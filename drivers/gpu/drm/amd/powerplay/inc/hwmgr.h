@@ -294,8 +294,7 @@ struct pp_hwmgr_func {
 	int (*get_clock_by_type_with_voltage)(struct pp_hwmgr *hwmgr,
 			enum amd_pp_clock_type type,
 			struct pp_clock_levels_with_voltage *clocks);
-	int (*set_watermarks_for_clocks_ranges)(struct pp_hwmgr *hwmgr,
-			struct pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges);
+	int (*set_watermarks_for_clocks_ranges)(struct pp_hwmgr *hwmgr, void *clock_ranges);
 	int (*display_clock_voltage_request)(struct pp_hwmgr *hwmgr,
 			struct pp_display_clock_request *clock);
 	int (*get_max_high_clocks)(struct pp_hwmgr *hwmgr, struct amd_pp_simple_clock_info *clocks);
@@ -585,6 +584,7 @@ struct phm_ppt_v3_information
 	uint32_t *power_saving_clock_max;
 	uint32_t *power_saving_clock_min;
 
+	uint8_t *od_feature_capabilities;
 	uint32_t *od_settings_max;
 	uint32_t *od_settings_min;
 

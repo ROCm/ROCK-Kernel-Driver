@@ -803,6 +803,9 @@ static int vega12_init_smc_table(struct pp_hwmgr *hwmgr)
 		data->vbios_boot_state.soc_clock = boot_up_values.ulSocClk;
 		data->vbios_boot_state.dcef_clock = boot_up_values.ulDCEFClk;
 		data->vbios_boot_state.uc_cooling_id = boot_up_values.ucCoolingID;
+		data->vbios_boot_state.eclock = boot_up_values.ulEClk;
+		data->vbios_boot_state.dclock = boot_up_values.ulDClk;
+		data->vbios_boot_state.vclock = boot_up_values.ulVClk;
 		smum_send_msg_to_smc_with_parameter(hwmgr,
 				PPSMC_MSG_SetMinDeepSleepDcefclk,
 			(uint32_t)(data->vbios_boot_state.dcef_clock / 100));
@@ -1713,62 +1716,21 @@ static int vega12_get_clock_by_type_with_voltage(struct pp_hwmgr *hwmgr,
 }
 
 static int vega12_set_watermarks_for_clocks_ranges(struct pp_hwmgr *hwmgr,
-		struct pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges)
+							void *clock_ranges)
 {
 	struct vega12_hwmgr *data = (struct vega12_hwmgr *)(hwmgr->backend);
 	Watermarks_t *table = &(data->smc_state_table.water_marks_table);
-	int result = 0;
-	uint32_t i;
+	struct dm_pp_wm_sets_with_clock_ranges_soc15 *wm_with_clock_ranges = clock_ranges;
 
 	if (!data->registry_data.disable_water_mark &&
 			data->smu_features[GNLD_DPM_DCEFCLK].supported &&
 			data->smu_features[GNLD_DPM_SOCCLK].supported) {
-		for (i = 0; i < wm_with_clock_ranges->num_wm_sets_dmif; i++) {
-			table->WatermarkRow[WM_DCEFCLK][i].MinClock =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_dmif[i].wm_min_dcefclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_DCEFCLK][i].MaxClock =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_dmif[i].wm_max_dcefclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_DCEFCLK][i].MinUclk =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_dmif[i].wm_min_memclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_DCEFCLK][i].MaxUclk =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_dmif[i].wm_max_memclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_DCEFCLK][i].WmSetting = (uint8_t)
-					wm_with_clock_ranges->wm_sets_dmif[i].wm_set_id;
-		}
-
-		for (i = 0; i < wm_with_clock_ranges->num_wm_sets_mcif; i++) {
-			table->WatermarkRow[WM_SOCCLK][i].MinClock =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_mcif[i].wm_min_socclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_SOCCLK][i].MaxClock =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_mcif[i].wm_max_socclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_SOCCLK][i].MinUclk =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_mcif[i].wm_min_memclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_SOCCLK][i].MaxUclk =
-				cpu_to_le16((uint16_t)
-				(wm_with_clock_ranges->wm_sets_mcif[i].wm_max_memclk_in_khz) /
-				100);
-			table->WatermarkRow[WM_SOCCLK][i].WmSetting = (uint8_t)
-					wm_with_clock_ranges->wm_sets_mcif[i].wm_set_id;
-		}
+		smu_set_watermarks_for_clocks_ranges(table, wm_with_clock_ranges);
 		data->water_marks_bitmap |= WaterMarksExist;
 		data->water_marks_bitmap &= ~WaterMarksLoaded;
 	}
 
-	return result;
+	return 0;
 }
 
 static int vega12_force_clock_level(struct pp_hwmgr *hwmgr,
