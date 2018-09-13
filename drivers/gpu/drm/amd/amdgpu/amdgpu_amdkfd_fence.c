@@ -167,7 +167,6 @@ static void amdkfd_fence_release(struct dma_fence *f)
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
-
 	if (!fence)
 		return false;
 	else if (fence->mm == mm)

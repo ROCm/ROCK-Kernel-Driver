@@ -303,7 +303,7 @@ struct amdgpu_display_funcs {
 
 struct amdgpu_framebuffer {
 	struct drm_framebuffer base;
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4 ,14, 0)
+#if  DRM_VERSION_CODE < DRM_VERSION(4 ,14, 0)
 	struct drm_gem_object *obj;
 #endif
 
@@ -311,7 +311,6 @@ struct amdgpu_framebuffer {
 	uint64_t address;
 };
 
-#ifdef BUILD_AS_DKMS
 static inline struct drm_gem_object *
 kcl_drm_fb_get_gem_obj(struct drm_framebuffer * fb,int index)
 {
@@ -344,7 +343,6 @@ kcl_drm_fb_set_gem_obj(struct drm_framebuffer * fb, int index ,struct drm_gem_ob
 		 afb->obj = obj;
 #endif
 }
-#endif
 
 struct amdgpu_fbdev {
 	struct drm_fb_helper helper;
