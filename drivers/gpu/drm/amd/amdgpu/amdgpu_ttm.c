@@ -49,7 +49,6 @@
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_sdma.h"
 #include "bif/bif_4_1_d.h"
-#include "amdgpu_amdkfd.h"
 
 #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 
@@ -1536,7 +1535,7 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 		for (i = 0; i < flist->shared_count; ++i) {
 			f = rcu_dereference_protected(flist->shared[i],
 				reservation_object_held(bo->resv));
-			if (amd_kfd_fence_check_mm(f, current->mm))
+			if (amdkfd_fence_check_mm(f, current->mm))
 				return false;
 		}
 	}

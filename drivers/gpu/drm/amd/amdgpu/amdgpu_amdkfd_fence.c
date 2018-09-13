@@ -158,16 +158,15 @@ static void amd_kfd_fence_release(struct dma_fence *f)
 }
 
 /**
- * amd_kfd_fence_check_mm - Check if @mm is same as that of the fence @f
+ * amdkfd_fence_check_mm - Check if @mm is same as that of the fence @f
  *  if same return TRUE else return FALSE.
  *
  * @f: [IN] fence
  * @mm: [IN] mm that needs to be verified
  */
-bool amd_kfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
+bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
-
 	if (!fence)
 		return false;
 	else if (fence->mm == mm)
