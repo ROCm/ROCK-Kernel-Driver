@@ -48,4 +48,15 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 			     enum pcie_link_width *width);
 #endif
 
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
+#endif
+
+static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+	_kcl_pci_configure_extended_tags(dev);
+#endif
+}
+
 #endif /* AMDKCL_PCI_H */
