@@ -12,6 +12,10 @@ endif
 ifeq ("centos",$(OS_NAME))
 OS_NAME = "rhel"
 OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/centos-release-upstream)"
+# Users could have installed a kernel not distributed from RHEL
+ifeq (,$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile))
+OS_NAME="custom-rhel"
+endif
 endif
 
 ifeq ("ubuntu",$(OS_NAME))
