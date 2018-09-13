@@ -2455,7 +2455,8 @@ static void adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_
 }
 /*****************************************************************************/
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_SUSE_15)
 static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode)
 {
@@ -3223,7 +3224,8 @@ static struct drm_encoder *best_encoder(struct drm_connector *connector)
 
 	/* pick the encoder ids */
 	if (enc_id) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0) && \
+	!defined(OS_NAME_SUSE_15)
 		obj = drm_mode_object_find(connector->dev, enc_id, DRM_MODE_OBJECT_ENCODER);
 #else
 		obj = drm_mode_object_find(connector->dev, NULL, enc_id, DRM_MODE_OBJECT_ENCODER);
