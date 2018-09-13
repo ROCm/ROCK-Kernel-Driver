@@ -1197,6 +1197,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (!supports_atomic)
 		ddev->driver_features &= ~DRIVER_ATOMIC;
 
+	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto err_free;
