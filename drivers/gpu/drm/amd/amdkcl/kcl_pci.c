@@ -3,6 +3,7 @@
 
 #if defined(BUILD_AS_DKMS)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
 /**
  * pci_enable_atomic_ops_to_root - enable AtomicOp requests to root port
  * @dev: the PCI device
@@ -87,5 +88,6 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 	return 0;
 }
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
+#endif
 
 #endif

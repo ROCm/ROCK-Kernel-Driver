@@ -2,6 +2,7 @@
 #define AMDKCL_PCI_H
 
 #include <linux/pci.h>
+#include <linux/version.h>
 
 #ifdef BUILD_AS_DKMS
 
@@ -12,7 +13,9 @@
 #define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
+#endif
 
 #endif
 
