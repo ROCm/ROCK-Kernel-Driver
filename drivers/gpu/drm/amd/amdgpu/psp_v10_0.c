@@ -115,6 +115,8 @@ static int psp_v10_0_init_microcode(struct psp_context *psp)
 	case CHIP_RAVEN:
 		if (adev->rev_id >= 0x8)
 			chip_name = "raven2";
+		else if (adev->pdev->device == 0x15d8)
+			chip_name = "picasso";
 		else
 			chip_name = "raven";
 		break;
