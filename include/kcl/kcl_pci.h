@@ -67,6 +67,10 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 int  _kcl_pci_create_measure_file(struct pci_dev *pdev);
 #endif
 
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
+#endif
+
 #if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
@@ -102,6 +106,13 @@ static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
 	return _kcl_pci_create_measure_file(pdev);
 #else
 	return 0;
+#endif
+}
+
+static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+	_kcl_pci_configure_extended_tags(dev);
 #endif
 }
 

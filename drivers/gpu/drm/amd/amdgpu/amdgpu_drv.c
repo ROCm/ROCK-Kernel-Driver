@@ -1117,6 +1117,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 #endif
 
 	kcl_pci_create_measure_file(pdev);
+	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto err_free;
