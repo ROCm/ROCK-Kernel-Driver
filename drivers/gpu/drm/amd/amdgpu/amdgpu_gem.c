@@ -404,7 +404,8 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 free_pages:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
+	!defined(OS_NAME_SUSE_15)
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages, false);
 #else
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
