@@ -3012,7 +3012,8 @@ static void adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_
 
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_SUSE_15)
 static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode)
 {
