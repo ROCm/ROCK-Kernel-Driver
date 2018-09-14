@@ -273,6 +273,13 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 
 	abo = ttm_to_amdgpu_bo(bo);
 	switch (bo->mem.mem_type) {
+	case AMDGPU_PL_GDS:
+	case AMDGPU_PL_GWS:
+	case AMDGPU_PL_OA:
+		placement->num_placement = 0;
+		placement->num_busy_placement = 0;
+		return;
+
 	case TTM_PL_VRAM:
 	case AMDGPU_PL_DGMA:
 		if (!adev->mman.buffer_funcs_enabled) {
@@ -302,6 +309,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 	case AMDGPU_PL_DGMA_IMPORT:
 	default:
 		amdgpu_bo_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
+		break;
 	}
 	*placement = abo->placement;
 }
@@ -699,6 +707,16 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 	    (old_mem->mem_type == TTM_PL_SYSTEM &&
 	     new_mem->mem_type == TTM_PL_TT)) {
 		/* bind is enough */
+		amdgpu_move_null(bo, new_mem);
+		return 0;
+	}
+	if (old_mem->mem_type == AMDGPU_PL_GDS ||
+	    old_mem->mem_type == AMDGPU_PL_GWS ||
+	    old_mem->mem_type == AMDGPU_PL_OA ||
+	    new_mem->mem_type == AMDGPU_PL_GDS ||
+	    new_mem->mem_type == AMDGPU_PL_GWS ||
+	    new_mem->mem_type == AMDGPU_PL_OA) {
+		/* Nothing to save here */
 		amdgpu_move_null(bo, new_mem);
 		return 0;
 	}
