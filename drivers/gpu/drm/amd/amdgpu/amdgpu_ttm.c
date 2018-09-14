@@ -2430,7 +2430,7 @@ error_free:
 static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *)m->private;
-	unsigned ttm_pl = *(int *)node->info_ent->data;
+	unsigned ttm_pl = (uintptr_t)node->info_ent->data;
 	struct drm_device *dev = node->minor->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
@@ -2459,8 +2459,11 @@ static int ttm_pl_dgma = AMDGPU_PL_DGMA;
 static int ttm_pl_dgma_import = AMDGPU_PL_DGMA_IMPORT;
 
 static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
-	{"amdgpu_vram_mm", amdgpu_mm_dump_table, 0, &ttm_pl_vram},
-	{"amdgpu_gtt_mm", amdgpu_mm_dump_table, 0, &ttm_pl_tt},
+	{"amdgpu_vram_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_VRAM},
+	{"amdgpu_gtt_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_TT},
+	{"amdgpu_gds_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_GDS},
+	{"amdgpu_gws_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_GWS},
+	{"amdgpu_oa_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_OA},
 	{"ttm_page_pool", ttm_page_alloc_debugfs, 0, NULL},
 #ifdef CONFIG_SWIOTLB
 	{"ttm_dma_page_pool", ttm_dma_page_alloc_debugfs, 0, NULL}
