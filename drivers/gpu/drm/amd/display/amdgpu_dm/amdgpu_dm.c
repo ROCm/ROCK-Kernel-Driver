@@ -8553,10 +8553,15 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 	/* TODO This hack should go away */
 	if (aconnector && enable) {
 		/* Make sure fake sink is created in plug-in scenario */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 		drm_new_conn_state = drm_atomic_get_new_connector_state(state,
 							    &aconnector->base);
 		drm_old_conn_state = drm_atomic_get_old_connector_state(state,
 							    &aconnector->base);
+#else
+		drm_new_conn_state = drm_atomic_get_connector_state(state,
+							    &aconnector->base);
+#endif
 
 		if (IS_ERR(drm_new_conn_state)) {
 			ret = PTR_ERR_OR_ZERO(drm_new_conn_state);
@@ -8564,7 +8569,9 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		}
 
 		dm_new_conn_state = to_dm_connector_state(drm_new_conn_state);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 		dm_old_conn_state = to_dm_connector_state(drm_old_conn_state);
+#endif
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state))
 			goto skip_modeset;
@@ -8720,10 +8727,12 @@ skip_modeset:
 	 */
 	BUG_ON(dm_new_crtc_state->stream == NULL);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	/* Scaling or underscan settings */
 	if (is_scaling_state_different(dm_old_conn_state, dm_new_conn_state))
 		update_stream_scaling_settings(
 			&new_crtc_state->mode, dm_new_conn_state, dm_new_crtc_state->stream);
+#endif
 
 	/* ABM settings */
 	dm_new_crtc_state->abm_level = dm_new_conn_state->abm_level;
