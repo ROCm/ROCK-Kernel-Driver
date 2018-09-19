@@ -555,7 +555,7 @@ static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 	struct amdgpu_bo *bo = mem->bo;
 
 	INIT_LIST_HEAD(&entry->head);
-	entry->shared = true;
+	entry->num_shared = 1;
 	entry->bo = &bo->tbo;
 	mutex_lock(&process_info->lock);
 	if (userptr)
@@ -710,7 +710,7 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
-	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.tv.num_shared = 1;
 	ctx->kfd_bo.user_pages = NULL;
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
@@ -774,7 +774,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
-	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.tv.num_shared = 1;
 	ctx->kfd_bo.user_pages = NULL;
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
@@ -2164,7 +2164,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 			    validate_list.head) {
 		list_add_tail(&mem->resv_list.head, &resv_list);
 		mem->resv_list.bo = mem->validate_list.bo;
-		mem->resv_list.shared = mem->validate_list.shared;
+		mem->resv_list.num_shared = mem->validate_list.num_shared;
 	}
 
 	/* Reserve all BOs and page tables for validation */
@@ -2388,7 +2388,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 
 		list_add_tail(&mem->resv_list.head, &ctx.list);
 		mem->resv_list.bo = mem->validate_list.bo;
-		mem->resv_list.shared = mem->validate_list.shared;
+		mem->resv_list.num_shared = mem->validate_list.num_shared;
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx.ticket, &ctx.list,
@@ -2525,7 +2525,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	resv_list[1].bo = dst.bo;
 
 	for (i = 0; i < 2; i++) {
-		resv_list[i].shared = true;
+		resv_list[i].num_shared = 1;
 		list_add_tail(&resv_list[i].head, &list);
 	}
 
