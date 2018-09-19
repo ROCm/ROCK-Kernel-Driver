@@ -1011,8 +1011,7 @@ static int amdgpu_cs_vm_handling(struct amdgpu_cs_parser *p)
 	r = amdgpu_sync_fence(adev, &p->job->sync, vm->last_update, false);
 	if (r)
 		return r;
-
-	r = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv);
+	r = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv, 1);
 	if (r)
 		return r;
 
