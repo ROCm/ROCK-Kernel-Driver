@@ -29,5 +29,6 @@
 #include <kcl/kcl_interval_tree_generic.h>
 #endif
 #include <kcl/kcl_pci.h>
+#include <kcl/kcl_firmware.h>
 
 #endif /* AMDGPU_BACKPORT_H */
