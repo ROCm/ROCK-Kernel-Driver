@@ -124,9 +124,6 @@ static int pp_hw_init(void *handle)
 	struct amdgpu_device *adev = handle;
 	struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
 
-	if (adev->firmware.load_type == AMDGPU_FW_LOAD_SMU)
-		amdgpu_ucode_init_bo(adev);
-
 	ret = hwmgr_hw_init(hwmgr);
 
 	if (ret)
@@ -275,6 +272,19 @@ const struct amdgpu_ip_block_version pp_smu_ip_block =
 
 static int pp_dpm_load_fw(void *handle)
 {
+	struct pp_hwmgr *hwmgr = handle;
+	int ret = 0;
+
+	if (!hwmgr || !hwmgr->smumgr_funcs)
+		return -EINVAL;
+
+	if (hwmgr->smumgr_funcs->start_smu) {
+		ret = hwmgr->smumgr_funcs->start_smu(hwmgr);
+		if (ret) {
+			pr_err("smc start failed\n");
+			return ret;
+		}
+	}
 	return 0;
 }
 
