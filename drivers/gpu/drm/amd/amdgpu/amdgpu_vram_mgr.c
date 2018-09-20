@@ -216,10 +216,19 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 	for (i = 0; pages_left >= pages_per_node; ++i) {
 		unsigned long pages = rounddown_pow_of_two(pages_left);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+		sflags |= DRM_MM_SEARCH_BEST;
+		uint32_t alignment = mem->page_alignment;
+		r = drm_mm_insert_node_in_range_generic(mm, &nodes[i], pages,
+					alignment, 0,
+					place->fpfn, lpfn,
+					sflags, aflags);
+#else
 		r = drm_mm_insert_node_in_range(mm, &nodes[i], pages,
 						pages_per_node, 0,
 						place->fpfn, lpfn,
 						mode);
+#endif
 		if (unlikely(r))
 			break;
 
