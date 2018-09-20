@@ -11,4 +11,6 @@
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_i2c.h>
+#include <kcl/kcl_firmware.h>
+
 #endif /* AMDGPU_BACKPORT_H */
