@@ -786,16 +786,17 @@ error_validate:
 error_free_pages:
 
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
+		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 		if (!e->user_pages)
 			continue;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
 	!defined(OS_NAME_SUSE_15)
 			release_pages(e->user_pages,
-				      e->robj->tbo.ttm->num_pages, false);
+				      bo->tbo.ttm->num_pages, false);
 #else
 			release_pages(e->user_pages,
-				      e->robj->tbo.ttm->num_pages);
+				      bo->tbo.ttm->num_pages);
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 			drm_free_large(e->user_pages);
