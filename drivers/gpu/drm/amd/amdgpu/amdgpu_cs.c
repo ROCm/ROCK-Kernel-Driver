@@ -1020,9 +1020,6 @@ static int amdgpu_cs_vm_handling(struct amdgpu_cs_parser *p)
 	r = amdgpu_sync_fence(adev, &p->job->sync, vm->last_update, false);
 	if (r)
 		return r;
-	r = kcl_reservation_object_reserve_shared(vm->root.base.bo->tbo.resv, 1);
-	if (r)
-		return r;
 
 	p->job->vm_pd_addr = amdgpu_gmc_pd_addr(vm->root.base.bo);
 
