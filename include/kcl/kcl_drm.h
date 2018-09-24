@@ -428,7 +428,7 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 
 static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
 	return drm_gem_object_unreference_unlocked(obj);
 #else
 	return drm_gem_object_put_unlocked(obj);
