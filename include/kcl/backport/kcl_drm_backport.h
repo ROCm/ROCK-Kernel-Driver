@@ -36,4 +36,10 @@ static inline const char *_kcl_drm_get_format_name(uint32_t format, struct drm_f
 #define drm_get_format_name _kcl_drm_get_format_name
 #endif
 
+#if !defined(HAVE_DRM_GEM_OBJECT_PUT_LOCKED)
+#if defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
+#define drm_gem_object_put _kcl_drm_gem_object_put
+#endif
+#endif
+
 #endif/*AMDKCL_DRM_BACKPORT_H*/
