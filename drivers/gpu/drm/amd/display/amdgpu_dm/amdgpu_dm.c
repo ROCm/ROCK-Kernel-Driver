@@ -5256,10 +5256,6 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
-	/* Signal HW programming completion */
-	drm_atomic_helper_commit_hw_done(state);
-#endif
 
 	if (wait_for_vblank)
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
@@ -5269,6 +5265,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+	/*
+	 * FIXME:
+	 * Delay hw_done() until flip_done() is signaled. This is to block
+	 * another commit from freeing the CRTC state while we're still
+	 * waiting on flip_done.
+	 */
+	drm_atomic_helper_commit_hw_done(state);
+
 	drm_atomic_helper_cleanup_planes(dev, state);
 #endif
 
