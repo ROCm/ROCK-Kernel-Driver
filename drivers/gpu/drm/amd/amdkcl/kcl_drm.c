@@ -262,3 +262,11 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 }
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
+
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
+bool drm_is_current_master(struct drm_file *fpriv)
+{
+	return fpriv->is_master && fpriv->master == fpriv->minor->master;
+}
+EXPORT_SYMBOL(drm_is_current_master);
+#endif

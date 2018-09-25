@@ -177,4 +177,8 @@ drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 }
 #endif
 
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
+bool drm_is_current_master(struct drm_file *fpriv);
+#endif
+
 #endif /* AMDKCL_DRM_H */
