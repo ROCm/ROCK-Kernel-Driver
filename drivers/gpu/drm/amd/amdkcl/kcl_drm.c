@@ -28,3 +28,11 @@ void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
+
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
+bool drm_is_current_master(struct drm_file *fpriv)
+{
+	return fpriv->is_master && fpriv->master == fpriv->minor->master;
+}
+EXPORT_SYMBOL(drm_is_current_master);
+#endif

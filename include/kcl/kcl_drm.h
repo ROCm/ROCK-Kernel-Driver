@@ -88,4 +88,8 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 	} while (0)
 #endif
 
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
+bool drm_is_current_master(struct drm_file *fpriv);
+#endif
+
 #endif /* AMDKCL_DRM_H */
