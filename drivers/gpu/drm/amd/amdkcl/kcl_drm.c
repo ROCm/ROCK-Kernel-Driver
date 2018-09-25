@@ -291,16 +291,12 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 		crtc = connector->state->crtc;
 		if ((!crtc && old_conn_state->crtc) ||
 		    (crtc && _kcl_drm_atomic_crtc_needs_modeset(crtc->state))) {
-			struct drm_property *dpms_prop =
-				dev->mode_config.dpms_property;
 			int mode = DRM_MODE_DPMS_OFF;
 
 			if (crtc && crtc->state->active)
 				mode = DRM_MODE_DPMS_ON;
 
 			connector->dpms = mode;
-			drm_object_property_set_value(&connector->base,
-						      dpms_prop, mode);
 		}
 	}
 
