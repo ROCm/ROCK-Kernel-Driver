@@ -27,6 +27,7 @@ m4_include([m4/drm-crtc-init-with-planes-valid-with-name.m4])
 m4_include([m4/drm-universal-plane-init.m4])
 m4_include([m4/drm-get-format-name.m4])
 m4_include([m4/drm-gem-object-ref.m4])
+m4_include([m4/drm-is-current-master.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
