@@ -5872,7 +5872,8 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 			dm_con_state->freesync_capable = true;
 		}
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)  && \
+        !defined(OS_NAME_SUSE_15)
 	drm_object_property_set_value(&connector->base,
 				      adev->mode_info.freesync_capable_property,
 				      dm_con_state->freesync_capable);
