@@ -2,6 +2,7 @@
 
 KERNELVER=$1
 KERNELVER_BASE=${KERNELVER%%-*}
+BUILD_PATH=$2
 
 version_lt () {
     newest=$((echo "$KERNELVER_BASE"; echo "$1") | sort -V | tail -n1)
@@ -22,6 +23,9 @@ version_le () {
     oldest=$((echo "$KERNELVER_BASE"; echo "$1") | sort -V | head -n1)
     [ "$KERNELVER_BASE" = "$oldest" ]
 }
+
+# dkms v2.1.1.2 or older doesn't execute this script from the build folder
+cd $BUILD_PATH
 
 source amd/amdkcl/symbols
 
