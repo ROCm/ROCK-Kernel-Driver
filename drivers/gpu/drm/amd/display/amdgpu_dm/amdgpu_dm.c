@@ -4172,14 +4172,14 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		aconnector->base.ycbcr_420_allowed =
-			link->link_enc->features.ycbcr420_supported ? true : false;
+			link->link_enc->features.hdmi_ycbcr420_supported ? true : false;
 #endif
 		break;
 	case DRM_MODE_CONNECTOR_DisplayPort:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		aconnector->base.ycbcr_420_allowed =
-			link->link_enc->features.ycbcr420_supported ? true : false;
+			link->link_enc->features.dp_ycbcr420_supported ? true : false;
 #endif
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
