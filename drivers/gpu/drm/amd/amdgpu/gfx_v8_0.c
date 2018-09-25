@@ -4216,17 +4216,10 @@ static int gfx_v8_0_rlc_resume(struct amdgpu_device *adev)
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT) {
 		/* legacy rlc firmware loading */
 		r = gfx_v8_0_rlc_load_microcode(adev);
-	} else if (adev->firmware.load_type == AMDGPU_FW_LOAD_SMU && adev->powerplay.pp_funcs->load_firmware) {
-		amdgpu_ucode_init_bo(adev);
-		r = adev->powerplay.pp_funcs->load_firmware(adev->powerplay.pp_handle);
-	} else {
-		r = -EINVAL;
+		if (r)
+			return r;
 	}
 
-	if (r) {
-		pr_err("firmware loading failed\n");
-		return r;
-	}
 	gfx_v8_0_rlc_start(adev);
 
 	return 0;
