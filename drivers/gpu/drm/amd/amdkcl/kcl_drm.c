@@ -498,7 +498,7 @@ void amdkcl_drm_init(void)
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv)
 {
 	return fpriv->is_master && fpriv->master == fpriv->minor->master;
