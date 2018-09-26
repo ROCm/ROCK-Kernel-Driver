@@ -2243,7 +2243,6 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 	atomic64_sub((u64)amdgpu_direct_gma_size << 20, &adev->gart_pin_size);
 }
 
-
 /*
  * amdgpu_ttm_init - Init the memory management (ttm) as well as various
  * gtt/vram related fields.
