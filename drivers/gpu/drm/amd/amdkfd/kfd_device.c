@@ -518,10 +518,12 @@ static void kfd_vram_limit_init(struct kfd_dev *kfd)
 }
 
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
+			 struct drm_device *ddev,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
 	unsigned int size;
 
+	kfd->ddev = ddev;
 	kfd->mec_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
 			KGD_ENGINE_MEC1);
 	kfd->sdma_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,

@@ -52,6 +52,8 @@
 /* GPU ID hash width in bits */
 #define KFD_GPU_ID_HASH_WIDTH 16
 
+struct drm_device;
+
 /* Use upper bits of mmap offset to store KFD driver specific information.
  * BITS[63:62] - Encode MMAP type
  * BITS[61:46] - Encode gpu_id. To identify to which GPU the offset belongs to
@@ -234,6 +236,7 @@ struct kfd_dev {
 
 	const struct kfd_device_info *device_info;
 	struct pci_dev *pdev;
+	struct drm_device *ddev;
 
 	unsigned int id;		/* topology stub index */
 
@@ -357,6 +360,7 @@ void kgd2kfd_exit(void);
 struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 			struct pci_dev *pdev, const struct kfd2kgd_calls *f2g);
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
+			struct drm_device *ddev,
 			const struct kgd2kfd_shared_resources *gpu_resources);
 void kgd2kfd_device_exit(struct kfd_dev *kfd);
 

@@ -179,7 +179,8 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 				&gpu_resources.doorbell_start_offset);
 
 		if (adev->asic_type < CHIP_VEGA10) {
-			kgd2kfd->device_init(adev->kfd, &gpu_resources);
+			kgd2kfd->device_init(adev->kfd, adev->ddev,
+					     &gpu_resources);
 			return;
 		}
 
@@ -219,7 +220,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		gpu_resources.reserved_doorbell_mask = 0x1e0;
 		gpu_resources.reserved_doorbell_val  = 0x0e0;
 
-		kgd2kfd->device_init(adev->kfd, &gpu_resources);
+		kgd2kfd->device_init(adev->kfd, adev->ddev, &gpu_resources);
 	}
 }
 

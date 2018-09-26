@@ -42,6 +42,7 @@ struct pci_dev;
 
 struct kfd_dev;
 struct kgd_dev;
+struct drm_device;
 
 struct kgd_mem;
 
@@ -402,6 +403,7 @@ struct kgd2kfd_calls {
 	struct kfd_dev* (*probe)(struct kgd_dev *kgd, struct pci_dev *pdev,
 		const struct kfd2kgd_calls *f2g);
 	bool (*device_init)(struct kfd_dev *kfd,
+			struct drm_device *ddev,
 			const struct kgd2kfd_shared_resources *gpu_resources);
 	void (*device_exit)(struct kfd_dev *kfd);
 	void (*interrupt)(struct kfd_dev *kfd, const void *ih_ring_entry);
