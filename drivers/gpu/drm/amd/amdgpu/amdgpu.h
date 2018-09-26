@@ -1500,6 +1500,9 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
+	struct dev_pagemap	pgmap
+#endif
 #endif
 };
 

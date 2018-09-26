@@ -1890,7 +1890,16 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	if (rc)
 		return rc;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
+	adev->ssg.pgmap.res.start = res.start;
+	adev->ssg.pgmap.res.end = res.end;
+	adev->ssg.pgmap.res.name = res.name;
+	adev->ssg.pgmap.ref = &adev->ssg.ref;
+	adev->ssg.pgmap.altmap_valid = false;
+	addr = devm_memremap_pages(adev->dev, &adev->ssg.pgmap);
+#else
 	addr = devm_memremap_pages(adev->dev, &res, &adev->ssg.ref, NULL);
+#endif
 	if (IS_ERR(addr)) {
 		percpu_ref_exit(&adev->ssg.ref);
 		return PTR_ERR(addr);
