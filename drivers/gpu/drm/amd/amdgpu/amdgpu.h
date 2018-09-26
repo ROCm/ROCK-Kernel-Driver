@@ -729,7 +729,9 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
-#if defined(CONFIG_ZONE_DEVICE) && defined(HAVE_DEV_PAGEMAP_STRUCT)
+#if defined(CONFIG_ZONE_DEVICE) && \
+	(defined(HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP) || \
+	defined(HAVE_DEVM_MEMREMAP_PAGES_P_P_P_P))
 #define CONFIG_ENABLE_SSG
 #endif
 
@@ -738,7 +740,9 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
+#if defined(HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP)
 	struct dev_pagemap	pgmap;
+#endif
 #endif
 };
 
