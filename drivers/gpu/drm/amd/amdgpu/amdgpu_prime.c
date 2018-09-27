@@ -427,7 +427,7 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf)) {
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 		buf->ops = &amdgpu_dmabuf_ops;
 #endif
 	}
@@ -435,7 +435,7 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	return buf;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 /**
  * amdgpu_gem_prime_import - &drm_driver.gem_prime_import implementation
  * @dev: DRM device

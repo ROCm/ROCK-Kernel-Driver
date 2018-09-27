@@ -1177,7 +1177,7 @@ static struct drm_driver kms_driver = {
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_export = amdgpu_gem_prime_export,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	.gem_prime_import = amdgpu_gem_prime_import,
 #else
 	.gem_prime_import = drm_gem_prime_import,
