@@ -13,4 +13,6 @@
 #include <kcl/kcl_bitops.h>
 #include <kcl/kcl_device.h>
 #include <kcl/kcl_device_cgroup_backport.h>
+#include <kcl/kcl_drm_atomic_helper.h>
+
 #endif /* AMDGPU_BACKPORT_H */
