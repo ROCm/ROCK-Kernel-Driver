@@ -249,7 +249,7 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 #endif
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
 
 #define for_each_connector_in_state(__state, connector, connector_state, __i) \
 	for ((__i) = 0;							\
