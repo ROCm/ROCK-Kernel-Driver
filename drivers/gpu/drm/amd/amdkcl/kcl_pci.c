@@ -3,7 +3,8 @@
 
 #if defined(BUILD_AS_DKMS)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4 ,16, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
+	!defined(OS_NAME_RHEL_7_6)
 /**
  * pci_enable_atomic_ops_to_root - enable AtomicOp requests to root port
  * @dev: the PCI device
