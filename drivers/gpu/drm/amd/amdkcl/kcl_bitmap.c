@@ -9,7 +9,8 @@
 #include <kcl/kcl_bitmap.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0) && \
-	!defined(OS_NAME_RHEL_7_5)
+	!defined(OS_NAME_RHEL_7_5) && \
+	!defined(OS_NAME_RHEL_7_6)
 unsigned long bitmap_find_next_zero_area_off(unsigned long *map,
 					     unsigned long size,
 					     unsigned long start,
