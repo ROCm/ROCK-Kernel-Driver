@@ -67,7 +67,7 @@ typedef struct dma_fence kcl_fence_t;
 typedef struct dma_fence_ops kcl_fence_ops_t;
 #endif
 
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4_5)
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
 extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
 					  bool intr,
 					  signed long timeout);
@@ -95,7 +95,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4_5)
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);

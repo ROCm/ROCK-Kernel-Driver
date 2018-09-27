@@ -660,7 +660,7 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_4_5)
+#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
 	.wait = kcl_fence_default_wait,
 #else
 	.wait = dma_fence_default_wait,
