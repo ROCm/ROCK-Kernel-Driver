@@ -594,4 +594,9 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0) && \
+	!defined(OS_NAME_SUSE_15)
+#define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
+#endif
+
 #endif /* AMDKCL_DRM_H */

@@ -303,12 +303,7 @@ dce_virtual_encoder(struct drm_connector *connector)
 		if (connector->encoder_ids[i] == 0)
 			break;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
-		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
-#else
 		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
-#endif
 		if (!encoder)
 			continue;
 
@@ -318,12 +313,7 @@ dce_virtual_encoder(struct drm_connector *connector)
 
 	/* pick the first one */
 	if (enc_id)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
-		return drm_encoder_find(connector->dev, enc_id);
-#else
 		return drm_encoder_find(connector->dev, NULL, enc_id);
-#endif
 	return NULL;
 }
 
