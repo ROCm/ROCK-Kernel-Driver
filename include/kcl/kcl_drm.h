@@ -542,4 +542,8 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 #define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
 #endif
 
+#if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
+#define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
+#endif
+
 #endif /* AMDKCL_DRM_H */
