@@ -102,12 +102,12 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0) && \
-		!defined(OS_NAME_RHEL_7_4_5)
+		!defined(OS_NAME_RHEL_7_X)
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
 
-#if !defined(OS_NAME_RHEL_7_4_5)
+#if !defined(OS_NAME_RHEL_7_X)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
 static inline void
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
@@ -348,7 +348,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
 	!defined(OS_NAME_RHEL_6) && \
 	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_4_5)
+	!defined(OS_NAME_RHEL_7_X)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
@@ -361,7 +361,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-#if !defined(OS_NAME_RHEL_7_4_5)
+#if !defined(OS_NAME_RHEL_7_X)
 /**
  * struct drm_format_name_buf - name of a DRM format
  * @str: string buffer containing the format name
@@ -419,7 +419,7 @@ kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	return drm_atomic_get_old_crtc_state(state, crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -432,7 +432,7 @@ kcl_drm_atomic_get_old_crtc_state_after_commit(struct drm_atomic_state *state,
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	return drm_atomic_get_old_crtc_state(state, crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
 	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
 	return state->crtc_states[drm_crtc_index(crtc)];
@@ -445,7 +445,7 @@ kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	return drm_atomic_get_new_crtc_state(state,crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
 	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
 	return state->crtc_states[drm_crtc_index(crtc)];
@@ -458,7 +458,7 @@ kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	return drm_atomic_get_new_crtc_state(state,crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -470,7 +470,7 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	return drm_atomic_get_new_plane_state(state,plane);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_4_5)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
 	return state->planes[drm_plane_index(plane)].state;
 #else
 	return state->plane_states[drm_plane_index(plane)];
@@ -478,7 +478,7 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_RHEL_7_4_5)
+	!defined(OS_NAME_RHEL_7_X)
 extern void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state);
