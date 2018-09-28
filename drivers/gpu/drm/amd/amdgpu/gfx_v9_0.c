@@ -1190,6 +1190,8 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 	case CHIP_VEGA20:
 		gfx_v9_4_init_lbpw(adev);
 		break;
+	default:
+		break;
 	}
 
 	return 0;
