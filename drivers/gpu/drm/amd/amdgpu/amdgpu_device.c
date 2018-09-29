@@ -3080,6 +3080,8 @@ static int amdgpu_device_reset(struct amdgpu_device *adev)
 	bool need_full_reset, vram_lost = 0;
 	int r;
 
+	amdgpu_amdkfd_pre_reset(adev);
+
 	need_full_reset = amdgpu_device_ip_need_full_reset(adev);
 
 	if (!need_full_reset) {
@@ -3137,9 +3139,10 @@ out:
 			goto retry;
 		}
 	}
-
+	
 	if (!r)
 		r = amdgpu_device_recover_vram(adev);
+	amdgpu_amdkfd_post_reset(adev);
 
 	return r;
 }
@@ -3165,6 +3168,8 @@ static int amdgpu_device_reset_sriov(struct amdgpu_device *adev,
 	if (r)
 		return r;
 
+	amdgpu_amdkfd_pre_reset(adev);
+
 	/* Resume IP prior to SMC */
 	r = amdgpu_device_ip_reinit_early_sriov(adev);
 	if (r)
@@ -3180,6 +3185,7 @@ static int amdgpu_device_reset_sriov(struct amdgpu_device *adev,
 
 	amdgpu_irq_gpu_reset_resume_helper(adev);
 	r = amdgpu_ib_ring_tests(adev);
+	amdgpu_amdkfd_post_reset(adev);
 
 error:
 	amdgpu_virt_release_full_gpu(adev, true);
@@ -3234,9 +3240,6 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	mutex_lock(&adev->lock_reset);
 	atomic_inc(&adev->gpu_reset_counter);
 	adev->in_gpu_reset = 1;
-
-	/* Block kfd */
-	amdgpu_amdkfd_pre_reset(adev);
 
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
@@ -3294,8 +3297,6 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		dev_info(adev->dev, "GPU reset(%d) succeeded!\n",atomic_read(&adev->gpu_reset_counter));
 	}
 
-	/*unlock kfd */
-	amdgpu_amdkfd_post_reset(adev);
 	amdgpu_vf_error_trans_all(adev);
 	adev->in_gpu_reset = 0;
 	mutex_unlock(&adev->lock_reset);
