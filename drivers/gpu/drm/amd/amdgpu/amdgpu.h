@@ -638,30 +638,6 @@ void amdgpu_debugfs_cleanup(struct drm_minor *minor);
 #endif
 
 /*
- * amdgpu smumgr functions
- */
-struct amdgpu_smumgr_funcs {
-	int (*check_fw_load_finish)(struct amdgpu_device *adev, uint32_t fwtype);
-	int (*request_smu_load_fw)(struct amdgpu_device *adev);
-	int (*request_smu_specific_fw)(struct amdgpu_device *adev, uint32_t fwtype);
-};
-
-/*
- * amdgpu smumgr
- */
-struct amdgpu_smumgr {
-	struct amdgpu_bo *toc_buf;
-	struct amdgpu_bo *smu_buf;
-	/* asic priv smu data */
-	void *priv;
-	spinlock_t smu_lock;
-	/* smumgr functions */
-	const struct amdgpu_smumgr_funcs *smumgr_funcs;
-	/* ucode loading complete flag */
-	uint32_t fw_flags;
-};
-
-/*
  * ASIC specific register table accessible by UMD
  */
 struct amdgpu_allowed_register_entry {
@@ -1030,9 +1006,6 @@ struct amdgpu_device {
 	struct amdgpu_pm		pm;
 	u32				cg_flags;
 	u32				pg_flags;
-
-	/* amdgpu smumgr */
-	struct amdgpu_smumgr smu;
 
 	/* gfx */
 	struct amdgpu_gfx		gfx;
