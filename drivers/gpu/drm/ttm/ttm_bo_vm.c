@@ -169,7 +169,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
-				up_read(&vmf->vma->vm_mm->mmap_sem);
+				up_read(&vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_put(bo);
 			}
