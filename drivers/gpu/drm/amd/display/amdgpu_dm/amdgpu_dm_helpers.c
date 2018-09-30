@@ -41,6 +41,10 @@
 
 #include "dm_helpers.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4 ,18, 0)
+#define kvcalloc(n, size, gfp) kvzalloc(((n)*(size)), gfp)
+#endif
+
 /* dm_helpers_parse_edid_caps
  *
  * Parse edid caps
