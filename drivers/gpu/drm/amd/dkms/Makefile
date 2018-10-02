@@ -3,7 +3,6 @@ OS_NAME = "$(shell sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | tr -d '\"')"
 OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
 else ifneq (,$(wildcard /etc/redhat-release))
 OS_NAME = "rhel"
-OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/redhat-release)"
 else
 OS_NAME = "unknown"
 OS_VERSION = "0.0"
@@ -11,10 +10,14 @@ endif
 
 ifeq ("centos",$(OS_NAME))
 OS_NAME = "rhel"
-OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/centos-release-upstream)"
+endif
+
+ifeq ("rhel",$(OS_NAME))
 # Users could have installed a kernel not distributed from RHEL
-ifeq (,$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile))
+ifeq (,$(shell sed -n 's/^RHEL_MAJOR = \(.*\)/\1/p' $(kdir)/Makefile))
 OS_NAME="custom-rhel"
+else
+OS_VERSION = "$(shell sed -n 's/^RHEL_MAJOR = \(.*\)/\1/p' $(kdir)/Makefile).$(shell sed -n 's/^RHEL_MINOR = \(.*\)/\1/p' $(kdir)/Makefile)"
 endif
 endif
 
