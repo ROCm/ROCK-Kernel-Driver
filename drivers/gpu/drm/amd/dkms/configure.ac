@@ -31,6 +31,7 @@ m4_include([m4/pci-is-thunderbolt-attached.m4])
 m4_include([m4/pci-pcie-type.m4])
 m4_include([m4/pci-upstream-bridge.m4])
 m4_include([m4/drm-is-current-master.m4])
+m4_include([m4/reservation-object-wait-timeout-rcu.m4])
 m4_include([m4/config.m4])
 
 

@@ -19,7 +19,7 @@ kcl_reservation_object_reserve_shared(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout);
@@ -30,7 +30,7 @@ kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
 {
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 	return _kcl_reservation_object_wait_timeout_rcu(obj,
 					wait_all, intr, timeout);
 #else
