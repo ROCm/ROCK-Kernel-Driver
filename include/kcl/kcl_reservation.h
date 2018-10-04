@@ -39,7 +39,7 @@ kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline int
 _kcl_reservation_object_lock(struct reservation_object *obj,
 				struct ww_acquire_ctx *ctx)
@@ -52,14 +52,14 @@ static inline int
 kcl_reservation_object_lock(struct reservation_object *obj,
 				struct ww_acquire_ctx *ctx)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 	return _kcl_reservation_object_lock(obj, ctx);
 #else
 	return reservation_object_lock(obj, ctx);
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline void
 _kcl_reservation_object_unlock(struct reservation_object *obj)
 {
@@ -70,7 +70,7 @@ _kcl_reservation_object_unlock(struct reservation_object *obj)
 static inline void
 kcl_reservation_object_unlock(struct reservation_object *obj)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 	return _kcl_reservation_object_unlock(obj);
 #else
 	return reservation_object_unlock(obj);
