@@ -104,7 +104,7 @@ kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if (BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 static inline bool __must_check
 _kcl_reservation_object_trylock(struct reservation_object *obj)
 {
@@ -115,7 +115,7 @@ _kcl_reservation_object_trylock(struct reservation_object *obj)
 static inline bool __must_check
 kcl_reservation_object_trylock(struct reservation_object *obj)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if (BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 	return _kcl_reservation_object_trylock(obj);
 #else
 	return reservation_object_trylock(obj);
