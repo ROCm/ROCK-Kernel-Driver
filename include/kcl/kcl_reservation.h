@@ -122,7 +122,7 @@ kcl_reservation_object_trylock(struct reservation_object *obj)
 #endif
 }
 
-#ifdef OS_NAME_RHEL_6
+#if (BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 bool _kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					       bool test_all);
 #endif
@@ -131,7 +131,7 @@ static inline bool
 kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					 bool test_all)
 {
-#ifdef OS_NAME_RHEL_6
+#if (BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 	return _kcl_reservation_object_test_signaled_rcu(obj, test_all);
 #else
 	return reservation_object_test_signaled_rcu(obj, test_all);
