@@ -3742,7 +3742,7 @@ void dm_drm_plane_destroy_state(struct drm_plane *plane,
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
-	.destroy	= drm_plane_cleanup,
+	.destroy	= drm_primary_helper_destroy,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	.set_property	= drm_atomic_helper_plane_set_property,
 #endif
