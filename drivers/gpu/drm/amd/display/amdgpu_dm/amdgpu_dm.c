@@ -5711,6 +5711,7 @@ static int dm_update_planes_state(struct dc *dc,
 
 	return ret;
 }
+
 enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, struct drm_atomic_state *state)
 {
 
@@ -5732,14 +5733,28 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
+	/*
+	 * TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set
+	 * update changed items
+	 */
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		new_dm_crtc_state = to_dm_crtc_state(new_crtc_state);
 		old_dm_crtc_state = to_dm_crtc_state(old_crtc_state);
 		num_plane = 0;
 
 		if (new_dm_crtc_state->stream) {
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+			for_each_plane_in_state(state, plane, old_plane_state, j) {
+				new_plane_state = plane->state;
+#else
 			for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, j) {
+#endif
 				new_plane_crtc = new_plane_state->crtc;
 				old_plane_crtc = old_plane_state->crtc;
 				new_dm_plane_state = to_dm_plane_state(new_plane_state);
