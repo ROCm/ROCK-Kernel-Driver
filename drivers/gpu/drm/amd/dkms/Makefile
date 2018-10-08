@@ -1,9 +1,12 @@
-ifneq (,$(wildcard /etc/os-release))
+RHEL_MAJOR = $(shell sed -n 's/^RHEL_MAJOR = \(.*\)/\1/p' $(kdir)/Makefile)
+RHEL_MINOR = $(shell sed -n 's/^RHEL_MINOR = \(.*\)/\1/p' $(kdir)/Makefile)
+
+ifneq (,$(RHEL_MAJOR))
+OS_NAME = "rhel"
+OS_VERSION = "$(RHEL_MAJOR).$(RHEL_MINOR)"
+else ifneq (,$(wildcard /etc/os-release))
 OS_NAME = "$(shell sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | tr -d '\"')"
 OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
-else ifneq (,$(wildcard /etc/redhat-release))
-OS_NAME = "rhel"
-OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/redhat-release)"
 else
 OS_NAME = "unknown"
 OS_VERSION = "0.0"
