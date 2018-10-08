@@ -6382,7 +6382,16 @@ dm_determine_update_type_for_commit(struct dc *dc,
 		goto cleanup;
 	}
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
+	/*
+	 * TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set
+	 * update changed items
+	 */
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		struct dc_stream_update stream_update = { 0 };
 
 		new_dm_crtc_state = to_dm_crtc_state(new_crtc_state);
