@@ -33,5 +33,6 @@
 #include <kcl/kcl_compat.h>
 #include <kcl/kcl_wait.h>
 #include <kcl/kcl_idr.h>
+#include <kcl/kcl_drm_atomic_helper.h>
 
 #endif /* AMDGPU_BACKPORT_H */
