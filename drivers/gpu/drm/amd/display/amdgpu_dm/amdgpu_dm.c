@@ -5881,6 +5881,12 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 	struct dc_stream_update stream_update;
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 
+	if (!updates || !surface) {
+		DRM_ERROR("Plane or surface update failed to allocate");
+		/* Set type to FULL to avoid crashing in DC*/
+		update_type = UPDATE_TYPE_FULL;
+		goto ret;
+	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
