@@ -5712,6 +5712,7 @@ static int dm_update_planes_state(struct dc *dc,
 	return ret;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, struct drm_atomic_state *state)
 {
 
@@ -5793,6 +5794,7 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 								new_dm_crtc_state->stream->out_transfer_func;
 					}
 
+
 					num_plane++;
 				}
 			}
@@ -5820,6 +5822,7 @@ ret:
 
 	return update_type;
 }
+#endif
 
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state)
@@ -5831,8 +5834,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_connector_state *old_con_state, *new_con_state;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 	enum surface_update_type overall_update_type = UPDATE_TYPE_FAST;
+#endif
 
 	int ret, i;
 
@@ -5938,7 +5943,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (!is_scaling_state_different(dm_new_con_state, dm_old_con_state))
 			continue;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		overall_update_type = UPDATE_TYPE_FULL;
+#endif
 		lock_and_validation_needed = true;
 	}
 
@@ -5951,6 +5958,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	 * will wait for completion of any outstanding flip using DRMs
 	 * synchronization events.
 	 */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	update_type = dm_determine_update_type_for_commit(dc, state);
 
 	if (overall_update_type < update_type)
@@ -5969,7 +5977,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 
 	if (overall_update_type > UPDATE_TYPE_FAST) {
+#else
 
+	if (lock_and_validation_needed) {
+#endif
 		ret = do_aquire_global_lock(dev, state);
 		if (ret)
 			goto fail;
