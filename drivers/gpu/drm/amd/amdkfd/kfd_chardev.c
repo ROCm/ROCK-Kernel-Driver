@@ -2613,24 +2613,6 @@ copy_from_user_fail:
 	return err;
 }
 
-static int kfd_ioctl_get_queue_wave_state(struct file *filep,
-					  struct kfd_process *p, void *data)
-{
-	struct kfd_ioctl_get_queue_wave_state_args *args = data;
-	int r;
-
-	mutex_lock(&p->mutex);
-
-	r = pqm_get_wave_state(&p->pqm, args->queue_id,
-			       (void __user *)args->ctl_stack_address,
-			       &args->ctl_stack_used_size,
-			       &args->save_area_used_size);
-
-	mutex_unlock(&p->mutex);
-
-	return r;
-}
-
 static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				struct kfd_process *p, void *data)
 {
