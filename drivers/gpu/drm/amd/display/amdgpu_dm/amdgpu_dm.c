@@ -7456,6 +7456,7 @@ static int dm_update_plane_state(struct dc *dc,
 	return ret;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 static int
 dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				    struct drm_atomic_state *state,
@@ -7612,6 +7613,7 @@ cleanup:
 	*out_type = update_type;
 	return ret;
 }
+#endif
 
 /**
  * amdgpu_dm_atomic_check() - Atomic check implementation for AMDgpu DM.
@@ -7638,6 +7640,7 @@ cleanup:
  *
  * Return: -Error code if validation failed.
  */
+
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state)
 {
@@ -7650,8 +7653,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 	enum surface_update_type overall_update_type = UPDATE_TYPE_FAST;
+#endif
 
 	int ret, i;
 
@@ -7824,10 +7829,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (!is_scaling_state_different(dm_new_con_state, dm_old_con_state))
 			continue;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		overall_update_type = UPDATE_TYPE_FULL;
+#endif
 		lock_and_validation_needed = true;
 	}
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	ret = dm_determine_update_type_for_commit(&adev->dm, state, &update_type);
 	if (ret)
 		goto fail;
@@ -7845,6 +7853,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		WARN(1, "Global lock should be Set, overall_update_type should be UPDATE_TYPE_MED or UPDATE_TYPE_FULL");
 
 	if (overall_update_type > UPDATE_TYPE_FAST) {
+#else
+	if (lock_and_validation_needed) {
+#endif
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto fail;
