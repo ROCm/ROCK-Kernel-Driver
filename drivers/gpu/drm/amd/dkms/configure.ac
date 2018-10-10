@@ -101,6 +101,7 @@ m4_include([m4/pci-pcie-type.m4])
 m4_include([m4/pci-upstream-bridge.m4])
 m4_include([m4/drm-calc-vbltimestamp-from-scanoutpos.m4])
 m4_include([m4/request-firmware-direct.m4])
+m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/config.m4])
 
 
