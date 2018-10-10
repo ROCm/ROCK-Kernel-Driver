@@ -12,7 +12,7 @@ kcl_hwmon_device_register_with_groups(struct device *dev, const char *name,
 				      void *drvdata,
 				      const struct attribute_group **groups)
 {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
+#if !defined(HAVE_4ARGS_HWMON_DEVICE_REGISTER_WITH_GROUPS)
 	return hwmon_device_register(dev);
 #else
 	return hwmon_device_register_with_groups(dev, name, drvdata, groups);

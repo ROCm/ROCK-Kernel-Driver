@@ -36,6 +36,7 @@ m4_include([m4/reservation-object-lock.m4])
 m4_include([m4/reservation-object-trylock.m4])
 m4_include([m4/reservation-object-test-signaled-rcu.m4])
 m4_include([m4/request-firmware-direct.m4])
+m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/config.m4])
 
 
