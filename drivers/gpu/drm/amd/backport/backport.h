@@ -12,6 +12,7 @@
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_firmware.h>
+#include <kcl/kcl_video.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/backport/kcl_kthread_backport.h>
