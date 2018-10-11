@@ -7,4 +7,5 @@
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
+#include <kcl/kcl_list.h>
 #endif
