@@ -11,4 +11,5 @@
 #include <kcl/kcl_highmem_backport.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/kcl_list.h>
 #endif
