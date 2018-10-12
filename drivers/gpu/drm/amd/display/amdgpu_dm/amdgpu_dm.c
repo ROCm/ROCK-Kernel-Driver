@@ -5875,7 +5875,7 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
-		old_crtc_state = crtc->state;
+		new_crtc_state = crtc->state;
 #else
 	/*
 	 * TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set
