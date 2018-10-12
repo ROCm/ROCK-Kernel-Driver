@@ -337,7 +337,7 @@ kcl_drm_fb_get_gem_obj(const struct drm_framebuffer * fb,int index)
 }
 
 static inline void
-kcl_drm_fb_set_gem_obj(const struct drm_framebuffer * fb, int index ,struct drm_gem_object * obj)
+kcl_drm_fb_set_gem_obj(struct drm_framebuffer * fb, int index ,struct drm_gem_object * obj)
 {
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
