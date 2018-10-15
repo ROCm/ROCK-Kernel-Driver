@@ -476,6 +476,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct kfd_dev *dev = pdd->dev;
 
+		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());
 		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
 			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
@@ -484,6 +485,22 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
+
+		/* New debugger for GFXv9 and later */
+		if (pdd->is_debugging_enabled) {
+			if (pdd->debug_trap_enabled) {
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				pdd->debug_trap_enabled = false;
+			}
+			if (pdd->trap_debug_wave_launch_mode != 0) {
+				dev->kfd2kgd->set_wave_launch_mode(
+					dev->kgd, 0,
+					dev->vm_info.last_vmid_kfd);
+				pdd->trap_debug_wave_launch_mode = 0;
+			}
+			release_debug_trap_vmid(dev->dqm);
+			pdd->is_debugging_enabled = false;
+		}
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
