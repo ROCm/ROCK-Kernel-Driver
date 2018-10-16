@@ -26,6 +26,7 @@
 
 #include "kfd_ipc.h"
 #include "kfd_priv.h"
+#include "amdgpu_amdkfd.h"
 
 #define KFD_IPC_HASH_TABLE_SIZE_SHIFT 4
 #define KFD_IPC_HASH_TABLE_SIZE_MASK ((1 << KFD_IPC_HASH_TABLE_SIZE_SHIFT) - 1)
@@ -154,7 +155,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	return 0;
 
 err_free:
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd,
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd,
 					 (struct kgd_mem *)mem);
 err_unlock:
 	mutex_unlock(&p->mutex);

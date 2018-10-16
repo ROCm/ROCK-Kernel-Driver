@@ -28,6 +28,7 @@
 #include "kfd_pm4_headers_vi.h"
 #include "cwsr_trap_handler.h"
 #include "kfd_iommu.h"
+#include "amdgpu_amdkfd.h"
 
 uint64_t kfd_total_mem_size;
 
@@ -503,10 +504,10 @@ static void kfd_vram_limit_init(struct kfd_dev *kfd)
 		kfd_total_mem_size += mem;
 	}
 
-	kfd->kfd2kgd->get_local_mem_info(kfd->kgd,
+	amdgpu_amdkfd_get_local_mem_info(kfd->kgd,
 			&local_mem_info);
 
-	vram_used = kfd->kfd2kgd->get_vram_usage(kfd->kgd);
+	vram_used = amdgpu_amdkfd_get_vram_usage(kfd->kgd);
 
 	kfd->vram_limit.max_vram_limit =
 			local_mem_info.local_mem_size_private +
@@ -561,7 +562,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	/* add another 512KB for all other allocations on gart (HPD, fences) */
 	size += 512 * 1024;
 
-	if (kfd->kfd2kgd->init_gtt_mem_allocation(
+	if (alloc_gtt_mem(
 			kfd->kgd, size, &kfd->gtt_mem,
 			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr,
 			false)) {
@@ -640,7 +641,7 @@ kfd_topology_add_device_error:
 kfd_doorbell_error:
 	kfd_gtt_sa_fini(kfd);
 kfd_gtt_sa_init_error:
-	kfd->kfd2kgd->free_gtt_mem(kfd->kgd, kfd->gtt_mem);
+	free_gtt_mem(kfd->kgd, kfd->gtt_mem);
 	dev_err(kfd_device,
 		"device %x:%x NOT added due to errors\n",
 		kfd->pdev->vendor, kfd->pdev->device);
@@ -660,7 +661,7 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 		kfd_topology_remove_device(kfd);
 		kfd_doorbell_fini(kfd);
 		kfd_gtt_sa_fini(kfd);
-		kfd->kfd2kgd->free_gtt_mem(kfd->kgd, kfd->gtt_mem);
+		free_gtt_mem(kfd->kgd, kfd->gtt_mem);
 	}
 
 	kfree(kfd);
