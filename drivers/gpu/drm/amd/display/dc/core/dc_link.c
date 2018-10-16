@@ -772,8 +772,12 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 			 * fail-safe mode
 			 */
 			if (dc_is_hdmi_signal(link->connector_signal) ||
-			    dc_is_dvi_signal(link->connector_signal))
+			    dc_is_dvi_signal(link->connector_signal)) {
+				if (prev_sink != NULL)
+					dc_sink_release(prev_sink);
+
 				return false;
+			}
 		default:
 			break;
 		}
@@ -884,6 +888,24 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 		dc_sink_release(prev_sink);
 
 	return true;
+}
+
+bool dc_link_get_hpd_state(struct dc_link *dc_link)
+{
+	struct gpio *hpd_pin;
+	uint32_t state;
+
+	hpd_pin = get_hpd_gpio(dc_link->ctx->dc_bios,
+					dc_link->link_id, dc_link->ctx->gpio_service);
+	if (hpd_pin == NULL)
+		ASSERT(false);
+
+	dal_gpio_open(hpd_pin, GPIO_MODE_INTERRUPT);
+	dal_gpio_get_value(hpd_pin, &state);
+	dal_gpio_close(hpd_pin);
+	dal_gpio_destroy_irq(&hpd_pin);
+
+	return state;
 }
 
 static enum hpd_source_id get_hpd_line(

@@ -3,7 +3,7 @@
 #
 
 config HSA_AMD
-	tristate "HSA kernel driver for AMD GPU devices"
+	bool "HSA kernel driver for AMD GPU devices"
 	depends on (DRM_RADEON || DRM_AMDGPU) && (X86_64 || PPC64 || ARM64)
 	select DRM_AMDGPU_USERPTR
 	imply AMD_IOMMU_V2

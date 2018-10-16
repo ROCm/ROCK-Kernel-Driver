@@ -428,6 +428,14 @@ typedef enum _AMDGPU_DOORBELL64_ASSIGNMENT
 	AMDGPU_DOORBELL64_sDMA_ENGINE1            = 0xE8,
 	AMDGPU_DOORBELL64_sDMA_HI_PRI_ENGINE1     = 0xE9,
 
+	/* For vega10 sriov, the sdma doorbell must be fixed as follow
+	* to keep the same setting with host driver, or it will
+	* happen conflicts */
+	AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE0            = 0xF0,
+	AMDGPU_VEGA10_DOORBELL64_sDMA_HI_PRI_ENGINE0     = 0xF1,
+	AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE1            = 0xF2,
+	AMDGPU_VEGA10_DOORBELL64_sDMA_HI_PRI_ENGINE1     = 0xF3,
+
 	/* Interrupt handler */
 	AMDGPU_DOORBELL64_IH                      = 0xF4,  /* For legacy interrupt ring buffer */
 	AMDGPU_DOORBELL64_IH_RING1                = 0xF5,  /* For page migration request log */
@@ -1221,10 +1229,6 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev);
 
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
-void amdgpu_device_vram_location(struct amdgpu_device *adev,
-				 struct amdgpu_gmc *mc, u64 base);
-void amdgpu_device_gart_location(struct amdgpu_device *adev,
-				 struct amdgpu_gmc *mc);
 #if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif

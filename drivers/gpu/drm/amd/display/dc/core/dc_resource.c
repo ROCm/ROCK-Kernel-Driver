@@ -88,6 +88,10 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 #ifdef CONFIG_X86
 	case FAMILY_RV:
 		dc_version = DCN_VERSION_1_0;
+#if defined(CONFIG_DRM_AMD_DC_DCN1_01)
+		if (ASICREV_IS_RAVEN2(asic_id.hw_internal_rev))
+			dc_version = DCN_VERSION_1_01;
+#endif
 		break;
 #endif
 	default:
@@ -138,6 +142,9 @@ struct resource_pool *dc_create_resource_pool(
 
 #ifdef CONFIG_X86
 	case DCN_VERSION_1_0:
+#if defined(CONFIG_DRM_AMD_DC_DCN1_01)
+	case DCN_VERSION_1_01:
+#endif
 		res_pool = dcn10_create_resource_pool(
 				num_virtual_links, dc);
 		break;
@@ -356,6 +363,9 @@ bool resource_are_streams_timing_synchronizable(
 			|| !dc_is_dp_signal(stream2->signal)))
 		return false;
 
+	if (stream1->view_format != stream2->view_format)
+		return false;
+
 	return true;
 }
 static bool is_dp_and_hdmi_sharable(
@@ -366,7 +376,7 @@ static bool is_dp_and_hdmi_sharable(
 		return false;
 
 	if (stream1->clamping.c_depth != COLOR_DEPTH_888 ||
-	    stream2->clamping.c_depth != COLOR_DEPTH_888)
+		stream2->clamping.c_depth != COLOR_DEPTH_888)
 		return false;
 
 	return true;
@@ -1762,7 +1772,7 @@ static struct stream_encoder *find_first_free_match_stream_enc_for_link(
 	 * required for non DP connectors.
 	 */
 
-	if (j >= 0 && dc_is_dp_signal(stream->signal))
+	if (j >= 0 && link->connector_signal == SIGNAL_TYPE_DISPLAY_PORT)
 		return pool->stream_enc[j];
 
 	return NULL;

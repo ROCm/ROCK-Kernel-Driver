@@ -48,6 +48,8 @@ MODULE_FIRMWARE("amdgpu/vega12_sdma1.bin");
 MODULE_FIRMWARE("amdgpu/vega20_sdma.bin");
 MODULE_FIRMWARE("amdgpu/vega20_sdma1.bin");
 MODULE_FIRMWARE("amdgpu/raven_sdma.bin");
+MODULE_FIRMWARE("amdgpu/picasso_sdma.bin");
+MODULE_FIRMWARE("amdgpu/raven2_sdma.bin");
 
 #define SDMA0_POWER_CNTL__ON_OFF_CONDITION_HOLD_TIME_MASK  0x000000F8L
 #define SDMA0_POWER_CNTL__ON_OFF_STATUS_DURATION_TIME_MASK 0xFC000000L
@@ -70,6 +72,7 @@ static const struct soc15_reg_golden golden_settings_sdma_4[] = {
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC1_IB_CNTL, 0x800f0100, 0x00000100),
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC1_RB_WPTR_POLL_CNTL, 0x0000fff0, 0x00403000),
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_PAGE, 0x000003ff, 0x000003c0),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_WATERMK, 0xfc000000, 0x00000000),
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_CHICKEN_BITS, 0xfe931f07, 0x02831f07),
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_CLK_CTRL, 0xffffffff, 0x3f000100),
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_GFX_IB_CNTL, 0x800f0100, 0x00000100),
@@ -81,7 +84,8 @@ static const struct soc15_reg_golden golden_settings_sdma_4[] = {
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_RLC0_RB_WPTR_POLL_CNTL, 0x0000fff0, 0x00403000),
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_RLC1_IB_CNTL, 0x800f0100, 0x00000100),
 	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_RLC1_RB_WPTR_POLL_CNTL, 0x0000fff0, 0x00403000),
-	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_UTCL1_PAGE, 0x000003ff, 0x000003c0)
+	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_UTCL1_PAGE, 0x000003ff, 0x000003c0),
+	SOC15_REG_GOLDEN_VALUE(SDMA1, 0, mmSDMA1_UTCL1_WATERMK, 0xfc000000, 0x00000000)
 };
 
 static const struct soc15_reg_golden golden_settings_sdma_vg10[] = {
@@ -108,7 +112,8 @@ static const struct soc15_reg_golden golden_settings_sdma_4_1[] = {
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC0_RB_WPTR_POLL_CNTL, 0xfffffff7, 0x00403000),
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC1_IB_CNTL, 0x800f0111, 0x00000100),
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC1_RB_WPTR_POLL_CNTL, 0xfffffff7, 0x00403000),
-	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_PAGE, 0x000003ff, 0x000003c0)
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_PAGE, 0x000003ff, 0x000003c0),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_WATERMK, 0xfc000000, 0x00000000)
 };
 
 static const struct soc15_reg_golden golden_settings_sdma0_4_2_init[] = {
@@ -180,6 +185,12 @@ static const struct soc15_reg_golden golden_settings_sdma_rv1[] =
 	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GB_ADDR_CONFIG_READ, 0x0018773f, 0x00000002)
 };
 
+static const struct soc15_reg_golden golden_settings_sdma_rv2[] =
+{
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GB_ADDR_CONFIG, 0x0018773f, 0x00003001),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GB_ADDR_CONFIG_READ, 0x0018773f, 0x00003001)
+};
+
 static u32 sdma_v4_0_get_reg_offset(struct amdgpu_device *adev,
 		u32 instance, u32 offset)
 {
@@ -219,11 +230,16 @@ static void sdma_v4_0_init_golden_registers(struct amdgpu_device *adev)
 		break;
 	case CHIP_RAVEN:
 		soc15_program_register_sequence(adev,
-						 golden_settings_sdma_4_1,
-						 ARRAY_SIZE(golden_settings_sdma_4_1));
-		soc15_program_register_sequence(adev,
-						 golden_settings_sdma_rv1,
-						 ARRAY_SIZE(golden_settings_sdma_rv1));
+						golden_settings_sdma_4_1,
+						ARRAY_SIZE(golden_settings_sdma_4_1));
+		if (adev->rev_id >= 8)
+			soc15_program_register_sequence(adev,
+							golden_settings_sdma_rv2,
+							ARRAY_SIZE(golden_settings_sdma_rv2));
+		else
+			soc15_program_register_sequence(adev,
+							golden_settings_sdma_rv1,
+							ARRAY_SIZE(golden_settings_sdma_rv1));
 		break;
 	default:
 		break;
@@ -264,7 +280,12 @@ static int sdma_v4_0_init_microcode(struct amdgpu_device *adev)
 		chip_name = "vega20";
 		break;
 	case CHIP_RAVEN:
-		chip_name = "raven";
+		if (adev->rev_id >= 8)
+			chip_name = "raven2";
+		else if (adev->pdev->device == 0x15d8)
+			chip_name = "picasso";
+		else
+			chip_name = "raven";
 		break;
 	default:
 		BUG();
@@ -1299,9 +1320,15 @@ static int sdma_v4_0_sw_init(void *handle)
 		DRM_INFO("use_doorbell being set to: [%s]\n",
 				ring->use_doorbell?"true":"false");
 
-		ring->doorbell_index = (i == 0) ?
-			(AMDGPU_DOORBELL64_sDMA_ENGINE0 << 1) //get DWORD offset
-			: (AMDGPU_DOORBELL64_sDMA_ENGINE1 << 1); // get DWORD offset
+		if (adev->asic_type == CHIP_VEGA10)
+			ring->doorbell_index = (i == 0) ?
+				(AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE0 << 1) //get DWORD offset
+				: (AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE1 << 1); // get DWORD offset
+		else
+			ring->doorbell_index = (i == 0) ?
+				(AMDGPU_DOORBELL64_sDMA_ENGINE0 << 1) //get DWORD offset
+				: (AMDGPU_DOORBELL64_sDMA_ENGINE1 << 1); // get DWORD offset
+
 
 		sprintf(ring->name, "sdma%d", i);
 		r = amdgpu_ring_init(adev, ring, 1024,

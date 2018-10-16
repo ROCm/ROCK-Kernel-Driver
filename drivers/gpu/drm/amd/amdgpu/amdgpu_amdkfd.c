@@ -39,34 +39,14 @@ int amdgpu_amdkfd_init(void)
 {
 	int ret;
 
-#if defined(CONFIG_HSA_AMD_MODULE)
-	int (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
-
-	kgd2kfd_init_p = symbol_request(kgd2kfd_init);
-
-	if (kgd2kfd_init_p == NULL)
-		return -ENOENT;
-
-	ret = kgd2kfd_init_p(KFD_INTERFACE_VERSION, &kgd2kfd);
-	if (ret) {
-		symbol_put(kgd2kfd_init);
-		kgd2kfd = NULL;
-	}
-
-
-#elif defined(CONFIG_HSA_AMD)
-
+#ifdef CONFIG_HSA_AMD
 	ret = kgd2kfd_init(KFD_INTERFACE_VERSION, &kgd2kfd);
 	if (ret)
 		kgd2kfd = NULL;
-
+	amdgpu_amdkfd_gpuvm_init_mem_limits();
 #else
 	kgd2kfd = NULL;
 	ret = -ENOENT;
-#endif
-
-#if defined(CONFIG_HSA_AMD_MODULE) || defined(CONFIG_HSA_AMD)
-	amdgpu_amdkfd_gpuvm_init_mem_limits();
 #endif
 
 	return ret;
@@ -166,7 +146,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 			.num_queue_per_pipe = adev->gfx.mec.num_queue_per_pipe,
 			.gpuvm_size = min(adev->vm_manager.max_pfn
 					  << AMDGPU_GPU_PAGE_SHIFT,
-					  AMDGPU_VA_HOLE_START),
+					  AMDGPU_GMC_HOLE_START),
 			.drm_render_minor = adev->ddev->render->index
 		};
 
@@ -214,14 +194,25 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 			 * process in case of 64-bit doorbells so we
 			 * can use each doorbell assignment twice.
 			 */
-			gpu_resources.sdma_doorbell[0][i] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE0 + (i >> 1);
-			gpu_resources.sdma_doorbell[0][i+1] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE0 + 0x200 + (i >> 1);
-			gpu_resources.sdma_doorbell[1][i] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE1 + (i >> 1);
-			gpu_resources.sdma_doorbell[1][i+1] =
-				AMDGPU_DOORBELL64_sDMA_ENGINE1 + 0x200 + (i >> 1);
+			if (adev->asic_type == CHIP_VEGA10) {
+				gpu_resources.sdma_doorbell[0][i] =
+					AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE0 + (i >> 1);
+				gpu_resources.sdma_doorbell[0][i+1] =
+					AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE0 + 0x200 + (i >> 1);
+				gpu_resources.sdma_doorbell[1][i] =
+					AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE1 + (i >> 1);
+				gpu_resources.sdma_doorbell[1][i+1] =
+					AMDGPU_VEGA10_DOORBELL64_sDMA_ENGINE1 + 0x200 + (i >> 1);
+			} else {
+				gpu_resources.sdma_doorbell[0][i] =
+					AMDGPU_DOORBELL64_sDMA_ENGINE0 + (i >> 1);
+				gpu_resources.sdma_doorbell[0][i+1] =
+					AMDGPU_DOORBELL64_sDMA_ENGINE0 + 0x200 + (i >> 1);
+				gpu_resources.sdma_doorbell[1][i] =
+					AMDGPU_DOORBELL64_sDMA_ENGINE1 + (i >> 1);
+				gpu_resources.sdma_doorbell[1][i+1] =
+					AMDGPU_DOORBELL64_sDMA_ENGINE1 + 0x200 + (i >> 1);
+			}
 		}
 		/* Doorbells 0x0e0-0ff and 0x2e0-2ff are reserved for
 		 * SDMA, IH and VCN. So don't use them for the CP.
@@ -288,8 +279,7 @@ void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 
-	if (amdgpu_device_should_recover_gpu(adev))
-		amdgpu_device_gpu_recover(adev, NULL);
+	amdgpu_device_gpu_recover(adev, NULL);
 }
 
 u32 pool_to_domain(enum kgd_memory_pool p)
@@ -606,7 +596,7 @@ bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
 	return false;
 }
 
-#if !defined(CONFIG_HSA_AMD_MODULE) && !defined(CONFIG_HSA_AMD)
+#ifndef CONFIG_HSA_AMD
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {
 	return false;

@@ -54,13 +54,6 @@ struct drm_device;
 struct amdgpu_dm_irq_handler_data;
 struct dc;
 
-struct amdgpu_dm_prev_state {
-	struct drm_framebuffer *fb;
-	int32_t x;
-	int32_t y;
-	struct drm_display_mode mode;
-};
-
 struct common_irq_params {
 	struct amdgpu_device *adev;
 	enum dc_irq_source irq_src;
@@ -103,15 +96,12 @@ struct dm_comressor_info {
 #endif
 
 struct amdgpu_display_manager {
-	struct dal *dal;
 	struct dc *dc;
 	struct cgs_device *cgs_device;
 
 	struct amdgpu_device *adev;	/*AMD base driver*/
 	struct drm_device *ddev;	/*DRM base driver*/
 	u16 display_indexes_num;
-
-	struct amdgpu_dm_prev_state prev_state;
 
 	/*
 	 * 'irq_source_handler_table' holds a list of handlers
@@ -152,6 +142,9 @@ struct amdgpu_display_manager {
 	struct drm_atomic_state *cached_state;
 
 	struct dm_comressor_info compressor;
+
+	const struct firmware *fw_dmcu;
+	uint32_t dmcu_fw_version;
 };
 
 struct amdgpu_dm_connector {

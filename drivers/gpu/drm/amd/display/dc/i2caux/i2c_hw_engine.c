@@ -24,6 +24,7 @@
  */
 
 #include "dm_services.h"
+#include "dm_event_log.h"
 
 /*
  * Pre-requisites: headers required by header of this unit
@@ -169,6 +170,8 @@ bool dal_i2c_hw_engine_submit_request(
 		hw_engine->base.funcs->
 			process_channel_reply(&hw_engine->base, &reply);
 	}
+
+
 
 	return result;
 }

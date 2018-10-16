@@ -1129,19 +1129,15 @@ static int kfd_ioctl_set_scratch_backing_va(struct file *filep,
 	mutex_unlock(&p->mutex);
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
-	    pdd->qpd.vmid != 0) {
-		err = dev->kfd2kgd->alloc_memory_of_scratch(
+	    pdd->qpd.vmid != 0)
+		dev->kfd2kgd->set_scratch_backing_va(
 			dev->kgd, args->va_addr, pdd->qpd.vmid);
-		if (err != 0)
-			goto alloc_memory_of_scratch_failed;
-	}
 
 	return 0;
 
 bind_process_to_device_fail:
 	mutex_unlock(&p->mutex);
-alloc_memory_of_scratch_failed:
-	return -EFAULT;
+	return err;
 }
 
 static int kfd_ioctl_get_tile_config(struct file *filep,
@@ -1274,7 +1270,7 @@ static int kfd_reserve_vram_limit(struct kfd_dev *dev, uint64_t size)
 	return ret;
 }
 
-static void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size)
+void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size)
 {
 	spin_lock(&dev->vram_limit.vram_limit_lock);
 	dev->vram_limit.vram_used -= size;
@@ -1425,13 +1421,17 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
 	 */
-	if (!ret)
-		kfd_process_device_remove_obj_handle(
-			pdd, GET_IDR_HANDLE(args->handle));
-
-	if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-		kfd_unreserve_vram_limit(dev,
+	if (!ret) {
+		/* kfd_process_device_remove_obj_handle will free buf_obj.
+		 * So do that last.
+		 */
+		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			kfd_unreserve_vram_limit(dev,
 				buf_obj->it.last - buf_obj->it.start + 1);
+
+		kfd_process_device_remove_obj_handle(
+				pdd, GET_IDR_HANDLE(args->handle));
+	}
 
 err_unlock:
 	mutex_unlock(&p->mutex);
@@ -2613,6 +2613,136 @@ static int kfd_ioctl_get_queue_wave_state(struct file *filep,
 	return r;
 }
 
+static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_dbg_trap_args *args = data;
+	struct kfd_process_device *pdd;
+	int r = 0;
+	struct kfd_dev *dev;
+	uint32_t gpu_id;
+	uint32_t debug_trap_action;
+	uint32_t data1;
+	uint32_t data2;
+
+	debug_trap_action = args->op;
+	gpu_id = args->gpu_id;
+	data1 = args->data1;
+	data2 = args->data2;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	if (dev->device_info->asic_family < CHIP_VEGA10)
+		return -EINVAL;
+
+	if (dev->mec_fw_version < 406) {
+		pr_err("Unsupported firmware version [%i]\n",
+				dev->mec_fw_version);
+		return -EINVAL;
+	}
+
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported sched_policy: %i", dev->dqm->sched_policy);
+		return -EINVAL;
+	}
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(dev, p);
+	if (!pdd) {
+		r = -EINVAL;
+		goto unlock_out;
+	}
+
+	if ((pdd->is_debugging_enabled == false) &&
+		((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
+			  data1 == 1) ||
+		 (debug_trap_action ==
+				 KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
+			 data1 != 0))) {
+
+		/* We need to reserve the debug trap vmid if we haven't yet, and
+		 * are enabling trap debugging, or we are setting the wave
+		 * launch mode to something other than normal==0.
+		 */
+		r = reserve_debug_trap_vmid(dev->dqm);
+		if (r)
+			goto unlock_out;
+
+		pdd->is_debugging_enabled = true;
+	}
+
+	if (!pdd->is_debugging_enabled) {
+		pr_err("Debugging is not enabled for this device\n");
+		r = -EINVAL;
+		goto unlock_out;
+	}
+
+	switch (debug_trap_action) {
+	case KFD_IOC_DBG_TRAP_ENABLE:
+		switch (data1) {
+		case 0:
+			pdd->debug_trap_enabled = false;
+			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			break;
+		case 1:
+			pdd->debug_trap_enabled = true;
+			r = dev->kfd2kgd->enable_debug_trap(dev->kgd,
+					pdd->trap_debug_wave_launch_mode,
+					dev->vm_info.last_vmid_kfd);
+			break;
+		default:
+			pr_err("Invalid trap enable option: %i\n",
+					data1);
+			r = -EINVAL;
+		}
+		break;
+
+	case KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
+		r = dev->kfd2kgd->set_debug_trap_data(dev->kgd,
+				data1,
+				data2);
+		break;
+
+	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+		r = dev->kfd2kgd->set_wave_launch_trap_override(
+				dev->kgd,
+				data1,
+				data2);
+		break;
+
+	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+		pdd->trap_debug_wave_launch_mode = data1;
+		r = dev->kfd2kgd->set_wave_launch_mode(
+				dev->kgd,
+				data1,
+				dev->vm_info.last_vmid_kfd);
+		break;
+	default:
+		pr_err("Invalid option: %i\n", debug_trap_action);
+		r = -EINVAL;
+	}
+
+	if (pdd->trap_debug_wave_launch_mode == 0 &&
+			!pdd->debug_trap_enabled) {
+		int result;
+
+		result = release_debug_trap_vmid(dev->dqm);
+		if (result) {
+			pr_err("Failed to release debug VMID\n");
+			r = result;
+			goto unlock_out;
+		}
+
+		pdd->is_debugging_enabled = false;
+	}
+
+unlock_out:
+	mutex_unlock(&p->mutex);
+	return r;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -2714,6 +2844,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_GET_QUEUE_WAVE_STATE,
 				kfd_ioctl_get_queue_wave_state, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
+			kfd_ioctl_dbg_set_debug_trap, 0),
 
 };
 

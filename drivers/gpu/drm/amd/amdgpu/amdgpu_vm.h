@@ -35,6 +35,7 @@
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 #include <drm/drm_file.h>
 #endif
+#include <drm/ttm/ttm_bo_driver.h>
 
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
@@ -53,9 +54,6 @@ struct amdgpu_bo_list_entry;
 
 /* number of entries in page table */
 #define AMDGPU_VM_PTE_COUNT(adev) (1 << (adev)->vm_manager.block_size)
-
-/* PTBs (Page Table Blocks) need to be aligned to 32K */
-#define AMDGPU_VM_PTB_ALIGN_SIZE   32768
 
 #define AMDGPU_PTE_VALID	(1ULL << 0)
 #define AMDGPU_PTE_SYSTEM	(1ULL << 1)
@@ -108,19 +106,6 @@ struct amdgpu_bo_list_entry;
 
 /* hardcode that limit for now */
 #define AMDGPU_VA_RESERVED_SIZE			(1ULL << 20)
-
-/* VA hole for 48bit addresses on Vega10 */
-#define AMDGPU_VA_HOLE_START			0x0000800000000000ULL
-#define AMDGPU_VA_HOLE_END			0xffff800000000000ULL
-
-/*
- * Hardware is programmed as if the hole doesn't exists with start and end
- * address values.
- *
- * This mask is used to remove the upper 16bits of the VA and so come up with
- * the linear addr value.
- */
-#define AMDGPU_VA_HOLE_MASK			0x0000ffffffffffffULL
 
 /* max vmids dedicated for process */
 #define AMDGPU_VM_MAX_RESERVED_VMID	1
@@ -213,12 +198,15 @@ struct amdgpu_vm {
 	/* PT BOs which relocated and their parent need an update */
 	struct list_head	relocated;
 
-	/* BOs moved, but not yet updated in the PT */
+	/* per VM BOs moved, but not yet updated in the PT */
 	struct list_head	moved;
-	spinlock_t		moved_lock;
 
 	/* All BOs of this VM not currently in the state machine */
 	struct list_head	idle;
+
+	/* regular invalidated BOs, but not yet updated in the PT */
+	struct list_head	invalidated;
+	spinlock_t		invalidated_lock;
 
 	/* BO mappings freed, but not yet updated in the PT */
 	struct list_head	freed;
@@ -257,6 +245,11 @@ struct amdgpu_vm {
 
 	/* Some basic info about the task */
 	struct amdgpu_task_info task_info;
+
+	/* Store positions of group of BOs */
+	struct ttm_lru_bulk_move lru_bulk_move;
+	/* mark whether can do the bulk move */
+	bool			bulk_moveable;
 };
 
 struct amdgpu_vm_manager {
@@ -304,7 +297,8 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev);
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev);
 int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		   int vm_context, unsigned int pasid);
-int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm, unsigned int pasid);
+void amdgpu_vm_release_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm);
 bool amdgpu_vm_pasid_fault_credit(struct amdgpu_device *adev,
 				  unsigned int pasid);
@@ -355,7 +349,7 @@ struct amdgpu_bo_va_mapping *amdgpu_vm_bo_lookup_mapping(struct amdgpu_vm *vm,
 void amdgpu_vm_bo_trace_cs(struct amdgpu_vm *vm, struct ww_acquire_ctx *ticket);
 void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 		      struct amdgpu_bo_va *bo_va);
-void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t vm_size,
+void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t min_vm_size,
 			   uint32_t fragment_size_default, unsigned max_level,
 			   unsigned max_bits);
 int amdgpu_vm_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
@@ -364,8 +358,11 @@ bool amdgpu_vm_need_pipeline_sync(struct amdgpu_ring *ring,
 void amdgpu_vm_check_compute_bug(struct amdgpu_device *adev);
 
 void amdgpu_vm_get_task_info(struct amdgpu_device *adev, unsigned int pasid,
-			 struct amdgpu_task_info *task_info);
+			     struct amdgpu_task_info *task_info);
 
 void amdgpu_vm_set_task_info(struct amdgpu_vm *vm);
+
+void amdgpu_vm_move_to_lru_tail(struct amdgpu_device *adev,
+				struct amdgpu_vm *vm);
 
 #endif

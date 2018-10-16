@@ -101,18 +101,10 @@ bool dm_pp_apply_display_requirements(
 			adev->pm.pm_display_cfg.displays[i].controller_id = dc_cfg->pipe_idx + 1;
 		}
 
-		/* TODO: complete implementation of
-		 * pp_display_configuration_change().
-		 * Follow example of:
-		 * PHM_StoreDALConfigurationData - powerplay\hwmgr\hardwaremanager.c
-		 * PP_IRI_DisplayConfigurationChange - powerplay\eventmgr\iri.c */
 		if (adev->powerplay.pp_funcs->display_configuration_change)
 			adev->powerplay.pp_funcs->display_configuration_change(
 				adev->powerplay.pp_handle,
 				&adev->pm.pm_display_cfg);
-
-		/* TODO: replace by a separate call to 'apply display cfg'? */
-		amdgpu_pm_compute_clocks(adev);
 	}
 
 	return true;
@@ -480,12 +472,20 @@ void pp_rv_set_display_requirement(struct pp_smu *pp,
 {
 	const struct dc_context *ctx = pp->dm;
 	struct amdgpu_device *adev = ctx->driver_context;
+	void *pp_handle = adev->powerplay.pp_handle;
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	struct pp_display_clock_request clock = {0};
 
-	if (!pp_funcs || !pp_funcs->display_configuration_changed)
+	if (!pp_funcs || !pp_funcs->display_clock_voltage_request)
 		return;
 
-	amdgpu_dpm_display_configuration_changed(adev);
+	clock.clock_type = amd_pp_dcf_clock;
+	clock.clock_freq_in_khz = req->hard_min_dcefclk_khz;
+	pp_funcs->display_clock_voltage_request(pp_handle, &clock);
+
+	clock.clock_type = amd_pp_f_clock;
+	clock.clock_freq_in_khz = req->hard_min_fclk_khz;
+	pp_funcs->display_clock_voltage_request(pp_handle, &clock);
 }
 
 void pp_rv_set_wm_ranges(struct pp_smu *pp,

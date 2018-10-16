@@ -119,8 +119,8 @@ uint amdgpu_pg_mask = 0xffffffff;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
-/* OverDrive(bit 14),gfxoff(bit 15),stutter mode(bit 17) disabled by default*/
-uint amdgpu_pp_feature_mask = 0xfffd3fff;
+/* OverDrive(bit 14) disabled by default*/
+uint amdgpu_pp_feature_mask = 0xffffbfff;
 int amdgpu_ngg = 0;
 int amdgpu_prim_buf_per_se = 0;
 int amdgpu_pos_buf_per_se = 0;
@@ -499,6 +499,26 @@ MODULE_PARM_DESC(emu_mode, "Emulation mode, (1 = enable, 0 = disable)");
 module_param_named(emu_mode, amdgpu_emu_mode, int, 0444);
 
 /**
+ * DOC: priv_cp_queues (int)
+ * Enable privileged mode for CP queues. Default value: 0 (off)
+ */
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
+
+/**
+ * DOC: keep_udle_process_evicted (bool)
+ * Keep an evicted process evicted if it is idle. Default value: false (off)
+ */
+bool keep_idle_process_evicted;
+module_param(keep_idle_process_evicted, bool, 0444);
+MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
+
+int cma_enable;
+module_param(cma_enable, int, 0644);
+MODULE_PARM_DESC(cma_enable,"Enable CMA (1 = enable, 0 = disable (default)). Warning! relaxed access check");
+
+/**
  * DOC: si_support (int)
  * Set SI support driver. This parameter works after set config CONFIG_DRM_AMDGPU_SI. For SI asic, when radeon driver is enabled,
  * set value 0 to use radeon driver, while set value 1 to use amdgpu driver. The default is using radeon driver when it available,
@@ -543,6 +563,102 @@ MODULE_PARM_DESC(smu_memory_pool_size,
 	"reserve gtt for smu debug usage, 0 = disable,"
 		"0x1 = 256Mbyte, 0x2 = 512Mbyte, 0x4 = 1 Gbyte, 0x8 = 2GByte");
 module_param_named(smu_memory_pool_size, amdgpu_smu_memory_pool_size, uint, 0444);
+
+#ifdef CONFIG_HSA_AMD
+/**
+ * DOC: sched_policy (int)
+ * Set scheduling policy. Default is HWS(hardware scheduling) with over-subscription.
+ * Setting 1 disables over-subscription. Setting 2 disables HWS and statically
+ * assigns queues to HQDs.
+ */
+int sched_policy = KFD_SCHED_POLICY_HWS;
+module_param(sched_policy, int, 0444);
+MODULE_PARM_DESC(sched_policy,
+	"Scheduling policy (0 = HWS (Default), 1 = HWS without over-subscription, 2 = Non-HWS (Used for debugging only)");
+
+/**
+ * DOC: hws_max_conc_proc (int)
+ * Maximum number of processes that HWS can schedule concurrently. The maximum is the
+ * number of VMIDs assigned to the HWS, which is also the default.
+ */
+int hws_max_conc_proc = 8;
+module_param(hws_max_conc_proc, int, 0444);
+MODULE_PARM_DESC(hws_max_conc_proc,
+	"Max # processes HWS can execute concurrently when sched_policy=0 (0 = no concurrency, #VMIDs for KFD = Maximum(default))");
+
+/**
+ * DOC: cwsr_enable (int)
+ * CWSR(compute wave store and resume) allows the GPU to preempt shader execution in
+ * the middle of a compute wave. Default is 1 to enable this feature. Setting 0
+ * disables it.
+ */
+int cwsr_enable = 1;
+module_param(cwsr_enable, int, 0444);
+MODULE_PARM_DESC(cwsr_enable, "CWSR enable (0 = Off, 1 = On (Default))");
+
+/**
+ * DOC: max_num_of_queues_per_device (int)
+ * Maximum number of queues per device. Valid setting is between 1 and 4096. Default
+ * is 4096.
+ */
+int max_num_of_queues_per_device = KFD_MAX_NUM_OF_QUEUES_PER_DEVICE_DEFAULT;
+module_param(max_num_of_queues_per_device, int, 0444);
+MODULE_PARM_DESC(max_num_of_queues_per_device,
+	"Maximum number of supported queues per device (1 = Minimum, 4096 = default)");
+
+/**
+ * DOC: send_sigterm (int)
+ * Send sigterm to HSA process on unhandled exceptions. Default is not to send sigterm
+ * but just print errors on dmesg. Setting 1 enables sending sigterm.
+ */
+int send_sigterm;
+module_param(send_sigterm, int, 0444);
+MODULE_PARM_DESC(send_sigterm,
+	"Send sigterm to HSA process on unhandled exception (0 = disable, 1 = enable)");
+
+/**
+ * DOC: debug_largebar (int)
+ * Set debug_largebar as 1 to enable simulating large-bar capability on non-large bar
+ * system. This limits the VRAM size reported to ROCm applications to the visible
+ * size, usually 256MB.
+ * Default value is 0, diabled.
+ */
+int debug_largebar;
+module_param(debug_largebar, int, 0444);
+MODULE_PARM_DESC(debug_largebar,
+	"Debug large-bar flag used to simulate large-bar capability on non-large bar machine (0 = disable, 1 = enable)");
+
+/**
+ * DOC: ignore_crat (int)
+ * Ignore CRAT table during KFD initialization. By default, KFD uses the ACPI CRAT
+ * table to get information about AMD APUs. This option can serve as a workaround on
+ * systems with a broken CRAT table.
+ */
+int ignore_crat;
+module_param(ignore_crat, int, 0444);
+MODULE_PARM_DESC(ignore_crat,
+	"Ignore CRAT table during KFD initialization (0 = use CRAT (default), 1 = ignore CRAT)");
+
+/**
+ * DOC: noretry (int)
+ * This parameter sets sh_mem_config.retry_disable. Default value, 0, enables retry.
+ * Setting 1 disables retry.
+ * Retry is needed for recoverable page faults.
+ */
+int noretry;
+module_param(noretry, int, 0644);
+MODULE_PARM_DESC(noretry,
+	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
+
+/**
+ * DOC: halt_if_hws_hang (int)
+ * Halt if HWS hang is detected. Default value, 0, disables the halt on hang.
+ * Setting 1 enables halt on hang.
+ */
+int halt_if_hws_hang;
+module_param(halt_if_hws_hang, int, 0644);
+MODULE_PARM_DESC(halt_if_hws_hang, "Halt if HWS hang is detected (0 = off (default), 1 = on)");
+#endif
 
 static const struct pci_device_id pciidlist[] = {
 #ifdef  CONFIG_DRM_AMDGPU_SI
@@ -753,6 +869,7 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x67CA, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS10},
 	{0x1002, 0x67CC, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS10},
 	{0x1002, 0x67CF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS10},
+	{0x1002, 0x6FDF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS10},
 	/* Polaris12 */
 	{0x1002, 0x6980, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS12},
 	{0x1002, 0x6981, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_POLARIS12},
@@ -790,6 +907,7 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x66AF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_VEGA20},
 	/* Raven */
 	{0x1002, 0x15dd, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_RAVEN|AMD_IS_APU},
+	{0x1002, 0x15d8, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_RAVEN|AMD_IS_APU},
 
 	{0, 0, 0}
 };
@@ -862,6 +980,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
+	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto err_free;
@@ -898,10 +1017,11 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 
-	drm_dev_unregister(dev);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
-	drm_dev_put(dev);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+	DRM_ERROR("Device removal is currently not supported outside of fbcon\n");
+	drm_dev_unplug(dev);
 #else
+	drm_dev_unregister(dev);
 	drm_dev_unref(dev);
 #endif
 	pci_disable_device(pdev);

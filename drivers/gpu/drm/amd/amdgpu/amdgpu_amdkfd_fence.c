@@ -32,7 +32,7 @@
 #endif
 #include "amdgpu_amdkfd.h"
 
-const struct dma_fence_ops amd_kfd_fence_ops;
+static const struct dma_fence_ops amdkfd_fence_ops;
 static atomic_t fence_seq = ATOMIC_INIT(0);
 
 /* Eviction Fence
@@ -65,7 +65,7 @@ static atomic_t fence_seq = ATOMIC_INIT(0);
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       struct mm_struct *mm)
 {
-	struct amdgpu_amdkfd_fence *fence = NULL;
+	struct amdgpu_amdkfd_fence *fence;
 
 	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
 	if (fence == NULL)
@@ -73,6 +73,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 
 	/* This reference gets released in amd_kfd_fence_release */
 #if LINUX_VERSION_CODE	> KERNEL_VERSION(4, 11, 0)
+	/* This reference gets released in amdkfd_fence_release */
 	mmgrab(mm);
 #else
 	atomic_inc(&mm->mm_count);
@@ -81,7 +82,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 	get_task_comm(fence->timeline_name, current);
 	spin_lock_init(&fence->lock);
 
-	dma_fence_init(&fence->base, &amd_kfd_fence_ops, &fence->lock,
+	dma_fence_init(&fence->base, &amdkfd_fence_ops, &fence->lock,
 		   context, atomic_inc_return(&fence_seq));
 
 	return fence;
@@ -95,18 +96,18 @@ struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f)
 		return NULL;
 
 	fence = container_of(f, struct amdgpu_amdkfd_fence, base);
-	if (fence && f->ops == &amd_kfd_fence_ops)
+	if (fence && f->ops == &amdkfd_fence_ops)
 		return fence;
 
 	return NULL;
 }
 
-static const char *amd_kfd_fence_get_driver_name(struct dma_fence *f)
+static const char *amdkfd_fence_get_driver_name(struct dma_fence *f)
 {
 	return "amdgpu_amdkfd_fence";
 }
 
-static const char *amd_kfd_fence_get_timeline_name(struct dma_fence *f)
+static const char *amdkfd_fence_get_timeline_name(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
 
@@ -114,12 +115,12 @@ static const char *amd_kfd_fence_get_timeline_name(struct dma_fence *f)
 }
 
 /**
- * amd_kfd_fence_enable_signaling - This gets called when TTM wants to evict
+ * amdkfd_fence_enable_signaling - This gets called when TTM wants to evict
  *  a KFD BO and schedules a job to move the BO.
  *  If fence is already signaled return true.
  *  If fence is not signaled schedule a evict KFD process work item.
  */
-static bool amd_kfd_fence_enable_signaling(struct dma_fence *f)
+static bool amdkfd_fence_enable_signaling(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
 
@@ -136,14 +137,14 @@ static bool amd_kfd_fence_enable_signaling(struct dma_fence *f)
 }
 
 /**
- * amd_kfd_fence_release - callback that fence can be freed
+ * amdkfd_fence_release - callback that fence can be freed
  *
  * @fence: fence
  *
  * This function is called when the reference count becomes zero.
  * Drops the mm_struct reference and RCU schedules freeing up the fence.
  */
-static void amd_kfd_fence_release(struct dma_fence *f)
+static void amdkfd_fence_release(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence = to_amdgpu_amdkfd_fence(f);
 
@@ -175,11 +176,11 @@ bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 	return false;
 }
 
-const struct dma_fence_ops amd_kfd_fence_ops = {
-	.get_driver_name = amd_kfd_fence_get_driver_name,
-	.get_timeline_name = amd_kfd_fence_get_timeline_name,
-	.enable_signaling = amd_kfd_fence_enable_signaling,
+static const struct dma_fence_ops amdkfd_fence_ops = {
+	.get_driver_name = amdkfd_fence_get_driver_name,
+	.get_timeline_name = amdkfd_fence_get_timeline_name,
+	.enable_signaling = amdkfd_fence_enable_signaling,
 	.signaled = NULL,
 	.wait = dma_fence_default_wait,
-	.release = amd_kfd_fence_release,
+	.release = amdkfd_fence_release,
 };

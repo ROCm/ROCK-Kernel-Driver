@@ -436,6 +436,7 @@ static const struct resource_caps res_cap = {
 		.num_audio = 7,
 		.num_stream_encoder = 6,
 		.num_pll = 6,
+		.num_ddc = 6,
 };
 
 static const struct dc_debug_options debug_defaults = {
@@ -455,7 +456,7 @@ struct clock_source *dce120_clock_source_create(
 	if (!clk_src)
 		return NULL;
 
-	if (dce110_clk_src_construct(clk_src, ctx, bios, id,
+	if (dce112_clk_src_construct(clk_src, ctx, bios, id,
 				     regs, &cs_shift, &cs_mask)) {
 		clk_src->base.dp_clk_src = dp_clk_src;
 		return &clk_src->base;
@@ -1062,6 +1063,12 @@ static bool construct(
 			dm_error(
 				"DC: failed to create output pixel processor!\n");
 		}
+
+		/* check next valid pipe */
+		j++;
+	}
+
+	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
 		pool->base.engines[i] = dce120_aux_engine_create(ctx, i);
 		if (pool->base.engines[i] == NULL) {
 			BREAK_TO_DEBUGGER();
@@ -1077,8 +1084,6 @@ static bool construct(
 			goto res_create_fail;
 		}
 		pool->base.sw_i2cs[i] = NULL;
-		/* check next valid pipe */
-		j++;
 	}
 
 	/* valid pipe num */

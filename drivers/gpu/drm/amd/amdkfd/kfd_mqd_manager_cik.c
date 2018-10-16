@@ -262,7 +262,6 @@ static int __update_mqd(struct mqd_manager *mm, void *mqd,
 	update_cu_mask(mm, mqd, q);
 	set_priority(m, q);
 
-
 	q->is_active = (q->queue_size > 0 &&
 			q->queue_address != 0 &&
 			q->queue_percent > 0 &&

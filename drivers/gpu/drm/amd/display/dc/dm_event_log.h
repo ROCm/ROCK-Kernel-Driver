@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-15 Advanced Micro Devices, Inc.
+ * Copyright 2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,31 +23,15 @@
  *
  */
 
-#ifndef __DAL_TYPES_H__
-#define __DAL_TYPES_H__
+/**
+ * This file defines external dependencies of Display Core.
+ */
 
-#include "signal_types.h"
-#include "dc_types.h"
+#ifndef __DM_EVENT_LOG_H__
 
-struct dal_logger;
-struct dc_bios;
+#define __DM_EVENT_LOG_H__
 
-enum dce_version {
-	DCE_VERSION_UNKNOWN = (-1),
-	DCE_VERSION_8_0,
-	DCE_VERSION_8_1,
-	DCE_VERSION_8_3,
-	DCE_VERSION_10_0,
-	DCE_VERSION_11_0,
-	DCE_VERSION_11_2,
-	DCE_VERSION_11_22,
-	DCE_VERSION_12_0,
-	DCE_VERSION_MAX,
-	DCN_VERSION_1_0,
-#if defined(CONFIG_DRM_AMD_DC_DCN1_01)
-	DCN_VERSION_1_01,
-#endif /* DCN1_01 */
-	DCN_VERSION_MAX
-};
+#define EVENT_LOG_AUX_REQ(dcc, type, action, address, len, data)
+#define EVENT_LOG_AUX_Reply(dcc, type, swStatus, replyStatus, len, data)
 
-#endif /* __DAL_TYPES_H__ */
+#endif

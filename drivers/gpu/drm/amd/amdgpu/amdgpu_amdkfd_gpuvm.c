@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2014-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -204,11 +204,9 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 					struct amdgpu_amdkfd_fence ***ef_list,
 					unsigned int *ef_count)
 {
-	struct reservation_object_list *fobj;
-	struct reservation_object *resv;
-	unsigned int i = 0, j = 0, k = 0, shared_count;
-	unsigned int count = 0;
-	struct amdgpu_amdkfd_fence **fence_list;
+	struct reservation_object *resv = bo->tbo.resv;
+	struct reservation_object_list *old, *new;
+	unsigned int i, j, k;
 
 	if (!ef && !ef_list)
 		return -EINVAL;
@@ -218,75 +216,67 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 		*ef_count = 0;
 	}
 
-	resv = bo->tbo.resv;
-	fobj = reservation_object_get_list(resv);
-
-	if (!fobj)
+	old = reservation_object_get_list(resv);
+	if (!old)
 		return 0;
 
-	preempt_disable();
-	write_seqcount_begin(&resv->seq);
-
-	/* Go through all the shared fences in the resevation object. If
-	 * ef is specified and it exists in the list, remove it and reduce the
-	 * count. If ef is not specified, then get the count of eviction fences
-	 * present.
-	 */
-	shared_count = fobj->shared_count;
-	for (i = 0; i < shared_count; ++i) {
-		struct dma_fence *f;
-
-		f = rcu_dereference_protected(fobj->shared[i],
-					      reservation_object_held(resv));
-
-		if (ef) {
-			if (f->context == ef->base.context) {
-				dma_fence_put(f);
-				fobj->shared_count--;
-			} else
-				RCU_INIT_POINTER(fobj->shared[j++], f);
-
-		} else if (to_amdgpu_amdkfd_fence(f))
-			count++;
-	}
-	write_seqcount_end(&resv->seq);
-	preempt_enable();
-
-	if (ef || !count)
-		return 0;
-
-	/* Alloc memory for count number of eviction fence pointers. Fill the
-	 * ef_list array and ef_count
-	 */
-	fence_list = kcalloc(count, sizeof(struct amdgpu_amdkfd_fence *),
-			     GFP_KERNEL);
-	if (!fence_list)
+	new = kmalloc(offsetof(typeof(*new), shared[old->shared_max]),
+		      GFP_KERNEL);
+	if (!new)
 		return -ENOMEM;
 
-	preempt_disable();
-	write_seqcount_begin(&resv->seq);
-
-	j = 0;
-	for (i = 0; i < shared_count; ++i) {
+	/* Go through all the shared fences in the resevation object and sort
+	 * the interesting ones to the end of the list.
+	 */
+	for (i = 0, j = old->shared_count, k = 0; i < old->shared_count; ++i) {
 		struct dma_fence *f;
-		struct amdgpu_amdkfd_fence *efence;
 
-		f = rcu_dereference_protected(fobj->shared[i],
-			reservation_object_held(resv));
+		f = rcu_dereference_protected(old->shared[i],
+					      reservation_object_held(resv));
 
-		efence = to_amdgpu_amdkfd_fence(f);
-		if (efence) {
-			fence_list[k++] = efence;
-			fobj->shared_count--;
-		} else
-			RCU_INIT_POINTER(fobj->shared[j++], f);
+		if ((ef && f->context == ef->base.context) ||
+		    (!ef && to_amdgpu_amdkfd_fence(f)))
+			RCU_INIT_POINTER(new->shared[--j], f);
+		else
+			RCU_INIT_POINTER(new->shared[k++], f);
+	}
+	new->shared_max = old->shared_max;
+	new->shared_count = k;
+
+	if (!ef) {
+		unsigned int count = old->shared_count - j;
+
+		/* Alloc memory for count number of eviction fence pointers.
+		 * Fill the ef_list array and ef_count
+		 */
+		*ef_list = kcalloc(count, sizeof(**ef_list), GFP_KERNEL);
+		*ef_count = count;
+
+		if (!*ef_list) {
+			kfree(new);
+			return -ENOMEM;
+		}
 	}
 
+	/* Install the new fence list, seqcount provides the barriers */
+	preempt_disable();
+	write_seqcount_begin(&resv->seq);
+	RCU_INIT_POINTER(resv->fence, new);
 	write_seqcount_end(&resv->seq);
 	preempt_enable();
 
-	*ef_list = fence_list;
-	*ef_count = k;
+	/* Drop the references to the removed fences or move them to ef_list */
+	for (i = j, k = 0; i < old->shared_count; ++i) {
+		struct dma_fence *f;
+
+		f = rcu_dereference_protected(new->shared[i],
+					      reservation_object_held(resv));
+		if (!ef)
+			(*ef_list)[k++] = to_amdgpu_amdkfd_fence(f);
+		else
+			dma_fence_put(f);
+	}
+	kfree_rcu(old, rcu);
 
 	return 0;
 }
@@ -1065,8 +1055,8 @@ create_evict_fence_fail:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
-					  void **process_info,
+int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, unsigned int pasid,
+					  void **vm, void **process_info,
 					  struct dma_fence **ef)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -1078,7 +1068,7 @@ int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, void **vm,
 		return -ENOMEM;
 
 	/* Initialize AMDGPU part of the VM */
-	ret = amdgpu_vm_init(adev, new_vm, AMDGPU_VM_CONTEXT_COMPUTE, 0);
+	ret = amdgpu_vm_init(adev, new_vm, AMDGPU_VM_CONTEXT_COMPUTE, pasid);
 	if (ret) {
 		pr_err("Failed init vm ret %d\n", ret);
 		goto amdgpu_vm_init_fail;
@@ -1101,7 +1091,7 @@ amdgpu_vm_init_fail:
 }
 
 int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
-					   struct file *filp,
+					   struct file *filp, unsigned int pasid,
 					   void **vm, void **process_info,
 					   struct dma_fence **ef)
 {
@@ -1116,7 +1106,7 @@ int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
 		return -EINVAL;
 
 	/* Convert VM into a compute VM */
-	ret = amdgpu_vm_make_compute(adev, avm);
+	ret = amdgpu_vm_make_compute(adev, avm, pasid);
 	if (ret)
 		return ret;
 
@@ -1176,6 +1166,25 @@ void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 	/* Release the VM context */
 	amdgpu_vm_fini(adev, avm);
 	kfree(vm);
+}
+
+void amdgpu_amdkfd_gpuvm_release_process_vm(struct kgd_dev *kgd, void *vm)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+        struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
+
+	if (WARN_ON(!kgd || !vm))
+                return;
+
+        pr_debug("Releasing process vm %p\n", vm);
+
+        /* The original pasid of amdgpu vm has already been
+         * released during making a amdgpu vm to a compute vm
+         * The current pasid is managed by kfd and will be
+         * released on kfd process destroy. Set amdgpu pasid
+         * to 0 to avoid duplicate release.
+         */
+	amdgpu_vm_release_compute(adev, avm);
 }
 
 uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm)

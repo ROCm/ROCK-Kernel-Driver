@@ -198,21 +198,6 @@ static inline u64 amdgpu_bo_mmap_offset(struct amdgpu_bo *bo)
 }
 
 /**
- * amdgpu_bo_gpu_accessible - return whether the bo is currently in memory that
- * is accessible to the GPU.
- */
-static inline bool amdgpu_bo_gpu_accessible(struct amdgpu_bo *bo)
-{
-	switch (bo->tbo.mem.mem_type) {
-	case TTM_PL_TT: return amdgpu_gtt_mgr_has_gart_addr(&bo->tbo.mem);
-	case AMDGPU_PL_DGMA:
-	case AMDGPU_PL_DGMA_IMPORT:
-	case TTM_PL_VRAM: return true;
-	default: return false;
-	}
-}
-
-/**
  * amdgpu_bo_in_cpu_visible_vram - check if BO is (partly) in visible VRAM
  */
 static inline bool amdgpu_bo_in_cpu_visible_vram(struct amdgpu_bo *bo)
@@ -292,12 +277,8 @@ int amdgpu_bo_backup_to_shadow(struct amdgpu_device *adev,
 			       struct reservation_object *resv,
 			       struct dma_fence **fence, bool direct);
 int amdgpu_bo_validate(struct amdgpu_bo *bo);
-int amdgpu_bo_restore_from_shadow(struct amdgpu_device *adev,
-				  struct amdgpu_ring *ring,
-				  struct amdgpu_bo *bo,
-				  struct reservation_object *resv,
-				  struct dma_fence **fence,
-				  bool direct);
+int amdgpu_bo_restore_shadow(struct amdgpu_bo *shadow,
+			     struct dma_fence **fence);
 uint32_t amdgpu_bo_get_preferred_pin_domain(struct amdgpu_device *adev,
 					    uint32_t domain);
 

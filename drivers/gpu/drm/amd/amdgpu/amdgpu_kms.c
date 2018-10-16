@@ -269,6 +269,10 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 		fw_info->ver = adev->psp.asd_fw_version;
 		fw_info->feature = adev->psp.asd_feature_version;
 		break;
+	case AMDGPU_INFO_FW_DMCU:
+		fw_info->ver = adev->dm.dmcu_fw_version;
+		fw_info->feature = 0;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -553,13 +557,13 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		struct drm_amdgpu_info_gds gds_info;
 
 		memset(&gds_info, 0, sizeof(gds_info));
-		gds_info.gds_gfx_partition_size = adev->gds.mem.gfx_partition_size >> AMDGPU_GDS_SHIFT;
-		gds_info.compute_partition_size = adev->gds.mem.cs_partition_size >> AMDGPU_GDS_SHIFT;
-		gds_info.gds_total_size = adev->gds.mem.total_size >> AMDGPU_GDS_SHIFT;
-		gds_info.gws_per_gfx_partition = adev->gds.gws.gfx_partition_size >> AMDGPU_GWS_SHIFT;
-		gds_info.gws_per_compute_partition = adev->gds.gws.cs_partition_size >> AMDGPU_GWS_SHIFT;
-		gds_info.oa_per_gfx_partition = adev->gds.oa.gfx_partition_size >> AMDGPU_OA_SHIFT;
-		gds_info.oa_per_compute_partition = adev->gds.oa.cs_partition_size >> AMDGPU_OA_SHIFT;
+		gds_info.gds_gfx_partition_size = adev->gds.mem.gfx_partition_size;
+		gds_info.compute_partition_size = adev->gds.mem.cs_partition_size;
+		gds_info.gds_total_size = adev->gds.mem.total_size;
+		gds_info.gws_per_gfx_partition = adev->gds.gws.gfx_partition_size;
+		gds_info.gws_per_compute_partition = adev->gds.gws.cs_partition_size;
+		gds_info.oa_per_gfx_partition = adev->gds.oa.gfx_partition_size;
+		gds_info.oa_per_compute_partition = adev->gds.oa.cs_partition_size;
 		return copy_to_user(out, &gds_info,
 				    min((size_t)size, sizeof(gds_info))) ? -EFAULT : 0;
 	}
@@ -684,11 +688,11 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 
 		dev_info.virtual_address_offset = AMDGPU_VA_RESERVED_SIZE;
 		dev_info.virtual_address_max =
-			min(vm_size, AMDGPU_VA_HOLE_START);
+			min(vm_size, AMDGPU_GMC_HOLE_START);
 
-		if (vm_size > AMDGPU_VA_HOLE_START) {
-			dev_info.high_va_offset = AMDGPU_VA_HOLE_END;
-			dev_info.high_va_max = AMDGPU_VA_HOLE_END | vm_size;
+		if (vm_size > AMDGPU_GMC_HOLE_START) {
+			dev_info.high_va_offset = AMDGPU_GMC_HOLE_END;
+			dev_info.high_va_max = AMDGPU_GMC_HOLE_END | vm_size;
 		}
 		dev_info.virtual_address_alignment = max((int)PAGE_SIZE, AMDGPU_GPU_PAGE_SIZE);
 		dev_info.pte_fragment_size = (1 << adev->vm_manager.fragment_size) * AMDGPU_GPU_PAGE_SIZE;
@@ -1026,10 +1030,10 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 
 	pm_runtime_get_sync(dev->dev);
 
-	if (adev->asic_type != CHIP_RAVEN) {
+	if (amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_UVD) != NULL)
 		amdgpu_uvd_free_handles(adev, file_priv);
+	if (amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_VCE) != NULL)
 		amdgpu_vce_free_handles(adev, file_priv);
-	}
 
 	amdgpu_vm_bo_rmv(adev, fpriv->prt_va);
 
@@ -1421,6 +1425,14 @@ static int amdgpu_debugfs_firmware_info(struct seq_file *m, void *data)
 	if (ret)
 		return ret;
 	seq_printf(m, "VCN feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+	/* DMCU */
+	query_fw.fw_type = AMDGPU_INFO_FW_DMCU;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "DMCU feature version: %u, firmware version: 0x%08x\n",
 		   fw_info.feature, fw_info.ver);
 
 

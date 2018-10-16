@@ -354,6 +354,11 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 		run_rdma_free_callback(buf_obj);
 		pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd,
 						      buf_obj->mem);
+
+		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			kfd_unreserve_vram_limit(pdd->dev,
+				buf_obj->it.last - buf_obj->it.start + 1);
+
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }
@@ -375,8 +380,10 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
 				pdd->dev->id, p->pasid);
 
-		if (pdd->drm_file)
+		if (pdd->drm_file) {
+			pdd->dev->kfd2kgd->release_process_vm(pdd->dev->kgd, pdd->vm);
 			fput(pdd->drm_file);
+		}
 		else if (pdd->vm)
 			pdd->dev->kfd2kgd->destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
@@ -715,6 +722,9 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
+	pdd->is_debugging_enabled = false;
+	pdd->debug_trap_enabled = false;
+	pdd->trap_debug_wave_launch_mode = 0;
 	list_add(&pdd->per_device_list, &p->per_device_data);
 
 	/* Init idr used for memory handle translation */
@@ -752,11 +762,11 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 
 	if (drm_file)
 		ret = dev->kfd2kgd->acquire_process_vm(
-			dev->kgd, drm_file,
+			dev->kgd, drm_file, p->pasid,
 			&pdd->vm, &p->kgd_process_info, &p->ef);
 	else
 		ret = dev->kfd2kgd->create_process_vm(
-			dev->kgd, &pdd->vm, &p->kgd_process_info, &p->ef);
+			dev->kgd, p->pasid, &pdd->vm, &p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;

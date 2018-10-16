@@ -553,7 +553,7 @@ static ssize_t amdgpu_set_pp_table(struct device *dev,
  *
  * - maximum memory clock labeled OD_MCLK
  *
- * - three <frequency, voltage offset> points labeled OD_VDDC_CURVE.
+ * - three <frequency, voltage> points labeled OD_VDDC_CURVE.
  *   They can be used to calibrate the sclk voltage curve.
  *
  * - a list of valid ranges for sclk, mclk, and voltage curve points
@@ -570,11 +570,11 @@ static ssize_t amdgpu_set_pp_table(struct device *dev,
  *   "m 1 800" will update maximum mclk to be 800Mhz.
  *
  *   For sclk voltage curve, enter the new values by writing a
- *   string that contains "vc point clock voff" to the file. The
- *   points are indexed by 0, 1 and 2. E.g., "vc 0 300 10" will
- *   update point1 with clock set as 300Mhz and voltage increased
- *   by 10mV. "vc 2 1000 -10" will update point3 with clock set
- *   as 1000Mhz and voltage drop by 10mV.
+ *   string that contains "vc point clock voltage" to the file. The
+ *   points are indexed by 0, 1 and 2. E.g., "vc 0 300 600" will
+ *   update point1 with clock set as 300Mhz and voltage as
+ *   600mV. "vc 2 1000 1000" will update point3 with clock set
+ *   as 1000Mhz and voltage 1000mV.
  *
  * - When you have edited all of the states as needed, write "c" (commit)
  *   to the file to commit your changes
@@ -1816,18 +1816,6 @@ void amdgpu_dpm_enable_uvd(struct amdgpu_device *adev, bool enable)
 		mutex_lock(&adev->pm.mutex);
 		amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_UVD, !enable);
 		mutex_unlock(&adev->pm.mutex);
-	} else {
-		if (enable) {
-			mutex_lock(&adev->pm.mutex);
-			adev->pm.dpm.uvd_active = true;
-			adev->pm.dpm.state = POWER_STATE_TYPE_INTERNAL_UVD;
-			mutex_unlock(&adev->pm.mutex);
-		} else {
-			mutex_lock(&adev->pm.mutex);
-			adev->pm.dpm.uvd_active = false;
-			mutex_unlock(&adev->pm.mutex);
-		}
-		amdgpu_pm_compute_clocks(adev);
 	}
 }
 
@@ -1838,29 +1826,6 @@ void amdgpu_dpm_enable_vce(struct amdgpu_device *adev, bool enable)
 		mutex_lock(&adev->pm.mutex);
 		amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_VCE, !enable);
 		mutex_unlock(&adev->pm.mutex);
-	} else {
-		if (enable) {
-			mutex_lock(&adev->pm.mutex);
-			adev->pm.dpm.vce_active = true;
-			/* XXX select vce level based on ring/task */
-			adev->pm.dpm.vce_level = AMD_VCE_LEVEL_AC_ALL;
-			mutex_unlock(&adev->pm.mutex);
-			amdgpu_device_ip_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-							       AMD_CG_STATE_UNGATE);
-			amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-							       AMD_PG_STATE_UNGATE);
-			amdgpu_pm_compute_clocks(adev);
-		} else {
-			amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-							       AMD_PG_STATE_GATE);
-			amdgpu_device_ip_set_clockgating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-							       AMD_CG_STATE_GATE);
-			mutex_lock(&adev->pm.mutex);
-			adev->pm.dpm.vce_active = false;
-			mutex_unlock(&adev->pm.mutex);
-			amdgpu_pm_compute_clocks(adev);
-		}
-
 	}
 }
 
@@ -2028,14 +1993,6 @@ void amdgpu_pm_compute_clocks(struct amdgpu_device *adev)
 		if (ring && ring->ready)
 			amdgpu_fence_wait_empty(ring);
 	}
-
-	mutex_lock(&adev->pm.mutex);
-	/* update battery/ac status */
-	if (power_supply_is_system_supplied() > 0)
-		adev->pm.ac_power = true;
-	else
-		adev->pm.ac_power = false;
-	mutex_unlock(&adev->pm.mutex);
 
 	if (adev->powerplay.pp_funcs->dispatch_tasks) {
 		if (!amdgpu_device_has_dc_support(adev)) {

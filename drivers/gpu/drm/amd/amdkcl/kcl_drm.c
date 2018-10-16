@@ -291,16 +291,12 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 		crtc = connector->state->crtc;
 		if ((!crtc && old_conn_state->crtc) ||
 		    (crtc && _kcl_drm_atomic_crtc_needs_modeset(crtc->state))) {
-			struct drm_property *dpms_prop =
-				dev->mode_config.dpms_property;
 			int mode = DRM_MODE_DPMS_OFF;
 
 			if (crtc && crtc->state->active)
 				mode = DRM_MODE_DPMS_ON;
 
 			connector->dpms = mode;
-			drm_object_property_set_value(&connector->base,
-						      dpms_prop, mode);
 		}
 	}
 
@@ -518,9 +514,6 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 EXPORT_SYMBOL(drm_atomic_helper_resume);
 #endif
 
-struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
-EXPORT_SYMBOL(_kcl_drm_gem_prime_dmabuf_ops);
-
 void amdkcl_drm_init(void)
 {
 	_kcl_drm_fb_helper_cfb_fillrect = amdkcl_fp_setup("drm_fb_helper_cfb_fillrect",
@@ -540,7 +533,6 @@ void amdkcl_drm_init(void)
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(
 					"drm_atomic_helper_update_legacy_modeset_state",
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
-	_kcl_drm_gem_prime_dmabuf_ops = amdkcl_fp_setup("drm_gem_prime_dmabuf_ops", NULL);
 }
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)

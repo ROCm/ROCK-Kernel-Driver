@@ -65,7 +65,7 @@ enum {
 	ADDRESS_WATCH_REG_CNTL_ATC_BIT = 0x10000000UL,
 	ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK = 0x00FFFFFF,
 	ADDRESS_WATCH_REG_ADDLOW_MASK_EXTENSION = 0x03000000,
-	/* extend the mask to 26 bits in order to match the low address field */
+	/* extend the mask to 26 bits to match the low address field */
 	ADDRESS_WATCH_REG_ADDLOW_SHIFT = 6,
 	ADDRESS_WATCH_REG_ADDHIGH_MASK = 0xFFFF
 };
@@ -90,17 +90,17 @@ union TCP_WATCH_CNTL_BITS {
 	float f32All;
 };
 
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
-
 /*
  * Register access functions
  */
 
 static void kgd_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
-			uint32_t sh_mem_config, uint32_t sh_mem_ape1_base,
-			uint32_t sh_mem_ape1_limit, uint32_t sh_mem_bases);
+		uint32_t sh_mem_config,	uint32_t sh_mem_ape1_base,
+		uint32_t sh_mem_ape1_limit, uint32_t sh_mem_bases);
+
 static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
-			unsigned int vmid);
+					unsigned int vmid);
+
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id,
 			uint32_t queue_id, uint32_t __user *wptr,
@@ -115,12 +115,13 @@ static int kgd_hqd_sdma_dump(struct kgd_dev *kgd,
 			     uint32_t engine_id, uint32_t queue_id,
 			     uint32_t (**dump)[2], uint32_t *n_regs);
 static bool kgd_hqd_is_occupied(struct kgd_dev *kgd, uint64_t queue_address,
-		uint32_t pipe_id, uint32_t queue_id);
-static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
+				uint32_t pipe_id, uint32_t queue_id);
+
 static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 				enum kfd_preempt_type reset_type,
 				unsigned int utimeout, uint32_t pipe_id,
 				uint32_t queue_id);
+static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
@@ -139,20 +140,20 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 							uint8_t vmid);
-static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
-static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-					 uint64_t va, uint32_t vmid);
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
+
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint64_t page_table_base);
+static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
+static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 static uint32_t read_vmid_from_vmfault_reg(struct kgd_dev *kgd);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
  */
-static int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
+static int get_tile_config(struct kgd_dev *kgd,
 		struct tile_config *config)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
@@ -180,10 +181,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_local_mem_info = get_local_mem_info,
 	.get_gpu_clock_counter = get_gpu_clock_counter,
 	.get_max_engine_clock_in_mhz = get_max_engine_clock_in_mhz,
-	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
-	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
-	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
-	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
 	.alloc_pasid = amdgpu_pasid_alloc,
 	.free_pasid = amdgpu_pasid_free,
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
@@ -201,40 +198,42 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_execute = kgd_address_watch_execute,
 	.wave_control_execute = kgd_wave_control_execute,
 	.address_watch_get_offset = kgd_address_watch_get_offset,
-	.get_atc_vmid_pasid_mapping_pasid =
-			get_atc_vmid_pasid_mapping_pasid,
-	.get_atc_vmid_pasid_mapping_valid =
-			get_atc_vmid_pasid_mapping_valid,
-	.invalidate_tlbs = invalidate_tlbs,
-	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
-	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
+	.get_atc_vmid_pasid_mapping_pasid = get_atc_vmid_pasid_mapping_pasid,
+	.get_atc_vmid_pasid_mapping_valid = get_atc_vmid_pasid_mapping_valid,
+	.get_fw_version = get_fw_version,
+	.set_scratch_backing_va = set_scratch_backing_va,
+	.get_tile_config = get_tile_config,
+	.get_cu_info = get_cu_info,
+	.get_vram_usage = amdgpu_amdkfd_get_vram_usage,
+	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
+	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
+	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
+	.release_process_vm = amdgpu_amdkfd_gpuvm_release_process_vm,
+	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
+	.set_vm_context_page_table_base = set_vm_context_page_table_base,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
 	.unmap_memory_to_gpu = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu,
-	.get_fw_version = get_fw_version,
-	.get_cu_info = get_cu_info,
-	.alloc_memory_of_scratch = alloc_memory_of_scratch,
-	.write_config_static_mem = write_config_static_mem,
+	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
-	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
-	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
+	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
+	.invalidate_tlbs = invalidate_tlbs,
+	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
+	.submit_ib = amdgpu_amdkfd_submit_ib,
+	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
+	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
+	.gpu_recover = amdgpu_amdkfd_gpu_reset,
+	.set_compute_idle = amdgpu_amdkfd_set_compute_idle,
 	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
 	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
 	.export_dmabuf = amdgpu_amdkfd_gpuvm_export_dmabuf,
-	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
-	.submit_ib = amdgpu_amdkfd_submit_ib,
-	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
-	.get_tile_config = amdgpu_amdkfd_get_tile_config,
-	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
+	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
+	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
-	.get_vram_usage = amdgpu_amdkfd_get_vram_usage,
-	.gpu_recover = amdgpu_amdkfd_gpu_reset,
-	.set_compute_idle = amdgpu_amdkfd_set_compute_idle
 };
 
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions()
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
 }
@@ -303,12 +302,12 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 
 	/*
 	 * We have to assume that there is no outstanding mapping.
-	 * The ATC_VMID_PASID_MAPPING_UPDATE_STATUS bit could be 0 because a
-	 * mapping is in progress or because a mapping finished and the SW
-	 * cleared it. So the protocol is to always wait & clear.
+	 * The ATC_VMID_PASID_MAPPING_UPDATE_STATUS bit could be 0 because
+	 * a mapping is in progress or because a mapping finished and the
+	 * SW cleared it. So the protocol is to always wait & clear.
 	 */
-	uint32_t pasid_mapping = (pasid == 0) ? 0 :
-			(uint32_t)pasid | ATC_VMID0_PASID_MAPPING__VALID_MASK;
+	uint32_t pasid_mapping = (pasid == 0) ? 0 : (uint32_t)pasid |
+			ATC_VMID0_PASID_MAPPING__VALID_MASK;
 
 	WREG32(mmATC_VMID0_PASID_MAPPING + vmid, pasid_mapping);
 
@@ -726,9 +725,8 @@ static int kgd_address_watch_disable(struct kgd_dev *kgd)
 
 	/* Turning off this address until we set all the registers */
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
-		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX
-				+ ADDRESS_WATCH_REG_CNTL],
-				cntl.u32All);
+		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX +
+			ADDRESS_WATCH_REG_CNTL], cntl.u32All);
 
 	return 0;
 }
@@ -746,24 +744,20 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 
 	/* Turning off this watch point until we set all the registers */
 	cntl.bitfields.valid = 0;
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
-			+ ADDRESS_WATCH_REG_CNTL],
-		cntl.u32All);
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+		ADDRESS_WATCH_REG_CNTL], cntl.u32All);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
-			+ ADDRESS_WATCH_REG_ADDR_HI],
-		addr_hi);
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+		ADDRESS_WATCH_REG_ADDR_HI], addr_hi);
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
-			+ ADDRESS_WATCH_REG_ADDR_LO],
-		addr_lo);
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+		ADDRESS_WATCH_REG_ADDR_LO], addr_lo);
 
 	/* Enable the watch point */
 	cntl.bitfields.valid = 1;
 
-	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
-			+ ADDRESS_WATCH_REG_CNTL],
-		cntl.u32All);
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+		ADDRESS_WATCH_REG_CNTL], cntl.u32All);
 
 	return 0;
 }
@@ -820,6 +814,86 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 	return reg & ATC_VMID0_PASID_MAPPING__PASID_MASK;
 }
 
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+
+	lock_srbm(kgd, 0, 0, 0, vmid);
+	WREG32(mmSH_HIDDEN_PRIVATE_BASE_VMID, va);
+	unlock_srbm(kgd);
+}
+
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+	const union amdgpu_firmware_header *hdr;
+
+	switch (type) {
+	case KGD_ENGINE_PFP:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.pfp_fw->data;
+		break;
+
+	case KGD_ENGINE_ME:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.me_fw->data;
+		break;
+
+	case KGD_ENGINE_CE:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.ce_fw->data;
+		break;
+
+	case KGD_ENGINE_MEC1:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.mec_fw->data;
+		break;
+
+	case KGD_ENGINE_MEC2:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.mec2_fw->data;
+		break;
+
+	case KGD_ENGINE_RLC:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->gfx.rlc_fw->data;
+		break;
+
+	case KGD_ENGINE_SDMA1:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->sdma.instance[0].fw->data;
+		break;
+
+	case KGD_ENGINE_SDMA2:
+		hdr = (const union amdgpu_firmware_header *)
+						adev->sdma.instance[1].fw->data;
+		break;
+
+	default:
+		return 0;
+	}
+
+	if (hdr == NULL)
+		return 0;
+
+	/* Only 12 bit in use*/
+	return hdr->common.ucode_version;
+}
+
+static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
+			uint64_t page_table_base)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
+		pr_err("trying to set page table base for wrong VMID\n");
+		return;
+	}
+	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8,
+		lower_32_bits(page_table_base));
+}
+
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
@@ -857,95 +931,6 @@ static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
 	RREG32(mmVM_INVALIDATE_RESPONSE);
 	return 0;
-}
-
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
-{
-	uint32_t reg;
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	reg = swizzle_enable << SH_STATIC_MEM_CONFIG__SWIZZLE_ENABLE__SHIFT |
-		element_size << SH_STATIC_MEM_CONFIG__ELEMENT_SIZE__SHIFT |
-		index_stride << SH_STATIC_MEM_CONFIG__INDEX_STRIDE__SHIFT |
-		mtype << SH_STATIC_MEM_CONFIG__PRIVATE_MTYPE__SHIFT;
-
-	WREG32(mmSH_STATIC_MEM_CONFIG, reg);
-	return 0;
-}
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-				 uint64_t va, uint32_t vmid)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	lock_srbm(kgd, 0, 0, 0, vmid);
-	WREG32(mmSH_HIDDEN_PRIVATE_BASE_VMID, va);
-	unlock_srbm(kgd);
-
-	return 0;
-}
-
-
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-	const union amdgpu_firmware_header *hdr;
-
-	switch (type) {
-	case KGD_ENGINE_PFP:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.pfp_fw->data;
-		break;
-
-	case KGD_ENGINE_ME:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.me_fw->data;
-		break;
-
-	case KGD_ENGINE_CE:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.ce_fw->data;
-		break;
-
-	case KGD_ENGINE_MEC1:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.mec_fw->data;
-		break;
-
-	case KGD_ENGINE_MEC2:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.mec2_fw->data;
-		break;
-
-	case KGD_ENGINE_RLC:
-		hdr = (const union amdgpu_firmware_header *)adev->gfx.rlc_fw->data;
-		break;
-
-	case KGD_ENGINE_SDMA1:
-		hdr = (const union amdgpu_firmware_header *)adev->sdma.instance[0].fw->data;
-		break;
-
-	case KGD_ENGINE_SDMA2:
-		hdr = (const union amdgpu_firmware_header *)adev->sdma.instance[1].fw->data;
-		break;
-
-	default:
-		return 0;
-	}
-
-	if (hdr == NULL)
-		return 0;
-
-	/* Only 12 bit in use*/
-	return hdr->common.ucode_version;
-}
-
-static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
-			uint64_t page_table_base)
-{
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
-	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
-		pr_err("trying to set page table base for wrong VMID\n");
-		return;
-	}
-	WREG32(mmVM_CONTEXT8_PAGE_TABLE_BASE_ADDR + vmid - 8,
-		lower_32_bits(page_table_base));
 }
 
  /**

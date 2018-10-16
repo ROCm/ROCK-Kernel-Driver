@@ -38,6 +38,10 @@
 #define VG20_PSUEDO_NUM_DCEFCLK_DPM_LEVELS  8
 #define VG20_PSUEDO_NUM_UCLK_DPM_LEVELS     4
 
+//OverDriver8 macro defs
+#define AVFS_CURVE 0
+#define OD8_HOTCURVE_TEMPERATURE 85
+
 typedef uint32_t PP_Clock;
 
 enum {
@@ -498,6 +502,8 @@ struct vega20_hwmgr {
 
 	/* ---- Overdrive next setting ---- */
 	struct vega20_odn_data         odn_data;
+	bool                           gfxclk_overdrive;
+	bool                           memclk_overdrive;
 
 	/* ---- Overdrive8 Setting ---- */
 	struct vega20_od8_settings     od8_settings;

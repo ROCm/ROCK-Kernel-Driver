@@ -42,8 +42,12 @@
 
 /* Firmware Names */
 #define FIRMWARE_RAVEN		"amdgpu/raven_vcn.bin"
+#define FIRMWARE_PICASSO	"amdgpu/picasso_vcn.bin"
+#define FIRMWARE_RAVEN2		"amdgpu/raven2_vcn.bin"
 
 MODULE_FIRMWARE(FIRMWARE_RAVEN);
+MODULE_FIRMWARE(FIRMWARE_PICASSO);
+MODULE_FIRMWARE(FIRMWARE_RAVEN2);
 
 static void amdgpu_vcn_idle_work_handler(struct work_struct *work);
 
@@ -59,7 +63,12 @@ int amdgpu_vcn_sw_init(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_RAVEN:
-		fw_name = FIRMWARE_RAVEN;
+		if (adev->rev_id >= 8)
+			fw_name = FIRMWARE_RAVEN2;
+		else if (adev->pdev->device == 0x15d8)
+			fw_name = FIRMWARE_PICASSO;
+		else
+			fw_name = FIRMWARE_RAVEN;
 		break;
 	default:
 		return -EINVAL;

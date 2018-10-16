@@ -109,7 +109,6 @@
  */
 extern int max_num_of_queues_per_device;
 
-#define KFD_MAX_NUM_OF_QUEUES_PER_DEVICE_DEFAULT 4096
 #define KFD_MAX_NUM_OF_QUEUES_PER_DEVICE		\
 	(KFD_MAX_NUM_OF_PROCESSES *			\
 			KFD_MAX_NUM_OF_QUEUES_PER_PROCESS)
@@ -178,32 +177,6 @@ extern bool keep_idle_process_evicted;
  */
 extern uint64_t kfd_total_mem_size;
 
-/**
- * enum kfd_sched_policy
- *
- * @KFD_SCHED_POLICY_HWS: H/W scheduling policy known as command processor (cp)
- * scheduling. In this scheduling mode we're using the firmware code to
- * schedule the user mode queues and kernel queues such as HIQ and DIQ.
- * the HIQ queue is used as a special queue that dispatches the configuration
- * to the cp and the user mode queues list that are currently running.
- * the DIQ queue is a debugging queue that dispatches debugging commands to the
- * firmware.
- * in this scheduling mode user mode queues over subscription feature is
- * enabled.
- *
- * @KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION: The same as above but the over
- * subscription feature disabled.
- *
- * @KFD_SCHED_POLICY_NO_HWS: no H/W scheduling policy is a mode which directly
- * set the command processor registers and sets the queues "manually". This
- * mode is used *ONLY* for debugging proposes.
- *
- */
-enum kfd_sched_policy {
-	KFD_SCHED_POLICY_HWS = 0,
-	KFD_SCHED_POLICY_HWS_NO_OVERSUBSCRIPTION,
-	KFD_SCHED_POLICY_NO_HWS
-};
 
 enum cache_policy {
 	cache_policy_coherent,
@@ -393,6 +366,7 @@ enum kfd_mempool {
 int kfd_chardev_init(void);
 void kfd_chardev_exit(void);
 struct device *kfd_chardev(void);
+void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size);
 
 /**
  * enum kfd_unmap_queues_filter
@@ -739,6 +713,22 @@ struct kfd_process_device {
 	 */
 	bool already_dequeued;
 
+	/* Flag to indicate if debugging is active on this device for this
+	 * process.  This is for the new GFX9+ debugging, and indicates that
+	 * any of the debug features are enabled, ie: wave launch mode,
+	 * address watch, or trap debug.  It also indicates that a debug
+	 * VMID has been allocated.
+	 */
+	bool is_debugging_enabled;
+
+	/* Flag to indicate if trap debugging is active on this device for
+	 * this process.  This is for the GFX9_ debugging features
+	 */
+	bool debug_trap_enabled;
+
+	/* Value of the wave launch mode if debugging is enabled */
+	uint32_t trap_debug_wave_launch_mode;
+
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
 };
@@ -949,6 +939,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu);
 int kfd_topology_remove_device(struct kfd_dev *gpu);
 struct kfd_topology_device *kfd_topology_device_by_proximity_domain(
 						uint32_t proximity_domain);
+struct kfd_topology_device *kfd_topology_device_by_id(uint32_t gpu_id);
 struct kfd_dev *kfd_device_by_id(uint32_t gpu_id);
 struct kfd_dev *kfd_device_by_pci_dev(const struct pci_dev *pdev);
 struct kfd_dev *kfd_device_by_kgd(const struct kgd_dev *kgd);

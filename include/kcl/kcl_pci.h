@@ -49,6 +49,15 @@ u32 pcie_bandwidth_capable(struct pci_dev *dev, enum pci_bus_speed *speed,
 #define  PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
 #endif
 
+void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
+
 #endif
+
+static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
+{
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+	_kcl_pci_configure_extended_tags(dev);
+#endif
+}
 
 #endif /* AMDKCL_PCI_H */

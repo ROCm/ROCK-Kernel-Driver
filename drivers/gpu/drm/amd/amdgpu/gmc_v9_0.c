@@ -265,12 +265,12 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 		amdgpu_vm_get_task_info(adev, entry->pasid, &task_info);
 
 		dev_err(adev->dev,
-			"[%s] VMC page fault (src_id:%u ring:%u vmid:%u pasid:%u, for process %s pid %d thread %s pid %d\n)\n",
+			"[%s] VMC page fault (src_id:%u ring:%u vmid:%u pasid:%u, for process %s pid %d thread %s pid %d)\n",
 			entry->vmid_src ? "mmhub" : "gfxhub",
 			entry->src_id, entry->ring_id, entry->vmid,
 			entry->pasid, task_info.process_name, task_info.tgid,
 			task_info.task_name, task_info.pid);
-		dev_err(adev->dev, "  at address 0x%016llx from %d\n",
+		dev_err(adev->dev, "  in page starting at address 0x%016llx from %d\n",
 			addr, entry->client_id);
 		if (!amdgpu_sriov_vf(adev))
 			dev_err(adev->dev,
@@ -560,7 +560,7 @@ static uint64_t gmc_v9_0_get_vm_pte_flags(struct amdgpu_device *adev,
 static void gmc_v9_0_get_vm_pde(struct amdgpu_device *adev, int level,
 				uint64_t *addr, uint64_t *flags)
 {
-	if (!(*flags & AMDGPU_PDE_PTE))
+	if (!(*flags & AMDGPU_PDE_PTE) && !(*flags & AMDGPU_PTE_SYSTEM))
 		*addr = adev->vm_manager.vram_base_offset + *addr -
 			adev->gmc.vram_start;
 	BUG_ON(*addr & 0xFFFF00000000003FULL);
@@ -692,6 +692,29 @@ static int gmc_v9_0_ecc_available(struct amdgpu_device *adev)
 	return lost_sheep == 0;
 }
 
+static bool gmc_v9_0_keep_stolen_memory(struct amdgpu_device *adev)
+{
+
+	/*
+	 * TODO:
+	 * Currently there is a bug where some memory client outside
+	 * of the driver writes to first 8M of VRAM on S3 resume,
+	 * this overrides GART which by default gets placed in first 8M and
+	 * causes VM_FAULTS once GTT is accessed.
+	 * Keep the stolen memory reservation until the while this is not solved.
+	 * Also check code in gmc_v9_0_get_vbios_fb_size and gmc_v9_0_late_init
+	 */
+	switch (adev->asic_type) {
+	case CHIP_VEGA10:
+		return true;
+	case CHIP_RAVEN:
+	case CHIP_VEGA12:
+	case CHIP_VEGA20:
+	default:
+		return false;
+	}
+}
+
 static int gmc_v9_0_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -708,10 +731,8 @@ static int gmc_v9_0_late_init(void *handle)
 	unsigned i;
 	int r;
 
-	/*
-	 * TODO - Uncomment once GART corruption issue is fixed.
-	 */
-	/* amdgpu_bo_late_init(adev); */
+	if (!gmc_v9_0_keep_stolen_memory(adev))
+		amdgpu_bo_late_init(adev);
 
 	for(i = 0; i < adev->num_rings; ++i) {
 		struct amdgpu_ring *ring = adev->rings[i];
@@ -749,8 +770,10 @@ static void gmc_v9_0_vram_gtt_location(struct amdgpu_device *adev,
 	u64 base = 0;
 	if (!amdgpu_sriov_vf(adev))
 		base = mmhub_v1_0_get_fb_location(adev);
-	amdgpu_device_vram_location(adev, &adev->gmc, base);
-	amdgpu_device_gart_location(adev, mc);
+	amdgpu_gmc_vram_location(adev, &adev->gmc, base);
+	amdgpu_gmc_gart_location(adev, mc);
+	if (!amdgpu_sriov_vf(adev))
+		amdgpu_gmc_agp_location(adev, mc);
 	/* base offset of vram pages */
 	adev->vm_manager.vram_base_offset = gfxhub_v1_0_get_mc_fb_offset(adev);
 }
@@ -850,18 +873,16 @@ static int gmc_v9_0_gart_init(struct amdgpu_device *adev)
 
 static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 {
-#if 0
 	u32 d1vga_control = RREG32_SOC15(DCE, 0, mmD1VGA_CONTROL);
-#endif
 	unsigned size;
 
 	/*
 	 * TODO Remove once GART corruption is resolved
 	 * Check related code in gmc_v9_0_sw_fini
 	 * */
-	size = 9 * 1024 * 1024;
+	if (gmc_v9_0_keep_stolen_memory(adev))
+		return 9 * 1024 * 1024;
 
-#if 0
 	if (REG_GET_FIELD(d1vga_control, D1VGA_CONTROL, D1VGA_MODE_ENABLE)) {
 		size = 9 * 1024 * 1024; /* reserve 8MB for vga emulator and 1 MB for FB */
 	} else {
@@ -878,6 +899,7 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 			break;
 		case CHIP_VEGA10:
 		case CHIP_VEGA12:
+		case CHIP_VEGA20:
 		default:
 			viewport = RREG32_SOC15(DCE, 0, mmSCL0_VIEWPORT_SIZE);
 			size = (REG_GET_FIELD(viewport, SCL0_VIEWPORT_SIZE, VIEWPORT_HEIGHT) *
@@ -890,7 +912,6 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 	if ((adev->gmc.real_vram_size - size) < (8 * 1024 * 1024))
 		return 0;
 
-#endif
 	return size;
 }
 
@@ -995,39 +1016,19 @@ static int gmc_v9_0_sw_init(void *handle)
 	return 0;
 }
 
-/**
- * gmc_v9_0_gart_fini - vm fini callback
- *
- * @adev: amdgpu_device pointer
- *
- * Tears down the driver GART/VM setup (CIK).
- */
-static void gmc_v9_0_gart_fini(struct amdgpu_device *adev)
-{
-	amdgpu_gart_table_vram_free(adev);
-	amdgpu_gart_fini(adev);
-}
-
 static int gmc_v9_0_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	amdgpu_gem_force_release(adev);
 	amdgpu_vm_manager_fini(adev);
-	gmc_v9_0_gart_fini(adev);
 
-	/*
-	* TODO:
-	* Currently there is a bug where some memory client outside
-	* of the driver writes to first 8M of VRAM on S3 resume,
-	* this overrides GART which by default gets placed in first 8M and
-	* causes VM_FAULTS once GTT is accessed.
-	* Keep the stolen memory reservation until the while this is not solved.
-	* Also check code in gmc_v9_0_get_vbios_fb_size and gmc_v9_0_late_init
-	*/
-	amdgpu_bo_free_kernel(&adev->stolen_vga_memory, NULL, NULL);
+	if (gmc_v9_0_keep_stolen_memory(adev))
+		amdgpu_bo_free_kernel(&adev->stolen_vga_memory, NULL, NULL);
 
+	amdgpu_gart_table_vram_free(adev);
 	amdgpu_bo_fini(adev);
+	amdgpu_gart_fini(adev);
 
 	return 0;
 }
@@ -1082,7 +1083,6 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_RAVEN:
-		mmhub_v1_0_initialize_power_gating(adev);
 		mmhub_v1_0_update_power_gating(adev, true);
 		break;
 	default:

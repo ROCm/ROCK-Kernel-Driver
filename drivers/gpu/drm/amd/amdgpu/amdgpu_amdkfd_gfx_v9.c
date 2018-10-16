@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2014-2018 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -87,8 +87,7 @@
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
-	RESET_WAVES,
-	SAVE_WAVES
+	RESET_WAVES
 };
 
 static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
@@ -97,13 +96,6 @@ static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
 	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
 	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
 };
-
-
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-		void *vm, struct kgd_mem **mem);
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
-
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
 /*
  * Register access functions
@@ -137,7 +129,6 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 				uint32_t queue_id);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int utimeout);
-static uint32_t get_watch_base_addr(struct amdgpu_device *adev);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
@@ -151,16 +142,29 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
 
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid);
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd);
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1);
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
+
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-				 uint64_t va, uint32_t vmid);
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype);
 static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 		uint64_t page_table_base);
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid);
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 
@@ -173,17 +177,6 @@ static int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 
 	config->gb_addr_config = adev->gfx.config.gb_addr_config;
-#if 0
-/* TODO - confirm REG_GET_FIELD x2, should be OK as is... but
- * MC_ARB_RAMCFG register doesn't exist on Vega10 - initial amdgpu
- * changes commented out related code, doing the same here for now but
- * need to sync with Ken et al
- */
-	config->num_banks = REG_GET_FIELD(adev->gfx.config.mc_arb_ramcfg,
-				MC_ARB_RAMCFG, NOOFBANK);
-	config->num_ranks = REG_GET_FIELD(adev->gfx.config.mc_arb_ramcfg,
-				MC_ARB_RAMCFG, NOOFRANKS);
-#endif
 
 	config->tile_config_ptr = adev->gfx.config.tile_mode_array;
 	config->num_tile_configs =
@@ -202,15 +195,9 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_local_mem_info = get_local_mem_info,
 	.get_gpu_clock_counter = get_gpu_clock_counter,
 	.get_max_engine_clock_in_mhz = get_max_engine_clock_in_mhz,
-	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
-	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
-	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
-	.create_process_gpumem = create_process_gpumem,
-	.destroy_process_gpumem = destroy_process_gpumem,
-	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
-	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.alloc_pasid = amdgpu_pasid_alloc,
 	.free_pasid = amdgpu_pasid_free,
+	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_set_pasid_vmid_mapping,
 	.init_interrupts = kgd_init_interrupts,
 	.hqd_load = kgd_hqd_load,
@@ -229,49 +216,45 @@ static const struct kfd2kgd_calls kfd2kgd = {
 			get_atc_vmid_pasid_mapping_pasid,
 	.get_atc_vmid_pasid_mapping_valid =
 			get_atc_vmid_pasid_mapping_valid,
-	.invalidate_tlbs = invalidate_tlbs,
-	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
-	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
+	.get_fw_version = get_fw_version,
+	.set_scratch_backing_va = set_scratch_backing_va,
+	.get_tile_config = amdgpu_amdkfd_get_tile_config,
+	.get_cu_info = get_cu_info,
+	.get_vram_usage = amdgpu_amdkfd_get_vram_usage,
+	.create_process_vm = amdgpu_amdkfd_gpuvm_create_process_vm,
+	.acquire_process_vm = amdgpu_amdkfd_gpuvm_acquire_process_vm,
+	.destroy_process_vm = amdgpu_amdkfd_gpuvm_destroy_process_vm,
+	.release_process_vm = amdgpu_amdkfd_gpuvm_release_process_vm,
+	.get_process_page_dir = amdgpu_amdkfd_gpuvm_get_process_page_dir,
+	.set_vm_context_page_table_base = set_vm_context_page_table_base,
 	.alloc_memory_of_gpu = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu,
 	.free_memory_of_gpu = amdgpu_amdkfd_gpuvm_free_memory_of_gpu,
 	.map_memory_to_gpu = amdgpu_amdkfd_gpuvm_map_memory_to_gpu,
 	.unmap_memory_to_gpu = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu,
-	.get_fw_version = get_fw_version,
-	.get_cu_info = get_cu_info,
-	.alloc_memory_of_scratch = alloc_memory_of_scratch,
-	.write_config_static_mem = write_config_static_mem,
+	.sync_memory = amdgpu_amdkfd_gpuvm_sync_memory,
 	.map_gtt_bo_to_kernel = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel,
-	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
-	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
+	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
+	.invalidate_tlbs = invalidate_tlbs,
+	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
+	.submit_ib = amdgpu_amdkfd_submit_ib,
+	.gpu_recover = amdgpu_amdkfd_gpu_reset,
+	.set_compute_idle = amdgpu_amdkfd_set_compute_idle,
 	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
 	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
 	.export_dmabuf = amdgpu_amdkfd_gpuvm_export_dmabuf,
-	.get_vm_fault_info = amdgpu_amdkfd_gpuvm_get_vm_fault_info,
-	.submit_ib = amdgpu_amdkfd_submit_ib,
-	.get_tile_config = amdgpu_amdkfd_get_tile_config,
-	.restore_process_bos = amdgpu_amdkfd_gpuvm_restore_process_bos,
+	.enable_debug_trap = kgd_enable_debug_trap,
+	.disable_debug_trap = kgd_disable_debug_trap,
+	.set_debug_trap_data = kgd_set_debug_trap_data,
+	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_set_wave_launch_mode,
+	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
+	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
 	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
-	.get_vram_usage = amdgpu_amdkfd_get_vram_usage,
-	.gpu_recover = amdgpu_amdkfd_gpu_reset,
-	.set_compute_idle = amdgpu_amdkfd_set_compute_idle
 };
 
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions()
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
-}
-
-static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
-				void *vm, struct kgd_mem **mem)
-{
-	return 0;
-}
-
-/* Destroys the GPU allocation and frees the kgd_mem structure */
-static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-
 }
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
@@ -745,12 +728,6 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 
 	if (adev->in_gpu_reset)
 		return -EIO;
-#if 0
-	unsigned long flags;
-	int retry;
-#endif
-	if (adev->in_gpu_reset)
-		return -EIO;
 
 	acquire_queue(kgd, pipe_id, queue_id);
 
@@ -768,62 +745,6 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 		type = DRAIN_PIPE;
 		break;
 	}
-
-#if 0 /* Is this still needed? */
-	/* Workaround: If IQ timer is active and the wait time is close to or
-	 * equal to 0, dequeueing is not safe. Wait until either the wait time
-	 * is larger or timer is cleared. Also, ensure that IQ_REQ_PEND is
-	 * cleared before continuing. Also, ensure wait times are set to at
-	 * least 0x3.
-	 */
-	local_irq_save(flags);
-	preempt_disable();
-	retry = 5000; /* wait for 500 usecs at maximum */
-	while (true) {
-		temp = RREG32(mmCP_HQD_IQ_TIMER);
-		if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, PROCESSING_IQ)) {
-			pr_debug("HW is processing IQ\n");
-			goto loop;
-		}
-		if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, ACTIVE)) {
-			if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, RETRY_TYPE)
-					== 3) /* SEM-rearm is safe */
-				break;
-			/* Wait time 3 is safe for CP, but our MMIO read/write
-			 * time is close to 1 microsecond, so check for 10 to
-			 * leave more buffer room
-			 */
-			if (REG_GET_FIELD(temp, CP_HQD_IQ_TIMER, WAIT_TIME)
-					>= 10)
-				break;
-			pr_debug("IQ timer is active\n");
-		} else
-			break;
-loop:
-		if (!retry) {
-			pr_err("CP HQD IQ timer status time out\n");
-			break;
-		}
-		ndelay(100);
-		--retry;
-	}
-	retry = 1000;
-	while (true) {
-		temp = RREG32(mmCP_HQD_DEQUEUE_REQUEST);
-		if (!(temp & CP_HQD_DEQUEUE_REQUEST__IQ_REQ_PEND_MASK))
-			break;
-		pr_debug("Dequeue request is pending\n");
-
-		if (!retry) {
-			pr_err("CP HQD dequeue request time out\n");
-			break;
-		}
-		ndelay(100);
-		--retry;
-	}
-	local_irq_restore(flags);
-	preempt_enable();
-#endif
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_DEQUEUE_REQUEST), type);
 
@@ -1121,24 +1042,149 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
-static int write_config_static_mem(struct kgd_dev *kgd, bool swizzle_enable,
-		uint8_t element_size, uint8_t index_stride, uint8_t mtype)
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid)
 {
-	/* No longer needed on GFXv9. These values are now hard-coded,
-	 * except for the MTYPE which comes from the page table.
-	 */
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	uint32_t orig_wave_cntl_value;
+	uint32_t orig_stall_vmid;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
+							0,
+							mmSPI_GDBG_WAVE_CNTL));
+	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
+					SPI_GDBG_WAVE_CNTL,
+					STALL_VMID);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	data = 0;
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		VMID_SEL, 1<<vmid);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		TRAP_EN, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
 
 	return 0;
 }
-static int alloc_memory_of_scratch(struct kgd_dev *kgd,
-				 uint64_t va, uint32_t vmid)
+
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), trap_data0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), trap_data1);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		EXCP_EN, trap_mask);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		REPLACE, trap_override);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	bool is_stall_mode;
+	bool is_mode_set;
+
+
+	is_stall_mode = (wave_launch_mode == 4);
+	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		VMID_MASK, is_mode_set ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		MODE, is_mode_set ? wave_launch_mode : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_VMID, is_stall_mode ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_RA, is_stall_mode ? 1 : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static void set_scratch_backing_va(struct kgd_dev *kgd,
+					uint64_t va, uint32_t vmid)
 {
 	/* No longer needed on GFXv9. The scratch base address is
 	 * passed to the shader by the CP. It's the user mode driver's
 	 * responsibility.
 	 */
-
-	return 0;
 }
 
 /* FIXME: Does this need to be ASIC-specific code? */

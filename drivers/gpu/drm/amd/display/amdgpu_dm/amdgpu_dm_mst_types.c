@@ -361,10 +361,14 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	struct drm_connector_list_iter conn_iter;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	drm_connector_list_iter_begin(dev, &conn_iter);
+#else
+	drm_connector_list_iter_get(dev, &conn_iter);
+#endif
 	drm_for_each_connector_iter(connector, &conn_iter) {
 #else
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
@@ -379,8 +383,12 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			aconnector->port = port;
 			drm_mode_connector_set_path_property(connector, pathprop);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 			drm_connector_list_iter_end(&conn_iter);
+#else
+			drm_connector_list_iter_put(&conn_iter);
+#endif
 #else
 			drm_modeset_unlock(&dev->mode_config.connection_mutex);
 #endif
@@ -388,8 +396,12 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			return &aconnector->base;
 		}
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-	drm_connector_list_iter_end(&conn_iter);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+			drm_connector_list_iter_end(&conn_iter);
+#else
+			drm_connector_list_iter_put(&conn_iter);
+#endif
 #else
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 #endif
