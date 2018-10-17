@@ -2748,6 +2748,8 @@ fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 	stream->out_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
 	if (stream->sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		adjust_colour_depth_from_display_info(timing_out, info);
+
+	dc_stream_calculate_phy_pix_clks(stream);
 }
 
 static void fill_audio_info(struct audio_info *audio_info,

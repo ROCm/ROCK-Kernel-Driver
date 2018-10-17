@@ -1937,49 +1937,6 @@ static struct dc_stream_state *find_pll_sharable_stream(
 	return NULL;
 }
 
-static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
-{
-	uint32_t pix_clk = timing->pix_clk_khz;
-	uint32_t normalized_pix_clk = pix_clk;
-
-	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
-		pix_clk /= 2;
-	if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422) {
-		switch (timing->display_color_depth) {
-		case COLOR_DEPTH_888:
-			normalized_pix_clk = pix_clk;
-			break;
-		case COLOR_DEPTH_101010:
-			normalized_pix_clk = (pix_clk * 30) / 24;
-			break;
-		case COLOR_DEPTH_121212:
-			normalized_pix_clk = (pix_clk * 36) / 24;
-		break;
-		case COLOR_DEPTH_161616:
-			normalized_pix_clk = (pix_clk * 48) / 24;
-		break;
-		default:
-			ASSERT(0);
-		break;
-		}
-	}
-	return normalized_pix_clk;
-}
-
-static void calculate_phy_pix_clks(struct dc_stream_state *stream)
-{
-	/* update actual pixel clock on all streams */
-	if (dc_is_hdmi_signal(stream->signal))
-		stream->phy_pix_clk = get_norm_pix_clk(
-			&stream->timing);
-	else
-		stream->phy_pix_clk =
-			stream->timing.pix_clk_khz;
-
-	if (stream->timing.timing_3d_format == TIMING_3D_FORMAT_HW_FRAME_PACKING)
-		stream->phy_pix_clk *= 2;
-}
-
 enum dc_status resource_map_pool_resources(
 		const struct dc  *dc,
 		struct dc_state *context,
@@ -2865,8 +2822,6 @@ enum dc_status dc_validate_stream(struct dc *dc, struct dc_stream_state *stream)
 	struct dc_link *link = stream->sink->link;
 	struct timing_generator *tg = core_dc->res_pool->timing_generators[0];
 	enum dc_status res = DC_OK;
-
-	calculate_phy_pix_clks(stream);
 
 	if (!tg->funcs->validate_timing(tg, &stream->timing))
 		res = DC_FAIL_CONTROLLER_VALIDATE;

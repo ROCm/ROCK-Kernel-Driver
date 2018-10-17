@@ -169,6 +169,8 @@ void dc_commit_updates_for_stream(struct dc *dc,
  */
 void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream);
 
+void dc_stream_calculate_phy_pix_clks(struct dc_stream_state *stream);
+
 uint8_t dc_get_current_stream_count(struct dc *dc);
 struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i);
 
