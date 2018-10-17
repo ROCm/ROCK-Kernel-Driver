@@ -724,11 +724,13 @@ static int pp_dpm_force_clock_level(void *handle,
 		return 0;
 	}
 
+	if (hwmgr->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL) {
+		pr_debug("force clock level is for dpm manual mode only.\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&hwmgr->smu_lock);
-	if (hwmgr->dpm_level == AMD_DPM_FORCED_LEVEL_MANUAL)
-		ret = hwmgr->hwmgr_func->force_clock_level(hwmgr, type, mask);
-	else
-		ret = -EINVAL;
+	ret = hwmgr->hwmgr_func->force_clock_level(hwmgr, type, mask);
 	mutex_unlock(&hwmgr->smu_lock);
 	return ret;
 }
