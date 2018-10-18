@@ -3233,8 +3233,10 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 #else
 					     &vm->va.rb_root, rb) {
 #endif
+		/* Don't remove the mapping here, we don't want to trigger a
+		 * rebalance and the tree is about to be destroyed anyway.
+		 */
 		list_del(&mapping->list);
-		amdgpu_vm_it_remove(mapping, &vm->va);
 		kfree(mapping);
 	}
 	list_for_each_entry_safe(mapping, tmp, &vm->freed, list) {
