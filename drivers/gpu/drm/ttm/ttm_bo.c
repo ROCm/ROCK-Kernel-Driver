@@ -1538,7 +1538,7 @@ static void ttm_bo_global_kobj_release(struct kobject *kobj)
 	kfree(glob);
 }
 
-void ttm_bo_global_release(void)
+static void ttm_bo_global_release(void)
 {
 	struct ttm_bo_global *glob = &ttm_bo_glob;
 
@@ -1552,9 +1552,8 @@ void ttm_bo_global_release(void)
 out:
 	mutex_unlock(&ttm_global_mutex);
 }
-EXPORT_SYMBOL(ttm_bo_global_release);
 
-int ttm_bo_global_init(void)
+static int ttm_bo_global_init(void)
 {
 	struct ttm_bo_global *glob = &ttm_bo_glob;
 	int ret = 0;
@@ -1591,8 +1590,6 @@ out:
 	mutex_unlock(&ttm_global_mutex);
 	return ret;
 }
-EXPORT_SYMBOL(ttm_bo_global_init);
-
 
 int ttm_bo_device_release(struct ttm_bo_device *bdev)
 {
@@ -1631,18 +1628,25 @@ int ttm_bo_device_release(struct ttm_bo_device *bdev)
 
 	drm_vma_offset_manager_destroy(&bdev->vma_manager);
 
+	if (!ret)
+		ttm_bo_global_release();
+
 	return ret;
 }
 EXPORT_SYMBOL(ttm_bo_device_release);
 
 int ttm_bo_device_init(struct ttm_bo_device *bdev,
-		       struct ttm_bo_global *glob,
 		       struct ttm_bo_driver *driver,
 		       struct address_space *mapping,
 		       uint64_t file_page_offset,
 		       bool need_dma32)
 {
-	int ret = -EINVAL;
+	struct ttm_bo_global *glob = &ttm_bo_glob;
+	int ret;
+
+	ret = ttm_bo_global_init();
+	if (ret)
+		return ret;
 
 	bdev->driver = driver;
 
@@ -1669,6 +1673,7 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 
 	return 0;
 out_no_sys:
+	ttm_bo_global_release();
 	return ret;
 }
 EXPORT_SYMBOL(ttm_bo_device_init);

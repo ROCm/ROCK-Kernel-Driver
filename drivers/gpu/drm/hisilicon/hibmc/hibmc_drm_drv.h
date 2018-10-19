@@ -50,7 +50,6 @@ struct hibmc_drm_private {
 	struct drm_atomic_state *suspend_state;
 
 	/* ttm */
-	struct ttm_bo_global_ref bo_global_ref;
 	struct ttm_bo_device bdev;
 	bool initialized;
 
