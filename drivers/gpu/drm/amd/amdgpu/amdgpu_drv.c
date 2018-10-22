@@ -1352,6 +1352,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		kms_driver.driver_features |= DRIVER_ATOMIC;
 #endif
 
+	kcl_pci_create_measure_file(pdev);
 	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
@@ -1410,6 +1411,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	 * Clear the Bus Master Enable bit and then wait on the PCIe Device
 	 * StatusTransactions Pending bit.
 	 */
+	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_wait_for_pending_transaction(pdev);
 }
