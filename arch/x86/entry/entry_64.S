@@ -1203,6 +1203,16 @@ ENTRY(paranoid_entry)
 	xorl	%ebx, %ebx
 
 1:
+	/*
+	 * Always stash CR3 in %r14.  This value will be restored,
+	 * verbatim, at exit.  Needed if paranoid_entry interrupted
+	 * another entry that already switched to the user CR3 value
+	 * but has not yet returned to userspace.
+	 *
+	 * This is also why CS (stashed in the "iret frame" by the
+	 * hardware at entry) can not be used: this may be a return
+	 * to kernel code, but with a user CR3 value.
+	 */
 	SAVE_AND_SWITCH_TO_KERNEL_CR3 scratch_reg=%rax save_reg=%r14
 	/* Restrict Indirect Branch speculation */
 	RESTRICT_IB_SPEC_SAVE_AND_CLOBBER save_reg=%r13d
@@ -1231,11 +1241,13 @@ ENTRY(paranoid_exit)
 	TRACE_IRQS_IRETQ
 	/* Restore Indirect Branch Speculation to the previous state */
 	RESTORE_IB_SPEC_CLOBBER save_reg=%r13d
+	/* Always restore stashed CR3 value (see paranoid_entry) */
 	RESTORE_CR3	scratch_reg=%rbx save_reg=%r14
 	SWAPGS_UNSAFE_STACK
 	jmp	.Lparanoid_exit_restore
 .Lparanoid_exit_no_swapgs:
 	TRACE_IRQS_IRETQ_DEBUG
+	/* Always restore stashed CR3 value (see paranoid_entry) */
 	RESTORE_CR3	scratch_reg=%rbx save_reg=%r14
 .Lparanoid_exit_restore:
 	jmp restore_regs_and_return_to_kernel
@@ -1659,6 +1671,7 @@ end_repeat_nmi:
 	/* Restore Indirect Branch speculation to the previous state */
 	RESTORE_IB_SPEC_CLOBBER save_reg=%r13d
 
+	/* Always restore stashed CR3 value (see paranoid_entry) */
 	RESTORE_CR3 scratch_reg=%r15 save_reg=%r14
 
 	testl	%ebx, %ebx			/* swapgs needed? */
