@@ -318,3 +318,125 @@ bool _kcl_pci_pr3_present(struct pci_dev *pdev)
 EXPORT_SYMBOL_GPL(_kcl_pci_pr3_present);
 #endif
 #endif /* HAVE_PCI_PR3_PRESENT */
+
+#ifdef AMDKCL_CREATE_MEASURE_FILE
+static ssize_t max_link_speed_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%s\n", PCIE_SPEED2STR(kcl_pcie_get_speed_cap(pdev)));
+}
+static DEVICE_ATTR_RO(max_link_speed);
+
+static ssize_t max_link_width_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", kcl_pcie_get_width_cap(pdev));
+}
+static DEVICE_ATTR_RO(max_link_width);
+
+static ssize_t current_link_speed_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	u16 linkstat;
+	int err;
+	const char *speed;
+
+	err = pcie_capability_read_word(pci_dev, PCI_EXP_LNKSTA, &linkstat);
+	if (err)
+		return -EINVAL;
+
+	switch (linkstat & PCI_EXP_LNKSTA_CLS) {
+	case PCI_EXP_LNKSTA_CLS_16_0GB:
+		speed = "16 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_8_0GB:
+		speed = "8 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_5_0GB:
+		speed = "5 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_2_5GB:
+		speed = "2.5 GT/s";
+		break;
+	default:
+		speed = "Unknown speed";
+	}
+
+	return sprintf(buf, "%s\n", speed);
+}
+static DEVICE_ATTR_RO(current_link_speed);
+
+static ssize_t current_link_width_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	u16 linkstat;
+	int err;
+
+	err = pcie_capability_read_word(pci_dev, PCI_EXP_LNKSTA, &linkstat);
+	if (err)
+		return -EINVAL;
+
+	return sprintf(buf, "%u\n",
+		(linkstat & PCI_EXP_LNKSTA_NLW) >> PCI_EXP_LNKSTA_NLW_SHIFT);
+}
+static DEVICE_ATTR_RO(current_link_width);
+
+static struct attribute *pcie_dev_attrs[] = {
+	&dev_attr_current_link_speed.attr,
+	&dev_attr_current_link_width.attr,
+	&dev_attr_max_link_width.attr,
+	&dev_attr_max_link_speed.attr,
+	NULL,
+};
+
+int _kcl_pci_create_measure_file(struct pci_dev *pdev)
+{
+	int ret = 0;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_current_link_speed);
+	if (ret) {
+		dev_err(&pdev->dev,
+				"Failed to create current_link_speed sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_current_link_width);
+	if (ret) {
+		dev_err(&pdev->dev,
+				"Failed to create current_link_width sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_max_link_width);
+	if (ret) {
+		dev_err(&pdev->dev,
+				"Failed to create max_link_width sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_max_link_speed);
+	if (ret) {
+		dev_err(&pdev->dev,
+				"Failed to create max_link_speed sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(_kcl_pci_create_measure_file);
+
+void _kcl_pci_remove_measure_file(struct pci_dev *pdev)
+{
+	device_remove_file(&pdev->dev, &dev_attr_current_link_speed);
+	device_remove_file(&pdev->dev, &dev_attr_current_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_speed);
+}
+EXPORT_SYMBOL(_kcl_pci_remove_measure_file);
+#endif /* AMDKCL_CREATE_MEASURE_FILE */
