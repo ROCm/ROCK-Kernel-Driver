@@ -36,6 +36,7 @@
 #include <drm/drm_file.h>
 #endif
 #include <drm/ttm/ttm_bo_driver.h>
+#include <linux/chash.h>
 
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
@@ -134,7 +135,7 @@ struct amdgpu_vm_bo_base {
 	struct amdgpu_bo		*bo;
 
 	/* protected by bo being reserved */
-	struct list_head		bo_list;
+	struct amdgpu_vm_bo_base	*next;
 
 	/* protected by spinlock */
 	struct list_head		vm_status;
@@ -182,6 +183,13 @@ struct amdgpu_task_info {
 	char	task_name[TASK_COMM_LEN];
 	pid_t	pid;
 	pid_t	tgid;
+};
+
+#define AMDGPU_PAGEFAULT_HASH_BITS 8
+struct amdgpu_retryfault_hashtable {
+	DECLARE_CHASH_TABLE(hash, AMDGPU_PAGEFAULT_HASH_BITS, 8, 0);
+	spinlock_t	lock;
+	int		count;
 };
 
 struct amdgpu_vm {
@@ -250,6 +258,7 @@ struct amdgpu_vm {
 	struct ttm_lru_bulk_move lru_bulk_move;
 	/* mark whether can do the bulk move */
 	bool			bulk_moveable;
+	struct amdgpu_retryfault_hashtable *fault_hash;
 };
 
 struct amdgpu_vm_manager {
@@ -364,5 +373,9 @@ void amdgpu_vm_set_task_info(struct amdgpu_vm *vm);
 
 void amdgpu_vm_move_to_lru_tail(struct amdgpu_device *adev,
 				struct amdgpu_vm *vm);
+
+int amdgpu_vm_add_fault(struct amdgpu_retryfault_hashtable *fault_hash, u64 key);
+
+void amdgpu_vm_clear_fault(struct amdgpu_retryfault_hashtable *fault_hash, u64 key);
 
 #endif

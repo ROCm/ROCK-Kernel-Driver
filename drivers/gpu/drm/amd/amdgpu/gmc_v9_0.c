@@ -43,6 +43,7 @@
 
 #include "gfxhub_v1_0.h"
 #include "mmhub_v1_0.h"
+#include "gfxhub_v1_1.h"
 
 #include "ivsrcid/vmc/irqsrcs_vmc_1_0.h"
 
@@ -592,8 +593,7 @@ static const struct amdgpu_gmc_funcs gmc_v9_0_gmc_funcs = {
 
 static void gmc_v9_0_set_gmc_funcs(struct amdgpu_device *adev)
 {
-	if (adev->gmc.gmc_funcs == NULL)
-		adev->gmc.gmc_funcs = &gmc_v9_0_gmc_funcs;
+	adev->gmc.gmc_funcs = &gmc_v9_0_gmc_funcs;
 }
 
 static int gmc_v9_0_early_init(void *handle)
@@ -770,12 +770,18 @@ static void gmc_v9_0_vram_gtt_location(struct amdgpu_device *adev,
 	u64 base = 0;
 	if (!amdgpu_sriov_vf(adev))
 		base = mmhub_v1_0_get_fb_location(adev);
+	/* add the xgmi offset of the physical node */
+	base += adev->gmc.xgmi.physical_node_id * adev->gmc.xgmi.node_segment_size;
 	amdgpu_gmc_vram_location(adev, &adev->gmc, base);
 	amdgpu_gmc_gart_location(adev, mc);
 	if (!amdgpu_sriov_vf(adev))
 		amdgpu_gmc_agp_location(adev, mc);
 	/* base offset of vram pages */
 	adev->vm_manager.vram_base_offset = gfxhub_v1_0_get_mc_fb_offset(adev);
+
+	/* XXX: add the xgmi offset of the physical node? */
+	adev->vm_manager.vram_base_offset +=
+		adev->gmc.xgmi.physical_node_id * adev->gmc.xgmi.node_segment_size;
 }
 
 /**
@@ -986,6 +992,12 @@ static int gmc_v9_0_sw_init(void *handle)
 		printk(KERN_WARNING "amdgpu: No coherent DMA available.\n");
 	}
 	adev->need_swiotlb = drm_get_max_iomem() > ((u64)1 << dma_bits);
+
+	if (adev->asic_type == CHIP_VEGA20) {
+		r = gfxhub_v1_1_get_xgmi_info(adev);
+		if (r)
+			return r;
+	}
 
 	r = gmc_v9_0_mc_init(adev);
 	if (r)

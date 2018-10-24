@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-16 Advanced Micro Devices, Inc.
+ * Copyright 2016 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,41 +23,27 @@
  *
  */
 
-#ifndef __DISPLAY_CLOCK_H__
-#define __DISPLAY_CLOCK_H__
 
-#include "dm_services_types.h"
-#include "dc.h"
+#ifndef MOD_SHARED_H_
+#define MOD_SHARED_H_
 
-/* Structure containing all state-dependent clocks
- * (dependent on "enum clocks_state") */
-struct state_dependent_clocks {
-	int display_clk_khz;
-	int pixel_clk_khz;
+enum color_transfer_func {
+	transfer_func_unknown,
+	transfer_func_srgb,
+	transfer_func_bt709,
+	transfer_func_pq2084,
+	transfer_func_pq2084_interim,
+	transfer_func_linear_0_1,
+	transfer_func_linear_0_125,
+	transfer_func_dolbyvision,
+	transfer_func_gamma_22,
+	transfer_func_gamma_26
 };
 
-struct dccg {
-	struct dc_context *ctx;
-	const struct display_clock_funcs *funcs;
-
-	enum dm_pp_clocks_state max_clks_state;
-	enum dm_pp_clocks_state cur_min_clks_state;
-	struct dc_clocks clks;
+enum vrr_packet_type {
+	packet_type_vrr,
+	packet_type_fs1,
+	packet_type_fs2
 };
 
-struct display_clock_funcs {
-	void (*update_clocks)(struct dccg *dccg,
-			struct dc_clocks *new_clocks,
-			bool safe_to_lower);
-	int (*set_dispclk)(struct dccg *dccg,
-		int requested_clock_khz);
-
-	int (*get_dp_ref_clk_frequency)(struct dccg *dccg);
-
-	bool (*update_dfs_bypass)(struct dccg *dccg,
-		struct dc *dc,
-		struct dc_state *context,
-		int requested_clock_khz);
-};
-
-#endif /* __DISPLAY_CLOCK_H__ */
+#endif /* MOD_SHARED_H_ */

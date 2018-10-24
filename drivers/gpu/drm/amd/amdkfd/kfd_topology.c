@@ -495,6 +495,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->node_props.location_id);
 	sysfs_show_32bit_prop(buffer, "drm_render_minor",
 			dev->node_props.drm_render_minor);
+	sysfs_show_64bit_prop(buffer, "hive_id",
+			dev->node_props.hive_id);
 
 	if (dev->gpu) {
 		log_max_watch_addr =
@@ -1235,9 +1237,9 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
 
 	if (!dev->gpu->pci_atomic_requested ||
-		dev->gpu->device_info->asic_family == CHIP_HAWAII)
-			flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
-				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+	    dev->gpu->device_info->asic_family == CHIP_HAWAII)
+		flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
 
 	/* GPU only creates direct links so apply flags setting to all */
 	list_for_each_entry(link, &dev->io_link_props, list) {
@@ -1345,6 +1347,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev->node_props.drm_render_minor =
 		gpu->shared_resources.drm_render_minor;
 
+	dev->node_props.hive_id = gpu->hive_id;
+
 	kfd_fill_mem_clk_max_info(dev);
 	kfd_fill_iolink_non_crat_info(dev);
 
@@ -1360,12 +1364,14 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		pr_debug("Adding doorbell packet type capability\n");
 		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_1_0 <<
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<

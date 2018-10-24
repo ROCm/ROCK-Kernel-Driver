@@ -38,12 +38,11 @@
 #include "inc/compressor.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.1.66"
+#define DC_VER "3.2.02"
 
 #define MAX_SURFACES 3
 #define MAX_STREAMS 6
 #define MAX_SINKS_PER_LINK 4
-
 
 /*******************************************************************************
  * Display Core Interfaces
@@ -208,6 +207,7 @@ struct dc_clocks {
 	int dcfclk_deep_sleep_khz;
 	int fclk_khz;
 	int phyclk_khz;
+	int dramclk_khz;
 };
 
 struct dc_debug_options {
@@ -249,8 +249,6 @@ struct dc_debug_options {
 	bool disable_dmcu;
 	bool disable_psr;
 	bool force_abm_enable;
-	bool disable_hbup_pg;
-	bool disable_dpp_pg;
 	bool disable_stereo_support;
 	bool vsr_support;
 	bool performance_trace;
@@ -304,17 +302,14 @@ struct dc {
 	struct hw_sequencer_funcs hwss;
 	struct dce_hwseq *hwseq;
 
-	/* temp store of dm_pp_display_configuration
-	 * to compare to see if display config changed
-	 */
-	struct dm_pp_display_configuration prev_display_config;
-
 	bool optimized_required;
 
 	/* FBC compressor */
 	struct compressor *fbc_compressor;
 
 	struct dc_debug_data debug_data;
+
+	const char *build_id;
 };
 
 enum frame_buffer_mode {
@@ -610,6 +605,8 @@ struct dc_validation_set {
 };
 
 enum dc_status dc_validate_plane(struct dc *dc, const struct dc_plane_state *plane_state);
+
+void get_clock_requirements_for_state(struct dc_state *state, struct AsicStateEx *info);
 
 enum dc_status dc_validate_global_state(
 		struct dc *dc,

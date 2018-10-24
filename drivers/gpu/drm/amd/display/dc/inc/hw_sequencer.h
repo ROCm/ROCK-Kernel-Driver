@@ -177,10 +177,12 @@ struct hw_sequencer_funcs {
 			struct pipe_ctx *pipe_ctx,
 			bool blank);
 
-	void (*set_bandwidth)(
+	void (*prepare_bandwidth)(
 			struct dc *dc,
-			struct dc_state *context,
-			bool safe_to_lower);
+			struct dc_state *context);
+	void (*optimize_bandwidth)(
+			struct dc *dc,
+			struct dc_state *context);
 
 	void (*set_drr)(struct pipe_ctx **pipe_ctx, int num_pipes,
 			int vmin, int vmax);
@@ -210,11 +212,6 @@ struct hw_sequencer_funcs {
 			struct resource_pool *res_pool,
 			struct pipe_ctx *pipe_ctx);
 
-	void (*ready_shared_resources)(struct dc *dc, struct dc_state *context);
-	void (*optimize_shared_resources)(struct dc *dc);
-	void (*pplib_apply_display_requirements)(
-			struct dc *dc,
-			struct dc_state *context);
 	void (*edp_power_control)(
 			struct dc_link *link,
 			bool enable);

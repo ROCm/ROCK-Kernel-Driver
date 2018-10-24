@@ -28,23 +28,23 @@
 
 #include "resource.h"
 #include "include/irq_service_interface.h"
-#include "dcn10/dcn10_resource.h"
+#include "dcn10_resource.h"
 
-#include "dcn10/dcn10_ipp.h"
-#include "dcn10/dcn10_mpc.h"
+#include "dcn10_ipp.h"
+#include "dcn10_mpc.h"
 #include "irq/dcn10/irq_service_dcn10.h"
-#include "dcn10/dcn10_dpp.h"
+#include "dcn10_dpp.h"
 #include "dcn10_optc.h"
-#include "dcn10/dcn10_hw_sequencer.h"
+#include "dcn10_hw_sequencer.h"
 #include "dce110/dce110_hw_sequencer.h"
-#include "dcn10/dcn10_opp.h"
-#include "dcn10/dcn10_link_encoder.h"
-#include "dcn10/dcn10_stream_encoder.h"
-#include "dce/dce_clocks.h"
+#include "dcn10_opp.h"
+#include "dcn10_link_encoder.h"
+#include "dcn10_stream_encoder.h"
+#include "dcn10_clk_mgr.h"
 #include "dce/dce_clock_source.h"
 #include "dce/dce_audio.h"
 #include "dce/dce_hwseq.h"
-#include "../virtual/virtual_stream_encoder.h"
+#include "virtual/virtual_stream_encoder.h"
 #include "dce110/dce110_resource.h"
 #include "dce112/dce112_resource.h"
 #include "dcn10_hubp.h"
@@ -719,12 +719,12 @@ static struct timing_generator *dcn10_timing_generator_create(
 static const struct encoder_feature_support link_enc_feature = {
 		.max_hdmi_deep_color = COLOR_DEPTH_121212,
 		.max_hdmi_pixel_clock = 600000,
-		.ycbcr420_supported = true,
+		.hdmi_ycbcr420_supported = true,
+		.dp_ycbcr420_supported = false,
 		.flags.bits.IS_HBR2_CAPABLE = true,
 		.flags.bits.IS_HBR3_CAPABLE = true,
 		.flags.bits.IS_TPS3_CAPABLE = true,
-		.flags.bits.IS_TPS4_CAPABLE = true,
-		.flags.bits.IS_YCBCR_CAPABLE = true
+		.flags.bits.IS_TPS4_CAPABLE = true
 };
 
 struct link_encoder *dcn10_link_encoder_create(
@@ -909,7 +909,9 @@ static void destruct(struct dcn10_resource_pool *pool)
 			kfree(DCN10TG_FROM_TG(pool->base.timing_generators[i]));
 			pool->base.timing_generators[i] = NULL;
 		}
+	}
 
+	for (i = 0; i < pool->base.res_cap->num_ddc; i++) {
 		if (pool->base.engines[i] != NULL)
 			pool->base.engines[i]->funcs->destroy_engine(&pool->base.engines[i]);
 		if (pool->base.hw_i2cs[i] != NULL) {
@@ -948,8 +950,8 @@ static void destruct(struct dcn10_resource_pool *pool)
 	if (pool->base.dmcu != NULL)
 		dce_dmcu_destroy(&pool->base.dmcu);
 
-	if (pool->base.dccg != NULL)
-		dce_dccg_destroy(&pool->base.dccg);
+	if (pool->base.clk_mgr != NULL)
+		dce_clk_mgr_destroy(&pool->base.clk_mgr);
 
 	kfree(pool->base.pp_smu);
 }
@@ -1131,6 +1133,24 @@ static enum dc_status dcn10_validate_plane(const struct dc_plane_state *plane_st
 	return DC_OK;
 }
 
+static enum dc_status dcn10_get_default_swizzle_mode(struct dc_plane_state *plane_state)
+{
+	enum dc_status result = DC_OK;
+
+	enum surface_pixel_format surf_pix_format = plane_state->format;
+	unsigned int bpp = resource_pixel_format_to_bpp(surf_pix_format);
+
+	enum swizzle_mode_values swizzle = DC_SW_LINEAR;
+
+	if (bpp == 64)
+		swizzle = DC_SW_64KB_D;
+	else
+		swizzle = DC_SW_64KB_S;
+
+	plane_state->tiling_info.gfx9.swizzle = swizzle;
+	return result;
+}
+
 static const struct dc_cap_funcs cap_funcs = {
 	.get_dcc_compression_cap = dcn10_get_dcc_compression_cap
 };
@@ -1141,7 +1161,8 @@ static const struct resource_funcs dcn10_res_pool_funcs = {
 	.validate_bandwidth = dcn_validate_bandwidth,
 	.acquire_idle_pipe_for_layer = dcn10_acquire_idle_pipe_for_layer,
 	.validate_plane = dcn10_validate_plane,
-	.add_stream_to_ctx = dcn10_add_stream_to_ctx
+	.add_stream_to_ctx = dcn10_add_stream_to_ctx,
+	.get_default_swizzle_mode = dcn10_get_default_swizzle_mode
 };
 
 static uint32_t read_pipe_fuses(struct dc_context *ctx)
@@ -1256,8 +1277,8 @@ static bool construct(
 		}
 	}
 
-	pool->base.dccg = dcn1_dccg_create(ctx);
-	if (pool->base.dccg == NULL) {
+	pool->base.clk_mgr = dcn1_clk_mgr_create(ctx);
+	if (pool->base.clk_mgr == NULL) {
 		dm_error("DC: failed to create display clock!\n");
 		BREAK_TO_DEBUGGER();
 		goto fail;

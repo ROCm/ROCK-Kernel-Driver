@@ -705,7 +705,8 @@ int connector_debugfs_init(struct amdgpu_dm_connector *connector)
 	int i;
 	struct dentry *ent, *dir = connector->base.debugfs_entry;
 
-	if (connector->base.connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+	if (connector->base.connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
+	    connector->base.connector_type == DRM_MODE_CONNECTOR_eDP) {
 		for (i = 0; i < ARRAY_SIZE(dp_debugfs_entries); i++) {
 			ent = debugfs_create_file(dp_debugfs_entries[i].name,
 						  0644,
@@ -801,8 +802,5 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 		adev,
 		&dtn_log_fops);
 
-	if (IS_ERR(ent))
-		return PTR_ERR(ent);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(ent);
 }

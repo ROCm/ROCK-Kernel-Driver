@@ -87,6 +87,20 @@ struct amdgpu_gmc_funcs {
 			   u64 *dst, u64 *flags);
 };
 
+struct amdgpu_xgmi {
+	/* from psp */
+	u64 device_id;
+	u64 hive_id;
+	/* fixed per family */
+	u64 node_segment_size;
+	/* physical node (0-3) */
+	unsigned physical_node_id;
+	/* number of nodes (0-4) */
+	unsigned num_physical_nodes;
+	/* gpu list in the same hive */
+	struct list_head head;
+};
+
 struct amdgpu_gmc {
 	resource_size_t		aper_size;
 	resource_size_t		aper_base;
@@ -102,6 +116,14 @@ struct amdgpu_gmc {
 	u64			gart_end;
 	u64			vram_start;
 	u64			vram_end;
+	/* FB region , it's same as local vram region in single GPU, in XGMI
+	 * configuration, this region covers all GPUs in the same hive ,
+	 * each GPU in the hive has the same view of this FB region .
+	 * GPU0's vram starts at offset (0 * segment size) ,
+	 * GPU1 starts at offset (1 * segment size), etc.
+	 */
+	u64			fb_start;
+	u64			fb_end;
 	unsigned		vram_width;
 	u64			real_vram_size;
 	int			vram_mtrr;
@@ -125,6 +147,8 @@ struct amdgpu_gmc {
 	atomic_t                vm_fault_info_updated;
 
 	const struct amdgpu_gmc_funcs	*gmc_funcs;
+
+	struct amdgpu_xgmi xgmi;
 };
 
 #define amdgpu_gmc_flush_gpu_tlb(adev, vmid) (adev)->gmc.gmc_funcs->flush_gpu_tlb((adev), (vmid))

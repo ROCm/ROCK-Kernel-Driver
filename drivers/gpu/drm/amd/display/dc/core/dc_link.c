@@ -198,7 +198,7 @@ static bool program_hpd_filter(
 	return result;
 }
 
-static bool detect_sink(struct dc_link *link, enum dc_connection_type *type)
+bool dc_link_detect_sink(struct dc_link *link, enum dc_connection_type *type)
 {
 	uint32_t is_hpd_high = 0;
 	struct gpio *hpd_pin;
@@ -612,7 +612,7 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 	if (link->connector_signal == SIGNAL_TYPE_VIRTUAL)
 		return false;
 
-	if (false == detect_sink(link, &new_connection_type)) {
+	if (false == dc_link_detect_sink(link, &new_connection_type)) {
 		BREAK_TO_DEBUGGER();
 		return false;
 	}
@@ -1357,28 +1357,13 @@ static enum dc_status enable_link_dp(
 	struct dc_link *link = stream->sink->link;
 	struct dc_link_settings link_settings = {0};
 	enum dp_panel_mode panel_mode;
-	enum dc_link_rate max_link_rate = LINK_RATE_HIGH2;
 
 	/* get link settings for video mode timing */
 	decide_link_settings(stream, &link_settings);
 
-	/* raise clock state for HBR3 if required. Confirmed with HW DCE/DPCS
-	 * logic for HBR3 still needs Nominal (0.8V) on VDDC rail
-	 */
-	if (link->link_enc->features.flags.bits.IS_HBR3_CAPABLE)
-		max_link_rate = LINK_RATE_HIGH3;
-
-	if (link_settings.link_rate == max_link_rate) {
-		struct dc_clocks clocks = state->bw.dcn.clk;
-
-		/* dce/dcn compat, do not update dispclk */
-		clocks.dispclk_khz = 0;
-		/* 27mhz = 27000000hz= 27000khz */
-		clocks.phyclk_khz = link_settings.link_rate * 27000;
-
-		state->dis_clk->funcs->update_clocks(
-				state->dis_clk, &clocks, false);
-	}
+	pipe_ctx->stream_res.pix_clk_params.requested_sym_clk =
+			link_settings.link_rate * LINK_RATE_REF_FREQ_IN_KHZ;
+	state->dccg->funcs->update_clocks(state->dccg, state, false);
 
 	dp_enable_link_phy(
 		link,
@@ -2559,23 +2544,24 @@ void core_link_enable_stream(
 			pipe_ctx->stream_res.stream_enc,
 			&stream->timing);
 
-	resource_build_info_frame(pipe_ctx);
-	core_dc->hwss.update_info_frame(pipe_ctx);
+	if (!IS_FPGA_MAXIMUS_DC(core_dc->ctx->dce_environment)) {
+		resource_build_info_frame(pipe_ctx);
+		core_dc->hwss.update_info_frame(pipe_ctx);
 
-	/* eDP lit up by bios already, no need to enable again. */
-	if (pipe_ctx->stream->signal == SIGNAL_TYPE_EDP &&
-			pipe_ctx->stream->apply_edp_fast_boot_optimization) {
-		pipe_ctx->stream->apply_edp_fast_boot_optimization = false;
-		pipe_ctx->stream->dpms_off = false;
-		return;
-	}
+		/* eDP lit up by bios already, no need to enable again. */
+		if (pipe_ctx->stream->signal == SIGNAL_TYPE_EDP &&
+				pipe_ctx->stream->apply_edp_fast_boot_optimization) {
+			pipe_ctx->stream->apply_edp_fast_boot_optimization = false;
+			pipe_ctx->stream->dpms_off = false;
+			return;
+		}
 
-	if (pipe_ctx->stream->dpms_off)
-		return;
+		if (pipe_ctx->stream->dpms_off)
+			return;
 
-	status = enable_link(state, pipe_ctx);
+		status = enable_link(state, pipe_ctx);
 
-	if (status != DC_OK) {
+		if (status != DC_OK) {
 			DC_LOG_WARNING("enabling link %u failed: %d\n",
 			pipe_ctx->stream->sink->link->link_index,
 			status);
@@ -2590,23 +2576,26 @@ void core_link_enable_stream(
 				BREAK_TO_DEBUGGER();
 				return;
 			}
+		}
+
+		core_dc->hwss.enable_audio_stream(pipe_ctx);
+
+		/* turn off otg test pattern if enable */
+		if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
+			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
+					CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
+					COLOR_DEPTH_UNDEFINED);
+
+		core_dc->hwss.enable_stream(pipe_ctx);
+
+		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
+			allocate_mst_payload(pipe_ctx);
+
+		core_dc->hwss.unblank_stream(pipe_ctx,
+			&pipe_ctx->stream->sink->link->cur_link_settings);
+
 	}
 
-	core_dc->hwss.enable_audio_stream(pipe_ctx);
-
-	/* turn off otg test pattern if enable */
-	if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
-		pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
-				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
-				COLOR_DEPTH_UNDEFINED);
-
-	core_dc->hwss.enable_stream(pipe_ctx);
-
-	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
-		allocate_mst_payload(pipe_ctx);
-
-	core_dc->hwss.unblank_stream(pipe_ctx,
-		&pipe_ctx->stream->sink->link->cur_link_settings);
 }
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx, int option)

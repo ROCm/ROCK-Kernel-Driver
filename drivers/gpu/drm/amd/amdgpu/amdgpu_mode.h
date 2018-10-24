@@ -319,7 +319,7 @@ struct amdgpu_framebuffer {
 };
 
 static inline struct drm_gem_object *
-kcl_drm_fb_get_gem_obj(struct drm_framebuffer * fb,int index)
+kcl_drm_fb_get_gem_obj(const struct drm_framebuffer * fb,int index)
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	if(fb)
@@ -328,7 +328,7 @@ kcl_drm_fb_get_gem_obj(struct drm_framebuffer * fb,int index)
 		return NULL;
 #else
 	struct amdgpu_framebuffer * afb = to_amdgpu_framebuffer(fb);
-	(void *)index; /* for compile un-used warning */
+	(void)index; /* for compile un-used warning */
 	if(afb)
 		return afb->obj;
 	else
@@ -345,7 +345,7 @@ kcl_drm_fb_set_gem_obj(struct drm_framebuffer * fb, int index ,struct drm_gem_ob
 		fb->obj[index] = obj;
 #else
 	struct amdgpu_framebuffer * afb = to_amdgpu_framebuffer(fb);
-	(void *)index; /* for compile un-used warning */
+	(void)index; /* for compile un-used warning */
 	if(afb)
 		 afb->obj = obj;
 #endif

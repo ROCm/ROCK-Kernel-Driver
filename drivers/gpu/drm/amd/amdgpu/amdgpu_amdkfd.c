@@ -31,7 +31,6 @@
 #include <linux/module.h>
 
 const struct kgd2kfd_calls *kgd2kfd;
-bool (*kgd2kfd_init_p)(unsigned int, const struct kgd2kfd_calls**);
 
 static unsigned int compute_vmid_bitmap = 0xFF00;
 
@@ -54,10 +53,8 @@ int amdgpu_amdkfd_init(void)
 
 void amdgpu_amdkfd_fini(void)
 {
-	if (kgd2kfd) {
+	if (kgd2kfd)
 		kgd2kfd->exit();
-		symbol_put(kgd2kfd_init);
-	}
 }
 
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
@@ -79,9 +76,11 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 	case CHIP_FIJI:
 	case CHIP_POLARIS10:
 	case CHIP_POLARIS11:
+	case CHIP_POLARIS12:
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	case CHIP_VEGA10:
+	case CHIP_VEGA12:
 	case CHIP_VEGA20:
 	case CHIP_RAVEN:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && defined(BUILD_AS_DKMS)
@@ -517,6 +516,13 @@ uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd)
 	uint64_t usage =
 		amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
 	return usage;
+}
+
+uint64_t amdgpu_amdkfd_get_hive_id(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	return adev->gmc.xgmi.hive_id;
 }
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,

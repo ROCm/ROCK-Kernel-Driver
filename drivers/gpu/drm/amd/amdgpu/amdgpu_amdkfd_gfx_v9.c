@@ -239,17 +239,7 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.submit_ib = amdgpu_amdkfd_submit_ib,
 	.gpu_recover = amdgpu_amdkfd_gpu_reset,
 	.set_compute_idle = amdgpu_amdkfd_set_compute_idle,
-	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
-	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
-	.export_dmabuf = amdgpu_amdkfd_gpuvm_export_dmabuf,
-	.enable_debug_trap = kgd_enable_debug_trap,
-	.disable_debug_trap = kgd_disable_debug_trap,
-	.set_debug_trap_data = kgd_set_debug_trap_data,
-	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
-	.set_wave_launch_mode = kgd_set_wave_launch_mode,
-	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
-	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
-	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
+	.get_hive_id = amdgpu_amdkfd_get_hive_id,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)

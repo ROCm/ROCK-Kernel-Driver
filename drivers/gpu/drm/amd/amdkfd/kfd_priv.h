@@ -297,6 +297,8 @@ struct kfd_dev {
 	const void *cwsr_isa;
 	unsigned int cwsr_isa_size;
 
+	/* xGMI */
+	uint64_t hive_id;
 	bool pci_atomic_requested;
 
 	/* VRAM limit */
@@ -342,10 +344,12 @@ struct cma_iter {
 	unsigned long bo_offset;
 	/* If cur_bo is a userptr BO, then a shadow system BO is created
 	 * using its underlying pages. cma_bo holds this BO. cma_list is a
-	 * list cma_bos created in one session
-	 */
+		* list cma_bos created in one session
+		*/
 	struct cma_system_bo *cma_bo;
 	struct list_head cma_list;
+
+	bool pci_atomic_requested;
 };
 
 /* KGD2KFD callbacks */
@@ -841,6 +845,7 @@ struct amdkfd_ioctl_desc {
 	unsigned int cmd_drv;
 	const char *name;
 };
+bool kfd_dev_is_large_bar(struct kfd_dev *dev);
 
 int kfd_process_create_wq(void);
 void kfd_process_destroy_wq(void);

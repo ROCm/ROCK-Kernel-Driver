@@ -58,7 +58,6 @@ struct encoder_feature_support {
 			uint32_t IS_HBR3_CAPABLE:1;
 			uint32_t IS_TPS3_CAPABLE:1;
 			uint32_t IS_TPS4_CAPABLE:1;
-			uint32_t IS_YCBCR_CAPABLE:1;
 			uint32_t HDMI_6GB_EN:1;
 		} bits;
 		uint32_t raw;
@@ -66,7 +65,8 @@ struct encoder_feature_support {
 
 	enum dc_color_depth max_hdmi_deep_color;
 	unsigned int max_hdmi_pixel_clock;
-	bool ycbcr420_supported;
+	bool hdmi_ycbcr420_supported;
+	bool dp_ycbcr420_supported;
 };
 
 union dpcd_psr_configuration {
