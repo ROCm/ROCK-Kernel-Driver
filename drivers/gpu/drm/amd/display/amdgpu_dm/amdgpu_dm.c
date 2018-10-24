@@ -5123,7 +5123,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
@@ -5135,7 +5135,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			new_crtc_state->mode_changed,
 			new_crtc_state->active_changed,
 			new_crtc_state->connectors_changed);
-
+#endif
 		/* Copy all transient state flags into dc state */
 		if (dm_new_crtc_state->stream) {
 			amdgpu_dm_crtc_copy_transient_flags(&dm_new_crtc_state->base,
@@ -5655,7 +5655,7 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state))
 			goto next_crtc;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
@@ -5667,7 +5667,7 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 			new_crtc_state->mode_changed,
 			new_crtc_state->active_changed,
 			new_crtc_state->connectors_changed);
-
+#endif
 		/* Remove stream for any changed/disabled CRTC */
 		if (!enable) {
 
