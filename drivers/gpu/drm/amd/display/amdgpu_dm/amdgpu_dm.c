@@ -1070,9 +1070,11 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 #endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_6)
 	.atomic_state_alloc = dm_atomic_state_alloc,
 	.atomic_state_clear = dm_atomic_state_clear,
 	.atomic_state_free = dm_atomic_state_alloc_free
+#endif
 };
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
