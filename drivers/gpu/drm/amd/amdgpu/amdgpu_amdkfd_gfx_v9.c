@@ -814,7 +814,8 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 		if (get_atc_vmid_pasid_mapping_valid(kgd, vmid)) {
 			if (get_atc_vmid_pasid_mapping_pasid(kgd, vmid)
 				== pasid) {
-				amdgpu_gmc_flush_gpu_tlb(adev, vmid, flush_type);
+				amdgpu_gmc_flush_gpu_tlb(adev, vmid,
+							 flush_type);
 				break;
 			}
 		}
