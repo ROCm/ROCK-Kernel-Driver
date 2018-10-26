@@ -221,7 +221,7 @@ v3d_sched_init(struct v3d_dev *v3d)
 			     &v3d_sched_ops,
 			     hw_jobs_limit, job_hang_limit,
 			     msecs_to_jiffies(hang_limit_ms),
-			     "v3d_render", true);
+			     "v3d_render");
 	if (ret) {
 		dev_err(v3d->dev, "Failed to create render scheduler: %d.",
 			ret);
