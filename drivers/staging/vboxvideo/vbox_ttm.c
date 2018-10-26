@@ -178,7 +178,7 @@ int vbox_mm_init(struct vbox_private *vbox)
 				 DRM_FILE_PAGE_OFFSET, true);
 	if (ret) {
 		DRM_ERROR("Error initialising bo driver; %d\n", ret);
-		goto err_ttm_global_release;
+		return ret;
 	}
 
 	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM,
@@ -200,8 +200,6 @@ int vbox_mm_init(struct vbox_private *vbox)
 
 err_device_release:
 	ttm_bo_device_release(&vbox->ttm.bdev);
-err_ttm_global_release:
-	vbox_ttm_global_release(vbox);
 	return ret;
 }
 
@@ -215,7 +213,6 @@ void vbox_mm_fini(struct vbox_private *vbox)
 	arch_phys_wc_del(vbox->fb_mtrr);
 #endif
 	ttm_bo_device_release(&vbox->ttm.bdev);
-	vbox_ttm_global_release(vbox);
 }
 
 void vbox_ttm_placement(struct vbox_bo *bo, int domain)
