@@ -64,7 +64,6 @@ static uint32_t smu8_get_argument(struct pp_hwmgr *hwmgr)
 static int smu8_send_msg_to_smc_async(struct pp_hwmgr *hwmgr, uint16_t msg)
 {
 	int result = 0;
-	uint32_t = val;
 
 	if (hwmgr == NULL || hwmgr->device == NULL)
 		return -EINVAL;
@@ -73,8 +72,8 @@ static int smu8_send_msg_to_smc_async(struct pp_hwmgr *hwmgr, uint16_t msg)
 					SMU_MP1_SRBM2P_RESP_0, CONTENT, 0);
 	if (result != 0) {
 		/* Read the last message to SMU, to report actual cause */
-		val = cgs_read_register(hwmgr->device,
-					mmSMU_MP1_SRBM2P_MSG_0);
+		uint32_t val = cgs_read_register(hwmgr->device,
+						 mmSMU_MP1_SRBM2P_MSG_0);
 		pr_err("smu8_send_msg_to_smc_async (0x%04x) failed\n", msg);
 		pr_err("SMU still servicing msg (0x%04x)\n", val);
 		return result;
