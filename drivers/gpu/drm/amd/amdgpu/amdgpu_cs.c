@@ -1355,7 +1355,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 	r = amdgpu_cs_parser_init(&parser, data);
 	if (r) {
-		DRM_ERROR("Failed to initialize parser !\n");
+		DRM_ERROR("Failed to initialize parser %d!\n", r);
 		goto out;
 	}
 
