@@ -322,50 +322,6 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
-	struct drm_connector_list_iter conn_iter;
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-	drm_connector_list_iter_begin(dev, &conn_iter);
-#else
-	drm_connector_list_iter_get(dev, &conn_iter);
-#endif
-	drm_for_each_connector_iter(connector, &conn_iter) {
-#else
-	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-#endif
-		aconnector = to_amdgpu_dm_connector(connector);
-		if (aconnector->mst_port == master
-				&& !aconnector->port) {
-			DRM_INFO("DM_MST: reusing connector: %p [id: %d] [master: %p]\n",
-						aconnector, connector->base.id, aconnector->mst_port);
-
-			aconnector->port = port;
-			drm_mode_connector_set_path_property(connector, pathprop);
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-			drm_connector_list_iter_end(&conn_iter);
-#else
-			drm_connector_list_iter_put(&conn_iter);
-#endif
-#else
-			drm_modeset_unlock(&dev->mode_config.connection_mutex);
-#endif
-			aconnector->mst_connected = true;
-			return &aconnector->base;
-		}
-	}
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-			drm_connector_list_iter_end(&conn_iter);
-#else
-			drm_connector_list_iter_put(&conn_iter);
-#endif
-#else
-	drm_modeset_unlock(&dev->mode_config.connection_mutex);
-#endif
 
 	aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 	if (!aconnector)
@@ -414,8 +370,6 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	 */
 	amdgpu_dm_connector_funcs_reset(connector);
 
-	aconnector->mst_connected = true;
-
 	DRM_INFO("DM_MST: added connector: %p [id: %d] [master: %p]\n",
 			aconnector, connector->base.id, aconnector->mst_port);
 
@@ -427,6 +381,9 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					struct drm_connector *connector)
 {
+	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
+	struct drm_device *dev = master->base.dev;
+	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
 	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
@@ -440,7 +397,10 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		aconnector->dc_sink = NULL;
 	}
 
-	aconnector->mst_connected = false;
+	drm_connector_unregister(connector);
+	if (adev->mode_info.rfbdev)
+		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
+	drm_connector_put(connector);
 }
 
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
@@ -451,22 +411,10 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 	drm_kms_helper_hotplug_event(dev);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-static void dm_dp_mst_link_status_reset(struct drm_connector *connector)
-{
-	mutex_lock(&connector->dev->mode_config.mutex);
-	drm_mode_connector_set_link_status_property(connector, DRM_MODE_LINK_STATUS_BAD);
-	mutex_unlock(&connector->dev->mode_config.mutex);
-}
-#endif
-
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
-#endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	drm_modeset_lock_all(dev);
@@ -481,11 +429,6 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 #endif
 
 	drm_connector_register(connector);
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-	if (aconnector->mst_connected)
-		dm_dp_mst_link_status_reset(connector);
-#endif
 }
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
