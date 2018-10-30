@@ -34,9 +34,12 @@
 #include "nbio/nbio_7_4_offset.h"
 
 MODULE_FIRMWARE("amdgpu/vega20_sos.bin");
+MODULE_FIRMWARE("amdgpu/vega20_sos_old.bin");
 
 /* address block */
 #define smnMP1_FIRMWARE_FLAGS		0x3010024
+
+#define VEGA20_BL_VERSION_VAR_NEW 0xA1
 
 static int
 psp_v11_0_get_fw_type(struct amdgpu_firmware_info *ucode, enum psp_gfx_fw_type *type)
@@ -99,6 +102,7 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 	char fw_name[30];
 	int err = 0;
 	const struct psp_firmware_header_v1_0 *hdr;
+	uint32_t bl_version;
 
 	DRM_DEBUG("\n");
 
@@ -110,7 +114,13 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 		BUG();
 	}
 
-	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos.bin", chip_name);
+	bl_version = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_100);
+	bl_version = (bl_version & 0xFF0000) >> 16;
+
+	if (bl_version == VEGA20_BL_VERSION_VAR_NEW)
+		snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos.bin", chip_name);
+	else
+		snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos_old.bin", chip_name);
 	err = request_firmware(&adev->psp.sos_fw, fw_name, adev->dev);
 	if (err)
 		goto out;
