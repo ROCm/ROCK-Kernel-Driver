@@ -40,6 +40,11 @@
 /* BO flag to indicate a KFD userptr BO */
 #define AMDGPU_AMDKFD_USERPTR_BO (1ULL << 63)
 
+/* Userptr restore delay, just long enough to allow consecutive VM
+ * changes to accumulate
+ */
+#define AMDGPU_USERPTR_RESTORE_DELAY_MS 1
+
 /* Impose limit on how much memory KFD can use */
 static struct {
 	uint64_t max_system_mem_limit;
@@ -1039,6 +1044,9 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 		pr_err("validate_pt_pd_bos() failed\n");
 		goto validate_pd_fail;
 	}
+	ret = ttm_bo_wait(&vm->root.base.bo->tbo, false, false);
+	if (ret)
+		goto wait_pd_fail;
 	amdgpu_bo_fence(vm->root.base.bo,
 			&vm->process_info->eviction_fence->base, true);
 	amdgpu_bo_unreserve(vm->root.base.bo);
@@ -1052,6 +1060,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 
 	return 0;
 
+wait_pd_fail:
 validate_pd_fail:
 	amdgpu_bo_unreserve(vm->root.base.bo);
 reserve_pd_fail:
@@ -1062,7 +1071,9 @@ reserve_pd_fail:
 		dma_fence_put(*ef);
 		*ef = NULL;
 		*process_info = NULL;
+		put_pid(info->pid);
 create_evict_fence_fail:
+		mutex_destroy(&info->lock);
 		kfree(info);
 	}
 	return ret;
@@ -1162,6 +1173,7 @@ void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 		dma_fence_put(&process_info->eviction_fence->base);
 		cancel_delayed_work_sync(&process_info->restore_userptr_work);
 		put_pid(process_info->pid);
+		mutex_destroy(&process_info->lock);
 		kfree(process_info);
 	}
 }
@@ -1365,6 +1377,7 @@ allocate_init_user_pages_failed:
 err_bo_create:
 	unreserve_system_mem_limit(adev, size, alloc_domain, !!sg);
 err_reserve_limit:
+	mutex_destroy(&(*mem)->lock);
 	kfree(*mem);
 err:
 	if (sg) {
@@ -1460,6 +1473,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	/* Free the BO*/
 	amdgpu_bo_unref(&mem->bo);
+	mutex_destroy(&mem->lock);
 	kfree(mem);
 
 	return ret;
@@ -1998,7 +2012,8 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 		r = kgd2kfd->quiesce_mm(mm);
 		if (r)
 			pr_err("Failed to quiesce KFD\n");
-		schedule_delayed_work(&process_info->restore_userptr_work, 1);
+		schedule_delayed_work(&process_info->restore_userptr_work,
+			msecs_to_jiffies(AMDGPU_USERPTR_RESTORE_DELAY_MS));
 	}
 
 	return r;
@@ -2314,7 +2329,8 @@ unlock_out:
 
 	/* If validation failed, reschedule another attempt */
 	if (evicted_bos)
-		schedule_delayed_work(&process_info->restore_userptr_work, 1);
+		schedule_delayed_work(&process_info->restore_userptr_work,
+			msecs_to_jiffies(AMDGPU_USERPTR_RESTORE_DELAY_MS));
 }
 
 /** amdgpu_amdkfd_gpuvm_restore_process_bos - Restore all BOs for the given
