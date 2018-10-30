@@ -26,10 +26,13 @@
 #define AMDGPU_AMDKFD_H_INCLUDED
 
 #include <linux/types.h>
-#include <linux/workqueue.h>
+#include <linux/mm.h>
 #include <linux/mmu_context.h>
+#include <linux/workqueue.h>
 #include <kgd_kfd_interface.h>
-#include "amdgpu.h"
+#include <drm/ttm/ttm_execbuf_util.h>
+#include "amdgpu_sync.h"
+#include "amdgpu_vm.h"
 
 extern const struct kgd2kfd_calls *kgd2kfd;
 
@@ -40,7 +43,6 @@ struct kfd_bo_va_list {
 	struct amdgpu_bo_va *bo_va;
 	void *kgd_dev;
 	bool is_mapped;
-	bool map_fail;
 	uint64_t va;
 	uint64_t pte_flags;
 };
@@ -98,7 +100,7 @@ struct amdkfd_process_info {
 
 	/* MMU-notifier related fields */
 	atomic_t evicted_bos;
-	struct delayed_work work;
+	struct delayed_work restore_userptr_work;
 	struct pid *pid;
 };
 
@@ -126,8 +128,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
 		uint64_t *actual_size);
 
-bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
-			u32 vmid);
+bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid);
 
 int amdgpu_amdkfd_pre_reset(struct amdgpu_device *adev);
 
@@ -198,7 +199,6 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr, uint64_t *size);
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info,
 					    struct dma_fence **ef);
-
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 					      struct kfd_vm_fault_info *info);
