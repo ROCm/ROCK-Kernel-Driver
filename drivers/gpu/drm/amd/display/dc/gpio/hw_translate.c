@@ -76,6 +76,7 @@ bool dal_hw_translate_init(
 		dal_hw_translate_dce110_init(translate);
 		return true;
 	case DCE_VERSION_12_0:
+	case DCE_VERSION_12_1:
 		dal_hw_translate_dce120_init(translate);
 		return true;
 #ifdef CONFIG_X86
