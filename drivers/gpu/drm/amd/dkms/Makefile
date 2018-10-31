@@ -6,18 +6,20 @@ OS_NAME = "rhel"
 OS_VERSION = "$(RHEL_MAJOR).$(RHEL_MINOR)"
 else ifneq (,$(wildcard /etc/os-release))
 OS_NAME = "$(shell sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | tr -d '\"')"
+# On CentOS/RHEL, users could have installed a kernel not distributed from RHEL
+ifeq ("centos",$(OS_NAME))
+OS_NAME="custom-rhel"
+else ifeq ("rhel",$(OS_NAME))
+OS_NAME="custom-rhel"
+else
 OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
+endif
 else
 OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
-ifeq ("centos",$(OS_NAME))
-OS_NAME = "rhel"
-OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/centos-release-upstream)"
-endif
-
-ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap" "amzn"),)
+ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap" "amzn" "custom-rhel"),)
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 else ifeq ("rhel",$(OS_NAME))
