@@ -599,4 +599,9 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#define DRM_DEV_DEBUG	dev_dbg
+#define DRM_DEV_ERROR	dev_err
+#endif
+
 #endif /* AMDKCL_DRM_H */
