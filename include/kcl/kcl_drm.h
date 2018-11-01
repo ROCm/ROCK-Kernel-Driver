@@ -11,6 +11,7 @@
 #include <drm/drm_fourcc.h>
 #include <drm/drm_rect.h>
 #include <linux/ctype.h>
+#include <linux/console.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -57,7 +58,7 @@ extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
 extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
 extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
 extern void (*_kcl_drm_fb_helper_release_fbi)(struct drm_fb_helper *fb_helper);
-extern void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
+extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
@@ -197,12 +198,12 @@ static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_hel
 #endif
 }
 
-static inline void kcl_drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper, int state)
+static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
 #ifdef BUILD_AS_DKMS
-	_kcl_drm_fb_helper_set_suspend(fb_helper, state);
+	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #else
-	drm_fb_helper_set_suspend(fb_helper, state);
+	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #endif
 }
 

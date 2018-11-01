@@ -430,10 +430,10 @@ void amdgpu_fbdev_fini(struct amdgpu_device *adev)
 	adev->mode_info.rfbdev = NULL;
 }
 
-void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state)
+void amdgpu_fbdev_set_suspend_unlocked(struct amdgpu_device *adev, int state)
 {
 	if (adev->mode_info.rfbdev)
-		kcl_drm_fb_helper_set_suspend(&adev->mode_info.rfbdev->helper,
+		kcl_drm_fb_helper_set_suspend_unlocked(&adev->mode_info.rfbdev->helper,
 			state);
 }
 
