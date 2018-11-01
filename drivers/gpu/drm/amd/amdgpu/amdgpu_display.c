@@ -1184,7 +1184,11 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 #else
 		vtotal = mode->crtc_vtotal;
 #endif
-		*vpos = *vpos - vtotal;
+		/* With variable refresh rate displays the vpos can exceed
+		 * the vtotal value. Clamp to 0 to return -vbl_end instead
+		 * of guessing the remaining number of lines until scanout.
+		 */
+		*vpos = (*vpos < vtotal) ? (*vpos - vtotal) : 0;
 	}
 
 	/* Correct for shifted end of vbl at vbl_end. */
