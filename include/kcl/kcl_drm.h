@@ -12,6 +12,7 @@
 #include <drm/drm_rect.h>
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
+#include <linux/console.h>
 #if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
@@ -51,7 +52,7 @@ extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
 				 const struct fb_image *image);
 extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
 extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
-extern void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
+extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
@@ -169,12 +170,12 @@ static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_hel
 #endif
 }
 
-static inline void kcl_drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper, int state)
+static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
 #ifdef BUILD_AS_DKMS
-	_kcl_drm_fb_helper_set_suspend(fb_helper, state);
+	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #else
-	drm_fb_helper_set_suspend(fb_helper, state);
+	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #endif
 }
 

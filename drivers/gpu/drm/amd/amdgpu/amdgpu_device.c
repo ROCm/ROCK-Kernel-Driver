@@ -3065,7 +3065,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 	drm_kms_helper_poll_disable(dev);
 
 	if (fbcon)
-		amdgpu_fbdev_set_suspend(adev, 1);
+		amdgpu_fbdev_set_suspend_unlocked(adev, 1);
 
 	cancel_delayed_work_sync(&adev->delayed_init_work);
 
@@ -3228,7 +3228,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			}
 			drm_modeset_unlock_all(dev);
 		}
-		amdgpu_fbdev_set_suspend(adev, 0);
+		amdgpu_fbdev_set_suspend_unlocked(adev, 0);
 	}
 
 	drm_kms_helper_poll_enable(dev);
