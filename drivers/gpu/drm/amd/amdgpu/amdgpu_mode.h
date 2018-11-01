@@ -677,7 +677,7 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc);
 /* fbdev layer */
 int amdgpu_fbdev_init(struct amdgpu_device *adev);
 void amdgpu_fbdev_fini(struct amdgpu_device *adev);
-void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state);
+void amdgpu_fbdev_set_suspend_unlocked(struct amdgpu_device *adev, int state);
 int amdgpu_fbdev_total_size(struct amdgpu_device *adev);
 bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj);
 #if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
