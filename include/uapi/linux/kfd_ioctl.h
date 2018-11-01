@@ -86,7 +86,7 @@ struct kfd_ioctl_get_queue_wave_state_args {
 	__u64 ctl_stack_address;	/* to KFD */
 	__u32 ctl_stack_used_size;	/* from KFD */
 	__u32 save_area_used_size;	/* from KFD */
-	__u32 queue_id;		/* to KFD */
+	__u32 queue_id;			/* to KFD */
 	__u32 pad;
 };
 
