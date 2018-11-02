@@ -605,4 +605,21 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #define DRM_DEV_ERROR	dev_err
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 3, 0)
+#define drm_for_each_plane(plane, dev) \
+	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
+
+#define drm_for_each_crtc(crtc, dev) \
+	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+
+#define drm_for_each_connector(connector, dev) \
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+
+#define drm_for_each_encoder(encoder, dev) \
+	list_for_each_entry(encoder, &(dev)->mode_config.encoder_list, head)
+
+#define drm_for_each_fb(fb, dev) \
+	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#endif
+
 #endif /* AMDKCL_DRM_H */
