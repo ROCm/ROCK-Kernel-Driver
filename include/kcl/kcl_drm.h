@@ -74,4 +74,29 @@
 #define for_each_if(condition) if (!(condition)) {} else
 #endif
 
+#ifndef drm_for_each_plane
+#define drm_for_each_plane(plane, dev) \
+	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
+#endif
+
+#ifndef drm_for_each_crtc
+#define drm_for_each_crtc(crtc, dev) \
+	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+#endif
+
+#ifndef drm_for_each_connector
+#define drm_for_each_connector(connector, dev) \
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
+
+#ifndef drm_for_each_encoder
+#define drm_for_each_encoder(encoder, dev) \
+	list_for_each_entry(encoder, &(dev)->mode_config.encoder_list, head)
+#endif
+
+#ifndef drm_for_each_fb
+#define drm_for_each_fb(fb, dev) \
+	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#endif
+
 #endif /* AMDKCL_DRM_H */
