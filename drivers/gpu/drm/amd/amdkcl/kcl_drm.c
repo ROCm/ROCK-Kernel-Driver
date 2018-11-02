@@ -18,7 +18,7 @@ int drm_crtc_force_disable_all(struct drm_device *dev)
 	int ret = 0;
 
 	drm_modeset_lock_all(dev);
-	kcl_drm_for_each_crtc(crtc, dev)
+	drm_for_each_crtc(crtc, dev)
 		if (crtc->enabled) {
 			ret = drm_crtc_force_disable(crtc);
 			if (ret)
@@ -334,13 +334,13 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-	kcl_drm_for_each_crtc(crtc, dev) {
+	drm_for_each_crtc(crtc, dev) {
 		ret = drm_modeset_lock(&crtc->mutex, ctx);
 		if (ret)
 			return ret;
 	}
 
-	kcl_drm_for_each_plane(plane, dev) {
+	drm_for_each_plane(plane, dev) {
 		ret = drm_modeset_lock(&plane->mutex, ctx);
 		if (ret)
 			return ret;
@@ -365,7 +365,7 @@ int drm_atomic_helper_disable_all(struct drm_device *dev,
 
 	state->acquire_ctx = ctx;
 
-	kcl_drm_for_each_connector(conn, dev) {
+	drm_for_each_connector(conn, dev) {
 		struct drm_crtc *crtc = conn->state->crtc;
 		struct drm_crtc_state *crtc_state;
 
@@ -409,7 +409,7 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 
 	state->acquire_ctx = ctx;
 
-	kcl_drm_for_each_crtc(crtc, dev) {
+	drm_for_each_crtc(crtc, dev) {
 		struct drm_crtc_state *crtc_state;
 
 		crtc_state = drm_atomic_get_crtc_state(state, crtc);
@@ -419,7 +419,7 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 		}
 	}
 
-	kcl_drm_for_each_plane(plane, dev) {
+	drm_for_each_plane(plane, dev) {
 		struct drm_plane_state *plane_state;
 
 		plane_state = drm_atomic_get_plane_state(state, plane);
@@ -429,7 +429,7 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 		}
 	}
 
-	kcl_drm_for_each_connector(conn, dev) {
+	drm_for_each_connector(conn, dev) {
 		struct drm_connector_state *conn_state;
 
 		conn_state = drm_atomic_get_connector_state(state, conn);
