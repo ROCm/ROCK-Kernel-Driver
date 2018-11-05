@@ -35,5 +35,6 @@
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_drm_connector.h>
+#include <kcl/kcl_device_cgroup.h>
 
 #endif /* AMDGPU_BACKPORT_H */
