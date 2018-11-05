@@ -942,14 +942,34 @@ static int stop_nocpsch(struct device_queue_manager *dqm)
 }
 
 static int allocate_sdma_queue(struct device_queue_manager *dqm,
+				unsigned int sdma_engine_id,
 				unsigned int *sdma_queue_id)
 {
-	int bit;
+	int bit = -1;
 
 	if (dqm->sdma_bitmap == 0)
 		return -ENOMEM;
 
-	bit = __ffs64(dqm->sdma_bitmap);
+	/* If sdma_engine_id is valid,
+	 * allocate queue on specific engine
+	 */
+	if (sdma_engine_id < get_num_sdma_engines(dqm)) {
+		unsigned int i;
+
+		for (i = sdma_engine_id; i < get_num_sdma_queues(dqm);
+			i += get_num_sdma_engines(dqm)) {
+			if (dqm->sdma_bitmap & (1<<i)) {
+				bit = i;
+				break;
+			}
+		}
+		if (bit == -1)
+			return -EBUSY;
+	/* Otherwise allocate from any engine */
+	} else {
+		bit = __ffs64(dqm->sdma_bitmap);
+	}
+
 	dqm->sdma_bitmap &= ~(1ULL << bit);
 	*sdma_queue_id = bit;
 
@@ -975,7 +995,8 @@ static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
 	if (!mqd_mgr)
 		return -ENOMEM;
 
-	retval = allocate_sdma_queue(dqm, &q->sdma_id);
+	retval = allocate_sdma_queue(dqm, q->properties.sdma_engine_id,
+					&q->sdma_id);
 	if (retval)
 		return retval;
 
@@ -1195,7 +1216,8 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	}
 
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA) {
-		retval = allocate_sdma_queue(dqm, &q->sdma_id);
+		retval = allocate_sdma_queue(dqm, q->properties.sdma_engine_id,
+						&q->sdma_id);
 		if (retval)
 			goto out_unlock;
 		q->properties.sdma_queue_id =

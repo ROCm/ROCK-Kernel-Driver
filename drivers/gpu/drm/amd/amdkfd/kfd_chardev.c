@@ -161,7 +161,8 @@ static int kfd_ioctl_get_version(struct file *filep, struct kfd_process *p,
 	return 0;
 }
 
-static int set_queue_properties_from_user(struct queue_properties *q_properties,
+static int set_queue_properties_from_user(struct kfd_dev *dev,
+				struct queue_properties *q_properties,
 				struct kfd_ioctl_create_queue_args *args)
 {
 	if (args->queue_percentage > KFD_MAX_QUEUE_PERCENTAGE) {
@@ -231,12 +232,21 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
 	q_properties->ctx_save_restore_area_size = args->ctx_save_restore_size;
 	q_properties->ctl_stack_size = args->ctl_stack_size;
 	if (args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE ||
-		args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL)
+		args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL) {
 		q_properties->type = KFD_QUEUE_TYPE_COMPUTE;
-	else if (args->queue_type == KFD_IOC_QUEUE_TYPE_SDMA)
+	} else if (args->queue_type == KFD_IOC_QUEUE_TYPE_SDMA) {
+		q_properties->sdma_engine_id =
+			dev->device_info->num_sdma_engines;
 		q_properties->type = KFD_QUEUE_TYPE_SDMA;
-	else
+	} else if (args->queue_type >= KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(0) &&
+		args->queue_type < KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(
+		dev->device_info->num_sdma_engines)) {
+		q_properties->sdma_engine_id =
+			args->queue_type - KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(0);
+		q_properties->type = KFD_QUEUE_TYPE_SDMA;
+	} else {
 		return -ENOTSUPP;
+	}
 
 	if (args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL)
 		q_properties->format = KFD_QUEUE_FORMAT_AQL;
@@ -283,16 +293,16 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 	pr_debug("Creating queue ioctl\n");
 
-	err = set_queue_properties_from_user(&q_properties, args);
-	if (err)
-		return err;
-
 	pr_debug("Looking for gpu id 0x%x\n", args->gpu_id);
 	dev = kfd_device_by_id(args->gpu_id);
 	if (!dev) {
 		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
 		return -EINVAL;
 	}
+
+	err = set_queue_properties_from_user(dev, &q_properties, args);
+	if (err)
+		return err;
 
 	mutex_lock(&p->mutex);
 
