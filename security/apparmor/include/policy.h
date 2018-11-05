@@ -157,6 +157,9 @@ struct aa_profile {
 
 	struct aa_rlimit rlimits;
 
+	int secmark_count;
+	struct aa_secmark *secmark;
+
 	struct aa_loaddata *rawdata;
 	unsigned char *hash;
 	char *dirname;
