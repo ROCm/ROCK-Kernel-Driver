@@ -1365,6 +1365,14 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		err = kfd_reserve_vram_limit(dev, args->size);
 		if (err)
 			goto err_unlock;
+
+		/*
+		 * Allocate public memory on large-bar systems to allow peer
+		 * mappings via PCIe even for memory that won't be mapped
+		 * to CPU
+		 */
+		if (kfd_dev_is_large_bar(dev))
+			flags |= KFD_IOC_ALLOC_MEM_FLAGS_PUBLIC;
 	}
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
