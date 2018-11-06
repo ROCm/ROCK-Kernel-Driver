@@ -44,7 +44,7 @@ void update_stream_signal(struct dc_stream_state *stream, struct dc_sink *sink)
 
 	if (dc_is_dvi_signal(stream->signal)) {
 		if (stream->ctx->dc->caps.dual_link_dvi &&
-		    stream->timing.pix_clk_khz > TMDS_MAX_PIXEL_CLOCK &&
+		    (stream->timing.pix_clk_100hz / 10) > TMDS_MAX_PIXEL_CLOCK &&
 		    sink->sink_signal != SIGNAL_TYPE_DVI_SINGLE_LINK)
 			stream->signal = SIGNAL_TYPE_DVI_DUAL_LINK;
 		else
@@ -361,7 +361,7 @@ void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream)
 			stream->output_color_space);
 	DC_LOG_DC(
 			"\tpix_clk_khz: %d, h_total: %d, v_total: %d, pixelencoder:%d, displaycolorDepth:%d\n",
-			stream->timing.pix_clk_khz,
+			stream->timing.pix_clk_100hz / 10,
 			stream->timing.h_total,
 			stream->timing.v_total,
 			stream->timing.pixel_encoding,
@@ -373,7 +373,7 @@ void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream)
 
 static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
 {
-	uint32_t pix_clk = timing->pix_clk_khz;
+	uint32_t pix_clk = timing->pix_clk_100hz/10;
 	uint32_t normalized_pix_clk = pix_clk;
 
 	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
@@ -408,7 +408,7 @@ void dc_stream_calculate_phy_pix_clks(struct dc_stream_state *stream)
 			&stream->timing);
 	else
 		stream->phy_pix_clk =
-			stream->timing.pix_clk_khz;
+			stream->timing.pix_clk_100hz/10;
 
 	if (stream->timing.timing_3d_format ==
 	    TIMING_3D_FORMAT_HW_FRAME_PACKING)
