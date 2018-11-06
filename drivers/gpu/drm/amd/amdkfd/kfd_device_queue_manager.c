@@ -1939,6 +1939,52 @@ out_unlock:
 	return r;
 }
 
+int suspend_queues(struct device_queue_manager *dqm,
+			struct kfd_process *p,
+			uint32_t flags)
+{
+	int r = -ENODEV;
+	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
+
+	dev = dqm->dev;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (dqm->dev == pdd->dev) {
+			r = pdd->dev->dqm->ops.evict_process_queues(
+					pdd->dev->dqm,
+					&pdd->qpd);
+			if (r)
+				pr_err("Failed to suspend process queues\n");
+			break;
+		}
+	}
+
+	/* Memory Fence */
+	if (!r && flags & KFD__DBG_NODE_SUSPEND_MEMORY_FENCE)
+		amdgpu_amdkfd_debug_mem_fence(dev->kgd);
+
+	return r;
+}
+
+int resume_queues(struct device_queue_manager *dqm, struct kfd_process *p)
+{
+	int r = -ENODEV;
+	struct kfd_process_device *pdd;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		if (dqm->dev == pdd->dev) {
+			r = pdd->dev->dqm->ops.restore_process_queues(
+					pdd->dev->dqm,
+					&pdd->qpd);
+			if (r)
+				pr_err("Failed to resume process queues\n");
+			break;
+		}
+	}
+
+	return r;
+}
 
 
 #if defined(CONFIG_DEBUG_FS)

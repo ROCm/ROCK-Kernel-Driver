@@ -193,32 +193,66 @@ struct kfd_ioctl_dbg_wave_control_args {
 /* KFD_IOC_DBG_TRAP_ENABLE:
  * data1: 0=disable, 1=enable
  * data2: queue ID (for future use)
+ * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
 /* KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
  * data1: SPI_GDBG_TRAP_DATA0
  * data2: SPI_GDBG_TRAP_DATA1
+ * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_TRAP_DATA 1
 
 /* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
  * data1: override mode: 0=OR, 1=REPLACE
  * data2: mask
+ * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 2
 
 /* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
  * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
  * data2: unused
+ * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 3
+
+
+#define KFD__DBG_NODE_SUSPEND_NO_GRACE		0x01
+#define KFD__DBG_NODE_SUSPEND_MEMORY_FENCE	0x02
+#define KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT	0x04
+/* KFD_IOC_DBG_TRAP_NODE_SUSPEND:
+ * data1: pid
+ * data2: nodeid
+ * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
+ *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
+ *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_NODE_SUSPEND 4
+
+/* KFD_IOC_DBG_TRAP_NODE_RESUME:
+ * data1: pid
+ * data2: nodeid
+ * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
+ *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
+ *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_NODE_RESUME 5
 
 struct kfd_ioctl_dbg_trap_args {
 	__u32 gpu_id;  /* to KFD */
 	__u32 op;      /* to KFD */
 	__u32 data1;   /* to KFD */
 	__u32 data2;   /* to KFD */
+	__u32 data3;   /* to KFD */
+	__u32 data4;   /* to KFD */
 };
 
 /* Matching HSA_EVENTTYPE */
