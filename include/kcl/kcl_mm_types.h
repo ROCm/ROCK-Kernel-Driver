@@ -2,9 +2,8 @@
 #define AMDKCL_MM_TYPES_H
 
 #include <linux/mm_types.h>
-/* Include RHEL 7.5 (drm ver:4.14)  by DRM_VERSION */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
-	DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+	defined(OS_NAME_RHEL_7_X)
 #include <linux/pfn.h>
 #else
 typedef struct {
@@ -17,9 +16,8 @@ typedef int vm_fault_t;
 
 static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
 				unsigned long addr,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
-				pfn_t pfn)
-#elif defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0) || \
+	defined(OS_NAME_SUSE_15)
 				pfn_t pfn)
 #else
 				unsigned long pfn)
