@@ -376,6 +376,8 @@ struct amdgpu_mode_info {
 	struct drm_property *audio_property;
 	/* FMT dithering */
 	struct drm_property *dither_property;
+	/* maximum number of bits per channel for monitor color */
+	struct drm_property *max_bpc_property;
 	/* it is used to allow enablement of freesync mode */
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
