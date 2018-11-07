@@ -15,5 +15,6 @@
 #include <kcl/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
+#include <kcl/kcl_drm_connector.h>
 
 #endif /* AMDGPU_BACKPORT_H */
