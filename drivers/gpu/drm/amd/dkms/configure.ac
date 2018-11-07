@@ -10,6 +10,7 @@ m4_include([m4/drm-encoder-find-valid-with-file.m4])
 m4_include([m4/drm-atomic-helper-best-encoder.m4])
 m4_include([m4/drm-edid-to-eld.m4])
 m4_include([m4/drm-cache.m4])
+m4_include([m4/drm-connector-put.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
