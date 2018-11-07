@@ -219,6 +219,9 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+	bool mst_connected;
+#endif
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)
