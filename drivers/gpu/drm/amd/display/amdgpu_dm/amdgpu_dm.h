@@ -505,6 +505,9 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
+#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
+	bool mst_connected;
+#endif
 #ifdef CONFIG_DEBUG_FS
 	uint32_t debugfs_dpcd_address;
 	uint32_t debugfs_dpcd_size;
