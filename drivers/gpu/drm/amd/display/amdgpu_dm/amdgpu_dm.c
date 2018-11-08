@@ -3345,6 +3345,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->freesync_enabled = cur->freesync_enabled;
 	state->abm_level = cur->abm_level;
+	state->crc_enabled = cur->crc_enabled;
 
 	/* TODO Duplicate dc_stream after objects are stream object is flattened */
 
