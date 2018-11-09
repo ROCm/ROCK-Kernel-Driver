@@ -276,8 +276,6 @@ static ssize_t iolink_show(struct kobject *kobj, struct attribute *attr,
 	buffer[0] = 0;
 
 	iolink = container_of(attr, struct kfd_iolink_properties, attr);
-	if (iolink->gpu && kfd_devcgroup_check_permission(iolink->gpu))
-		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "type", iolink->iolink_type);
 	sysfs_show_32bit_prop(buffer, "version_major", iolink->ver_maj);
 	sysfs_show_32bit_prop(buffer, "version_minor", iolink->ver_min);
@@ -318,8 +316,6 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 		mem = container_of(attr, struct kfd_mem_properties,
 				attr_used);
 		if (mem->gpu) {
-			if (kfd_devcgroup_check_permission(mem->gpu))
-				return -EPERM;
 			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->kgd);
 			return sysfs_show_64bit_val(buffer, used_mem);
 		}
@@ -328,8 +324,6 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 	}
 
 	mem = container_of(attr, struct kfd_mem_properties, attr_props);
-	if (mem->gpu && kfd_devcgroup_check_permission(mem->gpu))
-		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "heap_type", mem->heap_type);
 	sysfs_show_64bit_prop(buffer, "size_in_bytes", mem->size_in_bytes);
 	sysfs_show_32bit_prop(buffer, "flags", mem->flags);
@@ -359,8 +353,6 @@ static ssize_t kfd_cache_show(struct kobject *kobj, struct attribute *attr,
 	buffer[0] = 0;
 
 	cache = container_of(attr, struct kfd_cache_properties, attr);
-	if (cache->gpu && kfd_devcgroup_check_permission(cache->gpu))
-		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "processor_id_low",
 			cache->processor_id_low);
 	sysfs_show_32bit_prop(buffer, "level", cache->cache_level);
@@ -446,16 +438,12 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 	if (strcmp(attr->name, "gpu_id") == 0) {
 		dev = container_of(attr, struct kfd_topology_device,
 				attr_gpuid);
-		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
-			return -EPERM;
 		return sysfs_show_32bit_val(buffer, dev->gpu_id);
 	}
 
 	if (strcmp(attr->name, "name") == 0) {
 		dev = container_of(attr, struct kfd_topology_device,
 				attr_name);
-		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
-			return -EPERM;
 		for (i = 0; i < KFD_TOPOLOGY_PUBLIC_NAME_SIZE; i++) {
 			public_name[i] =
 					(char)dev->node_props.marketing_name[i];
@@ -468,8 +456,6 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 
 	dev = container_of(attr, struct kfd_topology_device,
 			attr_props);
-	if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
-		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "cpu_cores_count",
 			dev->node_props.cpu_cores_count);
 	sysfs_show_32bit_prop(buffer, "simd_count",
