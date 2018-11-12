@@ -1640,13 +1640,6 @@ static int amdgpu_vm_update_ptes(struct amdgpu_pte_update_params *params,
 			continue;
 		}
 
-		/* First check if the entry is already handled */
-		if (cursor.pfn < frag_start) {
-			cursor.entry->huge = true;
-			amdgpu_vm_pt_next(adev, &cursor);
-			continue;
-		}
-
 		/* If it isn't already handled it can't be a huge page */
 		if (cursor.entry->huge) {
 			/* Add the entry to the relocated list to update it. */
@@ -1709,8 +1702,17 @@ static int amdgpu_vm_update_ptes(struct amdgpu_pte_update_params *params,
 			}
 		} while (frag_start < entry_end);
 
-		if (frag >= shift)
+		if (amdgpu_vm_pt_descendant(adev, &cursor)) {
+			/* Mark all child entries as huge */
+			while (cursor.pfn < frag_start) {
+				cursor.entry->huge = true;
+				amdgpu_vm_pt_next(adev, &cursor);
+			}
+
+		} else if (frag >= shift) {
+			/* or just move on to the next on the same level. */
 			amdgpu_vm_pt_next(adev, &cursor);
+		}
 	}
 
 	return 0;
