@@ -211,23 +211,18 @@ static const struct dma_fence_ops drm_syncobj_null_fence_ops = {
 	.release = NULL,
 };
 
-static int drm_syncobj_assign_null_handle(struct drm_syncobj *syncobj)
+/**
+ * drm_syncobj_assign_null_handle - assign a stub fence to the sync object
+ * @syncobj: sync object to assign the fence on
+ *
+ * Assign a already signaled stub fence to the sync object.
+ */
+static void drm_syncobj_assign_null_handle(struct drm_syncobj *syncobj)
 {
-	struct drm_syncobj_null_fence *fence;
-	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
-	if (fence == NULL)
-		return -ENOMEM;
+	struct dma_fence *fence = dma_fence_get_stub();
 
-	spin_lock_init(&fence->lock);
-	dma_fence_init(&fence->base, &drm_syncobj_null_fence_ops,
-		       &fence->lock, 0, 0);
-	dma_fence_signal(&fence->base);
-
-	drm_syncobj_replace_fence(syncobj, &fence->base);
-
-	dma_fence_put(&fence->base);
-
-	return 0;
+	drm_syncobj_replace_fence(syncobj, 0, fence);
+	dma_fence_put(fence);
 }
 
 /**
@@ -293,7 +288,6 @@ EXPORT_SYMBOL(drm_syncobj_free);
 int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 		       struct dma_fence *fence)
 {
-	int ret;
 	struct drm_syncobj *syncobj;
 
 	syncobj = kzalloc(sizeof(struct drm_syncobj), GFP_KERNEL);
@@ -304,13 +298,8 @@ int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 	INIT_LIST_HEAD(&syncobj->cb_list);
 	spin_lock_init(&syncobj->lock);
 
-	if (flags & DRM_SYNCOBJ_CREATE_SIGNALED) {
-		ret = drm_syncobj_assign_null_handle(syncobj);
-		if (ret < 0) {
-			drm_syncobj_put(syncobj);
-			return ret;
-		}
-	}
+	if (flags & DRM_SYNCOBJ_CREATE_SIGNALED)
+		drm_syncobj_assign_null_handle(syncobj);
 
 	if (fence)
 		drm_syncobj_replace_fence(syncobj, fence);
@@ -1012,11 +1001,8 @@ drm_syncobj_signal_ioctl(struct drm_device *dev, void *data,
 	if (ret < 0)
 		return ret;
 
-	for (i = 0; i < args->count_handles; i++) {
-		ret = drm_syncobj_assign_null_handle(syncobjs[i]);
-		if (ret < 0)
-			break;
-	}
+	for (i = 0; i < args->count_handles; i++)
+		drm_syncobj_assign_null_handle(syncobjs[i]);
 
 	drm_syncobj_array_free(syncobjs, args->count_handles);
 
