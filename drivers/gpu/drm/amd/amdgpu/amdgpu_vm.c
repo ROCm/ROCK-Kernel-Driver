@@ -2069,12 +2069,12 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			if (adev->gmc.xgmi.hive_id &&
 			    adev->gmc.xgmi.hive_id == bo_adev->gmc.xgmi.hive_id) {
 				vram_base_offset = bo_adev->vm_manager.vram_base_offset;
-			} else {
-				if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
-					return -EINVAL;
+			} else if (amdgpu_device_is_peer_accessible(bo_adev,
+								    adev)) {
 				flags |= AMDGPU_PTE_SYSTEM;
 				vram_base_offset = bo_adev->gmc.aper_base;
-			}
+			} else
+				return -EINVAL;
 		}
 	} else
 		flags = 0x0;
