@@ -2284,11 +2284,12 @@ retry:
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -2485,6 +2486,14 @@ static int dm_early_init(void *handle)
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0)
+static inline bool
+drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+{
+	return state->mode_changed || state->active_changed;
+}
 #endif
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
@@ -6817,10 +6826,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			return ret;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 	/*
