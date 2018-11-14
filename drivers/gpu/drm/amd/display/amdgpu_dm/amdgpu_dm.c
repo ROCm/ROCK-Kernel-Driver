@@ -1023,12 +1023,15 @@ dm_atomic_state_alloc(struct drm_device *dev)
 
 	if (!state)
 		return NULL;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	if (drm_atomic_state_init(dev, &state->base) < 0)
 		goto fail;
 
 	return &state->base;
-
+#else
+	DRM_DEBUG_ATOMIC("Allocate atomic state %p\n", state);
+	return (struct drm_atomic_state *)state;
+#endif
 fail:
 	kfree(state);
 	return NULL;
@@ -1043,15 +1046,22 @@ dm_atomic_state_clear(struct drm_atomic_state *state)
 		dc_release_state(dm_state->context);
 		dm_state->context = NULL;
 	}
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	drm_atomic_state_default_clear(state);
+#else
+	drm_atomic_state_clear(state);
+#endif
 }
 
 static void
 dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 {
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	drm_atomic_state_default_release(state);
+#else
+	drm_atomic_state_free(state);
+#endif
 	kfree(dm_state);
 }
 
@@ -2022,11 +2032,12 @@ retry:
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -2219,6 +2230,14 @@ static int dm_early_init(void *handle)
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0)
+static inline bool
+drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+{
+	return state->mode_changed || state->active_changed;
+}
 #endif
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
@@ -6118,10 +6137,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			return ret;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 	dm_state->context = dc_create_state();
