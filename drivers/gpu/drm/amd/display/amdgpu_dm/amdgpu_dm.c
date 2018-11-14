@@ -3355,11 +3355,12 @@ retry:
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 #if !defined(for_each_oldnew_connector_in_state)
@@ -9028,10 +9029,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			return ret;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 	/*
