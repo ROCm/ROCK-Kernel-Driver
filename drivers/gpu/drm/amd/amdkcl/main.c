@@ -4,12 +4,19 @@
 extern void amdkcl_drm_init(void);
 extern void amdkcl_fence_init(void);
 extern void amdkcl_dev_cgroup_init(void);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+extern void amdkcl_pci_init(void);
+#endif
+
 
 int __init amdkcl_init(void)
 {
 	amdkcl_drm_init();
 	amdkcl_fence_init();
 	amdkcl_dev_cgroup_init();
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+	amdkcl_pci_init();
+#endif
 	return 0;
 }
 module_init(amdkcl_init);
