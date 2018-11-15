@@ -3663,8 +3663,8 @@ static void amdgpu_device_get_min_pci_speed_width(struct amdgpu_device *adev,
 	*width = PCIE_LNK_WIDTH_UNKNOWN;
 
 	while (pdev) {
-		cur_speed = pcie_get_speed_cap(pdev);
-		cur_width = pcie_get_width_cap(pdev);
+		cur_speed = kcl_pcie_get_speed_cap(pdev);
+		cur_width = kcl_pcie_get_width_cap(pdev);
 
 		if (cur_speed != PCI_SPEED_UNKNOWN) {
 			if (*speed == PCI_SPEED_UNKNOWN)
@@ -3722,7 +3722,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	if (adev->pm.pcie_gen_mask == 0) {
 		/* asic caps */
 		pdev = adev->pdev;
-		speed_cap = pcie_get_speed_cap(pdev);
+		speed_cap = kcl_pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
