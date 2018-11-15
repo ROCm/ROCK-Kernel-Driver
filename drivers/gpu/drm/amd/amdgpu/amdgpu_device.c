@@ -3509,7 +3509,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	if (adev->pm.pcie_gen_mask == 0) {
 		/* asic caps */
 		pdev = adev->pdev;
-		speed_cap = pcie_get_speed_cap(pdev);
+		speed_cap = kcl_pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
@@ -3532,7 +3532,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 		}
 		/* platform caps */
 		pdev = adev->ddev->pdev->bus->self;
-		speed_cap = pcie_get_speed_cap(pdev);
+		speed_cap = kcl_pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2);
@@ -3556,7 +3556,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	}
 	if (adev->pm.pcie_mlw_mask == 0) {
 		pdev = adev->ddev->pdev->bus->self;
-		link_width = pcie_get_width_cap(pdev);
+		link_width = kcl_pcie_get_width_cap(pdev);
 		if (link_width == PCIE_LNK_WIDTH_UNKNOWN) {
 			adev->pm.pcie_mlw_mask |= AMDGPU_DEFAULT_PCIE_MLW_MASK;
 		} else {

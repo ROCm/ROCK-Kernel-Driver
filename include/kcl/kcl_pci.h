@@ -17,12 +17,10 @@
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
-enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev);
-enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
+enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev);
+enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev);
 u32 pcie_bandwidth_capable(struct pci_dev *dev, enum pci_bus_speed *speed,
 		enum pcie_link_width *width);
-#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 #define PCIE_SPEED_16_0GT 0x17

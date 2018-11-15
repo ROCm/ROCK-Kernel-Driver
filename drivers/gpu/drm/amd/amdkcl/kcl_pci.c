@@ -1,5 +1,8 @@
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+#include "kcl_common.h"
+#endif
 
 #if defined(BUILD_AS_DKMS)
 
@@ -156,7 +159,42 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pcie_get_width_cap);
 
+#else
+
+enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
+
+enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
+
+
+void amdkcl_pci_init(void)
+{
+	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
+	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+}
+
 #endif
+
+enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+	return pcie_get_speed_cap(dev);
+#else
+	return _kcl_pcie_get_speed_cap(dev);
+#endif
+}
+EXPORT_SYMBOL(kcl_pcie_get_speed_cap);
+
+enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+	return pcie_get_width_cap(dev);
+#else
+	return _kcl_pcie_get_width_cap(dev);
+#endif
+}
+EXPORT_SYMBOL(kcl_pcie_get_width_cap);
 
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
@@ -182,7 +220,7 @@ ssize_t max_link_speed_show(struct device *dev,
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 
-	return sprintf(buf, "%s\n", PCIE_SPEED2STR(pcie_get_speed_cap(pdev)));
+	return sprintf(buf, "%s\n", PCIE_SPEED2STR(kcl_pcie_get_speed_cap(pdev)));
 }
 static DEVICE_ATTR_RO(max_link_speed);
 
@@ -191,7 +229,7 @@ ssize_t max_link_width_show(struct device *dev,
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 
-	return sprintf(buf, "%u\n", pcie_get_width_cap(pdev));
+	return sprintf(buf, "%u\n", kcl_pcie_get_width_cap(pdev));
 }
 static DEVICE_ATTR_RO(max_link_width);
 
