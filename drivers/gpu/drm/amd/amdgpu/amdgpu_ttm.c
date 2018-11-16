@@ -1429,6 +1429,9 @@ uint64_t amdgpu_ttm_tt_pde_flags(struct ttm_tt *ttm, struct ttm_mem_reg *mem)
 			flags |= AMDGPU_PTE_SNOOPED;
 	}
 
+	if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+		flags |= AMDGPU_PTE_SYSTEM;
+
 	return flags;
 }
 
