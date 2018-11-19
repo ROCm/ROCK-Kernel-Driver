@@ -122,7 +122,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	if (!handle)
 		return -EINVAL;
 
-	if (!dev || !dev->kfd2kgd->import_dmabuf)
+	if (!dev)
 		return -EINVAL;
 
 	mutex_lock(&p->mutex);
@@ -133,7 +133,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 		goto err_unlock;
 	}
 
-	r = dev->kfd2kgd->import_dmabuf(dev->kgd, dmabuf,
+	r = amdgpu_amdkfd_gpuvm_import_dmabuf(dev->kgd, dmabuf,
 					va_addr, pdd->vm,
 					(struct kgd_mem **)&mem, &size,
 					mmap_offset);
@@ -263,7 +263,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 		return 0;
 	}
 
-	r = dev->kfd2kgd->export_dmabuf(dev->kgd, pdd->vm,
+	r = amdgpu_amdkfd_gpuvm_export_dmabuf(dev->kgd, pdd->vm,
 					(struct kgd_mem *)kfd_bo->mem,
 					&dmabuf);
 	if (r)

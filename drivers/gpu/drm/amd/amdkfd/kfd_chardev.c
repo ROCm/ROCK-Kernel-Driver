@@ -1681,7 +1681,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 
 	/* Find a KFD GPU device that supports the get_dmabuf_info query */
 	for (i = 0; kfd_topology_enum_kfd_devices(i, &dev) == 0; i++)
-		if (dev && dev->kfd2kgd->get_dmabuf_info)
+		if (dev)
 			break;
 	if (!dev)
 		return -EINVAL;
@@ -1693,7 +1693,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 	}
 
 	/* Get dmabuf info from KGD */
-	r = dev->kfd2kgd->get_dmabuf_info(dev->kgd, args->dmabuf_fd,
+	r = amdgpu_amdkfd_get_dmabuf_info(dev->kgd, args->dmabuf_fd,
 					  &dma_buf_kgd, &args->size,
 					  metadata_buffer, args->metadata_size,
 					  &args->metadata_size, &flags);
@@ -2069,7 +2069,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		ret = kdev->kfd2kgd->copy_mem_to_mem(kdev->kgd, bo->mem,
+		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->kgd, bo->mem,
 						     offset, cbo->mem, 0,
 						     bo_size, &f, size);
 		if (ret) {
@@ -2387,7 +2387,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		return -EINVAL;
 	}
 
-	err = dev->kfd2kgd->copy_mem_to_mem(dev->kgd, src_mem, src_offset,
+	err = amdgpu_amdkfd_copy_mem_to_mem(dev->kgd, src_mem, src_offset,
 					    dst_mem, dst_offset, size, f,
 					    copied);
 	/* The tmp_bo allocates additional memory. So it is better to wait and

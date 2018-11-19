@@ -331,26 +331,6 @@ struct kfd2kgd_calls {
 	int (*invalidate_tlbs_vmid)(struct kgd_dev *kgd, uint16_t vmid);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 	uint64_t (*get_hive_id)(struct kgd_dev *kgd);
-	int (*get_dmabuf_info)(struct kgd_dev *kgd, int dma_buf_fd,
-			       struct kgd_dev **dma_buf_kgd, uint64_t *bo_size,
-			       void *metadata_buffer, size_t buffer_size,
-			       uint32_t *metadata_size, uint32_t *flags);
-	int (*import_dmabuf)(struct kgd_dev *kgd, struct dma_buf *dmabuf,
-			     uint64_t va, void *vm, struct kgd_mem **mem,
-			     uint64_t *size, uint64_t *mmap_offset);
-	int (*export_dmabuf)(struct kgd_dev *kgd, void *vm, struct kgd_mem *mem,
-			     struct dma_buf **dmabuf);
-	int (*pin_get_sg_table_bo)(struct kgd_dev *kgd,
-				   struct kgd_mem *mem, uint64_t offset,
-				   uint64_t size, struct sg_table **ret_sg);
-	void (*unpin_put_sg_table_bo)(struct kgd_mem *mem,
-				      struct sg_table *sg);
-
-	int (*copy_mem_to_mem)(struct kgd_dev *kgd, struct kgd_mem *src_mem,
-			       uint64_t src_offset, struct kgd_mem *dst_mem,
-			       uint64_t dest_offset, uint64_t size,
-			       struct dma_fence **f, uint64_t *actual_size);
-
 	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
 				      uint32_t trap_debug_wave_launch_mode,
 				      uint32_t vmid);
