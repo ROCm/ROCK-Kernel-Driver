@@ -2348,7 +2348,8 @@ static void dcn10_apply_ctx_for_surface(
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 			/* Skip inactive pipes and ones already updated */
-			if (!pipe_ctx->stream || pipe_ctx->stream == stream)
+			if (!pipe_ctx->stream || pipe_ctx->stream == stream
+					|| !pipe_ctx->plane_state)
 				continue;
 
 			pipe_ctx->stream_res.tg->funcs->lock(pipe_ctx->stream_res.tg);
@@ -2362,7 +2363,8 @@ static void dcn10_apply_ctx_for_surface(
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
-		if (!pipe_ctx->stream || pipe_ctx->stream == stream)
+		if (!pipe_ctx->stream || pipe_ctx->stream == stream
+				|| !pipe_ctx->plane_state)
 			continue;
 
 		dcn10_pipe_control_lock(dc, pipe_ctx, false);
