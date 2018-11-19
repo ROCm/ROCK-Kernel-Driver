@@ -76,6 +76,16 @@
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
 
+/**
+ * DOC: overview
+ *
+ * The AMDgpu display manager, **amdgpu_dm** (or even simpler,
+ * **dm**) sits between DRM and DC. It acts as a liason, converting DRM
+ * requests into DC requests, and DC responses into DRM responses.
+ *
+ * The root control structure is &struct amdgpu_display_manager.
+ */
+
 /* basic init/fini API */
 static int amdgpu_dm_init(struct amdgpu_device *adev);
 static void amdgpu_dm_fini(struct amdgpu_device *adev);
@@ -89,7 +99,7 @@ static void
 amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector);
 
 static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
-				struct amdgpu_plane *aplane,
+				struct drm_plane *plane,
 				unsigned long possible_crtcs);
 static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 			       struct drm_plane *plane,
@@ -395,11 +405,6 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 
 }
 
-/*
- * Init display KMS
- *
- * Returns 0 on success
- */
 static int amdgpu_dm_init(struct amdgpu_device *adev)
 {
 	struct dc_init_data init_data;
@@ -444,6 +449,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	    adev->asic_type >= CHIP_CARRIZO &&
 	    adev->asic_type < CHIP_RAVEN)
 		init_data.flags.gpu_vm_support = true;
+
+	if (amdgpu_dc_feature_mask & DC_FBC_MASK)
+		init_data.flags.fbc_support = true;
 
 	/* Display Core create. */
 	adev->dm.dc = dc_create(&init_data);
@@ -678,6 +686,26 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 }
 
+/**
+ * dm_hw_init() - Initialize DC device
+ * @handle: The base driver device containing the amdpgu_dm device.
+ *
+ * Initialize the &struct amdgpu_display_manager device. This involves calling
+ * the initializers of each DM component, then populating the struct with them.
+ *
+ * Although the function implies hardware initialization, both hardware and
+ * software are initialized here. Splitting them out to their relevant init
+ * hooks is a future TODO item.
+ *
+ * Some notable things that are initialized here:
+ *
+ * - Display Core, both software and hardware
+ * - DC modules that we need (freesync and color management)
+ * - DRM software states
+ * - Interrupt sources and handlers
+ * - Vblank support
+ * - Debug FS entries, if enabled
+ */
 static int dm_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -688,6 +716,14 @@ static int dm_hw_init(void *handle)
 	return 0;
 }
 
+/**
+ * dm_hw_fini() - Teardown DC device
+ * @handle: The base driver device containing the amdpgu_dm device.
+ *
+ * Teardown components within &struct amdgpu_display_manager that require
+ * cleanup. This involves cleaning up the DRM device, DC, and any modules that
+ * were loaded. Also flush IRQ workqueues and disable them.
+ */
 static int dm_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -942,6 +978,16 @@ static int dm_resume(void *handle)
 	return ret;
 }
 
+/**
+ * DOC: DM Lifecycle
+ *
+ * DM (and consequently DC) is registered in the amdgpu base driver as a IP
+ * block. When CONFIG_DRM_AMD_DC is enabled, the DM device IP block is added to
+ * the base driver's device list to be initialized and torn down accordingly.
+ *
+ * The functions to do so are provided as hooks in &struct amd_ip_funcs.
+ */
+
 static const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.name = "dm",
 	.early_init = dm_early_init,
@@ -1008,6 +1054,12 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 	drm_atomic_state_default_release(state);
 	kfree(dm_state);
 }
+
+/**
+ * DOC: atomic
+ *
+ * *WIP*
+ */
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
@@ -1573,8 +1625,23 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
 
+	/* backlight_pwm_u16_16 parameter is in unsigned 32 bit, 16 bit integer
+	 * and 16 bit fractional, where 1.0 is max backlight value.
+	 * bd->props.brightness is 8 bit format and needs to be converted by
+	 * scaling via copy lower byte to upper byte of 16 bit value.
+	 */
+	uint32_t brightness = bd->props.brightness * 0x101;
+
+	/*
+	 * PWM interperts 0 as 100% rather than 0% because of HW
+	 * limitation for level 0.  So limiting minimum brightness level
+	 * to 1.
+	 */
+	if (bd->props.brightness < 1)
+		brightness = 0x101;
+
 	if (dc_link_set_backlight_level(dm->backlight_link,
-			bd->props.brightness, 0, 0))
+			brightness, 0, 0))
 		return 0;
 	else
 		return 1;
@@ -1639,18 +1706,18 @@ static int initialize_plane(struct amdgpu_display_manager *dm,
 			     struct amdgpu_mode_info *mode_info,
 			     int plane_id)
 {
-	struct amdgpu_plane *plane;
+	struct drm_plane *plane;
 	unsigned long possible_crtcs;
 	int ret = 0;
 
-	plane = kzalloc(sizeof(struct amdgpu_plane), GFP_KERNEL);
+	plane = kzalloc(sizeof(struct drm_plane), GFP_KERNEL);
 	mode_info->planes[plane_id] = plane;
 
 	if (!plane) {
 		DRM_ERROR("KMS: Failed to allocate plane\n");
 		return -ENOMEM;
 	}
-	plane->base.type = mode_info->plane_type[plane_id];
+	plane->type = mode_info->plane_type[plane_id];
 
 	/*
 	 * HACK: IGT tests expect that each plane can only have
@@ -1741,7 +1808,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	}
 
 	for (i = 0; i < dm->dc->caps.max_streams; i++)
-		if (amdgpu_dm_crtc_init(dm, &mode_info->planes[i]->base, i)) {
+		if (amdgpu_dm_crtc_init(dm, mode_info->planes[i], i)) {
 			DRM_ERROR("KMS: Failed to initialize crtc\n");
 			goto fail;
 		}
@@ -2748,6 +2815,8 @@ fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 	stream->out_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
 	if (stream->sink->sink_signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		adjust_colour_depth_from_display_info(timing_out, info);
+
+	dc_stream_calculate_phy_pix_clks(stream);
 }
 
 static void fill_audio_info(struct audio_info *audio_info,
@@ -2919,18 +2988,11 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	drm_connector = &aconnector->base;
 
 	if (!aconnector->dc_sink) {
-		/*
-		 * Create dc_sink when necessary to MST
-		 * Don't apply fake_sink to MST
-		 */
-		if (aconnector->mst_port) {
-			dm_dp_mst_dc_sink_create(drm_connector);
-			return stream;
+		if (!aconnector->mst_port) {
+			sink = create_fake_sink(aconnector);
+			if (!sink)
+				return stream;
 		}
-
-		sink = create_fake_sink(aconnector);
-		if (!sink)
-			return stream;
 	} else {
 		sink = aconnector->dc_sink;
 	}
@@ -3678,7 +3740,7 @@ void dm_drm_plane_destroy_state(struct drm_plane *plane,
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
-	.destroy	= drm_plane_cleanup,
+	.destroy	= drm_primary_helper_destroy,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	.set_property	= drm_atomic_helper_plane_set_property,
 #endif
@@ -3860,49 +3922,49 @@ static const u32 cursor_formats[] = {
 };
 
 static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
-				struct amdgpu_plane *aplane,
+				struct drm_plane *plane,
 				unsigned long possible_crtcs)
 {
 	int res = -EPERM;
 
-	switch (aplane->base.type) {
+	switch (plane->type) {
 	case DRM_PLANE_TYPE_PRIMARY:
 		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
-				&aplane->base,
+				plane,
 				possible_crtcs,
 				&dm_plane_funcs,
 				rgb_formats,
 				ARRAY_SIZE(rgb_formats),
-				NULL, aplane->base.type, NULL);
+				NULL, plane->type, NULL);
 		break;
 	case DRM_PLANE_TYPE_OVERLAY:
 		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
-				&aplane->base,
+				plane,
 				possible_crtcs,
 				&dm_plane_funcs,
 				yuv_formats,
 				ARRAY_SIZE(yuv_formats),
-				NULL, aplane->base.type, NULL);
+				NULL, plane->type, NULL);
 		break;
 	case DRM_PLANE_TYPE_CURSOR:
 		res = kcl_drm_universal_plane_init(
 				dm->adev->ddev,
-				&aplane->base,
+				plane,
 				possible_crtcs,
 				&dm_plane_funcs,
 				cursor_formats,
 				ARRAY_SIZE(cursor_formats),
-				NULL, aplane->base.type, NULL);
+				NULL, plane->type, NULL);
 		break;
 	}
 
-	drm_plane_helper_add(&aplane->base, &dm_plane_helper_funcs);
+	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
 
 	/* Create (reset) the plane state */
-	if (aplane->base.funcs->reset)
-		aplane->base.funcs->reset(&aplane->base);
+	if (plane->funcs->reset)
+		plane->funcs->reset(plane);
 
 
 	return res;
@@ -3913,7 +3975,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 			       uint32_t crtc_index)
 {
 	struct amdgpu_crtc *acrtc = NULL;
-	struct amdgpu_plane *cursor_plane;
+	struct drm_plane *cursor_plane;
 
 	int res = -ENOMEM;
 
@@ -3921,7 +3983,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!cursor_plane)
 		goto fail;
 
-	cursor_plane->base.type = DRM_PLANE_TYPE_CURSOR;
+	cursor_plane->type = DRM_PLANE_TYPE_CURSOR;
 	res = amdgpu_dm_plane_init(dm, cursor_plane, 0);
 
 	acrtc = kzalloc(sizeof(struct amdgpu_crtc), GFP_KERNEL);
@@ -3932,7 +3994,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 			dm->ddev,
 			&acrtc->base,
 			plane,
-			&cursor_plane->base,
+			cursor_plane,
 			&amdgpu_dm_crtc_funcs, NULL);
 
 	if (res)
@@ -5020,6 +5082,14 @@ cleanup:
 #endif
 }
 
+/**
+ * amdgpu_dm_atomic_commit_tail() - AMDgpu DM's commit tail implementation.
+ * @state: The atomic state to commit
+ *
+ * This will tell DC to commit the constructed DC state from atomic_check,
+ * programming the hardware. Any failures here implies a hardware failure, since
+ * atomic check should have filtered anything non-kosher.
+ */
 static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
@@ -5872,6 +5942,12 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 	struct dc_stream_update stream_update;
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 
+	if (!updates || !surface) {
+		DRM_ERROR("Plane or surface update failed to allocate");
+		/* Set type to FULL to avoid crashing in DC*/
+		update_type = UPDATE_TYPE_FULL;
+		goto ret;
+	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
@@ -5963,6 +6039,31 @@ ret:
 }
 #endif
 
+/**
+ * amdgpu_dm_atomic_check() - Atomic check implementation for AMDgpu DM.
+ * @dev: The DRM device
+ * @state: The atomic state to commit
+ *
+ * Validate that the given atomic state is programmable by DC into hardware.
+ * This involves constructing a &struct dc_state reflecting the new hardware
+ * state we wish to commit, then querying DC to see if it is programmable. It's
+ * important not to modify the existing DC state. Otherwise, atomic_check
+ * may unexpectedly commit hardware changes.
+ *
+ * When validating the DC state, it's important that the right locks are
+ * acquired. For full updates case which removes/adds/updates streams on one
+ * CRTC while flipping on another CRTC, acquiring global lock will guarantee
+ * that any such full update commit will wait for completion of any outstanding
+ * flip using DRMs synchronization events. See
+ * dm_determine_update_type_for_commit()
+ *
+ * Note that DM adds the affected connectors for all CRTCs in state, when that
+ * might not seem necessary. This is because DC stream creation requires the
+ * DC sink, which is tied to the DRM connector state. Cleaning this up should
+ * be possible but non-trivial - a possible TODO item.
+ *
+ * Return: -Error code if validation failed.
+ */
 static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state)
 {

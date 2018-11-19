@@ -21,7 +21,6 @@
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_tracepoint.h>
-#include <kcl/kcl_drm_global.h>
 #include <kcl/kcl_bitmap.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_preempt.h>
@@ -35,5 +34,7 @@
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_video.h>
+#include <kcl/kcl_drm_connector.h>
+#include <kcl/kcl_device_cgroup.h>
 
 #endif /* AMDGPU_BACKPORT_H */

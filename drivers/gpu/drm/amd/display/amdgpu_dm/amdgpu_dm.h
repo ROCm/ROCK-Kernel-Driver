@@ -59,73 +59,111 @@ struct common_irq_params {
 	enum dc_irq_source irq_src;
 };
 
+/**
+ * struct irq_list_head - Linked-list for low context IRQ handlers.
+ *
+ * @head: The list_head within &struct handler_data
+ * @work: A work_struct containing the deferred handler work
+ */
 struct irq_list_head {
 	struct list_head head;
 	/* In case this interrupt needs post-processing, 'work' will be queued*/
 	struct work_struct work;
 };
 
+/**
+ * struct dm_compressor_info - Buffer info used by frame buffer compression
+ * @cpu_addr: MMIO cpu addr
+ * @bo_ptr: Pointer to the buffer object
+ * @gpu_addr: MMIO gpu addr
+ */
 struct dm_comressor_info {
 	void *cpu_addr;
 	struct amdgpu_bo *bo_ptr;
 	uint64_t gpu_addr;
 };
 
-/**
- * for_each_oldnew_plane_in_state_reverse - iterate over all planes in an atomic
- * update in reverse order
- * @__state: &struct drm_atomic_state pointer
- * @plane: &struct drm_plane iteration cursor
- * @old_plane_state: &struct drm_plane_state iteration cursor for the old state
- * @new_plane_state: &struct drm_plane_state iteration cursor for the new state
- * @__i: int iteration cursor, for macro-internal use
- *
- * This iterates over all planes in an atomic update in reverse order,
- * tracking both old and  new state. This is useful in places where the
- * state delta needs to be considered, for example in atomic check functions.
- */
 #ifndef for_each_oldnew_plane_in_state_reverse
 #define for_each_oldnew_plane_in_state_reverse(__state, plane, old_plane_state, new_plane_state, __i) \
-	for ((__i) = ((__state)->dev->mode_config.num_total_plane - 1);	\
-	     (__i) >= 0;						\
-	     (__i)--)							\
-		for_each_if ((__state)->planes[__i].ptr &&		\
-			     ((plane) = (__state)->planes[__i].ptr,	\
-			      (old_plane_state) = (__state)->planes[__i].old_state,\
-			      (new_plane_state) = (__state)->planes[__i].new_state, 1))
+			for ((__i) = ((__state)->dev->mode_config.num_total_plane - 1); \
+				(__i) >= 0;                                                \
+				(__i)--)                                                   \
+				for_each_if ((__state)->planes[__i].ptr &&              \
+				((plane) = (__state)->planes[__i].ptr,     \
+				(old_plane_state) = (__state)->planes[__i].old_state,\
+				(new_plane_state) = (__state)->planes[__i].new_state, 1))
 #endif
 
+/**
+ * struct amdgpu_display_manager - Central amdgpu display manager device
+ *
+ * @dc: Display Core control structure
+ * @adev: AMDGPU base driver structure
+ * @ddev: DRM base driver structure
+ * @display_indexes_num: Max number of display streams supported
+ * @irq_handler_list_table_lock: Synchronizes access to IRQ tables
+ * @backlight_dev: Backlight control device
+ * @cached_state: Caches device atomic state for suspend/resume
+ * @compressor: Frame buffer compression buffer. See &struct dm_comressor_info
+ */
 struct amdgpu_display_manager {
+
 	struct dc *dc;
+
+	/**
+	 * @cgs_device:
+	 *
+	 * The Common Graphics Services device. It provides an interface for
+	 * accessing registers.
+	 */
 	struct cgs_device *cgs_device;
 
-	struct amdgpu_device *adev;	/*AMD base driver*/
-	struct drm_device *ddev;	/*DRM base driver*/
+	struct amdgpu_device *adev;
+	struct drm_device *ddev;
 	u16 display_indexes_num;
 
-	/*
-	 * 'irq_source_handler_table' holds a list of handlers
-	 * per (DAL) IRQ source.
+	/**
+	 * @irq_handler_list_low_tab:
 	 *
-	 * Each IRQ source may need to be handled at different contexts.
-	 * By 'context' we mean, for example:
-	 * - The ISR context, which is the direct interrupt handler.
-	 * - The 'deferred' context - this is the post-processing of the
-	 *	interrupt, but at a lower priority.
+	 * Low priority IRQ handler table.
+	 *
+	 * It is a n*m table consisting of n IRQ sources, and m handlers per IRQ
+	 * source. Low priority IRQ handlers are deferred to a workqueue to be
+	 * processed. Hence, they can sleep.
 	 *
 	 * Note that handlers are called in the same order as they were
 	 * registered (FIFO).
 	 */
 	struct irq_list_head irq_handler_list_low_tab[DAL_IRQ_SOURCES_NUMBER];
+
+	/**
+	 * @irq_handler_list_high_tab:
+	 *
+	 * High priority IRQ handler table.
+	 *
+	 * It is a n*m table, same as &irq_handler_list_low_tab. However,
+	 * handlers in this table are not deferred and are called immediately.
+	 */
 	struct list_head irq_handler_list_high_tab[DAL_IRQ_SOURCES_NUMBER];
 
+	/**
+	 * @pflip_params:
+	 *
+	 * Page flip IRQ parameters, passed to registered handlers when
+	 * triggered.
+	 */
 	struct common_irq_params
 	pflip_params[DC_IRQ_SOURCE_PFLIP_LAST - DC_IRQ_SOURCE_PFLIP_FIRST + 1];
 
+	/**
+	 * @vblank_params:
+	 *
+	 * Vertical blanking IRQ parameters, passed to registered handlers when
+	 * triggered.
+	 */
 	struct common_irq_params
 	vblank_params[DC_IRQ_SOURCE_VBLANK6 - DC_IRQ_SOURCE_VBLANK1 + 1];
 
-	/* this spin lock synchronizes access to 'irq_handler_list_table' */
 	spinlock_t irq_handler_list_table_lock;
 
 	struct backlight_device *backlight_dev;
@@ -134,9 +172,6 @@ struct amdgpu_display_manager {
 
 	struct mod_freesync *freesync_module;
 
-	/**
-	 * Caches device atomic state for suspend/resume
-	 */
 	struct drm_atomic_state *cached_state;
 
 	struct dm_comressor_info compressor;
@@ -184,8 +219,9 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
-
+#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
 	bool mst_connected;
+#endif
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)

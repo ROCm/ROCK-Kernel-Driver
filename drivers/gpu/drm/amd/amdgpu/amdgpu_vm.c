@@ -548,7 +548,8 @@ static void amdgpu_vm_pt_next_leaf(struct amdgpu_device *adev,
 				   struct amdgpu_vm_pt_cursor *cursor)
 {
 	amdgpu_vm_pt_next(adev, cursor);
-	while (amdgpu_vm_pt_descendant(adev, cursor));
+	if (cursor->pfn != ~0ll)
+		while (amdgpu_vm_pt_descendant(adev, cursor));
 }
 
 /**
@@ -706,6 +707,11 @@ int amdgpu_vm_validate_pt_bos(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 				r = amdgpu_ttm_alloc_gart(&bo->tbo);
 			if (r)
 				break;
+			if (bo->shadow) {
+				r = amdgpu_ttm_alloc_gart(&bo->shadow->tbo);
+				if (r)
+					break;
+			}
 			amdgpu_vm_bo_relocated(bo_base);
 		}
 	}
@@ -2053,6 +2059,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
 		if (mem && mem->mem_type == TTM_PL_VRAM &&
 			adev != bo_adev) {
+			if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
+				return -EINVAL;
 			flags |= AMDGPU_PTE_SYSTEM;
 			vram_base_offset = bo_adev->gmc.aper_base;
 		}
@@ -3277,8 +3285,10 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 #else
 					     &vm->va.rb_root, rb) {
 #endif
+		/* Don't remove the mapping here, we don't want to trigger a
+		 * rebalance and the tree is about to be destroyed anyway.
+		 */
 		list_del(&mapping->list);
-		amdgpu_vm_it_remove(mapping, &vm->va);
 		kfree(mapping);
 	}
 	list_for_each_entry_safe(mapping, tmp, &vm->freed, list) {

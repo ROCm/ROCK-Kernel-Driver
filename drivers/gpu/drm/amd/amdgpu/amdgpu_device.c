@@ -1651,7 +1651,7 @@ static int amdgpu_device_fw_loading(struct amdgpu_device *adev)
 		}
 	}
 
-	if (adev->powerplay.pp_funcs->load_firmware) {
+	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->load_firmware) {
 		r = adev->powerplay.pp_funcs->load_firmware(adev->powerplay.pp_handle);
 		if (r) {
 			pr_err("firmware loading failed\n");
@@ -1709,7 +1709,9 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 
 			/* right after GMC hw init, we create CSA */
 			if (amdgpu_sriov_vf(adev)) {
-				r = amdgpu_allocate_static_csa(adev);
+				r = amdgpu_allocate_static_csa(adev, &adev->virt.csa_obj,
+								AMDGPU_GEM_DOMAIN_VRAM,
+								AMDGPU_CSA_SIZE);
 				if (r) {
 					DRM_ERROR("allocate CSA failed %d\n", r);
 					return r;
@@ -1734,7 +1736,8 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	if (r)
 		return r;
 
-	amdgpu_xgmi_add_device(adev);
+	if (adev->gmc.xgmi.num_physical_nodes > 1)
+		amdgpu_xgmi_add_device(adev);
 	amdgpu_amdkfd_device_init(adev);
 
 	if (amdgpu_sriov_vf(adev))
@@ -1943,7 +1946,7 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC) {
 			amdgpu_ucode_free_bo(adev);
-			amdgpu_free_static_csa(adev);
+			amdgpu_free_static_csa(&adev->virt.csa_obj);
 			amdgpu_device_wb_fini(adev);
 			amdgpu_device_vram_scratch_fini(adev);
 		}
@@ -2805,7 +2808,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 	drm_kms_helper_poll_disable(dev);
 
 	if (fbcon)
-		amdgpu_fbdev_set_suspend(adev, 1);
+		amdgpu_fbdev_set_suspend_unlocked(adev, 1);
 
 	cancel_delayed_work_sync(&adev->late_init_work);
 
@@ -2963,7 +2966,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			}
 			drm_modeset_unlock_all(dev);
 		}
-		amdgpu_fbdev_set_suspend(adev, 0);
+		amdgpu_fbdev_set_suspend_unlocked(adev, 0);
 	}
 
 	drm_kms_helper_poll_enable(dev);
@@ -3360,13 +3363,35 @@ bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev)
 		return false;
 	}
 
-	if (amdgpu_gpu_recovery == 0 || (amdgpu_gpu_recovery == -1  &&
-					 !amdgpu_sriov_vf(adev))) {
-		DRM_INFO("GPU recovery disabled.\n");
-		return false;
+	if (amdgpu_gpu_recovery == 0)
+		goto disabled;
+
+	if (amdgpu_sriov_vf(adev))
+		return true;
+
+	if (amdgpu_gpu_recovery == -1) {
+		switch (adev->asic_type) {
+		case CHIP_TOPAZ:
+		case CHIP_TONGA:
+		case CHIP_FIJI:
+		case CHIP_POLARIS10:
+		case CHIP_POLARIS11:
+		case CHIP_POLARIS12:
+		case CHIP_VEGAM:
+		case CHIP_VEGA20:
+		case CHIP_VEGA10:
+		case CHIP_VEGA12:
+			break;
+		default:
+			goto disabled;
+		}
 	}
 
 	return true;
+
+disabled:
+		DRM_INFO("GPU recovery disabled.\n");
+		return false;
 }
 
 /**
@@ -3401,7 +3426,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 
 		kcl_kthread_park(ring->sched.thread);
 
-		if (job && job->base.sched == &ring->sched)
+		if (job && job->base.sched != &ring->sched)
 			continue;
 
 		drm_sched_hw_job_reset(&ring->sched, job ? &job->base : NULL);

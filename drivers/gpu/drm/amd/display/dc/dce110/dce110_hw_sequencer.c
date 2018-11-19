@@ -548,14 +548,14 @@ dce110_translate_regamma_to_hw_format(const struct dc_transfer_func *output_tf,
 
 	regamma_params->hw_points_num = hw_points;
 
-	i = 1;
-	for (k = 0; k < 16 && i < 16; k++) {
+	k = 0;
+	for (i = 1; i < 16; i++) {
 		if (seg_distr[k] != -1) {
 			regamma_params->arr_curve_points[k].segments_num = seg_distr[k];
 			regamma_params->arr_curve_points[i].offset =
 					regamma_params->arr_curve_points[k].offset + (1 << seg_distr[k]);
 		}
-		i++;
+		k++;
 	}
 
 	if (seg_distr[k] != -1)
@@ -1085,7 +1085,6 @@ void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 
 	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {
 		link->dc->hwss.edp_backlight_control(link, true);
-		stream->bl_pwm_level = EDP_BACKLIGHT_RAMP_DISABLE_LEVEL;
 	}
 }
 void dce110_blank_stream(struct pipe_ctx *pipe_ctx)
@@ -1547,6 +1546,7 @@ void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 	int i;
 	struct dc_link *edp_link_to_turnoff = NULL;
 	struct dc_link *edp_link = get_link_for_edp(dc);
+	struct dc_bios *bios = dc->ctx->dc_bios;
 	bool can_edp_fast_boot_optimize = false;
 	bool apply_edp_fast_boot_optimization = false;
 
@@ -1573,6 +1573,20 @@ void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 			if (context->streams[i]->signal == SIGNAL_TYPE_EDP) {
 				context->streams[i]->apply_edp_fast_boot_optimization = true;
 				apply_edp_fast_boot_optimization = true;
+
+				/* When after S4 and S5, vbios may post edp and previous dpms_off
+				 * doesn't make sense.
+				 * Update dpms_off state to align hw and sw state via check
+				 * vBios scratch register.
+				 */
+				if (bios->funcs->is_active_display)	{
+					const struct connector_device_tag_info *device_tag = &(edp_link->device_tag);
+
+					if (bios->funcs->is_active_display(bios,
+							context->streams[i]->signal,
+							device_tag))
+						context->streams[i]->dpms_off = false;
+				}
 			}
 		}
 	}
@@ -1736,7 +1750,12 @@ static void set_static_screen_control(struct pipe_ctx **pipe_ctx,
 	if (events->force_trigger)
 		value |= 0x1;
 
-	value |= 0x84;
+	if (num_pipes) {
+		struct dc *dc = pipe_ctx[0]->stream->ctx->dc;
+
+		if (dc->fbc_compressor)
+			value |= 0x84;
+	}
 
 	for (i = 0; i < num_pipes; i++)
 		pipe_ctx[i]->stream_res.tg->funcs->
@@ -2583,28 +2602,6 @@ static void dce110_wait_for_mpcc_disconnect(
 	/* do nothing*/
 }
 
-static void program_csc_matrix(struct pipe_ctx *pipe_ctx,
-		enum dc_color_space colorspace,
-		uint16_t *matrix)
-{
-	int i;
-	struct out_csc_color_matrix tbl_entry;
-
-	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment
-				== true) {
-			enum dc_color_space color_space =
-				pipe_ctx->stream->output_color_space;
-
-			//uint16_t matrix[12];
-			for (i = 0; i < 12; i++)
-				tbl_entry.regval[i] = pipe_ctx->stream->csc_color_matrix.matrix[i];
-
-			tbl_entry.color_space = color_space;
-			//tbl_entry.regval = matrix;
-			pipe_ctx->plane_res.xfm->funcs->opp_set_csc_adjustment(pipe_ctx->plane_res.xfm, &tbl_entry);
-	}
-}
-
 void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_position pos_cpy = pipe_ctx->stream->cursor_position;
@@ -2655,7 +2652,6 @@ void dce110_set_cursor_attribute(struct pipe_ctx *pipe_ctx)
 
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.program_gamut_remap = program_gamut_remap,
-	.program_csc_matrix = program_csc_matrix,
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = dce110_apply_ctx_for_surface,

@@ -38,7 +38,7 @@
 #include "inc/compressor.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.02"
+#define DC_VER "3.2.04"
 
 #define MAX_SURFACES 3
 #define MAX_STREAMS 6
@@ -169,6 +169,7 @@ struct link_training_settings;
 struct dc_config {
 	bool gpu_vm_support;
 	bool disable_disp_pll_sharing;
+	bool fbc_support;
 };
 
 enum visual_confirm {

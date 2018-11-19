@@ -824,6 +824,7 @@ static bool build_freesync_hdr(struct pwl_float_data_ex *rgb_regamma,
 	struct fixed31_32 clip = dc_fixpt_one;
 	struct fixed31_32 output;
 	bool use_eetf = false;
+	bool is_clipped = false;
 	struct fixed31_32 sdr_white_level = dc_fixpt_from_int(fs_params->sdr_white_level);
 
 	if (fs_params == NULL || fs_params->max_content == 0 ||
@@ -848,25 +849,32 @@ static bool build_freesync_hdr(struct pwl_float_data_ex *rgb_regamma,
 	rgb += 32; // first 32 points have problems with fixed point, too small
 	coord_x += 32;
 	for (i = 32; i <= hw_points_num; i++) {
-		if (use_eetf) {
-			/*max content is equal 1 */
-			scaledX1 = dc_fixpt_div(coord_x->x,
-					dc_fixpt_div(max_content, sdr_white_level));
-			hermite_spline_eetf(scaledX1, max_display, min_display,
-					max_content, &scaledX);
-		} else
-			scaledX = dc_fixpt_div(coord_x->x,
-					dc_fixpt_div(max_display, sdr_white_level));
+		if (!is_clipped) {
+			if (use_eetf) {
+				/*max content is equal 1 */
+				scaledX1 = dc_fixpt_div(coord_x->x,
+						dc_fixpt_div(max_content, sdr_white_level));
+				hermite_spline_eetf(scaledX1, max_display, min_display,
+						max_content, &scaledX);
+			} else
+				scaledX = dc_fixpt_div(coord_x->x,
+						dc_fixpt_div(max_display, sdr_white_level));
 
-		if (dc_fixpt_lt(scaledX, clip)) {
-			if (dc_fixpt_lt(scaledX, dc_fixpt_zero))
-				output = dc_fixpt_zero;
-			else
-				output = calculate_gamma22(scaledX);
+			if (dc_fixpt_lt(scaledX, clip)) {
+				if (dc_fixpt_lt(scaledX, dc_fixpt_zero))
+					output = dc_fixpt_zero;
+				else
+					output = calculate_gamma22(scaledX);
 
-			rgb->r = output;
-			rgb->g = output;
-			rgb->b = output;
+				rgb->r = output;
+				rgb->g = output;
+				rgb->b = output;
+			} else {
+				is_clipped = true;
+				rgb->r = clip;
+				rgb->g = clip;
+				rgb->b = clip;
+			}
 		} else {
 			rgb->r = clip;
 			rgb->g = clip;
@@ -1546,7 +1554,7 @@ bool mod_color_calculate_regamma_params(struct dc_transfer_func *output_tf,
 	/* we can use hardcoded curve for plain SRGB TF */
 	if (output_tf->type == TF_TYPE_PREDEFINED && canRomBeUsed == true &&
 			output_tf->tf == TRANSFER_FUNCTION_SRGB &&
-			(!mapUserRamp && ramp->type == GAMMA_RGB_256))
+			(ramp->is_identity || (!mapUserRamp && ramp->type == GAMMA_RGB_256)))
 		return true;
 
 	output_tf->type = TF_TYPE_DISTRIBUTED_POINTS;

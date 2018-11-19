@@ -34,6 +34,10 @@
 #include <linux/file.h>
 #include <asm/page.h>
 #include "kfd_ipc.h"
+#include "amdgpu_amdkfd.h"
+
+struct mm_struct;
+
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
@@ -118,8 +122,8 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
 {
 	struct kfd_dev *dev = pdd->dev;
 
-	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem, pdd->vm);
-	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
+	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->kgd, mem, pdd->vm);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, mem);
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
@@ -138,17 +142,16 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	int err;
 	unsigned int mem_type;
 
-	err = kdev->kfd2kgd->alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-						 pdd->vm, NULL, &mem, NULL,
-						 flags);
+	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
+						 pdd->vm, NULL, &mem, NULL, flags);
 	if (err)
 		goto err_alloc_mem;
 
-	err = kdev->kfd2kgd->map_memory_to_gpu(kdev->kgd, mem, pdd->vm);
+	err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(kdev->kgd, mem, pdd->vm);
 	if (err)
 		goto err_map_mem;
 
-	err = kdev->kfd2kgd->sync_memory(kdev->kgd, mem, true);
+	err = amdgpu_amdkfd_gpuvm_sync_memory(kdev->kgd, mem, true);
 	if (err) {
 		pr_debug("Sync memory failed, wait interrupted by user signal\n");
 		goto sync_memory_failed;
@@ -173,7 +176,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	}
 
 	if (kptr) {
-		err = kdev->kfd2kgd->map_gtt_bo_to_kernel(kdev->kgd,
+		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kdev->kgd,
 				(struct kgd_mem *)mem, kptr, NULL);
 		if (err) {
 			pr_debug("Map GTT BO to kernel failed\n");
@@ -191,7 +194,7 @@ sync_memory_failed:
 	return err;
 
 err_map_mem:
-	kdev->kfd2kgd->free_memory_of_gpu(kdev->kgd, mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, mem);
 err_alloc_mem:
 	*kptr = NULL;
 	return err;
@@ -347,17 +350,18 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 				    per_device_list) {
 			if (!peer_pdd->vm)
 				continue;
-			peer_pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->vm);
+
 		}
 
 		run_rdma_free_callback(buf_obj);
-		pdd->dev->kfd2kgd->free_memory_of_gpu(pdd->dev->kgd,
-						      buf_obj->mem);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, buf_obj->mem);
 
 		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 			kfd_unreserve_vram_limit(pdd->dev,
 				buf_obj->it.last - buf_obj->it.start + 1);
+
 
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
@@ -381,11 +385,12 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 				pdd->dev->id, p->pasid);
 
 		if (pdd->drm_file) {
-			pdd->dev->kfd2kgd->release_process_vm(pdd->dev->kgd, pdd->vm);
+			amdgpu_amdkfd_gpuvm_release_process_vm(
+					pdd->dev->kgd, pdd->vm);
 			fput(pdd->drm_file);
 		}
 		else if (pdd->vm)
-			pdd->dev->kfd2kgd->destroy_process_vm(
+			amdgpu_amdkfd_gpuvm_destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
 
 		list_del(&pdd->per_device_list);
@@ -476,6 +481,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct kfd_dev *dev = pdd->dev;
 
+		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());
 		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
 			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
@@ -484,6 +490,22 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
+
+		/* New debugger for GFXv9 and later */
+		if (pdd->is_debugging_enabled) {
+			if (pdd->debug_trap_enabled) {
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				pdd->debug_trap_enabled = false;
+			}
+			if (pdd->trap_debug_wave_launch_mode != 0) {
+				dev->kfd2kgd->set_wave_launch_mode(
+					dev->kgd, 0,
+					dev->vm_info.last_vmid_kfd);
+				pdd->trap_debug_wave_launch_mode = 0;
+			}
+			release_debug_trap_vmid(dev->dqm);
+			pdd->is_debugging_enabled = false;
+		}
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
@@ -761,12 +783,12 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	dev = pdd->dev;
 
 	if (drm_file)
-		ret = dev->kfd2kgd->acquire_process_vm(
+		ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
 			dev->kgd, drm_file, p->pasid,
 			&pdd->vm, &p->kgd_process_info, &p->ef);
 	else
-		ret = dev->kfd2kgd->create_process_vm(
-			dev->kgd, p->pasid, &pdd->vm, &p->kgd_process_info, &p->ef);
+		ret = amdgpu_amdkfd_gpuvm_create_process_vm(dev->kgd, p->pasid,
+			&pdd->vm, &p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
@@ -787,7 +809,7 @@ err_init_cwsr:
 err_reserve_ib_mem:
 	kfd_process_device_free_bos(pdd);
 	if (!drm_file)
-		dev->kfd2kgd->destroy_process_vm(dev->kgd, pdd->vm);
+		amdgpu_amdkfd_gpuvm_destroy_process_vm(dev->kgd, pdd->vm);
 	pdd->vm = NULL;
 
 	return ret;
@@ -1232,7 +1254,7 @@ static void restore_process_worker(struct work_struct *work)
 	 */
 
 	p->last_restore_timestamp = get_jiffies_64();
-	ret = pdd->dev->kfd2kgd->restore_process_bos(p->kgd_process_info,
+	ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
 						     &p->ef);
 	if (ret) {
 		pr_info("Failed to restore BOs of pasid %d, retry after %d ms\n",

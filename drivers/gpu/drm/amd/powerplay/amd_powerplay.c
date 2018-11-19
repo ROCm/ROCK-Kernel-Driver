@@ -963,6 +963,7 @@ static int pp_dpm_switch_power_profile(void *handle,
 static int pp_set_power_limit(void *handle, uint32_t limit)
 {
 	struct pp_hwmgr *hwmgr = handle;
+	uint32_t max_power_limit;
 
 	if (!hwmgr || !hwmgr->pm_en)
 		return -EINVAL;
@@ -975,7 +976,13 @@ static int pp_set_power_limit(void *handle, uint32_t limit)
 	if (limit == 0)
 		limit = hwmgr->default_power_limit;
 
-	if (limit > hwmgr->default_power_limit)
+	max_power_limit = hwmgr->default_power_limit;
+	if (hwmgr->od_enabled) {
+		max_power_limit *= (100 + hwmgr->platform_descriptor.TDPODLimit);
+		max_power_limit /= 100;
+	}
+
+	if (limit > max_power_limit)
 		return -EINVAL;
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -994,8 +1001,13 @@ static int pp_get_power_limit(void *handle, uint32_t *limit, bool default_limit)
 
 	mutex_lock(&hwmgr->smu_lock);
 
-	if (default_limit)
+	if (default_limit) {
 		*limit = hwmgr->default_power_limit;
+		if (hwmgr->od_enabled) {
+			*limit *= (100 + hwmgr->platform_descriptor.TDPODLimit);
+			*limit /= 100;
+		}
+	}
 	else
 		*limit = hwmgr->power_limit;
 
@@ -1303,12 +1315,12 @@ static int pp_enable_mgpu_fan_boost(void *handle)
 {
 	struct pp_hwmgr *hwmgr = handle;
 
-	if (!hwmgr || !hwmgr->pm_en)
+	if (!hwmgr)
 		return -EINVAL;
 
-	if (hwmgr->hwmgr_func->enable_mgpu_fan_boost == NULL) {
+	if (!hwmgr->pm_en ||
+	     hwmgr->hwmgr_func->enable_mgpu_fan_boost == NULL)
 		return 0;
-	}
 
 	mutex_lock(&hwmgr->smu_lock);
 	hwmgr->hwmgr_func->enable_mgpu_fan_boost(hwmgr);

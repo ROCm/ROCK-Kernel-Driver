@@ -36,6 +36,7 @@
 #include "kfd_topology.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_iommu.h"
+#include "amdgpu_amdkfd.h"
 
 /* topology_device_list - Master list of all topology devices */
 static struct list_head topology_device_list;
@@ -275,6 +276,8 @@ static ssize_t iolink_show(struct kobject *kobj, struct attribute *attr,
 	buffer[0] = 0;
 
 	iolink = container_of(attr, struct kfd_iolink_properties, attr);
+	if (iolink->gpu && kfd_devcgroup_check_permission(iolink->gpu))
+		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "type", iolink->iolink_type);
 	sysfs_show_32bit_prop(buffer, "version_major", iolink->ver_maj);
 	sysfs_show_32bit_prop(buffer, "version_minor", iolink->ver_min);
@@ -315,7 +318,9 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 		mem = container_of(attr, struct kfd_mem_properties,
 				attr_used);
 		if (mem->gpu) {
-			used_mem = mem->gpu->kfd2kgd->get_vram_usage(mem->gpu->kgd);
+			if (kfd_devcgroup_check_permission(mem->gpu))
+				return -EPERM;
+			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->kgd);
 			return sysfs_show_64bit_val(buffer, used_mem);
 		}
 		/* TODO: Report APU/CPU-allocated memory; For now return 0 */
@@ -323,6 +328,8 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 	}
 
 	mem = container_of(attr, struct kfd_mem_properties, attr_props);
+	if (mem->gpu && kfd_devcgroup_check_permission(mem->gpu))
+		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "heap_type", mem->heap_type);
 	sysfs_show_64bit_prop(buffer, "size_in_bytes", mem->size_in_bytes);
 	sysfs_show_32bit_prop(buffer, "flags", mem->flags);
@@ -352,6 +359,8 @@ static ssize_t kfd_cache_show(struct kobject *kobj, struct attribute *attr,
 	buffer[0] = 0;
 
 	cache = container_of(attr, struct kfd_cache_properties, attr);
+	if (cache->gpu && kfd_devcgroup_check_permission(cache->gpu))
+		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "processor_id_low",
 			cache->processor_id_low);
 	sysfs_show_32bit_prop(buffer, "level", cache->cache_level);
@@ -437,12 +446,16 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 	if (strcmp(attr->name, "gpu_id") == 0) {
 		dev = container_of(attr, struct kfd_topology_device,
 				attr_gpuid);
+		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
+			return -EPERM;
 		return sysfs_show_32bit_val(buffer, dev->gpu_id);
 	}
 
 	if (strcmp(attr->name, "name") == 0) {
 		dev = container_of(attr, struct kfd_topology_device,
 				attr_name);
+		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
+			return -EPERM;
 		for (i = 0; i < KFD_TOPOLOGY_PUBLIC_NAME_SIZE; i++) {
 			public_name[i] =
 					(char)dev->node_props.marketing_name[i];
@@ -455,6 +468,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 
 	dev = container_of(attr, struct kfd_topology_device,
 			attr_props);
+	if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
+		return -EPERM;
 	sysfs_show_32bit_prop(buffer, "cpu_cores_count",
 			dev->node_props.cpu_cores_count);
 	sysfs_show_32bit_prop(buffer, "simd_count",
@@ -525,7 +540,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		 */
 		if (!dev->gpu->device_info->needs_iommu_device
 			|| dev->gpu->device_info->asic_family == CHIP_KAVERI) {
-			dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
+			amdgpu_amdkfd_get_local_mem_info(dev->gpu->kgd,
 				&local_mem_info);
 			sysfs_show_64bit_prop(buffer, "local_mem_size",
 					local_mem_info.local_mem_size_private +
@@ -537,6 +552,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				dev->gpu->mec_fw_version);
 		sysfs_show_32bit_prop(buffer, "capability",
 				dev->node_props.capability);
+		sysfs_show_64bit_prop(buffer, "debug_prop",
+				dev->node_props.debug_prop);
 		sysfs_show_32bit_prop(buffer, "sdma_fw_version",
 				dev->gpu->sdma_fw_version);
 	}
@@ -1138,7 +1155,7 @@ static uint32_t kfd_generate_gpu_id(struct kfd_dev *gpu)
 	if (!gpu)
 		return 0;
 
-	gpu->kfd2kgd->get_local_mem_info(gpu->kgd, &local_mem_info);
+	amdgpu_amdkfd_get_local_mem_info(gpu->kgd, &local_mem_info);
 
 	local_mem_size = local_mem_info.local_mem_size_private +
 			local_mem_info.local_mem_size_public;
@@ -1168,6 +1185,8 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 	struct kfd_topology_device *dev;
 	struct kfd_topology_device *out_dev = NULL;
 	struct kfd_mem_properties *mem;
+	struct kfd_cache_properties *cache;
+	struct kfd_iolink_properties *iolink;
 
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list)
@@ -1178,7 +1197,10 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 			/* Assign mem->gpu */
 			list_for_each_entry(mem, &dev->mem_props, list)
 				mem->gpu = dev->gpu;
-
+			list_for_each_entry(cache, &dev->cache_props, list)
+				cache->gpu = dev->gpu;
+			list_for_each_entry(iolink, &dev->io_link_props, list)
+				iolink->gpu = dev->gpu;
 			break;
 		}
 	up_write(&topology_lock);
@@ -1210,8 +1232,7 @@ static void kfd_fill_mem_clk_max_info(struct kfd_topology_device *dev)
 	 * for APUs - If CRAT from ACPI reports more than one bank, then
 	 *	all the banks will report the same mem_clk_max information
 	 */
-	dev->gpu->kfd2kgd->get_local_mem_info(dev->gpu->kgd,
-		&local_mem_info);
+	amdgpu_amdkfd_get_local_mem_info(dev->gpu->kgd, &local_mem_info);
 
 	list_for_each_entry(mem, &dev->mem_props, list)
 		mem->mem_clk_max = local_mem_info.mem_clk_max;
@@ -1332,7 +1353,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	 * needed for the topology
 	 */
 
-	dev->gpu->kfd2kgd->get_cu_info(dev->gpu->kgd, &cu_info);
+	amdgpu_amdkfd_get_cu_info(dev->gpu->kgd, &cu_info);
 	dev->node_props.simd_arrays_per_engine =
 		cu_info.num_shader_arrays_per_engine;
 
@@ -1341,7 +1362,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev->node_props.location_id = PCI_DEVID(gpu->pdev->bus->number,
 		gpu->pdev->devfn);
 	dev->node_props.max_engine_clk_fcompute =
-		dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(dev->gpu->kgd);
+		amdgpu_amdkfd_get_max_engine_clock_in_mhz(dev->gpu->kgd);
 	dev->node_props.max_engine_clk_ccompute =
 		cpufreq_quick_get_max(0) / 1000;
 	dev->node_props.drm_render_minor =
@@ -1379,9 +1400,10 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 
 		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
-			HSA_CAP_TRAP_DEBUG_TRAP_DATA_COUNT |
 			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
 			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
+		dev->node_props.debug_prop |=
+					HSA_DBG_TRAP_DEBUG_TRAP_DATA_COUNT;
 		break;
 	default:
 		WARN(1, "Unexpected ASIC family %u",

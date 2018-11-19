@@ -59,7 +59,6 @@ struct amdgpu_hpd;
 #define to_amdgpu_connector(x) container_of(x, struct amdgpu_connector, base)
 #define to_amdgpu_encoder(x) container_of(x, struct amdgpu_encoder, base)
 #define to_amdgpu_framebuffer(x) container_of(x, struct amdgpu_framebuffer, base)
-#define to_amdgpu_plane(x)	container_of(x, struct amdgpu_plane, base)
 
 #define to_dm_plane_state(x)	container_of(x, struct dm_plane_state, base);
 
@@ -363,7 +362,7 @@ struct amdgpu_mode_info {
 	struct card_info *atom_card_info;
 	bool mode_config_initialized;
 	struct amdgpu_crtc *crtcs[AMDGPU_MAX_CRTCS];
-	struct amdgpu_plane *planes[AMDGPU_MAX_PLANES];
+	struct drm_plane *planes[AMDGPU_MAX_PLANES];
 	struct amdgpu_afmt *afmt[AMDGPU_MAX_AFMT_BLOCKS];
 	/* DVI-I properties */
 	struct drm_property *coherent_mode_property;
@@ -480,11 +479,6 @@ struct amdgpu_crtc {
 	uint32_t flip_flags;
 #endif
 	struct drm_pending_vblank_event *event;
-};
-
-struct amdgpu_plane {
-	struct drm_plane base;
-	enum drm_plane_type plane_type;
 };
 
 struct amdgpu_encoder_atom_dig {
@@ -677,7 +671,7 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc);
 /* fbdev layer */
 int amdgpu_fbdev_init(struct amdgpu_device *adev);
 void amdgpu_fbdev_fini(struct amdgpu_device *adev);
-void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state);
+void amdgpu_fbdev_set_suspend_unlocked(struct amdgpu_device *adev, int state);
 int amdgpu_fbdev_total_size(struct amdgpu_device *adev);
 bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj);
 #if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)

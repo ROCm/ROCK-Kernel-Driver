@@ -26,10 +26,13 @@
 #define AMDGPU_AMDKFD_H_INCLUDED
 
 #include <linux/types.h>
-#include <linux/workqueue.h>
+#include <linux/mm.h>
 #include <linux/mmu_context.h>
+#include <linux/workqueue.h>
 #include <kgd_kfd_interface.h>
-#include "amdgpu.h"
+#include <drm/ttm/ttm_execbuf_util.h>
+#include "amdgpu_sync.h"
+#include "amdgpu_vm.h"
 
 extern const struct kgd2kfd_calls *kgd2kfd;
 
@@ -40,7 +43,6 @@ struct kfd_bo_va_list {
 	struct amdgpu_bo_va *bo_va;
 	void *kgd_dev;
 	bool is_mapped;
-	bool map_fail;
 	uint64_t va;
 	uint64_t pte_flags;
 };
@@ -98,7 +100,7 @@ struct amdkfd_process_info {
 
 	/* MMU-notifier related fields */
 	atomic_t evicted_bos;
-	struct delayed_work work;
+	struct delayed_work restore_userptr_work;
 	struct pid *pid;
 };
 
@@ -126,8 +128,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
 		uint64_t *actual_size);
 
-bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
-			u32 vmid);
+bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid);
 
 int amdgpu_amdkfd_pre_reset(struct amdgpu_device *adev);
 
@@ -136,21 +137,21 @@ int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev);
 void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd);
 
 /* Shared API */
-int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
-			void **mem_obj, uint64_t *gpu_addr,
-			void **cpu_ptr, bool mqd_gfx9);
-void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj);
-void get_local_mem_info(struct kgd_dev *kgd,
-			struct kfd_local_mem_info *mem_info);
-uint64_t get_gpu_clock_counter(struct kgd_dev *kgd);
-
-uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
-void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 				  struct kgd_dev **dmabuf_kgd,
 				  uint64_t *bo_size, void *metadata_buffer,
 				  size_t buffer_size, uint32_t *metadata_size,
 				  uint32_t *flags);
+int amdgpu_amdkfd_alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
+				void **mem_obj, uint64_t *gpu_addr,
+				void **cpu_ptr, bool mqd_gfx9);
+void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj);
+void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
+				      struct kfd_local_mem_info *mem_info);
+uint64_t amdgpu_amdkfd_get_gpu_clock_counter(struct kgd_dev *kgd);
+
+uint32_t amdgpu_amdkfd_get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
+void amdgpu_amdkfd_get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd);
 uint64_t amdgpu_amdkfd_get_hive_id(struct kgd_dev *kgd);
 
@@ -198,7 +199,6 @@ int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
 		struct kgd_mem *mem, void **kptr, uint64_t *size);
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info,
 					    struct dma_fence **ef);
-
 
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 					      struct kfd_vm_fault_info *info);

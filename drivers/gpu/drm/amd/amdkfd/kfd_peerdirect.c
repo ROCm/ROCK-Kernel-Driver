@@ -182,6 +182,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 	int ret;
 	struct amd_mem_context *mem_context;
 	struct pid *pid;
+	unsigned long page_size;
 
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);
@@ -208,7 +209,14 @@ static int amd_acquire(unsigned long addr, size_t size,
 
 	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
-	mem_context->size = size;
+
+	/* Workaround: Currently, Mellanox drivers seem to be supporting only at
+	 * page granularity. This is causing failures when an application tries
+	 * to register size < page_size. Fix it temporarily by aligning the size
+	 * to page size
+	 */
+	rdma_interface->get_page_size(addr, size, pid, &page_size);
+	mem_context->size = ALIGN(size, page_size);
 
 	/* Save PID. It is guaranteed that the function will be
 	 * called in the correct process context as opposite to others.
@@ -231,6 +239,7 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 			  void *client_context, void *core_context)
 {
 	int ret;
+	unsigned long page_size;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
@@ -251,14 +260,17 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	if (size != mem_context->size) {
+	/* Workaround: see amd_acquire */
+	rdma_interface->get_page_size(addr, size, mem_context->pid,
+				      &page_size);
+	if (ALIGN(size, page_size) != mem_context->size) {
 		pr_warn("Context size (0x%llx) is not the same\n",
 			mem_context->size);
 		return -EINVAL;
 	}
 
 	ret = rdma_interface->get_pages(addr,
-					size,
+					mem_context->size,
 					mem_context->pid,
 					&mem_context->p2p_info,
 					free_callback,

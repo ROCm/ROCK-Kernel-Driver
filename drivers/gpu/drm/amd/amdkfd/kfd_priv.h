@@ -41,6 +41,8 @@
 #include <linux/kref.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
+#include <linux/device_cgroup.h>
+#include <drm/drmP.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_shared.h"
@@ -51,6 +53,8 @@
 
 /* GPU ID hash width in bits */
 #define KFD_GPU_ID_HASH_WIDTH 16
+
+struct drm_device;
 
 /* Use upper bits of mmap offset to store KFD driver specific information.
  * BITS[63:62] - Encode MMAP type
@@ -234,6 +238,7 @@ struct kfd_dev {
 
 	const struct kfd_device_info *device_info;
 	struct pci_dev *pdev;
+	struct drm_device *ddev;
 
 	unsigned int id;		/* topology stub index */
 
@@ -357,6 +362,7 @@ void kgd2kfd_exit(void);
 struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 			struct pci_dev *pdev, const struct kfd2kgd_calls *f2g);
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
+			struct drm_device *ddev,
 			const struct kgd2kfd_shared_resources *gpu_resources);
 void kgd2kfd_device_exit(struct kfd_dev *kfd);
 
@@ -612,6 +618,7 @@ struct qcm_process_device {
 	 * All the memory management data should be here too
 	 */
 	uint64_t gds_context_area;
+	/* Contains page table flags such as AMDGPU_PTE_VALID since gfx9 */
 	uint64_t page_table_base;
 	uint32_t sh_mem_config;
 	uint32_t sh_mem_bases;
@@ -1145,6 +1152,17 @@ void kfd_close_peer_direct(void);
 
 /* IPC Support */
 int kfd_ipc_init(void);
+
+/* Cgroup Support */
+/* Check with device cgroup if @kfd device is accessible */
+static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
+{
+	struct drm_device *ddev = kfd->ddev;
+
+	return devcgroup_check_permission(DEVCG_DEV_CHAR, ddev->driver->major,
+					  ddev->render->index,
+					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
+}
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)

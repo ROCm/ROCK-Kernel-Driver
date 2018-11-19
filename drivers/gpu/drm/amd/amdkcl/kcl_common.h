@@ -4,7 +4,7 @@
 /*
  * kallsyms_lookup_name has been exported in version 2.6.33
  */
-#include <linux/version.h>
+
 #include <linux/kallsyms.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)

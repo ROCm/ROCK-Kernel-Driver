@@ -33,6 +33,7 @@
 #include "kfd_mqd_manager.h"
 #include "cik_regs.h"
 #include "kfd_kernel_queue.h"
+#include "amdgpu_amdkfd.h"
 
 /* Size of the per-pipe EOP queue */
 #define CIK_HPD_EOP_BYTES_LOG2 11
@@ -244,7 +245,7 @@ static int flush_texture_cache_nocpsch(struct kfd_dev *kdev,
 	if (ret)
 		return ret;
 
-	return kdev->kfd2kgd->submit_ib(kdev->kgd, KGD_ENGINE_MEC1, qpd->vmid,
+	return amdgpu_amdkfd_submit_ib(kdev->kgd, KGD_ENGINE_MEC1, qpd->vmid,
 				qpd->ib_base, (uint32_t *)qpd->ib_kaddr,
 				pmf->release_mem_size / sizeof(uint32_t));
 }
@@ -697,7 +698,7 @@ static int restore_process_queues_nocpsch(struct device_queue_manager *dqm,
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
-	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
+	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
 
 	dqm_lock(dqm);
 	if (WARN_ON_ONCE(!qpd->evicted)) /* already restored, do nothing */
@@ -768,7 +769,7 @@ static int restore_process_queues_cpsch(struct device_queue_manager *dqm,
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
-	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
+	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
 
 	dqm_lock(dqm);
 	if (WARN_ON_ONCE(!qpd->evicted)) /* already restored, do nothing */
@@ -818,7 +819,7 @@ static int register_process(struct device_queue_manager *dqm,
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
-	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
+	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
 
 	dqm_lock(dqm);
 	list_add(&n->list, &dqm->queues);
@@ -830,7 +831,7 @@ static int register_process(struct device_queue_manager *dqm,
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
 	if (dqm->processes_count++ == 0)
-		dqm->dev->kfd2kgd->set_compute_idle(dqm->dev->kgd, false);
+		amdgpu_amdkfd_set_compute_idle(dqm->dev->kgd, false);
 
 	dqm_unlock(dqm);
 
@@ -854,7 +855,7 @@ static int unregister_process(struct device_queue_manager *dqm,
 			list_del(&cur->list);
 			kfree(cur);
 			if (--dqm->processes_count == 0)
-				dqm->dev->kfd2kgd->set_compute_idle(
+				amdgpu_amdkfd_set_compute_idle(
 					dqm->dev->kgd, true);
 			goto out;
 		}
@@ -870,15 +871,8 @@ static int
 set_pasid_vmid_mapping(struct device_queue_manager *dqm, unsigned int pasid,
 			unsigned int vmid)
 {
-	uint32_t pasid_mapping;
-
-	pasid_mapping = (pasid == 0) ? 0 :
-		(uint32_t)pasid |
-		ATC_VMID_PASID_MAPPING_VALID;
-
 	return dqm->dev->kfd2kgd->set_pasid_vmid_mapping(
-						dqm->dev->kgd, pasid_mapping,
-						vmid);
+						dqm->dev->kgd, pasid, vmid);
 }
 
 static void init_interrupts(struct device_queue_manager *dqm)
@@ -1825,7 +1819,7 @@ static void kfd_process_hw_exception(struct work_struct *work)
 {
 	struct device_queue_manager *dqm = container_of(work,
 			struct device_queue_manager, hw_exception_work);
-	dqm->dev->kfd2kgd->gpu_recover(dqm->dev->kgd);
+	amdgpu_amdkfd_gpu_reset(dqm->dev->kgd);
 }
 
 /*

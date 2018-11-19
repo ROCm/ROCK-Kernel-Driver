@@ -499,8 +499,13 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->top_pipe->plane_state == pipe_ctx->plane_state;
 	bool flip_vert_scan_dir = false, flip_horz_scan_dir = false;
 
+
 	/*
-	 * Need to calculate the scan direction for viewport to properly determine offset
+	 * We need take horizontal mirror into account. On an unrotated surface this means
+	 * that the viewport offset is actually the offset from the other side of source
+	 * image so we have to subtract the right edge of the viewport from the right edge of
+	 * the source window. Similar to mirror we need to take into account how offset is
+	 * affected for 270/180 rotations
 	 */
 	if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_180) {
 		flip_vert_scan_dir = true;
@@ -509,6 +514,9 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 		flip_vert_scan_dir = true;
 	else if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_270)
 		flip_horz_scan_dir = true;
+
+	if (pipe_ctx->plane_state->horizontal_mirror)
+		flip_horz_scan_dir = !flip_horz_scan_dir;
 
 	if (stream->view_format == VIEW_3D_FORMAT_SIDE_BY_SIDE ||
 		stream->view_format == VIEW_3D_FORMAT_TOP_AND_BOTTOM) {
@@ -540,45 +548,27 @@ static void calculate_viewport(struct pipe_ctx *pipe_ctx)
 			plane_state->clip_rect.y + plane_state->clip_rect.height - clip.y ;
 
 	/* offset = surf_src.ofs + (clip.ofs - surface->dst_rect.ofs) * scl_ratio
+	 * note: surf_src.ofs should be added after rotation/mirror offset direction
+	 *       adjustment since it is already in viewport space
 	 * num_pixels = clip.num_pix * scl_ratio
 	 */
-	data->viewport.x = surf_src.x + (clip.x - plane_state->dst_rect.x) *
+	data->viewport.x = (clip.x - plane_state->dst_rect.x) *
 			surf_src.width / plane_state->dst_rect.width;
 	data->viewport.width = clip.width *
 			surf_src.width / plane_state->dst_rect.width;
 
-	data->viewport.y = surf_src.y + (clip.y - plane_state->dst_rect.y) *
+	data->viewport.y = (clip.y - plane_state->dst_rect.y) *
 			surf_src.height / plane_state->dst_rect.height;
 	data->viewport.height = clip.height *
 			surf_src.height / plane_state->dst_rect.height;
 
-	/* To transfer the x, y to correct coordinate on mirror image (camera).
-	 * deg  0 : transfer x,
-	 * deg 90 : don't need to transfer,
-	 * deg180 : transfer y,
-	 * deg270 : transfer x and y.
-	 * To transfer the x, y to correct coordinate on non-mirror image (video).
-	 * deg  0 : don't need to transfer,
-	 * deg 90 : transfer y,
-	 * deg180 : transfer x and y,
-	 * deg270 : transfer x.
-	 */
-	if (pipe_ctx->plane_state->horizontal_mirror) {
-		if (flip_horz_scan_dir && !flip_vert_scan_dir) {
-			data->viewport.y = surf_src.height - data->viewport.y - data->viewport.height;
-			data->viewport.x = surf_src.width - data->viewport.x - data->viewport.width;
-		} else if (flip_horz_scan_dir && flip_vert_scan_dir)
-			data->viewport.y = surf_src.height - data->viewport.y - data->viewport.height;
-		else {
-			if (!flip_horz_scan_dir && !flip_vert_scan_dir)
-				data->viewport.x = surf_src.width - data->viewport.x - data->viewport.width;
-		}
-	} else {
-		if (flip_horz_scan_dir)
-			data->viewport.x = surf_src.width - data->viewport.x - data->viewport.width;
-		if (flip_vert_scan_dir)
-			data->viewport.y = surf_src.height - data->viewport.y - data->viewport.height;
-	}
+	if (flip_vert_scan_dir)
+		data->viewport.y = surf_src.height - data->viewport.y - data->viewport.height;
+	if (flip_horz_scan_dir)
+		data->viewport.x = surf_src.width - data->viewport.x - data->viewport.width;
+
+	data->viewport.x += surf_src.x;
+	data->viewport.y += surf_src.y;
 
 	/* Round down, compensate in init */
 	data->viewport_c.x = data->viewport.x / vpc_div;
@@ -773,22 +763,15 @@ static void calculate_inits_and_adj_vp(struct pipe_ctx *pipe_ctx, struct rect *r
 	else if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_270)
 		flip_horz_scan_dir = true;
 
+	if (pipe_ctx->plane_state->horizontal_mirror)
+			flip_horz_scan_dir = !flip_horz_scan_dir;
+
 	if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_90 ||
 			pipe_ctx->plane_state->rotation == ROTATION_ANGLE_270) {
 		rect_swap_helper(&src);
 		rect_swap_helper(&data->viewport_c);
 		rect_swap_helper(&data->viewport);
-
-		if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_270 &&
-			pipe_ctx->plane_state->horizontal_mirror) {
-			flip_vert_scan_dir = true;
-		}
-		if (pipe_ctx->plane_state->rotation == ROTATION_ANGLE_90 &&
-			pipe_ctx->plane_state->horizontal_mirror) {
-			flip_vert_scan_dir = false;
-		}
-	} else if (pipe_ctx->plane_state->horizontal_mirror)
-			flip_horz_scan_dir = !flip_horz_scan_dir;
+	}
 
 	/*
 	 * Init calculated according to formula:
@@ -1115,9 +1098,6 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 	pipe_ctx->plane_res.scl_data.format = convert_pixel_format_to_dalsurface(
 			pipe_ctx->plane_state->format);
 
-	if (pipe_ctx->stream->timing.flags.INTERLACE)
-		pipe_ctx->stream->dst.height *= 2;
-
 	calculate_scaling_ratios(pipe_ctx);
 
 	calculate_viewport(pipe_ctx);
@@ -1138,9 +1118,6 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 
 	pipe_ctx->plane_res.scl_data.h_active = timing->h_addressable + timing->h_border_left + timing->h_border_right;
 	pipe_ctx->plane_res.scl_data.v_active = timing->v_addressable + timing->v_border_top + timing->v_border_bottom;
-	if (pipe_ctx->stream->timing.flags.INTERLACE)
-		pipe_ctx->plane_res.scl_data.v_active *= 2;
-
 
 	/* Taps calculations */
 	if (pipe_ctx->plane_res.xfm != NULL)
@@ -1184,9 +1161,6 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 				plane_state->dst_rect.width,
 				plane_state->dst_rect.x,
 				plane_state->dst_rect.y);
-
-	if (pipe_ctx->stream->timing.flags.INTERLACE)
-		pipe_ctx->stream->dst.height /= 2;
 
 	return res;
 }
@@ -1935,49 +1909,6 @@ static struct dc_stream_state *find_pll_sharable_stream(
 	}
 
 	return NULL;
-}
-
-static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
-{
-	uint32_t pix_clk = timing->pix_clk_khz;
-	uint32_t normalized_pix_clk = pix_clk;
-
-	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
-		pix_clk /= 2;
-	if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422) {
-		switch (timing->display_color_depth) {
-		case COLOR_DEPTH_888:
-			normalized_pix_clk = pix_clk;
-			break;
-		case COLOR_DEPTH_101010:
-			normalized_pix_clk = (pix_clk * 30) / 24;
-			break;
-		case COLOR_DEPTH_121212:
-			normalized_pix_clk = (pix_clk * 36) / 24;
-		break;
-		case COLOR_DEPTH_161616:
-			normalized_pix_clk = (pix_clk * 48) / 24;
-		break;
-		default:
-			ASSERT(0);
-		break;
-		}
-	}
-	return normalized_pix_clk;
-}
-
-static void calculate_phy_pix_clks(struct dc_stream_state *stream)
-{
-	/* update actual pixel clock on all streams */
-	if (dc_is_hdmi_signal(stream->signal))
-		stream->phy_pix_clk = get_norm_pix_clk(
-			&stream->timing);
-	else
-		stream->phy_pix_clk =
-			stream->timing.pix_clk_khz;
-
-	if (stream->timing.timing_3d_format == TIMING_3D_FORMAT_HW_FRAME_PACKING)
-		stream->phy_pix_clk *= 2;
 }
 
 enum dc_status resource_map_pool_resources(
@@ -2865,8 +2796,6 @@ enum dc_status dc_validate_stream(struct dc *dc, struct dc_stream_state *stream)
 	struct dc_link *link = stream->sink->link;
 	struct timing_generator *tg = core_dc->res_pool->timing_generators[0];
 	enum dc_status res = DC_OK;
-
-	calculate_phy_pix_clks(stream);
 
 	if (!tg->funcs->validate_timing(tg, &stream->timing))
 		res = DC_FAIL_CONTROLLER_VALIDATE;

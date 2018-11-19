@@ -32,8 +32,6 @@
 #include "inc/hw/link_encoder.h"
 #include "core_status.h"
 
-#define EDP_BACKLIGHT_RAMP_DISABLE_LEVEL 0xFFFFFFFF
-
 enum pipe_gating_control {
 	PIPE_GATING_CONTROL_DISABLE = 0,
 	PIPE_GATING_CONTROL_ENABLE,
@@ -86,11 +84,6 @@ struct hw_sequencer_funcs {
 
 	void (*program_gamut_remap)(
 			struct pipe_ctx *pipe_ctx);
-
-	void (*program_csc_matrix)(
-			struct pipe_ctx *pipe_ctx,
-			enum dc_color_space colorspace,
-			uint16_t *matrix);
 
 	void (*program_output_csc)(struct dc *dc,
 			struct pipe_ctx *pipe_ctx,

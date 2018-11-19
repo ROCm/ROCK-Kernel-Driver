@@ -22,7 +22,7 @@
 
 #undef pr_fmt
 #define pr_fmt(fmt) "kfd2kgd: " fmt
-
+#include <linux/pagemap.h>
 #include <linux/list.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/mm.h>
@@ -39,6 +39,11 @@
 
 /* BO flag to indicate a KFD userptr BO */
 #define AMDGPU_AMDKFD_USERPTR_BO (1ULL << 63)
+
+/* Userptr restore delay, just long enough to allow consecutive VM
+ * changes to accumulate
+ */
+#define AMDGPU_USERPTR_RESTORE_DELAY_MS 1
 
 /* Impose limit on how much memory KFD can use */
 static struct {
@@ -317,7 +322,7 @@ static void amdgpu_amdkfd_add_eviction_fence(struct amdgpu_bo *bo,
 
 	for (i = 0; i < ef_count; i++) {
 		amdgpu_bo_fence(bo, &ef_list[i]->base, true);
-		/* Readding the fence takes an additional reference. Drop that
+		/* Re-adding the fence takes an additional reference. Drop that
 		 * reference.
 		 */
 		dma_fence_put(&ef_list[i]->base);
@@ -495,7 +500,7 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	if (p_bo_va_entry)
 		*p_bo_va_entry = bo_va_entry;
 
-	/* Allocate new page tables if neeeded and validate
+	/* Allocate new page tables if needed and validate
 	 * them. Clearing of new page tables and validate need to wait
 	 * on move fences. We don't want that to trigger the eviction
 	 * fence, so remove it temporarily.
@@ -1021,7 +1026,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 
 		info->pid = get_task_pid(current->group_leader, PIDTYPE_PID);
 		atomic_set(&info->evicted_bos, 0);
-		INIT_DELAYED_WORK(&info->work,
+		INIT_DELAYED_WORK(&info->restore_userptr_work,
 				  amdgpu_amdkfd_restore_userptr_worker);
 
 		*process_info = info;
@@ -1039,6 +1044,9 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 		pr_err("validate_pt_pd_bos() failed\n");
 		goto validate_pd_fail;
 	}
+	ret = ttm_bo_wait(&vm->root.base.bo->tbo, false, false);
+	if (ret)
+		goto wait_pd_fail;
 	amdgpu_bo_fence(vm->root.base.bo,
 			&vm->process_info->eviction_fence->base, true);
 	amdgpu_bo_unreserve(vm->root.base.bo);
@@ -1052,6 +1060,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 
 	return 0;
 
+wait_pd_fail:
 validate_pd_fail:
 	amdgpu_bo_unreserve(vm->root.base.bo);
 reserve_pd_fail:
@@ -1062,7 +1071,9 @@ reserve_pd_fail:
 		dma_fence_put(*ef);
 		*ef = NULL;
 		*process_info = NULL;
+		put_pid(info->pid);
 create_evict_fence_fail:
+		mutex_destroy(&info->lock);
 		kfree(info);
 	}
 	return ret;
@@ -1160,8 +1171,9 @@ void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 		WARN_ON(!list_empty(&process_info->userptr_inval_list));
 
 		dma_fence_put(&process_info->eviction_fence->base);
-		cancel_delayed_work_sync(&process_info->work);
+		cancel_delayed_work_sync(&process_info->restore_userptr_work);
 		put_pid(process_info->pid);
+		mutex_destroy(&process_info->lock);
 		kfree(process_info);
 	}
 }
@@ -1273,7 +1285,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	}
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	(*mem)->aql_queue     = !!(flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM);
+	(*mem)->aql_queue = !!(flags & ALLOC_MEM_FLAGS_AQL_QUEUE_MEM);
 
 	/* Workaround for AQL queue wraparound bug. Map the same
 	 * memory twice. That means we only actually allocate half
@@ -1321,9 +1333,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	bp.type = bo_type;
 	bp.resv = NULL;
 
-	/* Allocate buffer object. Userptr objects need to start out
-	 * in the CPU domain, get moved to GTT when pinned.
-	 */
 	ret = amdgpu_bo_create(adev, &bp, &bo);
 
 	if (ret) {
@@ -1368,6 +1377,7 @@ allocate_init_user_pages_failed:
 err_bo_create:
 	unreserve_system_mem_limit(adev, size, alloc_domain, !!sg);
 err_reserve_limit:
+	mutex_destroy(&(*mem)->lock);
 	kfree(*mem);
 err:
 	if (sg) {
@@ -1463,6 +1473,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	/* Free the BO*/
 	amdgpu_bo_unref(&mem->bo);
+	mutex_destroy(&mem->lock);
 	kfree(mem);
 
 	return ret;
@@ -1600,7 +1611,6 @@ add_bo_to_vm_failed_aql:
 		remove_bo_from_vm(adev, bo_va_entry, bo_size);
 add_bo_to_vm_failed:
 	unreserve_bo_and_vms(&ctx, false, false);
-
 out:
 	mutex_unlock(&mem->process_info->lock);
 	mutex_unlock(&mem->lock);
@@ -1754,7 +1764,7 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 {
 	struct amdgpu_device *adev;
 
-	adev = (struct amdgpu_device *) kgd;
+	adev = (struct amdgpu_device *)kgd;
 	if (atomic_read(&adev->gmc.vm_fault_info_updated) == 1) {
 		*mem = *adev->gmc.vm_fault_info;
 		mb();
@@ -2002,7 +2012,8 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 		r = kgd2kfd->quiesce_mm(mm);
 		if (r)
 			pr_err("Failed to quiesce KFD\n");
-		schedule_delayed_work(&process_info->work, 1);
+		schedule_delayed_work(&process_info->restore_userptr_work,
+			msecs_to_jiffies(AMDGPU_USERPTR_RESTORE_DELAY_MS));
 	}
 
 	return r;
@@ -2261,7 +2272,8 @@ static void amdgpu_amdkfd_restore_userptr_worker(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct amdkfd_process_info *process_info =
-		container_of(dwork, struct amdkfd_process_info, work);
+		container_of(dwork, struct amdkfd_process_info,
+			     restore_userptr_work);
 	struct task_struct *usertask;
 	struct mm_struct *mm;
 	int evicted_bos;
@@ -2317,7 +2329,8 @@ unlock_out:
 
 	/* If validation failed, reschedule another attempt */
 	if (evicted_bos)
-		schedule_delayed_work(&process_info->work, 1);
+		schedule_delayed_work(&process_info->restore_userptr_work,
+			msecs_to_jiffies(AMDGPU_USERPTR_RESTORE_DELAY_MS));
 }
 
 /** amdgpu_amdkfd_gpuvm_restore_process_bos - Restore all BOs for the given

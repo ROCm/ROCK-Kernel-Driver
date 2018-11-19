@@ -391,9 +391,11 @@ bool dc_stream_program_csc_matrix(struct dc *dc, struct dc_stream_state *stream)
 				== stream) {
 
 			pipes = &dc->current_state->res_ctx.pipe_ctx[i];
-			dc->hwss.program_csc_matrix(pipes,
-			stream->output_color_space,
-			stream->csc_color_matrix.matrix);
+			dc->hwss.program_output_csc(dc,
+					pipes,
+					stream->output_color_space,
+					stream->csc_color_matrix.matrix,
+					pipes->plane_res.hubp->opp_id);
 			ret = true;
 		}
 	}
@@ -1389,7 +1391,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					stream_update->adjust->v_total_max);
 
 			if (stream_update->periodic_fn_vsync_delta &&
-					pipe_ctx->stream_res.tg &&
 					pipe_ctx->stream_res.tg->funcs->program_vline_interrupt)
 				pipe_ctx->stream_res.tg->funcs->program_vline_interrupt(
 					pipe_ctx->stream_res.tg, &pipe_ctx->stream->timing,

@@ -787,7 +787,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 			&dc->current_state->res_ctx.pipe_ctx[i];
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
-			if (hubp != NULL) {
+			if (hubp != NULL && hubp->funcs->hubp_get_underflow_status) {
 				if (hubp->funcs->hubp_get_underflow_status(hubp) != 0) {
 					/* one pipe underflow, we will reset all the pipes*/
 					need_recover = true;
@@ -813,7 +813,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_BLANK_EN=1*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->set_hubp_blank_en)
 				hubp->funcs->set_hubp_blank_en(hubp, true);
 		}
 	}
@@ -826,7 +826,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_DISABLE=1*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->hubp_disable_control)
 				hubp->funcs->hubp_disable_control(hubp, true);
 		}
 	}
@@ -836,7 +836,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_DISABLE=0*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->hubp_disable_control)
 				hubp->funcs->hubp_disable_control(hubp, true);
 		}
 	}
@@ -848,7 +848,7 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 		if (pipe_ctx != NULL) {
 			hubp = pipe_ctx->plane_res.hubp;
 			/*DCHUBP_CNTL:HUBP_BLANK_EN=0*/
-			if (hubp != NULL)
+			if (hubp != NULL && hubp->funcs->set_hubp_blank_en)
 				hubp->funcs->set_hubp_blank_en(hubp, true);
 		}
 	}
@@ -1704,30 +1704,19 @@ static void program_gamut_remap(struct pipe_ctx *pipe_ctx)
 	pipe_ctx->plane_res.dpp->funcs->dpp_set_gamut_remap(pipe_ctx->plane_res.dpp, &adjust);
 }
 
-
-static void program_csc_matrix(struct pipe_ctx *pipe_ctx,
-		enum dc_color_space colorspace,
-		uint16_t *matrix)
-{
-	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
-			if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment != NULL)
-				pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment(pipe_ctx->plane_res.dpp, matrix);
-	} else {
-		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default != NULL)
-			pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default(pipe_ctx->plane_res.dpp, colorspace);
-	}
-}
-
 static void dcn10_program_output_csc(struct dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		enum dc_color_space colorspace,
 		uint16_t *matrix,
 		int opp_id)
 {
-	if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment != NULL)
-		program_csc_matrix(pipe_ctx,
-				colorspace,
-				matrix);
+	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
+		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment != NULL)
+			pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment(pipe_ctx->plane_res.dpp, matrix);
+	} else {
+		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default != NULL)
+			pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default(pipe_ctx->plane_res.dpp, colorspace);
+	}
 }
 
 bool is_lower_pipe_tree_visible(struct pipe_ctx *pipe_ctx)
@@ -1944,10 +1933,6 @@ static void dcn10_update_mpcc(struct dc *dc, struct pipe_ctx *pipe_ctx)
 	struct mpc *mpc = dc->res_pool->mpc;
 	struct mpc_tree *mpc_tree_params = &(pipe_ctx->stream_res.opp->mpc_tree_params);
 
-
-
-	/* TODO: proper fix once fpga works */
-
 	if (dc->debug.visual_confirm == VISUAL_CONFIRM_HDR) {
 		dcn10_get_hdr_visual_confirm_color(
 				pipe_ctx, &blnd_cfg.black_color);
@@ -2026,8 +2011,6 @@ static void update_scaler(struct pipe_ctx *pipe_ctx)
 {
 	bool per_pixel_alpha =
 			pipe_ctx->plane_state->per_pixel_alpha && pipe_ctx->bottom_pipe;
-
-	/* TODO: proper fix once fpga works */
 
 	pipe_ctx->plane_res.scl_data.lb_params.alpha_en = per_pixel_alpha;
 	pipe_ctx->plane_res.scl_data.lb_params.depth = LB_PIXEL_DEPTH_30BPP;
@@ -2690,7 +2673,6 @@ static void dcn10_set_cursor_sdr_white_level(struct pipe_ctx *pipe_ctx)
 
 static const struct hw_sequencer_funcs dcn10_funcs = {
 	.program_gamut_remap = program_gamut_remap,
-	.program_csc_matrix = program_csc_matrix,
 	.init_hw = dcn10_init_hw,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = dcn10_apply_ctx_for_surface,

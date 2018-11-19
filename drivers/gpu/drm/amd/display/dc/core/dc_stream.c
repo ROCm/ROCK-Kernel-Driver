@@ -349,3 +349,47 @@ void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream)
 			"\tlink: %d\n",
 			stream->sink->link->link_index);
 }
+
+static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
+{
+	uint32_t pix_clk = timing->pix_clk_khz;
+	uint32_t normalized_pix_clk = pix_clk;
+
+	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		pix_clk /= 2;
+	if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422) {
+		switch (timing->display_color_depth) {
+		case COLOR_DEPTH_888:
+			normalized_pix_clk = pix_clk;
+			break;
+		case COLOR_DEPTH_101010:
+			normalized_pix_clk = (pix_clk * 30) / 24;
+			break;
+		case COLOR_DEPTH_121212:
+			normalized_pix_clk = (pix_clk * 36) / 24;
+		break;
+		case COLOR_DEPTH_161616:
+			normalized_pix_clk = (pix_clk * 48) / 24;
+		break;
+		default:
+			ASSERT(0);
+		break;
+		}
+	}
+	return normalized_pix_clk;
+}
+
+void dc_stream_calculate_phy_pix_clks(struct dc_stream_state *stream)
+{
+	/* update actual pixel clock on all streams */
+	if (dc_is_hdmi_signal(stream->signal))
+		stream->phy_pix_clk = get_norm_pix_clk(
+			&stream->timing);
+	else
+		stream->phy_pix_clk =
+			stream->timing.pix_clk_khz;
+
+	if (stream->timing.timing_3d_format ==
+	    TIMING_3D_FORMAT_HW_FRAME_PACKING)
+		stream->phy_pix_clk *= 2;
+}
