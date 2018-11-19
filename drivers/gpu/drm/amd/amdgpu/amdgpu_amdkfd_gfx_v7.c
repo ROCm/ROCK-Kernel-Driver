@@ -200,12 +200,6 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.invalidate_tlbs = invalidate_tlbs,
 	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 	.read_vmid_from_vmfault_reg = read_vmid_from_vmfault_reg,
-	.get_dmabuf_info = amdgpu_amdkfd_get_dmabuf_info,
-	.import_dmabuf = amdgpu_amdkfd_gpuvm_import_dmabuf,
-	.export_dmabuf = amdgpu_amdkfd_gpuvm_export_dmabuf,
-	.pin_get_sg_table_bo = amdgpu_amdkfd_gpuvm_pin_get_sg_table,
-	.unpin_put_sg_table_bo = amdgpu_amdkfd_gpuvm_unpin_put_sg_table,
-	.copy_mem_to_mem = amdgpu_amdkfd_copy_mem_to_mem,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void)
