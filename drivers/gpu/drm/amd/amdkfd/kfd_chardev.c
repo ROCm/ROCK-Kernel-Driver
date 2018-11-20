@@ -1262,40 +1262,6 @@ bool kfd_dev_is_large_bar(struct kfd_dev *dev)
 	return false;
 }
 
-static int kfd_reserve_vram_limit(struct kfd_dev *dev, uint64_t size)
-{
-	int ret = 0;
-	uint64_t limit;
-
-	if (dev->vram_limit.max_vram_limit <=
-			kfd_total_mem_size / 512)
-		return -ENOMEM;
-
-	/* Subtract potential page tables size */
-	limit = dev->vram_limit.max_vram_limit -
-			kfd_total_mem_size / 512;
-
-	spin_lock(&dev->vram_limit.vram_limit_lock);
-
-	if (limit > dev->vram_limit.vram_used + size)
-		dev->vram_limit.vram_used += size;
-	else
-		ret = -ENOMEM;
-
-	spin_unlock(&dev->vram_limit.vram_limit_lock);
-
-	return ret;
-}
-
-void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size)
-{
-	spin_lock(&dev->vram_limit.vram_limit_lock);
-	dev->vram_limit.vram_used -= size;
-	spin_unlock(&dev->vram_limit.vram_limit_lock);
-
-	WARN_ON_ONCE(dev->vram_limit.vram_used < 0);
-}
-
 static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 					struct kfd_process *p, void *data)
 {
@@ -1361,19 +1327,13 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto err_unlock;
 	}
 
-	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		err = kfd_reserve_vram_limit(dev, args->size);
-		if (err)
-			goto err_unlock;
-	}
-
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->vm, NULL, (struct kgd_mem **) &mem, &offset,
 		flags);
 
 	if (err)
-		goto err_vram_limit;
+		goto err_unlock;
 
 	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
 			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
@@ -1395,9 +1355,6 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 err_free:
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem);
-err_vram_limit:
-	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-		kfd_unreserve_vram_limit(dev, args->size);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1439,17 +1396,9 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
 	 */
-	if (!ret) {
-		/* kfd_process_device_remove_obj_handle will free buf_obj.
-		 * So do that last.
-		 */
-		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-			kfd_unreserve_vram_limit(dev,
-				buf_obj->it.last - buf_obj->it.start + 1);
-
+	if (!ret)
 		kfd_process_device_remove_obj_handle(
-				pdd, GET_IDR_HANDLE(args->handle));
-	}
+			pdd, GET_IDR_HANDLE(args->handle));
 
 err_unlock:
 	mutex_unlock(&p->mutex);
