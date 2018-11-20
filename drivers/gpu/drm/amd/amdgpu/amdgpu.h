@@ -83,6 +83,7 @@
 #include "amdgpu_gem.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_doorbell.h"
+#include "amdgpu_amdkfd.h"
 
 #define MAX_GPU_INSTANCE		16
 
