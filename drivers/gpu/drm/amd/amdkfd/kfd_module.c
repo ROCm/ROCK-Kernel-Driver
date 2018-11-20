@@ -24,7 +24,7 @@
 #include <linux/device.h>
 #include "kfd_priv.h"
 
-static const struct kgd2kfd_calls kgd2kfd = {
+static const struct kgd2kfd_calls s_kgd2kfd = {
 	.exit		= kgd2kfd_exit,
 	.probe		= kgd2kfd_probe,
 	.device_init	= kgd2kfd_device_init,
@@ -108,7 +108,7 @@ int kgd2kfd_init(unsigned int interface_version,
 	if (err)
 		return err;
 
-	*g2f = &kgd2kfd;
+	*g2f = &s_kgd2kfd;
 
 	return 0;
 }

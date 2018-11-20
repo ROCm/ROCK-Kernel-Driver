@@ -81,6 +81,7 @@
 #include "amdgpu_job.h"
 #include "amdgpu_bo_list.h"
 #include "amdgpu_gem.h"
+#include "amdgpu_amdkfd.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -1032,6 +1033,9 @@ struct amdgpu_device {
 	/* GDS */
 	struct amdgpu_gds		gds;
 
+	/* KFD */
+	struct amdgpu_kfd_dev		kfd;
+
 	/* display related functionality */
 	struct amdgpu_display_manager dm;
 
@@ -1044,9 +1048,6 @@ struct amdgpu_device {
 	atomic64_t vram_pin_size;
 	atomic64_t visible_pin_size;
 	atomic64_t gart_pin_size;
-
-	/* amdkfd interface */
-	struct kfd_dev          *kfd;
 
 	/* soc15 register offset based on ip, instance and  segment */
 	uint32_t 		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
