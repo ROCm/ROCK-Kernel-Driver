@@ -802,7 +802,7 @@ static struct aa_profile *unpack_profile(struct aa_ext *e, char **ns_name)
 	}
 
 	size = unpack_array(e, "net_allowed_af");
-	if (size || VERSION_LT(e->version, v8)) {
+	if (size && VERSION_LT(e->version, v8)) {
 		profile->net_compat = kzalloc(sizeof(struct aa_net_compat), GFP_KERNEL);
 		if (!profile->net_compat) {
 			info = "out of memory";

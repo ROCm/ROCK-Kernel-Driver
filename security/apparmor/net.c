@@ -126,8 +126,6 @@ int aa_profile_af_perm(struct aa_profile *profile, struct common_audit_data *sa,
 		return 0;
 	state = PROFILE_MEDIATES(profile, AA_CLASS_NET);
 	if (state) {
-		if (!state)
-			return 0;
 		buffer[0] = cpu_to_be16(family);
 		buffer[1] = cpu_to_be16((u16) type);
 		state = aa_dfa_match_len(profile->policy.dfa, state,
