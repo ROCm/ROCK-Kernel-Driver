@@ -232,4 +232,52 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
+					    struct drm_crtc *crtc)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
+	return drm_atomic_get_old_crtc_state(state, crtc);
+#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
+	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+#else
+	return state->crtcs[drm_crtc_index(crtc)]->state;
+#endif
+}
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_old_crtc_state_after_commit(struct drm_atomic_state *state,
+				  struct drm_crtc *crtc)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
+	return drm_atomic_get_old_crtc_state(state, crtc);
+#else
+	return drm_atomic_get_existing_crtc_state(state, crtc);
+#endif
+}
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
+				  struct drm_crtc *crtc)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
+	return drm_atomic_get_new_crtc_state(state,crtc);
+#else
+	return drm_atomic_get_existing_crtc_state(state, crtc);
+#endif
+}
+
+static inline struct drm_crtc_state *
+kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
+					    struct drm_crtc *crtc)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
+	return drm_atomic_get_new_crtc_state(state,crtc);
+#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
+	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
+#else
+	return state->crtcs[drm_crtc_index(crtc)]->state;
+#endif
+}
+
 #endif /* AMDKCL_DRM_H */

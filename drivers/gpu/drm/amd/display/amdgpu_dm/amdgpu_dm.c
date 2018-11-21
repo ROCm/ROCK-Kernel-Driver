@@ -3143,7 +3143,7 @@ retry:
 			continue;
 		}
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
+		new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(state, &acrtc->base);
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 		dm_new_crtc_state->base.vrr_enabled =
@@ -6710,10 +6710,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
-			drm_atomic_get_new_crtc_state(state, pcrtc);
+			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_crtc_state *dm_old_crtc_state =
-			to_dm_crtc_state(drm_atomic_get_old_crtc_state(state, pcrtc));
+			to_dm_crtc_state(kcl_drm_atomic_get_old_crtc_state_after_commit(state, pcrtc));
 	int planes_count = 0, vpos, hpos;
 	long r;
 	unsigned long flags;
@@ -6762,7 +6762,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+		new_crtc_state =
+			kcl_drm_atomic_get_new_crtc_state_after_commit(
+					state, crtc);
 		if (!new_crtc_state->active)
 			continue;
 
@@ -7378,8 +7380,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		memset(&stream_update, 0, sizeof(stream_update));
 
 		if (acrtc) {
-			new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
-			old_crtc_state = drm_atomic_get_old_crtc_state(state, &acrtc->base);
+			new_crtc_state = kcl_drm_atomic_get_new_crtc_state_after_commit(state, &acrtc->base);
+			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_after_commit(state, &acrtc->base);
 		}
 
 		/* Skip any modesets/resets */
@@ -7959,7 +7961,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		return false;
 
 	new_crtc_state =
-		drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
+		kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_state->crtc);
 
 	if (!new_crtc_state)
 		return true;
@@ -8037,7 +8039,7 @@ static int dm_update_plane_state(struct dc *dc,
 		if (!old_plane_crtc)
 			return 0;
 
-		old_crtc_state = drm_atomic_get_old_crtc_state(
+		old_crtc_state = kcl_drm_atomic_get_old_crtc_state_before_commit(
 				state, old_plane_crtc);
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
@@ -8076,7 +8078,7 @@ static int dm_update_plane_state(struct dc *dc,
 		if (!new_plane_crtc)
 			return 0;
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, new_plane_crtc);
+		new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_crtc);
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 		if (!dm_new_crtc_state->stream)
