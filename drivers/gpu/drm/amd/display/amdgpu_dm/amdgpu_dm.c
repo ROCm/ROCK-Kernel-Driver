@@ -6719,7 +6719,7 @@ static int count_crtc_active_planes(struct drm_crtc_state *new_crtc_state)
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		new_plane_state = drm_atomic_get_new_plane_state(state, plane);
+		new_plane_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, plane);
 
 		if (!new_plane_state) {
 			/*
@@ -8536,10 +8536,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
 	struct drm_crtc_state *new_pcrtc_state =
-			drm_atomic_get_new_crtc_state(state, pcrtc);
+			kcl_drm_atomic_get_new_crtc_state_after_commit(state, pcrtc);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(new_pcrtc_state);
 	struct dm_crtc_state *dm_old_crtc_state =
-			to_dm_crtc_state(drm_atomic_get_old_crtc_state(state, pcrtc));
+			to_dm_crtc_state(kcl_drm_atomic_get_old_crtc_state_after_commit(state, pcrtc));
 	int planes_count = 0, vpos, hpos;
 	long r;
 	unsigned long flags;
@@ -8587,7 +8587,9 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (!fb || !crtc || pcrtc != crtc)
 			continue;
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, crtc);
+		new_crtc_state =
+			kcl_drm_atomic_get_new_crtc_state_after_commit(
+					state, crtc);
 		if (!new_crtc_state->active)
 			continue;
 
@@ -9152,8 +9154,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		memset(&stream_update, 0, sizeof(stream_update));
 
 		if (acrtc) {
-			new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
-			old_crtc_state = drm_atomic_get_old_crtc_state(state, &acrtc->base);
+			new_crtc_state = kcl_drm_atomic_get_new_crtc_state_after_commit(state, &acrtc->base);
+			old_crtc_state = kcl_drm_atomic_get_old_crtc_state_after_commit(state, &acrtc->base);
 		}
 
 		/* Skip any modesets/resets */
@@ -9621,10 +9623,15 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 	/* TODO This hack should go away */
 	if (aconnector && enable) {
 		/* Make sure fake sink is created in plug-in scenario */
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 		drm_new_conn_state = drm_atomic_get_new_connector_state(state,
 							    &aconnector->base);
 		drm_old_conn_state = drm_atomic_get_old_connector_state(state,
 							    &aconnector->base);
+#else
+		drm_new_conn_state = drm_atomic_get_connector_state(state,
+							    &aconnector->base);
+#endif
 
 		if (IS_ERR(drm_new_conn_state)) {
 			ret = PTR_ERR_OR_ZERO(drm_new_conn_state);
@@ -9632,7 +9639,9 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		}
 
 		dm_new_conn_state = to_dm_connector_state(drm_new_conn_state);
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 		dm_old_conn_state = to_dm_connector_state(drm_old_conn_state);
+#endif
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state))
 			goto skip_modeset;
@@ -9817,11 +9826,13 @@ skip_modeset:
 	 */
 	BUG_ON(dm_new_crtc_state->stream == NULL);
 
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 	/* Scaling or underscan settings */
 	if (is_scaling_state_different(dm_old_conn_state, dm_new_conn_state) ||
 				drm_atomic_crtc_needs_modeset(new_crtc_state))
 		update_stream_scaling_settings(
 			&new_crtc_state->mode, dm_new_conn_state, dm_new_crtc_state->stream);
+#endif
 
 	/* ABM settings */
 	dm_new_crtc_state->abm_level = dm_new_conn_state->abm_level;
@@ -9876,7 +9887,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		return false;
 
 	new_crtc_state =
-		drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
+		kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_state->crtc);
 
 	if (!new_crtc_state)
 		return true;
@@ -10075,7 +10086,7 @@ static int dm_update_plane_state(struct dc *dc,
 		if (!old_plane_crtc)
 			return 0;
 
-		old_crtc_state = drm_atomic_get_old_crtc_state(
+		old_crtc_state = kcl_drm_atomic_get_old_crtc_state_before_commit(
 				state, old_plane_crtc);
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
@@ -10113,7 +10124,7 @@ static int dm_update_plane_state(struct dc *dc,
 		if (!new_plane_crtc)
 			return 0;
 
-		new_crtc_state = drm_atomic_get_new_crtc_state(state, new_plane_crtc);
+		new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_crtc);
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
 		if (!dm_new_crtc_state->stream)
@@ -10194,8 +10205,8 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 	 * positioning from the underlying pipe. Check the cursor plane's
 	 * blending properties match the primary plane's. */
 
-	new_cursor_state = drm_atomic_get_new_plane_state(state, crtc->cursor);
-	new_primary_state = drm_atomic_get_new_plane_state(state, crtc->primary);
+	new_cursor_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->cursor);
+	new_primary_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->primary);
 	if (!new_cursor_state || !new_primary_state ||
 	    !new_cursor_state->fb || !new_primary_state->fb) {
 		return 0;
@@ -10529,7 +10540,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(
+#ifndef HAVE_DRM_ATOMIC_GET_CRTC_STATE
+				acrtc->base.state))
+#else
 				drm_atomic_get_new_crtc_state(state, &acrtc->base)))
+#endif
 			continue;
 
 		/* Skip any thing not scale or underscan changes */
