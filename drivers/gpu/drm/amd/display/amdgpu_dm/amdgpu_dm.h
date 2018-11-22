@@ -142,6 +142,16 @@ struct amdgpu_display_manager {
 	 */
 	struct mutex dc_lock;
 
+	 * @atomic_obj
+	 *
+	 * In combination with &dm_atomic_state it helps manage
+	 * global atomic state that doesn't map cleanly into existing
+	 * drm resources, like &dc_context.
+	 */
+	struct drm_private_obj atomic_obj;
+
+	struct drm_modeset_lock atomic_obj_lock;
+
 	/**
 	 * @irq_handler_list_low_tab:
 	 *
@@ -284,7 +294,7 @@ struct dm_crtc_state {
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)
 
 struct dm_atomic_state {
-	struct drm_atomic_state base;
+	struct drm_private_state base;
 
 	struct dc_state *context;
 };
