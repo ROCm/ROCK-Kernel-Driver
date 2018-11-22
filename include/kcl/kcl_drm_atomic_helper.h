@@ -8,6 +8,17 @@
 #include <kcl/kcl_drm_modes.h>
 #include <kcl/kcl_drm_crtc.h>
 
+static inline struct drm_plane_state *
+kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
+							struct drm_plane *plane)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE)
+	return drm_atomic_get_new_plane_state(state, plane);
+#else
+	return drm_atomic_get_existing_plane_state(state, plane);
+#endif
+}
+
 #if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
