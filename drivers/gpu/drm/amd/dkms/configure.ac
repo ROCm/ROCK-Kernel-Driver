@@ -88,6 +88,7 @@ m4_include([m4/vmf-insert.m4])
 m4_include([m4/reservation-object-wait-timeout-rcu.m4])
 m4_include([m4/obj-in-struct-drm-framebuffer.m4])
 m4_include([m4/drm-atomic-get-crtc-state.m4])
+m4_include([m4/drm-atomic-get-new-plane-state.m4])
 m4_include([m4/config.m4])
 
 

@@ -458,12 +458,10 @@ static inline struct drm_plane_state *
 kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 							struct drm_plane *plane)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-	return drm_atomic_get_new_plane_state(state,plane);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
-	return state->planes[drm_plane_index(plane)].state;
+#if defined(HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE)
+	return drm_atomic_get_new_plane_state(state, plane);
 #else
-	return state->plane_states[drm_plane_index(plane)];
+	return drm_atomic_get_existing_plane_state(state, plane);
 #endif
 }
 
