@@ -181,4 +181,17 @@ drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
+extern void
+__kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state);
+
+static inline void
+__drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state)
+{
+	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
