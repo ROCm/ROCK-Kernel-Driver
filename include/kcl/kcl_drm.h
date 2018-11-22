@@ -280,4 +280,15 @@ kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 #endif
 }
 
+static inline struct drm_plane_state *
+kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
+							struct drm_plane *plane)
+{
+#if defined(HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE)
+	return drm_atomic_get_new_plane_state(state, plane);
+#else
+	return drm_atomic_get_existing_plane_state(state, plane);
+#endif
+}
+
 #endif /* AMDKCL_DRM_H */
