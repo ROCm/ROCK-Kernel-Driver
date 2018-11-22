@@ -508,8 +508,7 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 extern void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state);
@@ -519,7 +518,7 @@ static inline void
 kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
 #else
 	return __drm_atomic_helper_connector_reset(connector, conn_state);

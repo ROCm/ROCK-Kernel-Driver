@@ -39,6 +39,7 @@ m4_include([m4/request-firmware-direct.m4])
 m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/mmu-notifier-call-srcu.m4])
 m4_include([m4/file-inode.m4])
+m4_include([m4/drm-atomic-helper-connector-reset.m4])
 m4_include([m4/config.m4])
 
 
