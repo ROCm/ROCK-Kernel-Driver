@@ -160,3 +160,17 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 }
 EXPORT_SYMBOL(drm_atomic_helper_resume);
 #endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
+void
+__kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+				    struct drm_connector_state *conn_state)
+{
+	if (conn_state)
+		conn_state->connector = connector;
+
+	connector->state = conn_state;
+}
+EXPORT_SYMBOL(__kcl_drm_atomic_helper_connector_reset);
+#endif
+
