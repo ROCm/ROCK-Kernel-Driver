@@ -398,7 +398,7 @@ u64 drm_get_max_iomem(void)
 EXPORT_SYMBOL(drm_get_max_iomem);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
