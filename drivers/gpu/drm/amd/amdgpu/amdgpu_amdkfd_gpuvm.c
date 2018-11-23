@@ -371,23 +371,6 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
-static u64 get_vm_pd_gpu_offset(struct amdgpu_vm *vm)
-{
-	struct amdgpu_device *adev =
-		amdgpu_ttm_adev(vm->root.base.bo->tbo.bdev);
-	u64 offset;
-	uint64_t flags = AMDGPU_PTE_VALID;
-
-	offset = amdgpu_bo_gpu_offset(vm->root.base.bo);
-
-	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
-	 * to an actual MC address.
-	 */
-	adev->gmc.gmc_funcs->get_vm_pde(adev, -1, &offset, &flags);
-
-	return offset;
-}
-
 /* vm_validate_pt_pd_bos - Validate page table and directory BOs
  *
  * Page directories are not updated here because huge page handling
