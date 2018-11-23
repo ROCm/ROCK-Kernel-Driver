@@ -338,8 +338,6 @@ struct cma_iter {
 		*/
 	struct cma_system_bo *cma_bo;
 	struct list_head cma_list;
-
-	bool pci_atomic_requested;
 };
 
 /* KGD2KFD callbacks */
