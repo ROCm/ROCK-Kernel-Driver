@@ -311,9 +311,9 @@ static int ttm_mem_init_kernel_zone(struct ttm_mem_global *glob,
 
 	zone->name = "kernel";
 	zone->zone_mem = mem;
-	zone->max_mem = mem - (mem >> 4); /* 15/16 */
-	zone->emer_mem = mem - (mem >> 4); /* 15/16 */
-	zone->swap_limit = zone->max_mem;
+	zone->max_mem = mem >> 1;
+	zone->emer_mem = (mem >> 1) + (mem >> 2);
+	zone->swap_limit = zone->max_mem - (mem >> 3);
 	zone->used_mem = 0;
 	zone->glob = glob;
 	glob->zone_kernel = zone;
@@ -381,8 +381,7 @@ static int ttm_mem_init_dma32_zone(struct ttm_mem_global *glob,
 	 * No special dma32 zone needed.
 	 */
 
-	/*if (mem <= ((uint64_t) 1ULL << 32)) {*/
-	if (1) {
+	if (mem <= ((uint64_t) 1ULL << 32)) {
 		kfree(zone);
 		return 0;
 	}
