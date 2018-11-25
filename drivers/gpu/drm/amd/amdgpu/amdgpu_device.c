@@ -839,34 +839,12 @@ static void amdgpu_device_check_block_size(struct amdgpu_device *adev)
  */
 static void amdgpu_device_check_vm_size(struct amdgpu_device *adev)
 {
-	struct sysinfo si;
-	int phys_ram_gb, amdgpu_vm_size_aligned;
+	/* no need to check the default value */
+	if (amdgpu_vm_size == -1)
+		return;
 
-	/* Compute the GPU VM space only if the user
-	 * hasn't changed it from the default.
-	 * In order for Raven ATC memory to work, vm size should be 256TB.
-	 * So we do not compute the new vm size here for Raven.
-	 */
-	if (amdgpu_vm_size == -1 && adev->asic_type != CHIP_RAVEN) {
-		/* Computation depends on the amount of physical RAM available.
-		 * Cannot exceed 1TB.
-		 */
-		si_meminfo(&si);
-		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
-		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
 
-		/* GPUVM sizes are almost never perfect powers of two.
-		 * Round up to nearest power of two starting from
-		 * the minimum allowed but aligned size of 32GB
-		 */
-		amdgpu_vm_size_aligned = 32;
-		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
-			amdgpu_vm_size_aligned *= 2;
-
-		amdgpu_vm_size = amdgpu_vm_size_aligned;
-	}
-
-	if (amdgpu_vm_size != -1 && amdgpu_vm_size < 1) {
+	if (amdgpu_vm_size < 1) {
 		dev_warn(adev->dev, "VM size (%d) too small, min is 1GB\n",
 			 amdgpu_vm_size);
 		amdgpu_vm_size = -1;
@@ -923,9 +901,6 @@ def_value:
  */
 static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 {
-	struct sysinfo si;
-	int phys_ram_gb, amdgpu_vm_size_aligned;
-
 	if (amdgpu_sched_jobs < 4) {
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
@@ -948,27 +923,6 @@ static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "gtt size (%d) too small\n",
 				 amdgpu_gtt_size);
 		amdgpu_gtt_size = -1;
-	}
-
-	/* Compute the GPU VM space only if the user
-	 * hasn't changed it from the default.
-	 */
-	if (amdgpu_vm_size == -1) {
-		/* Computation depends on the amount of physical RAM available.
-		 * Cannot exceed 1TB.
-		 */
-		si_meminfo(&si);
-		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
-		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
-
-		/* GPUVM sizes are almost never perfect powers of two.
-		 * Round up to nearest power of two starting from
-		 * the minimum allowed but aligned size of 32GB */
-		amdgpu_vm_size_aligned = 32;
-		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
-			amdgpu_vm_size_aligned *= 2;
-
-		amdgpu_vm_size = amdgpu_vm_size_aligned;
 	}
 
 	/* valid range is between 4 and 9 inclusive */
