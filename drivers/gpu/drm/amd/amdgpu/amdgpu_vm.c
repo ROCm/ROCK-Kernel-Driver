@@ -2059,7 +2059,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
 		if (mem && mem->mem_type == TTM_PL_VRAM &&
 			adev != bo_adev) {
-			if (!(bo->flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED))
+			if (!(amdgpu_device_is_peer_accessible(bo_adev,adev)))
 				return -EINVAL;
 			flags |= AMDGPU_PTE_SYSTEM;
 			vram_base_offset = bo_adev->gmc.aper_base;

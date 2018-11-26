@@ -1,5 +1,8 @@
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+#include "kcl_common.h"
+#endif
 
 #if defined(BUILD_AS_DKMS)
 
@@ -67,7 +70,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 		/*
 		 * Upstream ports may block AtomicOps on egress.
 		 */
-#if defined(OS_NAME_RHEL_6)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0) || defined(OS_NAME_RHEL_6)
 		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM) {
 #else
 		if (!bridge->has_secondary_link) {
@@ -156,7 +159,42 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pcie_get_width_cap);
 
+#else
+
+enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
+
+enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
+
+
+void amdkcl_pci_init(void)
+{
+	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
+	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+}
+
 #endif
+
+enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+	return pcie_get_speed_cap(dev);
+#else
+	return _kcl_pcie_get_speed_cap(dev);
+#endif
+}
+EXPORT_SYMBOL(kcl_pcie_get_speed_cap);
+
+enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+	return pcie_get_width_cap(dev);
+#else
+	return _kcl_pcie_get_width_cap(dev);
+#endif
+}
+EXPORT_SYMBOL(kcl_pcie_get_width_cap);
 
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
@@ -175,4 +213,126 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 					 PCI_EXP_DEVCTL_EXT_TAG);
 }
 EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+ssize_t max_link_speed_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%s\n", PCIE_SPEED2STR(kcl_pcie_get_speed_cap(pdev)));
+}
+static DEVICE_ATTR_RO(max_link_speed);
+
+ssize_t max_link_width_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", kcl_pcie_get_width_cap(pdev));
+}
+static DEVICE_ATTR_RO(max_link_width);
+
+ssize_t current_link_speed_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	u16 linkstat;
+	int err;
+	const char *speed;
+
+	err = pcie_capability_read_word(pci_dev, PCI_EXP_LNKSTA, &linkstat);
+	if (err)
+		return -EINVAL;
+
+	switch (linkstat & PCI_EXP_LNKSTA_CLS) {
+	case PCI_EXP_LNKSTA_CLS_16_0GB:
+		speed = "16 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_8_0GB:
+		speed = "8 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_5_0GB:
+		speed = "5 GT/s";
+		break;
+	case PCI_EXP_LNKSTA_CLS_2_5GB:
+		speed = "2.5 GT/s";
+		break;
+	default:
+		speed = "Unknown speed";
+	}
+
+	return sprintf(buf, "%s\n", speed);
+}
+static DEVICE_ATTR_RO(current_link_speed);
+
+ssize_t current_link_width_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
+{
+	struct pci_dev *pci_dev = to_pci_dev(dev);
+	u16 linkstat;
+	int err;
+
+	err = pcie_capability_read_word(pci_dev, PCI_EXP_LNKSTA, &linkstat);
+	if (err)
+		return -EINVAL;
+
+	return sprintf(buf, "%u\n",
+		(linkstat & PCI_EXP_LNKSTA_NLW) >> PCI_EXP_LNKSTA_NLW_SHIFT);
+}
+static DEVICE_ATTR_RO(current_link_width);
+
+static struct attribute *pcie_dev_attrs[] = {
+	&dev_attr_current_link_speed.attr,
+	&dev_attr_current_link_width.attr,
+	&dev_attr_max_link_width.attr,
+	&dev_attr_max_link_speed.attr,
+	NULL,
+};
+
+static const struct attribute_group pcie_dev_group = {
+	.attrs = pcie_dev_attrs,
+};
+
+const struct attribute_group *pcie_dev_groups[] = {
+	&pcie_dev_group,
+	NULL,
+};
+
+int _kcl_pci_create_measure_file(struct pci_dev *pdev)
+{
+	int ret;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_current_link_speed);
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+				"Failed to create current_link_speed sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_current_link_width);
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+				"Failed to create current_link_width sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_max_link_width);
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+				"Failed to create max_link_width sysfs files: %d\n", ret);
+		return ret;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_max_link_speed);
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+				"Failed to create max_link_speed sysfs files: %d\n", ret);
+		return ret;
+	}
+
+}
+EXPORT_SYMBOL(_kcl_pci_create_measure_file);
+#endif
+
 #endif

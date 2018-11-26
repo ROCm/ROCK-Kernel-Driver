@@ -3,7 +3,7 @@
 #include <linux/version.h>
 #include <linux/types.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
 
 #ifdef CONFIG_X86_PAT
 extern int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size);

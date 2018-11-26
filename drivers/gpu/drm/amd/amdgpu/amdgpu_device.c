@@ -534,6 +534,12 @@ static int amdgpu_device_doorbell_init(struct amdgpu_device *adev)
 	if (adev->doorbell.num_doorbells == 0)
 		return -EINVAL;
 
+	/* For Vega, reserve and map two pages on doorbell BAR since SDMA
+	 * paging queue doorbell use the second page
+	 */
+	if (adev->asic_type >= CHIP_VEGA10)
+		adev->doorbell.num_doorbells *= 2;
+
 	adev->doorbell.ptr = ioremap(adev->doorbell.base,
 				     adev->doorbell.num_doorbells *
 				     sizeof(u32));
@@ -3509,7 +3515,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	if (adev->pm.pcie_gen_mask == 0) {
 		/* asic caps */
 		pdev = adev->pdev;
-		speed_cap = pcie_get_speed_cap(pdev);
+		speed_cap = kcl_pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
@@ -3532,7 +3538,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 		}
 		/* platform caps */
 		pdev = adev->ddev->pdev->bus->self;
-		speed_cap = pcie_get_speed_cap(pdev);
+		speed_cap = kcl_pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2);
@@ -3556,7 +3562,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	}
 	if (adev->pm.pcie_mlw_mask == 0) {
 		pdev = adev->ddev->pdev->bus->self;
-		link_width = pcie_get_width_cap(pdev);
+		link_width = kcl_pcie_get_width_cap(pdev);
 		if (link_width == PCIE_LNK_WIDTH_UNKNOWN) {
 			adev->pm.pcie_mlw_mask |= AMDGPU_DEFAULT_PCIE_MLW_MASK;
 		} else {
@@ -3610,3 +3616,26 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	}
 }
 
+/**
+ * amdgpu_device_is_peer_accessible - Check peer access through PCIe BAR
+ *
+ * @adev: amdgpu_device pointer
+ * @peer_adev: amdgpu_device pointer for peer device trying to access @adev
+ *
+ * Return true if @peer_adev can access (DMA) @adev through the PCIe
+ * BAR, i.e. @adev is "large BAR" and the BAR matches the DMA mask of
+ * @peer_adev.
+ */
+bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
+				      struct amdgpu_device *peer_adev)
+{
+	uint64_t address_mask = peer_adev->dev->dma_mask ?
+		~*peer_adev->dev->dma_mask : ~((1ULL << 32) - 1);
+	resource_size_t aper_limit =
+		adev->gmc.aper_base + adev->gmc.aper_size - 1;
+
+	return adev->gmc.visible_vram_size &&
+		adev->gmc.real_vram_size == adev->gmc.visible_vram_size &&
+		!(adev->gmc.aper_base & address_mask ||
+		  aper_limit & address_mask);
+}

@@ -1023,12 +1023,15 @@ dm_atomic_state_alloc(struct drm_device *dev)
 
 	if (!state)
 		return NULL;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	if (drm_atomic_state_init(dev, &state->base) < 0)
 		goto fail;
 
 	return &state->base;
-
+#else
+	DRM_DEBUG_ATOMIC("Allocate atomic state %p\n", state);
+	return (struct drm_atomic_state *)state;
+#endif
 fail:
 	kfree(state);
 	return NULL;
@@ -1043,15 +1046,22 @@ dm_atomic_state_clear(struct drm_atomic_state *state)
 		dc_release_state(dm_state->context);
 		dm_state->context = NULL;
 	}
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	drm_atomic_state_default_clear(state);
+#else
+	drm_atomic_state_clear(state);
+#endif
 }
 
 static void
 dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 {
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	drm_atomic_state_default_release(state);
+#else
+	drm_atomic_state_free(state);
+#endif
 	kfree(dm_state);
 }
 
@@ -1070,9 +1080,11 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 #endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_6)
 	.atomic_state_alloc = dm_atomic_state_alloc,
 	.atomic_state_clear = dm_atomic_state_clear,
 	.atomic_state_free = dm_atomic_state_alloc_free
+#endif
 };
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
@@ -2020,11 +2032,12 @@ retry:
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -2217,6 +2230,14 @@ static int dm_early_init(void *handle)
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0)
+static inline bool
+drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+{
+	return state->mode_changed || state->active_changed;
+}
 #endif
 
 static bool modeset_required(struct drm_crtc_state *crtc_state,
@@ -2626,7 +2647,14 @@ static void update_stream_scaling_settings(const struct drm_display_mode *mode,
 static enum dc_color_depth
 convert_color_depth_from_display_info(const struct drm_connector *connector)
 {
+	struct dm_connector_state *dm_conn_state =
+		to_dm_connector_state(connector->state);
 	uint32_t bpc = connector->display_info.bpc;
+
+	/* TODO: Remove this when there's support for max_bpc in drm */
+	if (dm_conn_state && bpc > dm_conn_state->max_bpc)
+		/* Round down to nearest even number. */
+		bpc = dm_conn_state->max_bpc - (dm_conn_state->max_bpc & 1);
 
 	switch (bpc) {
 	case 0:
@@ -3367,6 +3395,9 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		dm_new_state->underscan_enable = val;
 		ret = 0;
+	} else if (property == adev->mode_info.max_bpc_property) {
+		dm_new_state->max_bpc = val;
+		ret = 0;
 	} else if (property == adev->mode_info.freesync_property) {
 		dm_new_state->freesync_enable = val;
 		ret = 0;
@@ -3414,6 +3445,9 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
+		ret = 0;
+	} else if (property == adev->mode_info.max_bpc_property) {
+		*val = dm_state->max_bpc;
 		ret = 0;
 	} else if (property == adev->mode_info.freesync_property) {
 		*val = dm_state->freesync_enable;
@@ -4263,6 +4297,9 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				0);
 	drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.underscan_vborder_property,
+				0);
+	drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.max_bpc_property,
 				0);
 
 	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
@@ -5121,7 +5158,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
@@ -5133,7 +5170,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			new_crtc_state->mode_changed,
 			new_crtc_state->active_changed,
 			new_crtc_state->connectors_changed);
-
+#endif
 		/* Copy all transient state flags into dc state */
 		if (dm_new_crtc_state->stream) {
 			amdgpu_dm_crtc_copy_transient_flags(&dm_new_crtc_state->base,
@@ -5653,7 +5690,7 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state))
 			goto next_crtc;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 		DRM_DEBUG_DRIVER(
 			"amdgpu_crtc id:%d crtc_state_flags: enable:%d, active:%d, "
 			"planes_changed:%d, mode_changed:%d,active_changed:%d,"
@@ -5665,7 +5702,7 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 			new_crtc_state->mode_changed,
 			new_crtc_state->active_changed,
 			new_crtc_state->connectors_changed);
-
+#endif
 		/* Remove stream for any changed/disabled CRTC */
 		if (!enable) {
 
@@ -6116,10 +6153,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			return ret;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 	dm_state->context = dc_create_state();

@@ -27,7 +27,7 @@
 #include <linux/slab.h>
 #include <drm/amd_rdma.h>
 #include "kfd_priv.h"
-
+#include "amdgpu_amdkfd.h"
 
 struct rdma_cb {
 	struct list_head node;
@@ -99,11 +99,11 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 	dev = buf_obj->dev;
 	offset = address - buf_obj->it.start;
 
-	ret = dev->kfd2kgd->pin_get_sg_table_bo(dev->kgd, mem,
+	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, mem,
 			offset, length, &sg_table_tmp);
 
 	if (ret) {
-		pr_err("pin_get_sg_table_bo failed.\n");
+		pr_err("amdgpu_amdkfd_gpuvm_pin_get_sg_table failed.\n");
 		*amd_p2p_data = NULL;
 		goto free_mem;
 	}
@@ -153,7 +153,7 @@ static int put_pages_helper(struct amd_p2p_info *p2p_data)
 	list_del(&rdma_cb_data->node);
 	kfree(rdma_cb_data);
 
-	dev->kfd2kgd->unpin_put_sg_table_bo(buf_obj->mem, sg_table_tmp);
+	amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem, sg_table_tmp);
 
 
 	return 0;

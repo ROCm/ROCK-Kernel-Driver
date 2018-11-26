@@ -161,7 +161,8 @@ static int kfd_ioctl_get_version(struct file *filep, struct kfd_process *p,
 	return 0;
 }
 
-static int set_queue_properties_from_user(struct queue_properties *q_properties,
+static int set_queue_properties_from_user(struct kfd_dev *dev,
+				struct queue_properties *q_properties,
 				struct kfd_ioctl_create_queue_args *args)
 {
 	if (args->queue_percentage > KFD_MAX_QUEUE_PERCENTAGE) {
@@ -231,12 +232,21 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
 	q_properties->ctx_save_restore_area_size = args->ctx_save_restore_size;
 	q_properties->ctl_stack_size = args->ctl_stack_size;
 	if (args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE ||
-		args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL)
+		args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL) {
 		q_properties->type = KFD_QUEUE_TYPE_COMPUTE;
-	else if (args->queue_type == KFD_IOC_QUEUE_TYPE_SDMA)
+	} else if (args->queue_type == KFD_IOC_QUEUE_TYPE_SDMA) {
+		q_properties->sdma_engine_id =
+			dev->device_info->num_sdma_engines;
 		q_properties->type = KFD_QUEUE_TYPE_SDMA;
-	else
+	} else if (args->queue_type >= KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(0) &&
+		args->queue_type < KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(
+		dev->device_info->num_sdma_engines)) {
+		q_properties->sdma_engine_id =
+			args->queue_type - KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(0);
+		q_properties->type = KFD_QUEUE_TYPE_SDMA;
+	} else {
 		return -ENOTSUPP;
+	}
 
 	if (args->queue_type == KFD_IOC_QUEUE_TYPE_COMPUTE_AQL)
 		q_properties->format = KFD_QUEUE_FORMAT_AQL;
@@ -283,16 +293,16 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 	pr_debug("Creating queue ioctl\n");
 
-	err = set_queue_properties_from_user(&q_properties, args);
-	if (err)
-		return err;
-
 	pr_debug("Looking for gpu id 0x%x\n", args->gpu_id);
 	dev = kfd_device_by_id(args->gpu_id);
 	if (!dev) {
 		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
 		return -EINVAL;
 	}
+
+	err = set_queue_properties_from_user(dev, &q_properties, args);
+	if (err)
+		return err;
 
 	mutex_lock(&p->mutex);
 
@@ -1365,14 +1375,6 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		err = kfd_reserve_vram_limit(dev, args->size);
 		if (err)
 			goto err_unlock;
-
-		/*
-		 * Allocate public memory on large-bar systems to allow peer
-		 * mappings via PCIe even for memory that won't be mapped
-		 * to CPU
-		 */
-		if (kfd_dev_is_large_bar(dev))
-			flags |= KFD_IOC_ALLOC_MEM_FLAGS_PUBLIC;
 	}
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
@@ -1679,7 +1681,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 
 	/* Find a KFD GPU device that supports the get_dmabuf_info query */
 	for (i = 0; kfd_topology_enum_kfd_devices(i, &dev) == 0; i++)
-		if (dev && dev->kfd2kgd->get_dmabuf_info)
+		if (dev)
 			break;
 	if (!dev)
 		return -EINVAL;
@@ -1691,7 +1693,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 	}
 
 	/* Get dmabuf info from KGD */
-	r = dev->kfd2kgd->get_dmabuf_info(dev->kgd, args->dmabuf_fd,
+	r = amdgpu_amdkfd_get_dmabuf_info(dev->kgd, args->dmabuf_fd,
 					  &dma_buf_kgd, &args->size,
 					  metadata_buffer, args->metadata_size,
 					  &args->metadata_size, &flags);
@@ -2067,7 +2069,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		ret = kdev->kfd2kgd->copy_mem_to_mem(kdev->kgd, bo->mem,
+		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->kgd, bo->mem,
 						     offset, cbo->mem, 0,
 						     bo_size, &f, size);
 		if (ret) {
@@ -2385,7 +2387,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		return -EINVAL;
 	}
 
-	err = dev->kfd2kgd->copy_mem_to_mem(dev->kgd, src_mem, src_offset,
+	err = amdgpu_amdkfd_copy_mem_to_mem(dev->kgd, src_mem, src_offset,
 					    dst_mem, dst_offset, size, f,
 					    copied);
 	/* The tmp_bo allocates additional memory. So it is better to wait and

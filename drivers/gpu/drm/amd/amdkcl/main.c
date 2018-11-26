@@ -1,6 +1,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+extern void amdkcl_pci_init(void);
+#endif
 
 extern void amdkcl_kthread_init(void);
 extern void amdkcl_drm_init(void);
@@ -19,6 +22,9 @@ int __init amdkcl_init(void)
 #endif
 	amdkcl_io_init();
 	amdkcl_dev_cgroup_init();
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+	amdkcl_pci_init();
+#endif
 	return 0;
 }
 module_init(amdkcl_init);

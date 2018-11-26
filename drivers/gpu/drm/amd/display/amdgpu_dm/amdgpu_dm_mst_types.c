@@ -456,7 +456,9 @@ static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
 	.destroy_connector = dm_dp_destroy_mst_connector,
 	.hotplug = dm_dp_mst_hotplug,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 	.register_connector = dm_dp_mst_register_connector
+#endif
 };
 
 void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,

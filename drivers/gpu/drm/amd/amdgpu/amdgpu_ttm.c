@@ -2547,7 +2547,7 @@ static const struct file_operations amdgpu_ttm_gtt_fops = {
 
 #endif
 
-#if !defined(OS_NAME_RHEL_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 
 /**
  * amdgpu_iomem_read - Virtual read access to GPU mapped memory
@@ -2674,7 +2674,7 @@ static const struct {
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	{ "amdgpu_gtt", &amdgpu_ttm_gtt_fops, TTM_PL_TT },
 #endif
-#if !defined(OS_NAME_RHEL_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 	{ "amdgpu_iomem", &amdgpu_ttm_iomem_fops, TTM_PL_SYSTEM },
 #endif
 };

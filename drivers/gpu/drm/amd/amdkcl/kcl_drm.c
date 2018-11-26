@@ -603,7 +603,9 @@ static void drm_atomic_crtc_print_state(struct drm_printer *p,
 	drm_printf(p, "\tplanes_changed=%d\n", state->planes_changed);
 	drm_printf(p, "\tmode_changed=%d\n", state->mode_changed);
 	drm_printf(p, "\tactive_changed=%d\n", state->active_changed);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
 	drm_printf(p, "\tconnectors_changed=%d\n", state->connectors_changed);
+#endif
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	drm_printf(p, "\tcolor_mgmt_changed=%d\n", state->color_mgmt_changed);
 #endif
