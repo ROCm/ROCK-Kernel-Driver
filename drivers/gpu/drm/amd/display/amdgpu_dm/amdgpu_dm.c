@@ -5416,6 +5416,10 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 					dc_stream_get_status(dm_new_crtc_state->stream);
 
 			if (!status)
+				status = dc_stream_get_status_from_state(dm_state->context,
+									 dm_new_crtc_state->stream);
+
+			if (!status)
 				DC_ERR("got no status for stream %p on acrtc%p\n", dm_new_crtc_state->stream, acrtc);
 			else
 				acrtc->otg_inst = status->primary_otg_inst;
@@ -6144,7 +6148,7 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 {
 
 
-	int i, j, num_plane;
+	int i, j, num_plane, ret;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	struct dm_plane_state *new_dm_plane_state, *old_dm_plane_state;
 	struct drm_crtc *new_plane_crtc, *old_plane_crtc;
@@ -6164,7 +6168,7 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 		DRM_ERROR("Plane or surface update failed to allocate");
 		/* Set type to FULL to avoid crashing in DC*/
 		update_type = UPDATE_TYPE_FULL;
-		goto ret;
+		goto cleanup;
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -6234,22 +6238,23 @@ enum surface_update_type dm_determine_update_type_for_commit(struct dc *dc, stru
 
 			if (num_plane > 0) {
 				status = dc_stream_get_status(new_dm_crtc_state->stream);
+
 				update_type = dc_check_update_surfaces_for_stream(dc, updates, num_plane,
 										  &stream_update, status);
 
 				if (update_type > UPDATE_TYPE_MED) {
 					update_type = UPDATE_TYPE_FULL;
-					goto ret;
+					goto cleanup;
 				}
 			}
 
 		} else if (!new_dm_crtc_state->stream && old_dm_crtc_state->stream) {
 			update_type = UPDATE_TYPE_FULL;
-			goto ret;
+			goto cleanup;
 		}
 	}
 
-ret:
+cleanup:
 	kfree(updates);
 	kfree(surface);
 
