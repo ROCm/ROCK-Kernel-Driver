@@ -935,17 +935,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 		return -ENOMEM;
 
 	if (amdgpu_device_has_dc_support(adev)) {
-		adev->mode_info.freesync_property =
-			drm_property_create_bool(adev->ddev, 0, "freesync");
-		if (!adev->mode_info.freesync_property)
-			return -ENOMEM;
-		adev->mode_info.freesync_capable_property =
-			drm_property_create_bool(adev->ddev,
-						 0,
-						 "freesync_capable");
-		if (!adev->mode_info.freesync_capable_property)
-			return -ENOMEM;
-		adev->mode_info.abm_level_property =
+    adev->mode_info.abm_level_property =
 			drm_property_create_range(adev->ddev, 0,
 						"abm level", 0, 4);
 		if (!adev->mode_info.abm_level_property)
