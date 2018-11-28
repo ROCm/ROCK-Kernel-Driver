@@ -200,6 +200,7 @@ struct device_queue_manager {
 	/* hw exception  */
 	bool			is_hws_hang;
 	struct work_struct	hw_exception_work;
+	struct kfd_mem_obj	hiq_sdma_mqd;
 };
 
 void device_queue_manager_init_cik(
@@ -222,7 +223,6 @@ bool check_if_queues_active(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);
 int reserve_debug_trap_vmid(struct device_queue_manager *dqm);
 int release_debug_trap_vmid(struct device_queue_manager *dqm);
-
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
