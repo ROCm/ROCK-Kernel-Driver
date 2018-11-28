@@ -102,6 +102,19 @@ static void set_priority(struct cik_mqd *m, struct queue_properties *q)
 				COMPUTE_PGM_RSRC1__PRIORITY__SHIFT);
 }
 
+static struct kfd_mem_obj *allocate_mqd(struct kfd_dev *kfd,
+					struct queue_properties *q)
+{
+	struct kfd_mem_obj *mqd_mem_obj;
+
+	if (kfd_gtt_sa_allocate(kfd, sizeof(struct cik_mqd),
+			&mqd_mem_obj))
+		return NULL;
+
+	return mqd_mem_obj;
+}
+
+
 static int init_mqd(struct mqd_manager *mm, void **mqd,
 		struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,
 		struct queue_properties *q)
@@ -109,11 +122,10 @@ static int init_mqd(struct mqd_manager *mm, void **mqd,
 	uint64_t addr;
 	struct cik_mqd *m;
 	int retval;
+	struct kfd_dev *kfd = mm->dev;
 
-	retval = kfd_gtt_sa_allocate(mm->dev, sizeof(struct cik_mqd),
-					mqd_mem_obj);
-
-	if (retval != 0)
+	*mqd_mem_obj = allocate_mqd(kfd, q);
+	if (!*mqd_mem_obj)
 		return -ENOMEM;
 
 	m = (struct cik_mqd *) (*mqd_mem_obj)->cpu_ptr;
