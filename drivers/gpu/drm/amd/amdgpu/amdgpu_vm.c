@@ -2043,15 +2043,31 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		flags = amdgpu_ttm_tt_pte_flags(adev, bo->tbo.ttm, mem);
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
 		if (mem && mem->mem_type == TTM_PL_VRAM && adev != bo_adev) {
+			if (drm_debug & DRM_UT_DRIVER) {
+				list_for_each_entry(mapping, &bo_va->invalids, list) {
+					DRM_DEBUG_DRIVER("Try map VRAM va 0x%llx - 0x%llx, offset 0x%llx, from dev %s for peer GPU %s access.\n",
+						mapping->start << PAGE_SHIFT,
+						((mapping->last + 1) << PAGE_SHIFT) - 1,
+						nodes ? nodes->start << PAGE_SHIFT : 0ll,
+						dev_name(bo_adev->dev),
+						dev_name(adev->dev));
+				}
+			}
 			if (adev->gmc.xgmi.hive_id &&
 			    adev->gmc.xgmi.hive_id == bo_adev->gmc.xgmi.hive_id) {
 				vram_base_offset = bo_adev->vm_manager.vram_base_offset;
+				DRM_DEBUG_DRIVER("Used XGMI mapping, vram_base_offset 0x%llx.\n",
+					vram_base_offset);
 			} else if (amdgpu_device_is_peer_accessible(bo_adev,
 								    adev)) {
 				flags |= AMDGPU_PTE_SYSTEM;
 				vram_base_offset = bo_adev->gmc.aper_base;
-			} else
+				DRM_DEBUG_DRIVER("Used PCIe mapping, vram_base_offset 0x%llx.\n",
+					vram_base_offset);
+			} else {
+				DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
 				return -EINVAL;
+			}
 		}
 	} else
 		flags = 0x0;
