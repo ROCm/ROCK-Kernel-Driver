@@ -7,6 +7,22 @@
 #include <linux/bpf-cgroup.h>
 #endif
 
+/*
+ * Fix __kcl_devcgroup_check_permission not define error in customer kernel build.
+ * the code segment copy from include/linux/device_cgroup.h,
+ * directly include the header result build failure since device_cgroup.h has no protection like DEVICE_CGROUP_H.
+ */
+#if !defined(BUILD_AS_DKMS)
+#ifdef CONFIG_CGROUP_DEVICE
+extern int __devcgroup_check_permission(short type, u32 major, u32 minor,
+					short access);
+#else
+static inline int __devcgroup_check_permission(short type, u32 major, u32 minor,
+					       short access)
+{ return 0; }
+#endif
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DEVCG_DEV_CHAR  2
 #define DEVCG_ACC_READ  2
@@ -27,8 +43,12 @@ static inline int kcl_devcgroup_check_permission(short type, u32 major, u32 mino
 		return -EPERM;
 #endif
 
-#if defined(CONFIG_CGROUP_DEVICE)	
+#if defined(CONFIG_CGROUP_DEVICE)
+#if defined(BUILD_AS_DKMS)
 	return __kcl_devcgroup_check_permission(type, major, minor, access);
+#else
+	return __devcgroup_check_permission(type, major, minor, access);
+#endif
 #else
 	return 0;
 #endif
