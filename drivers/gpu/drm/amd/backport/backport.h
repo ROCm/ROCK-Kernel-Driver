@@ -28,4 +28,5 @@
 #include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_suspend.h>
 #include <kcl/kcl_pagemap.h>
+#include <kcl/kcl_pci_backport.h>
 #endif /* AMDGPU_BACKPORT_H */

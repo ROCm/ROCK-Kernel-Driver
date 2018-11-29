@@ -85,6 +85,7 @@ m4_include([m4/get-user-pages-remote.m4])
 m4_include([m4/vmf-insert.m4])
 m4_include([m4/mmu-notifier.m4])
 m4_include([m4/mm-release-pages.m4])
+m4_include([m4/pcie-get-speed-width-cap.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
