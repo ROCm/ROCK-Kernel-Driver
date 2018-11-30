@@ -669,7 +669,7 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
 #if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
 	.wait = kcl_fence_default_wait,
-#else
+#elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,
 #endif
 #endif
