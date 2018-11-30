@@ -1452,9 +1452,7 @@ static bool sdma_v4_0_fw_support_paging_queue(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
-		/* TODO: Remove temporary workaround on Vega10 */
-		/*return fw_version >= 430;*/
-		return false;
+		return fw_version >= 430;
 	case CHIP_VEGA12:
 		/*return fw_version >= 31;*/
 		return false;
