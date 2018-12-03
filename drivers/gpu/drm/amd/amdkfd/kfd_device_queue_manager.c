@@ -943,7 +943,7 @@ static int stop_nocpsch(struct device_queue_manager *dqm)
 
 static int allocate_sdma_queue(struct device_queue_manager *dqm,
 				unsigned int sdma_engine_id,
-				unsigned int *sdma_queue_id)
+				unsigned int *sdma_id)
 {
 	int bit = -1;
 
@@ -971,17 +971,17 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 	}
 
 	dqm->sdma_bitmap &= ~(1ULL << bit);
-	*sdma_queue_id = bit;
+	*sdma_id = bit;
 
 	return 0;
 }
 
 static void deallocate_sdma_queue(struct device_queue_manager *dqm,
-				unsigned int sdma_queue_id)
+				unsigned int sdma_id)
 {
-	if (sdma_queue_id >= get_num_sdma_queues(dqm))
+	if (sdma_id >= get_num_sdma_queues(dqm))
 		return;
-	dqm->sdma_bitmap |= (1ULL << sdma_queue_id);
+	dqm->sdma_bitmap |= (1ULL << sdma_id);
 }
 
 static int create_sdma_queue_nocpsch(struct device_queue_manager *dqm,
