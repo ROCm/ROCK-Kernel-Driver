@@ -95,6 +95,7 @@ void dp_enable_link_phy(
 						link_settings,
 						clock_source);
 	}
+	link->cur_link_settings = *link_settings;
 
 	dp_receiver_power_ctrl(link, true);
 }
@@ -304,6 +305,7 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 						link->link_enc,
 						link_setting,
 						pipes[i].clock_source->id);
+			link->cur_link_settings = *link_setting;
 
 			dp_receiver_power_ctrl(link, true);
 
@@ -313,7 +315,6 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 					skip_video_pattern,
 					LINK_TRAINING_ATTEMPTS);
 
-			link->cur_link_settings = *link_setting;
 
 			link->dc->hwss.enable_stream(&pipes[i]);
 
