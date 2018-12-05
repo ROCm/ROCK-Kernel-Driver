@@ -1196,28 +1196,27 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	int retval;
 	struct mqd_manager *mqd_mgr;
 
-	retval = 0;
-
-	dqm_lock(dqm);
-
 	if (dqm->total_queue_count >= max_num_of_queues_per_device) {
 		pr_warn("Can't create new usermode queue because %d queues were already created\n",
 				dqm->total_queue_count);
 		retval = -EPERM;
-		goto out_unlock;
+		goto out;
 	}
 
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA ||
 		q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) {
 		retval = allocate_sdma_queue(dqm, q);
 		if (retval)
-			goto out_unlock;
+			goto out;
 	}
 
 	retval = allocate_doorbell(qpd, q);
 	if (retval)
 		goto out_deallocate_sdma_queue;
 
+	/* Do init_mqd before dqm_lock(dqm) to avoid circular locking order:
+	 * lock(dqm) -> bo::Reserves
+	 */
 	mqd_mgr = dqm->mqd_mgrs[get_mqd_type_from_queue_type(
 			q->properties.type)];
 	/*
@@ -1228,15 +1227,15 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		q->properties.is_evicted = (q->properties.queue_size > 0 &&
 					    q->properties.queue_percent > 0 &&
 					    q->properties.queue_address != 0);
-
 	dqm->asic_ops.init_sdma_vm(dqm, q, qpd);
-
 	q->properties.tba_addr = qpd->tba_addr;
 	q->properties.tma_addr = qpd->tma_addr;
 	retval = mqd_mgr->init_mqd(mqd_mgr, &q->mqd, &q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
 	if (retval)
 		goto out_deallocate_doorbell;
+
+	dqm_lock(dqm);
 
 	list_add(&q->list, &qpd->queues_list);
 	qpd->queue_count++;
@@ -1268,9 +1267,7 @@ out_deallocate_sdma_queue:
 	if (q->properties.type == KFD_QUEUE_TYPE_SDMA ||
 		q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI)
 		deallocate_sdma_queue(dqm, q);
-out_unlock:
-	dqm_unlock(dqm);
-
+out:
 	return retval;
 }
 
@@ -1436,8 +1433,6 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 			qpd->reset_wavefronts = true;
 	}
 
-	mqd_mgr->uninit_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
-
 	/*
 	 * Unconditionally decrement this counter, regardless of the queue's
 	 * type
@@ -1447,6 +1442,9 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 			dqm->total_queue_count);
 
 	dqm_unlock(dqm);
+
+	/* Do uninit_mqd after dqm_unlock(dqm) to avoid circular locking */
+	mqd_mgr->uninit_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 
 	return retval;
 
@@ -1669,7 +1667,11 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		qpd->reset_wavefronts = false;
 	}
 
-	/* lastly, free mqd resources */
+	dqm_unlock(dqm);
+
+	/* Lastly, free mqd resources.
+	 * Do uninit_mqd() after dqm_unlock to avoid circular locking.
+	 */
 	list_for_each_entry_safe(q, next, &qpd->queues_list, list) {
 		mqd_mgr = dqm->mqd_mgrs[get_mqd_type_from_queue_type(
 				q->properties.type)];
@@ -1678,7 +1680,6 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		mqd_mgr->uninit_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 	}
 
-	dqm_unlock(dqm);
 	return retval;
 }
 
