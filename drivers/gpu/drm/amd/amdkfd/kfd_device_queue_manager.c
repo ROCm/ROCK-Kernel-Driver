@@ -1224,9 +1224,6 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	if (retval)
 		goto out_deallocate_sdma_queue;
 
-	/* Do init_mqd before dqm_lock(dqm) to avoid circular locking order:
-	 * lock(dqm) -> bo::Reserves
-	 */
 	mqd_mgr = dqm->mqd_mgrs[get_mqd_type_from_queue_type(
 			q->properties.type)];
 	/*
