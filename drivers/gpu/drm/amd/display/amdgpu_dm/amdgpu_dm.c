@@ -57,6 +57,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
+#include <drm/drm_atomic_uapi.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_mst_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -134,7 +135,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				  struct drm_atomic_state *state);
 
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
-
+static void handle_cursor_update(struct drm_plane *plane,
+				 struct drm_plane_state *old_plane_state);
 
 
 static const enum drm_plane_type dm_plane_type_default[AMDGPU_MAX_PLANES] = {
@@ -418,6 +420,8 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));
 
+	mutex_init(&adev->dm.dc_lock);
+
 	if(amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
 		goto error;
@@ -534,6 +538,9 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
+
+	mutex_destroy(&adev->dm.dc_lock);
+
 	return;
 }
 
@@ -4010,10 +4017,43 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 	return -EINVAL;
 }
 
+static int dm_plane_atomic_async_check(struct drm_plane *plane,
+				       struct drm_plane_state *new_plane_state)
+{
+	/* Only support async updates on cursor planes. */
+	if (plane->type != DRM_PLANE_TYPE_CURSOR)
+		return -EINVAL;
+
+	return 0;
+}
+
+static void dm_plane_atomic_async_update(struct drm_plane *plane,
+					 struct drm_plane_state *new_state)
+{
+	struct drm_plane_state *old_state =
+		drm_atomic_get_old_plane_state(new_state->state, plane);
+
+	if (plane->state->fb != new_state->fb)
+		drm_atomic_set_fb_for_plane(plane->state, new_state->fb);
+
+	plane->state->src_x = new_state->src_x;
+	plane->state->src_y = new_state->src_y;
+	plane->state->src_w = new_state->src_w;
+	plane->state->src_h = new_state->src_h;
+	plane->state->crtc_x = new_state->crtc_x;
+	plane->state->crtc_y = new_state->crtc_y;
+	plane->state->crtc_w = new_state->crtc_w;
+	plane->state->crtc_h = new_state->crtc_h;
+
+	handle_cursor_update(plane, old_state);
+}
+
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = dm_plane_helper_prepare_fb,
 	.cleanup_fb = dm_plane_helper_cleanup_fb,
 	.atomic_check = dm_plane_atomic_check,
+	.atomic_async_check = dm_plane_atomic_async_check,
+	.atomic_async_update = dm_plane_atomic_async_update
 };
 
 /*
@@ -4707,6 +4747,7 @@ static int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
 static void handle_cursor_update(struct drm_plane *plane,
 				 struct drm_plane_state *old_plane_state)
 {
+	struct amdgpu_device *adev = plane->dev->dev_private;
 	struct amdgpu_framebuffer *afb = to_amdgpu_framebuffer(plane->state->fb);
 	struct drm_crtc *crtc = afb ? plane->state->crtc : old_plane_state->crtc;
 	struct dm_crtc_state *crtc_state = crtc ? to_dm_crtc_state(crtc->state) : NULL;
@@ -4731,9 +4772,12 @@ static void handle_cursor_update(struct drm_plane *plane,
 
 	if (!position.enable) {
 		/* turn off cursor */
-		if (crtc_state && crtc_state->stream)
+		if (crtc_state && crtc_state->stream) {
+			mutex_lock(&adev->dm.dc_lock);
 			dc_stream_set_cursor_position(crtc_state->stream,
 						      &position);
+			mutex_unlock(&adev->dm.dc_lock);
+		}
 		return;
 	}
 
@@ -4751,6 +4795,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 	attributes.pitch = attributes.width;
 
 	if (crtc_state->stream) {
+		mutex_lock(&adev->dm.dc_lock);
 		if (!dc_stream_set_cursor_attributes(crtc_state->stream,
 							 &attributes))
 			DRM_ERROR("DC failed to set cursor attributes\n");
@@ -4758,6 +4803,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 		if (!dc_stream_set_cursor_position(crtc_state->stream,
 						   &position))
 			DRM_ERROR("DC failed to set cursor position\n");
+		mutex_unlock(&adev->dm.dc_lock);
 	}
 }
 
@@ -4880,6 +4926,7 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	}
 	surface_updates->flip_addr = &addr;
 
+	mutex_lock(&adev->dm.dc_lock);
 	dc_commit_updates_for_stream(adev->dm.dc,
 					     surface_updates,
 					     1,
@@ -4887,6 +4934,7 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 					     NULL,
 					     &surface_updates->surface,
 					     state);
+	mutex_unlock(&adev->dm.dc_lock);
 
 	DRM_DEBUG_DRIVER("%s Flipping to hi: 0x%x, low: 0x%x \n",
 			 __func__,
@@ -4901,6 +4949,7 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
  * with a dc_plane_state and follow the atomic model a bit more closely here.
  */
 static bool commit_planes_to_stream(
+		struct amdgpu_display_manager *dm,
 		struct dc *dc,
 		struct dc_plane_state **plane_states,
 		uint8_t new_plane_count,
@@ -4982,11 +5031,13 @@ static bool commit_planes_to_stream(
 		updates[i].scaling_info = &scaling_info[i];
 	}
 
+	mutex_lock(&dm->dc_lock);
 	dc_commit_updates_for_stream(
 			dc,
 			updates,
 			new_plane_count,
 			dc_stream, stream_update, plane_states, state);
+	mutex_unlock(&dm->dc_lock);
 
 	kfree(flip_addr);
 	kfree(plane_info);
@@ -5119,7 +5170,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		dc_stream_attach->vrr_infopacket = acrtc_state->vrr_infopacket;
 		dc_stream_attach->abm_level = acrtc_state->abm_level;
 
-		if (false == commit_planes_to_stream(dm->dc,
+		if (false == commit_planes_to_stream(dm,
+							dm->dc,
 							plane_states_constructed,
 							planes_count,
 							acrtc_state,
@@ -5326,7 +5378,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 	if (dm_state->context) {
 		dm_enable_per_frame_crtc_master_sync(dm_state->context);
+		mutex_lock(&dm->dc_lock);
 		WARN_ON(!dc_commit_state(dm->dc, dm_state->context));
+		mutex_unlock(&dm->dc_lock);
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -5396,6 +5450,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		/*TODO How it works with MPO ?*/
 		if (!commit_planes_to_stream(
+				dm,
 				dm->dc,
 				status->plane_states,
 				status->plane_count,
@@ -6375,6 +6430,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			ret = -EINVAL;
 			goto fail;
 		}
+	} else if (state->legacy_cursor_update) {
+		/*
+		 * This is a fast cursor update coming from the plane update
+		 * helper, check if it can be done asynchronously for better
+		 * performance.
+		 */
+		state->async_update = !drm_atomic_helper_async_check(dev, state);
 	}
 
 	/* Must be success */
