@@ -357,12 +357,6 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 
 		run_rdma_free_callback(buf_obj);
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, buf_obj->mem);
-
-		if (buf_obj->mem_type & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
-			kfd_unreserve_vram_limit(pdd->dev,
-				buf_obj->it.last - buf_obj->it.start + 1);
-
-
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }

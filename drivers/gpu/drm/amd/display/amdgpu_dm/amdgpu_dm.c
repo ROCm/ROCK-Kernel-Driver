@@ -38,7 +38,6 @@
 #include "amd_shared.h"
 #include "amdgpu_dm_irq.h"
 #include "dm_helpers.h"
-#include "dm_services_types.h"
 #include "amdgpu_dm_mst_types.h"
 #if defined(CONFIG_DEBUG_FS)
 #include "amdgpu_dm_debugfs.h"
@@ -72,6 +71,7 @@
 #endif
 
 #include "modules/inc/mod_freesync.h"
+#include "modules/power/power_helpers.h"
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
@@ -660,6 +660,26 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 static int dm_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	struct dmcu_iram_parameters params;
+	unsigned int linear_lut[16];
+	int i;
+	struct dmcu *dmcu = adev->dm.dc->res_pool->dmcu;
+	bool ret;
+
+	for (i = 0; i < 16; i++)
+		linear_lut[i] = 0xFFFF * i / 15;
+
+	params.set = 0;
+	params.backlight_ramping_start = 0xCCCC;
+	params.backlight_ramping_reduction = 0xCCCCCCCC;
+	params.backlight_lut_array_size = 16;
+	params.backlight_lut_array = linear_lut;
+
+	ret = dmcu_load_iram(dmcu, params);
+
+	if (!ret)
+		return -EINVAL;
 
 	return detect_mst_link_for_all_connectors(adev->ddev);
 }
@@ -1630,27 +1650,60 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	return 0;
 }
 
+#define AMDGPU_DM_DEFAULT_MIN_BACKLIGHT 12
+#define AMDGPU_DM_DEFAULT_MAX_BACKLIGHT 255
+
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
 	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+
+static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
+{
+#if defined(CONFIG_ACPI)
+	struct amdgpu_dm_backlight_caps caps;
+
+	if (dm->backlight_caps.caps_valid)
+		return;
+
+	amdgpu_acpi_get_backlight_caps(dm->adev, &caps);
+	if (caps.caps_valid) {
+		dm->backlight_caps.min_input_signal = caps.min_input_signal;
+		dm->backlight_caps.max_input_signal = caps.max_input_signal;
+		dm->backlight_caps.caps_valid = true;
+	} else {
+		dm->backlight_caps.min_input_signal =
+				AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+		dm->backlight_caps.max_input_signal =
+				AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	}
+#else
+	dm->backlight_min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+#endif
+}
 
 static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
+	struct amdgpu_dm_backlight_caps caps;
+	uint32_t brightness = bd->props.brightness;
 
-	/* backlight_pwm_u16_16 parameter is in unsigned 32 bit, 16 bit integer
-	 * and 16 bit fractional, where 1.0 is max backlight value.
-	 * bd->props.brightness is 8 bit format and needs to be converted by
-	 * scaling via copy lower byte to upper byte of 16 bit value.
-	 */
-	uint32_t brightness = bd->props.brightness * 0x101;
-
+	amdgpu_dm_update_backlight_caps(dm);
+	caps = dm->backlight_caps;
 	/*
-	 * PWM interperts 0 as 100% rather than 0% because of HW
-	 * limitation for level 0.  So limiting minimum brightness level
-	 * to 1.
+	 * The brightness input is in the range 0-255
+	 * It needs to be rescaled to be between the
+	 * requested min and max input signal
+	 *
+	 * It also needs to be scaled up by 0x101 to
+	 * match the DC interface which has a range of
+	 * 0 to 0xffff
 	 */
-	if (bd->props.brightness < 1)
-		brightness = 0x101;
+	brightness =
+		brightness
+		* 0x101
+		* (caps.max_input_signal - caps.min_input_signal)
+		/ AMDGPU_MAX_BL_LEVEL
+		+ caps.min_input_signal * 0x101;
 
 	if (dc_link_set_backlight_level(dm->backlight_link,
 			brightness, 0, 0))
@@ -1684,6 +1737,8 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 	char bl_name[16];
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	struct backlight_properties props = { 0 };
+
+	amdgpu_dm_update_backlight_caps(dm);
 
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 	props.brightness = AMDGPU_MAX_BL_LEVEL;
@@ -2790,7 +2845,8 @@ static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
 static void
 fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 					     const struct drm_display_mode *mode_in,
-					     const struct drm_connector *connector)
+					     const struct drm_connector *connector,
+					     const struct dc_stream_state *old_stream)
 {
 	struct dc_crtc_timing *timing_out = &stream->timing;
 	const struct drm_display_info *info = &connector->display_info;
@@ -2816,7 +2872,18 @@ fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 			connector);
 	timing_out->scan_type = SCANNING_TYPE_NODATA;
 	timing_out->hdmi_vic = 0;
-	timing_out->vic = drm_match_cea_mode(mode_in);
+
+	if(old_stream) {
+		timing_out->vic = old_stream->timing.vic;
+		timing_out->flags.HSYNC_POSITIVE_POLARITY = old_stream->timing.flags.HSYNC_POSITIVE_POLARITY;
+		timing_out->flags.VSYNC_POSITIVE_POLARITY = old_stream->timing.flags.VSYNC_POSITIVE_POLARITY;
+	} else {
+		timing_out->vic = drm_match_cea_mode(mode_in);
+		if (mode_in->flags & DRM_MODE_FLAG_PHSYNC)
+			timing_out->flags.HSYNC_POSITIVE_POLARITY = 1;
+		if (mode_in->flags & DRM_MODE_FLAG_PVSYNC)
+			timing_out->flags.VSYNC_POSITIVE_POLARITY = 1;
+	}
 
 	timing_out->h_addressable = mode_in->crtc_hdisplay;
 	timing_out->h_total = mode_in->crtc_htotal;
@@ -2832,10 +2899,6 @@ fill_stream_properties_from_drm_display_mode(struct dc_stream_state *stream,
 		mode_in->crtc_vsync_end - mode_in->crtc_vsync_start;
 	timing_out->pix_clk_khz = mode_in->crtc_clock;
 	timing_out->aspect_ratio = get_aspect_ratio(mode_in);
-	if (mode_in->flags & DRM_MODE_FLAG_PHSYNC)
-		timing_out->flags.HSYNC_POSITIVE_POLARITY = 1;
-	if (mode_in->flags & DRM_MODE_FLAG_PVSYNC)
-		timing_out->flags.VSYNC_POSITIVE_POLARITY = 1;
 
 	stream->output_color_space = get_output_color_space(timing_out);
 
@@ -3000,13 +3063,18 @@ static void dm_enable_per_frame_crtc_master_sync(struct dc_state *context)
 static struct dc_stream_state *
 create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		       const struct drm_display_mode *drm_mode,
-		       const struct dm_connector_state *dm_state)
+		       const struct dm_connector_state *dm_state,
+		       const struct dc_stream_state *old_stream)
 {
 	struct drm_display_mode *preferred_mode = NULL;
 	struct drm_connector *drm_connector;
 	struct dc_stream_state *stream = NULL;
 	struct drm_display_mode mode = *drm_mode;
 	bool native_mode_found = false;
+	bool scale = dm_state ? (dm_state->scaling != RMX_OFF) : false;
+	int mode_refresh;
+	int preferred_refresh;
+
 	struct dc_sink *sink = NULL;
 	if (aconnector == NULL) {
 		DRM_ERROR("aconnector is NULL!\n");
@@ -3045,6 +3113,8 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 				struct drm_display_mode,
 				head);
 
+	mode_refresh = drm_mode_vrefresh(&mode);
+
 	if (preferred_mode == NULL) {
 		/*
 		 * This may not be an error, the use case is when we have no
@@ -3062,8 +3132,19 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	if (!dm_state)
 		drm_mode_set_crtcinfo(&mode, 0);
 
-	fill_stream_properties_from_drm_display_mode(stream,
-			&mode, &aconnector->base);
+	preferred_refresh = drm_mode_vrefresh(preferred_mode);
+
+	/*
+	* If scaling is enabled and refresh rate didn't change
+	* we copy the vic and polarities of the old timings
+	*/
+	if (!scale || mode_refresh != preferred_refresh)
+		fill_stream_properties_from_drm_display_mode(stream,
+			&mode, &aconnector->base, NULL);
+	else
+		fill_stream_properties_from_drm_display_mode(stream,
+			&mode, &aconnector->base, old_stream);
+
 	update_stream_scaling_settings(&mode, dm_state, stream);
 
 	fill_audio_info(
@@ -3266,6 +3347,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	state->adjust = cur->adjust;
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->freesync_enabled = cur->freesync_enabled;
+	state->abm_level = cur->abm_level;
 
 	/* TODO Duplicate dc_stream after objects are stream object is flattened */
 
@@ -3376,8 +3458,10 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 			rmx_type = RMX_FULL;
 			break;
 		case DRM_MODE_SCALE_NONE:
-		default:
 			rmx_type = RMX_OFF;
+			break;
+		default:
+			rmx_type = RMX_ASPECT;
 			break;
 		}
 
@@ -3403,6 +3487,9 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.freesync_capable_property) {
 		dm_new_state->freesync_capable = val;
+		ret = 0;
+	} else if (property == adev->mode_info.abm_level_property) {
+		dm_new_state->abm_level = val;
 		ret = 0;
 	}
 
@@ -3455,7 +3542,11 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.freesync_capable_property) {
 		*val = dm_state->freesync_capable;
 		ret = 0;
+	} else if (property == adev->mode_info.abm_level_property) {
+		*val = dm_state->abm_level;
+		ret = 0;
 	}
+
 	return ret;
 }
 
@@ -3498,7 +3589,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 
 	if (state) {
-		state->scaling = RMX_OFF;
+		state->scaling = RMX_ASPECT;
 		state->underscan_enable = false;
 		state->underscan_hborder = 0;
 		state->underscan_vborder = 0;
@@ -3523,6 +3614,7 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 
 	new_state->freesync_capable = state->freesync_capable;
 	new_state->freesync_enable = state->freesync_enable;
+	new_state->abm_level = state->abm_level;
 
 	return &new_state->base;
 }
@@ -3628,7 +3720,7 @@ enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connec
 		goto fail;
 	}
 
-	stream = create_stream_for_sink(aconnector, mode, NULL);
+	stream = create_stream_for_sink(aconnector, mode, NULL, NULL);
 	if (stream == NULL) {
 		DRM_ERROR("Failed to create stream for sink!\n");
 		goto fail;
@@ -4309,6 +4401,11 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.freesync_capable_property, 0);
 	}
+	if (connector_type == DRM_MODE_CONNECTOR_eDP &&
+	    dc_is_dmcu_initialized(adev->dm.dc)) {
+		drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.abm_level_property, 0);
+	}
 }
 
 static int amdgpu_dm_i2c_xfer(struct i2c_adapter *i2c_adap,
@@ -4823,6 +4920,7 @@ static bool commit_planes_to_stream(
 	struct dc_stream_state *dc_stream = dm_new_crtc_state->stream;
 	struct dc_stream_update *stream_update =
 			kzalloc(sizeof(struct dc_stream_update), GFP_KERNEL);
+	unsigned int abm_level;
 
 	if (!stream_update) {
 		BREAK_TO_DEBUGGER();
@@ -4853,6 +4951,11 @@ static bool commit_planes_to_stream(
 	if (dm_new_crtc_state->freesync_enabled != dm_old_crtc_state->freesync_enabled) {
 		stream_update->vrr_infopacket = &dc_stream->vrr_infopacket;
 		stream_update->adjust = &dc_stream->adjust;
+	}
+
+	if (dm_new_crtc_state->abm_level != dm_old_crtc_state->abm_level) {
+		abm_level = dm_new_crtc_state->abm_level;
+		stream_update->abm_level = &abm_level;
 	}
 
 	for (i = 0; i < new_plane_count; i++) {
@@ -5017,6 +5120,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 
 		dc_stream_attach->adjust = acrtc_state->adjust;
 		dc_stream_attach->vrr_infopacket = acrtc_state->vrr_infopacket;
+		dc_stream_attach->abm_level = acrtc_state->abm_level;
 
 		if (false == commit_planes_to_stream(dm->dc,
 							plane_states_constructed,
@@ -5249,7 +5353,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		}
 	}
 
-	/* Handle scaling and underscan changes*/
+	/* Handle scaling, underscan, and abm changes*/
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_connector_in_state(state, connector, old_con_state, i) {
 		new_con_state = connector->state;
@@ -5270,11 +5374,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		if (!acrtc || drm_atomic_crtc_needs_modeset(new_crtc_state))
 			continue;
 
-		/* Skip anything that is not scaling or underscan changes */
-		if (!is_scaling_state_different(dm_new_con_state, dm_old_con_state))
-			continue;
 
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
+		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
+
+		/* Skip anything that is not scaling or underscan changes */
+		if (!is_scaling_state_different(dm_new_con_state, dm_old_con_state) &&
+				(dm_new_crtc_state->abm_level == dm_old_crtc_state->abm_level))
+			continue;
 
 		update_stream_scaling_settings(&dm_new_con_state->base.crtc->mode,
 				dm_new_con_state, (struct dc_stream_state *)dm_new_crtc_state->stream);
@@ -5288,6 +5395,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		dm_new_crtc_state->stream->adjust = dm_new_crtc_state->adjust;
 		dm_new_crtc_state->stream->vrr_infopacket = dm_new_crtc_state->vrr_infopacket;
+		dm_new_crtc_state->stream->abm_level = dm_new_crtc_state->abm_level;
 
 		/*TODO How it works with MPO ?*/
 		if (!commit_planes_to_stream(
@@ -5659,7 +5767,8 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 
 			new_stream = create_stream_for_sink(aconnector,
 							     &new_crtc_state->mode,
-							    dm_new_conn_state);
+							    dm_new_conn_state,
+							    dm_old_crtc_state->stream);
 
 			/*
 			 * we can have no stream on ACTION_SET if a display
@@ -5676,6 +5785,8 @@ static int dm_update_crtcs_state(struct amdgpu_display_manager *dm,
 
 			set_freesync_on_stream(dm, dm_new_crtc_state,
 					dm_new_conn_state, new_stream);
+
+			dm_new_crtc_state->abm_level = dm_new_conn_state->abm_level;
 
 			if (dc_is_stream_unchanged(new_stream, dm_old_crtc_state->stream) &&
 			    dc_is_stream_scaling_unchanged(new_stream, dm_old_crtc_state->stream)) {
