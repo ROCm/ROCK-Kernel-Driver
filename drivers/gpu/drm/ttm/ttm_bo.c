@@ -1286,6 +1286,9 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	}
 
 	if (likely(!ret))
+		ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
+
+	if (likely(!ret))
 		ret = ttm_bo_validate(bo, placement, ctx);
 
 	if (unlikely(ret)) {
