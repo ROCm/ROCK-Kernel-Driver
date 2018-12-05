@@ -348,12 +348,29 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	struct amdgpu_crtc *acrtc;
+	struct dm_crtc_state *acrtc_state;
 
 	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VBLANK);
 
 	if (acrtc) {
 		drm_crtc_handle_vblank(&acrtc->base);
 		amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
+
+		acrtc_state = to_dm_crtc_state(acrtc->base.state);
+
+		if (acrtc_state->stream &&
+		    acrtc_state->vrr_params.supported &&
+		    acrtc_state->freesync_config.state == VRR_STATE_ACTIVE_VARIABLE) {
+			mod_freesync_handle_v_update(
+				adev->dm.freesync_module,
+				acrtc_state->stream,
+				&acrtc_state->vrr_params);
+
+			dc_stream_adjust_vmin_vmax(
+				adev->dm.dc,
+				acrtc_state->stream,
+				&acrtc_state->vrr_params.adjust);
+		}
 	}
 }
 
@@ -3430,7 +3447,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 		dc_stream_retain(state->stream);
 	}
 
-	state->adjust = cur->adjust;
+	state->vrr_params = cur->vrr_params;
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->abm_level = cur->abm_level;
 	state->crc_enabled = cur->crc_enabled;
@@ -4953,9 +4970,11 @@ static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 static void update_freesync_state_on_stream(
 	struct amdgpu_display_manager *dm,
 	struct dm_crtc_state *new_crtc_state,
-	struct dc_stream_state *new_stream)
+	struct dc_stream_state *new_stream,
+	struct dc_plane_state *surface,
+	u32 flip_timestamp_in_us)
 {
-	struct mod_vrr_params vrr = {0};
+	struct mod_vrr_params vrr_params = new_crtc_state->vrr_params;
 	struct dc_info_packet vrr_infopacket = {0};
 	struct mod_freesync_config config = new_crtc_state->freesync_config;
 
@@ -4982,43 +5001,52 @@ static void update_freesync_state_on_stream(
 
 	mod_freesync_build_vrr_params(dm->freesync_module,
 				      new_stream,
-				      &config, &vrr);
+				      &config, &vrr_params);
+
+	if (surface) {
+		mod_freesync_handle_preflip(
+			dm->freesync_module,
+			surface,
+			new_stream,
+			flip_timestamp_in_us,
+			&vrr_params);
+	}
 
 	mod_freesync_build_vrr_infopacket(
 		dm->freesync_module,
 		new_stream,
-		&vrr,
+		&vrr_params,
 		PACKET_TYPE_VRR,
 		TRANSFER_FUNC_UNKNOWN,
 		&vrr_infopacket);
 
 	new_crtc_state->freesync_timing_changed =
-		(memcmp(&new_crtc_state->adjust,
-			&vrr.adjust,
-			sizeof(vrr.adjust)) != 0);
+		(memcmp(&new_crtc_state->vrr_params.adjust,
+			&vrr_params.adjust,
+			sizeof(vrr_params.adjust)) != 0);
 
 	new_crtc_state->freesync_vrr_info_changed =
 		(memcmp(&new_crtc_state->vrr_infopacket,
 			&vrr_infopacket,
 			sizeof(vrr_infopacket)) != 0);
 
-	new_crtc_state->adjust = vrr.adjust;
+	new_crtc_state->vrr_params = vrr_params;
 	new_crtc_state->vrr_infopacket = vrr_infopacket;
 
-	new_stream->adjust = new_crtc_state->adjust;
+	new_stream->adjust = new_crtc_state->vrr_params.adjust;
 	new_stream->vrr_infopacket = vrr_infopacket;
 
 	if (new_crtc_state->freesync_vrr_info_changed)
 		DRM_DEBUG_KMS("VRR packet update: crtc=%u enabled=%d state=%d",
 			      new_crtc_state->base.crtc->base.id,
 			      (int)new_crtc_state->base.vrr_enabled,
-			      (int)vrr.state);
+			      (int)vrr_params.state);
 
 	if (new_crtc_state->freesync_timing_changed)
 		DRM_DEBUG_KMS("VRR timing update: crtc=%u min=%u max=%u\n",
 			      new_crtc_state->base.crtc->base.id,
-			      vrr.adjust.v_total_min,
-			      vrr.adjust.v_total_max);
+				  vrr_params.adjust.v_total_min,
+				  vrr_params.adjust.v_total_max);
 }
 
 /*
@@ -5051,6 +5079,7 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
 	struct dc_stream_status *stream_status;
 	uint64_t tiling_flags, dcc_address;
+	struct dc_plane_state *surface;
 
 
 	/* Prepare wait for target vblank early - before the fence-waits */
@@ -5124,8 +5153,10 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 		return;
 	}
 
-	surface_updates->surface = stream_status->plane_states[0];
-	if (!surface_updates->surface) {
+	surface = stream_status->plane_states[0];
+	surface_updates->surface = surface;
+
+	if (!surface) {
 		DRM_ERROR("No surface for CRTC: id=%d\n",
 			acrtc->crtc_id);
 		return;
@@ -5137,7 +5168,9 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 		update_freesync_state_on_stream(
 			&adev->dm,
 			acrtc_state,
-			acrtc_state->stream);
+			acrtc_state->stream,
+			surface,
+			addr.flip_timestamp_in_us);
 
 		if (acrtc_state->freesync_timing_changed)
 			stream_update.adjust =
@@ -5147,6 +5180,14 @@ static void amdgpu_dm_do_flip(struct drm_crtc *crtc,
 			stream_update.vrr_infopacket =
 				&acrtc_state->stream->vrr_infopacket;
 	}
+
+	/* Update surface timing information. */
+	surface->time.time_elapsed_in_us[surface->time.index] =
+		addr.flip_timestamp_in_us - surface->time.prev_update_time_in_us;
+	surface->time.prev_update_time_in_us = addr.flip_timestamp_in_us;
+	surface->time.index++;
+	if (surface->time.index >= DC_PLANE_UPDATE_TIMES_MAX)
+		surface->time.index = 0;
 
 	dc_commit_updates_for_stream(adev->dm.dc,
 					     surface_updates,
@@ -5938,6 +5979,7 @@ static void get_freesync_config_for_crtc(
 		config.max_refresh_in_uhz =
 				aconnector->max_vfreq * 1000000;
 		config.vsif_supported = true;
+		config.btr = true;
 	}
 
 	new_crtc_state->freesync_config = config;
@@ -5948,8 +5990,8 @@ static void reset_freesync_config_for_crtc(
 {
 	new_crtc_state->vrr_supported = false;
 
-	memset(&new_crtc_state->adjust, 0,
-	       sizeof(new_crtc_state->adjust));
+	memset(&new_crtc_state->vrr_params, 0,
+	       sizeof(new_crtc_state->vrr_params));
 	memset(&new_crtc_state->vrr_infopacket, 0,
 	       sizeof(new_crtc_state->vrr_infopacket));
 }
