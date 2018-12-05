@@ -5650,6 +5650,10 @@ static void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 		 * preferred resolution in DID extension block later.
 		 */
 		drm_mode_sort(&connector->probed_modes);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0) && !defined(OS_NAME_SUSE_15_1)
+		drm_edid_to_eld(connector, edid);
+#endif
+
 		amdgpu_dm_get_native_mode(connector);
 	} else {
 		amdgpu_dm_connector->num_modes = 0;
