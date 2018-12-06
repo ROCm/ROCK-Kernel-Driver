@@ -81,6 +81,7 @@
 #include "amdgpu_job.h"
 #include "amdgpu_bo_list.h"
 #include "amdgpu_gem.h"
+#include "amdgpu_amdkfd.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -850,7 +851,7 @@ struct amdgpu_ssg {
 	struct percpu_ref	ref;
 	struct completion	cmp;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6)
-	struct dev_pagemap	pgmap
+	struct dev_pagemap	pgmap;
 #endif
 #endif
 };
@@ -1032,6 +1033,9 @@ struct amdgpu_device {
 	/* GDS */
 	struct amdgpu_gds		gds;
 
+	/* KFD */
+	struct amdgpu_kfd_dev		kfd;
+
 	/* display related functionality */
 	struct amdgpu_display_manager dm;
 
@@ -1044,9 +1048,6 @@ struct amdgpu_device {
 	atomic64_t vram_pin_size;
 	atomic64_t visible_pin_size;
 	atomic64_t gart_pin_size;
-
-	/* amdkfd interface */
-	struct kfd_dev          *kfd;
 
 	/* soc15 register offset based on ip, instance and  segment */
 	uint32_t 		*reg_offset[MAX_HWIP][HWIP_MAX_INSTANCE];
@@ -1324,6 +1325,9 @@ bool amdgpu_acpi_is_pcie_performance_request_supported(struct amdgpu_device *ade
 int amdgpu_acpi_pcie_performance_request(struct amdgpu_device *adev,
 						u8 perf_req, bool advertise);
 int amdgpu_acpi_pcie_notify_device_ready(struct amdgpu_device *adev);
+
+void amdgpu_acpi_get_backlight_caps(struct amdgpu_device *adev,
+		struct amdgpu_dm_backlight_caps *caps);
 #else
 static inline int amdgpu_acpi_init(struct amdgpu_device *adev) { return 0; }
 static inline void amdgpu_acpi_fini(struct amdgpu_device *adev) { }

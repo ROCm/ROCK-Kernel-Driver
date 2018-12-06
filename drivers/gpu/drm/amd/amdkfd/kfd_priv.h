@@ -176,12 +176,6 @@ extern int halt_if_hws_hang;
  */
 extern bool keep_idle_process_evicted;
 
-/* An accumulated available system RAM and
- * VRAM size of all GPUs
- */
-extern uint64_t kfd_total_mem_size;
-
-
 enum cache_policy {
 	cache_policy_coherent,
 	cache_policy_noncoherent
@@ -225,12 +219,6 @@ struct kfd_vmid_info {
 	uint32_t first_vmid_kfd;
 	uint32_t last_vmid_kfd;
 	uint32_t vmid_num_kfd;
-};
-
-struct kfd_vram_limit {
-	uint64_t max_vram_limit;
-	int64_t  vram_used;
-	spinlock_t vram_limit_lock;
 };
 
 struct kfd_dev {
@@ -305,9 +293,6 @@ struct kfd_dev {
 	/* xGMI */
 	uint64_t hive_id;
 	bool pci_atomic_requested;
-
-	/* VRAM limit */
-	struct kfd_vram_limit vram_limit;
 };
 
 struct kfd_ipc_obj;
@@ -376,7 +361,6 @@ enum kfd_mempool {
 int kfd_chardev_init(void);
 void kfd_chardev_exit(void);
 struct device *kfd_chardev(void);
-void kfd_unreserve_vram_limit(struct kfd_dev *dev, uint64_t size);
 
 /**
  * enum kfd_unmap_queues_filter

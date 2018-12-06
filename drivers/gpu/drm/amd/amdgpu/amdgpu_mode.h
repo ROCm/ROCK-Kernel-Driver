@@ -40,7 +40,6 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_plane_helper.h>
-#include <drm/drm_fb_helper.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
 #include <linux/hrtimer.h>
@@ -382,6 +381,8 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
+	/* Adaptive Backlight Modulation (power feature) */
+	struct drm_property *abm_level_property;
 	/* hardcoded DFP edid from BIOS */
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
