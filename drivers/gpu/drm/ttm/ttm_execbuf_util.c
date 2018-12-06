@@ -129,7 +129,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 			if (!entry->num_shared)
 				continue;
 
-			ret = reservation_object_reserve_shared(bo->resv,
+			ret = kcl_reservation_object_reserve_shared(bo->resv,
 								entry->num_shared);
 			if (!ret)
 				continue;
@@ -152,7 +152,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 		}
 
 		if (!ret && entry->num_shared)
-			ret = reservation_object_reserve_shared(bo->resv,
+			ret = kcl_reservation_object_reserve_shared(bo->resv,
 								entry->num_shared);
 
 		if (unlikely(ret != 0)) {

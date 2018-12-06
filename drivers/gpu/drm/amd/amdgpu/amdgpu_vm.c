@@ -3092,7 +3092,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (r)
 		goto error_free_root;
 
-	r = reservation_object_reserve_shared(root->tbo.resv, 1);
+	r = kcl_reservation_object_reserve_shared(root->tbo.resv, 1);
 	if (r)
 		goto error_unreserve;
 
