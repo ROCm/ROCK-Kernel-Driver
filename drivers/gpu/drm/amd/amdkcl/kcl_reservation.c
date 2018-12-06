@@ -37,6 +37,89 @@
  * Modifications [2017-07-06] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
+
+#if defined(BUILD_AS_DKMS)
+/**
+ * _kcl_reservation_object_reserve_shared - Reserve space to add shared fences to
+ * a reservation_object.
+ * @obj: reservation object
+ * @num_fences: number of fences we want to add
+ *
+ * Should be called before reservation_object_add_shared_fence().  Must
+ * be called with obj->lock held.
+ *
+ * RETURNS
+ * Zero for success, or -errno
+ */
+int _kcl_reservation_object_reserve_shared(struct reservation_object *obj,
+				      unsigned int num_fences)
+{
+	struct reservation_object_list *old, *new;
+	unsigned int i, j, k, max;
+
+	old = reservation_object_get_list(obj);
+
+	if (old && old->shared_max) {
+		if ((old->shared_count + num_fences) <= old->shared_max)
+			return 0;
+		else
+			max = max(old->shared_count + num_fences,
+				  old->shared_max * 2);
+	} else {
+		max = 4;
+	}
+
+	new = kmalloc(offsetof(typeof(*new), shared[max]), GFP_KERNEL);
+	if (!new)
+		return -ENOMEM;
+
+	/*
+	 * no need to bump fence refcounts, rcu_read access
+	 * requires the use of kref_get_unless_zero, and the
+	 * references from the old struct are carried over to
+	 * the new.
+	 */
+	for (i = 0, j = 0, k = max; i < (old ? old->shared_count : 0); ++i) {
+		struct dma_fence *fence;
+
+		fence = rcu_dereference_protected(old->shared[i],
+						  reservation_object_held(obj));
+		if (dma_fence_is_signaled(fence))
+			RCU_INIT_POINTER(new->shared[--k], fence);
+		else
+			RCU_INIT_POINTER(new->shared[j++], fence);
+	}
+	new->shared_count = j;
+	new->shared_max = max;
+
+	preempt_disable();
+	write_seqcount_begin(&obj->seq);
+	/*
+	 * RCU_INIT_POINTER can be used here,
+	 * seqcount provides the necessary barriers
+	 */
+	RCU_INIT_POINTER(obj->fence, new);
+	write_seqcount_end(&obj->seq);
+	preempt_enable();
+
+	if (!old)
+		return 0;
+
+	/* Drop the references to the signaled fences */
+	for (i = k; i < new->shared_max; ++i) {
+		struct dma_fence *fence;
+
+		fence = rcu_dereference_protected(new->shared[i],
+						  reservation_object_held(obj));
+		dma_fence_put(fence);
+	}
+	kfree_rcu(old, rcu);
+
+	return 0;
+}
+EXPORT_SYMBOL(_kcl_reservation_object_reserve_shared);
+#endif
+
 #if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
