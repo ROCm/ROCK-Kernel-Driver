@@ -333,10 +333,10 @@ static int gmc_v6_0_mc_init(struct amdgpu_device *adev)
 		if (r)
 			return r;
 	}
+#endif
 	adev->gmc.aper_base = pci_resource_start(adev->pdev, 0);
 	adev->gmc.aper_size = pci_resource_len(adev->pdev, 0);
 	adev->gmc.visible_vram_size = adev->gmc.aper_size;
-#endif
 
 	/* set the gart size */
 	if (amdgpu_gart_size == -1) {
