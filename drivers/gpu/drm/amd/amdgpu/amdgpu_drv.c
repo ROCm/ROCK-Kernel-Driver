@@ -521,10 +521,6 @@ bool keep_idle_process_evicted;
 module_param(keep_idle_process_evicted, bool, 0444);
 MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 
-int cma_enable = 1;
-module_param(cma_enable, int, 0644);
-MODULE_PARM_DESC(cma_enable,"Enable CMA (1 = enable, 0 = disable (default)). Warning! relaxed access check");
-
 /**
  * DOC: si_support (int)
  * Set SI support driver. This parameter works after set config CONFIG_DRM_AMDGPU_SI. For SI asic, when radeon driver is enabled,
