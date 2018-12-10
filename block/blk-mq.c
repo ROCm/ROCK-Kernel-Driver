@@ -1715,15 +1715,6 @@ static blk_status_t __blk_mq_issue_directly(struct blk_mq_hw_ctx *hctx,
 		break;
 	case BLK_STS_RESOURCE:
 	case BLK_STS_DEV_RESOURCE:
-		/*
-		 * If direct dispatch fails, we cannot allow any merging on
-		 * this IO. Drivers (like SCSI) may have set up permanent state
-		 * for this request, like SG tables and mappings, and if we
-		 * merge to it later on then we'll still only do IO to the
-		 * original part.
-		 */
-		rq->cmd_flags |= REQ_NOMERGE;
-
 		blk_mq_update_dispatch_busy(hctx, true);
 		__blk_mq_requeue_request(rq);
 		break;
