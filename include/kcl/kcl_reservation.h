@@ -13,9 +13,9 @@ kcl_reservation_object_reserve_shared(struct reservation_object *obj,
 				      unsigned int num_fences)
 {
 #if defined(BUILD_AS_DKMS)
-        _kcl_reservation_object_reserve_shared(obj,num_fences);
+        return _kcl_reservation_object_reserve_shared(obj,num_fences);
 #else
-        reservation_object_reserve_shared(obj,num_fences);
+        return reservation_object_reserve_shared(obj,num_fences);
 #endif
 }
 
