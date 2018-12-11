@@ -3319,6 +3319,8 @@ bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev)
 
 	if (amdgpu_gpu_recovery == -1) {
 		switch (adev->asic_type) {
+		case CHIP_BONAIRE:
+		case CHIP_HAWAII:
 		case CHIP_TOPAZ:
 		case CHIP_TONGA:
 		case CHIP_FIJI:
