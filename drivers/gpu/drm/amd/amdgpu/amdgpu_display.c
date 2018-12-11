@@ -935,17 +935,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 		return -ENOMEM;
 
 	if (amdgpu_device_has_dc_support(adev)) {
-		adev->mode_info.freesync_property =
-			drm_property_create_bool(adev->ddev, 0, "freesync");
-		if (!adev->mode_info.freesync_property)
-			return -ENOMEM;
-		adev->mode_info.freesync_capable_property =
-			drm_property_create_bool(adev->ddev,
-						 0,
-						 "freesync_capable");
-		if (!adev->mode_info.freesync_capable_property)
-			return -ENOMEM;
-		adev->mode_info.abm_level_property =
+    adev->mode_info.abm_level_property =
 			drm_property_create_range(adev->ddev, 0,
 						"abm level", 0, 4);
 		if (!adev->mode_info.abm_level_property)
@@ -1184,7 +1174,11 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 #else
 		vtotal = mode->crtc_vtotal;
 #endif
-		*vpos = *vpos - vtotal;
+		/* With variable refresh rate displays the vpos can exceed
+		 * the vtotal value. Clamp to 0 to return -vbl_end instead
+		 * of guessing the remaining number of lines until scanout.
+		 */
+		*vpos = (*vpos < vtotal) ? (*vpos - vtotal) : 0;
 	}
 
 	/* Correct for shifted end of vbl at vbl_end. */
@@ -1215,18 +1209,3 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 		return AMDGPU_CRTC_IRQ_NONE;
 	}
 }
-
-int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
-				  struct drm_file *filp)
-{
-	int ret = -EPERM;
-	struct amdgpu_device *adev = dev->dev_private;
-
-	if (adev->mode_info.funcs->notify_freesync)
-		ret = adev->mode_info.funcs->notify_freesync(dev,data,filp);
-	else
-		DRM_DEBUG("amdgpu no notify_freesync ioctl\n");
-
-	return ret;
-}
-

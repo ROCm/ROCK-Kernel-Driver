@@ -23,6 +23,9 @@
  *
  */
 
+/* The caprices of the preprocessor require that this be declared right here */
+#define CREATE_TRACE_POINTS
+
 #include "dm_services_types.h"
 #include "dc.h"
 #include "dc/inc/core_types.h"
@@ -72,6 +75,7 @@
 
 #include "modules/inc/mod_freesync.h"
 #include "modules/power/power_helpers.h"
+#include "modules/inc/mod_info_packet.h"
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
@@ -1676,8 +1680,8 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
 				AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 	}
 #else
-	dm->backlight_min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
-	dm->backlight_max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
+	dm->backlight_caps.min_input_signal = AMDGPU_DM_DEFAULT_MIN_BACKLIGHT;
+	dm->backlight_caps.max_input_signal = AMDGPU_DM_DEFAULT_MAX_BACKLIGHT;
 #endif
 }
 
@@ -2060,7 +2064,6 @@ static void dm_page_flip(struct amdgpu_device *adev,
 static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 				struct drm_file *filp)
 {
-	struct drm_amdgpu_freesync *args = data;
 	struct drm_atomic_state *state;
 	struct drm_modeset_acquire_ctx ctx;
 	struct drm_crtc *crtc;
@@ -2069,9 +2072,6 @@ static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
 	int ret = 0;
 	uint8_t i;
 	bool enable = false;
-
-	if (args->op == AMDGPU_FREESYNC_FULLSCREEN_ENTER)
-		enable = true;
 
 	drm_modeset_acquire_init(&ctx, 0);
 
@@ -2922,11 +2922,15 @@ static void fill_audio_info(struct audio_info *audio_info,
 	audio_info->product_id = edid_caps->product_id;
 
 	cea_revision = drm_connector->display_info.cea_rev;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
 	strncpy(audio_info->display_name,
 		edid_caps->display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS - 1);
-
+#else
+	strscpy(audio_info->display_name,
+		edid_caps->display_name,
+		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
+#endif
 	if (cea_revision >= 3) {
 		audio_info->mode_count = edid_caps->audio_mode_count;
 
@@ -3073,7 +3077,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	bool native_mode_found = false;
 	bool scale = dm_state ? (dm_state->scaling != RMX_OFF) : false;
 	int mode_refresh;
-	int preferred_refresh;
+	int preferred_refresh = 0;
 
 	struct dc_sink *sink = NULL;
 	if (aconnector == NULL) {
@@ -3127,12 +3131,11 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		decide_crtc_timing_for_drm_display_mode(
 				&mode, preferred_mode,
 				dm_state ? (dm_state->scaling != RMX_OFF) : false);
+		preferred_refresh = drm_mode_vrefresh(preferred_mode);
 	}
 
 	if (!dm_state)
 		drm_mode_set_crtcinfo(&mode, 0);
-
-	preferred_refresh = drm_mode_vrefresh(preferred_mode);
 
 	/*
 	* If scaling is enabled and refresh rate didn't change
@@ -3156,6 +3159,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 
 	if (dm_state && dm_state->freesync_capable)
 		stream->ignore_msa_timing_param = true;
+
 finish:
 	if (sink && sink->sink_signal == SIGNAL_TYPE_VIRTUAL && aconnector->base.force != DRM_FORCE_ON)
 		dc_sink_release(sink);
@@ -3348,6 +3352,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->freesync_enabled = cur->freesync_enabled;
 	state->abm_level = cur->abm_level;
+	state->crc_enabled = cur->crc_enabled;
 
 	/* TODO Duplicate dc_stream after objects are stream object is flattened */
 
@@ -3482,12 +3487,6 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.max_bpc_property) {
 		dm_new_state->max_bpc = val;
 		ret = 0;
-	} else if (property == adev->mode_info.freesync_property) {
-		dm_new_state->freesync_enable = val;
-		ret = 0;
-	} else if (property == adev->mode_info.freesync_capable_property) {
-		dm_new_state->freesync_capable = val;
-		ret = 0;
 	} else if (property == adev->mode_info.abm_level_property) {
 		dm_new_state->abm_level = val;
 		ret = 0;
@@ -3535,12 +3534,6 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.max_bpc_property) {
 		*val = dm_state->max_bpc;
-		ret = 0;
-	} else if (property == adev->mode_info.freesync_property) {
-		*val = dm_state->freesync_enable;
-		ret = 0;
-	} else if (property == adev->mode_info.freesync_capable_property) {
-		*val = dm_state->freesync_capable;
 		ret = 0;
 	} else if (property == adev->mode_info.abm_level_property) {
 		*val = dm_state->abm_level;
@@ -3593,6 +3586,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		state->underscan_enable = false;
 		state->underscan_hborder = 0;
 		state->underscan_vborder = 0;
+		state->max_bpc = 8;
 
 		kcl_drm_atomic_helper_connector_reset(connector, &state->base);
 	}
@@ -3615,6 +3609,7 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	new_state->freesync_capable = state->freesync_capable;
 	new_state->freesync_enable = state->freesync_enable;
 	new_state->abm_level = state->abm_level;
+	new_state->max_bpc = state->max_bpc;
 
 	return &new_state->base;
 }
@@ -4228,8 +4223,11 @@ amdgpu_dm_create_common_mode(struct drm_encoder *encoder,
 	mode->hdisplay = hdisplay;
 	mode->vdisplay = vdisplay;
 	mode->type &= ~DRM_MODE_TYPE_PREFERRED;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
 	strncpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
-
+#else
+	strscpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
+#endif
 	return mode;
 
 }
@@ -4394,13 +4392,6 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.max_bpc_property,
 				0);
 
-	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
-	    connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
-		drm_object_attach_property(&aconnector->base.base,
-				adev->mode_info.freesync_property, 0);
-		drm_object_attach_property(&aconnector->base.base,
-				adev->mode_info.freesync_capable_property, 0);
-	}
 	if (connector_type == DRM_MODE_CONNECTOR_eDP &&
 	    dc_is_dmcu_initialized(adev->dm.dc)) {
 		drm_object_attach_property(&aconnector->base.base,
@@ -5682,7 +5673,7 @@ void set_freesync_on_stream(struct amdgpu_display_manager *dm,
 	mod_freesync_build_vrr_infopacket(dm->freesync_module,
 					  new_stream,
 					  &vrr,
-					  packet_type_fs1,
+					  PACKET_TYPE_FS1,
 					  NULL,
 					  &vrr_infopacket);
 
@@ -6501,11 +6492,5 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 			dm_con_state->freesync_capable = true;
 		}
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)  && \
-        !defined(OS_NAME_SUSE_15)
-	drm_object_property_set_value(&connector->base,
-				      adev->mode_info.freesync_capable_property,
-				      dm_con_state->freesync_capable);
-#endif
 }
 

@@ -18,31 +18,23 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors: AMD
- *
  */
+#ifndef __AMDGPU_XGMI_H__
+#define __AMDGPU_XGMI_H__
 
-#ifndef MOD_SHARED_H_
-#define MOD_SHARED_H_
+#include "amdgpu_psp.h"
 
-enum color_transfer_func {
-	TRANSFER_FUNC_UNKNOWN,
-	TRANSFER_FUNC_SRGB,
-	TRANSFER_FUNC_BT709,
-	TRANSFER_FUNC_PQ2084,
-	TRANSFER_FUNC_PQ2084_INTERIM,
-	TRANSFER_FUNC_LINEAR_0_1,
-	TRANSFER_FUNC_LINEAR_0_125,
-	TRANSFER_FUNC_GAMMA_22,
-	TRANSFER_FUNC_GAMMA_26
+struct amdgpu_hive_info {
+	uint64_t		hive_id;
+	struct list_head	device_list;
+	struct psp_xgmi_topology_info	topology_info;
+	int number_devices;
+	struct mutex hive_lock;
 };
 
-enum vrr_packet_type {
-	PACKET_TYPE_VRR,
-	PACKET_TYPE_FS1,
-	PACKET_TYPE_FS2
-};
+struct amdgpu_hive_info *amdgpu_get_xgmi_hive(struct amdgpu_device *adev);
+int amdgpu_xgmi_update_topology(struct amdgpu_hive_info *hive, struct amdgpu_device *adev);
+int amdgpu_xgmi_add_device(struct amdgpu_device *adev);
+void amdgpu_xgmi_remove_device(struct amdgpu_device *adev);
 
-
-#endif /* MOD_SHARED_H_ */
+#endif

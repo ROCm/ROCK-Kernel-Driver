@@ -76,7 +76,7 @@
 #define KMS_DRIVER_MINOR	27
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"19.10.1.418"
+#define AMDGPU_VERSION		"19.10.2.418"
 
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
@@ -521,7 +521,7 @@ bool keep_idle_process_evicted;
 module_param(keep_idle_process_evicted, bool, 0444);
 MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 
-int cma_enable;
+int cma_enable = 1;
 module_param(cma_enable, int, 0644);
 MODULE_PARM_DESC(cma_enable,"Enable CMA (1 = enable, 0 = disable (default)). Warning! relaxed access check");
 

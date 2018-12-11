@@ -377,10 +377,6 @@ struct amdgpu_mode_info {
 	struct drm_property *dither_property;
 	/* maximum number of bits per channel for monitor color */
 	struct drm_property *max_bpc_property;
-	/* it is used to allow enablement of freesync mode */
-	struct drm_property *freesync_property;
-	/* it is used to know about display capability of freesync mode */
-	struct drm_property *freesync_capable_property;
 	/* Adaptive Backlight Modulation (power feature) */
 	struct drm_property *abm_level_property;
 	/* hardcoded DFP edid from BIOS */
