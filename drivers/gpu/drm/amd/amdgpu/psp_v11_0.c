@@ -303,8 +303,6 @@ static int psp_v11_0_ring_init(struct psp_context *psp,
 
 static bool psp_v11_0_support_vmr_ring(struct psp_context *psp)
 {
-	struct amdgpu_device *adev = psp->adev;
-
 	if (amdgpu_sriov_vf(psp->adev) && psp->sos_fw_version > 0x80045)
 		return true;
 	return false;
