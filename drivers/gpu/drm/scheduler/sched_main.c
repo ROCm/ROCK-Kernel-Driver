@@ -431,7 +431,11 @@ void drm_sched_job_recovery(struct drm_gpu_scheduler *sched)
 					  r);
 			dma_fence_put(fence);
 		} else {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			if (s_fence->finished.status < 0)
+#else
 			if (s_fence->finished.error < 0)
+#endif
 				drm_sched_expel_job_unlocked(s_job);
 			drm_sched_process_job(NULL, &s_fence->cb);
 		}
@@ -637,7 +641,11 @@ static int drm_sched_main(void *param)
 					  r);
 			dma_fence_put(fence);
 		} else {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			if (s_fence->finished.status < 0)
+#else
 			if (s_fence->finished.error < 0)
+#endif
 				drm_sched_expel_job_unlocked(sched_job);
 			drm_sched_process_job(NULL, &s_fence->cb);
 		}
