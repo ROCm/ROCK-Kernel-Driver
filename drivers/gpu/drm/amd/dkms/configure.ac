@@ -90,6 +90,7 @@ m4_include([m4/obj-in-struct-drm-framebuffer.m4])
 m4_include([m4/drm-atomic-get-crtc-state.m4])
 m4_include([m4/drm-atomic-get-new-plane-state.m4])
 m4_include([m4/drm-atomic-helper-connector-reset.m4])
+m4_include([m4/drm-encoder-find-valid-with-file.m4])
 m4_include([m4/config.m4])
 
 
