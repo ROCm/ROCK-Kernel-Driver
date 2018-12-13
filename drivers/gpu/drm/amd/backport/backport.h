@@ -6,5 +6,4 @@
 #include <kcl/kcl_amdgpu.h>
 #include <kcl/kcl_bitops.h>
 #include <kcl/kcl_drm_connector.h>
-
 #endif /* AMDGPU_BACKPORT_H */
