@@ -57,7 +57,9 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 #include <drm/drm_atomic_uapi.h>
+#endif
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_mst_helper.h>
 #include <drm/drm_fb_helper.h>
@@ -4209,6 +4211,7 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 	return -EINVAL;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 static int dm_plane_atomic_async_check(struct drm_plane *plane,
 				       struct drm_plane_state *new_plane_state)
 {
@@ -4249,13 +4252,16 @@ static void dm_plane_atomic_async_update(struct drm_plane *plane,
 
 	handle_cursor_update(plane, old_state);
 }
+#endif
 
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = dm_plane_helper_prepare_fb,
 	.cleanup_fb = dm_plane_helper_cleanup_fb,
 	.atomic_check = dm_plane_atomic_check,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	.atomic_async_check = dm_plane_atomic_async_check,
 	.atomic_async_update = dm_plane_atomic_async_update
+#endif
 };
 
 /*
@@ -6732,6 +6738,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			ret = -EINVAL;
 			goto fail;
 		}
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	} else if (state->legacy_cursor_update) {
 		/*
 		 * This is a fast cursor update coming from the plane update
@@ -6739,6 +6746,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * performance.
 		 */
 		state->async_update = !drm_atomic_helper_async_check(dev, state);
+#endif
 	}
 
 	/* Must be success */
