@@ -70,13 +70,13 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
 #endif
 
-#if defined(DKMS_AS_BUILD)
+#if defined(BUILD_AS_DKMS)
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
 
 static inline struct mm_struct * kcl_mm_access(struct task_struct *task, unsigned int mode)
 {
-#if defined(DKMS_AS_BUILD)
+#if defined(BUILD_AS_DKMS)
 	return _kcl_mm_access(task, mode);
 #else
 	return mm_access(task, mode);
