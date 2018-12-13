@@ -23,6 +23,7 @@
 #include <linux/sched.h>
 #include <linux/device.h>
 #include "kfd_priv.h"
+#include "amdgpu_amdkfd.h"
 
 static const struct kgd2kfd_calls s_kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -112,7 +113,6 @@ int kgd2kfd_init(unsigned int interface_version,
 
 	return 0;
 }
-EXPORT_SYMBOL(kgd2kfd_init);
 
 void kgd2kfd_exit(void)
 {
