@@ -4,7 +4,7 @@
 #include <drm/drm_atomic_helper.h>
 
 
-#if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_BEST_ENCODER)
 static struct drm_encoder *
 drm_atomic_helper_best_encoder(struct drm_connector *connector)
 {
