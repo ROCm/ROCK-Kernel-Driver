@@ -1607,6 +1607,8 @@ static blk_qc_t __split_and_process_bio(struct mapped_device *md,
 		return ret;
 	}
 
+	blk_queue_split(md->queue, &bio);
+
 	init_clone_info(&ci, md, map, bio);
 
 	if (bio->bi_opf & REQ_PREFLUSH) {
