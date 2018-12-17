@@ -1414,7 +1414,6 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 
 	return retval;
 
-failed:
 failed_try_destroy_debugged_queue:
 
 	dqm_unlock(dqm);
@@ -1642,7 +1641,6 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		mqd_mgr->uninit_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 	}
 
-out:
 	dqm_unlock(dqm);
 	return retval;
 }
