@@ -4810,7 +4810,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 
 	attributes.pitch = attributes.width;
 
-	if (crtc_state && crtc_state->stream) {
+	if (crtc_state->stream) {
 		mutex_lock(&adev->dm.dc_lock);
 		if (!dc_stream_set_cursor_attributes(crtc_state->stream,
 							 &attributes))
