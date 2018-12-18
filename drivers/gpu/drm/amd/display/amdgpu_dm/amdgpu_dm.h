@@ -257,8 +257,6 @@ struct dc_plane_state;
 struct dm_plane_state {
 	struct drm_plane_state base;
 	struct dc_plane_state *dc_state;
-
-	bool cursor_update;
 };
 
 struct dm_crtc_state {

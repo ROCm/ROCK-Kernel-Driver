@@ -3983,10 +3983,9 @@ static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 #endif
 {
 	struct amdgpu_bo *rbo;
-	struct dm_plane_state *dm_plane_state = to_dm_plane_state(old_state);
 	int r;
 
-	if (!old_state->fb || dm_plane_state->cursor_update)
+	if (!old_state->fb)
 		return;
 
 	rbo = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(old_state->fb, 0));
@@ -4044,8 +4043,8 @@ static int dm_plane_atomic_async_check(struct drm_plane *plane,
 static void dm_plane_atomic_async_update(struct drm_plane *plane,
 					 struct drm_plane_state *new_state)
 {
-	struct drm_plane_state old_state = *plane->state;
-	struct dm_plane_state *dm_plane_state = to_dm_plane_state(new_state);
+	struct drm_plane_state *old_state =
+		drm_atomic_get_old_plane_state(new_state->state, plane);
 
 	if (plane->state->fb != new_state->fb)
 		drm_atomic_set_fb_for_plane(plane->state, new_state->fb);
@@ -4059,15 +4058,7 @@ static void dm_plane_atomic_async_update(struct drm_plane *plane,
 	plane->state->crtc_w = new_state->crtc_w;
 	plane->state->crtc_h = new_state->crtc_h;
 
-	handle_cursor_update(plane, &old_state);
-
-	/*
-	 * While DRM already takes care of drm_atomic_helper_cleanup_planes,
-	 * it does it on the wrong state (new_state instead of old_state).
-	 * This is a workaround for that behavior.
-	 */
-	dm_plane_helper_cleanup_fb(plane, &old_state);
-	dm_plane_state->cursor_update = true;
+	handle_cursor_update(plane, old_state);
 }
 #endif
 
