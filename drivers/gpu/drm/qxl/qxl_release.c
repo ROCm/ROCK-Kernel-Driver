@@ -224,7 +224,7 @@ int qxl_release_list_add(struct qxl_release *release, struct qxl_bo *bo)
 
 	qxl_bo_ref(bo);
 	entry->tv.bo = &bo->tbo;
-	entry->tv.shared = false;
+	entry->tv.num_shared = 0;
 	list_add_tail(&entry->tv.head, &release->bos);
 	return 0;
 }
@@ -241,7 +241,7 @@ static int qxl_release_validate_bo(struct qxl_bo *bo)
 			return ret;
 	}
 
-	ret = reservation_object_reserve_shared(bo->tbo.resv);
+	ret = reservation_object_reserve_shared(bo->tbo.resv, 1);
 	if (ret)
 		return ret;
 

@@ -92,8 +92,8 @@ static bool check_if_add_bo_to_vm(struct amdgpu_vm *avm,
 }
 
 /* Set memory usage limits. Current, limits are
- *  System (TTM + userptr) memory - 3/4th System RAM
- *  TTM memory - 3/8th System RAM
+ *  System (TTM + userptr) memory - 29/32th System RAM
+ *  TTM memory - 29/32th System RAM
  */
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
 {
@@ -105,8 +105,8 @@ void amdgpu_amdkfd_gpuvm_init_mem_limits(void)
 	mem *= si.mem_unit;
 
 	spin_lock_init(&kfd_mem_limit.mem_limit_lock);
-	kfd_mem_limit.max_system_mem_limit = (mem >> 1) + (mem >> 2);
-	kfd_mem_limit.max_ttm_mem_limit = (mem >> 1) - (mem >> 3);
+	kfd_mem_limit.max_system_mem_limit = mem - (3 * (mem >> 5)); /* 29/32 */
+	kfd_mem_limit.max_ttm_mem_limit = mem - (3 * (mem >> 5)); /* 29/32 */
 	pr_debug("Kernel memory limit %lluM, TTM limit %lluM\n",
 		(kfd_mem_limit.max_system_mem_limit >> 20),
 		(kfd_mem_limit.max_ttm_mem_limit >> 20));
@@ -371,23 +371,6 @@ static int amdgpu_amdkfd_validate(void *param, struct amdgpu_bo *bo)
 	return amdgpu_amdkfd_bo_validate(bo, p->domain, p->wait);
 }
 
-static u64 get_vm_pd_gpu_offset(struct amdgpu_vm *vm)
-{
-	struct amdgpu_device *adev =
-		amdgpu_ttm_adev(vm->root.base.bo->tbo.bdev);
-	u64 offset;
-	uint64_t flags = AMDGPU_PTE_VALID;
-
-	offset = amdgpu_bo_gpu_offset(vm->root.base.bo);
-
-	/* On some ASICs the FB doesn't start at 0. Adjust FB offset
-	 * to an actual MC address.
-	 */
-	adev->gmc.gmc_funcs->get_vm_pde(adev, -1, &offset, &flags);
-
-	return offset;
-}
-
 /* vm_validate_pt_pd_bos - Validate page table and directory BOs
  *
  * Page directories are not updated here because huge page handling
@@ -555,7 +538,7 @@ static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 	struct amdgpu_bo *bo = mem->bo;
 
 	INIT_LIST_HEAD(&entry->head);
-	entry->shared = true;
+	entry->num_shared = 1;
 	entry->bo = &bo->tbo;
 	mutex_lock(&process_info->lock);
 	if (userptr)
@@ -710,7 +693,7 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
-	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.tv.num_shared = 1;
 	ctx->kfd_bo.user_pages = NULL;
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
@@ -774,7 +757,7 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
-	ctx->kfd_bo.tv.shared = true;
+	ctx->kfd_bo.tv.num_shared = 1;
 	ctx->kfd_bo.user_pages = NULL;
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
@@ -1810,7 +1793,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct sg_table *sg = NULL;
-	unsigned long bus_addr;
+	unsigned long bus_addr, aper_limit;
 	unsigned int chunks;
 	unsigned int i;
 	struct scatterlist *s;
@@ -1818,6 +1801,8 @@ static int get_sg_table(struct amdgpu_device *adev,
 	unsigned int page_size;
 	int ret;
 
+	if (size + offset > amdgpu_bo_size(bo))
+		return -EFAULT;
 	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
@@ -1841,6 +1826,12 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		bus_addr = amdgpu_bo_gpu_offset(bo) - adev->gmc.vram_start
 			   + adev->gmc.aper_base + offset;
+		aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
+		if (bus_addr + (chunks * page_size) > aper_limit) {
+			pr_err("sg: bus addr not inside pci aperture\n");
+			ret = -EFAULT;
+			goto out_of_range;
+		}
 
 		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
 			uint64_t chunk_size, length;
@@ -1881,6 +1872,9 @@ static int get_sg_table(struct amdgpu_device *adev,
 
 	*ret_sg = sg;
 	return 0;
+
+out_of_range:
+	sg_free_table(sg);
 out:
 	kfree(sg);
 	*ret_sg = NULL;
@@ -2164,7 +2158,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 			    validate_list.head) {
 		list_add_tail(&mem->resv_list.head, &resv_list);
 		mem->resv_list.bo = mem->validate_list.bo;
-		mem->resv_list.shared = mem->validate_list.shared;
+		mem->resv_list.num_shared = mem->validate_list.num_shared;
 	}
 
 	/* Reserve all BOs and page tables for validation */
@@ -2388,7 +2382,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 
 		list_add_tail(&mem->resv_list.head, &ctx.list);
 		mem->resv_list.bo = mem->validate_list.bo;
-		mem->resv_list.shared = mem->validate_list.shared;
+		mem->resv_list.num_shared = mem->validate_list.num_shared;
 	}
 
 	ret = ttm_eu_reserve_buffers(&ctx.ticket, &ctx.list,
@@ -2525,7 +2519,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	resv_list[1].bo = dst.bo;
 
 	for (i = 0; i < 2; i++) {
-		resv_list[i].shared = true;
+		resv_list[i].num_shared = 1;
 		list_add_tail(&resv_list[i].head, &list);
 	}
 

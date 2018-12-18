@@ -4,6 +4,21 @@
 #include <linux/reservation.h>
 #include <linux/ww_mutex.h>
 
+#if defined(BUILD_AS_DKMS)
+extern int _kcl_reservation_object_reserve_shared(struct reservation_object *obj,
+				      unsigned int num_fences);
+#endif
+static inline int
+kcl_reservation_object_reserve_shared(struct reservation_object *obj,
+				      unsigned int num_fences)
+{
+#if defined(BUILD_AS_DKMS)
+        return _kcl_reservation_object_reserve_shared(obj,num_fences);
+#else
+        return reservation_object_reserve_shared(obj,num_fences);
+#endif
+}
+
 #if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,

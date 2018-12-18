@@ -258,6 +258,9 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 					&aconnector->base, aconnector->edid);
 
 	ret = drm_add_edid_modes(connector, aconnector->edid);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+	drm_edid_to_eld(connector, aconnector->edid);
+#endif
 
 	return ret;
 }

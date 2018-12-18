@@ -110,7 +110,7 @@ static void vmw_resource_release(struct kref *kref)
 			struct ttm_validate_buffer val_buf;
 
 			val_buf.bo = bo;
-			val_buf.shared = false;
+			val_buf.num_shared = 0;
 			res->func->unbind(res, false, &val_buf);
 		}
 		res->backup_dirty = false;
@@ -983,7 +983,7 @@ vmw_resource_check_buffer(struct vmw_resource *res,
 
 	INIT_LIST_HEAD(&val_list);
 	val_buf->bo = ttm_bo_reference(&res->backup->base);
-	val_buf->shared = false;
+	val_buf->num_shared = 0;
 	list_add_tail(&val_buf->head, &val_list);
 	ret = ttm_eu_reserve_buffers(NULL, &val_list, interruptible, NULL);
 	if (unlikely(ret != 0))
@@ -1082,7 +1082,7 @@ static int vmw_resource_do_evict(struct vmw_resource *res, bool interruptible)
 	BUG_ON(!func->may_evict);
 
 	val_buf.bo = NULL;
-	val_buf.shared = false;
+	val_buf.num_shared = 0;
 	ret = vmw_resource_check_buffer(res, interruptible, &val_buf);
 	if (unlikely(ret != 0))
 		return ret;
@@ -1128,7 +1128,7 @@ int vmw_resource_validate(struct vmw_resource *res)
 		return 0;
 
 	val_buf.bo = NULL;
-	val_buf.shared = false;
+	val_buf.num_shared = 0;
 	if (res->backup)
 		val_buf.bo = &res->backup->base;
 	do {
@@ -1252,7 +1252,7 @@ void vmw_resource_move_notify(struct ttm_buffer_object *bo,
 		struct ttm_validate_buffer val_buf;
 
 		val_buf.bo = bo;
-		val_buf.shared = false;
+		val_buf.num_shared = 0;
 
 		list_for_each_entry_safe(res, n, &dma_buf->res_list, mob_head) {
 

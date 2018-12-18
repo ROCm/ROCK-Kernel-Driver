@@ -623,7 +623,8 @@ void amdgpu_vm_get_pd_bo(struct amdgpu_vm *vm,
 {
 	entry->priority = 0;
 	entry->tv.bo = &vm->root.base.bo->tbo;
-	entry->tv.shared = true;
+	/* One for the VM updates, one for TTM and one for the CS job */
+	entry->tv.num_shared = 3;
 	entry->user_pages = NULL;
 	list_add(&entry->tv.head, validated);
 }
@@ -778,10 +779,6 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	}
 
 	ring = container_of(vm->entity.rq->sched, struct amdgpu_ring, sched);
-
-	r = reservation_object_reserve_shared(bo->tbo.resv);
-	if (r)
-		return r;
 
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 	if (r)
@@ -1577,11 +1574,19 @@ static void amdgpu_vm_fragment(struct amdgpu_pte_update_params *params,
 	 * larger. Thus, we try to use large fragments wherever possible.
 	 * Userspace can support this by aligning virtual base address and
 	 * allocation size to the fragment size.
+	 *
+	 * Starting with Vega10 the fragment size only controls the L1. The L2
+	 * is now directly feed with small/huge/giant pages from the walker.
 	 */
-	unsigned max_frag = params->adev->vm_manager.fragment_size;
+	unsigned max_frag;
+
+	if (params->adev->asic_type < CHIP_VEGA10)
+		max_frag = params->adev->vm_manager.fragment_size;
+	else
+		max_frag = 31;
 
 	/* system pages are non continuously */
-	if (params->src || !(flags & AMDGPU_PTE_VALID)) {
+	if (params->src) {
 		*frag = 0;
 		*frag_end = end;
 		return;
@@ -1852,10 +1857,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	if (r)
 		goto error_free;
 
-	r = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv);
-	if (r)
-		goto error_free;
-
 	r = amdgpu_vm_update_ptes(&params, start, last + 1, addr, flags);
 	if (r)
 		goto error_free;
@@ -2061,10 +2062,22 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
 		if (mem && mem->mem_type == TTM_PL_VRAM &&
 			adev != bo_adev) {
+			if (drm_debug & DRM_UT_DRIVER) {
+				list_for_each_entry(mapping, &bo_va->invalids, list) {
+					DRM_DEBUG_DRIVER("Try map VRAM va 0x%llx - 0x%llx, offset 0x%llx, from dev %s for peer GPU %s access.\n",
+						mapping->start << PAGE_SHIFT,
+						((mapping->last + 1) << PAGE_SHIFT) - 1,
+						nodes ? nodes->start << PAGE_SHIFT : 0ll,
+						dev_name(bo_adev->dev),
+						dev_name(adev->dev));
+				}
+			}
 			if (!(amdgpu_device_is_peer_accessible(bo_adev,adev)))
 				return -EINVAL;
 			flags |= AMDGPU_PTE_SYSTEM;
 			vram_base_offset = bo_adev->gmc.aper_base;
+			DRM_DEBUG_DRIVER("Used PCIe mapping, vram_base_offset 0x%llx.\n",
+				vram_base_offset);
 		}
 	} else
 		flags = 0x0;
@@ -3065,6 +3078,10 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (r)
 		goto error_free_root;
 
+	r = kcl_reservation_object_reserve_shared(root->tbo.resv, 1);
+	if (r)
+		goto error_unreserve;
+
 	r = amdgpu_vm_clear_bo(adev, vm, root,
 			       adev->vm_manager.root_level,
 			       vm->pte_support_ats);
@@ -3094,7 +3111,6 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	}
 
 	INIT_KFIFO(vm->faults);
-	vm->fault_credit = 16;
 
 	return 0;
 
@@ -3315,42 +3331,6 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	dma_fence_put(vm->last_update);
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		amdgpu_vmid_free_reserved(adev, vm, i);
-}
-
-/**
- * amdgpu_vm_pasid_fault_credit - Check fault credit for given PASID
- *
- * @adev: amdgpu_device pointer
- * @pasid: PASID do identify the VM
- *
- * This function is expected to be called in interrupt context.
- *
- * Returns:
- * True if there was fault credit, false otherwise
- */
-bool amdgpu_vm_pasid_fault_credit(struct amdgpu_device *adev,
-				  unsigned int pasid)
-{
-	struct amdgpu_vm *vm;
-
-	spin_lock(&adev->vm_manager.pasid_lock);
-	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
-	if (!vm) {
-		/* VM not found, can't track fault credit */
-		spin_unlock(&adev->vm_manager.pasid_lock);
-		return true;
-	}
-
-	/* No lock needed. only accessed by IRQ handler */
-	if (!vm->fault_credit) {
-		/* Too many faults in this VM */
-		spin_unlock(&adev->vm_manager.pasid_lock);
-		return false;
-	}
-
-	vm->fault_credit--;
-	spin_unlock(&adev->vm_manager.pasid_lock);
-	return true;
 }
 
 /**

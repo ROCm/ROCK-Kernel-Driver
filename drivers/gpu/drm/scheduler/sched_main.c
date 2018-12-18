@@ -62,6 +62,8 @@
 
 static void drm_sched_process_job(struct dma_fence *f, struct dma_fence_cb *cb);
 
+static void drm_sched_expel_job_unlocked(struct drm_sched_job *s_job);
+
 /**
  * drm_sched_rq_init - initialize a given run queue struct
  *
@@ -287,7 +289,7 @@ static void drm_sched_job_finish(struct work_struct *work)
 
 	spin_lock_irqsave(&sched->job_list_lock, flags);
 	/* remove job from ring_mirror_list */
-	list_del(&s_job->node);
+	list_del_init(&s_job->node);
 	/* queue TDR for next job */
 	drm_sched_start_timeout(sched);
 	spin_unlock_irqrestore(&sched->job_list_lock, flags);
@@ -429,6 +431,12 @@ void drm_sched_job_recovery(struct drm_gpu_scheduler *sched)
 					  r);
 			dma_fence_put(fence);
 		} else {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			if (s_fence->finished.status < 0)
+#else
+			if (s_fence->finished.error < 0)
+#endif
+				drm_sched_expel_job_unlocked(s_job);
 			drm_sched_process_job(NULL, &s_fence->cb);
 		}
 		spin_lock_irqsave(&sched->job_list_lock, flags);
@@ -633,12 +641,27 @@ static int drm_sched_main(void *param)
 					  r);
 			dma_fence_put(fence);
 		} else {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			if (s_fence->finished.status < 0)
+#else
+			if (s_fence->finished.error < 0)
+#endif
+				drm_sched_expel_job_unlocked(sched_job);
 			drm_sched_process_job(NULL, &s_fence->cb);
 		}
 
 		wake_up(&sched->job_scheduled);
 	}
 	return 0;
+}
+
+static void drm_sched_expel_job_unlocked(struct drm_sched_job *s_job)
+{
+	struct drm_gpu_scheduler *sched = s_job->sched;
+
+	spin_lock(&sched->job_list_lock);
+	list_del_init(&s_job->node);
+	spin_unlock(&sched->job_list_lock);
 }
 
 /**

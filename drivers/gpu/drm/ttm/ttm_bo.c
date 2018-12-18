@@ -886,8 +886,7 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 
 	if (fence) {
 		kcl_reservation_object_add_shared_fence(bo->resv, fence);
-
-		ret = reservation_object_reserve_shared(bo->resv);
+		ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
 		if (unlikely(ret))
 			return ret;
 
@@ -991,8 +990,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	bool type_ok = false;
 	bool has_erestartsys = false;
 	int i, ret;
-
-	ret = reservation_object_reserve_shared(bo->resv);
+	ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
 	if (unlikely(ret))
 		return ret;
 
@@ -1286,6 +1284,9 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 		locked = kcl_reservation_object_trylock(bo->resv);
 		WARN_ON(!locked);
 	}
+
+	if (likely(!ret))
+		ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
 
 	if (likely(!ret))
 		ret = ttm_bo_validate(bo, placement, ctx);

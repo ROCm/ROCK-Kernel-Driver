@@ -41,6 +41,11 @@ uint64_t amdgpu_amdkfd_total_mem_size;
 
 extern bool pcie_p2p;
 
+/* Total memory size in system memory and all GPU VRAM. Used to
+ * estimate worst case amount of memory to reserve for page tables
+ */
+uint64_t amdgpu_amdkfd_total_mem_size;
+
 int amdgpu_amdkfd_init(void)
 {
 	struct sysinfo si;

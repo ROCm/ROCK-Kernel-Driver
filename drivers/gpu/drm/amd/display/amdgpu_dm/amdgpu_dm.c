@@ -3463,10 +3463,8 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 			rmx_type = RMX_FULL;
 			break;
 		case DRM_MODE_SCALE_NONE:
-			rmx_type = RMX_OFF;
-			break;
 		default:
-			rmx_type = RMX_ASPECT;
+			rmx_type = RMX_OFF;
 			break;
 		}
 
@@ -3582,7 +3580,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 
 	if (state) {
-		state->scaling = RMX_ASPECT;
+		state->scaling = RMX_OFF;
 		state->underscan_enable = false;
 		state->underscan_hborder = 0;
 		state->underscan_vborder = 0;
@@ -3609,6 +3607,10 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	new_state->freesync_capable = state->freesync_capable;
 	new_state->freesync_enable = state->freesync_enable;
 	new_state->abm_level = state->abm_level;
+	new_state->scaling = state->scaling;
+	new_state->underscan_enable = state->underscan_enable;
+	new_state->underscan_hborder = state->underscan_hborder;
+	new_state->underscan_vborder = state->underscan_vborder;
 	new_state->max_bpc = state->max_bpc;
 
 	return &new_state->base;
@@ -4302,6 +4304,10 @@ static void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 		INIT_LIST_HEAD(&connector->probed_modes);
 		amdgpu_dm_connector->num_modes =
 				drm_add_edid_modes(connector, edid);
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+		drm_edid_to_eld(connector, edid);
+#endif
 
 		amdgpu_dm_get_native_mode(connector);
 	} else {
