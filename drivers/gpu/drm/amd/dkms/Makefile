@@ -18,8 +18,13 @@ ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 else ifeq ("rhel",$(OS_NAME))
+ifneq ($(OS_VERSION),"8.0")
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
+else
+DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
+endif
 endif
 
 subdir-ccflags-y += \
@@ -119,9 +124,13 @@ subdir-ccflags-y += -DOS_NAME_RHEL_7_X
 else ifeq ($(OS_VERSION),"7.6")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_6
 subdir-ccflags-y += -DOS_NAME_RHEL_7_X
+else ifeq ($(OS_VERSION),"8.0")
+subdir-ccflags-y += -DOS_NAME_RHEL_8_0
 endif
+ifneq ($(OS_VERSION),"8.0")
 subdir-ccflags-y += \
 	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
+endif
 endif
 
 DKMS_INCLUDE_PREFIX = \
