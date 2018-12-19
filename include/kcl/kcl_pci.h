@@ -65,6 +65,9 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev);
 enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
+#else
+extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
+extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 #endif
 
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
