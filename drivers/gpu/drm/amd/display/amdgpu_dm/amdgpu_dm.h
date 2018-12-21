@@ -134,6 +134,7 @@ struct amdgpu_display_manager {
 	struct drm_device *ddev;
 	u16 display_indexes_num;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	/**
 	 * @dc_lock:
 	 *
@@ -142,7 +143,7 @@ struct amdgpu_display_manager {
 	 */
 	struct mutex dc_lock;
 
-	 * @atomic_obj
+	/* @atomic_obj
 	 *
 	 * In combination with &dm_atomic_state it helps manage
 	 * global atomic state that doesn't map cleanly into existing
@@ -151,6 +152,7 @@ struct amdgpu_display_manager {
 	struct drm_private_obj atomic_obj;
 
 	struct drm_modeset_lock atomic_obj_lock;
+#endif
 
 	/**
 	 * @irq_handler_list_low_tab:
@@ -294,7 +296,11 @@ struct dm_crtc_state {
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)
 
 struct dm_atomic_state {
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	struct drm_private_state base;
+#else
+	struct drm_atomic_state base;
+#endif
 
 	struct dc_state *context;
 };
