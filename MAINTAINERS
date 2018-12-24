@@ -2633,6 +2633,13 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/sound/axentia,*
 F:	sound/soc/atmel/tse850-pcm5142.c
 
+AXXIA I2C CONTROLLER
+M:	Krzysztof Adamski <krzysztof.adamski@nokia.com>
+L:	linux-i2c@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/i2c/i2c-axxia.txt
+F:	drivers/i2c/busses/i2c-axxia.c
+
 AZ6007 DVB DRIVER
 M:	Mauro Carvalho Chehab <mchehab@kernel.org>
 L:	linux-media@vger.kernel.org
@@ -4050,7 +4057,7 @@ S:	Maintained
 F:	drivers/media/dvb-frontends/cxd2820r*
 
 CXGB3 ETHERNET DRIVER (CXGB3)
-M:	Santosh Raspatur <santosh@chelsio.com>
+M:	Arjun Vynipadath <arjun@chelsio.com>
 L:	netdev@vger.kernel.org
 W:	http://www.chelsio.com
 S:	Supported
@@ -4079,7 +4086,7 @@ S:	Supported
 F:	drivers/crypto/chelsio
 
 CXGB4 ETHERNET DRIVER (CXGB4)
-M:	Ganesh Goudar <ganeshgr@chelsio.com>
+M:	Arjun Vynipadath <arjun@chelsio.com>
 L:	netdev@vger.kernel.org
 W:	http://www.chelsio.com
 S:	Supported
@@ -6906,8 +6913,10 @@ Hyper-V CORE AND DRIVERS
 M:	"K. Y. Srinivasan" <kys@microsoft.com>
 M:	Haiyang Zhang <haiyangz@microsoft.com>
 M:	Stephen Hemminger <sthemmin@microsoft.com>
+M:	Sasha Levin <sashal@kernel.org>
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/hyperv/linux.git
 L:	devel@linuxdriverproject.org
-S:	Maintained
+S:	Supported
 F:	Documentation/networking/netvsc.txt
 F:	arch/x86/include/asm/mshyperv.h
 F:	arch/x86/include/asm/trace/hyperv.h
@@ -8943,7 +8952,7 @@ F:	arch/mips/boot/dts/img/pistachio_marduk.dts
 
 MARVELL 88E6XXX ETHERNET SWITCH FABRIC DRIVER
 M:	Andrew Lunn <andrew@lunn.ch>
-M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+M:	Vivien Didelot <vivien.didelot@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/dsa/mv88e6xxx/
@@ -9447,6 +9456,13 @@ F:	drivers/media/platform/mtk-vcodec/
 F:	drivers/media/platform/mtk-vpu/
 F:	Documentation/devicetree/bindings/media/mediatek-vcodec.txt
 F:	Documentation/devicetree/bindings/media/mediatek-vpu.txt
+
+MEDIATEK MT76 WIRELESS LAN DRIVER
+M:	Felix Fietkau <nbd@nbd.name>
+M:	Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>
+L:	linux-wireless@vger.kernel.org
+S:	Maintained
+F:	drivers/net/wireless/mediatek/mt76/
 
 MEDIATEK MT7601U WIRELESS LAN DRIVER
 M:	Jakub Kicinski <kubakici@wp.pl>
@@ -10418,7 +10434,7 @@ F:	drivers/net/wireless/
 
 NETWORKING [DSA]
 M:	Andrew Lunn <andrew@lunn.ch>
-M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+M:	Vivien Didelot <vivien.didelot@gmail.com>
 M:	Florian Fainelli <f.fainelli@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/dsa/
