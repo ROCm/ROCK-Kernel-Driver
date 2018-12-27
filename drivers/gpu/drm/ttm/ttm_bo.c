@@ -93,7 +93,7 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, struct drm_printer *p
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 		(*man->func->debug)(man, p);
 #else
-		(*man->func->debug)(man, TTM_PFX);
+		(*man->func->debug)(man, p->prefix);
 #endif
 }
 
