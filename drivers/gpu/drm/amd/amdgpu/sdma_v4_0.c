@@ -1458,8 +1458,7 @@ static bool sdma_v4_0_fw_support_paging_queue(struct amdgpu_device *adev)
 		/*return fw_version >= 31;*/
 		return false;
 	case CHIP_VEGA20:
-		/*return fw_version >= 115;*/
-		return false;
+		return fw_version >= 123;
 	default:
 		return false;
 	}
@@ -1522,9 +1521,7 @@ static int sdma_v4_0_sw_init(void *handle)
 				ring->use_doorbell?"true":"false");
 
 		/* doorbell size is 2 dwords, get DWORD offset */
-		ring->doorbell_index = (i == 0) ?
-			(adev->doorbell_index.sdma_engine0 << 1)
-			: (adev->doorbell_index.sdma_engine1 << 1);
+		ring->doorbell_index = adev->doorbell_index.sdma_engine[i] << 1;
 
 		sprintf(ring->name, "sdma%d", i);
 		r = amdgpu_ring_init(adev, ring, 1024,
@@ -1543,9 +1540,7 @@ static int sdma_v4_0_sw_init(void *handle)
 			/* paging queue use same doorbell index/routing as gfx queue
 			 * with 0x400 (4096 dwords) offset on second doorbell page
 			 */
-			ring->doorbell_index = (i == 0) ?
-				(adev->doorbell_index.sdma_engine0 << 1)
-				: (adev->doorbell_index.sdma_engine1 << 1);
+			ring->doorbell_index = adev->doorbell_index.sdma_engine[i] << 1;
 			ring->doorbell_index += 0x400;
 
 			sprintf(ring->name, "page%d", i);
@@ -1706,13 +1701,15 @@ static int sdma_v4_0_process_trap_irq(struct amdgpu_device *adev,
 		amdgpu_fence_process(&adev->sdma.instance[instance].ring);
 		break;
 	case 1:
-		/* XXX compute */
+		if (adev->asic_type == CHIP_VEGA20)
+			amdgpu_fence_process(&adev->sdma.instance[instance].page);
 		break;
 	case 2:
 		/* XXX compute */
 		break;
 	case 3:
-		amdgpu_fence_process(&adev->sdma.instance[instance].page);
+		if (adev->asic_type != CHIP_VEGA20)
+			amdgpu_fence_process(&adev->sdma.instance[instance].page);
 		break;
 	}
 	return 0;

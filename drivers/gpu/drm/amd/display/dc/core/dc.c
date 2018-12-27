@@ -151,10 +151,6 @@ static bool create_links(
 		return false;
 	}
 
-	if (connectors_num == 0 && num_virtual_links == 0) {
-		dm_error("DC: Number of connectors is zero!\n");
-	}
-
 	dm_output_to_console(
 		"DC: %s: connectors_num: physical:%d, virtual:%d\n",
 		__func__,
@@ -388,7 +384,7 @@ void dc_stream_set_dither_option(struct dc_stream_state *stream,
 		enum dc_dither_option option)
 {
 	struct bit_depth_reduction_params params;
-	struct dc_link *link = stream->sink->link;
+	struct dc_link *link = stream->link;
 	struct pipe_ctx *pipes = NULL;
 	int i;
 
@@ -530,9 +526,8 @@ void dc_link_set_preferred_link_settings(struct dc *dc,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe = &dc->current_state->res_ctx.pipe_ctx[i];
-		if (pipe->stream && pipe->stream->sink
-			&& pipe->stream->sink->link) {
-			if (pipe->stream->sink->link == link)
+		if (pipe->stream && pipe->stream->link) {
+			if (pipe->stream->link == link)
 				break;
 		}
 	}
@@ -674,6 +669,7 @@ static bool construct(struct dc *dc,
 	dc_ctx->dc = dc;
 	dc_ctx->asic_id = init_params->asic_id;
 	dc_ctx->dc_sink_id_count = 0;
+	dc_ctx->dc_stream_id_count = 0;
 	dc->ctx = dc_ctx;
 
 	dc->current_state = dc_create_state();
@@ -842,6 +838,11 @@ construct_fail:
 
 alloc_fail:
 	return NULL;
+}
+
+void dc_init_callbacks(struct dc *dc,
+		const struct dc_callback_init *init_params)
+{
 }
 
 void dc_destroy(struct dc **dc)
@@ -1044,7 +1045,8 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	/* Program all planes within new context*/
 	for (i = 0; i < context->stream_count; i++) {
-		const struct dc_sink *sink = context->streams[i]->sink;
+		const struct dc_link *link = context->streams[i]->link;
+		struct dc_stream_status *status;
 
 		if (!context->streams[i]->mode_changed)
 			continue;
@@ -1069,12 +1071,15 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 			}
 		}
 
-		CONN_MSG_MODE(sink->link, "{%dx%d, %dx%d@%dKhz}",
+		status = dc_stream_get_status_from_state(context, context->streams[i]);
+		context->streams[i]->out.otg_offset = status->primary_otg_inst;
+
+		CONN_MSG_MODE(link, "{%dx%d, %dx%d@%dKhz}",
 				context->streams[i]->timing.h_addressable,
 				context->streams[i]->timing.v_addressable,
 				context->streams[i]->timing.h_total,
 				context->streams[i]->timing.v_total,
-				context->streams[i]->timing.pix_clk_khz);
+				context->streams[i]->timing.pix_clk_100hz / 10);
 	}
 
 	dc_enable_stereo(dc, context, dc_streams, context->stream_count);
@@ -1218,6 +1223,12 @@ static enum surface_update_type get_plane_info_update_type(const struct dc_surfa
 		 * and DML calculation
 		 */
 		update_flags->bits.bpp_change = 1;
+
+	if (u->plane_info->plane_size.grph.surface_pitch != u->surface->plane_size.grph.surface_pitch
+			|| u->plane_info->plane_size.video.luma_pitch != u->surface->plane_size.video.luma_pitch
+			|| u->plane_info->plane_size.video.chroma_pitch != u->surface->plane_size.video.chroma_pitch)
+		update_flags->bits.plane_size_change = 1;
+
 
 	if (memcmp(&u->plane_info->tiling_info, &u->surface->tiling_info,
 			sizeof(union dc_tiling_info)) != 0) {
@@ -1471,7 +1482,8 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 			if ((stream_update->hdr_static_metadata && !stream->use_dynamic_meta) ||
 					stream_update->vrr_infopacket ||
-					stream_update->vsc_infopacket) {
+					stream_update->vsc_infopacket ||
+					stream_update->vsp_infopacket) {
 				resource_build_info_frame(pipe_ctx);
 				dc->hwss.update_info_frame(pipe_ctx);
 			}
@@ -1573,9 +1585,6 @@ static void commit_planes_for_stream(struct dc *dc,
 		}
 	}
 
-	if (update_type == UPDATE_TYPE_FULL)
-		context_timing_trace(dc, &context->res_ctx);
-
 	// Update Type FAST, Surface updates
 	if (update_type == UPDATE_TYPE_FAST) {
 		/* Lock the top pipe while updating plane addrs, since freesync requires
@@ -1611,7 +1620,6 @@ void dc_commit_updates_for_stream(struct dc *dc,
 		int surface_count,
 		struct dc_stream_state *stream,
 		struct dc_stream_update *stream_update,
-		struct dc_plane_state **plane_states,
 		struct dc_state *state)
 {
 	const struct dc_stream_status *stream_status;
@@ -1795,6 +1803,26 @@ void dc_resume(struct dc *dc)
 
 	for (i = 0; i < dc->link_count; i++)
 		core_link_resume(dc->links[i]);
+}
+
+unsigned int dc_get_current_backlight_pwm(struct dc *dc)
+{
+	struct abm *abm = dc->res_pool->abm;
+
+	if (abm)
+		return abm->funcs->get_current_backlight(abm);
+
+	return 0;
+}
+
+unsigned int dc_get_target_backlight_pwm(struct dc *dc)
+{
+	struct abm *abm = dc->res_pool->abm;
+
+	if (abm)
+		return abm->funcs->get_target_backlight(abm);
+
+	return 0;
 }
 
 bool dc_is_dmcu_initialized(struct dc *dc)

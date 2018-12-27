@@ -140,12 +140,18 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	while (*((unsigned int *)psp->fence_buf) != index)
 		msleep(1);
 
-	/* the status field must be 0 after FW is loaded */
-	if (ucode && psp->cmd_buf_mem->resp.status) {
-		DRM_ERROR("failed loading with status (%d) and ucode id (%d)\n",
-			  psp->cmd_buf_mem->resp.status, ucode->ucode_id);
+	/* the status field must be 0 after psp command completion */
+	if (psp->cmd_buf_mem->resp.status) {
+		if (ucode)
+			DRM_ERROR("failed to load ucode id (%d) ",
+				  ucode->ucode_id);
+		DRM_ERROR("psp command failed and response status is (%d)\n",
+			  psp->cmd_buf_mem->resp.status);
 		return -EINVAL;
 	}
+
+	/* get xGMI session id from response buffer */
+	cmd->resp.session_id = psp->cmd_buf_mem->resp.session_id;
 
 	if (ucode) {
 		ucode->tmr_mc_addr_lo = psp->cmd_buf_mem->resp.fw_addr_lo;
@@ -541,7 +547,7 @@ static int psp_load_fw(struct amdgpu_device *adev)
 	struct psp_context *psp = &adev->psp;
 
 	if (amdgpu_sriov_vf(adev) && adev->in_gpu_reset) {
-		psp_ring_destroy(psp, PSP_RING_TYPE__KM);
+		psp_ring_stop(psp, PSP_RING_TYPE__KM); /* should not destroy ring, only stop */
 		goto skip_memalloc;
 	}
 

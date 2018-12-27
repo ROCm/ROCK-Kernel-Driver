@@ -192,7 +192,6 @@ enum surface_pixel_format {
 	/*swaped & float*/
 	SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F,
 	/*grow graphics here if necessary */
-	SURFACE_PIXEL_FORMAT_VIDEO_AYCrCb8888,
 	SURFACE_PIXEL_FORMAT_VIDEO_BEGIN,
 	SURFACE_PIXEL_FORMAT_VIDEO_420_YCbCr =
 		SURFACE_PIXEL_FORMAT_VIDEO_BEGIN,
@@ -200,6 +199,7 @@ enum surface_pixel_format {
 	SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCbCr,
 	SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb,
 		SURFACE_PIXEL_FORMAT_SUBSAMPLE_END,
+	SURFACE_PIXEL_FORMAT_VIDEO_AYCrCb8888,
 	SURFACE_PIXEL_FORMAT_INVALID
 
 	/*grow 444 video here if necessary */
@@ -730,7 +730,7 @@ struct dc_crtc_timing {
 	uint32_t v_front_porch;
 	uint32_t v_sync_width;
 
-	uint32_t pix_clk_khz;
+	uint32_t pix_clk_100hz;
 
 	uint32_t vic;
 	uint32_t hdmi_vic;

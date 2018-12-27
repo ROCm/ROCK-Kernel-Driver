@@ -34,13 +34,11 @@
 #include "nbio/nbio_7_4_offset.h"
 
 MODULE_FIRMWARE("amdgpu/vega20_sos.bin");
-MODULE_FIRMWARE("amdgpu/vega20_sos_old.bin");
+MODULE_FIRMWARE("amdgpu/vega20_asd.bin");
 MODULE_FIRMWARE("amdgpu/vega20_ta.bin");
 
 /* address block */
 #define smnMP1_FIRMWARE_FLAGS		0x3010024
-
-#define VEGA20_BL_VERSION_VAR_NEW 0xA1
 
 static int
 psp_v11_0_get_fw_type(struct amdgpu_firmware_info *ucode, enum psp_gfx_fw_type *type)
@@ -103,8 +101,8 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 	char fw_name[30];
 	int err = 0;
 	const struct psp_firmware_header_v1_0 *sos_hdr;
+	const struct psp_firmware_header_v1_0 *asd_hdr;
 	const struct ta_firmware_header_v1_0 *ta_hdr;
-	uint32_t bl_version;
 
 	DRM_DEBUG("\n");
 
@@ -116,13 +114,7 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 		BUG();
 	}
 
-	bl_version = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_100);
-	bl_version = (bl_version & 0xFF0000) >> 16;
-
-	if (bl_version == VEGA20_BL_VERSION_VAR_NEW)
-		snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos.bin", chip_name);
-	else
-		snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos_old.bin", chip_name);
+	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sos.bin", chip_name);
 	err = request_firmware(&adev->psp.sos_fw, fw_name, adev->dev);
 	if (err)
 		goto out;
@@ -142,14 +134,30 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 	adev->psp.sos_start_addr = (uint8_t *)adev->psp.sys_start_addr +
 				le32_to_cpu(sos_hdr->sos_offset_bytes);
 
+	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_asd.bin", chip_name);
+	err = request_firmware(&adev->psp.asd_fw, fw_name, adev->dev);
+	if (err)
+		goto out1;
+
+	err = amdgpu_ucode_validate(adev->psp.asd_fw);
+	if (err)
+		goto out1;
+
+	asd_hdr = (const struct psp_firmware_header_v1_0 *)adev->psp.asd_fw->data;
+	adev->psp.asd_fw_version = le32_to_cpu(asd_hdr->header.ucode_version);
+	adev->psp.asd_feature_version = le32_to_cpu(asd_hdr->ucode_feature_version);
+	adev->psp.asd_ucode_size = le32_to_cpu(asd_hdr->header.ucode_size_bytes);
+	adev->psp.asd_start_addr = (uint8_t *)asd_hdr +
+				le32_to_cpu(asd_hdr->header.ucode_array_offset_bytes);
+
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_ta.bin", chip_name);
 	err = request_firmware(&adev->psp.ta_fw, fw_name, adev->dev);
 	if (err)
-		goto out;
+		goto out2;
 
 	err = amdgpu_ucode_validate(adev->psp.ta_fw);
 	if (err)
-		goto out;
+		goto out2;
 
 	ta_hdr = (const struct ta_firmware_header_v1_0 *)adev->psp.ta_fw->data;
 	adev->psp.ta_xgmi_ucode_version = le32_to_cpu(ta_hdr->ta_xgmi_ucode_version);
@@ -158,14 +166,18 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 		le32_to_cpu(ta_hdr->header.ucode_array_offset_bytes);
 
 	return 0;
+
+out2:
+	release_firmware(adev->psp.ta_fw);
+	adev->psp.ta_fw = NULL;
+out1:
+	release_firmware(adev->psp.asd_fw);
+	adev->psp.asd_fw = NULL;
 out:
-	if (err) {
-		dev_err(adev->dev,
-			"psp v11.0: Failed to load firmware \"%s\"\n",
-			fw_name);
-		release_firmware(adev->psp.sos_fw);
-		adev->psp.sos_fw = NULL;
-	}
+	dev_err(adev->dev,
+		"psp v11.0: Failed to load firmware \"%s\"\n", fw_name);
+	release_firmware(adev->psp.sos_fw);
+	adev->psp.sos_fw = NULL;
 
 	return err;
 }
@@ -697,7 +709,7 @@ static int psp_v11_0_xgmi_set_topology_info(struct psp_context *psp,
 	return psp_xgmi_invoke(psp, TA_COMMAND_XGMI__SET_TOPOLOGY_INFO);
 }
 
-static u64 psp_v11_0_xgmi_get_hive_id(struct psp_context *psp)
+static int psp_v11_0_xgmi_get_hive_id(struct psp_context *psp, uint64_t *hive_id)
 {
 	struct ta_xgmi_shared_memory *xgmi_cmd;
 	int ret;
@@ -710,12 +722,14 @@ static u64 psp_v11_0_xgmi_get_hive_id(struct psp_context *psp)
 	/* Invoke xgmi ta to get hive id */
 	ret = psp_xgmi_invoke(psp, xgmi_cmd->cmd_id);
 	if (ret)
-		return 0;
-	else
-		return xgmi_cmd->xgmi_out_message.get_hive_id.hive_id;
+		return ret;
+
+	*hive_id = xgmi_cmd->xgmi_out_message.get_hive_id.hive_id;
+
+	return 0;
 }
 
-static u64 psp_v11_0_xgmi_get_node_id(struct psp_context *psp)
+static int psp_v11_0_xgmi_get_node_id(struct psp_context *psp, uint64_t *node_id)
 {
 	struct ta_xgmi_shared_memory *xgmi_cmd;
 	int ret;
@@ -728,9 +742,11 @@ static u64 psp_v11_0_xgmi_get_node_id(struct psp_context *psp)
 	/* Invoke xgmi ta to get the node id */
 	ret = psp_xgmi_invoke(psp, xgmi_cmd->cmd_id);
 	if (ret)
-		return 0;
-	else
-		return xgmi_cmd->xgmi_out_message.get_node_id.node_id;
+		return ret;
+
+	*node_id = xgmi_cmd->xgmi_out_message.get_node_id.node_id;
+
+	return 0;
 }
 
 static const struct psp_funcs psp_v11_0_funcs = {

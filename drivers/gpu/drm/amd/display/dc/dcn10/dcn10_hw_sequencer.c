@@ -95,7 +95,7 @@ void dcn10_log_hubbub_state(struct dc *dc, struct dc_log_buffer_ctx *log_ctx)
 	struct dcn_hubbub_wm wm = {0};
 	int i;
 
-	hubbub1_wm_read_state(dc->res_pool->hubbub, &wm);
+	dc->res_pool->hubbub->funcs->wm_read_state(dc->res_pool->hubbub, &wm);
 
 	DTN_INFO("HUBBUB WM:      data_urgent  pte_meta_urgent"
 			"         sr_enter          sr_exit  dram_clk_change\n");
@@ -2048,7 +2048,7 @@ void update_dchubp_dpp(
 			dc->res_pool->dccg->funcs->update_dpp_dto(
 					dc->res_pool->dccg,
 					dpp->inst,
-					pipe_ctx->plane_res.bw.calc.dppclk_khz);
+					pipe_ctx->plane_res.bw.dppclk_khz);
 		else
 			dc->res_pool->clk_mgr->clks.dppclk_khz = should_divided_by_2 ?
 						dc->res_pool->clk_mgr->clks.dispclk_khz / 2 :
@@ -2125,7 +2125,8 @@ void update_dchubp_dpp(
 		plane_state->update_flags.bits.swizzle_change ||
 		plane_state->update_flags.bits.dcc_change ||
 		plane_state->update_flags.bits.bpp_change ||
-		plane_state->update_flags.bits.scaling_change) {
+		plane_state->update_flags.bits.scaling_change ||
+		plane_state->update_flags.bits.plane_size_change) {
 		hubp->funcs->hubp_program_surface_config(
 			hubp,
 			plane_state->format,
@@ -2158,6 +2159,15 @@ static void dcn10_blank_pixel_data(
 	/* program otg blank color */
 	color_space = stream->output_color_space;
 	color_space_to_black_color(dc, color_space, &black_color);
+
+	/*
+	 * The way 420 is packed, 2 channels carry Y component, 1 channel
+	 * alternate between Cb and Cr, so both channels need the pixel
+	 * value for Y
+	 */
+	if (stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		black_color.color_r_cr = black_color.color_g_y;
+
 
 	if (stream_res->tg->funcs->set_blank_color)
 		stream_res->tg->funcs->set_blank_color(
@@ -2243,13 +2253,11 @@ static void program_all_pipe_in_tree(
 
 	}
 
-	if (pipe_ctx->plane_state != NULL) {
+	if (pipe_ctx->plane_state != NULL)
 		dcn10_program_pipe(dc, pipe_ctx, context);
-	}
 
-	if (pipe_ctx->bottom_pipe != NULL && pipe_ctx->bottom_pipe != pipe_ctx) {
+	if (pipe_ctx->bottom_pipe != NULL && pipe_ctx->bottom_pipe != pipe_ctx)
 		program_all_pipe_in_tree(dc, pipe_ctx->bottom_pipe, context);
-	}
 }
 
 struct pipe_ctx *find_top_pipe_for_stream(
@@ -2348,7 +2356,8 @@ static void dcn10_apply_ctx_for_surface(
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 			/* Skip inactive pipes and ones already updated */
-			if (!pipe_ctx->stream || pipe_ctx->stream == stream)
+			if (!pipe_ctx->stream || pipe_ctx->stream == stream
+					|| !pipe_ctx->plane_state)
 				continue;
 
 			pipe_ctx->stream_res.tg->funcs->lock(pipe_ctx->stream_res.tg);
@@ -2362,7 +2371,8 @@ static void dcn10_apply_ctx_for_surface(
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
-		if (!pipe_ctx->stream || pipe_ctx->stream == stream)
+		if (!pipe_ctx->stream || pipe_ctx->stream == stream
+				|| !pipe_ctx->plane_state)
 			continue;
 
 		dcn10_pipe_control_lock(dc, pipe_ctx, false);
@@ -2514,7 +2524,7 @@ static void dcn10_config_stereo_parameters(
 			timing_3d_format == TIMING_3D_FORMAT_DP_HDMI_INBAND_FA ||
 			timing_3d_format == TIMING_3D_FORMAT_SIDEBAND_FA) {
 			enum display_dongle_type dongle = \
-					stream->sink->link->ddc->dongle_type;
+					stream->link->ddc->dongle_type;
 			if (dongle == DISPLAY_DONGLE_DP_VGA_CONVERTER ||
 				dongle == DISPLAY_DONGLE_DP_DVI_CONVERTER ||
 				dongle == DISPLAY_DONGLE_DP_HDMI_CONVERTER)
@@ -2645,7 +2655,7 @@ static void dcn10_set_cursor_position(struct pipe_ctx *pipe_ctx)
 	struct hubp *hubp = pipe_ctx->plane_res.hubp;
 	struct dpp *dpp = pipe_ctx->plane_res.dpp;
 	struct dc_cursor_mi_param param = {
-		.pixel_clk_khz = pipe_ctx->stream->timing.pix_clk_khz,
+		.pixel_clk_khz = pipe_ctx->stream->timing.pix_clk_100hz / 10,
 		.ref_clk_khz = pipe_ctx->stream->ctx->dc->res_pool->ref_clock_inKhz,
 		.viewport = pipe_ctx->plane_res.scl_data.viewport,
 		.h_scale_ratio = pipe_ctx->plane_res.scl_data.ratios.horz,

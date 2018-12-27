@@ -617,12 +617,11 @@ dce110_set_output_transfer_func(struct pipe_ctx *pipe_ctx,
 static enum dc_status bios_parser_crtc_source_select(
 		struct pipe_ctx *pipe_ctx)
 {
-	struct dc_bios *dcb;
+	struct dc_bios *dcb = pipe_ctx->stream->ctx->dc_bios;
 	/* call VBIOS table to set CRTC source for the HW
 	 * encoder block
 	 * note: video bios clears all FMT setting here. */
 	struct bp_crtc_source_select crtc_source_select = {0};
-	const struct dc_sink *sink = pipe_ctx->stream->sink;
 
 	crtc_source_select.engine_id = pipe_ctx->stream_res.stream_enc->id;
 	crtc_source_select.controller_id = pipe_ctx->stream_res.tg->inst + 1;
@@ -651,8 +650,6 @@ static enum dc_status bios_parser_crtc_source_select(
 		crtc_source_select.display_output_bit_depth = PANEL_8BIT_COLOR;
 		break;
 	}
-
-	dcb = sink->ctx->dc_bios;
 
 	if (BP_RESULT_OK != dcb->funcs->crtc_source_select(
 		dcb,
@@ -692,10 +689,10 @@ void dce110_update_info_frame(struct pipe_ctx *pipe_ctx)
 void dce110_enable_stream(struct pipe_ctx *pipe_ctx)
 {
 	enum dc_lane_count lane_count =
-		pipe_ctx->stream->sink->link->cur_link_settings.lane_count;
+		pipe_ctx->stream->link->cur_link_settings.lane_count;
 
 	struct dc_crtc_timing *timing = &pipe_ctx->stream->timing;
-	struct dc_link *link = pipe_ctx->stream->sink->link;
+	struct dc_link *link = pipe_ctx->stream->link;
 
 
 	uint32_t active_total_with_borders;
@@ -1048,7 +1045,7 @@ void dce110_disable_audio_stream(struct pipe_ctx *pipe_ctx, int option)
 void dce110_disable_stream(struct pipe_ctx *pipe_ctx, int option)
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct dc_link *link = stream->sink->link;
+	struct dc_link *link = stream->link;
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
 
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
@@ -1073,11 +1070,11 @@ void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 {
 	struct encoder_unblank_param params = { { 0 } };
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct dc_link *link = stream->sink->link;
+	struct dc_link *link = stream->link;
 
 	/* only 3 items below are used by unblank */
 	params.pixel_clk_khz =
-		pipe_ctx->stream->timing.pix_clk_khz;
+		pipe_ctx->stream->timing.pix_clk_100hz / 10;
 	params.link_settings.link_rate = link_settings->link_rate;
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
@@ -1090,7 +1087,7 @@ void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
 void dce110_blank_stream(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
-	struct dc_link *link = stream->sink->link;
+	struct dc_link *link = stream->link;
 
 	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {
 		link->dc->hwss.edp_backlight_control(link, false);
@@ -1163,27 +1160,27 @@ static void build_audio_output(
 			stream->timing.flags.INTERLACE;
 
 	audio_output->crtc_info.refresh_rate =
-		(stream->timing.pix_clk_khz*1000)/
+		(stream->timing.pix_clk_100hz*10000)/
 		(stream->timing.h_total*stream->timing.v_total);
 
 	audio_output->crtc_info.color_depth =
 		stream->timing.display_color_depth;
 
 	audio_output->crtc_info.requested_pixel_clock =
-			pipe_ctx->stream_res.pix_clk_params.requested_pix_clk;
+			pipe_ctx->stream_res.pix_clk_params.requested_pix_clk_100hz / 10;
 
 	audio_output->crtc_info.calculated_pixel_clock =
-			pipe_ctx->stream_res.pix_clk_params.requested_pix_clk;
+			pipe_ctx->stream_res.pix_clk_params.requested_pix_clk_100hz / 10;
 
 /*for HDMI, audio ACR is with deep color ratio factor*/
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal) &&
 		audio_output->crtc_info.requested_pixel_clock ==
-				stream->timing.pix_clk_khz) {
+				(stream->timing.pix_clk_100hz / 10)) {
 		if (pipe_ctx->stream_res.pix_clk_params.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
 			audio_output->crtc_info.requested_pixel_clock =
 					audio_output->crtc_info.requested_pixel_clock/2;
 			audio_output->crtc_info.calculated_pixel_clock =
-					pipe_ctx->stream_res.pix_clk_params.requested_pix_clk/2;
+					pipe_ctx->stream_res.pix_clk_params.requested_pix_clk_100hz/20;
 
 		}
 	}
@@ -1267,10 +1264,19 @@ static void program_scaler(const struct dc *dc,
 		pipe_ctx->plane_res.scl_data.lb_params.depth,
 		&pipe_ctx->stream->bit_depth_params);
 
-	if (pipe_ctx->stream_res.tg->funcs->set_overscan_blank_color)
+	if (pipe_ctx->stream_res.tg->funcs->set_overscan_blank_color) {
+		/*
+		 * The way 420 is packed, 2 channels carry Y component, 1 channel
+		 * alternate between Cb and Cr, so both channels need the pixel
+		 * value for Y
+		 */
+		if (pipe_ctx->stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
+			color.color_r_cr = color.color_g_y;
+
 		pipe_ctx->stream_res.tg->funcs->set_overscan_blank_color(
 				pipe_ctx->stream_res.tg,
 				&color);
+	}
 
 	pipe_ctx->plane_res.xfm->funcs->transform_set_scaler(pipe_ctx->plane_res.xfm,
 		&pipe_ctx->plane_res.scl_data);
@@ -1399,7 +1405,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 	pipe_ctx->plane_res.scl_data.lb_params.alpha_en = pipe_ctx->bottom_pipe != 0;
 
-	pipe_ctx->stream->sink->link->psr_enabled = false;
+	pipe_ctx->stream->link->psr_enabled = false;
 
 	return DC_OK;
 }
@@ -1615,8 +1621,8 @@ static uint32_t compute_pstate_blackout_duration(
 	pstate_blackout_duration_ns = 1000 * blackout_duration.value >> 24;
 
 	total_dest_line_time_ns = 1000000UL *
-		stream->timing.h_total /
-		stream->timing.pix_clk_khz +
+		(stream->timing.h_total * 10) /
+		stream->timing.pix_clk_100hz +
 		pstate_blackout_duration_ns;
 
 	return total_dest_line_time_ns;
@@ -1804,18 +1810,15 @@ static bool should_enable_fbc(struct dc *dc,
 	if (i == dc->res_pool->pipe_count)
 		return false;
 
-	if (!pipe_ctx->stream->sink)
-		return false;
-
-	if (!pipe_ctx->stream->sink->link)
+	if (!pipe_ctx->stream->link)
 		return false;
 
 	/* Only supports eDP */
-	if (pipe_ctx->stream->sink->link->connector_signal != SIGNAL_TYPE_EDP)
+	if (pipe_ctx->stream->link->connector_signal != SIGNAL_TYPE_EDP)
 		return false;
 
 	/* PSR should not be enabled */
-	if (pipe_ctx->stream->sink->link->psr_enabled)
+	if (pipe_ctx->stream->link->psr_enabled)
 		return false;
 
 	/* Nothing to compress */
@@ -2564,7 +2567,7 @@ static void dce110_apply_ctx_for_surface(
 				pipe_ctx->plane_res.mi,
 				pipe_ctx->stream->timing.h_total,
 				pipe_ctx->stream->timing.v_total,
-				pipe_ctx->stream->timing.pix_clk_khz,
+				pipe_ctx->stream->timing.pix_clk_100hz / 10,
 				context->stream_count);
 
 		dce110_program_front_end_for_pipe(dc, pipe_ctx);
@@ -2619,7 +2622,7 @@ void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 	struct input_pixel_processor *ipp = pipe_ctx->plane_res.ipp;
 	struct mem_input *mi = pipe_ctx->plane_res.mi;
 	struct dc_cursor_mi_param param = {
-		.pixel_clk_khz = pipe_ctx->stream->timing.pix_clk_khz,
+		.pixel_clk_khz = pipe_ctx->stream->timing.pix_clk_100hz / 10,
 		.ref_clk_khz = pipe_ctx->stream->ctx->dc->res_pool->ref_clock_inKhz,
 		.viewport = pipe_ctx->plane_res.scl_data.viewport,
 		.h_scale_ratio = pipe_ctx->plane_res.scl_data.ratios.horz,

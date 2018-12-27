@@ -90,6 +90,7 @@ struct i2caux *dal_i2caux_create(
 	case DCE_VERSION_10_0:
 		return dal_i2caux_dce100_create(ctx);
 	case DCE_VERSION_12_0:
+	case DCE_VERSION_12_1:
 		return dal_i2caux_dce120_create(ctx);
 #ifdef CONFIG_X86
 	case DCN_VERSION_1_0:

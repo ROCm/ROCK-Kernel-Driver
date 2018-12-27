@@ -70,13 +70,12 @@ void dp_enable_link_phy(
 	 */
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (pipes[i].stream != NULL &&
-			pipes[i].stream->sink != NULL &&
-			pipes[i].stream->sink->link == link) {
+			pipes[i].stream->link == link) {
 			if (pipes[i].clock_source != NULL &&
 					pipes[i].clock_source->id != CLOCK_SOURCE_ID_DP_DTO) {
 				pipes[i].clock_source = dp_cs;
-				pipes[i].stream_res.pix_clk_params.requested_pix_clk =
-						pipes[i].stream->timing.pix_clk_khz;
+				pipes[i].stream_res.pix_clk_params.requested_pix_clk_100hz =
+						pipes[i].stream->timing.pix_clk_100hz;
 				pipes[i].clock_source->funcs->program_pix_clk(
 							pipes[i].clock_source,
 							&pipes[i].stream_res.pix_clk_params,
@@ -96,6 +95,7 @@ void dp_enable_link_phy(
 						link_settings,
 						clock_source);
 	}
+	link->cur_link_settings = *link_settings;
 
 	dp_receiver_power_ctrl(link, true);
 }
@@ -278,10 +278,8 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 	for (i = 0; i < MAX_PIPES; i++) {
 		if (pipes[i].stream != NULL &&
 			!pipes[i].top_pipe &&
-			pipes[i].stream->sink != NULL &&
-			pipes[i].stream->sink->link != NULL &&
-			pipes[i].stream_res.stream_enc != NULL &&
-			pipes[i].stream->sink->link == link) {
+			pipes[i].stream->link != NULL &&
+			pipes[i].stream_res.stream_enc != NULL) {
 			udelay(100);
 
 			pipes[i].stream_res.stream_enc->funcs->dp_blank(
@@ -307,6 +305,7 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 						link->link_enc,
 						link_setting,
 						pipes[i].clock_source->id);
+			link->cur_link_settings = *link_setting;
 
 			dp_receiver_power_ctrl(link, true);
 
@@ -316,7 +315,6 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 					skip_video_pattern,
 					LINK_TRAINING_ATTEMPTS);
 
-			link->cur_link_settings = *link_setting;
 
 			link->dc->hwss.enable_stream(&pipes[i]);
 
