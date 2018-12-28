@@ -295,6 +295,7 @@ struct dm_connector_state {
 	uint8_t underscan_hborder;
 	uint8_t max_bpc;
 	bool underscan_enable;
+	bool freesync_enable;
 	bool freesync_capable;
 	uint8_t abm_level;
 };

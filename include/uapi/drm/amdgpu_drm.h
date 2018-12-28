@@ -58,6 +58,8 @@ extern "C" {
 
 /* hybrid specific ioctls */
 #define DRM_AMDGPU_SEM			0x5b
+/* not upstream */
+#define DRM_AMDGPU_FREESYNC	        0x5d
 
 #define DRM_IOCTL_AMDGPU_GEM_CREATE	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_CREATE, union drm_amdgpu_gem_create)
 #define DRM_IOCTL_AMDGPU_GEM_MMAP	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_MMAP, union drm_amdgpu_gem_mmap)
@@ -75,6 +77,7 @@ extern "C" {
 #define DRM_IOCTL_AMDGPU_VM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_VM, union drm_amdgpu_vm)
 #define DRM_IOCTL_AMDGPU_FENCE_TO_HANDLE DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FENCE_TO_HANDLE, union drm_amdgpu_fence_to_handle)
 #define DRM_IOCTL_AMDGPU_SCHED		DRM_IOW(DRM_COMMAND_BASE + DRM_AMDGPU_SCHED, union drm_amdgpu_sched)
+#define DRM_IOCTL_AMDGPU_FREESYNC	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_FREESYNC, struct drm_amdgpu_freesync)
 
 #define DRM_IOCTL_AMDGPU_GEM_DGMA	DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_GEM_DGMA, struct drm_amdgpu_gem_dgma)
 
@@ -1086,6 +1089,19 @@ struct drm_amdgpu_virtual_range {
 struct drm_amdgpu_capability {
 	__u32 flag;
 	__u32 direct_gma_size;
+};
+
+/*
+ * Definition of free sync enter and exit signals
+ * We may have more options in the future
+ */
+#define AMDGPU_FREESYNC_FULLSCREEN_ENTER		1
+#define AMDGPU_FREESYNC_FULLSCREEN_EXIT 		2
+
+struct drm_amdgpu_freesync {
+	__u32 op;			/* AMDGPU_FREESYNC_FULLSCREEN_ENTER or */
+				        /* AMDGPU_FREESYNC_FULLSCREEN_ENTER */
+	__u32 spare[7];
 };
 
 #if defined(__cplusplus)
