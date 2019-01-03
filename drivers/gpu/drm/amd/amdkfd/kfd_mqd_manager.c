@@ -45,28 +45,6 @@ int pipe_priority_map[] = {
 	KFD_PIPE_PRIORITY_CS_HIGH
 };
 
-/* Mapping queue priority to SPI priority, indexed by queue priority
- * SPI priority 2 and 3 are reserved for trap handler context save
- */
-int spi_priority_map[] = {
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_EXTRA_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW,
-	KFD_SPI_PRIORITY_LOW
-};
-
 struct kfd_mem_obj *allocate_hiq_mqd(struct kfd_dev *dev)
 {
 	struct kfd_mem_obj *mqd_mem_obj = NULL;

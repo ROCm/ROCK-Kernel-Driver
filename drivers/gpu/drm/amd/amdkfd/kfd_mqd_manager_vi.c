@@ -112,10 +112,6 @@ static void set_priority(struct vi_mqd *m, struct queue_properties *q)
 {
 	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
 	m->cp_hqd_queue_priority = q->priority;
-	m->compute_pgm_rsrc1 = (m->compute_pgm_rsrc1 &
-				(~COMPUTE_PGM_RSRC1__PRIORITY_MASK)) |
-				(spi_priority_map[q->priority] <<
-				COMPUTE_PGM_RSRC1__PRIORITY__SHIFT);
 }
 
 static struct kfd_mem_obj *allocate_mqd(struct kfd_dev *kfd,
