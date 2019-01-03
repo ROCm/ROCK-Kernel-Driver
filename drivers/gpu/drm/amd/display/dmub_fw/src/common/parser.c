@@ -22,36 +22,44 @@
  * Authors: AMD
  *
  */
-#ifndef DMUB_COMMON_H_
-#define DMUB_COMMON_H_
+#include "dmub_dc.h"
+#include "..\..\dc\dmub_cmd.h"
+#include "dmub_common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+static void read_modify_write(struct dmub *dmub, union dmub_rb_cmd *cmd)
+{
+	int32_t reg_count =
+			cmd->read_modify_write.header.payload_bytes / sizeof(struct read_modify_write_sequence);
+	int32_t i;
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-struct dmub_dc_cmd;
+	for (i = 0; i < reg_count; i++) {
+		uint32_t addr = cmd->read_modify_write.seq[i].addr;
+		uint32_t mask = cmd->read_modify_write.seq[i].modify_mask;
+		uint32_t value = cmd->read_modify_write.seq[i].modify_value;
+		uint32_t reg_val = dmub->reg_read(dmub, addr);
 
-struct dmub {
-	void *ctx;
-	void (*reg_write)(struct dmub *dmub, uint32_t offset, uint32_t value);
-	uint32_t (*reg_read)(struct dmub *dmub, uint32_t offset);
-	void (*dequeque)();
-};
+		reg_val = (reg_val & ~mask) | value;
 
-#define mmRegWrite(offset, value)
-#define mmRegRead(offset)
-#endif
+		dmub->reg_write(dmub, addr, reg_val);
+	}
+}
 
 void process_ring_buffer_command(
 		struct dmub *dmub,
-		struct dmub_dc_cmd *dc_cmd);
-void ring_buffer_command_dequeue(
-		struct dmub_dc_cmd *dmub_cmd,
-		union dmub_rb_cmd *cmd);
+		struct dmub_dc_cmd *dc_cmd)
+{
+	union dmub_rb_cmd cmd;
 
-#ifdef __cplusplus
+	ring_buffer_command_dequeue(dc_cmd, &cmd);
+
+	switch (cmd.cmd_common.header.type) {
+	case DMUB_CMD__REG_SEQ_READ_MODIFY_WRITE:
+		read_modify_write(dmub, &cmd);
+		break;
+	case DMUB_CMD__REG_SEQ_BURST_WRITE:
+		break;
+	default:
+		break;
+	}
 }
-#endif
 
-#endif /* DMUB_COMMON_H_ */
