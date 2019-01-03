@@ -644,11 +644,11 @@ MODULE_PARM_DESC(ignore_crat,
 
 /**
  * DOC: noretry (int)
- * This parameter sets sh_mem_config.retry_disable. Default value, 0, enables retry.
- * Setting 1 disables retry.
+ * This parameter sets sh_mem_config.retry_disable. Default value, 1, disable retry.
+ * Setting 0 enables retry.
  * Retry is needed for recoverable page faults.
  */
-int noretry;
+int noretry = 1;
 module_param(noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
 	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
