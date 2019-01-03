@@ -31,6 +31,8 @@
 #include "hw_sequencer.h"
 #include "dce/dce_hwseq.h"
 
+#include "reg_helper.h"
+
 #include "resource.h"
 
 #include "clock_source.h"
@@ -57,8 +59,12 @@
 
 #include "dce/dce_i2c.h"
 
+#define CTX \
+	dc->ctx
+
 #define DC_LOGGER \
-	dc->ctx->logger
+	CTX->logger
+
 
 const static char DC_BUILD_ID[] = "production-build";
 
@@ -668,6 +674,7 @@ static bool construct(struct dc *dc,
 	dc_ctx->asic_id = init_params->asic_id;
 	dc_ctx->dc_sink_id_count = 0;
 	dc_ctx->dc_stream_id_count = 0;
+
 	dc->ctx = dc_ctx;
 
 	dc->current_state = dc_create_state();
@@ -833,6 +840,11 @@ alloc_fail:
 void dc_init_callbacks(struct dc *dc,
 		const struct dc_callback_init *init_params)
 {
+
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+	dc->ctx->dmub_if = init_params->dmub_if;
+	dc->ctx->reg_helper_offload = init_params->dmub_offload;
+#endif
 }
 
 void dc_destroy(struct dc **dc)
@@ -1769,7 +1781,6 @@ static void commit_planes_for_stream(struct dc *dc,
 					dc->hwss.update_plane_addr(dc, pipe_ctx);
 			}
 		}
-
 		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 	}
 }

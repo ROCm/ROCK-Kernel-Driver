@@ -29,6 +29,9 @@
 #include "dc_types.h"
 #include "grph_object_defs.h"
 #include "logger_types.h"
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+#include "dmub_dc.h"
+#endif
 #include "gpio_types.h"
 #include "link_service_types.h"
 #include "grph_object_ctrl_defs.h"
@@ -349,12 +352,23 @@ struct dc_init_data {
 	struct dc_bios *vbios_override;
 	enum dce_environment dce_environment;
 
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+	struct dmub_offload_funcs *dmub_if;
+	struct dc_reg_helper_state *dmub_offload;
+#endif
 	struct dc_config flags;
 	uint32_t log_mask;
 };
 
 struct dc_callback_init {
+
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+	struct dmub_offload_funcs *dmub_if;
+	struct dc_reg_helper_state *dmub_offload;
+#endif
+
 	uint8_t reserved;
+
 };
 
 struct dc *dc_create(const struct dc_init_data *init_params);

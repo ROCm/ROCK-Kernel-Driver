@@ -33,6 +33,10 @@
 #include "dal_types.h"
 #include "grph_object_defs.h"
 
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+#include "dmub_dc.h"
+#endif
+
 /* forward declarations */
 struct dc_plane_state;
 struct dc_stream_state;
@@ -100,6 +104,11 @@ struct dc_context {
 	uint32_t dc_sink_id_count;
 	uint32_t dc_stream_id_count;
 	uint64_t fbc_gpu_addr;
+
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+	struct dc_reg_helper_state *reg_helper_offload;
+	struct dmub_offload_funcs *dmub_if;
+#endif
 };
 
 

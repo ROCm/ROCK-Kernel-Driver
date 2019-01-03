@@ -29,6 +29,25 @@
 #include "dm_services.h"
 #include <stdarg.h>
 
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+#include "dmub_dc.h"
+
+static inline void submit_dmub_read_modify_write(
+	struct dc_reg_helper_state *offload,
+	const struct dc_context *ctx)
+{
+	struct dmub_rb_cmd_read_modify_write *cmd_buf = &offload->cmd_data.read_modify_write;
+	struct dmub_offload_funcs *dmub_if = ctx->dmub_if;
+
+	cmd_buf->header.type = DMUB_CMD__REG_SEQ_READ_MODIFY_WRITE;
+	cmd_buf->header.payload_bytes = sizeof(struct read_modify_write_sequence) * offload->reg_seq_count;
+
+	dmub_if->queue_dmub_cmd(&dmub_if->dmub_cmd, &cmd_buf->header);
+
+	offload->reg_seq_count = 0;
+}
+#endif
+
 struct dc_reg_value_masks {
 	uint32_t value;
 	uint32_t mask;
@@ -78,6 +97,28 @@ uint32_t generic_reg_update_ex(const struct dc_context *ctx,
 	}
 	va_end(ap);
 
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+	if (ctx->reg_helper_offload && ctx->reg_helper_offload->gather_in_progress) {
+
+		struct dc_reg_helper_state *offload = ctx->reg_helper_offload;
+		struct dmub_rb_cmd_read_modify_write *cmd_buf = &offload->cmd_data.read_modify_write;
+		struct read_modify_write_sequence *seq;
+
+		/* flush command if buffer is full */
+		if (offload->reg_seq_count == DMUB_READ_MODIFY_WRITE_SEQ__MAX)
+			submit_dmub_read_modify_write(offload, ctx);
+
+		/* pack commands */
+		seq = &cmd_buf->seq[offload->reg_seq_count];
+
+		seq->addr = addr;
+		seq->modify_mask = field_value_mask.mask;
+		seq->modify_value = field_value_mask.value;
+		offload->reg_seq_count++;
+
+		return reg_val;  /* todo: return void so we can decouple code running in driver from register states */
+	}
+#endif
 
 	/* mmio write directly */
 	reg_val = (reg_val & ~field_value_mask.mask) | field_value_mask.value;
@@ -329,3 +370,41 @@ uint32_t generic_indirect_reg_update_ex(const struct dc_context *ctx,
 
 	return reg_val;
 }
+
+#ifdef CONFIG_DRM_AMD_DC_DMUB
+void reg_sequence_start_gather(const struct dc_context *ctx)
+{
+	/* if reg sequence is supported and enabled, set flag to
+	 * indicate we want to have REG_SET, REG_UPDATE macro build
+	 * reg sequence command buffer rather than MMIO directly.
+	 */
+
+	if (ctx->reg_helper_offload) {
+		struct dc_reg_helper_state *offload = ctx->reg_helper_offload;
+
+		/* caller sequence mismatch.  need to debug caller.  offload will not work!!! */
+		ASSERT(!offload->gather_in_progress);
+
+		offload->gather_in_progress = true;
+	}
+}
+
+void reg_sequence_start_execute(const struct dc_context *ctx)
+{
+	struct dc_reg_helper_state *offload = ctx->reg_helper_offload;
+
+	if (offload && offload->gather_in_progress) {
+
+		submit_dmub_read_modify_write(offload, ctx);
+
+		offload->gather_in_progress = false;
+
+		ctx->dmub_if->execute_dmub_queue(&ctx->dmub_if->dmub_cmd);
+	}
+}
+
+void reg_sequence_wait_done(const struct dc_context *ctx)
+{
+	/* callback to DM to poll for last submission done*/
+}
+#endif
