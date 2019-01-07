@@ -8725,6 +8725,7 @@ skip_modeset:
 	if (!(enable && aconnector && new_crtc_state->enable &&
 	      new_crtc_state->active))
 		return 0;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	/*
 	 * Given above conditions, the dc state cannot be NULL because:
 	 * 1. We're in the process of enabling CRTCs (just been added
@@ -8757,6 +8758,7 @@ skip_modeset:
 			goto fail;
 #endif
 	}
+#endif
 
 	/* Update Freesync settings. */
 	get_freesync_config_for_crtc(dm_new_crtc_state,
