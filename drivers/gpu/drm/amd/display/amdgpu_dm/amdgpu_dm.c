@@ -7212,7 +7212,6 @@ skip_modeset:
 	if (new_stream)
 		 dc_stream_release(new_stream);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	/*
 	 * We want to do dc stream updates that do not require a
 	 * full modeset below.
@@ -7220,6 +7219,7 @@ skip_modeset:
 	if (!(enable && aconnector && new_crtc_state->enable &&
 	      new_crtc_state->active))
 		return 0;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	/*
 	 * Given above conditions, the dc state cannot be NULL because:
 	 * 1. We're in the process of enabling CRTCs (just been added
