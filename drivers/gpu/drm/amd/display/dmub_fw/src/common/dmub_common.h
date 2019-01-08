@@ -30,6 +30,7 @@ extern "C" {
 #endif
 
 #ifdef CONFIG_DRM_AMD_DC_DMUB
+#include "os_types.h"
 struct dmub_dc_cmd;
 
 struct dmub {

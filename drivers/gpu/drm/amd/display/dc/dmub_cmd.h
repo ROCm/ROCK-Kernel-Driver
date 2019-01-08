@@ -26,7 +26,12 @@
 #ifndef DMUB_CMD__H
 #define DMUB_CMD__H
 
+
+#ifdef CONFIG_DRM_AMD_DC_DMUB
 #include "os_types.h"
+#else
+#include "dmub_types.h"
+#endif
 /*
  * DMUB command definition
  */
