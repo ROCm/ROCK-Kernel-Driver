@@ -47,6 +47,7 @@
 #include "dce/dce_6_0_d.h"
 #include "uvd/uvd_4_0_d.h"
 #include "bif/bif_3_0_d.h"
+#include "bif/bif_3_0_sh_mask.h"
 
 static const u32 tahiti_golden_registers[] =
 {
