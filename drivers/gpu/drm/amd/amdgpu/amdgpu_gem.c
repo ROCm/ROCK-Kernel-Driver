@@ -380,7 +380,11 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 	return 0;
 
 free_pages:
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
+	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages, false);
+#else
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
+#endif
 
 release_object:
 	kcl_drm_gem_object_put_unlocked(gobj);

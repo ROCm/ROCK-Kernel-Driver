@@ -103,6 +103,7 @@ m4_include([m4/drm-calc-vbltimestamp-from-scanoutpos.m4])
 m4_include([m4/request-firmware-direct.m4])
 m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/mmu-notifier-call-srcu.m4])
+m4_include([m4/mm-release-pages.m4])
 m4_include([m4/config.m4])
 
 
