@@ -867,8 +867,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	return 0;
 
 release_pages:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 	release_pages(pages, pinned, 0);
 #else
 	release_pages(pages, pinned);

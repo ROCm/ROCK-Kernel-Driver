@@ -653,8 +653,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				/* We acquired a page array, but somebody
 				 * invalidated it. Free it and try again
 				 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
@@ -792,8 +791,8 @@ error_free_pages:
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
 		if (!e->user_pages)
 			continue;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages, false);
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
