@@ -568,13 +568,7 @@ bool drm_is_current_master(struct drm_file *fpriv)
 EXPORT_SYMBOL(drm_is_current_master);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
-{
-	dev_printk(KERN_INFO, p->arg, "[" DRM_NAME "] %pV", vaf);
-}
-EXPORT_SYMBOL(__drm_printfn_info);
-
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 void drm_printf(struct drm_printer *p, const char *f, ...)
 {
 	struct va_format vaf;
@@ -587,6 +581,14 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 	va_end(args);
 }
 EXPORT_SYMBOL(drm_printf);
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
+{
+	dev_printk(KERN_INFO, p->arg, "[" DRM_NAME "] %pV", vaf);
+}
+EXPORT_SYMBOL(__drm_printfn_info);
 
 static void drm_atomic_crtc_print_state(struct drm_printer *p,
 		const struct drm_crtc_state *state)
@@ -714,6 +716,13 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 EXPORT_SYMBOL(drm_state_dump);
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
+{
+       pr_debug("%s %pV", p->prefix, vaf);
+}
+EXPORT_SYMBOL(__drm_printfn_debug);
+#endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
 u64 drm_get_max_iomem(void)

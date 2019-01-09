@@ -251,7 +251,6 @@ struct pp_hwmgr_func {
 	uint32_t (*get_sclk)(struct pp_hwmgr *hwmgr, bool low);
 	int (*power_state_set)(struct pp_hwmgr *hwmgr,
 						const void *state);
-	int (*enable_clock_power_gating)(struct pp_hwmgr *hwmgr);
 	int (*notify_smc_display_config_after_ps_adjustment)(struct pp_hwmgr *hwmgr);
 	int (*pre_display_config_changed)(struct pp_hwmgr *hwmgr);
 	int (*display_config_changed)(struct pp_hwmgr *hwmgr);
@@ -705,7 +704,7 @@ enum PP_TABLE_VERSION {
 /**
  * The main hardware manager structure.
  */
-#define Workload_Policy_Max 5
+#define Workload_Policy_Max 6
 
 struct pp_hwmgr {
 	void *adev;

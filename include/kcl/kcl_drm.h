@@ -500,6 +500,14 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+struct drm_printer {
+	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
+	void *arg;
+	const char *prefix;
+};
+#endif
+
 #if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 #define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
 #define DRM_MODE_ARG(m)	\
@@ -542,14 +550,8 @@ drm_plane_state_dest(const struct drm_plane_state *state)
 	return dest;
 }
 
-struct drm_printer {
-	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
-	void *arg;
-};
-
 void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
 void drm_printf(struct drm_printer *p, const char *f, ...);
-
 static inline struct drm_printer drm_info_printer(struct device *dev)
 {
 	struct drm_printer p = {
@@ -561,6 +563,26 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
+/**
+ * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
+ * @prefix: debug output prefix
+ *
+ * RETURNS:
+ * The &drm_printer object
+ */
+static inline struct drm_printer drm_debug_printer(const char *prefix)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_debug,
+		.prefix = prefix
+	};
+	return p;
+}
+#endif
+
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
