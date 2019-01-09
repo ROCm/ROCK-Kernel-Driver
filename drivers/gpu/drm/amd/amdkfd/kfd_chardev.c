@@ -2194,6 +2194,48 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 
 }
 
+static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
+			      struct kfd_process *p, struct kgd_mem **mem)
+{
+	int ret;
+	struct kfd_process_device *pdd = NULL;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_WRITABLE |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	if (!mem || !size || !p || !kdev)
+		return -EINVAL;
+
+	*mem = NULL;
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(kdev, p);
+	if (!pdd) {
+		mutex_unlock(&p->mutex);
+		pr_err("Process device data doesn't exist\n");
+		return -EINVAL;
+	}
+
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
+						      pdd->vm, NULL,
+						      mem, NULL, flags);
+	mutex_unlock(&p->mutex);
+	if (ret) {
+		pr_err("Failed to create shadow system BO %d\n", ret);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
+{
+	if (!mem)
+		return -EINVAL;
+
+	/* param adev is not used*/
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem);
+}
+
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
  * respective offset.
  * @si: Source iter
@@ -2205,14 +2247,15 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
  */
 static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 			int cma_write, uint64_t size,
-			struct dma_fence **f, uint64_t *copied)
+			struct dma_fence **f, uint64_t *copied,
+			struct kgd_mem **tmp_mem)
 {
 	int err = 0;
 	struct kfd_bo *dst_bo = di->cur_bo, *src_bo = si->cur_bo;
 	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
 	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
 	struct kfd_dev *dev = dst_bo->dev;
-	struct cma_system_bo *tmp_bo = NULL;
+	int d2d = 0;
 
 	*copied = 0;
 	if (f)
@@ -2257,12 +2300,28 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM &&
 		    dst_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
 			dev = dst_bo->dev;
-			err = kfd_create_cma_system_bo(src_bo->dev, src_bo,
-						       &size, si->bo_offset,
-						       cma_write, si->p,
-						       si->mm, si->task,
-						       &tmp_bo);
-			src_mem = tmp_bo->mem;
+			size = min_t(uint64_t, size, MAX_SYSTEM_BO_SIZE);
+			d2d = 1;
+
+			if (*tmp_mem == NULL) {
+				if (kfd_create_kgd_mem(src_bo->dev,
+							MAX_SYSTEM_BO_SIZE,
+							si->p,
+							tmp_mem))
+					return -EINVAL;
+			}
+
+			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->kgd,
+						src_bo->mem, si->bo_offset,
+						*tmp_mem, 0,
+						size, f, &size))
+				/* tmp_mem will be freed in caller.*/
+				return -EINVAL;
+
+			kfd_cma_fence_wait(*f);
+			dma_fence_put(*f);
+
+			src_mem = *tmp_mem;
 			src_offset = 0;
 		} else if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 			dev = src_bo->dev;
@@ -2281,14 +2340,12 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	 * delete. Also since multiple GPUs are involved the copies are
 	 * currently not pipelined.
 	 */
-	if (tmp_bo) {
+	if (*tmp_mem && d2d) {
 		if (!err) {
 			kfd_cma_fence_wait(*f);
 			dma_fence_put(*f);
 			*f = NULL;
 		}
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, tmp_bo->mem);
-		kfree(tmp_bo);
 	}
 	return err;
 }
@@ -2301,7 +2358,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
  */
 static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 				 bool cma_write, struct dma_fence **f,
-				 uint64_t *copied)
+				 uint64_t *copied, struct kgd_mem **tmp_mem)
 {
 	int err = 0;
 	uint64_t copy_size, n;
@@ -2320,7 +2377,8 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 
 		copy_size = min(size, (di->array->size - di->offset));
 
-		err = kfd_copy_bos(si, di, cma_write, copy_size, &fence, &n);
+		err = kfd_copy_bos(si, di, cma_write, copy_size,
+				&fence, &n, tmp_mem);
 		if (err) {
 			pr_err("CMA %d failed\n", err);
 			break;
@@ -2365,6 +2423,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	struct cma_iter di, si;
 	const char *cma_op;
 	int err = 0;
+	struct kgd_mem *tmp_mem = NULL;
 
 	/* Check parameters */
 	if (args->src_mem_range_array == 0 || args->dst_mem_range_array == 0 ||
@@ -2465,7 +2524,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 		err = kfd_copy_single_range(&si, &di,
 					KFD_IS_CROSS_MEMORY_WRITE(args->flags),
-					&fence, &copied);
+					&fence, &copied, &tmp_mem);
 		total_copied += copied;
 
 		if (err)
@@ -2490,6 +2549,9 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		if (err)
 			pr_err("CMA %s failed. BO timed out\n", cma_op);
 	}
+
+	if (tmp_mem)
+		kfd_destroy_kgd_mem(tmp_mem);
 
 	kfd_free_cma_bos(&si);
 	kfd_free_cma_bos(&di);
