@@ -6564,7 +6564,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 21, 0)
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed &&
-		    !new_crtc_state->vrr_enabled)
+		    old_crtc_state->vrr_enabled == new_crtc_state->vrr_enabled)
 #elif DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed &&
