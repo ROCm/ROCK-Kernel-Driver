@@ -7180,10 +7180,11 @@ static int dm_update_plane_state(struct dc *dc,
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 static int
-dm_determine_update_type_for_commit(struct dc *dc,
+dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				    struct drm_atomic_state *state,
 				    enum surface_update_type *out_type)
 {
+	struct dc *dc = dm->dc;
 	struct dm_atomic_state *dm_state = NULL, *old_dm_state = NULL;
 	int i, j, num_plane, ret = 0;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
@@ -7197,14 +7198,12 @@ dm_determine_update_type_for_commit(struct dc *dc,
 	struct dc_stream_status *status = NULL;
 
 	struct dc_surface_update *updates;
-	struct dc_plane_state *surface;
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 
 	updates = kcalloc(MAX_SURFACES, sizeof(*updates), GFP_KERNEL);
-	surface = kcalloc(MAX_SURFACES, sizeof(*surface), GFP_KERNEL);
 
-	if (!updates || !surface) {
-		DRM_ERROR("Plane or surface update failed to allocate");
+	if (!updates) {
+		DRM_ERROR("Failed to allocate plane updates\n");
 		/* Set type to FULL to avoid crashing in DC*/
 		update_type = UPDATE_TYPE_FULL;
 		goto cleanup;
@@ -7261,17 +7260,9 @@ dm_determine_update_type_for_commit(struct dc *dc,
 			if (crtc != new_plane_crtc)
 				continue;
 
-			updates[num_plane].surface = &surface[num_plane];
+			updates[num_plane].surface = new_dm_plane_state->dc_state;
 
 			if (new_crtc_state->mode_changed) {
-				updates[num_plane].surface->src_rect =
-						new_dm_plane_state->dc_state->src_rect;
-				updates[num_plane].surface->dst_rect =
-						new_dm_plane_state->dc_state->dst_rect;
-				updates[num_plane].surface->rotation =
-						new_dm_plane_state->dc_state->rotation;
-				updates[num_plane].surface->in_transfer_func =
-						new_dm_plane_state->dc_state->in_transfer_func;
 				stream_update.dst = new_dm_crtc_state->stream->dst;
 				stream_update.src = new_dm_crtc_state->stream->src;
 			}
@@ -7308,8 +7299,15 @@ dm_determine_update_type_for_commit(struct dc *dc,
 #else
 		status = dc_stream_get_status(new_dm_crtc_state->stream);
 #endif
+
+		/*
+		 * TODO: DC modifies the surface during this call so we need
+		 * to lock here - find a way to do this without locking.
+		 */
+		mutex_lock(&dm->dc_lock);
 		update_type = dc_check_update_surfaces_for_stream(dc, updates, num_plane,
 								  &stream_update, status);
+		mutex_unlock(&dm->dc_lock);
 
 		if (update_type > UPDATE_TYPE_MED) {
 			update_type = UPDATE_TYPE_FULL;
@@ -7319,7 +7317,6 @@ dm_determine_update_type_for_commit(struct dc *dc,
 
 cleanup:
 	kfree(updates);
-	kfree(surface);
 
 	*out_type = update_type;
 	return ret;
@@ -7567,7 +7564,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-	ret = dm_determine_update_type_for_commit(dc, state, &update_type);
+	ret = dm_determine_update_type_for_commit(&adev->dm, state, &update_type);
 	if (ret)
 		goto fail;
 
