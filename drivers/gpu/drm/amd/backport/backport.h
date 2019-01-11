@@ -38,4 +38,6 @@
 #include <kcl/kcl_device_cgroup.h>
 #include <kcl/kcl_workqueue.h>
 #include <kcl/kcl_timekeeping.h>
+#include <kcl/kcl_drm_dp_helper.h>
+
 #endif /* AMDGPU_BACKPORT_H */
