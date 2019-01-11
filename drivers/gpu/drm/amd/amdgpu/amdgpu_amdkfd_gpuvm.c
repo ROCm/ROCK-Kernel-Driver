@@ -192,6 +192,7 @@ static void unreserve_mem_limit(struct amdgpu_device *adev,
 	spin_unlock(&kfd_mem_limit.mem_limit_lock);
 }
 
+#ifdef CONFIG_HSA_AMD
 void amdgpu_amdkfd_unreserve_memory_limit(struct amdgpu_bo *bo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -205,7 +206,7 @@ void amdgpu_amdkfd_unreserve_memory_limit(struct amdgpu_bo *bo)
 
 	unreserve_mem_limit(adev, amdgpu_bo_size(bo), domain, sg);
 }
-
+#endif
 
 /* amdgpu_amdkfd_remove_eviction_fence - Removes eviction fence from BO's
  *  reservation object.
@@ -1030,6 +1031,7 @@ int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
 	return 0;
 }
 
+#ifdef CONFIG_HSA_AMD
 void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 				    struct amdgpu_vm *vm)
 {
@@ -1063,6 +1065,7 @@ void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 		kfree(process_info);
 	}
 }
+#endif
 
 void amdgpu_amdkfd_gpuvm_destroy_process_vm(struct kgd_dev *kgd, void *vm)
 {
@@ -1885,6 +1888,7 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 	return 0;
 }
 
+#ifdef CONFIG_HSA_AMD
 /* Evict a userptr BO by stopping the queues if necessary
  *
  * Runs in MMU notifier, may be in RECLAIM_FS context. This means it
@@ -1916,6 +1920,7 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 
 	return r;
 }
+#endif
 
 /* Update invalid userptr BOs
  *

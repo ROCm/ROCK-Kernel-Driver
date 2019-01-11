@@ -80,6 +80,8 @@ struct default_wait_cb {
 	struct task_struct *task;
 };
 static void (*_kcl_fence_default_wait_cb)(struct fence *fence, struct fence_cb *cb);
+
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 static signed long
 _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 {
@@ -147,6 +149,7 @@ out:
 	spin_unlock_irqrestore(fence->lock, flags);
 	return ret;
 }
+#endif
 
 signed long kcl_fence_default_wait(kcl_fence_t *fence,
 				   bool intr,

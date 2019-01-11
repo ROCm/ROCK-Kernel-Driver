@@ -137,6 +137,11 @@ amdgpu-y += \
 # add amdkfd interfaces
 amdgpu-y += amdgpu_amdkfd.o
 
+# linux-headers-4.15.0-20-generic/.config defined
+# CONFIG_HSA_AMD=m by default,
+# here we disable HSA just for rebase before enable kfd.
+# override CONFIG_HSA_AMD =
+
 ifneq ($(CONFIG_HSA_AMD),)
 AMDKFD_PATH := ../amdkfd
 include $(FULL_AMD_PATH)/amdkfd/Makefile

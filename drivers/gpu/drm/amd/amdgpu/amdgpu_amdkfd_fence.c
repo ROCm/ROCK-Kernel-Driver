@@ -87,6 +87,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 	return fence;
 }
 
+#ifdef CONFIG_HSA_AMD
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f)
 {
 	struct amdgpu_amdkfd_fence *fence;
@@ -100,6 +101,7 @@ struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f)
 
 	return NULL;
 }
+#endif
 
 static const char *amdkfd_fence_get_driver_name(struct dma_fence *f)
 {
@@ -157,6 +159,7 @@ static void amdkfd_fence_release(struct dma_fence *f)
 	kfree_rcu(f, rcu);
 }
 
+#ifdef CONFIG_HSA_AMD
 /**
  * amdkfd_fence_check_mm - Check if @mm is same as that of the fence @f
  *  if same return TRUE else return FALSE.
@@ -174,6 +177,7 @@ bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 
 	return false;
 }
+#endif
 
 static const struct dma_fence_ops amdkfd_fence_ops = {
 	.get_driver_name = amdkfd_fence_get_driver_name,

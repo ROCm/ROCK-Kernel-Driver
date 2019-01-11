@@ -443,6 +443,7 @@ static const struct kfd_device_info *lookup_device_info(unsigned short did)
 	return NULL;
 }
 
+#ifdef CONFIG_HSA_AMD
 struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	struct pci_dev *pdev, const struct kfd2kgd_calls *f2g)
 {
@@ -489,6 +490,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 
 	return kfd;
 }
+#endif
 
 static void kfd_cwsr_init(struct kfd_dev *kfd)
 {
@@ -507,6 +509,7 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 	}
 }
 
+#ifdef CONFIG_HSA_AMD
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 struct drm_device *ddev,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
@@ -692,12 +695,14 @@ int kgd2kfd_post_reset(struct kfd_dev *kfd)
 	WARN_ONCE(count != 0, "KFD reset ref. error");
 	return 0;
 }
+#endif
 
 bool kfd_is_locked(void)
 {
 	return  (atomic_read(&kfd_locked) > 0);
 }
 
+#ifdef CONFIG_HSA_AMD
 void kgd2kfd_suspend(struct kfd_dev *kfd)
 {
 	if (!kfd->init_complete)
@@ -730,6 +735,7 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 
 	return ret;
 }
+#endif
 
 static int kfd_resume(struct kfd_dev *kfd)
 {
@@ -758,6 +764,7 @@ dqm_start_error:
 	return err;
 }
 
+#ifdef CONFIG_HSA_AMD
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
@@ -784,6 +791,7 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 
 	spin_unlock_irqrestore(&kfd->interrupt_lock, flags);
 }
+#endif
 
 int kgd2kfd_quiesce_mm(struct mm_struct *mm)
 {

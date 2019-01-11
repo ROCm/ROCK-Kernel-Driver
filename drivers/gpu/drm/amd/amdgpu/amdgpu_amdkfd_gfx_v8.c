@@ -166,10 +166,12 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 };
 
+#ifdef CONFIG_HSA_AMD
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
 }
+#endif
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {

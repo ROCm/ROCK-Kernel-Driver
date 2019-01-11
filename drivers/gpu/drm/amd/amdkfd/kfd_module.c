@@ -89,7 +89,9 @@ int kgd2kfd_init()
 	return kfd_init();
 }
 
+#ifdef CONFIG_HSA_AMD
 void kgd2kfd_exit(void)
 {
 	kfd_exit();
 }
+#endif

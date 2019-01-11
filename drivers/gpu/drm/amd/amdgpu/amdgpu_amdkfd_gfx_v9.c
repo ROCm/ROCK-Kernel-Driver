@@ -195,10 +195,12 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.set_wave_launch_mode = kgd_set_wave_launch_mode,
 };
 
+#ifdef CONFIG_HSA_AMD
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
 {
 	return (struct kfd2kgd_calls *)&kfd2kgd;
 }
+#endif
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
