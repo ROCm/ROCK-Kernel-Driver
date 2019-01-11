@@ -300,6 +300,9 @@ struct kfd_dev {
 
 	bool pci_atomic_requested;
 
+	/* SRAM ECC flag */
+	atomic_t sram_ecc_flag;
+
 	/* Compute Profile ref. count */
 	atomic_t compute_profile;
 };
