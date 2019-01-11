@@ -1536,7 +1536,7 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 		dc_sink_retain(aconnector->dc_sink);
 		if (sink->dc_edid.length == 0) {
 			aconnector->edid = NULL;
-			drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
+			kcl_drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
 		} else {
 			aconnector->edid =
 				(struct edid *) sink->dc_edid.raw_edid;
@@ -1544,13 +1544,13 @@ amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
 
 			drm_connector_update_edid_property(connector,
 					aconnector->edid);
-			drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
+			kcl_drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
 					    aconnector->edid);
 		}
 		amdgpu_dm_update_freesync_caps(connector, aconnector->edid);
 
 	} else {
-		drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
+		kcl_drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
 		amdgpu_dm_update_freesync_caps(connector, NULL);
 		drm_connector_update_edid_property(connector, NULL);
 		aconnector->num_modes = 0;
@@ -1745,7 +1745,7 @@ static void handle_hpd_rx_irq(void *param)
 		dm_handle_hpd_rx_irq(aconnector);
 
 	if (dc_link->type != dc_connection_mst_branch) {
-		drm_dp_cec_irq(&aconnector->dm_dp_aux.aux);
+		kcl_drm_dp_cec_irq(&aconnector->dm_dp_aux.aux);
 		mutex_unlock(&aconnector->hpd_lock);
 	}
 }
@@ -4527,7 +4527,7 @@ static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 		dc_sink_release(aconnector->dc_sink);
 	aconnector->dc_sink = NULL;
 
-	drm_dp_cec_unregister_connector(&aconnector->dm_dp_aux.aux);
+	kcl_drm_dp_cec_unregister_connector(&aconnector->dm_dp_aux.aux);
 	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	if (aconnector->i2c) {
