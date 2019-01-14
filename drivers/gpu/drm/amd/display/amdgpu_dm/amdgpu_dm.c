@@ -5794,10 +5794,10 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 #endif
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
-
+#endif
 	if (wait_for_vblank)
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 		drm_atomic_helper_wait_for_vblanks(dev, state);
