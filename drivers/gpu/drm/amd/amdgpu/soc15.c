@@ -435,7 +435,6 @@ static int soc15_asic_get_baco_capability(struct amdgpu_device *adev, bool *cap)
 
 static int soc15_asic_baco_reset(struct amdgpu_device *adev)
 {
-	int state;
 	void *pp_handle = adev->powerplay.pp_handle;
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
