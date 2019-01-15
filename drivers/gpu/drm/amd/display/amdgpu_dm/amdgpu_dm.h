@@ -266,8 +266,16 @@ struct dm_crtc_state {
 	int crc_skip_count;
 	bool crc_enabled;
 
-	bool freesync_enabled;
-	struct dc_crtc_timing_adjust adjust;
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+	bool base_vrr_enabled;
+#endif
+
+	bool freesync_timing_changed;
+	bool freesync_vrr_info_changed;
+
+	bool vrr_supported;
+	struct mod_freesync_config freesync_config;
+	struct mod_vrr_params vrr_params;
 	struct dc_info_packet vrr_infopacket;
 
 	int abm_level;

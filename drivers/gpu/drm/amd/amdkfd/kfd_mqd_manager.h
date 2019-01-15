@@ -63,7 +63,6 @@
  *
  */
 extern int pipe_priority_map[];
-extern int spi_priority_map[];
 struct mqd_manager {
 	int	(*init_mqd)(struct mqd_manager *mm, void **mqd,
 			struct kfd_mem_obj **mqd_mem_obj, uint64_t *gart_addr,

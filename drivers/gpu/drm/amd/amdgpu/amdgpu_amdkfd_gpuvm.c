@@ -1299,6 +1299,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	amdgpu_sync_create(&(*mem)->sync);
 
+	size = ALIGN(size, PAGE_SIZE);
 	ret = amdgpu_amdkfd_reserve_mem_limit(adev, size, alloc_domain, !!sg);
 	if (ret) {
 		pr_debug("Insufficient system memory\n");

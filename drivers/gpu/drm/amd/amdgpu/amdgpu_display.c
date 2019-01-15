@@ -822,6 +822,17 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	struct drm_gem_object *obj;
 	struct amdgpu_framebuffer *amdgpu_fb;
 	int ret;
+	int height;
+	struct amdgpu_device *adev = dev->dev_private;
+	int cpp = drm_format_plane_cpp(mode_cmd->pixel_format, 0);
+	int pitch = mode_cmd->pitches[0] / cpp;
+
+	pitch = amdgpu_align_pitch(adev, pitch, cpp, false);
+	if (mode_cmd->pitches[0] != pitch) {
+		DRM_DEBUG_KMS("Invalid pitch: expecting %d but got %d\n",
+			      pitch, mode_cmd->pitches[0]);
+		return ERR_PTR(-EINVAL);
+	}
 
 	obj = kcl_drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
 	if (obj ==  NULL) {
@@ -833,6 +844,13 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	/* Handle is imported dma-buf, so cannot be migrated to VRAM for scanout */
 	if (obj->import_attach) {
 		DRM_DEBUG_KMS("Cannot create framebuffer from imported dma_buf\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	height = ALIGN(mode_cmd->height, 8);
+	if (obj->size < pitch * height) {
+		DRM_DEBUG_KMS("Invalid GEM size: expecting >= %d but got %zu\n",
+			      pitch * height, obj->size);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -943,6 +961,17 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 		adev->mode_info.max_bpc_property =
 			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)
+			return -ENOMEM;
+
+		adev->mode_info.freesync_property =
+			drm_property_create_bool(adev->ddev, 0, "freesync");
+		if (!adev->mode_info.freesync_property)
+			return -ENOMEM;
+		adev->mode_info.freesync_capable_property =
+			drm_property_create_bool(adev->ddev,
+						 0,
+						 "freesync_capable");
+		if (!adev->mode_info.freesync_capable_property)
 			return -ENOMEM;
 	}
 
@@ -1213,3 +1242,18 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 		return AMDGPU_CRTC_IRQ_NONE;
 	}
 }
+
+int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *filp)
+{
+	int ret = -EPERM;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (adev->mode_info.funcs->notify_freesync)
+		ret = adev->mode_info.funcs->notify_freesync(dev,data,filp);
+	else
+		DRM_DEBUG("amdgpu no notify_freesync ioctl\n");
+
+	return ret;
+}
+

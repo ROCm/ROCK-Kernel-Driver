@@ -295,15 +295,10 @@ struct amdgpu_display_funcs {
 			      uint16_t connector_object_id,
 			      struct amdgpu_hpd *hpd,
 			      struct amdgpu_router *router);
+
 	/* it is used to enter or exit into free sync mode */
 	int (*notify_freesync)(struct drm_device *dev, void *data,
 			       struct drm_file *filp);
-	/* it is used to allow enablement of freesync mode */
-	int (*set_freesync_property)(struct drm_connector *connector,
-				     struct drm_property *property,
-				     uint64_t val);
-
-
 };
 
 struct amdgpu_framebuffer {
@@ -379,6 +374,10 @@ struct amdgpu_mode_info {
 	struct drm_property *max_bpc_property;
 	/* Adaptive Backlight Modulation (power feature) */
 	struct drm_property *abm_level_property;
+	/* it is used to allow enablement of freesync mode */
+	struct drm_property *freesync_property;
+	/* it is used to know about display capability of freesync mode */
+	struct drm_property *freesync_capable_property;
 	/* hardcoded DFP edid from BIOS */
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;

@@ -322,13 +322,17 @@ struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 	struct task_struct *task = NULL;
 	struct kfd_process *p    = NULL;
 
-	if (!pid)
+	if (!pid) {
 		task = current;
-	else
+		get_task_struct(task);
+	} else {
 		task = get_pid_task(pid, PIDTYPE_PID);
+	}
 
-	if (task)
+	if (task) {
 		p = find_process(task, true);
+		put_task_struct(task);
+	}
 
 	return p;
 }

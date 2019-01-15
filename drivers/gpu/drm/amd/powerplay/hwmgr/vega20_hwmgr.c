@@ -980,6 +980,9 @@ static int vega20_od8_set_feature_capabilities(
 	    pp_table->FanZeroRpmEnable)
 		od_settings->overdrive8_capabilities |= OD8_FAN_ZERO_RPM_CONTROL;
 
+	if (!od_settings->overdrive8_capabilities)
+		hwmgr->od_enabled = false;
+
 	return 0;
 }
 
@@ -1689,13 +1692,6 @@ static int vega20_upload_dpm_min_level(struct pp_hwmgr *hwmgr, uint32_t feature_
 					(PPCLK_UCLK << 16) | (min_freq & 0xffff))),
 					"Failed to set soft min memclk !",
 					return ret);
-
-		min_freq = data->dpm_table.mem_table.dpm_state.hard_min_level;
-		PP_ASSERT_WITH_CODE(!(ret = smum_send_msg_to_smc_with_parameter(
-					hwmgr, PPSMC_MSG_SetHardMinByFreq,
-					(PPCLK_UCLK << 16) | (min_freq & 0xffff))),
-					"Failed to set hard min memclk !",
-					return ret);
 	}
 
 	if (data->smu_features[GNLD_DPM_UVD].enabled &&
@@ -2248,6 +2244,13 @@ static int vega20_force_clock_level(struct pp_hwmgr *hwmgr,
 		soft_min_level = mask ? (ffs(mask) - 1) : 0;
 		soft_max_level = mask ? (fls(mask) - 1) : 0;
 
+		if (soft_max_level >= data->dpm_table.gfx_table.count) {
+			pr_err("Clock level specified %d is over max allowed %d\n",
+					soft_max_level,
+					data->dpm_table.gfx_table.count - 1);
+			return -EINVAL;
+		}
+
 		data->dpm_table.gfx_table.dpm_state.soft_min_level =
 			data->dpm_table.gfx_table.dpm_levels[soft_min_level].value;
 		data->dpm_table.gfx_table.dpm_state.soft_max_level =
@@ -2267,6 +2270,13 @@ static int vega20_force_clock_level(struct pp_hwmgr *hwmgr,
 	case PP_MCLK:
 		soft_min_level = mask ? (ffs(mask) - 1) : 0;
 		soft_max_level = mask ? (fls(mask) - 1) : 0;
+
+		if (soft_max_level >= data->dpm_table.mem_table.count) {
+			pr_err("Clock level specified %d is over max allowed %d\n",
+					soft_max_level,
+					data->dpm_table.mem_table.count - 1);
+			return -EINVAL;
+		}
 
 		data->dpm_table.mem_table.dpm_state.soft_min_level =
 			data->dpm_table.mem_table.dpm_levels[soft_min_level].value;
