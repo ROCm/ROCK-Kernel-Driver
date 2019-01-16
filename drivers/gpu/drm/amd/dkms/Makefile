@@ -12,6 +12,9 @@ OS_NAME="custom-rhel"
 else ifeq ("rhel",$(OS_NAME))
 OS_NAME="custom-rhel"
 else
+ifeq ("linuxmint",$(OS_NAME))
+OS_NAME="ubuntu"
+endif
 OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
 endif
 else
