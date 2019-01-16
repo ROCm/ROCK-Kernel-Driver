@@ -1181,6 +1181,9 @@ static void handle_hpd_irq(void *param)
 	if (aconnector->fake_enable)
 		aconnector->fake_enable = false;
 
+	if (aconnector->base.dpms != DRM_MODE_DPMS_ON)
+		goto unlock;
+
 	if (!dc_link_detect_sink(aconnector->dc_link, &new_connection_type))
 		DRM_ERROR("KMS: Failed to detect connector\n");
 
@@ -1206,6 +1209,8 @@ static void handle_hpd_irq(void *param)
 		if (aconnector->base.force == DRM_FORCE_UNSPECIFIED)
 			drm_kms_helper_hotplug_event(dev);
 	}
+
+unlock:
 	mutex_unlock(&aconnector->hpd_lock);
 
 }
