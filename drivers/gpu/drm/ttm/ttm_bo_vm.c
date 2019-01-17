@@ -91,7 +91,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 		up_read(&vmf->vma->vm_mm->mmap_sem);
 #endif
 		(void) dma_fence_wait(bo->moving, true);
-		reservation_object_unlock(bo->resv);
+		kcl_reservation_object_unlock(bo->resv);
 		ttm_bo_put(bo);
 		goto out_unlock;
 	}
@@ -160,7 +160,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
-	if (unlikely(!reservation_object_trylock(bo->resv))) {
+	if (unlikely(!kcl_reservation_object_trylock(bo->resv))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
@@ -345,7 +345,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 out_io_unlock:
 	ttm_mem_io_unlock(man);
 out_unlock:
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 	return ret;
 }
 
