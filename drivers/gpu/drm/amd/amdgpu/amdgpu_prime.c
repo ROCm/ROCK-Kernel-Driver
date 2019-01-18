@@ -247,6 +247,9 @@ err_fences_put:
  * 0 on success or a negative error code on failure.
  */
 static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+				 struct device *target_dev,
+#endif
 				 struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
@@ -254,7 +257,11 @@ static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	long r;
 
-	r = drm_gem_map_attach(dma_buf, attach);
+	r = drm_gem_map_attach(dma_buf,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+						target_dev,
+#endif
+						attach);
 	if (r)
 		return r;
 
