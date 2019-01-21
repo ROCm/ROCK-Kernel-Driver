@@ -5694,6 +5694,21 @@ amdgpu_dm_connector_helper_funcs = {
 	.get_modes = get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.atomic_check = amdgpu_dm_connector_atomic_check,
+#if (DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)) && defined(BUILD_AS_DKMS)
+	/*
+	 * why introduce BUILD_AS_DKMS control here?
+	 * patch "drm/amdgpu: Remove default best_encoder hook from DC" removed
+	 * assignment of .best_encoder from v5.0-rc1 on upstream branch,
+	 * but this patch was merged into drmnext branch previous its upstream
+	 * to get a DRM version, so the DRM_VERSION can't handle this situation,
+	 * in our case, drm_atomic_helper_best_encoder has already removed in our branch
+	 * with DRM version 4.20rc3, but if we only use DRM_VERSION(5, 0, 0) for code control,
+	 * customer kernel build will fail for implicit drm_atomic_helper_best_encoder, actually,
+	 * .best_encoder assignment code is unnecessary in customer kernel build, since
+	 * patch "drm/amdgpu: Remove default best_encoder hook from DC" intend to remove it.
+	*/
+	.best_encoder = drm_atomic_helper_best_encoder
+#endif
 };
 
 static void dm_crtc_helper_disable(struct drm_crtc *crtc)
