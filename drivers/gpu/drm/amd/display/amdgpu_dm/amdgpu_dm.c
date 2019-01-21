@@ -6092,7 +6092,6 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		drm_mode_set_crtcinfo(&saved_mode, 0);
 	else if (!dm_state)
 		drm_mode_set_crtcinfo(&mode, 0);
-
 	/*
 	* If scaling is enabled and refresh rate didn't change
 	* we copy the vic and polarities of the old timings
@@ -6793,6 +6792,21 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 	return 0;
 }
 
+static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
+{
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
+	struct drm_encoder *encoder;
+
+	/* There is only one encoder per connector */
+	drm_connector_for_each_possible_encoder(connector, encoder)
+		return encoder;
+
+	return NULL;
+#else
+	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
+#endif
+}
+
 static const struct drm_connector_helper_funcs
 amdgpu_dm_connector_helper_funcs = {
 	/*
@@ -6804,6 +6818,7 @@ amdgpu_dm_connector_helper_funcs = {
 	.get_modes = get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.atomic_check = amdgpu_dm_connector_atomic_check,
+	.best_encoder = amdgpu_dm_connector_to_encoder
 };
 
 static void dm_encoder_helper_disable(struct drm_encoder *encoder)
@@ -6993,21 +7008,6 @@ static int to_drm_connector_type(enum signal_type st)
 	default:
 		return DRM_MODE_CONNECTOR_Unknown;
 	}
-}
-
-static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
-{
-#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
-	struct drm_encoder *encoder;
-
-	/* There is only one encoder per connector */
-	drm_connector_for_each_possible_encoder(connector, encoder)
-		return encoder;
-
-	return NULL;
-#else
-	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
-#endif
 }
 
 static void amdgpu_dm_get_native_mode(struct drm_connector *connector)
