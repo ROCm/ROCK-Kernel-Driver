@@ -2,7 +2,7 @@
 VERSION = 5
 PATCHLEVEL = 0
 SUBLEVEL = 0
-EXTRAVERSION = -rc2
+EXTRAVERSION = -rc3
 NAME = Shy Crocodile
 
 # *DOCUMENTATION*
@@ -960,6 +960,8 @@ ifdef CONFIG_STACK_VALIDATION
   endif
 endif
 
+PHONY += prepare0
+
 suse_version_h := include/generated/uapi/linux/suse_version.h
 
 define filechk_suse_version
@@ -968,7 +970,6 @@ endef
 
 $(suse_version_h): include/config/auto.conf FORCE
 	$(call filechk,suse_version)
-
 
 ifeq ($(KBUILD_EXTMOD),)
 core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/
@@ -1075,8 +1076,7 @@ scripts: scripts_basic scripts_dtc
 # archprepare is used in arch Makefiles and when processed asm symlink,
 # version.h and scripts_basic is processed / created.
 
-# Listed in dependency order
-PHONY += prepare archprepare prepare0 prepare1 prepare2 prepare3
+PHONY += prepare archprepare prepare1 prepare2 prepare3
 
 # prepare3 is used to check if we are building in a separate output directory,
 # and if so do:
@@ -1375,11 +1375,11 @@ mrproper: rm-dirs  := $(wildcard $(MRPROPER_DIRS))
 mrproper: rm-files := $(wildcard $(MRPROPER_FILES))
 mrproper-dirs      := $(addprefix _mrproper_,scripts)
 
-PHONY += $(mrproper-dirs) mrproper archmrproper
+PHONY += $(mrproper-dirs) mrproper
 $(mrproper-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _mrproper_%,%,$@)
 
-mrproper: clean archmrproper $(mrproper-dirs)
+mrproper: clean $(mrproper-dirs)
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
 
