@@ -4980,6 +4980,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.set_power_limit = vega10_set_power_limit,
 	.odn_edit_dpm_table = vega10_odn_edit_dpm_table,
 	.get_performance_level = vega10_get_performance_level,
+	.enable_mgpu_fan_boost = vega10_enable_mgpu_fan_boost,
 };
 
 int vega10_hwmgr_init(struct pp_hwmgr *hwmgr)
