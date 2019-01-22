@@ -20,6 +20,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#undef pr_fmt
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
 #include <linux/module.h>
@@ -31,6 +32,7 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
+#include "amdgpu_amdkfd_gfx_v8.h"
 #include "soc15_hw_ip.h"
 #include "gc/gc_9_0_offset.h"
 #include "gc/gc_9_0_sh_mask.h"
@@ -58,6 +60,13 @@ enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
 	RESET_WAVES
+};
+
+static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
+	mmTCP_WATCH0_ADDR_H, mmTCP_WATCH0_ADDR_L, mmTCP_WATCH0_CNTL,
+	mmTCP_WATCH1_ADDR_H, mmTCP_WATCH1_ADDR_L, mmTCP_WATCH1_CNTL,
+	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
+	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
 };
 
 /*
@@ -104,6 +113,20 @@ static int kgd_wave_control_execute(struct kgd_dev *kgd,
 static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
+
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid);
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd);
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1);
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
 
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
@@ -165,6 +188,11 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.invalidate_tlbs = invalidate_tlbs,
 	.invalidate_tlbs_vmid = invalidate_tlbs_vmid,
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
+	.enable_debug_trap = kgd_enable_debug_trap,
+	.disable_debug_trap = kgd_disable_debug_trap,
+	.set_debug_trap_data = kgd_set_debug_trap_data,
+	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_set_wave_launch_mode,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
@@ -333,6 +361,16 @@ static uint32_t get_sdma_base_addr(struct amdgpu_device *adev,
 					       mmSDMA0_RLC0_RB_CNTL);
 
 	pr_debug("sdma base address: 0x%x\n", retval);
+
+	return retval;
+}
+
+static uint32_t get_watch_base_addr(struct amdgpu_device *adev)
+{
+	uint32_t retval = SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) -
+			mmTCP_WATCH0_ADDR_H;
+
+	pr_debug("kfd: reg watch base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -730,29 +768,8 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 	return reg & ATC_VMID0_PASID_MAPPING__PASID_MASK;
 }
 
-static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
-
-	/* Use legacy mode tlb invalidation.
-	 *
-	 * Currently on Raven the code below is broken for anything but
-	 * legacy mode due to a MMHUB power gating problem. A workaround
-	 * is for MMHUB to wait until the condition PER_VMID_INVALIDATE_REQ
-	 * == PER_VMID_INVALIDATE_ACK instead of simply waiting for the ack
-	 * bit.
-	 *
-	 * TODO 1: agree on the right set of invalidation registers for
-	 * KFD use. Use the last one for now. Invalidate both GC and
-	 * MMHUB.
-	 *
-	 * TODO 2: support range-based invalidation, requires kfg2kgd
-	 * interface change
-	 */
-	amdgpu_gmc_flush_gpu_tlb(adev, vmid, 0);
-}
-
-static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
+static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid,
+			uint32_t flush_type)
 {
 	signed long r;
 	uint32_t seq;
@@ -765,7 +782,7 @@ static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
 			PACKET3_INVALIDATE_TLBS_DST_SEL(1) |
 			PACKET3_INVALIDATE_TLBS_ALL_HUB(1) |
 			PACKET3_INVALIDATE_TLBS_PASID(pasid) |
-			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(0)); /* legacy */
+			PACKET3_INVALIDATE_TLBS_FLUSH_TYPE(flush_type));
 	amdgpu_fence_emit_polling(ring, &seq);
 	amdgpu_ring_commit(ring);
 	spin_unlock(&adev->gfx.kiq.ring_lock);
@@ -784,12 +801,16 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
 	int vmid;
 	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+	uint32_t flush_type = 0;
 
 	if (adev->in_gpu_reset)
 		return -EIO;
+	if (adev->gmc.xgmi.num_physical_nodes &&
+		adev->asic_type == CHIP_VEGA20)
+		flush_type = 2;
 
 	if (ring->sched.ready)
-		return invalidate_tlbs_with_kiq(adev, pasid);
+		return invalidate_tlbs_with_kiq(adev, pasid, flush_type);
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
@@ -797,7 +818,7 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 		if (get_atc_vmid_pasid_mapping_valid(kgd, vmid)) {
 			if (get_atc_vmid_pasid_mapping_pasid(kgd, vmid)
 				== pasid) {
-				write_vmid_invalidate_request(kgd, vmid);
+				amdgpu_gmc_flush_gpu_tlb(adev, vmid, flush_type);
 				break;
 			}
 		}
@@ -815,12 +836,46 @@ static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
 		return 0;
 	}
 
-	write_vmid_invalidate_request(kgd, vmid);
+	/* Use legacy mode tlb invalidation.
+	 *
+	 * Currently on Raven the code below is broken for anything but
+	 * legacy mode due to a MMHUB power gating problem. A workaround
+	 * is for MMHUB to wait until the condition PER_VMID_INVALIDATE_REQ
+	 * == PER_VMID_INVALIDATE_ACK instead of simply waiting for the ack
+	 * bit.
+	 *
+	 * TODO 1: agree on the right set of invalidation registers for
+	 * KFD use. Use the last one for now. Invalidate both GC and
+	 * MMHUB.
+	 *
+	 * TODO 2: support range-based invalidation, requires kfg2kgd
+	 * interface change
+	 */
+	amdgpu_gmc_flush_gpu_tlb(adev, vmid, 0);
 	return 0;
 }
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	unsigned int i;
+	uint32_t watch_base_addr;
+
+	cntl.u32All = 0;
+
+	cntl.bitfields.valid = 0;
+	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
+	cntl.bitfields.atc = 1;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	/* Turning off this address until we set all the registers */
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		WREG32(watch_base_addr +
+				watchRegs[i * ADDRESS_WATCH_REG_MAX +
+						ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -830,6 +885,32 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	uint32_t watch_base_addr;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	cntl.u32All = cntl_val;
+
+	/* Turning off this watch point until we set all the registers */
+	cntl.bitfields.valid = 0;
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+			addr_hi);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+			addr_lo);
+
+	/* Enable the watch point */
+	cntl.bitfields.valid = 1;
+
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -862,6 +943,143 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
+	return get_watch_base_addr(get_amdgpu_device(kgd)) +
+		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
+}
+
+static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	uint32_t orig_wave_cntl_value;
+	uint32_t orig_stall_vmid;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
+							0,
+							mmSPI_GDBG_WAVE_CNTL));
+	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
+					SPI_GDBG_WAVE_CNTL,
+					STALL_VMID);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	data = 0;
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		VMID_SEL, 1<<vmid);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+		TRAP_EN, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), trap_data0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), trap_data1);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		EXCP_EN, trap_mask);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		REPLACE, trap_override);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	bool is_stall_mode;
+	bool is_mode_set;
+
+
+	is_stall_mode = (wave_launch_mode == 4);
+	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		VMID_MASK, is_mode_set ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		MODE, is_mode_set ? wave_launch_mode : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_VMID, is_stall_mode ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_RA, is_stall_mode ? 1 : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
 	return 0;
 }
 

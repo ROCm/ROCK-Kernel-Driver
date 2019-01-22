@@ -23,11 +23,11 @@
 #ifndef KFD_IOCTL_H_INCLUDED
 #define KFD_IOCTL_H_INCLUDED
 
-#include <drm/drm.h>
+#include <linux/types.h>
 #include <linux/ioctl.h>
 
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 1
+#define KFD_IOCTL_MINOR_VERSION 2
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -35,9 +35,13 @@ struct kfd_ioctl_get_version_args {
 };
 
 /* For kfd_ioctl_create_queue_args.queue_type. */
-#define KFD_IOC_QUEUE_TYPE_COMPUTE	0
-#define KFD_IOC_QUEUE_TYPE_SDMA		1
-#define KFD_IOC_QUEUE_TYPE_COMPUTE_AQL	2
+#define KFD_IOC_QUEUE_TYPE_COMPUTE		0x0
+#define KFD_IOC_QUEUE_TYPE_SDMA			0x1
+#define KFD_IOC_QUEUE_TYPE_COMPUTE_AQL		0x2
+#define KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(e)	(0x10000 + (e))
+#define KFD_IOC_QUEUE_TYPE_SDMA_AQL_ENGINE(e)	(0x20000 + (e))
+#define KFD_IOC_QUEUE_TYPE_SDMA_ENGINE_MAX	(KFD_IOC_QUEUE_TYPE_SDMA_ENGINE(0xffff))
+#define KFD_IOC_QUEUE_TYPE_SDMA_AQL_ENGINE_MAX	(KFD_IOC_QUEUE_TYPE_SDMA_AQL_ENGINE(0xffff))
 
 #define KFD_MAX_QUEUE_PERCENTAGE	100
 #define KFD_MAX_QUEUE_PRIORITY		15
@@ -186,6 +190,71 @@ struct kfd_ioctl_dbg_wave_control_args {
 	__u32 buf_size_in_bytes;	/*including gpu_id and buf_size */
 };
 
+/* KFD_IOC_DBG_TRAP_ENABLE:
+ * data1: 0=disable, 1=enable
+ * data2: queue ID (for future use)
+ * data3: unused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_ENABLE 0
+
+/* KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
+ * data1: SPI_GDBG_TRAP_DATA0
+ * data2: SPI_GDBG_TRAP_DATA1
+ * data3: unused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_TRAP_DATA 1
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+ * data1: override mode: 0=OR, 1=REPLACE
+ * data2: mask
+ * data3: unused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 2
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+ * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
+ * data2: unused
+ * data3: unused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 3
+
+
+#define KFD__DBG_NODE_SUSPEND_NO_GRACE		0x01
+#define KFD__DBG_NODE_SUSPEND_MEMORY_FENCE	0x02
+#define KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT	0x04
+/* KFD_IOC_DBG_TRAP_NODE_SUSPEND:
+ * data1: pid
+ * data2: nodeid
+ * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
+ *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
+ *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_NODE_SUSPEND 4
+
+/* KFD_IOC_DBG_TRAP_NODE_RESUME:
+ * data1: pid
+ * data2: nodeid
+ * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
+ *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
+ *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_NODE_RESUME 5
+
+struct kfd_ioctl_dbg_trap_args {
+	__u32 gpu_id;  /* to KFD */
+	__u32 op;      /* to KFD */
+	__u32 data1;   /* to KFD */
+	__u32 data2;   /* to KFD */
+	__u32 data3;   /* to KFD */
+	__u32 data4;   /* to KFD */
+};
+
 /* Matching HSA_EVENTTYPE */
 #define KFD_IOC_EVENT_SIGNAL			0
 #define KFD_IOC_EVENT_NODECHANGE		1
@@ -245,7 +314,7 @@ struct kfd_memory_exception_failure {
 	__u32 imprecise;	/* Can't determine the	exact fault address */
 };
 
-/* memory exception data*/
+/* memory exception data */
 struct kfd_hsa_memory_exception_data {
 	struct kfd_memory_exception_failure failure;
 	__u64 va;
@@ -416,6 +485,53 @@ struct kfd_ioctl_import_dmabuf_args {
 	__u32 dmabuf_fd;	/* to KFD */
 };
 
+struct kfd_ioctl_ipc_export_handle_args {
+	__u64 handle;		/* to KFD */
+	__u32 share_handle[4];	/* from KFD */
+	__u32 gpu_id;		/* to KFD */
+	__u32 pad;
+};
+
+struct kfd_ioctl_ipc_import_handle_args {
+	__u64 handle;		/* from KFD */
+	__u64 va_addr;		/* to KFD */
+	__u64 mmap_offset;		/* from KFD */
+	__u32 share_handle[4];	/* to KFD */
+	__u32 gpu_id;		/* to KFD */
+	__u32 pad;
+};
+
+struct kfd_memory_range {
+	__u64 va_addr;
+	__u64 size;
+};
+
+/* flags definitions
+ * BIT0: 0: read operation, 1: write operation.
+ * This also identifies if the src or dst array belongs to remote process
+ */
+#define KFD_CROSS_MEMORY_RW_BIT (1 << 0)
+#define KFD_SET_CROSS_MEMORY_READ(flags) (flags &= ~KFD_CROSS_MEMORY_RW_BIT)
+#define KFD_SET_CROSS_MEMORY_WRITE(flags) (flags |= KFD_CROSS_MEMORY_RW_BIT)
+#define KFD_IS_CROSS_MEMORY_WRITE(flags) (flags & KFD_CROSS_MEMORY_RW_BIT)
+
+struct kfd_ioctl_cross_memory_copy_args {
+	/* to KFD: Process ID of the remote process */
+	__u32 pid;
+	/* to KFD: See above definition */
+	__u32 flags;
+	/* to KFD: Source GPU VM range */
+	__u64 src_mem_range_array;
+	/* to KFD: Size of above array */
+	__u64 src_mem_array_size;
+	/* to KFD: Destination GPU VM range */
+	__u64 dst_mem_range_array;
+	/* to KFD: Size of above array */
+	__u64 dst_mem_array_size;
+	/* from KFD: Total amount of bytes copied */
+	__u64 bytes_copied;
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -473,7 +589,7 @@ struct kfd_ioctl_import_dmabuf_args {
 #define AMDKFD_IOC_SET_SCRATCH_BACKING_VA	\
 		AMDKFD_IOWR(0x11, struct kfd_ioctl_set_scratch_backing_va_args)
 
-#define AMDKFD_IOC_GET_TILE_CONFIG                                      \
+#define AMDKFD_IOC_GET_TILE_CONFIG		\
 		AMDKFD_IOWR(0x12, struct kfd_ioctl_get_tile_config_args)
 
 #define AMDKFD_IOC_SET_TRAP_HANDLER		\
@@ -510,7 +626,19 @@ struct kfd_ioctl_import_dmabuf_args {
 #define AMDKFD_IOC_IMPORT_DMABUF		\
 		AMDKFD_IOWR(0x1D, struct kfd_ioctl_import_dmabuf_args)
 
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE		\
+		AMDKFD_IOWR(0x1E, struct kfd_ioctl_ipc_import_handle_args)
+
+#define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
+		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_export_handle_args)
+
+#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+		AMDKFD_IOWR(0x20, struct kfd_ioctl_cross_memory_copy_args)
+
+#define AMDKFD_IOC_DBG_TRAP			\
+		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x1E
+#define AMDKFD_COMMAND_END		0x22
 
 #endif

@@ -20,6 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#undef pr_fmt
+#define pr_fmt(fmt) "kfd2kgd: " fmt
+
 #include <linux/module.h>
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
@@ -29,7 +32,7 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ucode.h"
-#include "gfx_v8_0.h"
+#include "amdgpu_amdkfd_gfx_v8.h"
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_d.h"
 #include "gca/gfx_8_0_enum.h"
@@ -44,6 +47,13 @@ enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
 	RESET_WAVES
+};
+
+static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
+	mmTCP_WATCH0_ADDR_H, mmTCP_WATCH0_ADDR_L, mmTCP_WATCH0_CNTL,
+	mmTCP_WATCH1_ADDR_H, mmTCP_WATCH1_ADDR_L, mmTCP_WATCH1_CNTL,
+	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
+	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
 };
 
 /*
@@ -270,7 +280,7 @@ static inline uint32_t get_sdma_base_addr(struct vi_sdma_mqd *m)
 
 	retval = m->sdma_engine_id * SDMA1_REGISTER_OFFSET +
 		m->sdma_queue_id * KFD_VI_SDMA_QUEUE_OFFSET;
-	pr_debug("kfd: sdma base address: 0x%x\n", retval);
+	pr_debug("sdma base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -697,6 +707,22 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 
 static int kgd_address_watch_disable(struct kgd_dev *kgd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	unsigned int i;
+
+	cntl.u32All = 0;
+
+	cntl.bitfields.valid = 0;
+	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
+	cntl.bitfields.atc = 1;
+
+	/* Turning off this address until we set all the registers */
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		WREG32(watchRegs[i * ADDRESS_WATCH_REG_MAX
+				+ ADDRESS_WATCH_REG_CNTL],
+				cntl.u32All);
+
 	return 0;
 }
 
@@ -706,6 +732,32 @@ static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+
+	cntl.u32All = cntl_val;
+
+	/* Turning off this watch point until we set all the registers */
+	cntl.bitfields.valid = 0;
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_ADDR_HI],
+			addr_hi);
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_ADDR_LO],
+			addr_lo);
+
+	/* Enable the watch point */
+	cntl.bitfields.valid = 1;
+
+	WREG32(watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX
+			+ ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -738,7 +790,7 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
-	return 0;
+	return watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
 static void set_scratch_backing_va(struct kgd_dev *kgd,
@@ -821,6 +873,38 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 			lower_32_bits(page_table_base));
 }
 
+/*
+ * FIXME: Poliars test failed with this package, FIJI works fine
+ * From the CP spec it does not official support the invalidation
+ * with the specified pasid in the package,  so disable it for V8
+ *
+ */
+#ifdef V8_SUPPORT_IT_OFFICIAL
+static int invalidate_tlbs_with_kiq(struct amdgpu_device *adev, uint16_t pasid)
+{
+	signed long r;
+	uint32_t seq;
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	spin_lock(&adev->gfx.kiq.ring_lock);
+	amdgpu_ring_alloc(ring, 12); /* fence + invalidate_tlbs package*/
+	amdgpu_ring_write(ring, PACKET3(PACKET3_INVALIDATE_TLBS, 0));
+	amdgpu_ring_write(ring,
+			PACKET3_INVALIDATE_TLBS_DST_SEL(1) |
+			PACKET3_INVALIDATE_TLBS_PASID(pasid));
+	amdgpu_fence_emit_polling(ring, &seq);
+	amdgpu_ring_commit(ring);
+	spin_unlock(&adev->gfx.kiq.ring_lock);
+
+	r = amdgpu_fence_wait_polling(ring, seq, adev->usec_timeout);
+	if (r < 1) {
+		DRM_ERROR("wait for kiq fence error: %ld.\n", r);
+		return -ETIME;
+	}
+
+	return 0;
+}
+#endif
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
@@ -829,6 +913,13 @@ static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid)
 
 	if (adev->in_gpu_reset)
 		return -EIO;
+
+#ifdef V8_SUPPORT_IT_OFFICIAL
+	struct amdgpu_ring *ring = &adev->gfx.kiq.ring;
+
+	if (ring->ready)
+		return invalidate_tlbs_with_kiq(adev, pasid);
+#endif
 
 	for (vmid = 0; vmid < 16; vmid++) {
 		if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid))
@@ -852,7 +943,7 @@ static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
 
 	if (!amdgpu_amdkfd_is_kfd_vmid(adev, vmid)) {
 		pr_err("non kfd vmid %d\n", vmid);
-		return -EINVAL;
+		return 0;
 	}
 
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);

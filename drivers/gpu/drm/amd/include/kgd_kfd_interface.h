@@ -31,6 +31,9 @@
 #include <linux/types.h>
 #include <linux/bitmap.h>
 #include <kcl/kcl_fence.h>
+#include <linux/dma-buf.h>
+#include <linux/mm_types.h>
+#include <linux/scatterlist.h>
 
 struct pci_dev;
 
@@ -38,6 +41,7 @@ struct pci_dev;
 
 struct kfd_dev;
 struct kgd_dev;
+struct drm_device;
 
 struct kgd_mem;
 
@@ -324,6 +328,19 @@ struct kfd2kgd_calls {
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 	uint64_t (*get_hive_id)(struct kgd_dev *kgd);
 
+	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
+					uint32_t trap_debug_wave_launch_mode,
+					uint32_t vmid);
+	uint32_t (*disable_debug_trap)(struct kgd_dev *kgd);
+	uint32_t (*set_debug_trap_data)(struct kgd_dev *kgd,
+					int trap_data0,
+					int trap_data1);
+	uint32_t (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */

@@ -496,7 +496,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 			pr_debug_ratelimited("Partial ID invalid: %u (%u valid bits)\n",
 					     partial_id, valid_id_bits);
 
-		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT / 64) {
+		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/64) {
 			/* With relatively few events, it's faster to
 			 * iterate over the event IDR
 			 */
@@ -935,6 +935,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 
 	/* Workaround on Raven to not kill the process when memory is freed
 	 * before IOMMU is able to finish processing all the excessive PPRs
+	 * triggered due to HW flaws.
 	 */
 	if (dev->device_info->asic_family != CHIP_RAVEN) {
 		mutex_lock(&p->event_mutex);
@@ -983,7 +984,7 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 		return; /* Presumably process exited. */
 	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
 	memory_exception_data.gpu_id = dev->id;
-	memory_exception_data.failure.imprecise = 1;
+	memory_exception_data.failure.imprecise = true;
 	/* Set failure reason */
 	if (info) {
 		memory_exception_data.va = (info->page_addr) << PAGE_SHIFT;
@@ -1016,12 +1017,12 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	unsigned int temp;
 	uint32_t id, idx;
 
-	/* Whole gpu reset caused by GPU hang and memory is lost */
+	/* Whole gpu reset caused by GPU hang , and  memory is lost */
 	memset(&hw_exception_data, 0, sizeof(hw_exception_data));
 	hw_exception_data.gpu_id = dev->id;
 	hw_exception_data.memory_lost = 1;
 
-	idx = srcu_read_lock(&kfd_processes_srcu);
+	idx  = srcu_read_lock(&kfd_processes_srcu);
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		mutex_lock(&p->event_mutex);
 		id = KFD_FIRST_NONSIGNAL_EVENT_ID;

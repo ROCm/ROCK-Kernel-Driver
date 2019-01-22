@@ -447,7 +447,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	ret = pci_enable_atomic_ops_to_root(pdev,
 			PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
 			PCI_EXP_DEVCAP2_ATOMIC_COMP64);
-	if (device_info->needs_pci_atomics && ret < 0) {
+	if (device_info->needs_pci_atomics && ret  < 0) {
 		dev_info(kfd_device,
 			 "skipped device %x:%x, PCI rejects atomics\n",
 			 pdev->vendor, pdev->device);
@@ -487,10 +487,12 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 }
 
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
+			 struct drm_device *ddev,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
 	unsigned int size;
 
+	kfd->ddev = ddev;
 	kfd->mec_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
 			KGD_ENGINE_MEC1);
 	kfd->sdma_fw_version = kfd->kfd2kgd->get_fw_version(kfd->kgd,
