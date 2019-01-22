@@ -1814,7 +1814,10 @@ static ssize_t amdgpu_hwmon_show_power_cap_max(struct device *dev,
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	uint32_t limit = 0;
 
-	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
+	if (is_support_sw_smu(adev)) {
+		smu_get_power_limit(&adev->smu, &limit, true);
+		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
+	} else if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
 		adev->powerplay.pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit, true);
 		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
 	} else {
@@ -1829,7 +1832,10 @@ static ssize_t amdgpu_hwmon_show_power_cap(struct device *dev,
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	uint32_t limit = 0;
 
-	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
+	if (is_support_sw_smu(adev)) {
+		smu_get_power_limit(&adev->smu, &limit, false);
+		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
+	} else if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->get_power_limit) {
 		adev->powerplay.pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit, false);
 		return snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
 	} else {
@@ -1852,7 +1858,9 @@ static ssize_t amdgpu_hwmon_set_power_cap(struct device *dev,
 		return err;
 
 	value = value / 1000000; /* convert to Watt */
-	if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->set_power_limit) {
+	if (is_support_sw_smu(adev)) {
+		adev->smu.funcs->set_power_limit(&adev->smu, value);
+	} else if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->set_power_limit) {
 		err = adev->powerplay.pp_funcs->set_power_limit(adev->powerplay.pp_handle, value);
 		if (err)
 			return err;
