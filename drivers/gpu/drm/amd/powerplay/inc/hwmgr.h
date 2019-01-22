@@ -677,6 +677,7 @@ struct pp_advance_fan_control_parameters {
 	uint32_t  ulTargetGfxClk;
 	uint16_t  usZeroRPMStartTemperature;
 	uint16_t  usZeroRPMStopTemperature;
+	uint16_t  usMGpuThrottlingRPMLimit;
 };
 
 struct pp_thermal_controller_info {
