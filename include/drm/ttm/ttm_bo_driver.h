@@ -133,8 +133,12 @@ struct ttm_mem_type_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	void (*debug)(struct ttm_mem_type_manager *man,
 		      struct drm_printer *printer);
+#else
+	void (*debug)(struct ttm_mem_type_manager *man, const char *prefix);
+#endif
 };
 
 /**

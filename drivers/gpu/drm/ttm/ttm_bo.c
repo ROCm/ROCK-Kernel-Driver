@@ -82,7 +82,6 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, struct drm_printer *p
 			       int mem_type)
 {
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
-
 	drm_printf(p, "    has_type: %d\n", man->has_type);
 	drm_printf(p, "    use_type: %d\n", man->use_type);
 	drm_printf(p, "    flags: 0x%08X\n", man->flags);
@@ -91,7 +90,11 @@ static void ttm_mem_type_debug(struct ttm_bo_device *bdev, struct drm_printer *p
 	drm_printf(p, "    available_caching: 0x%08X\n", man->available_caching);
 	drm_printf(p, "    default_caching: 0x%08X\n", man->default_caching);
 	if (mem_type != TTM_PL_SYSTEM)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 		(*man->func->debug)(man, p);
+#else
+		(*man->func->debug)(man, TTM_PFX);
+#endif
 }
 
 static void ttm_bo_mem_space_debug(struct ttm_buffer_object *bo,

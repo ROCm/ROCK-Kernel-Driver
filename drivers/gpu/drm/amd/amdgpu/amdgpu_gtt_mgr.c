@@ -298,7 +298,11 @@ int amdgpu_gtt_mgr_recover(struct ttm_mem_type_manager *man)
  * Dump the table content using printk.
  */
 static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 				 struct drm_printer *printer)
+#else
+				 const char *prefix)
+#endif
 {
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
@@ -306,13 +310,19 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_mm_print(&mgr->mm, printer);
 #else
-	drm_mm_debug_table(&mgr->mm, printer->prefix);
+	drm_mm_debug_table(&mgr->mm, prefix);
 #endif
 	spin_unlock(&mgr->lock);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
+#else
+	DRM_DEBUG("man size:%llu pages, gtt available:%llu pages, usage:%lluMB\n",
+		   man->size, (u64)atomic64_read(&mgr->available),
+		   amdgpu_gtt_mgr_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_gtt_mgr_func = {

@@ -361,7 +361,11 @@ uint64_t amdgpu_vram_mgr_vis_usage(struct ttm_mem_type_manager *man)
  * Dump the table content using printk.
  */
 static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 				  struct drm_printer *printer)
+#else
+				  const char *prefix)
+#endif
 {
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
@@ -369,13 +373,19 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_mm_print(&mgr->mm, printer);
 #else
-	drm_mm_debug_table(&mgr->mm, printer->prefix);
+	drm_mm_debug_table(&mgr->mm, prefix);
 #endif
 	spin_unlock(&mgr->lock);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
 		   amdgpu_vram_mgr_vis_usage(man) >> 20);
+#else
+	DRM_DEBUG("man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
+		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
+		   amdgpu_vram_mgr_vis_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_vram_mgr_func = {

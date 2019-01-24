@@ -576,7 +576,7 @@ void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
 EXPORT_SYMBOL(__drm_printfn_info);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 void drm_printf(struct drm_printer *p, const char *f, ...)
 {
 	struct va_format vaf;
@@ -718,10 +718,14 @@ void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
 EXPORT_SYMBOL(drm_state_dump);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-       pr_debug("%s %pV", p->prefix, vaf);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+	pr_debug("%s %pV", p->prefix, vaf);
+#else
+	pr_debug("%s %pV", p->arg, vaf);
+#endif
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
