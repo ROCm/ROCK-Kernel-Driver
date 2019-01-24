@@ -12,6 +12,9 @@
 #include <drm/drm_rect.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#include <drm/drm_print.h>
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -500,7 +503,7 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -564,7 +567,7 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
 /**
  * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
@@ -577,7 +580,9 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 		.prefix = prefix
+#endif
 	};
 	return p;
 }
