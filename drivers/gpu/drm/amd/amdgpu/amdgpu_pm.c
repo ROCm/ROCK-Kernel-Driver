@@ -1659,7 +1659,11 @@ static ssize_t amdgpu_hwmon_set_fan1_target(struct device *dev,
 	u32 value;
 	u32 pwm_mode;
 
-	pwm_mode = amdgpu_dpm_get_fan_control_mode(adev);
+	if (is_support_sw_smu(adev))
+		pwm_mode = smu_get_fan_control_mode(&adev->smu);
+	else
+		pwm_mode = amdgpu_dpm_get_fan_control_mode(adev);
+
 	if (pwm_mode != AMD_FAN_CTRL_MANUAL)
 		return -ENODATA;
 
@@ -1672,7 +1676,11 @@ static ssize_t amdgpu_hwmon_set_fan1_target(struct device *dev,
 	if (err)
 		return err;
 
-	if (adev->powerplay.pp_funcs->set_fan_speed_rpm) {
+	if (is_support_sw_smu(adev)) {
+		err = smu_set_fan_speed_rpm(&adev->smu, value);
+		if (err)
+			return err;
+	} else if (adev->powerplay.pp_funcs->set_fan_speed_rpm) {
 		err = amdgpu_dpm_set_fan_speed_rpm(adev, value);
 		if (err)
 			return err;
