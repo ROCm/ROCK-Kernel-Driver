@@ -5316,10 +5316,16 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			dcc_address = get_dcc_address(afb->address, tiling_flags);
 			bundle->flip_addrs[planes_count].address.grph.meta_addr.low_part = lower_32_bits(dcc_address);
 			bundle->flip_addrs[planes_count].address.grph.meta_addr.high_part = upper_32_bits(dcc_address);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+			struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+#endif
 
 			bundle->flip_addrs[planes_count].flip_immediate =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+					(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#else
 					(crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
-
+#endif
 			timestamp_ns = ktime_get_ns();
 			bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
 			bundle->surface_updates[planes_count].flip_addr = &bundle->flip_addrs[planes_count];
