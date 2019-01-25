@@ -5288,7 +5288,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			 * and in general should be called for
 			 * blocking commit to as per framework helpers
 			 */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 			abo = gem_to_amdgpu_bo(fb->obj[0]);
+#else
+			abo = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(fb, 0));
+#endif
 			r = amdgpu_bo_reserve(abo, true);
 			if (unlikely(r != 0))
 				DRM_ERROR("failed to reserve buffer before flip\n");
