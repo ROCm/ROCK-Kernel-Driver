@@ -285,6 +285,9 @@ struct kfd_dev {
 	/* xGMI */
 	uint64_t hive_id;
 	bool pci_atomic_requested;
+
+	/* Compute Profile ref. count */
+	atomic_t compute_profile;
 };
 
 struct kfd_ipc_obj;
@@ -1113,6 +1116,10 @@ static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
 					  ddev->render->index,
 					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
 }
+
+/* Compute profile */
+void kfd_inc_compute_active(struct kfd_dev *dev);
+void kfd_dec_compute_active(struct kfd_dev *dev);
 
 /* Debugfs */
 #if defined(CONFIG_DEBUG_FS)

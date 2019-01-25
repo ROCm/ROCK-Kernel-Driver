@@ -791,8 +791,8 @@ static int register_process(struct device_queue_manager *dqm,
 
 	retval = dqm->asic_ops.update_qpd(dqm, qpd);
 
-	if (dqm->processes_count++ == 0)
-		amdgpu_amdkfd_set_compute_idle(dqm->dev->kgd, false);
+	dqm->processes_count++;
+	kfd_inc_compute_active(dqm->dev);
 
 	dqm_unlock(dqm);
 
@@ -815,9 +815,8 @@ static int unregister_process(struct device_queue_manager *dqm,
 		if (qpd == cur->qpd) {
 			list_del(&cur->list);
 			kfree(cur);
-			if (--dqm->processes_count == 0)
-				amdgpu_amdkfd_set_compute_idle(
-					dqm->dev->kgd, true);
+			dqm->processes_count--;
+			kfd_dec_compute_active(dqm->dev);
 			goto out;
 		}
 	}
@@ -1533,9 +1532,8 @@ static int process_termination_nocpsch(struct device_queue_manager *dqm,
 		if (qpd == cur->qpd) {
 			list_del(&cur->list);
 			kfree(cur);
-			if (--dqm->processes_count == 0)
-				amdgpu_amdkfd_set_compute_idle(
-						dqm->dev->kgd, true);
+			dqm->processes_count--;
+			kfd_dec_compute_active(dqm->dev);
 			break;
 		}
 	}
@@ -1618,9 +1616,8 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		if (qpd == cur->qpd) {
 			list_del(&cur->list);
 			kfree(cur);
-			if (--dqm->processes_count == 0)
-				amdgpu_amdkfd_set_compute_idle(
-						dqm->dev->kgd, true);
+			dqm->processes_count--;
+			kfd_dec_compute_active(dqm->dev);
 			break;
 		}
 	}
