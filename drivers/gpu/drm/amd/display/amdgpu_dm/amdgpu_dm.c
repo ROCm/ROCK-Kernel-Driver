@@ -6129,10 +6129,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		dc_plane = dm_new_plane_state->dc_state;
 
 		bundle->surface_updates[planes_count].surface = dc_plane;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		if (new_pcrtc_state->color_mgmt_changed) {
 			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
 			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
 		}
+#endif
 
 		fill_dc_scaling_info(new_plane_state,
 				     &bundle->scaling_infos[planes_count]);
@@ -6203,6 +6205,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 					acrtc_attach->crtc_id);
 			continue;
 		}
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+		if (new_pcrtc_state->color_mgmt_changed) {
+			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
+			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
+		}
+#endif
 
 		if (plane == pcrtc->primary)
 			update_freesync_state_on_stream(
@@ -6308,6 +6316,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				acrtc_state->stream->out_transfer_func;
 		}
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+		if (new_pcrtc_state->color_mgmt_changed)
+			bundle->stream_update.out_transfer_func = acrtc_state->stream->out_transfer_func;
+#endif
 		acrtc_state->stream->abm_level = acrtc_state->abm_level;
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
