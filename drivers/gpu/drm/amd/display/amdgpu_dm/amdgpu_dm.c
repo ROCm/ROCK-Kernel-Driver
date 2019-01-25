@@ -5352,11 +5352,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 
 		bundle->surface_updates[planes_count].surface = dc_plane;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		if (new_pcrtc_state->color_mgmt_changed) {
 			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
 			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
 		}
-
+#endif
 
 		bundle->scaling_infos[planes_count].scaling_quality = dc_plane->scaling_quality;
 		bundle->scaling_infos[planes_count].src_rect = dc_plane->src_rect;
@@ -5437,10 +5438,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			bundle->stream_update.src = acrtc_state->stream->src;
 			bundle->stream_update.dst = acrtc_state->stream->dst;
 		}
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		if (new_pcrtc_state->color_mgmt_changed)
 			bundle->stream_update.out_transfer_func = acrtc_state->stream->out_transfer_func;
-
+#endif
 		acrtc_state->stream->abm_level = acrtc_state->abm_level;
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
