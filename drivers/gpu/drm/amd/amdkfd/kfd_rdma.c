@@ -119,6 +119,7 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 
 	list_add(&rdma_cb_data->node, &buf_obj->cb_data_head);
 
+	kfd_inc_compute_active(dev);
 	*amd_p2p_data = &rdma_cb_data->amd_p2p_data;
 
 	goto out;
@@ -154,7 +155,7 @@ static int put_pages_helper(struct amd_p2p_info *p2p_data)
 	kfree(rdma_cb_data);
 
 	amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem, sg_table_tmp);
-
+	kfd_dec_compute_active(dev);
 
 	return 0;
 }
