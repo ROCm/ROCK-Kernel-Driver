@@ -559,9 +559,9 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_destroy(&adev->dm.dc_lock);
-
+#endif
 	return;
 }
 
@@ -5450,14 +5450,18 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&dm->dc_lock);
+#endif
 		dc_commit_updates_for_stream(dm->dc,
 						     bundle->surface_updates,
 						     planes_count,
 						     acrtc_state->stream,
 						     &bundle->stream_update,
 						     dc_state);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&dm->dc_lock);
+#endif
 	}
 
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i)
@@ -5786,15 +5790,18 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		for (j = 0; j < status->plane_count; j++)
 			dummy_updates[j].surface = status->plane_states[0];
 
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&dm->dc_lock);
+#endif
 		dc_commit_updates_for_stream(dm->dc,
 						     dummy_updates,
 						     status->plane_count,
 						     dm_new_crtc_state->stream,
 						     &stream_update,
 						     dc_state);
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&dm->dc_lock);
+#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
