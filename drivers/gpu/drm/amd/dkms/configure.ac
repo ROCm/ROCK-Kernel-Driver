@@ -42,6 +42,7 @@ m4_include([m4/file-inode.m4])
 m4_include([m4/drm-atomic-helper-connector-reset.m4])
 m4_include([m4/drm-get-max-iomem.m4])
 m4_include([m4/mm-release-pages.m4])
+m4_include([m4/sched-list-for-each-entry.m4])
 m4_include([m4/config.m4])
 
 
