@@ -38,7 +38,11 @@
  * Wrapper around wait_queue_entry_t
  */
 struct kfd_event_waiter {
+#if defined(HAVE_WAIT_QUEUE_ENTRY)
 	wait_queue_entry_t wait;
+#else
+	wait_queue_t wait;
+#endif
 	struct kfd_event *event; /* Event to wait for */
 	bool activated;		 /* Becomes true when event is signaled */
 };
@@ -264,7 +268,11 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 
 	/* Wake up pending waiters. They will return failure */
 	spin_lock(&ev->lock);
+#if !defined(HAVE_WAIT_QUEUE_ENTRY)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		WRITE_ONCE(waiter->event, NULL);
 	wake_up_all(&ev->wq);
 	spin_unlock(&ev->lock);
@@ -630,7 +638,11 @@ static void set_event(struct kfd_event *ev)
 	 */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
+#if !defined(HAVE_WAIT_QUEUE_ENTRY)
+	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
+#else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
+#endif
 		WRITE_ONCE(waiter->activated, true);
 
 	wake_up_all(&ev->wq);
