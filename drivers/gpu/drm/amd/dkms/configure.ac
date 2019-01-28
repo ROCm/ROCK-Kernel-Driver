@@ -104,6 +104,7 @@ m4_include([m4/vga-switcheroo-set-dynamic-switch.m4])
 m4_include([m4/vga-switcheroo-register-handler.m4])
 m4_include([m4/vga-switcheroo-handler-get-client-id.m4])
 m4_include([m4/vga-switcheroo-register-client.m4])
+m4_include([m4/sched-list-for-each-entry.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
