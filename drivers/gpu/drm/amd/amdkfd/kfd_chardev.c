@@ -2194,6 +2194,48 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 
 }
 
+static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
+			      struct kfd_process *p, struct kgd_mem **mem)
+{
+	int ret;
+	struct kfd_process_device *pdd = NULL;
+	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_WRITABLE |
+			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	if (!mem || !size || !p || !kdev)
+		return -EINVAL;
+
+	*mem = NULL;
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(kdev, p);
+	if (!pdd) {
+		mutex_unlock(&p->mutex);
+		pr_err("Process device data doesn't exist\n");
+		return -EINVAL;
+	}
+
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
+						      pdd->vm, NULL,
+						      mem, NULL, flags);
+	mutex_unlock(&p->mutex);
+	if (ret) {
+		pr_err("Failed to create shadow system BO %d\n", ret);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
+{
+	if (!mem)
+		return -EINVAL;
+
+	/* param adev is not used*/
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem);
+}
+
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
  * respective offset.
  * @si: Source iter
@@ -2205,14 +2247,15 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
  */
 static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 			int cma_write, uint64_t size,
-			struct dma_fence **f, uint64_t *copied)
+			struct dma_fence **f, uint64_t *copied,
+			struct kgd_mem **tmp_mem)
 {
 	int err = 0;
 	struct kfd_bo *dst_bo = di->cur_bo, *src_bo = si->cur_bo;
 	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
 	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
 	struct kfd_dev *dev = dst_bo->dev;
-	struct cma_system_bo *tmp_bo = NULL;
+	int d2d = 0;
 
 	*copied = 0;
 	if (f)
@@ -2257,12 +2300,28 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM &&
 		    dst_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
 			dev = dst_bo->dev;
-			err = kfd_create_cma_system_bo(src_bo->dev, src_bo,
-						       &size, si->bo_offset,
-						       cma_write, si->p,
-						       si->mm, si->task,
-						       &tmp_bo);
-			src_mem = tmp_bo->mem;
+			size = min_t(uint64_t, size, MAX_SYSTEM_BO_SIZE);
+			d2d = 1;
+
+			if (*tmp_mem == NULL) {
+				if (kfd_create_kgd_mem(src_bo->dev,
+							MAX_SYSTEM_BO_SIZE,
+							si->p,
+							tmp_mem))
+					return -EINVAL;
+			}
+
+			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->kgd,
+						src_bo->mem, si->bo_offset,
+						*tmp_mem, 0,
+						size, f, &size))
+				/* tmp_mem will be freed in caller.*/
+				return -EINVAL;
+
+			kfd_cma_fence_wait(*f);
+			dma_fence_put(*f);
+
+			src_mem = *tmp_mem;
 			src_offset = 0;
 		} else if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 			dev = src_bo->dev;
@@ -2281,14 +2340,12 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 	 * delete. Also since multiple GPUs are involved the copies are
 	 * currently not pipelined.
 	 */
-	if (tmp_bo) {
+	if (*tmp_mem && d2d) {
 		if (!err) {
 			kfd_cma_fence_wait(*f);
 			dma_fence_put(*f);
 			*f = NULL;
 		}
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, tmp_bo->mem);
-		kfree(tmp_bo);
 	}
 	return err;
 }
@@ -2301,7 +2358,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
  */
 static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 				 bool cma_write, struct dma_fence **f,
-				 uint64_t *copied)
+				 uint64_t *copied, struct kgd_mem **tmp_mem)
 {
 	int err = 0;
 	uint64_t copy_size, n;
@@ -2320,7 +2377,8 @@ static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
 
 		copy_size = min(size, (di->array->size - di->offset));
 
-		err = kfd_copy_bos(si, di, cma_write, copy_size, &fence, &n);
+		err = kfd_copy_bos(si, di, cma_write, copy_size,
+				&fence, &n, tmp_mem);
 		if (err) {
 			pr_err("CMA %d failed\n", err);
 			break;
@@ -2365,6 +2423,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	struct cma_iter di, si;
 	const char *cma_op;
 	int err = 0;
+	struct kgd_mem *tmp_mem = NULL;
 
 	/* Check parameters */
 	if (args->src_mem_range_array == 0 || args->dst_mem_range_array == 0 ||
@@ -2465,7 +2524,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 
 		err = kfd_copy_single_range(&si, &di,
 					KFD_IS_CROSS_MEMORY_WRITE(args->flags),
-					&fence, &copied);
+					&fence, &copied, &tmp_mem);
 		total_copied += copied;
 
 		if (err)
@@ -2490,6 +2549,9 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 		if (err)
 			pr_err("CMA %s failed. BO timed out\n", cma_op);
 	}
+
+	if (tmp_mem)
+		kfd_destroy_kgd_mem(tmp_mem);
 
 	kfd_free_cma_bos(&si);
 	kfd_free_cma_bos(&di);
@@ -2517,15 +2579,19 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct kfd_process_device *pdd;
 	int r = 0;
 	struct kfd_dev *dev;
+	struct kfd_process *process;
 	uint32_t gpu_id;
 	uint32_t debug_trap_action;
 	uint32_t data1;
 	uint32_t data2;
+	uint32_t data3;
+	struct pid *pid;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
 	data1 = args->data1;
 	data2 = args->data2;
+	data3 = args->data3;
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (!dev)
@@ -2615,6 +2681,80 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				dev->kgd,
 				data1,
 				dev->vm_info.last_vmid_kfd);
+		break;
+	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
+		pid = find_get_pid(data1);
+		if (!pid) {
+			pr_err("Cannot find pid info for %i\n", data1);
+			r = -ESRCH;
+			goto unlock_out;
+		}
+
+		process = kfd_lookup_process_by_pid(pid);
+		if (!process) {
+			pr_err("Cannot find process info info for %i\n", data1);
+			r = -ESRCH;
+			put_pid(pid);
+			goto unlock_out;
+		}
+
+		/*
+		 * To suspend/resume queues, we need:
+		 *  ptrace to be enabled,
+		 *         process->lead_thread->ptrace == true
+		 *  and we need either:
+		 *  i) be allowed to trace the process
+		 *			process->lead_thread->parent == current
+		 *  ii) or to be ptrace'ing ourself
+		 *		 process->lead_thread == current
+		 */
+		if (process->lead_thread->ptrace &&
+				(process->lead_thread->parent == current ||
+				 process->lead_thread == current)) {
+			r = suspend_queues(dev->dqm, process, data3);
+		} else {
+			pr_err("Cannot debug process to suspend queues\n");
+			r = -ESRCH;
+		}
+		kfd_unref_process(process);
+		put_pid(pid);
+		break;
+	case KFD_IOC_DBG_TRAP_NODE_RESUME:
+		pid = find_get_pid(data1);
+		if (!pid) {
+			pr_err("Cannot find pid info for %i\n", data1);
+			r = -ESRCH;
+			goto unlock_out;
+		}
+
+		process = kfd_lookup_process_by_pid(pid);
+		if (!process) {
+			pr_err("Cannot find process info info for %i\n", data1);
+			r = -ESRCH;
+			put_pid(pid);
+			goto unlock_out;
+		}
+
+		/*
+		 * To suspend/resume queues, we need:
+		 *  ptrace to be enabled,
+		 *         process->lead_thread->ptrace == true
+		 *  and we need either:
+		 *  i) be allowed to trace the process
+		 *			process->lead_thread->parent == current
+		 *  ii) or to be ptrace'ing ourself
+		 *		 process->lead_thread == current
+		 */
+		if (process->lead_thread->ptrace &&
+				(process->lead_thread->parent == current ||
+				 process->lead_thread == current)) {
+			r = resume_queues(dev->dqm, process);
+		} else {
+			pr_err("Cannot debug process to resume queues\n");
+			r = -ESRCH;
+		}
+		kfd_unref_process(process);
+		put_pid(pid);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

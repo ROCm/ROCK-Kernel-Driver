@@ -997,7 +997,7 @@ void dce110_enable_audio_stream(struct pipe_ctx *pipe_ctx)
 
 		pipe_ctx->stream_res.audio->funcs->az_enable(pipe_ctx->stream_res.audio);
 
-		if (num_audio == 1 && pp_smu != NULL && pp_smu->set_pme_wa_enable != NULL)
+		if (num_audio >= 1 && pp_smu != NULL && pp_smu->set_pme_wa_enable != NULL)
 			/*this is the first audio. apply the PME w/a in order to wake AZ from D3*/
 			pp_smu->set_pme_wa_enable(&pp_smu->pp_smu);
 		/* un-mute audio */
@@ -1014,6 +1014,8 @@ void dce110_disable_audio_stream(struct pipe_ctx *pipe_ctx, int option)
 	pipe_ctx->stream_res.stream_enc->funcs->audio_mute_control(
 			pipe_ctx->stream_res.stream_enc, true);
 	if (pipe_ctx->stream_res.audio) {
+		struct pp_smu_funcs_rv *pp_smu = dc->res_pool->pp_smu;
+
 		if (option != KEEP_ACQUIRED_RESOURCE ||
 				!dc->debug.az_endpoint_mute_only) {
 			/*only disalbe az_endpoint if power down or free*/
@@ -1033,6 +1035,9 @@ void dce110_disable_audio_stream(struct pipe_ctx *pipe_ctx, int option)
 			update_audio_usage(&dc->current_state->res_ctx, dc->res_pool, pipe_ctx->stream_res.audio, false);
 			pipe_ctx->stream_res.audio = NULL;
 		}
+		if (pp_smu != NULL && pp_smu->set_pme_wa_enable != NULL)
+			/*this is the first audio. apply the PME w/a in order to wake AZ from D3*/
+			pp_smu->set_pme_wa_enable(&pp_smu->pp_smu);
 
 		/* TODO: notify audio driver for if audio modes list changed
 		 * add audio mode list change flag */
@@ -2616,6 +2621,28 @@ static void dce110_wait_for_mpcc_disconnect(
 	/* do nothing*/
 }
 
+static void program_output_csc(struct dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		enum dc_color_space colorspace,
+		uint16_t *matrix,
+		int opp_id)
+{
+	int i;
+	struct out_csc_color_matrix tbl_entry;
+
+	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
+		enum dc_color_space color_space = pipe_ctx->stream->output_color_space;
+
+		for (i = 0; i < 12; i++)
+			tbl_entry.regval[i] = pipe_ctx->stream->csc_color_matrix.matrix[i];
+
+		tbl_entry.color_space = color_space;
+
+		pipe_ctx->plane_res.xfm->funcs->opp_set_csc_adjustment(
+				pipe_ctx->plane_res.xfm, &tbl_entry);
+	}
+}
+
 void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_position pos_cpy = pipe_ctx->stream->cursor_position;
@@ -2666,6 +2693,7 @@ void dce110_set_cursor_attribute(struct pipe_ctx *pipe_ctx)
 
 static const struct hw_sequencer_funcs dce110_funcs = {
 	.program_gamut_remap = program_gamut_remap,
+	.program_output_csc = program_output_csc,
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = dce110_apply_ctx_for_surface,

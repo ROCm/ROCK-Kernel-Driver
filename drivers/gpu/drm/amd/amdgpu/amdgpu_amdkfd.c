@@ -603,6 +603,11 @@ bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
 	return false;
 }
 
+void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd)
+{
+	amdgpu_asic_flush_hdp((struct amdgpu_device *) kgd, NULL);
+}
+
 #ifndef CONFIG_HSA_AMD
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {

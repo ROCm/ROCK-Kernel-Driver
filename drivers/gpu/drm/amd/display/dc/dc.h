@@ -39,7 +39,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.11"
+#define DC_VER "3.2.14"
 
 #define MAX_SURFACES 3
 #define MAX_STREAMS 6
@@ -671,6 +671,7 @@ struct dpcd_caps {
 	int8_t branch_dev_name[6];
 	int8_t branch_hw_revision;
 	int8_t branch_fw_revision[2];
+	uint8_t link_rate_set;
 
 	bool allow_invalid_MSA_timing_param;
 	bool panel_mode_edp;

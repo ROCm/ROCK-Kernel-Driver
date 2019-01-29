@@ -67,9 +67,6 @@ static int psp_sw_init(void *handle)
 
 	psp->adev = adev;
 
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
-
 	ret = psp_init_microcode(psp);
 	if (ret) {
 		DRM_ERROR("Failed to load psp firmware!\n");
@@ -82,9 +79,6 @@ static int psp_sw_init(void *handle)
 static int psp_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
 
 	release_firmware(adev->psp.sos_fw);
 	adev->psp.sos_fw = NULL;
@@ -140,14 +134,19 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	while (*((unsigned int *)psp->fence_buf) != index)
 		msleep(1);
 
-	/* the status field must be 0 after psp command completion */
+	/* In some cases, psp response status is not 0 even there is no
+	 * problem while the command is submitted. Some version of PSP FW
+	 * doesn't write 0 to that field.
+	 * So here we would like to only print a warning instead of an error
+	 * during psp initialization to avoid breaking hw_init and it doesn't
+	 * return -EINVAL.
+	 */
 	if (psp->cmd_buf_mem->resp.status) {
 		if (ucode)
-			DRM_ERROR("failed to load ucode id (%d) ",
+			DRM_WARN("failed to load ucode id (%d) ",
 				  ucode->ucode_id);
-		DRM_ERROR("psp command failed and response status is (%d)\n",
+		DRM_WARN("psp command failed and response status is (%d)\n",
 			  psp->cmd_buf_mem->resp.status);
-		return -EINVAL;
 	}
 
 	/* get xGMI session id from response buffer */
@@ -716,10 +715,6 @@ static int psp_hw_init(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
-
 	mutex_lock(&adev->firmware.mutex);
 	/*
 	 * This sequence is just used on hw_init only once, no need on
@@ -749,9 +744,6 @@ static int psp_hw_fini(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct psp_context *psp = &adev->psp;
 
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
-
 	if (adev->gmc.xgmi.num_physical_nodes > 1 &&
 	    psp->xgmi_context.initialized == 1)
                 psp_xgmi_terminate(psp);
@@ -780,9 +772,6 @@ static int psp_suspend(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct psp_context *psp = &adev->psp;
 
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
-
 	if (adev->gmc.xgmi.num_physical_nodes > 1 &&
 	    psp->xgmi_context.initialized == 1) {
 		ret = psp_xgmi_terminate(psp);
@@ -806,9 +795,6 @@ static int psp_resume(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct psp_context *psp = &adev->psp;
-
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP)
-		return 0;
 
 	DRM_INFO("PSP is resuming...\n");
 
@@ -844,11 +830,6 @@ static bool psp_check_fw_loading_status(struct amdgpu_device *adev,
 					enum AMDGPU_UCODE_ID ucode_type)
 {
 	struct amdgpu_firmware_info *ucode = NULL;
-
-	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP) {
-		DRM_INFO("firmware is not loaded by PSP\n");
-		return true;
-	}
 
 	if (!adev->firmware.fw_size)
 		return false;

@@ -1979,6 +1979,9 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 	adev = get_amdgpu_device(kgd);
 
 	*dmabuf = amdgpu_gem_prime_export(adev->ddev, &mem->bo->gem_base, 0);
+	if (IS_ERR(*dmabuf))
+		return -EINVAL;
+
 	return 0;
 }
 

@@ -451,7 +451,7 @@ bool dc_stream_program_csc_matrix(struct dc *dc, struct dc_stream_state *stream)
 					pipes,
 					stream->output_color_space,
 					stream->csc_color_matrix.matrix,
-					pipes->plane_res.hubp->opp_id);
+					pipes->plane_res.hubp ? pipes->plane_res.hubp->opp_id : 0);
 			ret = true;
 		}
 	}
@@ -585,9 +585,6 @@ static void destruct(struct dc *dc)
 	if (dc->ctx->gpio_service)
 		dal_gpio_service_destroy(&dc->ctx->gpio_service);
 
-	if (dc->ctx->i2caux)
-		dal_i2caux_destroy(&dc->ctx->i2caux);
-
 	if (dc->ctx->created_bios)
 		dal_bios_parser_destroy(&dc->ctx->dc_bios);
 
@@ -708,14 +705,6 @@ static bool construct(struct dc *dc,
 
 		dc_ctx->created_bios = true;
 		}
-
-	/* Create I2C AUX */
-	dc_ctx->i2caux = dal_i2caux_create(dc_ctx);
-
-	if (!dc_ctx->i2caux) {
-		ASSERT_CRITICAL(false);
-		goto fail;
-	}
 
 	dc_ctx->perf_trace = dc_perf_trace_create();
 	if (!dc_ctx->perf_trace) {
