@@ -3653,7 +3653,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
 #endif
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	.verify_crc_source = amdgpu_dm_crtc_verify_crc_source,
+#endif
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	.enable_vblank = dm_enable_vblank,
 	.disable_vblank = dm_disable_vblank,
@@ -5832,10 +5834,19 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 		manage_dm_interrupts(adev, acrtc, true);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #ifdef CONFIG_DEBUG_FS
 		/* The stream has changed so CRC capture needs to re-enabled. */
 		if (dm_new_crtc_state->crc_enabled)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 			amdgpu_dm_crtc_set_crc_source(crtc, "auto");
+#else
+		{
+			size_t values_cnt;
+			amdgpu_dm_crtc_set_crc_source(crtc, "auto", &values_cnt);
+		}
+#endif
+#endif
 #endif
 	}
 

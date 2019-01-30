@@ -46,6 +46,7 @@ static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 	return AMDGPU_DM_PIPE_CRC_SOURCE_INVALID;
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 int
 amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 				 size_t *values_cnt)
@@ -61,9 +62,15 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 	*values_cnt = 3;
 	return 0;
 }
+#endif
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
+#else
+int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
+				size_t *values_cnt)
+#endif
 {
 	struct amdgpu_device *adev = crtc->dev->dev_private;
 	struct dm_crtc_state *crtc_state = to_dm_crtc_state(crtc->state);
