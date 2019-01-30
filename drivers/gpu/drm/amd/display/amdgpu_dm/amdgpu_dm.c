@@ -564,7 +564,9 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	 * Following stuff must happen at start of vblank, for crc
 	 * computation and below-the-range btr support in vrr mode.
 	 */
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 	amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
+#endif
 
 	/* BTR updates need to happen before VUPDATE on Vega and above. */
 	if (adev->family < AMDGPU_FAMILY_AI)
@@ -8493,6 +8495,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		/* Handle vrr on->off / off->on transitions */
 		amdgpu_dm_handle_vrr_transition(dm_old_crtc_state, dm_new_crtc_state);
 
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 #ifdef CONFIG_DEBUG_FS
 		if (new_crtc_state->active &&
 		    (!old_crtc_state->active ||
@@ -8518,6 +8521,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 					DRM_DEBUG_DRIVER("Failed to configure crc source");
 			}
 		}
+#endif
 #endif
 	}
 
