@@ -4623,10 +4623,13 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.page_flip = drm_atomic_helper_page_flip,
 	.atomic_duplicate_state = dm_crtc_duplicate_state,
 	.atomic_destroy_state = dm_crtc_destroy_state,
+#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
+#endif
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	.verify_crc_source = amdgpu_dm_crtc_verify_crc_source,
 	.get_crc_sources = amdgpu_dm_crtc_get_crc_sources,
-	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
+#endif
 	.enable_vblank = dm_enable_vblank,
 	.disable_vblank = dm_disable_vblank,
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
