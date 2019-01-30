@@ -155,6 +155,7 @@ m4_include([m4/hash-for-each-safe.m4])
 m4_include([m4/amd-iommu-pc-supported.m4])
 m4_include([m4/memremap-devm-memremap-pages.m4])
 m4_include([m4/drm-audio-component-header.m4])
+m4_include([m4/drm-set-crc-source.m4])
 m4_include([m4/config.m4])
 
 

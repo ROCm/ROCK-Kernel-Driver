@@ -74,13 +74,16 @@ static bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_NONE);
 }
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count)
 {
 	*count = ARRAY_SIZE(pipe_crc_sources);
 	return pipe_crc_sources;
 }
+#endif
 
+#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int
 amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 				 size_t *values_cnt)
@@ -96,7 +99,9 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 	*values_cnt = 3;
 	return 0;
 }
+#endif
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
 					enum amdgpu_dm_pipe_crc_source source)
@@ -139,7 +144,12 @@ unlock:
 	return ret;
 }
 
+#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
+#else
+int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
+				  size_t *values_cnt)
+#endif
 {
 	enum amdgpu_dm_pipe_crc_source source = dm_parse_crc_source(src_name);
 	struct drm_crtc_commit *commit;
@@ -318,3 +328,4 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 				       drm_crtc_accurate_vblank_count(crtc), crcs);
 	}
 }
+#endif
