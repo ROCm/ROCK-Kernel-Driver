@@ -70,16 +70,27 @@ static inline bool amdgpu_dm_is_valid_crc_source(enum amdgpu_dm_pipe_crc_source 
 
 /* amdgpu_dm_crc.c */
 #ifdef CONFIG_DEBUG_FS
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE)
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
 					enum amdgpu_dm_pipe_crc_source source);
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
+#else
+int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
+				  size_t *values_cnt);
+#endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS */
+#endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE */
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 int amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc,
 				     const char *src_name,
 				     size_t *values_cnt);
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count);
+#endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES */
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
+#endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE */
 #else
 #define amdgpu_dm_crtc_set_crc_source NULL
 #define amdgpu_dm_crtc_verify_crc_source NULL
