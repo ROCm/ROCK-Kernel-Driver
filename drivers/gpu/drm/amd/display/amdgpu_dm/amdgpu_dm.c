@@ -3671,8 +3671,7 @@ static void adjust_colour_depth_from_display_info(struct dc_crtc_timing *timing_
 
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_DRM_MODE_IS_420_ONLY)
 static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode)
 {
@@ -3700,7 +3699,8 @@ static void fill_stream_properties_from_drm_display_mode(
 	if (drm_mode_is_420_only(info, mode_in)
 			&& stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		timing_out->pixel_encoding = PIXEL_ENCODING_YCBCR420;
-	else if ((connector->display_info.color_formats & DRM_COLOR_FORMAT_YCRCB444)
+	else
+	if ((connector->display_info.color_formats & DRM_COLOR_FORMAT_YCRCB444)
 			&& stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
 		timing_out->pixel_encoding = PIXEL_ENCODING_YCBCR444;
 	else
