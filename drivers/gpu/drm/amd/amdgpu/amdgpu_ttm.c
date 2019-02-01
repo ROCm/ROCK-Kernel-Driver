@@ -1869,8 +1869,7 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	if (rc)
 		return rc;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
-	defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
 	adev->ssg.pgmap.res.start = res.start;
 	adev->ssg.pgmap.res.end = res.end;
 	adev->ssg.pgmap.res.name = res.name;
