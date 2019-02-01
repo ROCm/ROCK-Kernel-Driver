@@ -1843,9 +1843,13 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	(*mem)->mapping_flags =
-		AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE |
-		AMDGPU_VM_PAGE_EXECUTABLE | AMDGPU_VM_MTYPE_NC;
+
+	if (bo->kfd_bo)
+		(*mem)->mapping_flags = bo->kfd_bo->mapping_flags;
+	else
+		(*mem)->mapping_flags =
+			AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE |
+			AMDGPU_VM_PAGE_EXECUTABLE | AMDGPU_VM_MTYPE_NC;
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
