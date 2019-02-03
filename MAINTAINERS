@@ -16641,6 +16641,15 @@ S:	Maintained
 F:	drivers/platform/x86/
 F:	drivers/platform/olpc/
 
+X86 PLATFORM DRIVERS - ARCH
+R:	Darren Hart <dvhart@infradead.org>
+R:	Andy Shevchenko <andy@infradead.org>
+L:	platform-driver-x86@vger.kernel.org
+L:	x86@kernel.org
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git x86/core
+S:	Maintained
+F:	arch/x86/platform
+
 X86 VDSO
 M:	Andy Lutomirski <luto@kernel.org>
 L:	linux-kernel@vger.kernel.org
@@ -16672,6 +16681,24 @@ W:	https://linuxtv.org
 T:	git git://linuxtv.org/media_tree.git
 S:	Maintained
 F:	drivers/media/tuners/tuner-xc2028.*
+
+XDP (eXpress Data Path)
+M:	Alexei Starovoitov <ast@kernel.org>
+M:	Daniel Borkmann <daniel@iogearbox.net>
+M:	David S. Miller <davem@davemloft.net>
+M:	Jakub Kicinski <jakub.kicinski@netronome.com>
+M:	Jesper Dangaard Brouer <hawk@kernel.org>
+M:	John Fastabend <john.fastabend@gmail.com>
+L:	netdev@vger.kernel.org
+L:	xdp-newbies@vger.kernel.org
+S:	Supported
+F:	net/core/xdp.c
+F:	include/net/xdp.h
+F:	kernel/bpf/devmap.c
+F:	kernel/bpf/cpumap.c
+F:	include/trace/events/xdp.h
+K:	xdp
+N:	xdp
 
 XDP SOCKETS (AF_XDP)
 M:	Björn Töpel <bjorn.topel@intel.com>
