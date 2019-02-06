@@ -2773,7 +2773,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	if (amdgpu_device_is_px(ddev))
 		runtime = true;
+#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
+#endif
 		kcl_vga_switcheroo_register_client(adev->pdev,
 					       &amdgpu_switcheroo_ops, runtime);
 	if (runtime)
@@ -3002,7 +3004,9 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 
 	kfree(adev->bios);
 	adev->bios = NULL;
+#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
+#endif
 		vga_switcheroo_unregister_client(adev->pdev);
 	if (adev->flags & AMD_IS_PX)
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
