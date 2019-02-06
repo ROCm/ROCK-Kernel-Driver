@@ -27,6 +27,7 @@ m4_include([m4/pcie-bandwidth-available.m4])
 m4_include([m4/drm-fb-helper-remove-conflicting-pci-framebuffers.m4])
 m4_include([m4/pcie-get-speed-width-cap.m4])
 m4_include([m4/pcie-enable-atomic-ops-to-root.m4])
+m4_include([m4/pci-is-thunderbolt-attached.m4])
 m4_include([m4/config.m4])
 
 
