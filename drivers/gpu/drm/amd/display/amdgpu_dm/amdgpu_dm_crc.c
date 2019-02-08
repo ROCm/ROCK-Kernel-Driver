@@ -80,8 +80,10 @@ const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 	*count = ARRAY_SIZE(pipe_crc_sources);
 	return pipe_crc_sources;
 }
+#endif
 
 
+#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int
 amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 				 size_t *values_cnt)
@@ -100,7 +102,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 #endif
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0) || !defined(BUILD_AS_DKMS)
+#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 #else
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
