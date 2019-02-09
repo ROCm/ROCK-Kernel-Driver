@@ -310,17 +310,11 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		return;
 	}
 
+	/* Update to correct count(s) if racing with vblank irq */
+	amdgpu_crtc->last_flip_vblank = drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
 
 	/* wake up userspace */
 	if (amdgpu_crtc->event) {
-		/* Update to correct count(s) if racing with vblank irq */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-		defined(OS_NAME_SUSE_15)
-		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
-#elif DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
-		/* Update to correct count/ts if racing with vblank irq */
-		drm_accurate_vblank_count(&amdgpu_crtc->base);
-#endif
 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
 
 		/* page flip completed. clean up */
@@ -5345,6 +5339,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	uint64_t tiling_flags, dcc_address;
 	uint32_t target, target_vblank;
 	bool pflip_present = false;
+	uint64_t last_flip_vblank;
+	bool vrr_active = acrtc_state->freesync_config.state == VRR_STATE_ACTIVE_VARIABLE;
 
 	struct {
 		struct dc_surface_update surface_updates[MAX_SURFACES];
@@ -5502,7 +5498,31 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	}
 
 	if (pflip_present) {
-		target = (uint32_t)drm_crtc_vblank_count(pcrtc) + wait_for_vblank;
+		if (!vrr_active) {
+			/* Use old throttling in non-vrr fixed refresh rate mode
+			 * to keep flip scheduling based on target vblank counts
+			 * working in a backwards compatible way, e.g., for
+			 * clients using the GLX_OML_sync_control extension or
+			 * DRI3/Present extension with defined target_msc.
+			 */
+			last_flip_vblank = drm_crtc_vblank_count(pcrtc);
+		}
+		else {
+			/* For variable refresh rate mode only:
+			 * Get vblank of last completed flip to avoid > 1 vrr
+			 * flips per video frame by use of throttling, but allow
+			 * flip programming anywhere in the possibly large
+			 * variable vrr vblank interval for fine-grained flip
+			 * timing control and more opportunity to avoid stutter
+			 * on late submission of flips.
+			 */
+			spin_lock_irqsave(&pcrtc->dev->event_lock, flags);
+			last_flip_vblank = acrtc_attach->last_flip_vblank;
+			spin_unlock_irqrestore(&pcrtc->dev->event_lock, flags);
+		}
+
+		target = (uint32_t)last_flip_vblank + wait_for_vblank;
+
 		/* Prepare wait for target vblank early - before the fence-waits */
 		target_vblank = target - (uint32_t)drm_crtc_vblank_count(pcrtc) +
 				amdgpu_get_vblank_counter_kms(pcrtc->dev, acrtc_attach->crtc_id);
