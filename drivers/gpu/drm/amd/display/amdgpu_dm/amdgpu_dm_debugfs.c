@@ -671,6 +671,7 @@ static ssize_t dp_phy_test_pattern_debugfs_write(struct file *f, const char __us
 	return bytes_from_user;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 /*
  * Returns the min and max vrr vfreq through the connector's debugfs file.
  * Example usage: cat /sys/kernel/debug/dri/0/DP-1/vrr_range
@@ -689,6 +690,7 @@ static int vrr_range_show(struct seq_file *m, void *data)
 	return 0;
 }
 DEFINE_SHOW_ATTRIBUTE(vrr_range);
+#endif
 
 static const struct file_operations dp_link_settings_debugfs_fops = {
 	.owner = THIS_MODULE,
@@ -717,7 +719,9 @@ static const struct {
 		{"link_settings", &dp_link_settings_debugfs_fops},
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
 		{"test_pattern", &dp_phy_test_pattern_fops},
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 		{"vrr_range", &vrr_range_fops}
+#endif
 };
 
 int connector_debugfs_init(struct amdgpu_dm_connector *connector)
