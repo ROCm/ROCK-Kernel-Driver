@@ -97,4 +97,14 @@ static inline u16 pci_dev_id(struct pci_dev *dev)
 }
 #endif /* HAVE_PCI_DEV_ID */
 
+#if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
+static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
+{
+	dev = pci_physfn(dev);
+	if (pci_is_root_bus(dev->bus))
+		return NULL;
+
+	return dev->bus->self;
+}
+#endif
 #endif /* AMDKCL_PCI_H */
