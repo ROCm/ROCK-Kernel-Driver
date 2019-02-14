@@ -6795,7 +6795,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	dc_resource_state_copy_construct_current(dc, dm_state->context);
 #endif
 	/* Remove exiting planes if they are modified */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, new_plane_state, i) {
+		old_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		ret = dm_update_plane_state(dc, state, plane,
 					    old_plane_state,
 					    new_plane_state,
@@ -6806,7 +6811,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Disable all crtcs which require disable */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		ret = dm_update_crtc_state(&adev->dm, state, crtc,
 					   old_crtc_state,
 					   new_crtc_state,
@@ -6817,7 +6827,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Enable all crtcs which require enable */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+		old_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+#endif
 		ret = dm_update_crtc_state(&adev->dm, state, crtc,
 					   old_crtc_state,
 					   new_crtc_state,
@@ -6828,7 +6843,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Add new/modified planes */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, new_plane_state, i) {
+		old_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		ret = dm_update_plane_state(dc, state, plane,
 					    old_plane_state,
 					    new_plane_state,
