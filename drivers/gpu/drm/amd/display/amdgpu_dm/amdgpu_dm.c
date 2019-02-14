@@ -1795,7 +1795,9 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
 	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
+#endif
 
 	adev->ddev->mode_config.max_width = 16384;
 	adev->ddev->mode_config.max_height = 16384;
