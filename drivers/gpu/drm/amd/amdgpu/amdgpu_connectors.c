@@ -225,10 +225,15 @@ amdgpu_connector_update_scratch_regs(struct drm_connector *connector,
 	struct drm_encoder *encoder;
 	const struct drm_connector_helper_funcs *connector_funcs = connector->helper_private;
 	bool connected;
+	int i;
 
 	best_encoder = connector_funcs->best_encoder(connector);
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		if ((encoder == best_encoder) && (status == connector_status_connected))
 			connected = true;
 		else
@@ -243,8 +248,13 @@ amdgpu_connector_find_encoder(struct drm_connector *connector,
 			       int encoder_type)
 {
 	struct drm_encoder *encoder;
+	int i;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		if (encoder->encoder_type == encoder_type)
 			return encoder;
 	}
@@ -353,9 +363,14 @@ static struct drm_encoder *
 amdgpu_connector_best_single_encoder(struct drm_connector *connector)
 {
 	struct drm_encoder *encoder;
+	int i;
 
 	/* pick the first one */
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder)
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i)
+#endif
 		return encoder;
 
 	return NULL;
@@ -1081,8 +1096,13 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 	/* find analog encoder */
 	if (amdgpu_connector->dac_load_detect) {
 		struct drm_encoder *encoder;
+		int i;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 		drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+		drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 			if (encoder->encoder_type != DRM_MODE_ENCODER_DAC &&
 			    encoder->encoder_type != DRM_MODE_ENCODER_TVDAC)
 				continue;
@@ -1132,8 +1152,13 @@ amdgpu_connector_dvi_encoder(struct drm_connector *connector)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 	struct drm_encoder *encoder;
+	int i;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		if (amdgpu_connector->use_digital == true) {
 			if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS)
 				return encoder;
@@ -1148,7 +1173,11 @@ amdgpu_connector_dvi_encoder(struct drm_connector *connector)
 
 	/* then check use digitial */
 	/* pick the first one */
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder)
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i)
+#endif
 		return encoder;
 
 	return NULL;
@@ -1285,8 +1314,13 @@ u16 amdgpu_connector_encoder_get_dp_bridge_encoder_id(struct drm_connector *conn
 {
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
+	int i;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		amdgpu_encoder = to_amdgpu_encoder(encoder);
 
 		switch (amdgpu_encoder->encoder_id) {
@@ -1305,9 +1339,14 @@ static bool amdgpu_connector_encoder_is_hbr2(struct drm_connector *connector)
 {
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
+	int i;
 	bool found = false;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		amdgpu_encoder = to_amdgpu_encoder(encoder);
 		if (amdgpu_encoder->caps & ATOM_ENCODER_CAP_RECORD_HBR2)
 			found = true;
