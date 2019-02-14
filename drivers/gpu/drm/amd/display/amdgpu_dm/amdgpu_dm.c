@@ -7477,6 +7477,7 @@ static int to_drm_connector_type(enum signal_type st)
 
 static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
 {
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	struct drm_encoder *encoder;
 
 	/* There is only one encoder per connector */
@@ -7484,6 +7485,9 @@ static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *
 		return encoder;
 
 	return NULL;
+#else
+	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
+#endif
 }
 
 static void amdgpu_dm_get_native_mode(struct drm_connector *connector)

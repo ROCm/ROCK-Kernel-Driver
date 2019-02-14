@@ -282,14 +282,23 @@ static struct drm_encoder *
 dce_virtual_encoder(struct drm_connector *connector)
 {
 	struct drm_encoder *encoder;
+	int i;
 
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder) {
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i) {
+#endif
 		if (encoder->encoder_type == DRM_MODE_ENCODER_VIRTUAL)
 			return encoder;
 	}
 
 	/* pick the first one */
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
 	drm_connector_for_each_possible_encoder(connector, encoder)
+#else
+	drm_connector_for_each_possible_encoder(connector, encoder, i)
+#endif
 		return encoder;
 
 	return NULL;
