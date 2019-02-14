@@ -583,6 +583,10 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 }
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
+/* helper for handling conditionals in various for_each macros */
+#define for_each_if(condition) if (!(condition)) {} else
+#endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
