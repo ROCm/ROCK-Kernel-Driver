@@ -558,8 +558,9 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_destroy(&adev->dm.dc_lock);
-
+#endif
 	return;
 }
 
