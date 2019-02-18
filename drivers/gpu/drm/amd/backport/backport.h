@@ -18,5 +18,6 @@
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_video.h>
+#include <kcl/kcl_acpi.h>
 
 #endif /* AMDGPU_BACKPORT_H */
