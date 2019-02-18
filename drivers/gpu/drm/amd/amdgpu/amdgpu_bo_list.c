@@ -223,12 +223,15 @@ void amdgpu_bo_list_put(struct amdgpu_bo_list *list)
 int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 				      struct drm_amdgpu_bo_list_entry **info_param)
 {
-	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
 	const uint32_t info_size = sizeof(struct drm_amdgpu_bo_list_entry);
+
+	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
+
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;
 
-	info = kvmalloc_array(in->bo_number, info_size, GFP_KERNEL);
+	info = kvmalloc_array(in->bo_number,
+			     sizeof(struct drm_amdgpu_bo_list_entry), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
