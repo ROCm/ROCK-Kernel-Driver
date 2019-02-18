@@ -63,4 +63,7 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVCALLOC */
 
+#ifndef HAVE_MM_ACCESS
+extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
+#endif
 #endif /* AMDKCL_MM_H */
