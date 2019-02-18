@@ -17,6 +17,7 @@
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_acpi.h>
+#include <kcl/kcl_workqueue.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/backport/kcl_kthread_backport.h>
