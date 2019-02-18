@@ -9,4 +9,5 @@
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_amdgpu.h>
 #include <kcl/kcl_drm_backport.h>
+#include <kcl/kcl_acpi.h>
 #endif /* AMDGPU_BACKPORT_H */
