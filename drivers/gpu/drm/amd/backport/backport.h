@@ -10,5 +10,6 @@
 #include <kcl/kcl_mm.h>
 #include <kcl/kcl_vga_switcheroo.h>
 #include <kcl/kcl_fence_array.h>
+#include <kcl/kcl_reservation.h>
 
 #endif /* AMDGPU_BACKPORT_H */
