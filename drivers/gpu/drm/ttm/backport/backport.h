@@ -3,7 +3,6 @@
 
 #include <linux/version.h>
 #include <kcl/reservation.h>
-#include <kcl/kcl_mm.h>
 #include <kcl/kcl_drm_vma_manager_backport.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_drm_backport.h>
@@ -12,5 +11,5 @@
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_list.h>
-#include <kcl/kcl_mm.h>
+#include <kcl/kcl_mm_backport.h>
 #endif
