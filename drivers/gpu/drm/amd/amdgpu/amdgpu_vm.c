@@ -2213,7 +2213,7 @@ static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	unsigned i, shared_count;
 	int r;
 
-	r = reservation_object_get_fences_rcu(resv, &excl,
+	r = kcl_reservation_object_get_fences_rcu(resv, &excl,
 					      &shared_count, &shared);
 	if (r) {
 		/* Not enough memory to grab the fence list, as last resort
@@ -2326,7 +2326,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 		spin_unlock(&vm->invalidated_lock);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
-		if (!amdgpu_vm_debug && reservation_object_trylock(resv))
+		if (!amdgpu_vm_debug && kcl_reservation_object_trylock(resv))
 			clear = false;
 		/* Somebody else is using the BO right now */
 		else
@@ -2337,7 +2337,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 			return r;
 
 		if (!clear)
-			reservation_object_unlock(resv);
+			kcl_reservation_object_unlock(resv);
 		spin_lock(&vm->invalidated_lock);
 	}
 	spin_unlock(&vm->invalidated_lock);
