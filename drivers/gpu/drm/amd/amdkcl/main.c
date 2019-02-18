@@ -10,6 +10,7 @@ extern void amdkcl_mm_init(void);
 extern void amdkcl_pci_init(void);
 extern void amdkcl_perf_event_init(void);
 extern void amdkcl_suspend_init(void);
+extern int amdkcl_workqueue_init_early(void);
 
 
 int __init amdkcl_init(void)
@@ -23,6 +24,7 @@ int __init amdkcl_init(void)
 	amdkcl_pci_init();
 	amdkcl_perf_event_init();
 	amdkcl_suspend_init();
+	amdkcl_workqueue_init_early();
 	return 0;
 }
 module_init(amdkcl_init);
