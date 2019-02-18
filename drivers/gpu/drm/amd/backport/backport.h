@@ -11,6 +11,7 @@
 #include <kcl/kcl_vga_switcheroo.h>
 #include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_reservation.h>
+#include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_kernel.h>
 
 #endif /* AMDGPU_BACKPORT_H */
