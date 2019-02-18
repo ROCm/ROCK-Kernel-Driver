@@ -8,5 +8,6 @@
 #include <kcl/kcl_fence_backport.h>
 #include <kcl/kcl_highmem_backport.h>
 #include <kcl/kcl_kernel.h>
+#include <kcl/kcl_kref.h>
 
 #endif
