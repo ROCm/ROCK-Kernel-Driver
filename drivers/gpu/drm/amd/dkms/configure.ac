@@ -61,6 +61,7 @@ m4_include([m4/dma-fence-headers.m4])
 m4_include([m4/dma-fence-set-error.m4])
 m4_include([m4/request-firmware-direct.m4])
 m4_include([m4/kmap-atomic.m4])
+m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
