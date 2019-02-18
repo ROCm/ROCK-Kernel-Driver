@@ -59,6 +59,10 @@ static inline void mmgrab(struct mm_struct *mm)
 }
 #endif
 
+#ifndef HAVE_MM_ACCESS
+extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
+#endif
+
 #if !defined(HAVE_MEMALLOC_NOFS_SAVE)
 static inline unsigned int memalloc_nofs_save(void)
 {
