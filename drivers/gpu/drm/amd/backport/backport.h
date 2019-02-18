@@ -21,6 +21,7 @@
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_tracepoint.h>
+#include <kcl/kcl_bitmap.h>
 #include <kcl/kcl_kernel.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
 #include <kcl/kcl_interval_tree_generic.h>
