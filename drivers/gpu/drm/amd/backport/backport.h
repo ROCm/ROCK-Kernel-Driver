@@ -16,5 +16,6 @@
 #include <kcl/kcl_eventpoll.h>
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_firmware.h>
+#include <kcl/kcl_hwmon.h>
 
 #endif /* AMDGPU_BACKPORT_H */
