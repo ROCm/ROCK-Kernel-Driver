@@ -5,6 +5,7 @@ m4_include([m4/kallsyms-lookup-name.m4])
 m4_include([m4/mmu-notifier-call-srcu.m4])
 m4_include([m4/in-compat-syscall.m4])
 m4_include([m4/kobj-to-dev.m4])
+m4_include([m4/devcgroup-check-permission.m4])
 
 m4_include([m4/config.m4])
 
