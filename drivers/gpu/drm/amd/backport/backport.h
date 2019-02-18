@@ -12,6 +12,7 @@
 #include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_reservation.h>
 #include <kcl/kcl_hwmon.h>
+#include <kcl/kcl_acpi.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_device_cgroup.h>
 #include <kcl/kcl_drm_dp_helper.h>
