@@ -3,6 +3,7 @@ dnl # Default kernel configuration
 dnl #
 AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_KERNEL
+	AC_AMDGPU_MMU_NOTIFIER_CALL_SRCU
 
 	AC_KERNEL_WAIT
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
