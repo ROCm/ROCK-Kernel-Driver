@@ -2620,9 +2620,8 @@ static int vega20_get_sclks(struct pp_hwmgr *hwmgr,
 	struct vega20_single_dpm_table *dpm_table = &(data->dpm_table.gfx_table);
 	int i, count;
 
-	PP_ASSERT_WITH_CODE(data->smu_features[GNLD_DPM_GFXCLK].enabled,
-		"[GetSclks]: gfxclk dpm not enabled!\n",
-		return -EPERM);
+	if (!data->smu_features[GNLD_DPM_GFXCLK].enabled)
+		return -1;
 
 	count = (dpm_table->count > MAX_NUM_CLOCKS) ? MAX_NUM_CLOCKS : dpm_table->count;
 	clocks->num_levels = count;
@@ -2649,9 +2648,8 @@ static int vega20_get_memclocks(struct pp_hwmgr *hwmgr,
 	struct vega20_single_dpm_table *dpm_table = &(data->dpm_table.mem_table);
 	int i, count;
 
-	PP_ASSERT_WITH_CODE(data->smu_features[GNLD_DPM_UCLK].enabled,
-		"[GetMclks]: uclk dpm not enabled!\n",
-		return -EPERM);
+	if (!data->smu_features[GNLD_DPM_UCLK].enabled)
+		return -1;
 
 	count = (dpm_table->count > MAX_NUM_CLOCKS) ? MAX_NUM_CLOCKS : dpm_table->count;
 	clocks->num_levels = data->mclk_latency_table.count = count;
@@ -2675,9 +2673,8 @@ static int vega20_get_dcefclocks(struct pp_hwmgr *hwmgr,
 	struct vega20_single_dpm_table *dpm_table = &(data->dpm_table.dcef_table);
 	int i, count;
 
-	PP_ASSERT_WITH_CODE(data->smu_features[GNLD_DPM_DCEFCLK].enabled,
-		"[GetDcfclocks]: dcefclk dpm not enabled!\n",
-		return -EPERM);
+	if (!data->smu_features[GNLD_DPM_DCEFCLK].enabled)
+		return -1;
 
 	count = (dpm_table->count > MAX_NUM_CLOCKS) ? MAX_NUM_CLOCKS : dpm_table->count;
 	clocks->num_levels = count;
@@ -2698,9 +2695,8 @@ static int vega20_get_socclocks(struct pp_hwmgr *hwmgr,
 	struct vega20_single_dpm_table *dpm_table = &(data->dpm_table.soc_table);
 	int i, count;
 
-	PP_ASSERT_WITH_CODE(data->smu_features[GNLD_DPM_SOCCLK].enabled,
-		"[GetSocclks]: socclk dpm not enabled!\n",
-		return -EPERM);
+	if (!data->smu_features[GNLD_DPM_SOCCLK].enabled)
+		return -1;
 
 	count = (dpm_table->count > MAX_NUM_CLOCKS) ? MAX_NUM_CLOCKS : dpm_table->count;
 	clocks->num_levels = count;
@@ -3116,10 +3112,11 @@ static int vega20_print_clock_levels(struct pp_hwmgr *hwmgr,
 				"Attempt to get current gfx clk Failed!",
 				return ret);
 
-		ret = vega20_get_sclks(hwmgr, &clocks);
-		PP_ASSERT_WITH_CODE(!ret,
-				"Attempt to get gfx clk levels Failed!",
-				return ret);
+		if (vega20_get_sclks(hwmgr, &clocks)) {
+			size += sprintf(buf + size, "0: %uMhz * (DPM disabled)\n",
+				now / 100);
+			break;
+		}
 
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
@@ -3133,10 +3130,11 @@ static int vega20_print_clock_levels(struct pp_hwmgr *hwmgr,
 				"Attempt to get current mclk freq Failed!",
 				return ret);
 
-		ret = vega20_get_memclocks(hwmgr, &clocks);
-		PP_ASSERT_WITH_CODE(!ret,
-				"Attempt to get memory clk levels Failed!",
-				return ret);
+		if (vega20_get_memclocks(hwmgr, &clocks)) {
+			size += sprintf(buf + size, "0: %uMhz * (DPM disabled)\n",
+				now / 100);
+			break;
+		}
 
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
@@ -3150,10 +3148,11 @@ static int vega20_print_clock_levels(struct pp_hwmgr *hwmgr,
 				"Attempt to get current socclk freq Failed!",
 				return ret);
 
-		ret = vega20_get_socclocks(hwmgr, &clocks);
-		PP_ASSERT_WITH_CODE(!ret,
-				"Attempt to get soc clk levels Failed!",
-				return ret);
+		if (vega20_get_socclocks(hwmgr, &clocks)) {
+			size += sprintf(buf + size, "0: %uMhz * (DPM disabled)\n",
+				now / 100);
+			break;
+		}
 
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
@@ -3179,10 +3178,11 @@ static int vega20_print_clock_levels(struct pp_hwmgr *hwmgr,
 				"Attempt to get current dcefclk freq Failed!",
 				return ret);
 
-		ret = vega20_get_dcefclocks(hwmgr, &clocks);
-		PP_ASSERT_WITH_CODE(!ret,
-				"Attempt to get dcefclk levels Failed!",
-				return ret);
+		if (vega20_get_dcefclocks(hwmgr, &clocks)) {
+			size += sprintf(buf + size, "0: %uMhz * (DPM disabled)\n",
+				now / 100);
+			break;
+		}
 
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
