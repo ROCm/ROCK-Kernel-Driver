@@ -5491,9 +5491,15 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 #endif
 	}
 
-	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
+	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			handle_cursor_update(plane, old_plane_state);
+	}
 
 cleanup:
 	kfree(bundle);
@@ -6761,7 +6767,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	drm_for_each_crtc(crtc, dev) {
 		bool modified = false;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		for_each_plane_in_state(state, plane, old_plane_state, i) {
+			new_plane_state = plane->state;
+#else
 		for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
+#endif
 			if (plane->type == DRM_PLANE_TYPE_CURSOR)
 				continue;
 
