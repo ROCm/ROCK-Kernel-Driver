@@ -5887,10 +5887,15 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 #endif
 	}
-
-	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
+	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
+#endif
 		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
 			wait_for_vblank = false;
+	}
 
 	/* update planes when needed per crtc*/
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
