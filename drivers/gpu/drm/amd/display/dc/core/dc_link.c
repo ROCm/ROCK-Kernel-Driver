@@ -43,6 +43,10 @@
 #include "dpcd_defs.h"
 #include "dmcu.h"
 #include "hw/clk_mgr.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#include "resource.h"
+#endif
+#include "hw/clk_mgr.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -1482,6 +1486,7 @@ static enum dc_status enable_link_dp(
 	if (link_settings.link_rate == LINK_RATE_LOW)
 			skip_video_pattern = false;
 
+
 	if (perform_link_training_with_retries(
 			link,
 			&link_settings,
@@ -2717,7 +2722,6 @@ void core_link_enable_stream(
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			enable_stream_features(pipe_ctx);
 	}
-
 }
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx, int option)
