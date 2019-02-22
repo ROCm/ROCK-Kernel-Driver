@@ -8240,7 +8240,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
 #endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#else
 		if (new_crtc_state->async_flip)
+#endif
 			wait_for_vblank = false;
 	}
 
