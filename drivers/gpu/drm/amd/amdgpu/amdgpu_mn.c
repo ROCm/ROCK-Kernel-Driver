@@ -435,6 +435,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 
 #endif
 
+
 /**
  * amdgpu_mn_invalidate_range_end - callback to notify about mm change
  *
@@ -446,7 +447,13 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
  * Release the lock again to allow new command submissions.
  */
 static void amdgpu_mn_invalidate_range_end(struct mmu_notifier *mn,
-			const struct mmu_notifier_range *range)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+					   const struct mmu_notifier_range *range)
+#else
+					   struct mm_struct *mm,
+					   unsigned long start,
+					   unsigned long end)
+#endif
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 
