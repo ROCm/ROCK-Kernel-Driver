@@ -6851,8 +6851,20 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	/* Enable interrupts for CRTCs going through a modeset. */
 	amdgpu_dm_enable_crtc_interrupts(dev, state, true);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j)
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#else
 		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#endif
 			wait_for_vblank = false;
 
 	/* update planes when needed per crtc*/
