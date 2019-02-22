@@ -3446,13 +3446,20 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
-
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
 	struct drm_crtc_state *crtc_state,
 	struct drm_property *property,
 	uint64_t val)
 {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+	struct drm_device *dev = crtc->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct dm_crtc_state *dm_state = to_dm_crtc_state(crtc_state);
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 	struct drm_plane_state *plane_state;
 
 	crtc_state->planes_changed = true;
@@ -3464,8 +3471,33 @@ static int dm_crtc_funcs_atomic_set_property(
 
 	if (!plane_state)
 		return -EINVAL;
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+	if (property == adev->mode_info.vrr_enabled_property) {
+		dm_state->base_vrr_enabled = val;
+	}
+#endif
 
 	return 0;
+}
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+static int dm_crtc_funcs_atomic_get_property(struct drm_crtc *crtc,
+	const struct drm_crtc_state *state,
+	struct drm_property *property,
+	uint64_t *val)
+{
+	struct drm_device *dev = crtc->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct dm_crtc_state *dm_state = to_dm_crtc_state(state);
+
+	if (property == adev->mode_info.vrr_enabled_property) {
+		*val = dm_state->base_vrr_enabled;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 #endif
 
@@ -3652,6 +3684,10 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 #else
 	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
+#endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
+	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
@@ -4471,6 +4507,12 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (res)
 		goto fail;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+	drm_object_attach_property(&acrtc->base.base,
+				   dm->adev->mode_info.vrr_enabled_property,
+				   0);
+#endif
+
 	drm_crtc_helper_add(&acrtc->base, &amdgpu_dm_crtc_helper_funcs);
 
 	/* Create (reset) the plane state */
@@ -4759,6 +4801,9 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 21, 0)
 		drm_connector_attach_vrr_capable_property(
 			&aconnector->base);
+#else
+		drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.vrr_capable_property, 0);
 #endif
 		drm_object_attach_property(&aconnector->base.base,
 					adev->mode_info.freesync_property, 0);
@@ -7101,6 +7146,11 @@ update:
 	if (connector->vrr_capable_property)
 		drm_connector_set_vrr_capable_property(connector,
 						       freesync_capable);
+#else
+	if (adev->mode_info.vrr_capable_property)
+		drm_object_property_set_value(
+			&connector->base, adev->mode_info.vrr_capable_property,
+			freesync_capable);
 #endif
 }
 
