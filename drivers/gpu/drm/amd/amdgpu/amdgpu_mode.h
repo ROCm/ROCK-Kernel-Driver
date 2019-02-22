@@ -378,7 +378,7 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	/* Support for upstream vrr_capable connector property */
 	struct drm_property *vrr_capable_property;
 	/* Support for upstream vrr_enabled CRTC property */

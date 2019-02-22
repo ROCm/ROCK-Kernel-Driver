@@ -2326,7 +2326,7 @@ retry:
 		new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(state, &acrtc->base);
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		dm_new_crtc_state->base_vrr_enabled =
 #else
 		dm_new_crtc_state->base.vrr_enabled =
@@ -3551,18 +3551,16 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
 	struct drm_crtc_state *crtc_state,
 	struct drm_property *property,
 	uint64_t val)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
 	struct drm_device *dev = crtc->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dm_crtc_state *dm_state = to_dm_crtc_state(crtc_state);
-#endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
 	struct drm_plane_state *plane_state;
 
@@ -3576,17 +3574,13 @@ static int dm_crtc_funcs_atomic_set_property(
 	if (!plane_state)
 		return -EINVAL;
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
 	if (property == adev->mode_info.vrr_enabled_property) {
 		dm_state->base_vrr_enabled = val;
 	}
-#endif
 
 	return 0;
 }
-#endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
 static int dm_crtc_funcs_atomic_get_property(struct drm_crtc *crtc,
 	const struct drm_crtc_state *state,
 	struct drm_property *property,
@@ -3741,7 +3735,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 		state->stream = cur->stream;
 		dc_stream_retain(state->stream);
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	state->base_vrr_enabled = cur->base_vrr_enabled;
 #endif
 	state->vrr_params = cur->vrr_params;
@@ -3789,7 +3783,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
@@ -4611,7 +4605,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (res)
 		goto fail;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	drm_object_attach_property(&acrtc->base.base,
 				   dm->adev->mode_info.vrr_enabled_property,
 				   0);
@@ -4902,7 +4896,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
 	    connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
 	    connector_type == DRM_MODE_CONNECTOR_eDP) {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 		drm_connector_attach_vrr_capable_property(
 			&aconnector->base);
 #else
@@ -5331,7 +5325,7 @@ static void update_freesync_state_on_stream(
 	if (new_crtc_state->vrr_supported &&
 	    config.min_refresh_in_uhz &&
 	    config.max_refresh_in_uhz) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		config.state = new_crtc_state->base_vrr_enabled ?
 #else
 		config.state = new_crtc_state->base.vrr_enabled ?
@@ -5382,7 +5376,7 @@ static void update_freesync_state_on_stream(
 	if (new_crtc_state->freesync_vrr_info_changed)
 		DRM_DEBUG_KMS("VRR packet update: crtc=%u enabled=%d state=%d",
 			      new_crtc_state->base.crtc->base.id,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 			      (int)new_crtc_state->base.vrr_enabled,
 #else
 			      (int)new_crtc_state->base_vrr_enabled,
@@ -6306,7 +6300,7 @@ static void get_freesync_config_for_crtc(
 
 	if (new_crtc_state->vrr_supported) {
 		new_crtc_state->stream->ignore_msa_timing_param = true;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		config.state = new_crtc_state->base_vrr_enabled ?
 #else
 		config.state = new_crtc_state->base.vrr_enabled ?
@@ -7278,7 +7272,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 update:
 	if (dm_con_state)
 		dm_con_state->freesync_capable = freesync_capable;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 21, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 	if (connector->vrr_capable_property)
 		drm_connector_set_vrr_capable_property(connector,
 						       freesync_capable);
