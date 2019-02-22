@@ -371,10 +371,13 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 /* amdgpu_dm_crc.c */
 #if defined(CONFIG_DEBUG_FS) && (DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0))
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
-int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
 int amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc,
 				     const char *src_name,
 				     size_t *values_cnt);
+
+#endif
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0) || !defined(BUILD_AS_DKMS)
+int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
 #else
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 				size_t *values_cnt);
