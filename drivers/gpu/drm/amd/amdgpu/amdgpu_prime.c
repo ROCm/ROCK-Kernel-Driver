@@ -38,7 +38,9 @@
 #include "amdgpu_gem.h"
 #include <drm/amdgpu_drm.h>
 #include <linux/dma-buf.h>
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #include <linux/dma-fence-array.h>
+#endif
 
 /**
  * amdgpu_gem_prime_get_sg_table - &drm_driver.gem_prime_get_sg_table
