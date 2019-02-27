@@ -8,7 +8,6 @@ menuconfig BPFILTER
 if BPFILTER
 config BPFILTER_UMH
 	tristate "bpfilter kernel module with user mode helper"
-	depends on $(success,$(srctree)/scripts/cc-can-link.sh $(CC))
 	default m
 	help
 	  This builds bpfilter kernel module with embedded user mode helper
