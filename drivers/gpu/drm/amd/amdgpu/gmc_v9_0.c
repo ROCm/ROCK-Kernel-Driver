@@ -726,8 +726,8 @@ static bool gmc_v9_0_keep_stolen_memory(struct amdgpu_device *adev)
 static int gmc_v9_0_allocate_vm_inv_eng(struct amdgpu_device *adev)
 {
 	struct amdgpu_ring *ring;
-	unsigned vm_inv_engs[AMDGPU_MAX_VMHUBS] =
-		{GFXHUB_FREE_VM_INV_ENGS_BITMAP, MMHUB_FREE_VM_INV_ENGS_BITMAP};
+	unsigned long vm_inv_engs[AMDGPU_MAX_VMHUBS] =
+		      {GFXHUB_FREE_VM_INV_ENGS_BITMAP, MMHUB_FREE_VM_INV_ENGS_BITMAP};
 	unsigned i;
 	unsigned vmhub, inv_eng;
 
@@ -743,7 +743,7 @@ static int gmc_v9_0_allocate_vm_inv_eng(struct amdgpu_device *adev)
 		}
 
 		ring->vm_inv_eng = inv_eng - 1;
-		change_bit(inv_eng - 1, (unsigned long *)(&vm_inv_engs[vmhub]));
+		change_bit(inv_eng - 1, &vm_inv_engs[vmhub]);
 
 		dev_info(adev->dev, "ring %s uses VM inv eng %u on hub %u\n",
 			 ring->name, ring->vm_inv_eng, ring->funcs->vmhub);
