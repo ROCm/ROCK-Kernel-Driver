@@ -234,6 +234,8 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 	return false;
 #elif defined(CONFIG_MIPS) && defined(CONFIG_CPU_LOONGSON3)
 	return false;
+#elif defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+	return false;
 #else
 	return true;
 #endif
