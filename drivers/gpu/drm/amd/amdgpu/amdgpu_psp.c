@@ -654,7 +654,6 @@ static int psp_ras_terminate(struct psp_context *psp)
 
 static int psp_ras_initialize(struct psp_context *psp)
 {
-	struct ta_ras_shared_memory *ras_cmd;
 	int ret;
 
 	if (!psp->ras.ras_initialized) {

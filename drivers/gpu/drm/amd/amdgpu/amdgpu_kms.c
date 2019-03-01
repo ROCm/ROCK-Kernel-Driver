@@ -973,7 +973,8 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		if (!ras)
 			return -EINVAL;
 		return copy_to_user(out, &ras->features,
-				min(size, sizeof(ras->features))) ? -EFAULT : 0;
+				min_t(u32, size, sizeof(ras->features))) ?
+			-EFAULT : 0;
 	}
 	default:
 		DRM_DEBUG_KMS("Invalid request %d\n", info->query);

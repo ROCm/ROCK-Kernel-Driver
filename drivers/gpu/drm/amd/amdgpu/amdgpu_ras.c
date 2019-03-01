@@ -142,7 +142,8 @@ static ssize_t amdgpu_ras_debugfs_read(struct file *f, char __user *buf,
 		return 0;
 
 	s -= *pos;
-	s = min(s, size);
+	s = min_t(u64, s, size);
+
 
 	if (copy_to_user(buf, &val[*pos], s))
 		return -EINVAL;
@@ -159,7 +160,7 @@ static ssize_t amdgpu_ras_debugfs_write(struct file *f, const char __user *buf,
 	struct ras_inject_if info = {
 		.head = obj->head,
 	};
-	ssize_t s = min(64ULL, size);
+	ssize_t s = min_t(u64, 64, size);
 	char val[64];
 	char *str = val;
 	memset(val, 0, sizeof(val));
