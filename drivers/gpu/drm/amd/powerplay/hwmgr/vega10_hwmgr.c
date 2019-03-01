@@ -3623,14 +3623,47 @@ static int vega10_generate_dpm_level_enable_mask(
 int vega10_enable_disable_vce_dpm(struct pp_hwmgr *hwmgr, bool enable)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
+	struct amdgpu_device *adev = hwmgr->adev;
 
 	if (data->smu_features[GNLD_DPM_VCE].supported) {
-		PP_ASSERT_WITH_CODE(!vega10_enable_smc_features(hwmgr,
-				enable,
-				data->smu_features[GNLD_DPM_VCE].smu_feature_bitmap),
-				"Attempt to Enable/Disable DPM VCE Failed!",
-				return -1);
-		data->smu_features[GNLD_DPM_VCE].enabled = enable;
+		if (adev->pdev->device == 0x6860 &&
+			adev->pdev->revision == 0x07 &&
+			data->smu_features[GNLD_DPM_VCE].enabled) {
+			if (enable) {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+								hwmgr,
+								PPSMC_MSG_SetSoftMaxVceByIndex,
+								4),
+								"Failed to set soft max eclk index!",
+								return -1);
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+								hwmgr,
+								PPSMC_MSG_SetSoftMinVceByIndex,
+								4),
+								"Failed to set soft min eclk index!",
+								return -1);
+			} else {
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+								hwmgr,
+								PPSMC_MSG_SetSoftMaxVceByIndex,
+								0),
+								"Failed to set soft max eclk index!",
+								return -1);
+				PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+								hwmgr,
+								PPSMC_MSG_SetSoftMinVceByIndex,
+								0),
+								"Failed to set soft min eclk index!",
+								return -1);
+			}
+		} else {
+			PP_ASSERT_WITH_CODE(!vega10_enable_smc_features(hwmgr,
+					enable,
+					data->smu_features[GNLD_DPM_VCE].smu_feature_bitmap),
+					"Attempt to Enable/Disable DPM VCE Failed!",
+					return -1);
+			data->smu_features[GNLD_DPM_VCE].enabled = enable;
+		}
 	}
 
 	return 0;
@@ -4132,6 +4165,134 @@ static int vega10_force_clock_level(struct pp_hwmgr *hwmgr,
 	return 0;
 }
 
+static void vega10_enable_manual_vce_dpm(struct pp_hwmgr *hwmgr)
+{
+	struct amdgpu_device *adev = hwmgr->adev;
+	struct vega10_hwmgr *data =
+			(struct vega10_hwmgr *)(hwmgr->backend);
+
+	if (adev->pdev->device == 0x6860 && adev->pdev->revision == 0x07) {
+		if (data->smu_features[GNLD_DPM_VCE].supported) {
+			PP_ASSERT_WITH_CODE(!vega10_enable_smc_features(hwmgr,
+					true,
+					data->smu_features[GNLD_DPM_VCE].smu_feature_bitmap),
+					"Attempt to Enable/Disable DPM VCE Failed!",
+					return);
+			data->smu_features[GNLD_DPM_VCE].enabled = true;
+			/* leave dpm level 0 at beginning */
+			PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc_with_parameter(
+					hwmgr,
+					PPSMC_MSG_SetSoftMaxVceByIndex,
+					0),
+					"Failed to set soft max eclk index!",
+					return);
+			pr_info("set virtualization VCE DPM policy success\n");
+		}
+	}
+}
+
+static void vega10_manual_dpm_levels(struct pp_hwmgr *hwmgr)
+{
+	struct amdgpu_device *adev = hwmgr->adev;
+	uint32_t reg, val, k;
+
+	/* only change policy for v340L and MI25 150w */
+	if (adev->pdev->device == 0x6860 && adev->pdev->revision == 0x07)
+		val = 0x03003C05;
+	else
+		return;
+
+	/*
+	 * set MIN dpm level and the policy (write 6 to mmMP1_SMN_C2PMSG_67)
+	 *
+	 * for mmMP1_SMN_C2PMSG_83: format as AABBCCDD:
+	 * AA: DPM drop to AA after power reach upper limit, e.g. 3 means drop to dpm3
+	 * DD: DPM will adjust if workload has DD% gap, e.g. 05 means 5% gap
+	 * BB: unknown yet
+	 * CC: unknown yet
+	 *
+	 */
+//	reg = soc15_get_register_offset(MP1_HWID, 0,
+//			mmMP1_SMN_C2PMSG_91_BASE_IDX, mmMP1_SMN_C2PMSG_91);
+//	cgs_write_register(hwmgr->device, reg, 0);
+//	udelay(10);
+//
+//	reg = soc15_get_register_offset(MP1_HWID, 0,
+//			mmMP1_SMN_C2PMSG_83_BASE_IDX, mmMP1_SMN_C2PMSG_83);
+//	cgs_write_register(hwmgr->device, reg, val);
+//	udelay(10);
+//
+//	reg = soc15_get_register_offset(MP1_HWID, 0,
+//			mmMP1_SMN_C2PMSG_67_BASE_IDX, mmMP1_SMN_C2PMSG_67);
+//	cgs_write_register(hwmgr->device, reg, 6);
+//	udelay(10);
+//
+//	reg = soc15_get_register_offset(MP1_HWID, 0,
+//			mmMP1_SMN_C2PMSG_91_BASE_IDX, mmMP1_SMN_C2PMSG_91);
+
+	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_91, 0);
+	udelay(10);
+	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_83, val);
+	udelay(10);
+	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_67, 6);
+	udelay(10);
+	
+	for (k = 0; k < 50; k++) {
+	//	val = cgs_read_register(hwmgr->device, reg);
+		val = RREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_91);
+
+		if (val == 1) {
+			pr_info("set virtualization GFX DPM policy success\n");
+			break;
+		}
+		udelay(1000);
+	}
+
+	if (k == 50)
+		pr_err("set GFX DPM policy failed\n");
+	else {
+
+		WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_91, 0);
+		udelay(10);
+		WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_83, 0x20);
+		udelay(10);
+		WREG32_SOC15(MP1, 0,  mmMP1_SMN_C2PMSG_67, 7);
+		udelay(10);
+		
+	//	reg = soc15_get_register_offset(MP1_HWID, 0,
+	//			mmMP1_SMN_C2PMSG_91_BASE_IDX, mmMP1_SMN_C2PMSG_91);
+	//	cgs_write_register(hwmgr->device, reg, 0);
+	//	udelay(10);
+
+	//	reg = soc15_get_register_offset(MP1_HWID, 0,
+	//			mmMP1_SMN_C2PMSG_83_BASE_IDX, mmMP1_SMN_C2PMSG_83);
+	//	cgs_write_register(hwmgr->device, reg, 0x20);
+	//	udelay(10);
+
+	//	reg = soc15_get_register_offset(MP1_HWID, 0,
+	//			mmMP1_SMN_C2PMSG_67_BASE_IDX, mmMP1_SMN_C2PMSG_67);
+	//	cgs_write_register(hwmgr->device, reg, 7);
+
+	//	reg = soc15_get_register_offset(MP1_HWID, 0,
+	//			mmMP1_SMN_C2PMSG_91_BASE_IDX, mmMP1_SMN_C2PMSG_91);
+
+		for (k = 0; k < 50; k++) {
+	//		val = cgs_read_register(hwmgr->device, reg);
+			val = RREG32_SOC15(MP1, 0,  mmMP1_SMN_C2PMSG_91);
+			if (val == 1) {
+				pr_info("activate virtualization GFX DPM policy success\n");
+				break;
+			}
+			udelay(1000);
+		}
+
+		if (k == 50)
+			pr_err("set GFX DPM policy failed\n");
+
+	}
+	vega10_enable_manual_vce_dpm(hwmgr);
+}
+
 static int vega10_dpm_force_dpm_level(struct pp_hwmgr *hwmgr,
 				enum amd_dpm_forced_level level)
 {
@@ -4152,6 +4313,8 @@ static int vega10_dpm_force_dpm_level(struct pp_hwmgr *hwmgr,
 		break;
 	case AMD_DPM_FORCED_LEVEL_AUTO:
 		ret = vega10_unforce_dpm_levels(hwmgr);
+		if (!ret)
+			vega10_manual_dpm_levels(hwmgr);
 		break;
 	case AMD_DPM_FORCED_LEVEL_PROFILE_STANDARD:
 	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK:
