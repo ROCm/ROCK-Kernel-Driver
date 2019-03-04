@@ -450,6 +450,9 @@ struct amdgpu_crtc {
 	enum amdgpu_interrupt_state vsync_timer_enabled;
 
 	int otg_inst;
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG)
+	uint32_t flip_flags;
+#endif
 	struct drm_pending_vblank_event *event;
 };
 

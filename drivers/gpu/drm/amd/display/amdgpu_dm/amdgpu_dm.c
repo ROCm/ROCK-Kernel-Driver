@@ -9231,12 +9231,22 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG)
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+#endif
 		/*
 		 * Only allow immediate flips for fast updates that don't
 		 * change FB pitch, DCC state, rotation or mirroing.
 		 */
 		bundle->flip_addrs[planes_count].flip_immediate =
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 			crtc->state->async_flip &&
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+			(crtc->state->pageflip_flags &
+			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#else
+			(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST;
 
 		timestamp_ns = ktime_get_ns();
@@ -9335,6 +9345,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG)
+	/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
+
+	/*clean up the flags for next usage*/
+	acrtc_attach->flip_flags = 0;
+#endif
 	/* Update the planes if changed or disable if we don't have any. */
 	if ((planes_count || acrtc_state->active_planes == 0) &&
 		acrtc_state->stream) {
@@ -9936,7 +9952,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
 #endif
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 		if (new_crtc_state->async_flip)
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#else
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#endif
 			wait_for_vblank = false;
 	}
 
