@@ -7501,13 +7501,20 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+#endif
 		/*
 		 * Only allow immediate flips for fast updates that don't
 		 * change FB pitch, DCC state, rotation or mirroing.
 		 */
 		bundle->flip_addrs[planes_count].flip_immediate =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#else
 			crtc->state->async_flip &&
 			acrtc_state->update_type == UPDATE_TYPE_FAST;
+#endif
 
 		timestamp_ns = ktime_get_ns();
 		bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
