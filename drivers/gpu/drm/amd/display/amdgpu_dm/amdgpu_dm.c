@@ -9056,7 +9056,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				      plane->base.id, plane->name);
 
 		bundle->flip_addrs[planes_count].flip_immediate =
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 			crtc->state->async_flip &&
+#else
+			(crtc->state->pageflip_flags &
+			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST &&
 			get_mem_type(old_plane_state->fb) == get_mem_type(fb);
 
@@ -10018,7 +10023,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j)
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 		if (new_crtc_state->async_flip)
+#else
+		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#endif
 			wait_for_vblank = false;
 
 	/* update planes when needed per crtc*/
