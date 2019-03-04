@@ -5459,7 +5459,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		 * and in general should be called for
 		 * blocking commit to as per framework helpers
 		 */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		abo = gem_to_amdgpu_bo(fb->obj[0]);
+#else
+		abo = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(fb, 0));
+#endif
 		r = amdgpu_bo_reserve(abo, true);
 		if (unlikely(r != 0)) {
 			DRM_ERROR("failed to reserve buffer before flip\n");
@@ -5483,8 +5487,15 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			&bundle->flip_addrs[planes_count].address,
 			tiling_flags);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+#endif
 		bundle->flip_addrs[planes_count].flip_immediate =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#else
 				(crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
+#endif
 
 		timestamp_ns = ktime_get_ns();
 		bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
