@@ -9131,7 +9131,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 
 		if (num_plane == 0)
 			continue;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto cleanup;
@@ -9144,6 +9144,9 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 
 		status = dc_stream_get_status_from_state(old_dm_state->context,
 							 new_dm_crtc_state->stream);
+#else
+		status = dc_stream_get_status(new_dm_crtc_state->stream);
+#endif
 		bundle->stream_update.stream = new_dm_crtc_state->stream;
 		/*
 		 * TODO: DC modifies the surface during this call so we need
