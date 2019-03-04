@@ -1440,16 +1440,18 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	}
 
 	ctx = amdgpu_ras_get_context((struct amdgpu_device *)(dev->gpu->kgd));
-	/* kfd only concerns sram ecc on GFX/SDMA and HBM ecc on UMC */
-	dev->node_props.capability |=
-		(((ctx->features & BIT(AMDGPU_RAS_BLOCK__SDMA)) != 0) ||
-		((ctx->features & BIT(AMDGPU_RAS_BLOCK__GFX)) != 0)) ?
-		HSA_CAP_SRAM_EDCSUPPORTED : 0;
-	dev->node_props.capability |= ((ctx->features & BIT(AMDGPU_RAS_BLOCK__UMC)) != 0) ?
-		HSA_CAP_MEM_EDCSUPPORTED : 0;
+	if (ctx) {
+		/* kfd only concerns sram ecc on GFX/SDMA and HBM ecc on UMC */
+		dev->node_props.capability |=
+			(((ctx->features & BIT(AMDGPU_RAS_BLOCK__SDMA)) != 0) ||
+			 ((ctx->features & BIT(AMDGPU_RAS_BLOCK__GFX)) != 0)) ?
+			HSA_CAP_SRAM_EDCSUPPORTED : 0;
+		dev->node_props.capability |= ((ctx->features & BIT(AMDGPU_RAS_BLOCK__UMC)) != 0) ?
+			HSA_CAP_MEM_EDCSUPPORTED : 0;
 
-	dev->node_props.capability |= (ctx->features != 0) ?
-		HSA_CAP_RASEVENTNOTIFY : 0;
+		dev->node_props.capability |= (ctx->features != 0) ?
+			HSA_CAP_RASEVENTNOTIFY : 0;
+	}
 
 	kfd_debug_print_topology();
 
