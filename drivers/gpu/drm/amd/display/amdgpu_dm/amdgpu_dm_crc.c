@@ -91,11 +91,14 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	}
 
 	enable = (source == AMDGPU_DM_PIPE_CRC_SOURCE_AUTO);
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_lock(&adev->dm.dc_lock);
+#endif
 	if (!dc_stream_configure_crc(stream_state->ctx->dc, stream_state,
 				     enable, enable)) {
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&adev->dm.dc_lock);
+#endif
 		return -EINVAL;
 	}
 
@@ -103,9 +106,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	dc_stream_set_dither_option(stream_state,
 				    enable ? DITHER_OPTION_TRUN8
 					   : DITHER_OPTION_DEFAULT);
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_unlock(&adev->dm.dc_lock);
-
+#endif
 	/*
 	 * Reading the CRC requires the vblank interrupt handler to be
 	 * enabled. Keep a reference until CRC capture stops.

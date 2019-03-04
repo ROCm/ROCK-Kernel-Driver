@@ -291,7 +291,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 			defined(OS_NAME_SUSE_15)
 	amdgpu_crtc->last_flip_vblank = drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
 #elif DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
-	amdgpu_crtc->last_flip_vblank = drm_accurate_vblank_count(&amdgpu_crtc->base)
+	amdgpu_crtc->last_flip_vblank = drm_accurate_vblank_count(&amdgpu_crtc->base);
 #endif
 
 	/* wake up userspace */
@@ -6733,7 +6733,12 @@ dm_determine_update_type_for_commit(struct dc *dc,
 		if (!new_dm_crtc_state->stream)
 			continue;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
 		for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, j) {
+#endif
 			new_plane_crtc = new_plane_state->crtc;
 			old_plane_crtc = old_plane_state->crtc;
 			new_dm_plane_state = to_dm_plane_state(new_plane_state);
@@ -6784,7 +6789,7 @@ dm_determine_update_type_for_commit(struct dc *dc,
 
 		if (num_plane == 0)
 			continue;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto cleanup;
@@ -6797,7 +6802,9 @@ dm_determine_update_type_for_commit(struct dc *dc,
 
 		status = dc_stream_get_status_from_state(old_dm_state->context,
 							 new_dm_crtc_state->stream);
-
+#else
+		status = dc_stream_get_status(new_dm_crtc_state->stream);
+#endif
 		update_type = dc_check_update_surfaces_for_stream(dc, updates, num_plane,
 								  &stream_update, status);
 
