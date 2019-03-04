@@ -6546,6 +6546,10 @@ skip_modeset:
 		update_stream_scaling_settings(
 			&new_crtc_state->mode, dm_new_conn_state, dm_new_crtc_state->stream);
 #endif
+
+	/* ABM settings */
+	dm_new_crtc_state->abm_level = dm_new_conn_state->abm_level;
+
 	/*
 	 * Color management settings. We also update color properties
 	 * when a modeset is needed, to ensure it gets reprogrammed.
