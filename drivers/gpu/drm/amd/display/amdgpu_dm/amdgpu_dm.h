@@ -268,6 +268,10 @@ struct amdgpu_dm_connector {
 #if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
 	bool mst_connected;
 #endif
+#ifdef CONFIG_DEBUG_FS
+	uint32_t debugfs_dpcd_address;
+	uint32_t debugfs_dpcd_size;
+#endif
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)
