@@ -2778,13 +2778,11 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 
 	adev->ddev->mode_config.fb_base = adev->gmc.aper_base;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
-	drm_modeset_lock_init(&adev->dm.atomic_obj_lock);
-
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state)
 		return -ENOMEM;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	state->context = dc_create_state(adev->dm.dc);
 	if (!state->context) {
 		kfree(state);
