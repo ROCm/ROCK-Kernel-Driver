@@ -142,6 +142,7 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void);
 struct kfd2kgd_calls *amdgpu_amdkfd_arcturus_get_functions(void);
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_10_0_get_functions(void);
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,

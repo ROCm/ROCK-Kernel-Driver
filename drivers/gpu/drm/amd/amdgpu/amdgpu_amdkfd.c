@@ -100,6 +100,8 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 		break;
 	case CHIP_ARCTURUS:
 		kfd2kgd = amdgpu_amdkfd_arcturus_get_functions();
+	case CHIP_NAVI10:
+		kfd2kgd = amdgpu_amdkfd_gfx_10_0_get_functions();
 		break;
 	default:
 		dev_info(adev->dev, "kfd not supported on this ASIC\n");
@@ -462,9 +464,12 @@ void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 
 	if (amdgpu_sriov_vf(adev))
 		mem_info->mem_clk_max = adev->clock.default_mclk / 100;
-	else if (adev->powerplay.pp_funcs)
-		mem_info->mem_clk_max = amdgpu_dpm_get_mclk(adev, false) / 100;
-	else
+	else if (adev->powerplay.pp_funcs) {
+		if (amdgpu_emu_mode == 1)
+			mem_info->mem_clk_max = 0;
+		else
+			mem_info->mem_clk_max = amdgpu_dpm_get_mclk(adev, false) / 100;
+	} else
 		mem_info->mem_clk_max = 100;
 }
 
@@ -742,6 +747,11 @@ struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
 }
 
 struct kfd2kgd_calls *amdgpu_amdkfd_arcturus_get_functions(void)
+{
+	return NULL;
+}
+
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_10_0_get_functions(void)
 {
 	return NULL;
 }
