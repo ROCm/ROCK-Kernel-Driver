@@ -32,6 +32,9 @@
 
 #include <drm/drm_mm.h>
 #include <drm/drm_vma_manager.h>
+#if defined(BUILD_AS_DKMS)
+#include <kcl/kcl_drm_vma_manager.h>
+#endif
 #include <linux/workqueue.h>
 #include <linux/fs.h>
 #include <linux/spinlock.h>
