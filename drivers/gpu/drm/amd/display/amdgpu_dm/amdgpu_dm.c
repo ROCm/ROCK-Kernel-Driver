@@ -3528,8 +3528,6 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 
 	adev_to_drm(adev)->mode_config.fb_base = adev->gmc.aper_base;
 
-	drm_modeset_lock_init(&adev->dm.atomic_obj_lock);
-
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state)
 		return -ENOMEM;

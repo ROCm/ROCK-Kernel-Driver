@@ -279,7 +279,6 @@ struct amdgpu_display_manager {
 	 */
 	struct drm_private_obj atomic_obj;
 
-	struct drm_modeset_lock atomic_obj_lock;
 #endif
 
 	/**
