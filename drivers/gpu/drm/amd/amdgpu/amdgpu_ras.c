@@ -240,6 +240,9 @@ static int amdgpu_ras_debugfs_ctrl_parse_data(struct file *f,
 		op = 1;
 	else if (sscanf(str, "inject %32s %8s", block_name, err) == 2)
 		op = 2;
+	else if (sscanf(str, "%32s", block_name) == 1)
+		/* ascii string, but commands are not matched. */
+		return -EINVAL;
 
 	if (op != -1) {
 		if (amdgpu_ras_find_block_id_by_name(block_name, &block_id))
@@ -351,6 +354,9 @@ static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f, const char __user *
 		break;
 	case 2:
 		ret = amdgpu_ras_error_inject(adev, &data.inject);
+		break;
+	default:
+		ret = -EINVAL;
 		break;
 	};
 
