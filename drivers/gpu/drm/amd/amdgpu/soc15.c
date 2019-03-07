@@ -760,6 +760,8 @@ static void soc15_get_pcie_usage(struct amdgpu_device *adev, uint64_t *count0,
 static bool soc15_need_reset_on_init(struct amdgpu_device *adev)
 {
 	u32 sol_reg;
+	void *pp_handle = adev->powerplay.pp_handle;
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
 
 	/* Just return false for soc15 GPUs.  Reset does not seem to
 	 * be necessary.
@@ -769,6 +771,11 @@ static bool soc15_need_reset_on_init(struct amdgpu_device *adev)
 
 	if (adev->flags & AMD_IS_APU)
 		return false;
+	
+	if (pp_funcs && pp_funcs->is_smc_ram_running) {
+		if(!pp_funcs->is_smc_ram_running(pp_handle))
+			return false;
+	}
 
 	/* Check sOS sign of life register to confirm sys driver and sOS
 	 * are already been loaded.
