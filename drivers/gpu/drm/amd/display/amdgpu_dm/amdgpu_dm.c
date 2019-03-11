@@ -6343,6 +6343,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	if (res)
 		return res;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -6351,6 +6352,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_alpha_property(plane);
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
+#endif
 
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY &&
 	    plane_cap &&
