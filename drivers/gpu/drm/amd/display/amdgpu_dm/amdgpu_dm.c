@@ -2892,6 +2892,7 @@ static void fill_gamma_from_crtc(
 }
 #endif
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 static void
 fill_blending_from_plane_state(struct drm_plane_state *plane_state,
 			       const struct dc_plane_state *dc_plane_state,
@@ -2927,6 +2928,7 @@ fill_blending_from_plane_state(struct drm_plane_state *plane_state,
 		*global_alpha_value = plane_state->alpha >> 8;
 	}
 }
+#endif
 
 static int fill_plane_attributes(struct amdgpu_device *adev,
 				 struct dc_plane_state *dc_plane_state,
@@ -2978,11 +2980,12 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
 	}
 #endif
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	fill_blending_from_plane_state(plane_state, dc_plane_state,
 				       &dc_plane_state->per_pixel_alpha,
 				       &dc_plane_state->global_alpha,
 				       &dc_plane_state->global_alpha_value);
+#endif
 
 	return ret;
 }
@@ -4560,7 +4563,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				NULL, plane->type, NULL);
 		break;
 	}
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	/* TODO: Check DC plane caps explicitly here for adding propertes */
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -4569,7 +4572,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_alpha_property(plane);
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
-
+#endif
 	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
 
 	/* Create (reset) the plane state */
@@ -5483,8 +5486,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->plane_infos[planes_count].stereo_format = dc_plane->stereo_format;
 		bundle->plane_infos[planes_count].tiling_info = dc_plane->tiling_info;
 		bundle->plane_infos[planes_count].visible = dc_plane->visible;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 		bundle->plane_infos[planes_count].global_alpha = dc_plane->global_alpha;
 		bundle->plane_infos[planes_count].global_alpha_value = dc_plane->global_alpha_value;
+#endif
 		bundle->plane_infos[planes_count].per_pixel_alpha = dc_plane->per_pixel_alpha;
 		bundle->plane_infos[planes_count].dcc = dc_plane->dcc;
 		bundle->surface_updates[planes_count].plane_info = &bundle->plane_infos[planes_count];
