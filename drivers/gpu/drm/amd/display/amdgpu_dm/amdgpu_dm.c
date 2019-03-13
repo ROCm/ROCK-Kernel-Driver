@@ -2692,8 +2692,7 @@ fill_plane_tiling_attributes(struct amdgpu_device *adev,
 		address->grph.addr.high_part = upper_32_bits(afb->address);
 	} else {
 		const struct drm_framebuffer *fb = &afb->base;
-		uint64_t awidth = ALIGN(fb->width, 64);
-		uint64_t chroma_addr = afb->address + awidth * fb->height;
+		uint64_t chroma_addr = afb->address + fb->offsets[1];
 
 		address->type = PLN_ADDR_TYPE_VIDEO_PROGRESSIVE;
 		address->video_progressive.luma_addr.low_part =
@@ -2769,7 +2768,6 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 					 const struct amdgpu_framebuffer *amdgpu_fb)
 {
 	uint64_t tiling_flags;
-	unsigned int awidth;
 	const struct drm_framebuffer *fb = &amdgpu_fb->base;
 	int ret = 0;
 	struct drm_format_name_buf format_name;
@@ -2841,20 +2839,21 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 		plane_state->color_space = COLOR_SPACE_SRGB;
 
 	} else {
-		awidth = ALIGN(fb->width, 64);
-
 		plane_state->plane_size.video.luma_size.x = 0;
 		plane_state->plane_size.video.luma_size.y = 0;
-		plane_state->plane_size.video.luma_size.width = awidth;
+		plane_state->plane_size.video.luma_size.width = fb->width;
 		plane_state->plane_size.video.luma_size.height = fb->height;
-		/* TODO: unhardcode */
-		plane_state->plane_size.video.luma_pitch = awidth;
+		plane_state->plane_size.video.luma_pitch =
+			fb->pitches[0] / fb->format->cpp[0];
 
 		plane_state->plane_size.video.chroma_size.x = 0;
 		plane_state->plane_size.video.chroma_size.y = 0;
-		plane_state->plane_size.video.chroma_size.width = awidth;
-		plane_state->plane_size.video.chroma_size.height = fb->height;
-		plane_state->plane_size.video.chroma_pitch = awidth / 2;
+		/* TODO: set these based on surface format */
+		plane_state->plane_size.video.chroma_size.width = fb->width / 2;
+		plane_state->plane_size.video.chroma_size.height = fb->height / 2;
+
+		plane_state->plane_size.video.chroma_pitch =
+			fb->pitches[1] / fb->format->cpp[1];
 
 		/* TODO: unhardcode */
 		plane_state->color_space = COLOR_SPACE_YCBCR709;
