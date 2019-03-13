@@ -1335,6 +1335,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	amdgpu_vm_move_to_lru_tail(p->adev, &fpriv->vm);
 
+	reservation_object_reserve_shared((p->vm_pd.tv.bo)->resv, p->fence->seqno);
 	ttm_eu_fence_buffer_objects(&p->ticket, &p->validated, p->fence);
 	amdgpu_mn_unlock(p->mn);
 
