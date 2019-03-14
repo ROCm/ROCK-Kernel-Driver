@@ -83,11 +83,11 @@ bool dal_hw_translate_init(
 	case DCN_VERSION_1_0:
 		dal_hw_translate_dcn10_init(translate);
 		return true;
-#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN1_01)
 	case DCN_VERSION_1_01:
 		dal_hw_translate_dcn10_init(translate);
 		return true;
+#endif
 #endif
 
 	default:
