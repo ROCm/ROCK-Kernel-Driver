@@ -2844,8 +2844,11 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 		plane_state->plane_size.video.luma_size.width = fb->width;
 		plane_state->plane_size.video.luma_size.height = fb->height;
 		plane_state->plane_size.video.luma_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			fb->pitches[0] / (fb->bits_per_pixel / 8);
+#else
 			fb->pitches[0] / fb->format->cpp[0];
-
+#endif
 		plane_state->plane_size.video.chroma_size.x = 0;
 		plane_state->plane_size.video.chroma_size.y = 0;
 		/* TODO: set these based on surface format */
@@ -2853,8 +2856,11 @@ static int fill_plane_attributes_from_fb(struct amdgpu_device *adev,
 		plane_state->plane_size.video.chroma_size.height = fb->height / 2;
 
 		plane_state->plane_size.video.chroma_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
+#else
 			fb->pitches[1] / fb->format->cpp[1];
-
+#endif
 		/* TODO: unhardcode */
 		plane_state->color_space = COLOR_SPACE_YCBCR709;
 	}
