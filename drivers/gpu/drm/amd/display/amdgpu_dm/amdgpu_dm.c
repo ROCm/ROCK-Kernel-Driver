@@ -3103,6 +3103,50 @@ fill_blending_from_plane_state(struct drm_plane_state *plane_state,
 }
 #endif
 
+static int
+fill_plane_color_attributes(const struct drm_plane_state *plane_state,
+			    const struct dc_plane_state *dc_plane_state,
+			    enum dc_color_space *color_space)
+{
+	bool full_range;
+
+	*color_space = COLOR_SPACE_SRGB;
+
+	/* DRM color properties only affect non-RGB formats. */
+	if (dc_plane_state->format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
+		return 0;
+
+	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
+
+	switch (plane_state->color_encoding) {
+	case DRM_COLOR_YCBCR_BT601:
+		if (full_range)
+			*color_space = COLOR_SPACE_YCBCR601;
+		else
+			*color_space = COLOR_SPACE_YCBCR601_LIMITED;
+		break;
+
+	case DRM_COLOR_YCBCR_BT709:
+		if (full_range)
+			*color_space = COLOR_SPACE_YCBCR709;
+		else
+			*color_space = COLOR_SPACE_YCBCR709_LIMITED;
+		break;
+
+	case DRM_COLOR_YCBCR_BT2020:
+		if (full_range)
+			*color_space = COLOR_SPACE_2020_YCBCR;
+		else
+			return -EINVAL;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int fill_plane_attributes(struct amdgpu_device *adev,
 				 struct dc_plane_state *dc_plane_state,
 				 struct drm_plane_state *plane_state,
@@ -3128,10 +3172,14 @@ static int fill_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
-
 	/* In case of gamma set, update gamma value */
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	if (crtc_state->gamma_lut)
+	ret = fill_plane_color_attributes(plane_state, dc_plane_state,
+					  &dc_plane_state->color_space);
+	if (ret)
+		return ret;
+
 	/*
 	 * Always set input transfer function, since plane state is refreshed
 	 * every time.
@@ -5718,8 +5766,10 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->scaling_infos[planes_count].clip_rect = dc_plane->clip_rect;
 		bundle->surface_updates[planes_count].scaling_info = &bundle->scaling_infos[planes_count];
 
+		fill_plane_color_attributes(
+			new_plane_state, dc_plane,
+			&bundle->plane_infos[planes_count].color_space);
 
-		bundle->plane_infos[planes_count].color_space = dc_plane->color_space;
 		bundle->plane_infos[planes_count].format = dc_plane->format;
 		bundle->plane_infos[planes_count].plane_size = dc_plane->plane_size;
 		bundle->plane_infos[planes_count].rotation = dc_plane->rotation;
