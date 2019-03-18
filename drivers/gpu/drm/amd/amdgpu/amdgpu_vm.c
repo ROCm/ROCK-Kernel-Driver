@@ -73,51 +73,6 @@ INTERVAL_TREE_DEFINE(struct amdgpu_bo_va_mapping, rb, uint64_t, __subtree_last,
 #undef LAST
 
 /**
- * struct amdgpu_pte_update_params - Local structure
- *
- * Encapsulate some VM table update parameters to reduce
- * the number of function parameters
- *
- */
-struct amdgpu_pte_update_params {
-
-	/**
-	 * @adev: amdgpu device we do this update for
-	 */
-	struct amdgpu_device *adev;
-
-	/**
-	 * @vm: optional amdgpu_vm we do this update for
-	 */
-	struct amdgpu_vm *vm;
-
-	/**
-	 * @pages_addr:
-	 *
-	 * DMA addresses to use for mapping
-	 */
-	dma_addr_t *pages_addr;
-
-	/**
-	 * @src: address where to copy page table entries from
-	 */
-	uint64_t src;
-
-	/**
-	 * @ib: indirect buffer to fill with commands
-	 */
-	struct amdgpu_ib *ib;
-
-	/**
-	 * @func: Function which actually does the update
-	 */
-	void (*func)(struct amdgpu_pte_update_params *params,
-		     struct amdgpu_bo *bo, uint64_t pe,
-		     uint64_t addr, unsigned count, uint32_t incr,
-		     uint64_t flags);
-};
-
-/**
  * struct amdgpu_prt_cb - Helper to disable partial resident texture feature from a fence callback
  */
 struct amdgpu_prt_cb {
@@ -1235,7 +1190,7 @@ struct amdgpu_bo_va *amdgpu_vm_bo_find(struct amdgpu_vm *vm,
 /**
  * amdgpu_vm_do_set_ptes - helper to call the right asic function
  *
- * @params: see amdgpu_pte_update_params definition
+ * @params: see amdgpu_vm_update_params definition
  * @bo: PD/PT to update
  * @pe: addr of the page entry
  * @addr: dst addr to write into pe
@@ -1246,7 +1201,7 @@ struct amdgpu_bo_va *amdgpu_vm_bo_find(struct amdgpu_vm *vm,
  * Traces the parameters and calls the right asic functions
  * to setup the page table using the DMA.
  */
-static void amdgpu_vm_do_set_ptes(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_do_set_ptes(struct amdgpu_vm_update_params *params,
 				  struct amdgpu_bo *bo,
 				  uint64_t pe, uint64_t addr,
 				  unsigned count, uint32_t incr,
@@ -1268,7 +1223,7 @@ static void amdgpu_vm_do_set_ptes(struct amdgpu_pte_update_params *params,
 /**
  * amdgpu_vm_do_copy_ptes - copy the PTEs from the GART
  *
- * @params: see amdgpu_pte_update_params definition
+ * @params: see amdgpu_vm_update_params definition
  * @bo: PD/PT to update
  * @pe: addr of the page entry
  * @addr: dst addr to write into pe
@@ -1278,7 +1233,7 @@ static void amdgpu_vm_do_set_ptes(struct amdgpu_pte_update_params *params,
  *
  * Traces the parameters and calls the DMA function to copy the PTEs.
  */
-static void amdgpu_vm_do_copy_ptes(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_do_copy_ptes(struct amdgpu_vm_update_params *params,
 				   struct amdgpu_bo *bo,
 				   uint64_t pe, uint64_t addr,
 				   unsigned count, uint32_t incr,
@@ -1322,7 +1277,7 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
 /**
  * amdgpu_vm_cpu_set_ptes - helper to update page tables via CPU
  *
- * @params: see amdgpu_pte_update_params definition
+ * @params: see amdgpu_vm_update_params definition
  * @bo: PD/PT to update
  * @pe: kmap addr of the page entry
  * @addr: dst addr to write into pe
@@ -1332,7 +1287,7 @@ static uint64_t amdgpu_vm_map_gart(const dma_addr_t *pages_addr, uint64_t addr)
  *
  * Write count number of PT/PD entries directly.
  */
-static void amdgpu_vm_cpu_set_ptes(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_cpu_set_ptes(struct amdgpu_vm_update_params *params,
 				   struct amdgpu_bo *bo,
 				   uint64_t pe, uint64_t addr,
 				   unsigned count, uint32_t incr,
@@ -1360,7 +1315,7 @@ static void amdgpu_vm_cpu_set_ptes(struct amdgpu_pte_update_params *params,
  *
  * Calls the update function for both the given BO as well as its shadow.
  */
-static void amdgpu_vm_update_func(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_update_func(struct amdgpu_vm_update_params *params,
 				  struct amdgpu_bo *bo,
 				  uint64_t pe, uint64_t addr,
 				  unsigned count, uint32_t incr,
@@ -1381,7 +1336,7 @@ static void amdgpu_vm_update_func(struct amdgpu_pte_update_params *params,
  *
  * Makes sure the requested entry in parent is up to date.
  */
-static void amdgpu_vm_update_pde(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_update_pde(struct amdgpu_vm_update_params *params,
 				 struct amdgpu_vm *vm,
 				 struct amdgpu_vm_pt *parent,
 				 struct amdgpu_vm_pt *entry)
@@ -1432,7 +1387,7 @@ static void amdgpu_vm_invalidate_pds(struct amdgpu_device *adev,
 int amdgpu_vm_update_directories(struct amdgpu_device *adev,
 				 struct amdgpu_vm *vm)
 {
-	struct amdgpu_pte_update_params params;
+	struct amdgpu_vm_update_params params;
 	struct amdgpu_job *job;
 	unsigned ndw = 0;
 	int r = 0;
@@ -1523,7 +1478,7 @@ error:
  *
  * Make sure to set the right flags for the PTEs at the desired level.
  */
-static void amdgpu_vm_update_flags(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_update_flags(struct amdgpu_vm_update_params *params,
 				   struct amdgpu_bo *bo, unsigned level,
 				   uint64_t pe, uint64_t addr,
 				   unsigned count, uint32_t incr,
@@ -1548,7 +1503,7 @@ static void amdgpu_vm_update_flags(struct amdgpu_pte_update_params *params,
 /**
  * amdgpu_vm_fragment - get fragment for PTEs
  *
- * @params: see amdgpu_pte_update_params definition
+ * @params: see amdgpu_vm_update_params definition
  * @start: first PTE to handle
  * @end: last PTE to handle
  * @flags: hw mapping flags
@@ -1557,7 +1512,7 @@ static void amdgpu_vm_update_flags(struct amdgpu_pte_update_params *params,
  *
  * Returns the first possible fragment for the start and end address.
  */
-static void amdgpu_vm_fragment(struct amdgpu_pte_update_params *params,
+static void amdgpu_vm_fragment(struct amdgpu_vm_update_params *params,
 			       uint64_t start, uint64_t end, uint64_t flags,
 			       unsigned int *frag, uint64_t *frag_end)
 {
@@ -1609,7 +1564,7 @@ static void amdgpu_vm_fragment(struct amdgpu_pte_update_params *params,
 /**
  * amdgpu_vm_update_ptes - make sure that page tables are valid
  *
- * @params: see amdgpu_pte_update_params definition
+ * @params: see amdgpu_vm_update_params definition
  * @start: start of GPU address range
  * @end: end of GPU address range
  * @dst: destination address to map to, the next dst inside the function
@@ -1620,7 +1575,7 @@ static void amdgpu_vm_fragment(struct amdgpu_pte_update_params *params,
  * Returns:
  * 0 for success, -EINVAL for failure.
  */
-static int amdgpu_vm_update_ptes(struct amdgpu_pte_update_params *params,
+static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
 				 uint64_t start, uint64_t end,
 				 uint64_t dst, uint64_t flags)
 {
@@ -1763,7 +1718,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	void *owner = AMDGPU_FENCE_OWNER_VM;
 	unsigned nptes, ncmds, ndw;
 	struct amdgpu_job *job;
-	struct amdgpu_pte_update_params params;
+	struct amdgpu_vm_update_params params;
 	struct dma_fence *f = NULL;
 	int r;
 
