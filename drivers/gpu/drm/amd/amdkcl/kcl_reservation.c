@@ -202,7 +202,7 @@ EXPORT_SYMBOL(_kcl_reservation_object_wait_timeout_rcu);
  * Modifications [2017-09-14] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0))
 int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 					struct reservation_object *src)
 {
@@ -485,6 +485,8 @@ done:
 	kfree_rcu(old, rcu);
 }
 
+
+#if (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
 void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					 struct dma_fence *fence)
 {
@@ -500,6 +502,7 @@ void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 		reservation_object_add_shared_replace(obj, old, fobj, fence);
 }
 EXPORT_SYMBOL(_kcl_reservation_object_add_shared_fence);
+#endif
 
 int _kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
 				      struct dma_fence **pfence_excl,

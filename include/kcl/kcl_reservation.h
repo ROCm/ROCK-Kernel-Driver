@@ -77,7 +77,7 @@ kcl_reservation_object_unlock(struct reservation_object *obj)
 #endif
 }
 
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0))
 extern int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 					struct reservation_object *src);
 #endif
@@ -86,7 +86,7 @@ static inline int
 kcl_reservation_object_copy_fences(struct reservation_object *dst,
 				struct reservation_object *src)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0))
 	return _kcl_reservation_object_copy_fences(dst, src);
 #else
 	return reservation_object_copy_fences(dst, src);
@@ -138,7 +138,7 @@ kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
 extern void _kcl_reservation_object_add_shared_fence(
 						struct reservation_object *obj,
 						struct dma_fence *fence);
@@ -148,7 +148,7 @@ static inline void
 kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					struct dma_fence *fence)
 {
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
 	return _kcl_reservation_object_add_shared_fence(obj, fence);
 #else
 	return reservation_object_add_shared_fence(obj, fence);

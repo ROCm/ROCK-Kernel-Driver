@@ -1,7 +1,7 @@
 #ifndef AMDKCL_LIST_H
 #define AMDKCL_LIST_H
 
-#if defined(BUILD_AS_DKMS)
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 #include <linux/list.h>
 static inline void list_bulk_move_tail(struct list_head *head,
 				       struct list_head *first,
@@ -17,5 +17,4 @@ static inline void list_bulk_move_tail(struct list_head *head,
 		head->prev = last;
 }
 #endif
-
 #endif /*AMDKCL_LIST_H*/
