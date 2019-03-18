@@ -559,7 +559,7 @@ struct Qdisc_ops noop_qdisc_ops __read_mostly = {
 };
 
 static struct netdev_queue noop_netdev_queue = {
-	.qdisc		=	&noop_qdisc,
+	RCU_POINTER_INITIALIZER(qdisc, &noop_qdisc),
 	.qdisc_sleeping	=	&noop_qdisc,
 };
 
@@ -1365,7 +1365,11 @@ static void mini_qdisc_rcu_func(struct rcu_head *head)
 void mini_qdisc_pair_swap(struct mini_Qdisc_pair *miniqp,
 			  struct tcf_proto *tp_head)
 {
-	struct mini_Qdisc *miniq_old = rtnl_dereference(*miniqp->p_miniq);
+	/* Protected with chain0->filter_chain_lock.
+	 * Can't access chain directly because tp_head can be NULL.
+	 */
+	struct mini_Qdisc *miniq_old =
+		rcu_dereference_protected(*miniqp->p_miniq, 1);
 	struct mini_Qdisc *miniq;
 
 	if (!tp_head) {

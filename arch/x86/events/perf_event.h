@@ -606,13 +606,14 @@ struct x86_pmu {
 	/*
 	 * Intel DebugStore bits
 	 */
-	unsigned int	bts		:1,
-			bts_active	:1,
-			pebs		:1,
-			pebs_active	:1,
-			pebs_broken	:1,
-			pebs_prec_dist	:1,
-			pebs_no_tlb	:1;
+	unsigned int	bts			:1,
+			bts_active		:1,
+			pebs			:1,
+			pebs_active		:1,
+			pebs_broken		:1,
+			pebs_prec_dist		:1,
+			pebs_no_tlb		:1,
+			pebs_no_isolation	:1;
 	int		pebs_record_size;
 	int		pebs_buffer_size;
 	void		(*drain_pebs)(struct pt_regs *regs);
@@ -1032,12 +1033,12 @@ static inline int intel_pmu_init(void)
 	return 0;
 }
 
-static inline int intel_cpuc_prepare(struct cpu_hw_event *cpuc, int cpu)
+static inline int intel_cpuc_prepare(struct cpu_hw_events *cpuc, int cpu)
 {
 	return 0;
 }
 
-static inline void intel_cpuc_finish(struct cpu_hw_event *cpuc)
+static inline void intel_cpuc_finish(struct cpu_hw_events *cpuc)
 {
 }
 

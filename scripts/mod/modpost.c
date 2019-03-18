@@ -38,7 +38,6 @@ static int vmlinux_section_warnings = 1;
 static int warn_unresolved = 0;
 /* How a symbol is exported */
 static int sec_mismatch_count = 0;
-static int sec_mismatch_verbose = 1;
 static int sec_mismatch_fatal = 0;
 /* ignore missing files */
 static int ignore_missing_files;
@@ -1409,8 +1408,6 @@ static void report_sec_mismatch(const char *modname,
 	char *prl_to;
 
 	sec_mismatch_count++;
-	if (!sec_mismatch_verbose)
-		return;
 
 	get_pretty_name(from_is_func, &from, &from_p);
 	get_pretty_name(to_is_func, &to, &to_p);
@@ -1658,9 +1655,7 @@ static void extable_mismatch_handler(const char* modname, struct elf_info *elf,
 
 	sec_mismatch_count++;
 
-	if (sec_mismatch_verbose)
-		report_extable_warnings(modname, elf, mismatch, r, sym,
-					fromsec, tosec);
+	report_extable_warnings(modname, elf, mismatch, r, sym, fromsec, tosec);
 
 	if (match(tosec, mismatch->bad_tosec))
 		fatal("The relocation at %s+0x%lx references\n"
@@ -2558,7 +2553,7 @@ int main(int argc, char **argv)
 	struct ext_sym_list *extsym_iter;
 	struct ext_sym_list *extsym_start = NULL;
 
-	while ((opt = getopt(argc, argv, "i:I:e:mnsST:o:awEN:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:e:mnsT:o:awEN:")) != -1) {
 		switch (opt) {
 		case 'i':
 			kernel_read = optarg;
@@ -2589,9 +2584,6 @@ int main(int argc, char **argv)
 			break;
 		case 's':
 			vmlinux_section_warnings = 0;
-			break;
-		case 'S':
-			sec_mismatch_verbose = 0;
 			break;
 		case 'T':
 			files_source = optarg;
@@ -2663,18 +2655,9 @@ int main(int argc, char **argv)
 	}
 	if (dump_write)
 		write_dump(dump_write);
-	if (sec_mismatch_count) {
-		if (!sec_mismatch_verbose) {
-			warn("modpost: Found %d section mismatch(es).\n"
-			     "To see full details build your kernel with:\n"
-			     "'make CONFIG_DEBUG_SECTION_MISMATCH=y'\n",
-			     sec_mismatch_count);
-		}
-		if (sec_mismatch_fatal) {
-			fatal("modpost: Section mismatches detected.\n"
-			      "Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.\n");
-		}
-	}
+	if (sec_mismatch_count && sec_mismatch_fatal)
+		fatal("modpost: Section mismatches detected.\n"
+		      "Set CONFIG_SECTION_MISMATCH_WARN_ONLY=y to allow them.\n");
 	free(buf.p);
 
 	return err;
