@@ -92,6 +92,13 @@ struct amdgpu_pte_update_params {
 	struct amdgpu_vm *vm;
 
 	/**
+	 * @pages_addr:
+	 *
+	 * DMA addresses to use for mapping
+	 */
+	dma_addr_t *pages_addr;
+
+	/**
 	 * @src: address where to copy page table entries from
 	 */
 	uint64_t src;
@@ -108,12 +115,6 @@ struct amdgpu_pte_update_params {
 		     struct amdgpu_bo *bo, uint64_t pe,
 		     uint64_t addr, unsigned count, uint32_t incr,
 		     uint64_t flags);
-	/**
-	 * @pages_addr:
-	 *
-	 * DMA addresses to use for mapping, used during VM update by CPU
-	 */
-	dma_addr_t *pages_addr;
 };
 
 /**
@@ -1589,7 +1590,7 @@ static void amdgpu_vm_fragment(struct amdgpu_pte_update_params *params,
 		max_frag = 31;
 
 	/* system pages are non continuously */
-	if (params->src) {
+	if (params->pages_addr) {
 		*frag = 0;
 		*frag_end = end;
 		return;
@@ -1769,16 +1770,13 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	memset(&params, 0, sizeof(params));
 	params.adev = adev;
 	params.vm = vm;
+	params.pages_addr = pages_addr;
 
 	/* sync to everything except eviction fences on unmapping */
 	if (!(flags & AMDGPU_PTE_VALID))
 		owner = AMDGPU_FENCE_OWNER_KFD;
 
 	if (vm->use_cpu_for_update) {
-		/* params.src is used as flag to indicate system Memory */
-		if (pages_addr)
-			params.src = ~0;
-
 		/* Wait for PT BOs to be idle. PTs share the same resv. object
 		 * as the root PD BO
 		 */
@@ -1794,7 +1792,6 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		}
 
 		params.func = amdgpu_vm_cpu_set_ptes;
-		params.pages_addr = pages_addr;
 		return amdgpu_vm_update_ptes(&params, start, last + 1,
 					     addr, flags);
 	}
