@@ -7016,7 +7016,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
-	dm_state->context = dc_create_state();
+	dm_state->context = dc_create_state(dc);
 	ASSERT(dm_state->context);
 	dc_resource_state_copy_construct_current(dc, dm_state->context);
 #endif
