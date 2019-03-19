@@ -5993,8 +5993,22 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 	amdgpu_state = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
 	WARN_ON(amdgpu_state == NULL);
 
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	if (amdgpu_state) {
+		plane->state = &amdgpu_state->base;
+		plane->state->plane = plane;
+		plane->state->rotation = DRM_MODE_ROTATE_0;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 18, 0)
+		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+#endif
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+		plane->state->pixel_blend_mode = DRM_MODE_BLEND_PREMULTI;
+#endif
+	}
+#else
 	if (amdgpu_state)
 		__drm_atomic_helper_plane_reset(plane, &amdgpu_state->base);
+#endif
 }
 
 static struct drm_plane_state *
