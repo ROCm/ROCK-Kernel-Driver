@@ -31,6 +31,10 @@
 #include <drm/drm_dp_helper.h>
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
+#endif
+
 static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
