@@ -1,10 +1,13 @@
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 #include "kcl_common.h"
-#endif
 
 #if defined(BUILD_AS_DKMS)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+const unsigned char *kcl_pcie_link_speed;
+EXPORT_SYMBOL(kcl_pcie_link_speed);
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
 	!defined(OS_NAME_RHEL_7_6)
@@ -192,7 +195,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 	while (dev) {
 		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
 
-		next_speed = pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
+		next_speed = kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
 		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
 		PCI_EXP_LNKSTA_NLW_SHIFT;
 
@@ -224,15 +227,19 @@ EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
 enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
-
+#endif
 
 void amdkcl_pci_init(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
 	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+	kcl_pcie_link_speed = (const) amdkcl_fp_setup("pcie_link_speed",NULL);
+#endif
 }
 
-#endif
 
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
