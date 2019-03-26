@@ -274,7 +274,7 @@ static int port_check(struct device *dev, void *dev_drv)
 int __parport_register_driver(struct parport_driver *drv, struct module *owner,
 			      const char *mod_name)
 {
-	if (list_empty(&portlist))
+	if (list_empty(&portlist) && strcmp(drv->name, "daisy_drv"))
 		get_lowlevel_driver();
 
 	if (drv->devmodel) {
