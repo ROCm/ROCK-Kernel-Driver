@@ -137,19 +137,11 @@ static struct bus_type parport_bus_type = {
 
 int parport_bus_init(void)
 {
-	int retval;
-
-	retval = bus_register(&parport_bus_type);
-	if (retval)
-		return retval;
-	daisy_drv_init();
-
-	return 0;
+	return bus_register(&parport_bus_type);
 }
 
 void parport_bus_exit(void)
 {
-	daisy_drv_exit();
 	bus_unregister(&parport_bus_type);
 }
 
@@ -274,7 +266,7 @@ static int port_check(struct device *dev, void *dev_drv)
 int __parport_register_driver(struct parport_driver *drv, struct module *owner,
 			      const char *mod_name)
 {
-	if (list_empty(&portlist) && strcmp(drv->name, "daisy_drv"))
+	if (list_empty(&portlist))
 		get_lowlevel_driver();
 
 	if (drv->devmodel) {
