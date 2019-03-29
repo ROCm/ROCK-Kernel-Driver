@@ -25,6 +25,10 @@ endif
 ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap" "amzn" "custom-rhel"),)
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
+else ifeq ("debian", $(OS_NAME))
+real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
+DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(real_kdir)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(real_kdir)/Makefile)
 else ifeq ("rhel",$(OS_NAME))
 ifneq ($(OS_VERSION),"8.0")
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
@@ -54,6 +58,8 @@ else ifeq ("sles",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("amzn",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_AMZ
+else ifeq ("debian",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_DEBIAN
 else
 subdir-ccflags-y += -DOS_NAME_UNKNOWN
 endif
