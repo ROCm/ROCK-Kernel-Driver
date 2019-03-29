@@ -257,7 +257,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
 /**
  * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
  *
@@ -365,10 +365,18 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
  * Block for operations on BOs to finish and mark pages as accessed and
  * potentially dirty.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+static int amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end,
+						 bool blockable)
+#else
 static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 						 struct mm_struct *mm,
 						 unsigned long start,
 						 unsigned long end)
+#endif
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 	struct interval_tree_node *it;
@@ -376,11 +384,23 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+	if (amdgpu_mn_read_lock(amn, blockable))
+		 return -EAGAIN;
+#else
 	amdgpu_mn_read_lock(amn);
+#endif
 
 	it = interval_tree_iter_first(&amn->objects, start, end);
 	while (it) {
 		struct amdgpu_mn_node *node;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+		if (!blockable) {
+			amdgpu_mn_read_unlock(amn);
+			return -EAGAIN;
+		}
+#endif
 
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, start, end);
@@ -402,10 +422,18 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
  * necessitates evicting all user-mode queues of the process. The BOs
  * are restorted in amdgpu_mn_invalidate_range_end_hsa.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end,
+						 bool blockable)
+#else
 static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 						 struct mm_struct *mm,
 						 unsigned long start,
 						 unsigned long end)
+#endif
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 	struct interval_tree_node *it;
@@ -413,12 +441,24 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+	if (amdgpu_mn_read_lock(amn, blockable))
+		 return -EAGAIN;
+#else
 	amdgpu_mn_read_lock(amn);
+#endif
 
 	it = interval_tree_iter_first(&amn->objects, start, end);
 	while (it) {
 		struct amdgpu_mn_node *node;
 		struct amdgpu_bo *bo;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+		if (!blockable) {
+			amdgpu_mn_read_unlock(amn);
+			return -EAGAIN;
+		}
+#endif
 
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, start, end);
