@@ -25,6 +25,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/mmu_context.h>
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
@@ -1976,6 +1977,52 @@ out_unlock:
 	return r;
 }
 
+
+struct copy_context_work_handler_workarea {
+	struct work_struct copy_context_work;
+	struct device_queue_manager *dqm;
+	struct qcm_process_device *qpd;
+	struct mm_struct *mm;
+};
+
+void copy_context_work_handler (struct work_struct *work)
+{
+	struct copy_context_work_handler_workarea *workarea;
+	struct mqd_manager *mqd_mgr;
+	struct qcm_process_device *qpd;
+	struct device_queue_manager *dqm;
+	struct queue *q;
+	uint32_t tmp_ctl_stack_used_size, tmp_save_area_used_size;
+
+	workarea = container_of(work,
+			struct copy_context_work_handler_workarea,
+			copy_context_work);
+
+	qpd = workarea->qpd;
+	dqm = workarea->dqm;
+	use_mm(workarea->mm);
+
+
+	list_for_each_entry(q, &qpd->queues_list, list) {
+		mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_COMPUTE];
+
+		/* We ignore the return value from get_wave_state because
+		 * i) right now, it always returns 0, and
+		 * ii) if we hit an error, we would continue to the next queue
+		 *     anyway.
+		 */
+		mqd_mgr->get_wave_state(mqd_mgr,
+				q->mqd,
+				(void __user *)	q->properties.ctx_save_restore_area_address,
+				&tmp_ctl_stack_used_size,
+				&tmp_save_area_used_size);
+	}
+
+	unuse_mm(workarea->mm);
+}
+
+
+
 int suspend_queues(struct device_queue_manager *dqm,
 			struct kfd_process *p,
 			uint32_t flags)
@@ -1984,6 +2031,9 @@ int suspend_queues(struct device_queue_manager *dqm,
 	struct kfd_dev *dev;
 	struct kfd_process_device *pdd;
 
+	bool queues_suspended = false;
+	struct copy_context_work_handler_workarea copy_context_worker;
+
 	dev = dqm->dev;
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
@@ -1991,8 +2041,21 @@ int suspend_queues(struct device_queue_manager *dqm,
 			r = pdd->dev->dqm->ops.evict_process_queues(
 					pdd->dev->dqm,
 					&pdd->qpd);
-			if (r)
+			if (r) {
 				pr_err("Failed to suspend process queues\n");
+				break;
+			}
+
+			copy_context_worker.qpd = &pdd->qpd;
+			copy_context_worker.dqm = dqm;
+			copy_context_worker.mm = get_task_mm(p->lead_thread);
+			queues_suspended = true;
+
+			INIT_WORK_ONSTACK(
+					&copy_context_worker.copy_context_work,
+					copy_context_work_handler);
+
+			schedule_work(&copy_context_worker.copy_context_work);
 			break;
 		}
 	}
@@ -2001,6 +2064,11 @@ int suspend_queues(struct device_queue_manager *dqm,
 	if (!r && flags & KFD__DBG_NODE_SUSPEND_MEMORY_FENCE)
 		amdgpu_amdkfd_debug_mem_fence(dev->kgd);
 
+	if (queues_suspended) {
+		flush_work(&copy_context_worker.copy_context_work);
+		mmput(copy_context_worker.mm);
+		destroy_work_on_stack(&copy_context_worker.copy_context_work);
+	}
 	return r;
 }
 
