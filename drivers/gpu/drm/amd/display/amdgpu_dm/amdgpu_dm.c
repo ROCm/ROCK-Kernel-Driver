@@ -378,7 +378,11 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		 */
 
 		/* sequence will be replaced by real count during send-out. */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
 		e->sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
+#else
+		e->event.sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
+#endif
 		e->pipe = amdgpu_crtc->crtc_id;
 
 		list_add_tail(&e->base.link, &adev->ddev->vblank_event_list);
