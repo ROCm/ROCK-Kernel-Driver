@@ -6733,7 +6733,11 @@ static void pre_update_freesync_state_on_stream(
 	if (new_crtc_state->vrr_supported &&
 	    config.min_refresh_in_uhz &&
 	    config.max_refresh_in_uhz) {
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+		config.state = new_crtc_state->base_vrr_enabled ?
+#else
 		config.state = new_crtc_state->base.vrr_enabled ?
+#endif
 			VRR_STATE_ACTIVE_VARIABLE :
 			VRR_STATE_INACTIVE;
 	} else {
