@@ -6248,7 +6248,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* Update freesync state before amdgpu_dm_handle_vrr_transition(). */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		pre_update_freesync_state_on_stream(dm, dm_new_crtc_state);
 	}
@@ -6305,7 +6310,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
-	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
+	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
@@ -6323,7 +6328,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
-	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
+	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 #endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 
