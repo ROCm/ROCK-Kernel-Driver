@@ -12,13 +12,18 @@
 #define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+extern const unsigned char *_kcl_pcie_link_speed;
+#define kcl_pcie_link_speed _kcl_pcie_link_speed
+#else
+extern const unsigned char *pcie_link_speed;
+#define kcl_pcie_link_speed pcie_link_speed
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
 	!defined(OS_NAME_RHEL_7_6)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
-
-u32 pcie_bandwidth_capable(struct pci_dev *dev, enum pci_bus_speed *speed,
-		enum pcie_link_width *width);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 #define PCIE_SPEED_16_0GT 0x17
@@ -65,6 +70,9 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev);
 enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
+u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+			enum pci_bus_speed *speed,
+			enum pcie_link_width *width);
 #else
 extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);

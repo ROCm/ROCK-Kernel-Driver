@@ -136,7 +136,7 @@ psp_cmd_submit_buf(struct psp_context *psp,
 
 	while (*((unsigned int *)psp->fence_buf) != index) {
 		if (--timeout == 0)
-			return -EINVAL;
+			break;
 		msleep(1);
 	}
 
@@ -147,12 +147,14 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	 * during psp initialization to avoid breaking hw_init and it doesn't
 	 * return -EINVAL.
 	 */
-	if (psp->cmd_buf_mem->resp.status) {
+	if (psp->cmd_buf_mem->resp.status || !timeout) {
 		if (ucode)
 			DRM_WARN("failed to load ucode id (%d) ",
 				  ucode->ucode_id);
 		DRM_WARN("psp command failed and response status is (%d)\n",
 			  psp->cmd_buf_mem->resp.status);
+		if (!timeout)
+			return -EINVAL;
 	}
 
 	/* get xGMI session id from response buffer */
@@ -677,25 +679,35 @@ static int psp_hw_start(struct psp_context *psp)
 
 	if (!amdgpu_sriov_vf(adev) || !adev->in_gpu_reset) {
 		ret = psp_bootloader_load_sysdrv(psp);
-		if (ret)
+		if (ret) {
+			DRM_ERROR("PSP load sysdrv failed!\n");
 			return ret;
+		}
 
 		ret = psp_bootloader_load_sos(psp);
-		if (ret)
+		if (ret) {
+			DRM_ERROR("PSP load sos failed!\n");
 			return ret;
+		}
 	}
 
 	ret = psp_ring_create(psp, PSP_RING_TYPE__KM);
-	if (ret)
+	if (ret) {
+		DRM_ERROR("PSP create ring failed!\n");
 		return ret;
+	}
 
 	ret = psp_tmr_load(psp);
-	if (ret)
+	if (ret) {
+		DRM_ERROR("PSP load tmr failed!\n");
 		return ret;
+	}
 
 	ret = psp_asd_load(psp);
-	if (ret)
+	if (ret) {
+		DRM_ERROR("PSP load asd failed!\n");
 		return ret;
+	}
 
 	if (adev->gmc.xgmi.num_physical_nodes > 1) {
 		ret = psp_xgmi_initialize(psp);
@@ -878,53 +890,52 @@ static int psp_load_fw(struct amdgpu_device *adev)
 					&psp->fence_buf_mc_addr,
 					&psp->fence_buf);
 	if (ret)
-		goto failed_mem2;
+		goto failed;
 
 	ret = amdgpu_bo_create_kernel(adev, PSP_CMD_BUFFER_SIZE, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &psp->cmd_buf_bo, &psp->cmd_buf_mc_addr,
 				      (void **)&psp->cmd_buf_mem);
 	if (ret)
-		goto failed_mem1;
+		goto failed;
 
 	memset(psp->fence_buf, 0, PSP_FENCE_BUFFER_SIZE);
 
 	ret = psp_ring_init(psp, PSP_RING_TYPE__KM);
-	if (ret)
-		goto failed_mem;
+	if (ret) {
+		DRM_ERROR("PSP ring init failed!\n");
+		goto failed;
+	}
 
 	ret = psp_tmr_init(psp);
-	if (ret)
-		goto failed_mem;
+	if (ret) {
+		DRM_ERROR("PSP tmr init failed!\n");
+		goto failed;
+	}
 
 	ret = psp_asd_init(psp);
-	if (ret)
-		goto failed_mem;
+	if (ret) {
+		DRM_ERROR("PSP asd init failed!\n");
+		goto failed;
+	}
 
 skip_memalloc:
 	ret = psp_hw_start(psp);
 	if (ret)
-		goto failed_mem;
+		goto failed;
 
 	ret = psp_np_fw_load(psp);
 	if (ret)
-		goto failed_mem;
+		goto failed;
 
 	return 0;
 
-failed_mem:
-	amdgpu_bo_free_kernel(&psp->cmd_buf_bo,
-			      &psp->cmd_buf_mc_addr,
-			      (void **)&psp->cmd_buf_mem);
-failed_mem1:
-	amdgpu_bo_free_kernel(&psp->fence_buf_bo,
-			      &psp->fence_buf_mc_addr, &psp->fence_buf);
-failed_mem2:
-	amdgpu_bo_free_kernel(&psp->fw_pri_bo,
-			      &psp->fw_pri_mc_addr, &psp->fw_pri_buf);
 failed:
-	kfree(psp->cmd);
-	psp->cmd = NULL;
+	/*
+	 * all cleanup jobs (xgmi terminate, ras terminate,
+	 * ring destroy, cmd/fence/fw buffers destory,
+	 * psp->cmd destory) are delayed to psp_hw_fini
+	 */
 	return ret;
 }
 
