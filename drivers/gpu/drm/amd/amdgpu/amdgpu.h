@@ -450,8 +450,12 @@ struct amdgpu_cs_chunk {
 };
 
 struct amdgpu_cs_post_dep {
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	struct drm_syncobj *syncobj;
+#endif
+#if !defined(BUILD_AS_DKMS)
 	struct dma_fence_chain *chain;
+#endif
 	u64 point;
 };
 

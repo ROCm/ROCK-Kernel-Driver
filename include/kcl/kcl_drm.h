@@ -15,6 +15,9 @@
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #include <drm/drm_print.h>
 #endif
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#include <drm/drm_syncobj.h>
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -240,6 +243,27 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 	return true;
 #endif
 }
+
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
+						u32 handle, u64 point, u64 flags,
+						struct dma_fence **fence)
+{
+#if defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+	return drm_syncobj_fence_get(file_private, handle, fence);
+#elif DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+	return drm_syncobj_find_fence(file_private, handle, fence);
+#elif DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	return drm_syncobj_find_fence(file_private, handle, point, fence);
+#else
+	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+#endif
+#else
+	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+#endif
+}
+#endif
 
 static inline int kcl_drm_encoder_init(struct drm_device *dev,
 		      struct drm_encoder *encoder,
