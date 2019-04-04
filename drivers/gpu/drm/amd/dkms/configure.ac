@@ -105,6 +105,7 @@ m4_include([m4/hwmon-device-register-with-groups.m4])
 m4_include([m4/mmu-notifier-call-srcu.m4])
 m4_include([m4/mm-release-pages.m4])
 m4_include([m4/sched-list-for-each-entry.m4])
+m4_include([m4/ktime-set.m4])
 m4_include([m4/config.m4])
 
 
