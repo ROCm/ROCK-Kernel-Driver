@@ -1572,6 +1572,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      struct ttm_mem_reg *mem,
 				      struct dma_fence **fence)
 {
+	uint64_t vram_base_offset = bo_adev->vm_manager.vram_base_offset;
 	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
 	unsigned min_linear_pages = 1 << adev->vm_manager.fragment_size;
 	uint64_t pfn, start = mapping->start;
@@ -1595,6 +1596,19 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	    (adev->asic_type >= CHIP_VEGA10)) {
 		flags |= AMDGPU_PTE_PRT;
 		flags &= ~AMDGPU_PTE_VALID;
+	}
+
+	if (adev != bo_adev &&
+	    !(adev->gmc.xgmi.hive_id &&
+	      adev->gmc.xgmi.hive_id == bo_adev->gmc.xgmi.hive_id) &&
+	    !pages_addr) {
+		if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+			flags |= AMDGPU_PTE_SYSTEM;
+			vram_base_offset = bo_adev->gmc.aper_base;
+		} else {
+			DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
+			return -EINVAL;
+		}
 	}
 
 	trace_amdgpu_vm_bo_update(mapping);
@@ -1640,13 +1654,13 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				dma_addr = pages_addr;
 				break;
 			case AMDGPU_PL_DGMA:
-				addr += bo_adev->vm_manager.vram_base_offset +
+				addr += vram_base_offset +
 					adev->mman.bdev.man[mem->mem_type].gpu_offset -
 					adev->mman.bdev.man[TTM_PL_VRAM].gpu_offset;
 				addr += pfn << PAGE_SHIFT;
 				break;
 			case TTM_PL_VRAM:
-				addr += bo_adev->vm_manager.vram_base_offset;
+				addr += vram_base_offset;
 				addr += pfn << PAGE_SHIFT;
 				break;
 			default:
