@@ -251,10 +251,10 @@ static int dce_virtual_crtc_init(struct amdgpu_device *adev, int index)
 	drm_crtc_helper_add(&amdgpu_crtc->base, &dce_virtual_crtc_helper_funcs);
 
 	hrtimer_init(&amdgpu_crtc->vblank_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hrtimer_set_expires(&amdgpu_crtc->vblank_timer, DCE_VIRTUAL_VBLANK_PERIOD);
+	hrtimer_set_expires(&amdgpu_crtc->vblank_timer, ktime_set(0, DCE_VIRTUAL_VBLANK_PERIOD));
 	amdgpu_crtc->vblank_timer.function = dce_virtual_vblank_timer_handle;
 	hrtimer_start(&amdgpu_crtc->vblank_timer,
-		      DCE_VIRTUAL_VBLANK_PERIOD, HRTIMER_MODE_REL);
+		      ktime_set(0, DCE_VIRTUAL_VBLANK_PERIOD), HRTIMER_MODE_REL);
 	return 0;
 }
 
@@ -726,7 +726,7 @@ static enum hrtimer_restart dce_virtual_vblank_timer_handle(struct hrtimer *vbla
 		drm_handle_vblank(ddev, amdgpu_crtc->crtc_id);
 		dce_virtual_pageflip(adev, amdgpu_crtc->crtc_id);
 	}
-	hrtimer_start(vblank_timer, DCE_VIRTUAL_VBLANK_PERIOD,
+	hrtimer_start(vblank_timer, ktime_set(0, DCE_VIRTUAL_VBLANK_PERIOD),
 		      HRTIMER_MODE_REL);
 
 	return HRTIMER_NORESTART;
