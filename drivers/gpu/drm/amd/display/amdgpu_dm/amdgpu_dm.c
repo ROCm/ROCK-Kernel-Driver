@@ -3959,6 +3959,9 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 #if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	state->base_vrr_enabled = cur->base_vrr_enabled;
 #endif
+
+	state->active_planes = cur->active_planes;
+	state->interrupts_enabled = cur->interrupts_enabled;
 	state->vrr_params = cur->vrr_params;
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->abm_level = cur->abm_level;
@@ -4443,7 +4446,7 @@ static void dm_crtc_helper_disable(struct drm_crtc *crtc)
 {
 }
 
-static bool does_crtc_have_active_plane(struct drm_crtc_state *new_crtc_state)
+static int count_crtc_active_planes(struct drm_crtc_state *new_crtc_state)
 {
 	struct drm_atomic_state *state = new_crtc_state->state;
 	struct drm_plane *plane;
@@ -4472,7 +4475,32 @@ static bool does_crtc_have_active_plane(struct drm_crtc_state *new_crtc_state)
 		num_active += (new_plane_state->fb != NULL);
 	}
 
-	return num_active > 0;
+	return num_active;
+}
+
+/*
+ * Sets whether interrupts should be enabled on a specific CRTC.
+ * We require that the stream be enabled and that there exist active
+ * DC planes on the stream.
+ */
+static void
+dm_update_crtc_interrupt_state(struct drm_crtc *crtc,
+			       struct drm_crtc_state *new_crtc_state)
+{
+	struct dm_crtc_state *dm_new_crtc_state =
+		to_dm_crtc_state(new_crtc_state);
+
+	dm_new_crtc_state->active_planes = 0;
+	dm_new_crtc_state->interrupts_enabled = false;
+
+	if (!dm_new_crtc_state->stream)
+		return;
+
+	dm_new_crtc_state->active_planes =
+		count_crtc_active_planes(new_crtc_state);
+
+	dm_new_crtc_state->interrupts_enabled =
+		dm_new_crtc_state->active_planes > 0;
 }
 
 static int dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
@@ -4482,6 +4510,14 @@ static int dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 	struct dc *dc = adev->dm.dc;
 	struct dm_crtc_state *dm_crtc_state = to_dm_crtc_state(state);
 	int ret = -EINVAL;
+
+	/*
+	 * Update interrupt state for the CRTC. This needs to happen whenever
+	 * the CRTC has changed or whenever any of its planes have changed.
+	 * Atomic check satisfies both of these requirements since the CRTC
+	 * is added to the state by DRM during drm_atomic_helper_check_planes.
+	 */
+	dm_update_crtc_interrupt_state(crtc, state);
 
 	if (unlikely(!dm_crtc_state->stream &&
 		     modeset_required(state, NULL, dm_crtc_state->stream))) {
@@ -4495,7 +4531,7 @@ static int dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 
 	/* We want at least one hardware plane enabled to use the stream. */
 	if (state->enable && state->active &&
-	    !does_crtc_have_active_plane(state))
+	    dm_crtc_state->active_planes == 0)
 		return -EINVAL;
 
 	if (dc_validate_stream(dc, dm_crtc_state->stream) == DC_OK)
@@ -6101,11 +6137,19 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	int i;
 
 	/*
-	 * We evade vblanks and pflips on crtc that
-	 * should be changed. We do it here to flush & disable
-	 * interrupts before drm_swap_state is called in drm_atomic_helper_commit
-	 * it will update crtc->dm_crtc_state->stream pointer which is used in
-	 * the ISRs.
+	 * We evade vblank and pflip interrupts on CRTCs that are undergoing
+	 * a modeset, being disabled, or have no active planes.
+	 *
+	 * It's done in atomic commit rather than commit tail for now since
+	 * some of these interrupt handlers access the current CRTC state and
+	 * potentially the stream pointer itself.
+	 *
+	 * Since the atomic state is swapped within atomic commit and not within
+	 * commit tail this would leave to new state (that hasn't been committed yet)
+	 * being accesssed from within the handlers.
+	 *
+	 * TODO: Fix this so we can do this in commit tail and not have to block
+	 * in atomic check.
 	 */
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
@@ -6117,13 +6161,14 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 
-		if (drm_atomic_crtc_needs_modeset(new_crtc_state)
-		    && dm_old_crtc_state->stream) {
+		if (dm_old_crtc_state->interrupts_enabled &&
+		    (!dm_new_crtc_state->interrupts_enabled ||
+		     drm_atomic_crtc_needs_modeset(new_crtc_state))) {
 			/*
 			 * If the stream is removed and CRC capture was
 			 * enabled on the CRTC the extra vblank reference
-			 * needs to be dropped since CRC capture will be
-			 * disabled.
+			 * needs to be dropped since CRC capture will not
+			 * be re-enabled.
 			 */
 			if (!dm_new_crtc_state->stream
 			    && dm_new_crtc_state->crc_enabled) {
@@ -6415,14 +6460,15 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
+	/*
+	 * Enable interrupts on CRTCs that are newly active, undergone
+	 * a modeset, or have active planes again.
+	 */
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
 			new_crtc_state, i) {
 #endif
-		/*
-		 * loop to enable interrupts on newly arrived crtc
-		 */
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		bool modeset_needed;
+		bool enable;
 
 		if (old_crtc_state->active && !new_crtc_state->active)
 			crtc_disable_count++;
@@ -6434,12 +6480,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		amdgpu_dm_handle_vrr_transition(dm_old_crtc_state,
 						dm_new_crtc_state);
 
-		modeset_needed = modeset_required(
-				new_crtc_state,
-				dm_new_crtc_state->stream,
-				dm_old_crtc_state->stream);
+		enable = dm_new_crtc_state->interrupts_enabled &&
+			 (!dm_old_crtc_state->interrupts_enabled ||
+			  drm_atomic_crtc_needs_modeset(new_crtc_state));
 
-		if (dm_new_crtc_state->stream == NULL || !modeset_needed)
+		if (!enable)
 			continue;
 
 		manage_dm_interrupts(adev, acrtc, true);
