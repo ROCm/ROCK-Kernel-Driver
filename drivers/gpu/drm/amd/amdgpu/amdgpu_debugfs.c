@@ -968,10 +968,12 @@ static void amdgpu_ib_preempt_signal_fences(struct dma_fence **fences,
 static void amdgpu_ib_preempt_job_recovery(struct drm_gpu_scheduler *sched)
 {
 	struct drm_sched_job *s_job;
+	struct dma_fence *fence;
 
 	spin_lock(&sched->job_list_lock);
 	list_for_each_entry(s_job, &sched->ring_mirror_list, node) {
-		sched->ops->run_job(s_job);
+		fence = sched->ops->run_job(s_job);
+		dma_fence_put(fence);
 	}
 	spin_unlock(&sched->job_list_lock);
 }
