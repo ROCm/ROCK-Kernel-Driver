@@ -5816,6 +5816,22 @@ static void amdgpu_dm_handle_vrr_transition(struct dm_crtc_state *old_state,
 	}
 }
 
+static void amdgpu_dm_commit_cursors(struct drm_atomic_state *state)
+{
+	struct drm_plane *plane;
+	struct drm_plane_state *old_plane_state, *new_plane_state;
+	int i;
+
+	/*
+	 * TODO: Make this per-stream so we don't issue redundant updates for
+	 * commits with multiple streams.
+	 */
+	for_each_oldnew_plane_in_state(state, plane, old_plane_state,
+				       new_plane_state, i)
+		if (plane->type == DRM_PLANE_TYPE_CURSOR)
+			handle_cursor_update(plane, old_plane_state);
+}
+
 static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				    struct dc_state *dc_state,
 				    struct drm_device *dev,
@@ -5854,6 +5870,14 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		dm_error("Failed to allocate update bundle\n");
 		goto cleanup;
 	}
+
+	/*
+	 * Disable the cursor first if we're disabling all the planes.
+	 * It'll remain on the screen after the planes are re-enabled
+	 * if we don't.
+	 */
+	if (acrtc_state->active_planes == 0)
+		amdgpu_dm_commit_cursors(state);
 
 	/* update planes when needed */
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -6099,15 +6123,13 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		mutex_unlock(&dm->dc_lock);
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	for_each_plane_in_state(state, plane, old_plane_state, i) {
-		new_plane_state = plane->state;
-#else
-	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i) {
-#endif
-		if (plane->type == DRM_PLANE_TYPE_CURSOR)
-			handle_cursor_update(plane, old_plane_state);
-	}
+	/*
+	 * Update cursor state *after* programming all the planes.
+	 * This avoids redundant programming in the case where we're going
+	 * to be disabling a single plane - those pipes are being disabled.
+	 */
+	if (acrtc_state->active_planes)
+		amdgpu_dm_commit_cursors(state);
 
 cleanup:
 	kfree(bundle);
