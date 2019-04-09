@@ -209,18 +209,13 @@ struct amdgpu_vm_update_params {
 	struct amdgpu_job *job;
 
 	/**
-	 * @ib: indirect buffer to fill with commands
-	 */
-	struct amdgpu_ib *ib;
-
-	/**
 	 * @num_dw_left: number of dw left for the IB
 	 */
 	unsigned int num_dw_left;
 };
 
 struct amdgpu_vm_update_funcs {
-
+	int (*map_table)(struct amdgpu_bo *bo);
 	int (*prepare)(struct amdgpu_vm_update_params *p, void * owner,
 		       struct dma_fence *exclusive);
 	int (*update)(struct amdgpu_vm_update_params *p,
@@ -317,6 +312,7 @@ struct amdgpu_vm_manager {
 	const struct amdgpu_vm_pte_funcs	*vm_pte_funcs;
 	struct drm_sched_rq			*vm_pte_rqs[AMDGPU_MAX_RINGS];
 	unsigned				vm_pte_num_rqs;
+	struct amdgpu_ring			*page_fault;
 
 	/* partial resident texture handling */
 	spinlock_t				prt_lock;
@@ -333,6 +329,10 @@ struct amdgpu_vm_manager {
 	 */
 	struct idr				pasid_idr;
 	spinlock_t				pasid_lock;
+
+	/* counter of mapped memory through xgmi */
+	uint32_t				xgmi_map_counter;
+	struct mutex				lock_pstate;
 };
 
 #define amdgpu_vm_copy_pte(adev, ib, pe, src, count) ((adev)->vm_manager.vm_pte_funcs->copy_pte((ib), (pe), (src), (count)))

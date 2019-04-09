@@ -81,7 +81,7 @@ static const char *drm_sched_fence_get_timeline_name(struct dma_fence *f)
 	return (const char *)fence->sched->name;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 static bool drm_sched_fence_enable_signaling(struct dma_fence *f)
 {
 	return true;
@@ -136,10 +136,10 @@ static void drm_sched_fence_release_finished(struct dma_fence *f)
 const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 	.get_driver_name = drm_sched_fence_get_driver_name,
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	.wait = kcl_fence_default_wait,
 #else
 	.wait = dma_fence_default_wait,
@@ -151,10 +151,10 @@ const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 const struct dma_fence_ops drm_sched_fence_ops_finished = {
 	.get_driver_name = drm_sched_fence_get_driver_name,
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	.wait = kcl_fence_default_wait,
 #else
 	.wait = dma_fence_default_wait,

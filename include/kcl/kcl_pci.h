@@ -14,11 +14,9 @@
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
 extern const unsigned char *_kcl_pcie_link_speed;
-#define kcl_pcie_link_speed _kcl_pcie_link_speed
-#else
-extern const unsigned char *pcie_link_speed;
-#define kcl_pcie_link_speed pcie_link_speed
 #endif
+
+#define kcl_pcie_link_speed _kcl_pcie_link_speed
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
 	!defined(OS_NAME_RHEL_7_6)

@@ -640,7 +640,8 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 	bool same_dpcd = true;
 	enum dc_connection_type new_connection_type = dc_connection_none;
 	DC_LOGGER_INIT(link->ctx->logger);
-	if (link->connector_signal == SIGNAL_TYPE_VIRTUAL)
+
+	if (dc_is_virtual_signal(link->connector_signal))
 		return false;
 
 	if (false == dc_link_detect_sink(link, &new_connection_type)) {
@@ -720,9 +721,8 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 					same_dpcd = false;
 			}
 			/* Active dongle plug in without display or downstream unplug*/
-			if (link->type == dc_connection_active_dongle
-					&& link->dpcd_caps.sink_count.
-					bits.SINK_COUNT == 0) {
+			if (link->type == dc_connection_active_dongle &&
+				link->dpcd_caps.sink_count.bits.SINK_COUNT == 0) {
 				if (prev_sink != NULL) {
 					/* Downstream unplug */
 					dc_sink_release(prev_sink);
@@ -1171,8 +1171,6 @@ static bool construct(
 		DC_LOG_WARNING("Unsupported Connector type:%d!\n", link->link_id.id);
 		goto create_fail;
 	}
-
-
 
 	/* TODO: #DAL3 Implement id to str function.*/
 	LINK_INFO("Connector[%d] description:"
@@ -2563,7 +2561,7 @@ void core_link_enable_stream(
 	enum dc_status status;
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 
-	if (pipe_ctx->stream->signal != SIGNAL_TYPE_VIRTUAL) {
+	if (!dc_is_virtual_signal(pipe_ctx->stream->signal)) {
 		stream->link->link_enc->funcs->setup(
 			stream->link->link_enc,
 			pipe_ctx->stream->signal);
@@ -2577,7 +2575,8 @@ void core_link_enable_stream(
 		pipe_ctx->stream_res.stream_enc->funcs->dp_set_stream_attribute(
 			pipe_ctx->stream_res.stream_enc,
 			&stream->timing,
-			stream->output_color_space);
+			stream->output_color_space,
+			stream->link->dpcd_caps.dprx_feature.bits.SST_SPLIT_SDP_CAP);
 
 	if (dc_is_hdmi_tmds_signal(pipe_ctx->stream->signal))
 		pipe_ctx->stream_res.stream_enc->funcs->hdmi_set_stream_attribute(
@@ -2667,11 +2666,17 @@ void core_link_enable_stream(
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx, int option)
 {
 	struct dc  *core_dc = pipe_ctx->stream->ctx->dc;
+	struct dc_stream_state *stream = pipe_ctx->stream;
 
 	core_dc->hwss.blank_stream(pipe_ctx);
 
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(pipe_ctx);
+
+	if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
+		dal_ddc_service_write_scdc_data(
+			stream->link->ddc, 0,
+			stream->timing.flags.LTE_340MCSC_SCRAMBLE);
 
 	core_dc->hwss.disable_stream(pipe_ctx, option);
 

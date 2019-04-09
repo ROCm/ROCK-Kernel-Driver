@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.23"
+#define DC_VER "3.2.24"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -716,6 +716,8 @@ struct dpcd_caps {
 
 	/* dongle type (DP converter, CV smart dongle) */
 	enum display_dongle_type dongle_type;
+	/* branch device or sink device */
+	bool is_branch_dev;
 	/* Dongle's downstream count. */
 	union sink_count sink_count;
 	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,

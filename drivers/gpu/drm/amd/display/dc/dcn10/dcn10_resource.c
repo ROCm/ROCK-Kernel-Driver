@@ -1081,7 +1081,7 @@ static struct pipe_ctx *dcn10_acquire_idle_pipe_for_layer(
 {
 	struct resource_context *res_ctx = &context->res_ctx;
 	struct pipe_ctx *head_pipe = resource_get_head_pipe_for_stream(res_ctx, stream);
-	struct pipe_ctx *idle_pipe = find_idle_secondary_pipe(res_ctx, pool);
+	struct pipe_ctx *idle_pipe = find_idle_secondary_pipe(res_ctx, pool, head_pipe);
 
 	if (!head_pipe) {
 		ASSERT(0);
@@ -1528,7 +1528,7 @@ fail:
 }
 
 struct resource_pool *dcn10_create_resource_pool(
-		uint8_t num_virtual_links,
+		const struct dc_init_data *init_data,
 		struct dc *dc)
 {
 	struct dcn10_resource_pool *pool =
@@ -1537,7 +1537,7 @@ struct resource_pool *dcn10_create_resource_pool(
 	if (!pool)
 		return NULL;
 
-	if (construct(num_virtual_links, dc, pool))
+	if (construct(init_data->num_virtual_links, dc, pool))
 		return &pool->base;
 
 	BREAK_TO_DEBUGGER();

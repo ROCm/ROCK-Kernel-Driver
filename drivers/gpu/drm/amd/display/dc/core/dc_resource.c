@@ -106,44 +106,43 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 	return dc_version;
 }
 
-struct resource_pool *dc_create_resource_pool(
-				struct dc  *dc,
-				int num_virtual_links,
-				enum dce_version dc_version,
-				struct hw_asic_id asic_id)
+struct resource_pool *dc_create_resource_pool(struct dc  *dc,
+					      const struct dc_init_data *init_data,
+					      enum dce_version dc_version)
 {
 	struct resource_pool *res_pool = NULL;
 
 	switch (dc_version) {
 	case DCE_VERSION_8_0:
 		res_pool = dce80_create_resource_pool(
-			num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 	case DCE_VERSION_8_1:
 		res_pool = dce81_create_resource_pool(
-			num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 	case DCE_VERSION_8_3:
 		res_pool = dce83_create_resource_pool(
-			num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 	case DCE_VERSION_10_0:
 		res_pool = dce100_create_resource_pool(
-				num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 	case DCE_VERSION_11_0:
 		res_pool = dce110_create_resource_pool(
-			num_virtual_links, dc, asic_id);
+				init_data->num_virtual_links, dc,
+				init_data->asic_id);
 		break;
 	case DCE_VERSION_11_2:
 	case DCE_VERSION_11_22:
 		res_pool = dce112_create_resource_pool(
-			num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 	case DCE_VERSION_12_0:
 	case DCE_VERSION_12_1:
 		res_pool = dce120_create_resource_pool(
-			num_virtual_links, dc);
+				init_data->num_virtual_links, dc);
 		break;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
@@ -151,8 +150,7 @@ struct resource_pool *dc_create_resource_pool(
 #if defined(CONFIG_DRM_AMD_DC_DCN1_01)
 	case DCN_VERSION_1_01:
 #endif
-		res_pool = dcn10_create_resource_pool(
-				num_virtual_links, dc);
+		res_pool = dcn10_create_resource_pool(init_data, dc);
 		break;
 #endif
 
@@ -1038,24 +1036,60 @@ enum dc_status resource_build_scaling_params_for_context(
 
 struct pipe_ctx *find_idle_secondary_pipe(
 		struct resource_context *res_ctx,
-		const struct resource_pool *pool)
+		const struct resource_pool *pool,
+		const struct pipe_ctx *primary_pipe)
 {
 	int i;
 	struct pipe_ctx *secondary_pipe = NULL;
 
 	/*
-	 * search backwards for the second pipe to keep pipe
-	 * assignment more consistent
+	 * We add a preferred pipe mapping to avoid the chance that
+	 * MPCCs already in use will need to be reassigned to other trees.
+	 * For example, if we went with the strict, assign backwards logic:
+	 *
+	 * (State 1)
+	 * Display A on, no surface, top pipe = 0
+	 * Display B on, no surface, top pipe = 1
+	 *
+	 * (State 2)
+	 * Display A on, no surface, top pipe = 0
+	 * Display B on, surface enable, top pipe = 1, bottom pipe = 5
+	 *
+	 * (State 3)
+	 * Display A on, surface enable, top pipe = 0, bottom pipe = 5
+	 * Display B on, surface enable, top pipe = 1, bottom pipe = 4
+	 *
+	 * The state 2->3 transition requires remapping MPCC 5 from display B
+	 * to display A.
+	 *
+	 * However, with the preferred pipe logic, state 2 would look like:
+	 *
+	 * (State 2)
+	 * Display A on, no surface, top pipe = 0
+	 * Display B on, surface enable, top pipe = 1, bottom pipe = 4
+	 *
+	 * This would then cause 2->3 to not require remapping any MPCCs.
 	 */
-
-	for (i = pool->pipe_count - 1; i >= 0; i--) {
-		if (res_ctx->pipe_ctx[i].stream == NULL) {
-			secondary_pipe = &res_ctx->pipe_ctx[i];
-			secondary_pipe->pipe_idx = i;
-			break;
+	if (primary_pipe) {
+		int preferred_pipe_idx = (pool->pipe_count - 1) - primary_pipe->pipe_idx;
+		if (res_ctx->pipe_ctx[preferred_pipe_idx].stream == NULL) {
+			secondary_pipe = &res_ctx->pipe_ctx[preferred_pipe_idx];
+			secondary_pipe->pipe_idx = preferred_pipe_idx;
 		}
 	}
 
+	/*
+	 * search backwards for the second pipe to keep pipe
+	 * assignment more consistent
+	 */
+	if (!secondary_pipe)
+		for (i = pool->pipe_count - 1; i >= 0; i--) {
+			if (res_ctx->pipe_ctx[i].stream == NULL) {
+				secondary_pipe = &res_ctx->pipe_ctx[i];
+				secondary_pipe->pipe_idx = i;
+				break;
+			}
+		}
 
 	return secondary_pipe;
 }
@@ -1268,7 +1302,7 @@ struct pipe_ctx *dc_res_get_odm_bottom_pipe(struct pipe_ctx *pipe_ctx)
 	return bottom_pipe;
 }
 
-static bool dc_res_is_odm_bottom_pipe(struct pipe_ctx *pipe_ctx)
+bool dc_res_is_odm_head_pipe(struct pipe_ctx *pipe_ctx)
 {
 	struct pipe_ctx *top_pipe = pipe_ctx->top_pipe;
 	bool result = false;
@@ -1311,7 +1345,7 @@ bool dc_remove_plane_from_context(
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->plane_state == plane_state) {
-			if (dc_res_is_odm_bottom_pipe(pipe_ctx)) {
+			if (dc_res_is_odm_head_pipe(pipe_ctx)) {
 				pipe_ctx->plane_state = NULL;
 				pipe_ctx->bottom_pipe = NULL;
 				continue;
@@ -2754,10 +2788,11 @@ enum dc_status dc_validate_stream(struct dc *dc, struct dc_stream_state *stream)
 	if (!tg->funcs->validate_timing(tg, &stream->timing))
 		res = DC_FAIL_CONTROLLER_VALIDATE;
 
-	if (res == DC_OK)
+	if (res == DC_OK) {
 		if (!link->link_enc->funcs->validate_output_with_stream(
 						link->link_enc, stream))
 			res = DC_FAIL_ENC_VALIDATE;
+	}
 
 	/* TODO: validate audio ASIC caps, encoder */
 

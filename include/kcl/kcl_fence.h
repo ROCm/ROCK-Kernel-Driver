@@ -95,7 +95,7 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
 {
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);

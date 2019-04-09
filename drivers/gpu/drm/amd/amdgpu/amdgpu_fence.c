@@ -666,12 +666,10 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
-#if defined(BUILD_AS_DKMS) && !defined(OS_NAME_RHEL_7_X)
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,
-#endif
 #endif
 	.release = amdgpu_fence_release,
 };
