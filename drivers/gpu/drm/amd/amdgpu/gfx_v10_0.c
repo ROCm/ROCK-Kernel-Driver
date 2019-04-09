@@ -4512,7 +4512,8 @@ static void gfx_v10_0_ring_emit_de_meta(struct amdgpu_ring *ring, bool resume)
 	int cnt;
 
 	csa_addr = amdgpu_csa_vaddr(ring->adev);
-	gds_addr = csa_addr + 4096;
+	gds_addr = ALIGN(csa_addr + AMDGPU_CSA_SIZE - adev->gds.mem.total_size,
+			 PAGE_SIZE);
 	de_payload.gds_backup_addrlo = lower_32_bits(gds_addr);
 	de_payload.gds_backup_addrhi = upper_32_bits(gds_addr);
 
