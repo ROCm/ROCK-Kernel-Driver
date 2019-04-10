@@ -2579,16 +2579,20 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
-	struct kfd_process_device *pdd;
+	struct kfd_process_device *pdd = NULL;
 	int r = 0;
 	struct kfd_dev *dev;
-	struct kfd_process *process = NULL;
+	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
+	uint32_t *queue_id_array = NULL;
 	uint32_t gpu_id;
 	uint32_t debug_trap_action;
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
+	bool is_suspend_or_resume;
+	bool is_debbugger_attached = false;
+	uint8_t id;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2596,74 +2600,109 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	data2 = args->data2;
 	data3 = args->data3;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
-		return -EINVAL;
-
-	if (dev->device_info->asic_family < CHIP_VEGA10)
-		return -EINVAL;
-
-	if (dev->mec_fw_version < 406) {
-		pr_err("Unsupported firmware version [%i]\n",
-				dev->mec_fw_version);
-		return -EINVAL;
+	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported sched_policy: %i", sched_policy);
+		r = -EINVAL;
+		goto out;
 	}
 
-	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported sched_policy: %i", dev->dqm->sched_policy);
-		return -EINVAL;
+	is_suspend_or_resume =
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
+
+
+	pid = find_get_pid(args->pid);
+	if (!pid) {
+		pr_err("Cannot find pid info for %i\n",
+				args->pid);
+		r =  -ESRCH;
+		goto out;
 	}
 
-	mutex_lock(&p->mutex);
+	target = kfd_lookup_process_by_pid(pid);
+	if (!target) {
+		pr_err("Cannot find process info info for %i\n",
+				args->pid);
+		r = -ESRCH;
+		goto out;
+	}
 
-	if (debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
-		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME) {
 
-		pid = find_get_pid(data1);
-		if (!pid) {
-			pr_err("Cannot find pid info for %i\n", data1);
-			r = -ESRCH;
+	rcu_read_lock();
+	if (ptrace_parent(target->lead_thread) == current)
+		is_debbugger_attached = true;
+	rcu_read_unlock();
+
+	if (!is_debbugger_attached) {
+		pr_err("Cannot debug process\n");
+		r = -ESRCH;
+		goto out;
+	}
+
+	mutex_lock(&target->mutex);
+
+	if (!is_suspend_or_resume) {
+
+		dev = kfd_device_by_id(args->gpu_id);
+		if (!dev) {
+			r = -EINVAL;
 			goto unlock_out;
 		}
 
-		process = kfd_lookup_process_by_pid(pid);
-		if (!process) {
-			pr_err("Cannot find process info info for %i\n", data1);
-			r = -ESRCH;
+		if (dev->device_info->asic_family < CHIP_VEGA10) {
+			r = -EINVAL;
 			goto unlock_out;
 		}
-		pdd = kfd_get_process_device_data(dev, process);
+
+		pdd = kfd_get_process_device_data(dev, target);
+
+		if (!pdd) {
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		if ((pdd->is_debugging_enabled == false) &&
+				((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE
+				  && data1 == 1) ||
+				 (debug_trap_action ==
+				  KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
+				  data1 != 0))) {
+
+			/* We need to reserve the debug trap vmid if we haven't
+			 * yet, and are enabling trap debugging, or we are
+			 * setting the wave launch mode to something other than
+			 * normal==0.
+			 */
+			r = reserve_debug_trap_vmid(dev->dqm);
+			if (r)
+				goto unlock_out;
+
+			pdd->is_debugging_enabled = true;
+		}
+
+		if (!pdd->is_debugging_enabled) {
+			pr_err("Debugging is not enabled for this device\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
 	} else {
-		pdd = kfd_get_process_device_data(dev, p);
-	}
-	if (!pdd) {
-		r = -EINVAL;
-		goto unlock_out;
-	}
+		/* data 2 has the number of queue IDs */
+		size_t queue_id_array_size = sizeof(uint32_t) * data2;
 
-	if ((pdd->is_debugging_enabled == false) &&
-		((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
-			  data1 == 1) ||
-		 (debug_trap_action ==
-				 KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
-			 data1 != 0))) {
-
-		/* We need to reserve the debug trap vmid if we haven't yet, and
-		 * are enabling trap debugging, or we are setting the wave
-		 * launch mode to something other than normal==0.
-		 */
-		r = reserve_debug_trap_vmid(dev->dqm);
-		if (r)
+		queue_id_array = kzalloc(queue_id_array_size, GFP_KERNEL);
+		if (!queue_id_array) {
+			r = -ENOMEM;
 			goto unlock_out;
-
-		pdd->is_debugging_enabled = true;
+		}
+		/* We need to copy the queue IDs from userspace */
+		if (copy_from_user(queue_id_array,
+					(uint32_t *) args->ptr,
+					queue_id_array_size)) {
+			r = -EFAULT;
+			goto unlock_out;
+		}
 	}
 
-	if (!pdd->is_debugging_enabled) {
-		pr_err("Debugging is not enabled for this device\n");
-		r = -EINVAL;
-		goto unlock_out;
-	}
 
 	switch (debug_trap_action) {
 	case KFD_IOC_DBG_TRAP_ENABLE:
@@ -2706,43 +2745,37 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				dev->vm_info.last_vmid_kfd);
 		break;
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
-		/*
-		 * To suspend/resume queues, we need:
-		 *  ptrace to be enabled,
-		 *         process->lead_thread->ptrace == true
-		 *  and we need either:
-		 *  i) be allowed to trace the process
-		 *			process->lead_thread->parent == current
-		 *  ii) or to be ptrace'ing ourself
-		 *		 process->lead_thread == current
-		 */
-		if (process->lead_thread->ptrace &&
-				(process->lead_thread->parent == current ||
-				 process->lead_thread == current)) {
-			r = suspend_queues(dev->dqm, process, data3);
-		} else {
-			pr_err("Cannot debug process to suspend queues\n");
-			r = -ESRCH;
+		id = 0;
+		/* We need to loop over all of the topology devices */
+		while (kfd_topology_enum_kfd_devices(id, &dev) == 0) {
+			if (!dev) {
+				/* Not a GPU.  Skip it */
+				id++;
+				continue;
+			}
+
+			r = suspend_queues(dev->dqm, target, data1);
+			if (r)
+				goto unlock_out;
+
+			id++;
 		}
 		break;
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
-		/*
-		 * To suspend/resume queues, we need:
-		 *  ptrace to be enabled,
-		 *         process->lead_thread->ptrace == true
-		 *  and we need either:
-		 *  i) be allowed to trace the process
-		 *			process->lead_thread->parent == current
-		 *  ii) or to be ptrace'ing ourself
-		 *		 process->lead_thread == current
-		 */
-		if (process->lead_thread->ptrace &&
-				(process->lead_thread->parent == current ||
-				 process->lead_thread == current)) {
-			r = resume_queues(dev->dqm, process);
-		} else {
-			pr_err("Cannot debug process to resume queues\n");
-			r = -ESRCH;
+		id = 0;
+		/* We need to loop over all of the topology devices */
+		while (kfd_topology_enum_kfd_devices(id, &dev) == 0) {
+			if (!dev) {
+				/* Not a GPU.  Skip it */
+				id++;
+				continue;
+			}
+
+			r = resume_queues(dev->dqm, target);
+			if (r)
+				goto unlock_out;
+
+			id++;
 		}
 		break;
 	default:
@@ -2750,7 +2783,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = -EINVAL;
 	}
 
-	if (pdd->trap_debug_wave_launch_mode == 0 &&
+	if (pdd && pdd->trap_debug_wave_launch_mode == 0 &&
 			!pdd->debug_trap_enabled) {
 		int result;
 
@@ -2765,11 +2798,14 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 unlock_out:
+	mutex_unlock(&target->mutex);
+
+out:
 	if (pid)
 		put_pid(pid);
-	if (process)
-		kfd_unref_process(process);
-	mutex_unlock(&p->mutex);
+	if (target)
+		kfd_unref_process(target);
+	kfree(queue_id_array);
 	return r;
 }
 

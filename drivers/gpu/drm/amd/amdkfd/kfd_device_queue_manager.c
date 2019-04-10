@@ -2087,11 +2087,8 @@ int suspend_queues(struct device_queue_manager *dqm,
 		}
 	}
 
-	/* Memory Fence */
-	if (!r && flags & KFD__DBG_NODE_SUSPEND_MEMORY_FENCE)
-		amdgpu_amdkfd_debug_mem_fence(dev->kgd);
-
 	if (queues_suspended) {
+		amdgpu_amdkfd_debug_mem_fence(dev->kgd);
 		flush_work(&copy_context_worker.copy_context_work);
 		mmput(copy_context_worker.mm);
 		destroy_work_on_stack(&copy_context_worker.copy_context_work);
