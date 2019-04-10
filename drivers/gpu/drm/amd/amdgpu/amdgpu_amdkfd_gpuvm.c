@@ -1813,6 +1813,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	struct amdgpu_bo *bo;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		return -EINVAL;
