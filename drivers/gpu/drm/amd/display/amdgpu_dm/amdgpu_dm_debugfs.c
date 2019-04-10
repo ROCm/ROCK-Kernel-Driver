@@ -1137,8 +1137,10 @@ static int visual_confirm_get(void *data, u64 *val)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
+#endif
 
 int dtn_debugfs_init(struct amdgpu_device *adev)
 {
