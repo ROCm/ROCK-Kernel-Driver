@@ -1770,15 +1770,18 @@ static int dm_resume(void *handle)
 	struct drm_plane *plane;
 	struct drm_plane_state *new_plane_state;
 	struct dm_plane_state *dm_new_plane_state;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	struct dm_atomic_state *dm_state = to_dm_atomic_state(dm->atomic_obj.state);
+#endif
 	enum dc_connection_type new_connection_type = dc_connection_none;
 	int i, r;
-
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	/* Recreate dc_state - DC invalidates it when setting power state to S3. */
 	dc_release_state(dm_state->context);
 	dm_state->context = dc_create_state(dm->dc);
 	/* TODO: Remove dc_state->dccg, use dc->dccg directly. */
 	dc_resource_state_construct(dm->dc, dm_state->context);
+#endif
 
 	/* Before powering on DC we need to re-initialize DMUB. */
 	r = dm_dmub_hw_init(adev);
