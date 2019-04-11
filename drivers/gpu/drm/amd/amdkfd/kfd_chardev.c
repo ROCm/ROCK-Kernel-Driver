@@ -2581,7 +2581,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct kfd_ioctl_dbg_trap_args *args = data;
 	struct kfd_process_device *pdd = NULL;
 	int r = 0;
-	struct kfd_dev *dev;
+	struct kfd_dev *dev = NULL;
 	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
 	uint32_t *queue_id_array = NULL;
@@ -2591,7 +2591,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data2;
 	uint32_t data3;
 	bool is_suspend_or_resume;
-	uint8_t id;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2746,39 +2745,24 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data1,
 				dev->vm_info.last_vmid_kfd);
 		break;
+
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
-		id = 0;
-		/* We need to loop over all of the topology devices */
-		while (kfd_topology_enum_kfd_devices(id, &dev) == 0) {
-			if (!dev) {
-				/* Not a GPU.  Skip it */
-				id++;
-				continue;
-			}
-
-			r = suspend_queues(dev->dqm, target, data1);
-			if (r)
-				goto unlock_out;
-
-			id++;
-		}
+		r = suspend_queues(target,
+				data2, /* Number of queues */
+				data3, /* Grace Period */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
 		break;
+
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
-		id = 0;
-		/* We need to loop over all of the topology devices */
-		while (kfd_topology_enum_kfd_devices(id, &dev) == 0) {
-			if (!dev) {
-				/* Not a GPU.  Skip it */
-				id++;
-				continue;
-			}
-
-			r = resume_queues(dev->dqm, target);
-			if (r)
-				goto unlock_out;
-
-			id++;
-		}
+		r = resume_queues(target,
+				data2, /* Number of queues */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

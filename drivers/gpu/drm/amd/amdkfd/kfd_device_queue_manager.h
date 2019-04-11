@@ -226,11 +226,15 @@ bool check_if_queues_active(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);
 int reserve_debug_trap_vmid(struct device_queue_manager *dqm);
 int release_debug_trap_vmid(struct device_queue_manager *dqm);
-int suspend_queues(struct device_queue_manager *dqm,
-				struct kfd_process *p,
-				uint32_t flags);
-int resume_queues(struct device_queue_manager *dqm, struct kfd_process *p);
-
+int suspend_queues(struct kfd_process *p,
+			uint32_t num_queues,
+			uint32_t grace_period,
+			uint32_t flags,
+			uint32_t *queue_ids);
+int resume_queues(struct kfd_process *p,
+		uint32_t num_queues,
+		uint32_t flags,
+		uint32_t *queue_ids);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
