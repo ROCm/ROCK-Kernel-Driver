@@ -335,17 +335,38 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 		pipe_id, queue_id);
 }
 
+struct user_context_save_area_header {
+	/* Byte offset from start of user context
+	 * save area to the last saved top (lowest
+	 * address) of control stack data. Must be
+	 * 4 byte aligned.
+	 */
+	uint32_t control_stack_offset;
+
+	/* Byte size of the last saved control stack
+	 * data. Must be 4 byte aligned.
+	 */
+	uint32_t control_stack_size;
+
+	/* Byte offset from start of user context save
+	 * area to the last saved base (lowest address)
+	 * of wave state data. Must be 4 byte aligned.
+	 */
+	uint32_t wave_state_offset;
+
+	/* Byte size of the last saved wave state data.
+	 * Must be 4 byte aligned.
+	 */
+	uint32_t wave_state_size;
+};
+
 static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  void __user *ctl_stack,
 			  u32 *ctl_stack_used_size,
 			  u32 *save_area_used_size)
 {
-	void __user *user_data_ptr;
 	struct v9_mqd *m;
-	struct {
-		uint32_t ctl_stack_size;
-		uint32_t save_area_size;
-	} user_data;
+	struct user_context_save_area_header header;
 
 	/* Control stack is located one page after MQD. */
 	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
@@ -353,27 +374,23 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	m = get_mqd(mqd);
 
 	*ctl_stack_used_size = m->cp_hqd_cntl_stack_size -
-		m->cp_hqd_cntl_stack_offset + sizeof(user_data);
+		m->cp_hqd_cntl_stack_offset;
 	*save_area_used_size = m->cp_hqd_wg_state_offset -
 		m->cp_hqd_cntl_stack_size;
 
-	/* To avoid breaking existing tools reading the control stack,
-	 * set the IS_EVENT and IS_STATE bits to the sizes so that they
-	 * are ignored if read as COMPUTE_RELAUNCH register.
-	 */
-	user_data.ctl_stack_size = 0xC0000000 | *ctl_stack_used_size;
-	user_data.save_area_size = 0xC0000000 | *save_area_used_size;
+	header.control_stack_size = *ctl_stack_used_size;
+	header.wave_state_size = *save_area_used_size;
 
-	/* The user ctl_stack_size and save_area size are located
-	 * right below the start of the context save area.
-	 */
-	user_data_ptr = (void __user *)((uintptr_t)ctl_stack
-		+ m->cp_hqd_cntl_stack_size - sizeof(user_data));
+	header.wave_state_offset = m->cp_hqd_wg_state_offset + sizeof(header);
+	header.control_stack_offset = m->cp_hqd_cntl_stack_offset;
 
-	if (copy_to_user(ctl_stack,
-			 (void *)((uintptr_t) mqd_ctl_stack + sizeof(user_data)),
-			 m->cp_hqd_cntl_stack_size - sizeof(user_data))
-		|| copy_to_user(user_data_ptr, &user_data, sizeof(user_data)))
+	if (copy_to_user(ctl_stack, &header, sizeof(header)))
+		return -EFAULT;
+
+	if (copy_to_user(ctl_stack + m->cp_hqd_cntl_stack_offset,
+				mqd_ctl_stack + m->cp_hqd_cntl_stack_offset,
+				*ctl_stack_used_size))
+
 		return -EFAULT;
 
 	return 0;
