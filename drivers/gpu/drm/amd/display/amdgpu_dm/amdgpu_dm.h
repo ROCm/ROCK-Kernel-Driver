@@ -157,7 +157,6 @@ struct amdgpu_display_manager {
 	 * drm resources, like &dc_context.
 	 */
 	struct drm_private_obj atomic_obj;
-
 #endif
 
 	/**
