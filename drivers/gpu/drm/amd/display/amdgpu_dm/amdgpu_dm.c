@@ -6983,7 +6983,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		return false;
 
 	new_crtc_state =
-		drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
+		kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_state->crtc);
 
 	if (!new_crtc_state)
 		return true;
