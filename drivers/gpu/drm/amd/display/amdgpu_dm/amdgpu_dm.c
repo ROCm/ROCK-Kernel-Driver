@@ -5168,6 +5168,7 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 		return 0;
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
 
 	switch (plane_state->color_encoding) {
@@ -5195,7 +5196,11 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	default:
 		return -EINVAL;
 	}
-
+#else
+	/* Assume 709 full range for YUV formats when not given color space on plane. */
+	full_range = true;
+	*color_space = COLOR_SPACE_YCBCR709;
+#endif
 	return 0;
 }
 
@@ -5889,6 +5894,7 @@ static void fill_stream_properties_from_drm_display_mode(
 	stream->output_color_space = get_output_color_space(timing_out, connector_state);
 	stream->content_type = get_output_content_type(connector_state);
 }
+
 static void fill_audio_info(struct audio_info *audio_info,
 			    const struct drm_connector *drm_connector,
 			    const struct dc_sink *dc_sink)
@@ -10342,10 +10348,12 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 			return true;
 #endif
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 		/* Colorspace changes. */
 		if (old_other_state->color_range != new_other_state->color_range ||
 		    old_other_state->color_encoding != new_other_state->color_encoding)
 			return true;
+#endif
 
 		/* HDR/Transfer Function changes. */
 		if (dm_old_other_state->degamma_tf != dm_new_other_state->degamma_tf ||

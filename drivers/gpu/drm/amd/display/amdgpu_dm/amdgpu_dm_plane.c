@@ -1753,6 +1753,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_zpos_immutable_property(plane, 255);
 	}
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY &&
 	    plane_cap &&
 	    (plane_cap->pixel_format_support.nv12 ||
@@ -1767,6 +1768,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 			BIT(DRM_COLOR_YCBCR_FULL_RANGE),
 			DRM_COLOR_YCBCR_BT709, DRM_COLOR_YCBCR_LIMITED_RANGE);
 	}
+#endif
 
 	supported_rotations =
 		DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 |
