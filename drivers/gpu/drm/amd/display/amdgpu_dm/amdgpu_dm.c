@@ -3784,8 +3784,11 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			fb->pitches[0] / (fb->bits_per_pixel / 8);
+#else
 			fb->pitches[0] / fb->format->cpp[0];
-
+#endif
 		address->type = PLN_ADDR_TYPE_GRAPHICS;
 		address->grph.addr.low_part = lower_32_bits(afb->address);
 		address->grph.addr.high_part = upper_32_bits(afb->address);
@@ -3797,7 +3800,11 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			fb->pitches[0] / (fb->bits_per_pixel / 8);
+#else
 			fb->pitches[0] / fb->format->cpp[0];
+#endif
 
 		plane_size->chroma_size.x = 0;
 		plane_size->chroma_size.y = 0;
@@ -3806,8 +3813,11 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->chroma_size.height = fb->height / 2;
 
 		plane_size->chroma_pitch =
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
+#else
 			fb->pitches[1] / fb->format->cpp[1];
-
+#endif
 		address->type = PLN_ADDR_TYPE_VIDEO_PROGRESSIVE;
 		address->video_progressive.luma_addr.low_part =
 			lower_32_bits(afb->address);
@@ -3980,8 +3990,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	int ret;
 
 	memset(plane_info, 0, sizeof(*plane_info));
-
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+	switch (fb->pixel_format) {
+#else
 	switch (fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		plane_info->format =
 			SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS;
@@ -4017,7 +4030,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %s\n",
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+			drm_get_format_name(fb->pixel_format, &format_name));
+#else
 			drm_get_format_name(fb->format->format, &format_name));
+#endif
 		return -EINVAL;
 	}
 
