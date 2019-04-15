@@ -225,7 +225,6 @@ enum spectre_v2_mitigation {
 	SPECTRE_V2_NONE,
 	SPECTRE_V2_RETPOLINE_GENERIC,
 	SPECTRE_V2_RETPOLINE_AMD,
-	SPECTRE_V2_IBRS,
 	SPECTRE_V2_IBRS_ENHANCED,
 };
 
@@ -257,6 +256,7 @@ extern char __indirect_thunk_end[];
  */
 static inline void vmexit_fill_RSB(void)
 {
+#ifdef CONFIG_RETPOLINE
 	unsigned long loops;
 
 	asm volatile (ANNOTATE_NOSPEC_ALTERNATIVE
@@ -266,6 +266,7 @@ static inline void vmexit_fill_RSB(void)
 		      "910:"
 		      : "=r" (loops), ASM_CALL_CONSTRAINT
 		      : : "memory" );
+#endif
 }
 
 static __always_inline
@@ -316,42 +317,6 @@ do {									\
 DECLARE_STATIC_KEY_FALSE(switch_to_cond_stibp);
 DECLARE_STATIC_KEY_FALSE(switch_mm_cond_ibpb);
 DECLARE_STATIC_KEY_FALSE(switch_mm_always_ibpb);
-
-/*
- * This also performs a barrier, and setting it again when it was already
- * set is NOT a no-op.
- */
-static inline void restrict_branch_speculation(void)
-{
-	unsigned long ax, cx, dx;
-
-	asm volatile(ALTERNATIVE("",
-				 "movl %[msr], %%ecx\n\t"
-				 "movl %[val], %%eax\n\t"
-				 "movl $0, %%edx\n\t"
-				 "wrmsr",
-				 X86_FEATURE_USE_IBRS)
-		     : "=a" (ax), "=c" (cx), "=d" (dx)
-		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
-		       [val] "i" (SPEC_CTRL_IBRS)
-		     : "memory");
-}
-
-static inline void unrestrict_branch_speculation(void)
-{
-	unsigned long ax, cx, dx;
-
-	asm volatile(ALTERNATIVE("",
-				 "movl %[msr], %%ecx\n\t"
-				 "movl %[val], %%eax\n\t"
-				 "movl $0, %%edx\n\t"
-				 "wrmsr",
-				 X86_FEATURE_USE_IBRS)
-		     : "=a" (ax), "=c" (cx), "=d" (dx)
-		     : [msr] "i" (MSR_IA32_SPEC_CTRL),
-		       [val] "i" (0)
-		     : "memory");
-}
 
 #endif /* __ASSEMBLY__ */
 

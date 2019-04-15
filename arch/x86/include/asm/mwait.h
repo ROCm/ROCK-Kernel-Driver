@@ -6,7 +6,6 @@
 #include <linux/sched/idle.h>
 
 #include <asm/cpufeature.h>
-#include <asm/nospec-branch.h>
 
 #define MWAIT_SUBSTATE_MASK		0xf
 #define MWAIT_CSTATE_MASK		0xf
@@ -107,20 +106,7 @@ static inline void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
 			mb();
 		}
 
-		/*
-		 * Indirect Branch Speculation (IBS) is controlled per
-		 * physical core. If one thread disables it, then it's
-		 * disabled on all threads of the core. The kernel disables
-		 * it on entry from user space. Reenable it on the thread
-		 * which goes idle so the other thread has a chance to run
-		 * with full speculation enabled in userspace.
-		 */
-		unrestrict_branch_speculation();
 		__monitor((void *)&current_thread_info()->flags, 0, 0);
-		/*
-		 * Restrict IBS again to protect kernel execution.
-		 */
-		restrict_branch_speculation();
 		if (!need_resched())
 			__mwait(eax, ecx);
 	}

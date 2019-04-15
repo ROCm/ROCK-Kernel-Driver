@@ -236,11 +236,6 @@ static inline const char *spectre_v2_module_string(void)
 static inline const char *spectre_v2_module_string(void) { return ""; }
 #endif
 
-static inline bool retp_compiler(void)
-{
-	return __is_defined(CONFIG_RETPOLINE);
-}
-
 static inline bool match_option(const char *arg, int arglen, const char *opt)
 {
 	int len = strlen(opt);
@@ -256,7 +251,6 @@ enum spectre_v2_mitigation_cmd {
 	SPECTRE_V2_CMD_RETPOLINE,
 	SPECTRE_V2_CMD_RETPOLINE_GENERIC,
 	SPECTRE_V2_CMD_RETPOLINE_AMD,
-	SPECTRE_V2_CMD_IBRS,
 };
 
 enum spectre_v2_user_cmd {
@@ -418,7 +412,6 @@ static const char * const spectre_v2_strings[] = {
 	[SPECTRE_V2_NONE]			= "Vulnerable",
 	[SPECTRE_V2_RETPOLINE_GENERIC]		= "Mitigation: Full generic retpoline",
 	[SPECTRE_V2_RETPOLINE_AMD]		= "Mitigation: Full AMD retpoline",
-	[SPECTRE_V2_IBRS]			= "Mitigation: Indirect Branch Restricted Speculation",
 	[SPECTRE_V2_IBRS_ENHANCED]		= "Mitigation: Enhanced IBRS",
 };
 
@@ -432,7 +425,6 @@ static const struct {
 	{ "retpoline",		SPECTRE_V2_CMD_RETPOLINE,	  false },
 	{ "retpoline,amd",	SPECTRE_V2_CMD_RETPOLINE_AMD,	  false },
 	{ "retpoline,generic",	SPECTRE_V2_CMD_RETPOLINE_GENERIC, false },
-	{ "ibrs",		SPECTRE_V2_CMD_IBRS,		  false },
 	{ "auto",		SPECTRE_V2_CMD_AUTO,		  false },
 };
 
@@ -487,23 +479,6 @@ static enum spectre_v2_mitigation_cmd __init spectre_v2_parse_cmdline(void)
 	return cmd;
 }
 
-/* Check for Skylake-like CPUs (for RSB handling) */
-static bool __init is_skylake_era(void)
-{
-	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-	    boot_cpu_data.x86 == 6) {
-		switch (boot_cpu_data.x86_model) {
-		case INTEL_FAM6_SKYLAKE_MOBILE:
-		case INTEL_FAM6_SKYLAKE_DESKTOP:
-		case INTEL_FAM6_SKYLAKE_X:
-		case INTEL_FAM6_KABYLAKE_MOBILE:
-		case INTEL_FAM6_KABYLAKE_DESKTOP:
-			return true;
-		}
-	}
-	return false;
-}
-
 static void __init spectre_v2_select_mitigation(void)
 {
 	enum spectre_v2_mitigation_cmd cmd = spectre_v2_parse_cmdline();
@@ -530,31 +505,17 @@ static void __init spectre_v2_select_mitigation(void)
 			wrmsrl(MSR_IA32_SPEC_CTRL, x86_spec_ctrl_base);
 			goto specv2_set_mode;
 		}
-		if (boot_cpu_has(X86_FEATURE_IBRS) &&
-		    (is_skylake_era() || !retp_compiler())) {
-			mode = SPECTRE_V2_IBRS;
-			setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
-			goto specv2_set_mode;
-		}
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_auto;
 		break;
-
-	case SPECTRE_V2_CMD_IBRS:
-		mode = SPECTRE_V2_IBRS;
-		setup_force_cpu_cap(X86_FEATURE_USE_IBRS);
-		goto specv2_set_mode;
-
 	case SPECTRE_V2_CMD_RETPOLINE_AMD:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_amd;
 		break;
-
 	case SPECTRE_V2_CMD_RETPOLINE_GENERIC:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_generic;
 		break;
-
 	case SPECTRE_V2_CMD_RETPOLINE:
 		if (IS_ENABLED(CONFIG_RETPOLINE))
 			goto retpoline_auto;

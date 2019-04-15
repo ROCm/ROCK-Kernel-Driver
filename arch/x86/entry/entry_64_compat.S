@@ -54,8 +54,6 @@ ENTRY(entry_SYSENTER_compat)
 	SWITCH_TO_KERNEL_CR3 scratch_reg=%rsp
 
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
-	/* Restrict Indirect Branch Speculation */
-	RESTRICT_IB_SPEC
 
 	/*
 	 * User tracing code (ptrace or signal handlers) might assume that
@@ -249,18 +247,12 @@ GLOBAL(entry_SYSCALL_compat_after_hwframe)
 	pushq   $0			/* pt_regs->r15 = 0 */
 	xorl	%r15d, %r15d		/* nospec   r15 */
 
-	/* Restrict Indirect Branch Speculation. All registers are saved already */
-	RESTRICT_IB_SPEC_CLOBBER
-
-	/* User mode is traced as though IRQs are on, and SYSENTER
+	/*
+	 * User mode is traced as though IRQs are on, and SYSENTER
 	 * turned them off.
 	 */
 	TRACE_IRQS_OFF
 
-	/*
-	 * We just saved %rdi so it is safe to clobber.  It is not
-	 * preserved during the C calls inside TRACE_IRQS_OFF anyway.
-	 */
 	movq	%rsp, %rdi
 	call	do_fast_syscall_32
 	/* XEN PV guests always use IRET path */
@@ -275,15 +267,6 @@ sysret32_from_system_call:
 	 */
 	STACKLEAK_ERASE
 	TRACE_IRQS_ON			/* User mode traces as IRQs on. */
-
-	/*
-	 * Unrestrict Indirect Branch Speculation. This is safe to do here
-	 * because there are no indirect branches between here and the
-	 * return to userspace (sysretl).
-	 * Clobber of %rax, %rcx, %rdx is OK before register restoring.
-	 */
-	UNRESTRICT_IB_SPEC_CLOBBER
-
 	movq	RBX(%rsp), %rbx		/* pt_regs->rbx */
 	movq	RBP(%rsp), %rbp		/* pt_regs->rbp */
 	movq	EFLAGS(%rsp), %r11	/* pt_regs->flags (in r11) */
@@ -378,8 +361,6 @@ ENTRY(entry_INT80_compat)
 
 	/* Need to switch before accessing the thread stack. */
 	SWITCH_TO_KERNEL_CR3 scratch_reg=%rdi
-	/* Restrict Indirect Branch Speculation */
-	RESTRICT_IB_SPEC
 	/* In the Xen PV case we already run on the thread stack. */
 	ALTERNATIVE "movq %rsp, %rdi", "jmp .Lint80_keep_stack", X86_FEATURE_XENPV
 	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
