@@ -4846,7 +4846,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = get_plane_formats(plane, plane_cap, formats,
 					ARRAY_SIZE(formats));
 
-	res = drm_universal_plane_init(dm->adev->ddev, plane, possible_crtcs,
+	res = kcl_drm_universal_plane_init(dm->adev->ddev, plane, possible_crtcs,
 				       &dm_plane_funcs, formats, num_formats,
 				       NULL, plane->type, NULL);
 	if (res)
