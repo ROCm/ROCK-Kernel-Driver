@@ -1599,8 +1599,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	}
 
 	if (adev != bo_adev &&
-	    !(adev->gmc.xgmi.hive_id &&
-	      adev->gmc.xgmi.hive_id == bo_adev->gmc.xgmi.hive_id) &&
+	    !mapping->bo_va->is_xgmi &&
 	    !pages_addr) {
 		if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
 			flags |= AMDGPU_PTE_SYSTEM;
