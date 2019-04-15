@@ -3668,6 +3668,7 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 		return 0;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
 
 	switch (plane_state->color_encoding) {
@@ -3695,7 +3696,11 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	default:
 		return -EINVAL;
 	}
-
+#else
+	/* Assume 709 full range for YUV formats when not given color space on plane. */
+	full_range = true;
+	*color_space = COLOR_SPACE_YCBCR709;
+#endif
 	return 0;
 }
 
