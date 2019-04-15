@@ -187,9 +187,15 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		edid = drm_dp_mst_get_edid(connector, &aconnector->mst_port->mst_mgr, aconnector->port);
 
 		if (!edid) {
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+			drm_mode_connector_update_edid_property(
+				&aconnector->base,
+				NULL);
+#else
 			drm_connector_update_edid_property(
 				&aconnector->base,
 				NULL);
+#endif
 			return ret;
 		}
 
@@ -221,8 +227,13 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 					connector, aconnector->edid);
 	}
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+	drm_mode_connector_update_edid_property(
+					&aconnector->base, aconnector->edid);
+#else
 	drm_connector_update_edid_property(
 					&aconnector->base, aconnector->edid);
+#endif
 
 	ret = drm_add_edid_modes(connector, aconnector->edid);
 #if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
@@ -337,8 +348,13 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		master->connector_id);
 
 	aconnector->mst_encoder = dm_dp_create_fake_mst_encoder(master);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+	drm_mode_connector_attach_encoder(&aconnector->base,
+				     &aconnector->mst_encoder->base);
+#else
 	drm_connector_attach_encoder(&aconnector->base,
 				     &aconnector->mst_encoder->base);
+#endif
 
 	drm_object_attach_property(
 		&connector->base,
@@ -349,7 +365,11 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		dev->mode_config.tile_property,
 		0);
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+	drm_mode_connector_set_path_property(connector, pathprop);
+#else
 	drm_connector_set_path_property(connector, pathprop);
+#endif
 
 	/*
 	 * Initialize connector state before adding the connectror to drm and
