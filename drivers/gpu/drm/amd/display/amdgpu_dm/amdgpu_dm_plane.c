@@ -104,6 +104,7 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -137,6 +138,7 @@ void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state
 		*global_alpha = true;
 		*global_alpha_value = plane_state->alpha >> 8;
 	}
+#endif
 }
 
 static void amdgpu_dm_plane_add_modifier(uint64_t **mods, uint64_t *size, uint64_t *cap, uint64_t mod)
@@ -1730,6 +1732,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	if (res)
 		return res;
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -1739,6 +1742,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_alpha_property(plane);
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
+#endif
 
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
 		drm_plane_create_zpos_immutable_property(plane, 0);

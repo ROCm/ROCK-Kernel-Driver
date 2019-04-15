@@ -5889,7 +5889,6 @@ static void fill_stream_properties_from_drm_display_mode(
 	stream->output_color_space = get_output_color_space(timing_out, connector_state);
 	stream->content_type = get_output_content_type(connector_state);
 }
-
 static void fill_audio_info(struct audio_info *audio_info,
 			    const struct drm_connector *drm_connector,
 			    const struct dc_sink *dc_sink)
@@ -10332,6 +10331,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		if (old_other_state->rotation != new_other_state->rotation)
 			return true;
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 		/* Blending updates. */
 		if (old_other_state->pixel_blend_mode !=
 		    new_other_state->pixel_blend_mode)
@@ -10340,6 +10340,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		/* Alpha updates. */
 		if (old_other_state->alpha != new_other_state->alpha)
 			return true;
+#endif
 
 		/* Colorspace changes. */
 		if (old_other_state->color_range != new_other_state->color_range ||
