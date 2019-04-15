@@ -4480,7 +4480,7 @@ static bool does_crtc_have_active_plane(struct drm_crtc_state *new_crtc_state)
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		new_plane_state = drm_atomic_get_new_plane_state(state, plane);
+		new_plane_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, plane);
 
 		if (!new_plane_state) {
 			/*
