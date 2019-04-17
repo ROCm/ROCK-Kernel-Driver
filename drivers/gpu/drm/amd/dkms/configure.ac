@@ -95,6 +95,7 @@ m4_include([m4/drm-atomic-helper-best-encoder.m4])
 m4_include([m4/drm-hdmi-avi-infoframe-from-display-mode.m4])
 m4_include([m4/drm-mode-is-420-only-handling.m4])
 m4_include([m4/drm-set-crc-source.m4])
+m4_include([m4/sequence-in-struct-drm-pending-vblank-event.m4])
 m4_include([m4/config.m4])
 
 
