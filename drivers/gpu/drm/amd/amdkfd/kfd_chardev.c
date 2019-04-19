@@ -2576,13 +2576,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct kfd_process_device *pdd;
 	int r = 0;
 	struct kfd_dev *dev;
-	struct kfd_process *process;
+	struct kfd_process *process = NULL;
+	struct pid *pid = NULL;
 	uint32_t gpu_id;
 	uint32_t debug_trap_action;
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
-	struct pid *pid;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2609,7 +2609,27 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 	mutex_lock(&p->mutex);
-	pdd = kfd_get_process_device_data(dev, p);
+
+	if (debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME) {
+
+		pid = find_get_pid(data1);
+		if (!pid) {
+			pr_err("Cannot find pid info for %i\n", data1);
+			r = -ESRCH;
+			goto unlock_out;
+		}
+
+		process = kfd_lookup_process_by_pid(pid);
+		if (!process) {
+			pr_err("Cannot find process info info for %i\n", data1);
+			r = -ESRCH;
+			goto unlock_out;
+		}
+		pdd = kfd_get_process_device_data(dev, process);
+	} else {
+		pdd = kfd_get_process_device_data(dev, p);
+	}
 	if (!pdd) {
 		r = -EINVAL;
 		goto unlock_out;
@@ -2680,21 +2700,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				dev->vm_info.last_vmid_kfd);
 		break;
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
-		pid = find_get_pid(data1);
-		if (!pid) {
-			pr_err("Cannot find pid info for %i\n", data1);
-			r = -ESRCH;
-			goto unlock_out;
-		}
-
-		process = kfd_lookup_process_by_pid(pid);
-		if (!process) {
-			pr_err("Cannot find process info info for %i\n", data1);
-			r = -ESRCH;
-			put_pid(pid);
-			goto unlock_out;
-		}
-
 		/*
 		 * To suspend/resume queues, we need:
 		 *  ptrace to be enabled,
@@ -2713,25 +2718,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			pr_err("Cannot debug process to suspend queues\n");
 			r = -ESRCH;
 		}
-		kfd_unref_process(process);
-		put_pid(pid);
 		break;
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
-		pid = find_get_pid(data1);
-		if (!pid) {
-			pr_err("Cannot find pid info for %i\n", data1);
-			r = -ESRCH;
-			goto unlock_out;
-		}
-
-		process = kfd_lookup_process_by_pid(pid);
-		if (!process) {
-			pr_err("Cannot find process info info for %i\n", data1);
-			r = -ESRCH;
-			put_pid(pid);
-			goto unlock_out;
-		}
-
 		/*
 		 * To suspend/resume queues, we need:
 		 *  ptrace to be enabled,
@@ -2750,8 +2738,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			pr_err("Cannot debug process to resume queues\n");
 			r = -ESRCH;
 		}
-		kfd_unref_process(process);
-		put_pid(pid);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
@@ -2773,6 +2759,10 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 unlock_out:
+	if (pid)
+		put_pid(pid);
+	if (process)
+		kfd_unref_process(process);
 	mutex_unlock(&p->mutex);
 	return r;
 }

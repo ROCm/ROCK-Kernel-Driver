@@ -914,9 +914,6 @@ def_value:
  */
 static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 {
-	struct sysinfo si;
-	int phys_ram_gb, amdgpu_vm_size_aligned;
-
 	if (amdgpu_sched_jobs < 4) {
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
@@ -939,27 +936,6 @@ static void amdgpu_device_check_arguments(struct amdgpu_device *adev)
 		dev_warn(adev->dev, "gtt size (%d) too small\n",
 				 amdgpu_gtt_size);
 		amdgpu_gtt_size = -1;
-	}
-
-	/* Compute the GPU VM space only if the user
-	 * hasn't changed it from the default.
-	 */
-	if (amdgpu_vm_size == -1) {
-		/* Computation depends on the amount of physical RAM available.
-		 * Cannot exceed 1TB.
-		 */
-		si_meminfo(&si);
-		phys_ram_gb = ((uint64_t)si.totalram * si.mem_unit) >> 30;
-		amdgpu_vm_size = min(phys_ram_gb * 3 + 16, 1024);
-
-		/* GPUVM sizes are almost never perfect powers of two.
-		 * Round up to nearest power of two starting from
-		 * the minimum allowed but aligned size of 32GB */
-		amdgpu_vm_size_aligned = 32;
-		while (amdgpu_vm_size > amdgpu_vm_size_aligned)
-			amdgpu_vm_size_aligned *= 2;
-
-		amdgpu_vm_size = amdgpu_vm_size_aligned;
 	}
 
 	/* valid range is between 4 and 9 inclusive */
@@ -2490,6 +2466,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->virt.vf_errors.lock);
 	hash_init(adev->mn_hash);
 	mutex_init(&adev->lock_reset);
+	mutex_init(&adev->virt.dpm_mutex);
 
 	amdgpu_device_check_arguments(adev);
 
@@ -3216,6 +3193,7 @@ static int amdgpu_device_recover_vram(struct amdgpu_device *adev)
 
 		/* No need to recover an evicted BO */
 		if (shadow->tbo.mem.mem_type != TTM_PL_TT ||
+		    shadow->tbo.mem.start == AMDGPU_BO_INVALID_OFFSET ||
 		    shadow->parent->tbo.mem.mem_type != TTM_PL_VRAM)
 			continue;
 
@@ -3224,11 +3202,16 @@ static int amdgpu_device_recover_vram(struct amdgpu_device *adev)
 			break;
 
 		if (fence) {
-			r = dma_fence_wait_timeout(fence, false, tmo);
+			tmo = dma_fence_wait_timeout(fence, false, tmo);
 			dma_fence_put(fence);
 			fence = next;
-			if (r <= 0)
+			if (tmo == 0) {
+				r = -ETIMEDOUT;
 				break;
+			} else if (tmo < 0) {
+				r = tmo;
+				break;
+			}
 		} else {
 			fence = next;
 		}
@@ -3239,8 +3222,8 @@ static int amdgpu_device_recover_vram(struct amdgpu_device *adev)
 		tmo = dma_fence_wait_timeout(fence, false, tmo);
 	dma_fence_put(fence);
 
-	if (r <= 0 || tmo <= 0) {
-		DRM_ERROR("recover vram bo from shadow failed\n");
+	if (r < 0 || tmo <= 0) {
+		DRM_ERROR("recover vram bo from shadow failed, r is %ld, tmo is %ld\n", r, tmo);
 		return -EIO;
 	}
 
@@ -3677,43 +3660,6 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 	return r;
 }
 
-static void amdgpu_device_get_min_pci_speed_width(struct amdgpu_device *adev,
-						  enum pci_bus_speed *speed,
-						  enum pcie_link_width *width)
-{
-	struct pci_dev *pdev = adev->pdev;
-	enum pci_bus_speed cur_speed;
-	enum pcie_link_width cur_width;
-	u32 ret = 1;
-
-	*speed = PCI_SPEED_UNKNOWN;
-	*width = PCIE_LNK_WIDTH_UNKNOWN;
-
-	while (pdev) {
-		cur_speed = kcl_pcie_get_speed_cap(pdev);
-		cur_width = kcl_pcie_get_width_cap(pdev);
-		ret = pcie_bandwidth_available(adev->pdev, NULL,
-						       NULL, &cur_width);
-		if (!ret)
-			cur_width = PCIE_LNK_WIDTH_RESRV;
-
-		if (cur_speed != PCI_SPEED_UNKNOWN) {
-			if (*speed == PCI_SPEED_UNKNOWN)
-				*speed = cur_speed;
-			else if (cur_speed < *speed)
-				*speed = cur_speed;
-		}
-
-		if (cur_width != PCIE_LNK_WIDTH_UNKNOWN) {
-			if (*width == PCIE_LNK_WIDTH_UNKNOWN)
-				*width = cur_width;
-			else if (cur_width < *width)
-				*width = cur_width;
-		}
-		pdev = pci_upstream_bridge(pdev);
-	}
-}
-
 /**
  * amdgpu_device_get_pcie_info - fence pcie info about the PCIE slot
  *
@@ -3747,8 +3693,8 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	if (adev->pm.pcie_gen_mask && adev->pm.pcie_mlw_mask)
 		return;
 
-	amdgpu_device_get_min_pci_speed_width(adev, &platform_speed_cap,
-					      &platform_link_width);
+	pcie_bandwidth_available(adev->pdev, NULL,
+				 &platform_speed_cap, &platform_link_width);
 
 	if (adev->pm.pcie_gen_mask == 0) {
 		/* asic caps */

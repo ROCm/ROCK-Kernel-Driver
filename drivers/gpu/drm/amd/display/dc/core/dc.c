@@ -590,6 +590,28 @@ void dc_link_set_test_pattern(struct dc_link *link,
 			cust_pattern_size);
 }
 
+uint32_t dc_link_bandwidth_kbps(
+	const struct dc_link *link,
+	const struct dc_link_settings *link_setting)
+{
+	uint32_t link_bw_kbps = link_setting->link_rate * LINK_RATE_REF_FREQ_IN_KHZ; /* bytes per sec */
+
+	link_bw_kbps *= 8;   /* 8 bits per byte*/
+	link_bw_kbps *= link_setting->lane_count;
+
+	return link_bw_kbps;
+
+}
+
+const struct dc_link_settings *dc_link_get_verified_link_cap(
+		const struct dc_link *link)
+{
+	if (link->preferred_link_setting.lane_count != LANE_COUNT_UNKNOWN &&
+			link->preferred_link_setting.link_rate != LINK_RATE_UNKNOWN)
+		return &link->preferred_link_setting;
+	return &link->verified_link_cap;
+}
+
 static void destruct(struct dc *dc)
 {
 	dc_release_state(dc->current_state);
@@ -638,6 +660,8 @@ static bool construct(struct dc *dc,
 #endif
 
 	enum dce_version dc_version = DCE_VERSION_UNKNOWN;
+	dc->config = init_params->flags;
+
 	memcpy(&dc->bb_overrides, &init_params->bb_overrides, sizeof(dc->bb_overrides));
 
 	dc_dceip = kzalloc(sizeof(*dc_dceip), GFP_KERNEL);
@@ -831,8 +855,6 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 
 	if (dc->res_pool->dmcu != NULL)
 		dc->versions.dmcu_version = dc->res_pool->dmcu->dmcu_version;
-
-	dc->config = init_params->flags;
 
 	dc->build_id = DC_BUILD_ID;
 

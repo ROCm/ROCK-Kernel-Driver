@@ -1518,7 +1518,7 @@ static int sdma_v4_0_late_init(void *handle)
 	int r;
 
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__SDMA)) {
-		amdgpu_ras_feature_enable(adev, &ras_block, 0);
+		amdgpu_ras_feature_enable_on_boot(adev, &ras_block, 0);
 		return 0;
 	}
 
@@ -1532,7 +1532,7 @@ static int sdma_v4_0_late_init(void *handle)
 
 	**ras_if = ras_block;
 
-	r = amdgpu_ras_feature_enable(adev, *ras_if, 1);
+	r = amdgpu_ras_feature_enable_on_boot(adev, *ras_if, 1);
 	if (r)
 		goto feature;
 
@@ -1865,10 +1865,16 @@ static int sdma_v4_0_process_ecc_irq(struct amdgpu_device *adev,
 				      struct amdgpu_irq_src *source,
 				      struct amdgpu_iv_entry *entry)
 {
+	struct ras_common_if *ras_if = adev->sdma.ras_if;
 	struct ras_dispatch_if ih_data = {
-		.head = *adev->sdma.ras_if,
 		.entry = entry,
 	};
+
+	if (!ras_if)
+		return 0;
+
+	ih_data.head = *ras_if;
+
 	amdgpu_ras_interrupt_dispatch(adev, &ih_data);
 	return 0;
 }
