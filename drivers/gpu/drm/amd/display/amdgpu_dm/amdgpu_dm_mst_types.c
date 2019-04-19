@@ -457,8 +457,39 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	return connector;
 }
 
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
+static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
+{
+	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
+	struct drm_device *dev = master->base.dev;
+
+	drm_kms_helper_hotplug_event(dev);
+}
+#endif
+
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR
+static void dm_dp_mst_register_connector(struct drm_connector *connector)
+{
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (adev->mode_info.rfbdev)
+		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
+	else
+		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
+
+	drm_connector_register(connector);
+}
+#endif
+
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
+	.hotplug = dm_dp_mst_hotplug,
+#endif
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR
+	.register_connector = dm_dp_mst_register_connector
+#endif
 };
 
 void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
