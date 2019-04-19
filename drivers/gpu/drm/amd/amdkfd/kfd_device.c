@@ -454,6 +454,10 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x66af, &vega20_device_info },	/* Vega20 */
 	/* Navi10 */
 	{ 0x7310, &navi10_device_info },	/* Navi10 */
+	{ 0x7312, &navi10_device_info },	/* Navi10 */
+	{ 0x7318, &navi10_device_info },	/* Navi10 */
+	{ 0x731a, &navi10_device_info },	/* Navi10 */
+	{ 0x731f, &navi10_device_info },	/* Navi10 */
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
