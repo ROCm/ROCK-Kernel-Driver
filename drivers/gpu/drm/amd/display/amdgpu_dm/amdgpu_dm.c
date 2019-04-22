@@ -517,9 +517,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	/* Zero all the fields */
 	memset(&init_data, 0, sizeof(init_data));
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_init(&adev->dm.dc_lock);
-#endif
 	if(amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
 		goto error;
@@ -636,9 +634,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	mutex_destroy(&adev->dm.dc_lock);
-#endif
 	return;
 }
 
@@ -5612,14 +5608,10 @@ static void handle_cursor_update(struct drm_plane *plane,
 	if (!position.enable) {
 		/* turn off cursor */
 		if (crtc_state && crtc_state->stream) {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 			mutex_lock(&adev->dm.dc_lock);
-#endif
 			dc_stream_set_cursor_position(crtc_state->stream,
 						      &position);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 			mutex_unlock(&adev->dm.dc_lock);
-#endif
 		}
 		return;
 	}
@@ -5639,9 +5631,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 	attributes.pitch = attributes.width;
 
 	if (crtc_state->stream) {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&adev->dm.dc_lock);
-#endif
 		if (!dc_stream_set_cursor_attributes(crtc_state->stream,
 							 &attributes))
 			DRM_ERROR("DC failed to set cursor attributes\n");
@@ -5649,9 +5639,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 		if (!dc_stream_set_cursor_position(crtc_state->stream,
 						   &position))
 			DRM_ERROR("DC failed to set cursor position\n");
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&adev->dm.dc_lock);
-#endif
 	}
 }
 
@@ -6060,18 +6048,14 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&dm->dc_lock);
-#endif
 		dc_commit_updates_for_stream(dm->dc,
 						     bundle->surface_updates,
 						     planes_count,
 						     acrtc_state->stream,
 						     &bundle->stream_update,
 						     dc_state);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&dm->dc_lock);
-#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -6312,13 +6296,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 	if (dc_state) {
 		dm_enable_per_frame_crtc_master_sync(dc_state);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&dm->dc_lock);
-#endif
 		WARN_ON(!dc_commit_state(dm->dc, dc_state));
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&dm->dc_lock);
-#endif
 	}
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
@@ -6405,18 +6385,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		for (j = 0; j < status->plane_count; j++)
 			dummy_updates[j].surface = status->plane_states[0];
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_lock(&dm->dc_lock);
-#endif
 		dc_commit_updates_for_stream(dm->dc,
 						     dummy_updates,
 						     status->plane_count,
 						     dm_new_crtc_state->stream,
 						     &stream_update,
 						     dc_state);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		mutex_unlock(&dm->dc_lock);
-#endif
 	}
 
 	/* Update freesync state before amdgpu_dm_handle_vrr_transition(). */
