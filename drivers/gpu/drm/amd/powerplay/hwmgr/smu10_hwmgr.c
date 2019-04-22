@@ -582,11 +582,6 @@ static int smu10_dpm_force_dpm_level(struct pp_hwmgr *hwmgr,
 		return 0;
 	}
 
-	/* Disable UMDPSTATE support on rv2 temporarily */
-	if ((adev->asic_type == CHIP_RAVEN) &&
-	    (adev->rev_id >= 8))
-		return 0;
-
 	if (min_sclk < data->gfx_min_freq_limit)
 		min_sclk = data->gfx_min_freq_limit;
 
