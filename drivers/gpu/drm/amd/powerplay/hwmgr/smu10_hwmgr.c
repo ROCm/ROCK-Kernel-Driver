@@ -573,7 +573,6 @@ static int smu10_dpm_force_dpm_level(struct pp_hwmgr *hwmgr,
 				enum amd_dpm_forced_level level)
 {
 	struct smu10_hwmgr *data = hwmgr->backend;
-	struct amdgpu_device *adev = hwmgr->adev;
 	uint32_t min_sclk = hwmgr->display_config->min_core_set_clock;
 	uint32_t min_mclk = hwmgr->display_config->min_mem_set_clock/100;
 
