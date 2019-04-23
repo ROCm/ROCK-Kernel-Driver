@@ -1268,7 +1268,7 @@ static int smu10_set_power_profile_mode(struct pp_hwmgr *hwmgr, long *input, uin
 	int workload_type = 0;
 
 	if (input[size] > PP_SMC_POWER_PROFILE_COMPUTE) {
-		pr_err("Invalid power profile mode %d\n", input[size]);
+		pr_err("Invalid power profile mode %ld\n", input[size]);
 		return -EINVAL;
 	}
 	hwmgr->power_profile_mode = input[size];
