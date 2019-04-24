@@ -97,6 +97,7 @@ m4_include([m4/drm-mode-is-420-only-handling.m4])
 m4_include([m4/drm-set-crc-source.m4])
 m4_include([m4/sequence-in-struct-drm-pending-vblank-event.m4])
 m4_include([m4/vrr-enabled-in-struct-drm-crtc-state.m4])
+m4_include([m4/for-each-new-crtc-in-state.m4])
 m4_include([m4/config.m4])
 
 
