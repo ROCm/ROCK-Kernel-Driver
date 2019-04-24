@@ -325,11 +325,9 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		 * vblank irq. This also updates to the correct vblank timestamp
 		 * even in VRR mode, as scanout is past the front-porch atm.
 		 */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-			defined(OS_NAME_SUSE_15) || \
-			defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT)
 		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
-#elif DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#elif defined(HAVE_DRM_ACCURATE_VBLANK_COUNT)
 		drm_accurate_vblank_count(&amdgpu_crtc->base);
 #endif
 
