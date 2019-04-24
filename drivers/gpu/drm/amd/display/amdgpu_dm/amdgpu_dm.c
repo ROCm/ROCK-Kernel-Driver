@@ -7460,7 +7460,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			continue;
 		}
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		abo = gem_to_amdgpu_bo(fb->obj[0]);
+#else
+		abo = gem_to_amdgpu_bo(kcl_drm_fb_get_gem_obj(fb, 0));
+#endif
 
 		/*
 		 * Wait for all fences on this FB. Do limited wait to avoid
