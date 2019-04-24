@@ -1283,7 +1283,7 @@ static int dm_resume(void *handle)
 	}
 
 	/* Force mode set in atomic commit */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	for_each_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
 #else
 	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i)
@@ -1295,7 +1295,7 @@ static int dm_resume(void *handle)
 	 * them here, since they were duplicated as part of the suspend
 	 * procedure.
 	 */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	for_each_crtc_in_state(adev->dm.cached_state, crtc, new_crtc_state, i) {
 #else
 	for_each_new_crtc_in_state(dm->cached_state, crtc, new_crtc_state, i) {
@@ -6904,7 +6904,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		mutex_unlock(&dm->dc_lock);
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		new_crtc_state = crtc->state;
 #else
@@ -7024,7 +7024,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	/* Enable interrupts for CRTCs going through a modeset. */
 	amdgpu_dm_enable_crtc_interrupts(dev, state, true);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -7041,7 +7041,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			wait_for_vblank = false;
 
 	/* update planes when needed per crtc*/
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -7069,7 +7069,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	 * mark consumed event for drm_atomic_helper_commit_hw_done
 	 */
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_NEW_CRTC_IN_STATE)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
