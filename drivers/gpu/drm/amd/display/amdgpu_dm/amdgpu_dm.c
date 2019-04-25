@@ -7441,6 +7441,7 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 
 		manage_dm_interrupts(adev, acrtc, true);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #ifdef CONFIG_DEBUG_FS
 		/* The stream has changed so CRC capture needs to re-enabled. */
 		source = dm_new_crtc_state->crc_src;
@@ -7449,6 +7450,7 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 				crtc, dm_new_crtc_state,
 				dm_new_crtc_state->crc_src);
 		}
+#endif
 #endif
 	}
 }
