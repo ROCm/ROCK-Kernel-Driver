@@ -5845,10 +5845,16 @@ static void amdgpu_dm_commit_cursors(struct drm_atomic_state *state)
 	 * TODO: Make this per-stream so we don't issue redundant updates for
 	 * commits with multiple streams.
 	 */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
 	for_each_oldnew_plane_in_state(state, plane, old_plane_state,
-				       new_plane_state, i)
+				       new_plane_state, i) {
+#endif
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			handle_cursor_update(plane, old_plane_state);
+	}
 }
 
 static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
@@ -6176,8 +6182,14 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	int i;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
+		new_crtc_state = crtc->state;
+#else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state,
 				      new_crtc_state, i) {
+#endif
+
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		struct dm_crtc_state *dm_new_crtc_state =
 			to_dm_crtc_state(new_crtc_state);
