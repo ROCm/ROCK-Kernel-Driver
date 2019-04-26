@@ -389,6 +389,7 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 	struct amdgpu_device *adev = irq_params->adev;
 	struct amdgpu_crtc *acrtc;
 	struct dm_crtc_state *acrtc_state;
+	unsigned long flags;
 
 	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VUPDATE);
 
@@ -404,8 +405,25 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 		 * page-flip completion events that have been queued to us
 		 * if a pageflip happened inside front-porch.
 		 */
-		if (amdgpu_dm_vrr_active(acrtc_state))
+		if (amdgpu_dm_vrr_active(acrtc_state)) {
 			drm_crtc_handle_vblank(&acrtc->base);
+
+			/* BTR processing for pre-DCE12 ASICs */
+			if (acrtc_state->stream &&
+			    adev->family < AMDGPU_FAMILY_AI) {
+				spin_lock_irqsave(&adev->ddev->event_lock, flags);
+				mod_freesync_handle_v_update(
+				    adev->dm.freesync_module,
+				    acrtc_state->stream,
+				    &acrtc_state->vrr_params);
+
+				dc_stream_adjust_vmin_vmax(
+				    adev->dm.dc,
+				    acrtc_state->stream,
+				    &acrtc_state->vrr_params.adjust);
+				spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
+			}
+		}
 	}
 }
 
@@ -415,6 +433,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	struct amdgpu_device *adev = irq_params->adev;
 	struct amdgpu_crtc *acrtc;
 	struct dm_crtc_state *acrtc_state;
+	unsigned long flags;
 
 	acrtc = get_crtc_by_otg_inst(adev, irq_params->irq_src - IRQ_TYPE_VBLANK);
 
@@ -437,9 +456,10 @@ static void dm_crtc_high_irq(void *interrupt_params)
 		 */
 		amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
 
-		if (acrtc_state->stream &&
+		if (acrtc_state->stream && adev->family >= AMDGPU_FAMILY_AI &&
 		    acrtc_state->vrr_params.supported &&
 		    acrtc_state->freesync_config.state == VRR_STATE_ACTIVE_VARIABLE) {
+			spin_lock_irqsave(&adev->ddev->event_lock, flags);
 			mod_freesync_handle_v_update(
 				adev->dm.freesync_module,
 				acrtc_state->stream,
@@ -449,6 +469,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 				adev->dm.dc,
 				acrtc_state->stream,
 				&acrtc_state->vrr_params.adjust);
+			spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 		}
 	}
 }
@@ -5704,8 +5725,10 @@ static void update_freesync_state_on_stream(
 	struct dc_plane_state *surface,
 	u32 flip_timestamp_in_us)
 {
-	struct mod_vrr_params vrr_params = new_crtc_state->vrr_params;
+	struct mod_vrr_params vrr_params;
 	struct dc_info_packet vrr_infopacket = {0};
+	struct amdgpu_device *adev = dm->adev;
+	unsigned long flags;
 
 	if (!new_stream)
 		return;
@@ -5718,6 +5741,9 @@ static void update_freesync_state_on_stream(
 	if (!new_stream->timing.h_total || !new_stream->timing.v_total)
 		return;
 
+	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+	vrr_params = new_crtc_state->vrr_params;
+
 	if (surface) {
 		mod_freesync_handle_preflip(
 			dm->freesync_module,
@@ -5725,6 +5751,12 @@ static void update_freesync_state_on_stream(
 			new_stream,
 			flip_timestamp_in_us,
 			&vrr_params);
+
+		if (adev->family < AMDGPU_FAMILY_AI &&
+		    amdgpu_dm_vrr_active(new_crtc_state)) {
+			mod_freesync_handle_v_update(dm->freesync_module,
+						     new_stream, &vrr_params);
+		}
 	}
 
 	mod_freesync_build_vrr_infopacket(
@@ -5760,6 +5792,8 @@ static void update_freesync_state_on_stream(
 			      (int)new_crtc_state->base_vrr_enabled,
 #endif
 			      (int)vrr_params.state);
+
+	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 }
 
 static void pre_update_freesync_state_on_stream(
@@ -5767,8 +5801,10 @@ static void pre_update_freesync_state_on_stream(
 	struct dm_crtc_state *new_crtc_state)
 {
 	struct dc_stream_state *new_stream = new_crtc_state->stream;
-	struct mod_vrr_params vrr_params = new_crtc_state->vrr_params;
+	struct mod_vrr_params vrr_params;
 	struct mod_freesync_config config = new_crtc_state->freesync_config;
+	struct amdgpu_device *adev = dm->adev;
+	unsigned long flags;
 
 	if (!new_stream)
 		return;
@@ -5779,6 +5815,9 @@ static void pre_update_freesync_state_on_stream(
 	 */
 	if (!new_stream->timing.h_total || !new_stream->timing.v_total)
 		return;
+
+	spin_lock_irqsave(&adev->ddev->event_lock, flags);
+	vrr_params = new_crtc_state->vrr_params;
 
 	if (new_crtc_state->vrr_supported &&
 	    config.min_refresh_in_uhz &&
@@ -5804,6 +5843,7 @@ static void pre_update_freesync_state_on_stream(
 			sizeof(vrr_params.adjust)) != 0);
 
 	new_crtc_state->vrr_params = vrr_params;
+	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 }
 
 static void amdgpu_dm_handle_vrr_transition(struct dm_crtc_state *old_state,
