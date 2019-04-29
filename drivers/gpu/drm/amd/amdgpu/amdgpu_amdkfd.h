@@ -81,6 +81,18 @@ struct amdgpu_kfd_dev {
 	uint64_t vram_used;
 };
 
+enum kgd_engine_type {
+	KGD_ENGINE_PFP = 1,
+	KGD_ENGINE_ME,
+	KGD_ENGINE_CE,
+	KGD_ENGINE_MEC1,
+	KGD_ENGINE_MEC2,
+	KGD_ENGINE_RLC,
+	KGD_ENGINE_SDMA1,
+	KGD_ENGINE_SDMA2,
+	KGD_ENGINE_MAX
+};
+
 struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 						       struct mm_struct *mm);
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
@@ -145,6 +157,8 @@ int amdgpu_amdkfd_alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 				void **mem_obj, uint64_t *gpu_addr,
 				void **cpu_ptr, bool mqd_gfx9);
 void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj);
+uint32_t amdgpu_amdkfd_get_fw_version(struct kgd_dev *kgd,
+				      enum kgd_engine_type type);
 void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 				      struct kfd_local_mem_info *mem_info);
 uint64_t amdgpu_amdkfd_get_gpu_clock_counter(struct kgd_dev *kgd);
@@ -158,6 +172,8 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 				  uint32_t *flags);
 uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd);
 uint64_t amdgpu_amdkfd_get_hive_id(struct kgd_dev *kgd);
+uint64_t amdgpu_amdkfd_get_mmio_remap_phys_addr(struct kgd_dev *kgd);
+uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct kgd_dev *dst, struct kgd_dev *src);
 
 #define read_user_wptr(mmptr, wptr, dst)				\
 	({								\

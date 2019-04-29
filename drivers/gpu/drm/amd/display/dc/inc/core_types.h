@@ -97,7 +97,8 @@ struct resource_funcs {
 			const struct encoder_init_data *init);
 	bool (*validate_bandwidth)(
 					struct dc *dc,
-					struct dc_state *context);
+					struct dc_state *context,
+					bool fast_validate);
 
 	enum dc_status (*validate_global)(
 		struct dc *dc,
@@ -144,7 +145,6 @@ struct resource_pool {
 	struct hubbub *hubbub;
 	struct mpc *mpc;
 	struct pp_smu_funcs *pp_smu;
-	struct pp_smu_display_requirement_rv pp_smu_req;
 	struct dce_aux *engines[MAX_PIPES];
 	struct dce_i2c_hw *hw_i2cs[MAX_PIPES];
 	struct dce_i2c_sw *sw_i2cs[MAX_PIPES];

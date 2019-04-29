@@ -120,6 +120,15 @@ static const struct cg_flag_name clocks[] = {
 	{0, NULL},
 };
 
+static const struct hwmon_temp_label {
+	enum PP_HWMON_TEMP channel;
+	const char *label;
+} temp_label[] = {
+	{PP_TEMP_EDGE, "edge"},
+	{PP_TEMP_JUNCTION, "junction"},
+	{PP_TEMP_MEM, "mem"},
+};
+
 void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev)
 {
 	if (adev->pm.dpm_enabled) {
@@ -197,7 +206,7 @@ static ssize_t amdgpu_get_dpm_state(struct device *dev,
 	struct amdgpu_device *adev = ddev->dev_private;
 	enum amd_pm_state_type pm;
 
-	if (adev->smu.ppt_funcs->get_current_power_state)
+	if (is_support_sw_smu(adev) && adev->smu.ppt_funcs->get_current_power_state)
 		pm = amdgpu_smu_get_current_power_state(adev);
 	else if (adev->powerplay.pp_funcs->get_current_power_state)
 		pm = amdgpu_dpm_get_current_power_state(adev);
@@ -1425,6 +1434,7 @@ static ssize_t amdgpu_hwmon_show_temp(struct device *dev,
 {
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	struct drm_device *ddev = adev->ddev;
+	int channel = to_sensor_dev_attr(attr)->index;
 	int r, temp, size = sizeof(temp);
 
 	/* Can't get temperature when the card is off */
@@ -1432,11 +1442,32 @@ static ssize_t amdgpu_hwmon_show_temp(struct device *dev,
 	     (ddev->switch_power_state != DRM_SWITCH_POWER_ON))
 		return -EINVAL;
 
-	/* get the temperature */
-	r = amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_GPU_TEMP,
-				   (void *)&temp, &size);
-	if (r)
-		return r;
+	if (channel >= PP_TEMP_MAX)
+		return -EINVAL;
+
+	switch (channel) {
+	case PP_TEMP_JUNCTION:
+		/* get current junction temperature */
+		r = amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_HOTSPOT_TEMP,
+					   (void *)&temp, &size);
+		if (r)
+			return r;
+		break;
+	case PP_TEMP_EDGE:
+		/* get current edge temperature */
+		r = amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_EDGE_TEMP,
+					   (void *)&temp, &size);
+		if (r)
+			return r;
+		break;
+	case PP_TEMP_MEM:
+		/* get current memory temperature */
+		r = amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_MEM_TEMP,
+					   (void *)&temp, &size);
+		if (r)
+			return r;
+		break;
+	}
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
 }
@@ -1453,6 +1484,76 @@ static ssize_t amdgpu_hwmon_show_temp_thresh(struct device *dev,
 		temp = adev->pm.dpm.thermal.min_temp;
 	else
 		temp = adev->pm.dpm.thermal.max_temp;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
+}
+
+static ssize_t amdgpu_hwmon_show_hotspot_temp_thresh(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	int hyst = to_sensor_dev_attr(attr)->index;
+	int temp;
+
+	if (hyst)
+		temp = adev->pm.dpm.thermal.min_hotspot_temp;
+	else
+		temp = adev->pm.dpm.thermal.max_hotspot_crit_temp;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
+}
+
+static ssize_t amdgpu_hwmon_show_mem_temp_thresh(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	int hyst = to_sensor_dev_attr(attr)->index;
+	int temp;
+
+	if (hyst)
+		temp = adev->pm.dpm.thermal.min_mem_temp;
+	else
+		temp = adev->pm.dpm.thermal.max_mem_crit_temp;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
+}
+
+static ssize_t amdgpu_hwmon_show_temp_label(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	int channel = to_sensor_dev_attr(attr)->index;
+
+	if (channel >= PP_TEMP_MAX)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", temp_label[channel].label);
+}
+
+static ssize_t amdgpu_hwmon_show_temp_emergency(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	struct amdgpu_device *adev = dev_get_drvdata(dev);
+	int channel = to_sensor_dev_attr(attr)->index;
+	int temp = 0;
+
+	if (channel >= PP_TEMP_MAX)
+		return -EINVAL;
+
+	switch (channel) {
+	case PP_TEMP_JUNCTION:
+		temp = adev->pm.dpm.thermal.max_hotspot_emergency_temp;
+		break;
+	case PP_TEMP_EDGE:
+		temp = adev->pm.dpm.thermal.max_edge_emergency_temp;
+		break;
+	case PP_TEMP_MEM:
+		temp = adev->pm.dpm.thermal.max_mem_emergency_temp;
+		break;
+	}
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", temp);
 }
@@ -2026,11 +2127,20 @@ static ssize_t amdgpu_hwmon_show_mclk_label(struct device *dev,
  *
  * hwmon interfaces for GPU temperature:
  *
- * - temp1_input: the on die GPU temperature in millidegrees Celsius
+ * - temp[1-3]_input: the on die GPU temperature in millidegrees Celsius
+ *   - temp2_input and temp3_input are supported on SOC15 dGPUs only
  *
- * - temp1_crit: temperature critical max value in millidegrees Celsius
+ * - temp[1-3]_label: temperature channel label
+ *   - temp2_label and temp3_label are supported on SOC15 dGPUs only
  *
- * - temp1_crit_hyst: temperature hysteresis for critical limit in millidegrees Celsius
+ * - temp[1-3]_crit: temperature critical max value in millidegrees Celsius
+ *   - temp2_crit and temp3_crit are supported on SOC15 dGPUs only
+ *
+ * - temp[1-3]_crit_hyst: temperature hysteresis for critical limit in millidegrees Celsius
+ *   - temp2_crit_hyst and temp3_crit_hyst are supported on SOC15 dGPUs only
+ *
+ * - temp[1-3]_emergency: temperature emergency max value(asic shutdown) in millidegrees Celsius
+ *   - these are supported on SOC15 dGPUs only
  *
  * hwmon interfaces for GPU voltage:
  *
@@ -2078,9 +2188,21 @@ static ssize_t amdgpu_hwmon_show_mclk_label(struct device *dev,
  *
  */
 
-static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, PP_TEMP_EDGE);
 static SENSOR_DEVICE_ATTR(temp1_crit, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 0);
 static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IRUGO, amdgpu_hwmon_show_temp_thresh, NULL, 1);
+static SENSOR_DEVICE_ATTR(temp1_emergency, S_IRUGO, amdgpu_hwmon_show_temp_emergency, NULL, PP_TEMP_EDGE);
+static SENSOR_DEVICE_ATTR(temp2_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, PP_TEMP_JUNCTION);
+static SENSOR_DEVICE_ATTR(temp2_crit, S_IRUGO, amdgpu_hwmon_show_hotspot_temp_thresh, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp2_crit_hyst, S_IRUGO, amdgpu_hwmon_show_hotspot_temp_thresh, NULL, 1);
+static SENSOR_DEVICE_ATTR(temp2_emergency, S_IRUGO, amdgpu_hwmon_show_temp_emergency, NULL, PP_TEMP_JUNCTION);
+static SENSOR_DEVICE_ATTR(temp3_input, S_IRUGO, amdgpu_hwmon_show_temp, NULL, PP_TEMP_MEM);
+static SENSOR_DEVICE_ATTR(temp3_crit, S_IRUGO, amdgpu_hwmon_show_mem_temp_thresh, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp3_crit_hyst, S_IRUGO, amdgpu_hwmon_show_mem_temp_thresh, NULL, 1);
+static SENSOR_DEVICE_ATTR(temp3_emergency, S_IRUGO, amdgpu_hwmon_show_temp_emergency, NULL, PP_TEMP_MEM);
+static SENSOR_DEVICE_ATTR(temp1_label, S_IRUGO, amdgpu_hwmon_show_temp_label, NULL, PP_TEMP_EDGE);
+static SENSOR_DEVICE_ATTR(temp2_label, S_IRUGO, amdgpu_hwmon_show_temp_label, NULL, PP_TEMP_JUNCTION);
+static SENSOR_DEVICE_ATTR(temp3_label, S_IRUGO, amdgpu_hwmon_show_temp_label, NULL, PP_TEMP_MEM);
 static SENSOR_DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, amdgpu_hwmon_get_pwm1, amdgpu_hwmon_set_pwm1, 0);
 static SENSOR_DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR, amdgpu_hwmon_get_pwm1_enable, amdgpu_hwmon_set_pwm1_enable, 0);
 static SENSOR_DEVICE_ATTR(pwm1_min, S_IRUGO, amdgpu_hwmon_get_pwm1_min, NULL, 0);
@@ -2107,6 +2229,18 @@ static struct attribute *hwmon_attributes[] = {
 	&sensor_dev_attr_temp1_input.dev_attr.attr,
 	&sensor_dev_attr_temp1_crit.dev_attr.attr,
 	&sensor_dev_attr_temp1_crit_hyst.dev_attr.attr,
+	&sensor_dev_attr_temp2_input.dev_attr.attr,
+	&sensor_dev_attr_temp2_crit.dev_attr.attr,
+	&sensor_dev_attr_temp2_crit_hyst.dev_attr.attr,
+	&sensor_dev_attr_temp3_input.dev_attr.attr,
+	&sensor_dev_attr_temp3_crit.dev_attr.attr,
+	&sensor_dev_attr_temp3_crit_hyst.dev_attr.attr,
+	&sensor_dev_attr_temp1_emergency.dev_attr.attr,
+	&sensor_dev_attr_temp2_emergency.dev_attr.attr,
+	&sensor_dev_attr_temp3_emergency.dev_attr.attr,
+	&sensor_dev_attr_temp1_label.dev_attr.attr,
+	&sensor_dev_attr_temp2_label.dev_attr.attr,
+	&sensor_dev_attr_temp3_label.dev_attr.attr,
 	&sensor_dev_attr_pwm1.dev_attr.attr,
 	&sensor_dev_attr_pwm1_enable.dev_attr.attr,
 	&sensor_dev_attr_pwm1_min.dev_attr.attr,
@@ -2227,6 +2361,22 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	if ((adev->flags & AMD_IS_APU) &&
 	    (attr == &sensor_dev_attr_freq2_input.dev_attr.attr ||
 	     attr == &sensor_dev_attr_freq2_label.dev_attr.attr))
+		return 0;
+
+	/* only SOC15 dGPUs support hotspot and mem temperatures */
+	if (((adev->flags & AMD_IS_APU) ||
+	     adev->asic_type < CHIP_VEGA10) &&
+	    (attr == &sensor_dev_attr_temp2_crit.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp2_crit_hyst.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_crit.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_crit_hyst.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp1_emergency.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp2_emergency.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_emergency.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp2_input.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_input.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp2_label.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_label.dev_attr.attr))
 		return 0;
 
 	return effective_mode;

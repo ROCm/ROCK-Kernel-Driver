@@ -1237,21 +1237,39 @@ static uint32_t vega12_dpm_get_mclk(struct pp_hwmgr *hwmgr, bool low)
 	return (mem_clk * 100);
 }
 
+static int vega12_get_metrics_table(struct pp_hwmgr *hwmgr, SmuMetrics_t *metrics_table)
+{
+	struct vega12_hwmgr *data =
+			(struct vega12_hwmgr *)(hwmgr->backend);
+	int ret = 0;
+
+	if (!data->metrics_time || time_after(jiffies, data->metrics_time + HZ / 2)) {
+		ret = smum_smc_table_manager(hwmgr, (uint8_t *)metrics_table,
+				TABLE_SMU_METRICS, true);
+		if (ret) {
+			pr_info("Failed to export SMU metrics table!\n");
+			return ret;
+		}
+		memcpy(&data->metrics_table, metrics_table, sizeof(SmuMetrics_t));
+		data->metrics_time = jiffies;
+	} else
+		memcpy(metrics_table, &data->metrics_table, sizeof(SmuMetrics_t));
+
+	return ret;
+}
+
 static int vega12_get_gpu_power(struct pp_hwmgr *hwmgr, uint32_t *query)
 {
-#if 0
-	uint32_t value;
+	SmuMetrics_t metrics_table;
+	int ret = 0;
 
-	PP_ASSERT_WITH_CODE(!smum_send_msg_to_smc(hwmgr,
-			PPSMC_MSG_GetCurrPkgPwr),
-			"Failed to get current package power!",
-			return -EINVAL);
+	ret = vega12_get_metrics_table(hwmgr, &metrics_table);
+	if (ret)
+		return ret;
 
-	value = smum_get_argument(hwmgr);
-	/* power value is an integer */
-	*query = value << 8;
-#endif
-	return 0;
+	*query = metrics_table.CurrSocketPower << 8;
+
+	return ret;
 }
 
 static int vega12_get_current_gfx_clk_freq(struct pp_hwmgr *hwmgr, uint32_t *gfx_freq)
@@ -1292,23 +1310,14 @@ static int vega12_get_current_activity_percent(
 		struct pp_hwmgr *hwmgr,
 		uint32_t *activity_percent)
 {
+	SmuMetrics_t metrics_table;
 	int ret = 0;
-	uint32_t current_activity = 50;
 
-#if 0
-	ret = smum_send_msg_to_smc_with_parameter(hwmgr, PPSMC_MSG_GetAverageGfxActivity, 0);
-	if (!ret) {
-		current_activity = smum_get_argument(hwmgr);
-		if (current_activity > 100) {
-			PP_ASSERT(false,
-				  "[GetCurrentActivityPercent] Activity Percentage Exceeds 100!");
-			current_activity = 100;
-		}
-	} else
-		PP_ASSERT(false,
-			"[GetCurrentActivityPercent] Attempt To Send Get Average Graphics Activity to SMU Failed!");
-#endif
-	*activity_percent = current_activity;
+	ret = vega12_get_metrics_table(hwmgr, &metrics_table);
+	if (ret)
+		return ret;
+
+	*activity_percent = metrics_table.AverageGfxActivity;
 
 	return ret;
 }
@@ -1317,6 +1326,7 @@ static int vega12_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 			      void *value, int *size)
 {
 	struct vega12_hwmgr *data = (struct vega12_hwmgr *)(hwmgr->backend);
+	SmuMetrics_t metrics_table;
 	int ret = 0;
 
 	switch (idx) {
@@ -1339,6 +1349,24 @@ static int vega12_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		*((uint32_t *)value) = vega12_thermal_get_temperature(hwmgr);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_HOTSPOT_TEMP:
+		ret = vega12_get_metrics_table(hwmgr, &metrics_table);
+		if (ret)
+			return ret;
+
+		*((uint32_t *)value) = metrics_table.TemperatureHotspot *
+			PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_MEM_TEMP:
+		ret = vega12_get_metrics_table(hwmgr, &metrics_table);
+		if (ret)
+			return ret;
+
+		*((uint32_t *)value) = metrics_table.TemperatureHBM *
+			PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		*size = 4;
+		break;
 	case AMDGPU_PP_SENSOR_UVD_POWER:
 		*((uint32_t *)value) = data->uvd_power_gated ? 0 : 1;
 		*size = 4;
@@ -1349,6 +1377,8 @@ static int vega12_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		break;
 	case AMDGPU_PP_SENSOR_GPU_POWER:
 		ret = vega12_get_gpu_power(hwmgr, (uint32_t *)value);
+		if (!ret)
+			*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_ENABLED_SMC_FEATURES_MASK:
 		ret = vega12_get_enabled_smc_features(hwmgr, (uint64_t *)value);
@@ -2526,12 +2556,23 @@ static int vega12_notify_cac_buffer_info(struct pp_hwmgr *hwmgr,
 static int vega12_get_thermal_temperature_range(struct pp_hwmgr *hwmgr,
 		struct PP_TemperatureRange *thermal_data)
 {
-	struct phm_ppt_v3_information *pptable_information =
-		(struct phm_ppt_v3_information *)hwmgr->pptable;
+	struct vega12_hwmgr *data =
+			(struct vega12_hwmgr *)(hwmgr->backend);
+	PPTable_t *pp_table = &(data->smc_state_table.pp_table);
 
 	memcpy(thermal_data, &SMU7ThermalWithDelayPolicy[0], sizeof(struct PP_TemperatureRange));
 
-	thermal_data->max = pptable_information->us_software_shutdown_temp *
+	thermal_data->max = pp_table->TedgeLimit *
+		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	thermal_data->edge_emergency_max = (pp_table->TedgeLimit + CTF_OFFSET_EDGE) *
+		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	thermal_data->hotspot_crit_max = pp_table->ThotspotLimit *
+		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	thermal_data->hotspot_emergency_max = (pp_table->ThotspotLimit + CTF_OFFSET_HOTSPOT) *
+		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	thermal_data->mem_crit_max = pp_table->ThbmLimit *
+		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	thermal_data->mem_emergency_max = (pp_table->ThbmLimit + CTF_OFFSET_HBM)*
 		PP_TEMPERATURE_UNITS_PER_CENTIGRADES;
 
 	return 0;

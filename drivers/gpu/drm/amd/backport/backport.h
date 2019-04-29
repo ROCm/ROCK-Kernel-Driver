@@ -40,5 +40,4 @@
 #include <kcl/kcl_timekeeping.h>
 #include <kcl/kcl_drm_dp_helper.h>
 #include <kcl/kcl_overflow.h>
-#include <kcl/kcl_debugfs.h>
 #endif /* AMDGPU_BACKPORT_H */

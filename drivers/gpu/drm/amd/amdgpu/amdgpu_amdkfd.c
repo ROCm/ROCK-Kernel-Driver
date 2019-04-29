@@ -30,6 +30,7 @@
 #include "amdgpu_gfx.h"
 #include <linux/module.h>
 #include <linux/dma-buf.h>
+#include "amdgpu_xgmi.h"
 
 static unsigned int compute_vmid_bitmap = 0xFF00;
 
@@ -355,6 +356,43 @@ void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 	amdgpu_bo_unref(&(bo));
 }
 
+uint32_t amdgpu_amdkfd_get_fw_version(struct kgd_dev *kgd,
+				      enum kgd_engine_type type)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	switch (type) {
+	case KGD_ENGINE_PFP:
+		return adev->gfx.pfp_fw_version;
+
+	case KGD_ENGINE_ME:
+		return adev->gfx.me_fw_version;
+
+	case KGD_ENGINE_CE:
+		return adev->gfx.ce_fw_version;
+
+	case KGD_ENGINE_MEC1:
+		return adev->gfx.mec_fw_version;
+
+	case KGD_ENGINE_MEC2:
+		return adev->gfx.mec2_fw_version;
+
+	case KGD_ENGINE_RLC:
+		return adev->gfx.rlc_fw_version;
+
+	case KGD_ENGINE_SDMA1:
+		return adev->sdma.instance[0].fw_version;
+
+	case KGD_ENGINE_SDMA2:
+		return adev->sdma.instance[1].fw_version;
+
+	default:
+		return 0;
+	}
+
+	return 0;
+}
+
 void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 				      struct kfd_local_mem_info *mem_info)
 {
@@ -508,6 +546,27 @@ uint64_t amdgpu_amdkfd_get_hive_id(struct kgd_dev *kgd)
 
 	return adev->gmc.xgmi.hive_id;
 }
+uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct kgd_dev *dst, struct kgd_dev *src)
+{
+	struct amdgpu_device *peer_adev = (struct amdgpu_device *)src;
+	struct amdgpu_device *adev = (struct amdgpu_device *)dst;
+	int ret = amdgpu_xgmi_get_hops_count(adev, peer_adev);
+
+	if (ret < 0) {
+		DRM_ERROR("amdgpu: failed to get  xgmi hops count between node %d and %d. ret = %d\n",
+			adev->gmc.xgmi.physical_node_id,
+			peer_adev->gmc.xgmi.physical_node_id, ret);
+		ret = 0;
+	}
+	return  (uint8_t)ret;
+}
+
+uint64_t amdgpu_amdkfd_get_mmio_remap_phys_addr(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	return adev->rmmio_remap.bus_addr;
+}
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
@@ -638,6 +697,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd, struct pci_dev *pdev,
 }
 
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
+			 struct drm_device *ddev,
 			 const struct kgd2kfd_shared_resources *gpu_resources)
 {
 	return false;

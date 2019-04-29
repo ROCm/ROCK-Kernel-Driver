@@ -120,6 +120,7 @@ struct dc_link {
 	/* MST record stream using this link */
 	struct link_flags {
 		bool dp_keep_receiver_powered;
+		bool dp_skip_DID2;
 	} wa_flags;
 	struct link_mst_stream_allocation_table mst_stream_alloc_table;
 
@@ -250,7 +251,7 @@ uint32_t dc_link_bandwidth_kbps(
 	const struct dc_link *link,
 	const struct dc_link_settings *link_setting);
 
-const struct dc_link_settings *dc_link_get_verified_link_cap(
+const struct dc_link_settings *dc_link_get_link_cap(
 		const struct dc_link *link);
 
 bool dc_submit_i2c(
