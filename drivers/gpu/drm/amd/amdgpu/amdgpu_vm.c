@@ -2800,6 +2800,37 @@ error_free_sched_entity:
 }
 
 /**
+ * amdgpu_vm_check_clean_reserved - check if a VM is clean
+ *
+ * @adev: amdgpu_device pointer
+ * @vm: the VM to check
+ *
+ * check all entries of the root PD, if any subsequent PDs are allocated,
+ * it means there are page table creating and filling, and is no a clean
+ * VM
+ *
+ * Returns:
+ *	0 if this VM is clean
+ */
+static int amdgpu_vm_check_clean_reserved(struct amdgpu_device *adev,
+	struct amdgpu_vm *vm)
+{
+	enum amdgpu_vm_level root = adev->vm_manager.root_level;
+	unsigned int entries = amdgpu_vm_num_entries(adev, root);
+	unsigned int i = 0;
+
+	if (!(vm->root.entries))
+		return 0;
+
+	for (i = 0; i < entries; i++) {
+		if (vm->root.entries[i].base.bo)
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
  * amdgpu_vm_make_compute - Turn a GFX VM into a compute VM
  *
  * @adev: amdgpu_device pointer
@@ -2829,14 +2860,9 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm, uns
 		return r;
 
 	/* Sanity checks */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-	if (!RB_EMPTY_ROOT(&vm->va) || vm->root.entries) {
-#else
-	if (!RB_EMPTY_ROOT(&vm->va.rb_root) || vm->root.entries) {
-#endif
-		r = -EINVAL;
+	r = amdgpu_vm_check_clean_reserved(adev, vm);
+	if (r)
 		goto unreserve_bo;
-	}
 
 	if (pasid) {
 		unsigned long flags;
