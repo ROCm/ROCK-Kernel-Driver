@@ -489,7 +489,7 @@ struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd,
 	ret = pci_enable_atomic_ops_to_root(pdev,
 			PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
 			PCI_EXP_DEVCAP2_ATOMIC_COMP64);
-	if (device_info->needs_pci_atomics && ret  < 0) {
+	if (device_info->needs_pci_atomics && ret < 0) {
 		dev_info(kfd_device,
 			 "skipped device %x:%x, PCI rejects atomics\n",
 			 pdev->vendor, pdev->device);

@@ -337,6 +337,7 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 		mm->dev->kgd, queue_address,
 		pipe_id, queue_id);
 }
+
 static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  void __user *ctl_stack,
 			  u32 *ctl_stack_used_size,

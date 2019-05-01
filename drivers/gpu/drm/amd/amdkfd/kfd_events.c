@@ -508,7 +508,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 			pr_debug_ratelimited("Partial ID invalid: %u (%u valid bits)\n",
 					     partial_id, valid_id_bits);
 
-		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/64) {
+		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT / 64) {
 			/* With relatively few events, it's faster to
 			 * iterate over the event IDR
 			 */
@@ -1036,7 +1036,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 			KFD_HW_EXCEPTION_ECC :
 			KFD_HW_EXCEPTION_GPU_HANG;
 
-	/* Whole gpu reset caused by GPU hang , and  memory is lost */
+	/* Whole gpu reset caused by GPU hang and memory is lost */
 	memset(&hw_exception_data, 0, sizeof(hw_exception_data));
 	hw_exception_data.gpu_id = dev->id;
 	hw_exception_data.memory_lost = 1;
@@ -1047,7 +1047,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	memory_exception_data.gpu_id = dev->id;
 	memory_exception_data.failure.imprecise = true;
 
-	idx  = srcu_read_lock(&kfd_processes_srcu);
+	idx = srcu_read_lock(&kfd_processes_srcu);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
 	struct hlist_node *node;
 

@@ -1112,8 +1112,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
-	uint64_t user_addr = 0;
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
+	uint64_t user_addr = 0;
 	struct amdgpu_bo *bo;
 	struct amdgpu_bo_param bp;
 	int byte_align;

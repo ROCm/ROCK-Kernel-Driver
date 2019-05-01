@@ -626,7 +626,7 @@ struct qcm_process_device {
 	uint64_t ib_base;
 	void *ib_kaddr;
 
-	/* doorbell resources per process per device*/
+	/* doorbell resources per process per device */
 	unsigned long *doorbell_bitmap;
 	/* doorbell user mmap vma */
 	struct vm_area_struct *doorbell_vma;
