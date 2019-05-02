@@ -5905,7 +5905,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				    struct drm_crtc *pcrtc,
 				    bool wait_for_vblank)
 {
-	uint32_t i, r;
+	uint32_t i;
 	uint64_t timestamp_ns;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
@@ -5916,6 +5916,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	struct dm_crtc_state *dm_old_crtc_state =
 			to_dm_crtc_state(kcl_drm_atomic_get_old_crtc_state_after_commit(state, pcrtc));
 	int planes_count = 0, vpos, hpos;
+	long r;
 	unsigned long flags;
 	struct amdgpu_bo *abo;
 	uint64_t tiling_flags;
