@@ -181,7 +181,7 @@ void amdgpu_mn_unlock(struct amdgpu_mn *mn)
 		up_write(&mn->lock);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if !defined(HAVE_5ARGS_INVALIDATE_RANGE_START) && !defined(HAVE_2ARGS_INVALIDATE_RANGE_START)
 /**
  * amdgpu_mn_read_lock - take the read side lock for this notifier
  *
@@ -257,7 +257,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+#if defined(HAVE_2ARGS_INVALIDATE_RANGE_START)
 /**
  * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
  *
@@ -365,7 +365,7 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
  * Block for operations on BOs to finish and mark pages as accessed and
  * potentially dirty.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 static int amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 						 struct mm_struct *mm,
 						 unsigned long start,
@@ -384,7 +384,7 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 	if (amdgpu_mn_read_lock(amn, blockable))
 		 return -EAGAIN;
 #else
@@ -395,7 +395,7 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 	while (it) {
 		struct amdgpu_mn_node *node;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 		if (!blockable) {
 			amdgpu_mn_read_unlock(amn);
 			return -EAGAIN;
@@ -422,7 +422,7 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
  * necessitates evicting all user-mode queues of the process. The BOs
  * are restorted in amdgpu_mn_invalidate_range_end_hsa.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 						 struct mm_struct *mm,
 						 unsigned long start,
@@ -441,7 +441,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	/* notification is exclusive, but interval is inclusive */
 	end -= 1;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 	if (amdgpu_mn_read_lock(amn, blockable))
 		 return -EAGAIN;
 #else
@@ -453,7 +453,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 		struct amdgpu_mn_node *node;
 		struct amdgpu_bo *bo;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
 		if (!blockable) {
 			amdgpu_mn_read_unlock(amn);
 			return -EAGAIN;
