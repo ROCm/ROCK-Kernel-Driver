@@ -718,6 +718,12 @@ struct amdgpu_df_funcs {
 				      u32 *flags);
 	void (*enable_ecc_force_par_wr_rmw)(struct amdgpu_device *adev,
 					    bool enable);
+	int (*pmc_start)(struct amdgpu_device *adev, uint64_t config,
+					 int is_enable);
+	int (*pmc_stop)(struct amdgpu_device *adev, uint64_t config,
+					 int is_disable);
+	void (*pmc_get_count)(struct amdgpu_device *adev, uint64_t config,
+					 uint64_t *count);
 };
 /* Define the HW IP blocks will be used in driver , add more if necessary */
 enum amd_hw_ip_block_type {
