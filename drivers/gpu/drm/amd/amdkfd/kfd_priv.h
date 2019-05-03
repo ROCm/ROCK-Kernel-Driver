@@ -177,6 +177,11 @@ extern int priv_cp_queues;
 extern int halt_if_hws_hang;
 
 /*
+ * Whether MEC FW support GWS barriers
+ */
+extern bool hws_gws_support;
+
+/*
  * Restore evicted process only if queues are active
  */
 extern bool keep_idle_process_evicted;
