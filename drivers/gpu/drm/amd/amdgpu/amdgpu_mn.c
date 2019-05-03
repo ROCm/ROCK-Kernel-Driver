@@ -171,6 +171,20 @@ void amdgpu_mn_unlock(struct amdgpu_mn *mn)
 		up_write(&mn->lock);
 }
 
+#if !defined(HAVE_5ARGS_INVALIDATE_RANGE_START) && !defined(HAVE_2ARGS_INVALIDATE_RANGE_START)
+/**
+ * amdgpu_mn_read_lock - take the read side lock for this notifier
+ *
+ * @amn: our notifier
+ */
+static void amdgpu_mn_read_lock(struct amdgpu_mn *amn)
+{
+	mutex_lock(&amn->read_lock);
+	if (atomic_inc_return(&amn->recursion) == 1)
+		down_read_non_owner(&amn->lock);
+	mutex_unlock(&amn->read_lock);
+}
+#else
 /**
  * amdgpu_mn_read_lock - take the read side lock for this notifier
  *
@@ -189,6 +203,7 @@ static int amdgpu_mn_read_lock(struct amdgpu_mn *amn, bool blockable)
 
 	return 0;
 }
+#endif
 
 /**
  * amdgpu_mn_read_unlock - drop the read side lock for this notifier
@@ -232,6 +247,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 	}
 }
 
+#if defined(HAVE_2ARGS_INVALIDATE_RANGE_START)
 /**
  * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
  *
@@ -326,6 +342,129 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	return 0;
 }
 
+#else
+
+/**
+ * amdgpu_mn_invalidate_range_start_gfx - callback to notify about mm change
+ *
+ * @mn: our notifier
+ * @mm: the mm this callback is about
+ * @start: start of updated range
+ * @end: end of updated range
+ *
+ * Block for operations on BOs to finish and mark pages as accessed and
+ * potentially dirty.
+ */
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+static int amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end,
+						 bool blockable)
+#else
+static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end)
+#endif
+{
+	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	/* notification is exclusive, but interval is inclusive */
+	end -= 1;
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+	if (amdgpu_mn_read_lock(amn, blockable))
+		 return -EAGAIN;
+#else
+	amdgpu_mn_read_lock(amn);
+#endif
+
+	it = interval_tree_iter_first(&amn->objects, start, end);
+	while (it) {
+		struct amdgpu_mn_node *node;
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+		if (!blockable) {
+			amdgpu_mn_read_unlock(amn);
+			return -EAGAIN;
+		}
+#endif
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+		it = interval_tree_iter_next(it, start, end);
+
+		amdgpu_mn_invalidate_node(node, start, end);
+	}
+}
+
+
+/**
+ * amdgpu_mn_invalidate_range_start_hsa - callback to notify about mm change
+ *
+ * @mn: our notifier
+ * @mm: the mm this callback is about
+ * @start: start of updated range
+ * @end: end of updated range
+ *
+ * We temporarily evict all BOs between start and end. This
+ * necessitates evicting all user-mode queues of the process. The BOs
+ * are restorted in amdgpu_mn_invalidate_range_end_hsa.
+ */
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end,
+						 bool blockable)
+#else
+static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
+						 struct mm_struct *mm,
+						 unsigned long start,
+						 unsigned long end)
+#endif
+{
+	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
+	struct interval_tree_node *it;
+
+	/* notification is exclusive, but interval is inclusive */
+	end -= 1;
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+	if (amdgpu_mn_read_lock(amn, blockable))
+		 return -EAGAIN;
+#else
+	amdgpu_mn_read_lock(amn);
+#endif
+
+	it = interval_tree_iter_first(&amn->objects, start, end);
+	while (it) {
+		struct amdgpu_mn_node *node;
+		struct amdgpu_bo *bo;
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+		if (!blockable) {
+			amdgpu_mn_read_unlock(amn);
+			return -EAGAIN;
+		}
+#endif
+
+		node = container_of(it, struct amdgpu_mn_node, it);
+		it = interval_tree_iter_next(it, start, end);
+
+		list_for_each_entry(bo, &node->bos, mn_list) {
+			struct kgd_mem *mem = bo->kfd_bo;
+
+			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
+							 start, end))
+				amdgpu_amdkfd_evict_userptr(mem, mm);
+		}
+	}
+}
+
+#endif
+
 /**
  * amdgpu_mn_invalidate_range_end - callback to notify about mm change
  *
@@ -337,7 +476,13 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
  * Release the lock again to allow new command submissions.
  */
 static void amdgpu_mn_invalidate_range_end(struct mmu_notifier *mn,
+#ifdef HAVE_2ARGS_INVALIDATE_RANGE_START
 			const struct mmu_notifier_range *range)
+#else
+					   struct mm_struct *mm,
+					   unsigned long start,
+					   unsigned long end)
+#endif
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 
