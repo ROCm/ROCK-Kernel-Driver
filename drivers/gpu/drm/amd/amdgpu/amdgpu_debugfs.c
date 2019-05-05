@@ -134,6 +134,7 @@ static int  amdgpu_debugfs_process_reg_op(bool read, struct file *f,
 			((*pos & (1ULL << 62)) && (*pos & (1ULL << 61))))
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	/* are we reading registers for which a PG lock is necessary? */
 	pm_pg_lock = (*pos >> 23) & 1;
 
@@ -164,8 +165,10 @@ static int  amdgpu_debugfs_process_reg_op(bool read, struct file *f,
 
 	if (use_bank) {
 		if ((sh_bank != 0xFFFFFFFF && sh_bank >= adev->gfx.config.max_sh_per_se) ||
-		    (se_bank != 0xFFFFFFFF && se_bank >= adev->gfx.config.max_shader_engines))
+		    (se_bank != 0xFFFFFFFF && se_bank >= adev->gfx.config.max_shader_engines)) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return -EINVAL;
+		}
 		mutex_lock(&adev->grbm_idx_mutex);
 		amdgpu_gfx_select_se_sh(adev, se_bank,
 					sh_bank, instance_bank);
@@ -211,6 +214,7 @@ end:
 	if (pm_pg_lock)
 		mutex_unlock(&adev->pm.mutex);
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -255,13 +259,16 @@ static ssize_t amdgpu_debugfs_regs_pcie_read(struct file *f, char __user *buf,
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		value = RREG32_PCIE(*pos >> 2);
 		r = put_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		result += 4;
 		buf += 4;
@@ -269,6 +276,7 @@ static ssize_t amdgpu_debugfs_regs_pcie_read(struct file *f, char __user *buf,
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -294,12 +302,15 @@ static ssize_t amdgpu_debugfs_regs_pcie_write(struct file *f, const char __user 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		r = get_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		WREG32_PCIE(*pos >> 2, value);
 
@@ -309,6 +320,7 @@ static ssize_t amdgpu_debugfs_regs_pcie_write(struct file *f, const char __user 
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -334,13 +346,16 @@ static ssize_t amdgpu_debugfs_regs_didt_read(struct file *f, char __user *buf,
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		value = RREG32_DIDT(*pos >> 2);
 		r = put_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		result += 4;
 		buf += 4;
@@ -348,6 +363,7 @@ static ssize_t amdgpu_debugfs_regs_didt_read(struct file *f, char __user *buf,
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -373,12 +389,15 @@ static ssize_t amdgpu_debugfs_regs_didt_write(struct file *f, const char __user 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		r = get_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		WREG32_DIDT(*pos >> 2, value);
 
@@ -388,6 +407,7 @@ static ssize_t amdgpu_debugfs_regs_didt_write(struct file *f, const char __user 
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -413,13 +433,16 @@ static ssize_t amdgpu_debugfs_regs_smc_read(struct file *f, char __user *buf,
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		value = RREG32_SMC(*pos);
 		r = put_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		result += 4;
 		buf += 4;
@@ -427,6 +450,7 @@ static ssize_t amdgpu_debugfs_regs_smc_read(struct file *f, char __user *buf,
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -452,12 +476,15 @@ static ssize_t amdgpu_debugfs_regs_smc_write(struct file *f, const char __user *
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	while (size) {
 		uint32_t value;
 
 		r = get_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		WREG32_SMC(*pos, value);
 
@@ -467,6 +494,7 @@ static ssize_t amdgpu_debugfs_regs_smc_write(struct file *f, const char __user *
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -651,6 +679,7 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 	wave = (*pos & GENMASK_ULL(36, 31)) >> 31;
 	simd = (*pos & GENMASK_ULL(44, 37)) >> 37;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	/* switch to the specific se/sh/cu */
 	mutex_lock(&adev->grbm_idx_mutex);
 	amdgpu_gfx_select_se_sh(adev, se, sh, cu);
@@ -662,16 +691,20 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
 	mutex_unlock(&adev->grbm_idx_mutex);
 
-	if (!x)
+	if (!x) {
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 		return -EINVAL;
+	}
 
 	while (size && (offset < x * 4)) {
 		uint32_t value;
 
 		value = data[offset >> 2];
 		r = put_user(value, (uint32_t *)buf);
-		if (r)
+		if (r) {
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return r;
+		}
 
 		result += 4;
 		buf += 4;
@@ -679,6 +712,7 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 		size -= 4;
 	}
 
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -715,6 +749,7 @@ static ssize_t amdgpu_debugfs_gpr_read(struct file *f, char __user *buf,
 	if (size & 3 || *pos & 3)
 		return -EINVAL;
 
+	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 	/* decode offset */
 	offset = *pos & GENMASK_ULL(11, 0);
 	se = (*pos & GENMASK_ULL(19, 12)) >> 12;
@@ -726,8 +761,10 @@ static ssize_t amdgpu_debugfs_gpr_read(struct file *f, char __user *buf,
 	bank = (*pos & GENMASK_ULL(61, 60)) >> 60;
 
 	data = kmalloc_array(1024, sizeof(*data), GFP_KERNEL);
-	if (!data)
+	if (!data) {
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 		return -ENOMEM;
+	}
 
 	/* switch to the specific se/sh/cu */
 	mutex_lock(&adev->grbm_idx_mutex);
@@ -760,6 +797,7 @@ static ssize_t amdgpu_debugfs_gpr_read(struct file *f, char __user *buf,
 	}
 
 err:
+	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	kfree(data);
 	return result;
 }
