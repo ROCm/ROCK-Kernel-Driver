@@ -2591,7 +2591,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data2;
 	uint32_t data3;
 	bool is_suspend_or_resume;
-	bool is_debbugger_attached = false;
 	uint8_t id;
 
 	debug_trap_action = args->op;
@@ -2627,16 +2626,19 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
+	if (target != p) {
+		bool is_debugger_attached = false;
 
-	rcu_read_lock();
-	if (ptrace_parent(target->lead_thread) == current)
-		is_debbugger_attached = true;
-	rcu_read_unlock();
+		rcu_read_lock();
+		if (ptrace_parent(target->lead_thread) == current)
+			is_debugger_attached = true;
+		rcu_read_unlock();
 
-	if (!is_debbugger_attached) {
-		pr_err("Cannot debug process\n");
-		r = -ESRCH;
-		goto out;
+		if (!is_debugger_attached) {
+			pr_err("Cannot debug process\n");
+			r = -ESRCH;
+			goto out;
+		}
 	}
 
 	mutex_lock(&target->mutex);
