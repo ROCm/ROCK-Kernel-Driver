@@ -311,6 +311,9 @@ struct kfd_dev {
 
 	/* Compute Profile ref. count */
 	atomic_t compute_profile;
+
+	/* Global GWS resource shared b/t processes*/
+	void *gws;
 };
 
 struct kfd_ipc_obj;
