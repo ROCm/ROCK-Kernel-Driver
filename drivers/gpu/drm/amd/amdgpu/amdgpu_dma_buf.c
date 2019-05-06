@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Advanced Micro Devices, Inc.
+ * Copyright 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -105,7 +105,8 @@ void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
+int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
+			  struct vm_area_struct *vma)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -137,60 +138,6 @@ int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma
 	drm_vma_node_revoke(&obj->vma_node, vma->vm_file->private_data);
 
 	return ret;
-}
-
-/**
- * amdgpu_gem_prime_import_sg_table - &drm_driver.gem_prime_import_sg_table
- * implementation
- * @dev: DRM device
- * @attach: DMA-buf attachment
- * @sg: Scatter/gather table
- *
- * Imports shared DMA buffer memory exported by another device.
- *
- * Returns:
- * A new GEM BO of the given DRM device, representing the memory
- * described by the given DMA-buf attachment and scatter/gather table.
- */
-struct drm_gem_object *
-amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
-				 struct dma_buf_attachment *attach,
-				 struct sg_table *sg)
-{
-	struct reservation_object *resv = attach->dmabuf->resv;
-	struct amdgpu_device *adev = dev->dev_private;
-	struct amdgpu_bo *bo;
-	struct amdgpu_bo_param bp;
-	int ret;
-
-	memset(&bp, 0, sizeof(bp));
-	bp.size = attach->dmabuf->size;
-	bp.byte_align = PAGE_SIZE;
-	bp.domain = AMDGPU_GEM_DOMAIN_CPU;
-	bp.flags = 0;
-	bp.type = ttm_bo_type_sg;
-	bp.resv = resv;
-	ww_mutex_lock(&resv->lock, NULL);
-	ret = amdgpu_bo_create(adev, &bp, &bo);
-	if (ret)
-		goto error;
-
-	bo->tbo.sg = sg;
-	bo->tbo.ttm->sg = sg;
-	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
-	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
-	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
-#endif
-		bo->prime_shared_count = 1;
-
-	ww_mutex_unlock(&resv->lock);
-	return &bo->gem_base;
-
-error:
-	ww_mutex_unlock(&resv->lock);
-	return ERR_PTR(ret);
 }
 
 static int
@@ -237,7 +184,7 @@ err_fences_put:
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 /**
- * amdgpu_gem_map_attach - &dma_buf_ops.attach implementation
+ * amdgpu_dma_buf_map_attach - &dma_buf_ops.attach implementation
  * @dma_buf: Shared DMA buffer
  * @attach: DMA-buf attachment
  *
@@ -248,11 +195,11 @@ err_fences_put:
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-static int amdgpu_gem_map_attach(struct dma_buf *dma_buf,
+static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
-				 struct device *target_dev,
+					struct device *target_dev,
 #endif
-				 struct dma_buf_attachment *attach)
+					struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -304,15 +251,15 @@ error_detach:
 }
 
 /**
- * amdgpu_gem_map_detach - &dma_buf_ops.detach implementation
+ * amdgpu_dma_buf_map_detach - &dma_buf_ops.detach implementation
  * @dma_buf: Shared DMA buffer
  * @attach: DMA-buf attachment
  *
  * This is called when a shared DMA buffer no longer needs to be accessible by
  * another device. For now, simply unpins the buffer from GTT.
  */
-static void amdgpu_gem_map_detach(struct dma_buf *dma_buf,
-				  struct dma_buf_attachment *attach)
+static void amdgpu_dma_buf_map_detach(struct dma_buf *dma_buf,
+				      struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -396,7 +343,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 /**
- * amdgpu_gem_begin_cpu_access - &dma_buf_ops.begin_cpu_access implementation
+ * amdgpu_dma_buf_begin_cpu_access - &dma_buf_ops.begin_cpu_access implementation
  * @dma_buf: Shared DMA buffer
  * @direction: Direction of DMA transfer
  *
@@ -407,8 +354,8 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
-				       enum dma_data_direction direction)
+static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
+					   enum dma_data_direction direction)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(dma_buf->priv);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -436,12 +383,12 @@ static int amdgpu_gem_begin_cpu_access(struct dma_buf *dma_buf,
 }
 
 const struct dma_buf_ops amdgpu_dmabuf_ops = {
-	.attach = amdgpu_gem_map_attach,
-	.detach = amdgpu_gem_map_detach,
+	.attach = amdgpu_dma_buf_map_attach,
+	.detach = amdgpu_dma_buf_map_detach,
 	.map_dma_buf = drm_gem_map_dma_buf,
 	.unmap_dma_buf = drm_gem_unmap_dma_buf,
 	.release = drm_gem_dmabuf_release,
-	.begin_cpu_access = amdgpu_gem_begin_cpu_access,
+	.begin_cpu_access = amdgpu_dma_buf_begin_cpu_access,
 	.mmap = drm_gem_dmabuf_mmap,
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
@@ -480,6 +427,57 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	}
 
 	return buf;
+}
+
+/**
+ * amdgpu_gem_prime_import_sg_table - &drm_driver.gem_prime_import_sg_table
+ * implementation
+ * @dev: DRM device
+ * @attach: DMA-buf attachment
+ * @sg: Scatter/gather table
+ *
+ * Imports shared DMA buffer memory exported by another device.
+ *
+ * Returns:
+ * A new GEM BO of the given DRM device, representing the memory
+ * described by the given DMA-buf attachment and scatter/gather table.
+ */
+struct drm_gem_object *
+amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
+				 struct dma_buf_attachment *attach,
+				 struct sg_table *sg)
+{
+	struct reservation_object *resv = attach->dmabuf->resv;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_bo *bo;
+	struct amdgpu_bo_param bp;
+	int ret;
+
+	memset(&bp, 0, sizeof(bp));
+	bp.size = attach->dmabuf->size;
+	bp.byte_align = PAGE_SIZE;
+	bp.domain = AMDGPU_GEM_DOMAIN_CPU;
+	bp.flags = 0;
+	bp.type = ttm_bo_type_sg;
+	bp.resv = resv;
+	ww_mutex_lock(&resv->lock, NULL);
+	ret = amdgpu_bo_create(adev, &bp, &bo);
+	if (ret)
+		goto error;
+
+	bo->tbo.sg = sg;
+	bo->tbo.ttm->sg = sg;
+	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
+	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
+		bo->prime_shared_count = 1;
+
+	ww_mutex_unlock(&resv->lock);
+	return &bo->gem_base;
+
+error:
+	ww_mutex_unlock(&resv->lock);
+	return ERR_PTR(ret);
 }
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
