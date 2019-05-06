@@ -101,6 +101,7 @@ m4_include([m4/for-each-new-crtc-in-state.m4])
 m4_include([m4/drm-crtc-accurate-vblank-count.m4])
 m4_include([m4/dp-dprx-feature-enumeration-list.m4])
 m4_include([m4/drm-atomic-helper-plane-reset.m4])
+m4_include([m4/alpha-in-struct-drm-plane-state.m4])
 m4_include([m4/config.m4])
 
 

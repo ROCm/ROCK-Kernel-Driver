@@ -4897,7 +4897,7 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 		plane->state = &amdgpu_state->base;
 		plane->state->plane = plane;
 		plane->state->rotation = DRM_MODE_ROTATE_0;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 18, 0)
+#if defined(HAVE_ALPHA_IN_STRUCT_DRM_PLANE_STATE)
 		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
 #endif
 	}
