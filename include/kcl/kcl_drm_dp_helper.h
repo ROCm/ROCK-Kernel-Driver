@@ -31,7 +31,7 @@
 #include <drm/drm_dp_helper.h>
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DP_DPRX_FEATURE_ENUMERATION_LIST)
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
