@@ -469,7 +469,9 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
+#endif
 		bo->prime_shared_count = 1;
 
 	ww_mutex_unlock(&resv->lock);
