@@ -138,7 +138,7 @@ kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 extern void _kcl_reservation_object_add_shared_fence(
 						struct reservation_object *obj,
 						struct dma_fence *fence);
@@ -148,7 +148,7 @@ static inline void
 kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					struct dma_fence *fence)
 {
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 	return _kcl_reservation_object_add_shared_fence(obj, fence);
 #else
 	return reservation_object_add_shared_fence(obj, fence);

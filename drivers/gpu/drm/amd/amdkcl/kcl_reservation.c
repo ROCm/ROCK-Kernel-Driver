@@ -486,7 +486,7 @@ done:
 }
 
 
-#if (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
+#if !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					 struct dma_fence *fence)
 {
