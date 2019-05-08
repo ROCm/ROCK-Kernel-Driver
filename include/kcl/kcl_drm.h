@@ -242,7 +242,7 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						struct dma_fence **fence)
 {
 #if defined(BUILD_AS_DKMS)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
 	return drm_syncobj_fence_get(file_private, handle, fence);
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
 	return drm_syncobj_find_fence(file_private, handle, fence);
