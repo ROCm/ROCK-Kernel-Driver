@@ -23,7 +23,7 @@ extern const unsigned char *_kcl_pcie_link_speed;
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 #define PCIE_SPEED_16_0GT 0x17
 #define  PCI_EXP_LNKCAP2_SLS_16_0GB 0x00000010 /* Supported Speed 16GT/s */
 #define  PCI_EXP_LNKCAP_SLS_16_0GB 0x00000004 /* LNKCAP2 SLS Vector bit 3 */
@@ -65,7 +65,7 @@ int  _kcl_pci_create_measure_file(struct pci_dev *pdev);
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev);
 enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
 #else
@@ -81,7 +81,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
 {
-#if !defined(BUILD_AS_DKMS) || (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+#if !defined(BUILD_AS_DKMS) || !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 		return pcie_get_speed_cap(dev);
 #else
 		return _kcl_pcie_get_speed_cap(dev);
@@ -90,7 +90,7 @@ static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
 
 static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 {
-#if !defined(BUILD_AS_DKMS) || (LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0))
+#if !defined(BUILD_AS_DKMS) || !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 		return pcie_get_width_cap(dev);
 #else
 		return _kcl_pcie_get_width_cap(dev);

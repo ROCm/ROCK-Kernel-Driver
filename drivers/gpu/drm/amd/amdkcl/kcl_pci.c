@@ -115,8 +115,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 /*
  * pcie_get_speed_cap - query for the PCI device's link speed capability
  * @dev: PCI device to query
@@ -180,9 +179,7 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 	return PCIE_LNK_WIDTH_UNKNOWN;
 }
 EXPORT_SYMBOL(pcie_get_width_cap);
-
 #else
-
 enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
@@ -192,7 +189,7 @@ EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
 
 void amdkcl_pci_init(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+#if defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
 	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
 #endif

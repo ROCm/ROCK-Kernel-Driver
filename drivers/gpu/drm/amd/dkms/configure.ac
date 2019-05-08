@@ -25,6 +25,7 @@ m4_include([m4/timer-setup.m4])
 m4_include([m4/dma-fence-set-error.m4])
 m4_include([m4/pcie-bandwidth-available.m4])
 m4_include([m4/drm-fb-helper-remove-conflicting-pci-framebuffers.m4])
+m4_include([m4/pcie-get-speed-width-cap.m4])
 m4_include([m4/config.m4])
 
 
