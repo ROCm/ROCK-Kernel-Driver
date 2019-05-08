@@ -2908,6 +2908,8 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 
 	amdgpu_amdkfd_suspend(adev);
 
+	amdgpu_ras_suspend(adev);
+
 	r = amdgpu_device_ip_suspend_phase1(adev);
 
 	/* evict vram memory */
@@ -3027,6 +3029,8 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 	}
 
 	drm_kms_helper_poll_enable(dev);
+
+	amdgpu_ras_resume(adev);
 
 	/*
 	 * Most of the connector probing functions try to acquire runtime pm
