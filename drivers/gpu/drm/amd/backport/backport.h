@@ -23,7 +23,7 @@
 #include <kcl/kcl_tracepoint.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_preempt.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
+#if !defined(HAVE_INTERVAL_TREE_DEFINE)
 #include <kcl/kcl_interval_tree_generic.h>
 #endif
 #include <kcl/kcl_pci.h>

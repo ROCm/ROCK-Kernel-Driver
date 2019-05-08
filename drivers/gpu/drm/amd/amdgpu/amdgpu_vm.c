@@ -29,7 +29,7 @@
 #include <linux/dma-fence-array.h>
 #endif
 #include <kcl/kcl_fence_array.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
+#if defined(HAVE_INTERVAL_TREE_DEFINE)
 #include <linux/interval_tree_generic.h>
 #endif
 #include <linux/idr.h>
