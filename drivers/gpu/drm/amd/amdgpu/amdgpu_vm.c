@@ -29,7 +29,9 @@
 #include <linux/dma-fence-array.h>
 #endif
 #include <kcl/kcl_fence_array.h>
+#if defined(HAVE_INTERVAL_TREE_DEFINE)
 #include <linux/interval_tree_generic.h>
+#endif
 #include <linux/idr.h>
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>

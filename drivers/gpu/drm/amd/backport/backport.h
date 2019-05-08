@@ -19,6 +19,9 @@
 #include <kcl/kcl_fs.h>
 #include <kcl/kcl_mn.h>
 #include <kcl/kcl_kernel.h>
+#if !defined(HAVE_INTERVAL_TREE_DEFINE)
+#include <kcl/kcl_interval_tree_generic.h>
+#endif
 #include <kcl/kcl_device_cgroup.h>
 #include <kcl/kcl_drm_dp_helper.h>
 #include <kcl/kcl_mmu_notifier.h>
