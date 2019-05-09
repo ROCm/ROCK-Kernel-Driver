@@ -241,16 +241,12 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						u32 handle, u64 point, u64 flags,
 						struct dma_fence **fence)
 {
-#if defined(BUILD_AS_DKMS)
 #if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
 	return drm_syncobj_fence_get(file_private, handle, fence);
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
 	return drm_syncobj_find_fence(file_private, handle, fence);
-#elif DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
 	return drm_syncobj_find_fence(file_private, handle, point, fence);
-#else
-	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
-#endif
 #else
 	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
 #endif
