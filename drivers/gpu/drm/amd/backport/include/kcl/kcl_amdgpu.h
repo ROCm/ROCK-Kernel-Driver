@@ -4,7 +4,7 @@
 #include <linux/version.h>
 #include <amdgpu.h>
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0) && defined(OS_NAME_SUSE_15)
 u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc);
 int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int crtc);
 void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc);

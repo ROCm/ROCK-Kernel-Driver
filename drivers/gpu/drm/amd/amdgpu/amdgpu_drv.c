@@ -1175,7 +1175,8 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 	drm_kms_helper_poll_disable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15)
  	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
@@ -1214,7 +1215,8 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 
 	ret = amdgpu_device_resume(drm_dev, false, false);
 	drm_kms_helper_poll_enable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
@@ -1398,7 +1400,8 @@ static struct drm_driver kms_driver = {
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
+	!defined(OS_NAME_SUSE_15)
 	.set_busid = drm_pci_set_busid,
 #endif
 	.unload = amdgpu_driver_unload_kms,
