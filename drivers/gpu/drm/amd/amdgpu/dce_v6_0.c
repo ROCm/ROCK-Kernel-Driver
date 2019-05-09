@@ -1829,7 +1829,7 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 	amdgpu_bo_get_tiling_flags(abo, &tiling_flags);
 	amdgpu_bo_unreserve(abo);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
 	switch (target_fb->pixel_format) {
 #else
 	switch (target_fb->format->format) {
@@ -1909,7 +1909,7 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
 		          kcl_drm_get_format_name(target_fb->pixel_format, &format_name));
 #else
 		          kcl_drm_get_format_name(target_fb->format->format, &format_name));
@@ -1976,7 +1976,7 @@ static int dce_v6_0_crtc_do_set_base(struct drm_crtc *crtc,
 	WREG32(mmGRPH_X_END + amdgpu_crtc->crtc_offset, target_fb->width);
 	WREG32(mmGRPH_Y_END + amdgpu_crtc->crtc_offset, target_fb->height);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
 	fb_pitch_pixels = target_fb->pitches[0] / (target_fb->bits_per_pixel / 8);
 #else
 	fb_pitch_pixels = target_fb->pitches[0] / target_fb->format->cpp[0];

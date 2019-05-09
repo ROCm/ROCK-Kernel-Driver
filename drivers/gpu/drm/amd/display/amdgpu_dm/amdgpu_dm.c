@@ -7608,7 +7608,11 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 
 		/* TODO: Remove this once we can handle fast format changes. */
 		if (old_other_state->fb && new_other_state->fb &&
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
+		    old_other_state->fb->pixel_format != new_other_state->fb->pixel_format)
+#else
 		    old_other_state->fb->format != new_other_state->fb->format)
+#endif
 			return true;
 	}
 
