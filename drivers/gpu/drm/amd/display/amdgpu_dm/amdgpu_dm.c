@@ -4699,7 +4699,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 
 	memset(plane_info, 0, sizeof(*plane_info));
 
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
+	switch (fb->pixel_format) {
+#else
 	switch (fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		plane_info->format =
 			SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS;
@@ -4751,7 +4755,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %p4cc\n",
+#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 			&fb->format->format);
+#else
+			&fb->pixel_format);
+#endif
 		return -EINVAL;
 	}
 
