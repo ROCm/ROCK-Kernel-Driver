@@ -330,6 +330,7 @@ static const struct kfd_device_info navi10_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = false,
 	.num_sdma_engines = 2,
+	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
