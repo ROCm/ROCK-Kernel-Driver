@@ -236,7 +236,9 @@ static void dce_v10_0_page_flip(struct amdgpu_device *adev,
 				int crtc_id, u64 crtc_base, bool async)
 {
 	struct amdgpu_crtc *amdgpu_crtc = adev->mode_info.crtcs[crtc_id];
+#if defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
 	struct drm_framebuffer *fb = amdgpu_crtc->base.primary->fb;
+#endif
 	u32 tmp;
 
 	/* flip at hsync for async, default is vsync */
@@ -244,9 +246,11 @@ static void dce_v10_0_page_flip(struct amdgpu_device *adev,
 	tmp = REG_SET_FIELD(tmp, GRPH_FLIP_CONTROL,
 			    GRPH_SURFACE_UPDATE_H_RETRACE_EN, async ? 1 : 0);
 	WREG32(mmGRPH_FLIP_CONTROL + amdgpu_crtc->crtc_offset, tmp);
+#if defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
 	/* update pitch */
 	WREG32(mmGRPH_PITCH + amdgpu_crtc->crtc_offset,
 	       fb->pitches[0] / fb->format->cpp[0]);
+#endif
 	/* update the primary scanout address */
 	WREG32(mmGRPH_PRIMARY_SURFACE_ADDRESS_HIGH + amdgpu_crtc->crtc_offset,
 	       upper_32_bits(crtc_base));
@@ -1897,7 +1901,11 @@ static int dce_v10_0_crtc_do_set_base(struct drm_crtc *crtc,
 
 	pipe_config = AMDGPU_TILING_GET(tiling_flags, PIPE_CONFIG);
 
+#if !defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
+	switch (target_fb->pixel_format) {
+#else
 	switch (target_fb->format->format) {
+#endif
 	case DRM_FORMAT_C8:
 		fb_format = REG_SET_FIELD(0, GRPH_CONTROL, GRPH_DEPTH, 0);
 		fb_format = REG_SET_FIELD(fb_format, GRPH_CONTROL, GRPH_FORMAT, 0);
@@ -1981,7 +1989,11 @@ static int dce_v10_0_crtc_do_set_base(struct drm_crtc *crtc,
 		break;
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
+#if !defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
+		          drm_get_format_name(target_fb->pixel_format, &format_name));
+#else
 		          drm_get_format_name(target_fb->format->format, &format_name));
+#endif
 		return -EINVAL;
 	}
 
@@ -2056,7 +2068,11 @@ static int dce_v10_0_crtc_do_set_base(struct drm_crtc *crtc,
 	WREG32(mmGRPH_X_END + amdgpu_crtc->crtc_offset, target_fb->width);
 	WREG32(mmGRPH_Y_END + amdgpu_crtc->crtc_offset, target_fb->height);
 
+#if !defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
+	fb_pitch_pixels = target_fb->pitches[0] / (target_fb->bits_per_pixel / 8);
+#else
 	fb_pitch_pixels = target_fb->pitches[0] / target_fb->format->cpp[0];
+#endif
 	WREG32(mmGRPH_PITCH + amdgpu_crtc->crtc_offset, fb_pitch_pixels);
 
 	dce_v10_0_grph_enable(crtc, true);
