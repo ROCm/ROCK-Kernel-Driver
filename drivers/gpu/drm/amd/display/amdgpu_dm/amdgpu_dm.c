@@ -9904,7 +9904,11 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 			continue;
 
 		/* Pixel format changes can require bandwidth updates. */
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
+		if (old_other_state->fb->pixel_format != new_other_state->fb->pixel_format)
+#else
 		if (old_other_state->fb->format != new_other_state->fb->format)
+#endif
 			return true;
 
 		old_afb = (struct amdgpu_framebuffer *)old_other_state->fb;
