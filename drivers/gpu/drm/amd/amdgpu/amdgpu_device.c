@@ -2361,6 +2361,7 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 	case CHIP_KAVERI:
 	case CHIP_KABINI:
 	case CHIP_MULLINS:
+#if !defined(BUILD_AS_DKMS)
 		/*
 		 * We have systems in the wild with these ASICs that require
 		 * LVDS and VGA support which is not supported with DC.
@@ -2369,6 +2370,7 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 		 * cause regressions.
 		 */
 		return amdgpu_dc > 0;
+#endif
 	case CHIP_HAWAII:
 	case CHIP_CARRIZO:
 	case CHIP_STONEY:
