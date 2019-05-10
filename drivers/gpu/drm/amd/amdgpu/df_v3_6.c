@@ -398,10 +398,7 @@ static int df_v3_6_start_xgmi_link_cntr(struct amdgpu_device *adev,
 				NULL);
 
 		if (lo_base_addr == 0)
-			ret = -EINVAL;
-
-		if (ret)
-			return ret;
+			return -EINVAL;
 
 		lo_val = RREG32_PCIE(lo_base_addr);
 
