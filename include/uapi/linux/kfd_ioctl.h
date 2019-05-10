@@ -187,11 +187,19 @@ struct kfd_ioctl_dbg_wave_control_args {
 	__u32 buf_size_in_bytes;	/*including gpu_id and buf_size */
 };
 
+/* mapping event types to API spec */
+#define	KFD_DBG_EV_STATUS_TRAP		1
+#define	KFD_DBG_EV_STATUS_VMFAULT	2
+#define	KFD_DBG_EV_STATUS_SUSPENDED	4
+#define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1
+
+#define KFD_INVALID_QUEUEID	0xffffffff
+
 /* KFD_IOC_DBG_TRAP_ENABLE:
  * ptr:   unused
  * data1: 0=disable, 1=enable
  * data2: queue ID (for future use)
- * data3: unused
+ * data3: return value for fd
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
@@ -234,6 +242,14 @@ struct kfd_ioctl_dbg_wave_control_args {
  * data3: unused
  */
 #define KFD_IOC_DBG_TRAP_NODE_RESUME 5
+
+/* KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
+ * ptr: unused
+ * data1: queue id (IN/OUT)
+ * data2: flags (IN)
+ * data3: suspend[2:2], event type [1:0] (OUT)
+ */
+#define KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT 6
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
@@ -656,6 +672,9 @@ enum kfd_mmio_remap {
 
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
 		AMDKFD_IOWR(0x20, struct kfd_ioctl_ipc_export_handle_args)
+
+#define AMDKFD_IOC_DBG_TRAP			\
+		AMDKFD_IOWR(0x21, struct kfd_ioctl_dbg_trap_args)
 
 #define AMDKFD_IOC_CROSS_MEMORY_COPY		\
 		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
