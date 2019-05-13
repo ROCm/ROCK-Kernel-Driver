@@ -73,12 +73,10 @@ extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1) && \
-	!defined(OS_NAME_UBUNTU_OEM)
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
-			enum pci_bus_speed *speed,
-			enum pcie_link_width *width);
+			     enum pci_bus_speed *speed,
+			     enum pcie_link_width *width);
 #endif
 
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
