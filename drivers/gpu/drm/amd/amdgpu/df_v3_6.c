@@ -477,6 +477,8 @@ static int df_v3_6_pmc_start(struct amdgpu_device *adev, uint64_t config,
 		ret = 0;
 
 		break;
+	default:
+		break;
 	}
 
 	return ret;
@@ -504,6 +506,8 @@ static int df_v3_6_pmc_stop(struct amdgpu_device *adev, uint64_t config,
 			ret = 0;
 
 			break;
+	default:
+		break;
 	}
 
 	return ret;
@@ -527,6 +531,8 @@ static void df_v3_6_pmc_get_count(struct amdgpu_device *adev,
 			df_v3_6_get_xgmi_link_cntr(adev, xgmi_tx_link, count);
 		}
 
+		break;
+	default:
 		break;
 	}
 
