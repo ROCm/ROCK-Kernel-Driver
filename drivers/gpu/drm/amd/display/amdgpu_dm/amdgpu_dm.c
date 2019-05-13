@@ -3218,7 +3218,7 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*per_pixel_alpha = false;
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#if defined(HAVE_PIXEL_BLEND_MODE_IN_STRUCT_DRM_PLANE_STATE)
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 

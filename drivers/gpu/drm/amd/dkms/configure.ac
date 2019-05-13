@@ -103,6 +103,7 @@ m4_include([m4/dp-dprx-feature-enumeration-list.m4])
 m4_include([m4/drm-atomic-helper-plane-reset.m4])
 m4_include([m4/alpha-in-struct-drm-plane-state.m4])
 m4_include([m4/helper-private-in-struct-drm-mode-config.m4])
+m4_include([m4/pixel-blend-mode-in-struct-drm-plane-state.m4])
 m4_include([m4/config.m4])
 
 
