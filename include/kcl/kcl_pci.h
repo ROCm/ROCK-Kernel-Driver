@@ -16,9 +16,6 @@
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
-u32 pcie_bandwidth_capable(struct pci_dev *dev, enum pci_bus_speed *speed,
-		enum pcie_link_width *width);
-
 #ifndef PCIE_SPEED_16_0GT
 #define PCIE_SPEED_16_0GT		0x17
 #endif
@@ -61,6 +58,12 @@ int  _kcl_pci_create_measure_file(struct pci_dev *pdev);
 #if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
+#endif
+
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
+u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+			     enum pci_bus_speed *speed,
+			     enum pcie_link_width *width);
 #endif
 
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
