@@ -580,6 +580,7 @@ static void gfx_v10_0_check_gfxoff_flag(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
+	case CHIP_NAVI12:
 		adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
 		break;
 	default:
