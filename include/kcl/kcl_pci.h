@@ -68,4 +68,18 @@ static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 	return dev->bus->self;
 }
 #endif
+
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
+u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+			     enum pci_bus_speed *speed,
+			     enum pcie_link_width *width);
+static inline
+u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+				enum pci_bus_speed *speed,
+				enum pcie_link_width *width)
+{
+	return _kcl_pcie_bandwidth_available(dev, limiting_dev, speed, width);
+}
+#endif
+
 #endif /* AMDKCL_PCI_H */
