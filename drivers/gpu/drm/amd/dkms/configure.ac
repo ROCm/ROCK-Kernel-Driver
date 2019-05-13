@@ -23,6 +23,7 @@ m4_include([m4/rename-fence-to-dma-fence.m4])
 m4_include([m4/fence-array-h.m4])
 m4_include([m4/timer-setup.m4])
 m4_include([m4/dma-fence-set-error.m4])
+m4_include([m4/pcie-bandwidth-available.m4])
 m4_include([m4/config.m4])
 
 
