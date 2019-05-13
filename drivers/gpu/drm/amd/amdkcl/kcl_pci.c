@@ -179,6 +179,16 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pcie_get_width_cap);
 
+#else
+
+enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
+
+enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
+#endif
+
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation
@@ -236,14 +246,6 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 	return bw;
 }
 EXPORT_SYMBOL(pcie_bandwidth_available);
-
-#else
-
-enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
-EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
-
-enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
-EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
 #endif
 
 void amdkcl_pci_init(void)

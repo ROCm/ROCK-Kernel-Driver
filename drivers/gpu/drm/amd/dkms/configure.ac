@@ -3,6 +3,7 @@ AC_INIT(amdgpu-dkms, 18.30)
 m4_include([m4/kernel.m4])
 m4_include([m4/acpi-handle.m4])
 m4_include([m4/bitmap-find-next-zero-area-off.m4])
+m4_include([m4/pcie-bandwidth-available.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
