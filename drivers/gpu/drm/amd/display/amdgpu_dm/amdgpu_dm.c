@@ -2128,7 +2128,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#if defined(HAVE_HELPER_PRIVATE_IN_STRUCT_DRM_MODE_CONFIG)
 	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
 #endif
 
