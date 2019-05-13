@@ -199,9 +199,7 @@ void amdkcl_pci_init(void)
 	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1) && \
-	!defined(OS_NAME_UBUNTU_OEM)
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation
