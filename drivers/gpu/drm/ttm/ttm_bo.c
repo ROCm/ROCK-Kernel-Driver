@@ -982,7 +982,6 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	uint32_t cur_flags = 0;
 	bool type_found = false;
 	bool type_ok = false;
-	bool has_erestartsys = false;
 	int i, ret;
 
 	ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
@@ -1073,8 +1072,8 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 			mem->placement = cur_flags;
 			return 0;
 		}
-		if (ret == -ERESTARTSYS)
-			has_erestartsys = true;
+		if (ret && ret != -EBUSY)
+			return ret;
 	}
 
 	if (!type_found) {
@@ -1082,7 +1081,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 		return -EINVAL;
 	}
 
-	return (has_erestartsys) ? -ERESTARTSYS : -ENOMEM;
+	return -ENOMEM;
 }
 EXPORT_SYMBOL(ttm_bo_mem_space);
 
