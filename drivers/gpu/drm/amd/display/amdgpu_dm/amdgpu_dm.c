@@ -689,10 +689,8 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_RAVEN:
 		if (ASICREV_IS_PICASSO(adev->external_rev_id))
 			fw_name_dmcu = FIRMWARE_RAVEN_DMCU;
-#if defined(CONFIG_DRM_AMD_DC_DCN1_01)
 		else if (ASICREV_IS_RAVEN2(adev->external_rev_id))
 			fw_name_dmcu = FIRMWARE_RAVEN_DMCU;
-#endif
 		else
 			return 0;
 		break;
