@@ -456,7 +456,7 @@ static int df_v3_6_stop_xgmi_link_cntr(struct amdgpu_device *adev,
 static int df_v3_6_pmc_start(struct amdgpu_device *adev, uint64_t config,
 			     int is_enable)
 {
-	int xgmi_tx_link, ret;
+	int xgmi_tx_link, ret = 0;
 
 	switch (adev->asic_type) {
 	case CHIP_VEGA20:
