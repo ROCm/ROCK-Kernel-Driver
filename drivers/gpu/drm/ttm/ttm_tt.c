@@ -276,7 +276,7 @@ EXPORT_SYMBOL(ttm_tt_init);
 
 void ttm_tt_fini(struct ttm_tt *ttm)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	drm_free_large(ttm->pages);
 #else
 	kvfree(ttm->pages);
@@ -328,7 +328,7 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	if (ttm->pages)
 	  drm_free_large(ttm->pages);
   else

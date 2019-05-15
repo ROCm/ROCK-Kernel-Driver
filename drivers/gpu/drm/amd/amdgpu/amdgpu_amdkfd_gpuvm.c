@@ -552,7 +552,7 @@ release_out:
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
 #endif
 free_out:
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	drm_free_large(mem->user_pages);
 #else
 	kvfree(mem->user_pages);
@@ -1322,7 +1322,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 #else
 			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 		drm_free_large(mem->user_pages);
 #else
 		kvfree(mem->user_pages);

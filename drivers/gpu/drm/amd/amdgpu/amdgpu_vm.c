@@ -918,7 +918,7 @@ static void amdgpu_vm_free_table(struct amdgpu_vm_pt *entry)
 		amdgpu_bo_unref(&entry->base.bo->shadow);
 		amdgpu_bo_unref(&entry->base.bo);
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	drm_free_large(entry->entries);
 #else
 	kvfree(entry->entries);
