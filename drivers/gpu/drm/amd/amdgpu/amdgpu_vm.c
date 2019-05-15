@@ -866,7 +866,7 @@ static int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 		unsigned num_entries;
 
 		num_entries = amdgpu_vm_num_entries(adev, cursor->level);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 		entry->entries = drm_calloc_large(num_entries,
 						sizeof(*entry->entries));
 #else

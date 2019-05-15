@@ -54,6 +54,7 @@ m4_include([m4/list-bulk-move-tail.m4])
 m4_include([m4/drm-syncobj-find-fence.m4])
 m4_include([m4/format-in-struct-drm-framebuffer.m4])
 m4_include([m4/drm-free-large.m4])
+m4_include([m4/drm-calloc-large.m4])
 m4_include([m4/config.m4])
 
 

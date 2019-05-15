@@ -510,7 +510,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	 */
 	WARN(mem->user_pages, "Leaking user_pages array");
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 	mem->user_pages = drm_calloc_large(bo->tbo.ttm->num_pages,
 					   sizeof(struct page *));
 #else
@@ -1981,7 +1981,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 		if (!mem->user_pages) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 			mem->user_pages =
 				drm_calloc_large(bo->tbo.ttm->num_pages,
 						 sizeof(struct page *));

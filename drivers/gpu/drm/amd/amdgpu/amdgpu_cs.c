@@ -692,7 +692,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->tv.bo->ttm;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 			e->user_pages = drm_calloc_large(ttm->num_pages,
 							 sizeof(struct page*));
 #else

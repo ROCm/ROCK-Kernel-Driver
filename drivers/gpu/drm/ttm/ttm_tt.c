@@ -94,7 +94,7 @@ int ttm_tt_create(struct ttm_buffer_object *bo, bool zero_alloc)
  */
 static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(void*));
 #else
 	ttm->pages = kvmalloc_array(ttm->num_pages, sizeof(void*),
@@ -107,7 +107,7 @@ static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 
 static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
 					  sizeof(*ttm->ttm.pages) +
 					  sizeof(*ttm->dma_address));
@@ -125,7 +125,7 @@ static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 
 static int ttm_sg_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
 					  sizeof(*ttm->dma_address));
 #else
