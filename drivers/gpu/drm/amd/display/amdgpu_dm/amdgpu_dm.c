@@ -347,8 +347,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		 */
 
 		/* sequence will be replaced by real count during send-out. */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0) || \
-	defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
 		e->sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
 #else
 		e->event.sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
@@ -4085,8 +4084,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	.set_property = drm_atomic_helper_crtc_set_property,
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
@@ -4334,8 +4332,7 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	.dpms = drm_atomic_helper_connector_dpms,
 	.set_property = drm_atomic_helper_connector_set_property,
 #endif
@@ -4696,8 +4693,7 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy	= drm_primary_helper_destroy,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
 	.set_property	= drm_atomic_helper_plane_set_property,
 #endif
 	.reset = dm_drm_plane_reset,
@@ -5241,8 +5237,7 @@ static void amdgpu_dm_connector_ddc_get_modes(struct drm_connector *connector,
 		amdgpu_dm_connector->num_modes =
 				drm_add_edid_modes(connector, edid);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
 		drm_edid_to_eld(connector, edid);
 #endif
 
