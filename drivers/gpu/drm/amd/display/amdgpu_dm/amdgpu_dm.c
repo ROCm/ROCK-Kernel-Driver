@@ -4237,7 +4237,7 @@ dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	state->abm_level = cur->abm_level;
 	state->vrr_supported = cur->vrr_supported;
 	state->freesync_config = cur->freesync_config;
-	state->crc_enabled = cur->crc_enabled;
+	state->crc_src = cur->crc_src;
 	state->cm_has_degamma = cur->cm_has_degamma;
 	state->cm_is_degamma_srgb = cur->cm_is_degamma_srgb;
 
@@ -6596,6 +6596,7 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	int i;
+	enum amdgpu_dm_pipe_crc_source source;
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
@@ -6628,14 +6629,13 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #ifdef CONFIG_DEBUG_FS
 		/* The stream has changed so CRC capture needs to re-enabled. */
-		if (dm_new_crtc_state->crc_enabled) {
-			dm_new_crtc_state->crc_enabled = false;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0) || !defined(BUILD_AS_DKMS)
-			amdgpu_dm_crtc_set_crc_source(crtc, "auto");
-#else
-			size_t values_cnt;
-			amdgpu_dm_crtc_set_crc_source(crtc, "auto", &values_cnt);
-#endif
+		source = dm_new_crtc_state->crc_src;
+		if (amdgpu_dm_is_valid_crc_source(source)) {
+			dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
+			if (source == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC)
+				amdgpu_dm_crtc_set_crc_source(crtc, "crtc");
+			else if (source == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX)
+				amdgpu_dm_crtc_set_crc_source(crtc, "dprx");
 		}
 #endif
 #endif
@@ -6697,7 +6697,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 			 * Drop the extra vblank reference added by CRC
 			 * capture if applicable.
 			 */
-			if (dm_new_crtc_state->crc_enabled)
+			if (amdgpu_dm_is_valid_crc_source(dm_new_crtc_state->crc_src))
 				drm_crtc_vblank_put(crtc);
 
 			/*
@@ -6705,7 +6705,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 			 * still a stream for the CRTC.
 			 */
 			if (!dm_new_crtc_state->stream)
-				dm_new_crtc_state->crc_enabled = false;
+				dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
 
 			manage_dm_interrupts(adev, acrtc, false);
 		}
