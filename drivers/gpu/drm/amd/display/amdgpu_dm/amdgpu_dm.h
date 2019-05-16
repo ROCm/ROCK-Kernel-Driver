@@ -138,6 +138,31 @@ struct amdgpu_dm_backlight_caps {
 };
 
 /**
+ * for_each_oldnew_plane_in_state_reverse - iterate over all planes in an atomic
+ * update in reverse order
+ * @__state: &struct drm_atomic_state pointer
+ * @plane: &struct drm_plane iteration cursor
+ * @old_plane_state: &struct drm_plane_state iteration cursor for the old state
+ * @new_plane_state: &struct drm_plane_state iteration cursor for the new state
+ * @__i: int iteration cursor, for macro-internal use
+ *
+ * This iterates over all planes in an atomic update in reverse order,
+ * tracking both old and  new state. This is useful in places where the
+ * state delta needs to be considered, for example in atomic check functions.
+ */
+#if !defined(for_each_oldnew_plane_in_state_reverse) && \
+	defined(for_each_oldnew_plane_in_state)
+#define for_each_oldnew_plane_in_state_reverse(__state, plane, old_plane_state, new_plane_state, __i) \
+	for ((__i) = ((__state)->dev->mode_config.num_total_plane - 1);	\
+	     (__i) >= 0;						\
+	     (__i)--)							\
+		for_each_if ((__state)->planes[__i].ptr &&		\
+			     ((plane) = (__state)->planes[__i].ptr,	\
+			      (old_plane_state) = (__state)->planes[__i].old_state,\
+			      (new_plane_state) = (__state)->planes[__i].new_state, 1))
+#endif
+
+/**
  * struct dal_allocation - Tracks mapped FB memory for SMU communication
  * @list: list of dal allocations
  * @bo: GPU buffer object
@@ -150,6 +175,7 @@ struct dal_allocation {
 	void *cpu_ptr;
 	u64 gpu_addr;
 };
+
 
 /**
  * struct amdgpu_display_manager - Central amdgpu display manager device
