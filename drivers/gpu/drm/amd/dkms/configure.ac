@@ -105,6 +105,7 @@ m4_include([m4/alpha-in-struct-drm-plane-state.m4])
 m4_include([m4/helper-private-in-struct-drm-mode-config.m4])
 m4_include([m4/pixel-blend-mode-in-struct-drm-plane-state.m4])
 m4_include([m4/for-each-oldnew-plane-in-state.m4])
+m4_include([m4/private-objs-in-struct-drm-atomic-state.m4])
 m4_include([m4/config.m4])
 
 

@@ -2016,7 +2016,7 @@ static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 /*
  * Acquires the lock for the atomic state object and returns
  * the new atomic state.
@@ -2146,7 +2146,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	if (!state)
 		return -ENOMEM;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 	state->context = dc_create_state(adev->dm.dc);
 	if (!state->context) {
 		kfree(state);
@@ -6790,7 +6790,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 	kcl_drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if !defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 	dm_state = to_dm_atomic_state(state);
 #else
 	dm_state = dm_atomic_get_new_state(state);
@@ -7417,7 +7417,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 
 		if (!dm_old_crtc_state->stream)
 			goto skip_modeset;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto fail;
@@ -7457,7 +7457,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 				     dm_old_crtc_state->stream)) {
 
 			WARN_ON(dm_new_crtc_state->stream);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 			ret = dm_atomic_get_state(state, &dm_state);
 			if (ret)
 				goto fail;
@@ -7665,7 +7665,7 @@ static int dm_update_plane_state(struct dc *dc,
 
 		DRM_DEBUG_ATOMIC("Disabling DRM plane: %d on DRM crtc %d\n",
 				plane->base.id, old_plane_crtc->base.id);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			return ret;
@@ -7725,7 +7725,7 @@ static int dm_update_plane_state(struct dc *dc,
 			dc_plane_state_release(dc_new_plane_state);
 			return ret;
 		}
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret) {
 			dc_plane_state_release(dc_new_plane_state);
@@ -7875,7 +7875,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 
 		if (num_plane == 0)
 			continue;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto cleanup;
@@ -8176,7 +8176,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #else
 	if (lock_and_validation_needed) {
 #endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_ATOMIC_STATE)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)
 			goto fail;
