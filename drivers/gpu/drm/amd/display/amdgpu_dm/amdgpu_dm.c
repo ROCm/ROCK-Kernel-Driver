@@ -6177,7 +6177,7 @@ static void amdgpu_dm_commit_cursors(struct drm_atomic_state *state)
 	 * TODO: Make this per-stream so we don't issue redundant updates for
 	 * commits with multiple streams.
 	 */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_OLDNEW_PLANE_IN_STATE)
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		new_plane_state = plane->state;
 #else
@@ -6238,7 +6238,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		amdgpu_dm_commit_cursors(state);
 
 	/* update planes when needed */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_OLDNEW_PLANE_IN_STATE)
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		new_plane_state = plane->state;
 #else
@@ -7585,7 +7585,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 	 *
 	 * TODO: Come up with a more elegant solution for this.
 	 */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_OLDNEW_PLANE_IN_STATE)
 	for_each_plane_in_state(state, other, old_other_state, i) {
 		new_other_state = other->state;
 #else
@@ -7821,7 +7821,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 		if (!new_dm_crtc_state->stream)
 			continue;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_OLDNEW_PLANE_IN_STATE)
 		for_each_plane_in_state(state, plane, old_plane_state, j) {
 		new_plane_state = plane->state;
 #else
@@ -8014,7 +8014,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	drm_for_each_crtc(crtc, dev) {
 		bool modified = false;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_FOR_EACH_OLDNEW_PLANE_IN_STATE)
 		for_each_plane_in_state(state, plane, old_plane_state, i) {
 			new_plane_state = plane->state;
 #else
