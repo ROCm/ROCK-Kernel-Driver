@@ -5108,6 +5108,8 @@ static void amdgpu_dm_get_native_mode(struct drm_connector *connector)
 
 	amdgpu_encoder->native_mode.clock = 0;
 
+	drm_mode_sort(&connector->probed_modes);
+
 	if (!list_empty(&connector->probed_modes)) {
 		struct drm_display_mode *preferred_mode = NULL;
 
