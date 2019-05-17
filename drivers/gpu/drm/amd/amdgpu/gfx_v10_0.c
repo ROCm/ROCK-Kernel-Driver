@@ -1232,25 +1232,6 @@ static int gfx_v10_0_sw_init(void *handle)
 	if (r)
 		return r;
 
-	/* reserve GDS, GWS and OA resource for gfx */
-	r = amdgpu_bo_create_kernel(adev, adev->gds.mem.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_GDS,
-				    &adev->gds.gds_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
-
-	r = amdgpu_bo_create_kernel(adev, adev->gds.gws.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_GWS,
-				    &adev->gds.gws_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
-
-	r = amdgpu_bo_create_kernel(adev, adev->gds.oa.gfx_partition_size,
-				    PAGE_SIZE, AMDGPU_GEM_DOMAIN_OA,
-				    &adev->gds.oa_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
-
 	/* allocate visible FB for rlc auto-loading fw */
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_RLC_BACKDOOR_AUTO) {
 		r = gfx_v10_0_rlc_backdoor_autoload_buffer_init(adev);
@@ -1290,10 +1271,6 @@ static int gfx_v10_0_sw_fini(void *handle)
 {
 	int i;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	amdgpu_bo_free_kernel(&adev->gds.oa_gfx_bo, NULL, NULL);
-	amdgpu_bo_free_kernel(&adev->gds.gws_gfx_bo, NULL, NULL);
-	amdgpu_bo_free_kernel(&adev->gds.gds_gfx_bo, NULL, NULL);
 
 	for (i = 0; i < adev->gfx.num_gfx_rings; i++)
 		amdgpu_ring_fini(&adev->gfx.gfx_ring[i]);
@@ -4526,7 +4503,7 @@ static void gfx_v10_0_ring_emit_de_meta(struct amdgpu_ring *ring, bool resume)
 	int cnt;
 
 	csa_addr = amdgpu_csa_vaddr(ring->adev);
-	gds_addr = ALIGN(csa_addr + AMDGPU_CSA_SIZE - adev->gds.mem.total_size,
+	gds_addr = ALIGN(csa_addr + AMDGPU_CSA_SIZE - adev->gds.gds_size,
 			 PAGE_SIZE);
 	de_payload.gds_backup_addrlo = lower_32_bits(gds_addr);
 	de_payload.gds_backup_addrhi = upper_32_bits(gds_addr);
@@ -5119,29 +5096,17 @@ static void gfx_v10_0_set_rlc_funcs(struct amdgpu_device *adev)
 static void gfx_v10_0_set_gds_init(struct amdgpu_device *adev)
 {
 	/* init asic gds info */
-	adev->gds.mem.total_size = RREG32_SOC15(GC, 0, mmGDS_VMID0_SIZE);
-	adev->gds.gws.total_size = 64;
-	adev->gds.oa.total_size = 16;
-
-	if (adev->gds.mem.total_size == 64 * 1024) {
-		adev->gds.mem.gfx_partition_size = 4096;
-		adev->gds.mem.cs_partition_size = 4096;
-
-		adev->gds.gws.gfx_partition_size = 4;
-		adev->gds.gws.cs_partition_size = 4;
-
-		adev->gds.oa.gfx_partition_size = 4;
-		adev->gds.oa.cs_partition_size = 1;
-	} else {
-		adev->gds.mem.gfx_partition_size = 1024;
-		adev->gds.mem.cs_partition_size = 1024;
-
-		adev->gds.gws.gfx_partition_size = 16;
-		adev->gds.gws.cs_partition_size = 16;
-
-		adev->gds.oa.gfx_partition_size = 4;
-		adev->gds.oa.cs_partition_size = 4;
+	switch (adev->asic_type) {
+	case CHIP_NAVI10:
+		adev->gds.gds_size = 0x10000;
+		break;
+	default:
+		adev->gds.gds_size = 0x10000;
+		break;
 	}
+
+	adev->gds.gws_size = 64;
+	adev->gds.oa_size = 16;
 }
 
 static void gfx_v10_0_set_user_wgp_inactive_bitmap_per_sh(struct amdgpu_device *adev,
