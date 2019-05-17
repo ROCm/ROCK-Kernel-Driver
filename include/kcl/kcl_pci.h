@@ -112,7 +112,7 @@ static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 13, 0) && !defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 {
 	dev = pci_physfn(dev);

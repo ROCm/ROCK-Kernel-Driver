@@ -29,6 +29,7 @@ m4_include([m4/pcie-get-speed-width-cap.m4])
 m4_include([m4/pcie-enable-atomic-ops-to-root.m4])
 m4_include([m4/pci-is-thunderbolt-attached.m4])
 m4_include([m4/pci-pcie-type.m4])
+m4_include([m4/pci-upstream-bridge.m4])
 m4_include([m4/config.m4])
 
 
