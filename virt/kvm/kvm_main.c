@@ -1743,6 +1743,7 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn)
 }
 EXPORT_SYMBOL_GPL(gfn_to_page);
 
+#ifdef CONFIG_HAS_IOMEM
 static int __kvm_map_gfn(struct kvm_memory_slot *slot, gfn_t gfn,
 			 struct kvm_host_map *map)
 {
@@ -1806,6 +1807,7 @@ void kvm_vcpu_unmap(struct kvm_vcpu *vcpu, struct kvm_host_map *map,
 	map->page = NULL;
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_unmap);
+#endif /* CONFIG_HAS_IOMEM */
 
 struct page *kvm_vcpu_gfn_to_page(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
