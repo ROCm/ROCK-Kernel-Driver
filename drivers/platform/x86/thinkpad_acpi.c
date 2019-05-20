@@ -4212,7 +4212,7 @@ static void hotkey_notify(struct ibm_struct *ibm, u32 event)
 				known_ev = true;
 				break;
 			}
-			/* fallthrough to default */
+			/* fallthrough - to default */
 		default:
 			known_ev = false;
 		}
@@ -5876,7 +5876,7 @@ static int led_set_status(const unsigned int led,
 			return -EPERM;
 		if (!acpi_evalf(led_handle, NULL, NULL, "vdd",
 				(1 << led), led_sled_arg1[ledstatus]))
-			rc = -EIO;
+			return -EIO;
 		break;
 	case TPACPI_LED_OLD:
 		/* 600e/x, 770e, 770x, A21e, A2xm/p, T20-22, X20 */
@@ -5900,10 +5900,10 @@ static int led_set_status(const unsigned int led,
 			return -EPERM;
 		if (!acpi_evalf(led_handle, NULL, NULL, "vdd",
 				led, led_led_arg1[ledstatus]))
-			rc = -EIO;
+			return -EIO;
 		break;
 	default:
-		rc = -ENXIO;
+		return -ENXIO;
 	}
 
 	if (!rc)
@@ -6317,8 +6317,8 @@ static int thermal_get_sensor(int idx, s32 *value)
 			t = TP_EC_THERMAL_TMP8;
 			idx -= 8;
 		}
-		/* fallthrough */
 #endif
+		/* fallthrough */
 	case TPACPI_THERMAL_TPEC_8:
 		if (idx <= 7) {
 			if (!acpi_ec_read(t + idx, &tmp))
@@ -9958,6 +9958,37 @@ invalid:
 	return '\0';
 }
 
+static void find_new_ec_fwstr(const struct dmi_header *dm, void *private)
+{
+	char *ec_fw_string = (char *) private;
+	const char *dmi_data = (const char *)dm;
+	/*
+	 * ThinkPad Embedded Controller Program Table on newer models
+	 *
+	 * Offset |  Name                | Width  | Description
+	 * ----------------------------------------------------
+	 *  0x00  | Type                 | BYTE   | 0x8C
+	 *  0x01  | Length               | BYTE   |
+	 *  0x02  | Handle               | WORD   | Varies
+	 *  0x04  | Signature            | BYTEx6 | ASCII for "LENOVO"
+	 *  0x0A  | OEM struct offset    | BYTE   | 0x0B
+	 *  0x0B  | OEM struct number    | BYTE   | 0x07, for this structure
+	 *  0x0C  | OEM struct revision  | BYTE   | 0x01, for this format
+	 *  0x0D  | ECP version ID       | STR ID |
+	 *  0x0E  | ECP release date     | STR ID |
+	 */
+
+	/* Return if data structure not match */
+	if (dm->type != 140 || dm->length < 0x0F ||
+	memcmp(dmi_data + 4, "LENOVO", 6) != 0 ||
+	dmi_data[0x0A] != 0x0B || dmi_data[0x0B] != 0x07 ||
+	dmi_data[0x0C] != 0x01)
+		return;
+
+	/* fwstr is the first 8byte string  */
+	strncpy(ec_fw_string, dmi_data + 0x0F, 8);
+}
+
 /* returns 0 - probe ok, or < 0 - probe error.
  * Probe ok doesn't mean thinkpad found.
  * On error, kfree() cleanup on tp->* is not performed, caller must do it */
@@ -9965,7 +9996,7 @@ static int __must_check __init get_thinkpad_model_data(
 						struct thinkpad_id_data *tp)
 {
 	const struct dmi_device *dev = NULL;
-	char ec_fw_string[18];
+	char ec_fw_string[18] = {0};
 	char const *s;
 	char t;
 
@@ -10005,20 +10036,25 @@ static int __must_check __init get_thinkpad_model_data(
 			   ec_fw_string) == 1) {
 			ec_fw_string[sizeof(ec_fw_string) - 1] = 0;
 			ec_fw_string[strcspn(ec_fw_string, " ]")] = 0;
-
-			tp->ec_version_str = kstrdup(ec_fw_string, GFP_KERNEL);
-			if (!tp->ec_version_str)
-				return -ENOMEM;
-
-			t = tpacpi_parse_fw_id(ec_fw_string,
-					       &tp->ec_model, &tp->ec_release);
-			if (t != 'H') {
-				pr_notice("ThinkPad firmware release %s doesn't match the known patterns\n",
-					  ec_fw_string);
-				pr_notice("please report this to %s\n",
-					  TPACPI_MAIL);
-			}
 			break;
+		}
+	}
+
+	/* Newer ThinkPads have different EC program info table */
+	if (!ec_fw_string[0])
+		dmi_walk(find_new_ec_fwstr, &ec_fw_string);
+
+	if (ec_fw_string[0]) {
+		tp->ec_version_str = kstrdup(ec_fw_string, GFP_KERNEL);
+		if (!tp->ec_version_str)
+			return -ENOMEM;
+
+		t = tpacpi_parse_fw_id(ec_fw_string,
+			 &tp->ec_model, &tp->ec_release);
+		if (t != 'H') {
+			pr_notice("ThinkPad firmware release %s doesn't match the known patterns\n",
+				  ec_fw_string);
+			pr_notice("please report this to %s\n", TPACPI_MAIL);
 		}
 	}
 
@@ -10233,7 +10269,7 @@ MODULE_PARM_DESC(volume_mode,
 
 module_param_named(volume_capabilities, volume_capabilities, uint, 0444);
 MODULE_PARM_DESC(volume_capabilities,
-		 "Selects the mixer capabilites: 0=auto, 1=volume and mute, 2=mute only");
+		 "Selects the mixer capabilities: 0=auto, 1=volume and mute, 2=mute only");
 
 module_param_named(volume_control, volume_control_allowed, bool, 0444);
 MODULE_PARM_DESC(volume_control,

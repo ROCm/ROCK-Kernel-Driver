@@ -4141,7 +4141,7 @@ lpfc_idiag_queacc_read_qe(char *pbuffer, int len, struct lpfc_queue *pque,
 			"QE-INDEX[%04d]:\n", index);
 
 	offset = 0;
-	pentry = pque->qe[index].address;
+	pentry = lpfc_sli4_qe(pque, index);
 	while (esize > 0) {
 		len += scnprintf(pbuffer+len, LPFC_QUE_ACC_BUF_SIZE-len,
 				"%08x ", *pentry);
@@ -4491,7 +4491,7 @@ pass_check:
 		pque = (struct lpfc_queue *)idiag.ptr_private;
 		if (offset > pque->entry_size/sizeof(uint32_t) - 1)
 			goto error_out;
-		pentry = pque->qe[index].address;
+		pentry = lpfc_sli4_qe(pque, index);
 		pentry += offset;
 		if (idiag.cmd.opcode == LPFC_IDIAG_CMD_QUEACC_WR)
 			*pentry = value;
@@ -4512,7 +4512,7 @@ error_out:
  * lpfc_idiag_drbacc_read_reg - idiag debugfs read a doorbell register
  * @phba: The pointer to hba structure.
  * @pbuffer: The pointer to the buffer to copy the data to.
- * @len: The lenght of bytes to copied.
+ * @len: The length of bytes to copied.
  * @drbregid: The id to doorbell registers.
  *
  * Description:
@@ -4722,7 +4722,7 @@ error_out:
  * lpfc_idiag_ctlacc_read_reg - idiag debugfs read a control registers
  * @phba: The pointer to hba structure.
  * @pbuffer: The pointer to the buffer to copy the data to.
- * @len: The lenght of bytes to copied.
+ * @len: The length of bytes to copied.
  * @drbregid: The id to doorbell registers.
  *
  * Description:
@@ -5897,7 +5897,7 @@ lpfc_debugfs_initialize(struct lpfc_vport *vport)
 					    phba, &lpfc_debugfs_op_lockstat);
 		if (!phba->debug_lockstat) {
 			lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
-					 "0913 Cant create debugfs lockstat\n");
+					 "4610 Cant create debugfs lockstat\n");
 			goto debug_failed;
 		}
 #endif
@@ -6140,7 +6140,7 @@ nvmeio_off:
 				    vport, &lpfc_debugfs_op_scsistat);
 	if (!vport->debug_scsistat) {
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
-				 "0914 Cannot create debugfs scsistat\n");
+				 "4611 Cannot create debugfs scsistat\n");
 		goto debug_failed;
 	}
 
