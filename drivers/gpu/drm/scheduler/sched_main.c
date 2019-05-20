@@ -631,7 +631,8 @@ static void drm_sched_cleanup_jobs(struct drm_gpu_scheduler *sched)
 	unsigned long flags;
 
 	/* Don't destroy jobs while the timeout worker is running */
-	if (!cancel_delayed_work(&sched->work_tdr))
+	if (sched->timeout !=3D MAX_SCHEDULE_TIMEOUT &&
+	    !cancel_delayed_work(&sched->work_tdr))
 		return;
 
 
