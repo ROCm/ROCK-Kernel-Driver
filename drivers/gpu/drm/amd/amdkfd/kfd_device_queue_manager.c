@@ -25,6 +25,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/mmu_context.h>
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
@@ -130,6 +131,31 @@ void program_sh_mem_settings(struct device_queue_manager *dqm,
 						qpd->sh_mem_ape1_base,
 						qpd->sh_mem_ape1_limit,
 						qpd->sh_mem_bases);
+}
+
+bool check_if_queues_active(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd)
+{
+	bool busy = false;
+	struct queue *q;
+
+	dqm_lock(dqm);
+	list_for_each_entry(q, &qpd->queues_list, list) {
+		struct mqd_manager *mqd_mgr;
+		enum KFD_MQD_TYPE type;
+
+		type = get_mqd_type_from_queue_type(q->properties.type);
+		mqd_mgr = dqm->mqd_mgrs[type];
+		if (!mqd_mgr || !mqd_mgr->check_queue_active)
+			continue;
+
+		busy = mqd_mgr->check_queue_active(q);
+		if (busy)
+			break;
+	}
+	dqm_unlock(dqm);
+
+	return busy;
 }
 
 static int allocate_doorbell(struct qcm_process_device *qpd, struct queue *q)
@@ -566,6 +592,66 @@ out_unlock:
 	return retval;
 }
 
+/* suspend_single_queue does not lock the dqm like the
+ * evict_process_queues_cpsch or evict_process_queues_nocpsch. You should
+ * lock the dqm before calling, and unlock after calling.
+ *
+ * The reason we don't lock the dqm is because this function may be
+ * called on multipe queues in a loop, so rather than locking/unlocking
+ * multiple times, we will just keep the dqm locked for all of the calls.
+ */
+static int suspend_single_queue(struct device_queue_manager *dqm,
+				      struct kfd_process_device *pdd,
+				      struct queue *q)
+{
+	int retval = 0;
+
+	pr_debug("Suspending PASID %u queue [%i]\n",
+			pdd->process->pasid,
+			q->properties.queue_id);
+
+	q->properties.is_suspended = true;
+	if (q->properties.is_active) {
+		dqm->queue_count--;
+		q->properties.is_active = false;
+	}
+
+	return retval;
+}
+
+/* resume_single_queue does not lock the dqm like the functions
+ * restore_process_queues_cpsch or restore_process_queues_nocpsch. You should
+ * lock the dqm before calling, and unlock after calling.
+ *
+ * The reason we don't lock the dqm is because this function may be
+ * called on multipe queues in a loop, so rather than locking/unlocking
+ * multiple times, we will just keep the dqm locked for all of the calls.
+ */
+static int resume_single_queue(struct device_queue_manager *dqm,
+				      struct qcm_process_device *qpd,
+				      struct queue *q)
+{
+	struct kfd_process_device *pdd;
+	uint64_t pd_base;
+	int retval = 0;
+
+	pdd = qpd_to_pdd(qpd);
+	/* Retrieve PD base */
+	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
+
+	pr_debug("Restoring from suspend PASID %u queue [%i]\n",
+			    pdd->process->pasid,
+			    q->properties.queue_id);
+
+	q->properties.is_suspended = false;
+
+	if (QUEUE_IS_ACTIVE(q->properties)) {
+		q->properties.is_active = true;
+		dqm->queue_count++;
+	}
+
+	return retval;
+}
 static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
@@ -869,6 +955,7 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	dqm->queue_count = dqm->next_pipe_to_allocate = 0;
 	dqm->sdma_queue_count = 0;
 	dqm->xgmi_sdma_queue_count = 0;
+	dqm->trap_debug_vmid = 0;
 
 	for (pipe = 0; pipe < get_pipes_per_mec(dqm); pipe++) {
 		int pipe_offset = pipe * get_queues_per_pipe(dqm);
@@ -1021,6 +1108,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->active_runlist = false;
 	dqm->sdma_bitmap = ~0ULL >> (64 - get_num_sdma_queues(dqm));
 	dqm->xgmi_sdma_bitmap = ~0ULL >> (64 - get_num_xgmi_sdma_queues(dqm));
+	dqm->trap_debug_vmid = 0;
 
 	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
 
@@ -1851,6 +1939,289 @@ static void kfd_process_hw_exception(struct work_struct *work)
 			struct device_queue_manager, hw_exception_work);
 	amdgpu_amdkfd_gpu_reset(dqm->dev->kgd);
 }
+
+/*
+ * Reserves a vmid for the trap debugger
+ */
+int reserve_debug_trap_vmid(struct device_queue_manager *dqm)
+{
+	int r;
+	int updated_vmid_mask;
+
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
+		return -EINVAL;
+	}
+
+	dqm_lock(dqm);
+
+	if (dqm->trap_debug_vmid != 0) {
+		pr_err("Trap debug id already reserved\n");
+		r = -EINVAL;
+		goto out_unlock;
+	}
+
+	r = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
+	if (r)
+		goto out_unlock;
+
+	updated_vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
+	updated_vmid_mask &= ~(1 << dqm->dev->vm_info.last_vmid_kfd);
+
+	dqm->dev->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
+	dqm->trap_debug_vmid = dqm->dev->vm_info.last_vmid_kfd;
+	r = set_sched_resources(dqm);
+	if (r)
+		goto out_unlock;
+
+	r = map_queues_cpsch(dqm);
+	if (r)
+		goto out_unlock;
+
+	pr_debug("Reserved VMID for trap debug: %i\n", dqm->trap_debug_vmid);
+
+out_unlock:
+	dqm_unlock(dqm);
+	return r;
+}
+
+/*
+ * Releases vmid for the trap debugger
+ */
+int release_debug_trap_vmid(struct device_queue_manager *dqm)
+{
+	int r;
+	int updated_vmid_mask;
+	uint32_t trap_debug_vmid;
+
+	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
+		return -EINVAL;
+	}
+
+	dqm_lock(dqm);
+	trap_debug_vmid = dqm->trap_debug_vmid;
+	if (dqm->trap_debug_vmid == 0) {
+		pr_err("Trap debug id is not reserved\n");
+		r = -EINVAL;
+		goto out_unlock;
+	}
+
+	r = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
+	if (r)
+		goto out_unlock;
+
+	updated_vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
+	updated_vmid_mask |= (1 << dqm->dev->vm_info.last_vmid_kfd);
+
+	dqm->dev->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
+	dqm->trap_debug_vmid = 0;
+	r = set_sched_resources(dqm);
+	if (r)
+		goto out_unlock;
+
+	r = map_queues_cpsch(dqm);
+	if (r)
+		goto out_unlock;
+
+	pr_debug("Released VMID for trap debug: %i\n", trap_debug_vmid);
+
+out_unlock:
+	dqm_unlock(dqm);
+	return r;
+}
+
+bool queue_id_in_array(unsigned int queue_id,
+		uint32_t num_queues,
+		uint32_t *queue_ids)
+{
+	int i;
+
+	for (i = 0; i < num_queues; i++)
+		if (queue_id == queue_ids[i])
+			return true;
+	return false;
+}
+
+struct copy_context_work_handler_workarea {
+	struct work_struct copy_context_work;
+	struct kfd_process *p;
+};
+
+void copy_context_work_handler (struct work_struct *work)
+{
+	struct copy_context_work_handler_workarea *workarea;
+	struct mqd_manager *mqd_mgr;
+	struct kfd_process_device *pdd;
+	struct queue *q;
+	struct mm_struct *mm;
+	struct kfd_process *p;
+	uint32_t tmp_ctl_stack_used_size, tmp_save_area_used_size;
+
+	workarea = container_of(work,
+			struct copy_context_work_handler_workarea,
+			copy_context_work);
+
+	p = workarea->p;
+	mm = get_task_mm(p->lead_thread);
+	use_mm(mm);
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		struct device_queue_manager *dqm = pdd->dev->dqm;
+		struct qcm_process_device *qpd = &pdd->qpd;
+
+		dqm_lock(dqm);
+
+
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_COMPUTE];
+
+			/* We ignore the return value from get_wave_state
+			 * because
+			 * i) right now, it always returns 0, and
+			 * ii) if we hit an error, we would continue to the
+			 *      next queue anyway.
+			 */
+			mqd_mgr->get_wave_state(mqd_mgr,
+					q->mqd,
+					(void __user *)	q->properties.ctx_save_restore_area_address,
+					&tmp_ctl_stack_used_size,
+					&tmp_save_area_used_size);
+		}
+
+		dqm_unlock(dqm);
+	}
+	unuse_mm(mm);
+	mmput(mm);
+}
+
+int suspend_queues(struct kfd_process *p,
+			uint32_t num_queues,
+			uint32_t grace_period,
+			uint32_t flags,
+			uint32_t *queue_ids)
+{
+	int r = -ENODEV;
+	bool any_queues_suspended = false;
+	struct kfd_process_device *pdd;
+	struct queue *q;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		bool queues_suspended_on_device = false;
+		struct device_queue_manager *dqm = pdd->dev->dqm;
+		struct qcm_process_device *qpd = &pdd->qpd;
+
+		dqm_lock(dqm);
+
+		/* We need to loop over all of the queues on this
+		 * device, and check if it is in the list passed in,
+		 * and if it is, we will evict it.
+		 */
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			if (queue_id_in_array(q->properties.queue_id,
+						num_queues,
+						queue_ids)) {
+				if (q->properties.is_suspended)
+					continue;
+				r = suspend_single_queue(dqm,
+						pdd,
+						q);
+				if (r) {
+					pr_err("Failed to suspend process queues. queue_id == %i\n",
+							q->properties.queue_id);
+					dqm_unlock(dqm);
+					return r;
+				}
+				queues_suspended_on_device = true;
+				any_queues_suspended = true;
+			}
+		}
+
+		if (queues_suspended_on_device) {
+			r = execute_queues_cpsch(dqm,
+				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
+			if (r) {
+				pr_err("Failed to suspend process queues.\n");
+				dqm_unlock(dqm);
+				return r;
+			}
+		}
+
+		dqm_unlock(dqm);
+		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
+	}
+
+	if (any_queues_suspended) {
+		struct copy_context_work_handler_workarea copy_context_worker;
+
+		INIT_WORK_ONSTACK(
+				&copy_context_worker.copy_context_work,
+				copy_context_work_handler);
+
+		copy_context_worker.p = p;
+
+		schedule_work(&copy_context_worker.copy_context_work);
+
+
+		flush_work(&copy_context_worker.copy_context_work);
+		destroy_work_on_stack(&copy_context_worker.copy_context_work);
+	}
+	return r;
+}
+
+int resume_queues(struct kfd_process *p,
+		uint32_t num_queues,
+		uint32_t flags,
+		uint32_t *queue_ids)
+{
+	int r = -ENODEV;
+	struct kfd_process_device *pdd;
+	struct queue *q;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		bool queues_resumed_on_device = false;
+		struct device_queue_manager *dqm = pdd->dev->dqm;
+		struct qcm_process_device *qpd = &pdd->qpd;
+
+		dqm_lock(dqm);
+
+		/* We need to loop over all of the queues on this
+		 * device, and check if it is in the list passed in,
+		 * and if it is, we will restore it.
+		 */
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			if (queue_id_in_array(q->properties.queue_id,
+						num_queues,
+						queue_ids)) {
+				if (!q->properties.is_suspended)
+					continue;
+				r = resume_single_queue(dqm,
+							&pdd->qpd,
+							q);
+				if (r) {
+					pr_err("Failed to resume process queues\n");
+					dqm_unlock(dqm);
+					return r;
+				}
+				queues_resumed_on_device = true;
+			}
+		}
+
+		if (queues_resumed_on_device) {
+			r = execute_queues_cpsch(dqm,
+					KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
+					0);
+			if (r) {
+				pr_err("Failed to resume process queues\n");
+				dqm_unlock(dqm);
+				return r;
+			}
+		}
+
+		dqm_unlock(dqm);
+	}
+	return r;
+}
+
 
 #if defined(CONFIG_DEBUG_FS)
 

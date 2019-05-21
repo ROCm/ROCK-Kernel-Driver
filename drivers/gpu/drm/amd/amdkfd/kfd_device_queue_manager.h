@@ -193,6 +193,7 @@ struct device_queue_manager {
 	struct kfd_mem_obj	*fence_mem;
 	bool			active_runlist;
 	int			sched_policy;
+	uint32_t		trap_debug_vmid;
 
 	/* hw exception  */
 	bool			is_hws_hang;
@@ -219,6 +220,19 @@ unsigned int get_queues_per_pipe(struct device_queue_manager *dqm);
 unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
 unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 unsigned int get_num_xgmi_sdma_queues(struct device_queue_manager *dqm);
+bool check_if_queues_active(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
+int reserve_debug_trap_vmid(struct device_queue_manager *dqm);
+int release_debug_trap_vmid(struct device_queue_manager *dqm);
+int suspend_queues(struct kfd_process *p,
+			uint32_t num_queues,
+			uint32_t grace_period,
+			uint32_t flags,
+			uint32_t *queue_ids);
+int resume_queues(struct kfd_process *p,
+		uint32_t num_queues,
+		uint32_t flags,
+		uint32_t *queue_ids);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {
