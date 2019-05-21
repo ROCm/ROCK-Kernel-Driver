@@ -6328,11 +6328,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 #endif
 		bundle->flip_addrs[planes_count].flip_immediate =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
 #else
 				(crtc->state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
@@ -6425,7 +6425,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
 			/*clean up the flags for next usage*/
@@ -7013,10 +7013,10 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
 #else
 		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
