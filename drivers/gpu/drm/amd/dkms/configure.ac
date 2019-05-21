@@ -86,6 +86,7 @@ m4_include([m4/kvmalloc-array.m4])
 m4_include([m4/kvcalloc.m4])
 m4_include([m4/vmf-insert.m4])
 m4_include([m4/reservation-object-wait-timeout-rcu.m4])
+m4_include([m4/obj-in-struct-drm-framebuffer.m4])
 m4_include([m4/config.m4])
 
 

@@ -314,7 +314,7 @@ struct amdgpu_framebuffer {
 static inline struct drm_gem_object *
 kcl_drm_fb_get_gem_obj(const struct drm_framebuffer * fb,int index)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_FRAMEBUFFER)
 	if(fb)
 		return fb->obj[index];
 	else
