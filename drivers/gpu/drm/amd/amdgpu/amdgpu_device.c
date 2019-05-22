@@ -128,6 +128,7 @@ static DEVICE_ATTR(pcie_replay_count, S_IRUGO,
 		amdgpu_device_get_pcie_replay_count, NULL);
 
 static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev);
+static void amdgpu_device_parse_faked_did(struct amdgpu_device *adev);
 
 /**
  * amdgpu_device_is_px - Is the device is a dGPU with HG/PX power control
