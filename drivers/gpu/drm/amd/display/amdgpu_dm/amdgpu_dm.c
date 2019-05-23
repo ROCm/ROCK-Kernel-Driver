@@ -2862,7 +2862,7 @@ static int dm_early_init(void *handle)
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0)
+#if !defined(HAVE_DRM_ATOMIC_CRTC_NEEDS_MODESET)
 static inline bool
 drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
 {
