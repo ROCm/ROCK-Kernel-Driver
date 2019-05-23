@@ -70,7 +70,7 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #define kvcalloc(n, size, gfp)	kvzalloc(((n)*(size)), gfp)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if !defined(GFP_TRANSHUGE_LIGHT)
 #define GFP_TRANSHUGE_LIGHT	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
 			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
 #endif

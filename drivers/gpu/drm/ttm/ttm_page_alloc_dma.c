@@ -883,7 +883,7 @@ static gfp_t ttm_dma_pool_gfp_flags(struct ttm_dma_tt *ttm_dma, bool huge)
 		gfp_flags |= __GFP_ZERO;
 
 	if (huge) {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
+#if defined(GFP_TRANSHUGE_LIGHT)
 		gfp_flags |= GFP_TRANSHUGE_LIGHT | __GFP_NORETRY |
 			__GFP_KSWAPD_RECLAIM;
 #else
