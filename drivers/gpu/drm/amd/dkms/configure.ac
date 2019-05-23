@@ -48,6 +48,7 @@ m4_include([m4/drm-atomic-helper-shutdown.m4])
 m4_include([m4/drm-file-h.m4])
 m4_include([m4/drm-print-h.m4])
 m4_include([m4/for-each-oldnew-plane-in-state.m4])
+m4_include([m4/for-each-oldnew-connector-in-state.m4])
 m4_include([m4/config.m4])
 
 
