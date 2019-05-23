@@ -5302,6 +5302,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.odn_edit_dpm_table = vega10_odn_edit_dpm_table,
 	.get_performance_level = vega10_get_performance_level,
 	.get_asic_baco_capability = smu9_baco_get_capability,
+	.set_asic_baco_cap = vega10_baco_set_cap,
 	.get_asic_baco_state = smu9_baco_get_state,
 	.set_asic_baco_state = vega10_baco_set_state,
 	.enable_mgpu_fan_boost = vega10_enable_mgpu_fan_boost,
