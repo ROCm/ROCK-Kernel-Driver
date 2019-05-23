@@ -2657,7 +2657,7 @@ retry:
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			goto fail;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
+#if defined(HAVE_DRM_ATOMIC_ADD_AFFECTED_PLANES)
 		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
@@ -7999,7 +7999,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret)
 			return ret;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
+#if defined(HAVE_DRM_ATOMIC_ADD_AFFECTED_PLANES)
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret)
 			goto fail;

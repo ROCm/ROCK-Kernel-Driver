@@ -107,6 +107,7 @@ m4_include([m4/pixel-blend-mode-in-struct-drm-plane-state.m4])
 m4_include([m4/for-each-oldnew-plane-in-state.m4])
 m4_include([m4/private-objs-in-struct-drm-atomic-state.m4])
 m4_include([m4/pageflip-flags-in-struct-drm-crtc-state.m4])
+m4_include([m4/drm-atomic-add-affected-planes.m4])
 m4_include([m4/config.m4])
 
 
