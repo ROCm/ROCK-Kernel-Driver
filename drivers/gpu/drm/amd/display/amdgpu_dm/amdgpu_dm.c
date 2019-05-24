@@ -4046,6 +4046,17 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 	if (!state)
 		state = connector->state;
 
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	struct dm_connector_state *dm_conn_state =
+			to_dm_connector_state(state);
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	/* TODO: Remove this when there's support for max_bpc in drm */
+	if (dm_conn_state && bpc > dm_conn_state->max_bpc)
+		/* Round down to nearest even number. */
+		bpc = dm_conn_state->max_bpc - (dm_conn_state->max_bpc & 1);
+#else
 	if (state) {
 		/*
 		 * Cap display bpc based on the user requested value.
@@ -4060,6 +4071,7 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 		/* Round down to the nearest even number. */
 		bpc = bpc - (bpc & 1);
 	}
+#endif
 
 	switch (bpc) {
 	case 0:
@@ -4817,6 +4829,11 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		dm_new_state->underscan_enable = val;
 		ret = 0;
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	} else if (property == adev->mode_info.max_bpc_property) {
+		dm_new_state->max_bpc = val;
+		ret = 0;
+#endif
 	} else if (property == adev->mode_info.abm_level_property) {
 		dm_new_state->abm_level = val;
 		ret = 0;
@@ -4868,6 +4885,11 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
 		ret = 0;
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	} else if (property == adev->mode_info.max_bpc_property) {
+		*val = dm_state->max_bpc;
+		ret = 0;
+#endif
 	} else if (property == adev->mode_info.abm_level_property) {
 		*val = dm_state->abm_level;
 		ret = 0;
@@ -4942,7 +4964,11 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		state->underscan_enable = false;
 		state->underscan_hborder = 0;
 		state->underscan_vborder = 0;
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 		state->base.max_requested_bpc = 8;
+#else
+		state->max_bpc = 8;
+#endif
 		state->vcpi_slots = 0;
 		state->pbn = 0;
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
@@ -4975,6 +5001,9 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	new_state->underscan_vborder = state->underscan_vborder;
 	new_state->vcpi_slots = state->vcpi_slots;
 	new_state->pbn = state->pbn;
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	new_state->max_bpc = state->max_bpc;
+#endif
 	return &new_state->base;
 }
 
@@ -6204,12 +6233,18 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.underscan_vborder_property,
 				0);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 	if (!aconnector->mst_port)
 		drm_connector_attach_max_bpc_property(&aconnector->base, 8, 16);
 
 	/* This defaults to the max in the range, but we want 8bpc for non-edp. */
 	aconnector->base.state->max_bpc = (connector_type == DRM_MODE_CONNECTOR_eDP) ? 16 : 8;
 	aconnector->base.state->max_requested_bpc = aconnector->base.state->max_bpc;
+#else
+	drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.max_bpc_property,
+				0);
+#endif
 
 	if (connector_type == DRM_MODE_CONNECTOR_eDP &&
 	    dc_is_dmcu_initialized(adev->dm.dc)) {
