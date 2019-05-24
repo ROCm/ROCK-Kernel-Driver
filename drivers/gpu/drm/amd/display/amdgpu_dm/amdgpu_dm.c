@@ -3009,6 +3009,7 @@ static void fill_gamma_from_crtc(
 }
 #endif
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 static void
 fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 			       bool *per_pixel_alpha, bool *global_alpha,
@@ -3017,7 +3018,7 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*per_pixel_alpha = false;
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -3042,8 +3043,8 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 		*global_alpha = true;
 		*global_alpha_value = plane_state->alpha >> 8;
 	}
-#endif
 }
+#endif
 
 static int
 fill_plane_color_attributes(const struct drm_plane_state *plane_state,
