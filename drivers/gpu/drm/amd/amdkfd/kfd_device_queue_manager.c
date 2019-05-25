@@ -1907,7 +1907,8 @@ out_free:
 	return NULL;
 }
 
-void deallocate_hiq_sdma_mqd(struct kfd_dev *dev, struct kfd_mem_obj *mqd)
+static void deallocate_hiq_sdma_mqd(struct kfd_dev *dev,
+				    struct kfd_mem_obj *mqd)
 {
 	WARN(!mqd, "No hiq sdma mqd trunk to free");
 
