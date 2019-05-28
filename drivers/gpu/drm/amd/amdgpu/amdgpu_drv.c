@@ -1400,10 +1400,11 @@ static struct drm_driver kms_driver = {
 	    DRIVER_ATOMIC |
 #endif
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
+	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET |
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	    DRIVER_SYNCOBJ |
 #endif
-	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
+		DRIVER_SYNCOBJ_TIMELINE,
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
