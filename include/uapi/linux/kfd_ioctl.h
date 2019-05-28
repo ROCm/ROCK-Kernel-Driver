@@ -652,17 +652,17 @@ enum kfd_mmio_remap {
 #define AMDKFD_IOC_ALLOC_QUEUE_GWS		\
 		AMDKFD_IOWR(0x1E, struct kfd_ioctl_alloc_queue_gws_args)
 
-#define AMDKFD_IOC_IPC_IMPORT_HANDLE		\
-		AMDKFD_IOWR(0x1E, struct kfd_ioctl_ipc_import_handle_args)
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
+		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_import_handle_args)
 
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
-		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_export_handle_args)
-
-#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
-		AMDKFD_IOWR(0x20, struct kfd_ioctl_cross_memory_copy_args)
+		AMDKFD_IOWR(0x20, struct kfd_ioctl_ipc_export_handle_args)
 
 #define AMDKFD_IOC_DBG_TRAP			\
 		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
+
+#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
 
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x22
