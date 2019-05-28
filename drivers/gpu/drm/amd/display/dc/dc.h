@@ -221,6 +221,8 @@ struct dc_config {
 	bool allow_seamless_boot_optimization;
 	bool power_down_display_on_boot;
 	bool edp_not_connected;
+	bool forced_clocks;
+
 };
 
 enum visual_confirm {
