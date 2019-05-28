@@ -3389,8 +3389,7 @@ static int gfx_v9_0_hw_fini(void *handle)
 	gfx_v9_0_cp_enable(adev, false);
 	adev->gfx.rlc.funcs->stop(adev);
 
-	if (adev->in_suspend)
-		gfx_v9_0_csb_vram_unpin(adev);
+	gfx_v9_0_csb_vram_unpin(adev);
 
 	return 0;
 }
