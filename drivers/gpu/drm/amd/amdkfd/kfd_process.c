@@ -468,6 +468,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		kfree(pdd->qpd.doorbell_bitmap);
 		idr_destroy(&pdd->alloc_idr);
 		mutex_destroy(&pdd->qpd.doorbell_lock);
+
 		kfree(pdd);
 	}
 }
@@ -550,10 +551,16 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	/* Iterate over all process device data structures and if the
 	 * pdd is in debug mode, we should first force unregistration,
-	 * then we will be able to destroy the queues
+	 * then we will be able to destroy the queues. Also invalidate
+	 * doorbell_vma private data because the pdds are about to be
+	 * destroyed, which can race with the kfd_doorbell_close
+	 * vm_ops callback.
 	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct kfd_dev *dev = pdd->dev;
+
+		if (pdd->qpd.doorbell_vma)
+			pdd->qpd.doorbell_vma->vm_private_data = NULL;
 
 		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());

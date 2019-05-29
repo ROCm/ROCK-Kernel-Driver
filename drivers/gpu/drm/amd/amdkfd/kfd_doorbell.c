@@ -126,20 +126,50 @@ void kfd_doorbell_fini(struct kfd_dev *kfd)
 		iounmap(kfd->doorbell_kernel_ptr);
 }
 
+static void kfd_doorbell_open(struct vm_area_struct *vma)
+{
+	/* Don't track the parent's PDD in a child process. We do set
+	 * VM_DONTCOPY, but that can be overridden from user mode.
+	 */
+	vma->vm_private_data = NULL;
+}
+
+static void kfd_doorbell_close(struct vm_area_struct *vma)
+{
+	struct kfd_process_device *pdd = vma->vm_private_data;
+
+	if (!pdd)
+		return;
+
+	mutex_lock(&pdd->qpd.doorbell_lock);
+	pdd->qpd.doorbell_vma = NULL;
+	/* Remember if the process was evicted without doorbells
+	 * mapped to user mode.
+	 */
+	if (pdd->qpd.doorbell_mapped == 0)
+		pdd->qpd.doorbell_mapped = -1;
+	mutex_unlock(&pdd->qpd.doorbell_lock);
+}
+
 static vm_fault_t kfd_doorbell_vm_fault(struct vm_fault *vmf)
 {
-	struct kfd_process *process = vmf->vma->vm_private_data;
+	struct kfd_process_device *pdd = vmf->vma->vm_private_data;
 
-	pr_debug("Process %d doorbell vm page fault\n", process->pasid);
+	if (!pdd)
+		return VM_FAULT_SIGBUS;
 
-	kfd_process_remap_doorbells_locked(process);
+	pr_debug("Process %d doorbell vm page fault\n", pdd->process->pasid);
 
-	kfd_process_schedule_restore(process);
+	kfd_process_remap_doorbells_locked(pdd->process);
+
+	kfd_process_schedule_restore(pdd->process);
 
 	return VM_FAULT_NOPAGE;
 }
 
 static const struct vm_operations_struct kfd_doorbell_vm_ops = {
+	.open = kfd_doorbell_open,
+	.close = kfd_doorbell_close,
 	.fault = kfd_doorbell_vm_fault,
 };
 
@@ -150,10 +180,10 @@ void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
 	size_t size;
 
 	vma = pdd->qpd.doorbell_vma;
-	/* If process is evicted before queue is created
-	 * doorbell is not mapped to user space yet
+	/* Remember if the process was evicted without doorbells
+	 * mapped to user mode.
 	 */
-	if (!vma || !pdd->qpd.queue_count) {
+	if (!vma) {
 		pdd->qpd.doorbell_mapped = -1;
 		return;
 	}
@@ -249,7 +279,7 @@ int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 
 	if (!ret && keep_idle_process_evicted) {
 		vma->vm_ops = &kfd_doorbell_vm_ops;
-		vma->vm_private_data = process;
+		vma->vm_private_data = pdd;
 		pdd->qpd.doorbell_vma = vma;
 
 		/* If process is evicted before the first queue is created,
