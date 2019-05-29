@@ -10,4 +10,5 @@
 #include <kcl/kcl_list.h>
 #include <kcl/backport/kcl_highmem_backport.h>
 #include <kcl/backport/kcl_mm_backport.h>
+#include <kcl/backport/kcl_shrinker_backport.h>
 #endif
