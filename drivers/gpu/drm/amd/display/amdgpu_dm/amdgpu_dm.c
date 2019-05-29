@@ -3155,11 +3155,12 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	bool full_range;
 
 	*color_space = COLOR_SPACE_SRGB;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+
 	/* DRM color properties only affect non-RGB formats. */
 	if (dc_plane_state->format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 		return 0;
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
 
 	switch (plane_state->color_encoding) {
