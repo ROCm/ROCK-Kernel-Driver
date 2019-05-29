@@ -125,7 +125,8 @@ static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
 static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
-
+static void kgd_get_iq_wait_times(struct kgd_dev *kgd,
+					uint32_t *wait_times);
 static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
@@ -136,6 +137,12 @@ static void set_scratch_backing_va(struct kgd_dev *kgd,
 					uint64_t va, uint32_t vmid);
 static int invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 static int invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
+
+static void kgd_build_grace_period_packet_info(struct kgd_dev *kgd,
+		uint32_t wait_times,
+		uint32_t grace_period,
+		uint32_t *reg_offset,
+		uint32_t *reg_data);
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -189,6 +196,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.set_debug_trap_data = kgd_set_debug_trap_data,
 	.set_wave_launch_trap_override = kgd_set_wave_launch_trap_override,
 	.set_wave_launch_mode = kgd_set_wave_launch_mode,
+	.get_iq_wait_times = kgd_get_iq_wait_times,
+	.build_grace_period_packet_info = kgd_build_grace_period_packet_info,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
@@ -1080,6 +1089,26 @@ static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
 	return 0;
 }
 
+/* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
+ * The values read are:
+ *     ib_offload_wait_time     -- Wait Count for Indirect Buffer Offloads.
+ *     atomic_offload_wait_time -- Wait Count for L2 and GDS Atomics Offloads.
+ *     wrm_offload_wait_time    -- Wait Count for WAIT_REG_MEM Offloads.
+ *     gws_wait_time            -- Wait Count for Global Wave Syncs.
+ *     que_sleep_wait_time      -- Wait Count for Dequeue Retry.
+ *     sch_wave_wait_time       -- Wait Count for Scheduling Wave Message.
+ *     sem_rearm_wait_time      -- Wait Count for Semaphore re-arm.
+ *     deq_retry_wait_time      -- Wait Count for Global Wave Syncs.
+ */
+static void kgd_get_iq_wait_times(struct kgd_dev *kgd,
+					uint32_t *wait_times)
+
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	*wait_times = RREG32(SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2));
+}
+
 static void set_scratch_backing_va(struct kgd_dev *kgd,
 					uint64_t va, uint32_t vmid)
 {
@@ -1107,4 +1136,20 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	mmhub_v1_0_setup_vm_pt_regs(adev, vmid, page_table_base);
 
 	gfxhub_v1_0_setup_vm_pt_regs(adev, vmid, page_table_base);
+}
+
+static void kgd_build_grace_period_packet_info(struct kgd_dev *kgd,
+		uint32_t wait_times,
+		uint32_t grace_period,
+		uint32_t *reg_offset,
+		uint32_t *reg_data)
+{
+	*reg_data = wait_times;
+
+	*reg_data = REG_SET_FIELD(*reg_data,
+			CP_IQ_WAIT_TIME2,
+			SCH_WAVE,
+			grace_period);
+
+	*reg_offset = mmCP_IQ_WAIT_TIME2;
 }
