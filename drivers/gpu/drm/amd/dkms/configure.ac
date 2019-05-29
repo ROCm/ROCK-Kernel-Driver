@@ -56,6 +56,7 @@ m4_include([m4/format-in-struct-drm-framebuffer.m4])
 m4_include([m4/drm-free-large.m4])
 m4_include([m4/drm-calloc-large.m4])
 m4_include([m4/mm-register-shrinker.m4])
+m4_include([m4/amdgpu-chunk-id-syncobj.m4])
 m4_include([m4/config.m4])
 
 

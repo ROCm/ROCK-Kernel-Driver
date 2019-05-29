@@ -15,7 +15,7 @@
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 #include <drm/drm_print.h>
 #endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 #include <drm/drm_syncobj.h>
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
@@ -236,7 +236,7 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 #endif
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						u32 handle, u64 point, u64 flags,
 						struct dma_fence **fence)

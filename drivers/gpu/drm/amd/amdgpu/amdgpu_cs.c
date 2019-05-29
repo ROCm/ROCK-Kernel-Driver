@@ -29,8 +29,8 @@
 #include <linux/sync_file.h>
 #endif
 #include <drm/drmP.h>
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 #include <drm/amdgpu_drm.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 #include <drm/drm_syncobj.h>
 #endif
 #include "amdgpu.h"
@@ -224,12 +224,10 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
-#endif
-		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
 #endif
@@ -841,7 +839,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 	if (error && backoff)
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
 #if !defined(BUILD_AS_DKMS)
@@ -1161,7 +1159,7 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 	return 0;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 						 uint32_t handle, u64 point,
 						 u64 flags)
@@ -1323,7 +1321,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 			if (r)
 				return r;
 			break;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 			r = amdgpu_cs_process_syncobj_in_dep(p, chunk);
 			if (r)
@@ -1351,7 +1349,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
@@ -1410,7 +1408,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
 	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 	amdgpu_cs_post_dependencies(p);
 #endif
 
