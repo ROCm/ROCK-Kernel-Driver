@@ -144,7 +144,7 @@ uint amdgpu_dc_feature_mask = 0;
 struct amdgpu_mgpu_info mgpu_info = {
 	.mutex = __MUTEX_INITIALIZER(mgpu_info.mutex),
 };
-int amdgpu_ras_enable = -1;
+int amdgpu_ras_enable = 0;
 uint amdgpu_ras_mask = 0xffffffff;
 
 /**
