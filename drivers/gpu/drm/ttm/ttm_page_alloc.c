@@ -434,7 +434,12 @@ static int ttm_pool_mm_shrink_init(struct ttm_pool_manager *manager)
 	manager->mm_shrink.count_objects = ttm_pool_shrink_count;
 	manager->mm_shrink.scan_objects = ttm_pool_shrink_scan;
 	manager->mm_shrink.seeks = 1;
+#if defined(HAVE_INT_REGISTER_SHRINKER)
 	return register_shrinker(&manager->mm_shrink);
+#else
+	register_shrinker(&manager->mm_shrink);
+	return 0;
+#endif
 }
 
 static void ttm_pool_mm_shrink_fini(struct ttm_pool_manager *manager)

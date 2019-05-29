@@ -112,6 +112,7 @@ m4_include([m4/ktime-get-boottime-ns.m4])
 m4_include([m4/invalidate-range-start.m4])
 m4_include([m4/mm-interval-tree-define.m4])
 m4_include([m4/list-bulk-move-tail.m4])
+m4_include([m4/mm-register-shrinker.m4])
 m4_include([m4/config.m4])
 
 
