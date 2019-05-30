@@ -5,6 +5,7 @@
 #include <linux/kconfig.h>
 #include <drm/drmP.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_dp_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
@@ -23,26 +24,56 @@
 #include <drm/drm_color_mgmt.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
+#endif
 
+#ifndef DP_TEST_MISC0
 #define DP_TEST_MISC0                       0x232
+#endif
 
+#ifndef DP_TEST_PHY_PATTERN
 #define DP_TEST_PHY_PATTERN                 0x248
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_7_0
 #define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_15_8
 #define DP_TEST_80BIT_CUSTOM_PATTERN_15_8   0x251
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_23_16
 #define DP_TEST_80BIT_CUSTOM_PATTERN_23_16  0x252
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_31_24
 #define DP_TEST_80BIT_CUSTOM_PATTERN_31_24  0x253
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_39_32
 #define DP_TEST_80BIT_CUSTOM_PATTERN_39_32  0x254
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_47_40
 #define DP_TEST_80BIT_CUSTOM_PATTERN_47_40  0x255
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_55_48
 #define DP_TEST_80BIT_CUSTOM_PATTERN_55_48  0x256
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_63_56
 #define DP_TEST_80BIT_CUSTOM_PATTERN_63_56  0x257
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_71_64
 #define DP_TEST_80BIT_CUSTOM_PATTERN_71_64  0x258
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_79_72
 #define DP_TEST_80BIT_CUSTOM_PATTERN_79_72  0x259
+#endif
 
+#ifndef DP_BRANCH_REVISION_START
 #define DP_BRANCH_REVISION_START            0x509
+#endif
 
+#ifndef DP_DP13_DPCD_REV
 #define DP_DP13_DPCD_REV                    0x2200
+#endif
+#ifndef DP_DP13_MAX_LINK_RATE
 #define DP_DP13_MAX_LINK_RATE               0x2201
 #endif
 
