@@ -253,10 +253,13 @@ int smu_feature_init_dpm(struct smu_context *smu)
 	return ret;
 }
 
-int smu_feature_is_enabled(struct smu_context *smu, int feature_id)
+int smu_feature_is_enabled(struct smu_context *smu, enum smu_feature_mask mask)
 {
 	struct smu_feature *feature = &smu->smu_feature;
+	uint32_t feature_id;
 	int ret = 0;
+
+	feature_id = smu_feature_get_index(smu, mask);
 
 	WARN_ON(feature_id > feature->feature_num);
 
@@ -267,10 +270,14 @@ int smu_feature_is_enabled(struct smu_context *smu, int feature_id)
 	return ret;
 }
 
-int smu_feature_set_enabled(struct smu_context *smu, int feature_id, bool enable)
+int smu_feature_set_enabled(struct smu_context *smu, enum smu_feature_mask mask,
+			    bool enable)
 {
 	struct smu_feature *feature = &smu->smu_feature;
+	uint32_t feature_id;
 	int ret = 0;
+
+	feature_id = smu_feature_get_index(smu, mask);
 
 	WARN_ON(feature_id > feature->feature_num);
 
@@ -290,10 +297,13 @@ failed:
 	return ret;
 }
 
-int smu_feature_is_supported(struct smu_context *smu, int feature_id)
+int smu_feature_is_supported(struct smu_context *smu, enum smu_feature_mask mask)
 {
 	struct smu_feature *feature = &smu->smu_feature;
+	uint32_t feature_id;
 	int ret = 0;
+
+	feature_id = smu_feature_get_index(smu, mask);
 
 	WARN_ON(feature_id > feature->feature_num);
 
@@ -304,11 +314,15 @@ int smu_feature_is_supported(struct smu_context *smu, int feature_id)
 	return ret;
 }
 
-int smu_feature_set_supported(struct smu_context *smu, int feature_id,
+int smu_feature_set_supported(struct smu_context *smu,
+			      enum smu_feature_mask mask,
 			      bool enable)
 {
 	struct smu_feature *feature = &smu->smu_feature;
+	uint32_t feature_id;
 	int ret = 0;
+
+	feature_id = smu_feature_get_index(smu, mask);
 
 	WARN_ON(feature_id > feature->feature_num);
 
