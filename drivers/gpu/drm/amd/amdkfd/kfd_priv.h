@@ -105,6 +105,8 @@
 
 #define KFD_KERNEL_QUEUE_SIZE 2048
 
+#define KFD_UNMAP_LATENCY_MS	(4000)
+
 /*
  * 512 = 0x200
  * The doorbell index distance between SDMA RLC (2*i) and (2*i+1) in the
@@ -166,6 +168,11 @@ extern int halt_if_hws_hang;
  * Whether MEC FW support GWS barriers
  */
 extern bool hws_gws_support;
+
+/*
+ * Queue preemption timeout in ms
+ */
+extern int queue_preemption_timeout_ms;
 
 enum cache_policy {
 	cache_policy_coherent,
