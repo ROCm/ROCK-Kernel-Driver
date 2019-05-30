@@ -115,6 +115,8 @@ struct drm_device;
 
 #define KFD_KERNEL_QUEUE_SIZE 2048
 
+#define KFD_UNMAP_LATENCY_MS	(4000)
+
 /*
  * 512 = 0x200
  * The doorbell index distance between SDMA RLC (2*i) and (2*i+1) in the
@@ -186,6 +188,11 @@ extern bool hws_gws_support;
  * Restore evicted process only if queues are active
  */
 extern bool keep_idle_process_evicted;
+
+/*
+ * Queue preemption timeout in ms
+ */
+extern int queue_preemption_timeout_ms;
 
 enum cache_policy {
 	cache_policy_coherent,
