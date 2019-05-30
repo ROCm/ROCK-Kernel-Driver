@@ -192,6 +192,10 @@ enum cache_policy {
 	cache_policy_noncoherent
 };
 
+#define KFD_IS_VI(chip) ((chip) >= CHIP_CARRIZO && (chip) <= CHIP_POLARIS11)
+#define KFD_IS_DGPU(chip) (((chip) >= CHIP_TONGA && \
+			   (chip) <= CHIP_NAVI10) || \
+			   (chip) == CHIP_HAWAII)
 #define KFD_IS_SOC15(chip) ((chip) >= CHIP_VEGA10)
 
 struct kfd_event_interrupt_class {
@@ -997,6 +1001,8 @@ struct mqd_manager *mqd_manager_init_vi_tonga(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
 struct mqd_manager *mqd_manager_init_v9(enum KFD_MQD_TYPE type,
 		struct kfd_dev *dev);
+struct mqd_manager *mqd_manager_init_v10(enum KFD_MQD_TYPE type,
+		struct kfd_dev *dev);
 struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev);
 void device_queue_manager_uninit(struct device_queue_manager *dqm);
 struct kernel_queue *kernel_queue_init(struct kfd_dev *dev,
@@ -1086,6 +1092,7 @@ struct packet_manager_funcs {
 
 extern const struct packet_manager_funcs kfd_vi_pm_funcs;
 extern const struct packet_manager_funcs kfd_v9_pm_funcs;
+extern const struct packet_manager_funcs kfd_v10_pm_funcs;
 
 int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm);
 void pm_uninit(struct packet_manager *pm);
@@ -1106,6 +1113,7 @@ void pm_release_ib(struct packet_manager *pm);
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
                                struct scheduling_resources *res);
+void kfd_pm_func_init_v10(struct packet_manager *pm, uint16_t fw_ver);
 
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
 
