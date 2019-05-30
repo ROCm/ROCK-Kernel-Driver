@@ -1120,6 +1120,8 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 
 void pm_release_ib(struct packet_manager *pm);
 
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period);
+
 /* Following PM funcs can be shared among VI and AI */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);
 int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,

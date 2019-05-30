@@ -223,6 +223,9 @@ static int pm_set_grace_period_v9(struct packet_manager *pm,
 			&reg_offset,
 			&reg_data);
 
+	if (grace_period == USE_DEFAULT_GRACE_PERIOD)
+		reg_data = pm->dqm->wait_times;
+
 	packet = (struct pm4_mec_write_data_mmio *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mec_write_data_mmio));
 

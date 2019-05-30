@@ -34,6 +34,8 @@
 #include "kfd_mqd_manager.h"
 
 
+#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
+
 struct device_process_node {
 	struct qcm_process_device *qpd;
 	struct list_head list;
