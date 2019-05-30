@@ -77,12 +77,20 @@
 #define DP_DP13_MAX_LINK_RATE               0x2201
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0)
+#ifndef DRM_MODE_ROTATE_0
 #define DRM_MODE_ROTATE_0       (1<<0)
+#endif
+#ifndef DRM_MODE_ROTATE_90
 #define DRM_MODE_ROTATE_90      (1<<1)
+#endif
+#ifndef DRM_MODE_ROTATE_180
 #define DRM_MODE_ROTATE_180     (1<<2)
+#endif
+#ifndef DRM_MODE_ROTATE_270
 #define DRM_MODE_ROTATE_270     (1<<3)
+#endif
 
+#ifndef DRM_MODE_ROTATE_MASK
 #define DRM_MODE_ROTATE_MASK (\
 		DRM_MODE_ROTATE_0  | \
 		DRM_MODE_ROTATE_90  | \
