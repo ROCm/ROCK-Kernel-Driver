@@ -24,7 +24,9 @@
 #ifndef __AMDGPU_IRQ_H__
 #define __AMDGPU_IRQ_H__
 
+#if defined(HAVE_IRQ_DOMAIN)
 #include <linux/irqdomain.h>
+#endif
 #include "soc15_ih_clientid.h"
 #include "amdgpu_ih.h"
 
@@ -93,9 +95,11 @@ struct amdgpu_irq {
 	struct work_struct		ih1_work, ih2_work;
 	struct amdgpu_irq_src		self_irq;
 
+#if defined(HAVE_IRQ_DOMAIN)
 	/* gen irq stuff */
 	struct irq_domain		*domain; /* GPU irq controller domain */
 	unsigned			virq[AMDGPU_MAX_IRQ_SRC_ID];
+#endif
 	uint32_t                        srbm_soft_reset;
 };
 
@@ -118,9 +122,10 @@ int amdgpu_irq_put(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 bool amdgpu_irq_enabled(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 			unsigned type);
 void amdgpu_irq_gpu_reset_resume_helper(struct amdgpu_device *adev);
-
+#if defined(HAVE_IRQ_DOMAIN)
 int amdgpu_irq_add_domain(struct amdgpu_device *adev);
 void amdgpu_irq_remove_domain(struct amdgpu_device *adev);
 unsigned amdgpu_irq_create_mapping(struct amdgpu_device *adev, unsigned src_id);
+#endif
 
 #endif

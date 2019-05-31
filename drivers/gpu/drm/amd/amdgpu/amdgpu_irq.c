@@ -435,9 +435,10 @@ void amdgpu_irq_dispatch(struct amdgpu_device *adev,
 
 	} else	if (src_id >= AMDGPU_MAX_IRQ_SRC_ID) {
 		DRM_DEBUG("Invalid src_id in IV: %d\n", src_id);
-
+#if defined(HAVE_IRQ_DOMAIN)
 	} else if (adev->irq.virq[src_id]) {
 		generic_handle_irq(irq_find_mapping(adev->irq.domain, src_id));
+#endif
 
 	} else if (!adev->irq.client[client_id].sources) {
 		DRM_DEBUG("Unregistered interrupt client_id: %d src_id: %d\n",
@@ -604,6 +605,7 @@ bool amdgpu_irq_enabled(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 	return !!atomic_read(&src->enabled_types[type]);
 }
 
+#if defined(HAVE_IRQ_DOMAIN)
 /* XXX: Generic IRQ handling */
 static void amdgpu_irq_mask(struct irq_data *irqd)
 {
@@ -709,3 +711,4 @@ unsigned amdgpu_irq_create_mapping(struct amdgpu_device *adev, unsigned src_id)
 
 	return adev->irq.virq[src_id];
 }
+#endif
