@@ -1204,25 +1204,6 @@ static int pp_get_display_mode_validation_clocks(void *handle,
 	return ret;
 }
 
-static bool pp_is_smc_ram_running(void *handle)
-{
-	struct pp_hwmgr *hwmgr = handle;
-
-	bool ret = false;
-
-	if (!hwmgr)
-		return false;
-
-	if (!hwmgr->smumgr_funcs->is_smc_ram_running)
-		return false;
-
-	mutex_lock(&hwmgr->smu_lock);
-	ret = hwmgr->smumgr_funcs->is_smc_ram_running(hwmgr);
-	mutex_unlock(&hwmgr->smu_lock);
-
-	return ret;
-}
-
 static int pp_dpm_powergate_mmhub(void *handle)
 {
 	struct pp_hwmgr *hwmgr = handle;
@@ -1546,7 +1527,6 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.odn_edit_dpm_table = pp_odn_edit_dpm_table,
 	.set_power_limit = pp_set_power_limit,
 	.get_power_limit = pp_get_power_limit,
-	.is_smc_ram_running = pp_is_smc_ram_running,
 /* export to DC */
 	.get_sclk = pp_dpm_get_sclk,
 	.get_mclk = pp_dpm_get_mclk,
