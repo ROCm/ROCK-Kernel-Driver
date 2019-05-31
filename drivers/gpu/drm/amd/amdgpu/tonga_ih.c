@@ -263,7 +263,7 @@ static void tonga_ih_set_rptr(struct amdgpu_device *adev,
 static int tonga_ih_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+#if defined(HAVE_IRQ_DOMAIN)
 	int ret;
 
 	ret = amdgpu_irq_add_domain(adev);
@@ -299,7 +299,7 @@ static int tonga_ih_sw_fini(void *handle)
 
 	amdgpu_irq_fini(adev);
 	amdgpu_ih_ring_fini(adev, &adev->irq.ih);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+#if defined(HAVE_IRQ_DOMAIN)
 	amdgpu_irq_remove_domain(adev);
 #endif
 
