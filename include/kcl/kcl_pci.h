@@ -106,7 +106,7 @@ static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
 {
 #if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0))
-	_kcl_pci_create_measure_file(pdev);
+	return _kcl_pci_create_measure_file(pdev);
 #else
 	return 0;
 #endif
