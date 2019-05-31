@@ -142,12 +142,6 @@ struct amdgpu_mgpu_info mgpu_info = {
 };
 int amdgpu_ras_enable = -1;
 uint amdgpu_ras_mask = 0xffffffff;
-int amdgpu_peermem_size = 16;
-int amdgpu_skip_golden_regs = 1;
-int amdgpu_force_vram_lost = 1;
-
-MODULE_PARM_DESC(vramlost, "force vram lost after hw reset, default is enable");
-module_param_named(vramlost, amdgpu_force_vram_lost, int, 0600);
 
 /**
  * DOC: vramlimit (int)
