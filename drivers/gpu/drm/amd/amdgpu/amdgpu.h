@@ -161,9 +161,6 @@ extern uint amdgpu_dc_feature_mask;
 extern struct amdgpu_mgpu_info mgpu_info;
 extern int amdgpu_ras_enable;
 extern uint amdgpu_ras_mask;
-extern int amdgpu_peermem_size;
-extern int amdgpu_skip_golden_regs;
-extern int amdgpu_force_vram_lost;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;
