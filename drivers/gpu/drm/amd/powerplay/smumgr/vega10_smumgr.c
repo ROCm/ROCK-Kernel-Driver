@@ -357,5 +357,4 @@ const struct pp_smumgr_func vega10_smu_funcs = {
 	.is_dpm_running = vega10_is_dpm_running,
 	.get_argument = smu9_get_argument,
 	.smc_table_manager = vega10_smc_table_manager,
-	.is_smc_ram_running = &smu9_is_smc_ram_running,
 };
