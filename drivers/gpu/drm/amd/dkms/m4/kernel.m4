@@ -210,3 +210,76 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 	[test -s build/conftest.o],
 	[$3], [$4])
 ])
+
+dnl #
+dnl # AC_KERNEL_CHECK_SYMBOL_EXPORT
+dnl # check symbol exported or not
+dnl #
+AC_DEFUN([AC_KERNEL_CHECK_SYMBOL_EXPORT], [
+	awk -v s="$1" '
+		BEGIN {
+			n = 0;
+			num = split(s, symbols, " ")
+		} {
+			for (i in symbols)
+				if (symbols[[i]] == $[2])
+					n++
+		} END {
+			if (num == n)
+				exit 0;
+			else
+				exit 1
+		}' $LINUX_OBJ/$LINUX_SYMBOLS 2>/dev/null
+	rc=$?
+	if test $rc -ne 0; then
+		n=0
+		export=0
+		for file in $2; do
+			n=$(awk -v s="$1" '
+				BEGIN {
+					n = 0;
+					split(s, symbols, " ")
+				} {
+					for (i in symbols) {
+						s="EXPORT_SYMBOL.*"symbols[[i]];
+						if ($[0] ~ s)
+							n++
+					}
+				} END {
+					print n
+				}' $LINUX/$file 2>/dev/null)
+			rc=$?
+			if test $rc -eq 0; then
+				(( export+=n ))
+			fi
+		done
+		if test $(wc -w <<< "$1") -eq $export; then :
+			$3
+		else :
+			$4
+		fi
+	else :
+		$3
+	fi
+])
+
+dnl #
+dnl # AC_KERNEL_TRY_COMPILE_SYMBOL
+dnl # like AC_KERNEL_TRY_COMPILE, except AC_KERNEL_CHECK_SYMBOL_EXPORT
+dnl # is called if not compiling for builtin
+dnl #
+AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
+	AC_KERNEL_TRY_COMPILE([$1], [$2], [rc=0], [rc=1])
+	if test $rc -ne 0; then :
+		$6
+	else
+		if test "x$enable_linux_builtin" != xyes; then
+			AC_KERNEL_CHECK_SYMBOL_EXPORT([$3], [$4], [rc=0], [rc=1])
+		fi
+		if test $rc -ne 0; then :
+			$6
+		else :
+			$5
+		fi
+	fi
+])
