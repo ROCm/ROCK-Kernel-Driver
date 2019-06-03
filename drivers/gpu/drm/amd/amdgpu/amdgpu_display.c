@@ -934,7 +934,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 					 amdgpu_dither_enum_list, sz);
 
 	if (amdgpu_device_has_dc_support(adev)) {
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
 		adev->mode_info.max_bpc_property =
 			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)

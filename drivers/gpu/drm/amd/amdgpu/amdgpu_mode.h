@@ -370,7 +370,7 @@ struct amdgpu_mode_info {
 	struct drm_property *audio_property;
 	/* FMT dithering */
 	struct drm_property *dither_property;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
 	/* maximum number of bits per channel for monitor color */
 	struct drm_property *max_bpc_property;
 #endif

@@ -381,7 +381,7 @@ struct dm_connector_state {
 	enum amdgpu_rmx_type scaling;
 	uint8_t underscan_vborder;
 	uint8_t underscan_hborder;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
 	uint8_t max_bpc;
 #endif
 	bool underscan_enable;
