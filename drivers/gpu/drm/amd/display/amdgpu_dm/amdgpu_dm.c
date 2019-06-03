@@ -4038,7 +4038,7 @@ static void amdgpu_dm_atomic_crtc_gamma_set(
 	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
 }
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR) && !defined(HAVE_VRR_ENABLED_IN_STRUCT_DM_CRTC_STATE)
 static int dm_crtc_funcs_atomic_set_property(
 	struct drm_crtc *crtc,
 	struct drm_crtc_state *crtc_state,
@@ -4304,7 +4304,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR) && !defined(HAVE_VRR_ENABLED_IN_STRUCT_DM_CRTC_STATE)
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
@@ -5295,7 +5295,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (res)
 		goto fail;
 
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR)
 	drm_object_attach_property(&acrtc->base.base,
 				   dm->adev->mode_info.vrr_enabled_property,
 				   0);
@@ -5604,7 +5604,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
 	    connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
 	    connector_type == DRM_MODE_CONNECTOR_eDP) {
-#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
+#if defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR)
 		drm_connector_attach_vrr_capable_property(
 			&aconnector->base);
 #else
@@ -8322,7 +8322,7 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 update:
 	if (dm_con_state)
 		dm_con_state->freesync_capable = freesync_capable;
-#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
+#if defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR)
 	if (connector->vrr_capable_property)
 		drm_connector_set_vrr_capable_property(connector,
 						       freesync_capable);
