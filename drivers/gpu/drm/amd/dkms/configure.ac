@@ -126,6 +126,7 @@ m4_include([m4/dma-fence-get-stub.m4])
 m4_include([m4/invalidate-range-start.m4])
 m4_include([m4/irq-domain.m4])
 m4_include([m4/zone-managed-pages.m4])
+m4_include([m4/bin-attrs-in-attribute-group.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
