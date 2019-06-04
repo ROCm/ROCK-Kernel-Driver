@@ -88,4 +88,17 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 }
 #endif
 
+#if !defined(HAVE_ZONE_MANAGED_PAGES)
+static inline unsigned long zone_managed_pages(struct zone *zone)
+{
+#if defined(HAVE_STRUCT_ZONE_MANAGED_PAGES)
+	return (unsigned long)zone->managed_pages;
+#else
+	/* zone->managed_pages is introduced in v3.7-4152-g9feedc9d831e */
+	WARN_ONCE(1, "struct zone->managed_pages don't exist. kernel is a bit old...");
+	return 0;
+#endif
+}
+#endif /* HAVE_ZONE_MANAGED_PAGES */
+
 #endif /* AMDKCL_MM_H */
