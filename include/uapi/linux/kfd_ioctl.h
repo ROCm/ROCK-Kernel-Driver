@@ -665,6 +665,6 @@ enum kfd_mmio_remap {
 		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x22
+#define AMDKFD_COMMAND_END		0x23
 
 #endif
