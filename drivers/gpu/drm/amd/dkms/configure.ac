@@ -91,6 +91,7 @@ m4_include([m4/pci-upstream-bridge.m4])
 m4_include([m4/pcie-bandwidth-available.m4])
 m4_include([m4/pci.m4])
 m4_include([m4/perf-event-update-userpage.m4])
+m4_include([m4/ptrace-parent.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
