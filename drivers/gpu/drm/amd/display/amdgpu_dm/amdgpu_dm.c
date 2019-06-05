@@ -3347,6 +3347,10 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 			to_dm_connector_state(state);
 #endif
 	uint32_t bpc = connector->display_info.bpc;
+
+	if (!state)
+		state = connector->state;
+
 #if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	/* TODO: Remove this when there's support for max_bpc in drm */
 	if (dm_conn_state && bpc > dm_conn_state->max_bpc)
@@ -4342,6 +4346,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 #if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		state->max_bpc = 8;
 #endif
+		state->base.max_requested_bpc = 8;
 
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
 			state->abm_level = amdgpu_dm_abm_level;
