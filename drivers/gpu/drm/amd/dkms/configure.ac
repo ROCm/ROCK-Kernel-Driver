@@ -115,6 +115,7 @@ m4_include([m4/list-bulk-move-tail.m4])
 m4_include([m4/mm-register-shrinker.m4])
 m4_include([m4/irq-domain.m4])
 m4_include([m4/zone-managed-pages.m4])
+m4_include([m4/access-ok.m4])
 m4_include([m4/config.m4])
 
 
