@@ -120,4 +120,19 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 #endif
 }
 
+#if !defined(HAVE_ZONE_MANAGED_PAGES)
+static inline unsigned long zone_managed_pages(struct zone *zone)
+{
+#if defined(HAVE_ATOMIC_MANAGED_PAGES_IN_STRUCT_ZONE)
+	return (unsigned long)atomic_long_read(&zone->managed_pages);
+#elif defined(HAVE_MANAGED_PAGES_IN_STRUCT_ZONE)
+	return (unsigned long)zone->managed_pages;
+#else
+	/* zone->managed_pages is introduced in v3.7-4152-g9feedc9d831e */
+	WARN_ONCE(1, "struct zone->managed_pages don't exist. kernel is a bit old...");
+	return 0;
+#endif
+}
+#endif
+
 #endif /* AMDKCL_MM_H */

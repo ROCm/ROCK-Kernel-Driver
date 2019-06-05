@@ -839,13 +839,6 @@ static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
 	return 0;
 }
 
-#if !defined(HAVE_ZONE_MANAGED_PAGES)
-static inline unsigned long zone_managed_pages(struct zone *zone)
-{
-	return (unsigned long)zone->managed_pages;
-}
-#endif
-
 /* kfd_fill_mem_info_for_cpu - Fill in Memory info for the given CPU NUMA node
  *
  *	@numa_node_id: CPU NUMA node id
