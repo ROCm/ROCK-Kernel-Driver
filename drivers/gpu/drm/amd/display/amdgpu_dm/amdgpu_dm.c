@@ -3218,7 +3218,7 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*per_pixel_alpha = false;
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
-#if defined(HAVE_PIXEL_BLEND_MODE_IN_STRUCT_DRM_PLANE_STATE)
+#if defined(HAVE_PIXEL_BLEND_MODE_IN_STRUCT_DRM_PLANE_STATE) && defined(HAVE_ALPHA_IN_STRUCT_DRM_PLANE_STATE)
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -5233,7 +5233,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 				       NULL, plane->type, NULL);
 	if (res)
 		return res;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#if defined(HAVE_PIXEL_BLEND_MODE_IN_STRUCT_DRM_PLANE_STATE) && defined(HAVE_ALPHA_IN_STRUCT_DRM_PLANE_STATE)
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
