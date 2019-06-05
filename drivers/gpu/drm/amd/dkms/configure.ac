@@ -64,6 +64,7 @@ m4_include([m4/access-ok.m4])
 m4_include([m4/bin-attrs-in-attribute-group.m4])
 m4_include([m4/ptrace-parent.m4])
 m4_include([m4/destroy-work-on-stack.m4])
+m4_include([m4/managed-pages-in-struct-zone.m4])
 m4_include([m4/config.m4])
 
 
