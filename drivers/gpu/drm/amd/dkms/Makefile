@@ -74,15 +74,33 @@ subdir-ccflags-y += -DOS_NAME_SUSE_15
 endif
 endif
 
+ifeq ($(OS_NAME),"opensuse-leap")
+ifeq ($(OS_VERSION),"15.1")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_1
+endif
+endif
+
 ifeq ($(OS_NAME),"sled")
 ifeq ($(OS_VERSION),"15")
 subdir-ccflags-y += -DOS_NAME_SUSE_15
 endif
 endif
 
+ifeq ($(OS_NAME),"sled")
+ifeq ($(OS_VERSION),"15.1")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_1
+endif
+endif
+
 ifeq ($(OS_NAME),"sles")
 ifeq ($(OS_VERSION),"15")
 subdir-ccflags-y += -DOS_NAME_SUSE_15
+endif
+endif
+
+ifeq ($(OS_NAME),"sles")
+ifeq ($(OS_VERSION),"15.1")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_1
 endif
 endif
 
