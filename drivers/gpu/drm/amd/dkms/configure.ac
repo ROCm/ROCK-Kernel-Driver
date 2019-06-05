@@ -73,6 +73,7 @@ m4_include([m4/kallsyms-lookup-name.m4])
 m4_include([m4/overflow-h.m4])
 m4_include([m4/perf-event-update-userpage.m4])
 m4_include([m4/memremap-devm-memremap-pages.m4])
+m4_include([m4/ptrace-parent.m4])
 m4_include([m4/config.m4])
 
 
