@@ -41,4 +41,5 @@
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_perf_event.h>
+#include <kcl/kcl_ptrace.h>
 #endif /* AMDGPU_BACKPORT_H */
