@@ -27,7 +27,8 @@ const unsigned char _kcl_pcie_link_speed_stub[] = {
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
-	!defined(OS_NAME_RHEL_7_6)
+	!defined(OS_NAME_RHEL_7_6) && \
+	!defined(OS_NAME_SUSE_15_1)
 /**
  * pci_enable_atomic_ops_to_root - enable AtomicOp requests to root port
  * @dev: the PCI device
@@ -114,7 +115,8 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15_1)
 /*
  * pcie_get_speed_cap - query for the PCI device's link speed capability
  * @dev: PCI device to query

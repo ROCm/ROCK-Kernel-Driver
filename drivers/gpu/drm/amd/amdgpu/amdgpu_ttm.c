@@ -832,7 +832,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 release_pages:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	release_pages(pages, pinned, 0);
 #else
 	release_pages(pages, pinned);
@@ -1834,7 +1834,8 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	if (rc)
 		return rc;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
+	defined(OS_NAME_SUSE_15_1)
 	adev->ssg.pgmap.res.start = res.start;
 	adev->ssg.pgmap.res.end = res.end;
 	adev->ssg.pgmap.res.name = res.name;

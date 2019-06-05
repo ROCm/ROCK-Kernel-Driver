@@ -303,7 +303,7 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     const char *name, ...)
 {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-	defined(OS_NAME_SUSE_15)
+	defined(OS_NAME_SUSE_15) || defined(OS_NAME_SUSE_15_1)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, format_modifiers, type, name);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
@@ -359,13 +359,13 @@ static inline int
 kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 					  unsigned int pipe,
 					  int *max_error,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
 					  ktime_t *vblank_time,
 #else
 					  struct timeval *vblank_time,
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 					  unsigned flags,
 #else
 					  bool in_vblank_irq,
@@ -380,7 +380,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, refcrtc, mode);
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
 						     flags, mode);
 #else
@@ -651,7 +651,7 @@ void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 #define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
 #endif
 

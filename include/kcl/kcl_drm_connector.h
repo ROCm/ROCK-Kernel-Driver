@@ -4,7 +4,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drmP.h>
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0) && !defined(OS_NAME_SUSE_15_1)
 #define drm_connector_update_edid_property drm_mode_connector_update_edid_property
 #define drm_connector_attach_encoder drm_mode_connector_attach_encoder
 #define drm_connector_set_path_property drm_mode_connector_set_path_property

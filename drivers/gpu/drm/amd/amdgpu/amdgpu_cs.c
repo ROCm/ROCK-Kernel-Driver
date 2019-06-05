@@ -654,7 +654,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				 * invalidated it. Free it and try again
 				 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
@@ -793,7 +793,7 @@ error_free_pages:
 		if (!e->user_pages)
 			continue;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages, false);
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);

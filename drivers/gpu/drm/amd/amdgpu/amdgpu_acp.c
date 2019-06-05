@@ -457,7 +457,7 @@ static int acp_hw_fini(void *handle)
 
 	for (i = 0; i < ACP_DEVS ; i++) {
 		dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(OS_NAME_SUSE_15_1)
 		ret = pm_genpd_remove_device(dev);
 #else
 		ret = pm_genpd_remove_device(&adev->acp.acp_genpd->gpd, dev);

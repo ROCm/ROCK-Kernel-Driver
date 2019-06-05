@@ -157,7 +157,8 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 			       &crcs[0], &crcs[1], &crcs[2]))
 		return;
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-	defined(OS_NAME_SUSE_15)
+	defined(OS_NAME_SUSE_15) || \
+	defined(OS_NAME_SUSE_15_1)
 	drm_crtc_add_crc_entry(crtc, true,
 			       drm_crtc_accurate_vblank_count(crtc), crcs);
 #else

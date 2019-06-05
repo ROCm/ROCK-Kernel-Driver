@@ -274,7 +274,7 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 #endif
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
 
 #define for_each_connector_in_state(__state, connector, connector_state, __i) \
 	for ((__i) = 0;							\
@@ -730,7 +730,8 @@ void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS) && \
+	!defined(OS_NAME_SUSE_15_1)
 u64 drm_get_max_iomem(void)
 {
 	struct resource *tmp;

@@ -1185,7 +1185,7 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 	drm_kms_helper_poll_disable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
  	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
@@ -1224,7 +1224,7 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 
 	ret = amdgpu_device_resume(drm_dev, false, false);
 	drm_kms_helper_poll_enable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
@@ -1395,23 +1395,24 @@ amdgpu_get_crtc_scanout_position(struct drm_device *dev, unsigned int pipe,
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP |
+		DRIVER_USE_AGP |
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
-	    DRIVER_ATOMIC |
+		DRIVER_ATOMIC |
 #endif
-	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
-	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET |
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0) && DRM_VERSION_CODE < DRM_VERSION(5, 2, 0)
-		DRIVER_SYNCOBJ,
+		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+		DRIVER_SYNCOBJ |
 #endif
 #if DRM_VERSION_CODE >= DRM_VERSION(5, 2, 0)
-		RIVER_SYNCOBJ | DRIVER_SYNCOBJ_TIMELINE,
+		DRIVER_SYNCOBJ_TIMELINE |
 #endif
+		DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
+
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
 	.set_busid = drm_pci_set_busid,
 #endif
 	.unload = amdgpu_driver_unload_kms,
@@ -1419,7 +1420,8 @@ static struct drm_driver kms_driver = {
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && \
+	!defined(OS_NAME_SUSE_15_1)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
 #else

@@ -244,7 +244,7 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 
 	/* Wake up pending waiters. They will return failure */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -406,7 +406,7 @@ static void set_event(struct kfd_event *ev)
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
