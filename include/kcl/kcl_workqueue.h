@@ -15,4 +15,16 @@
 extern struct workqueue_struct *system_highpri_wq;
 #endif
 
+#ifndef INIT_WORK_ONSTACK
+#ifdef __INIT_WORK
+#define INIT_WORK_ONSTACK(_work, _func) __INIT_WORK((_work), (_func), 1)
+#else
+#define INIT_WORK_ONSTACK(_work, _func) INIT_WORK((_work), (_func))
+#endif
+#endif
+
+#if !defined(HAVE_DESTROY_WORK_ON_STACK)
+static inline void destroy_work_on_stack(struct work_struct *work) { }
+#endif
+
 #endif
