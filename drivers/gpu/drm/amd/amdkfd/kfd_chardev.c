@@ -50,7 +50,7 @@
 #include "amdgpu_amdkfd.h"
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+#if !defined(HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS)
 #define kcl_access_ok(addr, size) access_ok(VERIFY_WRITE, (addr), (size))
 #else
 #define kcl_access_ok(addr, size) access_ok((addr), (size))

@@ -60,6 +60,7 @@ m4_include([m4/amdgpu-chunk-id-syncobj.m4])
 m4_include([m4/irq-domain.m4])
 m4_include([m4/invalidate-range-end.m4])
 m4_include([m4/zone-managed-pages.m4])
+m4_include([m4/access-ok.m4])
 m4_include([m4/config.m4])
 
 
