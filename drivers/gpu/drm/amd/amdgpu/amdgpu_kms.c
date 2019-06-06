@@ -225,7 +225,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	}
 
 	if (amdgpu_device_is_px(dev)) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) || defined(OS_NAME_RHEL_7_6)
+#if defined(HAVE_DEV_PM_SET_DRIVER_FLAGS)
 		dev_pm_set_driver_flags(dev->dev, DPM_FLAG_NEVER_SKIP);
 #endif
 		pm_runtime_use_autosuspend(dev->dev);
