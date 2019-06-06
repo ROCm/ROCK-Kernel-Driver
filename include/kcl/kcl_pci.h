@@ -18,8 +18,7 @@ extern const unsigned char *_kcl_pcie_link_speed;
 
 #define kcl_pcie_link_speed _kcl_pcie_link_speed
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
-	!defined(OS_NAME_RHEL_7_6)
+#if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
