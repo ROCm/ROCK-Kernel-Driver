@@ -27,4 +27,8 @@ static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 #endif
 }
 
+#if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
+int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
+#endif
+
 #endif /* AMDKCL_PCI_H */
