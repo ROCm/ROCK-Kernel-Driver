@@ -3236,9 +3236,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
-	/* In case of gamma set, update gamma value */
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-	if (crtc_state->gamma_lut)
 	ret = fill_dc_plane_info_and_addr(adev, plane_state, tiling_flags,
 					  &plane_info,
 					  &dc_plane_state->address);
