@@ -672,7 +672,6 @@ static ssize_t dp_phy_test_pattern_debugfs_write(struct file *f, const char __us
 	return bytes_from_user;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 /*
  * Returns the current and maximum output bpc for the connector.
  * Example usage: cat /sys/kernel/debug/dri/0/DP-1/output_bpc
@@ -755,7 +754,6 @@ static int vrr_range_show(struct seq_file *m, void *data)
 
 	return 0;
 }
-#endif
 
 /* function description
  *
@@ -935,9 +933,7 @@ static const struct {
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
 		{"test_pattern", &dp_phy_test_pattern_fops},
 		{"output_bpc", &output_bpc_fops},
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
 		{"vrr_range", &vrr_range_fops},
-#endif
 		{"sdp_message", &sdp_message_fops},
 		{"aux_dpcd_address", &dp_dpcd_address_debugfs_fops},
 		{"aux_dpcd_size", &dp_dpcd_size_debugfs_fops},
