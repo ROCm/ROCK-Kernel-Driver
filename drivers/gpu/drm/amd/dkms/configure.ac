@@ -95,6 +95,7 @@ m4_include([m4/drm-dev-put.m4])
 m4_include([m4/timer-setup.m4])
 m4_include([m4/pcie-enable-atomic-ops-to-root.m4])
 m4_include([m4/pci-is-thunderbolt-attached.m4])
+m4_include([m4/pci-pcie-type.m4])
 m4_include([m4/config.m4])
 
 
