@@ -10,6 +10,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_rect.h>
+#include <drm/drm_modes.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
@@ -533,24 +534,36 @@ struct drm_printer {
 };
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#ifndef DRM_MODE_FMT
 #define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
+#endif
+#ifndef DRM_MODE_ARG
 #define DRM_MODE_ARG(m)	\
 	(m)->base.id, (m)->name, (m)->vrefresh, (m)->clock, \
 	(m)->hdisplay, (m)->hsync_start, (m)->hsync_end, (m)->htotal, \
 	(m)->vdisplay, (m)->vsync_start, (m)->vsync_end, (m)->vtotal, \
 	(m)->type, (m)->flags
+#endif
 
+#ifndef DRM_RECT_FMT
 #define DRM_RECT_FMT	"%dx%d%+d%+d"
+#endif
+#ifndef DRM_RECT_ARG
 #define DRM_RECT_ARG(r) drm_rect_width(r), drm_rect_height(r), (r)->x1, (r)->y1
+#endif
 
+#ifndef DRM_RECT_FP_FMT
 #define DRM_RECT_FP_FMT	"%d.%06ux%d.%06u%+d.%06u%+d.%06u"
+#endif
+#ifndef DRM_RECT_FP_ARG
 #define DRM_RECT_FP_ARG(r) \
 	drm_rect_width(r) >> 16, ((drm_rect_width(r) & 0xffff) * 15625) >> 10, \
 	drm_rect_height(r) >> 16, ((drm_rect_height(r) & 0xffff) * 15625) >> 10, \
 	(r)->x1 >> 16, (((r)->x1 & 0xffff) * 15625) >> 10, \
 	(r)->y1 >> 16, (((r)->y1 & 0xffff) * 15625) >> 10
+#endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 static inline struct drm_rect
 drm_plane_state_src(const struct drm_plane_state *state)
 {
