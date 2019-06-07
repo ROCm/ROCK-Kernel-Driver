@@ -109,6 +109,7 @@ m4_include([m4/system-highpri-wq.m4])
 m4_include([m4/drm-framebuffer-format.m4])
 m4_include([m4/timer-setup.m4])
 m4_include([m4/pci-is-thunderbolt-attached.m4])
+m4_include([m4/pci-pcie-type.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

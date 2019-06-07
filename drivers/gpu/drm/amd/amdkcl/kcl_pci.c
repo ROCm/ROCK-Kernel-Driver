@@ -165,7 +165,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 		/*
 		 * Upstream ports may block AtomicOps on egress.
 		 */
-#if defined(OS_NAME_RHEL_6)
+#if defined(HAVE_PCI_PCIE_TYPE)
 		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM) {
 #else
 		if (!bridge->has_secondary_link) {
