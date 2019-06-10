@@ -3760,7 +3760,7 @@ static void fill_audio_info(struct audio_info *audio_info,
 
 	cea_revision = drm_connector->display_info.cea_rev;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
+#if !defined(HAVE_STRSCPY)
 	strncpy(audio_info->display_name,
 		edid_caps->display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS - 1);
@@ -5411,7 +5411,7 @@ amdgpu_dm_create_common_mode(struct drm_encoder *encoder,
 	mode->hdisplay = hdisplay;
 	mode->vdisplay = vdisplay;
 	mode->type &= ~DRM_MODE_TYPE_PREFERRED;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
+#if !defined(HAVE_STRSCPY)
 	strncpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
 #else
 	strscpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
