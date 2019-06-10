@@ -5548,9 +5548,15 @@ static void fill_audio_info(struct audio_info *audio_info,
 
 	cea_revision = drm_connector->display_info.cea_rev;
 
+#if !defined(HAVE_STRSCPY)
+	strncpy(audio_info->display_name,
+		edid_caps->display_name,
+		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS - 1);
+#else
 	strscpy(audio_info->display_name,
 		edid_caps->display_name,
 		AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
+#endif
 
 	if (cea_revision >= 3) {
 		audio_info->mode_count = edid_caps->audio_mode_count;
@@ -7576,7 +7582,11 @@ amdgpu_dm_create_common_mode(struct drm_encoder *encoder,
 	mode->hdisplay = hdisplay;
 	mode->vdisplay = vdisplay;
 	mode->type &= ~DRM_MODE_TYPE_PREFERRED;
+#if !defined(HAVE_STRSCPY)
+	strncpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
+#else
 	strscpy(mode->name, name, DRM_DISPLAY_MODE_LEN);
+#endif
 
 	return mode;
 
