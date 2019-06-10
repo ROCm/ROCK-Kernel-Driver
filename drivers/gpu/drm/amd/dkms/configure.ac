@@ -112,6 +112,7 @@ m4_include([m4/for-each-oldnew-connector-in-state.m4])
 m4_include([m4/drm-atomic-crtc-needs-modeset.m4])
 m4_include([m4/max-bpc-in-struct-drm-connector-state.m4])
 m4_include([m4/vrr-capable-property-in-struct-drm_connector.m4])
+m4_include([m4/drm-dp-cec-correlation-functions.m4])
 m4_include([m4/config.m4])
 
 
