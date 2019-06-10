@@ -27,13 +27,11 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
 #include <drm/drm_dp_helper.h>
-#endif
 
 static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	drm_dp_cec_irq(aux);
 #endif
 }
@@ -42,14 +40,14 @@ static inline void kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 						 const char *name,
 						 struct device *parent)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	drm_dp_cec_register_connector(aux, name, parent);
 #endif
 }
 
 static inline void kcl_drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	drm_dp_cec_unregister_connector(aux);
 #endif
 }
@@ -57,14 +55,14 @@ static inline void kcl_drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
 static inline void kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
 				       const struct edid *edid)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	drm_dp_cec_set_edid(aux, edid);
 #endif
 }
 
 static inline void kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	drm_dp_cec_unset_edid(aux);
 #endif
 }
