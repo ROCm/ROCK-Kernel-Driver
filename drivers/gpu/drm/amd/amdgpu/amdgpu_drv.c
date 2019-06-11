@@ -1050,7 +1050,7 @@ MODULE_DEVICE_TABLE(pci, pciidlist);
 
 static struct drm_driver kms_driver;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
 {
 	struct apertures_struct *ap;
@@ -1092,7 +1092,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	}
 
 	/* Get rid of things like offb */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 	ret = amdgpu_kick_out_firmware_fb(pdev);
 #else
 	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "amdgpudrmfb");
