@@ -832,7 +832,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 release_pages:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	release_pages(pages, pinned, 0);
 #else
 	release_pages(pages, pinned);
@@ -1834,7 +1834,8 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	if (rc)
 		return rc;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
+	defined(OS_NAME_SUSE_15_1)
 	adev->ssg.pgmap.res.start = res.start;
 	adev->ssg.pgmap.res.end = res.end;
 	adev->ssg.pgmap.res.name = res.name;
@@ -1979,43 +1980,25 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 
 	/* Initialize various on-chip memory pools */
 	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GDS,
-			   adev->gds.mem.total_size);
+			   adev->gds.gds_size);
 	if (r) {
 		DRM_ERROR("Failed initializing GDS heap.\n");
 		return r;
 	}
 
-	r = amdgpu_bo_create_kernel(adev, adev->gds.mem.gfx_partition_size,
-				    4, AMDGPU_GEM_DOMAIN_GDS,
-				    &adev->gds.gds_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
-
 	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GWS,
-			   adev->gds.gws.total_size);
+			   adev->gds.gws_size);
 	if (r) {
 		DRM_ERROR("Failed initializing gws heap.\n");
 		return r;
 	}
 
-	r = amdgpu_bo_create_kernel(adev, adev->gds.gws.gfx_partition_size,
-				    1, AMDGPU_GEM_DOMAIN_GWS,
-				    &adev->gds.gws_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
-
 	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_OA,
-			   adev->gds.oa.total_size);
+			   adev->gds.oa_size);
 	if (r) {
 		DRM_ERROR("Failed initializing oa heap.\n");
 		return r;
 	}
-
-	r = amdgpu_bo_create_kernel(adev, adev->gds.oa.gfx_partition_size,
-				    1, AMDGPU_GEM_DOMAIN_OA,
-				    &adev->gds.oa_gfx_bo, NULL, NULL);
-	if (r)
-		return r;
 
 	/* Register debugfs entries for amdgpu_ttm */
 	r = amdgpu_ttm_debugfs_init(adev);

@@ -289,6 +289,8 @@ static int vega12_set_features_platform_caps(struct pp_hwmgr *hwmgr)
 static void vega12_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 {
 	struct vega12_hwmgr *data = (struct vega12_hwmgr *)(hwmgr->backend);
+	struct amdgpu_device *adev = hwmgr->adev;
+	uint32_t top32, bottom32;
 	int i;
 
 	data->smu_features[GNLD_DPM_PREFETCHER].smu_feature_id =
@@ -353,6 +355,14 @@ static void vega12_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 			((data->registry_data.disallowed_features >> i) & 1) ?
 			false : true;
 	}
+
+	/* Get the SN to turn into a Unique ID */
+	smum_send_msg_to_smc(hwmgr, PPSMC_MSG_ReadSerialNumTop32);
+	top32 = smum_get_argument(hwmgr);
+	smum_send_msg_to_smc(hwmgr, PPSMC_MSG_ReadSerialNumBottom32);
+	bottom32 = smum_get_argument(hwmgr);
+
+	adev->unique_id = ((uint64_t)bottom32 << 32) | top32;
 }
 
 static int vega12_set_private_data_based_on_pptable(struct pp_hwmgr *hwmgr)
@@ -1308,6 +1318,7 @@ static int vega12_get_current_mclk_freq(struct pp_hwmgr *hwmgr, uint32_t *mclk_f
 
 static int vega12_get_current_activity_percent(
 		struct pp_hwmgr *hwmgr,
+		int idx,
 		uint32_t *activity_percent)
 {
 	SmuMetrics_t metrics_table;
@@ -1317,7 +1328,17 @@ static int vega12_get_current_activity_percent(
 	if (ret)
 		return ret;
 
-	*activity_percent = metrics_table.AverageGfxActivity;
+	switch (idx) {
+	case AMDGPU_PP_SENSOR_GPU_LOAD:
+		*activity_percent = metrics_table.AverageGfxActivity;
+		break;
+	case AMDGPU_PP_SENSOR_MEM_LOAD:
+		*activity_percent = metrics_table.AverageUclkActivity;
+		break;
+	default:
+		pr_err("Invalid index for retrieving clock activity\n");
+		return -EINVAL;
+	}
 
 	return ret;
 }
@@ -1341,7 +1362,8 @@ static int vega12_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 			*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_GPU_LOAD:
-		ret = vega12_get_current_activity_percent(hwmgr, (uint32_t *)value);
+	case AMDGPU_PP_SENSOR_MEM_LOAD:
+		ret = vega12_get_current_activity_percent(hwmgr, idx, (uint32_t *)value);
 		if (!ret)
 			*size = 4;
 		break;

@@ -188,68 +188,61 @@ struct kfd_ioctl_dbg_wave_control_args {
 };
 
 /* KFD_IOC_DBG_TRAP_ENABLE:
+ * ptr:   unused
  * data1: 0=disable, 1=enable
  * data2: queue ID (for future use)
  * data3: unused
- * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
 /* KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
+ * ptr:   unused
  * data1: SPI_GDBG_TRAP_DATA0
  * data2: SPI_GDBG_TRAP_DATA1
  * data3: unused
- * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_TRAP_DATA 1
 
 /* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+ * ptr:   unused
  * data1: override mode: 0=OR, 1=REPLACE
  * data2: mask
  * data3: unused
- * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 2
 
 /* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+ * ptr:   unused
  * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
  * data2: unused
  * data3: unused
- * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 3
 
-
-#define KFD__DBG_NODE_SUSPEND_NO_GRACE		0x01
-#define KFD__DBG_NODE_SUSPEND_MEMORY_FENCE	0x02
-#define KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT	0x04
 /* KFD_IOC_DBG_TRAP_NODE_SUSPEND:
- * data1: pid
- * data2: nodeid
- * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
- *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
- *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
- * data4: unused
+ * ptr:   pointer to an array of Queues IDs
+ * data1: flags
+ * data2: number of queues
+ * data3: grace period
  */
 #define KFD_IOC_DBG_TRAP_NODE_SUSPEND 4
 
 /* KFD_IOC_DBG_TRAP_NODE_RESUME:
- * data1: pid
- * data2: nodeid
- * data3: flags : KFD__DBG_NODE_SUSPEND_NO_GRACE
- *                KFD__DBG_NODE_SUSPEND_MEMORY_FENCE
- *                KFD__DBG_NODE_SUSPEND_UPDATE_CONTEXT
- * data4: unused
+ * ptr:   pointer to an array of Queues IDs
+ * data1: flags
+ * data2: number of queues
+ * data3: unused
  */
 #define KFD_IOC_DBG_TRAP_NODE_RESUME 5
 
 struct kfd_ioctl_dbg_trap_args {
+	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
+	__u32 pid;     /* to KFD */
 	__u32 gpu_id;  /* to KFD */
 	__u32 op;      /* to KFD */
 	__u32 data1;   /* to KFD */
 	__u32 data2;   /* to KFD */
 	__u32 data3;   /* to KFD */
-	__u32 data4;   /* to KFD */
 };
 
 /* Matching HSA_EVENTTYPE */
@@ -475,6 +468,21 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 	__u32 n_success;		/* to/from KFD */
 };
 
+/* Allocate GWS for specific queue
+ *
+ * @gpu_id:      device identifier
+ * @queue_id:    queue's id that GWS is allocated for
+ * @num_gws:     how many GWS to allocate
+ * @first_gws:   index of the first GWS allocated.
+ *               only support contiguous GWS allocation
+ */
+struct kfd_ioctl_alloc_queue_gws_args {
+	__u32 gpu_id;		/* to KFD */
+	__u32 queue_id;		/* to KFD */
+	__u32 num_gws;		/* to KFD */
+	__u32 first_gws;	/* from KFD */
+};
+
 struct kfd_ioctl_get_dmabuf_info_args {
 	__u64 size;		/* from KFD */
 	__u64 metadata_ptr;	/* to KFD */
@@ -641,17 +649,20 @@ enum kfd_mmio_remap {
 #define AMDKFD_IOC_IMPORT_DMABUF		\
 		AMDKFD_IOWR(0x1D, struct kfd_ioctl_import_dmabuf_args)
 
-#define AMDKFD_IOC_IPC_IMPORT_HANDLE		\
-		AMDKFD_IOWR(0x1E, struct kfd_ioctl_ipc_import_handle_args)
+#define AMDKFD_IOC_ALLOC_QUEUE_GWS		\
+		AMDKFD_IOWR(0x1E, struct kfd_ioctl_alloc_queue_gws_args)
+
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
+		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_import_handle_args)
 
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
-		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_export_handle_args)
-
-#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
-		AMDKFD_IOWR(0x20, struct kfd_ioctl_cross_memory_copy_args)
+		AMDKFD_IOWR(0x20, struct kfd_ioctl_ipc_export_handle_args)
 
 #define AMDKFD_IOC_DBG_TRAP			\
 		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
+
+#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
 
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x22

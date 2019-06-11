@@ -33,6 +33,7 @@
 #include "amdgpu_object.h"
 #include "amdgpu_vm.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu_dma_buf.h"
 
 /* Special VM and GART address alignment needed for VI pre-Fiji due to
  * a HW bug.
@@ -458,6 +459,17 @@ static void add_kgd_mem_to_kfd_bo_list(struct kgd_mem *mem,
 	mutex_unlock(&process_info->lock);
 }
 
+static void remove_kgd_mem_from_kfd_bo_list(struct kgd_mem *mem,
+		struct amdkfd_process_info *process_info)
+{
+	struct ttm_validate_buffer *bo_list_entry;
+
+	bo_list_entry = &mem->validate_list;
+	mutex_lock(&process_info->lock);
+	list_del(&bo_list_entry->head);
+	mutex_unlock(&process_info->lock);
+}
+
 /* Initializes user pages. It registers the MMU notifier and validates
  * the userptr BO in the GTT domain.
  *
@@ -535,7 +547,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 release_out:
 	if (ret)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
@@ -924,6 +936,9 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 				  AMDGPU_FENCE_OWNER_KFD, false);
 	if (ret)
 		goto wait_pd_fail;
+	ret = kcl_reservation_object_reserve_shared(vm->root.base.bo->tbo.resv, 1);
+	if (ret)
+		goto reserve_shared_fail;
 	amdgpu_bo_fence(vm->root.base.bo,
 			&vm->process_info->eviction_fence->base, true);
 	amdgpu_bo_unreserve(vm->root.base.bo);
@@ -937,6 +952,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 
 	return 0;
 
+reserve_shared_fail:
 wait_pd_fail:
 validate_pd_fail:
 	amdgpu_bo_unreserve(vm->root.base.bo);
@@ -1107,8 +1123,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
-	uint64_t user_addr = 0;
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
+	uint64_t user_addr = 0;
 	struct amdgpu_bo *bo;
 	struct amdgpu_bo_param bp;
 	int byte_align;
@@ -1237,12 +1253,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	if (user_addr) {
 		ret = init_user_pages(*mem, current->mm, user_addr);
-		if (ret) {
-			mutex_lock(&avm->process_info->lock);
-			list_del(&(*mem)->validate_list.head);
-			mutex_unlock(&avm->process_info->lock);
+		if (ret)
 			goto allocate_init_user_pages_failed;
-		}
 	}
 
 	if (offset)
@@ -1251,6 +1263,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	return 0;
 
 allocate_init_user_pages_failed:
+	remove_kgd_mem_from_kfd_bo_list(*mem, avm->process_info);
 	amdgpu_bo_unref(&bo);
 	/* Don't unreserve system mem limit twice */
 	goto err_reserve_limit;
@@ -1305,7 +1318,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 		pr_debug("%s: Freeing user_pages array\n", __func__);
 		if (mem->user_pages[0])
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages, false);
 #else
 			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages);
@@ -1986,7 +1999,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			}
 		} else if (mem->user_pages[0]) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 			release_pages(mem->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 			release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
@@ -2448,4 +2461,89 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 validate_fail:
 	ttm_eu_backoff_reservation(&ticket, &list);
 	return r;
+}
+
+int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem)
+{
+	struct amdkfd_process_info *process_info = (struct amdkfd_process_info *)info;
+	struct amdgpu_bo *gws_bo = (struct amdgpu_bo *)gws;
+	int ret;
+
+	if (!info || !gws)
+		return -EINVAL;
+
+	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	if (!*mem)
+		return -ENOMEM;
+
+	mutex_init(&(*mem)->lock);
+	(*mem)->bo = amdgpu_bo_ref(gws_bo);
+	(*mem)->domain = AMDGPU_GEM_DOMAIN_GWS;
+	(*mem)->process_info = process_info;
+	add_kgd_mem_to_kfd_bo_list(*mem, process_info, false);
+	amdgpu_sync_create(&(*mem)->sync);
+
+
+	/* Validate gws bo the first time it is added to process */
+	mutex_lock(&(*mem)->process_info->lock);
+	ret = amdgpu_bo_reserve(gws_bo, false);
+	if (unlikely(ret)) {
+		pr_err("Reserve gws bo failed %d\n", ret);
+		goto bo_reservation_failure;
+	}
+
+	ret = amdgpu_amdkfd_bo_validate(gws_bo, AMDGPU_GEM_DOMAIN_GWS, true);
+	if (ret) {
+		pr_err("GWS BO validate failed %d\n", ret);
+		goto bo_validation_failure;
+	}
+	/* GWS resource is shared b/t amdgpu and amdkfd
+	 * Add process eviction fence to bo so they can
+	 * evict each other.
+	 */
+	amdgpu_bo_fence(gws_bo, &process_info->eviction_fence->base, true);
+	amdgpu_bo_unreserve(gws_bo);
+	mutex_unlock(&(*mem)->process_info->lock);
+
+	return ret;
+
+bo_validation_failure:
+	amdgpu_bo_unreserve(gws_bo);
+bo_reservation_failure:
+	mutex_unlock(&(*mem)->process_info->lock);
+	amdgpu_sync_free(&(*mem)->sync);
+	remove_kgd_mem_from_kfd_bo_list(*mem, process_info);
+	amdgpu_bo_unref(&gws_bo);
+	mutex_destroy(&(*mem)->lock);
+	kfree(*mem);
+	*mem = NULL;
+	return ret;
+}
+
+int amdgpu_amdkfd_remove_gws_from_process(void *info, void *mem)
+{
+	int ret;
+	struct amdkfd_process_info *process_info = (struct amdkfd_process_info *)info;
+	struct kgd_mem *kgd_mem = (struct kgd_mem *)mem;
+	struct amdgpu_bo *gws_bo = kgd_mem->bo;
+
+	/* Remove BO from process's validate list so restore worker won't touch
+	 * it anymore
+	 */
+	remove_kgd_mem_from_kfd_bo_list(kgd_mem, process_info);
+
+	ret = amdgpu_bo_reserve(gws_bo, false);
+	if (unlikely(ret)) {
+		pr_err("Reserve gws bo failed %d\n", ret);
+		//TODO add BO back to validate_list?
+		return ret;
+	}
+	amdgpu_amdkfd_remove_eviction_fence(gws_bo,
+			process_info->eviction_fence);
+	amdgpu_bo_unreserve(gws_bo);
+	amdgpu_sync_free(&kgd_mem->sync);
+	amdgpu_bo_unref(&gws_bo);
+	mutex_destroy(&kgd_mem->lock);
+	kfree(mem);
+	return 0;
 }

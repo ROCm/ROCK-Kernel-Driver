@@ -69,6 +69,7 @@ struct drm_device;
 #define KFD_MMAP_TYPE_DOORBELL	(0x3ULL << KFD_MMAP_TYPE_SHIFT)
 #define KFD_MMAP_TYPE_EVENTS	(0x2ULL << KFD_MMAP_TYPE_SHIFT)
 #define KFD_MMAP_TYPE_RESERVED_MEM	(0x1ULL << KFD_MMAP_TYPE_SHIFT)
+#define KFD_MMAP_TYPE_MMIO	(0x0ULL << KFD_MMAP_TYPE_SHIFT)
 
 #define KFD_MMAP_GPU_ID_SHIFT (46 - PAGE_SHIFT)
 #define KFD_MMAP_GPU_ID_MASK (((1ULL << KFD_GPU_ID_HASH_WIDTH) - 1) \
@@ -174,6 +175,11 @@ extern int priv_cp_queues;
  * Halt if HWS hang is detected
  */
 extern int halt_if_hws_hang;
+
+/*
+ * Whether MEC FW support GWS barriers
+ */
+extern bool hws_gws_support;
 
 /*
  * Restore evicted process only if queues are active
@@ -305,6 +311,9 @@ struct kfd_dev {
 
 	/* Compute Profile ref. count */
 	atomic_t compute_profile;
+
+	/* Global GWS resource shared b/t processes*/
+	void *gws;
 };
 
 struct kfd_ipc_obj;
@@ -473,6 +482,7 @@ struct queue_properties {
 	uint32_t doorbell_off;
 	bool is_interop;
 	bool is_evicted;
+	bool is_suspended;
 	bool is_active;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -492,6 +502,12 @@ struct queue_properties {
 	uint32_t cu_mask_count; /* Must be a multiple of 32 */
 	uint32_t *cu_mask;
 };
+
+#define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
+			    (q).queue_address != 0 &&	\
+			    (q).queue_percent > 0 &&	\
+			    !(q).is_evicted && \
+			    !(q).is_suspended)
 
 /**
  * struct queue
@@ -518,6 +534,9 @@ struct queue_properties {
  *
  * @device: The kfd device that created this queue.
  *
+ * @gws: Pointing to gws kgd_mem if this is a gws control queue; NULL
+ * otherwise.
+ *
  * This structure represents user mode compute queues.
  * It contains all the necessary data to handle such queues.
  *
@@ -539,6 +558,7 @@ struct queue {
 
 	struct kfd_process	*process;
 	struct kfd_dev		*device;
+	void *gws;
 };
 
 /*
@@ -626,7 +646,7 @@ struct qcm_process_device {
 	uint64_t ib_base;
 	void *ib_kaddr;
 
-	/* doorbell resources per process per device*/
+	/* doorbell resources per process per device */
 	unsigned long *doorbell_bitmap;
 	/* doorbell user mmap vma */
 	struct vm_area_struct *doorbell_vma;
@@ -995,6 +1015,8 @@ int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
 int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
+int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,
+			void *gws);
 struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
 						unsigned int qid);
 int pqm_get_wave_state(struct process_queue_manager *pqm,
@@ -1128,11 +1150,15 @@ int kfd_ipc_init(void);
 /* Check with device cgroup if @kfd device is accessible */
 static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
 {
+#if defined(CONFIG_CGROUP_DEVICE)
 	struct drm_device *ddev = kfd->ddev;
 
 	return kcl_devcgroup_check_permission(DEVCG_DEV_CHAR, DRM_MAJOR,
 					  ddev->render->index,
 					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
+#else
+	return 0;
+#endif
 }
 
 /* Compute profile */

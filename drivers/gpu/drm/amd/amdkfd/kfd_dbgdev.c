@@ -190,6 +190,7 @@ static int dbgdev_register_diq(struct kfd_dbgdev *dbgdev)
 	int status;
 
 	properties.type = KFD_QUEUE_TYPE_DIQ;
+
 	status = pqm_create_queue(dbgdev->pqm, dbgdev->dev, NULL,
 				&properties, &qid);
 

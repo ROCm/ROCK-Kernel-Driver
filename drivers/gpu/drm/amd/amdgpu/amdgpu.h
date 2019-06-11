@@ -118,7 +118,6 @@ extern int amdgpu_disp_priority;
 extern int amdgpu_hw_i2c;
 extern int amdgpu_pcie_gen2;
 extern int amdgpu_msi;
-extern int amdgpu_lockup_timeout;
 extern int amdgpu_dpm;
 extern int amdgpu_fw_load_type;
 extern int amdgpu_aspm;
@@ -428,6 +427,7 @@ struct amdgpu_fpriv {
 };
 
 int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
+int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev);
 
 int amdgpu_ib_get(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		  unsigned size, struct amdgpu_ib *ib);
@@ -581,6 +581,8 @@ struct amdgpu_asic_funcs {
 			       uint64_t *count1);
 	/* do we need to reset the asic at init time (e.g., kexec) */
 	bool (*need_reset_on_init)(struct amdgpu_device *adev);
+	/* PCIe replay counter */
+	uint64_t (*get_pcie_replay_count)(struct amdgpu_device *adev);
 };
 
 /*
@@ -716,6 +718,12 @@ struct amdgpu_df_funcs {
 				      u32 *flags);
 	void (*enable_ecc_force_par_wr_rmw)(struct amdgpu_device *adev,
 					    bool enable);
+	int (*pmc_start)(struct amdgpu_device *adev, uint64_t config,
+					 int is_enable);
+	int (*pmc_stop)(struct amdgpu_device *adev, uint64_t config,
+					 int is_disable);
+	void (*pmc_get_count)(struct amdgpu_device *adev, uint64_t config,
+					 uint64_t *count);
 };
 /* Define the HW IP blocks will be used in driver , add more if necessary */
 enum amd_hw_ip_block_type {
@@ -761,7 +769,8 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
+	defined(OS_NAME_SUSE_15_1)
 	struct dev_pagemap	pgmap;
 #endif
 #endif
@@ -971,7 +980,7 @@ struct amdgpu_device {
 	const struct amdgpu_df_funcs	*df_funcs;
 
 	/* delayed work_func for deferring clockgating during resume */
-	struct delayed_work     late_init_work;
+	struct delayed_work     delayed_init_work;
 
 	struct amdgpu_virt	virt;
 	/* firmware VRAM reservation */
@@ -1001,6 +1010,13 @@ struct amdgpu_device {
 	struct work_struct		xgmi_reset_work;
 
 	bool                            in_baco_reset;
+
+	long				gfx_timeout;
+	long				sdma_timeout;
+	long				video_timeout;
+	long				compute_timeout;
+
+	uint64_t			unique_id;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
@@ -1130,6 +1146,7 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
 #define amdgpu_asic_init_doorbell_index(adev) (adev)->asic_funcs->init_doorbell_index((adev))
 #define amdgpu_asic_get_pcie_usage(adev, cnt0, cnt1) ((adev)->asic_funcs->get_pcie_usage((adev), (cnt0), (cnt1)))
 #define amdgpu_asic_need_reset_on_init(adev) (adev)->asic_funcs->need_reset_on_init((adev))
+#define amdgpu_asic_get_pcie_replay_count(adev) ((adev)->asic_funcs->get_pcie_replay_count((adev)))
 
 /* Common functions */
 bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev);

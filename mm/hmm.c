@@ -313,7 +313,7 @@ struct hmm_vma_walk {
 static int hmm_vma_do_fault(struct mm_walk *walk, unsigned long addr,
 			    bool write_fault, uint64_t *pfn)
 {
-	unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_REMOTE;
+	unsigned int flags = FAULT_FLAG_REMOTE;
 	struct hmm_vma_walk *hmm_vma_walk = walk->private;
 	struct hmm_range *range = hmm_vma_walk->range;
 	struct vm_area_struct *vma = walk->vma;
@@ -494,7 +494,7 @@ static int hmm_vma_handle_pmd(struct mm_walk *walk,
 
 static inline uint64_t pte_to_hmm_pfn_flags(struct hmm_range *range, pte_t pte)
 {
-	if (pte_none(pte) || !pte_present(pte))
+	if (pte_none(pte) || !pte_present(pte) || pte_protnone(pte))
 		return 0;
 	return pte_write(pte) ? range->flags[HMM_PFN_VALID] |
 				range->flags[HMM_PFN_WRITE] :

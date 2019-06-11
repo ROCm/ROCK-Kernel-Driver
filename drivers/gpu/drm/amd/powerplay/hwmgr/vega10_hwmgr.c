@@ -356,6 +356,7 @@ static void vega10_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 	struct vega10_hwmgr *data = hwmgr->backend;
 	int i;
 	uint32_t sub_vendor_id, hw_revision;
+	uint32_t top32, bottom32;
 	struct amdgpu_device *adev = hwmgr->adev;
 
 	vega10_initialize_power_tune_defaults(hwmgr);
@@ -499,6 +500,14 @@ static void vega10_init_dpm_defaults(struct pp_hwmgr *hwmgr)
 		(hw_revision == 0) &&
 		(sub_vendor_id != 0x1002))
 		data->smu_features[GNLD_PCC_LIMIT].supported = true;
+
+	/* Get the SN to turn into a Unique ID */
+	smum_send_msg_to_smc(hwmgr, PPSMC_MSG_ReadSerialNumTop32);
+	top32 = smum_get_argument(hwmgr);
+	smum_send_msg_to_smc(hwmgr, PPSMC_MSG_ReadSerialNumBottom32);
+	bottom32 = smum_get_argument(hwmgr);
+
+	adev->unique_id = ((uint64_t)bottom32 << 32) | top32;
 }
 
 #ifdef PPLIB_VEGA10_EVV_SUPPORT
@@ -2267,8 +2276,8 @@ static int vega10_populate_avfs_parameters(struct pp_hwmgr *hwmgr)
 			pp_table->AcgAvfsGb.m1                   = avfs_params.ulAcgGbFuseTableM1;
 			pp_table->AcgAvfsGb.m2                   = avfs_params.ulAcgGbFuseTableM2;
 			pp_table->AcgAvfsGb.b                    = avfs_params.ulAcgGbFuseTableB;
-			pp_table->AcgAvfsGb.m1_shift             = 0;
-			pp_table->AcgAvfsGb.m2_shift             = 0;
+			pp_table->AcgAvfsGb.m1_shift             = 24;
+			pp_table->AcgAvfsGb.m2_shift             = 12;
 			pp_table->AcgAvfsGb.b_shift              = 0;
 
 		} else {
@@ -2364,6 +2373,10 @@ static int vega10_avfs_enable(struct pp_hwmgr *hwmgr, bool enable)
 	struct vega10_hwmgr *data = hwmgr->backend;
 
 	if (data->smu_features[GNLD_AVFS].supported) {
+		/* Already enabled or disabled */
+		if (!(enable ^ data->smu_features[GNLD_AVFS].enabled))
+			return 0;
+
 		if (enable) {
 			PP_ASSERT_WITH_CODE(!vega10_enable_smc_features(hwmgr,
 					true,
@@ -2465,11 +2478,6 @@ static void vega10_check_dpm_table_updated(struct pp_hwmgr *hwmgr)
 			data->need_update_dpm_table |= DPMTABLE_OD_UPDATE_VDDC | DPMTABLE_OD_UPDATE_SCLK;
 			return;
 		}
-	}
-
-	if (data->need_update_dpm_table & DPMTABLE_OD_UPDATE_VDDC) {
-		data->need_update_dpm_table &= ~DPMTABLE_OD_UPDATE_VDDC;
-		data->need_update_dpm_table |= DPMTABLE_OD_UPDATE_SCLK | DPMTABLE_OD_UPDATE_MCLK;
 	}
 }
 
@@ -3683,6 +3691,10 @@ static int vega10_set_power_state_tasks(struct pp_hwmgr *hwmgr,
 
 	vega10_update_avfs(hwmgr);
 
+	/*
+	 * Clear all OD flags except DPMTABLE_OD_UPDATE_VDDC.
+	 * That will help to keep AVFS disabled.
+	 */
 	data->need_update_dpm_table &= DPMTABLE_OD_UPDATE_VDDC;
 
 	return 0;
@@ -5010,13 +5022,70 @@ static bool vega10_check_clk_voltage_valid(struct pp_hwmgr *hwmgr,
 	return true;
 }
 
+static void vega10_odn_update_power_state(struct pp_hwmgr *hwmgr)
+{
+	struct vega10_hwmgr *data = hwmgr->backend;
+	struct pp_power_state *ps = hwmgr->request_ps;
+	struct vega10_power_state *vega10_ps;
+	struct vega10_single_dpm_table *gfx_dpm_table =
+		&data->dpm_table.gfx_table;
+	struct vega10_single_dpm_table *soc_dpm_table =
+		&data->dpm_table.soc_table;
+	struct vega10_single_dpm_table *mem_dpm_table =
+		&data->dpm_table.mem_table;
+	int max_level;
+
+	if (!ps)
+		return;
+
+	vega10_ps = cast_phw_vega10_power_state(&ps->hardware);
+	max_level = vega10_ps->performance_level_count - 1;
+
+	if (vega10_ps->performance_levels[max_level].gfx_clock !=
+	    gfx_dpm_table->dpm_levels[gfx_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].gfx_clock =
+			gfx_dpm_table->dpm_levels[gfx_dpm_table->count - 1].value;
+
+	if (vega10_ps->performance_levels[max_level].soc_clock !=
+	    soc_dpm_table->dpm_levels[soc_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].soc_clock =
+			soc_dpm_table->dpm_levels[soc_dpm_table->count - 1].value;
+
+	if (vega10_ps->performance_levels[max_level].mem_clock !=
+	    mem_dpm_table->dpm_levels[mem_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].mem_clock =
+			mem_dpm_table->dpm_levels[mem_dpm_table->count - 1].value;
+
+	if (!hwmgr->ps)
+		return;
+
+	ps = (struct pp_power_state *)((unsigned long)(hwmgr->ps) + hwmgr->ps_size * (hwmgr->num_ps - 1));
+	vega10_ps = cast_phw_vega10_power_state(&ps->hardware);
+	max_level = vega10_ps->performance_level_count - 1;
+
+	if (vega10_ps->performance_levels[max_level].gfx_clock !=
+	    gfx_dpm_table->dpm_levels[gfx_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].gfx_clock =
+			gfx_dpm_table->dpm_levels[gfx_dpm_table->count - 1].value;
+
+	if (vega10_ps->performance_levels[max_level].soc_clock !=
+	    soc_dpm_table->dpm_levels[soc_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].soc_clock =
+			soc_dpm_table->dpm_levels[soc_dpm_table->count - 1].value;
+
+	if (vega10_ps->performance_levels[max_level].mem_clock !=
+	    mem_dpm_table->dpm_levels[mem_dpm_table->count - 1].value)
+		vega10_ps->performance_levels[max_level].mem_clock =
+			mem_dpm_table->dpm_levels[mem_dpm_table->count - 1].value;
+}
+
 static void vega10_odn_update_soc_table(struct pp_hwmgr *hwmgr,
 						enum PP_OD_DPM_TABLE_COMMAND type)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
 	struct phm_ppt_v2_information *table_info = hwmgr->pptable;
 	struct phm_ppt_v1_clock_voltage_dependency_table *dep_table = table_info->vdd_dep_on_socclk;
-	struct vega10_single_dpm_table *dpm_table = &data->golden_dpm_table.soc_table;
+	struct vega10_single_dpm_table *dpm_table = &data->golden_dpm_table.mem_table;
 
 	struct vega10_odn_clock_voltage_dependency_table *podn_vdd_dep_on_socclk =
 							&data->odn_dpm_table.vdd_dep_on_socclk;
@@ -5040,7 +5109,8 @@ static void vega10_odn_update_soc_table(struct pp_hwmgr *hwmgr,
 					break;
 			}
 			if (j == od_vddc_lookup_table->count) {
-				od_vddc_lookup_table->entries[j-1].us_vdd =
+				j = od_vddc_lookup_table->count - 1;
+				od_vddc_lookup_table->entries[j].us_vdd =
 					podn_vdd_dep->entries[i].vddc;
 				data->need_update_dpm_table |= DPMTABLE_OD_UPDATE_VDDC;
 			}
@@ -5048,25 +5118,38 @@ static void vega10_odn_update_soc_table(struct pp_hwmgr *hwmgr,
 		}
 		dpm_table = &data->dpm_table.soc_table;
 		for (i = 0; i < dep_table->count; i++) {
-			if (dep_table->entries[i].vddInd == podn_vdd_dep->entries[dep_table->count-1].vddInd &&
-					dep_table->entries[i].clk < podn_vdd_dep->entries[dep_table->count-1].clk) {
+			if (dep_table->entries[i].vddInd == podn_vdd_dep->entries[podn_vdd_dep->count-1].vddInd &&
+					dep_table->entries[i].clk < podn_vdd_dep->entries[podn_vdd_dep->count-1].clk) {
 				data->need_update_dpm_table |= DPMTABLE_UPDATE_SOCCLK;
-				podn_vdd_dep_on_socclk->entries[i].clk = podn_vdd_dep->entries[dep_table->count-1].clk;
-				dpm_table->dpm_levels[i].value = podn_vdd_dep_on_socclk->entries[i].clk;
+				for (; (i < dep_table->count) &&
+				       (dep_table->entries[i].clk < podn_vdd_dep->entries[podn_vdd_dep->count - 1].clk); i++) {
+					podn_vdd_dep_on_socclk->entries[i].clk = podn_vdd_dep->entries[podn_vdd_dep->count-1].clk;
+					dpm_table->dpm_levels[i].value = podn_vdd_dep_on_socclk->entries[i].clk;
+				}
+				break;
+			} else {
+				dpm_table->dpm_levels[i].value = dep_table->entries[i].clk;
+				podn_vdd_dep_on_socclk->entries[i].vddc = dep_table->entries[i].vddc;
+				podn_vdd_dep_on_socclk->entries[i].vddInd = dep_table->entries[i].vddInd;
+				podn_vdd_dep_on_socclk->entries[i].clk = dep_table->entries[i].clk;
 			}
 		}
 		if (podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].clk <
-					podn_vdd_dep->entries[dep_table->count-1].clk) {
+					podn_vdd_dep->entries[podn_vdd_dep->count - 1].clk) {
 			data->need_update_dpm_table |= DPMTABLE_UPDATE_SOCCLK;
-			podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].clk = podn_vdd_dep->entries[dep_table->count-1].clk;
-			dpm_table->dpm_levels[podn_vdd_dep_on_socclk->count - 1].value = podn_vdd_dep->entries[dep_table->count-1].clk;
+			podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].clk =
+				podn_vdd_dep->entries[podn_vdd_dep->count - 1].clk;
+			dpm_table->dpm_levels[podn_vdd_dep_on_socclk->count - 1].value =
+				podn_vdd_dep->entries[podn_vdd_dep->count - 1].clk;
 		}
 		if (podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].vddInd <
-					podn_vdd_dep->entries[dep_table->count-1].vddInd) {
+					podn_vdd_dep->entries[podn_vdd_dep->count - 1].vddInd) {
 			data->need_update_dpm_table |= DPMTABLE_UPDATE_SOCCLK;
-			podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].vddInd = podn_vdd_dep->entries[dep_table->count-1].vddInd;
+			podn_vdd_dep_on_socclk->entries[podn_vdd_dep_on_socclk->count - 1].vddInd =
+				podn_vdd_dep->entries[podn_vdd_dep->count - 1].vddInd;
 		}
 	}
+	vega10_odn_update_power_state(hwmgr);
 }
 
 static int vega10_odn_edit_dpm_table(struct pp_hwmgr *hwmgr,
@@ -5101,6 +5184,11 @@ static int vega10_odn_edit_dpm_table(struct pp_hwmgr *hwmgr,
 	} else if (PP_OD_RESTORE_DEFAULT_TABLE == type) {
 		memcpy(&(data->dpm_table), &(data->golden_dpm_table), sizeof(struct vega10_dpm_table));
 		vega10_odn_initial_default_setting(hwmgr);
+		vega10_odn_update_power_state(hwmgr);
+		/* force to update all clock tables */
+		data->need_update_dpm_table = DPMTABLE_UPDATE_SCLK |
+					      DPMTABLE_UPDATE_MCLK |
+					      DPMTABLE_UPDATE_SOCCLK;
 		return 0;
 	} else if (PP_OD_COMMIT_DPM_TABLE == type) {
 		vega10_check_dpm_table_updated(hwmgr);
@@ -5214,6 +5302,7 @@ static const struct pp_hwmgr_func vega10_hwmgr_funcs = {
 	.odn_edit_dpm_table = vega10_odn_edit_dpm_table,
 	.get_performance_level = vega10_get_performance_level,
 	.get_asic_baco_capability = smu9_baco_get_capability,
+	.set_asic_baco_cap = vega10_baco_set_cap,
 	.get_asic_baco_state = smu9_baco_get_state,
 	.set_asic_baco_state = vega10_baco_set_state,
 	.enable_mgpu_fan_boost = vega10_enable_mgpu_fan_boost,

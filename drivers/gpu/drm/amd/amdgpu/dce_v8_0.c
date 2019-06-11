@@ -1617,7 +1617,7 @@ static void dce_v8_0_afmt_setmode(struct drm_encoder *encoder,
 	dce_v8_0_audio_write_latency_fields(encoder, mode);
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
 #else
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);

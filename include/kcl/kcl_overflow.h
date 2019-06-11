@@ -2,7 +2,7 @@
 #ifndef AMDKCL_OVERFLOW_H
 #define AMDKCL_OVERFLOW_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0) && !defined(OS_NAME_SUSE_15_1)
 #include <linux/compiler.h>
 
 /*

@@ -197,6 +197,8 @@ int smu_sys_set_pp_table(struct smu_context *smu,  void *buf, size_t size)
 	ATOM_COMMON_TABLE_HEADER *header = (ATOM_COMMON_TABLE_HEADER *)buf;
 	int ret = 0;
 
+	if (!smu->pm_enabled)
+		return -EINVAL;
 	if (header->usStructureSize != size) {
 		pr_err("pp table size not matched !\n");
 		return -EIO;
@@ -232,6 +234,8 @@ int smu_feature_init_dpm(struct smu_context *smu)
 	int ret = 0;
 	uint32_t unallowed_feature_mask[SMU_FEATURE_MAX/32];
 
+	if (!smu->pm_enabled)
+		return ret;
 	mutex_lock(&feature->mutex);
 	bitmap_fill(feature->allowed, SMU_FEATURE_MAX);
 	mutex_unlock(&feature->mutex);
@@ -309,7 +313,7 @@ int smu_feature_set_supported(struct smu_context *smu, int feature_id,
 
 	WARN_ON(feature_id > feature->feature_num);
 
-	mutex_unlock(&feature->mutex);
+	mutex_lock(&feature->mutex);
 	if (enable)
 		test_and_set_bit(feature_id, feature->supported);
 	else
@@ -343,6 +347,7 @@ static int smu_early_init(void *handle)
 	struct smu_context *smu = &adev->smu;
 
 	smu->adev = adev;
+	smu->pm_enabled = !!amdgpu_dpm;
 	mutex_init(&smu->mutex);
 
 	return smu_set_funcs(adev);
@@ -352,6 +357,9 @@ static int smu_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
+
+	if (!smu->pm_enabled)
+		return 0;
 	mutex_lock(&smu->mutex);
 	smu_handle_task(&adev->smu,
 			smu->smu_dpm.dpm_level,
@@ -435,9 +443,6 @@ static int smu_sw_init(void *handle)
 	struct smu_context *smu = &adev->smu;
 	int ret;
 
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
-
 	smu->pool_size = adev->pm.smu_prv_buffer_size;
 	smu->smu_feature.feature_num = SMU_FEATURE_MAX;
 	mutex_init(&smu->smu_feature.mutex);
@@ -488,9 +493,6 @@ static int smu_sw_fini(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 	int ret;
-
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
 
 	ret = smu_smc_table_sw_fini(smu);
 	if (ret) {
@@ -600,10 +602,6 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 		 * check if the format_revision in vbios is up to pptable header
 		 * version, and the structure size is not 0.
 		 */
-		ret = smu_get_clk_info_from_vbios(smu);
-		if (ret)
-			return ret;
-
 		ret = smu_check_pptable(smu);
 		if (ret)
 			return ret;
@@ -700,6 +698,9 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 	 */
 	ret = smu_set_tool_table_location(smu);
 
+	if (!smu_is_dpm_running(smu))
+		pr_info("dpm has been disabled\n");
+
 	return ret;
 }
 
@@ -772,9 +773,6 @@ static int smu_hw_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
-
 	if (adev->firmware.load_type != AMDGPU_FW_LOAD_PSP) {
 		ret = smu_load_microcode(smu);
 		if (ret)
@@ -815,7 +813,10 @@ static int smu_hw_init(void *handle)
 
 	mutex_unlock(&smu->mutex);
 
-	adev->pm.dpm_enabled = true;
+	if (!smu->pm_enabled)
+		adev->pm.dpm_enabled = false;
+	else
+		adev->pm.dpm_enabled = true;
 
 	pr_info("SMU is initialized successfully!\n");
 
@@ -832,9 +833,6 @@ static int smu_hw_fini(void *handle)
 	struct smu_context *smu = &adev->smu;
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret = 0;
-
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
 
 	kfree(table_context->driver_pptable);
 	table_context->driver_pptable = NULL;
@@ -890,9 +888,6 @@ static int smu_suspend(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
-
 	ret = smu_system_features_control(smu, false);
 	if (ret)
 		return ret;
@@ -907,9 +902,6 @@ static int smu_resume(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
-
-	if (!is_support_sw_smu(adev))
-		return -EINVAL;
 
 	pr_info("SMU is resuming...\n");
 
@@ -939,7 +931,7 @@ int smu_display_configuration_change(struct smu_context *smu,
 	int index = 0;
 	int num_of_active_display = 0;
 
-	if (!is_support_sw_smu(smu->adev))
+	if (!smu->pm_enabled || !is_support_sw_smu(smu->adev))
 		return -EINVAL;
 
 	if (!display_config)
@@ -1067,7 +1059,7 @@ static int smu_enable_umd_pstate(void *handle,
 
 	struct smu_context *smu = (struct smu_context*)(handle);
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
-	if (!smu_dpm_ctx->dpm_context)
+	if (!smu->pm_enabled || !smu_dpm_ctx->dpm_context)
 		return -EINVAL;
 
 	if (!(smu_dpm_ctx->dpm_level & profile_mode_mask)) {
@@ -1110,6 +1102,8 @@ int smu_adjust_power_state_dynamic(struct smu_context *smu,
 	long workload;
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
 
+	if (!smu->pm_enabled)
+		return -EINVAL;
 	if (!skip_display_settings) {
 		ret = smu_display_config_changed(smu);
 		if (ret) {
@@ -1118,6 +1112,8 @@ int smu_adjust_power_state_dynamic(struct smu_context *smu,
 		}
 	}
 
+	if (!smu->pm_enabled)
+		return -EINVAL;
 	ret = smu_apply_clocks_adjust_rules(smu);
 	if (ret) {
 		pr_err("Failed to apply clocks adjust rules!");

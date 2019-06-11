@@ -34,6 +34,7 @@
 #include "kfd_events.h"
 #include "kfd_iommu.h"
 #include <linux/device.h>
+#include <linux/ptrace.h>
 
 /*
  * Wrapper around wait_queue_entry_t
@@ -243,7 +244,7 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 
 	/* Wake up pending waiters. They will return failure */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -405,7 +406,7 @@ static void set_event(struct kfd_event *ev)
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -464,6 +465,36 @@ static void acknowledge_signal(struct kfd_process *p, struct kfd_event *ev)
 	page_slots(p->signal_page)[ev->event_id] = UNSIGNALED_EVENT_SLOT;
 }
 
+/* HACK: Temporary hack to enable signaling to debuggers running in a
+ * separate process. Remove this when the real signaling mechanism is
+ * implemented.
+ */
+static void signal_event_to_debugger(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct task_struct *tracer;
+
+	/* Check that a debugger is attached to the process */
+	rcu_read_lock();
+	tracer = ptrace_parent(p->lead_thread);
+	if (tracer)
+		get_task_struct(tracer);
+	rcu_read_unlock();
+	if (!tracer)
+		return;
+
+	/* Check that GPU debugging is enabled for at least one device
+	 * for this process
+	 */
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		if (pdd->is_debugging_enabled) {
+			send_sig(SIGUSR2, tracer, 0);
+			break;
+		}
+
+	put_task_struct(tracer);
+}
+
 static void set_event_from_interrupt(struct kfd_process *p,
 					struct kfd_event *ev)
 {
@@ -476,6 +507,7 @@ static void set_event_from_interrupt(struct kfd_process *p,
 void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				uint32_t valid_id_bits)
 {
+	bool events_signaled = false;
 	struct kfd_event *ev = NULL;
 
 	/*
@@ -495,6 +527,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 							 valid_id_bits);
 	if (ev) {
 		set_event_from_interrupt(p, ev);
+		events_signaled = true;
 	} else if (p->signal_page) {
 		/*
 		 * Partial ID lookup failed. Assume that the event ID
@@ -508,7 +541,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 			pr_debug_ratelimited("Partial ID invalid: %u (%u valid bits)\n",
 					     partial_id, valid_id_bits);
 
-		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT/64) {
+		if (p->signal_event_count < KFD_SIGNAL_EVENT_LIMIT / 64) {
 			/* With relatively few events, it's faster to
 			 * iterate over the event IDR
 			 */
@@ -516,8 +549,10 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (id >= KFD_SIGNAL_EVENT_LIMIT)
 					break;
 
-				if (slots[id] != UNSIGNALED_EVENT_SLOT)
+				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					set_event_from_interrupt(p, ev);
+					events_signaled = true;
+				}
 			}
 		} else {
 			/* With relatively many events, it's faster to
@@ -528,9 +563,12 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					ev = lookup_event_by_id(p, id);
 					set_event_from_interrupt(p, ev);
+					events_signaled = true;
 				}
 		}
 	}
+	if (events_signaled)
+		signal_event_to_debugger(p);
 
 	mutex_unlock(&p->event_mutex);
 	kfd_unref_process(p);
@@ -1036,7 +1074,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 			KFD_HW_EXCEPTION_ECC :
 			KFD_HW_EXCEPTION_GPU_HANG;
 
-	/* Whole gpu reset caused by GPU hang , and  memory is lost */
+	/* Whole gpu reset caused by GPU hang and memory is lost */
 	memset(&hw_exception_data, 0, sizeof(hw_exception_data));
 	hw_exception_data.gpu_id = dev->id;
 	hw_exception_data.memory_lost = 1;
@@ -1047,7 +1085,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	memory_exception_data.gpu_id = dev->id;
 	memory_exception_data.failure.imprecise = true;
 
-	idx  = srcu_read_lock(&kfd_processes_srcu);
+	idx = srcu_read_lock(&kfd_processes_srcu);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
 	struct hlist_node *node;
 

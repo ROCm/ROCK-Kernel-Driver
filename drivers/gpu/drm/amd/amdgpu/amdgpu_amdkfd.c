@@ -28,6 +28,7 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_gfx.h"
+#include "amdgpu_dma_buf.h"
 #include <linux/module.h>
 #include <linux/dma-buf.h>
 #include "amdgpu_xgmi.h"
@@ -356,6 +357,40 @@ void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 	amdgpu_bo_unref(&(bo));
 }
 
+int amdgpu_amdkfd_alloc_gws(struct kgd_dev *kgd, size_t size,
+				void **mem_obj)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct amdgpu_bo *bo = NULL;
+	struct amdgpu_bo_param bp;
+	int r;
+
+	memset(&bp, 0, sizeof(bp));
+	bp.size = size;
+	bp.byte_align = 1;
+	bp.domain = AMDGPU_GEM_DOMAIN_GWS;
+	bp.flags = AMDGPU_GEM_CREATE_NO_CPU_ACCESS;
+	bp.type = ttm_bo_type_device;
+	bp.resv = NULL;
+
+	r = amdgpu_bo_create(adev, &bp, &bo);
+	if (r) {
+		dev_err(adev->dev,
+			"failed to allocate gws BO for amdkfd (%d)\n", r);
+		return r;
+	}
+
+	*mem_obj = bo;
+	return 0;
+}
+
+void amdgpu_amdkfd_free_gws(struct kgd_dev *kgd, void *mem_obj)
+{
+	struct amdgpu_bo *bo = (struct amdgpu_bo *)mem_obj;
+
+	amdgpu_bo_unref(&bo);
+}
+
 uint32_t amdgpu_amdkfd_get_fw_version(struct kgd_dev *kgd,
 				      enum kgd_engine_type type)
 {
@@ -463,7 +498,7 @@ void amdgpu_amdkfd_get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
 	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
-					sizeof(acu_info.bitmap));
+	       sizeof(acu_info.bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
@@ -535,9 +570,8 @@ out_put:
 uint64_t amdgpu_amdkfd_get_vram_usage(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	uint64_t usage =
-		amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
-	return usage;
+
+	return amdgpu_vram_mgr_usage(&adev->mman.bdev.man[TTM_PL_VRAM]);
 }
 
 uint64_t amdgpu_amdkfd_get_hive_id(struct kgd_dev *kgd)
@@ -566,6 +600,13 @@ uint64_t amdgpu_amdkfd_get_mmio_remap_phys_addr(struct kgd_dev *kgd)
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 
 	return adev->rmmio_remap.bus_addr;
+}
+
+uint32_t amdgpu_amdkfd_get_num_gws(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	return adev->gds.gws_size;
 }
 
 int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
@@ -634,8 +675,7 @@ void amdgpu_amdkfd_set_compute_idle(struct kgd_dev *kgd, bool idle)
 						!idle);
 }
 
-bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev,
-			u32 vmid)
+bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid)
 {
 	if (adev->kfd.dev) {
 		if ((1 << vmid) & compute_vmid_bitmap)

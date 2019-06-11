@@ -185,7 +185,7 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
 
 	if ((args->ring_base_address) &&
 		(!kcl_access_ok((const void __user *) args->ring_base_address,
-			    sizeof(uint64_t)))) {
+			sizeof(uint64_t)))) {
 		pr_err("Can't access ring base address\n");
 		return -EFAULT;
 	}
@@ -196,27 +196,27 @@ static int set_queue_properties_from_user(struct queue_properties *q_properties,
 	}
 
 	if (!kcl_access_ok((const void __user *) args->read_pointer_address,
-		       sizeof(uint32_t))) {
+			sizeof(uint32_t))) {
 		pr_err("Can't access read pointer\n");
 		return -EFAULT;
 	}
 
 	if (!kcl_access_ok((const void __user *) args->write_pointer_address,
-		       sizeof(uint32_t))) {
+			sizeof(uint32_t))) {
 		pr_err("Can't access write pointer\n");
 		return -EFAULT;
 	}
 
 	if (args->eop_buffer_address &&
 		!kcl_access_ok((const void __user *) args->eop_buffer_address,
-			   sizeof(uint32_t))) {
+			sizeof(uint32_t))) {
 		pr_debug("Can't access eop buffer");
 		return -EFAULT;
 	}
 
 	if (args->ctx_save_restore_address &&
 		!kcl_access_ok((const void __user *) args->ctx_save_restore_address,
-			   sizeof(uint32_t))) {
+			sizeof(uint32_t))) {
 		pr_debug("Can't access ctx save restore buffer");
 		return -EFAULT;
 	}
@@ -389,7 +389,7 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 
 	if ((args->ring_base_address) &&
 		(!kcl_access_ok((const void __user *) args->ring_base_address,
-			    sizeof(uint64_t)))) {
+			sizeof(uint64_t)))) {
 		pr_err("Can't access ring base address\n");
 		return -EFAULT;
 	}
@@ -1365,6 +1365,14 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
 	args->mmap_offset = offset;
 
+	/* MMIO is mapped through kfd device
+	 * Generate a kfd mmap offset
+	 */
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
+		args->mmap_offset = KFD_MMAP_TYPE_MMIO | KFD_MMAP_GPU_ID(args->gpu_id);
+		args->mmap_offset <<= PAGE_SHIFT;
+	}
+
 	return 0;
 
 err_free:
@@ -1618,6 +1626,32 @@ unmap_memory_from_gpu_failed:
 copy_from_user_failed:
 	kfree(devices_arr);
 	return err;
+}
+
+static int kfd_ioctl_alloc_queue_gws(struct file *filep,
+		struct kfd_process *p, void *data)
+{
+	int retval;
+	struct kfd_ioctl_alloc_queue_gws_args *args = data;
+	struct kfd_dev *dev;
+
+	if (!hws_gws_support)
+		return -ENODEV;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev) {
+		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
+		return -ENODEV;
+	}
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
+		return -ENODEV;
+
+	mutex_lock(&p->mutex);
+	retval = pqm_set_gws(&p->pqm, args->queue_id, args->num_gws ? dev->gws : NULL);
+	mutex_unlock(&p->mutex);
+
+	args->first_gws = 0;
+	return retval;
 }
 
 static int kfd_ioctl_get_dmabuf_info(struct file *filep,
@@ -2579,16 +2613,18 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
-	struct kfd_process_device *pdd;
+	struct kfd_process_device *pdd = NULL;
 	int r = 0;
-	struct kfd_dev *dev;
-	struct kfd_process *process = NULL;
+	struct kfd_dev *dev = NULL;
+	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
+	uint32_t *queue_id_array = NULL;
 	uint32_t gpu_id;
 	uint32_t debug_trap_action;
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
+	bool is_suspend_or_resume;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2596,74 +2632,112 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	data2 = args->data2;
 	data3 = args->data3;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
-		return -EINVAL;
-
-	if (dev->device_info->asic_family < CHIP_VEGA10)
-		return -EINVAL;
-
-	if (dev->mec_fw_version < 406) {
-		pr_err("Unsupported firmware version [%i]\n",
-				dev->mec_fw_version);
-		return -EINVAL;
+	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported sched_policy: %i", sched_policy);
+		r = -EINVAL;
+		goto out;
 	}
 
-	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported sched_policy: %i", dev->dqm->sched_policy);
-		return -EINVAL;
+	is_suspend_or_resume =
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
+
+
+	pid = find_get_pid(args->pid);
+	if (!pid) {
+		pr_err("Cannot find pid info for %i\n",
+				args->pid);
+		r =  -ESRCH;
+		goto out;
 	}
 
-	mutex_lock(&p->mutex);
+	target = kfd_lookup_process_by_pid(pid);
+	if (!target) {
+		pr_err("Cannot find process info info for %i\n",
+				args->pid);
+		r = -ESRCH;
+		goto out;
+	}
 
-	if (debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
-		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME) {
+	if (target != p) {
+		bool is_debugger_attached = false;
 
-		pid = find_get_pid(data1);
-		if (!pid) {
-			pr_err("Cannot find pid info for %i\n", data1);
+		rcu_read_lock();
+		if (ptrace_parent(target->lead_thread) == current)
+			is_debugger_attached = true;
+		rcu_read_unlock();
+
+		if (!is_debugger_attached) {
+			pr_err("Cannot debug process\n");
 			r = -ESRCH;
+			goto out;
+		}
+	}
+
+	mutex_lock(&target->mutex);
+
+	if (!is_suspend_or_resume) {
+
+		dev = kfd_device_by_id(args->gpu_id);
+		if (!dev) {
+			r = -EINVAL;
 			goto unlock_out;
 		}
 
-		process = kfd_lookup_process_by_pid(pid);
-		if (!process) {
-			pr_err("Cannot find process info info for %i\n", data1);
-			r = -ESRCH;
+		if (dev->device_info->asic_family < CHIP_VEGA10) {
+			r = -EINVAL;
 			goto unlock_out;
 		}
-		pdd = kfd_get_process_device_data(dev, process);
+
+		pdd = kfd_get_process_device_data(dev, target);
+
+		if (!pdd) {
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		if ((pdd->is_debugging_enabled == false) &&
+				((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE
+				  && data1 == 1) ||
+				 (debug_trap_action ==
+				  KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
+				  data1 != 0))) {
+
+			/* We need to reserve the debug trap vmid if we haven't
+			 * yet, and are enabling trap debugging, or we are
+			 * setting the wave launch mode to something other than
+			 * normal==0.
+			 */
+			r = reserve_debug_trap_vmid(dev->dqm);
+			if (r)
+				goto unlock_out;
+
+			pdd->is_debugging_enabled = true;
+		}
+
+		if (!pdd->is_debugging_enabled) {
+			pr_err("Debugging is not enabled for this device\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
 	} else {
-		pdd = kfd_get_process_device_data(dev, p);
-	}
-	if (!pdd) {
-		r = -EINVAL;
-		goto unlock_out;
-	}
+		/* data 2 has the number of queue IDs */
+		size_t queue_id_array_size = sizeof(uint32_t) * data2;
 
-	if ((pdd->is_debugging_enabled == false) &&
-		((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
-			  data1 == 1) ||
-		 (debug_trap_action ==
-				 KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
-			 data1 != 0))) {
-
-		/* We need to reserve the debug trap vmid if we haven't yet, and
-		 * are enabling trap debugging, or we are setting the wave
-		 * launch mode to something other than normal==0.
-		 */
-		r = reserve_debug_trap_vmid(dev->dqm);
-		if (r)
+		queue_id_array = kzalloc(queue_id_array_size, GFP_KERNEL);
+		if (!queue_id_array) {
+			r = -ENOMEM;
 			goto unlock_out;
-
-		pdd->is_debugging_enabled = true;
+		}
+		/* We need to copy the queue IDs from userspace */
+		if (copy_from_user(queue_id_array,
+					(uint32_t *) args->ptr,
+					queue_id_array_size)) {
+			r = -EFAULT;
+			goto unlock_out;
+		}
 	}
 
-	if (!pdd->is_debugging_enabled) {
-		pr_err("Debugging is not enabled for this device\n");
-		r = -EINVAL;
-		goto unlock_out;
-	}
 
 	switch (debug_trap_action) {
 	case KFD_IOC_DBG_TRAP_ENABLE:
@@ -2705,52 +2779,31 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data1,
 				dev->vm_info.last_vmid_kfd);
 		break;
+
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
-		/*
-		 * To suspend/resume queues, we need:
-		 *  ptrace to be enabled,
-		 *         process->lead_thread->ptrace == true
-		 *  and we need either:
-		 *  i) be allowed to trace the process
-		 *			process->lead_thread->parent == current
-		 *  ii) or to be ptrace'ing ourself
-		 *		 process->lead_thread == current
-		 */
-		if (process->lead_thread->ptrace &&
-				(process->lead_thread->parent == current ||
-				 process->lead_thread == current)) {
-			r = suspend_queues(dev->dqm, process, data3);
-		} else {
-			pr_err("Cannot debug process to suspend queues\n");
-			r = -ESRCH;
-		}
+		r = suspend_queues(target,
+				data2, /* Number of queues */
+				data3, /* Grace Period */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
 		break;
+
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
-		/*
-		 * To suspend/resume queues, we need:
-		 *  ptrace to be enabled,
-		 *         process->lead_thread->ptrace == true
-		 *  and we need either:
-		 *  i) be allowed to trace the process
-		 *			process->lead_thread->parent == current
-		 *  ii) or to be ptrace'ing ourself
-		 *		 process->lead_thread == current
-		 */
-		if (process->lead_thread->ptrace &&
-				(process->lead_thread->parent == current ||
-				 process->lead_thread == current)) {
-			r = resume_queues(dev->dqm, process);
-		} else {
-			pr_err("Cannot debug process to resume queues\n");
-			r = -ESRCH;
-		}
+		r = resume_queues(target,
+				data2, /* Number of queues */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
 		r = -EINVAL;
 	}
 
-	if (pdd->trap_debug_wave_launch_mode == 0 &&
+	if (pdd && pdd->trap_debug_wave_launch_mode == 0 &&
 			!pdd->debug_trap_enabled) {
 		int result;
 
@@ -2765,11 +2818,14 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 unlock_out:
+	mutex_unlock(&target->mutex);
+
+out:
 	if (pid)
 		put_pid(pid);
-	if (process)
-		kfd_unref_process(process);
-	mutex_unlock(&p->mutex);
+	if (target)
+		kfd_unref_process(target);
+	kfree(queue_id_array);
 	return r;
 }
 
@@ -2866,6 +2922,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IMPORT_DMABUF,
 				kfd_ioctl_import_dmabuf, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_QUEUE_GWS,
+			kfd_ioctl_alloc_queue_gws, 0),
+
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),
 
@@ -2877,7 +2936,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_dbg_set_debug_trap, 0),
-
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
@@ -2970,6 +3028,39 @@ err_i1:
 	return retcode;
 }
 
+static int kfd_mmio_mmap(struct kfd_dev *dev, struct kfd_process *process,
+		      struct vm_area_struct *vma)
+{
+	phys_addr_t address;
+	int ret;
+
+	if (vma->vm_end - vma->vm_start != PAGE_SIZE)
+		return -EINVAL;
+
+	address = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->kgd);
+
+	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE |
+				VM_DONTDUMP | VM_PFNMAP;
+
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	pr_debug("Process %d mapping mmio page\n"
+		 "     target user address == 0x%08llX\n"
+		 "     physical address    == 0x%08llX\n"
+		 "     vm_flags            == 0x%04lX\n"
+		 "     size                == 0x%04lX\n",
+		 process->pasid, (unsigned long long) vma->vm_start,
+		 address, vma->vm_flags, PAGE_SIZE);
+
+	ret = io_remap_pfn_range(vma,
+				vma->vm_start,
+				address >> PAGE_SHIFT,
+				PAGE_SIZE,
+				vma->vm_page_prot);
+	return ret;
+}
+
+
 static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct kfd_process *process;
@@ -3000,6 +3091,10 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 		if (!dev)
 			return -ENODEV;
 		return kfd_reserved_mem_mmap(dev, process, vma);
+	case KFD_MMAP_TYPE_MMIO:
+		if (!dev)
+			return -ENODEV;
+		return kfd_mmio_mmap(dev, process, vma);
 	}
 
 	return -EFAULT;

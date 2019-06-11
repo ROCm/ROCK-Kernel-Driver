@@ -654,7 +654,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				 * invalidated it. Free it and try again
 				 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
@@ -740,16 +740,12 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	}
 
 	r = amdgpu_cs_list_validate(p, &duplicates);
-	if (r) {
-		DRM_ERROR("amdgpu_cs_list_validate(duplicates) failed.\n");
+	if (r)
 		goto error_validate;
-	}
 
 	r = amdgpu_cs_list_validate(p, &p->validated);
-	if (r) {
-		DRM_ERROR("amdgpu_cs_list_validate(validated) failed.\n");
+	if (r)
 		goto error_validate;
-	}
 
 	amdgpu_cs_report_moved_bytes(p->adev, p->bytes_moved,
 				     p->bytes_moved_vis);
@@ -797,7 +793,7 @@ error_free_pages:
 		if (!e->user_pages)
 			continue;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15)
+	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages, false);
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
@@ -1101,11 +1097,9 @@ static int amdgpu_cs_ib_fill(struct amdgpu_device *adev,
 		j++;
 	}
 
-	/* UVD & VCE fw doesn't support user fences */
+	/* MM engine doesn't support user fences */
 	ring = to_amdgpu_ring(parser->entity->rq->sched);
-	if (parser->job->uf_addr && (
-	    ring->funcs->type == AMDGPU_RING_TYPE_UVD ||
-	    ring->funcs->type == AMDGPU_RING_TYPE_VCE))
+	if (parser->job->uf_addr && ring->funcs->no_user_fence)
 		return -EINVAL;
 
 	return amdgpu_ctx_wait_prev_fence(parser->ctx, parser->entity);
@@ -1489,7 +1483,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	if (r) {
 		if (r == -ENOMEM)
 			DRM_ERROR("Not enough memory for command submission!\n");
-		else if (r != -ERESTARTSYS)
+		else if (r != -ERESTARTSYS && r != -EAGAIN)
 			DRM_ERROR("Failed to process the buffer list %d!\n", r);
 		goto out;
 	}
