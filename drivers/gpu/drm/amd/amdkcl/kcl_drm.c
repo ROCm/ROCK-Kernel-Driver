@@ -298,3 +298,18 @@ u64 drm_get_max_iomem(void)
 }
 EXPORT_SYMBOL(drm_get_max_iomem);
 #endif
+
+#if !defined(HAVE_DRM_PRINTF)
+void drm_printf(struct drm_printer *p, const char *f, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, f);
+	vaf.fmt = f;
+	vaf.va = &args;
+	p->printfn(p, &vaf);
+	va_end(args);
+}
+EXPORT_SYMBOL(drm_printf);
+#endif

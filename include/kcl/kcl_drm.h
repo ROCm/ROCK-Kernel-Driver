@@ -3,6 +3,9 @@
 
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_modes.h>
+#if defined(HAVE_DRM_PRINTF)
+#include <drm/drm_print.h>
+#endif
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -198,4 +201,13 @@ __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
+#if !defined(HAVE_DRM_PRINTF)
+struct drm_printer {
+	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
+	void *arg;
+	const char *prefix;
+};
+
+void drm_printf(struct drm_printer *p, const char *f, ...);
+#endif
 #endif /* AMDKCL_DRM_H */

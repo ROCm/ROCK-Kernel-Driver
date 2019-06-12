@@ -344,9 +344,11 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 	drm_mm_print(&mgr->mm, printer);
 	spin_unlock(&mgr->lock);
 
+#if defined(HAVE_DRM_PRINTF)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_gtt_mgr_func = {
