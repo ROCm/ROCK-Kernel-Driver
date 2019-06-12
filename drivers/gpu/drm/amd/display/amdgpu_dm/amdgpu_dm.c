@@ -4345,8 +4345,9 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		state->underscan_vborder = 0;
 #if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		state->max_bpc = 8;
-#endif
+#else
 		state->base.max_requested_bpc = 8;
+#endif
 
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
 			state->abm_level = amdgpu_dm_abm_level;
