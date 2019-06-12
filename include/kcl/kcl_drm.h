@@ -12,9 +12,10 @@
 #include <drm/drm_rect.h>
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
-#include <drm/drm_syncobj.h>
+#if defined(HAVE_DRM_PRINTF)
+#include <drm/drm_print.h>
 #endif
+#include <drm/drm_syncobj.h>
 
 #ifndef DRM_MODE_ROTATE_0
 #define DRM_MODE_ROTATE_0       (1<<0)
@@ -460,13 +461,7 @@ drm_plane_state_dest(const struct drm_plane_state *state)
 	return dest;
 }
 
-struct drm_printer {
-	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
-	void *arg;
-};
-
 void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
-void drm_printf(struct drm_printer *p, const char *f, ...);
 
 static inline struct drm_printer drm_info_printer(struct device *dev)
 {
@@ -478,6 +473,16 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 }
 
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
+#endif
+
+#if !defined(HAVE_DRM_PRINTF)
+struct drm_printer {
+	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
+	void *arg;
+	const char *prefix;
+};
+
+void drm_printf(struct drm_printer *p, const char *f, ...);
 #endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)

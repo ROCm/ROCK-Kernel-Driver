@@ -24,6 +24,7 @@ m4_include([m4/drm-atomic-helper-connector-reset.m4])
 m4_include([m4/drm-get-max-iomem.m4])
 m4_include([m4/drm-syncobj-find-fence.m4])
 m4_include([m4/format-in-struct-drm-framebuffer.m4])
+m4_include([m4/drm-printer.m4])
 m4_include([m4/config.m4])
 
 
