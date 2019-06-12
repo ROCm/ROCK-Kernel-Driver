@@ -506,7 +506,7 @@ bool drm_is_current_master(struct drm_file *fpriv)
 EXPORT_SYMBOL(drm_is_current_master);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_PRINTF)
 void drm_printf(struct drm_printer *p, const char *f, ...)
 {
 	struct va_format vaf;

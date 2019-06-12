@@ -13,7 +13,7 @@
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if defined(HAVE_DRM_PRINTF)
 #include <drm/drm_print.h>
 #endif
 #if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
@@ -526,7 +526,7 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_PRINTF)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;

@@ -373,7 +373,7 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 #endif
 	spin_unlock(&mgr->lock);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
+#if defined(HAVE_DRM_PRINTF)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
