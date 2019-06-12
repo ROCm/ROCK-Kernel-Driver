@@ -521,14 +521,10 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 EXPORT_SYMBOL(drm_printf);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	pr_debug("%s %pV", p->prefix, vaf);
-#else
-	pr_debug("%s %pV", p->arg, vaf);
-#endif
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif

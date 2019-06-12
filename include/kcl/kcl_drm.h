@@ -536,6 +536,25 @@ struct drm_printer {
 void drm_printf(struct drm_printer *p, const char *f, ...);
 #endif
 
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
+extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
+/**
+ * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
+ * @prefix: debug output prefix
+ *
+ * RETURNS:
+ * The &drm_printer object
+ */
+static inline struct drm_printer drm_debug_printer(const char *prefix)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_debug,
+		.prefix = prefix
+	};
+	return p;
+}
+#endif
+
 #if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
 /* helper for handling conditionals in various for_each macros */
 #define for_each_if(condition) if (!(condition)) {} else
