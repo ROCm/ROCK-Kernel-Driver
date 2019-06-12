@@ -22,28 +22,20 @@
  * Authors:
  * Rob Clark <robdclark@gmail.com>
  */
-#ifndef AMDKCL_DRM_PRINT_H
-#define AMDKCL_DRM_PRINT_H
-
-#include <drm/drm_print.h>
-#include <drm/drm_drv.h>
+#include <kcl/kcl_drm_print.h>
+#include <stdarg.h>
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
-/* Copied from include/drm/drm_print.h */
-struct drm_printer {
-	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
-	void *arg;
-	const char *prefix;
-};
-
-void drm_printf(struct drm_printer *p, const char *f, ...);
-#endif
-
-#ifndef HAVE_DRM_DEBUG_ENABLED
-/* Copied from v5.3-rc1-708-gf0a8f533adc2 include/drm/drm_print.h */
-static  inline bool drm_debug_enabled(unsigned int category)
+void drm_printf(struct drm_printer *p, const char *f, ...)
 {
-	return unlikely(drm_debug & category);
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, f);
+	vaf.fmt = f;
+	vaf.va = &args;
+	p->printfn(p, &vaf);
+	va_end(args);
 }
-#endif /* HAVE_DRM_DEBUG_ENABLED */
+EXPORT_SYMBOL(drm_printf);
 #endif
