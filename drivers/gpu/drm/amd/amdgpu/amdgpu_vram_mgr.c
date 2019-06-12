@@ -503,9 +503,11 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 	drm_mm_print(&mgr->mm, printer);
 	spin_unlock(&mgr->lock);
 
+#if defined(HAVE_DRM_PRINTF)
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
 		   amdgpu_vram_mgr_vis_usage(man) >> 20);
+#endif
 }
 
 const struct ttm_mem_type_manager_func amdgpu_vram_mgr_func = {
