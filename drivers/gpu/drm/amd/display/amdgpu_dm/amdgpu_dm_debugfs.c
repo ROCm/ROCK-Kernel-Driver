@@ -998,12 +998,14 @@ static ssize_t dp_dpcd_data_read(struct file *f, char __user *buf,
 	return read_size - r;
 }
 
+#ifdef DEFINE_SHOW_ATTRIBUTE
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
 DEFINE_SHOW_ATTRIBUTE(output_bpc);
 DEFINE_SHOW_ATTRIBUTE(vrr_range);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
+#endif
 #endif
 
 static const struct file_operations dp_link_settings_debugfs_fops = {
@@ -1353,13 +1355,13 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
-#endif
 
 	debugfs_create_file_unsafe("amdgpu_dm_dmub_tracebuffer", 0644, root,
 				   adev, &dmub_tracebuffer_fops);
 
 	debugfs_create_file_unsafe("amdgpu_dm_dmub_fw_state", 0644, root,
 				   adev, &dmub_fw_state_fops);
+#endif
 
 	return 0;
 }
