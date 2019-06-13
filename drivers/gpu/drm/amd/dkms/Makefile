@@ -88,6 +88,10 @@ endif
 ifeq ($(OS_NAME),"ubuntu")
 OS_BUILD_NUM = $(shell echo $(KERNELRELEASE) | cut -d '-' -f 2)
 subdir-ccflags-y += -DUBUNTU_BUILD_NUM=$(OS_BUILD_NUM)
+OS_OEM = "$(shell echo $(KERNELRELEASE) | cut -d '-' -f 3)"
+ifeq ($(OS_OEM),"oem")
+subdir-ccflags-y += -DOS_NAME_UBUNTU_OEM
+endif
 ifeq ($(OS_VERSION),"14.04")
 subdir-ccflags-y += -DOS_NAME_UBUNTU_1404
 else
