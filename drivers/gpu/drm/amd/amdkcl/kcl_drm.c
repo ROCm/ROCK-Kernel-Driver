@@ -559,16 +559,6 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 	wake_up_interruptible(&e->file_priv->event_wait);
 }
 EXPORT_SYMBOL(drm_send_event_locked);
-
-void drm_send_event(struct drm_device *dev, struct drm_pending_event *e)
-{
-	unsigned long irqflags;
-
-	spin_lock_irqsave(&dev->event_lock, irqflags);
-	drm_send_event_locked(dev, e);
-	spin_unlock_irqrestore(&dev->event_lock, irqflags);
-}
-EXPORT_SYMBOL(drm_send_event);
 #endif
 
 #if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
