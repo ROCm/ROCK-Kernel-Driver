@@ -1986,6 +1986,7 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 }
 #endif
 
+#ifdef DEFINE_SHOW_ATTRIBUTE
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 #endif
@@ -1994,6 +1995,7 @@ DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
 DEFINE_SHOW_ATTRIBUTE(output_bpc);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
+#endif
 #endif
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
