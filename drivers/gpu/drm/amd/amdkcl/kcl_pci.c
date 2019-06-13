@@ -181,6 +181,27 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pcie_get_width_cap);
 
+#else
+
+enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
+
+enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
+EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
+#endif
+
+void amdkcl_pci_init(void)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
+	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
+	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+#endif
+	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15_1) && \
+	!defined(OS_NAME_UBUNTU_OEM)
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation
@@ -238,25 +259,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 	return bw;
 }
 EXPORT_SYMBOL(pcie_bandwidth_available);
-
-#else
-
-enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
-EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
-
-enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
-EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
 #endif
-
-void amdkcl_pci_init(void)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
-	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
-#endif
-	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
-}
-
 
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
