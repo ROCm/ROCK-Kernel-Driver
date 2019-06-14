@@ -2394,7 +2394,7 @@ int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem
 	 * Add process eviction fence to bo so they can
 	 * evict each other.
 	 */
-	ret = reservation_object_reserve_shared(gws_bo->tbo.resv, 1);
+	ret = kcl_reservation_object_reserve_shared(gws_bo->tbo.resv, 1);
 	if (ret)
 		goto reserve_shared_fail;
 	amdgpu_bo_fence(gws_bo, &process_info->eviction_fence->base, true);
