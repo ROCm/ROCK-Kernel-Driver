@@ -243,7 +243,10 @@ union drm_amdgpu_bo_list {
 #define AMDGPU_CTX_PRIORITY_VERY_LOW    -1023
 #define AMDGPU_CTX_PRIORITY_LOW         -512
 #define AMDGPU_CTX_PRIORITY_NORMAL      0
-/* Selecting a priority above NORMAL requires CAP_SYS_NICE or DRM_MASTER */
+/*
+ * When used in struct drm_amdgpu_ctx_in, a priority above NORMAL requires
+ * CAP_SYS_NICE or DRM_MASTER
+*/
 #define AMDGPU_CTX_PRIORITY_HIGH        512
 #define AMDGPU_CTX_PRIORITY_VERY_HIGH   1023
 
@@ -253,6 +256,7 @@ struct drm_amdgpu_ctx_in {
 	/** For future use, no flags defined so far */
 	__u32	flags;
 	__u32	ctx_id;
+	/** AMDGPU_CTX_PRIORITY_* */
 	__s32	priority;
 };
 
@@ -334,6 +338,7 @@ struct drm_amdgpu_sched_in {
 	/* AMDGPU_SCHED_OP_* */
 	__u32	op;
 	__u32	fd;
+	/** AMDGPU_CTX_PRIORITY_* */
 	__s32	priority;
 	__u32   ctx_id;
 };
