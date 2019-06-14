@@ -69,6 +69,7 @@ m4_include([m4/strscpy.m4])
 m4_include([m4/drm-printer.m4])
 m4_include([m4/drm-debug-printer.m4])
 m4_include([m4/dev-pm-set-driver-flags.m4])
+m4_include([m4/drm-send-event-locked.m4])
 m4_include([m4/config.m4])
 
 

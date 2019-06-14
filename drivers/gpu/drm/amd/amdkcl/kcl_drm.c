@@ -544,7 +544,7 @@ u64 drm_get_max_iomem(void)
 EXPORT_SYMBOL(drm_get_max_iomem);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 {
 	assert_spin_locked(&dev->event_lock);
