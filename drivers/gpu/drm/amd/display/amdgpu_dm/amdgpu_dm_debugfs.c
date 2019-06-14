@@ -1163,8 +1163,10 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
+#endif
 
 	return 0;
 }
