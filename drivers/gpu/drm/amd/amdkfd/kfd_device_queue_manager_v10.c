@@ -36,6 +36,7 @@ void device_queue_manager_init_v10_navi10(
 {
 	asic_ops->update_qpd = update_qpd_v10;
 	asic_ops->init_sdma_vm = init_sdma_vm_v10;
+	asic_ops->mqd_manager_init = mqd_manager_init_v10;
 }
 
 static uint32_t compute_sh_mem_bases_64bit(struct kfd_process_device *pdd)
