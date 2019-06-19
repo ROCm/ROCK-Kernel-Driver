@@ -201,6 +201,7 @@ struct device_queue_manager {
 	bool			is_hws_hang;
 	struct work_struct	hw_exception_work;
 	struct kfd_mem_obj	hiq_sdma_mqd;
+	uint32_t		wait_times;
 };
 
 void device_queue_manager_init_cik(
