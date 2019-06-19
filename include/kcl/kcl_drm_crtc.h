@@ -79,4 +79,18 @@ extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
+/**
+ * drm_color_lut_size - calculate the number of entries in the LUT
+ * @blob: blob containing the LUT
+ *
+ * Returns:
+ * The number of entries in the color LUT stored in @blob.
+ */
+#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
+static inline int drm_color_lut_size(const struct drm_property_blob *blob)
+{
+	return blob->length / sizeof(struct drm_color_lut);
+}
+#endif
+
 #endif
