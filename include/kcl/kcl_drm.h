@@ -6,6 +6,9 @@
 #if defined(HAVE_DRM_PRINTF)
 #include <drm/drm_print.h>
 #endif
+#if defined(HAVE_DRM_COLOR_LUT_SIZE)
+#include <drm/drm_color_mgmt.h>
+#endif
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -213,6 +216,20 @@ void drm_printf(struct drm_printer *p, const char *f, ...);
 
 #if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
+#endif
+
+/**
+ * drm_color_lut_size - calculate the number of entries in the LUT
+ * @blob: blob containing the LUT
+ *
+ * Returns:
+ * The number of entries in the color LUT stored in @blob.
+ */
+#if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
+static inline int drm_color_lut_size(const struct drm_property_blob *blob)
+{
+	return blob->length / sizeof(struct drm_color_lut);
+}
 #endif
 
 #endif /* AMDKCL_DRM_H */
