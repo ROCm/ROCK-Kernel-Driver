@@ -19,8 +19,7 @@
 #if defined(HAVE_AMDGPU_CHUNK_ID_SYNCOBJ)
 #include <drm/drm_syncobj.h>
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_DRM_COLOR_LUT)
 #include <drm/drm_color_mgmt.h>
 #endif
 
@@ -254,8 +253,7 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_DRM_COLOR_LUT)
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
