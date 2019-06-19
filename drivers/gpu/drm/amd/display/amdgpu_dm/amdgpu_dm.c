@@ -6267,7 +6267,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		dc_plane = dm_new_plane_state->dc_state;
 
 		bundle->surface_updates[planes_count].surface = dc_plane;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 		if (new_pcrtc_state->color_mgmt_changed) {
 			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
 			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
@@ -6440,6 +6440,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			bundle->stream_update.dst = acrtc_state->stream->dst;
 		}
 
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 		if (new_pcrtc_state->color_mgmt_changed) {
 			/*
 			 * TODO: This isn't fully correct since we've actually
@@ -6452,6 +6453,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			bundle->stream_update.out_transfer_func =
 				acrtc_state->stream->out_transfer_func;
 		}
+#endif
 
 		acrtc_state->stream->abm_level = acrtc_state->abm_level;
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
@@ -7493,7 +7495,7 @@ skip_modeset:
 	if (!(enable && aconnector && new_crtc_state->enable &&
 	      new_crtc_state->active))
 		return 0;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 	/*
 	 * Given above conditions, the dc state cannot be NULL because:
 	 * 1. We're in the process of enabling CRTCs (just been added
@@ -7570,9 +7572,11 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 	if (!new_crtc_state)
 		return true;
 
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 	/* CRTC Degamma changes currently require us to recreate planes. */
 	if (new_crtc_state->color_mgmt_changed)
 		return true;
+#endif
 
 	if (drm_atomic_crtc_needs_modeset(new_crtc_state))
 		return true;
@@ -7850,6 +7854,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				stream_update.src = new_dm_crtc_state->stream->src;
 			}
 
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 			if (new_crtc_state->color_mgmt_changed) {
 				updates[num_plane].gamma =
 						new_dm_plane_state->dc_state->gamma_correction;
@@ -7862,6 +7867,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				stream_update.out_transfer_func =
 						new_dm_crtc_state->stream->out_transfer_func;
 			}
+#endif
 
 			ret = fill_dc_scaling_info(new_plane_state,
 						   &scaling_info);
@@ -7983,7 +7989,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		struct dm_crtc_state *dm_old_crtc_state  = to_dm_crtc_state(old_crtc_state);
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+#if defined(HAVE_COLOR_MGMT_CHANGED_IN_STRUCT_DRM_CRTC_STATE)
 		    && !new_crtc_state->color_mgmt_changed
 #endif
 #if defined(HAVE_VRR_ENABLED_IN_STRUCT_DM_CRTC_STATE)
