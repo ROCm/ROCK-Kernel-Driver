@@ -1112,6 +1112,9 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 
 	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
 
+	if (dqm->dev->kfd2kgd->get_iq_wait_times)
+		dqm->dev->kfd2kgd->get_iq_wait_times(dqm->dev->kgd,
+					&dqm->wait_times);
 	return 0;
 }
 
