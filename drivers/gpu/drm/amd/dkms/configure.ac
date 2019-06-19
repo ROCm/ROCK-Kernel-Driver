@@ -37,6 +37,7 @@ m4_include([m4/drm-file-h.m4])
 m4_include([m4/drm-syncobj-find-fence.m4])
 m4_include([m4/drm-printer.m4])
 m4_include([m4/drm-send-event-locked.m4])
+m4_include([m4/drm-color-lut-size.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
