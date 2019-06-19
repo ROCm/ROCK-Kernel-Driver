@@ -25,6 +25,7 @@
 
 #include <linux/version.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_dp_mst_helper.h>
 #include "dm_services.h"
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
@@ -216,6 +217,30 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
+static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
+{
+	struct dc_sink *dc_sink = aconnector->dc_sink;
+	struct drm_dp_mst_port *port = aconnector->port;
+	u8 dsc_caps[16] = { 0 };
+
+	aconnector->dsc_aux = drm_dp_mst_dsc_aux_for_port(port);
+
+	if (!aconnector->dsc_aux)
+		return false;
+
+	if (drm_dp_dpcd_read(aconnector->dsc_aux, DP_DSC_SUPPORT, dsc_caps, 16) < 0)
+		return false;
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	if (!dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
+				   dsc_caps, NULL,
+				   &dc_sink->sink_dsc_caps.dsc_dec_caps))
+		return false;
+#endif
+
+	return true;
+}
+
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
@@ -258,9 +283,16 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		/* dc_link_add_remote_sink returns a new reference */
 		aconnector->dc_sink = dc_sink;
 
-		if (aconnector->dc_sink)
+		if (aconnector->dc_sink) {
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+			if (!validate_dsc_caps_on_connector(aconnector))
+				memset(&aconnector->dc_sink->sink_dsc_caps,
+				       0, sizeof(aconnector->dc_sink->sink_dsc_caps));
+#endif
+		}
 	}
 
 	drm_connector_update_edid_property(
