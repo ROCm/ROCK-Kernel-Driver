@@ -16,6 +16,9 @@
 #include <drm/drm_print.h>
 #endif
 #include <drm/drm_syncobj.h>
+#if defined(HAVE_DRM_COLOR_LUT_SIZE)
+#include <drm/drm_color_mgmt.h>
+#endif
 
 #ifndef DRM_MODE_ROTATE_0
 #define DRM_MODE_ROTATE_0       (1<<0)
@@ -173,6 +176,20 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #else
 	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
 #endif
+}
+#endif
+
+#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
+/**
+ * drm_color_lut_size - calculate the number of entries in the LUT
+ * @blob: blob containing the LUT
+ *
+ * Returns:
+ * The number of entries in the color LUT stored in @blob.
+ */
+static inline int drm_color_lut_size(const struct drm_property_blob *blob)
+{
+	return blob->length / sizeof(struct drm_color_lut);
 }
 #endif
 
