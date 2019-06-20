@@ -2,7 +2,7 @@
 #define AMDKCL_BITOPS_H
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
+#ifndef _BITOPS_LONG_SHIFT
 #if BITS_PER_LONG == 32
 # define _BITOPS_LONG_SHIFT 5
 #elif BITS_PER_LONG == 64
