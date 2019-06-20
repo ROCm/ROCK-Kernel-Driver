@@ -34,6 +34,7 @@ m4_include([m4/drm-atomic-helper-best-encoder.m4])
 m4_include([m4/drm-set-crc-source.m4])
 m4_include([m4/for-each-new-crtc-in-state.m4])
 m4_include([m4/drm-dp-cec-correlation-functions.m4])
+m4_include([m4/drm-connector-put.m4])
 m4_include([m4/config.m4])
 
 
