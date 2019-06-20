@@ -118,7 +118,7 @@ static ssize_t df_v3_6_get_df_cntr_avail(struct device *dev,
 static DEVICE_ATTR(df_cntr_avail, S_IRUGO, df_v3_6_get_df_cntr_avail, NULL);
 
 /* init perfmons */
-static void df_v3_6_init(struct amdgpu_device *adev)
+static void df_v3_6_sw_init(struct amdgpu_device *adev)
 {
 	int i, ret;
 
@@ -491,7 +491,7 @@ static void df_v3_6_pmc_get_count(struct amdgpu_device *adev,
 }
 
 const struct amdgpu_df_funcs df_v3_6_funcs = {
-	.init = df_v3_6_init,
+	.sw_init = df_v3_6_sw_init,
 	.enable_broadcast_mode = df_v3_6_enable_broadcast_mode,
 	.get_fb_channel_number = df_v3_6_get_fb_channel_number,
 	.get_hbm_channel_number = df_v3_6_get_hbm_channel_number,
