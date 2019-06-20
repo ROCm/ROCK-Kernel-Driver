@@ -1066,6 +1066,7 @@ static void soc15_doorbell_range_init(struct amdgpu_device *adev)
 static int soc15_common_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	int ret;
 
 	/* enable pcie gen2/3 link */
 	soc15_pcie_gen3_enable(adev);
@@ -1079,6 +1080,9 @@ static int soc15_common_hw_init(void *handle)
 	 */
 	if (adev->nbio_funcs->remap_hdp_registers)
 		adev->nbio_funcs->remap_hdp_registers(adev);
+
+	adev->df_funcs->init(adev);
+
 	/* enable the doorbell aperture */
 	soc15_enable_doorbell_aperture(adev, true);
 	/* HW doorbell routing policy: doorbell writing not
