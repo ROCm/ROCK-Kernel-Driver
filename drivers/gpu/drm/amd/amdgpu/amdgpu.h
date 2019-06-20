@@ -707,7 +707,7 @@ struct amdgpu_nbio_funcs {
 };
 
 struct amdgpu_df_funcs {
-	void (*init)(struct amdgpu_device *adev);
+	void (*sw_init)(struct amdgpu_device *adev);
 	void (*enable_broadcast_mode)(struct amdgpu_device *adev,
 				      bool enable);
 	u32 (*get_fb_channel_number)(struct amdgpu_device *adev);
@@ -782,7 +782,7 @@ struct amd_powerplay {
 };
 
 #define AMDGPU_RESET_MAGIC_NUM 64
-#define AMDGPU_MAX_DF_PERFMONS 16
+#define AMDGPU_MAX_DF_PERFMONS 4
 struct amdgpu_device {
 	struct device			*dev;
 	struct drm_device		*ddev;
