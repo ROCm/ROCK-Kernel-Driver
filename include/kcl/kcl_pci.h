@@ -24,18 +24,28 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 
 #if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 #define PCIE_SPEED_16_0GT 0x17
+#endif
+#ifndef PCI_EXP_LNKCAP2_SLS_16_0GB
 #define  PCI_EXP_LNKCAP2_SLS_16_0GB 0x00000010 /* Supported Speed 16GT/s */
+#endif
+#ifndef PCI_EXP_LNKCAP_SLS_16_0GB
 #define  PCI_EXP_LNKCAP_SLS_16_0GB 0x00000004 /* LNKCAP2 SLS Vector bit 3 */
+#endif
+#ifndef PCI_EXP_LNKSTA_CLS_16_0GB
 #define  PCI_EXP_LNKSTA_CLS_16_0GB 0x0004 /* Current Link Speed 16.0GT/s */
+#endif
 /* PCIe link information */
+#ifndef PCIE_SPEED2STR
 #define PCIE_SPEED2STR(speed) \
 	((speed) == PCIE_SPEED_16_0GT ? "16 GT/s" : \
 	(speed) == PCIE_SPEED_8_0GT ? "8 GT/s" : \
 	(speed) == PCIE_SPEED_5_0GT ? "5 GT/s" : \
 	(speed) == PCIE_SPEED_2_5GT ? "2.5 GT/s" : \
 	"Unknown speed")
+#endif
 
 /* PCIe speed to Mb/s reduced by encoding overhead */
+#ifndef PCIE_SPEED2MBS_ENC
 #define PCIE_SPEED2MBS_ENC(speed) \
 	((speed) == PCIE_SPEED_16_0GT ? 16000*128/130 : \
 	(speed) == PCIE_SPEED_8_0GT  ?  8000*128/130 : \

@@ -3,7 +3,7 @@
 
 #include <linux/preempt.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#ifndef in_task
 #define in_task()		(!(preempt_count() & \
 				(NMI_MASK | HARDIRQ_MASK | SOFTIRQ_OFFSET)))
 
