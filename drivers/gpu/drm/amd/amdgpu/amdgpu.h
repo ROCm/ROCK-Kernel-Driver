@@ -716,7 +716,6 @@ struct amdgpu_nbio_funcs {
 };
 
 struct amdgpu_df_funcs {
-	void (*init)(struct amdgpu_device *adev);
 	void (*sw_init)(struct amdgpu_device *adev);
 	void (*enable_broadcast_mode)(struct amdgpu_device *adev,
 				      bool enable);
