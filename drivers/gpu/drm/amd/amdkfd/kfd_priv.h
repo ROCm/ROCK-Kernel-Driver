@@ -167,7 +167,7 @@ extern int ignore_crat;
 /*
  * Set sh_mem_config.retry_disable on Vega10
  */
-extern int noretry;
+extern int amdgpu_noretry;
 
 /*
  * Enable privileged mode for all CP queues including user queues
