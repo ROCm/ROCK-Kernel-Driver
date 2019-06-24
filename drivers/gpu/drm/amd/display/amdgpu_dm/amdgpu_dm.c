@@ -766,14 +766,16 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	amdgpu_dm_init_color_mod();
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-	adev->dm.hdcp_workqueue = hdcp_create_workqueue(&adev->psp, &init_params.cp_psp, adev->dm.dc);
+	if (adev->asic_type >= CHIP_RAVEN) {
+		adev->dm.hdcp_workqueue = hdcp_create_workqueue(&adev->psp, &init_params.cp_psp, adev->dm.dc);
 
-	if (!adev->dm.hdcp_workqueue)
-		DRM_ERROR("amdgpu: failed to initialize hdcp_workqueue.\n");
-	else
-		DRM_DEBUG_DRIVER("amdgpu: hdcp_workqueue init done %p.\n", adev->dm.hdcp_workqueue);
+		if (!adev->dm.hdcp_workqueue)
+			DRM_ERROR("amdgpu: failed to initialize hdcp_workqueue.\n");
+		else
+			DRM_DEBUG_DRIVER("amdgpu: hdcp_workqueue init done %p.\n", adev->dm.hdcp_workqueue);
 
-	dc_init_callbacks(adev->dm.dc, &init_params);
+		dc_init_callbacks(adev->dm.dc, &init_params);
+	}
 #endif
 #endif
 
@@ -1635,7 +1637,8 @@ static void handle_hpd_irq(void *param)
 	mutex_lock(&aconnector->hpd_lock);
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-	hdcp_reset_display(adev->dm.hdcp_workqueue, aconnector->dc_link->link_index);
+	if (adev->asic_type >= CHIP_RAVEN)
+		hdcp_reset_display(adev->dm.hdcp_workqueue, aconnector->dc_link->link_index);
 #endif
 	if (aconnector->fake_enable)
 		aconnector->fake_enable = false;
@@ -5735,7 +5738,8 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.freesync_capable_property, 0);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-		drm_connector_attach_content_protection_property(&aconnector->base, false);
+		if (adev->asic_type >= CHIP_RAVEN)
+			drm_connector_attach_content_protection_property(&aconnector->base, false);
 #endif
 	}
 }
