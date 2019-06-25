@@ -173,6 +173,8 @@ static inline int amdgpu_ras_is_supported(struct amdgpu_device *adev,
 {
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 
+	if (block >= AMDGPU_RAS_BLOCK_COUNT)
+		return 0;
 	return ras && (ras->supported & (1 << block));
 }
 
@@ -274,10 +276,10 @@ int amdgpu_ras_sysfs_create(struct amdgpu_device *adev,
 int amdgpu_ras_sysfs_remove(struct amdgpu_device *adev,
 		struct ras_common_if *head);
 
-int amdgpu_ras_debugfs_create(struct amdgpu_device *adev,
+void amdgpu_ras_debugfs_create(struct amdgpu_device *adev,
 		struct ras_fs_if *head);
 
-int amdgpu_ras_debugfs_remove(struct amdgpu_device *adev,
+void amdgpu_ras_debugfs_remove(struct amdgpu_device *adev,
 		struct ras_common_if *head);
 
 int amdgpu_ras_error_query(struct amdgpu_device *adev,

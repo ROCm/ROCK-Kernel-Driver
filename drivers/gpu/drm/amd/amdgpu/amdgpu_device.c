@@ -975,13 +975,6 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 
 	amdgpu_device_check_block_size(adev);
 
-	if (amdgpu_vram_page_split != -1 && (amdgpu_vram_page_split < 16 ||
-	    !is_power_of_2(amdgpu_vram_page_split))) {
-		dev_warn(adev->dev, "invalid VRAM page split (%d)\n",
-			 amdgpu_vram_page_split);
-		amdgpu_vram_page_split = 1024;
-	}
-
 	ret = amdgpu_device_get_job_timeout_settings(adev);
 	if (ret) {
 		dev_err(adev->dev, "invalid lockup_timeout parameter syntax\n");
@@ -2705,6 +2698,9 @@ fence_driver_init:
 
 	amdgpu_fbdev_init(adev);
 
+	if (amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev))
+		amdgpu_pm_virt_sysfs_init(adev);
+
 	r = amdgpu_pm_sysfs_init(adev);
 	if (r)
 		DRM_ERROR("registering pm debugfs failed (%d).\n", r);
@@ -2831,6 +2827,9 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	iounmap(adev->rmmio);
 	adev->rmmio = NULL;
 	amdgpu_device_doorbell_fini(adev);
+	if (amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev))
+		amdgpu_pm_virt_sysfs_fini(adev);
+
 	amdgpu_debugfs_regs_cleanup(adev);
 	device_remove_file(adev->dev, &dev_attr_pcie_replay_count);
 	amdgpu_ucode_sysfs_fini(adev);

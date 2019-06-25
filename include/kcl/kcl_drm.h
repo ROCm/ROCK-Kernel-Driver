@@ -18,6 +18,10 @@
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 #include <drm/drm_syncobj.h>
 #endif
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15_1)
+#include <drm/drm_color_mgmt.h>
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -262,6 +266,21 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #else
 	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
 #endif
+}
+#endif
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
+	!defined(OS_NAME_SUSE_15_1)
+/**
+ * drm_color_lut_size - calculate the number of entries in the LUT
+ * @blob: blob containing the LUT
+ *
+ * Returns:
+ * The number of entries in the color LUT stored in @blob.
+ */
+static inline int drm_color_lut_size(const struct drm_property_blob *blob)
+{
+	return blob->length / sizeof(struct drm_color_lut);
 }
 #endif
 

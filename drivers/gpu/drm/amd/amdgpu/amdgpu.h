@@ -144,7 +144,6 @@ extern uint amdgpu_sdma_phase_quantum;
 extern char *amdgpu_disable_cu;
 extern char *amdgpu_virtual_display;
 extern uint amdgpu_pp_feature_mask;
-extern int amdgpu_vram_page_split;
 extern int amdgpu_ssg_enabled;
 extern int amdgpu_ngg;
 extern int amdgpu_prim_buf_per_se;
@@ -158,6 +157,7 @@ extern int amdgpu_gpu_recovery;
 extern int amdgpu_emu_mode;
 extern uint amdgpu_smu_memory_pool_size;
 extern uint amdgpu_dc_feature_mask;
+extern uint amdgpu_dm_abm_level;
 extern struct amdgpu_mgpu_info mgpu_info;
 extern int amdgpu_ras_enable;
 extern uint amdgpu_ras_mask;
@@ -782,6 +782,7 @@ struct amd_powerplay {
 };
 
 #define AMDGPU_RESET_MAGIC_NUM 64
+#define AMDGPU_MAX_DF_PERFMONS 16
 struct amdgpu_device {
 	struct device			*dev;
 	struct drm_device		*ddev;
@@ -1017,6 +1018,7 @@ struct amdgpu_device {
 	long				compute_timeout;
 
 	uint64_t			unique_id;
+	uint64_t	df_perfmon_config_assign_mask[AMDGPU_MAX_DF_PERFMONS];
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
@@ -1269,4 +1271,19 @@ static inline int amdgpu_dm_display_resume(struct amdgpu_device *adev) { return 
 #endif
 
 #include "amdgpu_object.h"
+
+/* used by df_v3_6.c and amdgpu_pmu.c */
+#define AMDGPU_PMU_ATTR(_name, _object)					\
+static ssize_t								\
+_name##_show(struct device *dev,					\
+			       struct device_attribute *attr,		\
+			       char *page)				\
+{									\
+	BUILD_BUG_ON(sizeof(_object) >= PAGE_SIZE - 1);			\
+	return sprintf(page, _object "\n");				\
+}									\
+									\
+static struct device_attribute pmu_attr_##_name = __ATTR_RO(_name)
+
 #endif
+

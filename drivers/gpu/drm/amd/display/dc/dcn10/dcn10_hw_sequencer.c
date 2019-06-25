@@ -360,6 +360,23 @@ void dcn10_log_hw_state(struct dc *dc,
 	DTN_INFO_END();
 }
 
+bool dcn10_did_underflow_occur(struct dc *dc, struct pipe_ctx *pipe_ctx)
+{
+	struct hubp *hubp = pipe_ctx->plane_res.hubp;
+	struct timing_generator *tg = pipe_ctx->stream_res.tg;
+
+	if (tg->funcs->is_optc_underflow_occurred(tg)) {
+		tg->funcs->clear_optc_underflow(tg);
+		return true;
+	}
+
+	if (hubp->funcs->hubp_get_underflow_status(hubp)) {
+		hubp->funcs->hubp_clear_underflow(hubp);
+		return true;
+	}
+	return false;
+}
+
 static void enable_power_gating_plane(
 	struct dce_hwseq *hws,
 	bool enable)
@@ -1025,7 +1042,7 @@ static void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 		pipe_ctx->plane_res.dpp = dpp;
 		pipe_ctx->plane_res.mpcc_inst = dpp->inst;
 		hubp->mpcc_id = dpp->inst;
-		hubp->opp_id = 0xf;
+		hubp->opp_id = OPP_ID_INVALID;
 		hubp->power_gated = false;
 
 		dc->res_pool->opps[i]->mpc_tree_params.opp_id = dc->res_pool->opps[i]->inst;
@@ -1236,8 +1253,7 @@ static void dcn10_update_plane_addr(const struct dc *dc, struct pipe_ctx *pipe_c
 	pipe_ctx->plane_res.hubp->funcs->hubp_program_surface_flip_and_addr(
 			pipe_ctx->plane_res.hubp,
 			&plane_state->address,
-			plane_state->flip_immediate,
-			0);
+			plane_state->flip_immediate);
 
 	plane_state->status.requested_address = plane_state->address;
 
@@ -2153,7 +2169,7 @@ void update_dchubp_dpp(
 				pipe_ctx,
 				pipe_ctx->stream->output_color_space,
 				pipe_ctx->stream->csc_color_matrix.matrix,
-				hubp->opp_id);
+				pipe_ctx->stream_res.opp->inst);
 	}
 
 	if (plane_state->update_flags.bits.full_update ||
@@ -2333,6 +2349,7 @@ static void dcn10_apply_ctx_for_surface(
 {
 	int i;
 	struct timing_generator *tg;
+	uint32_t underflow_check_delay_us;
 	bool removed_pipe[4] = { false };
 	bool interdependent_update = false;
 	struct pipe_ctx *top_pipe_to_program =
@@ -2347,10 +2364,21 @@ static void dcn10_apply_ctx_for_surface(
 	interdependent_update = top_pipe_to_program->plane_state &&
 		top_pipe_to_program->plane_state->update_flags.bits.full_update;
 
+	underflow_check_delay_us = dc->debug.underflow_assert_delay_us;
+
+	if (underflow_check_delay_us != 0xFFFFFFFF && dc->hwss.did_underflow_occur)
+		ASSERT(dc->hwss.did_underflow_occur(dc, top_pipe_to_program));
+
 	if (interdependent_update)
 		lock_all_pipes(dc, context, true);
 	else
 		dcn10_pipe_control_lock(dc, top_pipe_to_program, true);
+
+	if (underflow_check_delay_us != 0xFFFFFFFF)
+		udelay(underflow_check_delay_us);
+
+	if (underflow_check_delay_us != 0xFFFFFFFF && dc->hwss.did_underflow_occur)
+		ASSERT(dc->hwss.did_underflow_occur(dc, top_pipe_to_program));
 
 	if (num_planes == 0) {
 		/* OTG blank before remove all front end */
@@ -2371,7 +2399,7 @@ static void dcn10_apply_ctx_for_surface(
 		if (pipe_ctx->plane_state && !old_pipe_ctx->plane_state) {
 			if (old_pipe_ctx->stream_res.tg == tg &&
 			    old_pipe_ctx->plane_res.hubp &&
-			    old_pipe_ctx->plane_res.hubp->opp_id != 0xf)
+			    old_pipe_ctx->plane_res.hubp->opp_id != OPP_ID_INVALID)
 				dcn10_disable_plane(dc, old_pipe_ctx);
 		}
 
@@ -3023,7 +3051,8 @@ static const struct hw_sequencer_funcs dcn10_funcs = {
 	.disable_stream_gating = NULL,
 	.enable_stream_gating = NULL,
 	.setup_periodic_interrupt = dcn10_setup_periodic_interrupt,
-	.setup_vupdate_interrupt = dcn10_setup_vupdate_interrupt
+	.setup_vupdate_interrupt = dcn10_setup_vupdate_interrupt,
+	.did_underflow_occur = dcn10_did_underflow_occur
 };
 
 

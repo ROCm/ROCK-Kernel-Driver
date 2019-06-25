@@ -76,9 +76,10 @@
  * - 3.30.0 - Add AMDGPU_SCHED_OP_CONTEXT_PRIORITY_OVERRIDE.
  * - 3.31.0 - Add support for per-flip tiling attribute changes with DC
  * - 3.32.0 - Add syncobj timeline support to AMDGPU_CS.
+ * - 3.33.0 - Fixes for GDS ENOMEM failures in AMDGPU_CS.
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	32
+#define KMS_DRIVER_MINOR	33
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.0.64"
@@ -109,7 +110,6 @@ int amdgpu_vm_fragment_size = -1;
 int amdgpu_vm_block_size = -1;
 int amdgpu_vm_fault_stop = 0;
 int amdgpu_vm_debug = 0;
-int amdgpu_vram_page_split = 512;
 int amdgpu_vm_update_mode = -1;
 int amdgpu_exp_hw_support = 0;
 int amdgpu_dc = -1;
@@ -144,7 +144,7 @@ uint amdgpu_dc_feature_mask = 0;
 struct amdgpu_mgpu_info mgpu_info = {
 	.mutex = __MUTEX_INITIALIZER(mgpu_info.mutex),
 };
-int amdgpu_ras_enable = -1;
+int amdgpu_ras_enable;
 uint amdgpu_ras_mask = 0xffffffff;
 
 /**
@@ -345,13 +345,6 @@ module_param_named(vm_debug, amdgpu_vm_debug, int, 0644);
  */
 MODULE_PARM_DESC(vm_update_mode, "VM update using CPU (0 = never (default except for large BAR(LB)), 1 = Graphics only, 2 = Compute only (default for LB), 3 = Both");
 module_param_named(vm_update_mode, amdgpu_vm_update_mode, int, 0444);
-
-/**
- * DOC: vram_page_split (int)
- * Override the number of pages after we split VRAM allocations (default 512, -1 = disable). The default is 512.
- */
-MODULE_PARM_DESC(vram_page_split, "Number of pages after we split VRAM allocations (default 512, -1 = disable)");
-module_param_named(vram_page_split, amdgpu_vram_page_split, int, 0444);
 
 /**
  * DOC: exp_hw_support (int)
@@ -661,14 +654,14 @@ MODULE_PARM_DESC(ignore_crat,
 
 /**
  * DOC: noretry (int)
- * This parameter sets sh_mem_config.retry_disable. Default value, 0, enables retry.
- * Setting 1 disables retry.
+ * This parameter sets sh_mem_config.retry_disable. Default value, 1, disable retry.
+ * Setting 0 enables retry.
  * Retry is needed for recoverable page faults.
  */
-int noretry;
+int noretry = 1;
 module_param(noretry, int, 0644);
 MODULE_PARM_DESC(noretry,
-	"Set sh_mem_config.retry_disable on Vega10 (0 = retry enabled (default), 1 = retry disabled)");
+	"Set sh_mem_config.retry_disable on Vega10 (1 = retry disabled (default), 0 = retry enabled)");
 
 /**
  * DOC: halt_if_hws_hang (int)
@@ -721,6 +714,22 @@ MODULE_PARM_DESC(pcie_p2p, "Enable PCIe P2P (requires large-BAR). (N = off, Y = 
  */
 MODULE_PARM_DESC(dcfeaturemask, "all stable DC features enabled (default))");
 module_param_named(dcfeaturemask, amdgpu_dc_feature_mask, uint, 0444);
+
+/**
+ * DOC: abmlevel (uint)
+ * Override the default ABM (Adaptive Backlight Management) level used for DC
+ * enabled hardware. Requires DMCU to be supported and loaded.
+ * Valid levels are 0-4. A value of 0 indicates that ABM should be disabled by
+ * default. Values 1-4 control the maximum allowable brightness reduction via
+ * the ABM algorithm, with 1 being the least reduction and 4 being the most
+ * reduction.
+ *
+ * Defaults to 0, or disabled. Userspace can still override this level later
+ * after boot.
+ */
+uint amdgpu_dm_abm_level = 0;
+MODULE_PARM_DESC(abmlevel, "ABM level (0 = off (default), 1-4 = backlight reduction level) ");
+module_param_named(abmlevel, amdgpu_dm_abm_level, uint, 0444);
 
 static const struct pci_device_id pciidlist[] = {
 #ifdef  CONFIG_DRM_AMDGPU_SI

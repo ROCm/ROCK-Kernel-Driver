@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.32"
+#define DC_VER "3.2.35"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -332,6 +332,7 @@ struct dc_debug_options {
 	int sr_exit_time_ns;
 	int sr_enter_plus_exit_time_ns;
 	int urgent_latency_ns;
+	uint32_t underflow_assert_delay_us;
 	int percent_of_ideal_drambw;
 	int dram_clock_change_latency_ns;
 	bool optimized_watermark;
@@ -472,6 +473,7 @@ struct dc_callback_init {
 };
 
 struct dc *dc_create(const struct dc_init_data *init_params);
+int dc_get_vmid_use_vector(struct dc *dc);
 void dc_init_callbacks(struct dc *dc,
 		const struct dc_callback_init *init_params);
 void dc_destroy(struct dc **dc);
