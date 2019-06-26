@@ -35,3 +35,8 @@ gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
 SCHED_FULL_PATH = $(src)
 include $(SCHED_FULL_PATH)/backport/Makefile
+
+ifndef BUILD_AS_DKMS
+FOR_MODULE := $(SCHED_NAME)
+include $(SCHED_FULL_PATH)/../amd/dkms/Makefile.intree
+endif

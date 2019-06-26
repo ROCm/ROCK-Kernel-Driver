@@ -1,0 +1,11 @@
+AMDGPU_CONFIG_PATH := drivers/gpu/drm/amd/dkms
+AMDGPU_CONFIG_H := dkms/config/config.h
+
+$(obj)/$(AMDGPU_CONFIG_H): $(AMDGPU_CONFIG_PATH)/m4/* $(AMDGPU_CONFIG_PATH)/configure.ac
+	@rm -rf $(obj)/dkms;
+	@cp -a $(AMDGPU_CONFIG_PATH) $(obj)/dkms;
+	@cd $(obj)/dkms && \
+	./autogen.sh && \
+	./configure --enable-linux-builtin --with-linux=$(shell pwd);
+
+$(addprefix $(obj)/,$($(FOR_MODULE)-y)): $(obj)/$(AMDGPU_CONFIG_H)
