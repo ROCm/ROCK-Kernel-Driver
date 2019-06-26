@@ -1381,7 +1381,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 				KFD_FENCE_COMPLETED);
 	/* should be timed out */
 	retval = amdkfd_fence_wait_timeout(dqm->fence_addr, KFD_FENCE_COMPLETED,
-				queue_preemption_timeout_ms);
+				QUEUE_PREEMPT_DEFAULT_TIMEOUT_MS);
 	if (retval)
 		return retval;
 
