@@ -22,3 +22,12 @@ else
 TTM_FULL_PATH = $(src)
 endif
 include $(TTM_FULL_PATH)/backport/Makefile
+
+#if defined(BUILD_AS_DKMS)
+CFLAGS_ttm_tracepoints.o := -I$(src)
+#endif
+
+ifeq (,$(BUILD_AS_DKMS))
+FOR_MODULE := $(TTM_NAME)
+include $(TTM_FULL_PATH)/../amd/dkms/Makefile.intree
+endif
