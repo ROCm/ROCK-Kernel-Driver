@@ -125,13 +125,13 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
 		+ page_offset;
 }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 #else
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #endif
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if !defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 	struct vm_area_struct *vma = vmf->vma;
 #endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
