@@ -74,6 +74,7 @@ m4_include([m4/drm-color-lut.m4])
 m4_include([m4/bpf-cgroup-run-prog-device-cgroup.m4])
 m4_include([m4/arch-io-reserve-free-memtype-wc.m4])
 m4_include([m4/kref-read.m4])
+m4_include([m4/vm-mm-in-vm-area-struct.m4])
 m4_include([m4/config.m4])
 
 
