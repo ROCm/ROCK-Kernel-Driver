@@ -46,6 +46,7 @@
 
 #ifndef HAVE_CONFIG_H
 #define HAVE_DRM_GEM_OBJECT_RESV	1
+#define HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG	1
 #endif
 
 struct ttm_global;
@@ -609,6 +610,7 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+#if defined(HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG)
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			     struct vm_fault *vmf);
 
@@ -618,6 +620,19 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				    pgoff_t fault_page_size);
 
 vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf);
+#else
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
+			     struct vm_fault *vmf,
+			     struct vm_area_struct *vma);
+
+vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
+				    struct vm_area_struct *vma,
+				    pgprot_t prot,
+				    pgoff_t num_prefault,
+				    pgoff_t fault_page_size);
+
+vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
+#endif
 
 void ttm_bo_vm_open(struct vm_area_struct *vma);
 
