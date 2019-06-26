@@ -44,7 +44,8 @@
 #include <linux/mem_encrypt.h>
 
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
-				struct vm_fault *vmf)
+				struct vm_fault *vmf,
+				struct vm_area_struct *vma)
 {
 	long err = 0;
 
@@ -64,7 +65,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			return VM_FAULT_RETRY;
 
 		ttm_bo_get(bo);
-		mmap_read_unlock(vmf->vma->vm_mm);
+		mmap_read_unlock(vma->vm_mm);
 		(void)dma_resv_wait_timeout(amdkcl_ttm_resvp(bo),
 					    DMA_RESV_USAGE_KERNEL, true,
 					    MAX_SCHEDULE_TIMEOUT);
@@ -118,9 +119,17 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
  *    VM_FAULT_RETRY if blocking wait.
  *    VM_FAULT_NOPAGE if blocking wait and retrying was not allowed.
  */
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
-			     struct vm_fault *vmf)
+			     struct vm_fault *vmf,
+			     struct vm_area_struct *vma)
 {
+#else
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
+				 struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+#endif
 	/*
 	 * Work around locking order reversal in fault / nopfn
 	 * between mmap_lock and bo_reserve: Perform a trylock operation
@@ -136,7 +145,7 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 		if (fault_flag_allow_retry_first(vmf->flags)) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
-				mmap_read_unlock(vmf->vma->vm_mm);
+				mmap_read_unlock(vma->vm_mm);
 				if (!dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo),
 								 NULL))
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
@@ -183,11 +192,19 @@ EXPORT_SYMBOL(ttm_bo_vm_reserve);
  *   VM_FAULT_OOM on out-of-memory
  *   VM_FAULT_RETRY if retryable wait
  */
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
+				    struct vm_area_struct *vma,
+				    pgprot_t prot,
+				    pgoff_t num_prefault)
+{
+#else
 vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				    pgprot_t prot,
 				    pgoff_t num_prefault)
 {
 	struct vm_area_struct *vma = vmf->vma;
+#endif
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	struct ttm_device *bdev = bo->bdev;
 	unsigned long page_offset;
@@ -198,13 +215,17 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 	int err;
 	pgoff_t i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
+	unsigned long address = (unsigned long)vmf->virtual_address;
+#else
 	unsigned long address = vmf->address;
+#endif
 
 	/*
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
-	ret = ttm_bo_vm_fault_idle(bo, vmf);
+	ret = ttm_bo_vm_fault_idle(bo, vmf, vma);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -316,22 +337,36 @@ vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot)
 }
 EXPORT_SYMBOL(ttm_bo_vm_dummy_page);
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+#else
 vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
+#endif
 	pgprot_t prot;
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	struct drm_device *ddev = bo->base.dev;
 	vm_fault_t ret;
 	int idx;
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+	ret = ttm_bo_vm_reserve(bo, vmf, vma);
+#else
 	ret = ttm_bo_vm_reserve(bo, vmf);
+#endif
 	if (ret)
 		return ret;
 
 	prot = vma->vm_page_prot;
 	if (drm_dev_enter(ddev, &idx)) {
+
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+		ret = ttm_bo_vm_fault_reserved(vmf, vma, prot, TTM_BO_VM_NUM_PREFAULT);
+#else
 		ret = ttm_bo_vm_fault_reserved(vmf, prot, TTM_BO_VM_NUM_PREFAULT);
+#endif
 		drm_dev_exit(idx);
 	} else {
 		ret = ttm_bo_vm_dummy_page(vmf, prot);
