@@ -41,7 +41,7 @@
 #include "amdgpu_display.h"
 #include "amdgpu_ras.h"
 
-static void amdgpu_unregister_gpu_instance(struct amdgpu_device *adev)
+void amdgpu_unregister_gpu_instance(struct amdgpu_device *adev)
 {
 	struct amdgpu_gpu_instance *gpu_instance;
 	int i;
@@ -113,7 +113,7 @@ done_free:
 #endif
 }
 
-static void amdgpu_register_gpu_instance(struct amdgpu_device *adev)
+void amdgpu_register_gpu_instance(struct amdgpu_device *adev)
 {
 	struct amdgpu_gpu_instance *gpu_instance;
 
