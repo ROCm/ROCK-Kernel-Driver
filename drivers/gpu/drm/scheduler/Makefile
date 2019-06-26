@@ -39,3 +39,8 @@ else
 SCHED_FULL_PATH = $(src)
 endif
 include $(SCHED_FULL_PATH)/backport/Makefile
+
+ifeq (,$(BUILD_AS_DKMS))
+FOR_MODULE := $(SCHED_NAME)
+include $(SCHED_FULL_PATH)/../amd/dkms/Makefile.intree
+endif
