@@ -148,9 +148,15 @@ static void kfd_doorbell_close(struct vm_area_struct *vma)
 	mutex_unlock(&pdd->qpd.doorbell_lock);
 }
 
+#ifdef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
 static vm_fault_t kfd_doorbell_vm_fault(struct vm_fault *vmf)
 {
-	struct kfd_process_device *pdd = vmf->vma->vm_private_data;
+	struct vm_area_struct *vma = vmf->vma;
+#else
+static int kfd_doorbell_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+#endif
+	struct kfd_process_device *pdd = vma->vm_private_data;
 
 	if (!pdd)
 		return VM_FAULT_SIGBUS;
