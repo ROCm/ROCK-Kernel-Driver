@@ -51,6 +51,7 @@
 #endif
 #include "vi.h"
 #include "soc15.h"
+#include "nv.h"
 #include "bif/bif_4_1_d.h"
 #include <linux/pci.h>
 #include <linux/firmware.h>
@@ -67,6 +68,7 @@ MODULE_FIRMWARE("amdgpu/vega12_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/raven_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/picasso_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/raven2_gpu_info.bin");
+MODULE_FIRMWARE("amdgpu/navi10_gpu_info.bin");
 
 #define AMDGPU_RESUME_MS		2000
 
@@ -94,6 +96,7 @@ static const char *amdgpu_asic_name[] = {
 	"VEGA12",
 	"VEGA20",
 	"RAVEN",
+	"NAVI10",
 	"LAST",
 };
 
@@ -506,7 +509,10 @@ void amdgpu_device_program_register_sequence(struct amdgpu_device *adev,
 		} else {
 			tmp = RREG32(reg);
 			tmp &= ~and_mask;
-			tmp |= or_mask;
+			if (adev->family >= AMDGPU_FAMILY_AI)
+				tmp |= (or_mask & and_mask);
+			else
+				tmp |= or_mask;
 		}
 		WREG32(reg, tmp);
 	}
@@ -1379,6 +1385,9 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		else
 			chip_name = "raven";
 		break;
+	case CHIP_NAVI10:
+		chip_name = "navi10";
+		break;
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_gpu_info.bin", chip_name);
@@ -1425,6 +1434,23 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		adev->gfx.cu_info.max_scratch_slots_per_cu =
 			le32_to_cpu(gpu_info_fw->gc_max_scratch_slots_per_cu);
 		adev->gfx.cu_info.lds_size = le32_to_cpu(gpu_info_fw->gc_lds_size);
+		if (hdr->version_minor >= 1) {
+			const struct gpu_info_firmware_v1_1 *gpu_info_fw =
+				(const struct gpu_info_firmware_v1_1 *)(adev->firmware.gpu_info_fw->data +
+									le32_to_cpu(hdr->header.ucode_array_offset_bytes));
+			adev->gfx.config.num_sc_per_sh =
+				le32_to_cpu(gpu_info_fw->num_sc_per_sh);
+			adev->gfx.config.num_packer_per_sc =
+				le32_to_cpu(gpu_info_fw->num_packer_per_sc);
+		}
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+		if (hdr->version_minor == 2) {
+			const struct gpu_info_firmware_v1_2 *gpu_info_fw =
+				(const struct gpu_info_firmware_v1_2 *)(adev->firmware.gpu_info_fw->data +
+									le32_to_cpu(hdr->header.ucode_array_offset_bytes));
+			adev->dm.soc_bounding_box = &gpu_info_fw->soc_bounding_box;
+		}
+#endif
 		break;
 	}
 	default:
@@ -1510,6 +1536,13 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 			adev->family = AMDGPU_FAMILY_AI;
 
 		r = soc15_set_ip_blocks(adev);
+		if (r)
+			return r;
+		break;
+	case  CHIP_NAVI10:
+		adev->family = AMDGPU_FAMILY_NV;
+
+		r = nv_set_ip_blocks(adev);
 		if (r)
 			return r;
 		break;
@@ -1697,7 +1730,7 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 			adev->ip_blocks[i].status.hw = true;
 
 			/* right after GMC hw init, we create CSA */
-			if (amdgpu_sriov_vf(adev)) {
+			if (amdgpu_mcbp || amdgpu_sriov_vf(adev)) {
 				r = amdgpu_allocate_static_csa(adev, &adev->virt.csa_obj,
 								AMDGPU_GEM_DOMAIN_VRAM,
 								AMDGPU_CSA_SIZE);
@@ -2373,6 +2406,9 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case CHIP_RAVEN:
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+	case CHIP_NAVI10:
+#endif
 		return amdgpu_dc != 0;
 #endif
 	default:
@@ -2543,6 +2579,20 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		DRM_INFO("PCI I/O BAR is not found.\n");
 
 	amdgpu_device_get_pcie_info(adev);
+
+	if (amdgpu_mcbp)
+		DRM_INFO("MCBP is enabled\n");
+
+	if (amdgpu_mes && adev->asic_type >= CHIP_NAVI10)
+		adev->enable_mes = true;
+
+	if (amdgpu_discovery) {
+		r = amdgpu_discovery_init(adev);
+		if (r) {
+			dev_err(adev->dev, "amdgpu_discovery_init failed\n");
+			return r;
+		}
+	}
 
 	/* early init functions */
 	r = amdgpu_device_ip_early_init(adev);
@@ -2833,6 +2883,9 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	amdgpu_debugfs_regs_cleanup(adev);
 	device_remove_file(adev->dev, &dev_attr_pcie_replay_count);
 	amdgpu_ucode_sysfs_fini(adev);
+	amdgpu_debugfs_preempt_cleanup(adev);
+	if (amdgpu_discovery)
+		amdgpu_discovery_fini(adev);
 }
 
 

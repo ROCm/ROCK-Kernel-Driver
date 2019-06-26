@@ -274,15 +274,6 @@ static bool soc15_read_bios_from_rom(struct amdgpu_device *adev,
 	return true;
 }
 
-struct soc15_allowed_register_entry {
-	uint32_t hwip;
-	uint32_t inst;
-	uint32_t seg;
-	uint32_t reg_offset;
-	bool grbm_indexed;
-};
-
-
 static struct soc15_allowed_register_entry soc15_allowed_read_registers[] = {
 	{ SOC15_REG_ENTRY(GC, 0, mmGRBM_STATUS)},
 	{ SOC15_REG_ENTRY(GC, 0, mmGRBM_STATUS2)},
@@ -387,7 +378,7 @@ void soc15_program_register_sequence(struct amdgpu_device *adev,
 		} else {
 			tmp = RREG32(reg);
 			tmp &= ~(entry->and_mask);
-			tmp |= entry->or_mask;
+			tmp |= (entry->or_mask & entry->and_mask);
 		}
 
 		if (reg == SOC15_REG_OFFSET(GC, 0, mmPA_SC_BINNER_EVENT_CNTL_3) ||

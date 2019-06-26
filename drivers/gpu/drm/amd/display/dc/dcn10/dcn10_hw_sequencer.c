@@ -48,6 +48,10 @@
 #include "clk_mgr.h"
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#include "dsc.h"
+#endif
+
 #define DC_LOGGER_INIT(logger)
 
 #define CTX \
@@ -344,6 +348,62 @@ void dcn10_log_hw_state(struct dc *dc,
 		tg->funcs->clear_optc_underflow(tg);
 	}
 	DTN_INFO("\n");
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
+	for (i = 0; i < pool->res_cap->num_dsc; i++) {
+		struct display_stream_compressor *dsc = pool->dscs[i];
+		struct dcn_dsc_state s = {0};
+
+		dsc->funcs->dsc_read_state(dsc, &s);
+		DTN_INFO("[%d]: %-9d %-12d %-10d\n",
+		dsc->inst,
+			s.dsc_clock_en,
+			s.dsc_slice_width,
+			s.dsc_bytes_per_pixel);
+		DTN_INFO("\n");
+	}
+	DTN_INFO("\n");
+
+	DTN_INFO("S_ENC: DSC_MODE  SEC_GSP7_LINE_NUM"
+			"  VBID6_LINE_REFERENCE  VBID6_LINE_NUM  SEC_GSP7_ENABLE  SEC_STREAM_ENABLE\n");
+	for (i = 0; i < pool->stream_enc_count; i++) {
+		struct stream_encoder *enc = pool->stream_enc[i];
+		struct enc_state s = {0};
+
+		if (enc->funcs->enc_read_state) {
+			enc->funcs->enc_read_state(enc, &s);
+			DTN_INFO("[%-3d]: %-9d %-18d %-21d %-15d %-16d %-17d\n",
+				enc->id,
+				s.dsc_mode,
+				s.sec_gsp_pps_line_num,
+				s.vbid6_line_reference,
+				s.vbid6_line_num,
+				s.sec_gsp_pps_enable,
+				s.sec_stream_enable);
+			DTN_INFO("\n");
+		}
+	}
+	DTN_INFO("\n");
+
+	DTN_INFO("L_ENC: DPHY_FEC_EN  DPHY_FEC_READY_SHADOW  DPHY_FEC_ACTIVE_STATUS\n");
+	for (i = 0; i < dc->link_count; i++) {
+		struct link_encoder *lenc = dc->links[i]->link_enc;
+
+		struct link_enc_state s = {0};
+
+		if (lenc->funcs->read_state) {
+			lenc->funcs->read_state(lenc, &s);
+			DTN_INFO("[%-3d]: %-12d %-22d %-22d\n",
+				i,
+				s.dphy_fec_en,
+				s.dphy_fec_ready_shadow,
+				s.dphy_fec_active_status);
+			DTN_INFO("\n");
+		}
+	}
+	DTN_INFO("\n");
+#endif
 
 	DTN_INFO("\nCALCULATED Clocks: dcfclk_khz:%d  dcfclk_deep_sleep_khz:%d  dispclk_khz:%d\n"
 		"dppclk_khz:%d  max_supported_dppclk_khz:%d  fclk_khz:%d  socclk_khz:%d\n\n",
@@ -1967,7 +2027,12 @@ static void update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state)
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+			plane_state->color_space,
+			NULL);
+#else
 			plane_state->color_space);
+#endif
 
 	//set scale and bias registers
 	dcn10_build_prescale_params(&bns_params, plane_state);
@@ -2419,6 +2484,11 @@ static void dcn10_apply_ctx_for_surface(
 	if (num_planes > 0)
 		program_all_pipe_in_tree(dc, top_pipe_to_program, context);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+	/* Program secondary blending tree and writeback pipes */
+	if ((stream->num_wb_info > 0) && (dc->hwss.program_all_writeback_pipes_in_tree))
+		dc->hwss.program_all_writeback_pipes_in_tree(dc, stream, context);
+#endif
 	if (interdependent_update)
 		for (i = 0; i < dc->res_pool->pipe_count; i++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];

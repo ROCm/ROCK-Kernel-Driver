@@ -4,6 +4,12 @@
 #include "dc_link_dp.h"
 #include "dm_helpers.h"
 #include "opp.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#include "dsc.h"
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#include "resource.h"
+#endif
 
 #include "inc/core_types.h"
 #include "link_hwss.h"
@@ -2547,6 +2553,30 @@ static bool retrieve_link_cap(struct dc_link *link)
 		dp_hw_fw_revision.ieee_fw_rev,
 		sizeof(dp_hw_fw_revision.ieee_fw_rev));
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	memset(&link->dpcd_caps.dsc_caps, '\0',
+			sizeof(link->dpcd_caps.dsc_caps));
+	memset(&link->dpcd_caps.fec_cap, '\0', sizeof(link->dpcd_caps.fec_cap));
+	/* Read DSC and FEC sink capabilities if DP revision is 1.4 and up */
+	if (link->dpcd_caps.dpcd_rev.raw >= DPCD_REV_14) {
+		status = core_link_read_dpcd(
+				link,
+				DP_FEC_CAPABILITY,
+				&link->dpcd_caps.fec_cap.raw,
+				sizeof(link->dpcd_caps.fec_cap.raw));
+		status = core_link_read_dpcd(
+				link,
+				DP_DSC_SUPPORT,
+				link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
+				sizeof(link->dpcd_caps.dsc_caps.dsc_basic_caps.raw));
+		status = core_link_read_dpcd(
+				link,
+				DP_DSC_BRANCH_OVERALL_THROUGHPUT_0,
+				link->dpcd_caps.dsc_caps.dsc_ext_caps.raw,
+				sizeof(link->dpcd_caps.dsc_caps.dsc_ext_caps.raw));
+	}
+#endif
+
 	/* Connectivity log: detection */
 	CONN_DATA_DETECT(link, dpcd_data, sizeof(dpcd_data), "Rx Caps: ");
 
@@ -2674,6 +2704,14 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		stream->timing.display_color_depth;
 	struct bit_depth_reduction_params params;
 	struct output_pixel_processor *opp = pipe_ctx->stream_res.opp;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+	int width = pipe_ctx->stream->timing.h_addressable +
+		pipe_ctx->stream->timing.h_border_left +
+		pipe_ctx->stream->timing.h_border_right;
+	int height = pipe_ctx->stream->timing.v_addressable +
+		pipe_ctx->stream->timing.v_border_bottom +
+		pipe_ctx->stream->timing.v_border_top;
+#endif
 
 	memset(&params, 0, sizeof(params));
 
@@ -2717,6 +2755,30 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				controller_test_pattern, color_depth);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+		else if (opp->funcs->opp_set_disp_pattern_generator) {
+			struct pipe_ctx *bot_odm_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
+
+			if (bot_odm_pipe) {
+				struct output_pixel_processor *bot_opp = bot_odm_pipe->stream_res.opp;
+
+				bot_opp->funcs->opp_program_bit_depth_reduction(bot_opp, &params);
+				width /= 2;
+				bot_opp->funcs->opp_set_disp_pattern_generator(bot_opp,
+					controller_test_pattern,
+					color_depth,
+					NULL,
+					width,
+					height);
+			}
+			opp->funcs->opp_set_disp_pattern_generator(opp,
+				controller_test_pattern,
+				color_depth,
+				NULL,
+				width,
+				height);
+		}
+#endif
 	}
 	break;
 	case DP_TEST_PATTERN_VIDEO_MODE:
@@ -2729,6 +2791,30 @@ static void set_crtc_test_pattern(struct dc_link *link,
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
 				color_depth);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+		else if (opp->funcs->opp_set_disp_pattern_generator) {
+			struct pipe_ctx *bot_odm_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
+
+			if (bot_odm_pipe) {
+				struct output_pixel_processor *bot_opp = bot_odm_pipe->stream_res.opp;
+
+				bot_opp->funcs->opp_program_bit_depth_reduction(bot_opp, &params);
+				width /= 2;
+				bot_opp->funcs->opp_set_disp_pattern_generator(bot_opp,
+					CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
+					color_depth,
+					NULL,
+					width,
+					height);
+			}
+			opp->funcs->opp_set_disp_pattern_generator(opp,
+				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
+				color_depth,
+				NULL,
+				width,
+				height);
+		}
+#endif
 	}
 	break;
 
@@ -2903,3 +2989,67 @@ void dp_enable_mst_on_sink(struct dc_link *link, bool enable)
 
 	core_link_write_dpcd(link, DP_MSTM_CTRL, &mstmCntl, 1);
 }
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+void dp_set_fec_ready(struct dc_link *link, bool ready)
+{
+	/* FEC has to be "set ready" before the link training.
+	 * The policy is to always train with FEC
+	 * if the sink supports it and leave it enabled on link.
+	 * If FEC is not supported, disable it.
+	 */
+	struct link_encoder *link_enc = link->link_enc;
+	uint8_t fec_config = 0;
+
+	if (link->dc->debug.disable_fec ||
+			IS_FPGA_MAXIMUS_DC(link->ctx->dce_environment))
+		return;
+
+	if (link_enc->funcs->fec_set_ready &&
+			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+		if (link->fec_state == dc_link_fec_not_ready && ready) {
+			fec_config = 1;
+			if (core_link_write_dpcd(link,
+					DP_FEC_CONFIGURATION,
+					&fec_config,
+					sizeof(fec_config)) == DC_OK) {
+				link_enc->funcs->fec_set_ready(link_enc, true);
+				link->fec_state = dc_link_fec_ready;
+			} else {
+				dm_error("dpcd write failed to set fec_ready");
+			}
+		} else if (link->fec_state == dc_link_fec_ready && !ready) {
+			fec_config = 0;
+			core_link_write_dpcd(link,
+					DP_FEC_CONFIGURATION,
+					&fec_config,
+					sizeof(fec_config));
+			link->link_enc->funcs->fec_set_ready(
+					link->link_enc, false);
+			link->fec_state = dc_link_fec_not_ready;
+		}
+	}
+}
+
+void dp_set_fec_enable(struct dc_link *link, bool enable)
+{
+	struct link_encoder *link_enc = link->link_enc;
+
+	if (link->dc->debug.disable_fec ||
+			IS_FPGA_MAXIMUS_DC(link->ctx->dce_environment))
+		return;
+
+	if (link_enc->funcs->fec_set_enable &&
+			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+		if (link->fec_state == dc_link_fec_ready && enable) {
+			msleep(1);
+			link_enc->funcs->fec_set_enable(link_enc, true);
+			link->fec_state = dc_link_fec_enabled;
+		} else if (link->fec_state == dc_link_fec_enabled && !enable) {
+			link_enc->funcs->fec_set_enable(link_enc, false);
+			link->fec_state = dc_link_fec_ready;
+		}
+	}
+}
+#endif
+

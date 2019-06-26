@@ -43,6 +43,10 @@
 #include "dpcd_defs.h"
 #include "dmcu.h"
 #include "hw/clk_mgr.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#include "resource.h"
+#endif
+#include "hw/clk_mgr.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -1482,6 +1486,10 @@ static enum dc_status enable_link_dp(
 	if (link_settings.link_rate == LINK_RATE_LOW)
 			skip_video_pattern = false;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	dp_set_fec_ready(link, true);
+#endif
+
 	if (perform_link_training_with_retries(
 			link,
 			&link_settings,
@@ -1493,6 +1501,9 @@ static enum dc_status enable_link_dp(
 	else
 		status = DC_FAIL_DP_LINK_TRAINING;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	dp_set_fec_enable(link, true);
+#endif
 	return status;
 }
 
@@ -2115,6 +2126,14 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 			dp_disable_link_phy(link, signal);
 		else
 			dp_disable_link_phy_mst(link, signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+
+		if (dc_is_dp_sst_signal(signal) ||
+				link->mst_stream_alloc_table.stream_count == 0) {
+			dp_set_fec_enable(link, false);
+			dp_set_fec_ready(link, false);
+		}
+#endif
 	} else
 		link->link_enc->funcs->disable_output(link->link_enc, signal);
 
@@ -2711,13 +2730,30 @@ void core_link_enable_stream(
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			allocate_mst_payload(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+		if (pipe_ctx->stream->timing.flags.DSC &&
+				(dc_is_dp_signal(pipe_ctx->stream->signal) ||
+				dc_is_virtual_signal(pipe_ctx->stream->signal))) {
+			dp_set_dsc_enable(pipe_ctx, true);
+			pipe_ctx->stream_res.tg->funcs->wait_for_state(
+					pipe_ctx->stream_res.tg,
+					CRTC_STATE_VBLANK);
+		}
+#endif
 		core_dc->hwss.unblank_stream(pipe_ctx,
 			&pipe_ctx->stream->link->cur_link_settings);
 
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			enable_stream_features(pipe_ctx);
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	else { // if (IS_FPGA_MAXIMUS_DC(core_dc->ctx->dce_environment))
+		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
+				dc_is_virtual_signal(pipe_ctx->stream->signal))
+			dp_set_dsc_enable(pipe_ctx, true);
 
+	}
+#endif
 }
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx, int option)
@@ -2758,6 +2794,12 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx, int option)
 	core_dc->hwss.disable_stream(pipe_ctx, option);
 
 	disable_link(pipe_ctx->stream->link, pipe_ctx->stream->signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	if (pipe_ctx->stream->timing.flags.DSC &&
+			dc_is_dp_signal(pipe_ctx->stream->signal)) {
+		dp_set_dsc_enable(pipe_ctx, false);
+	}
+#endif
 }
 
 void core_link_set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
@@ -2824,6 +2866,14 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 {
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	if (timing->flags.DSC) {
+		kbps = (timing->pix_clk_100hz * timing->dsc_cfg.bits_per_pixel);
+		kbps = kbps / 160 + ((kbps % 160) ? 1 : 0);
+		return kbps;
+	}
+#endif
 
 	switch (timing->display_color_depth) {
 	case COLOR_DEPTH_666:
@@ -2975,6 +3025,33 @@ uint32_t dc_link_bandwidth_kbps(
 
 	link_bw_kbps *= 8;   /* 8 bits per byte*/
 	link_bw_kbps *= link_setting->lane_count;
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	if (link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+		/* Account for FEC overhead.
+		 * We have to do it based on caps,
+		 * and not based on FEC being set ready,
+		 * because FEC is set ready too late in
+		 * the process to correctly be picked up
+		 * by mode enumeration.
+		 *
+		 * There's enough zeros at the end of 'kbps'
+		 * that make the below operation 100% precise
+		 * for our purposes.
+		 * 'long long' makes it work even for HDMI 2.1
+		 * max bandwidth (and much, much bigger bandwidths
+		 * than that, actually).
+		 *
+		 * NOTE: Reducing link BW by 3% may not be precise
+		 * because it may be a stream BT that increases by 3%, and so
+		 * 1/1.03 = 0.970873 factor should have been used instead,
+		 * but the difference is minimal and is in a safe direction,
+		 * which all works well around potential ambiguity of DP 1.4a spec.
+		 */
+		long long fec_link_bw_kbps = link_bw_kbps * 970LL;
+		link_bw_kbps = (uint32_t)(fec_link_bw_kbps / 1000LL);
+	}
+#endif
 
 	return link_bw_kbps;
 
