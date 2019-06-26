@@ -146,6 +146,7 @@ m4_include([m4/backlight-device-register.m4])
 m4_include([m4/backlight-properties-type.m4])
 m4_include([m4/managed-pages-in-struct-zone.m4])
 m4_include([m4/iommu-get-domain-for-dev.m4])
+m4_include([m4/virtual-mm-fault-function.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
