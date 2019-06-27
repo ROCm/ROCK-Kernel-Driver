@@ -90,7 +90,7 @@ static void amdgpu_perf_start(struct perf_event *event, int flags)
 		break;
 	}
 
-	perf_event_update_userpage(event);
+	kcl_perf_event_update_userpage(event);
 
 }
 
@@ -215,7 +215,7 @@ static void amdgpu_perf_del(struct perf_event *event, int flags)
 		break;
 	};
 
-	perf_event_update_userpage(event);
+	kcl_perf_event_update_userpage(event);
 }
 
 /* vega20 pmus */
