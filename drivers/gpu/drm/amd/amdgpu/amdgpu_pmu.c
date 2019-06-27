@@ -52,7 +52,11 @@ static int amdgpu_perf_event_init(struct perf_event *event)
 		return -ENOENT;
 
 	/* update the hw_perf_event struct with config data */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 	hwc->conf = event->attr.config;
+#else
+	hwc->config = event->attr.config;
+#endif
 
 	return 0;
 }
@@ -74,9 +78,13 @@ static void amdgpu_perf_start(struct perf_event *event, int flags)
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
 		if (!(flags & PERF_EF_RELOAD))
-			pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
 		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 0);
+#else
+		pe->adev->df_funcs->pmc_start(pe->adev, hwc->config,1);
+		pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 0);
+#endif
 		break;
 	default:
 		break;
@@ -101,8 +109,13 @@ static void amdgpu_perf_read(struct perf_event *event)
 
 		switch (pe->pmu_perf_type) {
 		case PERF_TYPE_AMDGPU_DF:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 			pe->adev->df_funcs->pmc_get_count(pe->adev, hwc->conf,
 							  &count);
+#else
+			pe->adev->df_funcs->pmc_get_count(pe->adev, hwc->config,
+							  &count);
+#endif
 			break;
 		default:
 			count = 0;
@@ -126,7 +139,11 @@ static void amdgpu_perf_stop(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 0);
+#else
+		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 0);
+#endif
 		break;
 	default:
 		break;
@@ -156,7 +173,11 @@ static int amdgpu_perf_add(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
+#else
+		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 1);
+#endif
 		break;
 	default:
 		return 0;
@@ -184,7 +205,11 @@ static void amdgpu_perf_del(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 1);
+#else
+		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 1);
+#endif
 		break;
 	default:
 		break;
