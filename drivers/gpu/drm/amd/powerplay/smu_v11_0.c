@@ -263,7 +263,8 @@ static int smu_v11_0_check_fw_version(struct smu_context *smu)
 			"smu fw version = 0x%08x (%d.%d.%d)\n",
 			smu->smc_if_version, if_version,
 			smu_version, smu_major, smu_minor, smu_debug);
-		pr_warn("SMU driver if version not matched\n");
+		pr_err("SMU driver if version not matched\n");
+		ret = -EINVAL;
 	}
 
 	return ret;
