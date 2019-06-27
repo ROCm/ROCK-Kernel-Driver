@@ -76,6 +76,7 @@ m4_include([m4/arch-io-reserve-free-memtype-wc.m4])
 m4_include([m4/kref-read.m4])
 m4_include([m4/vm-mm-in-vm-area-struct.m4])
 m4_include([m4/virtual-mm-fault-function.m4])
+m4_include([m4/pfn_to_pfn_t.m4])
 m4_include([m4/config.m4])
 
 
