@@ -9,6 +9,7 @@ extern void amdkcl_dev_cgroup_init(void);
 extern void amdkcl_pci_init(void);
 #endif
 extern void amdkcl_suspend_init(void);
+extern void amdkcl_perf_event_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -19,6 +20,7 @@ int __init amdkcl_init(void)
 	amdkcl_pci_init();
 #endif
 	amdkcl_suspend_init();
+	amdkcl_perf_event_init();
 
 	return 0;
 }
