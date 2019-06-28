@@ -308,7 +308,7 @@ static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 {
 	struct dma_page *d_page;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef DMA_ATTR_NO_WARN
 	unsigned long attrs = 0;
 #endif
 	void *vaddr;
@@ -317,7 +317,7 @@ static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 	if (!d_page)
 		return NULL;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef DMA_ATTR_NO_WARN
 	if (pool->type & IS_HUGE)
 		attrs = DMA_ATTR_NO_WARN;
 
