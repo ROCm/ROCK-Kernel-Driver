@@ -44,7 +44,9 @@
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
+#ifdef pgprot_decrypted
 #include <linux/mem_encrypt.h>
+#endif
 
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_fault *vmf,
@@ -348,8 +350,10 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 		if (ttm_tt_populate(bdev, bo->ttm, &ctx))
 			return VM_FAULT_OOM;
 	} else {
+#ifdef pgprot_decrypted
 		/* Iomem should not be marked encrypted */
 		prot = pgprot_decrypted(prot);
+#endif
 	}
 
 	/* We don't prefault on huge faults. Yet. */
