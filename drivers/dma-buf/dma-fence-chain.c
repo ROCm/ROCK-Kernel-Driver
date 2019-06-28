@@ -20,20 +20,65 @@
 static bool dma_fence_chain_enable_signaling(struct dma_fence *fence);
 
 /**
- * dma_fence_chain_get_prev - use RCU to get a reference to the previous fence
- * @chain: chain node to get the previous node from
+ * dma_fence_chain_get - use RCU to get a reference to a fence
+ * @pfence: rcu protected fence pointer
  *
- * Use dma_fence_get_rcu_safe to get a reference to the previous fence of the
- * chain node.
+ * Use dma_fence_get_rcu_safe to get a reference to a fence in a chain.
  */
-static struct dma_fence *dma_fence_chain_get_prev(struct dma_fence_chain *chain)
+static struct dma_fence *dma_fence_chain_get(struct dma_fence __rcu **pfence)
 {
 	struct dma_fence *prev;
 
 	rcu_read_lock();
-	prev = dma_fence_get_rcu_safe(&chain->prev);
+	prev = dma_fence_get_rcu_safe(pfence);
 	rcu_read_unlock();
 	return prev;
+}
+
+/**
+ * dma_fence_chain_is_dead - check if dma_fence_chain should be unlinked
+ * @fence: fence to check
+ *
+ * If @fence is a dma_fence_chain node we check if the contained fence is
+ * signaled, otherwise we check if just this fence is signaled.
+ */
+static bool dma_fence_chain_is_dead(struct dma_fence *fence)
+{
+	struct dma_fence_chain *chain = to_dma_fence_chain(fence);
+
+	if (chain)
+		return dma_fence_is_signaled(chain->fence);
+
+	return dma_fence_is_signaled(fence);
+}
+
+/**
+ * dma_fence_chain_unlink - make an RCU safe removal of a chain node
+ * @pfence: the pointer to replace
+ * @old: the current value of that pointer
+ *
+ * Tries to replace the RCU protected value of pointer @pfence with the previous
+ * fence in the chain. The reference to the old fence is dropped no matter if
+ * the exchange was succesfully or not.
+ */
+static void dma_fence_chain_unlink(struct dma_fence __rcu **pfence,
+				   struct dma_fence *old)
+{
+	struct dma_fence *replacement, *tmp;
+	struct dma_fence_chain *chain;
+
+	chain = to_dma_fence_chain(old);
+	if (chain)
+		replacement = dma_fence_chain_get(&chain->prev);
+	else
+		replacement = NULL;
+
+	tmp = cmpxchg((void **)pfence, (void *)current, (void *)replacement);
+	if (tmp == old)
+		dma_fence_put(tmp);
+	else
+		dma_fence_put(replacement);
+	dma_fence_put(old);
 }
 
 /**
@@ -46,8 +91,8 @@ static struct dma_fence *dma_fence_chain_get_prev(struct dma_fence_chain *chain)
  */
 struct dma_fence *dma_fence_chain_walk(struct dma_fence *fence)
 {
-	struct dma_fence_chain *chain, *prev_chain;
-	struct dma_fence *prev, *replacement, *tmp;
+	struct dma_fence_chain *chain;
+	struct dma_fence *prev;
 
 	chain = to_dma_fence_chain(fence);
 	if (!chain) {
@@ -55,27 +100,12 @@ struct dma_fence *dma_fence_chain_walk(struct dma_fence *fence)
 		return NULL;
 	}
 
-	while ((prev = dma_fence_chain_get_prev(chain))) {
+	while ((prev = dma_fence_chain_get(&chain->prev))) {
 
-		prev_chain = to_dma_fence_chain(prev);
-		if (prev_chain) {
-			if (!dma_fence_is_signaled(prev_chain->fence))
-				break;
+		if (!dma_fence_chain_is_dead(prev))
+			break;
 
-			replacement = dma_fence_chain_get_prev(prev_chain);
-		} else {
-			if (!dma_fence_is_signaled(prev))
-				break;
-
-			replacement = NULL;
-		}
-
-		tmp = cmpxchg((void **)&chain->prev, (void *)prev, (void *)replacement);
-		if (tmp == prev)
-			dma_fence_put(tmp);
-		else
-			dma_fence_put(replacement);
-		dma_fence_put(prev);
+		dma_fence_chain_unlink(&chain->prev, prev);
 	}
 
 	dma_fence_put(fence);
@@ -115,6 +145,55 @@ int dma_fence_chain_find_seqno(struct dma_fence **pfence, uint64_t seqno)
 	return 0;
 }
 EXPORT_SYMBOL(dma_fence_chain_find_seqno);
+
+/**
+ * dma_fence_chain_remove_fences - remove fences from a chain
+ * @pfence: pointer to the chain node where to start
+ * @cb: callback to decide if fence should be removed
+ * @data: data for the callback
+ *
+ * Iterate over the chain nodes until we can be sure that there are no more
+ * fences which should be removed.
+ *
+ * To remove a node we need to iterate at least twice to make sure we doesn't
+ * collide with concurrent operations.
+ */
+void dma_fence_chain_remove_fence(struct dma_fence __rcu **pfence,
+				  bool (*cb)(struct dma_fence *f, void *data),
+				  void *data)
+{
+	struct dma_fence_chain *chain = NULL;
+	struct dma_fence **prev, *fence;
+
+retry:
+	prev = pfence;
+	while ((fence = dma_fence_chain_get(prev))) {
+		dma_fence_put(&chain->base);
+		chain = to_dma_fence_chain(fence);
+
+		if (dma_fence_chain_is_dead(fence)) {
+			dma_fence_chain_unlink(prev, fence);
+			continue;
+		}
+
+		if (cb(chain ? chain->fence : fence, data)) {
+			dma_fence_chain_unlink(prev, fence);
+			/* Restart the search cause it can be that the previous
+			 * chain is unlinked just as we try to unlink this one.
+			 */
+			goto retry;
+		}
+
+		if (!chain) {
+			dma_fence_put(fence);
+			break;
+		}
+
+		prev = &chain->prev;
+	}
+	dma_fence_put(&chain->base);
+}
+EXPORT_SYMBOL(dma_fence_chain_remove_fence);
 
 static const char *dma_fence_chain_get_driver_name(struct dma_fence *fence)
 {
