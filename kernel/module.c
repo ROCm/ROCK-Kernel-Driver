@@ -1271,14 +1271,14 @@ static struct module_attribute modinfo_taint =
 static void setup_modinfo_supported(struct module *mod, const char *s)
 {
 	if (!s) {
-		mod->taints |= (1 << TAINT_AUX);
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
 		return;
 	}
 
 	if (strcmp(s, "external") == 0)
-		return;
+		mod->taints |= (1 << TAINT_EXTERNAL_SUPPORT);
 	else if (strcmp(s, "yes"))
-		mod->taints |= (1 << TAINT_AUX);
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
 }
 
 static ssize_t show_modinfo_supported(struct module_attribute *mattr,
@@ -1865,7 +1865,9 @@ static int mod_sysfs_setup(struct module *mod,
 	add_notes_attrs(mod, info);
 
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
-	if (mod->taints & (1 << TAINT_AUX)) {
+	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
+		add_taint(TAINT_EXTERNAL_SUPPORT, LOCKDEP_STILL_OK);
+	else if (mod->taints & (1 << TAINT_NO_SUPPORT)) {
 		if (suse_unsupported == 0) {
 			printk(KERN_WARNING "%s: module not supported by "
 			       "SUSE, refusing to load. To override, echo "
@@ -1873,7 +1875,7 @@ static int mod_sysfs_setup(struct module *mod,
 			err = -ENOEXEC;
 			goto out_remove_attrs;
 		}
-		add_taint(TAINT_AUX, LOCKDEP_STILL_OK);
+		add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
 		if (suse_unsupported == 1) {
 			printk(KERN_WARNING "%s: module is not supported by "
 			       "SUSE. Our support organization may not be "

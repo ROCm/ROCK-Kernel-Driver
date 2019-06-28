@@ -577,6 +577,20 @@ extern enum system_states {
 #define TAINT_RANDSTRUCT		17
 #define TAINT_FLAGS_COUNT		18
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+/*
+ * Take the upper bits to hopefully allow them
+ * to stay the same for more than one release.
+ */
+#  define TAINT_NO_SUPPORT		30
+#  define TAINT_EXTERNAL_SUPPORT	31
+#  if TAINT_FLAGS_COUNT >= TAINT_NO_SUPPORT
+#    error Upstream taint flags overlap with SUSE flags
+#  endif
+#  undef TAINT_FLAGS_COUNT
+#  define TAINT_FLAGS_COUNT		32
+#endif
+
 struct taint_flag {
 	char c_true;	/* character printed when tainted */
 	char c_false;	/* character printed when not tainted */

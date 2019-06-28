@@ -331,6 +331,11 @@ else
 
 include scripts/Kbuild.include
 
+# Warn about unsupported modules in kernels built inside Autobuild
+ifneq ($(wildcard /.buildenv),)
+CFLAGS		+= -DUNSUPPORTED_MODULES=2
+endif
+
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
 KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
@@ -467,11 +472,6 @@ KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 KBUILD_LDFLAGS :=
 GCC_PLUGINS_CFLAGS :=
-
-# Warn about unsupported modules in kernels built inside Autobuild
-ifneq ($(wildcard /.buildenv),)
-CFLAGS		+= -DUNSUPPORTED_MODULES=2
-endif
 
 export ARCH SRCARCH CONFIG_SHELL HOSTCC KBUILD_HOSTCFLAGS CROSS_COMPILE AS LD CC
 export CPP AR NM STRIP OBJCOPY OBJDUMP PAHOLE KBUILD_HOSTLDFLAGS KBUILD_HOSTLDLIBS

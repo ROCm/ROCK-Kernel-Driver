@@ -367,6 +367,10 @@ const struct taint_flag taint_flags[TAINT_FLAGS_COUNT] = {
 	[ TAINT_LIVEPATCH ]		= { 'K', ' ', true },
 	[ TAINT_AUX ]			= { 'X', ' ', true },
 	[ TAINT_RANDSTRUCT ]		= { 'T', ' ', true },
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	[ TAINT_EXTERNAL_SUPPORT ]	= { 'x', ' ', true }, /* should move to TAINT_AUX? */
+	[ TAINT_NO_SUPPORT ]		= { 'n', ' ', true },
+#endif
 };
 
 /**
