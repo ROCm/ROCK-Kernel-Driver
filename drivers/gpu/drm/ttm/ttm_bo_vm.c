@@ -251,8 +251,10 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 		if (ttm_tt_populate(bdev, bo->ttm, &ctx))
 			return VM_FAULT_OOM;
 	} else {
+#ifdef pgprot_decrypted
 		/* Iomem should not be marked encrypted */
 		prot = pgprot_decrypted(prot);
+#endif
 	}
 
 	/*
