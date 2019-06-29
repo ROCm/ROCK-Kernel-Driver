@@ -2021,7 +2021,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		}
 
 		/* Mark the BO as valid unless it was invalidated
-		 * again concurrently
+		 * again concurrently.
 		 */
 		if (atomic_cmpxchg(&mem->invalid, invalid, 0) != invalid)
 			return -EAGAIN;
