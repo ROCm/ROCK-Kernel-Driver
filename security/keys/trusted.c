@@ -32,7 +32,6 @@
 static const char hmac_alg[] = "hmac(sha1)";
 static const char hash_alg[] = "sha1";
 static struct tpm_chip *chip;
-static struct tpm_digest *digests;
 
 struct sdesc {
 	struct shash_desc shash;
@@ -386,10 +385,15 @@ EXPORT_SYMBOL_GPL(trusted_tpm_send);
  */
 static int pcrlock(const int pcrnum)
 {
+	unsigned char hash[SHA1_DIGEST_SIZE];
+	int ret;
+
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-
-	return tpm_pcr_extend(chip, pcrnum, digests) ? -EINVAL : 0;
+	ret = tpm_get_random(chip, hash, SHA1_DIGEST_SIZE);
+	if (ret != SHA1_DIGEST_SIZE)
+		return ret;
+	return tpm_pcr_extend(chip, pcrnum, hash) ? -EINVAL : 0;
 }
 
 /*
@@ -1226,29 +1230,6 @@ hashalg_fail:
 	return ret;
 }
 
-static int __init init_digests(void)
-{
-	u8 digest[TPM_MAX_DIGEST_SIZE];
-	int ret;
-	int i;
-
-	ret = tpm_get_random(chip, digest, TPM_MAX_DIGEST_SIZE);
-	if (ret < 0)
-		return ret;
-	if (ret < TPM_MAX_DIGEST_SIZE)
-		return -EFAULT;
-
-	digests = kcalloc(chip->nr_allocated_banks, sizeof(*digests),
-			  GFP_KERNEL);
-	if (!digests)
-		return -ENOMEM;
-
-	for (i = 0; i < chip->nr_allocated_banks; i++)
-		memcpy(digests[i].digest, digest, TPM_MAX_DIGEST_SIZE);
-
-	return 0;
-}
-
 static int __init init_trusted(void)
 {
 	int ret;
@@ -1259,21 +1240,15 @@ static int __init init_trusted(void)
 	chip = tpm_default_chip();
 	if (!chip)
 		return 0;
-
-	ret = init_digests();
-	if (ret < 0)
-		goto err_put;
 	ret = trusted_shash_alloc();
 	if (ret < 0)
-		goto err_free;
+		goto err_put;
 	ret = register_key_type(&key_type_trusted);
 	if (ret < 0)
 		goto err_release;
 	return 0;
 err_release:
 	trusted_shash_release();
-err_free:
-	kfree(digests);
 err_put:
 	put_device(&chip->dev);
 	return ret;
@@ -1283,7 +1258,6 @@ static void __exit cleanup_trusted(void)
 {
 	if (chip) {
 		put_device(&chip->dev);
-		kfree(digests);
 		trusted_shash_release();
 		unregister_key_type(&key_type_trusted);
 	}
