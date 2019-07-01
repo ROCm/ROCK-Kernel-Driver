@@ -245,7 +245,7 @@ static void gmc_v10_0_flush_gpu_tlb(struct amdgpu_device *adev,
 
 	gmc_v10_0_flush_vm_hub(adev, vmid, AMDGPU_MMHUB, 0);
 	if (!adev->mman.buffer_funcs_enabled || !adev->ib_pool_ready ||
-	    adev->asic_type != CHIP_NAVI10) {
+	    adev->asic_type > CHIP_NAVI14) {
 		gmc_v10_0_flush_vm_hub(adev, vmid, AMDGPU_GFXHUB, 0);
 		mutex_unlock(&adev->mman.gtt_window_lock);
 		return;
