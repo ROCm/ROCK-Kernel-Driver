@@ -1375,6 +1375,7 @@ int vega10_get_powerplay_table_entry(struct pp_hwmgr *hwmgr,
 int vega10_baco_set_cap(struct pp_hwmgr *hwmgr)
 {
 	int result = 0;
+
 	const ATOM_Vega10_POWERPLAYTABLE *powerplay_table;
 
 	powerplay_table = get_powerplay_table(hwmgr);
@@ -1393,3 +1394,4 @@ int vega10_baco_set_cap(struct pp_hwmgr *hwmgr)
 			PHM_PlatformCaps_BACO);
 	return result;
 }
+

@@ -37,7 +37,7 @@
 
 #include "asic_reg/mp/mp_11_0_sh_mask.h"
 
-#define FEATURE_MASK(feature) (1UL << feature)
+#define FEATURE_MASK(feature) (1ULL << feature)
 #define SMC_DPM_FEATURE ( \
 	FEATURE_MASK(FEATURE_DPM_PREFETCHER_BIT) | \
 	FEATURE_MASK(FEATURE_DPM_GFXCLK_BIT)	 | \
@@ -325,8 +325,6 @@ navi10_get_allowed_feature_mask(struct smu_context *smu,
 				| FEATURE_MASK(FEATURE_FAN_CONTROL_BIT)
 				| FEATURE_MASK(FEATURE_THERMAL_BIT)
 				| FEATURE_MASK(FEATURE_LED_DISPLAY_BIT)
-				| FEATURE_MASK(FEATURE_MMHUB_PG_BIT)
-				| FEATURE_MASK(FEATURE_ATHUB_PG_BIT)
 				| FEATURE_MASK(FEATURE_DPM_DCEFCLK_BIT)
 				| FEATURE_MASK(FEATURE_DS_GFXCLK_BIT)
 				| FEATURE_MASK(FEATURE_DS_DCEFCLK_BIT)
@@ -345,6 +343,12 @@ navi10_get_allowed_feature_mask(struct smu_context *smu,
 		/* TODO: remove it once fw fix the bug */
 		*(uint64_t *)feature_mask &= ~FEATURE_MASK(FEATURE_FW_DSTATE_BIT);
 	}
+
+	if (smu->adev->pg_flags & AMD_PG_SUPPORT_MMHUB)
+		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_MMHUB_PG_BIT);
+
+	if (smu->adev->pg_flags & AMD_PG_SUPPORT_ATHUB)
+		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_ATHUB_PG_BIT);
 
 	if (smu->adev->pg_flags & AMD_PG_SUPPORT_VCN)
 		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_VCN_PG_BIT);
@@ -570,15 +574,19 @@ static int navi10_dpm_set_uvd_enable(struct smu_context *smu, bool enable)
 	struct smu_power_gate *power_gate = &smu_power->power_gate;
 
 	if (enable && power_gate->uvd_gated) {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_PowerUpVcn, 1);
-		if (ret)
-			return ret;
+		if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UVD_BIT)) {
+			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_PowerUpVcn, 1);
+			if (ret)
+				return ret;
+		}
 		power_gate->uvd_gated = false;
 	} else {
 		if (!enable && !power_gate->uvd_gated) {
-			ret = smu_send_smc_msg(smu, SMU_MSG_PowerDownVcn);
-			if (ret)
-				return ret;
+			if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UVD_BIT)) {
+				ret = smu_send_smc_msg(smu, SMU_MSG_PowerDownVcn);
+				if (ret)
+					return ret;
+			}
 			power_gate->uvd_gated = true;
 		}
 	}
@@ -815,14 +823,21 @@ static int navi10_unforce_dpm_levels(struct smu_context *smu) {
 	uint32_t min_freq, max_freq;
 	enum smu_clk_type clk_type;
 
-	enum smu_clk_type clks[] = {
-		SMU_GFXCLK,
-		SMU_MCLK,
-		SMU_SOCCLK,
+	struct clk_feature_map {
+		enum smu_clk_type clk_type;
+		uint32_t	feature;
+	} clk_feature_map[] = {
+		{SMU_GFXCLK, SMU_FEATURE_DPM_GFXCLK_BIT},
+		{SMU_MCLK,   SMU_FEATURE_DPM_UCLK_BIT},
+		{SMU_SOCCLK, SMU_FEATURE_DPM_SOCCLK_BIT},
 	};
 
-	for (i = 0; i < ARRAY_SIZE(clks); i++) {
-		clk_type = clks[i];
+	for (i = 0; i < ARRAY_SIZE(clk_feature_map); i++) {
+		if (!smu_feature_is_enabled(smu, clk_feature_map[i].feature))
+		    continue;
+
+		clk_type = clk_feature_map[i].clk_type;
+
 		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
@@ -848,7 +863,7 @@ static int navi10_get_gpu_power(struct smu_context *smu, uint32_t *value)
 	if (ret)
 		return ret;
 
-	*value = metrics.CurrSocketPower << 8;
+	*value = metrics.AverageSocketPower << 8;
 
 	return 0;
 }
@@ -885,15 +900,33 @@ static bool navi10_is_dpm_running(struct smu_context *smu)
 	return !!(feature_enabled & SMC_DPM_FEATURE);
 }
 
+static int navi10_get_fan_speed(struct smu_context *smu, uint16_t *value)
+{
+	SmuMetrics_t metrics = {0};
+	int ret = 0;
+
+	if (!value)
+		return -EINVAL;
+
+	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS,
+			       (void *)&metrics, false);
+	if (ret)
+		return ret;
+
+	*value = metrics.CurrFanSpeed;
+
+	return ret;
+}
+
 static int navi10_get_fan_speed_percent(struct smu_context *smu,
 					uint32_t *speed)
 {
 	int ret = 0;
 	uint32_t percent = 0;
-	uint32_t current_rpm;
+	uint16_t current_rpm;
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
 
-	ret = smu_get_current_rpm(smu, &current_rpm);
+	ret = navi10_get_fan_speed(smu, &current_rpm);
 	if (ret)
 		return ret;
 
@@ -1271,6 +1304,169 @@ static int navi10_get_uclk_dpm_states(struct smu_context *smu, uint32_t *clocks_
 	return 0;
 }
 
+static int navi10_get_ppfeature_status(struct smu_context *smu,
+				       char *buf)
+{
+	static const char *ppfeature_name[] = {
+				"DPM_PREFETCHER",
+				"DPM_GFXCLK",
+				"DPM_GFX_PACE",
+				"DPM_UCLK",
+				"DPM_SOCCLK",
+				"DPM_MP0CLK",
+				"DPM_LINK",
+				"DPM_DCEFCLK",
+				"MEM_VDDCI_SCALING",
+				"MEM_MVDD_SCALING",
+				"DS_GFXCLK",
+				"DS_SOCCLK",
+				"DS_LCLK",
+				"DS_DCEFCLK",
+				"DS_UCLK",
+				"GFX_ULV",
+				"FW_DSTATE",
+				"GFXOFF",
+				"BACO",
+				"VCN_PG",
+				"JPEG_PG",
+				"USB_PG",
+				"RSMU_SMN_CG",
+				"PPT",
+				"TDC",
+				"GFX_EDC",
+				"APCC_PLUS",
+				"GTHR",
+				"ACDC",
+				"VR0HOT",
+				"VR1HOT",
+				"FW_CTF",
+				"FAN_CONTROL",
+				"THERMAL",
+				"GFX_DCS",
+				"RM",
+				"LED_DISPLAY",
+				"GFX_SS",
+				"OUT_OF_BAND_MONITOR",
+				"TEMP_DEPENDENT_VMIN",
+				"MMHUB_PG",
+				"ATHUB_PG"};
+	static const char *output_title[] = {
+				"FEATURES",
+				"BITMASK",
+				"ENABLEMENT"};
+	uint64_t features_enabled;
+	uint32_t feature_mask[2];
+	int i;
+	int ret = 0;
+	int size = 0;
+
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	PP_ASSERT_WITH_CODE(!ret,
+			"[GetPPfeatureStatus] Failed to get enabled smc features!",
+			return ret);
+	features_enabled = (uint64_t)feature_mask[0] |
+			   (uint64_t)feature_mask[1] << 32;
+
+	size += sprintf(buf + size, "Current ppfeatures: 0x%016llx\n", features_enabled);
+	size += sprintf(buf + size, "%-19s %-22s %s\n",
+				output_title[0],
+				output_title[1],
+				output_title[2]);
+	for (i = 0; i < (sizeof(ppfeature_name) / sizeof(ppfeature_name[0])); i++) {
+		size += sprintf(buf + size, "%-19s 0x%016llx %6s\n",
+					ppfeature_name[i],
+					1ULL << i,
+					(features_enabled & (1ULL << i)) ? "Y" : "N");
+	}
+
+	return size;
+}
+
+static int navi10_enable_smc_features(struct smu_context *smu,
+				      bool enabled,
+				      uint64_t feature_masks)
+{
+	struct smu_feature *feature = &smu->smu_feature;
+	uint32_t feature_low, feature_high;
+	uint32_t feature_mask[2];
+	int ret = 0;
+
+	feature_low = (uint32_t)(feature_masks & 0xFFFFFFFF);
+	feature_high = (uint32_t)((feature_masks & 0xFFFFFFFF00000000ULL) >> 32);
+
+	if (enabled) {
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesLow,
+						  feature_low);
+		if (ret)
+			return ret;
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesHigh,
+						  feature_high);
+		if (ret)
+			return ret;
+	} else {
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesLow,
+						  feature_low);
+		if (ret)
+			return ret;
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesHigh,
+						  feature_high);
+		if (ret)
+			return ret;
+	}
+
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	if (ret)
+		return ret;
+
+	mutex_lock(&feature->mutex);
+	bitmap_copy(feature->enabled, (unsigned long *)&feature_mask,
+		    feature->feature_num);
+	mutex_unlock(&feature->mutex);
+
+	return 0;
+}
+
+static int navi10_set_ppfeature_status(struct smu_context *smu,
+				       uint64_t new_ppfeature_masks)
+{
+	uint64_t features_enabled;
+	uint32_t feature_mask[2];
+	uint64_t features_to_enable;
+	uint64_t features_to_disable;
+	int ret = 0;
+
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	PP_ASSERT_WITH_CODE(!ret,
+			"[SetPPfeatureStatus] Failed to get enabled smc features!",
+			return ret);
+	features_enabled = (uint64_t)feature_mask[0] |
+			   (uint64_t)feature_mask[1] << 32;
+
+	features_to_disable =
+		features_enabled & ~new_ppfeature_masks;
+	features_to_enable =
+		~features_enabled & new_ppfeature_masks;
+
+	pr_debug("features_to_disable 0x%llx\n", features_to_disable);
+	pr_debug("features_to_enable 0x%llx\n", features_to_enable);
+
+	if (features_to_disable) {
+		ret = navi10_enable_smc_features(smu, false, features_to_disable);
+		PP_ASSERT_WITH_CODE(!ret,
+				"[SetPPfeatureStatus] Failed to disable smc features!",
+				return ret);
+	}
+
+	if (features_to_enable) {
+		ret = navi10_enable_smc_features(smu, true, features_to_enable);
+		PP_ASSERT_WITH_CODE(!ret,
+				"[SetPPfeatureStatus] Failed to enable smc features!",
+				return ret);
+	}
+
+	return 0;
+}
+
 static const struct pptable_funcs navi10_ppt_funcs = {
 	.tables_init = navi10_tables_init,
 	.alloc_dpm_context = navi10_allocate_dpm_context,
@@ -1304,6 +1500,8 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.set_watermarks_table = navi10_set_watermarks_table,
 	.read_sensor = navi10_read_sensor,
 	.get_uclk_dpm_states = navi10_get_uclk_dpm_states,
+	.get_ppfeature_status = navi10_get_ppfeature_status,
+	.set_ppfeature_status = navi10_set_ppfeature_status,
 };
 
 void navi10_set_ppt_funcs(struct smu_context *smu)

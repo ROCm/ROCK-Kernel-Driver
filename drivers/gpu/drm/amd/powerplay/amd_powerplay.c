@@ -1404,21 +1404,6 @@ static int pp_set_active_display_count(void *handle, uint32_t count)
 	return ret;
 }
 
-static int pp_set_asic_baco_cap(void *handle)
-{
-	struct pp_hwmgr *hwmgr = handle;
-
-	if (!hwmgr)
-		return -EINVAL;
-
-	if (!hwmgr->pm_en || !hwmgr->hwmgr_func->set_asic_baco_cap)
-		return 0;
-
-	hwmgr->hwmgr_func->set_asic_baco_cap(hwmgr);
-
-	return 0;
-}
-
 static int pp_get_asic_baco_capability(void *handle, bool *cap)
 {
 	struct pp_hwmgr *hwmgr = handle;
@@ -1561,7 +1546,6 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.set_hard_min_dcefclk_by_freq = pp_set_hard_min_dcefclk_by_freq,
 	.set_hard_min_fclk_by_freq = pp_set_hard_min_fclk_by_freq,
 	.get_asic_baco_capability = pp_get_asic_baco_capability,
-	.set_asic_baco_cap = pp_set_asic_baco_cap,
 	.get_asic_baco_state = pp_get_asic_baco_state,
 	.set_asic_baco_state = pp_set_asic_baco_state,
 	.get_ppfeature_status = pp_get_ppfeature_status,

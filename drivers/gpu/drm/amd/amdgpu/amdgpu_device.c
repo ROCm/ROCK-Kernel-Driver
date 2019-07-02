@@ -62,6 +62,7 @@
 
 #include "amdgpu_xgmi.h"
 #include "amdgpu_ras.h"
+#include "amdgpu_pmu.h"
 
 MODULE_FIRMWARE("amdgpu/vega10_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/vega12_gpu_info.bin");
@@ -1591,6 +1592,19 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 				adev->ip_blocks[i].status.valid = true;
 			}
 		}
+		/* get the vbios after the asic_funcs are set up */
+		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON) {
+			/* Read BIOS */
+			if (!amdgpu_get_bios(adev))
+				return -EINVAL;
+
+			r = amdgpu_atombios_init(adev);
+			if (r) {
+				dev_err(adev->dev, "amdgpu_atombios_init failed\n");
+				amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL, 0, 0);
+				return r;
+			}
+		}
 	}
 
 	adev->cg_flags &= amdgpu_cg_mask;
@@ -1740,6 +1754,13 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 				}
 			}
 		}
+	}
+
+	r = amdgpu_ib_pool_init(adev);
+	if (r) {
+		dev_err(adev->dev, "IB initialization failed (%d).\n", r);
+		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_IB_INIT_FAIL, 0, r);
+		goto init_failed;
 	}
 
 	r = amdgpu_ucode_create_bo(adev); /* create ucode bo when sw_init complete*/
@@ -2021,6 +2042,7 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 			amdgpu_free_static_csa(&adev->virt.csa_obj);
 			amdgpu_device_wb_fini(adev);
 			amdgpu_device_vram_scratch_fini(adev);
+			amdgpu_ib_pool_fini(adev);
 		}
 
 		r = adev->ip_blocks[i].version->funcs->sw_fini((void *)adev);
@@ -2623,34 +2645,13 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		goto fence_driver_init;
 	}
 
-	/* Read BIOS */
-	if (!amdgpu_get_bios(adev)) {
-		r = -EINVAL;
-		goto failed;
-	}
-
-	r = amdgpu_atombios_init(adev);
-	if (r) {
-		dev_err(adev->dev, "amdgpu_atombios_init failed\n");
-		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL, 0, 0);
-		goto failed;
-	}
-
 	/* detect if we are with an SRIOV vbios */
 	amdgpu_device_detect_sriov_bios(adev);
 
 	/* check if we need to reset the asic
 	 *  E.g., driver was not cleanly unloaded previously, etc.
 	 */
-	if (amdgpu_passthrough(adev) && amdgpu_asic_need_reset_on_init(adev)) {
-		if (adev->powerplay.pp_funcs && adev->powerplay.pp_funcs->set_asic_baco_cap) {
-			r = adev->powerplay.pp_funcs->set_asic_baco_cap(adev->powerplay.pp_handle);
-			if (r) {
-				dev_err(adev->dev, "set baco capability failed\n");
-				goto failed;
-			}
-		}
-
+	if (!amdgpu_sriov_vf(adev) && amdgpu_asic_need_reset_on_init(adev)) {
 		r = amdgpu_asic_reset(adev);
 		if (r) {
 			dev_err(adev->dev, "asic reset on init failed\n");
@@ -2739,13 +2740,6 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
-	r = amdgpu_ib_pool_init(adev);
-	if (r) {
-		dev_err(adev->dev, "IB initialization failed (%d).\n", r);
-		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_IB_INIT_FAIL, 0, r);
-		goto failed;
-	}
-
 	amdgpu_fbdev_init(adev);
 
 	if (amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev))
@@ -2810,6 +2804,10 @@ fence_driver_init:
 		return r;
 	}
 
+	r = amdgpu_pmu_init(adev);
+	if (r)
+		dev_err(adev->dev, "amdgpu_pmu_init failed\n");
+
 	return 0;
 
 failed:
@@ -2844,7 +2842,6 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 #endif
 			drm_crtc_force_disable_all(adev->ddev);
 	}
-	amdgpu_ib_pool_fini(adev);
 	amdgpu_fence_driver_fini(adev);
 	amdgpu_pm_sysfs_fini(adev);
 	amdgpu_fbdev_fini(adev);
@@ -2883,9 +2880,12 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	amdgpu_debugfs_regs_cleanup(adev);
 	device_remove_file(adev->dev, &dev_attr_pcie_replay_count);
 	amdgpu_ucode_sysfs_fini(adev);
+
 	amdgpu_debugfs_preempt_cleanup(adev);
 	if (amdgpu_discovery)
 		amdgpu_discovery_fini(adev);
+
+	amdgpu_pmu_fini(adev);
 }
 
 

@@ -712,8 +712,8 @@ static void soc15_get_pcie_usage(struct amdgpu_device *adev, uint64_t *count0,
 	/* This reports 0 on APUs, so return to avoid writing/reading registers
 	 * that may or may not be different from their GPU counterparts
 	 */
-	 if (adev->flags & AMD_IS_APU)
-		 return;
+	if (adev->flags & AMD_IS_APU)
+		return;
 
 	/* Set the 2 events that we wish to watch, defined above */
 	/* Reg 40 is # received msgs, Reg 104 is # of posted requests sent */
@@ -755,7 +755,8 @@ static bool soc15_need_reset_on_init(struct amdgpu_device *adev)
 	/* Just return false for soc15 GPUs.  Reset does not seem to
 	 * be necessary.
 	 */
-	return false;
+	if (!amdgpu_passthrough(adev))
+		return false;
 
 	if (adev->flags & AMD_IS_APU)
 		return false;
@@ -1024,6 +1025,8 @@ static int soc15_common_sw_init(void *handle)
 	if (amdgpu_sriov_vf(adev))
 		xgpu_ai_mailbox_add_irq_id(adev);
 
+	adev->df_funcs->sw_init(adev);
+
 	return 0;
 }
 
@@ -1057,7 +1060,6 @@ static void soc15_doorbell_range_init(struct amdgpu_device *adev)
 static int soc15_common_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	int ret;
 
 	/* enable pcie gen2/3 link */
 	soc15_pcie_gen3_enable(adev);
@@ -1071,8 +1073,6 @@ static int soc15_common_hw_init(void *handle)
 	 */
 	if (adev->nbio_funcs->remap_hdp_registers)
 		adev->nbio_funcs->remap_hdp_registers(adev);
-
-	adev->df_funcs->init(adev);
 
 	/* enable the doorbell aperture */
 	soc15_enable_doorbell_aperture(adev, true);

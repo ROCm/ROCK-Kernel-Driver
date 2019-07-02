@@ -142,6 +142,7 @@ int smu_get_dpm_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
 		}
 		break;
 	case SMU_GFXCLK:
+	case SMU_SCLK:
 		if (!smu_feature_is_enabled(smu, SMU_FEATURE_DPM_GFXCLK_BIT)) {
 			pr_warn("gfxclk dpm is not enabled\n");
 			return 0;
@@ -777,6 +778,10 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 		if (ret)
 			return ret;
 
+		ret = smu_get_clk_info_from_vbios(smu);
+		if (ret)
+			return ret;
+
 		/*
 		 * check if the format_revision in vbios is up to pptable header
 		 * version, and the structure size is not 0.
@@ -998,7 +1003,6 @@ static int smu_hw_init(void *handle)
 	return 0;
 
 failed:
-	mutex_unlock(&smu->mutex);
 	return ret;
 }
 

@@ -739,12 +739,12 @@ static ssize_t amdgpu_set_pp_od_clk_voltage(struct device *dev,
 		if (ret)
 			return -EINVAL;
 	} else {
-		if (adev->powerplay.pp_funcs->odn_edit_dpm_table)
+		if (adev->powerplay.pp_funcs->odn_edit_dpm_table) {
 			ret = amdgpu_dpm_odn_edit_dpm_table(adev, type,
 						parameter, parameter_size);
-
-		if (ret)
-			return -EINVAL;
+			if (ret)
+				return -EINVAL;
+		}
 
 		if (type == PP_OD_COMMIT_DPM_TABLE) {
 			if (adev->powerplay.pp_funcs->dispatch_tasks) {
@@ -1512,7 +1512,7 @@ static ssize_t amdgpu_hwmon_show_temp(struct device *dev,
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	struct drm_device *ddev = adev->ddev;
 	int channel = to_sensor_dev_attr(attr)->index;
-	int r, temp, size = sizeof(temp);
+	int r, temp = 0, size = sizeof(temp);
 
 	/* Can't get temperature when the card is off */
 	if  ((adev->flags & AMD_IS_PX) &&
@@ -2937,7 +2937,8 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		return ret;
 	}
 	/* APU does not have its own dedicated memory */
-	if (!(adev->flags & AMD_IS_APU)) {
+	if (!(adev->flags & AMD_IS_APU) &&
+	     (adev->asic_type != CHIP_VEGA10)) {
 		ret = device_create_file(adev->dev,
 				&dev_attr_mem_busy_percent);
 		if (ret) {
@@ -3017,7 +3018,8 @@ void amdgpu_pm_sysfs_fini(struct amdgpu_device *adev)
 		device_remove_file(adev->dev,
 				&dev_attr_pp_od_clk_voltage);
 	device_remove_file(adev->dev, &dev_attr_gpu_busy_percent);
-	if (!(adev->flags & AMD_IS_APU))
+	if (!(adev->flags & AMD_IS_APU) &&
+	     (adev->asic_type != CHIP_VEGA10))
 		device_remove_file(adev->dev, &dev_attr_mem_busy_percent);
 	if (!(adev->flags & AMD_IS_APU))
 		device_remove_file(adev->dev, &dev_attr_pcie_bw);

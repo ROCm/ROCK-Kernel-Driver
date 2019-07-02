@@ -6269,7 +6269,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 #endif
 
 	/* Update the planes if changed or disable if we don't have any. */
-	if (planes_count || acrtc_state->active_planes == 0) {
+	if ((planes_count || acrtc_state->active_planes == 0) &&
+		acrtc_state->stream) {
 		if (new_pcrtc_state->mode_changed) {
 			bundle->stream_update.src = acrtc_state->stream->src;
 			bundle->stream_update.dst = acrtc_state->stream->dst;
