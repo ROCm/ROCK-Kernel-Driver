@@ -41,5 +41,4 @@ find scheduler -name '*.c' -exec grep EXPORT_SYMBOL {} + \
     | awk -F'[()]' '{print "#define "$2" amd"$2" //"$0}'\
     >> include/rename_symbol.h
 
-./autogen.sh
 ./configure
