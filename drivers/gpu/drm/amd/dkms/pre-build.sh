@@ -57,5 +57,4 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
 done
 
-./autogen.sh
 ./configure
