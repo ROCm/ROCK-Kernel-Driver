@@ -49,5 +49,4 @@ for file in $FILES; do
 		>> include/rename_symbol.h
 done
 
-./autogen.sh
 ./configure
