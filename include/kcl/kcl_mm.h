@@ -2,11 +2,7 @@
 #define AMDKCL_MM_H
 
 #include <linux/mm.h>
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 0)
-#include <linux/sched/mm.h>
-#else
 #include <linux/sched.h>
-#endif
 
 static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				unsigned long start, unsigned long nr_pages,
