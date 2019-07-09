@@ -766,7 +766,7 @@ enum amd_hw_ip_block_type {
 	MAX_HWIP
 };
 
-#define HWIP_MAX_INSTANCE	7
+#define HWIP_MAX_INSTANCE	8
 
 struct amdgpu_direct_gma {
 	/* reserved in visible vram*/
