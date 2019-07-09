@@ -244,8 +244,10 @@ static void gmc_v10_0_flush_gpu_tlb(struct amdgpu_device *adev,
 	mutex_lock(&adev->mman.gtt_window_lock);
 
 	gmc_v10_0_flush_vm_hub(adev, vmid, AMDGPU_MMHUB, 0);
-	if (!adev->mman.buffer_funcs_enabled || !adev->ib_pool_ready ||
-	    adev->asic_type != CHIP_NAVI10) {
+	if (!adev->mman.buffer_funcs_enabled ||
+	    !adev->ib_pool_ready ||
+	    adev->asic_type > CHIP_NAVI14 ||
+	    adev->in_gpu_reset) {
 		gmc_v10_0_flush_vm_hub(adev, vmid, AMDGPU_GFXHUB, 0);
 		mutex_unlock(&adev->mman.gtt_window_lock);
 		return;
@@ -522,6 +524,7 @@ static int gmc_v10_0_mc_init(struct amdgpu_device *adev)
 	if (amdgpu_gart_size == -1) {
 		switch (adev->asic_type) {
 		case CHIP_NAVI10:
+		case CHIP_NAVI14:
 		default:
 			adev->gmc.gart_size = 512ULL << 20;
 			break;
@@ -599,9 +602,10 @@ static int gmc_v10_0_sw_init(void *handle)
 	adev->gmc.vram_type = amdgpu_atomfirmware_get_vram_type(adev);
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		/*
 		 * To fulfill 4-level page support,
-		 * vm size is 256TB (48bit), maximum size of Navi10,
+		 * vm size is 256TB (48bit), maximum size of Navi10/Navi14,
 		 * block size 512 (9bit)
 		 */
 		amdgpu_vm_adjust_size(adev, 256 * 1024, 9, 3, 48);
@@ -715,6 +719,7 @@ static void gmc_v10_0_init_golden_registers(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		break;
 	default:
 		break;

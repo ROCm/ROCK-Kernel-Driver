@@ -862,7 +862,7 @@ static int process_sync_pds_resv(struct amdkfd_process_info *process_info,
 
 		ret = amdgpu_sync_resv(NULL,
 					sync, pd->tbo.resv,
-					AMDGPU_FENCE_OWNER_UNDEFINED, false);
+					AMDGPU_FENCE_OWNER_KFD, false);
 		if (ret)
 			return ret;
 	}
@@ -2021,7 +2021,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		}
 
 		/* Mark the BO as valid unless it was invalidated
-		 * again concurrently
+		 * again concurrently.
 		 */
 		if (atomic_cmpxchg(&mem->invalid, invalid, 0) != invalid)
 			return -EAGAIN;

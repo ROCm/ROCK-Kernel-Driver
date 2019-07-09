@@ -70,6 +70,7 @@ MODULE_FIRMWARE("amdgpu/raven_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/picasso_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/raven2_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/navi10_gpu_info.bin");
+MODULE_FIRMWARE("amdgpu/navi14_gpu_info.bin");
 
 #define AMDGPU_RESUME_MS		2000
 
@@ -98,6 +99,7 @@ static const char *amdgpu_asic_name[] = {
 	"VEGA20",
 	"RAVEN",
 	"NAVI10",
+	"NAVI14",
 	"LAST",
 };
 
@@ -1389,6 +1391,9 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 	case CHIP_NAVI10:
 		chip_name = "navi10";
 		break;
+	case CHIP_NAVI14:
+		chip_name = "navi14";
+		break;
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_gpu_info.bin", chip_name);
@@ -1541,6 +1546,7 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 			return r;
 		break;
 	case  CHIP_NAVI10:
+	case  CHIP_NAVI14:
 		adev->family = AMDGPU_FAMILY_NV;
 
 		r = nv_set_ip_blocks(adev);
@@ -1754,13 +1760,6 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 				}
 			}
 		}
-	}
-
-	r = amdgpu_ib_pool_init(adev);
-	if (r) {
-		dev_err(adev->dev, "IB initialization failed (%d).\n", r);
-		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_IB_INIT_FAIL, 0, r);
-		goto init_failed;
 	}
 
 	r = amdgpu_ucode_create_bo(adev); /* create ucode bo when sw_init complete*/
@@ -2042,7 +2041,6 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 			amdgpu_free_static_csa(&adev->virt.csa_obj);
 			amdgpu_device_wb_fini(adev);
 			amdgpu_device_vram_scratch_fini(adev);
-			amdgpu_ib_pool_fini(adev);
 		}
 
 		r = adev->ip_blocks[i].version->funcs->sw_fini((void *)adev);
@@ -2430,6 +2428,7 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 #endif
 		return amdgpu_dc != 0;
 #endif
@@ -2600,6 +2599,17 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	if (adev->rio_mem == NULL)
 		DRM_INFO("PCI I/O BAR is not found.\n");
 
+	/* enable PCIE atomic ops */
+	r = pci_enable_atomic_ops_to_root(adev->pdev,
+					  PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
+					  PCI_EXP_DEVCAP2_ATOMIC_COMP64);
+	if (r) {
+		adev->have_atomics_support = false;
+		DRM_INFO("PCIE atomic ops is not supported\n");
+	} else {
+		adev->have_atomics_support = true;
+	}
+
 	amdgpu_device_get_pcie_info(adev);
 
 	if (amdgpu_mcbp)
@@ -2740,6 +2750,13 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
+	r = amdgpu_ib_pool_init(adev);
+	if (r) {
+		dev_err(adev->dev, "IB initialization failed (%d).\n", r);
+		amdgpu_vf_error_put(adev, AMDGIM_ERROR_VF_IB_INIT_FAIL, 0, r);
+		goto failed;
+	}
+
 	amdgpu_fbdev_init(adev);
 
 	if (amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev))
@@ -2842,6 +2859,7 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 #endif
 			drm_crtc_force_disable_all(adev->ddev);
 	}
+	amdgpu_ib_pool_fini(adev);
 	amdgpu_fence_driver_fini(adev);
 	amdgpu_pm_sysfs_fini(adev);
 	amdgpu_fbdev_fini(adev);
@@ -3571,6 +3589,12 @@ static int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
 				if (vram_lost)
 					amdgpu_device_fill_reset_magic(tmp_adev);
 
+				/*
+				 * Add this ASIC as tracked as reset was already
+				 * complete successfully.
+				 */
+				amdgpu_register_gpu_instance(tmp_adev);
+
 				r = amdgpu_device_ip_late_init(tmp_adev);
 				if (r)
 					goto out;
@@ -3705,8 +3729,19 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		device_list_handle = &device_list;
 	}
 
+	/*
+	 * Mark these ASICs to be reseted as untracked first
+	 * And add them back after reset completed
+	 */
+	list_for_each_entry(tmp_adev, device_list_handle, gmc.xgmi.head)
+		amdgpu_unregister_gpu_instance(tmp_adev);
+
 	/* block all schedulers and reset given job's ring */
 	list_for_each_entry(tmp_adev, device_list_handle, gmc.xgmi.head) {
+		/* disable ras on ALL IPs */
+		if (amdgpu_device_ip_need_full_reset(tmp_adev))
+			amdgpu_ras_suspend(tmp_adev);
+
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = tmp_adev->rings[i];
 

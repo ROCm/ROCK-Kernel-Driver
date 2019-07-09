@@ -37,11 +37,13 @@
 #include "asic_reg/mp/mp_11_0_offset.h"
 #include "asic_reg/mp/mp_11_0_sh_mask.h"
 #include "asic_reg/nbio/nbio_7_4_offset.h"
+#include "asic_reg/nbio/nbio_7_4_sh_mask.h"
 #include "asic_reg/smuio/smuio_11_0_0_offset.h"
 #include "asic_reg/smuio/smuio_11_0_0_sh_mask.h"
 
 MODULE_FIRMWARE("amdgpu/vega20_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi10_smc.bin");
+MODULE_FIRMWARE("amdgpu/navi14_smc.bin");
 
 #define SMU11_VOLTAGE_SCALE 4
 
@@ -64,9 +66,9 @@ static int smu_v11_0_read_arg(struct smu_context *smu, uint32_t *arg)
 static int smu_v11_0_wait_for_response(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
-	uint32_t cur_value, i;
+	uint32_t cur_value, i, timeout = adev->usec_timeout * 10;
 
-	for (i = 0; i < adev->usec_timeout; i++) {
+	for (i = 0; i < timeout; i++) {
 		cur_value = RREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_90);
 		if ((cur_value & MP1_C2PMSG_90__CONTENT_MASK) != 0)
 			break;
@@ -74,7 +76,7 @@ static int smu_v11_0_wait_for_response(struct smu_context *smu)
 	}
 
 	/* timeout means wrong logic */
-	if (i == adev->usec_timeout)
+	if (i == timeout)
 		return -ETIME;
 
 	return RREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_90) == 0x1 ? 0 : -EIO;
@@ -152,6 +154,9 @@ static int smu_v11_0_init_microcode(struct smu_context *smu)
 		break;
 	case CHIP_NAVI10:
 		chip_name = "navi10";
+		break;
+	case CHIP_NAVI14:
+		chip_name = "navi14";
 		break;
 	default:
 		BUG();
@@ -1345,6 +1350,7 @@ static int smu_v11_0_gfx_off_control(struct smu_context *smu, bool enable)
 	case CHIP_VEGA20:
 		break;
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		if (!(adev->pm.pp_feature & PP_GFXOFF_MASK))
 			return 0;
 		mutex_lock(&smu->mutex);
@@ -1638,6 +1644,92 @@ static int smu_v11_0_set_azalia_d3_pme(struct smu_context *smu)
 	return ret;
 }
 
+static int smu_v11_0_baco_set_armd3_sequence(struct smu_context *smu, enum smu_v11_0_baco_seq baco_seq)
+{
+	return smu_send_smc_msg_with_param(smu, SMU_MSG_ArmD3, baco_seq);
+}
+
+static bool smu_v11_0_baco_is_support(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+	struct smu_baco_context *smu_baco = &smu->smu_baco;
+	uint32_t val;
+	bool baco_support;
+
+	mutex_lock(&smu_baco->mutex);
+	baco_support = smu_baco->platform_support;
+	mutex_unlock(&smu_baco->mutex);
+
+	if (!baco_support)
+		return false;
+
+	if (!smu_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT))
+		return false;
+
+	val = RREG32_SOC15(NBIO, 0, mmRCC_BIF_STRAP0);
+	if (val & RCC_BIF_STRAP0__STRAP_PX_CAPABLE_MASK)
+		return true;
+
+	return false;
+}
+
+static enum smu_baco_state smu_v11_0_baco_get_state(struct smu_context *smu)
+{
+	struct smu_baco_context *smu_baco = &smu->smu_baco;
+	enum smu_baco_state baco_state = SMU_BACO_STATE_EXIT;
+
+	mutex_lock(&smu_baco->mutex);
+	baco_state = smu_baco->state;
+	mutex_unlock(&smu_baco->mutex);
+
+	return baco_state;
+}
+
+static int smu_v11_0_baco_set_state(struct smu_context *smu, enum smu_baco_state state)
+{
+
+	struct smu_baco_context *smu_baco = &smu->smu_baco;
+	int ret = 0;
+
+	if (smu_v11_0_baco_get_state(smu) == state)
+		return 0;
+
+	mutex_lock(&smu_baco->mutex);
+
+	if (state == SMU_BACO_STATE_ENTER)
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, BACO_SEQ_BACO);
+	else
+		ret = smu_send_smc_msg(smu, SMU_MSG_ExitBaco);
+	if (ret)
+		goto out;
+
+	smu_baco->state = state;
+out:
+	mutex_unlock(&smu_baco->mutex);
+	return ret;
+}
+
+static int smu_v11_0_baco_reset(struct smu_context *smu)
+{
+	int ret = 0;
+
+	ret = smu_v11_0_baco_set_armd3_sequence(smu, BACO_SEQ_BACO);
+	if (ret)
+		return ret;
+
+	ret = smu_v11_0_baco_set_state(smu, SMU_BACO_STATE_ENTER);
+	if (ret)
+		return ret;
+
+	msleep(10);
+
+	ret = smu_v11_0_baco_set_state(smu, SMU_BACO_STATE_EXIT);
+	if (ret)
+		return ret;
+
+	return ret;
+}
+
 static const struct smu_funcs smu_v11_0_funcs = {
 	.init_microcode = smu_v11_0_init_microcode,
 	.load_microcode = smu_v11_0_load_microcode,
@@ -1686,6 +1778,10 @@ static const struct smu_funcs smu_v11_0_funcs = {
 	.register_irq_handler = smu_v11_0_register_irq_handler,
 	.set_azalia_d3_pme = smu_v11_0_set_azalia_d3_pme,
 	.get_max_sustainable_clocks_by_dc = smu_v11_0_get_max_sustainable_clocks_by_dc,
+	.baco_is_support= smu_v11_0_baco_is_support,
+	.baco_get_state = smu_v11_0_baco_get_state,
+	.baco_set_state = smu_v11_0_baco_set_state,
+	.baco_reset = smu_v11_0_baco_reset,
 };
 
 void smu_v11_0_set_smu_funcs(struct smu_context *smu)
@@ -1698,6 +1794,7 @@ void smu_v11_0_set_smu_funcs(struct smu_context *smu)
 		vega20_set_ppt_funcs(smu);
 		break;
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		navi10_set_ppt_funcs(smu);
 		break;
 	default:

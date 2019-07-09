@@ -31,6 +31,7 @@
 #include "amdgpu_vce.h"
 #include "amdgpu_ucode.h"
 #include "amdgpu_psp.h"
+#include "amdgpu_smu.h"
 #include "atom.h"
 #include "amd_pcie.h"
 
@@ -255,6 +256,39 @@ static void nv_gpu_pci_config_reset(struct amdgpu_device *adev)
 }
 #endif
 
+static int nv_asic_mode1_reset(struct amdgpu_device *adev)
+{
+	u32 i;
+	int ret = 0;
+
+	amdgpu_atombios_scratch_regs_engine_hung(adev, true);
+
+	dev_info(adev->dev, "GPU mode1 reset\n");
+
+	/* disable BM */
+	pci_clear_master(adev->pdev);
+
+	pci_save_state(adev->pdev);
+
+	ret = psp_gpu_reset(adev);
+	if (ret)
+		dev_err(adev->dev, "GPU mode1 reset failed\n");
+
+	pci_restore_state(adev->pdev);
+
+	/* wait for asic to come out of reset */
+	for (i = 0; i < adev->usec_timeout; i++) {
+		u32 memsize = adev->nbio_funcs->get_memsize(adev);
+
+		if (memsize != 0xffffffff)
+			break;
+		udelay(1);
+	}
+
+	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
+
+	return ret;
+}
 static int nv_asic_reset(struct amdgpu_device *adev)
 {
 
@@ -266,8 +300,15 @@ static int nv_asic_reset(struct amdgpu_device *adev)
 
 	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
 #endif
+	int ret = 0;
+	struct smu_context *smu = &adev->smu;
 
-	return 0;
+	if (smu_baco_is_support(smu))
+		ret = smu_baco_reset(smu);
+	else
+		ret = nv_asic_mode1_reset(adev);
+
+	return ret;
 }
 
 static int nv_set_uvd_clocks(struct amdgpu_device *adev, u32 vclk, u32 dclk)
@@ -329,6 +370,9 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 	case CHIP_NAVI10:
 		navi10_reg_base_init(adev);
 		break;
+	case CHIP_NAVI14:
+		navi14_reg_base_init(adev);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -339,6 +383,7 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		amdgpu_device_ip_block_add(adev, &nv_common_ip_block);
 		amdgpu_device_ip_block_add(adev, &gmc_v10_0_ip_block);
 		amdgpu_device_ip_block_add(adev, &navi10_ih_ip_block);
@@ -512,6 +557,25 @@ static int nv_common_early_init(void *handle)
 			AMD_PG_SUPPORT_MMHUB |
 			AMD_PG_SUPPORT_ATHUB;
 		adev->external_rev_id = adev->rev_id + 0x1;
+		break;
+	case CHIP_NAVI14:
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
+			AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_IH_CG |
+			AMD_CG_SUPPORT_HDP_MGCG |
+			AMD_CG_SUPPORT_HDP_LS |
+			AMD_CG_SUPPORT_SDMA_MGCG |
+			AMD_CG_SUPPORT_SDMA_LS |
+			AMD_CG_SUPPORT_MC_MGCG |
+			AMD_CG_SUPPORT_MC_LS |
+			AMD_CG_SUPPORT_ATHUB_MGCG |
+			AMD_CG_SUPPORT_ATHUB_LS |
+			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_BIF_MGCG |
+			AMD_CG_SUPPORT_BIF_LS;
+		adev->pg_flags = AMD_PG_SUPPORT_VCN |
+			AMD_PG_SUPPORT_VCN_DPG;
+		adev->external_rev_id = adev->rev_id + 0x1; /* ??? */
 		break;
 	default:
 		/* FIXME: not supported yet */
@@ -705,6 +769,7 @@ static int nv_common_set_clockgating_state(void *handle,
 
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
+	case CHIP_NAVI14:
 		adev->nbio_funcs->update_medium_grain_clock_gating(adev,
 				state == AMD_CG_STATE_GATE ? true : false);
 		adev->nbio_funcs->update_medium_grain_light_sleep(adev,
