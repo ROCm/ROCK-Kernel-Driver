@@ -1056,7 +1056,7 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 		return -ENOMEM;
 
 	/* stop the scheduler */
-	kthread_park(ring->sched.thread);
+	kcl_kthread_park(ring->sched.thread);
 
 	resched = ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 
@@ -1092,7 +1092,7 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 
 failure:
 	/* restart the scheduler */
-	kthread_unpark(ring->sched.thread);
+	kcl_kthread_unpark(ring->sched.thread);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 
