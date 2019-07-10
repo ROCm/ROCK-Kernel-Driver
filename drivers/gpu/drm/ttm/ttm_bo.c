@@ -783,7 +783,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 		if (busy)
 			*busy = false;
 	} else {
-		ret = reservation_object_trylock(bo->resv);
+		ret = kcl_reservation_object_trylock(bo->resv);
 		*locked = ret;
 		if (busy)
 			*busy = !ret;
@@ -814,7 +814,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		r = kcl_reservation_object_lock_interruptible(busy_bo->resv,
 							  ticket);
 	else
-		r = reservation_object_lock(busy_bo->resv, ticket);
+		r = kcl_reservation_object_lock(busy_bo->resv, ticket);
 
 	/*
 	 * TODO: It would be better to keep the BO locked until allocation is at
@@ -822,7 +822,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 	 * of TTM.
 	 */
 	if (!r)
-		reservation_object_unlock(busy_bo->resv);
+		kcl_reservation_object_unlock(busy_bo->resv);
 
 	return r == -EDEADLK ? -EBUSY : r;
 }
