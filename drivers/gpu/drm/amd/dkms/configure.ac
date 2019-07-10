@@ -179,6 +179,8 @@ m4_include([m4/driver-atomic.m4])
 m4_include([m4/iommu-get-domain-for-dev.m4])
 m4_include([m4/vm-fault-address-vma.m4])
 m4_include([m4/hlist-for-each-entry.m4])
+m4_include([m4/get-user-pages.m4])
+m4_include([m4/get-user-pages-remote.m4])
 m4_include([m4/config.m4])
 
 
