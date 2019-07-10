@@ -85,4 +85,39 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 }
 #endif
 
+static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+				unsigned long start, unsigned long nr_pages,
+				int write, int force, struct page **pages,
+				struct vm_area_struct **vmas, int *locked)
+{
+#if !defined(HAVE_8ARGS_GET_USER_PAGES)
+	if (mm == current->mm) {
+#if defined(HAVE_5ARGS_GET_USER_PAGES)
+		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
+		return get_user_pages(start, nr_pages, write, pages, vmas);
+#else
+		return get_user_pages(start, nr_pages, write, force, pages,
+				vmas);
+#endif
+	} else {
+#if defined(HAVE_8ARGS_GET_USER_PAGES_REMOTE)
+		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
+		return get_user_pages_remote(tsk, mm, start, nr_pages,
+				write, pages, vmas, locked);
+#elif defined(HAVE_7ARGS_GET_USER_PAGES_REMOTE)
+		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
+		return get_user_pages_remote(tsk, mm, start, nr_pages,
+				write, pages, vmas);
+#else
+		return get_user_pages_remote(tsk, mm, start, nr_pages,
+				write, force, pages, vmas);
+#endif
+	}
+#else
+	write = !!(write & FOLL_WRITE);
+	return get_user_pages(tsk, mm, start, nr_pages,
+			write, force, pages, vmas);
+#endif
+}
+
 #endif /* AMDKCL_MM_H */
