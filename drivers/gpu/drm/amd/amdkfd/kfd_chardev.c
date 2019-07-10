@@ -1844,7 +1844,7 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 		flags = FOLL_WRITE;
 	locked = 1;
 	down_read(&mm->mmap_sem);
-	n = get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
 		up_read(&mm->mmap_sem);
@@ -2181,8 +2181,8 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
 		down_read(&ri->mm->mmap_sem);
-		nl = get_user_pages_remote(ri->task, ri->mm, rva, nl,
-					   flags, process_pages, NULL,
+		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
+					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
 			up_read(&ri->mm->mmap_sem);
