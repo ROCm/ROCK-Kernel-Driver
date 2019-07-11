@@ -77,4 +77,15 @@ static inline void mmgrab(struct mm_struct *mm)
 }
 #endif
 
+#if !defined(HAVE_MEMALLOC_NOFS_SAVE)
+static inline unsigned int memalloc_nofs_save(void)
+{
+	return current->flags;
+}
+
+static inline void memalloc_nofs_restore(unsigned int flags)
+{
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
