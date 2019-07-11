@@ -79,6 +79,7 @@ m4_include([m4/virtual-mm-fault-function.m4])
 m4_include([m4/pfn_to_pfn_t.m4])
 m4_include([m4/get-user-pages.m4])
 m4_include([m4/get-user-pages-remote.m4])
+m4_include([m4/memalloc-nofs-save.m4])
 m4_include([m4/config.m4])
 
 

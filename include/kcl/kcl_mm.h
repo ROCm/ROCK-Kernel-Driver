@@ -35,7 +35,7 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 }
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if !defined(HAVE_MEMALLOC_NOFS_SAVE)
 static inline unsigned int memalloc_nofs_save(void)
 {
 		return current->flags;
@@ -44,7 +44,6 @@ static inline unsigned int memalloc_nofs_save(void)
 static inline void memalloc_nofs_restore(unsigned int flags)
 {
 }
-
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
