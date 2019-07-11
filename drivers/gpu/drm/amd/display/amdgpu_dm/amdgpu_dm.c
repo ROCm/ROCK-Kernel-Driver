@@ -1368,10 +1368,10 @@ dm_atomic_state_alloc(struct drm_device *dev)
 	if (!state)
 		return NULL;
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
-	if (drm_atomic_state_init(dev, &state->base) < 0)
+	if (drm_atomic_state_init(dev, (struct drm_atomic_state*)&state->base) < 0)
 		goto fail;
 
-	return &state->base;
+	return (struct drm_atomic_state*)&state->base;
 #else
 	DRM_DEBUG_ATOMIC("Allocate atomic state %p\n", state);
 	return (struct drm_atomic_state *)state;
@@ -1384,7 +1384,7 @@ fail:
 static void
 dm_atomic_state_clear(struct drm_atomic_state *state)
 {
-	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state((struct drm_private_state*)state);
 
 	if (dm_state->context) {
 		dc_release_state(dm_state->context);
@@ -1400,7 +1400,7 @@ dm_atomic_state_clear(struct drm_atomic_state *state)
 static void
 dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 {
-	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state((struct drm_private_state*)state);
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 2, 0)
 	drm_atomic_state_default_release(state);
 #else
@@ -7306,7 +7306,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	struct dm_atomic_state *dm_state = NULL;
 #else
-	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state((struct drm_private_state*)state);
 #endif
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 	struct dc_stream_state *new_stream;
@@ -7630,7 +7630,7 @@ static int dm_update_plane_state(struct dc *dc,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	struct dm_atomic_state *dm_state = NULL;
 #else
-	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state((struct drm_private_state*)state);
 #endif
 	struct drm_crtc *new_plane_crtc, *old_plane_crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
@@ -7954,7 +7954,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	struct dm_atomic_state *dm_state = NULL;
 #else
-	struct dm_atomic_state *dm_state = to_dm_atomic_state(state);
+	struct dm_atomic_state *dm_state = to_dm_atomic_state((struct drm_private_state*)state);
 #endif
 	struct dc *dc = adev->dm.dc;
 	struct drm_connector *connector;
