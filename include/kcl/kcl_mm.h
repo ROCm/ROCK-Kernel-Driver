@@ -51,8 +51,11 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #define kvmalloc kzalloc
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if !defined(HAVE_KVFREE)
 #define kvfree kfree
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 #define kvmalloc_array kmalloc_array
 #endif
 
