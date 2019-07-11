@@ -1699,7 +1699,7 @@ static int vega20_get_metrics_table(struct smu_context *smu,
 	int ret = 0;
 
 	if (!smu_table->metrics_time || time_after(jiffies, smu_table->metrics_time + HZ / 1000)) {
-		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS,
+		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
 				(void *)smu_table->metrics_table, false);
 		if (ret) {
 			pr_info("Failed to export SMU metrics table!\n");
@@ -1728,7 +1728,7 @@ static int vega20_set_default_od_settings(struct smu_context *smu,
 		if (!table_context->overdrive_table)
 			return -ENOMEM;
 
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 				       table_context->overdrive_table, false);
 		if (ret) {
 			pr_err("Failed to export over drive table!\n");
@@ -1740,7 +1740,7 @@ static int vega20_set_default_od_settings(struct smu_context *smu,
 			return ret;
 	}
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, true);
 	if (ret) {
 		pr_err("Failed to import over drive table!\n");
@@ -1827,7 +1827,7 @@ static int vega20_get_power_profile_mode(struct smu_context *smu, char *buf)
 			return -EINVAL;
 
 		result = smu_update_table(smu,
-					  SMU_TABLE_ACTIVITY_MONITOR_COEFF | workload_type << 16,
+					  SMU_TABLE_ACTIVITY_MONITOR_COEFF, workload_type,
 					  (void *)(&activity_monitor), false);
 		if (result) {
 			pr_err("[%s] Failed to get activity monitor!", __func__);
@@ -1913,7 +1913,7 @@ static int vega20_set_power_profile_mode(struct smu_context *smu, long *input, u
 
 	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_CUSTOM) {
 		ret = smu_update_table(smu,
-				       SMU_TABLE_ACTIVITY_MONITOR_COEFF | WORKLOAD_PPLIB_CUSTOM_BIT << 16,
+				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), false);
 		if (ret) {
 			pr_err("[%s] Failed to get activity monitor!", __func__);
@@ -1968,7 +1968,7 @@ static int vega20_set_power_profile_mode(struct smu_context *smu, long *input, u
 		}
 
 		ret = smu_update_table(smu,
-				       SMU_TABLE_ACTIVITY_MONITOR_COEFF | WORKLOAD_PPLIB_CUSTOM_BIT << 16,
+				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), true);
 		if (ret) {
 			pr_err("[%s] Failed to set activity monitor!", __func__);
@@ -2519,7 +2519,7 @@ static int vega20_update_od8_settings(struct smu_context *smu,
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret;
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, false);
 	if (ret) {
 		pr_err("Failed to export over drive table!\n");
@@ -2530,7 +2530,7 @@ static int vega20_update_od8_settings(struct smu_context *smu,
 	if (ret)
 		return ret;
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, true);
 	if (ret) {
 		pr_err("Failed to import over drive table!\n");
@@ -2794,7 +2794,7 @@ static int vega20_odn_edit_dpm_table(struct smu_context *smu,
 		break;
 
 	case PP_OD_RESTORE_DEFAULT_TABLE:
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, table_context->overdrive_table, false);
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, false);
 		if (ret) {
 			pr_err("Failed to export over drive table!\n");
 			return ret;
@@ -2803,7 +2803,7 @@ static int vega20_odn_edit_dpm_table(struct smu_context *smu,
 		break;
 
 	case PP_OD_COMMIT_DPM_TABLE:
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, table_context->overdrive_table, true);
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, true);
 		if (ret) {
 			pr_err("Failed to import over drive table!\n");
 			return ret;
