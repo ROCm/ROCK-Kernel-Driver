@@ -78,6 +78,7 @@ m4_include([m4/kvmalloc-array.m4])
 m4_include([m4/kvzalloc-kvmalloc.m4])
 m4_include([m4/mm-h.m4])
 m4_include([m4/mm-access.m4])
+m4_include([m4/memalloc-nofs-save.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
