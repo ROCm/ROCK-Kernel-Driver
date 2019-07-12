@@ -104,7 +104,7 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
 #define __take_second_arg(__ignored, val, ...) val
 
@@ -119,10 +119,7 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #define __or(x, y)			___or(x, y)
 #define ___or(x, y)			____or(__ARG_PLACEHOLDER_##x, y)
 #define ____or(arg1_or_junk, y)		__take_second_arg(arg1_or_junk 1, y)
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0) && \
-		!defined(OS_NAME_RHEL_7_X)
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
