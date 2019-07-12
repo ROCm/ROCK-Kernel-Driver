@@ -3,6 +3,7 @@
 
 #include <linux/mm.h>
 #include <linux/sched.h>
+#include <linux/gfp.h>
 
 static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				unsigned long start, unsigned long nr_pages,
@@ -59,8 +60,11 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #define kvmalloc_array kmalloc_array
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4 ,18, 0)
-#define kvcalloc(n, size, gfp)	kvzalloc(((n)*(size)), gfp)
+#if !defined(HAVE_KVCALLOC)
+static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
+{
+	return kvmalloc_array(n, size, flags | __GFP_ZERO);
+}
 #endif
 
 #if !defined(GFP_TRANSHUGE_LIGHT)
