@@ -69,7 +69,10 @@
 #include <linux/pm_runtime.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
+
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 #include <linux/component.h>
+#endif
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_uapi.h>
@@ -79,7 +82,9 @@
 #include <drm/drm_fourcc.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_vblank.h>
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 #include <drm/drm_audio_component.h>
+#endif
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 #include <drm/drm_hdcp.h>
 #endif
@@ -730,6 +735,7 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 
 }
 
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 					  int pipe, bool *enabled,
 					  unsigned char *buf, int max_bytes)
@@ -862,6 +868,7 @@ static  void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
 						 pin, -1);
 	}
 }
+#endif
 
 static int dm_dmub_hw_init(struct amdgpu_device *adev)
 {
@@ -1104,7 +1111,10 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #endif
 
 	mutex_init(&adev->dm.dc_lock);
+
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	mutex_init(&adev->dm.audio_lock);
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	spin_lock_init(&adev->dm.vblank_lock);
 #endif
@@ -1366,7 +1376,9 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.freesync_module = NULL;
 	}
 
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	mutex_destroy(&adev->dm.audio_lock);
+#endif
 	mutex_destroy(&adev->dm.dc_lock);
 
 	return;
@@ -3409,12 +3421,14 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 		return r;
 	}
 
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	r = amdgpu_dm_audio_init(adev);
 	if (r) {
 		dc_release_state(state->context);
 		kfree(state);
 		return r;
 	}
+#endif
 
 	return 0;
 }
@@ -7788,7 +7802,9 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	aconnector->base.stereo_allowed = false;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	aconnector->audio_inst = -1;
+#endif
 	mutex_init(&aconnector->hpd_lock);
 
 	/*
@@ -8827,6 +8843,7 @@ cleanup:
 	kfree(bundle);
 }
 
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 static void amdgpu_dm_commit_audio(struct drm_device *dev,
 				   struct drm_atomic_state *state)
 {
@@ -8901,6 +8918,7 @@ static void amdgpu_dm_commit_audio(struct drm_device *dev,
 		amdgpu_dm_audio_eld_notify(adev, inst);
 	}
 }
+#endif
 
 /*
  * amdgpu_dm_crtc_copy_transient_flags - copy mirrored flags from DRM to DC
@@ -9290,8 +9308,10 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						dm, crtc, wait_for_vblank);
 	}
 
+#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
+#endif
 
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||		\
 	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
