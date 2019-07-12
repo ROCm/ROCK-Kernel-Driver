@@ -2423,7 +2423,7 @@ struct pipe_ctx *dcn20_acquire_idle_pipe_for_layer(
 		ASSERT(0);
 
 	if (!idle_pipe)
-		return false;
+		return NULL;
 
 	idle_pipe->stream = head_pipe->stream;
 	idle_pipe->stream_res.tg = head_pipe->stream_res.tg;
