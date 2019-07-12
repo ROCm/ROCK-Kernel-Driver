@@ -3,7 +3,6 @@ dnl # Default kernel configuration
 dnl #
 AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_KERNEL
-	AC_AMDGPU_ACPI_HANDLE
 
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
 		KERNEL_MAKE="$KERNEL_MAKE O=$LINUX_OBJ"
