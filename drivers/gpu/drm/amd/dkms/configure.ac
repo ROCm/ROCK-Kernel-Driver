@@ -12,6 +12,7 @@ m4_include([m4/drm-crtc-force-disable-all.m4])
 m4_include([m4/drm-audio-component-header.m4])
 m4_include([m4/remove-conflicting-framebuffers.m4])
 m4_include([m4/drm-fb-helper-remove-conflicting-framebuffers.m4])
+m4_include([m4/drm-encoder-init-valid-with-name.m4])
 m4_include([m4/config.m4])
 
 
