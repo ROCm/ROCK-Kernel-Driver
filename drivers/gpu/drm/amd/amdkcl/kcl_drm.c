@@ -31,30 +31,6 @@ out:
 EXPORT_SYMBOL(drm_crtc_force_disable_all);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
-int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
-{
-	struct pci_dev *root;
-	u32 lnkcap;
-
-	*mlw = 0;
-	if (!dev->pdev)
-		return -EINVAL;
-
-	root = dev->pdev->bus->self;
-	if (!root)
-		return -EINVAL;
-
-	pcie_capability_read_dword(root, PCI_EXP_LNKCAP, &lnkcap);
-
-	*mlw = (lnkcap & PCI_EXP_LNKCAP_MLW) >> 4;
-
-	DRM_INFO("probing mlw for device %x:%x = %x\n", root->vendor, root->device, lnkcap);
-	return 0;
-}
-EXPORT_SYMBOL(drm_pcie_get_max_link_width);
-#endif
-
 void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
 				const struct fb_fillrect *rect);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);

@@ -149,10 +149,6 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 #endif
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
-#endif
-
 static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
