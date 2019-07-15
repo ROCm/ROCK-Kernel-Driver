@@ -289,7 +289,7 @@ static inline int kcl_drm_encoder_init(struct drm_device *dev,
 		      const struct drm_encoder_funcs *funcs,
 		      int encoder_type, const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
+#if defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
 	return drm_encoder_init(dev, encoder, funcs,
 			 encoder_type, name);
 #else
