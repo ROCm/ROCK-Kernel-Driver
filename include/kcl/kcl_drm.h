@@ -67,7 +67,6 @@ extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
 				 const struct fb_image *image);
 extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
 extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
-extern void (*_kcl_drm_fb_helper_release_fbi)(struct drm_fb_helper *fb_helper);
 extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
@@ -185,17 +184,6 @@ static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
 #else
 	return drm_fb_helper_alloc_fbi(fb_helper);
-#endif
-}
-
-static inline void kcl_drm_fb_helper_release_fbi(struct drm_fb_helper *fb_helper)
-{
-#ifdef BUILD_AS_DKMS
-	_kcl_drm_fb_helper_release_fbi(fb_helper);
-#else
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	drm_fb_helper_release_fbi(fb_helper);
-#endif
 #endif
 }
 
