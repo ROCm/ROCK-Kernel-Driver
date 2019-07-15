@@ -35,4 +35,15 @@ int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 #define drm_fb_helper_remove_conflicting_pci_framebuffers _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers
 #endif
 
+#if !defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
+static inline int _kcl_drm_encoder_init(struct drm_device *dev,
+		      struct drm_encoder *encoder,
+		      const struct drm_encoder_funcs *funcs,
+		      int encoder_type, const char *name, ...)
+{
+	return drm_encoder_init(dev, encoder, funcs, encoder_type);
+}
+#define drm_encoder_init _kcl_drm_encoder_init
+#endif
+
 #endif /* AMDKCL_DRM_BACKPORT_H */
