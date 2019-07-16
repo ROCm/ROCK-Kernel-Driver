@@ -7,6 +7,5 @@
 #include <kcl/backport/kcl_kthread_backport.h>
 #include <kcl/kcl_sched.h>
 #include <kcl/backport/kcl_fence_backport.h>
-#include <kcl/kcl_drm.h>
-
+#include <kcl/backport/kcl_drm_backport.h>
 #endif
