@@ -106,6 +106,9 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 			adev->psp.toc_bin_size = le32_to_cpu(sos_hdr_v1_1->toc_size_bytes);
 			adev->psp.toc_start_addr = (uint8_t *)adev->psp.sys_start_addr +
 					le32_to_cpu(sos_hdr_v1_1->toc_offset_bytes);
+			adev->psp.kdb_bin_size = le32_to_cpu(sos_hdr_v1_1->kdb_size_bytes);
+			adev->psp.kdb_start_addr = (uint8_t *)adev->psp.sys_start_addr +
+					le32_to_cpu(sos_hdr_v1_1->kdb_offset_bytes);
 		}
 		break;
 	default:
@@ -181,6 +184,48 @@ out:
 	return err;
 }
 
+static int psp_v11_0_bootloader_load_kdb(struct psp_context *psp)
+{
+	int ret;
+	uint32_t psp_gfxdrv_command_reg = 0;
+	struct amdgpu_device *adev = psp->adev;
+	uint32_t sol_reg;
+
+	/* Check tOS sign of life register to confirm sys driver and sOS
+	 * are already been loaded.
+	 */
+	sol_reg = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_81);
+	if (sol_reg) {
+		psp->sos_fw_version = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_58);
+		dev_info(adev->dev, "sos fw version = 0x%x.\n", psp->sos_fw_version);
+		return 0;
+	}
+
+	/* Wait for bootloader to signify that is ready having bit 31 of C2PMSG_35 set to 1 */
+	ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_35),
+			   0x80000000, 0x80000000, false);
+	if (ret)
+		return ret;
+
+	memset(psp->fw_pri_buf, 0, PSP_1_MEG);
+
+	/* Copy PSP KDB binary to memory */
+	memcpy(psp->fw_pri_buf, psp->kdb_start_addr, psp->kdb_bin_size);
+
+	/* Provide the sys driver to bootloader */
+	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_36,
+	       (uint32_t)(psp->fw_pri_mc_addr >> 20));
+	psp_gfxdrv_command_reg = PSP_BL__LOAD_KEY_DATABASE;
+	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_35,
+	       psp_gfxdrv_command_reg);
+
+	/* Wait for bootloader to signify that is ready having  bit 31 of C2PMSG_35 set to 1*/
+	ret = psp_wait_for(psp, SOC15_REG_OFFSET(MP0, 0, mmMP0_SMN_C2PMSG_35),
+			   0x80000000, 0x80000000, false);
+
+	return ret;
+}
+
 static int psp_v11_0_bootloader_load_sysdrv(struct psp_context *psp)
 {
 	int ret;
@@ -194,7 +239,7 @@ static int psp_v11_0_bootloader_load_sysdrv(struct psp_context *psp)
 	sol_reg = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_81);
 	if (sol_reg) {
 		psp->sos_fw_version = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_58);
-		printk("sos fw version = 0x%x.\n", psp->sos_fw_version);
+		dev_info(adev->dev, "sos fw version = 0x%x.\n", psp->sos_fw_version);
 		return 0;
 	}
 
@@ -212,7 +257,7 @@ static int psp_v11_0_bootloader_load_sysdrv(struct psp_context *psp)
 	/* Provide the sys driver to bootloader */
 	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_36,
 	       (uint32_t)(psp->fw_pri_mc_addr >> 20));
-	psp_gfxdrv_command_reg = 1 << 16;
+	psp_gfxdrv_command_reg = PSP_BL__LOAD_SYSDRV;
 	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_35,
 	       psp_gfxdrv_command_reg);
 
@@ -253,7 +298,7 @@ static int psp_v11_0_bootloader_load_sos(struct psp_context *psp)
 	/* Provide the PSP secure OS to bootloader */
 	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_36,
 	       (uint32_t)(psp->fw_pri_mc_addr >> 20));
-	psp_gfxdrv_command_reg = 2 << 16;
+	psp_gfxdrv_command_reg = PSP_BL__LOAD_SOSDRV;
 	WREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_35,
 	       psp_gfxdrv_command_reg);
 
@@ -538,11 +583,10 @@ psp_v11_0_sram_map(struct amdgpu_device *adev,
 
 	case AMDGPU_UCODE_ID_RLC_G:
 		*sram_offset = 0x2000;
-		if (adev->asic_type != CHIP_NAVI10 || adev->asic_type != CHIP_NAVI14) {
+		if (adev->asic_type < CHIP_NAVI10) {
 			*sram_addr_reg_offset = SOC15_REG_OFFSET(GC, 0, mmRLC_GPM_UCODE_ADDR);
 			*sram_data_reg_offset = SOC15_REG_OFFSET(GC, 0, mmRLC_GPM_UCODE_DATA);
-		}
-		else {
+		} else {
 			*sram_addr_reg_offset = adev->reg_offset[GC_HWIP][0][1] + mmRLC_GPM_UCODE_ADDR_NV10;
 			*sram_data_reg_offset = adev->reg_offset[GC_HWIP][0][1] + mmRLC_GPM_UCODE_DATA_NV10;
 		}
@@ -550,11 +594,10 @@ psp_v11_0_sram_map(struct amdgpu_device *adev,
 
 	case AMDGPU_UCODE_ID_SDMA0:
 		*sram_offset = 0x0;
-		if (adev->asic_type != CHIP_NAVI10 || adev->asic_type != CHIP_NAVI14) {
+		if (adev->asic_type < CHIP_NAVI10) {
 			*sram_addr_reg_offset = SOC15_REG_OFFSET(SDMA0, 0, mmSDMA0_UCODE_ADDR);
 			*sram_data_reg_offset = SOC15_REG_OFFSET(SDMA0, 0, mmSDMA0_UCODE_DATA);
-		}
-		else {
+		} else {
 			*sram_addr_reg_offset = adev->reg_offset[GC_HWIP][0][1] + mmSDMA0_UCODE_ADDR_NV10;
 			*sram_data_reg_offset = adev->reg_offset[GC_HWIP][0][1] + mmSDMA0_UCODE_DATA_NV10;
 		}
@@ -828,6 +871,7 @@ static int psp_v11_0_rlc_autoload_start(struct psp_context *psp)
 
 static const struct psp_funcs psp_v11_0_funcs = {
 	.init_microcode = psp_v11_0_init_microcode,
+	.bootloader_load_kdb = psp_v11_0_bootloader_load_kdb,
 	.bootloader_load_sysdrv = psp_v11_0_bootloader_load_sysdrv,
 	.bootloader_load_sos = psp_v11_0_bootloader_load_sos,
 	.ring_init = psp_v11_0_ring_init,

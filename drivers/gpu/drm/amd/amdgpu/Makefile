@@ -54,7 +54,9 @@ amdgpu-y += amdgpu_device.o amdgpu_kms.o \
 	amdgpu_gtt_mgr.o amdgpu_vram_mgr.o amdgpu_virt.o amdgpu_atomfirmware.o \
 	amdgpu_vf_error.o amdgpu_sched.o amdgpu_debugfs.o amdgpu_ids.o \
 	amdgpu_gmc.o amdgpu_xgmi.o amdgpu_csa.o amdgpu_sem.o amdgpu_ras.o \
-	amdgpu_vm_cpu.o amdgpu_vm_sdma.o amdgpu_discovery.o amdgpu_pmu.o
+	amdgpu_vm_cpu.o amdgpu_vm_sdma.o amdgpu_discovery.o
+
+amdgpu-$(CONFIG_PERF_EVENTS) += amdgpu_pmu.o
 
 # add asic specific block
 amdgpu-$(CONFIG_DRM_AMDGPU_CIK)+= cik.o cik_ih.o kv_smc.o kv_dpm.o \
@@ -213,3 +215,8 @@ obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
 #if defined(BUILD_AS_DKMS)
 CFLAGS_amdgpu_trace_points.o := -I$(src)
 #endif
+
+ifndef BUILD_AS_DKMS
+FOR_MODULE := amdgpu
+include $(FULL_AMD_PATH)/dkms/Makefile.intree
+endif
