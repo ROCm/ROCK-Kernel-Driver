@@ -84,6 +84,7 @@ m4_include([m4/kvzalloc-kvmalloc.m4])
 m4_include([m4/kvfree.m4])
 m4_include([m4/kvmalloc-array.m4])
 m4_include([m4/kvcalloc.m4])
+m4_include([m4/vmf-insert.m4])
 m4_include([m4/config.m4])
 
 

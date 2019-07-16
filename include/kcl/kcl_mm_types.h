@@ -2,22 +2,20 @@
 #define AMDKCL_MM_TYPES_H
 
 #include <linux/mm_types.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0) || \
-	defined(OS_NAME_RHEL_7_X)
 #include <linux/pfn.h>
-#else
+
+#if !defined(HAVE_VMF_INSERT)
+#if !defined(HAVE_PFN_T)
 typedef struct {
 		u64 val;
 } pfn_t;
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0)
 typedef int vm_fault_t;
 
 static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
 				unsigned long addr,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0) || \
-	defined(OS_NAME_SUSE_15)
+#if defined(HAVE_PFN_T_VM_INSERT_MIXED)
 				pfn_t pfn)
 #else
 				unsigned long pfn)
@@ -45,7 +43,6 @@ static inline vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma,
 
 		return VM_FAULT_NOPAGE;
 }
-
 #endif
 
 #endif /* AMDKCL_MM_TYPES_H */
