@@ -392,8 +392,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-#if !defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_DRM_GET_FORMAT_NAME)
 /**
  * struct drm_format_name_buf - name of a DRM format
  * @str: string buffer containing the format name
@@ -401,17 +400,14 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 struct drm_format_name_buf {
 	char str[32];
 };
-#endif
 
 static char printable_char(int c)
 {
 	return isascii(c) && isprint(c) ? c : '?';
 }
-#endif
 
 static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	snprintf(buf->str, sizeof(buf->str),
 		 "%c%c%c%c %s-endian (0x%08x)",
 		 printable_char(format & 0xff),
@@ -422,10 +418,13 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 		 format);
 
 	return buf->str;
-#else
-	return drm_get_format_name(format, buf);
-#endif
 }
+#else
+static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
+{
+	return drm_get_format_name(format, buf);
+}
+#endif
 
 static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
