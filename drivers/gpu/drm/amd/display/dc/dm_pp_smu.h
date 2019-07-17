@@ -29,7 +29,8 @@
 /*
  * interface to PPLIB/SMU to setup clocks and pstate requirements on SoC
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0) || defined(OS_NAME_RHEL_7_6)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0) || defined(OS_NAME_RHEL_7_6)\
+		      || defined(OS_NAME_RHEL_7_5) || defined(OS_NAME_RHEL_7_4)
 typedef bool BOOLEAN;
 #endif
 
