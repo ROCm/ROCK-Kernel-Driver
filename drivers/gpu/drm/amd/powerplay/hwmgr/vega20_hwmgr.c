@@ -3764,6 +3764,11 @@ static int vega20_power_off_asic(struct pp_hwmgr *hwmgr)
 			);
 	data->water_marks_bitmap &= ~(WaterMarksLoaded);
 
+	PP_ASSERT_WITH_CODE((result = smum_send_msg_to_smc(hwmgr,
+			PPSMC_MSG_PrepareMp1ForUnload)) == 0,
+			"[PrepareMp1ForUnload] Failed!",
+			return result);
+
 	return result;
 }
 
