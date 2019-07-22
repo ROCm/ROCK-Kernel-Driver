@@ -7,6 +7,8 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_HEADERS],
 	AC_KERNEL_TEST_HEADER_FILE_EXIST([linux/dma-fence.h], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DMA_FENCE_DEFINED, 1, [fence is renamed to dma_fence])
+
+		AC_AMDGPU_DMA_FENCE_SET_ERROR
 	], [
 		AC_MSG_RESULT(no)
 dnl #

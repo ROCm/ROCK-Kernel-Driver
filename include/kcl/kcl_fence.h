@@ -124,5 +124,15 @@ _kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 bool _kcl_fence_enable_signaling(struct dma_fence *f);
 #endif
 
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
+static inline void dma_fence_set_error(struct dma_fence *fence,
+				       int error)
+{
+	BUG_ON(test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags));
+	BUG_ON(error >= 0 || error < -MAX_ERRNO);
+
+	fence->status = error;
+}
+#endif
 
 #endif /* AMDKCL_FENCE_H */

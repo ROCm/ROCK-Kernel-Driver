@@ -58,6 +58,7 @@ m4_include([m4/drm_mode_is_420_xxx.m4])
 m4_include([m4/fb-ops-fb-debug-xx.m4])
 m4_include([m4/drm-vma-node-verify-access.m4])
 m4_include([m4/dma-fence-headers.m4])
+m4_include([m4/dma-fence-set-error.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
