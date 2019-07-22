@@ -63,7 +63,12 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	rcu_read_lock();
 	in_dev = __in_dev_get_rcu(rt->dst.dev);
 	if (in_dev != NULL) {
-		for_primary_ifa(in_dev) {
+		const struct in_ifaddr *ifa;
+
+		in_dev_for_each_ifa_rcu(ifa, in_dev) {
+			if (ifa->ifa_flags & IFA_F_SECONDARY)
+				continue;
+
 			/* this is a hack as slp uses multicast we can't match
 			 * the destination address to some broadcast address. So
 			 * just take the first one. Better would be to install
@@ -71,7 +76,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 			mask = ifa->ifa_mask;
 			src = ifa->ifa_broadcast;
 			break;
-		} endfor_ifa(in_dev);
+		}
 	}
 	rcu_read_unlock();
 

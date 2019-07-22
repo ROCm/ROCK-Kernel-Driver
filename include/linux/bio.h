@@ -422,7 +422,6 @@ static inline void bio_wouldblock_error(struct bio *bio)
 }
 
 struct request_queue;
-extern int bio_phys_segments(struct request_queue *, struct bio *);
 
 extern int submit_bio_wait(struct bio *bio);
 extern void bio_advance(struct bio *, unsigned);
@@ -441,6 +440,7 @@ bool __bio_try_merge_page(struct bio *bio, struct page *page,
 void __bio_add_page(struct bio *bio, struct page *page,
 		unsigned int len, unsigned int off);
 int bio_iov_iter_get_pages(struct bio *bio, struct iov_iter *iter);
+void bio_release_pages(struct bio *bio, bool mark_dirty);
 struct rq_map_data;
 extern struct bio *bio_map_user_iov(struct request_queue *,
 				    struct iov_iter *, gfp_t);
@@ -457,17 +457,6 @@ void generic_start_io_acct(struct request_queue *q, int op,
 void generic_end_io_acct(struct request_queue *q, int op,
 				struct hd_struct *part,
 				unsigned long start_time);
-
-#ifndef ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE
-# error	"You should define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE for your platform"
-#endif
-#if ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE
-extern void bio_flush_dcache_pages(struct bio *bi);
-#else
-static inline void bio_flush_dcache_pages(struct bio *bi)
-{
-}
-#endif
 
 extern void bio_copy_data_iter(struct bio *dst, struct bvec_iter *dst_iter,
 			       struct bio *src, struct bvec_iter *src_iter);

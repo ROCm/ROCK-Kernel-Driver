@@ -16,6 +16,7 @@
 #include <net/netfilter/nf_conntrack.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_core.h>
+#include <net/netfilter/nf_conntrack_bridge.h>
 #include <net/netfilter/nf_log.h>
 
 #include <linux/ip.h>
@@ -120,55 +121,54 @@ const struct nf_conntrack_l4proto *nf_ct_l4proto_find(u8 l4proto)
 };
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_find);
 
-static unsigned int ipv4_helper(void *priv,
-				struct sk_buff *skb,
-				const struct nf_hook_state *state)
+unsigned int nf_confirm(struct sk_buff *skb, unsigned int protoff,
+			struct nf_conn *ct, enum ip_conntrack_info ctinfo)
 {
-	struct nf_conn *ct;
-	enum ip_conntrack_info ctinfo;
 	const struct nf_conn_help *help;
-	const struct nf_conntrack_helper *helper;
-
-	/* This is where we call the helper: as the packet goes out. */
-	ct = nf_ct_get(skb, &ctinfo);
-	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		return NF_ACCEPT;
 
 	help = nfct_help(ct);
-	if (!help)
-		return NF_ACCEPT;
+	if (help) {
+		const struct nf_conntrack_helper *helper;
+		int ret;
 
-	/* rcu_read_lock()ed by nf_hook_thresh */
-	helper = rcu_dereference(help->helper);
-	if (!helper)
-		return NF_ACCEPT;
+		/* rcu_read_lock()ed by nf_hook_thresh */
+		helper = rcu_dereference(help->helper);
+		if (helper) {
+			ret = helper->help(skb,
+					   protoff,
+					   ct, ctinfo);
+			if (ret != NF_ACCEPT)
+				return ret;
+		}
+	}
 
-	return helper->help(skb, skb_network_offset(skb) + ip_hdrlen(skb),
-			    ct, ctinfo);
+	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
+	    !nf_is_loopback_packet(skb)) {
+		if (!nf_ct_seq_adjust(skb, ct, ctinfo, protoff)) {
+			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
+			return NF_DROP;
+		}
+	}
+
+	/* We've seen it coming out the other side: confirm it */
+	return nf_conntrack_confirm(skb);
 }
+EXPORT_SYMBOL_GPL(nf_confirm);
 
 static unsigned int ipv4_confirm(void *priv,
 				 struct sk_buff *skb,
 				 const struct nf_hook_state *state)
 {
-	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		goto out;
+		return nf_conntrack_confirm(skb);
 
-	/* adjust seqs for loopback traffic only in outgoing direction */
-	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
-	    !nf_is_loopback_packet(skb)) {
-		if (!nf_ct_seq_adjust(skb, ct, ctinfo, ip_hdrlen(skb))) {
-			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
-			return NF_DROP;
-		}
-	}
-out:
-	/* We've seen it coming out the other side: confirm it */
-	return nf_conntrack_confirm(skb);
+	return nf_confirm(skb,
+			  skb_network_offset(skb) + ip_hdrlen(skb),
+			  ct, ctinfo);
 }
 
 static unsigned int ipv4_conntrack_in(void *priv,
@@ -217,22 +217,10 @@ static const struct nf_hook_ops ipv4_conntrack_ops[] = {
 		.priority	= NF_IP_PRI_CONNTRACK,
 	},
 	{
-		.hook		= ipv4_helper,
-		.pf		= NFPROTO_IPV4,
-		.hooknum	= NF_INET_POST_ROUTING,
-		.priority	= NF_IP_PRI_CONNTRACK_HELPER,
-	},
-	{
 		.hook		= ipv4_confirm,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP_PRI_CONNTRACK_CONFIRM,
-	},
-	{
-		.hook		= ipv4_helper,
-		.pf		= NFPROTO_IPV4,
-		.hooknum	= NF_INET_LOCAL_IN,
-		.priority	= NF_IP_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv4_confirm,
@@ -379,31 +367,21 @@ static unsigned int ipv6_confirm(void *priv,
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	unsigned char pnum = ipv6_hdr(skb)->nexthdr;
-	int protoff;
 	__be16 frag_off;
+	int protoff;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		goto out;
+		return nf_conntrack_confirm(skb);
 
 	protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &pnum,
 				   &frag_off);
 	if (protoff < 0 || (frag_off & htons(~0x7)) != 0) {
 		pr_debug("proto header not found\n");
-		goto out;
+		return nf_conntrack_confirm(skb);
 	}
 
-	/* adjust seqs for loopback traffic only in outgoing direction */
-	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
-	    !nf_is_loopback_packet(skb)) {
-		if (!nf_ct_seq_adjust(skb, ct, ctinfo, protoff)) {
-			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
-			return NF_DROP;
-		}
-	}
-out:
-	/* We've seen it coming out the other side: confirm it */
-	return nf_conntrack_confirm(skb);
+	return nf_confirm(skb, protoff, ct, ctinfo);
 }
 
 static unsigned int ipv6_conntrack_in(void *priv,
@@ -420,42 +398,6 @@ static unsigned int ipv6_conntrack_local(void *priv,
 	return nf_conntrack_in(skb, state);
 }
 
-static unsigned int ipv6_helper(void *priv,
-				struct sk_buff *skb,
-				const struct nf_hook_state *state)
-{
-	struct nf_conn *ct;
-	const struct nf_conn_help *help;
-	const struct nf_conntrack_helper *helper;
-	enum ip_conntrack_info ctinfo;
-	__be16 frag_off;
-	int protoff;
-	u8 nexthdr;
-
-	/* This is where we call the helper: as the packet goes out. */
-	ct = nf_ct_get(skb, &ctinfo);
-	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		return NF_ACCEPT;
-
-	help = nfct_help(ct);
-	if (!help)
-		return NF_ACCEPT;
-	/* rcu_read_lock()ed by nf_hook_thresh */
-	helper = rcu_dereference(help->helper);
-	if (!helper)
-		return NF_ACCEPT;
-
-	nexthdr = ipv6_hdr(skb)->nexthdr;
-	protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &nexthdr,
-				   &frag_off);
-	if (protoff < 0 || (frag_off & htons(~0x7)) != 0) {
-		pr_debug("proto header not found\n");
-		return NF_ACCEPT;
-	}
-
-	return helper->help(skb, protoff, ct, ctinfo);
-}
-
 static const struct nf_hook_ops ipv6_conntrack_ops[] = {
 	{
 		.hook		= ipv6_conntrack_in,
@@ -470,22 +412,10 @@ static const struct nf_hook_ops ipv6_conntrack_ops[] = {
 		.priority	= NF_IP6_PRI_CONNTRACK,
 	},
 	{
-		.hook		= ipv6_helper,
-		.pf		= NFPROTO_IPV6,
-		.hooknum	= NF_INET_POST_ROUTING,
-		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
-	},
-	{
 		.hook		= ipv6_confirm,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP6_PRI_LAST,
-	},
-	{
-		.hook		= ipv6_helper,
-		.pf		= NFPROTO_IPV6,
-		.hooknum	= NF_INET_LOCAL_IN,
-		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv6_confirm,
@@ -512,12 +442,14 @@ static int nf_ct_tcp_fixup(struct nf_conn *ct, void *_nfproto)
 	return 0;
 }
 
+static struct nf_ct_bridge_info *nf_ct_bridge_info;
+
 static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 {
 	struct nf_conntrack_net *cnet = net_generic(net, nf_conntrack_net_id);
-	bool fixup_needed = false;
+	bool fixup_needed = false, retry = true;
 	int err = 0;
-
+retry:
 	mutex_lock(&nf_ct_proto_mutex);
 
 	switch (nfproto) {
@@ -557,6 +489,32 @@ static int nf_ct_netns_do_get(struct net *net, u8 nfproto)
 			fixup_needed = true;
 		break;
 #endif
+	case NFPROTO_BRIDGE:
+		if (!nf_ct_bridge_info) {
+			if (!retry) {
+				err = -EPROTO;
+				goto out_unlock;
+			}
+			mutex_unlock(&nf_ct_proto_mutex);
+			request_module("nf_conntrack_bridge");
+			retry = false;
+			goto retry;
+		}
+		if (!try_module_get(nf_ct_bridge_info->me)) {
+			err = -EPROTO;
+			goto out_unlock;
+		}
+		cnet->users_bridge++;
+		if (cnet->users_bridge > 1)
+			goto out_unlock;
+
+		err = nf_register_net_hooks(net, nf_ct_bridge_info->ops,
+					    nf_ct_bridge_info->ops_size);
+		if (err)
+			cnet->users_bridge = 0;
+		else
+			fixup_needed = true;
+		break;
 	default:
 		err = -EPROTO;
 		break;
@@ -589,46 +547,98 @@ static void nf_ct_netns_do_put(struct net *net, u8 nfproto)
 						ARRAY_SIZE(ipv6_conntrack_ops));
 		break;
 #endif
-	}
+	case NFPROTO_BRIDGE:
+		if (!nf_ct_bridge_info)
+			break;
+		if (cnet->users_bridge && (--cnet->users_bridge == 0))
+			nf_unregister_net_hooks(net, nf_ct_bridge_info->ops,
+						nf_ct_bridge_info->ops_size);
 
+		module_put(nf_ct_bridge_info->me);
+		break;
+	}
 	mutex_unlock(&nf_ct_proto_mutex);
+}
+
+static int nf_ct_netns_inet_get(struct net *net)
+{
+	int err;
+
+	err = nf_ct_netns_do_get(net, NFPROTO_IPV4);
+	if (err < 0)
+		goto err1;
+	err = nf_ct_netns_do_get(net, NFPROTO_IPV6);
+	if (err < 0)
+		goto err2;
+
+	return err;
+err2:
+	nf_ct_netns_put(net, NFPROTO_IPV4);
+err1:
+	return err;
 }
 
 int nf_ct_netns_get(struct net *net, u8 nfproto)
 {
 	int err;
 
-	if (nfproto == NFPROTO_INET) {
-		err = nf_ct_netns_do_get(net, NFPROTO_IPV4);
+	switch (nfproto) {
+	case NFPROTO_INET:
+		err = nf_ct_netns_inet_get(net);
+		break;
+	case NFPROTO_BRIDGE:
+		err = nf_ct_netns_do_get(net, NFPROTO_BRIDGE);
 		if (err < 0)
-			goto err1;
-		err = nf_ct_netns_do_get(net, NFPROTO_IPV6);
-		if (err < 0)
-			goto err2;
-	} else {
-		err = nf_ct_netns_do_get(net, nfproto);
-		if (err < 0)
-			goto err1;
-	}
-	return 0;
+			return err;
 
-err2:
-	nf_ct_netns_put(net, NFPROTO_IPV4);
-err1:
+		err = nf_ct_netns_inet_get(net);
+		if (err < 0) {
+			nf_ct_netns_put(net, NFPROTO_BRIDGE);
+			return err;
+		}
+		break;
+	default:
+		err = nf_ct_netns_do_get(net, nfproto);
+		break;
+	}
 	return err;
 }
 EXPORT_SYMBOL_GPL(nf_ct_netns_get);
 
 void nf_ct_netns_put(struct net *net, uint8_t nfproto)
 {
-	if (nfproto == NFPROTO_INET) {
+	switch (nfproto) {
+	case NFPROTO_BRIDGE:
+		nf_ct_netns_do_put(net, NFPROTO_BRIDGE);
+		/* fall through */
+	case NFPROTO_INET:
 		nf_ct_netns_do_put(net, NFPROTO_IPV4);
 		nf_ct_netns_do_put(net, NFPROTO_IPV6);
-	} else {
+		break;
+	default:
 		nf_ct_netns_do_put(net, nfproto);
+		break;
 	}
 }
 EXPORT_SYMBOL_GPL(nf_ct_netns_put);
+
+void nf_ct_bridge_register(struct nf_ct_bridge_info *info)
+{
+	WARN_ON(nf_ct_bridge_info);
+	mutex_lock(&nf_ct_proto_mutex);
+	nf_ct_bridge_info = info;
+	mutex_unlock(&nf_ct_proto_mutex);
+}
+EXPORT_SYMBOL_GPL(nf_ct_bridge_register);
+
+void nf_ct_bridge_unregister(struct nf_ct_bridge_info *info)
+{
+	WARN_ON(!nf_ct_bridge_info);
+	mutex_lock(&nf_ct_proto_mutex);
+	nf_ct_bridge_info = NULL;
+	mutex_unlock(&nf_ct_proto_mutex);
+}
+EXPORT_SYMBOL_GPL(nf_ct_bridge_unregister);
 
 int nf_conntrack_proto_init(void)
 {
