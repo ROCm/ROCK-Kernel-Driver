@@ -4,7 +4,7 @@
 #include <linux/version.h>
 #if !defined(RENAME_FENCE_TO_DMA_FENCE)
 #include <linux/fence.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+#if defined(HAVE_FENCE_ARRAY_H)
 #include <linux/fence-array.h>
 #endif
 #include <kcl/kcl_fence_array.h>
