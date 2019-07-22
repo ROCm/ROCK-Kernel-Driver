@@ -299,6 +299,7 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
  *
  * Checks for fence activity.
  */
+#if defined(HAVE_TIMER_SETUP)
 static void amdgpu_fence_fallback(struct timer_list *t)
 {
 	struct amdgpu_ring *ring = from_timer(ring, t,
@@ -307,6 +308,14 @@ static void amdgpu_fence_fallback(struct timer_list *t)
 	if (amdgpu_fence_process(ring))
 		DRM_WARN("Fence fallback timer expired on ring %s\n", ring->name);
 }
+#else
+static void amdgpu_fence_fallback(unsigned long arg)
+{
+	struct amdgpu_ring *ring = (void *)arg;
+
+	amdgpu_fence_process(ring);
+}
+#endif
 
 /**
  * amdgpu_fence_wait_empty - wait for all fences to signal
@@ -460,7 +469,12 @@ int amdgpu_fence_driver_init_ring(struct amdgpu_ring *ring,
 	atomic_set(&ring->fence_drv.last_seq, 0);
 	ring->fence_drv.initialized = false;
 
+#if defined(HAVE_TIMER_SETUP)
 	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
+#else
+	setup_timer(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback,
+		    (unsigned long)ring);
+#endif
 
 	ring->fence_drv.num_fences_mask = num_hw_submission * 2 - 1;
 	spin_lock_init(&ring->fence_drv.lock);
