@@ -220,7 +220,7 @@ obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
 CFLAGS_amdgpu_trace_points.o := -I$(src)
 #endif
 
-ifndef BUILD_AS_DKMS
+ifeq (,$(BUILD_AS_DKMS))
 FOR_MODULE := amdgpu
 include $(FULL_AMD_PATH)/dkms/Makefile.intree
 endif
