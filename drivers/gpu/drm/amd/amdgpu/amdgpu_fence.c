@@ -699,7 +699,7 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,

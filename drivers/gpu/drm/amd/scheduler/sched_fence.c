@@ -159,7 +159,7 @@ const struct dma_fence_ops amd_sched_fence_ops_scheduled = {
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,
@@ -172,7 +172,7 @@ const struct dma_fence_ops amd_sched_fence_ops_finished = {
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,
