@@ -158,7 +158,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f,
 		struct dma_fence *old;
 
 		rcu_read_lock();
-		old = dma_fence_get_rcu_safe(ptr);
+		old = kcl_fence_get_rcu_safe(ptr);
 		rcu_read_unlock();
 
 		if (old) {
