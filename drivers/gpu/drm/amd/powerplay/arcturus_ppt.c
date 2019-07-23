@@ -51,6 +51,9 @@
 #define SMU_FEATURES_HIGH_MASK       0xFFFFFFFF00000000
 #define SMU_FEATURES_HIGH_SHIFT      32
 
+/* possible frequency drift (1Mhz) */
+#define EPSILON				1
+
 static struct smu_11_0_cmn2aisc_mapping arcturus_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(TestMessage,			     PPSMC_MSG_TestMessage),
 	MSG_MAP(GetSmuVersion,			     PPSMC_MSG_GetSmuVersion),
@@ -567,6 +570,12 @@ static int arcturus_get_clk_table(struct smu_context *smu,
 	return 0;
 }
 
+static int arcturus_freqs_in_same_level(int32_t frequency1,
+					int32_t frequency2)
+{
+	return (abs(frequency1 - frequency2) <= EPSILON);
+}
+
 static int arcturus_print_clk_levels(struct smu_context *smu,
 			enum smu_clk_type type, char *buf)
 {
@@ -597,8 +606,9 @@ static int arcturus_print_clk_levels(struct smu_context *smu,
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n", i,
 					clocks.data[i].clocks_in_khz / 1000,
-					(clocks.data[i].clocks_in_khz == now * 10)
-					? "*" : "");
+					arcturus_freqs_in_same_level(
+					clocks.data[i].clocks_in_khz / 1000,
+					now / 100) ? "*" : "");
 		break;
 
 	case SMU_MCLK:
@@ -618,8 +628,9 @@ static int arcturus_print_clk_levels(struct smu_context *smu,
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
 				i, clocks.data[i].clocks_in_khz / 1000,
-				(clocks.data[i].clocks_in_khz == now * 10)
-				? "*" : "");
+				arcturus_freqs_in_same_level(
+				clocks.data[i].clocks_in_khz / 1000,
+				now / 100) ? "*" : "");
 		break;
 
 	case SMU_SOCCLK:
@@ -639,8 +650,9 @@ static int arcturus_print_clk_levels(struct smu_context *smu,
 		for (i = 0; i < clocks.num_levels; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
 				i, clocks.data[i].clocks_in_khz / 1000,
-				(clocks.data[i].clocks_in_khz == now * 10)
-				? "*" : "");
+				arcturus_freqs_in_same_level(
+				clocks.data[i].clocks_in_khz / 1000,
+				now / 100) ? "*" : "");
 		break;
 
 	case SMU_FCLK:
@@ -651,11 +663,18 @@ static int arcturus_print_clk_levels(struct smu_context *smu,
 		}
 
 		single_dpm_table = &(dpm_table->fclk_table);
+		ret = arcturus_get_clk_table(smu, &clocks, single_dpm_table);
+		if (ret) {
+			pr_err("Attempt to get fclk levels Failed!");
+			return ret;
+		}
+
 		for (i = 0; i < single_dpm_table->count; i++)
 			size += sprintf(buf + size, "%d: %uMhz %s\n",
 				i, single_dpm_table->dpm_levels[i].value,
-				(single_dpm_table->dpm_levels[i].value == now / 100)
-				? "*" : "");
+				arcturus_freqs_in_same_level(
+				clocks.data[i].clocks_in_khz / 1000,
+				now / 100) ? "*" : "");
 		break;
 
 	default:
