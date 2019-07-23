@@ -495,7 +495,7 @@ static void set_event_from_interrupt(struct kfd_process *p,
 void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				uint32_t valid_id_bits)
 {
-	bool events_signaled = false;
+	bool debug_events_signaled = false;
 	struct kfd_event *ev = NULL;
 
 	/*
@@ -515,7 +515,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 							 valid_id_bits);
 	if (ev) {
 		set_event_from_interrupt(p, ev);
-		events_signaled = true;
+		debug_events_signaled |= (ev->type == KFD_EVENT_TYPE_DEBUG);
 	} else if (p->signal_page) {
 		/*
 		 * Partial ID lookup failed. Assume that the event ID
@@ -539,7 +539,8 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					set_event_from_interrupt(p, ev);
-					events_signaled = true;
+					debug_events_signaled |=
+					(ev->type == KFD_EVENT_TYPE_DEBUG);
 				}
 			}
 		} else {
@@ -551,11 +552,12 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					ev = lookup_event_by_id(p, id);
 					set_event_from_interrupt(p, ev);
-					events_signaled = true;
+					debug_events_signaled |=
+					(ev->type == KFD_EVENT_TYPE_DEBUG);
 				}
 		}
 	}
-	if (events_signaled)
+	if (debug_events_signaled)
 		signal_event_to_debugger(p);
 
 	mutex_unlock(&p->event_mutex);
