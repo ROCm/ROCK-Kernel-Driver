@@ -6632,22 +6632,10 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 		source = dm_new_crtc_state->crc_src;
 		if (amdgpu_dm_is_valid_crc_source(source)) {
 			dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
-			if (source == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
+			if (source == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC)
 				amdgpu_dm_crtc_set_crc_source(crtc, "crtc");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "crtc", &values_cnt);
-#endif
-			}
-			else if (source == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
+			else if (source == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX)
 				amdgpu_dm_crtc_set_crc_source(crtc, "dprx");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "dprx", &values_cnt);
-#endif
-			}
 		}
 #endif
 #endif

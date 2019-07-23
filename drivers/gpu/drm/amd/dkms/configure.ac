@@ -17,7 +17,6 @@ m4_include([m4/drm-universal-plane-init.m4])
 m4_include([m4/drm-gem-object-lookup.m4])
 m4_include([m4/in-compat-syscall.m4])
 m4_include([m4/drm-get-format-name.m4])
-m4_include([m4/set-crc-source.m4])
 m4_include([m4/config.m4])
 
 

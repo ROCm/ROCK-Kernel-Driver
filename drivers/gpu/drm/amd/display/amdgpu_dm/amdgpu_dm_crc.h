@@ -44,12 +44,7 @@ static inline bool amdgpu_dm_is_valid_crc_source(enum amdgpu_dm_pipe_crc_source 
 
 /* amdgpu_dm_crc.c */
 #ifdef CONFIG_DEBUG_FS
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
-#else
-int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
-								size_t *values_cnt);
-#endif
 int amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc,
 				     const char *src_name,
 				     size_t *values_cnt);
