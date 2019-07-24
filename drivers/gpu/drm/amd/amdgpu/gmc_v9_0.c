@@ -699,6 +699,7 @@ static bool gmc_v9_0_keep_stolen_memory(struct amdgpu_device *adev)
 	case CHIP_VEGA10:
 	case CHIP_RAVEN:
 	case CHIP_ARCTURUS:
+	case CHIP_RENOIR:
 		return true;
 	case CHIP_VEGA12:
 	case CHIP_VEGA20:
@@ -1007,6 +1008,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 			adev->gmc.gart_size = 512ULL << 20;
 			break;
 		case CHIP_RAVEN:   /* DCE SG support */
+		case CHIP_RENOIR:
 			adev->gmc.gart_size = 1024ULL << 20;
 			break;
 		}
@@ -1057,6 +1059,7 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 
 		switch (adev->asic_type) {
 		case CHIP_RAVEN:
+		case CHIP_RENOIR:
 			viewport = RREG32_SOC15(DCE, 0, mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION);
 			size = (REG_GET_FIELD(viewport,
 					      HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION, PRI_VIEWPORT_HEIGHT) *
@@ -1113,7 +1116,9 @@ static int gmc_v9_0_sw_init(void *handle)
 	case CHIP_VEGA10:
 	case CHIP_VEGA12:
 	case CHIP_VEGA20:
+	case CHIP_RENOIR:
 		adev->num_vmhubs = 2;
+
 
 		/*
 		 * To fulfill 4-level page support,
@@ -1286,6 +1291,7 @@ static void gmc_v9_0_init_golden_registers(struct amdgpu_device *adev)
 	case CHIP_VEGA12:
 		break;
 	case CHIP_RAVEN:
+		/* TODO for renoir */
 		soc15_program_register_sequence(adev,
 						golden_settings_athub_1_0_0,
 						ARRAY_SIZE(golden_settings_athub_1_0_0));
@@ -1320,6 +1326,7 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_RAVEN:
+		/* TODO for renoir */
 		mmhub_v1_0_update_power_gating(adev, true);
 		break;
 	default:
