@@ -1290,6 +1290,12 @@ static int cik_asic_reset(struct amdgpu_device *adev)
 	return r;
 }
 
+static enum amd_reset_method
+cik_asic_reset_method(struct amdgpu_device *adev)
+{
+	return AMD_RESET_METHOD_LEGACY;
+}
+
 static u32 cik_get_config_memsize(struct amdgpu_device *adev)
 {
 	return RREG32(mmCONFIG_MEMSIZE);
@@ -1822,6 +1828,7 @@ static const struct amdgpu_asic_funcs cik_asic_funcs =
 	.read_bios_from_rom = &cik_read_bios_from_rom,
 	.read_register = &cik_read_register,
 	.reset = &cik_asic_reset,
+	.reset_method = &cik_asic_reset_method,
 	.set_vga_state = &cik_vga_set_state,
 	.get_xclk = &cik_get_xclk,
 	.set_uvd_clocks = &cik_set_uvd_clocks,
