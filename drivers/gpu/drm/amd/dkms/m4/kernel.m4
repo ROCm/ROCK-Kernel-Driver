@@ -54,11 +54,11 @@ AC_DEFUN([AC_KERNEL], [
 
 	AC_MSG_CHECKING([kernel source directory])
 	AS_IF([test -z "$kernelsrc"], [
-		AS_IF([test -e "/lib/modules/$(uname -r)/source"], [
-			headersdir="/lib/modules/$(uname -r)/source"
+		AS_IF([test -e "/lib/modules/$KERNELVER/source"], [
+			headersdir="/lib/modules/$KERNELVER/source"
 			sourcelink=$(readlink -f "$headersdir")
-		], [test -e "/lib/modules/$(uname -r)/build"], [
-			headersdir="/lib/modules/$(uname -r)/build"
+		], [test -e "/lib/modules/$KERNELVER/build"], [
+			headersdir="/lib/modules/$KERNELVER/build"
 			sourcelink=$(readlink -f "$headersdir")
 		], [
 			sourcelink=$(ls -1d /usr/src/kernels/* \
@@ -88,8 +88,8 @@ AC_DEFUN([AC_KERNEL], [
 
 	AC_MSG_CHECKING([kernel build directory])
 	AS_IF([test -z "$kernelbuild"], [
-		AS_IF([test x$withlinux != xyes -a -e "/lib/modules/$(uname -r)/build"], [
-			kernelbuild=`readlink -f /lib/modules/$(uname -r)/build`
+		AS_IF([test x$withlinux != xyes -a -e "/lib/modules/$KERNELVER/build"], [
+			kernelbuild=`readlink -f /lib/modules/$KERNELVER/build`
 		], [test -d ${kernelsrc}-obj/${target_cpu}/${target_cpu}], [
 			kernelbuild=${kernelsrc}-obj/${target_cpu}/${target_cpu}
 		], [test -d ${kernelsrc}-obj/${target_cpu}/default], [
