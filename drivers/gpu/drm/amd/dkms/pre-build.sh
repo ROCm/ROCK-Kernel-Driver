@@ -49,4 +49,5 @@ for file in $FILES; do
 		>> include/rename_symbol.h
 done
 
+export KERNELVER
 ./configure
