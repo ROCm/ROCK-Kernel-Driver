@@ -2157,6 +2157,7 @@ drm_dp_mst_topology_unlink_port(struct drm_dp_mst_topology_mgr *mgr,
 				struct drm_dp_mst_port *port)
 {
 	mutex_lock(&mgr->lock);
+	port->parent->num_ports--;
 	list_del(&port->next);
 	mutex_unlock(&mgr->lock);
 	drm_dp_mst_topology_put_port(port);
@@ -2256,6 +2257,7 @@ drm_dp_mst_handle_link_address_port(struct drm_dp_mst_branch *mstb,
 		mutex_lock(&mgr->lock);
 		drm_dp_mst_topology_get_port(port);
 		list_add(&port->next, &mstb->ports);
+		mstb->num_ports++;
 		mutex_unlock(&mgr->lock);
 	}
 
