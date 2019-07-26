@@ -26,7 +26,24 @@ AC_DEFUN([AC_AMDGPU_GET_USER_PAGES], [
 			AC_MSG_RESULT(yes)
 			AC_DEFINE(HAVE_6ARGS_GET_USER_PAGES, 1, [get_user_pages() wants 6 args])
 		], [
+			dnl #
+			dnl # redhat 7.x wrap a get_user_pages()
+			dnl #
 			AC_MSG_RESULT(no)
+			AC_MSG_CHECKING([whether get_user_pages get wrapped in drm_backport.h])
+			AC_KERNEL_TRY_COMPILE([
+				#include <asm/current.h>
+				#include <linux/sched.h>
+				#include <drm/drm_backport.h>
+			], [
+				get_user_pages(0, 0, 0, NULL, NULL);
+			], [
+				AC_MSG_RESULT(yes)
+				AC_DEFINE(HAVE_5ARGS_GET_USER_PAGES, 1, [get_user_pages get wrapped in drm_backport.h and wants 5 args])
+			], [
+				AC_MSG_RESULT(no)
+				AC_DEFINE(HAVE_8ARGS_GET_USER_PAGES, 1, [get_user_pages() wants 8 args])
+			])
 		])
 	])
 ])

@@ -14,9 +14,14 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 				int write, int force, struct page **pages,
 				struct vm_area_struct **vmas, int *locked)
 {
-#if defined(HAVE_5ARGS_GET_USER_PAGES)
+#if !defined(HAVE_8ARGS_GET_USER_PAGES)
 	if (mm == current->mm)
+#if defined(HAVE_5ARGS_GET_USER_PAGES)
 		return get_user_pages(start, nr_pages, write, pages, vmas);
+#else
+		return get_user_pages(start, nr_pages, write, force, pages,
+				vmas);
+#endif
 	else
 #if defined(HAVE_8ARGS_GET_USER_PAGES_REMOTE)
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
@@ -25,13 +30,6 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
 				write, pages, vmas);
 #endif
-#elif defined(HAVE_6ARGS_GET_USER_PAGES)
-	if (mm == current->mm)
-		return get_user_pages(start, nr_pages, write, force, pages,
-				vmas);
-	else
-		return get_user_pages_remote(tsk, mm, start, nr_pages,
-				write, force, pages, vmas);
 #else
 	write = !!(write & FOLL_WRITE);
 	return get_user_pages(tsk, mm, start, nr_pages,
