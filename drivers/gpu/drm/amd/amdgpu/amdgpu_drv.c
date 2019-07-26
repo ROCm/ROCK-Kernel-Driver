@@ -82,7 +82,7 @@
 #define KMS_DRIVER_MINOR	33
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"5.0.76"
+#define AMDGPU_VERSION		"5.0.77"
 #define AMDGPU_MAX_TIMEOUT_PARAM_LENTH	256
 
 int amdgpu_vram_limit = 0;
