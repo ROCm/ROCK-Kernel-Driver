@@ -1877,6 +1877,15 @@ static void gfx_v7_0_init_compute_vmid(struct amdgpu_device *adev)
 	}
 	cik_srbm_select(adev, 0, 0, 0, 0);
 	mutex_unlock(&adev->srbm_mutex);
+
+	/* Initialize all compute VMIDs to have no GDS, GWS, or OA
+	   acccess. These should be enabled by FW for target VMIDs. */
+	for (i = FIRST_COMPUTE_VMID; i < LAST_COMPUTE_VMID; i++) {
+		WREG32(amdgpu_gds_reg_offset[i].mem_base, 0);
+		WREG32(amdgpu_gds_reg_offset[i].mem_size, 0);
+		WREG32(amdgpu_gds_reg_offset[i].gws, 0);
+		WREG32(amdgpu_gds_reg_offset[i].oa, 0);
+	}
 }
 
 static void gfx_v7_0_config_init(struct amdgpu_device *adev)
@@ -4167,9 +4176,9 @@ static void gfx_v7_0_read_wave_sgprs(struct amdgpu_device *adev, uint32_t simd,
 }
 
 static void gfx_v7_0_select_me_pipe_q(struct amdgpu_device *adev,
-				  u32 me, u32 pipe, u32 q)
+				  u32 me, u32 pipe, u32 q, u32 vm)
 {
-	cik_srbm_select(adev, me, pipe, q, 0);
+	cik_srbm_select(adev, me, pipe, q, vm);
 }
 
 static const struct amdgpu_gfx_funcs gfx_v7_0_gfx_funcs = {

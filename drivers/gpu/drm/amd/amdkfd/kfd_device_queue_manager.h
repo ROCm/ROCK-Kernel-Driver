@@ -34,6 +34,8 @@
 #include "kfd_mqd_manager.h"
 
 
+#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
+
 struct device_process_node {
 	struct qcm_process_device *qpd;
 	struct list_head list;
@@ -201,6 +203,7 @@ struct device_queue_manager {
 	bool			is_hws_hang;
 	struct work_struct	hw_exception_work;
 	struct kfd_mem_obj	hiq_sdma_mqd;
+	uint32_t		wait_times;
 };
 
 void device_queue_manager_init_cik(

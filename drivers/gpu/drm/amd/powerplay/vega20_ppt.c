@@ -47,7 +47,7 @@
 #define CTF_OFFSET_HBM			5
 
 #define MSG_MAP(msg) \
-	[SMU_MSG_##msg] = PPSMC_MSG_##msg
+	[SMU_MSG_##msg] = {1, PPSMC_MSG_##msg}
 
 #define SMC_DPM_FEATURE (FEATURE_DPM_PREFETCHER_MASK | \
 			 FEATURE_DPM_GFXCLK_MASK | \
@@ -59,7 +59,7 @@
 			 FEATURE_DPM_LINK_MASK | \
 			 FEATURE_DPM_DCEFCLK_MASK)
 
-static int vega20_message_map[SMU_MSG_MAX_COUNT] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(TestMessage),
 	MSG_MAP(GetSmuVersion),
 	MSG_MAP(GetDriverIfVersion),
@@ -145,7 +145,7 @@ static int vega20_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(GetAVFSVoltageByDpm),
 };
 
-static int vega20_clk_map[SMU_CLK_COUNT] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_clk_map[SMU_CLK_COUNT] = {
 	CLK_MAP(GFXCLK, PPCLK_GFXCLK),
 	CLK_MAP(VCLK, PPCLK_VCLK),
 	CLK_MAP(DCLK, PPCLK_DCLK),
@@ -159,7 +159,7 @@ static int vega20_clk_map[SMU_CLK_COUNT] = {
 	CLK_MAP(FCLK, PPCLK_FCLK),
 };
 
-static int vega20_feature_mask_map[SMU_FEATURE_COUNT] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_feature_mask_map[SMU_FEATURE_COUNT] = {
 	FEA_MAP(DPM_PREFETCHER),
 	FEA_MAP(DPM_GFXCLK),
 	FEA_MAP(DPM_UCLK),
@@ -195,7 +195,7 @@ static int vega20_feature_mask_map[SMU_FEATURE_COUNT] = {
 	FEA_MAP(XGMI),
 };
 
-static int vega20_table_map[SMU_TABLE_COUNT] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_table_map[SMU_TABLE_COUNT] = {
 	TAB_MAP(PPTABLE),
 	TAB_MAP(WATERMARKS),
 	TAB_MAP(AVFS),
@@ -208,12 +208,12 @@ static int vega20_table_map[SMU_TABLE_COUNT] = {
 	TAB_MAP(OVERDRIVE),
 };
 
-static int vega20_pwr_src_map[SMU_POWER_SOURCE_COUNT] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_pwr_src_map[SMU_POWER_SOURCE_COUNT] = {
 	PWR_MAP(AC),
 	PWR_MAP(DC),
 };
 
-static int vega20_workload_map[] = {
+static struct smu_11_0_cmn2aisc_mapping vega20_workload_map[PP_SMC_POWER_PROFILE_COUNT] = {
 	WORKLOAD_MAP(PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT,	WORKLOAD_DEFAULT_BIT),
 	WORKLOAD_MAP(PP_SMC_POWER_PROFILE_FULLSCREEN3D,		WORKLOAD_PPLIB_FULL_SCREEN_3D_BIT),
 	WORKLOAD_MAP(PP_SMC_POWER_PROFILE_POWERSAVING,		WORKLOAD_PPLIB_POWER_SAVING_BIT),
@@ -225,79 +225,92 @@ static int vega20_workload_map[] = {
 
 static int vega20_get_smu_table_index(struct smu_context *smc, uint32_t index)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
+
 	if (index >= SMU_TABLE_COUNT)
 		return -EINVAL;
 
-	val = vega20_table_map[index];
-	if (val >= TABLE_COUNT)
+	mapping = vega20_table_map[index];
+	if (!(mapping.valid_mapping)) {
 		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_get_pwr_src_index(struct smu_context *smc, uint32_t index)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
+
 	if (index >= SMU_POWER_SOURCE_COUNT)
 		return -EINVAL;
 
-	val = vega20_pwr_src_map[index];
-	if (val >= POWER_SOURCE_COUNT)
+	mapping = vega20_pwr_src_map[index];
+	if (!(mapping.valid_mapping)) {
 		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_get_smu_feature_index(struct smu_context *smc, uint32_t index)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
+
 	if (index >= SMU_FEATURE_COUNT)
 		return -EINVAL;
 
-	val = vega20_feature_mask_map[index];
-	if (val > 64)
+	mapping = vega20_feature_mask_map[index];
+	if (!(mapping.valid_mapping)) {
 		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_get_smu_clk_index(struct smu_context *smc, uint32_t index)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
+
 	if (index >= SMU_CLK_COUNT)
 		return -EINVAL;
 
-	val = vega20_clk_map[index];
-	if (val >= PPCLK_COUNT)
+	mapping = vega20_clk_map[index];
+	if (!(mapping.valid_mapping)) {
 		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_get_smu_msg_index(struct smu_context *smc, uint32_t index)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
 
 	if (index >= SMU_MSG_MAX_COUNT)
 		return -EINVAL;
 
-	val = vega20_message_map[index];
-	if (val > PPSMC_Message_Count)
+	mapping = vega20_message_map[index];
+	if (!(mapping.valid_mapping)) {
 		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_get_workload_type(struct smu_context *smu, enum PP_SMC_POWER_PROFILE profile)
 {
-	int val;
+	struct smu_11_0_cmn2aisc_mapping mapping;
+
 	if (profile > PP_SMC_POWER_PROFILE_CUSTOM)
 		return -EINVAL;
 
-	val = vega20_workload_map[profile];
+	mapping = vega20_workload_map[profile];
+	if (!(mapping.valid_mapping)) {
+		return -EINVAL;
+	}
 
-	return val;
+	return mapping.map_to;
 }
 
 static int vega20_tables_init(struct smu_context *smu, struct smu_table *tables)
@@ -319,7 +332,7 @@ static int vega20_tables_init(struct smu_context *smu, struct smu_table *tables)
 	               AMDGPU_GEM_DOMAIN_VRAM);
 
 	smu_table->metrics_table = kzalloc(sizeof(SmuMetrics_t), GFP_KERNEL);
-	if (smu_table->metrics_table)
+	if (!smu_table->metrics_table)
 		return -ENOMEM;
 	smu_table->metrics_time = 0;
 
@@ -441,7 +454,6 @@ static int vega20_store_powerplay_table(struct smu_context *smu)
 {
 	ATOM_Vega20_POWERPLAYTABLE *powerplay_table = NULL;
 	struct smu_table_context *table_context = &smu->smu_table;
-	int ret;
 
 	if (!table_context->power_play_table)
 		return -EINVAL;
@@ -455,9 +467,7 @@ static int vega20_store_powerplay_table(struct smu_context *smu)
 	table_context->thermal_controller_type = powerplay_table->ucThermalControllerType;
 	table_context->TDPODLimit = le32_to_cpu(powerplay_table->OverDrive8Table.ODSettingsMax[ATOM_VEGA20_ODSETTING_POWERPERCENTAGE]);
 
-	ret = vega20_setup_od8_information(smu);
-
-	return ret;
+	return 0;
 }
 
 static int vega20_append_powerplay_table(struct smu_context *smu)
@@ -992,7 +1002,7 @@ static int vega20_print_clk_levels(struct smu_context *smu,
 		break;
 
 	case SMU_SOCCLK:
-		ret = smu_get_current_clk_freq(smu, PPCLK_SOCCLK, &now);
+		ret = smu_get_current_clk_freq(smu, SMU_SOCCLK, &now);
 		if (ret) {
 			pr_err("Attempt to get current socclk Failed!");
 			return ret;
@@ -1013,7 +1023,7 @@ static int vega20_print_clk_levels(struct smu_context *smu,
 		break;
 
 	case SMU_FCLK:
-		ret = smu_get_current_clk_freq(smu, PPCLK_FCLK, &now);
+		ret = smu_get_current_clk_freq(smu, SMU_FCLK, &now);
 		if (ret) {
 			pr_err("Attempt to get current fclk Failed!");
 			return ret;
@@ -1028,7 +1038,7 @@ static int vega20_print_clk_levels(struct smu_context *smu,
 		break;
 
 	case SMU_DCEFCLK:
-		ret = smu_get_current_clk_freq(smu, PPCLK_DCEFCLK, &now);
+		ret = smu_get_current_clk_freq(smu, SMU_DCEFCLK, &now);
 		if (ret) {
 			pr_err("Attempt to get current dcefclk Failed!");
 			return ret;
@@ -1502,10 +1512,16 @@ static int vega20_set_default_od8_setttings(struct smu_context *smu)
 
 	od8_settings = kzalloc(sizeof(struct vega20_od8_settings), GFP_KERNEL);
 
-	if (od8_settings)
+	if (!od8_settings)
 		return -ENOMEM;
 
 	smu->od_settings = (void *)od8_settings;
+
+	ret = vega20_setup_od8_information(smu);
+	if (ret) {
+		pr_err("Retrieve board OD limits failed!\n");
+		return ret;
+	}
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_SOCCLK_BIT)) {
 		if (od8_settings->od_feature_capabilities[ATOM_VEGA20_ODFEATURE_GFXCLK_LIMITS] &&
@@ -1677,7 +1693,7 @@ static int vega20_get_metrics_table(struct smu_context *smu,
 	int ret = 0;
 
 	if (!smu_table->metrics_time || time_after(jiffies, smu_table->metrics_time + HZ / 1000)) {
-		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS,
+		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
 				(void *)smu_table->metrics_table, false);
 		if (ret) {
 			pr_info("Failed to export SMU metrics table!\n");
@@ -1706,7 +1722,7 @@ static int vega20_set_default_od_settings(struct smu_context *smu,
 		if (!table_context->overdrive_table)
 			return -ENOMEM;
 
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 				       table_context->overdrive_table, false);
 		if (ret) {
 			pr_err("Failed to export over drive table!\n");
@@ -1718,7 +1734,7 @@ static int vega20_set_default_od_settings(struct smu_context *smu,
 			return ret;
 	}
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, true);
 	if (ret) {
 		pr_err("Failed to import over drive table!\n");
@@ -1768,7 +1784,7 @@ static int vega20_get_power_profile_mode(struct smu_context *smu, char *buf)
 {
 	DpmActivityMonitorCoeffInt_t activity_monitor;
 	uint32_t i, size = 0;
-	uint16_t workload_type = 0;
+	int16_t workload_type = 0;
 	static const char *profile_name[] = {
 					"BOOTUP_DEFAULT",
 					"3D_FULL_SCREEN",
@@ -1801,8 +1817,11 @@ static int vega20_get_power_profile_mode(struct smu_context *smu, char *buf)
 	for (i = 0; i <= PP_SMC_POWER_PROFILE_CUSTOM; i++) {
 		/* conv PP_SMC_POWER_PROFILE* to WORKLOAD_PPLIB_*_BIT */
 		workload_type = smu_workload_get_type(smu, i);
+		if (workload_type < 0)
+			return -EINVAL;
+
 		result = smu_update_table(smu,
-					  SMU_TABLE_ACTIVITY_MONITOR_COEFF | workload_type << 16,
+					  SMU_TABLE_ACTIVITY_MONITOR_COEFF, workload_type,
 					  (void *)(&activity_monitor), false);
 		if (result) {
 			pr_err("[%s] Failed to get activity monitor!", __func__);
@@ -1888,7 +1907,7 @@ static int vega20_set_power_profile_mode(struct smu_context *smu, long *input, u
 
 	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_CUSTOM) {
 		ret = smu_update_table(smu,
-				       SMU_TABLE_ACTIVITY_MONITOR_COEFF | WORKLOAD_PPLIB_CUSTOM_BIT << 16,
+				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), false);
 		if (ret) {
 			pr_err("[%s] Failed to get activity monitor!", __func__);
@@ -1943,7 +1962,7 @@ static int vega20_set_power_profile_mode(struct smu_context *smu, long *input, u
 		}
 
 		ret = smu_update_table(smu,
-				       SMU_TABLE_ACTIVITY_MONITOR_COEFF | WORKLOAD_PPLIB_CUSTOM_BIT << 16,
+				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), true);
 		if (ret) {
 			pr_err("[%s] Failed to set activity monitor!", __func__);
@@ -1953,6 +1972,8 @@ static int vega20_set_power_profile_mode(struct smu_context *smu, long *input, u
 
 	/* conv PP_SMC_POWER_PROFILE* to WORKLOAD_PPLIB_*_BIT */
 	workload_type = smu_workload_get_type(smu, smu->power_profile_mode);
+	if (workload_type < 0)
+		return -EINVAL;
 	smu_send_smc_msg_with_param(smu, SMU_MSG_SetWorkloadMask,
 				    1 << workload_type);
 
@@ -2492,7 +2513,7 @@ static int vega20_update_od8_settings(struct smu_context *smu,
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret;
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, false);
 	if (ret) {
 		pr_err("Failed to export over drive table!\n");
@@ -2503,7 +2524,7 @@ static int vega20_update_od8_settings(struct smu_context *smu,
 	if (ret)
 		return ret;
 
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE,
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0,
 			       table_context->overdrive_table, true);
 	if (ret) {
 		pr_err("Failed to import over drive table!\n");
@@ -2767,7 +2788,7 @@ static int vega20_odn_edit_dpm_table(struct smu_context *smu,
 		break;
 
 	case PP_OD_RESTORE_DEFAULT_TABLE:
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, table_context->overdrive_table, false);
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, false);
 		if (ret) {
 			pr_err("Failed to export over drive table!\n");
 			return ret;
@@ -2776,7 +2797,7 @@ static int vega20_odn_edit_dpm_table(struct smu_context *smu,
 		break;
 
 	case PP_OD_COMMIT_DPM_TABLE:
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, table_context->overdrive_table, true);
+		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, true);
 		if (ret) {
 			pr_err("Failed to import over drive table!\n");
 			return ret;

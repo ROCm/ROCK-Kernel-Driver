@@ -408,6 +408,7 @@ int amdgpu_ttm_copy_mem_to_mem(struct amdgpu_device *adev,
 			src_node_start = amdgpu_mm_node_addr(src->bo, ++src_mm,
 							     src->mem);
 			src_node_size = (src_mm->size << PAGE_SHIFT);
+			src_page_offset = 0;
 		} else {
 			src_node_start += cur_size;
 			src_page_offset = src_node_start & (PAGE_SIZE - 1);
@@ -417,6 +418,7 @@ int amdgpu_ttm_copy_mem_to_mem(struct amdgpu_device *adev,
 			dst_node_start = amdgpu_mm_node_addr(dst->bo, ++dst_mm,
 							     dst->mem);
 			dst_node_size = (dst_mm->size << PAGE_SHIFT);
+			dst_page_offset = 0;
 		} else {
 			dst_node_start += cur_size;
 			dst_page_offset = dst_node_start & (PAGE_SIZE - 1);
@@ -504,6 +506,7 @@ static int amdgpu_move_vram_ram(struct ttm_buffer_object *bo, bool evict,
 	placements.flags = TTM_PL_MASK_CACHING | TTM_PL_FLAG_TT;
 	r = ttm_bo_mem_space(bo, &placement, &tmp_mem, ctx);
 	if (unlikely(r)) {
+		pr_err("Failed to find GTT space for blit from VRAM\n");
 		return r;
 	}
 
@@ -562,6 +565,7 @@ static int amdgpu_move_ram_vram(struct ttm_buffer_object *bo, bool evict,
 	placements.flags = TTM_PL_MASK_CACHING | TTM_PL_FLAG_TT;
 	r = ttm_bo_mem_space(bo, &placement, &tmp_mem, ctx);
 	if (unlikely(r)) {
+		pr_err("Failed to find GTT space for blit to VRAM\n");
 		return r;
 	}
 
@@ -579,6 +583,30 @@ static int amdgpu_move_ram_vram(struct ttm_buffer_object *bo, bool evict,
 out_cleanup:
 	ttm_bo_mem_put(bo, &tmp_mem);
 	return r;
+}
+
+/**
+ * amdgpu_mem_visible - Check that memory can be accessed by ttm_bo_move_memcpy
+ *
+ * Called by amdgpu_bo_move()
+ */
+static bool amdgpu_mem_visible(struct amdgpu_device *adev,
+			       struct ttm_mem_reg *mem)
+{
+	struct drm_mm_node *nodes = mem->mm_node;
+
+	if (mem->mem_type == TTM_PL_SYSTEM ||
+	    mem->mem_type == TTM_PL_TT)
+		return true;
+	if (mem->mem_type != TTM_PL_VRAM)
+		return false;
+
+	/* ttm_mem_reg_ioremap only supports contiguous memory */
+	if (nodes->size != mem->num_pages)
+		return false;
+
+	return ((nodes->start + nodes->size) << PAGE_SHIFT)
+		<= adev->gmc.visible_vram_size;
 }
 
 /**
@@ -629,8 +657,10 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 		return 0;
 	}
 
-	if (!adev->mman.buffer_funcs_enabled)
+	if (!adev->mman.buffer_funcs_enabled) {
+		r = -ENODEV;
 		goto memcpy;
+	}
 
 	if (old_mem->mem_type == TTM_PL_VRAM &&
 	    new_mem->mem_type == TTM_PL_SYSTEM) {
@@ -645,10 +675,16 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 
 	if (r) {
 memcpy:
-		r = ttm_bo_move_memcpy(bo, ctx, new_mem);
-		if (r) {
+		/* Check that all memory is CPU accessible */
+		if (!amdgpu_mem_visible(adev, old_mem) ||
+		    !amdgpu_mem_visible(adev, new_mem)) {
+			pr_err("Move buffer fallback to memcpy unavailable\n");
 			return r;
 		}
+
+		r = ttm_bo_move_memcpy(bo, ctx, new_mem);
+		if (r)
+			return r;
 	}
 
 	if (bo->type == ttm_bo_type_device &&

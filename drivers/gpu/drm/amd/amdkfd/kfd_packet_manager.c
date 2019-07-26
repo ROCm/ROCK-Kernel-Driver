@@ -239,6 +239,7 @@ int pm_init(struct packet_manager *pm, struct device_queue_manager *dqm)
 	case CHIP_VEGA12:
 	case CHIP_VEGA20:
 	case CHIP_RAVEN:
+	case CHIP_ARCTURUS:
 		pm->pmf = &kfd_v9_pm_funcs;
 		break;
 	case CHIP_NAVI10:
@@ -363,6 +364,38 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 		pm->priv_queue->ops.submit_packet(pm->priv_queue);
 	else
 		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+
+out:
+	mutex_unlock(&pm->lock);
+	return retval;
+}
+
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period)
+{
+	int retval = 0;
+	uint32_t *buffer, size;
+
+	size = pm->pmf->set_grace_period_size;
+
+	mutex_lock(&pm->lock);
+
+	if (size) {
+		pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+			size / sizeof(uint32_t),
+			(unsigned int **)&buffer);
+
+		if (!buffer) {
+			pr_err("Failed to allocate buffer on kernel queue\n");
+			retval = -ENOMEM;
+			goto out;
+		}
+
+		retval = pm->pmf->set_grace_period(pm, buffer, grace_period);
+		if (!retval)
+			pm->priv_queue->ops.submit_packet(pm->priv_queue);
+		else
+			pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+	}
 
 out:
 	mutex_unlock(&pm->lock);

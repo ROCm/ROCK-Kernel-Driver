@@ -167,7 +167,7 @@ extern int ignore_crat;
 /*
  * Set sh_mem_config.retry_disable on Vega10
  */
-extern int noretry;
+extern int amdgpu_noretry;
 
 /*
  * Enable privileged mode for all CP queues including user queues
@@ -1084,6 +1084,8 @@ struct packet_manager_funcs {
 			enum kfd_unmap_queues_filter mode,
 			uint32_t filter_param, bool reset,
 			unsigned int sdma_engine);
+	int (*set_grace_period)(struct packet_manager *pm, uint32_t *buffer,
+			uint32_t grace_period);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint32_t fence_value);
 	int (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
@@ -1094,6 +1096,7 @@ struct packet_manager_funcs {
 	int set_resources_size;
 	int map_queues_size;
 	int unmap_queues_size;
+	int set_grace_period_size;
 	int query_status_size;
 	int release_mem_size;
 };
@@ -1116,6 +1119,8 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 			unsigned int sdma_engine);
 
 void pm_release_ib(struct packet_manager *pm);
+
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period);
 
 /* Following PM funcs can be shared among VI and AI */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);

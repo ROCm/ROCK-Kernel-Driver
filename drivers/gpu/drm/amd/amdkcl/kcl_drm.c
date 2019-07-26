@@ -1,24 +1,7 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
-/**
- * drm_crtc_force_disable - Forcibly turn off a CRTC
- * @crtc: CRTC to turn off
- *
- * Returns:
- * Zero on success, error code on failure.
- */
-int drm_crtc_force_disable(struct drm_crtc *crtc)
-{
-	struct drm_mode_set set = {
-		.crtc = crtc,
-	};
-
-	return drm_mode_set_config_internal(&set);
-}
-EXPORT_SYMBOL(drm_crtc_force_disable);
-
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
 /**
  * drm_crtc_force_disable_all - Forcibly turn off all enabled CRTCs
  * @dev: DRM device whose CRTCs to turn off
@@ -48,30 +31,6 @@ out:
 EXPORT_SYMBOL(drm_crtc_force_disable_all);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
-int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw)
-{
-	struct pci_dev *root;
-	u32 lnkcap;
-
-	*mlw = 0;
-	if (!dev->pdev)
-		return -EINVAL;
-
-	root = dev->pdev->bus->self;
-	if (!root)
-		return -EINVAL;
-
-	pcie_capability_read_dword(root, PCI_EXP_LNKCAP, &lnkcap);
-
-	*mlw = (lnkcap & PCI_EXP_LNKCAP_MLW) >> 4;
-
-	DRM_INFO("probing mlw for device %x:%x = %x\n", root->vendor, root->device, lnkcap);
-	return 0;
-}
-EXPORT_SYMBOL(drm_pcie_get_max_link_width);
-#endif
-
 void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
 				const struct fb_fillrect *rect);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);
@@ -89,9 +48,6 @@ EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
 
 struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_alloc_fbi);
-
-void (*_kcl_drm_fb_helper_release_fbi)(struct drm_fb_helper *fb_helper);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_release_fbi);
 
 void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
@@ -195,28 +151,6 @@ void _kcl_drm_fb_helper_unregister_fbi_stub(struct drm_fb_helper *fb_helper)
 {
 	if (fb_helper && fb_helper->fbdev)
 		unregister_framebuffer(fb_helper->fbdev);
-}
-
-/**
- * _kcl_drm_fb_helper_release_fbi_stub - dealloc fb_info and its members
- * @fb_helper: driver-allocated fbdev helper
- *
- * A helper to free memory taken by fb_info and the members cmap and
- * apertures
- */
-void _kcl_drm_fb_helper_release_fbi_stub(struct drm_fb_helper *fb_helper)
-{
-	if (fb_helper) {
-		struct fb_info *info = fb_helper->fbdev;
-
-		if (info) {
-			if (info->cmap.len)
-				fb_dealloc_cmap(&info->cmap);
-			framebuffer_release(info);
-		}
-
-		fb_helper->fbdev = NULL;
-	}
 }
 
 /**
@@ -356,7 +290,7 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 	}
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
+#if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx)
 {
@@ -383,7 +317,9 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 	return 0;
 }
 EXPORT_SYMBOL(drm_modeset_lock_all_ctx);
+#endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)
 {
@@ -422,8 +358,9 @@ free:
 	return err;
 }
 EXPORT_SYMBOL(drm_atomic_helper_disable_all);
+#endif
 
-#if !defined(OS_NAME_RHEL_6) && !defined(OS_NAME_AMZ)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE)
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx)
@@ -484,6 +421,7 @@ free:
 EXPORT_SYMBOL(drm_atomic_helper_duplicate_state);
 #endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND)
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev)
 {
 	struct drm_modeset_acquire_ctx ctx;
@@ -521,7 +459,9 @@ unlock:
 	return state;
 }
 EXPORT_SYMBOL(drm_atomic_helper_suspend);
+#endif
 
+#if !defined(HAVE_DRM_ATOMIC_HELPER_RESUME)
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state)
 {
@@ -551,8 +491,6 @@ void amdkcl_drm_init(void)
 					_kcl_drm_fb_helper_alloc_fbi_stub);
 	_kcl_drm_fb_helper_unregister_fbi = amdkcl_fp_setup("drm_fb_helper_unregister_fbi",
 					_kcl_drm_fb_helper_unregister_fbi_stub);
-	_kcl_drm_fb_helper_release_fbi = amdkcl_fp_setup("drm_fb_helper_release_fbi",
-					_kcl_drm_fb_helper_release_fbi_stub);
 	_kcl_drm_fb_helper_set_suspend_unlocked = amdkcl_fp_setup("drm_fb_helper_set_suspend_unlocked",
 					_kcl_drm_fb_helper_set_suspend_unlocked_stub);
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(

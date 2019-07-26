@@ -67,35 +67,43 @@ extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
 				 const struct fb_image *image);
 extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
 extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
-extern void (*_kcl_drm_fb_helper_release_fbi)(struct drm_fb_helper *fb_helper);
 extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && !(defined(OS_NAME_UBUNTU) || defined(OS_NAME_SLE))
+#if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
+#endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
-#ifndef OS_NAME_RHEL_6
+#endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE)
 struct drm_atomic_state *
 drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND)
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
+#endif
+
+#if !defined(HAVE_DRM_ATOMIC_HELPER_RESUME)
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
-extern int drm_crtc_force_disable(struct drm_crtc *crtc);
+#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_FRAMEBUFFERS)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
+#if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
 #define __take_second_arg(__ignored, val, ...) val
 
@@ -110,16 +118,12 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #define __or(x, y)			___or(x, y)
 #define ___or(x, y)			____or(__ARG_PLACEHOLDER_##x, y)
 #define ____or(arg1_or_junk, y)		__take_second_arg(arg1_or_junk 1, y)
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0) && \
-		!defined(OS_NAME_RHEL_7_X)
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
 
-#if !defined(OS_NAME_RHEL_7_X)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
+#if !defined(HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT)
 static inline void
 drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 					      const char *name, bool primary)
@@ -141,12 +145,7 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 	return 0;
 #endif
 }
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) */
 #endif
-#endif
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-extern int drm_pcie_get_max_link_width(struct drm_device *dev, u32 *mlw);
 #endif
 
 static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
@@ -185,17 +184,6 @@ static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
 #else
 	return drm_fb_helper_alloc_fbi(fb_helper);
-#endif
-}
-
-static inline void kcl_drm_fb_helper_release_fbi(struct drm_fb_helper *fb_helper)
-{
-#ifdef BUILD_AS_DKMS
-	_kcl_drm_fb_helper_release_fbi(fb_helper);
-#else
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	drm_fb_helper_release_fbi(fb_helper);
-#endif
 #endif
 }
 
@@ -289,7 +277,7 @@ static inline int kcl_drm_encoder_init(struct drm_device *dev,
 		      const struct drm_encoder_funcs *funcs,
 		      int encoder_type, const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
+#if defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
 	return drm_encoder_init(dev, encoder, funcs,
 			 encoder_type, name);
 #else
@@ -304,7 +292,7 @@ static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct d
 			      const struct drm_crtc_funcs *funcs,
 			      const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
+#if defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
 		return drm_crtc_init_with_planes(dev, crtc, primary,
 				 cursor, funcs, name);
 #else
@@ -321,13 +309,10 @@ static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct dr
 			     enum drm_plane_type type,
 			     const char *name, ...)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0) || \
-	defined(OS_NAME_SUSE_15) || defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_9ARGS_DRM_UNIVERSAL_PLANE_INIT)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, format_modifiers, type, name);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
-		defined(OS_NAME_RHEL_7_3) || \
-		defined(OS_NAME_RHEL_7_4)
+#elif defined(HAVE_8ARGS_DRM_UNIVERSAL_PLANE_INIT)
 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
 				 formats, format_count, type, name);
 #else
@@ -340,10 +325,10 @@ static inline struct drm_gem_object *
 kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
 				u32 handle)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
-		return drm_gem_object_lookup(dev, filp, handle);
-#else
+#if defined(HAVE_2ARGS_DRM_GEM_OBJECT_LOOKUP)
 		return drm_gem_object_lookup(filp, handle);
+#else
+		return drm_gem_object_lookup(dev, filp, handle);
 #endif
 }
 
@@ -407,8 +392,7 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-#if !defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_DRM_GET_FORMAT_NAME)
 /**
  * struct drm_format_name_buf - name of a DRM format
  * @str: string buffer containing the format name
@@ -416,17 +400,14 @@ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
 struct drm_format_name_buf {
 	char str[32];
 };
-#endif
 
 static char printable_char(int c)
 {
 	return isascii(c) && isprint(c) ? c : '?';
 }
-#endif
 
 static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	snprintf(buf->str, sizeof(buf->str),
 		 "%c%c%c%c %s-endian (0x%08x)",
 		 printable_char(format & 0xff),
@@ -437,10 +418,13 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 		 format);
 
 	return buf->str;
-#else
-	return drm_get_format_name(format, buf);
-#endif
 }
+#else
+static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
+{
+	return drm_get_format_name(format, buf);
+}
+#endif
 
 static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {

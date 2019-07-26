@@ -83,10 +83,10 @@ struct pm4_mes_set_resources {
 
 	union {
 		struct {
-		uint32_t gds_heap_base:6;
-		uint32_t reserved3:5;
-		uint32_t gds_heap_size:6;
-		uint32_t reserved4:15;
+		uint32_t gds_heap_base:10;
+		uint32_t reserved3:1;
+		uint32_t gds_heap_size:10;
+		uint32_t reserved4:11;
 		} bitfields8;
 		uint32_t ordinal8;
 	};
@@ -182,7 +182,7 @@ struct pm4_mes_map_process {
 			uint32_t num_gws:7;
 			uint32_t sdma_enable:1;
 			uint32_t num_oac:4;
-			uint32_t reserved8:4;
+			uint32_t gds_size_hi:4;
 			uint32_t gds_size:6;
 			uint32_t num_queues:10;
 		} bitfields14;
@@ -263,6 +263,10 @@ enum mes_map_queues_engine_sel_enum {
 	engine_sel__mes_map_queues__sdma1_vi = 3
 };
 
+enum mes_map_queues_extended_engine_sel_enum {
+	extended_engine_sel__mes_map_queues__legacy_engine_sel = 0,
+	extended_engine_sel__mes_map_queues__sdma0_to_7_sel = 1
+};
 
 struct pm4_mes_map_queues {
 	union {
@@ -272,7 +276,8 @@ struct pm4_mes_map_queues {
 
 	union {
 		struct {
-			uint32_t reserved1:4;
+			uint32_t reserved1:2;
+			enum mes_map_queues_extended_engine_sel_enum extended_engine_sel:2;
 			enum mes_map_queues_queue_sel_enum queue_sel:2;
 			uint32_t reserved5:6;
 			uint32_t gws_control_queue:1;
@@ -385,6 +390,11 @@ enum mes_unmap_queues_engine_sel_enum {
 	engine_sel__mes_unmap_queues__sdmal = 3
 };
 
+enum mes_unmap_queues_extended_engine_sel_enum {
+	extended_engine_sel__mes_unmap_queues__legacy_engine_sel = 0,
+	extended_engine_sel__mes_unmap_queues__sdma0_to_7_sel = 1
+};
+
 struct pm4_mes_unmap_queues {
 	union {
 		union PM4_MES_TYPE_3_HEADER   header;            /* header */
@@ -394,7 +404,7 @@ struct pm4_mes_unmap_queues {
 	union {
 		struct {
 			enum mes_unmap_queues_action_enum action:2;
-			uint32_t reserved1:2;
+			enum mes_unmap_queues_extended_engine_sel_enum extended_engine_sel:2;
 			enum mes_unmap_queues_queue_sel_enum queue_sel:2;
 			uint32_t reserved2:20;
 			enum mes_unmap_queues_engine_sel_enum engine_sel:3;
@@ -570,6 +580,71 @@ struct pm4_mec_release_mem {
 	};
 
 	uint32_t int_ctxid;
+
+};
+
+#endif
+
+#ifndef PM4_MEC_WRITE_DATA_DEFINED
+#define PM4_MEC_WRITE_DATA_DEFINED
+
+enum WRITE_DATA_dst_sel_enum {
+	dst_sel___write_data__mem_mapped_register = 0,
+	dst_sel___write_data__tc_l2 = 2,
+	dst_sel___write_data__gds = 3,
+	dst_sel___write_data__memory = 5,
+	dst_sel___write_data__memory_mapped_adc_persistent_state = 6,
+};
+
+enum WRITE_DATA_addr_incr_enum {
+	addr_incr___write_data__increment_address = 0,
+	addr_incr___write_data__do_not_increment_address = 1
+};
+
+enum WRITE_DATA_wr_confirm_enum {
+	wr_confirm___write_data__do_not_wait_for_write_confirmation = 0,
+	wr_confirm___write_data__wait_for_write_confirmation = 1
+};
+
+enum WRITE_DATA_cache_policy_enum {
+	cache_policy___write_data__lru = 0,
+	cache_policy___write_data__stream = 1
+};
+
+
+struct pm4_mec_write_data_mmio {
+	union {
+		union PM4_MES_TYPE_3_HEADER header;     /*header */
+		unsigned int ordinal1;
+	};
+
+	union {
+		struct {
+			unsigned int reserved1:8;
+			unsigned int dst_sel:4;
+			unsigned int reserved2:4;
+			unsigned int addr_incr:1;
+			unsigned int reserved3:2;
+			unsigned int resume_vf:1;
+			unsigned int wr_confirm:1;
+			unsigned int reserved4:4;
+			unsigned int cache_policy:2;
+			unsigned int reserved5:5;
+		} bitfields2;
+		unsigned int ordinal2;
+	};
+
+	union {
+		struct {
+			unsigned int dst_mmreg_addr:18;
+			unsigned int reserved6:14;
+		} bitfields3;
+		unsigned int ordinal3;
+	};
+
+	uint32_t reserved7;
+
+	uint32_t data;
 
 };
 

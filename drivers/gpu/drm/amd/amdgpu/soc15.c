@@ -62,6 +62,7 @@
 #include "uvd_v7_0.h"
 #include "vce_v4_0.h"
 #include "vcn_v1_0.h"
+#include "vcn_v2_5.h"
 #include "dce_virtual.h"
 #include "mxgpu_ai.h"
 #include "amdgpu_smu.h"
@@ -585,21 +586,25 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 	case CHIP_VEGA20:
 		vega20_reg_base_init(adev);
 		break;
+	case CHIP_ARCTURUS:
+		arct_reg_base_init(adev);
+		break;
 	default:
 		return -EINVAL;
 	}
 
-	if (adev->asic_type == CHIP_VEGA20)
+	if (adev->asic_type == CHIP_VEGA20 || adev->asic_type == CHIP_ARCTURUS)
 		adev->gmc.xgmi.supported = true;
 
 	if (adev->flags & AMD_IS_APU)
 		adev->nbio_funcs = &nbio_v7_0_funcs;
-	else if (adev->asic_type == CHIP_VEGA20)
+	else if (adev->asic_type == CHIP_VEGA20 ||
+		adev->asic_type == CHIP_ARCTURUS)
 		adev->nbio_funcs = &nbio_v7_4_funcs;
 	else
 		adev->nbio_funcs = &nbio_v6_1_funcs;
 
-	if (adev->asic_type == CHIP_VEGA20)
+	if (adev->asic_type == CHIP_VEGA20 || adev->asic_type == CHIP_ARCTURUS)
 		adev->df_funcs = &df_v3_6_funcs;
 	else
 		adev->df_funcs = &df_v1_7_funcs;
@@ -648,8 +653,6 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_DC)
 		else if (amdgpu_device_has_dc_support(adev))
 			amdgpu_device_ip_block_add(adev, &dm_ip_block);
-#else
-#	warning "Enable CONFIG_DRM_AMD_DC for display support on SOC15."
 #endif
 		if (!(adev->asic_type == CHIP_VEGA20 && amdgpu_sriov_vf(adev))) {
 			amdgpu_device_ip_block_add(adev, &uvd_v7_0_ip_block);
@@ -670,10 +673,18 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_DC)
 		else if (amdgpu_device_has_dc_support(adev))
 			amdgpu_device_ip_block_add(adev, &dm_ip_block);
-#else
-#	warning "Enable CONFIG_DRM_AMD_DC for display support on SOC15."
 #endif
 		amdgpu_device_ip_block_add(adev, &vcn_v1_0_ip_block);
+		break;
+	case CHIP_ARCTURUS:
+		amdgpu_device_ip_block_add(adev, &vega10_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v9_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &vega10_ih_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_device_ip_block_add(adev, &dce_virtual_ip_block);
+		amdgpu_device_ip_block_add(adev, &gfx_v9_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v4_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -691,7 +702,7 @@ static void soc15_invalidate_hdp(struct amdgpu_device *adev,
 				 struct amdgpu_ring *ring)
 {
 	if (!ring || !ring->funcs->emit_wreg)
-		WREG32_SOC15_NO_KIQ(NBIO, 0, mmHDP_READ_CACHE_INVALIDATE, 1);
+		WREG32_SOC15_NO_KIQ(HDP, 0, mmHDP_READ_CACHE_INVALIDATE, 1);
 	else
 		amdgpu_ring_emit_wreg(ring, SOC15_REG_OFFSET(
 			HDP, 0, mmHDP_READ_CACHE_INVALIDATE), 1);
@@ -716,9 +727,15 @@ static void soc15_get_pcie_usage(struct amdgpu_device *adev, uint64_t *count0,
 		return;
 
 	/* Set the 2 events that we wish to watch, defined above */
-	/* Reg 40 is # received msgs, Reg 104 is # of posted requests sent */
+	/* Reg 40 is # received msgs */
 	perfctr = REG_SET_FIELD(perfctr, PCIE_PERF_CNTL_TXCLK, EVENT0_SEL, 40);
-	perfctr = REG_SET_FIELD(perfctr, PCIE_PERF_CNTL_TXCLK, EVENT1_SEL, 104);
+	/* Pre-VG20, Reg 104 is # of posted requests sent. On VG20 it's 108 */
+	if (adev->asic_type == CHIP_VEGA20)
+		perfctr = REG_SET_FIELD(perfctr, PCIE_PERF_CNTL_TXCLK,
+					EVENT1_SEL, 108);
+	else
+		perfctr = REG_SET_FIELD(perfctr, PCIE_PERF_CNTL_TXCLK,
+					EVENT1_SEL, 104);
 
 	/* Write to enable desired perf counters */
 	WREG32_PCIE(smnPCIE_PERF_CNTL_TXCLK, perfctr);
@@ -994,6 +1011,12 @@ static int soc15_common_early_init(void *handle)
 			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
 				AMD_PG_SUPPORT_CP |
 				AMD_PG_SUPPORT_RLC_SMU_HS;
+		break;
+	case CHIP_ARCTURUS:
+		adev->asic_funcs = &vega20_asic_funcs;
+		adev->cg_flags = 0;
+		adev->pg_flags = 0;
+		adev->external_rev_id = adev->rev_id + 0x32;
 		break;
 	default:
 		/* FIXME: not supported yet */

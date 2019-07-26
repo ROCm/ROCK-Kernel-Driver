@@ -167,6 +167,7 @@ extern int amdgpu_async_gfx_ring;
 extern int amdgpu_mcbp;
 extern int amdgpu_discovery;
 extern int amdgpu_mes;
+extern int amdgpu_noretry;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;
@@ -676,6 +677,12 @@ struct nbio_hdp_flush_reg {
 	u32 ref_and_mask_cp9;
 	u32 ref_and_mask_sdma0;
 	u32 ref_and_mask_sdma1;
+	u32 ref_and_mask_sdma2;
+	u32 ref_and_mask_sdma3;
+	u32 ref_and_mask_sdma4;
+	u32 ref_and_mask_sdma5;
+	u32 ref_and_mask_sdma6;
+	u32 ref_and_mask_sdma7;
 };
 
 struct amdgpu_mmio_remap {
@@ -696,7 +703,7 @@ struct amdgpu_nbio_funcs {
 	void (*sdma_doorbell_range)(struct amdgpu_device *adev, int instance,
 			bool use_doorbell, int doorbell_index, int doorbell_size);
 	void (*vcn_doorbell_range)(struct amdgpu_device *adev, bool use_doorbell,
-			int doorbell_index);
+				   int doorbell_index, int instance);
 	void (*enable_doorbell_aperture)(struct amdgpu_device *adev,
 					 bool enable);
 	void (*enable_doorbell_selfring_aperture)(struct amdgpu_device *adev,
@@ -740,6 +747,12 @@ enum amd_hw_ip_block_type {
 	HDP_HWIP,
 	SDMA0_HWIP,
 	SDMA1_HWIP,
+	SDMA2_HWIP,
+	SDMA3_HWIP,
+	SDMA4_HWIP,
+	SDMA5_HWIP,
+	SDMA6_HWIP,
+	SDMA7_HWIP,
 	MMHUB_HWIP,
 	ATHUB_HWIP,
 	NBIO_HWIP,
@@ -759,7 +772,7 @@ enum amd_hw_ip_block_type {
 	MAX_HWIP
 };
 
-#define HWIP_MAX_INSTANCE	7
+#define HWIP_MAX_INSTANCE	8
 
 struct amdgpu_direct_gma {
 	/* reserved in visible vram*/
@@ -893,6 +906,7 @@ struct amdgpu_device {
 	dma_addr_t			dummy_page_addr;
 	struct amdgpu_vm_manager	vm_manager;
 	struct amdgpu_vmhub             vmhub[AMDGPU_MAX_VMHUBS];
+	unsigned			num_vmhubs;
 
 	/* memory management */
 	struct amdgpu_mman		mman;

@@ -242,6 +242,16 @@ enum smu_message_type
 	SMU_MSG_PowerDownJpeg,
 	SMU_MSG_BacoAudioD3PME,
 	SMU_MSG_ArmD3,
+	SMU_MSG_RunGfxDcBtc,
+	SMU_MSG_RunSocDcBtc,
+	SMU_MSG_SetMemoryChannelEnable,
+	SMU_MSG_SetDfSwitchType,
+	SMU_MSG_GetVoltageByDpm,
+	SMU_MSG_GetVoltageByDpmOverdrive,
+	SMU_MSG_PowerUpVcn0,
+	SMU_MSG_PowerDownVcn01,
+	SMU_MSG_PowerUpVcn1,
+	SMU_MSG_PowerDownVcn1,
 	SMU_MSG_MAX_COUNT,
 };
 
@@ -621,6 +631,7 @@ struct pptable_funcs {
 	int (*get_thermal_temperature_range)(struct smu_context *smu, struct smu_temperature_range *range);
 	int (*get_uclk_dpm_states)(struct smu_context *smu, uint32_t *clocks_in_khz, uint32_t *num_states);
 	int (*set_default_od_settings)(struct smu_context *smu, bool initialize);
+	int (*set_performance_level)(struct smu_context *smu, enum amd_dpm_forced_level level);
 };
 
 struct smu_funcs
@@ -918,6 +929,9 @@ struct smu_funcs
 	((smu)->funcs->baco_get_state? (smu)->funcs->baco_get_state((smu), (state)) : 0)
 #define smu_baco_reset(smu) \
 	((smu)->funcs->baco_reset? (smu)->funcs->baco_reset((smu)) : 0)
+#define smu_asic_set_performance_level(smu, level) \
+	((smu)->ppt_funcs->set_performance_level? (smu)->ppt_funcs->set_performance_level((smu), (level)) : -EINVAL);
+
 
 extern int smu_get_atom_data_table(struct smu_context *smu, uint32_t table,
 				   uint16_t *size, uint8_t *frev, uint8_t *crev,
@@ -937,10 +951,11 @@ extern int smu_feature_is_supported(struct smu_context *smu,
 extern int smu_feature_set_supported(struct smu_context *smu,
 				     enum smu_feature_mask mask, bool enable);
 
-int smu_update_table(struct smu_context *smu, uint32_t table_index,
+int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int argument,
 		     void *table_data, bool drv2smu);
 
 bool is_support_sw_smu(struct amdgpu_device *adev);
+bool is_support_sw_smu_xgmi(struct amdgpu_device *adev);
 int smu_reset(struct smu_context *smu);
 int smu_common_read_sensor(struct smu_context *smu, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size);
@@ -973,5 +988,6 @@ int smu_set_hard_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
 enum amd_dpm_forced_level smu_get_performance_level(struct smu_context *smu);
 int smu_force_performance_level(struct smu_context *smu, enum amd_dpm_forced_level level);
 int smu_set_display_count(struct smu_context *smu, uint32_t count);
+bool smu_clk_dpm_is_enabled(struct smu_context *smu, enum smu_clk_type clk_type);
 
 #endif

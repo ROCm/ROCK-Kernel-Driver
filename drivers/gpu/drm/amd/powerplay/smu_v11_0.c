@@ -30,6 +30,7 @@
 #include "soc15_common.h"
 #include "atom.h"
 #include "vega20_ppt.h"
+#include "arcturus_ppt.h"
 #include "navi10_ppt.h"
 
 #include "asic_reg/thm/thm_11_0_2_offset.h"
@@ -42,6 +43,7 @@
 #include "asic_reg/smuio/smuio_11_0_0_sh_mask.h"
 
 MODULE_FIRMWARE("amdgpu/vega20_smc.bin");
+MODULE_FIRMWARE("amdgpu/arcturus_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi10_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi14_smc.bin");
 
@@ -152,6 +154,9 @@ static int smu_v11_0_init_microcode(struct smu_context *smu)
 	case CHIP_VEGA20:
 		chip_name = "vega20";
 		break;
+	case CHIP_ARCTURUS:
+		chip_name = "arcturus";
+		break;
 	case CHIP_NAVI10:
 		chip_name = "navi10";
 		break;
@@ -203,7 +208,7 @@ static int smu_v11_0_load_microcode(struct smu_context *smu)
 	uint32_t i;
 	uint32_t mp1_fw_flags;
 
-	hdr = (const struct smc_firmware_header_v1_0 *)	adev->pm.fw->data;
+	hdr = (const struct smc_firmware_header_v1_0 *) adev->pm.fw->data;
 	src = (const uint32_t *)(adev->pm.fw->data +
 		le32_to_cpu(hdr->header.ucode_array_offset_bytes));
 
@@ -262,14 +267,20 @@ static int smu_v11_0_check_fw_version(struct smu_context *smu)
 	smu_minor = (smu_version >> 8) & 0xff;
 	smu_debug = (smu_version >> 0) & 0xff;
 
-
+	/*
+	 * 1. if_version mismatch is not critical as our fw is designed
+	 * to be backward compatible.
+	 * 2. New fw usually brings some optimizations. But that's visible
+	 * only on the paired driver.
+	 * Considering above, we just leave user a warning message instead
+	 * of halt driver loading.
+	 */
 	if (if_version != smu->smc_if_version) {
 		pr_info("smu driver if version = 0x%08x, smu fw if version = 0x%08x, "
 			"smu fw version = 0x%08x (%d.%d.%d)\n",
 			smu->smc_if_version, if_version,
 			smu_version, smu_major, smu_minor, smu_debug);
-		pr_err("SMU driver if version not matched\n");
-		ret = -EINVAL;
+		pr_warn("SMU driver if version not matched\n");
 	}
 
 	return ret;
@@ -290,7 +301,8 @@ static int smu_v11_0_set_pptable_v2_0(struct smu_context *smu, void **table, uin
 	return 0;
 }
 
-static int smu_v11_0_set_pptable_v2_1(struct smu_context *smu, void **table, uint32_t *size, uint32_t pptable_id)
+static int smu_v11_0_set_pptable_v2_1(struct smu_context *smu, void **table,
+				      uint32_t *size, uint32_t pptable_id)
 {
 	struct amdgpu_device *adev = smu->adev;
 	const struct smc_firmware_header_v2_1 *v2_1;
@@ -704,7 +716,7 @@ static int smu_v11_0_write_pptable(struct smu_context *smu)
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret = 0;
 
-	ret = smu_update_table(smu, SMU_TABLE_PPTABLE,
+	ret = smu_update_table(smu, SMU_TABLE_PPTABLE, 0,
 			       table_context->driver_pptable, true);
 
 	return ret;
@@ -723,7 +735,7 @@ static int smu_v11_0_write_watermarks_table(struct smu_context *smu)
 	if (!table->cpu_addr)
 		return -EINVAL;
 
-	ret = smu_update_table(smu, SMU_TABLE_WATERMARKS, table->cpu_addr,
+	ret = smu_update_table(smu, SMU_TABLE_WATERMARKS, 0, table->cpu_addr,
 				true);
 
 	return ret;
@@ -922,11 +934,17 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 				    enum smu_clk_type clock_select)
 {
 	int ret = 0;
+	int clk_id;
 
 	if (!smu->pm_enabled)
 		return ret;
+
+	clk_id = smu_clk_get_index(smu, clock_select);
+	if (clk_id < 0)
+		return -EINVAL;
+
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDcModeMaxDpmFreq,
-					  smu_clk_get_index(smu, clock_select) << 16);
+					  clk_id << 16);
 	if (ret) {
 		pr_err("[GetMaxSustainableClock] Failed to get max DC clock from SMC!");
 		return ret;
@@ -941,7 +959,7 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 
 	/* if DC limit is zero, return AC limit */
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMaxDpmFreq,
-					  smu_clk_get_index(smu, clock_select) << 16);
+					  clk_id << 16);
 	if (ret) {
 		pr_err("[GetMaxSustainableClock] failed to get max AC clock from SMC!");
 		return ret;
@@ -1037,6 +1055,11 @@ static int smu_v11_0_get_power_limit(struct smu_context *smu,
 				     bool get_default)
 {
 	int ret = 0;
+	int power_src;
+
+	power_src = smu_power_get_index(smu, SMU_POWER_SOURCE_AC);
+	if (power_src < 0)
+		return -EINVAL;
 
 	if (get_default) {
 		mutex_lock(&smu->mutex);
@@ -1048,7 +1071,7 @@ static int smu_v11_0_get_power_limit(struct smu_context *smu,
 		mutex_unlock(&smu->mutex);
 	} else {
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetPptLimit,
-			smu_power_get_index(smu, SMU_POWER_SOURCE_AC) << 16);
+			power_src << 16);
 		if (ret) {
 			pr_err("[%s] get PPT limit failed!", __func__);
 			return ret;
@@ -1091,16 +1114,21 @@ static int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
 {
 	int ret = 0;
 	uint32_t freq = 0;
+	int asic_clk_id;
 
 	if (clk_id >= SMU_CLK_COUNT || !value)
 		return -EINVAL;
 
+	asic_clk_id = smu_clk_get_index(smu, clk_id);
+	if (asic_clk_id < 0)
+		return -EINVAL;
+
 	/* if don't has GetDpmClockFreq Message, try get current clock by SmuMetrics_t */
-	if (smu_msg_get_index(smu, SMU_MSG_GetDpmClockFreq) == 0)
+	if (smu_msg_get_index(smu, SMU_MSG_GetDpmClockFreq) < 0)
 		ret =  smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
 	else {
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDpmClockFreq,
-						  (smu_clk_get_index(smu, clk_id) << 16));
+						  (asic_clk_id << 16));
 		if (ret)
 			return ret;
 
@@ -1280,6 +1308,7 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 	int ret = 0;
 	enum smu_clk_type clk_select = 0;
 	uint32_t clk_freq = clock_req->clock_freq_in_khz / 1000;
+	int clk_id;
 
 	if (!smu->pm_enabled)
 		return -EINVAL;
@@ -1311,9 +1340,15 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 		if (ret)
 			goto failed;
 
+		clk_id = smu_clk_get_index(smu, clk_select);
+		if (clk_id < 0) {
+			ret = -EINVAL;
+			goto failed;
+		}
+
 		mutex_lock(&smu->mutex);
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinByFreq,
-			(smu_clk_get_index(smu, clk_select) << 16) | clk_freq);
+			(clk_id << 16) | clk_freq);
 		mutex_unlock(&smu->mutex);
 	}
 
@@ -1738,7 +1773,7 @@ static const struct smu_funcs smu_v11_0_funcs = {
 	.send_smc_msg = smu_v11_0_send_msg,
 	.send_smc_msg_with_param = smu_v11_0_send_msg_with_param,
 	.read_smc_arg = smu_v11_0_read_arg,
-	.setup_pptable= smu_v11_0_setup_pptable,
+	.setup_pptable = smu_v11_0_setup_pptable,
 	.init_smc_tables = smu_v11_0_init_smc_tables,
 	.fini_smc_tables = smu_v11_0_fini_smc_tables,
 	.init_power = smu_v11_0_init_power,
@@ -1792,6 +1827,9 @@ void smu_v11_0_set_smu_funcs(struct smu_context *smu)
 	switch (adev->asic_type) {
 	case CHIP_VEGA20:
 		vega20_set_ppt_funcs(smu);
+		break;
+	case CHIP_ARCTURUS:
+		arcturus_set_ppt_funcs(smu);
 		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:

@@ -82,7 +82,8 @@ static int pm_map_process_v9(struct packet_manager *pm,
 	packet->bitfields2.diq_enable = (qpd->is_debug) ? 1 : 0;
 	packet->bitfields2.process_quantum = 1;
 	packet->bitfields2.pasid = qpd->pqm->process->pasid;
-	packet->bitfields14.gds_size = qpd->gds_size;
+	packet->bitfields14.gds_size = qpd->gds_size & 0x3F;
+	packet->bitfields14.gds_size_hi = (qpd->gds_size >> 6) & 0xF;
 	packet->bitfields14.num_gws = qpd->num_gws;
 	packet->bitfields14.num_oac = qpd->num_oac;
 	packet->bitfields14.sdma_enable = 1;
@@ -149,6 +150,34 @@ static int pm_runlist_v9(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
+static int pm_set_resources_v9(struct packet_manager *pm, uint32_t *buffer,
+				struct scheduling_resources *res)
+{
+	struct pm4_mes_set_resources *packet;
+
+	packet = (struct pm4_mes_set_resources *)buffer;
+	memset(buffer, 0, sizeof(struct pm4_mes_set_resources));
+
+	packet->header.u32All = pm_build_pm4_header(IT_SET_RESOURCES,
+					sizeof(struct pm4_mes_set_resources));
+
+	packet->bitfields2.queue_type =
+			queue_type__mes_set_resources__hsa_interface_queue_hiq;
+	packet->bitfields2.vmid_mask = res->vmid_mask;
+	packet->bitfields2.unmap_latency = KFD_UNMAP_LATENCY_MS / 100;
+	packet->bitfields7.oac_mask = res->oac_mask;
+	packet->bitfields8.gds_heap_base = res->gds_heap_base;
+	packet->bitfields8.gds_heap_size = res->gds_heap_size;
+
+	packet->gws_mask_lo = lower_32_bits(res->gws_mask);
+	packet->gws_mask_hi = upper_32_bits(res->gws_mask);
+
+	packet->queue_mask_lo = lower_32_bits(res->queue_mask);
+	packet->queue_mask_hi = upper_32_bits(res->queue_mask);
+
+	return 0;
+}
+
 static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		struct queue *q, bool is_static)
 {
@@ -167,6 +196,8 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 	packet->bitfields2.engine_sel =
 		engine_sel__mes_map_queues__compute_vi;
 	packet->bitfields2.gws_control_queue = q->gws ? 1 : 0;
+	packet->bitfields2.extended_engine_sel =
+		extended_engine_sel__mes_map_queues__legacy_engine_sel;
 	packet->bitfields2.queue_type =
 		queue_type__mes_map_queues__normal_compute_vi;
 
@@ -182,9 +213,15 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 		break;
 	case KFD_QUEUE_TYPE_SDMA:
 	case KFD_QUEUE_TYPE_SDMA_XGMI:
-		packet->bitfields2.engine_sel = q->properties.sdma_engine_id +
-				engine_sel__mes_map_queues__sdma0_vi;
 		use_static = false; /* no static queues under SDMA */
+		if (q->properties.sdma_engine_id < 2)
+			packet->bitfields2.engine_sel = q->properties.sdma_engine_id +
+				engine_sel__mes_map_queues__sdma0_vi;
+		else {
+			packet->bitfields2.extended_engine_sel =
+				extended_engine_sel__mes_map_queues__sdma0_to_7_sel;
+			packet->bitfields2.engine_sel = q->properties.sdma_engine_id;
+		}
 		break;
 	default:
 		WARN(1, "queue type %d", q->properties.type);
@@ -208,6 +245,41 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
+static int pm_set_grace_period_v9(struct packet_manager *pm,
+		uint32_t *buffer,
+		uint32_t grace_period)
+{
+	struct pm4_mec_write_data_mmio *packet;
+	uint32_t reg_offset = 0;
+	uint32_t reg_data = 0;
+
+	pm->dqm->dev->kfd2kgd->build_grace_period_packet_info(
+			pm->dqm->dev->kgd,
+			pm->dqm->wait_times,
+			grace_period,
+			&reg_offset,
+			&reg_data);
+
+	if (grace_period == USE_DEFAULT_GRACE_PERIOD)
+		reg_data = pm->dqm->wait_times;
+
+	packet = (struct pm4_mec_write_data_mmio *)buffer;
+	memset(buffer, 0, sizeof(struct pm4_mec_write_data_mmio));
+
+	packet->header.u32All = pm_build_pm4_header(IT_WRITE_DATA,
+					sizeof(struct pm4_mec_write_data_mmio));
+
+	packet->bitfields2.dst_sel  = dst_sel___write_data__mem_mapped_register;
+	packet->bitfields2.addr_incr =
+			addr_incr___write_data__do_not_increment_address;
+
+	packet->bitfields3.dst_mmreg_addr = reg_offset;
+
+	packet->data = reg_data;
+
+	return 0;
+}
+
 static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter filter,
@@ -224,13 +296,23 @@ static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 	switch (type) {
 	case KFD_QUEUE_TYPE_COMPUTE:
 	case KFD_QUEUE_TYPE_DIQ:
+		packet->bitfields2.extended_engine_sel =
+			extended_engine_sel__mes_unmap_queues__legacy_engine_sel;
 		packet->bitfields2.engine_sel =
 			engine_sel__mes_unmap_queues__compute;
 		break;
 	case KFD_QUEUE_TYPE_SDMA:
 	case KFD_QUEUE_TYPE_SDMA_XGMI:
-		packet->bitfields2.engine_sel =
-			engine_sel__mes_unmap_queues__sdma0 + sdma_engine;
+		if (sdma_engine < 2) {
+			packet->bitfields2.extended_engine_sel =
+				extended_engine_sel__mes_unmap_queues__legacy_engine_sel;
+			packet->bitfields2.engine_sel =
+				engine_sel__mes_unmap_queues__sdma0 + sdma_engine;
+		} else {
+			packet->bitfields2.extended_engine_sel =
+				extended_engine_sel__mes_unmap_queues__sdma0_to_7_sel;
+			packet->bitfields2.engine_sel = sdma_engine;
+		}
 		break;
 	default:
 		WARN(1, "queue type %d", type);
@@ -332,9 +414,10 @@ static int pm_release_mem_v9(uint64_t gpu_addr, uint32_t *buffer)
 const struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.map_process		= pm_map_process_v9,
 	.runlist		= pm_runlist_v9,
-	.set_resources		= pm_set_resources_vi,
+	.set_resources		= pm_set_resources_v9,
 	.map_queues		= pm_map_queues_v9,
 	.unmap_queues		= pm_unmap_queues_v9,
+	.set_grace_period       = pm_set_grace_period_v9,
 	.query_status		= pm_query_status_v9,
 	.release_mem		= pm_release_mem_v9,
 	.map_process_size	= sizeof(struct pm4_mes_map_process),
@@ -342,6 +425,7 @@ const struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
 	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
 	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
+	.set_grace_period_size  = sizeof(struct pm4_mec_write_data_mmio),
 	.query_status_size	= sizeof(struct pm4_mes_query_status),
 	.release_mem_size	= sizeof(struct pm4_mec_release_mem)
 };
