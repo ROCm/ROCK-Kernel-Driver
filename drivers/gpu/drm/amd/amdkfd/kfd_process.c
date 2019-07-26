@@ -1332,7 +1332,6 @@ static void restore_process_worker(struct work_struct *work)
 {
 	struct delayed_work *dwork;
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 	int ret = 0;
 
 	dwork = to_delayed_work(work);
@@ -1341,16 +1340,8 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	trace_kfd_restore_process_worker_start(p);
 
-	/* Call restore_process_bos on the first KGD device. This function
-	 * takes care of restoring the whole process including other devices.
-	 * Restore can fail if enough memory is not available. If so,
-	 * reschedule again.
-	 */
-	pdd = list_first_entry(&p->per_device_data,
-			       struct kfd_process_device,
-			       per_device_list);
+	trace_kfd_restore_process_worker_start(p);
 
 	pr_info("Started restoring pasid %d\n", p->pasid);
 
