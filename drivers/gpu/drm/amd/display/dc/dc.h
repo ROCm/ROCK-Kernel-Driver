@@ -764,6 +764,7 @@ struct dc_plane_state {
 	bool visible;
 	bool flip_immediate;
 	bool horizontal_mirror;
+	int layer_index;
 
 	union surface_update_flags update_flags;
 	/* private to DC core */
@@ -793,6 +794,7 @@ struct dc_plane_info {
 	bool global_alpha;
 	int  global_alpha_value;
 	bool input_csc_enabled;
+	int layer_index;
 };
 
 struct dc_scaling_info {
