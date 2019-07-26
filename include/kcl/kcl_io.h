@@ -3,7 +3,7 @@
 #include <linux/version.h>
 #include <linux/types.h>
 
-#if !defined(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
 
 #ifdef CONFIG_X86_PAT
 extern int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size);
@@ -33,6 +33,6 @@ static inline void arch_io_free_memtype_wc(resource_size_t base,
 }
 #endif
 
-#endif /* HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
 
 #endif /* AMDKCL_IO_H */

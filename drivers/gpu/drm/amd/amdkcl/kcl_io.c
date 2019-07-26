@@ -3,7 +3,7 @@
 #include <kcl/kcl_io.h>
 #include "kcl_common.h"
 
-#if !defined(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC) && \
+#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0) && \
 	defined(CONFIG_X86_PAT)
 
 static int (*_kcl_io_reserve_memtype)(resource_size_t start, resource_size_t end,
@@ -20,13 +20,17 @@ int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
 
 	return _kcl_io_reserve_memtype(start, start + size, &type);
 }
+#if !defined(OS_NAME_SLE_12_3) && !defined(OS_NAME_SUSE_42_3)
 EXPORT_SYMBOL(arch_io_reserve_memtype_wc);
+#endif
 
 void arch_io_free_memtype_wc(resource_size_t start, resource_size_t size)
 {
 	_kcl_io_free_memtype(start, start + size);
 }
+#if !defined(OS_NAME_SLE_12_3) && !defined(OS_NAME_SUSE_42_3)
 EXPORT_SYMBOL(arch_io_free_memtype_wc);
+#endif
 
 void amdkcl_io_init(void)
 {
@@ -38,4 +42,4 @@ void amdkcl_io_init(void)
 {
 
 }
-#endif /* HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) */
