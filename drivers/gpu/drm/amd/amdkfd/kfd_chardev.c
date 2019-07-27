@@ -1572,24 +1572,35 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 {
 	int retval;
 	struct kfd_ioctl_alloc_queue_gws_args *args = data;
+	struct queue *q;
 	struct kfd_dev *dev;
 
 	if (!hws_gws_support)
 		return -ENODEV;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
-		return -ENODEV;
-	}
-	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		return -ENODEV;
-
 	mutex_lock(&p->mutex);
+	q = pqm_get_user_queue(&p->pqm, args->queue_id);
+
+	if (q) {
+		dev = q->device;
+	} else {
+		retval = -EINVAL;
+		goto out_unlock;
+	}
+
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		retval = -ENODEV;
+		goto out_unlock;
+	}
+
 	retval = pqm_set_gws(&p->pqm, args->queue_id, args->num_gws ? dev->gws : NULL);
 	mutex_unlock(&p->mutex);
 
 	args->first_gws = 0;
+	return retval;
+
+out_unlock:
+	mutex_unlock(&p->mutex);
 	return retval;
 }
 

@@ -412,17 +412,16 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 
 /* Allocate GWS for specific queue
  *
- * @gpu_id:      device identifier
  * @queue_id:    queue's id that GWS is allocated for
  * @num_gws:     how many GWS to allocate
  * @first_gws:   index of the first GWS allocated.
  *               only support contiguous GWS allocation
  */
 struct kfd_ioctl_alloc_queue_gws_args {
-	__u32 gpu_id;		/* to KFD */
 	__u32 queue_id;		/* to KFD */
 	__u32 num_gws;		/* to KFD */
 	__u32 first_gws;	/* from KFD */
+	__u32 pad;
 };
 
 struct kfd_ioctl_get_dmabuf_info_args {
