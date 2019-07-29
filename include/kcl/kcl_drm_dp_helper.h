@@ -29,6 +29,10 @@
 
 #include <drm/drm_dp_helper.h>
 
+#if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
+#define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
+#endif
+
 static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
