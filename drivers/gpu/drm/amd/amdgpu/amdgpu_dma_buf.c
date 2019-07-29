@@ -193,14 +193,21 @@ err_fences_put:
  */
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
-				     struct dma_buf_attachment *attach)
+#ifndef HAVE_2ARGS_DRM_GEM_MAP_ATTACH
+					struct device *target_dev,
+#endif
+					struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	long r;
 
+#ifdef HAVE_2ARGS_DRM_GEM_MAP_ATTACH
 	r = drm_gem_map_attach(dma_buf, attach);
+#else
+	r = drm_gem_map_attach(dma_buf, target_dev, attach);
+#endif
 	if (r)
 		return r;
 
