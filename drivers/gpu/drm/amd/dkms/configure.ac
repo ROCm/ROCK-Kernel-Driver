@@ -111,6 +111,7 @@ m4_include([m4/color-mgmt-changed-in-struct-drm-crtc-state.m4])
 m4_include([m4/drm-connector-put.m4])
 m4_include([m4/drm-vma-node-verify-access.m4])
 m4_include([m4/overflow-h.m4])
+m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/config.m4])
 
 
