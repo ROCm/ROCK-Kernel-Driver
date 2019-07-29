@@ -2665,7 +2665,7 @@ retry:
 #endif
 	}
 
-#if !defined(HAVE_FOR_EACH_OLDNEW_CONNECTOR_IN_STATE)
+#if !defined(for_each_oldnew_connector_in_state)
 	for_each_connector_in_state(state, connector, new_con_state, i) {
 		old_con_state = connector->state;
 #else
@@ -6916,7 +6916,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* Handle connector state changes */
-#if !defined(HAVE_FOR_EACH_OLDNEW_CONNECTOR_IN_STATE)
+#if !defined(for_each_oldnew_connector_in_state)
 	for_each_connector_in_state(state, connector, old_con_state, i) {
 		new_con_state = connector->state;
 #else
@@ -8132,7 +8132,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	 * new stream into context w\o causing full reset. Need to
 	 * decide how to handle.
 	 */
-#if !defined(HAVE_FOR_EACH_OLDNEW_CONNECTOR_IN_STATE)
+#if !defined(for_each_oldnew_connector_in_state)
 	for_each_connector_in_state(state, connector, new_con_state, i) {
 		old_con_state = connector->state;
 #else
