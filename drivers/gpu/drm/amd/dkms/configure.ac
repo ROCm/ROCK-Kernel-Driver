@@ -195,6 +195,7 @@ m4_include([m4/drm-gem-object-lookup.m4])
 m4_include([m4/drm-crtc-helper.m4])
 m4_include([m4/drm-amdgpu-fence-to-handle.m4])
 m4_include([m4/drm-driver-gem-prime-res-obj.m4])
+m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/config.m4])
 
 
