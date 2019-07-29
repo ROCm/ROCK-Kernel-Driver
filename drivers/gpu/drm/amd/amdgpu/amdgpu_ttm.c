@@ -240,11 +240,11 @@ static int amdgpu_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 
 	if (amdgpu_ttm_tt_get_usermm(bo->ttm))
 		return -EPERM;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
-	return drm_vma_node_verify_access(&abo->gem_base.vma_node, filp);
-#else
+#if defined(DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE)
 	return drm_vma_node_verify_access(&abo->gem_base.vma_node,
 					  filp->private_data);
+#else
+	return drm_vma_node_verify_access(&abo->gem_base.vma_node, filp);
 #endif
 }
 
