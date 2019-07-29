@@ -803,8 +803,7 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
-	defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
 	struct dev_pagemap	pgmap;
 #endif
 #endif
