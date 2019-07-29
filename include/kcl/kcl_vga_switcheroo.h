@@ -18,46 +18,21 @@ static inline int kcl_vga_switcheroo_register_client(struct pci_dev *dev,
 #endif
 }
 
-#if defined(CONFIG_VGA_SWITCHEROO)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER)
+static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
+								   enum vga_switcheroo_handler_flags_t handler_flags)
+#elif defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
 						      int handler_flags)
 #else
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-		enum vga_switcheroo_handler_flags_t handler_flags)
+static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
+						      int handler_flags)
 #endif
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-	return vga_switcheroo_register_handler(handler);
-#else
-	/* the value fo handler_flags is enumerated in vga_switcheroo_handler_flags_t
-	 * in vga_switheroo.h */
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER)
 	return vga_switcheroo_register_handler(handler, handler_flags);
+#else
+	return vga_switcheroo_register_handler(handler);
 #endif
 }
-#else
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#else
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-		enum vga_switcheroo_handler_flags_t handler_flags)
-#endif
-	{ return 0; }
-#endif /* defined(CONFIG_VGA_SWITCHEROO) */
-
 #endif /* AMDKCL_VGA_SWITCHEROO_H */

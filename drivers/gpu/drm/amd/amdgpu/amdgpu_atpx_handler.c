@@ -573,11 +573,12 @@ static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *p
 		return VGA_SWITCHEROO_DIS;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
-static struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#else
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER) ||\
+	defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static const struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) */
+#else
+static struct vga_switcheroo_handler amdgpu_atpx_handler = {
+#endif
 	.switchto = amdgpu_atpx_switchto,
 	.power_state = amdgpu_atpx_power_state,
 	.get_client_id = amdgpu_atpx_get_client_id,
@@ -674,7 +675,7 @@ static bool amdgpu_atpx_detect(void)
 void amdgpu_register_atpx_handler(void)
 {
 	bool r;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#ifndef HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER
 	int handler_flags = 0;
 #else
 	enum vga_switcheroo_handler_flags_t handler_flags = 0;
