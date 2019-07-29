@@ -29,7 +29,7 @@
 
 #include <drm/drm_dp_helper.h>
 
-#if !defined(HAVE_DP_DPRX_FEATURE_ENUMERATION_LIST)
+#if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
