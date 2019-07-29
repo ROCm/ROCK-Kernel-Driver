@@ -32,6 +32,10 @@
 #include <kcl/header/kcl_drm_device_h.h>
 #include <drm/drm_dp_helper.h>
 
+#if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
+#define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
+#endif
+
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
