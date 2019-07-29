@@ -109,7 +109,8 @@ struct amdgpu_dm_backlight_caps {
  * tracking both old and  new state. This is useful in places where the
  * state delta needs to be considered, for example in atomic check functions.
  */
-#ifndef for_each_oldnew_plane_in_state_reverse
+#if !defined(for_each_oldnew_plane_in_state_reverse) && \
+	defined(for_each_oldnew_plane_in_state)
 #define for_each_oldnew_plane_in_state_reverse(__state, plane, old_plane_state, new_plane_state, __i) \
 	for ((__i) = ((__state)->dev->mode_config.num_total_plane - 1);	\
 	     (__i) >= 0;						\
