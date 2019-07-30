@@ -292,7 +292,7 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 }
 #endif
 
-#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
+#if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
