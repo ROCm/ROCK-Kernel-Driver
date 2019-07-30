@@ -267,13 +267,6 @@ reservation_object_get_excl_rcu(struct reservation_object *obj)
 	return fence;
 }
 
-#define reservation_object_for_each_shared(i, fence, flist, obj)	\
-	for (flist = reservation_object_get_list(obj), i = 0;		\
-	     flist && i < flist->shared_count ? (fence =		\
-		rcu_dereference_protected(flist->shared[i],		\
-					  reservation_object_held(obj))	\
-		), true : false; ++i)
-
 int reservation_object_reserve_shared(struct reservation_object *obj,
 				      unsigned int num_fences);
 void reservation_object_add_shared_fence(struct reservation_object *obj,

@@ -206,10 +206,14 @@ int amdgpu_sync_resv(struct amdgpu_device *adev,
 	/* always sync to the exclusive fence */
 	f = reservation_object_get_excl(resv);
 	r = amdgpu_sync_fence(adev, sync, f, false);
-	if (r)
+
+	flist = reservation_object_get_list(resv);
+	if (!flist || r)
 		return r;
 
-	reservation_object_for_each_shared(i, f, flist, resv) {
+	for (i = 0; i < flist->shared_count; ++i) {
+		f = rcu_dereference_protected(flist->shared[i],
+					      reservation_object_held(resv));
 		/* We only want to trigger KFD eviction fences on
 		 * evict or move jobs. Skip KFD fences otherwise.
 		 */
