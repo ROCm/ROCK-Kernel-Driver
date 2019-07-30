@@ -31,7 +31,9 @@
 #include <linux/dma-buf.h>
 
 #include <drm/amdgpu_drm.h>
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
+#endif
 #include <drm/ttm/ttm_tt.h>
 
 #include "amdgpu_cs.h"
@@ -270,14 +272,19 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
+#endif
+#if defined(HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
+#endif
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
+#endif
 		case AMDGPU_CHUNK_ID_CP_GFX_SHADOW:
 			break;
-
 		default:
 			goto free_partial_kdata;
 		}
@@ -565,6 +572,7 @@ static int amdgpu_cs_p2_syncobj_timeline_signal(struct amdgpu_cs_parser *p,
 
 	return 0;
 }
+#endif
 
 static int amdgpu_cs_p2_shadow(struct amdgpu_cs_parser *p,
 			       struct amdgpu_cs_chunk *chunk)
@@ -1234,11 +1242,13 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 	return 0;
 }
 
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
 
 	for (i = 0; i < p->num_post_deps; ++i) {
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		if (p->post_deps[i].chain && p->post_deps[i].point) {
 			drm_syncobj_add_point(p->post_deps[i].syncobj,
 					      p->post_deps[i].chain,
@@ -1248,8 +1258,13 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 			drm_syncobj_replace_fence(p->post_deps[i].syncobj,
 						  p->fence);
 		}
+#else
+			drm_syncobj_replace_fence(p->post_deps[i].syncobj,
+						  p->fence);
+#endif
 	}
 }
+#endif
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			    union drm_amdgpu_cs *cs)
@@ -1328,7 +1343,9 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	seq = amdgpu_ctx_add_fence(p->ctx, p->entities[p->gang_leader_idx],
 				   p->fence);
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	amdgpu_cs_post_dependencies(p);
+#endif
 
 	if ((leader->preamble_status & AMDGPU_PREAMBLE_IB_PRESENT) &&
 	    !p->ctx->preamble_presented) {
