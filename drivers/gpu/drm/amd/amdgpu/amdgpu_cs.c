@@ -31,7 +31,9 @@
 #include <linux/dma-buf.h>
 
 #include <drm/amdgpu_drm.h>
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
+#endif
 #include "amdgpu_cs.h"
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
@@ -276,13 +278,18 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
+#endif
+#if defined(HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
+#endif
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
+#endif
 			break;
-
 		default:
 			goto free_partial_kdata;
 		}
@@ -572,9 +579,11 @@ static int amdgpu_cs_p2_syncobj_timeline_signal(struct amdgpu_cs_parser *p,
 		dep->point = syncobj_deps[i].point;
 		p->num_post_deps++;
 	}
+	}
 
 	return 0;
 }
+#endif
 
 static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 {
@@ -1212,11 +1221,13 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 	return r;
 }
 
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
 
 	for (i = 0; i < p->num_post_deps; ++i) {
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		if (p->post_deps[i].chain && p->post_deps[i].point) {
 			drm_syncobj_add_point(p->post_deps[i].syncobj,
 					      p->post_deps[i].chain,
@@ -1226,8 +1237,13 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 			drm_syncobj_replace_fence(p->post_deps[i].syncobj,
 						  p->fence);
 		}
+#else
+			drm_syncobj_replace_fence(p->post_deps[i].syncobj,
+						  p->fence);
+#endif
 	}
 }
+#endif
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			    union drm_amdgpu_cs *cs)
@@ -1293,7 +1309,9 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	seq = amdgpu_ctx_add_fence(p->ctx, p->entities[p->gang_size - 1],
 				   p->fence);
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	amdgpu_cs_post_dependencies(p);
+#endif
 
 	if ((leader->preamble_status & AMDGPU_PREAMBLE_IB_PRESENT) &&
 	    !p->ctx->preamble_presented) {
@@ -1735,34 +1753,34 @@ err_free_fences:
  */
 int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 			   uint64_t addr, struct amdgpu_bo **bo,
+		goto err_free_fences;
+	}
+
+	if (wait->in.wait_all)
+		r = amdgpu_cs_wait_all_fences(adev, filp, wait, fences);
+	else
+		r = amdgpu_cs_wait_any_fence(adev, filp, wait, fences);
+
+err_free_fences:
+	kfree(fences);
+
+	return r;
+}
+
+/**
+ * amdgpu_cs_find_mapping - find bo_va for VM address
+ *
+ * @parser: command submission parser context
+ * @addr: VM address
+ * @bo: resulting BO of the mapping found
+ * @map: Placeholder to return found BO mapping
+ *
+ * Search the buffer objects in the command submission context for a certain
+ * virtual memory address. Returns allocation structure when found, NULL
+ * otherwise.
+ */
+int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
+			   uint64_t addr, struct amdgpu_bo **bo,
 			   struct amdgpu_bo_va_mapping **map)
 {
 	struct amdgpu_fpriv *fpriv = parser->filp->driver_priv;
-	struct ttm_operation_ctx ctx = { false, false };
-	struct amdgpu_vm *vm = &fpriv->vm;
-	struct amdgpu_bo_va_mapping *mapping;
-	int r;
-
-	addr /= AMDGPU_GPU_PAGE_SIZE;
-
-	mapping = amdgpu_vm_bo_lookup_mapping(vm, addr);
-	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo)
-		return -EINVAL;
-
-	*bo = mapping->bo_va->base.bo;
-	*map = mapping;
-
-	/* Double check that the BO is reserved by this CS */
-	if (dma_resv_locking_ctx(amdkcl_ttm_resvp(&(*bo)->tbo)) != &parser->ticket)
-		return -EINVAL;
-
-	if (!((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {
-		(*bo)->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
-		amdgpu_bo_placement_from_domain(*bo, (*bo)->allowed_domains);
-		r = ttm_bo_validate(&(*bo)->tbo, &(*bo)->placement, &ctx);
-		if (r)
-			return r;
-	}
-
-	return amdgpu_ttm_alloc_gart(&(*bo)->tbo);
-}
