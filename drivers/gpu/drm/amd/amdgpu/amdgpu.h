@@ -524,11 +524,13 @@ struct amdgpu_cs_chunk {
 	void			*kdata;
 };
 
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 struct amdgpu_cs_post_dep {
 	struct drm_syncobj *syncobj;
 	struct dma_fence_chain *chain;
 	u64 point;
 };
+#endif
 
 struct amdgpu_cs_parser {
 	struct amdgpu_device	*adev;

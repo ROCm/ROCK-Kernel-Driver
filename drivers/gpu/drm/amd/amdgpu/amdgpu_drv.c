@@ -1817,8 +1817,14 @@ static const struct drm_driver amdgpu_kms_driver = {
 	.driver_features =
 	    DRIVER_ATOMIC |
 	    DRIVER_GEM |
-	    DRIVER_RENDER | DRIVER_MODESET | DRIVER_SYNCOBJ |
-	    DRIVER_SYNCOBJ_TIMELINE,
+	    DRIVER_RENDER | DRIVER_MODESET
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+	    | DRIVER_SYNCOBJ
+#endif
+#ifdef HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE
+	    | DRIVER_SYNCOBJ_TIMELINE
+#endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
+	    ,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
