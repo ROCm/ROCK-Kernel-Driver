@@ -150,6 +150,7 @@ AC_DEFUN([AC_KERNEL], [
 
 dnl #
 dnl # AC_KERNEL_CONFTEST_H
+dnl # $1: contents to be filled in conftest.h
 dnl #
 AC_DEFUN([AC_KERNEL_CONFTEST_H], [
 cat - <<_ACEOF >conftest.h
@@ -159,6 +160,8 @@ _ACEOF
 
 dnl #
 dnl # AC_KERNEL_CONFTEST_C
+dnl # fill in contents of conftest.h and $1 to conftest.c
+dnl # $1: contents to be filled in conftest.c
 dnl #
 AC_DEFUN([AC_KERNEL_CONFTEST_C], [
 cat confdefs.h - <<_ACEOF >conftest.c
@@ -167,7 +170,7 @@ _ACEOF
 ])
 
 dnl #
-dnl # AC_KERNEL_LANG_PROGRAM(C)([PROLOGUE], [BODY])
+dnl # AC_KERNEL_LANG_PROGRAM([PROLOGUE], [BODY])
 dnl #
 AC_DEFUN([AC_KERNEL_LANG_PROGRAM], [
 $1
@@ -184,6 +187,12 @@ $2
 
 dnl #
 dnl # AC_KERNEL_COMPILE_IFELSE / like AC_COMPILE_IFELSE
+dnl # $1: contents to be filled in conftest.c
+dnl # $2: make target. "modules" for most case
+dnl # $3: user defined commands. It "AND" the make command to check the result. If true, expands to $4. Otherwise $5.
+dnl # $4: run it if make & $3 pass.
+dnl # $5: run it if make & $3 fail.
+dnl # $6: contents to be filled in conftest.h. Could be null.
 dnl #
 AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
 	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
@@ -202,6 +211,10 @@ AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
 
 dnl #
 dnl # AC_KERNEL_TRY_COMPILE like AC_TRY_COMPILE
+dnl # $1: Prologue for conftest.c. including header files, extends, etc
+dnl # $2: Body for conftest.c.
+dnl # $3: run it if compile pass.
+dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 	[AC_KERNEL_COMPILE_IFELSE(
@@ -214,6 +227,10 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 dnl #
 dnl # AC_KERNEL_CHECK_SYMBOL_EXPORT
 dnl # check symbol exported or not
+dnl # $1: symbol list to look for
+dnl # $2: file list to look for $1
+dnl # $3: run it if pass.
+dnl # $4: run it if fail.
 dnl #
 AC_DEFUN([AC_KERNEL_CHECK_SYMBOL_EXPORT], [
 	awk -v s="$1" '
@@ -267,6 +284,12 @@ dnl #
 dnl # AC_KERNEL_TRY_COMPILE_SYMBOL
 dnl # like AC_KERNEL_TRY_COMPILE, except AC_KERNEL_CHECK_SYMBOL_EXPORT
 dnl # is called if not compiling for builtin
+dnl # $1: Prologue for conftest.c. including header files, extends, etc
+dnl # $2: Body for conftest.c.
+dnl # $3: AC_KERNEL_CHECK_SYMBOL_EXPORT $1
+dnl # $4: AC_KERNEL_CHECK_SYMBOL_EXPORT $2
+dnl # $5: run it if checking pass
+dnl # $6: run it if checking fail
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
 	AC_KERNEL_TRY_COMPILE([$1], [$2], [rc=0], [rc=1])
