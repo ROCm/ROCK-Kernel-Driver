@@ -3,18 +3,27 @@
 
 #include <linux/vga_switcheroo.h>
 
-/**
- * arg change in mainline kernel 3.12
- * but only affect RHEL6 without backport
- */
+#if !defined(HAVE_3ARGS_VGA_SWITCHEROO_CLIENT_OPS_VGA_SWITCHEROO_REGISTER_CLIENT) &&\
+	!defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+struct vga_switcheroo_client_ops {
+       void (*set_gpu_state)(struct pci_dev *dev, enum vga_switcheroo_state);
+       void (*reprobe)(struct pci_dev *dev);
+       bool (*can_switch)(struct pci_dev *dev);
+};
+#endif
+
 static inline int kcl_vga_switcheroo_register_client(struct pci_dev *dev,
 						     const struct vga_switcheroo_client_ops *ops,
 						     bool driver_power_control)
 {
-#if defined(OS_NAME_RHEL_6)
-	return vga_switcheroo_register_client(dev, ops);
-#else
+#if defined(HAVE_3ARGS_VGA_SWITCHEROO_CLIENT_OPS_VGA_SWITCHEROO_REGISTER_CLIENT)
 	return vga_switcheroo_register_client(dev, ops, driver_power_control);
+#elif defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+	return vga_switcheroo_register_client(dev, ops);
+#elif defined(HAVE_4ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+	return vga_switcheroo_register_client(dev, ops->set_gpu_state, ops->reprobe, ops->can_switch);
+#else
+	return vga_switcheroo_register_client(dev, ops->set_gpu_state, ops->can_switch);
 #endif
 }
 
