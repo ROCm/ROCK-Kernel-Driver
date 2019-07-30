@@ -115,6 +115,9 @@ m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/reservation-object-reserve-shared.m4])
 m4_include([m4/drm-amdgpu-fence-to-handle.m4])
 m4_include([m4/dma-fence-get-stub.m4])
+m4_include([m4/chunk-id-synobj-in-out.m4])
+m4_include([m4/chunk-id-scheduled-dependencies.m4])
+m4_include([m4/chunk-id-syncobj-timeline-wait-signal.m4])
 m4_include([m4/config.m4])
 
 

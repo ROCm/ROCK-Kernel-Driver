@@ -17,7 +17,7 @@
 #if defined(HAVE_DRM_PRINTF)
 #include <drm/drm_print.h>
 #endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
 #endif
 #if defined(HAVE_DRM_COLOR_LUT)
@@ -275,7 +275,7 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 #endif
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						u32 handle, u64 point, u64 flags,
 						struct dma_fence **fence)
