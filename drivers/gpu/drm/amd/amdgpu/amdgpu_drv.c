@@ -1487,8 +1487,9 @@ static struct drm_driver kms_driver = {
 #endif
 	    DRIVER_GEM |
 	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET |
-	    DRIVER_SYNCOBJ |
-	    DRIVER_SYNCOBJ_TIMELINE,
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+	    DRIVER_SYNCOBJ,
+#endif
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
