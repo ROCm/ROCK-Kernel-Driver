@@ -69,7 +69,7 @@
  * CRTC DGM Bypass -> CRTC CTM Bypass -> CRTC RGM Bypass
  */
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+#if defined(HAVE_DRM_COLOR_LUT)
 #define MAX_DRM_LUT_VALUE 0xFFFF
 
 /*
@@ -82,7 +82,6 @@ void amdgpu_dm_init_color_mod(void)
 {
 	setup_x_points_distribution();
 }
-#endif
 
 /* Extracts the DRM lut and lut size from a blob. */
 static const struct drm_color_lut *
@@ -480,3 +479,4 @@ int amdgpu_dm_update_plane_color_mgmt(struct dm_crtc_state *crtc,
 
 	return 0;
 }
+#endif
