@@ -1471,10 +1471,14 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_ATOMIC |
-	    DRIVER_GEM |
-	    DRIVER_RENDER | DRIVER_MODESET | DRIVER_SYNCOBJ |
-	    DRIVER_SYNCOBJ_TIMELINE,
+	    DRIVER_USE_AGP | DRIVER_ATOMIC
+	    | DRIVER_GEM
+	    | DRIVER_RENDER | DRIVER_MODESET
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+	    | DRIVER_SYNCOBJ
+#endif
+	    | DRIVER_SYNCOBJ_TIMELINE,
+	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
