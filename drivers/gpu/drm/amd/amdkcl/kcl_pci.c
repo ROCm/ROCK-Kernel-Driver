@@ -157,7 +157,6 @@ enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev)
 
 	return PCI_SPEED_UNKNOWN;
 }
-EXPORT_SYMBOL(pcie_get_speed_cap);
 
 /**
  * pcie_get_width_cap - query for the PCI device's link width capability
@@ -176,20 +175,19 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 
 	return PCIE_LNK_WIDTH_UNKNOWN;
 }
-EXPORT_SYMBOL(pcie_get_width_cap);
-#else
+#endif
+
 enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
 enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
-#endif
 
 void amdkcl_pci_init(void)
 {
-#if defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
-	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
-	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
+	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap", pcie_get_speed_cap);
+	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
 #endif
 	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
 }

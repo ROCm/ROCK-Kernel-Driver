@@ -22,7 +22,7 @@ extern const unsigned char *_kcl_pcie_link_speed;
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
-#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
+#if !defined(PCIE_SPEED_16_0GT)
 #define PCIE_SPEED_16_0GT 0x17
 #endif
 #ifndef PCI_EXP_LNKCAP2_SLS_16_0GB
@@ -75,9 +75,6 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #endif
 
 #if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
-enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev);
-enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev);
-#else
 extern enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 extern enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 #endif
@@ -90,7 +87,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
 {
-#if !defined(BUILD_AS_DKMS) || !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
+#if defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 		return pcie_get_speed_cap(dev);
 #else
 		return _kcl_pcie_get_speed_cap(dev);
@@ -99,7 +96,7 @@ static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
 
 static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 {
-#if !defined(BUILD_AS_DKMS) || !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
+#if defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 		return pcie_get_width_cap(dev);
 #else
 		return _kcl_pcie_get_width_cap(dev);
