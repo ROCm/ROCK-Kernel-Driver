@@ -117,6 +117,7 @@ m4_include([m4/set-busid.m4])
 m4_include([m4/mm-h.m4])
 m4_include([m4/signal-h.m4])
 m4_include([m4/task-h.m4])
+m4_include([m4/uapi-linux-sched-types-h.m4])
 m4_include([m4/config.m4])
 
 
