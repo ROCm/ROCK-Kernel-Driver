@@ -47,7 +47,9 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#ifdef HAVE_SCHED_TYPES_H
 #include <uapi/linux/sched/types.h>
+#endif
 #include <drm/drmP.h>
 #include <drm/gpu_scheduler.h>
 #include <drm/spsc_queue.h>
