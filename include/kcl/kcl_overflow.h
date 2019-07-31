@@ -202,6 +202,8 @@
 
 
 #endif /* COMPILER_HAS_GENERIC_BUILTIN_OVERFLOW */
+#else
+#include <linux/overflow.h>
 #endif /* HAVE_OVERFLOW_H */
 
 #ifndef struct_size
