@@ -33,13 +33,12 @@
 #include <linux/power_supply.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4 ,16, 0)
+#ifdef HAVE_LINUX_NOSPEC_H
 #include <linux/nospec.h>
 #endif
 #include "hwmgr.h"
 #define WIDTH_4K 3840
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4 ,16, 0)
 /**
  * array_index_mask_nospec() - generate a ~0 mask when index < size, 0 otherwise
  * @index: array element index
@@ -77,6 +76,7 @@ static inline unsigned long array_index_mask_nospec(unsigned long index,
  * array_index_nospec() will clamp the index within the range of [0,
  * size).
  */
+#ifndef array_index_nospec
 #define array_index_nospec(index, size)					\
 ({									\
 	typeof(index) _i = (index);					\
