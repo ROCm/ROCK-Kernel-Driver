@@ -130,6 +130,7 @@ m4_include([m4/bin-attrs-in-attribute-group.m4])
 m4_include([m4/strscpy.m4])
 m4_include([m4/dev-pm-set-driver-flags.m4])
 m4_include([m4/alloc-ordered-workqueue.m4])
+m4_include([m4/pm-genpd-remove-device.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
