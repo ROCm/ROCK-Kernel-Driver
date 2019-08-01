@@ -820,10 +820,10 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		return -EBUSY;
 
 	if (ctx->interruptible)
-		r = reservation_object_lock_interruptible(busy_bo->resv,
+		r = kcl_reservation_object_lock_interruptible(busy_bo->resv,
 							  ticket);
 	else
-		r = reservation_object_lock(busy_bo->resv, ticket);
+		r = kcl_reservation_object_lock(busy_bo->resv, ticket);
 
 	/*
 	 * TODO: It would be better to keep the BO locked until allocation is at
@@ -831,7 +831,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 	 * of TTM.
 	 */
 	if (!r)
-		reservation_object_unlock(busy_bo->resv);
+		kcl_reservation_object_unlock(busy_bo->resv);
 
 	return r == -EDEADLK ? -EBUSY : r;
 }
