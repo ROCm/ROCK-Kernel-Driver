@@ -304,3 +304,21 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
 		fi
 	fi
 ])
+
+dnl #
+dnl # AC_KERNEL_TEST_HEADER_FILE_EXIST
+dnl # check header file exist
+dnl # $1: header file to check
+dnl # $2: run it if header file exist
+dnl # $3: run it if header file nonexistent
+dnl #
+AC_DEFUN([AC_KERNEL_TEST_HEADER_FILE_EXIST], [
+	header_file=m4_normalize([$1])
+	header_file_obj=$LINUX_OBJ/include/$header_file
+	header_file_src=$LINUX/include/$header_file
+	AS_IF([test -e $header_file_obj -o -e $header_file_src], [
+		$2
+	], [
+		$3
+	])
+])
