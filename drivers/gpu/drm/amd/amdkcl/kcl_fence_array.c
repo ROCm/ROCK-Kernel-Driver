@@ -149,4 +149,4 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 }
 EXPORT_SYMBOL(fence_array_create);
 
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) */
+#endif /* !defined(RENAME_FENCE_TO_DMA_FENCE) && !defined(HAVE_FENCE_ARRAY_H) */

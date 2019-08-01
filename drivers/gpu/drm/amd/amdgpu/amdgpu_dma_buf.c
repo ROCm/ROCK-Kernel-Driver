@@ -38,7 +38,7 @@
 #include "amdgpu_gem.h"
 #include <drm/amdgpu_drm.h>
 #include <linux/dma-buf.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if defined(RENAME_FENCE_TO_DMA_FENCE)
 #include <linux/dma-fence-array.h>
 #endif
 

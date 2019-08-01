@@ -1537,7 +1537,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 		r = PTR_ERR(fence);
 	else if (fence) {
 		r = kcl_fence_wait_timeout(fence, true, timeout);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else

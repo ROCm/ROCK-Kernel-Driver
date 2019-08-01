@@ -26,7 +26,7 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if defined(RENAME_FENCE_TO_DMA_FENCE)
 #include <linux/dma-fence.h>
 #endif
 

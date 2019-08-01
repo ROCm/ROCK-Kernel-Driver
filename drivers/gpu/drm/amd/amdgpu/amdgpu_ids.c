@@ -23,7 +23,7 @@
 #include "amdgpu_ids.h"
 
 #include <linux/idr.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if defined(RENAME_FENCE_TO_DMA_FENCE)
 #include <linux/dma-fence-array.h>
 #endif
 #include <drm/drmP.h>
