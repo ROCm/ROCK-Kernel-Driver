@@ -289,7 +289,7 @@ EXPORT_SYMBOL(_kcl_reservation_object_copy_fences);
  * Modifications [2016-12-27] (c) [2016]
  * Advanced Micro Devices, Inc.
  */
-#ifdef OS_NAME_RHEL_6
+#if !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 static inline int
 reservation_object_test_signaled_single(struct fence *passed_fence)
 {
