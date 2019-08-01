@@ -38,7 +38,7 @@
  * Advanced Micro Devices, Inc.
  */
 
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_RESERVATION_OBJECT_RESERVE_SHARED)
 /**
  * _kcl_reservation_object_reserve_shared - Reserve space to add shared fences to
  * a reservation_object.
