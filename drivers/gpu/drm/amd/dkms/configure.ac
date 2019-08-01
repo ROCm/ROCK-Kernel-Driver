@@ -127,6 +127,7 @@ m4_include([m4/memalloc-nofs-save.m4])
 m4_include([m4/vmf-insert.m4])
 m4_include([m4/drm-amdgpu-fence-to-handle.m4])
 m4_include([m4/dma-fence-get-stub.m4])
+m4_include([m4/drm-fb-helper-lastclose.m4])
 m4_include([m4/config.m4])
 
 
