@@ -126,6 +126,7 @@ m4_include([m4/vga-switcheroo-set-dynamic-switch.m4])
 m4_include([m4/use-unsigned-pipe.m4])
 m4_include([m4/drm-fb-helper-lastclose.m4])
 m4_include([m4/pm-genpd-remove-device.m4])
+m4_include([m4/si-mem-available.m4])
 m4_include([m4/config.m4])
 
 
