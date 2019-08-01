@@ -166,6 +166,7 @@ m4_include([m4/drm-edid.m4])
 m4_include([m4/drm-hdmi-vendor-infoframe-from-display-mode.m4])
 m4_include([m4/drm-dp-mst-topology-cbs.m4])
 m4_include([m4/drm-atomic.m4])
+m4_include([m4/drm-fb-helper-lastclose.m4])
 m4_include([m4/config.m4])
 
 
