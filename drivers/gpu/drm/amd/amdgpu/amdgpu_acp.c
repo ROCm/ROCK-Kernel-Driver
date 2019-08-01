@@ -452,7 +452,11 @@ static int acp_hw_fini(void *handle)
 
 	for (i = 0; i < ACP_DEVS ; i++) {
 		dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
+#ifndef HAVE_2ARGS_PM_GENPD_REMOVE_DEVICE
 		ret = pm_genpd_remove_device(dev);
+#else
+		ret = pm_genpd_remove_device(&adev->acp.acp_genpd->gpd, dev);
+#endif
 		/* If removal fails, dont giveup and try rest */
 		if (ret)
 			dev_err(dev, "remove dev from genpd failed\n");
