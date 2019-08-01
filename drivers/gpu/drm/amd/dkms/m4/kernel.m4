@@ -417,3 +417,20 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
 		fi
 	fi
 ])
+
+dnl #
+dnl # AC_KERNEL_TEST_HEADER_FILE_EXIST
+dnl # check header file exist
+dnl # $1: header file to check
+dnl # $2: run it if header file exist
+dnl # $3: run it if header file nonexistent
+dnl #
+AC_DEFUN([AC_KERNEL_TEST_HEADER_FILE_EXIST], [
+	header_file=$LINUX_OBJ/include/$1
+	test "x$enable_linux_builtin" = xyes && header_file=$LINUX/include/$1
+	AS_IF([test -e $header_file], [
+		$2
+	], [
+		$3
+	])
+])
