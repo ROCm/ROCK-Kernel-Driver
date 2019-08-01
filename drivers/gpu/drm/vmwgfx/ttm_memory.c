@@ -549,7 +549,11 @@ ttm_check_under_lowerlimit(struct ttm_mem_global *glob,
 	if (ctx->force_alloc)
 		return false;
 
+#if defined(HAVE_SI_MEM_AVAILABLE)
 	available = get_nr_swap_pages() + si_mem_available();
+#else
+	return false;
+#endif
 	available -= num_pages;
 	if (available < glob->lower_mem_limit)
 		return true;
