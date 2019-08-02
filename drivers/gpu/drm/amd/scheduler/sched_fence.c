@@ -104,10 +104,12 @@ static const char *amd_sched_fence_get_timeline_name(struct dma_fence *f)
 	return (const char *)fence->sched->name;
 }
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 static bool amd_sched_fence_enable_signaling(struct dma_fence *f)
 {
 	return true;
 }
+#endif
 
 /**
  * amd_sched_fence_free - free up the fence memory
@@ -157,12 +159,14 @@ static void amd_sched_fence_release_finished(struct dma_fence *f)
 const struct dma_fence_ops amd_sched_fence_ops_scheduled = {
 	.get_driver_name = amd_sched_fence_get_driver_name,
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
 #if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#else
 	.wait = dma_fence_default_wait,
+#endif
 #endif
 	.release = amd_sched_fence_release_scheduled,
 };
@@ -170,12 +174,14 @@ const struct dma_fence_ops amd_sched_fence_ops_scheduled = {
 const struct dma_fence_ops amd_sched_fence_ops_finished = {
 	.get_driver_name = amd_sched_fence_get_driver_name,
 	.get_timeline_name = amd_sched_fence_get_timeline_name,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = amd_sched_fence_enable_signaling,
 	.signaled = NULL,
 #if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#else
 	.wait = dma_fence_default_wait,
+#endif
 #endif
 	.release = amd_sched_fence_release_finished,
 };

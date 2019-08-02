@@ -179,7 +179,7 @@ static const struct dma_fence_ops amdkfd_fence_ops = {
 	.get_driver_name = amdkfd_fence_get_driver_name,
 	.get_timeline_name = amdkfd_fence_get_timeline_name,
 	.enable_signaling = amdkfd_fence_enable_signaling,
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,
