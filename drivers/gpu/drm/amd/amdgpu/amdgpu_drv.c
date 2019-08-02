@@ -1497,7 +1497,7 @@ static struct drm_driver kms_driver = {
 #endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
 	.gem_free_object = amdgpu_gem_object_free,
 #else
 	.gem_free_object_unlocked = amdgpu_gem_object_free,
