@@ -1654,7 +1654,7 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
-	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 4.13\n");
+	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 5.0\n");
 	return -EINVAL;
 }
 #endif
