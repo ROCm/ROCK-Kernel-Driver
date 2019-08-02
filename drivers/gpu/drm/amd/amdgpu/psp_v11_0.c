@@ -43,6 +43,8 @@ MODULE_FIRMWARE("amdgpu/navi10_sos.bin");
 MODULE_FIRMWARE("amdgpu/navi10_asd.bin");
 MODULE_FIRMWARE("amdgpu/navi14_sos.bin");
 MODULE_FIRMWARE("amdgpu/navi14_asd.bin");
+MODULE_FIRMWARE("amdgpu/navi12_sos.bin");
+MODULE_FIRMWARE("amdgpu/navi12_asd.bin");
 MODULE_FIRMWARE("amdgpu/arcturus_sos.bin");
 MODULE_FIRMWARE("amdgpu/arcturus_asd.bin");
 
@@ -77,6 +79,9 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 		break;
 	case CHIP_NAVI14:
 		chip_name = "navi14";
+		break;
+	case CHIP_NAVI12:
+		chip_name = "navi12";
 		break;
 	case CHIP_ARCTURUS:
 		chip_name = "arcturus";
@@ -174,6 +179,7 @@ static int psp_v11_0_init_microcode(struct psp_context *psp)
 		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 	case CHIP_ARCTURUS:
 		break;
 	default:
