@@ -25,7 +25,7 @@
  *    Jerome Glisse <glisse@freedesktop.org>
  */
 #include <linux/pagemap.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
 #include <linux/sync_file.h>
 #endif
 #include <drm/drmP.h>
@@ -1591,7 +1591,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {

@@ -113,6 +113,7 @@ m4_include([m4/drm-vma-node-verify-access.m4])
 m4_include([m4/overflow-h.m4])
 m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/reservation-object-reserve-shared.m4])
+m4_include([m4/drm-amdgpu-fence-to-handle.m4])
 m4_include([m4/config.m4])
 
 
