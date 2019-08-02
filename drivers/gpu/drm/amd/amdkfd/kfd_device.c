@@ -77,7 +77,7 @@ static const struct kfd2kgd_calls *kfd2kgd_funcs[] = {
 #ifdef KFD_SUPPORT_IOMMU_V2
 static const struct kfd_device_info kaveri_device_info = {
 	.asic_family = CHIP_KAVERI,
-	.asic_name = "Kaveri",
+	.asic_name = "kaveri",
 	.max_pasid_bits = 16,
 	/* max num of queues for KV.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
@@ -96,7 +96,7 @@ static const struct kfd_device_info kaveri_device_info = {
 
 static const struct kfd_device_info carrizo_device_info = {
 	.asic_family = CHIP_CARRIZO,
-	.asic_name = "Carrizo",
+	.asic_name = "carrizo",
 	.max_pasid_bits = 16,
 	/* max num of queues for CZ.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
@@ -115,7 +115,7 @@ static const struct kfd_device_info carrizo_device_info = {
 
 static const struct kfd_device_info raven_device_info = {
 	.asic_family = CHIP_RAVEN,
-	.asic_name = "Raven",
+	.asic_name = "raven",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
@@ -134,7 +134,7 @@ static const struct kfd_device_info raven_device_info = {
 
 static const struct kfd_device_info hawaii_device_info = {
 	.asic_family = CHIP_HAWAII,
-	.asic_name = "Hawaii",
+	.asic_name = "hawaii",
 	.max_pasid_bits = 16,
 	/* max num of queues for KV.TODO should be a dynamic value */
 	.max_no_of_hqd	= 24,
@@ -153,7 +153,7 @@ static const struct kfd_device_info hawaii_device_info = {
 
 static const struct kfd_device_info tonga_device_info = {
 	.asic_family = CHIP_TONGA,
-	.asic_name = "Tonga",
+	.asic_name = "tonga",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -171,7 +171,7 @@ static const struct kfd_device_info tonga_device_info = {
 
 static const struct kfd_device_info fiji_device_info = {
 	.asic_family = CHIP_FIJI,
-	.asic_name = "Fiji",
+	.asic_name = "fiji",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -189,7 +189,7 @@ static const struct kfd_device_info fiji_device_info = {
 
 static const struct kfd_device_info fiji_vf_device_info = {
 	.asic_family = CHIP_FIJI,
-	.asic_name = "Fiji",
+	.asic_name = "fiji",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -208,7 +208,7 @@ static const struct kfd_device_info fiji_vf_device_info = {
 
 static const struct kfd_device_info polaris10_device_info = {
 	.asic_family = CHIP_POLARIS10,
-	.asic_name = "Polaris10",
+	.asic_name = "polaris10",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -226,7 +226,7 @@ static const struct kfd_device_info polaris10_device_info = {
 
 static const struct kfd_device_info polaris10_vf_device_info = {
 	.asic_family = CHIP_POLARIS10,
-	.asic_name = "Polaris10",
+	.asic_name = "polaris10",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -244,7 +244,7 @@ static const struct kfd_device_info polaris10_vf_device_info = {
 
 static const struct kfd_device_info polaris11_device_info = {
 	.asic_family = CHIP_POLARIS11,
-	.asic_name = "Polaris11",
+	.asic_name = "polaris11",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -262,7 +262,7 @@ static const struct kfd_device_info polaris11_device_info = {
 
 static const struct kfd_device_info polaris12_device_info = {
 	.asic_family = CHIP_POLARIS12,
-	.asic_name = "Polaris12",
+	.asic_name = "polaris12",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -280,7 +280,7 @@ static const struct kfd_device_info polaris12_device_info = {
 
 static const struct kfd_device_info vegam_device_info = {
 	.asic_family = CHIP_VEGAM,
-	.asic_name = "VegaM",
+	.asic_name = "vegam",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 4,
@@ -298,7 +298,7 @@ static const struct kfd_device_info vegam_device_info = {
 
 static const struct kfd_device_info vega10_device_info = {
 	.asic_family = CHIP_VEGA10,
-	.asic_name = "Vega10",
+	.asic_name = "vega10",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
@@ -316,7 +316,7 @@ static const struct kfd_device_info vega10_device_info = {
 
 static const struct kfd_device_info vega10_vf_device_info = {
 	.asic_family = CHIP_VEGA10,
-	.asic_name = "Vega10",
+	.asic_name = "vega10",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
@@ -334,7 +334,7 @@ static const struct kfd_device_info vega10_vf_device_info = {
 
 static const struct kfd_device_info vega12_device_info = {
 	.asic_family = CHIP_VEGA12,
-	.asic_name = "Vega12",
+	.asic_name = "vega12",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
@@ -352,7 +352,7 @@ static const struct kfd_device_info vega12_device_info = {
 
 static const struct kfd_device_info vega20_device_info = {
 	.asic_family = CHIP_VEGA20,
-	.asic_name = "Vega20",
+	.asic_name = "vega20",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd	= 24,
 	.doorbell_size	= 8,
@@ -370,7 +370,7 @@ static const struct kfd_device_info vega20_device_info = {
 
 static const struct kfd_device_info arcturus_device_info = {
 	.asic_family = CHIP_ARCTURUS,
-	.asic_name = "Arcturus",
+	.asic_name = "arcturus",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd	= 24,
 	.doorbell_size	= 8,
@@ -406,7 +406,7 @@ static const struct kfd_device_info renoir_device_info = {
 
 static const struct kfd_device_info navi10_device_info = {
 	.asic_family = CHIP_NAVI10,
-	.asic_name = "Navi10",
+	.asic_name = "navi10",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
