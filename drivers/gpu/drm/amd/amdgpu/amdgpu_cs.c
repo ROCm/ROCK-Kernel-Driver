@@ -1591,7 +1591,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
-#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE) && defined(HAVE_DMA_FENCE_GET_STUB)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
