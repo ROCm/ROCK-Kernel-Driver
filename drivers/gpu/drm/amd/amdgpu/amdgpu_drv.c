@@ -1443,7 +1443,11 @@ static struct drm_driver kms_driver = {
 	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
+#ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
+	.gem_free_object = amdgpu_gem_object_free,
+#else
 	.gem_free_object_unlocked = amdgpu_gem_object_free,
+#endif
 	.gem_open_object = amdgpu_gem_object_open,
 	.gem_close_object = amdgpu_gem_object_close,
 	.dumb_create = amdgpu_mode_dumb_create,
