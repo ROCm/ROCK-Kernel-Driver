@@ -27,8 +27,9 @@
 
 #include <linux/file.h>
 #include <linux/pagemap.h>
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
 #include <linux/sync_file.h>
-
+#endif
 #include <drm/amdgpu_drm.h>
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
@@ -1500,6 +1501,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
@@ -1559,6 +1561,14 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 }
+#else
+int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
+				    struct drm_file *filp)
+{
+	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 5.0\n");
+	return -EINVAL;
+}
+#endif
 
 /**
  * amdgpu_cs_wait_all_fence - wait on all fences to signal
