@@ -427,7 +427,7 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 
 	/* Limit maximum size to 2GB due to SG table limitations */
 	pages = min(pages_left, 2UL << (30 - PAGE_SHIFT));
-
+	
 	i = 0;
 	spin_lock(&mgr->lock);
 	while (pages_left) {
