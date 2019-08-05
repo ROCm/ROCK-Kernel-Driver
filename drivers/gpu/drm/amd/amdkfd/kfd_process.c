@@ -1228,7 +1228,13 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (p->pasid == pasid) {
 			kref_get(&p->ref);
 			ret_p = p;
@@ -1505,7 +1511,13 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		cancel_delayed_work_sync(&p->eviction_work);
 		cancel_delayed_work_sync(&p->restore_work);
 
@@ -1524,7 +1536,13 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
@@ -1593,7 +1611,13 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+	struct hlist_node *node;
+
+	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
+#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+#endif
 		seq_printf(m, "Process %d PASID 0x%x:\n",
 			   p->lead_thread->tgid, p->pasid);
 
