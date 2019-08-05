@@ -54,6 +54,7 @@ enum amd_asic_type {
 	CHIP_RAVEN,
 	CHIP_ARCTURUS,
 	CHIP_NAVI10,
+	CHIP_NAVI12,
 	CHIP_NAVI14,
 	CHIP_LAST,
 };
