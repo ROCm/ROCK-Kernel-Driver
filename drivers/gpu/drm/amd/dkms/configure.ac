@@ -168,6 +168,7 @@ m4_include([m4/drm-dp-mst-topology-cbs.m4])
 m4_include([m4/drm-atomic.m4])
 m4_include([m4/drm-fb-helper-lastclose.m4])
 m4_include([m4/set-busid.m4])
+m4_include([m4/drm-mm-insert-mode.m4])
 m4_include([m4/config.m4])
 
 
