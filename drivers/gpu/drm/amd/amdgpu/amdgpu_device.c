@@ -1753,34 +1753,28 @@ static int amdgpu_device_fw_loading(struct amdgpu_device *adev)
 
 	if (adev->asic_type >= CHIP_VEGA10) {
 		for (i = 0; i < adev->num_ip_blocks; i++) {
-			if (adev->ip_blocks[i].version->type != AMD_IP_BLOCK_TYPE_PSP)
-				continue;
-
-			/* no need to do the fw loading again if already done*/
-			if (adev->ip_blocks[i].status.hw == true)
-				break;
-
-			if (adev->in_gpu_reset || adev->in_suspend) {
-				r = adev->ip_blocks[i].version->funcs->resume(adev);
-				if (r) {
-					DRM_ERROR("resume of IP block <%s> failed %d\n",
+			if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_PSP) {
+				if (adev->in_gpu_reset || adev->in_suspend) {
+					if (amdgpu_sriov_vf(adev) && adev->in_gpu_reset)
+						break; /* sriov gpu reset, psp need to do hw_init before IH because of hw limit */
+					r = adev->ip_blocks[i].version->funcs->resume(adev);
+					if (r) {
+						DRM_ERROR("resume of IP block <%s> failed %d\n",
 							  adev->ip_blocks[i].version->funcs->name, r);
-					return r;
+						return r;
+					}
+				} else {
+					r = adev->ip_blocks[i].version->funcs->hw_init(adev);
+					if (r) {
+						DRM_ERROR("hw_init of IP block <%s> failed %d\n",
+						  adev->ip_blocks[i].version->funcs->name, r);
+						return r;
+					}
 				}
-			} else {
-				r = adev->ip_blocks[i].version->funcs->hw_init(adev);
-				if (r) {
-					DRM_ERROR("hw_init of IP block <%s> failed %d\n",
-							  adev->ip_blocks[i].version->funcs->name, r);
-					return r;
-				}
+				adev->ip_blocks[i].status.hw = true;
 			}
-
-			adev->ip_blocks[i].status.hw = true;
-			break;
 		}
 	}
-
 	r = amdgpu_pm_load_smu_firmware(adev, &smu_version);
 
 	return r;
@@ -2214,9 +2208,7 @@ static int amdgpu_device_ip_suspend_phase1(struct amdgpu_device *adev)
 			if (r) {
 				DRM_ERROR("suspend of IP block <%s> failed %d\n",
 					  adev->ip_blocks[i].version->funcs->name, r);
-				return r;
 			}
-			adev->ip_blocks[i].status.hw = false;
 		}
 	}
 
@@ -2256,16 +2248,14 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 			if (is_support_sw_smu(adev)) {
 				/* todo */
 			} else if (adev->powerplay.pp_funcs &&
-					   adev->powerplay.pp_funcs->set_mp1_state) {
+				   adev->powerplay.pp_funcs->set_mp1_state) {
 				r = adev->powerplay.pp_funcs->set_mp1_state(
 					adev->powerplay.pp_handle,
 					adev->mp1_state);
 				if (r) {
 					DRM_ERROR("SMC failed to set mp1 state %d, %d\n",
 						  adev->mp1_state, r);
-					return r;
 				}
-				adev->ip_blocks[i].status.hw = false;
 			}
 		}
 	}
@@ -2320,7 +2310,6 @@ static int amdgpu_device_ip_reinit_early_sriov(struct amdgpu_device *adev)
 		for (j = 0; j < adev->num_ip_blocks; j++) {
 			block = &adev->ip_blocks[j];
 
-			block->status.hw = false;
 			if (block->version->type != ip_order[i] ||
 				!block->status.valid)
 				continue;
@@ -2329,7 +2318,6 @@ static int amdgpu_device_ip_reinit_early_sriov(struct amdgpu_device *adev)
 			DRM_INFO("RE-INIT-early: %s %s\n", block->version->funcs->name, r?"failed":"succeeded");
 			if (r)
 				return r;
-			block->status.hw = true;
 		}
 	}
 
@@ -2357,15 +2345,13 @@ static int amdgpu_device_ip_reinit_late_sriov(struct amdgpu_device *adev)
 			block = &adev->ip_blocks[j];
 
 			if (block->version->type != ip_order[i] ||
-				!block->status.valid ||
-				block->status.hw)
+				!block->status.valid)
 				continue;
 
 			r = block->version->funcs->hw_init(adev);
 			DRM_INFO("RE-INIT-late: %s %s\n", block->version->funcs->name, r?"failed":"succeeded");
 			if (r)
 				return r;
-			block->status.hw = true;
 		}
 	}
 
@@ -2389,19 +2375,17 @@ static int amdgpu_device_ip_resume_phase1(struct amdgpu_device *adev)
 	int i, r;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid || adev->ip_blocks[i].status.hw)
+		if (!adev->ip_blocks[i].status.valid)
 			continue;
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
 		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
 		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH) {
-
 			r = adev->ip_blocks[i].version->funcs->resume(adev);
 			if (r) {
 				DRM_ERROR("resume of IP block <%s> failed %d\n",
 					  adev->ip_blocks[i].version->funcs->name, r);
 				return r;
 			}
-			adev->ip_blocks[i].status.hw = true;
 		}
 	}
 
@@ -2426,7 +2410,7 @@ static int amdgpu_device_ip_resume_phase2(struct amdgpu_device *adev)
 	int i, r;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.valid || adev->ip_blocks[i].status.hw)
+		if (!adev->ip_blocks[i].status.valid)
 			continue;
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
 		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_GMC ||
@@ -2439,7 +2423,6 @@ static int amdgpu_device_ip_resume_phase2(struct amdgpu_device *adev)
 				  adev->ip_blocks[i].version->funcs->name, r);
 			return r;
 		}
-		adev->ip_blocks[i].status.hw = true;
 	}
 
 	return 0;
