@@ -533,6 +533,9 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	struct amdgpu_mn *amn;
 	unsigned long key = AMDGPU_MN_KEY(mm, type);
 	int r;
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE
+	struct hlist_node *node;
+#endif
 
 	mutex_lock(&adev->mn_lock);
 #ifndef HAVE_DOWN_WRITE_KILLABLE
@@ -544,7 +547,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	}
 #endif
 
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE
+	hash_for_each_possible(adev->mn_hash, amn, node, node, key)
+#else
 	hash_for_each_possible(adev->mn_hash, amn, node, key)
+#endif
 		if (AMDGPU_MN_KEY(amn->mm, amn->type) == key)
 			goto release_locks;
 
