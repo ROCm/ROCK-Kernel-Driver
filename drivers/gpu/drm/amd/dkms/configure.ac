@@ -150,6 +150,7 @@ m4_include([m4/virtual-mm-fault-function.m4])
 m4_include([m4/vm-fault-address-vma.m4])
 m4_include([m4/hlist-for-each-entry.m4])
 m4_include([m4/hash-for-each-possible.m4])
+m4_include([m4/hash-for-each-possible-rcu.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
