@@ -512,7 +512,12 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 	struct amdgpu_device *adev = to_amdgpu_device(mgr);
 	struct drm_mm *mm = &mgr->mm;
 	struct drm_mm_node *nodes;
+#ifndef HAVE_DRM_MM_INSERT_MODE
+	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_DEFAULT;
+	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+#else
 	enum drm_mm_insert_mode mode;
+#endif
 	unsigned long lpfn, num_nodes, pages_per_node, pages_left;
 	uint64_t vis_usage = 0, mem_bytes, max_bytes;
 	unsigned i;
@@ -554,9 +559,16 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 		return -ENOMEM;
 	}
 
+#ifndef HAVE_DRM_MM_INSERT_MODE
+	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
+		sflags = DRM_MM_SEARCH_BELOW;
+		aflags = DRM_MM_CREATE_TOP;
+	}
+#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
+#endif
 
 	mem->start = 0;
 	pages_left = mem->num_pages;
@@ -568,10 +580,19 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 		/* Limit maximum size to 2GB due to SG table limitations */
 		pages = min(pages, (2UL << (30 - PAGE_SHIFT)));
 
+#ifndef HAVE_DRM_MM_INSERT_MODE
+		sflags |= DRM_MM_SEARCH_BEST;
+		uint32_t alignment = mem->page_alignment;
+		r = drm_mm_insert_node_in_range_generic(mm, &nodes[i], pages,
+					alignment, 0,
+					place->fpfn, lpfn,
+					sflags, aflags);
+#else
 		r = drm_mm_insert_node_in_range(mm, &nodes[i], pages,
 						pages_per_node, 0,
 						place->fpfn, lpfn,
 						mode);
+#endif
 		if (unlikely(r))
 			break;
 
@@ -586,11 +607,20 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 
 		if (pages == pages_per_node)
 			alignment = pages_per_node;
+#ifndef HAVE_DRM_MM_INSERT_MODE
+		else
+			sflags |= DRM_MM_SEARCH_BEST;
 
+		r = drm_mm_insert_node_in_range_generic(mm, &nodes[i], pages,
+							alignment, 0,
+							place->fpfn, lpfn,
+							sflags, aflags);
+#else
 		r = drm_mm_insert_node_in_range(mm, &nodes[i],
 						pages, alignment, 0,
 						place->fpfn, lpfn,
 						mode);
+#endif
 		if (unlikely(r))
 			goto error;
 
