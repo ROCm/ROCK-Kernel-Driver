@@ -4,7 +4,7 @@
 
 #include <linux/workqueue.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0)
+#if defined(HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED) && !defined(HAVE_SYSTEM_HIGHPRI_WQ_DECLARED)
 /*
  * System-wide workqueues which are always present.
 *
