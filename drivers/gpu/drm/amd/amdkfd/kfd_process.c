@@ -1100,7 +1100,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1394,7 +1394,7 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1419,7 +1419,7 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1493,7 +1493,7 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {

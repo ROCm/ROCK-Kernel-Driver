@@ -128,6 +128,7 @@ m4_include([m4/amd-iommu-pc-supported.m4])
 m4_include([m4/drm-dev-put.m4])
 m4_include([m4/hash-for-each-possible.m4])
 m4_include([m4/hash-for-each-possible-rcu.m4])
+m4_include([m4/hash-for-each-rcu.m4])
 m4_include([m4/config.m4])
 
 

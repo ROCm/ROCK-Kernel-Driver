@@ -1035,7 +1035,7 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	uint32_t id;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct kfd_hsa_memory_exception_data memory_exception_data;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 #endif
 
@@ -1092,7 +1092,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	memory_exception_data.failure.imprecise = true;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
