@@ -134,7 +134,7 @@ static bool amdgpu_sync_add_later(struct amdgpu_sync *sync, struct dma_fence *f,
 {
 	struct amdgpu_sync_entry *e;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE
 	struct hlist_node *node;
 
 	hash_for_each_possible(sync->fences, e, node, node, f->context) {
