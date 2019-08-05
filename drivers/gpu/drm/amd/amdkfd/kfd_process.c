@@ -374,7 +374,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE_RCU
 	struct hlist_node *node;
 	hash_for_each_possible_rcu(kfd_processes_table, process, node,
 					kfd_processes, (uintptr_t)mm)
