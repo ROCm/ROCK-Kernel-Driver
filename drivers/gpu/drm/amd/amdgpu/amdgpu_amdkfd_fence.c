@@ -72,7 +72,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 		return NULL;
 
 	/* This reference gets released in amdkfd_fence_release */
-#if LINUX_VERSION_CODE	> KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MMGRAB)
 	mmgrab(mm);
 #else
 	atomic_inc(&mm->mm_count);
