@@ -3138,7 +3138,9 @@ static void __exit amdgpu_exit(void)
 	amdgpu_sync_fini();
 	amdgpu_fence_slab_fini();
 	amdgpu_userq_fence_slab_fini();
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_synchronize();
+#endif
 	amdgpu_xcp_drv_release();
 }
 
