@@ -63,6 +63,13 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVCALLOC */
 
+#if !defined(HAVE_MMGRAB)
+static inline void mmgrab(struct mm_struct *mm)
+{
+	atomic_inc(&mm->mm_count);
+}
+#endif
+
 #ifndef HAVE_MM_ACCESS
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
