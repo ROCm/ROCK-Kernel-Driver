@@ -876,6 +876,10 @@ struct kfd_process {
 	/* We want to receive a notification when the mm_struct is destroyed */
 	struct mmu_notifier mmu_notifier;
 
+#ifndef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+	/* Use for delayed freeing of kfd_process structure */
+	struct rcu_head	rcu;
+#endif
 	u32 pasid;
 
 	/*

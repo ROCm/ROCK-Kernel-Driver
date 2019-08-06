@@ -1116,6 +1116,7 @@ static void kfd_process_ref_release(struct kref *ref)
 	queue_work(kfd_process_wq, &p->release_work);
 }
 
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 static struct mmu_notifier *kfd_process_alloc_notifier(struct mm_struct *mm)
 {
 	int idx = srcu_read_lock(&kfd_processes_srcu);
@@ -1130,6 +1131,14 @@ static void kfd_process_free_notifier(struct mmu_notifier *mn)
 {
 	kfd_unref_process(container_of(mn, struct kfd_process, mmu_notifier));
 }
+#else
+static void kfd_process_destroy_delayed(struct rcu_head *rcu)
+{
+	struct kfd_process *p = container_of(rcu, struct kfd_process, rcu);
+
+	kfd_unref_process(p);
+}
+#endif
 
 static void kfd_process_notifier_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
@@ -1197,13 +1206,20 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	mutex_unlock(&p->mutex);
 
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_put(&p->mmu_notifier);
+#else
+	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
+	mmu_notifier_call_srcu(&p->rcu, &kfd_process_destroy_delayed);
+#endif
 }
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	.alloc_notifier = kfd_process_alloc_notifier,
 	.free_notifier = kfd_process_free_notifier,
+#endif
 };
 
 int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep)
@@ -1354,7 +1370,9 @@ bool kfd_process_xnack_mode(struct kfd_process *p, bool supported)
 static struct kfd_process *create_process(const struct task_struct *thread)
 {
 	struct kfd_process *process;
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	struct mmu_notifier *mn;
+#endif
 	int err = -ENOMEM;
 
 	process = kzalloc(sizeof(*process), GFP_KERNEL);
@@ -1398,6 +1416,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	hash_add_rcu(kfd_processes_table, &process->kfd_processes,
 			(uintptr_t)process->mm);
 
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	/* MMU notifier registration must be the last call that can fail
 	 * because after this point we cannot unwind the process creation.
 	 * After this point, mmu_notifier_put will trigger the cleanup by
@@ -1409,6 +1428,13 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 		goto err_register_notifier;
 	}
 	BUG_ON(mn != &process->mmu_notifier);
+#else
+	/* Must be last, have to use release destruction after this */
+	process->mmu_notifier.ops = &kfd_process_mmu_notifier_ops;
+	err = mmu_notifier_register(&process->mmu_notifier, process->mm);
+	if (err)
+		goto err_register_notifier;
+#endif
 
 	get_task_struct(process->lead_thread);
 
