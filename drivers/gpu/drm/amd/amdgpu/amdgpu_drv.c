@@ -1482,9 +1482,7 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
 #else

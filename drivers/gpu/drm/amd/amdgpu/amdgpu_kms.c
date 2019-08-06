@@ -1277,8 +1277,7 @@ void amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int pipe)
 	amdgpu_irq_put(adev, &adev->crtc_irq, idx);
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 /**
  * amdgpu_get_vblank_timestamp_kms - get vblank timestamp
  *

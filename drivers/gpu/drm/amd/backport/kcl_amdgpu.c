@@ -16,9 +16,7 @@ void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc)
 	amdgpu_disable_vblank_kms(dev, crtc);
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int crtc,
 					int *max_error,
 					struct timeval *vblank_time,
