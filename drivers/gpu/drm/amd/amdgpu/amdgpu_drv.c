@@ -1469,16 +1469,6 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 	return ret;
 }
 
-static bool
-amdgpu_get_crtc_scanout_position(struct drm_device *dev, unsigned int pipe,
-				 bool in_vblank_irq, int *vpos, int *hpos,
-				 ktime_t *stime, ktime_t *etime,
-				 const struct drm_display_mode *mode)
-{
-	return amdgpu_display_get_crtc_scanoutpos(dev, pipe, 0, vpos, hpos,
-						  stime, etime, mode);
-}
-
 static struct drm_driver kms_driver = {
 	.driver_features =
 	    DRIVER_USE_AGP |
@@ -1501,8 +1491,8 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
-	.get_scanout_position = amdgpu_get_crtc_scanout_position,
+	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
+	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #if defined(CONFIG_DEBUG_FS)
 #if defined(BUILD_AS_DKMS) && \
 	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
