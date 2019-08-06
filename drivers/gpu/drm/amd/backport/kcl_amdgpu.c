@@ -1,6 +1,6 @@
 #include <kcl/kcl_amdgpu.h>
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+#if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
 u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc)
 {
 	return amdgpu_get_vblank_counter_kms(dev, crtc);
