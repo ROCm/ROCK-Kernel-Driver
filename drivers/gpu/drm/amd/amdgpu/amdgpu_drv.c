@@ -1245,7 +1245,7 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 	drm_kms_helper_poll_disable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
  	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
@@ -1284,7 +1284,7 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 
 	ret = amdgpu_device_resume(drm_dev, false, false);
 	drm_kms_helper_poll_enable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;

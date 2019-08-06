@@ -120,6 +120,7 @@ m4_include([m4/chunk-id-scheduled-dependencies.m4])
 m4_include([m4/chunk-id-syncobj-timeline-wait-signal.m4])
 m4_include([m4/drm-driver-unload.m4])
 m4_include([m4/get-scanout-position.m4])
+m4_include([m4/vga-switcheroo-set-dynamic-switch.m4])
 m4_include([m4/config.m4])
 
 
