@@ -223,7 +223,11 @@ int kfd_process_create_wq(void)
 	if (!kfd_process_wq)
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
 	if (!kfd_restore_wq)
+#ifdef HAVE_ALLOC_ORDERED_WORKQUEUE
 		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
+#else
+		kfd_restore_wq = alloc_workqueue("kfd_restore_wq", WQ_UNBOUND, 1);
+#endif
 
 	if (!kfd_process_wq || !kfd_restore_wq) {
 		kfd_process_destroy_wq();
