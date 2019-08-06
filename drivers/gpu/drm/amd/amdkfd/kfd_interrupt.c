@@ -60,11 +60,16 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 		return r;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifdef create_rt_workqueue
 	kfd->ih_wq = create_rt_workqueue("KFD IH");
 #else
+#ifdef WQ_HIGHPRI
 	kfd->ih_wq = alloc_workqueue("KFD IH", WQ_HIGHPRI, 1);
+#else
+	kfd->ih_wq = create_workqueue("KFD IH");
 #endif
+#endif
+
 	spin_lock_init(&kfd->interrupt_lock);
 
 	INIT_WORK(&kfd->interrupt_work, interrupt_wq);
