@@ -648,10 +648,19 @@ static void kfd_process_ref_release(struct kref *ref)
 	queue_work(kfd_process_wq, &p->release_work);
 }
 
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 static void kfd_process_free_notifier(struct mmu_notifier *mn)
 {
 	kfd_unref_process(container_of(mn, struct kfd_process, mmu_notifier));
 }
+#else
+static void kfd_process_destroy_delayed(struct rcu_head *rcu)
+{
+	struct kfd_process *p = container_of(rcu, struct kfd_process, rcu);
+
+	kfd_unref_process(p);
+}
+#endif
 
 static void kfd_process_notifier_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
@@ -730,12 +739,19 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	mutex_unlock(&p->mutex);
 
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	mmu_notifier_put(&p->mmu_notifier);
+#else
+	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
+	mmu_notifier_call_srcu(&p->rcu, &kfd_process_destroy_delayed);
+#endif
 }
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
+#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
 	.free_notifier = kfd_process_free_notifier,
+#endif
 };
 
 int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep)
