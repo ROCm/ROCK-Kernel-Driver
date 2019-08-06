@@ -70,4 +70,11 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVCALLOC */
 
+#if !defined(HAVE_MMGRAB)
+static inline void mmgrab(struct mm_struct *mm)
+{
+	atomic_inc(&mm->mm_count);
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
