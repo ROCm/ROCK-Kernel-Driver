@@ -130,6 +130,7 @@ m4_include([m4/dma-fence-get-stub.m4])
 m4_include([m4/drm-fb-helper-lastclose.m4])
 m4_include([m4/pm-genpd-remove-device.m4])
 m4_include([m4/si-mem-available.m4])
+m4_include([m4/mmgrab.m4])
 m4_include([m4/config.m4])
 
 
