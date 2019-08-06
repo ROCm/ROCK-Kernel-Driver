@@ -35,4 +35,5 @@
 #include <kcl/kcl_uaccess_backport.h>
 #include <kcl/kcl_vga_switcheroo_backport.h>
 #include <kcl/kcl_types.h>
+#include <kcl/kcl_amdgpu.h>
 #endif /* AMDGPU_BACKPORT_H */
