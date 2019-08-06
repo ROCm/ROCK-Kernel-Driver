@@ -1260,7 +1260,7 @@ extern const struct drm_ioctl_desc amdgpu_ioctls_kms[];
 extern const int amdgpu_max_kms_ioctl;
 
 int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 int amdgpu_driver_unload_kms(struct drm_device *dev);
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev);

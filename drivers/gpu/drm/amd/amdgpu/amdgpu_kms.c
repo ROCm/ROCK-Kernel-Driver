@@ -73,7 +73,7 @@ void amdgpu_unregister_gpu_instance(struct amdgpu_device *adev)
  * This is the main unload function for KMS (all asics).
  * Returns 0 on success.
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 int amdgpu_driver_unload_kms(struct drm_device *dev)
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev)
