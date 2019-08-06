@@ -102,8 +102,8 @@ static int smu_v11_0_send_msg(struct smu_context *smu, uint16_t msg)
 	ret = smu_v11_0_wait_for_response(smu);
 
 	if (ret)
-		pr_err("Failed to send message 0x%x, response 0x%x\n", index,
-		       ret);
+		pr_err("failed send message: %10s (%d) response %#x\n",
+		       smu_get_message_name(smu, msg), index, ret);
 
 	return ret;
 
@@ -123,8 +123,8 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu, uint16_t msg,
 
 	ret = smu_v11_0_wait_for_response(smu);
 	if (ret)
-		pr_err("Failed to send message 0x%x, response 0x%x, param 0x%x\n",
-		       index, ret, param);
+		pr_err("failed send message: %10s (%d) \tparam: 0x%08x response %#x\n",
+		       smu_get_message_name(smu, msg), index, param, ret);
 
 	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);
 
@@ -134,8 +134,8 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu, uint16_t msg,
 
 	ret = smu_v11_0_wait_for_response(smu);
 	if (ret)
-		pr_err("Failed to send message 0x%x, response 0x%x param 0x%x\n",
-		       index, ret, param);
+		pr_err("failed send message: %10s (%d) \tparam: 0x%08x response %#x\n",
+		       smu_get_message_name(smu, msg), index, param, ret);
 
 	return ret;
 }
@@ -795,44 +795,6 @@ static int smu_v11_0_init_display_count(struct smu_context *smu, uint32_t count)
 	return ret;
 }
 
-static int smu_v11_0_update_feature_enable_state(struct smu_context *smu, uint32_t feature_id, bool enabled)
-{
-	uint32_t feature_low = 0, feature_high = 0;
-	int ret = 0;
-
-	if (!smu->pm_enabled)
-		return ret;
-	if (feature_id >= 0 && feature_id < 31)
-		feature_low = (1 << feature_id);
-	else if (feature_id > 31 && feature_id < 63)
-		feature_high = (1 << feature_id);
-	else
-		return -EINVAL;
-
-	if (enabled) {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesLow,
-						  feature_low);
-		if (ret)
-			return ret;
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesHigh,
-						  feature_high);
-		if (ret)
-			return ret;
-
-	} else {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesLow,
-						  feature_low);
-		if (ret)
-			return ret;
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesHigh,
-						  feature_high);
-		if (ret)
-			return ret;
-
-	}
-
-	return ret;
-}
 
 static int smu_v11_0_set_allowed_mask(struct smu_context *smu)
 {
@@ -1097,6 +1059,8 @@ static int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n)
 		max_power_limit *= (100 + smu->smu_table.TDPODLimit);
 		max_power_limit /= 100;
 	}
+	if (n > max_power_limit)
+		return -EINVAL;
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT))
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetPptLimit, n);
@@ -1147,10 +1111,8 @@ static int smu_v11_0_set_thermal_range(struct smu_context *smu,
 				       struct smu_temperature_range *range)
 {
 	struct amdgpu_device *adev = smu->adev;
-	int low = SMU_THERMAL_MINIMUM_ALERT_TEMP *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	int high = SMU_THERMAL_MAXIMUM_ALERT_TEMP *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	int low = SMU_THERMAL_MINIMUM_ALERT_TEMP;
+	int high = SMU_THERMAL_MAXIMUM_ALERT_TEMP;
 	uint32_t val;
 
 	if (!range)
@@ -1161,6 +1123,9 @@ static int smu_v11_0_set_thermal_range(struct smu_context *smu,
 	if (high > range->max)
 		high = range->max;
 
+	low = max(SMU_THERMAL_MINIMUM_ALERT_TEMP, range->min);
+	high = min(SMU_THERMAL_MAXIMUM_ALERT_TEMP, range->max);
+
 	if (low > high)
 		return -EINVAL;
 
@@ -1169,8 +1134,8 @@ static int smu_v11_0_set_thermal_range(struct smu_context *smu,
 	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, THERM_IH_HW_ENA, 1);
 	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, THERM_INTH_MASK, 0);
 	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, THERM_INTL_MASK, 0);
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTH, (high / SMU_TEMPERATURE_UNITS_PER_CENTIGRADES));
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTL, (low / SMU_TEMPERATURE_UNITS_PER_CENTIGRADES));
+	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTH, (high & 0xff));
+	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTL, (low & 0xff));
 	val = val & (~THM_THERMAL_INT_CTRL__THERM_TRIGGER_MASK_MASK);
 
 	WREG32_SOC15(THM, 0, mmTHM_THERMAL_INT_CTRL, val);
@@ -1209,7 +1174,10 @@ static int smu_v11_0_start_thermal_control(struct smu_context *smu)
 
 	if (!smu->pm_enabled)
 		return ret;
+
 	ret = smu_get_thermal_temperature_range(smu, &range);
+	if (ret)
+		return ret;
 
 	if (smu->smu_table.thermal_controller_type) {
 		ret = smu_v11_0_set_thermal_range(smu, &range);
@@ -1225,15 +1193,17 @@ static int smu_v11_0_start_thermal_control(struct smu_context *smu)
 			return ret;
 	}
 
-	adev->pm.dpm.thermal.min_temp = range.min;
-	adev->pm.dpm.thermal.max_temp = range.max;
-	adev->pm.dpm.thermal.max_edge_emergency_temp = range.edge_emergency_max;
-	adev->pm.dpm.thermal.min_hotspot_temp = range.hotspot_min;
-	adev->pm.dpm.thermal.max_hotspot_crit_temp = range.hotspot_crit_max;
-	adev->pm.dpm.thermal.max_hotspot_emergency_temp = range.hotspot_emergency_max;
-	adev->pm.dpm.thermal.min_mem_temp = range.mem_min;
-	adev->pm.dpm.thermal.max_mem_crit_temp = range.mem_crit_max;
-	adev->pm.dpm.thermal.max_mem_emergency_temp = range.mem_emergency_max;
+	adev->pm.dpm.thermal.min_temp = range.min * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_temp = range.max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_edge_emergency_temp = range.edge_emergency_max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.min_hotspot_temp = range.hotspot_min * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_hotspot_crit_temp = range.hotspot_crit_max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_hotspot_emergency_temp = range.hotspot_emergency_max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.min_mem_temp = range.mem_min * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_mem_crit_temp = range.mem_crit_max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_mem_emergency_temp = range.mem_emergency_max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.min_temp = range.min * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	adev->pm.dpm.thermal.max_temp = range.max * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
 
 	return ret;
 }
@@ -1340,16 +1310,23 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 		if (ret)
 			goto failed;
 
+		if (clk_select == SMU_UCLK && smu->disable_uclk_switch)
+			return 0;
+
 		clk_id = smu_clk_get_index(smu, clk_select);
 		if (clk_id < 0) {
 			ret = -EINVAL;
 			goto failed;
 		}
 
+
 		mutex_lock(&smu->mutex);
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinByFreq,
 			(clk_id << 16) | clk_freq);
 		mutex_unlock(&smu->mutex);
+
+		if(clk_select == SMU_UCLK)
+			smu->hard_min_uclk_req_from_dal = clk_freq;
 	}
 
 failed:
@@ -1402,23 +1379,6 @@ static int smu_v11_0_gfx_off_control(struct smu_context *smu, bool enable)
 	return ret;
 }
 
-static int smu_v11_0_get_current_rpm(struct smu_context *smu,
-				     uint32_t *current_rpm)
-{
-	int ret;
-
-	ret = smu_send_smc_msg(smu, SMU_MSG_GetCurrentRpm);
-
-	if (ret) {
-		pr_err("Attempt to get current RPM from SMC Failed!\n");
-		return ret;
-	}
-
-	smu_read_smc_arg(smu, current_rpm);
-
-	return 0;
-}
-
 static uint32_t
 smu_v11_0_get_fan_control_mode(struct smu_context *smu)
 {
@@ -1429,17 +1389,17 @@ smu_v11_0_get_fan_control_mode(struct smu_context *smu)
 }
 
 static int
-smu_v11_0_smc_fan_control(struct smu_context *smu, bool start)
+smu_v11_0_auto_fan_control(struct smu_context *smu, bool auto_fan_control)
 {
 	int ret = 0;
 
 	if (smu_feature_is_supported(smu, SMU_FEATURE_FAN_CONTROL_BIT))
 		return 0;
 
-	ret = smu_feature_set_enabled(smu, SMU_FEATURE_FAN_CONTROL_BIT, start);
+	ret = smu_feature_set_enabled(smu, SMU_FEATURE_FAN_CONTROL_BIT, auto_fan_control);
 	if (ret)
 		pr_err("[%s]%s smc FAN CONTROL feature failed!",
-		       __func__, (start ? "Start" : "Stop"));
+		       __func__, (auto_fan_control ? "Start" : "Stop"));
 
 	return ret;
 }
@@ -1463,16 +1423,15 @@ static int
 smu_v11_0_set_fan_speed_percent(struct smu_context *smu, uint32_t speed)
 {
 	struct amdgpu_device *adev = smu->adev;
-	uint32_t duty100;
-	uint32_t duty;
+	uint32_t duty100, duty;
 	uint64_t tmp64;
-	bool stop = 0;
 
 	if (speed > 100)
 		speed = 100;
 
-	if (smu_v11_0_smc_fan_control(smu, stop))
+	if (smu_v11_0_auto_fan_control(smu, 0))
 		return -EINVAL;
+
 	duty100 = REG_GET_FIELD(RREG32_SOC15(THM, 0, mmCG_FDO_CTRL1),
 				CG_FDO_CTRL1, FMAX_DUTY100);
 	if (!duty100)
@@ -1494,18 +1453,16 @@ smu_v11_0_set_fan_control_mode(struct smu_context *smu,
 			       uint32_t mode)
 {
 	int ret = 0;
-	bool start = 1;
-	bool stop  = 0;
 
 	switch (mode) {
 	case AMD_FAN_CTRL_NONE:
 		ret = smu_v11_0_set_fan_speed_percent(smu, 100);
 		break;
 	case AMD_FAN_CTRL_MANUAL:
-		ret = smu_v11_0_smc_fan_control(smu, stop);
+		ret = smu_v11_0_auto_fan_control(smu, 0);
 		break;
 	case AMD_FAN_CTRL_AUTO:
-		ret = smu_v11_0_smc_fan_control(smu, start);
+		ret = smu_v11_0_auto_fan_control(smu, 1);
 		break;
 	default:
 		break;
@@ -1525,13 +1482,12 @@ static int smu_v11_0_set_fan_speed_rpm(struct smu_context *smu,
 	struct amdgpu_device *adev = smu->adev;
 	int ret;
 	uint32_t tach_period, crystal_clock_freq;
-	bool stop = 0;
 
 	if (!speed)
 		return -EINVAL;
 
 	mutex_lock(&(smu->mutex));
-	ret = smu_v11_0_smc_fan_control(smu, stop);
+	ret = smu_v11_0_auto_fan_control(smu, 0);
 	if (ret)
 		goto set_fan_speed_rpm_failed;
 
@@ -1792,7 +1748,6 @@ static const struct smu_funcs smu_v11_0_funcs = {
 	.set_allowed_mask = smu_v11_0_set_allowed_mask,
 	.get_enabled_mask = smu_v11_0_get_enabled_mask,
 	.system_features_control = smu_v11_0_system_features_control,
-	.update_feature_enable_state = smu_v11_0_update_feature_enable_state,
 	.notify_display_change = smu_v11_0_notify_display_change,
 	.get_power_limit = smu_v11_0_get_power_limit,
 	.set_power_limit = smu_v11_0_set_power_limit,
@@ -1803,7 +1758,6 @@ static const struct smu_funcs smu_v11_0_funcs = {
 	.set_deep_sleep_dcefclk = smu_v11_0_set_deep_sleep_dcefclk,
 	.display_clock_voltage_request = smu_v11_0_display_clock_voltage_request,
 	.set_watermarks_for_clock_ranges = smu_v11_0_set_watermarks_for_clock_ranges,
-	.get_current_rpm = smu_v11_0_get_current_rpm,
 	.get_fan_control_mode = smu_v11_0_get_fan_control_mode,
 	.set_fan_control_mode = smu_v11_0_set_fan_control_mode,
 	.set_fan_speed_percent = smu_v11_0_set_fan_speed_percent,

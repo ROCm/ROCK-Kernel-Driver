@@ -69,7 +69,7 @@ subdir-ccflags-y += \
 	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
 
 ifeq ($(OS_NAME),"opensuse-leap")
-ifeq ($(OS_VERSION),"15.0")
+ifeq ($(OS_VERSION),"15.1")
 subdir-ccflags-y += -DOS_NAME_SUSE_15
 endif
 endif
@@ -155,6 +155,9 @@ subdir-ccflags-y += -DOS_NAME_RHEL_7_5
 subdir-ccflags-y += -DOS_NAME_RHEL_7_X
 else ifeq ($(OS_VERSION),"7.6")
 subdir-ccflags-y += -DOS_NAME_RHEL_7_6
+subdir-ccflags-y += -DOS_NAME_RHEL_7_X
+else ifeq ($(OS_VERSION),"7.7")
+subdir-ccflags-y += -DOS_NAME_RHEL_7_7
 subdir-ccflags-y += -DOS_NAME_RHEL_7_X
 else ifeq ($(OS_VERSION),"8.0")
 subdir-ccflags-y += -DOS_NAME_RHEL_8_0

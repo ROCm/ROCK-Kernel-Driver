@@ -554,6 +554,14 @@ struct amdgpu_allowed_register_entry {
 	bool grbm_indexed;
 };
 
+enum amd_reset_method {
+	AMD_RESET_METHOD_LEGACY = 0,
+	AMD_RESET_METHOD_MODE0,
+	AMD_RESET_METHOD_MODE1,
+	AMD_RESET_METHOD_MODE2,
+	AMD_RESET_METHOD_BACO
+};
+
 /*
  * ASIC specific functions.
  */
@@ -565,6 +573,7 @@ struct amdgpu_asic_funcs {
 			     u32 sh_num, u32 reg_offset, u32 *value);
 	void (*set_vga_state)(struct amdgpu_device *adev, bool state);
 	int (*reset)(struct amdgpu_device *adev);
+	enum amd_reset_method (*reset_method)(struct amdgpu_device *adev);
 	/* get the reference clock */
 	u32 (*get_xclk)(struct amdgpu_device *adev);
 	/* MM block clocks */
@@ -740,6 +749,9 @@ struct amdgpu_df_funcs {
 					 int is_disable);
 	void (*pmc_get_count)(struct amdgpu_device *adev, uint64_t config,
 					 uint64_t *count);
+	uint64_t (*get_fica)(struct amdgpu_device *adev, uint32_t ficaa_val);
+	void (*set_fica)(struct amdgpu_device *adev, uint32_t ficaa_val,
+			 uint32_t ficadl_val, uint32_t ficadh_val);
 };
 /* Define the HW IP blocks will be used in driver , add more if necessary */
 enum amd_hw_ip_block_type {
@@ -791,8 +803,7 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0) || defined(OS_NAME_RHEL_7_6) || \
-	defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
 	struct dev_pagemap	pgmap;
 #endif
 #endif
@@ -1036,6 +1047,7 @@ struct amdgpu_device {
 	/* record last mm index being written through WREG32*/
 	unsigned long last_mm_index;
 	bool                            in_gpu_reset;
+	enum pp_mp1_state               mp1_state;
 	struct mutex  lock_reset;
 	struct amdgpu_doorbell_index doorbell_index;
 
@@ -1164,6 +1176,7 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
  */
 #define amdgpu_asic_set_vga_state(adev, state) (adev)->asic_funcs->set_vga_state((adev), (state))
 #define amdgpu_asic_reset(adev) (adev)->asic_funcs->reset((adev))
+#define amdgpu_asic_reset_method(adev) (adev)->asic_funcs->reset_method((adev))
 #define amdgpu_asic_get_xclk(adev) (adev)->asic_funcs->get_xclk((adev))
 #define amdgpu_asic_set_uvd_clocks(adev, v, d) (adev)->asic_funcs->set_uvd_clocks((adev), (v), (d))
 #define amdgpu_asic_set_vce_clocks(adev, ev, ec) (adev)->asic_funcs->set_vce_clocks((adev), (ev), (ec))

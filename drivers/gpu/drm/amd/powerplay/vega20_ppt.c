@@ -463,7 +463,6 @@ static int vega20_store_powerplay_table(struct smu_context *smu)
 	memcpy(table_context->driver_pptable, &powerplay_table->smcPPTable,
 	       sizeof(PPTable_t));
 
-	table_context->software_shutdown_temp = powerplay_table->usSoftwareShutdownTemp;
 	table_context->thermal_controller_type = powerplay_table->ucThermalControllerType;
 	table_context->TDPODLimit = le32_to_cpu(powerplay_table->OverDrive8Table.ODSettingsMax[ATOM_VEGA20_ODSETTING_POWERPERCENTAGE]);
 
@@ -2859,157 +2858,6 @@ static int vega20_dpm_set_vce_enable(struct smu_context *smu, bool enable)
 	return smu_feature_set_enabled(smu, SMU_FEATURE_DPM_VCE_BIT, enable);
 }
 
-static int vega20_get_enabled_smc_features(struct smu_context *smu,
-		uint64_t *features_enabled)
-{
-	uint32_t feature_mask[2] = {0, 0};
-	int ret = 0;
-
-	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
-	if (ret)
-		return ret;
-
-	*features_enabled = ((((uint64_t)feature_mask[0] << SMU_FEATURES_LOW_SHIFT) & SMU_FEATURES_LOW_MASK) |
-			(((uint64_t)feature_mask[1] << SMU_FEATURES_HIGH_SHIFT) & SMU_FEATURES_HIGH_MASK));
-
-	return ret;
-}
-
-static int vega20_enable_smc_features(struct smu_context *smu,
-		bool enable, uint64_t feature_mask)
-{
-	uint32_t smu_features_low, smu_features_high;
-	int ret = 0;
-
-	smu_features_low = (uint32_t)((feature_mask & SMU_FEATURES_LOW_MASK) >> SMU_FEATURES_LOW_SHIFT);
-	smu_features_high = (uint32_t)((feature_mask & SMU_FEATURES_HIGH_MASK) >> SMU_FEATURES_HIGH_SHIFT);
-
-	if (enable) {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesLow,
-						  smu_features_low);
-		if (ret)
-			return ret;
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesHigh,
-						  smu_features_high);
-		if (ret)
-			return ret;
-	} else {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesLow,
-						  smu_features_low);
-		if (ret)
-			return ret;
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesHigh,
-						  smu_features_high);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-
-}
-
-static int vega20_get_ppfeature_status(struct smu_context *smu, char *buf)
-{
-	static const char *ppfeature_name[] = {
-				"DPM_PREFETCHER",
-				"GFXCLK_DPM",
-				"UCLK_DPM",
-				"SOCCLK_DPM",
-				"UVD_DPM",
-				"VCE_DPM",
-				"ULV",
-				"MP0CLK_DPM",
-				"LINK_DPM",
-				"DCEFCLK_DPM",
-				"GFXCLK_DS",
-				"SOCCLK_DS",
-				"LCLK_DS",
-				"PPT",
-				"TDC",
-				"THERMAL",
-				"GFX_PER_CU_CG",
-				"RM",
-				"DCEFCLK_DS",
-				"ACDC",
-				"VR0HOT",
-				"VR1HOT",
-				"FW_CTF",
-				"LED_DISPLAY",
-				"FAN_CONTROL",
-				"GFX_EDC",
-				"GFXOFF",
-				"CG",
-				"FCLK_DPM",
-				"FCLK_DS",
-				"MP1CLK_DS",
-				"MP0CLK_DS",
-				"XGMI",
-				"ECC"};
-	static const char *output_title[] = {
-				"FEATURES",
-				"BITMASK",
-				"ENABLEMENT"};
-	uint64_t features_enabled;
-	int i;
-	int ret = 0;
-	int size = 0;
-
-	ret = vega20_get_enabled_smc_features(smu, &features_enabled);
-	if (ret)
-		return ret;
-
-	size += sprintf(buf + size, "Current ppfeatures: 0x%016llx\n", features_enabled);
-	size += sprintf(buf + size, "%-19s %-22s %s\n",
-				output_title[0],
-				output_title[1],
-				output_title[2]);
-	for (i = 0; i < GNLD_FEATURES_MAX; i++) {
-		size += sprintf(buf + size, "%-19s 0x%016llx %6s\n",
-					ppfeature_name[i],
-					1ULL << i,
-					(features_enabled & (1ULL << i)) ? "Y" : "N");
-	}
-
-	return size;
-}
-
-static int vega20_set_ppfeature_status(struct smu_context *smu, uint64_t new_ppfeature_masks)
-{
-	uint64_t features_enabled;
-	uint64_t features_to_enable;
-	uint64_t features_to_disable;
-	int ret = 0;
-
-	if (new_ppfeature_masks >= (1ULL << GNLD_FEATURES_MAX))
-		return -EINVAL;
-
-	ret = vega20_get_enabled_smc_features(smu, &features_enabled);
-	if (ret)
-		return ret;
-
-	features_to_disable =
-		features_enabled & ~new_ppfeature_masks;
-	features_to_enable =
-		~features_enabled & new_ppfeature_masks;
-
-	pr_debug("features_to_disable 0x%llx\n", features_to_disable);
-	pr_debug("features_to_enable 0x%llx\n", features_to_enable);
-
-	if (features_to_disable) {
-		ret = vega20_enable_smc_features(smu, false, features_to_disable);
-		if (ret)
-			return ret;
-	}
-
-	if (features_to_enable) {
-		ret = vega20_enable_smc_features(smu, true, features_to_enable);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
 static bool vega20_is_dpm_running(struct smu_context *smu)
 {
 	int ret = 0;
@@ -3033,6 +2881,23 @@ static int vega20_set_thermal_fan_table(struct smu_context *smu)
 	return ret;
 }
 
+static int vega20_get_fan_speed_rpm(struct smu_context *smu,
+				    uint32_t *speed)
+{
+	int ret;
+
+	ret = smu_send_smc_msg(smu, SMU_MSG_GetCurrentRpm);
+
+	if (ret) {
+		pr_err("Attempt to get current RPM from SMC Failed!\n");
+		return ret;
+	}
+
+	smu_read_smc_arg(smu, speed);
+
+	return 0;
+}
+
 static int vega20_get_fan_speed_percent(struct smu_context *smu,
 					uint32_t *speed)
 {
@@ -3040,7 +2905,7 @@ static int vega20_get_fan_speed_percent(struct smu_context *smu,
 	uint32_t current_rpm = 0, percent = 0;
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
 
-	ret = smu_get_current_rpm(smu, &current_rpm);
+	ret = vega20_get_fan_speed_rpm(smu, &current_rpm);
 	if (ret)
 		return ret;
 
@@ -3235,35 +3100,24 @@ static int vega20_set_watermarks_table(struct smu_context *smu,
 	return 0;
 }
 
-static const struct smu_temperature_range vega20_thermal_policy[] =
-{
-	{-273150,  99000, 99000, -273150, 99000, 99000, -273150, 99000, 99000},
-	{ 120000, 120000, 120000, 120000, 120000, 120000, 120000, 120000, 120000},
-};
-
 static int vega20_get_thermal_temperature_range(struct smu_context *smu,
 						struct smu_temperature_range*range)
 {
-
+	struct smu_table_context *table_context = &smu->smu_table;
+	ATOM_Vega20_POWERPLAYTABLE *powerplay_table = table_context->power_play_table;
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
 
-	if (!range)
+	if (!range || !powerplay_table)
 		return -EINVAL;
 
-	memcpy(range, &vega20_thermal_policy[0], sizeof(struct smu_temperature_range));
-
-	range->max = pptable->TedgeLimit *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	range->edge_emergency_max = (pptable->TedgeLimit + CTF_OFFSET_EDGE) *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	range->hotspot_crit_max = pptable->ThotspotLimit *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	range->hotspot_emergency_max = (pptable->ThotspotLimit + CTF_OFFSET_HOTSPOT) *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	range->mem_crit_max = pptable->ThbmLimit *
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
-	range->mem_emergency_max = (pptable->ThbmLimit + CTF_OFFSET_HBM)*
-		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	/* The unit is temperature */
+	range->min = 0;
+	range->max = powerplay_table->usSoftwareShutdownTemp;
+	range->edge_emergency_max = (pptable->TedgeLimit + CTF_OFFSET_EDGE);
+	range->hotspot_crit_max = pptable->ThotspotLimit;
+	range->hotspot_emergency_max = (pptable->ThotspotLimit + CTF_OFFSET_HOTSPOT);
+	range->mem_crit_max = pptable->ThbmLimit;
+	range->mem_emergency_max = (pptable->ThbmLimit + CTF_OFFSET_HBM);
 
 
 	return 0;
@@ -3306,11 +3160,10 @@ static const struct pptable_funcs vega20_ppt_funcs = {
 	.force_dpm_limit_value = vega20_force_dpm_limit_value,
 	.unforce_dpm_levels = vega20_unforce_dpm_levels,
 	.get_profiling_clk_mask = vega20_get_profiling_clk_mask,
-	.set_ppfeature_status = vega20_set_ppfeature_status,
-	.get_ppfeature_status = vega20_get_ppfeature_status,
 	.is_dpm_running = vega20_is_dpm_running,
 	.set_thermal_fan_table = vega20_set_thermal_fan_table,
 	.get_fan_speed_percent = vega20_get_fan_speed_percent,
+	.get_fan_speed_rpm = vega20_get_fan_speed_rpm,
 	.set_watermarks_table = vega20_set_watermarks_table,
 	.get_thermal_temperature_range = vega20_get_thermal_temperature_range
 };

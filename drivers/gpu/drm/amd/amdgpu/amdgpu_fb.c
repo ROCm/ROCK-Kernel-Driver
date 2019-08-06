@@ -144,21 +144,21 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 	int aligned_size, size;
 	int height = mode_cmd->height;
 	u32 cpp;
+	u64 flags = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
+			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS     |
+			       AMDGPU_GEM_CREATE_VRAM_CLEARED 	     |
+			       AMDGPU_GEM_CREATE_CPU_GTT_USWC;
 
 	cpp = drm_format_plane_cpp(mode_cmd->pixel_format, 0);
 
 	/* need to align pitch with crtc limits */
 	mode_cmd->pitches[0] = amdgpu_align_pitch(adev, mode_cmd->width, cpp,
 						  fb_tiled);
-	domain = amdgpu_display_supported_domains(adev);
-
+	domain = amdgpu_display_supported_domains(adev, flags);
 	height = ALIGN(mode_cmd->height, 8);
 	size = mode_cmd->pitches[0] * height;
 	aligned_size = ALIGN(size, PAGE_SIZE);
-	ret = amdgpu_gem_object_create(adev, aligned_size, 0, domain,
-				       AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
-				       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS |
-				       AMDGPU_GEM_CREATE_VRAM_CLEARED,
+	ret = amdgpu_gem_object_create(adev, aligned_size, 0, domain, flags,
 				       ttm_bo_type_kernel, NULL, &gobj);
 	if (ret) {
 		pr_err("failed to allocate framebuffer (%d)\n", aligned_size);
@@ -179,7 +179,6 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 		if (ret)
 			dev_err(adev->dev, "FB failed to set tiling flags\n");
 	}
-
 
 	ret = amdgpu_bo_pin(abo, domain);
 	if (ret) {
@@ -264,7 +263,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 
 	strcpy(info->fix.id, "amdgpudrmfb");
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
 #else
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
@@ -299,7 +298,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb mappable at 0x%lX\n",  info->fix.smem_start);
 	DRM_INFO("vram apper at 0x%lX\n",  (unsigned long)adev->gmc.aper_base);
 	DRM_INFO("size %lu\n", (unsigned long)amdgpu_bo_size(abo));
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
 	DRM_INFO("fb depth is %d\n", fb->depth);
 #else
 	DRM_INFO("fb depth is %d\n", fb->format->depth);

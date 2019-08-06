@@ -1,12 +1,10 @@
 #ifndef AMDKCL_VIDEO_H
 #define AMDKCL_VIDEO_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) && defined(BUILD_AS_DKMS)
+#include <acpi/video.h>
 
 #ifndef ACPI_VIDEO_NOTIFY_PROBE
 #define ACPI_VIDEO_NOTIFY_PROBE		0x81
-#endif
-
 #endif
 
 #endif/*AMDKCL_VIDEO_H*/

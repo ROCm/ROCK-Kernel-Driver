@@ -158,7 +158,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f,
 		struct dma_fence *old;
 
 		rcu_read_lock();
-		old = dma_fence_get_rcu_safe(ptr);
+		old = kcl_fence_get_rcu_safe(ptr);
 		rcu_read_unlock();
 
 		if (old) {
@@ -284,14 +284,7 @@ bool amdgpu_fence_process(struct amdgpu_ring *ring)
  *
  * Checks for fence activity.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-static void amdgpu_fence_fallback(unsigned long arg)
-{
-	struct amdgpu_ring *ring = (void *)arg;
-
-	amdgpu_fence_process(ring);
-}
-#else
+#if defined(HAVE_TIMER_SETUP)
 static void amdgpu_fence_fallback(struct timer_list *t)
 {
 	struct amdgpu_ring *ring = from_timer(ring, t,
@@ -299,6 +292,13 @@ static void amdgpu_fence_fallback(struct timer_list *t)
 
 	if (amdgpu_fence_process(ring))
 		DRM_WARN("Fence fallback timer expired on ring %s\n", ring->name);
+}
+#else
+static void amdgpu_fence_fallback(unsigned long arg)
+{
+	struct amdgpu_ring *ring = (void *)arg;
+
+	amdgpu_fence_process(ring);
 }
 #endif
 
@@ -453,11 +453,11 @@ int amdgpu_fence_driver_init_ring(struct amdgpu_ring *ring,
 	atomic_set(&ring->fence_drv.last_seq, 0);
 	ring->fence_drv.initialized = false;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if defined(HAVE_TIMER_SETUP)
+	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
+#else
 	setup_timer(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback,
 		    (unsigned long)ring);
-#else
-	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
 #endif
 
 	ring->fence_drv.num_fences_mask = num_hw_submission * 2 - 1;
@@ -699,7 +699,7 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
 	.wait = kcl_fence_default_wait,
 #elif DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.wait = dma_fence_default_wait,

@@ -4,8 +4,7 @@
 #include <drm/drm_atomic_helper.h>
 
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
-
+#if !defined(HAVE_DRM_ATOMIC_HELPER_BEST_ENCODER)
 static struct drm_encoder *
 drm_atomic_helper_best_encoder(struct drm_connector *connector)
 {

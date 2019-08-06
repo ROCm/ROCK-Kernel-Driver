@@ -2,10 +2,7 @@
 #include <linux/sched.h>
 #include <kcl/kcl_mn.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && \
-  !defined(OS_NAME_RHEL_7_2) && \
-  !defined(OS_NAME_RHEL_7_3) && \
-  !defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU)
 /*
  * Modifications [2017-03-14] (c) [2017]
  */

@@ -495,7 +495,7 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 #endif
 	spin_unlock(&mgr->lock);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
+#if defined(HAVE_DRM_PRINTF)
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
 		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
 		   amdgpu_vram_mgr_vis_usage(man) >> 20);

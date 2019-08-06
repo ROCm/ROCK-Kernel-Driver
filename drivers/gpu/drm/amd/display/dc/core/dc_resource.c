@@ -172,32 +172,22 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 	if (res_pool != NULL) {
 		struct dc_firmware_info fw_info = { { 0 } };
 
-		if (dc->ctx->dc_bios->funcs->get_firmware_info(
-				dc->ctx->dc_bios, &fw_info) == BP_RESULT_OK) {
-				res_pool->ref_clocks.xtalin_clock_inKhz = fw_info.pll_info.crystal_frequency;
-
-				if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
-					// On FPGA these dividers are currently not configured by GDB
-					res_pool->ref_clocks.dccg_ref_clock_inKhz = res_pool->ref_clocks.xtalin_clock_inKhz;
-					res_pool->ref_clocks.dchub_ref_clock_inKhz = res_pool->ref_clocks.xtalin_clock_inKhz;
-				} else if (res_pool->dccg && res_pool->hubbub) {
-					// If DCCG reference frequency cannot be determined (usually means not set to xtalin) then this is a critical error
-					// as this value must be known for DCHUB programming
-					(res_pool->dccg->funcs->get_dccg_ref_freq)(res_pool->dccg,
-							fw_info.pll_info.crystal_frequency,
-							&res_pool->ref_clocks.dccg_ref_clock_inKhz);
-
-					// Similarly, if DCHUB reference frequency cannot be determined, then it is also a critical error
-					(res_pool->hubbub->funcs->get_dchub_ref_freq)(res_pool->hubbub,
-							res_pool->ref_clocks.dccg_ref_clock_inKhz,
-							&res_pool->ref_clocks.dchub_ref_clock_inKhz);
-				} else {
-					// Not all ASICs have DCCG sw component
-					res_pool->ref_clocks.dccg_ref_clock_inKhz = res_pool->ref_clocks.xtalin_clock_inKhz;
-					res_pool->ref_clocks.dchub_ref_clock_inKhz = res_pool->ref_clocks.xtalin_clock_inKhz;
-				}
-			} else
-				ASSERT_CRITICAL(false);
+		if (dc->ctx->dc_bios->funcs->get_firmware_info(dc->ctx->dc_bios,
+				&fw_info) == BP_RESULT_OK) {
+			res_pool->ref_clocks.xtalin_clock_inKhz =
+				fw_info.pll_info.crystal_frequency;
+			/* initialize with firmware data first, no all
+			 * ASIC have DCCG SW component. FPGA or
+			 * simulation need initialization of
+			 * dccg_ref_clock_inKhz, dchub_ref_clock_inKhz
+			 * with xtalin_clock_inKhz
+			 */
+			res_pool->ref_clocks.dccg_ref_clock_inKhz =
+				res_pool->ref_clocks.xtalin_clock_inKhz;
+			res_pool->ref_clocks.dchub_ref_clock_inKhz =
+				res_pool->ref_clocks.xtalin_clock_inKhz;
+		} else
+			ASSERT_CRITICAL(false);
 	}
 
 	return res_pool;
@@ -265,7 +255,7 @@ bool resource_construct(
 		 * PORT_CONNECTIVITY == 1 (as instructed by HW team).
 		 */
 		update_num_audio(&straps, &num_audio, &pool->audio_support);
-		for (i = 0; i < pool->pipe_count && i < num_audio; i++) {
+		for (i = 0; i < caps->num_audio; i++) {
 			struct audio *aud = create_funcs->create_audio(ctx, i);
 
 			if (aud == NULL) {
@@ -947,7 +937,14 @@ static void calculate_inits_and_adj_vp(struct pipe_ctx *pipe_ctx)
 	data->inits.v_c_bot = dc_fixpt_add(data->inits.v_c, data->ratios.vert_c);
 
 }
+static bool are_rect_integer_multiples(struct rect src, struct rect dest)
+{
+	if (dest.width  >= src.width  && dest.width  % src.width  == 0 &&
+		dest.height >= src.height && dest.height % src.height == 0)
+		return true;
 
+	return false;
+}
 bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 {
 	const struct dc_plane_state *plane_state = pipe_ctx->plane_state;
@@ -990,6 +987,15 @@ bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
 	if (pipe_ctx->plane_res.dpp != NULL)
 		res = pipe_ctx->plane_res.dpp->funcs->dpp_get_optimal_number_of_taps(
 				pipe_ctx->plane_res.dpp, &pipe_ctx->plane_res.scl_data, &plane_state->scaling_quality);
+
+	if (res &&
+	    plane_state->scaling_quality.integer_scaling &&
+	    are_rect_integer_multiples(pipe_ctx->plane_res.scl_data.viewport,
+				       pipe_ctx->plane_res.scl_data.recout)) {
+		pipe_ctx->plane_res.scl_data.taps.v_taps = 1;
+		pipe_ctx->plane_res.scl_data.taps.h_taps = 1;
+	}
+
 	if (!res) {
 		/* Try 24 bpp linebuffer */
 		pipe_ctx->plane_res.scl_data.lb_params.depth = LB_PIXEL_DEPTH_24BPP;
@@ -1676,6 +1682,12 @@ static struct audio *find_first_free_audio(
 			return pool->audios[i];
 		}
 	}
+
+    /* use engine id to find free audio */
+	if ((id < pool->audio_count) && (res_ctx->is_audio_acquired[id] == false)) {
+		return pool->audios[id];
+	}
+
 	/*not found the matching one, first come first serve*/
 	for (i = 0; i < pool->audio_count; i++) {
 		if (res_ctx->is_audio_acquired[i] == false) {
@@ -1840,6 +1852,7 @@ static int get_norm_pix_clk(const struct dc_crtc_timing *timing)
 		pix_clk /= 2;
 	if (timing->pixel_encoding != PIXEL_ENCODING_YCBCR422) {
 		switch (timing->display_color_depth) {
+		case COLOR_DEPTH_666:
 		case COLOR_DEPTH_888:
 			normalized_pix_clk = pix_clk;
 			break;
@@ -1986,7 +1999,7 @@ enum dc_status resource_map_pool_resources(
 	/* TODO: Add check if ASIC support and EDID audio */
 	if (!stream->converter_disable_audio &&
 	    dc_is_audio_capable_signal(pipe_ctx->stream->signal) &&
-	    stream->audio_info.mode_count) {
+	    stream->audio_info.mode_count && stream->audio_info.flags.all) {
 		pipe_ctx->stream_res.audio = find_first_free_audio(
 		&context->res_ctx, pool, pipe_ctx->stream_res.stream_enc->id);
 

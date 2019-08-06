@@ -1,7 +1,7 @@
 #ifndef AMDKCL_KERNEL_H
 #define AMDKCL_KERNEL_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef u64_to_user_ptr
 #define kcl_u64_to_user_ptr(x) (	\
 {					\
 	typecheck(u64, x);		\
@@ -12,7 +12,7 @@
 #define kcl_u64_to_user_ptr(x) u64_to_user_ptr(x)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#ifndef __GFP_RETRY_MAYFAIL
 #define __GFP_RETRY_MAYFAIL __GFP_REPEAT
 #endif
 

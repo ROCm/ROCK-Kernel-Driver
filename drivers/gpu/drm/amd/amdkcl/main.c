@@ -5,9 +5,7 @@ extern void amdkcl_pci_init(void);
 
 extern void amdkcl_kthread_init(void);
 extern void amdkcl_drm_init(void);
-#if !defined(OS_NAME_RHEL_7_X)
 extern void amdkcl_fence_init(void);
-#endif
 extern void amdkcl_io_init(void);
 extern void amdkcl_dev_cgroup_init(void);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
@@ -20,9 +18,7 @@ int __init amdkcl_init(void)
 {
 	amdkcl_kthread_init();
 	amdkcl_drm_init();
-#if !defined(OS_NAME_RHEL_7_X)
 	amdkcl_fence_init();
-#endif
 	amdkcl_io_init();
 	amdkcl_dev_cgroup_init();
 	amdkcl_pci_init();

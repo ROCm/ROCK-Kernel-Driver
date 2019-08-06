@@ -25,12 +25,11 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#if defined(BUILD_AS_DKMS)
-#include <kcl/kcl_fence_array.h>
-#else
+#if defined(RENAME_FENCE_TO_DMA_FENCE)
 #include <linux/dma-fence-array.h>
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
+#include <kcl/kcl_fence_array.h>
+#if defined(HAVE_INTERVAL_TREE_DEFINE)
 #include <linux/interval_tree_generic.h>
 #endif
 #include <linux/idr.h>
@@ -867,7 +866,7 @@ static int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 		unsigned num_entries;
 
 		num_entries = amdgpu_vm_num_entries(adev, cursor->level);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 		entry->entries = drm_calloc_large(num_entries,
 						sizeof(*entry->entries));
 #else
@@ -919,7 +918,7 @@ static void amdgpu_vm_free_table(struct amdgpu_vm_pt *entry)
 		amdgpu_bo_unref(&entry->base.bo->shadow);
 		amdgpu_bo_unref(&entry->base.bo);
 	}
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	drm_free_large(entry->entries);
 #else
 	kvfree(entry->entries);
@@ -1589,7 +1588,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 	flags &= ~AMDGPU_PTE_EXECUTABLE;
 	flags |= mapping->flags & AMDGPU_PTE_EXECUTABLE;
 
-	if (adev->asic_type == CHIP_NAVI10) {
+	if (adev->asic_type >= CHIP_NAVI10) {
 		flags &= ~AMDGPU_PTE_MTYPE_NV10_MASK;
 		flags |= (mapping->flags & AMDGPU_PTE_MTYPE_NV10_MASK);
 	} else {

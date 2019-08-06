@@ -436,8 +436,6 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		char *buffer)
 {
 	struct kfd_topology_device *dev;
-	char public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE];
-	uint32_t i;
 	uint32_t log_max_watch_addr;
 	struct kfd_local_mem_info local_mem_info;
 
@@ -457,14 +455,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				attr_name);
 		if (dev->gpu && kfd_devcgroup_check_permission(dev->gpu))
 			return -EPERM;
-		for (i = 0; i < KFD_TOPOLOGY_PUBLIC_NAME_SIZE; i++) {
-			public_name[i] =
-					(char)dev->node_props.marketing_name[i];
-			if (dev->node_props.marketing_name[i] == 0)
-				break;
-		}
-		public_name[KFD_TOPOLOGY_PUBLIC_NAME_SIZE-1] = 0x0;
-		return sysfs_show_str_val(buffer, public_name);
+
+		return sysfs_show_str_val(buffer, dev->node_props.name);
 	}
 
 	dev = container_of(attr, struct kfd_topology_device,
@@ -1369,6 +1361,10 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	 */
 
 	amdgpu_amdkfd_get_cu_info(dev->gpu->kgd, &cu_info);
+
+	strncpy(dev->node_props.name, gpu->device_info->asic_name,
+			KFD_TOPOLOGY_PUBLIC_NAME_SIZE);
+
 	dev->node_props.simd_arrays_per_engine =
 		cu_info.num_shader_arrays_per_engine;
 

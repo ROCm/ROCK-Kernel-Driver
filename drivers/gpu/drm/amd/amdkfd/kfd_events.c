@@ -40,7 +40,11 @@
  * Wrapper around wait_queue_entry_t
  */
 struct kfd_event_waiter {
+#if defined(HAVE_WAIT_QUEUE_ENTRY)
 	wait_queue_entry_t wait;
+#else
+	wait_queue_t wait;
+#endif
 	struct kfd_event *event; /* Event to wait for */
 	bool activated;		 /* Becomes true when event is signaled */
 };
@@ -243,8 +247,7 @@ static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 	struct kfd_event_waiter *waiter;
 
 	/* Wake up pending waiters. They will return failure */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_WAIT_QUEUE_ENTRY)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -405,8 +408,7 @@ static void set_event(struct kfd_event *ev)
 	 */
 	ev->signaled = !ev->auto_reset || !waitqueue_active(&ev->wq);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_WAIT_QUEUE_ENTRY)
 	list_for_each_entry(waiter, &ev->wq.task_list, wait.task_list)
 #else
 	list_for_each_entry(waiter, &ev->wq.head, wait.entry)
@@ -507,7 +509,7 @@ static void set_event_from_interrupt(struct kfd_process *p,
 void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				uint32_t valid_id_bits)
 {
-	bool events_signaled = false;
+	bool debug_events_signaled = false;
 	struct kfd_event *ev = NULL;
 
 	/*
@@ -527,7 +529,7 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 							 valid_id_bits);
 	if (ev) {
 		set_event_from_interrupt(p, ev);
-		events_signaled = true;
+		debug_events_signaled |= (ev->type == KFD_EVENT_TYPE_DEBUG);
 	} else if (p->signal_page) {
 		/*
 		 * Partial ID lookup failed. Assume that the event ID
@@ -551,7 +553,8 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					set_event_from_interrupt(p, ev);
-					events_signaled = true;
+					debug_events_signaled |=
+					(ev->type == KFD_EVENT_TYPE_DEBUG);
 				}
 			}
 		} else {
@@ -563,11 +566,12 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					ev = lookup_event_by_id(p, id);
 					set_event_from_interrupt(p, ev);
-					events_signaled = true;
+					debug_events_signaled |=
+					(ev->type == KFD_EVENT_TYPE_DEBUG);
 				}
 		}
 	}
-	if (events_signaled)
+	if (debug_events_signaled)
 		signal_event_to_debugger(p);
 
 	mutex_unlock(&p->event_mutex);

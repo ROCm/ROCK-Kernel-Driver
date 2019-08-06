@@ -510,7 +510,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	 */
 	WARN(mem->user_pages, "Leaking user_pages array");
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 	mem->user_pages = drm_calloc_large(bo->tbo.ttm->num_pages,
 					   sizeof(struct page *));
 #else
@@ -546,14 +546,13 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 
 release_out:
 	if (ret)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
 #endif
 free_out:
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 	drm_free_large(mem->user_pages);
 #else
 	kvfree(mem->user_pages);
@@ -1195,7 +1194,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			adev->asic_type != CHIP_FIJI &&
 			adev->asic_type != CHIP_POLARIS10 &&
 			adev->asic_type != CHIP_POLARIS11 &&
-			adev->asic_type != CHIP_POLARIS12) ?
+			adev->asic_type != CHIP_POLARIS12 &&
+			adev->asic_type != CHIP_VEGAM) ?
 			VI_BO_SIZE_ALIGN : 1;
 
 	mapping_flags = AMDGPU_VM_PAGE_READABLE;
@@ -1317,13 +1317,12 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	if (mem->user_pages) {
 		pr_debug("%s: Freeing user_pages array\n", __func__);
 		if (mem->user_pages[0])
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages, false);
 #else
 			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 		drm_free_large(mem->user_pages);
 #else
 		kvfree(mem->user_pages);
@@ -1982,7 +1981,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 		if (!mem->user_pages) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 			mem->user_pages =
 				drm_calloc_large(bo->tbo.ttm->num_pages,
 						 sizeof(struct page *));
@@ -1998,8 +1997,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 				return -ENOMEM;
 			}
 		} else if (mem->user_pages[0]) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 			release_pages(mem->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 			release_pages(mem->user_pages, bo->tbo.ttm->num_pages);

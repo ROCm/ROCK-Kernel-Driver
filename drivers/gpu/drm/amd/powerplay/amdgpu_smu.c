@@ -29,6 +29,93 @@
 #include "smu_v11_0.h"
 #include "atom.h"
 
+#undef __SMU_DUMMY_MAP
+#define __SMU_DUMMY_MAP(type)	#type
+static const char* __smu_message_names[] = {
+	SMU_MESSAGE_TYPES
+};
+
+const char *smu_get_message_name(struct smu_context *smu, enum smu_message_type type)
+{
+	if (type < 0 || type > SMU_MSG_MAX_COUNT)
+		return "unknow smu message";
+	return __smu_message_names[type];
+}
+
+#undef __SMU_DUMMY_MAP
+#define __SMU_DUMMY_MAP(fea)	#fea
+static const char* __smu_feature_names[] = {
+	SMU_FEATURE_MASKS
+};
+
+const char *smu_get_feature_name(struct smu_context *smu, enum smu_feature_mask feature)
+{
+	if (feature < 0 || feature > SMU_FEATURE_COUNT)
+		return "unknow smu feature";
+	return __smu_feature_names[feature];
+}
+
+size_t smu_sys_get_pp_feature_mask(struct smu_context *smu, char *buf)
+{
+	size_t size = 0;
+	int ret = 0, i = 0;
+	uint32_t feature_mask[2] = { 0 };
+	int32_t feature_index = 0;
+	uint32_t count = 0;
+
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	if (ret)
+		goto failed;
+
+	size =  sprintf(buf + size, "features high: 0x%08x low: 0x%08x\n",
+			feature_mask[1], feature_mask[0]);
+
+	for (i = 0; i < SMU_FEATURE_COUNT; i++) {
+		feature_index = smu_feature_get_index(smu, i);
+		if (feature_index < 0)
+			continue;
+		size += sprintf(buf + size, "%02d. %-20s (%2d) : %s\n",
+			       count++,
+			       smu_get_feature_name(smu, i),
+			       feature_index,
+			       !!smu_feature_is_enabled(smu, i) ? "enabeld" : "disabled");
+	}
+
+failed:
+	return size;
+}
+
+int smu_sys_set_pp_feature_mask(struct smu_context *smu, uint64_t new_mask)
+{
+	int ret = 0;
+	uint32_t feature_mask[2] = { 0 };
+	uint64_t feature_2_enabled = 0;
+	uint64_t feature_2_disabled = 0;
+	uint64_t feature_enables = 0;
+
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	if (ret)
+		return ret;
+
+	feature_enables = ((uint64_t)feature_mask[1] << 32 | (uint64_t)feature_mask[0]);
+
+	feature_2_enabled  = ~feature_enables & new_mask;
+	feature_2_disabled = feature_enables & ~new_mask;
+
+	if (feature_2_enabled) {
+		ret = smu_feature_update_enable_state(smu, feature_2_enabled, true);
+		if (ret)
+			return ret;
+	}
+	if (feature_2_disabled) {
+		ret = smu_feature_update_enable_state(smu, feature_2_disabled, false);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}
+
 int smu_get_smc_version(struct smu_context *smu, uint32_t *if_version, uint32_t *smu_version)
 {
 	int ret = 0;
@@ -136,12 +223,37 @@ int smu_get_dpm_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
 {
 	int ret = 0, clk_id = 0;
 	uint32_t param = 0;
+	uint32_t clock_limit;
 
 	if (!min && !max)
 		return -EINVAL;
 
-	if (!smu_clk_dpm_is_enabled(smu, clk_type))
+	if (!smu_clk_dpm_is_enabled(smu, clk_type)) {
+		switch (clk_type) {
+		case SMU_MCLK:
+		case SMU_UCLK:
+			clock_limit = smu->smu_table.boot_values.uclk;
+			break;
+		case SMU_GFXCLK:
+		case SMU_SCLK:
+			clock_limit = smu->smu_table.boot_values.gfxclk;
+			break;
+		case SMU_SOCCLK:
+			clock_limit = smu->smu_table.boot_values.socclk;
+			break;
+		default:
+			clock_limit = 0;
+			break;
+		}
+
+		/* clock in Mhz unit */
+		if (min)
+			*min = clock_limit / 100;
+		if (max)
+			*max = clock_limit / 100;
+
 		return 0;
+	}
 
 	mutex_lock(&smu->mutex);
 	clk_id = smu_clk_get_index(smu, clk_type);
@@ -279,7 +391,8 @@ int smu_get_power_num_states(struct smu_context *smu,
 
 	/* not support power state */
 	memset(state_info, 0, sizeof(struct pp_states_info));
-	state_info->nums = 0;
+	state_info->nums = 1;
+	state_info->states[0] = POWER_STATE_TYPE_DEFAULT;
 
 	return 0;
 }
@@ -456,6 +569,41 @@ int smu_feature_init_dpm(struct smu_context *smu)
 
 	return ret;
 }
+int smu_feature_update_enable_state(struct smu_context *smu, uint64_t feature_mask, bool enabled)
+{
+	uint32_t feature_low = 0, feature_high = 0;
+	int ret = 0;
+
+	if (!smu->pm_enabled)
+		return ret;
+
+	feature_low = (feature_mask >> 0 ) & 0xffffffff;
+	feature_high = (feature_mask >> 32) & 0xffffffff;
+
+	if (enabled) {
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesLow,
+						  feature_low);
+		if (ret)
+			return ret;
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnableSmuFeaturesHigh,
+						  feature_high);
+		if (ret)
+			return ret;
+
+	} else {
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesLow,
+						  feature_low);
+		if (ret)
+			return ret;
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DisableSmuFeaturesHigh,
+						  feature_high);
+		if (ret)
+			return ret;
+
+	}
+
+	return ret;
+}
 
 int smu_feature_is_enabled(struct smu_context *smu, enum smu_feature_mask mask)
 {
@@ -481,6 +629,7 @@ int smu_feature_set_enabled(struct smu_context *smu, enum smu_feature_mask mask,
 {
 	struct smu_feature *feature = &smu->smu_feature;
 	int feature_id;
+	uint64_t feature_mask = 0;
 	int ret = 0;
 
 	feature_id = smu_feature_get_index(smu, mask);
@@ -489,8 +638,10 @@ int smu_feature_set_enabled(struct smu_context *smu, enum smu_feature_mask mask,
 
 	WARN_ON(feature_id > feature->feature_num);
 
+	feature_mask = 1ULL << feature_id;
+
 	mutex_lock(&feature->mutex);
-	ret = smu_feature_update_enable_state(smu, feature_id, enable);
+	ret = smu_feature_update_enable_state(smu, feature_mask, enable);
 	if (ret)
 		goto failed;
 
@@ -716,6 +867,12 @@ static int smu_sw_init(void *handle)
 		return ret;
 	}
 
+	ret = smu_register_irq_handler(smu);
+	if (ret) {
+		pr_err("Failed to register smc irq handler!\n");
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -724,6 +881,9 @@ static int smu_sw_fini(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 	int ret;
+
+	kfree(smu->irq_source);
+	smu->irq_source = NULL;
 
 	ret = smu_smc_table_sw_fini(smu);
 	if (ret) {
@@ -1012,6 +1172,9 @@ static int smu_hw_init(void *handle)
 		}
 	}
 
+	if (!smu->pm_enabled)
+		return 0;
+
 	ret = smu_feature_init_dpm(smu);
 	if (ret)
 		goto failed;
@@ -1033,10 +1196,6 @@ static int smu_hw_init(void *handle)
 		goto failed;
 
 	ret = smu_start_thermal_control(smu);
-	if (ret)
-		goto failed;
-
-	ret = smu_register_irq_handler(smu);
 	if (ret)
 		goto failed;
 
@@ -1068,9 +1227,6 @@ static int smu_hw_fini(void *handle)
 
 	kfree(table_context->overdrive_table);
 	table_context->overdrive_table = NULL;
-
-	kfree(smu->irq_source);
-	smu->irq_source = NULL;
 
 	ret = smu_fini_fb_allocations(smu);
 	if (ret)
@@ -1370,6 +1526,7 @@ int smu_adjust_power_state_dynamic(struct smu_context *smu,
 
 	if (!smu->pm_enabled)
 		return -EINVAL;
+
 	if (!skip_display_settings) {
 		ret = smu_display_config_changed(smu);
 		if (ret) {
@@ -1378,8 +1535,6 @@ int smu_adjust_power_state_dynamic(struct smu_context *smu,
 		}
 	}
 
-	if (!smu->pm_enabled)
-		return -EINVAL;
 	ret = smu_apply_clocks_adjust_rules(smu);
 	if (ret) {
 		pr_err("Failed to apply clocks adjust rules!");
@@ -1398,9 +1553,14 @@ int smu_adjust_power_state_dynamic(struct smu_context *smu,
 		ret = smu_asic_set_performance_level(smu, level);
 		if (ret) {
 			ret = smu_default_set_performance_level(smu, level);
+			if (ret) {
+				pr_err("Failed to set performance level!");
+				return ret;
+			}
 		}
-		if (!ret)
-			smu_dpm_ctx->dpm_level = level;
+
+		/* update the saved copy */
+		smu_dpm_ctx->dpm_level = level;
 	}
 
 	if (smu_dpm_ctx->dpm_level != AMD_DPM_FORCED_LEVEL_MANUAL) {
@@ -1459,28 +1619,18 @@ enum amd_dpm_forced_level smu_get_performance_level(struct smu_context *smu)
 
 int smu_force_performance_level(struct smu_context *smu, enum amd_dpm_forced_level level)
 {
-	int ret = 0;
-	int i;
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
+	int ret = 0;
 
 	if (!smu_dpm_ctx->dpm_context)
 		return -EINVAL;
 
-	for (i = 0; i < smu->adev->num_ip_blocks; i++) {
-		if (smu->adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC)
-			break;
-	}
-
-
-	smu->adev->ip_blocks[i].version->funcs->enable_umd_pstate(smu, &level);
-	ret = smu_handle_task(smu, level,
-			      AMD_PP_TASK_READJUST_POWER_STATE);
+	ret = smu_enable_umd_pstate(smu, &level);
 	if (ret)
 		return ret;
 
-	mutex_lock(&smu->mutex);
-	smu_dpm_ctx->dpm_level = level;
-	mutex_unlock(&smu->mutex);
+	ret = smu_handle_task(smu, level,
+			      AMD_PP_TASK_READJUST_POWER_STATE);
 
 	return ret;
 }

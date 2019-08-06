@@ -294,9 +294,19 @@ static int ttm_set_pages_caching(struct dma_pool *pool,
 
 static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 {
+#ifdef DMA_ATTR_NO_WARN
+	unsigned long attrs = 0;
+#endif
 	dma_addr_t dma = d_page->dma;
 	d_page->vaddr &= ~VADDR_FLAG_HUGE_POOL;
+#ifdef DMA_ATTR_NO_WARN
+	if (pool->type & IS_HUGE)
+		attrs = DMA_ATTR_NO_WARN;
+
+	dma_free_attrs(pool->dev, pool->size, (void *)d_page->vaddr, dma, attrs);
+#else
 	dma_free_coherent(pool->dev, pool->size, (void *)d_page->vaddr, dma);
+#endif
 
 	kfree(d_page);
 	d_page = NULL;
@@ -304,7 +314,7 @@ static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 {
 	struct dma_page *d_page;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef DMA_ATTR_NO_WARN
 	unsigned long attrs = 0;
 #endif
 	void *vaddr;
@@ -313,7 +323,7 @@ static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 	if (!d_page)
 		return NULL;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef DMA_ATTR_NO_WARN
 	if (pool->type & IS_HUGE)
 		attrs = DMA_ATTR_NO_WARN;
 
@@ -879,7 +889,7 @@ static gfp_t ttm_dma_pool_gfp_flags(struct ttm_dma_tt *ttm_dma, bool huge)
 		gfp_flags |= __GFP_ZERO;
 
 	if (huge) {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)
+#if defined(GFP_TRANSHUGE_LIGHT)
 		gfp_flags |= GFP_TRANSHUGE_LIGHT | __GFP_NORETRY |
 			__GFP_KSWAPD_RECLAIM;
 #else
@@ -1166,7 +1176,7 @@ static int ttm_dma_pool_mm_shrink_init(struct ttm_pool_manager *manager)
 	manager->mm_shrink.count_objects = ttm_dma_pool_shrink_count;
 	manager->mm_shrink.scan_objects = &ttm_dma_pool_shrink_scan;
 	manager->mm_shrink.seeks = 1;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+#if defined(HAVE_INT_REGISTER_SHRINKER)
 	return register_shrinker(&manager->mm_shrink);
 #else
 	register_shrinker(&manager->mm_shrink);

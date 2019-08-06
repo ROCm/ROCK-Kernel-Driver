@@ -22,7 +22,7 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE) && !defined(HAVE_FENCE_ARRAY_H)
 static void fence_array_cb_func(struct fence *f, struct fence_cb *cb);
 
 static const char *fence_array_get_driver_name(struct fence *fence)
@@ -147,8 +147,6 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 
 	return array;
 }
-#if !defined(OS_NAME_SLE_12_3) && !defined(OS_NAME_SUSE_42_3)
 EXPORT_SYMBOL(fence_array_create);
-#endif
 
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0) */

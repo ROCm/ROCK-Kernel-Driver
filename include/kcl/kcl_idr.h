@@ -3,7 +3,7 @@
 
 #include <linux/idr.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0)
+#ifndef idr_for_each_entry_continue
 #define idr_for_each_entry_continue(idr, entry, id)			\
 	for ((entry) = idr_get_next((idr), &(id));			\
 	     entry;							\

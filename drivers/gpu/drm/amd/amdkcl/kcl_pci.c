@@ -26,9 +26,7 @@ const unsigned char _kcl_pcie_link_speed_stub[] = {
 	PCI_SPEED_UNKNOWN               /* F */
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 16, 0) && \
-	!defined(OS_NAME_RHEL_7_6) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 /**
  * pci_enable_atomic_ops_to_root - enable AtomicOp requests to root port
  * @dev: the PCI device
@@ -91,7 +89,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 		/*
 		 * Upstream ports may block AtomicOps on egress.
 		 */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0) || defined(OS_NAME_RHEL_6)
+#if defined(HAVE_PCI_PCIE_TYPE)
 		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM) {
 #else
 		if (!bridge->has_secondary_link) {
@@ -115,8 +113,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 /*
  * pcie_get_speed_cap - query for the PCI device's link speed capability
  * @dev: PCI device to query
@@ -160,7 +157,6 @@ enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *dev)
 
 	return PCI_SPEED_UNKNOWN;
 }
-EXPORT_SYMBOL(pcie_get_speed_cap);
 
 /**
  * pcie_get_width_cap - query for the PCI device's link width capability
@@ -179,29 +175,24 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 
 	return PCIE_LNK_WIDTH_UNKNOWN;
 }
-EXPORT_SYMBOL(pcie_get_width_cap);
-
-#else
+#endif
 
 enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
 enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
-#endif
 
 void amdkcl_pci_init(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
-	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap",NULL);
-	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap",NULL);
+#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
+	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap", pcie_get_speed_cap);
+	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
 #endif
 	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1) && \
-	!defined(OS_NAME_UBUNTU_OEM)
+#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation

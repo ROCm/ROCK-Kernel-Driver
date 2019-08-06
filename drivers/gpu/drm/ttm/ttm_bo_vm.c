@@ -37,22 +37,19 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
-	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_X) || \
-	defined(OS_NAME_SLE)
+#if defined(HAVE_PFN_TO_PFN_T)
 #include <linux/pfn_t.h>
 #endif
 #include <linux/rbtree.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+#ifdef pgprot_decrypted
 #include <linux/mem_encrypt.h>
 #endif
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_area_struct *vma,
 				struct vm_fault *vmf)
@@ -85,7 +82,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 #endif
 
 		ttm_bo_get(bo);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 		up_read(&vma->vm_mm->mmap_sem);
 #else
 		up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -125,13 +122,13 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
 		+ page_offset;
 }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 #else
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #endif
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if !defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 	struct vm_area_struct *vma = vmf->vma;
 #endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -221,7 +218,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
 #else
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
@@ -297,7 +294,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 */
 	for (i = 0; i < TTM_BO_VM_NUM_PREFAULT; ++i) {
 		if (bo->mem.bus.is_iomem) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+#ifdef pgprot_decrypted
 			/* Iomem should not be marked encrypted */
 			cvma.vm_page_prot = pgprot_decrypted(cvma.vm_page_prot);
 #endif
@@ -317,10 +314,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vmf_insert_mixed(&cvma, address,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
-	defined(OS_NAME_RHEL_7_3) || \
-	defined(OS_NAME_RHEL_7_X) || \
-	defined(OS_NAME_SLE)
+#if defined(HAVE_PFN_TO_PFN_T)
 			__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 #else
 					pfn);

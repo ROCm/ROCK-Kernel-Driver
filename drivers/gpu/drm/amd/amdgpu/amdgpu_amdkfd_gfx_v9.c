@@ -870,13 +870,6 @@ static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
 	data = 0;
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
-	data = 0;
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
-		VMID_SEL, 1<<vmid);
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
-		TRAP_EN, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
-
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
@@ -889,8 +882,6 @@ static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&adev->grbm_idx_mutex);
-
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), 0);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);

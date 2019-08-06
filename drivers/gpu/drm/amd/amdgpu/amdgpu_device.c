@@ -2169,6 +2169,21 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 			DRM_ERROR("suspend of IP block <%s> failed %d\n",
 				  adev->ip_blocks[i].version->funcs->name, r);
 		}
+		/* handle putting the SMC in the appropriate state */
+		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) {
+			if (is_support_sw_smu(adev)) {
+				/* todo */
+			} else if (adev->powerplay.pp_funcs &&
+				   adev->powerplay.pp_funcs->set_mp1_state) {
+				r = adev->powerplay.pp_funcs->set_mp1_state(
+					adev->powerplay.pp_handle,
+					adev->mp1_state);
+				if (r) {
+					DRM_ERROR("SMC failed to set mp1 state %d, %d\n",
+						  adev->mp1_state, r);
+				}
+			}
+		}
 	}
 
 	return 0;
@@ -2648,7 +2663,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	if (amdgpu_device_is_px(ddev))
 		runtime = true;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
 		kcl_vga_switcheroo_register_client(adev->pdev,
@@ -2887,7 +2902,7 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 
 	kfree(adev->bios);
 	adev->bios = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
 		vga_switcheroo_unregister_client(adev->pdev);
@@ -3650,6 +3665,17 @@ static bool amdgpu_device_lock_adev(struct amdgpu_device *adev, bool trylock)
 
 	atomic_inc(&adev->gpu_reset_counter);
 	adev->in_gpu_reset = 1;
+	switch (amdgpu_asic_reset_method(adev)) {
+	case AMD_RESET_METHOD_MODE1:
+		adev->mp1_state = PP_MP1_STATE_SHUTDOWN;
+		break;
+	case AMD_RESET_METHOD_MODE2:
+		adev->mp1_state = PP_MP1_STATE_RESET;
+		break;
+	default:
+		adev->mp1_state = PP_MP1_STATE_NONE;
+		break;
+	}
 	/* Block kfd: SRIOV would do it separately */
 	if (!amdgpu_sriov_vf(adev))
                 amdgpu_amdkfd_pre_reset(adev);
@@ -3663,6 +3689,7 @@ static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
 	if (!amdgpu_sriov_vf(adev))
                 amdgpu_amdkfd_post_reset(adev);
 	amdgpu_vf_error_trans_all(adev);
+	adev->mp1_state = PP_MP1_STATE_NONE;
 	adev->in_gpu_reset = 0;
 	mutex_unlock(&adev->lock_reset);
 }

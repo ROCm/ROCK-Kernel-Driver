@@ -405,7 +405,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
 	}
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
+#if defined(HAVE_DRM_CONNECTOR_PUT)
 	drm_connector_unregister(connector);
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);

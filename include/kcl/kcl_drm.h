@@ -5,53 +5,92 @@
 #include <linux/kconfig.h>
 #include <drm/drmP.h>
 #include <drm/drm_fb_helper.h>
+#include <drm/drm_dp_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_rect.h>
+#include <drm/drm_modes.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#if defined(HAVE_DRM_PRINTF)
 #include <drm/drm_print.h>
 #endif
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 #include <drm/drm_syncobj.h>
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_DRM_COLOR_LUT)
 #include <drm/drm_color_mgmt.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
+#endif
 
+#ifndef DP_TEST_MISC0
 #define DP_TEST_MISC0                       0x232
+#endif
 
+#ifndef DP_TEST_PHY_PATTERN
 #define DP_TEST_PHY_PATTERN                 0x248
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_7_0
 #define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_15_8
 #define DP_TEST_80BIT_CUSTOM_PATTERN_15_8   0x251
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_23_16
 #define DP_TEST_80BIT_CUSTOM_PATTERN_23_16  0x252
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_31_24
 #define DP_TEST_80BIT_CUSTOM_PATTERN_31_24  0x253
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_39_32
 #define DP_TEST_80BIT_CUSTOM_PATTERN_39_32  0x254
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_47_40
 #define DP_TEST_80BIT_CUSTOM_PATTERN_47_40  0x255
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_55_48
 #define DP_TEST_80BIT_CUSTOM_PATTERN_55_48  0x256
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_63_56
 #define DP_TEST_80BIT_CUSTOM_PATTERN_63_56  0x257
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_71_64
 #define DP_TEST_80BIT_CUSTOM_PATTERN_71_64  0x258
+#endif
+#ifndef DP_TEST_80BIT_CUSTOM_PATTERN_79_72
 #define DP_TEST_80BIT_CUSTOM_PATTERN_79_72  0x259
+#endif
 
+#ifndef DP_BRANCH_REVISION_START
 #define DP_BRANCH_REVISION_START            0x509
+#endif
 
+#ifndef DP_DP13_DPCD_REV
 #define DP_DP13_DPCD_REV                    0x2200
+#endif
+#ifndef DP_DP13_MAX_LINK_RATE
 #define DP_DP13_MAX_LINK_RATE               0x2201
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0)
+#ifndef DRM_MODE_ROTATE_0
 #define DRM_MODE_ROTATE_0       (1<<0)
+#endif
+#ifndef DRM_MODE_ROTATE_90
 #define DRM_MODE_ROTATE_90      (1<<1)
+#endif
+#ifndef DRM_MODE_ROTATE_180
 #define DRM_MODE_ROTATE_180     (1<<2)
+#endif
+#ifndef DRM_MODE_ROTATE_270
 #define DRM_MODE_ROTATE_270     (1<<3)
+#endif
 
+#ifndef DRM_MODE_ROTATE_MASK
 #define DRM_MODE_ROTATE_MASK (\
 		DRM_MODE_ROTATE_0  | \
 		DRM_MODE_ROTATE_90  | \
@@ -241,24 +280,19 @@ static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						u32 handle, u64 point, u64 flags,
 						struct dma_fence **fence)
 {
-#if defined(BUILD_AS_DKMS)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
 	return drm_syncobj_fence_get(file_private, handle, fence);
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
 	return drm_syncobj_find_fence(file_private, handle, fence);
-#elif DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
 	return drm_syncobj_find_fence(file_private, handle, point, fence);
-#else
-	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
-#endif
 #else
 	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
 #endif
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
@@ -359,39 +393,6 @@ kcl_assert_drm_connector_list_read_locked(struct drm_mode_config *mode_config)
 			!drm_modeset_is_locked(&mode_config->connection_mutex));
 }
 
-static inline int
-kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
-					  unsigned int pipe,
-					  int *max_error,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
-					  ktime_t *vblank_time,
-#else
-					  struct timeval *vblank_time,
-#endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
-					  unsigned flags,
-#else
-					  bool in_vblank_irq,
-#endif
-					  const struct drm_crtc *refcrtc,
-					  const struct drm_display_mode *mode)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0) && \
-	!defined(OS_NAME_RHEL_6) && \
-	!defined(OS_NAME_RHEL_7_3) && \
-	!defined(OS_NAME_RHEL_7_X)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
-						     flags, refcrtc, mode);
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time,
-						     flags, mode);
-#else
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time, in_vblank_irq);
-#endif
-}
-
 #if !defined(HAVE_DRM_GET_FORMAT_NAME)
 /**
  * struct drm_format_name_buf - name of a DRM format
@@ -428,7 +429,7 @@ static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_fo
 
 static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
 	return drm_gem_object_unreference_unlocked(obj);
 #else
 	return drm_gem_object_put_unlocked(obj);
@@ -440,7 +441,7 @@ extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
 #define drm_gem_prime_dmabuf_ops (*_kcl_drm_gem_prime_dmabuf_ops)
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
@@ -448,9 +449,9 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
 	return drm_atomic_get_old_crtc_state(state, crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
+#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
@@ -461,12 +462,10 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_after_commit(struct drm_atomic_state *state,
 				  struct drm_crtc *crtc)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
 	return drm_atomic_get_old_crtc_state(state, crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
-	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
-	return state->crtc_states[drm_crtc_index(crtc)];
+	return drm_atomic_get_existing_crtc_state(state, crtc);
 #endif
 }
 
@@ -474,12 +473,10 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
 				  struct drm_crtc *crtc)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
 	return drm_atomic_get_new_crtc_state(state,crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
-	return state->crtcs[drm_crtc_index(crtc)].state;
 #else
-	return state->crtc_states[drm_crtc_index(crtc)];
+	return drm_atomic_get_existing_crtc_state(state, crtc);
 #endif
 }
 
@@ -487,29 +484,27 @@ static inline struct drm_crtc_state *
 kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
 	return drm_atomic_get_new_crtc_state(state,crtc);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
+#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
 	return state->crtcs[drm_crtc_index(crtc)]->state;
 #endif
 }
+
 static inline struct drm_plane_state *
 kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 							struct drm_plane *plane)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-	return drm_atomic_get_new_plane_state(state,plane);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0) || defined(OS_NAME_RHEL_7_X)
-	return state->planes[drm_plane_index(plane)].state;
+#if defined(HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE)
+	return drm_atomic_get_new_plane_state(state, plane);
 #else
-	return state->plane_states[drm_plane_index(plane)];
+	return drm_atomic_get_existing_plane_state(state, plane);
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 5, 0) && \
-	!defined(OS_NAME_RHEL_7_X)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 extern void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state);
@@ -519,82 +514,28 @@ static inline void
 kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
 #else
 	return __drm_atomic_helper_connector_reset(connector, conn_state);
 #endif
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+#if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_PRINTF)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
 	const char *prefix;
 };
-#endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-#define DRM_MODE_FMT	"%d:\"%s\" %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
-#define DRM_MODE_ARG(m)	\
-	(m)->base.id, (m)->name, (m)->vrefresh, (m)->clock, \
-	(m)->hdisplay, (m)->hsync_start, (m)->hsync_end, (m)->htotal, \
-	(m)->vdisplay, (m)->vsync_start, (m)->vsync_end, (m)->vtotal, \
-	(m)->type, (m)->flags
-
-#define DRM_RECT_FMT	"%dx%d%+d%+d"
-#define DRM_RECT_ARG(r) drm_rect_width(r), drm_rect_height(r), (r)->x1, (r)->y1
-
-#define DRM_RECT_FP_FMT	"%d.%06ux%d.%06u%+d.%06u%+d.%06u"
-#define DRM_RECT_FP_ARG(r) \
-	drm_rect_width(r) >> 16, ((drm_rect_width(r) & 0xffff) * 15625) >> 10, \
-	drm_rect_height(r) >> 16, ((drm_rect_height(r) & 0xffff) * 15625) >> 10, \
-	(r)->x1 >> 16, (((r)->x1 & 0xffff) * 15625) >> 10, \
-	(r)->y1 >> 16, (((r)->y1 & 0xffff) * 15625) >> 10
-
-static inline struct drm_rect
-drm_plane_state_src(const struct drm_plane_state *state)
-{
-	struct drm_rect src = {
-		.x1 = state->src_x,
-		.y1 = state->src_y,
-		.x2 = state->src_x + state->src_w,
-		.y2 = state->src_y + state->src_h,
-	};
-	return src;
-}
-
-static inline struct drm_rect
-drm_plane_state_dest(const struct drm_plane_state *state)
-{
-	struct drm_rect dest = {
-		.x1 = state->crtc_x,
-		.y1 = state->crtc_y,
-		.x2 = state->crtc_x + state->crtc_w,
-		.y2 = state->crtc_y + state->crtc_h,
-	};
-	return dest;
-}
-
-void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf);
 void drm_printf(struct drm_printer *p, const char *f, ...);
-static inline struct drm_printer drm_info_printer(struct device *dev)
-{
-	struct drm_printer p = {
-		.printfn = __drm_printfn_info,
-		.arg = dev,
-	};
-	return p;
-}
-
-void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
 extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
 /**
  * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
@@ -607,75 +548,79 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 		.prefix = prefix
-#endif
 	};
 	return p;
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
+#ifndef for_each_if
 /* helper for handling conditionals in various for_each macros */
 #define for_each_if(condition) if (!(condition)) {} else
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
-void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0) && \
-		defined(BUILD_AS_DKMS)
-
+#ifndef _DRM_PRINTK
 #define _DRM_PRINTK(once, level, fmt, ...)				\
 	do {								\
 		printk##once(KERN_##level "[" DRM_NAME "] " fmt,	\
 			     ##__VA_ARGS__);				\
 	} while (0)
-
-#define DRM_NOTE(fmt, ...)						\
-	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
-#define DRM_WARN(fmt, ...)						\
-	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
-
-#define DRM_NOTE_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
-#define DRM_WARN_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
-
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+#ifndef DRM_WARN
+#define DRM_WARN(fmt, ...)						\
+	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DP_LANE0_1_STATUS_ESI
 #define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
+#endif
+#ifndef DP_LANE2_3_STATUS_ESI
 #define DP_LANE2_3_STATUS_ESI                  0x200d /* status same as 0x203 */
+#endif
+#ifndef DP_LANE_ALIGN_STATUS_UPDATED_ESI
 #define DP_LANE_ALIGN_STATUS_UPDATED_ESI       0x200e /* status same as 0x204 */
+#endif
+#ifndef DP_SINK_STATUS_ESI
 #define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
 #define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#ifndef DRM_DEV_DEBUG
 #define DRM_DEV_DEBUG	dev_dbg
+#endif
+#ifndef DRM_DEV_ERROR
 #define DRM_DEV_ERROR	dev_err
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 3, 0)
+#ifndef drm_for_each_plane
 #define drm_for_each_plane(plane, dev) \
 	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
+#endif
 
+#ifndef drm_for_each_crtc
 #define drm_for_each_crtc(crtc, dev) \
 	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+#endif
 
+#ifndef drm_for_each_connector
 #define drm_for_each_connector(connector, dev) \
 	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
 
+#ifndef drm_for_each_encoder
 #define drm_for_each_encoder(encoder, dev) \
 	list_for_each_entry(encoder, &(dev)->mode_config.encoder_list, head)
+#endif
 
+#ifndef drm_for_each_fb
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif

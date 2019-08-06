@@ -19,7 +19,7 @@ kcl_reservation_object_reserve_shared(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout);
@@ -30,7 +30,7 @@ kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
 {
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 	return _kcl_reservation_object_wait_timeout_rcu(obj,
 					wait_all, intr, timeout);
 #else
@@ -39,7 +39,7 @@ kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline int
 _kcl_reservation_object_lock(struct reservation_object *obj,
 				struct ww_acquire_ctx *ctx)
@@ -52,14 +52,14 @@ static inline int
 kcl_reservation_object_lock(struct reservation_object *obj,
 				struct ww_acquire_ctx *ctx)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 	return _kcl_reservation_object_lock(obj, ctx);
 #else
 	return reservation_object_lock(obj, ctx);
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline void
 _kcl_reservation_object_unlock(struct reservation_object *obj)
 {
@@ -70,14 +70,14 @@ _kcl_reservation_object_unlock(struct reservation_object *obj)
 static inline void
 kcl_reservation_object_unlock(struct reservation_object *obj)
 {
-#if defined(BUILD_AS_DKMS) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_LOCK)
 	return _kcl_reservation_object_unlock(obj);
 #else
 	return reservation_object_unlock(obj);
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_COPY_FENCES)
 extern int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 					struct reservation_object *src);
 #endif
@@ -86,7 +86,7 @@ static inline int
 kcl_reservation_object_copy_fences(struct reservation_object *dst,
 				struct reservation_object *src)
 {
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(4, 14, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_COPY_FENCES)
 	return _kcl_reservation_object_copy_fences(dst, src);
 #else
 	return reservation_object_copy_fences(dst, src);
@@ -104,7 +104,7 @@ kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
 #endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 static inline bool __must_check
 _kcl_reservation_object_trylock(struct reservation_object *obj)
 {
@@ -115,14 +115,14 @@ _kcl_reservation_object_trylock(struct reservation_object *obj)
 static inline bool __must_check
 kcl_reservation_object_trylock(struct reservation_object *obj)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 	return _kcl_reservation_object_trylock(obj);
 #else
 	return reservation_object_trylock(obj);
 #endif
 }
 
-#ifdef OS_NAME_RHEL_6
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 bool _kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					       bool test_all);
 #endif
@@ -131,14 +131,14 @@ static inline bool
 kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					 bool test_all)
 {
-#ifdef OS_NAME_RHEL_6
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 	return _kcl_reservation_object_test_signaled_rcu(obj, test_all);
 #else
 	return reservation_object_test_signaled_rcu(obj, test_all);
 #endif
 }
 
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 extern void _kcl_reservation_object_add_shared_fence(
 						struct reservation_object *obj,
 						struct dma_fence *fence);
@@ -148,7 +148,7 @@ static inline void
 kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					struct dma_fence *fence)
 {
-#if defined(BUILD_AS_DKMS) && (DRM_VERSION_CODE < DRM_VERSION(3, 17, 0))
+#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 	return _kcl_reservation_object_add_shared_fence(obj, fence);
 #else
 	return reservation_object_add_shared_fence(obj, fence);

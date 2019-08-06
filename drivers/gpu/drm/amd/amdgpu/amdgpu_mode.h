@@ -314,7 +314,7 @@ struct amdgpu_framebuffer {
 static inline struct drm_gem_object *
 kcl_drm_fb_get_gem_obj(const struct drm_framebuffer * fb,int index)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_PRIVATE_OBJS_IN_STRUCTURE_DRM_FRAMEBUFFER)
 	if(fb)
 		return fb->obj[index];
 	else
@@ -370,7 +370,7 @@ struct amdgpu_mode_info {
 	struct drm_property *audio_property;
 	/* FMT dithering */
 	struct drm_property *dither_property;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
 	/* maximum number of bits per channel for monitor color */
 	struct drm_property *max_bpc_property;
 #endif
@@ -380,7 +380,7 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR)
 	/* Support for upstream vrr_capable connector property */
 	struct drm_property *vrr_capable_property;
 	/* Support for upstream vrr_enabled CRTC property */
@@ -482,7 +482,7 @@ struct amdgpu_crtc {
 	enum amdgpu_interrupt_state vsync_timer_enabled;
 
 	int otg_inst;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_PAGEFLIP_FLAGS_IN_STRUCTURE_DRM_CRTC_STATE)
 	uint32_t flip_flags;
 #endif
 	struct drm_pending_vblank_event *event;

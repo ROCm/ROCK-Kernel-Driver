@@ -498,7 +498,7 @@ void amdkcl_drm_init(void)
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv)
 {
 	return fpriv->is_master && fpriv->master == fpriv->minor->master;
@@ -506,15 +506,7 @@ bool drm_is_current_master(struct drm_file *fpriv)
 EXPORT_SYMBOL(drm_is_current_master);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-void __drm_printfn_info(struct drm_printer *p, struct va_format *vaf)
-{
-	dev_printk(KERN_INFO, p->arg, "[" DRM_NAME "] %pV", vaf);
-}
-EXPORT_SYMBOL(__drm_printfn_info);
-#endif
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_PRINTF)
 void drm_printf(struct drm_printer *p, const char *f, ...)
 {
 	struct va_format vaf;
@@ -529,147 +521,15 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 EXPORT_SYMBOL(drm_printf);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-static void drm_atomic_crtc_print_state(struct drm_printer *p,
-		const struct drm_crtc_state *state)
-{
-	struct drm_crtc *crtc = state->crtc;
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
-	drm_printf(p, "crtc[%u]: %s\n", crtc->base.id, crtc->name);
-#else
-	drm_printf(p, "crtc[%u]:\n", crtc->base.id);
-#endif
-	drm_printf(p, "\tenable=%d\n", state->enable);
-	drm_printf(p, "\tactive=%d\n", state->active);
-	drm_printf(p, "\tplanes_changed=%d\n", state->planes_changed);
-	drm_printf(p, "\tmode_changed=%d\n", state->mode_changed);
-	drm_printf(p, "\tactive_changed=%d\n", state->active_changed);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
-	drm_printf(p, "\tconnectors_changed=%d\n", state->connectors_changed);
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-	drm_printf(p, "\tcolor_mgmt_changed=%d\n", state->color_mgmt_changed);
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(3, 19, 0)
-	drm_printf(p, "\tplane_mask=%x\n", state->plane_mask);
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
-	drm_printf(p, "\tconnector_mask=%x\n", state->connector_mask);
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-	drm_printf(p, "\tencoder_mask=%x\n", state->encoder_mask);
-#endif
-	drm_printf(p, "\tmode: " DRM_MODE_FMT "\n", DRM_MODE_ARG(&state->mode));
-}
-
-static void drm_atomic_plane_print_state(struct drm_printer *p,
-		const struct drm_plane_state *state)
-{
-	struct drm_plane *plane = state->plane;
-	struct drm_rect src  = drm_plane_state_src(state);
-	struct drm_rect dest = drm_plane_state_dest(state);
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
-	drm_printf(p, "plane[%u]: %s\n", plane->base.id, plane->name);
-	drm_printf(p, "\tcrtc=%s\n", state->crtc ? state->crtc->name : "(null)");
-#else
-	drm_printf(p, "plane[%u]\n", plane->base.id);
-	drm_printf(p, "\tcrtc=%u\n", state->crtc ? state->crtc->base.id : 0);
-#endif
-	drm_printf(p, "\tfb=%u\n", state->fb ? state->fb->base.id : 0);
-	if (state->fb) {
-		struct drm_framebuffer *fb = state->fb;
-		int i, n = drm_format_num_planes(fb->pixel_format);
-		struct drm_format_name_buf format_name;
-
-		drm_printf(p, "\t\tformat=%s\n",
-				kcl_drm_get_format_name(fb->pixel_format, &format_name));
-		drm_printf(p, "\t\t\tmodifier=0x%llx\n", fb->modifier);
-		drm_printf(p, "\t\tsize=%dx%d\n", fb->width, fb->height);
-		drm_printf(p, "\t\tlayers:\n");
-		for (i = 0; i < n; i++) {
-			drm_printf(p, "\t\t\tpitch[%d]=%u\n", i, fb->pitches[i]);
-			drm_printf(p, "\t\t\toffset[%d]=%u\n", i, fb->offsets[i]);
-		}
-	}
-	drm_printf(p, "\tcrtc-pos=" DRM_RECT_FMT "\n", DRM_RECT_ARG(&dest));
-	drm_printf(p, "\tsrc-pos=" DRM_RECT_FP_FMT "\n", DRM_RECT_FP_ARG(&src));
-	drm_printf(p, "\trotation=%x\n", state->rotation);
-}
-
-static void drm_atomic_connector_print_state(struct drm_printer *p,
-		const struct drm_connector_state *state)
-{
-	struct drm_connector *connector = state->connector;
-
-	drm_printf(p, "connector[%u]: %s\n", connector->base.id, connector->name);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
-	drm_printf(p, "\tcrtc=%s\n", state->crtc ? state->crtc->name : "(null)");
-#else
-	drm_printf(p, "\tcrtc=%d\n", state->crtc ? state->crtc->base.id : 0);
-#endif
-}
-
-static void drm_atomic_print_state(const struct drm_atomic_state *state)
-{
-	struct drm_printer p = drm_info_printer(state->dev->dev);
-	struct drm_plane *plane;
-	struct drm_plane_state *plane_state;
-	struct drm_crtc *crtc;
-	struct drm_crtc_state *crtc_state;
-	struct drm_connector *connector;
-	struct drm_connector_state *connector_state;
-	int i;
-
-	DRM_DEBUG_ATOMIC("checking %p\n", state);
-
-	for_each_plane_in_state(state, plane, plane_state, i)
-		drm_atomic_plane_print_state(&p, plane_state);
-
-	for_each_crtc_in_state(state, crtc, crtc_state, i)
-		drm_atomic_crtc_print_state(&p, crtc_state);
-
-	for_each_connector_in_state(state, connector, connector_state, i)
-		drm_atomic_connector_print_state(&p, connector_state);
-}
-
-void drm_state_dump(struct drm_device *dev, struct drm_printer *p)
-{
-	struct drm_mode_config *config = &dev->mode_config;
-	struct drm_plane *plane;
-	struct drm_crtc *crtc;
-	struct drm_connector *connector;
-
-	if (!drm_core_check_feature(dev, DRIVER_ATOMIC))
-		return;
-
-	list_for_each_entry(plane, &config->plane_list, head)
-		drm_atomic_plane_print_state(p, plane->state);
-
-	list_for_each_entry(crtc, &config->crtc_list, head)
-		drm_atomic_crtc_print_state(p, crtc->state);
-
-	list_for_each_entry(connector, &config->connector_list, head)
-		drm_atomic_connector_print_state(p, connector->state);
-}
-EXPORT_SYMBOL(drm_state_dump);
-#endif
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 	pr_debug("%s %pV", p->prefix, vaf);
-#else
-	pr_debug("%s %pV", p->arg, vaf);
-#endif
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void)
 {
 	struct resource *tmp;
@@ -684,7 +544,7 @@ u64 drm_get_max_iomem(void)
 EXPORT_SYMBOL(drm_get_max_iomem);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
+#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 {
 	assert_spin_locked(&dev->event_lock);
@@ -699,19 +559,9 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 	wake_up_interruptible(&e->file_priv->event_wait);
 }
 EXPORT_SYMBOL(drm_send_event_locked);
-
-void drm_send_event(struct drm_device *dev, struct drm_pending_event *e)
-{
-	unsigned long irqflags;
-
-	spin_lock_irqsave(&dev->event_lock, irqflags);
-	drm_send_event_locked(dev, e);
-	spin_unlock_irqrestore(&dev->event_lock, irqflags);
-}
-EXPORT_SYMBOL(drm_send_event);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)

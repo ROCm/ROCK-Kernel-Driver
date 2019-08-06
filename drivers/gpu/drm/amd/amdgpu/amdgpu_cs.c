@@ -39,7 +39,7 @@
 #include "amdgpu_gem.h"
 #include "amdgpu_display.h"
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 #define kvfree drm_free_large
 #endif
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
@@ -653,13 +653,12 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				/* We acquired a page array, but somebody
 				 * invalidated it. Free it and try again
 				 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages, false);
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 				drm_free_large(e->user_pages);
 #else
 				kvfree(e->user_pages);
@@ -693,7 +692,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->tv.bo->ttm;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_CALLOC_LARGE)
 			e->user_pages = drm_calloc_large(ttm->num_pages,
 							 sizeof(struct page*));
 #else
@@ -710,7 +709,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 				drm_free_large(e->user_pages);
 #else
 				kvfree(e->user_pages);
@@ -792,13 +791,13 @@ error_free_pages:
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
 		if (!e->user_pages)
 			continue;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+
+#if !defined(HAVE_2ARGS_MM_RELEASE_PAGES)
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages, false);
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 		drm_free_large(e->user_pages);
 #else
 		kvfree(e->user_pages);
@@ -861,7 +860,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		amdgpu_bo_list_put(parser->bo_list);
 
 	for (i = 0; i < parser->nchunks; i++)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if defined(HAVE_DRM_FREE_LARGE)
 		drm_free_large(parser->chunks[i].kdata);
 #else
 		kvfree(parser->chunks[i].kdata);
@@ -1135,29 +1134,27 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 			return r;
 		}
 
-		fence = amdgpu_ctx_get_fence(ctx, entity,
-					     deps[i].handle);
+		fence = amdgpu_ctx_get_fence(ctx, entity, deps[i].handle);
+		amdgpu_ctx_put(ctx);
+
+		if (IS_ERR(fence))
+			return PTR_ERR(fence);
+		else if (!fence)
+			continue;
 
 		if (chunk->chunk_id == AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES) {
-			struct drm_sched_fence *s_fence = to_drm_sched_fence(fence);
+			struct drm_sched_fence *s_fence;
 			struct dma_fence *old = fence;
 
+			s_fence = to_drm_sched_fence(fence);
 			fence = dma_fence_get(&s_fence->scheduled);
 			dma_fence_put(old);
 		}
 
-		if (IS_ERR(fence)) {
-			r = PTR_ERR(fence);
-			amdgpu_ctx_put(ctx);
+		r = amdgpu_sync_fence(p->adev, &p->job->sync, fence, true);
+		dma_fence_put(fence);
+		if (r)
 			return r;
-		} else if (fence) {
-			r = amdgpu_sync_fence(p->adev, &p->job->sync, fence,
-					true);
-			dma_fence_put(fence);
-			amdgpu_ctx_put(ctx);
-			if (r)
-				return r;
-		}
 	}
 	return 0;
 }

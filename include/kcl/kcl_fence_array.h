@@ -22,7 +22,7 @@
 #ifndef __LINUX_FENCE_ARRAY_H
 #define __LINUX_FENCE_ARRAY_H
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE) && !defined(HAVE_FENCE_ARRAY_H)
 #include <linux/fence.h>
 
 /**

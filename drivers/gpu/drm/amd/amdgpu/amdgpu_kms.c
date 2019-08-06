@@ -194,7 +194,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	    amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
 	     amdgpu_has_atpx_dgpu_power_cntl()) &&
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+#if !defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	    ((flags & AMD_IS_APU) == 0))
 #else
 	    ((flags & AMD_IS_APU) == 0) &&
@@ -225,7 +225,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	}
 
 	if (amdgpu_device_is_px(dev)) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) || defined(OS_NAME_RHEL_7_6)
+#if defined(HAVE_DEV_PM_SET_DRIVER_FLAGS)
 		dev_pm_set_driver_flags(dev->dev, DPM_FLAG_NEVER_SKIP);
 #endif
 		pm_runtime_use_autosuspend(dev->dev);
@@ -1315,9 +1315,9 @@ int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 	}
 
 	/* Helper routine in DRM core does all the work: */
-	return kcl_drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						     vblank_time, flags,
-						     crtc, &crtc->hwmode);
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
+						vblank_time, flags,
+						&crtc->hwmode);
 }
 #endif
 

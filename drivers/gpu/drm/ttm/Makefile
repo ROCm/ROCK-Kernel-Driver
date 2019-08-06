@@ -23,7 +23,7 @@ include $(TTM_FULL_PATH)/backport/Makefile
 CFLAGS_ttm_tracepoints.o := -I$(src)
 #endif
 
-ifndef BUILD_AS_DKMS
+ifeq (,$(BUILD_AS_DKMS))
 FOR_MODULE := $(TTM_NAME)
 include $(TTM_FULL_PATH)/../amd/dkms/Makefile.intree
 endif

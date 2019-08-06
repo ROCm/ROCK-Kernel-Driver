@@ -399,15 +399,19 @@ static bool is_occupied_sdma(struct mqd_manager *mm, void *mqd,
 
 static int debugfs_show_mqd(struct seq_file *m, void *data)
 {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct v10_compute_mqd), false);
+#endif
 	return 0;
 }
 
 static int debugfs_show_mqd_sdma(struct seq_file *m, void *data)
 {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct v10_sdma_mqd), false);
+#endif
 	return 0;
 }
 
@@ -429,7 +433,6 @@ struct mqd_manager *mqd_manager_init_v10(enum KFD_MQD_TYPE type,
 
 	switch (type) {
 	case KFD_MQD_TYPE_CP:
-		pr_debug("%s@%i\n", __func__, __LINE__);
 	case KFD_MQD_TYPE_COMPUTE:
 		pr_debug("%s@%i\n", __func__, __LINE__);
 		mqd->allocate_mqd = allocate_mqd;
