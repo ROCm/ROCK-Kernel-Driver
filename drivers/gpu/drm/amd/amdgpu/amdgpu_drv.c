@@ -1472,7 +1472,7 @@ static struct drm_driver kms_driver = {
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
 	.set_busid = drm_pci_set_busid,
 #endif
 	.unload = amdgpu_driver_unload_kms,
