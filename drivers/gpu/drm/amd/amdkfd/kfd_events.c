@@ -23,6 +23,7 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/sched/mm.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/mm.h>
 #include <linux/uaccess.h>

@@ -24,7 +24,6 @@
 #include <linux/pagemap.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/task.h>
-
 #include "amdgpu_object.h"
 #include "amdgpu_vm.h"
 #include "amdgpu_amdkfd.h"
