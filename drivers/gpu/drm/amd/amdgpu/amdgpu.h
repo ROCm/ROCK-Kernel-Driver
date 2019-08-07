@@ -1279,8 +1279,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon);
 u32 amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe);
 int amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int pipe);
 void amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int pipe);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 				     int *max_error,
 				     struct timeval *vblank_time,
