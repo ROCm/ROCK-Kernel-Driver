@@ -2,7 +2,7 @@
 #define AMDKCL_MM_H
 
 #include <linux/mm.h>
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #else
 #include <linux/sched.h>

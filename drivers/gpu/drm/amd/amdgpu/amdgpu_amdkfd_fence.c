@@ -25,7 +25,7 @@
 #include <linux/stacktrace.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#if LINUX_VERSION_CODE	> KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #else
 #include <linux/mm_types.h>

@@ -129,6 +129,7 @@ m4_include([m4/pm-genpd-remove-device.m4])
 m4_include([m4/si-mem-available.m4])
 m4_include([m4/mmgrab.m4])
 m4_include([m4/set-busid.m4])
+m4_include([m4/mm-h.m4])
 m4_include([m4/config.m4])
 
 

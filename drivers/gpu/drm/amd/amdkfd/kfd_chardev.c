@@ -26,7 +26,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #include <linux/slab.h>

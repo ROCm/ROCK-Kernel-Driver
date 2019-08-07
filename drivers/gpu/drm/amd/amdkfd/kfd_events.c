@@ -23,8 +23,10 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <linux/sched/signal.h>
 #endif
 #include <linux/uaccess.h>

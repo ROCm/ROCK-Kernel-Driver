@@ -27,7 +27,7 @@
 #include <linux/rwsem.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #include "kfd_priv.h"
