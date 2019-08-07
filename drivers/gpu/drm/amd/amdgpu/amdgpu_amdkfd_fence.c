@@ -25,7 +25,7 @@
 #include <linux/stacktrace.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#if defined(HAVE_SCHED_MM_H)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #else
 #include <linux/mm_types.h>

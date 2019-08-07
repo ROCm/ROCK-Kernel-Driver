@@ -23,7 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/log2.h>
 #include <linux/sched.h>
-#if defined(HAVE_SCHED_MM_H)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)

@@ -1,7 +1,7 @@
 #ifndef AMDKCL_MM_H
 #define AMDKCL_MM_H
 
-#if defined(HAVE_SCHED_MM_H)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #else
 #include <linux/sched.h>

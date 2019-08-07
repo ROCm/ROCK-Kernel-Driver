@@ -27,7 +27,7 @@
 
 #include <linux/list.h>
 #include <linux/pagemap.h>
-#if defined(HAVE_SCHED_MM_H)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #include <linux/dma-buf.h>

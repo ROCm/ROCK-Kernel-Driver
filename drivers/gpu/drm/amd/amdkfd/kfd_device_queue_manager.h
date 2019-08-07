@@ -27,7 +27,7 @@
 #include <linux/rwsem.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
-#if defined(HAVE_SCHED_MM_H)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #include "kfd_priv.h"
