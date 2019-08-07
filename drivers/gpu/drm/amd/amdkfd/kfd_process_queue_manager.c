@@ -318,6 +318,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 
 	if (q) {
 		pr_debug("PQM done creating queue\n");
+		q->properties.is_new = true;
 		print_queue_properties(&q->properties);
 	}
 
