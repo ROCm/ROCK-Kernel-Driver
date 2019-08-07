@@ -182,7 +182,7 @@ err_fences_put:
 	return -ENOMEM;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 /**
  * amdgpu_dma_buf_map_attach - &dma_buf_ops.attach implementation
  * @dma_buf: Shared DMA buffer
@@ -280,7 +280,7 @@ error:
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0) && defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0)
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -341,7 +341,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 	return bo->tbo.resv;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 /**
  * amdgpu_dma_buf_begin_cpu_access - &dma_buf_ops.begin_cpu_access implementation
  * @dma_buf: Shared DMA buffer
@@ -469,7 +469,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
 #endif
 		bo->prime_shared_count = 1;

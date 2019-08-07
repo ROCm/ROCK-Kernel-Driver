@@ -326,7 +326,7 @@ struct amdgpu_clock {
 	uint32_t max_pixel_clock;
 };
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 #endif
 
@@ -1223,7 +1223,7 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev);
 
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
-#if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif
 void amdgpu_device_program_register_sequence(struct amdgpu_device *adev,
