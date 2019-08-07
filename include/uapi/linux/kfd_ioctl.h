@@ -191,6 +191,7 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define	KFD_DBG_EV_STATUS_TRAP		1
 #define	KFD_DBG_EV_STATUS_VMFAULT	2
 #define	KFD_DBG_EV_STATUS_SUSPENDED	4
+#define KFD_DBG_EV_STATUS_NEW_QUEUE	8
 #define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1
 
 #define KFD_INVALID_QUEUEID	0xffffffff

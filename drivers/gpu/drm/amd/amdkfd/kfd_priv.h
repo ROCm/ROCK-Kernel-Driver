@@ -492,6 +492,7 @@ struct queue_properties {
 	bool is_evicted;
 	bool is_suspended;
 	bool is_active;
+	bool is_new;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
