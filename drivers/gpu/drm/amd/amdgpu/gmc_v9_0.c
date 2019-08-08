@@ -43,6 +43,7 @@
 
 #include "gfxhub_v1_0.h"
 #include "mmhub_v1_0.h"
+#include "athub_v1_0.h"
 #include "gfxhub_v1_1.h"
 #include "mmhub_v9_4.h"
 
@@ -1377,7 +1378,11 @@ static int gmc_v9_0_set_clockgating_state(void *handle,
 	if (adev->asic_type == CHIP_ARCTURUS)
 		return 0;
 
-	return mmhub_v1_0_set_clockgating(adev, state);
+	mmhub_v1_0_set_clockgating(adev, state);
+
+	athub_v1_0_set_clockgating(adev, state);
+
+	return 0;
 }
 
 static void gmc_v9_0_get_clockgating_state(void *handle, u32 *flags)
@@ -1388,6 +1393,8 @@ static void gmc_v9_0_get_clockgating_state(void *handle, u32 *flags)
 		return;
 
 	mmhub_v1_0_get_clockgating(adev, flags);
+
+	athub_v1_0_get_clockgating(adev, flags);
 }
 
 static int gmc_v9_0_set_powergating_state(void *handle,
