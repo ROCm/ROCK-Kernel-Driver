@@ -347,7 +347,7 @@ struct dm_crtc_state {
 	int crc_skip_count;
 	enum amdgpu_dm_pipe_crc_source crc_src;
 
-#if !defined(HAVE_VRR_ENABLED_IN_STRUCT_DM_CRTC_STATE)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	bool base_vrr_enabled;
 #endif
 
@@ -382,7 +382,7 @@ struct dm_connector_state {
 	enum amdgpu_rmx_type scaling;
 	uint8_t underscan_vborder;
 	uint8_t underscan_hborder;
-#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	uint8_t max_bpc;
 #endif
 	bool underscan_enable;

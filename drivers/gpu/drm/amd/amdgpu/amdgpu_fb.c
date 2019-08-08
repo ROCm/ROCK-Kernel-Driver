@@ -263,7 +263,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 
 	strcpy(info->fix.id, "amdgpudrmfb");
 
-#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
 #else
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
@@ -298,7 +298,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb mappable at 0x%lX\n",  info->fix.smem_start);
 	DRM_INFO("vram apper at 0x%lX\n",  (unsigned long)adev->gmc.aper_base);
 	DRM_INFO("size %lu\n", (unsigned long)amdgpu_bo_size(abo));
-#if !defined(HAVE_FORMAT_IN_STRUCT_DRM_FRAMEBUFFER)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 	DRM_INFO("fb depth is %d\n", fb->depth);
 #else
 	DRM_INFO("fb depth is %d\n", fb->format->depth);
