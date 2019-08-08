@@ -26,7 +26,7 @@
 #if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_TASK_H)
 #include <linux/sched/task.h>
 #endif
 #include <linux/slab.h>
