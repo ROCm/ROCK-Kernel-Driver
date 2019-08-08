@@ -17,14 +17,14 @@ dnl #
 AC_DEFUN([AC_MODULE_SYMVERS], [
 	modpost=$LINUX/scripts/Makefile.modpost
 	AC_MSG_CHECKING([kernel file name for module symbols])
-	AS_IF([test "x$enable_linux_builtin" != xyes -a -f "$modpost"], [
+	AS_IF([test -f "$modpost"], [
 		AS_IF([grep -q Modules.symvers $modpost], [
 			LINUX_SYMBOLS=Modules.symvers
 		], [
 			LINUX_SYMBOLS=Module.symvers
 		])
 
-		AS_IF([test ! -f "$LINUX_OBJ/$LINUX_SYMBOLS"], [
+		AS_IF([test "x$enable_linux_builtin" != xyes -a ! -f "$LINUX_OBJ/$LINUX_SYMBOLS"], [
 			AC_MSG_ERROR([
 	*** Please make sure the kernel devel package for your distribution
 	*** is installed.  If you are building with a custom kernel, make sure the
@@ -273,9 +273,7 @@ AC_DEFUN([AC_KERNEL_TRY_COMPILE_SYMBOL], [
 	if test $rc -ne 0; then :
 		$6
 	else
-		if test "x$enable_linux_builtin" != xyes; then
-			AC_KERNEL_CHECK_SYMBOL_EXPORT([$3], [$4], [rc=0], [rc=1])
-		fi
+		AC_KERNEL_CHECK_SYMBOL_EXPORT([$3], [$4], [rc=0], [rc=1])
 		if test $rc -ne 0; then :
 			$6
 		else :
