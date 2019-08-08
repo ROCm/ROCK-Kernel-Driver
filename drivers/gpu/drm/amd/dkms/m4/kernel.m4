@@ -241,7 +241,7 @@ AC_DEFUN([AC_KERNEL_CHECK_SYMBOL_EXPORT], [
 					split(s, symbols, " ")
 				} {
 					for (i in symbols) {
-						s="EXPORT_SYMBOL.*"symbols[[i]];
+						s="EXPORT_SYMBOL.*\\("symbols[[i]]"\\);"
 						if ($[0] ~ s)
 							n++
 					}
