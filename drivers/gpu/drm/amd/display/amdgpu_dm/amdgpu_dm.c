@@ -8240,6 +8240,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			goto fail;
 		}
 	} else {
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		/*
 		 * The commit is a fast update. Fast updates shouldn't change
 		 * the DC context, affect global validation, and can have their
@@ -8262,6 +8263,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			if (old_dm_state->context)
 				dc_retain_state(old_dm_state->context);
 		}
+#endif
 	}
 
 	/* Store the overall update type for use later in atomic check. */
