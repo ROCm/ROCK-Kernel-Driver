@@ -190,6 +190,7 @@ m4_include([m4/drm-util-h.m4])
 m4_include([m4/drm_mode_is_420_xxx.m4])
 m4_include([m4/in-compat-syscall.m4])
 m4_include([m4/drm-error.m4])
+m4_include([m4/signal-h.m4])
 m4_include([m4/config.m4])
 
 
