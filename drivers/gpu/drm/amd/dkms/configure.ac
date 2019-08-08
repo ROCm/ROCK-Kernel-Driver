@@ -112,6 +112,7 @@ m4_include([m4/pci-is-thunderbolt-attached.m4])
 m4_include([m4/pci-pcie-type.m4])
 m4_include([m4/drm-auth-h.m4])
 m4_include([m4/drm-print-h.m4])
+m4_include([m4/task-h.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

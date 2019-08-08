@@ -6,4 +6,5 @@ linux/sched/mm.h kcl/kcl_sched_mm_h.h
 linux/pfn_t.h kcl/kcl_mm_types.h
 drm/drm_auth.h kcl/kcl_drm_auth_h.h
 drm/drm_print.h kcl/kcl_drm_print_h.h
+linux/sched/task.h kcl/kcl_sched_task_h.h
 
