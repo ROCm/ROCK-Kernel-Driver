@@ -121,6 +121,7 @@ m4_include([m4/linux-bits-h.m4])
 m4_include([m4/set-memory-h.m4])
 m4_include([m4/drm-util-h.m4])
 m4_include([m4/asm-fpu-api-h.m4])
+m4_include([m4/signal-h.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

@@ -14,4 +14,5 @@ linux/kfifo.h kcl/kcl_kfifo_h.h
 linux/bits.h kcl/kcl_bits_h.h
 asm/set_memory.h kcl/kcl_set_memory_h.h
 drm/drm_util.h kcl/kcl_drm_util_h.h
+linux/sched/signal.h kcl/kcl_sched_signal_h.h
 
