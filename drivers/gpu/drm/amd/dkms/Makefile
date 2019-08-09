@@ -192,6 +192,7 @@ export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
 export CONFIG_DRM_AMD_DC_DCN1_01=y
 export CONFIG_DRM_AMD_DC_DCN2_0=y
+export CONFIG_DRM_AMD_DC_DCN2_1=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DBUILD_AS_DKMS
@@ -202,5 +203,6 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
