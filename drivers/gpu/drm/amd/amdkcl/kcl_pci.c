@@ -1,10 +1,29 @@
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 #include "kcl_common.h"
-#endif
 
 #if defined(BUILD_AS_DKMS)
+
+const unsigned char *_kcl_pcie_link_speed;
+
+const unsigned char _kcl_pcie_link_speed_stub[] = {
+	PCI_SPEED_UNKNOWN,              /* 0 */
+	PCIE_SPEED_2_5GT,               /* 1 */
+	PCIE_SPEED_5_0GT,               /* 2 */
+	PCIE_SPEED_8_0GT,               /* 3 */
+	PCI_SPEED_UNKNOWN,              /* 4 */
+	PCI_SPEED_UNKNOWN,              /* 5 */
+	PCI_SPEED_UNKNOWN,              /* 6 */
+	PCI_SPEED_UNKNOWN,              /* 7 */
+	PCI_SPEED_UNKNOWN,              /* 8 */
+	PCI_SPEED_UNKNOWN,              /* 9 */
+	PCI_SPEED_UNKNOWN,              /* A */
+	PCI_SPEED_UNKNOWN,              /* B */
+	PCI_SPEED_UNKNOWN,              /* C */
+	PCI_SPEED_UNKNOWN,              /* D */
+	PCI_SPEED_UNKNOWN,              /* E */
+	PCI_SPEED_UNKNOWN               /* F */
+};
 
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 /**
@@ -169,6 +188,7 @@ void amdkcl_pci_init(void)
 	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap", pcie_get_speed_cap);
 	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
 #endif
+	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed", _kcl_pcie_link_speed_stub);
 }
 
 /**
@@ -205,7 +225,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 	while (dev) {
 		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
 
-		next_speed = kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
+		next_speed = _kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
 		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
 		PCI_EXP_LNKSTA_NLW_SHIFT;
 
