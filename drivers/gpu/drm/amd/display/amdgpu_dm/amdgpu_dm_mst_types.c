@@ -110,6 +110,7 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	kfree(amdgpu_dm_connector);
 }
 
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
 static int
 amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 {
@@ -128,7 +129,9 @@ amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 
 	return r;
 }
+#endif /* HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER */
 
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
 static void
 amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 {
@@ -138,6 +141,7 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 
 	drm_dp_mst_connector_early_unregister(connector, port);
 }
+#endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -147,8 +151,12 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property,
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
 	.late_register = amdgpu_dm_mst_connector_late_register,
+#endif /* HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER */
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
 	.early_unregister = amdgpu_dm_mst_connector_early_unregister,
+#endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
