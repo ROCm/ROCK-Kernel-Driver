@@ -153,6 +153,7 @@ m4_include([m4/hash-for-each-possible.m4])
 m4_include([m4/hash-for-each-possible-rcu.m4])
 m4_include([m4/hash-for-each-rcu.m4])
 m4_include([m4/hash-for-each-safe.m4])
+m4_include([m4/amd-iommu-pc-supported.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
