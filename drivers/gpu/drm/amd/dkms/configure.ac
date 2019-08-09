@@ -122,6 +122,7 @@ m4_include([m4/uapi-linux-sched-types-h.m4])
 m4_include([m4/linux-nospec-h.m4])
 m4_include([m4/drm-driver-gem-free-object-unlocked.m4])
 m4_include([m4/drm-mm-insert-mode.m4])
+m4_include([m4/drm-dp-mst-connector-late-register.m4])
 m4_include([m4/config.m4])
 
 
