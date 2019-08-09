@@ -159,12 +159,14 @@ struct kfd_iolink_properties {
 	struct attribute	attr;
 };
 
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 struct kfd_perf_properties {
 	struct list_head	list;
 	char			block_name[16];
 	uint32_t		max_concurrent;
 	struct attribute_group	*attr_group;
 };
+#endif
 
 struct kfd_topology_device {
 	struct list_head		list;
@@ -176,13 +178,17 @@ struct kfd_topology_device {
 	struct list_head		cache_props;
 	uint32_t			io_link_count;
 	struct list_head		io_link_props;
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct list_head		perf_props;
+#endif
 	struct kfd_dev			*gpu;
 	struct kobject			*kobj_node;
 	struct kobject			*kobj_mem;
 	struct kobject			*kobj_cache;
 	struct kobject			*kobj_iolink;
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct kobject			*kobj_perf;
+#endif
 	struct attribute		attr_gpuid;
 	struct attribute		attr_name;
 	struct attribute		attr_props;
@@ -206,5 +212,11 @@ struct kfd_system_properties {
 struct kfd_topology_device *kfd_create_topology_device(
 		struct list_head *device_list);
 void kfd_release_topology_device_list(struct list_head *device_list);
+
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
+extern bool amd_iommu_pc_supported(void);
+extern u8 amd_iommu_pc_get_max_banks(u16 devid);
+extern u8 amd_iommu_pc_get_max_counters(u16 devid);
+#endif
 
 #endif /* __KFD_TOPOLOGY_H__ */
