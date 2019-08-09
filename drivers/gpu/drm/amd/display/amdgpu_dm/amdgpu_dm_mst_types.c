@@ -167,6 +167,7 @@ amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 }
 #endif
 
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
 static void
 amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 {
@@ -176,6 +177,7 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 
 	drm_dp_mst_connector_early_unregister(connector, port);
 }
+#endif
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 /* 
@@ -197,7 +199,9 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER)
 	.late_register = amdgpu_dm_mst_connector_late_register,
 #endif
+#if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
 	.early_unregister = amdgpu_dm_mst_connector_early_unregister,
+#endif
 };
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
