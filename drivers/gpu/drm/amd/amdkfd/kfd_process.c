@@ -153,8 +153,11 @@ void kfd_procfs_shutdown(void)
 int kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 		kfd_process_wq = create_workqueue("kfd_process_wq");
-
+#else
+		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
+#endif
 	if (!kfd_restore_wq)
 #ifdef HAVE_ALLOC_ORDERED_WORKQUEUE
 		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
