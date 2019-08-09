@@ -32,7 +32,6 @@
 #include "kfd_events.h"
 #include "kfd_iommu.h"
 #include <linux/device.h>
-#include <linux/ptrace.h>
 
 /*
  * Wrapper around wait_queue_entry_t
@@ -453,36 +452,6 @@ static void acknowledge_signal(struct kfd_process *p, struct kfd_event *ev)
 	page_slots(p->signal_page)[ev->event_id] = UNSIGNALED_EVENT_SLOT;
 }
 
-/* HACK: Temporary hack to enable signaling to debuggers running in a
- * separate process. Remove this when the real signaling mechanism is
- * implemented.
- */
-static void signal_event_to_debugger(struct kfd_process *p)
-{
-	struct kfd_process_device *pdd;
-	struct task_struct *tracer;
-
-	/* Check that a debugger is attached to the process */
-	rcu_read_lock();
-	tracer = ptrace_parent(p->lead_thread);
-	if (tracer)
-		get_task_struct(tracer);
-	rcu_read_unlock();
-	if (!tracer)
-		return;
-
-	/* Check that GPU debugging is enabled for at least one device
-	 * for this process
-	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		if (pdd->is_debugging_enabled) {
-			send_sig(SIGUSR2, tracer, 0);
-			break;
-		}
-
-	put_task_struct(tracer);
-}
-
 static void set_event_from_interrupt(struct kfd_process *p,
 					struct kfd_event *ev)
 {
@@ -495,7 +464,6 @@ static void set_event_from_interrupt(struct kfd_process *p,
 void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				uint32_t valid_id_bits)
 {
-	bool debug_events_signaled = false;
 	struct kfd_event *ev = NULL;
 
 	/*
@@ -515,7 +483,6 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 							 valid_id_bits);
 	if (ev) {
 		set_event_from_interrupt(p, ev);
-		debug_events_signaled |= (ev->type == KFD_EVENT_TYPE_DEBUG);
 	} else if (p->signal_page) {
 		/*
 		 * Partial ID lookup failed. Assume that the event ID
@@ -537,11 +504,8 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (id >= KFD_SIGNAL_EVENT_LIMIT)
 					break;
 
-				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
+				if (slots[id] != UNSIGNALED_EVENT_SLOT)
 					set_event_from_interrupt(p, ev);
-					debug_events_signaled |=
-					(ev->type == KFD_EVENT_TYPE_DEBUG);
-				}
 			}
 		} else {
 			/* With relatively many events, it's faster to
@@ -552,13 +516,9 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 				if (slots[id] != UNSIGNALED_EVENT_SLOT) {
 					ev = lookup_event_by_id(p, id);
 					set_event_from_interrupt(p, ev);
-					debug_events_signaled |=
-					(ev->type == KFD_EVENT_TYPE_DEBUG);
 				}
 		}
 	}
-	if (debug_events_signaled)
-		signal_event_to_debugger(p);
 
 	mutex_unlock(&p->event_mutex);
 	kfd_unref_process(p);
