@@ -125,6 +125,7 @@ m4_include([m4/drm-mm-insert-mode.m4])
 m4_include([m4/drm-dp-mst-connector-late-register.m4])
 m4_include([m4/drm-dp-mst-connector-early-unregister.m4])
 m4_include([m4/amd-iommu-pc-supported.m4])
+m4_include([m4/drm-dev-put.m4])
 m4_include([m4/config.m4])
 
 
