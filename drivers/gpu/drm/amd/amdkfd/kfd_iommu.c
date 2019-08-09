@@ -333,10 +333,17 @@ int kfd_iommu_resume(struct kfd_dev *kfd)
 	return 0;
 }
 
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
+extern bool amd_iommu_pc_supported(void);
+extern u8 amd_iommu_pc_get_max_banks(u16 devid);
+extern u8 amd_iommu_pc_get_max_counters(u16 devid);
+#endif
+
 /** kfd_iommu_add_perf_counters - Add IOMMU performance counters to topology
  */
 int kfd_iommu_add_perf_counters(struct kfd_topology_device *kdev)
 {
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct kfd_perf_properties *props;
 
 	if (!(kdev->node_props.capability & HSA_CAP_ATS_PRESENT))
@@ -352,7 +359,7 @@ int kfd_iommu_add_perf_counters(struct kfd_topology_device *kdev)
 	props->max_concurrent = amd_iommu_pc_get_max_banks(0) *
 		amd_iommu_pc_get_max_counters(0); /* assume one iommu */
 	list_add_tail(&props->list, &kdev->perf_props);
-
+#endif
 	return 0;
 }
 
