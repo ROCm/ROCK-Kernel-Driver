@@ -41,5 +41,27 @@ dnl #
 	], [
 		AC_MSG_RESULT(no)
 	])
+
+dnl #
+dnl # commit aad0eab4e8dd76d1ba5248f9278633829cbcec38
+dnl # drm/dp_mst: Enable registration of AUX devices for MST ports
+dnl #
+	AC_MSG_CHECKING([whether drm_dp_mst_connector_{early_unregister,late_register}() are available])
+	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drm_dp_mst_helper.h>
+	], [
+		drm_dp_mst_connector_early_unregister(NULL, NULL);
+		drm_dp_mst_connector_late_register(NULL, NULL);
+	], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DP_MST_CONNECTOR_EARLY_UNREGISTER, 1, [
+			drm_dp_mst_connector_early_unregister() is available
+		])
+		AC_DEFINE(HAVE_DP_MST_CONNECTOR_LATE_REGISTER, 1, [
+			drm_dp_mst_connector_late_register() is available
+		])
+	], [
+		AC_MSG_RESULT(no)
+	])
 ])
 
