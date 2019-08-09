@@ -5,7 +5,6 @@
 #if defined(BUILD_AS_DKMS)
 
 const unsigned char *_kcl_pcie_link_speed;
-EXPORT_SYMBOL(_kcl_pcie_link_speed);
 
 const unsigned char _kcl_pcie_link_speed_stub[] = {
 	PCI_SPEED_UNKNOWN,              /* 0 */
@@ -189,7 +188,7 @@ void amdkcl_pci_init(void)
 	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap", pcie_get_speed_cap);
 	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
 #endif
-	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed",_kcl_pcie_link_speed_stub);
+	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed", _kcl_pcie_link_speed);
 }
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
@@ -226,7 +225,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 	while (dev) {
 		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
 
-		next_speed = kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
+		next_speed = _kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
 		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
 		PCI_EXP_LNKSTA_NLW_SHIFT;
 
