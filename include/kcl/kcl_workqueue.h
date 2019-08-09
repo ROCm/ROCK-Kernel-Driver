@@ -4,7 +4,7 @@
 
 #include <linux/workqueue.h>
 
-#if defined(HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED) && !defined(HAVE_SYSTEM_HIGHPRI_WQ_DECLARED)
+#if !defined(HAVE_SYSTEM_HIGHPRI_WQ_DECLARED)
 /*
  * System-wide workqueues which are always present.
 *
