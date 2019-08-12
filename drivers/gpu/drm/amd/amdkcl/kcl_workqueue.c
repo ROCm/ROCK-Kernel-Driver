@@ -18,10 +18,10 @@ EXPORT_SYMBOL(system_highpri_wq);
 int amdkcl_workqueue_init_early(void)
 {
 #ifndef HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
-	system_highpri_wq = __create_workqueue("events_highpri", 0, 0, 1);
-#else
+#ifdef HAVE_WQ_HIGHPRI
 	system_highpri_wq = alloc_workqueue("events_highpri", WQ_HIGHPRI, 0);
+#else
+	system_highpri_wq = create_workqueue("events_highpri");
 #endif
 #endif
 	BUG_ON(!system_highpri_wq);
