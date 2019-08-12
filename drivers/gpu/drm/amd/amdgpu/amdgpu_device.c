@@ -64,6 +64,7 @@
 #include "amdgpu_xgmi.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_pmu.h"
+#include "amdgpu_tmz.h"
 
 #include <linux/suspend.h>
 
@@ -1071,6 +1072,8 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 	amdgpu_device_check_block_size(adev);
 
 	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
+
+	adev->tmz.enabled = amdgpu_is_tmz(adev);
 
 	return ret;
 }
