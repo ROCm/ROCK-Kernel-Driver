@@ -60,7 +60,7 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 		return r;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifdef create_rt_workqueue
 	kfd->ih_wq = create_rt_workqueue("KFD IH");
 #elif defined(HAVE_WQ_HIGHPRI)
 	kfd->ih_wq = alloc_workqueue("KFD IH", WQ_HIGHPRI, 1);
