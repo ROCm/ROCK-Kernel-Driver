@@ -61,7 +61,13 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 		return r;
 	}
 
+#ifdef create_rt_workqueue
+	kfd->ih_wq = create_rt_workqueue("KFD IH");
+#elif defined(HAVE_WQ_HIGHPRI)
 	kfd->ih_wq = alloc_workqueue("KFD IH", WQ_HIGHPRI, 1);
+#else
+	kfd->ih_wq = create_workqueue("KFD IH");
+#endif
 	if (unlikely(!kfd->ih_wq)) {
 		kfifo_free(&kfd->ih_fifo);
 		dev_err(kfd_chardev(), "Failed to allocate KFD IH workqueue\n");

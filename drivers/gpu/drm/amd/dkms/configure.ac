@@ -133,6 +133,7 @@ m4_include([m4/alloc-ordered-workqueue.m4])
 m4_include([m4/pm-genpd-remove-device.m4])
 m4_include([m4/si-mem-available.m4])
 m4_include([m4/drm-driver-gem-free-object-unlocked.m4])
+m4_include([m4/wq-highpri.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
