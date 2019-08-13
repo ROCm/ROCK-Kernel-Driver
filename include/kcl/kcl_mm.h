@@ -74,13 +74,13 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
 #endif
 
-#if defined(BUILD_AS_DKMS)
+#ifndef HAVE_MM_ACCESS
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
 
 static inline struct mm_struct * kcl_mm_access(struct task_struct *task, unsigned int mode)
 {
-#if defined(BUILD_AS_DKMS)
+#ifndef HAVE_MM_ACCESS
 	return _kcl_mm_access(task, mode);
 #else
 	return mm_access(task, mode);
