@@ -39,6 +39,10 @@
 
 #include "reg_helper.h"
 
+#undef FN
+#define FN(reg_name, field_name) \
+	aux110->shift->field_name, aux110->mask->field_name
+
 #define FROM_AUX_ENGINE(ptr) \
 	container_of((ptr), struct aux_engine_dce110, base)
 
@@ -411,11 +415,14 @@ void dce110_engine_destroy(struct dce_aux **engine)
 	*engine = NULL;
 
 }
+
 struct dce_aux *dce110_aux_engine_construct(struct aux_engine_dce110 *aux_engine110,
 		struct dc_context *ctx,
 		uint32_t inst,
 		uint32_t timeout_period,
-		const struct dce110_aux_registers *regs)
+		const struct dce110_aux_registers *regs,
+		const struct dce110_aux_registers_mask *mask,
+		const struct dce110_aux_registers_shift *shift)
 {
 	aux_engine110->base.ddc = NULL;
 	aux_engine110->base.ctx = ctx;
@@ -425,6 +432,8 @@ struct dce_aux *dce110_aux_engine_construct(struct aux_engine_dce110 *aux_engine
 	aux_engine110->timeout_period = timeout_period;
 	aux_engine110->regs = regs;
 
+	aux_engine110->mask = mask;
+	aux_engine110->shift = shift;
 	return &aux_engine110->base;
 }
 
