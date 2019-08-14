@@ -795,7 +795,11 @@ static bool amdgpu_vram_mgr_compatible(struct ttm_resource_manager *man,
  * Dump the table content using printk.
  */
 static void amdgpu_vram_mgr_debug(struct ttm_resource_manager *man,
+#if defined(HAVE_DRM_MM_PRINT)
 				  struct drm_printer *printer)
+#else
+				  const char *prefix)
+#endif
 {
 	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
 	struct drm_buddy *mm = &mgr->mm;
