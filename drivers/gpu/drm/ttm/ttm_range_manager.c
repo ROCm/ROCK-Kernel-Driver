@@ -165,12 +165,20 @@ int ttm_range_man_fini(struct ttm_device *bdev,
 EXPORT_SYMBOL(ttm_range_man_fini);
 
 static void ttm_range_man_debug(struct ttm_resource_manager *man,
-				struct drm_printer *printer)
+#if !defined(HAVE_DRM_MM_PRINT)
+			     const char *prefix)
+#else
+			     struct drm_printer *printer)
+#endif
 {
 	struct ttm_range_manager *rman = to_range_manager(man);
 
 	spin_lock(&rman->lock);
+#if !defined(HAVE_DRM_MM_PRINT)
+	drm_mm_debug_table(&rman->mm, prefix);
+#else
 	drm_mm_print(&rman->mm, printer);
+#endif
 	spin_unlock(&rman->lock);
 }
 
