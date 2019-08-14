@@ -2532,14 +2532,12 @@ int amdgpu_ttm_evict_resources(struct amdgpu_device *adev, int mem_type)
 }
 
 #if defined(CONFIG_DEBUG_FS)
-
 static int amdgpu_mm_vram_table_show(struct seq_file *m, void *unused)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_VRAM);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
