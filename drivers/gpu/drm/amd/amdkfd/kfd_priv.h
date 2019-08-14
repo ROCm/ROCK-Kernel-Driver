@@ -514,7 +514,6 @@ struct queue_properties {
 	/* Relevant for CU */
 	uint32_t cu_mask_count; /* Must be a multiple of 32 */
 	uint32_t *cu_mask;
-	unsigned int debug_event_type;
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
@@ -701,13 +700,6 @@ enum kfd_pdd_bound {
 	PDD_BOUND_SUSPENDED,
 };
 
-struct kfd_debug_process_device {
-	struct kfifo fifo;
-	wait_queue_head_t wait_queue;
-	int max_debug_events;
-};
-
-
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/*
@@ -721,9 +713,6 @@ struct kfd_process_device {
 
 	/* The process that owns this kfd_process_device. */
 	struct kfd_process *process;
-
-	/* per-process-per device debug event info */
-	struct kfd_debug_process_device dpd;
 
 	/* per-process-per device QCM data structure */
 	struct qcm_process_device qpd;

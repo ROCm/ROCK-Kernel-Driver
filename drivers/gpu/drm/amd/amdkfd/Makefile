@@ -59,8 +59,7 @@ AMDKFD_FILES	:= $(AMDKFD_PATH)/kfd_module.o \
 		$(AMDKFD_PATH)/kfd_rdma.o \
 		$(AMDKFD_PATH)/kfd_peerdirect.o \
 		$(AMDKFD_PATH)/kfd_ipc.o \
-		$(AMDKFD_PATH)/kfd_trace.o \
-		$(AMDKFD_PATH)/kfd_debug_events.o
+		$(AMDKFD_PATH)/kfd_trace.o
 
 ifneq ($(CONFIG_AMD_IOMMU_V2),)
 AMDKFD_FILES += $(AMDKFD_PATH)/kfd_iommu.o
