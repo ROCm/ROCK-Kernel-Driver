@@ -45,6 +45,8 @@ m4_include([m4/drm-dev-put.m4])
 m4_include([m4/get-scanout-position-in-struct-drm-driver.m4])
 m4_include([m4/get-vblank-timestamp-in-struct-drm-driver.m4])
 m4_include([m4/drm-calc-vbltimestamp-from-scanoutpos.m4])
+m4_include([m4/drm-mm-print.m4])
+m4_include([m4/drm-debug-printer.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

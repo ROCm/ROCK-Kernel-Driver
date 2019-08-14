@@ -336,16 +336,28 @@ int amdgpu_gtt_mgr_recover(struct ttm_mem_type_manager *man)
  * Dump the table content using printk.
  */
 static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
+#if defined(HAVE_DRM_MM_PRINT)
 				 struct drm_printer *printer)
+#else
+				 const char *prefix)
+#endif
 {
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
+#if defined(HAVE_DRM_MM_PRINT)
 	drm_mm_print(&mgr->mm, printer);
+#else
+	drm_mm_debug_table(&mgr->mm, prefix);
+#endif
 	spin_unlock(&mgr->lock);
 
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_MM_PRINT)
 	drm_printf(printer, "man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
+		   man->size, (u64)atomic64_read(&mgr->available),
+		   amdgpu_gtt_mgr_usage(man) >> 20);
+#else
+	DRM_DEBUG("man size:%llu pages, gtt available:%lld pages, usage:%lluMB\n",
 		   man->size, (u64)atomic64_read(&mgr->available),
 		   amdgpu_gtt_mgr_usage(man) >> 20);
 #endif
