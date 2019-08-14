@@ -8653,6 +8653,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
+	/* Perform validation of MST topology in the state*/
+	ret = drm_dp_mst_atomic_check(state);
+	if (ret)
+		goto fail;
+
+#if defined(HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE)
 	if (state->legacy_cursor_update) {
 		/*
 		 * This is a fast cursor update coming from the plane update
@@ -8672,6 +8678,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (state->async_update)
 			return 0;
 	}
+#endif
 
 	/* Check scaling and underscan changes*/
 	/* TODO Removed scaling changes validation due to inability to commit
