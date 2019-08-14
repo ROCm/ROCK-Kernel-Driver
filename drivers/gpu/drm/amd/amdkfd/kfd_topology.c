@@ -163,7 +163,7 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 		kfree(iolink);
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	while (dev->perf_props.next != &dev->perf_props) {
 		perf = container_of(dev->perf_props.next,
 				struct kfd_perf_properties, list);
@@ -206,7 +206,7 @@ struct kfd_topology_device *kfd_create_topology_device(
 	INIT_LIST_HEAD(&dev->mem_props);
 	INIT_LIST_HEAD(&dev->cache_props);
 	INIT_LIST_HEAD(&dev->io_link_props);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	INIT_LIST_HEAD(&dev->perf_props);
 #endif
 
@@ -626,7 +626,7 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 		dev->kobj_mem = NULL;
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	if (dev->kobj_perf) {
 		list_for_each_entry(perf, &dev->perf_props, list) {
 			kfree(perf->attr_group);
@@ -689,7 +689,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	if (!dev->kobj_iolink)
 		return -ENOMEM;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	dev->kobj_perf = kobject_create_and_add("perf", dev->kobj_node);
 	if (!dev->kobj_perf)
 		return -ENOMEM;
@@ -785,7 +785,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		i++;
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	/* All hardware blocks have the same number of attributes. */
 	num_attrs = ARRAY_SIZE(perf_attr_iommu);
 	list_for_each_entry(perf, &dev->perf_props, list) {
