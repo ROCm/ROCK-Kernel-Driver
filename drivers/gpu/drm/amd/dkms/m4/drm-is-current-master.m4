@@ -9,6 +9,7 @@ AC_DEFUN([AC_AMDGPU_DRM_IS_CURRENT_MASTER],
 		#include <linux/wait.h>
 		#include <linux/kref.h>
 		#include <linux/idr.h>
+		#include <drm/drmP.h>
 		#include <drm/drm_auth.h>
 	],[
 		drm_is_current_master(NULL);
