@@ -12,7 +12,7 @@
 #include <drm/drm_rect.h>
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
@@ -453,6 +453,9 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_info,
+#if !defined(HAVE_DRM_PRINTF)
+		.prefix = prefix
+#endif
 		.arg = dev,
 	};
 	return p;
@@ -461,7 +464,7 @@ static inline struct drm_printer drm_info_printer(struct device *dev)
 void drm_state_dump(struct drm_device *dev, struct drm_printer *p);
 #endif
 
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -469,6 +472,27 @@ struct drm_printer {
 };
 
 void drm_printf(struct drm_printer *p, const char *f, ...);
+#endif
+
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
+extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
+/**
+ * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
+ * @prefix: debug output prefix
+ *
+ * RETURNS:
+ * The &drm_printer object
+ */
+static inline struct drm_printer drm_debug_printer(const char *prefix)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_debug,
+#if !defined(HAVE_DRM_PRINTER)
+		.prefix = prefix
+#endif
+	};
+	return p;
+}
 #endif
 
 /* helper for handling conditionals in various for_each macros */
