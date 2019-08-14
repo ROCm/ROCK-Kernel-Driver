@@ -48,6 +48,10 @@
 #define TTM_MEMTYPE_FLAG_FIXED         (1 << 0)	/* Fixed (on-card) PCI memory */
 #define TTM_MEMTYPE_FLAG_MAPPABLE      (1 << 1)	/* Memory mappable */
 
+#ifndef HAVE_CONFIG_H
+#define HAVE_DRM_MM_PRINT	1
+#endif
+
 struct ttm_mem_type_manager;
 
 struct ttm_mem_type_manager_func {
@@ -130,8 +134,12 @@ struct ttm_mem_type_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
+#if defined(HAVE_DRM_MM_PRINT)
 	void (*debug)(struct ttm_mem_type_manager *man,
 		      struct drm_printer *printer);
+#else
+	void (*debug)(struct ttm_mem_type_manager *man, const char *prefix);
+#endif
 };
 
 /**
