@@ -2274,6 +2274,11 @@ static void gfx_v9_0_init_compute_vmid(struct amdgpu_device *adev)
 	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
 			TRAP_EN, 1);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
 }
 
 static void gfx_v9_0_init_gds_vmid(struct amdgpu_device *adev)
