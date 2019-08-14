@@ -5,13 +5,11 @@ dnl #
 AC_DEFUN([AC_AMDGPU_2ARGS_DRM_GEM_OBJECT_LOOKUP],
 	[AC_MSG_CHECKING([whether drm_gem_object_lookup() wants 2 args])
 	AC_KERNEL_TRY_COMPILE_SYMBOL([
+		#include <linux/kref.h>
+		#include <drm/drm_vma_manager.h>
 		#include <drm/drm_gem.h>
 	], [
-		struct drm_file *filp = NULL;
-		u32 handle = 0;
-		struct drm_gem_object *obj;
-
-		obj = drm_gem_object_lookup(filp, handle);
+		drm_gem_object_lookup(NULL, 0);
 	], [drm_gem_object_lookup], [drivers/gpu/drm/drm_gem.c], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_2ARGS_DRM_GEM_OBJECT_LOOKUP, 1, [drm_gem_object_lookup() wants 2 args])
