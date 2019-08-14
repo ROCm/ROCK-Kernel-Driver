@@ -753,7 +753,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 				adev->dm.freesync_module);
 
 #if (DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)) &&\
-	!(OS_NAME_RHEL_7_4)
+	!defined(OS_NAME_RHEL_7_4)
 	amdgpu_dm_init_color_mod();
 
 #endif
