@@ -8277,7 +8277,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Store the overall update type for use later in atomic check. */
+#if !defined(for_each_new_crtc_in_state)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+#else
 	for_each_new_crtc_in_state (state, crtc, new_crtc_state, i) {
+#endif
 		struct dm_crtc_state *dm_new_crtc_state =
 			to_dm_crtc_state(new_crtc_state);
 
