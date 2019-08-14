@@ -848,9 +848,6 @@ uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
-
 	data = 0;
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
@@ -867,28 +864,10 @@ uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd)
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
-
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 
-	return 0;
-}
-
-uint32_t kgd_gfx_v9_set_debug_trap_data(struct kgd_dev *kgd,
-					int trap_data0,
-					int trap_data1)
-{
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
-	mutex_lock(&adev->grbm_idx_mutex);
-
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), trap_data0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), trap_data1);
-
-	mutex_unlock(&adev->grbm_idx_mutex);
 	return 0;
 }
 
@@ -1040,7 +1019,6 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
 	.enable_debug_trap = kgd_gfx_v9_enable_debug_trap,
 	.disable_debug_trap = kgd_gfx_v9_disable_debug_trap,
-	.set_debug_trap_data = kgd_gfx_v9_set_debug_trap_data,
 	.set_wave_launch_trap_override = kgd_gfx_v9_set_wave_launch_trap_override,
 	.set_wave_launch_mode = kgd_gfx_v9_set_wave_launch_mode,
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,

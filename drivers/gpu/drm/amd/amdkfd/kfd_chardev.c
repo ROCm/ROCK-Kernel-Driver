@@ -2770,12 +2770,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		}
 		break;
 
-	case KFD_IOC_DBG_TRAP_SET_TRAP_DATA:
-		r = dev->kfd2kgd->set_debug_trap_data(dev->kgd,
-				data1,
-				data2);
-		break;
-
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
 		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
