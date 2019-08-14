@@ -548,7 +548,9 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
+#if !defined(HAVE_DRM_PRINTF)
 		.prefix = prefix
+#endif
 	};
 	return p;
 }
