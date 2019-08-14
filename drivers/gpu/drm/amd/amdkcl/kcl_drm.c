@@ -299,21 +299,6 @@ u64 drm_get_max_iomem(void)
 EXPORT_SYMBOL(drm_get_max_iomem);
 #endif
 
-#if !defined(HAVE_DRM_PRINTF)
-void drm_printf(struct drm_printer *p, const char *f, ...)
-{
-	struct va_format vaf;
-	va_list args;
-
-	va_start(args, f);
-	vaf.fmt = f;
-	vaf.va = &args;
-	p->printfn(p, &vaf);
-	va_end(args);
-}
-EXPORT_SYMBOL(drm_printf);
-#endif
-
 #if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 {
@@ -349,3 +334,31 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 }
 EXPORT_SYMBOL(drm_fb_helper_fill_info);
 #endif
+
+#if !defined(HAVE_DRM_PRINTER)
+void drm_printf(struct drm_printer *p, const char *f, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, f);
+	vaf.fmt = f;
+	vaf.va = &args;
+	p->printfn(p, &vaf);
+	va_end(args);
+}
+EXPORT_SYMBOL(drm_printf);
+#endif
+
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
+void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
+{
+#if !defined(HAVE_DRM_PRINTER)
+	pr_debug("%s %pV", p->prefix, vaf);
+#else
+	pr_debug("%s %pV", "no prefix < 4.11", vaf);
+#endif
+}
+EXPORT_SYMBOL(__drm_printfn_debug);
+#endif
+

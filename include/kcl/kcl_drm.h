@@ -3,7 +3,7 @@
 
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_modes.h>
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
@@ -204,7 +204,7 @@ __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -301,6 +301,28 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 static inline void drm_dev_put(struct drm_device *dev)
 {
 	return drm_dev_unref(dev);
+}
+#endif
+
+/**
+ * drm_debug_printer - construct a &drm_printer that outputs to pr_debug()
+ * @prefix: debug output prefix
+ *
+ * RETURNS:
+ * The &drm_printer object
+ */
+#if !defined(HAVE_DRM_DEBUG_PRINTER)
+extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
+
+static inline struct drm_printer drm_debug_printer(const char *prefix)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_debug,
+#if !defined(HAVE_DRM_PRINTER)
+		.prefix = prefix
+#endif
+	};
+	return p;
 }
 #endif
 

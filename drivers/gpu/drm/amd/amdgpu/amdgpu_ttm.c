@@ -2467,11 +2467,24 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 	unsigned ttm_pl = (uintptr_t)node->info_ent->data;
 	struct drm_device *dev = node->minor->dev;
 	struct amdgpu_device *adev = dev->dev_private;
+#if !defined(HAVE_DRM_MM_PRINT)
+	struct drm_mm *mm = (struct drm_mm *)adev->mman.bdev.man[ttm_pl].priv;
+	struct ttm_bo_global *glob = &ttm_bo_glob;
+	int ret;
+#else
 	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[ttm_pl];
 	struct drm_printer p = drm_seq_file_printer(m);
+#endif
 
+#if !defined(HAVE_DRM_MM_PRINT)
+	spin_lock(&glob->lru_lock);
+	ret = drm_mm_dump_table(m, mm);
+	spin_unlock(&glob->lru_lock);
+	return ret;
+#else
 	man->func->debug(man, &p);
 	return 0;
+#endif
 }
 
 static int ttm_pl_dgma = AMDGPU_PL_DGMA;
