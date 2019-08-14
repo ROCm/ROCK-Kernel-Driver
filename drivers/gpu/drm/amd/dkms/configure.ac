@@ -145,6 +145,7 @@ m4_include([m4/hash-for-each-possible.m4])
 m4_include([m4/hash-for-each-possible-rcu.m4])
 m4_include([m4/hash-for-each-rcu.m4])
 m4_include([m4/hash-for-each-safe.m4])
+m4_include([m4/drm-atomic-state-async-update.m4])
 m4_include([m4/config.m4])
 
 
