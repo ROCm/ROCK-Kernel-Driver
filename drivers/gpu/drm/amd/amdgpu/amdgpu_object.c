@@ -1279,7 +1279,7 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))
 		return;
 
-	reservation_object_lock(bo->resv, NULL);
+	kcl_reservation_object_lock(bo->resv, NULL);
 
 	r = amdgpu_fill_buffer(abo, AMDGPU_POISON, bo->resv, &fence);
 	if (!WARN_ON(r)) {
@@ -1287,7 +1287,7 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 		dma_fence_put(fence);
 	}
 
-	reservation_object_unlock(bo->resv);
+	kcl_reservation_object_unlock(bo->resv);
 }
 
 /**
