@@ -145,7 +145,7 @@ kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 static inline void kcl_dma_fence_set_error(struct dma_fence *fence,
 				       int error)
 {
-#if !defined(RENAME_FENCE_TO_DMA_FENCE)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 	BUG_ON(test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags));
 	BUG_ON(error >= 0 || error < -MAX_ERRNO);
 
