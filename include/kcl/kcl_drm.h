@@ -454,7 +454,7 @@ kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 #elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
-	return state->crtcs[drm_crtc_index(crtc)]->state;
+	return state->crtcs[drm_crtc_index(crtc)].state;
 #endif
 }
 
@@ -489,7 +489,7 @@ kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
 #elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
 	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
 #else
-	return state->crtcs[drm_crtc_index(crtc)]->state;
+	return state->crtcs[drm_crtc_index(crtc)].state;
 #endif
 }
 
