@@ -2594,7 +2594,6 @@ int amdgpu_ttm_evict_resources(struct amdgpu_device *adev, int mem_type)
 }
 
 #if defined(CONFIG_DEBUG_FS)
-
 static int amdgpu_ttm_page_pool_show(struct seq_file *m, void *unused)
 {
 	struct amdgpu_device *adev = m->private;
