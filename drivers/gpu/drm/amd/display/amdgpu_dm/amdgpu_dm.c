@@ -1007,6 +1007,8 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		DRM_DEBUG_DRIVER("amdgpu: freesync_module init done %p.\n",
 				adev->dm.freesync_module);
 
+#if (DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)) &&\
+	!defined(OS_NAME_RHEL_7_4)
 	amdgpu_dm_init_color_mod();
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
@@ -1020,6 +1022,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 		dc_init_callbacks(adev->dm.dc, &init_params);
 	}
+#endif
 #endif
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
@@ -3926,6 +3929,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	dc_plane_state->dcc = plane_info.dcc;
 	dc_plane_state->layer_index = plane_info.layer_index; // Always returns 0
 
+#if !defined(OS_NAME_RHEL_7_4)
 	/*
 	 * Always set input transfer function, since plane state is refreshed
 	 * every time.
@@ -3933,6 +3937,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	ret = amdgpu_dm_update_plane_color_mgmt(dm_crtc_state, dm_plane_state);
 	if (ret)
 		return ret;
+#endif
 
 	return 0;
 }
@@ -8077,9 +8082,11 @@ skip_modeset:
 	 */
 	if (dm_new_crtc_state->base.color_mgmt_changed ||
 	    drm_atomic_crtc_needs_modeset(new_crtc_state)) {
+#if !defined(OS_NAME_RHEL_7_4)
 		ret = amdgpu_dm_update_crtc_color_mgmt(dm_new_crtc_state);
 		if (ret)
 			goto fail;
+#endif
 	}
 
 	/* Update Freesync settings. */
