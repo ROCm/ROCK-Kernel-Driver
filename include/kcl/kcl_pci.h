@@ -4,7 +4,6 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 
-#ifdef BUILD_AS_DKMS
 #ifndef PCI_EXP_DEVCAP2_ATOMIC_ROUTE
 #define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
 #endif
@@ -63,6 +62,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #ifndef  PCI_EXP_LNKCAP_SLS_8_0GB
 #define  PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
 #endif
+#ifdef BUILD_AS_DKMS
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf);
