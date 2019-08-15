@@ -850,7 +850,7 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
+#ifdef HAVE_KTIME_GET_RAW_NS
 	args->cpu_clock_counter = ktime_get_raw_ns();
 #else
 	getrawmonotonic(&time);

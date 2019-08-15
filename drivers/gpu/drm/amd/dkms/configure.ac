@@ -171,6 +171,7 @@ m4_include([m4/drm-connector-attach-encoder.m4])
 m4_include([m4/drm-connector-set-path-property.m4])
 m4_include([m4/get-monotonic-boottime64.m4])
 m4_include([m4/timespec64-to-ns.m4])
+m4_include([m4/ktime-get-raw-ns.m4])
 m4_include([m4/config.m4])
 
 
