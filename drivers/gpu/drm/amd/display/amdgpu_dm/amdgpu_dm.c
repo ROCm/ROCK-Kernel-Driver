@@ -62,7 +62,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_atomic.h>
-#if defined(HAVE_DRM_ATOMIC_UAPI_HEADER)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 #include <drm/drm_atomic_uapi.h>
 #endif
 #include <drm/drm_atomic_helper.h>
