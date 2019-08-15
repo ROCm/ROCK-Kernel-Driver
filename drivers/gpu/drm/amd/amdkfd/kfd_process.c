@@ -53,7 +53,20 @@ struct mm_struct;
 DEFINE_HASHTABLE(kfd_processes_table, KFD_PROCESS_TABLE_SIZE);
 static DEFINE_MUTEX(kfd_processes_mutex);
 
+#ifndef DEFINE_SRCU
+struct srcu_struct kfd_processes_srcu;
+void kfd_init_processes_srcu(void)
+{
+	init_srcu_struct(&kfd_processes_srcu);
+}
+
+void kfd_cleanup_processes_srcu(void)
+{
+	cleanup_srcu_struct(&kfd_processes_srcu);
+}
+#else
 DEFINE_SRCU(kfd_processes_srcu);
+#endif
 
 /* For process termination handling */
 static struct workqueue_struct *kfd_process_wq;
