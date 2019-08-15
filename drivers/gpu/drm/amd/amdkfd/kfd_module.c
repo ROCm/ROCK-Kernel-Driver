@@ -26,6 +26,11 @@
 #include "kfd_priv.h"
 #include "amdgpu_amdkfd.h"
 
+#ifndef DEFINE_SRCU
+void kfd_init_processes_srcu(void);
+void kfd_cleanup_processes_srcu(void);
+#endif
+
 static int kfd_init(void)
 {
 	int err;
@@ -69,6 +74,10 @@ static int kfd_init(void)
 	kfd_procfs_init();
 
 	kfd_debugfs_init();
+
+#ifndef DEFINE_SRCU
+	kfd_init_processes_srcu();
+#endif
 
 	return 0;
 
