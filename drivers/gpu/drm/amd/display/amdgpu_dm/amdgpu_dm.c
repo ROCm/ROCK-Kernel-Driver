@@ -4144,7 +4144,7 @@ retry:
 		goto fail;
 	}
 	acrtc->flip_flags = flags;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#if !defined(HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT)
 	ret = drm_atomic_async_commit(state);
 #else
 	ret = drm_atomic_nonblocking_commit(state);
