@@ -53,7 +53,7 @@ struct mm_struct;
 DEFINE_HASHTABLE(kfd_processes_table, KFD_PROCESS_TABLE_SIZE);
 static DEFINE_MUTEX(kfd_processes_mutex);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifndef DEFINE_SRCU
 struct srcu_struct kfd_processes_srcu;
 void kfd_init_processes_srcu(void)
 {
