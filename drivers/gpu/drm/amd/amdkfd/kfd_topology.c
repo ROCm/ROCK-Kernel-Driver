@@ -136,7 +136,7 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_cache_properties *cache;
 	struct kfd_iolink_properties *iolink;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct kfd_perf_properties *perf;
 #endif
 
@@ -397,7 +397,7 @@ static struct kobj_type cache_type = {
 	.sysfs_ops = &cache_ops,
 };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 /****** Sysfs of Performance Counters ******/
 
 struct kfd_perf_attr {
@@ -582,7 +582,7 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct kfd_perf_properties *perf;
 #endif
 
@@ -654,7 +654,7 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct kfd_perf_properties *perf;
 	uint32_t num_attrs;
 	struct attribute **attrs;
@@ -979,7 +979,7 @@ static void find_system_memory(const struct dmi_header *dm,
 	}
 }
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 /*
  * Performance counters information is not part of CRAT but we would like to
  * put them in the sysfs under topology directory for Thunk to get the data.
@@ -1097,7 +1097,7 @@ int kfd_topology_init(void)
 		}
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0)
+#ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	kdev = list_first_entry(&temp_topology_device_list,
 				struct kfd_topology_device, list);
 	kfd_add_perf_to_topology(kdev);
