@@ -5,12 +5,24 @@
 #include <linux/version.h>
 
 #ifdef BUILD_AS_DKMS
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_ROUTE
 #define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP32
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP32	0x00000080 /* 32b AtomicOp completion */
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP64
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP64	0x00000100 /* 64b AtomicOp completion*/
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP128
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP128	0x00000200 /* 128b AtomicOp completion*/
+#endif
+#ifndef PCI_EXP_DEVCTL2_ATOMIC_REQ
 #define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
+#endif
+#ifndef PCI_EXP_DEVCTL2_ATOMIC_BLOCK
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
+#endif
 
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
@@ -48,8 +60,10 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 	0)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+#ifndef  PCI_EXP_LNKCAP_SLS_8_0GB
 #define  PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
+#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf);
 ssize_t max_link_width_show(struct device *dev,
