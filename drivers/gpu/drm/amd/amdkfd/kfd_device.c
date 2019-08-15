@@ -503,7 +503,7 @@ static void kfd_gtt_sa_fini(struct kfd_dev *kfd);
 
 static int kfd_resume(struct kfd_dev *kfd);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifndef DEFINE_SRCU
 void kfd_init_processes_srcu(void);
 void kfd_cleanup_processes_srcu(void);
 #endif
@@ -696,7 +696,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	kfd_cwsr_init(kfd);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifndef DEFINE_SRCU
 	kfd_init_processes_srcu();
 #endif
 	if (kfd_resume(kfd))
@@ -744,7 +744,7 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 {
 	if (kfd->init_complete) {
 		kgd2kfd_suspend(kfd);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifndef DEFINE_SRCU
 		kfd_cleanup_processes_srcu();
 #endif
 		device_queue_manager_uninit(kfd->dqm);
