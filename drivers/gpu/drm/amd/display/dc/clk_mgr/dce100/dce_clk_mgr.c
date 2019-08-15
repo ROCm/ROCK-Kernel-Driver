@@ -273,12 +273,18 @@ static void dce_clock_read_integrated_info(struct clk_mgr_internal *clk_mgr_dce)
 {
 	struct dc_debug_options *debug = &clk_mgr_dce->base.ctx->dc->debug;
 	struct dc_bios *bp = clk_mgr_dce->base.ctx->dc_bios;
+	struct integrated_info info = { { { 0 } } };
+	struct dc_firmware_info fw_info = { { 0 } };
 	int i;
 
 	if (bp->integrated_info)
-		clk_mgr_dce->dentist_vco_freq_khz = bp->integrated_info->dentist_vco_freq;
+		info = *bp->integrated_info;
+
+	clk_mgr_dce->dentist_vco_freq_khz = info.dentist_vco_freq;
 	if (clk_mgr_dce->dentist_vco_freq_khz == 0) {
-		clk_mgr_dce->dentist_vco_freq_khz = bp->fw_info.smu_gpu_pll_output_freq;
+		bp->funcs->get_firmware_info(bp, &fw_info);
+		clk_mgr_dce->dentist_vco_freq_khz =
+			fw_info.smu_gpu_pll_output_freq;
 		if (clk_mgr_dce->dentist_vco_freq_khz == 0)
 			clk_mgr_dce->dentist_vco_freq_khz = 3600000;
 	}
@@ -311,10 +317,9 @@ static void dce_clock_read_integrated_info(struct clk_mgr_internal *clk_mgr_dce)
 
 		/*Do not allow bad VBIOS/SBIOS to override with invalid values,
 		 * check for > 100MHz*/
-		if (bp->integrated_info)
-			if (bp->integrated_info->disp_clk_voltage[i].max_supported_clk >= 100000)
-				clk_mgr_dce->max_clks_by_state[clk_state].display_clk_khz =
-					bp->integrated_info->disp_clk_voltage[i].max_supported_clk;
+		if (info.disp_clk_voltage[i].max_supported_clk >= 100000)
+			clk_mgr_dce->max_clks_by_state[clk_state].display_clk_khz =
+				info.disp_clk_voltage[i].max_supported_clk;
 	}
 
 	if (!debug->disable_dfs_bypass && bp->integrated_info)
