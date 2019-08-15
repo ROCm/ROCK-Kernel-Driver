@@ -9,4 +9,5 @@ drm/drm_print.h kcl/kcl_drm_print_h.h
 linux/sched/task.h kcl/kcl_sched_task_h.h
 uapi/linux/sched/types.h kcl/kcl_uapi_linux_sched_types_h.h
 linux/nospec.h kcl/kcl_nospec.h
+drm/drm_atomic_uapi.h kcl/kcl_drm_atomic_uapi_h.h
 
