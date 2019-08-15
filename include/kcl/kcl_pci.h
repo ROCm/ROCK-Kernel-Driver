@@ -5,12 +5,24 @@
 #include <linux/version.h>
 
 #ifdef BUILD_AS_DKMS
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_ROUTE
 #define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP32
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP32	0x00000080 /* 32b AtomicOp completion */
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP64
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP64	0x00000100 /* 64b AtomicOp completion*/
+#endif
+#ifndef PCI_EXP_DEVCAP2_ATOMIC_COMP128
 #define PCI_EXP_DEVCAP2_ATOMIC_COMP128	0x00000200 /* 128b AtomicOp completion*/
+#endif
+#ifndef PCI_EXP_DEVCTL2_ATOMIC_REQ
 #define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
+#endif
+#ifndef PCI_EXP_DEVCTL2_ATOMIC_BLOCK
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
+#endif
 
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
