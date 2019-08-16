@@ -1735,7 +1735,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
 			pages_addr = (dma_addr_t *)bo_va->base.bo->tbo.mem.bus.addr;
 		}
-		exclusive = reservation_object_get_excl(bo->tbo.resv);
+		exclusive = bo->tbo.moving;
 	}
 
 	if (bo) {
