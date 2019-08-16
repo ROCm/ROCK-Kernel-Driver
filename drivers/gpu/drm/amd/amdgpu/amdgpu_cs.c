@@ -1700,7 +1700,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		if (r == 0)
 			break;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else
@@ -1768,7 +1768,7 @@ out:
 	wait->out.first_signaled = first;
 
 	if (first < fence_count && array[first])
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		r = array[first]->status;
 #else
 		r = array[first]->error;
