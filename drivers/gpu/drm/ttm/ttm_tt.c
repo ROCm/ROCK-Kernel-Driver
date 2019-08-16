@@ -37,9 +37,6 @@
 #include <linux/shmem_fs.h>
 #include <linux/file.h>
 #include <drm/drm_cache.h>
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-#include <drm/drm_mem_util.h>
-#endif
 #include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_page_alloc.h>
@@ -276,11 +273,7 @@ EXPORT_SYMBOL(ttm_tt_init);
 
 void ttm_tt_fini(struct ttm_tt *ttm)
 {
-#if defined(HAVE_DRM_FREE_LARGE)
-	drm_free_large(ttm->pages);
-#else
 	kvfree(ttm->pages);
-#endif
 	ttm->pages = NULL;
 }
 EXPORT_SYMBOL(ttm_tt_fini);
@@ -328,17 +321,10 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
-#if defined(HAVE_DRM_FREE_LARGE)
-	if (ttm->pages)
-	  drm_free_large(ttm->pages);
-  else
-	  drm_free_large(ttm_dma->dma_address);
-#else
 	if (ttm->pages)
 		kvfree(ttm->pages);
 	else
 		kvfree(ttm_dma->dma_address);
-#endif
 	ttm->pages = NULL;
 	ttm_dma->dma_address = NULL;
 }

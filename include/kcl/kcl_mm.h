@@ -55,7 +55,11 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #endif
 
 #if !defined(HAVE_KVFREE)
+#if defined(HAVE_DRM_FREE_LARGE)
+#define kvfree drm_free_large
+#else
 #define kvfree kfree
+#endif
 #endif
 
 #if !defined(HAVE_KVMALLOC_ARRAY)

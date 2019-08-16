@@ -39,9 +39,6 @@
 #include "amdgpu_gem.h"
 #include "amdgpu_display.h"
 
-#if defined(HAVE_DRM_FREE_LARGE)
-#define kvfree drm_free_large
-#endif
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
 				      uint32_t *offset)
@@ -656,11 +653,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
 #endif
-#if defined(HAVE_DRM_FREE_LARGE)
-				drm_free_large(e->user_pages);
-#else
 				kvfree(e->user_pages);
-#endif
 				e->user_pages = NULL;
 			}
 
@@ -707,11 +700,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
-#if defined(HAVE_DRM_FREE_LARGE)
-				drm_free_large(e->user_pages);
-#else
 				kvfree(e->user_pages);
-#endif
 				e->user_pages = NULL;
 				goto error_free_pages;
 			}
@@ -795,11 +784,7 @@ error_free_pages:
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
 #endif
-#if defined(HAVE_DRM_FREE_LARGE)
-		drm_free_large(e->user_pages);
-#else
 		kvfree(e->user_pages);
-#endif
 	}
 
 	return r;
@@ -858,11 +843,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		amdgpu_bo_list_put(parser->bo_list);
 
 	for (i = 0; i < parser->nchunks; i++)
-#if defined(HAVE_DRM_FREE_LARGE)
-		drm_free_large(parser->chunks[i].kdata);
-#else
 		kvfree(parser->chunks[i].kdata);
-#endif
 	kfree(parser->chunks);
 	if (parser->job)
 		amdgpu_job_free(parser->job);
