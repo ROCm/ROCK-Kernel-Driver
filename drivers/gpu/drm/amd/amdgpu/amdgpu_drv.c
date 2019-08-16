@@ -1107,7 +1107,16 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+
+	dev = drm_dev_alloc(&kms_driver, &pdev->dev);
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+
+#ifdef HAVE_DRIVER_ATOMIC
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
+	if (!supports_atomic)
+		dev->driver_features &= ~DRIVER_ATOMIC;
+#else
 	/* warn the user if they mix atomic and non-atomic capable GPUs */
 	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
 		DRM_ERROR("Mixing atomic and non-atomic capable GPUs!\n");
@@ -1115,14 +1124,6 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (supports_atomic)
 		kms_driver.driver_features |= DRIVER_ATOMIC;
 #endif
-
-	dev = drm_dev_alloc(&kms_driver, &pdev->dev);
-	if (IS_ERR(dev))
-		return PTR_ERR(dev);
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
-	if (!supports_atomic)
-		dev->driver_features &= ~DRIVER_ATOMIC;
 #endif
 
 	kcl_pci_create_measure_file(pdev);
@@ -1456,7 +1457,7 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 static struct drm_driver kms_driver = {
 	.driver_features =
 		DRIVER_USE_AGP |
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef DRIVER_ATOMIC
 		DRIVER_ATOMIC |
 #endif
 		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
