@@ -145,6 +145,7 @@ m4_include([m4/reservation_object_lock_interruptible.m4])
 m4_include([m4/hw-perf-event-conf-member.m4])
 m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/kmap-atomic.m4])
+m4_include([m4/ktime-get-ns.m4])
 m4_include([m4/config.m4])
 
 
