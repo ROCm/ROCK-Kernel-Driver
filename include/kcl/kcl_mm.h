@@ -63,10 +63,13 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #endif
 
 #if !defined(HAVE_KVMALLOC_ARRAY)
-#if defined(HAVE_DRM_MALLOC_AB)
+#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-	return drm_malloc_ab(n, size);
+	if (flags & __GFP_ZERO)
+		return drm_calloc_large(n, size);
+	else
+		return drm_malloc_ab(n, size);
 }
 #else
 #define kvmalloc_array kmalloc_array

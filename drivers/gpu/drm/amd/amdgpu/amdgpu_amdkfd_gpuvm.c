@@ -510,14 +510,9 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 	 */
 	WARN(mem->user_pages, "Leaking user_pages array");
 
-#if defined(HAVE_DRM_CALLOC_LARGE)
-	mem->user_pages = drm_calloc_large(bo->tbo.ttm->num_pages,
-					   sizeof(struct page *));
-#else
 	mem->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
 					   sizeof(struct page *),
 					   GFP_KERNEL | __GFP_ZERO);
-#endif
 
 	if (!mem->user_pages) {
 		pr_err("%s: Failed to allocate pages array\n", __func__);
@@ -1974,16 +1969,10 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		bo = mem->bo;
 
 		if (!mem->user_pages) {
-#if defined(HAVE_DRM_CALLOC_LARGE)
-			mem->user_pages =
-				drm_calloc_large(bo->tbo.ttm->num_pages,
-						 sizeof(struct page *));
-#else
 			mem->user_pages =
 				kvmalloc_array(bo->tbo.ttm->num_pages,
 						 sizeof(struct page *),
 						 GFP_KERNEL | __GFP_ZERO);
-#endif
 			if (!mem->user_pages) {
 				pr_err("%s: Failed to allocate pages array\n",
 				       __func__);

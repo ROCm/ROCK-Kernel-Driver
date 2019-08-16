@@ -683,14 +683,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->tv.bo->ttm;
 
-#if defined(HAVE_DRM_CALLOC_LARGE)
-			e->user_pages = drm_calloc_large(ttm->num_pages,
-							 sizeof(struct page*));
-#else
 			e->user_pages = kvmalloc_array(ttm->num_pages,
 							 sizeof(struct page*),
 							 GFP_KERNEL | __GFP_ZERO);
-#endif
 			if (!e->user_pages) {
 				r = -ENOMEM;
 				DRM_ERROR("calloc failure in %s\n", __func__);
