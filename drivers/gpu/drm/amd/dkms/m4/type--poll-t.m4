@@ -12,7 +12,7 @@ AC_DEFUN([AC_AMDGPU_TYPE__POLL_T],
 				__poll_t mask = 0;
 		],[
 				AC_MSG_RESULT(yes)
-				AC_DEFINE(HAVE_IMO___POLL_T, 1, [__poll_t is available])
+				AC_DEFINE(HAVE_TYPE___POLL_T, 1, [__poll_t is available])
 		],[
 				AC_MSG_RESULT(no)
 		])
