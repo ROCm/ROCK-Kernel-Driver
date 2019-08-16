@@ -36,7 +36,11 @@
  * space. Therefore PASIDs are allocated using a global IDA. VMs are
  * looked up from the PASID per amdgpu_device.
  */
+#ifndef DEFINE_IDA2
 static DEFINE_IDA(amdgpu_pasid_ida);
+#else
+static DEFINE_IDA2(amdgpu_pasid_ida);
+#endif
 
 /* Helper to free pasid from a fence callback */
 struct amdgpu_pasid_cb {
