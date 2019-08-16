@@ -175,11 +175,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		size = p->chunks[i].length_dw;
 		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
-#else
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
-#endif
 		if (p->chunks[i].kdata == NULL) {
 			ret = -ENOMEM;
 			i--;

@@ -236,13 +236,8 @@ int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	info = drm_malloc_ab(in->bo_number,
-			     sizeof(struct drm_amdgpu_bo_list_entry));
-#else
 	info = kvmalloc_array(in->bo_number,
 			     sizeof(struct drm_amdgpu_bo_list_entry), GFP_KERNEL);
-#endif
 	if (!info)
 		return -ENOMEM;
 
