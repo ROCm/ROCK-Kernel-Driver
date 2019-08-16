@@ -1129,8 +1129,19 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
+#ifdef HAVE_DRIVER_ATOMIC
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
 		dev->driver_features &= ~DRIVER_ATOMIC;
+#else
+	/* warn the user if they mix atomic and non-atomic capable GPUs */
+	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
+		DRM_ERROR("Mixing atomic and non-atomic capable GPUs!\n");
+	/* support atomic early so the atomic debugfs stuff gets created */
+	if (supports_atomic)
+		kms_driver.driver_features |= DRIVER_ATOMIC;
+#endif
+#endif
 
 	kcl_pci_create_measure_file(pdev);
 	ret = pci_enable_device(pdev);
@@ -1460,9 +1471,13 @@ amdgpu_get_crtc_scanout_position(struct drm_device *dev, unsigned int pipe,
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP | DRIVER_ATOMIC |
+	    DRIVER_USE_AGP |
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
+	    DRIVER_ATOMIC |
+#endif
 	    DRIVER_GEM |
-	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET | DRIVER_SYNCOBJ |
+	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET |
+	    DRIVER_SYNCOBJ |
 	    DRIVER_SYNCOBJ_TIMELINE,
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
