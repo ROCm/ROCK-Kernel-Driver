@@ -157,6 +157,7 @@ m4_include([m4/memremap-devm-memremap-pages.m4])
 m4_include([m4/drm-audio-component-header.m4])
 m4_include([m4/drm-set-crc-source.m4])
 m4_include([m4/drm-driver-unload.m4])
+m4_include([m4/drm-device-driver-features.m4])
 m4_include([m4/config.m4])
 
 
