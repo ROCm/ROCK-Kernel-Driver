@@ -29,6 +29,14 @@
 #include "kfd_priv.h"
 #include "kfd_topology.h"
 
+#ifndef HAVE_TYPE__POLL_T
+#ifdef __CHECK_POLL
+typedef unsigned __bitwise __poll_t;
+#else
+typedef unsigned __poll_t;
+#endif
+#endif
+
 /* poll and read functions */
 static __poll_t kfd_dbg_ev_poll(struct file *, struct poll_table_struct *);
 static ssize_t kfd_dbg_ev_read(struct file *, char __user *, size_t, loff_t *);

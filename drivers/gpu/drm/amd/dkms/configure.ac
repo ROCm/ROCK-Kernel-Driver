@@ -149,6 +149,7 @@ m4_include([m4/drm-debug-printer.m4])
 m4_include([m4/drm-atomic-nonblocking-commit.m4])
 m4_include([m4/drm-atomic-state-put.m4])
 m4_include([m4/drm-atomic-audio-component-header.m4])
+m4_include([m4/type--poll-t.m4])
 m4_include([m4/config.m4])
 
 
