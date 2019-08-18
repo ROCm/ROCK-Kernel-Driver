@@ -136,6 +136,7 @@ m4_include([m4/drm-driver-gem-free-object-unlocked.m4])
 m4_include([m4/wq-highpri.m4])
 m4_include([m4/type--poll-t.m4])
 m4_include([m4/hw-perf-event-conf-member.m4])
+m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

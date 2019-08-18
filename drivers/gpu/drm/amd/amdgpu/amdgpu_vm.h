@@ -240,7 +240,11 @@ struct amdgpu_vm_update_funcs {
 
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+	struct rb_root	va;
+#else
 	struct rb_root_cached	va;
+#endif
 
 	/* BOs who needs a validation */
 	struct list_head	evicted;
