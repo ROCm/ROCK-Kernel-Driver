@@ -169,6 +169,7 @@ m4_include([m4/backlight-properties-type.m4])
 m4_include([m4/drm-connector-update-edid-property.m4])
 m4_include([m4/drm-connector-attach-encoder.m4])
 m4_include([m4/drm-connector-set-path-property.m4])
+m4_include([m4/get-monotonic-boottime64.m4])
 m4_include([m4/config.m4])
 
 
