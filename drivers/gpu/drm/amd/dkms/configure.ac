@@ -142,6 +142,7 @@ m4_include([m4/type--poll-t.m4])
 m4_include([m4/reservation-object-get-fences-rcu.m4])
 m4_include([m4/reservation_object_lock_interruptible.m4])
 m4_include([m4/hw-perf-event-conf-member.m4])
+m4_include([m4/struct-rb-root-cached.m4])
 m4_include([m4/config.m4])
 
 

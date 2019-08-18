@@ -234,7 +234,7 @@ struct amdgpu_vm_update_funcs {
 
 struct amdgpu_vm {
 	/* tree of virtual addresses mapped */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_STRUCT_RB_ROOT_CACHED
 	struct rb_root	va;
 #else
 	struct rb_root_cached	va;

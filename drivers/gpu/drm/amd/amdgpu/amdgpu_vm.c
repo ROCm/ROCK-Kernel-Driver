@@ -2701,7 +2701,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct amdgpu_bo *root;
 	int r, i;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_STRUCT_RB_ROOT_CACHED
 	vm->va = RB_ROOT;
 #else
 	vm->va = RB_ROOT_CACHED;
@@ -2985,7 +2985,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	drm_sched_entity_destroy(&vm->entity);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_STRUCT_RB_ROOT_CACHED
 	if (!RB_EMPTY_ROOT(&vm->va)) {
 #else
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
@@ -2993,7 +2993,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_STRUCT_RB_ROOT_CACHED
 					     &vm->va, rb) {
 #else
 					     &vm->va.rb_root, rb) {
