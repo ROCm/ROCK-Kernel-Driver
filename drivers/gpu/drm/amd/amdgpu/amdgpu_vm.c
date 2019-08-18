@@ -2919,7 +2919,11 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	struct amdgpu_bo_vm *root;
 	int r, i;
 
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+	vm->va = RB_ROOT;
+#else
 	vm->va = RB_ROOT_CACHED;
+#endif
 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
 		vm->reserved_vmid[i] = NULL;
 	INIT_LIST_HEAD(&vm->evicted);
@@ -3172,11 +3176,19 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	drm_sched_entity_destroy(&vm->immediate);
 	drm_sched_entity_destroy(&vm->delayed);
 
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+	if (!RB_EMPTY_ROOT(&vm->va)) {
+#else
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
+#endif
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+					     &vm->va, rb) {
+#else
 					     &vm->va.rb_root, rb) {
+#endif
 		/* Don't remove the mapping here, we don't want to trigger a
 		 * rebalance and the tree is about to be destroyed anyway.
 		 */
