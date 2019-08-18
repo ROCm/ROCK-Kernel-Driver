@@ -23,7 +23,9 @@
  */
 
 #include <drm/drmP.h>
+#ifdef HAVE_DRM_AUTH_H
 #include <drm/drm_auth.h>
+#endif
 #include "amdgpu.h"
 #include "amdgpu_sched.h"
 #include "amdgpu_ras.h"
