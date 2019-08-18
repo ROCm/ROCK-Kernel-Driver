@@ -30,7 +30,7 @@
 #if defined(OS_NAME_RHEL_6)
 #include <linux/kernel.h>
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#ifdef HAVE_SCHED_CLOCK_H
 #include <linux/sched/clock.h>
 #else
 #include <linux/sched.h>
