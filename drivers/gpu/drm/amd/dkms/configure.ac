@@ -152,6 +152,7 @@ m4_include([m4/drm-atomic-audio-component-header.m4])
 m4_include([m4/type--poll-t.m4])
 m4_include([m4/use-unsigned-pipe.m4])
 m4_include([m4/hw-perf-event-conf-member.m4])
+m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/config.m4])
 
 

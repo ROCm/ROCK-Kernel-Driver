@@ -708,7 +708,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (!process)
 		goto err_alloc_process;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	process->bo_interval_tree = RB_ROOT;
 #else
 	process->bo_interval_tree = RB_ROOT_CACHED;
