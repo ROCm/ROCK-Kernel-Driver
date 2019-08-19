@@ -32,7 +32,7 @@
 #include <linux/spinlock.h>
 #include <linux/kfd_ioctl.h>
 #include <linux/idr.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifdef HAVE_KFIFO_NEW_H
 #include <linux/kfifo-new.h>
 #else
 #include <linux/kfifo.h>

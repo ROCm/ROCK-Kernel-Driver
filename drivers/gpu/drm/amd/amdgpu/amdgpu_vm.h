@@ -25,7 +25,7 @@
 #define __AMDGPU_VM_H__
 
 #include <linux/idr.h>
-#if defined(OS_NAME_RHEL_6)
+#if defined(HAVE_KFIFO_NEW_H)
 #include <linux/kfifo-new.h>
 #else
 #include <linux/kfifo.h>
