@@ -155,6 +155,7 @@ m4_include([m4/hw-perf-event-conf-member.m4])
 m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/kmap-atomic.m4])
 m4_include([m4/sched-clock-h.m4])
+m4_include([m4/kfifo-new-h.m4])
 m4_include([m4/config.m4])
 
 
