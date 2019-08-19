@@ -69,11 +69,6 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 }
 #endif
 
-#if !defined(GFP_TRANSHUGE_LIGHT)
-#define GFP_TRANSHUGE_LIGHT	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
-			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
-#endif
-
 #ifndef HAVE_MM_ACCESS
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
