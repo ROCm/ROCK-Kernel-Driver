@@ -2,6 +2,8 @@
 #define AMDKCL_MM_H
 
 #include <linux/mm.h>
+#include <linux/gfp.h>
+#include <kcl/kcl_overflow.h>
 
 static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				unsigned long start, unsigned long nr_pages,
@@ -54,20 +56,64 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
-#define kvzalloc kzalloc
-#define kvfree kfree
-#define kvmalloc kzalloc
-#endif
+#ifndef HAVE_KVZALLOC_KVMALLOC
+static inline void *kvmalloc(size_t size, gfp_t flags)
+{
+	void *out;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4 ,18, 0)
-#define kvcalloc(n, size, gfp)	kvzalloc(((n)*(size)), gfp)
-#endif
+	if (size > PAGE_SIZE)
+		out = __vmalloc(size, flags, PAGE_KERNEL);
+	else
+		out = kmalloc(size, flags);
+	return out;
+}
+static inline void *kvzalloc(size_t size, gfp_t flags)
+{
+	return kvmalloc(size, flags | __GFP_ZERO);
+}
+#endif /* HAVE_KVZALLOC_KVMALLOC */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
-#define GFP_TRANSHUGE_LIGHT	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
-			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
-#endif
+#ifndef HAVE_KVFREE
+#ifdef HAVE_DRM_FREE_LARGE
+#define kvfree drm_free_large
+#else
+static inline void kvfree(const void *addr)
+{
+	if (is_vmalloc_addr(addr))
+		vfree(addr);
+	else
+		kfree(addr);
+}
+#endif /* HAVE_DRM_FREE_LARGE */
+#endif /* HAVE_KVFREE */
 
+#ifndef HAVE_KVMALLOC_ARRAY
+#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
+static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
+{
+	if (flags & __GFP_ZERO)
+		return drm_calloc_large(n, size);
+	else
+		return drm_malloc_ab(n, size);
+}
+#else
+static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
+{
+	size_t bytes;
+
+	if (unlikely(check_mul_overflow(n, size, &bytes)))
+		return NULL;
+
+	return kvmalloc(bytes, flags);
+}
+#endif /* HAVE_DRM_MALLOC_AB && HAVE_DRM_CALLOC_LARGE */
+#endif /* HAVE_KVMALLOC_ARRAY */
+
+#ifndef HAVE_KVCALLOC
+static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
+{
+	return kvmalloc_array(n, size, flags | __GFP_ZERO);
+}
+#endif /* HAVE_KVCALLOC */
 
 #endif /* AMDKCL_MM_H */

@@ -1,6 +1,9 @@
 AC_INIT(amdgpu-dkms, 19.40)
 
 m4_include([m4/kernel.m4])
+m4_include([m4/drm-calloc-large.m4])
+m4_include([m4/drm-free-large.m4])
+m4_include([m4/drm-malloc-ab.m4])
 m4_include([m4/drm-probe-helper-h.m4])
 m4_include([m4/kobj-to-dev.m4])
 m4_include([m4/drm-modeset-lock-all-ctx.m4])
@@ -47,6 +50,10 @@ m4_include([m4/drm-atomic-helper-shutdown.m4])
 m4_include([m4/drm-file-h.m4])
 m4_include([m4/drm-print-h.m4])
 m4_include([m4/drm-syncobj-fence-get.m4])
+m4_include([m4/kvcalloc.m4])
+m4_include([m4/kvfree.m4])
+m4_include([m4/kvmalloc-array.m4])
+m4_include([m4/kvzalloc-kvmalloc.m4])
 m4_include([m4/config.m4])
 
 
