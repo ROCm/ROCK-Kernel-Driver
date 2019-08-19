@@ -8,6 +8,7 @@
 #include <linux/sched.h>
 #endif
 #include <linux/gfp.h>
+#include <kcl/kcl_overflow.h>
 
 static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				unsigned long start, unsigned long nr_pages,
@@ -50,15 +51,33 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #endif
 
 #if !defined(HAVE_KVZALLOC_KVMALLOC)
-#define kvzalloc kzalloc
-#define kvmalloc kzalloc
+static inline void *kvmalloc(size_t size, gfp_t flags)
+{
+	void *out;
+
+	if (size > PAGE_SIZE)
+		out = __vmalloc(size, flags, PAGE_KERNEL);
+	else
+		out = kmalloc(size, flags);
+	return out;
+}
+static inline void *kvzalloc(size_t size, gfp_t flags)
+{
+	return kvmalloc(size, flags | __GFP_ZERO);
+}
 #endif
 
 #if !defined(HAVE_KVFREE)
 #if defined(HAVE_DRM_FREE_LARGE)
 #define kvfree drm_free_large
 #else
-#define kvfree kfree
+static inline void kvfree(const void *addr)
+{
+	if (is_vmalloc_addr(addr))
+		vfree(addr);
+	else
+		kfree(addr);
+}
 #endif
 #endif
 
@@ -72,7 +91,15 @@ static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 		return drm_malloc_ab(n, size);
 }
 #else
-#define kvmalloc_array kmalloc_array
+static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
+{
+	size_t bytes;
+
+	if (unlikely(check_mul_overflow(n, size, &bytes)))
+		return NULL;
+
+	return kvmalloc(bytes, flags);
+}
 #endif
 #endif
 
