@@ -756,7 +756,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		kfree(parser->post_deps[i].chain);
 #endif
 	}
@@ -1159,7 +1159,7 @@ static int amdgpu_cs_process_syncobj_out_dep(struct amdgpu_cs_parser *p,
 			drm_syncobj_find(p->filp, deps[i].handle);
 		if (!p->post_deps[i].syncobj)
 			return -EINVAL;
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		p->post_deps[i].chain = NULL;
 #endif
 		p->post_deps[i].point = 0;
@@ -1193,7 +1193,7 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 
 	for (i = 0; i < num_deps; ++i) {
 		struct amdgpu_cs_post_dep *dep = &p->post_deps[i];
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		dep->chain = NULL;
 		if (syncobj_deps[i].point) {
 			dep->chain = kmalloc(sizeof(*dep->chain), GFP_KERNEL);
@@ -1204,7 +1204,7 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 		dep->syncobj = drm_syncobj_find(p->filp,
 						syncobj_deps[i].handle);
 		if (!dep->syncobj) {
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 			kfree(dep->chain);
 #endif
 			return -EINVAL;
@@ -1272,7 +1272,7 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 	int i;
 
 	for (i = 0; i < p->num_post_deps; ++i) {
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		if (p->post_deps[i].chain && p->post_deps[i].point) {
 			drm_syncobj_add_point(p->post_deps[i].syncobj,
 					      p->post_deps[i].chain,
