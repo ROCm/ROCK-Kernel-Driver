@@ -155,7 +155,7 @@ kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 #endif
 }
 
-#if defined(BUILD_AS_DKMS)
+#if !defined(HAVE_RESERVATION_OBJECT_GET_FENCES_RCU)
 extern int
 _kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
 				      struct dma_fence **pfence_excl,
@@ -169,7 +169,7 @@ kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
 				      unsigned *pshared_count,
 				      struct dma_fence ***pshared)
 {
-#if defined(BUILD_AS_DKMS)
+#if !defined(HAVE_RESERVATION_OBJECT_GET_FENCES_RCU)
 	return _kcl_reservation_object_get_fences_rcu(obj, pfence_excl, pshared_count, pshared);
 #else
 	return reservation_object_get_fences_rcu(obj, pfence_excl, pshared_count, pshared);
