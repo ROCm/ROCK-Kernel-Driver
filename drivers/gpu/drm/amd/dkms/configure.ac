@@ -116,6 +116,7 @@ m4_include([m4/task-h.m4])
 m4_include([m4/uapi-linux-sched-types-h.m4])
 m4_include([m4/linux-nospec-h.m4])
 m4_include([m4/drm-atomic-uapi-h.m4])
+m4_include([m4/kfifo-new-h.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
