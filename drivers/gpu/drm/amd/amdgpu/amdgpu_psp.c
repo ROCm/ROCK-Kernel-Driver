@@ -992,6 +992,8 @@ static void psp_print_fw_hdr(struct psp_context *psp,
 	case AMDGPU_UCODE_ID_SMC:
 		amdgpu_ucode_print_smc_hdr(&smc_hdr->header);
 		break;
+	default:
+		break;
 	}
 }
 
