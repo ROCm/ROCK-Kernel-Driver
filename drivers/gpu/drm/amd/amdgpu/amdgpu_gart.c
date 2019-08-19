@@ -250,9 +250,7 @@ int amdgpu_gart_unbind(struct amdgpu_device *adev, uint64_t offset,
 	}
 	mb();
 	amdgpu_asic_flush_hdp(adev, NULL);
-	for (i = 0; i < adev->num_vmhubs; i++)
-		amdgpu_gmc_flush_gpu_tlb(adev, 0, i, 0);
-
+	amdgpu_gmc_flush_gpu_tlb(adev, 0, 0);
 	return 0;
 }
 
@@ -313,7 +311,7 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	unsigned t,p;
 #endif
-	int r, i;
+	int r;
 
 	if (!adev->gart.ready) {
 		WARN(1, "trying to bind memory to uninitialized GART !\n");
@@ -337,8 +335,7 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 
 	mb();
 	amdgpu_asic_flush_hdp(adev, NULL);
-	for (i = 0; i < adev->num_vmhubs; i++)
-		amdgpu_gmc_flush_gpu_tlb(adev, 0, i, 0);
+	amdgpu_gmc_flush_gpu_tlb(adev, 0, 0);
 	return 0;
 }
 
