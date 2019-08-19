@@ -147,6 +147,7 @@ m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/kmap-atomic.m4])
 m4_include([m4/ktime-get-ns.m4])
 m4_include([m4/sched-clock-h.m4])
+m4_include([m4/perf-event-update-userpage.m4])
 m4_include([m4/config.m4])
 
 
