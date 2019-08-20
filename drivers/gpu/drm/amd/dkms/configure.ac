@@ -149,6 +149,7 @@ m4_include([m4/ktime-get-ns.m4])
 m4_include([m4/sched-clock-h.m4])
 m4_include([m4/perf-event-update-userpage.m4])
 m4_include([m4/kfifo-new-h.m4])
+m4_include([m4/kthread-park-xx.m4])
 m4_include([m4/config.m4])
 
 
