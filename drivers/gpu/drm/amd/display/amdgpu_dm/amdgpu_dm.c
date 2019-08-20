@@ -6637,23 +6637,9 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 		/* The stream has changed so CRC capture needs to re-enabled. */
 		source = dm_new_crtc_state->crc_src;
 		if (amdgpu_dm_is_valid_crc_source(source)) {
-			dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
-			if (source == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
-				amdgpu_dm_crtc_set_crc_source(crtc, "crtc");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "crtc", &values_cnt);
-#endif
-			}
-			else if (source == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
-				amdgpu_dm_crtc_set_crc_source(crtc, "dprx");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "dprx", &values_cnt);
-#endif
-			}
+			amdgpu_dm_crtc_configure_crc_source(
+				crtc, dm_new_crtc_state,
+				dm_new_crtc_state->crc_src);
 		}
 #endif
 #endif
@@ -6710,23 +6696,8 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 
 		if (dm_old_crtc_state->interrupts_enabled &&
 		    (!dm_new_crtc_state->interrupts_enabled ||
-		     drm_atomic_crtc_needs_modeset(new_crtc_state))) {
-			/*
-			 * Drop the extra vblank reference added by CRC
-			 * capture if applicable.
-			 */
-			if (amdgpu_dm_is_valid_crc_source(dm_new_crtc_state->crc_src))
-				drm_crtc_vblank_put(crtc);
-
-			/*
-			 * Only keep CRC capture enabled if there's
-			 * still a stream for the CRTC.
-			 */
-			if (!dm_new_crtc_state->stream)
-				dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
-
+		     drm_atomic_crtc_needs_modeset(new_crtc_state)))
 			manage_dm_interrupts(adev, acrtc, false);
-		}
 	}
 	/*
 	 * Add check here for SoC's that support hardware cursor plane, to
