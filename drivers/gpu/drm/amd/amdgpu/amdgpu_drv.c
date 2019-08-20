@@ -1486,11 +1486,7 @@ static struct drm_driver kms_driver = {
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
-#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
-	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
-#else
-	.get_scanout_position = amdgpu_get_crtc_scanout_position,
-#endif
+	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #if defined(CONFIG_DEBUG_FS)
 /* drm_debugfs_cleanup() now removes
  * all minor->debugfs_list entries since 4.11,

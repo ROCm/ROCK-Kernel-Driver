@@ -1283,6 +1283,11 @@ int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 				     struct timeval *vblank_time,
 				     unsigned flags);
 #endif
+int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
+			unsigned int pipe, unsigned int flags, int *vpos,
+			int *hpos, ktime_t *stime, ktime_t *etime,
+			const struct drm_display_mode *mode);
+
 long amdgpu_kms_compat_ioctl(struct file *filp, unsigned int cmd,
 			     unsigned long arg);
 
