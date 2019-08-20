@@ -16,16 +16,6 @@ void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc)
 	amdgpu_disable_vblank_kms(dev, crtc);
 }
 
-#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
-int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int crtc,
-					int *max_error,
-					struct timeval *vblank_time,
-					unsigned flags)
-{
-	return amdgpu_get_vblank_timestamp_kms(dev, crtc, max_error, vblank_time, flags);
-}
-#endif
-
 int kcl_amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev, unsigned int crtc,
 				   unsigned int flags, int *vpos, int *hpos,
 				   ktime_t *stime, ktime_t *etime,
@@ -47,14 +37,6 @@ int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, int crtc)
 void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, int crtc)
 {
 	amdgpu_disable_vblank_kms(dev, crtc);
-}
-
-int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, int crtc,
-					int *max_error,
-					struct timeval *vblank_time,
-					unsigned flags)
-{
-	return amdgpu_get_vblank_timestamp_kms(dev, crtc, max_error, vblank_time, flags);
 }
 
 int kcl_amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev, int crtc, unsigned int flags,
