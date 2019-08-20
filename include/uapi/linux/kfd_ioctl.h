@@ -679,9 +679,6 @@ enum kfd_mmio_remap {
 #define AMDKFD_IOC_CROSS_MEMORY_COPY		\
 		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
 
-#define AMDKFD_IOC_DBG_TRAP			\
-		AMDKFD_IOW(0x21, struct kfd_ioctl_dbg_trap_args)
-
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x23
 

@@ -68,12 +68,6 @@ static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
 	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
 };
 
-static void kgd_build_grace_period_packet_info(struct kgd_dev *kgd,
-		uint32_t wait_times,
-		uint32_t grace_period,
-		uint32_t *reg_offset,
-		uint32_t *reg_data);
-
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
  */
@@ -843,7 +837,7 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
-static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
@@ -877,7 +871,7 @@ static uint32_t kgd_enable_debug_trap(struct kgd_dev *kgd,
 	return 0;
 }
 
-static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
+uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
@@ -893,7 +887,7 @@ static uint32_t kgd_disable_debug_trap(struct kgd_dev *kgd)
 	return 0;
 }
 
-static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_debug_trap_data(struct kgd_dev *kgd,
 					int trap_data0,
 					int trap_data1)
 {
@@ -908,7 +902,7 @@ static uint32_t kgd_set_debug_trap_data(struct kgd_dev *kgd,
 	return 0;
 }
 
-static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 						uint32_t trap_override,
 						uint32_t trap_mask)
 {
@@ -937,7 +931,7 @@ static uint32_t kgd_set_wave_launch_trap_override(struct kgd_dev *kgd,
 	return 0;
 }
 
-static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
@@ -981,7 +975,7 @@ static uint32_t kgd_set_wave_launch_mode(struct kgd_dev *kgd,
  *     sem_rearm_wait_time      -- Wait Count for Semaphore re-arm.
  *     deq_retry_wait_time      -- Wait Count for Global Wave Syncs.
  */
-static void kgd_get_iq_wait_times(struct kgd_dev *kgd,
+void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd,
 					uint32_t *wait_times)
 
 {
@@ -1024,7 +1018,7 @@ void kgd_gfx_v9_set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmi
 	gfxhub_v1_0_setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
-static void kgd_build_grace_period_packet_info(struct kgd_dev *kgd,
+void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
 		uint32_t wait_times,
 		uint32_t grace_period,
 		uint32_t *reg_offset,
@@ -1066,6 +1060,13 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.invalidate_tlbs = kgd_gfx_v9_invalidate_tlbs,
 	.invalidate_tlbs_vmid = kgd_gfx_v9_invalidate_tlbs_vmid,
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
+	.enable_debug_trap = kgd_gfx_v9_enable_debug_trap,
+	.disable_debug_trap = kgd_gfx_v9_disable_debug_trap,
+	.set_debug_trap_data = kgd_gfx_v9_set_debug_trap_data,
+	.set_wave_launch_trap_override = kgd_gfx_v9_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_gfx_v9_set_wave_launch_mode,
+	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
+	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
