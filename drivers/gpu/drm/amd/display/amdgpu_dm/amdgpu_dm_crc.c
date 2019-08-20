@@ -116,6 +116,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	struct drm_dp_aux *aux = NULL;
 	bool enable = false;
 	bool enabled = false;
+	int ret;
 
 	enum amdgpu_dm_pipe_crc_source source = dm_parse_crc_source(src_name);
 
@@ -185,7 +186,10 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	 */
 	enabled = amdgpu_dm_is_valid_crc_source(crtc_state->crc_src);
 	if (!enabled && enable) {
-		drm_crtc_vblank_get(crtc);
+		ret = drm_crtc_vblank_get(crtc);
+		if (ret)
+			return ret;
+
 		if (dm_is_crc_source_dprx(source)) {
 #if !defined(OS_NAME_RHEL_7_4)
 			if (drm_dp_start_crc(aux, crtc)) {
