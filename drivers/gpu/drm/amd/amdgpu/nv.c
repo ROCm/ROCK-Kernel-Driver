@@ -375,9 +375,22 @@ static const struct amdgpu_ip_block_version nv_common_ip_block =
 	.funcs = &nv_common_ip_funcs,
 };
 
-int nv_set_ip_blocks(struct amdgpu_device *adev)
+static int nv_reg_base_init(struct amdgpu_device *adev)
 {
-	/* Set IP register base before any HW register access */
+	int r;
+
+	if (amdgpu_discovery) {
+		r = amdgpu_discovery_reg_base_init(adev);
+		if (r) {
+			DRM_WARN("failed to init reg base from ip discovery table, "
+					"fallback to legacy init method\n");
+			goto legacy_init;
+		}
+
+		return 0;
+	}
+
+legacy_init:
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
 		navi10_reg_base_init(adev);
@@ -385,9 +398,24 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 	case CHIP_NAVI14:
 		navi14_reg_base_init(adev);
 		break;
+	case CHIP_NAVI12:
+		navi12_reg_base_init(adev);
+		break;
 	default:
 		return -EINVAL;
 	}
+
+	return 0;
+}
+
+int nv_set_ip_blocks(struct amdgpu_device *adev)
+{
+	int r;
+
+	/* Set IP register base before any HW register access */
+	r = nv_reg_base_init(adev);
+	if (r)
+		return r;
 
 	adev->nbio_funcs = &nbio_v2_3_funcs;
 
@@ -417,6 +445,25 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
 		if (adev->enable_mes)
 			amdgpu_device_ip_block_add(adev, &mes_v10_1_ip_block);
+		break;
+	case CHIP_NAVI12:
+		amdgpu_device_ip_block_add(adev, &nv_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &navi10_ih_ip_block);
+		amdgpu_device_ip_block_add(adev, &psp_v11_0_ip_block);
+		if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP &&
+		    is_support_sw_smu(adev))
+			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_device_ip_block_add(adev, &dce_virtual_ip_block);
+		else if (amdgpu_device_has_dc_support(adev))
+			amdgpu_device_ip_block_add(adev, &dm_ip_block);
+		amdgpu_device_ip_block_add(adev, &gfx_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v5_0_ip_block);
+		if (adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT &&
+		    is_support_sw_smu(adev))
+			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -590,7 +637,26 @@ static int nv_common_early_init(void *handle)
 			AMD_CG_SUPPORT_BIF_LS;
 		adev->pg_flags = AMD_PG_SUPPORT_VCN |
 			AMD_PG_SUPPORT_VCN_DPG;
-		adev->external_rev_id = adev->rev_id + 0x1; /* ??? */
+		adev->external_rev_id = adev->rev_id + 20;
+		break;
+	case CHIP_NAVI12:
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
+			AMD_CG_SUPPORT_GFX_MGLS |
+			AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_GFX_CP_LS |
+			AMD_CG_SUPPORT_GFX_RLC_LS |
+			AMD_CG_SUPPORT_IH_CG |
+			AMD_CG_SUPPORT_HDP_MGCG |
+			AMD_CG_SUPPORT_HDP_LS |
+			AMD_CG_SUPPORT_SDMA_MGCG |
+			AMD_CG_SUPPORT_SDMA_LS |
+			AMD_CG_SUPPORT_MC_MGCG |
+			AMD_CG_SUPPORT_MC_LS |
+			AMD_CG_SUPPORT_ATHUB_MGCG |
+			AMD_CG_SUPPORT_ATHUB_LS |
+			AMD_CG_SUPPORT_VCN_MGCG;
+		adev->pg_flags = AMD_PG_SUPPORT_VCN_DPG;
+		adev->external_rev_id = adev->rev_id + 0xa;
 		break;
 	default:
 		/* FIXME: not supported yet */
@@ -785,6 +851,7 @@ static int nv_common_set_clockgating_state(void *handle,
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 		adev->nbio_funcs->update_medium_grain_clock_gating(adev,
 				state == AMD_CG_STATE_GATE ? true : false);
 		adev->nbio_funcs->update_medium_grain_light_sleep(adev,

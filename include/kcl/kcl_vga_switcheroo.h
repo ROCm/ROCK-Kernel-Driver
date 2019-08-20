@@ -3,61 +3,45 @@
 
 #include <linux/vga_switcheroo.h>
 
-/**
- * arg change in mainline kernel 3.12
- * but only affect RHEL6 without backport
- */
+#if !defined(HAVE_3ARGS_VGA_SWITCHEROO_CLIENT_OPS_VGA_SWITCHEROO_REGISTER_CLIENT) &&\
+	!defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+struct vga_switcheroo_client_ops {
+       void (*set_gpu_state)(struct pci_dev *dev, enum vga_switcheroo_state);
+       void (*reprobe)(struct pci_dev *dev);
+       bool (*can_switch)(struct pci_dev *dev);
+};
+#endif
+
 static inline int kcl_vga_switcheroo_register_client(struct pci_dev *dev,
 						     const struct vga_switcheroo_client_ops *ops,
 						     bool driver_power_control)
 {
-#if defined(OS_NAME_RHEL_6)
-	return vga_switcheroo_register_client(dev, ops);
-#else
+#if defined(HAVE_3ARGS_VGA_SWITCHEROO_CLIENT_OPS_VGA_SWITCHEROO_REGISTER_CLIENT)
 	return vga_switcheroo_register_client(dev, ops, driver_power_control);
+#elif defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+	return vga_switcheroo_register_client(dev, ops);
+#elif defined(HAVE_4ARGS_VGA_SWITCHEROO_REGISTER_CLIENT)
+	return vga_switcheroo_register_client(dev, ops->set_gpu_state, ops->reprobe, ops->can_switch);
+#else
+	return vga_switcheroo_register_client(dev, ops->set_gpu_state, ops->can_switch);
 #endif
 }
 
-#if defined(CONFIG_VGA_SWITCHEROO)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER)
+static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
+								   enum vga_switcheroo_handler_flags_t handler_flags)
+#elif defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
 						      int handler_flags)
 #else
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-		enum vga_switcheroo_handler_flags_t handler_flags)
+static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
+						      int handler_flags)
 #endif
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-	return vga_switcheroo_register_handler(handler);
-#else
-	/* the value fo handler_flags is enumerated in vga_switcheroo_handler_flags_t
-	 * in vga_switheroo.h */
+#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER)
 	return vga_switcheroo_register_handler(handler, handler_flags);
+#else
+	return vga_switcheroo_register_handler(handler);
 #endif
 }
-#else
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-static inline int kcl_vga_switcheroo_register_handler(struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 6, 0) && \
-  !defined(OS_NAME_SLE_12_3) && \
-  !defined(OS_NAME_SUSE_42_3)
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-						      int handler_flags)
-#else
-static inline int kcl_vga_switcheroo_register_handler(const struct vga_switcheroo_handler *handler,
-		enum vga_switcheroo_handler_flags_t handler_flags)
-#endif
-	{ return 0; }
-#endif /* defined(CONFIG_VGA_SWITCHEROO) */
-
 #endif /* AMDKCL_VGA_SWITCHEROO_H */

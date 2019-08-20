@@ -109,7 +109,7 @@ static void mmhub_v1_0_init_system_aperture_regs(struct amdgpu_device *adev)
 		WREG32_SOC15(MMHUB, 0, mmMC_VM_SYSTEM_APERTURE_HIGH_ADDR,
 			     max(adev->gmc.fb_end, adev->gmc.agp_end) >> 18);
 
-	if (amdgpu_virt_support_skip_setting(adev))
+	if (amdgpu_sriov_vf(adev))
 		return;
 
 	/* Set default page address. */
@@ -157,7 +157,7 @@ static void mmhub_v1_0_init_cache_regs(struct amdgpu_device *adev)
 {
 	uint32_t tmp;
 
-	if (amdgpu_virt_support_skip_setting(adev))
+	if (amdgpu_sriov_vf(adev))
 		return;
 
 	/* Setup L2 cache */
@@ -206,7 +206,7 @@ static void mmhub_v1_0_enable_system_domain(struct amdgpu_device *adev)
 
 static void mmhub_v1_0_disable_identity_aperture(struct amdgpu_device *adev)
 {
-	if (amdgpu_virt_support_skip_setting(adev))
+	if (amdgpu_sriov_vf(adev))
 		return;
 
 	WREG32_SOC15(MMHUB, 0, mmVM_L2_CONTEXT1_IDENTITY_APERTURE_LOW_ADDR_LO32,
@@ -346,7 +346,7 @@ void mmhub_v1_0_gart_disable(struct amdgpu_device *adev)
 				0);
 	WREG32_SOC15(MMHUB, 0, mmMC_VM_MX_L1_TLB_CNTL, tmp);
 
-	if (!amdgpu_virt_support_skip_setting(adev)) {
+	if (!amdgpu_sriov_vf(adev)) {
 		/* Setup L2 cache */
 		tmp = RREG32_SOC15(MMHUB, 0, mmVM_L2_CNTL);
 		tmp = REG_SET_FIELD(tmp, VM_L2_CNTL, ENABLE_L2_CACHE, 0);
@@ -365,7 +365,7 @@ void mmhub_v1_0_set_fault_enable_default(struct amdgpu_device *adev, bool value)
 {
 	u32 tmp;
 
-	if (amdgpu_virt_support_skip_setting(adev))
+	if (amdgpu_sriov_vf(adev))
 		return;
 
 	tmp = RREG32_SOC15(MMHUB, 0, mmVM_L2_PROTECTION_FAULT_CNTL);
@@ -553,3 +553,12 @@ void mmhub_v1_0_get_clockgating(struct amdgpu_device *adev, u32 *flags)
 	if (data & ATC_L2_MISC_CG__MEM_LS_ENABLE_MASK)
 		*flags |= AMD_CG_SUPPORT_MC_LS;
 }
+
+static void mmhub_v1_0_query_ras_error_count(struct amdgpu_device *adev,
+					   void *ras_error_status)
+{
+}
+
+const struct amdgpu_mmhub_funcs mmhub_v1_0_funcs = {
+	.query_ras_error_count = mmhub_v1_0_query_ras_error_count,
+};

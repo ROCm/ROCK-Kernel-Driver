@@ -51,6 +51,15 @@
 #define SMU_FEATURES_HIGH_MASK       0xFFFFFFFF00000000
 #define SMU_FEATURES_HIGH_SHIFT      32
 
+#define SMC_DPM_FEATURE ( \
+	FEATURE_DPM_PREFETCHER_MASK | \
+	FEATURE_DPM_GFXCLK_MASK | \
+	FEATURE_DPM_UCLK_MASK | \
+	FEATURE_DPM_SOCCLK_MASK | \
+	FEATURE_DPM_MP0CLK_MASK | \
+	FEATURE_DPM_FCLK_MASK | \
+	FEATURE_DPM_XGMI_MASK)
+
 /* possible frequency drift (1Mhz) */
 #define EPSILON				1
 
@@ -215,7 +224,6 @@ static int arcturus_get_smu_feature_index(struct smu_context *smc, uint32_t inde
 
 	mapping = arcturus_feature_mask_map[index];
 	if (!(mapping.valid_mapping)) {
-		pr_warn("Unsupported SMU feature: %d\n", index);
 		return -EINVAL;
 	}
 
@@ -1326,7 +1334,7 @@ static int arcturus_get_power_limit(struct smu_context *smu,
 				     bool asic_default)
 {
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	uint32_t asic_default_power_limit;
+	uint32_t asic_default_power_limit = 0;
 	int ret = 0;
 	int power_src;
 
@@ -1874,6 +1882,17 @@ static void arcturus_dump_pptable(struct smu_context *smu)
 
 }
 
+static bool arcturus_is_dpm_running(struct smu_context *smu)
+{
+	int ret = 0;
+	uint32_t feature_mask[2];
+	unsigned long feature_enabled;
+	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
+	feature_enabled = (unsigned long)((uint64_t)feature_mask[0] |
+			   ((uint64_t)feature_mask[1] << 32));
+	return !!(feature_enabled & SMC_DPM_FEATURE);
+}
+
 static const struct pptable_funcs arcturus_ppt_funcs = {
 	/* translate smu index into arcturus specific index */
 	.get_smu_msg_index = arcturus_get_smu_msg_index,
@@ -1911,6 +1930,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	/* debug (internal used) */
 	.dump_pptable = arcturus_dump_pptable,
 	.get_power_limit = arcturus_get_power_limit,
+	.is_dpm_running = arcturus_is_dpm_running,
 };
 
 void arcturus_set_ppt_funcs(struct smu_context *smu)
@@ -1918,6 +1938,5 @@ void arcturus_set_ppt_funcs(struct smu_context *smu)
 	struct smu_table_context *smu_table = &smu->smu_table;
 
 	smu->ppt_funcs = &arcturus_ppt_funcs;
-	smu->smc_if_version = SMU11_DRIVER_IF_VERSION;
 	smu_table->table_count = TABLE_COUNT;
 }

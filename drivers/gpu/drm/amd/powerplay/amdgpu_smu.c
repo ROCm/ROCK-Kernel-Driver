@@ -28,6 +28,7 @@
 #include "soc15_common.h"
 #include "smu_v11_0.h"
 #include "atom.h"
+#include "amd_pcie.h"
 
 #undef __SMU_DUMMY_MAP
 #define __SMU_DUMMY_MAP(type)	#type
@@ -37,8 +38,8 @@ static const char* __smu_message_names[] = {
 
 const char *smu_get_message_name(struct smu_context *smu, enum smu_message_type type)
 {
-	if (type < 0 || type > SMU_MSG_MAX_COUNT)
-		return "unknow smu message";
+	if (type < 0 || type >= SMU_MSG_MAX_COUNT)
+		return "unknown smu message";
 	return __smu_message_names[type];
 }
 
@@ -50,8 +51,8 @@ static const char* __smu_feature_names[] = {
 
 const char *smu_get_feature_name(struct smu_context *smu, enum smu_feature_mask feature)
 {
-	if (feature < 0 || feature > SMU_FEATURE_COUNT)
-		return "unknow smu feature";
+	if (feature < 0 || feature >= SMU_FEATURE_COUNT)
+		return "unknown smu feature";
 	return __smu_feature_names[feature];
 }
 
@@ -62,6 +63,8 @@ size_t smu_sys_get_pp_feature_mask(struct smu_context *smu, char *buf)
 	uint32_t feature_mask[2] = { 0 };
 	int32_t feature_index = 0;
 	uint32_t count = 0;
+	uint32_t sort_feature[SMU_FEATURE_COUNT];
+	uint64_t hw_feature_count = 0;
 
 	ret = smu_feature_get_enabled_mask(smu, feature_mask, 2);
 	if (ret)
@@ -74,11 +77,17 @@ size_t smu_sys_get_pp_feature_mask(struct smu_context *smu, char *buf)
 		feature_index = smu_feature_get_index(smu, i);
 		if (feature_index < 0)
 			continue;
+		sort_feature[feature_index] = i;
+		hw_feature_count++;
+	}
+
+	for (i = 0; i < hw_feature_count; i++) {
 		size += sprintf(buf + size, "%02d. %-20s (%2d) : %s\n",
 			       count++,
-			       smu_get_feature_name(smu, i),
-			       feature_index,
-			       !!smu_feature_is_enabled(smu, i) ? "enabeld" : "disabled");
+			       smu_get_feature_name(smu, sort_feature[i]),
+			       i,
+			       !!smu_feature_is_enabled(smu, sort_feature[i]) ?
+			       "enabled" : "disabled");
 	}
 
 failed:
@@ -400,7 +409,12 @@ int smu_get_power_num_states(struct smu_context *smu,
 int smu_common_read_sensor(struct smu_context *smu, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size)
 {
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
 	int ret = 0;
+
+	if(!data || !size)
+		return -EINVAL;
 
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_STABLE_PSTATE_SCLK:
@@ -423,6 +437,10 @@ int smu_common_read_sensor(struct smu_context *smu, enum amd_pp_sensors sensor,
 		*(uint32_t *)data = smu_feature_is_enabled(smu, SMU_FEATURE_DPM_VCE_BIT) ? 1 : 0;
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_VCN_POWER_STATE:
+		*(uint32_t *)data = power_gate->vcn_gated ? 0 : 1;
+		*size = 4;
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -438,6 +456,7 @@ int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int
 		     void *table_data, bool drv2smu)
 {
 	struct smu_table_context *smu_table = &smu->smu_table;
+	struct amdgpu_device *adev = smu->adev;
 	struct smu_table *table = NULL;
 	int ret = 0;
 	int table_id = smu_table_get_index(smu, table_index);
@@ -464,6 +483,9 @@ int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int
 					  table_id | ((argument & 0xFFFF) << 16));
 	if (ret)
 		return ret;
+
+	/* flush hdp cache */
+	adev->nbio_funcs->hdp_flush(adev, NULL);
 
 	if (!drv2smu)
 		memcpy(table_data, table->cpu_addr, table->size);
@@ -707,6 +729,7 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 	case CHIP_VEGA20:
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 	case CHIP_ARCTURUS:
 		if (adev->pm.pp_feature & PP_OVERDRIVE_MASK)
 			smu->od_enabled = true;
@@ -961,6 +984,47 @@ static int smu_fini_fb_allocations(struct smu_context *smu)
 	return 0;
 }
 
+static int smu_override_pcie_parameters(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+	uint32_t pcie_gen = 0, pcie_width = 0, smu_pcie_arg;
+	int ret;
+
+	if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN4)
+		pcie_gen = 3;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)
+		pcie_gen = 2;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2)
+		pcie_gen = 1;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1)
+		pcie_gen = 0;
+
+	/* Bit 31:16: LCLK DPM level. 0 is DPM0, and 1 is DPM1
+	 * Bit 15:8:  PCIE GEN, 0 to 3 corresponds to GEN1 to GEN4
+	 * Bit 7:0:   PCIE lane width, 1 to 7 corresponds is x1 to x32
+	 */
+	if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X16)
+		pcie_width = 6;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X12)
+		pcie_width = 5;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X8)
+		pcie_width = 4;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X4)
+		pcie_width = 3;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X2)
+		pcie_width = 2;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X1)
+		pcie_width = 1;
+
+	smu_pcie_arg = (1 << 16) | (pcie_gen << 8) | pcie_width;
+	ret = smu_send_smc_msg_with_param(smu,
+					  SMU_MSG_OverridePcieParameters,
+					  smu_pcie_arg);
+	if (ret)
+		pr_err("[%s] Attempt to override pcie params failed!\n", __func__);
+	return ret;
+}
+
 static int smu_smc_table_hw_init(struct smu_context *smu,
 				 bool initialize)
 {
@@ -1049,6 +1113,10 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 		return ret;
 
 	if (adev->asic_type != CHIP_ARCTURUS) {
+		ret = smu_override_pcie_parameters(smu);
+		if (ret)
+			return ret;
+
 		ret = smu_notify_display_change(smu);
 		if (ret)
 			return ret;

@@ -140,17 +140,40 @@ static int gmc_v10_0_process_interrupt(struct amdgpu_device *adev,
 	}
 
 	if (printk_ratelimit()) {
+		struct amdgpu_task_info task_info;
+
+		memset(&task_info, 0, sizeof(struct amdgpu_task_info));
+		amdgpu_vm_get_task_info(adev, entry->pasid, &task_info);
+
 		dev_err(adev->dev,
-			"[%s] VMC page fault (src_id:%u ring:%u vmid:%u pasid:%u)\n",
+			"[%s] page fault (src_id:%u ring:%u vmid:%u pasid:%u, "
+			"for process %s pid %d thread %s pid %d)\n",
 			entry->vmid_src ? "mmhub" : "gfxhub",
 			entry->src_id, entry->ring_id, entry->vmid,
-			entry->pasid);
-		dev_err(adev->dev, "  at page 0x%016llx from %d\n",
+			entry->pasid, task_info.process_name, task_info.tgid,
+			task_info.task_name, task_info.pid);
+		dev_err(adev->dev, "  in page starting at address 0x%016llx from client %d\n",
 			addr, entry->client_id);
-		if (!amdgpu_sriov_vf(adev))
+		if (!amdgpu_sriov_vf(adev)) {
 			dev_err(adev->dev,
-				"VM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
+				"GCVM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
 				status);
+			dev_err(adev->dev, "\t MORE_FAULTS: 0x%lx\n",
+				REG_GET_FIELD(status,
+				GCVM_L2_PROTECTION_FAULT_STATUS, MORE_FAULTS));
+			dev_err(adev->dev, "\t WALKER_ERROR: 0x%lx\n",
+				REG_GET_FIELD(status,
+				GCVM_L2_PROTECTION_FAULT_STATUS, WALKER_ERROR));
+			dev_err(adev->dev, "\t PERMISSION_FAULTS: 0x%lx\n",
+				REG_GET_FIELD(status,
+				GCVM_L2_PROTECTION_FAULT_STATUS, PERMISSION_FAULTS));
+			dev_err(adev->dev, "\t MAPPING_ERROR: 0x%lx\n",
+				REG_GET_FIELD(status,
+				GCVM_L2_PROTECTION_FAULT_STATUS, MAPPING_ERROR));
+			dev_err(adev->dev, "\t RW: 0x%lx\n",
+				REG_GET_FIELD(status,
+				GCVM_L2_PROTECTION_FAULT_STATUS, RW));
+		}
 	}
 
 	return 0;
@@ -525,6 +548,7 @@ static int gmc_v10_0_mc_init(struct amdgpu_device *adev)
 		switch (adev->asic_type) {
 		case CHIP_NAVI10:
 		case CHIP_NAVI14:
+		case CHIP_NAVI12:
 		default:
 			adev->gmc.gart_size = 512ULL << 20;
 			break;
@@ -603,10 +627,11 @@ static int gmc_v10_0_sw_init(void *handle)
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 		adev->num_vmhubs = 2;
 		/*
 		 * To fulfill 4-level page support,
-		 * vm size is 256TB (48bit), maximum size of Navi10/Navi14,
+		 * vm size is 256TB (48bit), maximum size of Navi10/Navi14/Navi12,
 		 * block size 512 (9bit)
 		 */
 		amdgpu_vm_adjust_size(adev, 256 * 1024, 9, 3, 48);
@@ -721,6 +746,7 @@ static void gmc_v10_0_init_golden_registers(struct amdgpu_device *adev)
 	switch (adev->asic_type) {
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 		break;
 	default:
 		break;

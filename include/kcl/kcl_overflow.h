@@ -2,9 +2,14 @@
 #ifndef AMDKCL_OVERFLOW_H
 #define AMDKCL_OVERFLOW_H
 
-#ifndef HAVE_OVERFLOW_H
+#ifdef HAVE_OVERFLOW_H
+#include <linux/overflow.h>
+#endif
+
+#ifndef struct_size
 #include <linux/compiler.h>
 
+#ifndef check_add_overflow
 /*
  * In the fallback code below, we need to compute the minimum and
  * maximum values representable in a given type. These macros may also
@@ -202,11 +207,9 @@
 
 
 #endif /* COMPILER_HAS_GENERIC_BUILTIN_OVERFLOW */
-#else
-#include <linux/overflow.h>
-#endif /* HAVE_OVERFLOW_H */
+#endif
 
-#ifndef struct_size
+#ifndef __ab_c_size
 static inline __must_check size_t __ab_c_size(size_t n, size_t size, size_t c)
 {
 	size_t bytes;
@@ -218,6 +221,7 @@ static inline __must_check size_t __ab_c_size(size_t n, size_t size, size_t c)
 
 	return bytes;
 }
+#endif
 
 /**
  * struct_size() - Calculate size of structure with trailing array.

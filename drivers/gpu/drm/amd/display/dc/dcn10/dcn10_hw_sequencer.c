@@ -701,7 +701,8 @@ static void false_optc_underflow_wa(
 		dc->hwss.wait_for_mpcc_disconnect(dc, dc->res_pool, old_pipe_ctx);
 	}
 
-	tg->funcs->set_blank_data_double_buffer(tg, true);
+	if (tg->funcs->set_blank_data_double_buffer)
+		tg->funcs->set_blank_data_double_buffer(tg, true);
 
 	if (tg->funcs->is_optc_underflow_occurred(tg) && !underflow)
 		tg->funcs->clear_optc_underflow(tg);
@@ -822,6 +823,9 @@ static void dcn10_reset_back_end_for_pipe(
 		pipe_ctx->stream_res.tg->funcs->disable_crtc(pipe_ctx->stream_res.tg);
 
 		pipe_ctx->stream_res.tg->funcs->enable_optc_clock(pipe_ctx->stream_res.tg, false);
+		if (pipe_ctx->stream_res.tg->funcs->set_drr)
+			pipe_ctx->stream_res.tg->funcs->set_drr(
+					pipe_ctx->stream_res.tg, NULL);
 	}
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++)
@@ -1070,9 +1074,16 @@ static void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 		}
 	}
 
-	/* Cannot reset the MPC mux if seamless boot */
-	if (!can_apply_seamless_boot)
-		dc->res_pool->mpc->funcs->mpc_init(dc->res_pool->mpc);
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+		/* Cannot reset the MPC mux if seamless boot */
+		if (pipe_ctx->stream != NULL && can_apply_seamless_boot)
+			continue;
+
+		dc->res_pool->mpc->funcs->mpc_init_single_inst(
+				dc->res_pool->mpc, i);
+	}
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct timing_generator *tg = dc->res_pool->timing_generators[i];
@@ -1227,8 +1238,6 @@ static void dcn10_init_hw(struct dc *dc)
 	}
 
 	enable_power_gating_plane(dc->hwseq, true);
-
-	memset(&dc->clk_mgr->clks, 0, sizeof(dc->clk_mgr->clks));
 }
 
 static void dcn10_reset_hw_ctx_wrap(
@@ -1365,6 +1374,34 @@ static bool dcn10_set_input_transfer_func(struct pipe_ctx *pipe_ctx,
 	return result;
 }
 
+#define MAX_NUM_HW_POINTS 0x200
+
+static void log_tf(struct dc_context *ctx,
+				struct dc_transfer_func *tf, uint32_t hw_points_num)
+{
+	// DC_LOG_GAMMA is default logging of all hw points
+	// DC_LOG_ALL_GAMMA logs all points, not only hw points
+	// DC_LOG_ALL_TF_POINTS logs all channels of the tf
+	int i = 0;
+
+	DC_LOGGER_INIT(ctx->logger);
+	DC_LOG_GAMMA("Gamma Correction TF");
+	DC_LOG_ALL_GAMMA("Logging all tf points...");
+	DC_LOG_ALL_TF_CHANNELS("Logging all channels...");
+
+	for (i = 0; i < hw_points_num; i++) {
+		DC_LOG_GAMMA("R %d %llu\n", i, tf->tf_pts.red[i].value);
+		DC_LOG_ALL_TF_CHANNELS("G %d, %llu\n", i, tf->tf_pts.green[i].value);
+		DC_LOG_ALL_TF_CHANNELS("B %d, %llu\n", i, tf->tf_pts.blue[i].value);
+	}
+
+	for (i = hw_points_num; i < MAX_NUM_HW_POINTS; i++) {
+		DC_LOG_ALL_GAMMA("R %d %llu\n", i, tf->tf_pts.red[i].value);
+		DC_LOG_ALL_TF_CHANNELS("G %d %llu\n", i, tf->tf_pts.green[i].value);
+		DC_LOG_ALL_TF_CHANNELS("B %d %llu\n", i, tf->tf_pts.blue[i].value);
+	}
+}
+
 static bool
 dcn10_set_output_transfer_func(struct pipe_ctx *pipe_ctx,
 			       const struct dc_stream_state *stream)
@@ -1392,6 +1429,10 @@ dcn10_set_output_transfer_func(struct pipe_ctx *pipe_ctx,
 				&dpp->regamma_params, OPP_REGAMMA_USER);
 	} else
 		dpp->funcs->dpp_program_regamma_pwl(dpp, NULL, OPP_REGAMMA_BYPASS);
+
+	log_tf(stream->ctx,
+			stream->out_transfer_func,
+			dpp->regamma_params.hw_points_num);
 
 	return true;
 }
@@ -1803,6 +1844,36 @@ static void program_gamut_remap(struct pipe_ctx *pipe_ctx)
 	pipe_ctx->plane_res.dpp->funcs->dpp_set_gamut_remap(pipe_ctx->plane_res.dpp, &adjust);
 }
 
+
+static bool dcn10_is_rear_mpo_fix_required(struct pipe_ctx *pipe_ctx, enum dc_color_space colorspace)
+{
+	if (pipe_ctx->plane_state && pipe_ctx->plane_state->layer_index > 0 && is_rgb_cspace(colorspace)) {
+		if (pipe_ctx->top_pipe) {
+			struct pipe_ctx *top = pipe_ctx->top_pipe;
+
+			while (top->top_pipe)
+				top = top->top_pipe; // Traverse to top pipe_ctx
+			if (top->plane_state && top->plane_state->layer_index == 0)
+				return true; // Front MPO plane not hidden
+		}
+	}
+	return false;
+}
+
+static void dcn10_set_csc_adjustment_rgb_mpo_fix(struct pipe_ctx *pipe_ctx, uint16_t *matrix)
+{
+	// Override rear plane RGB bias to fix MPO brightness
+	uint16_t rgb_bias = matrix[3];
+
+	matrix[3] = 0;
+	matrix[7] = 0;
+	matrix[11] = 0;
+	pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment(pipe_ctx->plane_res.dpp, matrix);
+	matrix[3] = rgb_bias;
+	matrix[7] = rgb_bias;
+	matrix[11] = rgb_bias;
+}
+
 static void dcn10_program_output_csc(struct dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		enum dc_color_space colorspace,
@@ -1810,8 +1881,25 @@ static void dcn10_program_output_csc(struct dc *dc,
 		int opp_id)
 {
 	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
-		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment != NULL)
-			pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment(pipe_ctx->plane_res.dpp, matrix);
+		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment != NULL) {
+
+			/* MPO is broken with RGB colorspaces when OCSC matrix
+			 * brightness offset >= 0 on DCN1 due to OCSC before MPC
+			 * Blending adds offsets from front + rear to rear plane
+			 *
+			 * Fix is to set RGB bias to 0 on rear plane, top plane
+			 * black value pixels add offset instead of rear + front
+			 */
+
+			int16_t rgb_bias = matrix[3];
+			// matrix[3/7/11] are all the same offset value
+
+			if (rgb_bias > 0 && dcn10_is_rear_mpo_fix_required(pipe_ctx, colorspace)) {
+				dcn10_set_csc_adjustment_rgb_mpo_fix(pipe_ctx, matrix);
+			} else {
+				pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_adjustment(pipe_ctx->plane_res.dpp, matrix);
+			}
+		}
 	} else {
 		if (pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default != NULL)
 			pipe_ctx->plane_res.dpp->funcs->dpp_set_csc_default(pipe_ctx->plane_res.dpp, colorspace);
@@ -2151,7 +2239,8 @@ void update_dchubp_dpp(
 			dc->res_pool->dccg->funcs->update_dpp_dto(
 					dc->res_pool->dccg,
 					dpp->inst,
-					pipe_ctx->plane_res.bw.dppclk_khz);
+					pipe_ctx->plane_res.bw.dppclk_khz,
+					false);
 		else
 			dc->clk_mgr->clks.dppclk_khz = should_divided_by_2 ?
 						dc->clk_mgr->clks.dispclk_khz / 2 :
@@ -2788,14 +2877,10 @@ static void dcn10_update_pending_status(struct pipe_ctx *pipe_ctx)
 
 static void dcn10_update_dchub(struct dce_hwseq *hws, struct dchub_init_data *dh_data)
 {
-	if (hws->ctx->dc->res_pool->hubbub != NULL) {
-		struct hubp *hubp = hws->ctx->dc->res_pool->hubps[0];
+	struct hubbub *hubbub = hws->ctx->dc->res_pool->hubbub;
 
-		if (hubp->funcs->hubp_update_dchub)
-			hubp->funcs->hubp_update_dchub(hubp, dh_data);
-		else
-			hubbub1_update_dchub(hws->ctx->dc->res_pool->hubbub, dh_data);
-	}
+	/* In DCN, this programming sequence is owned by the hubbub */
+	hubbub->funcs->update_dchub(hubbub, dh_data);
 }
 
 static void dcn10_set_cursor_position(struct pipe_ctx *pipe_ctx)

@@ -73,7 +73,7 @@ void amdgpu_unregister_gpu_instance(struct amdgpu_device *adev)
  * This is the main unload function for KMS (all asics).
  * Returns 0 on success.
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 int amdgpu_driver_unload_kms(struct drm_device *dev)
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev)
@@ -1019,7 +1019,7 @@ static int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file
  */
 void amdgpu_driver_lastclose_kms(struct drm_device *dev)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4 ,16, 0)
+#if !defined(HAVE_DRM_FB_HELPER_LASTCLOSE)
 	struct amdgpu_device *adev = dev->dev_private;
 	amdgpu_fbdev_restore_mode(adev);
 #else
@@ -1277,8 +1277,7 @@ void amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int pipe)
 	amdgpu_irq_put(adev, &adev->crtc_irq, idx);
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && !defined(OS_NAME_SUSE_15_1)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 /**
  * amdgpu_get_vblank_timestamp_kms - get vblank timestamp
  *

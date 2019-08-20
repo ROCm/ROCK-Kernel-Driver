@@ -26,7 +26,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
 #endif
 #include <linux/slab.h>
@@ -44,6 +44,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
+#include "kfd_debug_events.h"
 #include "kfd_ipc.h"
 #include "kfd_trace.h"
 
@@ -1633,24 +1634,35 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 {
 	int retval;
 	struct kfd_ioctl_alloc_queue_gws_args *args = data;
+	struct queue *q;
 	struct kfd_dev *dev;
 
 	if (!hws_gws_support)
 		return -ENODEV;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev) {
-		pr_debug("Could not find gpu id 0x%x\n", args->gpu_id);
-		return -ENODEV;
-	}
-	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS)
-		return -ENODEV;
-
 	mutex_lock(&p->mutex);
+	q = pqm_get_user_queue(&p->pqm, args->queue_id);
+
+	if (q) {
+		dev = q->device;
+	} else {
+		retval = -EINVAL;
+		goto out_unlock;
+	}
+
+	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		retval = -ENODEV;
+		goto out_unlock;
+	}
+
 	retval = pqm_set_gws(&p->pqm, args->queue_id, args->num_gws ? dev->gws : NULL);
 	mutex_unlock(&p->mutex);
 
 	args->first_gws = 0;
+	return retval;
+
+out_unlock:
+	mutex_unlock(&p->mutex);
 	return retval;
 }
 
@@ -2751,6 +2763,18 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = dev->kfd2kgd->enable_debug_trap(dev->kgd,
 					pdd->trap_debug_wave_launch_mode,
 					dev->vm_info.last_vmid_kfd);
+			if (r)
+				break;
+
+			r = kfd_dbg_ev_enable(pdd);
+			if (r >= 0) {
+				args->data3 = r;
+				r = 0;
+			} else {
+				pdd->debug_trap_enabled = false;
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			}
+
 			break;
 		default:
 			pr_err("Invalid trap enable option: %i\n",
@@ -2797,6 +2821,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				queue_id_array); /* array of queue ids */
 		if (r)
 			goto unlock_out;
+		break;
+	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
+		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,
+						 args->data2,
+						 &args->data3);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

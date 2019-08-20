@@ -14,5 +14,17 @@ AC_DEFUN([AC_AMDGPU_ARCH_IO_RESERVE_FREE_MEMTYPE_WC],
 		AC_DEFINE(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC, 1, [arch_io_reserve_memtype_wc() and arch_io_free_memtype_wc() are available])
 	], [
 		AC_MSG_RESULT(no)
+		AC_MSG_CHECKING([whether arch_io_reserve_memtype_wc() and arch_io_free_memtype_wc() are available in drm_backport.h])
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_backport.h>
+		], [
+			arch_io_reserve_memtype_wc(0, 0);
+			arch_io_free_memtype_wc(0, 0);
+		], [
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC, 1, [arch_io_reserve_memtype_wc() and arch_io_free_memtype_wc() are available in drm_backport.h])
+		], [
+			AC_MSG_RESULT(no)
+		])
 	])
 ])

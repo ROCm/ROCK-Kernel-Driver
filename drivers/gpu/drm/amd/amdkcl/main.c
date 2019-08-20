@@ -8,9 +8,7 @@ extern void amdkcl_drm_init(void);
 extern void amdkcl_fence_init(void);
 extern void amdkcl_io_init(void);
 extern void amdkcl_dev_cgroup_init(void);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
 extern int amdkcl_workqueue_init_early(void);
-#endif
 extern void amdkcl_mm_init(void);
 extern void amdkcl_perf_event_init(void);
 
@@ -22,9 +20,7 @@ int __init amdkcl_init(void)
 	amdkcl_io_init();
 	amdkcl_dev_cgroup_init();
 	amdkcl_pci_init();
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
 	amdkcl_workqueue_init_early();
-#endif
 	amdkcl_mm_init();
 	amdkcl_perf_event_init();
 

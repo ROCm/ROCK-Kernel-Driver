@@ -947,7 +947,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 					 amdgpu_dither_enum_list, sz);
 
 	if (amdgpu_device_has_dc_support(adev)) {
-#if !defined(HAVE_MAX_BPC_AND_MAX_REQUESTED_BPC_IN_STRUCT_DRM_CONNECTOR_STATE)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		adev->mode_info.max_bpc_property =
 			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)
@@ -968,7 +968,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 						 "freesync_capable");
 		if (!adev->mode_info.freesync_capable_property)
 			return -ENOMEM;
-#if !defined(HAVE_VRR_CAPABLE_PROPERTY_IN_STRUCT_DRM_CONNECTOR)
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 		adev->mode_info.vrr_capable_property =
 			drm_property_create_bool(adev->ddev,
 						 DRM_MODE_PROP_IMMUTABLE,

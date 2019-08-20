@@ -228,14 +228,12 @@ struct resource_pool {
 
 struct dcn_fe_bandwidth {
 	int dppclk_khz;
-
 };
 
 struct stream_resource {
 	struct output_pixel_processor *opp;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct display_stream_compressor *dsc;
-	int dscclk_khz;
 #endif
 	struct timing_generator *tg;
 	struct stream_encoder *stream_enc;

@@ -515,6 +515,8 @@ static int navi10_store_powerplay_table(struct smu_context *smu)
 
 static int navi10_tables_init(struct smu_context *smu, struct smu_table *tables)
 {
+	struct smu_table_context *smu_table = &smu->smu_table;
+
 	SMU_TABLE_INIT(tables, SMU_TABLE_PPTABLE, sizeof(PPTable_t),
 		       PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM);
 	SMU_TABLE_INIT(tables, SMU_TABLE_WATERMARKS, sizeof(Watermarks_t),
@@ -529,7 +531,33 @@ static int navi10_tables_init(struct smu_context *smu, struct smu_table *tables)
 		       sizeof(DpmActivityMonitorCoeffInt_t), PAGE_SIZE,
 	               AMDGPU_GEM_DOMAIN_VRAM);
 
+	smu_table->metrics_table = kzalloc(sizeof(SmuMetrics_t), GFP_KERNEL);
+	if (!smu_table->metrics_table)
+		return -ENOMEM;
+	smu_table->metrics_time = 0;
+
 	return 0;
+}
+
+static int navi10_get_metrics_table(struct smu_context *smu,
+				    SmuMetrics_t *metrics_table)
+{
+	struct smu_table_context *smu_table= &smu->smu_table;
+	int ret = 0;
+
+	if (!smu_table->metrics_time || time_after(jiffies, smu_table->metrics_time + HZ / 1000)) {
+		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
+				(void *)smu_table->metrics_table, false);
+		if (ret) {
+			pr_info("Failed to export SMU metrics table!\n");
+			return ret;
+		}
+		smu_table->metrics_time = jiffies;
+	}
+
+	memcpy(metrics_table, smu_table->metrics_table, sizeof(SmuMetrics_t));
+
+	return ret;
 }
 
 static int navi10_allocate_dpm_context(struct smu_context *smu)
@@ -590,44 +618,38 @@ static int navi10_set_default_dpm_table(struct smu_context *smu)
 
 static int navi10_dpm_set_uvd_enable(struct smu_context *smu, bool enable)
 {
-	int ret = 0;
 	struct smu_power_context *smu_power = &smu->smu_power;
 	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
 
-	if (enable && power_gate->uvd_gated) {
-		if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UVD_BIT)) {
+	if (enable) {
+		/* vcn dpm on is a prerequisite for vcn power gate messages */
+		if (smu_feature_is_enabled(smu, SMU_FEATURE_VCN_PG_BIT)) {
 			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_PowerUpVcn, 1);
 			if (ret)
 				return ret;
 		}
-		power_gate->uvd_gated = false;
+		power_gate->vcn_gated = false;
 	} else {
-		if (!enable && !power_gate->uvd_gated) {
-			if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UVD_BIT)) {
-				ret = smu_send_smc_msg(smu, SMU_MSG_PowerDownVcn);
-				if (ret)
-					return ret;
-			}
-			power_gate->uvd_gated = true;
+		if (smu_feature_is_enabled(smu, SMU_FEATURE_VCN_PG_BIT)) {
+			ret = smu_send_smc_msg(smu, SMU_MSG_PowerDownVcn);
+			if (ret)
+				return ret;
 		}
+		power_gate->vcn_gated = true;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int navi10_get_current_clk_freq_by_table(struct smu_context *smu,
 				       enum smu_clk_type clk_type,
 				       uint32_t *value)
 {
-	static SmuMetrics_t metrics;
 	int ret = 0, clk_id = 0;
+	SmuMetrics_t metrics;
 
-	if (!value)
-		return -EINVAL;
-
-	memset(&metrics, 0, sizeof(metrics));
-
-	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0, (void *)&metrics, false);
+	ret = navi10_get_metrics_table(smu, &metrics);
 	if (ret)
 		return ret;
 
@@ -915,8 +937,7 @@ static int navi10_get_gpu_power(struct smu_context *smu, uint32_t *value)
 	if (!value)
 		return -EINVAL;
 
-	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0, (void *)&metrics,
-			       false);
+	ret = navi10_get_metrics_table(smu, &metrics);
 	if (ret)
 		return ret;
 
@@ -935,10 +956,7 @@ static int navi10_get_current_activity_percent(struct smu_context *smu,
 	if (!value)
 		return -EINVAL;
 
-	msleep(1);
-
-	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
-			       (void *)&metrics, false);
+	ret = navi10_get_metrics_table(smu, &metrics);
 	if (ret)
 		return ret;
 
@@ -977,10 +995,7 @@ static int navi10_get_fan_speed_rpm(struct smu_context *smu,
 	if (!speed)
 		return -EINVAL;
 
-	memset(&metrics, 0, sizeof(metrics));
-
-	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
-			       (void *)&metrics, false);
+	ret = navi10_get_metrics_table(smu, &metrics);
 	if (ret)
 		return ret;
 
@@ -1333,7 +1348,7 @@ static int navi10_thermal_get_temperature(struct smu_context *smu,
 	if (!value)
 		return -EINVAL;
 
-	ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0, (void *)&metrics, false);
+	ret = navi10_get_metrics_table(smu, &metrics);
 	if (ret)
 		return ret;
 
@@ -1366,6 +1381,9 @@ static int navi10_read_sensor(struct smu_context *smu,
 	struct smu_table_context *table_context = &smu->smu_table;
 	PPTable_t *pptable = table_context->driver_pptable;
 
+	if(!data || !size)
+		return -EINVAL;
+
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_MAX_FAN_RPM:
 		*(uint32_t *)data = pptable->FanMaximumRpm;
@@ -1387,7 +1405,7 @@ static int navi10_read_sensor(struct smu_context *smu,
 		*size = 4;
 		break;
 	default:
-		return -EINVAL;
+		ret = smu_smc_read_sensor(smu, sensor, data, size);
 	}
 
 	return ret;
@@ -1521,7 +1539,7 @@ static int navi10_get_power_limit(struct smu_context *smu,
 				     bool asic_default)
 {
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	uint32_t asic_default_power_limit;
+	uint32_t asic_default_power_limit = 0;
 	int ret = 0;
 	int power_src;
 
@@ -1611,6 +1629,5 @@ void navi10_set_ppt_funcs(struct smu_context *smu)
 	struct smu_table_context *smu_table = &smu->smu_table;
 
 	smu->ppt_funcs = &navi10_ppt_funcs;
-	smu->smc_if_version = SMU11_DRIVER_IF_VERSION;
 	smu_table->table_count = TABLE_COUNT;
 }

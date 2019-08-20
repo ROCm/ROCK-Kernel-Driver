@@ -25,12 +25,12 @@
  *    Jerome Glisse <glisse@freedesktop.org>
  */
 #include <linux/pagemap.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE)
 #include <linux/sync_file.h>
 #endif
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
 #endif
 #include "amdgpu.h"
@@ -224,12 +224,14 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
 #endif
+#if defined(HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#endif
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_SIGNAL:
 #endif
@@ -841,7 +843,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 	if (error && backoff)
 		ttm_eu_backoff_reservation(&parser->ticket,
 					   &parser->validated);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
 #if !defined(BUILD_AS_DKMS)
@@ -1159,7 +1161,7 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 	return 0;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 						 uint32_t handle, u64 point,
 						 u64 flags)
@@ -1316,12 +1318,14 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 
 		switch (chunk->chunk_id) {
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
+#if defined(HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
+#endif
 			r = amdgpu_cs_process_fence_dep(p, chunk);
 			if (r)
 				return r;
 			break;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 			r = amdgpu_cs_process_syncobj_in_dep(p, chunk);
 			if (r)
@@ -1332,6 +1336,8 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 			if (r)
 				return r;
 			break;
+#endif
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 			r = amdgpu_cs_process_syncobj_timeline_in_dep(p, chunk);
 			if (r)
@@ -1349,7 +1355,7 @@ static int amdgpu_cs_dependencies(struct amdgpu_device *adev,
 	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
@@ -1408,7 +1414,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
 	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	amdgpu_cs_post_dependencies(p);
 #endif
 
@@ -1537,7 +1543,7 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 		r = PTR_ERR(fence);
 	else if (fence) {
 		r = kcl_fence_wait_timeout(fence, true, timeout);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else
@@ -1591,7 +1597,7 @@ static struct dma_fence *amdgpu_cs_get_fence(struct amdgpu_device *adev,
 	return fence;
 }
 
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_DRM_AMDGPU_FENCE_TO_HANDLE) && defined(HAVE_DMA_FENCE_GET_STUB)
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
@@ -1654,7 +1660,7 @@ int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 int amdgpu_cs_fence_to_handle_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *filp)
 {
-	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 4.13\n");
+	DRM_ERROR("FENCE_TO_HANDLE ioctl is not supported for kernel < 5.0\n");
 	return -EINVAL;
 }
 #endif
@@ -1694,7 +1700,7 @@ static int amdgpu_cs_wait_all_fences(struct amdgpu_device *adev,
 		if (r == 0)
 			break;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		if (r > 0 && fence->status)
 			r = fence->status;
 #else
@@ -1762,7 +1768,7 @@ out:
 	wait->out.first_signaled = first;
 
 	if (first < fence_count && array[first])
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
 		r = array[first]->status;
 #else
 		r = array[first]->error;

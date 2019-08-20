@@ -12,12 +12,6 @@
 #define PCI_EXP_DEVCTL2_ATOMIC_REQ	0x0040	/* Set Atomic requests */
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0)
-extern const unsigned char *_kcl_pcie_link_speed;
-#endif
-
-#define kcl_pcie_link_speed _kcl_pcie_link_speed
-
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif

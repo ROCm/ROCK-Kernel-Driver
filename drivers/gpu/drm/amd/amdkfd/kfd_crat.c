@@ -832,7 +832,7 @@ static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
 	return 0;
 }
 
-#if !defined(HAVE_ZONE_MANAGED_PAGES) && defined(BUILD_AS_DKMS)
+#if !defined(HAVE_ZONE_MANAGED_PAGES)
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
 #if defined(HAVE_MANAGED_PAGES_IN_STRUCT_ZONE)

@@ -65,13 +65,7 @@ MODULE_FIRMWARE("amdgpu/raven_sdma.bin");
 MODULE_FIRMWARE("amdgpu/picasso_sdma.bin");
 MODULE_FIRMWARE("amdgpu/raven2_sdma.bin");
 MODULE_FIRMWARE("amdgpu/arcturus_sdma.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma1.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma2.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma3.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma4.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma5.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma6.bin");
-MODULE_FIRMWARE("amdgpu/arcturus_sdma7.bin");
+MODULE_FIRMWARE("amdgpu/renoir_sdma.bin");
 
 #define SDMA0_POWER_CNTL__ON_OFF_CONDITION_HOLD_TIME_MASK  0x000000F8L
 #define SDMA0_POWER_CNTL__ON_OFF_STATUS_DURATION_TIME_MASK 0xFC000000L
@@ -247,6 +241,18 @@ static const struct soc15_reg_golden golden_settings_sdma_arct[] =
 	SOC15_REG_GOLDEN_VALUE(SDMA7, 0, mmSDMA7_GB_ADDR_CONFIG_READ, 0x0000773f, 0x00004002)
 };
 
+static const struct soc15_reg_golden golden_settings_sdma_4_3[] = {
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_CHICKEN_BITS, 0xfe931f07, 0x02831f07),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_CLK_CTRL, 0xffffffff, 0x3f000100),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GB_ADDR_CONFIG, 0x0018773f, 0x00003002),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GB_ADDR_CONFIG_READ, 0x0018773f, 0x00003002),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_GFX_RB_WPTR_POLL_CNTL, 0xfffffff7, 0x00403000),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_POWER_CNTL, 0x003fff07, 0x40000051),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC0_RB_WPTR_POLL_CNTL, 0xfffffff7, 0x00403000),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_RLC1_RB_WPTR_POLL_CNTL, 0xfffffff7, 0x00403000),
+	SOC15_REG_GOLDEN_VALUE(SDMA0, 0, mmSDMA0_UTCL1_PAGE, 0x000003ff, 0x000003c0),
+};
+
 static u32 sdma_v4_0_get_reg_offset(struct amdgpu_device *adev,
 		u32 instance, u32 offset)
 {
@@ -327,14 +333,12 @@ static void sdma_v4_0_init_golden_registers(struct amdgpu_device *adev)
 {
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
-		if (!amdgpu_virt_support_skip_setting(adev)) {
-			soc15_program_register_sequence(adev,
-							 golden_settings_sdma_4,
-							 ARRAY_SIZE(golden_settings_sdma_4));
-			soc15_program_register_sequence(adev,
-							 golden_settings_sdma_vg10,
-							 ARRAY_SIZE(golden_settings_sdma_vg10));
-		}
+		soc15_program_register_sequence(adev,
+						golden_settings_sdma_4,
+						ARRAY_SIZE(golden_settings_sdma_4));
+		soc15_program_register_sequence(adev,
+						golden_settings_sdma_vg10,
+						ARRAY_SIZE(golden_settings_sdma_vg10));
 		break;
 	case CHIP_VEGA12:
 		soc15_program_register_sequence(adev,
@@ -373,9 +377,51 @@ static void sdma_v4_0_init_golden_registers(struct amdgpu_device *adev)
 							golden_settings_sdma_rv1,
 							ARRAY_SIZE(golden_settings_sdma_rv1));
 		break;
+	case CHIP_RENOIR:
+		soc15_program_register_sequence(adev,
+						golden_settings_sdma_4_3,
+						ARRAY_SIZE(golden_settings_sdma_4_3));
+		break;
 	default:
 		break;
 	}
+}
+
+static int sdma_v4_0_init_inst_ctx(struct amdgpu_sdma_instance *sdma_inst)
+{
+	int err = 0;
+	const struct sdma_firmware_header_v1_0 *hdr;
+
+	err = amdgpu_ucode_validate(sdma_inst->fw);
+	if (err)
+		return err;
+
+	hdr = (const struct sdma_firmware_header_v1_0 *)sdma_inst->fw->data;
+	sdma_inst->fw_version = le32_to_cpu(hdr->header.ucode_version);
+	sdma_inst->feature_version = le32_to_cpu(hdr->ucode_feature_version);
+
+	if (sdma_inst->feature_version >= 20)
+		sdma_inst->burst_nop = true;
+
+	return 0;
+}
+
+static void sdma_v4_0_destroy_inst_ctx(struct amdgpu_device *adev)
+{
+	int i;
+
+	for (i = 0; i < adev->sdma.num_instances; i++) {
+		if (adev->sdma.instance[i].fw != NULL)
+			release_firmware(adev->sdma.instance[i].fw);
+
+		/* arcturus shares the same FW memory across
+		   all SDMA isntances */
+		if (adev->asic_type == CHIP_ARCTURUS)
+			break;
+	}
+
+	memset((void*)adev->sdma.instance, 0,
+		sizeof(struct amdgpu_sdma_instance) * AMDGPU_MAX_SDMA_INSTANCES);
 }
 
 /**
@@ -397,7 +443,6 @@ static int sdma_v4_0_init_microcode(struct amdgpu_device *adev)
 	int err = 0, i;
 	struct amdgpu_firmware_info *info = NULL;
 	const struct common_firmware_header *header = NULL;
-	const struct sdma_firmware_header_v1_0 *hdr;
 
 	DRM_DEBUG("\n");
 
@@ -422,30 +467,49 @@ static int sdma_v4_0_init_microcode(struct amdgpu_device *adev)
 	case CHIP_ARCTURUS:
 		chip_name = "arcturus";
 		break;
+	case CHIP_RENOIR:
+		chip_name = "renoir";
+		break;
 	default:
 		BUG();
 	}
 
-	for (i = 0; i < adev->sdma.num_instances; i++) {
-		if (i == 0)
-			snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sdma.bin", chip_name);
-		else
-			snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sdma%d.bin", chip_name, i);
-		err = request_firmware(&adev->sdma.instance[i].fw, fw_name, adev->dev);
-		if (err)
-			goto out;
-		err = amdgpu_ucode_validate(adev->sdma.instance[i].fw);
-		if (err)
-			goto out;
-		hdr = (const struct sdma_firmware_header_v1_0 *)adev->sdma.instance[i].fw->data;
-		adev->sdma.instance[i].fw_version = le32_to_cpu(hdr->header.ucode_version);
-		adev->sdma.instance[i].feature_version = le32_to_cpu(hdr->ucode_feature_version);
-		if (adev->sdma.instance[i].feature_version >= 20)
-			adev->sdma.instance[i].burst_nop = true;
-		DRM_DEBUG("psp_load == '%s'\n",
-				adev->firmware.load_type == AMDGPU_FW_LOAD_PSP ? "true" : "false");
+	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sdma.bin", chip_name);
 
-		if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
+	err = request_firmware(&adev->sdma.instance[0].fw, fw_name, adev->dev);
+	if (err)
+		goto out;
+
+	err = sdma_v4_0_init_inst_ctx(&adev->sdma.instance[0]);
+	if (err)
+		goto out;
+
+	for (i = 1; i < adev->sdma.num_instances; i++) {
+		if (adev->asic_type == CHIP_ARCTURUS) {
+			/* Acturus will leverage the same FW memory
+			   for every SDMA instance */
+			memcpy((void*)&adev->sdma.instance[i],
+			       (void*)&adev->sdma.instance[0],
+			       sizeof(struct amdgpu_sdma_instance));
+		}
+		else {
+			snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_sdma%d.bin", chip_name, i);
+
+			err = request_firmware(&adev->sdma.instance[i].fw, fw_name, adev->dev);
+			if (err)
+				goto out;
+
+			err = sdma_v4_0_init_inst_ctx(&adev->sdma.instance[i]);
+			if (err)
+				goto out;
+		}
+	}
+
+	DRM_DEBUG("psp_load == '%s'\n",
+		adev->firmware.load_type == AMDGPU_FW_LOAD_PSP ? "true" : "false");
+
+	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
+		for (i = 0; i < adev->sdma.num_instances; i++) {
 			info = &adev->firmware.ucode[AMDGPU_UCODE_ID_SDMA0 + i];
 			info->ucode_id = AMDGPU_UCODE_ID_SDMA0 + i;
 			info->fw = adev->sdma.instance[i].fw;
@@ -454,13 +518,11 @@ static int sdma_v4_0_init_microcode(struct amdgpu_device *adev)
 				ALIGN(le32_to_cpu(header->ucode_size_bytes), PAGE_SIZE);
 		}
 	}
+
 out:
 	if (err) {
 		DRM_ERROR("sdma_v4_0: Failed to load firmware \"%s\"\n", fw_name);
-		for (i = 0; i < adev->sdma.num_instances; i++) {
-			release_firmware(adev->sdma.instance[i].fw);
-			adev->sdma.instance[i].fw = NULL;
-		}
+		sdma_v4_0_destroy_inst_ctx(adev);
 	}
 	return err;
 }
@@ -1596,7 +1658,7 @@ static int sdma_v4_0_early_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int r;
 
-	if (adev->asic_type == CHIP_RAVEN)
+	if (adev->asic_type == CHIP_RAVEN || adev->asic_type == CHIP_RENOIR)
 		adev->sdma.num_instances = 1;
 	else if (adev->asic_type == CHIP_ARCTURUS)
 		adev->sdma.num_instances = 8;
@@ -1624,6 +1686,7 @@ static int sdma_v4_0_early_init(void *handle)
 }
 
 static int sdma_v4_0_process_ras_data_cb(struct amdgpu_device *adev,
+		struct ras_err_data *err_data,
 		struct amdgpu_iv_entry *entry);
 
 static int sdma_v4_0_late_init(void *handle)
@@ -1812,10 +1875,7 @@ static int sdma_v4_0_sw_fini(void *handle)
 			amdgpu_ring_fini(&adev->sdma.instance[i].page);
 	}
 
-	for (i = 0; i < adev->sdma.num_instances; i++) {
-		release_firmware(adev->sdma.instance[i].fw);
-		adev->sdma.instance[i].fw = NULL;
-	}
+	sdma_v4_0_destroy_inst_ctx(adev);
 
 	return 0;
 }
@@ -1829,7 +1889,8 @@ static int sdma_v4_0_hw_init(void *handle)
 			adev->powerplay.pp_funcs->set_powergating_by_smu)
 		amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_SDMA, false);
 
-	sdma_v4_0_init_golden_registers(adev);
+	if (!amdgpu_sriov_vf(adev))
+		sdma_v4_0_init_golden_registers(adev);
 
 	r = sdma_v4_0_start(adev);
 
@@ -1957,9 +2018,11 @@ static int sdma_v4_0_process_trap_irq(struct amdgpu_device *adev,
 }
 
 static int sdma_v4_0_process_ras_data_cb(struct amdgpu_device *adev,
+		struct ras_err_data *err_data,
 		struct amdgpu_iv_entry *entry)
 {
-	uint32_t instance, err_source;
+	uint32_t err_source;
+	int instance;
 
 	instance = sdma_v4_0_irq_id_to_seq(entry->client_id);
 	if (instance < 0)
@@ -1980,7 +2043,7 @@ static int sdma_v4_0_process_ras_data_cb(struct amdgpu_device *adev,
 
 	amdgpu_ras_reset_gpu(adev, 0);
 
-	return AMDGPU_RAS_UE;
+	return AMDGPU_RAS_SUCCESS;
 }
 
 static int sdma_v4_0_process_ecc_irq(struct amdgpu_device *adev,

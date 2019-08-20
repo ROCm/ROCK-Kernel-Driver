@@ -969,7 +969,7 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 {
 	struct timing_generator *tg;
 	struct dc_link *link = sink->link;
-	unsigned int inst;
+	unsigned int enc_inst, tg_inst;
 
 	/* Check for enabled DIG to identify enabled display */
 	if (!link->link_enc->funcs->is_dig_enabled(link->link_enc))
@@ -981,13 +981,22 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 	 * current implementation always map 1-to-1, so this code makes
 	 * the same assumption and doesn't check OTG source.
 	 */
-	inst = link->link_enc->funcs->get_dig_frontend(link->link_enc) - 1;
+	enc_inst = link->link_enc->funcs->get_dig_frontend(link->link_enc);
 
 	/* Instance should be within the range of the pool */
-	if (inst >= dc->res_pool->pipe_count)
+	if (enc_inst >= dc->res_pool->pipe_count)
 		return false;
 
-	tg = dc->res_pool->timing_generators[inst];
+	if (enc_inst >= dc->res_pool->stream_enc_count)
+		return false;
+
+	tg_inst = dc->res_pool->stream_enc[enc_inst]->funcs->dig_source_otg(
+		dc->res_pool->stream_enc[enc_inst]);
+
+	if (tg_inst >= dc->res_pool->timing_generator_count)
+		return false;
+
+	tg = dc->res_pool->timing_generators[tg_inst];
 
 	if (!tg->funcs->is_matching_timing)
 		return false;
@@ -1000,10 +1009,11 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 
 		dc->res_pool->dp_clock_source->funcs->get_pixel_clk_frequency_100hz(
 			dc->res_pool->dp_clock_source,
-			inst, &pix_clk_100hz);
+			tg_inst, &pix_clk_100hz);
 
 		if (crtc_timing->pix_clk_100hz != pix_clk_100hz)
 			return false;
+
 	}
 
 	return true;
@@ -1193,8 +1203,8 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 
 struct dc_state *dc_create_state(struct dc *dc)
 {
-	struct dc_state *context = kzalloc(sizeof(struct dc_state),
-					   GFP_KERNEL);
+	struct dc_state *context = kvzalloc(sizeof(struct dc_state),
+					    GFP_KERNEL);
 
 	if (!context)
 		return NULL;
@@ -1214,11 +1224,11 @@ struct dc_state *dc_create_state(struct dc *dc)
 struct dc_state *dc_copy_state(struct dc_state *src_ctx)
 {
 	int i, j;
-	struct dc_state *new_ctx = kmemdup(src_ctx,
-			sizeof(struct dc_state), GFP_KERNEL);
+	struct dc_state *new_ctx = kvmalloc(sizeof(struct dc_state), GFP_KERNEL);
 
 	if (!new_ctx)
 		return NULL;
+	memcpy(new_ctx, src_ctx, sizeof(struct dc_state));
 
 	for (i = 0; i < MAX_PIPES; i++) {
 			struct pipe_ctx *cur_pipe = &new_ctx->res_ctx.pipe_ctx[i];
@@ -1252,7 +1262,7 @@ static void dc_state_free(struct kref *kref)
 {
 	struct dc_state *context = container_of(kref, struct dc_state, refcount);
 	dc_resource_state_destruct(context);
-	kfree(context);
+	kvfree(context);
 }
 
 void dc_release_state(struct dc_state *context)
@@ -1612,6 +1622,9 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 		for (i = 0; i < surface_count; i++)
 			updates[i].surface->update_flags.raw = 0xFFFFFFFF;
 
+	if (type == UPDATE_TYPE_FAST && memcmp(&dc->current_state->bw_ctx.bw.dcn.clk, &dc->clk_mgr->clks, offsetof(struct dc_clocks, prev_p_state_change_support)) != 0)
+		dc->optimized_required = true;
+
 	return type;
 }
 
@@ -1688,6 +1701,8 @@ static void copy_surface_update_to_plane(
 				srf_update->plane_info->dcc;
 		surface->sdr_white_level =
 				srf_update->plane_info->sdr_white_level;
+		surface->layer_index =
+				srf_update->plane_info->layer_index;
 	}
 
 	if (srf_update->gamma &&
@@ -1910,13 +1925,17 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 			if (stream_update->dpms_off) {
 				dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
+
 				if (*stream_update->dpms_off) {
 					core_link_disable_stream(pipe_ctx, KEEP_ACQUIRED_RESOURCE);
 					dc->hwss.optimize_bandwidth(dc, dc->current_state);
 				} else {
-					dc->hwss.prepare_bandwidth(dc, dc->current_state);
+					if (!dc->optimize_seamless_boot)
+						dc->hwss.prepare_bandwidth(dc, dc->current_state);
+
 					core_link_enable_stream(dc->current_state, pipe_ctx);
 				}
+
 				dc->hwss.pipe_control_lock(dc, pipe_ctx, false);
 			}
 
@@ -2283,6 +2302,14 @@ void dc_set_power_state(
 		dc_resource_state_construct(dc, dc->current_state);
 
 		dc->hwss.init_hw(dc);
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+		if (dc->hwss.init_sys_ctx != NULL &&
+			dc->vm_pa_config.valid) {
+			dc->hwss.init_sys_ctx(dc->hwseq, dc, &dc->vm_pa_config);
+		}
+#endif
+
 		break;
 	default:
 		ASSERT(dc->current_state->stream_count == 0);

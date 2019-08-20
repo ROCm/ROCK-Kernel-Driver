@@ -158,8 +158,7 @@ void dcn20_display_init(struct dc *dc)
 	/* DCCG */
 	dcn20_dccg_init(hws);
 
-	/* Disable all memory low power mode. All memories are enabled. */
-	REG_UPDATE(DC_MEM_GLOBAL_PWR_REQ_CNTL, DC_MEM_GLOBAL_PWR_REQ_DIS, 1);
+	REG_UPDATE(DC_MEM_GLOBAL_PWR_REQ_CNTL, DC_MEM_GLOBAL_PWR_REQ_DIS, 0);
 
 	/* DCHUB/MMHUBBUB
 	 * set global timer refclk divider
@@ -781,12 +780,14 @@ enum dc_status dcn20_enable_stream_timing(
 
 	/* TODO check if timing_changed, disable stream if timing changed */
 
-	if (odm_pipe)
+	if (odm_pipe) {
+		int opp_inst[2] = { pipe_ctx->stream_res.opp->inst, odm_pipe->stream_res.opp->inst };
+
 		pipe_ctx->stream_res.tg->funcs->set_odm_combine(
 				pipe_ctx->stream_res.tg,
-				odm_pipe->stream_res.opp->inst,
-				pipe_ctx->stream->timing.h_addressable/2,
-				pipe_ctx->stream->timing.pixel_encoding);
+				opp_inst, 2,
+				&pipe_ctx->stream->timing);
+	}
 	/* HW program guide assume display already disable
 	 * by unplug sequence. OTG assume stop.
 	 */
@@ -865,6 +866,10 @@ void dcn20_program_output_csc(struct dc *dc,
 {
 	struct mpc *mpc = dc->res_pool->mpc;
 	enum mpc_output_csc_mode ocsc_mode = MPC_OUTPUT_CSC_COEF_A;
+	int mpcc_id = pipe_ctx->plane_res.hubp->inst;
+
+	if (mpc->funcs->power_on_mpc_mem_pwr)
+		mpc->funcs->power_on_mpc_mem_pwr(mpc, mpcc_id, true);
 
 	if (pipe_ctx->stream->csc_color_matrix.enable_adjustment == true) {
 		if (mpc->funcs->set_output_csc != NULL)
@@ -894,6 +899,8 @@ bool dcn20_set_output_transfer_func(struct pipe_ctx *pipe_ctx,
 	 * if programming for all pipes is required then remove condition
 	 * pipe_ctx->top_pipe == NULL ,but then fix the diagnostic.
 	 */
+	if (mpc->funcs->power_on_mpc_mem_pwr)
+		mpc->funcs->power_on_mpc_mem_pwr(mpc, mpcc_id, true);
 	if ((pipe_ctx->top_pipe == NULL || dc_res_is_odm_head_pipe(pipe_ctx))
 			&& mpc->funcs->set_output_gamma && stream->out_transfer_func) {
 		if (stream->out_transfer_func->type == TF_TYPE_HWPWL)
@@ -1058,13 +1065,15 @@ static void dcn20_update_odm(struct dc *dc, struct dc_state *context, struct pip
 {
 	struct pipe_ctx *combine_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
 
-	if (combine_pipe)
+	if (combine_pipe) {
+		int opp_inst[2] = { pipe_ctx->stream_res.opp->inst,
+				combine_pipe->stream_res.opp->inst };
+
 		pipe_ctx->stream_res.tg->funcs->set_odm_combine(
 				pipe_ctx->stream_res.tg,
-				combine_pipe->stream_res.opp->inst,
-				pipe_ctx->plane_res.scl_data.h_active,
-				pipe_ctx->stream->timing.pixel_encoding);
-	else
+				opp_inst, 2,
+				&pipe_ctx->stream->timing);
+	} else
 		pipe_ctx->stream_res.tg->funcs->set_odm_bypass(
 				pipe_ctx->stream_res.tg, &pipe_ctx->stream->timing);
 }
@@ -1354,13 +1363,15 @@ static void dcn20_apply_ctx_for_surface(
 		int num_planes,
 		struct dc_state *context)
 {
-
+	const unsigned int TIMEOUT_FOR_PIPE_ENABLE_MS = 100;
 	int i;
 	struct timing_generator *tg;
 	bool removed_pipe[6] = { false };
 	bool interdependent_update = false;
 	struct pipe_ctx *top_pipe_to_program =
 			find_top_pipe_for_stream(dc, context, stream);
+	struct pipe_ctx *prev_top_pipe_to_program =
+			find_top_pipe_for_stream(dc, dc->current_state, stream);
 	DC_LOGGER_INIT(dc->ctx->logger);
 
 	if (!top_pipe_to_program)
@@ -1454,6 +1465,22 @@ static void dcn20_apply_ctx_for_surface(
 	for (i = 0; i < dc->res_pool->pipe_count; i++)
 		if (removed_pipe[i])
 			dcn20_disable_plane(dc, &dc->current_state->res_ctx.pipe_ctx[i]);
+
+	/*
+	 * If we are enabling a pipe, we need to wait for pending clear as this is a critical
+	 * part of the enable operation otherwise, DM may request an immediate flip which
+	 * will cause HW to perform an "immediate enable" (as opposed to "vsync enable") which
+	 * is unsupported on DCN.
+	 */
+	i = 0;
+	if (num_planes > 0 && top_pipe_to_program &&
+			(prev_top_pipe_to_program == NULL || prev_top_pipe_to_program->plane_state == NULL)) {
+		while (i < TIMEOUT_FOR_PIPE_ENABLE_MS &&
+				top_pipe_to_program->plane_res.hubp->funcs->hubp_is_flip_pending(top_pipe_to_program->plane_res.hubp)) {
+			i += 1;
+			msleep(1);
+		}
+	}
 }
 
 
@@ -1834,6 +1861,10 @@ static void dcn20_reset_back_end_for_pipe(
 		if (pipe_ctx->stream_res.tg->funcs->set_odm_bypass)
 			pipe_ctx->stream_res.tg->funcs->set_odm_bypass(
 					pipe_ctx->stream_res.tg, &pipe_ctx->stream->timing);
+
+		if (pipe_ctx->stream_res.tg->funcs->set_drr)
+			pipe_ctx->stream_res.tg->funcs->set_drr(
+					pipe_ctx->stream_res.tg, NULL);
 	}
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++)

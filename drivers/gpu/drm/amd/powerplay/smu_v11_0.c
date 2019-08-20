@@ -46,6 +46,7 @@ MODULE_FIRMWARE("amdgpu/vega20_smc.bin");
 MODULE_FIRMWARE("amdgpu/arcturus_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi10_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi14_smc.bin");
+MODULE_FIRMWARE("amdgpu/navi12_smc.bin");
 
 #define SMU11_VOLTAGE_SCALE 4
 
@@ -163,6 +164,9 @@ static int smu_v11_0_init_microcode(struct smu_context *smu)
 	case CHIP_NAVI14:
 		chip_name = "navi14";
 		break;
+	case CHIP_NAVI12:
+		chip_name = "navi12";
+		break;
 	default:
 		BUG();
 	}
@@ -266,6 +270,28 @@ static int smu_v11_0_check_fw_version(struct smu_context *smu)
 	smu_major = (smu_version >> 16) & 0xffff;
 	smu_minor = (smu_version >> 8) & 0xff;
 	smu_debug = (smu_version >> 0) & 0xff;
+
+	switch (smu->adev->asic_type) {
+	case CHIP_VEGA20:
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_VG20;
+		break;
+	case CHIP_ARCTURUS:
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_ARCT;
+		break;
+	case CHIP_NAVI10:
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_NV10;
+		break;
+	case CHIP_NAVI12:
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_NV12;
+		break;
+	case CHIP_NAVI14:
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_NV14;
+		break;
+	default:
+		pr_err("smu unsuported asic type:%d.\n",smu->adev->asic_type);
+		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_INV;
+		break;
+	}
 
 	/*
 	 * 1. if_version mismatch is not critical as our fw is designed
@@ -729,8 +755,6 @@ static int smu_v11_0_write_watermarks_table(struct smu_context *smu)
 	struct smu_table *table = NULL;
 
 	table = &smu_table->tables[SMU_TABLE_WATERMARKS];
-	if (!table)
-		return -EINVAL;
 
 	if (!table->cpu_addr)
 		return -EINVAL;
@@ -900,6 +924,10 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 
 	if (!smu->pm_enabled)
 		return ret;
+
+	if ((smu_msg_get_index(smu, SMU_MSG_GetDcModeMaxDpmFreq) < 0) ||
+	    (smu_msg_get_index(smu, SMU_MSG_GetMaxDpmFreq) < 0))
+		return 0;
 
 	clk_id = smu_clk_get_index(smu, clock_select);
 	if (clk_id < 0)
@@ -1205,6 +1233,10 @@ static int smu_v11_0_read_sensor(struct smu_context *smu,
 				 void *data, uint32_t *size)
 {
 	int ret = 0;
+
+	if(!data || !size)
+		return -EINVAL;
+
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_GFX_MCLK:
 		ret = smu_get_current_clk_freq(smu, SMU_UCLK, (uint32_t *)data);
@@ -1226,10 +1258,6 @@ static int smu_v11_0_read_sensor(struct smu_context *smu,
 		ret = smu_common_read_sensor(smu, sensor, data, size);
 		break;
 	}
-
-	/* try get sensor data by asic */
-	if (ret)
-		ret = smu_asic_read_sensor(smu, sensor, data, size);
 
 	if (ret)
 		*size = 0;
@@ -1331,6 +1359,7 @@ static int smu_v11_0_gfx_off_control(struct smu_context *smu, bool enable)
 		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 		if (!(adev->pm.pp_feature & PP_GFXOFF_MASK))
 			return 0;
 		mutex_lock(&smu->mutex);
@@ -1361,7 +1390,7 @@ smu_v11_0_auto_fan_control(struct smu_context *smu, bool auto_fan_control)
 {
 	int ret = 0;
 
-	if (smu_feature_is_supported(smu, SMU_FEATURE_FAN_CONTROL_BIT))
+	if (!smu_feature_is_supported(smu, SMU_FEATURE_FAN_CONTROL_BIT))
 		return 0;
 
 	ret = smu_feature_set_enabled(smu, SMU_FEATURE_FAN_CONTROL_BIT, auto_fan_control);
@@ -1754,6 +1783,7 @@ void smu_v11_0_set_smu_funcs(struct smu_context *smu)
 		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
+	case CHIP_NAVI12:
 		navi10_set_ppt_funcs(smu);
 		break;
 	default:

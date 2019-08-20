@@ -38,7 +38,7 @@
  * Advanced Micro Devices, Inc.
  */
 
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#if !defined(HAVE_RESERVATION_OBJECT_RESERVE_SHARED)
 /**
  * _kcl_reservation_object_reserve_shared - Reserve space to add shared fences to
  * a reservation_object.
@@ -120,7 +120,7 @@ int _kcl_reservation_object_reserve_shared(struct reservation_object *obj,
 EXPORT_SYMBOL(_kcl_reservation_object_reserve_shared);
 #endif
 
-#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
+#if !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
@@ -202,7 +202,7 @@ EXPORT_SYMBOL(_kcl_reservation_object_wait_timeout_rcu);
  * Modifications [2017-09-14] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if defined(BUILD_AS_DKMS) && !defined(HAVE_RESERVATION_OBJECT_COPY_FENCES)
+#if !defined(HAVE_RESERVATION_OBJECT_COPY_FENCES)
 int _kcl_reservation_object_copy_fences(struct reservation_object *dst,
 					struct reservation_object *src)
 {
@@ -289,7 +289,7 @@ EXPORT_SYMBOL(_kcl_reservation_object_copy_fences);
  * Modifications [2016-12-27] (c) [2016]
  * Advanced Micro Devices, Inc.
  */
-#ifdef OS_NAME_RHEL_6
+#if !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 static inline int
 reservation_object_test_signaled_single(struct fence *passed_fence)
 {

@@ -174,7 +174,7 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 	struct amdgpu_gtt_node *node = mem->mm_node;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
 	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
 #else
@@ -196,7 +196,7 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 	else
 		lpfn = adev->gart.num_cpu_pages;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	if (place && place->flags & TTM_PL_FLAG_TOPDOWN) {
 		sflags = DRM_MM_SEARCH_BELOW;
 		aflags = DRM_MM_CREATE_TOP;
@@ -208,7 +208,7 @@ static int amdgpu_gtt_mgr_alloc(struct ttm_mem_type_manager *man,
 #endif
 
 	spin_lock(&mgr->lock);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
 						mem->num_pages,
 						mem->page_alignment, 0,

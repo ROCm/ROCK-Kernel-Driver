@@ -77,9 +77,10 @@
  * - 3.31.0 - Add support for per-flip tiling attribute changes with DC
  * - 3.32.0 - Add syncobj timeline support to AMDGPU_CS.
  * - 3.33.0 - Fixes for GDS ENOMEM failures in AMDGPU_CS.
+ * - 3.34.0 - Non-DC can flip correctly between buffers with different pitches
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	33
+#define KMS_DRIVER_MINOR	34
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.0.78"
@@ -1042,6 +1043,11 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x731A, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI10},
 	{0x1002, 0x731B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI10},
 	{0x1002, 0x731F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI10},
+	/* Navi14 */
+	{0x1002, 0x7340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI14},
+
+	/* Renoir */
+	{0x1002, 0x1636, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_RENOIR|AMD_IS_APU},
 
 	{0, 0, 0}
 };
@@ -1143,7 +1149,7 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0)
+#ifdef HAVE_DRM_DEV_PUT
 	drm_dev_put(dev);
 #else
 	drm_dev_unref(dev);
@@ -1245,7 +1251,7 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 	drm_kms_helper_poll_disable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
  	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
@@ -1284,7 +1290,7 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 
 	ret = amdgpu_device_resume(drm_dev, false, false);
 	drm_kms_helper_poll_enable(drm_dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 17, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
 	drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
@@ -1463,11 +1469,8 @@ static struct drm_driver kms_driver = {
 		DRIVER_ATOMIC |
 #endif
 		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		DRIVER_SYNCOBJ |
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(5, 2, 0)
-		DRIVER_SYNCOBJ_TIMELINE |
 #endif
 		DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET,
 
@@ -1475,16 +1478,14 @@ static struct drm_driver kms_driver = {
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
 	.set_busid = drm_pci_set_busid,
 #endif
 	.unload = amdgpu_driver_unload_kms,
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15) && \
-	!defined(OS_NAME_SUSE_15_1)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
 #else
@@ -1492,14 +1493,17 @@ static struct drm_driver kms_driver = {
 	.get_scanout_position = amdgpu_get_crtc_scanout_position,
 #endif
 #if defined(CONFIG_DEBUG_FS)
-#if defined(BUILD_AS_DKMS) && \
-	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+/* drm_debugfs_cleanup() now removes
+ * all minor->debugfs_list entries since 4.11,
+ * no need to call amdgpu_debugfs_cleanup
+ */
+#if	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
 	.gem_free_object = amdgpu_gem_object_free,
 #else
 	.gem_free_object_unlocked = amdgpu_gem_object_free,

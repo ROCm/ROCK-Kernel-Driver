@@ -86,6 +86,8 @@
 #include "amdgpu_smu.h"
 #include "amdgpu_discovery.h"
 #include "amdgpu_mes.h"
+#include "amdgpu_umc.h"
+#include "amdgpu_mmhub.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -325,7 +327,7 @@ struct amdgpu_clock {
 	uint32_t max_pixel_clock;
 };
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 #endif
 
@@ -457,15 +459,13 @@ struct amdgpu_cs_chunk {
 	void			*kdata;
 };
 
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 struct amdgpu_cs_post_dep {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	struct drm_syncobj *syncobj;
-#endif
-#if !defined(BUILD_AS_DKMS)
 	struct dma_fence_chain *chain;
-#endif
 	u64 point;
 };
+#endif
 
 struct amdgpu_cs_parser {
 	struct amdgpu_device	*adev;
@@ -541,7 +541,11 @@ void amdgpu_benchmark(struct amdgpu_device *adev, int test_number);
 void amdgpu_test_moves(struct amdgpu_device *adev);
 
 #if defined(CONFIG_DEBUG_FS)
-#if defined(BUILD_AS_DKMS) &&  LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+/* drm_debugfs_cleanup() now removes
+ * all minor->debugfs_list entries since 4.11,
+ * no need to call amdgpu_debugfs_cleanup
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 void amdgpu_debugfs_cleanup(struct drm_minor *minor);
 #endif
 #endif
@@ -665,6 +669,9 @@ void amdgpu_cgs_destroy_device(struct cgs_device *cgs_device);
 typedef uint32_t (*amdgpu_rreg_t)(struct amdgpu_device*, uint32_t);
 typedef void (*amdgpu_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 
+typedef uint64_t (*amdgpu_rreg64_t)(struct amdgpu_device*, uint32_t);
+typedef void (*amdgpu_wreg64_t)(struct amdgpu_device*, uint32_t, uint64_t);
+
 typedef uint32_t (*amdgpu_block_rreg_t)(struct amdgpu_device*, uint32_t, uint32_t);
 typedef void (*amdgpu_block_wreg_t)(struct amdgpu_device*, uint32_t, uint32_t, uint32_t);
 
@@ -781,6 +788,8 @@ enum amd_hw_ip_block_type {
 	NBIF_HWIP,
 	THM_HWIP,
 	CLK_HWIP,
+	UMC_HWIP,
+	RSMU_HWIP,
 	MAX_HWIP
 };
 
@@ -884,6 +893,8 @@ struct amdgpu_device {
 	amdgpu_wreg_t			pcie_wreg;
 	amdgpu_rreg_t			pciep_rreg;
 	amdgpu_wreg_t			pciep_wreg;
+	amdgpu_rreg64_t			pcie_rreg64;
+	amdgpu_wreg64_t			pcie_wreg64;
 	/* protects concurrent UVD register access */
 	spinlock_t uvd_ctx_idx_lock;
 	amdgpu_rreg_t			uvd_ctx_rreg;
@@ -997,6 +1008,9 @@ struct amdgpu_device {
 	/* KFD */
 	struct amdgpu_kfd_dev		kfd;
 
+	/* UMC */
+	struct amdgpu_umc		umc;
+
 	/* display related functionality */
 	struct amdgpu_display_manager dm;
 
@@ -1022,6 +1036,7 @@ struct amdgpu_device {
 
 	const struct amdgpu_nbio_funcs	*nbio_funcs;
 	const struct amdgpu_df_funcs	*df_funcs;
+	const struct amdgpu_mmhub_funcs	*mmhub_funcs;
 
 	/* delayed work_func for deferring clockgating during resume */
 	struct delayed_work     delayed_init_work;
@@ -1116,6 +1131,8 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
 #define WREG32_PCIE(reg, v) adev->pcie_wreg(adev, (reg), (v))
 #define RREG32_PCIE_PORT(reg) adev->pciep_rreg(adev, (reg))
 #define WREG32_PCIE_PORT(reg, v) adev->pciep_wreg(adev, (reg), (v))
+#define RREG64_PCIE(reg) adev->pcie_rreg64(adev, (reg))
+#define WREG64_PCIE(reg, v) adev->pcie_wreg64(adev, (reg), (v))
 #define RREG32_SMC(reg) adev->smc_rreg(adev, (reg))
 #define WREG32_SMC(reg, v) adev->smc_wreg(adev, (reg), (v))
 #define RREG32_UVD_CTX(reg) adev->uvd_ctx_rreg(adev, (reg))
@@ -1204,7 +1221,7 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev);
 
 void amdgpu_cs_report_moved_bytes(struct amdgpu_device *adev, u64 num_bytes,
 				  u64 num_vis_bytes);
-#if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev);
 #endif
 void amdgpu_device_program_register_sequence(struct amdgpu_device *adev,
@@ -1245,7 +1262,7 @@ extern const struct drm_ioctl_desc amdgpu_ioctls_kms[];
 extern const int amdgpu_max_kms_ioctl;
 
 int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 int amdgpu_driver_unload_kms(struct drm_device *dev);
 #else
 void amdgpu_driver_unload_kms(struct drm_device *dev);
@@ -1260,8 +1277,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon);
 u32 amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe);
 int amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int pipe);
 void amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int pipe);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 13, 0) && \
-	!defined(OS_NAME_SUSE_15)
+#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 				     int *max_error,
 				     struct timeval *vblank_time,
