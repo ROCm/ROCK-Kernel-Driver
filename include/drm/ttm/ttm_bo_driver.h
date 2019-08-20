@@ -135,7 +135,7 @@ struct ttm_mem_type_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_PRINTF) || !defined(BUILD_AS_DKMS)
 	void (*debug)(struct ttm_mem_type_manager *man,
 		      struct drm_printer *printer);
 #else
