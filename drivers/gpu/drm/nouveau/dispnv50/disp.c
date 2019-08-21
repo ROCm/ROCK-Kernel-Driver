@@ -782,7 +782,7 @@ nv50_msto_atomic_check(struct drm_encoder *encoder,
 			const int bpp = connector->display_info.bpc * 3;
 			const int clock = crtc_state->adjusted_mode.clock;
 
-			asyh->dp.pbn = drm_dp_calc_pbn_mode(clock, bpp);
+			asyh->dp.pbn = drm_dp_calc_pbn_mode(clock, bpp, false);
 		}
 
 		slots = drm_dp_atomic_find_vcpi_slots(state, &mstm->mgr,
