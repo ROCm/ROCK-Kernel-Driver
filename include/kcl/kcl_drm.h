@@ -219,7 +219,7 @@ static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 
 static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
 #else
 	return drm_fb_helper_alloc_fbi(fb_helper);
@@ -228,7 +228,7 @@ static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *
 
 static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
 #else
 	drm_fb_helper_unregister_fbi(fb_helper);
