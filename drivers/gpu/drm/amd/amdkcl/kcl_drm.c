@@ -59,6 +59,18 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
+void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
+				const struct fb_fillrect *rect);
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);
+
+void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
+				const struct fb_copyarea *area);
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_copyarea);
+
+void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
+				 const struct fb_image *image);
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
+
 void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend);
 
@@ -66,6 +78,45 @@ void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 				struct drm_atomic_state *old_state);
 EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
+
+/**
+ * _kcl_drm_fb_helper_cfb_fillrect_stub - wrapper around cfb_fillrect
+ * @info: fbdev registered by the helper
+ * @rect: info about rectangle to fill
+ *
+ * A wrapper around cfb_imageblit implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_fillrect_stub(struct fb_info *info,
+				const struct fb_fillrect *rect)
+{
+	cfb_fillrect(info, rect);
+}
+
+/**
+ * _kcl_drm_fb_helper_cfb_copyarea_stub - wrapper around cfb_copyarea
+ * @info: fbdev registered by the helper
+ * @area: info about area to copy
+ *
+ * A wrapper around cfb_copyarea implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_copyarea_stub(struct fb_info *info,
+				const struct fb_copyarea *area)
+{
+	cfb_copyarea(info, area);
+}
+
+/**
+ * _kcl_drm_fb_helper_cfb_imageblit_stub - wrapper around cfb_imageblit
+ * @info: fbdev registered by the helper
+ * @image: info about image to blit
+ *
+ * A wrapper around cfb_imageblit implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_imageblit_stub(struct fb_info *info,
+				 const struct fb_image *image)
+{
+	cfb_imageblit(info, image);
+}
 
 /**
  * _kcl_drm_fb_helper_set_suspend_stub - wrapper around fb_set_suspend
@@ -374,6 +425,12 @@ EXPORT_SYMBOL(drm_atomic_helper_resume);
 
 void amdkcl_drm_init(void)
 {
+	_kcl_drm_fb_helper_cfb_fillrect = amdkcl_fp_setup("drm_fb_helper_cfb_fillrect",
+					_kcl_drm_fb_helper_cfb_fillrect_stub);
+	_kcl_drm_fb_helper_cfb_copyarea = amdkcl_fp_setup("drm_fb_helper_cfb_copyarea",
+					_kcl_drm_fb_helper_cfb_copyarea_stub);
+	_kcl_drm_fb_helper_cfb_imageblit = amdkcl_fp_setup("drm_fb_helper_cfb_imageblit",
+					_kcl_drm_fb_helper_cfb_imageblit_stub);
 	_kcl_drm_fb_helper_set_suspend = amdkcl_fp_setup("drm_fb_helper_set_suspend",
 					_kcl_drm_fb_helper_set_suspend_stub);
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(

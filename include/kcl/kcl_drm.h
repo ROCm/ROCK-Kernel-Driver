@@ -43,6 +43,12 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
+extern void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
+				const struct fb_fillrect *rect);
+extern void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
+				const struct fb_copyarea *area);
+extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
+				 const struct fb_image *image);
 extern void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
@@ -112,6 +118,36 @@ drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 #endif
 }
 #endif
+
+static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
+				const struct fb_fillrect *rect)
+{
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
+#else
+	drm_fb_helper_cfb_fillrect(info, rect);
+#endif
+}
+
+static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
+				const struct fb_copyarea *area)
+{
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+	_kcl_drm_fb_helper_cfb_copyarea(info, area);
+#else
+	drm_fb_helper_cfb_copyarea(info, area);
+#endif
+}
+
+static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
+				 const struct fb_image *image)
+{
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+	_kcl_drm_fb_helper_cfb_imageblit(info, image);
+#else
+	drm_fb_helper_cfb_imageblit(info, image);
+#endif
+}
 
 static inline void kcl_drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper, int state)
 {
