@@ -495,6 +495,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			dev->node_props.device_id);
 	sysfs_show_32bit_prop(buffer, "location_id",
 			dev->node_props.location_id);
+	sysfs_show_32bit_prop(buffer, "domain",
+			dev->node_props.domain);
 	sysfs_show_32bit_prop(buffer, "drm_render_minor",
 			dev->node_props.drm_render_minor);
 	sysfs_show_64bit_prop(buffer, "hive_id",
@@ -1349,6 +1351,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev->node_props.device_id = gpu->pdev->device;
 	dev->node_props.location_id = PCI_DEVID(gpu->pdev->bus->number,
 		gpu->pdev->devfn);
+	dev->node_props.domain = pci_domain_nr(gpu->pdev->bus);
 	dev->node_props.max_engine_clk_fcompute =
 		amdgpu_amdkfd_get_max_engine_clock_in_mhz(dev->gpu->kgd);
 	dev->node_props.max_engine_clk_ccompute =
