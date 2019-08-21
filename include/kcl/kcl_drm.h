@@ -326,4 +326,34 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 }
 #endif
 
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+extern void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
+				const struct fb_fillrect *rect);
+extern void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
+				const struct fb_copyarea *area);
+extern void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
+				 const struct fb_image *image);
+
+static inline
+void drm_fb_helper_cfb_fillrect(struct fb_info *info,
+				const struct fb_fillrect *rect)
+{
+	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
+}
+
+static inline
+void drm_fb_helper_cfb_copyarea(struct fb_info *info,
+				const struct fb_copyarea *area)
+{
+	_kcl_drm_fb_helper_cfb_copyarea(info, area);
+}
+
+static inline
+void drm_fb_helper_cfb_imageblit(struct fb_info *info,
+				 const struct fb_image *image)
+{
+	_kcl_drm_fb_helper_cfb_imageblit(info, image);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
