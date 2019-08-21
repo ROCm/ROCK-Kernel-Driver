@@ -36,6 +36,24 @@ void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 }
 #endif
 
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
+extern struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper);
+extern void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper);
+
+static inline
+struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+
+{
+	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
+}
+
+static inline
+void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+{
+	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
+}
+#endif
+
 #if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 #if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
