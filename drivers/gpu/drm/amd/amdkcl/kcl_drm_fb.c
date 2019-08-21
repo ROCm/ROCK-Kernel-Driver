@@ -7,6 +7,50 @@
 #include <kcl/kcl_drm_fb.h>
 #include "kcl_common.h"
 
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+/**
+ * _kcl_drm_fb_helper_cfb_fillrect - wrapper around cfb_fillrect
+ * @info: fbdev registered by the helper
+ * @rect: info about rectangle to fill
+ *
+ * A wrapper around cfb_imageblit implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
+				const struct fb_fillrect *rect)
+{
+	cfb_fillrect(info, rect);
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);
+
+/**
+ * _kcl_drm_fb_helper_cfb_copyarea - wrapper around cfb_copyarea
+ * @info: fbdev registered by the helper
+ * @area: info about area to copy
+ *
+ * A wrapper around cfb_copyarea implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
+				const struct fb_copyarea *area)
+{
+	cfb_copyarea(info, area);
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_copyarea);
+
+/**
+ * _kcl_drm_fb_helper_cfb_imageblit - wrapper around cfb_imageblit
+ * @info: fbdev registered by the helper
+ * @image: info about image to blit
+ *
+ * A wrapper around cfb_imageblit implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
+				 const struct fb_image *image)
+{
+	cfb_imageblit(info, image);
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
+#endif
+
 #if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const char *name)
 {
