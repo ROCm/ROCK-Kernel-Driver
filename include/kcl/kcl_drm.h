@@ -49,6 +49,8 @@ extern void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
 				const struct fb_copyarea *area);
 extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
 				 const struct fb_image *image);
+extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
+extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
 extern void (*_kcl_drm_fb_helper_set_suspend)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
@@ -146,6 +148,24 @@ static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 	_kcl_drm_fb_helper_cfb_imageblit(info, image);
 #else
 	drm_fb_helper_cfb_imageblit(info, image);
+#endif
+}
+
+static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+{
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
+	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
+#else
+	return drm_fb_helper_alloc_fbi(fb_helper);
+#endif
+}
+
+static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+{
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
+	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
+#else
+	drm_fb_helper_unregister_fbi(fb_helper);
 #endif
 }
 
