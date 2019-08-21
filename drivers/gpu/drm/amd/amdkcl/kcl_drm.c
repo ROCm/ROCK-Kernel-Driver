@@ -405,3 +405,64 @@ void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 }
 EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
 #endif
+
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
+/**
+ * _kcl_drm_fb_helper_alloc_fbi - allocate fb_info and some of its members
+ * @fb_helper: driver-allocated fbdev helper
+ *
+ * A helper to alloc fb_info and the members cmap and apertures. Called
+ * by the driver within the fb_probe fb_helper callback function.
+ *
+ * RETURNS:
+ * fb_info pointer if things went okay, pointer containing error code
+ * otherwise
+ */
+struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+{
+	struct device *dev = fb_helper->dev->dev;
+	struct fb_info *info;
+	int ret;
+
+	info = framebuffer_alloc(0, dev);
+	if (!info)
+		return ERR_PTR(-ENOMEM);
+
+	ret = fb_alloc_cmap(&info->cmap, 256, 0);
+	if (ret)
+		goto err_release;
+
+#ifdef HAVE_FB_INFO_APERTURES
+	info->apertures = alloc_apertures(1);
+	if (!info->apertures) {
+		ret = -ENOMEM;
+		goto err_free_cmap;
+	}
+#endif
+
+	fb_helper->fbdev = info;
+
+	return info;
+
+err_free_cmap:
+	fb_dealloc_cmap(&info->cmap);
+err_release:
+	framebuffer_release(info);
+	return ERR_PTR(ret);
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_alloc_fbi);
+
+/**
+ * _kcl_drm_fb_helper_unregister_fbi - unregister fb_info framebuffer device
+ * @fb_helper: driver-allocated fbdev helper
+ *
+ * A wrapper around unregister_framebuffer, to release the fb_info
+ * framebuffer device
+ */
+void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+{
+	if (fb_helper && fb_helper->fbdev)
+		unregister_framebuffer(fb_helper->fbdev);
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
+#endif
