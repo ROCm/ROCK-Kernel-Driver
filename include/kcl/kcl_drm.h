@@ -14,7 +14,7 @@
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
@@ -525,7 +525,7 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -548,7 +548,7 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 		.prefix = prefix
 #endif
 	};
