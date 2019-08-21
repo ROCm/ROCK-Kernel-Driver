@@ -190,7 +190,7 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
 #else
 	drm_fb_helper_cfb_fillrect(info, rect);
@@ -200,7 +200,7 @@ static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_copyarea(info, area);
 #else
 	drm_fb_helper_cfb_copyarea(info, area);
@@ -210,7 +210,7 @@ static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
 static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_imageblit(info, image);
 #else
 	drm_fb_helper_cfb_imageblit(info, image);
