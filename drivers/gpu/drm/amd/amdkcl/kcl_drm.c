@@ -497,3 +497,91 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 	return state->planes[drm_plane_index(plane)].state;
 #endif
 }
+
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+#ifndef for_each_connector_in_state
+#define for_each_connector_in_state(__state, connector, connector_state, __i) \
+	for ((__i) = 0;							\
+	     (__i) < (__state)->num_connector &&				\
+	     ((connector) = (__state)->connectors[__i].ptr,			\
+	     (connector_state) = (__state)->connectors[__i].state, 1); 	\
+	     (__i)++)							\
+		for_each_if (connector)
+
+#define for_each_crtc_in_state(__state, crtc, crtc_state, __i)	\
+	for ((__i) = 0;						\
+	     (__i) < (__state)->dev->mode_config.num_crtc &&	\
+	     ((crtc) = (__state)->crtcs[__i].ptr,			\
+	     (crtc_state) = (__state)->crtcs[__i].state, 1);	\
+	     (__i)++)						\
+		for_each_if (crtc_state)
+
+#endif
+
+void
+_kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+					      struct drm_atomic_state *old_state)
+{
+	struct drm_connector *connector;
+	struct drm_connector_state *old_conn_state;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *old_crtc_state;
+	int i;
+
+	/* clear out existing links and update dpms */
+	for_each_connector_in_state(old_state, connector, old_conn_state, i) {
+		if (connector->encoder) {
+			WARN_ON(!connector->encoder->crtc);
+
+			connector->encoder->crtc = NULL;
+			connector->encoder = NULL;
+		}
+
+		crtc = connector->state->crtc;
+		if ((!crtc && old_conn_state->crtc) ||
+		    (crtc && _kcl_drm_atomic_crtc_needs_modeset(crtc->state))) {
+			struct drm_property *dpms_prop =
+				dev->mode_config.dpms_property;
+			int mode = DRM_MODE_DPMS_OFF;
+
+			if (crtc && crtc->state->active)
+				mode = DRM_MODE_DPMS_ON;
+
+			connector->dpms = mode;
+			drm_object_property_set_value(&connector->base,
+						      dpms_prop, mode);
+		}
+	}
+
+	/* set new links */
+	for_each_connector_in_state(old_state, connector, old_conn_state, i) {
+		if (!connector->state->crtc)
+			continue;
+
+		if (WARN_ON(!connector->state->best_encoder))
+			continue;
+
+		connector->encoder = connector->state->best_encoder;
+		connector->encoder->crtc = connector->state->crtc;
+	}
+
+	/* set legacy state in the crtc structure */
+	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
+		struct drm_plane *primary = crtc->primary;
+
+		crtc->mode = crtc->state->mode;
+		crtc->enabled = crtc->state->enable;
+
+		if (_kcl_drm_atomic_get_existing_plane_state(old_state, primary) &&
+		    primary->state->crtc == crtc) {
+			crtc->x = primary->state->src_x >> 16;
+			crtc->y = primary->state->src_y >> 16;
+		}
+
+		if (crtc->state->enable)
+			drm_calc_timestamping_constants(crtc,
+							&crtc->state->adjusted_mode);
+	}
+}
+EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
+#endif
