@@ -24,6 +24,8 @@
 #include <linux/debugfs.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/reboot.h>
+#include <linux/syscalls.h>
 #include "amdgpu.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_atomfirmware.h"
@@ -63,6 +65,9 @@ const char *ras_block_string[] = {
 
 /* inject address is 52 bits */
 #define	RAS_UMC_INJECT_ADDR_LIMIT	(0x1ULL << 52)
+
+
+atomic_t amdgpu_ras_in_intr = ATOMIC_INIT(0);
 
 static int amdgpu_ras_reserve_vram(struct amdgpu_device *adev,
 		uint64_t offset, uint64_t size,
@@ -188,6 +193,10 @@ static int amdgpu_ras_debugfs_ctrl_parse_data(struct file *f,
 
 	return 0;
 }
+
+static struct ras_manager *amdgpu_ras_find_obj(struct amdgpu_device *adev,
+		struct ras_common_if *head);
+
 /**
  * DOC: AMDGPU RAS debugfs control interface
  *
@@ -627,12 +636,14 @@ int amdgpu_ras_error_query(struct amdgpu_device *adev,
 	info->ue_count = obj->err_data.ue_count;
 	info->ce_count = obj->err_data.ce_count;
 
-	if (err_data.ce_count)
+	if (err_data.ce_count) {
 		dev_info(adev->dev, "%ld correctable errors detected in %s block\n",
 			 obj->err_data.ce_count, ras_block_str(info->head.block));
-	if (err_data.ue_count)
+	}
+	if (err_data.ue_count) {
 		dev_info(adev->dev, "%ld uncorrectable errors detected in %s block\n",
 			 obj->err_data.ue_count, ras_block_str(info->head.block));
+	}
 
 	return 0;
 }
@@ -1728,4 +1739,11 @@ int amdgpu_ras_fini(struct amdgpu_device *adev)
 	kfree(con);
 
 	return 0;
+}
+
+void amdgpu_ras_global_ras_isr(struct amdgpu_device *adev)
+{
+	if (atomic_cmpxchg(&amdgpu_ras_in_intr, 0, 1) == 0) {
+		DRM_WARN("RAS event of type ERREVENT_ATHUB_INTERRUPT detected! Stopping all GPU jobs.\n");
+	}
 }
