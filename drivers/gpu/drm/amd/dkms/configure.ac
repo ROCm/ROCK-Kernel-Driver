@@ -50,6 +50,7 @@ m4_include([m4/drm-debug-printer.m4])
 m4_include([m4/drm-fb-helper-cfb-xx.m4])
 m4_include([m4/fb-info-apertures.m4])
 m4_include([m4/drm-fb-helper-xx-fbi.m4])
+m4_include([m4/drm-fb-helper-set-suspend-unlocked.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
