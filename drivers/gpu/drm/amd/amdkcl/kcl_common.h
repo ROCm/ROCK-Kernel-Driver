@@ -7,12 +7,12 @@
 #include <linux/version.h>
 #include <linux/kallsyms.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+#ifndef HAVE_KALLSYMS_LOOKUP_NAME
 extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
 #endif
 static inline unsigned long kcl_kallsyms_lookup_name(const char *name)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+#ifndef HAVE_KALLSYMS_LOOKUP_NAME
 	return _kcl_kallsyms_lookup_name(name);
 #else
 	return kallsyms_lookup_name(name);
