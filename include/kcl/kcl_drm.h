@@ -374,4 +374,15 @@ void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 }
 #endif
 
+#ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
+extern void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state);
+static inline
+void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
+					bool suspend)
+
+{
+	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, suspend);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
