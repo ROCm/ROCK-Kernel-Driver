@@ -523,7 +523,7 @@ void amdkcl_drm_init(void)
 					_kcl_drm_fb_helper_alloc_fbi_stub);
 	_kcl_drm_fb_helper_unregister_fbi = amdkcl_fp_setup("drm_fb_helper_unregister_fbi",
 					_kcl_drm_fb_helper_unregister_fbi_stub);
-	_kcl_drm_fb_helper_set_suspend_unlocked = amdkcl_fp_setup("drm_fb_helper_set_suspend",
+	_kcl_drm_fb_helper_set_suspend_unlocked = amdkcl_fp_setup("drm_fb_helper_set_suspend_unlocked",
 					_kcl_drm_fb_helper_set_suspend_unlocked_stub);
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(
 					"drm_atomic_helper_update_legacy_modeset_state",

@@ -172,7 +172,7 @@ static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_hel
 
 static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #else
 	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
