@@ -37,4 +37,16 @@ __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 }
 #endif
 
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+extern void _kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+					      struct drm_atomic_state *old_state);
+
+static inline void
+drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+					      struct drm_atomic_state *old_state)
+{
+	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
+}
+#endif
+
 #endif
