@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include <linux/console.h>
 #include <kcl/header/kcl_drm_device_h.h>
 #include <kcl/header/kcl_drm_drv_h.h>
 #include <drm/drm_crtc.h>
@@ -108,6 +109,26 @@ void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 		unregister_framebuffer(fb_helper->fbdev);
 }
 EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
+#endif
+
+#ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
+/**
+ * _kcl_drm_fb_helper_set_suspend_stub - wrapper around fb_set_suspend
+ * @fb_helper: driver-allocated fbdev helper
+ * @state: desired state, zero to resume, non-zero to suspend
+ *
+ * A wrapper around fb_set_suspend implemented by fbdev core
+ */
+void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
+{
+	if (!fb_helper || !fb_helper->fbdev)
+		return;
+
+	console_lock();
+	fb_set_suspend(fb_helper->fbdev, state);
+	console_unlock();
+}
+EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
 #endif
 
 #if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
