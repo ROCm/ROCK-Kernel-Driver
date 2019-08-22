@@ -68,6 +68,7 @@ m4_include([m4/reservation-object-add-shared-fence.m4])
 m4_include([m4/reservation-object-wait-timeout-rcu.m4])
 m4_include([m4/dma-fence-set-error.m4])
 m4_include([m4/ksys_sync_helper.m4])
+m4_include([m4/kallsyms-lookup-name.m4])
 m4_include([m4/config.m4])
 
 
