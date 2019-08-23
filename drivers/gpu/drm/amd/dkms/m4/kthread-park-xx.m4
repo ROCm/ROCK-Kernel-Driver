@@ -10,8 +10,8 @@ AC_DEFUN([AC_AMDGPU_KTHREAD_PARK_XX],
 		#include <linux/kthread.h>
 	],[
 		kthread_parkme();
-		kthread_park();
-		kthread_unpark();
+		kthread_park(NULL);
+		kthread_unpark(NULL);
 		kthread_should_park();
 	],[kthread_parkme kthread_park kthread_unpark kthread_should_park],[kernel/kthread.c],[
 		AC_MSG_RESULT(yes)
