@@ -992,7 +992,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 
 	/* size in MB on si */
 	adev->gmc.mc_vram_size =
-		adev->nbio_funcs->get_memsize(adev) * 1024ULL * 1024ULL;
+		adev->nbio.funcs->get_memsize(adev) * 1024ULL * 1024ULL;
 	adev->gmc.real_vram_size = adev->gmc.mc_vram_size;
 
 #if !defined(BUILD_AS_DKMS) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
@@ -1372,7 +1372,7 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 	WREG32_SOC15(HDP, 0, mmHDP_NONSURFACE_BASE_HI, (adev->gmc.vram_start >> 40));
 
 	/* After HDP is initialized, flush HDP.*/
-	adev->nbio_funcs->hdp_flush(adev, NULL);
+	adev->nbio.funcs->hdp_flush(adev, NULL);
 
 	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_ALWAYS)
 		value = false;
