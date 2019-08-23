@@ -29,7 +29,6 @@
 #define dma_fence_signal fence_signal
 #define dma_fence_signal_locked fence_signal_locked
 #define dma_fence_get_rcu fence_get_rcu
-#define dma_fence_is_later fence_is_later
 #define dma_fence_wait_timeout fence_wait_timeout
 #define dma_fence_array_create fence_array_create
 #define dma_fence_add_callback fence_add_callback
@@ -82,8 +81,8 @@ extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 5, 0)
-static inline bool fence_is_later(struct fence *f1, struct fence *f2)
+#if !defined(RENAME_FENCE_TO_DMA_FENCE)
+static inline bool dma_fence_is_later(struct fence *f1, struct fence *f2)
 {
 	if (WARN_ON(f1->context != f2->context))
 		return false;
