@@ -248,7 +248,7 @@ static inline void
 kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
-#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+#ifdef BUILD_AS_DKMS
 	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
 #else
 	drm_atomic_helper_update_legacy_modeset_state(dev, old_state);

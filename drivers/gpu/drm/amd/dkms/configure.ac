@@ -153,7 +153,6 @@ m4_include([m4/kthread-park-xx.m4])
 m4_include([m4/drm-fb-helper-cfb-xx.m4])
 m4_include([m4/drm-fb-helper-xx-fbi.m4])
 m4_include([m4/drm-fb-helper-set-suspend-unlocked.m4])
-m4_include([m4/drm-atomic-helper-update-legacy-modeset-state.m4])
 m4_include([m4/config.m4])
 
 
