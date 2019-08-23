@@ -707,7 +707,7 @@ static struct kfd_process *create_process(const struct task_struct *thread,
 	if (!process)
 		goto err_alloc_process;
 
-#ifndef HAVE_STRUCT_RB_ROOT_CACHED
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	process->bo_interval_tree = RB_ROOT;
 #else
 	process->bo_interval_tree = RB_ROOT_CACHED;

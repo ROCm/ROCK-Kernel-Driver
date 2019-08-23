@@ -84,7 +84,7 @@ struct amdgpu_mn {
 
 	/* objects protected by lock */
 	struct rw_semaphore	lock;
-#ifndef HAVE_STRUCT_RB_ROOT_CACHED
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	struct rb_root		objects;
 #else
 	struct rb_root_cached	objects;
@@ -124,7 +124,7 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 	down_write(&amn->lock);
 	hash_del(&amn->node);
 	rbtree_postorder_for_each_entry_safe(node, next_node,
-#ifndef HAVE_STRUCT_RB_ROOT_CACHED
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 					     &amn->objects, it.rb) {
 #else
 					     &amn->objects.rb_root, it.rb) {
@@ -567,7 +567,7 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	init_rwsem(&amn->lock);
 	amn->type = type;
 	amn->mn.ops = &amdgpu_mn_ops[type];
-#ifndef HAVE_STRUCT_RB_ROOT_CACHED
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	amn->objects = RB_ROOT;
 #else
 	amn->objects = RB_ROOT_CACHED;
