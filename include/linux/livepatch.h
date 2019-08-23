@@ -23,6 +23,8 @@
 #define KLP_UNPATCHED	 0
 #define KLP_PATCHED	 1
 
+#define KLP_NOREG_API
+
 /**
  * struct klp_func - function structure for live patching
  * @old_name:	name of the function to be patched
