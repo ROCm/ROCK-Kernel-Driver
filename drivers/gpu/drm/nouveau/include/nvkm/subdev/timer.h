@@ -60,7 +60,7 @@ s64 nvkm_timer_wait_test(struct nvkm_timer_wait *);
 	} while ((_taken = nvkm_timer_wait_test(&_wait)) >= 0);                \
                                                                                \
 	if (_warn && _taken < 0)                                               \
-		dev_WARN(_wait.tmr->subdev.device->dev, "timeout\n");          \
+		dev_info(_wait.tmr->subdev.device->dev, "timeout\n");          \
 	_taken;                                                                \
 })
 #define nvkm_usec(d,u,cond...) nvkm_nsec((d), (u) * 1000, ##cond)
