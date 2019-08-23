@@ -171,6 +171,7 @@ struct psp_context
 	/* tmr buffer */
 	struct amdgpu_bo		*tmr_bo;
 	uint64_t			tmr_mc_addr;
+	void				*tmr_buf;
 
 	/* asd firmware and buffer */
 	const struct firmware		*asd_fw;
