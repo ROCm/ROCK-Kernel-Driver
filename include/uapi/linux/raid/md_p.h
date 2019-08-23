@@ -89,6 +89,7 @@
 				    * devices available - and don't try to
 				    * correct read errors.
 				    */
+#define	MD_DISK_TIMEOUT		11 /* disk is faulty due to timeout */
 
 #define	MD_DISK_WRITEMOSTLY	9 /* disk is "write-mostly" is RAID1 config.
 				   * read requests will only be sent here in
@@ -99,6 +100,7 @@
 #define MD_DISK_ROLE_SPARE	0xffff
 #define MD_DISK_ROLE_FAULTY	0xfffe
 #define MD_DISK_ROLE_JOURNAL	0xfffd
+#define MD_DISK_ROLE_TIMEOUT	0xfff0 /* SUSE-only timed-out */
 #define MD_DISK_ROLE_MAX	0xff00 /* max value of regular disk role */
 
 typedef struct mdp_device_descriptor_s {
