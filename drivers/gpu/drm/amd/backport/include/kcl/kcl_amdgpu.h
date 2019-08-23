@@ -1,24 +1,34 @@
 #ifndef AMDGPU_BACKPORT_KCL_AMDGPU_H
 #define AMDGPU_BACKPORT_KCL_AMDGPU_H
 
-#include <linux/version.h>
-#include "amdgpu.h"
+#include <amdgpu.h>
 
 #if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
-u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc);
-int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int crtc);
-void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc);
-int kcl_amdgpu_get_crtc_scanoutpos(struct drm_device *dev, unsigned int crtc,
-				   unsigned int flags, int *vpos, int *hpos,
-				   ktime_t *stime, ktime_t *etime,
-				   const struct drm_display_mode *mode);
+static inline u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int crtc)
 #else
-u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, int crtc);
-int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, int crtc);
-void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, int crtc);
-int kcl_amdgpu_get_crtc_scanoutpos(struct drm_device *dev, int crtc, unsigned int flags,
-				   int *vpos, int *hpos, ktime_t *stime, ktime_t *etime);
+static inline u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, int crtc)
 #endif
+{
+	return amdgpu_get_vblank_counter_kms(dev, crtc);
+}
+
+#if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
+static inline int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int crtc)
+#else
+static inline int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, int crtc)
+#endif
+{
+	return amdgpu_enable_vblank_kms(dev, crtc);
+}
+
+#if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
+static inline void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int crtc)
+#else
+static inline void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, int crtc)
+#endif
+{
+	return amdgpu_disable_vblank_kms(dev, crtc);
+}
 
 #if defined(HAVE_GET_SCANOUT_POSITION_RETURN_BOOL)
 static inline bool kcl_amdgpu_get_crtc_scanout_position(struct drm_device *dev, unsigned int pipe,
