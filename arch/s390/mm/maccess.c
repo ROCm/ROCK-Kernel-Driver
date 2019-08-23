@@ -228,3 +228,7 @@ void unxlate_dev_mem_ptr(phys_addr_t addr, void *buf)
 	if ((void *) addr != buf)
 		free_page((unsigned long) buf);
 }
+
+/* crash-kmp uses these */
+EXPORT_SYMBOL_GPL(xlate_dev_mem_ptr);
+EXPORT_SYMBOL_GPL(unxlate_dev_mem_ptr);
