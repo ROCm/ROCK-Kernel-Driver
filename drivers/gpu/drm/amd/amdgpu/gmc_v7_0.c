@@ -962,6 +962,8 @@ static int gmc_v7_0_sw_init(void *handle)
 	int dma_bits;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+	adev->num_vmhubs = 1;
+
 	if (adev->flags & AMD_IS_APU) {
 		adev->gmc.vram_type = AMDGPU_VRAM_TYPE_UNKNOWN;
 	} else {
