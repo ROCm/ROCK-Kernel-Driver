@@ -1674,9 +1674,6 @@ xfs_fs_fill_super(
 	if (mp->m_flags & XFS_MOUNT_DAX) {
 		bool rtdev_is_dax = false, datadev_is_dax;
 
-		xfs_warn(mp,
-		"DAX enabled. Warning: EXPERIMENTAL, use at your own risk");
-
 		datadev_is_dax = bdev_dax_supported(mp->m_ddev_targp->bt_bdev,
 			sb->s_blocksize);
 		if (mp->m_rtdev_targp)
