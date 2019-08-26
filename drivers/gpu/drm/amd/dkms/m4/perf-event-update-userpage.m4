@@ -10,7 +10,7 @@ AC_DEFUN([AC_AMDGPU_PERF_EVENT_UPDATE_USERPAGE],
 		#include <linux/perf_event.h>
 	],[
 		perf_event_update_userpage(NULL);
-	],[perf_event_update_userpage],[kernel/event/core.c],[
+	],[perf_event_update_userpage],[kernel/events/core.c],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_PERF_EVENT_UPDATE_USERPAGE, 1, [whether  perf_event_update_userpage is available])
 	],[
