@@ -729,7 +729,7 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
-#if defined(CONFIG_ZONE_DEVICE)
+#if defined(CONFIG_ZONE_DEVICE) && defined(HAVE_DEV_PAGEMAP_STRUCT)
 #define CONFIG_ENABLE_SSG
 #endif
 
