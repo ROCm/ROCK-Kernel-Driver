@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE],
 		#include <drm/drm_atomic_helper.h>
 	],[
 		drm_atomic_helper_update_legacy_modeset_state(NULL,NULL);
-	],[drm_atomic_helper_update_legacy_modeset_state],[drivers/gpu/drm/drm_fb_helper.c],[
+	],[drm_atomic_helper_update_legacy_modeset_state],[drivers/gpu/drm/drm_atomic_helper.c],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE, 1, [drm_atomic_helper_update_legacy_modeset_state() is available])
 	],[
