@@ -803,7 +803,7 @@ struct amdgpu_direct_gma {
 	atomic64_t		gart_usage;
 };
 
-#if defined(CONFIG_ZONE_DEVICE) && (DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0))
+#if defined(CONFIG_ZONE_DEVICE) && defined(HAVE_DEV_PAGEMAP_STRUCT)
 #define CONFIG_ENABLE_SSG
 #endif
 
