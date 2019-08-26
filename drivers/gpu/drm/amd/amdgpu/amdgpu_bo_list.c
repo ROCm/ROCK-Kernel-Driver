@@ -152,8 +152,7 @@ error_free:
 static void amdgpu_bo_list_destroy(struct amdgpu_fpriv *fpriv, int id)
 {
 		struct amdgpu_bo_list *list;
-
-	#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#ifndef HAVE_IDR_REMOVE_RETURN_VOID_POINTER
 		mutex_lock(&fpriv->bo_list_lock);
 		list = idr_find(&fpriv->bo_list_handles, id);
 		if (list) {
@@ -163,13 +162,13 @@ static void amdgpu_bo_list_destroy(struct amdgpu_fpriv *fpriv, int id)
 				} else {
 							mutex_unlock(&fpriv->bo_list_lock);
 						}
-	#else
+#else
 		mutex_lock(&fpriv->bo_list_lock);
 		list = idr_remove(&fpriv->bo_list_handles, id);
 		mutex_unlock(&fpriv->bo_list_lock);
 		if (list)
 			kref_put(&list->refcount, amdgpu_bo_list_free);
-	#endif
+#endif
 }
 
 int amdgpu_bo_list_get(struct amdgpu_fpriv *fpriv, int id,

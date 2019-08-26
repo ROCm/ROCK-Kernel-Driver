@@ -159,6 +159,7 @@ m4_include([m4/kallsyms-lookup-name.m4])
 m4_include([m4/dev-err-ratelimited.m4])
 m4_include([m4/seq-hex-dump.m4])
 m4_include([m4/fb-info-apertures.m4])
+m4_include([m4/idr-remove.m4])
 m4_include([m4/config.m4])
 
 
