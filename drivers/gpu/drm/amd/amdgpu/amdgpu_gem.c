@@ -161,7 +161,11 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 	struct drm_device *ddev = adev_to_drm(adev);
 	struct drm_file *file;
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	mutex_lock(&ddev->struct_mutex);
+#else
 	mutex_lock(&ddev->filelist_mutex);
+#endif
 
 	list_for_each_entry(file, &ddev->filelist, lhead) {
 		struct drm_gem_object *gobj;
@@ -171,13 +175,21 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		spin_lock(&file->table_lock);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+			drm_gem_object_unreference(gobj);
+#else
 			drm_gem_object_put(gobj);
+#endif
 		}
 		idr_destroy(&file->object_idr);
 		spin_unlock(&file->table_lock);
 	}
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	mutex_unlock(&ddev->struct_mutex);
+#else
 	mutex_unlock(&ddev->filelist_mutex);
+#endif
 }
 
 /*
@@ -1014,7 +1026,11 @@ static int amdgpu_debugfs_gem_info_show(struct seq_file *m, void *unused)
 	struct drm_file *file;
 	int r;
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	r = mutex_lock_interruptible(&dev->struct_mutex);
+#else
 	r = mutex_lock_interruptible(&dev->filelist_mutex);
+#endif
 	if (r)
 		return r;
 
@@ -1044,7 +1060,11 @@ static int amdgpu_debugfs_gem_info_show(struct seq_file *m, void *unused)
 		spin_unlock(&file->table_lock);
 	}
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	mutex_unlock(&dev->struct_mutex);
+#else
 	mutex_unlock(&dev->filelist_mutex);
+#endif
 	return 0;
 }
 
