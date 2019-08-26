@@ -161,6 +161,7 @@ m4_include([m4/drm-fb-helper-xx-fbi.m4])
 m4_include([m4/drm-fb-helper-set-suspend-unlocked.m4])
 m4_include([m4/drm-atomic-helper-update-legacy-modeset-state.m4])
 m4_include([m4/dev-pagemap-struct.m4])
+m4_include([m4/drm-device-filelist-mutex.m4])
 m4_include([m4/config.m4])
 
 
