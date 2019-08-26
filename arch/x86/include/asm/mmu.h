@@ -54,6 +54,7 @@ typedef struct {
 	/* address of the bounds directory */
 	void __user *bd_addr;
 #endif
+	void *suse_kabi_padding;
 } mm_context_t;
 
 #define INIT_MM_CONTEXT(mm)						\

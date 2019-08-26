@@ -507,6 +507,7 @@ struct sched_rt_entity {
 	/* rq "owned" by this entity/group: */
 	struct rt_rq			*my_q;
 #endif
+	void *suse_kabi_padding;
 } __randomize_layout;
 
 struct sched_dl_entity {
@@ -1273,6 +1274,7 @@ struct task_struct {
 	unsigned long			lowest_stack;
 	unsigned long			prev_lowest_stack;
 #endif
+	void				*suse_kabi_padding;
 
 	/*
 	 * New fields for task_struct should be added above here, so that
