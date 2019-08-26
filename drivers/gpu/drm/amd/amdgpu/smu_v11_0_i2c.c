@@ -50,7 +50,7 @@
 static void smu_v11_0_i2c_set_clock_gating(struct i2c_adapter *control, bool en)
 {
 	struct amdgpu_device *adev = to_amdgpu_device(control);
-	uint32_t reg;
+	uint32_t reg = RREG32_SOC15(SMUIO, 0, mmSMUIO_PWRMGT);
 
 	reg = REG_SET_FIELD(reg, SMUIO_PWRMGT, i2c_clk_gate_en, en ? 1 : 0);
 	WREG32_SOC15(SMUIO, 0, mmSMUIO_PWRMGT, reg);
