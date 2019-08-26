@@ -354,7 +354,6 @@ static int vm_update_pds(struct amdgpu_vm *vm, struct amdgpu_sync *sync)
 
 static uint64_t get_pte_flags(struct amdgpu_device *adev, struct kgd_mem *mem)
 {
-	struct amdgpu_device *bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
 	bool coherent = mem->alloc_flags & ALLOC_MEM_FLAGS_COHERENT;
 	uint32_t mapping_flags;
 
@@ -364,23 +363,8 @@ static uint64_t get_pte_flags(struct amdgpu_device *adev, struct kgd_mem *mem)
 	if (mem->alloc_flags & ALLOC_MEM_FLAGS_EXECUTABLE)
 		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
 
-	switch (adev->asic_type) {
-	case CHIP_ARCTURUS:
-		if (mem->alloc_flags & ALLOC_MEM_FLAGS_VRAM) {
-			if (bo_adev == adev)
-				mapping_flags |= coherent ?
-					AMDGPU_VM_MTYPE_CC : AMDGPU_VM_MTYPE_RW;
-			else
-				mapping_flags |= AMDGPU_VM_MTYPE_UC;
-		} else {
-			mapping_flags |= coherent ?
-				AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
-		}
-		break;
-	default:
-		mapping_flags |= coherent ?
-			AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
-	}
+	mapping_flags |= coherent ?
+		AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
 
 	return amdgpu_gmc_get_pte_flags(adev, mapping_flags);
 }
@@ -433,8 +417,7 @@ static int add_bo_to_vm(struct amdgpu_device *adev, struct kgd_mem *mem,
 	}
 
 	bo_va_entry->va = va;
-	bo_va_entry->pte_flags = amdgpu_gmc_get_pte_flags(adev,
-							 mem->mapping_flags);
+	bo_va_entry->pte_flags = get_pte_flags(adev, mem);
 	bo_va_entry->kgd_dev = (void *)adev;
 	list_add(&bo_va_entry->bo_list, list_bo_va);
 
@@ -1147,7 +1130,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	struct amdgpu_bo_param bp;
 	u32 domain, alloc_domain;
 	u64 alloc_flags;
-	uint32_t mapping_flags;
 	int ret;
 
 	/*
@@ -1216,16 +1198,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 			adev->asic_type != CHIP_VEGAM) ?
 			VI_BO_SIZE_ALIGN : 1;
 
-	mapping_flags = AMDGPU_VM_PAGE_READABLE;
-	if (flags & ALLOC_MEM_FLAGS_WRITABLE)
-		mapping_flags |= AMDGPU_VM_PAGE_WRITEABLE;
-	if (flags & ALLOC_MEM_FLAGS_EXECUTABLE)
-		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
-	if (flags & ALLOC_MEM_FLAGS_COHERENT)
-		mapping_flags |= AMDGPU_VM_MTYPE_UC;
-	else
-		mapping_flags |= AMDGPU_VM_MTYPE_NC;
-	(*mem)->mapping_flags = mapping_flags;
+	(*mem)->alloc_flags = flags;
 
 	amdgpu_sync_create(&(*mem)->sync);
 
@@ -1870,13 +1843,13 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-
 	if (bo->kfd_bo)
-		(*mem)->mapping_flags = bo->kfd_bo->mapping_flags;
+		(*mem)->alloc_flags = bo->kfd_bo->alloc_flags;
 	else
-		(*mem)->mapping_flags =
-			AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE |
-			AMDGPU_VM_PAGE_EXECUTABLE | AMDGPU_VM_MTYPE_NC;
+		(*mem)->alloc_flags =
+			((bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
+			 ALLOC_MEM_FLAGS_VRAM : ALLOC_MEM_FLAGS_GTT) |
+			ALLOC_MEM_FLAGS_WRITABLE | ALLOC_MEM_FLAGS_EXECUTABLE;
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
