@@ -48,6 +48,7 @@ m4_include([m4/drm-calc-vbltimestamp-from-scanoutpos.m4])
 m4_include([m4/drm-mm-print.m4])
 m4_include([m4/drm-debug-printer.m4])
 m4_include([m4/drm-fb-helper-cfb-xx.m4])
+m4_include([m4/fb-info-apertures.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
