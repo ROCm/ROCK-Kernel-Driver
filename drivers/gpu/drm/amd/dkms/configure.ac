@@ -158,6 +158,7 @@ m4_include([m4/dev-pagemap-struct.m4])
 m4_include([m4/drm-device-filelist-mutex.m4])
 m4_include([m4/kallsyms-lookup-name.m4])
 m4_include([m4/dev-err-ratelimited.m4])
+m4_include([m4/seq-hex-dump.m4])
 m4_include([m4/config.m4])
 
 
