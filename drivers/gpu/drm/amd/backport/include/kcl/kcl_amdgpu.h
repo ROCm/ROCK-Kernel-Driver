@@ -64,7 +64,7 @@ static inline int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, in
 					struct timeval *vblank_time,
 					unsigned flags)
 {
-	return amdgpu_get_vblank_timestamp_kms(dev, pipe, max_error, vblank_time, flags);
+	return amdgpu_get_vblank_timestamp_kms(dev, crtc, max_error, vblank_time, flags);
 }
 #endif
 
