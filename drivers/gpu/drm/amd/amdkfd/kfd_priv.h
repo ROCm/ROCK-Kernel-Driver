@@ -1053,6 +1053,11 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       u32 *ctl_stack_used_size,
 		       u32 *save_area_used_size);
 
+int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
+			   int flags,
+			   struct kfd_queue_snapshot_entry __user *buf,
+			   int num_qss_entries);
+
 int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 				unsigned int fence_value,
 				unsigned int timeout_ms);

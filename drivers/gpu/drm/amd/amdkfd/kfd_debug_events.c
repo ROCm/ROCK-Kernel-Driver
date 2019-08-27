@@ -100,6 +100,25 @@ static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
 	((x) = (n) ? (x) | KFD_DBG_EV_STATUS_NEW_QUEUE :	\
 		(x) & ~KFD_DBG_EV_STATUS_NEW_QUEUE)
 
+uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
+{
+	uint32_t queue_status_word = 0;
+
+	KFD_DBG_EV_SET_EVENT_TYPE(queue_status_word,
+				  q->properties.debug_event_type);
+	KFD_DBG_EV_SET_SUSPEND_STATE(queue_status_word,
+				  q->properties.is_suspended);
+	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
+				  q->properties.is_new);
+
+	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
+		q->properties.is_new = false;
+		q->properties.debug_event_type = 0;
+	}
+
+	return queue_status_word;
+}
+
 int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		      unsigned int *queue_id,
 		      unsigned int flags,
@@ -125,16 +144,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 			goto out;
 		}
 
-		KFD_DBG_EV_SET_EVENT_TYPE(*event_status,
-					  q->properties.debug_event_type);
-		KFD_DBG_EV_SET_SUSPEND_STATE(*event_status,
-					  q->properties.is_suspended);
-		KFD_DBG_EV_SET_NEW_QUEUE_STATE(*event_status,
-					  q->properties.is_new);
-		if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
-			q->properties.is_new = false;
-			q->properties.debug_event_type = 0;
-		}
+		*event_status = kfd_dbg_get_queue_status_word(q, flags);
+
 		goto out;
 
 	} else {
@@ -145,17 +156,9 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 				|| pqn->q->properties.debug_event_type
 					== KFD_DBG_EV_STATUS_VMFAULT)) {
 				*queue_id = pqn->q->properties.queue_id;
-				KFD_DBG_EV_SET_EVENT_TYPE(*event_status,
-					pqn->q->properties.debug_event_type);
-				KFD_DBG_EV_SET_SUSPEND_STATE(*event_status,
-					pqn->q->properties.is_suspended);
-				KFD_DBG_EV_SET_NEW_QUEUE_STATE(*event_status,
-					pqn->q->properties.is_new);
-				if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
-					pqn->q->properties.is_new = false;
-					pqn->q->properties.debug_event_type
-									= 0;
-				}
+				*event_status =
+					kfd_dbg_get_queue_status_word(pqn->q,
+								      flags);
 				goto out;
 			}
 		}

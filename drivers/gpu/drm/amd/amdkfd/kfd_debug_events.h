@@ -25,6 +25,8 @@
 
 #include "kfd_priv.h"
 
+uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags);
+
 int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		      unsigned int *queue_id,
 		      unsigned int flags,

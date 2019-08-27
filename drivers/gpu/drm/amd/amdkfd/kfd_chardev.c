@@ -2623,7 +2623,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
 
-
 	pid = find_get_pid(args->pid);
 	if (!pid) {
 		pr_err("Cannot find pid info for %i\n",
@@ -2795,6 +2794,17 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,
 						 args->data2,
 						 &args->data3);
+		break;
+	case KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT:
+		r = pqm_get_queue_snapshot(&p->pqm, args->data1,
+					   (void __user *)args->ptr,
+					   args->data2);
+
+		if (r > 0) {
+			args->data2 = r;
+			r = 0;
+		}
+
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
