@@ -80,6 +80,7 @@ struct tb {
 	int index;
 	enum tb_security_level security_level;
 	size_t nboot_acl;
+	void *suse_kabi_padding;
 	unsigned long privdata[0];
 };
 
@@ -104,6 +105,7 @@ static inline unsigned int tb_phy_port_from_link(unsigned int link)
 struct tb_property_dir {
 	const uuid_t *uuid;
 	struct list_head properties;
+	void *suse_kabi_padding;
 };
 
 enum tb_property_type {
@@ -137,6 +139,7 @@ struct tb_property {
 		char *text;
 		u32 immediate;
 	} value;
+	void *suse_kabi_padding;
 };
 
 struct tb_property_dir *tb_property_parse_dir(const u32 *block,
@@ -449,6 +452,7 @@ struct tb_nhi {
 	bool going_away;
 	struct work_struct interrupt_work;
 	u32 hop_count;
+	void *suse_kabi_padding;
 };
 
 /**
@@ -496,6 +500,7 @@ struct tb_ring {
 	u16 eof_mask;
 	void (*start_poll)(void *data);
 	void *poll_data;
+	void *suse_kabi_padding;
 };
 
 /* Leave ring interrupt enabled on suspend */
