@@ -12,10 +12,10 @@ AC_DEFUN([AC_AMDGPU_GET_USER_PAGES], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_5ARGS_GET_USER_PAGES, 1, [get_user_pages() wants 5 args])
 	], [
-		dnl #
-		dnl # commit c12d2da56d0e07d230968ee2305aaa86b93a6832
-		dnl # mm/gup: Remove the macro overload API migration helpers from the get_user*() APIs
-		dnl #
+dnl #
+dnl # commit c12d2da56d0e07d230968ee2305aaa86b93a6832
+dnl # mm/gup: Remove the macro overload API migration helpers from the get_user*() APIs
+dnl #
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether get_user_pages() wants 6 args])
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
@@ -26,9 +26,9 @@ AC_DEFUN([AC_AMDGPU_GET_USER_PAGES], [
 			AC_MSG_RESULT(yes)
 			AC_DEFINE(HAVE_6ARGS_GET_USER_PAGES, 1, [get_user_pages() wants 6 args])
 		], [
-			dnl #
-			dnl # redhat 7.x wrap a get_user_pages()
-			dnl #
+dnl #
+dnl # redhat 7.x wrap a get_user_pages()
+dnl #
 			AC_MSG_RESULT(no)
 			AC_MSG_CHECKING([whether get_user_pages get wrapped in drm_backport.h])
 			AC_KERNEL_TRY_COMPILE([
