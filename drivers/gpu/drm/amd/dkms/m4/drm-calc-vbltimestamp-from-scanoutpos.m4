@@ -15,10 +15,10 @@ AC_DEFUN([AC_AMDGPU_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS],
 	], [
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether drm_calc_vbltimestamp_from_scanoutpos() drop mode arg])
-		dnl #
-		dnl # commit 1bf6ad622b9be
-		dnl # drm/vblank: drop the mode argument from drm_calc_vbltimestamp_from_scanoutpos
-		dnl #
+dnl #
+dnl # commit 1bf6ad622b9be
+dnl # drm/vblank: drop the mode argument from drm_calc_vbltimestamp_from_scanoutpos
+dnl #
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
 			#include <drm/drmP.h>
 		], [
@@ -29,10 +29,10 @@ AC_DEFUN([AC_AMDGPU_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS],
 		], [
 			AC_MSG_RESULT(no)
 			AC_MSG_CHECKING([whether drm_calc_vbltimestamp_from_scanoutpos() remove crtc arg])
-			dnl #
-			dnl # commit eba1f35dfe14
-			dnl # drm: Move timestamping constants into drm_vblank_crtc
-			dnl #
+dnl #
+dnl # commit eba1f35dfe14
+dnl # drm: Move timestamping constants into drm_vblank_crtc
+dnl #
 			AC_KERNEL_TRY_COMPILE_SYMBOL([
 				#include <drm/drmP.h>
 			], [
@@ -43,10 +43,10 @@ AC_DEFUN([AC_AMDGPU_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS],
 			], [
 				AC_MSG_RESULT(no)
 				AC_MSG_CHECKING([whether drm_calc_vbltimestamp_from_scanoutpos() have the crtc & mode arg])
-				dnl #
-				dnl # commit 7da903ef0485
-				dnl # drm: Pass the display mode to drm_calc_vbltimestamp_from_scanoutpos()
-				dnl #
+dnl #
+dnl # commit 7da903ef0485
+dnl # drm: Pass the display mode to drm_calc_vbltimestamp_from_scanoutpos()
+dnl #
 				AC_KERNEL_TRY_COMPILE_SYMBOL([
 					#include <drm/drmP.h>
 				], [
