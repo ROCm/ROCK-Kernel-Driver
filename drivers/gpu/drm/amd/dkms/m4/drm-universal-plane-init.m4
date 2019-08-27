@@ -20,11 +20,11 @@ AC_DEFUN([AC_AMDGPU_NUM_ARGS_DRM_UNIVERSAL_PLANE_INIT], [
 	], [
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether drm_universal_plane_init() wants 8 args and declared in drm_plane.h])
-		dnl #
-		dnl # 4.5 API
-		dnl # commit 43968d7b806d7a7e021261294c583a216fddf0e5
-		dnl # drm: Extract drm_plane.[hc]
-		dnl #
+dnl #
+dnl # 4.5 API
+dnl # commit 43968d7b806d7a7e021261294c583a216fddf0e5
+dnl # drm: Extract drm_plane.[hc]
+dnl #
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
 			#include <linux/types.h>
 			#include <drm/drm_modeset_lock.h>
@@ -39,10 +39,10 @@ AC_DEFUN([AC_AMDGPU_NUM_ARGS_DRM_UNIVERSAL_PLANE_INIT], [
 		], [
 			AC_MSG_RESULT(no)
 			AC_MSG_CHECKING([whether drm_universal_plane_init() wants 8 args and declared in drm_crtc.h])
-			dnl #
-			dnl # commit b0b3b79511143
-			dnl # drm: Pass 'name' to drm_universal_plane_init()
-			dnl #
+dnl #
+dnl # commit b0b3b79511143
+dnl # drm: Pass 'name' to drm_universal_plane_init()
+dnl #
 			AC_KERNEL_TRY_COMPILE_SYMBOL([
 				#include <drm/drm_crtc.h>
 			], [
