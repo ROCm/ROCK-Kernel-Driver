@@ -138,6 +138,7 @@ m4_include([m4/type--poll-t.m4])
 m4_include([m4/hw-perf-event-conf-member.m4])
 m4_include([m4/interval-tree-insert.m4])
 m4_include([m4/dev-pagemap-struct.m4])
+m4_include([m4/seq-hex-dump.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
