@@ -156,7 +156,7 @@ static void kfd_doorbell_close(struct vm_area_struct *vma)
 }
 
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+#ifndef HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION
 static int kfd_doorbell_vm_fault(struct vm_fault *vmf)
 {
 	struct kfd_process_device *pdd = vmf->vma->vm_private_data;
