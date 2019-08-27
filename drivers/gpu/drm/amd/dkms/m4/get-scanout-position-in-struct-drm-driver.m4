@@ -19,10 +19,10 @@ AC_DEFUN([AC_AMDGPU_GET_SCANOUT_POSITION_IN_DRM_DRIVER],
 	], [
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether get_scanout_position has struct drm_display_mode arg])
-		dnl #
-		dnl # commit 3bb403bf421b
-		dnl # drm: Stop using linedur_ns and pixeldur_ns for vblank timestamps
-		dnl #
+dnl #
+dnl # commit 3bb403bf421b
+dnl # drm: Stop using linedur_ns and pixeldur_ns for vblank timestamps
+dnl #
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drmP.h>
 			int foo(struct drm_device *dev, int crtc,
@@ -39,10 +39,10 @@ AC_DEFUN([AC_AMDGPU_GET_SCANOUT_POSITION_IN_DRM_DRIVER],
 		], [
 			AC_MSG_RESULT(no)
 			AC_MSG_CHECKING([whether get_scanout_position has timestamp arg])
-			dnl #
-			dnl # commit 8f6fce03ddaf
-			dnl # drm: Push latency sensitive bits of vblank scanoutpos timestamping into kms drivers.
-			dnl #
+dnl #
+dnl # commit 8f6fce03ddaf
+dnl # drm: Push latency sensitive bits of vblank scanoutpos timestamping into kms drivers.
+dnl #
 			AC_KERNEL_TRY_COMPILE([
 				#include <drm/drmP.h>
 				int foo(struct drm_device *dev, int crtc,
