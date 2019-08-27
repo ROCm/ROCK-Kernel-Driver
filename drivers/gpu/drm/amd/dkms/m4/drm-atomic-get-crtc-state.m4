@@ -17,10 +17,10 @@ AC_DEFUN([AC_AMDGPU_DRM_ATOMIC_GET_CRTC_STATE], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DRM_ATOMIC_GET_CRTC_STATE, 1, [drm_atomic_get_old_crtc_state() and drm_atomic_get_new_crtc_state() are available])
 	], [
-		dnl #
-		dnl # commit 43968d7b806d7a7e021261294c583a216fddf0e5
-		dnl # drm: Extract drm_plane.[hc]
-		dnl #
+dnl #
+dnl # commit 43968d7b806d7a7e021261294c583a216fddf0e5
+dnl # drm: Extract drm_plane.[hc]
+dnl #
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether struct drm_atomic_state has __drm_crtcs_state member])
 		AC_KERNEL_TRY_COMPILE([
