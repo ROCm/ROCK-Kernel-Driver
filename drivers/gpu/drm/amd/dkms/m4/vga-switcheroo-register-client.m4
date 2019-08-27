@@ -13,10 +13,10 @@ AC_DEFUN([AC_AMDGPU_VGA_SWITCHEROO_REGISTER_CLIENT], [
 		AC_DEFINE(HAVE_3ARGS_VGA_SWITCHEROO_CLIENT_OPS_VGA_SWITCHEROO_REGISTER_CLIENT, 1, [vga_switcheroo_register_client() with 3 args & struct vga_switcheroo_client_ops])
 	], [
 		AC_MSG_RESULT(no)
-		dnl #
-		dnl # commit 26ec685ff9d9
-		dnl # vga_switcheroo: Introduce struct vga_switcheroo_client_ops
-		dnl #
+dnl #
+dnl # commit 26ec685ff9d9
+dnl # vga_switcheroo: Introduce struct vga_switcheroo_client_ops
+dnl #
 		AC_MSG_CHECKING([whether vga_switcheroo_register_client() with 2 args is available])
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/vga_switcheroo.h>
@@ -27,10 +27,10 @@ AC_DEFUN([AC_AMDGPU_VGA_SWITCHEROO_REGISTER_CLIENT], [
 			AC_DEFINE(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_CLIENT, 1, [vga_switcheroo_register_client() with 2 args])
 		], [
 			AC_MSG_RESULT(no)
-			dnl #
-			dnl # commit 8d608aa62952
-			dnl # vga_switcheroo: add reprobe hook for fbcon to recheck connected outputs.
-			dnl #
+dnl #
+dnl # commit 8d608aa62952
+dnl # vga_switcheroo: add reprobe hook for fbcon to recheck connected outputs.
+dnl #
 			AC_MSG_CHECKING([whether vga_switcheroo_register_client() with 4 args is available])
 			AC_KERNEL_TRY_COMPILE([
 				#include <linux/vga_switcheroo.h>
