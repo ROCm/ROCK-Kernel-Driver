@@ -12,9 +12,9 @@ AC_DEFUN([AC_AMDGPU_GET_USER_PAGES_REMOTE], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_8ARGS_GET_USER_PAGES_REMOTE, 1, [get_user_pages_remote() wants 8 args])
 	], [
-		dnl #
-		dnl # redhat 7.x wrap a get_user_pages_remote()
-		dnl #
+dnl #
+dnl # redhat 7.x wrap a get_user_pages_remote()
+dnl #
 		AC_MSG_RESULT(no)
 		AC_MSG_CHECKING([whether get_user_pages_remote() get wrapped in drm_backport.h])
 		AC_KERNEL_TRY_COMPILE([
