@@ -532,6 +532,9 @@ About use_hierarchy, see Section 6.
 
   About use_hierarchy, see Section 6.
 
+  Please note that this knob is considered deprecated and will be removed
+  in future.
+
 5.2 stat file
 -------------
 

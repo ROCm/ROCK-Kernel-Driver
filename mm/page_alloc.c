@@ -7405,6 +7405,7 @@ static int __init cmdline_parse_kernelcore(char *p)
 	/* parse kernelcore=mirror */
 	if (parse_option_str(p, "mirror")) {
 		mirrored_kernelcore = true;
+		pr_info("Kernel memory mirroring enabled.\n");
 		return 0;
 	}
 
