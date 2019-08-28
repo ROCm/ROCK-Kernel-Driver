@@ -24,7 +24,11 @@
 #include "amdgpu_ras_eeprom.h"
 #include "amdgpu.h"
 #include "amdgpu_ras.h"
+#if defined(HAVE_LINUX_BITS_H)
 #include <linux/bits.h>
+#else
+#include <linux/bitops.h>
+#endif
 #include "smu_v11_0_i2c.h"
 
 #define EEPROM_I2C_TARGET_ADDR 0xA0
