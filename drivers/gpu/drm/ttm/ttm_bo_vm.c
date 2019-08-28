@@ -76,7 +76,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
 #endif
@@ -159,7 +159,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 */
 	if (unlikely(!kcl_reservation_object_trylock(bo->resv))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				up_read(&vma->vm_mm->mmap_sem);
@@ -224,7 +224,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
 #endif
 	if (unlikely(ret != 0)) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 		if (ret == VM_FAULT_RETRY &&
 		    !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 #else
