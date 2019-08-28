@@ -35,7 +35,11 @@
 
 #ifdef CONFIG_X86
 
+#if defined(HAVE_SET_MEMORY_H) || !defined(BUILD_AS_DKMS)
 #include <asm/set_memory.h>
+#else
+#include <asm/cacheflush.h>
+#endif
 
 static inline int ttm_set_pages_array_wb(struct page **pages, int addrinarray)
 {
