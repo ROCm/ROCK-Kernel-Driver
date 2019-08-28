@@ -539,7 +539,7 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 #endif
 
 	mutex_lock(&adev->mn_lock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef HAVE_DOWN_WRITE_KILLABLE
 	down_write(&mm->mmap_sem);
 #else
 	if (down_write_killable(&mm->mmap_sem)) {
