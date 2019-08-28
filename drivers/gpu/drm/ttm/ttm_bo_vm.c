@@ -63,8 +63,10 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		ttm_bo_get(bo);
 		up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -136,12 +138,16 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 	 */
 	if (unlikely(!dma_resv_trylock(bo->base.resv))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				up_read(&vmf->vma->vm_mm->mmap_sem);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_put(bo);
 			}
+#else
+			up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
@@ -329,7 +335,11 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 
 	prot = vm_get_page_prot(vma->vm_flags);
 	ret = ttm_bo_vm_fault_reserved(vmf, prot, TTM_BO_VM_NUM_PREFAULT);
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
+#else
+	if (ret == VM_FAULT_RETRY)
+#endif
 		return ret;
 
 	dma_resv_unlock(bo->base.resv);
