@@ -166,6 +166,7 @@ m4_include([m4/dev-err-ratelimited.m4])
 m4_include([m4/seq-hex-dump.m4])
 m4_include([m4/fb-info-apertures.m4])
 m4_include([m4/idr-remove.m4])
+m4_include([m4/linux-bits-h.m4])
 m4_include([m4/config.m4])
 
 
