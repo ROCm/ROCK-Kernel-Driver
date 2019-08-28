@@ -27,17 +27,17 @@
 int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 #endif
 
-#if !defined(PCIE_SPEED_16_0GT)
-#define PCIE_SPEED_16_0GT 0x17
+#ifndef PCIE_SPEED_16_0GT
+#define PCIE_SPEED_16_0GT		0x17
 #endif
 #ifndef PCI_EXP_LNKCAP2_SLS_16_0GB
-#define  PCI_EXP_LNKCAP2_SLS_16_0GB 0x00000010 /* Supported Speed 16GT/s */
+#define PCI_EXP_LNKCAP2_SLS_16_0GB	0x00000010	/* Supported Speed 16GT/s */
 #endif
 #ifndef PCI_EXP_LNKCAP_SLS_16_0GB
-#define  PCI_EXP_LNKCAP_SLS_16_0GB 0x00000004 /* LNKCAP2 SLS Vector bit 3 */
+#define PCI_EXP_LNKCAP_SLS_16_0GB	0x00000004	/* LNKCAP2 SLS Vector bit 3 */
 #endif
 #ifndef PCI_EXP_LNKSTA_CLS_16_0GB
-#define  PCI_EXP_LNKSTA_CLS_16_0GB 0x0004 /* Current Link Speed 16.0GT/s */
+#define PCI_EXP_LNKSTA_CLS_16_0GB	0x0004		/* Current Link Speed 16.0GT/s */
 #endif
 /* PCIe link information */
 #ifndef PCIE_SPEED2STR
@@ -59,26 +59,13 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
 	0)
 #endif
 
-#ifndef  PCI_EXP_LNKCAP_SLS_8_0GB
-#define  PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
-#endif
-#ifdef BUILD_AS_DKMS
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
-ssize_t max_link_speed_show(struct device *dev,
-				   struct device_attribute *attr, char *buf);
-ssize_t max_link_width_show(struct device *dev,
-				   struct device_attribute *attr, char *buf);
-ssize_t current_link_speed_show(struct device *dev,
-				   struct device_attribute *attr, char *buf);
-ssize_t current_link_width_show(struct device *dev,
-				   struct device_attribute *attr, char *buf);
-ssize_t secondary_bus_number_show(struct device *dev,
-				    struct device_attribute *attr, char *buf);
-ssize_t subordinate_bus_number_show(struct device *dev,
-				    struct device_attribute *attr, char *buf);
+#ifndef PCI_EXP_LNKCAP_SLS_8_0GB
+#define AMDKCL_CREATE_MEASURE_FILE
+#define PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
 int  _kcl_pci_create_measure_file(struct pci_dev *pdev);
 #endif
 
+#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #endif
 
@@ -120,7 +107,7 @@ static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 
 static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
 {
-#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0))
+#ifdef AMDKCL_CREATE_MEASURE_FILE
 	return _kcl_pci_create_measure_file(pdev);
 #else
 	return 0;

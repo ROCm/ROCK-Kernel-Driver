@@ -269,8 +269,8 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
-ssize_t max_link_speed_show(struct device *dev,
+#ifdef AMDKCL_CREATE_MEASURE_FILE
+static ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
@@ -279,7 +279,7 @@ ssize_t max_link_speed_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(max_link_speed);
 
-ssize_t max_link_width_show(struct device *dev,
+static ssize_t max_link_width_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
@@ -288,7 +288,7 @@ ssize_t max_link_width_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(max_link_width);
 
-ssize_t current_link_speed_show(struct device *dev,
+static ssize_t current_link_speed_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -321,7 +321,7 @@ ssize_t current_link_speed_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(current_link_speed);
 
-ssize_t current_link_width_show(struct device *dev,
+static ssize_t current_link_width_show(struct device *dev,
 				       struct device_attribute *attr, char *buf)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -359,28 +359,28 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 	int ret;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_current_link_speed);
-	if (ret != 0) {
+	if (ret != 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev,
 				"Failed to create current_link_speed sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_current_link_width);
-	if (ret != 0) {
+	if (ret != 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev,
 				"Failed to create current_link_width sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_max_link_width);
-	if (ret != 0) {
+	if (ret != 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev,
 				"Failed to create max_link_width sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_max_link_speed);
-	if (ret != 0) {
+	if (ret != 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev,
 				"Failed to create max_link_speed sysfs files: %d\n", ret);
 		return ret;
@@ -388,6 +388,6 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 
 }
 EXPORT_SYMBOL(_kcl_pci_create_measure_file);
-#endif
+#endif /* AMDKCL_CREATE_MEASURE_FILE */
 
 #endif
