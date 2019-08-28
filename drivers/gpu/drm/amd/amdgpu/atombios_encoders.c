@@ -200,7 +200,7 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 #ifdef HAVE_BACKLIGHT_DEVICE_REGISTER_WITH_5ARGS
 	memset(&props, 0, sizeof(props));
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+#ifdef HAVE_BACKLIGHT_PROPERTIES_TYPE
 	props.type = BACKLIGHT_RAW;
 #endif
 	snprintf(bl_name, sizeof(bl_name),
