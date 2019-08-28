@@ -142,6 +142,7 @@ m4_include([m4/seq-hex-dump.m4])
 m4_include([m4/idr-remove.m4])
 m4_include([m4/i2c-lock-operations-struct.m4])
 m4_include([m4/down-write-killable.m4])
+m4_include([m4/backlight-device-register.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
