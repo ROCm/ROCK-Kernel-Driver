@@ -118,6 +118,7 @@ m4_include([m4/linux-nospec-h.m4])
 m4_include([m4/drm-atomic-uapi-h.m4])
 m4_include([m4/kfifo-new-h.m4])
 m4_include([m4/linux-bits-h.m4])
+m4_include([m4/set-memory-h.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
