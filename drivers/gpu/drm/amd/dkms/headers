@@ -11,4 +11,5 @@ uapi/linux/sched/types.h kcl/kcl_uapi_linux_sched_types_h.h
 linux/nospec.h kcl/kcl_nospec.h
 drm/drm_atomic_uapi.h kcl/kcl_drm_atomic_uapi_h.h
 linux/kfifo.h kcl/kcl_kfifo_h.h
+linux/bits.h kcl/kcl_bits_h.h
 
