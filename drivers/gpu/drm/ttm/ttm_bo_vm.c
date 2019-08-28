@@ -63,8 +63,10 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 		ret = VM_FAULT_RETRY;
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 		if (vmf->flags & FAULT_FLAG_RETRY_NOWAIT)
 			goto out_unlock;
+#endif
 
 		ttm_bo_get(bo);
 		up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -136,6 +138,7 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 	 */
 	if (unlikely(!dma_resv_trylock(amdkcl_ttm_resvp(bo)))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -144,6 +147,9 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
 				ttm_bo_put(bo);
 			}
+#else
+			up_read(&vmf->vma->vm_mm->mmap_sem);
+#endif
 
 			return VM_FAULT_RETRY;
 		}
@@ -335,7 +341,11 @@ vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 
 	prot = vma->vm_page_prot;
 	ret = ttm_bo_vm_fault_reserved(vmf, prot, TTM_BO_VM_NUM_PREFAULT);
+#ifdef FAULT_FLAG_RETRY_NOWAIT
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
+#else
+	if (ret == VM_FAULT_RETRY)
+#endif
 		return ret;
 
 	dma_resv_unlock(amdkcl_ttm_resvp(bo));
