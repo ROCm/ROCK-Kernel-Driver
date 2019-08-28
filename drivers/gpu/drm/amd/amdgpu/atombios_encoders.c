@@ -170,7 +170,7 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 	struct drm_device *dev = amdgpu_encoder->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct backlight_device *bd;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+#ifdef HAVE_BACKLIGHT_DEVICE_REGISTER_WITH_5ARGS
 	struct backlight_properties props;
 #endif
 	struct amdgpu_backlight_privdata *pdata;
@@ -197,7 +197,7 @@ void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *amdgpu_encode
 		goto error;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+#ifdef HAVE_BACKLIGHT_DEVICE_REGISTER_WITH_5ARGS
 	memset(&props, 0, sizeof(props));
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
