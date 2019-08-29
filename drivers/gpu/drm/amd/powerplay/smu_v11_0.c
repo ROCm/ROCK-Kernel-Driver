@@ -927,14 +927,12 @@ static int smu_v11_0_system_features_control(struct smu_context *smu,
 
 static int smu_v11_0_notify_display_change(struct smu_context *smu)
 {
-	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
 
 	if (!smu->pm_enabled)
 		return ret;
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT) &&
-	    smu->adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM &&
-	    adev->asic_type != CHIP_NAVI12)
+	    smu->adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM)
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetUclkFastSwitch, 1);
 
 	return ret;
