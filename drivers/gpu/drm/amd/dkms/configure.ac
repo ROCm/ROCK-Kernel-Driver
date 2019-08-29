@@ -38,6 +38,7 @@ m4_include([m4/drm-connector-put.m4])
 m4_include([m4/drm-vma-node-verify-access.m4])
 m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/drm-driver-unload.m4])
+m4_include([m4/drm-connector-update-edid-property.m4])
 m4_include([m4/config.m4])
 
 
