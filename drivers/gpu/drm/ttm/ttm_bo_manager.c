@@ -157,7 +157,7 @@ static int ttm_bo_man_takedown(struct ttm_mem_type_manager *man)
 }
 
 static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_MM_PRINT)
 			     const char *prefix)
 #else
 			     struct drm_printer *printer)
@@ -166,7 +166,7 @@ static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 
 	spin_lock(&rman->lock);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_MM_PRINT)
 	drm_mm_debug_table(&rman->mm, prefix);
 #else
 	drm_mm_print(&rman->mm, printer);
