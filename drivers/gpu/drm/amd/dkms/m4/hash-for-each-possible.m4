@@ -4,7 +4,6 @@ dnl #Author: Sasha Levin <sasha.levin@oracle.com>
 dnl #Date:   Wed Feb 27 17:06:00 2013 -0800
 dnl #hlist: drop the node parameter from iterators
 dnl #
-
 AC_DEFUN([AC_AMDGPU_4ARGS_HASH_FOR_EACH_POSSIBLE],
 		[AC_MSG_CHECKING([whether hash_for_each_possible() wants 4 arguments])
 		AC_KERNEL_TRY_COMPILE([
@@ -24,4 +23,3 @@ AC_DEFUN([AC_AMDGPU_4ARGS_HASH_FOR_EACH_POSSIBLE],
 				AC_MSG_RESULT(no)
 		])
 ])
-
