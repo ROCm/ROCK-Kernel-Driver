@@ -33,4 +33,8 @@
 #define drm_connector_attach_encoder drm_mode_connector_attach_encoder
 #endif
 
+#ifndef HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY
+#define drm_connector_set_path_property drm_mode_connector_set_path_property
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
