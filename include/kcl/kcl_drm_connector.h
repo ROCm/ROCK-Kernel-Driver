@@ -29,4 +29,8 @@
 #define drm_connector_update_edid_property drm_mode_connector_update_edid_property
 #endif
 
+#ifndef HAVE_DRM_CONNECTOR_ATTACH_ENCODER
+#define drm_connector_attach_encoder drm_mode_connector_attach_encoder
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
