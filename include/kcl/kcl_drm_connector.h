@@ -10,7 +10,7 @@
 #ifndef HAVE_DRM_CONNECTOR_ATTACH_ENCODER
 #define drm_connector_attach_encoder drm_mode_connector_attach_encoder
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0) && !defined(OS_NAME_SUSE_15_1)
+#ifndef HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY
 #define drm_connector_set_path_property drm_mode_connector_set_path_property
 #endif
 
