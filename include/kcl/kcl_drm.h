@@ -14,7 +14,7 @@
 #include <drm/drm_modes.h>
 #include <linux/ctype.h>
 #include <linux/console.h>
-#if defined(HAVE_DRM_PRINTF)
+#if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
@@ -190,7 +190,7 @@ drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
 static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
 #else
 	drm_fb_helper_cfb_fillrect(info, rect);
@@ -200,7 +200,7 @@ static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_copyarea(info, area);
 #else
 	drm_fb_helper_cfb_copyarea(info, area);
@@ -210,7 +210,7 @@ static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
 static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_imageblit(info, image);
 #else
 	drm_fb_helper_cfb_imageblit(info, image);
@@ -219,7 +219,7 @@ static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 
 static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
 #else
 	return drm_fb_helper_alloc_fbi(fb_helper);
@@ -228,7 +228,7 @@ static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *
 
 static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
 #else
 	drm_fb_helper_unregister_fbi(fb_helper);
@@ -237,7 +237,7 @@ static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_hel
 
 static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
 #else
 	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
@@ -248,7 +248,7 @@ static inline void
 kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
-#ifdef BUILD_AS_DKMS
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
 	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
 #else
 	drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
@@ -525,7 +525,7 @@ kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -548,7 +548,7 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if !defined(HAVE_DRM_PRINTF)
+#if !defined(HAVE_DRM_PRINTER)
 		.prefix = prefix
 #endif
 	};

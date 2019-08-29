@@ -144,8 +144,7 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	memcpy(psp->cmd_buf_mem, cmd, sizeof(struct psp_gfx_cmd_resp));
 
 	index = atomic_inc_return(&psp->fence_value);
-	ret = psp_cmd_submit(psp, ucode, psp->cmd_buf_mc_addr,
-			     fence_mc_addr, index);
+	ret = psp_cmd_submit(psp, psp->cmd_buf_mc_addr, fence_mc_addr, index);
 	if (ret) {
 		atomic_dec(&psp->fence_value);
 		mutex_unlock(&psp->mutex);
@@ -1033,8 +1032,7 @@ out:
 			return ret;
 
 		/* Start rlc autoload after psp recieved all the gfx firmware */
-		if (ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM ||
-		    (adev->asic_type == CHIP_NAVI12 && ucode->ucode_id == AMDGPU_UCODE_ID_RLC_G)) {
+		if (ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM) {
 			ret = psp_rlc_autoload(psp);
 			if (ret) {
 				DRM_ERROR("Failed to start rlc autoload\n");

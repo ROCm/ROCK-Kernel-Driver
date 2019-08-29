@@ -24,7 +24,7 @@
 #ifndef _GPU_SCHEDULER_H_
 #define _GPU_SCHEDULER_H_
 
-#ifdef OS_NAME_RHEL_6
+#ifdef HAVE_KFIFO_NEW_H
 #include <linux/kfifo-new.h>
 #else
 #include <linux/kfifo.h>

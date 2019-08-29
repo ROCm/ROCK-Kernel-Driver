@@ -39,9 +39,6 @@
 #include "amdgpu_gem.h"
 #include "amdgpu_display.h"
 
-#if defined(HAVE_DRM_FREE_LARGE)
-#define kvfree drm_free_large
-#endif
 static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 				      struct drm_amdgpu_cs_chunk_fence *data,
 				      uint32_t *offset)
@@ -175,11 +172,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		size = p->chunks[i].length_dw;
 		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-		p->chunks[i].kdata = drm_malloc_ab(size, sizeof(uint32_t));
-#else
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
-#endif
 		if (p->chunks[i].kdata == NULL) {
 			ret = -ENOMEM;
 			i--;
@@ -660,11 +653,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 #else
 				release_pages(e->user_pages, bo->tbo.ttm->num_pages);
 #endif
-#if defined(HAVE_DRM_FREE_LARGE)
-				drm_free_large(e->user_pages);
-#else
 				kvfree(e->user_pages);
-#endif
 				e->user_pages = NULL;
 			}
 
@@ -694,14 +683,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		list_for_each_entry(e, &need_pages, tv.head) {
 			struct ttm_tt *ttm = e->tv.bo->ttm;
 
-#if defined(HAVE_DRM_CALLOC_LARGE)
-			e->user_pages = drm_calloc_large(ttm->num_pages,
-							 sizeof(struct page*));
-#else
 			e->user_pages = kvmalloc_array(ttm->num_pages,
 							 sizeof(struct page*),
 							 GFP_KERNEL | __GFP_ZERO);
-#endif
 			if (!e->user_pages) {
 				r = -ENOMEM;
 				DRM_ERROR("calloc failure in %s\n", __func__);
@@ -711,11 +695,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
-#if defined(HAVE_DRM_FREE_LARGE)
-				drm_free_large(e->user_pages);
-#else
 				kvfree(e->user_pages);
-#endif
 				e->user_pages = NULL;
 				goto error_free_pages;
 			}
@@ -799,11 +779,7 @@ error_free_pages:
 #else
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
 #endif
-#if defined(HAVE_DRM_FREE_LARGE)
-		drm_free_large(e->user_pages);
-#else
 		kvfree(e->user_pages);
-#endif
 	}
 
 	return r;
@@ -846,7 +822,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		kfree(parser->post_deps[i].chain);
 #endif
 	}
@@ -862,11 +838,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 		amdgpu_bo_list_put(parser->bo_list);
 
 	for (i = 0; i < parser->nchunks; i++)
-#if defined(HAVE_DRM_FREE_LARGE)
-		drm_free_large(parser->chunks[i].kdata);
-#else
 		kvfree(parser->chunks[i].kdata);
-#endif
 	kfree(parser->chunks);
 	if (parser->job)
 		amdgpu_job_free(parser->job);
@@ -1237,6 +1209,9 @@ static int amdgpu_cs_process_syncobj_out_dep(struct amdgpu_cs_parser *p,
 	num_deps = chunk->length_dw * 4 /
 		sizeof(struct drm_amdgpu_cs_chunk_sem);
 
+	if (p->post_deps)
+		return -EINVAL;
+
 	p->post_deps = kmalloc_array(num_deps, sizeof(*p->post_deps),
 				     GFP_KERNEL);
 	p->num_post_deps = 0;
@@ -1250,7 +1225,7 @@ static int amdgpu_cs_process_syncobj_out_dep(struct amdgpu_cs_parser *p,
 			drm_syncobj_find(p->filp, deps[i].handle);
 		if (!p->post_deps[i].syncobj)
 			return -EINVAL;
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		p->post_deps[i].chain = NULL;
 #endif
 		p->post_deps[i].point = 0;
@@ -1262,8 +1237,7 @@ static int amdgpu_cs_process_syncobj_out_dep(struct amdgpu_cs_parser *p,
 
 
 static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p,
-						      struct amdgpu_cs_chunk
-						      *chunk)
+						      struct amdgpu_cs_chunk *chunk)
 {
 	struct drm_amdgpu_cs_chunk_syncobj *syncobj_deps;
 	unsigned num_deps;
@@ -1272,6 +1246,9 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 	syncobj_deps = (struct drm_amdgpu_cs_chunk_syncobj *)chunk->kdata;
 	num_deps = chunk->length_dw * 4 /
 		sizeof(struct drm_amdgpu_cs_chunk_syncobj);
+
+	if (p->post_deps)
+		return -EINVAL;
 
 	p->post_deps = kmalloc_array(num_deps, sizeof(*p->post_deps),
 				     GFP_KERNEL);
@@ -1282,7 +1259,7 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 
 	for (i = 0; i < num_deps; ++i) {
 		struct amdgpu_cs_post_dep *dep = &p->post_deps[i];
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		dep->chain = NULL;
 		if (syncobj_deps[i].point) {
 			dep->chain = kmalloc(sizeof(*dep->chain), GFP_KERNEL);
@@ -1293,7 +1270,7 @@ static int amdgpu_cs_process_syncobj_timeline_out_dep(struct amdgpu_cs_parser *p
 		dep->syncobj = drm_syncobj_find(p->filp,
 						syncobj_deps[i].handle);
 		if (!dep->syncobj) {
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 			kfree(dep->chain);
 #endif
 			return -EINVAL;
@@ -1361,7 +1338,7 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 	int i;
 
 	for (i = 0; i < p->num_post_deps; ++i) {
-#if !defined(BUILD_AS_DKMS)
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		if (p->post_deps[i].chain && p->post_deps[i].point) {
 			drm_syncobj_add_point(p->post_deps[i].syncobj,
 					      p->post_deps[i].chain,

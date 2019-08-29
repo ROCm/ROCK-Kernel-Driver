@@ -866,14 +866,9 @@ static int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 		unsigned num_entries;
 
 		num_entries = amdgpu_vm_num_entries(adev, cursor->level);
-#if defined(HAVE_DRM_CALLOC_LARGE)
-		entry->entries = drm_calloc_large(num_entries,
-						sizeof(*entry->entries));
-#else
 		entry->entries = kvmalloc_array(num_entries,
 						sizeof(*entry->entries),
 						GFP_KERNEL | __GFP_ZERO);
-#endif
 		if (!entry->entries)
 			return -ENOMEM;
 	}
@@ -918,11 +913,7 @@ static void amdgpu_vm_free_table(struct amdgpu_vm_pt *entry)
 		amdgpu_bo_unref(&entry->base.bo->shadow);
 		amdgpu_bo_unref(&entry->base.bo);
 	}
-#if defined(HAVE_DRM_FREE_LARGE)
-	drm_free_large(entry->entries);
-#else
 	kvfree(entry->entries);
-#endif
 	entry->entries = NULL;
 }
 
@@ -2710,7 +2701,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	struct amdgpu_bo *root;
 	int r, i;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	vm->va = RB_ROOT;
 #else
 	vm->va = RB_ROOT_CACHED;
@@ -2994,7 +2985,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 
 	drm_sched_entity_destroy(&vm->entity);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	if (!RB_EMPTY_ROOT(&vm->va)) {
 #else
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
@@ -3002,7 +2993,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		dev_err(adev->dev, "still active bo inside vm\n");
 	}
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 					     &vm->va, rb) {
 #else
 					     &vm->va.rb_root, rb) {

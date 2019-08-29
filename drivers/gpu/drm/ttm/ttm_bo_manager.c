@@ -48,7 +48,6 @@ struct ttm_range_manager {
 	spinlock_t lock;
 };
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 			       struct ttm_buffer_object *bo,
 			       const struct ttm_place *place,
@@ -57,8 +56,12 @@ static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 	struct drm_mm *mm = &rman->mm;
 	struct drm_mm_node *node = NULL;
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
 	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
+#else
+	enum drm_mm_insert_mode mode;
+#endif
 	unsigned long lpfn;
 	int ret;
 
@@ -70,57 +73,30 @@ static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 	if (!node)
 		return -ENOMEM;
 
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
 		sflags = DRM_MM_SEARCH_BELOW;
 		aflags = DRM_MM_CREATE_TOP;
 	}
+#else
+	mode = DRM_MM_INSERT_BEST;
+	if (place->flags & TTM_PL_FLAG_TOPDOWN)
+		mode = DRM_MM_INSERT_HIGH;
+#endif
 
 	spin_lock(&rman->lock);
+#ifndef HAVE_DRM_MM_INSERT_MODE
 	ret = drm_mm_insert_node_in_range_generic(mm, node, mem->num_pages,
 					  mem->page_alignment, 0,
 					  place->fpfn, lpfn,
 					  sflags, aflags);
-	spin_unlock(&rman->lock);
-
-	if (unlikely(ret)) {
-		kfree(node);
-	} else {
-		mem->mm_node = node;
-		mem->start = node->start;
-	}
-
-	return 0;
-}
 #else
-static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
-			       struct ttm_buffer_object *bo,
-			       const struct ttm_place *place,
-			       struct ttm_mem_reg *mem)
-{
-	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
-	struct drm_mm *mm = &rman->mm;
-	struct drm_mm_node *node;
-	enum drm_mm_insert_mode mode;
-	unsigned long lpfn;
-	int ret;
-
-	lpfn = place->lpfn;
-	if (!lpfn)
-		lpfn = man->size;
-
-	node = kzalloc(sizeof(*node), GFP_KERNEL);
-	if (!node)
-		return -ENOMEM;
-
-	mode = DRM_MM_INSERT_BEST;
-	if (place->flags & TTM_PL_FLAG_TOPDOWN)
-		mode = DRM_MM_INSERT_HIGH;
-
-	spin_lock(&rman->lock);
 	ret = drm_mm_insert_node_in_range(mm, node,
 					  mem->num_pages,
 					  mem->page_alignment, 0,
 					  place->fpfn, lpfn, mode);
+#endif
+
 	spin_unlock(&rman->lock);
 
 	if (unlikely(ret)) {
@@ -132,7 +108,6 @@ static int ttm_bo_man_get_node(struct ttm_mem_type_manager *man,
 
 	return 0;
 }
-#endif
 
 static void ttm_bo_man_put_node(struct ttm_mem_type_manager *man,
 				struct ttm_mem_reg *mem)
@@ -182,7 +157,7 @@ static int ttm_bo_man_takedown(struct ttm_mem_type_manager *man)
 }
 
 static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_MM_PRINT)
 			     const char *prefix)
 #else
 			     struct drm_printer *printer)
@@ -191,7 +166,7 @@ static void ttm_bo_man_debug(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman = (struct ttm_range_manager *) man->priv;
 
 	spin_lock(&rman->lock);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if !defined(HAVE_DRM_MM_PRINT)
 	drm_mm_debug_table(&rman->mm, prefix);
 #else
 	drm_mm_print(&rman->mm, printer);

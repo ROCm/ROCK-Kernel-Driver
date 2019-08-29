@@ -52,7 +52,7 @@ static int amdgpu_perf_event_init(struct perf_event *event)
 		return -ENOENT;
 
 	/* update the hw_perf_event struct with config data */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 	hwc->conf = event->attr.config;
 #else
 	hwc->config = event->attr.config;
@@ -78,7 +78,7 @@ static void amdgpu_perf_start(struct perf_event *event, int flags)
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
 		if (!(flags & PERF_EF_RELOAD))
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
 		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 0);
 #else
@@ -109,7 +109,7 @@ static void amdgpu_perf_read(struct perf_event *event)
 
 		switch (pe->pmu_perf_type) {
 		case PERF_TYPE_AMDGPU_DF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 			pe->adev->df_funcs->pmc_get_count(pe->adev, hwc->conf,
 							  &count);
 #else
@@ -139,7 +139,7 @@ static void amdgpu_perf_stop(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 0);
 #else
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 0);
@@ -173,7 +173,7 @@ static int amdgpu_perf_add(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
 #else
 		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 1);
@@ -205,7 +205,7 @@ static void amdgpu_perf_del(struct perf_event *event, int flags)
 
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 1);
 #else
 		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 1);

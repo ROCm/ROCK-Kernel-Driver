@@ -37,9 +37,6 @@
 #include <linux/shmem_fs.h>
 #include <linux/file.h>
 #include <drm/drm_cache.h>
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-#include <drm/drm_mem_util.h>
-#endif
 #include <drm/ttm/ttm_module.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_page_alloc.h>
@@ -94,12 +91,8 @@ int ttm_tt_create(struct ttm_buffer_object *bo, bool zero_alloc)
  */
 static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-#if defined(HAVE_DRM_CALLOC_LARGE)
-	ttm->pages = drm_calloc_large(ttm->num_pages, sizeof(void*));
-#else
 	ttm->pages = kvmalloc_array(ttm->num_pages, sizeof(void*),
 			GFP_KERNEL | __GFP_ZERO);
-#endif
 	if (!ttm->pages)
 		return -ENOMEM;
 	return 0;
@@ -107,16 +100,10 @@ static int ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 
 static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-#if defined(HAVE_DRM_CALLOC_LARGE)
-	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
-					  sizeof(*ttm->ttm.pages) +
-					  sizeof(*ttm->dma_address));
-#else
 	ttm->ttm.pages = kvmalloc_array(ttm->ttm.num_pages,
 					  sizeof(*ttm->ttm.pages) +
 					  sizeof(*ttm->dma_address),
 					  GFP_KERNEL | __GFP_ZERO);
-#endif
 	if (!ttm->ttm.pages)
 		return -ENOMEM;
 	ttm->dma_address = (void *) (ttm->ttm.pages + ttm->ttm.num_pages);
@@ -125,14 +112,9 @@ static int ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 
 static int ttm_sg_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-#if defined(HAVE_DRM_CALLOC_LARGE)
-	ttm->ttm.pages = drm_calloc_large(ttm->ttm.num_pages,
-					  sizeof(*ttm->dma_address));
-#else
 	ttm->dma_address = kvmalloc_array(ttm->ttm.num_pages,
 					  sizeof(*ttm->dma_address),
 					  GFP_KERNEL | __GFP_ZERO);
-#endif
 	if (!ttm->dma_address)
 		return -ENOMEM;
 	return 0;
@@ -276,11 +258,7 @@ EXPORT_SYMBOL(ttm_tt_init);
 
 void ttm_tt_fini(struct ttm_tt *ttm)
 {
-#if defined(HAVE_DRM_FREE_LARGE)
-	drm_free_large(ttm->pages);
-#else
 	kvfree(ttm->pages);
-#endif
 	ttm->pages = NULL;
 }
 EXPORT_SYMBOL(ttm_tt_fini);
@@ -328,17 +306,10 @@ void ttm_dma_tt_fini(struct ttm_dma_tt *ttm_dma)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 
-#if defined(HAVE_DRM_FREE_LARGE)
-	if (ttm->pages)
-	  drm_free_large(ttm->pages);
-  else
-	  drm_free_large(ttm_dma->dma_address);
-#else
 	if (ttm->pages)
 		kvfree(ttm->pages);
 	else
 		kvfree(ttm_dma->dma_address);
-#endif
 	ttm->pages = NULL;
 	ttm_dma->dma_address = NULL;
 }

@@ -32,7 +32,7 @@
 #include <linux/spinlock.h>
 #include <linux/kfd_ioctl.h>
 #include <linux/idr.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
+#ifdef HAVE_KFIFO_NEW_H
 #include <linux/kfifo-new.h>
 #else
 #include <linux/kfifo.h>
@@ -497,6 +497,7 @@ struct queue_properties {
 	bool is_evicted;
 	bool is_suspended;
 	bool is_active;
+	bool is_new;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
@@ -831,7 +832,7 @@ struct kfd_process {
 	size_t signal_event_count;
 	bool signal_event_limit_reached;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	struct rb_root bo_interval_tree;
 #else
 	struct rb_root_cached bo_interval_tree;

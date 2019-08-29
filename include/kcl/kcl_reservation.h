@@ -97,7 +97,7 @@ static inline int
 kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
 					struct ww_acquire_ctx *ctx)
 {
-#if defined(BUILD_AS_DKMS)
+#if !defined(HAVE_RESERVATION_OBJECT_LOCK_INTERRUPTIBLE)
 	return ww_mutex_lock_interruptible(&obj->lock, ctx);
 #else
 	return reservation_object_lock_interruptible(obj, ctx);

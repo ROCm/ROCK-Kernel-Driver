@@ -288,7 +288,7 @@ static int smu_v11_0_check_fw_version(struct smu_context *smu)
 		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_NV14;
 		break;
 	default:
-		pr_err("smu unsuported asic type:%d.\n",smu->adev->asic_type);
+		pr_err("smu unsupported asic type:%d.\n", smu->adev->asic_type);
 		smu->smc_if_version = SMU11_DRIVER_IF_VERSION_INV;
 		break;
 	}
@@ -359,7 +359,8 @@ static int smu_v11_0_setup_pptable(struct smu_context *smu)
 	struct amdgpu_device *adev = smu->adev;
 	const struct smc_firmware_header_v1_0 *hdr;
 	int ret, index;
-	uint32_t size;
+	uint32_t size = 0;
+	uint16_t atom_table_size;
 	uint8_t frev, crev;
 	void *table;
 	uint16_t version_major, version_minor;
@@ -387,10 +388,11 @@ static int smu_v11_0_setup_pptable(struct smu_context *smu)
 		index = get_index_into_master_table(atom_master_list_of_data_tables_v2_1,
 						    powerplayinfo);
 
-		ret = smu_get_atom_data_table(smu, index, (uint16_t *)&size, &frev, &crev,
+		ret = smu_get_atom_data_table(smu, index, &atom_table_size, &frev, &crev,
 					      (uint8_t **)&table);
 		if (ret)
 			return ret;
+		size = atom_table_size;
 	}
 
 	if (!smu->smu_table.power_play_table)
@@ -568,6 +570,9 @@ int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu)
 		smu->smu_table.boot_values.pp_table_id = v_3_3->pplib_pptable_id;
 	}
 
+	smu->smu_table.boot_values.format_revision = header->format_revision;
+	smu->smu_table.boot_values.content_revision = header->content_revision;
+
 	return 0;
 }
 
@@ -646,6 +651,24 @@ static int smu_v11_0_get_clk_info_from_vbios(struct smu_context *smu)
 
 	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
 	smu->smu_table.boot_values.dclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
+
+	if ((smu->smu_table.boot_values.format_revision == 3) &&
+	    (smu->smu_table.boot_values.content_revision >= 2)) {
+		memset(&input, 0, sizeof(input));
+		input.clk_id = SMU11_SYSPLL1_0_FCLK_ID;
+		input.syspll_id = SMU11_SYSPLL1_2_ID;
+		input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
+		index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
+						    getsmuclockinfo);
+
+		ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
+						(uint32_t *)&input);
+		if (ret)
+			return -EINVAL;
+
+		output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
+		smu->smu_table.boot_values.fclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
+	}
 
 	return 0;
 }
@@ -1259,7 +1282,6 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 	int ret = 0;
 	enum smu_clk_type clk_select = 0;
 	uint32_t clk_freq = clock_req->clock_freq_in_khz / 1000;
-	int clk_id;
 
 	if (!smu->pm_enabled)
 		return -EINVAL;
@@ -1294,16 +1316,8 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 		if (clk_select == SMU_UCLK && smu->disable_uclk_switch)
 			return 0;
 
-		clk_id = smu_clk_get_index(smu, clk_select);
-		if (clk_id < 0) {
-			ret = -EINVAL;
-			goto failed;
-		}
-
-
 		mutex_lock(&smu->mutex);
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinByFreq,
-			(clk_id << 16) | clk_freq);
+		ret = smu_set_hard_freq_range(smu, clk_select, clk_freq, 0);
 		mutex_unlock(&smu->mutex);
 
 		if(clk_select == SMU_UCLK)
@@ -1649,7 +1663,7 @@ static bool smu_v11_0_baco_is_support(struct smu_context *smu)
 static enum smu_baco_state smu_v11_0_baco_get_state(struct smu_context *smu)
 {
 	struct smu_baco_context *smu_baco = &smu->smu_baco;
-	enum smu_baco_state baco_state = SMU_BACO_STATE_EXIT;
+	enum smu_baco_state baco_state;
 
 	mutex_lock(&smu_baco->mutex);
 	baco_state = smu_baco->state;
@@ -1721,7 +1735,7 @@ static const struct smu_funcs smu_v11_0_funcs = {
 	.notify_memory_pool_location = smu_v11_0_notify_memory_pool_location,
 	.check_pptable = smu_v11_0_check_pptable,
 	.parse_pptable = smu_v11_0_parse_pptable,
-	.populate_smc_pptable = smu_v11_0_populate_smc_pptable,
+	.populate_smc_tables = smu_v11_0_populate_smc_pptable,
 	.write_pptable = smu_v11_0_write_pptable,
 	.write_watermarks_table = smu_v11_0_write_watermarks_table,
 	.set_min_dcef_deep_sleep = smu_v11_0_set_min_dcef_deep_sleep,

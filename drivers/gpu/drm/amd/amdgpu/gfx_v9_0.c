@@ -36,7 +36,6 @@
 #include "vega10_enum.h"
 #include "hdp/hdp_4_0_offset.h"
 
-#include "soc15.h"
 #include "soc15_common.h"
 #include "clearstate_gfx9.h"
 #include "v9_structs.h"
@@ -620,12 +619,11 @@ static const struct soc15_reg_golden golden_settings_gc_9_1_rv2[] =
 
 static const struct soc15_reg_golden golden_settings_gc_9_1_rn[] =
 {
-	SOC15_REG_GOLDEN_VALUE(GC, 0, mmWD_UTCL1_CNTL, 0x3f8fffff, 0x08000080),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCB_HW_CONTROL, 0xfffdf3cf, 0x00014104),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCB_HW_CONTROL_2, 0xff7fffff, 0x0a000000),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmDB_DEBUG2, 0xf00fffff, 0x00000400),
-	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGB_ADDR_CONFIG, 0xf3e777ff, 0x22010042),
-	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGB_ADDR_CONFIG_READ, 0xf3e777ff, 0x22010042),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGB_ADDR_CONFIG, 0xf3e777ff, 0x24000042),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGB_ADDR_CONFIG_READ, 0xf3e777ff, 0x24000042),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_SC_ENHANCE, 0x3fffffff, 0x00000001),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_SC_ENHANCE_1, 0xffffffff, 0x04040000),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_SC_LINE_STIPPLE_STATE, 0x0000ff0f, 0x00000000),
@@ -783,7 +781,7 @@ static void gfx_v9_0_init_golden_registers(struct amdgpu_device *adev)
 		soc15_program_register_sequence(adev,
 						golden_settings_gc_9_1_rn,
 						ARRAY_SIZE(golden_settings_gc_9_1_rn));
-		break;
+		return; /* for renoir, don't need common goldensetting */
 	default:
 		break;
 	}
@@ -1037,6 +1035,10 @@ static void gfx_v9_0_check_if_need_gfxoff(struct amdgpu_device *adev)
 		    (adev->gfx.rlc_feature_version < 1) ||
 		    !adev->gfx.rlc.is_rlc_v2_1)
 			adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
+		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
+				AMD_PG_SUPPORT_CP |
+				AMD_PG_SUPPORT_RLC_SMU_HS;
 		break;
 	default:
 		break;
@@ -4558,6 +4560,9 @@ static void gfx_v9_0_update_gfx_cg_power_gating(struct amdgpu_device *adev,
 {
 	amdgpu_gfx_rlc_enter_safe_mode(adev);
 
+	if (is_support_sw_smu(adev) && !enable)
+		smu_set_gfx_cgpg(&adev->smu, enable);
+
 	if ((adev->pg_flags & AMD_PG_SUPPORT_GFX_PG) && enable) {
 		gfx_v9_0_enable_gfx_cg_power_gating(adev, true);
 		if (adev->pg_flags & AMD_PG_SUPPORT_GFX_PIPELINE)
@@ -4833,6 +4838,8 @@ static int gfx_v9_0_set_powergating_state(void *handle,
 			gfx_v9_0_enable_cp_power_gating(adev, false);
 
 		/* update gfx cgpg state */
+		if (is_support_sw_smu(adev) && enable)
+			smu_set_gfx_cgpg(&adev->smu, enable);
 		gfx_v9_0_update_gfx_cg_power_gating(adev, enable);
 
 		/* update mgcg state */

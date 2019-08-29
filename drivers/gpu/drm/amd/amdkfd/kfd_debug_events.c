@@ -78,9 +78,10 @@ static ssize_t kfd_dbg_ev_read(struct file *filep, char __user *user,
 
 	ret = kfifo_to_user(&dpd->fifo, user, size, &copied);
 
-	if (ret) {
-		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i)\n", ret);
-		return ret;
+	if (ret || !copied) {
+		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i) (%i)\n",
+								ret, copied);
+		return ret ? ret : -EAGAIN;
 	}
 
 	return copied;
@@ -103,6 +104,10 @@ static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
 #define KFD_DBG_EV_SET_EVENT_TYPE(x, e)				\
 	((x) = ((x) & ~(KFD_DBG_EV_STATUS_TRAP			\
 		| KFD_DBG_EV_STATUS_VMFAULT)) | (e))
+
+#define KFD_DBG_EV_SET_NEW_QUEUE_STATE(x, n)			\
+	((x) = (n) ? (x) | KFD_DBG_EV_STATUS_NEW_QUEUE :	\
+		(x) & ~KFD_DBG_EV_STATUS_NEW_QUEUE)
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		      unsigned int *queue_id,
@@ -133,8 +138,12 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 					  q->properties.debug_event_type);
 		KFD_DBG_EV_SET_SUSPEND_STATE(*event_status,
 					  q->properties.is_suspended);
-		if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
+		KFD_DBG_EV_SET_NEW_QUEUE_STATE(*event_status,
+					  q->properties.is_new);
+		if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
+			q->properties.is_new = false;
 			q->properties.debug_event_type = 0;
+		}
 		goto out;
 
 	} else {
@@ -149,9 +158,13 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 					pqn->q->properties.debug_event_type);
 				KFD_DBG_EV_SET_SUSPEND_STATE(*event_status,
 					pqn->q->properties.is_suspended);
-				if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
+				KFD_DBG_EV_SET_NEW_QUEUE_STATE(*event_status,
+					pqn->q->properties.is_new);
+				if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
+					pqn->q->properties.is_new = false;
 					pqn->q->properties.debug_event_type
 									= 0;
+				}
 				goto out;
 			}
 		}

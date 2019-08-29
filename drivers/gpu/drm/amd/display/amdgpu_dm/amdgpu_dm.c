@@ -3541,7 +3541,10 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 	struct dm_connector_state *dm_conn_state =
 			to_dm_connector_state(state);
 #endif
-	uint32_t bpc = connector->display_info.bpc;
+	uint8_t bpc = (uint8_t)connector->display_info.bpc;
+
+	/* Assume 8 bpc by default if no bpc is specified. */
+	bpc = bpc ? bpc : 8;
 
 	if (!state)
 		state = connector->state;
@@ -3553,7 +3556,16 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 		bpc = dm_conn_state->max_bpc - (dm_conn_state->max_bpc & 1);
 #else
 	if (state) {
-		bpc = state->max_bpc;
+		/*
+		 * Cap display bpc based on the user requested value.
+		 *
+		 * The value for state->max_bpc may not correctly updated
+		 * depending on when the connector gets added to the state
+		 * or if this was called outside of atomic check, so it
+		 * can't be used directly.
+		 */
+		bpc = min(bpc, state->max_requested_bpc);
+
 		/* Round down to the nearest even number. */
 		bpc = bpc - (bpc & 1);
 	}
@@ -3928,6 +3940,10 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	bool scale = dm_state ? (dm_state->scaling != RMX_OFF) : false;
 	int mode_refresh;
 	int preferred_refresh = 0;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	struct dsc_dec_dpcd_caps dsc_caps;
+	uint32_t link_bandwidth_kbps;
+#endif
 
 	struct dc_sink *sink = NULL;
 	if (aconnector == NULL) {
@@ -4000,17 +4016,23 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			&mode, &aconnector->base, con_state, old_stream);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	/* stream->timing.flags.DSC = 0; */
-        /*  */
-	/* if (aconnector->dc_link && */
-	/* 		aconnector->dc_link->connector_signal == SIGNAL_TYPE_DISPLAY_PORT #<{(|&& */
-	/* 		aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.is_dsc_supported|)}>#) */
-	/* 	if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc, */
-	/* 			&aconnector->dc_link->dpcd_caps.dsc_caps, */
-	/* 			dc_link_bandwidth_kbps(aconnector->dc_link, dc_link_get_link_cap(aconnector->dc_link)), */
-	/* 			&stream->timing, */
-	/* 			&stream->timing.dsc_cfg)) */
-	/* 		stream->timing.flags.DSC = 1; */
+	stream->timing.flags.DSC = 0;
+
+	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
+		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_ext_caps.raw,
+				      &dsc_caps);
+		link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
+							     dc_link_get_link_cap(aconnector->dc_link));
+
+		if (dsc_caps.is_dsc_supported)
+			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc,
+						  &dsc_caps,
+						  link_bandwidth_kbps,
+						  &stream->timing,
+						  &stream->timing.dsc_cfg))
+				stream->timing.flags.DSC = 1;
+	}
 #endif
 
 	update_stream_scaling_settings(&mode, dm_state, stream);
@@ -6637,23 +6659,9 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 		/* The stream has changed so CRC capture needs to re-enabled. */
 		source = dm_new_crtc_state->crc_src;
 		if (amdgpu_dm_is_valid_crc_source(source)) {
-			dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
-			if (source == AMDGPU_DM_PIPE_CRC_SOURCE_CRTC) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
-				amdgpu_dm_crtc_set_crc_source(crtc, "crtc");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "crtc", &values_cnt);
-#endif
-			}
-			else if (source == AMDGPU_DM_PIPE_CRC_SOURCE_DPRX) {
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
-				amdgpu_dm_crtc_set_crc_source(crtc, "dprx");
-#else
-				size_t values_cnt;
-				amdgpu_dm_crtc_set_crc_source(crtc, "dprx", &values_cnt);
-#endif
-			}
+			amdgpu_dm_crtc_configure_crc_source(
+				crtc, dm_new_crtc_state,
+				dm_new_crtc_state->crc_src);
 		}
 #endif
 #endif
@@ -6710,23 +6718,8 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 
 		if (dm_old_crtc_state->interrupts_enabled &&
 		    (!dm_new_crtc_state->interrupts_enabled ||
-		     drm_atomic_crtc_needs_modeset(new_crtc_state))) {
-			/*
-			 * Drop the extra vblank reference added by CRC
-			 * capture if applicable.
-			 */
-			if (amdgpu_dm_is_valid_crc_source(dm_new_crtc_state->crc_src))
-				drm_crtc_vblank_put(crtc);
-
-			/*
-			 * Only keep CRC capture enabled if there's
-			 * still a stream for the CRTC.
-			 */
-			if (!dm_new_crtc_state->stream)
-				dm_new_crtc_state->crc_src = AMDGPU_DM_PIPE_CRC_SOURCE_NONE;
-
+		     drm_atomic_crtc_needs_modeset(new_crtc_state)))
 			manage_dm_interrupts(adev, acrtc, false);
-		}
 	}
 	/*
 	 * Add check here for SoC's that support hardware cursor plane, to

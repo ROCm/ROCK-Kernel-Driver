@@ -1035,6 +1035,7 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x738C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ARCTURUS},
 	{0x1002, 0x7388, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ARCTURUS},
 	{0x1002, 0x738E, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ARCTURUS},
+	{0x1002, 0x7390, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ARCTURUS},
 	/* Navi10 */
 	{0x1002, 0x7310, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI10},
 	{0x1002, 0x7312, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI10},
@@ -1485,13 +1486,8 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-#if defined(GET_SCANOUT_POSITION_HAVE_FLAGS)
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
-	.get_scanout_position = kcl_amdgpu_display_get_crtc_scanoutpos,
-#else
-	.get_vblank_timestamp = drm_calc_vbltimestamp_from_scanoutpos,
-	.get_scanout_position = amdgpu_get_crtc_scanout_position,
-#endif
+	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #if defined(CONFIG_DEBUG_FS)
 /* drm_debugfs_cleanup() now removes
  * all minor->debugfs_list entries since 4.11,

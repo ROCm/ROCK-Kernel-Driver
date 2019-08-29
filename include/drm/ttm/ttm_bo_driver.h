@@ -32,9 +32,8 @@
 
 #include <drm/drm_mm.h>
 #include <drm/drm_vma_manager.h>
-#if defined(BUILD_AS_DKMS)
 #include <kcl/kcl_drm_vma_manager.h>
-#endif
+#include <kcl/kcl_reservation.h>
 #include <linux/workqueue.h>
 #include <linux/fs.h>
 #include <linux/spinlock.h>
@@ -136,7 +135,7 @@ struct ttm_mem_type_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
+#if defined(HAVE_DRM_MM_PRINT) || !defined(BUILD_AS_DKMS)
 	void (*debug)(struct ttm_mem_type_manager *man,
 		      struct drm_printer *printer);
 #else
@@ -673,26 +672,14 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 		if (WARN_ON(ticket))
 			return -EBUSY;
 
-#if defined(BUILD_AS_DKMS)
 		success = kcl_reservation_object_trylock(bo->resv);
-#else
-		success = reservation_object_trylock(bo->resv);
-#endif
 		return success ? 0 : -EBUSY;
 	}
 
 	if (interruptible)
-#if defined(BUILD_AS_DKMS)
 		ret = kcl_reservation_object_lock_interruptible(bo->resv, ticket);
-#else
-		ret = reservation_object_lock_interruptible(bo->resv, ticket);
-#endif
 	else
-#if defined(BUILD_AS_DKMS)
 		ret = kcl_reservation_object_lock(bo->resv, ticket);
-#else
-		ret = reservation_object_lock(bo->resv, ticket);
-#endif
 	if (ret == -EINTR)
 		return -ERESTARTSYS;
 	return ret;
@@ -804,11 +791,7 @@ static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 	else
 		ttm_bo_move_to_lru_tail(bo, NULL);
 	spin_unlock(&bo->bdev->glob->lru_lock);
-#if defined(BUILD_AS_DKMS)
 	kcl_reservation_object_unlock(bo->resv);
-#else
-	reservation_object_unlock(bo->resv);
-#endif
 }
 
 /*

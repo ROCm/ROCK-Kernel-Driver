@@ -43,10 +43,6 @@
 #include "dpcd_defs.h"
 #include "dmcu.h"
 #include "hw/clk_mgr.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-#include "resource.h"
-#endif
-#include "hw/clk_mgr.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -719,7 +715,7 @@ bool wait_for_alt_mode(struct dc_link *link)
 			time_taken_in_ns = dm_get_elapse_time_in_ns(
 				link->ctx, finish_timestamp, enter_timestamp);
 			DC_LOG_WARNING("Alt mode entered finished after %llu ms\n",
-				       time_taken_in_ns / 1000000);
+				       div_u64(time_taken_in_ns, 1000000));
 			return true;
 		}
 
@@ -728,7 +724,7 @@ bool wait_for_alt_mode(struct dc_link *link)
 	time_taken_in_ns = dm_get_elapse_time_in_ns(link->ctx, finish_timestamp,
 						    enter_timestamp);
 	DC_LOG_WARNING("Alt mode has timed out after %llu ms\n",
-			time_taken_in_ns / 1000000);
+			div_u64(time_taken_in_ns, 1000000));
 	return false;
 }
 

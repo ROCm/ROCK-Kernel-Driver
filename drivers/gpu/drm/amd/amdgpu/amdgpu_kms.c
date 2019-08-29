@@ -82,7 +82,7 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 	struct amdgpu_device *adev = dev->dev_private;
 
 	if (adev == NULL)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 		return 0;
 #else
 		return;
@@ -108,7 +108,7 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 done_free:
 	kfree(adev);
 	dev->dev_private = NULL;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(DRM_DRIVER_UNLOAD_RETURN_INT)
 	return 0;
 #endif
 }
@@ -1314,9 +1314,19 @@ int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 	}
 
 	/* Helper routine in DRM core does all the work: */
+#if defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_MODE_ARG)
 	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
 						vblank_time, flags,
 						&crtc->hwmode);
+#elif defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_CRTC_MODE_ARG)
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
+						vblank_time, flags,
+						crtc, &crtc->hwmode);
+#else
+	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
+						vblank_time, flags,
+						crtc);
+#endif
 }
 #endif
 

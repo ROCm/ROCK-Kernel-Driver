@@ -370,7 +370,7 @@ unlock_retry:
 EXPORT_SYMBOL_GPL(_kcl_reservation_object_test_signaled_rcu);
 #endif
 
-#if defined(BUILD_AS_DKMS)
+#if !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 static void
 reservation_object_add_shared_inplace(struct reservation_object *obj,
 				      struct reservation_object_list *fobj,
@@ -486,7 +486,6 @@ done:
 }
 
 
-#if !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 					 struct dma_fence *fence)
 {
@@ -504,6 +503,7 @@ void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 EXPORT_SYMBOL(_kcl_reservation_object_add_shared_fence);
 #endif
 
+#if !defined(HAVE_RESERVATION_OBJECT_GET_FENCES_RCU)
 int _kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
 				      struct dma_fence **pfence_excl,
 				      unsigned *pshared_count,
