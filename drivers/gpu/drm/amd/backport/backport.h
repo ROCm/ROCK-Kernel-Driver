@@ -41,5 +41,6 @@
 #include <kcl/backport/kcl_drm_fb.h>
 #include <kcl/kcl_drm_modes.h>
 #include <kcl/backport/kcl_drm_encoder.h>
+#include <kcl/kcl_drm_connector.h>
 
 #endif /* AMDGPU_BACKPORT_H */
