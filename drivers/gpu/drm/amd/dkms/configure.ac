@@ -167,6 +167,7 @@ m4_include([m4/down-write-killable.m4])
 m4_include([m4/backlight-device-register.m4])
 m4_include([m4/backlight-properties-type.m4])
 m4_include([m4/drm-connector-update-edid-property.m4])
+m4_include([m4/drm-connector-attach-encoder.m4])
 m4_include([m4/config.m4])
 
 
