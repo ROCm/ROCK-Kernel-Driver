@@ -73,7 +73,7 @@ amdgpufb_release(struct fb_info *info, int user)
 
 static struct fb_ops amdgpufb_ops = {
 	.owner = THIS_MODULE,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#ifndef DRM_FB_HELPER_DEFAULT_OPS
 	.fb_check_var	= drm_fb_helper_check_var,
 	.fb_set_par	= drm_fb_helper_set_par,
 	.fb_setcmap	= drm_fb_helper_setcmap,
