@@ -432,4 +432,49 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
        drm_err(fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef DRM_FB_HELPER_DEFAULT_OPS
+#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
+		defined(HAVE_DRM_FB_HELPER_IOCTL)
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display, \
+	.fb_debug_enter = drm_fb_helper_debug_enter, \
+	.fb_debug_leave = drm_fb_helper_debug_leave,\
+	.fb_ioctl	= drm_fb_helper_ioctl
+#endif
+#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
+		defined(HAVE_DRM_FB_HELPER_IOCTL)
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display, \
+	.fb_ioctl	= drm_fb_helper_ioctl
+#endif
+#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
+		!defined(HAVE_DRM_FB_HELPER_IOCTL)
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display, \
+	.fb_debug_enter = drm_fb_helper_debug_enter, \
+	.fb_debug_leave = drm_fb_helper_debug_leave
+#endif
+#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
+		!defined(HAVE_DRM_FB_HELPER_IOCTL)
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display
+#endif
+#endif
+
 #endif /* AMDKCL_DRM_H */
