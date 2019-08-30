@@ -55,6 +55,7 @@ m4_include([m4/drm-atomic-state-plane-states.m4])
 m4_include([m4/drm-atomic-helper-update-legacy-modeset-state.m4])
 m4_include([m4/drm-crtc-accurate-vblank-count.m4])
 m4_include([m4/drm_mode_is_420_xxx.m4])
+m4_include([m4/fb-ops-fb-debug-xx.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
