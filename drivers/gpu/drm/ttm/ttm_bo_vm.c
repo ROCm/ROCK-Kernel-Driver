@@ -121,7 +121,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *v
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #endif
 {
-#if !defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
+#if defined(HAVE_VM_FAULT_ADDRESS_VMA)
 	struct vm_area_struct *vma = vmf->vma;
 #endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -135,7 +135,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	int err;
 	int i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
-#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 	unsigned long address = (unsigned long)vmf->virtual_address;
 #else
 	unsigned long address = vmf->address;
