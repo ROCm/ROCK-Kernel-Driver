@@ -41,7 +41,8 @@
 #include <linux/kref.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
-#include <linux/device_cgroup.h>
+/* amdkcl: this header file is included in kcl_device_cgroup.h
+#include <linux/device_cgroup.h>*/
 #include <drm/drmP.h>
 #include <kgd_kfd_interface.h>
 
@@ -1215,7 +1216,7 @@ static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
 #if defined(CONFIG_CGROUP_DEVICE)
 	struct drm_device *ddev = kfd->ddev;
 
-	return devcgroup_check_permission(DEVCG_DEV_CHAR, DRM_MAJOR,
+	return kcl_devcgroup_check_permission(DEVCG_DEV_CHAR, DRM_MAJOR,
 					  ddev->render->index,
 					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
 #else
