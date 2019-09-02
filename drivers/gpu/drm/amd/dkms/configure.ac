@@ -177,6 +177,7 @@ m4_include([m4/driver-atomic.m4])
 m4_include([m4/drm-device-driver-features.m4])
 m4_include([m4/drm-auth-h.m4])
 m4_include([m4/iommu-get-domain-for-dev.m4])
+m4_include([m4/drm-dev-unplug.m4])
 m4_include([m4/config.m4])
 
 

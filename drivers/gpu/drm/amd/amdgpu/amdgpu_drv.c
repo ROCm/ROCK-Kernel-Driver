@@ -1164,7 +1164,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_DRM_DEV_UNPLUG
 	DRM_ERROR("Device removal is currently not supported outside of fbcon\n");
 	drm_dev_unplug(dev);
 #else
