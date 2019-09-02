@@ -3,7 +3,7 @@
 #include <linux/version.h>
 #include <linux/types.h>
 
-#if defined(HAVE_BPF_CGROUP_RUN_PROG_DEVICE_CGROUP)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 #include <linux/bpf-cgroup.h>
 #endif
 
@@ -17,7 +17,7 @@ extern int __devcgroup_check_permission(short type, u32 major, u32 minor,
 					short access);
 #endif
 
-#if !defined(HAVE_BPF_CGROUP_RUN_PROG_DEVICE_CGROUP)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 #define DEVCG_DEV_CHAR  2
 #define DEVCG_ACC_READ  2
 #define DEVCG_ACC_WRITE 4
@@ -30,7 +30,7 @@ extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
 static inline int kcl_devcgroup_check_permission(short type, u32 major, u32 minor,
 					short access)
 {
-#if defined(HAVE_BPF_CGROUP_RUN_PROG_DEVICE_CGROUP)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 	int rc = BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type, major, minor, access);
         
 	if (rc)
