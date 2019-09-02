@@ -486,3 +486,14 @@ void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, in
 }
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
 #endif
+
+static inline struct drm_plane_state *
+_kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
+                    struct drm_plane *plane)
+{
+#ifdef HAVE_DRM_ATOMIC_STATE_PLANE_STATES
+	return state->plane_states[drm_plane_index(plane)];
+#else
+	return state->planes[drm_plane_index(plane)].state;
+#endif
+}
