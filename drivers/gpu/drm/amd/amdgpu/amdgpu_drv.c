@@ -1178,7 +1178,11 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	if (THIS_MODULE->state != MODULE_STATE_GOING)
 #endif
 		DRM_ERROR("Hotplug removal is not supported\n");
+#ifdef HAVE_DRM_DEV_UNPLUG
 	drm_dev_unplug(dev);
+#else
+	drm_dev_unregister(dev);
+#endif
 	drm_dev_put(dev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
