@@ -2327,6 +2327,7 @@ static struct backlight_ops amdgpu_dm_backlight_ops = {
 #else
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
 #endif
+	.options = BL_CORE_SUSPENDRESUME,
 	.get_brightness = amdgpu_dm_backlight_get_brightness,
 	.update_status	= amdgpu_dm_backlight_update_status,
 };
