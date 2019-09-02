@@ -1186,7 +1186,11 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	if (THIS_MODULE->state != MODULE_STATE_GOING)
 #endif
 		DRM_ERROR("Hotplug removal is not supported\n");
+#ifdef HAVE_DRM_DEV_UNPLUG
 	drm_dev_unplug(dev);
+#else
+	drm_dev_unregister(dev);
+#endif
 	amdgpu_driver_unload_kms(dev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
@@ -1510,7 +1514,6 @@ static struct drm_driver kms_driver = {
 	    | DRIVER_SYNCOBJ_TIMELINE
 #endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
 	    ,
-	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
