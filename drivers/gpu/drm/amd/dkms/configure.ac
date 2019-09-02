@@ -176,6 +176,7 @@ m4_include([m4/fb-ops-fb-debug-xx.m4])
 m4_include([m4/managed-pages-in-struct-zone.m4])
 m4_include([m4/devcgroup-check-permission.m4])
 m4_include([m4/driver-atomic.m4])
+m4_include([m4/iommu-get-domain-for-dev.m4])
 m4_include([m4/config.m4])
 
 
