@@ -172,6 +172,7 @@ m4_include([m4/get-monotonic-boottime64.m4])
 m4_include([m4/timespec64-to-ns.m4])
 m4_include([m4/ktime-get-raw-ns.m4])
 m4_include([m4/fb-ops-fb-debug-xx.m4])
+m4_include([m4/devcgroup-check-permission.m4])
 m4_include([m4/config.m4])
 
 
