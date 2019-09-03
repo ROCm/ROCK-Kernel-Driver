@@ -32,7 +32,7 @@
 #endif
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
 #endif
 #include <drm/ttm/ttm_bo_driver.h>
