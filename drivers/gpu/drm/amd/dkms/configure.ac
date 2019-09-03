@@ -160,6 +160,7 @@ m4_include([m4/drm-driver-unload.m4])
 m4_include([m4/drm-device-driver-features.m4])
 m4_include([m4/drm-driver-feature.m4])
 m4_include([m4/drm-dev-unplug.m4])
+m4_include([m4/drm-atomic-helper-shutdown.m4])
 m4_include([m4/config.m4])
 
 
