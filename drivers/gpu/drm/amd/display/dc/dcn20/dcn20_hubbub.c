@@ -380,6 +380,11 @@ int hubbub2_init_dchub_sys_ctx(struct hubbub *hubbub,
 	REG_SET(DCN_VM_AGP_BASE, 0,
 			AGP_BASE, pa_config->system_aperture.agp_base >> 24);
 
+	REG_SET(DCN_VM_PROTECTION_FAULT_DEFAULT_ADDR_MSB, 0,
+			DCN_VM_PROTECTION_FAULT_DEFAULT_ADDR_MSB, (pa_config->page_table_default_page_addr >> 44) & 0xF);
+	REG_SET(DCN_VM_PROTECTION_FAULT_DEFAULT_ADDR_LSB, 0,
+			DCN_VM_PROTECTION_FAULT_DEFAULT_ADDR_LSB, (pa_config->page_table_default_page_addr >> 12) & 0xFFFFFFFF);
+
 	if (pa_config->gart_config.page_table_start_addr != pa_config->gart_config.page_table_end_addr) {
 		phys_config.page_table_start_addr = pa_config->gart_config.page_table_start_addr >> 12;
 		phys_config.page_table_end_addr = pa_config->gart_config.page_table_end_addr >> 12;
@@ -595,7 +600,7 @@ static const struct hubbub_funcs hubbub2_funcs = {
 	.get_dcc_compression_cap = hubbub2_get_dcc_compression_cap,
 	.wm_read_state = hubbub2_wm_read_state,
 	.get_dchub_ref_freq = hubbub2_get_dchub_ref_freq,
-	.program_watermarks = hubbub2_program_watermarks,
+	.program_watermarks = hubbub2_program_watermarks
 };
 
 void hubbub2_construct(struct dcn20_hubbub *hubbub,

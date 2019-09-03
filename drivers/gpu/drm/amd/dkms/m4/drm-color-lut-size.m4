@@ -14,11 +14,10 @@ AC_DEFUN([AC_AMDGPU_DRM_COLOR_LUT_SIZE], [
 	], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DRM_COLOR_LUT, 1, [drm_color_lut structure is defined])
-
-		dnl #
-		dnl # commit 41204dfeed93f2c7668cf8aa5086bcd96eccaa35
-		dnl # drm: Introduce drm_color_lut_size()
-		dnl #
+dnl #
+dnl # commit 41204dfeed93f2c7668cf8aa5086bcd96eccaa35
+dnl # drm: Introduce drm_color_lut_size()
+dnl #
 		AC_MSG_CHECKING([whether drm_color_lut_size() is available])
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_mode.h>

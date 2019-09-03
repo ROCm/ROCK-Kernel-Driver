@@ -1,6 +1,6 @@
 LINUXINCLUDE := $(DKMS_INCLUDE_PREFIX) $(LINUXINCLUDE)
 
-BACKPORT_OBJS += kcl_amdgpu.o
+BACKPORT_OBJS :=
 
 amdgpu-y += $(addprefix ../backport/,$(BACKPORT_OBJS))
 

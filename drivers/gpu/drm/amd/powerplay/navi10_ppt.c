@@ -212,7 +212,7 @@ static int navi10_get_smu_msg_index(struct smu_context *smc, uint32_t index)
 {
 	struct smu_11_0_cmn2aisc_mapping mapping;
 
-	if (index > SMU_MSG_MAX_COUNT)
+	if (index >= SMU_MSG_MAX_COUNT)
 		return -EINVAL;
 
 	mapping = navi10_message_map[index];
@@ -368,7 +368,8 @@ navi10_get_allowed_feature_mask(struct smu_context *smu,
 		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_ATHUB_PG_BIT);
 
 	if (smu->adev->pg_flags & AMD_PG_SUPPORT_VCN)
-		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_VCN_PG_BIT);
+		*(uint64_t *)feature_mask |= FEATURE_MASK(FEATURE_VCN_PG_BIT)
+				| FEATURE_MASK(FEATURE_JPEG_PG_BIT);
 
 	/* disable DPM UCLK and DS SOCCLK on navi10 A0 secure board */
 	if (is_asic_secure(smu)) {
@@ -1481,6 +1482,10 @@ static int navi10_set_peak_clock_by_device(struct smu_context *smu)
 static int navi10_set_performance_level(struct smu_context *smu, enum amd_dpm_forced_level level)
 {
 	int ret = 0;
+	struct amdgpu_device *adev = smu->adev;
+
+	if (adev->asic_type != CHIP_NAVI10)
+		return -EINVAL;
 
 	switch (level) {
 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:

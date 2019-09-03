@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.46"
+#define DC_VER "3.2.48"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -223,7 +223,7 @@ struct dc_config {
 	bool power_down_display_on_boot;
 	bool edp_not_connected;
 	bool forced_clocks;
-
+	bool multi_mon_pp_mclk_switch;
 };
 
 enum visual_confirm {
@@ -426,6 +426,7 @@ struct dc_phy_addr_space_config {
 	} gart_config;
 
 	bool valid;
+	uint64_t page_table_default_page_addr;
 };
 
 struct dc_virtual_addr_space_config {

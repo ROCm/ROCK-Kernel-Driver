@@ -8,10 +8,10 @@ AC_DEFUN([AC_AMDGPU_SYSTEM_HIGHPRI_WQ], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED, 1, [system_highpri_wq is exported])
 		AC_MSG_CHECKING([whether system_highpri_wq is declared])
-		dnl #
-		dnl # 73e4354444eef
-		dnl # workqueue: declare system_highpri_wq
-		dnl #
+dnl #
+dnl # 73e4354444eef
+dnl # workqueue: declare system_highpri_wq
+dnl #
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/workqueue.h>
 		], [

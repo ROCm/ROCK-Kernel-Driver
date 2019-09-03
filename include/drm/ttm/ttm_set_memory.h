@@ -35,7 +35,7 @@
 
 #ifdef CONFIG_X86
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#if defined(HAVE_SET_MEMORY_H) || !defined(BUILD_AS_DKMS)
 #include <asm/set_memory.h>
 #else
 #include <asm/cacheflush.h>

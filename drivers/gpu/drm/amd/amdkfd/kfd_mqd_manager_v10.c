@@ -399,7 +399,7 @@ static bool is_occupied_sdma(struct mqd_manager *mm, void *mqd,
 
 static int debugfs_show_mqd(struct seq_file *m, void *data)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
+#ifdef HAVE_SEQ_HEX_DUMP
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct v10_compute_mqd), false);
 #endif
@@ -408,7 +408,7 @@ static int debugfs_show_mqd(struct seq_file *m, void *data)
 
 static int debugfs_show_mqd_sdma(struct seq_file *m, void *data)
 {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 3, 0)
+#ifdef HAVE_SEQ_HEX_DUMP
 	seq_hex_dump(m, "    ", DUMP_PREFIX_OFFSET, 32, 4,
 		     data, sizeof(struct v10_sdma_mqd), false);
 #endif

@@ -72,11 +72,7 @@ struct amdgpu_amdkfd_fence *amdgpu_amdkfd_fence_create(u64 context,
 		return NULL;
 
 	/* This reference gets released in amdkfd_fence_release */
-#if defined(HAVE_MMGRAB)
 	mmgrab(mm);
-#else
-	atomic_inc(&mm->mm_count);
-#endif
 	fence->mm = mm;
 	get_task_comm(fence->timeline_name, current);
 	spin_lock_init(&fence->lock);

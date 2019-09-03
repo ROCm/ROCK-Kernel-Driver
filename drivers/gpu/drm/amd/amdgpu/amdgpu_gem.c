@@ -121,7 +121,7 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 	struct drm_device *ddev = adev->ddev;
 	struct drm_file *file;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 	mutex_lock(&ddev->struct_mutex);
 #else
 	mutex_lock(&ddev->filelist_mutex);
@@ -135,7 +135,7 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		spin_lock(&file->table_lock);
 		idr_for_each_entry(&file->object_idr, gobj, handle) {
 			WARN_ONCE(1, "And also active allocations!\n");
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 			drm_gem_object_unreference(gobj);
 #else
 			kcl_drm_gem_object_put_unlocked(gobj);
@@ -145,7 +145,7 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 		spin_unlock(&file->table_lock);
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 	mutex_unlock(&ddev->struct_mutex);
 #else
 	mutex_unlock(&ddev->filelist_mutex);
@@ -958,7 +958,7 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 	struct drm_file *file;
 	int r;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 	r = mutex_lock_interruptible(&dev->struct_mutex);
 #else
 	r = mutex_lock_interruptible(&dev->filelist_mutex);
@@ -986,7 +986,7 @@ static int amdgpu_debugfs_gem_info(struct seq_file *m, void *data)
 		spin_unlock(&file->table_lock);
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 	mutex_unlock(&dev->struct_mutex);
 #else
 	mutex_unlock(&dev->filelist_mutex);

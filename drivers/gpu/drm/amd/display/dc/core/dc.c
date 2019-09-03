@@ -294,7 +294,9 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 			dc->hwss.set_drr(&pipe,
 					1,
 					adjust->v_total_min,
-					adjust->v_total_max);
+					adjust->v_total_max,
+					adjust->v_total_mid,
+					adjust->v_total_mid_frame_num);
 
 			ret = true;
 		}
@@ -1239,6 +1241,12 @@ struct dc_state *dc_copy_state(struct dc_state *src_ctx)
 			if (cur_pipe->bottom_pipe)
 				cur_pipe->bottom_pipe = &new_ctx->res_ctx.pipe_ctx[cur_pipe->bottom_pipe->pipe_idx];
 
+			if (cur_pipe->prev_odm_pipe)
+				cur_pipe->prev_odm_pipe =  &new_ctx->res_ctx.pipe_ctx[cur_pipe->prev_odm_pipe->pipe_idx];
+
+			if (cur_pipe->next_odm_pipe)
+				cur_pipe->next_odm_pipe = &new_ctx->res_ctx.pipe_ctx[cur_pipe->next_odm_pipe->pipe_idx];
+
 	}
 
 	for (i = 0; i < new_ctx->stream_count; i++) {
@@ -1869,9 +1877,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
-		if (!pipe_ctx->top_pipe &&
-			pipe_ctx->stream &&
-			pipe_ctx->stream == stream) {
+		if (!pipe_ctx->top_pipe &&  !pipe_ctx->prev_odm_pipe && pipe_ctx->stream == stream) {
 
 			if (stream_update->periodic_interrupt0 &&
 					dc->hwss.setup_periodic_interrupt)
@@ -1897,7 +1903,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 			if (stream_update->dither_option) {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-				struct pipe_ctx *odm_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
+				struct pipe_ctx *odm_pipe = pipe_ctx->next_odm_pipe;
 #endif
 				resource_build_bit_depth_reduction_params(pipe_ctx->stream,
 									&pipe_ctx->stream->bit_depth_params);
@@ -1905,10 +1911,12 @@ static void commit_planes_do_stream_update(struct dc *dc,
 						&stream->bit_depth_params,
 						&stream->clamping);
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-				if (odm_pipe)
+				while (odm_pipe) {
 					odm_pipe->stream_res.opp->funcs->opp_program_fmt(odm_pipe->stream_res.opp,
 							&stream->bit_depth_params,
 							&stream->clamping);
+					odm_pipe = odm_pipe->next_odm_pipe;
+				}
 #endif
 			}
 
@@ -1927,7 +1935,11 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
 
 				if (*stream_update->dpms_off) {
-					core_link_disable_stream(pipe_ctx, KEEP_ACQUIRED_RESOURCE);
+					core_link_disable_stream(pipe_ctx);
+					/* for dpms, keep acquired resources*/
+					if (pipe_ctx->stream_res.audio && !dc->debug.az_endpoint_mute_only)
+						pipe_ctx->stream_res.audio->funcs->az_disable(pipe_ctx->stream_res.audio);
+
 					dc->hwss.optimize_bandwidth(dc, dc->current_state);
 				} else {
 					if (!dc->optimize_seamless_boot)
@@ -2025,6 +2037,7 @@ static void commit_planes_for_stream(struct dc *dc,
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
 		if (!pipe_ctx->top_pipe &&
+			!pipe_ctx->prev_odm_pipe &&
 			pipe_ctx->stream &&
 			pipe_ctx->stream == stream) {
 			struct dc_stream_status *stream_status = NULL;

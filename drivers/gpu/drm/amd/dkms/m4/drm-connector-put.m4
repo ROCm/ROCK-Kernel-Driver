@@ -11,11 +11,10 @@ AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_PUT],[
 	],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DRM_CONNECTOR_PUT, 1, [drm_connector_put() is available])
-
-		dnl #
-		dnl # commit d0f37cf62979e65558c1b7bd4d4c221c5281bae1
-		dnl # drm/mode: move framebuffer reference into object
-		dnl #
+dnl #
+dnl # commit d0f37cf62979e65558c1b7bd4d4c221c5281bae1
+dnl # drm/mode: move framebuffer reference into object
+dnl #
 		AC_MSG_CHECKING([for free_cb field within drm_mode_object structure])
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_crtc.h>

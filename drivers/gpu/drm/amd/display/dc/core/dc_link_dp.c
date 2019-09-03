@@ -2684,13 +2684,13 @@ static void dp_wa_power_up_0010FA(struct dc_link *link, uint8_t *dpcd_data,
 
 	if (link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_VGA_CONVERTER) {
 		switch (link->dpcd_caps.branch_dev_id) {
-		/* Some active dongles (DP-VGA, DP-DLDVI converters) power down
+		/* 0010FA active dongles (DP-VGA, DP-DLDVI converters) power down
 		 * all internal circuits including AUX communication preventing
 		 * reading DPCD table and EDID (spec violation).
 		 * Encoder will skip DP RX power down on disable_output to
 		 * keep receiver powered all the time.*/
-		case DP_BRANCH_DEVICE_ID_1:
-		case DP_BRANCH_DEVICE_ID_4:
+		case DP_BRANCH_DEVICE_ID_0010FA:
+		case DP_BRANCH_DEVICE_ID_0080E1:
 			link->wa_flags.dp_keep_receiver_powered = true;
 			break;
 
@@ -3095,14 +3095,19 @@ static void set_crtc_test_pattern(struct dc_link *link,
 				controller_test_pattern, color_depth);
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		else if (opp->funcs->opp_set_disp_pattern_generator) {
-			struct pipe_ctx *bot_odm_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
+			struct pipe_ctx *odm_pipe;
+			int opp_cnt = 1;
 
-			if (bot_odm_pipe) {
-				struct output_pixel_processor *bot_opp = bot_odm_pipe->stream_res.opp;
+			for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
+				opp_cnt++;
 
-				bot_opp->funcs->opp_program_bit_depth_reduction(bot_opp, &params);
-				width /= 2;
-				bot_opp->funcs->opp_set_disp_pattern_generator(bot_opp,
+			width /= opp_cnt;
+
+			for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
+				struct output_pixel_processor *odm_opp = odm_pipe->stream_res.opp;
+
+				odm_opp->funcs->opp_program_bit_depth_reduction(odm_opp, &params);
+				odm_opp->funcs->opp_set_disp_pattern_generator(odm_opp,
 					controller_test_pattern,
 					color_depth,
 					NULL,
@@ -3131,14 +3136,18 @@ static void set_crtc_test_pattern(struct dc_link *link,
 				color_depth);
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		else if (opp->funcs->opp_set_disp_pattern_generator) {
-			struct pipe_ctx *bot_odm_pipe = dc_res_get_odm_bottom_pipe(pipe_ctx);
+			struct pipe_ctx *odm_pipe;
+			int opp_cnt = 1;
 
-			if (bot_odm_pipe) {
-				struct output_pixel_processor *bot_opp = bot_odm_pipe->stream_res.opp;
+			for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
+				opp_cnt++;
 
-				bot_opp->funcs->opp_program_bit_depth_reduction(bot_opp, &params);
-				width /= 2;
-				bot_opp->funcs->opp_set_disp_pattern_generator(bot_opp,
+			width /= opp_cnt;
+			for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
+				struct output_pixel_processor *odm_opp = odm_pipe->stream_res.opp;
+
+				odm_opp->funcs->opp_program_bit_depth_reduction(odm_opp, &params);
+				odm_opp->funcs->opp_set_disp_pattern_generator(odm_opp,
 					CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
 					color_depth,
 					NULL,
@@ -3179,7 +3188,7 @@ bool dc_link_dp_set_test_pattern(
 	memset(&training_pattern, 0, sizeof(training_pattern));
 
 	for (i = 0; i < MAX_PIPES; i++) {
-		if (pipes[i].stream->link == link) {
+		if (pipes[i].stream->link == link && !pipes[i].top_pipe && !pipes[i].prev_odm_pipe) {
 			pipe_ctx = &pipes[i];
 			break;
 		}
@@ -3385,7 +3394,13 @@ enum dp_panel_mode dp_get_panel_mode(struct dc_link *link)
 	if (link->connector_signal != SIGNAL_TYPE_DISPLAY_PORT) {
 
 		switch (link->dpcd_caps.branch_dev_id) {
-		case DP_BRANCH_DEVICE_ID_2:
+		case DP_BRANCH_DEVICE_ID_0022B9:
+			/* alternate scrambler reset is required for Travis
+			 * for the case when external chip does not
+			 * provide sink device id, alternate scrambler
+			 * scheme will  be overriden later by querying
+			 * Encoder features
+			 */
 			if (strncmp(
 				link->dpcd_caps.branch_dev_name,
 				DP_VGA_LVDS_CONVERTER_ID_2,
@@ -3395,7 +3410,12 @@ enum dp_panel_mode dp_get_panel_mode(struct dc_link *link)
 					return DP_PANEL_MODE_SPECIAL;
 			}
 			break;
-		case DP_BRANCH_DEVICE_ID_3:
+		case DP_BRANCH_DEVICE_ID_00001A:
+			/* alternate scrambler reset is required for Travis
+			 * for the case when external chip does not provide
+			 * sink device id, alternate scrambler scheme will
+			 * be overriden later by querying Encoder feature
+			 */
 			if (strncmp(link->dpcd_caps.branch_dev_name,
 				DP_VGA_LVDS_CONVERTER_ID_3,
 				sizeof(

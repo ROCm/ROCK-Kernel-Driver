@@ -301,7 +301,7 @@ static void amdgpu_ctx_do_release(struct kref *ref)
 	amdgpu_ctx_fini(ref);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#ifndef HAVE_IDR_REMOVE_RETURN_VOID_POINTER
 static int amdgpu_ctx_free(struct amdgpu_fpriv *fpriv, uint32_t id)
 {
 	struct amdgpu_ctx_mgr *mgr = &fpriv->ctx_mgr;

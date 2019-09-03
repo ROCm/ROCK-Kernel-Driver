@@ -27,11 +27,6 @@
  */
 #include <drm/drmP.h>
 #include <drm/amdgpu_drm.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-#ifdef CONFIG_X86
-#include <asm/set_memory.h>
-#endif
-#endif
 #include "amdgpu.h"
 
 /*
@@ -250,7 +245,9 @@ int amdgpu_gart_unbind(struct amdgpu_device *adev, uint64_t offset,
 	}
 	mb();
 	amdgpu_asic_flush_hdp(adev, NULL);
-	amdgpu_gmc_flush_gpu_tlb(adev, 0, 0);
+	for (i = 0; i < adev->num_vmhubs; i++)
+		amdgpu_gmc_flush_gpu_tlb(adev, 0, i, 0);
+
 	return 0;
 }
 
@@ -311,7 +308,7 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 #ifdef CONFIG_DRM_AMDGPU_GART_DEBUGFS
 	unsigned t,p;
 #endif
-	int r;
+	int r, i;
 
 	if (!adev->gart.ready) {
 		WARN(1, "trying to bind memory to uninitialized GART !\n");
@@ -335,7 +332,8 @@ int amdgpu_gart_bind(struct amdgpu_device *adev, uint64_t offset,
 
 	mb();
 	amdgpu_asic_flush_hdp(adev, NULL);
-	amdgpu_gmc_flush_gpu_tlb(adev, 0, 0);
+	for (i = 0; i < adev->num_vmhubs; i++)
+		amdgpu_gmc_flush_gpu_tlb(adev, 0, i, 0);
 	return 0;
 }
 

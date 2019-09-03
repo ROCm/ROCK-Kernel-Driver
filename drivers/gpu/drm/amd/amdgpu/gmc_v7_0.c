@@ -432,8 +432,8 @@ static int gmc_v7_0_mc_init(struct amdgpu_device *adev)
  *
  * Flush the TLB for the requested page table (CIK).
  */
-static void gmc_v7_0_flush_gpu_tlb(struct amdgpu_device *adev,
-				uint32_t vmid, uint32_t flush_type)
+static void gmc_v7_0_flush_gpu_tlb(struct amdgpu_device *adev, uint32_t vmid,
+					uint32_t vmhub, uint32_t flush_type)
 {
 	/* bits 0-15 are the VM contexts0-15 */
 	WREG32(mmVM_INVALIDATE_REQUEST, 1 << vmid);
@@ -676,7 +676,7 @@ static int gmc_v7_0_gart_enable(struct amdgpu_device *adev)
 		WREG32(mmCHUB_CONTROL, tmp);
 	}
 
-	gmc_v7_0_flush_gpu_tlb(adev, 0, 0);
+	gmc_v7_0_flush_gpu_tlb(adev, 0, 0, 0);
 	DRM_INFO("PCIE GART of %uM enabled (table at 0x%016llX).\n",
 		 (unsigned)(adev->gmc.gart_size >> 20),
 		 (unsigned long long)table_addr);
@@ -961,6 +961,8 @@ static int gmc_v7_0_sw_init(void *handle)
 	int r;
 	int dma_bits;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	adev->num_vmhubs = 1;
 
 	if (adev->flags & AMD_IS_APU) {
 		adev->gmc.vram_type = AMDGPU_VRAM_TYPE_UNKNOWN;

@@ -315,10 +315,13 @@ static int nv_asic_reset(struct amdgpu_device *adev)
 	int ret = 0;
 	struct smu_context *smu = &adev->smu;
 
-	if (nv_asic_reset_method(adev) == AMD_RESET_METHOD_BACO)
+	if (nv_asic_reset_method(adev) == AMD_RESET_METHOD_BACO) {
+		amdgpu_inc_vram_lost(adev);
 		ret = smu_baco_reset(smu);
-	else
+	} else {
+		amdgpu_inc_vram_lost(adev);
 		ret = nv_asic_mode1_reset(adev);
+	}
 
 	return ret;
 }
@@ -649,7 +652,9 @@ static int nv_common_early_init(void *handle)
 			AMD_CG_SUPPORT_ATHUB_MGCG |
 			AMD_CG_SUPPORT_ATHUB_LS |
 			AMD_CG_SUPPORT_VCN_MGCG;
-		adev->pg_flags = AMD_PG_SUPPORT_VCN_DPG;
+		adev->pg_flags = AMD_PG_SUPPORT_VCN |
+			AMD_PG_SUPPORT_VCN_DPG |
+			AMD_PG_SUPPORT_ATHUB;
 		adev->external_rev_id = adev->rev_id + 0xa;
 		break;
 	default:
