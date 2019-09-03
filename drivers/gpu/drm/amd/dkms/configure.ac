@@ -33,6 +33,7 @@ m4_include([m4/drm-get-max-iomem.m4])
 m4_include([m4/chunk-id-synobj-in-out.m4])
 m4_include([m4/chunk-id-scheduled-dependencies.m4])
 m4_include([m4/chunk-id-syncobj-timeline-wait-signal.m4])
+m4_include([m4/drm-file-h.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
