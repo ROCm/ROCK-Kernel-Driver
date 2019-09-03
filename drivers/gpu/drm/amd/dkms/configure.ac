@@ -53,6 +53,7 @@ m4_include([m4/drm-fb-helper-xx-fbi.m4])
 m4_include([m4/drm-fb-helper-set-suspend-unlocked.m4])
 m4_include([m4/drm-atomic-state-plane-states.m4])
 m4_include([m4/drm-atomic-helper-update-legacy-modeset-state.m4])
+m4_include([m4/drm-crtc-accurate-vblank-count.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
