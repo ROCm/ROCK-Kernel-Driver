@@ -187,13 +187,21 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 {
 	int r;
 	struct kfd_ipc_obj *entry, *found = NULL;
+#ifdef HAVE_HLIST_FOR_EACH_ENTRY_WITH_4ARGS
+	struct hlist_node *tmp_node;
+#endif
 
 	mutex_lock(&kfd_ipc_handles.lock);
 	/* Convert the user provided handle to hash key and search only in that
 	 * bucket
 	 */
+#ifdef HAVE_HLIST_FOR_EACH_ENTRY_WITH_4ARGS
+	hlist_for_each_entry(entry, tmp_node,
+		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
+#else
 	hlist_for_each_entry(entry,
 		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
+#endif
 		if (!memcmp(entry->share_handle, share_handle,
 			    sizeof(entry->share_handle))) {
 			found = entry;
