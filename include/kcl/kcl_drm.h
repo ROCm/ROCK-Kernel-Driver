@@ -397,4 +397,16 @@ drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 }
 #endif
 
+#if !defined(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT)
+static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
+{
+#if defined(HAVE_DRM_ACCURATE_VBLANK_COUNT)
+	return drm_accurate_vblank_count(crtc);
+#else
+	pr_warn_once("drm_crtc_accurate_vblank_count is not supported");
+	return 0;
+#endif
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
