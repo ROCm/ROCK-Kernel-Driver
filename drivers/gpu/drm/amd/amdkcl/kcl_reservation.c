@@ -503,7 +503,6 @@ void _kcl_reservation_object_add_shared_fence(struct reservation_object *obj,
 EXPORT_SYMBOL(_kcl_reservation_object_add_shared_fence);
 #endif
 
-#if !defined(HAVE_RESERVATION_OBJECT_GET_FENCES_RCU)
 int _kcl_reservation_object_get_fences_rcu(struct reservation_object *obj,
 				      struct dma_fence **pfence_excl,
 				      unsigned *pshared_count,
@@ -592,4 +591,3 @@ unlock:
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_reservation_object_get_fences_rcu);
-#endif
