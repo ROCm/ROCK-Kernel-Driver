@@ -183,6 +183,7 @@ m4_include([m4/vm-fault-address-vma.m4])
 m4_include([m4/hlist-for-each-entry.m4])
 m4_include([m4/drm-atomic-helper-shutdown.m4])
 m4_include([m4/drm-file-h.m4])
+m4_include([m4/drm-print-h.m4])
 m4_include([m4/config.m4])
 
 
