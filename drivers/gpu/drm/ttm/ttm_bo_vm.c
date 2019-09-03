@@ -49,7 +49,7 @@
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_area_struct *vma,
 				struct vm_fault *vmf)
@@ -82,7 +82,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 #endif
 
 		ttm_bo_get(bo);
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 		up_read(&vma->vm_mm->mmap_sem);
 #else
 		up_read(&vmf->vma->vm_mm->mmap_sem);
@@ -218,7 +218,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
 	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
 #else
 	ret = ttm_bo_vm_fault_idle(bo, vmf);
