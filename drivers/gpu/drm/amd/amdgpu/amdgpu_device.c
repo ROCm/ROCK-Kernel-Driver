@@ -3422,8 +3422,10 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	if (adev->mode_info.mode_config_initialized){
 		if (!amdgpu_device_has_dc_support(adev))
 			drm_helper_force_disable_all(adev_to_drm(adev));
+#ifdef HAVE_DRM_ATOMIC_HELPER_SHUTDOWN
 		else
 			drm_atomic_helper_shutdown(adev_to_drm(adev));
+#endif
 	}
 	amdgpu_fence_driver_fini(adev);
 	if (adev->pm_sysfs_en)
