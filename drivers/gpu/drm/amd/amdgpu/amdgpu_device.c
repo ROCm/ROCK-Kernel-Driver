@@ -2928,7 +2928,7 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	/* disable all interrupts */
 	amdgpu_irq_disable_all(adev);
 	if (adev->mode_info.mode_config_initialized){
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_ATOMIC_HELPER_SHUTDOWN
 		if (amdgpu_device_has_dc_support(adev))
 			drm_atomic_helper_shutdown(adev->ddev);
 		else
