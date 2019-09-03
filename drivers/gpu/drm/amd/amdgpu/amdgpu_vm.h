@@ -28,7 +28,9 @@
 #include <linux/kfifo.h>
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
+#ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
+#endif
 #include <drm/ttm/ttm_bo_driver.h>
 
 #include "amdgpu_sync.h"
