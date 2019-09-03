@@ -47,6 +47,7 @@ m4_include([m4/drm-dev-unplug.m4])
 m4_include([m4/drm-atomic-state-plane-states.m4])
 m4_include([m4/drm-atomic-helper-shutdown.m4])
 m4_include([m4/drm-file-h.m4])
+m4_include([m4/drm-print-h.m4])
 m4_include([m4/config.m4])
 
 
