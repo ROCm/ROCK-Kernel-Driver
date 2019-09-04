@@ -869,6 +869,15 @@ static int klp_init_patch(struct klp_patch *patch)
 	return 0;
 }
 
+static void klp_taint_kernel(const struct klp_patch *patch)
+{
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	pr_warn("attempt to disable live patch %s, setting NO_SUPPORT taint flag\n",
+			patch->mod->name);
+	add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
+#endif
+}
+
 static int __klp_disable_patch(struct klp_patch *patch)
 {
 	struct klp_object *obj;
@@ -878,6 +887,8 @@ static int __klp_disable_patch(struct klp_patch *patch)
 
 	if (klp_transition_patch)
 		return -EBUSY;
+
+	klp_taint_kernel(patch);
 
 	klp_init_transition(patch, KLP_UNPATCHED);
 
