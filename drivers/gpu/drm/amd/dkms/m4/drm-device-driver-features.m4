@@ -7,7 +7,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DEVICE_DRIVER_FEATURES],
 	AC_KERNEL_TRY_COMPILE([
 		#include <drm/drm_device.h>
 	],[
-		struct dev_device *ddev = NULL;
+		struct drm_device *ddev = NULL;
 		ddev->driver_features = 0;
 	],[
 		AC_MSG_RESULT(yes)
