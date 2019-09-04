@@ -1109,7 +1109,7 @@ amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
 	struct drm_connector *connector;
 	struct drm_crtc *crtc_from_state;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_new_connector_in_state)
 	for_each_connector_in_state(state, connector, new_con_state, i) {
 		crtc_from_state = from_state_var ? new_con_state->crtc :
 						   connector->state->crtc;
@@ -1303,7 +1303,7 @@ static int dm_resume(void *handle)
 		}
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_new_plane_in_state)
 	for_each_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
 #else
 	for_each_new_plane_in_state(dm->cached_state, plane, new_plane_state, i) {
@@ -6645,7 +6645,7 @@ static void amdgpu_dm_enable_crtc_interrupts(struct drm_device *dev,
 	int i;
 	enum amdgpu_dm_pipe_crc_source source;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -6725,7 +6725,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * TODO: Fix this so we can do this in commit tail and not have to block
 	 * in atomic check.
 	 */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -6830,7 +6830,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* update changed items */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -7007,7 +7007,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	/* Count number of newly disabled CRTCs for dropping PM refs later. */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
 		new_crtc_state = crtc->state;
 #else
@@ -7820,7 +7820,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 		goto cleanup;
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -8024,7 +8024,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -8103,7 +8103,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	dc_resource_state_copy_construct_current(dc, dm_state->context);
 #endif
 	/* Remove exiting planes if they are modified */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_plane_in_state_reverse)
 	for_each_plane_in_state(state, plane, new_plane_state, i) {
 		old_plane_state = plane->state;
 #else
@@ -8119,7 +8119,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Disable all crtcs which require disable */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -8135,7 +8135,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Enable all crtcs which require enable */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_crtc_in_state)
 	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
 		old_crtc_state = crtc->state;
 #else
@@ -8151,7 +8151,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 	/* Add new/modified planes */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(for_each_oldnew_plane_in_state_reverse)
 	for_each_plane_in_state(state, plane, new_plane_state, i) {
 		old_plane_state = plane->state;
 #else
