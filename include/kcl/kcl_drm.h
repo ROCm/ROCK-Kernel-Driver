@@ -627,4 +627,8 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
 
+#ifndef HAVE_DRM_DEV_PUT
+#define drm_dev_put drm_dev_unref
+#endif
+
 #endif /* AMDKCL_DRM_H */

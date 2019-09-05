@@ -1151,11 +1151,7 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
-#ifdef HAVE_DRM_DEV_PUT
 	drm_dev_put(dev);
-#else
-	drm_dev_unref(dev);
-#endif
 	return ret;
 }
 
@@ -1169,7 +1165,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	drm_dev_unplug(dev);
 #else
 	drm_dev_unregister(dev);
-	drm_dev_unref(dev);
+	drm_dev_put(dev);
 #endif
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
