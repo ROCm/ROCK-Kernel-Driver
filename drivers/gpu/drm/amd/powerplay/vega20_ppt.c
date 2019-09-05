@@ -3180,7 +3180,5 @@ static const struct pptable_funcs vega20_ppt_funcs = {
 
 void vega20_set_ppt_funcs(struct smu_context *smu)
 {
-	struct smu_table_context *smu_table = &smu->smu_table;
-
 	smu->ppt_funcs = &vega20_ppt_funcs;
 }
