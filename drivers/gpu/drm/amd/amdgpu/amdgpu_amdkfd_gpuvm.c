@@ -352,6 +352,23 @@ static int vm_update_pds(struct amdgpu_vm *vm, struct amdgpu_sync *sync)
 	return amdgpu_sync_fence(NULL, sync, vm->last_update, false);
 }
 
+static uint64_t get_pte_flags(struct amdgpu_device *adev, struct kgd_mem *mem)
+{
+	bool coherent = mem->alloc_flags & ALLOC_MEM_FLAGS_COHERENT;
+	uint32_t mapping_flags;
+
+	mapping_flags = AMDGPU_VM_PAGE_READABLE;
+	if (mem->alloc_flags & ALLOC_MEM_FLAGS_WRITABLE)
+		mapping_flags |= AMDGPU_VM_PAGE_WRITEABLE;
+	if (mem->alloc_flags & ALLOC_MEM_FLAGS_EXECUTABLE)
+		mapping_flags |= AMDGPU_VM_PAGE_EXECUTABLE;
+
+	mapping_flags |= coherent ?
+		AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
+
+	return amdgpu_gmc_get_pte_flags(adev, mapping_flags);
+}
+
 /* add_bo_to_vm - Add a BO to a VM
  *
  * Everything that needs to bo done only once when a BO is first added
