@@ -140,7 +140,7 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
-#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_FRAMEBUFFERS)
+#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 
 #if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
@@ -161,30 +161,19 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif
-
-#if !defined(HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT)
-static inline void
-drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
-					      const char *name, bool primary)
-{
-#if IS_REACHABLE(CONFIG_FB)
-	remove_conflicting_framebuffers(a, name, primary);
-#else
-	return;
-#endif
-}
-#else
+extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id,
+					       const char *name);
 static inline int
-drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
-					      const char *name, bool primary)
+drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
+						  int resource_id,
+						  const char *name)
 {
 #if IS_REACHABLE(CONFIG_FB)
-	return remove_conflicting_framebuffers(a, name, primary);
+	return remove_conflicting_pci_framebuffers(pdev, resource_id, name);
 #else
 	return 0;
 #endif
 }
-#endif
 #endif
 
 static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
