@@ -835,11 +835,6 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 {
 	struct kfd_ioctl_get_clock_counters_args *args = data;
 	struct kfd_dev *dev;
-#ifndef HAVE_TIMESPEC64_TO_NS
-	struct timespec time;
-#else
-	struct timespec64 time;
-#endif
 
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev)
@@ -850,22 +845,8 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 		args->gpu_clock_counter = 0;
 
 	/* No access to rdtsc. Using raw monotonic time */
-#ifdef HAVE_KTIME_GET_RAW_NS
 	args->cpu_clock_counter = ktime_get_raw_ns();
-#else
-	getrawmonotonic(&time);
-	args->cpu_clock_counter = (uint64_t)timespec_to_ns(&time);
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
- 	args->system_clock_counter = ktime_get_boot_ns();
-#elif defined(HAVE_GET_MONOTONIC_BOOTTIME64) && defined(HAVE_TIMESPEC64_TO_NS)
-	get_monotonic_boottime64(&time);
-	args->system_clock_counter = (uint64_t)timespec64_to_ns(&time);
-#else
-	get_monotonic_boottime(&time);
-	args->system_clock_counter = (uint64_t)timespec_to_ns(&time);
-#endif
+	args->system_clock_counter = ktime_get_boottime_ns();
 
 	/* Since the counter is in nano-seconds we use 1GHz frequency */
 	args->system_clock_freq = 1000000000;
