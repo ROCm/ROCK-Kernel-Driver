@@ -1597,7 +1597,6 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 		}
 		flags &= ~AMDGPU_PTE_VALID;
 	}
-
 	if (adev->asic_type == CHIP_ARCTURUS &&
 	    !(flags & AMDGPU_PTE_SYSTEM) &&
 	    mapping->bo_va->is_xgmi) {
