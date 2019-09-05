@@ -37,7 +37,10 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
-#if defined(HAVE_PFN_TO_PFN_T)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_X) || \
+	defined(OS_NAME_SLE)
 #include <linux/pfn_t.h>
 #endif
 #include <linux/rbtree.h>
@@ -314,7 +317,10 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vmf_insert_mixed(&cvma, address,
-#if defined(HAVE_PFN_TO_PFN_T)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+	defined(OS_NAME_RHEL_7_3) || \
+	defined(OS_NAME_RHEL_7_X) || \
+	defined(OS_NAME_SLE)
 			__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 #else
 					pfn);
