@@ -2,6 +2,7 @@
 #define AMDKCL_FENCE_H
 
 #include <linux/version.h>
+#include <kcl/kcl_rcupdate.h>
 #if !defined(HAVE_DMA_FENCE_DEFINED)
 #include <linux/fence.h>
 #include <kcl/kcl_fence_array.h>
@@ -35,7 +36,6 @@ typedef struct fence_ops kcl_fence_ops_t;
 #endif
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
-extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);
 extern u64 _kcl_fence_context_alloc(unsigned num);
 extern void _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	     spinlock_t *lock, u64 context, unsigned seqno);
@@ -111,14 +111,46 @@ dma_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
-extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
+static inline struct dma_fence *
+_kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
+{
+	do {
+		struct dma_fence *fence;
+
+		fence = rcu_dereference(*fencep);
+		if (!fence)
+			return NULL;
+
+		if (!dma_fence_get_rcu(fence))
+			continue;
+
+		/* The atomic_inc_not_zero() inside dma_fence_get_rcu()
+		 * provides a full memory barrier upon success (such as now).
+		 * This is paired with the write barrier from assigning
+		 * to the __rcu protected fence pointer so that if that
+		 * pointer still matches the current fence, we know we
+		 * have successfully acquire a reference to it. If it no
+		 * longer matches, we are holding a reference to some other
+		 * reallocated pointer. This is possible if the allocator
+		 * is using a freelist like SLAB_TYPESAFE_BY_RCU where the
+		 * fence remains valid for the RCU grace period, but it
+		 * may be reallocated. When using such allocators, we are
+		 * responsible for ensuring the reference we get is to
+		 * the right fence, as below.
+		 */
+		if (fence == rcu_access_pointer(*fencep))
+			return rcu_pointer_handoff(fence);
+
+		dma_fence_put(fence);
+	} while (1);
+}
 #endif
 
-static inline struct fence *
-kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
+static inline struct dma_fence *
+kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 {
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
 	return _kcl_fence_get_rcu_safe(fencep);
 #else
 	return dma_fence_get_rcu_safe(fencep);

@@ -265,30 +265,3 @@ void amdkcl_fence_init(void)
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
 #endif
 }
-
-/*
- * Modifications [2017-09-19] (c) [2017]
- * Advanced Micro Devices, Inc.
- */
-#if defined(HAVE_DMA_FENCE_DEFINED)
-struct fence *
-_kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
-{
-	do {
-		struct fence *fence;
-
-		fence = rcu_dereference(*fencep);
-		if (!fence)
-			return NULL;
-
-		if (!fence_get_rcu(fence))
-			continue;
-
-		if (fence == rcu_access_pointer(*fencep))
-			return rcu_pointer_handoff(fence);
-
-		fence_put(fence);
-	} while (1);
-}
-EXPORT_SYMBOL(_kcl_fence_get_rcu_safe);
-#endif
