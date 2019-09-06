@@ -36,9 +36,6 @@ typedef struct fence_ops kcl_fence_ops_t;
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
 extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);
-extern signed long _kcl_fence_wait_any_timeout(struct fence **fences,
-				   uint32_t count, bool intr,
-				   signed long timeout, uint32_t *idx);
 extern u64 _kcl_fence_context_alloc(unsigned num);
 extern void _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	     spinlock_t *lock, u64 context, unsigned seqno);
@@ -74,11 +71,18 @@ dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
 }
 #endif
 
-static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
-				   uint32_t count, bool intr,
-				   signed long timeout, uint32_t *idx)
+/* commit 796422f227ee(dma-fence: Allow wait_any_timeout for all fences) */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+signed long
+_kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
+			   bool intr, signed long timeout, uint32_t *idx);
+#endif
+
+static inline signed long
+kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
+			   bool intr, signed long timeout, uint32_t *idx)
 {
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);

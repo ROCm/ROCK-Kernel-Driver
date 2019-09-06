@@ -60,13 +60,14 @@ EXPORT_SYMBOL(_kcl_fence_init);
 #endif
 
 static bool
-fence_test_signaled_any(struct fence **fences, uint32_t count, uint32_t *idx)
+dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
+			    uint32_t *idx)
 {
 	int i;
 
 	for (i = 0; i < count; ++i) {
-		struct fence *fence = fences[i];
-		if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		struct dma_fence *fence = fences[i];
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
 			if (idx)
 				*idx = i;
 			return true;
@@ -158,9 +159,10 @@ EXPORT_SYMBOL(_kcl_fence_default_wait);
  * Modifications [2017-09-19] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 signed long
-_kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
-		       bool intr, signed long timeout, uint32_t *idx)
+_kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
+			   bool intr, signed long timeout, uint32_t *idx)
 {
 	struct default_wait_cb *cb;
 	signed long ret = timeout;
@@ -171,7 +173,7 @@ _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
 
 	if (timeout == 0) {
 		for (i = 0; i < count; ++i)
-			if (fence_is_signaled(fences[i])) {
+			if (dma_fence_is_signaled(fences[i])) {
 				if (idx)
 					*idx = i;
 				return 1;
@@ -187,16 +189,11 @@ _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
 	}
 
 	for (i = 0; i < count; ++i) {
-		struct fence *fence = fences[i];
-
-		if (fence->ops->wait != kcl_fence_default_wait) {
-			ret = -EINVAL;
-			goto fence_rm_cb;
-		}
+		struct dma_fence *fence = fences[i];
 
 		cb[i].task = current;
-		if (fence_add_callback(fence, &cb[i].base,
-				       _kcl_fence_default_wait_cb)) {
+		if (dma_fence_add_callback(fence, &cb[i].base,
+					   _kcl_fence_default_wait_cb)) {
 			/* This fence is already signaled */
 			if (idx)
 				*idx = i;
@@ -210,7 +207,7 @@ _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
 		else
 			set_current_state(TASK_UNINTERRUPTIBLE);
 
-		if (fence_test_signaled_any(fences, count, idx))
+		if (dma_fence_test_signaled_any(fences, count, idx))
 			break;
 
 		ret = schedule_timeout(ret);
@@ -223,7 +220,7 @@ _kcl_fence_wait_any_timeout(struct fence **fences, uint32_t count,
 
 fence_rm_cb:
 	while (i-- > 0)
-		fence_remove_callback(fences[i], &cb[i].base);
+		dma_fence_remove_callback(fences[i], &cb[i].base);
 
 err_free_cb:
 	kfree(cb);
@@ -231,6 +228,7 @@ err_free_cb:
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_fence_wait_any_timeout);
+#endif
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
 signed long
