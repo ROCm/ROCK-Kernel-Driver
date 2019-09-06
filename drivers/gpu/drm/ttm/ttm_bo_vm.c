@@ -119,7 +119,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *v
 static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #endif
 {
-#if defined(HAVE_VM_FAULT_ADDRESS_VMA)
+#if !defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 	struct vm_area_struct *vma = vmf->vma;
 #endif
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)
@@ -133,7 +133,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	int err;
 	int i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 	unsigned long address = (unsigned long)vmf->virtual_address;
 #else
 	unsigned long address = vmf->address;
