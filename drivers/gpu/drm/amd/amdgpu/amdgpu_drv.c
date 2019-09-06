@@ -1426,7 +1426,7 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 static struct drm_driver kms_driver = {
 	.driver_features =
 		DRIVER_USE_AGP |
-#ifdef DRIVER_ATOMIC
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 		DRIVER_ATOMIC |
 #endif
 		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
