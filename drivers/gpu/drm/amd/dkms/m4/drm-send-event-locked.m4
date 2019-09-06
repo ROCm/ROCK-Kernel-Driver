@@ -1,6 +1,6 @@
 dnl #
-dnl # commit a8f8b1d9b8701465f1309d551fba2ebda6760f49
-dnl # drm: Extract drm_file.h
+dnl # commit fb740cf2492cc
+dnl # drm: Create drm_send_event helpers
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_SEND_EVENT_LOCKED],
 	[AC_MSG_CHECKING([whether drm_send_event_locked() function is available])
