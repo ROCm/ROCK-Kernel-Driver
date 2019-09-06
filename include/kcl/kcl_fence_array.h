@@ -19,9 +19,13 @@
  * more details.
  */
 
-#ifndef __LINUX_FENCE_ARRAY_H
-#define __LINUX_FENCE_ARRAY_H
+#ifndef AMDKCL_FENCE_ARRAY_H
+#define AMDKCL_FENCE_ARRAY_H
 
+#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if defined(HAVE_FENCE_ARRAY_H)
+#include <linux/fence-array.h>
+#else
 #include <linux/fence.h>
 
 /**
@@ -71,5 +75,7 @@ static inline struct fence_array *to_fence_array(struct fence *fence)
 struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 				       u64 context, unsigned seqno,
 				       bool signal_on_any);
+#endif
+#endif
 
 #endif /* __LINUX_FENCE_ARRAY_H */

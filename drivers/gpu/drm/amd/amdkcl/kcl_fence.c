@@ -20,12 +20,11 @@
 
 #include <linux/slab.h>
 #include <kcl/kcl_fence.h>
-#include <kcl/kcl_rcupdate.h>
 #include "kcl_common.h"
 
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DMA_FENCE_DEFINED)
 static atomic64_t fence_context_counter = ATOMIC64_INIT(0);
 u64 _kcl_fence_context_alloc(unsigned num)
 {
@@ -80,6 +79,8 @@ struct default_wait_cb {
 	struct task_struct *task;
 };
 static void (*_kcl_fence_default_wait_cb)(struct fence *fence, struct fence_cb *cb);
+
+#if !defined(HAVE_DMA_FENCE_DEFINED)
 static signed long
 _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 {
@@ -147,12 +148,13 @@ out:
 	spin_unlock_irqrestore(fence->lock, flags);
 	return ret;
 }
+#endif
 
 signed long kcl_fence_default_wait(kcl_fence_t *fence,
 				   bool intr,
 				   signed long timeout)
 {
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#if !defined(HAVE_DMA_FENCE_DEFINED)
 	return _kcl_fence_default_wait(fence, intr, timeout);
 #else
 	return dma_fence_default_wait(fence, intr, timeout);
@@ -263,7 +265,7 @@ EXPORT_SYMBOL(_kcl_fence_wait_timeout);
  */
 void amdkcl_fence_init(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#if defined(HAVE_DMA_FENCE_DEFINED)
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("dma_fence_default_wait_cb", NULL);
 #else
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
@@ -274,7 +276,7 @@ void amdkcl_fence_init(void)
  * Modifications [2017-09-19] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(HAVE_DMA_FENCE_DEFINED)
 struct fence *
 _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 {

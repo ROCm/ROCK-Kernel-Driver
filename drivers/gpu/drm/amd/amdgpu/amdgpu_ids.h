@@ -26,7 +26,9 @@
 #include <linux/types.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
+#if defined(HAVE_DMA_FENCE_DEFINED)
 #include <linux/dma-fence.h>
+#endif
 
 #include "amdgpu_sync.h"
 

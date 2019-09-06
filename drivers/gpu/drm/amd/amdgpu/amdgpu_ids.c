@@ -23,7 +23,9 @@
 #include "amdgpu_ids.h"
 
 #include <linux/idr.h>
+#if defined(HAVE_DMA_FENCE_DEFINED)
 #include <linux/dma-fence-array.h>
+#endif
 #include <drm/drmP.h>
 
 #include "amdgpu.h"

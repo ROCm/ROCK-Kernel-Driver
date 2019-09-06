@@ -36,8 +36,9 @@
 #include <linux/kref.h>
 #include <linux/rbtree.h>
 #include <linux/hashtable.h>
+#ifdef HAVE_DMA_FENCE_DEFINED
 #include <linux/dma-fence.h>
-
+#endif
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
 #include <drm/ttm/ttm_placement.h>
