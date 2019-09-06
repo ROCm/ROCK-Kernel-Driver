@@ -133,7 +133,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	int err;
 	int i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
-#ifndef HAVE_VM_FAULT_ADDRESS_VMA
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 	unsigned long address = (unsigned long)vmf->virtual_address;
 #else
 	unsigned long address = vmf->address;
