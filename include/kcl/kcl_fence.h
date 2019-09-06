@@ -125,17 +125,15 @@ kcl_fence_get_rcu_safe(struct fence * __rcu *fencep)
 #endif
 }
 
-static inline void kcl_dma_fence_set_error(struct dma_fence *fence,
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
+static inline void dma_fence_set_error(struct dma_fence *fence,
 				       int error)
 {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
-	BUG_ON(test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags));
+	BUG_ON(test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags));
 	BUG_ON(error >= 0 || error < -MAX_ERRNO);
 
 	fence->status = error;
-#else
-	dma_fence_set_error(fence, error);
-#endif
 }
+#endif
 
 #endif /* AMDKCL_FENCE_H */
