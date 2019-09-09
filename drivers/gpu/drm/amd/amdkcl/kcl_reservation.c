@@ -238,7 +238,7 @@ retry:
 			struct dma_fence *fence;
 
 			fence = rcu_dereference(src_list->shared[i]);
-			if (test_bit(FENCE_FLAG_SIGNALED_BIT,
+			if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT,
 				     &fence->flags))
 				continue;
 

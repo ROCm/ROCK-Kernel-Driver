@@ -7,11 +7,11 @@
 #define TRACE_SYSTEM kcl_fence
 #define TRACE_INCLUDE_FILE kcl_trace
 
-struct fence;
+struct dma_fence;
 
 DECLARE_EVENT_CLASS(kcl_fence,
 
-	TP_PROTO(struct fence *fence),
+	TP_PROTO(struct dma_fence *fence),
 
 	TP_ARGS(fence),
 
@@ -36,28 +36,28 @@ DECLARE_EVENT_CLASS(kcl_fence,
 
 DEFINE_EVENT(kcl_fence, kcl_fence_init,
 
-	TP_PROTO(struct fence *fence),
+	TP_PROTO(struct dma_fence *fence),
 
 	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(kcl_fence, kcl_fence_enable_signal,
 
-	TP_PROTO(struct fence *fence),
+	TP_PROTO(struct dma_fence *fence),
 
 	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(kcl_fence, kcl_fence_wait_start,
 
-	TP_PROTO(struct fence *fence),
+	TP_PROTO(struct dma_fence *fence),
 
 	TP_ARGS(fence)
 );
 
 DEFINE_EVENT(kcl_fence, kcl_fence_wait_end,
 
-	TP_PROTO(struct fence *fence),
+	TP_PROTO(struct dma_fence *fence),
 
 	TP_ARGS(fence)
 );

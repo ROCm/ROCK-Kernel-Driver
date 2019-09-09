@@ -31,8 +31,6 @@
 #define dma_fence_remove_callback fence_remove_callback
 #define dma_fence_default_wait fence_default_wait
 #define dma_fence_enable_sw_signaling fence_enable_sw_signaling
-typedef struct fence kcl_fence_t;
-typedef struct fence_ops kcl_fence_ops_t;
 #endif
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
