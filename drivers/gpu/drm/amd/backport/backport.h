@@ -21,5 +21,6 @@
 #include <kcl/backport/kcl_perf_event_backport.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_preempt.h>
+#include <kcl/kcl_suspend.h>
 
 #endif /* AMDGPU_BACKPORT_H */
