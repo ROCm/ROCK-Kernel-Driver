@@ -134,7 +134,7 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 		return NULL;
 
 	spin_lock_init(&array->lock);
-	kcl_fence_init(&array->base, &fence_array_ops, &array->lock,
+	dma_fence_init(&array->base, &fence_array_ops, &array->lock,
 		   context, seqno);
 
 	array->num_fences = num_fences;

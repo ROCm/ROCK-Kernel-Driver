@@ -182,9 +182,9 @@ struct drm_sched_fence *drm_sched_fence_create(struct drm_sched_entity *entity,
 	spin_lock_init(&fence->lock);
 
 	seq = atomic_inc_return(&entity->fence_seq);
-	kcl_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
+	dma_fence_init(&fence->scheduled, &drm_sched_fence_ops_scheduled,
 		       &fence->lock, entity->fence_context, seq);
-	kcl_fence_init(&fence->finished, &drm_sched_fence_ops_finished,
+	dma_fence_init(&fence->finished, &drm_sched_fence_ops_finished,
 		       &fence->lock, entity->fence_context + 1, seq);
 
 	return fence;

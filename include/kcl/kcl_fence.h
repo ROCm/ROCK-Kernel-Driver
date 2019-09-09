@@ -18,7 +18,6 @@
 #define DMA_FENCE_TRACE FENCE_TRACE
 #define DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT FENCE_FLAG_ENABLE_SIGNAL_BIT
 #define DMA_FENCE_FLAG_SIGNALED_BIT FENCE_FLAG_SIGNALED_BIT
-#define dma_fence_init fence_init
 #define dma_fence_wait fence_wait
 #define dma_fence_get fence_get
 #define dma_fence_put fence_put
@@ -61,6 +60,20 @@ static inline bool dma_fence_is_later(struct dma_fence *f1, struct dma_fence *f2
 }
 #endif
 
+#if !defined(HAVE_DMA_FENCE_DEFINED)
+static inline u64 dma_fence_context_alloc(unsigned num)
+{
+	return _kcl_fence_context_alloc(num);
+}
+
+static inline void
+dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
+	       spinlock_t *lock, u64 context, unsigned seqno)
+{
+	return _kcl_fence_init(fence, ops, lock, context, seqno);
+}
+#endif
+
 static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx)
@@ -69,25 +82,6 @@ static inline signed long kcl_fence_wait_any_timeout(kcl_fence_t **fences,
 	return _kcl_fence_wait_any_timeout(fences, count, intr, timeout, idx);
 #else
 	return dma_fence_wait_any_timeout(fences, count, intr, timeout, idx);
-#endif
-}
-
-static inline u64 kcl_fence_context_alloc(unsigned num)
-{
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-	return _kcl_fence_context_alloc(num);
-#else
-	return dma_fence_context_alloc(num);
-#endif
-}
-
-static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops,
-	     spinlock_t *lock, u64 context, unsigned seqno)
-{
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-	return _kcl_fence_init(fence, ops, lock, context, seqno);
-#else
-	return dma_fence_init(fence, ops, lock, context, seqno);
 #endif
 }
 

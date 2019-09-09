@@ -146,7 +146,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f,
 
 	seq = ++ring->fence_drv.sync_seq;
 	fence->ring = ring;
-	kcl_fence_init(&fence->base, &amdgpu_fence_ops,
+	dma_fence_init(&fence->base, &amdgpu_fence_ops,
 		   &ring->fence_drv.lock,
 		   adev->fence_context + ring->idx,
 		   seq);

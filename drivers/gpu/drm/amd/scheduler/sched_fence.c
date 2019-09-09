@@ -61,9 +61,9 @@ struct amd_sched_fence *amd_sched_fence_create(struct amd_sched_entity *entity,
 	spin_lock_init(&fence->lock);
 
 	seq = atomic_inc_return(&entity->fence_seq);
-	kcl_fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,
+	dma_fence_init(&fence->scheduled, &amd_sched_fence_ops_scheduled,
 		   &fence->lock, entity->fence_context, seq);
-	kcl_fence_init(&fence->finished, &amd_sched_fence_ops_finished,
+	dma_fence_init(&fence->finished, &amd_sched_fence_ops_finished,
 		   &fence->lock, entity->fence_context + 1, seq);
 
 	return fence;

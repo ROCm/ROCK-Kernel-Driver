@@ -34,8 +34,8 @@ u64 _kcl_fence_context_alloc(unsigned num)
 EXPORT_SYMBOL(_kcl_fence_context_alloc);
 
 void
-_kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
-	     spinlock_t *lock, u64 context, unsigned seqno)
+_kcl_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
+	       spinlock_t *lock, u64 context, unsigned seqno)
 {
 	BUG_ON(!lock);
 	BUG_ON(!ops || !ops->wait || !ops->enable_signaling ||
@@ -48,6 +48,7 @@ _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
 	fence->context = context;
 	fence->seqno = seqno;
 	fence->flags = 0UL;
+	fence->status = 0;
 
 	/*
 	 * Modifications [2017-03-29] (c) [2017]
