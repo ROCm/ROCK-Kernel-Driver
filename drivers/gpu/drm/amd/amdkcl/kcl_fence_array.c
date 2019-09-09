@@ -98,11 +98,7 @@ const struct fence_ops fence_array_ops = {
 	.get_timeline_name = fence_array_get_timeline_name,
 	.enable_signaling = fence_array_enable_signaling,
 	.signaled = fence_array_signaled,
-#if defined(BUILD_AS_DKMS)
 	.wait = kcl_fence_default_wait,
-#else
-	.wait = fence_default_wait,
-#endif
 	.release = fence_array_release,
 };
 

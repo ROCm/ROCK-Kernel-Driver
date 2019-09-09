@@ -139,6 +139,7 @@ const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
+	.wait = kcl_fence_default_wait,
 #endif
 	.release = drm_sched_fence_release_scheduled,
 };
@@ -149,6 +150,7 @@ const struct dma_fence_ops drm_sched_fence_ops_finished = {
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
+	.wait = kcl_fence_default_wait,
 #endif
 	.release = drm_sched_fence_release_finished,
 };

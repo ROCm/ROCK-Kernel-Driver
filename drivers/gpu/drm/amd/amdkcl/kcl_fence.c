@@ -75,21 +75,22 @@ fence_test_signaled_any(struct fence **fences, uint32_t count, uint32_t *idx)
 }
 
 struct default_wait_cb {
-	struct fence_cb base;
+	struct dma_fence_cb base;
 	struct task_struct *task;
 };
-static void (*_kcl_fence_default_wait_cb)(struct fence *fence, struct fence_cb *cb);
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-static signed long
-_kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
+static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+signed long
+_kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	struct default_wait_cb cb;
 	unsigned long flags;
 	signed long ret = timeout ? timeout : 1;
 	bool was_set;
 
-	if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		return ret;
 
 	spin_lock_irqsave(fence->lock, flags);
@@ -99,12 +100,13 @@ _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 		goto out;
 	}
 
-	was_set = test_and_set_bit(FENCE_FLAG_ENABLE_SIGNAL_BIT, &fence->flags);
+	was_set = test_and_set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
+				   &fence->flags);
 
-	if (test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+	if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 		goto out;
 
-	if (!was_set) {
+	if (!was_set && fence->ops->enable_signaling) {
 		/*
 		 * Modifications [2017-03-29] (c) [2017]
 		 * Advanced Micro Devices, Inc.
@@ -112,7 +114,7 @@ _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 		trace_kcl_fence_enable_signal(fence);
 
 		if (!fence->ops->enable_signaling(fence)) {
-			fence_signal_locked(fence);
+			dma_fence_signal_locked(fence);
 			goto out;
 		}
 	}
@@ -126,7 +128,7 @@ _kcl_fence_default_wait(struct fence *fence, bool intr, signed long timeout)
 	cb.task = current;
 	list_add(&cb.base.node, &fence->cb_list);
 
-	while (!test_bit(FENCE_FLAG_SIGNALED_BIT, &fence->flags) && ret > 0) {
+	while (!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags) && ret > 0) {
 		if (intr)
 			__set_current_state(TASK_INTERRUPTIBLE);
 		else
@@ -148,19 +150,8 @@ out:
 	spin_unlock_irqrestore(fence->lock, flags);
 	return ret;
 }
+EXPORT_SYMBOL(_kcl_fence_default_wait);
 #endif
-
-signed long kcl_fence_default_wait(kcl_fence_t *fence,
-				   bool intr,
-				   signed long timeout)
-{
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-	return _kcl_fence_default_wait(fence, intr, timeout);
-#else
-	return dma_fence_default_wait(fence, intr, timeout);
-#endif
-}
-EXPORT_SYMBOL(kcl_fence_default_wait);
 
 /*
  * Modifications [2017-09-19] (c) [2017]
@@ -240,8 +231,9 @@ err_free_cb:
 }
 EXPORT_SYMBOL(_kcl_fence_wait_any_timeout);
 
+#if !defined(HAVE_DMA_FENCE_DEFINED)
 signed long
-_kcl_fence_wait_timeout(struct fence *fence, bool intr, signed long timeout)
+_kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 {
 	signed long ret;
 
@@ -253,12 +245,15 @@ _kcl_fence_wait_timeout(struct fence *fence, bool intr, signed long timeout)
 	 * Advanced Micro Devices, Inc.
 	 */
 	trace_kcl_fence_wait_start(fence);
-	ret = fence->ops->wait(fence, intr, timeout);
+	if (fence->ops->wait)
+		ret = fence->ops->wait(fence, intr, timeout);
+	else
+		ret = kcl_fence_default_wait(fence, intr, timeout);
 	trace_kcl_fence_wait_end(fence);
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_fence_wait_timeout);
-
+#endif
 /*
  * Modifications [2016-12-23] (c) [2016]
  * Advanced Micro Devices, Inc.

@@ -26,7 +26,6 @@
 #define dma_fence_signal fence_signal
 #define dma_fence_signal_locked fence_signal_locked
 #define dma_fence_get_rcu fence_get_rcu
-#define dma_fence_wait_timeout fence_wait_timeout
 #define dma_fence_array_create fence_array_create
 #define dma_fence_add_callback fence_add_callback
 #define dma_fence_remove_callback fence_remove_callback
@@ -38,9 +37,6 @@ typedef struct fence_ops kcl_fence_ops_t;
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
 extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);
-extern signed long kcl_fence_default_wait(kcl_fence_t *fence,
-					  bool intr,
-					  signed long timeout);
 extern signed long _kcl_fence_wait_any_timeout(struct fence **fences,
 				   uint32_t count, bool intr,
 				   signed long timeout, uint32_t *idx);
@@ -95,15 +91,27 @@ static inline void kcl_fence_init(kcl_fence_t *fence, const kcl_fence_ops_t *ops
 #endif
 }
 
-static inline signed long kcl_fence_wait_timeout(kcl_fence_t *fences, bool intr,
-					signed long timeout)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+signed long
+_kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout);
+#endif
+static inline signed long
+kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-	return _kcl_fence_wait_timeout(fences, intr, timeout);
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+	return _kcl_fence_default_wait(fence, intr, timeout);
 #else
-	return dma_fence_wait_timeout(fences, intr, timeout);
+	return dma_fence_default_wait(fence, intr, timeout);
 #endif
 }
+
+#if !defined(HAVE_DMA_FENCE_DEFINED)
+static inline signed long
+dma_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
+{
+	return _kcl_fence_wait_timeout(fence, intr, timeout);
+}
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
 extern struct fence * _kcl_fence_get_rcu_safe(struct fence * __rcu *fencep);

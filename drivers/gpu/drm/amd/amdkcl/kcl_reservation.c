@@ -184,7 +184,7 @@ retry:
 
 	rcu_read_unlock();
 	if (fence) {
-		ret = kcl_fence_wait_timeout(fence, intr, ret);
+		ret = dma_fence_wait_timeout(fence, intr, ret);
 		fence_put(fence);
 		if (ret > 0 && wait_all && (i + 1 < shared_count))
 			goto retry;
