@@ -6,6 +6,7 @@
  */
 #include <linux/version.h>
 #include <linux/kallsyms.h>
+#include <linux/bug.h>
 
 #ifndef HAVE_KALLSYMS_LOOKUP_NAME
 extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
