@@ -31,6 +31,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/console.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/iommu.h>
 #include <linux/pci.h>
