@@ -29,6 +29,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/console.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 
 #include <drm/drm_atomic_helper.h>
