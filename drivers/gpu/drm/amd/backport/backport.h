@@ -32,4 +32,5 @@
 #include <kcl/kcl_pagemap.h>
 #include <kcl/kcl_pci_backport.h>
 #include <kcl/kcl_perf_event_backport.h>
+#include <kcl/kcl_suspend.h>
 #endif /* AMDGPU_BACKPORT_H */

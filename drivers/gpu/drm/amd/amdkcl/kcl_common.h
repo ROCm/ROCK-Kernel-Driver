@@ -6,6 +6,7 @@
  */
 #include <linux/version.h>
 #include <linux/kallsyms.h>
+#include <linux/bug.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
