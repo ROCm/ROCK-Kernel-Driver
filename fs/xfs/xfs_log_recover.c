@@ -2906,6 +2906,46 @@ out_free_ip:
 	return error;
 }
 
+/*
+ * SUSE kernels 3.12.74-60.64.40 through 3.12.74-60.64.99 had a regression
+ * where we would write out malformed inode items that would in turn
+ * corrupt inodes.  Handle them gracefully here rather than forcing the
+ * user to zero out their log.
+ */
+STATIC void
+repair_malformed_inode_item(struct xlog *log, xfs_log_iovec_t *vec)
+{
+	struct xfs_icdinode_malformed *mal = vec->i_addr;
+	struct xfs_log_dinode *ldip = vec->i_addr;
+	struct xfs_log_dinode fixed;
+
+	if (!log->l_malformed_inode_warning) {
+		xfs_info(log->l_mp,
+			 "detected malformed inodes in log, repairing");
+		log->l_malformed_inode_warning = 1;
+	}
+
+	fixed.di_dmstate	= atomic_read(&mal->di_dmstate);
+	fixed.di_flags		= mal->di_flags;
+	fixed.di_gen		= mal->di_gen;
+	fixed.di_next_unlinked	= mal->di_next_unlinked;
+
+	if (ldip->di_version >= 3) {
+		fixed.di_crc		= mal->di_crc;
+		fixed.di_changecount	= mal->di_changecount;
+		fixed.di_lsn		= mal->di_lsn;
+		fixed.di_flags2		= mal->di_flags2;
+		fixed.di_crtime.t_sec	= mal->di_crtime.t_sec;
+		fixed.di_crtime.t_nsec	= mal->di_crtime.t_nsec;
+		fixed.di_ino		= mal->di_ino;
+		memcpy(&fixed.di_pad2, mal->di_pad2, sizeof(fixed.di_pad2));
+		uuid_copy(&fixed.di_uuid, &mal->di_uuid);
+	}
+
+	memcpy(&ldip->di_dmstate, &fixed.di_dmstate,
+	       vec->i_len - offsetof(struct xfs_log_dinode, di_dmstate));
+}
+
 STATIC int
 xlog_recover_inode_pass2(
 	struct xlog			*log,
@@ -2924,7 +2964,7 @@ xlog_recover_inode_pass2(
 	int			attr_index;
 	uint			fields;
 	struct xfs_log_dinode	*ldip;
-	uint			isize;
+	uint			isize, malformed_isize;
 	int			need_free = 0;
 
 	if (item->ri_buf[0].i_len == sizeof(struct xfs_inode_log_format)) {
@@ -2983,6 +3023,21 @@ xlog_recover_inode_pass2(
 			__func__, item, in_f->ilf_ino);
 		XFS_ERROR_REPORT("xlog_recover_inode_pass2(2)",
 				 XFS_ERRLEVEL_LOW, mp);
+		error = -EFSCORRUPTED;
+		goto out_release;
+	}
+
+	isize = xfs_log_dinode_size(ldip->di_version);
+	malformed_isize = xfs_icdinode_size_malformed(ldip->di_version);
+	if (unlikely(item->ri_buf[1].i_len == malformed_isize)) {
+		repair_malformed_inode_item(log, &item->ri_buf[1]);
+	} else if (unlikely(item->ri_buf[1].i_len > isize)) {
+		XFS_CORRUPTION_ERROR("xlog_recover_inode_pass2(7)",
+				     XFS_ERRLEVEL_LOW, mp, ldip,
+				     sizeof(*ldip));
+		xfs_alert(mp,
+			"%s: Bad inode log record length %d, rec ptr "PTR_FMT,
+			__func__, item->ri_buf[1].i_len, item);
 		error = -EFSCORRUPTED;
 		goto out_release;
 	}
@@ -3080,17 +3135,6 @@ xlog_recover_inode_pass2(
 	"%s: Bad inode log record, rec ptr "PTR_FMT", dino ptr "PTR_FMT", "
 	"dino bp "PTR_FMT", ino %Ld, forkoff 0x%x", __func__,
 			item, dip, bp, in_f->ilf_ino, ldip->di_forkoff);
-		error = -EFSCORRUPTED;
-		goto out_release;
-	}
-	isize = xfs_log_dinode_size(ldip->di_version);
-	if (unlikely(item->ri_buf[1].i_len > isize)) {
-		XFS_CORRUPTION_ERROR("xlog_recover_inode_pass2(7)",
-				     XFS_ERRLEVEL_LOW, mp, ldip,
-				     sizeof(*ldip));
-		xfs_alert(mp,
-			"%s: Bad inode log record length %d, rec ptr "PTR_FMT,
-			__func__, item->ri_buf[1].i_len, item);
 		error = -EFSCORRUPTED;
 		goto out_release;
 	}
