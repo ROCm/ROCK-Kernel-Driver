@@ -28,6 +28,7 @@
 #include <linux/power_supply.h>
 #include <linux/kthread.h>
 #include <linux/console.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>

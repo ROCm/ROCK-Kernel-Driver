@@ -8,6 +8,7 @@ extern void amdkcl_dev_cgroup_init(void);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 extern void amdkcl_pci_init(void);
 #endif
+extern void amdkcl_suspend_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -17,6 +18,8 @@ int __init amdkcl_init(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)
 	amdkcl_pci_init();
 #endif
+	amdkcl_suspend_init();
+
 	return 0;
 }
 module_init(amdkcl_init);
