@@ -10,7 +10,7 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_GET_STUB],
 		dma_fence_get_stub();
 	],[
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(DMA_FENCE_GET_STUB, 1, [whether dma_fence_get_stub exits])
+		AC_DEFINE(HAVE_DMA_FENCE_GET_STUB, 1, [whether dma_fence_get_stub exits])
 	],[
 		AC_MSG_RESULT(no)
 	])
