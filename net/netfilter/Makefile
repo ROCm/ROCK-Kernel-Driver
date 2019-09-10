@@ -45,7 +45,6 @@ obj-$(CONFIG_NF_CONNTRACK_PPTP) += nf_conntrack_pptp.o
 obj-$(CONFIG_NF_CONNTRACK_SANE) += nf_conntrack_sane.o
 obj-$(CONFIG_NF_CONNTRACK_SIP) += nf_conntrack_sip.o
 obj-$(CONFIG_NF_CONNTRACK_TFTP) += nf_conntrack_tftp.o
-obj-$(CONFIG_NF_CONNTRACK_SLP) += nf_conntrack_slp.o
 
 nf_nat-y	:= nf_nat_core.o nf_nat_proto.o nf_nat_helper.o
 
