@@ -2,8 +2,6 @@
 #include <linux/version.h>
 #include "kcl_common.h"
 
-#if defined(BUILD_AS_DKMS)
-
 const unsigned char *_kcl_pcie_link_speed;
 
 const unsigned char _kcl_pcie_link_speed_stub[] = {
@@ -389,5 +387,3 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 }
 EXPORT_SYMBOL(_kcl_pci_create_measure_file);
 #endif /* AMDKCL_CREATE_MEASURE_FILE */
-
-#endif

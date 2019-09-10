@@ -187,7 +187,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 {
 	int r;
 	struct kfd_ipc_obj *entry, *found = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifdef HAVE_HLIST_FOR_EACH_ENTRY_WITH_4ARGS
 	struct hlist_node *tmp_node;
 #endif
 
@@ -195,7 +195,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 	/* Convert the user provided handle to hash key and search only in that
 	 * bucket
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#ifdef HAVE_HLIST_FOR_EACH_ENTRY_WITH_4ARGS
 	hlist_for_each_entry(entry, tmp_node,
 		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
 #else

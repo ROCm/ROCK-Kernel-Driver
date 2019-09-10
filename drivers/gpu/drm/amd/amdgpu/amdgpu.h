@@ -492,7 +492,6 @@ struct amdgpu_cs_parser {
 	uint64_t			bytes_moved_vis_threshold;
 	uint64_t			bytes_moved;
 	uint64_t			bytes_moved_vis;
-	struct amdgpu_bo_list_entry	*evictable;
 
 	/* user fence */
 	struct amdgpu_bo_list_entry	uf_entry;
@@ -683,6 +682,7 @@ struct amdgpu_mmio_remap {
 
 struct amdgpu_df_funcs {
 	void (*sw_init)(struct amdgpu_device *adev);
+	void (*sw_fini)(struct amdgpu_device *adev);
 	void (*enable_broadcast_mode)(struct amdgpu_device *adev,
 				      bool enable);
 	u32 (*get_fb_channel_number)(struct amdgpu_device *adev);

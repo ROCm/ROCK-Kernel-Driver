@@ -42,7 +42,8 @@
 #include <linux/sysfs.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
-#include <linux/device_cgroup.h>
+/* amdkcl: this header file is included in kcl_device_cgroup.h
+#include <linux/device_cgroup.h>*/
 #include <drm/drmP.h>
 #include <kgd_kfd_interface.h>
 

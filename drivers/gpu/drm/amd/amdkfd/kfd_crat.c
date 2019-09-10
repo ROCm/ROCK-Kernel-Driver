@@ -835,10 +835,14 @@ static int kfd_fill_cu_for_cpu(int numa_node_id, int *avail_size,
 #if !defined(HAVE_ZONE_MANAGED_PAGES)
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
-#if defined(HAVE_MANAGED_PAGES_IN_STRUCT_ZONE)
+#if defined(HAVE_ATOMIC_MANAGED_PAGES_IN_STRUCT_ZONE)
+	return (unsigned long)atomic_long_read(&zone->managed_pages);
+#elif defined(HAVE_MANAGED_PAGES_IN_STRUCT_ZONE)
 	return (unsigned long)zone->managed_pages;
 #else
-	return zone->present_pages;
+	/* zone->managed_pages is introduced in v3.7-4152-g9feedc9d831e */
+	WARN_ONCE(1, "struct zone->managed_pages don't exist. kernel is a bit old...");
+	return 0;
 #endif
 }
 #endif

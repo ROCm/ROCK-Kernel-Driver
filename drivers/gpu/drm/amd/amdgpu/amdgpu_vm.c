@@ -1597,10 +1597,13 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 		}
 		flags &= ~AMDGPU_PTE_VALID;
 	}
-
-	if (adev != bo_adev &&
-	    !mapping->bo_va->is_xgmi &&
-	    !pages_addr) {
+	if (adev->asic_type == CHIP_ARCTURUS &&
+	    !(flags & AMDGPU_PTE_SYSTEM) &&
+	    mapping->bo_va->is_xgmi) {
+		flags |= AMDGPU_PTE_SNOOPED;
+	} else if (adev != bo_adev &&
+	    !(flags & AMDGPU_PTE_SYSTEM) &&
+	    !mapping->bo_va->is_xgmi) {
 		if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
 			flags |= AMDGPU_PTE_SYSTEM;
 			vram_base_offset = bo_adev->gmc.aper_base;
@@ -1731,7 +1734,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
 			pages_addr = (dma_addr_t *)bo_va->base.bo->tbo.mem.bus.addr;
 		}
-		exclusive = reservation_object_get_excl(bo->tbo.resv);
+		exclusive = bo->tbo.moving;
 	}
 
 	if (bo) {

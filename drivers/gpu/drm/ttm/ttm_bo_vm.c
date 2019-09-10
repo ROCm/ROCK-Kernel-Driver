@@ -37,7 +37,7 @@
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drm_vma_manager.h>
 #include <linux/mm.h>
-#if defined(HAVE_PFN_TO_PFN_T)
+#ifdef HAVE_PFN_T
 #include <linux/pfn_t.h>
 #endif
 #include <linux/rbtree.h>
@@ -49,14 +49,9 @@
 
 #define TTM_BO_VM_NUM_PREFAULT 16
 
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 				struct vm_area_struct *vma,
 				struct vm_fault *vmf)
-#else
-static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
-				struct vm_fault *vmf)
-#endif
 {
 	vm_fault_t ret = 0;
 	int err = 0;
@@ -82,11 +77,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 #endif
 
 		ttm_bo_get(bo);
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 		up_read(&vma->vm_mm->mmap_sem);
-#else
-		up_read(&vmf->vma->vm_mm->mmap_sem);
-#endif
 		(void) dma_fence_wait(bo->moving, true);
 		kcl_reservation_object_unlock(bo->resv);
 		ttm_bo_put(bo);
@@ -142,7 +133,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	int err;
 	int i;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
+#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
 	unsigned long address = (unsigned long)vmf->virtual_address;
 #else
 	unsigned long address = vmf->address;
@@ -218,11 +209,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * Wait for buffer data in transit, due to a pipelined
 	 * move.
 	 */
-#if defined(HAVE_VM_MM_IN_STRUCT_VM_AREA_STRUCT)
 	ret = ttm_bo_vm_fault_idle(bo, vma, vmf);
-#else
-	ret = ttm_bo_vm_fault_idle(bo, vmf);
-#endif
 	if (unlikely(ret != 0)) {
 #ifdef FAULT_FLAG_RETRY_NOWAIT
 		if (ret == VM_FAULT_RETRY &&
@@ -314,11 +301,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vmf_insert_mixed(&cvma, address,
-#if defined(HAVE_PFN_TO_PFN_T)
-			__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
-#else
-					pfn);
-#endif
+				__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
 		else
 			ret = vmf_insert_pfn(&cvma, address, pfn);
 		/*

@@ -32,7 +32,7 @@
 #endif
 #include <linux/rbtree.h>
 #include <drm/gpu_scheduler.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
 #endif
 #include <drm/ttm/ttm_bo_driver.h>
@@ -103,6 +103,9 @@ struct amdgpu_bo_list_entry;
 #define AMDGPU_VM_FAULT_STOP_NEVER	0
 #define AMDGPU_VM_FAULT_STOP_FIRST	1
 #define AMDGPU_VM_FAULT_STOP_ALWAYS	2
+
+/* Reserve 4MB VRAM for page tables */
+#define AMDGPU_VM_RESERVED_VRAM		(4ULL << 20)
 
 /* max number of VMHUB */
 #define AMDGPU_MAX_VMHUBS			3

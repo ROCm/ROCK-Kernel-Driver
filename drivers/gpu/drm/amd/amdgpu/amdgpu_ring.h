@@ -26,7 +26,7 @@
 
 #include <drm/amdgpu_drm.h>
 #include <drm/gpu_scheduler.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#ifdef HAVE_DRM_PRINT_H
 #include <drm/drm_print.h>
 #endif
 

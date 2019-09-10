@@ -435,7 +435,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
 	}
-#if defined(HAVE_DRM_CONNECTOR_PUT)
+#if defined(HAVE_DRM_CONNECTOR_PUT) || defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
 	drm_connector_unregister(connector);
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);

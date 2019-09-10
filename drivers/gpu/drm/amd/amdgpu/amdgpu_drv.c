@@ -1057,29 +1057,6 @@ MODULE_DEVICE_TABLE(pci, pciidlist);
 
 static struct drm_driver kms_driver;
 
-#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
-static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
-{
-	struct apertures_struct *ap;
-	bool primary = false;
-
-	ap = alloc_apertures(1);
-	if (!ap)
-		return -ENOMEM;
-
-	ap->ranges[0].base = pci_resource_start(pdev, 0);
-	ap->ranges[0].size = pci_resource_len(pdev, 0);
-
-#ifdef CONFIG_X86
-	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
-#endif
-	drm_fb_helper_remove_conflicting_framebuffers(ap, "amdgpudrmfb", primary);
-	kfree(ap);
-
-	return 0;
-}
-#endif
-
 static int amdgpu_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
@@ -1099,15 +1076,20 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	}
 
 	/* Get rid of things like offb */
-#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
-	ret = amdgpu_kick_out_firmware_fb(pdev);
-#else
 	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "amdgpudrmfb");
-#endif
 	if (ret)
 		return ret;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+
+	dev = drm_dev_alloc(&kms_driver, &pdev->dev);
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
+
+#ifdef HAVE_DRIVER_ATOMIC
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
+	if (!supports_atomic)
+		dev->driver_features &= ~DRIVER_ATOMIC;
+#else
 	/* warn the user if they mix atomic and non-atomic capable GPUs */
 	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
 		DRM_ERROR("Mixing atomic and non-atomic capable GPUs!\n");
@@ -1115,14 +1097,6 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (supports_atomic)
 		kms_driver.driver_features |= DRIVER_ATOMIC;
 #endif
-
-	dev = drm_dev_alloc(&kms_driver, &pdev->dev);
-	if (IS_ERR(dev))
-		return PTR_ERR(dev);
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
-	if (!supports_atomic)
-		dev->driver_features &= ~DRIVER_ATOMIC;
 #endif
 
 	kcl_pci_create_measure_file(pdev);
@@ -1150,11 +1124,7 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
-#ifdef HAVE_DRM_DEV_PUT
 	drm_dev_put(dev);
-#else
-	drm_dev_unref(dev);
-#endif
 	return ret;
 }
 
@@ -1163,12 +1133,12 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_DRM_DEV_UNPLUG
 	DRM_ERROR("Device removal is currently not supported outside of fbcon\n");
 	drm_dev_unplug(dev);
 #else
 	drm_dev_unregister(dev);
-	drm_dev_unref(dev);
+	drm_dev_put(dev);
 #endif
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
@@ -1456,7 +1426,7 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 static struct drm_driver kms_driver = {
 	.driver_features =
 		DRIVER_USE_AGP |
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 		DRIVER_ATOMIC |
 #endif
 		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |

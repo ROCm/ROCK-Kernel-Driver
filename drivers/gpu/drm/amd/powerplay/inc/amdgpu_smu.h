@@ -497,6 +497,7 @@ struct smu_funcs
 	int (*get_current_clk_freq)(struct smu_context *smu, enum smu_clk_type clk_id, uint32_t *value);
 	int (*init_max_sustainable_clocks)(struct smu_context *smu);
 	int (*start_thermal_control)(struct smu_context *smu);
+	int (*stop_thermal_control)(struct smu_context *smu);
 	int (*read_sensor)(struct smu_context *smu, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size);
 	int (*set_deep_sleep_dcefclk)(struct smu_context *smu, uint32_t clk);
@@ -634,8 +635,6 @@ struct smu_funcs
 	((smu)->funcs->get_current_clk_freq? (smu)->funcs->get_current_clk_freq((smu), (clk_id), (value)) : 0)
 #define smu_print_clk_levels(smu, clk_type, buf) \
 	((smu)->ppt_funcs->print_clk_levels ? (smu)->ppt_funcs->print_clk_levels((smu), (clk_type), (buf)) : 0)
-#define smu_force_clk_levels(smu, clk_type, level) \
-	((smu)->ppt_funcs->force_clk_levels ? (smu)->ppt_funcs->force_clk_levels((smu), (clk_type), (level)) : 0)
 #define smu_get_od_percentage(smu, type) \
 	((smu)->ppt_funcs->get_od_percentage ? (smu)->ppt_funcs->get_od_percentage((smu), (type)) : 0)
 #define smu_set_od_percentage(smu, type, value) \
@@ -648,6 +647,8 @@ struct smu_funcs
 	((smu)->ppt_funcs->set_thermal_fan_table ? (smu)->ppt_funcs->set_thermal_fan_table((smu)) : 0)
 #define smu_start_thermal_control(smu) \
 	((smu)->funcs->start_thermal_control? (smu)->funcs->start_thermal_control((smu)) : 0)
+#define smu_stop_thermal_control(smu) \
+	((smu)->funcs->stop_thermal_control? (smu)->funcs->stop_thermal_control((smu)) : 0)
 #define smu_read_sensor(smu, sensor, data, size) \
 	((smu)->ppt_funcs->read_sensor? (smu)->ppt_funcs->read_sensor((smu), (sensor), (data), (size)) : 0)
 #define smu_smc_read_sensor(smu, sensor, data, size) \
@@ -828,10 +829,12 @@ enum amd_dpm_forced_level smu_get_performance_level(struct smu_context *smu);
 int smu_force_performance_level(struct smu_context *smu, enum amd_dpm_forced_level level);
 int smu_set_display_count(struct smu_context *smu, uint32_t count);
 bool smu_clk_dpm_is_enabled(struct smu_context *smu, enum smu_clk_type clk_type);
-int smu_feature_update_enable_state(struct smu_context *smu, uint64_t feature_mask, bool enabled);
 const char *smu_get_message_name(struct smu_context *smu, enum smu_message_type type);
 const char *smu_get_feature_name(struct smu_context *smu, enum smu_feature_mask feature);
 size_t smu_sys_get_pp_feature_mask(struct smu_context *smu, char *buf);
 int smu_sys_set_pp_feature_mask(struct smu_context *smu, uint64_t new_mask);
+int smu_force_clk_levels(struct smu_context *smu,
+			 enum smu_clk_type clk_type,
+			 uint32_t mask);
 
 #endif
