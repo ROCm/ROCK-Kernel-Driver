@@ -120,10 +120,10 @@ uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
 	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
 				  q->properties.is_new);
 
-	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
-		q->properties.is_new = false;
+	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
 		q->properties.debug_event_type = 0;
-	}
+
+	q->properties.is_new = false;
 
 	return queue_status_word;
 }
