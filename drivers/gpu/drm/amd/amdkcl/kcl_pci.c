@@ -336,7 +336,7 @@ const struct attribute_group *pcie_dev_groups[] = {
 
 int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 {
-	int ret;
+	int ret = 0;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_current_link_speed);
 	if (ret != 0 && ret != -EEXIST) {
@@ -366,6 +366,7 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 		return ret;
 	}
 
+	return ret;
 }
 EXPORT_SYMBOL(_kcl_pci_create_measure_file);
 #endif /* AMDKCL_CREATE_MEASURE_FILE */
