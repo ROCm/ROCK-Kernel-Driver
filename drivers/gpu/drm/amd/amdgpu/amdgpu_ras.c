@@ -1438,7 +1438,7 @@ int amdgpu_ras_reserve_bad_pages(struct amdgpu_device *adev)
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_err_handler_data *data;
 	uint64_t bp;
-	struct amdgpu_bo *bo;
+	struct amdgpu_bo *bo = NULL;
 	int i, ret = 0;
 
 	if (!con || !con->eh_data)
@@ -1452,13 +1452,14 @@ int amdgpu_ras_reserve_bad_pages(struct amdgpu_device *adev)
 	for (i = data->last_reserved; i < data->count; i++) {
 		bp = data->bps[i].retired_page;
 
-		if (amdgpu_bo_create_kernel_at(adev, bp << PAGE_SIZE, PAGE_SIZE,
+		if (amdgpu_bo_create_kernel_at(adev, bp << PAGE_SHIFT, PAGE_SIZE,
 					       AMDGPU_GEM_DOMAIN_VRAM,
 					       &bo, NULL))
 			DRM_ERROR("RAS ERROR: reserve vram %llx fail\n", bp);
 
 		data->bps_bo[i] = bo;
 		data->last_reserved = i + 1;
+		bo = NULL;
 	}
 
 	/* continue to save bad pages to eeprom even reesrve_vram fails */

@@ -364,7 +364,7 @@ int amdgpu_bo_create_kernel(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_bo_create_kernel - create BO for kernel use at specific location
+ * amdgpu_bo_create_kernel_at - create BO for kernel use at specific location
  *
  * @adev: amdgpu device object
  * @offset: offset of the BO
@@ -387,7 +387,7 @@ int amdgpu_bo_create_kernel_at(struct amdgpu_device *adev,
 	int r;
 
 	offset &= PAGE_MASK;
-	size = ALIGN(offset, PAGE_SIZE);
+	size = ALIGN(size, PAGE_SIZE);
 
 	r = amdgpu_bo_create_reserved(adev, size, PAGE_SIZE, domain, bo_ptr,
 				      NULL, NULL);
