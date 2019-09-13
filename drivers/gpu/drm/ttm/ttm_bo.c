@@ -1131,6 +1131,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 
 			goto error;
 		}
+		return 0;
 	}
 
 	for (i = 0; i < placement->num_busy_placement; ++i) {
