@@ -17,5 +17,9 @@ $(TTM_NAME)-$(CONFIG_AGP) += ttm_agp_backend.o
 
 obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
-TTM_FULL_PATH = $(src)
+ifeq ($(KBUILD_EXTMOD),)
+TTM_FULL_PATH := $(srctree)/$(src)
+else
+TTM_FULL_PATH := $(src)
+endif
 include $(TTM_FULL_PATH)/backport/Makefile
