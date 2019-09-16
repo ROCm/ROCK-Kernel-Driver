@@ -30,7 +30,8 @@ SCHED_NAME = gpu-sched
 $(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
 obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 
-SCHED_FULL_PATH = $(src)
+SCHED_FULL_PATH := $(src)
+
 
 ccflags-y := -I$(SCHED_FULL_PATH)
 

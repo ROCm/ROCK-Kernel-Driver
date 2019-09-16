@@ -18,5 +18,5 @@ $(TTM_NAME)-$(CONFIG_AGP) += ttm_agp_backend.o
 obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 obj-$(CONFIG_DRM_TTM_KUNIT_TEST) += tests/
 
-TTM_FULL_PATH = $(src)
+TTM_FULL_PATH := $(src)
 include $(TTM_FULL_PATH)/backport/Makefile
