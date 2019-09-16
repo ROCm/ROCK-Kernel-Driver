@@ -16,5 +16,9 @@ $(TTM_NAME)-y := ttm_memory.o ttm_tt.o ttm_bo.o \
 $(TTM_NAME)-$(CONFIG_AGP) += ttm_agp_backend.o
 obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
+ifeq (,$(BUILD_AS_DKMS))
+TTM_FULL_PATH = $(srctree)/$(src)
+else
 TTM_FULL_PATH = $(src)
+endif
 include $(TTM_FULL_PATH)/backport/Makefile
