@@ -31,7 +31,11 @@
 #include <linux/slab.h>
 #include <drm/drmP.h>
 #include <drm/drm_atomic_helper.h>
+#ifdef HAVE_DRM_PROBE_HELPER_H
 #include <drm/drm_probe_helper.h>
+#else
+#include <drm/drm_crtc_helper.h>
+#endif /* HAVE_DRM_PROBE_HELPER_H */
 #include <drm/amdgpu_drm.h>
 #include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>

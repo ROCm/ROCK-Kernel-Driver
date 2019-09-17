@@ -32,7 +32,11 @@
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/vga_switcheroo.h>
+#ifdef HAVE_DRM_PROBE_HELPER_H
 #include <drm/drm_probe_helper.h>
+#else
+#include <drm/drm_crtc_helper.h>
+#endif /* HAVE_DRM_PROBE_HELPER_H */
 
 #include "amdgpu.h"
 #include "amdgpu_irq.h"
