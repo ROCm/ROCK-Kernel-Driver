@@ -207,7 +207,11 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port,
 					       dm_conn_state->pbn,
+#ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
 					       dm_conn_state->vcpi_slots);
+#else
+					       &dm_conn_state->vcpi_slots);
+#endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
 		if (!ret)
 			return false;
 

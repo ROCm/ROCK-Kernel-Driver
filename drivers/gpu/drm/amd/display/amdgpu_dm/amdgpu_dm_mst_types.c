@@ -109,7 +109,9 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	kfree(aconnector->edid);
 
 	drm_connector_cleanup(connector);
+#if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
 	drm_dp_mst_put_port_malloc(aconnector->port);
+#endif /* HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC */
 	kfree(aconnector);
 }
 
@@ -448,7 +450,9 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	 */
 	amdgpu_dm_connector_funcs_reset(connector);
 
+#if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
 	drm_dp_mst_get_port_malloc(port);
+#endif /* HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC */
 
 	return connector;
 }
