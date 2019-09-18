@@ -553,4 +553,12 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 #define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
 #endif
 
+#if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
+static inline
+int drm_helper_force_disable_all(struct drm_device *dev)
+{
+       return drm_crtc_force_disable_all(dev);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
