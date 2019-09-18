@@ -67,6 +67,11 @@ int kfd_interrupt_init(struct kfd_dev *kfd)
 #else
 	kfd->ih_wq = create_workqueue("KFD IH");
 #endif
+	if (unlikely(!kfd->ih_wq)) {
+		kfifo_free(&kfd->ih_fifo);
+		dev_err(kfd_chardev(), "Failed to allocate KFD IH workqueue\n");
+		return -ENOMEM;
+	}
 	spin_lock_init(&kfd->interrupt_lock);
 
 	INIT_WORK(&kfd->interrupt_work, interrupt_wq);
