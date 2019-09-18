@@ -1127,6 +1127,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
+#ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
 		dev->driver_features &= ~DRIVER_ATOMIC;
@@ -1137,6 +1138,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	/* support atomic early so the atomic debugfs stuff gets created */
 	if (supports_atomic)
 		kms_driver.driver_features |= DRIVER_ATOMIC;
+#endif
 #endif
 
 	kcl_pci_create_measure_file(pdev);
@@ -1491,13 +1493,23 @@ static struct drm_driver kms_driver = {
 	    DRIVER_USE_AGP
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
-#endif
+#endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
+	    | DRIVER_HAVE_IRQ
+#ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
+	    | DRIVER_IRQ_SHARED
+#endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
+#ifdef HAVE_DRM_DRV_DRIVER_PRIME
+	    | DRIVER_PRIME
+#endif /* HAVE_DRM_DRV_DRIVER_PRIME */
 	    | DRIVER_GEM
 	    | DRIVER_RENDER | DRIVER_MODESET
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	    | DRIVER_SYNCOBJ
 #endif
-	    | DRIVER_SYNCOBJ_TIMELINE,
+#ifdef HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE
+	    | DRIVER_SYNCOBJ_TIMELINE
+#endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
+	    ,
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
