@@ -114,4 +114,12 @@ drm_crtc_from_index(struct drm_device *dev, int idx)
 }
 #endif
 
+#if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
+static inline
+int drm_helper_force_disable_all(struct drm_device *dev)
+{
+	return drm_crtc_force_disable_all(dev);
+}
+#endif
+
 #endif
