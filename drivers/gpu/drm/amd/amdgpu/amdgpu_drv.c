@@ -1444,15 +1444,23 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP |
+	    DRIVER_USE_AGP
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
-	    DRIVER_ATOMIC |
-#endif
-	    DRIVER_GEM |
-	    DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET |
+	    | DRIVER_ATOMIC
+#endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
+	    | DRIVER_HAVE_IRQ
+#ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
+	    | DRIVER_IRQ_SHARED
+#endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
+	    | DRIVER_GEM
+	    | DRIVER_PRIME | DRIVER_RENDER | DRIVER_MODESET
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
-	    DRIVER_SYNCOBJ,
+	    | DRIVER_SYNCOBJ
 #endif
+#ifdef HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE
+	    | DRIVER_SYNCOBJ_TIMELINE
+#endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
+	    ,
 	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
