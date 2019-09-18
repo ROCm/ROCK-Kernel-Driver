@@ -534,8 +534,13 @@ static int destroy_queue_nocpsch_locked(struct device_queue_manager *dqm,
 		deallocate_vmid(dqm, qpd, q);
 	}
 	qpd->queue_count--;
-	if (q->properties.is_active)
+	if (q->properties.is_active) {
 		decrement_queue_count(dqm, q->properties.type);
+		if (q->properties.is_gws) {
+			dqm->gws_queue_count--;
+			qpd->mapped_gws_queue = false;
+		}
+	}
 
 	return retval;
 }
@@ -612,6 +617,20 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q)
 		increment_queue_count(dqm, q->properties.type);
 	else if (!q->properties.is_active && prev_active)
 		decrement_queue_count(dqm, q->properties.type);
+
+	if (q->gws && !q->properties.is_gws) {
+		if (q->properties.is_active) {
+			dqm->gws_queue_count++;
+			pdd->qpd.mapped_gws_queue = true;
+		}
+		q->properties.is_gws = true;
+	} else if (!q->gws && q->properties.is_gws) {
+		if (q->properties.is_active) {
+			dqm->gws_queue_count--;
+			pdd->qpd.mapped_gws_queue = false;
+		}
+		q->properties.is_gws = false;
+	}
 
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS)
 		retval = map_queues_cpsch(dqm);
@@ -729,6 +748,10 @@ static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
 				q->properties.type)];
 		q->properties.is_active = false;
 		decrement_queue_count(dqm, q->properties.type);
+		if (q->properties.is_gws) {
+			dqm->gws_queue_count--;
+			qpd->mapped_gws_queue = false;
+		}
 
 		if (WARN_ONCE(!dqm->sched_running, "Evict when stopped\n"))
 			continue;
@@ -847,6 +870,10 @@ static int restore_process_queues_nocpsch(struct device_queue_manager *dqm,
 				q->properties.type)];
 		q->properties.is_active = true;
 		increment_queue_count(dqm, q->properties.type);
+		if (q->properties.is_gws) {
+			dqm->gws_queue_count++;
+			qpd->mapped_gws_queue = true;
+		}
 
 		if (WARN_ONCE(!dqm->sched_running, "Restore when stopped\n"))
 			continue;
@@ -1021,6 +1048,7 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	INIT_LIST_HEAD(&dqm->queues);
 	dqm->active_queue_count = dqm->next_pipe_to_allocate = 0;
 	dqm->active_cp_queue_count = 0;
+	dqm->gws_queue_count = 0;
 	dqm->trap_debug_vmid = 0;
 
 	for (pipe = 0; pipe < get_pipes_per_mec(dqm); pipe++) {
@@ -1191,7 +1219,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	INIT_LIST_HEAD(&dqm->queues);
 	dqm->active_queue_count = dqm->processes_count = 0;
 	dqm->active_cp_queue_count = 0;
-
+	dqm->gws_queue_count = 0;
 	dqm->active_runlist = false;
 	dqm->sdma_bitmap = ~0ULL >> (64 - get_num_sdma_queues(dqm));
 	dqm->xgmi_sdma_bitmap = ~0ULL >> (64 - get_num_xgmi_sdma_queues(dqm));
@@ -1566,6 +1594,10 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 				USE_DEFAULT_GRACE_PERIOD);
 		if (retval == -ETIME)
 			qpd->reset_wavefronts = true;
+		if (q->properties.is_gws) {
+			dqm->gws_queue_count--;
+			qpd->mapped_gws_queue = false;
+		}
 	}
 
 	/*
@@ -1784,8 +1816,13 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 		else if (q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI)
 			deallocate_sdma_queue(dqm, q);
 
-		if (q->properties.is_active)
+		if (q->properties.is_active) {
 			decrement_queue_count(dqm, q->properties.type);
+			if (q->properties.is_gws) {
+				dqm->gws_queue_count--;
+				qpd->mapped_gws_queue = false;
+			}
+		}
 
 		dqm->total_queue_count--;
 	}

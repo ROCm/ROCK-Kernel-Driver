@@ -925,6 +925,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->qpd.dqm = dev->dqm;
 	pdd->qpd.pqm = &p->pqm;
 	pdd->qpd.evicted = 0;
+	pdd->qpd.mapped_gws_queue = false;
 	mutex_init(&pdd->qpd.doorbell_lock);
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
