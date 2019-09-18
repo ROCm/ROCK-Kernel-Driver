@@ -1340,6 +1340,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
+#ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
 		ddev->driver_features &= ~DRIVER_ATOMIC;
@@ -1350,6 +1351,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	/* support atomic early so the atomic debugfs stuff gets created */
 	if (supports_atomic)
 		kms_driver.driver_features |= DRIVER_ATOMIC;
+#endif
 #endif
 
 	kcl_pci_configure_extended_tags(pdev);
@@ -1828,6 +1830,13 @@ static const struct drm_driver amdgpu_kms_driver = {
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
 #endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
+	    | DRIVER_HAVE_IRQ
+#ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
+	    | DRIVER_IRQ_SHARED
+#endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
+#ifdef HAVE_DRM_DRV_DRIVER_PRIME
+	    | DRIVER_PRIME
+#endif /* HAVE_DRM_DRV_DRIVER_PRIME */
 	    | DRIVER_GEM
 	    | DRIVER_RENDER | DRIVER_MODESET
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
