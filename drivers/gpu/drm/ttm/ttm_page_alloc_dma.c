@@ -34,6 +34,9 @@
  */
 
 #if defined(CONFIG_SWIOTLB) || defined(CONFIG_INTEL_IOMMU)
+#ifdef pr_fmt
+#undef pr_fmt
+#endif /* pr_fmt */
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/dma-mapping.h>

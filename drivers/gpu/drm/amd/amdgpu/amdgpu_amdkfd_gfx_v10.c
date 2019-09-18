@@ -19,7 +19,10 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+#ifdef pr_fmt
 #undef pr_fmt
+#endif /* pr_fmt */
 #define pr_fmt(fmt) "kfd2kgd: " fmt
 
 #include <linux/module.h>
