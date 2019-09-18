@@ -7,6 +7,7 @@ dnl # to the hwmon device directly and no longer with its parent device.
 AC_DEFUN([AC_AMDGPU_4ARGS_HWMON_DEVICE_REGISTER_WITH_GROUPS],
 	[AC_MSG_CHECKING([whether hwmon_device_register_with_groups() wants 4 args])
 	AC_KERNEL_TRY_COMPILE_SYMBOL([
+		#include <linux/stddef.h>
 		#include <linux/hwmon.h>
 	], [
 		hwmon_device_register_with_groups(NULL, NULL, NULL, NULL);
