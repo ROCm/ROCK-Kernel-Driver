@@ -29,6 +29,9 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#ifdef pr_fmt
+#undef pr_fmt
+#endif /* pr_fmt */
 #define pr_fmt(fmt) "[TTM] " fmt
 
 #include <linux/sched.h>
