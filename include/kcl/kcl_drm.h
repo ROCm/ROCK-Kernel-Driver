@@ -133,6 +133,12 @@ static inline void kcl_drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper
 #endif
 }
 
+#ifndef HAVE_DRM_FB_HELPER_FILL_INFO
+void drm_fb_helper_fill_info(struct fb_info *info,
+			     struct drm_fb_helper *fb_helper,
+			     struct drm_fb_helper_surface_size *sizes);
+#endif
+
 static inline void
 kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
