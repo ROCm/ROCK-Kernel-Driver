@@ -98,6 +98,7 @@ m4_include([m4/ktime-set.m4])
 m4_include([m4/ktime-get-ns.m4])
 m4_include([m4/ktime-get-raw-ns.m4])
 m4_include([m4/ktime-get-boottime-ns.m4])
+m4_include([m4/ktime-get-real-seconds.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
