@@ -291,4 +291,10 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 #endif
 }
 
+#ifndef HAVE_DRM_FB_HELPER_FILL_INFO
+void drm_fb_helper_fill_info(struct fb_info *info,
+			     struct drm_fb_helper *fb_helper,
+			     struct drm_fb_helper_surface_size *sizes);
+#endif
+
 #endif /* AMDKCL_DRM_H */
