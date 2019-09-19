@@ -77,4 +77,10 @@ _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 }
 #endif /* HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
 
+#ifndef HAVE_DRM_FB_HELPER_FILL_INFO
+void drm_fb_helper_fill_info(struct fb_info *info,
+			     struct drm_fb_helper *fb_helper,
+			     struct drm_fb_helper_surface_size *sizes);
+#endif
+
 #endif
