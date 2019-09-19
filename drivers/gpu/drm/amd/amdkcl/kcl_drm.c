@@ -330,3 +330,22 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e)
 }
 EXPORT_SYMBOL(drm_send_event_locked);
 #endif
+
+#ifndef HAVE_DRM_FB_HELPER_FILL_INFO
+void drm_fb_helper_fill_info(struct fb_info *info,
+			     struct drm_fb_helper *fb_helper,
+			     struct drm_fb_helper_surface_size *sizes)
+{
+	struct drm_framebuffer *fb = fb_helper->fb;
+
+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
+	drm_fb_helper_fill_var(info, fb_helper,
+			       sizes->fb_width, sizes->fb_height);
+
+	info->par = fb_helper;
+	snprintf(info->fix.id, sizeof(info->fix.id), "%sdrmfb",
+		 fb_helper->dev->driver->name);
+
+}
+EXPORT_SYMBOL(drm_fb_helper_fill_info);
+#endif

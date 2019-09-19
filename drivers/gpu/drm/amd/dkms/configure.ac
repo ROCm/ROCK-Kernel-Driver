@@ -40,6 +40,7 @@ m4_include([m4/drm-send-event-locked.m4])
 m4_include([m4/drm-color-lut-size.m4])
 m4_include([m4/drm-atomic-get-crtc-state.m4])
 m4_include([m4/drm-atomic-get-new-plane-state.m4])
+m4_include([m4/drm-fb-helper-fill-info.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)
