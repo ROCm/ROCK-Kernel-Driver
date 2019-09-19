@@ -38,3 +38,13 @@ static inline u64 ktime_get_raw_ns(void)
 #endif
 
 #endif
+
+#ifndef HAVE_KTIME_GET_REAL_SECONDS
+static inline time64_t ktime_get_real_seconds(void)
+{
+	struct timeval ts;
+
+	do_gettimeofday(&ts);
+	return (time64_t)ts.tv_sec;
+}
+#endif
