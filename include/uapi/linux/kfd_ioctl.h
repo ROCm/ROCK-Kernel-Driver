@@ -28,6 +28,8 @@
 
 #define KFD_IOCTL_MAJOR_VERSION 1
 #define KFD_IOCTL_MINOR_VERSION 2
+#define KFD_IOCTL_DBG_MAJOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -272,6 +274,14 @@ struct kfd_ioctl_dbg_wave_control_args {
  * data3: unused
  */
 #define KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT 7
+
+/* KFD_IOC_DBG_TRAP_GET_VERSION:
+ * prt: unsused
+ * data1: major version (OUT)
+ * data2: minor version (OUT)
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_GET_VERSION	8
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */

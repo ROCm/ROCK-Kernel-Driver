@@ -2606,7 +2606,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
-	bool is_suspend_or_resume;
+	bool need_device;
+	bool need_qid_array;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2620,7 +2621,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
-	is_suspend_or_resume =
+	need_device =
+		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_SUSPEND &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_RESUME &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION;
+
+	need_qid_array =
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
 
@@ -2657,7 +2664,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	mutex_lock(&target->mutex);
 
-	if (!is_suspend_or_resume) {
+	if (need_device) {
 
 		dev = kfd_device_by_id(args->gpu_id);
 		if (!dev) {
@@ -2701,7 +2708,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = -EINVAL;
 			goto unlock_out;
 		}
-	} else {
+	} else if (need_qid_array) {
 		/* data 2 has the number of queue IDs */
 		size_t queue_id_array_size = sizeof(uint32_t) * data2;
 
@@ -2718,7 +2725,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			goto unlock_out;
 		}
 	}
-
 
 	switch (debug_trap_action) {
 	case KFD_IOC_DBG_TRAP_ENABLE:
@@ -2806,6 +2812,10 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = 0;
 		}
 
+		break;
+	case KFD_IOC_DBG_TRAP_GET_VERSION:
+		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
+		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
