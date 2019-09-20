@@ -37,14 +37,20 @@ amdgpu_link_encoder_connector(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct amdgpu_connector *amdgpu_connector;
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	/* walk the list and link encoders to connectors */
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 			amdgpu_encoder = to_amdgpu_encoder(encoder);
@@ -57,7 +63,9 @@ amdgpu_link_encoder_connector(struct drm_device *dev)
 			}
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 }
 
 void amdgpu_encoder_set_active_device(struct drm_encoder *encoder)
@@ -65,10 +73,15 @@ void amdgpu_encoder_set_active_device(struct drm_encoder *encoder)
 	struct drm_device *dev = encoder->dev;
 	struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
 
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+
+	drm_for_each_connector(connector, dev) {
+#endif
 		if (connector->encoder == encoder) {
 			struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 			amdgpu_encoder->active_device = amdgpu_encoder->devices & amdgpu_connector->devices;
@@ -77,7 +90,9 @@ void amdgpu_encoder_set_active_device(struct drm_encoder *encoder)
 				  amdgpu_connector->devices, encoder->encoder_type);
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 }
 
 struct drm_connector *
@@ -86,18 +101,27 @@ amdgpu_get_connector_for_encoder(struct drm_encoder *encoder)
 	struct drm_device *dev = encoder->dev;
 	struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
 	struct drm_connector *connector, *found = NULL;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct amdgpu_connector *amdgpu_connector;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_encoder->active_device & amdgpu_connector->devices) {
 			found = connector;
 			break;
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 	return found;
 }
 
@@ -107,18 +131,26 @@ amdgpu_get_connector_for_encoder_init(struct drm_encoder *encoder)
 	struct drm_device *dev = encoder->dev;
 	struct amdgpu_encoder *amdgpu_encoder = to_amdgpu_encoder(encoder);
 	struct drm_connector *connector, *found = NULL;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct amdgpu_connector *amdgpu_connector;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_encoder->devices & amdgpu_connector->devices) {
 			found = connector;
 			break;
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 	return found;
 }
 
