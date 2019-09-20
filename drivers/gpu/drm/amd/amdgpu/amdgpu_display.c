@@ -591,13 +591,19 @@ void amdgpu_display_print_display_setup(struct drm_device *dev)
 	struct amdgpu_connector *amdgpu_connector;
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	uint32_t devices;
 	int i = 0;
 
-	drm_connector_list_iter_begin(dev, &iter);
 	DRM_INFO("AMDGPU Display Connectors\n");
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		DRM_INFO("Connector %d:\n", i);
 		DRM_INFO("  %s\n", connector->name);
@@ -661,7 +667,9 @@ void amdgpu_display_print_display_setup(struct drm_device *dev)
 		}
 		i++;
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 }
 
 bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,

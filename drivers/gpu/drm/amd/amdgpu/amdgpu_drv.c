@@ -1720,20 +1720,28 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 
 	} else {
 		struct drm_connector *list_connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		struct drm_connector_list_iter iter;
+#endif
 
 		mutex_lock(&drm_dev->mode_config.mutex);
 		drm_modeset_lock(&drm_dev->mode_config.connection_mutex, NULL);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_begin(drm_dev, &iter);
 		drm_for_each_connector_iter(list_connector, &iter) {
+#else
+		drm_for_each_connector(list_connector, drm_dev) {
+#endif
 			if (list_connector->dpms ==  DRM_MODE_DPMS_ON) {
 				ret = -EBUSY;
 				break;
 			}
 		}
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_end(&iter);
+#endif
 
 		drm_modeset_unlock(&drm_dev->mode_config.connection_mutex);
 		mutex_unlock(&drm_dev->mode_config.mutex);
