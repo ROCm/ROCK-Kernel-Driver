@@ -299,17 +299,25 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	     dm_is_crc_source_dprx(cur_crc_src))) {
 		struct amdgpu_dm_connector *aconn = NULL;
 		struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		struct drm_connector_list_iter conn_iter;
+#endif
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_begin(crtc->dev, &conn_iter);
 		drm_for_each_connector_iter(connector, &conn_iter) {
+#else
+		drm_for_each_connector(connector, crtc->dev) {
+#endif
 			if (!connector->state || connector->state->crtc != crtc)
 				continue;
 
 			aconn = to_amdgpu_dm_connector(connector);
 			break;
 		}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_end(&conn_iter);
+#endif
 
 		if (!aconn) {
 			DRM_DEBUG_DRIVER("No amd connector matching CRTC-%d\n", crtc->index);

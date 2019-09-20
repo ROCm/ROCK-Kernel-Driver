@@ -1048,12 +1048,19 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 			 */
 			if (amdgpu_connector->shared_ddc && (ret == connector_status_connected)) {
 				struct drm_connector *list_connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 				struct drm_connector_list_iter iter;
+#endif
 				struct amdgpu_connector *list_amdgpu_connector;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 				drm_connector_list_iter_begin(dev, &iter);
 				drm_for_each_connector_iter(list_connector,
 							    &iter) {
+
+#else
+				drm_for_each_connector(list_connector, dev) {
+#endif
 					if (connector == list_connector)
 						continue;
 					list_amdgpu_connector = to_amdgpu_connector(list_connector);
@@ -1070,7 +1077,9 @@ amdgpu_connector_dvi_detect(struct drm_connector *connector, bool force)
 						}
 					}
 				}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 				drm_connector_list_iter_end(&iter);
+#endif
 			}
 		}
 	}
@@ -1576,7 +1585,9 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct amdgpu_connector *amdgpu_connector;
 	struct amdgpu_connector_atom_dig *amdgpu_dig_connector;
 	struct drm_encoder *encoder;
@@ -1591,12 +1602,18 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 		return;
 
 	/* see if we already added it */
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_connector->connector_id == connector_id) {
 			amdgpu_connector->devices |= supported_device;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 			drm_connector_list_iter_end(&iter);
+#endif
 			return;
 		}
 		if (amdgpu_connector->ddc_bus && i2c_bus->valid) {
@@ -1611,7 +1628,9 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 			}
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 
 	/* check if it's a dp bridge */
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
