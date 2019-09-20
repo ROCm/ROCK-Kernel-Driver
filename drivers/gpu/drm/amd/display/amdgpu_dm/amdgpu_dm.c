@@ -5452,7 +5452,13 @@ static void fill_stream_properties_from_drm_display_mode(
 	}
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+#if defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P)
 		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, (struct drm_connector *)connector, mode_in);
+#elif defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B)
+		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in, false);
+#else
+		drm_hdmi_avi_infoframe_from_display_mode(&avi_frame, mode_in);
+#endif /* HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P */
 		timing_out->vic = avi_frame.video_code;
 		drm_hdmi_vendor_infoframe_from_display_mode(&hv_frame, (struct drm_connector *)connector, mode_in);
 		timing_out->hdmi_vic = hv_frame.vic;
