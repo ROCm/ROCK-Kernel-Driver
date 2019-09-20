@@ -1462,7 +1462,13 @@ static void dce_v6_0_audio_set_avi_infoframe(struct drm_encoder *encoder,
 	ssize_t err;
 	u32 tmp;
 
+#if defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P)
 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, connector, mode);
+#elif defined(HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B)
+	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
+#else
+	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
+#endif /* HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P */
 	if (err < 0) {
 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
 		return;
