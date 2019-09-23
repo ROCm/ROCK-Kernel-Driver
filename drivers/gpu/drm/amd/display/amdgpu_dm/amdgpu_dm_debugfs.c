@@ -2723,8 +2723,10 @@ static int force_yuv420_output_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_yuv420_output_fops, force_yuv420_output_get,
 			 force_yuv420_output_set, "%llu\n");
+#endif
 
 /*
  *  Read PSR state
@@ -2773,10 +2775,12 @@ static int dmcub_trace_event_state_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(dmcub_trace_event_state_fops, dmcub_trace_event_state_get,
 			 dmcub_trace_event_state_set, "%llu\n");
 
 DEFINE_DEBUGFS_ATTRIBUTE(psr_fops, psr_get, NULL, "%llu\n");
+#endif
 
 DEFINE_SHOW_ATTRIBUTE(current_backlight);
 DEFINE_SHOW_ATTRIBUTE(target_backlight);
@@ -2785,7 +2789,9 @@ static const struct {
 	char *name;
 	const struct file_operations *fops;
 } connector_debugfs_entries[] = {
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 		{"force_yuv420_output", &force_yuv420_output_fops},
+#endif
 		{"output_bpc", &output_bpc_fops},
 		{"trigger_hotplug", &trigger_hotplug_debugfs_fops},
 		{"internal_display", &internal_display_fops}
@@ -2936,6 +2942,8 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 					    dp_debugfs_entries[i].fops);
 		}
 	}
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_eDP) {
 		debugfs_create_file_unsafe("psr_capability", 0444, dir, connector, &psr_capability_fops);
 		debugfs_create_file_unsafe("psr_state", 0444, dir, connector, &psr_fops);
@@ -2946,6 +2954,7 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		debugfs_create_file("ilr_setting", 0644, dir, connector,
 					&edp_ilr_debugfs_fops);
 	}
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(connector_debugfs_entries); i++) {
 		debugfs_create_file(connector_debugfs_entries[i].name,
@@ -3373,8 +3382,10 @@ static int force_timing_sync_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_timing_sync_ops, force_timing_sync_get,
 			 force_timing_sync_set, "%llu\n");
+#endif
 
 
 /*
@@ -3484,8 +3495,10 @@ static int visual_confirm_get(void *data, u64 *val)
 }
 
 DEFINE_SHOW_ATTRIBUTE(mst_topo);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
+#endif
 
 /*
  * Dumps the DCC_EN bit for each pipe.
@@ -3577,6 +3590,7 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 				&dp_ignore_cable_id_ops);
 #endif
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
 
@@ -3600,5 +3614,5 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 
 	debugfs_create_file_unsafe("amdgpu_dm_disable_hpd", 0644, root, adev,
 				   &disable_hpd_ops);
-
+#endif
 }
