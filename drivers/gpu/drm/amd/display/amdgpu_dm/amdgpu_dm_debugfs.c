@@ -967,8 +967,10 @@ static int force_yuv420_output_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_yuv420_output_fops, force_yuv420_output_get,
 			 force_yuv420_output_set, "%llu\n");
+#endif
 
 /*
  *  Read PSR state
@@ -987,7 +989,9 @@ static int psr_get(void *data, u64 *val)
 }
 
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(psr_fops, psr_get, NULL, "%llu\n");
+#endif
 
 void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 {
@@ -1002,11 +1006,16 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 					    dp_debugfs_entries[i].fops);
 		}
 	}
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_eDP)
 		debugfs_create_file_unsafe("psr_state", 0444, dir, connector, &psr_fops);
+#endif
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("force_yuv420_output", 0644, dir, connector,
 				   &force_yuv420_output_fops);
+#endif
 
 }
 
@@ -1161,8 +1170,10 @@ static int visual_confirm_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
+#endif
 
 int dtn_debugfs_init(struct amdgpu_device *adev)
 {
@@ -1185,8 +1196,10 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
+#endif
 
 	return 0;
 }
