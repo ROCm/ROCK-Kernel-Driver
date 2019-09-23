@@ -147,4 +147,11 @@ static inline void kcl_pci_remove_measure_file(struct pci_dev *pdev)
 #endif
 }
 
+#if !defined(HAVE_PCI_DEV_ID)
+static inline u16 pci_dev_id(struct pci_dev *dev)
+{
+	return PCI_DEVID(dev->bus->number, dev->devfn);
+}
+#endif /* HAVE_PCI_DEV_ID */
+
 #endif /* AMDKCL_PCI_H */
