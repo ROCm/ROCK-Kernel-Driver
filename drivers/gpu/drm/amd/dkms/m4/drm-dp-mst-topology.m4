@@ -19,5 +19,27 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
 	], [
 		AC_MSG_RESULT(no)
 	])
+
+dnl #
+dnl # commit d25689760b747287c6ca03cfe0729da63e0717f4
+dnl # drm/amdgpu/display: Keep malloc ref to MST port
+dnl #
+dnl # commit ebcc0e6b509108b4a67daa4c55809a05ab7f4b77
+dnl # drm/dp_mst: Introduce new refcounting scheme for mstbs and ports
+dnl #
+	AC_MSG_CHECKING([whether drm_dp_mst_{get,put}_port_malloc() is available])
+	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drm_dp_mst_helper.h>
+	], [
+		drm_dp_mst_get_port_malloc(NULL);
+		drm_dp_mst_put_port_malloc(NULL);
+	], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC, 1, [
+			drm_dp_mst_{get,put}_port_malloc() is available
+		])
+	], [
+		AC_MSG_RESULT(no)
+	])
 ])
 
