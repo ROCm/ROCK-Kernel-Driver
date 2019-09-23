@@ -51,5 +51,6 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
 				drm_dp_mst_connector_late_register() is available])
 		])
 	])
+
 ])
 

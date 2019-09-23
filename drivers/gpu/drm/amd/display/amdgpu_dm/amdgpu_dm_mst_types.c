@@ -104,7 +104,9 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	drm_encoder_cleanup(&amdgpu_encoder->base);
 	kfree(amdgpu_encoder);
 	drm_connector_cleanup(connector);
+#if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
 	drm_dp_mst_put_port_malloc(amdgpu_dm_connector->port);
+#endif /* HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC */
 	kfree(amdgpu_dm_connector);
 }
 
@@ -420,7 +422,9 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	DRM_INFO("DM_MST: added connector: %p [id: %d] [master: %p]\n",
 		 aconnector, connector->base.id, aconnector->mst_port);
 
+#if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
 	drm_dp_mst_get_port_malloc(port);
+#endif /* HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC */
 
 	DRM_DEBUG_KMS(":%d\n", connector->base.id);
 
