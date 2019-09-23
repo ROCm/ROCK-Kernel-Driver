@@ -1,6 +1,7 @@
 AC_INIT(amdgpu-dkms, 19.40)
 
 m4_include([m4/kernel.m4])
+m4_include([m4/drm-cache.m4])
 m4_include([m4/drm-calloc-large.m4])
 m4_include([m4/drm-free-large.m4])
 m4_include([m4/drm-malloc-ab.m4])
