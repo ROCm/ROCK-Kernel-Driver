@@ -964,8 +964,10 @@ static int force_yuv420_output_get(void *data, u64 *val)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_yuv420_output_fops, force_yuv420_output_get,
 			 force_yuv420_output_set, "%llu\n");
+#endif
 
 void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 {
@@ -981,8 +983,10 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		}
 	}
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("force_yuv420_output", 0644, dir, connector,
 				   &force_yuv420_output_fops);
+#endif
 
 }
 
@@ -1145,7 +1149,7 @@ static int visual_confirm_get(void *data, u64 *val)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
 #endif
@@ -1171,7 +1175,7 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
 #endif
