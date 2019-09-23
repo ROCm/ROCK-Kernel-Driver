@@ -20,6 +20,7 @@
 #include <kcl/backport/kcl_uaccess_backport.h>
 #include <kcl/backport/kcl_perf_event_backport.h>
 #include <kcl/kcl_seq_file.h>
+#include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_preempt.h>
 #include <kcl/kcl_suspend.h>
 #include <kcl/backport/kcl_pci_backport.h>
