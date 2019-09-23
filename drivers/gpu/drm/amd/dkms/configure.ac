@@ -88,6 +88,7 @@ m4_include([m4/kthread-park-xx.m4])
 m4_include([m4/file-inode.m4])
 m4_include([m4/sched-mm-h.m4])
 m4_include([m4/mm-access.m4])
+m4_include([m4/mmu-notifier.m4])
 m4_include([m4/config.m4])
 
 
