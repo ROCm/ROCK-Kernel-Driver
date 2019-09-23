@@ -27,5 +27,6 @@
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_kthread_backport.h>
 #include <kcl/kcl_mm_backport.h>
+#include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_suspend.h>
 #endif /* AMDGPU_BACKPORT_H */
