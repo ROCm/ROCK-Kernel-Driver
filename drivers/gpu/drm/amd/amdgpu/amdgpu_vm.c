@@ -1593,17 +1593,17 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  * Returns:
  * 0 for success, -EINVAL for failure.
  */
-static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
-				       struct amdgpu_device *bo_adev,
-				       struct amdgpu_vm *vm, bool immediate,
-				       bool unlocked, struct dma_resv *resv,
-				       uint64_t start, uint64_t last,
-				       uint64_t flags, uint64_t offset,
-				       struct ttm_resource *mem,
-				       struct drm_mm_node *nodes,
-				       dma_addr_t *pages_addr,
-				       struct dma_fence **fence,
-				       uint64_t vram_base_offset)
+int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
+                                       struct amdgpu_device *bo_adev,
+                                       struct amdgpu_vm *vm, bool immediate,
+                                       bool unlocked, struct dma_resv *resv,
+                                       uint64_t start, uint64_t last,
+                                       uint64_t flags, uint64_t offset,
+                                       struct ttm_resource *mem,
+                                       struct drm_mm_node *nodes,
+                                       dma_addr_t *pages_addr,
+                                       struct dma_fence **fence,
+                                       uint64_t vram_base_offset)
 {
 	struct amdgpu_vm_update_params params;
 	enum amdgpu_sync_mode sync_mode;
