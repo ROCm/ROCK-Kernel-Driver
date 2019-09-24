@@ -1,10 +1,10 @@
 /*
- * Copyright © 2006 Keith Packard
- * Copyright © 2007-2008 Dave Airlie
+ * Copyright © 1997-2003 by The XFree86 Project, Inc.
+ * Copyright © 2007 Dave Airlie
  * Copyright © 2007-2008 Intel Corporation
  *   Jesse Barnes <jesse.barnes@intel.com>
- * Copyright © 2014 Intel Corporation
- *   Daniel Vetter <daniel.vetter@ffwll.ch>
+ * Copyright 2005-2006 Luc Verhaegen
+ * Copyright (c) 2001, Andy Ritger  aritger@nvidia.com
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,21 +23,19 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Except as contained in this notice, the name of the copyright holder(s)
+ * and author(s) shall not be used in advertising or otherwise to promote
+ * the sale, use or other dealings in this Software without prior written
+ * authorization from the copyright holder(s) and author(s).
  */
-#ifndef KCL_KCL_DRM_MODES_H
-#define KCL_KCL_DRM_MODES_H
-
-#include <drm/drm_modes.h>
-
-#ifndef HAVE_DRM_MODE_GET_HV_TIMING
-#define drm_mode_get_hv_timing drm_crtc_get_hv_timing
-#endif
+#include <drm/drm_crtc.h>
+#include <drm/drm_mode.h>
+#include <kcl/kcl_drm_modes.h>
 
 #ifndef HAVE_DRM_MODE_IS_420_XXX
-bool drm_mode_is_420_only(const struct drm_display_info *display,
-		const struct drm_display_mode *mode);
-bool drm_mode_is_420_also(const struct drm_display_info *display,
-		const struct drm_display_mode *mode);
-#endif
-
+amdkcl_dummy_symbol(drm_mode_is_420_only, bool, return false,
+				  const struct drm_display_info *display, const struct drm_display_mode *mode)
+amdkcl_dummy_symbol(drm_mode_is_420_also, bool, return false,
+			 const struct drm_display_info *display, const struct drm_display_mode *mode)
 #endif
