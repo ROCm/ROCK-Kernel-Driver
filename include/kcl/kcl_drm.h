@@ -700,4 +700,21 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
+
+#ifndef HAVE_DRM_MODE_IS_420_XXX
+static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode)
+{
+	/* DRM < 4.4 ,un-support this pixel format */
+	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_only!\n");
+	return false;
+}
+static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode)
+{
+	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_also!\n");
+	return false;
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
