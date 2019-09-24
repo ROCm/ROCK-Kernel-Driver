@@ -409,4 +409,22 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 }
 #endif
 
+#ifndef HAVE_DRM_MODE_IS_420_XXX
+bool _kcl_drm_mode_is_420_only(const struct drm_display_info *display,
+		const struct drm_display_mode *mode);
+bool _kcl_drm_mode_is_420_also(const struct drm_display_info *display,
+		const struct drm_display_mode *mode);
+
+static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
+		const struct drm_display_mode *mode)
+{
+	return _kcl_drm_mode_is_420_only(display, mode);
+}
+static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
+		const struct drm_display_mode *mode)
+{
+	return _kcl_drm_mode_is_420_also(display, mode);
+}
+#endif
+
 #endif /* AMDKCL_DRM_H */
