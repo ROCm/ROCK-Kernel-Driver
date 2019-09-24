@@ -88,7 +88,7 @@ amdgpu-y += \
 
 # add UMC block
 amdgpu-y += \
-	umc_v6_1.o
+	umc_v6_1.o umc_v6_0.o
 
 # add IH block
 amdgpu-y += \
