@@ -1631,7 +1631,6 @@ bool dcn20_split_stream_for_odm(
 	next_odm_pipe->stream_res.dsc = NULL;
 #endif
 	if (prev_odm_pipe->next_odm_pipe && prev_odm_pipe->next_odm_pipe != next_odm_pipe) {
-		ASSERT(!next_odm_pipe->next_odm_pipe);
 		next_odm_pipe->next_odm_pipe = prev_odm_pipe->next_odm_pipe;
 		next_odm_pipe->next_odm_pipe->prev_odm_pipe = next_odm_pipe;
 	}
@@ -2396,8 +2395,8 @@ int dcn20_validate_apply_pipe_split_flags(
 			split[i] = true;
 			context->bw_ctx.dml.vba.ODMCombineEnablePerState[vlevel][pipe_idx] = true;
 		}
-		context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_idx]
-			= context->bw_ctx.dml.vba.ODMCombineEnablePerState[vlevel][pipe_idx];
+		context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_idx] =
+			context->bw_ctx.dml.vba.ODMCombineEnablePerState[vlevel][pipe_idx];
 		/* Adjust dppclk when split is forced, do not bother with dispclk */
 		if (split[i] && context->bw_ctx.dml.vba.NoOfDPP[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_idx] == 1)
 			context->bw_ctx.dml.vba.RequiredDPPCLK[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_idx] /= 2;
