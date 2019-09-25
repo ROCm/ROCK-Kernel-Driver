@@ -472,7 +472,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
 				 per_device_list) {
-		pr_debug("Releasing pdd (topology id %d) for process (pasid %d)\n",
+		pr_debug("Releasing pdd (topology id %d) for process (pasid 0x%x)\n",
 				pdd->dev->id, p->pasid);
 
 		if (pdd->drm_file) {
@@ -1315,7 +1315,7 @@ static void evict_process_worker(struct work_struct *work)
 
 	p->last_evict_timestamp = get_jiffies_64();
 
-	pr_info("Started evicting pasid %d\n", p->pasid);
+	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
@@ -1328,9 +1328,9 @@ static void evict_process_worker(struct work_struct *work)
 			pr_debug("Process %d queues idle, doorbell unmapped\n",
 				p->pasid);
 
-		pr_info("Finished evicting pasid %d\n", p->pasid);
+		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
-		pr_err("Failed to evict queues of pasid %d\n", p->pasid);
+		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
 	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
 }
 
@@ -1349,7 +1349,7 @@ static void restore_process_worker(struct work_struct *work)
 
 	trace_kfd_restore_process_worker_start(p);
 
-	pr_debug("Started restoring pasid %d\n", p->pasid);
+	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -1365,7 +1365,7 @@ static void restore_process_worker(struct work_struct *work)
 	ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
 						     &p->ef);
 	if (ret) {
-		pr_info("Failed to restore BOs of pasid %d, retry after %d ms\n",
+		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
@@ -1380,9 +1380,9 @@ static void restore_process_worker(struct work_struct *work)
 	ret = kfd_process_restore_queues(p);
 	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
-		pr_info("Finished restoring pasid %d\n", p->pasid);
+		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
 	else
-		pr_err("Failed to restore queues of pasid %d\n", p->pasid);
+		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
 }
 
 void kfd_suspend_all_processes(void)
@@ -1402,7 +1402,7 @@ void kfd_suspend_all_processes(void)
 		cancel_delayed_work_sync(&p->restore_work);
 
 		if (kfd_process_evict_queues(p))
-			pr_err("Failed to suspend process %d\n", p->pasid);
+			pr_err("Failed to suspend process 0x%x\n", p->pasid);
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
@@ -1497,7 +1497,7 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 #else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 #endif
-		seq_printf(m, "Process %d PASID %d:\n",
+		seq_printf(m, "Process %d PASID 0x%x:\n",
 			   p->lead_thread->tgid, p->pasid);
 
 		mutex_lock(&p->mutex);
