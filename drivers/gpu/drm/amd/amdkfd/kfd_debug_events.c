@@ -160,9 +160,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
 			if (pqn->q &&
 				 (pqn->q->properties.debug_event_type
-					== KFD_DBG_EV_STATUS_TRAP
-				|| pqn->q->properties.debug_event_type
-					== KFD_DBG_EV_STATUS_VMFAULT)) {
+					& (KFD_DBG_EV_STATUS_TRAP
+					| KFD_DBG_EV_STATUS_VMFAULT))) {
 				*queue_id = pqn->q->properties.queue_id;
 				*event_status =
 					kfd_dbg_get_queue_status_word(pqn->q,
