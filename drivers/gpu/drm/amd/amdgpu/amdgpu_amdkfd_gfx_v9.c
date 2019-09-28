@@ -1015,7 +1015,7 @@ void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
 	*reg_offset = mmCP_IQ_WAIT_TIME2;
 }
 
-static const struct kfd2kgd_calls kfd2kgd = {
+const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.program_sh_mem_settings = kgd_gfx_v9_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_gfx_v9_set_pasid_vmid_mapping,
 	.init_interrupts = kgd_gfx_v9_init_interrupts,
@@ -1046,8 +1046,3 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 };
-
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void)
-{
-	return (struct kfd2kgd_calls *)&kfd2kgd;
-}

@@ -138,11 +138,6 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 void amdgpu_amdkfd_set_compute_idle(struct kgd_dev *kgd, bool idle);
 bool amdgpu_amdkfd_have_atomics_support(struct kgd_dev *kgd);
 
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_9_0_get_functions(void);
-struct kfd2kgd_calls *amdgpu_amdkfd_arcturus_get_functions(void);
-struct kfd2kgd_calls *amdgpu_amdkfd_gfx_10_0_get_functions(void);
 int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
@@ -262,7 +257,6 @@ void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
 int kgd2kfd_init(void);
 void kgd2kfd_exit(void);
 struct kfd_dev *kgd2kfd_probe(struct kgd_dev *kgd, struct pci_dev *pdev,
-			      const struct kfd2kgd_calls *f2g,
 			      unsigned int asic_type, bool vf);
 bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			 struct drm_device *ddev,
