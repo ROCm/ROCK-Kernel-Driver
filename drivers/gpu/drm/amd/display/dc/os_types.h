@@ -50,7 +50,7 @@
 
 #define dm_vlog(fmt, args) vprintk(fmt, args)
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
+#if defined(HAVE_ASM_FPU_API_H)
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include <asm/fpu/api.h>
 #endif
