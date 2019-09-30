@@ -99,6 +99,7 @@ static void kdump_nmi_callback(int cpu, struct pt_regs *regs)
 void kdump_nmi_shootdown_cpus(void)
 {
 	nmi_shootdown_cpus(kdump_nmi_callback);
+	printk_bust_locks();
 
 	disable_local_APIC();
 }

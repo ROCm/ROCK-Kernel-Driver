@@ -1626,6 +1626,22 @@ static struct task_struct *console_owner;
 static bool console_waiter;
 
 /**
+ * printk_bust_locks - forcibly reset all printk-related locks
+ *
+ * This function can be used after CPUs were stopped using NMI.
+ * It is especially useful in kdump_nmi_shootdown_cpus() that
+ * uses NMI but it does not modify the online CPU mask.
+ */
+void printk_bust_locks(void)
+{
+	debug_locks_off();
+	raw_spin_lock_init(&logbuf_lock);
+	raw_spin_lock_init(&console_owner_lock);
+	console_owner = NULL;
+	console_waiter = false;
+}
+
+/**
  * console_lock_spinning_enable - mark beginning of code where another
  *	thread might safely busy wait
  *
