@@ -2640,15 +2640,22 @@ void register_console(struct console *newcon)
 	int i;
 	unsigned long flags;
 	struct console *bcon = NULL;
+	struct console *con_consdev = NULL;
 	struct console_cmdline *c;
 	static bool has_preferred;
+	bool consdev_fallback = false;
 
-	if (console_drivers)
-		for_each_console(bcon)
+	if (console_drivers) {
+		for_each_console(bcon) {
 			if (WARN(bcon == newcon,
 					"console '%s%d' already registered\n",
 					bcon->name, bcon->index))
 				return;
+
+			if (bcon->flags & CON_CONSDEV && !con_consdev)
+				con_consdev = bcon;
+		}
+	}
 
 	/*
 	 * before we register a new CON_BOOT console, make sure we don't
@@ -2718,8 +2725,17 @@ void register_console(struct console *newcon)
 
 		newcon->flags |= CON_ENABLED;
 		if (i == preferred_console) {
+			/* This is the last console on the command line. */
 			newcon->flags |= CON_CONSDEV;
 			has_preferred = true;
+		} else if (newcon->device && !con_consdev) {
+			/*
+			 * This is the first console with tty binding. It will
+			 * be used for /dev/console when the preferred one
+			 * will not get registered for some reason.
+			 */
+			newcon->flags |= CON_CONSDEV;
+			consdev_fallback = true;
 		}
 		break;
 	}
@@ -2733,7 +2749,9 @@ void register_console(struct console *newcon)
 	 * the real console are the same physical device, it's annoying to
 	 * see the beginning boot messages twice
 	 */
-	if (bcon && ((newcon->flags & (CON_CONSDEV | CON_BOOT)) == CON_CONSDEV))
+	if (bcon &&
+	    ((newcon->flags & (CON_CONSDEV | CON_BOOT)) == CON_CONSDEV) &&
+	    !consdev_fallback)
 		newcon->flags &= ~CON_PRINTBUFFER;
 
 	/*
@@ -2741,12 +2759,28 @@ void register_console(struct console *newcon)
 	 *	preferred driver at the head of the list.
 	 */
 	console_lock();
-	if ((newcon->flags & CON_CONSDEV) || console_drivers == NULL) {
+	if ((newcon->flags & CON_CONSDEV && !consdev_fallback) ||
+	     console_drivers == NULL) {
+		/* Put the preferred or the first console at the head. */
 		newcon->next = console_drivers;
 		console_drivers = newcon;
-		if (newcon->next)
-			newcon->next->flags &= ~CON_CONSDEV;
+		/* Only one console can have CON_CONSDEV flag set */
+		if (con_consdev)
+			con_consdev->flags &= ~CON_CONSDEV;
+	} else if (newcon->device && con_consdev) {
+		/*
+		 * Keep the driver associated with /dev/console.
+		 * We are here only when the console was enabled by the cycle
+		 * checking console_cmdline and this is neither preferred
+		 * console nor the consdev fallback.
+		 */
+		newcon->next = con_consdev->next;
+		con_consdev->next = newcon;
 	} else {
+		/*
+		 * Keep a boot console first until the preferred real one
+		 * is registered.
+		 */
 		newcon->next = console_drivers->next;
 		console_drivers->next = newcon;
 	}
@@ -2790,6 +2824,7 @@ void register_console(struct console *newcon)
 		newcon->name, newcon->index);
 	if (bcon &&
 	    ((newcon->flags & (CON_CONSDEV | CON_BOOT)) == CON_CONSDEV) &&
+	    !consdev_fallback &&
 	    !keep_bootcon) {
 		/* We need to iterate through all boot consoles, to make
 		 * sure we print everything out, before we unregister them.
@@ -2835,10 +2870,16 @@ int unregister_console(struct console *console)
 
 	/*
 	 * If this isn't the last console and it has CON_CONSDEV set, we
-	 * need to set it on the next preferred console.
+	 * need to set it on the first console with tty binding.
 	 */
-	if (console_drivers != NULL && console->flags & CON_CONSDEV)
-		console_drivers->flags |= CON_CONSDEV;
+	if (console_drivers != NULL && console->flags & CON_CONSDEV) {
+		for_each_console(a) {
+			if (a->device) {
+				a->flags |= CON_CONSDEV;
+				break;
+			}
+		}
+	}
 
 	console->flags &= ~CON_ENABLED;
 	console_unlock();
