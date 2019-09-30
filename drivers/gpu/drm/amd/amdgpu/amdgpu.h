@@ -293,6 +293,9 @@ struct amdgpu_ip_block_version {
 	const struct amd_ip_funcs *funcs;
 };
 
+#define hw_revision(major, minor, revision) \
+	((((uint32_t) major) << 16) | ((uint32_t) minor << 8) | ((uint32_t) revision))
+
 struct amdgpu_ip_block {
 	struct amdgpu_ip_block_status status;
 	const struct amdgpu_ip_block_version *version;
@@ -656,6 +659,10 @@ struct amdgpu_fw_vram_usage {
 	u64 size;
 	struct amdgpu_bo *reserved_bo;
 	void *va;
+
+	/*offset on the top of vram, used as c2p write buffer*/
+	u64 mem_train_fb_loc;
+	bool mem_train_support;
 };
 
 /*
