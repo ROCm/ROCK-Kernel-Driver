@@ -1722,6 +1722,14 @@ static bool construct(
 
 	pool->base.pp_smu = dcn21_pp_smu_create(ctx);
 
+	uint32_t num_pipes = dcn2_1_ip.max_num_dpp;
+
+	for (i = 0; i < dcn2_1_ip.max_num_dpp; i++)
+		if (pipe_fuses & 1 << i)
+			num_pipes--;
+	dcn2_1_ip.max_num_dpp = num_pipes;
+	dcn2_1_ip.max_num_otg = num_pipes;
+
 	dml_init_instance(&dc->dml, &dcn2_1_soc, &dcn2_1_ip, DML_PROJECT_DCN21);
 
 	init_data.ctx = dc->ctx;
