@@ -98,11 +98,12 @@ int mga_crtc_cursor_set(struct drm_crtc *crtc,
 	}
 
 	/* Pin and map up-coming buffer to write colour indices */
-	ret = drm_gem_vram_pin(pixels_next, 0);
-	if (ret)
+	ret = drm_gem_vram_pin(pixels_next, DRM_GEM_VRAM_PL_FLAG_VRAM);
+	if (ret) {
 		dev_err(&dev->pdev->dev,
 			"failed to pin cursor buffer: %d\n", ret);
 		goto err_drm_gem_vram_kunmap_src;
+	}
 	dst = drm_gem_vram_kmap(pixels_next, true, NULL);
 	if (IS_ERR(dst)) {
 		ret = PTR_ERR(dst);
@@ -110,7 +111,7 @@ int mga_crtc_cursor_set(struct drm_crtc *crtc,
 			"failed to kmap cursor updates: %d\n", ret);
 		goto err_drm_gem_vram_unpin_dst;
 	}
-	gpu_addr = drm_gem_vram_offset(pixels_2);
+	gpu_addr = drm_gem_vram_offset(pixels_next);
 	if (gpu_addr < 0) {
 		ret = (int)gpu_addr;
 		dev_err(&dev->pdev->dev,
@@ -211,7 +212,6 @@ int mga_crtc_cursor_set(struct drm_crtc *crtc,
 	mdev->cursor.pixels_current = pixels_next;
 
 	drm_gem_vram_kunmap(pixels_next);
-	drm_gem_vram_unpin(pixels_next);
 	drm_gem_vram_kunmap(gbo);
 	drm_gem_vram_unpin(gbo);
 	drm_gem_object_put_unlocked(obj);
