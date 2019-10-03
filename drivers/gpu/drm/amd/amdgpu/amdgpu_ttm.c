@@ -1684,7 +1684,6 @@ static void amdgpu_ttm_fw_reserve_vram_fini(struct amdgpu_device *adev)
 static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
 {
 	uint64_t vram_size = adev->gmc.visible_vram_size;
-	int r;
 
 	adev->fw_vram_usage.va = NULL;
 	adev->fw_vram_usage.reserved_bo = NULL;
@@ -1699,7 +1698,6 @@ static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
 					  AMDGPU_GEM_DOMAIN_VRAM,
 					  &adev->fw_vram_usage.reserved_bo,
 					  &adev->fw_vram_usage.va);
-	return r;
 }
 
 static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
