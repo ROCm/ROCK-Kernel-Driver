@@ -169,10 +169,6 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 #endif
 		flags |= AMD_IS_PX;
 
-	if ((amdgpu_runtime_pm != 0) &&
-	    (flags & AMD_IS_PX))
-		adev->runpm = true;
-
 	/* amdgpu_device_init should report only fatal error
 	 * like memory allocation failure or iomapping failure,
 	 * or memory manager initialization failure, it must
@@ -184,6 +180,13 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 		dev_err(&dev->pdev->dev, "Fatal error during GPU init\n");
 		goto out;
 	}
+
+	if (amdgpu_device_supports_boco(dev) &&
+	    (amdgpu_runtime_pm != 0)) /* enable runpm by default */
+		adev->runpm = true;
+	else if (amdgpu_device_supports_baco(dev) &&
+		 (amdgpu_runtime_pm > 0)) /* enable runpm if runpm=1 */
+		adev->runpm = true;
 
 	/* Call ACPI methods: require modeset init
 	 * but failure is not fatal
