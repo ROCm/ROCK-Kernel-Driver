@@ -498,6 +498,7 @@ enum atombios_firmware_capability
   ATOM_FIRMWARE_CAP_HWEMU_ENABLE  = 0x00000080,
   ATOM_FIRMWARE_CAP_HWEMU_UMC_CFG = 0x00000100,
   ATOM_FIRMWARE_CAP_SRAM_ECC      = 0x00000200,
+  ATOM_FIRMWARE_CAP_ENABLE_2STAGE_BIST_TRAINING  = 0x00000400,
 };
 
 enum atom_cooling_solution_id{
@@ -671,6 +672,20 @@ struct vram_usagebyfirmware_v2_1
   uint16_t  used_by_driver_in_kb; 
 };
 
+/* This is part of vram_usagebyfirmware_v2_1 */
+struct vram_reserve_block
+{
+    uint32_t  start_address_in_kb;
+    uint16_t  used_by_firmware_in_kb;
+    uint16_t  used_by_driver_in_kb;
+};
+
+/* Definitions for constance */
+enum atomfirmware_internal_constants {
+    ONE_K	= 0x400,
+    ONE_MEG	= 0x100000,
+    ONE_G	= 0x40000000,
+};
 
 /* 
   ***************************************************************************
