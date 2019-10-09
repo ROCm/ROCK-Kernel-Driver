@@ -2441,8 +2441,6 @@ extern void intel_engine_init_hangcheck(struct intel_engine_cs *engine);
 extern void intel_hangcheck_init(struct drm_i915_private *dev_priv);
 int vlv_force_gfx_clock(struct drm_i915_private *dev_priv, bool on);
 
-u32 intel_calculate_mcr_s_ss_select(struct drm_i915_private *dev_priv);
-
 static inline void i915_queue_hangcheck(struct drm_i915_private *dev_priv)
 {
 	unsigned long delay;
