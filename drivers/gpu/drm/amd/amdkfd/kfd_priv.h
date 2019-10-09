@@ -43,7 +43,9 @@
 #include <linux/interval_tree.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
-#include <drm/drmP.h>
+#include <drm/drm_file.h>
+#include <drm/drm_drv.h>
+#include <drm/drm_device.h>
 #include <kgd_kfd_interface.h>
 
 #include "amd_shared.h"
@@ -54,8 +56,6 @@
 
 /* GPU ID hash width in bits */
 #define KFD_GPU_ID_HASH_WIDTH 16
-
-struct drm_device;
 
 /* Use upper bits of mmap offset to store KFD driver specific information.
  * BITS[63:62] - Encode MMAP type
