@@ -4453,11 +4453,11 @@ int stmmac_suspend(struct device *dev)
 	if (!ndev || !netif_running(ndev))
 		return 0;
 
-	mutex_lock(&priv->lock);
-
 	rtnl_lock();
 	phylink_stop(priv->phylink);
 	rtnl_unlock();
+
+	mutex_lock(&priv->lock);
 
 	netif_device_detach(ndev);
 	stmmac_stop_all_queues(priv);
@@ -4562,11 +4562,11 @@ int stmmac_resume(struct device *dev)
 
 	stmmac_start_all_queues(priv);
 
+	mutex_unlock(&priv->lock);
+
 	rtnl_lock();
 	phylink_start(priv->phylink);
 	rtnl_unlock();
-
-	mutex_unlock(&priv->lock);
 
 	return 0;
 }
