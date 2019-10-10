@@ -29,7 +29,7 @@
 
 #define EEPROM_I2C_TARGET_ADDR_ARCTURUS  0xA8
 #define EEPROM_I2C_TARGET_ADDR_VEGA20    0xA0
-
+#define EEPROM_I2C_PI_ADDR 0xAC
 /*
  * The 2 macros bellow represent the actual size in bytes that
  * those entities occupy in the EEPROM memory.
@@ -77,6 +77,44 @@ static void __decode_table_header_from_buff(struct amdgpu_ras_eeprom_table_heade
 	hdr->first_rec_offset = le32_to_cpu(pp[2]);
 	hdr->tbl_size 	      = le32_to_cpu(pp[3]);
 	hdr->checksum 	      = le32_to_cpu(pp[4]);
+}
+
+static int amdgpu_ras_eeprom_get_product_info(struct amdgpu_ras_eeprom_control *control)
+{
+	int ret = 0, i;
+	struct amdgpu_device *adev = to_amdgpu_device(control);
+	unsigned char buff[18], sn[16];
+	//TODO: Get length of entire product info segment
+	struct i2c_msg msg = {
+			.addr	= EEPROM_I2C_PI_ADDR,
+			.flags	= I2C_M_RD,
+			.len	= EEPROM_ADDRESS_SIZE + 16,
+			.buf	= buff,
+	};
+
+	/* Not supported before VG20 */
+	if (adev->asic_type < CHIP_VEGA20)
+		return 0;
+
+	/* Read from address 0x3d, which is a hard-coded value for serial
+	 * number for Vega20. This won't make it to upstream
+	 */
+	buff[0] = 0;
+	buff[1] = 0x31;
+
+	/* No need to lock the mutex, since the data is ummutable */
+	ret = i2c_transfer(&control->eeprom_accessor, &msg, 1);
+
+	// Convert to ASCII from hex
+	for (i = 2; i < 16; i++) {
+		sprintf(&sn[i-2], "%c", buff[i]);
+	}
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM product info, ret:%d", ret);
+		return ret;
+	}
+	strcpy(adev->serial, sn);
+	return 0;
 }
 
 static int __update_table_header(struct amdgpu_ras_eeprom_control *control,
@@ -259,6 +297,8 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control)
 
 		ret = amdgpu_ras_eeprom_reset_table(control);
 	}
+
+	amdgpu_ras_eeprom_get_product_info(control);
 
 	return ret == 1 ? 0 : -EIO;
 }
