@@ -634,6 +634,10 @@ static int smu_v11_0_i2c_eeprom_i2c_xfer(struct i2c_adapter *i2c_adap,
 	int i, ret;
 	struct amdgpu_ras_eeprom_control *control = to_eeprom_control(i2c_adap);
 
+#if !defined(HAVE_I2C_LOCK_OPERATIONS_STRUCT)
+	lock_bus(i2c_adap, 0);
+#endif
+
 	if (!control->bus_locked) {
 		DRM_ERROR("I2C bus unlocked, stopping transaction!");
 		return -EIO;
@@ -658,6 +662,10 @@ static int smu_v11_0_i2c_eeprom_i2c_xfer(struct i2c_adapter *i2c_adap,
 	}
 
 	smu_v11_0_i2c_fini(i2c_adap);
+
+#if !defined(HAVE_I2C_LOCK_OPERATIONS_STRUCT)
+	unlock_bus(i2c_adap, 0);
+#endif
 	return num;
 }
 
