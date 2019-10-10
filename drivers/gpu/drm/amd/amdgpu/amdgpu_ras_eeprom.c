@@ -29,6 +29,8 @@
 
 #define EEPROM_I2C_TARGET_ADDR_ARCTURUS  0xA8
 #define EEPROM_I2C_TARGET_ADDR_VEGA20    0xA0
+#define EEPROM_I2C_PI_ADDR 0xAC
+#define I2C_PRODUCT_INFO_OFFSET 0xC0
 
 /*
  * The 2 macros bellow represent the actual size in bytes that
@@ -77,6 +79,155 @@ static void __decode_table_header_from_buff(struct amdgpu_ras_eeprom_table_heade
 	hdr->first_rec_offset = le32_to_cpu(pp[2]);
 	hdr->tbl_size 	      = le32_to_cpu(pp[3]);
 	hdr->checksum 	      = le32_to_cpu(pp[4]);
+}
+
+static int amdgpu_ras_eeprom_get_product_info(struct amdgpu_ras_eeprom_control *control)
+{
+	int ret = 0, i, addrptr = 0, size = 0;
+	struct amdgpu_device *adev = to_amdgpu_device(control);
+	unsigned char buff[34], sizebuff[3];
+	/* size_msg will be the message to get the size of a field,
+	 * since it's always 1 for field length
+	 */
+	struct i2c_msg size_msg = {
+			.addr	= EEPROM_I2C_PI_ADDR,
+			.flags	= I2C_M_RD,
+			.len	= EEPROM_ADDRESS_SIZE + 1,
+			.buf	= sizebuff,
+	};
+
+	/* Add the size obtained above to .len as required */
+	struct i2c_msg msg = {
+			.addr	= EEPROM_I2C_PI_ADDR,
+			.flags	= I2C_M_RD,
+			.len	= EEPROM_ADDRESS_SIZE,
+			.buf	= buff,
+	};
+
+	/* Not supported before VG20 */
+	if (adev->asic_type < CHIP_VEGA20)
+		return 0;
+
+	/* There's a lot of repetition here. This is due to the FRU having
+	 * variable-length fields. To get the information, we have to find the
+	 * size of each field, and then keep reading along and reading along
+	 * until we get all of the data that we want. We use addrptr to track
+	 * the address as we go, while we create 2 i2c messages, one to obtain
+	 * size (since that's always 1-byte, and one to get the data.
+	 *
+	 * The size returned by the i2c requires subtraction of 0xC0 since the
+	 * size apparently always reports as 0xC0+actual size.
+	 *
+	 * NOTE: We don't lock the mutex since this data is ummutable
+	 */
+
+	/* The first fields are all of size 1-byte, from 0-7 are offsets that
+	 * aren't entirely useful. Bytes 8-e are all 1-byte and refer to the
+	 * size of the entire struct, and the language field, so just start
+	 * from 0xf, which is the size of the manufacturer
+	 */
+	addrptr = 0xf;
+
+	/* The i2c message reads the address from the buffer passed in */
+	sizebuff[0] = 0;
+	sizebuff[1] = 0xf;
+
+	ret = i2c_transfer(&control->eeprom_accessor, &size_msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM manufacturer size, ret:%d", ret);
+		return ret;
+	}
+
+	size = sizebuff[2] - I2C_PRODUCT_INFO_OFFSET;
+	msg.len = EEPROM_ADDRESS_SIZE + size;
+	/* Add 1 since address field was 1 byte */
+	addrptr += 1;
+	/* Now fill in the actual buffer with the desired address */
+	buff[0] = 0;
+	buff[1] = addrptr;
+	ret = i2c_transfer(&control->eeprom_accessor, &msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM product name, ret:%d", ret);
+		return ret;
+	}
+	memcpy(adev->product_name, &buff[2], size);
+	adev->product_name[size] = '\0';
+
+	/* Increase the addrptr by the appropriate size */
+	addrptr += size;
+
+	/* Get the next field, product name, starting with size */
+	sizebuff[0] = 0;
+	sizebuff[1] = addrptr;
+
+	ret = i2c_transfer(&control->eeprom_accessor, &size_msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM product number size, ret:%d", ret);
+		return ret;
+	}
+
+	size = sizebuff[2] - I2C_PRODUCT_INFO_OFFSET;
+	msg.len = EEPROM_ADDRESS_SIZE + size;
+	/* Add 1 since address field was 1 byte */
+	addrptr += 1;
+	buff[0] = 0;
+	buff[1] = addrptr;
+
+	ret = i2c_transfer(&control->eeprom_accessor, &msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM product number, ret:%d", ret);
+		return ret;
+	}
+	memcpy(adev->product_number, &buff[2], size);
+	adev->product_number[size] = '\0';
+
+	/* Increase the addrptr by the appropriate size */
+	addrptr += size;
+
+	/* Skip over the Product Version, it's not very useful */
+	sizebuff[0] = 0;
+	sizebuff[1] = addrptr;
+
+	ret = i2c_transfer(&control->eeprom_accessor, &size_msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM product version size, ret:%d", ret);
+		return ret;
+	}
+	size = sizebuff[2] - I2C_PRODUCT_INFO_OFFSET;
+	/* Add 1 since address field was 1 byte, plus the size of the version */
+	addrptr += size + 1;
+
+	/* Get the last field, serial number */
+	sizebuff[0] = 0;
+	sizebuff[1] = addrptr;
+
+	ret = i2c_transfer(&control->eeprom_accessor, &size_msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM serial number size, ret:%d", ret);
+		return ret;
+	}
+	size = sizebuff[2] - I2C_PRODUCT_INFO_OFFSET;
+	msg.len = EEPROM_ADDRESS_SIZE + size;
+	/* Add 1 since address field was 1 byte */
+	addrptr += 1;
+	buff[0] = 0;
+	buff[1] = addrptr;
+	ret = i2c_transfer(&control->eeprom_accessor, &msg, 1);
+
+	if (ret < 1) {
+		DRM_ERROR("Failed to read EEPROM serial info, ret:%d", ret);
+		return ret;
+	}
+	memcpy(adev->serial, &buff[2], size);
+	adev->serial[size] = '\0';
+
+	return 0;
 }
 
 static int __update_table_header(struct amdgpu_ras_eeprom_control *control,
@@ -259,6 +410,8 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control)
 
 		ret = amdgpu_ras_eeprom_reset_table(control);
 	}
+
+	amdgpu_ras_eeprom_get_product_info(control);
 
 	return ret == 1 ? 0 : -EIO;
 }
