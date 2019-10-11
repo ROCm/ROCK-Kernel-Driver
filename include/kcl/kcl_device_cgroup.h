@@ -13,8 +13,8 @@
 #define DEVCG_ACC_WRITE 4
 #endif
 
-#if defined(CONFIG_CGROUP_DEVICE) || defined(CONFIG_CGROUP_BPF)
-#ifndef HAVE___DEVCGROUP_CHECK_PERMISSION
+#if defined(CONFIG_CGROUP_DEVICE)
+#ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
 extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
 				short access);
 #endif
@@ -22,7 +22,7 @@ extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
 static inline int kcl_devcgroup_check_permission(short type, u32 major, u32 minor,
 					short access)
 {
-#ifndef HAVE___DEVCGROUP_CHECK_PERMISSION
+#ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
 #ifdef BPF_CGROUP_RUN_PROG_DEVICE_CGROUP
 	int rc = BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type, major, minor, access);
 

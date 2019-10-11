@@ -2,8 +2,8 @@
 #include <kcl/kcl_device_cgroup.h>
 #include "kcl_common.h"
 
-#if (defined(CONFIG_CGROUP_DEVICE) || defined(CONFIG_CGROUP_BPF)) && \
-	!defined(HAVE___DEVCGROUP_CHECK_PERMISSION)
+#if defined(CONFIG_CGROUP_DEVICE) && \
+	!defined(HAVE_DEVCGROUP_CHECK_PERMISSION)
 /*
 __devcgroup_check_permission is introduced in v3.6-6796-gad676077a2ae
 prototype is:
@@ -24,8 +24,8 @@ EXPORT_SYMBOL(__kcl_devcgroup_check_permission);
 #endif
 void amdkcl_dev_cgroup_init(void)
 {
-#if (defined(CONFIG_CGROUP_DEVICE) || defined(CONFIG_CGROUP_BPF)) && \
-		!defined(HAVE___DEVCGROUP_CHECK_PERMISSION)
+#if defined(CONFIG_CGROUP_DEVICE) && \
+	!defined(HAVE_DEVCGROUP_CHECK_PERMISSION)
 	__kcl_devcgroup_check_permission = amdkcl_fp_setup("__devcgroup_check_permission", NULL);
 #endif
 }
