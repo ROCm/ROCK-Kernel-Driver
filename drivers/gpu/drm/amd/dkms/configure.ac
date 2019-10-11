@@ -1,5 +1,4 @@
 AC_INIT(amdgpu-dkms, 19.40)
-
 AC_LANG(C)
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_HEADERS([config/config.h])
@@ -8,5 +7,4 @@ AC_PROG_CC
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_AMDGPU_CONFIG
-
 AC_OUTPUT
