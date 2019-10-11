@@ -26,9 +26,9 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
-
+#ifdef HAVE_DRM_UTIL_H
 #include <drm/drm_util.h>
-
+#endif
 #define ATOM_DEBUG
 
 #include "atom.h"

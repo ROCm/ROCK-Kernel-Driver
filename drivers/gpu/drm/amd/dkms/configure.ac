@@ -184,6 +184,7 @@ m4_include([m4/get-user-pages.m4])
 m4_include([m4/get-user-pages-remote.m4])
 m4_include([m4/ktime-get-real-seconds.m4])
 m4_include([m4/drm-connector-list-iter-begin.m4])
+m4_include([m4/drm-util-h.m4])
 m4_include([m4/config.m4])
 
 
