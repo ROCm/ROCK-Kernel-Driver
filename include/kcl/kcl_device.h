@@ -2,7 +2,8 @@
 #ifndef AMDKCL_DEVICE_H
 #define AMDKCL_DEVICE_H
 
-/* Copied from include/linux/dev_printk.h */
+#include <linux/ratelimit.h>
+
 #if !defined(dev_err_once)
 #ifdef CONFIG_PRINTK
 #define dev_level_once(dev_level, dev, fmt, ...)			\
@@ -24,5 +25,19 @@ do {									\
 
 #define dev_err_once(dev, fmt, ...)					\
 	dev_level_once(dev_err, dev, fmt, ##__VA_ARGS__)
+#endif
+
+#if !defined(dev_err_ratelimited)
+#define dev_level_ratelimited(dev_level, dev, fmt, ...)			\
+do {									\
+	static DEFINE_RATELIMIT_STATE(_rs,				\
+				      DEFAULT_RATELIMIT_INTERVAL,	\
+				      DEFAULT_RATELIMIT_BURST);		\
+	if (__ratelimit(&_rs))						\
+		dev_level(dev, fmt, ##__VA_ARGS__);			\
+} while (0)
+
+#define dev_err_ratelimited(dev, fmt, ...)				\
+	dev_level_ratelimited(dev_err, dev, fmt, ##__VA_ARGS__)
 #endif
 #endif /* AMDKCL_DEVICE_H */
