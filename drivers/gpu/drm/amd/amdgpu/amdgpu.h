@@ -155,7 +155,6 @@ extern char *amdgpu_disable_cu;
 extern char *amdgpu_virtual_display;
 extern uint amdgpu_pp_feature_mask;
 extern int amdgpu_ssg_enabled;
-extern uint amdgpu_force_long_training;
 extern int amdgpu_job_hang_limit;
 extern int amdgpu_lbpw;
 extern int amdgpu_compute_multipipe;
@@ -293,9 +292,6 @@ struct amdgpu_ip_block_version {
 	const u32 rev;
 	const struct amd_ip_funcs *funcs;
 };
-
-#define hw_revision(major, minor, revision) \
-	((((uint32_t) major) << 16) | ((uint32_t) minor << 8) | ((uint32_t) revision))
 
 struct amdgpu_ip_block {
 	struct amdgpu_ip_block_status status;
@@ -660,10 +656,6 @@ struct amdgpu_fw_vram_usage {
 	u64 size;
 	struct amdgpu_bo *reserved_bo;
 	void *va;
-
-	/*offset on the top of vram, used as c2p write buffer*/
-	u64 mem_train_fb_loc;
-	bool mem_train_support;
 };
 
 /*
@@ -1048,8 +1040,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 void amdgpu_device_fini(struct amdgpu_device *adev);
 int amdgpu_gpu_wait_for_idle(struct amdgpu_device *adev);
 
-int amdgpu_device_vram_access(struct amdgpu_device *adev, loff_t pos,
-		       uint32_t *buf, size_t size, bool write);
 uint32_t amdgpu_mm_rreg(struct amdgpu_device *adev, uint32_t reg,
 			uint32_t acc_flags);
 void amdgpu_mm_wreg(struct amdgpu_device *adev, uint32_t reg, uint32_t v,

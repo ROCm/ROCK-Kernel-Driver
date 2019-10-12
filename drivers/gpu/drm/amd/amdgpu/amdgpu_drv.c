@@ -134,7 +134,6 @@ char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
 /* OverDrive(bit 14) disabled by default*/
 uint amdgpu_pp_feature_mask = 0xffffbfff;
-uint amdgpu_force_long_training = 0;
 int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
@@ -405,14 +404,6 @@ module_param_named(direct_gma_size, amdgpu_direct_gma_size, int, 0444);
 
 MODULE_PARM_DESC(ssg, "SSG support (1 = enable, 0 = disable (default))");
 module_param_named(ssg, amdgpu_ssg_enabled, int, 0444);
-
-/**
- * DOC: forcelongtraining (uint)
- * Force long memory training in resume.
- * The default is zero, indicates short training in resume.
- */
-MODULE_PARM_DESC(forcelongtraining, "force memory long training");
-module_param_named(forcelongtraining, amdgpu_force_long_training, uint, 0444);
 
 /**
  * DOC: pcie_gen_cap (uint)
