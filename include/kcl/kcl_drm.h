@@ -632,6 +632,11 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef DRM_ERROR
+#define DRM_ERROR(fmt, ...)                                            \
+       drm_err(fmt, ##__VA_ARGS__)
+#endif
+
 #ifndef DP_LANE0_1_STATUS_ESI
 #define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
 #endif
