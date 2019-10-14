@@ -427,4 +427,9 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 }
 #endif
 
+#ifndef DRM_ERROR
+#define DRM_ERROR(fmt, ...)                                            \
+       drm_err(fmt, ##__VA_ARGS__)
+#endif
+
 #endif /* AMDKCL_DRM_H */
