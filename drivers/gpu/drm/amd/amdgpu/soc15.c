@@ -601,6 +601,28 @@ static int soc15_asic_reset(struct amdgpu_device *adev)
 	}
 }
 
+static bool soc15_supports_baco(struct amdgpu_device *adev)
+{
+	bool baco_support;
+
+	switch (adev->asic_type) {
+	case CHIP_VEGA10:
+	case CHIP_VEGA12:
+		soc15_asic_get_baco_capability(adev, &baco_support);
+		break;
+	case CHIP_VEGA20:
+		if (adev->psp.sos_fw_version >= 0x80067)
+			soc15_asic_get_baco_capability(adev, &baco_support);
+		else
+			baco_support = false;
+		break;
+	default:
+		return false;
+	}
+
+	return baco_support;
+}
+
 /*static int soc15_set_uvd_clock(struct amdgpu_device *adev, u32 clock,
 			u32 cntl_reg, u32 status_reg)
 {
@@ -1003,6 +1025,7 @@ static const struct amdgpu_asic_funcs soc15_asic_funcs =
 	.get_pcie_usage = &soc15_get_pcie_usage,
 	.need_reset_on_init = &soc15_need_reset_on_init,
 	.get_pcie_replay_count = &soc15_get_pcie_replay_count,
+	.supports_baco = &soc15_supports_baco,
 };
 
 static const struct amdgpu_asic_funcs vega20_asic_funcs =
@@ -1024,6 +1047,7 @@ static const struct amdgpu_asic_funcs vega20_asic_funcs =
 	.get_pcie_usage = &vega20_get_pcie_usage,
 	.need_reset_on_init = &soc15_need_reset_on_init,
 	.get_pcie_replay_count = &soc15_get_pcie_replay_count,
+	.supports_baco = &soc15_supports_baco,
 };
 
 static int soc15_common_early_init(void *handle)
