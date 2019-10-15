@@ -225,6 +225,7 @@ void dcn20_init_blank(
 	opp->funcs->opp_set_disp_pattern_generator(
 			opp,
 			CONTROLLER_DP_TEST_PATTERN_SOLID_COLOR,
+			CONTROLLER_DP_COLOR_SPACE_UDEFINED,
 			COLOR_DEPTH_UNDEFINED,
 			&black_color,
 			otg_active_width,
@@ -234,6 +235,7 @@ void dcn20_init_blank(
 		bottom_opp->funcs->opp_set_disp_pattern_generator(
 				bottom_opp,
 				CONTROLLER_DP_TEST_PATTERN_SOLID_COLOR,
+				CONTROLLER_DP_COLOR_SPACE_UDEFINED,
 				COLOR_DEPTH_UNDEFINED,
 				&black_color,
 				otg_active_width,
@@ -855,6 +857,7 @@ void dcn20_blank_pixel_data(
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_color_space color_space = stream->output_color_space;
 	enum controller_dp_test_pattern test_pattern = CONTROLLER_DP_TEST_PATTERN_SOLID_COLOR;
+	enum controller_dp_color_space test_pattern_color_space = CONTROLLER_DP_COLOR_SPACE_UDEFINED;
 	struct pipe_ctx *odm_pipe;
 	int odm_cnt = 1;
 
@@ -873,8 +876,10 @@ void dcn20_blank_pixel_data(
 		if (stream_res->abm)
 			stream_res->abm->funcs->set_abm_immediate_disable(stream_res->abm);
 
-		if (dc->debug.visual_confirm != VISUAL_CONFIRM_DISABLE)
+		if (dc->debug.visual_confirm != VISUAL_CONFIRM_DISABLE) {
 			test_pattern = CONTROLLER_DP_TEST_PATTERN_COLORSQUARES;
+			test_pattern_color_space = CONTROLLER_DP_COLOR_SPACE_RGB;
+		}
 	} else {
 		test_pattern = CONTROLLER_DP_TEST_PATTERN_VIDEOMODE;
 	}
@@ -882,6 +887,7 @@ void dcn20_blank_pixel_data(
 	stream_res->opp->funcs->opp_set_disp_pattern_generator(
 			stream_res->opp,
 			test_pattern,
+			test_pattern_color_space,
 			stream->timing.display_color_depth,
 			&black_color,
 			width,
@@ -892,6 +898,7 @@ void dcn20_blank_pixel_data(
 				odm_pipe->stream_res.opp,
 				dc->debug.visual_confirm != VISUAL_CONFIRM_DISABLE && blank ?
 						CONTROLLER_DP_TEST_PATTERN_COLORRAMP : test_pattern,
+				test_pattern_color_space,
 				stream->timing.display_color_depth,
 				&black_color,
 				width,
