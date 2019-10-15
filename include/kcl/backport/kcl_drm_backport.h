@@ -6,6 +6,9 @@
 #include <drm/drm_fourcc.h>
 #include <kcl/kcl_drm.h>
 #include <kcl/header/kcl_drm_file_h.h>
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+#include <drm/drm_syncobj.h>
+#endif
 
 #if !defined(HAVE_DRM_GET_FORMAT_NAME_I_P)
 /**
@@ -50,6 +53,27 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 	return drm_gem_object_lookup(filp->minor->dev, filp, handle);
 }
 #define drm_gem_object_lookup _kcl_drm_gem_object_lookup
+#endif
+
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+static inline
+int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
+						u32 handle, u64 point, u64 flags,
+						struct dma_fence **fence)
+{
+#if defined(HAVE_DRM_SYNCOBJ_FIND_FENCE)
+#if defined(HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS)
+	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+#elif defined(HAVE_DRM_SYNCOBJ_FIND_FENCE_4ARGS)
+	return drm_syncobj_find_fence(file_private, handle, point, fence);
+#else
+	return drm_syncobj_find_fence(file_private, handle, fence);
+#endif
+#elif defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
+	return drm_syncobj_fence_get(file_private, handle, fence);
+#endif
+}
+#define drm_syncobj_find_fence _kcl_drm_syncobj_find_fence
 #endif
 
 #endif/*AMDKCL_DRM_BACKPORT_H*/
