@@ -42,6 +42,7 @@
 #include <kcl/backport/kcl_drm_fourcc.h>
 #include <kcl/backport/kcl_drm_gem.h>
 #include <kcl/backport/kcl_drm_drv.h>
+#include <kcl/backport/kcl_drm_syncobj.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/backport/kcl_drm_fb.h>
 #include <kcl/kcl_drm_modes.h>
