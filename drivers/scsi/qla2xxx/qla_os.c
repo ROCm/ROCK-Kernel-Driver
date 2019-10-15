@@ -1296,6 +1296,9 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 	if (!qpair)
 		return SUCCESS;
 
+	if (sp->fcport && sp->fcport->deleted)
+		return SUCCESS;
+
 	spin_lock_irqsave(qpair->qp_lock_ptr, flags);
 	if (sp->type != SRB_SCSI_CMD || GET_CMD_SP(sp) != cmd) {
 		/* there's a chance an interrupt could clear
@@ -1420,6 +1423,9 @@ __qla2xxx_eh_generic_reset(char *name, enum nexus_wait_type type,
 	if (err != 0)
 		return err;
 
+	if (fcport->deleted)
+		return SUCCESS;
+
 	ql_log(ql_log_info, vha, 0x8009,
 	    "%s RESET ISSUED nexus=%ld:%d:%llu cmd=%p.\n", name, vha->host_no,
 	    cmd->device->id, cmd->device->lun, cmd);
@@ -1533,6 +1539,9 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	if (ret != 0)
 		return ret;
 	ret = FAILED;
+
+	if (qla2x00_chip_is_down(vha))
+		return ret;
 
 	ql_log(ql_log_info, vha, 0x8012,
 	    "BUS RESET ISSUED nexus=%ld:%d:%llu.\n", vha->host_no, id, lun);
@@ -1800,8 +1809,13 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 	int que;
 	struct qla_hw_data *ha = vha->hw;
 
+	/* Continue only if initialization complete. */
+	if (!ha->base_qpair)
+		return;
 	__qla2x00_abort_all_cmds(ha->base_qpair, res);
 
+	if (!ha->queue_pair_map)
+		return;
 	for (que = 0; que < ha->max_qpairs; que++) {
 		if (!ha->queue_pair_map[que])
 			continue;
@@ -2477,7 +2491,7 @@ static struct isp_operations qla27xx_isp_ops = {
 	.config_rings		= qla24xx_config_rings,
 	.reset_adapter		= qla24xx_reset_adapter,
 	.nvram_config		= qla81xx_nvram_config,
-	.update_fw_options	= qla81xx_update_fw_options,
+	.update_fw_options	= qla24xx_update_fw_options,
 	.load_risc		= qla81xx_load_risc,
 	.pci_info_str		= qla24xx_pci_info_str,
 	.fw_version_str		= qla24xx_fw_version_str,
@@ -3154,6 +3168,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		ql_log(ql_log_fatal, base_vha, 0x003d,
 		    "Failed to allocate memory for queue pointers..."
 		    "aborting.\n");
+		ret = -ENODEV;
 		goto probe_failed;
 	}
 
@@ -4716,7 +4731,7 @@ qla2x00_mem_free(struct qla_hw_data *ha)
 	mempool_destroy(ha->ctx_mempool);
 	ha->ctx_mempool = NULL;
 
-	if (ql2xenabledif) {
+	if (ql2xenabledif && ha->dif_bundl_pool) {
 		struct dsd_dma *dsd, *nxt;
 
 		list_for_each_entry_safe(dsd, nxt, &ha->pool.unusable.head,
@@ -4739,8 +4754,7 @@ qla2x00_mem_free(struct qla_hw_data *ha)
 		}
 	}
 
-	if (ha->dif_bundl_pool)
-		dma_pool_destroy(ha->dif_bundl_pool);
+	dma_pool_destroy(ha->dif_bundl_pool);
 	ha->dif_bundl_pool = NULL;
 
 	qlt_mem_free(ha);
@@ -4812,7 +4826,7 @@ struct scsi_qla_host *qla2x00_create_host(struct scsi_host_template *sht,
 	if (!vha->gnl.l) {
 		ql_log(ql_log_fatal, vha, 0xd04a,
 		    "Alloc failed for name list.\n");
-		scsi_remove_host(vha->host);
+		scsi_host_put(vha->host);
 		return NULL;
 	}
 
@@ -4825,7 +4839,7 @@ struct scsi_qla_host *qla2x00_create_host(struct scsi_host_template *sht,
 		dma_free_coherent(&ha->pdev->dev, vha->gnl.size,
 		    vha->gnl.l, vha->gnl.ldma);
 		vha->gnl.l = NULL;
-		scsi_remove_host(vha->host);
+		scsi_host_put(vha->host);
 		return NULL;
 	}
 	INIT_DELAYED_WORK(&vha->scan.scan_work, qla_scan_work_fn);
