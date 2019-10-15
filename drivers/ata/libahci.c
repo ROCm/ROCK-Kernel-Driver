@@ -667,6 +667,24 @@ int ahci_stop_engine(struct ata_port *ap)
 	tmp &= ~PORT_CMD_START;
 	writel(tmp, port_mmio + PORT_CMD);
 
+#ifdef CONFIG_ARM64
+	/* Rev Ax of Cavium CN99XX needs a hack for port stop */
+	if (dev_is_pci(ap->host->dev) &&
+	    to_pci_dev(ap->host->dev)->vendor == 0x14e4 &&
+	    to_pci_dev(ap->host->dev)->device == 0x9027 &&
+	    midr_is_cpu_model_range(read_cpuid_id(),
+			MIDR_CPU_MODEL(ARM_CPU_IMP_BRCM, BRCM_CPU_PART_VULCAN),
+			MIDR_CPU_VAR_REV(0, 0),
+			MIDR_CPU_VAR_REV(0, MIDR_REVISION_MASK))) {
+		tmp = readl(hpriv->mmio + 0x8000);
+		udelay(100);
+		writel(tmp | (1 << 26), hpriv->mmio + 0x8000);
+		udelay(100);
+		writel(tmp & ~(1 << 26), hpriv->mmio + 0x8000);
+		dev_warn(ap->host->dev, "CN99XX SATA reset workaround applied\n");
+	}
+#endif
+
 	/* wait for engine to stop. This could be as long as 500 msec */
 	tmp = ata_wait_register(ap, port_mmio + PORT_CMD,
 				PORT_CMD_LIST_ON, PORT_CMD_LIST_ON, 1, 500);
