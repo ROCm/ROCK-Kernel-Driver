@@ -49,9 +49,6 @@
 #define LPFC_FCP_MQ_THRESHOLD_MAX	256
 #define LPFC_FCP_MQ_THRESHOLD_DEF	8
 
-/* Common buffer size to accomidate SCSI and NVME IO buffers */
-#define LPFC_COMMON_IO_BUF_SZ	768
-
 /*
  * Provide the default FCF Record attributes used by the driver
  * when nonFIP mode is configured and there is no other default
