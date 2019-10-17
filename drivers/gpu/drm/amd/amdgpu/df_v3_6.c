@@ -93,7 +93,7 @@ const struct attribute_group *df_v3_6_attr_groups[] = {
 		NULL
 };
 
-static df_v3_6_set_df_cstate(struct amdgpu_device *adev, int allow)
+static int df_v3_6_set_df_cstate(struct amdgpu_device *adev, int allow)
 {
 	int r = 0;
 
@@ -546,7 +546,7 @@ static void df_v3_6_pmc_get_count(struct amdgpu_device *adev,
 				  uint64_t config,
 				  uint64_t *count)
 {
-	uint32_t lo_base_addr, hi_base_addr, lo_val, hi_val;
+	uint32_t lo_base_addr, hi_base_addr, lo_val = 0, hi_val = 0;
 	*count = 0;
 
 	switch (adev->asic_type) {
