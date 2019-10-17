@@ -193,8 +193,14 @@ out:
 	return err;
 }
 
-static int nsim_dev_reload(struct devlink *devlink,
-			   struct netlink_ext_ack *extack)
+static int nsim_dev_reload_down(struct devlink *devlink,
+				struct netlink_ext_ack *extack)
+{
+	return 0;
+}
+
+static int nsim_dev_reload_up(struct devlink *devlink,
+			      struct netlink_ext_ack *extack)
 {
 	enum nsim_resource_id res_ids[] = {
 		NSIM_RESOURCE_IPV4_FIB, NSIM_RESOURCE_IPV4_FIB_RULES,
@@ -259,7 +265,8 @@ static int nsim_dev_flash_update(struct devlink *devlink, const char *file_name,
 }
 
 static const struct devlink_ops nsim_dev_devlink_ops = {
-	.reload = nsim_dev_reload,
+	.reload_down = nsim_dev_reload_down,
+	.reload_up = nsim_dev_reload_up,
 	.flash_update = nsim_dev_flash_update,
 };
 
