@@ -2086,7 +2086,7 @@ static inline void __skb_fill_page_desc(struct sk_buff *skb, int i,
 	 * on page_is_pfmemalloc doing the right thing(tm).
 	 */
 	frag->bv_page		  = page;
-	frag->page_offset	  = off;
+	frag->bv_offset		  = off;
 	skb_frag_size_set(frag, size);
 
 	page = compound_head(page);
@@ -2871,7 +2871,7 @@ static inline void skb_propagate_pfmemalloc(struct page *page,
  */
 static inline unsigned int skb_frag_off(const skb_frag_t *frag)
 {
-	return frag->page_offset;
+	return frag->bv_offset;
 }
 
 /**
@@ -2881,7 +2881,7 @@ static inline unsigned int skb_frag_off(const skb_frag_t *frag)
  */
 static inline void skb_frag_off_add(skb_frag_t *frag, int delta)
 {
-	frag->page_offset += delta;
+	frag->bv_offset += delta;
 }
 
 /**
@@ -2891,7 +2891,7 @@ static inline void skb_frag_off_add(skb_frag_t *frag, int delta)
  */
 static inline void skb_frag_off_set(skb_frag_t *frag, unsigned int offset)
 {
-	frag->page_offset = offset;
+	frag->bv_offset = offset;
 }
 
 /**
@@ -2902,7 +2902,7 @@ static inline void skb_frag_off_set(skb_frag_t *frag, unsigned int offset)
 static inline void skb_frag_off_copy(skb_frag_t *fragto,
 				     const skb_frag_t *fragfrom)
 {
-	fragto->page_offset = fragfrom->page_offset;
+	fragto->bv_offset = fragfrom->bv_offset;
 }
 
 /**
