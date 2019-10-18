@@ -963,10 +963,10 @@ rpcrdma_mrs_create(struct rpcrdma_xprt *r_xprt)
 
 		mr->mr_xprt = r_xprt;
 
-		spin_lock(&buf->rb_mrlock);
+		spin_lock(&buf->rb_lock);
 		list_add(&mr->mr_list, &buf->rb_mrs);
 		list_add(&mr->mr_all, &buf->rb_all_mrs);
-		spin_unlock(&buf->rb_mrlock);
+		spin_unlock(&buf->rb_lock);
 	}
 
 	r_xprt->rx_stats.mrs_allocated += count;
@@ -1085,7 +1085,6 @@ int rpcrdma_buffer_create(struct rpcrdma_xprt *r_xprt)
 
 	buf->rb_max_requests = r_xprt->rx_ep.rep_max_requests;
 	buf->rb_bc_srv_max_requests = 0;
-	spin_lock_init(&buf->rb_mrlock);
 	spin_lock_init(&buf->rb_lock);
 	INIT_LIST_HEAD(&buf->rb_mrs);
 	INIT_LIST_HEAD(&buf->rb_all_mrs);
@@ -1155,18 +1154,18 @@ rpcrdma_mrs_destroy(struct rpcrdma_buffer *buf)
 	unsigned int count;
 
 	count = 0;
-	spin_lock(&buf->rb_mrlock);
+	spin_lock(&buf->rb_lock);
 	while ((mr = list_first_entry_or_null(&buf->rb_all_mrs,
 					      struct rpcrdma_mr,
 					      mr_all)) != NULL) {
 		list_del(&mr->mr_all);
-		spin_unlock(&buf->rb_mrlock);
+		spin_unlock(&buf->rb_lock);
 
 		frwr_release_mr(mr);
 		count++;
-		spin_lock(&buf->rb_mrlock);
+		spin_lock(&buf->rb_lock);
 	}
-	spin_unlock(&buf->rb_mrlock);
+	spin_unlock(&buf->rb_lock);
 	r_xprt->rx_stats.mrs_allocated = 0;
 }
 
@@ -1219,9 +1218,9 @@ rpcrdma_mr_get(struct rpcrdma_xprt *r_xprt)
 	struct rpcrdma_buffer *buf = &r_xprt->rx_buf;
 	struct rpcrdma_mr *mr;
 
-	spin_lock(&buf->rb_mrlock);
+	spin_lock(&buf->rb_lock);
 	mr = rpcrdma_mr_pop(&buf->rb_mrs);
-	spin_unlock(&buf->rb_mrlock);
+	spin_unlock(&buf->rb_lock);
 	return mr;
 }
 
@@ -1250,9 +1249,9 @@ static void rpcrdma_mr_free(struct rpcrdma_mr *mr)
 	struct rpcrdma_buffer *buf = &r_xprt->rx_buf;
 
 	mr->mr_req = NULL;
-	spin_lock(&buf->rb_mrlock);
+	spin_lock(&buf->rb_lock);
 	rpcrdma_mr_push(mr, &buf->rb_mrs);
-	spin_unlock(&buf->rb_mrlock);
+	spin_unlock(&buf->rb_lock);
 }
 
 /**
