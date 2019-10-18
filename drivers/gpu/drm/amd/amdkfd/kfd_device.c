@@ -741,9 +741,6 @@ int kgd2kfd_pre_reset(struct kfd_dev *kfd)
 		return 0;
 	kgd2kfd_suspend(kfd);
 
-	/* hold dqm->lock to prevent further execution*/
-	dqm_lock(kfd->dqm);
-
 	kfd_signal_reset_event(kfd);
 	return 0;
 }
@@ -760,8 +757,6 @@ int kgd2kfd_post_reset(struct kfd_dev *kfd)
 
 	if (!kfd->init_complete)
 		return 0;
-
-	dqm_unlock(kfd->dqm);
 
 	ret = kfd_resume(kfd);
 	if (ret)

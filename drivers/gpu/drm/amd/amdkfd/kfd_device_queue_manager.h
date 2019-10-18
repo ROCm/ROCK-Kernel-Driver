@@ -207,6 +207,7 @@ struct device_queue_manager {
 	struct work_struct	hw_exception_work;
 	struct kfd_mem_obj	hiq_sdma_mqd;
 	uint32_t		wait_times;
+	bool			sched_running;
 };
 
 void device_queue_manager_init_cik(
