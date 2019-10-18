@@ -1271,7 +1271,7 @@ static inline int skb_flow_dissector_bpf_prog_detach(const union bpf_attr *attr)
 
 struct bpf_flow_dissector;
 bool bpf_flow_dissect(struct bpf_prog *prog, struct bpf_flow_dissector *ctx,
-		      __be16 proto, int nhoff, int hlen);
+		      __be16 proto, int nhoff, int hlen, unsigned int flags);
 
 bool __skb_flow_dissect(const struct net *net,
 			const struct sk_buff *skb,
@@ -2086,7 +2086,7 @@ static inline void __skb_fill_page_desc(struct sk_buff *skb, int i,
 	 * on page_is_pfmemalloc doing the right thing(tm).
 	 */
 	frag->bv_page		  = page;
-	frag->page_offset	  = off;
+	frag->bv_offset		  = off;
 	skb_frag_size_set(frag, size);
 
 	page = compound_head(page);
@@ -2871,7 +2871,7 @@ static inline void skb_propagate_pfmemalloc(struct page *page,
  */
 static inline unsigned int skb_frag_off(const skb_frag_t *frag)
 {
-	return frag->page_offset;
+	return frag->bv_offset;
 }
 
 /**
@@ -2881,7 +2881,7 @@ static inline unsigned int skb_frag_off(const skb_frag_t *frag)
  */
 static inline void skb_frag_off_add(skb_frag_t *frag, int delta)
 {
-	frag->page_offset += delta;
+	frag->bv_offset += delta;
 }
 
 /**
@@ -2891,7 +2891,7 @@ static inline void skb_frag_off_add(skb_frag_t *frag, int delta)
  */
 static inline void skb_frag_off_set(skb_frag_t *frag, unsigned int offset)
 {
-	frag->page_offset = offset;
+	frag->bv_offset = offset;
 }
 
 /**
@@ -2902,7 +2902,7 @@ static inline void skb_frag_off_set(skb_frag_t *frag, unsigned int offset)
 static inline void skb_frag_off_copy(skb_frag_t *fragto,
 				     const skb_frag_t *fragfrom)
 {
-	fragto->page_offset = fragfrom->page_offset;
+	fragto->bv_offset = fragfrom->bv_offset;
 }
 
 /**
@@ -4133,8 +4133,17 @@ static inline void *skb_ext_find(const struct sk_buff *skb, enum skb_ext_id id)
 
 	return NULL;
 }
+
+static inline void skb_ext_reset(struct sk_buff *skb)
+{
+	if (unlikely(skb->active_extensions)) {
+		__skb_ext_put(skb->extensions);
+		skb->active_extensions = 0;
+	}
+}
 #else
 static inline void skb_ext_put(struct sk_buff *skb) {}
+static inline void skb_ext_reset(struct sk_buff *skb) {}
 static inline void skb_ext_del(struct sk_buff *skb, int unused) {}
 static inline void __skb_ext_copy(struct sk_buff *d, const struct sk_buff *s) {}
 static inline void skb_ext_copy(struct sk_buff *dst, const struct sk_buff *s) {}
