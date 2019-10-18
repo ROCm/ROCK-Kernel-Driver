@@ -4,7 +4,6 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 
-#ifdef BUILD_AS_DKMS
 #ifndef PCI_EXP_DEVCAP2_ATOMIC_ROUTE
 #define PCI_EXP_DEVCAP2_ATOMIC_ROUTE	0x00000040 /* Atomic Op routing */
 #endif
