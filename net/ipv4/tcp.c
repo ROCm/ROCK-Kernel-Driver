@@ -1789,18 +1789,18 @@ static int tcp_zerocopy_receive(struct sock *sk,
 				break;
 			frags = skb_shinfo(skb)->frags;
 			while (offset) {
-				if (frags->size > offset)
+				if (skb_frag_size(frags) > offset)
 					goto out;
-				offset -= frags->size;
+				offset -= skb_frag_size(frags);
 				frags++;
 			}
 		}
-		if (frags->size != PAGE_SIZE || frags->page_offset) {
+		if (skb_frag_size(frags) != PAGE_SIZE || skb_frag_off(frags)) {
 			int remaining = zc->recv_skip_hint;
 
-			while (remaining && (frags->size != PAGE_SIZE ||
-					     frags->page_offset)) {
-				remaining -= frags->size;
+			while (remaining && (skb_frag_size(frags) != PAGE_SIZE ||
+					     skb_frag_off(frags))) {
+				remaining -= skb_frag_size(frags);
 				frags++;
 			}
 			zc->recv_skip_hint -= remaining;
@@ -3794,8 +3794,8 @@ int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *hp,
 		return 1;
 
 	for (i = 0; i < shi->nr_frags; ++i) {
-		const struct skb_frag_struct *f = &shi->frags[i];
-		unsigned int offset = f->page_offset;
+		const skb_frag_t *f = &shi->frags[i];
+		unsigned int offset = skb_frag_off(f);
 		struct page *page = skb_frag_page(f) + (offset >> PAGE_SHIFT);
 
 		sg_set_page(&sg, page, skb_frag_size(f),
