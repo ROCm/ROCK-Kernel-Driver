@@ -43,7 +43,9 @@
 #include <linux/interval_tree.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
+#ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
+#endif
 #include <drm/drm_drv.h>
 #include <drm/drm_device.h>
 #include <kgd_kfd_interface.h>
