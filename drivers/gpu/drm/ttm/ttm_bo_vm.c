@@ -79,7 +79,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 #endif
 
 		ttm_bo_get(bo);
-		up_read(&vmf->vma->vm_mm->mmap_sem);
+		up_read(&vma->vm_mm->mmap_sem);
 		(void) dma_fence_wait(bo->moving, true);
 		kcl_reservation_object_unlock(bo->resv);
 		ttm_bo_put(bo);
