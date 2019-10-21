@@ -47,7 +47,9 @@
 #include <drm/drm_file.h>
 #endif
 #include <drm/drm_drv.h>
+#ifdef HAVE_DRM_DEVICE_H
 #include <drm/drm_device.h>
+#endif
 #include <kgd_kfd_interface.h>
 
 #include "amd_shared.h"
