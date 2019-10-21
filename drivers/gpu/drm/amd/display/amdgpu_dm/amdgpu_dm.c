@@ -620,7 +620,9 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 	struct drm_device *dev = dev_get_drvdata(kdev);
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter conn_iter;
+#endif
 	struct amdgpu_dm_connector *aconnector;
 	int ret = 0;
 
@@ -628,8 +630,12 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 
 	mutex_lock(&adev->dm.audio_lock);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->audio_inst != port)
 			continue;
@@ -640,7 +646,9 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 
 		break;
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&conn_iter);
+#endif
 
 	mutex_unlock(&adev->dm.audio_lock);
 
@@ -1296,11 +1304,17 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	int ret = 0;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type == dc_connection_mst_branch &&
 		    aconnector->mst_mgr.aux) {
@@ -1317,7 +1331,9 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 			}
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 
 	return ret;
 }
@@ -1361,13 +1377,19 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct drm_dp_mst_topology_mgr *mgr;
 	int ret;
 	bool need_hotplug = false;
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, dev) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type != dc_connection_mst_branch ||
 		    aconnector->mst_port)
@@ -1385,7 +1407,9 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 			}
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 
 	if (need_hotplug)
 		drm_kms_helper_hotplug_event(dev);
@@ -1573,7 +1597,9 @@ static int dm_resume(void *handle)
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *new_crtc_state;
 	struct dm_crtc_state *dm_new_crtc_state;
@@ -1606,8 +1632,12 @@ static int dm_resume(void *handle)
 	s3_handle_mst(ddev, false);
 
 	/* Do detection*/
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(ddev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	drm_for_each_connector(connector, ddev) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 
 		/*
@@ -1635,7 +1665,9 @@ static int dm_resume(void *handle)
 		amdgpu_dm_update_connector_after_detect(aconnector);
 		mutex_unlock(&aconnector->hpd_lock);
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 
 	/* Force mode set in atomic commit */
 #if !defined(for_each_new_crtc_in_state)

@@ -3219,7 +3219,9 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 	struct amdgpu_device *adev;
 	struct drm_crtc *crtc;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	int r;
 
 	if (dev == NULL || dev->dev_private == NULL) {
@@ -3242,11 +3244,17 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 	if (!amdgpu_device_has_dc_support(adev)) {
 		/* turn off display hw */
 		drm_modeset_lock_all(dev);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_begin(dev, &iter);
 		drm_for_each_connector_iter(connector, &iter)
+#else
+		drm_for_each_connector(connector, dev)
+#endif
 			drm_helper_connector_dpms(connector,
 						  DRM_MODE_DPMS_OFF);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_end(&iter);
+#endif
 		drm_modeset_unlock_all(dev);
 			/* unpin the front buffers and cursors */
 		list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
@@ -3321,7 +3329,9 @@ int amdgpu_device_suspend(struct drm_device *dev, bool suspend, bool fbcon)
 int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 {
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct amdgpu_device *adev = dev->dev_private;
 	struct drm_crtc *crtc;
 	int r = 0;
@@ -3393,11 +3403,17 @@ int amdgpu_device_resume(struct drm_device *dev, bool resume, bool fbcon)
 			/* turn on display hw */
 			drm_modeset_lock_all(dev);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 			drm_connector_list_iter_begin(dev, &iter);
 			drm_for_each_connector_iter(connector, &iter)
+#else
+			drm_for_each_connector(connector, dev)
+#endif
 				drm_helper_connector_dpms(connector,
 							  DRM_MODE_DPMS_ON);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 			drm_connector_list_iter_end(&iter);
+#endif
 
 			drm_modeset_unlock_all(dev);
 		}
