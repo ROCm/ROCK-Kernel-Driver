@@ -17,4 +17,5 @@ drm/drm_util.h kcl/kcl_drm_util_h.h
 linux/sched/signal.h kcl/kcl_sched_signal_h.h
 drm/drm_probe_helper.h kcl/kcl_drm_probe_helper_h.h
 drm/drm_drv.h kcl/kcl_drm_drv_h.h
+drm/drm_device.h kcl/kcl_drm_device_h.h
 
