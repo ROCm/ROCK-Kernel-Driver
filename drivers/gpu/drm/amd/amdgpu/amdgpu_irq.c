@@ -309,6 +309,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	adev->irq.msi_enabled = false;
 
 	if (amdgpu_msi_ok(adev)) {
+#ifdef PCI_IRQ_MSI
 		int nvec = pci_msix_vec_count(adev->pdev);
 		unsigned int flags;
 
@@ -320,6 +321,10 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		/* we only need one vector */
 		nvec = pci_alloc_irq_vectors(adev->pdev, 1, 1, flags);
 		if (nvec > 0) {
+#else
+		r = pci_enable_msi(adev->pdev);
+		if (!r) {
+#endif
 			adev->irq.msi_enabled = true;
 			dev_dbg(adev->dev, "using MSI/MSI-X.\n");
 		}
