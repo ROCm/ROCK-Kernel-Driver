@@ -352,7 +352,7 @@ enum {
  */
 #ifdef SUPPORT_VGA_SWITCHEROO
 #define use_vga_switcheroo(chip)	((chip)->use_vga_switcheroo)
-#define needs_eld_notify_link(chip)	((chip)->need_eld_notify_link)
+#define needs_eld_notify_link(chip)	((chip)->bus.keep_power)
 #else
 #define use_vga_switcheroo(chip)	0
 #define needs_eld_notify_link(chip)	false
@@ -1141,7 +1141,7 @@ static int azx_runtime_idle(struct device *dev)
 		return -EBUSY;
 
 	/* ELD notification gets broken when HD-audio bus is off */
-	if (needs_eld_notify_link(hda))
+	if (needs_eld_notify_link(chip))
 		return -EBUSY;
 
 	return 0;
@@ -1252,7 +1252,7 @@ static void setup_vga_switcheroo_runtime_pm(struct azx *chip)
 	struct hda_intel *hda = container_of(chip, struct hda_intel, chip);
 	struct hda_codec *codec;
 
-	if (hda->use_vga_switcheroo && !hda->need_eld_notify_link) {
+	if (hda->use_vga_switcheroo && !needs_eld_notify_link(chip)) {
 		list_for_each_codec(codec, &chip->bus)
 			codec->auto_runtime_pm = 1;
 		/* reset the power save setup */
@@ -1266,10 +1266,9 @@ static void azx_vs_gpu_bound(struct pci_dev *pci,
 {
 	struct snd_card *card = pci_get_drvdata(pci);
 	struct azx *chip = card->private_data;
-	struct hda_intel *hda = container_of(chip, struct hda_intel, chip);
 
 	if (client_id == VGA_SWITCHEROO_DIS)
-		hda->need_eld_notify_link = 0;
+		chip->bus.keep_power = 0;
 	setup_vga_switcheroo_runtime_pm(chip);
 }
 
@@ -1281,7 +1280,7 @@ static void init_vga_switcheroo(struct azx *chip)
 		dev_info(chip->card->dev,
 			 "Handle vga_switcheroo audio client\n");
 		hda->use_vga_switcheroo = 1;
-		hda->need_eld_notify_link = 1; /* cleared in gpu_bound op */
+		chip->bus.keep_power = 1; /* cleared in either gpu_bound op or codec probe */
 		chip->driver_caps |= AZX_DCAPS_PM_RUNTIME;
 		pci_dev_put(p);
 	}
