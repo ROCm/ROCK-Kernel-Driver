@@ -174,6 +174,7 @@ m4_include([m4/drm-atomic-nonblocking-commit.m4])
 m4_include([m4/drm-atomic-state-put.m4])
 m4_include([m4/drm-device-filelist-mutex.m4])
 m4_include([m4/drm-connector-list-iter-begin.m4])
+m4_include([m4/drm-display-info.m4])
 m4_include([m4/config.m4])
 
 
