@@ -668,11 +668,7 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 		if (WARN_ON(ticket))
 			return -EBUSY;
 
-#if defined(BUILD_AS_DKMS)
-		success = kcl_reservation_object_trylock(bo->resv);
-#else
 		success = reservation_object_trylock(bo->resv);
-#endif
 		return success ? 0 : -EBUSY;
 	}
 

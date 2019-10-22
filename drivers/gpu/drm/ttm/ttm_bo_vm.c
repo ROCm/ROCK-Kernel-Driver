@@ -149,7 +149,7 @@ static vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
-	if (unlikely(!kcl_reservation_object_trylock(bo->resv))) {
+	if (unlikely(!reservation_object_trylock(bo->resv))) {
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 #ifdef FAULT_FLAG_RETRY_NOWAIT
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {

@@ -106,21 +106,11 @@ kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
 
 #if !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 static inline bool __must_check
-_kcl_reservation_object_trylock(struct reservation_object *obj)
+reservation_object_trylock(struct reservation_object *obj)
 {
 	return ww_mutex_trylock(&obj->lock);
 }
 #endif
-
-static inline bool __must_check
-kcl_reservation_object_trylock(struct reservation_object *obj)
-{
-#if !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
-	return _kcl_reservation_object_trylock(obj);
-#else
-	return reservation_object_trylock(obj);
-#endif
-}
 
 #if !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 bool _kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,

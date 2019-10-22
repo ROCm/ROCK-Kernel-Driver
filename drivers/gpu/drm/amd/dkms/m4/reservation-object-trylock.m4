@@ -8,7 +8,8 @@ AC_DEFUN([AC_AMDGPU_RESERVATION_OBJECT_TRYLOCK],
 	AC_KERNEL_TRY_COMPILE([
 		#include <linux/reservation.h>
 	],[
-		reservation_object_trylock(NULL);
+		int r;
+		r = reservation_object_trylock(NULL);
 	],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_RESERVATION_OBJECT_TRYLOCK, 1, [reservation_object_trylock() is available])

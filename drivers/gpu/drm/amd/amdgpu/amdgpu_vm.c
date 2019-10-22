@@ -2042,7 +2042,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 		spin_unlock(&vm->invalidated_lock);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
-		if (!amdgpu_vm_debug && kcl_reservation_object_trylock(resv))
+		if (!amdgpu_vm_debug && reservation_object_trylock(resv))
 			clear = false;
 		/* Somebody else is using the BO right now */
 		else

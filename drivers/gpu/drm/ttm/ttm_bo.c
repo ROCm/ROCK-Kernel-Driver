@@ -449,7 +449,7 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 	if (bo->resv == &bo->ttm_resv)
 		return 0;
 
-	BUG_ON(!kcl_reservation_object_trylock(&bo->ttm_resv));
+	BUG_ON(!reservation_object_trylock(&bo->ttm_resv));
 
 	r = kcl_reservation_object_copy_fences(&bo->ttm_resv, bo->resv);
 	if (r)
@@ -496,7 +496,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 	}
 
 	spin_lock(&glob->lru_lock);
-	ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+	ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 	if (!ret) {
 		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
@@ -583,7 +583,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_lock(&glob->lru_lock);
-		if (unlock_resv && !kcl_reservation_object_trylock(bo->resv)) {
+		if (unlock_resv && !reservation_object_trylock(bo->resv)) {
 			/*
 			 * We raced, and lost, someone else holds the reservation now,
 			 * and is probably busy in ttm_bo_cleanup_memtype_use.
@@ -646,7 +646,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 
-		} else if (kcl_reservation_object_trylock(bo->resv)) {
+		} else if (reservation_object_trylock(bo->resv)) {
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 		} else {
 			spin_unlock(&glob->lru_lock);
@@ -797,7 +797,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 		if (busy)
 			*busy = false;
 	} else {
-		*locked = kcl_reservation_object_trylock(bo->resv);
+		*locked = reservation_object_trylock(bo->resv);
 		ret = *locked;
 		if (busy)
 			*busy = !ret;
@@ -1371,7 +1371,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	 * since otherwise lockdep will be angered in radeon.
 	 */
 	if (!resv) {
-		locked = kcl_reservation_object_trylock(bo->resv);
+		locked = reservation_object_trylock(bo->resv);
 		WARN_ON(!locked);
 	}
 
