@@ -29,6 +29,12 @@
 /* buffer filled with zeros, used for padding */
 static u8 *zero_buffer;
 
+/*
+ * variable used to avoid double free of resources in case
+ * algorithm registration was unsuccessful
+ */
+static bool init_done;
+
 static void rsa_io_unmap(struct device *dev, struct rsa_edesc *edesc,
 			 struct akcipher_request *req)
 {
@@ -1077,6 +1083,7 @@ int caam_pkc_init(struct device *ctrldev)
 	struct caam_drv_private *priv = dev_get_drvdata(ctrldev);
 	u32 pk_inst;
 	int err;
+	init_done = false;
 
 	/* Determine public key hardware accelerator presence. */
 	if (priv->era < 10)
@@ -1101,6 +1108,7 @@ int caam_pkc_init(struct device *ctrldev)
 		dev_warn(ctrldev, "%s alg registration failed\n",
 			 caam_rsa.base.cra_driver_name);
 	} else {
+		init_done = true;
 		dev_info(ctrldev, "caam pkc algorithms registered in /proc/crypto\n");
 	}
 
@@ -1109,6 +1117,9 @@ int caam_pkc_init(struct device *ctrldev)
 
 void caam_pkc_exit(void)
 {
+	if (!init_done)
+		return;
+
 	kfree(zero_buffer);
 	crypto_unregister_akcipher(&caam_rsa);
 }
