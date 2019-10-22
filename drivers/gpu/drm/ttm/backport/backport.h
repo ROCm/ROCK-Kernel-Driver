@@ -4,7 +4,7 @@
 #include <linux/version.h>
 #include <kcl/kcl_drm_vma_manager.h>
 #include <kcl/kcl_drm_backport.h>
-#include <kcl/kcl_reservation.h>
+#include <kcl/kcl_reservation_backport.h>
 #include <kcl/kcl_mm.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_list.h>

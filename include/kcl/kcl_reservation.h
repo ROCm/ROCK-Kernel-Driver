@@ -4,21 +4,6 @@
 #include <linux/reservation.h>
 #include <linux/ww_mutex.h>
 
-#if !defined(HAVE_RESERVATION_OBJECT_RESERVE_SHARED)
-extern int _kcl_reservation_object_reserve_shared(struct reservation_object *obj,
-				      unsigned int num_fences);
-#endif
-static inline int
-kcl_reservation_object_reserve_shared(struct reservation_object *obj,
-				      unsigned int num_fences)
-{
-#if !defined(HAVE_RESERVATION_OBJECT_RESERVE_SHARED)
-        return _kcl_reservation_object_reserve_shared(obj,num_fences);
-#else
-        return reservation_object_reserve_shared(obj,num_fences);
-#endif
-}
-
 #if !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
 extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
