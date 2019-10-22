@@ -6050,8 +6050,10 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 
 	stream->dm_stream_context = aconnector;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING
 	stream->timing.flags.LTE_340MCSC_SCRAMBLE =
 		drm_connector->display_info.hdmi.scdc.scrambling.low_rates;
+#endif
 
 	list_for_each_entry(preferred_mode, &aconnector->base.modes, head) {
 		/* Search for preferred mode */
