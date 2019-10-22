@@ -1,0 +1,22 @@
+#ifndef AMDKCL_DRM_BACKPORT_H
+#define AMDKCL_DRM_BACKPORT_H
+
+#include <drm/drm_edid.h>
+#include <kcl/kcl_drm.h>
+
+#if defined(HAVE_DRM_EDID_TO_ELD)
+static inline
+int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
+{
+	int ret;
+
+	ret = drm_add_edid_modes(connector, edid);
+
+	if (drm_edid_is_valid(edid))
+		drm_edid_to_eld(connector, edid);
+
+	return ret;
+}
+#define drm_add_edid_modes _kcl_drm_add_edid_modes
+#endif
+#endif
