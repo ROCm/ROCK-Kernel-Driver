@@ -988,7 +988,9 @@ static int psr_get(void *data, u64 *val)
 }
 
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(psr_fops, psr_get, NULL, "%llu\n");
+#endif
 
 void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 {
@@ -1003,8 +1005,11 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 					    dp_debugfs_entries[i].fops);
 		}
 	}
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_eDP)
 		debugfs_create_file_unsafe("psr_state", 0444, dir, connector, &psr_fops);
+#endif
 
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("force_yuv420_output", 0644, dir, connector,
