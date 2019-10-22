@@ -76,18 +76,6 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
-void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
-				const struct fb_fillrect *rect);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);
-
-void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
-				const struct fb_copyarea *area);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_copyarea);
-
-void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
-				 const struct fb_image *image);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
-
 void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
 
@@ -102,45 +90,50 @@ void
 				struct drm_atomic_state *old_state);
 EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
 
+
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 /**
- * _kcl_drm_fb_helper_cfb_fillrect_stub - wrapper around cfb_fillrect
+ * _kcl_drm_fb_helper_cfb_fillrect - wrapper around cfb_fillrect
  * @info: fbdev registered by the helper
  * @rect: info about rectangle to fill
  *
  * A wrapper around cfb_imageblit implemented by fbdev core
  */
-void _kcl_drm_fb_helper_cfb_fillrect_stub(struct fb_info *info,
+void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
 	cfb_fillrect(info, rect);
 }
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_fillrect);
 
 /**
- * _kcl_drm_fb_helper_cfb_copyarea_stub - wrapper around cfb_copyarea
+ * _kcl_drm_fb_helper_cfb_copyarea - wrapper around cfb_copyarea
  * @info: fbdev registered by the helper
  * @area: info about area to copy
  *
  * A wrapper around cfb_copyarea implemented by fbdev core
  */
-void _kcl_drm_fb_helper_cfb_copyarea_stub(struct fb_info *info,
+void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
 	cfb_copyarea(info, area);
 }
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_copyarea);
 
 /**
- * _kcl_drm_fb_helper_cfb_imageblit_stub - wrapper around cfb_imageblit
+ * _kcl_drm_fb_helper_cfb_imageblit - wrapper around cfb_imageblit
  * @info: fbdev registered by the helper
  * @image: info about image to blit
  *
  * A wrapper around cfb_imageblit implemented by fbdev core
  */
-void _kcl_drm_fb_helper_cfb_imageblit_stub(struct fb_info *info,
+void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
 	cfb_imageblit(info, image);
 }
-
+EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
+#endif
 /**
  * _kcl_drm_fb_helper_alloc_fbi_stub - allocate fb_info and some of its members
  * @fb_helper: driver-allocated fbdev helper
@@ -530,12 +523,6 @@ EXPORT_SYMBOL(drm_atomic_helper_resume);
 
 void amdkcl_drm_init(void)
 {
-	_kcl_drm_fb_helper_cfb_fillrect = amdkcl_fp_setup("drm_fb_helper_cfb_fillrect",
-					_kcl_drm_fb_helper_cfb_fillrect_stub);
-	_kcl_drm_fb_helper_cfb_copyarea = amdkcl_fp_setup("drm_fb_helper_cfb_copyarea",
-					_kcl_drm_fb_helper_cfb_copyarea_stub);
-	_kcl_drm_fb_helper_cfb_imageblit = amdkcl_fp_setup("drm_fb_helper_cfb_imageblit",
-					_kcl_drm_fb_helper_cfb_imageblit_stub);
 	_kcl_drm_fb_helper_alloc_fbi = amdkcl_fp_setup("drm_fb_helper_alloc_fbi",
 					_kcl_drm_fb_helper_alloc_fbi_stub);
 	_kcl_drm_fb_helper_unregister_fbi = amdkcl_fp_setup("drm_fb_helper_unregister_fbi",

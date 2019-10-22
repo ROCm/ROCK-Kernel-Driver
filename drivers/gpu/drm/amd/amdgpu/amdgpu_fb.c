@@ -86,9 +86,9 @@ static struct fb_ops amdgpufb_ops = {
 #endif
 	.fb_open = amdgpufb_open,
 	.fb_release = amdgpufb_release,
-	.fb_fillrect = kcl_drm_fb_helper_cfb_fillrect,
-	.fb_copyarea = kcl_drm_fb_helper_cfb_copyarea,
-	.fb_imageblit = kcl_drm_fb_helper_cfb_imageblit,
+	.fb_fillrect = drm_fb_helper_cfb_fillrect,
+	.fb_copyarea = drm_fb_helper_cfb_copyarea,
+	.fb_imageblit = drm_fb_helper_cfb_imageblit,
 };
 
 
