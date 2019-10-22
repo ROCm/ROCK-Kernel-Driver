@@ -5,4 +5,5 @@
 #include <kcl/reservation.h>
 #include <kcl/kcl_mm.h>
 #include <kcl/kcl_dma_mapping.h>
+#include <kcl/kcl_drm_backport.h>
 #endif
