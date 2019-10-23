@@ -498,7 +498,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 	spin_lock(&glob->lru_lock);
 	ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 	if (!ret) {
-		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
+		if (reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&glob->lru_lock);
 			if (bo->resv != &bo->ttm_resv)
@@ -561,7 +561,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	else
 		resv = &bo->ttm_resv;
 
-	if (kcl_reservation_object_test_signaled_rcu(resv, true))
+	if (reservation_object_test_signaled_rcu(resv, true))
 		ret = 0;
 	else
 		ret = -EBUSY;
@@ -1815,7 +1815,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	long timeout = 15 * HZ;
 
 	if (no_wait) {
-		if (kcl_reservation_object_test_signaled_rcu(bo->resv, true))
+		if (reservation_object_test_signaled_rcu(bo->resv, true))
 			return 0;
 		else
 			return -EBUSY;

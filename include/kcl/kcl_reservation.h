@@ -56,18 +56,13 @@ reservation_object_trylock(struct reservation_object *obj)
 #if !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 bool _kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
 					       bool test_all);
-#endif
-
-static inline bool
-kcl_reservation_object_test_signaled_rcu(struct reservation_object *obj,
-					 bool test_all)
+static inline
+bool reservation_object_test_signaled_rcu(struct reservation_object *obj,
+					  bool test_all)
 {
-#if !defined(HAVE_RESERVATION_OBJECT_TEST_SIGNALED_RCU)
 	return _kcl_reservation_object_test_signaled_rcu(obj, test_all);
-#else
-	return reservation_object_test_signaled_rcu(obj, test_all);
-#endif
 }
+#endif
 
 #if !defined(HAVE_RESERVATION_OBJECT_ADD_SHARED_FENCE)
 extern void _kcl_reservation_object_add_shared_fence(
