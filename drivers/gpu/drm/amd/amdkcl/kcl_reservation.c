@@ -37,7 +37,7 @@
  * Modifications [2017-07-06] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if !defined(HAVE_RESERVATION_OBJECT_WAIT_TIMEOUT_RCU)
+#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
 					 bool wait_all, bool intr,
 					 unsigned long timeout)
