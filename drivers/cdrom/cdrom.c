@@ -289,7 +289,7 @@
 /* used to tell the module to turn on full debugging messages */
 static bool debug;
 /* default compatibility mode */
-static bool autoclose=1;
+static bool autoclose = 0; /* we ship /usr/lib/sysctl.d/50-default.conf:dev.cdrom.autoclose = 0 */
 static bool autoeject;
 static bool lockdoor = 1;
 /* will we ever get to use this... sigh. */
