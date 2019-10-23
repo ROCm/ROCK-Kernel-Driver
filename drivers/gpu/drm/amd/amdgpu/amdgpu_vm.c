@@ -3014,6 +3014,16 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		vm->pasid = 0;
 	}
 
+	list_for_each_entry_safe(mapping, tmp, &vm->freed, list) {
+		if (mapping->flags & AMDGPU_PTE_PRT && prt_fini_needed) {
+			amdgpu_vm_prt_fini(adev, vm);
+			prt_fini_needed = false;
+		}
+
+		list_del(&mapping->list);
+		amdgpu_vm_free_mapping(adev, vm, mapping, NULL);
+	}
+
 	amdgpu_vm_free_pts(adev, vm, NULL);
 	amdgpu_bo_unreserve(root);
 	amdgpu_bo_unref(&root);
@@ -3040,15 +3050,6 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		 */
 		list_del(&mapping->list);
 		kfree(mapping);
-	}
-	list_for_each_entry_safe(mapping, tmp, &vm->freed, list) {
-		if (mapping->flags & AMDGPU_PTE_PRT && prt_fini_needed) {
-			amdgpu_vm_prt_fini(adev, vm);
-			prt_fini_needed = false;
-		}
-
-		list_del(&mapping->list);
-		amdgpu_vm_free_mapping(adev, vm, mapping, NULL);
 	}
 
 	dma_fence_put(vm->last_update);
