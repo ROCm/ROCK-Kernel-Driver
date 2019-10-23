@@ -2,6 +2,7 @@
 #define AMDKCL_DRM_BACKPORT_H
 
 #include <drm/drm_edid.h>
+#include <drm/drm_cache.h>
 #include <kcl/kcl_drm.h>
 
 #if defined(HAVE_DRM_EDID_TO_ELD)
@@ -18,5 +19,9 @@ int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 	return ret;
 }
 #define drm_add_edid_modes _kcl_drm_add_edid_modes
+#endif
+
+#ifdef BUILD_AS_DKMS
+#define drm_arch_can_wc_memory kcl_drm_arch_can_wc_memory
 #endif
 #endif
