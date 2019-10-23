@@ -948,7 +948,7 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 	if (no_wait_gpu)
 		return -EBUSY;
 
-	kcl_reservation_object_add_shared_fence(bo->resv, fence);
+	reservation_object_add_shared_fence(bo->resv, fence);
 
 	ret = reservation_object_reserve_shared(bo->resv, 1);
 	if (unlikely(ret)) {
