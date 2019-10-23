@@ -1045,6 +1045,18 @@ static void cdrom_count_tracks(struct cdrom_device_info *cdi, tracktype *tracks)
 	       tracks->cdi, tracks->xa);
 }
 
+static int cdrom_tray_close(struct cdrom_device_info *cdi)
+{
+	int ret;
+
+	ret = cdi->ops->tray_move(cdi, 0);
+	if (ret || !cdi->ops->drive_status)
+		return ret;
+
+	return poll_event_interruptible(CDS_TRAY_OPEN !=
+			cdi->ops->drive_status(cdi, CDSL_CURRENT), 500);
+}
+
 static
 int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 {
@@ -1063,7 +1075,9 @@ int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 			if (CDROM_CAN(CDC_CLOSE_TRAY) &&
 			    cdi->options & CDO_AUTO_CLOSE) {
 				cd_dbg(CD_OPEN, "trying to close the tray\n");
-				ret=cdo->tray_move(cdi,0);
+				ret = cdrom_tray_close(cdi);
+				if (ret == -ERESTARTSYS)
+					return ret;
 				if (ret) {
 					cd_dbg(CD_OPEN, "bummer. tried to close the tray but failed.\n");
 					/* Ignore the error from the low
@@ -1085,6 +1099,15 @@ int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 				return -ENOMEDIUM;
 			}
 			cd_dbg(CD_OPEN, "the tray is now closed\n");
+		}
+		/* the door should be closed now, check for the disc */
+		if (ret == CDS_DRIVE_NOT_READY) {
+			int poll_res = poll_event_interruptible(
+				CDS_DRIVE_NOT_READY !=
+				(ret = cdo->drive_status(cdi, CDSL_CURRENT)),
+				500);
+			if (poll_res == -ERESTARTSYS)
+				return poll_res;
 		}
 		if (ret != CDS_DISC_OK)
 			return -ENOMEDIUM;
