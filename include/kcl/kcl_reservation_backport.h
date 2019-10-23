@@ -38,4 +38,8 @@ int _kcl_reservation_object_reserve_shared(struct reservation_object *obj,
 #define reservation_object_wait_timeout_rcu _kcl_reservation_object_wait_timeout_rcu
 #endif
 
+#if defined(BUILD_AS_DKMS)
+#define reservation_object_get_fences_rcu _kcl_reservation_object_get_fences_rcu
+#endif
+
 #endif
