@@ -12,41 +12,18 @@ extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *
 
 #if !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline int
-_kcl_reservation_object_lock(struct reservation_object *obj,
+reservation_object_lock(struct reservation_object *obj,
 				struct ww_acquire_ctx *ctx)
 {
 	return ww_mutex_lock(&obj->lock, ctx);
 }
-#endif
 
-static inline int
-kcl_reservation_object_lock(struct reservation_object *obj,
-				struct ww_acquire_ctx *ctx)
-{
-#if !defined(HAVE_RESERVATION_OBJECT_LOCK)
-	return _kcl_reservation_object_lock(obj, ctx);
-#else
-	return reservation_object_lock(obj, ctx);
-#endif
-}
-
-#if !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline void
-_kcl_reservation_object_unlock(struct reservation_object *obj)
+reservation_object_unlock(struct reservation_object *obj)
 {
 	ww_mutex_unlock(&obj->lock);
 }
 #endif
-
-static inline void
-kcl_reservation_object_unlock(struct reservation_object *obj)
-{
-#if !defined(HAVE_RESERVATION_OBJECT_LOCK)
-	return _kcl_reservation_object_unlock(obj);
-#else
-	return reservation_object_unlock(obj);
-#endif
-}
 
 #if !defined(HAVE_RESERVATION_OBJECT_COPY_FENCES)
 extern int _kcl_reservation_object_copy_fences(struct reservation_object *dst,

@@ -2053,7 +2053,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 			return r;
 
 		if (!clear)
-			kcl_reservation_object_unlock(resv);
+			reservation_object_unlock(resv);
 		spin_lock(&vm->invalidated_lock);
 	}
 	spin_unlock(&vm->invalidated_lock);

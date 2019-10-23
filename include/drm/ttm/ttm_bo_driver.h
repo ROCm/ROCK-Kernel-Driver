@@ -679,11 +679,7 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 		ret = reservation_object_lock_interruptible(bo->resv, ticket);
 #endif
 	else
-#if defined(BUILD_AS_DKMS)
-		ret = kcl_reservation_object_lock(bo->resv, ticket);
-#else
 		ret = reservation_object_lock(bo->resv, ticket);
-#endif
 	if (ret == -EINTR)
 		return -ERESTARTSYS;
 	return ret;
@@ -795,11 +791,7 @@ static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 	else
 		ttm_bo_move_to_lru_tail(bo, NULL);
 	spin_unlock(&bo->bdev->glob->lru_lock);
-#if defined(BUILD_AS_DKMS)
-	kcl_reservation_object_unlock(bo->resv);
-#else
 	reservation_object_unlock(bo->resv);
-#endif
 }
 
 /*

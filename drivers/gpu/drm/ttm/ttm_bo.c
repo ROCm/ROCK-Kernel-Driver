@@ -453,7 +453,7 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 
 	r = kcl_reservation_object_copy_fences(&bo->ttm_resv, bo->resv);
 	if (r)
-		kcl_reservation_object_unlock(&bo->ttm_resv);
+		reservation_object_unlock(&bo->ttm_resv);
 
 	return r;
 }
@@ -502,10 +502,10 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&glob->lru_lock);
 			if (bo->resv != &bo->ttm_resv)
-				kcl_reservation_object_unlock(&bo->ttm_resv);
+				reservation_object_unlock(&bo->ttm_resv);
 
 			ttm_bo_cleanup_memtype_use(bo);
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 			return;
 		}
 
@@ -521,10 +521,10 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 			ttm_bo_add_to_lru(bo);
 		}
 
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 	}
 	if (bo->resv != &bo->ttm_resv)
-		kcl_reservation_object_unlock(&bo->ttm_resv);
+		reservation_object_unlock(&bo->ttm_resv);
 
 error:
 	kref_get(&bo->list_kref);
@@ -570,7 +570,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 		long lret;
 
 		if (unlock_resv)
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 
 		lret = reservation_object_wait_timeout_rcu(resv, true,
@@ -600,7 +600,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 
 	if (ret || unlikely(list_empty(&bo->ddestroy))) {
 		if (unlock_resv)
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 		return ret;
 	}
@@ -613,7 +613,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	ttm_bo_cleanup_memtype_use(bo);
 
 	if (unlock_resv)
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 
 	return 0;
 }
@@ -641,7 +641,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 
 		if (remove_all || bo->resv != &bo->ttm_resv) {
 			spin_unlock(&glob->lru_lock);
-			kcl_reservation_object_lock(bo->resv, NULL);
+			reservation_object_lock(bo->resv, NULL);
 
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
@@ -828,7 +828,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		r = kcl_reservation_object_lock_interruptible(busy_bo->resv,
 							  ticket);
 	else
-		r = kcl_reservation_object_lock(busy_bo->resv, ticket);
+		r = reservation_object_lock(busy_bo->resv, ticket);
 
 	/*
 	 * TODO: It would be better to keep the BO locked until allocation is at
@@ -836,7 +836,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 	 * of TTM.
 	 */
 	if (!r)
-		kcl_reservation_object_unlock(busy_bo->resv);
+		reservation_object_unlock(busy_bo->resv);
 
 	return r == -EDEADLK ? -EBUSY : r;
 }
@@ -870,7 +870,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 			if (place && !bdev->driver->eviction_valuable(bo,
 								      place)) {
 				if (locked)
-					kcl_reservation_object_unlock(bo->resv);
+					reservation_object_unlock(bo->resv);
 				continue;
 			}
 			break;
@@ -1945,7 +1945,7 @@ out:
 	 * already swapped buffer.
 	 */
 	if (locked)
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
@@ -1990,7 +1990,7 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))
 		goto out_unlock;
-	kcl_reservation_object_unlock(bo->resv);
+	reservation_object_unlock(bo->resv);
 
 out_unlock:
 	mutex_unlock(&bo->wu_mutex);
