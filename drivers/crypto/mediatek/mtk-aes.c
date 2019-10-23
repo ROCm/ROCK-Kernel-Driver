@@ -905,14 +905,11 @@ static int mtk_aes_gcm_start(struct mtk_cryp *cryp, struct mtk_aes_rec *aes)
 		aes->resume = mtk_aes_transfer_complete;
 		/* Compute total process length. */
 		aes->total = len + gctx->authsize;
-		/* Compute text length. */
-		gctx->textlen = req->cryptlen;
 		/* Hardware will append authenticated tag to output buffer */
 		scatterwalk_map_and_copy(tag, req->dst, len, gctx->authsize, 1);
 	} else {
 		aes->resume = mtk_aes_gcm_tag_verify;
 		aes->total = len;
-		gctx->textlen = req->cryptlen - gctx->authsize;
 	}
 
 	return mtk_aes_gcm_dma(cryp, aes, req->src, req->dst, len);
@@ -923,6 +920,10 @@ static int mtk_aes_gcm_crypt(struct aead_request *req, u64 mode)
 	struct mtk_aes_base_ctx *ctx = crypto_aead_ctx(crypto_aead_reqtfm(req));
 	struct mtk_aes_gcm_ctx *gctx = mtk_aes_gcm_ctx_cast(ctx);
 	struct mtk_aes_reqctx *rctx = aead_request_ctx(req);
+	bool enc = !!(mode & AES_FLAGS_ENCRYPT);
+
+	/* Compute text length. */
+	gctx->textlen = req->cryptlen - (enc ? 0 : gctx->authsize);
 
 	/* Empty messages are not supported yet */
 	if (!gctx->textlen && !req->assoclen)
@@ -930,8 +931,7 @@ static int mtk_aes_gcm_crypt(struct aead_request *req, u64 mode)
 
 	rctx->mode = AES_FLAGS_GCM | mode;
 
-	return mtk_aes_handle_queue(ctx->cryp, !!(mode & AES_FLAGS_ENCRYPT),
-				    &req->base);
+	return mtk_aes_handle_queue(ctx->cryp, enc, &req->base);
 }
 
 /*
