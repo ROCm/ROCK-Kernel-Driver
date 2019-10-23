@@ -800,7 +800,7 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	if (ret)
 		return ret;
 
-	ret = kcl_reservation_object_copy_fences(ghost->resv, bo->resv);
+	ret = reservation_object_copy_fences(ghost->resv, bo->resv);
 	/* Last resort, wait for the BO to be idle when we are OOM */
 	if (ret)
 		ttm_bo_wait(bo, false, false);
