@@ -1404,10 +1404,9 @@ out:
 	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
 }
 
-int i915_reset_trylock(struct drm_i915_private *i915)
+int i915_reset_trylock(struct drm_i915_private *i915, int *srcu)
 {
 	struct i915_gpu_error *error = &i915->gpu_error;
-	int srcu;
 
 	might_lock(&error->reset_backoff_srcu);
 	might_sleep();
@@ -1423,10 +1422,10 @@ int i915_reset_trylock(struct drm_i915_private *i915)
 
 		rcu_read_lock();
 	}
-	srcu = srcu_read_lock(&error->reset_backoff_srcu);
+	*srcu = srcu_read_lock(&error->reset_backoff_srcu);
 	rcu_read_unlock();
 
-	return srcu;
+	return 0;
 }
 
 void i915_reset_unlock(struct drm_i915_private *i915, int tag)
