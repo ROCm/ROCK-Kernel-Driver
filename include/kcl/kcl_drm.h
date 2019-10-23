@@ -98,7 +98,6 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
-extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 					      struct drm_atomic_state *old_state);
@@ -216,14 +215,16 @@ void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 }
 #endif
 
-static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
-{
 #ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
+extern void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state);
+static inline
+void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
+					bool suspend)
+
+{
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
-#else
-	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
-#endif
 }
+#endif
 
 #ifndef HAVE_DRM_FB_HELPER_FILL_INFO
 void drm_fb_helper_fill_info(struct fb_info *info,

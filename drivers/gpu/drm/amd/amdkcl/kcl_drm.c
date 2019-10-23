@@ -76,9 +76,6 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
-void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
-
 void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
 				struct drm_atomic_state *old_state);
@@ -190,6 +187,7 @@ void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
 #endif
 
+#ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
 /**
  * _kcl_drm_fb_helper_set_suspend_stub - wrapper around fb_set_suspend
  * @fb_helper: driver-allocated fbdev helper
@@ -197,36 +195,17 @@ EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
  *
  * A wrapper around fb_set_suspend implemented by fbdev core
  */
-void _kcl_drm_fb_helper_set_suspend_unlocked_stub(struct drm_fb_helper *fb_helper, int state)
+void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
 	if (!fb_helper || !fb_helper->fbdev)
 		return;
-#if DRM_VERSION_CODE >=  DRM_VERSION(4, 9, 0)
-	/* make sure there's no pending/ongoing resume */
-	flush_work(&fb_helper->resume_work);
 
-	if (state) {
-		if (fb_helper->fbdev->state != FBINFO_STATE_RUNNING)
-			return;
-
-		console_lock();
-
-	} else {
-		if (fb_helper->fbdev->state == FBINFO_STATE_RUNNING)
-			return;
-
-		if (!console_trylock()) {
-			schedule_work(&fb_helper->resume_work);
-
-			return;
-		}
-	}
-#else
 	console_lock();
-#endif
 	fb_set_suspend(fb_helper->fbdev, state);
 	console_unlock();
 }
+EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
+#endif
 
 static inline bool
 _kcl_drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
@@ -522,8 +501,6 @@ EXPORT_SYMBOL(drm_atomic_helper_resume);
 
 void amdkcl_drm_init(void)
 {
-	_kcl_drm_fb_helper_set_suspend_unlocked = amdkcl_fp_setup("drm_fb_helper_set_suspend_unlocked",
-					_kcl_drm_fb_helper_set_suspend_unlocked_stub);
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(
 					"drm_atomic_helper_update_legacy_modeset_state",
 					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
