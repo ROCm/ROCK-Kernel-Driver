@@ -98,10 +98,6 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
-extern void
-(*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
-					      struct drm_atomic_state *old_state);
-
 #if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
@@ -232,16 +228,17 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper_surface_size *sizes);
 #endif
 
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+extern void _kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+					      struct drm_atomic_state *old_state);
+
 static inline void
-kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
-#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
 	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
-#else
-	drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
-#endif
 }
+#endif
 
 #ifndef DRM_DEBUG_VBL
 #define DRM_UT_VBL		0x20

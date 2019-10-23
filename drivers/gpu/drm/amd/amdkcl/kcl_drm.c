@@ -76,12 +76,6 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
-void
-(*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
-				struct drm_atomic_state *old_state);
-EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
-
-
 #ifndef HAVE_DRM_FB_HELPER_CFB_XX
 /**
  * _kcl_drm_fb_helper_cfb_fillrect - wrapper around cfb_fillrect
@@ -224,8 +218,8 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 #endif
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
-
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+#ifndef for_each_connector_in_state
 #define for_each_connector_in_state(__state, connector, connector_state, __i) \
 	for ((__i) = 0;							\
 	     (__i) < (__state)->num_connector &&				\
@@ -245,7 +239,7 @@ _kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
 #endif
 
 void
-_kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
+_kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
 	struct drm_connector *connector;
@@ -309,6 +303,8 @@ _kcl_drm_atomic_helper_update_legacy_modeset_state_stub(struct drm_device *dev,
 							&crtc->state->adjusted_mode);
 	}
 }
+EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
+#endif
 
 #if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
@@ -501,9 +497,6 @@ EXPORT_SYMBOL(drm_atomic_helper_resume);
 
 void amdkcl_drm_init(void)
 {
-	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(
-					"drm_atomic_helper_update_legacy_modeset_state",
-					_kcl_drm_atomic_helper_update_legacy_modeset_state_stub);
 }
 
 #if !defined(HAVE_DRM_IS_CURRENT_MASTER)
