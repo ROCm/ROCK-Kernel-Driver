@@ -36,16 +36,14 @@ int reservation_object_copy_fences(struct reservation_object *dst,
 }
 #endif
 
+#if !defined(HAVE_RESERVATION_OBJECT_LOCK_INTERRUPTIBLE)
 static inline int
-kcl_reservation_object_lock_interruptible(struct reservation_object *obj,
+reservation_object_lock_interruptible(struct reservation_object *obj,
 					struct ww_acquire_ctx *ctx)
 {
-#if !defined(HAVE_RESERVATION_OBJECT_LOCK_INTERRUPTIBLE)
 	return ww_mutex_lock_interruptible(&obj->lock, ctx);
-#else
-	return reservation_object_lock_interruptible(obj, ctx);
-#endif
 }
+#endif
 
 #if !defined(HAVE_RESERVATION_OBJECT_TRYLOCK)
 static inline bool __must_check

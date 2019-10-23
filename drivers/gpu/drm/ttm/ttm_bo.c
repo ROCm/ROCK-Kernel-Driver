@@ -825,7 +825,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		return -EBUSY;
 
 	if (ctx->interruptible)
-		r = kcl_reservation_object_lock_interruptible(busy_bo->resv,
+		r = reservation_object_lock_interruptible(busy_bo->resv,
 							  ticket);
 	else
 		r = reservation_object_lock(busy_bo->resv, ticket);
@@ -1985,7 +1985,7 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 		return -ERESTARTSYS;
 	if (!ww_mutex_is_locked(&bo->resv->lock))
 		goto out_unlock;
-	ret = kcl_reservation_object_lock_interruptible(bo->resv, NULL);
+	ret = reservation_object_lock_interruptible(bo->resv, NULL);
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))

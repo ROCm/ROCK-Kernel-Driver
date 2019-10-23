@@ -673,11 +673,7 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 	}
 
 	if (interruptible)
-#if defined(BUILD_AS_DKMS)
-		ret = kcl_reservation_object_lock_interruptible(bo->resv, ticket);
-#else
 		ret = reservation_object_lock_interruptible(bo->resv, ticket);
-#endif
 	else
 		ret = reservation_object_lock(bo->resv, ticket);
 	if (ret == -EINTR)
