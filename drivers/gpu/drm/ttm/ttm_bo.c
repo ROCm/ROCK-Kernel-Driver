@@ -489,7 +489,7 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		/* Last resort, if we fail to allocate memory for the
 		 * fences block for the BO to become idle
 		 */
-		kcl_reservation_object_wait_timeout_rcu(bo->resv, true, false,
+		reservation_object_wait_timeout_rcu(bo->resv, true, false,
 						    30 * HZ);
 		spin_lock(&glob->lru_lock);
 		goto error;
@@ -573,7 +573,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			kcl_reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 
-		lret = kcl_reservation_object_wait_timeout_rcu(resv, true,
+		lret = reservation_object_wait_timeout_rcu(resv, true,
 							   interruptible,
 							   30 * HZ);
 
@@ -1821,7 +1821,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 			return -EBUSY;
 	}
 
-	timeout = kcl_reservation_object_wait_timeout_rcu(bo->resv, true,
+	timeout = reservation_object_wait_timeout_rcu(bo->resv, true,
 						      interruptible, timeout);
 	if (timeout < 0)
 		return timeout;

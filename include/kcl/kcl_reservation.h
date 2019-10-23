@@ -10,20 +10,6 @@ extern long _kcl_reservation_object_wait_timeout_rcu(struct reservation_object *
 					 unsigned long timeout);
 #endif
 
-static inline long
-kcl_reservation_object_wait_timeout_rcu(struct reservation_object *obj,
-					 bool wait_all, bool intr,
-					 unsigned long timeout)
-{
-#if defined(BUILD_AS_DKMS) && DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-	return _kcl_reservation_object_wait_timeout_rcu(obj,
-					wait_all, intr, timeout);
-#else
-	return reservation_object_wait_timeout_rcu(obj,
-					wait_all, intr, timeout);
-#endif
-}
-
 #if !defined(HAVE_RESERVATION_OBJECT_LOCK)
 static inline int
 _kcl_reservation_object_lock(struct reservation_object *obj,
