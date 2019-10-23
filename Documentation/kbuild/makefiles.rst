@@ -471,21 +471,6 @@ more details, with real examples.
 	The second argument is optional, and if supplied will be used
 	if first argument is not supported.
 
-    cc-ldoption
-	cc-ldoption is used to check if $(CC) when used to link object files
-	supports the given option.  An optional second option may be
-	specified if first option are not supported.
-
-	Example::
-
-		#arch/x86/kernel/Makefile
-		vsyscall-flags += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
-
-	In the above example, vsyscall-flags will be assigned the option
-	-Wl$(comma)--hash-style=sysv if it is supported by $(CC).
-	The second argument is optional, and if supplied will be used
-	if first argument is not supported.
-
     as-instr
 	as-instr checks if the assembler reports a specific instruction
 	and then outputs either option1 or option2
@@ -1139,7 +1124,7 @@ When kbuild executes, the following steps are followed (roughly):
 
     header-test-y
 
-	header-test-y specifies headers (*.h) in the current directory that
+	header-test-y specifies headers (`*.h`) in the current directory that
 	should be compile tested to ensure they are self-contained,
 	i.e. compilable as standalone units. If CONFIG_HEADER_TEST is enabled,
 	this builds them as part of extra-y.
@@ -1147,11 +1132,11 @@ When kbuild executes, the following steps are followed (roughly):
     header-test-pattern-y
 
 	This works as a weaker version of header-test-y, and accepts wildcard
-	patterns. The typical usage is:
+	patterns. The typical usage is::
 
-		  header-test-pattern-y += *.h
+		header-test-pattern-y += *.h
 
-	This specifies all the files that matches to '*.h' in the current
+	This specifies all the files that matches to `*.h` in the current
 	directory, but the files in 'header-test-' are excluded.
 
 6.7 Commands useful for building a boot image

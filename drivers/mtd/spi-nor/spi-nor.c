@@ -2526,10 +2526,10 @@ static int spi_nor_read_raw(struct spi_nor *nor, u32 addr, size_t len, u8 *buf)
 
 	while (len) {
 		ret = nor->read(nor, addr, len, buf);
-		if (!ret || ret > len)
-			return -EIO;
 		if (ret < 0)
 			return ret;
+		if (!ret || ret > len)
+			return -EIO;
 
 		buf += ret;
 		addr += ret;
@@ -3453,7 +3453,7 @@ static int spi_nor_parse_4bait(struct spi_nor *nor,
 	addr = SFDP_PARAM_HEADER_PTP(param_header);
 	ret = spi_nor_read_sfdp(nor, addr, len, dwords);
 	if (ret)
-		return ret;
+		goto out;
 
 	/* Fix endianness of the 4BAIT DWORDs. */
 	for (i = 0; i < SFDP_4BAIT_DWORD_MAX; i++)

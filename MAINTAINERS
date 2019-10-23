@@ -12115,7 +12115,7 @@ L:	netdev@vger.kernel.org
 S:	Supported
 F:	lib/packing.c
 F:	include/linux/packing.h
-F:	Documentation/packing.txt
+F:	Documentation/core-api/packing.rst
 
 PADATA PARALLEL EXECUTION MECHANISM
 M:	Steffen Klassert <steffen.klassert@secunet.com>
@@ -17823,14 +17823,6 @@ L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/zpool.c
 F:	include/linux/zpool.h
-
-ZR36067 VIDEO FOR LINUX DRIVER
-L:	mjpeg-users@lists.sourceforge.net
-L:	linux-media@vger.kernel.org
-W:	http://mjpeg.sourceforge.net/driver-zoran/
-T:	hg https://linuxtv.org/hg/v4l-dvb
-S:	Odd Fixes
-F:	drivers/staging/media/zoran/
 
 ZRAM COMPRESSED RAM BLOCK DEVICE DRVIER
 M:	Minchan Kim <minchan@kernel.org>
