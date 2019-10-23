@@ -1292,7 +1292,8 @@ static void process_csb(struct intel_engine_cs *engine)
 			 * coherent (visible from the CPU) before the
 			 * user interrupt and CSB is processed.
 			 */
-			GEM_BUG_ON(!i915_request_completed(rq));
+			GEM_BUG_ON(!i915_request_completed(rq) &&
+				   !reset_in_progress(execlists));
 
 			execlists_context_schedule_out(rq,
 						       INTEL_CONTEXT_SCHEDULE_OUT);
@@ -2141,7 +2142,7 @@ static void __execlists_reset(struct intel_engine_cs *engine, bool stalled)
 
 	rq = active_request(rq);
 	if (!rq)
-		goto out_replay;
+		goto unwind;
 
 	/*
 	 * If this request hasn't started yet, e.g. it is waiting on a
@@ -2196,6 +2197,7 @@ out_replay:
 	intel_ring_update_space(ce->ring);
 	__execlists_update_reg_state(ce, engine);
 
+unwind:
 	/* Push back any incomplete requests for replay after the reset. */
 	__unwind_incomplete_requests(engine);
 
