@@ -76,12 +76,6 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
-void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
-
-struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
-EXPORT_SYMBOL(_kcl_drm_fb_helper_alloc_fbi);
-
 void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
 
@@ -134,8 +128,10 @@ void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
 }
 EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
 #endif
+
+#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 /**
- * _kcl_drm_fb_helper_alloc_fbi_stub - allocate fb_info and some of its members
+ * _kcl_drm_fb_helper_alloc_fbi - allocate fb_info and some of its members
  * @fb_helper: driver-allocated fbdev helper
  *
  * A helper to alloc fb_info and the members cmap and apertures. Called
@@ -145,7 +141,7 @@ EXPORT_SYMBOL(_kcl_drm_fb_helper_cfb_imageblit);
  * fb_info pointer if things went okay, pointer containing error code
  * otherwise
  */
-struct fb_info *_kcl_drm_fb_helper_alloc_fbi_stub(struct drm_fb_helper *fb_helper)
+struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 {
 	struct device *dev = fb_helper->dev->dev;
 	struct fb_info *info;
@@ -177,19 +173,22 @@ err_release:
 	framebuffer_release(info);
 	return ERR_PTR(ret);
 }
+EXPORT_SYMBOL(_kcl_drm_fb_helper_alloc_fbi);
 
 /**
- * _kcl_drm_fb_helper_unregister_fbi_stub - unregister fb_info framebuffer device
+ * _kcl_drm_fb_helper_unregister_fbi - unregister fb_info framebuffer device
  * @fb_helper: driver-allocated fbdev helper
  *
  * A wrapper around unregister_framebuffer, to release the fb_info
  * framebuffer device
  */
-void _kcl_drm_fb_helper_unregister_fbi_stub(struct drm_fb_helper *fb_helper)
+void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
 	if (fb_helper && fb_helper->fbdev)
 		unregister_framebuffer(fb_helper->fbdev);
 }
+EXPORT_SYMBOL(_kcl_drm_fb_helper_unregister_fbi);
+#endif
 
 /**
  * _kcl_drm_fb_helper_set_suspend_stub - wrapper around fb_set_suspend
@@ -523,10 +522,6 @@ EXPORT_SYMBOL(drm_atomic_helper_resume);
 
 void amdkcl_drm_init(void)
 {
-	_kcl_drm_fb_helper_alloc_fbi = amdkcl_fp_setup("drm_fb_helper_alloc_fbi",
-					_kcl_drm_fb_helper_alloc_fbi_stub);
-	_kcl_drm_fb_helper_unregister_fbi = amdkcl_fp_setup("drm_fb_helper_unregister_fbi",
-					_kcl_drm_fb_helper_unregister_fbi_stub);
 	_kcl_drm_fb_helper_set_suspend_unlocked = amdkcl_fp_setup("drm_fb_helper_set_suspend_unlocked",
 					_kcl_drm_fb_helper_set_suspend_unlocked_stub);
 	_kcl_drm_atomic_helper_update_legacy_modeset_state = amdkcl_fp_setup(

@@ -236,7 +236,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	abo = gem_to_amdgpu_bo(gobj);
 
 	/* okay we have an object now allocate the framebuffer */
-	info = kcl_drm_fb_helper_alloc_fbi(helper);
+	info = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
 		ret = PTR_ERR(info);
 		goto out;
@@ -339,7 +339,7 @@ static int amdgpu_fbdev_destroy(struct drm_device *dev, struct amdgpu_fbdev *rfb
 	struct amdgpu_framebuffer *rfb = &rfbdev->rfb;
 	struct drm_gem_object * obj = NULL;
 
-	kcl_drm_fb_helper_unregister_fbi(&rfbdev->helper);
+	drm_fb_helper_unregister_fbi(&rfbdev->helper);
 	obj = kcl_drm_fb_get_gem_obj(&rfb->base, 0);
 
 	if (obj) {

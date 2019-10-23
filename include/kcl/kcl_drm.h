@@ -98,8 +98,6 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
-extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
-extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
 extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
 extern void
 (*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
@@ -200,23 +198,23 @@ void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 }
 #endif
 
-static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
-{
 #ifndef HAVE_DRM_FB_HELPER_XX_FBI
+extern struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper);
+extern void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper);
+
+static inline
+struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+
+{
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
-#else
-	return drm_fb_helper_alloc_fbi(fb_helper);
-#endif
 }
 
-static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+static inline
+void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
-#else
-	drm_fb_helper_unregister_fbi(fb_helper);
-#endif
 }
+#endif
 
 static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
 {
