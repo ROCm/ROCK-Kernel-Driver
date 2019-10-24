@@ -5500,7 +5500,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	if (!acrtc)
 		goto fail;
 
-	res = kcl_drm_crtc_init_with_planes(
+	res = drm_crtc_init_with_planes(
 			dm->ddev,
 			&acrtc->base,
 			plane,

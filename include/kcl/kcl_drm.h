@@ -271,21 +271,6 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
-static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
-			      struct drm_plane *primary,
-			      struct drm_plane *cursor,
-			      const struct drm_crtc_funcs *funcs,
-			      const char *name, ...)
-{
-#if defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
-		return drm_crtc_init_with_planes(dev, crtc, primary,
-				 cursor, funcs, name);
-#else
-		return drm_crtc_init_with_planes(dev, crtc, primary,
-				 cursor, funcs);
-#endif
-}
-
 static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 			     unsigned long possible_crtcs,
 			     const struct drm_plane_funcs *funcs,

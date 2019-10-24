@@ -64,4 +64,18 @@ static inline int _kcl_drm_encoder_init(struct drm_device *dev,
 }
 #define drm_encoder_init _kcl_drm_encoder_init
 #endif
+
+
+#if !defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
+static inline
+int _kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
+			      struct drm_plane *primary,
+			      struct drm_plane *cursor,
+			      const struct drm_crtc_funcs *funcs,
+			      const char *name, ...)
+{
+	return drm_crtc_init_with_planes(dev, crtc, primary, cursor, funcs);
+}
+#define drm_crtc_init_with_planes _kcl_drm_crtc_init_with_planes
+#endif
 #endif
