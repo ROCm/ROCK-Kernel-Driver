@@ -3,6 +3,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_edid.h>
+#include <drm/drm_crtc.h>
 #include <drm/drm_cache.h>
 #ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
@@ -51,5 +52,16 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #endif
 }
 #define drm_syncobj_find_fence _kcl_drm_syncobj_find_fence
+#endif
+
+#if !defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
+static inline int _kcl_drm_encoder_init(struct drm_device *dev,
+		      struct drm_encoder *encoder,
+		      const struct drm_encoder_funcs *funcs,
+		      int encoder_type, const char *name, ...)
+{
+	return drm_encoder_init(dev, encoder, funcs, encoder_type);
+}
+#define drm_encoder_init _kcl_drm_encoder_init
 #endif
 #endif

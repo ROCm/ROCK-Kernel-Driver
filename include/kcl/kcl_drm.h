@@ -271,20 +271,6 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
-static inline int kcl_drm_encoder_init(struct drm_device *dev,
-		      struct drm_encoder *encoder,
-		      const struct drm_encoder_funcs *funcs,
-		      int encoder_type, const char *name, ...)
-{
-#if defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
-	return drm_encoder_init(dev, encoder, funcs,
-			 encoder_type, name);
-#else
-	return drm_encoder_init(dev, encoder, funcs,
-			 encoder_type);
-#endif
-}
-
 static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
 			      struct drm_plane *primary,
 			      struct drm_plane *cursor,
