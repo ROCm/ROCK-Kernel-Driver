@@ -1582,7 +1582,8 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 					put_disk_and_module(disk);
 					goto restart;
 				}
-				if (bdev->bd_disk->fops->open_finish)
+				if ((ret != -ENXIO) &&
+				    bdev->bd_disk->fops->open_finish)
 					need_finish = true;
 			}
 
@@ -1634,7 +1635,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
 				ret = bdev->bd_disk->fops->open(bdev, mode);
-				if ((ret != -ERESTARTSYS) &&
+				if ((ret != -ERESTARTSYS) && (ret != -ENXIO) &&
 				    bdev->bd_disk->fops->open_finish)
 					need_finish = true;
 			}
