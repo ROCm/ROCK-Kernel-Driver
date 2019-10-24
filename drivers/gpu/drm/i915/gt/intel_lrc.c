@@ -2129,17 +2129,6 @@ static void __execlists_reset(struct intel_engine_cs *engine, bool stalled)
 	rq = port_request(execlists->port);
 	ce = rq->hw_context;
 
-	/*
-	 * Catch up with any missed context-switch interrupts.
-	 *
-	 * Ideally we would just read the remaining CSB entries now that we
-	 * know the gpu is idle. However, the CSB registers are sometimes^W
-	 * often trashed across a GPU reset! Instead we have to rely on
-	 * guessing the missed context-switch events by looking at what
-	 * requests were completed.
-	 */
-	execlists_cancel_port_requests(execlists);
-
 	rq = active_request(rq);
 	if (!rq)
 		goto unwind;
@@ -2199,6 +2188,7 @@ out_replay:
 
 unwind:
 	/* Push back any incomplete requests for replay after the reset. */
+	execlists_cancel_port_requests(execlists);
 	__unwind_incomplete_requests(engine);
 
 out_clear:
