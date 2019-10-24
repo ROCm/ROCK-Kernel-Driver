@@ -17,9 +17,6 @@
 #if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
-#include <drm/drm_syncobj.h>
-#endif
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
@@ -259,23 +256,6 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 	return true;
 #endif
 }
-
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
-static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
-						u32 handle, u64 point, u64 flags,
-						struct dma_fence **fence)
-{
-#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
-	return drm_syncobj_fence_get(file_private, handle, fence);
-#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
-	return drm_syncobj_find_fence(file_private, handle, fence);
-#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
-	return drm_syncobj_find_fence(file_private, handle, point, fence);
-#else
-	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
-#endif
-}
-#endif
 
 #if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
 /**

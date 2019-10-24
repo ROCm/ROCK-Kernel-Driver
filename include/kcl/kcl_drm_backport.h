@@ -1,8 +1,15 @@
 #ifndef AMDKCL_DRM_BACKPORT_H
 #define AMDKCL_DRM_BACKPORT_H
 
+#include <drm/drmP.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_cache.h>
+#ifdef HAVE_DRM_FILE_H
+#include <drm/drm_file.h>
+#endif
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+#include <drm/drm_syncobj.h>
+#endif
 #include <kcl/kcl_drm.h>
 
 #if defined(HAVE_DRM_EDID_TO_ELD)
@@ -23,5 +30,25 @@ int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 
 #ifdef BUILD_AS_DKMS
 #define drm_arch_can_wc_memory kcl_drm_arch_can_wc_memory
+#endif
+
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+static inline
+int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
+						u32 handle, u64 point, u64 flags,
+						struct dma_fence **fence)
+{
+#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
+	return drm_syncobj_fence_get(file_private, handle, fence);
+#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
+	return drm_syncobj_find_fence(file_private, handle, fence);
+#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
+	return drm_syncobj_find_fence(file_private, handle, point, fence);
+#else
+	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+#endif
+}
+
+#define drm_syncobj_find_fence _kcl_drm_syncobj_find_fence
 #endif
 #endif

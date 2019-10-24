@@ -1073,7 +1073,7 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 	struct dma_fence *fence;
 	int r;
 
-	r = kcl_drm_syncobj_find_fence(p->filp, handle, point, flags, &fence);
+	r = drm_syncobj_find_fence(p->filp, handle, point, flags, &fence);
 
 	if (r) {
 		DRM_ERROR("syncobj %u failed to find fence @ %llu (%d)!\n",
