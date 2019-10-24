@@ -60,6 +60,7 @@ are as follows:
 	CDROM_LOCKDOOR		lock or unlock door
 	CDROM_DEBUG		Turn debug messages on/off
 	CDROM_GET_CAPABILITY	get capabilities
+	CDROM_AUTOCLOSE 	If autoclose enabled close the tray
 	CDROMAUDIOBUFSIZ	set the audio buffer size
 	DVD_READ_STRUCT		Read structure
 	DVD_WRITE_STRUCT	Write structure
@@ -1053,6 +1054,30 @@ CDROM_GET_CAPABILITY
 	outputs:
 		The ioctl return value is the current device capability
 		flags.  See CDC_CLOSE_TRAY, CDC_OPEN_TRAY, etc.
+
+
+
+CDROM_AUTOCLOSE
+	Close the tray if the device has one, and autoclose is enabled.
+	Wait for drive to become ready.
+
+
+	usage::
+
+	  ioctl(fd, CDROM_AUTOCLOSE, 0);
+
+
+	inputs:
+		none
+
+
+	outputs:
+		The ioctl return value is 0 or an error code.
+
+
+	error return:
+	  - ENOMEDIUM	No medium found or drive error.
+	  - ERESTARTSYS	Received a signal while waiting for drive to become ready.
 
 
 

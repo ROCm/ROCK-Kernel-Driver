@@ -1673,6 +1673,7 @@ static inline struct bio_vec *rq_integrity_vec(struct request *rq)
 
 struct block_device_operations {
 	int (*open) (struct block_device *, fmode_t);
+	int (*open_finish)(struct block_device *bdev, fmode_t mode, int ret);
 	void (*release) (struct gendisk *, fmode_t);
 	int (*rw_page)(struct block_device *, sector_t, struct page *, unsigned int);
 	int (*ioctl) (struct block_device *, fmode_t, unsigned, unsigned long);

@@ -1526,6 +1526,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	int partno;
 	int perm = 0;
 	bool first_open = false;
+	bool need_finish = false;
 
 	if (mode & FMODE_READ)
 		perm |= MAY_READ;
@@ -1581,6 +1582,8 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 					put_disk_and_module(disk);
 					goto restart;
 				}
+				if (bdev->bd_disk->fops->open_finish)
+					need_finish = true;
 			}
 
 			if (!ret) {
@@ -1601,7 +1604,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 					invalidate_partitions(disk, bdev);
 			}
 
-			if (ret)
+			if (ret && !need_finish)
 				goto out_clear;
 		} else {
 			struct block_device *whole;
@@ -1627,10 +1630,14 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		if (bdev->bd_bdi == &noop_backing_dev_info)
 			bdev->bd_bdi = bdi_get(disk->queue->backing_dev_info);
 	} else {
+		ret = 0;
 		if (bdev->bd_contains == bdev) {
-			ret = 0;
-			if (bdev->bd_disk->fops->open)
+			if (bdev->bd_disk->fops->open) {
 				ret = bdev->bd_disk->fops->open(bdev, mode);
+				if ((ret != -ERESTARTSYS) &&
+				    bdev->bd_disk->fops->open_finish)
+					need_finish = true;
+			}
 			/* the same as first opener case, read comment there */
 			if (bdev->bd_invalidated) {
 				if (!ret)
@@ -1638,7 +1645,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 				else if (ret == -ENOMEDIUM)
 					invalidate_partitions(bdev->bd_disk, bdev);
 			}
-			if (ret)
+			if (ret && !need_finish)
 				goto out_unlock_bdev;
 		}
 	}
@@ -1650,6 +1657,12 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	/* only one opener holds refs to the module and disk */
 	if (!first_open)
 		put_disk_and_module(disk);
+	if (ret && need_finish)
+		ret = bdev->bd_disk->fops->open_finish(bdev, mode, ret);
+	if (ret) {
+		__blkdev_put(bdev, mode, for_part);
+		return ret;
+	}
 	return 0;
 
  out_clear:
