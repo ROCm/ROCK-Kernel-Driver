@@ -30,6 +30,26 @@
 #include <linux/namei.h>
 #include <linux/crc32.h>
 #include <linux/seq_file.h>
+#include <linux/moduleparam.h>
+#include <linux/unsupported-feature.h>
+
+DECLARE_SUSE_UNSUPPORTED_FEATURE(reiserfs)
+DEFINE_SUSE_UNSUPPORTED_FEATURE(reiserfs)
+
+static bool check_rw_mount(struct super_block *sb, unsigned long flags)
+{
+	if (flags & SB_RDONLY)
+		return true;
+
+	if (reiserfs_allow_unsupported()) {
+		reiserfs_mark_unsupported();
+		return true;
+	}
+
+	pr_warn("reiserfs: read-write mode is unsupported.\n");
+	pr_warn("reiserfs: load module with allow_unsupported=1 to enable read-write mode.\n");
+	return false;
+}
 
 struct file_system_type reiserfs_fs_type;
 
@@ -1444,6 +1464,9 @@ static int reiserfs_remount(struct super_block *s, int *mount_flags, char *arg)
 	int i;
 #endif
 
+	if (!check_rw_mount(s, *mount_flags))
+		return -EACCES;
+
 	new_opts = kstrdup(arg, GFP_KERNEL);
 	if (arg && !new_opts)
 		return -ENOMEM;
@@ -1907,6 +1930,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	int errval = -EINVAL;
 	char *qf_names[REISERFS_MAXQUOTAS] = {};
 	unsigned int qfmt = 0;
+
+	if (!check_rw_mount(s, s->s_flags))
+		return -EACCES;
 
 	sbi = kzalloc(sizeof(struct reiserfs_sb_info), GFP_KERNEL);
 	if (!sbi)
