@@ -38,17 +38,18 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 						u32 handle, u64 point, u64 flags,
 						struct dma_fence **fence)
 {
-#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
-	return drm_syncobj_fence_get(file_private, handle, fence);
-#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
-	return drm_syncobj_find_fence(file_private, handle, fence);
-#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
+#if defined(HAVE_DRM_SYNCOBJ_FIND_FENCE)
+#if defined(HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS)
+	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+#elif defined(HAVE_DRM_SYNCOBJ_FIND_FENCE_4ARGS)
 	return drm_syncobj_find_fence(file_private, handle, point, fence);
 #else
-	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
+	return drm_syncobj_find_fence(file_private, handle, fence);
+#endif
+#elif defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
+	return drm_syncobj_fence_get(file_private, handle, fence);
 #endif
 }
-
 #define drm_syncobj_find_fence _kcl_drm_syncobj_find_fence
 #endif
 #endif
