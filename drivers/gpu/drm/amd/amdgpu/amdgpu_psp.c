@@ -167,6 +167,13 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	while (*((unsigned int *)psp->fence_buf) != index) {
 		if (--timeout == 0)
 			break;
+		/*
+		 * Shouldn't wait for timeout when err_event_athub occurs,
+		 * because gpu reset thread triggered and lock resource should
+		 * be released for psp resume sequence.
+		 */
+		if (amdgpu_ras_intr_triggered())
+			break;
 		msleep(1);
 		amdgpu_asic_invalidate_hdp(psp->adev, NULL);
 	}
