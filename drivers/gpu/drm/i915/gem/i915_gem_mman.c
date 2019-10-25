@@ -246,11 +246,9 @@ vm_fault_t i915_gem_fault(struct vm_fault *vmf)
 
 	wakeref = intel_runtime_pm_get(rpm);
 
-	srcu = i915_reset_trylock(i915);
-	if (srcu < 0) {
-		ret = srcu;
+	ret = i915_reset_trylock(i915, &srcu);
+	if (ret)
 		goto err_rpm;
-	}
 
 	ret = i915_mutex_lock_interruptible(dev);
 	if (ret)

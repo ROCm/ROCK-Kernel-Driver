@@ -35,7 +35,7 @@ int i915_reset_engine(struct intel_engine_cs *engine,
 
 void i915_reset_request(struct i915_request *rq, bool guilty);
 
-int __must_check i915_reset_trylock(struct drm_i915_private *i915);
+int __must_check i915_reset_trylock(struct drm_i915_private *i915, int *srcu);
 void i915_reset_unlock(struct drm_i915_private *i915, int tag);
 
 int i915_terminally_wedged(struct drm_i915_private *i915);
