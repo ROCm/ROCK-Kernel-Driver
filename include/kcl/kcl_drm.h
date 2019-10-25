@@ -237,6 +237,20 @@ drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 }
 #endif
 
+#ifndef DRM_FB_HELPER_DEFAULT_OPS
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display, \
+#ifdef HAVE_FB_OPS_FB_DEBUG_XX \
+	.fb_debug_enter = drm_fb_helper_debug_enter, \
+	.fb_debug_leave = drm_fb_helper_debug_leave,\
+#endif \
+	.fb_ioctl	= drm_fb_helper_ioctl
+#endif
+
 #ifndef DRM_DEBUG_VBL
 #define DRM_UT_VBL		0x20
 #define DRM_DEBUG_VBL(fmt, args...)					\
