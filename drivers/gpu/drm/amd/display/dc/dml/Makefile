@@ -43,10 +43,8 @@ dml_ccflags := -mfpu=64
 dml_rcflags := -msoft-float
 endif
 
-ifdef CONFIG_CC_IS_GCC
 ifneq ($(call gcc-min-version, 70100),y)
 IS_OLD_GCC = 1
-endif
 endif
 
 ifdef CONFIG_X86
