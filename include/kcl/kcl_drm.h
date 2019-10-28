@@ -365,18 +365,14 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 extern void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state);
-#endif
 
 static inline void
-kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+__drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
 {
-#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
-#else
-	return __drm_atomic_helper_connector_reset(connector, conn_state);
-#endif
 }
+#endif
 
 #if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void);
