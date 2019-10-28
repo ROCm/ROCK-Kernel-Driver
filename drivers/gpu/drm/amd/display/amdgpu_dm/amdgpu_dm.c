@@ -3463,9 +3463,9 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 		DRM_ERROR(
 			"Unsupported screen format %s\n",
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
-			kcl_drm_get_format_name(fb->pixel_format, &format_name));
+			drm_get_format_name(fb->pixel_format, &format_name));
 #else
-			kcl_drm_get_format_name(fb->format->format, &format_name));
+			drm_get_format_name(fb->format->format, &format_name));
 #endif
 		return -EINVAL;
 	}
