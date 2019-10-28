@@ -49,7 +49,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	unsigned long size;
 	int r;
 
-	gobj = kcl_drm_gem_object_lookup(p->adev->ddev, p->filp, data->handle);
+	gobj = drm_gem_object_lookup(p->filp, data->handle);
 	if (gobj == NULL)
 		return -EINVAL;
 

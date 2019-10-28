@@ -5,6 +5,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_cache.h>
+#include <drm/drm_gem.h>
 #ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
 #endif
@@ -97,5 +98,14 @@ static inline int _kcl_drm_universal_plane_init(struct drm_device *dev, struct d
 #endif
 }
 #define drm_universal_plane_init _kcl_drm_universal_plane_init
+#endif
+
+#ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
+static inline struct drm_gem_object *
+_kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
+{
+	return drm_gem_object_lookup(filp->minor->dev, filp, handle);
+}
+#define drm_gem_object_lookup _kcl_drm_gem_object_lookup
 #endif
 #endif

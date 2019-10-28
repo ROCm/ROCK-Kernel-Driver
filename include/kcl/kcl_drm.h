@@ -285,18 +285,6 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
-
-static inline struct drm_gem_object *
-kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
-				u32 handle)
-{
-#if defined(HAVE_2ARGS_DRM_GEM_OBJECT_LOOKUP)
-		return drm_gem_object_lookup(filp, handle);
-#else
-		return drm_gem_object_lookup(dev, filp, handle);
-#endif
-}
-
 #if !defined(HAVE_DRM_GET_FORMAT_NAME)
 /**
  * struct drm_format_name_buf - name of a DRM format
