@@ -1714,7 +1714,7 @@ out:
 	return ret;
 }
 
-int smu_v11_0_baco_reset(struct smu_context *smu)
+int smu_v11_0_baco_enter(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
@@ -1731,6 +1731,13 @@ int smu_v11_0_baco_reset(struct smu_context *smu)
 		return ret;
 
 	msleep(10);
+
+	return ret;
+}
+
+int smu_v11_0_baco_exit(struct smu_context *smu)
+{
+	int ret = 0;
 
 	ret = smu_v11_0_baco_set_state(smu, SMU_BACO_STATE_EXIT);
 	if (ret)
