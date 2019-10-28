@@ -12,10 +12,8 @@ endif
 
 CFLAGS_dcn20_resource.o := -mhard-float -msse
 
-ifdef CONFIG_CC_IS_GCC
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
-endif
 endif
 
 ifdef IS_OLD_GCC
