@@ -30,12 +30,10 @@
 #include "dc.h"
 #include "dc/inc/core_types.h"
 #include "dal_asic_id.h"
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 #include "dmub/inc/dmub_srv.h"
 #include "dc/inc/hw/dmcu.h"
 #include "dc/inc/hw/abm.h"
 #include "dc/dc_dmub_srv.h"
-#endif
 
 #include "vid.h"
 #include "amdgpu.h"
@@ -101,10 +99,9 @@
 #include "modules/power/power_helpers.h"
 #include "modules/inc/mod_info_packet.h"
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 #define FIRMWARE_RENOIR_DMUB "amdgpu/renoir_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_RENOIR_DMUB);
-#endif
+
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
 
@@ -711,7 +708,6 @@ void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
 }
 #endif
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 static int dm_dmub_hw_init(struct amdgpu_device *adev)
 {
 	const unsigned int psp_header_bytes = 0x100;
@@ -850,16 +846,13 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	return 0;
 }
 
-#endif
 static int amdgpu_dm_init(struct amdgpu_device *adev)
 {
 	struct dc_init_data init_data;
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	struct dc_callback_init init_params;
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 	int r;
-#endif
 
 	adev->dm.ddev = adev->ddev;
 	adev->dm.adev = adev;
@@ -939,14 +932,12 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	dc_hardware_init(adev->dm.dc);
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 	r = dm_dmub_hw_init(adev);
 	if (r) {
 		DRM_ERROR("DMUB interface failed to initialize: status=%d\n", r);
 		goto error;
 	}
 
-#endif
 	adev->dm.freesync_module = mod_freesync_create(adev->dm.dc);
 	if (!adev->dm.freesync_module) {
 		DRM_ERROR(
@@ -1025,7 +1016,6 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	if (adev->dm.dc)
 		dc_deinit_callbacks(adev->dm.dc);
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 	if (adev->dm.dc->ctx->dmub_srv) {
 		dc_dmub_srv_destroy(&adev->dm.dc->ctx->dmub_srv);
 		adev->dm.dc->ctx->dmub_srv = NULL;
@@ -1035,7 +1025,6 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		amdgpu_bo_free_kernel(&adev->dm.dmub_bo,
 				      &adev->dm.dmub_bo_gpu_addr,
 				      &adev->dm.dmub_bo_cpu_addr);
-#endif
 
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
@@ -1149,7 +1138,6 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	return 0;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 static uint32_t amdgpu_dm_dmub_reg_read(void *ctx, uint32_t address)
 {
 	struct amdgpu_device *adev = ctx;
@@ -1235,18 +1223,14 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	return 0;
 }
 
-#endif
 static int dm_sw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 	int r;
 
 	r = dm_dmub_sw_init(adev);
 	if (r)
 		return r;
-
-#endif
 
 	return load_dmcu_fw(adev);
 }
@@ -1255,7 +1239,6 @@ static int dm_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
 	if (adev->dm.dmub_srv) {
 		dmub_srv_destroy(adev->dm.dmub_srv);
 		adev->dm.dmub_srv = NULL;
@@ -1266,7 +1249,6 @@ static int dm_sw_fini(void *handle)
 		adev->dm.dmub_fw = NULL;
 	}
 
-#endif
 	if(adev->dm.fw_dmcu) {
 		release_firmware(adev->dm.fw_dmcu);
 		adev->dm.fw_dmcu = NULL;
