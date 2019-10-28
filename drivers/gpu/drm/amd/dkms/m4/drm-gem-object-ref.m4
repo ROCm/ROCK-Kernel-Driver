@@ -1,6 +1,6 @@
 dnl #
-dnl # commit 743e0f079a38182cb22e663b34e6a45ad3274b9e
-dnl # drm/nouveau: Replace drm_gem_object_unreference_unlocked with put function
+dnl # commit v4.10-rc8-1302-ge6b62714e87c
+dnl # drm: Introduce drm_gem_object_{get,put}()
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_GEM_OBJECT_PUT_UNLOCKED],
 	[AC_MSG_CHECKING([whether drm_gem_object_put_unlocked() is available])

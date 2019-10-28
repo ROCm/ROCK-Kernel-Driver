@@ -114,7 +114,7 @@ static void amdgpufb_destroy_pinned_object(struct drm_gem_object *gobj)
 		amdgpu_bo_unpin(abo);
 		amdgpu_bo_unreserve(abo);
 	}
-	kcl_drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put_unlocked(gobj);
 }
 
 static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
@@ -286,7 +286,7 @@ out:
 
 	}
 	if (fb && ret) {
-		kcl_drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put_unlocked(gobj);
 		drm_framebuffer_unregister_private(fb);
 		drm_framebuffer_cleanup(fb);
 		kfree(fb);

@@ -285,14 +285,13 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
-static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
-{
 #if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
+static inline void
+drm_gem_object_put_unlocked(struct drm_gem_object *obj)
+{
 	return drm_gem_object_unreference_unlocked(obj);
-#else
-	return drm_gem_object_put_unlocked(obj);
-#endif
 }
+#endif
 
 #ifdef BUILD_AS_DKMS
 extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
