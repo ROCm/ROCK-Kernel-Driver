@@ -37,10 +37,8 @@ ifdef CONFIG_ARM64
 dml_rcflags := -mgeneral-regs-only
 endif
 
-ifdef CONFIG_CC_IS_GCC
 ifneq ($(call gcc-min-version, 70100),y)
 IS_OLD_GCC = 1
-endif
 endif
 
 ifdef CONFIG_X86
