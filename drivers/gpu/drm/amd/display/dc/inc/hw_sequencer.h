@@ -156,11 +156,11 @@ struct hw_sequencer_funcs {
 	void (*update_pending_status)(
 			struct pipe_ctx *pipe_ctx);
 
-	bool (*set_input_transfer_func)(
+	bool (*set_input_transfer_func)(struct dc *dc,
 				struct pipe_ctx *pipe_ctx,
 				const struct dc_plane_state *plane_state);
 
-	bool (*set_output_transfer_func)(
+	bool (*set_output_transfer_func)(struct dc *dc,
 				struct pipe_ctx *pipe_ctx,
 				const struct dc_stream_state *stream);
 
@@ -289,8 +289,10 @@ struct hw_sequencer_funcs {
 	void (*set_cursor_attribute)(struct pipe_ctx *pipe);
 	void (*set_cursor_sdr_white_level)(struct pipe_ctx *pipe);
 
-	void (*setup_periodic_interrupt)(struct pipe_ctx *pipe_ctx, enum vline_select vline);
-	void (*setup_vupdate_interrupt)(struct pipe_ctx *pipe_ctx);
+	void (*setup_periodic_interrupt)(struct dc *dc,
+			struct pipe_ctx *pipe_ctx,
+			enum vline_select vline);
+	void (*setup_vupdate_interrupt)(struct dc *dc, struct pipe_ctx *pipe_ctx);
 	bool (*did_underflow_occur)(struct dc *dc, struct pipe_ctx *pipe_ctx);
 
 	void (*init_blank)(struct dc *dc, struct timing_generator *tg);
@@ -352,6 +354,36 @@ struct hw_sequencer_funcs {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	bool (*s0i3_golden_init_wa)(struct dc *dc);
 #endif
+
+	void (*get_surface_visual_confirm_color)(
+			const struct pipe_ctx *pipe_ctx,
+			struct tg_color *color);
+
+	void (*get_hdr_visual_confirm_color)(
+			struct pipe_ctx *pipe_ctx,
+			struct tg_color *color);
+
+	void (*set_hdr_multiplier)(struct pipe_ctx *pipe_ctx);
+
+	void (*verify_allow_pstate_change_high)(struct dc *dc);
+
+	void (*program_pipe)(
+			struct dc *dc,
+			struct pipe_ctx *pipe_ctx,
+			struct dc_state *context);
+
+	bool (*wait_for_blank_complete)(
+			struct output_pixel_processor *opp);
+
+	void (*dccg_init)(struct dce_hwseq *hws);
+
+	bool (*set_blend_lut)(
+		struct pipe_ctx *pipe_ctx, const struct dc_plane_state *plane_state);
+
+	bool (*set_shaper_3dlut)(
+		struct pipe_ctx *pipe_ctx, const struct dc_plane_state *plane_state);
+
+	int (*get_vupdate_offset_from_vsync)(struct pipe_ctx *pipe_ctx);
 };
 
 void color_space_to_black_color(

@@ -1,7 +1,8 @@
 #
 # Makefile for DCN21.
 
-DCN21 = dcn21_hubp.o dcn21_hubbub.o dcn21_resource.o dcn21_hwseq.o dcn21_link_encoder.o
+DCN21 = dcn21_init.o dcn21_hubp.o dcn21_hubbub.o dcn21_resource.o \
+	 dcn21_hwseq.o dcn21_link_encoder.o
 
 ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
 AMDKCL_KBUILD_TAKE_PATH_CURRENT=$(AMDDALPATH)/dc/dcn21/
