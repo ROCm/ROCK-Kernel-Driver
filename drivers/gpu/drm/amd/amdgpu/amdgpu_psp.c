@@ -34,6 +34,8 @@
 #include "psp_v11_0.h"
 #include "psp_v12_0.h"
 
+#include "amdgpu_ras.h"
+
 static void psp_set_funcs(struct amdgpu_device *adev);
 
 static int psp_early_init(void *handle)
