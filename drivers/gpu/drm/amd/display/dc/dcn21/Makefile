@@ -1,7 +1,8 @@
 #
 # Makefile for DCN21.
 
-DCN21 = dcn21_hubp.o dcn21_hubbub.o dcn21_resource.o dcn21_hwseq.o dcn21_link_encoder.o
+DCN21 = dcn21_init.o dcn21_hubp.o dcn21_hubbub.o dcn21_resource.o \
+	 dcn21_hwseq.o dcn21_link_encoder.o
 
 CFLAGS_dcn21_resource.o := -mhard-float -msse
 
