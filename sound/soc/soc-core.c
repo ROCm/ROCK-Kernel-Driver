@@ -965,6 +965,7 @@ _err_defer:
 static void soc_cleanup_component(struct snd_soc_component *component)
 {
 	snd_soc_component_set_jack(component, NULL, NULL);
+	list_del_init(&component->card_list);
 	snd_soc_dapm_free(snd_soc_component_get_dapm(component));
 	soc_cleanup_component_debugfs(component);
 	component->card = NULL;
@@ -980,7 +981,6 @@ static void soc_remove_component(struct snd_soc_component *component)
 	if (component->driver->remove)
 		component->driver->remove(component);
 
-	list_del(&component->card_list);
 	soc_cleanup_component(component);
 }
 
