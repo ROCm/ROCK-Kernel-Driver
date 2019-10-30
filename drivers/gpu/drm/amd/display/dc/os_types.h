@@ -53,7 +53,7 @@
 #define dm_vlog(fmt, args) vprintk(fmt, args)
 
 #if defined(HAVE_ASM_FPU_API_H)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 #include <asm/fpu/api.h>
 #endif
 #else
