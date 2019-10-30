@@ -1002,7 +1002,6 @@ static bool get_pixel_clk_frequency_100hz(
 	return false;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 
 /* this table is use to find *1.001 and /1.001 pixel rates from non-precise pixel rate */
 struct pixel_rate_range_table_entry {
@@ -1062,7 +1061,6 @@ static const struct clock_source_funcs dcn20_clk_src_funcs = {
 	.get_pix_clk_dividers = dce112_get_pix_clk_dividers,
 	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
 };
-#endif
 
 /*****************************************/
 /* Constructor                           */
@@ -1433,7 +1431,6 @@ bool dce112_clk_src_construct(
 	return true;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 bool dcn20_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -1449,4 +1446,3 @@ bool dcn20_clk_src_construct(
 
 	return ret;
 }
-#endif
