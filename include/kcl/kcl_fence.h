@@ -16,6 +16,8 @@
 #define dma_fence_ops fence_ops
 #define dma_fence_array fence_array
 #define dma_fence fence
+#define dma_fence_init fence_init
+#define dma_fence_context_alloc fence_context_alloc
 #define DMA_FENCE_TRACE FENCE_TRACE
 #define DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT FENCE_FLAG_ENABLE_SIGNAL_BIT
 #define DMA_FENCE_FLAG_SIGNALED_BIT FENCE_FLAG_SIGNALED_BIT
@@ -34,9 +36,6 @@
 #endif
 
 #if !defined(HAVE_DMA_FENCE_DEFINED)
-extern u64 _kcl_fence_context_alloc(unsigned num);
-extern void _kcl_fence_init(struct fence *fence, const struct fence_ops *ops,
-	     spinlock_t *lock, u64 context, unsigned seqno);
 extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
@@ -52,20 +51,6 @@ static inline bool dma_fence_is_later(struct dma_fence *f1, struct dma_fence *f2
 		return false;
 
 	return (int)(f1->seqno - f2->seqno) > 0;
-}
-#endif
-
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-static inline u64 dma_fence_context_alloc(unsigned num)
-{
-	return _kcl_fence_context_alloc(num);
-}
-
-static inline void
-dma_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
-	       spinlock_t *lock, u64 context, unsigned seqno)
-{
-	return _kcl_fence_init(fence, ops, lock, context, seqno);
 }
 #endif
 
