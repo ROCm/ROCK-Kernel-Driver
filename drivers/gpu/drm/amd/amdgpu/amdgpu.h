@@ -90,7 +90,6 @@
 #include "amdgpu_mes.h"
 #include "amdgpu_umc.h"
 #include "amdgpu_mmhub.h"
-#include "amdgpu_tmz.h"
 #include "amdgpu_df.h"
 
 #define MAX_GPU_INSTANCE		16
@@ -962,9 +961,6 @@ struct amdgpu_device {
 	bool                            enable_mes;
 	struct amdgpu_mes               mes;
 
-	/* tmz */
-	struct amdgpu_tmz		tmz;
-
 	/* df */
 	struct amdgpu_df                df;
 
@@ -1321,5 +1317,9 @@ _name##_show(struct device *dev,					\
 									\
 static struct device_attribute pmu_attr_##_name = __ATTR_RO(_name)
 
-#endif
+static inline bool amdgpu_is_tmz(struct amdgpu_device *adev)
+{
+       return adev->gmc.tmz_enabled;
+}
 
+#endif
