@@ -236,7 +236,7 @@ int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 {
 	const uint32_t info_size = sizeof(struct drm_amdgpu_bo_list_entry);
 
-	const void __user *uptr = kcl_u64_to_user_ptr(in->bo_info_ptr);
+	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
 
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;
