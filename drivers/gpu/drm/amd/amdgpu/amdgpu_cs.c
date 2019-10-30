@@ -1670,7 +1670,7 @@ static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
 		}
 	}
 
-	r = kcl_fence_wait_any_timeout(array, fence_count, true, timeout,
+	r = dma_fence_wait_any_timeout(array, fence_count, true, timeout,
 				   &first);
 	if (r < 0)
 		goto err_free_fence_array;
