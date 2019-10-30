@@ -40,9 +40,7 @@ enum pp_smu_ver {
 	PP_SMU_UNSUPPORTED,
 	PP_SMU_VER_RV,
 	PP_SMU_VER_NV,
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	PP_SMU_VER_RN,
-#endif
 
 	PP_SMU_VER_MAX
 };
@@ -286,9 +284,7 @@ struct pp_smu_funcs {
 	union {
 		struct pp_smu_funcs_rv rv_funcs;
 		struct pp_smu_funcs_nv nv_funcs;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 		struct pp_smu_funcs_rn rn_funcs;
-#endif
 
 	};
 };
