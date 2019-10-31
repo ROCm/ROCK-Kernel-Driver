@@ -101,16 +101,6 @@ _kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 }
 #endif
 
-static inline struct dma_fence *
-kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
-{
-#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
-	return _kcl_fence_get_rcu_safe(fencep);
-#else
-	return dma_fence_get_rcu_safe(fencep);
-#endif
-}
-
 #if !defined(HAVE_DMA_FENCE_SET_ERROR)
 static inline void dma_fence_set_error(struct dma_fence *fence,
 				       int error)

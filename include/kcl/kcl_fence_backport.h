@@ -25,4 +25,12 @@
 #if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 #define dma_fence_wait_timeout _kcl_fence_wait_timeout
 #endif
+
+/*
+ * commit v4.14-rc3-601-g5f72db59160c
+ * dma-buf/fence: Sparse wants __rcu on the object itself
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
+#define dma_fence_get_rcu_safe _kcl_fence_get_rcu_safe
+#endif
 #endif
