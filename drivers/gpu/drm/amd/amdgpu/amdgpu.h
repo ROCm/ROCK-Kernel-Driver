@@ -1041,6 +1041,9 @@ struct amdgpu_device {
 
 	uint64_t			unique_id;
 	uint64_t	df_perfmon_config_assign_mask[AMDGPU_MAX_DF_PERFMONS];
+
+	/* device pstate */
+	int				pstate;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)
