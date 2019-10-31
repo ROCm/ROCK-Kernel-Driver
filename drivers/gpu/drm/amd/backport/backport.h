@@ -16,7 +16,6 @@
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_device.h>
-#include <kcl/kcl_fs.h>
 #include <kcl/kcl_mn.h>
 #include <kcl/kcl_kernel.h>
 #if !defined(HAVE_INTERVAL_TREE_DEFINE)
