@@ -161,6 +161,13 @@ struct hubp_funcs {
 		bool enable);
 #endif
 
+	void (*validate_dml_output)(
+			struct hubp *hubp,
+			struct dc_context *ctx,
+			struct _vcs_dpi_display_rq_regs_st *dml_rq_regs,
+			struct _vcs_dpi_display_dlg_regs_st *dml_dlg_attr,
+			struct _vcs_dpi_display_ttu_regs_st *dml_ttu_attr);
+
 };
 
 #endif
