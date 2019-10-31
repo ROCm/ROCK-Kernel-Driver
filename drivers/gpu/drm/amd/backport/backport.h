@@ -22,7 +22,7 @@
 #include <kcl/kcl_interval_tree_generic.h>
 #endif
 #include <kcl/kcl_device_cgroup.h>
-#include <kcl/kcl_drm_dp_helper.h>
+#include <kcl/kcl_drm_dp_helper_backport.h>
 #include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>

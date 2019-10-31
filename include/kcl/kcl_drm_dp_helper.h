@@ -33,7 +33,8 @@
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
-static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+static inline void _kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	/* No transfer function was set, so not a DP connector */
@@ -44,7 +45,7 @@ static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 #endif
 }
 
-static inline void kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
+static inline void _kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 						 const char *name,
 						 struct device *parent)
 {
@@ -56,14 +57,7 @@ static inline void kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 #endif
 }
 
-static inline void kcl_drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
-{
-#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
-	drm_dp_cec_unregister_connector(aux);
-#endif
-}
-
-static inline void kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
+static inline void _kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
 				       const struct edid *edid)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
@@ -75,7 +69,7 @@ static inline void kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
 #endif
 }
 
-static inline void kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
+static inline void _kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 	/* No transfer function was set, so not a DP connector */
@@ -85,5 +79,11 @@ static inline void kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 	drm_dp_cec_unset_edid(aux);
 #endif
 }
+#endif
 
+#if !defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+static inline void drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
+{
+}
+#endif
 #endif /* _KCL_DRM_DP_HELPER_H_ */
