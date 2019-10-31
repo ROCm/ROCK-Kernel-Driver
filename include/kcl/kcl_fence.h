@@ -35,11 +35,6 @@
 #define dma_fence_enable_sw_signaling fence_enable_sw_signaling
 #endif
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
-				signed long timeout);
-#endif
-
 /* commit v4.5-rc3-715-gb47bcb93bbf2
  * fall back to HAVE_DMA_FENCE_DEFINED check directly
  * as it's hard to detect the implementation in kernel
@@ -74,12 +69,10 @@ kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 #endif
 }
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-static inline signed long
-dma_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
-{
-	return _kcl_fence_wait_timeout(fence, intr, timeout);
-}
+
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
+				signed long timeout);
 #endif
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)

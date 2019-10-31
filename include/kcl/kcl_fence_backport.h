@@ -9,4 +9,12 @@
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 #define dma_fence_wait_any_timeout _kcl_fence_wait_any_timeout
 #endif
+
+/*
+ * commit v4.9-rc2-473-g698c0f7ff216
+ * dma-buf/fence: revert "don't wait when specified timeout is zero" (v2)
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#define dma_fence_wait_timeout _kcl_fence_wait_timeout
+#endif
 #endif

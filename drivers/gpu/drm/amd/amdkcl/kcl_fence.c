@@ -196,7 +196,7 @@ err_free_cb:
 EXPORT_SYMBOL(_kcl_fence_wait_any_timeout);
 #endif
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 signed long
 _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 {
