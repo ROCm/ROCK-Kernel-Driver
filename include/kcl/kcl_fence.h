@@ -31,7 +31,6 @@
 #define dma_fence_array_create fence_array_create
 #define dma_fence_add_callback fence_add_callback
 #define dma_fence_remove_callback fence_remove_callback
-#define dma_fence_default_wait fence_default_wait
 #define dma_fence_enable_sw_signaling fence_enable_sw_signaling
 #endif
 
@@ -55,19 +54,10 @@ _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 			   bool intr, signed long timeout, uint32_t *idx);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout);
 #endif
-static inline signed long
-kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
-{
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-	return _kcl_fence_default_wait(fence, intr, timeout);
-#else
-	return dma_fence_default_wait(fence, intr, timeout);
-#endif
-}
 
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)

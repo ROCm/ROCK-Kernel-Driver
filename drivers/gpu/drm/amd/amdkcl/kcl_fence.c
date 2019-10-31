@@ -49,7 +49,7 @@ struct default_wait_cb {
 
 static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
@@ -213,7 +213,7 @@ _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 	if (fence->ops->wait)
 		ret = fence->ops->wait(fence, intr, timeout);
 	else
-		ret = kcl_fence_default_wait(fence, intr, timeout);
+		ret = _kcl_fence_default_wait(fence, intr, timeout);
 	trace_kcl_fence_wait_end(fence);
 	return ret;
 }
