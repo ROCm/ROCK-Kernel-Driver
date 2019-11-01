@@ -577,12 +577,7 @@ static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *p
 		return VGA_SWITCHEROO_DIS;
 }
 
-#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER) ||\
-	defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static const struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#else
-static struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#endif
 	.switchto = amdgpu_atpx_switchto,
 	.power_state = amdgpu_atpx_power_state,
 	.get_client_id = amdgpu_atpx_get_client_id,
@@ -668,18 +663,14 @@ static bool amdgpu_atpx_detect(void)
 void amdgpu_register_atpx_handler(void)
 {
 	bool r;
-#ifndef HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER
-	int handler_flags = 0;
-#else
 	enum vga_switcheroo_handler_flags_t handler_flags = 0;
-#endif
 
 	/* detect if we have any ATPX + 2 VGA in the system */
 	r = amdgpu_atpx_detect();
 	if (!r)
 		return;
 
-	kcl_vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
+	vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
 }
 
 /**
