@@ -124,14 +124,4 @@ static inline void mmgrab(struct mm_struct *mm)
 #ifndef HAVE_MM_ACCESS
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
-
-static inline struct mm_struct * kcl_mm_access(struct task_struct *task, unsigned int mode)
-{
-#ifndef HAVE_MM_ACCESS
-	return _kcl_mm_access(task, mode);
-#else
-	return mm_access(task, mode);
-#endif
-
-}
 #endif /* AMDKCL_MM_H */

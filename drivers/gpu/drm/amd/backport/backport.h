@@ -10,7 +10,7 @@
 #include <kcl/kcl_fence_backport.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
-#include <kcl/kcl_mm.h>
+#include <kcl/kcl_mm_backport.h>
 #include <kcl/kcl_vga_switcheroo.h>
 #include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_hwmon.h>
