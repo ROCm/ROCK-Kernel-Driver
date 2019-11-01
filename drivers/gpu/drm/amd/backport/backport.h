@@ -24,7 +24,7 @@
 #include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>
-#include <kcl/kcl_perf_event.h>
+#include <kcl/kcl_perf_event_backport.h>
 #include <kcl/kcl_ptrace.h>
 #include <kcl/kcl_pci.h>
 #include <kcl/kcl_suspend.h>
