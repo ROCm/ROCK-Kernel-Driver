@@ -854,7 +854,7 @@ enum dcn20_clk_src_array_id {
 	DCN20_CLK_SRC_TOTAL_DCN21
 };
 
-static void destruct(struct dcn21_resource_pool *pool)
+static void dcn21_resource_destruct(struct dcn21_resource_pool *pool)
 {
 	unsigned int i;
 
@@ -1160,7 +1160,7 @@ static void dcn21_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dcn21_resource_pool *dcn21_pool = TO_DCN21_RES_POOL(*pool);
 
-	destruct(dcn21_pool);
+	dcn21_resource_destruct(dcn21_pool);
 	kfree(dcn21_pool);
 	*pool = NULL;
 }
@@ -1640,7 +1640,7 @@ static struct resource_funcs dcn21_res_pool_funcs = {
 	.update_bw_bounding_box = update_bw_bounding_box
 };
 
-static bool construct(
+static bool dcn21_resource_construct(
 	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct dcn21_resource_pool *pool)
@@ -1894,7 +1894,7 @@ static bool construct(
 
 create_fail:
 
-	destruct(pool);
+	dcn21_resource_destruct(pool);
 
 	return false;
 }
@@ -1909,7 +1909,7 @@ struct resource_pool *dcn21_create_resource_pool(
 	if (!pool)
 		return NULL;
 
-	if (construct(init_data->num_virtual_links, dc, pool))
+	if (dcn21_resource_construct(init_data->num_virtual_links, dc, pool))
 		return &pool->base;
 
 	BREAK_TO_DEBUGGER();

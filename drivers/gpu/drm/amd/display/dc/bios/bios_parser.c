@@ -109,7 +109,7 @@ struct dc_bios *bios_parser_create(
 	return NULL;
 }
 
-static void destruct(struct bios_parser *bp)
+static void bios_parser_destruct(struct bios_parser *bp)
 {
 	kfree(bp->base.bios_local_image);
 	kfree(bp->base.integrated_info);
@@ -124,7 +124,7 @@ static void bios_parser_destroy(struct dc_bios **dcb)
 		return;
 	}
 
-	destruct(bp);
+	bios_parser_destruct(bp);
 
 	kfree(bp);
 	*dcb = NULL;

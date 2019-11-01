@@ -1236,7 +1236,7 @@ void dcn20_dsc_destroy(struct display_stream_compressor **dsc)
 
 #endif
 
-static void destruct(struct dcn20_resource_pool *pool)
+static void dcn20_resource_destruct(struct dcn20_resource_pool *pool)
 {
 	unsigned int i;
 
@@ -2932,7 +2932,7 @@ static void dcn20_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dcn20_resource_pool *dcn20_pool = TO_DCN20_RES_POOL(*pool);
 
-	destruct(dcn20_pool);
+	dcn20_resource_destruct(dcn20_pool);
 	kfree(dcn20_pool);
 	*pool = NULL;
 }
@@ -3388,7 +3388,7 @@ static bool init_soc_bounding_box(struct dc *dc,
 	return true;
 }
 
-static bool construct(
+static bool dcn20_resource_construct(
 	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct dcn20_resource_pool *pool)
@@ -3707,7 +3707,7 @@ static bool construct(
 
 create_fail:
 
-	destruct(pool);
+	dcn20_resource_destruct(pool);
 
 	return false;
 }
@@ -3722,7 +3722,7 @@ struct resource_pool *dcn20_create_resource_pool(
 	if (!pool)
 		return NULL;
 
-	if (construct(init_data->num_virtual_links, dc, pool))
+	if (dcn20_resource_construct(init_data->num_virtual_links, dc, pool))
 		return &pool->base;
 
 	BREAK_TO_DEBUGGER();
