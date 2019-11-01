@@ -28,7 +28,7 @@
 #include <kcl/kcl_ptrace.h>
 #include <kcl/kcl_pci_backport.h>
 #include <kcl/kcl_suspend.h>
-#include <kcl/kcl_kthread.h>
+#include <kcl/kcl_kthread_backport.h>
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_timekeeping.h>
 #include <kcl/kcl_io.h>

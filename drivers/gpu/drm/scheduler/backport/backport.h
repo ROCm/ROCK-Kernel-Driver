@@ -3,6 +3,6 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_fence_backport.h>
-#include <kcl/kcl_kthread.h>
+#include <kcl/kcl_kthread_backport.h>
 
 #endif

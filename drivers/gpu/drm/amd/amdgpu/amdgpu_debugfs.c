@@ -884,7 +884,7 @@ static int amdgpu_debugfs_test_ib(struct seq_file *m, void *data)
 
 		if (!ring || !ring->sched.thread)
 			continue;
-		kcl_kthread_park(ring->sched.thread);
+		kthread_park(ring->sched.thread);
 	}
 
 	seq_printf(m, "run ib test:\n");
@@ -900,7 +900,7 @@ static int amdgpu_debugfs_test_ib(struct seq_file *m, void *data)
 
 		if (!ring || !ring->sched.thread)
 			continue;
-		kcl_kthread_unpark(ring->sched.thread);
+		kthread_unpark(ring->sched.thread);
 	}
 
 	return 0;

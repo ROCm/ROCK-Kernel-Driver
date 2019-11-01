@@ -367,7 +367,7 @@ void drm_sched_stop(struct drm_gpu_scheduler *sched, struct drm_sched_job *bad)
 	struct drm_sched_job *s_job, *tmp;
 	unsigned long flags;
 
-	kcl_kthread_park(sched->thread);
+	kthread_park(sched->thread);
 
 	/*
 	 * Iterate the job list from later to  earlier one and either deactive
@@ -463,7 +463,7 @@ void drm_sched_start(struct drm_gpu_scheduler *sched, bool full_recovery)
 		spin_unlock_irqrestore(&sched->job_list_lock, flags);
 	}
 
-	kcl_kthread_unpark(sched->thread);
+	kthread_unpark(sched->thread);
 }
 EXPORT_SYMBOL(drm_sched_start);
 
