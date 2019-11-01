@@ -2916,7 +2916,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 #if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
-		kcl_vga_switcheroo_register_client(adev->pdev,
+		vga_switcheroo_register_client(adev->pdev,
 					       &amdgpu_switcheroo_ops, runtime);
 	if (runtime)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
