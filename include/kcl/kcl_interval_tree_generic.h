@@ -20,6 +20,9 @@
 */
 
 #include <linux/rbtree.h>
+#if defined(HAVE_INTERVAL_TREE_DEFINE)
+#include <linux/interval_tree_generic.h>
+#else
 
 /*
  * Template for implementing interval trees
@@ -189,3 +192,4 @@ ITPREFIX ## _iter_next(ITSTRUCT *node, ITTYPE start, ITTYPE last)	      \
 			return node;					      \
 	}								      \
 }
+#endif
