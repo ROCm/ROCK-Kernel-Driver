@@ -44,4 +44,15 @@
 #else
 #define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 #endif
+
+/*
+ * commit v4.18-rc2-519-gc701317a3eb8
+ * dma-fence: Make ->enable_signaling optional
+ */
+#ifdef AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
+#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL \
+	.enable_signaling = _kcl_fence_enable_signaling,
+#else
+#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
+#endif
 #endif

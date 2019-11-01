@@ -219,6 +219,15 @@ _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 }
 EXPORT_SYMBOL(_kcl_fence_wait_timeout);
 #endif
+
+#ifdef AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
+bool _kcl_fence_enable_signaling(struct dma_fence *f)
+{
+	return true;
+}
+EXPORT_SYMBOL(_kcl_fence_enable_signaling);
+#endif
+
 /*
  * Modifications [2016-12-23] (c) [2016]
  * Advanced Micro Devices, Inc.

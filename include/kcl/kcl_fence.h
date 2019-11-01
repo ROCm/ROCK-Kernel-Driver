@@ -101,6 +101,15 @@ _kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 }
 #endif
 
+/*
+ * commit v4.18-rc2-519-gc701317a3eb8
+ * dma-fence: Make ->enable_signaling optional
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
+bool _kcl_fence_enable_signaling(struct dma_fence *f);
+#endif
+
 #if !defined(HAVE_DMA_FENCE_SET_ERROR)
 static inline void dma_fence_set_error(struct dma_fence *fence,
 				       int error)

@@ -81,13 +81,6 @@ static const char *drm_sched_fence_get_timeline_name(struct dma_fence *f)
 	return (const char *)fence->sched->name;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-static bool drm_sched_fence_enable_signaling(struct dma_fence *f)
-{
-	return true;
-}
-#endif
-
 /**
  * drm_sched_fence_free - free up the fence memory
  *
@@ -136,8 +129,8 @@ static void drm_sched_fence_release_finished(struct dma_fence *f)
 const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 	.get_driver_name = drm_sched_fence_get_driver_name,
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
+	AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
 #endif
 	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
@@ -147,8 +140,8 @@ const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 const struct dma_fence_ops drm_sched_fence_ops_finished = {
 	.get_driver_name = drm_sched_fence_get_driver_name,
 	.get_timeline_name = drm_sched_fence_get_timeline_name,
+	AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-	.enable_signaling = drm_sched_fence_enable_signaling,
 	.signaled = NULL,
 #endif
 	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
