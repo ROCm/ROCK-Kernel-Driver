@@ -176,6 +176,7 @@ m4_include([m4/drm-device-filelist-mutex.m4])
 m4_include([m4/drm-connector-list-iter-begin.m4])
 m4_include([m4/drm-display-info.m4])
 m4_include([m4/drm-probe-helper-h.m4])
+m4_include([m4/struct-name-cb-name-2args.m4])
 m4_include([m4/config.m4])
 
 

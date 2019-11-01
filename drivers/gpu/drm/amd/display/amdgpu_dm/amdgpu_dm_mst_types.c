@@ -271,6 +271,7 @@ dm_dp_mst_detect(struct drm_connector *connector,
 				      aconnector->port);
 }
 
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
 static int dm_dp_mst_atomic_check(struct drm_connector *connector,
 				struct drm_atomic_state *state)
 {
@@ -301,13 +302,16 @@ static int dm_dp_mst_atomic_check(struct drm_connector *connector,
 						mst_mgr,
 						mst_port);
 }
+#endif
 
 static const struct drm_connector_helper_funcs dm_dp_mst_connector_helper_funcs = {
 	.get_modes = dm_dp_mst_get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.atomic_best_encoder = dm_mst_atomic_best_encoder,
 	.detect_ctx = dm_dp_mst_detect,
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
 	.atomic_check = dm_dp_mst_atomic_check,
+#endif
 };
 
 static void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
