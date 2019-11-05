@@ -36,5 +36,5 @@
 #include <kcl/kcl_preempt.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_idr.h>
-
+#include <kcl/kcl_uaccess_backport.h>
 #endif /* AMDGPU_BACKPORT_H */
