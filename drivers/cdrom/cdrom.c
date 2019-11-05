@@ -1057,8 +1057,58 @@ static int cdrom_tray_close(struct cdrom_device_info *cdi)
 			cdi->ops->drive_status(cdi, CDSL_CURRENT), 500);
 }
 
-static
-int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
+int cdrom_autoclose(struct cdrom_device_info *cdi)
+{
+	int ret;
+	const struct cdrom_device_ops *cdo = cdi->ops;
+
+	cd_dbg(CD_OPEN, "entering cdrom_autoclose\n");
+	if (!cdo->drive_status)
+		return -EOPNOTSUPP;
+
+	ret = cdo->drive_status(cdi, CDSL_CURRENT);
+	cd_dbg(CD_OPEN, "drive_status=%d\n", ret);
+
+	if (ret == CDS_TRAY_OPEN) {
+		cd_dbg(CD_OPEN, "the tray is open...\n");
+		if(CDROM_CAN(CDC_CLOSE_TRAY)) {
+			if (!(cdi->options & CDO_AUTO_CLOSE))
+				return -ENOMEDIUM;
+			cd_dbg(CD_OPEN, "trying to close the tray\n");
+			ret = cdrom_tray_close(cdi);
+			if (ret == -ERESTARTSYS)
+				return ret;
+			if (ret) {
+				cd_dbg(CD_OPEN, "bummer. tried to close the tray but failed.\n");
+				return -ENOMEDIUM;
+			}
+			ret = cdo->drive_status(cdi, CDSL_CURRENT);
+			if (ret == CDS_NO_DISC)
+				cd_dbg(CD_OPEN, "tray might not contain a medium\n");
+		} else {
+			cd_dbg(CD_OPEN, "bummer. this drive can't close the tray.\n");
+			return -ENOMEDIUM;
+		}
+	}
+
+	if (ret == CDS_DRIVE_NOT_READY) {
+		int poll_res;
+
+		cd_dbg(CD_OPEN, "waiting for drive to become ready...\n");
+		poll_res = poll_event_interruptible(CDS_DRIVE_NOT_READY !=
+				(ret = cdo->drive_status(cdi, CDSL_CURRENT)), 50);
+		if (poll_res == -ERESTARTSYS)
+			return poll_res;
+	}
+
+	if (ret != CDS_DISC_OK)
+		return -ENOMEDIUM;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(cdrom_autoclose);
+
+static int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 {
 	int ret;
 	const struct cdrom_device_ops *cdo = cdi->ops;
@@ -1077,6 +1127,10 @@ int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 			cd_dbg(CD_OPEN, "the drive is not ready...\n");
 			return -ENOMEDIUM;
 		}
+		if (ret == CDS_NO_DISC) {
+			cd_dbg(CD_OPEN, "tray might not contain a medium...\n");
+			return -ENOMEDIUM;
+		}
 		if (ret != CDS_DISC_OK) {
 			cd_dbg(CD_OPEN, "drive returned status %i...\n", ret);
 			return -ENOMEDIUM;
@@ -1091,8 +1145,7 @@ int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 	return 0;
 }
 
-static
-int open_for_data(struct cdrom_device_info *cdi)
+static int open_for_data(struct cdrom_device_info *cdi)
 {
 	int ret;
 	const struct cdrom_device_ops *cdo = cdi->ops;
@@ -2323,45 +2376,6 @@ static int cdrom_ioctl_closetray(struct cdrom_device_info *cdi)
 	return cdi->ops->tray_move(cdi, 0);
 }
 
-static int cdrom_ioctl_autoclose(struct cdrom_device_info *cdi)
-{
-	const struct cdrom_device_ops *cdo = cdi->ops;
-	int ret;
-
-	if (!cdo->drive_status)
-		return -ENXIO;
-
-	ret = cdo->drive_status(cdi, CDSL_CURRENT);
-
-	if ((ret == CDS_TRAY_OPEN) && CDROM_CAN(CDC_CLOSE_TRAY) &&
-	    (cdi->options & CDO_AUTO_CLOSE)) {
-		cd_dbg(CD_DO_IOCTL, "trying to close the tray...\n");
-		ret = cdrom_tray_close(cdi);
-		if (ret == -ERESTARTSYS)
-			return ret;
-		if (ret) {
-			cd_dbg(CD_DO_IOCTL, "bummer. tried to close the tray but failed.\n");
-			return -ENOMEDIUM;
-			ret = cdo->drive_status(cdi, CDSL_CURRENT);
-		}
-		ret = cdo->drive_status(cdi, CDSL_CURRENT);
-	}
-
-	if (ret == CDS_DRIVE_NOT_READY) {
-		int poll_res;
-
-		cd_dbg(CD_DO_IOCTL, "waiting for drive to become ready...\n");
-		poll_res = poll_event_interruptible(CDS_DRIVE_NOT_READY !=
-			(ret = cdo->drive_status(cdi, CDSL_CURRENT)), 50);
-		if (poll_res == -ERESTARTSYS)
-			return poll_res;
-	}
-	if (ret != CDS_DISC_OK)
-		return -ENOMEDIUM;
-
-	return 0;
-}
-
 static int cdrom_ioctl_eject_sw(struct cdrom_device_info *cdi,
 		unsigned long arg)
 {
@@ -3374,8 +3388,6 @@ int cdrom_ioctl(struct cdrom_device_info *cdi, struct block_device *bdev,
 		return cdrom_ioctl_debug(cdi, arg);
 	case CDROM_GET_CAPABILITY:
 		return cdrom_ioctl_get_capability(cdi);
-	case CDROM_AUTOCLOSE:
-		return cdrom_ioctl_autoclose(cdi);
 	case CDROM_GET_MCN:
 		return cdrom_ioctl_get_mcn(cdi, argp);
 	case CDROM_DRIVE_STATUS:
