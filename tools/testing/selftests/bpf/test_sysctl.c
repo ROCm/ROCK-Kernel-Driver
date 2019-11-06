@@ -1506,6 +1506,7 @@ static int run_test_case(int cgfd, struct sysctl_test *test)
 			goto err;
 	}
 
+	errno = 0;
 	if (access_sysctl(sysctl_path, test) == -1) {
 		if (test->result == OP_EPERM && errno == EPERM)
 			goto out;
@@ -1514,7 +1515,7 @@ static int run_test_case(int cgfd, struct sysctl_test *test)
 	}
 
 	if (test->result != SUCCESS) {
-		log_err("Unexpected failure");
+		log_err("Unexpected success");
 		goto err;
 	}
 
