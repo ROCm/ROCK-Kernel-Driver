@@ -48,7 +48,12 @@ static inline bool dma_fence_is_later(struct dma_fence *f1, struct dma_fence *f2
 }
 #endif
 
+/*
+ * commit v4.18-rc2-533-g418cc6ca0607
+ * dma-fence: Allow wait_any_timeout for all fences)
+ */
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#define AMDKCL_FENCE_WAIT_ANY_TIMEOUT
 signed long
 _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 			   bool intr, signed long timeout, uint32_t *idx);

@@ -125,7 +125,7 @@ EXPORT_SYMBOL(_kcl_fence_default_wait);
  * Modifications [2017-09-19] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#ifdef AMDKCL_FENCE_WAIT_ANY_TIMEOUT
 signed long
 _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 			   bool intr, signed long timeout, uint32_t *idx)

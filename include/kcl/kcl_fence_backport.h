@@ -6,7 +6,7 @@
  * commit v4.18-rc2-533-g418cc6ca0607
  * dma-fence: Allow wait_any_timeout for all fences)
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#ifdef AMDKCL_FENCE_WAIT_ANY_TIMEOUT
 #define dma_fence_wait_any_timeout _kcl_fence_wait_any_timeout
 #endif
 
