@@ -17,12 +17,10 @@
 #ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
 extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
 				short access);
-#endif
 
-static inline int kcl_devcgroup_check_permission(short type, u32 major, u32 minor,
+static inline int _kcl_devcgroup_check_permission(short type, u32 major, u32 minor,
 					short access)
 {
-#ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
 #ifdef BPF_CGROUP_RUN_PROG_DEVICE_CGROUP
 	int rc = BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type, major, minor, access);
 
@@ -31,9 +29,7 @@ static inline int kcl_devcgroup_check_permission(short type, u32 major, u32 mino
 #endif
 
 	return __kcl_devcgroup_check_permission(type, major, minor, access);
-#else
-	return devcgroup_check_permission(type, major, minor, access);
-#endif
 }
+#endif
 #endif
 #endif /*AMDKCL_DEVICE_CGROUP_H*/
