@@ -148,4 +148,12 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #define AMDKCL_ENABLE_RESIZE_FB_BAR
 #endif
 
+/*
+ * commit v4.10-rc3-539-g086f2e5cde74
+ * drm: debugfs: Remove all files automatically on cleanup
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
+#endif
+
 #endif /* AMDKCL_DRM_BACKPORT_H */
