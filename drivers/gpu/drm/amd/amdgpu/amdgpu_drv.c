@@ -1587,6 +1587,11 @@ static struct drm_driver kms_driver = {
 #if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
 	.set_busid = drm_pci_set_busid,
 #endif
+#if defined(CONFIG_DEBUG_FS)
+#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
+	.debugfs_cleanup = amdgpu_debugfs_cleanup,
+#endif
+#endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 #ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
