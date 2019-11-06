@@ -40,6 +40,7 @@
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_task_barrier.h>
 #include <kcl/kcl_drm_print.h>
+#include <kcl/backport/kcl_drm_backport.h>
 #include <kcl/backport/kcl_drm_gem.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/backport/kcl_drm_fb.h>
