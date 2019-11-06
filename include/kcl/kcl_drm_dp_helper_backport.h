@@ -8,7 +8,7 @@
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#if defined(AMDKCL_DRM_DP_CEC_XXX_CHECK_CB)
 #define drm_dp_cec_irq _kcl_drm_dp_cec_irq
 #define drm_dp_cec_register_connector _kcl_drm_dp_cec_register_connector
 #define drm_dp_cec_set_edid _kcl_drm_dp_cec_set_edid

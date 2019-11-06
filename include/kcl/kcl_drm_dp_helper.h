@@ -33,7 +33,15 @@
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
+/*
+ * commit v4.19-rc1-100-g5ce70c799ac2
+ * drm_dp_cec: check that aux has a transfer function
+ */
 #if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#define AMDKCL_DRM_DP_CEC_XXX_CHECK_CB
+#endif
+
+#if defined(AMDKCL_DRM_DP_CEC_XXX_CHECK_CB)
 static inline void _kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
