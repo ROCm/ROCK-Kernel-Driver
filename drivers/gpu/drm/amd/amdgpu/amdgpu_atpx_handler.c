@@ -44,7 +44,7 @@ struct amdgpu_atpx {
 
 static struct amdgpu_atpx_priv {
 	bool atpx_detected;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool bridge_pm_usable;
 #endif
 	unsigned int quirks;
@@ -230,7 +230,7 @@ static int amdgpu_atpx_validate(struct amdgpu_atpx *atpx)
 			atpx->is_hybrid = false;
 		} else {
 			printk("ATPX Hybrid Graphics\n");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 			/*
 			 * Disable legacy PM methods only when pcie port PM is usable,
 			 * otherwise the device might fail to power off or power on.
@@ -624,7 +624,7 @@ static bool amdgpu_atpx_detect(void)
 	struct pci_dev *pdev = NULL;
 	bool has_atpx = false;
 	int vga_count = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool d3_supported = false;
 	struct pci_dev *parent_pdev;
 #endif
@@ -634,7 +634,7 @@ static bool amdgpu_atpx_detect(void)
 
 		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
 #endif
@@ -646,7 +646,7 @@ static bool amdgpu_atpx_detect(void)
 		pr_info("vga_switcheroo: detected switching method %s handle\n",
 			acpi_method_name);
 		amdgpu_atpx_priv.atpx_detected = true;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		amdgpu_atpx_priv.bridge_pm_usable = d3_supported;
 #endif
 		amdgpu_atpx_init();
