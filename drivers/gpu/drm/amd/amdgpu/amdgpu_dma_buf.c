@@ -42,6 +42,7 @@
 #include <linux/pci-p2pdma.h>
 #include <linux/pm_runtime.h>
 
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 static int
 __dma_resv_make_exclusive(struct dma_resv *obj)
 {
@@ -485,6 +486,7 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+#endif
 
 /**
  * amdgpu_gem_prime_export - &drm_driver.gem_prime_export implementation
@@ -507,8 +509,10 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
 		return ERR_PTR(-EPERM);
 
 	buf = drm_gem_prime_export(gobj, flags);
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (!IS_ERR(buf))
 		buf->ops = &amdgpu_dmabuf_ops;
+#endif
 
 	return buf;
 }
@@ -587,7 +591,10 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-	bo->prime_shared_count = 1;
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
+	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
+#endif
+		bo->prime_shared_count = 1;
 
 	dma_resv_unlock(resv);
 	return &bo->tbo.base;
@@ -597,6 +604,7 @@ error:
 	return ERR_PTR(ret);
 }
 
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 /**
  * amdgpu_gem_prime_import - &drm_driver.gem_prime_import implementation
  * @dev: DRM device
@@ -627,9 +635,8 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 
 	return drm_gem_prime_import(dev, dma_buf);
 }
-
+#endif
 #else
-
 /**
  * amdgpu_dma_buf_create_obj - create BO for DMA-buf import
  *
@@ -751,7 +758,6 @@ static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
 	.move_notify = amdgpu_dma_buf_move_notify
 };
 #endif
-
 /**
  * amdgpu_gem_prime_import - &drm_driver.gem_prime_import implementation
  * @dev: DRM device
@@ -801,6 +807,53 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 }
 #endif
 
+#ifndef AMDKCL_AMDGPU_DMABUF_OPS
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	long ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	/*
+	 * Wait for all shared fences to complete before we switch to future
+	 * use of exclusive fence on this prime shared bo.
+	 */
+	ret = dma_resv_wait_timeout_rcu(bo->tbo.resv, true, false,
+						  MAX_SCHEDULE_TIMEOUT);
+	if (unlikely(ret < 0)) {
+		DRM_DEBUG_PRIME("Fence wait failed: %li\n", ret);
+		amdgpu_bo_unreserve(bo);
+		return ret;
+	}
+
+	/* pin buffer into GTT */
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
+	if (likely(ret == 0))
+		bo->prime_shared_count++;
+
+	amdgpu_bo_unreserve(bo);
+	return ret;
+}
+
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, true);
+	if (unlikely(ret != 0))
+		return;
+
+	amdgpu_bo_unpin(bo);
+	if (bo->prime_shared_count)
+		bo->prime_shared_count--;
+	amdgpu_bo_unreserve(bo);
+}
+#endif
+
 /**
  * amdgpu_dmabuf_is_xgmi_accessible - Check if xgmi available for P2P transfer
  *
@@ -819,9 +872,11 @@ bool amdgpu_dmabuf_is_xgmi_accessible(struct amdgpu_device *adev,
 	if (obj->import_attach) {
 		struct dma_buf *dma_buf = obj->import_attach->dmabuf;
 
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 		if (dma_buf->ops != &amdgpu_dmabuf_ops)
 			/* No XGMI with non AMD GPUs */
 			return false;
+#endif
 
 		gobj = dma_buf->priv;
 		bo = gem_to_amdgpu_bo(gobj);

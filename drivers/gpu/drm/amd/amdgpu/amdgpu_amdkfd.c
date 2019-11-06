@@ -479,9 +479,11 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 	if (IS_ERR(dma_buf))
 		return PTR_ERR(dma_buf);
 
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		goto out_put;
+#endif
 
 	obj = dma_buf->priv;
 	if (obj->dev->driver != adev_to_drm(adev)->driver)

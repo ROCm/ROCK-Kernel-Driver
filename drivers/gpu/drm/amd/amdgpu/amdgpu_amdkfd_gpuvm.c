@@ -1887,9 +1887,11 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	struct amdgpu_bo *bo;
 	int ret;
 
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		return -EINVAL;
+#endif
 
 	obj = dma_buf->priv;
 	if (drm_to_adev(obj->dev) != adev)
