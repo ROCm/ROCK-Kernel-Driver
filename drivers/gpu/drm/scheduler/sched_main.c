@@ -646,9 +646,13 @@ static void drm_sched_cleanup_jobs(struct drm_gpu_scheduler *sched)
 {
 	unsigned long flags;
 
-	/* Don't destroy jobs while the timeout worker is running */
-	if (sched->timeout != MAX_SCHEDULE_TIMEOUT &&
-	    !cancel_delayed_work(&sched->work_tdr))
+	/*
+	 * Don't destroy jobs while the timeout worker is running  OR thread
+	 * is being parked and hence assumed to not touch ring_mirror_list
+	 */
+	if ((sched->timeout != MAX_SCHEDULE_TIMEOUT &&
+	    !cancel_delayed_work(&sched->work_tdr)) ||
+	    __kthread_should_park(sched->thread))
 		return;
 
 
