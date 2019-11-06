@@ -1170,6 +1170,7 @@ void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb)
 		__clear_bit(wb, adev->wb.used);
 }
 
+#ifdef AMDKCL_ENABLE_RESIZE_FB_BAR
 /**
  * amdgpu_device_resize_fb_bar - try to resize FB BAR
  *
@@ -1247,6 +1248,7 @@ int amdgpu_device_resize_fb_bar(struct amdgpu_device *adev)
 
 	return 0;
 }
+#endif
 
 /*
  * GPU helpers function.
