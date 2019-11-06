@@ -155,4 +155,8 @@ static inline const char *_kcl_drm_get_format_name(uint32_t format, struct drm_f
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
 #define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
 #endif
+
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#define AMDKCL_AMDGPU_DMABUF_OPS
+#endif
 #endif

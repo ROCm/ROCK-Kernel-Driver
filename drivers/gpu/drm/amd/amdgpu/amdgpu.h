@@ -342,7 +342,7 @@ struct amdgpu_clock {
 	uint32_t max_pixel_clock;
 };
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 #endif
 

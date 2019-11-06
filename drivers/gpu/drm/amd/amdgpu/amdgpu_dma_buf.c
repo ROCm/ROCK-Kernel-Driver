@@ -193,7 +193,7 @@ err_fences_put:
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 #ifndef HAVE_2ARGS_DRM_GEM_MAP_ATTACH
 					struct device *target_dev,
@@ -279,7 +279,7 @@ error:
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 17, 0)
+#if !defined(AMDKCL_AMDGPU_DMABUF_OPS)
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -352,7 +352,7 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
  * Returns:
  * 0 on success or a negative error code on failure.
  */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
 					   enum dma_data_direction direction)
 {
@@ -419,7 +419,7 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf)) {
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 		buf->ops = &amdgpu_dmabuf_ops;
 #endif
 	}
@@ -467,7 +467,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
 #endif
 		bo->prime_shared_count = 1;
@@ -491,7 +491,7 @@ error:
  * Returns:
  * GEM BO representing the shared DMA buffer for the given device.
  */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf)
 {
