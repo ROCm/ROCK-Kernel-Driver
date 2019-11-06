@@ -213,4 +213,14 @@ static inline void kcl_pci_remove_measure_file(struct pci_dev *pdev)
 #endif
 }
 
+/*
+ * v4.18-rc1-3-gb1277a226d8c PCI: Cleanup PCI_REBAR_CTRL_BAR_SHIFT handling
+ * v4.18-rc1-2-gd3252ace0bc6 PCI: Restore resized BAR state on resume
+ * v4.14-rc3-3-g8bb705e3e79d PCI: Add pci_resize_resource() for resizing BARs
+ * v4.14-rc3-2-g276b738deb5b PCI: Add resizable BAR infrastructure
+ */
+#ifdef PCI_REBAR_CTRL_BAR_SHIFT
+#define AMDKCL_ENABLE_RESIZE_FB_BAR
+#endif /* PCI_REBAR_CTRL_BAR_SHIFT */
+
 #endif /* AMDKCL_PCI_H */
