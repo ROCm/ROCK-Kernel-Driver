@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef AMDKCL_DRM_BACKPORT_H
+#define AMDKCL_DRM_BACKPORT_H
+
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#define AMDKCL_AMDGPU_DMABUF_OPS
+#endif
+
+#endif/*AMDKCL_DRM_BACKPORT_H*/
