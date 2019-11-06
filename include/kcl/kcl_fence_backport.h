@@ -13,16 +13,12 @@
 /*
  * commit  v4.9-rc2-472-gbcc004b629d2
  * dma-buf/fence: make timeout handling in fence_default_wait consistent (v2))
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-#define dma_fence_default_wait _kcl_fence_default_wait
-#endif
-
-/*
+ *
  * commit v4.9-rc2-473-g698c0f7ff216
  * dma-buf/fence: revert "don't wait when specified timeout is zero" (v2)
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
+#define dma_fence_default_wait _kcl_fence_default_wait
 #define dma_fence_wait_timeout _kcl_fence_wait_timeout
 #endif
 

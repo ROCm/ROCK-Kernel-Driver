@@ -49,7 +49,7 @@ struct default_wait_cb {
 
 static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
@@ -196,7 +196,7 @@ err_free_cb:
 EXPORT_SYMBOL(_kcl_fence_wait_any_timeout);
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 {

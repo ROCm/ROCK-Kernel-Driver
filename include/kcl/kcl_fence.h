@@ -59,13 +59,18 @@ _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 			   bool intr, signed long timeout, uint32_t *idx);
 #endif
 
+/*
+ * commit  v4.9-rc2-472-gbcc004b629d2
+ * dma-buf/fence: make timeout handling in fence_default_wait consistent (v2))
+ *
+ * commit v4.9-rc2-473-g698c0f7ff216
+ * dma-buf/fence: revert "don't wait when specified timeout is zero" (v2)
+ */
+
 #if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#define AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout);
-#endif
-
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
 extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
