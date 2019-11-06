@@ -67,8 +67,8 @@ int amdgpu_debugfs_add_files(struct amdgpu_device *adev,
 	return 0;
 }
 
-#if defined(BUILD_AS_DKMS) && \
-	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(CONFIG_DEBUG_FS)
+#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 void amdgpu_debugfs_cleanup(struct drm_minor *minor)
 {
 	struct drm_info_node *node, *tmp;
@@ -88,8 +88,6 @@ void amdgpu_debugfs_cleanup(struct drm_minor *minor)
 	return 0;
 }
 #endif
-
-#if defined(CONFIG_DEBUG_FS)
 
 /**
  * amdgpu_debugfs_process_reg_op - Handle MMIO register reads/writes
