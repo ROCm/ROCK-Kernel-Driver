@@ -9,4 +9,8 @@
 #if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
 #define pcie_get_speed_cap _kcl_pcie_get_speed_cap
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#define AMDKCL_PCIE_BRIDGE_PM_USABLE
+#endif
 #endif

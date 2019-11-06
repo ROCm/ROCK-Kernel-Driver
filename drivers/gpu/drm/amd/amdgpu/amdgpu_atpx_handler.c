@@ -43,7 +43,9 @@ struct amdgpu_atpx {
 
 static struct amdgpu_atpx_priv {
 	bool atpx_detected;
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool bridge_pm_usable;
+#endif
 	unsigned int quirks;
 	/* handle for device - and atpx */
 	acpi_handle dhandle;
@@ -227,11 +229,18 @@ static int amdgpu_atpx_validate(struct amdgpu_atpx *atpx)
 			atpx->is_hybrid = false;
 		} else {
 			printk("ATPX Hybrid Graphics\n");
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 			/*
 			 * Disable legacy PM methods only when pcie port PM is usable,
 			 * otherwise the device might fail to power off or power on.
 			 */
 			atpx->functions.power_cntl = !amdgpu_atpx_priv.bridge_pm_usable;
+#else
+                        /*
+                         * This is a temporary hack for the kernel doesn't support D3.
+                         */
+			atpx->functions.power_cntl = true;
+#endif
 			atpx->is_hybrid = true;
 		}
 	}
@@ -610,16 +619,20 @@ static bool amdgpu_atpx_detect(void)
 	struct pci_dev *pdev = NULL;
 	bool has_atpx = false;
 	int vga_count = 0;
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool d3_supported = false;
 	struct pci_dev *parent_pdev;
+#endif
 
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
 		vga_count++;
 
 		has_atpx |= amdgpu_atpx_pci_probe_handle(pdev);
 
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
+#endif
 		amdgpu_atpx_get_quirks(pdev);
 	}
 
@@ -628,8 +641,10 @@ static bool amdgpu_atpx_detect(void)
 
 		has_atpx |= amdgpu_atpx_pci_probe_handle(pdev);
 
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
+#endif
 		amdgpu_atpx_get_quirks(pdev);
 	}
 
@@ -638,7 +653,9 @@ static bool amdgpu_atpx_detect(void)
 		pr_info("vga_switcheroo: detected switching method %s handle\n",
 			acpi_method_name);
 		amdgpu_atpx_priv.atpx_detected = true;
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		amdgpu_atpx_priv.bridge_pm_usable = d3_supported;
+#endif
 		amdgpu_atpx_init();
 		return true;
 	}
