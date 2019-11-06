@@ -37,4 +37,5 @@
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_uaccess_backport.h>
+#include <kcl/kcl_pagemap.h>
 #endif /* AMDGPU_BACKPORT_H */
