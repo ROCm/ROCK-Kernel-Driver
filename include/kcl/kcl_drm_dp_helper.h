@@ -33,6 +33,62 @@
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
+#if !defined(DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER1              0xf0010 /* 1.3 */
+#endif
+
+#if !defined(DP_LANE0_1_STATUS_PHY_REPEATER1)
+#define DP_LANE0_1_STATUS_PHY_REPEATER1                            0xf0030 /* 1.3 */
+#endif
+
+#if !defined(DP_ADJUST_REQUEST_LANE0_1_PHY_REPEATER1)
+#define DP_ADJUST_REQUEST_LANE0_1_PHY_REPEATER1                    0xf0033 /* 1.3 */
+#endif
+
+#if !defined(DP_TRAINING_LANE0_SET_PHY_REPEATER1)
+#define DP_TRAINING_LANE0_SET_PHY_REPEATER1                0xf0011 /* 1.3 */
+#endif
+
+#if !defined(DP_PHY_REPEATER_MODE_TRANSPARENT)
+#define DP_PHY_REPEATER_MODE_TRANSPARENT                   0x55    /* 1.3 */
+#endif
+
+#if !defined(DP_PHY_REPEATER_MODE)
+#define DP_PHY_REPEATER_MODE                               0xf0003 /* 1.3 */
+#endif
+
+#if !defined(DP_PHY_REPEATER_MODE_NON_TRANSPARENT)
+#define DP_PHY_REPEATER_MODE_NON_TRANSPARENT               0xaa    /* 1.3 */
+#endif
+
+#if !defined(DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1)
+#define DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1          0xf0020 /* 1.4a */
+#endif
+
+#if !defined(DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER1              0xf0010 /* 1.3 */
+#endif
+
+#if !defined(DP_PHY_REPEATER_EXTENDED_WAIT_TIMEOUT)
+#define DP_PHY_REPEATER_EXTENDED_WAIT_TIMEOUT              0xf0005 /* 1.4a */
+#endif
+
+#if !defined(DP_LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV)
+#define DP_LT_TUNABLE_PHY_REPEATER_FIELD_DATA_STRUCTURE_REV 0xf0000 /* 1.3 */
+#endif
+
+#if !defined(DP_MAX_LINK_RATE_PHY_REPEATER)
+#define DP_MAX_LINK_RATE_PHY_REPEATER                      0xf0001 /* 1.4a */
+#endif
+
+#if !defined(DP_PHY_REPEATER_CNT)
+#define DP_PHY_REPEATER_CNT                                0xf0002 /* 1.3 */
+#endif
+
+#if !defined(DP_MAX_LANE_COUNT_PHY_REPEATER)
+#define DP_MAX_LANE_COUNT_PHY_REPEATER                     0xf0004 /* 1.4a */
+#endif
+
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
