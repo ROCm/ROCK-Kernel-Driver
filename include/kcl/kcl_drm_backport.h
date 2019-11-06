@@ -140,4 +140,11 @@ static inline const char *_kcl_drm_get_format_name(uint32_t format, struct drm_f
 #define drm_get_format_name _kcl_drm_get_format_name
 #endif
 
+/*
+ * commit d3252ace0bc652a1a244455556b6a549f969bf99
+ * PCI: Restore resized BAR state on resume
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#define AMDKCL_ENABLE_RESIZE_FB_BAR
+#endif
 #endif

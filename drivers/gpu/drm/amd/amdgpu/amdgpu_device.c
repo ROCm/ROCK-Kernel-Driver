@@ -777,7 +777,7 @@ void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb)
 		__clear_bit(wb, adev->wb.used);
 }
 
-#if !defined(BUILD_AS_DKMS) ||  LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#ifdef AMDKCL_ENABLE_RESIZE_FB_BAR
 /**
  * amdgpu_device_resize_fb_bar - try to resize FB BAR
  *
