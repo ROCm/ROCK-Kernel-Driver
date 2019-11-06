@@ -1493,7 +1493,13 @@ static struct drm_driver kms_driver = {
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_export = amdgpu_gem_prime_export,
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	.gem_prime_import = amdgpu_gem_prime_import,
+#else
+	.gem_prime_import = drm_gem_prime_import,
+	.gem_prime_pin = amdgpu_gem_prime_pin,
+	.gem_prime_unpin = amdgpu_gem_prime_unpin,
+#endif
 	.gem_prime_vmap = amdgpu_gem_prime_vmap,
 	.gem_prime_vunmap = amdgpu_gem_prime_vunmap,
 	.gem_prime_mmap = amdgpu_gem_prime_mmap,

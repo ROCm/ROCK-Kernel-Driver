@@ -298,6 +298,7 @@ static void amdgpu_dma_buf_unmap(struct dma_buf_attachment *attach,
  * Returns:
  * 0 on success or a negative error code on failure.
  */
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 static int amdgpu_dma_buf_begin_cpu_access(struct dma_buf *dma_buf,
 					   enum dma_data_direction direction)
 {
@@ -338,6 +339,7 @@ const struct dma_buf_ops amdgpu_dmabuf_ops = {
 	.vmap = drm_gem_dmabuf_vmap,
 	.vunmap = drm_gem_dmabuf_vunmap,
 };
+#endif
 
 /**
  * amdgpu_gem_prime_export - &drm_driver.gem_prime_export implementation
@@ -362,7 +364,9 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
 	buf = drm_gem_prime_export(gobj, flags);
 	if (!IS_ERR(buf)) {
 		buf->file->f_mapping = gobj->dev->anon_inode->i_mapping;
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 		buf->ops = &amdgpu_dmabuf_ops;
+#endif
 	}
 
 	return buf;
@@ -403,7 +407,9 @@ amdgpu_dma_buf_create_obj(struct drm_device *dev, struct dma_buf *dma_buf)
 
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
+#endif
 		bo->prime_shared_count = 1;
 
 	dma_resv_unlock(resv);
@@ -424,6 +430,7 @@ error:
  * Returns:
  * GEM BO representing the shared DMA buffer for the given device.
  */
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					       struct dma_buf *dma_buf)
 {
@@ -456,3 +463,51 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 	obj->import_attach = attach;
 	return obj;
 }
+#endif
+
+#if !defined(AMDKCL_AMDGPU_DMABUF_OPS)
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	long ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	/*
+	 * Wait for all shared fences to complete before we switch to future
+	 * use of exclusive fence on this prime shared bo.
+	 */
+	ret = dma_resv_wait_timeout_rcu(bo->tbo.resv, true, false,
+						  MAX_SCHEDULE_TIMEOUT);
+	if (unlikely(ret < 0)) {
+		DRM_DEBUG_PRIME("Fence wait failed: %li\n", ret);
+		amdgpu_bo_unreserve(bo);
+		return ret;
+	}
+
+	/* pin buffer into GTT */
+	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
+	if (likely(ret == 0))
+		bo->prime_shared_count++;
+
+	amdgpu_bo_unreserve(bo);
+	return ret;
+}
+
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	int ret = 0;
+
+	ret = amdgpu_bo_reserve(bo, true);
+	if (unlikely(ret != 0))
+		return;
+
+	amdgpu_bo_unpin(bo);
+	if (bo->prime_shared_count)
+		bo->prime_shared_count--;
+	amdgpu_bo_unreserve(bo);
+}
+#endif

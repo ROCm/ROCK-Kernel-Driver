@@ -27,8 +27,13 @@
 
 struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
 					int flags);
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf);
+#else
+int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
+void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
+#endif
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
