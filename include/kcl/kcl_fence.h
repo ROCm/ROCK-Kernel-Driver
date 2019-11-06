@@ -75,7 +75,12 @@ extern signed long _kcl_fence_wait_timeout(struct fence *fence, bool intr,
 				signed long timeout);
 #endif
 
+/*
+ * commit v4.14-rc3-601-g5f72db59160c
+ * dma-buf/fence: Sparse wants __rcu on the object itself
+ */
 #if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
+#define AMDKCL_FENCE_GET_RCU_SAFE
 static inline struct dma_fence *
 _kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 {

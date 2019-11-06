@@ -26,7 +26,7 @@
  * commit v4.14-rc3-601-g5f72db59160c
  * dma-buf/fence: Sparse wants __rcu on the object itself
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 15, 0)
+#ifdef AMDKCL_FENCE_GET_RCU_SAFE
 #define dma_fence_get_rcu_safe _kcl_fence_get_rcu_safe
 #endif
 
