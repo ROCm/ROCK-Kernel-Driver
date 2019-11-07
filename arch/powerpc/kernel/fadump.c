@@ -1466,11 +1466,6 @@ static void fadump_init_files(void)
  */
 int __init setup_fadump(void)
 {
-	if (!fw_dump.fadump_supported && fw_dump.fadump_enabled) {
-		printk(KERN_ERR "Firmware-assisted dump is not supported on"
-			" this hardware\n");
-	}
-
 	if (!fw_dump.fadump_supported)
 		return 0;
 
