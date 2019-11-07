@@ -763,7 +763,7 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
-#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
+#if defined(HAVE_DEVM_MEMREMAP_PAGES_2ARGS)
 	struct dev_pagemap	pgmap;
 #endif
 #endif

@@ -1815,7 +1815,7 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 	if (rc)
 		return rc;
 
-#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
+#if defined(HAVE_DEVM_MEMREMAP_PAGES_2ARGS)
 	adev->ssg.pgmap.res.start = res.start;
 	adev->ssg.pgmap.res.end = res.end;
 	adev->ssg.pgmap.res.name = res.name;
