@@ -4412,7 +4412,9 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	int mode_refresh;
 	int preferred_refresh = 0;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_dec_dpcd_caps dsc_caps;
+#endif
 	uint32_t link_bandwidth_kbps;
 #endif
 
@@ -4495,12 +4497,15 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	stream->timing.flags.DSC = 0;
 
 	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
 				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_ext_caps.raw,
 				      &dsc_caps);
+#endif
 		link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
 							     dc_link_get_link_cap(aconnector->dc_link));
 
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (dsc_caps.is_dsc_supported)
 			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
 						  &dsc_caps,
@@ -4509,6 +4514,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 						  &stream->timing,
 						  &stream->timing.dsc_cfg))
 				stream->timing.flags.DSC = 1;
+#endif
 	}
 #endif
 
