@@ -1241,6 +1241,7 @@ extern int __init efi_setup_pcdp_console(char *);
 #define EFI_NX_PE_DATA		9	/* Can runtime data regions be mapped non-executable? */
 #define EFI_MEM_ATTR		10	/* Did firmware publish an EFI_MEMORY_ATTRIBUTES table? */
 #define EFI_SECURE_BOOT		11	/* Are we in Secure Boot mode? */
+#define EFI_MEM_NO_SOFT_RESERVE	12	/* Is the kernel configured to ignore soft reservations? */
 
 enum efi_secureboot_mode {
 	efi_secureboot_mode_unset,
@@ -1265,6 +1266,14 @@ static inline bool efi_rt_services_supported(unsigned int mask)
 }
 
 extern void __init efi_set_secure_boot(enum efi_secureboot_mode mode);
+
+bool __pure __efi_soft_reserve_enabled(void);
+
+static inline bool __pure efi_soft_reserve_enabled(void)
+{
+	return IS_ENABLED(CONFIG_EFI_SOFT_RESERVE)
+		&& __efi_soft_reserve_enabled();
+}
 #else
 static inline bool efi_enabled(int feature)
 {
@@ -1285,6 +1294,11 @@ static inline bool efi_rt_services_supported(unsigned int mask)
 }
 
 static inline void efi_set_secure_boot(enum efi_secureboot_mode mode) {}
+
+static inline bool efi_soft_reserve_enabled(void)
+{
+	return false;
+}
 #endif
 
 extern int efi_status_to_err(efi_status_t status);
