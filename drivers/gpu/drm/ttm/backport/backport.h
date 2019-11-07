@@ -12,5 +12,6 @@
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_highmem_backport.h>
 #include <kcl/kcl_shrinker_backport.h>
+#include <kcl/kcl_dma_mapping.h>
 
 #endif
