@@ -599,3 +599,23 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 }
 EXPORT_SYMBOL(drm_fb_helper_fill_info);
 #endif
+
+#ifndef HAVE_DRM_MODE_IS_420_XXX
+bool _kcl_drm_mode_is_420_only(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode)
+{
+	/* DRM < 4.4 ,un-support this pixel format */
+	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_only!\n");
+	return false;
+}
+EXPORT_SYMBOL(_kcl_drm_mode_is_420_only);
+
+bool _kcl_drm_mode_is_420_also(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode)
+{
+	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_also!\n");
+	return false;
+}
+EXPORT_SYMBOL(_kcl_drm_mode_is_420_also);
+
+#endif
