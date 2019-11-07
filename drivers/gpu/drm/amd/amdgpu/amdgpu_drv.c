@@ -1194,6 +1194,8 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	drmm_add_final_kfree(ddev, adev);
 
+	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
+
 	if (!supports_atomic)
 		ddev->driver_features &= ~DRIVER_ATOMIC;
 
