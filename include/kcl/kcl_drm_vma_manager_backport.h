@@ -6,6 +6,7 @@
  * that the faked up offset will fit
  */
 #include <drm/drm_vma_manager.h>
+#include <kcl/kcl_drmP_h.h>
 
 #ifdef DRM_FILE_PAGE_OFFSET_START
 #undef DRM_FILE_PAGE_OFFSET_START
@@ -22,4 +23,12 @@
 #define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFUL >> PAGE_SHIFT) * 16)
 #endif
 
+#ifndef HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE
+static inline int _kcl_drm_vma_node_verify_access(struct drm_vma_offset_node *node,
+					     struct drm_file *tag)
+{
+	return drm_vma_node_verify_access(node, tag->filp);
+}
+#define drm_vma_node_verify_access _kcl_drm_vma_node_verify_access
+#endif
 #endif
