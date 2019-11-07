@@ -4,11 +4,11 @@ dnl # hw-breakpoints: Fix broken hw-breakpoint sample module
 dnl #
 AC_DEFUN([AC_AMDGPU_KALLSYMS_LOOKUP_NAME],
 	[AC_MSG_CHECKING([whether kallsyms_lookup_name() is available])
-	AC_KERNEL_TRY_COMPILE_SYMBOL([
+	AC_KERNEL_TRY_COMPILE([
 		#include <linux/kallsyms.h>
 	],[
 		kallsyms_lookup_name(NULL);
-	],[kallsyms_lookup_name],[kernel/kallsyms.c],[
+	],[
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_KALLSYMS_LOOKUP_NAME, 1, [kallsyms_lookup_name is available])
 	],[
