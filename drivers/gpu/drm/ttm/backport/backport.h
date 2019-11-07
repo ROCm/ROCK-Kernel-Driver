@@ -11,5 +11,6 @@
 #include <kcl/kcl_mm_types.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_highmem_backport.h>
+#include <kcl/kcl_shrinker_backport.h>
 
 #endif
