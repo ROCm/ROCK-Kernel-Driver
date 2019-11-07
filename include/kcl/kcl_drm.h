@@ -111,11 +111,8 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #endif
 
-#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME)
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
-#endif
-
-#if !defined(HAVE_DRM_ATOMIC_HELPER_RESUME)
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
