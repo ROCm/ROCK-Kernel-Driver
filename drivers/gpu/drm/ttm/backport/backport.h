@@ -12,5 +12,6 @@
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/backport/kcl_shrinker_backport.h>
 #include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/backport/kcl_drm_backport.h>
 #endif
