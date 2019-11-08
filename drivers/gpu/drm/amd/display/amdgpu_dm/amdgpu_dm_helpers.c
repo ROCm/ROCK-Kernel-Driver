@@ -207,17 +207,17 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 #endif
 
 	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
 	/* Accessing the connector state is required for vcpi_slots allocation
 	 * and directly relies on behaviour in commit check
 	 * that blocks before commit guaranteeing that the state
 	 * is not gonna be swapped while still in use in commit tail */
 
-	dm_conn_state = to_dm_connector_state(aconnector->base.state);
-#endif
-
 	if (!aconnector || !aconnector->mst_port)
 		return false;
+
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+	dm_conn_state = to_dm_connector_state(aconnector->base.state);
+#endif
 
 	mst_mgr = &aconnector->mst_port->mst_mgr;
 
