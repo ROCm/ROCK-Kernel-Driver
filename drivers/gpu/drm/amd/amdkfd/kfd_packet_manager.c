@@ -280,7 +280,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 
 	size = pm->pmf->set_resources_size;
 	mutex_lock(&pm->lock);
-	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+	kq_acquire_packet_buffer(pm->priv_queue,
 					size / sizeof(uint32_t),
 					(unsigned int **)&buffer);
 	if (!buffer) {
@@ -291,9 +291,9 @@ int pm_send_set_resources(struct packet_manager *pm,
 
 	retval = pm->pmf->set_resources(pm, buffer, res);
 	if (!retval)
-		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+		kq_submit_packet(pm->priv_queue);
 	else
-		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+		kq_rollback_packet(pm->priv_queue);
 
 out:
 	mutex_unlock(&pm->lock);
@@ -318,7 +318,7 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 	packet_size_dwords = pm->pmf->runlist_size / sizeof(uint32_t);
 	mutex_lock(&pm->lock);
 
-	retval = pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+	retval = kq_acquire_packet_buffer(pm->priv_queue,
 					packet_size_dwords, &rl_buffer);
 	if (retval)
 		goto fail_acquire_packet_buffer;
@@ -328,14 +328,14 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues)
 	if (retval)
 		goto fail_create_runlist;
 
-	pm->priv_queue->ops.submit_packet(pm->priv_queue);
+	kq_submit_packet(pm->priv_queue);
 
 	mutex_unlock(&pm->lock);
 
 	return retval;
 
 fail_create_runlist:
-	pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+	kq_rollback_packet(pm->priv_queue);
 fail_acquire_packet_buffer:
 	mutex_unlock(&pm->lock);
 fail_create_runlist_ib:
@@ -354,7 +354,7 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 
 	size = pm->pmf->query_status_size;
 	mutex_lock(&pm->lock);
-	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+	kq_acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
 	if (!buffer) {
 		pr_err("Failed to allocate buffer on kernel queue\n");
@@ -364,9 +364,9 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 
 	retval = pm->pmf->query_status(pm, buffer, fence_address, fence_value);
 	if (!retval)
-		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+		kq_submit_packet(pm->priv_queue);
 	else
-		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+		kq_rollback_packet(pm->priv_queue);
 
 out:
 	mutex_unlock(&pm->lock);
@@ -383,7 +383,7 @@ int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period)
 	mutex_lock(&pm->lock);
 
 	if (size) {
-		pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+		kq_acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t),
 			(unsigned int **)&buffer);
 
@@ -395,9 +395,9 @@ int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period)
 
 		retval = pm->pmf->set_grace_period(pm, buffer, grace_period);
 		if (!retval)
-			pm->priv_queue->ops.submit_packet(pm->priv_queue);
+			kq_submit_packet(pm->priv_queue);
 		else
-			pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+			kq_rollback_packet(pm->priv_queue);
 	}
 
 out:
@@ -415,7 +415,7 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 
 	size = pm->pmf->unmap_queues_size;
 	mutex_lock(&pm->lock);
-	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+	kq_acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
 	if (!buffer) {
 		pr_err("Failed to allocate buffer on kernel queue\n");
@@ -426,9 +426,9 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 	retval = pm->pmf->unmap_queues(pm, buffer, type, filter, filter_param,
 				       reset, sdma_engine);
 	if (!retval)
-		pm->priv_queue->ops.submit_packet(pm->priv_queue);
+		kq_submit_packet(pm->priv_queue);
 	else
-		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+		kq_rollback_packet(pm->priv_queue);
 
 out:
 	mutex_unlock(&pm->lock);
@@ -473,7 +473,7 @@ int pm_debugfs_hang_hws(struct packet_manager *pm)
 
 	size = pm->pmf->query_status_size;
 	mutex_lock(&pm->lock);
-	pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+	kq_acquire_packet_buffer(pm->priv_queue,
 			size / sizeof(uint32_t), (unsigned int **)&buffer);
 	if (!buffer) {
 		pr_err("Failed to allocate buffer on kernel queue\n");
@@ -481,7 +481,7 @@ int pm_debugfs_hang_hws(struct packet_manager *pm)
 		goto out;
 	}
 	memset(buffer, 0x55, size);
-	pm->priv_queue->ops.submit_packet(pm->priv_queue);
+	kq_submit_packet(pm->priv_queue);
 
 	pr_info("Submitting %x %x %x %x %x %x %x to HIQ to hang the HWS.",
 		buffer[0], buffer[1], buffer[2], buffer[3],
