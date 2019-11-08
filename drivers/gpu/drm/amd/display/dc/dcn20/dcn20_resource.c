@@ -1160,11 +1160,6 @@ struct stream_encoder *dcn20_stream_encoder_create(
 					&stream_enc_regs[eng_id],
 					&se_shift, &se_mask);
 
-	if (ASICREV_IS_NAVI14_M(ctx->asic_id.hw_internal_rev)) {
-		if (eng_id >= ENGINE_ID_DIGD)
-			eng_id++;
-	}
-
 	return &enc1->base;
 }
 
