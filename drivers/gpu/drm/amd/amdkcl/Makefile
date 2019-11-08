@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-amdkcl-y += main.o
+amdkcl-y += main.o symbols.o kcl_common.o
 
 ccflags-y += \
 	-include $(src)/../dkms/config/config.h \
