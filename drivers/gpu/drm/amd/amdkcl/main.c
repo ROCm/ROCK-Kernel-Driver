@@ -2,8 +2,11 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
+extern void amdkcl_symbol_init(void);
+
 int __init amdkcl_init(void)
 {
+	amdkcl_symbol_init();
 	return 0;
 }
 module_init(amdkcl_init);
