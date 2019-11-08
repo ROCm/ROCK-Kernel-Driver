@@ -44,7 +44,7 @@ struct amdgpu_atpx {
 
 static struct amdgpu_atpx_priv {
 	bool atpx_detected;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool bridge_pm_usable;
 #endif
 	unsigned int quirks;
@@ -230,7 +230,7 @@ static int amdgpu_atpx_validate(struct amdgpu_atpx *atpx)
 			atpx->is_hybrid = false;
 		} else {
 			printk("ATPX Hybrid Graphics\n");
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 			/*
 			 * Disable legacy PM methods only when pcie port PM is usable,
 			 * otherwise the device might fail to power off or power on.
@@ -577,12 +577,7 @@ static enum vga_switcheroo_client_id amdgpu_atpx_get_client_id(struct pci_dev *p
 		return VGA_SWITCHEROO_DIS;
 }
 
-#if defined(HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER) ||\
-	defined(HAVE_1ARG_CONST_VGA_SWITCHEROO_REGISTER_HANDLER)
 static const struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#else
-static struct vga_switcheroo_handler amdgpu_atpx_handler = {
-#endif
 	.switchto = amdgpu_atpx_switchto,
 	.power_state = amdgpu_atpx_power_state,
 	.get_client_id = amdgpu_atpx_get_client_id,
@@ -629,7 +624,7 @@ static bool amdgpu_atpx_detect(void)
 	struct pci_dev *pdev = NULL;
 	bool has_atpx = false;
 	int vga_count = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 	bool d3_supported = false;
 	struct pci_dev *parent_pdev;
 #endif
@@ -639,7 +634,7 @@ static bool amdgpu_atpx_detect(void)
 
 		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
 		d3_supported |= parent_pdev && parent_pdev->bridge_d3;
 #endif
@@ -651,7 +646,7 @@ static bool amdgpu_atpx_detect(void)
 		pr_info("vga_switcheroo: detected switching method %s handle\n",
 			acpi_method_name);
 		amdgpu_atpx_priv.atpx_detected = true;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		amdgpu_atpx_priv.bridge_pm_usable = d3_supported;
 #endif
 		amdgpu_atpx_init();
@@ -668,18 +663,14 @@ static bool amdgpu_atpx_detect(void)
 void amdgpu_register_atpx_handler(void)
 {
 	bool r;
-#ifndef HAVE_2ARGS_VGA_SWITCHEROO_REGISTER_HANDLER
-	int handler_flags = 0;
-#else
 	enum vga_switcheroo_handler_flags_t handler_flags = 0;
-#endif
 
 	/* detect if we have any ATPX + 2 VGA in the system */
 	r = amdgpu_atpx_detect();
 	if (!r)
 		return;
 
-	kcl_vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
+	vga_switcheroo_register_handler(&amdgpu_atpx_handler, handler_flags);
 }
 
 /**

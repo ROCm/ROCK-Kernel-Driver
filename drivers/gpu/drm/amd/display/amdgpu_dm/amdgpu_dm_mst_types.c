@@ -257,9 +257,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 					&aconnector->base, aconnector->edid);
 
 	ret = drm_add_edid_modes(connector, aconnector->edid);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0) && !defined(OS_NAME_SUSE_15_1)
-	drm_edid_to_eld(connector, aconnector->edid);
-#endif
 
 	return ret;
 }
@@ -302,7 +299,7 @@ dm_dp_create_fake_mst_encoder(struct amdgpu_dm_connector *connector)
 	encoder = &amdgpu_encoder->base;
 	encoder->possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
 
-	kcl_drm_encoder_init(
+	drm_encoder_init(
 		dev,
 		&amdgpu_encoder->base,
 		&amdgpu_dm_encoder_funcs,
@@ -479,7 +476,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
 
 	drm_dp_aux_register(&aconnector->dm_dp_aux.aux);
-	kcl_drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
+	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
 				      aconnector->base.name, dm->adev->dev);
 
 	if (aconnector->base.connector_type == DRM_MODE_CONNECTOR_eDP)

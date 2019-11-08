@@ -1,5 +1,8 @@
-RHEL_MAJOR = $(shell sed -n 's/^RHEL_MAJOR = \(.*\)/\1/p' $(kdir)/Makefile)
-RHEL_MINOR = $(shell sed -n 's/^RHEL_MINOR = \(.*\)/\1/p' $(kdir)/Makefile)
+define get_rhel_version
+	find -L $(kdir) -name 'version.h' -exec grep $(1) {} + | sort -u | awk -F ' ' '{print $$NF}'
+endef
+RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
+RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
 
 ifneq (,$(RHEL_MAJOR))
 OS_NAME = "rhel"
@@ -162,7 +165,7 @@ subdir-ccflags-y += -DOS_NAME_RHEL_7_X
 else ifeq ($(OS_VERSION),"8.0")
 subdir-ccflags-y += -DOS_NAME_RHEL_8_0
 endif
-ifneq ($(OS_VERSION),"8.0")
+ifneq ($(RHEL_MAJOR),8)
 subdir-ccflags-y += \
 	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
 endif

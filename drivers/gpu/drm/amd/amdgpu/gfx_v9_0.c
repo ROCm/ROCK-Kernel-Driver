@@ -699,6 +699,7 @@ static const struct soc15_reg_golden golden_settings_gc_9_4_1_arct[] =
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmTCP_CHAN_STEER_3_ARCT, 0x3fffffff, 0x2ebd9fe3),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmTCP_CHAN_STEER_4_ARCT, 0x3fffffff, 0xb90f5b1),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmTCP_CHAN_STEER_5_ARCT, 0x3ff, 0x135),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_CONFIG, 0xffffffff, 0x011A0000),
 };
 
 static const u32 GFX_RLC_SRM_INDEX_CNTL_ADDR_OFFSETS[] =
@@ -981,6 +982,13 @@ static void gfx_v9_0_check_fw_write_wait(struct amdgpu_device *adev)
 	adev->gfx.me_fw_write_wait = false;
 	adev->gfx.mec_fw_write_wait = false;
 
+	if ((adev->gfx.mec_fw_version < 0x000001a5) ||
+	    (adev->gfx.mec_feature_version < 46) ||
+	    (adev->gfx.pfp_fw_version < 0x000000b7) ||
+	    (adev->gfx.pfp_feature_version < 46))
+		DRM_WARN_ONCE("Warning: check cp_fw_version and update it to realize \
+			      GRBM requires 1-cycle delay in cp firmware\n");
+
 	switch (adev->asic_type) {
 	case CHIP_VEGA10:
 		if ((adev->gfx.me_fw_version >= 0x0000009c) &&
@@ -1047,6 +1055,12 @@ static void gfx_v9_0_check_if_need_gfxoff(struct amdgpu_device *adev)
 			    !adev->gfx.rlc.is_rlc_v2_1))
 			adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
 
+		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
+				AMD_PG_SUPPORT_CP |
+				AMD_PG_SUPPORT_RLC_SMU_HS;
+		break;
+	case CHIP_RENOIR:
 		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
 			adev->pg_flags |= AMD_PG_SUPPORT_GFX_PG |
 				AMD_PG_SUPPORT_CP |
@@ -2728,7 +2742,8 @@ static void gfx_v9_0_init_pg(struct amdgpu_device *adev)
 	 * And it's needed by gfxoff feature.
 	 */
 	if (adev->gfx.rlc.is_rlc_v2_1) {
-		gfx_v9_1_init_rlc_save_restore_list(adev);
+		if (adev->asic_type == CHIP_VEGA12)
+			gfx_v9_1_init_rlc_save_restore_list(adev);
 		gfx_v9_0_enable_save_restore_machine(adev);
 	}
 
@@ -3740,8 +3755,10 @@ static int gfx_v9_0_hw_fini(void *handle)
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
 
-	/* disable KCQ to avoid CPC touch memory not valid anymore */
-	gfx_v9_0_kcq_disable(adev);
+	/* DF freeze and kcq disable will fail */
+	if (!amdgpu_ras_intr_triggered())
+		/* disable KCQ to avoid CPC touch memory not valid anymore */
+		gfx_v9_0_kcq_disable(adev);
 
 	if (amdgpu_sriov_vf(adev)) {
 		gfx_v9_0_cp_gfx_enable(adev, false);
@@ -3877,9 +3894,22 @@ static uint64_t gfx_v9_0_get_gpu_clock_counter(struct amdgpu_device *adev)
 	uint64_t clock;
 
 	mutex_lock(&adev->gfx.gpu_clock_mutex);
-	WREG32_SOC15(GC, 0, mmRLC_CAPTURE_GPU_CLOCK_COUNT, 1);
-	clock = (uint64_t)RREG32_SOC15(GC, 0, mmRLC_GPU_CLOCK_COUNT_LSB) |
-		((uint64_t)RREG32_SOC15(GC, 0, mmRLC_GPU_CLOCK_COUNT_MSB) << 32ULL);
+	if (adev->asic_type == CHIP_VEGA10 && amdgpu_sriov_runtime(adev)) {
+		uint32_t tmp, lsb, msb, i = 0;
+		do {
+			if (i != 0)
+				udelay(1);
+			tmp = RREG32_SOC15(GC, 0, mmRLC_REFCLOCK_TIMESTAMP_MSB);
+			lsb = RREG32_SOC15(GC, 0, mmRLC_REFCLOCK_TIMESTAMP_LSB);
+			msb = RREG32_SOC15(GC, 0, mmRLC_REFCLOCK_TIMESTAMP_MSB);
+			i++;
+		} while (unlikely(tmp != msb) && (i < adev->usec_timeout));
+		clock = (uint64_t)lsb | ((uint64_t)msb << 32ULL);
+	} else {
+		WREG32_SOC15(GC, 0, mmRLC_CAPTURE_GPU_CLOCK_COUNT, 1);
+		clock = (uint64_t)RREG32_SOC15(GC, 0, mmRLC_GPU_CLOCK_COUNT_LSB) |
+			((uint64_t)RREG32_SOC15(GC, 0, mmRLC_GPU_CLOCK_COUNT_MSB) << 32ULL);
+	}
 	mutex_unlock(&adev->gfx.gpu_clock_mutex);
 	return clock;
 }

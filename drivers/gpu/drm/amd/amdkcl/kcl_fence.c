@@ -24,40 +24,6 @@
 
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-static atomic64_t fence_context_counter = ATOMIC64_INIT(0);
-u64 _kcl_fence_context_alloc(unsigned num)
-{
-	BUG_ON(!num);
-	return atomic64_add_return(num, &fence_context_counter) - num;
-}
-EXPORT_SYMBOL(_kcl_fence_context_alloc);
-
-void
-_kcl_fence_init(struct dma_fence *fence, const struct dma_fence_ops *ops,
-	       spinlock_t *lock, u64 context, unsigned seqno)
-{
-	BUG_ON(!lock);
-	BUG_ON(!ops || !ops->wait || !ops->enable_signaling ||
-	       !ops->get_driver_name || !ops->get_timeline_name);
-
-	kref_init(&fence->refcount);
-	fence->ops = ops;
-	INIT_LIST_HEAD(&fence->cb_list);
-	fence->lock = lock;
-	fence->context = context;
-	fence->seqno = seqno;
-	fence->flags = 0UL;
-	fence->status = 0;
-
-	/*
-	 * Modifications [2017-03-29] (c) [2017]
-	 * Advanced Micro Devices, Inc.
-	 */
-	trace_kcl_fence_init(fence);
-}
-EXPORT_SYMBOL(_kcl_fence_init);
-#endif
 
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
@@ -83,7 +49,7 @@ struct default_wait_cb {
 
 static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
@@ -159,7 +125,7 @@ EXPORT_SYMBOL(_kcl_fence_default_wait);
  * Modifications [2017-09-19] (c) [2017]
  * Advanced Micro Devices, Inc.
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#ifdef AMDKCL_FENCE_WAIT_ANY_TIMEOUT
 signed long
 _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 			   bool intr, signed long timeout, uint32_t *idx)
@@ -230,7 +196,7 @@ err_free_cb:
 EXPORT_SYMBOL(_kcl_fence_wait_any_timeout);
 #endif
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 {
@@ -247,12 +213,21 @@ _kcl_fence_wait_timeout(struct dma_fence *fence, bool intr, signed long timeout)
 	if (fence->ops->wait)
 		ret = fence->ops->wait(fence, intr, timeout);
 	else
-		ret = kcl_fence_default_wait(fence, intr, timeout);
+		ret = _kcl_fence_default_wait(fence, intr, timeout);
 	trace_kcl_fence_wait_end(fence);
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_fence_wait_timeout);
 #endif
+
+#ifdef AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
+bool _kcl_fence_enable_signaling(struct dma_fence *f)
+{
+	return true;
+}
+EXPORT_SYMBOL(_kcl_fence_enable_signaling);
+#endif
+
 /*
  * Modifications [2016-12-23] (c) [2016]
  * Advanced Micro Devices, Inc.

@@ -49,7 +49,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	unsigned long size;
 	int r;
 
-	gobj = kcl_drm_gem_object_lookup(p->adev->ddev, p->filp, data->handle);
+	gobj = drm_gem_object_lookup(p->filp, data->handle);
 	if (gobj == NULL)
 		return -EINVAL;
 
@@ -60,7 +60,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	p->uf_entry.tv.num_shared = 2;
 	p->uf_entry.user_pages = NULL;
 
-	kcl_drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put_unlocked(gobj);
 
 	size = amdgpu_bo_size(bo);
 	if (size != PAGE_SIZE || (data->offset + 8) > size) {
@@ -140,7 +140,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 	}
 
 	/* get chunks */
-	chunk_array_user = kcl_u64_to_user_ptr(cs->in.chunks);
+	chunk_array_user = u64_to_user_ptr(cs->in.chunks);
 	if (copy_from_user(chunk_array, chunk_array_user,
 			   sizeof(uint64_t)*cs->in.num_chunks)) {
 		ret = -EFAULT;
@@ -160,7 +160,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		struct drm_amdgpu_cs_chunk user_chunk;
 		uint32_t __user *cdata;
 
-		chunk_ptr = kcl_u64_to_user_ptr(chunk_array[i]);
+		chunk_ptr = u64_to_user_ptr(chunk_array[i]);
 		if (copy_from_user(&user_chunk, chunk_ptr,
 				       sizeof(struct drm_amdgpu_cs_chunk))) {
 			ret = -EFAULT;
@@ -171,7 +171,7 @@ static int amdgpu_cs_parser_init(struct amdgpu_cs_parser *p, union drm_amdgpu_cs
 		p->chunks[i].length_dw = user_chunk.length_dw;
 
 		size = p->chunks[i].length_dw;
-		cdata = kcl_u64_to_user_ptr(user_chunk.chunk_data);
+		cdata = u64_to_user_ptr(user_chunk.chunk_data);
 
 		p->chunks[i].kdata = kvmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
 		if (p->chunks[i].kdata == NULL) {
@@ -1073,7 +1073,7 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 	struct dma_fence *fence;
 	int r;
 
-	r = kcl_drm_syncobj_find_fence(p->filp, handle, point, flags, &fence);
+	r = drm_syncobj_find_fence(p->filp, handle, point, flags, &fence);
 
 	if (r) {
 		DRM_ERROR("syncobj %u failed to find fence @ %llu (%d)!\n",
@@ -1670,7 +1670,7 @@ static int amdgpu_cs_wait_any_fence(struct amdgpu_device *adev,
 		}
 	}
 
-	r = kcl_fence_wait_any_timeout(array, fence_count, true, timeout,
+	r = dma_fence_wait_any_timeout(array, fence_count, true, timeout,
 				   &first);
 	if (r < 0)
 		goto err_free_fence_array;
@@ -1720,7 +1720,7 @@ int amdgpu_cs_wait_fences_ioctl(struct drm_device *dev, void *data,
 	if (fences == NULL)
 		return -ENOMEM;
 
-	fences_user = kcl_u64_to_user_ptr(wait->in.fences);
+	fences_user = u64_to_user_ptr(wait->in.fences);
 	if (copy_from_user(fences, fences_user,
 		sizeof(struct drm_amdgpu_fence) * fence_count)) {
 		r = -EFAULT;

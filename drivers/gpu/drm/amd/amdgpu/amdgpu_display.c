@@ -326,7 +326,7 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 		goto unpin;
 	}
 
-	r = kcl_reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
+	r = reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
@@ -443,7 +443,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		goto unreserve;
 	}
 
-	r = kcl_reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
+	r = reservation_object_get_fences_rcu(new_abo->tbo.resv, &work->excl,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
@@ -758,7 +758,7 @@ static void amdgpu_display_user_framebuffer_destroy(struct drm_framebuffer *fb)
 {
 	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
 
-	kcl_drm_gem_object_put_unlocked(amdgpu_fb->obj);
+	drm_gem_object_put_unlocked(amdgpu_fb->obj);
 	drm_framebuffer_cleanup(fb);
 	kfree(amdgpu_fb);
 }
@@ -847,7 +847,7 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	struct amdgpu_framebuffer *amdgpu_fb;
 	int ret;
 
-	obj = kcl_drm_gem_object_lookup(dev, file_priv, mode_cmd->handles[0]);
+	obj = drm_gem_object_lookup(file_priv, mode_cmd->handles[0]);
 	if (obj ==  NULL) {
 		dev_err(&dev->pdev->dev, "No GEM object associated to handle 0x%08X, "
 			"can't create framebuffer\n", mode_cmd->handles[0]);
@@ -862,14 +862,14 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);
 	if (amdgpu_fb == NULL) {
-		kcl_drm_gem_object_put_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	ret = amdgpu_display_framebuffer_init(dev, amdgpu_fb, mode_cmd, obj);
 	if (ret) {
 		kfree(amdgpu_fb);
-		kcl_drm_gem_object_put_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(ret);
 	}
 

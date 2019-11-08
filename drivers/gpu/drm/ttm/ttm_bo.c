@@ -449,11 +449,11 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 	if (bo->resv == &bo->ttm_resv)
 		return 0;
 
-	BUG_ON(!kcl_reservation_object_trylock(&bo->ttm_resv));
+	BUG_ON(!reservation_object_trylock(&bo->ttm_resv));
 
-	r = kcl_reservation_object_copy_fences(&bo->ttm_resv, bo->resv);
+	r = reservation_object_copy_fences(&bo->ttm_resv, bo->resv);
 	if (r)
-		kcl_reservation_object_unlock(&bo->ttm_resv);
+		reservation_object_unlock(&bo->ttm_resv);
 
 	return r;
 }
@@ -489,23 +489,23 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		/* Last resort, if we fail to allocate memory for the
 		 * fences block for the BO to become idle
 		 */
-		kcl_reservation_object_wait_timeout_rcu(bo->resv, true, false,
+		reservation_object_wait_timeout_rcu(bo->resv, true, false,
 						    30 * HZ);
 		spin_lock(&glob->lru_lock);
 		goto error;
 	}
 
 	spin_lock(&glob->lru_lock);
-	ret = kcl_reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
+	ret = reservation_object_trylock(bo->resv) ? 0 : -EBUSY;
 	if (!ret) {
-		if (kcl_reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
+		if (reservation_object_test_signaled_rcu(&bo->ttm_resv, true)) {
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&glob->lru_lock);
 			if (bo->resv != &bo->ttm_resv)
-				kcl_reservation_object_unlock(&bo->ttm_resv);
+				reservation_object_unlock(&bo->ttm_resv);
 
 			ttm_bo_cleanup_memtype_use(bo);
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 			return;
 		}
 
@@ -521,10 +521,10 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 			ttm_bo_add_to_lru(bo);
 		}
 
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 	}
 	if (bo->resv != &bo->ttm_resv)
-		kcl_reservation_object_unlock(&bo->ttm_resv);
+		reservation_object_unlock(&bo->ttm_resv);
 
 error:
 	kref_get(&bo->list_kref);
@@ -561,7 +561,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	else
 		resv = &bo->ttm_resv;
 
-	if (kcl_reservation_object_test_signaled_rcu(resv, true))
+	if (reservation_object_test_signaled_rcu(resv, true))
 		ret = 0;
 	else
 		ret = -EBUSY;
@@ -570,10 +570,10 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 		long lret;
 
 		if (unlock_resv)
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 
-		lret = kcl_reservation_object_wait_timeout_rcu(resv, true,
+		lret = reservation_object_wait_timeout_rcu(resv, true,
 							   interruptible,
 							   30 * HZ);
 
@@ -583,7 +583,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_lock(&glob->lru_lock);
-		if (unlock_resv && !kcl_reservation_object_trylock(bo->resv)) {
+		if (unlock_resv && !reservation_object_trylock(bo->resv)) {
 			/*
 			 * We raced, and lost, someone else holds the reservation now,
 			 * and is probably busy in ttm_bo_cleanup_memtype_use.
@@ -600,7 +600,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 
 	if (ret || unlikely(list_empty(&bo->ddestroy))) {
 		if (unlock_resv)
-			kcl_reservation_object_unlock(bo->resv);
+			reservation_object_unlock(bo->resv);
 		spin_unlock(&glob->lru_lock);
 		return ret;
 	}
@@ -613,7 +613,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	ttm_bo_cleanup_memtype_use(bo);
 
 	if (unlock_resv)
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 
 	return 0;
 }
@@ -641,12 +641,12 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 
 		if (remove_all || bo->resv != &bo->ttm_resv) {
 			spin_unlock(&glob->lru_lock);
-			kcl_reservation_object_lock(bo->resv, NULL);
+			reservation_object_lock(bo->resv, NULL);
 
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 
-		} else if (kcl_reservation_object_trylock(bo->resv)) {
+		} else if (reservation_object_trylock(bo->resv)) {
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 		} else {
 			spin_unlock(&glob->lru_lock);
@@ -797,7 +797,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 		if (busy)
 			*busy = false;
 	} else {
-		*locked = kcl_reservation_object_trylock(bo->resv);
+		*locked = reservation_object_trylock(bo->resv);
 		ret = *locked;
 		if (busy)
 			*busy = !ret;
@@ -825,10 +825,10 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		return -EBUSY;
 
 	if (ctx->interruptible)
-		r = kcl_reservation_object_lock_interruptible(busy_bo->resv,
+		r = reservation_object_lock_interruptible(busy_bo->resv,
 							  ticket);
 	else
-		r = kcl_reservation_object_lock(busy_bo->resv, ticket);
+		r = reservation_object_lock(busy_bo->resv, ticket);
 
 	/*
 	 * TODO: It would be better to keep the BO locked until allocation is at
@@ -836,7 +836,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 	 * of TTM.
 	 */
 	if (!r)
-		kcl_reservation_object_unlock(busy_bo->resv);
+		reservation_object_unlock(busy_bo->resv);
 
 	return r == -EDEADLK ? -EBUSY : r;
 }
@@ -870,7 +870,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 			if (place && !bdev->driver->eviction_valuable(bo,
 								      place)) {
 				if (locked)
-					kcl_reservation_object_unlock(bo->resv);
+					reservation_object_unlock(bo->resv);
 				continue;
 			}
 			break;
@@ -948,9 +948,9 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 	if (no_wait_gpu)
 		return -EBUSY;
 
-	kcl_reservation_object_add_shared_fence(bo->resv, fence);
+	reservation_object_add_shared_fence(bo->resv, fence);
 
-	ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
+	ret = reservation_object_reserve_shared(bo->resv, 1);
 	if (unlikely(ret)) {
 		dma_fence_put(fence);
 		return ret;
@@ -1103,7 +1103,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	bool type_found = false;
 	int i, ret;
 
-	ret = kcl_reservation_object_reserve_shared(bo->resv, 1);
+	ret = reservation_object_reserve_shared(bo->resv, 1);
 	if (unlikely(ret))
 		return ret;
 
@@ -1371,7 +1371,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	 * since otherwise lockdep will be angered in radeon.
 	 */
 	if (!resv) {
-		locked = kcl_reservation_object_trylock(bo->resv);
+		locked = reservation_object_trylock(bo->resv);
 		WARN_ON(!locked);
 	}
 
@@ -1815,13 +1815,13 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	long timeout = 15 * HZ;
 
 	if (no_wait) {
-		if (kcl_reservation_object_test_signaled_rcu(bo->resv, true))
+		if (reservation_object_test_signaled_rcu(bo->resv, true))
 			return 0;
 		else
 			return -EBUSY;
 	}
 
-	timeout = kcl_reservation_object_wait_timeout_rcu(bo->resv, true,
+	timeout = reservation_object_wait_timeout_rcu(bo->resv, true,
 						      interruptible, timeout);
 	if (timeout < 0)
 		return timeout;
@@ -1945,7 +1945,7 @@ out:
 	 * already swapped buffer.
 	 */
 	if (locked)
-		kcl_reservation_object_unlock(bo->resv);
+		reservation_object_unlock(bo->resv);
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
@@ -1985,12 +1985,12 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 		return -ERESTARTSYS;
 	if (!ww_mutex_is_locked(&bo->resv->lock))
 		goto out_unlock;
-	ret = kcl_reservation_object_lock_interruptible(bo->resv, NULL);
+	ret = reservation_object_lock_interruptible(bo->resv, NULL);
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))
 		goto out_unlock;
-	kcl_reservation_object_unlock(bo->resv);
+	reservation_object_unlock(bo->resv);
 
 out_unlock:
 	mutex_unlock(&bo->wu_mutex);

@@ -57,6 +57,7 @@
 #include "dml/display_mode_vba.h"
 #include "dcn20_dccg.h"
 #include "dcn20_vmid.h"
+#include "dc_link_ddc.h"
 
 #include "navi10_ip_offset.h"
 
@@ -1150,6 +1151,11 @@ struct stream_encoder *dcn20_stream_encoder_create(
 	if (!enc1)
 		return NULL;
 
+	if (ASICREV_IS_NAVI14_M(ctx->asic_id.hw_internal_rev)) {
+		if (eng_id >= ENGINE_ID_DIGD)
+			eng_id++;
+	}
+
 	dcn20_stream_encoder_construct(enc1, ctx, ctx->dc_bios, eng_id,
 					&stream_enc_regs[eng_id],
 					&se_shift, &se_mask);
@@ -1344,6 +1350,8 @@ static void destruct(struct dcn20_resource_pool *pool)
 	if (pool->base.pp_smu != NULL)
 		dcn20_pp_smu_destroy(&pool->base.pp_smu);
 
+	if (pool->base.oem_device != NULL)
+		dal_ddc_service_destroy(&pool->base.oem_device);
 }
 
 struct hubp *dcn20_hubp_create(
@@ -2848,6 +2856,7 @@ bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
 	bool full_pstate_supported = false;
 	bool dummy_pstate_supported = false;
 	double p_state_latency_us = context->bw_ctx.dml.soc.dram_clock_change_latency_us;
+	context->bw_ctx.dml.soc.disable_dram_clock_change_vactive_support = dc->debug.disable_dram_clock_change_vactive_support;
 
 	if (fast_validate)
 		return dcn20_validate_bandwidth_internal(dc, context, true);
@@ -3388,6 +3397,7 @@ static bool construct(
 	int i;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
+	struct ddc_service_init_data ddc_init_data;
 	struct _vcs_dpi_soc_bounding_box_st *loaded_bb =
 			get_asic_rev_soc_bb(ctx->asic_id.hw_internal_rev);
 	struct _vcs_dpi_ip_params_st *loaded_ip =
@@ -3682,6 +3692,17 @@ static bool construct(
 		dc->caps.planes[i] = plane_cap;
 
 	dc->cap_funcs = cap_funcs;
+
+	if (dc->ctx->dc_bios->fw_info.oem_i2c_present) {
+		ddc_init_data.ctx = dc->ctx;
+		ddc_init_data.link = NULL;
+		ddc_init_data.id.id = dc->ctx->dc_bios->fw_info.oem_i2c_obj_id;
+		ddc_init_data.id.enum_id = 0;
+		ddc_init_data.id.type = OBJECT_TYPE_GENERIC;
+		pool->base.oem_device = dal_ddc_service_create(&ddc_init_data);
+	} else {
+		pool->base.oem_device = NULL;
+	}
 
 	return true;
 

@@ -2501,7 +2501,7 @@ static int kfd_ioctl_cross_memory_copy(struct file *filep,
 	}
 
 	/* Check access permission */
-	remote_mm = kcl_mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
+	remote_mm = mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
 	if (!remote_mm || IS_ERR(remote_mm)) {
 		err = IS_ERR(remote_mm) ? PTR_ERR(remote_mm) : -ESRCH;
 		if (err == -EACCES) {

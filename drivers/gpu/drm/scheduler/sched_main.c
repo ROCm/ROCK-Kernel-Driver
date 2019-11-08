@@ -367,7 +367,7 @@ void drm_sched_stop(struct drm_gpu_scheduler *sched, struct drm_sched_job *bad)
 	struct drm_sched_job *s_job, *tmp;
 	unsigned long flags;
 
-	kcl_kthread_park(sched->thread);
+	kthread_park(sched->thread);
 
 	/*
 	 * Iterate the job list from later to  earlier one and either deactive
@@ -463,7 +463,7 @@ void drm_sched_start(struct drm_gpu_scheduler *sched, bool full_recovery)
 		spin_unlock_irqrestore(&sched->job_list_lock, flags);
 	}
 
-	kcl_kthread_unpark(sched->thread);
+	kthread_unpark(sched->thread);
 }
 EXPORT_SYMBOL(drm_sched_start);
 
@@ -478,6 +478,7 @@ void drm_sched_resubmit_jobs(struct drm_gpu_scheduler *sched)
 	struct drm_sched_job *s_job, *tmp;
 	uint64_t guilty_context;
 	bool found_guilty = false;
+	struct dma_fence *fence;
 
 	list_for_each_entry_safe(s_job, tmp, &sched->ring_mirror_list, node) {
 		struct drm_sched_fence *s_fence = s_job->s_fence;
@@ -491,7 +492,18 @@ void drm_sched_resubmit_jobs(struct drm_gpu_scheduler *sched)
 			dma_fence_set_error(&s_fence->finished, -ECANCELED);
 
 		dma_fence_put(s_job->s_fence->parent);
-		s_job->s_fence->parent = sched->ops->run_job(s_job);
+		fence = sched->ops->run_job(s_job);
+
+		if (IS_ERR_OR_NULL(fence)) {
+			if (IS_ERR(fence))
+				dma_fence_set_error(&s_fence->finished, PTR_ERR(fence));
+
+			s_job->s_fence->parent = NULL;
+		} else {
+			s_job->s_fence->parent = fence;
+		}
+
+
 	}
 }
 EXPORT_SYMBOL(drm_sched_resubmit_jobs);
@@ -719,7 +731,7 @@ static int drm_sched_main(void *param)
 		fence = sched->ops->run_job(sched_job);
 		drm_sched_fence_scheduled(s_fence);
 
-		if (fence) {
+		if (!IS_ERR_OR_NULL(fence)) {
 			s_fence->parent = dma_fence_get(fence);
 			r = dma_fence_add_callback(fence, &sched_job->cb,
 						   drm_sched_process_job);
@@ -729,8 +741,12 @@ static int drm_sched_main(void *param)
 				DRM_ERROR("fence add callback failed (%d)\n",
 					  r);
 			dma_fence_put(fence);
-		} else
+		} else {
+			if (IS_ERR(fence))
+				dma_fence_set_error(&s_fence->finished, PTR_ERR(fence));
+
 			drm_sched_process_job(NULL, &sched_job->cb);
+		}
 
 		wake_up(&sched->job_scheduled);
 	}

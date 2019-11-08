@@ -30,11 +30,12 @@
 
 #include <linux/types.h>
 #include <linux/bitmap.h>
+#if defined(HAVE_DMA_FENCE_DEFINED)
 #include <linux/dma-fence.h>
+#endif
 #include <linux/dma-buf.h>
 #include <linux/mm_types.h>
 #include <linux/scatterlist.h>
-#include <kcl/kcl_fence.h>
 
 struct pci_dev;
 

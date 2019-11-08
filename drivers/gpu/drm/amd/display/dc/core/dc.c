@@ -55,6 +55,7 @@
 #include "hubp.h"
 
 #include "dc_link_dp.h"
+#include "dc_dmub_srv.h"
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
@@ -598,6 +599,10 @@ static bool construct(struct dc *dc,
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	// Allocate memory for the vm_helper
 	dc->vm_helper = kzalloc(sizeof(struct vm_helper), GFP_KERNEL);
+	if (!dc->vm_helper) {
+		dm_error("%s: failed to create dc->vm_helper\n", __func__);
+		goto fail;
+	}
 
 #endif
 	memcpy(&dc->bb_overrides, &init_params->bb_overrides, sizeof(dc->bb_overrides));
@@ -1238,6 +1243,10 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	dc_enable_stereo(dc, context, dc_streams, context->stream_count);
 
+	if (!dc->optimize_seamless_boot)
+			/* pplib is notified if disp_num changed */
+			dc->hwss.optimize_bandwidth(dc, context);
+
 	for (i = 0; i < context->stream_count; i++)
 		context->streams[i]->mode_changed = false;
 
@@ -1540,7 +1549,10 @@ static enum surface_update_type get_scaling_info_update_type(
 	if (u->scaling_info->clip_rect.width != u->surface->clip_rect.width
 			|| u->scaling_info->clip_rect.height != u->surface->clip_rect.height
 			|| u->scaling_info->dst_rect.width != u->surface->dst_rect.width
-			|| u->scaling_info->dst_rect.height != u->surface->dst_rect.height) {
+			|| u->scaling_info->dst_rect.height != u->surface->dst_rect.height
+			|| u->scaling_info->scaling_quality.integer_scaling !=
+				u->surface->scaling_quality.integer_scaling
+			) {
 		update_flags->bits.scaling_change = 1;
 
 		if ((u->scaling_info->dst_rect.width < u->surface->dst_rect.width
@@ -1661,7 +1673,8 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		union stream_update_flags *su_flags = &stream_update->stream->update_flags;
 
 		if ((stream_update->src.height != 0 && stream_update->src.width != 0) ||
-				(stream_update->dst.height != 0 && stream_update->dst.width != 0))
+			(stream_update->dst.height != 0 && stream_update->dst.width != 0) ||
+			stream_update->integer_scaling_update)
 			su_flags->bits.scaling = 1;
 
 		if (stream_update->out_transfer_func)
@@ -2427,6 +2440,9 @@ void dc_set_power_state(
 	case DC_ACPI_CM_POWER_STATE_D0:
 		dc_resource_state_construct(dc, dc->current_state);
 
+		if (dc->ctx->dmub_srv)
+			dc_dmub_srv_wait_phy_init(dc->ctx->dmub_srv);
+
 		dc->hwss.init_hw(dc);
 
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
@@ -2508,6 +2524,17 @@ bool dc_submit_i2c(
 
 	struct dc_link *link = dc->links[link_index];
 	struct ddc_service *ddc = link->ddc;
+	return dce_i2c_submit_command(
+		dc->res_pool,
+		ddc->ddc_pin,
+		cmd);
+}
+
+bool dc_submit_i2c_oem(
+		struct dc *dc,
+		struct i2c_command *cmd)
+{
+	struct ddc_service *ddc = dc->res_pool->oem_device;
 	return dce_i2c_submit_command(
 		dc->res_pool,
 		ddc->ddc_pin,

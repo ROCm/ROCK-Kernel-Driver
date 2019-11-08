@@ -19,12 +19,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#ifdef pr_fmt
-#undef pr_fmt
-#endif /* pr_fmt */
-#define pr_fmt(fmt) "kfd2kgd: " fmt
-
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #if defined(HAVE_MM_H)
@@ -955,7 +949,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 				  AMDGPU_FENCE_OWNER_KFD, false);
 	if (ret)
 		goto wait_pd_fail;
-	ret = kcl_reservation_object_reserve_shared(vm->root.base.bo->tbo.resv, 1);
+	ret = reservation_object_reserve_shared(vm->root.base.bo->tbo.resv, 1);
 	if (ret)
 		goto reserve_shared_fail;
 	amdgpu_bo_fence(vm->root.base.bo,
@@ -1824,7 +1818,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	struct amdgpu_bo *bo;
 	struct amdgpu_vm *avm = (struct amdgpu_vm *)vm;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		return -EINVAL;
@@ -2410,7 +2404,7 @@ int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem
 	 * Add process eviction fence to bo so they can
 	 * evict each other.
 	 */
-	ret = kcl_reservation_object_reserve_shared(gws_bo->tbo.resv, 1);
+	ret = reservation_object_reserve_shared(gws_bo->tbo.resv, 1);
 	if (ret)
 		goto reserve_shared_fail;
 	amdgpu_bo_fence(gws_bo, &process_info->eviction_fence->base, true);

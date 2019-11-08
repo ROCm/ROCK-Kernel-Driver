@@ -155,6 +155,8 @@ struct vba_vars_st {
 	double UrgentLatencySupportUsChroma;
 	unsigned int DSCFormatFactor;
 
+	bool DummyPStateCheck;
+	bool DRAMClockChangeSupportsVActive;
 	bool PrefetchModeSupported;
 	enum self_refresh_affinity AllowDRAMSelfRefreshOrDRAMClockChangeInVblank; // Mode Support only
 	double XFCRemoteSurfaceFlipDelay;

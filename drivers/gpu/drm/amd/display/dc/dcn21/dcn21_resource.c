@@ -350,7 +350,7 @@ static const struct bios_registers bios_regs = {
 };
 
 static const struct dce_dmcu_registers dmcu_regs = {
-		DMCU_DCN10_REG_LIST()
+		DMCU_DCN20_REG_LIST()
 };
 
 static const struct dce_dmcu_shift dmcu_shift = {
@@ -372,20 +372,6 @@ static const struct dce_abm_shift abm_shift = {
 static const struct dce_abm_mask abm_mask = {
 		ABM_MASK_SH_LIST_DCN20(_MASK)
 };
-
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-static const struct dcn21_dmcub_registers dmcub_regs = {
-		DMCUB_REG_LIST_DCN()
-};
-
-static const struct dcn21_dmcub_shift dmcub_shift = {
-		DMCUB_COMMON_MASK_SH_LIST_BASE(__SHIFT)
-};
-
-static const struct dcn21_dmcub_mask dmcub_mask = {
-		DMCUB_COMMON_MASK_SH_LIST_BASE(_MASK)
-};
-#endif
 
 #define audio_regs(id)\
 [id] = {\
@@ -845,6 +831,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.scl_reset_length10 = true,
 		.sanity_checks = true,
 		.disable_48mhz_pwrdwn = false,
+		.nv12_iflip_vm_wa = true
 };
 
 static const struct dc_debug_options debug_defaults_diags = {
@@ -969,11 +956,6 @@ static void destruct(struct dcn21_resource_pool *pool)
 
 	if (pool->base.dmcu != NULL)
 		dce_dmcu_destroy(&pool->base.dmcu);
-
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-	if (pool->base.dmcub != NULL)
-		dcn21_dmcub_destroy(&pool->base.dmcub);
-#endif
 
 	if (pool->base.dccg != NULL)
 		dcn_dccg_destroy(&pool->base.dccg);
@@ -1666,6 +1648,7 @@ static bool construct(
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
 	uint32_t pipe_fuses = read_pipe_fuses(ctx);
+	uint32_t num_pipes;
 
 	ctx->dc_bios->regs = &bios_regs;
 
@@ -1696,6 +1679,7 @@ static bool construct(
 	dc->caps.post_blend_color_processing = true;
 	dc->caps.force_dp_tps4_for_cp2520 = true;
 	dc->caps.extended_aux_timeout_support = true;
+	dc->caps.dmcub_support = true;
 
 	if (dc->ctx->dce_environment == DCE_ENV_PRODUCTION_DRV)
 		dc->debug = debug_defaults_drv;
@@ -1745,7 +1729,7 @@ static bool construct(
 		goto create_fail;
 	}
 
-	pool->base.dmcu = dcn20_dmcu_create(ctx,
+	pool->base.dmcu = dcn21_dmcu_create(ctx,
 			&dmcu_regs,
 			&dmcu_shift,
 			&dmcu_mask);
@@ -1765,21 +1749,9 @@ static bool construct(
 		goto create_fail;
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DMUB
-	pool->base.dmcub = dcn21_dmcub_create(ctx,
-			&dmcub_regs,
-			&dmcub_shift,
-			&dmcub_mask);
-	if (pool->base.dmcub == NULL) {
-		dm_error("DC: failed to create dmcub!\n");
-		BREAK_TO_DEBUGGER();
-		goto create_fail;
-	}
-#endif
-
 	pool->base.pp_smu = dcn21_pp_smu_create(ctx);
 
-	uint32_t num_pipes = dcn2_1_ip.max_num_dpp;
+	num_pipes = dcn2_1_ip.max_num_dpp;
 
 	for (i = 0; i < dcn2_1_ip.max_num_dpp; i++)
 		if (pipe_fuses & 1 << i)

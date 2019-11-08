@@ -17,9 +17,6 @@
 #if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
 #endif
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
-#include <drm/drm_syncobj.h>
-#endif
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
@@ -98,19 +95,6 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
-extern void (*_kcl_drm_fb_helper_cfb_fillrect)(struct fb_info *info,
-				const struct fb_fillrect *rect);
-extern void (*_kcl_drm_fb_helper_cfb_copyarea)(struct fb_info *info,
-				const struct fb_copyarea *area);
-extern void (*_kcl_drm_fb_helper_cfb_imageblit)(struct fb_info *info,
-				 const struct fb_image *image);
-extern void (*_kcl_drm_fb_helper_unregister_fbi)(struct drm_fb_helper *fb_helper);
-extern struct fb_info *(*_kcl_drm_fb_helper_alloc_fbi)(struct drm_fb_helper *fb_helper);
-extern void (*_kcl_drm_fb_helper_set_suspend_unlocked)(struct drm_fb_helper *fb_helper, int state);
-extern void
-(*_kcl_drm_atomic_helper_update_legacy_modeset_state)(struct drm_device *dev,
-					      struct drm_atomic_state *old_state);
-
 #if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
 int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
@@ -176,62 +160,64 @@ drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 }
 #endif
 
-static inline void kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
+#ifndef HAVE_DRM_FB_HELPER_CFB_XX
+extern void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
+				const struct fb_fillrect *rect);
+extern void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
+				const struct fb_copyarea *area);
+extern void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
+				 const struct fb_image *image);
+
+static inline
+void drm_fb_helper_cfb_fillrect(struct fb_info *info,
 				const struct fb_fillrect *rect)
 {
-#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
-#else
-	drm_fb_helper_cfb_fillrect(info, rect);
-#endif
 }
 
-static inline void kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
+static inline
+void drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area)
 {
-#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_copyarea(info, area);
-#else
-	drm_fb_helper_cfb_copyarea(info, area);
-#endif
 }
 
-static inline void kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
+static inline
+void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image)
 {
-#ifndef HAVE_DRM_FB_HELPER_CFB_XX
 	_kcl_drm_fb_helper_cfb_imageblit(info, image);
-#else
-	drm_fb_helper_cfb_imageblit(info, image);
-#endif
 }
+#endif
 
-static inline struct fb_info *kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
-{
 #ifndef HAVE_DRM_FB_HELPER_XX_FBI
+extern struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper);
+extern void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper);
+
+static inline
+struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+
+{
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
-#else
-	return drm_fb_helper_alloc_fbi(fb_helper);
-#endif
 }
 
-static inline void kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+static inline
+void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
-#ifndef HAVE_DRM_FB_HELPER_XX_FBI
 	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
-#else
-	drm_fb_helper_unregister_fbi(fb_helper);
-#endif
 }
+#endif
 
-static inline void kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state)
-{
 #ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
+extern void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state);
+static inline
+void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
+					bool suspend)
+
+{
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
-#else
-	drm_fb_helper_set_suspend_unlocked(fb_helper, state);
-#endif
 }
+#endif
 
 #ifndef HAVE_DRM_FB_HELPER_FILL_INFO
 void drm_fb_helper_fill_info(struct fb_info *info,
@@ -239,16 +225,31 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper_surface_size *sizes);
 #endif
 
+#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
+extern void _kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+					      struct drm_atomic_state *old_state);
+
 static inline void
-kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
+drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
-#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
 	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
-#else
-	drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
-#endif
 }
+#endif
+
+#ifndef DRM_FB_HELPER_DEFAULT_OPS
+#define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_check_var	= drm_fb_helper_check_var, \
+	.fb_set_par	= drm_fb_helper_set_par, \
+	.fb_setcmap	= drm_fb_helper_setcmap, \
+	.fb_blank	= drm_fb_helper_blank, \
+	.fb_pan_display	= drm_fb_helper_pan_display, \
+#ifdef HAVE_FB_OPS_FB_DEBUG_XX \
+	.fb_debug_enter = drm_fb_helper_debug_enter, \
+	.fb_debug_leave = drm_fb_helper_debug_leave,\
+#endif \
+	.fb_ioctl	= drm_fb_helper_ioctl
+#endif
 
 #ifndef DRM_DEBUG_VBL
 #define DRM_UT_VBL		0x20
@@ -270,23 +271,6 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 #endif
 }
 
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
-static inline int kcl_drm_syncobj_find_fence(struct drm_file *file_private,
-						u32 handle, u64 point, u64 flags,
-						struct dma_fence **fence)
-{
-#if defined(HAVE_DRM_SYNCOBJ_FENCE_GET)
-	return drm_syncobj_fence_get(file_private, handle, fence);
-#elif defined(HAVE_3ARGS_DRM_SYNCOBJ_FIND_FENCE)
-	return drm_syncobj_find_fence(file_private, handle, fence);
-#elif defined(HAVE_4ARGS_DRM_SYNCOBJ_FIND_FENCE)
-	return drm_syncobj_find_fence(file_private, handle, point, fence);
-#else
-	return drm_syncobj_find_fence(file_private, handle, point, flags, fence);
-#endif
-}
-#endif
-
 #if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
@@ -301,108 +285,13 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 }
 #endif
 
-static inline int kcl_drm_encoder_init(struct drm_device *dev,
-		      struct drm_encoder *encoder,
-		      const struct drm_encoder_funcs *funcs,
-		      int encoder_type, const char *name, ...)
-{
-#if defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
-	return drm_encoder_init(dev, encoder, funcs,
-			 encoder_type, name);
-#else
-	return drm_encoder_init(dev, encoder, funcs,
-			 encoder_type);
-#endif
-}
-
-static inline int kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
-			      struct drm_plane *primary,
-			      struct drm_plane *cursor,
-			      const struct drm_crtc_funcs *funcs,
-			      const char *name, ...)
-{
-#if defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
-		return drm_crtc_init_with_planes(dev, crtc, primary,
-				 cursor, funcs, name);
-#else
-		return drm_crtc_init_with_planes(dev, crtc, primary,
-				 cursor, funcs);
-#endif
-}
-
-static inline int kcl_drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
-			     unsigned long possible_crtcs,
-			     const struct drm_plane_funcs *funcs,
-			     const uint32_t *formats, unsigned int format_count,
-			     const uint64_t *format_modifiers,
-			     enum drm_plane_type type,
-			     const char *name, ...)
-{
-#if defined(HAVE_9ARGS_DRM_UNIVERSAL_PLANE_INIT)
-		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-				 formats, format_count, format_modifiers, type, name);
-#elif defined(HAVE_8ARGS_DRM_UNIVERSAL_PLANE_INIT)
-		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-				 formats, format_count, type, name);
-#else
-		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-				 formats, format_count, type);
-#endif
-}
-
-static inline struct drm_gem_object *
-kcl_drm_gem_object_lookup(struct drm_device *dev, struct drm_file *filp,
-				u32 handle)
-{
-#if defined(HAVE_2ARGS_DRM_GEM_OBJECT_LOOKUP)
-		return drm_gem_object_lookup(filp, handle);
-#else
-		return drm_gem_object_lookup(dev, filp, handle);
-#endif
-}
-
-#if !defined(HAVE_DRM_GET_FORMAT_NAME)
-/**
- * struct drm_format_name_buf - name of a DRM format
- * @str: string buffer containing the format name
- */
-struct drm_format_name_buf {
-	char str[32];
-};
-
-static char printable_char(int c)
-{
-	return isascii(c) && isprint(c) ? c : '?';
-}
-
-static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
-{
-	snprintf(buf->str, sizeof(buf->str),
-		 "%c%c%c%c %s-endian (0x%08x)",
-		 printable_char(format & 0xff),
-		 printable_char((format >> 8) & 0xff),
-		 printable_char((format >> 16) & 0xff),
-		 printable_char((format >> 24) & 0x7f),
-		 format & DRM_FORMAT_BIG_ENDIAN ? "big" : "little",
-		 format);
-
-	return buf->str;
-}
-#else
-static inline const char *kcl_drm_get_format_name(uint32_t format, struct drm_format_name_buf *buf)
-{
-	return drm_get_format_name(format, buf);
-}
-#endif
-
-static inline void kcl_drm_gem_object_put_unlocked(struct drm_gem_object *obj)
-{
 #if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
+static inline void
+drm_gem_object_put_unlocked(struct drm_gem_object *obj)
+{
 	return drm_gem_object_unreference_unlocked(obj);
-#else
-	return drm_gem_object_put_unlocked(obj);
-#endif
 }
+#endif
 
 #ifdef BUILD_AS_DKMS
 extern struct dma_buf_ops *_kcl_drm_gem_prime_dmabuf_ops;
@@ -476,18 +365,14 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 extern void
 __kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state);
-#endif
 
 static inline void
-kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
+__drm_atomic_helper_connector_reset(struct drm_connector *connector,
 				    struct drm_connector_state *conn_state)
 {
-#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
 	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
-#else
-	return __drm_atomic_helper_connector_reset(connector, conn_state);
-#endif
 }
+#endif
 
 #if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void);

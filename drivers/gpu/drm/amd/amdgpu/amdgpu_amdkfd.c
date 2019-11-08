@@ -19,10 +19,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#undef pr_fmt
-#define pr_fmt(fmt) "kfd2kgd: " fmt
-
 #include "amdgpu_amdkfd.h"
 #include <linux/dma-buf.h>
 #include <drm/drmP.h>
@@ -134,14 +130,6 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		bitmap_complement(gpu_resources.queue_bitmap,
 				  adev->gfx.mec.queue_bitmap,
 				  KGD_MAX_QUEUES);
-
-		/* remove the KIQ bit as well */
-		if (adev->gfx.kiq.ring.sched.ready)
-			clear_bit(amdgpu_gfx_mec_queue_to_bit(adev,
-							  adev->gfx.kiq.ring.me - 1,
-							  adev->gfx.kiq.ring.pipe,
-							  adev->gfx.kiq.ring.queue),
-				  gpu_resources.queue_bitmap);
 
 		/* According to linux/bitmap.h we shouldn't use bitmap_clear if
 		 * nbits is not compile time constant
@@ -497,7 +485,7 @@ int amdgpu_amdkfd_get_dmabuf_info(struct kgd_dev *kgd, int dma_buf_fd,
 	if (IS_ERR(dma_buf))
 		return PTR_ERR(dma_buf);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (dma_buf->ops != &amdgpu_dmabuf_ops)
 		/* Can't handle non-graphics buffers */
 		goto out_put;

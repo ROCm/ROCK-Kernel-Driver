@@ -6,15 +6,9 @@ dnl # Update the generic interval tree code that was introduced in
 dnl # "mm:replace  vma prio_tree with an interval tree".
 AC_DEFUN([AC_AMDGPU_MM_INTERVAL_TREE_DEFINE],
 	[AC_MSG_CHECKING([whether INTERVAL_TREE_DEFINE() is defined])
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/interval_tree_generic.h>
-	],[
-		#if !defined(INTERVAL_TREE_DEFINE)
-		#error INTERVAL_TREE_DEFINE not #defined
-		#endif
-	],[
+	AC_KERNEL_TEST_HEADER_FILE_EXIST([linux/interval_tree_generic.h],[
 		AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_INTERVAL_TREE_DEFINE, 1, [whether INTERVAL_TREE_DEFINE() is defined])
+		AC_DEFINE(HAVE_INTERVAL_TREE_DEFINE, 1, [whether INTERVAL_TREE_DEFINE() is defined])
 	],[
 		AC_MSG_RESULT(no)
 	])

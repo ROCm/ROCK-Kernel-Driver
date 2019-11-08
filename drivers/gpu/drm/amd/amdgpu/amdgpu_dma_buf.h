@@ -33,7 +33,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 					struct drm_gem_object *gobj,
 					int flags);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf);
 #else

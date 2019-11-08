@@ -158,7 +158,7 @@ int amdgpu_fence_emit(struct amdgpu_ring *ring, struct dma_fence **f,
 		struct dma_fence *old;
 
 		rcu_read_lock();
-		old = kcl_fence_get_rcu_safe(ptr);
+		old = dma_fence_get_rcu_safe(ptr);
 		rcu_read_unlock();
 
 		if (old) {
@@ -688,7 +688,7 @@ static const struct dma_fence_ops amdgpu_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_fence_get_timeline_name,
 	.enable_signaling = amdgpu_fence_enable_signaling,
-	.wait = kcl_fence_default_wait,
+	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 	.release = amdgpu_fence_release,
 };
 

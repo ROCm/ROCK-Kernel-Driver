@@ -118,7 +118,7 @@ void amdgpu_pasid_free_delayed(struct reservation_object *resv,
 	unsigned count;
 	int r;
 
-	r = kcl_reservation_object_get_fences_rcu(resv, NULL, &count, &fences);
+	r = reservation_object_get_fences_rcu(resv, NULL, &count, &fences);
 	if (r)
 		goto fallback;
 

@@ -11,3 +11,5 @@ include/drm/spsc_queue.h include/drm/
 include/drm/amd_rdma.h include/drm
 include/uapi/linux/kfd_ioctl.h include/uapi/linux
 drivers/gpu/drm/radeon/cik_reg.h radeon
+drivers/dma-buf/reservation.c amd/amdkcl/
+include/linux/reservation.h include/linux/

@@ -383,13 +383,24 @@ bool smu_clk_dpm_is_enabled(struct smu_context *smu, enum smu_clk_type clk_type)
 	return true;
 }
 
-
+/**
+ * smu_dpm_set_power_gate - power gate/ungate the specific IP block
+ *
+ * @smu:        smu_context pointer
+ * @block_type: the IP block to power gate/ungate
+ * @gate:       to power gate if true, ungate otherwise
+ *
+ * This API uses no smu->mutex lock protection due to:
+ * 1. It is either called by other IP block(gfx/sdma/vcn/uvd/vce).
+ *    This is guarded to be race condition free by the caller.
+ * 2. Or get called on user setting request of power_dpm_force_performance_level.
+ *    Under this case, the smu->mutex lock protection is already enforced on
+ *    the parent API smu_force_performance_level of the call path.
+ */
 int smu_dpm_set_power_gate(struct smu_context *smu, uint32_t block_type,
 			   bool gate)
 {
 	int ret = 0;
-
-	mutex_lock(&smu->mutex);
 
 	switch (block_type) {
 	case AMD_IP_BLOCK_TYPE_UVD:
@@ -407,8 +418,6 @@ int smu_dpm_set_power_gate(struct smu_context *smu, uint32_t block_type,
 	default:
 		break;
 	}
-
-	mutex_unlock(&smu->mutex);
 
 	return ret;
 }
@@ -526,7 +535,7 @@ bool is_support_sw_smu(struct amdgpu_device *adev)
 
 bool is_support_sw_smu_xgmi(struct amdgpu_device *adev)
 {
-	if (amdgpu_dpm != 1)
+	if (!is_support_sw_smu(adev))
 		return false;
 
 	if (adev->asic_type == CHIP_VEGA20)
@@ -1351,6 +1360,8 @@ static int smu_suspend(void *handle)
 	if (adev->asic_type >= CHIP_NAVI10 &&
 	    adev->gfx.rlc.funcs->stop)
 		adev->gfx.rlc.funcs->stop(adev);
+	if (smu->is_apu)
+		smu_set_gfx_cgpg(&adev->smu, false);
 
 	return 0;
 }

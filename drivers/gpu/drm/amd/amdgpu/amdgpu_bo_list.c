@@ -94,14 +94,14 @@ int amdgpu_bo_list_create(struct amdgpu_device *adev, struct drm_file *filp,
 		struct amdgpu_bo *bo;
 		struct mm_struct *usermm;
 
-		gobj = kcl_drm_gem_object_lookup(adev->ddev, filp, info[i].bo_handle);
+		gobj = drm_gem_object_lookup(filp, info[i].bo_handle);
 		if (!gobj) {
 			r = -ENOENT;
 			goto error_free;
 		}
 
 		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
-		kcl_drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put_unlocked(gobj);
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
 		if (usermm) {
@@ -236,7 +236,7 @@ int amdgpu_bo_create_list_entry_array(struct drm_amdgpu_bo_list_in *in,
 {
 	const uint32_t info_size = sizeof(struct drm_amdgpu_bo_list_entry);
 
-	const void __user *uptr = kcl_u64_to_user_ptr(in->bo_info_ptr);
+	const void __user *uptr = u64_to_user_ptr(in->bo_info_ptr);
 
 	struct drm_amdgpu_bo_list_entry *info;
 	int r;

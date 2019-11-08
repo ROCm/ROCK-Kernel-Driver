@@ -75,39 +75,36 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 #endif /* HAVE_KVZALLOC_KVMALLOC */
 
 #ifndef HAVE_KVFREE
-#ifdef HAVE_DRM_FREE_LARGE
-#define kvfree drm_free_large
-#else
 static inline void kvfree(const void *addr)
 {
+#ifdef HAVE_DRM_FREE_LARGE
+	return drm_free_large(addr);
+#else
 	if (is_vmalloc_addr(addr))
 		vfree(addr);
 	else
 		kfree(addr);
-}
 #endif /* HAVE_DRM_FREE_LARGE */
+}
 #endif /* HAVE_KVFREE */
 
 #ifndef HAVE_KVMALLOC_ARRAY
-#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
+#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 	if (flags & __GFP_ZERO)
 		return drm_calloc_large(n, size);
 	else
 		return drm_malloc_ab(n, size);
-}
 #else
-static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
-{
 	size_t bytes;
 
 	if (unlikely(check_mul_overflow(n, size, &bytes)))
 		return NULL;
 
 	return kvmalloc(bytes, flags);
-}
 #endif /* HAVE_DRM_MALLOC_AB && HAVE_DRM_CALLOC_LARGE */
+}
 #endif /* HAVE_KVMALLOC_ARRAY */
 
 #ifndef HAVE_KVCALLOC
@@ -127,14 +124,4 @@ static inline void mmgrab(struct mm_struct *mm)
 #ifndef HAVE_MM_ACCESS
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
-
-static inline struct mm_struct * kcl_mm_access(struct task_struct *task, unsigned int mode)
-{
-#ifndef HAVE_MM_ACCESS
-	return _kcl_mm_access(task, mode);
-#else
-	return mm_access(task, mode);
-#endif
-
-}
 #endif /* AMDKCL_MM_H */

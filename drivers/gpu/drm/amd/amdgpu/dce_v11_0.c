@@ -2075,9 +2075,9 @@ static int dce_v11_0_crtc_do_set_base(struct drm_crtc *crtc,
 	default:
 		DRM_ERROR("Unsupported screen format %s\n",
 #if !defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
-		          kcl_drm_get_format_name(target_fb->pixel_format, &format_name));
+			  drm_get_format_name(target_fb->pixel_format, &format_name));
 #else
-		          kcl_drm_get_format_name(target_fb->format->format, &format_name));
+			  drm_get_format_name(target_fb->format->format, &format_name));
 #endif
 		return -EINVAL;
 	}
@@ -2533,7 +2533,7 @@ static int dce_v11_0_crtc_cursor_set2(struct drm_crtc *crtc,
 		return -EINVAL;
 	}
 
-	obj = kcl_drm_gem_object_lookup(crtc->dev, file_priv, handle);
+	obj = drm_gem_object_lookup(file_priv, handle);
 	if (!obj) {
 		DRM_ERROR("Cannot find cursor object %x for crtc %d\n", handle, amdgpu_crtc->crtc_id);
 		return -ENOENT;
@@ -2542,7 +2542,7 @@ static int dce_v11_0_crtc_cursor_set2(struct drm_crtc *crtc,
 	aobj = gem_to_amdgpu_bo(obj);
 	ret = amdgpu_bo_reserve(aobj, false);
 	if (ret != 0) {
-		kcl_drm_gem_object_put_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		return ret;
 	}
 
@@ -2550,7 +2550,7 @@ static int dce_v11_0_crtc_cursor_set2(struct drm_crtc *crtc,
 	amdgpu_bo_unreserve(aobj);
 	if (ret) {
 		DRM_ERROR("Failed to pin new cursor BO (%d)\n", ret);
-		kcl_drm_gem_object_put_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		return ret;
 	}
 	amdgpu_crtc->cursor_addr = amdgpu_bo_gpu_offset(aobj);
@@ -2585,7 +2585,7 @@ unpin:
 			amdgpu_bo_unpin(aobj);
 			amdgpu_bo_unreserve(aobj);
 		}
-		kcl_drm_gem_object_put_unlocked(amdgpu_crtc->cursor_bo);
+		drm_gem_object_put_unlocked(amdgpu_crtc->cursor_bo);
 	}
 
 	amdgpu_crtc->cursor_bo = obj;
@@ -3746,7 +3746,7 @@ static void dce_v11_0_encoder_add(struct amdgpu_device *adev,
 	switch (amdgpu_encoder->encoder_id) {
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DAC1:
 	case ENCODER_OBJECT_ID_INTERNAL_KLDSCP_DAC2:
-		kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+		drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 				 DRM_MODE_ENCODER_DAC, NULL);
 		drm_encoder_helper_add(encoder, &dce_v11_0_dac_helper_funcs);
 		break;
@@ -3757,15 +3757,15 @@ static void dce_v11_0_encoder_add(struct amdgpu_device *adev,
 	case ENCODER_OBJECT_ID_INTERNAL_UNIPHY3:
 		if (amdgpu_encoder->devices & (ATOM_DEVICE_LCD_SUPPORT)) {
 			amdgpu_encoder->rmx_type = RMX_FULL;
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_LVDS, NULL);
 			amdgpu_encoder->enc_priv = amdgpu_atombios_encoder_get_lcd_info(amdgpu_encoder);
 		} else if (amdgpu_encoder->devices & (ATOM_DEVICE_CRT_SUPPORT)) {
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_DAC, NULL);
 			amdgpu_encoder->enc_priv = amdgpu_atombios_encoder_get_dig_info(amdgpu_encoder);
 		} else {
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_TMDS, NULL);
 			amdgpu_encoder->enc_priv = amdgpu_atombios_encoder_get_dig_info(amdgpu_encoder);
 		}
@@ -3783,13 +3783,13 @@ static void dce_v11_0_encoder_add(struct amdgpu_device *adev,
 		/* these are handled by the primary encoders */
 		amdgpu_encoder->is_ext_encoder = true;
 		if (amdgpu_encoder->devices & (ATOM_DEVICE_LCD_SUPPORT))
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_LVDS, NULL);
 		else if (amdgpu_encoder->devices & (ATOM_DEVICE_CRT_SUPPORT))
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_DAC, NULL);
 		else
-			kcl_drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
+			drm_encoder_init(dev, encoder, &dce_v11_0_encoder_funcs,
 					 DRM_MODE_ENCODER_TMDS, NULL);
 		drm_encoder_helper_add(encoder, &dce_v11_0_ext_helper_funcs);
 		break;

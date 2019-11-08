@@ -39,7 +39,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.56"
+#define DC_VER "3.2.58"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -112,6 +112,7 @@ struct dc_caps {
 	bool disable_dp_clk_share;
 	bool psp_setup_panel_mode;
 	bool extended_aux_timeout_support;
+	bool dmcub_support;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	bool hw_3d_lut;
 #endif
@@ -401,6 +402,9 @@ struct dc_debug_options {
 	unsigned int force_odm_combine; //bit vector based on otg inst
 	unsigned int force_fclk_khz;
 	bool disable_tri_buf;
+	bool dmub_offload_enabled;
+	bool dmcub_emulation;
+	bool dmub_command_table; /* for testing only */
 	struct dc_bw_validation_profile bw_val_profile;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_fec;
@@ -417,6 +421,9 @@ struct dc_debug_options {
 	bool cm_in_bypass;
 #endif
 	int force_clock_mode;/*every mode change.*/
+
+	bool nv12_iflip_vm_wa;
+	bool disable_dram_clock_change_vactive_support;
 };
 
 struct dc_debug_data {
@@ -557,6 +564,9 @@ struct dc_init_data {
 	 */
 	struct dc_bios *vbios_override;
 	enum dce_environment dce_environment;
+
+	struct dmub_offload_funcs *dmub_if;
+	struct dc_reg_helper_state *dmub_offload;
 
 	struct dc_config flags;
 	uint32_t log_mask;

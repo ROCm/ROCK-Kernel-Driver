@@ -26,6 +26,8 @@
 #ifndef _OS_TYPES_H_
 #define _OS_TYPES_H_
 
+#include <linux/slab.h>
+
 #include <asm/byteorder.h>
 #include <linux/types.h>
 #include <drm/drmP.h>

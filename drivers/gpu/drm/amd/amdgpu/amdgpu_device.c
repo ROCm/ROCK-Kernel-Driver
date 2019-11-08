@@ -777,7 +777,7 @@ void amdgpu_device_wb_free(struct amdgpu_device *adev, u32 wb)
 		__clear_bit(wb, adev->wb.used);
 }
 
-#if !defined(BUILD_AS_DKMS) ||  LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+#ifdef AMDKCL_ENABLE_RESIZE_FB_BAR
 /**
  * amdgpu_device_resize_fb_bar - try to resize FB BAR
  *
@@ -1971,6 +1971,7 @@ static bool amdgpu_device_check_vram_lost(struct amdgpu_device *adev)
  * amdgpu_device_set_cg_state - set clockgating for amdgpu device
  *
  * @adev: amdgpu_device pointer
+ * @state: clockgating state (gate or ungate)
  *
  * The list of all the hardware IPs that make up the asic is walked and the
  * set_clockgating_state callbacks are run.
@@ -2090,6 +2091,7 @@ out:
  */
 static int amdgpu_device_ip_late_init(struct amdgpu_device *adev)
 {
+	struct amdgpu_gpu_instance *gpu_instance;
 	int i = 0, r;
 
 	for (i = 0; i < adev->num_ip_blocks; i++) {
@@ -2115,8 +2117,39 @@ static int amdgpu_device_ip_late_init(struct amdgpu_device *adev)
 	if (r)
 		DRM_ERROR("enable mgpu fan boost failed (%d).\n", r);
 
-	/* set to low pstate by default */
-	amdgpu_xgmi_set_pstate(adev, 0);
+
+	if (adev->gmc.xgmi.num_physical_nodes > 1) {
+		mutex_lock(&mgpu_info.mutex);
+
+		/*
+		 * Reset device p-state to low as this was booted with high.
+		 *
+		 * This should be performed only after all devices from the same
+		 * hive get initialized.
+		 *
+		 * However, it's unknown how many device in the hive in advance.
+		 * As this is counted one by one during devices initializations.
+		 *
+		 * So, we wait for all XGMI interlinked devices initialized.
+		 * This may bring some delays as those devices may come from
+		 * different hives. But that should be OK.
+		 */
+		if (mgpu_info.num_dgpu == adev->gmc.xgmi.num_physical_nodes) {
+			for (i = 0; i < mgpu_info.num_gpu; i++) {
+				gpu_instance = &(mgpu_info.gpu_ins[i]);
+				if (gpu_instance->adev->flags & AMD_IS_APU)
+					continue;
+
+				r = amdgpu_xgmi_set_pstate(gpu_instance->adev, 0);
+				if (r) {
+					DRM_ERROR("pstate setting failed (%d).\n", r);
+					break;
+				}
+			}
+		}
+
+		mutex_unlock(&mgpu_info.mutex);
+	}
 
 	return 0;
 }
@@ -2304,6 +2337,12 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 		/* displays are handled in phase1 */
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_DCE)
 			continue;
+		/* PSP lost connection when err_event_athub occurs */
+		if (amdgpu_ras_intr_triggered() &&
+		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_PSP) {
+			adev->ip_blocks[i].status.hw = false;
+			continue;
+		}
 		/* XXX handle errors */
 		r = adev->ip_blocks[i].version->funcs->suspend(adev);
 		/* XXX handle errors */
@@ -2661,9 +2700,9 @@ static int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 	else
 		adev->compute_timeout = MAX_SCHEDULE_TIMEOUT;
 
-	if (strnlen(input, AMDGPU_MAX_TIMEOUT_PARAM_LENTH)) {
+	if (strnlen(input, AMDGPU_MAX_TIMEOUT_PARAM_LENGTH)) {
 		while ((timeout_setting = strsep(&input, ",")) &&
-				strnlen(timeout_setting, AMDGPU_MAX_TIMEOUT_PARAM_LENTH)) {
+				strnlen(timeout_setting, AMDGPU_MAX_TIMEOUT_PARAM_LENGTH)) {
 			ret = kstrtol(timeout_setting, 0, &timeout);
 			if (ret)
 				return ret;
@@ -2901,7 +2940,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 #if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
 	if (!pci_is_thunderbolt_attached(adev->pdev))
 #endif
-		kcl_vga_switcheroo_register_client(adev->pdev,
+		vga_switcheroo_register_client(adev->pdev,
 					       &amdgpu_switcheroo_ops, runtime);
 	if (runtime)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
@@ -3048,6 +3087,13 @@ fence_driver_init:
 		else
 			DRM_INFO("amdgpu: acceleration disabled, skipping benchmarks\n");
 	}
+
+	/*
+	 * Register gpu instance before amdgpu_device_enable_mgpu_fan_boost.
+	 * Otherwise the mgpu fan boost feature will be skipped due to the
+	 * gpu instance is counted less.
+	 */
+	amdgpu_register_gpu_instance(adev);
 
 	/* enable clockgating, etc. after ib tests, etc. since some blocks require
 	 * explicit gating rather than handling it automatically.
@@ -4196,7 +4242,7 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 	if (adev->pm.pcie_gen_mask == 0) {
 		/* asic caps */
 		pdev = adev->pdev;
-		speed_cap = kcl_pcie_get_speed_cap(pdev);
+		speed_cap = pcie_get_speed_cap(pdev);
 		if (speed_cap == PCI_SPEED_UNKNOWN) {
 			adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |

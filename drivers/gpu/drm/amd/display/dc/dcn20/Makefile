@@ -10,15 +10,18 @@ ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DCN20 += dcn20_dsc.o
 endif
 
-ifneq ($(call cc-option, -mpreferred-stack-boundary=4),)
-	cc_stack_align := -mpreferred-stack-boundary=4
-else ifneq ($(call cc-option, -mstack-alignment=16),)
-	cc_stack_align := -mstack-alignment=16
+CFLAGS_dcn20_resource.o := -mhard-float -msse
+
+ifeq ($(call cc-ifversion, -lt, 0701, y), y)
+IS_OLD_GCC = 1
 endif
 
-CFLAGS_dcn20_resource.o := -mhard-float -msse $(cc_stack_align)
-
-ifdef CONFIG_CC_IS_CLANG
+ifdef IS_OLD_GCC
+# Stack alignment mismatch, proceed with caution.
+# GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
+# (8B stack alignment).
+CFLAGS_dcn20_resource.o += -mpreferred-stack-boundary=4
+else
 CFLAGS_dcn20_resource.o += -msse2
 endif
 

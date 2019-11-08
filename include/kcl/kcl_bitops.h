@@ -1,6 +1,5 @@
 #ifndef AMDKCL_BITOPS_H
 #define AMDKCL_BITOPS_H
-#include <linux/version.h>
 
 #ifndef _BITOPS_LONG_SHIFT
 #if BITS_PER_LONG == 32

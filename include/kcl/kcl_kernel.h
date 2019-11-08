@@ -2,14 +2,12 @@
 #define AMDKCL_KERNEL_H
 
 #ifndef u64_to_user_ptr
-#define kcl_u64_to_user_ptr(x) (	\
+#define u64_to_user_ptr(x) (	\
 {					\
 	typecheck(u64, x);		\
 	(void __user *)(uintptr_t)x;	\
 }					\
 )
-#else
-#define kcl_u64_to_user_ptr(x) u64_to_user_ptr(x)
 #endif
 
 #ifndef __GFP_RETRY_MAYFAIL

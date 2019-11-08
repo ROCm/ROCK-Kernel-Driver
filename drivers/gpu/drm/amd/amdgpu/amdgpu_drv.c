@@ -105,7 +105,7 @@ int amdgpu_disp_priority = 0;
 int amdgpu_hw_i2c = 0;
 int amdgpu_pcie_gen2 = -1;
 int amdgpu_msi = -1;
-char amdgpu_lockup_timeout[AMDGPU_MAX_TIMEOUT_PARAM_LENTH];
+char amdgpu_lockup_timeout[AMDGPU_MAX_TIMEOUT_PARAM_LENGTH];
 int amdgpu_dpm = -1;
 int amdgpu_fw_load_type = -1;
 int amdgpu_aspm = -1;
@@ -1049,6 +1049,7 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x7340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI14},
 	{0x1002, 0x7341, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI14},
 	{0x1002, 0x7347, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI14},
+	{0x1002, 0x734F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI14},
 
 	/* Renoir */
 	{0x1002, 0x1636, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_RENOIR|AMD_IS_APU},
@@ -1448,8 +1449,7 @@ static struct drm_driver kms_driver = {
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #if defined(CONFIG_DEBUG_FS)
-#if defined(BUILD_AS_DKMS) && \
-	DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
@@ -1469,7 +1469,7 @@ static struct drm_driver kms_driver = {
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_export = amdgpu_gem_prime_export,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0) || !defined(BUILD_AS_DKMS)
+#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	.gem_prime_import = amdgpu_gem_prime_import,
 #else
 	.gem_prime_import = drm_gem_prime_import,

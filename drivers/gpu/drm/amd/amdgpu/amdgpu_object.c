@@ -715,13 +715,13 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 
 	if ((flags & AMDGPU_GEM_CREATE_SHADOW) && !(adev->flags & AMD_IS_APU)) {
 		if (!bp->resv)
-			WARN_ON(kcl_reservation_object_lock((*bo_ptr)->tbo.resv,
+			WARN_ON(reservation_object_lock((*bo_ptr)->tbo.resv,
 							NULL));
 
 		r = amdgpu_bo_create_shadow(adev, bp->size, *bo_ptr);
 
 		if (!bp->resv)
-			kcl_reservation_object_unlock((*bo_ptr)->tbo.resv);
+			reservation_object_unlock((*bo_ptr)->tbo.resv);
 
 		if (r)
 			amdgpu_bo_unref(bo_ptr);
@@ -818,7 +818,7 @@ int amdgpu_bo_kmap(struct amdgpu_bo *bo, void **ptr)
 		return 0;
 	}
 
-	r = kcl_reservation_object_wait_timeout_rcu(bo->tbo.resv, false, false,
+	r = reservation_object_wait_timeout_rcu(bo->tbo.resv, false, false,
 						MAX_SCHEDULE_TIMEOUT);
 	if (r < 0)
 		return r;
@@ -1345,7 +1345,7 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))
 		return;
 
-	kcl_reservation_object_lock(bo->resv, NULL);
+	reservation_object_lock(bo->resv, NULL);
 
 	r = amdgpu_fill_buffer(abo, AMDGPU_POISON, bo->resv, &fence);
 	if (!WARN_ON(r)) {
@@ -1353,7 +1353,7 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 		dma_fence_put(fence);
 	}
 
-	kcl_reservation_object_unlock(bo->resv);
+	reservation_object_unlock(bo->resv);
 }
 
 /**
@@ -1431,7 +1431,7 @@ void amdgpu_bo_fence(struct amdgpu_bo *bo, struct dma_fence *fence,
 	struct reservation_object *resv = bo->tbo.resv;
 
 	if (shared)
-		kcl_reservation_object_add_shared_fence(resv, fence);
+		reservation_object_add_shared_fence(resv, fence);
 	else
 		reservation_object_add_excl_fence(resv, fence);
 }

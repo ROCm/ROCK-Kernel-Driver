@@ -98,7 +98,7 @@ const struct fence_ops fence_array_ops = {
 	.get_timeline_name = fence_array_get_timeline_name,
 	.enable_signaling = fence_array_enable_signaling,
 	.signaled = fence_array_signaled,
-	.wait = kcl_fence_default_wait,
+	.wait = _kcl_fence_default_wait,
 	.release = fence_array_release,
 };
 
@@ -134,7 +134,7 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 		return NULL;
 
 	spin_lock_init(&array->lock);
-	dma_fence_init(&array->base, &fence_array_ops, &array->lock,
+	fence_init(&array->base, &fence_array_ops, &array->lock,
 		   context, seqno);
 
 	array->num_fences = num_fences;

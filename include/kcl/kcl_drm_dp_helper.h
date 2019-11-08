@@ -33,57 +33,73 @@
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
 
-static inline void kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
+/*
+ * commit v4.19-rc1-100-g5ce70c799ac2
+ * drm_dp_cec: check that aux has a transfer function
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#define AMDKCL_DRM_DP_CEC_XXX_CHECK_CB
+#endif
+
+#if defined(AMDKCL_DRM_DP_CEC_XXX_CHECK_CB)
+static inline void _kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+#ifdef CONFIG_DRM_DP_CEC
 	/* No transfer function was set, so not a DP connector */
 	if (!aux->transfer)
 		return;
+#endif
 
 	drm_dp_cec_irq(aux);
 #endif
 }
 
-static inline void kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
+static inline void _kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 						 const char *name,
 						 struct device *parent)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+#ifdef CONFIG_DRM_DP_CEC
 	if (WARN_ON(!aux->transfer))
 		return;
+#endif
 
 	drm_dp_cec_register_connector(aux, name, parent);
 #endif
 }
 
-static inline void kcl_drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
-{
-#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
-	drm_dp_cec_unregister_connector(aux);
-#endif
-}
-
-static inline void kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
+static inline void _kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
 				       const struct edid *edid)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+#ifdef CONFIG_DRM_DP_CEC
 	/* No transfer function was set, so not a DP connector */
 	if (!aux->transfer)
 		return;
+#endif
 
 	drm_dp_cec_set_edid(aux, edid);
 #endif
 }
 
-static inline void kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
+static inline void _kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 {
 #if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+#ifdef CONFIG_DRM_DP_CEC
 	/* No transfer function was set, so not a DP connector */
 	if (!aux->transfer)
 		return;
+#endif
 
 	drm_dp_cec_unset_edid(aux);
 #endif
 }
+#endif
 
+#if !defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+static inline void drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
+{
+}
+#endif
 #endif /* _KCL_DRM_DP_HELPER_H_ */
