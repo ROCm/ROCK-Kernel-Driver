@@ -509,7 +509,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	}
 }
 
-
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 /**
  * dm_dcn_crtc_high_irq() - Handles VStartup interrupt for DCN generation ASICs
  * @interrupt params - interrupt parameters
@@ -571,6 +571,7 @@ static void dm_dcn_crtc_high_irq(void *interrupt_params)
 
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
 }
+#endif
 
 static int dm_set_clockgating_state(void *handle,
 		  enum amd_clockgating_state state)
