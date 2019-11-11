@@ -16,6 +16,8 @@
 #include <linux/fault-inject.h>
 #include <linux/rcupdate.h>
 
+#include <trace/events/block.h>
+
 extern unsigned int nvme_io_timeout;
 #define NVME_IO_TIMEOUT	(nvme_io_timeout * HZ)
 
@@ -520,6 +522,16 @@ static inline void nvme_mpath_check_last_path(struct nvme_ns *ns)
 		kblockd_schedule_work(&head->requeue_work);
 }
 
+static inline void nvme_trace_bio_complete(struct request *req,
+        blk_status_t status)
+{
+	struct nvme_ns *ns = req->q->queuedata;
+
+	if (req->cmd_flags & REQ_NVME_MPATH)
+		trace_block_bio_complete(ns->head->disk->queue,
+					 req->bio, status);
+}
+
 extern struct device_attribute dev_attr_ana_grpid;
 extern struct device_attribute dev_attr_ana_state;
 extern struct device_attribute subsys_attr_iopolicy;
@@ -565,6 +577,10 @@ static inline void nvme_mpath_clear_ctrl_paths(struct nvme_ctrl *ctrl)
 {
 }
 static inline void nvme_mpath_check_last_path(struct nvme_ns *ns)
+{
+}
+static inline void nvme_trace_bio_complete(struct request *req,
+        blk_status_t status)
 {
 }
 static inline int nvme_mpath_init(struct nvme_ctrl *ctrl,
