@@ -538,13 +538,8 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			       bool interruptible, bool no_wait_gpu,
 			       bool unlock_resv)
 {
-	struct dma_resv *resv;
+	struct dma_resv *resv = &amdkcl_ttm_resv(bo);
 	int ret;
-
-	if (unlikely(list_empty(&bo->ddestroy)))
-		resv = amdkcl_ttm_resvp(bo);
-	else
-		resv = &amdkcl_ttm_resv(bo);
 
 	if (dma_resv_test_signaled_rcu(resv, true))
 		ret = 0;
@@ -558,9 +553,8 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		spin_unlock(&ttm_bo_glob.lru_lock);
 
-		lret = dma_resv_wait_timeout_rcu(resv, true,
-							   interruptible,
-							   30 * HZ);
+		lret = dma_resv_wait_timeout_rcu(resv, true, interruptible,
+						 30 * HZ);
 
 		if (lret < 0)
 			return lret;
