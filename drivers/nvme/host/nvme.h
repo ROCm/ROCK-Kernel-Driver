@@ -99,6 +99,16 @@ enum nvme_quirks {
 	 * Force simple suspend/resume path.
 	 */
 	NVME_QUIRK_SIMPLE_SUSPEND		= (1 << 10),
+
+	/*
+	 * Use only one interrupt vector for all queues
+	 */
+	NVME_QUIRK_SINGLE_VECTOR		= (1 << 11),
+
+	/*
+	 * Use non-standard 128 bytes SQEs.
+	 */
+	NVME_QUIRK_128_BYTES_SQES		= (1 << 12),
 };
 
 /*
