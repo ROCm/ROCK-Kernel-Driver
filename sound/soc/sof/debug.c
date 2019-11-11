@@ -150,8 +150,10 @@ static ssize_t sof_dfsentry_write(struct file *file, const char __user *buffer,
 	 * in the debugfs entry.
 	 */
 	if (strcmp(dfse->dfsentry->d_name.name, "ipc_flood_count") &&
-	    strcmp(dfse->dfsentry->d_name.name, "ipc_flood_duration_ms"))
-		return -EINVAL;
+	    strcmp(dfse->dfsentry->d_name.name, "ipc_flood_duration_ms")) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	if (!strcmp(dfse->dfsentry->d_name.name, "ipc_flood_duration_ms"))
 		flood_duration_test = true;
