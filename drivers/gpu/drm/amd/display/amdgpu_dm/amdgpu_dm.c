@@ -5674,6 +5674,71 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
+					    struct dc_state *dc_state)
+{
+	struct dc_stream_state *stream = NULL;
+	struct drm_connector *connector;
+	struct drm_connector_state *new_con_state, *old_con_state;
+	struct amdgpu_dm_connector *aconnector;
+	struct dm_connector_state *dm_conn_state;
+	int i, j, clock, bpp;
+	int vcpi, pbn_div, pbn = 0;
+
+	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+
+		aconnector = to_amdgpu_dm_connector(connector);
+
+		if (!aconnector->port)
+			continue;
+
+		if (!new_con_state || !new_con_state->crtc)
+			continue;
+
+		dm_conn_state = to_dm_connector_state(new_con_state);
+
+		for (j = 0; j < dc_state->stream_count; j++) {
+			stream = dc_state->streams[j];
+			if (!stream)
+				continue;
+
+			if ((struct amdgpu_dm_connector*)stream->dm_stream_context == aconnector)
+				break;
+
+			stream = NULL;
+		}
+
+		if (!stream)
+			continue;
+
+		if (stream->timing.flags.DSC != 1) {
+			drm_dp_mst_atomic_enable_dsc(state,
+						     aconnector->port,
+						     dm_conn_state->pbn,
+						     0,
+						     false);
+			continue;
+		}
+
+		pbn_div = dm_mst_get_pbn_divider(stream->link);
+		bpp = stream->timing.dsc_cfg.bits_per_pixel;
+		clock = stream->timing.pix_clk_100hz / 10;
+		pbn = drm_dp_calc_pbn_mode(clock, bpp, true);
+		vcpi = drm_dp_mst_atomic_enable_dsc(state,
+						    aconnector->port,
+						    pbn, pbn_div,
+						    true);
+		if (vcpi < 0)
+			return vcpi;
+
+		dm_conn_state->pbn = pbn;
+		dm_conn_state->vcpi_slots = vcpi;
+	}
+	return 0;
+}
+#endif
+
 static void dm_drm_plane_reset(struct drm_plane *plane)
 {
 	struct dm_plane_state *amdgpu_state = NULL;
@@ -9181,6 +9246,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (!compute_mst_dsc_configs_for_state(state, dm_state->context))
 			goto fail;
+
+		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context);
+		if (ret)
+			goto fail;
 #endif
 
 		if (dc_validate_global_state(dc, dm_state->context, false) != DC_OK) {
@@ -9213,6 +9282,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 #endif
 	}
+	/* Perform validation of MST topology in the state*/
+	ret = drm_dp_mst_atomic_check(state);
+	if (ret)
+		goto fail;
 
 	/* Store the overall update type for use later in atomic check. */
 #if !defined(for_each_new_crtc_in_state)
