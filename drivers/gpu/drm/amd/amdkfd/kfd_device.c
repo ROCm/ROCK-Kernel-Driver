@@ -388,7 +388,7 @@ static const struct kfd_device_info arcturus_device_info = {
 
 static const struct kfd_device_info renoir_device_info = {
 	.asic_family = CHIP_RENOIR,
-	.asic_name = "Renoir",
+	.asic_name = "renoir",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
@@ -442,7 +442,7 @@ static const struct kfd_device_info navi12_device_info = {
 
 static const struct kfd_device_info navi14_device_info = {
 	.asic_family = CHIP_NAVI14,
-	.asic_name = "Navi14",
+	.asic_name = "navi14",
 	.max_pasid_bits = 16,
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,

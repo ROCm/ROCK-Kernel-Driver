@@ -19,7 +19,7 @@
 #include <kcl/kcl_mn.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_interval_tree_generic.h>
-#include <kcl/kcl_device_cgroup.h>
+#include <kcl/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_drm_dp_helper_backport.h>
 #include <kcl/kcl_mmu_notifier.h>
 #include <kcl/kcl_overflow.h>
@@ -36,5 +36,6 @@
 #include <kcl/kcl_preempt.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_idr.h>
-
+#include <kcl/kcl_uaccess_backport.h>
+#include <kcl/kcl_pagemap.h>
 #endif /* AMDGPU_BACKPORT_H */

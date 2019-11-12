@@ -22,6 +22,7 @@
  */
 
 #include <linux/kthread.h>
+#include <linux/completion.h>
 #include <drm/gpu_scheduler.h>
 
 #include "gpu_scheduler_trace.h"
@@ -64,6 +65,8 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 				GFP_KERNEL);
 	if (!entity->rq_list)
 		return -ENOMEM;
+
+	init_completion(&entity->entity_idle);
 
 	for (i = 0; i < num_rq_list; ++i)
 		entity->rq_list[i] = rq_list[i];
@@ -283,11 +286,12 @@ void drm_sched_entity_fini(struct drm_sched_entity *entity)
 	 */
 	if (spsc_queue_count(&entity->job_queue)) {
 		if (sched) {
-			/* Park the kernel for a moment to make sure it isn't processing
-			 * our enity.
+			/*
+			 * Wait for thread to idle to make sure it isn't processing
+			 * this entity.
 			 */
-			kthread_park(sched->thread);
-			kthread_unpark(sched->thread);
+			wait_for_completion(&entity->entity_idle);
+
 		}
 		if (entity->dependency) {
 			dma_fence_remove_callback(entity->dependency,
