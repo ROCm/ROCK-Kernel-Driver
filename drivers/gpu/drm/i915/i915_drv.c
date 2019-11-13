@@ -388,7 +388,7 @@ static int i915_getparam_ioctl(struct drm_device *dev, void *data,
 		value = !!(dev_priv->caps.scheduler & I915_SCHEDULER_CAP_SEMAPHORES);
 		break;
 	case I915_PARAM_HAS_SECURE_BATCHES:
-		value = capable(CAP_SYS_ADMIN);
+		value = HAS_SECURE_BATCHES(dev_priv) && capable(CAP_SYS_ADMIN);
 		break;
 	case I915_PARAM_CMD_PARSER_VERSION:
 		value = i915_cmd_parser_get_version(dev_priv);
@@ -2157,6 +2157,8 @@ static int i915_drm_suspend_late(struct drm_device *dev, bool hibernation)
 
 	i915_gem_suspend_late(dev_priv);
 
+	intel_rc6_ctx_wa_suspend(dev_priv);
+
 	intel_uncore_suspend(&dev_priv->uncore);
 
 	intel_power_domains_suspend(dev_priv,
@@ -2372,6 +2374,8 @@ static int i915_drm_resume_early(struct drm_device *dev)
 	intel_uncore_sanitize(dev_priv);
 
 	intel_power_domains_resume(dev_priv);
+
+	intel_rc6_ctx_wa_resume(dev_priv);
 
 	intel_gt_sanitize(dev_priv, true);
 
