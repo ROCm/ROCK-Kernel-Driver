@@ -20,6 +20,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 #
+
+ifneq (,$(BUILD_AS_DKMS))
+	SCHED_NAME = amd-sched
+else
+	SCHED_NAME = gpu-sched
+endif
+
+ccflags-y := -Iinclude/drm
+$(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
+
+obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
-obj-$(CONFIG_DRM_SCHED) += gpu-sched.o
+SCHED_FULL_PATH = $(src)
+include $(SCHED_FULL_PATH)/backport/Makefile
