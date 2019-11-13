@@ -66,6 +66,7 @@ m4_include([m4/mm-interval-tree-define.m4])
 m4_include([m4/arch-io-reserve-free-memtype-wc.m4])
 m4_include([m4/kref-read.m4])
 m4_include([m4/kthread-park-xx.m4])
+m4_include([m4/__kthread-should-park.m4])
 m4_include([m4/config.m4])
 
 AC_LANG(C)

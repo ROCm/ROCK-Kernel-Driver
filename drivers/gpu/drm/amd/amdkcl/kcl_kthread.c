@@ -6,6 +6,15 @@
 #include <kcl/kcl_kthread.h>
 #include "kcl_common.h"
 
+#if !defined(HAVE___KTHREAD_SHOULD_PARK)
+bool __kcl_kthread_should_park(struct task_struct *k)
+{
+	printk_once(KERN_WARNING "This kernel version not support API: __kthread_should_park!\n");
+	return false;
+}
+EXPORT_SYMBOL(__kcl_kthread_should_park);
+#endif
+
 #if !defined(HAVE_KTHREAD_PARK_XX)
 bool (*_kcl_kthread_should_park)(void);
 EXPORT_SYMBOL(_kcl_kthread_should_park);
