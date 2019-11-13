@@ -1185,10 +1185,6 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 				context->stream_status[i].plane_count,
 				context); /* use new pipe config in new context */
 		}
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-	if (dc->hwss.program_front_end_for_ctx)
-		dc->hwss.program_front_end_for_ctx(dc, context);
-#endif
 
 	/* Program hardware */
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
