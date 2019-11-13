@@ -20,6 +20,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 #
-gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
-obj-$(CONFIG_DRM_SCHED) += gpu-sched.o
+#
+# In DKMS mode the module can be renamed by passing SCHED_NAME as a parameter
+# to 'make' if required
+#
+SCHED_NAME = gpu-sched
+
+$(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
+obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
+
+SCHED_FULL_PATH = $(src)
+
+ccflags-y := -I$(SCHED_FULL_PATH)
+
+include $(SCHED_FULL_PATH)/backport/Makefile
