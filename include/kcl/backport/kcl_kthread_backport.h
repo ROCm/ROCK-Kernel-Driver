@@ -5,6 +5,10 @@
 #include <linux/kthread.h>
 #include <kcl/kcl_kthread.h>
 
+#if !defined(HAVE___KTHREAD_SHOULD_PARK)
+#define __kthread_should_park __kcl_kthread_should_park
+#endif
+
 #if !defined(HAVE_KTHREAD_PARK_XX)
 #define kthread_parkme _kcl_kthread_parkme
 #define kthread_unpark _kcl_kthread_unpark
