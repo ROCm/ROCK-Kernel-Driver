@@ -1,0 +1,12 @@
+drivers/gpu/drm/amd .
+drivers/gpu/drm/ttm .
+include/drm/ttm include/drm
+include/uapi/drm/amdgpu_drm.h include/uapi/drm
+include/kcl include
+drivers/gpu/drm/scheduler .
+include/drm/gpu_scheduler.h include/drm/
+drivers/gpu/drm/scheduler/gpu_scheduler_trace.h include/drm/
+include/drm/amd_asic_type.h include/drm/
+include/drm/spsc_queue.h include/drm/
+include/uapi/linux/kfd_ioctl.h include/uapi/linux
+include/drm/amd_rdma.h include/drm
