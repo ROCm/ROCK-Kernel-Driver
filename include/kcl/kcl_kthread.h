@@ -5,6 +5,10 @@
 #include <linux/sched.h>
 #include <linux/kthread.h>
 
+#if !defined(HAVE___KTHREAD_SHOULD_PATK)
+extern bool __kcl_kthread_should_park(struct task_struct *k);
+#endif
+
 #if !defined(HAVE_KTHREAD_PARK_XX)
 extern void (*_kcl_kthread_parkme)(void);
 extern void (*_kcl_kthread_unpark)(struct task_struct *k);
