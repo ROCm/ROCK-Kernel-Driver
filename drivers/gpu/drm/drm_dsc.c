@@ -297,6 +297,9 @@ int drm_dsc_compute_rc_parameters(struct drm_dsc_config *vdsc_cfg)
 	unsigned long final_scale = 0;
 	unsigned long rbs_min = 0;
 	unsigned long max_offset = 0;
+	u32 nfl_bpg_offset;
+	u32 nsl_bpg_offset;
+	u32 scale_increment_interval;
 
 	if (vdsc_cfg->native_420 || vdsc_cfg->native_422) {
 		/* Number of groups used to code each line of a slice */
@@ -364,27 +367,31 @@ int drm_dsc_compute_rc_parameters(struct drm_dsc_config *vdsc_cfg)
 		 * hence we multiply by 2^11 for preserving the
 		 * fractional part
 		 */
-		vdsc_cfg->nfl_bpg_offset = DIV_ROUND_UP((vdsc_cfg->first_line_bpg_offset << 11),
+		nfl_bpg_offset = DIV_ROUND_UP((vdsc_cfg->first_line_bpg_offset << 11),
 							(vdsc_cfg->slice_height - 1));
 	else
-		vdsc_cfg->nfl_bpg_offset = 0;
+		nfl_bpg_offset = 0;
 
 	/* 2^16 - 1 */
-	if (vdsc_cfg->nfl_bpg_offset > 65535) {
+	if (nfl_bpg_offset > 65535) {
 		DRM_DEBUG_KMS("NflBpgOffset is too large for this slice height\n");
 		return -ERANGE;
 	}
 
+	vdsc_cfg->nfl_bpg_offset = (u16)nfl_bpg_offset;
+
 	if (vdsc_cfg->slice_height > 2)
-		vdsc_cfg->nsl_bpg_offset = DIV_ROUND_UP((vdsc_cfg->second_line_bpg_offset << 11),
+		nsl_bpg_offset = DIV_ROUND_UP((vdsc_cfg->second_line_bpg_offset << 11),
 							(vdsc_cfg->slice_height - 1));
 	else
-		vdsc_cfg->nsl_bpg_offset = 0;
+		nsl_bpg_offset = 0;
 
-	if (vdsc_cfg->nsl_bpg_offset > 65535) {
+	if (nsl_bpg_offset > 65535) {
 		DRM_DEBUG_KMS("NslBpgOffset is too large for this slice height\n");
 		return -ERANGE;
 	}
+
+	vdsc_cfg->nsl_bpg_offset = (u16)nsl_bpg_offset;
 
 	/* Number of groups used to code the entire slice */
 	groups_total = groups_per_line * vdsc_cfg->slice_height;
@@ -402,10 +409,10 @@ int drm_dsc_compute_rc_parameters(struct drm_dsc_config *vdsc_cfg)
 		 * as (NflBpgOffset + SliceBpgOffset) has 11 bit fractional value,
 		 * we need divide by 2^11 from pstDscCfg values
 		 */
-		vdsc_cfg->scale_increment_interval =
+		scale_increment_interval =
 				(vdsc_cfg->final_offset * (1 << 11)) /
-				((vdsc_cfg->nfl_bpg_offset +
-				vdsc_cfg->nsl_bpg_offset +
+				((nfl_bpg_offset +
+				nsl_bpg_offset +
 				vdsc_cfg->slice_bpg_offset) *
 				(final_scale - 9));
 	} else {
@@ -413,13 +420,15 @@ int drm_dsc_compute_rc_parameters(struct drm_dsc_config *vdsc_cfg)
 		 * If finalScaleValue is less than or equal to 9, a value of 0 should
 		 * be used to disable the scale increment at the end of the slice
 		 */
-		vdsc_cfg->scale_increment_interval = 0;
+		scale_increment_interval = 0;
 	}
 
-	if (vdsc_cfg->scale_increment_interval > 65535) {
+	if (scale_increment_interval > 65535) {
 		DRM_DEBUG_KMS("ScaleIncrementInterval is large for slice height\n");
 		return -ERANGE;
 	}
+
+	vdsc_cfg->scale_increment_interval = (u16)scale_increment_interval;
 
 	/*
 	 * DSC spec mentions that bits_per_pixel specifies the target
