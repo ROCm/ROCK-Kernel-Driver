@@ -54,6 +54,10 @@ struct dc_versions {
 	struct dmcu_version dmcu_version;
 };
 
+enum dp_protocol_version {
+	DP_VERSION_1_4,
+};
+
 enum dc_plane_type {
 	DC_PLANE_TYPE_INVALID,
 	DC_PLANE_TYPE_DCE_RGB,
@@ -116,6 +120,7 @@ struct dc_caps {
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	bool hw_3d_lut;
 #endif
+	enum dp_protocol_version max_dp_protocol_version;
 	struct dc_plane_cap planes[MAX_PLANES];
 };
 
