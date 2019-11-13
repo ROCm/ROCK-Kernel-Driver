@@ -13,6 +13,7 @@ import sys
 import re
 import time
 import json
+import math
 
 import drgn
 from drgn import container_of
@@ -95,7 +96,7 @@ class IocStat:
 
         self.enabled = ioc.enabled.value_()
         self.running = ioc.running.value_() == IOC_RUNNING
-        self.period_ms = round(ioc.period_us.value_() / 1_000)
+        self.period_ms = ioc.period_us.value_() / 1_000
         self.period_at = ioc.period_at.value_() / 1_000_000
         self.vperiod_at = ioc.period_at_vtime.value_() / VTIME_PER_SEC
         self.vrate_pct = ioc.vtime_rate.counter.value_() * 100 / VTIME_PER_USEC
@@ -111,14 +112,14 @@ class IocStat:
 
     def dict(self, now):
         return { 'device'               : devname,
-                 'timestamp'            : now,
-                 'enabled'              : self.enabled,
-                 'running'              : self.running,
-                 'period_ms'            : self.period_ms,
-                 'period_at'            : self.period_at,
-                 'period_vtime_at'      : self.vperiod_at,
-                 'busy_level'           : self.busy_level,
-                 'vrate_pct'            : self.vrate_pct, }
+                 'timestamp'            : str(now),
+                 'enabled'              : str(int(self.enabled)),
+                 'running'              : str(int(self.running)),
+                 'period_ms'            : str(self.period_ms),
+                 'period_at'            : str(self.period_at),
+                 'period_vtime_at'      : str(self.vperiod_at),
+                 'busy_level'           : str(self.busy_level),
+                 'vrate_pct'            : str(self.vrate_pct), }
 
     def table_preamble_str(self):
         state = ('RUN' if self.running else 'IDLE') if self.enabled else 'OFF'
@@ -134,7 +135,7 @@ class IocStat:
 
     def table_header_str(self):
         return f'{"":25} active {"weight":>9} {"hweight%":>13} {"inflt%":>6} ' \
-               f'{"del_ms":>6} {"usages%"}'
+               f'{"dbt":>3} {"delay":>6} {"usages%"}'
 
 class IocgStat:
     def __init__(self, iocg):
@@ -147,6 +148,7 @@ class IocgStat:
         self.inuse = iocg.inuse.value_()
         self.hwa_pct = iocg.hweight_active.value_() * 100 / HWEIGHT_WHOLE
         self.hwi_pct = iocg.hweight_inuse.value_() * 100 / HWEIGHT_WHOLE
+        self.address = iocg.value_()
 
         vdone = iocg.done_vtime.counter.value_()
         vtime = iocg.vtime.counter.value_()
@@ -157,33 +159,36 @@ class IocgStat:
         else:
             self.inflight_pct = 0
 
-        self.use_delay = min(blkg.use_delay.counter.value_(), 99)
-        self.delay_ms = min(round(blkg.delay_nsec.counter.value_() / 1_000_000), 999)
+        self.debt_ms = iocg.abs_vdebt.counter.value_() / VTIME_PER_USEC / 1000
+        self.use_delay = blkg.use_delay.counter.value_()
+        self.delay_ms = blkg.delay_nsec.counter.value_() / 1_000_000
 
         usage_idx = iocg.usage_idx.value_()
         self.usages = []
         self.usage = 0
         for i in range(NR_USAGE_SLOTS):
             usage = iocg.usages[(usage_idx + i) % NR_USAGE_SLOTS].value_()
-            upct = min(usage * 100 / HWEIGHT_WHOLE, 999)
+            upct = usage * 100 / HWEIGHT_WHOLE
             self.usages.append(upct)
             self.usage = max(self.usage, upct)
 
     def dict(self, now, path):
         out = { 'cgroup'                : path,
-                'timestamp'             : now,
-                'is_active'             : self.is_active,
-                'weight'                : self.weight,
-                'weight_active'         : self.active,
-                'weight_inuse'          : self.inuse,
-                'hweight_active_pct'    : self.hwa_pct,
-                'hweight_inuse_pct'     : self.hwi_pct,
-                'inflight_pct'          : self.inflight_pct,
-                'use_delay'             : self.use_delay,
-                'delay_ms'              : self.delay_ms,
-                'usage_pct'             : self.usage }
+                'timestamp'             : str(now),
+                'is_active'             : str(int(self.is_active)),
+                'weight'                : str(self.weight),
+                'weight_active'         : str(self.active),
+                'weight_inuse'          : str(self.inuse),
+                'hweight_active_pct'    : str(self.hwa_pct),
+                'hweight_inuse_pct'     : str(self.hwi_pct),
+                'inflight_pct'          : str(self.inflight_pct),
+                'debt_ms'               : str(self.debt_ms),
+                'use_delay'             : str(self.use_delay),
+                'delay_ms'              : str(self.delay_ms),
+                'usage_pct'             : str(self.usage),
+                'address'               : str(hex(self.address)) }
         for i in range(len(self.usages)):
-            out[f'usage_pct_{i}'] = f'{self.usages[i]}'
+            out[f'usage_pct_{i}'] = str(self.usages[i])
         return out
 
     def table_row_str(self, path):
@@ -192,9 +197,11 @@ class IocgStat:
               f'{self.inuse:5}/{self.active:5} ' \
               f'{self.hwi_pct:6.2f}/{self.hwa_pct:6.2f} ' \
               f'{self.inflight_pct:6.2f} ' \
-              f'{self.use_delay:2}*{self.delay_ms:03} '
+              f'{min(math.ceil(self.debt_ms), 999):3} ' \
+              f'{min(self.use_delay, 99):2}*'\
+              f'{min(math.ceil(self.delay_ms), 999):03} '
         for u in self.usages:
-            out += f'{round(u):03d}:'
+            out += f'{min(round(u), 999):03d}:'
         out = out.rstrip(':')
         return out
 

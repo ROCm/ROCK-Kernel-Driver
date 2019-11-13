@@ -161,9 +161,9 @@
  * https://github.com/osandov/drgn.  The ouput looks like the following.
  *
  *  sdb RUN   per=300ms cur_per=234.218:v203.695 busy= +1 vrate= 62.12%
- *                 active      weight      hweight% inflt% del_ms usages%
- *  test/a              *    50/   50  33.33/ 33.33  27.65  0*041 033:033:033
- *  test/b              *   100/  100  66.67/ 66.67  17.56  0*000 066:079:077
+ *                 active      weight      hweight% inflt% dbt  delay usages%
+ *  test/a              *    50/   50  33.33/ 33.33  27.65   2  0*041 033:033:033
+ *  test/b              *   100/  100  66.67/ 66.67  17.56   0  0*000 066:079:077
  *
  * - per	: Timer period
  * - cur_per	: Internal wall and device vtime clock
@@ -469,6 +469,7 @@ struct ioc_gq {
 	 */
 	atomic64_t			vtime;
 	atomic64_t			done_vtime;
+	atomic64_t			abs_vdebt;
 	u64				last_vtime;
 
 	/*
@@ -528,8 +529,8 @@ struct iocg_wake_ctx {
 static const struct ioc_params autop[] = {
 	[AUTOP_HDD] = {
 		.qos				= {
-			[QOS_RLAT]		=         50000, /* 50ms */
-			[QOS_WLAT]		=         50000,
+			[QOS_RLAT]		=        250000, /* 250ms */
+			[QOS_WLAT]		=        250000,
 			[QOS_MIN]		= VRATE_MIN_PPM,
 			[QOS_MAX]		= VRATE_MAX_PPM,
 		},
@@ -653,11 +654,19 @@ static struct ioc_cgrp *blkcg_to_iocc(struct blkcg *blkcg)
 
 /*
  * Scale @abs_cost to the inverse of @hw_inuse.  The lower the hierarchical
- * weight, the more expensive each IO.
+ * weight, the more expensive each IO.  Must round up.
  */
 static u64 abs_cost_to_cost(u64 abs_cost, u32 hw_inuse)
 {
 	return DIV64_U64_ROUND_UP(abs_cost * HWEIGHT_WHOLE, hw_inuse);
+}
+
+/*
+ * The inverse of abs_cost_to_cost().  Must round up.
+ */
+static u64 cost_to_abs_cost(u64 cost, u32 hw_inuse)
+{
+	return DIV64_U64_ROUND_UP(cost * hw_inuse, HWEIGHT_WHOLE);
 }
 
 static void iocg_commit_bio(struct ioc_gq *iocg, struct bio *bio, u64 cost)
@@ -1132,16 +1141,36 @@ static void iocg_kick_waitq(struct ioc_gq *iocg, struct ioc_now *now)
 	struct iocg_wake_ctx ctx = { .iocg = iocg };
 	u64 margin_ns = (u64)(ioc->period_us *
 			      WAITQ_TIMER_MARGIN_PCT / 100) * NSEC_PER_USEC;
-	u64 vshortage, expires, oexpires;
+	u64 abs_vdebt, vdebt, vshortage, expires, oexpires;
+	s64 vbudget;
+	u32 hw_inuse;
 
 	lockdep_assert_held(&iocg->waitq.lock);
+
+	current_hweight(iocg, NULL, &hw_inuse);
+	vbudget = now->vnow - atomic64_read(&iocg->vtime);
+
+	/* pay off debt */
+	abs_vdebt = atomic64_read(&iocg->abs_vdebt);
+	vdebt = abs_cost_to_cost(abs_vdebt, hw_inuse);
+	if (vdebt && vbudget > 0) {
+		u64 delta = min_t(u64, vbudget, vdebt);
+		u64 abs_delta = min(cost_to_abs_cost(delta, hw_inuse),
+				    abs_vdebt);
+
+		atomic64_add(delta, &iocg->vtime);
+		atomic64_add(delta, &iocg->done_vtime);
+		atomic64_sub(abs_delta, &iocg->abs_vdebt);
+		if (WARN_ON_ONCE(atomic64_read(&iocg->abs_vdebt) < 0))
+			atomic64_set(&iocg->abs_vdebt, 0);
+	}
 
 	/*
 	 * Wake up the ones which are due and see how much vtime we'll need
 	 * for the next one.
 	 */
-	current_hweight(iocg, NULL, &ctx.hw_inuse);
-	ctx.vbudget = now->vnow - atomic64_read(&iocg->vtime);
+	ctx.hw_inuse = hw_inuse;
+	ctx.vbudget = vbudget - vdebt;
 	__wake_up_locked_key(&iocg->waitq, TASK_NORMAL, &ctx);
 	if (!waitqueue_active(&iocg->waitq))
 		return;
@@ -1187,6 +1216,11 @@ static void iocg_kick_delay(struct ioc_gq *iocg, struct ioc_now *now, u64 cost)
 	u64 vmargin = ioc->margin_us * now->vrate;
 	u64 margin_ns = ioc->margin_us * NSEC_PER_USEC;
 	u64 expires, oexpires;
+	u32 hw_inuse;
+
+	/* debt-adjust vtime */
+	current_hweight(iocg, NULL, &hw_inuse);
+	vtime += abs_cost_to_cost(atomic64_read(&iocg->abs_vdebt), hw_inuse);
 
 	/* clear or maintain depending on the overage */
 	if (time_before_eq64(vtime, now->vnow)) {
@@ -1309,7 +1343,7 @@ static void ioc_timer_fn(struct timer_list *timer)
 	u32 ppm_wthr = MILLION - ioc->params.qos[QOS_WPPM];
 	u32 missed_ppm[2], rq_wait_pct;
 	u64 period_vtime;
-	int i;
+	int prev_busy_level, i;
 
 	/* how were the latencies during the period? */
 	ioc_lat_stat(ioc, missed_ppm, &rq_wait_pct);
@@ -1332,12 +1366,14 @@ static void ioc_timer_fn(struct timer_list *timer)
 	 * should have woken up in the last period and expire idle iocgs.
 	 */
 	list_for_each_entry_safe(iocg, tiocg, &ioc->active_iocgs, active_list) {
-		if (!waitqueue_active(&iocg->waitq) && !iocg_is_idle(iocg))
+		if (!waitqueue_active(&iocg->waitq) &&
+		    !atomic64_read(&iocg->abs_vdebt) && !iocg_is_idle(iocg))
 			continue;
 
 		spin_lock(&iocg->waitq.lock);
 
-		if (waitqueue_active(&iocg->waitq)) {
+		if (waitqueue_active(&iocg->waitq) ||
+		    atomic64_read(&iocg->abs_vdebt)) {
 			/* might be oversleeping vtime / hweight changes, kick */
 			iocg_kick_waitq(iocg, &now);
 			iocg_kick_delay(iocg, &now, 0);
@@ -1371,7 +1407,8 @@ static void ioc_timer_fn(struct timer_list *timer)
 		 * comparing vdone against period start.  If lagging behind
 		 * IOs from past periods, don't increase vrate.
 		 */
-		if (!atomic_read(&iocg_to_blkg(iocg)->use_delay) &&
+		if ((ppm_rthr != MILLION || ppm_wthr != MILLION) &&
+		    !atomic_read(&iocg_to_blkg(iocg)->use_delay) &&
 		    time_after64(vtime, vdone) &&
 		    time_after64(vtime, now.vnow -
 				 MAX_LAGGING_PERIODS * period_vtime) &&
@@ -1495,26 +1532,29 @@ skip_surplus_transfers:
 	 * and experiencing shortages but not surpluses, we're too stingy
 	 * and should increase vtime rate.
 	 */
+	prev_busy_level = ioc->busy_level;
 	if (rq_wait_pct > RQ_WAIT_BUSY_PCT ||
 	    missed_ppm[READ] > ppm_rthr ||
 	    missed_ppm[WRITE] > ppm_wthr) {
 		ioc->busy_level = max(ioc->busy_level, 0);
 		ioc->busy_level++;
-	} else if (nr_lagging) {
-		ioc->busy_level = max(ioc->busy_level, 0);
-	} else if (nr_shortages && !nr_surpluses &&
-		   rq_wait_pct <= RQ_WAIT_BUSY_PCT * UNBUSY_THR_PCT / 100 &&
+	} else if (rq_wait_pct <= RQ_WAIT_BUSY_PCT * UNBUSY_THR_PCT / 100 &&
 		   missed_ppm[READ] <= ppm_rthr * UNBUSY_THR_PCT / 100 &&
 		   missed_ppm[WRITE] <= ppm_wthr * UNBUSY_THR_PCT / 100) {
-		ioc->busy_level = min(ioc->busy_level, 0);
-		ioc->busy_level--;
+		/* take action iff there is contention */
+		if (nr_shortages && !nr_lagging) {
+			ioc->busy_level = min(ioc->busy_level, 0);
+			/* redistribute surpluses first */
+			if (!nr_surpluses)
+				ioc->busy_level--;
+		}
 	} else {
 		ioc->busy_level = 0;
 	}
 
 	ioc->busy_level = clamp(ioc->busy_level, -1000, 1000);
 
-	if (ioc->busy_level) {
+	if (ioc->busy_level > 0 || (ioc->busy_level < 0 && !nr_lagging)) {
 		u64 vrate = atomic64_read(&ioc->vtime_rate);
 		u64 vrate_min = ioc->vrate_min, vrate_max = ioc->vrate_max;
 
@@ -1556,6 +1596,10 @@ skip_surplus_transfers:
 		atomic64_set(&ioc->vtime_rate, vrate);
 		ioc->inuse_margin_vtime = DIV64_U64_ROUND_UP(
 			ioc->period_us * vrate * INUSE_MARGIN_PCT, 100);
+	} else if (ioc->busy_level != prev_busy_level || nr_lagging) {
+		trace_iocost_ioc_vrate_adj(ioc, atomic64_read(&ioc->vtime_rate),
+					   &missed_ppm, rq_wait_pct, nr_lagging,
+					   nr_shortages, nr_surpluses);
 	}
 
 	ioc_refresh_params(ioc, false);
@@ -1673,13 +1717,24 @@ static void ioc_rqos_throttle(struct rq_qos *rqos, struct bio *bio)
 	 * in a while which is fine.
 	 */
 	if (!waitqueue_active(&iocg->waitq) &&
+	    !atomic64_read(&iocg->abs_vdebt) &&
 	    time_before_eq64(vtime + cost, now.vnow)) {
 		iocg_commit_bio(iocg, bio, cost);
 		return;
 	}
 
+	/*
+	 * We're over budget.  If @bio has to be issued regardless,
+	 * remember the abs_cost instead of advancing vtime.
+	 * iocg_kick_waitq() will pay off the debt before waking more IOs.
+	 * This way, the debt is continuously paid off each period with the
+	 * actual budget available to the cgroup.  If we just wound vtime,
+	 * we would incorrectly use the current hw_inuse for the entire
+	 * amount which, for example, can lead to the cgroup staying
+	 * blocked for a long time even with substantially raised hw_inuse.
+	 */
 	if (bio_issue_as_root_blkg(bio) || fatal_signal_pending(current)) {
-		iocg_commit_bio(iocg, bio, cost);
+		atomic64_add(abs_cost, &iocg->abs_vdebt);
 		iocg_kick_delay(iocg, &now, cost);
 		return;
 	}
@@ -1737,28 +1792,39 @@ static void ioc_rqos_merge(struct rq_qos *rqos, struct request *rq,
 			   struct bio *bio)
 {
 	struct ioc_gq *iocg = blkg_to_iocg(bio->bi_blkg);
+	struct ioc *ioc = iocg->ioc;
 	sector_t bio_end = bio_end_sector(bio);
+	struct ioc_now now;
 	u32 hw_inuse;
 	u64 abs_cost, cost;
 
-	/* add iff the existing request has cost assigned */
-	if (!rq->bio || !rq->bio->bi_iocost_cost)
+	/* bypass if disabled or for root cgroup */
+	if (!ioc->enabled || !iocg->level)
 		return;
 
 	abs_cost = calc_vtime_cost(bio, iocg, true);
 	if (!abs_cost)
 		return;
 
+	ioc_now(ioc, &now);
+	current_hweight(iocg, NULL, &hw_inuse);
+	cost = abs_cost_to_cost(abs_cost, hw_inuse);
+
 	/* update cursor if backmerging into the request at the cursor */
 	if (blk_rq_pos(rq) < bio_end &&
 	    blk_rq_pos(rq) + blk_rq_sectors(rq) == iocg->cursor)
 		iocg->cursor = bio_end;
 
-	current_hweight(iocg, NULL, &hw_inuse);
-	cost = div64_u64(abs_cost * HWEIGHT_WHOLE, hw_inuse);
-	bio->bi_iocost_cost = cost;
-
-	atomic64_add(cost, &iocg->vtime);
+	/*
+	 * Charge if there's enough vtime budget and the existing request
+	 * has cost assigned.  Otherwise, account it as debt.  See debt
+	 * handling in ioc_rqos_throttle() for details.
+	 */
+	if (rq->bio && rq->bio->bi_iocost_cost &&
+	    time_before_eq64(atomic64_read(&iocg->vtime) + cost, now.vnow))
+		iocg_commit_bio(iocg, bio, cost);
+	else
+		atomic64_add(abs_cost, &iocg->abs_vdebt);
 }
 
 static void ioc_rqos_done_bio(struct rq_qos *rqos, struct bio *bio)
@@ -1928,6 +1994,7 @@ static void ioc_pd_init(struct blkg_policy_data *pd)
 	iocg->ioc = ioc;
 	atomic64_set(&iocg->vtime, now.vnow);
 	atomic64_set(&iocg->done_vtime, now.vnow);
+	atomic64_set(&iocg->abs_vdebt, 0);
 	atomic64_set(&iocg->active_period, atomic64_read(&ioc->cur_period));
 	INIT_LIST_HEAD(&iocg->active_list);
 	iocg->hweight_active = HWEIGHT_WHOLE;
