@@ -1546,6 +1546,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
  restart:
 
 	ret = -ENXIO;
+	first_open = false;
 	disk = bdev_get_gendisk(bdev, &partno);
 	if (!disk)
 		goto out;
@@ -1658,8 +1659,21 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 	/* only one opener holds refs to the module and disk */
 	if (!first_open)
 		put_disk_and_module(disk);
-	if (ret && need_finish)
+	if (ret && need_finish) {
 		ret = bdev->bd_disk->fops->open_finish(bdev, mode, ret);
+
+		if (!ret && first_open) {
+			bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
+			set_init_blocksize(bdev);
+		}
+		/* the same as first opener case, read comment there */
+		if (bdev->bd_invalidated) {
+			if (!ret)
+				rescan_partitions(disk, bdev);
+			else if (ret == -ENOMEDIUM)
+				invalidate_partitions(disk, bdev);
+		}
+	}
 	if (ret) {
 		__blkdev_put(bdev, mode, for_part);
 		return ret;
