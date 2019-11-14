@@ -24,6 +24,8 @@
 #define MEGASAS_VERSION				"07.710.50.00-rc1"
 #define MEGASAS_RELDATE				"June 28, 2019"
 
+#define MEGASAS_MSIX_NAME_LEN			32
+
 /*
  * Device IDs
  */
@@ -2203,6 +2205,7 @@ struct megasas_aen_event {
 };
 
 struct megasas_irq_context {
+	char name[MEGASAS_MSIX_NAME_LEN];
 	struct megasas_instance *instance;
 	u32 MSIxIndex;
 	u32 os_irq;
@@ -2429,6 +2432,7 @@ struct megasas_instance {
 	u8 adapter_type;
 	bool consistent_mask_64bit;
 	bool support_nvme_passthru;
+	bool enable_sdev_max_qd;
 	u8 task_abort_tmo;
 	u8 max_reset_tmo;
 	u8 snapdump_wait_time;

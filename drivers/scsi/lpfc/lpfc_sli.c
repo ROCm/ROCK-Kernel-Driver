@@ -515,7 +515,8 @@ lpfc_sli4_eqcq_flush(struct lpfc_hba *phba, struct lpfc_queue *eq)
 }
 
 static int
-lpfc_sli4_process_eq(struct lpfc_hba *phba, struct lpfc_queue *eq)
+lpfc_sli4_process_eq(struct lpfc_hba *phba, struct lpfc_queue *eq,
+		     uint8_t rearm)
 {
 	struct lpfc_eqe *eqe;
 	int count = 0, consumed = 0;
@@ -549,8 +550,8 @@ lpfc_sli4_process_eq(struct lpfc_hba *phba, struct lpfc_queue *eq)
 	eq->queue_claimed = 0;
 
 rearm_and_exit:
-	/* Always clear and re-arm the EQ */
-	phba->sli4_hba.sli4_write_eq_db(phba, eq, consumed, LPFC_QUEUE_REARM);
+	/* Always clear the EQ. */
+	phba->sli4_hba.sli4_write_eq_db(phba, eq, consumed, rearm);
 
 	return count;
 }
@@ -6202,6 +6203,14 @@ lpfc_set_features(struct lpfc_hba *phba, LPFC_MBOXQ_t *mbox,
 		mbox->u.mqe.un.set_feature.feature = LPFC_SET_MDS_DIAGS;
 		mbox->u.mqe.un.set_feature.param_len = 8;
 		break;
+	case LPFC_SET_DUAL_DUMP:
+		bf_set(lpfc_mbx_set_feature_dd,
+		       &mbox->u.mqe.un.set_feature, LPFC_ENABLE_DUAL_DUMP);
+		bf_set(lpfc_mbx_set_feature_ddquery,
+		       &mbox->u.mqe.un.set_feature, 0);
+		mbox->u.mqe.un.set_feature.feature = LPFC_SET_DUAL_DUMP;
+		mbox->u.mqe.un.set_feature.param_len = 4;
+		break;
 	}
 
 	return;
@@ -6219,11 +6228,16 @@ lpfc_ras_stop_fwlog(struct lpfc_hba *phba)
 {
 	struct lpfc_ras_fwlog *ras_fwlog = &phba->ras_fwlog;
 
-	ras_fwlog->ras_active = false;
+	spin_lock_irq(&phba->hbalock);
+	ras_fwlog->state = INACTIVE;
+	spin_unlock_irq(&phba->hbalock);
 
 	/* Disable FW logging to host memory */
 	writel(LPFC_CTL_PDEV_CTL_DDL_RAS,
 	       phba->sli4_hba.conf_regs_memmap_p + LPFC_CTL_PDEV_CTL_OFFSET);
+
+	/* Wait 10ms for firmware to stop using DMA buffer */
+	usleep_range(10 * 1000, 20 * 1000);
 }
 
 /**
@@ -6259,7 +6273,9 @@ lpfc_sli4_ras_dma_free(struct lpfc_hba *phba)
 		ras_fwlog->lwpd.virt = NULL;
 	}
 
-	ras_fwlog->ras_active = false;
+	spin_lock_irq(&phba->hbalock);
+	ras_fwlog->state = INACTIVE;
+	spin_unlock_irq(&phba->hbalock);
 }
 
 /**
@@ -6361,7 +6377,9 @@ lpfc_sli4_ras_mbox_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 		goto disable_ras;
 	}
 
-	ras_fwlog->ras_active = true;
+	spin_lock_irq(&phba->hbalock);
+	ras_fwlog->state = ACTIVE;
+	spin_unlock_irq(&phba->hbalock);
 	mempool_free(pmb, phba->mbox_mem_pool);
 
 	return;
@@ -6392,6 +6410,10 @@ lpfc_sli4_ras_fwlog_init(struct lpfc_hba *phba,
 	LPFC_MBOXQ_t *mbox;
 	uint32_t len = 0, fwlog_buffsize, fwlog_entry_count;
 	int rc = 0;
+
+	spin_lock_irq(&phba->hbalock);
+	ras_fwlog->state = INACTIVE;
+	spin_unlock_irq(&phba->hbalock);
 
 	fwlog_buffsize = (LPFC_RAS_MIN_BUFF_POST_SIZE *
 			  phba->cfg_ras_fwlog_buffsize);
@@ -6452,6 +6474,9 @@ lpfc_sli4_ras_fwlog_init(struct lpfc_hba *phba,
 	mbx_fwlog->u.request.lwpd.addr_lo = putPaddrLow(ras_fwlog->lwpd.phys);
 	mbx_fwlog->u.request.lwpd.addr_hi = putPaddrHigh(ras_fwlog->lwpd.phys);
 
+	spin_lock_irq(&phba->hbalock);
+	ras_fwlog->state = REG_INPROGRESS;
+	spin_unlock_irq(&phba->hbalock);
 	mbox->vport = phba->pport;
 	mbox->mbox_cmpl = lpfc_sli4_ras_mbox_cmpl;
 
@@ -7183,7 +7208,7 @@ lpfc_post_rq_buffer(struct lpfc_hba *phba, struct lpfc_queue *hrq,
 int
 lpfc_sli4_hba_setup(struct lpfc_hba *phba)
 {
-	int rc, i, cnt, len;
+	int rc, i, cnt, len, dd;
 	LPFC_MBOXQ_t *mboxq;
 	struct lpfc_mqe *mqe;
 	uint8_t *vpd;
@@ -7434,6 +7459,23 @@ lpfc_sli4_hba_setup(struct lpfc_hba *phba)
 	phba->sli3_options |= (LPFC_SLI3_NPIV_ENABLED | LPFC_SLI3_HBQ_ENABLED);
 	spin_unlock_irq(&phba->hbalock);
 
+	/* Always try to enable dual dump feature if we can */
+	lpfc_set_features(phba, mboxq, LPFC_SET_DUAL_DUMP);
+	rc = lpfc_sli_issue_mbox(phba, mboxq, MBX_POLL);
+	dd = bf_get(lpfc_mbx_set_feature_dd, &mboxq->u.mqe.un.set_feature);
+	if ((rc == MBX_SUCCESS) && (dd == LPFC_ENABLE_DUAL_DUMP))
+		lpfc_printf_log(phba, KERN_ERR, LOG_SLI | LOG_INIT,
+				"6448 Dual Dump is enabled\n");
+	else
+		lpfc_printf_log(phba, KERN_INFO, LOG_SLI | LOG_INIT,
+				"6447 Dual Dump Mailbox x%x (x%x/x%x) failed, "
+				"rc:x%x dd:x%x\n",
+				bf_get(lpfc_mqe_command, &mboxq->u.mqe),
+				lpfc_sli_config_mbox_subsys_get(
+					phba, mboxq),
+				lpfc_sli_config_mbox_opcode_get(
+					phba, mboxq),
+				rc, dd);
 	/*
 	 * Allocate all resources (xri,rpi,vpi,vfi) now.  Subsequent
 	 * calls depends on these resources to complete port setup.
@@ -7932,7 +7974,7 @@ lpfc_sli4_process_missed_mbox_completions(struct lpfc_hba *phba)
 
 	if (mbox_pending)
 		/* process and rearm the EQ */
-		lpfc_sli4_process_eq(phba, fpeq);
+		lpfc_sli4_process_eq(phba, fpeq, LPFC_QUEUE_REARM);
 	else
 		/* Always clear and re-arm the EQ */
 		sli4_hba->sli4_write_eq_db(phba, fpeq, 0, LPFC_QUEUE_REARM);
@@ -9004,7 +9046,8 @@ lpfc_mbox_api_table_setup(struct lpfc_hba *phba, uint8_t dev_grp)
  * @pring: Pointer to driver SLI ring object.
  * @piocb: Pointer to address of newly added command iocb.
  *
- * This function is called with hbalock held to add a command
+ * This function is called with hbalock held for SLI3 ports or
+ * the ring lock held for SLI4 ports to add a command
  * iocb to the txq when SLI layer cannot submit the command iocb
  * to the ring.
  **/
@@ -9012,7 +9055,10 @@ void
 __lpfc_sli_ringtx_put(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 		    struct lpfc_iocbq *piocb)
 {
-	lockdep_assert_held(&phba->hbalock);
+	if (phba->sli_rev == LPFC_SLI_REV4)
+		lockdep_assert_held(&pring->ring_lock);
+	else
+		lockdep_assert_held(&phba->hbalock);
 	/* Insert the caller's iocb in the txq tail for later processing. */
 	list_add_tail(&piocb->list, &pring->txq);
 }
@@ -9903,7 +9949,7 @@ lpfc_sli4_iocb2wqe(struct lpfc_hba *phba, struct lpfc_iocbq *iocbq,
  * __lpfc_sli_issue_iocb_s4 is used by other functions in the driver to issue
  * an iocb command to an HBA with SLI-4 interface spec.
  *
- * This function is called with hbalock held. The function will return success
+ * This function is called with ringlock held. The function will return success
  * after it successfully submit the iocb to firmware or after adding to the
  * txq.
  **/
@@ -10093,10 +10139,13 @@ lpfc_sli_issue_iocb(struct lpfc_hba *phba, uint32_t ring_number,
 		    struct lpfc_iocbq *piocb, uint32_t flag)
 {
 	struct lpfc_sli_ring *pring;
+	struct lpfc_queue *eq;
 	unsigned long iflags;
 	int rc;
 
 	if (phba->sli_rev == LPFC_SLI_REV4) {
+		eq = phba->sli4_hba.hdwq[piocb->hba_wqidx].hba_eq;
+
 		pring = lpfc_sli4_calc_ring(phba, piocb);
 		if (unlikely(pring == NULL))
 			return IOCB_ERROR;
@@ -10104,6 +10153,8 @@ lpfc_sli_issue_iocb(struct lpfc_hba *phba, uint32_t ring_number,
 		spin_lock_irqsave(&pring->ring_lock, iflags);
 		rc = __lpfc_sli_issue_iocb(phba, ring_number, piocb, flag);
 		spin_unlock_irqrestore(&pring->ring_lock, iflags);
+
+		lpfc_sli4_poll_eq(eq, LPFC_POLL_FASTPATH);
 	} else {
 		/* For now, SLI2/3 will still use hbalock */
 		spin_lock_irqsave(&phba->hbalock, iflags);
@@ -11773,7 +11824,10 @@ lpfc_sli_wake_iocb_wait(struct lpfc_hba *phba,
 		!(cmdiocbq->iocb_flag & LPFC_IO_LIBDFC)) {
 		lpfc_cmd = container_of(cmdiocbq, struct lpfc_io_buf,
 			cur_iocbq);
-		lpfc_cmd->exch_busy = rspiocbq->iocb_flag & LPFC_EXCHANGE_BUSY;
+		if (rspiocbq && (rspiocbq->iocb_flag & LPFC_EXCHANGE_BUSY))
+			lpfc_cmd->flags |= LPFC_SBUF_XBUSY;
+		else
+			lpfc_cmd->flags &= ~LPFC_SBUF_XBUSY;
 	}
 
 	pdone_q = cmdiocbq->context_un.wait_queue;
@@ -13633,6 +13687,7 @@ __lpfc_sli4_process_cq(struct lpfc_hba *phba, struct lpfc_queue *cq,
 			phba->sli4_hba.sli4_write_cq_db(phba, cq, consumed,
 						LPFC_QUEUE_NOARM);
 			consumed = 0;
+			cq->assoc_qp->q_flag |= HBA_EQ_DELAY_CHK;
 		}
 
 		if (count == LPFC_NVMET_CQ_NOTIFY)
@@ -14271,14 +14326,14 @@ lpfc_sli4_hba_intr_handler(int irq, void *dev_id)
 	fpeq->last_cpu = raw_smp_processor_id();
 
 	if (icnt > LPFC_EQD_ISR_TRIGGER &&
-	    phba->cfg_irq_chann == 1 &&
+	    fpeq->q_flag & HBA_EQ_DELAY_CHK &&
 	    phba->cfg_auto_imax &&
 	    fpeq->q_mode != LPFC_MAX_AUTO_EQ_DELAY &&
 	    phba->sli.sli_flag & LPFC_SLI_USE_EQDR)
 		lpfc_sli4_mod_hba_eq_delay(phba, fpeq, LPFC_MAX_AUTO_EQ_DELAY);
 
 	/* process and rearm the EQ */
-	ecount = lpfc_sli4_process_eq(phba, fpeq);
+	ecount = lpfc_sli4_process_eq(phba, fpeq, LPFC_QUEUE_REARM);
 
 	if (unlikely(ecount == 0)) {
 		fpeq->EQ_no_entry++;
@@ -14337,6 +14392,147 @@ lpfc_sli4_intr_handler(int irq, void *dev_id)
 
 	return (hba_handled == true) ? IRQ_HANDLED : IRQ_NONE;
 } /* lpfc_sli4_intr_handler */
+
+void lpfc_sli4_poll_hbtimer(struct timer_list *t)
+{
+	struct lpfc_hba *phba = from_timer(phba, t, cpuhp_poll_timer);
+	struct lpfc_queue *eq;
+	int i = 0;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(eq, &phba->poll_list, _poll_list)
+		i += lpfc_sli4_poll_eq(eq, LPFC_POLL_SLOWPATH);
+	if (!list_empty(&phba->poll_list))
+		mod_timer(&phba->cpuhp_poll_timer,
+			  jiffies + msecs_to_jiffies(LPFC_POLL_HB));
+
+	rcu_read_unlock();
+}
+
+inline int lpfc_sli4_poll_eq(struct lpfc_queue *eq, uint8_t path)
+{
+	struct lpfc_hba *phba = eq->phba;
+	int i = 0;
+
+	/*
+	 * Unlocking an irq is one of the entry point to check
+	 * for re-schedule, but we are good for io submission
+	 * path as midlayer does a get_cpu to glue us in. Flush
+	 * out the invalidate queue so we can see the updated
+	 * value for flag.
+	 */
+	smp_rmb();
+
+	if (READ_ONCE(eq->mode) == LPFC_EQ_POLL)
+		/* We will not likely get the completion for the caller
+		 * during this iteration but i guess that's fine.
+		 * Future io's coming on this eq should be able to
+		 * pick it up.  As for the case of single io's, they
+		 * will be handled through a sched from polling timer
+		 * function which is currently triggered every 1msec.
+		 */
+		i = lpfc_sli4_process_eq(phba, eq, LPFC_QUEUE_NOARM);
+
+	return i;
+}
+
+static inline void lpfc_sli4_add_to_poll_list(struct lpfc_queue *eq)
+{
+	struct lpfc_hba *phba = eq->phba;
+
+	if (list_empty(&phba->poll_list)) {
+		timer_setup(&phba->cpuhp_poll_timer, lpfc_sli4_poll_hbtimer, 0);
+		/* kickstart slowpath processing for this eq */
+		mod_timer(&phba->cpuhp_poll_timer,
+			  jiffies + msecs_to_jiffies(LPFC_POLL_HB));
+	}
+
+	list_add_rcu(&eq->_poll_list, &phba->poll_list);
+	synchronize_rcu();
+}
+
+static inline void lpfc_sli4_remove_from_poll_list(struct lpfc_queue *eq)
+{
+	struct lpfc_hba *phba = eq->phba;
+
+	/* Disable slowpath processing for this eq.  Kick start the eq
+	 * by RE-ARMING the eq's ASAP
+	 */
+	list_del_rcu(&eq->_poll_list);
+	synchronize_rcu();
+
+	if (list_empty(&phba->poll_list))
+		del_timer_sync(&phba->cpuhp_poll_timer);
+}
+
+void lpfc_sli4_cleanup_poll_list(struct lpfc_hba *phba)
+{
+	struct lpfc_queue *eq, *next;
+
+	list_for_each_entry_safe(eq, next, &phba->poll_list, _poll_list)
+		list_del(&eq->_poll_list);
+
+	INIT_LIST_HEAD(&phba->poll_list);
+	synchronize_rcu();
+}
+
+static inline void
+__lpfc_sli4_switch_eqmode(struct lpfc_queue *eq, uint8_t mode)
+{
+	if (mode == eq->mode)
+		return;
+	/*
+	 * currently this function is only called during a hotplug
+	 * event and the cpu on which this function is executing
+	 * is going offline.  By now the hotplug has instructed
+	 * the scheduler to remove this cpu from cpu active mask.
+	 * So we don't need to work about being put aside by the
+	 * scheduler for a high priority process.  Yes, the inte-
+	 * rrupts could come but they are known to retire ASAP.
+	 */
+
+	/* Disable polling in the fastpath */
+	WRITE_ONCE(eq->mode, mode);
+	/* flush out the store buffer */
+	smp_wmb();
+
+	/*
+	 * Add this eq to the polling list and start polling. For
+	 * a grace period both interrupt handler and poller will
+	 * try to process the eq _but_ that's fine.  We have a
+	 * synchronization mechanism in place (queue_claimed) to
+	 * deal with it.  This is just a draining phase for int-
+	 * errupt handler (not eq's) as we have guranteed through
+	 * barrier that all the CPUs have seen the new CQ_POLLED
+	 * state. which will effectively disable the REARMING of
+	 * the EQ.  The whole idea is eq's die off eventually as
+	 * we are not rearming EQ's anymore.
+	 */
+	mode ? lpfc_sli4_add_to_poll_list(eq) :
+	       lpfc_sli4_remove_from_poll_list(eq);
+}
+
+void lpfc_sli4_start_polling(struct lpfc_queue *eq)
+{
+	__lpfc_sli4_switch_eqmode(eq, LPFC_EQ_POLL);
+}
+
+void lpfc_sli4_stop_polling(struct lpfc_queue *eq)
+{
+	struct lpfc_hba *phba = eq->phba;
+
+	__lpfc_sli4_switch_eqmode(eq, LPFC_EQ_INTERRUPT);
+
+	/* Kick start for the pending io's in h/w.
+	 * Once we switch back to interrupt processing on a eq
+	 * the io path completion will only arm eq's when it
+	 * receives a completion.  But since eq's are in disa-
+	 * rmed state it doesn't receive a completion.  This
+	 * creates a deadlock scenaro.
+	 */
+	phba->sli4_hba.sli4_write_eq_db(phba, eq, 0, LPFC_QUEUE_REARM);
+}
 
 /**
  * lpfc_sli4_queue_free - free a queue structure and associated memory
@@ -14412,6 +14608,7 @@ lpfc_sli4_queue_alloc(struct lpfc_hba *phba, uint32_t page_size,
 		return NULL;
 
 	INIT_LIST_HEAD(&queue->list);
+	INIT_LIST_HEAD(&queue->_poll_list);
 	INIT_LIST_HEAD(&queue->wq_list);
 	INIT_LIST_HEAD(&queue->wqfull_list);
 	INIT_LIST_HEAD(&queue->page_list);
@@ -18223,6 +18420,13 @@ lpfc_sli4_alloc_rpi(struct lpfc_hba *phba)
 static void
 __lpfc_sli4_free_rpi(struct lpfc_hba *phba, int rpi)
 {
+	/*
+	 * if the rpi value indicates a prior unreg has already
+	 * been done, skip the unreg.
+	 */
+	if (rpi == LPFC_RPI_ALLOC_ERROR)
+		return;
+
 	if (test_and_clear_bit(rpi, phba->sli4_hba.rpi_bmask)) {
 		phba->sli4_hba.rpi_count--;
 		phba->sli4_hba.max_cfg_param.rpi_used--;
@@ -19726,6 +19930,8 @@ lpfc_sli4_issue_wqe(struct lpfc_hba *phba, struct lpfc_sli4_hdw_queue *qp,
 
 		lpfc_sli_ringtxcmpl_put(phba, pring, pwqe);
 		spin_unlock_irqrestore(&pring->ring_lock, iflags);
+
+		lpfc_sli4_poll_eq(qp->hba_eq, LPFC_POLL_FASTPATH);
 		return 0;
 	}
 
@@ -19746,6 +19952,8 @@ lpfc_sli4_issue_wqe(struct lpfc_hba *phba, struct lpfc_sli4_hdw_queue *qp,
 		}
 		lpfc_sli_ringtxcmpl_put(phba, pring, pwqe);
 		spin_unlock_irqrestore(&pring->ring_lock, iflags);
+
+		lpfc_sli4_poll_eq(qp->hba_eq, LPFC_POLL_FASTPATH);
 		return 0;
 	}
 
@@ -19774,6 +19982,8 @@ lpfc_sli4_issue_wqe(struct lpfc_hba *phba, struct lpfc_sli4_hdw_queue *qp,
 		}
 		lpfc_sli_ringtxcmpl_put(phba, pring, pwqe);
 		spin_unlock_irqrestore(&pring->ring_lock, iflags);
+
+		lpfc_sli4_poll_eq(qp->hba_eq, LPFC_POLL_FASTPATH);
 		return 0;
 	}
 	return WQE_ERROR;
@@ -20458,7 +20668,7 @@ lpfc_get_sgl_per_hdwq(struct lpfc_hba *phba, struct lpfc_io_buf *lpfc_buf)
 		/* allocate more */
 		spin_unlock_irqrestore(&hdwq->hdwq_lock, iflags);
 		tmp = kmalloc_node(sizeof(*tmp), GFP_ATOMIC,
-				   cpu_to_node(smp_processor_id()));
+				   cpu_to_node(raw_smp_processor_id()));
 		if (!tmp) {
 			lpfc_printf_log(phba, KERN_INFO, LOG_SLI,
 					"8353 error kmalloc memory for HDWQ "
@@ -20601,7 +20811,7 @@ lpfc_get_cmd_rsp_buf_per_hdwq(struct lpfc_hba *phba,
 		/* allocate more */
 		spin_unlock_irqrestore(&hdwq->hdwq_lock, iflags);
 		tmp = kmalloc_node(sizeof(*tmp), GFP_ATOMIC,
-				   cpu_to_node(smp_processor_id()));
+				   cpu_to_node(raw_smp_processor_id()));
 		if (!tmp) {
 			lpfc_printf_log(phba, KERN_INFO, LOG_SLI,
 					"8355 error kmalloc memory for HDWQ "

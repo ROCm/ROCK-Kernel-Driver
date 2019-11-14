@@ -1138,7 +1138,6 @@ void
 lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 {
 	struct lpfc_vport *vport = pmb->vport;
-	uint8_t bbscn = 0;
 
 	if (pmb->u.mb.mbxStatus)
 		goto out;
@@ -1165,17 +1164,11 @@ lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	/* Start discovery by sending a FLOGI. port_state is identically
 	 * LPFC_FLOGI while waiting for FLOGI cmpl
 	 */
-	if (vport->port_state != LPFC_FLOGI) {
-		if (phba->bbcredit_support && phba->cfg_enable_bbcr) {
-			bbscn = bf_get(lpfc_bbscn_def,
-				       &phba->sli4_hba.bbscn_params);
-			vport->fc_sparam.cmn.bbRcvSizeMsb &= 0xf;
-			vport->fc_sparam.cmn.bbRcvSizeMsb |= (bbscn << 4);
-		}
+	if (vport->port_state != LPFC_FLOGI)
 		lpfc_initial_flogi(vport);
-	} else if (vport->fc_flag & FC_PT2PT) {
+	else if (vport->fc_flag & FC_PT2PT)
 		lpfc_disc_start(vport);
-	}
+
 	return;
 
 out:
@@ -3459,8 +3452,8 @@ lpfc_mbx_cmpl_read_topology(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 				phba->pport->port_state, vport->fc_flag);
 		else if (attn_type == LPFC_ATT_UNEXP_WWPN)
 			lpfc_printf_log(phba, KERN_ERR, LOG_LINK_EVENT,
-				"1313 Link Down UNEXP WWPN Event x%x received "
-				"Data: x%x x%x x%x x%x x%x\n",
+				"1313 Link Down Unexpected FA WWPN Event x%x "
+				"received Data: x%x x%x x%x x%x x%x\n",
 				la->eventTag, phba->fc_eventTag,
 				phba->pport->port_state, vport->fc_flag,
 				bf_get(lpfc_mbx_read_top_mm, la),
@@ -5404,6 +5397,13 @@ lpfc_setup_disc_node(struct lpfc_vport *vport, uint32_t did)
 		if (!ndlp)
 			return NULL;
 		lpfc_nlp_set_state(vport, ndlp, NLP_STE_NPR_NODE);
+
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+				 "6453 Setup New Node 2B_DISC x%x "
+				 "Data:x%x x%x x%x\n",
+				 ndlp->nlp_DID, ndlp->nlp_flag,
+				 ndlp->nlp_state, vport->fc_flag);
+
 		spin_lock_irq(shost->host_lock);
 		ndlp->nlp_flag |= NLP_NPR_2B_DISC;
 		spin_unlock_irq(shost->host_lock);
@@ -5417,6 +5417,12 @@ lpfc_setup_disc_node(struct lpfc_vport *vport, uint32_t did)
 					 "0014 Could not enable ndlp\n");
 			return NULL;
 		}
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+				 "6454 Setup Enabled Node 2B_DISC x%x "
+				 "Data:x%x x%x x%x\n",
+				 ndlp->nlp_DID, ndlp->nlp_flag,
+				 ndlp->nlp_state, vport->fc_flag);
+
 		spin_lock_irq(shost->host_lock);
 		ndlp->nlp_flag |= NLP_NPR_2B_DISC;
 		spin_unlock_irq(shost->host_lock);
@@ -5435,6 +5441,12 @@ lpfc_setup_disc_node(struct lpfc_vport *vport, uint32_t did)
 			 * delay timeout is not needed.
 			 */
 			lpfc_cancel_retry_delay_tmo(vport, ndlp);
+
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+					 "6455 Setup RSCN Node 2B_DISC x%x "
+					 "Data:x%x x%x x%x\n",
+					 ndlp->nlp_DID, ndlp->nlp_flag,
+					 ndlp->nlp_state, vport->fc_flag);
 
 			/* NVME Target mode waits until rport is known to be
 			 * impacted by the RSCN before it transitions.  No
@@ -5458,9 +5470,21 @@ lpfc_setup_disc_node(struct lpfc_vport *vport, uint32_t did)
 			spin_lock_irq(shost->host_lock);
 			ndlp->nlp_flag |= NLP_NPR_2B_DISC;
 			spin_unlock_irq(shost->host_lock);
-		} else
+		} else {
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+					 "6456 Skip Setup RSCN Node x%x "
+					 "Data:x%x x%x x%x\n",
+					 ndlp->nlp_DID, ndlp->nlp_flag,
+					 ndlp->nlp_state, vport->fc_flag);
 			ndlp = NULL;
+		}
 	} else {
+		lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
+				 "6457 Setup Active Node 2B_DISC x%x "
+				 "Data:x%x x%x x%x\n",
+				 ndlp->nlp_DID, ndlp->nlp_flag,
+				 ndlp->nlp_state, vport->fc_flag);
+
 		/* If the initiator received a PLOGI from this NPort or if the
 		 * initiator is already in the process of discovery on it,
 		 * there's no need to try to discover it again.
@@ -5612,10 +5636,10 @@ lpfc_disc_start(struct lpfc_vport *vport)
 
 	/* Start Discovery state <hba_state> */
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_DISCOVERY,
-			 "0202 Start Discovery hba state x%x "
-			 "Data: x%x x%x x%x\n",
+			 "0202 Start Discovery port state x%x "
+			 "flg x%x Data: x%x x%x x%x\n",
 			 vport->port_state, vport->fc_flag, vport->fc_plogi_cnt,
-			 vport->fc_adisc_cnt);
+			 vport->fc_adisc_cnt, vport->fc_npr_cnt);
 
 	/* First do ADISCs - if any */
 	num_sent = lpfc_els_disc_adisc(vport);
