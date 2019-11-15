@@ -81,7 +81,7 @@ static void hwmgr_init_workload_prority(struct pp_hwmgr *hwmgr)
 
 int hwmgr_early_init(struct pp_hwmgr *hwmgr)
 {
-	struct amdgpu_device *adev = hwmgr->adev;
+	struct amdgpu_device *adev;
 
 	if (!hwmgr)
 		return -EINVAL;
@@ -95,6 +95,8 @@ int hwmgr_early_init(struct pp_hwmgr *hwmgr)
 	hwmgr->fan_ctrl_is_in_default_mode = true;
 	hwmgr_init_workload_prority(hwmgr);
 	hwmgr->gfxoff_state_changed_by_workload = false;
+
+	adev = hwmgr->adev;
 
 	switch (hwmgr->chip_family) {
 	case AMDGPU_FAMILY_CI:
