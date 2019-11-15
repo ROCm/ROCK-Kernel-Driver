@@ -89,6 +89,18 @@
 #define DP_MAX_LANE_COUNT_PHY_REPEATER                     0xf0004 /* 1.4a */
 #endif
 
+#if !defined(DP_TEST_AUDIO_MODE)
+#define DP_TEST_AUDIO_MODE                 0x271
+#endif
+
+#if !defined(DP_TEST_AUDIO_PATTERN_TYPE)
+#define DP_TEST_AUDIO_PATTERN_TYPE         0x272
+#endif
+
+#if !defined(DP_TEST_AUDIO_PERIOD_CH1)
+#define DP_TEST_AUDIO_PERIOD_CH1           0x273
+#endif
+
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
