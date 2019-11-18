@@ -144,7 +144,11 @@ int dscc_compute_dsc_parameters(const struct drm_dsc_config *pps, struct dsc_par
 
 	dsc_cfg.mux_word_size = dsc_params->pps.bits_per_component <= 10 ? 48 : 64;
 
+#if defined(HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS)
 	ret = drm_dsc_compute_rc_parameters(&dsc_cfg);
+#else
+	ret = kcl_drm_dsc_compute_rc_parameters(&dsc_cfg);
+#endif
 
 	copy_pps_fields(&dsc_params->pps, &dsc_cfg);
 	dsc_params->rc_buffer_model_size = dsc_cfg.rc_bits;
