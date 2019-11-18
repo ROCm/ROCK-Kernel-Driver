@@ -54,7 +54,11 @@ void kcl_drm_dsc_pps_payload_pack(struct drm_dsc_picture_parameter_set *pps_payl
 		((dsc_cfg->bits_per_pixel & DSC_PPS_BPP_HIGH_MASK) >>
 		 DSC_PPS_MSB_SHIFT) |
 		dsc_cfg->vbr_enable << DSC_PPS_VBR_EN_SHIFT |
+#if defined(HAVE_DRM_DSC_CONFIG_RENAME_ENABLE422)
 		dsc_cfg->simple_422 << DSC_PPS_SIMPLE422_SHIFT |
+#else
+		dsc_cfg->enable422 << DSC_PPS_SIMPLE422_SHIFT |
+#endif
 		dsc_cfg->convert_rgb << DSC_PPS_CONVERT_RGB_SHIFT |
 		dsc_cfg->block_pred_enable << DSC_PPS_BLOCK_PRED_EN_SHIFT;
 

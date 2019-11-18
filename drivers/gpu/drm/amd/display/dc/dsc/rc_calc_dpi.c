@@ -36,7 +36,11 @@ static void copy_pps_fields(struct drm_dsc_config *to, const struct drm_dsc_conf
 	to->convert_rgb              = from->convert_rgb;
 	to->slice_width              = from->slice_width;
 	to->slice_height             = from->slice_height;
+#if defined(HAVE_DRM_DSC_CONFIG_RENAME_ENABLE422)
 	to->simple_422               = from->simple_422;
+#else
+	to->enable422               = from->enable422;
+#endif
 	to->native_422               = from->native_422;
 	to->native_420               = from->native_420;
 	to->pic_width                = from->pic_width;
@@ -101,7 +105,11 @@ static void copy_rc_to_cfg(struct drm_dsc_config *dsc_cfg, const struct rc_param
 int dscc_compute_dsc_parameters(const struct drm_dsc_config *pps, struct dsc_parameters *dsc_params)
 {
 	enum colour_mode  mode = pps->convert_rgb ? CM_RGB :
+#if defined(HAVE_DRM_DSC_CONFIG_RENAME_ENABLE422)
 							(pps->simple_422  ? CM_444 :
+#else
+							(pps->enable422  ? CM_444 :
+#endif
 							(pps->native_422  ? CM_422 :
 							pps->native_420  ? CM_420 : CM_444));
 	enum bits_per_comp bpc = (pps->bits_per_component == 8) ? BPC_8 :
