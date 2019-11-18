@@ -7,4 +7,5 @@
 #include <kcl/kcl_types.h>
 #include <kcl/kcl_hashtable.h>
 #include <kcl/kcl_overflow.h>
+#include <kcl/kcl_idr.h>
 #endif /* AMDGPU_BACKPORT_H */
