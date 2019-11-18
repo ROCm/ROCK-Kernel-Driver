@@ -8,6 +8,7 @@
 #include <kcl/kcl_bitops.h>
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/kcl_fence_backport.h>
+#include <kcl/kcl_drm_dsc.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
 #include <kcl/kcl_drm_vma_manager_backport.h>

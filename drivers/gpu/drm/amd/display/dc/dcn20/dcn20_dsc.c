@@ -211,7 +211,11 @@ static bool dsc2_get_packed_pps(struct display_stream_compressor *dsc, const str
 	DC_LOG_DSC("DSC Picture Parameter Set (PPS):");
 	is_config_ok = dsc_prepare_config(dsc_cfg, &dsc_reg_vals, &dsc_optc_cfg);
 	ASSERT(is_config_ok);
+#if defined(HAVE_DRM_DSC_PPS_PAYLOAD_PACK)
 	drm_dsc_pps_payload_pack((struct drm_dsc_picture_parameter_set *)dsc_packed_pps, &dsc_reg_vals.pps);
+#else
+	kcl_drm_dsc_pps_payload_pack((struct drm_dsc_picture_parameter_set *)dsc_packed_pps, &dsc_reg_vals.pps);
+#endif
 	dsc_log_pps(dsc, &dsc_reg_vals.pps);
 
 	return is_config_ok;
