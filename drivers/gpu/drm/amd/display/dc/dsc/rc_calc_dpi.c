@@ -23,7 +23,11 @@
  *
  */
 #include "os_types.h"
+#if defined(HAVE_DRM_DSC_H)
 #include <drm/drm_dsc.h>
+#else
+#include <kcl/kcl_drm_dsc.h>
+#endif
 #include "dscc_types.h"
 #include "rc_calc.h"
 

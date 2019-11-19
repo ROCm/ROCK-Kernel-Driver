@@ -26,7 +26,11 @@
 #ifndef __DSCC_TYPES_H__
 #define __DSCC_TYPES_H__
 
+#if defined(HAVE_DRM_DSC_H)
 #include <drm/drm_dsc.h>
+#else
+#include <kcl/kcl_drm_dsc.h>
+#endif
 
 #ifndef NUM_BUF_RANGES
 #define NUM_BUF_RANGES 15
