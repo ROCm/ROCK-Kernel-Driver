@@ -893,6 +893,20 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 {
 	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
 	struct i915_address_space *vm = &dev_priv->ggtt.vm;
+
+	return i915_gem_object_pin(obj, vm, view, size, alignment,
+				   flags | PIN_GLOBAL);
+}
+
+struct i915_vma *
+i915_gem_object_pin(struct drm_i915_gem_object *obj,
+		    struct i915_address_space *vm,
+		    const struct i915_ggtt_view *view,
+		    u64 size,
+		    u64 alignment,
+		    u64 flags)
+{
+	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
 	struct i915_vma *vma;
 	int ret;
 
@@ -958,7 +972,7 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 			return ERR_PTR(ret);
 	}
 
-	ret = i915_vma_pin(vma, size, alignment, flags | PIN_GLOBAL);
+	ret = i915_vma_pin(vma, size, alignment, flags);
 	if (ret)
 		return ERR_PTR(ret);
 
@@ -1037,38 +1051,6 @@ i915_gem_madvise_ioctl(struct drm_device *dev, void *data,
 out:
 	i915_gem_object_put(obj);
 	return err;
-}
-
-void i915_gem_sanitize(struct drm_i915_private *i915)
-{
-	intel_wakeref_t wakeref;
-
-	GEM_TRACE("\n");
-
-	wakeref = intel_runtime_pm_get(&i915->runtime_pm);
-	intel_uncore_forcewake_get(&i915->uncore, FORCEWAKE_ALL);
-
-	/*
-	 * As we have just resumed the machine and woken the device up from
-	 * deep PCI sleep (presumably D3_cold), assume the HW has been reset
-	 * back to defaults, recovering from whatever wedged state we left it
-	 * in and so worth trying to use the device once more.
-	 */
-	if (intel_gt_is_wedged(&i915->gt))
-		intel_gt_unset_wedged(&i915->gt);
-
-	/*
-	 * If we inherit context state from the BIOS or earlier occupants
-	 * of the GPU, the GPU may be in an inconsistent state when we
-	 * try to take over. The only way to remove the earlier state
-	 * is by resetting. However, resetting on earlier gen is tricky as
-	 * it may impact the display and we are uncertain about the stability
-	 * of the reset, so this could be applied to even earlier gen.
-	 */
-	intel_gt_sanitize(&i915->gt, false);
-
-	intel_uncore_forcewake_put(&i915->uncore, FORCEWAKE_ALL);
-	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
 }
 
 static int __intel_engines_record_defaults(struct intel_gt *gt)
@@ -1411,11 +1393,6 @@ void i915_gem_driver_release(struct drm_i915_private *dev_priv)
 	i915_gem_drain_freed_objects(dev_priv);
 
 	WARN_ON(!list_empty(&dev_priv->gem.contexts.list));
-}
-
-void i915_gem_init_mmio(struct drm_i915_private *i915)
-{
-	i915_gem_sanitize(i915);
 }
 
 static void i915_gem_init__mm(struct drm_i915_private *i915)
