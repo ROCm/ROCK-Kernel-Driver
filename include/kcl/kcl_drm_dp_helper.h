@@ -109,6 +109,10 @@
 # define DP_DSC_THROUGHPUT_MODE_0_170       (15 << 4)
 #endif
 
+#if !defined(DP_SDP_PPS_HEADER_PAYLOAD_BYTES_MINUS_1)
+#define DP_SDP_PPS_HEADER_PAYLOAD_BYTES_MINUS_1 0x7F
+#endif
+
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
