@@ -52,6 +52,12 @@ for sym in $SYMS; do
 	}' /boot/System.map-$KERNELVER >>$KCL/symbols.c
 done
 
+sed -i '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' $KCL/dma-resv.c
+sed -i 's/linux\/sched\/mm\.h/kcl\/kcl_sched_mm_h\.h/' $KCL/dma-resv.c
+sed -i '/define _LINUX_RESERVATION_H/i #include <kcl/kcl_reservation_backport.h>' $INC/linux/dma-resv.h
+sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' $INC/linux/dma-resv.h
+sed -i '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
+
 while read from to; do
 	[[ -z "$from" ]] && continue
 	file=${from//\//\\/}

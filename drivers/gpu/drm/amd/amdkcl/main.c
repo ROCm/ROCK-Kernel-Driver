@@ -1,8 +1,11 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
+extern void amdkcl_reservation_init(void);
+
 int __init amdkcl_init(void)
 {
+	amdkcl_reservation_init();
 	return 0;
 }
 module_init(amdkcl_init);
