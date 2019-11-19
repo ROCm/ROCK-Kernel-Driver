@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_FB_OPS_FB_DEBUG_XX],
 	[AC_MSG_CHECKING([whether  fb_ops->fb_debug_xx is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_fb_helper.h>
 	],[
 		struct fb_ops *ptest = NULL;
