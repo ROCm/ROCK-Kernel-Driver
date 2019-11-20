@@ -158,7 +158,7 @@ static void interrupt_wq(struct work_struct *work)
 	uint32_t ih_ring_entry[KFD_MAX_RING_ENTRY_SIZE];
 
 	if (dev->device_info->ih_ring_entry_size > sizeof(ih_ring_entry)) {
-		dev_err(kfd_chardev(), "Ring entry too small\n");
+		dev_err_once(kfd_chardev(), "Ring entry too small\n");
 		return;
 	}
 

@@ -844,7 +844,7 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 		return;
 
 	if (kfd->device_info->ih_ring_entry_size > sizeof(patched_ihre)) {
-		dev_err(kfd_device, "Ring entry too small\n");
+		dev_err_once(kfd_device, "Ring entry too small\n");
 		return;
 	}
 
