@@ -212,7 +212,7 @@ void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 					bool suspend)
 
 {
-	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, state);
+	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, suspend);
 }
 #endif
 
