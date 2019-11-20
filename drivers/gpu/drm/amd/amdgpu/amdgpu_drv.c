@@ -1211,7 +1211,7 @@ static int amdgpu_pmops_suspend(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	return amdgpu_device_suspend(drm_dev, true, true);
+	return amdgpu_device_suspend(drm_dev, true);
 }
 
 static int amdgpu_pmops_resume(struct device *dev)
@@ -1226,7 +1226,7 @@ static int amdgpu_pmops_resume(struct device *dev)
 		pm_runtime_enable(dev);
 	}
 
-	return amdgpu_device_resume(drm_dev, true, true);
+	return amdgpu_device_resume(drm_dev, true);
 }
 
 static int amdgpu_pmops_freeze(struct device *dev)
@@ -1235,7 +1235,7 @@ static int amdgpu_pmops_freeze(struct device *dev)
 	struct amdgpu_device *adev = drm_dev->dev_private;
 	int r;
 
-	r = amdgpu_device_suspend(drm_dev, false, true);
+	r = amdgpu_device_suspend(drm_dev, true);
 	if (r)
 		return r;
 	return amdgpu_asic_reset(adev);
@@ -1245,21 +1245,21 @@ static int amdgpu_pmops_thaw(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	return amdgpu_device_resume(drm_dev, false, true);
+	return amdgpu_device_resume(drm_dev, true);
 }
 
 static int amdgpu_pmops_poweroff(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	return amdgpu_device_suspend(drm_dev, true, true);
+	return amdgpu_device_suspend(drm_dev, true);
 }
 
 static int amdgpu_pmops_restore(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	return amdgpu_device_resume(drm_dev, false, true);
+	return amdgpu_device_resume(drm_dev, true);
 }
 
 static int amdgpu_pmops_runtime_suspend(struct device *dev)
@@ -1281,7 +1281,7 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
-	ret = amdgpu_device_suspend(drm_dev, false, false);
+	ret = amdgpu_device_suspend(drm_dev, false);
 	if (amdgpu_device_supports_boco(drm_dev)) {
 		/* Only need to handle PCI state in the driver for ATPX
 		 * PCI core handles it for _PR3.
@@ -1331,7 +1331,7 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 	} else if (amdgpu_device_supports_baco(drm_dev)) {
 		amdgpu_device_baco_exit(drm_dev);
 	}
-	ret = amdgpu_device_resume(drm_dev, false, false);
+	ret = amdgpu_device_resume(drm_dev, false);
 	drm_kms_helper_poll_enable(drm_dev);
 #if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
