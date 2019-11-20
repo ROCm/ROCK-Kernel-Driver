@@ -1,4 +1,4 @@
-BACKPORT_OBJS :=
+BACKPORT_OBJS := kcl_mmu_notifier.o
 
 amdgpu-y += $(addprefix ../backport/,$(BACKPORT_OBJS))
 
