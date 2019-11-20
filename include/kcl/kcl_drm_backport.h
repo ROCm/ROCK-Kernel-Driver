@@ -6,6 +6,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc.h>
+#include <drm/drm_cache.h>
 #include <kcl/kcl_drm_file_h.h>
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
@@ -133,6 +134,10 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #endif
 }
 #define drm_syncobj_find_fence _kcl_drm_syncobj_find_fence
+#endif
+
+#ifdef BUILD_AS_DKMS
+#define drm_arch_can_wc_memory kcl_drm_arch_can_wc_memory
 #endif
 
 #endif /* AMDKCL_DRM_BACKPORT_H */
