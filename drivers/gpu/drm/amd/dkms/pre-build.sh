@@ -32,6 +32,16 @@ for sym in $SYMS; do
     echo "void *_kcl_$sym = (void *)0x$addr;" >> amd/amdkcl/symbols.c
 done
 
+while read line; do
+	from_header=$(echo $line | cut -d ' ' -f 1)
+	to_header=$(echo $line | cut -d ' ' -f 2)
+	[ x$from_header = x ] && break
+	from_header=$(echo "$from_header" | sed 's|\.h|\\&|')
+	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/drm/* include/linux/* include/uapi/*`; do
+		sed -i "s|${from_header}|${to_header}|" $file
+	done
+done < headers
+
 for file in $FILES; do
 	grep EXPORT_SYMBOL $file \
 		| sort -u \
