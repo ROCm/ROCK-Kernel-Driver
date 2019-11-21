@@ -84,11 +84,11 @@ static void amdgpu_display_flip_work_func(struct work_struct *__work)
 	unsigned long flags;
 	unsigned i;
 
-	if (amdgpu_flip_handle_fence(work, &work->excl))
+	if (amdgpu_display_flip_handle_fence(work, &work->excl))
 		return;
 
 	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_flip_handle_fence(work, &work->shared[i]))
+		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
 			return;
 
 	/* We borrow the event spin lock for protecting flip_status */
@@ -114,11 +114,11 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	int vpos, hpos, stat, min_udelay = 0;
 	struct drm_vblank_crtc *vblank = &crtc->dev->vblank[work->crtc_id];
 
-	if (amdgpu_flip_handle_fence(work, &work->excl))
+	if (amdgpu_display_flip_handle_fence(work, &work->excl))
 		return;
 
 	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_flip_handle_fence(work, &work->shared[i]))
+		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
 			return;
 
 	/* We borrow the event spin lock for protecting flip_status */
@@ -142,7 +142,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 		 * start in hpos, and to the "fudged earlier" vblank start in
 		 * vpos.
 		 */
-		stat = amdgpu_get_crtc_scanoutpos(adev->ddev, work->crtc_id,
+		stat = amdgpu_display_get_crtc_scanoutpos(adev->ddev, work->crtc_id,
 						  GET_DISTANCE_TO_VBLANKSTART,
 						  &vpos, &hpos, NULL, NULL,
 						  &crtc->hwmode);
@@ -410,7 +410,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		return -ENOMEM;
 
 	INIT_WORK(&work->flip_work, amdgpu_flip_work_func);
-	INIT_WORK(&work->unpin_work, amdgpu_unpin_work_func);
+	INIT_WORK(&work->unpin_work, amdgpu_display_unpin_work_func);
 
 	work->event = event;
 	work->adev = adev;
