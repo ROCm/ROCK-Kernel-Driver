@@ -6,6 +6,7 @@
 #include <linux/ww_mutex.h>
 #include <linux/seqlock.h>
 #include <linux/rcupdate.h>
+#include <asm/barrier.h>
 
 #define reservation_ww_class (*_kcl_reservation_ww_class)
 #define reservation_seqcount_class (*_kcl_reservation_seqcount_class)
@@ -56,5 +57,9 @@ struct dma_resv {
 	struct dma_resv_list *staged;
 };
 #endif
+#endif
+
+#if !defined(smp_store_mb)
+#define smp_store_mb set_mb
 #endif
 #endif
