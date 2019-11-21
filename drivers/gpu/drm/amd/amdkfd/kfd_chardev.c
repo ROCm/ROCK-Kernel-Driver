@@ -26,9 +26,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
-#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
-#endif
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>

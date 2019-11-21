@@ -1,11 +1,7 @@
 #ifndef AMDKCL_MM_H
 #define AMDKCL_MM_H
 
-#if defined(HAVE_MM_H)
-#include <linux/sched/mm.h>
-#else
-#include <linux/sched.h>
-#endif
+#include <kcl/kcl_sched_mm_h.h>
 #include <linux/mm.h>
 #include <linux/gfp.h>
 #include <kcl/kcl_overflow.h>
