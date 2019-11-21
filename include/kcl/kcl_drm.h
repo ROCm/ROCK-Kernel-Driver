@@ -19,6 +19,7 @@
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
+#include <kcl/kcl_drm_drv_h.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
