@@ -71,6 +71,7 @@
 #include "amdgpu_uvd.h"
 #include "amdgpu_vce.h"
 #include "amdgpu_vcn.h"
+#include "amdgpu_jpeg.h"
 #include "amdgpu_mn.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_gfx.h"
@@ -730,6 +731,7 @@ enum amd_hw_ip_block_type {
 	MP1_HWIP,
 	UVD_HWIP,
 	VCN_HWIP = UVD_HWIP,
+	JPEG_HWIP = VCN_HWIP,
 	VCE_HWIP,
 	DF_HWIP,
 	DCE_HWIP,
@@ -763,7 +765,7 @@ struct amdgpu_ssg {
 #ifdef CONFIG_ENABLE_SSG
 	struct percpu_ref	ref;
 	struct completion	cmp;
-#if defined(HAVE_2ARGS_DEVM_MEMREMAP_PAGES)
+#if defined(HAVE_DEVM_MEMREMAP_PAGES_2ARGS)
 	struct dev_pagemap	pgmap;
 #endif
 #endif
@@ -953,6 +955,9 @@ struct amdgpu_device {
 
 	/* vcn */
 	struct amdgpu_vcn		vcn;
+
+	/* jpeg */
+	struct amdgpu_jpeg		jpeg;
 
 	/* firmwares */
 	struct amdgpu_firmware		firmware;

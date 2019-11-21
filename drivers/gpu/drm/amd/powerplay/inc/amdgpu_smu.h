@@ -261,7 +261,6 @@ struct smu_table_context
 	struct smu_table		*tables;
 	struct smu_table		memory_pool;
 	uint8_t                         thermal_controller_type;
-	uint16_t			TDPODLimit;
 
 	void				*overdrive_table;
 };
@@ -283,6 +282,7 @@ struct smu_power_gate {
 	bool uvd_gated;
 	bool vce_gated;
 	bool vcn_gated;
+	bool jpeg_gated;
 };
 
 struct smu_power_context {
@@ -391,6 +391,7 @@ struct smu_context
 
 	uint32_t smc_if_version;
 
+	bool uploading_custom_pp_table;
 };
 
 struct i2c_adapter;
@@ -436,6 +437,7 @@ struct pptable_funcs {
 	int (*set_power_profile_mode)(struct smu_context *smu, long *input, uint32_t size);
 	int (*dpm_set_uvd_enable)(struct smu_context *smu, bool enable);
 	int (*dpm_set_vce_enable)(struct smu_context *smu, bool enable);
+	int (*dpm_set_jpeg_enable)(struct smu_context *smu, bool enable);
 	int (*read_sensor)(struct smu_context *smu, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size);
 	int (*pre_display_config_changed)(struct smu_context *smu);
@@ -490,6 +492,7 @@ struct pptable_funcs {
 	int (*check_fw_version)(struct smu_context *smu);
 	int (*powergate_sdma)(struct smu_context *smu, bool gate);
 	int (*powergate_vcn)(struct smu_context *smu, bool gate);
+	int (*powergate_jpeg)(struct smu_context *smu, bool gate);
 	int (*set_gfx_cgpg)(struct smu_context *smu, bool enable);
 	int (*write_pptable)(struct smu_context *smu);
 	int (*set_min_dcef_deep_sleep)(struct smu_context *smu);
@@ -548,6 +551,7 @@ struct pptable_funcs {
 	int (*get_dpm_ultimate_freq)(struct smu_context *smu, enum smu_clk_type clk_type, uint32_t *min, uint32_t *max);
 	int (*set_soft_freq_limited_range)(struct smu_context *smu, enum smu_clk_type clk_type, uint32_t min, uint32_t max);
 	int (*override_pcie_parameters)(struct smu_context *smu);
+	uint32_t (*get_pptable_power_limit)(struct smu_context *smu);
 };
 
 int smu_load_microcode(struct smu_context *smu);
@@ -716,5 +720,7 @@ int smu_get_uclk_dpm_states(struct smu_context *smu,
 
 int smu_get_dpm_clock_table(struct smu_context *smu,
 			    struct dpm_clocks *clock_table);
+
+uint32_t smu_get_pptable_power_limit(struct smu_context *smu);
 
 #endif

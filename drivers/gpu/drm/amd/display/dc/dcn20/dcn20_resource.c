@@ -1236,7 +1236,7 @@ void dcn20_dsc_destroy(struct display_stream_compressor **dsc)
 
 #endif
 
-static void destruct(struct dcn20_resource_pool *pool)
+static void dcn20_resource_destruct(struct dcn20_resource_pool *pool)
 {
 	unsigned int i;
 
@@ -1799,10 +1799,11 @@ void dcn20_populate_dml_writeback_from_context(
 }
 
 int dcn20_populate_dml_pipes_from_context(
-		struct dc *dc, struct resource_context *res_ctx, display_e2e_pipe_params_st *pipes)
+		struct dc *dc, struct dc_state *context, display_e2e_pipe_params_st *pipes)
 {
 	int pipe_cnt, i;
 	bool synchronized_vblank = true;
+	struct resource_context *res_ctx = &context->res_ctx;
 
 	for (i = 0, pipe_cnt = -1; i < dc->res_pool->pipe_count; i++) {
 		if (!res_ctx->pipe_ctx[i].stream)
@@ -1822,10 +1823,13 @@ int dcn20_populate_dml_pipes_from_context(
 
 	for (i = 0, pipe_cnt = 0; i < dc->res_pool->pipe_count; i++) {
 		struct dc_crtc_timing *timing = &res_ctx->pipe_ctx[i].stream->timing;
+		unsigned int v_total;
 		int output_bpc;
 
 		if (!res_ctx->pipe_ctx[i].stream)
 			continue;
+
+		v_total = timing->v_total;
 		/* todo:
 		pipes[pipe_cnt].pipe.src.dynamic_metadata_enable = 0;
 		pipes[pipe_cnt].pipe.src.dcc = 0;
@@ -1840,7 +1844,7 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].pipe.src.dynamic_metadata_enable = true;
 			/* 1/2 vblank */
 			pipes[pipe_cnt].pipe.src.dynamic_metadata_lines_before_active =
-				(timing->v_total - timing->v_addressable
+				(v_total - timing->v_addressable
 					- timing->v_border_top - timing->v_border_bottom) / 2;
 			/* 36 bytes dp, 32 hdmi */
 			pipes[pipe_cnt].pipe.src.dynamic_metadata_xmit_bytes =
@@ -1854,13 +1858,13 @@ int dcn20_populate_dml_pipes_from_context(
 				- timing->h_addressable
 				- timing->h_border_left
 				- timing->h_border_right;
-		pipes[pipe_cnt].pipe.dest.vblank_start = timing->v_total - timing->v_front_porch;
+		pipes[pipe_cnt].pipe.dest.vblank_start = v_total - timing->v_front_porch;
 		pipes[pipe_cnt].pipe.dest.vblank_end = pipes[pipe_cnt].pipe.dest.vblank_start
 				- timing->v_addressable
 				- timing->v_border_top
 				- timing->v_border_bottom;
 		pipes[pipe_cnt].pipe.dest.htotal = timing->h_total;
-		pipes[pipe_cnt].pipe.dest.vtotal = timing->v_total;
+		pipes[pipe_cnt].pipe.dest.vtotal = v_total;
 		pipes[pipe_cnt].pipe.dest.hactive = timing->h_addressable;
 		pipes[pipe_cnt].pipe.dest.vactive = timing->v_addressable;
 		pipes[pipe_cnt].pipe.dest.interlaced = timing->flags.INTERLACE;
@@ -1999,8 +2003,8 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].pipe.scale_taps.vtaps = 1;
 			pipes[pipe_cnt].pipe.src.is_hsplit = 0;
 			pipes[pipe_cnt].pipe.dest.odm_combine = 0;
-			pipes[pipe_cnt].pipe.dest.vtotal_min = timing->v_total;
-			pipes[pipe_cnt].pipe.dest.vtotal_max = timing->v_total;
+			pipes[pipe_cnt].pipe.dest.vtotal_min = v_total;
+			pipes[pipe_cnt].pipe.dest.vtotal_max = v_total;
 		} else {
 			struct dc_plane_state *pln = res_ctx->pipe_ctx[i].plane_state;
 			struct scaler_data *scl = &res_ctx->pipe_ctx[i].plane_res.scl_data;
@@ -2466,7 +2470,7 @@ bool dcn20_fast_validate_bw(
 
 	dcn20_merge_pipes_for_validate(dc, context);
 
-	pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, &context->res_ctx, pipes);
+	pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes);
 
 	*pipe_cnt_out = pipe_cnt;
 
@@ -2614,10 +2618,10 @@ static void dcn20_calculate_wm(
 	if (pipe_cnt != pipe_idx) {
 		if (dc->res_pool->funcs->populate_dml_pipes)
 			pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc,
-				&context->res_ctx, pipes);
+				context, pipes);
 		else
 			pipe_cnt = dcn20_populate_dml_pipes_from_context(dc,
-				&context->res_ctx, pipes);
+				context, pipes);
 	}
 
 	*out_pipe_cnt = pipe_cnt;
@@ -2928,7 +2932,7 @@ static void dcn20_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dcn20_resource_pool *dcn20_pool = TO_DCN20_RES_POOL(*pool);
 
-	destruct(dcn20_pool);
+	dcn20_resource_destruct(dcn20_pool);
 	kfree(dcn20_pool);
 	*pool = NULL;
 }
@@ -3384,7 +3388,7 @@ static bool init_soc_bounding_box(struct dc *dc,
 	return true;
 }
 
-static bool construct(
+static bool dcn20_resource_construct(
 	uint8_t num_virtual_links,
 	struct dc *dc,
 	struct dcn20_resource_pool *pool)
@@ -3703,7 +3707,7 @@ static bool construct(
 
 create_fail:
 
-	destruct(pool);
+	dcn20_resource_destruct(pool);
 
 	return false;
 }
@@ -3718,7 +3722,7 @@ struct resource_pool *dcn20_create_resource_pool(
 	if (!pool)
 		return NULL;
 
-	if (construct(init_data->num_virtual_links, dc, pool))
+	if (dcn20_resource_construct(init_data->num_virtual_links, dc, pool))
 		return &pool->base;
 
 	BREAK_TO_DEBUGGER();

@@ -111,11 +111,8 @@ drm_atomic_helper_duplicate_state(struct drm_device *dev,
 				  struct drm_modeset_acquire_ctx *ctx);
 #endif
 
-#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND)
+#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME)
 struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
-#endif
-
-#if !defined(HAVE_DRM_ATOMIC_HELPER_RESUME)
 int drm_atomic_helper_resume(struct drm_device *dev,
 			     struct drm_atomic_state *state);
 #endif
@@ -521,18 +518,20 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 #endif
 
 #ifndef HAVE_DRM_MODE_IS_420_XXX
+bool _kcl_drm_mode_is_420_only(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode);
+bool _kcl_drm_mode_is_420_also(const struct drm_display_info *display,
+			  const struct drm_display_mode *mode);
+
 static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode)
 {
-	/* DRM < 4.4 ,un-support this pixel format */
-	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_only!\n");
-	return false;
+	return _kcl_drm_mode_is_420_only(display, mode);
 }
 static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode)
 {
-	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_also!\n");
-	return false;
+	return _kcl_drm_mode_is_420_also(display, mode);
 }
 #endif
 

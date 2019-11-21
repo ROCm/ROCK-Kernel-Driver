@@ -55,7 +55,7 @@ void update_stream_signal(struct dc_stream_state *stream, struct dc_sink *sink)
 	}
 }
 
-static void construct(struct dc_stream_state *stream,
+static void dc_stream_construct(struct dc_stream_state *stream,
 	struct dc_sink *dc_sink_data)
 {
 	uint32_t i = 0;
@@ -126,7 +126,7 @@ static void construct(struct dc_stream_state *stream,
 	stream->ctx->dc_stream_id_count++;
 }
 
-static void destruct(struct dc_stream_state *stream)
+static void dc_stream_destruct(struct dc_stream_state *stream)
 {
 	dc_sink_release(stream->sink);
 	if (stream->out_transfer_func != NULL) {
@@ -144,7 +144,7 @@ static void dc_stream_free(struct kref *kref)
 {
 	struct dc_stream_state *stream = container_of(kref, struct dc_stream_state, refcount);
 
-	destruct(stream);
+	dc_stream_destruct(stream);
 	kfree(stream);
 }
 
@@ -167,7 +167,7 @@ struct dc_stream_state *dc_create_stream_for_sink(
 	if (stream == NULL)
 		return NULL;
 
-	construct(stream, sink);
+	dc_stream_construct(stream, sink);
 
 	kref_init(&stream->refcount);
 
@@ -567,7 +567,6 @@ bool dc_stream_get_scanoutpos(const struct dc_stream_state *stream,
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 bool dc_stream_dmdata_status_done(struct dc *dc, struct dc_stream_state *stream)
 {
-	bool status = true;
 	struct pipe_ctx *pipe = NULL;
 	int i;
 
@@ -583,8 +582,7 @@ bool dc_stream_dmdata_status_done(struct dc *dc, struct dc_stream_state *stream)
 	if (i == MAX_PIPES)
 		return true;
 
-	status = dc->hwss.dmdata_status_done(pipe);
-	return status;
+	return dc->hwss.dmdata_status_done(pipe);
 }
 
 bool dc_stream_set_dynamic_metadata(struct dc *dc,

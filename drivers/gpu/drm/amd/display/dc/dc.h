@@ -39,7 +39,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.58"
+#define DC_VER "3.2.60"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -368,6 +368,7 @@ struct dc_debug_options {
 	bool disable_dsc_power_gate;
 	int dsc_min_slice_height_override;
 #endif
+	bool native422_support;
 	bool disable_pplib_wm_range;
 	enum wm_report_mode pplib_wm_report_mode;
 	unsigned int min_disp_clk_khz;
@@ -424,6 +425,7 @@ struct dc_debug_options {
 
 	bool nv12_iflip_vm_wa;
 	bool disable_dram_clock_change_vactive_support;
+	bool validate_dml_output;
 };
 
 struct dc_debug_data {
@@ -690,7 +692,7 @@ union dc_3dlut_state {
 struct dc_3dlut {
 	struct kref refcount;
 	struct tetrahedral_params lut_3d;
-	uint32_t hdr_multiplier;
+	struct fixed31_32 hdr_multiplier;
 	bool initialized; /*remove after diag fix*/
 	union dc_3dlut_state state;
 	struct dc_context *ctx;
@@ -718,7 +720,7 @@ union surface_update_flags {
 		uint32_t horizontal_mirror_change:1;
 		uint32_t per_pixel_alpha_change:1;
 		uint32_t global_alpha_change:1;
-		uint32_t sdr_white_level:1;
+		uint32_t hdr_mult:1;
 		uint32_t rotation_change:1;
 		uint32_t swizzle_change:1;
 		uint32_t scaling_change:1;
@@ -764,7 +766,7 @@ struct dc_plane_state {
 	struct dc_bias_and_scale *bias_and_scale;
 	struct dc_csc_transform input_csc_color_matrix;
 	struct fixed31_32 coeff_reduction_factor;
-	uint32_t sdr_white_level;
+	struct fixed31_32 hdr_mult;
 
 	// TODO: No longer used, remove
 	struct dc_hdr_static_metadata hdr_static_ctx;
@@ -811,7 +813,6 @@ struct dc_plane_info {
 	enum dc_rotation_angle rotation;
 	enum plane_stereo_format stereo_format;
 	enum dc_color_space color_space;
-	unsigned int sdr_white_level;
 	bool horizontal_mirror;
 	bool visible;
 	bool per_pixel_alpha;
@@ -835,7 +836,7 @@ struct dc_surface_update {
 	const struct dc_flip_addrs *flip_addr;
 	const struct dc_plane_info *plane_info;
 	const struct dc_scaling_info *scaling_info;
-
+	struct fixed31_32 hdr_mult;
 	/* following updates require alloc/sleep/spin that is not isr safe,
 	 * null means no updates
 	 */
@@ -1006,6 +1007,8 @@ struct dpcd_caps {
 	union dpcd_fec_capability fec_cap;
 	struct dpcd_dsc_capabilities dsc_caps;
 #endif
+	struct dc_lttpr_caps lttpr_caps;
+
 };
 
 #include "dc_link.h"

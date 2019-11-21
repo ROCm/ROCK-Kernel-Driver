@@ -76,7 +76,6 @@ struct kernel_queue_ops {
 
 struct kernel_queue {
 	struct kernel_queue_ops ops;
-	struct kernel_queue_ops ops_asic_specific;
 
 	/* data */
 	struct kfd_dev		*dev;
@@ -108,10 +107,5 @@ struct kernel_queue {
 
 	struct list_head	list;
 };
-
-void kernel_queue_init_cik(struct kernel_queue_ops *ops);
-void kernel_queue_init_vi(struct kernel_queue_ops *ops);
-void kernel_queue_init_v9(struct kernel_queue_ops *ops);
-void kernel_queue_init_v10(struct kernel_queue_ops *ops);
 
 #endif /* KFD_KERNEL_QUEUE_H_ */

@@ -288,19 +288,13 @@ static int ttm_set_pages_caching(struct dma_pool *pool,
 
 static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 {
-#ifdef DMA_ATTR_NO_WARN
 	unsigned long attrs = 0;
-#endif
 	dma_addr_t dma = d_page->dma;
 	d_page->vaddr &= ~VADDR_FLAG_HUGE_POOL;
-#ifdef DMA_ATTR_NO_WARN
 	if (pool->type & IS_HUGE)
 		attrs = DMA_ATTR_NO_WARN;
 
 	dma_free_attrs(pool->dev, pool->size, (void *)d_page->vaddr, dma, attrs);
-#else
-	dma_free_coherent(pool->dev, pool->size, (void *)d_page->vaddr, dma);
-#endif
 
 	kfree(d_page);
 	d_page = NULL;
@@ -308,25 +302,18 @@ static void __ttm_dma_free_page(struct dma_pool *pool, struct dma_page *d_page)
 static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
 {
 	struct dma_page *d_page;
-#ifdef DMA_ATTR_NO_WARN
 	unsigned long attrs = 0;
-#endif
 	void *vaddr;
 
 	d_page = kmalloc(sizeof(struct dma_page), GFP_KERNEL);
 	if (!d_page)
 		return NULL;
 
-#ifdef DMA_ATTR_NO_WARN
 	if (pool->type & IS_HUGE)
 		attrs = DMA_ATTR_NO_WARN;
 
 	vaddr = dma_alloc_attrs(pool->dev, pool->size, &d_page->dma,
 				pool->gfp_flags, attrs);
-#else
-	vaddr = dma_alloc_coherent(pool->dev, pool->size, &d_page->dma,
-				pool->gfp_flags);
-#endif
 	if (vaddr) {
 		if (is_vmalloc_addr(vaddr))
 			d_page->p = vmalloc_to_page(vaddr);
@@ -1170,12 +1157,7 @@ static int ttm_dma_pool_mm_shrink_init(struct ttm_pool_manager *manager)
 	manager->mm_shrink.count_objects = ttm_dma_pool_shrink_count;
 	manager->mm_shrink.scan_objects = &ttm_dma_pool_shrink_scan;
 	manager->mm_shrink.seeks = 1;
-#if defined(HAVE_INT_REGISTER_SHRINKER)
 	return register_shrinker(&manager->mm_shrink);
-#else
-	register_shrinker(&manager->mm_shrink);
-	return 0;
-#endif
 }
 
 static void ttm_dma_pool_mm_shrink_fini(struct ttm_pool_manager *manager)

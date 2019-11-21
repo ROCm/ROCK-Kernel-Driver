@@ -415,6 +415,9 @@ int smu_dpm_set_power_gate(struct smu_context *smu, uint32_t block_type,
 	case AMD_IP_BLOCK_TYPE_SDMA:
 		ret = smu_powergate_sdma(smu, gate);
 		break;
+	case AMD_IP_BLOCK_TYPE_JPEG:
+		ret = smu_dpm_set_jpeg_enable(smu, gate);
+		break;
 	default:
 		break;
 	}
@@ -591,9 +594,17 @@ int smu_sys_set_pp_table(struct smu_context *smu,  void *buf, size_t size)
 	smu_table->power_play_table = smu_table->hardcode_pptable;
 	smu_table->power_play_table_size = size;
 
+	/*
+	 * Special hw_fini action(for Navi1x, the DPMs disablement will be
+	 * skipped) may be needed for custom pptable uploading.
+	 */
+	smu->uploading_custom_pp_table = true;
+
 	ret = smu_reset(smu);
 	if (ret)
 		pr_info("smu reset failed, ret = %d\n", ret);
+
+	smu->uploading_custom_pp_table = false;
 
 failed:
 	mutex_unlock(&smu->mutex);
@@ -714,8 +725,12 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 {
 	struct smu_context *smu = &adev->smu;
 
+	if (adev->pm.pp_feature & PP_OVERDRIVE_MASK)
+		smu->od_enabled = true;
+
 	switch (adev->asic_type) {
 	case CHIP_VEGA20:
+		adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
 		vega20_set_ppt_funcs(smu);
 		break;
 	case CHIP_NAVI10:
@@ -724,7 +739,10 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		navi10_set_ppt_funcs(smu);
 		break;
 	case CHIP_ARCTURUS:
+		adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
 		arcturus_set_ppt_funcs(smu);
+		/* OD is not supported on Arcturus */
+		smu->od_enabled =false;
 		break;
 	case CHIP_RENOIR:
 		renoir_set_ppt_funcs(smu);
@@ -732,9 +750,6 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 	default:
 		return -EINVAL;
 	}
-
-	if (adev->pm.pp_feature & PP_OVERDRIVE_MASK)
-		smu->od_enabled = true;
 
 	return 0;
 }
@@ -1066,10 +1081,6 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 		return ret;
 
 	if (adev->asic_type != CHIP_ARCTURUS) {
-		ret = smu_override_pcie_parameters(smu);
-		if (ret)
-			return ret;
-
 		ret = smu_notify_display_change(smu);
 		if (ret)
 			return ret;
@@ -1098,6 +1109,12 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 			return ret;
 	}
 
+	if (adev->asic_type != CHIP_ARCTURUS) {
+		ret = smu_override_pcie_parameters(smu);
+		if (ret)
+			return ret;
+	}
+
 	ret = smu_set_default_od_settings(smu, initialize);
 	if (ret)
 		return ret;
@@ -1107,7 +1124,7 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 		if (ret)
 			return ret;
 
-		ret = smu_get_power_limit(smu, &smu->default_power_limit, true, false);
+		ret = smu_get_power_limit(smu, &smu->default_power_limit, false, false);
 		if (ret)
 			return ret;
 	}
@@ -1225,6 +1242,7 @@ static int smu_hw_init(void *handle)
 	if (adev->flags & AMD_IS_APU) {
 		smu_powergate_sdma(&adev->smu, false);
 		smu_powergate_vcn(&adev->smu, false);
+		smu_powergate_jpeg(&adev->smu, false);
 		smu_set_gfx_cgpg(&adev->smu, true);
 	}
 
@@ -1283,6 +1301,7 @@ static int smu_hw_fini(void *handle)
 	if (adev->flags & AMD_IS_APU) {
 		smu_powergate_sdma(&adev->smu, true);
 		smu_powergate_vcn(&adev->smu, true);
+		smu_powergate_jpeg(&adev->smu, true);
 	}
 
 	ret = smu_stop_thermal_control(smu);
@@ -1291,10 +1310,25 @@ static int smu_hw_fini(void *handle)
 		return ret;
 	}
 
-	ret = smu_stop_dpms(smu);
-	if (ret) {
-		pr_warn("Fail to stop Dpms!\n");
-		return ret;
+	/*
+	 * For custom pptable uploading, skip the DPM features
+	 * disable process on Navi1x ASICs.
+	 *   - As the gfx related features are under control of
+	 *     RLC on those ASICs. RLC reinitialization will be
+	 *     needed to reenable them. That will cost much more
+	 *     efforts.
+	 *
+	 *   - SMU firmware can handle the DPM reenablement
+	 *     properly.
+	 */
+	if (!smu->uploading_custom_pp_table ||
+	    !((adev->asic_type >= CHIP_NAVI10) &&
+	      (adev->asic_type <= CHIP_NAVI12))) {
+		ret = smu_stop_dpms(smu);
+		if (ret) {
+			pr_warn("Fail to stop Dpms!\n");
+			return ret;
+		}
 	}
 
 	kfree(table_context->driver_pptable);
@@ -2506,6 +2540,16 @@ int smu_get_dpm_clock_table(struct smu_context *smu,
 		ret = smu->ppt_funcs->get_dpm_clock_table(smu, clock_table);
 
 	mutex_unlock(&smu->mutex);
+
+	return ret;
+}
+
+uint32_t smu_get_pptable_power_limit(struct smu_context *smu)
+{
+	uint32_t ret = 0;
+
+	if (smu->ppt_funcs->get_pptable_power_limit)
+		ret = smu->ppt_funcs->get_pptable_power_limit(smu);
 
 	return ret;
 }

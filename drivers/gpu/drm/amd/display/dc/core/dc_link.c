@@ -72,7 +72,7 @@ enum {
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-static void destruct(struct dc_link *link)
+static void dc_link_destruct(struct dc_link *link)
 {
 	int i;
 
@@ -1242,7 +1242,7 @@ static enum transmitter translate_encoder_to_transmitter(
 	}
 }
 
-static bool construct(
+static bool dc_link_construct(
 	struct dc_link *link,
 	const struct link_init_data *init_params)
 {
@@ -1444,7 +1444,7 @@ struct dc_link *link_create(const struct link_init_data *init_params)
 	if (NULL == link)
 		goto alloc_fail;
 
-	if (false == construct(link, init_params))
+	if (false == dc_link_construct(link, init_params))
 		goto construct_fail;
 
 	return link;
@@ -1458,7 +1458,7 @@ alloc_fail:
 
 void link_destroy(struct dc_link **link)
 {
-	destruct(*link);
+	dc_link_destruct(*link);
 	kfree(*link);
 	*link = NULL;
 }
@@ -1546,6 +1546,10 @@ static enum dc_status enable_link_dp(
 	panel_mode = dp_get_panel_mode(link);
 	dp_set_panel_mode(link, panel_mode);
 
+	/* We need to do this before the link training to ensure the idle pattern in SST
+	 * mode will be sent right after the link training */
+	link->link_enc->funcs->connect_dig_be_to_fe(link->link_enc,
+						    pipe_ctx->stream_res.stream_enc->id, true);
 	skip_video_pattern = true;
 
 	if (link_settings.link_rate == LINK_RATE_LOW)
@@ -2642,28 +2646,13 @@ static struct fixed31_32 get_pbn_per_slot(struct dc_stream_state *stream)
 	return dc_fixpt_div_int(mbytes_per_sec, 54);
 }
 
-static int get_color_depth(enum dc_color_depth color_depth)
-{
-	switch (color_depth) {
-	case COLOR_DEPTH_666: return 6;
-	case COLOR_DEPTH_888: return 8;
-	case COLOR_DEPTH_101010: return 10;
-	case COLOR_DEPTH_121212: return 12;
-	case COLOR_DEPTH_141414: return 14;
-	case COLOR_DEPTH_161616: return 16;
-	default: return 0;
-	}
-}
-
 static struct fixed31_32 get_pbn_from_timing(struct pipe_ctx *pipe_ctx)
 {
-	uint32_t bpc;
 	uint64_t kbps;
 	struct fixed31_32 peak_kbps;
 	uint32_t numerator;
 	uint32_t denominator;
 
-	bpc = get_color_depth(pipe_ctx->stream_res.pix_clk_params.color_depth);
 	kbps = dc_bandwidth_in_kbps_from_timing(&pipe_ctx->stream->timing);
 
 	/*
@@ -3344,6 +3333,7 @@ void dc_link_disable_hpd(const struct dc_link *link)
 
 void dc_link_set_test_pattern(struct dc_link *link,
 			      enum dp_test_pattern test_pattern,
+			      enum dp_test_pattern_color_space test_pattern_color_space,
 			      const struct link_training_settings *p_link_settings,
 			      const unsigned char *p_custom_pattern,
 			      unsigned int cust_pattern_size)
@@ -3352,6 +3342,7 @@ void dc_link_set_test_pattern(struct dc_link *link,
 		dc_link_dp_set_test_pattern(
 			link,
 			test_pattern,
+			test_pattern_color_space,
 			p_link_settings,
 			p_custom_pattern,
 			cust_pattern_size);

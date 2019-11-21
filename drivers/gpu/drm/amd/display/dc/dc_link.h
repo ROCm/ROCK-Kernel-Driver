@@ -85,6 +85,7 @@ struct dc_link {
 	bool link_state_valid;
 	bool aux_access_disabled;
 	bool sync_lt_in_progress;
+	bool is_lttpr_mode_transparent;
 
 	/* caps is the same as reported_link_cap. link_traing use
 	 * reported_link_cap. Will clean up.  TODO
@@ -95,6 +96,7 @@ struct dc_link {
 	struct dc_lane_settings cur_lane_setting;
 	struct dc_link_settings preferred_link_setting;
 	struct dc_link_training_overrides preferred_training_settings;
+	struct dp_audio_test_data audio_test_data;
 
 	uint8_t ddc_hw_inst;
 
@@ -259,6 +261,7 @@ void dc_link_dp_disable_hpd(const struct dc_link *link);
 bool dc_link_dp_set_test_pattern(
 	struct dc_link *link,
 	enum dp_test_pattern test_pattern,
+	enum dp_test_pattern_color_space test_pattern_color_space,
 	const struct link_training_settings *p_link_settings,
 	const unsigned char *p_custom_pattern,
 	unsigned int cust_pattern_size);
@@ -290,6 +293,7 @@ void dc_link_enable_hpd(const struct dc_link *link);
 void dc_link_disable_hpd(const struct dc_link *link);
 void dc_link_set_test_pattern(struct dc_link *link,
 			enum dp_test_pattern test_pattern,
+			enum dp_test_pattern_color_space test_pattern_color_space,
 			const struct link_training_settings *p_link_settings,
 			const unsigned char *p_custom_pattern,
 			unsigned int cust_pattern_size);

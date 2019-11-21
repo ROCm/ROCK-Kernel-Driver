@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,33 +21,22 @@
  *
  */
 
-#include "kfd_kernel_queue.h"
+#ifndef __JPEG_V2_0_H__
+#define __JPEG_V2_0_H__
 
-static bool initialize_cik(struct kernel_queue *kq, struct kfd_dev *dev,
-			enum kfd_queue_type type, unsigned int queue_size);
-static void uninitialize_cik(struct kernel_queue *kq);
-static void submit_packet_cik(struct kernel_queue *kq);
+void jpeg_v2_0_dec_ring_insert_start(struct amdgpu_ring *ring);
+void jpeg_v2_0_dec_ring_insert_end(struct amdgpu_ring *ring);
+void jpeg_v2_0_dec_ring_emit_fence(struct amdgpu_ring *ring, u64 addr, u64 seq,
+				unsigned flags);
+void jpeg_v2_0_dec_ring_emit_ib(struct amdgpu_ring *ring, struct amdgpu_job *job,
+				struct amdgpu_ib *ib, uint32_t flags);
+void jpeg_v2_0_dec_ring_emit_reg_wait(struct amdgpu_ring *ring, uint32_t reg,
+				uint32_t val, uint32_t mask);
+void jpeg_v2_0_dec_ring_emit_vm_flush(struct amdgpu_ring *ring,
+				unsigned vmid, uint64_t pd_addr);
+void jpeg_v2_0_dec_ring_emit_wreg(struct amdgpu_ring *ring, uint32_t reg, uint32_t val);
+void jpeg_v2_0_dec_ring_nop(struct amdgpu_ring *ring, uint32_t count);
 
-void kernel_queue_init_cik(struct kernel_queue_ops *ops)
-{
-	ops->initialize = initialize_cik;
-	ops->uninitialize = uninitialize_cik;
-	ops->submit_packet = submit_packet_cik;
-}
+extern const struct amdgpu_ip_block_version jpeg_v2_0_ip_block;
 
-static bool initialize_cik(struct kernel_queue *kq, struct kfd_dev *dev,
-			enum kfd_queue_type type, unsigned int queue_size)
-{
-	return true;
-}
-
-static void uninitialize_cik(struct kernel_queue *kq)
-{
-}
-
-static void submit_packet_cik(struct kernel_queue *kq)
-{
-	*kq->wptr_kernel = kq->pending_wptr;
-	write_kernel_doorbell(kq->queue->properties.doorbell_ptr,
-				kq->pending_wptr);
-}
+#endif /* __JPEG_V2_0_H__ */

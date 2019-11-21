@@ -6,11 +6,11 @@ dnl #drm/amdkcl: [4.16] fix drm .last code, .output_poll_changed conflict
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_LASTCLOSE],[
 		AC_MSG_CHECKING([whether drm_fb_helper_lastclose() is available])
-		AC_KERNEL_TRY_COMPILE_SYMBOL([
+		AC_KERNEL_TRY_COMPILE([
 				#include <drm/drm_fb_helper.h>
 		], [
 				drm_fb_helper_lastclose(NULL);
-		], [drm_fb_helper_lastclose], [drivers/gpu/drm/drm_fb_helper.c], [
+		], [
 				AC_MSG_RESULT(yes)
 				AC_DEFINE(HAVE_DRM_FB_HELPER_LASTCLOSE, 1, [whether drm_fb_helper_lastclose() is available])
 		], [

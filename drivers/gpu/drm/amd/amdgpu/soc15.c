@@ -66,7 +66,9 @@
 #include "vce_v4_0.h"
 #include "vcn_v1_0.h"
 #include "vcn_v2_0.h"
+#include "jpeg_v2_0.h"
 #include "vcn_v2_5.h"
+#include "jpeg_v2_5.h"
 #include "dce_virtual.h"
 #include "mxgpu_ai.h"
 #include "amdgpu_smu.h"
@@ -362,19 +364,27 @@ static uint32_t soc15_read_indexed_register(struct amdgpu_device *adev, u32 se_n
 	return val;
 }
 
-static uint32_t soc15_get_register_value(struct amdgpu_device *adev,
+static int soc15_get_register_value(struct amdgpu_device *adev,
 					 bool indexed, u32 se_num,
-					 u32 sh_num, u32 reg_offset)
+					 u32 sh_num, u32 reg_offset,
+					 u32 *value)
 {
 	if (indexed) {
-		return soc15_read_indexed_register(adev, se_num, sh_num, reg_offset);
+		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+			return -EINVAL;
+	        *value = soc15_read_indexed_register(adev, se_num, sh_num, reg_offset);
 	} else {
-		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG))
-			return adev->gfx.config.gb_addr_config;
-		else if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmDB_DEBUG2))
-			return adev->gfx.config.db_debug2;
-		return RREG32(reg_offset);
+		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG)) {
+			*value = adev->gfx.config.gb_addr_config;
+		} else if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmDB_DEBUG2)) {
+			*value = adev->gfx.config.db_debug2;
+		} else {
+			if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+				return -EINVAL;
+			*value = RREG32(reg_offset);
+		}
 	}
+	return 0;
 }
 
 static int soc15_read_register(struct amdgpu_device *adev, u32 se_num,
@@ -390,10 +400,9 @@ static int soc15_read_register(struct amdgpu_device *adev, u32 se_num,
 					+ en->reg_offset))
 			continue;
 
-		*value = soc15_get_register_value(adev,
-						  soc15_allowed_read_registers[i].grbm_indexed,
-						  se_num, sh_num, reg_offset);
-		return 0;
+		return soc15_get_register_value(adev,
+						soc15_allowed_read_registers[i].grbm_indexed,
+						se_num, sh_num, reg_offset, value);
 	}
 	return -EINVAL;
 }
@@ -802,6 +811,7 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 
 		if (unlikely(adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT))
 			amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v2_5_ip_block);
 		break;
 	case CHIP_RENOIR:
 		amdgpu_device_ip_block_add(adev, &vega10_common_ip_block);
@@ -820,6 +830,7 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
                         amdgpu_device_ip_block_add(adev, &dm_ip_block);
 #endif
 		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v2_0_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -1207,7 +1218,9 @@ static int soc15_common_early_init(void *handle)
 			AMD_CG_SUPPORT_SDMA_LS |
 			AMD_CG_SUPPORT_MC_MGCG |
 			AMD_CG_SUPPORT_MC_LS |
-			AMD_CG_SUPPORT_IH_CG;
+			AMD_CG_SUPPORT_IH_CG |
+			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_JPEG_MGCG;
 		adev->pg_flags = 0;
 		adev->external_rev_id = adev->rev_id + 0x32;
 		break;
@@ -1228,12 +1241,14 @@ static int soc15_common_early_init(void *handle)
 				 AMD_CG_SUPPORT_HDP_LS |
 				 AMD_CG_SUPPORT_ROM_MGCG |
 				 AMD_CG_SUPPORT_VCN_MGCG |
+				 AMD_CG_SUPPORT_JPEG_MGCG |
 				 AMD_CG_SUPPORT_IH_CG |
 				 AMD_CG_SUPPORT_ATHUB_LS |
 				 AMD_CG_SUPPORT_ATHUB_MGCG |
 				 AMD_CG_SUPPORT_DF_MGCG;
 		adev->pg_flags = AMD_PG_SUPPORT_SDMA |
 				 AMD_PG_SUPPORT_VCN |
+				 AMD_PG_SUPPORT_JPEG |
 				 AMD_PG_SUPPORT_VCN_DPG;
 		adev->external_rev_id = adev->rev_id + 0x91;
 		break;

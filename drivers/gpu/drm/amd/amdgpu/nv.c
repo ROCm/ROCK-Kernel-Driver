@@ -51,6 +51,7 @@
 #include "gfx_v10_0.h"
 #include "sdma_v5_0.h"
 #include "vcn_v2_0.h"
+#include "jpeg_v2_0.h"
 #include "dce_virtual.h"
 #include "mes_v10_1.h"
 #include "mxgpu_nv.h"
@@ -200,17 +201,25 @@ static uint32_t nv_read_indexed_register(struct amdgpu_device *adev, u32 se_num,
 	return val;
 }
 
-static uint32_t nv_get_register_value(struct amdgpu_device *adev,
+static int nv_get_register_value(struct amdgpu_device *adev,
 				      bool indexed, u32 se_num,
-				      u32 sh_num, u32 reg_offset)
+				      u32 sh_num, u32 reg_offset,
+				      u32 *value)
 {
 	if (indexed) {
-		return nv_read_indexed_register(adev, se_num, sh_num, reg_offset);
+		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+			return -EINVAL;
+		*value = nv_read_indexed_register(adev, se_num, sh_num, reg_offset);
 	} else {
-		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG))
-			return adev->gfx.config.gb_addr_config;
-		return RREG32(reg_offset);
+		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG)) {
+			*value = adev->gfx.config.gb_addr_config;
+		} else {
+			if (adev->pm.pp_feature & PP_GFXOFF_MASK)
+				return -EINVAL;
+			*value = RREG32(reg_offset);
+		}
 	}
+	return 0;
 }
 
 static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
@@ -226,10 +235,9 @@ static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
 		    (adev->reg_offset[en->hwip][en->inst][en->seg] + en->reg_offset))
 			continue;
 
-		*value = nv_get_register_value(adev,
-					       nv_allowed_read_registers[i].grbm_indexed,
-					       se_num, sh_num, reg_offset);
-		return 0;
+		return nv_get_register_value(adev,
+					     nv_allowed_read_registers[i].grbm_indexed,
+					     se_num, sh_num, reg_offset, value);
 	}
 	return -EINVAL;
 }
@@ -455,6 +463,7 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 		    is_support_sw_smu(adev) && !amdgpu_sriov_vf(adev))
 			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
 		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v2_0_ip_block);
 		if (adev->enable_mes)
 			amdgpu_device_ip_block_add(adev, &mes_v10_1_ip_block);
 		break;
@@ -478,6 +487,7 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 		    is_support_sw_smu(adev) && !amdgpu_sriov_vf(adev))
 			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
 		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v2_0_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -635,10 +645,12 @@ static int nv_common_early_init(void *handle)
 			AMD_CG_SUPPORT_ATHUB_MGCG |
 			AMD_CG_SUPPORT_ATHUB_LS |
 			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_JPEG_MGCG |
 			AMD_CG_SUPPORT_BIF_MGCG |
 			AMD_CG_SUPPORT_BIF_LS;
 		adev->pg_flags = AMD_PG_SUPPORT_VCN |
 			AMD_PG_SUPPORT_VCN_DPG |
+			AMD_PG_SUPPORT_JPEG |
 			AMD_PG_SUPPORT_ATHUB;
 		adev->external_rev_id = adev->rev_id + 0x1;
 		break;
@@ -655,9 +667,11 @@ static int nv_common_early_init(void *handle)
 			AMD_CG_SUPPORT_ATHUB_MGCG |
 			AMD_CG_SUPPORT_ATHUB_LS |
 			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_JPEG_MGCG |
 			AMD_CG_SUPPORT_BIF_MGCG |
 			AMD_CG_SUPPORT_BIF_LS;
 		adev->pg_flags = AMD_PG_SUPPORT_VCN |
+			AMD_PG_SUPPORT_JPEG |
 			AMD_PG_SUPPORT_VCN_DPG;
 		adev->external_rev_id = adev->rev_id + 20;
 		break;
@@ -676,9 +690,11 @@ static int nv_common_early_init(void *handle)
 			AMD_CG_SUPPORT_MC_LS |
 			AMD_CG_SUPPORT_ATHUB_MGCG |
 			AMD_CG_SUPPORT_ATHUB_LS |
-			AMD_CG_SUPPORT_VCN_MGCG;
+			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_JPEG_MGCG;
 		adev->pg_flags = AMD_PG_SUPPORT_VCN |
 			AMD_PG_SUPPORT_VCN_DPG |
+			AMD_PG_SUPPORT_JPEG |
 			AMD_PG_SUPPORT_ATHUB;
 		adev->external_rev_id = adev->rev_id + 0xa;
 		break;

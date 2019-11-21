@@ -2,7 +2,7 @@
 #define AMDTTM_BACKPORT_H
 
 #include <linux/version.h>
-#include <kcl/kcl_drm_vma_manager.h>
+#include <kcl/kcl_drm_vma_manager_backport.h>
 #include <kcl/kcl_drm_backport.h>
 #include <kcl/kcl_mm_backport.h>
 #include <kcl/kcl_fence_backport.h>
@@ -11,5 +11,7 @@
 #include <kcl/kcl_mm_types.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_highmem_backport.h>
+#include <kcl/kcl_shrinker_backport.h>
+#include <kcl/kcl_dma_mapping.h>
 
 #endif

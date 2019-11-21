@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2014 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,59 +23,28 @@
 
 #include "kfd_kernel_queue.h"
 #include "kfd_device_queue_manager.h"
-#include "kfd_pm4_headers_ai.h"
+#include "kfd_pm4_headers_vi.h"
 #include "kfd_pm4_opcodes.h"
-#include "gc/gc_10_1_0_sh_mask.h"
 
-static bool initialize_v10(struct kernel_queue *kq, struct kfd_dev *dev,
-			enum kfd_queue_type type, unsigned int queue_size);
-static void uninitialize_v10(struct kernel_queue *kq);
-static void submit_packet_v10(struct kernel_queue *kq);
-
-void kernel_queue_init_v10(struct kernel_queue_ops *ops)
+unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size)
 {
-	ops->initialize = initialize_v10;
-	ops->uninitialize = uninitialize_v10;
-	ops->submit_packet = submit_packet_v10;
+	union PM4_MES_TYPE_3_HEADER header;
+
+	header.u32All = 0;
+	header.opcode = opcode;
+	header.count = packet_size / 4 - 2;
+	header.type = PM4_TYPE_3;
+
+	return header.u32All;
 }
 
-static bool initialize_v10(struct kernel_queue *kq, struct kfd_dev *dev,
-			enum kfd_queue_type type, unsigned int queue_size)
-{
-	int retval;
-
-	retval = kfd_gtt_sa_allocate(dev, PAGE_SIZE, &kq->eop_mem);
-	if (retval != 0)
-		return false;
-
-	kq->eop_gpu_addr = kq->eop_mem->gpu_addr;
-	kq->eop_kernel_addr = kq->eop_mem->cpu_ptr;
-
-	memset(kq->eop_kernel_addr, 0, PAGE_SIZE);
-
-	return true;
-}
-
-static void uninitialize_v10(struct kernel_queue *kq)
-{
-	kfd_gtt_sa_free(kq->dev, kq->eop_mem);
-}
-
-static void submit_packet_v10(struct kernel_queue *kq)
-{
-	*kq->wptr64_kernel = kq->pending_wptr64;
-	write_kernel_doorbell64(kq->queue->properties.doorbell_ptr,
-				kq->pending_wptr64);
-}
-
-static int pm_map_process_v10(struct packet_manager *pm,
-		uint32_t *buffer, struct qcm_process_device *qpd)
+static int pm_map_process_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct qcm_process_device *qpd)
 {
 	struct pm4_mes_map_process *packet;
-	uint64_t vm_page_table_base_addr = qpd->page_table_base;
-	struct kfd_dev *kfd = pm->dqm->dev;
 
 	packet = (struct pm4_mes_map_process *)buffer;
+
 	memset(buffer, 0, sizeof(struct pm4_mes_map_process));
 
 	packet->header.u32All = pm_build_pm4_header(IT_MAP_PROCESS,
@@ -83,46 +52,34 @@ static int pm_map_process_v10(struct packet_manager *pm,
 	packet->bitfields2.diq_enable = (qpd->is_debug) ? 1 : 0;
 	packet->bitfields2.process_quantum = 1;
 	packet->bitfields2.pasid = qpd->pqm->process->pasid;
-	packet->bitfields14.gds_size = qpd->gds_size;
-	packet->bitfields14.num_gws = qpd->num_gws;
-	packet->bitfields14.num_oac = qpd->num_oac;
-	packet->bitfields14.sdma_enable = 1;
-
-	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
-
-	if (kfd->dqm->trap_debug_vmid) {
-		packet->bitfields2.debug_vmid = kfd->dqm->trap_debug_vmid;
-		packet->bitfields2.new_debug = 1;
-	}
+	packet->bitfields3.page_table_base = qpd->page_table_base;
+	packet->bitfields10.gds_size = qpd->gds_size;
+	packet->bitfields10.num_gws = qpd->num_gws;
+	packet->bitfields10.num_oac = qpd->num_oac;
+	packet->bitfields10.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
 
 	packet->sh_mem_config = qpd->sh_mem_config;
 	packet->sh_mem_bases = qpd->sh_mem_bases;
-	if (qpd->tba_addr) {
-		packet->sq_shader_tba_lo = lower_32_bits(qpd->tba_addr >> 8);
-		packet->sq_shader_tba_hi = (1 << SQ_SHADER_TBA_HI__TRAP_EN__SHIFT) |
-			upper_32_bits(qpd->tba_addr >> 8);
-		packet->sq_shader_tma_lo = lower_32_bits(qpd->tma_addr >> 8);
-		packet->sq_shader_tma_hi = upper_32_bits(qpd->tma_addr >> 8);
-	}
+	packet->sh_mem_ape1_base = qpd->sh_mem_ape1_base;
+	packet->sh_mem_ape1_limit = qpd->sh_mem_ape1_limit;
+
+	packet->sh_hidden_private_base_vmid = qpd->sh_hidden_private_base;
 
 	packet->gds_addr_lo = lower_32_bits(qpd->gds_context_area);
 	packet->gds_addr_hi = upper_32_bits(qpd->gds_context_area);
 
-	packet->vm_context_page_table_base_addr_lo32 =
-			lower_32_bits(vm_page_table_base_addr);
-	packet->vm_context_page_table_base_addr_hi32 =
-			upper_32_bits(vm_page_table_base_addr);
-
 	return 0;
 }
 
-static int pm_runlist_v10(struct packet_manager *pm, uint32_t *buffer,
+static int pm_runlist_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t ib, size_t ib_size_in_dwords, bool chain)
 {
 	struct pm4_mes_runlist *packet;
-
 	int concurrent_proc_cnt = 0;
 	struct kfd_dev *kfd = pm->dqm->dev;
+
+	if (WARN_ON(!ib))
+		return -EFAULT;
 
 	/* Determine the number of processes to map together to HW:
 	 * it can not exceed the number of VMIDs available to the
@@ -136,7 +93,6 @@ static int pm_runlist_v10(struct packet_manager *pm, uint32_t *buffer,
 	concurrent_proc_cnt = min(pm->dqm->processes_count,
 			kfd->max_proc_per_quantum);
 
-
 	packet = (struct pm4_mes_runlist *)buffer;
 
 	memset(buffer, 0, sizeof(struct pm4_mes_runlist));
@@ -149,12 +105,40 @@ static int pm_runlist_v10(struct packet_manager *pm, uint32_t *buffer,
 	packet->bitfields4.valid = 1;
 	packet->bitfields4.process_cnt = concurrent_proc_cnt;
 	packet->ordinal2 = lower_32_bits(ib);
-	packet->ib_base_hi = upper_32_bits(ib);
+	packet->bitfields3.ib_base_hi = upper_32_bits(ib);
 
 	return 0;
 }
 
-static int pm_map_queues_v10(struct packet_manager *pm, uint32_t *buffer,
+int pm_set_resources_vi(struct packet_manager *pm, uint32_t *buffer,
+				struct scheduling_resources *res)
+{
+	struct pm4_mes_set_resources *packet;
+
+	packet = (struct pm4_mes_set_resources *)buffer;
+	memset(buffer, 0, sizeof(struct pm4_mes_set_resources));
+
+	packet->header.u32All = pm_build_pm4_header(IT_SET_RESOURCES,
+					sizeof(struct pm4_mes_set_resources));
+
+	packet->bitfields2.queue_type =
+			queue_type__mes_set_resources__hsa_interface_queue_hiq;
+	packet->bitfields2.vmid_mask = res->vmid_mask;
+	packet->bitfields2.unmap_latency = KFD_UNMAP_LATENCY_MS / 100;
+	packet->bitfields7.oac_mask = res->oac_mask;
+	packet->bitfields8.gds_heap_base = res->gds_heap_base;
+	packet->bitfields8.gds_heap_size = res->gds_heap_size;
+
+	packet->gws_mask_lo = lower_32_bits(res->gws_mask);
+	packet->gws_mask_hi = upper_32_bits(res->gws_mask);
+
+	packet->queue_mask_lo = lower_32_bits(res->queue_mask);
+	packet->queue_mask_hi = upper_32_bits(res->queue_mask);
+
+	return 0;
+}
+
+static int pm_map_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 		struct queue *q, bool is_static)
 {
 	struct pm4_mes_map_queues *packet;
@@ -191,7 +175,7 @@ static int pm_map_queues_v10(struct packet_manager *pm, uint32_t *buffer,
 		use_static = false; /* no static queues under SDMA */
 		break;
 	default:
-		WARN(1, "queue type %d\n", q->properties.type);
+		WARN(1, "queue type %d", q->properties.type);
 		return -EINVAL;
 	}
 	packet->bitfields3.doorbell_offset =
@@ -212,41 +196,7 @@ static int pm_map_queues_v10(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-static int pm_set_grace_period_v10(struct packet_manager *pm,
-					uint32_t *buffer,
-					uint32_t grace_period)
-{
-	struct pm4_mec_write_data_mmio *packet;
-	uint32_t reg_offset = 0;
-	uint32_t reg_data = 0;
-
-	pm->dqm->dev->kfd2kgd->build_grace_period_packet_info(
-			pm->dqm->dev->kgd,
-			pm->dqm->wait_times,
-			grace_period,
-			&reg_offset,
-			&reg_data);
-
-	if (grace_period == USE_DEFAULT_GRACE_PERIOD)
-		reg_data = pm->dqm->wait_times;
-
-	packet = (struct pm4_mec_write_data_mmio *)buffer;
-	memset(buffer, 0, sizeof(struct pm4_mec_write_data_mmio));
-
-	packet->header.u32All = pm_build_pm4_header(IT_WRITE_DATA,
-			sizeof(struct pm4_mec_write_data_mmio));
-
-	packet->bitfields2.dst_sel  = dst_sel___write_data__mem_mapped_register;
-	packet->bitfields2.addr_incr =
-		addr_incr___write_data__do_not_increment_address;
-
-	packet->bitfields3.dst_mmreg_addr = reg_offset;
-
-	packet->data = reg_data;
-
-	return 0;
-}
-static int pm_unmap_queues_v10(struct packet_manager *pm, uint32_t *buffer,
+static int pm_unmap_queues_vi(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter filter,
 			uint32_t filter_param, bool reset,
@@ -271,8 +221,8 @@ static int pm_unmap_queues_v10(struct packet_manager *pm, uint32_t *buffer,
 			engine_sel__mes_unmap_queues__sdma0 + sdma_engine;
 		break;
 	default:
-		WARN(1, "queue type %d\n", type);
-		break;
+		WARN(1, "queue type %d", type);
+		return -EINVAL;
 	}
 
 	if (reset)
@@ -304,22 +254,21 @@ static int pm_unmap_queues_v10(struct packet_manager *pm, uint32_t *buffer,
 			queue_sel__mes_unmap_queues__unmap_all_non_static_queues;
 		break;
 	default:
-		WARN(1, "filter %d\n", filter);
-		break;
+		WARN(1, "filter %d", filter);
+		return -EINVAL;
 	}
 
 	return 0;
 
 }
 
-static int pm_query_status_v10(struct packet_manager *pm, uint32_t *buffer,
+static int pm_query_status_vi(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint32_t fence_value)
 {
 	struct pm4_mes_query_status *packet;
 
 	packet = (struct pm4_mes_query_status *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mes_query_status));
-
 
 	packet->header.u32All = pm_build_pm4_header(IT_QUERY_STATUS,
 					sizeof(struct pm4_mes_query_status));
@@ -338,22 +287,50 @@ static int pm_query_status_v10(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-const struct packet_manager_funcs kfd_v10_pm_funcs = {
-	.map_process		= pm_map_process_v10,
-	.runlist		= pm_runlist_v10,
+static int pm_release_mem_vi(uint64_t gpu_addr, uint32_t *buffer)
+{
+	struct pm4_mec_release_mem *packet;
+
+	packet = (struct pm4_mec_release_mem *)buffer;
+	memset(buffer, 0, sizeof(*packet));
+
+	packet->header.u32All = pm_build_pm4_header(IT_RELEASE_MEM,
+						 sizeof(*packet));
+
+	packet->bitfields2.event_type = CACHE_FLUSH_AND_INV_TS_EVENT;
+	packet->bitfields2.event_index = event_index___release_mem__end_of_pipe;
+	packet->bitfields2.tcl1_action_ena = 1;
+	packet->bitfields2.tc_action_ena = 1;
+	packet->bitfields2.cache_policy = cache_policy___release_mem__lru;
+	packet->bitfields2.atc = 0;
+
+	packet->bitfields3.data_sel = data_sel___release_mem__send_32_bit_low;
+	packet->bitfields3.int_sel =
+		int_sel___release_mem__send_interrupt_after_write_confirm;
+
+	packet->bitfields4.address_lo_32b = (gpu_addr & 0xffffffff) >> 2;
+	packet->address_hi = upper_32_bits(gpu_addr);
+
+	packet->data_lo = 0;
+
+	return 0;
+}
+
+const struct packet_manager_funcs kfd_vi_pm_funcs = {
+	.map_process		= pm_map_process_vi,
+	.runlist		= pm_runlist_vi,
 	.set_resources		= pm_set_resources_vi,
-	.map_queues		= pm_map_queues_v10,
-	.unmap_queues		= pm_unmap_queues_v10,
-	.set_grace_period	= pm_set_grace_period_v10,
-	.query_status		= pm_query_status_v10,
-	.release_mem		= NULL,
+	.map_queues		= pm_map_queues_vi,
+	.unmap_queues		= pm_unmap_queues_vi,
+	.set_grace_period       = NULL,
+	.query_status		= pm_query_status_vi,
+	.release_mem		= pm_release_mem_vi,
 	.map_process_size	= sizeof(struct pm4_mes_map_process),
 	.runlist_size		= sizeof(struct pm4_mes_runlist),
 	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
 	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
 	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
-	.set_grace_period_size	= sizeof(struct pm4_mec_write_data_mmio),
+	.set_grace_period_size  = 0,
 	.query_status_size	= sizeof(struct pm4_mes_query_status),
-	.release_mem_size	= 0,
+	.release_mem_size	= sizeof(struct pm4_mec_release_mem)
 };
-

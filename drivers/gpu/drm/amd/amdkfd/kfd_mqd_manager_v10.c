@@ -66,6 +66,12 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 		m->compute_static_thread_mgmt_se3);
 }
 
+static void set_priority(struct v10_compute_mqd *m, struct queue_properties *q)
+{
+	m->cp_hqd_pipe_priority = pipe_priority_map[q->priority];
+	m->cp_hqd_queue_priority = q->priority;
+}
+
 static struct kfd_mem_obj *allocate_mqd(struct kfd_dev *kfd,
 		struct queue_properties *q)
 {
@@ -108,9 +114,6 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 	m->cp_hqd_quantum = 1 << CP_HQD_QUANTUM__QUANTUM_EN__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			10 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
-
-	m->cp_hqd_pipe_priority = 1;
-	m->cp_hqd_queue_priority = 15;
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL) {
 		m->cp_hqd_aql_control =
@@ -208,11 +211,9 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_ctx_save_control = 0;
 
 	update_cu_mask(mm, mqd, q);
+	set_priority(m, q);
 
-	q->is_active = (q->queue_size > 0 &&
-			q->queue_address != 0 &&
-			q->queue_percent > 0 &&
-			!q->is_evicted);
+	q->is_active = QUEUE_IS_ACTIVE(*q);
 }
 
 static int destroy_mqd(struct mqd_manager *mm, void *mqd,
@@ -247,18 +248,22 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 {
 	struct v10_compute_mqd *m;
 
-	/* Control stack is located one page after MQD. */
-	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
-
 	m = get_mqd(mqd);
 
+	/* Control stack is written backwards, while workgroup context data
+	 * is written forwards. Both starts from m->cp_hqd_cntl_stack_size.
+	 * Current position is at m->cp_hqd_cntl_stack_offset and
+	 * m->cp_hqd_wg_state_offset, respectively.
+	 */
 	*ctl_stack_used_size = m->cp_hqd_cntl_stack_size -
 		m->cp_hqd_cntl_stack_offset;
 	*save_area_used_size = m->cp_hqd_wg_state_offset -
 		m->cp_hqd_cntl_stack_size;
 
-	if (copy_to_user(ctl_stack, mqd_ctl_stack, m->cp_hqd_cntl_stack_size))
-		return -EFAULT;
+	/* Control stack is not copied to user mode for GFXv10 because
+	 * it's part of the context save area that is already
+	 * accessible to user mode
+	 */
 
 	return 0;
 }
@@ -340,11 +345,7 @@ static void update_mqd_sdma(struct mqd_manager *mm, void *mqd,
 	m->sdma_queue_id = q->sdma_queue_id;
 	m->sdmax_rlcx_dummy_reg = SDMA_RLC_DUMMY_DEFAULT;
 
-
-	q->is_active = (q->queue_size > 0 &&
-			q->queue_address != 0 &&
-			q->queue_percent > 0 &&
-			!q->is_evicted);
+	q->is_active = QUEUE_IS_ACTIVE(*q);
 }
 
 /*
@@ -396,7 +397,7 @@ struct mqd_manager *mqd_manager_init_v10(enum KFD_MQD_TYPE type,
 	if (WARN_ON(type >= KFD_MQD_TYPE_MAX))
 		return NULL;
 
-	mqd = kzalloc(sizeof(*mqd), GFP_NOIO);
+	mqd = kzalloc(sizeof(*mqd), GFP_KERNEL);
 	if (!mqd)
 		return NULL;
 

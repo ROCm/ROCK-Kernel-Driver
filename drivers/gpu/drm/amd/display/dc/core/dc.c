@@ -70,7 +70,7 @@
 #define DC_LOGGER \
 	dc->ctx->logger
 
-const static char DC_BUILD_ID[] = "production-build";
+static const char DC_BUILD_ID[] = "production-build";
 
 /**
  * DOC: Overview
@@ -534,7 +534,7 @@ void dc_stream_set_static_screen_events(struct dc *dc,
 	dc->hwss.set_static_screen_control(pipes_affected, num_pipes_affected, events);
 }
 
-static void destruct(struct dc *dc)
+static void dc_destruct(struct dc *dc)
 {
 	if (dc->current_state) {
 		dc_release_state(dc->current_state);
@@ -582,7 +582,7 @@ static void destruct(struct dc *dc)
 #endif
 }
 
-static bool construct(struct dc *dc,
+static bool dc_construct(struct dc *dc,
 		const struct dc_init_data *init_params)
 {
 	struct dc_context *dc_ctx;
@@ -738,7 +738,7 @@ static bool construct(struct dc *dc,
 
 fail:
 
-	destruct(dc);
+	dc_destruct(dc);
 	return false;
 }
 
@@ -810,7 +810,7 @@ struct dc *dc_create(const struct dc_init_data *init_params)
 	if (NULL == dc)
 		goto alloc_fail;
 
-	if (false == construct(dc, init_params))
+	if (false == dc_construct(dc, init_params))
 		goto construct_fail;
 
 	full_pipe_count = dc->res_pool->pipe_count;
@@ -867,7 +867,7 @@ void dc_deinit_callbacks(struct dc *dc)
 
 void dc_destroy(struct dc **dc)
 {
-	destruct(*dc);
+	dc_destruct(*dc);
 	kfree(*dc);
 	*dc = NULL;
 }
@@ -1488,11 +1488,6 @@ static enum surface_update_type get_plane_info_update_type(const struct dc_surfa
 		elevate_update_type(&update_type, UPDATE_TYPE_MED);
 	}
 
-	if (u->plane_info->sdr_white_level != u->surface->sdr_white_level) {
-		update_flags->bits.sdr_white_level = 1;
-		elevate_update_type(&update_type, UPDATE_TYPE_MED);
-	}
-
 	if (u->plane_info->dcc.enable != u->surface->dcc.enable
 			|| u->plane_info->dcc.independent_64b_blks != u->surface->dcc.independent_64b_blks
 			|| u->plane_info->dcc.meta_pitch != u->surface->dcc.meta_pitch) {
@@ -1510,7 +1505,6 @@ static enum surface_update_type get_plane_info_update_type(const struct dc_surfa
 	}
 
 	if (u->plane_info->plane_size.surface_pitch != u->surface->plane_size.surface_pitch
-			|| u->plane_info->plane_size.surface_pitch != u->surface->plane_size.surface_pitch
 			|| u->plane_info->plane_size.chroma_pitch != u->surface->plane_size.chroma_pitch) {
 		update_flags->bits.plane_size_change = 1;
 		elevate_update_type(&update_type, UPDATE_TYPE_MED);
@@ -1639,6 +1633,12 @@ static enum surface_update_type det_surface_update(const struct dc *dc,
 		if (dce_use_lut(format))
 			update_flags->bits.gamma_change = 1;
 	}
+
+	if (u->hdr_mult.value)
+		if (u->hdr_mult.value != u->surface->hdr_mult.value) {
+			update_flags->bits.hdr_mult = 1;
+			elevate_update_type(&overall_type, UPDATE_TYPE_MED);
+		}
 
 	if (update_flags->bits.in_transfer_func_change) {
 		type = UPDATE_TYPE_MED;
@@ -1823,8 +1823,6 @@ static void copy_surface_update_to_plane(
 				srf_update->plane_info->global_alpha_value;
 		surface->dcc =
 				srf_update->plane_info->dcc;
-		surface->sdr_white_level =
-				srf_update->plane_info->sdr_white_level;
 		surface->layer_index =
 				srf_update->plane_info->layer_index;
 	}
@@ -1869,6 +1867,10 @@ static void copy_surface_update_to_plane(
 			srf_update->lut3d_func))
 		memcpy(surface->lut3d_func, srf_update->lut3d_func,
 		sizeof(*surface->lut3d_func));
+
+	if (srf_update->hdr_mult.value)
+		surface->hdr_mult =
+				srf_update->hdr_mult;
 
 	if (srf_update->blend_tf &&
 			(surface->blend_tf !=
@@ -2200,8 +2202,24 @@ static void commit_planes_for_stream(struct dc *dc,
 		}
 	}
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-	if (dc->hwss.program_front_end_for_ctx && update_type != UPDATE_TYPE_FAST)
+	if (dc->hwss.program_front_end_for_ctx && update_type != UPDATE_TYPE_FAST) {
 		dc->hwss.program_front_end_for_ctx(dc, context);
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
+		if (dc->debug.validate_dml_output) {
+			for (i = 0; i < dc->res_pool->pipe_count; i++) {
+				struct pipe_ctx cur_pipe = context->res_ctx.pipe_ctx[i];
+				if (cur_pipe.stream == NULL)
+					continue;
+
+				cur_pipe.plane_res.hubp->funcs->validate_dml_output(
+						cur_pipe.plane_res.hubp, dc->ctx,
+						&context->res_ctx.pipe_ctx[i].rq_regs,
+						&context->res_ctx.pipe_ctx[i].dlg_regs,
+						&context->res_ctx.pipe_ctx[i].ttu_regs);
+			}
+		}
+#endif
+	}
 #endif
 
 	// Update Type FAST, Surface updates

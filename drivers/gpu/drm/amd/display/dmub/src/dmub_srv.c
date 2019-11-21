@@ -26,6 +26,8 @@
 #include "../inc/dmub_srv.h"
 #include "dmub_dcn20.h"
 #include "dmub_dcn21.h"
+#include "dmub_trace_buffer.h"
+#include "os_types.h"
 /*
  * Note: the DMUB service is standalone. No additional headers should be
  * added below or above this line unless they reside within the DMUB
@@ -44,8 +46,6 @@
 /* Mailbox size */
 #define DMUB_MAILBOX_SIZE (DMUB_RB_SIZE)
 
-/* Tracebuffer size */
-#define DMUB_TRACEBUFF_SIZE (1024) //1kB buffer
 
 /* Number of windows in use. */
 #define DMUB_NUM_WINDOWS (DMUB_WINDOW_5_TRACEBUFF + 1)
@@ -53,6 +53,7 @@
 
 #define DMUB_CW0_BASE (0x60000000)
 #define DMUB_CW1_BASE (0x61000000)
+#define DMUB_CW3_BASE (0x63000000)
 #define DMUB_CW5_BASE (0x65000000)
 
 static inline uint32_t dmub_align(uint32_t val, uint32_t factor)
@@ -76,6 +77,7 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 		funcs->set_inbox1_wptr = dmub_dcn20_set_inbox1_wptr;
 		funcs->is_supported = dmub_dcn20_is_supported;
 		funcs->is_phy_init = dmub_dcn20_is_phy_init;
+		funcs->is_hw_init = dmub_dcn20_is_hw_init;
 
 		if (asic == DMUB_ASIC_DCN21) {
 			funcs->backdoor_load = dmub_dcn21_backdoor_load;
@@ -180,7 +182,7 @@ dmub_srv_calc_region_info(struct dmub_srv *dmub,
 	mail->top = mail->base + DMUB_MAILBOX_SIZE;
 
 	trace_buff->base = dmub_align(mail->top, 256);
-	trace_buff->top = trace_buff->base + DMUB_TRACEBUFF_SIZE;
+	trace_buff->top = trace_buff->base + TRACE_BUF_SIZE;
 
 	out->fb_size = dmub_align(trace_buff->top, 4096);
 
@@ -234,6 +236,19 @@ enum dmub_status dmub_srv_has_hw_support(struct dmub_srv *dmub,
 	return DMUB_STATUS_OK;
 }
 
+enum dmub_status dmub_srv_is_hw_init(struct dmub_srv *dmub, bool *is_hw_init)
+{
+	*is_hw_init = false;
+
+	if (!dmub->sw_init)
+		return DMUB_STATUS_INVALID;
+
+	if (dmub->hw_funcs.is_hw_init)
+		*is_hw_init = dmub->hw_funcs.is_hw_init(dmub);
+
+	return DMUB_STATUS_OK;
+}
+
 enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 				  const struct dmub_srv_hw_params *params)
 {
@@ -264,7 +279,7 @@ enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 		cw1.region.base = DMUB_CW1_BASE;
 		cw1.region.top = cw1.region.base + stack_fb->size - 1;
 
-		if (dmub->hw_funcs.backdoor_load)
+		if (params->load_inst_const && dmub->hw_funcs.backdoor_load)
 			dmub->hw_funcs.backdoor_load(dmub, &cw0, &cw1);
 	}
 
@@ -277,7 +292,7 @@ enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 		cw2.region.top = cw2.region.base + data_fb->size;
 
 		cw3.offset.quad_part = bios_fb->gpu_addr;
-		cw3.region.base = DMUB_CW1_BASE + stack_fb->size;
+		cw3.region.base = DMUB_CW3_BASE;
 		cw3.region.top = cw3.region.base + bios_fb->size;
 
 		cw4.offset.quad_part = mail_fb->gpu_addr;
@@ -380,7 +395,7 @@ enum dmub_status dmub_srv_wait_for_auto_load(struct dmub_srv *dmub,
 enum dmub_status dmub_srv_wait_for_phy_init(struct dmub_srv *dmub,
 					    uint32_t timeout_us)
 {
-	uint32_t i;
+	uint32_t i = 0;
 
 	if (!dmub->hw_init || !dmub->hw_funcs.is_phy_init)
 		return DMUB_STATUS_INVALID;

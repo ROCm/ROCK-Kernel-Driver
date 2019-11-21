@@ -252,6 +252,8 @@ struct dmub_srv_hw_funcs {
 
 	bool (*is_supported)(struct dmub_srv *dmub);
 
+	bool (*is_hw_init)(struct dmub_srv *dmub);
+
 	bool (*is_phy_init)(struct dmub_srv *dmub);
 
 	bool (*is_auto_load_done)(struct dmub_srv *dmub);
@@ -279,12 +281,14 @@ struct dmub_srv_create_params {
  * @fb_base: base of the framebuffer aperture
  * @fb_offset: offset of the framebuffer aperture
  * @psp_version: psp version to pass for DMCU init
+ * @load_inst_const: true if DMUB should load inst const fw
  */
 struct dmub_srv_hw_params {
 	struct dmub_fb *fb[DMUB_WINDOW_TOTAL];
 	uint64_t fb_base;
 	uint64_t fb_offset;
 	uint32_t psp_version;
+	bool load_inst_const;
 };
 
 /**
@@ -381,6 +385,15 @@ enum dmub_status dmub_srv_has_hw_support(struct dmub_srv *dmub,
 					 bool *is_supported);
 
 /**
+ * dmub_srv_is_hw_init() - returns hardware init state
+ *
+ * Return:
+ *   DMUB_STATUS_OK - success
+ *   DMUB_STATUS_INVALID - unspecified error
+ */
+enum dmub_status dmub_srv_is_hw_init(struct dmub_srv *dmub, bool *is_hw_init);
+
+/**
  * dmub_srv_hw_init() - initializes the underlying DMUB hardware
  * @dmub: the dmub service
  * @params: params for hardware initialization
@@ -416,7 +429,7 @@ enum dmub_status dmub_srv_cmd_queue(struct dmub_srv *dmub,
  * dmub_srv_cmd_execute() - Executes a queued sequence to the dmub
  * @dmub: the dmub service
  *
- * Begins exeuction of queued commands on the dmub.
+ * Begins execution of queued commands on the dmub.
  *
  * Return:
  *   DMUB_STATUS_OK - success

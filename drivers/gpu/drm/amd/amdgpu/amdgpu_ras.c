@@ -1689,7 +1689,8 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev,
 	*supported = 0;
 
 	if (amdgpu_sriov_vf(adev) ||
-			adev->asic_type != CHIP_VEGA20)
+	    (adev->asic_type != CHIP_VEGA20 &&
+	     adev->asic_type != CHIP_ARCTURUS))
 		return;
 
 	if (adev->is_atom_fw &&

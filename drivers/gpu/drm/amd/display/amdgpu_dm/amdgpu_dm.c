@@ -43,6 +43,7 @@
 #include "amdgpu_dm.h"
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 #include "amdgpu_dm_hdcp.h"
+#include <drm/drm_hdcp.h>
 #endif
 #include "amdgpu_pm.h"
 
@@ -3972,12 +3973,26 @@ static void update_stream_scaling_settings(const struct drm_display_mode *mode,
 
 static enum dc_color_depth
 convert_color_depth_from_display_info(const struct drm_connector *connector,
-				      const struct drm_connector_state *state)
+				      const struct drm_connector_state *state,
+				      bool is_y420)
 {
-	uint8_t bpc = (uint8_t)connector->display_info.bpc;
+	uint8_t bpc;
 
-	/* Assume 8 bpc by default if no bpc is specified. */
-	bpc = bpc ? bpc : 8;
+	if (is_y420) {
+		bpc = 8;
+
+		/* Cap display bpc based on HDMI 2.0 HF-VSDB */
+		if (connector->display_info.hdmi.y420_dc_modes & DRM_EDID_YCBCR420_DC_48)
+			bpc = 16;
+		else if (connector->display_info.hdmi.y420_dc_modes & DRM_EDID_YCBCR420_DC_36)
+			bpc = 12;
+		else if (connector->display_info.hdmi.y420_dc_modes & DRM_EDID_YCBCR420_DC_30)
+			bpc = 10;
+	} else {
+		bpc = (uint8_t)connector->display_info.bpc;
+		/* Assume 8 bpc by default if no bpc is specified. */
+		bpc = bpc ? bpc : 8;
+	}
 
 	if (!state)
 		state = connector->state;
@@ -4166,7 +4181,8 @@ static void fill_stream_properties_from_drm_display_mode(
 
 	timing_out->timing_3d_format = TIMING_3D_FORMAT_NONE;
 	timing_out->display_color_depth = convert_color_depth_from_display_info(
-		connector, connector_state);
+		connector, connector_state,
+		(timing_out->pixel_encoding == PIXEL_ENCODING_YCBCR420));
 	timing_out->scan_type = SCANNING_TYPE_NODATA;
 	timing_out->hdmi_vic = 0;
 
@@ -5059,6 +5075,10 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		state->max_bpc = 8;
 #endif
 
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+		state->vcpi_slots = 0;
+		state->pbn = 0;
+#endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
 			state->abm_level = amdgpu_dm_abm_level;
 
@@ -5091,6 +5111,10 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	new_state->max_bpc = state->max_bpc;
 #endif
 
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+	new_state->vcpi_slots = state->vcpi_slots;
+	new_state->pbn = state->pbn;
+#endif
 	return &new_state->base;
 }
 
@@ -5382,10 +5406,72 @@ static void dm_encoder_helper_disable(struct drm_encoder *encoder)
 
 }
 
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+static int convert_dc_color_depth_into_bpc (enum dc_color_depth display_color_depth)
+{
+	switch (display_color_depth) {
+		case COLOR_DEPTH_666:
+			return 6;
+		case COLOR_DEPTH_888:
+			return 8;
+		case COLOR_DEPTH_101010:
+			return 10;
+		case COLOR_DEPTH_121212:
+			return 12;
+		case COLOR_DEPTH_141414:
+			return 14;
+		case COLOR_DEPTH_161616:
+			return 16;
+		default:
+			break;
+		}
+	return 0;
+}
+#endif
+
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
 					  struct drm_connector_state *conn_state)
 {
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+	struct drm_atomic_state *state = crtc_state->state;
+	struct drm_connector *connector = conn_state->connector;
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	struct dm_connector_state *dm_new_connector_state = to_dm_connector_state(conn_state);
+	const struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
+	struct drm_dp_mst_topology_mgr *mst_mgr;
+	struct drm_dp_mst_port *mst_port;
+	enum dc_color_depth color_depth;
+	int clock, bpp = 0;
+	bool is_y420 = false;
+
+	if (!aconnector->port || !aconnector->dc_sink)
+		return 0;
+
+	mst_port = aconnector->port;
+	mst_mgr = &aconnector->mst_port->mst_mgr;
+
+	if (!crtc_state->connectors_changed && !crtc_state->mode_changed)
+		return 0;
+
+	if (!state->duplicated) {
+		is_y420 = drm_mode_is_420_also(&connector->display_info, adjusted_mode) &&
+				aconnector->force_yuv420_output;
+		color_depth = convert_color_depth_from_display_info(connector, conn_state,
+								    is_y420);
+		bpp = convert_dc_color_depth_into_bpc(color_depth) * 3;
+		clock = adjusted_mode->clock;
+		dm_new_connector_state->pbn = drm_dp_calc_pbn_mode(clock, bpp);
+	}
+	dm_new_connector_state->vcpi_slots = drm_dp_atomic_find_vcpi_slots(state,
+									   mst_mgr,
+									   mst_port,
+									   dm_new_connector_state->pbn);
+	if (dm_new_connector_state->vcpi_slots < 0) {
+		DRM_DEBUG_ATOMIC("failed finding vcpi slots: %d\n", (int)dm_new_connector_state->vcpi_slots);
+		return dm_new_connector_state->vcpi_slots;
+	}
+#endif
 	return 0;
 }
 
@@ -6140,7 +6226,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.freesync_capable_property, 0);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 		if (adev->asic_type >= CHIP_RAVEN)
-			drm_connector_attach_content_protection_property(&aconnector->base, false);
+			drm_connector_attach_content_protection_property(&aconnector->base, true);
 #endif
 	}
 }
@@ -6391,6 +6477,12 @@ static bool is_content_protection_different(struct drm_connector_state *state,
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
+	if (old_state->hdcp_content_type != state->hdcp_content_type &&
+	    state->content_protection != DRM_MODE_CONTENT_PROTECTION_UNDESIRED) {
+		state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
+		return true;
+	}
+
 	/* CP is being re enabled, ignore this */
 	if (old_state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED &&
 	    state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED) {
@@ -6419,17 +6511,6 @@ static bool is_content_protection_different(struct drm_connector_state *state,
 	return false;
 }
 
-static void update_content_protection(struct drm_connector_state *state, const struct drm_connector *connector,
-				      struct hdcp_workqueue *hdcp_w)
-{
-	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
-
-	if (state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED)
-		hdcp_add_display(hdcp_w, aconnector->dc_link->link_index, aconnector);
-	else if (state->content_protection == DRM_MODE_CONTENT_PROTECTION_UNDESIRED)
-		hdcp_remove_display(hdcp_w, aconnector->dc_link->link_index, aconnector->base.index);
-
-}
 #endif
 static void remove_stream(struct amdgpu_device *adev,
 			  struct amdgpu_crtc *acrtc,
@@ -7522,7 +7603,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		}
 
 		if (is_content_protection_different(new_con_state, old_con_state, connector, adev->dm.hdcp_workqueue))
-			update_content_protection(new_con_state, connector, adev->dm.hdcp_workqueue);
+			hdcp_update_display(
+				adev->dm.hdcp_workqueue, aconnector->dc_link->link_index, aconnector,
+				new_con_state->hdcp_content_type,
+				new_con_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED ? true
+													 : false);
 	}
 #endif
 
@@ -8387,7 +8472,7 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 	int i, j, num_plane, ret = 0;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	struct dm_plane_state *new_dm_plane_state, *old_dm_plane_state;
-	struct drm_crtc *new_plane_crtc, *old_plane_crtc;
+	struct drm_crtc *new_plane_crtc;
 	struct drm_plane *plane;
 
 	struct drm_crtc *crtc;
@@ -8443,7 +8528,6 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 			uint64_t tiling_flags;
 
 			new_plane_crtc = new_plane_state->crtc;
-			old_plane_crtc = old_plane_state->crtc;
 			new_dm_plane_state = to_dm_plane_state(new_plane_state);
 			old_dm_plane_state = to_dm_plane_state(old_plane_state);
 
@@ -8753,6 +8837,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	ret = drm_atomic_helper_check_planes(dev, state);
 	if (ret)
 		goto fail;
+
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+	/* Perform validation of MST topology in the state*/
+	ret = drm_dp_mst_atomic_check(state);
+	if (ret)
+		goto fail;
+#endif
 
 #if defined(HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE)
 	if (state->legacy_cursor_update) {
