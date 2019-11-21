@@ -7,6 +7,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRIVER_ATOMIC], [
 	AC_MSG_CHECKING([whether DRIVER_ATOMIC is available])
         AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_drv.h>
         ], [
 		int test = DRIVER_ATOMIC;

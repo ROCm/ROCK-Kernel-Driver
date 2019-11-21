@@ -41,12 +41,15 @@
 #include <linux/kref.h>
 #include <linux/pid.h>
 #include <linux/interval_tree.h>
+#include <drm/drmP.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
 #ifdef HAVE_DRM_FILE_H
 #include <drm/drm_file.h>
 #endif
+#ifdef HAVE_DRM_DRV_H
 #include <drm/drm_drv.h>
+#endif
 #ifdef HAVE_DRM_DEVICE_H
 #include <drm/drm_device.h>
 #endif
