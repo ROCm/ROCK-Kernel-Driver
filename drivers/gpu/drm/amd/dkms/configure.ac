@@ -189,6 +189,7 @@ m4_include([m4/in-compat-syscall.m4])
 m4_include([m4/signal-h.m4])
 m4_include([m4/drm-dp-mst-topology-cbs.m4])
 m4_include([m4/config.m4])
+m4_include([m4/drm-fb-helper-ioctl.m4])
 
 
 AC_LANG(C)
