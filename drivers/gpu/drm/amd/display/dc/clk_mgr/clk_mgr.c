@@ -35,7 +35,9 @@
 #include "dcn10/rv1_clk_mgr.h"
 #include "dcn10/rv2_clk_mgr.h"
 #include "dcn20/dcn20_clk_mgr.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #include "dcn21/rn_clk_mgr.h"
+#endif
 
 
 int clk_mgr_helper_get_active_display_cnt(
@@ -130,12 +132,14 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			dce120_clk_mgr_construct(ctx, clk_mgr);
 		break;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case FAMILY_RV:
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 		if (ASICREV_IS_RENOIR(asic_id.hw_internal_rev)) {
 			rn_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			break;
 		}
+#endif	/* DCN2_1 */
 		if (ASICREV_IS_RAVEN2(asic_id.hw_internal_rev)) {
 			rv2_clk_mgr_construct(ctx, clk_mgr, pp_smu);
 			break;
@@ -146,11 +150,13 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			break;
 		}
 		break;
+#endif	/* Family RV */
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	case FAMILY_NV:
 		dcn20_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 		break;
-#endif	/* Family RV and NV*/
+#endif /* Family NV */
 
 	default:
 		ASSERT(0); /* Unknown Asic */

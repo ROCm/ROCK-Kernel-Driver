@@ -1494,7 +1494,9 @@ static enum dc_status enable_link_dp(
 	struct dc_link *link = stream->link;
 	struct dc_link_settings link_settings = {0};
 	enum dp_panel_mode panel_mode;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
+#endif
 	int i;
 	bool apply_seamless_boot_optimization = false;
 
@@ -1569,12 +1571,14 @@ static enum dc_status enable_link_dp(
 	else
 		status = DC_FAIL_DP_LINK_TRAINING;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable != NULL)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
 		fec_enable = true;
 
 	dp_set_fec_enable(link, fec_enable);
+#endif
 	return status;
 }
 
@@ -2197,12 +2201,14 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 			dp_disable_link_phy(link, signal);
 		else
 			dp_disable_link_phy_mst(link, signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 		if (dc_is_dp_sst_signal(signal) ||
 				link->mst_stream_alloc_table.stream_count == 0) {
 			dp_set_fec_enable(link, false);
 			dp_set_fec_ready(link, false);
 		}
+#endif
 	} else {
 		if (signal != SIGNAL_TYPE_VIRTUAL)
 			link->link_enc->funcs->disable_output(link->link_enc, signal);
@@ -2582,7 +2588,7 @@ bool dc_link_setup_psr(struct dc_link *link,
 
 	psr_context->psr_level.u32all = 0;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/*skip power down the single pipe since it blocks the cstate*/
 	if (ASICREV_IS_RAVEN(link->ctx->asic_id.hw_internal_rev))
 		psr_context->psr_level.bits.SKIP_CRTC_DISABLE = true;
@@ -3009,19 +3015,23 @@ void core_link_enable_stream(
 					CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
 					COLOR_DEPTH_UNDEFINED);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 					dc_is_virtual_signal(pipe_ctx->stream->signal))
 				dp_set_dsc_enable(pipe_ctx, true);
 		}
+#endif
 		core_dc->hwss.enable_stream(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* Set DPS PPS SDP (AKA "info frames") */
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 					dc_is_virtual_signal(pipe_ctx->stream->signal))
 				dp_set_dsc_pps_sdp(pipe_ctx, true);
 		}
+#endif
 
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_link_allocate_mst_payload(pipe_ctx);
@@ -3035,12 +3045,14 @@ void core_link_enable_stream(
 		update_psp_stream_config(pipe_ctx, false);
 #endif
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	else { // if (IS_FPGA_MAXIMUS_DC(core_dc->ctx->dce_environment))
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
 
 	}
+#endif
 }
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
@@ -3089,10 +3101,12 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 	core_dc->hwss.disable_stream(pipe_ctx);
 
 	disable_link(pipe_ctx->stream->link, pipe_ctx->stream->signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, false);
 	}
+#endif
 }
 
 void core_link_set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
@@ -3160,11 +3174,13 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC) {
 		kbps = (timing->pix_clk_100hz * timing->dsc_cfg.bits_per_pixel);
 		kbps = kbps / 160 + ((kbps % 160) ? 1 : 0);
 		return kbps;
 	}
+#endif
 
 	switch (timing->display_color_depth) {
 	case COLOR_DEPTH_666:
@@ -3342,6 +3358,7 @@ uint32_t dc_link_bandwidth_kbps(
 	link_bw_kbps *= 8;   /* 8 bits per byte*/
 	link_bw_kbps *= link_setting->lane_count;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
 		/* Account for FEC overhead.
 		 * We have to do it based on caps,
@@ -3366,6 +3383,7 @@ uint32_t dc_link_bandwidth_kbps(
 		link_bw_kbps = mul_u64_u32_shr(BIT_ULL(32) * 970LL / 1000,
 					       link_bw_kbps, 32);
 	}
+#endif
 
 	return link_bw_kbps;
 

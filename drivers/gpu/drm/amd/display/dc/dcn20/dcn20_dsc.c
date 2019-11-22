@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "reg_helper.h"
 #include "dcn20_dsc.h"
 #include "dsc/dscc_types.h"
@@ -211,11 +212,7 @@ static bool dsc2_get_packed_pps(struct display_stream_compressor *dsc, const str
 	DC_LOG_DSC("DSC Picture Parameter Set (PPS):");
 	is_config_ok = dsc_prepare_config(dsc_cfg, &dsc_reg_vals, &dsc_optc_cfg);
 	ASSERT(is_config_ok);
-#if defined(HAVE_DRM_DSC_PPS_PAYLOAD_PACK)
 	drm_dsc_pps_payload_pack((struct drm_dsc_picture_parameter_set *)dsc_packed_pps, &dsc_reg_vals.pps);
-#else
-	kcl_drm_dsc_pps_payload_pack((struct drm_dsc_picture_parameter_set *)dsc_packed_pps, &dsc_reg_vals.pps);
-#endif
 	dsc_log_pps(dsc, &dsc_reg_vals.pps);
 
 	return is_config_ok;
@@ -283,11 +280,7 @@ static void dsc_log_pps(struct display_stream_compressor *dsc, struct drm_dsc_co
 	DC_LOG_DSC("\tline_buf_depth %d", pps->line_buf_depth);
 	DC_LOG_DSC("\tblock_pred_enable %d", pps->block_pred_enable);
 	DC_LOG_DSC("\tconvert_rgb %d", pps->convert_rgb);
-#if defined(HAVE_DRM_DSC_CONFIG_RENAME_ENABLE422)
 	DC_LOG_DSC("\tsimple_422 %d", pps->simple_422);
-#else
-	DC_LOG_DSC("\tenable422 %d", pps->enable422);
-#endif
 	DC_LOG_DSC("\tvbr_enable %d", pps->vbr_enable);
 	DC_LOG_DSC("\tbits_per_pixel %d (%d.%04d)", bits_per_pixel, bits_per_pixel / 16, ((bits_per_pixel % 16) * 10000) / 16);
 	DC_LOG_DSC("\tpic_height %d", pps->pic_height);
@@ -395,11 +388,7 @@ static bool dsc_prepare_config(const struct dsc_config *dsc_cfg, struct dsc_reg_
 	dsc_reg_vals->pps.convert_rgb = dsc_reg_vals->pixel_format == DSC_PIXFMT_RGB ? 1 : 0;
 	dsc_reg_vals->pps.native_422 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_NATIVE_YCBCR422);
 	dsc_reg_vals->pps.native_420 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_NATIVE_YCBCR420);
-#if defined(HAVE_DRM_DSC_CONFIG_RENAME_ENABLE422)
 	dsc_reg_vals->pps.simple_422 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_SIMPLE_YCBCR422);
-#else
-	dsc_reg_vals->pps.enable422 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_SIMPLE_YCBCR422);
-#endif
 
 	if (dscc_compute_dsc_parameters(&dsc_reg_vals->pps, &dsc_params)) {
 		dm_output_to_console("%s: DSC config failed\n", __func__);
@@ -745,3 +734,4 @@ static void dsc_write_to_registers(struct display_stream_compressor *dsc, const 
 	}
 }
 
+#endif

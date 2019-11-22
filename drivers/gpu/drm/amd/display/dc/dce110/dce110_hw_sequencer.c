@@ -58,8 +58,6 @@
 
 #include "atomfirmware.h"
 
-#define GAMMA_HW_POINTS_NUM 256
-
 /*
  * All values are in milliseconds;
  * For eDP, after power-up/power/down,
@@ -267,7 +265,7 @@ static void build_prescale_params(struct ipp_prescale_params *prescale_params,
 }
 
 static bool
-dce110_set_input_transfer_func(struct dc *dc, struct pipe_ctx *pipe_ctx,
+dce110_set_input_transfer_func(struct pipe_ctx *pipe_ctx,
 			       const struct dc_plane_state *plane_state)
 {
 	struct input_pixel_processor *ipp = pipe_ctx->plane_res.ipp;
@@ -595,7 +593,7 @@ dce110_translate_regamma_to_hw_format(const struct dc_transfer_func *output_tf,
 }
 
 static bool
-dce110_set_output_transfer_func(struct dc *dc, struct pipe_ctx *pipe_ctx,
+dce110_set_output_transfer_func(struct pipe_ctx *pipe_ctx,
 				const struct dc_stream_state *stream)
 {
 	struct transform *xfm = pipe_ctx->plane_res.xfm;
@@ -1222,7 +1220,7 @@ static void program_scaler(const struct dc *dc,
 {
 	struct tg_color color = {0};
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* TOFPGA */
 	if (pipe_ctx->plane_res.xfm->funcs->transform_set_pixel_storage_depth == NULL)
 		return;
@@ -1321,7 +1319,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct drr_params params = {0};
 	unsigned int event_triggers = 0;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct pipe_ctx *odm_pipe = pipe_ctx->next_odm_pipe;
+#endif
 
 	if (dc->hwss.disable_stream_gating) {
 		dc->hwss.disable_stream_gating(dc, pipe_ctx);
@@ -1357,7 +1357,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		dc->hwss.enable_stream_timing(pipe_ctx, context, dc);
 
 	if (dc->hwss.setup_vupdate_interrupt)
-		dc->hwss.setup_vupdate_interrupt(dc, pipe_ctx);
+		dc->hwss.setup_vupdate_interrupt(pipe_ctx);
 
 	params.vertical_total_min = stream->adjust.v_total_min;
 	params.vertical_total_max = stream->adjust.v_total_max;
@@ -1387,6 +1387,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		pipe_ctx->stream_res.opp,
 		&stream->bit_depth_params,
 		&stream->clamping);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	while (odm_pipe) {
 		odm_pipe->stream_res.opp->funcs->opp_set_dyn_expansion(
 				odm_pipe->stream_res.opp,
@@ -1400,6 +1401,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 				&stream->clamping);
 		odm_pipe = odm_pipe->next_odm_pipe;
 	}
+#endif
 
 	if (!stream->dpms_off)
 		core_link_enable_stream(context, pipe_ctx);
@@ -2500,10 +2502,10 @@ static void dce110_program_front_end_for_pipe(
 	if (pipe_ctx->plane_state->update_flags.bits.full_update ||
 			pipe_ctx->plane_state->update_flags.bits.in_transfer_func_change ||
 			pipe_ctx->plane_state->update_flags.bits.gamma_change)
-		dc->hwss.set_input_transfer_func(dc, pipe_ctx, pipe_ctx->plane_state);
+		dc->hwss.set_input_transfer_func(pipe_ctx, pipe_ctx->plane_state);
 
 	if (pipe_ctx->plane_state->update_flags.bits.full_update)
-		dc->hwss.set_output_transfer_func(dc, pipe_ctx, pipe_ctx->stream);
+		dc->hwss.set_output_transfer_func(pipe_ctx, pipe_ctx->stream);
 
 	DC_LOG_SURFACE(
 			"Pipe:%d %p: addr hi:0x%x, "

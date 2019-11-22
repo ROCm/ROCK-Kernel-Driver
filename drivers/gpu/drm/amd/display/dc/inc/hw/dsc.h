@@ -22,6 +22,7 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef __DAL_DSC_H__
 #define __DAL_DSC_H__
 
@@ -96,4 +97,5 @@ struct dsc_funcs {
 	void (*dsc_disable)(struct display_stream_compressor *dsc);
 };
 
+#endif
 #endif

@@ -129,7 +129,9 @@ struct dc_link_training_overrides {
 	bool *alternate_scrambler_reset;
 	bool *enhanced_framing;
 	bool *mst_enable;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool *fec_enable;
+#endif
 };
 
 union dpcd_rev {
@@ -568,6 +570,7 @@ struct dp_audio_test_data {
 	uint8_t pattern_period[8];
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* FEC capability DPCD register field bits-*/
 union dpcd_fec_capability {
 	struct {
@@ -692,5 +695,6 @@ struct dpcd_dsc_capabilities {
 	union dpcd_dsc_ext_capabilities dsc_ext_caps;
 };
 
+#endif /* CONFIG_DRM_AMD_DC_DSC_SUPPORT */
 
 #endif /* DC_DP_TYPES_H */

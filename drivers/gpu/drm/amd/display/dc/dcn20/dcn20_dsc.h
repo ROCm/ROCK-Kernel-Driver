@@ -21,16 +21,13 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef __DCN20_DSC_H__
 #define __DCN20_DSC_H__
 
 #include "dsc.h"
 #include "dsc/dscc_types.h"
-#if defined(HAVE_DRM_DSC_H)
 #include <drm/drm_dsc.h>
-#else
-#include <kcl/kcl_drm_dsc.h>
-#endif
 
 #define TO_DCN20_DSC(dsc)\
 	container_of(dsc, struct dcn20_dsc, base)
@@ -575,3 +572,4 @@ void dsc2_construct(struct dcn20_dsc *dsc,
 
 #endif
 
+#endif
