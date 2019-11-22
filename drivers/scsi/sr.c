@@ -550,7 +550,7 @@ static int sr_block_open(struct block_device *bdev, fmode_t mode)
 	ret = __sr_block_open(bdev, mode);
 	scsi_autopm_put_device(sdev);
 
-	if (ret == -ERESTARTSYS)
+	if ((ret == -ERESTARTSYS) || (ret == -ENXIO))
 		scsi_cd_put(cd);
 
 	return ret;
