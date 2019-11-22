@@ -46,4 +46,15 @@ do {									\
 #define dev_err_ratelimited(dev, fmt, ...)				\
 	dev_level_ratelimited(dev_err, dev, fmt, ##__VA_ARGS__)
 #endif
+
+#if !defined(DRM_DEV_DEBUG)
+#define DRM_DEV_DEBUG(dev, fmt, ...)					\
+	DRM_DEBUG(fmt, ##__VA_ARGS__)
+#endif
+
+#if !defined(DRM_DEV_ERROR)
+#define DRM_DEV_ERROR(dev, fmt, ...)					\
+	DRM_ERROR(fmt, ##__VA_ARGS__)
+#endif
+
 #endif /* AMDKCL_DEVICE_H */
