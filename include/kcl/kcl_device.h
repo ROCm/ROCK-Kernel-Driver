@@ -2,7 +2,6 @@
 #define AMDKCL_DEVICE_H
 
 #include <linux/ratelimit.h>
-#include <drm/drmP.h>
 
 #if !defined(HAVE_KOBJ_TO_DEV)
 static inline struct device *kobj_to_dev(struct kobject *kobj)
@@ -56,11 +55,6 @@ do {									\
 #if !defined(DRM_DEV_ERROR)
 #define DRM_DEV_ERROR(dev, fmt, ...)					\
 	DRM_ERROR(fmt, ##__VA_ARGS__)
-#endif
-
-#if !defined(DRM_DEBUG_KMS)
-#define DRM_DEBUG_KMS(fmt, ...)					\
-	DRM_DEBUG(fmt, ##__VA_ARGS__)
 #endif
 
 #endif /* AMDKCL_DEVICE_H */

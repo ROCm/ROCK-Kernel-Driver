@@ -3,11 +3,8 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/byteorder/generic.h>
-#if defined(HAVE_DRM_PRINTER)
 #include <drm/drm_print.h>
-#endif
 #include <drm/drm_dp_helper.h>
-#include <kcl/kcl_device.h>
 #include <kcl/kcl_drm_dsc.h>
 #include <kcl/kcl_drm_dp_helper.h>
 #include "kcl_common.h"
