@@ -61,6 +61,58 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 }
 #endif
 
+#ifndef _DRM_PRINTK
+#define _DRM_PRINTK(once, level, fmt, ...)				\
+	do {								\
+		printk##once(KERN_##level "[" DRM_NAME "] " fmt,	\
+			     ##__VA_ARGS__);				\
+	} while (0)
+#endif
+
+#ifndef DRM_WARN
+#define DRM_WARN(fmt, ...)						\
+	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_WARN_ONCE
+#define DRM_WARN_ONCE(fmt, ...)						\
+	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_NOTE
+#define DRM_NOTE(fmt, ...)						\
+	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_NOTE_ONCE
+#define DRM_NOTE_ONCE(fmt, ...)						\
+	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_ERROR
+#define DRM_ERROR(fmt, ...)                                            \
+	drm_printk(KERN_ERR, DRM_UT_NONE, fmt,  ##__VA_ARGS__)
+#endif
+
+#if !defined(DRM_DEV_DEBUG)
+#define DRM_DEV_DEBUG(dev, fmt, ...)					\
+	DRM_DEBUG(fmt, ##__VA_ARGS__)
+#endif
+
+#if !defined(DRM_DEV_ERROR)
+#define DRM_DEV_ERROR(dev, fmt, ...)					\
+	DRM_ERROR(fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_DEBUG_VBL
+#define DRM_UT_VBL		0x20
+#define DRM_DEBUG_VBL(fmt, args...)					\
+	do {								\
+		if (unlikely(drm_debug & DRM_UT_VBL))			\
+			drm_ut_debug_printk(__func__, fmt, ##args);	\
+	} while (0)
+#endif
+
 #ifndef HAVE_DRM_DEBUG_ENABLED
 /* Copied from v5.3-rc1-708-gf0a8f533adc2 include/drm/drm_print.h */
 static  inline bool drm_debug_enabled(unsigned int category)
