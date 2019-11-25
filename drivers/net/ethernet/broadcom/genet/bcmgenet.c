@@ -3601,6 +3601,11 @@ static int bcmgenet_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void bcmgenet_shutdown(struct platform_device *pdev)
+{
+	bcmgenet_remove(pdev);
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int bcmgenet_resume(struct device *d)
 {
@@ -3720,6 +3725,7 @@ static SIMPLE_DEV_PM_OPS(bcmgenet_pm_ops, bcmgenet_suspend, bcmgenet_resume);
 static struct platform_driver bcmgenet_driver = {
 	.probe	= bcmgenet_probe,
 	.remove	= bcmgenet_remove,
+	.shutdown = bcmgenet_shutdown,
 	.driver	= {
 		.name	= "bcmgenet",
 		.of_match_table = bcmgenet_match,
