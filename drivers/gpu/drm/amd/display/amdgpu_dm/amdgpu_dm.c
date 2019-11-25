@@ -1857,9 +1857,11 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 #endif
 };
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
+#endif
 
 static void
 amdgpu_dm_update_connector_after_detect(struct amdgpu_dm_connector *aconnector)
@@ -2547,7 +2549,9 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev->ddev->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	adev->ddev->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
+#endif
 
 	adev->ddev->mode_config.max_width = 16384;
 	adev->ddev->mode_config.max_height = 16384;
