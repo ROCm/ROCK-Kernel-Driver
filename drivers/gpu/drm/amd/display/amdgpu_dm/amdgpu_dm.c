@@ -3568,6 +3568,14 @@ static int dm_early_init(void *handle)
 #define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
 #endif
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 2, 0)
+static inline bool
+drm_atomic_crtc_needs_modeset(struct drm_crtc_state *state)
+{
+	        return state->mode_changed || state->active_changed;
+}
+#endif
+
 static bool modeset_required(struct drm_crtc_state *crtc_state,
 			     struct dc_stream_state *new_stream,
 			     struct dc_stream_state *old_stream)
@@ -9195,7 +9203,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+				acrtc->base.state))
+#else
 				drm_atomic_get_new_crtc_state(state, &acrtc->base)))
+#endif
 			continue;
 
 		/* Skip any thing not scale or underscan changes */
