@@ -4367,9 +4367,13 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 int amdgpu_device_baco_enter(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 
 	if (!amdgpu_device_supports_baco(adev->ddev))
 		return -ENOTSUPP;
+
+	if (ras && ras->supported)
+		adev->nbio.funcs->enable_doorbell_interrupt(adev, false);
 
 	if (is_support_sw_smu(adev)) {
 		struct smu_context *smu = &adev->smu;
@@ -4378,8 +4382,6 @@ int amdgpu_device_baco_enter(struct drm_device *dev)
 		ret = smu_baco_enter(smu);
 		if (ret)
 			return ret;
-
-		return 0;
 	} else {
 		void *pp_handle = adev->powerplay.pp_handle;
 		const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
@@ -4390,14 +4392,15 @@ int amdgpu_device_baco_enter(struct drm_device *dev)
 		/* enter BACO state */
 		if (pp_funcs->set_asic_baco_state(pp_handle, 1))
 			return -EIO;
-
-		return 0;
 	}
+
+	return 0;
 }
 
 int amdgpu_device_baco_exit(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 
 	if (!amdgpu_device_supports_baco(adev->ddev))
 		return -ENOTSUPP;
@@ -4410,7 +4413,6 @@ int amdgpu_device_baco_exit(struct drm_device *dev)
 		if (ret)
 			return ret;
 
-		return 0;
 	} else {
 		void *pp_handle = adev->powerplay.pp_handle;
 		const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
@@ -4421,7 +4423,10 @@ int amdgpu_device_baco_exit(struct drm_device *dev)
 		/* exit BACO state */
 		if (pp_funcs->set_asic_baco_state(pp_handle, 0))
 			return -EIO;
-
-		return 0;
 	}
+
+	if (ras && ras->supported)
+		adev->nbio.funcs->enable_doorbell_interrupt(adev, true);
+
+	return 0;
 }
