@@ -2398,3 +2398,9 @@ int security_locked_down(enum lockdown_reason what)
 	return call_int_hook(locked_down, 0, what);
 }
 EXPORT_SYMBOL(security_locked_down);
+
+int security_lock_kernel_down(const char *where, enum lockdown_reason level)
+{
+	return call_int_hook(lock_kernel_down, 0, where, level);
+}
+EXPORT_SYMBOL(security_lock_kernel_down);
