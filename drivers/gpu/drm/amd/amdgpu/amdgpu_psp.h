@@ -94,9 +94,6 @@ struct psp_funcs
 			    enum psp_ring_type ring_type);
 	int (*ring_destroy)(struct psp_context *psp,
 			    enum psp_ring_type ring_type);
-	int (*cmd_submit)(struct psp_context *psp,
-			  uint64_t cmd_buf_mc_addr, uint64_t fence_mc_addr,
-			  int index);
 	bool (*compare_sram_data)(struct psp_context *psp,
 				  struct amdgpu_firmware_info *ucode,
 				  enum AMDGPU_UCODE_ID ucode_type);
@@ -116,6 +113,8 @@ struct psp_funcs
 	int (*mem_training_init)(struct psp_context *psp);
 	void (*mem_training_fini)(struct psp_context *psp);
 	int (*mem_training)(struct psp_context *psp, uint32_t ops);
+	uint32_t (*ring_get_wptr)(struct psp_context *psp);
+	void (*ring_set_wptr)(struct psp_context *psp, uint32_t value);
 };
 
 #define AMDGPU_XGMI_MAX_CONNECTED_NODES		64
@@ -300,8 +299,6 @@ struct amdgpu_psp_funcs {
 #define psp_ring_create(psp, type) (psp)->funcs->ring_create((psp), (type))
 #define psp_ring_stop(psp, type) (psp)->funcs->ring_stop((psp), (type))
 #define psp_ring_destroy(psp, type) ((psp)->funcs->ring_destroy((psp), (type)))
-#define psp_cmd_submit(psp, cmd_mc, fence_mc, index) \
-		(psp)->funcs->cmd_submit((psp), (cmd_mc), (fence_mc), (index))
 #define psp_compare_sram_data(psp, ucode, type) \
 		(psp)->funcs->compare_sram_data((psp), (ucode), (type))
 #define psp_init_microcode(psp) \
@@ -346,6 +343,9 @@ struct amdgpu_psp_funcs {
 	((psp)->funcs->ras_cure_posion ? \
 	(psp)->funcs->ras_cure_posion(psp, (addr)) : -EINVAL)
 
+#define psp_ring_get_wptr(psp) (psp)->funcs->ring_get_wptr((psp))
+#define psp_ring_set_wptr(psp, value) (psp)->funcs->ring_set_wptr((psp), (value))
+
 extern const struct amd_ip_funcs psp_ip_funcs;
 
 extern const struct amdgpu_ip_block_version psp_v3_1_ip_block;
@@ -372,4 +372,8 @@ int psp_rlc_autoload_start(struct psp_context *psp);
 extern const struct amdgpu_ip_block_version psp_v11_0_ip_block;
 int psp_reg_program(struct psp_context *psp, enum psp_reg_prog_id reg,
 		uint32_t value);
+int psp_ring_cmd_submit(struct psp_context *psp,
+			uint64_t cmd_buf_mc_addr,
+			uint64_t fence_mc_addr,
+			int index);
 #endif

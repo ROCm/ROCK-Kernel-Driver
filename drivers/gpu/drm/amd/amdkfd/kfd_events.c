@@ -23,9 +23,7 @@
 #include <linux/mm_types.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
-#endif
 #if defined(HAVE_SIGNAL_H)
 #include <linux/sched/signal.h>
 #endif

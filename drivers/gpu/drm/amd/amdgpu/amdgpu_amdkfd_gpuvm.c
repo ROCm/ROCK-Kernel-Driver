@@ -21,9 +21,7 @@
  */
 #include <linux/list.h>
 #include <linux/pagemap.h>
-#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
-#endif
 #include <linux/dma-buf.h>
 #include <drm/drmP.h>
 #include "amdgpu_object.h"

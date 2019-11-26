@@ -121,15 +121,9 @@ bool enqueue_ih_ring_entry(struct kfd_dev *kfd,	const void *ih_ring_entry)
 	count = kfifo_in(&kfd->ih_fifo, ih_ring_entry,
 				kfd->device_info->ih_ring_entry_size);
 	if (count != kfd->device_info->ih_ring_entry_size) {
-#ifndef HAVE_DEV_ERR_RATELIMITED
-		dev_err(kfd_chardev(),
-			"Interrupt ring overflow, dropping interrupt %d\n",
-			count);
-#else
 		dev_err_ratelimited(kfd_chardev(),
 			"Interrupt ring overflow, dropping interrupt %d\n",
 			count);
-#endif
 		return false;
 	}
 
@@ -158,7 +152,7 @@ static void interrupt_wq(struct work_struct *work)
 	uint32_t ih_ring_entry[KFD_MAX_RING_ENTRY_SIZE];
 
 	if (dev->device_info->ih_ring_entry_size > sizeof(ih_ring_entry)) {
-		dev_err(kfd_chardev(), "Ring entry too small\n");
+		dev_err_once(kfd_chardev(), "Ring entry too small\n");
 		return;
 	}
 

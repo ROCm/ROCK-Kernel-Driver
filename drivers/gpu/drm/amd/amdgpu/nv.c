@@ -39,6 +39,7 @@
 #include "gc/gc_10_1_0_sh_mask.h"
 #include "hdp/hdp_5_0_0_offset.h"
 #include "hdp/hdp_5_0_0_sh_mask.h"
+#include "smuio/smuio_11_0_0_offset.h"
 
 #include "soc15.h"
 #include "soc15_common.h"
@@ -156,8 +157,27 @@ static bool nv_read_disabled_bios(struct amdgpu_device *adev)
 static bool nv_read_bios_from_rom(struct amdgpu_device *adev,
 				  u8 *bios, u32 length_bytes)
 {
-	/* TODO: will implement it when SMU header is available */
-	return false;
+	u32 *dw_ptr;
+	u32 i, length_dw;
+
+	if (bios == NULL)
+		return false;
+	if (length_bytes == 0)
+		return false;
+	/* APU vbios image is part of sbios image */
+	if (adev->flags & AMD_IS_APU)
+		return false;
+
+	dw_ptr = (u32 *)bios;
+	length_dw = ALIGN(length_bytes, 4) / 4;
+
+	/* set rom index to 0 */
+	WREG32(SOC15_REG_OFFSET(SMUIO, 0, mmROM_INDEX), 0);
+	/* read out the rom data */
+	for (i = 0; i < length_dw; i++)
+		dw_ptr[i] = RREG32(SOC15_REG_OFFSET(SMUIO, 0, mmROM_DATA));
+
+	return true;
 }
 
 static struct soc15_allowed_register_entry nv_allowed_read_registers[] = {
@@ -201,25 +221,17 @@ static uint32_t nv_read_indexed_register(struct amdgpu_device *adev, u32 se_num,
 	return val;
 }
 
-static int nv_get_register_value(struct amdgpu_device *adev,
+static uint32_t nv_get_register_value(struct amdgpu_device *adev,
 				      bool indexed, u32 se_num,
-				      u32 sh_num, u32 reg_offset,
-				      u32 *value)
+				      u32 sh_num, u32 reg_offset)
 {
 	if (indexed) {
-		if (adev->pm.pp_feature & PP_GFXOFF_MASK)
-			return -EINVAL;
-		*value = nv_read_indexed_register(adev, se_num, sh_num, reg_offset);
+		return nv_read_indexed_register(adev, se_num, sh_num, reg_offset);
 	} else {
-		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG)) {
-			*value = adev->gfx.config.gb_addr_config;
-		} else {
-			if (adev->pm.pp_feature & PP_GFXOFF_MASK)
-				return -EINVAL;
-			*value = RREG32(reg_offset);
-		}
+		if (reg_offset == SOC15_REG_OFFSET(GC, 0, mmGB_ADDR_CONFIG))
+			return adev->gfx.config.gb_addr_config;
+		return RREG32(reg_offset);
 	}
-	return 0;
 }
 
 static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
@@ -235,9 +247,10 @@ static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
 		    (adev->reg_offset[en->hwip][en->inst][en->seg] + en->reg_offset))
 			continue;
 
-		return nv_get_register_value(adev,
-					     nv_allowed_read_registers[i].grbm_indexed,
-					     se_num, sh_num, reg_offset, value);
+		*value = nv_get_register_value(adev,
+					       nv_allowed_read_registers[i].grbm_indexed,
+					       se_num, sh_num, reg_offset);
+		return 0;
 	}
 	return -EINVAL;
 }
@@ -301,6 +314,16 @@ static int nv_asic_mode1_reset(struct amdgpu_device *adev)
 	return ret;
 }
 
+static bool nv_asic_supports_baco(struct amdgpu_device *adev)
+{
+	struct smu_context *smu = &adev->smu;
+
+	if (smu_baco_is_support(smu))
+		return true;
+	else
+		return false;
+}
+
 static enum amd_reset_method
 nv_asic_reset_method(struct amdgpu_device *adev)
 {
@@ -329,7 +352,12 @@ static int nv_asic_reset(struct amdgpu_device *adev)
 	if (nv_asic_reset_method(adev) == AMD_RESET_METHOD_BACO) {
 		if (!adev->in_suspend)
 			amdgpu_inc_vram_lost(adev);
-		ret = smu_baco_reset(smu);
+		ret = smu_baco_enter(smu);
+		if (ret)
+			return ret;
+		ret = smu_baco_exit(smu);
+		if (ret)
+			return ret;
 	} else {
 		if (!adev->in_suspend)
 			amdgpu_inc_vram_lost(adev);
@@ -606,6 +634,7 @@ static const struct amdgpu_asic_funcs nv_asic_funcs =
 	.get_pcie_usage = &nv_get_pcie_usage,
 	.need_reset_on_init = &nv_need_reset_on_init,
 	.get_pcie_replay_count = &nv_get_pcie_replay_count,
+	.supports_baco = &nv_asic_supports_baco,
 };
 
 static int nv_common_early_init(void *handle)

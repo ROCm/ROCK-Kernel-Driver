@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED],
 	[AC_MSG_CHECKING([whether drm_fb_helper_set_suspend_unlocked() is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_fb_helper.h>
 	],[
 		drm_fb_helper_set_suspend_unlocked(NULL,0);

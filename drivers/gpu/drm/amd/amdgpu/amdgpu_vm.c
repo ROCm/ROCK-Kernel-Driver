@@ -2752,6 +2752,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		goto error_free_direct;
 
 	vm->pte_support_ats = false;
+	vm->is_compute_context = false;
 
 	if (vm_context == AMDGPU_VM_CONTEXT_COMPUTE) {
 		vm->use_cpu_for_update = !!(adev->vm_manager.vm_update_mode &
@@ -2937,6 +2938,7 @@ int amdgpu_vm_make_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		vm->update_funcs = &amdgpu_vm_sdma_funcs;
 	dma_fence_put(vm->last_update);
 	vm->last_update = NULL;
+	vm->is_compute_context = true;
 
 	if (vm->pasid) {
 		unsigned long flags;
@@ -2991,6 +2993,7 @@ void amdgpu_vm_release_compute(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 		spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
 	}
 	vm->pasid = 0;
+	vm->is_compute_context = false;
 }
 
 /**
@@ -3245,11 +3248,20 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, unsigned int pasid,
 	flags = AMDGPU_PTE_VALID | AMDGPU_PTE_SNOOPED |
 		AMDGPU_PTE_SYSTEM;
 
-	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_NEVER) {
+	if (vm->is_compute_context) {
+		/* Intentionally setting invalid PTE flag
+		 * combination to force a no-retry-fault
+		 */
+		flags = AMDGPU_PTE_EXECUTABLE | AMDGPU_PDE_PTE |
+			AMDGPU_PTE_TF;
+		value = 0;
+
+	} else if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_NEVER) {
 		/* Redirect the access to the dummy page */
 		value = adev->dummy_page_addr;
 		flags |= AMDGPU_PTE_EXECUTABLE | AMDGPU_PTE_READABLE |
 			AMDGPU_PTE_WRITEABLE;
+
 	} else {
 		/* Let the hw retry silently on the PTE */
 		value = 0;

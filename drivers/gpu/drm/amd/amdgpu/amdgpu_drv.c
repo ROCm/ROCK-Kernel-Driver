@@ -1220,7 +1220,8 @@ static int amdgpu_pmops_resume(struct device *dev)
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
 	/* GPU comes up enabled by the bios on resume */
-	if (amdgpu_device_is_px(drm_dev)) {
+	if (amdgpu_device_supports_boco(drm_dev) ||
+	    amdgpu_device_supports_baco(drm_dev)) {
 		pm_runtime_disable(dev);
 		pm_runtime_set_active(dev);
 		pm_runtime_enable(dev);
@@ -1266,28 +1267,38 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct amdgpu_device *adev = drm_dev->dev_private;
 	int ret;
 
-	if (!amdgpu_device_is_px(drm_dev)) {
+	if (!adev->runpm) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}
 
-	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
+	if (amdgpu_device_supports_boco(drm_dev))
+		drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 	drm_kms_helper_poll_disable(drm_dev);
 #if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
  	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
 	ret = amdgpu_device_suspend(drm_dev, false, false);
-	pci_save_state(pdev);
-	pci_disable_device(pdev);
-	pci_ignore_hotplug(pdev);
-	if (amdgpu_is_atpx_hybrid())
-		pci_set_power_state(pdev, PCI_D3cold);
-	else if (!amdgpu_has_atpx_dgpu_power_cntl())
-		pci_set_power_state(pdev, PCI_D3hot);
-	drm_dev->switch_power_state = DRM_SWITCH_POWER_DYNAMIC_OFF;
+	if (amdgpu_device_supports_boco(drm_dev)) {
+		/* Only need to handle PCI state in the driver for ATPX
+		 * PCI core handles it for _PR3.
+		 */
+		if (amdgpu_is_atpx_hybrid()) {
+			pci_ignore_hotplug(pdev);
+		} else {
+			pci_save_state(pdev);
+			pci_disable_device(pdev);
+			pci_ignore_hotplug(pdev);
+			pci_set_power_state(pdev, PCI_D3cold);
+		}
+		drm_dev->switch_power_state = DRM_SWITCH_POWER_DYNAMIC_OFF;
+	} else if (amdgpu_device_supports_baco(drm_dev)) {
+		amdgpu_device_baco_enter(drm_dev);
+	}
 
 	return 0;
 }
@@ -1296,37 +1307,48 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+	struct amdgpu_device *adev = drm_dev->dev_private;
 	int ret;
 
-	if (!amdgpu_device_is_px(drm_dev))
+	if (!adev->runpm)
 		return -EINVAL;
 
-	drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
+	if (amdgpu_device_supports_boco(drm_dev)) {
+		drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
 
-	if (amdgpu_is_atpx_hybrid() ||
-	    !amdgpu_has_atpx_dgpu_power_cntl())
-		pci_set_power_state(pdev, PCI_D0);
-	pci_restore_state(pdev);
-	ret = pci_enable_device(pdev);
-	if (ret)
-		return ret;
-	pci_set_master(pdev);
-
+		/* Only need to handle PCI state in the driver for ATPX
+		 * PCI core handles it for _PR3.
+		 */
+		if (amdgpu_is_atpx_hybrid()) {
+			pci_set_master(pdev);
+		} else {
+			pci_set_power_state(pdev, PCI_D0);
+			pci_restore_state(pdev);
+			ret = pci_enable_device(pdev);
+			if (ret)
+				return ret;
+			pci_set_master(pdev);
+		}
+	} else if (amdgpu_device_supports_baco(drm_dev)) {
+		amdgpu_device_baco_exit(drm_dev);
+	}
 	ret = amdgpu_device_resume(drm_dev, false, false);
 	drm_kms_helper_poll_enable(drm_dev);
 #if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
-	drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
+	if (amdgpu_device_supports_boco(drm_dev))
+		drm_dev->switch_power_state = DRM_SWITCH_POWER_ON;
 	return 0;
 }
 
 static int amdgpu_pmops_runtime_idle(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_dev->dev_private;
 	struct drm_crtc *crtc;
 
-	if (!amdgpu_device_is_px(drm_dev)) {
+	if (!adev->runpm) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}

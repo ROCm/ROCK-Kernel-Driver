@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_CFB_XX],
 	[AC_MSG_CHECKING([whether drm_fb_helper_cfb_{fillrect/copyarea/imageblit}() is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_fb_helper.h>
 	],[
 		drm_fb_helper_cfb_fillrect(NULL,NULL);

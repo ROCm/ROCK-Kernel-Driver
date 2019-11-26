@@ -26,9 +26,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
-#if defined(HAVE_MM_H)
 #include <linux/sched/mm.h>
-#endif
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
@@ -2812,14 +2810,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 						 &args->data3);
 		break;
 	case KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT:
-		r = pqm_get_queue_snapshot(&p->pqm, args->data1,
+		r = pqm_get_queue_snapshot(&target->pqm, args->data1,
 					   (void __user *)args->ptr,
 					   args->data2);
 
-		if (r > 0) {
-			args->data2 = r;
+		args->data2 = r < 0 ? 0 : r;
+		if (r > 0)
 			r = 0;
-		}
 
 		break;
 	case KFD_IOC_DBG_TRAP_GET_VERSION:

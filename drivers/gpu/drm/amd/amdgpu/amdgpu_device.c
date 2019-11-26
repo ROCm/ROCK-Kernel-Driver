@@ -142,20 +142,35 @@ static DEVICE_ATTR(pcie_replay_count, S_IRUGO,
 static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev);
 
 /**
- * amdgpu_device_is_px - Is the device is a dGPU with HG/PX power control
+ * amdgpu_device_supports_boco - Is the device a dGPU with HG/PX power control
  *
  * @dev: drm_device pointer
  *
  * Returns true if the device is a dGPU with HG/PX power control,
  * otherwise return false.
  */
-bool amdgpu_device_is_px(struct drm_device *dev)
+bool amdgpu_device_supports_boco(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = dev->dev_private;
 
 	if (adev->flags & AMD_IS_PX)
 		return true;
 	return false;
+}
+
+/**
+ * amdgpu_device_supports_baco - Does the device support BACO
+ *
+ * @dev: drm_device pointer
+ *
+ * Returns true if the device supporte BACO,
+ * otherwise return false.
+ */
+bool amdgpu_device_supports_baco(struct drm_device *dev)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+
+	return amdgpu_asic_supports_baco(adev);
 }
 
 /**
@@ -1106,7 +1121,7 @@ static void amdgpu_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
 
-	if (amdgpu_device_is_px(dev) && state == VGA_SWITCHEROO_OFF)
+	if (amdgpu_device_supports_boco(dev) && state == VGA_SWITCHEROO_OFF)
 		return;
 
 	if (state == VGA_SWITCHEROO_ON) {
@@ -2767,7 +2782,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		       uint32_t flags)
 {
 	int r, i;
-	bool runtime = false;
+	bool boco = false;
 	u32 max_MBps;
 
 	adev->shutdown = false;
@@ -2937,14 +2952,21 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 * ignore it */
 	vga_client_register(adev->pdev, adev, NULL, amdgpu_device_vga_set_decode);
 
-	if (amdgpu_device_is_px(ddev))
-		runtime = true;
+	if (amdgpu_device_supports_boco(ddev))
+		boco = true;
 #if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
-	if (!pci_is_thunderbolt_attached(adev->pdev))
+	if (amdgpu_has_atpx() &&
+	    (amdgpu_is_atpx_hybrid() ||
+	     amdgpu_has_atpx_dgpu_power_cntl()) &&
+	    !pci_is_thunderbolt_attached(adev->pdev))
+#else
+	if (amdgpu_has_atpx() &&
+	    (amdgpu_is_atpx_hybrid() ||
+	     amdgpu_has_atpx_dgpu_power_cntl()))
 #endif
 		vga_switcheroo_register_client(adev->pdev,
-					       &amdgpu_switcheroo_ops, runtime);
-	if (runtime)
+					       &amdgpu_switcheroo_ops, boco);
+	if (boco)
 		vga_switcheroo_init_domain_pm_ops(adev->dev, &adev->vga_pm_domain);
 
 	if (amdgpu_emu_mode == 1) {
@@ -3128,7 +3150,7 @@ fence_driver_init:
 
 failed:
 	amdgpu_vf_error_trans_all(adev);
-	if (runtime)
+	if (boco)
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
 
 	return r;
@@ -3147,9 +3169,8 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	int r;
 
 	DRM_INFO("amdgpu: finishing device.\n");
-	adev->shutdown = true;
-
 	flush_delayed_work(&adev->delayed_init_work);
+	adev->shutdown = true;
 
 	/* disable all interrupts */
 	amdgpu_irq_disable_all(adev);
@@ -3170,7 +3191,6 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 		adev->firmware.gpu_info_fw = NULL;
 	}
 	adev->accel_working = false;
-	cancel_delayed_work_sync(&adev->delayed_init_work);
 	/* free i2c buses */
 	if (!amdgpu_device_has_dc_support(adev))
 		amdgpu_i2c_fini(adev);
@@ -3181,10 +3201,17 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	kfree(adev->bios);
 	adev->bios = NULL;
 #if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
-	if (!pci_is_thunderbolt_attached(adev->pdev))
+	if (amdgpu_has_atpx() &&
+	    (amdgpu_is_atpx_hybrid() ||
+	     amdgpu_has_atpx_dgpu_power_cntl()) &&
+	    !pci_is_thunderbolt_attached(adev->pdev))
+#else
+	if (amdgpu_has_atpx() &&
+	    (amdgpu_is_atpx_hybrid() ||
+	     amdgpu_has_atpx_dgpu_power_cntl()))
 #endif
 		vga_switcheroo_unregister_client(adev->pdev);
-	if (adev->flags & AMD_IS_PX)
+	if (amdgpu_device_supports_boco(adev->ddev))
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
 	vga_client_register(adev->pdev, NULL, NULL, NULL);
 	if (adev->rio_mem)
@@ -4366,4 +4393,66 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 		adev->gmc.real_vram_size == adev->gmc.visible_vram_size &&
 		!(adev->gmc.aper_base & address_mask ||
 		  aper_limit & address_mask);
+}
+
+int amdgpu_device_baco_enter(struct drm_device *dev)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (!amdgpu_device_supports_baco(adev->ddev))
+		return -ENOTSUPP;
+
+	if (is_support_sw_smu(adev)) {
+		struct smu_context *smu = &adev->smu;
+		int ret;
+
+		ret = smu_baco_enter(smu);
+		if (ret)
+			return ret;
+
+		return 0;
+	} else {
+		void *pp_handle = adev->powerplay.pp_handle;
+		const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+
+		if (!pp_funcs ||!pp_funcs->get_asic_baco_state ||!pp_funcs->set_asic_baco_state)
+			return -ENOENT;
+
+		/* enter BACO state */
+		if (pp_funcs->set_asic_baco_state(pp_handle, 1))
+			return -EIO;
+
+		return 0;
+	}
+}
+
+int amdgpu_device_baco_exit(struct drm_device *dev)
+{
+	struct amdgpu_device *adev = dev->dev_private;
+
+	if (!amdgpu_device_supports_baco(adev->ddev))
+		return -ENOTSUPP;
+
+	if (is_support_sw_smu(adev)) {
+		struct smu_context *smu = &adev->smu;
+		int ret;
+
+		ret = smu_baco_exit(smu);
+		if (ret)
+			return ret;
+
+		return 0;
+	} else {
+		void *pp_handle = adev->powerplay.pp_handle;
+		const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+
+		if (!pp_funcs ||!pp_funcs->get_asic_baco_state ||!pp_funcs->set_asic_baco_state)
+			return -ENOENT;
+
+		/* exit BACO state */
+		if (pp_funcs->set_asic_baco_state(pp_handle, 0))
+			return -EIO;
+
+		return 0;
+	}
 }

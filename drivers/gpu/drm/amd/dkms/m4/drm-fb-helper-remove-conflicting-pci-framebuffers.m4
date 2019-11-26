@@ -7,6 +7,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS],
 	[AC_MSG_CHECKING([whether drm_fb_helper_remove_conflicting_pci_framebuffers() is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_fb_helper.h>
 	],[
 		drm_fb_helper_remove_conflicting_pci_framebuffers(NULL, 0, NULL);

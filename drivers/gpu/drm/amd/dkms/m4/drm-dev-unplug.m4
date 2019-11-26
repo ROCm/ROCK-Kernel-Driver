@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DEV_UNPLUG],
 	[AC_MSG_CHECKING([whether drm_dev_unplug() is available])
 	AC_KERNEL_TRY_COMPILE_SYMBOL([
 		struct vm_area_struct;
+		#include <drm/drmP.h>
 		#include <drm/drm_drv.h>
 	],[
 		drm_dev_unplug(NULL);

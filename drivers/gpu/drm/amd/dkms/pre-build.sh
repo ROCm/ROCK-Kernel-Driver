@@ -34,8 +34,17 @@ done
 
 sed -i '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' amd/amdkcl/reservation.c
 sed -i '1i #include <kcl/kcl_reservation_backport.h>' include/linux/reservation.h
+sed -i '1i #include <kcl/kcl_fence_backport.h>' include/linux/reservation.h
 sed -i 's/linux\/dma-fence.h/kcl\/kcl_fence.h/' include/linux/reservation.h include/drm/gpu_scheduler.h
 sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' include/linux/reservation.h
+
+while read line; do
+	from_header=$(echo $line | cut -d ' ' -f 1)
+	to_header=$(echo $line | cut -d ' ' -f 2)
+	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/drm/* include/linux/* include/uapi/*`; do
+		sed -i "s|${from_header}|${to_header}|" $file
+	done
+done < amd/amdkcl/headers
 
 for file in $FILES; do
 	grep EXPORT_SYMBOL $file \

@@ -7,6 +7,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_MSG_CHECKING([whether drm_driver_feature DRIVER_ATOMIC is available])
         AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_drv.h>
         ], [
 		int _ = DRIVER_ATOMIC;
@@ -25,6 +26,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_MSG_CHECKING([whether drm_driver_feature DRIVER_SYNCOBJ_TIMELINE is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_drv.h>
 	],[
 		int _ = DRIVER_SYNCOBJ_TIMELINE;
@@ -43,6 +45,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_MSG_CHECKING([whether drm_driver_feature DRIVER_IRQ_SHARED is available])
 	AC_KERNEL_TRY_COMPILE([
+		#include <drm/drmP.h>
 		#include <drm/drm_drv.h>
 	],[
 		int _ = DRIVER_IRQ_SHARED;

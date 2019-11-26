@@ -6,4 +6,9 @@
 #define reservation_ww_class (*_kcl_reservation_ww_class)
 #define reservation_seqcount_class (*_kcl_reservation_seqcount_class)
 #define reservation_seqcount_string (_kcl_reservation_seqcount_string)
+
+#if !defined(smp_store_mb)
+#define smp_store_mb set_mb
+#endif
+
 #endif

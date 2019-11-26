@@ -78,9 +78,10 @@ static ssize_t kfd_dbg_ev_read(struct file *filep, char __user *user,
 
 	ret = kfifo_to_user(&dpd->fifo, user, size, &copied);
 
-	if (ret) {
-		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i)\n", ret);
-		return ret;
+	if (ret || !copied) {
+		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i) (%i)\n",
+								ret, copied);
+		return ret ? ret : -EAGAIN;
 	}
 
 	return copied;
@@ -119,10 +120,10 @@ uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
 	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
 				  q->properties.is_new);
 
-	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) {
-		q->properties.is_new = false;
+	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
 		q->properties.debug_event_type = 0;
-	}
+
+	q->properties.is_new = false;
 
 	return queue_status_word;
 }
