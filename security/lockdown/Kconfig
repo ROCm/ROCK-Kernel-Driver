@@ -16,6 +16,19 @@ config SECURITY_LOCKDOWN_LSM_EARLY
 	  subsystem is fully initialised. If enabled, lockdown will
 	  unconditionally be called before any other LSMs.
 
+config LOCK_DOWN_IN_EFI_SECURE_BOOT
+	bool "Lock down the kernel in EFI Secure Boot mode"
+	default n
+	depends on EFI && SECURITY_LOCKDOWN_LSM_EARLY
+	help
+	  UEFI Secure Boot provides a mechanism for ensuring that the firmware
+	  will only load signed bootloaders and kernels.  Secure boot mode may
+	  be determined from EFI variables provided by the system firmware if
+	  not indicated by the boot parameters.
+
+	  Enabling this option results in kernel lockdown being triggered if
+	  EFI Secure Boot is set.
+
 choice
 	prompt "Kernel default lockdown mode"
 	default LOCK_DOWN_KERNEL_FORCE_NONE
