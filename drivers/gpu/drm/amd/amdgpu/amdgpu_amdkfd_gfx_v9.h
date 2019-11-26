@@ -20,8 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-
 void kgd_gfx_v9_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
 		uint32_t sh_mem_config,
 		uint32_t sh_mem_ape1_base, uint32_t sh_mem_ape1_limit,
@@ -63,3 +61,20 @@ int kgd_gfx_v9_invalidate_tlbs(struct kgd_dev *kgd, uint16_t pasid);
 int kgd_gfx_v9_invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid);
 int kgd_gfx_v9_get_tile_config(struct kgd_dev *kgd,
 		struct tile_config *config);
+uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
+				      uint32_t trap_debug_wave_launch_mode,
+				      uint32_t vmid);
+uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd);
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						  uint32_t trap_override,
+						  uint32_t trap_mask);
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
+					 uint8_t wave_launch_mode,
+					 uint32_t vmid);
+void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd, uint32_t *wait_times);
+
+void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
+					       uint32_t wait_times,
+					       uint32_t grace_period,
+					       uint32_t *reg_offset,
+					       uint32_t *reg_data);

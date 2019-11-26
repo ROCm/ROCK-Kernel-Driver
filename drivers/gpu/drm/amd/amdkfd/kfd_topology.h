@@ -47,6 +47,11 @@
 #define HSA_CAP_DOORBELL_TYPE_1_0		0x1
 #define HSA_CAP_DOORBELL_TYPE_2_0		0x2
 #define HSA_CAP_AQL_QUEUE_DOUBLE_MAP		0x00004000
+#define HSA_CAP_TRAP_DEBUG_SUPPORT				0x00008000
+#define HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED	0x00010000
+#define HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED		0x00020000
+
+#define HSA_DBG_TRAP_DEBUG_TRAP_DATA_COUNT			0x00008000
 
 #define HSA_CAP_SRAM_EDCSUPPORTED		0x00080000
 #define HSA_CAP_MEM_EDCSUPPORTED		0x00100000
@@ -62,6 +67,7 @@ struct kfd_node_properties {
 	uint32_t cpu_core_id_base;
 	uint32_t simd_id_base;
 	uint32_t capability;
+	uint64_t debug_prop;
 	uint32_t max_waves_per_simd;
 	uint32_t lds_size_in_kb;
 	uint32_t gds_size_in_kb;
@@ -76,6 +82,7 @@ struct kfd_node_properties {
 	uint32_t vendor_id;
 	uint32_t device_id;
 	uint32_t location_id;
+	uint32_t domain;
 	uint32_t max_engine_clk_fcompute;
 	uint32_t max_engine_clk_ccompute;
 	int32_t  drm_render_minor;
@@ -104,7 +111,8 @@ struct kfd_mem_properties {
 	uint32_t		mem_clk_max;
 	struct kfd_dev		*gpu;
 	struct kobject		*kobj;
-	struct attribute	attr;
+	struct attribute	attr_props;
+	struct attribute	attr_used;
 };
 
 #define HSA_CACHE_TYPE_DATA		0x00000001

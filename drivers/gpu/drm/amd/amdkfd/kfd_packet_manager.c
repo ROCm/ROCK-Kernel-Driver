@@ -41,7 +41,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 				unsigned int *rlib_size,
 				bool *over_subscription)
 {
-	unsigned int process_count, queue_count, compute_queue_count;
+	unsigned int process_count, queue_count, compute_queue_count, gws_queue_count;
 	unsigned int map_queue_size;
 	unsigned int max_proc_per_quantum = 1;
 	struct kfd_dev *dev = pm->dqm->dev;
@@ -50,6 +50,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 	queue_count = pm->dqm->queue_count;
 	compute_queue_count = queue_count - pm->dqm->sdma_queue_count -
 				pm->dqm->xgmi_sdma_queue_count;
+	gws_queue_count = pm->dqm->gws_queue_count;
 
 	/* check if there is over subscription
 	 * Note: the arbitration between the number of VMIDs and
@@ -62,7 +63,8 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 		max_proc_per_quantum = dev->max_proc_per_quantum;
 
 	if ((process_count > max_proc_per_quantum) ||
-	    compute_queue_count > get_queues_num(pm->dqm)) {
+	    compute_queue_count > get_queues_num(pm->dqm) ||
+	    gws_queue_count > 1) {
 		*over_subscription = true;
 		pr_debug("Over subscribed runlist\n");
 	}
@@ -365,6 +367,38 @@ int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 		pm->priv_queue->ops.submit_packet(pm->priv_queue);
 	else
 		pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+
+out:
+	mutex_unlock(&pm->lock);
+	return retval;
+}
+
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period)
+{
+	int retval = 0;
+	uint32_t *buffer, size;
+
+	size = pm->pmf->set_grace_period_size;
+
+	mutex_lock(&pm->lock);
+
+	if (size) {
+		pm->priv_queue->ops.acquire_packet_buffer(pm->priv_queue,
+			size / sizeof(uint32_t),
+			(unsigned int **)&buffer);
+
+		if (!buffer) {
+			pr_err("Failed to allocate buffer on kernel queue\n");
+			retval = -ENOMEM;
+			goto out;
+		}
+
+		retval = pm->pmf->set_grace_period(pm, buffer, grace_period);
+		if (!retval)
+			pm->priv_queue->ops.submit_packet(pm->priv_queue);
+		else
+			pm->priv_queue->ops.rollback_packet(pm->priv_queue);
+	}
 
 out:
 	mutex_unlock(&pm->lock);

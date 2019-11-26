@@ -19,10 +19,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "amdgpu_amdkfd.h"
-#include "amd_shared.h"
-
+#include <linux/dma-buf.h>
 #include "amdgpu.h"
 #include "amdgpu_gfx.h"
 #include "amdgpu_dma_buf.h"
@@ -30,12 +28,14 @@
 #include <linux/dma-buf.h>
 #include "amdgpu_xgmi.h"
 
-static const unsigned int compute_vmid_bitmap = 0xFF00;
+static unsigned int compute_vmid_bitmap = 0xFF00;
 
 /* Total memory size in system memory and all GPU VRAM. Used to
  * estimate worst case amount of memory to reserve for page tables
  */
 uint64_t amdgpu_amdkfd_total_mem_size;
+
+extern bool pcie_p2p;
 
 int amdgpu_amdkfd_init(void)
 {
@@ -217,9 +217,16 @@ int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev)
 void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	if (amdgpu_device_should_recover_gpu(adev))
 		amdgpu_device_gpu_recover(adev, NULL);
+}
+
+u32 pool_to_domain(enum kgd_memory_pool p)
+{
+	switch (p) {
+	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
+	default: return AMDGPU_GEM_DOMAIN_GTT;
+	}
 }
 
 int amdgpu_amdkfd_alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
@@ -379,13 +386,17 @@ uint32_t amdgpu_amdkfd_get_fw_version(struct kgd_dev *kgd,
 void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 				      struct kfd_local_mem_info *mem_info)
 {
+	uint64_t address_mask;
+	resource_size_t aper_limit;
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	uint64_t address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
+
+	address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
 					     ~((1ULL << 32) - 1);
-	resource_size_t aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
+	aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
 
 	memset(mem_info, 0, sizeof(*mem_info));
-	if (!(adev->gmc.aper_base & address_mask || aper_limit & address_mask)) {
+	if (pcie_p2p && !(adev->gmc.aper_base & address_mask ||
+			  aper_limit & address_mask)) {
 		mem_info->local_mem_size_public = adev->gmc.visible_vram_size;
 		mem_info->local_mem_size_private = adev->gmc.real_vram_size -
 				adev->gmc.visible_vram_size;
@@ -639,6 +650,11 @@ bool amdgpu_amdkfd_have_atomics_support(struct kgd_dev *kgd)
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 
 	return adev->have_atomics_support;
+}
+
+void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd)
+{
+	amdgpu_asic_flush_hdp((struct amdgpu_device *) kgd, NULL);
 }
 
 #ifndef CONFIG_HSA_AMD

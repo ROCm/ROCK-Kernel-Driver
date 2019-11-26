@@ -23,6 +23,7 @@
 
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu_amdkfd_gfx_v8.h"
 #include "gc/gc_9_0_offset.h"
 #include "gc/gc_9_0_sh_mask.h"
 #include "vega10_enum.h"
@@ -49,6 +50,12 @@ enum hqd_dequeue_request_type {
 	RESET_WAVES
 };
 
+static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
+	mmTCP_WATCH0_ADDR_H, mmTCP_WATCH0_ADDR_L, mmTCP_WATCH0_CNTL,
+	mmTCP_WATCH1_ADDR_H, mmTCP_WATCH1_ADDR_L, mmTCP_WATCH1_CNTL,
+	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
+	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
+};
 
 /* Because of REG_GET_FIELD() being used, we put this function in the
  * asic specific file.
@@ -231,6 +238,16 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 
 	pr_debug("RLC register offset for SDMA%d RLC%d: 0x%x\n", engine_id,
 			queue_id, retval);
+
+	return retval;
+}
+
+static uint32_t get_watch_base_addr(struct amdgpu_device *adev)
+{
+	uint32_t retval = SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) -
+			mmTCP_WATCH0_ADDR_H;
+
+	pr_debug("kfd: reg watch base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -714,6 +731,25 @@ int kgd_gfx_v9_invalidate_tlbs_vmid(struct kgd_dev *kgd, uint16_t vmid)
 
 int kgd_gfx_v9_address_watch_disable(struct kgd_dev *kgd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	unsigned int i;
+	uint32_t watch_base_addr;
+
+	cntl.u32All = 0;
+
+	cntl.bitfields.valid = 0;
+	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
+	cntl.bitfields.atc = 1;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	/* Turning off this address until we set all the registers */
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		WREG32(watch_base_addr +
+				watchRegs[i * ADDRESS_WATCH_REG_MAX +
+						ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -723,6 +759,32 @@ int kgd_gfx_v9_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	uint32_t watch_base_addr;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	cntl.u32All = cntl_val;
+
+	/* Turning off this watch point until we set all the registers */
+	cntl.bitfields.valid = 0;
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+			addr_hi);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+			addr_lo);
+
+	/* Enable the watch point */
+	cntl.bitfields.valid = 1;
+
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -755,7 +817,134 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
+	return get_watch_base_addr(get_amdgpu_device(kgd)) +
+		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
+}
+
+uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
+				uint32_t trap_debug_wave_launch_mode,
+				uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	uint32_t orig_wave_cntl_value;
+	uint32_t orig_stall_vmid;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
+							0,
+							mmSPI_GDBG_WAVE_CNTL));
+	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
+					SPI_GDBG_WAVE_CNTL,
+					STALL_VMID);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	data = 0;
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
 	return 0;
+}
+
+uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+						uint32_t trap_override,
+						uint32_t trap_mask)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	data = 0;
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		EXCP_EN, trap_mask);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
+		REPLACE, trap_override);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
+					uint8_t wave_launch_mode,
+					uint32_t vmid)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+	bool is_stall_mode;
+	bool is_mode_set;
+
+
+	is_stall_mode = (wave_launch_mode == 4);
+	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		VMID_MASK, is_mode_set ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
+		MODE, is_mode_set ? wave_launch_mode : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_VMID, is_stall_mode ? 1 << vmid : 0);
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
+		STALL_RA, is_stall_mode ? 1 : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
+/* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
+ * The values read are:
+ *     ib_offload_wait_time     -- Wait Count for Indirect Buffer Offloads.
+ *     atomic_offload_wait_time -- Wait Count for L2 and GDS Atomics Offloads.
+ *     wrm_offload_wait_time    -- Wait Count for WAIT_REG_MEM Offloads.
+ *     gws_wait_time            -- Wait Count for Global Wave Syncs.
+ *     que_sleep_wait_time      -- Wait Count for Dequeue Retry.
+ *     sch_wave_wait_time       -- Wait Count for Scheduling Wave Message.
+ *     sem_rearm_wait_time      -- Wait Count for Semaphore re-arm.
+ *     deq_retry_wait_time      -- Wait Count for Global Wave Syncs.
+ */
+void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd,
+					uint32_t *wait_times)
+
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	*wait_times = RREG32(SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2));
 }
 
 void kgd_gfx_v9_set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
@@ -783,6 +972,22 @@ void kgd_gfx_v9_set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmi
 	gfxhub_v1_0_setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
+void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
+		uint32_t wait_times,
+		uint32_t grace_period,
+		uint32_t *reg_offset,
+		uint32_t *reg_data)
+{
+	*reg_data = wait_times;
+
+	*reg_data = REG_SET_FIELD(*reg_data,
+			CP_IQ_WAIT_TIME2,
+			SCH_WAVE,
+			grace_period);
+
+	*reg_offset = mmCP_IQ_WAIT_TIME2;
+}
+
 const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.program_sh_mem_settings = kgd_gfx_v9_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_gfx_v9_set_pasid_vmid_mapping,
@@ -806,4 +1011,10 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.invalidate_tlbs = kgd_gfx_v9_invalidate_tlbs,
 	.invalidate_tlbs_vmid = kgd_gfx_v9_invalidate_tlbs_vmid,
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
+	.enable_debug_trap = kgd_gfx_v9_enable_debug_trap,
+	.disable_debug_trap = kgd_gfx_v9_disable_debug_trap,
+	.set_wave_launch_trap_override = kgd_gfx_v9_set_wave_launch_trap_override,
+	.set_wave_launch_mode = kgd_gfx_v9_set_wave_launch_mode,
+	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
+	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 };

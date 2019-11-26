@@ -31,6 +31,8 @@
 #include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/file.h>
+#include <asm/page.h>
+#include "kfd_ipc.h"
 #include "amdgpu_amdkfd.h"
 
 struct mm_struct;
@@ -39,6 +41,7 @@ struct mm_struct;
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
 #include "kfd_iommu.h"
+#include "kfd_trace.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -60,7 +63,8 @@ static struct workqueue_struct *kfd_process_wq;
  */
 static struct workqueue_struct *kfd_restore_wq;
 
-static struct kfd_process *find_process(const struct task_struct *thread);
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref);
 static void kfd_process_ref_release(struct kref *ref);
 static struct kfd_process *create_process(const struct task_struct *thread);
 static int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep);
@@ -181,9 +185,11 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	struct kgd_mem *mem = NULL;
 	int handle;
 	int err;
+	unsigned int mem_type;
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-						 pdd->vm, &mem, NULL, flags);
+						 pdd->vm, NULL, &mem, NULL,
+						 flags);
 	if (err)
 		goto err_alloc_mem;
 
@@ -197,12 +203,19 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 		goto sync_memory_failed;
 	}
 
+	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+			    KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
+
 	/* Create an obj handle so kfd_process_device_remove_obj_handle
 	 * will take care of the bo removal when the process finishes.
 	 * We do not need to take p->mutex, because the process is just
 	 * created and the ioctls have not had the chance to run.
 	 */
-	handle = kfd_process_device_create_obj_handle(pdd, mem);
+	handle = kfd_process_device_create_obj_handle(
+			pdd, mem, gpu_va, size, 0, mem_type, NULL);
 
 	if (handle < 0) {
 		err = handle;
@@ -285,7 +298,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	mutex_lock(&kfd_processes_mutex);
 
 	/* A prior open of /dev/kfd could have already created the process. */
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (process) {
 		pr_debug("Process already found\n");
 	} else {
@@ -340,7 +353,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 	if (thread->group_leader->mm != thread->mm)
 		return ERR_PTR(-EINVAL);
 
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (!process)
 		return ERR_PTR(-EINVAL);
 
@@ -359,13 +372,16 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 	return NULL;
 }
 
-static struct kfd_process *find_process(const struct task_struct *thread)
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref)
 {
 	struct kfd_process *p;
 	int idx;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
+	if (p && ref)
+		kref_get(&p->ref);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
@@ -376,17 +392,38 @@ void kfd_unref_process(struct kfd_process *p)
 	kref_put(&p->ref, kfd_process_ref_release);
 }
 
+/* This increments the process->ref counter. */
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
+{
+	struct task_struct *task = NULL;
+	struct kfd_process *p    = NULL;
+
+	if (!pid) {
+		task = current;
+		get_task_struct(task);
+	} else {
+		task = get_pid_task(pid, PIDTYPE_PID);
+	}
+
+	if (task) {
+		p = find_process(task, true);
+		put_task_struct(task);
+	}
+
+	return p;
+}
+
 static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 {
 	struct kfd_process *p = pdd->process;
-	void *mem;
+	struct kfd_bo *buf_obj;
 	int id;
 
 	/*
 	 * Remove all handles from idr and release appropriate
 	 * local memory object
 	 */
-	idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+	idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 		struct kfd_process_device *peer_pdd;
 
 		list_for_each_entry(peer_pdd, &p->per_device_data,
@@ -394,10 +431,12 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			if (!peer_pdd->vm)
 				continue;
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->kgd, mem, peer_pdd->vm);
+				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->vm);
 		}
 
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, mem);
+		run_rdma_free_callback(buf_obj);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd,
+						      buf_obj->mem);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }
@@ -436,6 +475,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		kfree(pdd->qpd.doorbell_bitmap);
 		idr_destroy(&pdd->alloc_idr);
+		mutex_destroy(&pdd->qpd.doorbell_lock);
 
 		kfree(pdd);
 	}
@@ -517,11 +557,18 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	/* Iterate over all process device data structures and if the
 	 * pdd is in debug mode, we should first force unregistration,
-	 * then we will be able to destroy the queues
+	 * then we will be able to destroy the queues. Also invalidate
+	 * doorbell_vma private data because the pdds are about to be
+	 * destroyed, which can race with the kfd_doorbell_close
+	 * vm_ops callback.
 	 */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct kfd_dev *dev = pdd->dev;
 
+		if (pdd->qpd.doorbell_vma)
+			pdd->qpd.doorbell_vma->vm_private_data = NULL;
+
+		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());
 		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
 			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
@@ -530,6 +577,22 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
+
+		/* New debugger for GFXv9 and later */
+		if (pdd->is_debugging_enabled) {
+			if (pdd->debug_trap_enabled) {
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				pdd->debug_trap_enabled = false;
+			}
+			if (pdd->trap_debug_wave_launch_mode != 0) {
+				dev->kfd2kgd->set_wave_launch_mode(
+					dev->kgd, 0,
+					dev->vm_info.last_vmid_kfd);
+				pdd->trap_debug_wave_launch_mode = 0;
+			}
+			release_debug_trap_vmid(dev->dqm);
+			pdd->is_debugging_enabled = false;
+		}
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
@@ -664,6 +727,11 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	hash_add_rcu(kfd_processes_table, &process->kfd_processes,
 			(uintptr_t)process->mm);
 
+	/* If PeerDirect interface was not detected try to detect it again
+	 * in case if network driver was loaded later.
+	 */
+	kfd_init_peer_direct();
+
 	return process;
 
 err_register_notifier:
@@ -748,9 +816,14 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->qpd.dqm = dev->dqm;
 	pdd->qpd.pqm = &p->pqm;
 	pdd->qpd.evicted = 0;
+	pdd->qpd.mapped_gws_queue = false;
+	mutex_init(&pdd->qpd.doorbell_lock);
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
+	pdd->is_debugging_enabled = false;
+	pdd->debug_trap_enabled = false;
+	pdd->trap_debug_wave_launch_mode = 0;
 	list_add(&pdd->per_device_list, &p->per_device_data);
 
 	/* Init idr used for memory handle translation */
@@ -877,9 +950,49 @@ bool kfd_has_process_device_data(struct kfd_process *p)
  * Assumes that the process lock is held.
  */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
-					void *mem)
+					void *mem, uint64_t start,
+					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
+					struct kfd_ipc_obj *ipc_obj)
 {
-	return idr_alloc(&pdd->alloc_idr, mem, 0, 0, GFP_KERNEL);
+	int handle;
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	buf_obj = kzalloc(sizeof(*buf_obj), GFP_KERNEL);
+
+	if (!buf_obj)
+		return -ENOMEM;
+
+	buf_obj->it.start = start;
+	buf_obj->it.last = start + length - 1;
+	interval_tree_insert(&buf_obj->it, &p->bo_interval_tree);
+
+	buf_obj->mem = mem;
+	buf_obj->dev = pdd->dev;
+	buf_obj->kfd_ipc_obj = ipc_obj;
+	buf_obj->cpuva = cpuva;
+	buf_obj->mem_type = mem_type;
+
+	INIT_LIST_HEAD(&buf_obj->cb_data_head);
+
+	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+
+	if (handle < 0)
+		kfree(buf_obj);
+
+	return handle;
+}
+
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle)
+{
+	if (handle < 0)
+		return NULL;
+
+	return (struct kfd_bo *)idr_find(&pdd->alloc_idr, handle);
 }
 
 /* Translate specific handle from process local memory idr
@@ -888,10 +1001,37 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle < 0)
-		return NULL;
+	struct kfd_bo *buf_obj;
 
-	return idr_find(&pdd->alloc_idr, handle);
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	return buf_obj->mem;
+}
+
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr)
+{
+	struct interval_tree_node *it_node;
+	struct kfd_bo *buf_obj;
+
+	it_node = interval_tree_iter_first(&p->bo_interval_tree,
+			start_addr, last_addr);
+	if (!it_node) {
+		pr_err("0x%llx-0x%llx does not relate to an existing buffer\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	if (interval_tree_iter_next(it_node, start_addr, last_addr)) {
+		pr_err("0x%llx-0x%llx spans more than a single BO\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	buf_obj = container_of(it_node, struct kfd_bo, it);
+
+	return buf_obj;
 }
 
 /* Remove specific handle from process local memory idr
@@ -900,8 +1040,24 @@ void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle >= 0)
-		idr_remove(&pdd->alloc_idr, handle);
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	if (handle < 0)
+		return;
+
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	if (buf_obj->kfd_ipc_obj)
+		ipc_obj_put(&buf_obj->kfd_ipc_obj);
+
+	idr_remove(&pdd->alloc_idr, handle);
+
+	interval_tree_remove(&buf_obj->it, &p->bo_interval_tree);
+
+	kfree(buf_obj);
 }
 
 /* This increments the process->ref counter. */
@@ -941,7 +1097,7 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
 	return p;
 }
 
-/* process_evict_queues - Evict all user queues of a process
+/* kfd_process_evict_queues - Evict all user queues of a process
  *
  * Eviction is reference-counted per process-device. This means multiple
  * evictions from different sources can be nested safely.
@@ -981,7 +1137,7 @@ fail:
 	return r;
 }
 
-/* process_restore_queues - Restore all user queues of a process */
+/* kfd_process_restore_queues - Restore all user queues of a process */
 int kfd_process_restore_queues(struct kfd_process *p)
 {
 	struct kfd_process_device *pdd;
@@ -1000,6 +1156,95 @@ int kfd_process_restore_queues(struct kfd_process *p)
 	return ret;
 }
 
+void kfd_process_schedule_restore(struct kfd_process *p)
+{
+	int ret;
+	unsigned long evicted_jiffies;
+	unsigned long delay_jiffies = msecs_to_jiffies(PROCESS_RESTORE_TIME_MS);
+
+	/* wait at least PROCESS_RESTORE_TIME_MS before attempting to restore
+	 */
+	evicted_jiffies = get_jiffies_64() - p->last_evict_timestamp;
+	if (delay_jiffies > evicted_jiffies)
+		delay_jiffies -= evicted_jiffies;
+	else
+		delay_jiffies = 0;
+
+	pr_debug("Process %d schedule restore work\n", p->pasid);
+	ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
+				delay_jiffies);
+	WARN(!ret, "Schedule restore work failed\n");
+}
+
+static void kfd_process_unmap_doorbells(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct mm_struct *mm = p->mm;
+
+	down_write(&mm->mmap_sem);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		kfd_doorbell_unmap(pdd);
+
+	up_write(&mm->mmap_sem);
+}
+
+int kfd_process_remap_doorbells_locked(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		ret = kfd_doorbell_remap(pdd);
+
+	return ret;
+}
+
+static int kfd_process_remap_doorbells(struct kfd_process *p)
+{
+	struct mm_struct *mm = p->mm;
+	int ret = 0;
+
+	down_write(&mm->mmap_sem);
+	ret = kfd_process_remap_doorbells_locked(p);
+	up_write(&mm->mmap_sem);
+
+	return ret;
+}
+
+/**
+ * kfd_process_unmap_doorbells_if_idle - Check if queues are active
+ *
+ * Returns true if queues are idle, and unmap doorbells.
+ * Returns false if queues are active
+ */
+static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	bool busy = false;
+
+	if (!keep_idle_process_evicted)
+		return false;
+
+	/* Unmap doorbell first to avoid race conditions. Otherwise while the
+	 * second queue is checked, the first queue may get more work, but we
+	 * won't detect that since it has been checked
+	 */
+	kfd_process_unmap_doorbells(p);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		busy = check_if_queues_active(pdd->qpd.dqm, &pdd->qpd);
+		if (busy)
+			break;
+	}
+
+	/* Remap doorbell if process queue is not idle */
+	if (busy)
+		kfd_process_remap_doorbells(p);
+
+	return !busy;
+}
+
 static void evict_process_worker(struct work_struct *work)
 {
 	int ret;
@@ -1012,6 +1257,7 @@ static void evict_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, eviction_work);
+	trace_kfd_evict_process_worker_start(p);
 	WARN_ONCE(p->last_eviction_seqno != p->ef->seqno,
 		  "Eviction fence mismatch\n");
 
@@ -1023,18 +1269,25 @@ static void evict_process_worker(struct work_struct *work)
 	 */
 	flush_delayed_work(&p->restore_work);
 
-	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
+	p->last_evict_timestamp = get_jiffies_64();
+
+	pr_info("Started evicting pasid 0x%x\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
-		queue_delayed_work(kfd_restore_wq, &p->restore_work,
-				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
 
-		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
+		if (!kfd_process_unmap_doorbells_if_idle(p))
+			kfd_process_schedule_restore(p);
+		else
+			pr_debug("Process %d queues idle, doorbell unmapped\n",
+				p->pasid);
+
+		pr_info("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
+	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
 }
 
 static void restore_process_worker(struct work_struct *work)
@@ -1049,7 +1302,8 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
+	trace_kfd_restore_process_worker_start(p);
+	pr_info("Started restoring pasid 0x%x\n", p->pasid);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -1065,17 +1319,22 @@ static void restore_process_worker(struct work_struct *work)
 	ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
 						     &p->ef);
 	if (ret) {
-		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
+		pr_info("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
+
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
-		WARN(!ret, "reschedule restore work failed\n");
+		WARN(!ret, "Reschedule restore work failed\n");
+		trace_kfd_restore_process_worker_end(p, ret ?
+					"Rescheduled restore" :
+					"Failed to reschedule restore");
 		return;
 	}
 
 	ret = kfd_process_restore_queues(p);
+	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
-		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
+		pr_info("Finished restoring pasid 0x%x\n", p->pasid);
 	else
 		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
 }

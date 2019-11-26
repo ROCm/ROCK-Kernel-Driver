@@ -138,6 +138,11 @@ int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
 void amdgpu_amdkfd_set_compute_idle(struct kgd_dev *kgd, bool idle);
 bool amdgpu_amdkfd_have_atomics_support(struct kgd_dev *kgd);
 
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+		uint64_t src_offset, struct kgd_mem *dst_mem,
+		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
+		uint64_t *actual_size);
+
 bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid);
 
 int amdgpu_amdkfd_pre_reset(struct amdgpu_device *adev);
@@ -212,7 +217,7 @@ void amdgpu_amdkfd_gpuvm_release_process_vm(struct kgd_dev *kgd, void *vm);
 uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *vm);
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
-		void *vm, struct kgd_mem **mem,
+		void *vm, struct sg_table *sg, struct kgd_mem **mem,
 		uint64_t *offset, uint32_t flags);
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 		struct kgd_dev *kgd, struct kgd_mem *mem);
@@ -230,14 +235,23 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info,
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 					      struct kfd_vm_fault_info *info);
 
+int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
+		struct kgd_mem *mem, uint64_t offset,
+		uint64_t size, struct sg_table **ret_sg);
+void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
+		struct kgd_mem *mem, struct sg_table *sg);
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 				      struct dma_buf *dmabuf,
 				      uint64_t va, void *vm,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset);
+int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
+				      struct kgd_mem *mem,
+				      struct dma_buf **dmabuf);
 
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
 void amdgpu_amdkfd_unreserve_memory_limit(struct amdgpu_bo *bo);
+void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
 
 /* KGD2KFD callbacks */
 int kgd2kfd_init(void);
