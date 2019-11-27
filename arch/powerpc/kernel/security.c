@@ -492,13 +492,24 @@ static int count_cache_flush_get(void *data, u64 *val)
 	return 0;
 }
 
+static int link_stack_flush_get(void *data, u64 *val)
+{
+	*val = link_stack_flush_enabled;
+
+	return 0;
+}
+
 DEFINE_SIMPLE_ATTRIBUTE(fops_count_cache_flush, count_cache_flush_get,
+			count_cache_flush_set, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(fops_link_stack_flush, link_stack_flush_get,
 			count_cache_flush_set, "%llu\n");
 
 static __init int count_cache_flush_debugfs_init(void)
 {
 	debugfs_create_file("count_cache_flush", 0600, powerpc_debugfs_root,
 			    NULL, &fops_count_cache_flush);
+	debugfs_create_file("link_stack_flush", 0600, powerpc_debugfs_root,
+			    NULL, &fops_link_stack_flush);
 	return 0;
 }
 device_initcall(count_cache_flush_debugfs_init);
