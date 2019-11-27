@@ -217,6 +217,7 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
 
 int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
 {
+	struct pci_host_bridge *bridge = pci_host_bridge_from_priv(pcie);
 	u32 value, pab_ctrl, type;
 	struct resource_entry *win;
 
@@ -275,7 +276,7 @@ int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
 	program_ib_windows(pcie, WIN_NUM_0, 0, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
 
 	/* Get the I/O and memory ranges from DT */
-	resource_list_for_each_entry(win, pcie->resources) {
+	resource_list_for_each_entry(win, &bridge->windows) {
 		if (resource_type(win->res) == IORESOURCE_MEM) {
 			type = MEM_WINDOW_TYPE;
 		} else if (resource_type(win->res) == IORESOURCE_IO) {
@@ -543,7 +544,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
 	struct pci_bus *child;
 	struct pci_host_bridge *bridge = pcie->bridge;
 	struct device *dev = &pcie->pdev->dev;
-	resource_size_t iobase;
 	int ret;
 
 	ret = mobiveil_pcie_parse_dt(pcie);
@@ -553,14 +553,12 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
 	}
 
 	/* parse the host bridge base addresses from the device tree file */
-	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-						    &bridge->windows, &iobase);
+	ret = pci_parse_request_of_pci_ranges(dev, &bridge->windows,
+					      &bridge->dma_ranges, NULL);
 	if (ret) {
 		dev_err(dev, "Getting bridge resources failed\n");
 		return ret;
 	}
-
-	pcie->resources = &bridge->windows;
 
 	/*
 	 * configure all inbound and outbound windows and prepare the RC for
@@ -577,10 +575,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
 		dev_err(dev, "Interrupt init failed\n");
 		return ret;
 	}
-
-	ret = devm_request_pci_bus_resources(dev, pcie->resources);
-	if (ret)
-		return ret;
 
 	/* Initialize bridge */
 	bridge->dev.parent = dev;

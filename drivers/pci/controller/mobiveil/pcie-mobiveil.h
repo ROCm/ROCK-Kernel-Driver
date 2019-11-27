@@ -165,7 +165,6 @@ struct mobiveil_pab_ops {
 
 struct mobiveil_pcie {
 	struct platform_device *pdev;
-	struct list_head *resources;
 	void __iomem *csr_axi_slave_base;	/* PAB registers base */
 	phys_addr_t pcie_reg_base;	/* Physical PCIe Controller Base */
 	void __iomem *apb_csr_base;	/* MSI register base */
