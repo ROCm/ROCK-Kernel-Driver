@@ -8922,7 +8922,11 @@ static int dm_update_plane_state(struct dc *dc,
 	} else { /* Add new planes */
 		struct dc_plane_state *dc_new_plane_state;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+		if (drm_atomic_plane_disabling(plane, old_plane_state))
+#else
 		if (drm_atomic_plane_disabling(plane->state, new_plane_state))
+#endif
 			return 0;
 
 		if (!new_plane_crtc)
