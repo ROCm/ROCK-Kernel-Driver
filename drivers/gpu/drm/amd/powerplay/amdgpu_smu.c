@@ -1192,10 +1192,9 @@ static int smu_free_memory_pool(struct smu_context *smu)
 {
 	struct smu_table_context *smu_table = &smu->smu_table;
 	struct smu_table *memory_pool = &smu_table->memory_pool;
-	int ret = 0;
 
 	if (memory_pool->size == SMU_MEMORY_POOL_SIZE_ZERO)
-		return ret;
+		return 0;
 
 	amdgpu_bo_free_kernel(&memory_pool->bo,
 			      &memory_pool->mc_address,
@@ -1203,7 +1202,7 @@ static int smu_free_memory_pool(struct smu_context *smu)
 
 	memset(memory_pool, 0, sizeof(struct smu_table));
 
-	return ret;
+	return 0;
 }
 
 static int smu_start_smc_engine(struct smu_context *smu)
@@ -1945,7 +1944,6 @@ int smu_write_watermarks_table(struct smu_context *smu)
 int smu_set_watermarks_for_clock_ranges(struct smu_context *smu,
 		struct dm_pp_wm_sets_with_clock_ranges_soc15 *clock_ranges)
 {
-	int ret = 0;
 	struct smu_table *watermarks = &smu->smu_table.tables[SMU_TABLE_WATERMARKS];
 	void *table = watermarks->cpu_addr;
 
@@ -1961,7 +1959,7 @@ int smu_set_watermarks_for_clock_ranges(struct smu_context *smu,
 
 	mutex_unlock(&smu->mutex);
 
-	return ret;
+	return 0;
 }
 
 const struct amd_ip_funcs smu_ip_funcs = {
