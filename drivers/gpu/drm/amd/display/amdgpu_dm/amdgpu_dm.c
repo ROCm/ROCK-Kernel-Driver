@@ -9059,7 +9059,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 				 struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	struct drm_crtc_commit *commit;
+#endif
 	long ret;
 
 	/*
@@ -9071,6 +9073,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	if (ret)
 		return ret;
 
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		spin_lock(&crtc->commit_lock);
 		commit = list_first_entry_or_null(&crtc->commit_list,
@@ -9098,6 +9101,9 @@ static int do_aquire_global_lock(struct drm_device *dev,
 
 		drm_crtc_commit_put(commit);
 	}
+#else
+	return 0;
+#endif
 
 	return ret < 0 ? ret : 0;
 }
