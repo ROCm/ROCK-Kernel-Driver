@@ -1649,7 +1649,12 @@ static int dm_suspend(void *handle)
 
 static struct amdgpu_dm_connector *
 amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+                                             struct drm_crtc *crtc,
+                                              bool from_state_var)
+#else
 					     struct drm_crtc *crtc)
+#endif
 {
 	uint32_t i;
 	struct drm_connector_state *new_con_state;
@@ -8548,8 +8553,11 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 	dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 	dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 	acrtc = to_amdgpu_crtc(crtc);
-	aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc);
-
+	aconnector = amdgpu_dm_find_first_crtc_matching_connector(state, crtc
+#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+								  , true
+#endif
+								  );
 	/* TODO This hack should go away */
 	if (aconnector && enable) {
 		/* Make sure fake sink is created in plug-in scenario */
