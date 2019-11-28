@@ -179,6 +179,7 @@ m4_include([m4/drm-probe-helper-h.m4])
 m4_include([m4/struct-name-cb-name-2args.m4])
 m4_include([m4/drm-drv-h.m4])
 m4_include([m4/drm-device-h.m4])
+m4_include([m4/drmp-h.m4])
 m4_include([m4/config.m4])
 
 
