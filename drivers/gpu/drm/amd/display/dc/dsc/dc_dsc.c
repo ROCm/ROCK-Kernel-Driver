@@ -22,6 +22,7 @@
  * Author: AMD
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dc_hw_types.h"
 #include "dsc.h"
 #include <drm/drm_dp_helper.h>
@@ -981,3 +982,4 @@ void dc_dsc_policy_set_max_target_bpp_limit(uint32_t limit)
 {
 	dsc_policy_max_target_bpp_limit = limit;
 }
+#endif /* CONFIG_DRM_AMD_DC_DSC_SUPPORT */

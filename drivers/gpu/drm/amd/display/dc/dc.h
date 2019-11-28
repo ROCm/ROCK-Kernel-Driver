@@ -120,14 +120,18 @@ struct dc_caps {
 	bool psp_setup_panel_mode;
 	bool extended_aux_timeout_support;
 	bool dmcub_support;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	bool hw_3d_lut;
+#endif
 	enum dp_protocol_version max_dp_protocol_version;
 	struct dc_plane_cap planes[MAX_PLANES];
 };
 
 struct dc_bug_wa {
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	bool no_connect_phy_config;
 	bool dedcn20_305_wa;
+#endif
 	bool skip_clock_update;
 	bool lt_early_cr_pattern;
 };
@@ -373,10 +377,12 @@ struct dc_debug_options {
 	bool disable_dfs_bypass;
 	bool disable_dpp_power_gate;
 	bool disable_hubp_power_gate;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_dsc_power_gate;
 	int dsc_min_slice_height_override;
 	int dsc_bpp_increment_div;
 	bool native422_support;
+#endif
 	bool disable_pplib_wm_range;
 	enum wm_report_mode pplib_wm_report_mode;
 	unsigned int min_disp_clk_khz;
@@ -416,7 +422,9 @@ struct dc_debug_options {
 	bool dmcub_emulation;
 	bool dmub_command_table; /* for testing only */
 	struct dc_bw_validation_profile bw_val_profile;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_fec;
+#endif
 #ifdef CONFIG_DRM_AMD_DC_DCN2_1
 	bool disable_48mhz_pwrdwn;
 #endif
@@ -425,7 +433,9 @@ struct dc_debug_options {
 	 */
 	unsigned int force_min_dcfclk_mhz;
 	bool disable_timing_sync;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	bool cm_in_bypass;
+#endif
 	int force_clock_mode;/*every mode change.*/
 
 	bool nv12_iflip_vm_wa;
@@ -442,6 +452,7 @@ struct dc_debug_data {
 	uint32_t auxErrorCount;
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 struct dc_phy_addr_space_config {
 	struct {
 		uint64_t start_addr;
@@ -472,6 +483,7 @@ struct dc_virtual_addr_space_config {
 	uint32_t	page_table_block_size_in_bytes;
 	uint8_t		page_table_depth; // 1 = 1 level, 2 = 2 level, etc.  0 = invalid
 };
+#endif
 
 struct dc_bounding_box_overrides {
 	int sr_exit_time_ns;
@@ -499,7 +511,9 @@ struct dc {
 	struct dc_bounding_box_overrides bb_overrides;
 	struct dc_bug_wa work_arounds;
 	struct dc_context *ctx;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	struct dc_phy_addr_space_config vm_pa_config;
+#endif
 
 	uint8_t link_count;
 	struct dc_link *links[MAX_PIPES * 2];
@@ -539,8 +553,10 @@ struct dc {
 	struct dpcd_vendor_signature vendor_signature;
 
 	const char *build_id;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	struct vm_helper *vm_helper;
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
+#endif
 };
 
 enum frame_buffer_mode {
@@ -578,11 +594,13 @@ struct dc_init_data {
 	struct dc_config flags;
 	uint64_t log_mask;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	/**
 	 * gpu_info FW provided soc bounding box struct or 0 if not
 	 * available in FW
 	 */
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
+#endif
 	struct dpcd_vendor_signature vendor_signature;
 };
 
@@ -598,9 +616,11 @@ struct dc *dc_create(const struct dc_init_data *init_params);
 void dc_hardware_init(struct dc *dc);
 
 int dc_get_vmid_use_vector(struct dc *dc);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 void dc_setup_vm_context(struct dc *dc, struct dc_virtual_addr_space_config *va_config, int vmid);
 /* Returns the number of vmids supported */
 int dc_setup_system_context(struct dc *dc, struct dc_phy_addr_space_config *pa_config);
+#endif
 void dc_init_callbacks(struct dc *dc,
 		const struct dc_callback_init *init_params);
 void dc_deinit_callbacks(struct dc *dc);
@@ -676,6 +696,7 @@ struct dc_transfer_func {
 	};
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 
 union dc_3dlut_state {
 	struct {
@@ -698,6 +719,7 @@ struct dc_3dlut {
 	union dc_3dlut_state state;
 	struct dc_context *ctx;
 };
+#endif
 /*
  * This structure is filled in by dc_surface_get_status and contains
  * the last requested address and the currently active address so the called
@@ -749,7 +771,9 @@ union surface_update_flags {
 struct dc_plane_state {
 	struct dc_plane_address address;
 	struct dc_plane_flip_time time;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	bool triplebuffer_flips;
+#endif
 	struct scaling_taps scaling_quality;
 	struct rect src_rect;
 	struct rect dst_rect;
@@ -773,9 +797,11 @@ struct dc_plane_state {
 
 	enum dc_color_space color_space;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct dc_3dlut *lut3d_func;
 	struct dc_transfer_func *in_shaper_func;
 	struct dc_transfer_func *blend_tf;
+#endif
 
 	enum surface_pixel_format format;
 	enum dc_rotation_angle rotation;
@@ -843,9 +869,11 @@ struct dc_surface_update {
 
 	const struct dc_csc_transform *input_csc_color_matrix;
 	const struct fixed31_32 *coeff_reduction_factor;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	const struct dc_transfer_func *func_shaper;
 	const struct dc_3dlut *lut3d_func;
 	const struct dc_transfer_func *blend_tf;
+#endif
 	const struct colorspace_transform *gamut_remap_matrix;
 };
 
@@ -867,9 +895,11 @@ void dc_transfer_func_retain(struct dc_transfer_func *dc_tf);
 void dc_transfer_func_release(struct dc_transfer_func *dc_tf);
 struct dc_transfer_func *dc_create_transfer_func(void);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 struct dc_3dlut *dc_create_3dlut_func(void);
 void dc_3dlut_func_release(struct dc_3dlut *lut);
 void dc_3dlut_func_retain(struct dc_3dlut *lut);
+#endif
 /*
  * This structure holds a surface address.  There could be multiple addresses
  * in cases such as Stereo 3D, Planar YUV, etc.  Other per-flip attributes such
@@ -989,8 +1019,10 @@ struct dpcd_caps {
 	bool panel_mode_edp;
 	bool dpcd_display_control_capable;
 	bool ext_receiver_cap_field_present;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	union dpcd_fec_capability fec_cap;
 	struct dpcd_dsc_capabilities dsc_caps;
+#endif
 	struct dc_lttpr_caps lttpr_caps;
 
 };
@@ -1056,12 +1088,14 @@ struct dc_container_id {
 };
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct dc_sink_dsc_caps {
 	// 'true' if these are virtual DPCD's DSC caps (immediately upstream of sink in MST topology),
 	// 'false' if they are sink's DSC caps
 	bool is_virtual_dpcd_dsc;
 	struct dsc_dec_dpcd_caps dsc_dec_caps;
 };
+#endif
 
 struct dc_sink_fec_caps {
 	bool is_rx_fec_supported;
@@ -1081,8 +1115,10 @@ struct dc_sink {
 	struct stereo_3d_features features_3d[TIMING_3D_FORMAT_MAX];
 	bool converter_disable_audio;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_sink_dsc_caps dsc_caps;
 	struct dc_sink_fec_caps fec_caps;
+#endif
 
 	bool is_vsc_sdp_colorimetry_supported;
 
@@ -1154,8 +1190,10 @@ bool dc_is_dmcu_initialized(struct dc *dc);
 
 enum dc_status dc_set_clock(struct dc *dc, enum dc_clock_type clock_type, uint32_t clk_khz, uint32_t stepping);
 void dc_get_clock(struct dc *dc, enum dc_clock_type clock_type, struct dc_clock_config *clock_cfg);
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 /*******************************************************************************
  * DSC Interfaces
  ******************************************************************************/
 #include "dc_dsc.h"
+#endif
 #endif /* DC_INTERFACE_H_ */

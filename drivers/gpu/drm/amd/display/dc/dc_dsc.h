@@ -1,3 +1,4 @@
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef DC_DSC_H_
 #define DC_DSC_H_
 /*
@@ -80,4 +81,5 @@ void dc_dsc_get_policy_for_timing(const struct dc_crtc_timing *timing,
 
 void dc_dsc_policy_set_max_target_bpp_limit(uint32_t limit);
 
+#endif
 #endif

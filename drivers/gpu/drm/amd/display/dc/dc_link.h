@@ -30,11 +30,13 @@
 #include "dc_types.h"
 #include "grph_object_defs.h"
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_link_fec_state {
 	dc_link_fec_not_ready,
 	dc_link_fec_ready,
 	dc_link_fec_enabled
 };
+#endif
 struct dc_link_status {
 	bool link_active;
 	struct dpcd_caps *dpcd_caps;
@@ -146,7 +148,9 @@ struct dc_link {
 
 	struct link_trace link_trace;
 	struct gpio *hpd_gpio;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	enum dc_link_fec_state fec_state;
+#endif
 };
 
 const struct dc_link_status *dc_link_get_status(const struct dc_link *dc_link);
@@ -341,6 +345,8 @@ bool dc_submit_i2c_oem(
 uint32_t dc_bandwidth_in_kbps_from_timing(
 	const struct dc_crtc_timing *timing);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dc_link_is_fec_supported(const struct dc_link *link);
+#endif
 
 #endif /* DC_LINK_H_ */

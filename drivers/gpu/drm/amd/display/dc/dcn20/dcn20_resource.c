@@ -48,7 +48,9 @@
 #include "dcn10/dcn10_resource.h"
 #include "dcn20_opp.h"
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dcn20_dsc.h"
+#endif
 
 #include "dcn20_link_encoder.h"
 #include "dcn20_stream_encoder.h"
@@ -96,7 +98,11 @@ struct _vcs_dpi_ip_params_st dcn2_0_ip = {
 	.hostvm_max_page_table_levels = 4,
 	.hostvm_cached_page_table_levels = 0,
 	.pte_group_size_bytes = 2048,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 6,
+#else
+	.num_dsc = 0,
+#endif
 	.rob_buffer_size_kbytes = 168,
 	.det_buffer_size_kbytes = 164,
 	.dpte_buffer_size_in_pte_reqs_luma = 84,
@@ -956,6 +962,7 @@ static int map_transmitter_id_to_phy_instance(
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -977,6 +984,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 static const struct dccg_registers dccg_regs = {
 		DCCG_REG_LIST_DCN2()
@@ -1000,7 +1008,9 @@ static const struct resource_caps res_cap_nv10 = {
 		.num_dwb = 1,
 		.num_ddc = 6,
 		.num_vmid = 16,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 6,
+#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
@@ -1038,7 +1048,9 @@ static const struct resource_caps res_cap_nv14 = {
 		.num_dwb = 1,
 		.num_ddc = 5,
 		.num_vmid = 16,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 5,
+#endif
 };
 
 static const struct dc_debug_options debug_defaults_drv = {
@@ -1398,6 +1410,7 @@ void dcn20_clock_source_destroy(struct clock_source **clk_src)
 	*clk_src = NULL;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 struct display_stream_compressor *dcn20_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
@@ -1420,6 +1433,7 @@ void dcn20_dsc_destroy(struct display_stream_compressor **dsc)
 	*dsc = NULL;
 }
 
+#endif
 
 static void dcn20_resource_destruct(struct dcn20_resource_pool *pool)
 {
@@ -1432,10 +1446,12 @@ static void dcn20_resource_destruct(struct dcn20_resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
+#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1646,6 +1662,7 @@ enum dc_status dcn20_build_mapped_resource(const struct dc *dc, struct dc_state 
 	return status;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 static void acquire_dsc(struct resource_context *res_ctx,
 			const struct resource_pool *pool,
@@ -1686,8 +1703,10 @@ void dcn20_release_dsc(struct resource_context *res_ctx,
 		}
 }
 
+#endif
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dcn20_add_dsc_to_stream_resource(struct dc *dc,
 		struct dc_state *dc_ctx,
 		struct dc_stream_state *dc_stream)
@@ -1741,6 +1760,7 @@ static enum dc_status remove_dsc_from_stream_resource(struct dc *dc,
 	else
 		return DC_OK;
 }
+#endif
 
 
 enum dc_status dcn20_add_stream_to_ctx(struct dc *dc, struct dc_state *new_ctx, struct dc_stream_state *dc_stream)
@@ -1752,9 +1772,11 @@ enum dc_status dcn20_add_stream_to_ctx(struct dc *dc, struct dc_state *new_ctx, 
 	if (result == DC_OK)
 		result = resource_map_phy_clock_resources(dc, new_ctx, dc_stream);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Get a DSC if required and available */
 	if (result == DC_OK && dc_stream->timing.flags.DSC)
 		result = dcn20_add_dsc_to_stream_resource(dc, new_ctx, dc_stream);
+#endif
 
 	if (result == DC_OK)
 		result = dcn20_build_mapped_resource(dc, new_ctx, dc_stream);
@@ -1767,7 +1789,9 @@ enum dc_status dcn20_remove_stream_from_ctx(struct dc *dc, struct dc_state *new_
 {
 	enum dc_status result = DC_OK;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	result = remove_dsc_from_stream_resource(dc, new_ctx, dc_stream);
+#endif
 
 	return result;
 }
@@ -1850,7 +1874,9 @@ bool dcn20_split_stream_for_odm(
 	next_odm_pipe->plane_res.xfm = pool->transforms[next_odm_pipe->pipe_idx];
 	next_odm_pipe->plane_res.dpp = pool->dpps[next_odm_pipe->pipe_idx];
 	next_odm_pipe->plane_res.mpcc_inst = pool->dpps[next_odm_pipe->pipe_idx]->inst;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	next_odm_pipe->stream_res.dsc = NULL;
+#endif
 	if (prev_odm_pipe->next_odm_pipe && prev_odm_pipe->next_odm_pipe != next_odm_pipe) {
 		next_odm_pipe->next_odm_pipe = prev_odm_pipe->next_odm_pipe;
 		next_odm_pipe->next_odm_pipe->prev_odm_pipe = next_odm_pipe;
@@ -1896,12 +1922,14 @@ bool dcn20_split_stream_for_odm(
 		sd->recout.x = 0;
 	}
 	next_odm_pipe->stream_res.opp = pool->opps[next_odm_pipe->pipe_idx];
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (next_odm_pipe->stream->timing.flags.DSC == 1) {
 		acquire_dsc(res_ctx, pool, &next_odm_pipe->stream_res.dsc, next_odm_pipe->pipe_idx);
 		ASSERT(next_odm_pipe->stream_res.dsc);
 		if (next_odm_pipe->stream_res.dsc == NULL)
 			return false;
 	}
+#endif
 
 	return true;
 }
@@ -1925,7 +1953,9 @@ void dcn20_split_stream_for_mpc(
 	secondary_pipe->plane_res.xfm = pool->transforms[secondary_pipe->pipe_idx];
 	secondary_pipe->plane_res.dpp = pool->dpps[secondary_pipe->pipe_idx];
 	secondary_pipe->plane_res.mpcc_inst = pool->dpps[secondary_pipe->pipe_idx]->inst;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	secondary_pipe->stream_res.dsc = NULL;
+#endif
 	if (primary_pipe->bottom_pipe && primary_pipe->bottom_pipe != secondary_pipe) {
 		ASSERT(!secondary_pipe->bottom_pipe);
 		secondary_pipe->bottom_pipe = primary_pipe->bottom_pipe;
@@ -2017,9 +2047,11 @@ int dcn20_populate_dml_pipes_from_context(
 
 		pipes[pipe_cnt].clks_cfg.refclk_mhz = dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000.0;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		pipes[pipe_cnt].dout.dsc_enable = res_ctx->pipe_ctx[i].stream->timing.flags.DSC;
 		/* todo: rotation?*/
 		pipes[pipe_cnt].dout.dsc_slices = res_ctx->pipe_ctx[i].stream->timing.dsc_cfg.num_slices_h;
+#endif
 		if (res_ctx->pipe_ctx[i].stream->use_dynamic_meta) {
 			pipes[pipe_cnt].pipe.src.dynamic_metadata_enable = true;
 			/* 1/2 vblank */
@@ -2117,12 +2149,14 @@ int dcn20_populate_dml_pipes_from_context(
 		case COLOR_DEPTH_161616:
 			output_bpc = 16;
 			break;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 		case COLOR_DEPTH_999:
 			output_bpc = 9;
 			break;
 		case COLOR_DEPTH_111111:
 			output_bpc = 11;
 			break;
+#endif
 		default:
 			output_bpc = 8;
 			break;
@@ -2150,8 +2184,10 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].dout.output_bpp = output_bpc * 3;
 		}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (res_ctx->pipe_ctx[i].stream->timing.flags.DSC)
 			pipes[pipe_cnt].dout.output_bpp = res_ctx->pipe_ctx[i].stream->timing.dsc_cfg.bits_per_pixel / 16.0;
+#endif
 
 		/* todo: default max for now, until there is logic reflecting this in dc*/
 		pipes[pipe_cnt].dout.output_bpc = 12;
@@ -2391,6 +2427,7 @@ void dcn20_set_mcif_arb_params(
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dcn20_validate_dsc(struct dc *dc, struct dc_state *new_ctx)
 {
 	int i;
@@ -2425,6 +2462,7 @@ bool dcn20_validate_dsc(struct dc *dc, struct dc_state *new_ctx)
 	}
 	return true;
 }
+#endif
 
 struct pipe_ctx *dcn20_find_secondary_pipe(struct dc *dc,
 		struct resource_context *res_ctx,
@@ -2527,8 +2565,10 @@ static void dcn20_merge_pipes_for_validate(
 			odm_pipe->bottom_pipe = NULL;
 			odm_pipe->prev_odm_pipe = NULL;
 			odm_pipe->next_odm_pipe = NULL;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (odm_pipe->stream_res.dsc)
 				dcn20_release_dsc(&context->res_ctx, dc->res_pool, &odm_pipe->stream_res.dsc);
+#endif
 			/* Clear plane_res and stream_res */
 			memset(&odm_pipe->plane_res, 0, sizeof(odm_pipe->plane_res));
 			memset(&odm_pipe->stream_res, 0, sizeof(odm_pipe->stream_res));
@@ -2771,12 +2811,14 @@ bool dcn20_fast_validate_bw(
 			ASSERT(0);
 		}
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		context->bw_ctx.dml.vba.ValidationStatus[context->bw_ctx.dml.vba.soc.num_states] =
 				DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
+#endif
 
 	*vlevel_out = vlevel;
 
@@ -3897,6 +3939,7 @@ static bool dcn20_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn20_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -3905,6 +3948,7 @@ static bool dcn20_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	if (!dcn20_dwbc_create(ctx, &pool->base)) {
 		BREAK_TO_DEBUGGER();

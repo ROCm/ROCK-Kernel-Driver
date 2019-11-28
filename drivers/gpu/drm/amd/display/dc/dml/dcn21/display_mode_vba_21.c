@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 
 #include "../display_mode_lib.h"
 #include "../dml_inline_defs.h"
@@ -6132,3 +6133,4 @@ static double CalculateExtraLatency(
 	return CalculateExtraLatency;
 }
 
+#endif
