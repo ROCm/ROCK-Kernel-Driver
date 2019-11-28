@@ -36,8 +36,16 @@
 #define KFD_IOCTL_MAJOR_VERSION 1
 #define KFD_IOCTL_MINOR_VERSION 6
 
+/*
+ * Debug revision change log
+ *
+ * 0.1 - Initial revision
+ * 0.2 - Fix to include querying pending event that is both trap and vmfault
+ * 1.0 - Removed function to set debug data (renumbering functions broke ABI)
+ * 1.1 - Allow attaching to processes that have not opened /dev/kfd yet
+ */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	1
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */

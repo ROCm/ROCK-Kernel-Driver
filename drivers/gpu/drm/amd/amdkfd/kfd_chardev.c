@@ -129,9 +129,14 @@ static int kfd_open(struct inode *inode, struct file *filep)
 		return -EPERM;
 	}
 
-	process = kfd_create_process(filep);
+	process = kfd_create_process(current);
 	if (IS_ERR(process))
 		return PTR_ERR(process);
+
+	if (kfd_process_init_cwsr_apu(process, filep)) {
+		kfd_unref_process(process);
+		return -EFAULT;
+	}
 
 	if (kfd_is_locked()) {
 		dev_dbg(kfd_device, "kfd is locked!\n"
@@ -2616,6 +2621,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
 	struct kfd_process_device *pdd = NULL;
+	struct task_struct *thread = NULL;
 	int r = 0;
 	struct kfd_dev *dev = NULL;
 	struct kfd_process *target = NULL;
@@ -2628,6 +2634,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data3;
 	bool need_device;
 	bool need_qid_array;
+	bool need_proc_create = false;
 
 	debug_trap_action = args->op;
 	gpu_id = args->gpu_id;
@@ -2659,7 +2666,17 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
-	target = kfd_lookup_process_by_pid(pid);
+	thread = get_pid_task(pid, PIDTYPE_PID);
+
+	rcu_read_lock();
+	need_proc_create =
+		debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
+		data1 == 1 && thread && thread != current &&
+		ptrace_parent(thread) == current;
+	rcu_read_unlock();
+
+	target = need_proc_create ?
+		kfd_create_process(thread) : kfd_lookup_process_by_pid(pid);
 	if (!target) {
 		pr_err("Cannot find process info info for %i\n",
 				args->pid);
@@ -2864,6 +2881,8 @@ unlock_out:
 	mutex_unlock(&target->mutex);
 
 out:
+	if (thread)
+		put_task_struct(thread);
 	if (pid)
 		put_pid(pid);
 	if (target)
