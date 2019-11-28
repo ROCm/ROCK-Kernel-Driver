@@ -88,7 +88,11 @@ struct _vcs_dpi_ip_params_st dcn2_1_ip = {
 	.gpuvm_max_page_table_levels = 1,
 	.hostvm_max_page_table_levels = 4,
 	.hostvm_cached_page_table_levels = 2,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 3,
+#else
+	.num_dsc = 0,
+#endif
 	.rob_buffer_size_kbytes = 168,
 	.det_buffer_size_kbytes = 164,
 	.dpte_buffer_size_in_pte_reqs_luma = 44,
@@ -534,6 +538,7 @@ static const struct dcn20_vmid_mask vmid_masks = {
 		DCN20_VMID_MASK_SH_LIST(_MASK)
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -555,6 +560,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 #define ipp_regs(id)\
 [id] = {\
@@ -751,7 +757,9 @@ static const struct resource_caps res_cap_rn = {
 		.num_dwb = 1,
 		.num_ddc = 5,
 		.num_vmid = 1,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 3,
+#endif
 };
 
 #ifdef DIAGS_BUILD
@@ -776,7 +784,9 @@ static const struct resource_caps res_cap_rn_FPGA_2pipe_dsc = {
 		.num_pll = 4,
 		.num_dwb = 1,
 		.num_ddc = 4,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 2,
+#endif
 };
 #endif
 
@@ -855,10 +865,12 @@ static void dcn21_resource_destruct(struct dcn21_resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
+#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1287,6 +1299,7 @@ static void read_dce_straps(
 
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 struct display_stream_compressor *dcn21_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
@@ -1302,6 +1315,7 @@ struct display_stream_compressor *dcn21_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
+#endif
 
 static void update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params)
 {
@@ -1840,6 +1854,7 @@ static bool dcn21_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn21_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -1848,6 +1863,7 @@ static bool dcn21_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	if (!dcn20_dwbc_create(ctx, &pool->base)) {
 		BREAK_TO_DEBUGGER();

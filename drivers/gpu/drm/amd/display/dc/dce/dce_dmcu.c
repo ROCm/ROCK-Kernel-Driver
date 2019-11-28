@@ -748,7 +748,9 @@ static bool dcn10_is_dmcu_initialized(struct dmcu *dmcu)
 	return true;
 }
 
+#endif //(CONFIG_DRM_AMD_DC_DCN1_0)
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 
 static bool dcn20_lock_phy(struct dmcu *dmcu)
 {
@@ -796,7 +798,7 @@ static bool dcn20_unlock_phy(struct dmcu *dmcu)
 	return true;
 }
 
-#endif //(CONFIG_DRM_AMD_DC_DCN1_0)
+#endif //(CONFIG_DRM_AMD_DC_DCN2_0)
 
 static const struct dmcu_funcs dce_funcs = {
 	.dmcu_init = dce_dmcu_init,
@@ -820,7 +822,9 @@ static const struct dmcu_funcs dcn10_funcs = {
 	.get_psr_wait_loop = dcn10_get_psr_wait_loop,
 	.is_dmcu_initialized = dcn10_is_dmcu_initialized
 };
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 static const struct dmcu_funcs dcn20_funcs = {
 	.dmcu_init = dcn10_dmcu_init,
 	.load_iram = dcn10_dmcu_load_iram,
@@ -833,6 +837,7 @@ static const struct dmcu_funcs dcn20_funcs = {
 	.lock_phy = dcn20_lock_phy,
 	.unlock_phy = dcn20_unlock_phy
 };
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 static const struct dmcu_funcs dcn21_funcs = {
@@ -847,7 +852,6 @@ static const struct dmcu_funcs dcn21_funcs = {
 	.lock_phy = dcn20_lock_phy,
 	.unlock_phy = dcn20_unlock_phy
 };
-#endif
 #endif
 
 static void dce_dmcu_construct(
@@ -868,7 +872,7 @@ static void dce_dmcu_construct(
 	dmcu_dce->dmcu_mask = dmcu_mask;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 static void dcn21_dmcu_construct(
 		struct dce_dmcu *dmcu_dce,
 		struct dc_context *ctx,
@@ -930,7 +934,9 @@ struct dmcu *dcn10_dmcu_create(
 
 	return &dmcu_dce->base;
 }
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 struct dmcu *dcn20_dmcu_create(
 	struct dc_context *ctx,
 	const struct dce_dmcu_registers *regs,
@@ -951,6 +957,7 @@ struct dmcu *dcn20_dmcu_create(
 
 	return &dmcu_dce->base;
 }
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 struct dmcu *dcn21_dmcu_create(
@@ -973,7 +980,6 @@ struct dmcu *dcn21_dmcu_create(
 
 	return &dmcu_dce->base;
 }
-#endif
 #endif
 
 void dce_dmcu_destroy(struct dmcu **dmcu)

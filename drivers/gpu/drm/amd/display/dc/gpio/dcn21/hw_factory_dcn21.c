@@ -22,6 +22,7 @@
  * Authors: AMD
  *
  */
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #include "dm_services.h"
 #include "include/gpio_types.h"
 #include "../hw_factory.h"
@@ -238,3 +239,4 @@ void dal_hw_factory_dcn21_init(struct hw_factory *factory)
 	factory->funcs = &funcs;
 }
 
+#endif
