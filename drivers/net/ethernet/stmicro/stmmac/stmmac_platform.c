@@ -342,10 +342,16 @@ static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
 		mdio = true;
 	}
 
-	if (mdio)
+	if (mdio) {
 		plat->mdio_bus_data =
 			devm_kzalloc(dev, sizeof(struct stmmac_mdio_bus_data),
 				     GFP_KERNEL);
+		if (!plat->mdio_bus_data)
+			return -ENOMEM;
+
+		plat->mdio_bus_data->needs_reset = true;
+	}
+
 	return 0;
 }
 
@@ -522,13 +528,15 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 	}
 
 	/* clock setup */
-	plat->stmmac_clk = devm_clk_get(&pdev->dev,
-					STMMAC_RESOURCE_NAME);
-	if (IS_ERR(plat->stmmac_clk)) {
-		dev_warn(&pdev->dev, "Cannot get CSR clock\n");
-		plat->stmmac_clk = NULL;
+	if (!of_device_is_compatible(np, "snps,dwc-qos-ethernet-4.10")) {
+		plat->stmmac_clk = devm_clk_get(&pdev->dev,
+						STMMAC_RESOURCE_NAME);
+		if (IS_ERR(plat->stmmac_clk)) {
+			dev_warn(&pdev->dev, "Cannot get CSR clock\n");
+			plat->stmmac_clk = NULL;
+		}
+		clk_prepare_enable(plat->stmmac_clk);
 	}
-	clk_prepare_enable(plat->stmmac_clk);
 
 	plat->pclk = devm_clk_get(&pdev->dev, "pclk");
 	if (IS_ERR(plat->pclk)) {
