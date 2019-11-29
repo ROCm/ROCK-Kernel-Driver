@@ -1,2 +1,1 @@
-FILES="ttm/*.c scheduler/*.c amd/amdkcl/reservation.c amd/amdkcl/dma-resv.c"
-
+FILES="ttm/*.c scheduler/*.c amd/amdkcl/dma-resv.c"
