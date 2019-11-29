@@ -32,9 +32,9 @@ for sym in $SYMS; do
     echo "void *_kcl_$sym = (void *)0x$addr;" >> amd/amdkcl/symbols.c
 done
 
-sed -i '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' amd/amdkcl/reservation.c
-sed -i '1i #include <kcl/kcl_reservation_backport.h>' include/linux/reservation.h
-sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' include/linux/reservation.h
+sed -i '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' amd/amdkcl/dma-resv.c
+sed -i '1i #include <kcl/kcl_reservation_backport.h>' include/linux/dma-resv.h
+sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' include/linux/dma-resv.h
 
 while read line; do
 	from_header=$(echo $line | cut -d ' ' -f 1)
