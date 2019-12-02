@@ -267,10 +267,10 @@ AC_DEFUN([AC_KERNEL_CHECK_SYMBOL_EXPORT], [
 				}' $LINUX/$file 2>/dev/null)
 			rc=$?
 			if test $rc -eq 0; then
-				(( export+=n ))
+				export=$(( $export+$n ))
 			fi
 		done
-		if test $(wc -w <<< "$1") -eq $export; then :
+		if test $(echo "$1" | wc -w) -eq $export; then :
 			$3
 		else :
 			$4
