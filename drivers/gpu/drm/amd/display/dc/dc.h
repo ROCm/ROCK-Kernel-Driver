@@ -372,6 +372,7 @@ struct dc_debug_options {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_dsc_power_gate;
 	int dsc_min_slice_height_override;
+	int dsc_bpp_increment_div;
 	bool native422_support;
 #endif
 	bool disable_pplib_wm_range;
