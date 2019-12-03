@@ -2302,12 +2302,13 @@ static bool io_get_sqring(struct io_ring_ctx *ctx, struct sqe_submit *s)
 }
 
 static int io_submit_sqes(struct io_ring_ctx *ctx, unsigned int nr,
-			  bool has_user, bool mm_fault)
+			  struct mm_struct **mm)
 {
 	struct io_submit_state state, *statep = NULL;
 	struct io_kiocb *link = NULL;
 	bool prev_was_link = false;
 	int i, submitted = 0;
+	bool mm_fault = false;
 
 	if (nr > IO_PLUG_THRESHOLD) {
 		io_submit_state_start(&state, ctx, nr);
@@ -2320,6 +2321,14 @@ static int io_submit_sqes(struct io_ring_ctx *ctx, unsigned int nr,
 		if (!io_get_sqring(ctx, &s))
 			break;
 
+		if (io_sqe_needs_user(s.sqe) && !*mm) {
+			mm_fault = mm_fault || !mmget_not_zero(ctx->sqo_mm);
+			if (!mm_fault) {
+				use_mm(ctx->sqo_mm);
+				*mm = ctx->sqo_mm;
+			}
+		}
+
 		/*
 		 * If previous wasn't linked and we have a linked command,
 		 * that's the end of the chain. Submit the previous link.
@@ -2330,16 +2339,11 @@ static int io_submit_sqes(struct io_ring_ctx *ctx, unsigned int nr,
 		}
 		prev_was_link = (s.sqe->flags & IOSQE_IO_LINK) != 0;
 
-		if (unlikely(mm_fault)) {
-			io_cqring_add_event(ctx, s.sqe->user_data,
-						-EFAULT);
-		} else {
-			s.has_user = has_user;
-			s.needs_lock = true;
-			s.needs_fixed_file = true;
-			io_submit_sqe(ctx, &s, statep, &link);
-			submitted++;
-		}
+		s.has_user = *mm != NULL;
+		s.needs_lock = true;
+		s.needs_fixed_file = true;
+		io_submit_sqe(ctx, &s, statep, &link);
+		submitted++;
 	}
 
 	if (link)
@@ -2366,7 +2370,6 @@ static int io_sq_thread(void *data)
 
 	timeout = inflight = 0;
 	while (!kthread_should_park()) {
-		bool mm_fault = false;
 		unsigned int to_submit;
 
 		if (inflight) {
@@ -2451,18 +2454,8 @@ static int io_sq_thread(void *data)
 			ctx->sq_ring->flags &= ~IORING_SQ_NEED_WAKEUP;
 		}
 
-		/* Unless all new commands are FIXED regions, grab mm */
-		if (!cur_mm) {
-			mm_fault = !mmget_not_zero(ctx->sqo_mm);
-			if (!mm_fault) {
-				use_mm(ctx->sqo_mm);
-				cur_mm = ctx->sqo_mm;
-			}
-		}
-
 		to_submit = min(to_submit, ctx->sq_entries);
-		inflight += io_submit_sqes(ctx, to_submit, cur_mm != NULL,
-					   mm_fault);
+		inflight += io_submit_sqes(ctx, to_submit, &cur_mm);
 
 		/* Commit SQ ring head once we've consumed all SQEs */
 		io_commit_sqring(ctx);
