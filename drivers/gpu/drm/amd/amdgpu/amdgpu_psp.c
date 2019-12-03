@@ -614,6 +614,36 @@ static int psp_xgmi_initialize(struct psp_context *psp)
 }
 
 // ras begin
+void psp_ras_print_dbg_msg(struct psp_context *psp)
+{
+	struct ta_ras_shared_memory *ras_cmd;
+	struct ta_dbg_msg_list *dbg_msgs;
+	struct ta_dbg_msg* msg;
+	uint32_t mem_offset;
+	int i, sec, m_sec;
+
+	ras_cmd  = (struct ta_ras_shared_memory *)psp->ras.ras_shared_buf;
+	dbg_msgs = &ras_cmd->debug_messages;
+	msg 	 = &dbg_msgs->msg;
+
+	for (i = 0; i < dbg_msgs->msg_cnt; i++)
+	{
+		mem_offset = (uint8_t*)msg - (uint8_t*)ras_cmd;
+
+		/* Validate memory access does not overflow shared region */
+		if (mem_offset >= PSP_RAS_SHARED_MEM_SIZE)
+			break;
+
+		/* Time stamp = seconds*1000000 + milli-seconds*1000 */
+		sec	= (int)msg->time_stamp/1000000;
+		m_sec 	= ((int)msg->time_stamp - sec*1000000) / 1000;
+
+		DRM_INFO("[RAS] %d.%d : %s\n", sec, m_sec, msg->msg);
+
+		msg = (struct ta_dbg_msg*)((uint8_t*)msg + SIZE_OF_MSG_STRUCT(msg));
+	}
+}
+
 static void psp_prep_ras_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
 		uint64_t ras_ta_mc, uint64_t ras_mc_shared,
 		uint32_t ras_ta_size, uint32_t shared_size)
@@ -676,6 +706,8 @@ static int psp_ras_load(struct psp_context *psp)
 	}
 
 	kfree(cmd);
+
+	psp_ras_print_dbg_msg(psp);
 
 	return ret;
 }
@@ -744,6 +776,8 @@ int psp_ras_invoke(struct psp_context *psp, uint32_t ta_cmd_id)
 			psp->fence_buf_mc_addr);
 
 	kfree(cmd);
+
+	psp_ras_print_dbg_msg(psp);
 
 	return ret;
 }
