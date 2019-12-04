@@ -164,7 +164,7 @@ int amdgpu_gem_object_open(struct drm_gem_object *obj,
 		return -EPERM;
 
 	if (abo->flags & AMDGPU_GEM_CREATE_VM_ALWAYS_VALID &&
-	    abo->tbo.base.resv != vm->root.base.bo->tbo.base.resv)
+	    amdkcl_ttm_resvp(&abo->tbo) != amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 		return -EPERM;
 
 	r = amdgpu_bo_reserve(abo, false);
@@ -220,7 +220,7 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 	if (!amdgpu_vm_ready(vm))
 		goto out_unlock;
 
-	fence = dma_resv_get_excl(bo->tbo.base.resv);
+	fence = dma_resv_get_excl(amdkcl_ttm_resvp(&bo->tbo));
 	if (fence) {
 		amdgpu_bo_fence(bo, fence, true);
 		fence = NULL;
@@ -296,7 +296,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 		if (r)
 			return r;
 
-		resv = vm->root.base.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 	}
 
 	r = amdgpu_gem_object_create(adev, size, args->in.alignment,
@@ -539,7 +539,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
-	ret = dma_resv_wait_timeout_rcu(robj->tbo.base.resv, true, true,
+	ret = dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(&robj->tbo), true, true,
 						  timeout);
 
 	/* ret == 0 means not signaled,

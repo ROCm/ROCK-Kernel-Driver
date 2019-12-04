@@ -646,14 +646,14 @@ static inline int __ttm_bo_reserve(struct ttm_buffer_object *bo,
 		if (WARN_ON(ticket))
 			return -EBUSY;
 
-		success = dma_resv_trylock(bo->base.resv);
+		success = dma_resv_trylock(amdkcl_ttm_resvp(bo));
 		return success ? 0 : -EBUSY;
 	}
 
 	if (interruptible)
-		ret = dma_resv_lock_interruptible(bo->base.resv, ticket);
+		ret = dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo), ticket);
 	else
-		ret = dma_resv_lock(bo->base.resv, ticket);
+		ret = dma_resv_lock(amdkcl_ttm_resvp(bo), ticket);
 	if (ret == -EINTR)
 		return -ERESTARTSYS;
 	return ret;
@@ -731,10 +731,10 @@ static inline int ttm_bo_reserve_slowpath(struct ttm_buffer_object *bo,
 	WARN_ON(!kref_read(&bo->kref));
 
 	if (interruptible)
-		ret = dma_resv_lock_slow_interruptible(bo->base.resv,
+		ret = dma_resv_lock_slow_interruptible(amdkcl_ttm_resvp(bo),
 								 ticket);
 	else
-		dma_resv_lock_slow(bo->base.resv, ticket);
+		dma_resv_lock_slow(amdkcl_ttm_resvp(bo), ticket);
 
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
@@ -754,7 +754,7 @@ static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 	spin_lock(&ttm_bo_glob.lru_lock);
 	ttm_bo_move_to_lru_tail(bo, NULL);
 	spin_unlock(&ttm_bo_glob.lru_lock);
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 }
 
 /*
