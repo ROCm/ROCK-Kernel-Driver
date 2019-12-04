@@ -44,6 +44,10 @@
 
 #include "ttm_resource.h"
 
+#ifndef HAVE_CONFIG_H
+#define HAVE_DRM_GEM_OBJECT_RESV	1
+#endif
+
 struct ttm_global;
 
 struct ttm_device;
@@ -163,6 +167,11 @@ struct ttm_buffer_object {
 	 */
 
 	struct sg_table *sg;
+
+#if !defined(HAVE_DRM_GEM_OBJECT_RESV)
+	struct dma_resv *resv;
+	struct dma_resv ttm_resv;
+#endif
 };
 
 /**
@@ -583,6 +592,14 @@ static inline bool ttm_bo_uses_embedded_gem_object(struct ttm_buffer_object *bo)
 	return bo->base.dev != NULL;
 }
 
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+#define amdkcl_ttm_resv(bo) ((bo)->base._resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->base.resv)
+#else
+#define amdkcl_ttm_resv(bo) ((bo)->ttm_resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->resv)
+#endif
+
 /**
  * ttm_bo_pin - Pin the buffer object.
  * @bo: The buffer object to pin
@@ -591,7 +608,7 @@ static inline bool ttm_bo_uses_embedded_gem_object(struct ttm_buffer_object *bo)
  */
 static inline void ttm_bo_pin(struct ttm_buffer_object *bo)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	WARN_ON_ONCE(!kref_read(&bo->kref));
 	++bo->pin_count;
 }
@@ -604,7 +621,7 @@ static inline void ttm_bo_pin(struct ttm_buffer_object *bo)
  */
 static inline void ttm_bo_unpin(struct ttm_buffer_object *bo)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	WARN_ON_ONCE(!bo->pin_count);
 	WARN_ON_ONCE(!kref_read(&bo->kref));
 	--bo->pin_count;
@@ -615,6 +632,7 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 			const struct ttm_place *place,
 			struct ttm_operation_ctx *ctx,
 			struct ww_acquire_ctx *ticket);
+
 
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
