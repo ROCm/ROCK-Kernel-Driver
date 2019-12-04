@@ -65,10 +65,10 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 
 		ttm_bo_get(bo);
 		mmap_read_unlock(vmf->vma->vm_mm);
-		(void)dma_resv_wait_timeout(bo->base.resv,
+		(void)dma_resv_wait_timeout(amdkcl_ttm_resvp(bo),
 					    DMA_RESV_USAGE_KERNEL, true,
 					    MAX_SCHEDULE_TIMEOUT);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		ttm_bo_put(bo);
 		return VM_FAULT_RETRY;
 	}
@@ -127,7 +127,7 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 	 * for reserve, and if it fails, retry the fault after waiting
 	 * for the buffer to become unreserved.
 	 */
-	if (unlikely(!dma_resv_trylock(bo->base.resv))) {
+	if (unlikely(!dma_resv_trylock(amdkcl_ttm_resvp(bo)))) {
 		/*
 		 * If the fault allows retry and this is the first
 		 * fault attempt, we try to release the mmap_lock
@@ -137,16 +137,16 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 				mmap_read_unlock(vmf->vma->vm_mm);
-				if (!dma_resv_lock_interruptible(bo->base.resv,
+				if (!dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo),
 								 NULL))
-					dma_resv_unlock(bo->base.resv);
+					dma_resv_unlock(amdkcl_ttm_resvp(bo));
 				ttm_bo_put(bo);
 			}
 
 			return VM_FAULT_RETRY;
 		}
 
-		if (dma_resv_lock_interruptible(bo->base.resv, NULL))
+		if (dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo), NULL))
 			return VM_FAULT_NOPAGE;
 	}
 
@@ -156,7 +156,7 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 	 */
 	if (bo->ttm && (bo->ttm->page_flags & TTM_TT_FLAG_EXTERNAL)) {
 		if (!(bo->ttm->page_flags & TTM_TT_FLAG_EXTERNAL_MAPPABLE)) {
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 			return VM_FAULT_SIGBUS;
 		}
 	}
@@ -339,7 +339,7 @@ vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
 		return ret;
 
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 
 	return ret;
 }

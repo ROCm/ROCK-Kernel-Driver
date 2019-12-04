@@ -67,6 +67,24 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	if (r < 0)
 		goto out;
 
+	r = amdgpu_bo_reserve(bo, false);
+	if (unlikely(r != 0))
+		goto out;
+
+	/*
+	 * We only create shared fences for internal use, but importers
+	 * of the dmabuf rely on exclusive fences for implicitly
+	 * tracking write hazards. As any of the current fences may
+	 * correspond to a write, we need to convert all existing
+	 * fences on the reservation object into a single exclusive
+	 * fence.
+	 */
+	r = __dma_resv_make_exclusive(amdkcl_ttm_resvp(&bo->tbo));
+	if (r)
+		goto out;
+
+	bo->prime_shared_count++;
+	amdgpu_bo_unreserve(bo);
 	return 0;
 
 out:
@@ -407,7 +425,7 @@ amdgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
 
 	for (bo_base = bo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
-		struct dma_resv *resv = vm->root.bo->tbo.base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 
 		if (ticket) {
 			/* When we get an error here it means that somebody

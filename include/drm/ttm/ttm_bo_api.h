@@ -43,6 +43,10 @@
 
 #include "ttm_resource.h"
 
+#ifndef HAVE_CONFIG_H
+#define HAVE_DRM_GEM_OBJECT_RESV	1
+#endif
+
 struct ttm_global;
 
 struct ttm_device;
@@ -156,6 +160,11 @@ struct ttm_buffer_object {
 	 */
 
 	struct sg_table *sg;
+
+#if !defined(HAVE_DRM_GEM_OBJECT_RESV)
+	struct dma_resv *resv;
+	struct dma_resv ttm_resv;
+#endif
 };
 
 /**
@@ -440,11 +449,20 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 void ttm_bo_pin(struct ttm_buffer_object *bo);
 void ttm_bo_unpin(struct ttm_buffer_object *bo);
 
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+#define amdkcl_ttm_resv(bo) ((bo)->base._resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->base.resv)
+#else
+#define amdkcl_ttm_resv(bo) ((bo)->ttm_resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->resv)
+#endif
+
 int ttm_mem_evict_first(struct ttm_device *bdev,
 			struct ttm_resource_manager *man,
 			const struct ttm_place *place,
 			struct ttm_operation_ctx *ctx,
 			struct ww_acquire_ctx *ticket);
+
 
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
