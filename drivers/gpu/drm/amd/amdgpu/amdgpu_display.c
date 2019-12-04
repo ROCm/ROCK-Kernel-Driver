@@ -200,7 +200,7 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 		goto unpin;
 	}
 
-	r = dma_resv_get_fences(new_abo->tbo.base.resv, NULL,
+	r = dma_resv_get_fences(amdkcl_ttm_resvp(&new_abo->tbo), NULL,
 				&work->shared_count, &work->shared);
 	if (unlikely(r != 0)) {
 		DRM_ERROR("failed to get fences for buffer\n");
