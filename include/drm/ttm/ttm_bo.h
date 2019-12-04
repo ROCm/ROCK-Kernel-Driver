@@ -37,6 +37,9 @@
 #include <linux/list.h>
 
 #include "ttm_device.h"
+#ifndef HAVE_CONFIG_H
+#define HAVE_DRM_GEM_OBJECT_RESV	1
+#endif
 
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
@@ -133,6 +136,11 @@ struct ttm_buffer_object {
 	 * either of these locks held.
 	 */
 	struct sg_table *sg;
+
+#if !defined(HAVE_DRM_GEM_OBJECT_RESV)
+	struct dma_resv *resv;
+	struct dma_resv ttm_resv;
+#endif
 };
 
 /**
@@ -213,6 +221,14 @@ ttm_bo_get_unless_zero(struct ttm_buffer_object *bo)
 	return bo;
 }
 
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+#define amdkcl_ttm_resv(bo) ((bo)->base._resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->base.resv)
+#else
+#define amdkcl_ttm_resv(bo) ((bo)->ttm_resv)
+#define amdkcl_ttm_resvp(bo) ((bo)->resv)
+#endif
+
 /**
  * ttm_bo_reserve:
  *
@@ -247,14 +263,14 @@ static inline int ttm_bo_reserve(struct ttm_buffer_object *bo,
 		if (WARN_ON(ticket))
 			return -EBUSY;
 
-		success = dma_resv_trylock(bo->base.resv);
+		success = dma_resv_trylock(amdkcl_ttm_resvp(bo));
 		return success ? 0 : -EBUSY;
 	}
 
 	if (interruptible)
-		ret = dma_resv_lock_interruptible(bo->base.resv, ticket);
+		ret = dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo), ticket);
 	else
-		ret = dma_resv_lock(bo->base.resv, ticket);
+		ret = dma_resv_lock(amdkcl_ttm_resvp(bo), ticket);
 	if (ret == -EINTR)
 		return -ERESTARTSYS;
 	return ret;
@@ -275,13 +291,13 @@ static inline int ttm_bo_reserve_slowpath(struct ttm_buffer_object *bo,
 					  struct ww_acquire_ctx *ticket)
 {
 	if (interruptible) {
-		int ret = dma_resv_lock_slow_interruptible(bo->base.resv,
+		int ret = dma_resv_lock_slow_interruptible(amdkcl_ttm_resvp(bo),
 							   ticket);
 		if (ret == -EINTR)
 			ret = -ERESTARTSYS;
 		return ret;
 	}
-	dma_resv_lock_slow(bo->base.resv, ticket);
+	dma_resv_lock_slow(amdkcl_ttm_resvp(bo), ticket);
 	return 0;
 }
 
@@ -326,7 +342,7 @@ static inline void ttm_bo_move_null(struct ttm_buffer_object *bo,
 static inline void ttm_bo_unreserve(struct ttm_buffer_object *bo)
 {
 	ttm_bo_move_to_lru_tail_unlocked(bo);
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 }
 
 /**
@@ -377,6 +393,7 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 		   gfp_t gfp_flags);
 void ttm_bo_pin(struct ttm_buffer_object *bo);
 void ttm_bo_unpin(struct ttm_buffer_object *bo);
+
 int ttm_mem_evict_first(struct ttm_device *bdev,
 			struct ttm_resource_manager *man,
 			const struct ttm_place *place,
