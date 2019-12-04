@@ -171,7 +171,7 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 		return -EPERM;
 
 	if (abo->flags & AMDGPU_GEM_CREATE_VM_ALWAYS_VALID &&
-	    abo->tbo.base.resv != vm->root.bo->tbo.base.resv)
+	    amdkcl_ttm_resvp(&abo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo))
 		return -EPERM;
 
 	r = amdgpu_bo_reserve(abo, false);
@@ -328,7 +328,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 		if (r)
 			return r;
 
-		resv = vm->root.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	}
 
 	initial_domain = (u32)(0xffffffff & args->in.domains);
@@ -527,7 +527,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 		return -ENOENT;
 	}
 	robj = gem_to_amdgpu_bo(gobj);
-	ret = dma_resv_wait_timeout(robj->tbo.base.resv, DMA_RESV_USAGE_READ,
+	ret = dma_resv_wait_timeout(amdkcl_ttm_resvp(&robj->tbo), DMA_RESV_USAGE_READ,
 				    true, timeout);
 
 	/* ret == 0 means not signaled,

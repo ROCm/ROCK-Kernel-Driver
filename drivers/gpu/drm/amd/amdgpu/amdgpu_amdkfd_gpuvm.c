@@ -296,7 +296,7 @@ static int amdgpu_amdkfd_remove_eviction_fence(struct amdgpu_bo *bo,
 	 * table update and TLB flush here directly.
 	 */
 	replacement = dma_fence_get_stub();
-	dma_resv_replace_fences(bo->tbo.base.resv, ef->base.context,
+	dma_resv_replace_fences(amdkcl_ttm_resvp(&bo->tbo), ef->base.context,
 				replacement, DMA_RESV_USAGE_BOOKKEEP);
 	dma_fence_put(replacement);
 	return 0;
@@ -330,9 +330,9 @@ int amdgpu_amdkfd_remove_fence_on_pt_pd_bos(struct amdgpu_bo *bo)
 	ef = container_of(dma_fence_get(&info->eviction_fence->base),
 			struct amdgpu_amdkfd_fence, base);
 
-	BUG_ON(!dma_resv_trylock(bo->tbo.base.resv));
+	BUG_ON(!dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo)));
 	ret = amdgpu_amdkfd_remove_eviction_fence(bo, ef);
-	dma_resv_unlock(bo->tbo.base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 
 	dma_fence_put(&ef->base);
 	return ret;
@@ -1263,7 +1263,7 @@ static int process_sync_pds_resv(struct amdkfd_process_info *process_info,
 			    vm_list_node) {
 		struct amdgpu_bo *pd = peer_vm->root.bo;
 
-		ret = amdgpu_sync_resv(NULL, sync, pd->tbo.base.resv,
+		ret = amdgpu_sync_resv(NULL, sync, amdkcl_ttm_resvp(&pd->tbo),
 				       AMDGPU_SYNC_NE_OWNER,
 				       AMDGPU_FENCE_OWNER_KFD);
 		if (ret)
@@ -1340,7 +1340,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 				  AMDGPU_FENCE_OWNER_KFD, false);
 	if (ret)
 		goto wait_pd_fail;
-	ret = dma_resv_reserve_fences(vm->root.bo->tbo.base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&vm->root.bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
 	dma_resv_add_fence(vm->root.bo->tbo.base.resv,
@@ -2773,7 +2773,7 @@ int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem
 	 * Add process eviction fence to bo so they can
 	 * evict each other.
 	 */
-	ret = dma_resv_reserve_fences(gws_bo->tbo.base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&gws_bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
 	dma_resv_add_fence(gws_bo->tbo.base.resv,

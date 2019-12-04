@@ -1163,7 +1163,7 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring, struct amdgpu_bo *bo,
 	ib->length_dw = 16;
 
 	if (direct) {
-		r = dma_resv_wait_timeout(bo->tbo.base.resv,
+		r = dma_resv_wait_timeout(amdkcl_ttm_resvp(&bo->tbo),
 					  DMA_RESV_USAGE_KERNEL, false,
 					  msecs_to_jiffies(10));
 		if (r == 0)
@@ -1175,7 +1175,7 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring, struct amdgpu_bo *bo,
 		if (r)
 			goto err_free;
 	} else {
-		r = amdgpu_sync_resv(adev, &job->sync, bo->tbo.base.resv,
+		r = amdgpu_sync_resv(adev, &job->sync, amdkcl_ttm_resvp(&bo->tbo),
 				     AMDGPU_SYNC_ALWAYS,
 				     AMDGPU_FENCE_OWNER_UNDEFINED);
 		if (r)

@@ -39,7 +39,7 @@ static void ttm_eu_backoff_reservation_reverse(struct list_head *list,
 	list_for_each_entry_continue_reverse(entry, list, head) {
 		struct ttm_buffer_object *bo = entry->bo;
 
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 }
 
@@ -55,7 +55,7 @@ void ttm_eu_backoff_reservation(struct ww_acquire_ctx *ticket,
 		struct ttm_buffer_object *bo = entry->bo;
 
 		ttm_bo_move_to_lru_tail_unlocked(bo);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 
 	if (ticket)
@@ -103,7 +103,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 
 		num_fences = max(entry->num_shared, 1u);
 		if (!ret) {
-			ret = dma_resv_reserve_fences(bo->base.resv,
+			ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(bo),
 						      num_fences);
 			if (!ret)
 				continue;
@@ -120,7 +120,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 		}
 
 		if (!ret)
-			ret = dma_resv_reserve_fences(bo->base.resv,
+			ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(bo),
 						      num_fences);
 
 		if (unlikely(ret != 0)) {
@@ -154,10 +154,10 @@ void ttm_eu_fence_buffer_objects(struct ww_acquire_ctx *ticket,
 	list_for_each_entry(entry, list, head) {
 		struct ttm_buffer_object *bo = entry->bo;
 
-		dma_resv_add_fence(bo->base.resv, fence, entry->num_shared ?
+		dma_resv_add_fence(amdkcl_ttm_resvp(bo), fence, entry->num_shared ?
 				   DMA_RESV_USAGE_READ : DMA_RESV_USAGE_WRITE);
 		ttm_bo_move_to_lru_tail_unlocked(bo);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 	if (ticket)
 		ww_acquire_fini(ticket);
