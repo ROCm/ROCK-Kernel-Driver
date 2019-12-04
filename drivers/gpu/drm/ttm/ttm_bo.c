@@ -164,7 +164,10 @@ static void ttm_bo_release_list(struct kref *list_kref)
 	atomic_dec(&ttm_bo_glob.bo_count);
 	dma_fence_put(bo->moving);
 	if (!ttm_bo_uses_embedded_gem_object(bo))
-		dma_resv_fini(&bo->base._resv);
+		dma_resv_fini(&amdkcl_ttm_resv(bo));
+#ifndef HAVE_DRM_GEM_OBJECT_RESV
+	dma_resv_fini(&amdkcl_ttm_resv(bo));
+#endif
 	mutex_destroy(&bo->wu_mutex);
 	bo->destroy(bo);
 	ttm_mem_global_free(&ttm_mem_glob, acc_size);
@@ -176,7 +179,7 @@ static void ttm_bo_add_mem_to_lru(struct ttm_buffer_object *bo,
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	if (!list_empty(&bo->lru))
 		return;
@@ -232,7 +235,7 @@ static void ttm_bo_bulk_move_set_pos(struct ttm_lru_bulk_move_pos *pos,
 void ttm_bo_move_to_lru_tail(struct ttm_buffer_object *bo,
 			     struct ttm_lru_bulk_move *bulk)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	ttm_bo_del_from_lru(bo);
 	ttm_bo_add_mem_to_lru(bo, &bo->mem);
@@ -265,8 +268,8 @@ void ttm_bo_bulk_move_lru_tail(struct ttm_lru_bulk_move *bulk)
 		if (!pos->first)
 			continue;
 
-		dma_resv_assert_held(pos->first->base.resv);
-		dma_resv_assert_held(pos->last->base.resv);
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->first));
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->last));
 
 		man = &pos->first->bdev->man[TTM_PL_TT];
 		list_bulk_move_tail(&man->lru[i], &pos->first->lru,
@@ -280,8 +283,8 @@ void ttm_bo_bulk_move_lru_tail(struct ttm_lru_bulk_move *bulk)
 		if (!pos->first)
 			continue;
 
-		dma_resv_assert_held(pos->first->base.resv);
-		dma_resv_assert_held(pos->last->base.resv);
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->first));
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->last));
 
 		man = &pos->first->bdev->man[TTM_PL_VRAM];
 		list_bulk_move_tail(&man->lru[i], &pos->first->lru,
@@ -295,8 +298,8 @@ void ttm_bo_bulk_move_lru_tail(struct ttm_lru_bulk_move *bulk)
 		if (!pos->first)
 			continue;
 
-		dma_resv_assert_held(pos->first->base.resv);
-		dma_resv_assert_held(pos->last->base.resv);
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->first));
+		dma_resv_assert_held(amdkcl_ttm_resvp(pos->last));
 
 		lru = &ttm_bo_glob.swap_lru[i];
 		list_bulk_move_tail(lru, &pos->first->swap, &pos->last->swap);
@@ -427,14 +430,14 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 {
 	int r;
 
-	if (bo->base.resv == &bo->base._resv)
+	if (amdkcl_ttm_resvp(bo) == &amdkcl_ttm_resv(bo))
 		return 0;
 
-	BUG_ON(!dma_resv_trylock(&bo->base._resv));
+	BUG_ON(!dma_resv_trylock(&amdkcl_ttm_resv(bo)));
 
-	r = dma_resv_copy_fences(&bo->base._resv, bo->base.resv);
+	r = dma_resv_copy_fences(&amdkcl_ttm_resv(bo), amdkcl_ttm_resvp(bo));
 	if (r)
-		dma_resv_unlock(&bo->base._resv);
+		dma_resv_unlock(&amdkcl_ttm_resv(bo));
 
 	return r;
 }
@@ -445,14 +448,14 @@ static void ttm_bo_flush_all_fences(struct ttm_buffer_object *bo)
 	struct dma_fence *fence;
 	int i;
 
-	fobj = dma_resv_get_list(&bo->base._resv);
-	fence = dma_resv_get_excl(&bo->base._resv);
+	fobj = dma_resv_get_list(&amdkcl_ttm_resv(bo));
+	fence = dma_resv_get_excl(&amdkcl_ttm_resv(bo));
 	if (fence && !fence->ops->signaled)
 		dma_fence_enable_sw_signaling(fence);
 
 	for (i = 0; fobj && i < fobj->shared_count; ++i) {
 		fence = rcu_dereference_protected(fobj->shared[i],
-					dma_resv_held(bo->base.resv));
+					dma_resv_held(amdkcl_ttm_resvp(bo)));
 
 		if (!fence->ops->signaled)
 			dma_fence_enable_sw_signaling(fence);
@@ -469,23 +472,23 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 		/* Last resort, if we fail to allocate memory for the
 		 * fences block for the BO to become idle
 		 */
-		dma_resv_wait_timeout_rcu(bo->base.resv, true, false,
+		dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(bo), true, false,
 						    30 * HZ);
 		spin_lock(&ttm_bo_glob.lru_lock);
 		goto error;
 	}
 
 	spin_lock(&ttm_bo_glob.lru_lock);
-	ret = dma_resv_trylock(bo->base.resv) ? 0 : -EBUSY;
+	ret = dma_resv_trylock(amdkcl_ttm_resvp(bo)) ? 0 : -EBUSY;
 	if (!ret) {
-		if (dma_resv_test_signaled_rcu(&bo->base._resv, true)) {
+		if (dma_resv_test_signaled_rcu(&amdkcl_ttm_resv(bo), true)) {
 			ttm_bo_del_from_lru(bo);
 			spin_unlock(&ttm_bo_glob.lru_lock);
-			if (bo->base.resv != &bo->base._resv)
-				dma_resv_unlock(&bo->base._resv);
+			if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo))
+				dma_resv_unlock(&amdkcl_ttm_resv(bo));
 
 			ttm_bo_cleanup_memtype_use(bo);
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 			return;
 		}
 
@@ -501,10 +504,10 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 			ttm_bo_move_to_lru_tail(bo, NULL);
 		}
 
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
-	if (bo->base.resv != &bo->base._resv)
-		dma_resv_unlock(&bo->base._resv);
+	if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo))
+		dma_resv_unlock(&amdkcl_ttm_resv(bo));
 
 error:
 	kref_get(&bo->list_kref);
@@ -536,9 +539,9 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	int ret;
 
 	if (unlikely(list_empty(&bo->ddestroy)))
-		resv = bo->base.resv;
+		resv = amdkcl_ttm_resvp(bo);
 	else
-		resv = &bo->base._resv;
+		resv = &amdkcl_ttm_resv(bo);
 
 	if (dma_resv_test_signaled_rcu(resv, true))
 		ret = 0;
@@ -549,7 +552,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 		long lret;
 
 		if (unlock_resv)
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		spin_unlock(&ttm_bo_glob.lru_lock);
 
 		lret = dma_resv_wait_timeout_rcu(resv, true,
@@ -562,7 +565,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			return -EBUSY;
 
 		spin_lock(&ttm_bo_glob.lru_lock);
-		if (unlock_resv && !dma_resv_trylock(bo->base.resv)) {
+		if (unlock_resv && !dma_resv_trylock(amdkcl_ttm_resvp(bo))) {
 			/*
 			 * We raced, and lost, someone else holds the reservation now,
 			 * and is probably busy in ttm_bo_cleanup_memtype_use.
@@ -579,7 +582,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 
 	if (ret || unlikely(list_empty(&bo->ddestroy))) {
 		if (unlock_resv)
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		spin_unlock(&ttm_bo_glob.lru_lock);
 		return ret;
 	}
@@ -592,7 +595,7 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 	ttm_bo_cleanup_memtype_use(bo);
 
 	if (unlock_resv)
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 
 	return 0;
 }
@@ -618,14 +621,14 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 		kref_get(&bo->list_kref);
 		list_move_tail(&bo->ddestroy, &removed);
 
-		if (remove_all || bo->base.resv != &bo->base._resv) {
+		if (remove_all || amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo)) {
 			spin_unlock(&glob->lru_lock);
-			dma_resv_lock(bo->base.resv, NULL);
+			dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 
-		} else if (dma_resv_trylock(bo->base.resv)) {
+		} else if (dma_resv_trylock(amdkcl_ttm_resvp(bo))) {
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 		} else {
 			spin_unlock(&glob->lru_lock);
@@ -697,7 +700,7 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo,
 	struct ttm_placement placement;
 	int ret = 0;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	placement.num_placement = 0;
 	placement.num_busy_placement = 0;
@@ -767,8 +770,8 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 {
 	bool ret = false;
 
-	if (bo->base.resv == ctx->resv) {
-		dma_resv_assert_held(bo->base.resv);
+	if (amdkcl_ttm_resvp(bo) == ctx->resv) {
+		dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 		if (ctx->flags & TTM_OPT_FLAG_ALLOW_RES_EVICT
 		    || !list_empty(&bo->ddestroy))
 			ret = true;
@@ -776,7 +779,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 		if (busy)
 			*busy = false;
 	} else {
-		ret = dma_resv_trylock(bo->base.resv);
+		ret = dma_resv_trylock(amdkcl_ttm_resvp(bo));
 		*locked = ret;
 		if (busy)
 			*busy = !ret;
@@ -804,10 +807,10 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 		return -EBUSY;
 
 	if (ctx->interruptible)
-		r = dma_resv_lock_interruptible(busy_bo->base.resv,
+		r = dma_resv_lock_interruptible(amdkcl_ttm_resvp(busy_bo),
 							  ticket);
 	else
-		r = dma_resv_lock(busy_bo->base.resv, ticket);
+		r = dma_resv_lock(amdkcl_ttm_resvp(busy_bo), ticket);
 
 	/*
 	 * TODO: It would be better to keep the BO locked until allocation is at
@@ -815,7 +818,7 @@ static int ttm_mem_evict_wait_busy(struct ttm_buffer_object *busy_bo,
 	 * of TTM.
 	 */
 	if (!r)
-		dma_resv_unlock(busy_bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(busy_bo));
 
 	return r == -EDEADLK ? -EBUSY : r;
 }
@@ -840,7 +843,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 			if (!ttm_bo_evict_swapout_allowable(bo, ctx, &locked,
 							    &busy)) {
 				if (busy && !busy_bo && ticket !=
-				    dma_resv_locking_ctx(bo->base.resv))
+				    dma_resv_locking_ctx(amdkcl_ttm_resvp(bo)))
 					busy_bo = bo;
 				continue;
 			}
@@ -848,7 +851,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 			if (place && !bdev->driver->eviction_valuable(bo,
 								      place)) {
 				if (locked)
-					dma_resv_unlock(bo->base.resv);
+					dma_resv_unlock(amdkcl_ttm_resvp(bo));
 				continue;
 			}
 			break;
@@ -920,9 +923,9 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 	if (no_wait_gpu)
 		return -EBUSY;
 
-	dma_resv_add_shared_fence(bo->base.resv, fence);
+	dma_resv_add_shared_fence(amdkcl_ttm_resvp(bo), fence);
 
-	ret = dma_resv_reserve_shared(bo->base.resv, 1);
+	ret = dma_resv_reserve_shared(amdkcl_ttm_resvp(bo), 1);
 	if (unlikely(ret)) {
 		dma_fence_put(fence);
 		return ret;
@@ -947,7 +950,7 @@ static int ttm_bo_mem_force_space(struct ttm_buffer_object *bo,
 	struct ww_acquire_ctx *ticket;
 	int ret;
 
-	ticket = dma_resv_locking_ctx(bo->base.resv);
+	ticket = dma_resv_locking_ctx(amdkcl_ttm_resvp(bo));
 	do {
 		ret = (*man->func->get_node)(man, bo, place, mem);
 		if (unlikely(ret != 0))
@@ -1075,7 +1078,7 @@ int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 	bool type_found = false;
 	int i, ret;
 
-	ret = dma_resv_reserve_shared(bo->base.resv, 1);
+	ret = dma_resv_reserve_shared(amdkcl_ttm_resvp(bo), 1);
 	if (unlikely(ret))
 		return ret;
 
@@ -1160,7 +1163,7 @@ static int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
 	int ret = 0;
 	struct ttm_mem_reg mem;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	mem.num_pages = bo->num_pages;
 	mem.size = mem.num_pages << PAGE_SHIFT;
@@ -1230,7 +1233,7 @@ int ttm_bo_validate(struct ttm_buffer_object *bo,
 	int ret;
 	uint32_t new_flags;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	/*
 	 * Check whether we need to move buffer.
 	 */
@@ -1320,19 +1323,22 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	bo->sg = sg;
 	bo->ssg_can_map = false;
 	if (resv) {
-		bo->base.resv = resv;
-		dma_resv_assert_held(bo->base.resv);
+		amdkcl_ttm_resvp(bo) = resv;
+		dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	} else {
-		bo->base.resv = &bo->base._resv;
+		amdkcl_ttm_resvp(bo) = &amdkcl_ttm_resv(bo);
 	}
 	if (!ttm_bo_uses_embedded_gem_object(bo)) {
 		/*
 		 * bo.gem is not initialized, so we have to setup the
 		 * struct elements we want use regardless.
 		 */
-		dma_resv_init(&bo->base._resv);
+		dma_resv_init(&amdkcl_ttm_resv(bo));
 		drm_vma_node_reset(&bo->base.vma_node);
 	}
+#ifndef HAVE_DRM_GEM_OBJECT_RESV
+	dma_resv_init(&amdkcl_ttm_resv(bo));
+#endif
 	atomic_inc(&ttm_bo_glob.bo_count);
 
 	/*
@@ -1348,7 +1354,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	 * since otherwise lockdep will be angered in radeon.
 	 */
 	if (!resv) {
-		locked = dma_resv_trylock(bo->base.resv);
+		locked = dma_resv_trylock(amdkcl_ttm_resvp(bo));
 		WARN_ON(!locked);
 	}
 
@@ -1787,13 +1793,13 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	long timeout = 15 * HZ;
 
 	if (no_wait) {
-		if (dma_resv_test_signaled_rcu(bo->base.resv, true))
+		if (dma_resv_test_signaled_rcu(amdkcl_ttm_resvp(bo), true))
 			return 0;
 		else
 			return -EBUSY;
 	}
 
-	timeout = dma_resv_wait_timeout_rcu(bo->base.resv, true,
+	timeout = dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(bo), true,
 						      interruptible, timeout);
 	if (timeout < 0)
 		return timeout;
@@ -1801,7 +1807,7 @@ int ttm_bo_wait(struct ttm_buffer_object *bo,
 	if (timeout == 0)
 		return -EBUSY;
 
-	dma_resv_add_excl_fence(bo->base.resv, NULL);
+	dma_resv_add_excl_fence(amdkcl_ttm_resvp(bo), NULL);
 	return 0;
 }
 EXPORT_SYMBOL(ttm_bo_wait);
@@ -1892,7 +1898,7 @@ out:
 	 * already swapped buffer.
 	 */
 	if (locked)
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
 }
@@ -1929,14 +1935,14 @@ int ttm_bo_wait_unreserved(struct ttm_buffer_object *bo)
 	ret = mutex_lock_interruptible(&bo->wu_mutex);
 	if (unlikely(ret != 0))
 		return -ERESTARTSYS;
-	if (!dma_resv_is_locked(bo->base.resv))
+	if (!dma_resv_is_locked(amdkcl_ttm_resvp(bo)))
 		goto out_unlock;
-	ret = dma_resv_lock_interruptible(bo->base.resv, NULL);
+	ret = dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo), NULL);
 	if (ret == -EINTR)
 		ret = -ERESTARTSYS;
 	if (unlikely(ret != 0))
 		goto out_unlock;
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 
 out_unlock:
 	mutex_unlock(&bo->wu_mutex);

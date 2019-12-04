@@ -617,7 +617,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	    bo->tbo.mem.placement & TTM_PL_FLAG_VRAM) {
 		struct dma_fence *fence;
 
-		r = amdgpu_fill_buffer(bo, 0, bo->tbo.base.resv, &fence);
+		r = amdgpu_fill_buffer(bo, 0, amdkcl_ttm_resvp(&bo->tbo), &fence);
 		if (unlikely(r))
 			goto fail_unreserve;
 
@@ -649,7 +649,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 
 fail_unreserve:
 	if (!bp->resv)
-		dma_resv_unlock(bo->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 	amdgpu_bo_unref(&bo);
 	return r;
 }
@@ -670,7 +670,7 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 	bp.flags = AMDGPU_GEM_CREATE_CPU_GTT_USWC |
 		AMDGPU_GEM_CREATE_SHADOW;
 	bp.type = ttm_bo_type_kernel;
-	bp.resv = bo->tbo.base.resv;
+	bp.resv = amdkcl_ttm_resvp(&bo->tbo);
 
 	r = amdgpu_bo_do_create(adev, &bp, &bo->shadow);
 	if (!r) {
@@ -711,13 +711,13 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 
 	if ((flags & AMDGPU_GEM_CREATE_SHADOW) && !(adev->flags & AMD_IS_APU)) {
 		if (!bp->resv)
-			WARN_ON(dma_resv_lock((*bo_ptr)->tbo.base.resv,
+			WARN_ON(dma_resv_lock(amdkcl_ttm_resvp(&(*bo_ptr)->tbo),
 							NULL));
 
 		r = amdgpu_bo_create_shadow(adev, bp->size, *bo_ptr);
 
 		if (!bp->resv)
-			dma_resv_unlock((*bo_ptr)->tbo.base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(&(*bo_ptr)->tbo));
 
 		if (r)
 			amdgpu_bo_unref(bo_ptr);
@@ -814,7 +814,7 @@ int amdgpu_bo_kmap(struct amdgpu_bo *bo, void **ptr)
 		return 0;
 	}
 
-	r = dma_resv_wait_timeout_rcu(bo->tbo.base.resv, false, false,
+	r = dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(&bo->tbo), false, false,
 						MAX_SCHEDULE_TIMEOUT);
 	if (r < 0)
 		return r;
@@ -1195,7 +1195,7 @@ int amdgpu_bo_set_tiling_flags(struct amdgpu_bo *bo, u64 tiling_flags)
  */
 void amdgpu_bo_get_tiling_flags(struct amdgpu_bo *bo, u64 *tiling_flags)
 {
-	dma_resv_assert_held(bo->tbo.base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
 
 	if (tiling_flags)
 		*tiling_flags = bo->tiling_flags;
@@ -1344,15 +1344,15 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))
 		return;
 
-	dma_resv_lock(bo->base.resv, NULL);
+	dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 
-	r = amdgpu_fill_buffer(abo, AMDGPU_POISON, bo->base.resv, &fence);
+	r = amdgpu_fill_buffer(abo, AMDGPU_POISON, amdkcl_ttm_resvp(bo), &fence);
 	if (!WARN_ON(r)) {
 		amdgpu_bo_fence(abo, fence, false);
 		dma_fence_put(fence);
 	}
 
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 }
 
 /**
@@ -1427,7 +1427,7 @@ int amdgpu_bo_fault_reserve_notify(struct ttm_buffer_object *bo)
 void amdgpu_bo_fence(struct amdgpu_bo *bo, struct dma_fence *fence,
 		     bool shared)
 {
-	struct dma_resv *resv = bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&bo->tbo);
 
 	if (shared)
 		dma_resv_add_shared_fence(resv, fence);
@@ -1452,7 +1452,7 @@ int amdgpu_bo_sync_wait(struct amdgpu_bo *bo, void *owner, bool intr)
 	int r;
 
 	amdgpu_sync_create(&sync);
-	amdgpu_sync_resv(adev, &sync, bo->tbo.base.resv, owner, false);
+	amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo), owner, false);
 	r = amdgpu_sync_wait(&sync, intr);
 	amdgpu_sync_free(&sync);
 
@@ -1472,7 +1472,7 @@ int amdgpu_bo_sync_wait(struct amdgpu_bo *bo, void *owner, bool intr)
 u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo)
 {
 	WARN_ON_ONCE(bo->tbo.mem.mem_type == TTM_PL_SYSTEM);
-	WARN_ON_ONCE(!dma_resv_is_locked(bo->tbo.base.resv) &&
+	WARN_ON_ONCE(!dma_resv_is_locked(amdkcl_ttm_resvp(&bo->tbo)) &&
 		     !bo->pin_count && bo->tbo.type != ttm_bo_type_kernel);
 	WARN_ON_ONCE(bo->tbo.mem.start == AMDGPU_BO_INVALID_OFFSET);
 	WARN_ON_ONCE(bo->tbo.mem.mem_type == TTM_PL_VRAM &&

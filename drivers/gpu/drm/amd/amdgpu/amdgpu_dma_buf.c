@@ -194,7 +194,7 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	 * fences on the reservation object into a single exclusive
 	 * fence.
 	 */
-	r = __dma_resv_make_exclusive(bo->tbo.base.resv);
+	r = __dma_resv_make_exclusive(amdkcl_ttm_resvp(&bo->tbo));
 	if (r)
 		return r;
 
