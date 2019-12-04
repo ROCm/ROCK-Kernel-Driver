@@ -1167,12 +1167,12 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		/* Implicitly sync to command submissions in the same VM before
 		 * unmapping.
 		 */
-		r = amdgpu_sync_resv(adev, &sync, vm->root.bo->tbo.base.resv,
+		r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&vm->root.bo->tbo),
 				     AMDGPU_SYNC_EQ_OWNER, vm);
 		if (r)
 			goto error_free;
 		if (bo) {
-			r = amdgpu_sync_kfd(&sync, bo->tbo.base.resv);
+			r = amdgpu_sync_kfd(&sync, amdkcl_ttm_resvp(&bo->tbo));
 			if (r)
 				goto error_free;
 		}
@@ -1445,7 +1445,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 	 * unmapping.
 	 */
 	amdgpu_sync_create(&sync);
-	r = amdgpu_sync_resv(adev, &sync, vm->root.bo->tbo.base.resv,
+	r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&vm->root.bo->tbo),
 			     AMDGPU_SYNC_EQ_OWNER, vm);
 	if (r)
 		goto error_free;
@@ -1517,7 +1517,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 	while (!list_empty(&vm->invalidated)) {
 		bo_va = list_first_entry(&vm->invalidated, struct amdgpu_bo_va,
 					 base.vm_status);
-		resv = bo_va->base.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&bo_va->base.bo->tbo);
 		spin_unlock(&vm->status_lock);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
@@ -2036,7 +2036,7 @@ void amdgpu_vm_bo_trace_cs(struct amdgpu_vm *vm, struct ww_acquire_ctx *ticket)
 			struct amdgpu_bo *bo;
 
 			bo = mapping->bo_va->base.bo;
-			if (dma_resv_locking_ctx(bo->tbo.base.resv) !=
+			if (dma_resv_locking_ctx(amdkcl_ttm_resvp(&bo->tbo)) !=
 			    ticket)
 				continue;
 		}
@@ -2122,7 +2122,7 @@ bool amdgpu_vm_evictable(struct amdgpu_bo *bo)
 		return true;
 
 	/* Don't evict VM page tables while they are busy */
-	if (!dma_resv_test_signaled(bo->tbo.base.resv, DMA_RESV_USAGE_BOOKKEEP))
+	if (!dma_resv_test_signaled(amdkcl_ttm_resvp(&bo->tbo), DMA_RESV_USAGE_BOOKKEEP))
 		return false;
 
 	/* Try to block ongoing updates */
@@ -2298,7 +2298,7 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t min_vm_size,
  */
 long amdgpu_vm_wait_idle(struct amdgpu_vm *vm, long timeout)
 {
-	timeout = dma_resv_wait_timeout(vm->root.bo->tbo.base.resv,
+	timeout = dma_resv_wait_timeout(amdkcl_ttm_resvp(&vm->root.bo->tbo),
 					DMA_RESV_USAGE_BOOKKEEP,
 					true, timeout);
 	if (timeout <= 0)
@@ -2488,7 +2488,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	}
 
 	amdgpu_vm_bo_base_init(&vm->root, vm, root_bo);
-	r = dma_resv_reserve_fences(root_bo->tbo.base.resv, 1);
+	r = dma_resv_reserve_fences(amdkcl_ttm_resvp(&root_bo->tbo), 1);
 	if (r)
 		goto error_free_root;
 
@@ -3042,5 +3042,5 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
  */
 bool amdgpu_vm_is_bo_always_valid(struct amdgpu_vm *vm, struct amdgpu_bo *bo)
 {
-	return bo && bo->tbo.base.resv == vm->root.bo->tbo.base.resv;
+	return bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo);
 }

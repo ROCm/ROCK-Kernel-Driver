@@ -1479,7 +1479,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	amdgpu_userq_mgr_fini(&fpriv->userq_mgr);
 
 	if (pasid)
-		amdgpu_pasid_free_delayed(pd->tbo.base.resv, pasid);
+		amdgpu_pasid_free_delayed(amdkcl_ttm_resvp(&pd->tbo), pasid);
 	amdgpu_bo_unref(&pd);
 
 	idr_for_each_entry(&fpriv->bo_list_handles, list, handle)

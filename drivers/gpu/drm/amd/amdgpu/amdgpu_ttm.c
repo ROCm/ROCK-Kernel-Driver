@@ -391,7 +391,7 @@ static int amdgpu_move_blit(struct ttm_buffer_object *bo,
 	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst,
 				       new_mem->size,
 				       amdgpu_bo_encrypted(abo),
-				       bo->base.resv, &fence);
+				       amdkcl_ttm_resvp(bo), &fence);
 	if (r)
 		goto error;
 
