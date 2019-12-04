@@ -62,7 +62,7 @@ int ttm_tt_create(struct ttm_buffer_object *bo, bool zero_alloc)
 	struct ttm_device *bdev = bo->bdev;
 	uint32_t page_flags = 0;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	if (bo->ttm)
 		return 0;

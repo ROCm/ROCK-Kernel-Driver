@@ -403,7 +403,7 @@ static int amdgpu_cs_bo_validate(void *param, struct amdgpu_bo *bo)
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false,
-		.resv = bo->tbo.base.resv
+		.resv = amdkcl_ttm_resvp(&bo->tbo),
 	};
 	uint32_t domain;
 	int r;
@@ -643,7 +643,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 
 	list_for_each_entry(e, &p->validated, tv.head) {
 		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
-		struct dma_resv *resv = bo->tbo.base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(&bo->tbo);
 		enum amdgpu_sync_mode sync_mode;
 
 		sync_mode = amdgpu_bo_explicit_sync(bo) ?
@@ -1655,7 +1655,7 @@ int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	*map = mapping;
 
 	/* Double check that the BO is reserved by this CS */
-	if (dma_resv_locking_ctx((*bo)->tbo.base.resv) != &parser->ticket)
+	if (dma_resv_locking_ctx(amdkcl_ttm_resvp(&(*bo)->tbo)) != &parser->ticket)
 		return -EINVAL;
 
 	if (!((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {

@@ -124,7 +124,7 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	 * fences on the reservation object into a single exclusive
 	 * fence.
 	 */
-	r = __dma_resv_make_exclusive(bo->tbo.base.resv);
+	r = __dma_resv_make_exclusive(amdkcl_ttm_resvp(&bo->tbo));
 	if (r)
 		goto out;
 
@@ -485,7 +485,7 @@ amdgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
 
 	for (bo_base = bo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
-		struct dma_resv *resv = vm->root.bo->tbo.base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 
 		if (ticket) {
 			/* When we get an error here it means that somebody

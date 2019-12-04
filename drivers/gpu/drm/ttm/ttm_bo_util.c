@@ -237,11 +237,11 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	fbo->base.destroy = &ttm_transfered_destroy;
 	fbo->base.pin_count = 0;
 	if (bo->type != ttm_bo_type_sg)
-		fbo->base.base.resv = &fbo->base.base._resv;
+		amdkcl_ttm_resvp(&fbo->base) = &amdkcl_ttm_resv(&fbo->base);
 
-	dma_resv_init(&fbo->base.base._resv);
+	dma_resv_init(&amdkcl_ttm_resv(&fbo->base));
 	fbo->base.base.dev = NULL;
-	ret = dma_resv_trylock(&fbo->base.base._resv);
+	ret = dma_resv_trylock(&amdkcl_ttm_resv(&fbo->base));
 	WARN_ON(!ret);
 
 	ttm_bo_move_to_lru_tail_unlocked(&fbo->base);
@@ -495,7 +495,7 @@ static int ttm_bo_move_to_ghost(struct ttm_buffer_object *bo,
 	if (ret)
 		return ret;
 
-	dma_resv_add_excl_fence(&ghost_obj->base._resv, fence);
+	dma_resv_add_excl_fence(&amdkcl_ttm_resv(ghost_obj), fence);
 
 	/**
 	 * If we're not moving to fixed memory, the TTM object
@@ -509,7 +509,7 @@ static int ttm_bo_move_to_ghost(struct ttm_buffer_object *bo,
 		bo->ttm = NULL;
 	bo->resource = NULL;
 
-	dma_resv_unlock(&ghost_obj->base._resv);
+	dma_resv_unlock(&amdkcl_ttm_resv(ghost_obj));
 	ttm_bo_put(ghost_obj);
 	return 0;
 }
@@ -550,7 +550,7 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 	struct ttm_resource_manager *man = ttm_manager_type(bdev, new_mem->mem_type);
 	int ret = 0;
 
-	dma_resv_add_excl_fence(bo->base.resv, fence);
+	dma_resv_add_excl_fence(amdkcl_ttm_resvp(bo), fence);
 	if (!evict)
 		ret = ttm_bo_move_to_ghost(bo, fence, man->use_tt);
 	else if (!from->use_tt && pipeline)
@@ -627,12 +627,12 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	if (ret)
 		goto error_destroy_tt;
 
-	ret = dma_resv_copy_fences(&ghost->base._resv, bo->base.resv);
+	ret = dma_resv_copy_fences(&amdkcl_ttm_resv(ghost), amdkcl_ttm_resvp(bo));
 	/* Last resort, wait for the BO to be idle when we are OOM */
 	if (ret)
 		ttm_bo_wait(bo, false, false);
 
-	dma_resv_unlock(&ghost->base._resv);
+	dma_resv_unlock(&amdkcl_ttm_resv(ghost));
 	ttm_bo_put(ghost);
 	bo->ttm = ttm;
 	bo->resource = NULL;

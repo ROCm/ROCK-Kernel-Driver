@@ -390,7 +390,7 @@ static int amdgpu_move_blit(struct ttm_buffer_object *bo,
 	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst,
 				       new_mem->num_pages << PAGE_SHIFT,
 				       amdgpu_bo_encrypted(abo),
-				       bo->base.resv, &fence);
+				       amdkcl_ttm_resvp(bo), &fence);
 	if (r)
 		goto error;
 
@@ -1347,11 +1347,11 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 	 * If true, then return false as any KFD process needs all its BOs to
 	 * be resident to run successfully
 	 */
-	flist = dma_resv_shared_list(bo->base.resv);
+	flist = dma_resv_shared_list(amdkcl_ttm_resvp(bo));
 	if (flist) {
 		for (i = 0; i < flist->shared_count; ++i) {
 			f = rcu_dereference_protected(flist->shared[i],
-				dma_resv_held(bo->base.resv));
+				dma_resv_held(amdkcl_ttm_resvp(bo)));
 			if (amdkfd_fence_check_mm(f, current->mm))
 				return false;
 		}
