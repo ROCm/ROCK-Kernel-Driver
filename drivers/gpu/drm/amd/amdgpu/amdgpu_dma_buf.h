@@ -25,7 +25,12 @@
 
 #include <drm/drm_gem.h>
 
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
+#else
+struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
+					struct drm_gem_object *gobj,
+#endif
 					int flags);
 #if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
