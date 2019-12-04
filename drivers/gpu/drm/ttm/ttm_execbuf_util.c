@@ -39,7 +39,7 @@ static void ttm_eu_backoff_reservation_reverse(struct list_head *list,
 	list_for_each_entry_continue_reverse(entry, list, head) {
 		struct ttm_buffer_object *bo = entry->bo;
 
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 }
 
@@ -56,7 +56,7 @@ void ttm_eu_backoff_reservation(struct ww_acquire_ctx *ticket,
 		struct ttm_buffer_object *bo = entry->bo;
 
 		ttm_bo_move_to_lru_tail(bo, NULL);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 	spin_unlock(&ttm_bo_glob.lru_lock);
 
@@ -106,7 +106,7 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 			if (!entry->num_shared)
 				continue;
 
-			ret = dma_resv_reserve_shared(bo->base.resv,
+			ret = dma_resv_reserve_shared(amdkcl_ttm_resvp(bo),
 								entry->num_shared);
 			if (!ret)
 				continue;
@@ -120,16 +120,16 @@ int ttm_eu_reserve_buffers(struct ww_acquire_ctx *ticket,
 
 		if (ret == -EDEADLK) {
 			if (intr) {
-				ret = dma_resv_lock_slow_interruptible(bo->base.resv,
+				ret = dma_resv_lock_slow_interruptible(amdkcl_ttm_resvp(bo),
 										 ticket);
 			} else {
-				dma_resv_lock_slow(bo->base.resv, ticket);
+				dma_resv_lock_slow(amdkcl_ttm_resvp(bo), ticket);
 				ret = 0;
 			}
 		}
 
 		if (!ret && entry->num_shared)
-			ret = dma_resv_reserve_shared(bo->base.resv,
+			ret = dma_resv_reserve_shared(amdkcl_ttm_resvp(bo),
 								entry->num_shared);
 
 		if (unlikely(ret != 0)) {
@@ -167,11 +167,11 @@ void ttm_eu_fence_buffer_objects(struct ww_acquire_ctx *ticket,
 		struct ttm_buffer_object *bo = entry->bo;
 
 		if (entry->num_shared)
-			dma_resv_add_shared_fence(bo->base.resv, fence);
+			dma_resv_add_shared_fence(amdkcl_ttm_resvp(bo), fence);
 		else
-			dma_resv_add_excl_fence(bo->base.resv, fence);
+			dma_resv_add_excl_fence(amdkcl_ttm_resvp(bo), fence);
 		ttm_bo_move_to_lru_tail(bo, NULL);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 	spin_unlock(&ttm_bo_glob.lru_lock);
 	if (ticket)

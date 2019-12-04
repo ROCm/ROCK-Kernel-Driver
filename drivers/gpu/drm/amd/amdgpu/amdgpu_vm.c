@@ -328,7 +328,7 @@ static void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
 	base->next = bo->vm_bo;
 	bo->vm_bo = base;
 
-	if (bo->tbo.base.resv != vm->root.base.bo->tbo.base.resv)
+	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 		return;
 
 	vm->bulk_moveable = false;
@@ -618,7 +618,7 @@ void amdgpu_vm_del_from_lru_notify(struct ttm_buffer_object *bo)
 	for (bo_base = abo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (abo->tbo.base.resv == vm->root.base.bo->tbo.base.resv)
+		if (amdkcl_ttm_resvp(&abo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 			vm->bulk_moveable = false;
 	}
 
@@ -874,7 +874,7 @@ static void amdgpu_vm_bo_param(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	bp->type = ttm_bo_type_kernel;
 	bp->no_wait_gpu = immediate;
 	if (vm->root.base.bo)
-		bp->resv = vm->root.base.bo->tbo.base.resv;
+		bp->resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 }
 
 /**
@@ -1805,12 +1805,12 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	if (clear || !bo) {
 		mem = NULL;
 		nodes = NULL;
-		resv = vm->root.base.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 	} else {
 		struct drm_gem_object *obj = &bo->tbo.base;
 		struct ttm_dma_tt *ttm;
 
-		resv = bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&bo->tbo);
 		if (obj->import_attach && bo_va->is_xgmi) {
 			struct dma_buf *dma_buf = obj->import_attach->dmabuf;
 			struct drm_gem_object *gobj = dma_buf->priv;
@@ -1840,8 +1840,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		flags = 0x0;
 	}
 
-	if (clear || (bo && bo->tbo.base.resv ==
-		      vm->root.base.bo->tbo.base.resv))
+	if (clear || (bo && amdkcl_ttm_resvp(&bo->tbo) ==
+		      amdkcl_ttm_resvp(&vm->root.base.bo->tbo)))
 		last_update = &vm->last_update;
 	else
 		last_update = &bo_va->last_pt_update;
@@ -1866,7 +1866,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	if (bo && bo->tbo.base.resv == vm->root.base.bo->tbo.base.resv) {
+	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo)) {
 		uint32_t mem_type = bo->tbo.mem.mem_type;
 
 		if (!(bo->preferred_domains &
@@ -2003,7 +2003,7 @@ static void amdgpu_vm_free_mapping(struct amdgpu_device *adev,
  */
 static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	struct dma_resv *resv = vm->root.base.bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 	struct dma_fence *excl, **shared;
 	unsigned i, shared_count;
 	int r;
@@ -2050,7 +2050,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 			  struct amdgpu_vm *vm,
 			  struct dma_fence **fence)
 {
-	struct dma_resv *resv = vm->root.base.bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
 	struct amdgpu_bo_va_mapping *mapping;
 	uint64_t init_pte_value = 0;
 	struct dma_fence *f = NULL;
@@ -2118,7 +2118,7 @@ int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 	while (!list_empty(&vm->invalidated)) {
 		bo_va = list_first_entry(&vm->invalidated, struct amdgpu_bo_va,
 					 base.vm_status);
-		resv = bo_va->base.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&bo_va->base.bo->tbo);
 		spin_unlock(&vm->invalidated_lock);
 
 		/* Try to reserve the BO to avoid clearing its ptes */
@@ -2208,7 +2208,7 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 	if (mapping->flags & AMDGPU_PTE_PRT)
 		amdgpu_vm_prt_get(adev);
 
-	if (bo && bo->tbo.base.resv == vm->root.base.bo->tbo.base.resv &&
+	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo) &&
 	    !bo_va->base.moved) {
 		list_move(&bo_va->base.vm_status, &vm->moved);
 	}
@@ -2542,7 +2542,7 @@ void amdgpu_vm_bo_trace_cs(struct amdgpu_vm *vm, struct ww_acquire_ctx *ticket)
 			struct amdgpu_bo *bo;
 
 			bo = mapping->bo_va->base.bo;
-			if (dma_resv_locking_ctx(bo->tbo.base.resv) !=
+			if (dma_resv_locking_ctx(amdkcl_ttm_resvp(&bo->tbo)) !=
 			    ticket)
 				continue;
 		}
@@ -2570,7 +2570,7 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 	struct amdgpu_vm_bo_base **base;
 
 	if (bo) {
-		if (bo->tbo.base.resv == vm->root.base.bo->tbo.base.resv)
+		if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 			vm->bulk_moveable = false;
 
 		for (base = &bo_va->base.bo->vm_bo; *base;
@@ -2625,7 +2625,7 @@ bool amdgpu_vm_evictable(struct amdgpu_bo *bo)
 		return true;
 
 	/* Don't evict VM page tables while they are busy */
-	if (!dma_resv_test_signaled_rcu(bo->tbo.base.resv, true))
+	if (!dma_resv_test_signaled_rcu(amdkcl_ttm_resvp(&bo->tbo), true))
 		return false;
 
 	/* Try to block ongoing updates */
@@ -2664,7 +2664,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 	for (bo_base = bo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (evicted && bo->tbo.base.resv == vm->root.base.bo->tbo.base.resv) {
+		if (evicted && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo)) {
 			amdgpu_vm_bo_evicted(bo_base);
 			continue;
 		}
@@ -2675,7 +2675,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 
 		if (bo->tbo.type == ttm_bo_type_kernel)
 			amdgpu_vm_bo_relocated(bo_base);
-		else if (bo->tbo.base.resv == vm->root.base.bo->tbo.base.resv)
+		else if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
 			amdgpu_vm_bo_moved(bo_base);
 		else
 			amdgpu_vm_bo_invalidated(bo_base);
@@ -2805,7 +2805,7 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t min_vm_size,
  */
 long amdgpu_vm_wait_idle(struct amdgpu_vm *vm, long timeout)
 {
-	timeout = dma_resv_wait_timeout_rcu(vm->root.base.bo->tbo.base.resv,
+	timeout = dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(&vm->root.base.bo->tbo),
 					    true, true, timeout);
 	if (timeout <= 0)
 		return timeout;
@@ -2898,7 +2898,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (r)
 		goto error_free_root;
 
-	r = dma_resv_reserve_shared(root->tbo.base.resv, 1);
+	r = dma_resv_reserve_shared(amdkcl_ttm_resvp(&root->tbo), 1);
 	if (r)
 		goto error_unreserve;
 
