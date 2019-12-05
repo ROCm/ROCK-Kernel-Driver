@@ -14,6 +14,7 @@
 #include <kcl/kcl_device.h>
 #include <kcl/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
 #include <kcl/kcl_drm_connector.h>
