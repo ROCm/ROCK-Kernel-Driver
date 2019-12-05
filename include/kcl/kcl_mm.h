@@ -6,6 +6,10 @@
 #include <linux/gfp.h>
 #include <kcl/kcl_overflow.h>
 
+#ifndef untagged_addr
+#define untagged_addr(addr) (addr)
+#endif
+
 #ifndef HAVE_KVZALLOC_KVMALLOC
 static inline void *kvmalloc(size_t size, gfp_t flags)
 {
