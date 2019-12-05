@@ -27,6 +27,8 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 
+#include <drm/drm_connector.h>
+#include <kcl/kcl_drm_device_h.h>
 #include <drm/drm_dp_helper.h>
 
 #if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
@@ -123,20 +125,6 @@ static inline void _kcl_drm_dp_cec_irq(struct drm_dp_aux *aux)
 #endif
 }
 
-static inline void _kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
-						 const char *name,
-						 struct device *parent)
-{
-#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
-#ifdef CONFIG_DRM_DP_CEC
-	if (WARN_ON(!aux->transfer))
-		return;
-#endif
-
-	drm_dp_cec_register_connector(aux, name, parent);
-#endif
-}
-
 static inline void _kcl_drm_dp_cec_set_edid(struct drm_dp_aux *aux,
 				       const struct edid *edid)
 {
@@ -168,6 +156,21 @@ static inline void _kcl_drm_dp_cec_unset_edid(struct drm_dp_aux *aux)
 #if !defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
 static inline void drm_dp_cec_unregister_connector(struct drm_dp_aux *aux)
 {
+}
+#endif
+
+#if !defined(HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP)
+static inline void _kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
+				   struct drm_connector *connector)
+{
+#if defined(HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS)
+#ifdef CONFIG_DRM_DP_CEC
+	if (WARN_ON(!aux->transfer))
+		return;
+#endif
+
+	drm_dp_cec_register_connector(aux, connector->name, connector->dev->dev);
+#endif
 }
 #endif
 #endif /* _KCL_DRM_DP_HELPER_H_ */
