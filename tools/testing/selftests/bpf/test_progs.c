@@ -8,22 +8,20 @@
 
 /* defined in test_progs.h */
 struct test_env env;
-int error_cnt, pass_cnt;
 
 struct prog_test_def {
 	const char *test_name;
 	int test_num;
 	void (*run_test)(void);
 	bool force_log;
-	int pass_cnt;
 	int error_cnt;
+	int skip_cnt;
 	bool tested;
 
 	const char *subtest_name;
 	int subtest_num;
 
 	/* store counts before subtest started */
-	int old_pass_cnt;
 	int old_error_cnt;
 };
 
@@ -40,29 +38,45 @@ static bool should_run(struct test_selector *sel, int num, const char *name)
 
 static void dump_test_log(const struct prog_test_def *test, bool failed)
 {
+	if (stdout == env.stdout)
+		return;
+
+	fflush(stdout); /* exports env.log_buf & env.log_cnt */
+
 	if (env.verbose || test->force_log || failed) {
 		if (env.log_cnt) {
-			fprintf(stdout, "%s", env.log_buf);
+			env.log_buf[env.log_cnt] = '\0';
+			fprintf(env.stdout, "%s", env.log_buf);
 			if (env.log_buf[env.log_cnt - 1] != '\n')
-				fprintf(stdout, "\n");
+				fprintf(env.stdout, "\n");
 		}
 	}
-	env.log_cnt = 0;
+
+	fseeko(stdout, 0, SEEK_SET); /* rewind */
+}
+
+static void skip_account(void)
+{
+	if (env.test->skip_cnt) {
+		env.skip_cnt++;
+		env.test->skip_cnt = 0;
+	}
 }
 
 void test__end_subtest()
 {
 	struct prog_test_def *test = env.test;
-	int sub_error_cnt = error_cnt - test->old_error_cnt;
+	int sub_error_cnt = test->error_cnt - test->old_error_cnt;
 
 	if (sub_error_cnt)
 		env.fail_cnt++;
 	else
 		env.sub_succ_cnt++;
+	skip_account();
 
 	dump_test_log(test, sub_error_cnt);
 
-	printf("#%d/%d %s:%s\n",
+	fprintf(env.stdout, "#%d/%d %s:%s\n",
 	       test->test_num, test->subtest_num,
 	       test->subtest_name, sub_error_cnt ? "FAIL" : "OK");
 }
@@ -79,7 +93,8 @@ bool test__start_subtest(const char *name)
 	test->subtest_num++;
 
 	if (!name || !name[0]) {
-		fprintf(stderr, "Subtest #%d didn't provide sub-test name!\n",
+		fprintf(env.stderr,
+			"Subtest #%d didn't provide sub-test name!\n",
 			test->subtest_num);
 		return false;
 	}
@@ -88,8 +103,7 @@ bool test__start_subtest(const char *name)
 		return false;
 
 	test->subtest_name = name;
-	env.test->old_pass_cnt = pass_cnt;
-	env.test->old_error_cnt = error_cnt;
+	env.test->old_error_cnt = env.test->error_cnt;
 
 	return true;
 }
@@ -98,64 +112,14 @@ void test__force_log() {
 	env.test->force_log = true;
 }
 
-void test__vprintf(const char *fmt, va_list args)
+void test__skip(void)
 {
-	size_t rem_sz;
-	int ret = 0;
-
-	if (env.verbose || (env.test && env.test->force_log)) {
-		vfprintf(stderr, fmt, args);
-		return;
-	}
-
-try_again:
-	rem_sz = env.log_cap - env.log_cnt;
-	if (rem_sz) {
-		va_list ap;
-
-		va_copy(ap, args);
-		/* we reserved extra byte for \0 at the end */
-		ret = vsnprintf(env.log_buf + env.log_cnt, rem_sz + 1, fmt, ap);
-		va_end(ap);
-
-		if (ret < 0) {
-			env.log_buf[env.log_cnt] = '\0';
-			fprintf(stderr, "failed to log w/ fmt '%s'\n", fmt);
-			return;
-		}
-	}
-
-	if (!rem_sz || ret > rem_sz) {
-		size_t new_sz = env.log_cap * 3 / 2;
-		char *new_buf;
-
-		if (new_sz < 4096)
-			new_sz = 4096;
-		if (new_sz < ret + env.log_cnt)
-			new_sz = ret + env.log_cnt;
-
-		/* +1 for guaranteed space for terminating \0 */
-		new_buf = realloc(env.log_buf, new_sz + 1);
-		if (!new_buf) {
-			fprintf(stderr, "failed to realloc log buffer: %d\n",
-				errno);
-			return;
-		}
-		env.log_buf = new_buf;
-		env.log_cap = new_sz;
-		goto try_again;
-	}
-
-	env.log_cnt += ret;
+	env.test->skip_cnt++;
 }
 
-void test__printf(const char *fmt, ...)
+void test__fail(void)
 {
-	va_list args;
-
-	va_start(args, fmt);
-	test__vprintf(fmt, args);
-	va_end(args);
+	env.test->error_cnt++;
 }
 
 struct ipv4_packet pkt_v4 = {
@@ -182,7 +146,7 @@ int bpf_find_map(const char *test, struct bpf_object *obj, const char *name)
 	map = bpf_object__find_map_by_name(obj, name);
 	if (!map) {
 		printf("%s:FAIL:map '%s' not found\n", test, name);
-		error_cnt++;
+		test__fail();
 		return -1;
 	}
 	return bpf_map__fd(map);
@@ -331,7 +295,7 @@ enum ARG_KEYS {
 	ARG_VERIFIER_STATS = 's',
 	ARG_VERBOSE = 'v',
 };
-	
+
 static const struct argp_option opts[] = {
 	{ "num", ARG_TEST_NUM, "NUM", 0,
 	  "Run test number NUM only " },
@@ -349,7 +313,7 @@ static int libbpf_print_fn(enum libbpf_print_level level,
 {
 	if (!env.very_verbose && level == LIBBPF_DEBUG)
 		return 0;
-	test__vprintf(format, args);
+	vprintf(format, args);
 	return 0;
 }
 
@@ -477,6 +441,48 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
+static void stdio_hijack(void)
+{
+#ifdef __GLIBC__
+	env.stdout = stdout;
+	env.stderr = stderr;
+
+	if (env.verbose) {
+		/* nothing to do, output to stdout by default */
+		return;
+	}
+
+	/* stdout and stderr -> buffer */
+	fflush(stdout);
+
+	stdout = open_memstream(&env.log_buf, &env.log_cnt);
+	if (!stdout) {
+		stdout = env.stdout;
+		perror("open_memstream");
+		return;
+	}
+
+	stderr = stdout;
+#endif
+}
+
+static void stdio_restore(void)
+{
+#ifdef __GLIBC__
+	if (stdout == env.stdout)
+		return;
+
+	fclose(stdout);
+	free(env.log_buf);
+
+	env.log_buf = NULL;
+	env.log_cnt = 0;
+
+	stdout = env.stdout;
+	stderr = env.stderr;
+#endif
+}
+
 int main(int argc, char **argv)
 {
 	static const struct argp argp = {
@@ -496,10 +502,9 @@ int main(int argc, char **argv)
 
 	env.jit_enabled = is_jit_enabled();
 
+	stdio_hijack();
 	for (i = 0; i < prog_test_cnt; i++) {
 		struct prog_test_def *test = &prog_test_defs[i];
-		int old_pass_cnt = pass_cnt;
-		int old_error_cnt = error_cnt;
 
 		env.test = test;
 		test->test_num = i + 1;
@@ -514,24 +519,24 @@ int main(int argc, char **argv)
 			test__end_subtest();
 
 		test->tested = true;
-		test->pass_cnt = pass_cnt - old_pass_cnt;
-		test->error_cnt = error_cnt - old_error_cnt;
 		if (test->error_cnt)
 			env.fail_cnt++;
 		else
 			env.succ_cnt++;
+		skip_account();
 
 		dump_test_log(test, test->error_cnt);
 
-		printf("#%d %s:%s\n", test->test_num, test->test_name,
-		       test->error_cnt ? "FAIL" : "OK");
+		fprintf(env.stdout, "#%d %s:%s\n",
+			test->test_num, test->test_name,
+			test->error_cnt ? "FAIL" : "OK");
 	}
-	printf("Summary: %d/%d PASSED, %d FAILED\n",
-	       env.succ_cnt, env.sub_succ_cnt, env.fail_cnt);
+	stdio_restore();
+	printf("Summary: %d/%d PASSED, %d SKIPPED, %d FAILED\n",
+	       env.succ_cnt, env.sub_succ_cnt, env.skip_cnt, env.fail_cnt);
 
-	free(env.log_buf);
 	free(env.test_selector.num_set);
 	free(env.subtest_selector.num_set);
 
-	return error_cnt ? EXIT_FAILURE : EXIT_SUCCESS;
+	return env.fail_cnt ? EXIT_FAILURE : EXIT_SUCCESS;
 }

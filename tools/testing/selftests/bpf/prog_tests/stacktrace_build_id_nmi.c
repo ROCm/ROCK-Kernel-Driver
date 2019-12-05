@@ -82,9 +82,10 @@ retry:
 		  "err %d errno %d\n", err, errno))
 		goto disable_pmu;
 
-	assert(system("dd if=/dev/urandom of=/dev/zero count=4 2> /dev/null")
-	       == 0);
-	assert(system("taskset 0x1 ./urandom_read 100000") == 0);
+	if (CHECK_FAIL(system("dd if=/dev/urandom of=/dev/zero count=4 2> /dev/null")))
+		goto disable_pmu;
+	if (CHECK_FAIL(system("taskset 0x1 ./urandom_read 100000")))
+		goto disable_pmu;
 	/* disable stack trace collection */
 	key = 0;
 	val = 1;
@@ -140,8 +141,8 @@ retry:
 	if (build_id_matches < 1 && retry--) {
 		bpf_link__destroy(link);
 		bpf_object__close(obj);
-		test__printf("%s:WARN:Didn't find expected build ID from the map, retrying\n",
-			     __func__);
+		printf("%s:WARN:Didn't find expected build ID from the map, retrying\n",
+		       __func__);
 		goto retry;
 	}
 

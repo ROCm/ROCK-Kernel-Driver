@@ -932,13 +932,13 @@ static int bpf_object__init_user_maps(struct bpf_object *obj, bool strict)
 	pr_debug("maps in %s: %d maps in %zd bytes\n",
 		 obj->path, nr_maps, data->d_size);
 
-	map_def_sz = data->d_size / nr_maps;
-	if (!data->d_size || (data->d_size % nr_maps) != 0) {
+	if (!data->d_size || nr_maps == 0 || (data->d_size % nr_maps) != 0) {
 		pr_warning("unable to determine map definition size "
 			   "section %s, %d maps in %zd bytes\n",
 			   obj->path, nr_maps, data->d_size);
 		return -EINVAL;
 	}
+	map_def_sz = data->d_size / nr_maps;
 
 	/* Fill obj->maps using data in "maps" section.  */
 	for (i = 0; i < nr_syms; i++) {
@@ -1645,7 +1645,7 @@ static int bpf_object__elf_collect(struct bpf_object *obj, int flags)
 		}
 	}
 
-	if (!obj->efile.strtabidx || obj->efile.strtabidx >= idx) {
+	if (!obj->efile.strtabidx || obj->efile.strtabidx > idx) {
 		pr_warning("Corrupted ELF file: index of strtab invalid\n");
 		return -LIBBPF_ERRNO__FORMAT;
 	}
@@ -1791,9 +1791,13 @@ bpf_program__collect_reloc(struct bpf_program *prog, GElf_Shdr *shdr,
 				pr_warning("incorrect bpf_call opcode\n");
 				return -LIBBPF_ERRNO__RELOC;
 			}
+			if (sym.st_value % 8) {
+				pr_warning("bad call relo offset: %lu\n", sym.st_value);
+				return -LIBBPF_ERRNO__RELOC;
+			}
 			prog->reloc_desc[i].type = RELO_CALL;
 			prog->reloc_desc[i].insn_idx = insn_idx;
-			prog->reloc_desc[i].text_off = sym.st_value;
+			prog->reloc_desc[i].text_off = sym.st_value / 8;
 			obj->has_pseudo_calls = true;
 			continue;
 		}
@@ -3214,6 +3218,7 @@ bpf_program__reloc_text(struct bpf_program *prog, struct bpf_object *obj,
 			pr_warning("oom in prog realloc\n");
 			return -ENOMEM;
 		}
+		prog->insns = new_insn;
 
 		if (obj->btf_ext) {
 			err = bpf_program_reloc_btf_ext(prog, obj,
@@ -3225,7 +3230,6 @@ bpf_program__reloc_text(struct bpf_program *prog, struct bpf_object *obj,
 
 		memcpy(new_insn + prog->insns_cnt, text->insns,
 		       text->insns_cnt * sizeof(*insn));
-		prog->insns = new_insn;
 		prog->main_prog_cnt = prog->insns_cnt;
 		prog->insns_cnt = new_cnt;
 		pr_debug("added %zd insn from %s to prog %s\n",
@@ -3233,7 +3237,7 @@ bpf_program__reloc_text(struct bpf_program *prog, struct bpf_object *obj,
 			 prog->section_name);
 	}
 	insn = &prog->insns[relo->insn_idx];
-	insn->imm += prog->main_prog_cnt - relo->insn_idx;
+	insn->imm += relo->text_off + prog->main_prog_cnt - relo->insn_idx;
 	return 0;
 }
 
@@ -4453,19 +4457,22 @@ void bpf_program__set_expected_attach_type(struct bpf_program *prog,
 	prog->expected_attach_type = type;
 }
 
-#define BPF_PROG_SEC_IMPL(string, ptype, eatype, is_attachable, atype) \
-	{ string, sizeof(string) - 1, ptype, eatype, is_attachable, atype }
+#define BPF_PROG_SEC_IMPL(string, ptype, eatype, is_attachable, btf, atype) \
+	{ string, sizeof(string) - 1, ptype, eatype, is_attachable, btf, atype }
 
 /* Programs that can NOT be attached. */
-#define BPF_PROG_SEC(string, ptype) BPF_PROG_SEC_IMPL(string, ptype, 0, 0, 0)
+#define BPF_PROG_SEC(string, ptype) BPF_PROG_SEC_IMPL(string, ptype, 0, 0, 0, 0)
 
 /* Programs that can be attached. */
 #define BPF_APROG_SEC(string, ptype, atype) \
-	BPF_PROG_SEC_IMPL(string, ptype, 0, 1, atype)
+	BPF_PROG_SEC_IMPL(string, ptype, 0, 1, 0, atype)
 
 /* Programs that must specify expected attach type at load time. */
 #define BPF_EAPROG_SEC(string, ptype, eatype) \
-	BPF_PROG_SEC_IMPL(string, ptype, eatype, 1, eatype)
+	BPF_PROG_SEC_IMPL(string, ptype, eatype, 1, 0, eatype)
+
+/* Programs that use BTF to identify attach point */
+#define BPF_PROG_BTF(string, ptype) BPF_PROG_SEC_IMPL(string, ptype, 0, 0, 1, 0)
 
 /* Programs that can be attached but attach type can't be identified by section
  * name. Kept for backward compatibility.
@@ -4477,7 +4484,8 @@ static const struct {
 	size_t len;
 	enum bpf_prog_type prog_type;
 	enum bpf_attach_type expected_attach_type;
-	int is_attachable;
+	bool is_attachable;
+	bool is_attach_btf;
 	enum bpf_attach_type attach_type;
 } section_names[] = {
 	BPF_PROG_SEC("socket",			BPF_PROG_TYPE_SOCKET_FILTER),
@@ -4487,6 +4495,7 @@ static const struct {
 	BPF_PROG_SEC("action",			BPF_PROG_TYPE_SCHED_ACT),
 	BPF_PROG_SEC("tracepoint/",		BPF_PROG_TYPE_TRACEPOINT),
 	BPF_PROG_SEC("raw_tracepoint/",		BPF_PROG_TYPE_RAW_TRACEPOINT),
+	BPF_PROG_BTF("tp_btf/",			BPF_PROG_TYPE_RAW_TRACEPOINT),
 	BPF_PROG_SEC("xdp",			BPF_PROG_TYPE_XDP),
 	BPF_PROG_SEC("perf_event",		BPF_PROG_TYPE_PERF_EVENT),
 	BPF_PROG_SEC("lwt_in",			BPF_PROG_TYPE_LWT_IN),
@@ -4591,6 +4600,27 @@ int libbpf_prog_type_by_name(const char *name, enum bpf_prog_type *prog_type,
 			continue;
 		*prog_type = section_names[i].prog_type;
 		*expected_attach_type = section_names[i].expected_attach_type;
+		if (section_names[i].is_attach_btf) {
+			struct btf *btf = bpf_core_find_kernel_btf();
+			char raw_tp_btf_name[128] = "btf_trace_";
+			char *dst = raw_tp_btf_name + sizeof("btf_trace_") - 1;
+			int ret;
+
+			if (IS_ERR(btf)) {
+				pr_warning("vmlinux BTF is not found\n");
+				return -EINVAL;
+			}
+			/* prepend "btf_trace_" prefix per kernel convention */
+			strncat(dst, name + section_names[i].len,
+				sizeof(raw_tp_btf_name) - sizeof("btf_trace_"));
+			ret = btf__find_by_name(btf, raw_tp_btf_name);
+			btf__free(btf);
+			if (ret <= 0) {
+				pr_warning("%s is not found in vmlinux BTF\n", dst);
+				return -EINVAL;
+			}
+			*expected_attach_type = ret;
+		}
 		return 0;
 	}
 	pr_warning("failed to guess program type based on ELF section name '%s'\n", name);
