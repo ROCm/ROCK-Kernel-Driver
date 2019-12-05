@@ -26,7 +26,7 @@
 #include <linux/kthread.h>
 #include <linux/pci.h>
 #include <linux/uaccess.h>
-
+#include <linux/debugfs.h>
 #include <drm/drm_debugfs.h>
 
 #include "amdgpu.h"
