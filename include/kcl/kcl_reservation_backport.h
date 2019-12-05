@@ -11,5 +11,4 @@
 #if !defined(smp_store_mb)
 #define smp_store_mb set_mb
 #endif
-
 #endif

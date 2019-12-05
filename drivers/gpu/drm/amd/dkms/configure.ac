@@ -181,6 +181,7 @@ m4_include([m4/drm-drv-h.m4])
 m4_include([m4/drm-device-h.m4])
 m4_include([m4/drmp-h.m4])
 m4_include([m4/drm-drv-gem-prime-export.m4])
+m4_include([m4/dma-resv-h.m4])
 m4_include([m4/config.m4])
 
 
