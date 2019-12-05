@@ -4,6 +4,8 @@ endef
 RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
 RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
 
+IS_VM = $(shell dmidecode -t processor | grep -m 1 "Manufacturer: QEMU")
+
 ifneq (,$(RHEL_MAJOR))
 OS_NAME = "rhel"
 OS_VERSION = "$(RHEL_MAJOR).$(RHEL_MINOR)"
@@ -189,21 +191,25 @@ export BUILD_AS_DKMS=y
 export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
+ifeq (,$(IS_VM))
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
 export CONFIG_DRM_AMD_DC_DCN1_01=y
 export CONFIG_DRM_AMD_DC_DCN2_0=y
 export CONFIG_DRM_AMD_DC_DCN2_1=y
+endif
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
+ifeq (,$(IS_VM))
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
+endif
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
