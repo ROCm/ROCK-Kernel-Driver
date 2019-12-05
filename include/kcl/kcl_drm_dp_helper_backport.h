@@ -10,8 +10,11 @@
  */
 #if defined(AMDKCL_DRM_DP_CEC_XXX_CHECK_CB)
 #define drm_dp_cec_irq _kcl_drm_dp_cec_irq
-#define drm_dp_cec_register_connector _kcl_drm_dp_cec_register_connector
 #define drm_dp_cec_set_edid _kcl_drm_dp_cec_set_edid
 #define drm_dp_cec_unset_edid _kcl_drm_dp_cec_unset_edid
+#endif
+
+#if !defined(HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP)
+#define drm_dp_cec_register_connector _kcl_drm_dp_cec_register_connector
 #endif
 #endif
