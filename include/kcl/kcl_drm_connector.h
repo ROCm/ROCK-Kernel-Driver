@@ -54,4 +54,21 @@
 
 #endif
 
+#ifndef HAVE_DRM_CONNECTOR_INIT_WITH_DDC
+int _kcl_drm_connector_init_with_ddc(struct drm_device *dev,
+				struct drm_connector *connector,
+				const struct drm_connector_funcs *funcs,
+				int connector_type,
+				struct i2c_adapter *ddc);
+static inline
+int drm_connector_init_with_ddc(struct drm_device *dev,
+				struct drm_connector *connector,
+				const struct drm_connector_funcs *funcs,
+				int connector_type,
+				struct i2c_adapter *ddc)
+{
+	return _kcl_drm_connector_init_with_ddc(dev, connector, funcs, connector_type, ddc);
+}
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
