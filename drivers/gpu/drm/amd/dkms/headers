@@ -18,4 +18,5 @@ linux/sched/signal.h kcl/kcl_sched_signal_h.h
 drm/drm_probe_helper.h kcl/kcl_drm_probe_helper_h.h
 drm/drm_drv.h kcl/kcl_drm_drv_h.h
 drm/drm_device.h kcl/kcl_drm_device_h.h
+linux/io-64-nonatomic-lo-hi.h kcl/kcl_linux_io_64_nonatomic_lo_hi_h.h
 

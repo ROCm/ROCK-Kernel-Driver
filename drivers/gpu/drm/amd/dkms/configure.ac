@@ -187,6 +187,7 @@ m4_include([m4/drm-connector-init-with-ddc.m4])
 m4_include([m4/ttm_buffer_object.m4])
 m4_include([m4/drm-dp-mst-topology-mgr-resume.m4])
 m4_include([m4/drm-dp-mst-detect-port.m4])
+m4_include([m4/linux-io-64-nonatomic-lo-hi-h.m4])
 m4_include([m4/config.m4])
 
 
