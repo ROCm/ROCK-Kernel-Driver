@@ -24,7 +24,7 @@
  */
 
 #include <linux/uaccess.h>
-
+#include <linux/debugfs.h>
 #include <drm/drm_debugfs.h>
 
 #include "dc.h"
