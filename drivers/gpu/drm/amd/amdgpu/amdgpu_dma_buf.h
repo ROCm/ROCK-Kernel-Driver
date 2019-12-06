@@ -25,6 +25,13 @@
 
 #include <drm/drm_gem.h>
 
+#if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING)
+struct sg_table *amdgpu_gem_prime_get_sg_table(struct drm_gem_object *obj);
+struct drm_gem_object *
+amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
+				 struct dma_buf_attachment *attach,
+				 struct sg_table *sg);
+#endif
 #ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
 #else
