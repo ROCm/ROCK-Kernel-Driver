@@ -6680,7 +6680,6 @@ create_stream_for_sink(struct drm_connector *connector,
 		sink = aconnector->dc_sink;
 		dc_sink_retain(sink);
 	}
-
 	stream = dc_create_stream_for_sink(sink);
 
 	if (stream == NULL) {
@@ -7441,6 +7440,7 @@ fail:
 	return result;
 }
 
+#ifdef HDMI_DRM_INFOFRAME_SIZE
 static int fill_hdr_info_packet(const struct drm_connector_state *state,
 				struct dc_info_packet *out)
 {
@@ -7569,7 +7569,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 
 	return 0;
 }
-
+#endif
 static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
 {
 #ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
@@ -7595,7 +7595,9 @@ amdgpu_dm_connector_helper_funcs = {
 	 */
 	.get_modes = get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
+#ifdef HDMI_DRM_INFOFRAME_SIZE
 	.atomic_check = amdgpu_dm_connector_atomic_check,
+#endif
 	.best_encoder = amdgpu_dm_connector_to_encoder
 };
 
@@ -8206,6 +8208,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	if (connector_type == DRM_MODE_CONNECTOR_HDMIA ||
 	    connector_type == DRM_MODE_CONNECTOR_DisplayPort ||
 	    connector_type == DRM_MODE_CONNECTOR_eDP) {
+
 		drm_connector_attach_hdr_output_metadata_property(&aconnector->base);
 
 		if (!aconnector->mst_root)
@@ -9869,9 +9872,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
 		struct dc_surface_update *dummy_updates;
 		struct dc_stream_update stream_update;
-		struct dc_info_packet hdr_packet;
 		struct dc_stream_status *status = NULL;
-		bool abm_changed, hdr_changed, scaling_changed;
+#ifdef HDMI_DRM_INFOFRAME_SIZE
+		struct dc_info_packet hdr_packet;
+		bool hdr_changed;
+#endif
+		bool abm_changed, scaling_changed;
 
 		memset(&stream_update, 0, sizeof(stream_update));
 
@@ -9893,10 +9899,16 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		abm_changed = dm_new_crtc_state->abm_level !=
 			      dm_old_crtc_state->abm_level;
 
+#ifdef HDMI_DRM_INFOFRAME_SIZE
 		hdr_changed =
 			!drm_connector_atomic_hdr_metadata_equal(old_con_state, new_con_state);
+#endif
 
-		if (!scaling_changed && !abm_changed && !hdr_changed)
+		if (!scaling_changed && !abm_changed
+#ifdef HDMI_DRM_INFOFRAME_SIZE
+			&& !hdr_changed
+#endif
+			)
 			continue;
 
 		stream_update.stream = dm_new_crtc_state->stream;
@@ -9914,10 +9926,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			stream_update.abm_level = &dm_new_crtc_state->abm_level;
 		}
 
+#ifdef HDMI_DRM_INFOFRAME_SIZE
 		if (hdr_changed) {
 			fill_hdr_info_packet(new_con_state, &hdr_packet);
 			stream_update.hdr_static_metadata = &hdr_packet;
 		}
+#endif
 
 		status = dc_stream_get_status(dm_new_crtc_state->stream);
 
@@ -10439,10 +10453,12 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 
 		dm_new_crtc_state->abm_level = dm_new_conn_state->abm_level;
 
+#ifdef HDMI_DRM_INFOFRAME_SIZE
 		ret = fill_hdr_info_packet(drm_new_conn_state,
 					   &new_stream->hdr_static_metadata);
 		if (ret)
 			goto fail;
+#endif
 
 		/*
 		 * If we already removed the old stream from the context
