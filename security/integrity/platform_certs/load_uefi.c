@@ -166,17 +166,6 @@ static int __init load_uefi_certs(void)
 		}
 	}
 
-	mok = get_cert_list(L"MokListRT", &mok_var, &moksize);
-	if (!mok) {
-		pr_info("Couldn't get UEFI MokListRT\n");
-	} else {
-		rc = parse_efi_signature_list("UEFI:MokListRT",
-					      mok, moksize, get_handler_for_db);
-		if (rc)
-			pr_err("Couldn't parse MokListRT signatures: %d\n", rc);
-		kfree(mok);
-	}
-
 	dbx = get_cert_list(L"dbx", &secure_var, &dbxsize);
 	if (!dbx) {
 		pr_info("Couldn't get UEFI dbx list\n");
@@ -187,6 +176,21 @@ static int __init load_uefi_certs(void)
 		if (rc)
 			pr_err("Couldn't parse dbx signatures: %d\n", rc);
 		kfree(dbx);
+	}
+
+	/* the MOK can not be trusted when secure boot is disabled */
+	if (!efi_enabled(EFI_SECURE_BOOT))
+		return 0;
+
+	mok = get_cert_list(L"MokListRT", &mok_var, &moksize);
+	if (!mok) {
+		pr_info("Couldn't get UEFI MokListRT\n");
+	} else {
+		rc = parse_efi_signature_list("UEFI:MokListRT",
+					      mok, moksize, get_handler_for_db);
+		if (rc)
+			pr_err("Couldn't parse MokListRT signatures: %d\n", rc);
+		kfree(mok);
 	}
 
 	return rc;
