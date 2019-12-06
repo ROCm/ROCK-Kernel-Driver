@@ -24,7 +24,7 @@
  */
 
 #include <linux/uaccess.h>
-
+#include <linux/debugfs.h>
 #include "dc.h"
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
