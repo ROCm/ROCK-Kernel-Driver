@@ -1116,7 +1116,7 @@ static void kfd_process_ref_release(struct kref *ref)
 	queue_work(kfd_process_wq, &p->release_work);
 }
 
-#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+#ifdef HAVE_MMU_NOTIFIER_PUT
 static struct mmu_notifier *kfd_process_alloc_notifier(struct mm_struct *mm)
 {
 	int idx = srcu_read_lock(&kfd_processes_srcu);
@@ -1206,7 +1206,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	mutex_unlock(&p->mutex);
 
-#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&p->mmu_notifier);
 #else
 	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
@@ -1216,7 +1216,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
-#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	.alloc_notifier = kfd_process_alloc_notifier,
 	.free_notifier = kfd_process_free_notifier,
 #endif
