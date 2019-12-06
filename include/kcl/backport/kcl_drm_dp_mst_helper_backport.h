@@ -51,4 +51,14 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS */
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS
+static inline int
+_kcl_drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr,
+			       bool sync)
+{
+	return drm_dp_mst_topology_mgr_resume(mgr);
+}
+#define drm_dp_mst_topology_mgr_resume _kcl_drm_dp_mst_topology_mgr_resume
+#endif
+
 #endif
