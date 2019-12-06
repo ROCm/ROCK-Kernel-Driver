@@ -1193,7 +1193,7 @@ static void kfd_process_ref_release(struct kref *ref)
 	queue_work(kfd_process_wq, &p->release_work);
 }
 
-#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+#ifdef HAVE_MMU_NOTIFIER_PUT
 static struct mmu_notifier *kfd_process_alloc_notifier(struct mm_struct *mm)
 {
 	/* This increments p->ref counter if kfd process p exists */
@@ -1289,7 +1289,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 	.release = kfd_process_notifier_release,
-#ifdef HAVE_MMU_NOTIFIER_SYNCHRONIZE
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	.alloc_notifier = kfd_process_alloc_notifier,
 	.free_notifier = kfd_process_free_notifier,
 #endif
