@@ -19,7 +19,15 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
 static inline bool _kcl_dma_addressing_limited(struct device *dev)
 {
-	return min_not_zero(dma_get_mask(dev), dev->bus_dma_mask) <
+	u64 bus_dma_mask;
+
+#ifdef HAVE_STRUCT_DEVICE_BUS_DMA_MASK
+	bus_dma_mask = dev->bus_dma_mask;
+#else
+	bus_dma_mask = DMA_BIT_MASK(32);
+#endif
+
+	return min_not_zero(dma_get_mask(dev), bus_dma_mask) <
 			dma_get_required_mask(dev);
 }
 #define dma_addressing_limited _kcl_dma_addressing_limited
