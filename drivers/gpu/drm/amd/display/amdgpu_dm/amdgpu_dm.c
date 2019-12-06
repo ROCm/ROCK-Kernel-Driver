@@ -7521,7 +7521,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
 				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
 #else
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
 			crtc->state->async_flip &&
+#else
+			(crtc->state->pageflip_flags &
+			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST;
 #endif
 
@@ -8264,7 +8269,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
 #else
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
 		if (new_crtc_state->async_flip)
+#else
+		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
+#endif
 #endif
 			wait_for_vblank = false;
 	}
