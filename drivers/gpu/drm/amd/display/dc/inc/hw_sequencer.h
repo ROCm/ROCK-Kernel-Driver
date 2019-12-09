@@ -44,7 +44,7 @@ struct dc_stream_status;
 struct dc_writeback_info;
 #endif
 struct dchub_init_data;
-struct dc_static_screen_events;
+struct dc_static_screen_params;
 struct resource_pool;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 struct dc_phy_addr_space_config;
@@ -112,7 +112,7 @@ struct hw_sequencer_funcs {
 			unsigned int vmid, unsigned int vmid_frame_number);
 	void (*set_static_screen_control)(struct pipe_ctx **pipe_ctx,
 			int num_pipes,
-			const struct dc_static_screen_events *events);
+			const struct dc_static_screen_params *events);
 
 	/* Stream Related */
 	void (*enable_stream)(struct pipe_ctx *pipe_ctx);
