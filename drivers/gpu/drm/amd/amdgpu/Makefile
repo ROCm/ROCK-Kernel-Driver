@@ -28,6 +28,9 @@ FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(srctree)/$(src))
 else
 FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(src))
 endif
+# commit v5.3-rc4-54-g54b8ae66ae1a
+# kbuild: change *FLAGS_<basetarget>.o to take the path relative to $(obj)
+AMDKCL_KBUILD_TAKE_PATH=$(shell grep -q "target-stem" scripts/Makefile.lib && echo "1" || echo "0")
 DISPLAY_FOLDER_NAME=display
 FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
