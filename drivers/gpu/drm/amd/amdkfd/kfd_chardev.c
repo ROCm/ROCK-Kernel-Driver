@@ -1791,6 +1791,10 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	return r;
 }
 
+#ifndef PTRACE_MODE_ATTACH_REALCREDS
+#define PTRACE_MODE_ATTACH_REALCREDS  PTRACE_MODE_ATTACH
+#endif
+
 /* Maximum number of entries for process pages array which lives on stack */
 #define MAX_PP_STACK_COUNT 16
 /* Maximum number of pages kmalloc'd to hold struct page's during copy */
