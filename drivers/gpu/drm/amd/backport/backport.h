@@ -38,4 +38,11 @@
 #include <kcl/kcl_types.h>
 #include <kcl/kcl_amdgpu.h>
 #include <kcl/kcl_drm_dp_mst_helper_backport.h>
+#include <kcl/kcl_overflow.h>
+#include <kcl/kcl_seq_file.h>
+#include <kcl/kcl_ptrace.h>
+#include <kcl/kcl_workqueue.h>
+#include <kcl/kcl_preempt.h>
+#include <kcl/kcl_video.h>
+#include <kcl/kcl_idr.h>
 #endif /* AMDGPU_BACKPORT_H */
