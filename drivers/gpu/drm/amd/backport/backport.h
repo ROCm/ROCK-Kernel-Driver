@@ -35,6 +35,9 @@
 #include <kcl/backport/kcl_ttm_tt_backport.h>
 #include <kcl/backport/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_mn.h>
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+#include <linux/reservation.h>
+#endif
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_task_barrier.h>
 #include <kcl/kcl_drm_print.h>
