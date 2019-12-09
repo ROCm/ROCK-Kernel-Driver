@@ -40,6 +40,9 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 					    struct dma_buf *dma_buf);
 bool amdgpu_dmabuf_is_xgmi_accessible(struct amdgpu_device *adev,
 				      struct amdgpu_bo *bo);
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
+#endif
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
