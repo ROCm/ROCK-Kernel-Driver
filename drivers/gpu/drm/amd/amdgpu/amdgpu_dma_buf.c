@@ -513,6 +513,22 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_gem_object *gobj,
 	return buf;
 }
 
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+/**
+ * amdgpu_gem_prime_res_obj - &drm_driver.gem_prime_res_obj implementation
+ * @obj: GEM BO
+ *
+ * Returns:
+ * The BO's reservation object.
+ */
+struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
+{
+       struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+
+       return amdkcl_ttm_resvp(&bo->tbo);
+}
+#endif
+
 #if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) && \
 	!defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
 /**

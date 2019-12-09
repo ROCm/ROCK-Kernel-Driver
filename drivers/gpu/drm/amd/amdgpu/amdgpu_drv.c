@@ -1795,6 +1795,14 @@ static const struct drm_driver amdgpu_kms_driver = {
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_import = amdgpu_gem_prime_import,
 	.gem_prime_mmap = drm_gem_prime_mmap,
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+	.gem_prime_res_obj = amdgpu_gem_prime_res_obj,
+#endif
+#if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) && \
+	!defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
+	.gem_prime_get_sg_table = amdgpu_gem_prime_get_sg_table,
+	.gem_prime_import_sg_table = amdgpu_gem_prime_import_sg_table,
+#endif
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
