@@ -24,6 +24,12 @@
 # It calculates Bandwidth and Watermarks values for HW programming
 #
 
+ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=$(AMDDALPATH)/dc/calcs/
+else
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=
+endif
+
 calcs_ccflags := -mhard-float -msse
 
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
@@ -39,9 +45,9 @@ else
 calcs_ccflags += -msse2
 endif
 
-CFLAGS_$(AMDDALPATH)/dc/calcs/dcn_calcs.o := $(calcs_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/calcs/dcn_calc_auto.o := $(calcs_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/calcs/dcn_calc_math.o := $(calcs_ccflags) -Wno-tautological-compare
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn_calcs.o := $(calcs_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn_calc_auto.o := $(calcs_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn_calc_math.o := $(calcs_ccflags) -Wno-tautological-compare
 
 BW_CALCS = dce_calcs.o bw_fixed.o custom_float.o
 

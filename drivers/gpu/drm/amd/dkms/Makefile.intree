@@ -8,6 +8,6 @@ $(obj)/$(AMDGPU_CONFIG_H): $(srctree)/$(AMDGPU_CONFIG_PATH)/m4/* $(srctree)/$(AM
 	./autogen.sh && \
 	./configure --enable-linux-builtin --with-linux=$(abspath $(srctree)) --with-linux-obj=$(abspath $(objtree));
 
-clean-dirs += $(objtree)/$(obj)/dkms
+clean-files += $(objtree)/$(obj)/dkms
 
 $(addprefix $(obj)/,$($(FOR_MODULE)-y)): $(obj)/$(AMDGPU_CONFIG_H)
