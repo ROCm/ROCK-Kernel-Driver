@@ -25,8 +25,12 @@
 
 ifeq (,$(BUILD_AS_DKMS))
 FULL_AMD_PATH=$(srctree)/$(src)/..
+AMDKCL_KBUILD_TAKE_PATH=1
 else
 FULL_AMD_PATH=$(src)/..
+# commit v5.3-rc4-54-g54b8ae66ae1a
+# kbuild: change *FLAGS_<basetarget>.o to take the path relative to $(obj)
+AMDKCL_KBUILD_TAKE_PATH=$(shell grep -q "target-stem" scripts/Makefile.lib && echo "1" || echo "0")
 endif
 DISPLAY_FOLDER_NAME=display
 FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
