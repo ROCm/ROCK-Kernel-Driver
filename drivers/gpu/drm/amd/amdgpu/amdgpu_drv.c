@@ -1500,6 +1500,9 @@ static struct drm_driver kms_driver = {
 	.gem_prime_pin = amdgpu_gem_prime_pin,
 	.gem_prime_unpin = amdgpu_gem_prime_unpin,
 #endif
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+	.gem_prime_res_obj = amdgpu_gem_prime_res_obj,
+#endif
 #if !defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING)
 	.gem_prime_get_sg_table = amdgpu_gem_prime_get_sg_table,
 	.gem_prime_import_sg_table = amdgpu_gem_prime_import_sg_table,

@@ -46,6 +46,9 @@ struct drm_gem_object *amdgpu_gem_prime_import(struct drm_device *dev,
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
 void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
 #endif
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
+#endif
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
