@@ -13612,6 +13612,11 @@ static void intel_update_crtc(struct drm_crtc *crtc,
 		/* vblanks work again, re-enable pipe CRC. */
 		intel_crtc_enable_pipe_crc(intel_crtc);
 	} else {
+		if (pipe_config->preload_luts &&
+		    (pipe_config->base.color_mgmt_changed ||
+		     pipe_config->update_pipe))
+			intel_color_load_luts(pipe_config);
+
 		intel_pre_plane_update(to_intel_crtc_state(old_crtc_state),
 				       pipe_config);
 
@@ -13913,6 +13918,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 
 		if (new_crtc_state->active &&
 		    !needs_modeset(new_crtc_state) &&
+		    !new_intel_crtc_state->preload_luts &&
 		    (new_intel_crtc_state->base.color_mgmt_changed ||
 		     new_intel_crtc_state->update_pipe))
 			intel_color_load_luts(new_intel_crtc_state);
