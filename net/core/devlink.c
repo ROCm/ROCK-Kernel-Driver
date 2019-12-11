@@ -2791,6 +2791,9 @@ static int devlink_reload(struct devlink *devlink, struct net *dest_net,
 {
 	int err;
 
+	if (!devlink->reload_enabled)
+		return -EOPNOTSUPP;
+
 	err = devlink->ops->reload_down(devlink, !!dest_net, extack);
 	if (err)
 		return err;
@@ -8244,7 +8247,7 @@ static void __net_exit devlink_pernet_pre_exit(struct net *net)
 			if (WARN_ON(!devlink_reload_supported(devlink)))
 				continue;
 			err = devlink_reload(devlink, &init_net, NULL);
-			if (err)
+			if (err && err != -EOPNOTSUPP)
 				pr_warn("Failed to reload devlink instance into init_net\n");
 		}
 	}
