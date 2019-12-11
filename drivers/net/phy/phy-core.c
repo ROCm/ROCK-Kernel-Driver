@@ -380,9 +380,9 @@ int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum)
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_read_mmd(phydev, devad, regnum);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -441,9 +441,9 @@ int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val)
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_write_mmd(phydev, devad, regnum, val);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -497,9 +497,9 @@ int phy_modify_changed(struct phy_device *phydev, u32 regnum, u16 mask, u16 set)
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_modify_changed(phydev, regnum, mask, set);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -541,9 +541,9 @@ int phy_modify(struct phy_device *phydev, u32 regnum, u16 mask, u16 set)
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_modify(phydev, regnum, mask, set);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -600,9 +600,9 @@ int phy_modify_mmd_changed(struct phy_device *phydev, int devad, u32 regnum,
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_modify_mmd_changed(phydev, devad, regnum, mask, set);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -648,9 +648,9 @@ int phy_modify_mmd(struct phy_device *phydev, int devad, u32 regnum,
 {
 	int ret;
 
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	ret = __phy_modify_mmd(phydev, devad, regnum, mask, set);
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
@@ -682,7 +682,7 @@ static int __phy_write_page(struct phy_device *phydev, int page)
  */
 int phy_save_page(struct phy_device *phydev)
 {
-	mutex_lock(&phydev->mdio.bus->mdio_lock);
+	phy_lock_mdio_bus(phydev);
 	return __phy_read_page(phydev);
 }
 EXPORT_SYMBOL_GPL(phy_save_page);
@@ -749,7 +749,7 @@ int phy_restore_page(struct phy_device *phydev, int oldpage, int ret)
 		ret = oldpage;
 	}
 
-	mutex_unlock(&phydev->mdio.bus->mdio_lock);
+	phy_unlock_mdio_bus(phydev);
 
 	return ret;
 }
