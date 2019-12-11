@@ -21,4 +21,5 @@ drm/drm_device.h kcl/kcl_drm_device_h.h
 linux/io-64-nonatomic-lo-hi.h kcl/kcl_linux_io_64_nonatomic_lo_hi_h.h
 drm/drm_vblank.h kcl/kcl_drm_vblank_h.h
 drm/drm_ioctl.h kcl/kcl_drm_ioctl_h.h
+drm/drm_debugfs.h kcl/kcl_drm_debugfs_h.h
 
