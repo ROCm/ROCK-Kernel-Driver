@@ -574,6 +574,8 @@ struct mlx5_ib_mr *mlx5_ib_alloc_implicit_mr(struct mlx5_ib_pd *pd,
 	atomic_set(&imr->num_pending_prefetch, 0);
 	smp_store_release(&imr->live, 1);
 
+	imr->is_odp_implicit = true;
+
 	return imr;
 }
 
