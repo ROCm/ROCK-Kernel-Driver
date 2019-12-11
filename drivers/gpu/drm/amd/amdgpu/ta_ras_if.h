@@ -97,21 +97,6 @@ struct ta_ras_trigger_error_input {
 	uint64_t		value;			// method if error injection. i.e persistent, coherent etc.
 };
 
-#define SIZE_OF_MSG_STRUCT(msg_ptr) ((msg_ptr)->msg_size + sizeof(struct ta_dbg_msg) - sizeof(char))
-struct __attribute__((__packed__)) ta_dbg_msg
-{
-	uint16_t msg_size;      // Not including string terminator
-	uint64_t time_stamp;
-	char     msg[1];	// string of size determined by msg_size
-};
-
-struct ta_dbg_msg_list
-{
-	uint32_t            total_buf_size;
-	uint32_t            msg_cnt;
-	struct ta_dbg_msg   msg;
-};
-
 /* Common input structure for RAS callbacks */
 /**********************************************************/
 union ta_ras_cmd_input {
@@ -128,7 +113,6 @@ struct ta_ras_shared_memory {
 	enum ta_ras_status	ras_status;
 	uint32_t		reserved;
 	union ta_ras_cmd_input	ras_in_message;
-	struct ta_dbg_msg_list	debug_messages;
 };
 
 #endif // TL_RAS_IF_H_
