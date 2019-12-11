@@ -1816,6 +1816,13 @@ search_again_locked:
 		return rule;
 	}
 
+	fte = alloc_fte(ft, spec, flow_act);
+	if (IS_ERR(fte)) {
+		up_write_ref_node(&ft->node, false);
+		err = PTR_ERR(fte);
+		goto err_alloc_fte;
+	}
+
 	nested_down_write_ref_node(&g->node, FS_LOCK_PARENT);
 	up_write_ref_node(&ft->node, false);
 
@@ -1823,17 +1830,9 @@ search_again_locked:
 	if (err)
 		goto err_release_fg;
 
-	fte = alloc_fte(ft, spec, flow_act);
-	if (IS_ERR(fte)) {
-		err = PTR_ERR(fte);
-		goto err_release_fg;
-	}
-
 	err = insert_fte(g, fte);
-	if (err) {
-		kmem_cache_free(steering->ftes_cache, fte);
+	if (err)
 		goto err_release_fg;
-	}
 
 	nested_down_write_ref_node(&fte->node, FS_LOCK_CHILD);
 	up_write_ref_node(&g->node, false);
@@ -1845,6 +1844,8 @@ search_again_locked:
 
 err_release_fg:
 	up_write_ref_node(&g->node, false);
+	kmem_cache_free(steering->ftes_cache, fte);
+err_alloc_fte:
 	tree_put_node(&g->node, false);
 	return ERR_PTR(err);
 }
