@@ -751,7 +751,7 @@ err_fib_destroy:
 	return err;
 }
 
-static struct nsim_dev *nsim_dev_create(struct nsim_bus_dev *nsim_bus_dev)
+int nsim_dev_probe(struct nsim_bus_dev *nsim_bus_dev)
 {
 	struct nsim_dev *nsim_dev;
 	struct devlink *devlink;
@@ -759,7 +759,7 @@ static struct nsim_dev *nsim_dev_create(struct nsim_bus_dev *nsim_bus_dev)
 
 	devlink = devlink_alloc(&nsim_dev_devlink_ops, sizeof(*nsim_dev));
 	if (!devlink)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 	devlink_net_set(devlink, nsim_bus_dev->initial_net);
 	nsim_dev = devlink_priv(devlink);
 	nsim_dev->nsim_bus_dev = nsim_bus_dev;
@@ -770,6 +770,8 @@ static struct nsim_dev *nsim_dev_create(struct nsim_bus_dev *nsim_bus_dev)
 	nsim_dev->fw_update_status = true;
 	nsim_dev->max_macs = NSIM_DEV_MAX_MACS_DEFAULT;
 	nsim_dev->test1 = NSIM_DEV_TEST1_DEFAULT;
+
+	dev_set_drvdata(&nsim_bus_dev->dev, nsim_dev);
 
 	err = nsim_dev_resources_register(devlink);
 	if (err)
@@ -817,7 +819,7 @@ static struct nsim_dev *nsim_dev_create(struct nsim_bus_dev *nsim_bus_dev)
 
 	devlink_params_publish(devlink);
 	devlink_reload_enable(devlink);
-	return nsim_dev;
+	return 0;
 
 err_bpf_dev_exit:
 	nsim_bpf_dev_exit(nsim_dev);
@@ -840,7 +842,7 @@ err_resources_unregister:
 	devlink_resources_unregister(devlink, NULL);
 err_devlink_free:
 	devlink_free(devlink);
-	return ERR_PTR(err);
+	return err;
 }
 
 static void nsim_dev_reload_destroy(struct nsim_dev *nsim_dev)
@@ -857,8 +859,9 @@ static void nsim_dev_reload_destroy(struct nsim_dev *nsim_dev)
 	nsim_fib_destroy(devlink, nsim_dev->fib_data);
 }
 
-static void nsim_dev_destroy(struct nsim_dev *nsim_dev)
+void nsim_dev_remove(struct nsim_bus_dev *nsim_bus_dev)
 {
+	struct nsim_dev *nsim_dev = dev_get_drvdata(&nsim_bus_dev->dev);
 	struct devlink *devlink = priv_to_devlink(nsim_dev);
 
 	nsim_dev_reload_destroy(nsim_dev);
@@ -870,25 +873,6 @@ static void nsim_dev_destroy(struct nsim_dev *nsim_dev)
 	devlink_unregister(devlink);
 	devlink_resources_unregister(devlink, NULL);
 	devlink_free(devlink);
-}
-
-int nsim_dev_probe(struct nsim_bus_dev *nsim_bus_dev)
-{
-	struct nsim_dev *nsim_dev;
-
-	nsim_dev = nsim_dev_create(nsim_bus_dev);
-	if (IS_ERR(nsim_dev))
-		return PTR_ERR(nsim_dev);
-	dev_set_drvdata(&nsim_bus_dev->dev, nsim_dev);
-
-	return 0;
-}
-
-void nsim_dev_remove(struct nsim_bus_dev *nsim_bus_dev)
-{
-	struct nsim_dev *nsim_dev = dev_get_drvdata(&nsim_bus_dev->dev);
-
-	nsim_dev_destroy(nsim_dev);
 }
 
 static struct nsim_dev_port *
