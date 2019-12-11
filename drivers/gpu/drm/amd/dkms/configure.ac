@@ -197,6 +197,7 @@ m4_include([m4/drm-amdgpu-fence-to-handle.m4])
 m4_include([m4/drm-driver-gem-prime-res-obj.m4])
 m4_include([m4/drm-gem-map-attach.m4])
 m4_include([m4/drm-vblank-h.m4])
+m4_include([m4/drm-ioctl-h.m4])
 m4_include([m4/config.m4])
 
 
