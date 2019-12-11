@@ -470,6 +470,15 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 	DRM_ERROR(fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef DRM_DEBUG_VBL
+#define DRM_UT_VBL		0x20
+#define DRM_DEBUG_VBL(fmt, args...)					\
+	do {								\
+		if (unlikely(drm_debug & DRM_UT_VBL))			\
+			drm_ut_debug_printk(__func__, fmt, ##args);	\
+	} while (0)
+#endif
+
 #ifndef DRM_FB_HELPER_DEFAULT_OPS
 #if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
 		defined(HAVE_DRM_FB_HELPER_IOCTL)
