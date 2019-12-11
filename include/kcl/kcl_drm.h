@@ -19,6 +19,8 @@
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
+#include <uapi/drm/drm_mode.h>
+#include <kcl/kcl_drm_drv_h.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -84,6 +86,27 @@
 #endif
 #ifndef DP_SINK_STATUS_ESI
 #define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
+#endif
+
+#ifndef DRM_MODE_ROTATE_0
+#define DRM_MODE_ROTATE_0       (1<<0)
+#endif
+#ifndef DRM_MODE_ROTATE_90
+#define DRM_MODE_ROTATE_90      (1<<1)
+#endif
+#ifndef DRM_MODE_ROTATE_180
+#define DRM_MODE_ROTATE_180     (1<<2)
+#endif
+#ifndef DRM_MODE_ROTATE_270
+#define DRM_MODE_ROTATE_270     (1<<3)
+#endif
+
+#ifndef DRM_MODE_ROTATE_MASK
+#define DRM_MODE_ROTATE_MASK (\
+		DRM_MODE_ROTATE_0  | \
+		DRM_MODE_ROTATE_90  | \
+		DRM_MODE_ROTATE_180 | \
+		DRM_MODE_ROTATE_270)
 #endif
 
 /* helper for handling conditionals in various for_each macros */
