@@ -121,7 +121,9 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 					 struct drm_mode_fb_cmd2 *mode_cmd,
 					 struct drm_gem_object **gobj_p)
 {
+#ifdef HAVE_DRM_GET_FORMAT_INFO
 	const struct drm_format_info *info;
+#endif
 	struct amdgpu_device *adev = rfbdev->adev;
 	struct drm_gem_object *gobj = NULL;
 	struct amdgpu_bo *abo = NULL;
@@ -135,8 +137,12 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS     |
 			       AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
+#ifdef HAVE_DRM_GET_FORMAT_INFO
 	info = drm_get_format_info(adev_to_drm(adev), mode_cmd);
 	cpp = info->cpp[0];
+#else
+	cpp = drm_format_plane_cpp(mode_cmd->pixel_format, 0);
+#endif
 
 	/* need to align pitch with crtc limits */
 	mode_cmd->pitches[0] = amdgpu_align_pitch(adev, mode_cmd->width, cpp,
