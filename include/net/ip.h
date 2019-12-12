@@ -338,10 +338,10 @@ static inline u64 snmp_fold_field64(void __percpu *mib, int offt, size_t syncp_o
 void inet_get_local_port_range(struct net *net, int *low, int *high);
 
 #ifdef CONFIG_SYSCTL
-static inline int inet_is_local_reserved_port(struct net *net, int port)
+static inline bool inet_is_local_reserved_port(struct net *net, unsigned short port)
 {
 	if (!net->ipv4.sysctl_local_reserved_ports)
-		return 0;
+		return false;
 	return test_bit(port, net->ipv4.sysctl_local_reserved_ports);
 }
 
@@ -356,9 +356,9 @@ static inline int inet_prot_sock(struct net *net)
 }
 
 #else
-static inline int inet_is_local_reserved_port(struct net *net, int port)
+static inline bool inet_is_local_reserved_port(struct net *net, unsigned short port)
 {
-	return 0;
+	return false;
 }
 
 static inline int inet_prot_sock(struct net *net)
@@ -758,5 +758,10 @@ int ip_misc_proc_init(void);
 
 int rtm_getroute_parse_ip_proto(struct nlattr *attr, u8 *ip_proto, u8 family,
 				struct netlink_ext_ack *extack);
+
+static inline bool inetdev_valid_mtu(unsigned int mtu)
+{
+	return likely(mtu >= IPV4_MIN_MTU);
+}
 
 #endif	/* _IP_H */

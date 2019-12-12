@@ -31,6 +31,7 @@
 #include <linux/rcupdate.h>
 #include <linux/perf_event.h>
 #include <linux/extable.h>
+#include <linux/log2.h>
 #include <asm/unaligned.h>
 
 /* Registers */
@@ -255,6 +256,7 @@ void __bpf_prog_free(struct bpf_prog *fp)
 {
 	if (fp->aux) {
 		free_percpu(fp->aux->stats);
+		kfree(fp->aux->poke_tab);
 		kfree(fp->aux);
 	}
 	vfree(fp);
@@ -755,6 +757,39 @@ int bpf_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
 	return ret;
 }
 
+int bpf_jit_add_poke_descriptor(struct bpf_prog *prog,
+				struct bpf_jit_poke_descriptor *poke)
+{
+	struct bpf_jit_poke_descriptor *tab = prog->aux->poke_tab;
+	static const u32 poke_tab_max = 1024;
+	u32 slot = prog->aux->size_poke_tab;
+	u32 size = slot + 1;
+
+	if (size > poke_tab_max)
+		return -ENOSPC;
+	if (poke->ip || poke->ip_stable || poke->adj_off)
+		return -EINVAL;
+
+	switch (poke->reason) {
+	case BPF_POKE_REASON_TAIL_CALL:
+		if (!poke->tail_call.map)
+			return -EINVAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	tab = krealloc(tab, size * sizeof(*poke), GFP_KERNEL);
+	if (!tab)
+		return -ENOMEM;
+
+	memcpy(&tab[slot], poke, sizeof(*poke));
+	prog->aux->size_poke_tab = size;
+	prog->aux->poke_tab = tab;
+
+	return slot;
+}
+
 static atomic_long_t bpf_jit_current;
 
 /* Can be overridden by an arch's JIT compiler if it has a custom,
@@ -814,6 +849,9 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 {
 	struct bpf_binary_header *hdr;
 	u32 size, hole, start, pages;
+
+	WARN_ON_ONCE(!is_power_of_2(alignment) ||
+		     alignment > BPF_IMAGE_ALIGNMENT);
 
 	/* Most of BPF filters are really small, but if some of them
 	 * fill a page, allow at least 128 extra bytes to insert a
@@ -1687,18 +1725,17 @@ bool bpf_prog_array_compatible(struct bpf_array *array,
 	if (fp->kprobe_override)
 		return false;
 
-	if (!array->owner_prog_type) {
+	if (!array->aux->type) {
 		/* There's no owner yet where we could check for
 		 * compatibility.
 		 */
-		array->owner_prog_type = fp->type;
-		array->owner_jited = fp->jited;
-
+		array->aux->type  = fp->type;
+		array->aux->jited = fp->jited;
 		return true;
 	}
 
-	return array->owner_prog_type == fp->type &&
-	       array->owner_jited == fp->jited;
+	return array->aux->type  == fp->type &&
+	       array->aux->jited == fp->jited;
 }
 
 static int bpf_check_tail_call(const struct bpf_prog *fp)
@@ -1999,18 +2036,47 @@ int bpf_prog_array_copy_info(struct bpf_prog_array *array,
 								     : 0;
 }
 
+static void bpf_free_cgroup_storage(struct bpf_prog_aux *aux)
+{
+	enum bpf_cgroup_storage_type stype;
+
+	for_each_cgroup_storage_type(stype) {
+		if (!aux->cgroup_storage[stype])
+			continue;
+		bpf_cgroup_storage_release(aux->prog,
+					   aux->cgroup_storage[stype]);
+	}
+}
+
+static void bpf_free_used_maps(struct bpf_prog_aux *aux)
+{
+	struct bpf_map *map;
+	int i;
+
+	bpf_free_cgroup_storage(aux);
+	for (i = 0; i < aux->used_map_cnt; i++) {
+		map = aux->used_maps[i];
+		if (map->ops->map_poke_untrack)
+			map->ops->map_poke_untrack(map, aux);
+		bpf_map_put(map);
+	}
+	kfree(aux->used_maps);
+}
+
 static void bpf_prog_free_deferred(struct work_struct *work)
 {
 	struct bpf_prog_aux *aux;
 	int i;
 
 	aux = container_of(work, struct bpf_prog_aux, work);
+	bpf_free_used_maps(aux);
 	if (bpf_prog_is_dev_bound(aux))
 		bpf_prog_offload_destroy(aux->prog);
 #ifdef CONFIG_PERF_EVENTS
 	if (aux->prog->has_callchain_buf)
 		put_callchain_buffers();
 #endif
+	bpf_trampoline_put(aux->trampoline);
 	for (i = 0; i < aux->func_cnt; i++)
 		bpf_jit_free(aux->func[i]);
 	if (aux->func_cnt) {
@@ -2026,6 +2092,8 @@ void bpf_prog_free(struct bpf_prog *fp)
 {
 	struct bpf_prog_aux *aux = fp->aux;
 
+	if (aux->linked_prog)
+		bpf_prog_put(aux->linked_prog);
 	INIT_WORK(&aux->work, bpf_prog_free_deferred);
 	schedule_work(&aux->work);
 }
@@ -2138,6 +2206,12 @@ int __weak skb_copy_bits(const struct sk_buff *skb, int offset, void *to,
 			 int len)
 {
 	return -EFAULT;
+}
+
+int __weak bpf_arch_text_poke(void *ip, enum bpf_text_poke_type t,
+			      void *addr1, void *addr2)
+{
+	return -ENOTSUPP;
 }
 
 DEFINE_STATIC_KEY_FALSE(bpf_stats_enabled_key);

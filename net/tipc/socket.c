@@ -2804,7 +2804,7 @@ static struct tipc_sock *tipc_sk_lookup(struct net *net, u32 portid)
 	struct tipc_sock *tsk;
 
 	rcu_read_lock();
-	tsk = rhashtable_lookup_fast(&tn->sk_rht, &portid, tsk_rht_params);
+	tsk = rhashtable_lookup(&tn->sk_rht, &portid, tsk_rht_params);
 	if (tsk)
 		sock_hold(&tsk->sk);
 	rcu_read_unlock();
@@ -3588,12 +3588,8 @@ int tipc_nl_publ_dump(struct sk_buff *skb, struct netlink_callback *cb)
 	struct tipc_sock *tsk;
 
 	if (!tsk_portid) {
-		struct nlattr **attrs;
+		struct nlattr **attrs = genl_dumpit_info(cb)->attrs;
 		struct nlattr *sock[TIPC_NLA_SOCK_MAX + 1];
-
-		err = tipc_nlmsg_parse(cb->nlh, &attrs);
-		if (err)
-			return err;
 
 		if (!attrs[TIPC_NLA_SOCK])
 			return -EINVAL;

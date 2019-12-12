@@ -128,6 +128,24 @@ enum genl_validate_flags {
 };
 
 /**
+ * struct genl_info - info that is available during dumpit op call
+ * @family: generic netlink family - for internal genl code usage
+ * @ops: generic netlink ops - for internal genl code usage
+ * @attrs: netlink attributes
+ */
+struct genl_dumpit_info {
+	const struct genl_family *family;
+	const struct genl_ops *ops;
+	struct nlattr **attrs;
+};
+
+static inline const struct genl_dumpit_info *
+genl_dumpit_info(struct netlink_callback *cb)
+{
+	return cb->data;
+}
+
+/**
  * struct genl_ops - generic netlink operations
  * @cmd: command identifier
  * @internal_flags: flags used by the family

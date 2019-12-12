@@ -334,7 +334,7 @@ void sctp_association_free(struct sctp_association *asoc)
 		 * socket.
 		 */
 		if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
-			sk->sk_ack_backlog--;
+			sk_acceptq_removed(sk);
 	}
 
 	/* Mark as dead, so other users can know this structure is
@@ -1087,7 +1087,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 
 	/* Decrement the backlog value for a TCP-style socket. */
 	if (sctp_style(oldsk, TCP))
-		oldsk->sk_ack_backlog--;
+		sk_acceptq_removed(oldsk);
 
 	/* Release references to the old endpoint and the sock.  */
 	sctp_endpoint_put(assoc->ep);
