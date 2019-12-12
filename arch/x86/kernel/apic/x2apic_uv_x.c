@@ -29,6 +29,7 @@
 #include <linux/memory.h>
 #include <linux/numa.h>
 #include <linux/acpi.h>
+#include <linux/efi.h>
 
 #include <asm/uv/uv_mmrs.h>
 #include <asm/uv/uv_hub.h>
@@ -1503,6 +1504,14 @@ static void __init build_socket_tables(void)
 	}
 }
 
+/* Check which reboot to use */
+static void check_efi_reboot(void)
+{
+	/* If EFI reboot not available, use ACPI reboot */
+	if (!efi_enabled(EFI_BOOT))
+		reboot_type = BOOT_ACPI;
+}
+
 /* Setup user proc fs files */
 static int proc_hubbed_show(struct seq_file *file, void *data)
 {
@@ -1586,6 +1595,8 @@ static __init int uv_system_init_hubless(void)
 	/* Create user access node */
 	if (rc >= 0)
 		uv_setup_proc_files(1);
+
+	check_efi_reboot();
 
 	return rc;
 }
@@ -1720,12 +1731,7 @@ static void __init uv_system_init_hub(void)
 	/* Register Legacy VGA I/O redirection handler: */
 	pci_register_set_vga_state(uv_set_vga_state);
 
-	/*
-	 * For a kdump kernel the reset must be BOOT_ACPI, not BOOT_EFI, as
-	 * EFI is not enabled in the kdump kernel:
-	 */
-	if (is_kdump_kernel())
-		reboot_type = BOOT_ACPI;
+	check_efi_reboot();
 }
 
 /*
