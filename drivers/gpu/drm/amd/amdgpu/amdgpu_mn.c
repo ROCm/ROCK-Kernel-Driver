@@ -397,6 +397,10 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 
 		amdgpu_mn_invalidate_node(node, start, end);
 	}
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+	return 0;
+#endif
 }
 
 
@@ -461,6 +465,10 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 				amdgpu_amdkfd_evict_userptr(mem, mm);
 		}
 	}
+
+#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
+	return 0;
+#endif
 }
 
 #endif
