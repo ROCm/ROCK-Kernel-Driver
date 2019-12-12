@@ -1242,6 +1242,7 @@ struct usb_device_driver {
 	int (*suspend) (struct usb_device *udev, pm_message_t message);
 	int (*resume) (struct usb_device *udev, pm_message_t message);
 	struct usbdrv_wrap drvwrap;
+	void *suse_kabi_padding;
 	unsigned int supports_autosuspend:1;
 };
 #define	to_usb_device_driver(d) container_of(d, struct usb_device_driver, \
@@ -1583,9 +1584,11 @@ struct urb {
 	int error_count;		/* (return) number of ISO errors */
 	void *context;			/* (in) context for completion */
 	usb_complete_t complete;	/* (in) completion routine */
+
+	void *suse_kabi_padding;
+
 	struct usb_iso_packet_descriptor iso_frame_desc[0];
 					/* (in) ISO ONLY */
-	void *suse_kabi_padding;
 };
 
 /* ----------------------------------------------------------------------- */
