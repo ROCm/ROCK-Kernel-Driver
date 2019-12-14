@@ -127,7 +127,8 @@ static inline int adis_read_reg_16(struct adis *adis, unsigned int reg,
 	int ret;
 
 	ret = adis_read_reg(adis, reg, &tmp, 2);
-	*val = tmp;
+	if (ret == 0)
+		*val = tmp;
 
 	return ret;
 }
@@ -145,7 +146,8 @@ static inline int adis_read_reg_32(struct adis *adis, unsigned int reg,
 	int ret;
 
 	ret = adis_read_reg(adis, reg, &tmp, 4);
-	*val = tmp;
+	if (ret == 0)
+		*val = tmp;
 
 	return ret;
 }
