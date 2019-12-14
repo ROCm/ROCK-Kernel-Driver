@@ -30,6 +30,8 @@ struct typec_altmode {
 
 	char				*desc;
 	const struct typec_altmode_ops	*ops;
+
+	void *suse_kabi_padding;
 };
 
 #define to_typec_altmode(d) container_of(d, struct typec_altmode, dev)
@@ -63,6 +65,8 @@ struct typec_altmode_ops {
 	int (*notify)(struct typec_altmode *altmode, unsigned long conf,
 		      void *data);
 	int (*activate)(struct typec_altmode *altmode, int activate);
+
+	void *suse_kabi_padding;
 };
 
 int typec_altmode_enter(struct typec_altmode *altmode);
@@ -141,6 +145,9 @@ struct typec_altmode_driver {
 	const struct typec_device_id *id_table;
 	int (*probe)(struct typec_altmode *altmode);
 	void (*remove)(struct typec_altmode *altmode);
+
+	void *suse_kabi_padding;
+
 	struct device_driver driver;
 };
 
