@@ -162,6 +162,7 @@ static int amdgpu_ctx_init(struct amdgpu_device *adev,
 		case AMDGPU_HW_IP_VCN_ENC:
 			scheds = adev->vcn.vcn_enc_sched;
 			num_scheds =  adev->vcn.num_vcn_enc_sched;
+			break;
 		case AMDGPU_HW_IP_VCN_JPEG:
 			scheds = adev->jpeg.jpeg_sched;
 			num_scheds =  adev->jpeg.num_jpeg_sched;
