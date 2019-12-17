@@ -46,6 +46,7 @@
 #include "gem/i915_gem_ioctls.h"
 #include "gem/i915_gem_pm.h"
 #include "gem/i915_gemfs.h"
+#include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
 #include "gt/intel_mocs.h"
 #include "gt/intel_reset.h"
@@ -141,7 +142,7 @@ i915_gem_phys_pwrite(struct drm_i915_gem_object *obj,
 		return -EFAULT;
 
 	drm_clflush_virt_range(vaddr, args->size);
-	i915_gem_chipset_flush(to_i915(obj->base.dev));
+	intel_gt_chipset_flush(&to_i915(obj->base.dev)->gt);
 
 	intel_fb_obj_flush(obj, ORIGIN_CPU);
 	return 0;
