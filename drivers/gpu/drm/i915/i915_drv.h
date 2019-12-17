@@ -2523,10 +2523,6 @@ int intel_engine_cmd_parser(struct i915_gem_context *cxt,
 			    struct drm_i915_gem_object *shadow_batch_obj,
 			    u64 shadow_batch_start);
 
-/* i915_suspend.c */
-int i915_save_state(struct drm_i915_private *dev_priv);
-int i915_restore_state(struct drm_i915_private *dev_priv);
-
 /* intel_device_info.c */
 static inline struct intel_device_info *
 mkwrite_device_info(struct drm_i915_private *dev_priv)
