@@ -1026,6 +1026,9 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 		struct i915_vma *vma;
 		int err;
 
+		if (i915_gem_object_is_tiled(obj))
+			return ERR_PTR(-EINVAL);
+
 		if (use_cpu_reloc(cache, obj))
 			return NULL;
 
@@ -1049,12 +1052,6 @@ static void *reloc_iomap(struct drm_i915_gem_object *obj,
 			if (err) /* no inactive aperture space, use cpu reloc */
 				return NULL;
 		} else {
-			err = i915_vma_put_fence(vma);
-			if (err) {
-				i915_vma_unpin(vma);
-				return ERR_PTR(err);
-			}
-
 			cache->node.start = vma->node.start;
 			cache->node.mm = (void *)vma;
 		}
