@@ -1199,7 +1199,7 @@ __intel_context_reconfigure_sseu(struct intel_context *ce,
 {
 	int ret;
 
-	GEM_BUG_ON(INTEL_GEN(ce->gem_context->i915) < 8);
+	GEM_BUG_ON(INTEL_GEN(ce->engine->i915) < 8);
 
 	ret = intel_context_lock_pinned(ce);
 	if (ret)
@@ -1221,7 +1221,7 @@ unlock:
 static int
 intel_context_reconfigure_sseu(struct intel_context *ce, struct intel_sseu sseu)
 {
-	struct drm_i915_private *i915 = ce->gem_context->i915;
+	struct drm_i915_private *i915 = ce->engine->i915;
 	int ret;
 
 	ret = mutex_lock_interruptible(&i915->drm.struct_mutex);
