@@ -1044,6 +1044,14 @@ i915_gem_object_pin(struct drm_i915_gem_object *obj,
 			return ERR_PTR(ret);
 	}
 
+	if (vma->fence && !i915_gem_object_is_tiled(obj)) {
+		mutex_lock(&vma->vm->mutex);
+		ret = i915_vma_revoke_fence(vma);
+		mutex_unlock(&vma->vm->mutex);
+		if (ret)
+			return ERR_PTR(ret);
+	}
+
 	ret = i915_vma_pin(vma, size, alignment, flags);
 	if (ret)
 		return ERR_PTR(ret);
