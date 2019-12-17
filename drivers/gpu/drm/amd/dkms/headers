@@ -22,4 +22,8 @@ linux/io-64-nonatomic-lo-hi.h kcl/kcl_linux_io_64_nonatomic_lo_hi_h.h
 drm/drm_vblank.h kcl/kcl_drm_vblank_h.h
 drm/drm_ioctl.h kcl/kcl_drm_ioctl_h.h
 drm/drm_debugfs.h kcl/kcl_drm_debugfs_h.h
+drm/drm_irq.h kcl/kcl_drm_irq_h.h
+drm/drm_connector.h kcl/kcl_drm_connector_h.h
+drm/drm_encoder.h kcl/kcl_drm_encoder_h.h
+drm/drm_plane.h kcl/kcl_drm_plane_h.h
 

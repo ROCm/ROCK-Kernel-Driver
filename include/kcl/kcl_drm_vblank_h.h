@@ -4,6 +4,6 @@
 #ifdef HAVE_DRM_VBLANK_H
 #include <drm/drm_vblank.h>
 #else
-#include <drm/drm_irq.h>
+#include <kcl/kcl_drm_irq_h.h>
 #endif
 #endif
