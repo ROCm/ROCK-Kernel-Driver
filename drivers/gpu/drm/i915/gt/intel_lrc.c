@@ -1783,7 +1783,8 @@ gen8_emit_flush_coherentl3_wa(struct intel_engine_cs *engine, u32 *batch)
 	/* NB no one else is allowed to scribble over scratch + 256! */
 	*batch++ = MI_STORE_REGISTER_MEM_GEN8 | MI_SRM_LRM_GLOBAL_GTT;
 	*batch++ = i915_mmio_reg_offset(GEN8_L3SQCREG4);
-	*batch++ = intel_gt_scratch_offset(engine->gt) + 256;
+	*batch++ = intel_gt_scratch_offset(engine->gt,
+					   INTEL_GT_SCRATCH_FIELD_COHERENTL3_WA);
 	*batch++ = 0;
 
 	*batch++ = MI_LOAD_REGISTER_IMM(1);
@@ -1797,10 +1798,17 @@ gen8_emit_flush_coherentl3_wa(struct intel_engine_cs *engine, u32 *batch)
 
 	*batch++ = MI_LOAD_REGISTER_MEM_GEN8 | MI_SRM_LRM_GLOBAL_GTT;
 	*batch++ = i915_mmio_reg_offset(GEN8_L3SQCREG4);
-	*batch++ = intel_gt_scratch_offset(engine->gt) + 256;
+	*batch++ = intel_gt_scratch_offset(engine->gt,
+					   INTEL_GT_SCRATCH_FIELD_COHERENTL3_WA);
 	*batch++ = 0;
 
 	return batch;
+}
+
+static u32 slm_offset(struct intel_engine_cs *engine)
+{
+	return intel_gt_scratch_offset(engine->gt,
+				       INTEL_GT_SCRATCH_FIELD_CLEAR_SLM_WA);
 }
 
 /*
@@ -1834,8 +1842,7 @@ static u32 *gen8_init_indirectctx_bb(struct intel_engine_cs *engine, u32 *batch)
 				       PIPE_CONTROL_GLOBAL_GTT_IVB |
 				       PIPE_CONTROL_CS_STALL |
 				       PIPE_CONTROL_QW_WRITE,
-				       intel_gt_scratch_offset(engine->gt) +
-				       2 * CACHELINE_BYTES);
+				       slm_offset(engine));
 
 	*batch++ = MI_ARB_ON_OFF | MI_ARB_ENABLE;
 
@@ -2519,7 +2526,8 @@ static int gen8_emit_flush_render(struct i915_request *request,
 {
 	struct intel_engine_cs *engine = request->engine;
 	u32 scratch_addr =
-		intel_gt_scratch_offset(engine->gt) + 2 * CACHELINE_BYTES;
+		intel_gt_scratch_offset(engine->gt,
+					INTEL_GT_SCRATCH_FIELD_RENDER_FLUSH);
 	bool vf_flush_wa = false, dc_flush_wa = false;
 	u32 *cs, flags = 0;
 	int len;
