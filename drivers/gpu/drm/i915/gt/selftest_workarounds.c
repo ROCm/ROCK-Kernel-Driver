@@ -25,11 +25,9 @@ static const struct wo_register {
 	{ INTEL_GEMINILAKE, 0x731c }
 };
 
-#define REF_NAME_MAX (INTEL_ENGINE_CS_MAX_NAME + 8)
 struct wa_lists {
 	struct i915_wa_list gt_wa_list;
 	struct {
-		char name[REF_NAME_MAX];
 		struct i915_wa_list wa_list;
 		struct i915_wa_list ctx_wa_list;
 	} engine[I915_NUM_ENGINES];
@@ -43,25 +41,20 @@ reference_lists_init(struct drm_i915_private *i915, struct wa_lists *lists)
 
 	memset(lists, 0, sizeof(*lists));
 
-	wa_init_start(&lists->gt_wa_list, "GT_REF");
+	wa_init_start(&lists->gt_wa_list, "GT_REF", "global");
 	gt_init_workarounds(i915, &lists->gt_wa_list);
 	wa_init_finish(&lists->gt_wa_list);
 
 	for_each_engine(engine, i915, id) {
 		struct i915_wa_list *wal = &lists->engine[id].wa_list;
-		char *name = lists->engine[id].name;
 
-		snprintf(name, REF_NAME_MAX, "%s_REF", engine->name);
-
-		wa_init_start(wal, name);
+		wa_init_start(wal, "REF", engine->name);
 		engine_init_workarounds(engine, wal);
 		wa_init_finish(wal);
 
-		snprintf(name, REF_NAME_MAX, "%s_CTX_REF", engine->name);
-
 		__intel_engine_init_ctx_wa(engine,
 					   &lists->engine[id].ctx_wa_list,
-					   name);
+					   "CTX_REF");
 	}
 }
 
@@ -292,8 +285,8 @@ static int check_whitelist_across_reset(struct intel_engine_cs *engine,
 	intel_wakeref_t wakeref;
 	int err;
 
-	pr_info("Checking %d whitelisted registers (RING_NONPRIV) [%s]\n",
-		engine->whitelist.count, name);
+	pr_info("Checking %d whitelisted registers on %s (RING_NONPRIV) [%s]\n",
+		engine->whitelist.count, engine->name, name);
 
 	ctx = kernel_context(i915);
 	if (IS_ERR(ctx))
@@ -397,6 +390,10 @@ static bool wo_register(struct intel_engine_cs *engine, u32 reg)
 	enum intel_platform platform = INTEL_INFO(engine->i915)->platform;
 	int i;
 
+	if ((reg & RING_FORCE_TO_NONPRIV_ACCESS_MASK) ==
+	     RING_FORCE_TO_NONPRIV_ACCESS_WR)
+		return true;
+
 	for (i = 0; i < ARRAY_SIZE(wo_registers); i++) {
 		if (wo_registers[i].platform == platform &&
 		    wo_registers[i].reg == reg)
@@ -408,7 +405,8 @@ static bool wo_register(struct intel_engine_cs *engine, u32 reg)
 
 static bool ro_register(u32 reg)
 {
-	if (reg & RING_FORCE_TO_NONPRIV_RD)
+	if ((reg & RING_FORCE_TO_NONPRIV_ACCESS_MASK) ==
+	     RING_FORCE_TO_NONPRIV_ACCESS_RD)
 		return true;
 
 	return false;
@@ -480,12 +478,12 @@ static int check_dirty_whitelist(struct i915_gem_context *ctx,
 		u32 srm, lrm, rsvd;
 		u32 expect;
 		int idx;
+		bool ro_reg;
 
 		if (wo_register(engine, reg))
 			continue;
 
-		if (ro_register(reg))
-			continue;
+		ro_reg = ro_register(reg);
 
 		srm = MI_STORE_REGISTER_MEM;
 		lrm = MI_LOAD_REGISTER_MEM;
@@ -586,24 +584,35 @@ err_request:
 		}
 
 		GEM_BUG_ON(values[ARRAY_SIZE(values) - 1] != 0xffffffff);
-		rsvd = results[ARRAY_SIZE(values)]; /* detect write masking */
-		if (!rsvd) {
-			pr_err("%s: Unable to write to whitelisted register %x\n",
-			       engine->name, reg);
-			err = -EINVAL;
-			goto out_unpin;
+		if (!ro_reg) {
+			/* detect write masking */
+			rsvd = results[ARRAY_SIZE(values)];
+			if (!rsvd) {
+				pr_err("%s: Unable to write to whitelisted register %x\n",
+				       engine->name, reg);
+				err = -EINVAL;
+				goto out_unpin;
+			}
 		}
 
 		expect = results[0];
 		idx = 1;
 		for (v = 0; v < ARRAY_SIZE(values); v++) {
-			expect = reg_write(expect, values[v], rsvd);
+			if (ro_reg)
+				expect = results[0];
+			else
+				expect = reg_write(expect, values[v], rsvd);
+
 			if (results[idx] != expect)
 				err++;
 			idx++;
 		}
 		for (v = 0; v < ARRAY_SIZE(values); v++) {
-			expect = reg_write(expect, ~values[v], rsvd);
+			if (ro_reg)
+				expect = results[0];
+			else
+				expect = reg_write(expect, ~values[v], rsvd);
+
 			if (results[idx] != expect)
 				err++;
 			idx++;
@@ -612,15 +621,22 @@ err_request:
 			pr_err("%s: %d mismatch between values written to whitelisted register [%x], and values read back!\n",
 			       engine->name, err, reg);
 
-			pr_info("%s: Whitelisted register: %x, original value %08x, rsvd %08x\n",
-				engine->name, reg, results[0], rsvd);
+			if (ro_reg)
+				pr_info("%s: Whitelisted read-only register: %x, original value %08x\n",
+					engine->name, reg, results[0]);
+			else
+				pr_info("%s: Whitelisted register: %x, original value %08x, rsvd %08x\n",
+					engine->name, reg, results[0], rsvd);
 
 			expect = results[0];
 			idx = 1;
 			for (v = 0; v < ARRAY_SIZE(values); v++) {
 				u32 w = values[v];
 
-				expect = reg_write(expect, w, rsvd);
+				if (ro_reg)
+					expect = results[0];
+				else
+					expect = reg_write(expect, w, rsvd);
 				pr_info("Wrote %08x, read %08x, expect %08x\n",
 					w, results[idx], expect);
 				idx++;
@@ -628,7 +644,10 @@ err_request:
 			for (v = 0; v < ARRAY_SIZE(values); v++) {
 				u32 w = ~values[v];
 
-				expect = reg_write(expect, w, rsvd);
+				if (ro_reg)
+					expect = results[0];
+				else
+					expect = reg_write(expect, w, rsvd);
 				pr_info("Wrote %08x, read %08x, expect %08x\n",
 					w, results[idx], expect);
 				idx++;
@@ -760,8 +779,8 @@ static int read_whitelisted_registers(struct i915_gem_context *ctx,
 		u64 offset = results->node.start + sizeof(u32) * i;
 		u32 reg = i915_mmio_reg_offset(engine->whitelist.list[i].reg);
 
-		/* Clear RD only and WR only flags */
-		reg &= ~(RING_FORCE_TO_NONPRIV_RD | RING_FORCE_TO_NONPRIV_WR);
+		/* Clear access permission field */
+		reg &= ~RING_FORCE_TO_NONPRIV_ACCESS_MASK;
 
 		*cs++ = srm;
 		*cs++ = reg;
@@ -931,7 +950,8 @@ check_whitelisted_registers(struct intel_engine_cs *engine,
 	for (i = 0; i < engine->whitelist.count; i++) {
 		const struct i915_wa *wa = &engine->whitelist.list[i];
 
-		if (i915_mmio_reg_offset(wa->reg) & RING_FORCE_TO_NONPRIV_RD)
+		if (i915_mmio_reg_offset(wa->reg) &
+		    RING_FORCE_TO_NONPRIV_ACCESS_RD)
 			continue;
 
 		if (!fn(engine, a[i], b[i], wa->reg))
