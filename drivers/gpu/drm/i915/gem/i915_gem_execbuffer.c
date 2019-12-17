@@ -16,6 +16,7 @@
 
 #include "gem/i915_gem_ioctls.h"
 #include "gt/intel_context.h"
+#include "gt/intel_engine_pool.h"
 #include "gt/intel_gt.h"
 #include "gt/intel_gt_pm.h"
 
@@ -1200,25 +1201,26 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 			     unsigned int len)
 {
 	struct reloc_cache *cache = &eb->reloc_cache;
-	struct drm_i915_gem_object *obj;
+	struct intel_engine_pool_node *pool;
 	struct i915_request *rq;
 	struct i915_vma *batch;
 	u32 *cmd;
 	int err;
 
-	obj = i915_gem_batch_pool_get(&eb->engine->batch_pool, PAGE_SIZE);
-	if (IS_ERR(obj))
-		return PTR_ERR(obj);
+	pool = intel_engine_pool_get(&eb->engine->pool, PAGE_SIZE);
+	if (IS_ERR(pool))
+		return PTR_ERR(pool);
 
-	cmd = i915_gem_object_pin_map(obj,
+	cmd = i915_gem_object_pin_map(pool->obj,
 				      cache->has_llc ?
 				      I915_MAP_FORCE_WB :
 				      I915_MAP_FORCE_WC);
-	i915_gem_object_unpin_pages(obj);
-	if (IS_ERR(cmd))
-		return PTR_ERR(cmd);
+	if (IS_ERR(cmd)) {
+		err = PTR_ERR(cmd);
+		goto out_pool;
+	}
 
-	batch = i915_vma_instance(obj, vma->vm, NULL);
+	batch = i915_vma_instance(pool->obj, vma->vm, NULL);
 	if (IS_ERR(batch)) {
 		err = PTR_ERR(batch);
 		goto err_unmap;
@@ -1233,6 +1235,10 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 		err = PTR_ERR(rq);
 		goto err_unpin;
 	}
+
+	err = intel_engine_pool_mark_active(pool, rq);
+	if (err)
+		goto err_request;
 
 	err = reloc_move_to_gpu(rq, vma);
 	if (err)
@@ -1259,7 +1265,7 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 	cache->rq_size = 0;
 
 	/* Return with batch mapping (cmd) still pinned */
-	return 0;
+	goto out_pool;
 
 skip_request:
 	i915_request_skip(rq, err);
@@ -1268,7 +1274,9 @@ err_request:
 err_unpin:
 	i915_vma_unpin(batch);
 err_unmap:
-	i915_gem_object_unpin_map(obj);
+	i915_gem_object_unpin_map(pool->obj);
+out_pool:
+	intel_engine_pool_put(pool);
 	return err;
 }
 
@@ -2037,20 +2045,19 @@ shadow_batch_pin(struct i915_execbuffer *eb, struct drm_i915_gem_object *obj)
 
 static struct i915_vma *eb_parse(struct i915_execbuffer *eb)
 {
-	struct drm_i915_gem_object *shadow_batch_obj;
+	struct intel_engine_pool_node *pool;
 	struct i915_vma *vma;
 	u64 batch_start;
 	u64 shadow_batch_start;
 	int err;
 
-	shadow_batch_obj = i915_gem_batch_pool_get(&eb->engine->batch_pool,
-						   PAGE_ALIGN(eb->batch_len));
-	if (IS_ERR(shadow_batch_obj))
-		return ERR_CAST(shadow_batch_obj);
+	pool = intel_engine_pool_get(&eb->engine->pool, eb->batch_len);
+	if (IS_ERR(pool))
+		return ERR_CAST(pool);
 
-	vma = shadow_batch_pin(eb, shadow_batch_obj);
+	vma = shadow_batch_pin(eb, pool->obj);
 	if (IS_ERR(vma))
-		goto out;
+		goto err;
 
 	batch_start = gen8_canonical_addr(eb->batch->node.start) +
 		      eb->batch_start_offset;
@@ -2063,7 +2070,7 @@ static struct i915_vma *eb_parse(struct i915_execbuffer *eb)
 				      batch_start,
 				      eb->batch_start_offset,
 				      eb->batch_len,
-				      shadow_batch_obj,
+				      pool->obj,
 				      shadow_batch_start);
 
 	if (err) {
@@ -2080,7 +2087,7 @@ static struct i915_vma *eb_parse(struct i915_execbuffer *eb)
 			vma = NULL;
 		else
 			vma = ERR_PTR(err);
-		goto out;
+		goto err;
 	}
 
 	eb->vma[eb->buffer_count] = i915_vma_get(vma);
@@ -2088,6 +2095,7 @@ static struct i915_vma *eb_parse(struct i915_execbuffer *eb)
 		__EXEC_OBJECT_HAS_PIN | __EXEC_OBJECT_HAS_REF;
 	vma->exec_flags = &eb->flags[eb->buffer_count];
 	eb->buffer_count++;
+
 	eb->batch_start_offset = 0;
 	eb->batch = vma;
 
@@ -2095,8 +2103,12 @@ static struct i915_vma *eb_parse(struct i915_execbuffer *eb)
 		eb->batch_flags |= I915_DISPATCH_SECURE;
 
 	/* eb->batch_len unchanged */
-out:
-	i915_gem_object_unpin_pages(shadow_batch_obj);
+
+	vma->private = pool;
+	return vma;
+
+err:
+	intel_engine_pool_put(pool);
 	return vma;
 }
 
@@ -2633,6 +2645,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	 * to explicitly hold another reference here.
 	 */
 	eb.request->batch = eb.batch;
+	if (eb.batch->private)
+		intel_engine_pool_mark_active(eb.batch->private, eb.request);
 
 	trace_i915_request_queue(eb.request, eb.batch_flags);
 	err = eb_submit(&eb);
@@ -2657,6 +2671,8 @@ err_request:
 err_batch_unpin:
 	if (eb.batch_flags & I915_DISPATCH_SECURE)
 		i915_vma_unpin(eb.batch);
+	if (eb.batch->private)
+		intel_engine_pool_put(eb.batch->private);
 err_vma:
 	if (eb.exec)
 		eb_release_vmas(&eb);
