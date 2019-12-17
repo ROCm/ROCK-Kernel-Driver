@@ -22,8 +22,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-#ifndef __INTEL_DRV_H__
-#define __INTEL_DRV_H__
+
+#ifndef __INTEL_DISPLAY_TYPES_H__
+#define __INTEL_DISPLAY_TYPES_H__
 
 #include <linux/async.h>
 #include <linux/i2c.h>
@@ -745,6 +746,7 @@ struct intel_crtc_state {
 	bool update_wm_pre, update_wm_post; /* watermarks are updated */
 	bool fb_changed; /* fb on any of the planes is changed */
 	bool fifo_changed; /* FIFO split is changed */
+	bool preload_luts;
 
 	/* Pipe source size (ie. panel fitter input size)
 	 * All planes will be positioned inside this space,
@@ -851,7 +853,7 @@ struct intel_crtc_state {
 
 	/*
 	 * Frequence the dpll for the port should run at. Differs from the
-	 * adjusted dotclock e.g. for DP or 10/12bpc hdmi mode. This is also
+	 * adjusted dotclock e.g. for DP or 12bpc hdmi mode. This is also
 	 * already multiplied by pixel_multiplier.
 	 */
 	int port_clock;
@@ -1506,4 +1508,4 @@ static inline u32 intel_plane_ggtt_offset(const struct intel_plane_state *state)
 	return i915_ggtt_offset(state->vma);
 }
 
-#endif /* __INTEL_DRV_H__ */
+#endif /*  __INTEL_DISPLAY_TYPES_H__ */
