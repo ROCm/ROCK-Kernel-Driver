@@ -200,6 +200,7 @@ struct global_params {
  * @update_util:	CPUFreq utility callback information
  * @update_util_set:	CPUFreq utility callback is set
  * @iowait_boost:	iowait-related boost fraction
+ * @idlewait_boost:	idle-related boost fraction
  * @last_update:	Time of the last update.
  * @pstate:		Stores P state limits for this CPU
  * @vid:		Stores VID limits for this CPU
@@ -258,6 +259,7 @@ struct cpudata {
 	bool valid_pss_table;
 #endif
 	unsigned int iowait_boost;
+	unsigned int idle_boost;
 	s16 epp_powersave;
 	s16 epp_policy;
 	s16 epp_default;
@@ -1719,13 +1721,22 @@ static inline int32_t get_target_pstate(struct cpudata *cpu)
 	busy_frac = div_fp(sample->mperf << cpu->aperf_mperf_shift,
 			   sample->tsc);
 
+	/* IO-wait boosting */
 	boost = cpu->iowait_boost;
 	cpu->iowait_boost >>= 1;
-
 	if (busy_frac < boost)
 		busy_frac = boost;
-
 	sample->busy_scaled = busy_frac * 100;
+
+	/* Exit from long idle boosting */
+	if (cpu->idle_boost && !global.vanilla_policy) {
+		boost = max_t(int32_t, CPUFREQ_SERVER_UTIL_THRESHOLD, cpu->idle_boost);
+		cpu->idle_boost >>= 1;
+		if (busy_frac < boost && !is_idle_task(current)) {
+			busy_frac = boost;
+			sample->busy_scaled = boost * 100;
+		}
+	}
 
 	max_target = global.no_turbo || global.turbo_disabled ?
 			cpu->pstate.max_pstate : cpu->pstate.turbo_pstate;
@@ -1824,11 +1835,16 @@ static void intel_pstate_update_util(struct update_util_data *data, u64 time,
 			return;
 
 		goto set_pstate;
-	} else if (cpu->iowait_boost) {
-		/* Clear iowait_boost if the CPU may have been idle. */
+	} else {
 		delta_ns = time - cpu->last_update;
-		if (delta_ns > TICK_NSEC)
-			cpu->iowait_boost = 0;
+		if (delta_ns > TICK_NSEC) {
+			/* Clear iowait_boost if the CPU may have been idle. */
+			if (cpu->iowait_boost)
+				cpu->iowait_boost = 0;
+
+			if (!is_idle_task(current))
+				cpu->idle_boost = int_tofp(1);
+		}
 	}
 	cpu->last_update = time;
 	delta_ns = time - cpu->sample.time;
