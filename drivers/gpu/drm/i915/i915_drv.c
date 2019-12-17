@@ -2390,7 +2390,7 @@ static int i915_drm_resume_early(struct drm_device *dev)
 
 	intel_rc6_ctx_wa_resume(dev_priv);
 
-	intel_gt_sanitize(dev_priv, true);
+	intel_gt_sanitize(&dev_priv->gt, true);
 
 	enable_rpm_wakeref_asserts(&dev_priv->runtime_pm);
 

@@ -18,7 +18,7 @@ static int __engine_unpark(struct intel_wakeref *wf)
 
 	GEM_TRACE("%s\n", engine->name);
 
-	intel_gt_pm_get(engine->i915);
+	intel_gt_pm_get(engine->gt);
 
 	/* Pin the default state for fast resets from atomic context. */
 	map = NULL;
@@ -129,7 +129,7 @@ static int __engine_park(struct intel_wakeref *wf)
 
 	engine->execlists.no_priolist = false;
 
-	intel_gt_pm_put(engine->i915);
+	intel_gt_pm_put(engine->gt);
 	return 0;
 }
 

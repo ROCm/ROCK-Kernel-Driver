@@ -1173,7 +1173,7 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	 * it may impact the display and we are uncertain about the stability
 	 * of the reset, so this could be applied to even earlier gen.
 	 */
-	intel_gt_sanitize(i915, false);
+	intel_gt_sanitize(&i915->gt, false);
 
 	intel_uncore_forcewake_put(&i915->uncore, FORCEWAKE_ALL);
 	intel_runtime_pm_put(&i915->runtime_pm, wakeref);
@@ -1505,7 +1505,7 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 		goto err_uc_init;
 
 	/* Only when the HW is re-initialised, can we replay the requests */
-	ret = intel_gt_resume(dev_priv);
+	ret = intel_gt_resume(&dev_priv->gt);
 	if (ret)
 		goto err_init_hw;
 
