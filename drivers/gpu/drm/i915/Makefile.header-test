@@ -26,5 +26,6 @@ header-test-$(CONFIG_DRM_I915_WERROR) := \
 	intel_pm.h \
 	intel_runtime_pm.h \
 	intel_sideband.h \
+	intel_uc_fw.h \
 	intel_uncore.h \
 	intel_wakeref.h
