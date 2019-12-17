@@ -1302,7 +1302,7 @@ int i915_gem_init_hw(struct drm_i915_private *dev_priv)
 		goto out;
 	}
 
-	intel_mocs_init_l3cc_table(dev_priv);
+	intel_mocs_init_l3cc_table(&dev_priv->gt);
 
 	intel_uncore_forcewake_put(&dev_priv->uncore, FORCEWAKE_ALL);
 
