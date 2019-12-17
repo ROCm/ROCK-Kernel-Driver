@@ -2,7 +2,7 @@
 #define AMDKCL_DRM_CONNECTOR_H
 
 #include <drm/drm_crtc.h>
-#include <drm/drm_connector.h>
+#include <kcl/kcl_drm_connector_h.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_drm.h>
 

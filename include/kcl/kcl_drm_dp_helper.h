@@ -27,7 +27,7 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 
-#include <drm/drm_connector.h>
+#include <kcl/kcl_drm_connector_h.h>
 #include <kcl/kcl_drm_device_h.h>
 #include <drm/drm_dp_helper.h>
 
