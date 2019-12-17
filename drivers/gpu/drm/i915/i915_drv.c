@@ -938,7 +938,7 @@ static int i915_driver_early_probe(struct drm_i915_private *dev_priv)
 	intel_detect_pch(dev_priv);
 
 	intel_wopcm_init_early(&dev_priv->wopcm);
-	intel_uc_init_early(dev_priv);
+	intel_uc_init_early(&dev_priv->gt.uc);
 	intel_pm_setup(dev_priv);
 	intel_init_dpio(dev_priv);
 	ret = intel_power_domains_init(dev_priv);
@@ -955,7 +955,7 @@ static int i915_driver_early_probe(struct drm_i915_private *dev_priv)
 	return 0;
 
 err_uc:
-	intel_uc_cleanup_early(dev_priv);
+	intel_uc_cleanup_early(&dev_priv->gt.uc);
 	i915_gem_cleanup_early(dev_priv);
 err_workqueues:
 	i915_workqueues_cleanup(dev_priv);
@@ -973,7 +973,7 @@ static void i915_driver_late_release(struct drm_i915_private *dev_priv)
 {
 	intel_irq_fini(dev_priv);
 	intel_power_domains_cleanup(dev_priv);
-	intel_uc_cleanup_early(dev_priv);
+	intel_uc_cleanup_early(&dev_priv->gt.uc);
 	i915_gem_cleanup_early(dev_priv);
 	i915_workqueues_cleanup(dev_priv);
 	i915_engines_cleanup(dev_priv);
@@ -1012,7 +1012,7 @@ static int i915_driver_mmio_probe(struct drm_i915_private *dev_priv)
 
 	intel_uncore_prune_mmio_domains(&dev_priv->uncore);
 
-	intel_uc_init_mmio(dev_priv);
+	intel_uc_init_mmio(&dev_priv->gt.uc);
 
 	ret = intel_engines_init_mmio(dev_priv);
 	if (ret)
@@ -2952,7 +2952,7 @@ static int intel_runtime_suspend(struct device *kdev)
 	 */
 	i915_gem_runtime_suspend(dev_priv);
 
-	intel_uc_runtime_suspend(dev_priv);
+	intel_uc_runtime_suspend(&dev_priv->gt.uc);
 
 	intel_runtime_pm_disable_interrupts(dev_priv);
 
@@ -2977,7 +2977,7 @@ static int intel_runtime_suspend(struct device *kdev)
 
 		intel_runtime_pm_enable_interrupts(dev_priv);
 
-		intel_uc_resume(dev_priv);
+		intel_uc_resume(&dev_priv->gt.uc);
 
 		intel_gt_init_swizzling(&dev_priv->gt);
 		i915_gem_restore_fences(dev_priv);
@@ -3075,7 +3075,7 @@ static int intel_runtime_resume(struct device *kdev)
 
 	intel_runtime_pm_enable_interrupts(dev_priv);
 
-	intel_uc_resume(dev_priv);
+	intel_uc_resume(&dev_priv->gt.uc);
 
 	/*
 	 * No point of rolling back things in case of an error, as the best
