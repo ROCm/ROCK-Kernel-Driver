@@ -1099,7 +1099,8 @@ static void edram_detect(struct drm_i915_private *dev_priv)
 		dev_priv->edram_size_mb =
 			gen9_edram_size_mb(dev_priv, edram_cap);
 
-	DRM_INFO("Found %uMB of eDRAM\n", dev_priv->edram_size_mb);
+	dev_info(dev_priv->drm.dev,
+		 "Found %uMB of eDRAM\n", dev_priv->edram_size_mb);
 }
 
 /**
