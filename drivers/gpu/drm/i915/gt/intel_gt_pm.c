@@ -17,7 +17,7 @@ static void pm_notify(struct drm_i915_private *i915, int state)
 	blocking_notifier_call_chain(&i915->gt.pm_notifications, state, i915);
 }
 
-static int intel_gt_unpark(struct intel_wakeref *wf)
+static int __gt_unpark(struct intel_wakeref *wf)
 {
 	struct intel_gt *gt = container_of(wf, typeof(*gt), wakeref);
 	struct drm_i915_private *i915 = gt->i915;
@@ -56,14 +56,7 @@ static int intel_gt_unpark(struct intel_wakeref *wf)
 	return 0;
 }
 
-void intel_gt_pm_get(struct intel_gt *gt)
-{
-	struct intel_runtime_pm *rpm = &gt->i915->runtime_pm;
-
-	intel_wakeref_get(rpm, &gt->wakeref, intel_gt_unpark);
-}
-
-static int intel_gt_park(struct intel_wakeref *wf)
+static int __gt_park(struct intel_wakeref *wf)
 {
 	struct drm_i915_private *i915 =
 		container_of(wf, typeof(*i915), gt.wakeref);
@@ -77,6 +70,9 @@ static int intel_gt_park(struct intel_wakeref *wf)
 	if (INTEL_GEN(i915) >= 6)
 		gen6_rps_idle(i915);
 
+	/* Everything switched off, flush any residual interrupt just in case */
+	intel_synchronize_irq(i915);
+
 	if (NEEDS_RC6_CTX_CORRUPTION_WA(i915)) {
 		intel_rc6_ctx_wa_check(i915);
 		intel_uncore_forcewake_put(&i915->uncore, FORCEWAKE_ALL);
@@ -88,16 +84,16 @@ static int intel_gt_park(struct intel_wakeref *wf)
 	return 0;
 }
 
-void intel_gt_pm_put(struct intel_gt *gt)
-{
-	struct intel_runtime_pm *rpm = &gt->i915->runtime_pm;
-
-	intel_wakeref_put(rpm, &gt->wakeref, intel_gt_park);
-}
+static const struct intel_wakeref_ops wf_ops = {
+	.get = __gt_unpark,
+	.put = __gt_park,
+	.flags = INTEL_WAKEREF_PUT_ASYNC,
+};
 
 void intel_gt_pm_init_early(struct intel_gt *gt)
 {
-	intel_wakeref_init(&gt->wakeref);
+	intel_wakeref_init(&gt->wakeref, &gt->i915->runtime_pm, &wf_ops);
+
 	BLOCKING_INIT_NOTIFIER_HEAD(&gt->pm_notifications);
 }
 
