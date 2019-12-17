@@ -1228,8 +1228,6 @@ int intel_vgpu_setup_submission(struct intel_vgpu *vgpu)
 	}
 
 	i915_gem_context_set_force_single_submission(ctx);
-	if (!USES_GUC_SUBMISSION(i915))
-		ctx->ring_size = 512 * PAGE_SIZE; /* Max ring buffer size */
 
 	i915_context_ppgtt_root_save(s, i915_vm_to_ppgtt(ctx->vm));
 
@@ -1243,6 +1241,12 @@ int intel_vgpu_setup_submission(struct intel_vgpu *vgpu)
 		if (IS_ERR(ce)) {
 			ret = PTR_ERR(ce);
 			goto out_shadow_ctx;
+		}
+
+		if (!USES_GUC_SUBMISSION(i915)) { /* Max ring buffer size */
+			const unsigned int ring_size = 512 * SZ_4K;
+
+			ce->ring = __intel_context_ring_size(ring_size);
 		}
 
 		ret = intel_context_pin(ce);
