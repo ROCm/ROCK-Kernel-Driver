@@ -36,9 +36,10 @@
  * This file provides an abstraction over display PLLs. The function
  * intel_shared_dpll_init() initializes the PLLs for the given platform.  The
  * users of a PLL are tracked and that tracking is integrated with the atomic
- * modest interface. During an atomic operation, a PLL can be requested for a
- * given CRTC and encoder configuration by calling intel_get_shared_dpll() and
- * a previously used PLL can be released with intel_release_shared_dpll().
+ * modset interface. During an atomic operation, required PLLs can be reserved
+ * for a given CRTC and encoder configuration by calling
+ * intel_reserve_shared_dplls() and previously reserved PLLs can be released
+ * with intel_release_shared_dplls().
  * Changes to the users are first staged in the atomic state, and then made
  * effective by calling intel_shared_dpll_swap_state() during the atomic
  * commit phase.
@@ -309,6 +310,28 @@ intel_reference_shared_dpll(struct intel_shared_dpll *pll,
 	shared_dpll[id].crtc_mask |= 1 << crtc->pipe;
 }
 
+static void intel_unreference_shared_dpll(struct intel_atomic_state *state,
+					  const struct intel_crtc *crtc,
+					  const struct intel_shared_dpll *pll)
+{
+	struct intel_shared_dpll_state *shared_dpll;
+
+	shared_dpll = intel_atomic_get_shared_dpll_state(&state->base);
+	shared_dpll[pll->info->id].crtc_mask &= ~(1 << crtc->pipe);
+}
+
+static void intel_put_dpll(struct intel_atomic_state *state,
+			   struct intel_crtc *crtc)
+{
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_old_crtc_state(state, crtc);
+
+	if (!crtc_state->shared_dpll)
+		return;
+
+	intel_unreference_shared_dpll(state, crtc, crtc_state->shared_dpll);
+}
+
 /**
  * intel_shared_dpll_swap_state - make atomic DPLL configuration effective
  * @state: atomic state
@@ -421,11 +444,12 @@ static void ibx_pch_dpll_disable(struct drm_i915_private *dev_priv,
 	udelay(200);
 }
 
-static struct intel_shared_dpll *
-ibx_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool ibx_get_dpll(struct intel_atomic_state *state,
+			 struct intel_crtc *crtc,
+			 struct intel_encoder *encoder)
 {
-	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct intel_shared_dpll *pll;
 	enum intel_dpll_id i;
@@ -445,12 +469,12 @@ ibx_get_dpll(struct intel_crtc_state *crtc_state,
 	}
 
 	if (!pll)
-		return NULL;
+		return false;
 
 	/* reference the pll */
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static void ibx_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -836,10 +860,12 @@ hsw_ddi_dp_get_dpll(struct intel_crtc_state *crtc_state)
 	return pll;
 }
 
-static struct intel_shared_dpll *
-hsw_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool hsw_get_dpll(struct intel_atomic_state *state,
+			 struct intel_crtc *crtc,
+			 struct intel_encoder *encoder)
 {
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct intel_shared_dpll *pll;
 
 	memset(&crtc_state->dpll_hw_state, 0,
@@ -851,7 +877,7 @@ hsw_get_dpll(struct intel_crtc_state *crtc_state,
 		pll = hsw_ddi_dp_get_dpll(crtc_state);
 	} else if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_ANALOG)) {
 		if (WARN_ON(crtc_state->port_clock / 2 != 135000))
-			return NULL;
+			return false;
 
 		crtc_state->dpll_hw_state.spll =
 			SPLL_PLL_ENABLE | SPLL_FREQ_1350MHz | SPLL_REF_MUXED_SSC;
@@ -859,15 +885,15 @@ hsw_get_dpll(struct intel_crtc_state *crtc_state,
 		pll = intel_find_shared_dpll(crtc_state,
 					     DPLL_ID_SPLL, DPLL_ID_SPLL);
 	} else {
-		return NULL;
+		return false;
 	}
 
 	if (!pll)
-		return NULL;
+		return false;
 
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static void hsw_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -1400,10 +1426,12 @@ skl_ddi_dp_set_dpll_hw_state(struct intel_crtc_state *crtc_state)
 	return true;
 }
 
-static struct intel_shared_dpll *
-skl_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool skl_get_dpll(struct intel_atomic_state *state,
+			 struct intel_crtc *crtc,
+			 struct intel_encoder *encoder)
 {
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct intel_shared_dpll *pll;
 	bool bret;
 
@@ -1411,16 +1439,16 @@ skl_get_dpll(struct intel_crtc_state *crtc_state,
 		bret = skl_ddi_hdmi_pll_dividers(crtc_state);
 		if (!bret) {
 			DRM_DEBUG_KMS("Could not get HDMI pll dividers.\n");
-			return NULL;
+			return false;
 		}
 	} else if (intel_crtc_has_dp_encoder(crtc_state)) {
 		bret = skl_ddi_dp_set_dpll_hw_state(crtc_state);
 		if (!bret) {
 			DRM_DEBUG_KMS("Could not set DP dpll HW state.\n");
-			return NULL;
+			return false;
 		}
 	} else {
-		return NULL;
+		return false;
 	}
 
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP))
@@ -1432,11 +1460,11 @@ skl_get_dpll(struct intel_crtc_state *crtc_state,
 					     DPLL_ID_SKL_DPLL1,
 					     DPLL_ID_SKL_DPLL3);
 	if (!pll)
-		return NULL;
+		return false;
 
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static void skl_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -1842,22 +1870,23 @@ bxt_ddi_hdmi_set_dpll_hw_state(struct intel_crtc_state *crtc_state)
 	return bxt_ddi_set_dpll_hw_state(crtc_state, &clk_div);
 }
 
-static struct intel_shared_dpll *
-bxt_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool bxt_get_dpll(struct intel_atomic_state *state,
+			 struct intel_crtc *crtc,
+			 struct intel_encoder *encoder)
 {
-	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct drm_i915_private *dev_priv = to_i915(crtc->base.dev);
 	struct intel_shared_dpll *pll;
 	enum intel_dpll_id id;
 
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_HDMI) &&
 	    !bxt_ddi_hdmi_set_dpll_hw_state(crtc_state))
-		return NULL;
+		return false;
 
 	if (intel_crtc_has_dp_encoder(crtc_state) &&
 	    !bxt_ddi_dp_set_dpll_hw_state(crtc_state))
-		return NULL;
+		return false;
 
 	/* 1:1 mapping between ports and PLLs */
 	id = (enum intel_dpll_id) encoder->port;
@@ -1868,7 +1897,7 @@ bxt_get_dpll(struct intel_crtc_state *crtc_state,
 
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static void bxt_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -1899,8 +1928,11 @@ static const struct intel_shared_dpll_funcs bxt_ddi_pll_funcs = {
 struct intel_dpll_mgr {
 	const struct dpll_info *dpll_info;
 
-	struct intel_shared_dpll *(*get_dpll)(struct intel_crtc_state *crtc_state,
-					      struct intel_encoder *encoder);
+	bool (*get_dplls)(struct intel_atomic_state *state,
+			  struct intel_crtc *crtc,
+			  struct intel_encoder *encoder);
+	void (*put_dplls)(struct intel_atomic_state *state,
+			  struct intel_crtc *crtc);
 
 	void (*dump_hw_state)(struct drm_i915_private *dev_priv,
 			      const struct intel_dpll_hw_state *hw_state);
@@ -1914,7 +1946,8 @@ static const struct dpll_info pch_plls[] = {
 
 static const struct intel_dpll_mgr pch_pll_mgr = {
 	.dpll_info = pch_plls,
-	.get_dpll = ibx_get_dpll,
+	.get_dplls = ibx_get_dpll,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = ibx_dump_hw_state,
 };
 
@@ -1930,7 +1963,8 @@ static const struct dpll_info hsw_plls[] = {
 
 static const struct intel_dpll_mgr hsw_pll_mgr = {
 	.dpll_info = hsw_plls,
-	.get_dpll = hsw_get_dpll,
+	.get_dplls = hsw_get_dpll,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = hsw_dump_hw_state,
 };
 
@@ -1944,7 +1978,8 @@ static const struct dpll_info skl_plls[] = {
 
 static const struct intel_dpll_mgr skl_pll_mgr = {
 	.dpll_info = skl_plls,
-	.get_dpll = skl_get_dpll,
+	.get_dplls = skl_get_dpll,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = skl_dump_hw_state,
 };
 
@@ -1957,7 +1992,8 @@ static const struct dpll_info bxt_plls[] = {
 
 static const struct intel_dpll_mgr bxt_pll_mgr = {
 	.dpll_info = bxt_plls,
-	.get_dpll = bxt_get_dpll,
+	.get_dplls = bxt_get_dpll,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = bxt_dump_hw_state,
 };
 
@@ -2347,10 +2383,12 @@ cnl_ddi_dp_set_dpll_hw_state(struct intel_crtc_state *crtc_state)
 	return true;
 }
 
-static struct intel_shared_dpll *
-cnl_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool cnl_get_dpll(struct intel_atomic_state *state,
+			 struct intel_crtc *crtc,
+			 struct intel_encoder *encoder)
 {
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct intel_shared_dpll *pll;
 	bool bret;
 
@@ -2358,18 +2396,18 @@ cnl_get_dpll(struct intel_crtc_state *crtc_state,
 		bret = cnl_ddi_hdmi_pll_dividers(crtc_state);
 		if (!bret) {
 			DRM_DEBUG_KMS("Could not get HDMI pll dividers.\n");
-			return NULL;
+			return false;
 		}
 	} else if (intel_crtc_has_dp_encoder(crtc_state)) {
 		bret = cnl_ddi_dp_set_dpll_hw_state(crtc_state);
 		if (!bret) {
 			DRM_DEBUG_KMS("Could not set DP dpll HW state.\n");
-			return NULL;
+			return false;
 		}
 	} else {
 		DRM_DEBUG_KMS("Skip DPLL setup for output_types 0x%x\n",
 			      crtc_state->output_types);
-		return NULL;
+		return false;
 	}
 
 	pll = intel_find_shared_dpll(crtc_state,
@@ -2377,12 +2415,12 @@ cnl_get_dpll(struct intel_crtc_state *crtc_state,
 				     DPLL_ID_SKL_DPLL2);
 	if (!pll) {
 		DRM_DEBUG_KMS("No PLL selected\n");
-		return NULL;
+		return false;
 	}
 
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static void cnl_dump_hw_state(struct drm_i915_private *dev_priv,
@@ -2409,7 +2447,8 @@ static const struct dpll_info cnl_plls[] = {
 
 static const struct intel_dpll_mgr cnl_pll_mgr = {
 	.dpll_info = cnl_plls,
-	.get_dpll = cnl_get_dpll,
+	.get_dplls = cnl_get_dpll,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = cnl_dump_hw_state,
 };
 
@@ -2807,11 +2846,13 @@ static bool icl_calc_mg_pll_state(struct intel_crtc_state *crtc_state)
 	return true;
 }
 
-static struct intel_shared_dpll *
-icl_get_dpll(struct intel_crtc_state *crtc_state,
-	     struct intel_encoder *encoder)
+static bool icl_get_dplls(struct intel_atomic_state *state,
+			  struct intel_crtc *crtc,
+			  struct intel_encoder *encoder)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc_state->base.crtc->dev);
+	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
+	struct intel_crtc_state *crtc_state =
+		intel_atomic_get_new_crtc_state(state, crtc);
 	struct intel_digital_port *intel_dig_port;
 	struct intel_shared_dpll *pll;
 	enum port port = encoder->port;
@@ -2846,24 +2887,24 @@ icl_get_dpll(struct intel_crtc_state *crtc_state,
 		}
 	} else {
 		MISSING_CASE(port);
-		return NULL;
+		return false;
 	}
 
 	if (!ret) {
 		DRM_DEBUG_KMS("Could not calculate PLL state.\n");
-		return NULL;
+		return false;
 	}
 
 
 	pll = intel_find_shared_dpll(crtc_state, min, max);
 	if (!pll) {
 		DRM_DEBUG_KMS("No PLL selected\n");
-		return NULL;
+		return false;
 	}
 
 	intel_reference_shared_dpll(pll, crtc_state);
 
-	return pll;
+	return true;
 }
 
 static bool mg_pll_get_hw_state(struct drm_i915_private *dev_priv,
@@ -3238,7 +3279,8 @@ static const struct dpll_info icl_plls[] = {
 
 static const struct intel_dpll_mgr icl_pll_mgr = {
 	.dpll_info = icl_plls,
-	.get_dpll = icl_get_dpll,
+	.get_dplls = icl_get_dplls,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = icl_dump_hw_state,
 };
 
@@ -3250,7 +3292,8 @@ static const struct dpll_info ehl_plls[] = {
 
 static const struct intel_dpll_mgr ehl_pll_mgr = {
 	.dpll_info = ehl_plls,
-	.get_dpll = icl_get_dpll,
+	.get_dplls = icl_get_dplls,
+	.put_dplls = intel_put_dpll,
 	.dump_hw_state = icl_dump_hw_state,
 };
 
@@ -3302,50 +3345,64 @@ void intel_shared_dpll_init(struct drm_device *dev)
 }
 
 /**
- * intel_get_shared_dpll - get a shared DPLL for CRTC and encoder combination
- * @crtc_state: atomic state for the crtc
+ * intel_reserve_shared_dplls - reserve DPLLs for CRTC and encoder combination
+ * @state: atomic state
+ * @crtc: CRTC to reserve DPLLs for
  * @encoder: encoder
  *
- * Find an appropriate DPLL for the given CRTC and encoder combination. A
- * reference from the @crtc_state to the returned pll is registered in the
- * atomic state. That configuration is made effective by calling
- * intel_shared_dpll_swap_state(). The reference should be released by calling
- * intel_release_shared_dpll().
+ * This function reserves all required DPLLs for the given CRTC and encoder
+ * combination in the current atomic commit @state and the new @crtc atomic
+ * state.
+ *
+ * The new configuration in the atomic commit @state is made effective by
+ * calling intel_shared_dpll_swap_state().
+ *
+ * The reserved DPLLs should be released by calling
+ * intel_release_shared_dplls().
  *
  * Returns:
- * A shared DPLL to be used by @crtc_state and @encoder.
+ * True if all required DPLLs were successfully reserved.
  */
-struct intel_shared_dpll *
-intel_get_shared_dpll(struct intel_crtc_state *crtc_state,
-		      struct intel_encoder *encoder)
+bool intel_reserve_shared_dplls(struct intel_atomic_state *state,
+				struct intel_crtc *crtc,
+				struct intel_encoder *encoder)
 {
-	struct drm_i915_private *dev_priv = to_i915(crtc_state->base.crtc->dev);
+	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
 	const struct intel_dpll_mgr *dpll_mgr = dev_priv->dpll_mgr;
 
 	if (WARN_ON(!dpll_mgr))
-		return NULL;
+		return false;
 
-	return dpll_mgr->get_dpll(crtc_state, encoder);
+	return dpll_mgr->get_dplls(state, crtc, encoder);
 }
 
 /**
- * intel_release_shared_dpll - end use of DPLL by CRTC in atomic state
- * @dpll: dpll in use by @crtc
- * @crtc: crtc
+ * intel_release_shared_dplls - end use of DPLLs by CRTC in atomic state
  * @state: atomic state
+ * @crtc: crtc from which the DPLLs are to be released
  *
- * This function releases the reference from @crtc to @dpll from the
- * atomic @state. The new configuration is made effective by calling
- * intel_shared_dpll_swap_state().
+ * This function releases all DPLLs reserved by intel_reserve_shared_dplls()
+ * from the current atomic commit @state and the old @crtc atomic state.
+ *
+ * The new configuration in the atomic commit @state is made effective by
+ * calling intel_shared_dpll_swap_state().
  */
-void intel_release_shared_dpll(struct intel_shared_dpll *dpll,
-			       struct intel_crtc *crtc,
-			       struct drm_atomic_state *state)
+void intel_release_shared_dplls(struct intel_atomic_state *state,
+				struct intel_crtc *crtc)
 {
-	struct intel_shared_dpll_state *shared_dpll_state;
+	struct drm_i915_private *dev_priv = to_i915(state->base.dev);
+	const struct intel_dpll_mgr *dpll_mgr = dev_priv->dpll_mgr;
 
-	shared_dpll_state = intel_atomic_get_shared_dpll_state(state);
-	shared_dpll_state[dpll->info->id].crtc_mask &= ~(1 << crtc->pipe);
+	/*
+	 * FIXME: this function is called for every platform having a
+	 * compute_clock hook, even though the platform doesn't yet support
+	 * the shared DPLL framework and intel_reserve_shared_dplls() is not
+	 * called on those.
+	 */
+	if (!dpll_mgr)
+		return;
+
+	dpll_mgr->put_dplls(state, crtc);
 }
 
 /**
