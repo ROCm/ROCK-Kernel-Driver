@@ -16153,7 +16153,6 @@ out:
 int intel_modeset_init(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct i915_ggtt *ggtt = &dev_priv->ggtt;
 	enum pipe pipe;
 	struct intel_crtc *crtc;
 	int ret;
@@ -16232,8 +16231,6 @@ int intel_modeset_init(struct drm_device *dev)
 		dev->mode_config.cursor_width = 256;
 		dev->mode_config.cursor_height = 256;
 	}
-
-	dev->mode_config.fb_base = ggtt->gmadr.start;
 
 	DRM_DEBUG_KMS("%d display pipe%s available.\n",
 		      INTEL_INFO(dev_priv)->num_pipes,
