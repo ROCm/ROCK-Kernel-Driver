@@ -2054,7 +2054,7 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 			dp_disable_link_phy(link, signal);
 		else
 			dp_disable_link_phy_mst(link, signal);
-#if CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 		if (dc_is_dp_sst_signal(signal) ||
 				link->mst_stream_alloc_table.stream_count == 0) {
