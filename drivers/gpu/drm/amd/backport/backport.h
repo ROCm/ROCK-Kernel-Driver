@@ -15,12 +15,19 @@
 #include <kcl/kcl_device_cgroup_backport.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_dma_mapping.h>
+/*
+ * linux/reservation.h must before all drm headers,
+ * otherwise struct reservation_object is undefined.
+ */
+#include <kcl/kcl_fence_backport.h>
+#ifdef BUILD_AS_DKMS
+#include <linux/reservation.h>
+#endif
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/kcl_drm_dp_helper_backport.h>
 #include <kcl/kcl_drm_vma_manager_backport.h>
-#include <kcl/kcl_fence_backport.h>
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_interval_tree_generic.h>

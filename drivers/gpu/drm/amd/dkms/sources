@@ -12,3 +12,4 @@ include/uapi/linux/kfd_ioctl.h include/uapi/linux
 include/drm/amd_rdma.h include/drm
 drivers/dma-buf/dma-resv.c amd/amdkcl/
 include/linux/dma-resv.h include/linux/
+include/kcl/reservation.h include/linux/
