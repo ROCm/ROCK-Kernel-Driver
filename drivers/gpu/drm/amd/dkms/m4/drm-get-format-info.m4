@@ -5,7 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_GET_FORMAT_INFO], [
 	AC_MSG_CHECKING([whether drm_get_format_info() is available])
 	AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_get_format_info],
-	[drivers/gpu/drm/drm_framebuffer.c], [
+	[drivers/gpu/drm/drm_fourcc.c], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DRM_GET_FORMAT_INFO, 1, [drm_get_format_info() is available])
 	], [
