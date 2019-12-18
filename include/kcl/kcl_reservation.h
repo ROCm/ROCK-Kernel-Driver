@@ -5,7 +5,4 @@ extern struct ww_class *_kcl_reservation_ww_class;
 extern struct lock_class_key *_kcl_reservation_seqcount_class;
 extern const char *_kcl_reservation_seqcount_string;
 
-#if !defined(HAVE_DMA_RESV_H)
-#define dma_resv reservation_object
-#endif
 #endif /* AMDKCL_RESERVATION_H */
