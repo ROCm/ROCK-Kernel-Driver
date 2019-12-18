@@ -104,16 +104,18 @@ query_engine_info(struct drm_i915_private *i915,
 	struct drm_i915_engine_info __user *info_ptr;
 	struct drm_i915_query_engine_info query;
 	struct drm_i915_engine_info info = { };
+	unsigned int num_uabi_engines = 0;
 	struct intel_engine_cs *engine;
-	enum intel_engine_id id;
 	int len, ret;
 
 	if (query_item->flags)
 		return -EINVAL;
 
+	for_each_uabi_engine(engine, i915)
+		num_uabi_engines++;
+
 	len = sizeof(struct drm_i915_query_engine_info) +
-	      RUNTIME_INFO(i915)->num_engines *
-	      sizeof(struct drm_i915_engine_info);
+	      num_uabi_engines * sizeof(struct drm_i915_engine_info);
 
 	ret = copy_query_item(&query, sizeof(query), len, query_item);
 	if (ret != 0)
@@ -125,9 +127,9 @@ query_engine_info(struct drm_i915_private *i915,
 
 	info_ptr = &query_ptr->engines[0];
 
-	for_each_engine(engine, i915, id) {
+	for_each_uabi_engine(engine, i915) {
 		info.engine.engine_class = engine->uabi_class;
-		info.engine.engine_instance = engine->instance;
+		info.engine.engine_instance = engine->uabi_instance;
 		info.capabilities = engine->uabi_capabilities;
 
 		if (__copy_to_user(info_ptr, &info, sizeof(info)))

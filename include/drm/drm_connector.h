@@ -539,8 +539,8 @@ struct drm_connector_state {
 	 *
 	 * This is also used in the atomic helpers to map encoders to their
 	 * current and previous connectors, see
-	 * &drm_atomic_get_old_connector_for_encoder() and
-	 * &drm_atomic_get_new_connector_for_encoder().
+	 * drm_atomic_get_old_connector_for_encoder() and
+	 * drm_atomic_get_new_connector_for_encoder().
 	 *
 	 * NOTE: Atomic drivers must fill this out (either themselves or through
 	 * helpers), for otherwise the GETCONNECTOR and GETENCODER IOCTLs will
@@ -597,6 +597,12 @@ struct drm_connector_state {
 	 * match the values.
 	 */
 	unsigned int content_type;
+
+	/**
+	 * @hdcp_content_type: Connector property to pass the type of
+	 * protected content. This is most commonly used for HDCP.
+	 */
+	unsigned int hdcp_content_type;
 
 	/**
 	 * @scaling_mode: Connector property to control the
@@ -1481,6 +1487,7 @@ const char *drm_get_dvi_i_select_name(int val);
 const char *drm_get_tv_subconnector_name(int val);
 const char *drm_get_tv_select_name(int val);
 const char *drm_get_content_protection_name(int val);
+const char *drm_get_hdcp_content_type_name(int val);
 
 int drm_mode_create_dvi_i_properties(struct drm_device *dev);
 int drm_mode_create_tv_margin_properties(struct drm_device *dev);
