@@ -957,6 +957,38 @@ int efi_status_to_err(efi_status_t status)
 	return err;
 }
 
+#define EFI_STATUS_STR(_status) \
+	EFI_##_status : return "EFI_" __stringify(_status)
+
+const char *efi_status_to_str(efi_status_t status)
+{
+	switch (status) {
+	case EFI_STATUS_STR(SUCCESS);
+	case EFI_STATUS_STR(LOAD_ERROR);
+	case EFI_STATUS_STR(INVALID_PARAMETER);
+	case EFI_STATUS_STR(UNSUPPORTED);
+	case EFI_STATUS_STR(BAD_BUFFER_SIZE);
+	case EFI_STATUS_STR(BUFFER_TOO_SMALL);
+	case EFI_STATUS_STR(NOT_READY);
+	case EFI_STATUS_STR(DEVICE_ERROR);
+	case EFI_STATUS_STR(WRITE_PROTECTED);
+	case EFI_STATUS_STR(OUT_OF_RESOURCES);
+	case EFI_STATUS_STR(NOT_FOUND);
+	case EFI_STATUS_STR(ABORTED);
+	case EFI_STATUS_STR(SECURITY_VIOLATION);
+	}
+	/*
+	 * There are two possibilities for this message to be exposed:
+	 * - Caller feeds a unknown status code from firmware.
+	 * - A new status code be defined in efi.h but we forgot to update
+	 *   this function.
+	 */
+	pr_warn("Unknown efi status: 0x%lx\n", status);
+
+	return "Unknown efi status";
+}
+EXPORT_SYMBOL(efi_status_to_str);
+
 static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
 static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
 
