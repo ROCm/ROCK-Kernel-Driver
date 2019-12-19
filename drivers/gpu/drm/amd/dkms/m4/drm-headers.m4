@@ -54,9 +54,25 @@ AC_DEFUN([AC_AMDGPU_DRM_PLANE_H],
 	])
 ])
 
+dnl #
+dnl # commit 1e53724100df15bb83e614879fedbc4914e9f3a1
+dnl # Subject: drm/amdgpu: Redo XGMI reset synchronization.
+dnl #
+AC_DEFUN([AC_AMDGPU_TASK_BARRIER_H],
+	[AC_MSG_CHECKING([whether task_barrier.h is available])
+	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/task_barrier.h
+	], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_TASK_BARRIER_H, 1, [include/drm/task_barrier.h is available])
+	],[
+		AC_MSG_RESULT(no)
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_AMDGPU_DRM_IRQ_H
 	AC_AMDGPU_DRM_CONNECTOR_H
 	AC_AMDGPU_DRM_ENCODER_H
 	AC_AMDGPU_DRM_PLANE_H
+	AC_AMDGPU_TASK_BARRIER_H
 ])
