@@ -1036,8 +1036,6 @@ def_value:
  */
 static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 {
-	int ret = 0;
-
 	if (amdgpu_sched_jobs < 4) {
 		dev_warn(adev->dev, "sched jobs (%d) must be at least 4\n",
 			 amdgpu_sched_jobs);
@@ -1080,7 +1078,7 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 
 	adev->tmz.enabled = amdgpu_is_tmz(adev);
 
-	return ret;
+	return 0;
 }
 
 /**
