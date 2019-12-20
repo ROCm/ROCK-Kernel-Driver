@@ -166,7 +166,7 @@ $(lastword $(MAKEFILE_LIST)): ;
 endif
 
 export abs_srctree abs_objtree
-export sub_make_done := 1
+export override sub_make_done := 1
 
 ifeq ($(need-sub-make),1)
 
@@ -177,7 +177,7 @@ $(filter-out _all sub-make $(lastword $(MAKEFILE_LIST)), $(MAKECMDGOALS)) _all: 
 
 # Invoke a second make in the output directory, passing relevant variables
 sub-make:
-	$(Q)$(MAKE) -C $(abs_objtree) -f $(abs_srctree)/Makefile $(MAKECMDGOALS)
+	$(Q)$(MAKE) -C $(abs_objtree) -f $(abs_srctree)/Makefile $(MAKECMDGOALS) sub_make_done=$(sub_make_done)
 
 endif # need-sub-make
 endif # sub_make_done
