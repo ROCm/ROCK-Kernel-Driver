@@ -786,6 +786,7 @@ amdgpu_connector_lvds_detect(struct drm_connector *connector, bool force)
 	return ret;
 }
 
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 static void amdgpu_connector_unregister(struct drm_connector *connector)
 {
 	struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
@@ -795,6 +796,7 @@ static void amdgpu_connector_unregister(struct drm_connector *connector)
 		amdgpu_connector->ddc_bus->has_aux = false;
 	}
 }
+#endif
 
 static void amdgpu_connector_destroy(struct drm_connector *connector)
 {
@@ -853,7 +855,9 @@ static const struct drm_connector_funcs amdgpu_connector_lvds_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.detect = amdgpu_connector_lvds_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.set_property = amdgpu_connector_set_lcd_property,
 };
@@ -971,7 +975,9 @@ static const struct drm_connector_funcs amdgpu_connector_vga_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.detect = amdgpu_connector_vga_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.set_property = amdgpu_connector_set_property,
 };
@@ -1280,7 +1286,9 @@ static const struct drm_connector_funcs amdgpu_connector_dvi_funcs = {
 	.detect = amdgpu_connector_dvi_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_property,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
 };
@@ -1567,6 +1575,7 @@ static enum drm_mode_status amdgpu_connector_dp_mode_valid(struct drm_connector 
 	return MODE_OK;
 }
 
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 static int
 amdgpu_connector_late_register(struct drm_connector *connector)
 {
@@ -1580,6 +1589,7 @@ amdgpu_connector_late_register(struct drm_connector *connector)
 
 	return r;
 }
+#endif
 
 static const struct drm_connector_helper_funcs amdgpu_connector_dp_helper_funcs = {
 	.get_modes = amdgpu_connector_dp_get_modes,
@@ -1592,10 +1602,14 @@ static const struct drm_connector_funcs amdgpu_connector_dp_funcs = {
 	.detect = amdgpu_connector_dp_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_property,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.late_register = amdgpu_connector_late_register,
+#endif
 };
 
 static const struct drm_connector_funcs amdgpu_connector_edp_funcs = {
@@ -1603,10 +1617,14 @@ static const struct drm_connector_funcs amdgpu_connector_edp_funcs = {
 	.detect = amdgpu_connector_dp_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = amdgpu_connector_set_lcd_property,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_connector_unregister,
+#endif
 	.destroy = amdgpu_connector_destroy,
 	.force = amdgpu_connector_dvi_force,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.late_register = amdgpu_connector_late_register,
+#endif
 };
 
 void
