@@ -201,6 +201,7 @@ m4_include([m4/drm-ioctl-h.m4])
 m4_include([m4/drm-debugfs-h.m4])
 m4_include([m4/drm-get-format-info.m4])
 m4_include([m4/drm-headers.m4])
+m4_include([m4/drm-connector-funcs-register-member.m4])
 m4_include([m4/config.m4])
 
 

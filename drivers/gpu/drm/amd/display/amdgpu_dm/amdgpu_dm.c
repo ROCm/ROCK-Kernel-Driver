@@ -5068,12 +5068,14 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	return ret;
 }
 
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 static void amdgpu_dm_connector_unregister(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector = to_amdgpu_dm_connector(connector);
 
 	drm_dp_aux_unregister(&amdgpu_dm_connector->dm_dp_aux.aux);
 }
+#endif
 
 static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 {
@@ -5193,7 +5195,9 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property,
+#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	.early_unregister = amdgpu_dm_connector_unregister
+#endif
 };
 
 static int get_modes(struct drm_connector *connector)
