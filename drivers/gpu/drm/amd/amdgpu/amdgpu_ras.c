@@ -1315,6 +1315,7 @@ static int amdgpu_ras_badpages_read(struct amdgpu_device *adev,
 	data = con->eh_data;
 	if (!data || data->count == 0) {
 		*bps = NULL;
+		ret = -EINVAL;
 		goto out;
 	}
 
