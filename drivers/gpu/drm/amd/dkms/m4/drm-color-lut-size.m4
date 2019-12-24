@@ -6,9 +6,6 @@ AC_DEFUN([AC_AMDGPU_DRM_COLOR_LUT_SIZE], [
 	AC_MSG_CHECKING([whether drm_color_lut structure is defined])
 	AC_KERNEL_TRY_COMPILE([
 		#include <drm/drm_mode.h>
-		#include <drm/drm_property.h>
-		struct drm_crtc;
-		#include <drm/drm_color_mgmt.h>
 	], [
 		struct drm_color_lut lut;
 		lut.red = 0;
