@@ -20,9 +20,6 @@
  * otherwise struct reservation_object is undefined.
  */
 #include <kcl/kcl_fence_backport.h>
-#ifdef BUILD_AS_DKMS
-#include <linux/reservation.h>
-#endif
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_cache.h>
 #include <kcl/kcl_drm_connector.h>
