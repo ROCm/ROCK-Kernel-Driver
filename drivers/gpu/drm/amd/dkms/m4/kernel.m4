@@ -420,9 +420,11 @@ dnl # $3: run it if compile pass.
 dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
+	target='modules'
+	test "x$enable_linux_builtin" = xyes && target='conftest.o'
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
-	[modules],
+	[$target],
 	[test -s build/conftest.o],
 	[$3], [$4])
 ])
