@@ -499,7 +499,9 @@ static void dm_crtc_high_irq(void *interrupt_params)
 		/* Following stuff must happen at start of vblank, for crc
 		 * computation and below-the-range btr support in vrr mode.
 		 */
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 		amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
+#endif
 
 		if (acrtc_state->stream && adev->family >= AMDGPU_FAMILY_AI &&
 		    acrtc_state->vrr_params.supported &&
@@ -553,7 +555,9 @@ static void dm_dcn_crtc_high_irq(void *interrupt_params)
 			 amdgpu_dm_vrr_active(acrtc_state),
 			 acrtc_state->active_planes);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
 	amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
+#endif
 	drm_crtc_handle_vblank(&acrtc->base);
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
