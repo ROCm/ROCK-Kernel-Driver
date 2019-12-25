@@ -1995,6 +1995,19 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	int r;
 	u64 vis_vram_limit;
 	void *stolen_vga_buf;
+	bool need_dma32;
+
+#ifdef AMDKCL_DMA_ADDRESSING_LIMITED_WORKAROUND
+	/*
+	 * set DMA mask + need_dma32 flags.
+	 * PCIE - can handle 44-bits.
+	 * IGP - can handle 44-bits
+	 * PCI - dma32 for legacy pci gart
+	 */
+	need_dma32 = !!pci_set_dma_mask(adev->pdev, DMA_BIT_MASK(44));
+#else
+	need_dma32 = dma_addressing_limited(adev->dev);
+#endif
 
 	mutex_init(&adev->mman.gtt_window_lock);
 
@@ -2003,7 +2016,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 			       &amdgpu_bo_driver,
 			       adev->ddev->anon_inode->i_mapping,
 			       adev->ddev->vma_offset_manager,
-			       dma_addressing_limited(adev->dev));
+			       need_dma32);
 	if (r) {
 		DRM_ERROR("failed initializing buffer object driver(%d).\n", r);
 		return r;

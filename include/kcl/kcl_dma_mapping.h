@@ -17,11 +17,6 @@
 * dma-mapping: use dma_get_mask in dma_addressing_limited
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
-static inline bool _kcl_dma_addressing_limited(struct device *dev)
-{
-	return min_not_zero(dma_get_mask(dev), dev->bus_dma_mask) <
-			dma_get_required_mask(dev);
-}
-#define dma_addressing_limited _kcl_dma_addressing_limited
+#define AMDKCL_DMA_ADDRESSING_LIMITED_WORKAROUND
 #endif
 #endif
