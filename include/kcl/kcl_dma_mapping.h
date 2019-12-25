@@ -13,6 +13,14 @@
 #define DMA_ATTR_NO_WARN (0UL)
 #endif
 
+/*
+* commit v5.3-rc1-57-g06532750010e
+* dma-mapping: use dma_get_mask in dma_addressing_limited
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
+#define AMDKCL_DMA_ADDRESSING_LIMITED_WORKAROUND
+#endif
+
 #ifdef HAVE_LINUX_DMA_ATTRS_H
 static inline
 void _kcl_convert_long_to_dma_attrs(struct dma_attrs *dma_attrs,
