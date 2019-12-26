@@ -105,7 +105,7 @@ void libbpf_print(enum libbpf_print_level level, const char *format, ...)
 	err = action;			\
 	if (err)			\
 		goto out;		\
-} while(0)
+} while (0)
 
 
 /* Copied from tools/perf/util/util.h */
@@ -958,8 +958,7 @@ static int bpf_object__init_user_maps(struct bpf_object *obj, bool strict)
 		 obj->path, nr_maps, data->d_size);
 
 	if (!data->d_size || nr_maps == 0 || (data->d_size % nr_maps) != 0) {
-		pr_warning("unable to determine map definition size "
-			   "section %s, %d maps in %zd bytes\n",
+		pr_warning("unable to determine map definition size section %s, %d maps in %zd bytes\n",
 			   obj->path, nr_maps, data->d_size);
 		return -EINVAL;
 	}
@@ -1023,12 +1022,11 @@ static int bpf_object__init_user_maps(struct bpf_object *obj, bool strict)
 			 * incompatible.
 			 */
 			char *b;
+
 			for (b = ((char *)def) + sizeof(struct bpf_map_def);
 			     b < ((char *)def) + map_def_sz; b++) {
 				if (*b != 0) {
-					pr_warning("maps section in %s: \"%s\" "
-						   "has unrecognized, non-zero "
-						   "options\n",
+					pr_warning("maps section in %s: \"%s\" has unrecognized, non-zero options\n",
 						   obj->path, map_name);
 					if (strict)
 						return -EINVAL;
@@ -1066,7 +1064,8 @@ skip_mods_and_typedefs(const struct btf *btf, __u32 id, __u32 *res_id)
  */
 static bool get_map_field_int(const char *map_name, const struct btf *btf,
 			      const struct btf_type *def,
-			      const struct btf_member *m, __u32 *res) {
+			      const struct btf_member *m, __u32 *res)
+{
 	const struct btf_type *t = skip_mods_and_typedefs(btf, m->type, NULL);
 	const char *name = btf__name_by_offset(btf, m->name_off);
 	const struct btf_array *arr_info;
@@ -1381,7 +1380,8 @@ static int bpf_object__init_user_btf_maps(struct bpf_object *obj, bool strict,
 	for (i = 0; i < vlen; i++) {
 		err = bpf_object__init_user_btf_map(obj, sec, i,
 						    obj->efile.btf_maps_shndx,
-						    data, strict, pin_root_path);
+						    data, strict,
+						    pin_root_path);
 		if (err)
 			return err;
 	}
@@ -1668,12 +1668,14 @@ static int bpf_object__elf_collect(struct bpf_object *obj, bool relaxed_maps,
 				if (strcmp(name, ".text") == 0)
 					obj->efile.text_shndx = idx;
 				err = bpf_object__add_program(obj, data->d_buf,
-							      data->d_size, name, idx);
+							      data->d_size,
+							      name, idx);
 				if (err) {
 					char errmsg[STRERR_BUFSIZE];
-					char *cp = libbpf_strerror_r(-err, errmsg,
-								     sizeof(errmsg));
+					char *cp;
 
+					cp = libbpf_strerror_r(-err, errmsg,
+							       sizeof(errmsg));
 					pr_warning("failed to alloc program %s (%s): %s",
 						   name, obj->path, cp);
 					return err;
@@ -1823,8 +1825,8 @@ static int bpf_program__record_reloc(struct bpf_program *prog,
 	}
 
 	if (insn->code != (BPF_LD | BPF_IMM | BPF_DW)) {
-		pr_warning("bpf: relocation: invalid relo for insns[%d].code 0x%x\n",
-			insn_idx, insn->code);
+		pr_warning("invalid relo for insns[%d].code 0x%x\n",
+			   insn_idx, insn->code);
 		return -LIBBPF_ERRNO__RELOC;
 	}
 	if (!shdr_idx || shdr_idx >= SHN_LORESERVE) {
@@ -2138,7 +2140,7 @@ bpf_object__probe_global_data(struct bpf_object *obj)
 
 static int bpf_object__probe_btf_func(struct bpf_object *obj)
 {
-	const char strs[] = "\0int\0x\0a";
+	static const char strs[] = "\0int\0x\0a";
 	/* void x(int a) {} */
 	__u32 types[] = {
 		/* int */
@@ -2164,7 +2166,7 @@ static int bpf_object__probe_btf_func(struct bpf_object *obj)
 
 static int bpf_object__probe_btf_datasec(struct bpf_object *obj)
 {
-	const char strs[] = "\0x\0.data";
+	static const char strs[] = "\0x\0.data";
 	/* static int a; */
 	__u32 types[] = {
 		/* int */
@@ -4971,7 +4973,7 @@ int libbpf_prog_type_by_name(const char *name, enum bpf_prog_type *prog_type,
 		*expected_attach_type = section_names[i].expected_attach_type;
 		return 0;
 	}
-	pr_warning("failed to guess program type based on ELF section name '%s'\n", name);
+	pr_warning("failed to guess program type from ELF section '%s'\n", name);
 	type_names = libbpf_get_type_names(false);
 	if (type_names != NULL) {
 		pr_info("supported section(type) names are:%s\n", type_names);
@@ -6198,7 +6200,8 @@ static struct bpf_prog_info_array_desc bpf_prog_info_array_desc[] = {
 
 };
 
-static __u32 bpf_prog_info_read_offset_u32(struct bpf_prog_info *info, int offset)
+static __u32 bpf_prog_info_read_offset_u32(struct bpf_prog_info *info,
+					   int offset)
 {
 	__u32 *array = (__u32 *)info;
 
@@ -6207,7 +6210,8 @@ static __u32 bpf_prog_info_read_offset_u32(struct bpf_prog_info *info, int offse
 	return -(int)offset;
 }
 
-static __u64 bpf_prog_info_read_offset_u64(struct bpf_prog_info *info, int offset)
+static __u64 bpf_prog_info_read_offset_u64(struct bpf_prog_info *info,
+					   int offset)
 {
 	__u64 *array = (__u64 *)info;
 
