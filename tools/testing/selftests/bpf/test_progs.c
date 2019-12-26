@@ -18,7 +18,7 @@ struct prog_test_def {
 	int skip_cnt;
 	bool tested;
 
-	const char *subtest_name;
+	char *subtest_name;
 	int subtest_num;
 
 	/* store counts before subtest started */
@@ -43,7 +43,7 @@ static void dump_test_log(const struct prog_test_def *test, bool failed)
 
 	fflush(stdout); /* exports env.log_buf & env.log_cnt */
 
-	if (env.verbose || test->force_log || failed) {
+	if (env.verbosity > VERBOSE_NONE || test->force_log || failed) {
 		if (env.log_cnt) {
 			env.log_buf[env.log_cnt] = '\0';
 			fprintf(env.stdout, "%s", env.log_buf);
@@ -79,16 +79,17 @@ void test__end_subtest()
 	fprintf(env.stdout, "#%d/%d %s:%s\n",
 	       test->test_num, test->subtest_num,
 	       test->subtest_name, sub_error_cnt ? "FAIL" : "OK");
+
+	free(test->subtest_name);
+	test->subtest_name = NULL;
 }
 
 bool test__start_subtest(const char *name)
 {
 	struct prog_test_def *test = env.test;
 
-	if (test->subtest_name) {
+	if (test->subtest_name)
 		test__end_subtest();
-		test->subtest_name = NULL;
-	}
 
 	test->subtest_num++;
 
@@ -102,7 +103,13 @@ bool test__start_subtest(const char *name)
 	if (!should_run(&env.subtest_selector, test->subtest_num, name))
 		return false;
 
-	test->subtest_name = name;
+	test->subtest_name = strdup(name);
+	if (!test->subtest_name) {
+		fprintf(env.stderr,
+			"Subtest #%d: failed to copy subtest name!\n",
+			test->subtest_num);
+		return false;
+	}
 	env.test->old_error_cnt = env.test->error_cnt;
 
 	return true;
@@ -304,14 +311,14 @@ static const struct argp_option opts[] = {
 	{ "verifier-stats", ARG_VERIFIER_STATS, NULL, 0,
 	  "Output verifier statistics", },
 	{ "verbose", ARG_VERBOSE, "LEVEL", OPTION_ARG_OPTIONAL,
-	  "Verbose output (use -vv for extra verbose output)" },
+	  "Verbose output (use -vv or -vvv for progressively verbose output)" },
 	{},
 };
 
 static int libbpf_print_fn(enum libbpf_print_level level,
 			   const char *format, va_list args)
 {
-	if (!env.very_verbose && level == LIBBPF_DEBUG)
+	if (env.verbosity < VERBOSE_VERY && level == LIBBPF_DEBUG)
 		return 0;
 	vprintf(format, args);
 	return 0;
@@ -377,6 +384,8 @@ int parse_num_list(const char *s, struct test_selector *sel)
 	return 0;
 }
 
+extern int extra_prog_load_log_flags;
+
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	struct test_env *env = state->input;
@@ -418,9 +427,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env->verifier_stats = true;
 		break;
 	case ARG_VERBOSE:
+		env->verbosity = VERBOSE_NORMAL;
 		if (arg) {
 			if (strcmp(arg, "v") == 0) {
-				env->very_verbose = true;
+				env->verbosity = VERBOSE_VERY;
+				extra_prog_load_log_flags = 1;
+			} else if (strcmp(arg, "vv") == 0) {
+				env->verbosity = VERBOSE_SUPER;
+				extra_prog_load_log_flags = 2;
 			} else {
 				fprintf(stderr,
 					"Unrecognized verbosity setting ('%s'), only -v and -vv are supported\n",
@@ -428,7 +442,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 				return -EINVAL;
 			}
 		}
-		env->verbose = true;
 		break;
 	case ARGP_KEY_ARG:
 		argp_usage(state);
@@ -447,7 +460,7 @@ static void stdio_hijack(void)
 	env.stdout = stdout;
 	env.stderr = stderr;
 
-	if (env.verbose) {
+	if (env.verbosity > VERBOSE_NONE) {
 		/* nothing to do, output to stdout by default */
 		return;
 	}
