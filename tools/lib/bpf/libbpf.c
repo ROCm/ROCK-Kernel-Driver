@@ -3825,6 +3825,28 @@ int bpf_object__load(struct bpf_object *obj)
 	return bpf_object__load_xattr(&attr);
 }
 
+static int make_parent_dir(const char *path)
+{
+	char *cp, errmsg[STRERR_BUFSIZE];
+	char *dname, *dir;
+	int err = 0;
+
+	dname = strdup(path);
+	if (dname == NULL)
+		return -ENOMEM;
+
+	dir = dirname(dname);
+	if (mkdir(dir, 0700) && errno != EEXIST)
+		err = -errno;
+
+	free(dname);
+	if (err) {
+		cp = libbpf_strerror_r(-err, errmsg, sizeof(errmsg));
+		pr_warning("failed to mkdir %s: %s\n", path, cp);
+	}
+	return err;
+}
+
 static int check_path(const char *path)
 {
 	char *cp, errmsg[STRERR_BUFSIZE];
@@ -3860,6 +3882,10 @@ int bpf_program__pin_instance(struct bpf_program *prog, const char *path,
 {
 	char *cp, errmsg[STRERR_BUFSIZE];
 	int err;
+
+	err = make_parent_dir(path);
+	if (err)
+		return err;
 
 	err = check_path(path);
 	if (err)
@@ -3914,24 +3940,13 @@ int bpf_program__unpin_instance(struct bpf_program *prog, const char *path,
 	return 0;
 }
 
-static int make_dir(const char *path)
-{
-	char *cp, errmsg[STRERR_BUFSIZE];
-	int err = 0;
-
-	if (mkdir(path, 0700) && errno != EEXIST)
-		err = -errno;
-
-	if (err) {
-		cp = libbpf_strerror_r(-err, errmsg, sizeof(errmsg));
-		pr_warning("failed to mkdir %s: %s\n", path, cp);
-	}
-	return err;
-}
-
 int bpf_program__pin(struct bpf_program *prog, const char *path)
 {
 	int i, err;
+
+	err = make_parent_dir(path);
+	if (err)
+		return err;
 
 	err = check_path(path);
 	if (err)
@@ -3952,10 +3967,6 @@ int bpf_program__pin(struct bpf_program *prog, const char *path)
 		/* don't create subdirs when pinning single instance */
 		return bpf_program__pin_instance(prog, path, 0);
 	}
-
-	err = make_dir(path);
-	if (err)
-		return err;
 
 	for (i = 0; i < prog->instances.nr; i++) {
 		char buf[PATH_MAX];
@@ -4079,6 +4090,10 @@ int bpf_map__pin(struct bpf_map *map, const char *path)
 		}
 	}
 
+	err = make_parent_dir(map->pin_path);
+	if (err)
+		return err;
+
 	err = check_path(map->pin_path);
 	if (err)
 		return err;
@@ -4173,10 +4188,6 @@ int bpf_object__pin_maps(struct bpf_object *obj, const char *path)
 		return -ENOENT;
 	}
 
-	err = make_dir(path);
-	if (err)
-		return err;
-
 	bpf_object__for_each_map(map, obj) {
 		char *pin_path = NULL;
 		char buf[PATH_MAX];
@@ -4262,10 +4273,6 @@ int bpf_object__pin_programs(struct bpf_object *obj, const char *path)
 		pr_warning("object not yet loaded; load it first\n");
 		return -ENOENT;
 	}
-
-	err = make_dir(path);
-	if (err)
-		return err;
 
 	bpf_object__for_each_program(prog, obj) {
 		char buf[PATH_MAX];
