@@ -192,7 +192,9 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	struct drm_dp_mst_port *port = aconnector->port;
 	u8 dsc_caps[16] = { 0 };
 
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 	aconnector->dsc_aux = drm_dp_mst_dsc_aux_for_port(port);
+#endif
 
 	if (!aconnector->dsc_aux)
 		return false;
@@ -259,6 +261,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 			if (!validate_dsc_caps_on_connector(aconnector))
 				memset(&aconnector->dc_sink->dsc_caps,
 				       0, sizeof(aconnector->dc_sink->dsc_caps));
