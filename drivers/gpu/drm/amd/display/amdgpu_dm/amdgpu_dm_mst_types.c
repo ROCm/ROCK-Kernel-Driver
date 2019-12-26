@@ -257,8 +257,9 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	u8 dsc_branch_dec_caps_raw[3] = { 0 };	// DSC branch decoder caps 0xA0 ~ 0xA2
 	u8 *dsc_branch_dec_caps = NULL;
 
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 	aconnector->dsc_aux = drm_dp_mst_dsc_aux_for_port(port);
-
+#endif
 	/*
 	 * drm_dp_mst_dsc_aux_for_port() will return NULL for certain configs
 	 * because it only check the dsc/fec caps of the "port variable" and not the dock
@@ -427,6 +428,8 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 #if defined(CONFIG_DRM_AMD_DC_FP)
 			if (!validate_dsc_caps_on_connector(aconnector))
 				memset(&aconnector->dc_sink->dsc_caps,
@@ -436,6 +439,8 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			if (!retrieve_downstream_port_device(aconnector))
 				memset(&aconnector->mst_downstream_port_present,
 					0, sizeof(aconnector->mst_downstream_port_present));
+#endif
+#endif
 		}
 	}
 
@@ -859,7 +864,7 @@ int dm_mst_get_pbn_divider(struct dc_link *link)
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
+#if defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
 	struct dc_sink *sink;
