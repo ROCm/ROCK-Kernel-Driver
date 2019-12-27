@@ -9183,7 +9183,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 	/* Perform validation of MST topology in the state*/
 	ret = drm_dp_mst_atomic_check(state);
 	if (ret)
@@ -9316,9 +9316,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #endif
 	}
 	/* Perform validation of MST topology in the state*/
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
 	ret = drm_dp_mst_atomic_check(state);
 	if (ret)
 		goto fail;
+#endif
 
 	/* Store the overall update type for use later in atomic check. */
 #if !defined(for_each_new_crtc_in_state)
