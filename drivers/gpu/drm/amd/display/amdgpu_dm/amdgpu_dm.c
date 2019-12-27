@@ -9314,7 +9314,7 @@ static int dm_update_plane_state(struct dc *dc,
 	return ret;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS)
 static int add_affected_mst_dsc_crtcs(struct drm_atomic_state *state, struct drm_crtc *crtc)
 {
 	struct drm_connector *connector;
@@ -9415,7 +9415,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			new_crtc_state->connectors_changed = true;
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS)
 	if (adev->asic_type >= CHIP_NAVI10) {
 		for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 			if (drm_atomic_crtc_needs_modeset(new_crtc_state)) {
