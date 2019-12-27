@@ -580,7 +580,7 @@ int dm_mst_get_pbn_divider(struct dc_link *link)
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
 	struct dc_sink *sink;
