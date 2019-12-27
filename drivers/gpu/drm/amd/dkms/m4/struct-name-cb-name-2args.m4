@@ -7,8 +7,8 @@ AC_DEFUN([AC_AMDGPU_STRUCT_NAME_CB_NAME_2ARGS],
 		#include <drm/drm_modeset_helper_vtables.h>
 		#include <drm/drm_atomic.h>
 	], [
-		struct drm_connector_helper_funcs p;
-		p->atomic_check(NULL, (struct drm_atomic_state*)NULL)
+		struct drm_connector_helper_funcs *p;
+		p->atomic_check(NULL, (struct drm_atomic_state*)NULL);
 	], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_STRUCT_NAME_CB_NAME_2ARGS, 1, [atomic_check() is available])
