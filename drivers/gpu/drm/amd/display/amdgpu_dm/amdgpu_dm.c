@@ -9238,6 +9238,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
+#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 	/* Perform validation of MST topology in the state*/
 	ret = drm_dp_mst_atomic_check(state);
 	if (ret)
@@ -9336,9 +9337,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * dc_validate_global_state(), or there is a chance
 		 * to get stuck in an infinite loop and hang eventually.
 		 */
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
 		ret = drm_dp_mst_atomic_check(state);
 		if (ret)
 			goto fail;
+#endif
 		status = dc_validate_global_state(dc, dm_state->context, false);
 		if (status != DC_OK) {
 			DC_LOG_WARNING("DC global validation failure: %s (%d)",
