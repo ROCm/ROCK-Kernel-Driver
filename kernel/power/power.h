@@ -13,6 +13,7 @@ struct swsusp_info {
 	unsigned long		image_pages;
 	unsigned long		pages;
 	unsigned long		size;
+	unsigned long           trampoline_pfn;
 } __aligned(PAGE_SIZE);
 
 #ifdef CONFIG_HIBERNATION
@@ -153,6 +154,10 @@ extern int snapshot_read_next(struct snapshot_handle *handle);
 extern int snapshot_write_next(struct snapshot_handle *handle);
 extern void snapshot_write_finalize(struct snapshot_handle *handle);
 extern int snapshot_image_loaded(struct snapshot_handle *handle);
+extern int snapshot_create_trampoline(void);
+extern void snapshot_init_trampoline(void);
+extern void snapshot_restore_trampoline(void);
+extern void snapshot_free_trampoline(void);
 
 /* If unset, the snapshot device cannot be open. */
 extern atomic_t snapshot_device_available;

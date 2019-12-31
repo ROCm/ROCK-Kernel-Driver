@@ -32,6 +32,7 @@
 #include <linux/ktime.h>
 #include <linux/set_memory.h>
 #include <linux/security.h>
+#include <linux/efi.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -77,6 +78,24 @@ static inline void hibernate_restore_protection_end(void) {}
 static inline void hibernate_restore_protect_page(void *page_address) {}
 static inline void hibernate_restore_unprotect_page(void *page_address) {}
 #endif /* CONFIG_STRICT_KERNEL_RWX  && CONFIG_ARCH_HAS_SET_MEMORY */
+
+/*
+ * The trampoline is used to forward information from boot kernel
+ * to image kernel.
+ */
+struct trampoline {
+	bool secret_key_valid;
+	u8 secret_key[SECRET_KEY_SIZE];
+};
+
+/* the trampoline is used by image kernel */
+static void *trampoline_virt;
+
+/* trampoline pfn from swsusp_info in snapshot for snapshot_write_next() */
+static unsigned long trampoline_pfn;
+
+/* Keep the buffer for foward page in snapshot_write_next() */
+static void *trampoline_buff;
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
@@ -2052,7 +2071,106 @@ static int init_header(struct swsusp_info *info)
 	info->pages = snapshot_get_image_size();
 	info->size = info->pages;
 	info->size <<= PAGE_SHIFT;
+	info->trampoline_pfn = page_to_pfn(virt_to_page(trampoline_virt));
 	return init_header_complete(info);
+}
+
+/**
+ * create trampoline - Create a trampoline page before snapshot be created
+ * In hibernation process, this routine will be called by kernel before
+ * the snapshot image be created. It can be used in resuming process.
+ */
+int snapshot_create_trampoline(void)
+{
+	if (trampoline_virt) {
+		pr_warn("PM: Tried to create trampoline again\n");
+		return 0;
+	}
+
+	trampoline_virt = (void *)get_zeroed_page(GFP_KERNEL);
+	if (!trampoline_virt) {
+		pr_err("PM: Allocate trampoline page failed\n");
+		return -ENOMEM;
+	}
+	trampoline_pfn = 0;
+	trampoline_buff = NULL;
+
+	return 0;
+}
+
+/**
+ * initial trampoline - Put data to trampoline buffer for target kernel
+ *
+ * In resuming process, this routine will be called by boot kernel before
+ * the target kernel be restored. The boot kernel uses trampoline buffer
+ * to transfer information to target kernel.
+ */
+void snapshot_init_trampoline(void)
+{
+	struct trampoline *t;
+	void *efi_secret_key;
+
+	if (!trampoline_pfn || !trampoline_buff) {
+		pr_err("PM: Did not find trampoline buffer, pfn: %ld\n",
+			trampoline_pfn);
+		return;
+	}
+
+	hibernate_restore_unprotect_page(trampoline_buff);
+	memset(trampoline_buff, 0, PAGE_SIZE);
+	t = (struct trampoline *)trampoline_buff;
+
+	efi_secret_key = get_efi_secret_key();
+	if (efi_secret_key) {
+		memset(t->secret_key, 0, SECRET_KEY_SIZE);
+		memcpy(t->secret_key, efi_secret_key, SECRET_KEY_SIZE);
+		t->secret_key_valid = true;
+	}
+	pr_info("PM: Hibernation trampoline page prepared\n");
+}
+
+/**
+ * restore trampoline - Handle the data from boot kernel and free.
+ *
+ * In resuming process, this routine will be called by target kernel
+ * after target kernel is restored. The target kernel handles
+ * the data in trampoline that it is transferred from boot kernel.
+ */
+void snapshot_restore_trampoline(void)
+{
+	struct trampoline *t;
+	int ret;
+
+	if (!trampoline_virt) {
+		pr_err("PM: Doesn't have trampoline page\n");
+		return;
+	}
+
+	t = (struct trampoline *)trampoline_virt;
+	if (t->secret_key_valid) {
+		ret = decrypt_restore_hidden_area(t->secret_key, SECRET_KEY_SIZE);
+		if (ret)
+			pr_err("PM: Decrypted hidden area failed: %d\n", ret);
+		else
+			pr_info("PM: Hidden area decrypted\n");
+	}
+
+	snapshot_free_trampoline();
+}
+
+void snapshot_free_trampoline(void)
+{
+	if (!trampoline_virt) {
+		pr_err("PM: No trampoline page can be freed\n");
+		return;
+	}
+
+	trampoline_pfn = 0;
+	trampoline_buff = NULL;
+	memset(trampoline_virt, 0, PAGE_SIZE);
+	free_page((unsigned long)trampoline_virt);
+	trampoline_virt = NULL;
+	pr_info("PM: Trampoline freed\n");
 }
 
 /**
@@ -2202,6 +2320,7 @@ static int load_header(struct swsusp_info *info)
 	if (!error) {
 		nr_copy_pages = info->image_pages;
 		nr_meta_pages = info->pages - info->image_pages - 1;
+		trampoline_pfn = info->trampoline_pfn;
 	}
 	return error;
 }
@@ -2535,7 +2654,8 @@ static int prepare_image(struct memory_bitmap *new_bm, struct memory_bitmap *bm)
  * Get the address that snapshot_write_next() should return to its caller to
  * write to.
  */
-static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
+static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca,
+			unsigned long *pfn_out)
 {
 	struct pbe *pbe;
 	struct page *page;
@@ -2543,6 +2663,9 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
 
 	if (pfn == BM_END_OF_MAP)
 		return ERR_PTR(-EFAULT);
+
+	if (pfn_out)
+		*pfn_out = pfn;
 
 	page = pfn_to_page(pfn);
 	if (PageHighMem(page))
@@ -2591,6 +2714,7 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
 int snapshot_write_next(struct snapshot_handle *handle)
 {
 	static struct chain_allocator ca;
+	unsigned long pfn;
 	int error = 0;
 
 	/* Check if we have already loaded the entire image */
@@ -2638,7 +2762,7 @@ int snapshot_write_next(struct snapshot_handle *handle)
 			chain_init(&ca, GFP_ATOMIC, PG_SAFE);
 			memory_bm_position_reset(&orig_bm);
 			restore_pblist = NULL;
-			handle->buffer = get_buffer(&orig_bm, &ca);
+			handle->buffer = get_buffer(&orig_bm, &ca, &pfn);
 			handle->sync_read = 0;
 			if (IS_ERR(handle->buffer))
 				return PTR_ERR(handle->buffer);
@@ -2648,11 +2772,14 @@ int snapshot_write_next(struct snapshot_handle *handle)
 		/* Restore page key for data page (s390 only). */
 		page_key_write(handle->buffer);
 		hibernate_restore_protect_page(handle->buffer);
-		handle->buffer = get_buffer(&orig_bm, &ca);
+		handle->buffer = get_buffer(&orig_bm, &ca, &pfn);
 		if (IS_ERR(handle->buffer))
 			return PTR_ERR(handle->buffer);
 		if (handle->buffer != buffer)
 			handle->sync_read = 0;
+		/* Capture the trampoline for transfer data */
+		if (pfn == trampoline_pfn && trampoline_pfn)
+			trampoline_buff = handle->buffer;
 	}
 	handle->cur++;
 	return PAGE_SIZE;

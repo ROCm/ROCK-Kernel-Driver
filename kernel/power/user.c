@@ -244,6 +244,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 		if (!data->frozen || data->ready)
 			break;
 		pm_restore_gfp_mask();
+		snapshot_restore_trampoline();
 		free_basic_memory_bitmaps();
 		data->free_bitmaps = false;
 		thaw_processes();
@@ -255,6 +256,9 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			error = -EPERM;
 			break;
 		}
+		error = snapshot_create_trampoline();
+		if (error)
+			return error;
 		pm_restore_gfp_mask();
 		error = hibernation_snapshot(data->platform_support);
 		if (!error) {
@@ -271,6 +275,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			error = -EPERM;
 			break;
 		}
+		snapshot_init_trampoline();
 		/* clean the hidden area in boot kernel */
 		clean_hidden_area();
 		error = hibernation_restore(data->platform_support);

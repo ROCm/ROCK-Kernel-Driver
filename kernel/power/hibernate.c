@@ -30,6 +30,7 @@
 #include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/ktime.h>
+#include <linux/efi.h>
 #include <linux/security.h>
 #include <trace/events/power.h>
 
@@ -696,10 +697,26 @@ int hibernate(void)
 {
 	int error, nr_calls = 0;
 	bool snapshot_test = false;
+	void *secret_key;
 
 	if (!hibernation_available()) {
 		pm_pr_dbg("Hibernation not available.\n");
 		return -EPERM;
+	}
+
+	error = snapshot_create_trampoline();
+	if (error)
+		return error;
+
+	/* using EFI secret key to encrypt hidden area */
+	secret_key = get_efi_secret_key();
+	if (secret_key) {
+		error = encrypt_backup_hidden_area(secret_key, SECRET_KEY_SIZE);
+		if (error) {
+			pr_err("Encrypt hidden area failed: %d\n", error);
+			snapshot_free_trampoline();
+			return error;
+		}
 	}
 
 	lock_system_sleep();
@@ -756,6 +773,7 @@ int hibernate(void)
 		pm_restore_gfp_mask();
 	} else {
 		pm_pr_dbg("Image restored successfully.\n");
+		snapshot_restore_trampoline();
 	}
 
  Free_bitmaps:
