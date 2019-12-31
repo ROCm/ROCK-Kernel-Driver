@@ -230,6 +230,13 @@ config STATIC_USERMODEHELPER_PATH
 	  If you wish for all usermode helper programs to be disabled,
 	  specify an empty string here (i.e. "").
 
+
+config HIDDEN_AREA
+	def_bool n
+	help
+          The data in hidden area will be filtered out when user space uses
+          /dev/mem, /dev/kmem, hibernation, kdump...
+
 source "security/selinux/Kconfig"
 source "security/smack/Kconfig"
 source "security/tomoyo/Kconfig"

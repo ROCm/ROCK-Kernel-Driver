@@ -1893,5 +1893,33 @@ static inline void security_bpf_prog_free(struct bpf_prog_aux *aux)
 #endif /* CONFIG_SECURITY */
 #endif /* CONFIG_BPF_SYSCALL */
 
+#ifdef CONFIG_HIDDEN_AREA
+extern void __init hidden_area_init(void);
+extern void * memcpy_to_hidden_area(const void *source, unsigned long size);
+extern bool page_is_hidden(struct page *page);
+extern void clean_hidden_area(void);
+extern int encrypt_backup_hidden_area(void *key, unsigned long key_len);
+extern int decrypt_restore_hidden_area(void *key, unsigned long key_len);
+#else
+static inline void __init hidden_area_init(void) {}
+static inline void * memcpy_to_hidden_area(const void *source, unsigned long size)
+{
+	return NULL;
+}
+static inline bool page_is_hidden(struct page *page)
+{
+	return false;
+}
+static inline void clean_hidden_area(void) {}
+static inline int encrypt_backup_hidden_area(void *key, unsigned long key_len)
+{
+	return 0;
+}
+static inline int decrypt_restore_hidden_area(void *key, unsigned long key_len)
+{
+	return 0;
+}
+#endif
+
 #endif /* ! __LINUX_SECURITY_H */
 
