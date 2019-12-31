@@ -161,6 +161,39 @@ static efi_status_t create_secret_key(struct efi_skey_setup_data *skey_setup)
 	return status;
 }
 
+static bool found_regen_flag(void)
+{
+	unsigned long attributes = 0;
+	unsigned long size = 0;
+	void *flag;
+	bool regen;
+	efi_status_t status;
+
+	/* detect secret key regen flag variable */
+	status = get_efi_var(EFI_SECRET_KEY_REGEN, &EFI_SECRET_GUID,
+			     &attributes, &size, NULL);
+	if (status != EFI_BUFFER_TOO_SMALL)
+		return false;
+
+	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
+				size, &flag);
+	if (status != EFI_SUCCESS)
+		return false;
+
+	memset(flag, 0, size);
+	status = get_efi_var(EFI_SECRET_KEY_REGEN, &EFI_SECRET_GUID,
+			     &attributes, &size, flag);
+	if (status == EFI_SUCCESS)
+		regen = *(bool *)flag;
+
+	/* clean regen flag */
+	set_efi_var(EFI_SECRET_KEY_REGEN, &EFI_SECRET_GUID,
+		    attributes, 0, NULL);
+err:
+	efi_call_early(free_pool, flag);
+	return regen;
+}
+
 static efi_status_t regen_secret_key(struct efi_skey_setup_data *skey_setup)
 {
 	unsigned long attributes = 0;
@@ -207,6 +240,9 @@ void efi_setup_secret_key(efi_system_table_t *sys_table, struct boot_params *par
 			break;
 		if (attributes != SECRET_KEY_ATTRIBUTE) {
 			efi_printk(sys_table, "Found a unqualified secret key\n");
+			status = regen_secret_key(skey_setup);
+		} else if (found_regen_flag()) {
+			efi_printk(sys_table, "Regenerate secret key\n");
 			status = regen_secret_key(skey_setup);
 		}
 		break;
