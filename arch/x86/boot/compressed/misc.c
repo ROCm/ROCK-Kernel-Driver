@@ -449,7 +449,7 @@ void fortify_panic(const char *name)
 	error("detected buffer overflow");
 }
 
-#if CONFIG_RANDOMIZE_BASE
+#if defined(CONFIG_RANDOMIZE_BASE) || defined(CONFIG_EFI_SECRET_KEY)
 unsigned long rotate_xor(unsigned long hash, const void *area,
 			size_t size)
 {
