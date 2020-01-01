@@ -3944,6 +3944,29 @@ static int __btf_resolve_helper_id(struct bpf_verifier_log *log, void *fn,
 	return btf_id;
 }
 
+int btf_resolve_helper_id(struct bpf_verifier_log *log,
+			  const struct bpf_func_proto *fn, int arg)
+{
+	int *btf_id = &fn->btf_id[arg];
+	int ret;
+
+	if (fn->arg_type[arg] != ARG_PTR_TO_BTF_ID)
+		return -EINVAL;
+
+	ret = READ_ONCE(*btf_id);
+	if (ret)
+		return ret;
+	/* ok to race the search. The result is the same */
+	ret = __btf_resolve_helper_id(log, fn->func, arg);
+	if (!ret) {
+		/* Function argument cannot be type 'void' */
+		bpf_log(log, "BTF resolution bug\n");
+		return -EFAULT;
+	}
+	WRITE_ONCE(*btf_id, ret);
+	return ret;
+}
+
 static int __get_type_size(struct btf *btf, u32 btf_id,
 			   const struct btf_type **bad_type)
 {
@@ -4018,29 +4041,6 @@ int btf_distill_func_proto(struct bpf_verifier_log *log,
 	}
 	m->nr_args = nargs;
 	return 0;
-}
-
-int btf_resolve_helper_id(struct bpf_verifier_log *log,
-			  const struct bpf_func_proto *fn, int arg)
-{
-	int *btf_id = &fn->btf_id[arg];
-	int ret;
-
-	if (fn->arg_type[arg] != ARG_PTR_TO_BTF_ID)
-		return -EINVAL;
-
-	ret = READ_ONCE(*btf_id);
-	if (ret)
-		return ret;
-	/* ok to race the search. The result is the same */
-	ret = __btf_resolve_helper_id(log, fn->func, arg);
-	if (!ret) {
-		/* Function argument cannot be type 'void' */
-		bpf_log(log, "BTF resolution bug\n");
-		return -EFAULT;
-	}
-	WRITE_ONCE(*btf_id, ret);
-	return ret;
 }
 
 int btf_check_func_arg_match(struct bpf_verifier_env *env, int subprog)
