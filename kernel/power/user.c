@@ -275,6 +275,10 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			error = -EPERM;
 			break;
 		}
+		if (snapshot_image_verify()) {
+			error = -EPERM;
+			break;
+		}
 		snapshot_init_trampoline();
 		/* clean the hidden area in boot kernel */
 		clean_hidden_area();

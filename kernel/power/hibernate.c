@@ -276,10 +276,14 @@ static int create_image(int platform_mode)
 {
 	int error;
 
+	error = swsusp_prepare_hash(false);
+	if (error)
+		return error;
+
 	error = dpm_suspend_end(PMSG_FREEZE);
 	if (error) {
 		pr_err("Some devices failed to power down, aborting hibernation\n");
-		return error;
+		goto finish_hash;
 	}
 
 	error = platform_pre_snapshot(platform_mode);
@@ -339,6 +343,9 @@ static int create_image(int platform_mode)
 
 	dpm_resume_start(in_suspend ?
 		(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
+
+ finish_hash:
+	swsusp_finish_hash();
 
 	return error;
 }

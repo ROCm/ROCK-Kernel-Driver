@@ -77,6 +77,19 @@ config HIBERNATION
 
 	  For more information take a look at <file:Documentation/power/swsusp.rst>.
 
+config HIBERNATE_VERIFICATION
+	bool "Hibernate verification"
+	depends on HIBERNATION
+	depends on EFI_SECRET_KEY
+	select CRYPTO_HMAC
+	select CRYPTO_SHA512
+	help
+	  This option provides support for generating and verifying the
+	  signature of memory snapshot image by HMAC-SHA512. Current mechanism
+	  relies on UEFI secure boot environment, EFI stub generates HMAC
+	  key for hibernate verification. This function will be bypassed on
+	  legacy BIOS.
+
 config ARCH_SAVE_PAGE_KEYS
 	bool
 
