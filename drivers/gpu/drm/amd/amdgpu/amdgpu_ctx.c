@@ -280,25 +280,6 @@ static void amdgpu_ctx_do_release(struct kref *ref)
 	amdgpu_ctx_fini(ref);
 }
 
-#ifndef HAVE_IDR_REMOVE_RETURN_VOID_POINTER
-static int amdgpu_ctx_free(struct amdgpu_fpriv *fpriv, uint32_t id)
-{
-	struct amdgpu_ctx_mgr *mgr = &fpriv->ctx_mgr;
-	struct amdgpu_ctx *ctx;
-
-	mutex_lock(&mgr->lock);
-	ctx = idr_find(&mgr->ctx_handles, id);
-	if (ctx) {
-		idr_remove(&mgr->ctx_handles, id);
-		kref_put(&ctx->refcount, amdgpu_ctx_do_release);
-		mutex_unlock(&mgr->lock);
-		return 0;
-	}
-	mutex_unlock(&mgr->lock);
-	return -EINVAL;
-}
-
-#else
 static int amdgpu_ctx_free(struct amdgpu_fpriv *fpriv, uint32_t id)
 {
 	struct amdgpu_ctx_mgr *mgr = &fpriv->ctx_mgr;
@@ -311,7 +292,6 @@ static int amdgpu_ctx_free(struct amdgpu_fpriv *fpriv, uint32_t id)
 	mutex_unlock(&mgr->lock);
 	return ctx ? 0 : -EINVAL;
 }
-#endif
 
 static int amdgpu_ctx_query(struct amdgpu_device *adev,
 			    struct amdgpu_fpriv *fpriv, uint32_t id,
