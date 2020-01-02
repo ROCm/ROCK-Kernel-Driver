@@ -958,7 +958,9 @@ static int amdgpu_ras_sysfs_create_feature_node(struct amdgpu_device *adev)
 	struct attribute_group group = {
 		.name = "ras",
 		.attrs = attrs,
+#if defined(HAVE_ATTRIBUTE_GROUP_BIN_ATTRS)
 		.bin_attrs = bin_attrs,
+#endif
 	};
 
 	con->features_attr = (struct device_attribute) {
@@ -999,7 +1001,9 @@ static int amdgpu_ras_sysfs_remove_feature_node(struct amdgpu_device *adev)
 	struct attribute_group group = {
 		.name = "ras",
 		.attrs = attrs,
+#if defined(HAVE_ATTRIBUTE_GROUP_BIN_ATTRS)
 		.bin_attrs = bin_attrs,
+#endif
 	};
 
 	sysfs_remove_group(&adev->dev->kobj, &group);
