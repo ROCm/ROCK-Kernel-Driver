@@ -167,10 +167,14 @@ extern void snapshot_free_trampoline(void);
 extern int snapshot_image_verify(void);
 extern int swsusp_prepare_hash(bool may_sleep);
 extern void swsusp_finish_hash(void);
+extern void snapshot_set_enforce_verify(void);
+extern int snapshot_is_enforce_verify(void);
 #else
 static inline int snapshot_image_verify(void) { return 0; }
 static inline int swsusp_prepare_hash(bool may_sleep) { return 0; }
 static inline void swsusp_finish_hash(void) {}
+static inline void snapshot_set_enforce_verify(void) {}
+static inline int snapshot_is_enforce_verify(void) {return 0;}
 #endif
 
 /* If unset, the snapshot device cannot be open. */

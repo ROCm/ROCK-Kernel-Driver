@@ -570,7 +570,8 @@ extern enum system_states {
 #define TAINT_LIVEPATCH			15
 #define TAINT_AUX			16
 #define TAINT_RANDSTRUCT		17
-#define TAINT_FLAGS_COUNT		18
+#define TAINT_UNSAFE_HIBERNATE		18
+#define TAINT_FLAGS_COUNT		19
 
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 /*

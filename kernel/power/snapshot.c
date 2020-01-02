@@ -88,6 +88,7 @@ static inline void hibernate_restore_unprotect_page(void *page_address) {}
  * to image kernel.
  */
 struct trampoline {
+	int sig_enforce;
 	int sig_verify_ret;
 	bool secret_key_valid;
 	u8 secret_key[SECRET_KEY_SIZE];
@@ -1446,6 +1447,23 @@ static u8 signature[SNAPSHOT_DIGEST_SIZE];
 /* Keep the signature verification result for trampoline */
 static int sig_verify_ret;
 
+/* enforce the snapshot must be signed */
+#ifdef CONFIG_HIBERNATE_VERIFICATION_FORCE
+static bool sig_enforce = true;
+#else
+static bool sig_enforce;
+#endif
+
+void snapshot_set_enforce_verify(void)
+{
+	sig_enforce = true;
+}
+
+int snapshot_is_enforce_verify(void)
+{
+	return sig_enforce;
+}
+
 static u8 *s4_verify_digest;
 static struct shash_desc *s4_verify_desc;
 
@@ -1459,7 +1477,7 @@ int swsusp_prepare_hash(bool may_sleep)
 	key = get_efi_secret_key();
 	if (!key) {
 		pr_warn_once("PM: secret key is invalid\n");
-		return -EINVAL;
+		return (sig_enforce) ? -EINVAL : 0;
 	}
 
 	tfm = crypto_alloc_shash(SNAPSHOT_HMAC, 0, 0);
@@ -1552,6 +1570,8 @@ int snapshot_image_verify(void)
 		pr_warn("PM: Signature verification failed: %d\n", ret);
  error:
 	sig_verify_ret = ret;
+	if (!sig_enforce)
+		ret = 0;
 	return ret;
 }
 
@@ -1625,17 +1645,30 @@ static void load_signature(struct swsusp_info *info)
 
 static void init_sig_verify(struct trampoline *t)
 {
+	t->sig_enforce = sig_enforce;
 	t->sig_verify_ret = sig_verify_ret;
 	sig_verify_ret = 0;
 }
 
 static void handle_sig_verify(struct trampoline *t)
 {
-	if (t->sig_verify_ret)
+	sig_enforce = t->sig_enforce;
+	if (sig_enforce)
+		pr_info("PM: Enforce the snapshot to be validly signed\n");
+
+	if (t->sig_verify_ret) {
 		pr_warn("PM: Signature verification failed: %d\n",
 			t->sig_verify_ret);
-	else if (t->secret_key_valid)
+		/* taint kernel */
+		if (!sig_enforce) {
+			pr_warn("PM: System resumed from unsafe snapshot - "
+				"tainting kernel\n");
+			add_taint(TAINT_UNSAFE_HIBERNATE, LOCKDEP_STILL_OK);
+			pr_info("%s\n", print_tainted());
+		}
+	} else if (t->secret_key_valid) {
 		pr_info("PM: Signature verification passed.\n");
+	}
 }
 #else
 static int

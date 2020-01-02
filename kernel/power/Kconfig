@@ -90,6 +90,15 @@ config HIBERNATE_VERIFICATION
 	  key for hibernate verification. This function will be bypassed on
 	  legacy BIOS.
 
+config HIBERNATE_VERIFICATION_FORCE
+	bool "Require hibernate snapshot image to be validly signed"
+	depends on HIBERNATE_VERIFICATION
+	help
+	  Refuse the system to be resumed from a snapshot image which is
+	  unsigned or signed by a wrong key. If this option is not enabled,
+	  the system can be resumed by unsigned snapshot image and kernel
+	  will be tainted.
+
 config ARCH_SAVE_PAGE_KEYS
 	bool
 

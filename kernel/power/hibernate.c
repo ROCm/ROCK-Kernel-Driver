@@ -1225,6 +1225,8 @@ static int __init hibernate_setup(char *str)
 	} else if (IS_ENABLED(CONFIG_STRICT_KERNEL_RWX)
 		   && !strncmp(str, "protect_image", 13)) {
 		enable_restore_image_protection();
+	} else if (!strncmp(str, "sigenforce", 10)) {
+		snapshot_set_enforce_verify();
 	}
 	return 1;
 }
