@@ -134,7 +134,7 @@ static bool amdgpu_sync_add_later(struct amdgpu_sync *sync, struct dma_fence *f,
 {
 	struct amdgpu_sync_entry *e;
 
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 
 	hash_for_each_possible(sync->fences, e, node, node, f->context) {
@@ -304,7 +304,7 @@ struct dma_fence *amdgpu_sync_peek_fence(struct amdgpu_sync *sync,
 	struct hlist_node *tmp;
 	int i;
 
-#ifndef HAVE_5ARGS_HASH_FOR_EACH_SAFE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
 #else
@@ -351,7 +351,7 @@ struct dma_fence *amdgpu_sync_get_fence(struct amdgpu_sync *sync, bool *explicit
 	struct hlist_node *tmp;
 	struct dma_fence *f;
 	int i;
-#ifndef HAVE_5ARGS_HASH_FOR_EACH_SAFE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
 #else
@@ -389,7 +389,7 @@ int amdgpu_sync_clone(struct amdgpu_sync *source, struct amdgpu_sync *clone)
 	struct dma_fence *f;
 	int i, r;
 
-#ifndef HAVE_5ARGS_HASH_FOR_EACH_SAFE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_safe(source->fences, i, node, tmp, e, node) {
 #else
@@ -419,7 +419,7 @@ int amdgpu_sync_wait(struct amdgpu_sync *sync, bool intr)
 	struct hlist_node *tmp;
 	int i, r;
 
-#ifndef HAVE_5ARGS_HASH_FOR_EACH_SAFE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
 #else
@@ -450,7 +450,7 @@ void amdgpu_sync_free(struct amdgpu_sync *sync)
 	struct hlist_node *tmp;
 	unsigned i;
 
-#ifndef HAVE_5ARGS_HASH_FOR_EACH_SAFE
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_safe(sync->fences, i, node, tmp, e, node) {
 #else
