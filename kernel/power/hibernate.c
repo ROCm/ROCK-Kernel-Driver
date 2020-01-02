@@ -710,6 +710,7 @@ int hibernate(void)
 		pm_pr_dbg("Hibernation not available.\n");
 		return -EPERM;
 	}
+	efi_skey_stop_regen();
 
 	error = snapshot_create_trampoline();
 	if (error)

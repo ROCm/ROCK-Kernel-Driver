@@ -22,6 +22,7 @@
 #include <linux/cpu.h>
 #include <linux/freezer.h>
 #include <linux/security.h>
+#include <linux/efi.h>
 
 #include <linux/uaccess.h>
 
@@ -347,6 +348,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 			error = -EPERM;
 			break;
 		}
+		efi_skey_stop_regen();
 		/*
 		 * Tasks are frozen and the notifiers have been called with
 		 * PM_HIBERNATION_PREPARE
@@ -360,6 +362,7 @@ static long snapshot_ioctl(struct file *filp, unsigned int cmd,
 		break;
 
 	case SNAPSHOT_POWER_OFF:
+		efi_skey_stop_regen();
 		if (data->platform_support)
 			error = hibernation_platform_enter();
 		break;
