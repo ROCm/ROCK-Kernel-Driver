@@ -145,4 +145,11 @@ static inline u16 pci_dev_id(struct pci_dev *dev)
 }
 #endif /* HAVE_PCI_DEV_ID */
 
+#ifndef HAVE_PCI_IS_THUNDERBOLD_ATTACHED
+static inline bool pci_is_thunderbolt_attached(struct pci_dev *pdev)
+{
+	return false;
+}
+#endif /* HAVE_PCI_IS_THUNDERBOLD_ATTACHED */
+
 #endif /* AMDKCL_PCI_H */
