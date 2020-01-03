@@ -1,5 +1,5 @@
 dnl #
-dnl # commit f519b1a2e08c913375324a927992bb328387f169
+dnl # commit v3.16-rc5-99-gf519b1a2e08c
 dnl # timekeeping: Provide ktime_get_raw()
 dnl # Provide a ktime_t based interface for raw monotonic time.
 dnl #

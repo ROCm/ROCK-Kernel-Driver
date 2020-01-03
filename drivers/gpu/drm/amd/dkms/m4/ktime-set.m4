@@ -1,7 +1,7 @@
-dnl # commit b17b20d70dcbe48dd1aa6aba073a60ddfce5d7db
+dnl #
+dnl # commit v3.16-rc5-54-gb17b20d70dcb
 dnl # Author: John Stultz <john.stultz@linaro.org>
 dnl # Date:   Wed Jul 16 21:03:56 2014 +0000
-dnl #
 dnl # ktime: Change ktime_set() to take 64bit seconds value
 dnl #
 AC_DEFUN([AC_AMDGPU_KTIME_SET],

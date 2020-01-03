@@ -11,7 +11,10 @@ static inline u64 ktime_get_ns(void)
 
 #if !defined(HAVE_KTIME_GET_BOOTTIME_NS)
 #if defined(HAVE_KTIME_GET_NS)
-#define ktime_get_boottime_ns ktime_get_boot_ns
+static inline u64 ktime_get_boottime_ns(void)
+{
+	return ktime_get_boot_ns();
+}
 #else
 static inline u64 ktime_get_boottime_ns(void)
 {
@@ -20,8 +23,8 @@ static inline u64 ktime_get_boottime_ns(void)
 	get_monotonic_boottime(&time);
 	return (u64)timespec_to_ns(&time);
 }
-#endif
-#endif
+#endif /* HAVE_KTIME_GET_NS */
+#endif /* HAVE_KTIME_GET_BOOTTIME_NS */
 
 #if !defined(HAVE_KTIME_GET_RAW_NS)
 static inline u64 ktime_get_raw_ns(void)
@@ -32,7 +35,6 @@ static inline u64 ktime_get_raw_ns(void)
 	return (u64)timespec_to_ns(&time);
 }
 #endif
-#endif
 
 #ifndef HAVE_KTIME_GET_REAL_SECONDS
 static inline time64_t ktime_get_real_seconds(void)
@@ -42,4 +44,6 @@ static inline time64_t ktime_get_real_seconds(void)
 	do_gettimeofday(&ts);
 	return (time64_t)ts.tv_sec;
 }
+#endif
+
 #endif
