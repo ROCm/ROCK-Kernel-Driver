@@ -103,6 +103,10 @@
 #define DP_TEST_AUDIO_PERIOD_CH1           0x273
 #endif
 
+#if !defined(DP_DSC_SUPPORT)
+#define DP_DSC_SUPPORT                      0x060   /* DP 1.4 */
+#endif
+
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
