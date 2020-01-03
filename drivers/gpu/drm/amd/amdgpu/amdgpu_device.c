@@ -3092,11 +3092,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		boco = true;
 	if (amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
-	     amdgpu_has_atpx_dgpu_power_cntl())
-#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
-	    && !pci_is_thunderbolt_attached(adev->pdev)
-#endif
-	    )
+	     amdgpu_has_atpx_dgpu_power_cntl()) &&
+	    !pci_is_thunderbolt_attached(adev->pdev))
 		vga_switcheroo_register_client(adev->pdev,
 					       &amdgpu_switcheroo_ops, boco);
 	if (boco)
@@ -3351,11 +3348,8 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	adev->bios = NULL;
 	if (amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
-	     amdgpu_has_atpx_dgpu_power_cntl())
-#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
-	    && !pci_is_thunderbolt_attached(adev->pdev)
-#endif
-	    )
+	     amdgpu_has_atpx_dgpu_power_cntl()) &&
+	    !pci_is_thunderbolt_attached(adev->pdev))
 		vga_switcheroo_unregister_client(adev->pdev);
 	if (amdgpu_device_supports_boco(adev->ddev))
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
