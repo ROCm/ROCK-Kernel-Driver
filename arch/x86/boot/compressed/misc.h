@@ -74,6 +74,17 @@ struct mem_vector {
 	unsigned long long size;
 };
 
+#if defined(CONFIG_RANDOMIZE_BASE) || defined(CONFIG_EFI_SECRET_KEY)
+#include <generated/compile.h>
+#include <generated/utsrelease.h>
+/* cpuflags.c */
+bool has_cpuflag(int flag);
+/* Simplified build-specific string for starting entropy. */
+static const char build_str[] = UTS_RELEASE " (" LINUX_COMPILE_BY "@"
+		LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION;
+unsigned long rotate_xor(unsigned long hash, const void *area, size_t size);
+#endif
+
 #if CONFIG_RANDOMIZE_BASE
 /* kaslr.c */
 void choose_random_location(unsigned long input,
@@ -81,8 +92,6 @@ void choose_random_location(unsigned long input,
 			    unsigned long *output,
 			    unsigned long output_size,
 			    unsigned long *virt_addr);
-/* cpuflags.c */
-bool has_cpuflag(int flag);
 #else
 static inline void choose_random_location(unsigned long input,
 					  unsigned long input_size,

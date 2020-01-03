@@ -30,6 +30,7 @@ obj-$(CONFIG_SECURITY_LOADPIN)		+= loadpin/
 obj-$(CONFIG_SECURITY_SAFESETID)       += safesetid/
 obj-$(CONFIG_SECURITY_LOCKDOWN_LSM)	+= lockdown/
 obj-$(CONFIG_CGROUP_DEVICE)		+= device_cgroup.o
+obj-$(CONFIG_HIDDEN_AREA)		+= hidden_area.o
 
 # Object integrity file lists
 subdir-$(CONFIG_INTEGRITY)		+= integrity

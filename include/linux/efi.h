@@ -1802,4 +1802,33 @@ struct linux_efi_memreserve {
 #define EFI_MEMRESERVE_COUNT(size) (((size) - sizeof(struct linux_efi_memreserve)) \
 	/ sizeof(((struct linux_efi_memreserve *)0)->entry[0]))
 
+#ifdef CONFIG_EFI_SECRET_KEY
+#define EFI_SECRET_GUID \
+	EFI_GUID(0x8c136d32, 0x039a, 0x4016, 0x8b, 0xb4, 0x9e, 0x98, 0x5e, 0x62, 0x78, 0x6f)
+#define SECRET_KEY_SIZE        64
+#define EFI_SECRET_KEY_REGEN \
+	((efi_char16_t [15]) { 'S', 'e', 'c', 'r', 'e', 't', 'K', 'e', 'y', 'R', 'e', 'g', 'e', 'n', 0 })
+#define EFI_SECRET_KEY_REGEN_ATTRIBUTE (EFI_VARIABLE_NON_VOLATILE | \
+					EFI_VARIABLE_BOOTSERVICE_ACCESS | \
+					EFI_VARIABLE_RUNTIME_ACCESS)
+struct efi_skey_setup_data {
+	unsigned long detect_status;
+	unsigned long final_status;
+	unsigned long key_size;
+	u8 secret_key[SECRET_KEY_SIZE];
+};
+extern void *get_efi_secret_key(void);
+extern void efi_skey_stop_regen(void);
+extern void efi_skey_set_regen(void);
+extern int efi_skey_sysfs_init(struct kobject *efi_kobj);
+#else
+#define SECRET_KEY_SIZE        0
+static inline void *get_efi_secret_key(void)
+{
+	return NULL;
+}
+static inline void efi_skey_stop_regen(void) {}
+static inline void efi_skey_set_regen(void) {}
+static inline int efi_skey_sysfs_init(struct kobject *efi_kobj) { return 0; }
+#endif /* CONFIG_EFI_SECRET_KEY */
 #endif /* _LINUX_EFI_H */
