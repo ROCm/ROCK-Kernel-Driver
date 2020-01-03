@@ -114,7 +114,7 @@ void amdkcl_pci_init(void)
  * and/or 128-bit AtomicOp completion), or negative otherwise.
  *
  */
-int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
+int _kcl_pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 {
 	struct pci_bus *bus = dev->bus;
 
@@ -186,7 +186,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 
 	return 0;
 }
-EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
+EXPORT_SYMBOL(_kcl_pci_enable_atomic_ops_to_root);
 #endif
 
 /**
@@ -204,7 +204,7 @@ EXPORT_SYMBOL(pci_enable_atomic_ops_to_root);
  * raw bandwidth.
  */
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
-u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 			enum pci_bus_speed *speed,
 			enum pcie_link_width *width)
 {
@@ -246,7 +246,7 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 
 	return bw;
 }
-EXPORT_SYMBOL(pcie_bandwidth_available);
+EXPORT_SYMBOL(_kcl_pcie_bandwidth_available);
 #endif
 
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)

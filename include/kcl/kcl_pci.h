@@ -80,7 +80,12 @@ static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 }
 
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
-int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
+int _kcl_pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
+static inline
+int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask)
+{
+	return _kcl_pci_enable_atomic_ops_to_root(dev, cap_mask);
+}
 #endif
 
 #if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
@@ -95,9 +100,16 @@ static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 #endif
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
-u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 			     enum pci_bus_speed *speed,
 			     enum pcie_link_width *width);
+static inline
+u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
+				enum pci_bus_speed *speed,
+				enum pcie_link_width *width)
+{
+	return _kcl_pcie_bandwidth_available(dev, limiting_dev, speed, width);
+}
 #endif
 
 #if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
