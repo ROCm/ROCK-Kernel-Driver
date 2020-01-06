@@ -253,7 +253,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
 		/* TODO need to know link rate */
 
-		pbn = drm_dp_calc_pbn_mode(clock, bpp);
+		pbn = drm_dp_calc_pbn_mode(clock, bpp, false);
 
 		slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn,
