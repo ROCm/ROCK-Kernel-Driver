@@ -204,7 +204,15 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	mst_port = aconnector->port;
 
 	if (enable) {
+		pbn = drm_dp_calc_pbn_mode(clock, bpp, false);
 
+		slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
+		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn,
+#ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
+                               slots);
+#else
+                               &slots);
+#endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port,
 					       dm_conn_state->pbn,
 #ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
