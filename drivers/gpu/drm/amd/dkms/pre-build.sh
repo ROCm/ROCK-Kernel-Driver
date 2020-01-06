@@ -38,11 +38,10 @@ sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' include
 sed -i '/struct dma_resv {/, /}/d' include/linux/dma-resv.h
 
 while read line; do
-	from_header=$(echo $line | cut -d ' ' -f 1)
-	to_header=$(echo $line | cut -d ' ' -f 2)
+	from_header=$(echo $line | cut -d ' ' -f 1 | sed 's|\.h|\\&|')
 	[ x$from_header = x ] && break
-	from_header=$(echo "$from_header" | sed 's|\.h|\\&|')
-	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/drm/* include/linux/* include/uapi/*`; do
+	to_header=$(echo $line | cut -d ' ' -f 2 | sed 's|\.h|\\&|')
+	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/* | sed '/^include\/kcl/d' | sed '/^amd\/dkms/d'`; do
 		sed -i "s|${from_header}|${to_header}|" $file
 	done
 done < headers
