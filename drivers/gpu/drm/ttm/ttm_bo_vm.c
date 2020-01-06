@@ -341,13 +341,12 @@ out_io_unlock:
 }
 EXPORT_SYMBOL(ttm_bo_vm_fault_reserved);
 
-#if defined(HAVE_2ARGS_VIRTUAL_MM_FAULT_FUNCTION)
+#if defined(HAVE_VM_OPERATIONS_STRUCT_FAULT_2ARG)
 vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
 #else
 vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
-#endif
 {
-#if defined(HAVE_VM_FAULT_ADDRESS_VMA)
 	struct vm_area_struct *vma = vmf->vma;
 #endif
 	pgprot_t prot;
