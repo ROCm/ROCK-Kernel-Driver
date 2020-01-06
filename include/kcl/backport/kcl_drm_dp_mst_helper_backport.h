@@ -24,6 +24,20 @@
 
 #include <drm/drm_dp_mst_helper.h>
 
+/* Copied from drivers/gpu/drm/drm_dp_mst_topology.c and modified for KCL */
+#if !defined(HAVE_DRM_DP_CALC_PBN_MODE_3ARGS)
+static inline
+int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
+{
+	if (dsc)
+		return DIV_ROUND_UP_ULL(mul_u32_u32(clock * (bpp / 16), 64 * 1006),
+				8 * 54 * 1000 * 1000);
+
+	return drm_dp_calc_pbn_mode(clock, bpp);
+}
+#define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
+#endif
+
 #if defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
 static inline
