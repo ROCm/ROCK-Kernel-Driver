@@ -1213,7 +1213,7 @@ static inline int kfd_devcgroup_check_permission(struct kfd_dev *kfd)
 #if defined(CONFIG_CGROUP_DEVICE)
 	struct drm_device *ddev = kfd->ddev;
 
-	return devcgroup_check_permission(DEVCG_DEV_CHAR, ddev->driver->major,
+	return devcgroup_check_permission(DEVCG_DEV_CHAR, DRM_MAJOR,
 					  ddev->render->index,
 					  DEVCG_ACC_WRITE | DEVCG_ACC_READ);
 #else
