@@ -176,6 +176,7 @@ m4_include([m4/drm-headers.m4])
 m4_include([m4/drm-connector-funcs-register-member.m4])
 m4_include([m4/drm-dp-mst-dsc-aux-for-port.m4])
 m4_include([m4/drm-dp-calc-pbn-mode.m4])
+m4_include([m4/drm-dp-atomic-find-vcpi-slots.m4])
 m4_include([m4/config.m4])
 
 
