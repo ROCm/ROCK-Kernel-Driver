@@ -191,9 +191,9 @@ psp_cmd_submit_buf(struct psp_context *psp,
 		if (ucode)
 			DRM_WARN("failed to load ucode id (%d) ",
 				  ucode->ucode_id);
-		DRM_DEBUG_DRIVER("psp command (0x%X) failed and response status is (0x%X)\n",
+		DRM_WARN("psp command (0x%X) failed and response status is (0x%X)\n",
 			 psp->cmd_buf_mem->cmd_id,
-			 psp->cmd_buf_mem->resp.status & GFX_CMD_STATUS_MASK);
+			 psp->cmd_buf_mem->resp.status);
 		if (!timeout) {
 			mutex_unlock(&psp->mutex);
 			return -EINVAL;
@@ -365,11 +365,11 @@ static int psp_asd_load(struct psp_context *psp)
 	return ret;
 }
 
-static void psp_prep_asd_unload_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					uint32_t asd_session_id)
+static void psp_prep_ta_unload_cmd_buf(struct psp_gfx_cmd_resp *cmd,
+				       uint32_t session_id)
 {
 	cmd->cmd_id = GFX_CMD_ID_UNLOAD_TA;
-	cmd->cmd.cmd_unload_ta.session_id = asd_session_id;
+	cmd->cmd.cmd_unload_ta.session_id = session_id;
 }
 
 static int psp_asd_unload(struct psp_context *psp)
@@ -387,7 +387,7 @@ static int psp_asd_unload(struct psp_context *psp)
 	if (!cmd)
 		return -ENOMEM;
 
-	psp_prep_asd_unload_cmd_buf(cmd, psp->asd_context.session_id);
+	psp_prep_ta_unload_cmd_buf(cmd, psp->asd_context.session_id);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 				 psp->fence_buf_mc_addr);
@@ -427,18 +427,20 @@ int psp_reg_program(struct psp_context *psp, enum psp_reg_prog_id reg,
 	return ret;
 }
 
-static void psp_prep_xgmi_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					  uint64_t xgmi_ta_mc, uint64_t xgmi_mc_shared,
-					  uint32_t xgmi_ta_size, uint32_t shared_size)
+static void psp_prep_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
+				     uint64_t ta_bin_mc,
+				     uint32_t ta_bin_size,
+				     uint64_t ta_shared_mc,
+				     uint32_t ta_shared_size)
 {
-        cmd->cmd_id = GFX_CMD_ID_LOAD_TA;
-        cmd->cmd.cmd_load_ta.app_phy_addr_lo = lower_32_bits(xgmi_ta_mc);
-        cmd->cmd.cmd_load_ta.app_phy_addr_hi = upper_32_bits(xgmi_ta_mc);
-        cmd->cmd.cmd_load_ta.app_len = xgmi_ta_size;
+	cmd->cmd_id 				= GFX_CMD_ID_LOAD_TA;
+	cmd->cmd.cmd_load_ta.app_phy_addr_lo 	= lower_32_bits(ta_bin_mc);
+	cmd->cmd.cmd_load_ta.app_phy_addr_hi 	= upper_32_bits(ta_bin_mc);
+	cmd->cmd.cmd_load_ta.app_len 		= ta_bin_size;
 
-        cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_lo = lower_32_bits(xgmi_mc_shared);
-        cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_hi = upper_32_bits(xgmi_mc_shared);
-        cmd->cmd.cmd_load_ta.cmd_buf_len = shared_size;
+	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_lo = lower_32_bits(ta_shared_mc);
+	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_hi = upper_32_bits(ta_shared_mc);
+	cmd->cmd.cmd_load_ta.cmd_buf_len 	 = ta_shared_size;
 }
 
 static int psp_xgmi_init_shared_buf(struct psp_context *psp)
@@ -454,6 +456,36 @@ static int psp_xgmi_init_shared_buf(struct psp_context *psp)
 				      &psp->xgmi_context.xgmi_shared_bo,
 				      &psp->xgmi_context.xgmi_shared_mc_addr,
 				      &psp->xgmi_context.xgmi_shared_buf);
+
+	return ret;
+}
+
+static void psp_prep_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
+				       uint32_t ta_cmd_id,
+				       uint32_t session_id)
+{
+	cmd->cmd_id 				= GFX_CMD_ID_INVOKE_CMD;
+	cmd->cmd.cmd_invoke_cmd.session_id 	= session_id;
+	cmd->cmd.cmd_invoke_cmd.ta_cmd_id 	= ta_cmd_id;
+}
+
+int psp_ta_invoke(struct psp_context *psp,
+		  uint32_t ta_cmd_id,
+		  uint32_t session_id)
+{
+	int ret;
+	struct psp_gfx_cmd_resp *cmd;
+
+	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
+	if (!cmd)
+		return -ENOMEM;
+
+	psp_prep_ta_invoke_cmd_buf(cmd, ta_cmd_id, session_id);
+
+	ret = psp_cmd_submit_buf(psp, NULL, cmd,
+				 psp->fence_buf_mc_addr);
+
+	kfree(cmd);
 
 	return ret;
 }
@@ -474,9 +506,11 @@ static int psp_xgmi_load(struct psp_context *psp)
 	memset(psp->fw_pri_buf, 0, PSP_1_MEG);
 	memcpy(psp->fw_pri_buf, psp->ta_xgmi_start_addr, psp->ta_xgmi_ucode_size);
 
-	psp_prep_xgmi_ta_load_cmd_buf(cmd, psp->fw_pri_mc_addr,
-				      psp->xgmi_context.xgmi_shared_mc_addr,
-				      psp->ta_xgmi_ucode_size, PSP_XGMI_SHARED_MEM_SIZE);
+	psp_prep_ta_load_cmd_buf(cmd,
+				 psp->fw_pri_mc_addr,
+				 psp->ta_xgmi_ucode_size,
+				 psp->xgmi_context.xgmi_shared_mc_addr,
+				 PSP_XGMI_SHARED_MEM_SIZE);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 				 psp->fence_buf_mc_addr);
@@ -489,13 +523,6 @@ static int psp_xgmi_load(struct psp_context *psp)
 	kfree(cmd);
 
 	return ret;
-}
-
-static void psp_prep_xgmi_ta_unload_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					    uint32_t xgmi_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_UNLOAD_TA;
-	cmd->cmd.cmd_unload_ta.session_id = xgmi_session_id;
 }
 
 static int psp_xgmi_unload(struct psp_context *psp)
@@ -511,7 +538,7 @@ static int psp_xgmi_unload(struct psp_context *psp)
 	if (!cmd)
 		return -ENOMEM;
 
-	psp_prep_xgmi_ta_unload_cmd_buf(cmd, psp->xgmi_context.session_id);
+	psp_prep_ta_unload_cmd_buf(cmd, psp->xgmi_context.session_id);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 				 psp->fence_buf_mc_addr);
@@ -521,35 +548,9 @@ static int psp_xgmi_unload(struct psp_context *psp)
 	return ret;
 }
 
-static void psp_prep_xgmi_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					    uint32_t ta_cmd_id,
-					    uint32_t xgmi_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_INVOKE_CMD;
-	cmd->cmd.cmd_invoke_cmd.session_id = xgmi_session_id;
-	cmd->cmd.cmd_invoke_cmd.ta_cmd_id = ta_cmd_id;
-	/* Note: cmd_invoke_cmd.buf is not used for now */
-}
-
 int psp_xgmi_invoke(struct psp_context *psp, uint32_t ta_cmd_id)
 {
-	int ret;
-	struct psp_gfx_cmd_resp *cmd;
-
-
-	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	psp_prep_xgmi_ta_invoke_cmd_buf(cmd, ta_cmd_id,
-					psp->xgmi_context.session_id);
-
-	ret = psp_cmd_submit_buf(psp, NULL, cmd,
-				 psp->fence_buf_mc_addr);
-
-	kfree(cmd);
-
-        return ret;
+	return psp_ta_invoke(psp, ta_cmd_id, psp->xgmi_context.session_id);
 }
 
 static int psp_xgmi_terminate(struct psp_context *psp)
@@ -605,20 +606,6 @@ static int psp_xgmi_initialize(struct psp_context *psp)
 }
 
 // ras begin
-static void psp_prep_ras_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-		uint64_t ras_ta_mc, uint64_t ras_mc_shared,
-		uint32_t ras_ta_size, uint32_t shared_size)
-{
-	cmd->cmd_id = GFX_CMD_ID_LOAD_TA;
-	cmd->cmd.cmd_load_ta.app_phy_addr_lo = lower_32_bits(ras_ta_mc);
-	cmd->cmd.cmd_load_ta.app_phy_addr_hi = upper_32_bits(ras_ta_mc);
-	cmd->cmd.cmd_load_ta.app_len = ras_ta_size;
-
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_lo = lower_32_bits(ras_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_hi = upper_32_bits(ras_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_len = shared_size;
-}
-
 static int psp_ras_init_shared_buf(struct psp_context *psp)
 {
 	int ret;
@@ -654,9 +641,11 @@ static int psp_ras_load(struct psp_context *psp)
 	memset(psp->fw_pri_buf, 0, PSP_1_MEG);
 	memcpy(psp->fw_pri_buf, psp->ta_ras_start_addr, psp->ta_ras_ucode_size);
 
-	psp_prep_ras_ta_load_cmd_buf(cmd, psp->fw_pri_mc_addr,
-			psp->ras.ras_shared_mc_addr,
-			psp->ta_ras_ucode_size, PSP_RAS_SHARED_MEM_SIZE);
+	psp_prep_ta_load_cmd_buf(cmd,
+				 psp->fw_pri_mc_addr,
+				 psp->ta_ras_ucode_size,
+				 psp->ras.ras_shared_mc_addr,
+				 PSP_RAS_SHARED_MEM_SIZE);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 			psp->fence_buf_mc_addr);
@@ -669,13 +658,6 @@ static int psp_ras_load(struct psp_context *psp)
 	kfree(cmd);
 
 	return ret;
-}
-
-static void psp_prep_ras_ta_unload_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-						uint32_t ras_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_UNLOAD_TA;
-	cmd->cmd.cmd_unload_ta.session_id = ras_session_id;
 }
 
 static int psp_ras_unload(struct psp_context *psp)
@@ -693,7 +675,7 @@ static int psp_ras_unload(struct psp_context *psp)
 	if (!cmd)
 		return -ENOMEM;
 
-	psp_prep_ras_ta_unload_cmd_buf(cmd, psp->ras.session_id);
+	psp_prep_ta_unload_cmd_buf(cmd, psp->ras.session_id);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 			psp->fence_buf_mc_addr);
@@ -703,40 +685,15 @@ static int psp_ras_unload(struct psp_context *psp)
 	return ret;
 }
 
-static void psp_prep_ras_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-		uint32_t ta_cmd_id,
-		uint32_t ras_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_INVOKE_CMD;
-	cmd->cmd.cmd_invoke_cmd.session_id = ras_session_id;
-	cmd->cmd.cmd_invoke_cmd.ta_cmd_id = ta_cmd_id;
-	/* Note: cmd_invoke_cmd.buf is not used for now */
-}
-
 int psp_ras_invoke(struct psp_context *psp, uint32_t ta_cmd_id)
 {
-	int ret;
-	struct psp_gfx_cmd_resp *cmd;
-
 	/*
 	 * TODO: bypass the loading in sriov for now
 	 */
 	if (amdgpu_sriov_vf(psp->adev))
 		return 0;
 
-	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	psp_prep_ras_ta_invoke_cmd_buf(cmd, ta_cmd_id,
-			psp->ras.session_id);
-
-	ret = psp_cmd_submit_buf(psp, NULL, cmd,
-			psp->fence_buf_mc_addr);
-
-	kfree(cmd);
-
-	return ret;
+	return psp_ta_invoke(psp, ta_cmd_id, psp->ras.session_id);
 }
 
 int psp_ras_enable_features(struct psp_context *psp,
@@ -823,24 +780,6 @@ static int psp_ras_initialize(struct psp_context *psp)
 // ras end
 
 // HDCP start
-static void psp_prep_hdcp_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					  uint64_t hdcp_ta_mc,
-					  uint64_t hdcp_mc_shared,
-					  uint32_t hdcp_ta_size,
-					  uint32_t shared_size)
-{
-	cmd->cmd_id = GFX_CMD_ID_LOAD_TA;
-	cmd->cmd.cmd_load_ta.app_phy_addr_lo = lower_32_bits(hdcp_ta_mc);
-	cmd->cmd.cmd_load_ta.app_phy_addr_hi = upper_32_bits(hdcp_ta_mc);
-	cmd->cmd.cmd_load_ta.app_len = hdcp_ta_size;
-
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_lo =
-		lower_32_bits(hdcp_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_hi =
-		upper_32_bits(hdcp_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_len = shared_size;
-}
-
 static int psp_hdcp_init_shared_buf(struct psp_context *psp)
 {
 	int ret;
@@ -877,10 +816,11 @@ static int psp_hdcp_load(struct psp_context *psp)
 	memcpy(psp->fw_pri_buf, psp->ta_hdcp_start_addr,
 	       psp->ta_hdcp_ucode_size);
 
-	psp_prep_hdcp_ta_load_cmd_buf(cmd, psp->fw_pri_mc_addr,
-				      psp->hdcp_context.hdcp_shared_mc_addr,
-				      psp->ta_hdcp_ucode_size,
-				      PSP_HDCP_SHARED_MEM_SIZE);
+	psp_prep_ta_load_cmd_buf(cmd,
+				 psp->fw_pri_mc_addr,
+				 psp->ta_hdcp_ucode_size,
+				 psp->hdcp_context.hdcp_shared_mc_addr,
+				 PSP_HDCP_SHARED_MEM_SIZE);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
 
@@ -921,12 +861,6 @@ static int psp_hdcp_initialize(struct psp_context *psp)
 
 	return 0;
 }
-static void psp_prep_hdcp_ta_unload_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					    uint32_t hdcp_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_UNLOAD_TA;
-	cmd->cmd.cmd_unload_ta.session_id = hdcp_session_id;
-}
 
 static int psp_hdcp_unload(struct psp_context *psp)
 {
@@ -943,7 +877,7 @@ static int psp_hdcp_unload(struct psp_context *psp)
 	if (!cmd)
 		return -ENOMEM;
 
-	psp_prep_hdcp_ta_unload_cmd_buf(cmd, psp->hdcp_context.session_id);
+	psp_prep_ta_unload_cmd_buf(cmd, psp->hdcp_context.session_id);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
 
@@ -952,39 +886,15 @@ static int psp_hdcp_unload(struct psp_context *psp)
 	return ret;
 }
 
-static void psp_prep_hdcp_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					    uint32_t ta_cmd_id,
-					    uint32_t hdcp_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_INVOKE_CMD;
-	cmd->cmd.cmd_invoke_cmd.session_id = hdcp_session_id;
-	cmd->cmd.cmd_invoke_cmd.ta_cmd_id = ta_cmd_id;
-	/* Note: cmd_invoke_cmd.buf is not used for now */
-}
-
 int psp_hdcp_invoke(struct psp_context *psp, uint32_t ta_cmd_id)
 {
-	int ret;
-	struct psp_gfx_cmd_resp *cmd;
-
 	/*
 	 * TODO: bypass the loading in sriov for now
 	 */
 	if (amdgpu_sriov_vf(psp->adev))
 		return 0;
 
-	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	psp_prep_hdcp_ta_invoke_cmd_buf(cmd, ta_cmd_id,
-					psp->hdcp_context.session_id);
-
-	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
-
-	kfree(cmd);
-
-	return ret;
+	return psp_ta_invoke(psp, ta_cmd_id, psp->hdcp_context.session_id);
 }
 
 static int psp_hdcp_terminate(struct psp_context *psp)
@@ -1016,22 +926,6 @@ static int psp_hdcp_terminate(struct psp_context *psp)
 // HDCP end
 
 // DTM start
-static void psp_prep_dtm_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					 uint64_t dtm_ta_mc,
-					 uint64_t dtm_mc_shared,
-					 uint32_t dtm_ta_size,
-					 uint32_t shared_size)
-{
-	cmd->cmd_id = GFX_CMD_ID_LOAD_TA;
-	cmd->cmd.cmd_load_ta.app_phy_addr_lo = lower_32_bits(dtm_ta_mc);
-	cmd->cmd.cmd_load_ta.app_phy_addr_hi = upper_32_bits(dtm_ta_mc);
-	cmd->cmd.cmd_load_ta.app_len = dtm_ta_size;
-
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_lo = lower_32_bits(dtm_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_phy_addr_hi = upper_32_bits(dtm_mc_shared);
-	cmd->cmd.cmd_load_ta.cmd_buf_len = shared_size;
-}
-
 static int psp_dtm_init_shared_buf(struct psp_context *psp)
 {
 	int ret;
@@ -1067,10 +961,11 @@ static int psp_dtm_load(struct psp_context *psp)
 	memset(psp->fw_pri_buf, 0, PSP_1_MEG);
 	memcpy(psp->fw_pri_buf, psp->ta_dtm_start_addr, psp->ta_dtm_ucode_size);
 
-	psp_prep_dtm_ta_load_cmd_buf(cmd, psp->fw_pri_mc_addr,
-				     psp->dtm_context.dtm_shared_mc_addr,
-				     psp->ta_dtm_ucode_size,
-				     PSP_DTM_SHARED_MEM_SIZE);
+	psp_prep_ta_load_cmd_buf(cmd,
+				 psp->fw_pri_mc_addr,
+				 psp->ta_dtm_ucode_size,
+				 psp->dtm_context.dtm_shared_mc_addr,
+				 PSP_DTM_SHARED_MEM_SIZE);
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
 
@@ -1113,39 +1008,15 @@ static int psp_dtm_initialize(struct psp_context *psp)
 	return 0;
 }
 
-static void psp_prep_dtm_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
-					   uint32_t ta_cmd_id,
-					   uint32_t dtm_session_id)
-{
-	cmd->cmd_id = GFX_CMD_ID_INVOKE_CMD;
-	cmd->cmd.cmd_invoke_cmd.session_id = dtm_session_id;
-	cmd->cmd.cmd_invoke_cmd.ta_cmd_id = ta_cmd_id;
-	/* Note: cmd_invoke_cmd.buf is not used for now */
-}
-
 int psp_dtm_invoke(struct psp_context *psp, uint32_t ta_cmd_id)
 {
-	int ret;
-	struct psp_gfx_cmd_resp *cmd;
-
 	/*
 	 * TODO: bypass the loading in sriov for now
 	 */
 	if (amdgpu_sriov_vf(psp->adev))
 		return 0;
 
-	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-
-	psp_prep_dtm_ta_invoke_cmd_buf(cmd, ta_cmd_id,
-				       psp->dtm_context.session_id);
-
-	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
-
-	kfree(cmd);
-
-	return ret;
+	return psp_ta_invoke(psp, ta_cmd_id, psp->dtm_context.session_id);
 }
 
 static int psp_dtm_terminate(struct psp_context *psp)
@@ -1448,7 +1319,8 @@ out:
                     || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_G
 	            || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_CNTL
 	            || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_GPM_MEM
-	            || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM))
+	            || ucode->ucode_id == AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM
+	            || ucode->ucode_id == AMDGPU_UCODE_ID_SMC))
 			/*skip ucode loading in SRIOV VF */
 			continue;
 
@@ -1466,7 +1338,7 @@ out:
 
 		/* Start rlc autoload after psp recieved all the gfx firmware */
 		if (psp->autoload_supported && ucode->ucode_id == (amdgpu_sriov_vf(adev) ?
-		    AMDGPU_UCODE_ID_CP_MEC2 : AMDGPU_UCODE_ID_RLC_RESTORE_LIST_SRM_MEM)) {
+		    AMDGPU_UCODE_ID_CP_MEC2 : AMDGPU_UCODE_ID_RLC_G)) {
 			ret = psp_rlc_autoload(psp);
 			if (ret) {
 				DRM_ERROR("Failed to start rlc autoload\n");

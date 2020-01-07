@@ -356,6 +356,35 @@ int smu_get_dpm_level_count(struct smu_context *smu, enum smu_clk_type clk_type,
 	return smu_get_dpm_freq_by_index(smu, clk_type, 0xff, value);
 }
 
+int smu_get_dpm_level_range(struct smu_context *smu, enum smu_clk_type clk_type,
+			    uint32_t *min_value, uint32_t *max_value)
+{
+	int ret = 0;
+	uint32_t level_count = 0;
+
+	if (!min_value && !max_value)
+		return -EINVAL;
+
+	if (min_value) {
+		/* by default, level 0 clock value as min value */
+		ret = smu_get_dpm_freq_by_index(smu, clk_type, 0, min_value);
+		if (ret)
+			return ret;
+	}
+
+	if (max_value) {
+		ret = smu_get_dpm_level_count(smu, clk_type, &level_count);
+		if (ret)
+			return ret;
+
+		ret = smu_get_dpm_freq_by_index(smu, clk_type, level_count - 1, max_value);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}
+
 bool smu_clk_dpm_is_enabled(struct smu_context *smu, enum smu_clk_type clk_type)
 {
 	enum smu_feature_mask feature_id = 0;
@@ -531,7 +560,7 @@ bool is_support_sw_smu(struct amdgpu_device *adev)
 	if (adev->asic_type == CHIP_VEGA20)
 		return (amdgpu_dpm == 2) ? true : false;
 	else if (adev->asic_type >= CHIP_ARCTURUS) {
-		if (amdgpu_sriov_vf(adev))
+		if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
 			return false;
 		else
 			return true;
@@ -643,12 +672,11 @@ int smu_feature_init_dpm(struct smu_context *smu)
 
 int smu_feature_is_enabled(struct smu_context *smu, enum smu_feature_mask mask)
 {
-	struct amdgpu_device *adev = smu->adev;
 	struct smu_feature *feature = &smu->smu_feature;
 	int feature_id;
 	int ret = 0;
 
-	if (adev->flags & AMD_IS_APU)
+	if (smu->is_apu)
 		return 1;
 
 	feature_id = smu_feature_get_index(smu, mask);
@@ -1062,28 +1090,27 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 	}
 
 	/* smu_dump_pptable(smu); */
+	if (!amdgpu_sriov_vf(adev)) {
+		/*
+		 * Copy pptable bo in the vram to smc with SMU MSGs such as
+		 * SetDriverDramAddr and TransferTableDram2Smu.
+		 */
+		ret = smu_write_pptable(smu);
+		if (ret)
+			return ret;
 
-	/*
-	 * Copy pptable bo in the vram to smc with SMU MSGs such as
-	 * SetDriverDramAddr and TransferTableDram2Smu.
-	 */
-	ret = smu_write_pptable(smu);
-	if (ret)
-		return ret;
+		/* issue Run*Btc msg */
+		ret = smu_run_btc(smu);
+		if (ret)
+			return ret;
+		ret = smu_feature_set_allowed_mask(smu);
+		if (ret)
+			return ret;
 
-	/* issue Run*Btc msg */
-	ret = smu_run_btc(smu);
-	if (ret)
-		return ret;
-
-	ret = smu_feature_set_allowed_mask(smu);
-	if (ret)
-		return ret;
-
-	ret = smu_system_features_control(smu, true);
-	if (ret)
-		return ret;
-
+		ret = smu_system_features_control(smu, true);
+		if (ret)
+			return ret;
+	}
 	if (adev->asic_type != CHIP_ARCTURUS) {
 		ret = smu_notify_display_change(smu);
 		if (ret)
@@ -1136,8 +1163,9 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 	/*
 	 * Set PMSTATUSLOG table bo address with SetToolsDramAddr MSG for tools.
 	 */
-	ret = smu_set_tool_table_location(smu);
-
+	if (!amdgpu_sriov_vf(adev)) {
+		ret = smu_set_tool_table_location(smu);
+	}
 	if (!smu_is_dpm_running(smu))
 		pr_info("dpm has been disabled\n");
 
@@ -1242,12 +1270,15 @@ static int smu_hw_init(void *handle)
 		return ret;
 	}
 
-	if (adev->flags & AMD_IS_APU) {
+	if (smu->is_apu) {
 		smu_powergate_sdma(&adev->smu, false);
 		smu_powergate_vcn(&adev->smu, false);
 		smu_powergate_jpeg(&adev->smu, false);
 		smu_set_gfx_cgpg(&adev->smu, true);
 	}
+
+	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
+		return 0;
 
 	if (!smu->pm_enabled)
 		return 0;
@@ -1291,7 +1322,7 @@ failed:
 
 static int smu_stop_dpms(struct smu_context *smu)
 {
-	return smu_send_smc_msg(smu, SMU_MSG_DisableAllSmuFeatures);
+	return smu_system_features_control(smu, false);
 }
 
 static int smu_hw_fini(void *handle)
@@ -1301,36 +1332,41 @@ static int smu_hw_fini(void *handle)
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret = 0;
 
-	if (adev->flags & AMD_IS_APU) {
+	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
+		return 0;
+
+	if (smu->is_apu) {
 		smu_powergate_sdma(&adev->smu, true);
 		smu_powergate_vcn(&adev->smu, true);
 		smu_powergate_jpeg(&adev->smu, true);
 	}
 
-	ret = smu_stop_thermal_control(smu);
-	if (ret) {
-		pr_warn("Fail to stop thermal control!\n");
-		return ret;
-	}
-
-	/*
-	 * For custom pptable uploading, skip the DPM features
-	 * disable process on Navi1x ASICs.
-	 *   - As the gfx related features are under control of
-	 *     RLC on those ASICs. RLC reinitialization will be
-	 *     needed to reenable them. That will cost much more
-	 *     efforts.
-	 *
-	 *   - SMU firmware can handle the DPM reenablement
-	 *     properly.
-	 */
-	if (!smu->uploading_custom_pp_table ||
-	    !((adev->asic_type >= CHIP_NAVI10) &&
-	      (adev->asic_type <= CHIP_NAVI12))) {
-		ret = smu_stop_dpms(smu);
+	if (!amdgpu_sriov_vf(adev)){
+		ret = smu_stop_thermal_control(smu);
 		if (ret) {
-			pr_warn("Fail to stop Dpms!\n");
+			pr_warn("Fail to stop thermal control!\n");
 			return ret;
+		}
+
+		/*
+		 * For custom pptable uploading, skip the DPM features
+		 * disable process on Navi1x ASICs.
+		 *   - As the gfx related features are under control of
+		 *     RLC on those ASICs. RLC reinitialization will be
+		 *     needed to reenable them. That will cost much more
+		 *     efforts.
+		 *
+		 *   - SMU firmware can handle the DPM reenablement
+		 *     properly.
+		 */
+		if (!smu->uploading_custom_pp_table ||
+				!((adev->asic_type >= CHIP_NAVI10) &&
+					(adev->asic_type <= CHIP_NAVI12))) {
+			ret = smu_stop_dpms(smu);
+			if (ret) {
+				pr_warn("Fail to stop Dpms!\n");
+				return ret;
+			}
 		}
 	}
 
@@ -1377,7 +1413,7 @@ static int smu_suspend(void *handle)
 	struct smu_context *smu = &adev->smu;
 	bool baco_feature_is_enabled = false;
 
-	if(!(adev->flags & AMD_IS_APU))
+	if(!smu->is_apu)
 		baco_feature_is_enabled = smu_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT);
 
 	ret = smu_system_features_control(smu, false);
@@ -1408,6 +1444,12 @@ static int smu_resume(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
+
+	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
+		return 0;
+
+	if (!smu->pm_enabled)
+		return 0;
 
 	pr_info("SMU is resuming...\n");
 
@@ -1905,8 +1947,14 @@ int smu_write_watermarks_table(struct smu_context *smu)
 int smu_set_watermarks_for_clock_ranges(struct smu_context *smu,
 		struct dm_pp_wm_sets_with_clock_ranges_soc15 *clock_ranges)
 {
-	struct smu_table *watermarks = &smu->smu_table.tables[SMU_TABLE_WATERMARKS];
-	void *table = watermarks->cpu_addr;
+	struct smu_table *watermarks;
+	void *table;
+
+	if (!smu->smu_table.tables)
+		return 0;
+
+	watermarks = &smu->smu_table.tables[SMU_TABLE_WATERMARKS];
+	table = watermarks->cpu_addr;
 
 	mutex_lock(&smu->mutex);
 
@@ -2245,12 +2293,8 @@ int smu_set_active_display_count(struct smu_context *smu, uint32_t count)
 {
 	int ret = 0;
 
-	mutex_lock(&smu->mutex);
-
 	if (smu->ppt_funcs->set_active_display_count)
 		ret = smu->ppt_funcs->set_active_display_count(smu, count);
-
-	mutex_unlock(&smu->mutex);
 
 	return ret;
 }
@@ -2398,7 +2442,7 @@ bool smu_baco_is_support(struct smu_context *smu)
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->baco_is_support)
+	if (smu->ppt_funcs && smu->ppt_funcs->baco_is_support)
 		ret = smu->ppt_funcs->baco_is_support(smu);
 
 	mutex_unlock(&smu->mutex);
