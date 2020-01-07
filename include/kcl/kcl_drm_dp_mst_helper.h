@@ -15,4 +15,34 @@ int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 }
 #define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
 #endif
+
+#if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
+static inline
+int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
+				  struct drm_dp_mst_topology_mgr *mgr,
+				  struct drm_dp_mst_port *port, int pbn,
+				  int pbn_div)
+{
+	int pbn_backup;
+	int req_slots;
+
+	if (pbn_div > 0) {
+		pbn_backup = mgr->pbn_div;
+		mgr->pbn_div = pbn_div;
+	} else {
+		pbn_div = mgr->pbn_div;
+	}
+
+	req_slots = DIV_ROUND_UP(pbn, pbn_div);
+
+	drm_dp_atomic_find_vcpi_slots(state, mgr, port, pbn);
+
+	if (pbn_div > 0)
+		mgr->pbn_div = pbn_backup;
+
+	return req_slots;
+}
+#define drm_dp_atomic_find_vcpi_slots _kcl_drm_dp_atomic_find_vcpi_slots
+#endif
+
 #endif
