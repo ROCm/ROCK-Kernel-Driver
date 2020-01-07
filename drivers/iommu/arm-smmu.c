@@ -2219,10 +2219,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	for (i = 0; i < num_irqs; ++i) {
 		int irq = platform_get_irq(pdev, i);
 
-		if (irq < 0) {
-			dev_err(dev, "failed to get irq index %d\n", i);
+		if (irq < 0)
 			return -ENODEV;
-		}
 		smmu->irqs[i] = irq;
 	}
 
