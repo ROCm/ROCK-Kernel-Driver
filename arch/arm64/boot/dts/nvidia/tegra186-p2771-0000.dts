@@ -7,7 +7,7 @@
 #include "tegra186-p3310.dtsi"
 
 / {
-	model = "NVIDIA Jetson TX2 Developer Kit dtb:next-20190925+sram-fix-2";
+	model = "NVIDIA Jetson TX2 Developer Kit";
 	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
 
 	aconnect {
