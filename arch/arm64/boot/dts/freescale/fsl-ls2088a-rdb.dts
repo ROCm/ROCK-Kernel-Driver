@@ -15,7 +15,7 @@
 #include "fsl-ls208xa-rdb.dtsi"
 
 / {
-	model = "Freescale Layerscape 2088A RDB Board";
+	model = "Freescale Layerscape 2088A RDB Board dtb:next-20200107";
 	compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
 
 	chosen {
