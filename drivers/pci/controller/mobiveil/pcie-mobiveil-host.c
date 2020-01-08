@@ -507,6 +507,9 @@ static int mobiveil_pcie_interrupt_init(struct mobiveil_pcie *pcie)
 	struct resource *res;
 	int ret;
 
+	if (rp->ops->interrupt_init)
+		return rp->ops->interrupt_init(pcie);
+
 	/* map MSI config resource */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "apb_csr");
 	pcie->apb_csr_base = devm_pci_remap_cfg_resource(dev, res);
