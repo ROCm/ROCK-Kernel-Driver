@@ -1279,6 +1279,25 @@ void dcn20_pipe_control_lock(
 			}
 	}
 
+	if (flip_immediate && lock) {
+		const int TIMEOUT_FOR_FLIP_PENDING = 100000;
+		int i;
+
+		for (i = 0; i < TIMEOUT_FOR_FLIP_PENDING; ++i) {
+			if (!pipe->plane_res.hubp->funcs->hubp_is_flip_pending(pipe->plane_res.hubp))
+				break;
+			udelay(1);
+		}
+
+		if (pipe->bottom_pipe != NULL) {
+			for (i = 0; i < TIMEOUT_FOR_FLIP_PENDING; ++i) {
+				if (!pipe->bottom_pipe->plane_res.hubp->funcs->hubp_is_flip_pending(pipe->bottom_pipe->plane_res.hubp))
+					break;
+				udelay(1);
+			}
+		}
+	}
+
 	/* In flip immediate and pipe splitting case, we need to use GSL
 	 * for synchronization. Only do setup on locking and on flip type change.
 	 */
