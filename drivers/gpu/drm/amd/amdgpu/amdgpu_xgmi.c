@@ -387,7 +387,7 @@ int amdgpu_xgmi_set_pstate(struct amdgpu_device *adev, int pstate)
 	bool update_hive_pstate = true;
 	bool is_high_pstate = pstate && adev->asic_type == CHIP_VEGA20;
 
-	if (!hive)
+	if (!hive || adev->asic_type == CHIP_VEGA20)
 		return 0;
 
 	mutex_lock(&hive->hive_lock);
