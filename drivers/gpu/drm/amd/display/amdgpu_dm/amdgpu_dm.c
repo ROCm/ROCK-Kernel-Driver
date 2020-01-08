@@ -6791,7 +6791,9 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 					    struct dc_state *dc_state,
 					    struct dsc_mst_fairness_vars *vars)
@@ -6867,6 +6869,8 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 	}
 	return 0;
 }
+#endif
+#endif
 #endif
 
 static int to_drm_connector_type(enum signal_type st)
@@ -10204,11 +10208,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			goto fail;
 		}
 
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context, vars);
 		if (ret) {
 			DRM_DEBUG_DRIVER("dm_update_mst_vcpi_slots_for_dsc() failed\n");
 			goto fail;
 		}
+#endif
 #endif
 
 		/*
@@ -10218,11 +10224,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * to get stuck in an infinite loop and hang eventually.
 		 */
 #ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = drm_dp_mst_atomic_check(state);
 		if (ret) {
 			DRM_DEBUG_DRIVER("drm_dp_mst_atomic_check() failed\n");
 			goto fail;
 		}
+#endif
 #endif
 		status = dc_validate_global_state(dc, dm_state->context, true);
 		if (status != DC_OK) {
