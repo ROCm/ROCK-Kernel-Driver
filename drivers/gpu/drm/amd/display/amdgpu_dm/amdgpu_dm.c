@@ -5930,7 +5930,9 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 					    struct dc_state *dc_state)
 {
@@ -5993,6 +5995,8 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 	}
 	return 0;
 }
+#endif
+#endif
 #endif
 
 static void dm_drm_plane_reset(struct drm_plane *plane)
@@ -9540,9 +9544,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (!compute_mst_dsc_configs_for_state(state, dm_state->context))
 			goto fail;
 
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context);
 		if (ret)
 			goto fail;
+#endif
 #endif
 
 		/*
