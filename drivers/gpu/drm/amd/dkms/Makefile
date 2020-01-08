@@ -183,6 +183,7 @@ export OS_NAME OS_VERSION DKMS_INCLUDE_PREFIX
 
 export CONFIG_HSA_AMD=y
 export CONFIG_DRM_TTM=m
+export CONFIG_DRM_TTM_DMA_PAGE_POOL=y
 export CONFIG_DRM_AMDGPU=m
 export CONFIG_DRM_SCHED=m
 export BUILD_AS_DKMS=y
@@ -196,6 +197,7 @@ export CONFIG_DRM_AMD_DC_DCN2_0=y
 export CONFIG_DRM_AMD_DC_DCN2_1=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
+subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
 subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
