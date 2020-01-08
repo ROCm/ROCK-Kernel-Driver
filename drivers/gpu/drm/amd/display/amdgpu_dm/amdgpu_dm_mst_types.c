@@ -43,7 +43,9 @@
 
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 #include "dc/dcn20/dcn20_resource.h"
+#endif
 #endif
 
 /* #define TRACE_DPCD */
@@ -223,6 +225,7 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
@@ -248,6 +251,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 
 	return true;
 }
+#endif
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
@@ -296,10 +300,12 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 					connector, aconnector->edid);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 			if (!validate_dsc_caps_on_connector(aconnector))
 				memset(&aconnector->dc_sink->sink_dsc_caps,
 				       0, sizeof(aconnector->dc_sink->sink_dsc_caps));
+#endif
 #endif
 #endif
 		}
@@ -609,7 +615,9 @@ int dm_mst_get_pbn_divider(struct dc_link *link)
 			dc_link_get_link_cap(link)) / (8 * 1000 * 54);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
 	struct dc_sink *sink;
@@ -978,4 +986,6 @@ bool compute_mst_dsc_configs_for_state(struct drm_atomic_state *state,
 
 	return true;
 }
+#endif
+#endif
 #endif
