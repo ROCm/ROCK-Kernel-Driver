@@ -79,11 +79,11 @@ static void amdgpu_perf_start(struct perf_event *event, int flags)
 	case PERF_TYPE_AMDGPU_DF:
 		if (!(flags & PERF_EF_RELOAD))
 #if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
-		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
-		pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 0);
+			pe->adev->df.funcs->pmc_start(pe->adev, hwc->conf, 1);
+		pe->adev->df.funcs->pmc_start(pe->adev, hwc->conf, 0);
 #else
-		pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 1);
-		pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 0);
+			pe->adev->df.funcs->pmc_start(pe->adev, hwc->config, 1);
+		pe->adev->df.funcs->pmc_start(pe->adev, hwc->config, 0);
 #endif
 		break;
 	default:
@@ -110,10 +110,10 @@ static void amdgpu_perf_read(struct perf_event *event)
 		switch (pe->pmu_perf_type) {
 		case PERF_TYPE_AMDGPU_DF:
 #if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
-			pe->adev->df_funcs->pmc_get_count(pe->adev, hwc->conf,
+			pe->adev->df.funcs->pmc_get_count(pe->adev, hwc->conf,
 							  &count);
 #else
-			pe->adev->df_funcs->pmc_get_count(pe->adev, hwc->config,
+			pe->adev->df.funcs->pmc_get_count(pe->adev, hwc->config,
 							  &count);
 #endif
 			break;
@@ -140,9 +140,9 @@ static void amdgpu_perf_stop(struct perf_event *event, int flags)
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
 #if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
-		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 0);
+		pe->adev->df.funcs->pmc_stop(pe->adev, hwc->conf, 0);
 #else
-		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 0);
+		pe->adev->df.funcs->pmc_stop(pe->adev, hwc->config, 0);
 #endif
 		break;
 	default:
@@ -174,9 +174,9 @@ static int amdgpu_perf_add(struct perf_event *event, int flags)
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
 #if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
-		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->conf, 1);
+		retval = pe->adev->df.funcs->pmc_start(pe->adev, hwc->conf, 1);
 #else
-		retval = pe->adev->df_funcs->pmc_start(pe->adev, hwc->config, 1);
+		retval = pe->adev->df.funcs->pmc_start(pe->adev, hwc->config, 1);
 #endif
 		break;
 	default:
@@ -206,9 +206,9 @@ static void amdgpu_perf_del(struct perf_event *event, int flags)
 	switch (pe->pmu_perf_type) {
 	case PERF_TYPE_AMDGPU_DF:
 #if defined(HAVE_HW_PERF_EVENT_CONF_MEMBER)
-		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->conf, 1);
+		pe->adev->df.funcs->pmc_stop(pe->adev, hwc->conf, 1);
 #else
-		pe->adev->df_funcs->pmc_stop(pe->adev, hwc->config, 1);
+		pe->adev->df.funcs->pmc_stop(pe->adev, hwc->config, 1);
 #endif
 		break;
 	default:
