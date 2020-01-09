@@ -75,6 +75,11 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 	uint32_t sdma_rlc_reg_offset;
 
 	switch (engine_id) {
+	default:
+		dev_warn(adev->dev,
+			 "Invalid sdma engine id (%d), using engine id 0\n",
+			 engine_id);
+		/* fall through */
 	case 0:
 		sdma_engine_reg_base = SOC15_REG_OFFSET(SDMA0, 0,
 				mmSDMA0_RLC0_RB_CNTL) - mmSDMA0_RLC0_RB_CNTL;
@@ -106,8 +111,6 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 	case 7:
 		sdma_engine_reg_base = SOC15_REG_OFFSET(SDMA7, 0,
 				mmSDMA7_RLC0_RB_CNTL) - mmSDMA7_RLC0_RB_CNTL;
-		break;
-	default:
 		break;
 	}
 
