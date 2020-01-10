@@ -60,6 +60,7 @@ modules.builtin
 /System.map
 /Module.markers
 /modules.builtin.modinfo
+/modules.nsdeps
 
 #
 # RPM spec file (make rpm-pkg)
