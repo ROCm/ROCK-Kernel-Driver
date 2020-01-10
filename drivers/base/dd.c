@@ -808,6 +808,9 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
 	async_allowed = driver_allows_async_probing(drv);
 
 	if (async_allowed)
+		async_allowed = dev->p->async_probe_enabled;
+
+	if (async_allowed)
 		data->have_async = true;
 
 	if (data->check_async && async_allowed != data->want_async)
@@ -1038,7 +1041,8 @@ static int __driver_attach(struct device *dev, void *data)
 		return ret;
 	} /* ret > 0 means positive match */
 
-	if (driver_allows_async_probing(drv)) {
+	if (dev->p && dev->p->async_probe_enabled &&
+	    driver_allows_async_probing(drv)) {
 		/*
 		 * Instead of probing the device synchronously we will
 		 * probe it asynchronously to allow for more parallelism.

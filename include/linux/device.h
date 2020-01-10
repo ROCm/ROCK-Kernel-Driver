@@ -1390,6 +1390,7 @@ extern int device_move(struct device *dev, struct device *new_parent,
 extern const char *device_get_devnode(struct device *dev,
 				      umode_t *mode, kuid_t *uid, kgid_t *gid,
 				      const char **tmp);
+extern void dev_enable_async_probe(struct device *dev, bool enabled);
 
 static inline bool device_supports_offline(struct device *dev)
 {
