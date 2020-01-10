@@ -1079,6 +1079,9 @@ static int scsi_probe_and_add_lun(struct scsi_target *starget,
 	if (!sdev)
 		goto out;
 
+	dev_enable_async_probe(&sdev->sdev_gendev,
+			       shost->async_device_scan);
+
 	result = kmalloc(result_len, GFP_KERNEL |
 			((shost->unchecked_isa_dma) ? __GFP_DMA : 0));
 	if (!result)

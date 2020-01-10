@@ -3442,3 +3442,14 @@ int device_match_fwnode(struct device *dev, const void *fwnode)
 	return dev_fwnode(dev) == fwnode;
 }
 EXPORT_SYMBOL_GPL(device_match_fwnode);
+
+void dev_enable_async_probe(struct device *dev, bool enabled)
+{
+	if (!dev->p) {
+		if (device_private_init(dev))
+			return;
+	}
+	if (dev->p)
+		dev->p->async_probe_enabled = enabled;
+}
+EXPORT_SYMBOL_GPL(dev_enable_async_probe);
