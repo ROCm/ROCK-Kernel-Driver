@@ -1123,7 +1123,8 @@ int amdgpu_dpm_switch_power_profile(struct amdgpu_device *adev,
 		ret = smu_switch_power_profile(&adev->smu, type, en);
 	else if (adev->powerplay.pp_funcs &&
 		 adev->powerplay.pp_funcs->switch_power_profile)
-		ret = adev->powerplay.pp_funcs->switch_power_profile(adev, type, en);
+		ret = adev->powerplay.pp_funcs->switch_power_profile(
+			adev->powerplay.pp_handle, type, en);
 
 	return ret;
 }
