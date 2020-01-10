@@ -98,7 +98,7 @@ __modpost: $(if $(KBUILD_MODPOST_NOFINAL), $(modules:.ko:.o),$(modules))
 	@:
 
 MODPOST += $(subst -i,-n,$(filter -i,$(MAKEFLAGS))) -s -T - \
- 		  $(if $(KBUILD_NSDEPS),-d modules.nsdeps) $(wildcard vmlinux)
+ 		  $(if $(KBUILD_NSDEPS),-d $(MODULES_NSDEPS)) $(wildcard vmlinux)
 
 # We can go over command line length here, so be careful.
 quiet_cmd_modpost = MODPOST $(words $(modules)) modules

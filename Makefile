@@ -1011,6 +1011,7 @@ endif
 PHONY += prepare0
 
 export MODORDER := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD)/)modules.order
+export MODULES_NSDEPS := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD)/)modules.nsdeps
 
 suse_version_h := include/generated/uapi/linux/suse_version.h
 
@@ -1666,7 +1667,7 @@ PHONY += $(clean-dirs) clean
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-clean: rm-files := $(KBUILD_EXTMOD)/Module.symvers
+clean: rm-files := $(KBUILD_EXTMOD)/Module.symvers $(KBUILD_EXTMOD)/modules.nsdeps
 
 PHONY += help
 help:
