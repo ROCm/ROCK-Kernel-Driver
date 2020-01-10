@@ -29,13 +29,9 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 	if (pbn_div > 0) {
 		pbn_backup = mgr->pbn_div;
 		mgr->pbn_div = pbn_div;
-	} else {
-		pbn_div = mgr->pbn_div;
 	}
 
-	req_slots = DIV_ROUND_UP(pbn, pbn_div);
-
-	drm_dp_atomic_find_vcpi_slots(state, mgr, port, pbn);
+	req_slots = drm_dp_atomic_find_vcpi_slots(state, mgr, port, pbn);
 
 	if (pbn_div > 0)
 		mgr->pbn_div = pbn_backup;
