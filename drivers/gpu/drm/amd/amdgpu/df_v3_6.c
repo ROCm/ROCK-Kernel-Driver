@@ -264,7 +264,7 @@ static DEVICE_ATTR(df_cntr_avail, S_IRUGO, df_v3_6_get_df_cntr_avail, NULL);
 
 static void df_v3_6_query_hashes(struct amdgpu_device *adev)
 {
-	u32 chan_cfg, tmp;
+	u32 tmp;
 
 	adev->df.hash_status.hash_64k = false;
 	adev->df.hash_status.hash_2m = false;
