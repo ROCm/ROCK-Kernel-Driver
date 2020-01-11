@@ -71,7 +71,7 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 				unsigned int engine_id,
 				unsigned int queue_id)
 {
-	uint32_t sdma_engine_reg_base;
+	uint32_t sdma_engine_reg_base = 0;
 	uint32_t sdma_rlc_reg_offset;
 
 	switch (engine_id) {
