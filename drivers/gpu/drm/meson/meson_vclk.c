@@ -635,12 +635,17 @@ static bool meson_hdmi_pll_validate_params(struct meson_drm *priv,
 		if (frac >= HDMI_FRAC_MAX_GXBB)
 			return false;
 	} else if (meson_vpu_is_compatible(priv, "amlogic,meson-gxm-vpu") ||
-		   meson_vpu_is_compatible(priv, "amlogic,meson-gxl-vpu") ||
-		   meson_vpu_is_compatible(priv, "amlogic,meson-g12a-vpu")) {
+		   meson_vpu_is_compatible(priv, "amlogic,meson-gxl-vpu")) {
 		/* Empiric supported min/max dividers */
 		if (m < 106 || m > 247)
 			return false;
 		if (frac >= HDMI_FRAC_MAX_GXL)
+			return false;
+	} else if (meson_vpu_is_compatible(priv, "amlogic,meson-g12a-vpu")) {
+		/* Empiric supported min/max dividers */
+		if (m < 106 || m > 247)
+			return false;
+		if (frac >= HDMI_FRAC_MAX_G12A)
 			return false;
 	}
 
