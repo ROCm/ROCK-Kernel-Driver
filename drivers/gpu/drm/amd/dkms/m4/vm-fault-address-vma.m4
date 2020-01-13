@@ -1,5 +1,5 @@
 dnl #
-dnl # commit 82b0f8c39a3869b6fd2a10e180a862248736ec6f
+dnl # commit v4.9-7746-g82b0f8c39a38
 dnl # mm: join struct fault_env and vm_fault
 dnl #
 AC_DEFUN([AC_AMDGPU_VM_FAULT_ADDRESS_VMA],

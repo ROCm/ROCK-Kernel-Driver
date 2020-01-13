@@ -1,5 +1,5 @@
 dnl #
-dnl # commit 34c0fd540e79fb49ef9ce864dae1058cca265780
+dnl # commit v4.4-6466-g34c0fd540e79
 dnl # mm, dax, pmem: introduce pfn_t
 dnl #
 AC_DEFUN([AC_AMDGPU_VMF_INSERT], [
@@ -11,7 +11,7 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT], [
 		pfn.val = 0;
 	], [
 		dnl #
-		dnl # commit 1c8f422059ae5da07db7406ab916203f9417e396
+		dnl # commit v4.16-7358-g1c8f422059ae
 		dnl # mm: change return type to vm_fault_t
 		dnl #
 		AC_MSG_RESULT(yes)
@@ -29,7 +29,7 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT], [
 			AC_DEFINE(HAVE_VMF_INSERT, 1, [vmf_insert_*() are available])
 		], [
 			dnl #
-			dnl # commit 01c8f1c44b83a0825b573e7c723b033cece37b86
+			dnl # commit v4.4-6475-g01c8f1c44b83
 			dnl # mm, dax, gpu: convert vm_insert_mixed to pfn_t
 			dnl #
 			AC_MSG_RESULT(no)

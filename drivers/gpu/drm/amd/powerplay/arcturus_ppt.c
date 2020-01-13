@@ -2022,7 +2022,7 @@ static int arcturus_i2c_eeprom_read_data(struct i2c_adapter *control,
 	SwI2cRequest_t req;
 	struct amdgpu_device *adev = to_amdgpu_device(control);
 	struct smu_table_context *smu_table = &adev->smu.smu_table;
-	struct smu_table *table = &smu_table->tables[SMU_TABLE_I2C_COMMANDS];
+	struct smu_table *table = &smu_table->driver_table;
 
 	memset(&req, 0, sizeof(req));
 	arcturus_fill_eeprom_i2c_req(&req, false, address, numbytes, data);
@@ -2176,7 +2176,11 @@ static const struct i2c_algorithm arcturus_i2c_eeprom_i2c_algo = {
 static int arcturus_i2c_eeprom_control_init(struct i2c_adapter *control)
 {
 	struct amdgpu_device *adev = to_amdgpu_device(control);
+	struct smu_context *smu = &adev->smu;
 	int res;
+
+	if (!smu->pm_enabled)
+		return -EOPNOTSUPP;
 
 	control->owner = THIS_MODULE;
 	control->class = I2C_CLASS_SPD;
@@ -2193,6 +2197,12 @@ static int arcturus_i2c_eeprom_control_init(struct i2c_adapter *control)
 
 static void arcturus_i2c_eeprom_control_fini(struct i2c_adapter *control)
 {
+	struct amdgpu_device *adev = to_amdgpu_device(control);
+	struct smu_context *smu = &adev->smu;
+
+	if (!smu->pm_enabled)
+		return;
+
 	i2c_del_adapter(control);
 }
 
@@ -2261,6 +2271,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.check_fw_version = smu_v11_0_check_fw_version,
 	.write_pptable = smu_v11_0_write_pptable,
 	.set_min_dcef_deep_sleep = smu_v11_0_set_min_dcef_deep_sleep,
+	.set_driver_table_location = smu_v11_0_set_driver_table_location,
 	.set_tool_table_location = smu_v11_0_set_tool_table_location,
 	.notify_memory_pool_location = smu_v11_0_notify_memory_pool_location,
 	.system_features_control = smu_v11_0_system_features_control,

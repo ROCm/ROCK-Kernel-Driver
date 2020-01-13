@@ -164,11 +164,8 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	if (amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||
 	     amdgpu_has_atpx_dgpu_power_cntl()) &&
-	    ((flags & AMD_IS_APU) == 0)
-#if defined(HAVE_PCI_IS_THUNDERBOLD_ATTACHED)
-	    && !pci_is_thunderbolt_attached(dev->pdev)
-#endif
-	    )
+	    ((flags & AMD_IS_APU) == 0) &&
+	    !pci_is_thunderbolt_attached(dev->pdev))
 		flags |= AMD_IS_PX;
 
 	/* amdgpu_device_init should report only fatal error
@@ -201,9 +198,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	}
 
 	if (adev->runpm) {
-#if defined(HAVE_DEV_PM_SET_DRIVER_FLAGS)
 		dev_pm_set_driver_flags(dev->dev, DPM_FLAG_NEVER_SKIP);
-#endif
 		pm_runtime_use_autosuspend(dev->dev);
 		pm_runtime_set_autosuspend_delay(dev->dev, 5000);
 		pm_runtime_set_active(dev->dev);

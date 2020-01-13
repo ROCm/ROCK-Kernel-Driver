@@ -453,8 +453,10 @@ int smu_v11_0_fini_smc_tables(struct smu_context *smu)
 
 	kfree(smu_table->tables);
 	kfree(smu_table->metrics_table);
+	kfree(smu_table->watermarks_table);
 	smu_table->tables = NULL;
 	smu_table->metrics_table = NULL;
+	smu_table->watermarks_table = NULL;
 	smu_table->metrics_time = 0;
 
 	ret = smu_v11_0_fini_dpm_context(smu);
@@ -775,6 +777,24 @@ int smu_v11_0_set_min_dcef_deep_sleep(struct smu_context *smu)
 		return -EINVAL;
 
 	return smu_v11_0_set_deep_sleep_dcefclk(smu, table_context->boot_values.dcefclk / 100);
+}
+
+int smu_v11_0_set_driver_table_location(struct smu_context *smu)
+{
+	struct smu_table *driver_table = &smu->smu_table.driver_table;
+	int ret = 0;
+
+	if (driver_table->mc_address) {
+		ret = smu_send_smc_msg_with_param(smu,
+				SMU_MSG_SetDriverDramAddrHigh,
+				upper_32_bits(driver_table->mc_address));
+		if (!ret)
+			ret = smu_send_smc_msg_with_param(smu,
+				SMU_MSG_SetDriverDramAddrLow,
+				lower_32_bits(driver_table->mc_address));
+	}
+
+	return ret;
 }
 
 int smu_v11_0_set_tool_table_location(struct smu_context *smu)

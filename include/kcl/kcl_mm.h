@@ -28,36 +28,42 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 #endif /* HAVE_KVZALLOC_KVMALLOC */
 
 #ifndef HAVE_KVFREE
+#ifdef HAVE_DRM_FREE_LARGE
 static inline void kvfree(const void *addr)
 {
-#ifdef HAVE_DRM_FREE_LARGE
 	return drm_free_large(addr);
+}
 #else
+static inline void kvfree(const void *addr)
+{
 	if (is_vmalloc_addr(addr))
 		vfree(addr);
 	else
 		kfree(addr);
-#endif /* HAVE_DRM_FREE_LARGE */
 }
+#endif /* HAVE_DRM_FREE_LARGE */
 #endif /* HAVE_KVFREE */
 
 #ifndef HAVE_KVMALLOC_ARRAY
+#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 	if (flags & __GFP_ZERO)
 		return drm_calloc_large(n, size);
 	else
 		return drm_malloc_ab(n, size);
+}
 #else
+static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
+{
 	size_t bytes;
 
 	if (unlikely(check_mul_overflow(n, size, &bytes)))
 		return NULL;
 
 	return kvmalloc(bytes, flags);
-#endif /* HAVE_DRM_MALLOC_AB && HAVE_DRM_CALLOC_LARGE */
 }
+#endif /* HAVE_DRM_MALLOC_AB && HAVE_DRM_CALLOC_LARGE */
 #endif /* HAVE_KVMALLOC_ARRAY */
 
 #ifndef HAVE_KVCALLOC
@@ -127,9 +133,7 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 #if !defined(HAVE_ZONE_MANAGED_PAGES)
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
-#if defined(HAVE_ATOMIC_MANAGED_PAGES_IN_STRUCT_ZONE)
-	return (unsigned long)atomic_long_read(&zone->managed_pages);
-#elif defined(HAVE_MANAGED_PAGES_IN_STRUCT_ZONE)
+#if defined(HAVE_STRUCT_ZONE_MANAGED_PAGES)
 	return (unsigned long)zone->managed_pages;
 #else
 	/* zone->managed_pages is introduced in v3.7-4152-g9feedc9d831e */
@@ -137,6 +141,6 @@ static inline unsigned long zone_managed_pages(struct zone *zone)
 	return 0;
 #endif
 }
-#endif
+#endif /* HAVE_ZONE_MANAGED_PAGES */
 
 #endif /* AMDKCL_MM_H */

@@ -40,6 +40,7 @@
 #include <linux/swap.h>
 #include <linux/swiotlb.h>
 #include <linux/dma-buf.h>
+#include <linux/sizes.h>
 
 #include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_bo_driver.h>
@@ -1743,10 +1744,10 @@ static int amdgpu_ttm_training_reserve_vram_fini(struct amdgpu_device *adev)
 
 static u64 amdgpu_ttm_training_get_c2p_offset(u64 vram_size)
 {
-       if ((vram_size & (ONE_MiB - 1)) < (4 * ONE_KiB + 1) )
-               vram_size -= ONE_MiB;
+       if ((vram_size & (SZ_1M - 1)) < (SZ_4K + 1) )
+               vram_size -= SZ_1M;
 
-       return ALIGN(vram_size, ONE_MiB);
+       return ALIGN(vram_size, SZ_1M);
 }
 
 /**

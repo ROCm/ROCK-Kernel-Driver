@@ -378,7 +378,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_POSSIBLE_RCU
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 	hash_for_each_possible_rcu(kfd_processes_table, process, node,
 					kfd_processes, (uintptr_t)mm)
@@ -1109,7 +1109,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1392,7 +1392,7 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1417,7 +1417,7 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
@@ -1491,7 +1491,7 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_4ARGS_HASH_FOR_EACH_RCU
+#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
 	struct hlist_node *node;
 
 	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
