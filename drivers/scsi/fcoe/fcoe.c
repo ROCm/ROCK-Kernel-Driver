@@ -275,7 +275,7 @@ static struct scsi_host_template fcoe_shost_template = {
 	.cmd_per_lun = 3,
 	.can_queue = FCOE_MAX_OUTSTANDING_COMMANDS,
 	.sg_tablesize = SG_ALL,
-	.max_sectors = 0xffff,
+	.max_sectors = 1024,
 	.track_queue_depth = 1,
 };
 
