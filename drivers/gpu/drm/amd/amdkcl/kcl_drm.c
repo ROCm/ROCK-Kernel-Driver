@@ -339,7 +339,7 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 EXPORT_SYMBOL(drm_fb_helper_fill_info);
 #endif
 
-#if !defined(HAVE_DRM_PRINTER)
+#if !defined(HAVE_DRM_PRINT_H)
 void drm_printf(struct drm_printer *p, const char *f, ...)
 {
 	struct va_format vaf;
@@ -357,7 +357,7 @@ EXPORT_SYMBOL(drm_printf);
 #if !defined(HAVE_DRM_DEBUG_PRINTER)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-#if !defined(HAVE_DRM_PRINTER)
+#if !defined(HAVE_DRM_PRINT_H)
 	pr_debug("%s %pV", p->prefix, vaf);
 #else
 	pr_debug("%s %pV", "no prefix < 4.11", vaf);

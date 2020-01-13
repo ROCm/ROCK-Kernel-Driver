@@ -16,9 +16,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_modes.h>
-#if defined(HAVE_DRM_PRINTER)
-#include <drm/drm_print.h>
-#endif
+#include <kcl/kcl_drm_print_h.h>
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
@@ -240,7 +238,7 @@ __drm_atomic_helper_connector_reset(struct drm_connector *connector,
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINTER)
+#if !defined(HAVE_DRM_PRINT_H)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -354,7 +352,7 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if !defined(HAVE_DRM_PRINTER)
+#if !defined(HAVE_DRM_PRINT_H)
 		.prefix = prefix
 #endif
 	};
