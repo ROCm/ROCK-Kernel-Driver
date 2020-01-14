@@ -124,6 +124,7 @@ union stream_update_flags {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		uint32_t wb_update:1;
 #endif
+		uint32_t dsc_changed : 1;
 	} bits;
 
 	uint32_t raw;

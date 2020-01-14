@@ -1760,16 +1760,17 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		if (stream_update->wb_update)
 			su_flags->bits.wb_update = 1;
 #endif
+
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+		if (stream_update->dsc_config)
+			su_flags->bits.dsc_changed = 1;
+#endif
+
 		if (su_flags->raw != 0)
 			overall_type = UPDATE_TYPE_FULL;
 
 		if (stream_update->output_csc_transform || stream_update->output_color_space)
 			su_flags->bits.out_csc = 1;
-
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-		if (stream_update->dsc_config)
-			overall_type = UPDATE_TYPE_FULL;
-#endif
 	}
 
 	for (i = 0 ; i < surface_count; i++) {
@@ -1804,8 +1805,11 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 
 	type = check_update_surfaces_for_stream(dc, updates, surface_count, stream_update, stream_status);
 	if (type == UPDATE_TYPE_FULL) {
-		if (stream_update)
+		if (stream_update) {
+			uint32_t dsc_changed = stream_update->stream->update_flags.bits.dsc_changed;
 			stream_update->stream->update_flags.raw = 0xFFFFFFFF;
+			stream_update->stream->update_flags.bits.dsc_changed = dsc_changed;
+		}
 		for (i = 0; i < surface_count; i++)
 			updates[i].surface->update_flags.raw = 0xFFFFFFFF;
 	}
@@ -2131,6 +2135,10 @@ static void commit_planes_do_stream_update(struct dc *dc,
 #endif
 			}
 
+			/* Full fe update*/
+			if (update_type == UPDATE_TYPE_FAST)
+				continue;
+
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 			if (stream_update->dsc_config && dc->hwss.pipe_control_lock_global) {
 				dc->hwss.pipe_control_lock_global(dc, pipe_ctx, true);
@@ -2138,9 +2146,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				dc->hwss.pipe_control_lock_global(dc, pipe_ctx, false);
 			}
 #endif
-			/* Full fe update*/
-			if (update_type == UPDATE_TYPE_FAST)
-				continue;
 
 			if (stream_update->dpms_off) {
 				dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
