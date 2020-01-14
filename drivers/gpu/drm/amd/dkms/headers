@@ -19,3 +19,12 @@ linux/dma-fence-array.h kcl/kcl_fence_backport.h
 linux/interval_tree_generic.h kcl/kcl_interval_tree_generic.h
 linux/pfn_t.h kcl/kcl_mm_types.h
 linux/nospec.h kcl/kcl_nospec.h
+drm/drm_vblank.h kcl/kcl_drm_vblank_h.h
+drm/drm_ioctl.h kcl/kcl_drm_ioctl_h.h
+drm/drm_debugfs.h kcl/kcl_drm_debugfs_h.h
+drm/drm_irq.h kcl/kcl_drm_irq_h.h
+drm/drm_connector.h kcl/kcl_drm_connector_h.h
+drm/drm_encoder.h kcl/kcl_drm_encoder_h.h
+drm/drm_plane.h kcl/kcl_drm_plane_h.h
+drm/task_barrier.h kcl/kcl_task_barrier.h
+linux/hashtable.h kcl/kcl_hashtable.h

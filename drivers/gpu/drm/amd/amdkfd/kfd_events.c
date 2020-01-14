@@ -991,9 +991,6 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, unsigned int pasid,
 	uint32_t id;
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
 	struct kfd_hsa_memory_exception_data memory_exception_data;
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-#endif
 
 	if (!p)
 		return; /* Presumably process exited. */
@@ -1048,13 +1045,7 @@ void kfd_signal_reset_event(struct kfd_dev *dev)
 	memory_exception_data.failure.imprecise = true;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
 		mutex_lock(&p->event_mutex);
 		id = KFD_FIRST_NONSIGNAL_EVENT_ID;
 		idr_for_each_entry_continue(&p->event_idr, ev, id) {
