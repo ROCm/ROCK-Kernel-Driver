@@ -1,6 +1,5 @@
 #
 # Copyright 2017 Advanced Micro Devices, Inc.
-# Copyright 2019 Raptor Engineering, LLC
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -31,19 +30,12 @@ else
 AMDKCL_KBUILD_TAKE_PATH_CURRENT=
 endif
 
-ifdef CONFIG_X86
 calcs_ccflags := -mhard-float -msse
-endif
-
-ifdef CONFIG_PPC64
-calcs_ccflags := -mhard-float -maltivec
-endif
 
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
 endif
 
-ifdef CONFIG_X86
 ifdef IS_OLD_GCC
 # Stack alignment mismatch, proceed with caution.
 # GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
@@ -51,7 +43,6 @@ ifdef IS_OLD_GCC
 calcs_ccflags += -mpreferred-stack-boundary=4
 else
 calcs_ccflags += -msse2
-endif
 endif
 
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn_calcs.o := $(calcs_ccflags)
