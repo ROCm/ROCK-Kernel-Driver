@@ -696,6 +696,7 @@ unsigned int _debug_guardpage_minorder;
 
 bool _debug_pagealloc_enabled_early __read_mostly
 			= IS_ENABLED(CONFIG_DEBUG_PAGEALLOC_ENABLE_DEFAULT);
+EXPORT_SYMBOL(_debug_pagealloc_enabled_early);
 DEFINE_STATIC_KEY_FALSE(_debug_pagealloc_enabled);
 EXPORT_SYMBOL(_debug_pagealloc_enabled);
 
