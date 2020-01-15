@@ -190,8 +190,10 @@ static int acpi_ac_add_fs(struct acpi_ac *ac)
 {
 	struct proc_dir_entry *entry = NULL;
 
+#if 0
 	printk(KERN_WARNING PREFIX "Deprecated procfs I/F for AC is loaded,"
 			" please retry with CONFIG_ACPI_PROCFS_POWER cleared\n");
+#endif
 	if (!acpi_device_dir(ac->device)) {
 		acpi_device_dir(ac->device) =
 			proc_mkdir(acpi_device_bid(ac->device), acpi_ac_dir);

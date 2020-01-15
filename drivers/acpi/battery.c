@@ -1176,7 +1176,9 @@ static const struct file_operations acpi_battery_alarm_fops = {
 
 static int acpi_battery_add_fs(struct acpi_device *device)
 {
+#if 0
 	pr_warning(PREFIX "Deprecated procfs I/F for battery is loaded, please retry with CONFIG_ACPI_PROCFS_POWER cleared\n");
+#endif
 	if (!acpi_device_dir(device)) {
 		acpi_device_dir(device) = proc_mkdir(acpi_device_bid(device),
 						     acpi_battery_dir);
