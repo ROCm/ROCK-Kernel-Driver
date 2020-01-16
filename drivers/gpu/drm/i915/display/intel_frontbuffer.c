@@ -225,7 +225,7 @@ static void frontbuffer_release(struct kref *ref)
 	spin_unlock(&to_i915(front->obj->base.dev)->fb_tracking.lock);
 
 	i915_gem_object_put(front->obj);
-	kfree(front);
+	kfree_rcu(front, rcu);
 }
 
 struct intel_frontbuffer *
@@ -234,11 +234,7 @@ intel_frontbuffer_get(struct drm_i915_gem_object *obj)
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct intel_frontbuffer *front;
 
-	spin_lock(&i915->fb_tracking.lock);
-	front = obj->frontbuffer;
-	if (front)
-		kref_get(&front->ref);
-	spin_unlock(&i915->fb_tracking.lock);
+	front = __intel_frontbuffer_get(obj);
 	if (front)
 		return front;
 
@@ -253,13 +249,13 @@ intel_frontbuffer_get(struct drm_i915_gem_object *obj)
 			 frontbuffer_active, frontbuffer_retire);
 
 	spin_lock(&i915->fb_tracking.lock);
-	if (obj->frontbuffer) {
+	if (rcu_access_pointer(obj->frontbuffer)) {
 		kfree(front);
-		front = obj->frontbuffer;
+		front = rcu_dereference_protected(obj->frontbuffer, true);
 		kref_get(&front->ref);
 	} else {
 		i915_gem_object_get(obj);
-		obj->frontbuffer = front;
+		rcu_assign_pointer(obj->frontbuffer, front);
 	}
 	spin_unlock(&i915->fb_tracking.lock);
 
