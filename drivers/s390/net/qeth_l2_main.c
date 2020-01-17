@@ -764,14 +764,6 @@ add_napi:
 	return rc;
 }
 
-static int qeth_l2_start_ipassists(struct qeth_card *card)
-{
-	/* configure isolation level */
-	if (qeth_set_access_ctrl_online(card, 0))
-		return -ENODEV;
-	return 0;
-}
-
 static void qeth_l2_trace_features(struct qeth_card *card)
 {
 	/* Set BridgePort features */
@@ -802,13 +794,6 @@ static int qeth_l2_set_online(struct ccwgroup_device *gdev)
 		goto out_remove;
 	}
 
-	if (qeth_is_diagass_supported(card, QETH_DIAGS_CMD_TRAP)) {
-		if (card->info.hwtrap &&
-		    qeth_hw_trap(card, QETH_DIAGS_TRAP_ARM))
-			card->info.hwtrap = 0;
-	} else
-		card->info.hwtrap = 0;
-
 	mutex_lock(&card->sbp_lock);
 	qeth_bridgeport_query_support(card);
 	if (card->options.sbp.supported_funcs)
@@ -831,12 +816,6 @@ static int qeth_l2_set_online(struct ccwgroup_device *gdev)
 
 	/* softsetup */
 	QETH_CARD_TEXT(card, 2, "softsetp");
-
-	if (IS_OSD(card) || IS_OSX(card)) {
-		rc = qeth_l2_start_ipassists(card);
-		if (rc)
-			goto out_remove;
-	}
 
 	rc = qeth_init_qdio_queues(card);
 	if (rc) {
