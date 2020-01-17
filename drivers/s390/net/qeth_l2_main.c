@@ -999,7 +999,7 @@ static void qeth_osn_assist_cb(struct qeth_card *card,
 			       struct qeth_cmd_buffer *iob,
 			       unsigned int data_length)
 {
-	qeth_notify_reply(iob->reply, 0);
+	qeth_notify_cmd(iob, 0);
 	qeth_put_cmd(iob);
 }
 
