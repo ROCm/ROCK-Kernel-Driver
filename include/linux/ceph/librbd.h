@@ -117,6 +117,7 @@ struct rbd_img_request {
 	union {
 		struct request		*rq;		/* block request */
 		struct rbd_obj_request	*obj_request;	/* obj req initiator */
+		void			*lio_cmd_data;	/* lio specific data */
 	};
 	rbd_img_request_end_cb_t callback;
 
