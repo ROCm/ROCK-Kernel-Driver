@@ -101,6 +101,8 @@ enum rbd_img_state {
 };
 
 struct rbd_obj_request;
+typedef void (*rbd_img_request_end_cb_t)(struct rbd_img_request *img_request,
+					 int result);
 
 struct rbd_img_request {
 	struct rbd_device	*rbd_dev;
@@ -116,6 +118,7 @@ struct rbd_img_request {
 		struct request		*rq;		/* block request */
 		struct rbd_obj_request	*obj_request;	/* obj req initiator */
 	};
+	rbd_img_request_end_cb_t callback;
 
 	struct list_head	lock_item;
 	struct list_head	object_extents;	/* obj_req.ex structs */
@@ -239,7 +242,8 @@ enum rbd_dev_flags {
 extern struct rbd_img_request *rbd_img_request_create(
 					struct rbd_device *rbd_dev,
 					enum obj_operation_type op_type,
-					struct ceph_snap_context *snapc);
+					struct ceph_snap_context *snapc,
+					rbd_img_request_end_cb_t end_cb);
 extern int rbd_img_fill_nodata(struct rbd_img_request *img_req,
 			       u64 off, u64 len);
 extern int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,

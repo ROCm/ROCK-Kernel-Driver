@@ -1504,7 +1504,8 @@ static bool rbd_dev_parent_get(struct rbd_device *rbd_dev)
 struct rbd_img_request *rbd_img_request_create(
 					struct rbd_device *rbd_dev,
 					enum obj_operation_type op_type,
-					struct ceph_snap_context *snapc)
+					struct ceph_snap_context *snapc,
+					rbd_img_request_end_cb_t end_cb)
 {
 	struct rbd_img_request *img_request;
 
@@ -1526,6 +1527,7 @@ struct rbd_img_request *rbd_img_request_create(
 	INIT_LIST_HEAD(&img_request->object_extents);
 	mutex_init(&img_request->state_mutex);
 	kref_init(&img_request->kref);
+	img_request->callback = end_cb;
 
 	return img_request;
 }
@@ -2704,6 +2706,8 @@ static int rbd_obj_read_object(struct rbd_obj_request *obj_req)
 	return 0;
 }
 
+static void rbd_img_end_request(struct rbd_img_request *img_req, int result);
+
 static int rbd_obj_read_from_parent(struct rbd_obj_request *obj_req)
 {
 	struct rbd_img_request *img_req = obj_req->img_request;
@@ -2711,7 +2715,8 @@ static int rbd_obj_read_from_parent(struct rbd_obj_request *obj_req)
 	int ret;
 
 	child_img_req = rbd_img_request_create(img_req->rbd_dev->parent,
-					       OBJ_OP_READ, NULL);
+					       OBJ_OP_READ, NULL,
+					       rbd_img_end_request);
 	if (!child_img_req)
 		return -ENOMEM;
 
@@ -3496,6 +3501,14 @@ static bool __rbd_img_handle_request(struct rbd_img_request *img_req,
 	return done;
 }
 
+static void rbd_img_end_request(struct rbd_img_request *img_req, int result)
+{
+	struct request *rq = img_req->rq;
+
+	rbd_img_request_put(img_req);
+	blk_mq_end_request(rq, errno_to_blk_status(result));
+}
+
 void rbd_img_handle_request(struct rbd_img_request *img_req, int result)
 {
 again:
@@ -3511,10 +3524,7 @@ again:
 			goto again;
 		}
 	} else {
-		struct request *rq = img_req->rq;
-
-		rbd_img_request_put(img_req);
-		blk_mq_end_request(rq, errno_to_blk_status(result));
+		img_req->callback(img_req, result);
 	}
 }
 EXPORT_SYMBOL(rbd_img_handle_request);
@@ -4647,7 +4657,8 @@ static void rbd_queue_workfn(struct work_struct *work)
 		goto err_rq;
 	}
 
-	img_request = rbd_img_request_create(rbd_dev, op_type, snapc);
+	img_request = rbd_img_request_create(rbd_dev, op_type, snapc,
+					     rbd_img_end_request);
 	if (!img_request) {
 		result = -ENOMEM;
 		goto err_rq;
