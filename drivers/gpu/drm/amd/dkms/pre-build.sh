@@ -41,7 +41,7 @@ while read line; do
 	from_header=$(echo $line | cut -d ' ' -f 1 | sed 's|\.h|\\&|')
 	[ x$from_header = x ] && break
 	to_header=$(echo $line | cut -d ' ' -f 2 | sed 's|\.h|\\&|')
-	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/* | sed '/^include\/kcl/d' | sed '/^amd\/dkms/d'`; do
+	for file in `grep -rl ${from_header} amd/* scheduler/* ttm/* include/* | sed '/^include\/kcl/d; /^amd\/dkms/d; /^amd\/amdkcl/d'`; do
 		sed -i "s|${from_header}|${to_header}|" $file
 	done
 done < headers
