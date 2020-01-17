@@ -638,7 +638,7 @@ static int _rbd_dev_v2_snap_features(struct rbd_device *rbd_dev, u64 snap_id,
 static int rbd_dev_v2_get_flags(struct rbd_device *rbd_dev);
 
 static void rbd_obj_handle_request(struct rbd_obj_request *obj_req, int result);
-static void rbd_img_handle_request(struct rbd_img_request *img_req, int result);
+void rbd_img_handle_request(struct rbd_img_request *img_req, int result);
 
 /*
  * Return true if nothing else is pending.
@@ -1414,13 +1414,14 @@ static void rbd_obj_request_put(struct rbd_obj_request *obj_request)
 }
 
 static void rbd_img_request_destroy(struct kref *kref);
-static void rbd_img_request_put(struct rbd_img_request *img_request)
+void rbd_img_request_put(struct rbd_img_request *img_request)
 {
 	rbd_assert(img_request != NULL);
 	dout("%s: img %p (was %d)\n", __func__, img_request,
 		kref_read(&img_request->kref));
 	kref_put(&img_request->kref, rbd_img_request_destroy);
 }
+EXPORT_SYMBOL(rbd_img_request_put);
 
 static inline void rbd_img_obj_request_add(struct rbd_img_request *img_request,
 					struct rbd_obj_request *obj_request)
@@ -1728,7 +1729,7 @@ static bool rbd_dev_parent_get(struct rbd_device *rbd_dev)
  * that comprises the image request, and the Linux request pointer
  * (if there is one).
  */
-static struct rbd_img_request *rbd_img_request_create(
+struct rbd_img_request *rbd_img_request_create(
 					struct rbd_device *rbd_dev,
 					enum obj_operation_type op_type,
 					struct ceph_snap_context *snapc)
@@ -1756,6 +1757,7 @@ static struct rbd_img_request *rbd_img_request_create(
 
 	return img_request;
 }
+EXPORT_SYMBOL(rbd_img_request_create);
 
 static void rbd_img_request_destroy(struct kref *kref)
 {
@@ -2735,8 +2737,8 @@ static int rbd_img_fill_request(struct rbd_img_request *img_req,
 	return __rbd_img_fill_request(img_req);
 }
 
-static int rbd_img_fill_nodata(struct rbd_img_request *img_req,
-			       u64 off, u64 len)
+int rbd_img_fill_nodata(struct rbd_img_request *img_req,
+			u64 off, u64 len)
 {
 	struct ceph_file_extent ex = { off, len };
 	union rbd_img_fill_iter dummy;
@@ -2747,6 +2749,7 @@ static int rbd_img_fill_nodata(struct rbd_img_request *img_req,
 
 	return rbd_img_fill_request(img_req, &ex, 1, &fctx);
 }
+EXPORT_SYMBOL(rbd_img_fill_nodata);
 
 static void set_bio_pos(struct ceph_object_extent *ex, u32 bytes, void *arg)
 {
@@ -2862,10 +2865,10 @@ static int __rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
 				    &fctx);
 }
 
-static int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
-				   struct ceph_file_extent *img_extents,
-				   u32 num_img_extents,
-				   struct bio_vec *bvecs)
+int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
+			    struct ceph_file_extent *img_extents,
+			    u32 num_img_extents,
+			    struct bio_vec *bvecs)
 {
 	struct ceph_bvec_iter it = {
 		.bvecs = bvecs,
@@ -2876,6 +2879,7 @@ static int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
 	return __rbd_img_fill_from_bvecs(img_req, img_extents, num_img_extents,
 					 &it);
 }
+EXPORT_SYMBOL(rbd_img_fill_from_bvecs);
 
 static void rbd_img_handle_request_work(struct work_struct *work)
 {
@@ -3720,7 +3724,7 @@ static bool __rbd_img_handle_request(struct rbd_img_request *img_req,
 	return done;
 }
 
-static void rbd_img_handle_request(struct rbd_img_request *img_req, int result)
+void rbd_img_handle_request(struct rbd_img_request *img_req, int result)
 {
 again:
 	if (!__rbd_img_handle_request(img_req, &result))
@@ -3741,6 +3745,7 @@ again:
 		blk_mq_end_request(rq, errno_to_blk_status(result));
 	}
 }
+EXPORT_SYMBOL(rbd_img_handle_request);
 
 static const struct rbd_client_id rbd_empty_cid;
 
