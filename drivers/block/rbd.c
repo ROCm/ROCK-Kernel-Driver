@@ -34,6 +34,7 @@
 #include <linux/ceph/cls_lock_client.h>
 #include <linux/ceph/striper.h>
 #include <linux/ceph/decode.h>
+#include <linux/ceph/librbd.h>
 #include <linux/parser.h>
 #include <linux/bsearch.h>
 
@@ -84,8 +85,6 @@ static int atomic_dec_return_safe(atomic_t *v)
 	return -EINVAL;
 }
 
-#define RBD_DRV_NAME "rbd"
-
 #define RBD_MINORS_PER_MAJOR		256
 #define RBD_SINGLE_MAJOR_PART_SHIFT	4
 
@@ -135,97 +134,12 @@ static int atomic_dec_return_safe(atomic_t *v)
 #define RBD_FEATURES_SUPPORTED	(RBD_FEATURES_ALL)
 
 /*
- * An RBD device name will be "rbd#", where the "rbd" comes from
- * RBD_DRV_NAME above, and # is a unique integer identifier.
- */
-#define DEV_NAME_LEN		32
-
-/*
- * block device image metadata (in-memory version)
- */
-struct rbd_image_header {
-	/* These six fields never change for a given rbd image */
-	char *object_prefix;
-	__u8 obj_order;
-	u64 stripe_unit;
-	u64 stripe_count;
-	s64 data_pool_id;
-	u64 features;		/* Might be changeable someday? */
-
-	/* The remaining fields need to be updated occasionally */
-	u64 image_size;
-	struct ceph_snap_context *snapc;
-	char *snap_names;	/* format 1 only */
-	u64 *snap_sizes;	/* format 1 only */
-};
-
-/*
- * An rbd image specification.
- *
- * The tuple (pool_id, image_id, snap_id) is sufficient to uniquely
- * identify an image.  Each rbd_dev structure includes a pointer to
- * an rbd_spec structure that encapsulates this identity.
- *
- * Each of the id's in an rbd_spec has an associated name.  For a
- * user-mapped image, the names are supplied and the id's associated
- * with them are looked up.  For a layered image, a parent image is
- * defined by the tuple, and the names are looked up.
- *
- * An rbd_dev structure contains a parent_spec pointer which is
- * non-null if the image it represents is a child in a layered
- * image.  This pointer will refer to the rbd_spec structure used
- * by the parent rbd_dev for its own identity (i.e., the structure
- * is shared between the parent and child).
- *
- * Since these structures are populated once, during the discovery
- * phase of image construction, they are effectively immutable so
- * we make no effort to synchronize access to them.
- *
- * Note that code herein does not assume the image name is known (it
- * could be a null pointer).
- */
-struct rbd_spec {
-	u64		pool_id;
-	const char	*pool_name;
-	const char	*pool_ns;	/* NULL if default, never "" */
-
-	const char	*image_id;
-	const char	*image_name;
-
-	u64		snap_id;
-	const char	*snap_name;
-
-	struct kref	kref;
-};
-
-/*
  * an instance of the client.  multiple devices may share an rbd client.
  */
 struct rbd_client {
 	struct ceph_client	*client;
 	struct kref		kref;
 	struct list_head	node;
-};
-
-struct pending_result {
-	int			result;		/* first nonzero result */
-	int			num_pending;
-};
-
-struct rbd_img_request;
-
-enum obj_request_type {
-	OBJ_REQUEST_NODATA = 1,
-	OBJ_REQUEST_BIO,	/* pointer into provided bio (list) */
-	OBJ_REQUEST_BVECS,	/* pointer into provided bio_vec array */
-	OBJ_REQUEST_OWN_BVECS,	/* private bio_vec array, doesn't own pages */
-};
-
-enum obj_operation_type {
-	OBJ_OP_READ = 1,
-	OBJ_OP_WRITE,
-	OBJ_OP_DISCARD,
-	OBJ_OP_ZEROOUT,
 };
 
 #define RBD_OBJ_FLAG_DELETION			(1U << 0)
@@ -320,151 +234,10 @@ enum img_req_flags {
 	IMG_REQ_LAYERED,	/* ENOENT handling: normal = 0, layered = 1 */
 };
 
-enum rbd_img_state {
-	RBD_IMG_START = 1,
-	RBD_IMG_EXCLUSIVE_LOCK,
-	__RBD_IMG_OBJECT_REQUESTS,
-	RBD_IMG_OBJECT_REQUESTS,
-};
-
-struct rbd_img_request {
-	struct rbd_device	*rbd_dev;
-	enum obj_operation_type	op_type;
-	enum obj_request_type	data_type;
-	unsigned long		flags;
-	enum rbd_img_state	state;
-	union {
-		u64			snap_id;	/* for reads */
-		struct ceph_snap_context *snapc;	/* for writes */
-	};
-	union {
-		struct request		*rq;		/* block request */
-		struct rbd_obj_request	*obj_request;	/* obj req initiator */
-	};
-
-	struct list_head	lock_item;
-	struct list_head	object_extents;	/* obj_req.ex structs */
-
-	struct mutex		state_mutex;
-	struct pending_result	pending;
-	struct work_struct	work;
-	int			work_result;
-	struct kref		kref;
-};
-
 #define for_each_obj_request(ireq, oreq) \
 	list_for_each_entry(oreq, &(ireq)->object_extents, ex.oe_item)
 #define for_each_obj_request_safe(ireq, oreq, n) \
 	list_for_each_entry_safe(oreq, n, &(ireq)->object_extents, ex.oe_item)
-
-enum rbd_watch_state {
-	RBD_WATCH_STATE_UNREGISTERED,
-	RBD_WATCH_STATE_REGISTERED,
-	RBD_WATCH_STATE_ERROR,
-};
-
-enum rbd_lock_state {
-	RBD_LOCK_STATE_UNLOCKED,
-	RBD_LOCK_STATE_LOCKED,
-	RBD_LOCK_STATE_RELEASING,
-};
-
-/* WatchNotify::ClientId */
-struct rbd_client_id {
-	u64 gid;
-	u64 handle;
-};
-
-struct rbd_mapping {
-	u64                     size;
-	u64                     features;
-};
-
-/*
- * a single device
- */
-struct rbd_device {
-	int			dev_id;		/* blkdev unique id */
-
-	int			major;		/* blkdev assigned major */
-	int			minor;
-	struct gendisk		*disk;		/* blkdev's gendisk and rq */
-
-	u32			image_format;	/* Either 1 or 2 */
-	struct rbd_client	*rbd_client;
-
-	char			name[DEV_NAME_LEN]; /* blkdev name, e.g. rbd3 */
-
-	spinlock_t		lock;		/* queue, flags, open_count */
-
-	struct rbd_image_header	header;
-	unsigned long		flags;		/* possibly lock protected */
-	struct rbd_spec		*spec;
-	struct rbd_options	*opts;
-	char			*config_info;	/* add{,_single_major} string */
-
-	struct ceph_object_id	header_oid;
-	struct ceph_object_locator header_oloc;
-
-	struct ceph_file_layout	layout;		/* used for all rbd requests */
-
-	struct mutex		watch_mutex;
-	enum rbd_watch_state	watch_state;
-	struct ceph_osd_linger_request *watch_handle;
-	u64			watch_cookie;
-	struct delayed_work	watch_dwork;
-
-	struct rw_semaphore	lock_rwsem;
-	enum rbd_lock_state	lock_state;
-	char			lock_cookie[32];
-	struct rbd_client_id	owner_cid;
-	struct work_struct	acquired_lock_work;
-	struct work_struct	released_lock_work;
-	struct delayed_work	lock_dwork;
-	struct work_struct	unlock_work;
-	spinlock_t		lock_lists_lock;
-	struct list_head	acquiring_list;
-	struct list_head	running_list;
-	struct completion	acquire_wait;
-	int			acquire_err;
-	struct completion	releasing_wait;
-
-	spinlock_t		object_map_lock;
-	u8			*object_map;
-	u64			object_map_size;	/* in objects */
-	u64			object_map_flags;
-
-	struct workqueue_struct	*task_wq;
-
-	struct rbd_spec		*parent_spec;
-	u64			parent_overlap;
-	atomic_t		parent_ref;
-	struct rbd_device	*parent;
-
-	/* Block layer tags. */
-	struct blk_mq_tag_set	tag_set;
-
-	/* protects updating the header */
-	struct rw_semaphore     header_rwsem;
-
-	struct rbd_mapping	mapping;
-
-	struct list_head	node;
-
-	/* sysfs related */
-	struct device		dev;
-	unsigned long		open_count;	/* protected by lock */
-};
-
-/*
- * Flag bits for rbd_dev->flags:
- * - REMOVING (which is coupled with rbd_dev->open_count) is protected
- *   by rbd_dev->lock
- */
-enum rbd_dev_flags {
-	RBD_DEV_FLAG_EXISTS,	/* mapped snapshot has not been deleted */
-	RBD_DEV_FLAG_REMOVING,	/* this mapping is being removed */
-};
 
 static DEFINE_MUTEX(client_mutex);	/* Serialize client creation */
 
@@ -638,7 +411,6 @@ static int _rbd_dev_v2_snap_features(struct rbd_device *rbd_dev, u64 snap_id,
 static int rbd_dev_v2_get_flags(struct rbd_device *rbd_dev);
 
 static void rbd_obj_handle_request(struct rbd_obj_request *obj_req, int result);
-static void rbd_img_handle_request(struct rbd_img_request *img_req, int result);
 
 /*
  * Return true if nothing else is pending.
@@ -1414,13 +1186,14 @@ static void rbd_obj_request_put(struct rbd_obj_request *obj_request)
 }
 
 static void rbd_img_request_destroy(struct kref *kref);
-static void rbd_img_request_put(struct rbd_img_request *img_request)
+void rbd_img_request_put(struct rbd_img_request *img_request)
 {
 	rbd_assert(img_request != NULL);
 	dout("%s: img %p (was %d)\n", __func__, img_request,
 		kref_read(&img_request->kref));
 	kref_put(&img_request->kref, rbd_img_request_destroy);
 }
+EXPORT_SYMBOL(rbd_img_request_put);
 
 static inline void rbd_img_obj_request_add(struct rbd_img_request *img_request,
 					struct rbd_obj_request *obj_request)
@@ -1728,10 +1501,11 @@ static bool rbd_dev_parent_get(struct rbd_device *rbd_dev)
  * that comprises the image request, and the Linux request pointer
  * (if there is one).
  */
-static struct rbd_img_request *rbd_img_request_create(
+struct rbd_img_request *rbd_img_request_create(
 					struct rbd_device *rbd_dev,
 					enum obj_operation_type op_type,
-					struct ceph_snap_context *snapc)
+					struct ceph_snap_context *snapc,
+					rbd_img_request_end_cb_t end_cb)
 {
 	struct rbd_img_request *img_request;
 
@@ -1753,9 +1527,11 @@ static struct rbd_img_request *rbd_img_request_create(
 	INIT_LIST_HEAD(&img_request->object_extents);
 	mutex_init(&img_request->state_mutex);
 	kref_init(&img_request->kref);
+	img_request->callback = end_cb;
 
 	return img_request;
 }
+EXPORT_SYMBOL(rbd_img_request_create);
 
 static void rbd_img_request_destroy(struct kref *kref)
 {
@@ -2735,8 +2511,8 @@ static int rbd_img_fill_request(struct rbd_img_request *img_req,
 	return __rbd_img_fill_request(img_req);
 }
 
-static int rbd_img_fill_nodata(struct rbd_img_request *img_req,
-			       u64 off, u64 len)
+int rbd_img_fill_nodata(struct rbd_img_request *img_req,
+			u64 off, u64 len)
 {
 	struct ceph_file_extent ex = { off, len };
 	union rbd_img_fill_iter dummy;
@@ -2747,6 +2523,7 @@ static int rbd_img_fill_nodata(struct rbd_img_request *img_req,
 
 	return rbd_img_fill_request(img_req, &ex, 1, &fctx);
 }
+EXPORT_SYMBOL(rbd_img_fill_nodata);
 
 static void set_bio_pos(struct ceph_object_extent *ex, u32 bytes, void *arg)
 {
@@ -2862,10 +2639,10 @@ static int __rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
 				    &fctx);
 }
 
-static int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
-				   struct ceph_file_extent *img_extents,
-				   u32 num_img_extents,
-				   struct bio_vec *bvecs)
+int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
+			    struct ceph_file_extent *img_extents,
+			    u32 num_img_extents,
+			    struct bio_vec *bvecs)
 {
 	struct ceph_bvec_iter it = {
 		.bvecs = bvecs,
@@ -2876,6 +2653,7 @@ static int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
 	return __rbd_img_fill_from_bvecs(img_req, img_extents, num_img_extents,
 					 &it);
 }
+EXPORT_SYMBOL(rbd_img_fill_from_bvecs);
 
 static void rbd_img_handle_request_work(struct work_struct *work)
 {
@@ -2928,6 +2706,8 @@ static int rbd_obj_read_object(struct rbd_obj_request *obj_req)
 	return 0;
 }
 
+static void rbd_img_end_request(struct rbd_img_request *img_req, int result);
+
 static int rbd_obj_read_from_parent(struct rbd_obj_request *obj_req)
 {
 	struct rbd_img_request *img_req = obj_req->img_request;
@@ -2935,7 +2715,8 @@ static int rbd_obj_read_from_parent(struct rbd_obj_request *obj_req)
 	int ret;
 
 	child_img_req = rbd_img_request_create(img_req->rbd_dev->parent,
-					       OBJ_OP_READ, NULL);
+					       OBJ_OP_READ, NULL,
+					       rbd_img_end_request);
 	if (!child_img_req)
 		return -ENOMEM;
 
@@ -3720,7 +3501,15 @@ static bool __rbd_img_handle_request(struct rbd_img_request *img_req,
 	return done;
 }
 
-static void rbd_img_handle_request(struct rbd_img_request *img_req, int result)
+static void rbd_img_end_request(struct rbd_img_request *img_req, int result)
+{
+	struct request *rq = img_req->rq;
+
+	rbd_img_request_put(img_req);
+	blk_mq_end_request(rq, errno_to_blk_status(result));
+}
+
+void rbd_img_handle_request(struct rbd_img_request *img_req, int result)
 {
 again:
 	if (!__rbd_img_handle_request(img_req, &result))
@@ -3735,12 +3524,10 @@ again:
 			goto again;
 		}
 	} else {
-		struct request *rq = img_req->rq;
-
-		rbd_img_request_put(img_req);
-		blk_mq_end_request(rq, errno_to_blk_status(result));
+		img_req->callback(img_req, result);
 	}
 }
+EXPORT_SYMBOL(rbd_img_handle_request);
 
 static const struct rbd_client_id rbd_empty_cid;
 
@@ -4870,7 +4657,8 @@ static void rbd_queue_workfn(struct work_struct *work)
 		goto err_rq;
 	}
 
-	img_request = rbd_img_request_create(rbd_dev, op_type, snapc);
+	img_request = rbd_img_request_create(rbd_dev, op_type, snapc,
+					     rbd_img_end_request);
 	if (!img_request) {
 		result = -ENOMEM;
 		goto err_rq;
