@@ -243,13 +243,13 @@ static int ls_pcie_g4_read_other_conf(struct pci_bus *bus, unsigned int devfn,
 	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
 	int ret;
 
-	if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
+	if (pcie->rev == REV_1_0)
 		ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
 				      0 << PCIE_LUT_GCR_RRE);
 
 	ret = pci_generic_config_read(bus, devfn, where, size, val);
 
-	if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
+	if (pcie->rev == REV_1_0)
 		ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
 				      1 << PCIE_LUT_GCR_RRE);
 
