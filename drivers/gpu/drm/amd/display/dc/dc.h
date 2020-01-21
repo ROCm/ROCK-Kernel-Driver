@@ -584,7 +584,8 @@ struct dc_init_data {
 	struct dc_reg_helper_state *dmub_offload;
 
 	struct dc_config flags;
-	uint32_t log_mask;
+	uint64_t log_mask;
+
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	/**
 	 * gpu_info FW provided soc bounding box struct or 0 if not
