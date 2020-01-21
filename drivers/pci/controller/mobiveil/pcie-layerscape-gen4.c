@@ -81,11 +81,26 @@ static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
 	return header_type == PCI_HEADER_TYPE_BRIDGE;
 }
 
+static void workaround_A011451(struct ls_pcie_g4 *pcie)
+{
+	struct mobiveil_pcie *mv_pci = &pcie->pci;
+	u32 val;
+
+	/* Set ACK latency timeout */
+	val = mobiveil_csr_readl(mv_pci, GPEX_ACK_REPLAY_TO);
+	val &= ~(ACK_LAT_TO_VAL_MASK << ACK_LAT_TO_VAL_SHIFT);
+	val |= (4 << ACK_LAT_TO_VAL_SHIFT);
+	mobiveil_csr_writel(mv_pci, val, GPEX_ACK_REPLAY_TO);
+}
+
 static int ls_pcie_g4_host_init(struct mobiveil_pcie *pci)
 {
 	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
 
 	pcie->rev = mobiveil_csr_readb(pci, PCI_REVISION_ID);
+
+	if (pcie->rev == REV_1_0)
+		workaround_A011451(pcie);
 
 	return 0;
 }
