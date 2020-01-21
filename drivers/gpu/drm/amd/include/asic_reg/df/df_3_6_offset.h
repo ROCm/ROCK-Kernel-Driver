@@ -27,6 +27,9 @@
 #define mmDF_PIE_AON0_DfGlobalClkGater									0x00fc
 #define mmDF_PIE_AON0_DfGlobalClkGater_BASE_IDX								0
 
+#define mmDF_CS_UMC_AON0_DfGlobalCtrl									0x00fe
+#define mmDF_CS_UMC_AON0_DfGlobalCtrl_BASE_IDX								0
+
 #define mmDF_CS_UMC_AON0_DramBaseAddress0								0x0044
 #define mmDF_CS_UMC_AON0_DramBaseAddress0_BASE_IDX							0
 
@@ -67,5 +70,8 @@
 #define smnDF_PIE_AON_FabricIndirectConfigAccessAddress3	0x1d05cUL
 #define smnDF_PIE_AON_FabricIndirectConfigAccessDataLo3		0x1d098UL
 #define smnDF_PIE_AON_FabricIndirectConfigAccessDataHi3		0x1d09cUL
+
+#define smnDF_CS_UMC_AON0_DramBaseAddress0 	0x1c110UL
+#define smnDF_CS_UMC_AON0_DramLimitAddress0 	0x1c114UL
 
 #endif

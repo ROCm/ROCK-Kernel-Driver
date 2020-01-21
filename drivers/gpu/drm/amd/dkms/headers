@@ -27,4 +27,5 @@ drm/drm_connector.h kcl/kcl_drm_connector_h.h
 drm/drm_encoder.h kcl/kcl_drm_encoder_h.h
 drm/drm_plane.h kcl/kcl_drm_plane_h.h
 drm/task_barrier.h kcl/kcl_task_barrier.h
+linux/hashtable.h kcl/kcl_hashtable.h
 

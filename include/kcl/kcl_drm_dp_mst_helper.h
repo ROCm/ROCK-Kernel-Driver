@@ -7,15 +7,18 @@
 static inline
 int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 {
+#if defined(HAVE_MUL_U32_U32)
 	if (dsc)
 		return DIV_ROUND_UP_ULL(mul_u32_u32(clock * (bpp / 16), 64 * 1006),
 				8 * 54 * 1000 * 1000);
+#endif
 
 	return drm_dp_calc_pbn_mode(clock, bpp);
 }
 #define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
 #endif
 
+#if defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
 static inline
 int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
@@ -39,6 +42,7 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 	return req_slots;
 }
 #define drm_dp_atomic_find_vcpi_slots _kcl_drm_dp_atomic_find_vcpi_slots
+#endif
 #endif
 
 #endif

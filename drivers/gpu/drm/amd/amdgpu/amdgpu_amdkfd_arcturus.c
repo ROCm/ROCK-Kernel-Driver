@@ -71,10 +71,15 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 				unsigned int engine_id,
 				unsigned int queue_id)
 {
-	uint32_t sdma_engine_reg_base;
+	uint32_t sdma_engine_reg_base = 0;
 	uint32_t sdma_rlc_reg_offset;
 
 	switch (engine_id) {
+	default:
+		dev_warn(adev->dev,
+			 "Invalid sdma engine id (%d), using engine id 0\n",
+			 engine_id);
+		/* fall through */
 	case 0:
 		sdma_engine_reg_base = SOC15_REG_OFFSET(SDMA0, 0,
 				mmSDMA0_RLC0_RB_CNTL) - mmSDMA0_RLC0_RB_CNTL;
@@ -106,8 +111,6 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 	case 7:
 		sdma_engine_reg_base = SOC15_REG_OFFSET(SDMA7, 0,
 				mmSDMA7_RLC0_RB_CNTL) - mmSDMA7_RLC0_RB_CNTL;
-		break;
-	default:
 		break;
 	}
 
@@ -302,6 +305,7 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.set_pasid_vmid_mapping = kgd_gfx_v9_set_pasid_vmid_mapping,
 	.init_interrupts = kgd_gfx_v9_init_interrupts,
 	.hqd_load = kgd_gfx_v9_hqd_load,
+	.hiq_mqd_load = kgd_gfx_v9_hiq_mqd_load,
 	.hqd_sdma_load = kgd_hqd_sdma_load,
 	.hqd_dump = kgd_gfx_v9_hqd_dump,
 	.hqd_sdma_dump = kgd_hqd_sdma_dump,
@@ -317,8 +321,6 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 			kgd_gfx_v9_get_atc_vmid_pasid_mapping_info,
 	.get_tile_config = kgd_gfx_v9_get_tile_config,
 	.set_vm_context_page_table_base = kgd_set_vm_context_page_table_base,
-	.invalidate_tlbs = kgd_gfx_v9_invalidate_tlbs,
-	.invalidate_tlbs_vmid = kgd_gfx_v9_invalidate_tlbs_vmid,
 	.get_hive_id = amdgpu_amdkfd_get_hive_id,
 	.enable_debug_trap = kgd_gfx_v9_enable_debug_trap,
 	.disable_debug_trap = kgd_gfx_v9_disable_debug_trap,

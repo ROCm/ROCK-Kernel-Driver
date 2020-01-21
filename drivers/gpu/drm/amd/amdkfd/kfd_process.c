@@ -34,6 +34,7 @@
 #include <asm/page.h>
 #include "kfd_ipc.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu.h"
 
 struct mm_struct;
 
@@ -378,14 +379,9 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 {
 	struct kfd_process *process;
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-	hash_for_each_possible_rcu(kfd_processes_table, process, node,
-					kfd_processes, (uintptr_t)mm)
-#else
+
 	hash_for_each_possible_rcu(kfd_processes_table, process,
 					kfd_processes, (uintptr_t)mm)
-#endif
 		if (process->mm == mm)
 			return process;
 
@@ -1109,13 +1105,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(unsigned int pasid)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
 		if (p->pasid == pasid) {
 			kref_get(&p->ref);
 			ret_p = p;
@@ -1392,13 +1382,7 @@ void kfd_suspend_all_processes(void)
 	unsigned int temp;
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
 		cancel_delayed_work_sync(&p->eviction_work);
 		cancel_delayed_work_sync(&p->restore_work);
 
@@ -1417,13 +1401,7 @@ int kfd_resume_all_processes(void)
 	unsigned int temp;
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
 		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
@@ -1468,16 +1446,17 @@ int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 void kfd_flush_tlb(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;
-	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
 		/* Nothing to flush until a VMID is assigned, which
 		 * only happens when the first queue is created.
 		 */
 		if (pdd->qpd.vmid)
-			f2g->invalidate_tlbs_vmid(dev->kgd, pdd->qpd.vmid);
+			amdgpu_amdkfd_flush_gpu_tlb_vmid(dev->kgd,
+							pdd->qpd.vmid);
 	} else {
-		f2g->invalidate_tlbs(dev->kgd, pdd->process->pasid);
+		amdgpu_amdkfd_flush_gpu_tlb_pasid(dev->kgd,
+						pdd->process->pasid);
 	}
 }
 
@@ -1491,13 +1470,7 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 
 	int idx = srcu_read_lock(&kfd_processes_srcu);
 
-#ifndef HAVE_HASH_FOR_EACH_XXX_DROP_NODE
-	struct hlist_node *node;
-
-	hash_for_each_rcu(kfd_processes_table, temp, node, p, kfd_processes) {
-#else
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-#endif
 		seq_printf(m, "Process %d PASID 0x%x:\n",
 			   p->lead_thread->tgid, p->pasid);
 

@@ -2078,6 +2078,17 @@ void dc_resource_state_construct(
 	dst_ctx->clk_mgr = dc->clk_mgr;
 }
 
+
+bool dc_resource_is_dsc_encoding_supported(const struct dc *dc)
+{
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	return dc->res_pool->res_cap->num_dsc > 0;
+#else
+	return 0;
+#endif
+}
+
+
 /**
  * dc_validate_global_state() - Determine if HW can support a given state
  * Checks HW resource availability and bandwidth requirement.
@@ -2908,7 +2919,4 @@ void get_audio_check(struct audio_info *aud_modes,
 		audio_chk->acat = 0;/*not support*/
 	}
 }
-
-
-
 
