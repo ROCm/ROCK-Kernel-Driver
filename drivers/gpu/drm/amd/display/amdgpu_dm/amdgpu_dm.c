@@ -5384,8 +5384,11 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 #else
 		state->max_bpc = 8;
 #endif
+
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 		state->vcpi_slots = 0;
 		state->pbn = 0;
+#endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
 			state->abm_level = amdgpu_dm_abm_level;
 
@@ -5414,8 +5417,10 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	new_state->underscan_enable = state->underscan_enable;
 	new_state->underscan_hborder = state->underscan_hborder;
 	new_state->underscan_vborder = state->underscan_vborder;
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	new_state->vcpi_slots = state->vcpi_slots;
 	new_state->pbn = state->pbn;
+#endif
 #if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
 	new_state->max_bpc = state->max_bpc;
 #endif
@@ -5859,6 +5864,7 @@ static void dm_encoder_helper_disable(struct drm_encoder *encoder)
 
 }
 
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 static int convert_dc_color_depth_into_bpc (enum dc_color_depth display_color_depth)
 {
 	switch (display_color_depth) {
@@ -5879,11 +5885,13 @@ static int convert_dc_color_depth_into_bpc (enum dc_color_depth display_color_de
 		}
 	return 0;
 }
+#endif
 
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
 					  struct drm_connector_state *conn_state)
 {
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	struct drm_atomic_state *state = crtc_state->state;
 	struct drm_connector *connector = conn_state->connector;
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
@@ -5922,6 +5930,7 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 		DRM_DEBUG_ATOMIC("failed finding vcpi slots: %d\n", (int)dm_new_connector_state->vcpi_slots);
 		return dm_new_connector_state->vcpi_slots;
 	}
+#endif
 	return 0;
 }
 
@@ -9448,11 +9457,12 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 	/* Perform validation of MST topology in the state*/
 	ret = drm_dp_mst_atomic_check(state);
 	if (ret)
 		goto fail;
+#endif
 
 #if defined(HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE)
 	if (state->legacy_cursor_update) {
