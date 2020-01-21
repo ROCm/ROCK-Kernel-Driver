@@ -339,7 +339,7 @@ dm_dp_mst_detect(struct drm_connector *connector,
 }
 #endif
 
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 static int dm_dp_mst_atomic_check(struct drm_connector *connector,
 				struct drm_atomic_state *state)
 {
@@ -379,7 +379,7 @@ static const struct drm_connector_helper_funcs dm_dp_mst_connector_helper_funcs 
 #ifdef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
 	.detect_ctx = dm_dp_mst_detect,
 #endif
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	.atomic_check = dm_dp_mst_atomic_check,
 #endif
 };

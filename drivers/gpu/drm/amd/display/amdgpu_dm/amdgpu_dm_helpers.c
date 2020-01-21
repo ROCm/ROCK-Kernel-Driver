@@ -185,16 +185,16 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		bool enable)
 {
 	struct amdgpu_dm_connector *aconnector;
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	struct dm_connector_state *dm_conn_state;
 #endif
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
-#if !defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	int slots = 0;
 #endif
 	bool ret;
-#if !defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	int clock;
 	int bpp = 0;
 	int pbn = 0;
@@ -209,7 +209,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	if (!aconnector || !aconnector->mst_port)
 		return false;
 
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	dm_conn_state = to_dm_connector_state(aconnector->base.state);
 #endif
 
@@ -221,7 +221,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	mst_port = aconnector->port;
 
 	if (enable) {
-#if !defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 		clock = stream->timing.pix_clk_100hz / 10;
 
 		switch (stream->timing.display_color_depth) {
