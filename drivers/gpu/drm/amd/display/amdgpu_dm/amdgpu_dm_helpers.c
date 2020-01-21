@@ -180,10 +180,20 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		bool enable)
 {
 	struct amdgpu_dm_connector *aconnector;
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	struct dm_connector_state *dm_conn_state;
+#endif
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+	int slots = 0;
+#endif
 	bool ret;
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+	int clock;
+	int bpp = 0;
+	int pbn = 0;
+#endif
 
 	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 	/* Accessing the connector state is required for vcpi_slots allocation
@@ -194,7 +204,9 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	if (!aconnector || !aconnector->mst_port)
 		return false;
 
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	dm_conn_state = to_dm_connector_state(aconnector->base.state);
+#endif
 
 	mst_mgr = &aconnector->mst_port->mst_mgr;
 
@@ -204,6 +216,38 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	mst_port = aconnector->port;
 
 	if (enable) {
+
+#if !defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+		clock = stream->timing.pix_clk_100hz / 10;
+
+		switch (stream->timing.display_color_depth) {
+
+			case COLOR_DEPTH_666:
+				bpp = 6;
+				break;
+			case COLOR_DEPTH_888:
+				bpp = 8;
+				break;
+			case COLOR_DEPTH_101010:
+				bpp = 10;
+				break;
+			case COLOR_DEPTH_121212:
+				bpp = 12;
+				break;
+			case COLOR_DEPTH_141414:
+				bpp = 14;
+				break;
+			case COLOR_DEPTH_161616:
+				bpp = 16;
+				break;
+			default:
+				ASSERT(bpp != 0);
+				break;
+		}
+
+		bpp = bpp * 3;
+
+		/* TODO need to know link rate */
 		pbn = drm_dp_calc_pbn_mode(clock, bpp, false);
 
 		slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
@@ -213,6 +257,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 #else
                                &slots);
 #endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
+#else
 		ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port,
 					       dm_conn_state->pbn,
 #ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
@@ -220,6 +265,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 #else
 					       &dm_conn_state->vcpi_slots);
 #endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
+#endif
 		if (!ret)
 			return false;
 
