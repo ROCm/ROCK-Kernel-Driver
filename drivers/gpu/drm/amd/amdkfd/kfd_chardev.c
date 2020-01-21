@@ -150,6 +150,8 @@ static int kfd_open(struct inode *inode, struct file *filep)
 	}
 
 	if (kfd_is_locked()) {
+		dev_dbg(kfd_device, "kfd is locked!\n"
+				"process %d unreferenced", process->pasid);
 		kfd_unref_process(process);
 		return -EAGAIN;
 	}
