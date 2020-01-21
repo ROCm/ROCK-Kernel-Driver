@@ -146,6 +146,8 @@ struct mobiveil_pcie;
 
 struct mobiveil_rp_ops {
 	int (*interrupt_init)(struct mobiveil_pcie *pcie);
+	int (*read_other_conf)(struct pci_bus *bus, unsigned int devfn,
+			       int where, int size, u32 *val);
 };
 
 struct root_port {
@@ -162,6 +164,7 @@ struct root_port {
 
 struct mobiveil_pab_ops {
 	int (*link_up)(struct mobiveil_pcie *pcie);
+	int (*host_init)(struct mobiveil_pcie *pcie);
 };
 
 struct mobiveil_pcie {

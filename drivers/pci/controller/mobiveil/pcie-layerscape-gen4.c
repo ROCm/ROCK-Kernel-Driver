@@ -22,8 +22,13 @@
 
 #include "pcie-mobiveil.h"
 
+#define REV_1_0				(0x10)
+
 /* LUT and PF control registers */
 #define PCIE_LUT_OFF			0x80000
+#define PCIE_LUT_GCR			0x28
+#define PCIE_LUT_GCR_RRE		0
+
 #define PCIE_PF_OFF			0xc0000
 #define PCIE_PF_INT_STAT		0x18
 #define PF_INT_STAT_PABRST		BIT(31)
@@ -40,6 +45,7 @@ struct ls_pcie_g4 {
 	struct mobiveil_pcie pci;
 	struct delayed_work dwork;
 	int irq;
+	u8 rev;
 };
 
 static inline u32 ls_pcie_g4_lut_readl(struct ls_pcie_g4 *pcie, u32 off)
@@ -73,6 +79,15 @@ static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
 	header_type &= 0x7f;
 
 	return header_type == PCI_HEADER_TYPE_BRIDGE;
+}
+
+static int ls_pcie_g4_host_init(struct mobiveil_pcie *pci)
+{
+	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
+
+	pcie->rev = mobiveil_csr_readb(pci, PCI_REVISION_ID);
+
+	return 0;
 }
 
 static int ls_pcie_g4_link_up(struct mobiveil_pcie *pci)
@@ -206,12 +221,34 @@ static void ls_pcie_g4_reset(struct work_struct *work)
 	ls_pcie_g4_enable_interrupt(pcie);
 }
 
+static int ls_pcie_g4_read_other_conf(struct pci_bus *bus, unsigned int devfn,
+				   int where, int size, u32 *val)
+{
+	struct mobiveil_pcie *pci = bus->sysdata;
+	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
+	int ret;
+
+	if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
+		ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
+				      0 << PCIE_LUT_GCR_RRE);
+
+	ret = pci_generic_config_read(bus, devfn, where, size, val);
+
+	if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
+		ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
+				      1 << PCIE_LUT_GCR_RRE);
+
+	return ret;
+}
+
 static struct mobiveil_rp_ops ls_pcie_g4_rp_ops = {
 	.interrupt_init = ls_pcie_g4_interrupt_init,
+	.read_other_conf = ls_pcie_g4_read_other_conf,
 };
 
 static const struct mobiveil_pab_ops ls_pcie_g4_pab_ops = {
 	.link_up = ls_pcie_g4_link_up,
+	.host_init = ls_pcie_g4_host_init,
 };
 
 static int __init ls_pcie_g4_probe(struct platform_device *pdev)
