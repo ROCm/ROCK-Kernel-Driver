@@ -460,7 +460,7 @@ struct dm_connector_state {
 	bool freesync_enable;
 	bool freesync_capable;
 	uint8_t abm_level;
-#if defined(HAVE_STRUCT_NAME_CB_NAME_2ARGS)
+#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	int vcpi_slots;
 	uint64_t pbn;
 #endif
