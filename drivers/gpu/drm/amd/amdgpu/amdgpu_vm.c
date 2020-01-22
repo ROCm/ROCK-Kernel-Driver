@@ -1460,7 +1460,7 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
 			 * unless one level up is the root level.
 			 */
 			if (!amdgpu_vm_pt_ancestor(&cursor))
-				return -ENOENT;
+				return -EINVAL;
 			continue;
 		}
 
