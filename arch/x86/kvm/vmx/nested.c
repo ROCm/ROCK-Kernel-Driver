@@ -2085,6 +2085,7 @@ static void prepare_vmcs02_early(struct vcpu_vmx *vmx, struct vmcs12 *vmcs12)
 				  SECONDARY_EXEC_ENABLE_INVPCID |
 				  SECONDARY_EXEC_RDTSCP |
 				  SECONDARY_EXEC_XSAVES |
+				  SECONDARY_EXEC_ENABLE_USR_WAIT_PAUSE |
 				  SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 				  SECONDARY_EXEC_APIC_REGISTER_VIRT |
 				  SECONDARY_EXEC_ENABLE_VMFUNC);
@@ -5432,6 +5433,10 @@ bool nested_vmx_exit_reflected(struct kvm_vcpu *vcpu, u32 exit_reason)
 	case EXIT_REASON_ENCLS:
 		/* SGX is never exposed to L1 */
 		return false;
+	case EXIT_REASON_UMWAIT:
+	case EXIT_REASON_TPAUSE:
+		return nested_cpu_has2(vmcs12,
+			SECONDARY_EXEC_ENABLE_USR_WAIT_PAUSE);
 	default:
 		return true;
 	}
