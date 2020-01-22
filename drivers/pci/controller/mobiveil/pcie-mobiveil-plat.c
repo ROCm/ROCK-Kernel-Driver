@@ -6,7 +6,7 @@
  * Copyright 2019 NXP
  *
  * Author: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
- * Refactor: Zhiqiang Hou <Zhiqiang.Hou@nxp.com>
+ * Recode: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
  */
 
 #include <linux/init.h>
@@ -30,6 +30,7 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pcie = pci_host_bridge_priv(bridge);
+	pcie->rp.bridge = bridge;
 
 	pcie->pdev = pdev;
 

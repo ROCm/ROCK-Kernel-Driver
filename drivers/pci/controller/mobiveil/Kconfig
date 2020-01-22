@@ -7,9 +7,9 @@ config PCIE_MOBIVEIL
 	bool
 
 config PCIE_MOBIVEIL_HOST
-        bool
+	bool
 	depends on PCI_MSI_IRQ_DOMAIN
-        select PCIE_MOBIVEIL
+	select PCIE_MOBIVEIL
 
 config PCIE_MOBIVEIL_PLAT
 	bool "Mobiveil AXI PCIe controller"
