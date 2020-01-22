@@ -757,6 +757,7 @@ struct kfd_process_device {
 	 * function.
 	 */
 	bool already_dequeued;
+	bool runtime_inuse;
 
 	/* Flag to indicate if debugging is active on this device for this
 	 * process.  This is for the new GFX9+ debugging, and indicates that
