@@ -771,8 +771,7 @@ static int smu_init_fb_allocations(struct smu_context *smu)
 	struct smu_table_context *smu_table = &smu->smu_table;
 	struct smu_table *tables = smu_table->tables;
 	uint32_t table_count = smu_table->table_count;
-	uint32_t i = 0;
-	int32_t ret = 0;
+	int ret, i;
 
 	if (table_count <= 0)
 		return -EINVAL;
@@ -793,7 +792,7 @@ static int smu_init_fb_allocations(struct smu_context *smu)
 
 	return 0;
 failed:
-	for (; i > 0; i--) {
+	while (--i >= 0) {
 		if (tables[i].size == 0)
 			continue;
 		amdgpu_bo_free_kernel(&tables[i].bo,
