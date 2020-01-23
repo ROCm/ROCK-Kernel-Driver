@@ -3152,7 +3152,7 @@ static void qeth_queue_input_buffer(struct qeth_card *card, int index)
 		for (i = queue->next_buf_to_init;
 		     i < queue->next_buf_to_init + count; ++i) {
 			if (qeth_init_input_buffer(card,
-				&queue->bufs[i % QDIO_MAX_BUFFERS_PER_Q])) {
+				&queue->bufs[QDIO_BUFNR(i)])) {
 				break;
 			} else {
 				newcount++;
@@ -3194,8 +3194,8 @@ static void qeth_queue_input_buffer(struct qeth_card *card, int index)
 		if (rc) {
 			QETH_CARD_TEXT(card, 2, "qinberr");
 		}
-		queue->next_buf_to_init = (queue->next_buf_to_init + count) %
-					  QDIO_MAX_BUFFERS_PER_Q;
+		queue->next_buf_to_init = QDIO_BUFNR(queue->next_buf_to_init +
+						     count);
 	}
 }
 
@@ -3243,7 +3243,7 @@ static int qeth_prep_flush_pack_buffer(struct qeth_qdio_out_q *queue)
 		/* it's a packing buffer */
 		atomic_set(&buffer->state, QETH_QDIO_BUF_PRIMED);
 		queue->next_buf_to_fill =
-			(queue->next_buf_to_fill + 1) % QDIO_MAX_BUFFERS_PER_Q;
+			QDIO_BUFNR(queue->next_buf_to_fill + 1);
 		return 1;
 	}
 	return 0;
@@ -3297,7 +3297,8 @@ static void qeth_flush_buffers(struct qeth_qdio_out_q *queue, int index,
 	unsigned int qdio_flags;
 
 	for (i = index; i < index + count; ++i) {
-		int bidx = i % QDIO_MAX_BUFFERS_PER_Q;
+		unsigned int bidx = QDIO_BUFNR(i);
+
 		buf = queue->bufs[bidx];
 		buf->buffer->element[buf->next_element_to_fill - 1].eflags |=
 				SBAL_EFLAGS_LAST_ENTRY;
@@ -3465,8 +3466,7 @@ static void qeth_qdio_cq_handler(struct qeth_card *card, unsigned int qdio_err,
 	}
 
 	for (i = first_element; i < first_element + count; ++i) {
-		int bidx = i % QDIO_MAX_BUFFERS_PER_Q;
-		struct qdio_buffer *buffer = cq->qdio_bufs[bidx];
+		struct qdio_buffer *buffer = cq->qdio_bufs[QDIO_BUFNR(i)];
 		int e = 0;
 
 		while ((e < QDIO_MAX_ELEMENTS_PER_BUFFER) &&
@@ -3487,8 +3487,8 @@ static void qeth_qdio_cq_handler(struct qeth_card *card, unsigned int qdio_err,
 			"QDIO reported an error, rc=%i\n", rc);
 		QETH_CARD_TEXT(card, 2, "qcqherr");
 	}
-	card->qdio.c_q->next_buf_to_init = (card->qdio.c_q->next_buf_to_init
-				   + count) % QDIO_MAX_BUFFERS_PER_Q;
+
+	cq->next_buf_to_init = QDIO_BUFNR(cq->next_buf_to_init + count);
 }
 
 static void qeth_qdio_input_handler(struct ccw_device *ccwdev,
@@ -3514,7 +3514,6 @@ static void qeth_qdio_output_handler(struct ccw_device *ccwdev,
 {
 	struct qeth_card *card        = (struct qeth_card *) card_ptr;
 	struct qeth_qdio_out_q *queue = card->qdio.out_qs[__queue];
-	struct qeth_qdio_out_buffer *buffer;
 	struct net_device *dev = card->dev;
 	struct netdev_queue *txq;
 	int i;
@@ -3528,10 +3527,10 @@ static void qeth_qdio_output_handler(struct ccw_device *ccwdev,
 	}
 
 	for (i = first_element; i < (first_element + count); ++i) {
-		int bidx = i % QDIO_MAX_BUFFERS_PER_Q;
-		buffer = queue->bufs[bidx];
-		qeth_handle_send_error(card, buffer, qdio_error);
-		qeth_clear_output_buffer(queue, buffer, qdio_error, 0);
+		struct qeth_qdio_out_buffer *buf = queue->bufs[QDIO_BUFNR(i)];
+
+		qeth_handle_send_error(card, buf, qdio_error);
+		qeth_clear_output_buffer(queue, buf, qdio_error, 0);
 	}
 
 	atomic_sub(count, &queue->used_buffers);
@@ -3963,8 +3962,7 @@ int qeth_do_send_packet(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 			atomic_set(&buffer->state, QETH_QDIO_BUF_PRIMED);
 			flush_count++;
 			queue->next_buf_to_fill =
-				(queue->next_buf_to_fill + 1) %
-				QDIO_MAX_BUFFERS_PER_Q;
+				QDIO_BUFNR(queue->next_buf_to_fill + 1);
 			buffer = queue->bufs[queue->next_buf_to_fill];
 
 			/* We stepped forward, so sanity-check again: */
@@ -3997,8 +3995,8 @@ int qeth_do_send_packet(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 	if (!queue->do_pack || stopped || next_element >= queue->max_elements) {
 		flush_count++;
 		atomic_set(&buffer->state, QETH_QDIO_BUF_PRIMED);
-		queue->next_buf_to_fill = (queue->next_buf_to_fill + 1) %
-					  QDIO_MAX_BUFFERS_PER_Q;
+		queue->next_buf_to_fill =
+				QDIO_BUFNR(queue->next_buf_to_fill + 1);
 	}
 
 	if (flush_count)
@@ -5228,8 +5226,7 @@ int qeth_poll(struct napi_struct *napi, int budget)
 				card->rx.b_count--;
 				if (card->rx.b_count) {
 					card->rx.b_index =
-						(card->rx.b_index + 1) %
-						QDIO_MAX_BUFFERS_PER_Q;
+						QDIO_BUFNR(card->rx.b_index + 1);
 					card->rx.b_element =
 						&card->qdio.in_q
 						->bufs[card->rx.b_index]
