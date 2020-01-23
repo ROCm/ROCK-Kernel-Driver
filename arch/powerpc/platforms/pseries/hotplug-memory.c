@@ -236,9 +236,9 @@ static int get_lmb_range(u32 drc_index, int n_lmbs,
 	if (!start)
 		return -EINVAL;
 
-	end = &start[n_lmbs - 1];
+	end = &start[n_lmbs];
 
-	last_lmb = &drmem_info->lmbs[drmem_info->n_lmbs - 1];
+	last_lmb = &drmem_info->lmbs[drmem_info->n_lmbs];
 	if (end > last_lmb)
 		return -EINVAL;
 
