@@ -662,9 +662,9 @@ static u64 execlists_update_context(struct i915_request *rq)
 	 * reload.
 	 */
 	tail = intel_ring_set_tail(rq->ring, rq->tail);
-	if (unlikely(ce->lrc_reg_state[CTX_RING_TAIL] == tail))
+	if (unlikely(ce->lrc_reg_state[CTX_RING_TAIL + 1] == tail))
 		desc |= CTX_DESC_FORCE_RESTORE;
-	ce->lrc_reg_state[CTX_RING_TAIL] = tail;
+	ce->lrc_reg_state[CTX_RING_TAIL + 1] = tail;
 	rq->tail = rq->wa_tail;
 
 	/*
@@ -685,6 +685,7 @@ static u64 execlists_update_context(struct i915_request *rq)
 	mb();
 
 	ce->lrc_desc &= ~CTX_DESC_FORCE_RESTORE;
+
 	return desc;
 }
 
