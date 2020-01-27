@@ -1293,6 +1293,9 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 #endif
 
 	ret = amdgpu_device_suspend(drm_dev, false);
+	if (ret)
+		return ret;
+
 	if (amdgpu_device_supports_boco(drm_dev)) {
 		/* Only need to handle PCI state in the driver for ATPX
 		 * PCI core handles it for _PR3.
