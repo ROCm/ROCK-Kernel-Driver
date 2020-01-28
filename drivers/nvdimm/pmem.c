@@ -372,6 +372,10 @@ static int pmem_attach_disk(struct device *dev,
 	if (!pmem)
 		return -ENOMEM;
 
+	rc = devm_namespace_enable(dev, ndns, nd_info_block_reserve());
+	if (rc)
+		return rc;
+
 	/* while nsio_rw_bytes is active, parse a pfn info block if present */
 	if (is_nd_pfn(dev)) {
 		nd_pfn = to_nd_pfn(dev);
@@ -381,7 +385,7 @@ static int pmem_attach_disk(struct device *dev,
 	}
 
 	/* we're attaching a block device, disable raw namespace access */
-	devm_nsio_disable(dev, nsio);
+	devm_namespace_disable(dev, ndns);
 
 	dev_set_drvdata(dev, pmem);
 	pmem->phys_addr = res->start;
@@ -491,13 +495,11 @@ static int pmem_attach_disk(struct device *dev,
 static int nd_pmem_probe(struct device *dev)
 {
 	struct nd_namespace_common *ndns;
+	int ret;
 
 	ndns = nvdimm_namespace_common_probe(dev);
 	if (IS_ERR(ndns))
 		return PTR_ERR(ndns);
-
-	if (devm_nsio_enable(dev, to_nd_namespace_io(&ndns->dev)))
-		return -ENXIO;
 
 	if (is_nd_btt(dev))
 		return nvdimm_namespace_attach_btt(ndns);
@@ -505,10 +507,17 @@ static int nd_pmem_probe(struct device *dev)
 	if (is_nd_pfn(dev))
 		return pmem_attach_disk(dev, ndns);
 
+	ret = devm_namespace_enable(dev, ndns, nd_info_block_reserve());
+	if (ret)
+		return ret;
+
 	/* if we find a valid info-block we'll come back as that personality */
 	if (nd_btt_probe(dev, ndns) == 0 || nd_pfn_probe(dev, ndns) == 0
 			|| nd_dax_probe(dev, ndns) == 0)
 		return -ENXIO;
+
+	/* probe complete, attach handles namespace enabling */
+	devm_namespace_disable(dev, ndns);
 
 	/* ...otherwise we're just a raw pmem device */
 	return pmem_attach_disk(dev, ndns);
