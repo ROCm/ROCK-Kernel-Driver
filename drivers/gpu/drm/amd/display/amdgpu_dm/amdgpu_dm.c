@@ -9309,6 +9309,20 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #endif
 #endif
 
+		/*
+		 * Perform validation of MST topology in the state:
+		 * We need to perform MST atomic check before calling
+		 * dc_validate_global_state(), or there is a chance
+		 * to get stuck in an infinite loop and hang eventually.
+		 */
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
+		ret = drm_dp_mst_atomic_check(state);
+		if (ret)
+			goto fail;
+#endif
+#endif
+
 		if (dc_validate_global_state(dc, dm_state->context, false) != DC_OK) {
 			ret = -EINVAL;
 			goto fail;
@@ -9339,14 +9353,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 #endif
 	}
-	/* Perform validation of MST topology in the state*/
-#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
-#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
-	ret = drm_dp_mst_atomic_check(state);
-	if (ret)
-		goto fail;
-#endif
-#endif
 
 	/* Store the overall update type for use later in atomic check. */
 #if !defined(for_each_new_crtc_in_state)
