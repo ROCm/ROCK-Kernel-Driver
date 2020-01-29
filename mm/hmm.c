@@ -357,6 +357,9 @@ static int hmm_vma_walk_hole_(unsigned long addr, unsigned long end,
 	page_size = hmm_range_page_size(range);
 	i = (addr - range->start) >> range->page_shift;
 
+	if (write_fault && walk->vma && !(walk->vma->vm_flags & VM_WRITE))
+		return -EPERM;
+
 	for (; addr < end; addr += page_size, i++) {
 		pfns[i] = range->values[HMM_PFN_NONE];
 		if (fault || write_fault) {
