@@ -556,10 +556,8 @@ static ssize_t dimmdev_ce_count_show(struct device *dev,
 				      char *data)
 {
 	struct dimm_info *dimm = to_dimm(dev);
-	u32 count;
 
-	count = dimm->mci->ce_per_layer[dimm->mci->n_layers-1][dimm->idx];
-	return sprintf(data, "%u\n", count);
+	return sprintf(data, "%u\n", dimm->ce_count);
 }
 
 static ssize_t dimmdev_ue_count_show(struct device *dev,
@@ -567,10 +565,8 @@ static ssize_t dimmdev_ue_count_show(struct device *dev,
 				      char *data)
 {
 	struct dimm_info *dimm = to_dimm(dev);
-	u32 count;
 
-	count = dimm->mci->ue_per_layer[dimm->mci->n_layers-1][dimm->idx];
-	return sprintf(data, "%u\n", count);
+	return sprintf(data, "%u\n", dimm->ue_count);
 }
 
 /* dimm/rank attribute files */
@@ -666,7 +662,9 @@ static ssize_t mci_reset_counters_store(struct device *dev,
 					const char *data, size_t count)
 {
 	struct mem_ctl_info *mci = to_mci(dev);
-	int cnt, row, chan, i;
+	struct dimm_info *dimm;
+	int row, chan;
+
 	mci->ue_mc = 0;
 	mci->ce_mc = 0;
 	mci->ue_noinfo_count = 0;
@@ -682,11 +680,9 @@ static ssize_t mci_reset_counters_store(struct device *dev,
 			ri->channels[chan]->ce_count = 0;
 	}
 
-	cnt = 1;
-	for (i = 0; i < mci->n_layers; i++) {
-		cnt *= mci->layers[i].size;
-		memset(mci->ce_per_layer[i], 0, cnt * sizeof(u32));
-		memset(mci->ue_per_layer[i], 0, cnt * sizeof(u32));
+	mci_for_each_dimm(mci, dimm) {
+		dimm->ue_count = 0;
+		dimm->ce_count = 0;
 	}
 
 	mci->start_time = jiffies;
