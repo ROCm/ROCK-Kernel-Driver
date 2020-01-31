@@ -78,11 +78,13 @@ static u32 clip_scaled(u32 src, u32 dst, u32 clip)
  * @clip: clip rectangle
  *
  * Clip rectangle @dst by rectangle @clip. Clip rectangle @src by the
- * same amounts multiplied by @hscale and @vscale.
+ * the corresponding amounts, retaining the vertical and horizontal scaling
+ * factors from @src to @dst.
  *
  * RETURNS:
+ *
  * %true if rectangle @dst is still visible after being clipped,
- * %false otherwise
+ * %false otherwise.
  */
 bool drm_rect_clip_scaled(struct drm_rect *src, struct drm_rect *dst,
 			  const struct drm_rect *clip)
