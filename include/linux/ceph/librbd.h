@@ -238,6 +238,7 @@ struct rbd_device {
 enum rbd_dev_flags {
 	RBD_DEV_FLAG_EXISTS,	/* mapped snapshot has not been deleted */
 	RBD_DEV_FLAG_REMOVING,	/* this mapping is being removed */
+	RBD_DEV_FLAG_READONLY,	/* -o ro or snapshot */
 };
 
 extern struct rbd_img_request *rbd_img_request_create(
