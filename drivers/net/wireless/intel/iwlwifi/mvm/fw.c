@@ -721,7 +721,7 @@ static int iwl_mvm_sar_get_ewrd_table(struct iwl_mvm *mvm)
 {
 	union acpi_object *wifi_pkg, *data;
 	bool enabled;
-	int i, n_profiles, ret, tbl_rev;
+	int i, n_profiles, ret, tbl_rev, pos;
 
 	data = iwl_acpi_get_object(mvm->dev, ACPI_EWRD_METHOD);
 	if (IS_ERR(data))
@@ -753,9 +753,8 @@ static int iwl_mvm_sar_get_ewrd_table(struct iwl_mvm *mvm)
 		goto out_free;
 	}
 
+	pos = 3;
 	for (i = 0; i < n_profiles; i++) {
-		/* the tables start at element 3 */
-		int pos = 3;
 
 		/* The EWRD profiles officially go from 2 to 4, but we
 		 * save them in sar_profiles[1-3] (because we don't
