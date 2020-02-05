@@ -509,10 +509,8 @@ static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
 
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
-	if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo)) {
-		ttm_bo_flush_all_fences(bo);
+	if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo))
 		dma_resv_unlock(&amdkcl_ttm_resv(bo));
-	}
 
 error:
 	kref_get(&bo->list_kref);
