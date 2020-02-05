@@ -380,9 +380,9 @@ void hdcp_destroy(struct hdcp_workqueue *hdcp_work)
 		cancel_delayed_work_sync(&hdcp_work[i].watchdog_timer_dwork);
 	}
 
-	kfree(hdcp_work);
 	kfree(hdcp_work->srm);
 	kfree(hdcp_work->srm_temp);
+	kfree(hdcp_work);
 }
 
 static void update_config(void *handle, struct cp_psp_stream_config *config)
@@ -555,11 +555,12 @@ struct hdcp_workqueue *hdcp_create_workqueue(struct amdgpu_device *adev, struct 
 {
 
 	int max_caps = dc->caps.max_links;
-	struct hdcp_workqueue *hdcp_work = kzalloc(max_caps*sizeof(*hdcp_work), GFP_KERNEL);
+	struct hdcp_workqueue *hdcp_work;
 	int i = 0;
 
+	hdcp_work = kcalloc(max_caps, sizeof(*hdcp_work), GFP_KERNEL);
 	if (hdcp_work == NULL)
-		goto fail_alloc_context;
+		return NULL;
 
 	hdcp_work->srm = kcalloc(PSP_HDCP_SRM_FIRST_GEN_MAX_SIZE, sizeof(*hdcp_work->srm), GFP_KERNEL);
 
@@ -602,9 +603,9 @@ struct hdcp_workqueue *hdcp_create_workqueue(struct amdgpu_device *adev, struct 
 	return hdcp_work;
 
 fail_alloc_context:
-	kfree(hdcp_work);
 	kfree(hdcp_work->srm);
 	kfree(hdcp_work->srm_temp);
+	kfree(hdcp_work);
 
 	return NULL;
 
