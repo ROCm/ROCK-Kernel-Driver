@@ -932,6 +932,8 @@ struct kfd_process {
 	/* Used to drain stale interrupts */
 	wait_queue_head_t wait_irq_drain;
 	bool irq_drain_is_open;
+
+	bool svm_disabled;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
