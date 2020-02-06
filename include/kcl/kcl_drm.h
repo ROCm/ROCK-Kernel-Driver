@@ -163,6 +163,7 @@ int drm_atomic_helper_resume(struct drm_device *dev,
 #endif
 
 #if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
+extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
