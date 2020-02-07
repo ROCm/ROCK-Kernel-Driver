@@ -1996,4 +1996,6 @@ void arch_smt_update(void)
 {
 	/* Handle the speculative execution misfeatures */
 	cpu_bugs_smt_update();
+	/* Check whether IPI broadcasting can be enabled */
+	apic_smt_update();
 }
