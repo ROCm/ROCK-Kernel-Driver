@@ -151,7 +151,6 @@ struct rbd_client_id {
 
 struct rbd_mapping {
 	u64                     size;
-	u64                     features;
 };
 
 /*
@@ -236,8 +235,9 @@ struct rbd_device {
  *   by rbd_dev->lock
  */
 enum rbd_dev_flags {
-	RBD_DEV_FLAG_EXISTS,	/* mapped snapshot has not been deleted */
+	RBD_DEV_FLAG_EXISTS,	/* rbd_dev_device_setup() ran */
 	RBD_DEV_FLAG_REMOVING,	/* this mapping is being removed */
+	RBD_DEV_FLAG_READONLY,	/* -o ro or snapshot */
 };
 
 extern struct rbd_img_request *rbd_img_request_create(
