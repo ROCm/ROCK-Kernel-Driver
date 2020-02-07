@@ -4,16 +4,15 @@ dnl # Author: Linus Torvalds <torvalds@linux-foundation.org>
 dnl # Date:   Thu Jan 3 18:57:57 2019 -0800
 dnl # Remove 'type' argument from access_ok() function
 dnl #
-AC_DEFUN([AC_AMDGPU_ACCESS_OK_WITH_TWO_ARGUMENTS],
-	[AC_MSG_CHECKING([whether access_ok(x, x) is available])
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/uaccess.h>
-	],[
-		access_ok(1, 1);
-	],[
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS, 1, [whether access_ok(x, x) is available])
-	],[
-		AC_MSG_RESULT(no)
+AC_DEFUN([AC_AMDGPU_ACCESS_OK_WITH_TWO_ARGUMENTS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/uaccess.h>
+		],[
+			access_ok(1, 1);
+		],[
+			AC_DEFINE(HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS, 1,
+				[whether access_ok(x, x) is available])
+		])
 	])
 ])

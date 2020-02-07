@@ -3,19 +3,18 @@ dnl # drm: Add API for capturing frame CRCs
 dnl # Adds files and directories to debugfs for controlling and reading
 dnl # frame CRCs, per CRTC
 dnl #
-AC_DEFUN([AC_AMDGPU_2ARGS_SET_CRC_SOURCE],
-	[AC_MSG_CHECKING([whether crtc->funcs->set_crc_source() wants 2 args])
-	AC_KERNEL_TRY_COMPILE([
-		#include <drm/drm_crtc.h>
-	], [
-		struct drm_crtc *crtc = NULL;
-		int ret;
+AC_DEFUN([AC_AMDGPU_2ARGS_SET_CRC_SOURCE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_crtc.h>
+		], [
+			struct drm_crtc *crtc = NULL;
+			int ret;
 
-		ret = crtc->funcs->set_crc_source(NULL, NULL);
-	], [
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_2ARGS_SET_CRC_SOURCE, 1, [crtc->funcs->set_crc_source() wants 2 args])
-	], [
-		AC_MSG_RESULT(no)
+			ret = crtc->funcs->set_crc_source(NULL, NULL);
+		], [
+			AC_DEFINE(HAVE_2ARGS_SET_CRC_SOURCE, 1,
+				[crtc->funcs->set_crc_source() wants 2 args])
+		])
 	])
 ])
