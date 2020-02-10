@@ -408,7 +408,7 @@ int aa_remount(struct aa_label *label, const struct path *path,
 
 	binary = path->dentry->d_sb->s_type->fs_flags & FS_BINARY_MOUNTDATA;
 
-	buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
 	if (!buffer)
 		return -ENOMEM;
 	error = fn_for_each_confined(label, profile,
@@ -439,8 +439,8 @@ int aa_bind_mount(struct aa_label *label, const struct path *path,
 	if (error)
 		return error;
 
-	buffer = aa_get_buffer();
-	old_buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
+	old_buffer = aa_get_buffer(false);
 	error = -ENOMEM;
 	if (!buffer || old_buffer)
 		goto out;
@@ -470,7 +470,7 @@ int aa_mount_change_type(struct aa_label *label, const struct path *path,
 	flags &= (MS_REC | MS_SILENT | MS_SHARED | MS_PRIVATE | MS_SLAVE |
 		  MS_UNBINDABLE);
 
-	buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
 	if (!buffer)
 		return -ENOMEM;
 	error = fn_for_each_confined(label, profile,
@@ -499,8 +499,8 @@ int aa_move_mount(struct aa_label *label, const struct path *path,
 	if (error)
 		return error;
 
-	buffer = aa_get_buffer();
-	old_buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
+	old_buffer = aa_get_buffer(false);
 	error = -ENOMEM;
 	if (!buffer || !old_buffer)
 		goto out;
@@ -550,13 +550,13 @@ int aa_new_mount(struct aa_label *label, const char *dev_name,
 		}
 	}
 
-	buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
 	if (!buffer) {
 		error = -ENOMEM;
 		goto out;
 	}
 	if (dev_path) {
-		dev_buffer = aa_get_buffer();
+		dev_buffer = aa_get_buffer(false);
 		if (!dev_buffer) {
 			error = -ENOMEM;
 			goto out;
@@ -620,7 +620,7 @@ int aa_umount(struct aa_label *label, struct vfsmount *mnt, int flags)
 	AA_BUG(!label);
 	AA_BUG(!mnt);
 
-	buffer = aa_get_buffer();
+	buffer = aa_get_buffer(false);
 	if (!buffer)
 		return -ENOMEM;
 
@@ -699,8 +699,8 @@ int aa_pivotroot(struct aa_label *label, const struct path *old_path,
 	AA_BUG(!old_path);
 	AA_BUG(!new_path);
 
-	old_buffer = aa_get_buffer();
-	new_buffer = aa_get_buffer();
+	old_buffer = aa_get_buffer(false);
+	new_buffer = aa_get_buffer(false);
 	error = -ENOMEM;
 	if (!old_buffer || !new_buffer)
 		goto out;
