@@ -82,6 +82,7 @@ MODULE_FIRMWARE("amdgpu/navi10_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/navi14_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/navi12_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/sienna_cichlid_gpu_info.bin");
+MODULE_FIRMWARE("amdgpu/navy_flounder_gpu_info.bin");
 
 #define AMDGPU_RESUME_MS		2000
 
@@ -1640,6 +1641,9 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		break;
 	case CHIP_SIENNA_CICHLID:
 		chip_name = "sienna_cichlid";
+		break;
+	case CHIP_NAVY_FLOUNDER:
+		chip_name = "navy_flounder";
 		break;
 	}
 
