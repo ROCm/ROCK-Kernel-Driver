@@ -72,7 +72,7 @@ int cc_pm_get(struct device *dev)
 	if (drvdata->pm_on)
 		rc = pm_runtime_get_sync(dev);
 
-	return rc;
+	return (rc == 1 ? 0 : rc);
 }
 
 int cc_pm_put_suspend(struct device *dev)
