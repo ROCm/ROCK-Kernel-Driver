@@ -27,6 +27,7 @@
 #define __DAL_CLK_MGR_H__
 
 #include "dc.h"
+#include "dm_pp_smu.h"
 
 #define DCN_MINIMUM_DISPCLK_Khz 100000
 #define DCN_MINIMUM_DPPCLK_Khz 100000
@@ -199,6 +200,7 @@ struct clk_mgr {
 	struct clk_state_registers_and_bypass boot_snapshot;
 	struct clk_bw_params *bw_params;
 #endif
+	struct pp_smu_wm_range_sets ranges;
 };
 
 /* forward declarations */

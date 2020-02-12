@@ -775,6 +775,28 @@ static bool disable_all_writeback_pipes_for_stream(
 }
 #endif
 
+void apply_ctx_interdependent_lock(struct dc *dc, struct dc_state *context, struct dc_stream_state *stream, bool lock)
+{
+	int i = 0;
+
+	/* Checks if interdependent update function pointer is NULL or not, takes care of DCE110 case */
+	if (dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, lock);
+	else {
+		for (i = 0; i < dc->res_pool->pipe_count; i++) {
+			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+			struct pipe_ctx *old_pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
+
+			// Copied conditions that were previously in dce110_apply_ctx_for_surface
+			if (stream == pipe_ctx->stream) {
+				if (!pipe_ctx->top_pipe &&
+					(pipe_ctx->plane_state || old_pipe_ctx->plane_state))
+					dc->hwss.pipe_control_lock(dc, pipe_ctx, lock);
+			}
+		}
+	}
+}
+
 static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 {
 	int i, j;
@@ -802,13 +824,21 @@ static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 			disable_all_writeback_pipes_for_stream(dc, old_stream, dangling_context);
 #endif
-			if (dc->hwss.apply_ctx_for_surface)
+			if (dc->hwss.apply_ctx_for_surface) {
+				apply_ctx_interdependent_lock(dc, dc->current_state, old_stream, true);
 				dc->hwss.apply_ctx_for_surface(dc, old_stream, 0, dangling_context);
-		}
+				apply_ctx_interdependent_lock(dc, dc->current_state, old_stream, false);
+				dc->hwss.post_unlock_program_front_end(dc, dangling_context);
+			}
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-		if (dc->hwss.program_front_end_for_ctx)
-			dc->hwss.program_front_end_for_ctx(dc, dangling_context);
+			if (dc->hwss.program_front_end_for_ctx) {
+				dc->hwss.interdependent_update_lock(dc, dc->current_state, true);
+				dc->hwss.program_front_end_for_ctx(dc, dangling_context);
+				dc->hwss.interdependent_update_lock(dc, dc->current_state, false);
+				dc->hwss.post_unlock_program_front_end(dc, dangling_context);
+			}
 #endif
+		}
 	}
 
 	current_ctx = dc->current_state;
@@ -1228,16 +1258,19 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	/* re-program planes for existing stream, in case we need to
 	 * free up plane resource for later use
 	 */
-	if (dc->hwss.apply_ctx_for_surface)
+	if (dc->hwss.apply_ctx_for_surface) {
 		for (i = 0; i < context->stream_count; i++) {
 			if (context->streams[i]->mode_changed)
 				continue;
-
+			apply_ctx_interdependent_lock(dc, context, context->streams[i], true);
 			dc->hwss.apply_ctx_for_surface(
 				dc, context->streams[i],
 				context->stream_status[i].plane_count,
 				context); /* use new pipe config in new context */
+			apply_ctx_interdependent_lock(dc, context, context->streams[i], false);
+			dc->hwss.post_unlock_program_front_end(dc, context);
 		}
+	}
 
 	/* Program hardware */
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
@@ -1257,20 +1290,29 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 
 	/* Program all planes within new context*/
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
-	if (dc->hwss.program_front_end_for_ctx)
+	if (dc->hwss.program_front_end_for_ctx) {
+		dc->hwss.interdependent_update_lock(dc, context, true);
 		dc->hwss.program_front_end_for_ctx(dc, context);
+		dc->hwss.interdependent_update_lock(dc, context, false);
+		dc->hwss.post_unlock_program_front_end(dc, context);
+	}
 #endif
+
 	for (i = 0; i < context->stream_count; i++) {
 		const struct dc_link *link = context->streams[i]->link;
 
 		if (!context->streams[i]->mode_changed)
 			continue;
 
-		if (dc->hwss.apply_ctx_for_surface)
+		if (dc->hwss.apply_ctx_for_surface) {
+			apply_ctx_interdependent_lock(dc, context, context->streams[i], true);
 			dc->hwss.apply_ctx_for_surface(
 					dc, context->streams[i],
 					context->stream_status[i].plane_count,
 					context);
+			apply_ctx_interdependent_lock(dc, context, context->streams[i], false);
+			dc->hwss.post_unlock_program_front_end(dc, context);
+		}
 
 		/*
 		 * enable stereo
@@ -1336,12 +1378,6 @@ bool dc_commit_state(struct dc *dc, struct dc_state *context)
 	result = dc_commit_state_no_check(dc, context);
 
 	return (result == DC_OK);
-}
-
-bool dc_is_hw_initialized(struct dc *dc)
-{
-	struct dc_bios *dcb = dc->ctx->dc_bios;
-	return dcb->funcs->is_accelerated_mode(dcb);
 }
 
 bool dc_post_update_surfaces_to_stream(struct dc *dc)
@@ -1756,16 +1792,17 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		if (stream_update->wb_update)
 			su_flags->bits.wb_update = 1;
 #endif
+
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+		if (stream_update->dsc_config)
+			su_flags->bits.dsc_changed = 1;
+#endif
+
 		if (su_flags->raw != 0)
 			overall_type = UPDATE_TYPE_FULL;
 
 		if (stream_update->output_csc_transform || stream_update->output_color_space)
 			su_flags->bits.out_csc = 1;
-
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-		if (stream_update->dsc_config)
-			overall_type = UPDATE_TYPE_FULL;
-#endif
 	}
 
 	for (i = 0 ; i < surface_count; i++) {
@@ -1800,8 +1837,11 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 
 	type = check_update_surfaces_for_stream(dc, updates, surface_count, stream_update, stream_status);
 	if (type == UPDATE_TYPE_FULL) {
-		if (stream_update)
+		if (stream_update) {
+			uint32_t dsc_changed = stream_update->stream->update_flags.bits.dsc_changed;
 			stream_update->stream->update_flags.raw = 0xFFFFFFFF;
+			stream_update->stream->update_flags.bits.dsc_changed = dsc_changed;
+		}
 		for (i = 0; i < surface_count; i++)
 			updates[i].surface->update_flags.raw = 0xFFFFFFFF;
 	}
@@ -2127,20 +2167,16 @@ static void commit_planes_do_stream_update(struct dc *dc,
 #endif
 			}
 
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-			if (stream_update->dsc_config && dc->hwss.pipe_control_lock_global) {
-				dc->hwss.pipe_control_lock_global(dc, pipe_ctx, true);
-				dp_update_dsc_config(pipe_ctx);
-				dc->hwss.pipe_control_lock_global(dc, pipe_ctx, false);
-			}
-#endif
 			/* Full fe update*/
 			if (update_type == UPDATE_TYPE_FAST)
 				continue;
 
-			if (stream_update->dpms_off) {
-				dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+			if (stream_update->dsc_config)
+				dp_update_dsc_config(pipe_ctx);
+#endif
 
+			if (stream_update->dpms_off) {
 				if (*stream_update->dpms_off) {
 					core_link_disable_stream(pipe_ctx);
 					/* for dpms, keep acquired resources*/
@@ -2154,8 +2190,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 					core_link_enable_stream(dc->current_state, pipe_ctx);
 				}
-
-				dc->hwss.pipe_control_lock(dc, pipe_ctx, false);
 			}
 
 			if (stream_update->abm_level && pipe_ctx->stream_res.abm) {
@@ -2211,6 +2245,32 @@ static void commit_planes_for_stream(struct dc *dc,
 		context_clock_trace(dc, context);
 	}
 
+	for (j = 0; j < dc->res_pool->pipe_count; j++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
+
+		if (!pipe_ctx->top_pipe &&
+			!pipe_ctx->prev_odm_pipe &&
+			pipe_ctx->stream &&
+			pipe_ctx->stream == stream) {
+			top_pipe_to_program = pipe_ctx;
+		}
+	}
+
+	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
+		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable)
+			top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable(
+					top_pipe_to_program->stream_res.tg);
+
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, true);
+	else
+		/* Lock the top pipe while updating plane addrs, since freesync requires
+		 *  plane addr update event triggers to be synchronized.
+		 *  top_pipe_to_program is expected to never be NULL
+		 */
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
+
+
 	// Stream updates
 	if (stream_update)
 		commit_planes_do_stream_update(dc, stream, stream_update, update_type, context);
@@ -2227,6 +2287,12 @@ static void commit_planes_for_stream(struct dc *dc,
 			dc->hwss.program_front_end_for_ctx(dc, context);
 #endif
 
+		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+			dc->hwss.interdependent_update_lock(dc, context, false);
+		else
+			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+
+		dc->hwss.post_unlock_program_front_end(dc, context);
 		return;
 	}
 
@@ -2263,8 +2329,6 @@ static void commit_planes_for_stream(struct dc *dc,
 			pipe_ctx->stream &&
 			pipe_ctx->stream == stream) {
 			struct dc_stream_status *stream_status = NULL;
-
-			top_pipe_to_program = pipe_ctx;
 
 			if (!pipe_ctx->plane_state)
 				continue;
@@ -2314,12 +2378,6 @@ static void commit_planes_for_stream(struct dc *dc,
 
 	// Update Type FAST, Surface updates
 	if (update_type == UPDATE_TYPE_FAST) {
-		/* Lock the top pipe while updating plane addrs, since freesync requires
-		 *  plane addr update event triggers to be synchronized.
-		 *  top_pipe_to_program is expected to never be NULL
-		 */
-		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
-
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		if (dc->hwss.set_flip_control_gsl)
 			for (i = 0; i < surface_count; i++) {
@@ -2365,9 +2423,30 @@ static void commit_planes_for_stream(struct dc *dc,
 					dc->hwss.update_plane_addr(dc, pipe_ctx);
 			}
 		}
-
-		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 	}
+
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, false);
+	else
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+
+	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
+		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable) {
+			top_pipe_to_program->stream_res.tg->funcs->wait_for_state(
+					top_pipe_to_program->stream_res.tg,
+					CRTC_STATE_VACTIVE);
+			top_pipe_to_program->stream_res.tg->funcs->wait_for_state(
+					top_pipe_to_program->stream_res.tg,
+					CRTC_STATE_VBLANK);
+			top_pipe_to_program->stream_res.tg->funcs->wait_for_state(
+					top_pipe_to_program->stream_res.tg,
+					CRTC_STATE_VACTIVE);
+			top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_disable(
+					top_pipe_to_program->stream_res.tg);
+		}
+
+	if (update_type != UPDATE_TYPE_FAST)
+		dc->hwss.post_unlock_program_front_end(dc, context);
 
 	// Fire manual trigger only when bottom plane is flipped
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
@@ -2537,12 +2616,7 @@ void dc_set_power_state(
 	enum dc_acpi_cm_power_state power_state)
 {
 	struct kref refcount;
-	struct display_mode_lib *dml = kzalloc(sizeof(struct display_mode_lib),
-						GFP_KERNEL);
-
-	ASSERT(dml);
-	if (!dml)
-		return;
+	struct display_mode_lib *dml;
 
 	switch (power_state) {
 	case DC_ACPI_CM_POWER_STATE_D0:
@@ -2567,6 +2641,12 @@ void dc_set_power_state(
 		 * clean state, and dc hw programming optimizations will not
 		 * cause any trouble.
 		 */
+		dml = kzalloc(sizeof(struct display_mode_lib),
+				GFP_KERNEL);
+
+		ASSERT(dml);
+		if (!dml)
+			return;
 
 		/* Preserve refcount */
 		refcount = dc->current_state->refcount;
@@ -2580,10 +2660,10 @@ void dc_set_power_state(
 		dc->current_state->refcount = refcount;
 		dc->current_state->bw_ctx.dml = *dml;
 
+		kfree(dml);
+
 		break;
 	}
-
-	kfree(dml);
 }
 
 void dc_resume(struct dc *dc)

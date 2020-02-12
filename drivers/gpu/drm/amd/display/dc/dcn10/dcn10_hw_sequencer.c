@@ -48,8 +48,8 @@
 #include "dc_link_dp.h"
 #include "dccg.h"
 #include "clk_mgr.h"
-
-
+#include "link_hwss.h"
+#include "dpcd_defs.h"
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
 #endif
@@ -84,7 +84,7 @@ void print_microsec(struct dc_context *dc_ctx,
 			us_x10 % frac);
 }
 
-static void dcn10_lock_all_pipes(struct dc *dc,
+void dcn10_lock_all_pipes(struct dc *dc,
 	struct dc_state *context,
 	bool lock)
 {
@@ -95,6 +95,7 @@ static void dcn10_lock_all_pipes(struct dc *dc,
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		tg = pipe_ctx->stream_res.tg;
+
 		/*
 		 * Only lock the top pipe's tg to prevent redundant
 		 * (un)locking. Also skip if pipe is disabled.
@@ -105,9 +106,9 @@ static void dcn10_lock_all_pipes(struct dc *dc,
 			continue;
 
 		if (lock)
-			tg->funcs->lock(tg);
+			dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
 		else
-			tg->funcs->unlock(tg);
+			dc->hwss.pipe_control_lock(dc, pipe_ctx, false);
 	}
 }
 
@@ -910,6 +911,10 @@ static void dcn10_reset_back_end_for_pipe(
 	 * parent pipe.
 	 */
 	if (pipe_ctx->top_pipe == NULL) {
+
+		if (pipe_ctx->stream_res.abm)
+			pipe_ctx->stream_res.abm->funcs->set_abm_immediate_disable(pipe_ctx->stream_res.abm);
+
 		pipe_ctx->stream_res.tg->funcs->disable_crtc(pipe_ctx->stream_res.tg);
 
 		pipe_ctx->stream_res.tg->funcs->enable_optc_clock(pipe_ctx->stream_res.tg, false);
@@ -1329,6 +1334,24 @@ void dcn10_init_hw(struct dc *dc)
 			hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
 #endif
 
+	/* we want to turn off all dp displays before doing detection */
+	if (dc->config.power_down_display_on_boot) {
+		uint8_t dpcd_power_state = '\0';
+		enum dc_status status = DC_ERROR_UNEXPECTED;
+
+		for (i = 0; i < dc->link_count; i++) {
+			if (dc->links[i]->connector_signal != SIGNAL_TYPE_DISPLAY_PORT) {
+				continue;
+			}
+			/* if any of the displays are lit up turn them off */
+			status = core_link_read_dpcd(dc->links[i], DP_SET_POWER,
+						     &dpcd_power_state, sizeof(dpcd_power_state));
+			if (status == DC_OK && dpcd_power_state == DP_POWER_STATE_D0) {
+				dp_receiver_power_ctrl(dc->links[i], false);
+			}
+		}
+	}
+
 	/* If taking control over from VBIOS, we may want to optimize our first
 	 * mode set, so we need to skip powering down pipes until we know which
 	 * pipes we want to use.
@@ -1588,7 +1611,7 @@ void dcn10_pipe_control_lock(
 	/* use TG master update lock to lock everything on the TG
 	 * therefore only top pipe need to lock
 	 */
-	if (pipe->top_pipe)
+	if (!pipe || pipe->top_pipe)
 		return;
 
 	if (dc->debug.sanity_checks)
@@ -2528,7 +2551,6 @@ void dcn10_apply_ctx_for_surface(
 	int i;
 	struct timing_generator *tg;
 	uint32_t underflow_check_delay_us;
-	bool removed_pipe[4] = { false };
 	bool interdependent_update = false;
 	struct pipe_ctx *top_pipe_to_program =
 			dcn10_find_top_pipe_for_stream(dc, context, stream);
@@ -2547,11 +2569,6 @@ void dcn10_apply_ctx_for_surface(
 	if (underflow_check_delay_us != 0xFFFFFFFF && hws->funcs.did_underflow_occur)
 		ASSERT(hws->funcs.did_underflow_occur(dc, top_pipe_to_program));
 
-	if (interdependent_update)
-		dcn10_lock_all_pipes(dc, context, true);
-	else
-		dcn10_pipe_control_lock(dc, top_pipe_to_program, true);
-
 	if (underflow_check_delay_us != 0xFFFFFFFF)
 		udelay(underflow_check_delay_us);
 
@@ -2568,18 +2585,8 @@ void dcn10_apply_ctx_for_surface(
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 		struct pipe_ctx *old_pipe_ctx =
 				&dc->current_state->res_ctx.pipe_ctx[i];
-		/*
-		 * Powergate reused pipes that are not powergated
-		 * fairly hacky right now, using opp_id as indicator
-		 * TODO: After move dc_post to dc_update, this will
-		 * be removed.
-		 */
-		if (pipe_ctx->plane_state && !old_pipe_ctx->plane_state) {
-			if (old_pipe_ctx->stream_res.tg == tg &&
-			    old_pipe_ctx->plane_res.hubp &&
-			    old_pipe_ctx->plane_res.hubp->opp_id != OPP_ID_INVALID)
-				dc->hwss.disable_plane(dc, old_pipe_ctx);
-		}
+
+		pipe_ctx->update_flags.raw = 0;
 
 		if ((!pipe_ctx->plane_state ||
 		     pipe_ctx->stream_res.tg != old_pipe_ctx->stream_res.tg) &&
@@ -2587,7 +2594,7 @@ void dcn10_apply_ctx_for_surface(
 		    old_pipe_ctx->stream_res.tg == tg) {
 
 			hws->funcs.plane_atomic_disconnect(dc, old_pipe_ctx);
-			removed_pipe[i] = true;
+			pipe_ctx->update_flags.bits.disable = 1;
 
 			DC_LOG_DC("Reset mpcc for pipe %d\n",
 					old_pipe_ctx->pipe_idx);
@@ -2615,21 +2622,41 @@ void dcn10_apply_ctx_for_surface(
 				&pipe_ctx->dlg_regs,
 				&pipe_ctx->ttu_regs);
 		}
+}
 
-	if (interdependent_update)
-		dcn10_lock_all_pipes(dc, context, false);
-	else
-		dcn10_pipe_control_lock(dc, top_pipe_to_program, false);
+void dcn10_post_unlock_program_front_end(
+		struct dc *dc,
+		struct dc_state *context)
+{
+	int i, j;
 
-	if (num_planes == 0)
-		false_optc_underflow_wa(dc, stream, tg);
+	DC_LOGGER_INIT(dc->ctx->logger);
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+		if (!pipe_ctx->top_pipe &&
+			!pipe_ctx->prev_odm_pipe &&
+			pipe_ctx->stream) {
+			struct dc_stream_status *stream_status = NULL;
+			struct timing_generator *tg = pipe_ctx->stream_res.tg;
+
+			for (j = 0; j < context->stream_count; j++) {
+				if (pipe_ctx->stream == context->streams[j])
+					stream_status = &context->stream_status[j];
+			}
+
+			if (context->stream_status[i].plane_count == 0)
+				false_optc_underflow_wa(dc, pipe_ctx->stream, tg);
+		}
+	}
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++)
-		if (removed_pipe[i])
+		if (context->res_ctx.pipe_ctx[i].update_flags.bits.disable)
 			dc->hwss.disable_plane(dc, &dc->current_state->res_ctx.pipe_ctx[i]);
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++)
-		if (removed_pipe[i]) {
+		if (context->res_ctx.pipe_ctx[i].update_flags.bits.disable) {
 			dc->hwss.optimize_bandwidth(dc, context);
 			break;
 		}
@@ -2929,6 +2956,33 @@ void dcn10_update_dchub(struct dce_hwseq *hws, struct dchub_init_data *dh_data)
 	hubbub->funcs->update_dchub(hubbub, dh_data);
 }
 
+static bool dcn10_can_pipe_disable_cursor(struct pipe_ctx *pipe_ctx)
+{
+	struct pipe_ctx *test_pipe;
+	const struct rect *r1 = &pipe_ctx->plane_res.scl_data.recout, *r2;
+	int r1_r = r1->x + r1->width, r1_b = r1->y + r1->height, r2_r, r2_b;
+
+	/**
+	 * Disable the cursor if there's another pipe above this with a
+	 * plane that contains this pipe's viewport to prevent double cursor
+	 * and incorrect scaling artifacts.
+	 */
+	for (test_pipe = pipe_ctx->top_pipe; test_pipe;
+	     test_pipe = test_pipe->top_pipe) {
+		if (!test_pipe->plane_state->visible)
+			continue;
+
+		r2 = &test_pipe->plane_res.scl_data.recout;
+		r2_r = r2->x + r2->width;
+		r2_b = r2->y + r2->height;
+
+		if (r1->x >= r2->x && r1->y >= r2->y && r1_r <= r2_r && r1_b <= r2_b)
+			return true;
+	}
+
+	return false;
+}
+
 void dcn10_set_cursor_position(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_position pos_cpy = pipe_ctx->stream->cursor_position;
@@ -2972,6 +3026,9 @@ void dcn10_set_cursor_position(struct pipe_ctx *pipe_ctx)
 
 	if (pipe_ctx->plane_state->address.type
 			== PLN_ADDR_TYPE_VIDEO_PROGRESSIVE)
+		pos_cpy.enable = false;
+
+	if (pos_cpy.enable && dcn10_can_pipe_disable_cursor(pipe_ctx))
 		pos_cpy.enable = false;
 
 	// Swap axis and mirror horizontally

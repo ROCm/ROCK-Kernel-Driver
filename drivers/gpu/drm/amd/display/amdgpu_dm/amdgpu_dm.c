@@ -1004,7 +1004,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	if (adev->asic_type >= CHIP_RAVEN) {
-		adev->dm.hdcp_workqueue = hdcp_create_workqueue(&adev->psp, &init_params.cp_psp, adev->dm.dc);
+		adev->dm.hdcp_workqueue = hdcp_create_workqueue(adev, &init_params.cp_psp, adev->dm.dc);
 
 		if (!adev->dm.hdcp_workqueue)
 			DRM_ERROR("amdgpu: failed to initialize hdcp_workqueue.\n");
@@ -9309,6 +9309,20 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #endif
 #endif
 
+		/*
+		 * Perform validation of MST topology in the state:
+		 * We need to perform MST atomic check before calling
+		 * dc_validate_global_state(), or there is a chance
+		 * to get stuck in an infinite loop and hang eventually.
+		 */
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
+#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
+		ret = drm_dp_mst_atomic_check(state);
+		if (ret)
+			goto fail;
+#endif
+#endif
+
 		if (dc_validate_global_state(dc, dm_state->context, false) != DC_OK) {
 			ret = -EINVAL;
 			goto fail;
@@ -9339,14 +9353,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 #endif
 	}
-	/* Perform validation of MST topology in the state*/
-#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
-#if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
-	ret = drm_dp_mst_atomic_check(state);
-	if (ret)
-		goto fail;
-#endif
-#endif
 
 	/* Store the overall update type for use later in atomic check. */
 #if !defined(for_each_new_crtc_in_state)
@@ -9560,7 +9566,6 @@ bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
 	/* Calculate number of static frames before generating interrupt to
 	 * enter PSR.
 	 */
-	unsigned int frame_time_microsec = 1000000 / vsync_rate_hz;
 	// Init fail safe of 2 frames static
 	unsigned int num_frames_static = 2;
 
@@ -9575,8 +9580,10 @@ bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
 	 * Calculate number of frames such that at least 30 ms of time has
 	 * passed.
 	 */
-	if (vsync_rate_hz != 0)
+	if (vsync_rate_hz != 0) {
+		unsigned int frame_time_microsec = 1000000 / vsync_rate_hz;
 		num_frames_static = (30000 / frame_time_microsec) + 1;
+	}
 
 	params.triggers.cursor_update = true;
 	params.triggers.overlay_update = true;

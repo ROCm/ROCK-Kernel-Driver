@@ -71,6 +71,8 @@
 #define PANEL_POWER_UP_TIMEOUT 300
 #define PANEL_POWER_DOWN_TIMEOUT 500
 #define HPD_CHECK_INTERVAL 10
+#define OLED_POST_T7_DELAY 100
+#define OLED_PRE_T11_DELAY 150
 
 #define CTX \
 	hws->ctx
@@ -936,9 +938,21 @@ void dce110_edp_backlight_control(
 	if (cntl.action == TRANSMITTER_CONTROL_BACKLIGHT_ON)
 		edp_receiver_ready_T7(link);
 	link_transmitter_control(ctx->dc_bios, &cntl);
+
+	if (enable && link->dpcd_sink_ext_caps.bits.oled)
+		msleep(OLED_POST_T7_DELAY);
+
+	if (link->dpcd_sink_ext_caps.bits.oled ||
+		link->dpcd_sink_ext_caps.bits.hdr_aux_backlight_control == 1 ||
+		link->dpcd_sink_ext_caps.bits.sdr_aux_backlight_control == 1)
+		dc_link_backlight_enable_aux(link, enable);
+
 	/*edp 1.2*/
 	if (cntl.action == TRANSMITTER_CONTROL_BACKLIGHT_OFF)
 		edp_receiver_ready_T9(link);
+
+	if (!enable && link->dpcd_sink_ext_caps.bits.oled)
+		msleep(OLED_PRE_T11_DELAY);
 }
 
 void dce110_enable_audio_stream(struct pipe_ctx *pipe_ctx)
@@ -2580,17 +2594,6 @@ static void dce110_apply_ctx_for_surface(
 
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
-		struct pipe_ctx *old_pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
-
-		if (stream == pipe_ctx->stream) {
-			if (!pipe_ctx->top_pipe &&
-				(pipe_ctx->plane_state || old_pipe_ctx->plane_state))
-				dc->hwss.pipe_control_lock(dc, pipe_ctx, true);
-		}
-	}
-
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
 
 		if (pipe_ctx->stream != stream)
 			continue;
@@ -2611,18 +2614,14 @@ static void dce110_apply_ctx_for_surface(
 
 	}
 
-	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
-		struct pipe_ctx *old_pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
-
-		if ((stream == pipe_ctx->stream) &&
-			(!pipe_ctx->top_pipe) &&
-			(pipe_ctx->plane_state || old_pipe_ctx->plane_state))
-			dc->hwss.pipe_control_lock(dc, pipe_ctx, false);
-	}
-
 	if (dc->fbc_compressor)
 		enable_fbc(dc, context);
+}
+
+static void dce110_post_unlock_program_front_end(
+		struct dc *dc,
+		struct dc_state *context)
+{
 }
 
 static void dce110_power_down_fe(struct dc *dc, struct pipe_ctx *pipe_ctx)
@@ -2726,6 +2725,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.init_hw = init_hw,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = dce110_apply_ctx_for_surface,
+	.post_unlock_program_front_end = dce110_post_unlock_program_front_end,
 	.update_plane_addr = update_plane_addr,
 	.update_pending_status = dce110_update_pending_status,
 	.enable_accelerated_mode = dce110_enable_accelerated_mode,
@@ -2740,6 +2740,7 @@ static const struct hw_sequencer_funcs dce110_funcs = {
 	.disable_audio_stream = dce110_disable_audio_stream,
 	.disable_plane = dce110_power_down_fe,
 	.pipe_control_lock = dce_pipe_control_lock,
+	.interdependent_update_lock = NULL,
 	.prepare_bandwidth = dce110_prepare_bandwidth,
 	.optimize_bandwidth = dce110_optimize_bandwidth,
 	.set_drr = set_drr,
