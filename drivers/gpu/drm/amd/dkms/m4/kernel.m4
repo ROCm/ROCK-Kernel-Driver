@@ -314,6 +314,7 @@ AC_DEFUN([AC_KERNEL], [
 	LINUX=${kernelsrc}
 	LINUX_OBJ=${kernelbuild}
 	LINUX_VERSION=${kernsrcver}
+	build_dir_root=$(cd "${0%/*}" && pwd)
 
 	AC_SUBST(LINUX)
 	AC_SUBST(LINUX_OBJ)
@@ -338,7 +339,7 @@ dnl # fill in contents of conftest.h and $1 to conftest.c
 dnl # $1: contents to be filled in conftest.c
 dnl #
 AC_DEFUN([AC_KERNEL_CONFTEST_C], [
-cat $ac_build_root_dir/confdefs.h - <<_ACEOF >conftest.c
+cat $build_dir_root/confdefs.h - <<_ACEOF >conftest.c
 $1
 _ACEOF
 ])
@@ -396,7 +397,7 @@ AC_DEFUN([AC_KERNEL_TMP_BUILD_DIR], [
 	build_dir=$PWD
 	popd >/dev/null
 	AS_IF([test -s $build_dir/confdefs.h], [
-		cat $build_dir/confdefs.h >>$ac_build_root_dir/confdefs.h
+		cat $build_dir/confdefs.h >>$build_dir_root/confdefs.h
 	])
 	rm -rf $build_dir
 ])
@@ -544,5 +545,3 @@ AC_DEFUN([AC_KERNEL_WAIT], [
 		AC_MSG_RESULT([failed])
 	])
 ])
-
-ac_build_root_dir=$PWD
