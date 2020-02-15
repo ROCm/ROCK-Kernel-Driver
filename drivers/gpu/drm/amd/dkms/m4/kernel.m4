@@ -239,13 +239,11 @@ dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 	target=''
 	test "x$enable_linux_builtin" = xyes && target='conftest.o'
-	[AC_KERNEL_TMP_BUILD_DIR(
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
 	[$target],
 	[test -s conftest.o],
 	[$3], [$4])
-	])
 ])
 
 dnl #
@@ -353,7 +351,7 @@ dnl # $1: contents to be executed
 dnl #
 AC_DEFUN([AC_KERNEL_DO_BACKGROUND], [
 	do_background() {
-		$1
+		AC_KERNEL_TMP_BUILD_DIR([$1])
 	}
 	do_background &
 	procs+=( "$!" )
