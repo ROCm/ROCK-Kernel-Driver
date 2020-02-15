@@ -7,7 +7,6 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_LASTCLOSE], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
-			#include <drm/drmP.h>
 			#include <drm/drm_fb_helper.h>
 		], [
 				drm_fb_helper_lastclose(NULL);
