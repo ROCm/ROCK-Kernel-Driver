@@ -391,14 +391,13 @@ dnl # AC_KERNEL_TMP_BUILD_DIR
 dnl # $1: contents to be executed in a temporary directory
 dnl #
 AC_DEFUN([AC_KERNEL_TMP_BUILD_DIR], [
-	local build_dir=$(mktemp -d -t build-XXXXXXXX -p .)
-	pushd $build_dir >/dev/null
+	build_dir=$(mktemp -d -t build-XXXXXXXX -p $build_dir_root)
+	cd $build_dir
 	$1
-	build_dir=$PWD
-	popd >/dev/null
-	AS_IF([test -s $build_dir/confdefs.h], [
-		cat $build_dir/confdefs.h >>$build_dir_root/confdefs.h
+	AS_IF([test -s confdefs.h], [
+		cat confdefs.h >>$build_dir_root/confdefs.h
 	])
+	cd $build_dir_root
 	rm -rf $build_dir
 ])
 
@@ -527,7 +526,7 @@ AC_DEFUN([AC_KERNEL_DO_BACKGROUND], [
 		AC_KERNEL_TMP_BUILD_DIR([$1])
 	}
 	do_background &
-	procs+=( "$!" )
+	procs="$! $procs"
 ])
 
 dnl #
@@ -536,7 +535,7 @@ dnl # wait for all tests to be finished
 dnl #
 AC_DEFUN([AC_KERNEL_WAIT], [
 	AC_MSG_CHECKING([for module configuration])
-	wait ${procs[[@]]}
+	wait $procs
 	AS_IF([[[ $? -eq 0 ]]], [
 		AC_MSG_RESULT([done])
 	], [
