@@ -512,21 +512,12 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 	lpfc_sli_read_link_ste(phba);
 
 	/* Reset the DFT_HBA_Q_DEPTH to the max xri  */
-	i = (mb->un.varRdConfig.max_xri + 1);
-	if (phba->cfg_hba_queue_depth > i) {
+	if (phba->cfg_hba_queue_depth > mb->un.varRdConfig.max_xri) {
 		lpfc_printf_log(phba, KERN_WARNING, LOG_INIT,
 				"3359 HBA queue depth changed from %d to %d\n",
-				phba->cfg_hba_queue_depth, i);
-		phba->cfg_hba_queue_depth = i;
-	}
-
-	/* Reset the DFT_LUN_Q_DEPTH to (max xri >> 3)  */
-	i = (mb->un.varRdConfig.max_xri >> 3);
-	if (phba->pport->cfg_lun_queue_depth > i) {
-		lpfc_printf_log(phba, KERN_WARNING, LOG_INIT,
-				"3360 LUN queue depth changed from %d to %d\n",
-				phba->pport->cfg_lun_queue_depth, i);
-		phba->pport->cfg_lun_queue_depth = i;
+				phba->cfg_hba_queue_depth,
+				mb->un.varRdConfig.max_xri);
+		phba->cfg_hba_queue_depth = mb->un.varRdConfig.max_xri;
 	}
 
 	phba->lmt = mb->un.varRdConfig.lmt;
@@ -1362,7 +1353,7 @@ lpfc_hb_timeout_handler(struct lpfc_hba *phba)
 	if (vports != NULL)
 		for (i = 0; i <= phba->max_vports && vports[i] != NULL; i++) {
 			lpfc_rcv_seq_check_edtov(vports[i]);
-			lpfc_fdmi_num_disc_check(vports[i]);
+			lpfc_fdmi_change_check(vports[i]);
 		}
 	lpfc_destroy_vport_work_array(phba, vports);
 
@@ -8320,14 +8311,6 @@ lpfc_map_topology(struct lpfc_hba *phba, struct lpfc_mbx_read_config *rd_config)
 	phba->hba_flag |= HBA_PERSISTENT_TOPO;
 	switch (phba->pcidev->device) {
 	case PCI_DEVICE_ID_LANCER_G7_FC:
-		if (tf || (pt == LINK_FLAGS_LOOP)) {
-			/* Invalid values from FW - use driver params */
-			phba->hba_flag &= ~HBA_PERSISTENT_TOPO;
-		} else {
-			/* Prism only supports PT2PT topology */
-			phba->cfg_topology = FLAGS_TOPOLOGY_MODE_PT_PT;
-		}
-		break;
 	case PCI_DEVICE_ID_LANCER_G6_FC:
 		if (!tf) {
 			phba->cfg_topology = ((pt == LINK_FLAGS_LOOP)
@@ -9243,6 +9226,7 @@ lpfc_sli4_release_hdwq(struct lpfc_hba *phba)
 		/* Free the CQ/WQ corresponding to the Hardware Queue */
 		lpfc_sli4_queue_free(hdwq[idx].io_cq);
 		lpfc_sli4_queue_free(hdwq[idx].io_wq);
+		hdwq[idx].hba_eq = NULL;
 		hdwq[idx].io_cq = NULL;
 		hdwq[idx].io_wq = NULL;
 		if (phba->cfg_xpsgl && !phba->nvmet_support)
@@ -10449,6 +10433,8 @@ lpfc_sli4_pci_mem_unset(struct lpfc_hba *phba)
 	case LPFC_SLI_INTF_IF_TYPE_6:
 		iounmap(phba->sli4_hba.drbl_regs_memmap_p);
 		iounmap(phba->sli4_hba.conf_regs_memmap_p);
+		if (phba->sli4_hba.dpp_regs_memmap_p)
+			iounmap(phba->sli4_hba.dpp_regs_memmap_p);
 		break;
 	case LPFC_SLI_INTF_IF_TYPE_1:
 	default:
@@ -11111,14 +11097,18 @@ found_any:
  * @cpu:    cpu going offline
  * @eqlist:
  */
-static void
+static int
 lpfc_cpuhp_get_eq(struct lpfc_hba *phba, unsigned int cpu,
 		  struct list_head *eqlist)
 {
 	const struct cpumask *maskp;
 	struct lpfc_queue *eq;
-	cpumask_t tmp;
+	struct cpumask *tmp;
 	u16 idx;
+
+	tmp = kzalloc(cpumask_size(), GFP_KERNEL);
+	if (!tmp)
+		return -ENOMEM;
 
 	for (idx = 0; idx < phba->cfg_irq_chann; idx++) {
 		maskp = pci_irq_get_affinity(phba->pcidev, idx);
@@ -11129,7 +11119,7 @@ lpfc_cpuhp_get_eq(struct lpfc_hba *phba, unsigned int cpu,
 		 * then we don't need to poll the eq attached
 		 * to it.
 		 */
-		if (!cpumask_and(&tmp, maskp, cpumask_of(cpu)))
+		if (!cpumask_and(tmp, maskp, cpumask_of(cpu)))
 			continue;
 		/* get the cpus that are online and are affini-
 		 * tized to this irq vector.  If the count is
@@ -11137,8 +11127,8 @@ lpfc_cpuhp_get_eq(struct lpfc_hba *phba, unsigned int cpu,
 		 * down this vector.  Since this cpu has not
 		 * gone offline yet, we need >1.
 		 */
-		cpumask_and(&tmp, maskp, cpu_online_mask);
-		if (cpumask_weight(&tmp) > 1)
+		cpumask_and(tmp, maskp, cpu_online_mask);
+		if (cpumask_weight(tmp) > 1)
 			continue;
 
 		/* Now that we have an irq to shutdown, get the eq
@@ -11149,6 +11139,8 @@ lpfc_cpuhp_get_eq(struct lpfc_hba *phba, unsigned int cpu,
 		eq = phba->sli4_hba.hba_eq_hdl[idx].eq;
 		list_add(&eq->_poll_list, eqlist);
 	}
+	kfree(tmp);
+	return 0;
 }
 
 static void __lpfc_cpuhp_remove(struct lpfc_hba *phba)
@@ -11319,7 +11311,9 @@ static int lpfc_cpu_offline(unsigned int cpu, struct hlist_node *node)
 
 	lpfc_irq_rebalance(phba, cpu, true);
 
-	lpfc_cpuhp_get_eq(phba, cpu, &eqlist);
+	retval = lpfc_cpuhp_get_eq(phba, cpu, &eqlist);
+	if (retval)
+		return retval;
 
 	/* start polling on these eq's */
 	list_for_each_entry_safe(eq, next, &eqlist, _poll_list) {

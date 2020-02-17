@@ -262,7 +262,6 @@ struct lpfc_stats {
 	uint32_t elsRcvPRLI;
 	uint32_t elsRcvLIRR;
 	uint32_t elsRcvRLS;
-	uint32_t elsRcvRPS;
 	uint32_t elsRcvRPL;
 	uint32_t elsRcvRRQ;
 	uint32_t elsRcvRTV;
@@ -749,6 +748,7 @@ struct lpfc_hba {
 					 * capability
 					 */
 #define HBA_FLOGI_ISSUED	0x100000 /* FLOGI was issued */
+#define HBA_DEFER_FLOGI		0x800000 /* Defer FLOGI till read_sparm cmpl */
 
 	uint32_t fcp_ring_in_use; /* When polling test if intr-hndlr active*/
 	struct lpfc_dmabuf slim2p;
@@ -1223,6 +1223,8 @@ struct lpfc_hba {
 #define LPFC_POLL_HB	1		/* slowpath heartbeat */
 #define LPFC_POLL_FASTPATH	0	/* called from fastpath */
 #define LPFC_POLL_SLOWPATH	1	/* called from slowpath */
+
+	char os_host_name[MAXHOSTNAMELEN];
 };
 
 static inline struct Scsi_Host *

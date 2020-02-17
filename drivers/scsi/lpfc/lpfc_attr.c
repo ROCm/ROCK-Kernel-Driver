@@ -3869,9 +3869,6 @@ LPFC_VPORT_ATTR_R(enable_da_id, 1, 0, 1,
 /*
 # lun_queue_depth:  This parameter is used to limit the number of outstanding
 # commands per FCP LUN. Value range is [1,512]. Default value is 30.
-# If this parameter value is greater than 1/8th the maximum number of exchanges
-# supported by the HBA port, then the lun queue depth will be reduced to
-# 1/8th the maximum number of exchanges.
 */
 LPFC_VPORT_ATTR_R(lun_queue_depth, 30, 1, 512,
 		  "Max number of FCP commands we can queue to a specific LUN");
@@ -4123,14 +4120,13 @@ lpfc_topology_store(struct device *dev, struct device_attribute *attr,
 		/*
 		 * The 'topology' is not a configurable parameter if :
 		 *   - persistent topology enabled
-		 *   - G7 adapters
-		 *   - G6 with no private loop support
+		 *   - G7/G6 with no private loop support
 		 */
 
-		if (((phba->hba_flag & HBA_PERSISTENT_TOPO) ||
+		if ((phba->hba_flag & HBA_PERSISTENT_TOPO ||
 		     (!phba->sli4_hba.pc_sli4_params.pls &&
-		     phba->pcidev->device == PCI_DEVICE_ID_LANCER_G6_FC) ||
-		     phba->pcidev->device == PCI_DEVICE_ID_LANCER_G7_FC) &&
+		     (phba->pcidev->device == PCI_DEVICE_ID_LANCER_G6_FC ||
+		     phba->pcidev->device == PCI_DEVICE_ID_LANCER_G7_FC))) &&
 		    val == 4) {
 			lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
 				"3114 Loop mode not supported\n");
