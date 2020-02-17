@@ -183,4 +183,9 @@ unsigned int resource_pixel_format_to_bpp(enum surface_pixel_format format);
 
 void get_audio_check(struct audio_info *aud_modes,
 	struct audio_check *aud_chk);
+
+#if !defined(CONFIG_DRM_AMD_DC_DCN2_0)
+int get_num_odm_splits(struct pipe_ctx *pipe);
+#endif
+
 #endif /* DRIVERS_GPU_DRM_AMD_DC_DEV_DC_INC_RESOURCE_H_ */
