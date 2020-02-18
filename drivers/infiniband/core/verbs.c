@@ -52,6 +52,7 @@
 #include <rdma/rw.h>
 
 #include "core_priv.h"
+#include <trace/events/rdma_core.h>
 
 #include <trace/events/rdma_core.h>
 
@@ -2040,6 +2041,7 @@ int ib_dereg_mr_user(struct ib_mr *mr, struct ib_udata *udata)
 	struct ib_sig_attrs *sig_attrs = mr->sig_attrs;
 	int ret;
 
+	trace_mr_dereg(mr);
 	rdma_restrack_del(&mr->res);
 	ret = mr->device->ops.dereg_mr(mr, udata);
 	if (!ret) {
@@ -2071,11 +2073,16 @@ struct ib_mr *ib_alloc_mr_user(struct ib_pd *pd, enum ib_mr_type mr_type,
 {
 	struct ib_mr *mr;
 
-	if (!pd->device->ops.alloc_mr)
-		return ERR_PTR(-EOPNOTSUPP);
+	if (!pd->device->ops.alloc_mr) {
+		mr = ERR_PTR(-EOPNOTSUPP);
+		goto out;
+	}
 
-	if (WARN_ON_ONCE(mr_type == IB_MR_TYPE_INTEGRITY))
-		return ERR_PTR(-EINVAL);
+	if (mr_type == IB_MR_TYPE_INTEGRITY) {
+		WARN_ON_ONCE(1);
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
 
 	mr = pd->device->ops.alloc_mr(pd, mr_type, max_num_sg, udata);
 	if (!IS_ERR(mr)) {
@@ -2091,6 +2098,8 @@ struct ib_mr *ib_alloc_mr_user(struct ib_pd *pd, enum ib_mr_type mr_type,
 		mr->sig_attrs = NULL;
 	}
 
+out:
+	trace_mr_alloc(pd, mr_type, max_num_sg, mr);
 	return mr;
 }
 EXPORT_SYMBOL(ib_alloc_mr_user);
@@ -2115,21 +2124,27 @@ struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
 	struct ib_sig_attrs *sig_attrs;
 
 	if (!pd->device->ops.alloc_mr_integrity ||
-	    !pd->device->ops.map_mr_sg_pi)
-		return ERR_PTR(-EOPNOTSUPP);
+	    !pd->device->ops.map_mr_sg_pi) {
+		mr = ERR_PTR(-EOPNOTSUPP);
+		goto out;
+	}
 
-	if (!max_num_meta_sg)
-		return ERR_PTR(-EINVAL);
+	if (!max_num_meta_sg) {
+		mr = ERR_PTR(-EINVAL);
+		goto out;
+	}
 
 	sig_attrs = kzalloc(sizeof(struct ib_sig_attrs), GFP_KERNEL);
-	if (!sig_attrs)
-		return ERR_PTR(-ENOMEM);
+	if (!sig_attrs) {
+		mr = ERR_PTR(-ENOMEM);
+		goto out;
+	}
 
 	mr = pd->device->ops.alloc_mr_integrity(pd, max_num_data_sg,
 						max_num_meta_sg);
 	if (IS_ERR(mr)) {
 		kfree(sig_attrs);
-		return mr;
+		goto out;
 	}
 
 	mr->device = pd->device;
@@ -2143,6 +2158,8 @@ struct ib_mr *ib_alloc_mr_integrity(struct ib_pd *pd,
 	mr->type = IB_MR_TYPE_INTEGRITY;
 	mr->sig_attrs = sig_attrs;
 
+out:
+	trace_mr_integ_alloc(pd, max_num_data_sg, max_num_meta_sg, mr);
 	return mr;
 }
 EXPORT_SYMBOL(ib_alloc_mr_integrity);
