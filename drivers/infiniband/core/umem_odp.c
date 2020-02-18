@@ -412,10 +412,11 @@ struct ib_umem_odp *ib_umem_odp_get(struct ib_udata *udata, unsigned long addr,
 	umem_odp->umem.writable = ib_access_writable(access);
 	umem_odp->umem.owning_mm = mm = current->mm;
 
+	umem_odp->page_shift = PAGE_SHIFT;
+#ifdef CONFIG_HUGETLB_PAGE
 	if (access & IB_ACCESS_HUGETLB)
 		umem_odp->page_shift = HPAGE_SHIFT;
-	else
-		umem_odp->page_shift = PAGE_SHIFT;
+#endif
 
 	ret = ib_init_umem_odp(umem_odp);
 	if (ret)
