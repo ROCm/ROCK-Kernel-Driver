@@ -53,6 +53,8 @@
 
 #include "core_priv.h"
 
+#include <trace/events/rdma_core.h>
+
 static int ib_resolve_eth_dmac(struct ib_device *device,
 			       struct rdma_ah_attr *ah_attr);
 
@@ -2785,6 +2787,7 @@ void ib_drain_sq(struct ib_qp *qp)
 		qp->device->ops.drain_sq(qp);
 	else
 		__ib_drain_sq(qp);
+	trace_cq_drain_complete(qp->send_cq);
 }
 EXPORT_SYMBOL(ib_drain_sq);
 
@@ -2813,6 +2816,7 @@ void ib_drain_rq(struct ib_qp *qp)
 		qp->device->ops.drain_rq(qp);
 	else
 		__ib_drain_rq(qp);
+	trace_cq_drain_complete(qp->recv_cq);
 }
 EXPORT_SYMBOL(ib_drain_rq);
 
