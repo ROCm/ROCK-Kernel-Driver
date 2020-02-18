@@ -423,7 +423,7 @@
 
 &hhi {
 	clkc: clock-controller {
-		compatible = "amlogic,meson8-clkc";
+		compatible = "amlogic,meson8b-clkc";
 		#clock-cells = <1>;
 		#reset-cells = <1>;
 	};
