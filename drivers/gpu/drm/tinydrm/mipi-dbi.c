@@ -362,9 +362,9 @@ static void mipi_dbi_blank(struct mipi_dbi *mipi)
 	memset(mipi->tx_buf, 0, len);
 
 	mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS, 0, 0,
-			 (width >> 8) & 0xFF, (width - 1) & 0xFF);
+			 ((width - 1) >> 8) & 0xFF, (width - 1) & 0xFF);
 	mipi_dbi_command(mipi, MIPI_DCS_SET_PAGE_ADDRESS, 0, 0,
-			 (height >> 8) & 0xFF, (height - 1) & 0xFF);
+			 ((height - 1) >> 8) & 0xFF, (height - 1) & 0xFF);
 	mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START,
 			     (u8 *)mipi->tx_buf, len);
 
