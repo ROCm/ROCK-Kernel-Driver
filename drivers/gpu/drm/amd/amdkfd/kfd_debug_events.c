@@ -106,14 +106,14 @@ uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
 	uint32_t queue_status_word = 0;
 
 	KFD_DBG_EV_SET_EVENT_TYPE(queue_status_word,
-				  q->properties.debug_event_type);
+				  READ_ONCE(q->properties.debug_event_type));
 	KFD_DBG_EV_SET_SUSPEND_STATE(queue_status_word,
 				  q->properties.is_suspended);
 	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
 				  q->properties.is_new);
 
 	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
-		q->properties.debug_event_type = 0;
+		WRITE_ONCE(q->properties.debug_event_type, 0);
 
 	q->properties.is_new = false;
 
@@ -148,22 +148,20 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		*event_status = kfd_dbg_get_queue_status_word(q, flags);
 
 		goto out;
-
-	} else {
-		list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-			if (pqn->q &&
-				 (pqn->q->properties.debug_event_type
-					& (KFD_DBG_EV_STATUS_TRAP
-					| KFD_DBG_EV_STATUS_VMFAULT))) {
-				*queue_id = pqn->q->properties.queue_id;
-				*event_status =
-					kfd_dbg_get_queue_status_word(pqn->q,
-								      flags);
-				goto out;
-			}
-		}
-		ret = -EAGAIN;
 	}
+
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
+		unsigned int tmp_status =
+				kfd_dbg_get_queue_status_word(pqn->q, flags);
+		if (pqn->q && (tmp_status & (KFD_DBG_EV_STATUS_TRAP |
+						KFD_DBG_EV_STATUS_VMFAULT))) {
+			*queue_id = pqn->q->properties.queue_id;
+			*event_status = tmp_status;
+			goto out;
+		}
+	}
+
+	ret = -EAGAIN;
 
 out:
 	mutex_unlock(&pdd->process->event_mutex);
@@ -199,7 +197,7 @@ static int kfd_create_event_queue(struct kfd_process_device *pdd)
 	/* to reset queue pending status - TBD need init in queue creation */
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
 		if (pqn->q->device == pdd->dev)
-			pqn->q->properties.debug_event_type = 0;
+			WRITE_ONCE(pqn->q->properties.debug_event_type, 0);
 	}
 
 	return ret;
@@ -222,6 +220,7 @@ static void kfd_dbg_ev_update_event_queue(struct kfd_process_device *pdd,
 	/* iterate through each queue */
 	list_for_each_entry(pqn, &pqm->queues,
 				process_queue_list) {
+		long bit_to_set;
 
 		if (!pqn->q)
 			continue;
@@ -232,9 +231,11 @@ static void kfd_dbg_ev_update_event_queue(struct kfd_process_device *pdd,
 		if (pqn->q->doorbell_id != doorbell_id && !is_vmfault)
 			continue;
 
-		pqn->q->properties.debug_event_type |=
-			is_vmfault ? KFD_DBG_EV_STATUS_VMFAULT :
-					KFD_DBG_EV_STATUS_TRAP;
+		bit_to_set = is_vmfault ?
+			KFD_DBG_EV_STATUS_VMFAULT_BIT :
+			KFD_DBG_EV_STATUS_TRAP_BIT;
+
+		set_bit(bit_to_set, &pqn->q->properties.debug_event_type);
 
 		fifo_output = is_vmfault ? 'v' : 't';
 
