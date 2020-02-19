@@ -338,8 +338,8 @@ static int ice_xsk_umem_dma_map(struct ice_vsi *vsi, struct xdp_umem *umem)
 						    DMA_BIDIRECTIONAL,
 						    ICE_RX_DMA_ATTR);
 		if (dma_mapping_error(dev, dma)) {
-			dev_dbg(dev,
-				"XSK UMEM DMA mapping error on page num %d", i);
+			dev_dbg(dev, "XSK UMEM DMA mapping error on page num %d\n",
+				i);
 			goto out_unmap;
 		}
 
@@ -414,7 +414,8 @@ ice_xsk_umem_enable(struct ice_vsi *vsi, struct xdp_umem *umem, u16 qid)
 	if (vsi->type != ICE_VSI_PF)
 		return -EINVAL;
 
-	vsi->num_xsk_umems = min_t(u16, vsi->num_rxq, vsi->num_txq);
+	if (!vsi->num_xsk_umems)
+		vsi->num_xsk_umems = min_t(u16, vsi->num_rxq, vsi->num_txq);
 	if (qid >= vsi->num_xsk_umems)
 		return -EINVAL;
 
