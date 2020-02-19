@@ -36,9 +36,10 @@
  * 0.2 - Fix to include querying pending event that is both trap and vmfault
  * 1.0 - Removed function to set debug data (renumbering functions broke ABI)
  * 1.1 - Allow attaching to processes that have not opened /dev/kfd yet
+ * 1.2 - Allow flag option to clear queue status on queue suspend
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	1
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	2
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
