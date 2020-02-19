@@ -4,16 +4,14 @@ dnl # Author: Chris Metcalf <cmetcalf@ezchip.com>
 dnl # Date:   Wed Apr 29 12:52:04 2015 -0400
 dnl # string: provide strscpy()
 dnl #
-AC_DEFUN([AC_AMDGPU_STRSCPY],
-	[AC_MSG_CHECKING([whether strscpy() is available])
-	AC_KERNEL_TRY_COMPILE_SYMBOL([
-		#include <linux/string.h>
-	], [
-		strscpy(NULL, NULL, 8);
-	], [strscpy], [lib/string.c], [
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_STRSCPY, 1, [strscpy() is available])
-	], [
-		AC_MSG_RESULT(no)
+AC_DEFUN([AC_AMDGPU_STRSCPY], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/string.h>
+		], [
+			strscpy(NULL, NULL, 8);
+		], [strscpy], [lib/string.c], [
+			AC_DEFINE(HAVE_STRSCPY, 1, [strscpy() is available])
+		])
 	])
 ])

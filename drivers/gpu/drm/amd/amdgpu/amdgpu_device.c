@@ -65,7 +65,6 @@
 #include "amdgpu_xgmi.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_pmu.h"
-#include "amdgpu_tmz.h"
 
 #include <linux/suspend.h>
 #include <drm/task_barrier.h>
@@ -185,20 +184,51 @@ bool amdgpu_device_supports_baco(struct drm_device *dev)
 void amdgpu_device_vram_access(struct amdgpu_device *adev, loff_t pos,
 			       uint32_t *buf, size_t size, bool write)
 {
-	uint64_t last;
 	unsigned long flags;
+	uint32_t hi = ~0;
+	uint64_t last;
 
-	last = size - 4;
-	for (last += pos; pos <= last; pos += 4) {
-		spin_lock_irqsave(&adev->mmio_idx_lock, flags);
+
+#ifdef CONFIG_64BIT
+	last = min(pos + size, adev->gmc.visible_vram_size);
+	if (last > pos) {
+		void __iomem *addr = adev->mman.aper_base_kaddr + pos;
+		size_t count = last - pos;
+
+		if (write) {
+			memcpy_toio(addr, buf, count);
+			mb();
+			amdgpu_asic_flush_hdp(adev, NULL);
+		} else {
+			amdgpu_asic_invalidate_hdp(adev, NULL);
+			mb();
+			memcpy_fromio(buf, addr, count);
+		}
+
+		if (count == size)
+			return;
+
+		pos += count;
+		buf += count / 4;
+		size -= count;
+	}
+#endif
+
+	spin_lock_irqsave(&adev->mmio_idx_lock, flags);
+	for (last = pos + size; pos < last; pos += 4) {
+		uint32_t tmp = pos >> 31;
+
 		WREG32_NO_KIQ(mmMM_INDEX, ((uint32_t)pos) | 0x80000000);
-		WREG32_NO_KIQ(mmMM_INDEX_HI, pos >> 31);
+		if (tmp != hi) {
+			WREG32_NO_KIQ(mmMM_INDEX_HI, tmp);
+			hi = tmp;
+		}
 		if (write)
 			WREG32_NO_KIQ(mmMM_DATA, *buf++);
 		else
 			*buf++ = RREG32_NO_KIQ(mmMM_DATA);
-		spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
 	}
+	spin_unlock_irqrestore(&adev->mmio_idx_lock, flags);
 }
 
 /*
@@ -1076,7 +1106,7 @@ static int amdgpu_device_check_arguments(struct amdgpu_device *adev)
 	adev->firmware.load_type = amdgpu_ucode_get_load_type(adev, amdgpu_fw_load_type);
 	amdgpu_direct_gma_size = min(amdgpu_direct_gma_size, 96);
 
-	adev->tmz.enabled = amdgpu_is_tmz(adev);
+	amdgpu_gmc_tmz_set(adev);
 
 	return 0;
 }

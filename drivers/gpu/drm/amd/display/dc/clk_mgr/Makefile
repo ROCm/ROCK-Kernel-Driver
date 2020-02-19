@@ -91,10 +91,16 @@ ifdef CONFIG_DRM_AMD_DC_DCN2_1
 ###############################################################################
 CLK_MGR_DCN21 = rn_clk_mgr.o rn_clk_mgr_vbios_smu.o
 
+ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=$(AMDDALPATH)/dc/clk_mgr/dcn21/
+else
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=
+endif
+
 # prevent build errors regarding soft-float vs hard-float FP ABI tags
 # this code is currently unused on ppc64, as it applies to Renoir APUs only
 ifdef CONFIG_PPC64
-CFLAGS_$(AMDDALPATH)/dc/clk_mgr/dcn21/rn_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rn_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
 endif
 
 AMD_DAL_CLK_MGR_DCN21 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn21/,$(CLK_MGR_DCN21))

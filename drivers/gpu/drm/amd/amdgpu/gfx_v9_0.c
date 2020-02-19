@@ -4390,9 +4390,12 @@ static int gfx_v9_0_ecc_late_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int r;
 
-	r = gfx_v9_0_do_edc_gds_workarounds(adev);
-	if (r)
-		return r;
+	/* limit gds clearing operation in cold boot sequence */
+	if (!adev->in_suspend) {
+		r = gfx_v9_0_do_edc_gds_workarounds(adev);
+		if (r)
+			return r;
+	}
 
 	/* requires IBs so do in late init after IB pool is initialized */
 	r = gfx_v9_0_do_edc_gpr_workarounds(adev);
@@ -5237,7 +5240,7 @@ static void gfx_v9_0_ring_emit_tmz(struct amdgpu_ring *ring, bool start,
 	 * cmd = 1: frame end
 	 */
 	amdgpu_ring_write(ring,
-			  ((ring->adev->tmz.enabled && trusted) ? FRAME_TMZ : 0)
+			  ((amdgpu_is_tmz(ring->adev) && trusted) ? FRAME_TMZ : 0)
 			  | FRAME_CMD(start ? 0 : 1));
 }
 

@@ -6,19 +6,16 @@ dnl # commit v4.12-rc1-110-gc4f51dc87296
 dnl #
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_MALLOC_AB], [
-	AC_MSG_CHECKING([whether drm_malloc_ab() is available])
-	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drmP.h>
-		],[
-			drm_malloc_ab(0, 0);
-		],[
-			AC_MSG_RESULT(yes)
-			AC_DEFINE(HAVE_DRM_MALLOC_AB, 1, [drm_malloc_ab() is available])
-		],[
-			AC_MSG_RESULT(no)
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
+			AC_KERNEL_TRY_COMPILE([
+				#include <drm/drmP.h>
+			], [
+				drm_malloc_ab(0, 0);
+			], [
+				AC_DEFINE(HAVE_DRM_MALLOC_AB, 1,
+					[drm_malloc_ab() is available])
+			])
 		])
-	], [
-		AC_MSG_RESULT(no)
 	])
 ])

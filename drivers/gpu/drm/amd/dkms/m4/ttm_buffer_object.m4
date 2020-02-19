@@ -8,17 +8,16 @@ dnl # v5.3-rc1-362-gc105de2828e1	drm/amdgpu: use embedded gem object
 dnl # v5.3-rc1-358-g8eb8833e7ed3	drm/ttm: add gem base object
 dnl # v5.0-rc1-1004-g1ba627148ef5	drm: Add reservation_object to drm_gem_object
 dnl #
-AC_DEFUN([AC_AMDGPU_TTM_BUFFER_OBJECT],
-	[AC_MSG_CHECKING([whether ttm_buffer_object->base is available])
-	AC_KERNEL_TRY_COMPILE([
-		#include <drm/drm_gem.h>
-	], [
-		struct drm_gem_object *gem_obj = NULL;
-		gem_obj->resv = &gem_obj->_resv;
-	], [
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_DRM_GEM_OBJECT_RESV, 1, [ttm_buffer_object->base is available])
-	], [
-		AC_MSG_RESULT(no)
+AC_DEFUN([AC_AMDGPU_TTM_BUFFER_OBJECT], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_gem.h>
+		], [
+			struct drm_gem_object *gem_obj = NULL;
+			gem_obj->resv = &gem_obj->_resv;
+		], [
+			AC_DEFINE(HAVE_DRM_GEM_OBJECT_RESV, 1,
+				[ttm_buffer_object->base is available])
+		])
 	])
 ])

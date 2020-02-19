@@ -24,14 +24,6 @@
 
 #define DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE   0x50
 
-#define DP_SOURCE_TABLE_REVISION	    0x310
-#define DP_SOURCE_PAYLOAD_SIZE		    0x311
-#define DP_SOURCE_SINK_CAP		    0x317
-#define DP_SOURCE_BACKLIGHT_LEVEL	    0x320
-#define DP_SOURCE_BACKLIGHT_CURRENT_PEAK    0x326
-#define DP_SOURCE_BACKLIGHT_CONTROL	    0x32E
-#define DP_SOURCE_BACKLIGHT_ENABLE	    0x32F
-
 /* maximum pre emphasis level allowed for each voltage swing level*/
 static const enum dc_pre_emphasis voltage_swing_to_pre_emphasis[] = {
 		PRE_EMPHASIS_LEVEL3,
@@ -4203,25 +4195,32 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 
 void dpcd_set_source_specific_data(struct dc_link *link)
 {
-	struct dpcd_amd_signature amd_signature;
 	const uint32_t post_oui_delay = 30; // 30ms
 
-	amd_signature.AMD_IEEE_TxSignature_byte1 = 0x0;
-	amd_signature.AMD_IEEE_TxSignature_byte2 = 0x0;
-	amd_signature.AMD_IEEE_TxSignature_byte3 = 0x1A;
-	amd_signature.device_id_byte1 =
-			(uint8_t)(link->ctx->asic_id.chip_id);
-	amd_signature.device_id_byte2 =
-			(uint8_t)(link->ctx->asic_id.chip_id >> 8);
-	memset(&amd_signature.zero, 0, 4);
-	amd_signature.dce_version =
-			(uint8_t)(link->ctx->dce_version);
-	amd_signature.dal_version_byte1 = 0x0; // needed? where to get?
-	amd_signature.dal_version_byte2 = 0x0; // needed? where to get?
+	if (!link->dc->vendor_signature.is_valid) {
+		struct dpcd_amd_signature amd_signature;
+		amd_signature.AMD_IEEE_TxSignature_byte1 = 0x0;
+		amd_signature.AMD_IEEE_TxSignature_byte2 = 0x0;
+		amd_signature.AMD_IEEE_TxSignature_byte3 = 0x1A;
+		amd_signature.device_id_byte1 =
+				(uint8_t)(link->ctx->asic_id.chip_id);
+		amd_signature.device_id_byte2 =
+				(uint8_t)(link->ctx->asic_id.chip_id >> 8);
+		memset(&amd_signature.zero, 0, 4);
+		amd_signature.dce_version =
+				(uint8_t)(link->ctx->dce_version);
+		amd_signature.dal_version_byte1 = 0x0; // needed? where to get?
+		amd_signature.dal_version_byte2 = 0x0; // needed? where to get?
 
-	core_link_write_dpcd(link, DP_SOURCE_OUI,
-			(uint8_t *)(&amd_signature),
-			sizeof(amd_signature));
+		core_link_write_dpcd(link, DP_SOURCE_OUI,
+				(uint8_t *)(&amd_signature),
+				sizeof(amd_signature));
+
+	} else {
+		core_link_write_dpcd(link, DP_SOURCE_OUI,
+				link->dc->vendor_signature.data.raw,
+				sizeof(link->dc->vendor_signature.data.raw));
+	}
 
 	// Sink may need to configure internals based on vendor, so allow some
 	// time before proceeding with possibly vendor specific transactions

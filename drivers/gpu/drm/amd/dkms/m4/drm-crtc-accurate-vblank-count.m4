@@ -11,37 +11,35 @@ dnl #   drm/vblank: Consistent drm_crtc_ prefix
 dnl #
 
 AC_DEFUN([AC_AMDGPU_DRM_CRTC_ACCURATE_VBLANK_COUNT], [
-	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drm_vblank.h], [
-		AC_MSG_CHECKING([whether drm_crtc_accurate_vblank_count() is available])
-		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drm_vblank.h>
-		], [
-			drm_crtc_accurate_vblank_count(NULL);
-		], [
-			AC_MSG_RESULT(yes)
-			AC_DEFINE(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT, 1, [drm_crtc_accurate_vblank_count() is available])
-		], [
-			dnl # When drm_crtc_accurate_vblank_count() function is not available,
-			dnl # we can fall back to drm_accurate_vblank_count()
-			AC_MSG_RESULT(no)
-			AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1, [drm_accurate_vblank_count() is available])
-		])
-	], [
-		AC_MSG_CHECKING([whether drm_accurate_vblank_count() is available])
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drm_vblank.h], [
 			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drmP.h>
+				#include <drm/drm_vblank.h>
 			], [
-				drm_accurate_vblank_count(NULL);
+				drm_crtc_accurate_vblank_count(NULL);
 			], [
-				AC_MSG_RESULT(yes)
-				AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1, [drm_accurate_vblank_count() is available])
+				AC_DEFINE(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT, 1,
+					[drm_crtc_accurate_vblank_count() is available])
 			], [
-				AC_MSG_RESULT(no)
+				dnl # When drm_crtc_accurate_vblank_count() function is not available,
+				dnl # we can fall back to drm_accurate_vblank_count()
+				AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
+					[drm_accurate_vblank_count() is available])
 			])
 		], [
-			AC_MSG_RESULT(yes)
-			AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1, [drm_accurate_vblank_count() is available])
+			AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
+				AC_KERNEL_TRY_COMPILE([
+					#include <drm/drmP.h>
+				], [
+					drm_accurate_vblank_count(NULL);
+				], [
+					AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
+						[drm_accurate_vblank_count() is available])
+				])
+			], [
+				AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
+					[drm_accurate_vblank_count() is available])
+			])
 		])
 	])
 ])

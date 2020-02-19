@@ -39,7 +39,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.71"
+#define DC_VER "3.2.72"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -543,6 +543,7 @@ struct dc {
 	struct compressor *fbc_compressor;
 
 	struct dc_debug_data debug_data;
+	struct dpcd_vendor_signature vendor_signature;
 
 	const char *build_id;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
@@ -593,6 +594,7 @@ struct dc_init_data {
 	 */
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
+	struct dpcd_vendor_signature vendor_signature;
 };
 
 struct dc_callback_init {

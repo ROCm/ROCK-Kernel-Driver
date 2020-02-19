@@ -5,16 +5,14 @@ dnl #
 dnl # commit v5.3-rc5-63-gc96245148c1e
 dnl # mm/mmu_notifiers: remove unregister_no_release
 dnl #
-AC_DEFUN([AC_AMDGPU_MMU_NOTIFIER_CALL_SRCU],
-	[AC_MSG_CHECKING([whether mmu_notifier_call_srcu() is available])
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/mmu_notifier.h>
-	],[
-		mmu_notifier_call_srcu(NULL, NULL);
-	],[
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_MMU_NOTIFIER_CALL_SRCU, 1, [mmu_notifier_call_srcu() is available])
-	],[
-		AC_MSG_RESULT(no)
+AC_DEFUN([AC_AMDGPU_MMU_NOTIFIER_CALL_SRCU], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/mmu_notifier.h>
+		],[
+			mmu_notifier_call_srcu(NULL, NULL);
+		],[
+			AC_DEFINE(HAVE_MMU_NOTIFIER_CALL_SRCU, 1, [mmu_notifier_call_srcu() is available])
+		])
 	])
 ])

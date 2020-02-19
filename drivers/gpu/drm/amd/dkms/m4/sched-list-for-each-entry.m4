@@ -5,18 +5,17 @@ dnl # Renamed wait_queue_head::task_list -> wait_queue_head::head
 dnl # Renamed wait_queue_entry::task_list -> wait_queue_entry::entry
 dnl #
 AC_DEFUN([AC_AMDGPU_LIST_FOR_EACH_ENTRY], [
-	AC_MSG_CHECKING([whether wait_queue_entry_t exists])
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/wait.h>
-	],[
-		wait_queue_entry_t *wq_entry = NULL;
-		wait_queue_head_t *wq_head = NULL;
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/wait.h>
+		], [
+			wait_queue_entry_t *wq_entry = NULL;
+			wait_queue_head_t *wq_head = NULL;
 
-		__add_wait_queue(wq_head, wq_entry);
-	],[
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_WAIT_QUEUE_ENTRY, 1, [wait_queue_entry_t exists])
-	],[
-		AC_MSG_RESULT(no)
+			__add_wait_queue(wq_head, wq_entry);
+		], [
+			AC_DEFINE(HAVE_WAIT_QUEUE_ENTRY, 1,
+				[wait_queue_entry_t exists])
+		])
 	])
 ])

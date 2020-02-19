@@ -8,16 +8,15 @@ dnl # for optional firmware, at which point drivers can take on the onus
 dnl # over informing of any failures, if udev firmware loading is disabled
 dnl # though we should at the very least provide some sort of information
 dnl # as when the udev loader was enabled by default back in the days.
-AC_DEFUN([AC_AMDGPU_REQUEST_FIRMWARE_DIRECT],
-	[AC_MSG_CHECKING([whether request_firmware_direct() is available])
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/firmware.h>
-	],[
-		request_firmware_direct(NULL, NULL, NULL);
-	],[
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_REQUEST_FIRMWARE_DIRECT, 1, [request_firmware_direct() is available])
-	],[
-		AC_MSG_RESULT(no)
+AC_DEFUN([AC_AMDGPU_REQUEST_FIRMWARE_DIRECT], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/firmware.h>
+		], [
+			request_firmware_direct(NULL, NULL, NULL);
+		], [
+			AC_DEFINE(HAVE_REQUEST_FIRMWARE_DIRECT, 1,
+				[request_firmware_direct() is available])
+		])
 	])
 ])
