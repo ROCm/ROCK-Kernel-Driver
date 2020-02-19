@@ -2291,6 +2291,10 @@ int suspend_queues(struct kfd_process *p,
 					dqm_unlock(dqm);
 					return r;
 				}
+				if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
+					WRITE_ONCE(
+						q->properties.debug_event_type,
+						0);
 				queues_suspended_on_device = true;
 				any_queues_suspended = true;
 			}
