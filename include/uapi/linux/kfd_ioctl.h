@@ -219,8 +219,10 @@ struct kfd_ioctl_dbg_wave_control_args {
 };
 
 /* mapping event types to API spec */
-#define	KFD_DBG_EV_STATUS_TRAP		1
-#define	KFD_DBG_EV_STATUS_VMFAULT	2
+#define KFD_DBG_EV_STATUS_TRAP_BIT	0
+#define KFD_DBG_EV_STATUS_VMFAULT_BIT	1
+#define	KFD_DBG_EV_STATUS_TRAP		(1 << KFD_DBG_EV_STATUS_TRAP_BIT)
+#define	KFD_DBG_EV_STATUS_VMFAULT	(1 << KFD_DBG_EV_STATUS_VMFAULT_BIT)
 #define	KFD_DBG_EV_STATUS_SUSPENDED	4
 #define KFD_DBG_EV_STATUS_NEW_QUEUE	8
 #define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1
