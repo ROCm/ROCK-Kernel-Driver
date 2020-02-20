@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER],
 		bool foo(struct drm_device *dev, unsigned int pipe,
 			int *max_error,
 			ktime_t *vblank_time,
-			bool in_vblank_irq);
+			bool in_vblank_irq) { return 0; }
 	], [
 		struct drm_driver *bar = NULL;
 		bar->get_vblank_timestamp = foo;
@@ -27,7 +27,7 @@ AC_DEFUN([AC_AMDGPU_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER],
 			bool foo(struct drm_device *dev, unsigned int pipe,
 					int *max_error,
 					struct timeval *vblank_time,
-					bool in_vblank_irq);
+					bool in_vblank_irq) { return 0; }
 		], [
 			struct drm_driver *bar = NULL;
 			bar->get_vblank_timestamp = foo;
@@ -46,7 +46,7 @@ AC_DEFUN([AC_AMDGPU_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER],
 				bool foo(struct drm_device *dev, unsigned int pipe,
 						int *max_error,
 						struct timeval *vblank_time,
-						unsigned flags);
+						unsigned flags) { return 0; }
 			], [
 				struct drm_driver *bar = NULL;
 				bar->get_vblank_timestamp = foo;

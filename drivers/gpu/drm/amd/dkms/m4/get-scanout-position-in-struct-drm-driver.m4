@@ -9,7 +9,7 @@ AC_DEFUN([AC_AMDGPU_GET_SCANOUT_POSITION_IN_DRM_DRIVER],
 		bool foo(struct drm_device *dev, unsigned int pipe,
 			bool in_vblank_irq, int *vpos, int *hpos,
 			ktime_t *stime, ktime_t *etime,
-			const struct drm_display_mode *mode);
+			const struct drm_display_mode *mode) { return 0; }
 	], [
 		struct drm_driver *bar = NULL;
 		bar->get_scanout_position = foo;
@@ -29,7 +29,7 @@ AC_DEFUN([AC_AMDGPU_GET_SCANOUT_POSITION_IN_DRM_DRIVER],
 				unsigned int flags,
 				int *vpos, int *hpos,
 				ktime_t *stime, ktime_t *etime,
-				const struct drm_display_mode *mode);
+				const struct drm_display_mode *mode) { return 0; }
 		], [
 			struct drm_driver *bar = NULL;
 			bar->get_scanout_position = foo;
@@ -47,7 +47,7 @@ AC_DEFUN([AC_AMDGPU_GET_SCANOUT_POSITION_IN_DRM_DRIVER],
 				#include <drm/drmP.h>
 				int foo(struct drm_device *dev, int crtc,
 					int *vpos, int *hpos, ktime_t *stime,
-					ktime_t *etime);
+					ktime_t *etime) { return 0; }
 			], [
 				struct drm_driver *bar = NULL;
 				bar->get_scanout_position = foo;
