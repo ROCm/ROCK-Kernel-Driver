@@ -125,10 +125,8 @@ void __init reserve_crashkernel(void)
 		crashk_res.end = crash_base + crash_size - 1;
 	}
 
-	if (crashk_res.end == crashk_res.start) {
-		crashk_res.start = crashk_res.end = 0;
-		return;
-	}
+	if (crashk_res.end == crashk_res.start)
+		goto error_out;
 
 	/* We might have got these values via the command line or the
 	 * device tree, either way sanitise them now. */
@@ -170,15 +168,13 @@ void __init reserve_crashkernel(void)
 	if (overlaps_crashkernel(__pa(_stext), _end - _stext)) {
 		printk(KERN_WARNING
 			"Crash kernel can not overlap current kernel\n");
-		crashk_res.start = crashk_res.end = 0;
-		return;
+		goto error_out;
 	}
 
 	/* Crash kernel trumps memory limit */
 	if (memory_limit && memory_limit <= crashk_res.end) {
-		memory_limit = crashk_res.end + 1;
-		printk("Adjusted memory limit for crashkernel, now 0x%llx\n",
-		       memory_limit);
+		pr_err("Crash kernel size can't exceed memory_limit\n");
+		goto error_out;
 	}
 
 	printk(KERN_INFO "Reserving %ldMB of memory at %ldMB "
@@ -190,9 +186,13 @@ void __init reserve_crashkernel(void)
 	if (!memblock_is_region_memory(crashk_res.start, crash_size) ||
 	    memblock_reserve(crashk_res.start, crash_size)) {
 		pr_err("Failed to reserve memory for crashkernel!\n");
-		crashk_res.start = crashk_res.end = 0;
-		return;
+		goto error_out;
 	}
+
+	return;
+error_out:
+	crashk_res.start = crashk_res.end = 0;
+	return;
 }
 
 int overlaps_crashkernel(unsigned long start, unsigned long size)

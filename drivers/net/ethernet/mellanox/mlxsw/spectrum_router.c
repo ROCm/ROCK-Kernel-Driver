@@ -3231,10 +3231,6 @@ mlxsw_sp_nexthop_group_update(struct mlxsw_sp *mlxsw_sp,
 	return 0;
 }
 
-static bool
-mlxsw_sp_fib_node_entry_is_first(const struct mlxsw_sp_fib_node *fib_node,
-				 const struct mlxsw_sp_fib_entry *fib_entry);
-
 static int
 mlxsw_sp_nexthop_fib_entries_update(struct mlxsw_sp *mlxsw_sp,
 				    struct mlxsw_sp_nexthop_group *nh_grp)
@@ -3243,9 +3239,6 @@ mlxsw_sp_nexthop_fib_entries_update(struct mlxsw_sp *mlxsw_sp,
 	int err;
 
 	list_for_each_entry(fib_entry, &nh_grp->fib_list, nexthop_group_node) {
-		if (!mlxsw_sp_fib_node_entry_is_first(fib_entry->fib_node,
-						      fib_entry))
-			continue;
 		err = mlxsw_sp_fib_entry_update(mlxsw_sp, fib_entry);
 		if (err)
 			return err;
@@ -3263,12 +3256,8 @@ mlxsw_sp_nexthop_fib_entries_refresh(struct mlxsw_sp_nexthop_group *nh_grp)
 	enum mlxsw_reg_ralue_op op = MLXSW_REG_RALUE_OP_WRITE_WRITE;
 	struct mlxsw_sp_fib_entry *fib_entry;
 
-	list_for_each_entry(fib_entry, &nh_grp->fib_list, nexthop_group_node) {
-		if (!mlxsw_sp_fib_node_entry_is_first(fib_entry->fib_node,
-						      fib_entry))
-			continue;
+	list_for_each_entry(fib_entry, &nh_grp->fib_list, nexthop_group_node)
 		mlxsw_sp_fib_entry_offload_refresh(fib_entry, op, 0);
-	}
 }
 
 static void mlxsw_sp_adj_grp_size_round_up(u16 *p_adj_grp_size)
@@ -4491,6 +4480,19 @@ mlxsw_sp_fib4_entry_type_set(struct mlxsw_sp *mlxsw_sp,
 	}
 }
 
+static void
+mlxsw_sp_fib4_entry_type_unset(struct mlxsw_sp *mlxsw_sp,
+			       struct mlxsw_sp_fib_entry *fib_entry)
+{
+	switch (fib_entry->type) {
+	case MLXSW_SP_FIB_ENTRY_TYPE_IPIP_DECAP:
+		mlxsw_sp_fib_entry_decap_fini(mlxsw_sp, fib_entry);
+		break;
+	default:
+		break;
+	}
+}
+
 static struct mlxsw_sp_fib4_entry *
 mlxsw_sp_fib4_entry_create(struct mlxsw_sp *mlxsw_sp,
 			   struct mlxsw_sp_fib_node *fib_node,
@@ -4523,6 +4525,7 @@ mlxsw_sp_fib4_entry_create(struct mlxsw_sp *mlxsw_sp,
 	return fib4_entry;
 
 err_nexthop4_group_get:
+	mlxsw_sp_fib4_entry_type_unset(mlxsw_sp, fib_entry);
 err_fib4_entry_type_set:
 	kfree(fib4_entry);
 	return ERR_PTR(err);
@@ -4532,6 +4535,7 @@ static void mlxsw_sp_fib4_entry_destroy(struct mlxsw_sp *mlxsw_sp,
 					struct mlxsw_sp_fib4_entry *fib4_entry)
 {
 	mlxsw_sp_nexthop4_group_put(mlxsw_sp, &fib4_entry->common);
+	mlxsw_sp_fib4_entry_type_unset(mlxsw_sp, &fib4_entry->common);
 	kfree(fib4_entry);
 }
 
@@ -4874,9 +4878,6 @@ static int mlxsw_sp_fib_node_entry_add(struct mlxsw_sp *mlxsw_sp,
 {
 	struct mlxsw_sp_fib_node *fib_node = fib_entry->fib_node;
 
-	if (!mlxsw_sp_fib_node_entry_is_first(fib_node, fib_entry))
-		return 0;
-
 	/* To prevent packet loss, overwrite the previously offloaded
 	 * entry.
 	 */
@@ -4897,16 +4898,6 @@ static void mlxsw_sp_fib_node_entry_del(struct mlxsw_sp *mlxsw_sp,
 
 	if (!mlxsw_sp_fib_node_entry_is_first(fib_node, fib_entry))
 		return;
-
-	/* Promote the next entry by overwriting the deleted entry */
-	if (!list_is_singular(&fib_node->entry_list)) {
-		struct mlxsw_sp_fib_entry *n = list_next_entry(fib_entry, list);
-		enum mlxsw_reg_ralue_op op = MLXSW_REG_RALUE_OP_WRITE_DELETE;
-
-		mlxsw_sp_fib_entry_update(mlxsw_sp, n);
-		mlxsw_sp_fib_entry_offload_refresh(fib_entry, op, 0);
-		return;
-	}
 
 	mlxsw_sp_fib_entry_del(mlxsw_sp, fib_entry);
 }
@@ -4938,9 +4929,6 @@ mlxsw_sp_fib4_node_entry_unlink(struct mlxsw_sp *mlxsw_sp,
 {
 	mlxsw_sp_fib_node_entry_del(mlxsw_sp, &fib4_entry->common);
 	mlxsw_sp_fib4_node_list_remove(fib4_entry);
-
-	if (fib4_entry->common.type == MLXSW_SP_FIB_ENTRY_TYPE_IPIP_DECAP)
-		mlxsw_sp_fib_entry_decap_fini(mlxsw_sp, &fib4_entry->common);
 }
 
 static void mlxsw_sp_fib4_entry_replace(struct mlxsw_sp *mlxsw_sp,

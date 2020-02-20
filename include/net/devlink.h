@@ -485,6 +485,10 @@ enum devlink_param_generic_id {
 #define DEVLINK_INFO_VERSION_GENERIC_FW_UNDI	"fw.undi"
 /* NCSI support/handler version */
 #define DEVLINK_INFO_VERSION_GENERIC_FW_NCSI	"fw.ncsi"
+/* FW parameter set id */
+#define DEVLINK_INFO_VERSION_GENERIC_FW_PSID	"fw.psid"
+/* RoCE FW version */
+#define DEVLINK_INFO_VERSION_GENERIC_FW_ROCE	"fw.roce"
 
 struct devlink_region;
 struct devlink_info_req;
@@ -1000,6 +1004,8 @@ int devlink_health_report(struct devlink_health_reporter *reporter,
 void
 devlink_health_reporter_state_update(struct devlink_health_reporter *reporter,
 				     enum devlink_health_reporter_state state);
+void
+devlink_health_reporter_recovery_done(struct devlink_health_reporter *reporter);
 
 bool devlink_is_reload_failed(const struct devlink *devlink);
 
