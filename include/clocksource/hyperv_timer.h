@@ -23,8 +23,9 @@
 /* Routines called by the VMbus driver */
 extern int hv_stimer_alloc(int sint);
 extern void hv_stimer_free(void);
-extern void hv_stimer_init(unsigned int cpu);
-extern void hv_stimer_cleanup(unsigned int cpu);
+extern int hv_stimer_cleanup(unsigned int cpu);
+extern void hv_stimer_legacy_init(unsigned int cpu, int sint);
+extern void hv_stimer_legacy_cleanup(unsigned int cpu);
 extern void hv_stimer_global_cleanup(void);
 extern void hv_stimer0_isr(void);
 

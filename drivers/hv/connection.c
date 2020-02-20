@@ -14,6 +14,7 @@
 #include <linux/wait.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/hyperv.h>
@@ -63,6 +64,12 @@ static __u32 vmbus_get_next_version(__u32 current_version)
 		return VERSION_INVAL;
 	}
 }
+
+static uint max_version;
+
+module_param(max_version, uint, S_IRUGO);
+MODULE_PARM_DESC(max_version,
+		"Maximal VMBus protocol version which can be negotiated (ignored!)");
 
 int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo, u32 version)
 {

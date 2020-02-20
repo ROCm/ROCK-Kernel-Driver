@@ -358,6 +358,7 @@ static inline
 void rsc_add_data(struct netvsc_channel *nvchan,
 		  const struct ndis_pkt_8021q_info *vlan,
 		  const struct ndis_tcp_ip_checksum_info *csum_info,
+		  const u32 *hash_info,
 		  void *data, u32 len)
 {
 	u32 cnt = nvchan->rsc.cnt;
@@ -441,7 +442,8 @@ static int rndis_filter_receive_data(struct net_device *ndev,
 	 * rndis_pkt->data_len tell us the real data length, we only copy
 	 * the data packet to the stack, without the rndis trailer padding
 	 */
-	rsc_add_data(nvchan, vlan, csum_info, data, rndis_pkt->data_len);
+	rsc_add_data(nvchan, vlan, csum_info, NULL,
+		     data, rndis_pkt->data_len);
 
 	if (rsc_more)
 		return NVSP_STAT_SUCCESS;

@@ -932,6 +932,10 @@ struct vmbus_channel {
 	 * full outbound ring buffer.
 	 */
 	u64 out_full_first;
+
+	bool fuzz_testing_state;
+	u32 fuzz_testing_interrupt_delay;
+	u32 fuzz_testing_message_delay;
 };
 
 static inline bool is_hvsock_channel(const struct vmbus_channel *c)
@@ -1180,6 +1184,7 @@ struct hv_device {
 
 	struct vmbus_channel *channel;
 	struct kset	     *channels_kset;
+	struct dentry *debug_dir;
 };
 
 
@@ -1412,6 +1417,8 @@ struct hv_util_service {
 	void (*util_cb)(void *);
 	int (*util_init)(struct hv_util_service *);
 	void (*util_deinit)(void);
+	int (*util_pre_suspend)(void);
+	int (*util_pre_resume)(void);
 };
 
 struct vmbuspipe_hdr {

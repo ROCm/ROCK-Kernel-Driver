@@ -17,6 +17,7 @@
 #include <linux/clocksource.h>
 #include <linux/sched_clock.h>
 #include <linux/mm.h>
+#include <linux/cpuhotplug.h>
 #include <clocksource/hyperv_timer.h>
 #include <asm/hyperv-tlfs.h>
 #include <asm/mshyperv.h>
@@ -102,7 +103,7 @@ static int hv_ce_set_oneshot(struct clock_event_device *evt)
 /*
  * hv_stimer_init - Per-cpu initialization of the clockevent
  */
-void hv_stimer_init(unsigned int cpu)
+static void hv_stimer_init(unsigned int cpu)
 {
 	struct clock_event_device *ce;
 
@@ -128,12 +129,16 @@ void hv_stimer_init(unsigned int cpu)
 					HV_MIN_DELTA_TICKS,
 					HV_MAX_MAX_DELTA_TICKS);
 }
-EXPORT_SYMBOL_GPL(hv_stimer_init);
+void hv_stimer_legacy_init(unsigned int cpu, int sint)
+{
+	hv_stimer_init(cpu);
+}
+EXPORT_SYMBOL_GPL(hv_stimer_legacy_init);
 
 /*
  * hv_stimer_cleanup - Per-cpu cleanup of the clockevent
  */
-void hv_stimer_cleanup(unsigned int cpu)
+int hv_stimer_cleanup(unsigned int cpu)
 {
 	struct clock_event_device *ce;
 
@@ -142,8 +147,15 @@ void hv_stimer_cleanup(unsigned int cpu)
 		ce = per_cpu_ptr(hv_clock_event, cpu);
 		hv_ce_shutdown(ce);
 	}
+	return 0;
 }
 EXPORT_SYMBOL_GPL(hv_stimer_cleanup);
+
+void hv_stimer_legacy_cleanup(unsigned int cpu)
+{
+	hv_stimer_cleanup(cpu);
+}
+EXPORT_SYMBOL_GPL(hv_stimer_legacy_cleanup);
 
 /* hv_stimer_alloc - Global initialization of the clockevent and stimer0 */
 int hv_stimer_alloc(int sint)
