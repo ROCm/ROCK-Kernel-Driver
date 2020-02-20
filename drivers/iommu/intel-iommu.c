@@ -2442,9 +2442,6 @@ static void do_deferred_attach(struct device *dev)
 
 static struct dmar_domain *deferred_attach_domain(struct device *dev)
 {
-	if (unlikely(attach_deferred(dev)))
-		do_deferred_attach(dev);
-
 	return find_domain(dev);
 }
 
@@ -3466,6 +3463,9 @@ static bool iommu_need_mapping(struct device *dev)
 
 	if (iommu_dummy(dev))
 		return false;
+
+	if (unlikely(attach_deferred(dev)))
+		do_deferred_attach(dev);
 
 	ret = identity_mapping(dev);
 	if (ret) {
