@@ -169,7 +169,6 @@ struct rndis_device {
 
 	u8 hw_mac_adr[ETH_ALEN];
 	u8 rss_key[NETVSC_HASH_KEYLEN];
-	u16 rx_table[ITAB_NUM];
 };
 
 
@@ -609,7 +608,8 @@ struct nvsp_5_send_indirect_table {
 	/* The number of entries in the send indirection table */
 	u32 count;
 
-	/* The offset of the send indirection table from top of this struct.
+	/* The offset of the send indirection table from the beginning of
+	 * struct nvsp_message.
 	 * The send indirection table tells which channel to put the send
 	 * traffic on. Each entry is a channel number.
 	 */
@@ -936,6 +936,8 @@ struct net_device_context {
 	u32 tx_checksum_mask;
 
 	u32 tx_table[VRSS_SEND_TAB_SIZE];
+
+	u16 rx_table[ITAB_NUM];
 
 	/* Ethtool settings */
 	u8 duplex;
