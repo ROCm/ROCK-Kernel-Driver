@@ -392,6 +392,7 @@ static int cbc_aes_crypt(struct blkcipher_desc *desc, unsigned long modifier,
 		ret = blkcipher_walk_done(desc, walk, nbytes - n);
 	}
 	memcpy(walk->iv, param.iv, AES_BLOCK_SIZE);
+	memzero_explicit(&param, sizeof(param));
 	return ret;
 }
 
@@ -576,6 +577,8 @@ static int xts_aes_crypt(struct blkcipher_desc *desc, unsigned long modifier,
 			 walk->dst.virt.addr, walk->src.virt.addr, n);
 		ret = blkcipher_walk_done(desc, walk, nbytes - n);
 	}
+	memzero_explicit(&pcc_param, sizeof(pcc_param));
+	memzero_explicit(&xts_param, sizeof(xts_param));
 	return ret;
 }
 
