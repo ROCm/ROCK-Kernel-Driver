@@ -1239,6 +1239,18 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 	if (!pi_test_sn(pi_desc) && vcpu->cpu == cpu)
 		return;
 
+	/*
+	 * If the 'nv' field is POSTED_INTR_WAKEUP_VECTOR, do not change
+	 * PI.NDST: pi_post_block is the one expected to change PID.NDST and the
+	 * wakeup handler expects the vCPU to be on the blocked_vcpu_list that
+	 * matches PI.NDST. Otherwise, a vcpu may not be able to be woken up
+	 * correctly.
+	 */
+	if (pi_desc->nv == POSTED_INTR_WAKEUP_VECTOR || vcpu->cpu == cpu) {
+		pi_clear_sn(pi_desc);
+		goto after_clear_sn;
+	}
+
 	/* The full case.  */
 	do {
 		old.control = new.control = pi_desc->control;
@@ -1253,6 +1265,8 @@ static void vmx_vcpu_pi_load(struct kvm_vcpu *vcpu, int cpu)
 		new.sn = 0;
 	} while (cmpxchg64(&pi_desc->control, old.control,
 			   new.control) != old.control);
+
+after_clear_sn:
 
 	/*
 	 * Clear SN before reading the bitmap.  The VT-d firmware
@@ -1778,10 +1792,8 @@ static int vmx_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		return vmx_get_vmx_msr(&vmx->nested.msrs, msr_info->index,
 				       &msr_info->data);
 	case MSR_IA32_XSS:
-		if (!vmx_xsaves_supported() ||
-		    (!msr_info->host_initiated &&
-		     !(guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
-		       guest_cpuid_has(vcpu, X86_FEATURE_XSAVES))))
+		if (!msr_info->host_initiated &&
+		    !guest_cpuid_has(vcpu, X86_FEATURE_XSAVES))
 			return 1;
 		msr_info->data = vcpu->arch.ia32_xss;
 		break;
@@ -2029,10 +2041,8 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 			return 1;
 		return vmx_set_vmx_msr(vcpu, msr_index, data);
 	case MSR_IA32_XSS:
-		if (!vmx_xsaves_supported() ||
-		    (!msr_info->host_initiated &&
-		     !(guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
-		       guest_cpuid_has(vcpu, X86_FEATURE_XSAVES))))
+		if (!msr_info->host_initiated &&
+		    !guest_cpuid_has(vcpu, X86_FEATURE_XSAVES))
 			return 1;
 		/*
 		 * The only supported bit as of Skylake is bit 8, but
@@ -2041,11 +2051,13 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		if (data != 0)
 			return 1;
 		vcpu->arch.ia32_xss = data;
-		if (vcpu->arch.ia32_xss != host_xss)
-			add_atomic_switch_msr(vmx, MSR_IA32_XSS,
-				vcpu->arch.ia32_xss, host_xss, false);
-		else
-			clear_atomic_switch_msr(vmx, MSR_IA32_XSS);
+		if (vcpu->arch.xsaves_enabled) {
+			if (vcpu->arch.ia32_xss != host_xss)
+				add_atomic_switch_msr(vmx, MSR_IA32_XSS,
+					vcpu->arch.ia32_xss, host_xss, false);
+			else
+				clear_atomic_switch_msr(vmx, MSR_IA32_XSS);
+		}
 		break;
 	case MSR_IA32_RTIT_CTL:
 		if ((pt_mode != PT_MODE_HOST_GUEST) ||
@@ -2924,6 +2936,9 @@ void vmx_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 
 static int get_ept_level(struct kvm_vcpu *vcpu)
 {
+	/* Nested EPT currently only supports 4-level walks. */
+	if (is_guest_mode(vcpu) && nested_cpu_has_ept(get_vmcs12(vcpu)))
+		return 4;
 	if (cpu_has_vmx_ept_5levels() && (cpuid_maxphyaddr(vcpu) > 48))
 		return 5;
 	return 4;
@@ -4001,6 +4016,8 @@ static void vmx_compute_secondary_exec_control(struct vcpu_vmx *vmx)
 			guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
 			guest_cpuid_has(vcpu, X86_FEATURE_XSAVES);
 
+		vcpu->arch.xsaves_enabled = xsaves_enabled;
+
 		if (!xsaves_enabled)
 			exec_control &= ~SECONDARY_EXEC_XSAVES;
 
@@ -4107,7 +4124,7 @@ static void ept_set_mmio_spte_mask(void)
 	 * of an EPT paging-structure entry is 110b (write/execute).
 	 */
 	kvm_mmu_set_mmio_spte_mask(VMX_EPT_RWX_MASK,
-				   VMX_EPT_MISCONFIG_WX_VALUE);
+				   VMX_EPT_MISCONFIG_WX_VALUE, 0);
 }
 
 #define VMX_XSS_EXIT_BITMAP 0
@@ -4972,14 +4989,10 @@ static int handle_rdmsr(struct kvm_vcpu *vcpu)
 
 static int handle_wrmsr(struct kvm_vcpu *vcpu)
 {
-	struct msr_data msr;
 	u32 ecx = kvm_rcx_read(vcpu);
 	u64 data = kvm_read_edx_eax(vcpu);
 
-	msr.data = data;
-	msr.index = ecx;
-	msr.host_initiated = false;
-	if (kvm_set_msr(vcpu, &msr) != 0) {
+	if (kvm_set_msr(vcpu, ecx, data) != 0) {
 		trace_kvm_msr_write_ex(ecx, data);
 		kvm_inject_gp(vcpu, 0);
 		return 1;
@@ -5973,15 +5986,41 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu)
 		}
 	}
 
-	if (exit_reason < kvm_vmx_max_exit_handlers
-	    && kvm_vmx_exit_handlers[exit_reason])
-		return kvm_vmx_exit_handlers[exit_reason](vcpu);
-	else {
-		vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
-				exit_reason);
-		kvm_queue_exception(vcpu, UD_VECTOR);
-		return 1;
-	}
+	if (exit_reason >= kvm_vmx_max_exit_handlers)
+		goto unexpected_vmexit;
+
+#ifdef CONFIG_RETPOLINE
+	if (exit_reason == EXIT_REASON_MSR_WRITE)
+		return kvm_emulate_wrmsr(vcpu);
+	else if (exit_reason == EXIT_REASON_PREEMPTION_TIMER)
+		return handle_preemption_timer(vcpu);
+	else if (exit_reason == EXIT_REASON_PENDING_INTERRUPT)
+		return handle_interrupt_window(vcpu);
+	else if (exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT)
+		return handle_external_interrupt(vcpu);
+	else if (exit_reason == EXIT_REASON_HLT)
+		return kvm_emulate_halt(vcpu);
+	else if (exit_reason == EXIT_REASON_EPT_MISCONFIG)
+		return handle_ept_misconfig(vcpu);
+#endif
+
+	exit_reason = array_index_nospec(exit_reason,
+					 kvm_vmx_max_exit_handlers);
+	if (!kvm_vmx_exit_handlers[exit_reason])
+		goto unexpected_vmexit;
+
+	return kvm_vmx_exit_handlers[exit_reason](vcpu);
+
+unexpected_vmexit:
+	vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n",
+			exit_reason);
+	dump_vmcs();
+	vcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
+	vcpu->run->internal.suberror =
+		KVM_INTERNAL_ERROR_UNEXPECTED_EXIT_REASON;
+	vcpu->run->internal.ndata = 1;
+	vcpu->run->internal.data[0] = exit_reason;
+	return 0;
 }
 
 /*
@@ -6211,7 +6250,11 @@ static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 
 static bool vmx_dy_apicv_has_pending_interrupt(struct kvm_vcpu *vcpu)
 {
-	return pi_test_on(vcpu_to_pi_desc(vcpu));
+	struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
+
+	return pi_test_on(pi_desc) ||
+		(pi_test_sn(pi_desc) &&
+		!bitmap_empty((unsigned long *)pi_desc->pir, NR_VECTORS));
 }
 
 static void vmx_load_eoi_exitmap(struct kvm_vcpu *vcpu, u64 *eoi_exit_bitmap)
@@ -7114,6 +7157,9 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
+	/* xsaves_enabled is recomputed in vmx_compute_secondary_exec_control(). */
+	vcpu->arch.xsaves_enabled = false;
+
 	if (cpu_has_secondary_exec_ctrls()) {
 		vmx_compute_secondary_exec_control(vmx);
 		vmcs_set_secondary_exec_control(vmx);
@@ -7121,10 +7167,12 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 
 	if (nested_vmx_allowed(vcpu))
 		to_vmx(vcpu)->msr_ia32_feature_control_valid_bits |=
+			FEATURE_CONTROL_VMXON_ENABLED_INSIDE_SMX |
 			FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
 	else
 		to_vmx(vcpu)->msr_ia32_feature_control_valid_bits &=
-			~FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
+			~(FEATURE_CONTROL_VMXON_ENABLED_INSIDE_SMX |
+			  FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX);
 
 	if (nested_vmx_allowed(vcpu)) {
 		nested_vmx_cr_fixed1_bits_update(vcpu);
@@ -7889,6 +7937,7 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.xsaves_supported = vmx_xsaves_supported,
 	.umip_emulated = vmx_umip_emulated,
 	.pt_supported = vmx_pt_supported,
+	.pku_supported = vmx_pku_supported,
 
 	.request_immediate_exit = vmx_request_immediate_exit,
 

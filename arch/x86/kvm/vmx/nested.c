@@ -864,9 +864,7 @@ static u32 nested_vmx_load_msr(struct kvm_vcpu *vcpu, u64 gpa, u32 count)
 {
 	u32 i;
 	struct vmx_msr_entry e;
-	struct msr_data msr;
 
-	msr.host_initiated = false;
 	for (i = 0; i < count; i++) {
 		if (kvm_vcpu_read_guest(vcpu, gpa + i * sizeof(e),
 					&e, sizeof(e))) {
@@ -881,9 +879,7 @@ static u32 nested_vmx_load_msr(struct kvm_vcpu *vcpu, u64 gpa, u32 count)
 				__func__, i, e.index, e.reserved);
 			goto fail;
 		}
-		msr.index = e.index;
-		msr.data = e.value;
-		if (kvm_set_msr(vcpu, &msr)) {
+		if (kvm_set_msr(vcpu, e.index, e.value)) {
 			pr_debug_ratelimited(
 				"%s cannot write MSR (%u, 0x%x, 0x%llx)\n",
 				__func__, i, e.index, e.value);
@@ -897,11 +893,11 @@ fail:
 
 static int nested_vmx_store_msr(struct kvm_vcpu *vcpu, u64 gpa, u32 count)
 {
+	u64 data;
 	u32 i;
 	struct vmx_msr_entry e;
 
 	for (i = 0; i < count; i++) {
-		struct msr_data msr_info;
 		if (kvm_vcpu_read_guest(vcpu,
 					gpa + i * sizeof(e),
 					&e, 2 * sizeof(u32))) {
@@ -916,9 +912,7 @@ static int nested_vmx_store_msr(struct kvm_vcpu *vcpu, u64 gpa, u32 count)
 				__func__, i, e.index, e.reserved);
 			return -EINVAL;
 		}
-		msr_info.host_initiated = false;
-		msr_info.index = e.index;
-		if (kvm_get_msr(vcpu, &msr_info)) {
+		if (kvm_get_msr(vcpu, e.index, &data)) {
 			pr_debug_ratelimited(
 				"%s cannot read MSR (%u, 0x%x)\n",
 				__func__, i, e.index);
@@ -927,10 +921,10 @@ static int nested_vmx_store_msr(struct kvm_vcpu *vcpu, u64 gpa, u32 count)
 		if (kvm_vcpu_write_guest(vcpu,
 					 gpa + i * sizeof(e) +
 					     offsetof(struct vmx_msr_entry, value),
-					 &msr_info.data, sizeof(msr_info.data))) {
+					 &data, sizeof(data))) {
 			pr_debug_ratelimited(
 				"%s cannot write MSR (%u, 0x%x, 0x%llx)\n",
-				__func__, i, e.index, msr_info.data);
+				__func__, i, e.index, data);
 			return -EINVAL;
 		}
 	}
@@ -2882,7 +2876,7 @@ static int nested_vmx_check_vmentry_hw(struct kvm_vcpu *vcpu)
 static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 						 struct vmcs12 *vmcs12);
 
-static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
+static bool nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
 {
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -2902,19 +2896,18 @@ static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
 			vmx->nested.apic_access_page = NULL;
 		}
 		page = kvm_vcpu_gpa_to_page(vcpu, vmcs12->apic_access_addr);
-		/*
-		 * If translation failed, no matter: This feature asks
-		 * to exit when accessing the given address, and if it
-		 * can never be accessed, this feature won't do
-		 * anything anyway.
-		 */
 		if (!is_error_page(page)) {
 			vmx->nested.apic_access_page = page;
 			hpa = page_to_phys(vmx->nested.apic_access_page);
 			vmcs_write64(APIC_ACCESS_ADDR, hpa);
 		} else {
-			secondary_exec_controls_clearbit(vmx,
-				SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES);
+			pr_debug_ratelimited("%s: no backing 'struct page' for APIC-access address in vmcs12\n",
+					     __func__);
+			vcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
+			vcpu->run->internal.suberror =
+				KVM_INTERNAL_ERROR_EMULATION;
+			vcpu->run->internal.ndata = 0;
+			return false;
 		}
 	}
 
@@ -2959,6 +2952,7 @@ static void nested_get_vmcs12_pages(struct kvm_vcpu *vcpu)
 		exec_controls_setbit(vmx, CPU_BASED_USE_MSR_BITMAPS);
 	else
 		exec_controls_clearbit(vmx, CPU_BASED_USE_MSR_BITMAPS);
+	return true;
 }
 
 /*
@@ -2997,13 +2991,15 @@ static void load_vmcs12_host_state(struct kvm_vcpu *vcpu,
 /*
  * If from_vmentry is false, this is being called from state restore (either RSM
  * or KVM_SET_NESTED_STATE).  Otherwise it's called from vmlaunch/vmresume.
-+ *
-+ * Returns:
-+ *   0 - success, i.e. proceed with actual VMEnter
-+ *   1 - consistency check VMExit
-+ *  -1 - consistency check VMFail
+ *
+ * Returns:
+ *	NVMX_ENTRY_SUCCESS: Entered VMX non-root mode
+ *	NVMX_ENTRY_VMFAIL:  Consistency check VMFail
+ *	NVMX_ENTRY_VMEXIT:  Consistency check VMExit
+ *	NVMX_ENTRY_KVM_INTERNAL_ERROR: KVM internal error
  */
-int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, bool from_vmentry)
+enum nvmx_vmentry_status nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu,
+							bool from_vmentry)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
@@ -3046,11 +3042,12 @@ int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, bool from_vmentry)
 	prepare_vmcs02_early(vmx, vmcs12);
 
 	if (from_vmentry) {
-		nested_get_vmcs12_pages(vcpu);
+		if (unlikely(!nested_get_vmcs12_pages(vcpu)))
+			return NVMX_VMENTRY_KVM_INTERNAL_ERROR;
 
 		if (nested_vmx_check_vmentry_hw(vcpu)) {
 			vmx_switch_vmcs(vcpu, &vmx->vmcs01);
-			return -1;
+			return NVMX_VMENTRY_VMFAIL;
 		}
 
 		if (nested_vmx_check_guest_state(vcpu, vmcs12, &exit_qual))
@@ -3114,7 +3111,7 @@ int nested_vmx_enter_non_root_mode(struct kvm_vcpu *vcpu, bool from_vmentry)
 	 * returned as far as L1 is concerned. It will only return (and set
 	 * the success flag) when L2 exits (see nested_vmx_vmexit()).
 	 */
-	return 0;
+	return NVMX_VMENTRY_SUCCESS;
 
 	/*
 	 * A failed consistency check that leads to a VMExit during L1's
@@ -3130,14 +3127,14 @@ vmentry_fail_vmexit:
 	vmx_switch_vmcs(vcpu, &vmx->vmcs01);
 
 	if (!from_vmentry)
-		return 1;
+		return NVMX_VMENTRY_VMEXIT;
 
 	load_vmcs12_host_state(vcpu, vmcs12);
 	vmcs12->vm_exit_reason = exit_reason | VMX_EXIT_REASONS_FAILED_VMENTRY;
 	vmcs12->exit_qualification = exit_qual;
 	if (enable_shadow_vmcs || vmx->nested.hv_evmcs)
 		vmx->nested.need_vmcs12_to_shadow_sync = true;
-	return 1;
+	return NVMX_VMENTRY_VMEXIT;
 }
 
 /*
@@ -3147,9 +3144,9 @@ vmentry_fail_vmexit:
 static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 {
 	struct vmcs12 *vmcs12;
+	enum nvmx_vmentry_status status;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 interrupt_shadow = vmx_get_interrupt_shadow(vcpu);
-	int ret;
 
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
@@ -3209,13 +3206,9 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	 * the nested entry.
 	 */
 	vmx->nested.nested_run_pending = 1;
-	ret = nested_vmx_enter_non_root_mode(vcpu, true);
-	vmx->nested.nested_run_pending = !ret;
-	if (ret > 0)
-		return 1;
-	else if (ret)
-		return nested_vmx_failValid(vcpu,
-			VMXERR_ENTRY_INVALID_CONTROL_FIELD);
+	status = nested_vmx_enter_non_root_mode(vcpu, true);
+	if (unlikely(status != NVMX_VMENTRY_SUCCESS))
+		goto vmentry_failed;
 
 	/* Hide L1D cache contents from the nested guest.  */
 	vmx->vcpu.arch.l1tf_flush_l1d = true;
@@ -3246,6 +3239,15 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 		return kvm_vcpu_halt(vcpu);
 	}
 	return 1;
+
+vmentry_failed:
+	vmx->nested.nested_run_pending = 0;
+	if (status == NVMX_VMENTRY_KVM_INTERNAL_ERROR)
+		return 0;
+	if (status == NVMX_VMENTRY_VMEXIT)
+		return 1;
+	WARN_ON_ONCE(status != NVMX_VMENTRY_VMFAIL);
+	return nested_vmx_failValid(vcpu, VMXERR_ENTRY_INVALID_CONTROL_FIELD);
 }
 
 /*
@@ -3900,7 +3902,6 @@ static void nested_vmx_restore_host_state(struct kvm_vcpu *vcpu)
 	struct vmcs12 *vmcs12 = get_vmcs12(vcpu);
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	struct vmx_msr_entry g, h;
-	struct msr_data msr;
 	gpa_t gpa;
 	u32 i, j;
 
@@ -3960,7 +3961,6 @@ static void nested_vmx_restore_host_state(struct kvm_vcpu *vcpu)
 	 * from the guest value.  The intent is to stuff host state as
 	 * silently as possible, not to fully process the exit load list.
 	 */
-	msr.host_initiated = false;
 	for (i = 0; i < vmcs12->vm_entry_msr_load_count; i++) {
 		gpa = vmcs12->vm_entry_msr_load_addr + (i * sizeof(g));
 		if (kvm_vcpu_read_guest(vcpu, gpa, &g, sizeof(g))) {
@@ -3990,9 +3990,7 @@ static void nested_vmx_restore_host_state(struct kvm_vcpu *vcpu)
 				goto vmabort;
 			}
 
-			msr.index = h.index;
-			msr.data = h.value;
-			if (kvm_set_msr(vcpu, &msr)) {
+			if (kvm_set_msr(vcpu, h.index, h.value)) {
 				pr_debug_ratelimited(
 					"%s WRMSR failed (%u, 0x%x, 0x%llx)\n",
 					__func__, j, h.index, h.value);
@@ -4546,31 +4544,27 @@ static int handle_vmread(struct kvm_vcpu *vcpu)
 {
 	unsigned long field;
 	u64 field_value;
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	unsigned long exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 	u32 vmx_instruction_info = vmcs_read32(VMX_INSTRUCTION_INFO);
 	int len;
 	gva_t gva = 0;
-	struct vmcs12 *vmcs12;
+	struct vmcs12 *vmcs12 = is_guest_mode(vcpu) ? get_shadow_vmcs12(vcpu)
+						    : get_vmcs12(vcpu);
 	struct x86_exception e;
 	short offset;
 
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
-	if (to_vmx(vcpu)->nested.current_vmptr == -1ull)
+	/*
+	 * In VMX non-root operation, when the VMCS-link pointer is -1ull,
+	 * any VMREAD sets the ALU flags for VMfailInvalid.
+	 */
+	if (vmx->nested.current_vmptr == -1ull ||
+	    (is_guest_mode(vcpu) &&
+	     get_vmcs12(vcpu)->vmcs_link_pointer == -1ull))
 		return nested_vmx_failInvalid(vcpu);
-
-	if (!is_guest_mode(vcpu))
-		vmcs12 = get_vmcs12(vcpu);
-	else {
-		/*
-		 * When vmcs->vmcs_link_pointer is -1ull, any VMREAD
-		 * to shadowed-field sets the ALU flags for VMfailInvalid.
-		 */
-		if (get_vmcs12(vcpu)->vmcs_link_pointer == -1ull)
-			return nested_vmx_failInvalid(vcpu);
-		vmcs12 = get_shadow_vmcs12(vcpu);
-	}
 
 	/* Decode instruction info and find the field to read */
 	field = kvm_register_readl(vcpu, (((vmx_instruction_info) >> 28) & 0xf));
@@ -4648,13 +4642,20 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 	 */
 	u64 field_value = 0;
 	struct x86_exception e;
-	struct vmcs12 *vmcs12;
+	struct vmcs12 *vmcs12 = is_guest_mode(vcpu) ? get_shadow_vmcs12(vcpu)
+						    : get_vmcs12(vcpu);
 	short offset;
 
 	if (!nested_vmx_check_permission(vcpu))
 		return 1;
 
-	if (vmx->nested.current_vmptr == -1ull)
+	/*
+	 * In VMX non-root operation, when the VMCS-link pointer is -1ull,
+	 * any VMWRITE sets the ALU flags for VMfailInvalid.
+	 */
+	if (vmx->nested.current_vmptr == -1ull ||
+	    (is_guest_mode(vcpu) &&
+	     get_vmcs12(vcpu)->vmcs_link_pointer == -1ull))
 		return nested_vmx_failInvalid(vcpu);
 
 	if (vmx_instruction_info & (1u << 10))
@@ -4673,6 +4674,12 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 
 
 	field = kvm_register_readl(vcpu, (((vmx_instruction_info) >> 28) & 0xf));
+
+	offset = vmcs_field_to_offset(field);
+	if (offset < 0)
+		return nested_vmx_failValid(vcpu,
+			VMXERR_UNSUPPORTED_VMCS_COMPONENT);
+
 	/*
 	 * If the vCPU supports "VMWRITE to any supported field in the
 	 * VMCS," then the "read-only" fields are actually read/write.
@@ -4682,29 +4689,12 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 		return nested_vmx_failValid(vcpu,
 			VMXERR_VMWRITE_READ_ONLY_VMCS_COMPONENT);
 
-	if (!is_guest_mode(vcpu)) {
-		vmcs12 = get_vmcs12(vcpu);
-
-		/*
-		 * Ensure vmcs12 is up-to-date before any VMWRITE that dirties
-		 * vmcs12, else we may crush a field or consume a stale value.
-		 */
-		if (!is_shadow_field_rw(field))
-			copy_vmcs02_to_vmcs12_rare(vcpu, vmcs12);
-	} else {
-		/*
-		 * When vmcs->vmcs_link_pointer is -1ull, any VMWRITE
-		 * to shadowed-field sets the ALU flags for VMfailInvalid.
-		 */
-		if (get_vmcs12(vcpu)->vmcs_link_pointer == -1ull)
-			return nested_vmx_failInvalid(vcpu);
-		vmcs12 = get_shadow_vmcs12(vcpu);
-	}
-
-	offset = vmcs_field_to_offset(field);
-	if (offset < 0)
-		return nested_vmx_failValid(vcpu,
-			VMXERR_UNSUPPORTED_VMCS_COMPONENT);
+	/*
+	 * Ensure vmcs12 is up-to-date before any VMWRITE that dirties
+	 * vmcs12, else we may crush a field or consume a stale value.
+	 */
+	if (!is_guest_mode(vcpu) && !is_shadow_field_rw(field))
+		copy_vmcs02_to_vmcs12_rare(vcpu, vmcs12);
 
 	/*
 	 * Some Intel CPUs intentionally drop the reserved bits of the AR byte
