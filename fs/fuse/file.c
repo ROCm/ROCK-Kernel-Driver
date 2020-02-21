@@ -1397,17 +1397,21 @@ ssize_t fuse_direct_io(struct fuse_io_priv *io, struct iov_iter *iter,
 			fuse_release_user_pages(req, io->should_dirty);
 		if (req->out.h.error) {
 			err = req->out.h.error;
+			iov_iter_revert(iter, nbytes);
 			break;
 		} else if (nres > nbytes) {
 			res = 0;
 			err = -EIO;
+			iov_iter_revert(iter, nbytes);
 			break;
 		}
 		count -= nres;
 		res += nres;
 		pos += nres;
-		if (nres != nbytes)
+		if (nres != nbytes) {
+			iov_iter_revert(iter, nbytes - nres);
 			break;
+		}
 		if (count) {
 			fuse_put_request(fc, req);
 			if (io->async)
