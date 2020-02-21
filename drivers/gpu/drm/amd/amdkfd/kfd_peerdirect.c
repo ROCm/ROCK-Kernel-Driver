@@ -182,7 +182,6 @@ static int amd_acquire(unsigned long addr, size_t size,
 	int ret;
 	struct amd_mem_context *mem_context;
 	struct pid *pid;
-	unsigned long page_size;
 
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);
@@ -209,14 +208,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 
 	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
-
-	/* Workaround: Currently, Mellanox drivers seem to be supporting only at
-	 * page granularity. This is causing failures when an application tries
-	 * to register size < page_size. Fix it temporarily by aligning the size
-	 * to page size
-	 */
-	rdma_interface->get_page_size(addr, size, pid, &page_size);
-	mem_context->size = ALIGN(size, page_size);
+	mem_context->size = size;
 
 	/* Save PID. It is guaranteed that the function will be
 	 * called in the correct process context as opposite to others.
@@ -260,17 +252,23 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	/* Workaround: see amd_acquire */
-	rdma_interface->get_page_size(addr, size, mem_context->pid,
-				      &page_size);
-	if (ALIGN(size, page_size) != mem_context->size) {
+	if (size != mem_context->size) {
 		pr_warn("Context size (0x%llx) is not the same\n",
 			mem_context->size);
 		return -EINVAL;
 	}
 
-	ret = rdma_interface->get_pages(addr,
-					mem_context->size,
+	/* Workaround: Mellanox peerdirect driver expects sg lists at
+	page granularity. This causes failures when an application tries
+	to register size < page_size or addr starts at some offset. Fix
+	it by aligning the size to page size and addr to page boundary.
+	*/
+	rdma_interface->get_page_size(addr, size, mem_context->pid,
+				      &page_size);
+
+	ret = rdma_interface->get_pages(
+					ALIGN_DOWN(addr, page_size),
+					ALIGN(size, page_size),
 					mem_context->pid,
 					&mem_context->p2p_info,
 					free_callback,
