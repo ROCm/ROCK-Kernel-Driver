@@ -1507,11 +1507,10 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP
+	    DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
 #endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
-	    | DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
 	    | DRIVER_IRQ_SHARED
 #endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
