@@ -943,7 +943,6 @@ static int handle_reserve_ticket(struct btrfs_fs_info *fs_info,
 				 struct reserve_ticket *ticket,
 				 enum btrfs_reserve_flush_enum flush)
 {
-	u64 reclaim_bytes = 0;
 	int ret;
 
 	switch (flush) {
@@ -968,17 +967,11 @@ static int handle_reserve_ticket(struct btrfs_fs_info *fs_info,
 	spin_lock(&space_info->lock);
 	ret = ticket->error;
 	if (ticket->bytes || ticket->error) {
-		if (ticket->bytes < ticket->orig_bytes)
-			reclaim_bytes = ticket->orig_bytes - ticket->bytes;
 		list_del_init(&ticket->list);
 		if (!ret)
 			ret = -ENOSPC;
 	}
 	spin_unlock(&space_info->lock);
-
-	if (reclaim_bytes)
-		btrfs_space_info_add_old_bytes(fs_info, space_info,
-					       reclaim_bytes);
 	ASSERT(list_empty(&ticket->list));
 	return ret;
 }
@@ -1038,7 +1031,6 @@ static int __reserve_metadata_bytes(struct btrfs_fs_info *fs_info,
 	 * the list and we will do our own flushing further down.
 	 */
 	if (ret && flush != BTRFS_RESERVE_NO_FLUSH) {
-		ticket.orig_bytes = orig_bytes;
 		ticket.bytes = orig_bytes;
 		ticket.error = 0;
 		init_waitqueue_head(&ticket.wait);
