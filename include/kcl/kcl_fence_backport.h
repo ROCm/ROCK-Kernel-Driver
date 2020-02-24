@@ -29,26 +29,4 @@
 #ifdef AMDKCL_FENCE_GET_RCU_SAFE
 #define dma_fence_get_rcu_safe _kcl_fence_get_rcu_safe
 #endif
-
-/*
- * commit v4.18-rc2-533-g418cc6ca0607
- * dma-fence: Make ->wait callback optional
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
-#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL \
-	.wait = dma_fence_default_wait,
-#else
-#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
-#endif
-
-/*
- * commit v4.18-rc2-519-gc701317a3eb8
- * dma-fence: Make ->enable_signaling optional
- */
-#ifdef AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
-#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL \
-	.enable_signaling = _kcl_fence_enable_signaling,
-#else
-#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
-#endif
 #endif
