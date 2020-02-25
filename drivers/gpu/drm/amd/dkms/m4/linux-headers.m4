@@ -85,17 +85,19 @@ dnl # commit 299878bac326c890699c696ebba26f56fe93fc75
 dnl # treewide: move set_memory_* functions away from cacheflush.h
 dnl #
 AC_DEFUN([AC_AMDGPU_ASM_SET_MEMORY_H], [
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/kernel.h>
-		#ifdef CONFIG_X86
-		#include <asm/set_memory.h>
-		#endif
-	],[
-		#ifndef CONFIG_X86
-		#error just check arch/x86/include/asm/set_memory.h
-		#endif
-	],[
-		AC_DEFINE(HAVE_SET_MEMORY_H, 1, [asm/set_memory.h is available])
+	AC_KERNEL_TMP_BUILD_DIR([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/kernel.h>
+			#ifdef CONFIG_X86
+			#include <asm/set_memory.h>
+			#endif
+		],[
+			#ifndef CONFIG_X86
+			#error just check arch/x86/include/asm/set_memory.h
+			#endif
+		],[
+			AC_DEFINE(HAVE_SET_MEMORY_H, 1, [asm/set_memory.h is available])
+		])
 	])
 ])
 
@@ -104,17 +106,19 @@ dnl # commit df6b35f409af0a8ff1ef62f552b8402f3fef8665
 dnl # x86/fpu: Rename i387.h to fpu/api.h
 dnl #
 AC_DEFUN([AC_AMDGPU_ASM_FPU_API_H], [
-	AC_KERNEL_TRY_COMPILE([
-		#include <linux/kernel.h>
-		#ifdef CONFIG_X86
-		#include <asm/fpu/api.h>
-		#endif
-	],[
-		#ifndef CONFIG_X86
-		#error just check arch/x86/include/asm/fpu/api.h
-		#endif
-	],[
-		AC_DEFINE(HAVE_ASM_FPU_API_H, 1, [asm/fpu/api.h is available])
+	AC_KERNEL_TMP_BUILD_DIR([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/kernel.h>
+			#ifdef CONFIG_X86
+			#include <asm/fpu/api.h>
+			#endif
+		],[
+			#ifndef CONFIG_X86
+			#error just check arch/x86/include/asm/fpu/api.h
+			#endif
+		],[
+			AC_DEFINE(HAVE_ASM_FPU_API_H, 1, [asm/fpu/api.h is available])
+		])
 	])
 ])
 
@@ -142,18 +146,16 @@ AC_DEFUN([AC_AMDGPU_MM_INTERVAL_TREE_DEFINE], [
 ])
 
 AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_AMDGPU_OVERFLOW_H
-		AC_AMDGPU_SCHED_MM_H
-		AC_AMDGPU_SCHED_TASK_H
-		AC_AMDGPU_SCHED_SIGNAL_H
-		AC_AMDGPU_NOSPEC_H
-		AC_AMDGPU_KFIFO_NEW_H
-		AC_AMDGPU_BITS_H
-		AC_AMDGPU_IO_64_NONATOMIC_LO_HI_H
-		AC_AMDGPU_ASM_SET_MEMORY_H
-		AC_AMDGPU_ASM_FPU_API_H
-		AC_AMDGPU_SCHED_TYPES_H
-		AC_AMDGPU_MM_INTERVAL_TREE_DEFINE
-	])
+	AC_AMDGPU_OVERFLOW_H
+	AC_AMDGPU_SCHED_MM_H
+	AC_AMDGPU_SCHED_TASK_H
+	AC_AMDGPU_SCHED_SIGNAL_H
+	AC_AMDGPU_NOSPEC_H
+	AC_AMDGPU_KFIFO_NEW_H
+	AC_AMDGPU_BITS_H
+	AC_AMDGPU_IO_64_NONATOMIC_LO_HI_H
+	AC_AMDGPU_ASM_SET_MEMORY_H
+	AC_AMDGPU_ASM_FPU_API_H
+	AC_AMDGPU_SCHED_TYPES_H
+	AC_AMDGPU_MM_INTERVAL_TREE_DEFINE
 ])

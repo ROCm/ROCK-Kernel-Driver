@@ -447,22 +447,24 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 
 static void ttm_bo_flush_all_fences(struct ttm_buffer_object *bo)
 {
+	struct dma_resv *resv = &amdkcl_ttm_resv(bo);
 	struct dma_resv_list *fobj;
 	struct dma_fence *fence;
 	int i;
 
-	fobj = dma_resv_get_list(&amdkcl_ttm_resv(bo));
-	fence = dma_resv_get_excl(&amdkcl_ttm_resv(bo));
+	rcu_read_lock();
+	fobj = rcu_dereference(resv->fence);
+	fence = rcu_dereference(resv->fence_excl);
 	if (fence && !fence->ops->signaled)
 		dma_fence_enable_sw_signaling(fence);
 
 	for (i = 0; fobj && i < fobj->shared_count; ++i) {
-		fence = rcu_dereference_protected(fobj->shared[i],
-					dma_resv_held(amdkcl_ttm_resvp(bo)));
+		fence = rcu_dereference(fobj->shared[i]);
 
 		if (!fence->ops->signaled)
 			dma_fence_enable_sw_signaling(fence);
 	}
+	rcu_read_unlock();
 }
 
 static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
@@ -538,13 +540,8 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			       bool interruptible, bool no_wait_gpu,
 			       bool unlock_resv)
 {
-	struct dma_resv *resv;
+	struct dma_resv *resv = &amdkcl_ttm_resv(bo);
 	int ret;
-
-	if (unlikely(list_empty(&bo->ddestroy)))
-		resv = amdkcl_ttm_resvp(bo);
-	else
-		resv = &amdkcl_ttm_resv(bo);
 
 	if (dma_resv_test_signaled_rcu(resv, true))
 		ret = 0;
@@ -558,9 +555,8 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		spin_unlock(&ttm_bo_glob.lru_lock);
 
-		lret = dma_resv_wait_timeout_rcu(resv, true,
-							   interruptible,
-							   30 * HZ);
+		lret = dma_resv_wait_timeout_rcu(resv, true, interruptible,
+						 30 * HZ);
 
 		if (lret < 0)
 			return lret;

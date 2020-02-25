@@ -36,9 +36,11 @@
  * 0.2 - Fix to include querying pending event that is both trap and vmfault
  * 1.0 - Removed function to set debug data (renumbering functions broke ABI)
  * 1.1 - Allow attaching to processes that have not opened /dev/kfd yet
+ * 1.2 - Allow flag option to clear queue status on queue suspend
+ * 1.3 - Fix race condition between clear on suspend and trap event handling
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	1
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	3
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -212,8 +214,10 @@ struct kfd_ioctl_dbg_wave_control_args {
 };
 
 /* mapping event types to API spec */
-#define	KFD_DBG_EV_STATUS_TRAP		1
-#define	KFD_DBG_EV_STATUS_VMFAULT	2
+#define KFD_DBG_EV_STATUS_TRAP_BIT	0
+#define KFD_DBG_EV_STATUS_VMFAULT_BIT	1
+#define	KFD_DBG_EV_STATUS_TRAP		(1 << KFD_DBG_EV_STATUS_TRAP_BIT)
+#define	KFD_DBG_EV_STATUS_VMFAULT	(1 << KFD_DBG_EV_STATUS_VMFAULT_BIT)
 #define	KFD_DBG_EV_STATUS_SUSPENDED	4
 #define KFD_DBG_EV_STATUS_NEW_QUEUE	8
 #define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1

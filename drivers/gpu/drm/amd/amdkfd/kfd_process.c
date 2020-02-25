@@ -33,6 +33,7 @@
 #include <linux/file.h>
 #include <asm/page.h>
 #include "kfd_ipc.h"
+#include <linux/pm_runtime.h>
 #include "amdgpu_amdkfd.h"
 #include "amdgpu.h"
 
@@ -580,6 +581,16 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		idr_destroy(&pdd->alloc_idr);
 		mutex_destroy(&pdd->qpd.doorbell_lock);
 
+		/*
+		 * before destroying pdd, make sure to report availability
+		 * for auto suspend
+		 */
+		if (pdd->runtime_inuse) {
+			pm_runtime_mark_last_busy(pdd->dev->ddev->dev);
+			pm_runtime_put_autosuspend(pdd->dev->ddev->dev);
+			pdd->runtime_inuse = false;
+		}
+
 		kfree(pdd);
 	}
 }
@@ -951,6 +962,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->is_debugging_enabled = false;
 	pdd->debug_trap_enabled = false;
 	pdd->trap_debug_wave_launch_mode = 0;
+	pdd->runtime_inuse = false;
 	list_add(&pdd->per_device_list, &p->per_device_data);
 
 	/* Init idr used for memory handle translation */
@@ -1040,15 +1052,41 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
+	/*
+	 * signal runtime-pm system to auto resume and prevent
+	 * further runtime suspend once device pdd is created until
+	 * pdd is destroyed.
+	 */
+	if (!pdd->runtime_inuse) {
+		err = pm_runtime_get_sync(dev->ddev->dev);
+		if (err < 0)
+			return ERR_PTR(err);
+	}
+
 	err = kfd_iommu_bind_process_to_device(pdd);
 	if (err)
-		return ERR_PTR(err);
+		goto out;
 
 	err = kfd_process_device_init_vm(pdd, NULL);
 	if (err)
-		return ERR_PTR(err);
+		goto out;
+
+	/*
+	 * make sure that runtime_usage counter is incremented just once
+	 * per pdd
+	 */
+	pdd->runtime_inuse = true;
 
 	return pdd;
+
+out:
+	/* balance runpm reference count and exit with error */
+	if (!pdd->runtime_inuse) {
+		pm_runtime_mark_last_busy(dev->ddev->dev);
+		pm_runtime_put_autosuspend(dev->ddev->dev);
+	}
+
+	return ERR_PTR(err);
 }
 
 struct kfd_process_device *kfd_get_first_process_device_data(

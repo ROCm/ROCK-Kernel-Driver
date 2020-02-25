@@ -512,7 +512,7 @@ struct queue_properties {
 	/* Relevant for CU */
 	uint32_t cu_mask_count; /* Must be a multiple of 32 */
 	uint32_t *cu_mask;
-	unsigned int debug_event_type;
+	unsigned long debug_event_type;
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
@@ -757,6 +757,7 @@ struct kfd_process_device {
 	 * function.
 	 */
 	bool already_dequeued;
+	bool runtime_inuse;
 
 	/* Flag to indicate if debugging is active on this device for this
 	 * process.  This is for the new GFX9+ debugging, and indicates that

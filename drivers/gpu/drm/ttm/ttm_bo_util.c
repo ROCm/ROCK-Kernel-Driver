@@ -512,7 +512,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	kref_init(&fbo->base.kref);
 	fbo->base.destroy = &ttm_transfered_destroy;
 	fbo->base.acc_size = 0;
-	if (amdkcl_ttm_resvp(bo) == &amdkcl_ttm_resv(bo))
+	if (bo->type != ttm_bo_type_sg)
 		amdkcl_ttm_resvp(&fbo->base) = &amdkcl_ttm_resv(&fbo->base);
 
 	dma_resv_init(&amdkcl_ttm_resv(&fbo->base));

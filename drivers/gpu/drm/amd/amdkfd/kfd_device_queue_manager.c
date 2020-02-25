@@ -2307,6 +2307,13 @@ int suspend_queues(struct kfd_process *p,
 			}
 		}
 
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			bool is_q = queue_id_in_array(q->properties.queue_id,
+						      num_queues, queue_ids);
+			if ((flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) && is_q)
+				WRITE_ONCE(q->properties.debug_event_type, 0);
+		}
+
 		dqm_unlock(dqm);
 		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
 	}

@@ -3975,6 +3975,7 @@ static uint64_t gfx_v9_0_get_gpu_clock_counter(struct amdgpu_device *adev)
 {
 	uint64_t clock;
 
+	amdgpu_gfx_off_ctrl(adev, false);
 	mutex_lock(&adev->gfx.gpu_clock_mutex);
 	if (adev->asic_type == CHIP_VEGA10 && amdgpu_sriov_runtime(adev)) {
 		uint32_t tmp, lsb, msb, i = 0;
@@ -3993,6 +3994,7 @@ static uint64_t gfx_v9_0_get_gpu_clock_counter(struct amdgpu_device *adev)
 			((uint64_t)RREG32_SOC15(GC, 0, mmRLC_GPU_CLOCK_COUNT_MSB) << 32ULL);
 	}
 	mutex_unlock(&adev->gfx.gpu_clock_mutex);
+	amdgpu_gfx_off_ctrl(adev, true);
 	return clock;
 }
 
@@ -4390,7 +4392,12 @@ static int gfx_v9_0_ecc_late_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int r;
 
-	/* limit gds clearing operation in cold boot sequence */
+	/*
+	 * Temp workaround to fix the issue that CP firmware fails to
+	 * update read pointer when CPDMA is writing clearing operation
+	 * to GDS in suspend/resume sequence on several cards. So just
+	 * limit this operation in cold boot sequence.
+	 */
 	if (!adev->in_suspend) {
 		r = gfx_v9_0_do_edc_gds_workarounds(adev);
 		if (r)
