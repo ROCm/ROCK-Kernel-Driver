@@ -810,6 +810,21 @@ void amdgpu_mn_unregister(struct amdgpu_bo *bo)
 	bo->notifier.mm = NULL;
 }
 
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+/* flags used by HMM internal, not related to CPU/GPU PTE flags */
+static const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
+	(1 << 0), /* HMM_PFN_VALID */
+	(1 << 1), /* HMM_PFN_WRITE */
+	0 /* HMM_PFN_DEVICE_PRIVATE */
+};
+
+static const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
+	0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
+	0, /* HMM_PFN_NONE */
+	0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
+};
+#endif
+
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       struct mm_struct *mm, struct page **pages,
 			       uint64_t start, uint64_t npages,
@@ -833,10 +848,20 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 	}
 
 	hmm_range->notifier = notifier;
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	hmm_range->flags = hmm_range_flags;
+	hmm_range->values = hmm_range_values;
+	hmm_range->pfn_shift = PAGE_SHIFT;
+	hmm_range->default_flags = hmm_range_flags[HMM_PFN_VALID];
+	if (!readonly)
+		hmm_range->default_flags |= hmm_range->flags[HMM_PFN_WRITE];
+	hmm_range->pfns = (uint64_t *)pfns;
+#else
 	hmm_range->default_flags = HMM_PFN_REQ_FAULT;
 	if (!readonly)
 		hmm_range->default_flags |= HMM_PFN_REQ_WRITE;
 	hmm_range->hmm_pfns = pfns;
+#endif
 	hmm_range->start = start;
 	hmm_range->end = start + npages * PAGE_SIZE;
 	hmm_range->dev_private_owner = owner;
@@ -855,12 +880,21 @@ retry:
 
 	if (likely(!mmap_locked))
 		mmap_read_unlock(mm);
+
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	if (unlikely(r <= 0)) {
+#else
 	if (unlikely(r)) {
+#endif
 		/*
 		 * FIXME: This timeout should encompass the retry from
 		 * mmu_interval_read_retry() as well.
 		 */
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		if ((r == 0 || r == -EBUSY) && !time_after(jiffies, timeout))
+#else
 		if (r == -EBUSY && !time_after(jiffies, timeout))
+#endif
 			goto retry;
 		goto out_free_pfns;
 	}
@@ -871,7 +905,19 @@ retry:
 	 * the notifier_lock, and mmu_interval_read_retry() must be done first.
 	 */
 	for (i = 0; pages && i < npages; i++)
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		pages[i] = hmm_device_entry_to_page(hmm_range, hmm_range->pfns[i]);
+		if (unlikely(!pages[i])) {
+			pr_err("Page fault failed for pfn[%lu] = 0x%llx\n",
+			       i, hmm_range->pfns[i]);
+			r = -ENOMEM;
+
+			goto out_free_pfns;
+		}
+
+#else
 		pages[i] = hmm_pfn_to_page(pfns[i]);
+#endif
 
 	*phmm_range = hmm_range;
 
@@ -891,7 +937,11 @@ int amdgpu_hmm_range_get_pages_done(struct hmm_range *hmm_range)
 
 	r = mmu_interval_read_retry(hmm_range->notifier,
 				    hmm_range->notifier_seq);
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	kvfree(hmm_range->pfns);
+#else
 	kvfree(hmm_range->hmm_pfns);
+#endif
 	kfree(hmm_range);
 
 	return r;
