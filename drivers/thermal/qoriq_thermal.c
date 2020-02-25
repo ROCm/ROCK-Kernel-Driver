@@ -10,6 +10,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/regmap.h>
+#include <linux/sizes.h>
 #include <linux/thermal.h>
 
 #include "thermal_core.h"
