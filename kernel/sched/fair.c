@@ -740,10 +740,8 @@ void init_entity_runnable_average(struct sched_entity *se)
 	 * Group entities are initialized with zero load to reflect the fact that
 	 * nothing has been attached to the task group yet.
 	 */
-	if (entity_is_task(se)) {
-		sa->runnable_avg = SCHED_CAPACITY_SCALE;
+	if (entity_is_task(se))
 		sa->load_avg = scale_load_down(se->load.weight);
-	}
 
 	/* when this task enqueue'ed, it will contribute to its cfs_rq's load_avg */
 }
@@ -796,6 +794,8 @@ void post_init_entity_util_avg(struct task_struct *p)
 			sa->util_avg = cap;
 		}
 	}
+
+	sa->runnable_avg = cpu_scale;
 
 	if (p->sched_class != &fair_sched_class) {
 		/*
@@ -1901,7 +1901,12 @@ static void task_numa_find_cpu(struct task_numa_env *env,
 		unsigned int imbalance;
 		int src_running, dst_running;
 
-		/* Would movement cause an imbalance? */
+		/*
+		 * Would movement cause an imbalance? Note that if src has
+		 * more running tasks that the imbalance is ignored as the
+		 * move improves the imbalance from the perspective of the
+		 * CPU load balancer.
+		 * */
 		src_running = env->src_stats.nr_running - 1;
 		dst_running = env->dst_stats.nr_running + 1;
 		imbalance = max(0, dst_running - src_running);
@@ -3079,9 +3084,9 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 #endif
 
 	enqueue_load_avg(cfs_rq, se);
-	if (se->on_rq) {
+	if (se->on_rq)
 		account_entity_enqueue(cfs_rq, se);
-	}
+
 }
 
 void reweight_task(struct task_struct *p, int prio)
@@ -5607,6 +5612,24 @@ static unsigned long cpu_load_without(struct rq *rq, struct task_struct *p)
 static unsigned long cpu_runnable(struct rq *rq)
 {
 	return cfs_rq_runnable_avg(&rq->cfs);
+}
+
+static unsigned long cpu_runnable_without(struct rq *rq, struct task_struct *p)
+{
+	struct cfs_rq *cfs_rq;
+	unsigned int runnable;
+
+	/* Task has no contribution or is new */
+	if (cpu_of(rq) != task_cpu(p) || !READ_ONCE(p->se.avg.last_update_time))
+		return cpu_runnable(rq);
+
+	cfs_rq = &rq->cfs;
+	runnable = READ_ONCE(cfs_rq->avg.runnable_avg);
+
+	/* Discount task's runnable from CPU's runnable */
+	lsub_positive(&runnable, p->se.avg.runnable_avg);
+
+	return runnable;
 }
 
 static unsigned long capacity_of(int cpu)
@@ -8481,6 +8504,7 @@ static inline void update_sg_wakeup_stats(struct sched_domain *sd,
 
 		sgs->group_load += cpu_load_without(rq, p);
 		sgs->group_util += cpu_util_without(i, p);
+		sgs->group_runnable += cpu_runnable_without(rq, p);
 		local = task_running_on_cpu(i, p);
 		sgs->sum_h_nr_running += rq->cfs.h_nr_running - local;
 
