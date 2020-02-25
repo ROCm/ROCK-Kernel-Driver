@@ -489,7 +489,7 @@ TRACE_EVENT(sched_process_hang,
 
 /*
  * Tracks migration of tasks from one runqueue to another. Can be used to
- * detect if automatic NUMA balancing is bouncing between nodes
+ * detect if automatic NUMA balancing is bouncing between nodes.
  */
 TRACE_EVENT(sched_move_numa,
 
