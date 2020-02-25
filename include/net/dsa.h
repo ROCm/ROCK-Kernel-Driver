@@ -275,6 +275,11 @@ struct dsa_switch {
 	 */
 	bool			vlan_filtering;
 
+	/* MAC PCS does not provide link state change interrupt, and requires
+	 * polling. Flag passed on to PHYLINK.
+	 */
+	bool			pcs_poll;
+
 	unsigned long		*bitmap;
 	unsigned long		_bitmap;
 
