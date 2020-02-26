@@ -318,8 +318,8 @@ static void mci_release(struct device *dev)
 
 static int edac_mc_alloc_csrows(struct mem_ctl_info *mci)
 {
-	unsigned int tot_csrows = mci->nr_csrows;
 	unsigned int tot_channels = mci->num_cschannel;
+	unsigned int tot_csrows = mci->nr_csrows;
 	unsigned int row, chn;
 
 	/*
@@ -363,10 +363,10 @@ static int edac_mc_alloc_csrows(struct mem_ctl_info *mci)
 
 static int edac_mc_alloc_dimms(struct mem_ctl_info *mci)
 {
-	void *p;
 	unsigned int pos[EDAC_MAX_LAYERS];
 	unsigned int row, chn, idx;
 	int layer;
+	void *p;
 
 	/*
 	 * Allocate and fill the dimm structs
@@ -535,8 +535,6 @@ EXPORT_SYMBOL_GPL(edac_mc_alloc);
 void edac_mc_free(struct mem_ctl_info *mci)
 {
 	edac_dbg(1, "\n");
-
-	edac_remove_sysfs_mci_device(mci);
 
 	_edac_mc_free(mci);
 }
@@ -934,8 +932,8 @@ EXPORT_SYMBOL_GPL(edac_layer_name);
 
 static void edac_inc_ce_error(struct edac_raw_error_desc *e)
 {
-	struct mem_ctl_info *mci = error_desc_to_mci(e);
 	int pos[EDAC_MAX_LAYERS] = { e->top_layer, e->mid_layer, e->low_layer };
+	struct mem_ctl_info *mci = error_desc_to_mci(e);
 	struct dimm_info *dimm = edac_get_dimm(mci, pos[0], pos[1], pos[2]);
 
 	mci->ce_mc += e->error_count;
@@ -948,8 +946,8 @@ static void edac_inc_ce_error(struct edac_raw_error_desc *e)
 
 static void edac_inc_ue_error(struct edac_raw_error_desc *e)
 {
-	struct mem_ctl_info *mci = error_desc_to_mci(e);
 	int pos[EDAC_MAX_LAYERS] = { e->top_layer, e->mid_layer, e->low_layer };
+	struct mem_ctl_info *mci = error_desc_to_mci(e);
 	struct dimm_info *dimm = edac_get_dimm(mci, pos[0], pos[1], pos[2]);
 
 	mci->ue_mc += e->error_count;
@@ -968,9 +966,11 @@ static void edac_ce_error(struct edac_raw_error_desc *e)
 	if (edac_mc_get_log_ce()) {
 		edac_mc_printk(mci, KERN_WARNING,
 			"%d CE %s%son %s (%s page:0x%lx offset:0x%lx grain:%ld syndrome:0x%lx%s%s)\n",
-			e->error_count, e->msg, *e->msg ? " " : "", e->label,
-			e->location, e->page_frame_number, e->offset_in_page,
-			e->grain, e->syndrome, *e->other_detail ? " - " : "",
+			e->error_count, e->msg,
+			*e->msg ? " " : "",
+			e->label, e->location, e->page_frame_number, e->offset_in_page,
+			e->grain, e->syndrome,
+			*e->other_detail ? " - " : "",
 			e->other_detail);
 	}
 
@@ -1003,17 +1003,22 @@ static void edac_ue_error(struct edac_raw_error_desc *e)
 	if (edac_mc_get_log_ue()) {
 		edac_mc_printk(mci, KERN_WARNING,
 			"%d UE %s%son %s (%s page:0x%lx offset:0x%lx grain:%ld%s%s)\n",
-			e->error_count, e->msg, *e->msg ? " " : "", e->label,
-			e->location, e->page_frame_number, e->offset_in_page,
-			e->grain, *e->other_detail ? " - " : "",
+			e->error_count, e->msg,
+			*e->msg ? " " : "",
+			e->label, e->location, e->page_frame_number, e->offset_in_page,
+			e->grain,
+			*e->other_detail ? " - " : "",
 			e->other_detail);
 	}
 
 	if (edac_mc_get_panic_on_ue()) {
 		panic("UE %s%son %s (%s page:0x%lx offset:0x%lx grain:%ld%s%s)\n",
-			e->msg, *e->msg ? " " : "", e->label, e->location,
-			e->page_frame_number, e->offset_in_page, e->grain,
-			*e->other_detail ? " - " : "", e->other_detail);
+			e->msg,
+			*e->msg ? " " : "",
+			e->label, e->location, e->page_frame_number, e->offset_in_page,
+			e->grain,
+			*e->other_detail ? " - " : "",
+			e->other_detail);
 	}
 
 	edac_inc_ue_error(e);
@@ -1022,8 +1027,8 @@ static void edac_ue_error(struct edac_raw_error_desc *e)
 static void edac_inc_csrow(struct edac_raw_error_desc *e, int row, int chan)
 {
 	struct mem_ctl_info *mci = error_desc_to_mci(e);
-	u16 count = e->error_count;
 	enum hw_event_mc_err_type type = e->type;
+	u16 count = e->error_count;
 
 	if (row < 0)
 		return;
@@ -1098,14 +1103,13 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 	e->offset_in_page = offset_in_page;
 	e->syndrome = syndrome;
 	/* need valid strings here for both: */
-	e->msg = msg ? msg : "";
-	e->other_detail = other_detail ? other_detail : "";
+	e->msg = msg ?: "";
+	e->other_detail = other_detail ?: "";
 
 	/*
-	 * Check if the event report is consistent and if the memory
-	 * location is known. If it is known, the DIMM(s) label info
-	 * will be filled and the DIMM's error counters will be
-	 * incremented.
+	 * Check if the event report is consistent and if the memory location is
+	 * known. If it is, the DIMM(s) label info will be filled and the DIMM's
+	 * error counters will be incremented.
 	 */
 	for (i = 0; i < mci->n_layers; i++) {
 		if (pos[i] >= (int)mci->layers[i].size) {
@@ -1153,11 +1157,10 @@ void edac_mc_handle_error(const enum hw_event_mc_err_type type,
 			e->grain = dimm->grain;
 
 		/*
-		 * If the error is memory-controller wide, there's no
-		 * need to seek for the affected DIMMs because the
-		 * whole channel/memory controller/... may be
-		 * affected. Also, don't show errors for empty DIMM
-		 * slots.
+		 * If the error is memory-controller wide, there's no need to
+		 * seek for the affected DIMMs because the whole channel/memory
+		 * controller/... may be affected. Also, don't show errors for
+		 * empty DIMM slots.
 		 */
 		if (!dimm->nr_pages)
 			continue;
