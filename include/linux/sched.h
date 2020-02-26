@@ -380,7 +380,7 @@ struct util_est {
  *
  *   runnable_avg = runnable% * SCHED_CAPACITY_SCALE
  *
-* [util_avg definition]
+ * [util_avg definition]
  *
  *   util_avg = running% * SCHED_CAPACITY_SCALE
  *

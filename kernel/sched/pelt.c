@@ -238,7 +238,7 @@ ___update_load_sum(u64 now, struct sched_avg *sa,
 }
 
 static __always_inline void
-___update_load_avg(struct sched_avg *sa, unsigned long load, unsigned long runnable)
+___update_load_avg(struct sched_avg *sa, unsigned long load)
 {
 	u32 divider = LOAD_AVG_MAX - 1024 + sa->period_contrib;
 
@@ -246,7 +246,7 @@ ___update_load_avg(struct sched_avg *sa, unsigned long load, unsigned long runna
 	 * Step 2: update *_avg.
 	 */
 	sa->load_avg = div_u64(load * sa->load_sum, divider);
-	sa->runnable_avg =	div_u64(runnable * sa->runnable_sum, divider);
+	sa->runnable_avg = div_u64(sa->runnable_sum, divider);
 	WRITE_ONCE(sa->util_avg, sa->util_sum / divider);
 }
 
@@ -267,8 +267,6 @@ ___update_load_avg(struct sched_avg *sa, unsigned long load, unsigned long runna
  *   load_sum := runnable
  *   load_avg = se_weight(se) * load_sum
  *
- * XXX collapse load_sum and runnable_load_sum
- *
  * cfq_rq:
  *
  *   runnable_sum = \Sum se->avg.runnable_sum
@@ -281,7 +279,7 @@ ___update_load_avg(struct sched_avg *sa, unsigned long load, unsigned long runna
 int __update_load_avg_blocked_se(u64 now, struct sched_entity *se)
 {
 	if (___update_load_sum(now, &se->avg, 0, 0, 0)) {
-		___update_load_avg(&se->avg, se_weight(se), 1);
+		___update_load_avg(&se->avg, se_weight(se));
 		trace_pelt_se_tp(se);
 		return 1;
 	}
@@ -294,7 +292,7 @@ int __update_load_avg_se(u64 now, struct cfs_rq *cfs_rq, struct sched_entity *se
 	if (___update_load_sum(now, &se->avg, !!se->on_rq, se_runnable(se),
 				cfs_rq->curr == se)) {
 
-		___update_load_avg(&se->avg, se_weight(se), 1);
+		___update_load_avg(&se->avg, se_weight(se));
 		cfs_se_util_change(&se->avg);
 		trace_pelt_se_tp(se);
 		return 1;
@@ -310,7 +308,7 @@ int __update_load_avg_cfs_rq(u64 now, struct cfs_rq *cfs_rq)
 				cfs_rq->h_nr_running,
 				cfs_rq->curr != NULL)) {
 
-		___update_load_avg(&cfs_rq->avg, 1, 1);
+		___update_load_avg(&cfs_rq->avg, 1);
 		trace_pelt_cfs_tp(cfs_rq);
 		return 1;
 	}
@@ -325,7 +323,7 @@ int __update_load_avg_cfs_rq(u64 now, struct cfs_rq *cfs_rq)
  *   util_sum = cpu_scale * load_sum
  *   runnable_sum = util_sum
  *
- *   load_avg and runnable_load_avg are not supported and meaningless.
+ *   load_avg and runnable_avg are not supported and meaningless.
  *
  */
 
@@ -336,7 +334,7 @@ int update_rt_rq_load_avg(u64 now, struct rq *rq, int running)
 				running,
 				running)) {
 
-		___update_load_avg(&rq->avg_rt, 1, 1);
+		___update_load_avg(&rq->avg_rt, 1);
 		trace_pelt_rt_tp(rq);
 		return 1;
 	}
@@ -351,7 +349,7 @@ int update_rt_rq_load_avg(u64 now, struct rq *rq, int running)
  *   util_sum = cpu_scale * load_sum
  *   runnable_sum = util_sum
  *
- *   load_avg and runnable_load_avg are not supported and meaningless.
+ *   load_avg and runnable_avg are not supported and meaningless.
  *
  */
 
@@ -362,7 +360,7 @@ int update_dl_rq_load_avg(u64 now, struct rq *rq, int running)
 				running,
 				running)) {
 
-		___update_load_avg(&rq->avg_dl, 1, 1);
+		___update_load_avg(&rq->avg_dl, 1);
 		trace_pelt_dl_tp(rq);
 		return 1;
 	}
@@ -378,7 +376,7 @@ int update_dl_rq_load_avg(u64 now, struct rq *rq, int running)
  *   util_sum = cpu_scale * load_sum
  *   runnable_sum = util_sum
  *
- *   load_avg and runnable_load_avg are not supported and meaningless.
+ *   load_avg and runnable_avg are not supported and meaningless.
  *
  */
 
@@ -415,7 +413,7 @@ int update_irq_load_avg(struct rq *rq, u64 running)
 				1);
 
 	if (ret) {
-		___update_load_avg(&rq->avg_irq, 1, 1);
+		___update_load_avg(&rq->avg_irq, 1);
 		trace_pelt_irq_tp(rq);
 	}
 
