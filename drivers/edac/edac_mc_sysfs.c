@@ -384,7 +384,7 @@ static const struct attribute_group *csrow_dev_groups[] = {
 static void csrow_release(struct device *dev)
 {
 	/*
-	 * Nothing to do. We just unregister sysfs here. The mci
+	 * Nothing to do, just unregister sysfs here. The mci
 	 * device owns the data and will also release it.
 	 */
 }
@@ -604,7 +604,7 @@ static const struct device_type dimm_attr_type = {
 static void dimm_release(struct device *dev)
 {
 	/*
-	 * Nothing to do. We just unregister sysfs here. The mci
+	 * Nothing to do, just unregister sysfs here. The mci
 	 * device owns the data and will also release it.
 	 */
 }
