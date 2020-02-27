@@ -1038,40 +1038,6 @@ static ssize_t amdgpu_read_mask(const char *buf, size_t count, uint32_t *mask)
 	return 0;
 }
 
-static ssize_t amdgpu_set_pp_sclk(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf,
-		size_t count)
-{
-	struct drm_device *ddev = dev_get_drvdata(dev);
-	struct amdgpu_device *adev = ddev->dev_private;
-	int ret;
-	uint32_t value;
-
-	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
-		return -EINVAL;
-
-	ret = pm_runtime_get_sync(ddev->dev);
-	if (ret < 0)
-		return ret;
-
-	ret = kstrtou32(buf, 0, &value);
-	if (ret < 0)
-		return ret;
-	if (is_support_sw_smu(adev))
-		ret = smu_set_soft_freq_range(&adev->smu, SMU_SCLK, value, value);
-	else
-		return 0;
-
-	pm_runtime_mark_last_busy(ddev->dev);
-	pm_runtime_put_autosuspend(ddev->dev);
-
-	if (ret)
-		return -EINVAL;
-
-	return count;
-}
-
 static ssize_t amdgpu_set_pp_dpm_sclk(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf,
@@ -1833,8 +1799,6 @@ static DEVICE_ATTR(pp_force_state, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(pp_table, S_IRUGO | S_IWUSR,
 		amdgpu_get_pp_table,
 		amdgpu_set_pp_table);
-static DEVICE_ATTR(pp_sclk, S_IWUSR,
-		NULL, amdgpu_set_pp_sclk);
 static DEVICE_ATTR(pp_dpm_sclk, S_IRUGO | S_IWUSR,
 		amdgpu_get_pp_dpm_sclk,
 		amdgpu_set_pp_dpm_sclk);
@@ -3323,12 +3287,6 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 	ret = device_create_file(adev->dev, &dev_attr_pp_table);
 	if (ret) {
 		DRM_ERROR("failed to create device file pp_table\n");
-		return ret;
-	}
-
-	ret = device_create_file(adev->dev, &dev_attr_pp_sclk);
-	if (ret) {
-		DRM_ERROR("failed to create device file pp_sclk\n");
 		return ret;
 	}
 
