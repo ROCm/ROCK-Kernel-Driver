@@ -378,4 +378,13 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_pci_create_measure_file);
+
+void _kcl_pci_remove_measure_file(struct pci_dev *pdev)
+{
+	device_remove_file(&pdev->dev, &dev_attr_current_link_speed);
+	device_remove_file(&pdev->dev, &dev_attr_current_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_speed);
+}
+EXPORT_SYMBOL(_kcl_pci_remove_measure_file);
 #endif /* AMDKCL_CREATE_MEASURE_FILE */

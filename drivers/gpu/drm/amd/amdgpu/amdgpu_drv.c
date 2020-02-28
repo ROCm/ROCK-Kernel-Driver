@@ -1196,6 +1196,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	drm_dev_unregister(dev);
 #endif
 	amdgpu_driver_unload_kms(dev);
+	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 	drm_dev_put(dev);

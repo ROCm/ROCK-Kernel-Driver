@@ -127,6 +127,7 @@ static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 #define AMDKCL_CREATE_MEASURE_FILE
 #define  PCI_EXP_LNKCAP_SLS_8_0GB 0x00000003 /* LNKCAP2 SLS Vector bit 2 */
 int  _kcl_pci_create_measure_file(struct pci_dev *pdev);
+void _kcl_pci_remove_measure_file(struct pci_dev *pdev);
 #endif
 
 static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
@@ -135,6 +136,13 @@ static inline int kcl_pci_create_measure_file(struct pci_dev *pdev)
 	return _kcl_pci_create_measure_file(pdev);
 #else
 	return 0;
+#endif
+}
+
+static inline void kcl_pci_remove_measure_file(struct pci_dev *pdev)
+{
+#ifdef AMDKCL_CREATE_MEASURE_FILE
+	_kcl_pci_remove_measure_file(pdev);
 #endif
 }
 
