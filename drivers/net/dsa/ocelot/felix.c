@@ -697,7 +697,7 @@ static int felix_pci_probe(struct pci_dev *pdev,
 
 	ocelot->ptp = 1;
 
-	ds = kzalloc(sizeof(struct dsa_switch), GFP_KERNEL);
+	ds = dsa_switch_alloc(&pdev->dev, felix->info->num_ports);
 	if (!ds) {
 		err = -ENOMEM;
 		dev_err(&pdev->dev, "Failed to allocate DSA switch\n");
@@ -719,7 +719,6 @@ static int felix_pci_probe(struct pci_dev *pdev,
 	return 0;
 
 err_register_ds:
-	kfree(ds);
 err_alloc_ds:
 err_alloc_irq:
 err_alloc_felix:
@@ -738,7 +737,6 @@ static void felix_pci_remove(struct pci_dev *pdev)
 
 	dsa_unregister_switch(felix->ds);
 
-	kfree(felix->ds);
 	kfree(felix);
 
 	pci_disable_device(pdev);
