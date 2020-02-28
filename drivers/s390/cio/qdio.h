@@ -82,6 +82,7 @@ enum qdio_irq_states {
 #define QDIO_SIGA_WRITE		0x00
 #define QDIO_SIGA_READ		0x01
 #define QDIO_SIGA_SYNC		0x02
+#define QDIO_SIGA_WRITEM	0x03
 #define QDIO_SIGA_WRITEQ	0x04
 #define QDIO_SIGA_QEBSM_FLAG	0x80
 
@@ -206,8 +207,6 @@ struct qdio_output_q {
 	struct qdio_outbuf_state *sbal_state;
 	/* timer to check for more outbound work */
 	struct timer_list timer;
-	/* used SBALs before tasklet schedule */
-	int scan_threshold;
 };
 
 /*
@@ -295,6 +294,7 @@ struct qdio_irq {
 	struct qdio_ssqd_desc ssqd_desc;
 	void (*orig_handler) (struct ccw_device *, unsigned long, struct irb *);
 
+	unsigned int scan_threshold;	/* used SBALs before tasklet schedule */
 	int perf_stat_enabled;
 
 	struct qdr *qdr;

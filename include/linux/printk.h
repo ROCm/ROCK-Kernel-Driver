@@ -194,6 +194,8 @@ devkmsg_sysctl_set_loglvl(struct ctl_table *table, int write, void __user *buf,
 
 extern void wake_up_klogd(void);
 
+void printk_bust_locks(void);
+
 char *log_buf_addr_get(void);
 u32 log_buf_len_get(void);
 void log_buf_vmcoreinfo_setup(void);
@@ -232,6 +234,10 @@ static inline bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 }
 
 static inline void wake_up_klogd(void)
+{
+}
+
+static void printk_bust_locks(void)
 {
 }
 

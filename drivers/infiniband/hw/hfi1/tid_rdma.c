@@ -2664,6 +2664,9 @@ static bool handle_read_kdeth_eflags(struct hfi1_ctxtdata *rcd,
 	u32 fpsn;
 
 	lockdep_assert_held(&qp->r_lock);
+	trace_hfi1_rsp_read_kdeth_eflags(qp, ibpsn);
+	trace_hfi1_sender_read_kdeth_eflags(qp);
+	trace_hfi1_tid_read_sender_kdeth_eflags(qp, 0);
 	spin_lock(&qp->s_lock);
 	/* If the psn is out of valid range, drop the packet */
 	if (cmp_psn(ibpsn, qp->s_last_psn) < 0 ||
@@ -2728,6 +2731,8 @@ static bool handle_read_kdeth_eflags(struct hfi1_ctxtdata *rcd,
 		goto s_unlock;
 
 	req = wqe_to_tid_req(wqe);
+	trace_hfi1_tid_req_read_kdeth_eflags(qp, 0, wqe->wr.opcode, wqe->psn,
+					     wqe->lpsn, req);
 	switch (rcv_type) {
 	case RHF_RCV_TYPE_EXPECTED:
 		switch (rte) {
@@ -2742,6 +2747,9 @@ static bool handle_read_kdeth_eflags(struct hfi1_ctxtdata *rcd,
 			 * packets that could be still in the fabric.
 			 */
 			flow = &req->flows[req->clear_tail];
+			trace_hfi1_tid_flow_read_kdeth_eflags(qp,
+							      req->clear_tail,
+							      flow);
 			if (priv->s_flags & HFI1_R_TID_SW_PSN) {
 				diff = cmp_psn(psn,
 					       flow->flow_state.r_next_psn);
@@ -4625,6 +4633,15 @@ void hfi1_rc_rcv_tid_rdma_ack(struct hfi1_packet *packet)
 			 */
 			fpsn = full_flow_psn(flow, flow->flow_state.spsn);
 			req->r_ack_psn = psn;
+			/*
+			 * If resync_psn points to the last flow PSN for a
+			 * segment and the new segment (likely from a new
+			 * request) starts with a new generation number, we
+			 * need to adjust resync_psn accordingly.
+			 */
+			if (flow->flow_state.generation !=
+			    (resync_psn >> HFI1_KDETH_BTH_SEQ_SHIFT))
+				resync_psn = mask_psn(fpsn - 1);
 			flow->resync_npkts +=
 				delta_psn(mask_psn(resync_psn + 1), fpsn);
 			/*

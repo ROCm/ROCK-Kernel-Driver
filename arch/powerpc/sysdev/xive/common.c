@@ -257,6 +257,13 @@ notrace void xmon_xive_do_dump(int cpu)
 	}
 #endif
 }
+
+int xmon_xive_get_irq_config(u32 irq, u32 *target, u8 *prio,
+			     u32 *sw_irq)
+{
+	return xive_ops->get_irq_config(irq, target, prio, sw_irq);
+}
+
 #endif /* CONFIG_XMON */
 
 static unsigned int xive_get_irq(void)
@@ -937,12 +944,21 @@ static int xive_get_irqchip_state(struct irq_data *data,
 				  enum irqchip_irq_state which, bool *state)
 {
 	struct xive_irq_data *xd = irq_data_get_irq_handler_data(data);
+	u8 pq;
 
 	switch (which) {
 	case IRQCHIP_STATE_ACTIVE:
-		*state = !xd->stale_p &&
-			 (xd->saved_p ||
-			  !!(xive_esb_read(xd, XIVE_ESB_GET) & XIVE_ESB_VAL_P));
+		pq = xive_esb_read(xd, XIVE_ESB_GET);
+
+		/*
+		 * The esb value being all 1's means we couldn't get
+		 * the PQ state of the interrupt through mmio. It may
+		 * happen, for example when querying a PHB interrupt
+		 * while the PHB is in an error state. We consider the
+		 * interrupt to be inactive in that case.
+		 */
+		*state = (pq != XIVE_ESB_INVALID) && !xd->stale_p &&
+			(xd->saved_p || !!(pq & XIVE_ESB_VAL_P));
 		return 0;
 	default:
 		return -EINVAL;

@@ -115,9 +115,15 @@ static unsigned long _memcpy_real(unsigned long dest, unsigned long src,
  */
 int memcpy_real(void *dest, void *src, size_t count)
 {
-	if (S390_lowcore.nodat_stack != 0)
-		return CALL_ON_STACK(_memcpy_real, S390_lowcore.nodat_stack,
-				     3, dest, src, count);
+	int rc;
+
+	if (S390_lowcore.nodat_stack != 0) {
+		preempt_disable();
+		rc = CALL_ON_STACK(_memcpy_real, S390_lowcore.nodat_stack, 3,
+				   dest, src, count);
+		preempt_enable();
+		return rc;
+	}
 	/*
 	 * This is a really early memcpy_real call, the stacks are
 	 * not set up yet. Just call _memcpy_real on the early boot
@@ -228,3 +234,7 @@ void unxlate_dev_mem_ptr(phys_addr_t addr, void *buf)
 	if ((void *) addr != buf)
 		free_page((unsigned long) buf);
 }
+
+/* crash-kmp uses these */
+EXPORT_SYMBOL_GPL(xlate_dev_mem_ptr);
+EXPORT_SYMBOL_GPL(unxlate_dev_mem_ptr);

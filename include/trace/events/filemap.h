@@ -31,7 +31,7 @@ DECLARE_EVENT_CLASS(mm_filemap_op_page_cache,
 		__entry->i_ino = page->mapping->host->i_ino;
 		__entry->index = page->index;
 		if (page->mapping->host->i_sb)
-			__entry->s_dev = page->mapping->host->i_sb->s_dev;
+			__entry->s_dev = inode_get_dev(page->mapping->host);
 		else
 			__entry->s_dev = page->mapping->host->i_rdev;
 	),

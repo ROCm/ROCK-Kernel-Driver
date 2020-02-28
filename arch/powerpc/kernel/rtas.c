@@ -16,6 +16,7 @@
 #include <linux/capability.h>
 #include <linux/delay.h>
 #include <linux/cpu.h>
+#include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/completion.h>
 #include <linux/cpumask.h>
@@ -898,6 +899,7 @@ static int rtas_cpu_state_change_mask(enum rtas_cpu_state state,
 				cpumask_clear_cpu(cpu, cpus);
 			}
 		}
+		cond_resched();
 	}
 
 	return ret;
@@ -924,13 +926,11 @@ int rtas_online_cpus_mask(cpumask_var_t cpus)
 
 	return ret;
 }
-EXPORT_SYMBOL(rtas_online_cpus_mask);
 
 int rtas_offline_cpus_mask(cpumask_var_t cpus)
 {
 	return rtas_cpu_state_change_mask(DOWN, cpus);
 }
-EXPORT_SYMBOL(rtas_offline_cpus_mask);
 
 int rtas_ibm_suspend_me(u64 handle)
 {

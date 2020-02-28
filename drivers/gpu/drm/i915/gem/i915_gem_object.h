@@ -13,8 +13,8 @@
 
 #include <drm/i915_drm.h>
 
+#include "display/intel_frontbuffer.h"
 #include "i915_gem_object_types.h"
-
 #include "i915_gem_gtt.h"
 
 void i915_gem_init__objects(struct drm_i915_private *i915);
@@ -81,7 +81,7 @@ i915_gem_object_lookup(struct drm_file *file, u32 handle)
 }
 
 __deprecated
-extern struct drm_gem_object *
+struct drm_gem_object *
 drm_gem_object_lookup(struct drm_file *file, u32 handle);
 
 __attribute__((nonnull))
@@ -165,15 +165,9 @@ i915_gem_object_needs_async_cancel(const struct drm_i915_gem_object *obj)
 }
 
 static inline bool
-i915_gem_object_is_active(const struct drm_i915_gem_object *obj)
-{
-	return READ_ONCE(obj->active_count);
-}
-
-static inline bool
 i915_gem_object_is_framebuffer(const struct drm_i915_gem_object *obj)
 {
-	return READ_ONCE(obj->framebuffer_references);
+	return READ_ONCE(obj->frontbuffer);
 }
 
 static inline unsigned int
@@ -406,6 +400,10 @@ i915_gem_object_pin_to_display_plane(struct drm_i915_gem_object *obj,
 				     unsigned int flags);
 void i915_gem_object_unpin_from_display_plane(struct i915_vma *vma);
 
+void i915_gem_object_make_unshrinkable(struct drm_i915_gem_object *obj);
+void i915_gem_object_make_shrinkable(struct drm_i915_gem_object *obj);
+void i915_gem_object_make_purgeable(struct drm_i915_gem_object *obj);
+
 static inline bool cpu_write_needs_clflush(struct drm_i915_gem_object *obj)
 {
 	if (obj->cache_dirty)
@@ -432,5 +430,26 @@ int i915_gem_object_wait_priority(struct drm_i915_gem_object *obj,
 				  unsigned int flags,
 				  const struct i915_sched_attr *attr);
 #define I915_PRIORITY_DISPLAY I915_USER_PRIORITY(I915_PRIORITY_MAX)
+
+void __i915_gem_object_flush_frontbuffer(struct drm_i915_gem_object *obj,
+					 enum fb_op_origin origin);
+void __i915_gem_object_invalidate_frontbuffer(struct drm_i915_gem_object *obj,
+					      enum fb_op_origin origin);
+
+static inline void
+i915_gem_object_flush_frontbuffer(struct drm_i915_gem_object *obj,
+				  enum fb_op_origin origin)
+{
+	if (unlikely(rcu_access_pointer(obj->frontbuffer)))
+		__i915_gem_object_flush_frontbuffer(obj, origin);
+}
+
+static inline void
+i915_gem_object_invalidate_frontbuffer(struct drm_i915_gem_object *obj,
+				       enum fb_op_origin origin)
+{
+	if (unlikely(rcu_access_pointer(obj->frontbuffer)))
+		__i915_gem_object_invalidate_frontbuffer(obj, origin);
+}
 
 #endif

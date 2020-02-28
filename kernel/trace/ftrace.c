@@ -325,6 +325,8 @@ int __register_ftrace_function(struct ftrace_ops *ops)
 	if (ops->flags & FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED)
 		ops->flags |= FTRACE_OPS_FL_SAVE_REGS;
 #endif
+	if (!ftrace_enabled && (ops->flags & FTRACE_OPS_FL_PERMANENT))
+		return -EBUSY;
 
 	if (!core_kernel_data((unsigned long)ops))
 		ops->flags |= FTRACE_OPS_FL_DYNAMIC;
@@ -523,8 +525,7 @@ static int function_stat_show(struct seq_file *m, void *v)
 	}
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	avg = rec->time;
-	do_div(avg, rec->counter);
+	avg = div64_ul(rec->time, rec->counter);
 	if (tracing_thresh && (avg < tracing_thresh))
 		goto out;
 #endif
@@ -550,7 +551,8 @@ static int function_stat_show(struct seq_file *m, void *v)
 		 * Divide only 1000 for ns^2 -> us^2 conversion.
 		 * trace_print_graph_duration will divide 1000 again.
 		 */
-		do_div(stddev, rec->counter * (rec->counter - 1) * 1000);
+		stddev = div64_ul(stddev,
+				  rec->counter * (rec->counter - 1) * 1000);
 	}
 
 	trace_seq_init(&s);
@@ -5085,8 +5087,8 @@ static const struct file_operations ftrace_notrace_fops = {
 
 static DEFINE_MUTEX(graph_lock);
 
-struct ftrace_hash *ftrace_graph_hash = EMPTY_HASH;
-struct ftrace_hash *ftrace_graph_notrace_hash = EMPTY_HASH;
+struct ftrace_hash __rcu *ftrace_graph_hash = EMPTY_HASH;
+struct ftrace_hash __rcu *ftrace_graph_notrace_hash = EMPTY_HASH;
 
 enum graph_filter_type {
 	GRAPH_FILTER_NOTRACE	= 0,
@@ -5357,8 +5359,15 @@ ftrace_graph_release(struct inode *inode, struct file *file)
 
 		mutex_unlock(&graph_lock);
 
-		/* Wait till all users are no longer using the old hash */
-		synchronize_rcu();
+		/*
+		 * We need to do a hard force of sched synchronization.
+		 * This is because we use preempt_disable() to do RCU, but
+		 * the function tracers can be called where RCU is not watching
+		 * (like before user_exit()). We can not rely on the RCU
+		 * infrastructure to do the synchronization, thus we must do it
+		 * ourselves.
+		 */
+		schedule_on_each_cpu(ftrace_sync);
 
 		free_ftrace_hash(old_hash);
 	}
@@ -6736,6 +6745,18 @@ int unregister_ftrace_function(struct ftrace_ops *ops)
 }
 EXPORT_SYMBOL_GPL(unregister_ftrace_function);
 
+static bool is_permanent_ops_registered(void)
+{
+	struct ftrace_ops *op;
+
+	do_for_each_ftrace_op(op, ftrace_ops_list) {
+		if (op->flags & FTRACE_OPS_FL_PERMANENT)
+			return true;
+	} while_for_each_ftrace_op(op);
+
+	return false;
+}
+
 int
 ftrace_enable_sysctl(struct ctl_table *table, int write,
 		     void __user *buffer, size_t *lenp,
@@ -6753,8 +6774,6 @@ ftrace_enable_sysctl(struct ctl_table *table, int write,
 	if (ret || !write || (last_ftrace_enabled == !!ftrace_enabled))
 		goto out;
 
-	last_ftrace_enabled = !!ftrace_enabled;
-
 	if (ftrace_enabled) {
 
 		/* we are starting ftrace again */
@@ -6765,12 +6784,19 @@ ftrace_enable_sysctl(struct ctl_table *table, int write,
 		ftrace_startup_sysctl();
 
 	} else {
+		if (is_permanent_ops_registered()) {
+			ftrace_enabled = true;
+			ret = -EBUSY;
+			goto out;
+		}
+
 		/* stopping ftrace calls (just send to ftrace_stub) */
 		ftrace_trace_function = ftrace_stub;
 
 		ftrace_shutdown_sysctl();
 	}
 
+	last_ftrace_enabled = !!ftrace_enabled;
  out:
 	mutex_unlock(&ftrace_lock);
 	return ret;

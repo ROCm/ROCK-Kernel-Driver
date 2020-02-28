@@ -1067,28 +1067,41 @@ tainted
 Non-zero if the kernel has been tainted. Numeric values, which can be
 ORed together. The letters are seen in "Tainted" line of Oops reports.
 
-======  =====  ==============================================================
-     1  `(P)`  proprietary module was loaded
-     2  `(F)`  module was force loaded
-     4  `(S)`  SMP kernel oops on an officially SMP incapable processor
-     8  `(R)`  module was force unloaded
-    16  `(M)`  processor reported a Machine Check Exception (MCE)
-    32  `(B)`  bad page referenced or some unexpected page flags
-    64  `(U)`  taint requested by userspace application
-   128  `(D)`  kernel died recently, i.e. there was an OOPS or BUG
-   256  `(A)`  an ACPI table was overridden by user
-   512  `(W)`  kernel issued warning
-  1024  `(C)`  staging driver was loaded
-  2048  `(I)`  workaround for bug in platform firmware applied
-  4096  `(O)`  externally-built ("out-of-tree") module was loaded
-  8192  `(E)`  unsigned module was loaded
- 16384  `(L)`  soft lockup occurred
- 32768  `(K)`  kernel has been live patched
- 65536  `(X)`  Auxiliary taint, defined and used by for distros
-131072  `(T)`  The kernel was built with the struct randomization plugin
-======  =====  ==============================================================
+==========  =====  ==========================================================
+         1  `(P)`  proprietary module was loaded
+         2  `(F)`  module was force loaded
+         4  `(S)`  SMP kernel oops on an officially SMP incapable processor
+         8  `(R)`  module was force unloaded
+        16  `(M)`  processor reported a Machine Check Exception (MCE)
+        32  `(B)`  bad page referenced or some unexpected page flags
+        64  `(U)`  taint requested by userspace application
+       128  `(D)`  kernel died recently, i.e. there was an OOPS or BUG
+       256  `(A)`  an ACPI table was overridden by user
+       512  `(W)`  kernel issued warning
+      1024  `(C)`  staging driver was loaded
+      2048  `(I)`  workaround for bug in platform firmware applied
+      4096  `(O)`  externally-built ("out-of-tree") module was loaded
+      8192  `(E)`  unsigned module was loaded
+     16384  `(L)`  soft lockup occurred
+     32768  `(K)`  kernel has been live patched
+     65536  `(X)`  A kernel module with external support was loaded
+    131072  `(T)`  The kernel was built with the struct randomization plugin
+2147483648  `(N)`  An unsupported kernel module was loaded
+==========  =====  ==========================================================
 
 See Documentation/admin-guide/tainted-kernels.rst for more information.
+
+
+unsupported:
+============
+
+Allow to load unsupported kernel modules:
+
+  = =========================================================================
+  0 refuse to load unsupported modules,
+  1 warn when loading unsupported modules,
+  2 don't warn.
+  = =========================================================================
 
 
 threads-max:
@@ -1101,17 +1114,13 @@ During initialization the kernel sets this value such that even if the
 maximum number of threads is created, the thread structures occupy only
 a part (1/8th) of the available RAM pages.
 
-The minimum value that can be written to threads-max is 20.
+The minimum value that can be written to threads-max is 1.
 
 The maximum value that can be written to threads-max is given by the
 constant FUTEX_TID_MASK (0x3fffffff).
 
 If a value outside of this range is written to threads-max an error
 EINVAL occurs.
-
-The value written is checked against the available RAM pages. If the
-thread structures would occupy too much (more than 1/8th) of the
-available RAM pages threads-max is reduced accordingly.
 
 
 unknown_nmi_panic:

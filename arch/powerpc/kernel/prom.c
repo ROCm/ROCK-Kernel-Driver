@@ -704,7 +704,7 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_opal, NULL);
 #endif
 
-#ifdef CONFIG_FA_DUMP
+#if defined(CONFIG_FA_DUMP) || defined(CONFIG_PRESERVE_FA_DUMP)
 	/* scan tree to see if dump is active during last boot */
 	of_scan_flat_dt(early_init_dt_scan_fw_dump, NULL);
 #endif
@@ -731,14 +731,6 @@ void __init early_init_devtree(void *params)
 	if (PHYSICAL_START > MEMORY_START)
 		memblock_reserve(MEMORY_START, 0x8000);
 	reserve_kdump_trampoline();
-#ifdef CONFIG_FA_DUMP
-	/*
-	 * If we fail to reserve memory for firmware-assisted dump then
-	 * fallback to kexec based kdump.
-	 */
-	if (fadump_reserve_mem() == 0)
-#endif
-		reserve_crashkernel();
 	early_reserve_mem();
 
 	/* Ensure that total memory size is page-aligned. */
@@ -777,6 +769,14 @@ void __init early_init_devtree(void *params)
 #endif
 
 	mmu_early_init_devtree();
+#if defined(CONFIG_FA_DUMP) || defined(CONFIG_PRESERVE_FA_DUMP)
+	/*
+	 * If we fail to reserve memory for firmware-assisted dump then
+	 * fallback to kexec based kdump.
+	 */
+	if (fadump_reserve_mem() == 0)
+#endif
+		reserve_crashkernel();
 
 #ifdef CONFIG_PPC_POWERNV
 	/* Scan and build the list of machine check recoverable ranges */

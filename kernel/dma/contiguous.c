@@ -23,6 +23,7 @@
 #include <linux/sizes.h>
 #include <linux/dma-contiguous.h>
 #include <linux/cma.h>
+#include <linux/of_fdt.h>
 
 #ifdef CONFIG_CMA_SIZE_MBYTES
 #define CMA_SIZE_MBYTES CONFIG_CMA_SIZE_MBYTES
@@ -113,6 +114,15 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
 
 	pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
 
+#ifdef CONFIG_OF_EARLY_FLATTREE
+	if (size_cmdline == -1) {
+		/* bsc#1123536: Reserve 64 MiB of CMA for RPi3's VC4. */
+		static const char model_name[] = "Raspberry Pi 3";
+		const char* model = of_flat_dt_get_machine_name();
+		if (model && !strncmp(model, model_name, strlen(model_name)))
+			size_cmdline = 64 << 20;
+	}
+#endif
 	if (size_cmdline != -1) {
 		selected_size = size_cmdline;
 		selected_base = base_cmdline;
@@ -301,8 +311,15 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
 	phys_addr_t mask = align - 1;
 	unsigned long node = rmem->fdt_node;
+	bool default_cma = of_get_flat_dt_prop(node, "linux,cma-default", NULL);
 	struct cma *cma;
 	int err;
+
+	if (size_cmdline != -1 && default_cma) {
+		pr_info("Reserved memory: bypass %s node, using cmdline CMA params instead\n",
+			rmem->name);
+		return -EBUSY;
+	}
 
 	if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
 	    of_get_flat_dt_prop(node, "no-map", NULL))
@@ -321,7 +338,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
 	/* Architecture specific contiguous memory fixup. */
 	dma_contiguous_early_fixup(rmem->base, rmem->size);
 
-	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
+	if (default_cma)
 		dma_contiguous_set_default(cma);
 
 	rmem->ops = &rmem_cma_ops;

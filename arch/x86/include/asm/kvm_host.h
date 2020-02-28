@@ -572,6 +572,7 @@ struct kvm_vcpu_arch {
 	u64 smbase;
 	u64 smi_count;
 	bool tpr_access_reporting;
+	bool xsaves_enabled;
 	u64 ia32_xss;
 	u64 microcode_version;
 	u64 arch_capabilities;
@@ -674,10 +675,10 @@ struct kvm_vcpu_arch {
 	bool pvclock_set_guest_stopped_request;
 
 	struct {
+		u8 preempted;
 		u64 msr_val;
 		u64 last_steal;
-		struct gfn_to_hva_cache stime;
-		struct kvm_steal_time steal;
+		struct gfn_to_pfn_cache cache;
 	} st;
 
 	u64 tsc_offset;
@@ -847,6 +848,8 @@ struct kvm_hv {
 
 	/* How many vCPUs have VP index != vCPU index */
 	atomic_t num_mismatched_vp_indexes;
+
+	struct hv_partition_assist_pg *hv_pa_pg;
 };
 
 enum kvm_irqchip_mode {
@@ -867,6 +870,7 @@ struct kvm_arch {
 	 */
 	struct list_head active_mmu_pages;
 	struct list_head lpage_disallowed_mmu_pages;
+	struct list_head zapped_obsolete_pages;
 	struct kvm_page_track_notifier_node mmu_sp_tracker;
 	struct kvm_page_track_notifier_head track_notifier_head;
 
@@ -1132,6 +1136,7 @@ struct kvm_x86_ops {
 	bool (*xsaves_supported)(void);
 	bool (*umip_emulated)(void);
 	bool (*pt_supported)(void);
+	bool (*pku_supported)(void);
 
 	int (*check_nested_events)(struct kvm_vcpu *vcpu, bool external_intr);
 	void (*request_immediate_exit)(struct kvm_vcpu *vcpu);
@@ -1199,7 +1204,7 @@ struct kvm_x86_ops {
 	int (*set_nested_state)(struct kvm_vcpu *vcpu,
 				struct kvm_nested_state __user *user_kvm_nested_state,
 				struct kvm_nested_state *kvm_state);
-	void (*get_vmcs12_pages)(struct kvm_vcpu *vcpu);
+	bool (*get_vmcs12_pages)(struct kvm_vcpu *vcpu);
 
 	int (*smi_allowed)(struct kvm_vcpu *vcpu);
 	int (*pre_enter_smm)(struct kvm_vcpu *vcpu, char *smstate);
@@ -1217,6 +1222,7 @@ struct kvm_x86_ops {
 	uint16_t (*nested_get_evmcs_version)(struct kvm_vcpu *vcpu);
 
 	bool (*need_emulation_on_page_fault)(struct kvm_vcpu *vcpu);
+	int (*enable_direct_tlbflush)(struct kvm_vcpu *vcpu);
 };
 
 struct kvm_arch_async_pf {
@@ -1334,8 +1340,10 @@ int kvm_emulate_instruction_from_buffer(struct kvm_vcpu *vcpu,
 
 void kvm_enable_efer_bits(u64);
 bool kvm_valid_efer(struct kvm_vcpu *vcpu, u64 efer);
-int kvm_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr);
-int kvm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr);
+int kvm_get_msr(struct kvm_vcpu *vcpu, u32 index, u64 *data);
+int kvm_set_msr(struct kvm_vcpu *vcpu, u32 index, u64 data);
+int kvm_emulate_rdmsr(struct kvm_vcpu *vcpu);
+int kvm_emulate_wrmsr(struct kvm_vcpu *vcpu);
 
 struct x86_emulate_ctxt;
 

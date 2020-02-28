@@ -56,6 +56,8 @@ enum xcan_reg {
 	XCAN_TXMSG_BASE_OFFSET	= 0x0100, /* TX Message Space */
 	XCAN_RXMSG_BASE_OFFSET	= 0x1100, /* RX Message Space */
 	XCAN_RXMSG_2_BASE_OFFSET	= 0x2100, /* RX Message Space */
+	XCAN_AFR_2_MASK_OFFSET	= 0x0A00, /* Acceptance Filter MASK */
+	XCAN_AFR_2_ID_OFFSET	= 0x0A04, /* Acceptance Filter ID */
 };
 
 #define XCAN_FRAME_ID_OFFSET(frame_base)	((frame_base) + 0x00)
@@ -392,9 +394,8 @@ static int xcan_set_bittiming(struct net_device *ndev)
 static int xcan_chip_start(struct net_device *ndev)
 {
 	struct xcan_priv *priv = netdev_priv(ndev);
-	u32 reg_msr, reg_sr_mask;
+	u32 reg_msr;
 	int err;
-	unsigned long timeout;
 	u32 ier;
 
 	/* Check if it is in reset mode */
@@ -420,10 +421,8 @@ static int xcan_chip_start(struct net_device *ndev)
 	/* Check whether it is loopback mode or normal mode  */
 	if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
 		reg_msr = XCAN_MSR_LBACK_MASK;
-		reg_sr_mask = XCAN_SR_LBACK_MASK;
 	} else {
 		reg_msr = 0x0;
-		reg_sr_mask = XCAN_SR_NORMAL_MASK;
 	}
 
 	/* enable the first extended filter, if any, as cores with extended
@@ -435,14 +434,6 @@ static int xcan_chip_start(struct net_device *ndev)
 	priv->write_reg(priv, XCAN_MSR_OFFSET, reg_msr);
 	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
 
-	timeout = jiffies + XCAN_TIMEOUT;
-	while (!(priv->read_reg(priv, XCAN_SR_OFFSET) & reg_sr_mask)) {
-		if (time_after(jiffies, timeout)) {
-			netdev_warn(ndev,
-				"timed out for correct mode\n");
-			return -ETIMEDOUT;
-		}
-	}
 	netdev_dbg(ndev, "status:#x%08x\n",
 			priv->read_reg(priv, XCAN_SR_OFFSET));
 
@@ -1570,7 +1561,8 @@ static int xcan_probe(struct platform_device *pdev)
 	/* Getting the CAN can_clk info */
 	priv->can_clk = devm_clk_get(&pdev->dev, "can_clk");
 	if (IS_ERR(priv->can_clk)) {
-		dev_err(&pdev->dev, "Device clock not found.\n");
+		if (PTR_ERR(priv->can_clk) != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Device clock not found.\n");
 		ret = PTR_ERR(priv->can_clk);
 		goto err_free;
 	}
@@ -1611,6 +1603,11 @@ static int xcan_probe(struct platform_device *pdev)
 	devm_can_led_init(ndev);
 
 	pm_runtime_put(&pdev->dev);
+
+	if (priv->devtype.flags & XCAN_FLAG_CANFD_2) {
+		priv->write_reg(priv, XCAN_AFR_2_ID_OFFSET, 0x00000000);
+		priv->write_reg(priv, XCAN_AFR_2_MASK_OFFSET, 0x00000000);
+	}
 
 	netdev_dbg(ndev, "reg_base=0x%p irq=%d clock=%d, tx buffers: actual %d, using %d\n",
 		   priv->reg_base, ndev->irq, priv->can.clock.freq,

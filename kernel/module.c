@@ -7,6 +7,7 @@
 #include <linux/export.h>
 #include <linux/extable.h>
 #include <linux/moduleloader.h>
+#include <linux/module_signature.h>
 #include <linux/trace_events.h>
 #include <linux/init.h>
 #include <linux/kallsyms.h>
@@ -75,6 +76,22 @@
 
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
+
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+/* Allow unsupported modules switch. */
+#ifdef UNSUPPORTED_MODULES
+int suse_unsupported = UNSUPPORTED_MODULES;
+#else
+int suse_unsupported = 2;  /* don't warn when loading unsupported modules. */
+#endif
+
+static int __init unsupported_setup(char *str)
+{
+	get_option(&str, &suse_unsupported);
+	return 1;
+}
+__setup("unsupported=", unsupported_setup);
+#endif
 
 /*
  * Mutex protects:
@@ -541,6 +558,17 @@ static const char *kernel_symbol_name(const struct kernel_symbol *sym)
 	return offset_to_ptr(&sym->name_offset);
 #else
 	return sym->name;
+#endif
+}
+
+static const char *kernel_symbol_namespace(const struct kernel_symbol *sym)
+{
+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+	if (!sym->namespace_offset)
+		return NULL;
+	return offset_to_ptr(&sym->namespace_offset);
+#else
+	return sym->namespace;
 #endif
 }
 
@@ -1024,6 +1052,8 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 	strlcpy(last_unloaded_module, mod->name, sizeof(last_unloaded_module));
 
 	free_module(mod);
+	/* someone could wait for the module in add_unformed_module() */
+	wake_up_all(&module_wq);
 	return 0;
 out:
 	mutex_unlock(&module_mutex);
@@ -1174,6 +1204,12 @@ static size_t module_flags_taint(struct module *mod, char *buf)
 			buf[l++] = taint_flags[i].c_true;
 	}
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	if (mod->taints & (1 << TAINT_NO_SUPPORT))
+		buf[l++] = 'N';
+	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
+		buf[l++] = 'X';
+#endif
 	return l;
 }
 
@@ -1245,6 +1281,33 @@ static ssize_t show_taint(struct module_attribute *mattr,
 static struct module_attribute modinfo_taint =
 	__ATTR(taint, 0444, show_taint, NULL);
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+static void setup_modinfo_supported(struct module *mod, const char *s)
+{
+	if (!s) {
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
+		return;
+	}
+
+	if (strcmp(s, "external") == 0)
+		mod->taints |= (1 << TAINT_EXTERNAL_SUPPORT);
+	else if (strcmp(s, "yes"))
+		mod->taints |= (1 << TAINT_NO_SUPPORT);
+}
+
+static ssize_t show_modinfo_supported(struct module_attribute *mattr,
+				      struct module_kobject *mk, char *buffer)
+{
+	return sprintf(buffer, "%s\n", supported_printable(mk->mod->taints));
+}
+
+static struct module_attribute modinfo_supported = {
+	.attr = { .name = "supported", .mode = 0444 },
+	.show = show_modinfo_supported,
+	.setup = setup_modinfo_supported,
+};
+#endif
+
 static struct module_attribute *modinfo_attrs[] = {
 	&module_uevent,
 	&modinfo_version,
@@ -1253,6 +1316,9 @@ static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_coresize,
 	&modinfo_initsize,
 	&modinfo_taint,
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	&modinfo_supported,
+#endif
 #ifdef CONFIG_MODULE_UNLOAD
 	&modinfo_refcnt,
 #endif
@@ -1379,6 +1445,41 @@ static inline int same_magic(const char *amagic, const char *bmagic,
 }
 #endif /* CONFIG_MODVERSIONS */
 
+static char *get_modinfo(const struct load_info *info, const char *tag);
+static char *get_next_modinfo(const struct load_info *info, const char *tag,
+			      char *prev);
+
+static int verify_namespace_is_imported(const struct load_info *info,
+					const struct kernel_symbol *sym,
+					struct module *mod)
+{
+	const char *namespace;
+	char *imported_namespace;
+
+	namespace = kernel_symbol_namespace(sym);
+	if (namespace && namespace[0]) {
+		imported_namespace = get_modinfo(info, "import_ns");
+		while (imported_namespace) {
+			if (strcmp(namespace, imported_namespace) == 0)
+				return 0;
+			imported_namespace = get_next_modinfo(
+				info, "import_ns", imported_namespace);
+		}
+#ifdef CONFIG_MODULE_ALLOW_MISSING_NAMESPACE_IMPORTS
+		pr_warn(
+#else
+		pr_err(
+#endif
+			"%s: module uses symbol (%s) from namespace %s, but does not import it.\n",
+			mod->name, kernel_symbol_name(sym), namespace);
+#ifndef CONFIG_MODULE_ALLOW_MISSING_NAMESPACE_IMPORTS
+		return -EINVAL;
+#endif
+	}
+	return 0;
+}
+
+
 /* Resolve a symbol for this module.  I.e. if we find one, record usage. */
 static const struct kernel_symbol *resolve_symbol(struct module *mod,
 						  const struct load_info *info,
@@ -1404,6 +1505,12 @@ static const struct kernel_symbol *resolve_symbol(struct module *mod,
 
 	if (!check_version(info, name, mod, crc)) {
 		sym = ERR_PTR(-EINVAL);
+		goto getname;
+	}
+
+	err = verify_namespace_is_imported(info, sym, mod);
+	if (err) {
+		sym = ERR_PTR(err);
 		goto getname;
 	}
 
@@ -1823,9 +1930,38 @@ static int mod_sysfs_setup(struct module *mod,
 	add_sect_attrs(mod, info);
 	add_notes_attrs(mod, info);
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT)) {
+		pr_notice("%s: externally supported module, "
+			  "setting X kernel taint flag.\n", mod->name);
+		add_taint(TAINT_EXTERNAL_SUPPORT, LOCKDEP_STILL_OK);
+	} else if (mod->taints & (1 << TAINT_NO_SUPPORT)) {
+		if (suse_unsupported == 0) {
+			printk(KERN_WARNING "%s: module not supported by "
+			       "SUSE, refusing to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
+			err = -ENOEXEC;
+			goto out_remove_attrs;
+		}
+		add_taint(TAINT_NO_SUPPORT, LOCKDEP_STILL_OK);
+		if (suse_unsupported == 1) {
+			printk(KERN_WARNING "%s: module is not supported by "
+			       "SUSE. Our support organization may not be "
+			       "able to address your support request if it "
+			       "involves a kernel fault.\n", mod->name);
+		}
+	}
+#endif
+
 	kobject_uevent(&mod->mkobj.kobj, KOBJ_ADD);
 	return 0;
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+out_remove_attrs:
+	remove_notes_attrs(mod);
+	remove_sect_attrs(mod);
+	del_usage_links(mod);
+#endif
 out_unreg_modinfo_attrs:
 	module_remove_modinfo_attrs(mod, -1);
 out_unreg_param:
@@ -2481,7 +2617,8 @@ static char *next_string(char *string, unsigned long *secsize)
 	return string;
 }
 
-static char *get_modinfo(struct load_info *info, const char *tag)
+static char *get_next_modinfo(const struct load_info *info, const char *tag,
+			      char *prev)
 {
 	char *p;
 	unsigned int taglen = strlen(tag);
@@ -2492,11 +2629,23 @@ static char *get_modinfo(struct load_info *info, const char *tag)
 	 * get_modinfo() calls made before rewrite_section_headers()
 	 * must use sh_offset, as sh_addr isn't set!
 	 */
-	for (p = (char *)info->hdr + infosec->sh_offset; p; p = next_string(p, &size)) {
+	char *modinfo = (char *)info->hdr + infosec->sh_offset;
+
+	if (prev) {
+		size -= prev - modinfo;
+		modinfo = next_string(prev, &size);
+	}
+
+	for (p = modinfo; p; p = next_string(p, &size)) {
 		if (strncmp(p, tag, taglen) == 0 && p[taglen] == '=')
 			return p + taglen + 1;
 	}
 	return NULL;
+}
+
+static char *get_modinfo(const struct load_info *info, const char *tag)
+{
+	return get_next_modinfo(info, tag, NULL);
 }
 
 static void setup_modinfo(struct module *mod, struct load_info *info)
@@ -2776,8 +2925,9 @@ static inline void kmemleak_load_module(const struct module *mod,
 #ifdef CONFIG_MODULE_SIG
 static int module_sig_check(struct load_info *info, int flags)
 {
-	int err = -ENOKEY;
+	int err = -ENODATA;
 	const unsigned long markerlen = sizeof(MODULE_SIG_STRING) - 1;
+	const char *reason;
 	const void *mod = info->hdr;
 
 	/*
@@ -2792,16 +2942,38 @@ static int module_sig_check(struct load_info *info, int flags)
 		err = mod_verify_sig(mod, info);
 	}
 
-	if (!err) {
+	switch (err) {
+	case 0:
 		info->sig_ok = true;
 		return 0;
+
+		/* We don't permit modules to be loaded into trusted kernels
+		 * without a valid signature on them, but if we're not
+		 * enforcing, certain errors are non-fatal.
+		 */
+	case -ENODATA:
+		reason = "Loading of unsigned module";
+		goto decide;
+	case -ENOPKG:
+		reason = "Loading of module with unsupported crypto";
+		goto decide;
+	case -ENOKEY:
+		reason = "Loading of module with unavailable key";
+	decide:
+		if (is_module_sig_enforced()) {
+			pr_notice("%s: %s is rejected\n", info->name, reason);
+			return -EKEYREJECTED;
+		}
+
+		return security_locked_down(LOCKDOWN_MODULE_SIGNATURE);
+
+		/* All other errors are fatal, including nomem, unparseable
+		 * signatures and signature check failures - even if signatures
+		 * aren't required.
+		 */
+	default:
+		return err;
 	}
-
-	/* Not having a signature is only an error if we're strict. */
-	if (err == -ENOKEY && !is_module_sig_enforced())
-		err = 0;
-
-	return err;
 }
 #else /* !CONFIG_MODULE_SIG */
 static int module_sig_check(struct load_info *info, int flags)
@@ -4448,6 +4620,9 @@ void print_modules(void)
 	if (last_unloaded_module[0])
 		pr_cont(" [last unloaded: %s]", last_unloaded_module);
 	pr_cont("\n");
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	printk("Supported: %s\n", supported_printable(get_taint()));
+#endif
 }
 
 #ifdef CONFIG_MODVERSIONS

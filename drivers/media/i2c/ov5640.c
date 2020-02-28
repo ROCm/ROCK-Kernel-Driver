@@ -874,7 +874,7 @@ static unsigned long ov5640_calc_sys_clk(struct ov5640_dev *sensor,
 			 * We have reached the maximum allowed PLL1 output,
 			 * increase sysdiv.
 			 */
-			if (!rate)
+			if (!_rate)
 				break;
 
 			/*
@@ -1609,6 +1609,11 @@ ov5640_find_mode(struct ov5640_dev *sensor, enum ov5640_frame_rate fr,
 	/* Only 640x480 can operate at 60fps (for now) */
 	if (fr == OV5640_60_FPS &&
 	    !(mode->hact == 640 && mode->vact == 480))
+		return NULL;
+
+	/* 2592x1944 only works at 15fps max */
+	if ((mode->hact == 2592 && mode->vact == 1944) &&
+	    fr > OV5640_15_FPS)
 		return NULL;
 
 	return mode;

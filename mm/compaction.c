@@ -970,7 +970,7 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 			 * is safe to read and it's 0 for tail pages.
 			 */
 			if (unlikely(PageCompound(page))) {
-				low_pfn += (1UL << compound_order(page)) - 1;
+				low_pfn += compound_nr(page) - 1;
 				goto isolate_fail;
 			}
 		}
@@ -1738,8 +1738,7 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
  * starting at the block pointed to by the migrate scanner pfn within
  * compact_control.
  */
-static isolate_migrate_t isolate_migratepages(struct zone *zone,
-					struct compact_control *cc)
+static isolate_migrate_t isolate_migratepages(struct compact_control *cc)
 {
 	unsigned long block_start_pfn;
 	unsigned long block_end_pfn;
@@ -1757,8 +1756,8 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 	 */
 	low_pfn = fast_find_migrateblock(cc);
 	block_start_pfn = pageblock_start_pfn(low_pfn);
-	if (block_start_pfn < zone->zone_start_pfn)
-		block_start_pfn = zone->zone_start_pfn;
+	if (block_start_pfn < cc->zone->zone_start_pfn)
+		block_start_pfn = cc->zone->zone_start_pfn;
 
 	/*
 	 * fast_find_migrateblock marks a pageblock skipped so to avoid
@@ -1788,8 +1787,8 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		if (!(low_pfn % (SWAP_CLUSTER_MAX * pageblock_nr_pages)))
 			cond_resched();
 
-		page = pageblock_pfn_to_page(block_start_pfn, block_end_pfn,
-									zone);
+		page = pageblock_pfn_to_page(block_start_pfn,
+						block_end_pfn, cc->zone);
 		if (!page)
 			continue;
 
@@ -2170,7 +2169,7 @@ compact_zone(struct compact_control *cc, struct capture_control *capc)
 			cc->rescan = true;
 		}
 
-		switch (isolate_migratepages(cc->zone, cc)) {
+		switch (isolate_migratepages(cc)) {
 		case ISOLATE_ABORT:
 			ret = COMPACT_CONTENDED;
 			putback_movable_pages(&cc->migratepages);

@@ -73,11 +73,6 @@ static void __xdp_mem_allocator_rcu_free(struct rcu_head *rcu)
 	/* Allow this ID to be reused */
 	ida_simple_remove(&mem_id_pool, xa->mem.id);
 
-	/* Poison memory */
-	xa->mem.id = 0xFFFF;
-	xa->mem.type = 0xF0F0;
-	xa->allocator = (void *)0xDEAD9001;
-
 	kfree(xa);
 }
 
@@ -360,7 +355,7 @@ EXPORT_SYMBOL_GPL(xdp_rxq_info_reg_mem_model);
 
 /* XDP RX runs under NAPI protection, and in different delivery error
  * scenarios (e.g. queue full), it is possible to return the xdp_frame
- * while still leveraging this protection.  The @napi_direct boolian
+ * while still leveraging this protection.  The @napi_direct boolean
  * is used for those calls sites.  Thus, allowing for faster recycling
  * of xdp_frames/pages in those cases.
  */

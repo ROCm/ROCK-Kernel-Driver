@@ -139,9 +139,20 @@ static int tid_fd_revalidate(struct dentry *dentry, unsigned int flags)
 	return 0;
 }
 
+int procfs_drop_fd_dentries = 0;
+
+static int tid_fd_delete_dentry(const struct dentry *dentry)
+{
+	/* Always delete immediately */
+	if (procfs_drop_fd_dentries)
+		return 1;
+
+	return pid_delete_dentry(dentry);
+}
+
 static const struct dentry_operations tid_fd_dentry_operations = {
 	.d_revalidate	= tid_fd_revalidate,
-	.d_delete	= pid_delete_dentry,
+	.d_delete	= tid_fd_delete_dentry,
 };
 
 static int proc_fd_link(struct dentry *dentry, struct path *path)

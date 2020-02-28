@@ -252,11 +252,10 @@ static int aead_setkey(struct crypto_aead *aead, const u8 *key,
 	dma_sync_single_for_device(jrdev->parent, ctx->key_dma,
 				   ctx->adata.keylen_pad + keys.enckeylen,
 				   ctx->dir);
-#ifdef DEBUG
-	print_hex_dump(KERN_ERR, "ctx.key@" __stringify(__LINE__)": ",
-		       DUMP_PREFIX_ADDRESS, 16, 4, ctx->key,
-		       ctx->adata.keylen_pad + keys.enckeylen, 1);
-#endif
+
+	print_hex_dump_debug("ctx.key@" __stringify(__LINE__)": ",
+			     DUMP_PREFIX_ADDRESS, 16, 4, ctx->key,
+			     ctx->adata.keylen_pad + keys.enckeylen, 1);
 
 skip_split_key:
 	ctx->cdata.keylen = keys.enckeylen;
@@ -2523,10 +2522,9 @@ int caam_qi_algapi_init(struct device *ctrldev)
 	unsigned int md_limit = SHA512_DIGEST_SIZE;
 	bool registered = false;
 
-	if (caam_dpaa2) {
-		dev_info(ctrldev, "caam/qi frontend driver not suitable for DPAA 2.x, aborting...\n");
-		return -ENODEV;
-	}
+	/* Make sure this runs only on (DPAA 1.x) QI */
+	if (!priv->qi_present || caam_dpaa2)
+		return 0;
 
 	/*
 	 * Register crypto algorithms the device supports.

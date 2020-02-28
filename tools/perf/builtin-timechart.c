@@ -1016,8 +1016,15 @@ static void draw_c_p_states(struct timechart *tchart)
 	 * two pass drawing so that the P state bars are on top of the C state blocks
 	 */
 	while (pwr) {
-		if (pwr->type == CSTATE)
+		if (pwr->type == CSTATE) {
+			/* If the first event is an _end event, start timestamp is zero
+			   -> ignore these */
+			if (pwr->start_time == 0 || pwr->end_time == 0) {
+				pwr = pwr->next;
+				continue;
+			}
 			svg_cstate(pwr->cpu, pwr->start_time, pwr->end_time, pwr->state);
+		}
 		pwr = pwr->next;
 	}
 

@@ -3425,8 +3425,31 @@ void device_set_of_node_from_dev(struct device *dev, const struct device *dev2)
 }
 EXPORT_SYMBOL_GPL(device_set_of_node_from_dev);
 
+int device_match_name(struct device *dev, const void *name)
+{
+	return sysfs_streq(dev_name(dev), name);
+}
+EXPORT_SYMBOL_GPL(device_match_name);
+
 int device_match_of_node(struct device *dev, const void *np)
 {
 	return dev->of_node == np;
 }
 EXPORT_SYMBOL_GPL(device_match_of_node);
+
+int device_match_fwnode(struct device *dev, const void *fwnode)
+{
+	return dev_fwnode(dev) == fwnode;
+}
+EXPORT_SYMBOL_GPL(device_match_fwnode);
+
+void dev_enable_async_probe(struct device *dev, bool enabled)
+{
+	if (!dev->p) {
+		if (device_private_init(dev))
+			return;
+	}
+	if (dev->p)
+		dev->p->async_probe_enabled = enabled;
+}
+EXPORT_SYMBOL_GPL(dev_enable_async_probe);

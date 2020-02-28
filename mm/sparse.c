@@ -763,12 +763,19 @@ static void section_deactivate(unsigned long pfn, unsigned long nr_pages,
 	if (bitmap_empty(subsection_map, SUBSECTIONS_PER_SECTION)) {
 		unsigned long section_nr = pfn_to_section_nr(pfn);
 
-		if (!section_is_early) {
+		/*
+		 * When removing an early section, the usage map is kept (as the
+		 * usage maps of other sections fall into the same page). It
+		 * will be re-used when re-adding the section - which is then no
+		 * longer an early section. If the usage map is PageReserved, it
+		 * was allocated during boot.
+		 */
+		if (!PageReserved(virt_to_page(ms->usage))) {
 			kfree(ms->usage);
 			ms->usage = NULL;
 		}
 		memmap = sparse_decode_mem_map(ms->section_mem_map, section_nr);
-		ms->section_mem_map = sparse_encode_mem_map(NULL, section_nr);
+		ms->section_mem_map = (unsigned long)NULL;
 	}
 
 	if (section_is_early && memmap)

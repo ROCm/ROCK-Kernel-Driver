@@ -245,7 +245,7 @@ static int hns_nic_maybe_stop_tso(
 	int frag_num;
 	struct sk_buff *skb = *out_skb;
 	struct sk_buff *new_skb = NULL;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 
 	size = skb_headlen(skb);
 	buf_num = (size + BD_MAX_SEND_SIZE - 1) / BD_MAX_SEND_SIZE;
@@ -309,7 +309,7 @@ netdev_tx_t hns_nic_net_xmit_hw(struct net_device *ndev,
 	struct hnae_ring *ring = ring_data->ring;
 	struct device *dev = ring_to_dev(ring);
 	struct netdev_queue *dev_queue;
-	struct skb_frag_struct *frag;
+	skb_frag_t *frag;
 	int buf_num;
 	int seg_num;
 	dma_addr_t dma;
@@ -565,7 +565,6 @@ static int hns_nic_poll_rx_skb(struct hns_nic_ring_data *ring_data,
 	skb = *out_skb = napi_alloc_skb(&ring_data->napi,
 					HNS_RX_HEAD_SIZE);
 	if (unlikely(!skb)) {
-		netdev_err(ndev, "alloc rx skb fail\n");
 		ring->stats.sw_err_cnt++;
 		return -ENOMEM;
 	}
@@ -1056,7 +1055,6 @@ static int hns_nic_common_poll(struct napi_struct *napi, int budget)
 		container_of(napi, struct hns_nic_ring_data, napi);
 	struct hnae_ring *ring = ring_data->ring;
 
-try_again:
 	clean_complete += ring_data->poll_one(
 				ring_data, budget - clean_complete,
 				ring_data->ex_process);
@@ -1066,7 +1064,7 @@ try_again:
 			napi_complete(napi);
 			ring->q->handle->dev->ops->toggle_ring_irq(ring, 0);
 		} else {
-			goto try_again;
+			return budget;
 		}
 	}
 
@@ -1161,6 +1159,8 @@ int hns_nic_init_phy(struct net_device *ndev, struct hnae_handle *h)
 	}
 	if (unlikely(ret))
 		return -ENODEV;
+
+	phy_attached_info(phy_dev);
 
 	return 0;
 }

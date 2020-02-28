@@ -1217,6 +1217,7 @@ header-test-			+= xen/interface/io/pvcalls.h
 header-test-			+= xen/interface/io/ring.h
 header-test-			+= xen/interface/io/sndif.h
 header-test-			+= xen/interface/io/tpmif.h
+header-test-			+= xen/interface/io/usbif.h
 header-test-			+= xen/interface/io/vscsiif.h
 header-test-			+= xen/interface/io/xs_wire.h
 header-test-			+= xen/interface/memory.h

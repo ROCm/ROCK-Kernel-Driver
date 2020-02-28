@@ -1607,6 +1607,7 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 	char *subvol_name = NULL;
 	u64 subvol_objectid = 0;
 	int error = 0;
+	static DEFINE_MUTEX(subvol_lock);
 
 	error = btrfs_parse_subvol_options(data, &subvol_name,
 					&subvol_objectid);
@@ -1614,6 +1615,24 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 		kfree(subvol_name);
 		return ERR_PTR(error);
 	}
+
+	/*
+	 * Protect against racing mounts of subvolumes with different RO/RW
+	 * flags.  The first vfs_kern_mount could fail with -EBUSY if the rw
+	 * flags do not match with the first and the currently mounted
+	 * subvolume.
+	 *
+	 * To resolve that, we adjust the rw flags and do remount. If another
+	 * mounts goes through the same path and hits the window between the
+	 * adjusted vfs_kern_mount and btrfs_remount, it will fail because of
+	 * the ro/rw mismatch in btrfs_mount.
+	 *
+	 * If the mounts do not race and are serialized externally, everything
+	 * works fine.  The function-local mutex enforces the serialization but
+	 * is otherwise only an ugly workaround due to lack of better
+	 * solutions.
+	 */
+	mutex_lock(&subvol_lock);
 
 	/* mount device's root (/) */
 	mnt_root = vfs_kern_mount(&btrfs_root_fs_type, flags, device_name, data);
@@ -1626,6 +1645,7 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 				flags | SB_RDONLY, device_name, data);
 			if (IS_ERR(mnt_root)) {
 				root = ERR_CAST(mnt_root);
+				mutex_unlock(&subvol_lock);
 				kfree(subvol_name);
 				goto out;
 			}
@@ -1636,11 +1656,14 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 			if (error < 0) {
 				root = ERR_PTR(error);
 				mntput(mnt_root);
+				mutex_unlock(&subvol_lock);
 				kfree(subvol_name);
 				goto out;
 			}
 		}
 	}
+	mutex_unlock(&subvol_lock);
+
 	if (IS_ERR(mnt_root)) {
 		root = ERR_CAST(mnt_root);
 		kfree(subvol_name);
@@ -2286,6 +2309,11 @@ static int btrfs_show_devname(struct seq_file *m, struct dentry *root)
 	return 0;
 }
 
+static dev_t btrfs_get_inode_dev(const struct inode *inode)
+{
+	return BTRFS_I(inode)->root->sbdev.anon_dev;
+}
+
 static const struct super_operations btrfs_super_ops = {
 	.drop_inode	= btrfs_drop_inode,
 	.evict_inode	= btrfs_evict_inode,
@@ -2300,6 +2328,7 @@ static const struct super_operations btrfs_super_ops = {
 	.remount_fs	= btrfs_remount,
 	.freeze_fs	= btrfs_freeze,
 	.unfreeze_fs	= btrfs_unfreeze,
+	.get_inode_dev	= btrfs_get_inode_dev,
 };
 
 static const struct file_operations btrfs_ctl_fops = {

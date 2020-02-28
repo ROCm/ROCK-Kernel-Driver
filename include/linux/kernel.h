@@ -307,13 +307,6 @@ extern int oops_may_print(void);
 void do_exit(long error_code) __noreturn;
 void complete_and_exit(struct completion *, long) __noreturn;
 
-#ifdef CONFIG_ARCH_HAS_REFCOUNT
-void refcount_error_report(struct pt_regs *regs, const char *err);
-#else
-static inline void refcount_error_report(struct pt_regs *regs, const char *err)
-{ }
-#endif
-
 /* Internal, do not use. */
 int __must_check _kstrtoul(const char *s, unsigned int base, unsigned long *res);
 int __must_check _kstrtol(const char *s, unsigned int base, long *res);
@@ -508,6 +501,9 @@ extern int panic_on_unrecovered_nmi;
 extern int panic_on_io_nmi;
 extern int panic_on_warn;
 extern int sysctl_panic_on_rcu_stall;
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+extern int suse_unsupported;
+#endif
 extern int sysctl_panic_on_stackoverflow;
 
 extern bool crash_kexec_post_notifiers;
@@ -574,7 +570,22 @@ extern enum system_states {
 #define TAINT_LIVEPATCH			15
 #define TAINT_AUX			16
 #define TAINT_RANDSTRUCT		17
-#define TAINT_FLAGS_COUNT		18
+#define TAINT_UNSAFE_HIBERNATE		18
+#define TAINT_FLAGS_COUNT		19
+
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+/*
+ * Take the upper bits to hopefully allow them
+ * to stay the same for more than one release.
+ */
+#  define TAINT_EXTERNAL_SUPPORT	TAINT_AUX
+#  define TAINT_NO_SUPPORT		31
+#  if TAINT_FLAGS_COUNT >= TAINT_NO_SUPPORT
+#    error Upstream taint flags overlap with SUSE flags
+#  endif
+#  undef TAINT_FLAGS_COUNT
+#  define TAINT_FLAGS_COUNT		32
+#endif
 
 struct taint_flag {
 	char c_true;	/* character printed when tainted */

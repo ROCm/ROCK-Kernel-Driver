@@ -205,6 +205,9 @@ enum flag_bits {
 				 * multiqueue device should check if there
 				 * is collision between write behind bios.
 				 */
+	Timeout,		/* Device fault due to timeout.
+				 * 'Faulty' is required to be set.
+				 */
 };
 
 static inline int is_badblock(struct md_rdev *rdev, sector_t s, int sectors,

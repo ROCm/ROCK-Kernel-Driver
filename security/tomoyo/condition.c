@@ -743,7 +743,7 @@ void tomoyo_get_attributes(struct tomoyo_obj_info *obj)
 			stat->gid  = inode->i_gid;
 			stat->ino  = inode->i_ino;
 			stat->mode = inode->i_mode;
-			stat->dev  = inode->i_sb->s_dev;
+			stat->dev  = inode_get_dev(inode);
 			stat->rdev = inode->i_rdev;
 			obj->stat_valid[i] = true;
 		}

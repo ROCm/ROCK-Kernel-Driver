@@ -599,7 +599,13 @@ EXPORT_SYMBOL_GPL(__online_page_free);
 
 static void generic_online_page(struct page *page, unsigned int order)
 {
-	kernel_map_pages(page, 1 << order, 1);
+	/*
+	 * Freeing the page with debug_pagealloc enabled will try to unmap it,
+	 * so we should map it first. This is better than introducing a special
+	 * case in page freeing fast path.
+	 */
+	if (debug_pagealloc_enabled_static())
+		kernel_map_pages(page, 1 << order, 1);
 	__free_pages_core(page, order);
 	totalram_pages_add(1UL << order);
 #ifdef CONFIG_HIGHMEM
@@ -1285,7 +1291,7 @@ static unsigned long scan_movable_pages(unsigned long start, unsigned long end)
 		head = compound_head(page);
 		if (page_huge_active(head))
 			return pfn;
-		skip = (1 << compound_order(head)) - (page - head);
+		skip = compound_nr(head) - (page - head);
 		pfn += skip - 1;
 	}
 	return 0;
@@ -1323,7 +1329,7 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 
 		if (PageHuge(page)) {
 			struct page *head = compound_head(page);
-			pfn = page_to_pfn(head) + (1<<compound_order(head)) - 1;
+			pfn = page_to_pfn(head) + compound_nr(head) - 1;
 			isolate_huge_page(head, &source);
 			continue;
 		} else if (PageTransHuge(page))

@@ -30,7 +30,7 @@ static int sk_diag_dump_vfs(struct sock *sk, struct sk_buff *nlskb)
 	if (dentry) {
 		struct unix_diag_vfs uv = {
 			.udiag_vfs_ino = d_backing_inode(dentry)->i_ino,
-			.udiag_vfs_dev = dentry->d_sb->s_dev,
+			.udiag_vfs_dev = inode_get_dev(d_backing_inode(dentry)),
 		};
 
 		return nla_put(nlskb, UNIX_DIAG_VFS, sizeof(uv), &uv);

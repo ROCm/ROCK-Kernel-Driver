@@ -36,6 +36,7 @@
 #include <linux/ns_common.h>
 #include <linux/idr.h>
 #include <linux/skbuff.h>
+#include <linux/notifier.h>
 
 struct user_namespace;
 struct proc_dir_entry;
@@ -104,6 +105,8 @@ struct net {
 
 	struct hlist_head 	*dev_name_head;
 	struct hlist_head	*dev_index_head;
+	struct raw_notifier_head	netdev_chain;
+
 	/* Note that @hash_mix can be read millions times per second,
 	 * it is critical that it is on a read_mostly cache line.
 	 */
@@ -114,9 +117,6 @@ struct net {
 	/* core fib_rules */
 	struct list_head	rules_ops;
 
-	struct list_head	fib_notifier_ops;  /* Populated by
-						    * register_pernet_subsys()
-						    */
 	struct netns_core	core;
 	struct netns_mib	mib;
 	struct netns_packet	packet;
@@ -326,7 +326,8 @@ static inline struct net *read_pnet(const possible_net_t *pnet)
 /* Protected by net_rwsem */
 #define for_each_net(VAR)				\
 	list_for_each_entry(VAR, &net_namespace_list, list)
-
+#define for_each_net_continue_reverse(VAR)		\
+	list_for_each_entry_continue_reverse(VAR, &net_namespace_list, list)
 #define for_each_net_rcu(VAR)				\
 	list_for_each_entry_rcu(VAR, &net_namespace_list, list)
 

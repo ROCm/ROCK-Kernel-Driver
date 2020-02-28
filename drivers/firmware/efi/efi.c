@@ -30,6 +30,7 @@
 #include <linux/acpi.h>
 #include <linux/ucs2_string.h>
 #include <linux/memblock.h>
+#include <linux/security.h>
 
 #include <asm/early_ioremap.h>
 
@@ -56,25 +57,6 @@ struct efi __read_mostly efi = {
 	.mem_reserve		= EFI_INVALID_TABLE_ADDR,
 };
 EXPORT_SYMBOL(efi);
-
-static unsigned long *efi_tables[] = {
-	&efi.mps,
-	&efi.acpi,
-	&efi.acpi20,
-	&efi.smbios,
-	&efi.smbios3,
-	&efi.sal_systab,
-	&efi.boot_info,
-	&efi.hcdp,
-	&efi.uga,
-	&efi.uv_systab,
-	&efi.fw_vendor,
-	&efi.runtime,
-	&efi.config_table,
-	&efi.esrt,
-	&efi.properties_table,
-	&efi.mem_attr_table,
-};
 
 struct mm_struct efi_mm = {
 	.mm_rb			= RB_ROOT,
@@ -242,6 +224,11 @@ static void generic_ops_unregister(void)
 static char efivar_ssdt[EFIVAR_SSDT_NAME_MAX] __initdata;
 static int __init efivar_ssdt_setup(char *str)
 {
+	int ret = security_locked_down(LOCKDOWN_ACPI_TABLES);
+
+	if (ret)
+		return ret;
+
 	if (strlen(str) < sizeof(efivar_ssdt))
 		memcpy(efivar_ssdt, str, strlen(str));
 	else
@@ -381,6 +368,10 @@ static int __init efisubsys_init(void)
 	if (error)
 		goto err_remove_group;
 
+	error = efi_skey_sysfs_init(efi_kobj);
+	if (error)
+		goto err_remove_group;
+
 	/* and the standard mountpoint for efivarfs */
 	error = sysfs_create_mount_point(efi_kobj, "efivars");
 	if (error) {
@@ -490,6 +481,9 @@ static __initdata efi_config_table_type_t common_tables[] = {
 	{LINUX_EFI_TPM_EVENT_LOG_GUID, "TPMEventLog", &efi.tpm_log},
 	{LINUX_EFI_TPM_FINAL_LOG_GUID, "TPMFinalLog", &efi.tpm_final_log},
 	{LINUX_EFI_MEMRESERVE_TABLE_GUID, "MEMRESERVE", &efi.mem_reserve},
+#ifdef CONFIG_EFI_RCI2_TABLE
+	{DELLEMC_EFI_RCI2_TABLE_GUID, NULL, &rci2_table_phys},
+#endif
 	{NULL_GUID, NULL, NULL},
 };
 
@@ -967,19 +961,37 @@ int efi_status_to_err(efi_status_t status)
 	return err;
 }
 
-bool efi_is_table_address(unsigned long phys_addr)
+#define EFI_STATUS_STR(_status) \
+	EFI_##_status : return "EFI_" __stringify(_status)
+
+const char *efi_status_to_str(efi_status_t status)
 {
-	unsigned int i;
+	switch (status) {
+	case EFI_STATUS_STR(SUCCESS);
+	case EFI_STATUS_STR(LOAD_ERROR);
+	case EFI_STATUS_STR(INVALID_PARAMETER);
+	case EFI_STATUS_STR(UNSUPPORTED);
+	case EFI_STATUS_STR(BAD_BUFFER_SIZE);
+	case EFI_STATUS_STR(BUFFER_TOO_SMALL);
+	case EFI_STATUS_STR(NOT_READY);
+	case EFI_STATUS_STR(DEVICE_ERROR);
+	case EFI_STATUS_STR(WRITE_PROTECTED);
+	case EFI_STATUS_STR(OUT_OF_RESOURCES);
+	case EFI_STATUS_STR(NOT_FOUND);
+	case EFI_STATUS_STR(ABORTED);
+	case EFI_STATUS_STR(SECURITY_VIOLATION);
+	}
+	/*
+	 * There are two possibilities for this message to be exposed:
+	 * - Caller feeds a unknown status code from firmware.
+	 * - A new status code be defined in efi.h but we forgot to update
+	 *   this function.
+	 */
+	pr_warn("Unknown efi status: 0x%lx\n", status);
 
-	if (phys_addr == EFI_INVALID_TABLE_ADDR)
-		return false;
-
-	for (i = 0; i < ARRAY_SIZE(efi_tables); i++)
-		if (*(efi_tables[i]) == phys_addr)
-			return true;
-
-	return false;
+	return "Unknown efi status";
 }
+EXPORT_SYMBOL(efi_status_to_str);
 
 static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
 static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
@@ -995,6 +1007,24 @@ static int __init efi_memreserve_map_root(void)
 	if (WARN_ON_ONCE(!efi_memreserve_root))
 		return -ENOMEM;
 	return 0;
+}
+
+static int efi_mem_reserve_iomem(phys_addr_t addr, u64 size)
+{
+	struct resource *res, *parent;
+
+	res = kzalloc(sizeof(struct resource), GFP_ATOMIC);
+	if (!res)
+		return -ENOMEM;
+
+	res->name	= "reserved";
+	res->flags	= IORESOURCE_MEM;
+	res->start	= addr;
+	res->end	= addr + size - 1;
+
+	/* we expect a conflict with a 'System RAM' region */
+	parent = request_resource_conflict(&iomem_resource, res);
+	return parent ? request_resource(parent, res) : 0;
 }
 
 int __ref efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
@@ -1021,7 +1051,7 @@ int __ref efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
 			rsv->entry[index].size = size;
 
 			memunmap(rsv);
-			return 0;
+			return efi_mem_reserve_iomem(addr, size);
 		}
 		memunmap(rsv);
 	}
@@ -1030,6 +1060,12 @@ int __ref efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
 	rsv = (struct linux_efi_memreserve *)__get_free_page(GFP_ATOMIC);
 	if (!rsv)
 		return -ENOMEM;
+
+	rc = efi_mem_reserve_iomem(__pa(rsv), SZ_4K);
+	if (rc) {
+		free_page((unsigned long)rsv);
+		return rc;
+	}
 
 	/*
 	 * The memremap() call above assumes that a linux_efi_memreserve entry
@@ -1047,7 +1083,7 @@ int __ref efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
 	efi_memreserve_root->next = __pa(rsv);
 	spin_unlock(&efi_mem_reserve_persistent_lock);
 
-	return 0;
+	return efi_mem_reserve_iomem(addr, size);
 }
 
 static int __init efi_memreserve_root_init(void)

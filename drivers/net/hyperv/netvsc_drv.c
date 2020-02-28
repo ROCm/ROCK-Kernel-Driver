@@ -285,9 +285,9 @@ static inline u32 netvsc_get_hash(
 		else if (flow.basic.n_proto == htons(ETH_P_IPV6))
 			hash = jhash2((u32 *)&flow.addrs.v6addrs, 8, hashrnd);
 		else
-			hash = 0;
+			return 0;
 
-		skb_set_hash(skb, hash, PKT_HASH_TYPE_L3);
+		__skb_set_sw_hash(skb, hash, false);
 	}
 
 	return hash;
@@ -435,7 +435,7 @@ static u32 init_page_array(void *hdr, u32 len, struct sk_buff *skb,
 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
 
 		slots_used += fill_pg_buf(skb_frag_page(frag),
-					frag->page_offset,
+					skb_frag_off(frag),
 					skb_frag_size(frag), &pb[slots_used]);
 	}
 	return slots_used;
@@ -449,7 +449,7 @@ static int count_skb_frag_slots(struct sk_buff *skb)
 	for (i = 0; i < frags; i++) {
 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
 		unsigned long size = skb_frag_size(frag);
-		unsigned long offset = frag->page_offset;
+		unsigned long offset = skb_frag_off(frag);
 
 		/* Skip unused frames from start of page */
 		offset &= ~PAGE_MASK;
@@ -795,8 +795,7 @@ static struct sk_buff *netvsc_alloc_recv_skb(struct net_device *net,
 	    skb->protocol == htons(ETH_P_IP))
 		netvsc_comp_ipcsum(skb);
 
-	/* Do L4 checksum offload if enabled and present.
-	 */
+	/* Do L4 checksum offload if enabled and present. */
 	if (csum_info && (net->features & NETIF_F_RXCSUM)) {
 		if (csum_info->receive.tcp_checksum_succeeded ||
 		    csum_info->receive.udp_checksum_succeeded)
@@ -1659,7 +1658,7 @@ static int netvsc_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 	rndis_dev = ndev->extension;
 	if (indir) {
 		for (i = 0; i < ITAB_NUM; i++)
-			indir[i] = rndis_dev->rx_table[i];
+			indir[i] = ndc->rx_table[i];
 	}
 
 	if (key)
@@ -1689,7 +1688,7 @@ static int netvsc_set_rxfh(struct net_device *dev, const u32 *indir,
 				return -EINVAL;
 
 		for (i = 0; i < ITAB_NUM; i++)
-			rndis_dev->rx_table[i] = indir[i];
+			ndc->rx_table[i] = indir[i];
 	}
 
 	if (!key) {
@@ -1792,13 +1791,15 @@ static int netvsc_set_features(struct net_device *ndev,
 	netdev_features_t change = features ^ ndev->features;
 	struct net_device_context *ndevctx = netdev_priv(ndev);
 	struct netvsc_device *nvdev = rtnl_dereference(ndevctx->nvdev);
+	struct net_device *vf_netdev = rtnl_dereference(ndevctx->vf_netdev);
 	struct ndis_offload_params offloads;
+	int ret = 0;
 
 	if (!nvdev || nvdev->destroy)
 		return -ENODEV;
 
 	if (!(change & NETIF_F_LRO))
-		return 0;
+		goto syncvf;
 
 	memset(&offloads, 0, sizeof(struct ndis_offload_params));
 
@@ -1810,7 +1811,21 @@ static int netvsc_set_features(struct net_device *ndev,
 		offloads.rsc_ip_v6 = NDIS_OFFLOAD_PARAMETERS_RSC_DISABLED;
 	}
 
-	return rndis_filter_set_offload_params(ndev, nvdev, &offloads);
+	ret = rndis_filter_set_offload_params(ndev, nvdev, &offloads);
+
+	if (ret) {
+		features ^= NETIF_F_LRO;
+		ndev->features = features;
+	}
+
+syncvf:
+	if (!vf_netdev)
+		return ret;
+
+	vf_netdev->wanted_features = features;
+	netdev_update_features(vf_netdev);
+
+	return ret;
 }
 
 static u32 netvsc_get_msglevel(struct net_device *ndev)
@@ -2188,6 +2203,10 @@ static int netvsc_register_vf(struct net_device *vf_netdev)
 
 	dev_hold(vf_netdev);
 	rcu_assign_pointer(net_device_ctx->vf_netdev, vf_netdev);
+
+	vf_netdev->wanted_features = ndev->features;
+	netdev_update_features(vf_netdev);
+
 	return NOTIFY_OK;
 }
 
@@ -2320,11 +2339,9 @@ static int netvsc_probe(struct hv_device *dev,
 
 	/* hw_features computed in rndis_netdev_set_hwcaps() */
 	net->features = net->hw_features |
-		NETIF_F_HIGHDMA | NETIF_F_SG |
-		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
+		NETIF_F_HIGHDMA | NETIF_F_HW_VLAN_CTAG_TX |
+		NETIF_F_HW_VLAN_CTAG_RX;
 	net->vlan_features = net->features;
-
-	netdev_lockdep_set_classes(net);
 
 	/* MTU range: 68 - 1500 or 65521 */
 	net->min_mtu = NETVSC_MTU_MIN;

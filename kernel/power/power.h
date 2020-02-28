@@ -5,6 +5,10 @@
 #include <linux/freezer.h>
 #include <linux/compiler.h>
 
+/* HMAC algorithm for hibernate snapshot signature */
+#define SNAPSHOT_HMAC	"hmac(sha512)"
+#define SNAPSHOT_DIGEST_SIZE 64
+
 struct swsusp_info {
 	struct new_utsname	uts;
 	u32			version_code;
@@ -13,6 +17,8 @@ struct swsusp_info {
 	unsigned long		image_pages;
 	unsigned long		pages;
 	unsigned long		size;
+	unsigned long           trampoline_pfn;
+	u8                      signature[SNAPSHOT_DIGEST_SIZE];
 } __aligned(PAGE_SIZE);
 
 #ifdef CONFIG_HIBERNATION
@@ -153,6 +159,23 @@ extern int snapshot_read_next(struct snapshot_handle *handle);
 extern int snapshot_write_next(struct snapshot_handle *handle);
 extern void snapshot_write_finalize(struct snapshot_handle *handle);
 extern int snapshot_image_loaded(struct snapshot_handle *handle);
+extern int snapshot_create_trampoline(void);
+extern void snapshot_init_trampoline(void);
+extern void snapshot_restore_trampoline(void);
+extern void snapshot_free_trampoline(void);
+#ifdef CONFIG_HIBERNATE_VERIFICATION
+extern int snapshot_image_verify(void);
+extern int swsusp_prepare_hash(bool may_sleep);
+extern void swsusp_finish_hash(void);
+extern void snapshot_set_enforce_verify(void);
+extern int snapshot_is_enforce_verify(void);
+#else
+static inline int snapshot_image_verify(void) { return 0; }
+static inline int swsusp_prepare_hash(bool may_sleep) { return 0; }
+static inline void swsusp_finish_hash(void) {}
+static inline void snapshot_set_enforce_verify(void) {}
+static inline int snapshot_is_enforce_verify(void) {return 0;}
+#endif
 
 /* If unset, the snapshot device cannot be open. */
 extern atomic_t snapshot_device_available;

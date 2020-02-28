@@ -121,54 +121,55 @@ const struct nf_conntrack_l4proto *nf_ct_l4proto_find(u8 l4proto)
 };
 EXPORT_SYMBOL_GPL(nf_ct_l4proto_find);
 
-unsigned int nf_confirm(struct sk_buff *skb, unsigned int protoff,
-			struct nf_conn *ct, enum ip_conntrack_info ctinfo)
+static unsigned int ipv4_helper(void *priv,
+				struct sk_buff *skb,
+				const struct nf_hook_state *state)
 {
+	struct nf_conn *ct;
+	enum ip_conntrack_info ctinfo;
 	const struct nf_conn_help *help;
+	const struct nf_conntrack_helper *helper;
+
+	/* This is where we call the helper: as the packet goes out. */
+	ct = nf_ct_get(skb, &ctinfo);
+	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
+		return NF_ACCEPT;
 
 	help = nfct_help(ct);
-	if (help) {
-		const struct nf_conntrack_helper *helper;
-		int ret;
+	if (!help)
+		return NF_ACCEPT;
 
-		/* rcu_read_lock()ed by nf_hook_thresh */
-		helper = rcu_dereference(help->helper);
-		if (helper) {
-			ret = helper->help(skb,
-					   protoff,
-					   ct, ctinfo);
-			if (ret != NF_ACCEPT)
-				return ret;
-		}
-	}
+	/* rcu_read_lock()ed by nf_hook_thresh */
+	helper = rcu_dereference(help->helper);
+	if (!helper)
+		return NF_ACCEPT;
 
-	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
-	    !nf_is_loopback_packet(skb)) {
-		if (!nf_ct_seq_adjust(skb, ct, ctinfo, protoff)) {
-			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
-			return NF_DROP;
-		}
-	}
-
-	/* We've seen it coming out the other side: confirm it */
-	return nf_conntrack_confirm(skb);
+	return helper->help(skb, skb_network_offset(skb) + ip_hdrlen(skb),
+			    ct, ctinfo);
 }
-EXPORT_SYMBOL_GPL(nf_confirm);
 
 static unsigned int ipv4_confirm(void *priv,
 				 struct sk_buff *skb,
 				 const struct nf_hook_state *state)
 {
-	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;
+	enum ip_conntrack_info ctinfo;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		return nf_conntrack_confirm(skb);
+		goto out;
 
-	return nf_confirm(skb,
-			  skb_network_offset(skb) + ip_hdrlen(skb),
-			  ct, ctinfo);
+	/* adjust seqs for loopback traffic only in outgoing direction */
+	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
+	    !nf_is_loopback_packet(skb)) {
+		if (!nf_ct_seq_adjust(skb, ct, ctinfo, ip_hdrlen(skb))) {
+			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
+			return NF_DROP;
+		}
+	}
+out:
+	/* We've seen it coming out the other side: confirm it */
+	return nf_conntrack_confirm(skb);
 }
 
 static unsigned int ipv4_conntrack_in(void *priv,
@@ -217,10 +218,22 @@ static const struct nf_hook_ops ipv4_conntrack_ops[] = {
 		.priority	= NF_IP_PRI_CONNTRACK,
 	},
 	{
+		.hook		= ipv4_helper,
+		.pf		= NFPROTO_IPV4,
+		.hooknum	= NF_INET_POST_ROUTING,
+		.priority	= NF_IP_PRI_CONNTRACK_HELPER,
+	},
+	{
 		.hook		= ipv4_confirm,
 		.pf		= NFPROTO_IPV4,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP_PRI_CONNTRACK_CONFIRM,
+	},
+	{
+		.hook		= ipv4_helper,
+		.pf		= NFPROTO_IPV4,
+		.hooknum	= NF_INET_LOCAL_IN,
+		.priority	= NF_IP_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv4_confirm,
@@ -367,21 +380,31 @@ static unsigned int ipv6_confirm(void *priv,
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
 	unsigned char pnum = ipv6_hdr(skb)->nexthdr;
-	__be16 frag_off;
 	int protoff;
+	__be16 frag_off;
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		return nf_conntrack_confirm(skb);
+		goto out;
 
 	protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &pnum,
 				   &frag_off);
 	if (protoff < 0 || (frag_off & htons(~0x7)) != 0) {
 		pr_debug("proto header not found\n");
-		return nf_conntrack_confirm(skb);
+		goto out;
 	}
 
-	return nf_confirm(skb, protoff, ct, ctinfo);
+	/* adjust seqs for loopback traffic only in outgoing direction */
+	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
+	    !nf_is_loopback_packet(skb)) {
+		if (!nf_ct_seq_adjust(skb, ct, ctinfo, protoff)) {
+			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
+			return NF_DROP;
+		}
+	}
+out:
+	/* We've seen it coming out the other side: confirm it */
+	return nf_conntrack_confirm(skb);
 }
 
 static unsigned int ipv6_conntrack_in(void *priv,
@@ -398,6 +421,42 @@ static unsigned int ipv6_conntrack_local(void *priv,
 	return nf_conntrack_in(skb, state);
 }
 
+static unsigned int ipv6_helper(void *priv,
+				struct sk_buff *skb,
+				const struct nf_hook_state *state)
+{
+	struct nf_conn *ct;
+	const struct nf_conn_help *help;
+	const struct nf_conntrack_helper *helper;
+	enum ip_conntrack_info ctinfo;
+	__be16 frag_off;
+	int protoff;
+	u8 nexthdr;
+
+	/* This is where we call the helper: as the packet goes out. */
+	ct = nf_ct_get(skb, &ctinfo);
+	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
+		return NF_ACCEPT;
+
+	help = nfct_help(ct);
+	if (!help)
+		return NF_ACCEPT;
+	/* rcu_read_lock()ed by nf_hook_thresh */
+	helper = rcu_dereference(help->helper);
+	if (!helper)
+		return NF_ACCEPT;
+
+	nexthdr = ipv6_hdr(skb)->nexthdr;
+	protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &nexthdr,
+				   &frag_off);
+	if (protoff < 0 || (frag_off & htons(~0x7)) != 0) {
+		pr_debug("proto header not found\n");
+		return NF_ACCEPT;
+	}
+
+	return helper->help(skb, protoff, ct, ctinfo);
+}
+
 static const struct nf_hook_ops ipv6_conntrack_ops[] = {
 	{
 		.hook		= ipv6_conntrack_in,
@@ -412,10 +471,22 @@ static const struct nf_hook_ops ipv6_conntrack_ops[] = {
 		.priority	= NF_IP6_PRI_CONNTRACK,
 	},
 	{
+		.hook		= ipv6_helper,
+		.pf		= NFPROTO_IPV6,
+		.hooknum	= NF_INET_POST_ROUTING,
+		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
+	},
+	{
 		.hook		= ipv6_confirm,
 		.pf		= NFPROTO_IPV6,
 		.hooknum	= NF_INET_POST_ROUTING,
 		.priority	= NF_IP6_PRI_LAST,
+	},
+	{
+		.hook		= ipv6_helper,
+		.pf		= NFPROTO_IPV6,
+		.hooknum	= NF_INET_LOCAL_IN,
+		.priority	= NF_IP6_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= ipv6_confirm,

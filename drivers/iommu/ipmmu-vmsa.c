@@ -145,14 +145,13 @@ static struct ipmmu_vmsa_device *to_ipmmu(struct device *dev)
 #define IMTTBCR_IRGN0_WT		(2 << 8)
 #define IMTTBCR_IRGN0_WB		(3 << 8)
 #define IMTTBCR_IRGN0_MASK		(3 << 8)
+#define IMTTBCR_SL0_TWOBIT_LVL_3	(0 << 6)	/* R-Car Gen3 only */
+#define IMTTBCR_SL0_TWOBIT_LVL_2	(1 << 6)	/* R-Car Gen3 only */
+#define IMTTBCR_SL0_TWOBIT_LVL_1	(2 << 6)	/* R-Car Gen3 only */
 #define IMTTBCR_SL0_LVL_2		(0 << 4)
 #define IMTTBCR_SL0_LVL_1		(1 << 4)
 #define IMTTBCR_TSZ0_MASK		(7 << 0)
 #define IMTTBCR_TSZ0_SHIFT		O
-
-#define IMTTBCR_SL0_TWOBIT_LVL_3	(0 << 6)
-#define IMTTBCR_SL0_TWOBIT_LVL_2	(1 << 6)
-#define IMTTBCR_SL0_TWOBIT_LVL_1	(2 << 6)
 
 #define IMBUSCR				0x000c
 #define IMBUSCR_DVM			(1 << 2)
@@ -1076,8 +1075,6 @@ static int ipmmu_probe(struct platform_device *pdev)
 
 	mmu->num_ctx = min(IPMMU_CTX_MAX, mmu->features->number_of_contexts);
 
-	irq = platform_get_irq(pdev, 0);
-
 	/*
 	 * Determine if this IPMMU instance is a root device by checking for
 	 * the lack of has_cache_leaf_nodes flag or renesas,ipmmu-main property.
@@ -1096,6 +1093,7 @@ static int ipmmu_probe(struct platform_device *pdev)
 
 	/* Root devices have mandatory IRQs */
 	if (ipmmu_is_root(mmu)) {
+		irq = platform_get_irq(pdev, 0);
 		if (irq < 0) {
 			dev_err(&pdev->dev, "no IRQ found\n");
 			return irq;

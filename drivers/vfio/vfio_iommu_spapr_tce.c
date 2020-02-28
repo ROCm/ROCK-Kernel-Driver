@@ -176,13 +176,13 @@ put_exit:
 }
 
 static bool tce_page_is_contained(struct mm_struct *mm, unsigned long hpa,
-		unsigned int page_shift)
+		unsigned int it_page_shift)
 {
 	struct page *page;
 	unsigned long size = 0;
 
-	if (mm_iommu_is_devmem(mm, hpa, page_shift, &size))
-		return size == (1UL << page_shift);
+	if (mm_iommu_is_devmem(mm, hpa, it_page_shift, &size))
+		return size == (1UL << it_page_shift);
 
 	page = pfn_to_page(hpa >> PAGE_SHIFT);
 	/*
@@ -190,7 +190,7 @@ static bool tce_page_is_contained(struct mm_struct *mm, unsigned long hpa,
 	 * a page we just found. Otherwise the hardware can get access to
 	 * a bigger memory chunk that it should.
 	 */
-	return (PAGE_SHIFT + compound_order(compound_head(page))) >= page_shift;
+	return page_shift(compound_head(page)) >= it_page_shift;
 }
 
 static inline bool tce_groups_attached(struct tce_container *container)
@@ -1234,7 +1234,7 @@ release_exit:
 static int tce_iommu_attach_group(void *iommu_data,
 		struct iommu_group *iommu_group)
 {
-	int ret;
+	int ret = 0;
 	struct tce_container *container = iommu_data;
 	struct iommu_table_group *table_group;
 	struct tce_iommu_group *tcegrp = NULL;
@@ -1287,13 +1287,13 @@ static int tce_iommu_attach_group(void *iommu_data,
 			!table_group->ops->release_ownership) {
 		if (container->v2) {
 			ret = -EPERM;
-			goto unlock_exit;
+			goto free_exit;
 		}
 		ret = tce_iommu_take_ownership(container, table_group);
 	} else {
 		if (!container->v2) {
 			ret = -EPERM;
-			goto unlock_exit;
+			goto free_exit;
 		}
 		ret = tce_iommu_take_ownership_ddw(container, table_group);
 		if (!tce_groups_attached(container) && !container->tables[0])
@@ -1305,10 +1305,11 @@ static int tce_iommu_attach_group(void *iommu_data,
 		list_add(&tcegrp->next, &container->group_list);
 	}
 
-unlock_exit:
+free_exit:
 	if (ret && tcegrp)
 		kfree(tcegrp);
 
+unlock_exit:
 	mutex_unlock(&container->lock);
 
 	return ret;

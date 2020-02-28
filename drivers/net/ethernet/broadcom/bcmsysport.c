@@ -708,8 +708,7 @@ static int bcm_sysport_alloc_rx_bufs(struct bcm_sysport_priv *priv)
 	for (i = 0; i < priv->num_rx_bds; i++) {
 		cb = &priv->rx_cbs[i];
 		skb = bcm_sysport_rx_refill(priv, cb);
-		if (skb)
-			dev_kfree_skb(skb);
+		dev_kfree_skb(skb);
 		if (!cb->skb)
 			return -ENOMEM;
 	}
@@ -2484,7 +2483,7 @@ static int bcm_sysport_probe(struct platform_device *pdev)
 
 	priv->phy_interface = of_get_phy_mode(dn);
 	/* Default to GMII interface mode */
-	if (priv->phy_interface < 0)
+	if ((int)priv->phy_interface < 0)
 		priv->phy_interface = PHY_INTERFACE_MODE_GMII;
 
 	/* In the case of a fixed PHY, the DT node associated

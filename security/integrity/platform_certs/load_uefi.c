@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -39,7 +40,7 @@ static __init bool uefi_check_ignore_db(void)
  * Get a certificate list blob from the named EFI variable.
  */
 static __init void *get_cert_list(efi_char16_t *name, efi_guid_t *guid,
-				  unsigned long *size)
+				  unsigned long *size, const char *source)
 {
 	efi_status_t status;
 	unsigned long lsize = 4;
@@ -48,23 +49,30 @@ static __init void *get_cert_list(efi_char16_t *name, efi_guid_t *guid,
 
 	status = efi.get_variable(name, guid, NULL, &lsize, &tmpdb);
 	if (status != EFI_BUFFER_TOO_SMALL) {
-		pr_err("Couldn't get size: 0x%lx\n", status);
-		return NULL;
+		if (status == EFI_NOT_FOUND) {
+			pr_debug("%s list was not found\n", source);
+			return NULL;
+		}
+		goto err;
 	}
 
 	db = kmalloc(lsize, GFP_KERNEL);
-	if (!db)
-		return NULL;
+	if (!db) {
+		status = EFI_OUT_OF_RESOURCES;
+		goto err;
+	}
 
 	status = efi.get_variable(name, guid, NULL, &lsize, db);
 	if (status != EFI_SUCCESS) {
 		kfree(db);
-		pr_err("Error reading db var: 0x%lx\n", status);
-		return NULL;
+		goto err;
 	}
 
 	*size = lsize;
 	return db;
+err:
+	pr_err("Couldn't get %s list: %s\n", source, efi_status_to_str(status));
+	return NULL;
 }
 
 /*
@@ -142,8 +150,8 @@ static int __init load_uefi_certs(void)
 {
 	efi_guid_t secure_var = EFI_IMAGE_SECURITY_DATABASE_GUID;
 	efi_guid_t mok_var = EFI_SHIM_LOCK_GUID;
-	void *db = NULL, *dbx = NULL, *mok = NULL;
-	unsigned long dbsize = 0, dbxsize = 0, moksize = 0;
+	void *db = NULL, *dbx = NULL, *mok = NULL, *mokx = NULL;
+	unsigned long dbsize = 0, dbxsize = 0, moksize = 0, mokxsize = 0;
 	int rc = 0;
 
 	if (!efi.get_variable)
@@ -153,10 +161,8 @@ static int __init load_uefi_certs(void)
 	 * an error if we can't get them.
 	 */
 	if (!uefi_check_ignore_db()) {
-		db = get_cert_list(L"db", &secure_var, &dbsize);
-		if (!db) {
-			pr_err("MODSIGN: Couldn't get UEFI db list\n");
-		} else {
+		db = get_cert_list(L"db", &secure_var, &dbsize, "UEFI:db");
+		if (db) {
 			rc = parse_efi_signature_list("UEFI:db",
 					db, dbsize, get_handler_for_db);
 			if (rc)
@@ -166,10 +172,22 @@ static int __init load_uefi_certs(void)
 		}
 	}
 
-	mok = get_cert_list(L"MokListRT", &mok_var, &moksize);
-	if (!mok) {
-		pr_info("Couldn't get UEFI MokListRT\n");
-	} else {
+	dbx = get_cert_list(L"dbx", &secure_var, &dbxsize, "UEFI:dbx");
+	if (dbx) {
+		rc = parse_efi_signature_list("UEFI:dbx",
+					      dbx, dbxsize,
+					      get_handler_for_dbx);
+		if (rc)
+			pr_err("Couldn't parse dbx signatures: %d\n", rc);
+		kfree(dbx);
+	}
+
+	/* the MOK and MOKx can not be trusted when secure boot is disabled */
+	if (!efi_enabled(EFI_SECURE_BOOT))
+		return 0;
+
+	mok = get_cert_list(L"MokListRT", &mok_var, &moksize, "UEFI:MokListRT");
+	if (mok) {
 		rc = parse_efi_signature_list("UEFI:MokListRT",
 					      mok, moksize, get_handler_for_db);
 		if (rc)
@@ -177,16 +195,14 @@ static int __init load_uefi_certs(void)
 		kfree(mok);
 	}
 
-	dbx = get_cert_list(L"dbx", &secure_var, &dbxsize);
-	if (!dbx) {
-		pr_info("Couldn't get UEFI dbx list\n");
-	} else {
-		rc = parse_efi_signature_list("UEFI:dbx",
-					      dbx, dbxsize,
+	mokx = get_cert_list(L"MokListXRT", &mok_var, &mokxsize, "MokListXRT");
+	if (mokx) {
+		rc = parse_efi_signature_list("UEFI:mokx",
+					      mokx, mokxsize,
 					      get_handler_for_dbx);
 		if (rc)
-			pr_err("Couldn't parse dbx signatures: %d\n", rc);
-		kfree(dbx);
+			pr_err("Couldn't parse MokListXRT signatures: %d\n", rc);
+		kfree(mokx);
 	}
 
 	return rc;

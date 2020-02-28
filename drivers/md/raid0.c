@@ -63,7 +63,7 @@ static void dump_zones(struct mddev *mddev)
 		int len = 0;
 
 		for (k = 0; k < conf->strip_zone[j].nb_dev; k++)
-			len += snprintf(line+len, 200-len, "%s%s", k?"/":"",
+			len += scnprintf(line+len, 200-len, "%s%s", k?"/":"",
 					bdevname(conf->devlist[j*raid_disks
 							       + k]->bdev, b));
 		pr_debug("md: zone%d=[%s]\n", j, line);
@@ -615,7 +615,6 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 		bio_io_error(bio);
 		return true;
 	}
-
 	bio_set_dev(bio, tmp_dev->bdev);
 	bio->bi_iter.bi_sector = sector + zone->dev_start +
 		tmp_dev->data_offset;

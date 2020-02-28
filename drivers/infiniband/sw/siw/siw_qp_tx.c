@@ -76,16 +76,15 @@ static int siw_try_1seg(struct siw_iwarp_tx *c_tx, void *paddr)
 			if (unlikely(!p))
 				return -EFAULT;
 
-			buffer = kmap_atomic(p);
+			buffer = kmap(p);
 
 			if (likely(PAGE_SIZE - off >= bytes)) {
 				memcpy(paddr, buffer + off, bytes);
-				kunmap_atomic(buffer);
 			} else {
 				unsigned long part = bytes - (PAGE_SIZE - off);
 
 				memcpy(paddr, buffer + off, part);
-				kunmap_atomic(buffer);
+				kunmap(p);
 
 				if (!mem->is_pbl)
 					p = siw_get_upage(mem->umem,
@@ -97,11 +96,10 @@ static int siw_try_1seg(struct siw_iwarp_tx *c_tx, void *paddr)
 				if (unlikely(!p))
 					return -EFAULT;
 
-				buffer = kmap_atomic(p);
-				memcpy(paddr + part, buffer,
-				       bytes - part);
-				kunmap_atomic(buffer);
+				buffer = kmap(p);
+				memcpy(paddr + part, buffer, bytes - part);
 			}
+			kunmap(p);
 		}
 	}
 	return (int)bytes;
@@ -518,11 +516,12 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 							c_tx->mpa_crc_hd,
 							iov[seg].iov_base,
 							plen);
-				} else if (do_crc)
-					crypto_shash_update(
-						c_tx->mpa_crc_hd,
-						page_address(p) + fp_off,
-						plen);
+				} else if (do_crc) {
+					crypto_shash_update(c_tx->mpa_crc_hd,
+							    kmap(p) + fp_off,
+							    plen);
+					kunmap(p);
+				}
 			} else {
 				u64 va = sge->laddr + sge_off;
 
@@ -818,7 +817,7 @@ static int siw_qp_sq_proc_tx(struct siw_qp *qp, struct siw_wqe *wqe)
 			}
 		} else {
 			wqe->bytes = wqe->sqe.sge[0].length;
-			if (!qp->kernel_verbs) {
+			if (!rdma_is_kernel_res(&qp->base_qp.res)) {
 				if (wqe->bytes > SIW_MAX_INLINE) {
 					rv = -EINVAL;
 					goto tx_error;

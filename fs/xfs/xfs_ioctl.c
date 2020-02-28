@@ -396,7 +396,7 @@ xfs_attrlist_by_handle(
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
-	kbuf = kmem_zalloc_large(al_hreq.buflen, KM_SLEEP);
+	kbuf = kmem_zalloc_large(al_hreq.buflen, 0);
 	if (!kbuf)
 		goto out_dput;
 
@@ -434,7 +434,7 @@ xfs_attrmulti_attr_get(
 
 	if (*len > XFS_XATTR_SIZE_MAX)
 		return -EINVAL;
-	kbuf = kmem_zalloc_large(*len, KM_SLEEP);
+	kbuf = kmem_zalloc_large(*len, 0);
 	if (!kbuf)
 		return -ENOMEM;
 
@@ -620,6 +620,7 @@ xfs_ioc_space(
 	error = xfs_break_layouts(inode, &iolock, BREAK_UNMAP);
 	if (error)
 		goto out_unlock;
+	inode_dio_wait(inode);
 
 	switch (bf->l_whence) {
 	case 0: /*SEEK_SET*/

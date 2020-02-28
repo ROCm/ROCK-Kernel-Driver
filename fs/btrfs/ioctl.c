@@ -704,11 +704,17 @@ static noinline int create_subvol(struct inode *dir,
 
 	btrfs_i_size_write(BTRFS_I(dir), dir->i_size + namelen * 2);
 	ret = btrfs_update_inode(trans, root, dir);
-	BUG_ON(ret);
+	if (ret) {
+		btrfs_abort_transaction(trans, ret);
+		goto fail;
+	}
 
 	ret = btrfs_add_root_ref(trans, objectid, root->root_key.objectid,
 				 btrfs_ino(BTRFS_I(dir)), index, name, namelen);
-	BUG_ON(ret);
+	if (ret) {
+		btrfs_abort_transaction(trans, ret);
+		goto fail;
+	}
 
 	ret = btrfs_uuid_tree_add(trans, root_item->uuid,
 				  BTRFS_UUID_KEY_SUBVOL, objectid);
@@ -3231,6 +3237,7 @@ static void btrfs_double_extent_lock(struct inode *inode1, u64 loff1,
 static int btrfs_extent_same_range(struct inode *src, u64 loff, u64 len,
 				   struct inode *dst, u64 dst_loff)
 {
+	const u64 bs = BTRFS_I(src)->root->fs_info->sb->s_blocksize;
 	int ret;
 
 	/*
@@ -3238,7 +3245,7 @@ static int btrfs_extent_same_range(struct inode *src, u64 loff, u64 len,
 	 * source range to serialize with relocation.
 	 */
 	btrfs_double_extent_lock(src, loff, dst, dst_loff, len);
-	ret = btrfs_clone(src, dst, loff, len, len, dst_loff, 1);
+	ret = btrfs_clone(src, dst, loff, len, ALIGN(len, bs), dst_loff, 1);
 	btrfs_double_extent_unlock(src, loff, dst, dst_loff, len);
 
 	return ret;
@@ -3320,61 +3327,6 @@ static int clone_finish_inode_update(struct btrfs_trans_handle *trans,
 	ret = btrfs_end_transaction(trans);
 out:
 	return ret;
-}
-
-static void clone_update_extent_map(struct btrfs_inode *inode,
-				    const struct btrfs_trans_handle *trans,
-				    const struct btrfs_path *path,
-				    const u64 hole_offset,
-				    const u64 hole_len)
-{
-	struct extent_map_tree *em_tree = &inode->extent_tree;
-	struct extent_map *em;
-	int ret;
-
-	em = alloc_extent_map();
-	if (!em) {
-		set_bit(BTRFS_INODE_NEEDS_FULL_SYNC, &inode->runtime_flags);
-		return;
-	}
-
-	if (path) {
-		struct btrfs_file_extent_item *fi;
-
-		fi = btrfs_item_ptr(path->nodes[0], path->slots[0],
-				    struct btrfs_file_extent_item);
-		btrfs_extent_item_to_extent_map(inode, path, fi, false, em);
-		em->generation = -1;
-		if (btrfs_file_extent_type(path->nodes[0], fi) ==
-		    BTRFS_FILE_EXTENT_INLINE)
-			set_bit(BTRFS_INODE_NEEDS_FULL_SYNC,
-					&inode->runtime_flags);
-	} else {
-		em->start = hole_offset;
-		em->len = hole_len;
-		em->ram_bytes = em->len;
-		em->orig_start = hole_offset;
-		em->block_start = EXTENT_MAP_HOLE;
-		em->block_len = 0;
-		em->orig_block_len = 0;
-		em->compress_type = BTRFS_COMPRESS_NONE;
-		em->generation = trans->transid;
-	}
-
-	while (1) {
-		write_lock(&em_tree->lock);
-		ret = add_extent_mapping(em_tree, em, 1);
-		write_unlock(&em_tree->lock);
-		if (ret != -EEXIST) {
-			free_extent_map(em);
-			break;
-		}
-		btrfs_drop_extent_cache(inode, em->start,
-					em->start + em->len - 1, 0);
-	}
-
-	if (ret)
-		set_bit(BTRFS_INODE_NEEDS_FULL_SYNC, &inode->runtime_flags);
 }
 
 /*
@@ -3517,6 +3469,7 @@ copy_inline_extent:
 						  path->slots[0]),
 			    size);
 	inode_add_bytes(dst, datal);
+	set_bit(BTRFS_INODE_NEEDS_FULL_SYNC, &BTRFS_I(dst)->runtime_flags);
 
 	return 0;
 }
@@ -3568,6 +3521,14 @@ static int btrfs_clone(struct inode *src, struct inode *inode,
 
 	while (1) {
 		u64 next_key_min_offset = key.offset + 1;
+		struct btrfs_file_extent_item *extent;
+		int type;
+		u32 size;
+		struct btrfs_key new_key;
+		u64 disko = 0, diskl = 0;
+		u64 datao = 0, datal = 0;
+		u8 comp;
+		u64 drop_start;
 
 		/*
 		 * note the key will change type as we walk through the
@@ -3608,75 +3569,115 @@ process_slot:
 		    key.objectid != btrfs_ino(BTRFS_I(src)))
 			break;
 
-		if (key.type == BTRFS_EXTENT_DATA_KEY) {
-			struct btrfs_file_extent_item *extent;
-			int type;
-			u32 size;
-			struct btrfs_key new_key;
-			u64 disko = 0, diskl = 0;
-			u64 datao = 0, datal = 0;
-			u8 comp;
-			u64 drop_start;
+		ASSERT(key.type == BTRFS_EXTENT_DATA_KEY);
 
-			extent = btrfs_item_ptr(leaf, slot,
-						struct btrfs_file_extent_item);
-			comp = btrfs_file_extent_compression(leaf, extent);
-			type = btrfs_file_extent_type(leaf, extent);
-			if (type == BTRFS_FILE_EXTENT_REG ||
-			    type == BTRFS_FILE_EXTENT_PREALLOC) {
-				disko = btrfs_file_extent_disk_bytenr(leaf,
-								      extent);
-				diskl = btrfs_file_extent_disk_num_bytes(leaf,
-								 extent);
-				datao = btrfs_file_extent_offset(leaf, extent);
-				datal = btrfs_file_extent_num_bytes(leaf,
-								    extent);
-			} else if (type == BTRFS_FILE_EXTENT_INLINE) {
-				/* take upper bound, may be compressed */
-				datal = btrfs_file_extent_ram_bytes(leaf,
-								    extent);
+		extent = btrfs_item_ptr(leaf, slot,
+					struct btrfs_file_extent_item);
+		comp = btrfs_file_extent_compression(leaf, extent);
+		type = btrfs_file_extent_type(leaf, extent);
+		if (type == BTRFS_FILE_EXTENT_REG ||
+		    type == BTRFS_FILE_EXTENT_PREALLOC) {
+			disko = btrfs_file_extent_disk_bytenr(leaf, extent);
+			diskl = btrfs_file_extent_disk_num_bytes(leaf, extent);
+			datao = btrfs_file_extent_offset(leaf, extent);
+			datal = btrfs_file_extent_num_bytes(leaf, extent);
+		} else if (type == BTRFS_FILE_EXTENT_INLINE) {
+			/* Take upper bound, may be compressed */
+			datal = btrfs_file_extent_ram_bytes(leaf, extent);
+		}
+
+		/*
+		 * The first search might have left us at an extent item that
+		 * ends before our target range's start, can happen if we have
+		 * holes and NO_HOLES feature enabled.
+		 */
+		if (key.offset + datal <= off) {
+			path->slots[0]++;
+			goto process_slot;
+		} else if (key.offset >= off + len) {
+			break;
+		}
+		next_key_min_offset = key.offset + datal;
+		size = btrfs_item_size_nr(leaf, slot);
+		read_extent_buffer(leaf, buf, btrfs_item_ptr_offset(leaf, slot),
+				   size);
+
+		btrfs_release_path(path);
+		path->leave_spinning = 0;
+
+		memcpy(&new_key, &key, sizeof(new_key));
+		new_key.objectid = btrfs_ino(BTRFS_I(inode));
+		if (off <= key.offset)
+			new_key.offset = key.offset + destoff - off;
+		else
+			new_key.offset = destoff;
+
+		/*
+		 * Deal with a hole that doesn't have an extent item that
+		 * represents it (NO_HOLES feature enabled).
+		 * This hole is either in the middle of the cloning range or at
+		 * the beginning (fully overlaps it or partially overlaps it).
+		 */
+		if (new_key.offset != last_dest_end)
+			drop_start = last_dest_end;
+		else
+			drop_start = new_key.offset;
+
+		if (type == BTRFS_FILE_EXTENT_REG ||
+		    type == BTRFS_FILE_EXTENT_PREALLOC) {
+			struct btrfs_clone_extent_info clone_info;
+
+			/*
+			 *    a  | --- range to clone ---|  b
+			 * | ------------- extent ------------- |
+			 */
+
+			/* Subtract range b */
+			if (key.offset + datal > off + len)
+				datal = off + len - key.offset;
+
+			/* Subtract range a */
+			if (off > key.offset) {
+				datao += off - key.offset;
+				datal -= off - key.offset;
 			}
 
-			/*
-			 * The first search might have left us at an extent
-			 * item that ends before our target range's start, can
-			 * happen if we have holes and NO_HOLES feature enabled.
-			 */
-			if (key.offset + datal <= off) {
-				path->slots[0]++;
-				goto process_slot;
-			} else if (key.offset >= off + len) {
-				break;
+			clone_info.disk_offset = disko;
+			clone_info.disk_len = diskl;
+			clone_info.data_offset = datao;
+			clone_info.data_len = datal;
+			clone_info.file_offset = new_key.offset;
+			clone_info.extent_buf = buf;
+			clone_info.item_size = size;
+			ret = btrfs_punch_hole_range(inode, path,
+						     drop_start,
+						     new_key.offset + datal - 1,
+						     &clone_info, &trans);
+			if (ret)
+				goto out;
+		} else if (type == BTRFS_FILE_EXTENT_INLINE) {
+			u64 skip = 0;
+			u64 trim = 0;
+
+			if (off > key.offset) {
+				skip = off - key.offset;
+				new_key.offset += skip;
 			}
-			next_key_min_offset = key.offset + datal;
-			size = btrfs_item_size_nr(leaf, slot);
-			read_extent_buffer(leaf, buf,
-					   btrfs_item_ptr_offset(leaf, slot),
-					   size);
 
-			btrfs_release_path(path);
-			path->leave_spinning = 0;
+			if (key.offset + datal > off + len)
+				trim = key.offset + datal - (off + len);
 
-			memcpy(&new_key, &key, sizeof(new_key));
-			new_key.objectid = btrfs_ino(BTRFS_I(inode));
-			if (off <= key.offset)
-				new_key.offset = key.offset + destoff - off;
-			else
-				new_key.offset = destoff;
+			if (comp && (skip || trim)) {
+				ret = -EINVAL;
+				goto out;
+			}
+			size -= skip + trim;
+			datal -= skip + trim;
 
 			/*
-			 * Deal with a hole that doesn't have an extent item
-			 * that represents it (NO_HOLES feature enabled).
-			 * This hole is either in the middle of the cloning
-			 * range or at the beginning (fully overlaps it or
-			 * partially overlaps it).
-			 */
-			if (new_key.offset != last_dest_end)
-				drop_start = last_dest_end;
-			else
-				drop_start = new_key.offset;
-
-			/*
+			 * If our extent is inline, we know we will drop or
+			 * adjust at most 1 extent item in the destination root.
+			 *
 			 * 1 - adjusting old extent (we may have to split it)
 			 * 1 - add new extent
 			 * 1 - inode update
@@ -3687,140 +3688,28 @@ process_slot:
 				goto out;
 			}
 
-			if (type == BTRFS_FILE_EXTENT_REG ||
-			    type == BTRFS_FILE_EXTENT_PREALLOC) {
-				/*
-				 *    a  | --- range to clone ---|  b
-				 * | ------------- extent ------------- |
-				 */
-
-				/* subtract range b */
-				if (key.offset + datal > off + len)
-					datal = off + len - key.offset;
-
-				/* subtract range a */
-				if (off > key.offset) {
-					datao += off - key.offset;
-					datal -= off - key.offset;
-				}
-
-				ret = btrfs_drop_extents(trans, root, inode,
-							 drop_start,
-							 new_key.offset + datal,
-							 1);
-				if (ret) {
-					if (ret != -EOPNOTSUPP)
-						btrfs_abort_transaction(trans,
-									ret);
-					btrfs_end_transaction(trans);
-					goto out;
-				}
-
-				ret = btrfs_insert_empty_item(trans, root, path,
-							      &new_key, size);
-				if (ret) {
+			ret = clone_copy_inline_extent(inode, trans, path,
+						       &new_key, drop_start,
+						       datal, skip, size, buf);
+			if (ret) {
+				if (ret != -EOPNOTSUPP)
 					btrfs_abort_transaction(trans, ret);
-					btrfs_end_transaction(trans);
-					goto out;
-				}
-
-				leaf = path->nodes[0];
-				slot = path->slots[0];
-				write_extent_buffer(leaf, buf,
-					    btrfs_item_ptr_offset(leaf, slot),
-					    size);
-
-				extent = btrfs_item_ptr(leaf, slot,
-						struct btrfs_file_extent_item);
-
-				/* disko == 0 means it's a hole */
-				if (!disko)
-					datao = 0;
-
-				btrfs_set_file_extent_offset(leaf, extent,
-							     datao);
-				btrfs_set_file_extent_num_bytes(leaf, extent,
-								datal);
-
-				if (disko) {
-					struct btrfs_ref ref = { 0 };
-					inode_add_bytes(inode, datal);
-					btrfs_init_generic_ref(&ref,
-						BTRFS_ADD_DELAYED_REF, disko,
-						diskl, 0);
-					btrfs_init_data_ref(&ref,
-						root->root_key.objectid,
-						btrfs_ino(BTRFS_I(inode)),
-						new_key.offset - datao);
-					ret = btrfs_inc_extent_ref(trans, &ref);
-					if (ret) {
-						btrfs_abort_transaction(trans,
-									ret);
-						btrfs_end_transaction(trans);
-						goto out;
-
-					}
-				}
-			} else if (type == BTRFS_FILE_EXTENT_INLINE) {
-				u64 skip = 0;
-				u64 trim = 0;
-
-				if (off > key.offset) {
-					skip = off - key.offset;
-					new_key.offset += skip;
-				}
-
-				if (key.offset + datal > off + len)
-					trim = key.offset + datal - (off + len);
-
-				if (comp && (skip || trim)) {
-					ret = -EINVAL;
-					btrfs_end_transaction(trans);
-					goto out;
-				}
-				size -= skip + trim;
-				datal -= skip + trim;
-
-				ret = clone_copy_inline_extent(inode,
-							       trans, path,
-							       &new_key,
-							       drop_start,
-							       datal,
-							       skip, size, buf);
-				if (ret) {
-					if (ret != -EOPNOTSUPP)
-						btrfs_abort_transaction(trans,
-									ret);
-					btrfs_end_transaction(trans);
-					goto out;
-				}
-				leaf = path->nodes[0];
-				slot = path->slots[0];
-			}
-
-			/* If we have an implicit hole (NO_HOLES feature). */
-			if (drop_start < new_key.offset)
-				clone_update_extent_map(BTRFS_I(inode), trans,
-						NULL, drop_start,
-						new_key.offset - drop_start);
-
-			clone_update_extent_map(BTRFS_I(inode), trans,
-					path, 0, 0);
-
-			btrfs_mark_buffer_dirty(leaf);
-			btrfs_release_path(path);
-
-			last_dest_end = ALIGN(new_key.offset + datal,
-					      fs_info->sectorsize);
-			ret = clone_finish_inode_update(trans, inode,
-							last_dest_end,
-							destoff, olen,
-							no_time_update);
-			if (ret)
+				btrfs_end_transaction(trans);
 				goto out;
-			if (new_key.offset + datal >= destoff + len)
-				break;
+			}
 		}
+
+		btrfs_release_path(path);
+
+		last_dest_end = ALIGN(new_key.offset + datal,
+				      fs_info->sectorsize);
+		ret = clone_finish_inode_update(trans, inode, last_dest_end,
+						destoff, olen, no_time_update);
+		if (ret)
+			goto out;
+		if (new_key.offset + datal >= destoff + len)
+			break;
+
 		btrfs_release_path(path);
 		key.offset = next_key_min_offset;
 
@@ -3833,31 +3722,20 @@ process_slot:
 
 	if (last_dest_end < destoff + len) {
 		/*
-		 * We have an implicit hole (NO_HOLES feature is enabled) that
-		 * fully or partially overlaps our cloning range at its end.
+		 * We have an implicit hole that fully or partially overlaps our
+		 * cloning range at its end. This means that we either have the
+		 * NO_HOLES feature enabled or the implicit hole happened due to
+		 * mixing buffered and direct IO writes against this file.
 		 */
 		btrfs_release_path(path);
+		path->leave_spinning = 0;
 
-		/*
-		 * 1 - remove extent(s)
-		 * 1 - inode update
-		 */
-		trans = btrfs_start_transaction(root, 2);
-		if (IS_ERR(trans)) {
-			ret = PTR_ERR(trans);
+		ret = btrfs_punch_hole_range(inode, path,
+					     last_dest_end, destoff + len - 1,
+					     NULL, &trans);
+		if (ret)
 			goto out;
-		}
-		ret = btrfs_drop_extents(trans, root, inode,
-					 last_dest_end, destoff + len, 1);
-		if (ret) {
-			if (ret != -EOPNOTSUPP)
-				btrfs_abort_transaction(trans, ret);
-			btrfs_end_transaction(trans);
-			goto out;
-		}
-		clone_update_extent_map(BTRFS_I(inode), trans, NULL,
-				last_dest_end,
-				destoff + len - last_dest_end);
+
 		ret = clone_finish_inode_update(trans, inode, destoff + len,
 						destoff, olen, no_time_update);
 	}
@@ -4370,7 +4248,19 @@ static long btrfs_ioctl_scrub(struct file *file, void __user *arg)
 			      &sa->progress, sa->flags & BTRFS_SCRUB_READONLY,
 			      0);
 
-	if (ret == 0 && copy_to_user(arg, sa, sizeof(*sa)))
+	/*
+	 * Copy scrub args to user space even if btrfs_scrub_dev() returned an
+	 * error. This is important as it allows user space to know how much
+	 * progress scrub has done. For example, if scrub is canceled we get
+	 * -ECANCELED from btrfs_scrub_dev() and return that error back to user
+	 * space. Later user space can inspect the progress from the structure
+	 * btrfs_ioctl_scrub_args and resume scrub from where it left off
+	 * previously (btrfs-progs does this).
+	 * If we fail to copy the btrfs_ioctl_scrub_args structure to user space
+	 * then return -EFAULT to signal the structure was not copied or it may
+	 * be corrupt and unreliable due to a partial copy.
+	 */
+	if (copy_to_user(arg, sa, sizeof(*sa)))
 		ret = -EFAULT;
 
 	if (!(sa->flags & BTRFS_SCRUB_READONLY))
@@ -5082,7 +4972,7 @@ static long btrfs_ioctl_quota_rescan_status(struct file *file, void __user *arg)
 	if (!qsa)
 		return -ENOMEM;
 
-	if (fs_info->qgroup_flags & BTRFS_QGROUP_STATUS_FLAG_RESCAN) {
+	if (fs_info->qgroup_rescan_ready || fs_info->qgroup_rescan_running) {
 		qsa->flags = 1;
 		qsa->progress = fs_info->qgroup_rescan_progress.objectid;
 	}

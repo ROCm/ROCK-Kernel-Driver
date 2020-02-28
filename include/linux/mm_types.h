@@ -139,6 +139,7 @@ struct page {
 		struct {	/* Second tail page of compound page */
 			unsigned long _compound_pad_1;	/* compound_head */
 			unsigned long _compound_pad_2;
+			/* For both global and memcg */
 			struct list_head deferred_list;
 		};
 		struct {	/* Page table pages */
@@ -353,6 +354,7 @@ struct vm_area_struct {
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
 	struct vm_userfaultfd_ctx vm_userfaultfd_ctx;
+	void *suse_kabi_padding;
 } __randomize_layout;
 
 struct core_thread {
@@ -387,6 +389,16 @@ struct mm_struct {
 		unsigned long task_size;	/* size of task vm space */
 		unsigned long highest_vm_end;	/* highest vma end address */
 		pgd_t * pgd;
+
+#ifdef CONFIG_MEMBARRIER
+		/**
+		 * @membarrier_state: Flags controlling membarrier behavior.
+		 *
+		 * This field is close to @pgd to hopefully fit in the same
+		 * cache-line, which needs to be touched by switch_mm().
+		 */
+		atomic_t membarrier_state;
+#endif
 
 		/**
 		 * @mm_users: The number of users including userspace.
@@ -457,9 +469,7 @@ struct mm_struct {
 		unsigned long flags; /* Must use atomic bitops to access */
 
 		struct core_state *core_state; /* coredumping support */
-#ifdef CONFIG_MEMBARRIER
-		atomic_t membarrier_state;
-#endif
+
 #ifdef CONFIG_AIO
 		spinlock_t			ioctx_lock;
 		struct kioctx_table __rcu	*ioctx_table;

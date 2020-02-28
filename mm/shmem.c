@@ -594,7 +594,7 @@ static int shmem_add_to_page_cache(struct page *page,
 {
 	XA_STATE_ORDER(xas, &mapping->i_pages, index, compound_order(page));
 	unsigned long i = 0;
-	unsigned long nr = 1UL << compound_order(page);
+	unsigned long nr = compound_nr(page);
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
 	VM_BUG_ON_PAGE(index != round_down(index, nr), page);
@@ -1354,7 +1354,8 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	if (list_empty(&info->swaplist))
 		list_add(&info->swaplist, &shmem_swaplist);
 
-	if (add_to_swap_cache(page, swap, GFP_ATOMIC) == 0) {
+	if (add_to_swap_cache(page, swap,
+			__GFP_HIGH | __GFP_NOMEMALLOC | __GFP_NOWARN) == 0) {
 		spin_lock_irq(&info->lock);
 		shmem_recalc_inode(inode);
 		info->swapped++;
@@ -1869,7 +1870,7 @@ alloc_nohuge:
 	lru_cache_add_anon(page);
 
 	spin_lock_irq(&info->lock);
-	info->alloced += 1 << compound_order(page);
+	info->alloced += compound_nr(page);
 	inode->i_blocks += BLOCKS_PER_PAGE << compound_order(page);
 	shmem_recalc_inode(inode);
 	spin_unlock_irq(&info->lock);
@@ -1910,7 +1911,7 @@ clear:
 		struct page *head = compound_head(page);
 		int i;
 
-		for (i = 0; i < (1 << compound_order(head)); i++) {
+		for (i = 0; i < compound_nr(head); i++) {
 			clear_highpage(head + i);
 			flush_dcache_page(head + i);
 		}
@@ -1937,7 +1938,7 @@ clear:
 	 * Error recovery.
 	 */
 unacct:
-	shmem_inode_unacct_blocks(inode, 1 << compound_order(page));
+	shmem_inode_unacct_blocks(inode, compound_nr(page));
 
 	if (PageTransHuge(page)) {
 		unlock_page(page);
@@ -2007,16 +2008,14 @@ static vm_fault_t shmem_fault(struct vm_fault *vmf)
 		    shmem_falloc->waitq &&
 		    vmf->pgoff >= shmem_falloc->start &&
 		    vmf->pgoff < shmem_falloc->next) {
+			struct file *fpin;
 			wait_queue_head_t *shmem_falloc_waitq;
 			DEFINE_WAIT_FUNC(shmem_fault_wait, synchronous_wake_function);
 
 			ret = VM_FAULT_NOPAGE;
-			if ((vmf->flags & FAULT_FLAG_ALLOW_RETRY) &&
-			   !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
-				/* It's polite to up mmap_sem if we can */
-				up_read(&vma->vm_mm->mmap_sem);
+			fpin = maybe_unlock_mmap_for_io(vmf, NULL);
+			if (fpin)
 				ret = VM_FAULT_RETRY;
-			}
 
 			shmem_falloc_waitq = shmem_falloc->waitq;
 			prepare_to_wait(shmem_falloc_waitq, &shmem_fault_wait,
@@ -2034,6 +2033,9 @@ static vm_fault_t shmem_fault(struct vm_fault *vmf)
 			spin_lock(&inode->i_lock);
 			finish_wait(shmem_falloc_waitq, &shmem_fault_wait);
 			spin_unlock(&inode->i_lock);
+
+			if (fpin)
+				fput(fpin);
 			return ret;
 		}
 		spin_unlock(&inode->i_lock);
@@ -2090,9 +2092,10 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 	/*
 	 * Our priority is to support MAP_SHARED mapped hugely;
 	 * and support MAP_PRIVATE mapped hugely too, until it is COWed.
-	 * But if caller specified an address hint, respect that as before.
+	 * But if caller specified an address hint and we allocated area there
+	 * successfully, respect that as before.
 	 */
-	if (uaddr)
+	if (uaddr == addr)
 		return addr;
 
 	if (shmem_huge != SHMEM_HUGE_FORCE) {
@@ -2126,7 +2129,7 @@ unsigned long shmem_get_unmapped_area(struct file *file,
 	if (inflated_len < len)
 		return addr;
 
-	inflated_addr = get_area(NULL, 0, inflated_len, 0, flags);
+	inflated_addr = get_area(NULL, uaddr, inflated_len, 0, flags);
 	if (IS_ERR_VALUE(inflated_addr))
 		return addr;
 	if (inflated_addr & ~PAGE_MASK)

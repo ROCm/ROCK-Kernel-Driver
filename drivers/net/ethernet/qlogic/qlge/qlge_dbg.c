@@ -1630,6 +1630,7 @@ void ql_dump_qdev(struct ql_adapter *qdev)
 	DUMP_QDEV_FIELD(qdev, "0x%08x", xg_sem_mask);
 	DUMP_QDEV_FIELD(qdev, "0x%08x", port_link_up);
 	DUMP_QDEV_FIELD(qdev, "0x%08x", port_init);
+	DUMP_QDEV_FIELD(qdev, "%u", lbq_buf_size);
 }
 #endif
 
@@ -1730,16 +1731,24 @@ void ql_dump_cqicb(struct cqicb *cqicb)
 	       le16_to_cpu(cqicb->sbq_len));
 }
 
+static const char *qlge_rx_ring_type_name(struct rx_ring *rx_ring)
+{
+	struct ql_adapter *qdev = rx_ring->qdev;
+
+	if (rx_ring->cq_id < qdev->rss_ring_count)
+		return "RX COMPLETION";
+	else
+		return "TX COMPLETION";
+};
+
 void ql_dump_rx_ring(struct rx_ring *rx_ring)
 {
 	if (rx_ring == NULL)
 		return;
 	pr_err("===================== Dumping rx_ring %d ===============\n",
 	       rx_ring->cq_id);
-	pr_err("Dumping rx_ring %d, type = %s%s%s\n",
-	       rx_ring->cq_id, rx_ring->type == DEFAULT_Q ? "DEFAULT" : "",
-	       rx_ring->type == TX_Q ? "OUTBOUND COMPLETIONS" : "",
-	       rx_ring->type == RX_Q ? "INBOUND_COMPLETIONS" : "");
+	pr_err("Dumping rx_ring %d, type = %s\n", rx_ring->cq_id,
+	       qlge_rx_ring_type_name(rx_ring));
 	pr_err("rx_ring->cqicb = %p\n", &rx_ring->cqicb);
 	pr_err("rx_ring->cq_base = %p\n", rx_ring->cq_base);
 	pr_err("rx_ring->cq_base_dma = %llx\n",
@@ -1758,41 +1767,33 @@ void ql_dump_rx_ring(struct rx_ring *rx_ring)
 	pr_err("rx_ring->curr_entry = %p\n", rx_ring->curr_entry);
 	pr_err("rx_ring->valid_db_reg = %p\n", rx_ring->valid_db_reg);
 
-	pr_err("rx_ring->lbq_base = %p\n", rx_ring->lbq_base);
-	pr_err("rx_ring->lbq_base_dma = %llx\n",
-	       (unsigned long long) rx_ring->lbq_base_dma);
-	pr_err("rx_ring->lbq_base_indirect = %p\n",
-	       rx_ring->lbq_base_indirect);
-	pr_err("rx_ring->lbq_base_indirect_dma = %llx\n",
-	       (unsigned long long) rx_ring->lbq_base_indirect_dma);
-	pr_err("rx_ring->lbq = %p\n", rx_ring->lbq);
-	pr_err("rx_ring->lbq_len = %d\n", rx_ring->lbq_len);
-	pr_err("rx_ring->lbq_size = %d\n", rx_ring->lbq_size);
-	pr_err("rx_ring->lbq_prod_idx_db_reg = %p\n",
-	       rx_ring->lbq_prod_idx_db_reg);
-	pr_err("rx_ring->lbq_prod_idx = %d\n", rx_ring->lbq_prod_idx);
-	pr_err("rx_ring->lbq_curr_idx = %d\n", rx_ring->lbq_curr_idx);
+	pr_err("rx_ring->lbq.base = %p\n", rx_ring->lbq.base);
+	pr_err("rx_ring->lbq.base_dma = %llx\n",
+	       (unsigned long long)rx_ring->lbq.base_dma);
+	pr_err("rx_ring->lbq.base_indirect = %p\n",
+	       rx_ring->lbq.base_indirect);
+	pr_err("rx_ring->lbq.base_indirect_dma = %llx\n",
+	       (unsigned long long)rx_ring->lbq.base_indirect_dma);
+	pr_err("rx_ring->lbq = %p\n", rx_ring->lbq.queue);
+	pr_err("rx_ring->lbq.prod_idx_db_reg = %p\n",
+	       rx_ring->lbq.prod_idx_db_reg);
+	pr_err("rx_ring->lbq.next_to_use = %d\n", rx_ring->lbq.next_to_use);
+	pr_err("rx_ring->lbq.next_to_clean = %d\n", rx_ring->lbq.next_to_clean);
 	pr_err("rx_ring->lbq_clean_idx = %d\n", rx_ring->lbq_clean_idx);
 	pr_err("rx_ring->lbq_free_cnt = %d\n", rx_ring->lbq_free_cnt);
-	pr_err("rx_ring->lbq_buf_size = %d\n", rx_ring->lbq_buf_size);
 
-	pr_err("rx_ring->sbq_base = %p\n", rx_ring->sbq_base);
-	pr_err("rx_ring->sbq_base_dma = %llx\n",
-	       (unsigned long long) rx_ring->sbq_base_dma);
-	pr_err("rx_ring->sbq_base_indirect = %p\n",
-	       rx_ring->sbq_base_indirect);
-	pr_err("rx_ring->sbq_base_indirect_dma = %llx\n",
-	       (unsigned long long) rx_ring->sbq_base_indirect_dma);
-	pr_err("rx_ring->sbq = %p\n", rx_ring->sbq);
-	pr_err("rx_ring->sbq_len = %d\n", rx_ring->sbq_len);
-	pr_err("rx_ring->sbq_size = %d\n", rx_ring->sbq_size);
-	pr_err("rx_ring->sbq_prod_idx_db_reg addr = %p\n",
-	       rx_ring->sbq_prod_idx_db_reg);
-	pr_err("rx_ring->sbq_prod_idx = %d\n", rx_ring->sbq_prod_idx);
-	pr_err("rx_ring->sbq_curr_idx = %d\n", rx_ring->sbq_curr_idx);
-	pr_err("rx_ring->sbq_clean_idx = %d\n", rx_ring->sbq_clean_idx);
-	pr_err("rx_ring->sbq_free_cnt = %d\n", rx_ring->sbq_free_cnt);
-	pr_err("rx_ring->sbq_buf_size = %d\n", rx_ring->sbq_buf_size);
+	pr_err("rx_ring->sbq.base = %p\n", rx_ring->sbq.base);
+	pr_err("rx_ring->sbq.base_dma = %llx\n",
+	       (unsigned long long)rx_ring->sbq.base_dma);
+	pr_err("rx_ring->sbq.base_indirect = %p\n",
+	       rx_ring->sbq.base_indirect);
+	pr_err("rx_ring->sbq.base_indirect_dma = %llx\n",
+	       (unsigned long long)rx_ring->sbq.base_indirect_dma);
+	pr_err("rx_ring->sbq = %p\n", rx_ring->sbq.queue);
+	pr_err("rx_ring->sbq.prod_idx_db_reg addr = %p\n",
+	       rx_ring->sbq.prod_idx_db_reg);
+	pr_err("rx_ring->sbq.next_to_use = %d\n", rx_ring->sbq.next_to_use);
+	pr_err("rx_ring->sbq.next_to_clean = %d\n", rx_ring->sbq.next_to_clean);
 	pr_err("rx_ring->cq_id = %d\n", rx_ring->cq_id);
 	pr_err("rx_ring->irq = %d\n", rx_ring->irq);
 	pr_err("rx_ring->cpu = %d\n", rx_ring->cpu);

@@ -2888,7 +2888,7 @@ static struct clk_regmap g12a_hdmi = {
  */
 
 static const char * const g12a_mali_0_1_parent_names[] = {
-	IN_PREFIX "xtal", "gp0_pll", "hihi_pll", "fclk_div2p5",
+	IN_PREFIX "xtal", "gp0_pll", "hifi_pll", "fclk_div2p5",
 	"fclk_div3", "fclk_div4", "fclk_div5", "fclk_div7"
 };
 
@@ -3616,6 +3616,7 @@ static struct clk_regmap *const g12a_clk_regmaps[] = {
 	&g12a_bt656,
 	&g12a_usb1_to_ddr,
 	&g12a_mmc_pclk,
+	&g12a_uart2,
 	&g12a_vpu_intr,
 	&g12a_gic,
 	&g12a_sd_emmc_a_clk0,

@@ -39,6 +39,8 @@
 #ifdef __KERNEL__
 #include <linux/compat.h>
 #endif
+#include <linux/module.h>
+#include <linux/unsupported-feature.h>
 
 #include <linux/fscrypt.h>
 
@@ -2446,8 +2448,11 @@ void ext4_insert_dentry(struct inode *inode,
 			struct ext4_filename *fname);
 static inline void ext4_update_dx_flag(struct inode *inode)
 {
-	if (!ext4_has_feature_dir_index(inode->i_sb))
+	if (!ext4_has_feature_dir_index(inode->i_sb)) {
+		/* ext4_iget() should have caught this... */
+		WARN_ON_ONCE(ext4_has_feature_metadata_csum(inode->i_sb));
 		ext4_clear_inode_flag(inode, EXT4_INODE_INDEX);
+	}
 }
 static const unsigned char ext4_filetype_table[] = {
 	DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR, DT_BLK, DT_FIFO, DT_SOCK, DT_LNK
@@ -3347,4 +3352,5 @@ extern const struct iomap_ops ext4_iomap_ops;
 #define EFSBADCRC	EBADMSG		/* Bad CRC detected */
 #define EFSCORRUPTED	EUCLEAN		/* Filesystem is corrupted */
 
+DECLARE_SUSE_UNSUPPORTED_FEATURE(ext4);
 #endif	/* _EXT4_H */

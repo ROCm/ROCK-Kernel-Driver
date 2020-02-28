@@ -180,7 +180,7 @@ int lpfc_issue_gidft(struct lpfc_vport *vport);
 int lpfc_get_gidft_type(struct lpfc_vport *vport, struct lpfc_iocbq *iocbq);
 int lpfc_ns_cmd(struct lpfc_vport *, int, uint8_t, uint32_t);
 int lpfc_fdmi_cmd(struct lpfc_vport *, struct lpfc_nodelist *, int, uint32_t);
-void lpfc_fdmi_num_disc_check(struct lpfc_vport *);
+void lpfc_fdmi_change_check(struct lpfc_vport *vport);
 void lpfc_delayed_disc_tmo(struct timer_list *);
 void lpfc_delayed_disc_timeout_handler(struct lpfc_vport *);
 
@@ -214,6 +214,12 @@ irqreturn_t lpfc_sli_sp_intr_handler(int, void *);
 irqreturn_t lpfc_sli_fp_intr_handler(int, void *);
 irqreturn_t lpfc_sli4_intr_handler(int, void *);
 irqreturn_t lpfc_sli4_hba_intr_handler(int, void *);
+
+void lpfc_sli4_cleanup_poll_list(struct lpfc_hba *phba);
+int lpfc_sli4_poll_eq(struct lpfc_queue *q, uint8_t path);
+void lpfc_sli4_poll_hbtimer(struct timer_list *t);
+void lpfc_sli4_start_polling(struct lpfc_queue *q);
+void lpfc_sli4_stop_polling(struct lpfc_queue *q);
 
 void lpfc_read_rev(struct lpfc_hba *, LPFC_MBOXQ_t *);
 void lpfc_sli4_swap_str(struct lpfc_hba *, LPFC_MBOXQ_t *);
@@ -326,7 +332,7 @@ void lpfc_sli_bemem_bcopy(void *, void *, uint32_t);
 void lpfc_sli_abort_iocb_ring(struct lpfc_hba *, struct lpfc_sli_ring *);
 void lpfc_sli_abort_fcp_rings(struct lpfc_hba *phba);
 void lpfc_sli_hba_iocb_abort(struct lpfc_hba *);
-void lpfc_sli_flush_fcp_rings(struct lpfc_hba *);
+void lpfc_sli_flush_io_rings(struct lpfc_hba *phba);
 int lpfc_sli_ringpostbuf_put(struct lpfc_hba *, struct lpfc_sli_ring *,
 			     struct lpfc_dmabuf *);
 struct lpfc_dmabuf *lpfc_sli_ringpostbuf_get(struct lpfc_hba *,
@@ -432,16 +438,6 @@ int lpfc_sli4_get_allocated_extnts(struct lpfc_hba *, uint16_t,
 				   uint16_t *, uint16_t *);
 int lpfc_sli4_get_avail_extnt_rsrc(struct lpfc_hba *, uint16_t,
 					  uint16_t *, uint16_t *);
-
-/* externs BlockGuard */
-extern char *_dump_buf_data;
-extern unsigned long _dump_buf_data_order;
-extern char *_dump_buf_dif;
-extern unsigned long _dump_buf_dif_order;
-extern spinlock_t _dump_buf_lock;
-extern int _dump_buf_done;
-extern spinlock_t pgcnt_lock;
-extern unsigned int pgcnt;
 
 /* Interface exported by fabric iocb scheduler */
 void lpfc_fabric_abort_nport(struct lpfc_nodelist *);
@@ -595,6 +591,8 @@ void lpfc_release_io_buf(struct lpfc_hba *phba, struct lpfc_io_buf *ncmd,
 			 struct lpfc_sli4_hdw_queue *qp);
 void lpfc_nvme_cmd_template(void);
 void lpfc_nvmet_cmd_template(void);
+void lpfc_nvme_cancel_iocb(struct lpfc_hba *phba, struct lpfc_iocbq *pwqeIn);
+void lpfc_nvme_prep_abort_wqe(struct lpfc_iocbq *pwqeq, u16 xritag, u8 opt);
 extern int lpfc_enable_nvmet_cnt;
 extern unsigned long long lpfc_enable_nvmet[];
 extern int lpfc_no_hba_reset_cnt;

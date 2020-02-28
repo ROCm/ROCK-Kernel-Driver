@@ -872,7 +872,8 @@ nfp_net_tls_tx(struct nfp_net_dp *dp, struct nfp_net_r_vector *r_vec,
 
 		/* jump forward, a TX may have gotten lost, need to sync TX */
 		if (!resync_pending && seq - ntls->next_seq < U32_MAX / 4)
-			tls_offload_tx_resync_request(nskb->sk);
+			tls_offload_tx_resync_request(nskb->sk, seq,
+						      ntls->next_seq);
 
 		*nr_frags = 0;
 		return nskb;
@@ -975,7 +976,7 @@ static int nfp_net_prep_tx_meta(struct sk_buff *skb, u64 tls_handle)
 static int nfp_net_tx(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct nfp_net *nn = netdev_priv(netdev);
-	const struct skb_frag_struct *frag;
+	const skb_frag_t *frag;
 	int f, nr_frags, wr_idx, md_bytes;
 	struct nfp_net_tx_ring *tx_ring;
 	struct nfp_net_r_vector *r_vec;
@@ -1155,7 +1156,7 @@ static void nfp_net_tx_complete(struct nfp_net_tx_ring *tx_ring, int budget)
 	todo = D_IDX(tx_ring, qcp_rd_p - tx_ring->qcp_rd_p);
 
 	while (todo--) {
-		const struct skb_frag_struct *frag;
+		const skb_frag_t *frag;
 		struct nfp_net_tx_buf *tx_buf;
 		struct sk_buff *skb;
 		int fidx, nr_frags;
@@ -1270,7 +1271,7 @@ static bool nfp_net_xdp_complete(struct nfp_net_tx_ring *tx_ring)
 static void
 nfp_net_tx_ring_reset(struct nfp_net_dp *dp, struct nfp_net_tx_ring *tx_ring)
 {
-	const struct skb_frag_struct *frag;
+	const skb_frag_t *frag;
 	struct netdev_queue *nd_q;
 
 	while (!tx_ring->is_xdp && tx_ring->rd_p != tx_ring->wr_p) {
@@ -4116,14 +4117,7 @@ int nfp_net_init(struct nfp_net *nn)
 
 	/* Set default MTU and Freelist buffer size */
 	if (!nfp_net_is_data_vnic(nn) && nn->app->ctrl_mtu) {
-		if (nn->app->ctrl_mtu <= nn->max_mtu) {
-			nn->dp.mtu = nn->app->ctrl_mtu;
-		} else {
-			if (nn->app->ctrl_mtu != NFP_APP_CTRL_MTU_MAX)
-				nn_warn(nn, "app requested MTU above max supported %u > %u\n",
-					nn->app->ctrl_mtu, nn->max_mtu);
-			nn->dp.mtu = nn->max_mtu;
-		}
+		nn->dp.mtu = min(nn->app->ctrl_mtu, nn->max_mtu);
 	} else if (nn->max_mtu < NFP_NET_DEFAULT_MTU) {
 		nn->dp.mtu = nn->max_mtu;
 	} else {

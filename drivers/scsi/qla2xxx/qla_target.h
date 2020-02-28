@@ -247,9 +247,9 @@ struct ctio_to_2xxx {
 
 struct fcp_hdr {
 	uint8_t  r_ctl;
-	uint8_t  d_id[3];
+	be_id_t  d_id;
 	uint8_t  cs_ctl;
-	uint8_t  s_id[3];
+	be_id_t  s_id;
 	uint8_t  type;
 	uint8_t  f_ctl[3];
 	uint8_t  seq_id;
@@ -261,9 +261,9 @@ struct fcp_hdr {
 } __packed;
 
 struct fcp_hdr_le {
-	uint8_t  d_id[3];
+	le_id_t  d_id;
 	uint8_t  r_ctl;
-	uint8_t  s_id[3];
+	le_id_t  s_id;
 	uint8_t  cs_ctl;
 	uint8_t  f_ctl[3];
 	uint8_t  type;
@@ -379,8 +379,7 @@ static inline int get_datalen_for_atio(struct atio_from_isp *atio)
 {
 	int len = atio->u.isp24.fcp_cmnd.add_cdb_len;
 
-	return (be32_to_cpu(get_unaligned((uint32_t *)
-	    &atio->u.isp24.fcp_cmnd.add_cdb[len * 4])));
+	return get_unaligned_be32(&atio->u.isp24.fcp_cmnd.add_cdb[len * 4]);
 }
 
 #define CTIO_TYPE7 0x12 /* Continue target I/O entry (for 24xx) */
@@ -402,7 +401,7 @@ struct ctio7_to_24xx {
 	uint16_t dseg_count;		    /* Data segment count. */
 	uint8_t  vp_index;
 	uint8_t  add_flags;
-	uint8_t  initiator_id[3];
+	le_id_t  initiator_id;
 	uint8_t  reserved;
 	uint32_t exchange_addr;
 	union {
@@ -498,7 +497,7 @@ struct ctio_crc2_to_fw {
 	uint8_t  add_flags;		/* additional flags */
 #define CTIO_CRC2_AF_DIF_DSD_ENA BIT_3
 
-	uint8_t  initiator_id[3];	/* initiator ID */
+	le_id_t  initiator_id;		/* initiator ID */
 	uint8_t  reserved1;
 	uint32_t exchange_addr;		/* rcv exchange address */
 	uint16_t reserved2;
@@ -672,6 +671,8 @@ struct qla_tgt_func_tmpl {
 	void (*handle_data)(struct qla_tgt_cmd *);
 	int (*handle_tmr)(struct qla_tgt_mgmt_cmd *, u64, uint16_t,
 			uint32_t);
+	struct qla_tgt_cmd *(*get_cmd)(struct fc_port *);
+	void (*rel_cmd)(struct qla_tgt_cmd *);
 	void (*free_cmd)(struct qla_tgt_cmd *);
 	void (*free_mcmd)(struct qla_tgt_mgmt_cmd *);
 	void (*free_session)(struct fc_port *);
@@ -682,7 +683,7 @@ struct qla_tgt_func_tmpl {
 	struct fc_port *(*find_sess_by_loop_id)(struct scsi_qla_host *,
 						const uint16_t);
 	struct fc_port *(*find_sess_by_s_id)(struct scsi_qla_host *,
-						const uint8_t *);
+					     const be_id_t);
 	void (*clear_nacl_from_fcport_map)(struct fc_port *);
 	void (*put_sess)(struct fc_port *);
 	void (*shutdown_sess)(struct fc_port *);
@@ -912,7 +913,7 @@ struct qla_tgt_cmd {
 	uint8_t scsi_status, sense_key, asc, ascq;
 
 	struct crc_context *ctx;
-	uint8_t		*cdb;
+	const uint8_t	*cdb;
 	uint64_t	lba;
 	uint16_t	a_guard, e_guard, a_app_tag, e_app_tag;
 	uint32_t	a_ref_tag, e_ref_tag;
@@ -1030,22 +1031,11 @@ static inline bool qla_dual_mode_enabled(struct scsi_qla_host *ha)
 	return (ha->host->active_mode == MODE_DUAL);
 }
 
-static inline uint32_t sid_to_key(const uint8_t *s_id)
+static inline uint32_t sid_to_key(const be_id_t s_id)
 {
-	uint32_t key;
-
-	key = (((unsigned long)s_id[0] << 16) |
-	       ((unsigned long)s_id[1] << 8) |
-	       (unsigned long)s_id[2]);
-	return key;
-}
-
-static inline void sid_to_portid(const uint8_t *s_id, port_id_t *p)
-{
-	memset(p, 0, sizeof(*p));
-	p->b.domain = s_id[0];
-	p->b.area = s_id[1];
-	p->b.al_pa = s_id[2];
+	return s_id.domain << 16 |
+		s_id.area << 8 |
+		s_id.al_pa;
 }
 
 /*

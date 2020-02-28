@@ -73,6 +73,7 @@
 #include <linux/jiffies.h>
 #include <linux/mem_encrypt.h>
 #include <linux/sizes.h>
+#include <linux/security.h>
 
 #include <linux/usb/xhci-dbgp.h>
 #include <video/edid.h>
@@ -397,10 +398,22 @@ static void __init reserve_initrd(void)
 }
 #endif /* CONFIG_BLK_DEV_INITRD */
 
+static void __init remove_setup_data(u64 pa_prev, u64 pa_next)
+{
+	struct setup_data *data;
+
+	if (pa_prev) {
+		data = early_memremap(pa_prev, sizeof(*data));
+		data->next = pa_next;
+		early_iounmap(data, sizeof(*data));
+	} else
+		boot_params.hdr.setup_data = pa_next;
+}
+
 static void __init parse_setup_data(void)
 {
 	struct setup_data *data;
-	u64 pa_data, pa_next;
+	u64 pa_data, pa_next, pa_prev = 0;
 
 	pa_data = boot_params.hdr.setup_data;
 	while (pa_data) {
@@ -422,9 +435,14 @@ static void __init parse_setup_data(void)
 		case SETUP_EFI:
 			parse_efi_setup(pa_data, data_len);
 			break;
+		case SETUP_EFI_SECRET_KEY:
+			parse_efi_secret_key_setup(pa_data, data_len);
+			remove_setup_data(pa_prev, pa_next);
+			break;
 		default:
 			break;
 		}
+		pa_prev = pa_data;
 		pa_data = pa_next;
 	}
 }
@@ -486,7 +504,7 @@ static int __init reserve_crashkernel_low(void)
 	ret = parse_crashkernel_low(boot_command_line, total_low_mem, &low_size, &base);
 	if (ret) {
 		/*
-		 * two parts from lib/swiotlb.c:
+		 * two parts from kernel/dma/swiotlb.c:
 		 * -swiotlb size: user-specified with swiotlb= or default.
 		 *
 		 * -swiotlb overflow buffer: now hardcoded to 32k. We round it
@@ -1027,6 +1045,13 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled(EFI_BOOT))
 		efi_init();
 
+	efi_set_secure_boot(boot_params.secure_boot);
+
+#ifdef CONFIG_LOCK_DOWN_IN_EFI_SECURE_BOOT
+	if (efi_enabled(EFI_SECURE_BOOT))
+		security_lock_kernel_down("EFI Secure Boot mode", LOCKDOWN_INTEGRITY_MAX);
+#endif
+
 	dmi_setup();
 
 	/*
@@ -1179,19 +1204,7 @@ void __init setup_arch(char **cmdline_p)
 	/* Allocate bigger log buffer */
 	setup_log_buf(1);
 
-	if (efi_enabled(EFI_BOOT)) {
-		switch (boot_params.secure_boot) {
-		case efi_secureboot_mode_disabled:
-			pr_info("Secure boot disabled\n");
-			break;
-		case efi_secureboot_mode_enabled:
-			pr_info("Secure boot enabled\n");
-			break;
-		default:
-			pr_info("Secure boot could not be determined\n");
-			break;
-		}
-	}
+	efi_set_secure_boot(boot_params.secure_boot);
 
 	reserve_initrd();
 

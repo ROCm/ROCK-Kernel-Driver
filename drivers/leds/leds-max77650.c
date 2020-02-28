@@ -132,9 +132,16 @@ static int max77650_led_probe(struct platform_device *pdev)
 			    MAX77650_LED_TOP_DEFAULT);
 }
 
+static const struct of_device_id max77650_led_of_match[] = {
+	{ .compatible = "maxim,max77650-led" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, max77650_led_of_match);
+
 static struct platform_driver max77650_led_driver = {
 	.driver = {
 		.name = "max77650-led",
+		.of_match_table = max77650_led_of_match,
 	},
 	.probe = max77650_led_probe,
 };

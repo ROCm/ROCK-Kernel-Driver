@@ -124,7 +124,7 @@ static int papr_scm_meta_get(struct papr_scm_priv *p,
 	int len, read;
 	int64_t ret;
 
-	if ((hdr->in_offset + hdr->in_length) >= p->metadata_size)
+	if ((hdr->in_offset + hdr->in_length) > p->metadata_size)
 		return -EINVAL;
 
 	for (len = hdr->in_length; len; len -= read) {
@@ -178,7 +178,7 @@ static int papr_scm_meta_set(struct papr_scm_priv *p,
 	__be64 data_be;
 	int64_t ret;
 
-	if ((hdr->in_offset + hdr->in_length) >= p->metadata_size)
+	if ((hdr->in_offset + hdr->in_length) > p->metadata_size)
 		return -EINVAL;
 
 	for (len = hdr->in_length; len; len -= wrote) {
@@ -314,6 +314,7 @@ static int papr_scm_nvdimm_init(struct papr_scm_priv *p)
 	p->bus = nvdimm_bus_register(NULL, &p->bus_desc);
 	if (!p->bus) {
 		dev_err(dev, "Error creating nvdimm bus %pOF\n", p->dn);
+		kfree(p->bus_desc.provider_name);
 		return -ENXIO;
 	}
 
@@ -349,7 +350,6 @@ static int papr_scm_nvdimm_init(struct papr_scm_priv *p)
 	ndr_desc.mapping = &mapping;
 	ndr_desc.num_mappings = 1;
 	ndr_desc.nd_set = &p->nd_set;
-	set_bit(ND_REGION_PAGEMAP, &ndr_desc.flags);
 
 	if (p->is_volatile)
 		p->region = nvdimm_volatile_region_create(p->bus, &ndr_desc);
@@ -470,6 +470,7 @@ static int papr_scm_remove(struct platform_device *pdev)
 
 	nvdimm_bus_unregister(p->bus);
 	drc_pmem_unbind(p);
+	kfree(p->bus_desc.provider_name);
 	kfree(p);
 
 	return 0;

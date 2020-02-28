@@ -210,6 +210,8 @@ struct typec_capability {
 				     enum typec_role);
 	int		(*port_type_set)(const struct typec_capability *,
 					 enum typec_port_type);
+
+	void *suse_kabi_padding;
 };
 
 /* Specific to try_role(). Indicates the user want's to clear the preference. */

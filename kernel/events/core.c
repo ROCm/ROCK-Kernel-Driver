@@ -1887,6 +1887,89 @@ list_del_event(struct perf_event *event, struct perf_event_context *ctx)
 	ctx->generation++;
 }
 
+static int
+perf_aux_output_match(struct perf_event *event, struct perf_event *aux_event)
+{
+	if (!has_aux(aux_event))
+		return 0;
+
+	if (!event->pmu->aux_output_match)
+		return 0;
+
+	return event->pmu->aux_output_match(aux_event);
+}
+
+static void put_event(struct perf_event *event);
+static void event_sched_out(struct perf_event *event,
+			    struct perf_cpu_context *cpuctx,
+			    struct perf_event_context *ctx);
+
+static void perf_put_aux_event(struct perf_event *event)
+{
+	struct perf_event_context *ctx = event->ctx;
+	struct perf_cpu_context *cpuctx = __get_cpu_context(ctx);
+	struct perf_event *iter;
+
+	/*
+	 * If event uses aux_event tear down the link
+	 */
+	if (event->aux_event) {
+		iter = event->aux_event;
+		event->aux_event = NULL;
+		put_event(iter);
+		return;
+	}
+
+	/*
+	 * If the event is an aux_event, tear down all links to
+	 * it from other events.
+	 */
+	for_each_sibling_event(iter, event->group_leader) {
+		if (iter->aux_event != event)
+			continue;
+
+		iter->aux_event = NULL;
+		put_event(event);
+
+		/*
+		 * If it's ACTIVE, schedule it out and put it into ERROR
+		 * state so that we don't try to schedule it again. Note
+		 * that perf_event_enable() will clear the ERROR status.
+		 */
+		event_sched_out(iter, cpuctx, ctx);
+		perf_event_set_state(event, PERF_EVENT_STATE_ERROR);
+	}
+}
+
+static int perf_get_aux_event(struct perf_event *event,
+			      struct perf_event *group_leader)
+{
+	/*
+	 * Our group leader must be an aux event if we want to be
+	 * an aux_output. This way, the aux event will precede its
+	 * aux_output events in the group, and therefore will always
+	 * schedule first.
+	 */
+	if (!group_leader)
+		return 0;
+
+	if (!perf_aux_output_match(event, group_leader))
+		return 0;
+
+	if (!atomic_long_inc_not_zero(&group_leader->refcount))
+		return 0;
+
+	/*
+	 * Link aux_outputs to their aux event; this is undone in
+	 * perf_group_detach() by perf_put_aux_event(). When the
+	 * group in torn down, the aux_output events loose their
+	 * link to the aux_event and can't schedule any more.
+	 */
+	event->aux_event = group_leader;
+
+	return 1;
+}
+
 static void perf_group_detach(struct perf_event *event)
 {
 	struct perf_event *sibling, *tmp;
@@ -1901,6 +1984,8 @@ static void perf_group_detach(struct perf_event *event)
 		return;
 
 	event->attach_state &= ~PERF_ATTACH_GROUP;
+
+	perf_put_aux_event(event);
 
 	/*
 	 * If this is a sibling, remove it from its group.
@@ -4101,10 +4186,8 @@ alloc_perf_context(struct pmu *pmu, struct task_struct *task)
 		return NULL;
 
 	__perf_event_init_context(ctx);
-	if (task) {
-		ctx->task = task;
-		get_task_struct(task);
-	}
+	if (task)
+		ctx->task = get_task_struct(task);
 	ctx->pmu = pmu;
 
 	return ctx;
@@ -7387,7 +7470,7 @@ static void perf_event_mmap_event(struct perf_mmap_event *mmap_event)
 			goto cpy_name;
 		}
 		inode = file_inode(vma->vm_file);
-		dev = inode->i_sb->s_dev;
+		dev = inode_get_dev(inode);
 		ino = inode->i_ino;
 		gen = inode->i_generation;
 		maj = MAJOR(dev);
@@ -10382,8 +10465,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 		 * and we cannot use the ctx information because we need the
 		 * pmu before we get a ctx.
 		 */
-		get_task_struct(task);
-		event->hw.target = task;
+		event->hw.target = get_task_struct(task);
 	}
 
 	event->clock = &local_clock;
@@ -10395,12 +10477,9 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 		context = parent_event->overflow_handler_context;
 #if defined(CONFIG_BPF_SYSCALL) && defined(CONFIG_EVENT_TRACING)
 		if (overflow_handler == bpf_overflow_handler) {
-			struct bpf_prog *prog = bpf_prog_inc(parent_event->prog);
+			struct bpf_prog *prog = parent_event->prog;
 
-			if (IS_ERR(prog)) {
-				err = PTR_ERR(prog);
-				goto err_ns;
-			}
+			bpf_prog_inc(prog);
 			event->prog = prog;
 			event->orig_overflow_handler =
 				parent_event->orig_overflow_handler;
@@ -10451,6 +10530,12 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	if (IS_ERR(pmu)) {
 		err = PTR_ERR(pmu);
 		goto err_ns;
+	}
+
+	if (event->attr.aux_output &&
+	    !(pmu->capabilities & PERF_PMU_CAP_AUX_OUTPUT)) {
+		err = -EOPNOTSUPP;
+		goto err_pmu;
 	}
 
 	err = exclusive_event_init(event);
@@ -10856,6 +10941,13 @@ SYSCALL_DEFINE5(perf_event_open,
 	    perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
+	err = security_locked_down(LOCKDOWN_PERF);
+	if (err && (attr.sample_type & PERF_SAMPLE_REGS_INTR))
+		/* REGS_INTR can leak data, lockdown must prevent this */
+		return err;
+
+	err = 0;
+
 	/*
 	 * In cgroup mode, the pid argument is used to pass the fd
 	 * opened to the cgroup directory in cgroupfs. The cpu argument
@@ -11109,6 +11201,8 @@ SYSCALL_DEFINE5(perf_event_open,
 		}
 	}
 
+	if (event->attr.aux_output && !perf_get_aux_event(event, group_leader))
+		goto err_locked;
 
 	/*
 	 * Must be under the same ctx::mutex as perf_install_in_context(),

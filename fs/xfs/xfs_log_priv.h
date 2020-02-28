@@ -404,6 +404,9 @@ struct xlog {
 #endif
 	/* log recovery lsn tracking (for buffer submission */
 	xfs_lsn_t		l_recovery_lsn;
+#ifndef __GENKSYMS__
+	int			l_malformed_inode_warning;
+#endif
 };
 
 #define XLOG_BUF_CANCEL_BUCKET(log, blkno) \

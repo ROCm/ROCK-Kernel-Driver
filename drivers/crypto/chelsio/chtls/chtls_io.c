@@ -1078,7 +1078,7 @@ new_buf:
 			bool merge;
 
 			if (page)
-				pg_size <<= compound_order(page);
+				pg_size = page_size(page);
 			if (off < pg_size &&
 			    skb_can_coalesce(skb, i, page, off)) {
 				merge = 1;
@@ -1105,8 +1105,7 @@ new_buf:
 							   __GFP_NORETRY,
 							   order);
 					if (page)
-						pg_size <<=
-							compound_order(page);
+						pg_size <<= order;
 				}
 				if (!page) {
 					page = alloc_page(gfp);
@@ -1134,7 +1133,9 @@ copy:
 			}
 			/* Update the skb. */
 			if (merge) {
-				skb_shinfo(skb)->frags[i - 1].size += copy;
+				skb_frag_size_add(
+						&skb_shinfo(skb)->frags[i - 1],
+						copy);
 			} else {
 				skb_fill_page_desc(skb, i, page, off, copy);
 				if (off + copy < pg_size) {
@@ -1247,7 +1248,7 @@ new_buf:
 
 		i = skb_shinfo(skb)->nr_frags;
 		if (skb_can_coalesce(skb, i, page, offset)) {
-			skb_shinfo(skb)->frags[i - 1].size += copy;
+			skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
 			skb_fill_page_desc(skb, i, page, offset, copy);
@@ -1436,7 +1437,7 @@ static int chtls_pt_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				      csk->wr_max_credits))
 			sk->sk_write_space(sk);
 
-		if (copied >= target && !sk->sk_backlog.tail)
+		if (copied >= target && !READ_ONCE(sk->sk_backlog.tail))
 			break;
 
 		if (copied) {
@@ -1469,7 +1470,7 @@ static int chtls_pt_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				break;
 			}
 		}
-		if (sk->sk_backlog.tail) {
+		if (READ_ONCE(sk->sk_backlog.tail)) {
 			release_sock(sk);
 			lock_sock(sk);
 			chtls_cleanup_rbuf(sk, copied);
@@ -1614,7 +1615,7 @@ static int peekmsg(struct sock *sk, struct msghdr *msg,
 			break;
 		}
 
-		if (sk->sk_backlog.tail) {
+		if (READ_ONCE(sk->sk_backlog.tail)) {
 			/* Do not sleep, just process backlog. */
 			release_sock(sk);
 			lock_sock(sk);
@@ -1742,7 +1743,7 @@ int chtls_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				      csk->wr_max_credits))
 			sk->sk_write_space(sk);
 
-		if (copied >= target && !sk->sk_backlog.tail)
+		if (copied >= target && !READ_ONCE(sk->sk_backlog.tail))
 			break;
 
 		if (copied) {
@@ -1773,7 +1774,7 @@ int chtls_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			}
 		}
 
-		if (sk->sk_backlog.tail) {
+		if (READ_ONCE(sk->sk_backlog.tail)) {
 			release_sock(sk);
 			lock_sock(sk);
 			chtls_cleanup_rbuf(sk, copied);

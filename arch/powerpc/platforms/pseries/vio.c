@@ -605,6 +605,8 @@ static const struct dma_map_ops vio_dma_mapping_ops = {
 	.unmap_page        = vio_dma_iommu_unmap_page,
 	.dma_supported     = dma_iommu_dma_supported,
 	.get_required_mask = dma_iommu_get_required_mask,
+	.mmap		   = dma_common_mmap,
+	.get_sgtable	   = dma_common_get_sgtable,
 };
 
 /**
@@ -1173,6 +1175,8 @@ static struct iommu_table *vio_build_iommu_table(struct vio_dev *dev)
 	tbl = kzalloc(sizeof(*tbl), GFP_KERNEL);
 	if (tbl == NULL)
 		return NULL;
+
+	kref_init(&tbl->it_kref);
 
 	of_parse_dma_window(dev->dev.of_node, dma_window,
 			    &tbl->it_index, &offset, &size);

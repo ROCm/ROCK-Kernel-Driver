@@ -191,24 +191,6 @@ int bnxt_re_query_device(struct ib_device *ibdev,
 	return 0;
 }
 
-int bnxt_re_modify_device(struct ib_device *ibdev,
-			  int device_modify_mask,
-			  struct ib_device_modify *device_modify)
-{
-	switch (device_modify_mask) {
-	case IB_DEVICE_MODIFY_SYS_IMAGE_GUID:
-		/* Modify the GUID requires the modification of the GID table */
-		/* GUID should be made as READ-ONLY */
-		break;
-	case IB_DEVICE_MODIFY_NODE_DESC:
-		/* Node Desc should be made as READ-ONLY */
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
 /* Port */
 int bnxt_re_query_port(struct ib_device *ibdev, u8 port_num,
 		       struct ib_port_attr *port_attr)
@@ -220,10 +202,10 @@ int bnxt_re_query_port(struct ib_device *ibdev, u8 port_num,
 
 	if (netif_running(rdev->netdev) && netif_carrier_ok(rdev->netdev)) {
 		port_attr->state = IB_PORT_ACTIVE;
-		port_attr->phys_state = 5;
+		port_attr->phys_state = IB_PORT_PHYS_STATE_LINK_UP;
 	} else {
 		port_attr->state = IB_PORT_DOWN;
-		port_attr->phys_state = 3;
+		port_attr->phys_state = IB_PORT_PHYS_STATE_DISABLED;
 	}
 	port_attr->max_mtu = IB_MTU_4096;
 	port_attr->active_mtu = iboe_get_mtu(rdev->netdev->mtu);
@@ -1398,7 +1380,7 @@ int bnxt_re_create_srq(struct ib_srq *ib_srq,
 			dev_err(rdev_to_dev(rdev), "SRQ copy to udata failed!");
 			bnxt_qplib_destroy_srq(&rdev->qplib_res,
 					       &srq->qplib_srq);
-			goto exit;
+			goto fail;
 		}
 	}
 	if (nq)
@@ -3323,8 +3305,10 @@ int bnxt_re_dereg_mr(struct ib_mr *ib_mr, struct ib_udata *udata)
 	int rc;
 
 	rc = bnxt_qplib_free_mrw(&rdev->qplib_res, &mr->qplib_mr);
-	if (rc)
+	if (rc) {
 		dev_err(rdev_to_dev(rdev), "Dereg MR failed: %#x\n", rc);
+		return rc;
+	}
 
 	if (mr->pages) {
 		rc = bnxt_qplib_free_fast_reg_page_list(&rdev->qplib_res,

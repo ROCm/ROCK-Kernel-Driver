@@ -75,7 +75,7 @@ static int __mt7615_mcu_msg_send(struct mt7615_dev *dev, struct sk_buff *skb,
 
 	txd = mcu_txd->txd;
 
-	val = FIELD_PREP(MT_TXD0_TX_BYTES, cpu_to_le16(skb->len)) |
+	val = FIELD_PREP(MT_TXD0_TX_BYTES, skb->len) |
 	      FIELD_PREP(MT_TXD0_P_IDX, MT_TX_PORT_IDX_MCU) |
 	      FIELD_PREP(MT_TXD0_Q_IDX, q_idx);
 	txd[0] = cpu_to_le32(val);
@@ -339,9 +339,9 @@ static u32 gen_dl_mode(u8 feature_set, bool is_cr4)
 static int mt7615_load_ram(struct mt7615_dev *dev)
 {
 	const struct mt7615_fw_trailer *hdr;
+	const struct firmware *fw;
 	u32 n9_ilm_addr, offset;
 	int i, ret;
-	const struct firmware *fw;
 
 	ret = request_firmware(&fw, MT7615_FIRMWARE_N9, dev->mt76.dev);
 	if (ret)

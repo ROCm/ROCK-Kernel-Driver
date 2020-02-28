@@ -281,14 +281,6 @@ static void enc2_dp_set_dsc_config(struct stream_encoder *enc,
 					uint8_t *dsc_packed_pps)
 {
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
-	uint32_t dsc_value = 0;
-
-	dsc_value = REG_READ(DP_DSC_CNTL);
-
-	/* dsc disable skip */
-	if ((dsc_value & 0x3) == 0x0)
-		return;
-
 
 	REG_UPDATE_2(DP_DSC_CNTL,
 			DP_DSC_MODE, dsc_mode,
@@ -495,15 +487,23 @@ void enc2_stream_encoder_dp_unblank(
 				DP_VID_N_MUL, n_multiply);
 	}
 
-	/* set DIG_START to 0x1 to reset FIFO */
+	/* make sure stream is disabled before resetting steer fifo */
+	REG_UPDATE(DP_VID_STREAM_CNTL, DP_VID_STREAM_ENABLE, false);
+	REG_WAIT(DP_VID_STREAM_CNTL, DP_VID_STREAM_STATUS, 0, 10, 5000);
 
+	/* set DIG_START to 0x1 to reset FIFO */
 	REG_UPDATE(DIG_FE_CNTL, DIG_START, 1);
+	udelay(1);
 
 	/* write 0 to take the FIFO out of reset */
 
 	REG_UPDATE(DIG_FE_CNTL, DIG_START, 0);
 
-	/* switch DP encoder to CRTC data */
+	/* switch DP encoder to CRTC data, but reset it the fifo first. It may happen
+	 * that it overflows during mode transition, and sometimes doesn't recover.
+	 */
+	REG_UPDATE(DP_STEER_FIFO, DP_STEER_FIFO_RESET, 1);
+	udelay(10);
 
 	REG_UPDATE(DP_STEER_FIFO, DP_STEER_FIFO_RESET, 0);
 

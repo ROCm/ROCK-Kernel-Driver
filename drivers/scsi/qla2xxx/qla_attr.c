@@ -102,8 +102,10 @@ qla2x00_sysfs_write_fw_dump(struct file *filp, struct kobject *kobj,
 			qla8044_idc_lock(ha);
 			qla82xx_set_reset_owner(vha);
 			qla8044_idc_unlock(ha);
-		} else
+		} else {
+			ha->fw_dump_mpi = 1;
 			qla2x00_system_error(vha);
+		}
 		break;
 	case 4:
 		if (IS_P3P_TYPE(ha)) {
@@ -176,6 +178,7 @@ qla2x00_sysfs_read_nvram(struct file *filp, struct kobject *kobj,
 
 	faddr = ha->flt_region_nvram;
 	if (IS_QLA28XX(ha)) {
+		qla28xx_get_aux_images(vha, &active_regions);
 		if (active_regions.aux.vpd_nvram == QLA27XX_SECONDARY_IMAGE)
 			faddr = ha->flt_region_nvram_sec;
 	}
@@ -382,7 +385,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		ha->optrom_region_size = size;
 
 		ha->optrom_state = QLA_SREADING;
-		ha->optrom_buffer = vmalloc(ha->optrom_region_size);
+		ha->optrom_buffer = vzalloc(ha->optrom_region_size);
 		if (ha->optrom_buffer == NULL) {
 			ql_log(ql_log_warn, vha, 0x7062,
 			    "Unable to allocate memory for optrom retrieval "
@@ -404,7 +407,6 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		    "Reading flash region -- 0x%x/0x%x.\n",
 		    ha->optrom_region_start, ha->optrom_region_size);
 
-		memset(ha->optrom_buffer, 0, ha->optrom_region_size);
 		ha->isp_ops->read_optrom(vha, ha->optrom_buffer,
 		    ha->optrom_region_start, ha->optrom_region_size);
 		break;
@@ -454,7 +456,7 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		ha->optrom_region_size = size;
 
 		ha->optrom_state = QLA_SWRITING;
-		ha->optrom_buffer = vmalloc(ha->optrom_region_size);
+		ha->optrom_buffer = vzalloc(ha->optrom_region_size);
 		if (ha->optrom_buffer == NULL) {
 			ql_log(ql_log_warn, vha, 0x7066,
 			    "Unable to allocate memory for optrom update "
@@ -469,7 +471,6 @@ qla2x00_sysfs_write_optrom_ctl(struct file *filp, struct kobject *kobj,
 		    "Staging flash region write -- 0x%x/0x%x.\n",
 		    ha->optrom_region_start, ha->optrom_region_size);
 
-		memset(ha->optrom_buffer, 0, ha->optrom_region_size);
 		break;
 	case 3:
 		if (ha->optrom_state != QLA_SWRITING) {
@@ -1126,7 +1127,8 @@ qla2x00_pci_info_show(struct device *dev, struct device_attribute *attr,
 	char pci_info[30];
 
 	return scnprintf(buf, PAGE_SIZE, "%s\n",
-	    vha->hw->isp_ops->pci_info_str(vha, pci_info));
+			 vha->hw->isp_ops->pci_info_str(vha, pci_info,
+							sizeof(pci_info)));
 }
 
 static ssize_t
@@ -2824,7 +2826,7 @@ qla24xx_vport_create(struct fc_vport *fc_vport, bool disable)
 			fc_vport_set_state(fc_vport, FC_VPORT_LINKDOWN);
 	}
 
-	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif) {
+	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif && !ql2xnvmeenable) {
 		if (ha->fw_attributes & BIT_4) {
 			int prot = 0, guard;
 
@@ -2919,6 +2921,8 @@ qla24xx_vport_delete(struct fc_vport *fc_vport)
 	scsi_qla_host_t *vha = fc_vport->dd_data;
 	struct qla_hw_data *ha = vha->hw;
 	uint16_t id = vha->vp_idx;
+
+	set_bit(VPORT_DELETE, &vha->dpc_flags);
 
 	while (test_bit(LOOP_RESYNC_ACTIVE, &vha->dpc_flags) ||
 	    test_bit(FCPORT_UPDATE_NEEDED, &vha->dpc_flags))

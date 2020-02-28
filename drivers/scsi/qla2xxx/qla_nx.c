@@ -1612,8 +1612,7 @@ qla82xx_get_bootld_offset(struct qla_hw_data *ha)
 	return (u8 *)&ha->hablob->fw->data[offset];
 }
 
-static __le32
-qla82xx_get_fw_size(struct qla_hw_data *ha)
+static u32 qla82xx_get_fw_size(struct qla_hw_data *ha)
 {
 	struct qla82xx_uri_data_desc *uri_desc = NULL;
 
@@ -1624,7 +1623,7 @@ qla82xx_get_fw_size(struct qla_hw_data *ha)
 			return cpu_to_le32(uri_desc->size);
 	}
 
-	return cpu_to_le32(*(u32 *)&ha->hablob->fw->data[FW_SIZE_OFFSET]);
+	return get_unaligned_le32(&ha->hablob->fw->data[FW_SIZE_OFFSET]);
 }
 
 static u8 *
@@ -1816,7 +1815,7 @@ qla82xx_fw_load_from_blob(struct qla_hw_data *ha)
 	}
 
 	flashaddr = FLASH_ADDR_START;
-	size = (__force u32)qla82xx_get_fw_size(ha) / 8;
+	size = qla82xx_get_fw_size(ha) / 8;
 	ptr64 = (u64 *)qla82xx_get_fw_offs(ha);
 
 	for (i = 0; i < size; i++) {
@@ -1883,7 +1882,7 @@ qla82xx_set_product_offset(struct qla_hw_data *ha)
 static int
 qla82xx_validate_firmware_blob(scsi_qla_host_t *vha, uint8_t fw_type)
 {
-	__le32 val;
+	uint32_t val;
 	uint32_t min_size;
 	struct qla_hw_data *ha = vha->hw;
 	const struct firmware *fw = ha->hablob->fw;
@@ -1896,8 +1895,8 @@ qla82xx_validate_firmware_blob(scsi_qla_host_t *vha, uint8_t fw_type)
 
 		min_size = QLA82XX_URI_FW_MIN_SIZE;
 	} else {
-		val = cpu_to_le32(*(u32 *)&fw->data[QLA82XX_FW_MAGIC_OFFSET]);
-		if ((__force u32)val != QLA82XX_BDINFO_MAGIC)
+		val = get_unaligned_le32(&fw->data[QLA82XX_FW_MAGIC_OFFSET]);
+		if (val != QLA82XX_BDINFO_MAGIC)
 			return -EINVAL;
 
 		min_size = QLA82XX_FW_MIN_SIZE;
@@ -1977,7 +1976,7 @@ qla82xx_check_rcvpeg_state(struct qla_hw_data *ha)
 	} while (--retries);
 
 	ql_log(ql_log_fatal, vha, 0x00ac,
-	    "Rcv Peg initializatin failed: 0x%x.\n", val);
+	    "Rcv Peg initialization failed: 0x%x.\n", val);
 	read_lock(&ha->hw_lock);
 	qla82xx_wr_32(ha, CRB_RCVPEG_STATE, PHAN_INITIALIZE_FAILED);
 	read_unlock(&ha->hw_lock);
@@ -1985,7 +1984,7 @@ qla82xx_check_rcvpeg_state(struct qla_hw_data *ha)
 }
 
 /* ISR related functions */
-static struct qla82xx_legacy_intr_set legacy_intr[] = \
+static struct qla82xx_legacy_intr_set legacy_intr[] =
 	QLA82XX_LEGACY_INTR_CONFIG;
 
 /*
@@ -3030,7 +3029,7 @@ qla8xxx_dev_failed_handler(scsi_qla_host_t *vha)
 	/* Set DEV_FAILED flag to disable timer */
 	vha->device_flags |= DFLG_DEV_FAILED;
 	qla2x00_abort_all_cmds(vha, DID_NO_CONNECT << 16);
-	qla2x00_mark_all_devices_lost(vha, 0);
+	qla2x00_mark_all_devices_lost(vha);
 	vha->flags.online = 0;
 	vha->flags.init_done = 0;
 }
@@ -3288,7 +3287,7 @@ qla82xx_device_state_handler(scsi_qla_host_t *vha)
 		case QLA8XXX_DEV_NEED_QUIESCENT:
 			qla82xx_need_qsnt_handler(vha);
 			/* Reset timeout value after quiescence handler */
-			dev_init_timeout = jiffies + (ha->fcoe_dev_init_timeout\
+			dev_init_timeout = jiffies + (ha->fcoe_dev_init_timeout
 							 * HZ);
 			break;
 		case QLA8XXX_DEV_QUIESCENT:
@@ -3303,7 +3302,7 @@ qla82xx_device_state_handler(scsi_qla_host_t *vha)
 			qla82xx_idc_lock(ha);
 
 			/* Reset timeout value after quiescence handler */
-			dev_init_timeout = jiffies + (ha->fcoe_dev_init_timeout\
+			dev_init_timeout = jiffies + (ha->fcoe_dev_init_timeout
 							 * HZ);
 			break;
 		case QLA8XXX_DEV_FAILED:
@@ -3688,7 +3687,7 @@ qla82xx_chip_reset_cleanup(scsi_qla_host_t *vha)
 			for (cnt = 1; cnt < req->num_outstanding_cmds; cnt++) {
 				sp = req->outstanding_cmds[cnt];
 				if (sp) {
-					if ((!sp->u.scmd.ctx ||
+					if ((!sp->u.scmd.crc_ctx ||
 					    (sp->flags &
 						SRB_FCP_CMND_DMA_VALID)) &&
 						!ha->flags.isp82xx_fw_hung) {
@@ -3712,10 +3711,12 @@ qla82xx_chip_reset_cleanup(scsi_qla_host_t *vha)
 
 		/* Wait for pending cmds (physical and virtual) to complete */
 		if (qla2x00_eh_wait_for_pending_commands(vha, 0, 0,
-		    WAIT_HOST)) {
+		    WAIT_HOST) == QLA_SUCCESS) {
 			ql_dbg(ql_dbg_init, vha, 0x00b3,
 			    "Done wait for "
 			    "pending commands.\n");
+		} else {
+			WARN_ON_ONCE(true);
 		}
 	}
 }
@@ -4234,7 +4235,7 @@ qla82xx_md_collect(scsi_qla_host_t *vha)
 		goto md_failed;
 	}
 
-	entry_hdr = (qla82xx_md_entry_hdr_t *) \
+	entry_hdr = (qla82xx_md_entry_hdr_t *)
 	    (((uint8_t *)ha->md_tmplt_hdr) + tmplt_hdr->first_entry_offset);
 
 	/* Walk through the entry headers */
@@ -4341,7 +4342,7 @@ qla82xx_md_collect(scsi_qla_host_t *vha)
 		data_collected = (uint8_t *)data_ptr -
 		    (uint8_t *)ha->md_dump;
 skip_nxt_entry:
-		entry_hdr = (qla82xx_md_entry_hdr_t *) \
+		entry_hdr = (qla82xx_md_entry_hdr_t *)
 		    (((uint8_t *)entry_hdr) + entry_hdr->entry_size);
 	}
 

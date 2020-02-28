@@ -1257,7 +1257,7 @@ static int reiserfs_link(struct dentry *old_dentry, struct inode *dir,
 
 /* de contains information pointing to an entry which */
 static int de_still_valid(const char *name, int len,
-			  struct reiserfs_dir_entry *de)
+			  const struct reiserfs_dir_entry *de)
 {
 	struct reiserfs_dir_entry tmp = *de;
 
@@ -1269,23 +1269,31 @@ static int de_still_valid(const char *name, int len,
 	return 1;
 }
 
-static int entry_points_to_object(const char *name, int len,
-				  struct reiserfs_dir_entry *de,
-				  struct inode *inode)
+static int entry_points_to_object(const struct inode *dir,
+				  const char *name, int len,
+				  const struct reiserfs_dir_entry *de,
+				  const struct inode *inode)
 {
 	if (!de_still_valid(name, len, de))
 		return 0;
 
 	if (inode) {
-		if (!de_visible(de->de_deh + de->de_entry_num))
-			reiserfs_panic(inode->i_sb, "vs-7042",
-				       "entry must be visible");
+		if (!de_visible(de->de_deh + de->de_entry_num)) {
+			reiserfs_error(dir->i_sb, "vs-7042",
+				       "entry must be visible (%.*s in dir %k",
+				       len, name, INODE_PKEY(dir));
+			return -EIO;
+		}
 		return (de->de_objectid == inode->i_ino) ? 1 : 0;
 	}
 
 	/* this must be added hidden entry */
-	if (de_visible(de->de_deh + de->de_entry_num))
-		reiserfs_panic(NULL, "vs-7043", "entry must be visible");
+	if (de_visible(de->de_deh + de->de_entry_num)) {
+		reiserfs_error(dir->i_sb, "vs-7043",
+			       "entry must be invisible (%.*s in dir %k",
+			       len, name, INODE_PKEY(dir));
+		return -EIO;
+	}
 
 	return 1;
 }
@@ -1392,7 +1400,8 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		    reiserfs_find_entry(old_inode, "..", 2, &dot_dot_entry_path,
 					&dot_dot_de);
 		pathrelse(&dot_dot_entry_path);
-		if (retval != NAME_FOUND) {
+		if (retval != NAME_FOUND ||
+		    dot_dot_de.de_objectid != old_dir->i_ino) {
 			reiserfs_write_unlock(old_dir->i_sb);
 			return -EIO;
 		}
@@ -1476,6 +1485,33 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			return -EIO;
 		}
 
+		/*
+		 * If this entry is corrupted and points somewhere else,
+		 * we'll loop forever as we check to ensure it points to
+		 * the expected object in the sanity check below.  Since
+		 * we can't have scheduled yet after finding this one,
+		 * check it now so we can bail early.
+		 */
+		if (new_dentry_inode &&
+		    new_de.de_objectid != new_dentry_inode->i_ino) {
+			struct reiserfs_key *key = INODE_PKEY(new_dentry_inode);
+
+			reiserfs_error(old_inode->i_sb, "namei-7055",
+"directory entry for %.*s points to [%u, %u]; expected [%u, %u], ino %lu",
+				       new_dentry->d_name.len,
+				       new_dentry->d_name.name,
+				       new_de.de_dir_id, new_de.de_objectid,
+				       le32_to_cpu(key->k_dir_id),
+				       le32_to_cpu(key->k_objectid),
+				       new_dentry_inode->i_ino);
+
+			pathrelse(&new_entry_path);
+			pathrelse(&old_entry_path);
+			journal_end(&th);
+			reiserfs_write_unlock(old_dir->i_sb);
+			return -EIO;
+		}
+
 		copy_item_head(&new_entry_ih, tp_item_head(&new_entry_path));
 
 		reiserfs_prepare_for_journal(old_inode->i_sb, new_de.de_bh, 1);
@@ -1516,47 +1552,65 @@ static int reiserfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		 * of the above checks could have scheduled.  We have to be
 		 * sure our items haven't been shifted by another process.
 		 */
-		if (item_moved(&new_entry_ih, &new_entry_path) ||
-		    !entry_points_to_object(new_dentry->d_name.name,
-					    new_dentry->d_name.len,
-					    &new_de, new_dentry_inode) ||
-		    item_moved(&old_entry_ih, &old_entry_path) ||
-		    !entry_points_to_object(old_dentry->d_name.name,
-					    old_dentry->d_name.len,
-					    &old_de, old_inode)) {
-			reiserfs_restore_prepared_buffer(old_inode->i_sb,
-							 new_de.de_bh);
-			reiserfs_restore_prepared_buffer(old_inode->i_sb,
-							 old_de.de_bh);
-			if (S_ISDIR(old_inode_mode))
-				reiserfs_restore_prepared_buffer(old_inode->
-								 i_sb,
-								 dot_dot_de.
-								 de_bh);
-			continue;
+		if (item_moved(&new_entry_ih, &new_entry_path)) {
+			retval = 0;
+			goto restore;
 		}
+
+		retval = entry_points_to_object(new_dir,
+						new_dentry->d_name.name,
+						new_dentry->d_name.len,
+						&new_de, new_dentry_inode);
+		if (retval != 1)
+			goto restore;
+
+		if (item_moved(&old_entry_ih, &old_entry_path)) {
+			retval = 0;
+			goto restore;
+		}
+
+		retval = entry_points_to_object(old_dir,
+						old_dentry->d_name.name,
+						old_dentry->d_name.len,
+						&old_de, old_inode);
+		if (retval != 1)
+			goto restore;
+
 		if (S_ISDIR(old_inode_mode)) {
-			if (item_moved(&dot_dot_ih, &dot_dot_entry_path) ||
-			    !entry_points_to_object("..", 2, &dot_dot_de,
-						    old_dir)) {
-				reiserfs_restore_prepared_buffer(old_inode->
-								 i_sb,
-								 old_de.de_bh);
-				reiserfs_restore_prepared_buffer(old_inode->
-								 i_sb,
-								 new_de.de_bh);
-				reiserfs_restore_prepared_buffer(old_inode->
-								 i_sb,
-								 dot_dot_de.
-								 de_bh);
-				continue;
+			if (item_moved(&dot_dot_ih, &dot_dot_entry_path)) {
+				retval = 0;
+				goto restore;
 			}
+
+			retval = entry_points_to_object(old_dir, "..", 2,
+							&dot_dot_de, old_dir);
+			if (retval != 1)
+				goto restore;
 		}
+
+		retval = 0;
 
 		RFALSE(S_ISDIR(old_inode_mode) &&
 		       !buffer_journal_prepared(dot_dot_de.de_bh), "");
 
 		break;
+
+restore:
+		reiserfs_restore_prepared_buffer(old_inode->i_sb,
+						 new_de.de_bh);
+		reiserfs_restore_prepared_buffer(old_inode->i_sb,
+						 old_de.de_bh);
+		if (S_ISDIR(old_inode_mode))
+			reiserfs_restore_prepared_buffer(old_inode->i_sb,
+							 dot_dot_de.de_bh);
+		if (retval) {
+			pathrelse(&dot_dot_entry_path);
+			pathrelse(&new_entry_path);
+			pathrelse(&old_entry_path);
+			journal_end(&th);
+			reiserfs_write_unlock(old_dir->i_sb);
+			return retval;
+		}
 	}
 
 	/*

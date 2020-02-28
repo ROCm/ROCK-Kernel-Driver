@@ -347,10 +347,15 @@ DECLARE_PER_CPU(struct tick_device, tick_cpu_device);
 /* Initialize timers: */
 extern void hrtimer_init(struct hrtimer *timer, clockid_t which_clock,
 			 enum hrtimer_mode mode);
+extern void hrtimer_init_sleeper(struct hrtimer_sleeper *sl, clockid_t clock_id,
+				 enum hrtimer_mode mode);
 
 #ifdef CONFIG_DEBUG_OBJECTS_TIMERS
 extern void hrtimer_init_on_stack(struct hrtimer *timer, clockid_t which_clock,
 				  enum hrtimer_mode mode);
+extern void hrtimer_init_sleeper_on_stack(struct hrtimer_sleeper *sl,
+					  clockid_t clock_id,
+					  enum hrtimer_mode mode);
 
 extern void destroy_hrtimer_on_stack(struct hrtimer *timer);
 #else
@@ -360,6 +365,14 @@ static inline void hrtimer_init_on_stack(struct hrtimer *timer,
 {
 	hrtimer_init(timer, which_clock, mode);
 }
+
+static inline void hrtimer_init_sleeper_on_stack(struct hrtimer_sleeper *sl,
+						 clockid_t clock_id,
+						 enum hrtimer_mode mode)
+{
+	hrtimer_init_sleeper(sl, clock_id, mode);
+}
+
 static inline void destroy_hrtimer_on_stack(struct hrtimer *timer) { }
 #endif
 
@@ -395,6 +408,9 @@ static inline void hrtimer_start_expires(struct hrtimer *timer,
 	hrtimer_start_range_ns(timer, soft, delta, mode);
 }
 
+void hrtimer_sleeper_start_expires(struct hrtimer_sleeper *sl,
+				   enum hrtimer_mode mode);
+
 static inline void hrtimer_restart(struct hrtimer *timer)
 {
 	hrtimer_start_expires(timer, HRTIMER_MODE_ABS);
@@ -413,12 +429,18 @@ extern u64 hrtimer_next_event_without(const struct hrtimer *exclude);
 
 extern bool hrtimer_active(const struct hrtimer *timer);
 
-/*
- * Helper function to check, whether the timer is on one of the queues
+/**
+ * hrtimer_is_queued = check, whether the timer is on one of the queues
+ * @timer:	Timer to check
+ *
+ * Returns: True if the timer is queued, false otherwise
+ *
+ * The function can be used lockless, but it gives only a current snapshot.
  */
-static inline int hrtimer_is_queued(struct hrtimer *timer)
+static inline bool hrtimer_is_queued(struct hrtimer *timer)
 {
-	return timer->state & HRTIMER_STATE_ENQUEUED;
+	/* The READ_ONCE pairs with the update functions of timer->state */
+	return !!(READ_ONCE(timer->state) & HRTIMER_STATE_ENQUEUED);
 }
 
 /*
@@ -463,11 +485,8 @@ extern long hrtimer_nanosleep(const struct timespec64 *rqtp,
 			      const enum hrtimer_mode mode,
 			      const clockid_t clockid);
 
-extern void hrtimer_init_sleeper(struct hrtimer_sleeper *sl,
-				 struct task_struct *tsk);
-
 extern int schedule_hrtimeout_range(ktime_t *expires, u64 delta,
-						const enum hrtimer_mode mode);
+				    const enum hrtimer_mode mode);
 extern int schedule_hrtimeout_range_clock(ktime_t *expires,
 					  u64 delta,
 					  const enum hrtimer_mode mode,

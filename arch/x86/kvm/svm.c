@@ -420,6 +420,8 @@ enum {
 
 #define VMCB_AVIC_APIC_BAR_MASK		0xFFFFFFFFFF000ULL
 
+static DEFINE_MUTEX(sev_deactivate_lock);
+static DEFINE_MUTEX(sev_bitmap_lock);
 static unsigned int max_sev_asid;
 static unsigned int min_sev_asid;
 static unsigned long *sev_asid_bitmap;
@@ -1300,6 +1302,47 @@ static void shrink_ple_window(struct kvm_vcpu *vcpu)
 				    control->pause_filter_count, old);
 }
 
+/*
+ * The default MMIO mask is a single bit (excluding the present bit),
+ * which could conflict with the memory encryption bit. Check for
+ * memory encryption support and override the default MMIO mask if
+ * memory encryption is enabled.
+ */
+static __init void svm_adjust_mmio_mask(void)
+{
+	unsigned int enc_bit, mask_bit;
+	u64 msr, mask;
+
+	/* If there is no memory encryption support, use existing mask */
+	if (cpuid_eax(0x80000000) < 0x8000001f)
+		return;
+
+	/* If memory encryption is not enabled, use existing mask */
+	rdmsrl(MSR_K8_SYSCFG, msr);
+	if (!(msr & MSR_K8_SYSCFG_MEM_ENCRYPT))
+		return;
+
+	enc_bit = cpuid_ebx(0x8000001f) & 0x3f;
+	mask_bit = boot_cpu_data.x86_phys_bits;
+
+	/* Increment the mask bit if it is the same as the encryption bit */
+	if (enc_bit == mask_bit)
+		mask_bit++;
+
+	/*
+	 * If the mask bit location is below 52, then some bits above the
+	 * physical addressing limit will always be reserved, so use the
+	 * rsvd_bits() function to generate the mask. This mask, along with
+	 * the present bit, will be used to generate a page fault with
+	 * PFER.RSV = 1.
+	 *
+	 * If the mask bit location is 52 (or above), then clear the mask.
+	 */
+	mask = (mask_bit < 52) ? rsvd_bits(mask_bit, 51) | PT_PRESENT_MASK : 0;
+
+	kvm_mmu_set_mmio_spte_mask(mask, mask, PT_WRITABLE_MASK | PT_USER_MASK);
+}
+
 static __init int svm_hardware_setup(void)
 {
 	int cpu;
@@ -1353,6 +1396,8 @@ static __init int svm_hardware_setup(void)
 			sev = false;
 		}
 	}
+
+	svm_adjust_mmio_mask();
 
 	for_each_possible_cpu(cpu) {
 		r = svm_cpu_init(cpu);
@@ -1730,25 +1775,22 @@ static int avic_init_backing_page(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
-static void __sev_asid_free(int asid)
+static void sev_asid_free(int asid)
 {
 	struct svm_cpu_data *sd;
 	int cpu, pos;
 
+	mutex_lock(&sev_bitmap_lock);
+
 	pos = asid - 1;
-	clear_bit(pos, sev_asid_bitmap);
+	__clear_bit(pos, sev_asid_bitmap);
 
 	for_each_possible_cpu(cpu) {
 		sd = per_cpu(svm_data, cpu);
 		sd->sev_vmcbs[pos] = NULL;
 	}
-}
 
-static void sev_asid_free(struct kvm *kvm)
-{
-	struct kvm_sev_info *sev = &to_kvm_svm(kvm)->sev_info;
-
-	__sev_asid_free(sev->asid);
+	mutex_unlock(&sev_bitmap_lock);
 }
 
 static void sev_unbind_asid(struct kvm *kvm, unsigned int handle)
@@ -1765,10 +1807,20 @@ static void sev_unbind_asid(struct kvm *kvm, unsigned int handle)
 
 	/* deactivate handle */
 	data->handle = handle;
+
+	/*
+	 * Guard against a parallel DEACTIVATE command before the DF_FLUSH
+	 * command has completed.
+	 */
+	mutex_lock(&sev_deactivate_lock);
+
 	sev_guest_deactivate(data, NULL);
 
 	wbinvd_on_all_cpus();
 	sev_guest_df_flush(NULL);
+
+	mutex_unlock(&sev_deactivate_lock);
+
 	kfree(data);
 
 	decommission = kzalloc(sizeof(*decommission), GFP_KERNEL);
@@ -1917,7 +1969,7 @@ static void sev_vm_destroy(struct kvm *kvm)
 	mutex_unlock(&kvm->lock);
 
 	sev_unbind_asid(kvm, sev->handle);
-	sev_asid_free(kvm);
+	sev_asid_free(sev->asid);
 }
 
 static void avic_vm_destroy(struct kvm *kvm)
@@ -4238,23 +4290,7 @@ static int svm_get_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 
 static int rdmsr_interception(struct vcpu_svm *svm)
 {
-	u32 ecx = kvm_rcx_read(&svm->vcpu);
-	struct msr_data msr_info;
-
-	msr_info.index = ecx;
-	msr_info.host_initiated = false;
-	if (svm_get_msr(&svm->vcpu, &msr_info)) {
-		trace_kvm_msr_read_ex(ecx);
-		kvm_inject_gp(&svm->vcpu, 0);
-		return 1;
-	} else {
-		trace_kvm_msr_read(ecx, msr_info.data);
-
-		kvm_rax_write(&svm->vcpu, msr_info.data & 0xffffffff);
-		kvm_rdx_write(&svm->vcpu, msr_info.data >> 32);
-		svm->next_rip = kvm_rip_read(&svm->vcpu) + 2;
-		return kvm_skip_emulated_instruction(&svm->vcpu);
-	}
+	return kvm_emulate_rdmsr(&svm->vcpu);
 }
 
 static int svm_set_vm_cr(struct kvm_vcpu *vcpu, u64 data)
@@ -4444,23 +4480,7 @@ static int svm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr)
 
 static int wrmsr_interception(struct vcpu_svm *svm)
 {
-	struct msr_data msr;
-	u32 ecx = kvm_rcx_read(&svm->vcpu);
-	u64 data = kvm_read_edx_eax(&svm->vcpu);
-
-	msr.data = data;
-	msr.index = ecx;
-	msr.host_initiated = false;
-
-	svm->next_rip = kvm_rip_read(&svm->vcpu) + 2;
-	if (kvm_set_msr(&svm->vcpu, &msr)) {
-		trace_kvm_msr_write_ex(ecx, data);
-		kvm_inject_gp(&svm->vcpu, 0);
-		return 1;
-	} else {
-		trace_kvm_msr_write(ecx, data);
-		return kvm_skip_emulated_instruction(&svm->vcpu);
-	}
+	return kvm_emulate_wrmsr(&svm->vcpu);
 }
 
 static int msr_interception(struct vcpu_svm *svm)
@@ -5031,9 +5051,14 @@ static int handle_exit(struct kvm_vcpu *vcpu)
 
 	if (exit_code >= ARRAY_SIZE(svm_exit_handlers)
 	    || !svm_exit_handlers[exit_code]) {
-		WARN_ONCE(1, "svm: unexpected exit reason 0x%x\n", exit_code);
-		kvm_queue_exception(vcpu, UD_VECTOR);
-		return 1;
+		vcpu_unimpl(vcpu, "svm: unexpected exit reason 0x%x\n", exit_code);
+		dump_vmcb(vcpu);
+		vcpu->run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
+		vcpu->run->internal.suberror =
+			KVM_INTERNAL_ERROR_UNEXPECTED_EXIT_REASON;
+		vcpu->run->internal.ndata = 1;
+		vcpu->run->internal.data[0] = exit_code;
+		return 0;
 	}
 
 	return svm_exit_handlers[exit_code](svm);
@@ -5932,6 +5957,9 @@ static void svm_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 
+	vcpu->arch.xsaves_enabled = guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
+				    boot_cpu_has(X86_FEATURE_XSAVES);
+
 	/* Update nrips enabled cache */
 	svm->nrips_enabled = !!guest_cpuid_has(&svm->vcpu, X86_FEATURE_NRIPS);
 
@@ -6016,6 +6044,11 @@ static bool svm_pt_supported(void)
 static bool svm_has_wbinvd_exit(void)
 {
 	return true;
+}
+
+static bool svm_pku_supported(void)
+{
+	return false;
 }
 
 #define PRE_EX(exit)  { .exit_code = (exit), \
@@ -6305,14 +6338,21 @@ static int sev_asid_new(void)
 {
 	int pos;
 
+	mutex_lock(&sev_bitmap_lock);
+
 	/*
 	 * SEV-enabled guest must use asid from min_sev_asid to max_sev_asid.
 	 */
 	pos = find_next_zero_bit(sev_asid_bitmap, max_sev_asid, min_sev_asid - 1);
-	if (pos >= max_sev_asid)
+	if (pos >= max_sev_asid) {
+		mutex_unlock(&sev_bitmap_lock);
 		return -EBUSY;
+	}
 
-	set_bit(pos, sev_asid_bitmap);
+	__set_bit(pos, sev_asid_bitmap);
+
+	mutex_unlock(&sev_bitmap_lock);
+
 	return pos + 1;
 }
 
@@ -6340,7 +6380,7 @@ static int sev_guest_init(struct kvm *kvm, struct kvm_sev_cmd *argp)
 	return 0;
 
 e_free:
-	__sev_asid_free(asid);
+	sev_asid_free(asid);
 	return ret;
 }
 
@@ -6350,9 +6390,18 @@ static int sev_bind_asid(struct kvm *kvm, unsigned int handle, int *error)
 	int asid = sev_get_asid(kvm);
 	int ret;
 
+	/*
+	 * Guard against a DEACTIVATE command before the DF_FLUSH command
+	 * has completed.
+	 */
+	mutex_lock(&sev_deactivate_lock);
+
 	wbinvd_on_all_cpus();
 
 	ret = sev_guest_df_flush(error);
+
+	mutex_unlock(&sev_deactivate_lock);
+
 	if (ret)
 		return ret;
 
@@ -7301,6 +7350,7 @@ static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.xsaves_supported = svm_xsaves_supported,
 	.umip_emulated = svm_umip_emulated,
 	.pt_supported = svm_pt_supported,
+	.pku_supported = svm_pku_supported,
 
 	.set_supported_cpuid = svm_set_supported_cpuid,
 

@@ -740,8 +740,14 @@ int open_shroot(unsigned int xid, struct cifs_tcon *tcon, struct cifs_fid *pfid)
 
 	/* Cached root is still invalid, continue normaly */
 
-	if (rc)
+	if (rc) {
+		if (rc == -EREMCHG) {
+			tcon->need_reconnect = true;
+			printk_once(KERN_WARNING "server share %s deleted\n",
+				    tcon->treeName);
+		}
 		goto oshr_exit;
+	}
 
 	atomic_inc(&tcon->num_remote_opens);
 
@@ -2220,6 +2226,11 @@ smb2_query_info_compound(const unsigned int xid, struct cifs_tcon *tcon,
 				resp_buftype, rsp_iov);
 	if (rc) {
 		free_rsp_buf(resp_buftype[1], rsp_iov[1].iov_base);
+		if (rc == -EREMCHG) {
+			tcon->need_reconnect = true;
+			printk_once(KERN_WARNING "server share %s deleted\n",
+				    tcon->treeName);
+		}
 		goto qic_exit;
 	}
 	*rsp = rsp_iov[1];

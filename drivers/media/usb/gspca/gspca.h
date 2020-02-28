@@ -130,6 +130,8 @@ struct sd_desc {
 	   int_pkt_scan is NULL, for cams with non interrupt driven buttons */
 	u8 other_input;
 #endif
+
+	void *suse_kabi_padding;
 };
 
 /* packet types when moving from iso buf to frame buf */
@@ -213,6 +215,8 @@ struct gspca_dev {
 	/* (*) These variables are proteced by both usb_lock and queue_lock,
 	   that is any code setting them is holding *both*, which means that
 	   any code getting them needs to hold at least one of them */
+
+	void *suse_kabi_padding;
 };
 
 int gspca_dev_probe(struct usb_interface *intf,

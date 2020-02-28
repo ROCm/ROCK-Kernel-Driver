@@ -26,9 +26,6 @@
 #include <linux/percpu.h>
 #include <asm/module.h>
 
-/* In stripped ARM and x86-64 modules, ~ is surprisingly rare. */
-#define MODULE_SIG_STRING "~Module signature appended~\n"
-
 /* Not Yet Implemented */
 #define MODULE_SUPPORTED_DEVICE(name)
 
@@ -280,6 +277,8 @@ struct notifier_block;
 
 #ifdef CONFIG_MODULES
 
+#define MODULE_IMPORT_NS(ns) MODULE_INFO(import_ns, #ns)
+
 extern int modules_disabled; /* for sysctl */
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
@@ -336,7 +335,7 @@ struct mod_kallsyms {
 	char *typetab;
 };
 
-#ifdef CONFIG_LIVEPATCH
+#if defined(CONFIG_LIVEPATCH) || defined(__aarch64__)
 struct klp_modinfo {
 	Elf_Ehdr hdr;
 	Elf_Shdr *sechdrs;
@@ -478,7 +477,7 @@ struct module {
 	unsigned long *ftrace_callsites;
 #endif
 
-#ifdef CONFIG_LIVEPATCH
+#if defined(CONFIG_LIVEPATCH) || defined(__aarch64__)
 	bool klp; /* Is this a livepatch module? */
 	bool klp_alive;
 
@@ -508,6 +507,7 @@ struct module {
 	struct error_injection_entry *ei_funcs;
 	unsigned int num_ei_funcs;
 #endif
+	void *suse_kabi_padding;
 } ____cacheline_aligned __randomize_layout;
 #ifndef MODULE_ARCH_INIT
 #define MODULE_ARCH_INIT {}
@@ -536,6 +536,9 @@ bool is_module_address(unsigned long addr);
 bool __is_module_percpu_address(unsigned long addr, unsigned long *can_addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+const char *supported_printable(int taint);
+#endif
 
 static inline bool within_module_core(unsigned long addr,
 				      const struct module *mod)

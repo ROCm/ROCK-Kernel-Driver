@@ -47,6 +47,21 @@ static int page_pool_init(struct page_pool *pool,
 	    (pool->p.dma_dir != DMA_BIDIRECTIONAL))
 		return -EINVAL;
 
+	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV) {
+		/* In order to request DMA-sync-for-device the page
+		 * needs to be mapped
+		 */
+		if (!(pool->p.flags & PP_FLAG_DMA_MAP))
+			return -EINVAL;
+
+		if (!pool->p.max_len)
+			return -EINVAL;
+
+		/* pool->p.offset has to be set according to the address
+		 * offset used by the DMA engine to start copying rx data
+		 */
+	}
+
 	if (ptr_ring_init(&pool->ring, ring_qsize, GFP_KERNEL) < 0)
 		return -ENOMEM;
 
@@ -64,7 +79,7 @@ static int page_pool_init(struct page_pool *pool,
 struct page_pool *page_pool_create(const struct page_pool_params *params)
 {
 	struct page_pool *pool;
-	int err = 0;
+	int err;
 
 	pool = kzalloc_node(sizeof(*pool), GFP_KERNEL, params->nid);
 	if (!pool)
@@ -81,45 +96,84 @@ struct page_pool *page_pool_create(const struct page_pool_params *params)
 }
 EXPORT_SYMBOL(page_pool_create);
 
-/* fast path */
-static struct page *__page_pool_get_cached(struct page_pool *pool)
+static void __page_pool_return_page(struct page_pool *pool, struct page *page);
+
+noinline
+static struct page *page_pool_refill_alloc_cache(struct page_pool *pool)
 {
 	struct ptr_ring *r = &pool->ring;
 	struct page *page;
+	int pref_nid; /* preferred NUMA node */
 
 	/* Quicker fallback, avoid locks when ring is empty */
 	if (__ptr_ring_empty(r))
 		return NULL;
 
-	/* Test for safe-context, caller should provide this guarantee */
-	if (likely(in_serving_softirq())) {
-		if (likely(pool->alloc.count)) {
-			/* Fast-path */
-			page = pool->alloc.cache[--pool->alloc.count];
-			return page;
-		}
-		/* Slower-path: Alloc array empty, time to refill
-		 *
-		 * Open-coded bulk ptr_ring consumer.
-		 *
-		 * Discussion: the ring consumer lock is not really
-		 * needed due to the softirq/NAPI protection, but
-		 * later need the ability to reclaim pages on the
-		 * ring. Thus, keeping the locks.
-		 */
-		spin_lock(&r->consumer_lock);
-		while ((page = __ptr_ring_consume(r))) {
-			if (pool->alloc.count == PP_ALLOC_CACHE_REFILL)
-				break;
+	/* Softirq guarantee CPU and thus NUMA node is stable. This,
+	 * assumes CPU refilling driver RX-ring will also run RX-NAPI.
+	 */
+#ifdef CONFIG_NUMA
+	pref_nid = (pool->p.nid == NUMA_NO_NODE) ? numa_mem_id() : pool->p.nid;
+#else
+	/* Ignore pool->p.nid setting if !CONFIG_NUMA, helps compiler */
+	pref_nid = numa_mem_id(); /* will be zero like page_to_nid() */
+#endif
+
+	/* Slower-path: Get pages from locked ring queue */
+	spin_lock(&r->consumer_lock);
+
+	/* Refill alloc array, but only if NUMA match */
+	do {
+		page = __ptr_ring_consume(r);
+		if (unlikely(!page))
+			break;
+
+		if (likely(page_to_nid(page) == pref_nid)) {
 			pool->alloc.cache[pool->alloc.count++] = page;
+		} else {
+			/* NUMA mismatch;
+			 * (1) release 1 page to page-allocator and
+			 * (2) break out to fallthrough to alloc_pages_node.
+			 * This limit stress on page buddy alloactor.
+			 */
+			__page_pool_return_page(pool, page);
+			page = NULL;
+			break;
 		}
-		spin_unlock(&r->consumer_lock);
-		return page;
+	} while (pool->alloc.count < PP_ALLOC_CACHE_REFILL);
+
+	/* Return last page */
+	if (likely(pool->alloc.count > 0))
+		page = pool->alloc.cache[--pool->alloc.count];
+
+	spin_unlock(&r->consumer_lock);
+	return page;
+}
+
+/* fast path */
+static struct page *__page_pool_get_cached(struct page_pool *pool)
+{
+	struct page *page;
+
+	/* Caller MUST guarantee safe non-concurrent access, e.g. softirq */
+	if (likely(pool->alloc.count)) {
+		/* Fast-path */
+		page = pool->alloc.cache[--pool->alloc.count];
+	} else {
+		page = page_pool_refill_alloc_cache(pool);
 	}
 
-	/* Slow-path: Get page from locked ring queue */
-	page = ptr_ring_consume(&pool->ring);
 	return page;
+}
+
+static void page_pool_dma_sync_for_device(struct page_pool *pool,
+					  struct page *page,
+					  unsigned int dma_sync_size)
+{
+	dma_sync_size = min(dma_sync_size, pool->p.max_len);
+	dma_sync_single_range_for_device(pool->p.dev, page->dma_addr,
+					 pool->p.offset, dma_sync_size,
+					 pool->p.dma_dir);
 }
 
 /* slow path */
@@ -145,7 +199,11 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 	 */
 
 	/* Cache was empty, do real allocation */
+#ifdef CONFIG_NUMA
 	page = alloc_pages_node(pool->p.nid, gfp, pool->p.order);
+#else
+	page = alloc_pages(gfp, pool->p.order);
+#endif
 	if (!page)
 		return NULL;
 
@@ -165,6 +223,9 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 		return NULL;
 	}
 	page->dma_addr = dma;
+
+	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
+		page_pool_dma_sync_for_device(pool, page, pool->p.max_len);
 
 skip_dma_map:
 	/* Track how many pages are held 'in-flight' */
@@ -207,7 +268,7 @@ static s32 page_pool_inflight(struct page_pool *pool)
 
 	inflight = _distance(hold_cnt, release_cnt);
 
-	trace_page_pool_inflight(pool, inflight, hold_cnt, release_cnt);
+	trace_page_pool_release(pool, inflight, hold_cnt, release_cnt);
 	WARN(inflight < 0, "Negative(%d) inflight packet-pages", inflight);
 
 	return inflight;
@@ -288,8 +349,16 @@ static bool __page_pool_recycle_direct(struct page *page,
 	return true;
 }
 
-void __page_pool_put_page(struct page_pool *pool,
-			  struct page *page, bool allow_direct)
+/* page is NOT reusable when:
+ * 1) allocated when system is under some pressure. (page_is_pfmemalloc)
+ */
+static bool pool_page_reusable(struct page_pool *pool, struct page *page)
+{
+	return !page_is_pfmemalloc(page);
+}
+
+void __page_pool_put_page(struct page_pool *pool, struct page *page,
+			  unsigned int dma_sync_size, bool allow_direct)
 {
 	/* This allocator is optimized for the XDP mode that uses
 	 * one-frame-per-page, but have fallbacks that act like the
@@ -297,8 +366,13 @@ void __page_pool_put_page(struct page_pool *pool,
 	 *
 	 * refcnt == 1 means page_pool owns page, and can recycle it.
 	 */
-	if (likely(page_ref_count(page) == 1)) {
+	if (likely(page_ref_count(page) == 1 &&
+		   pool_page_reusable(pool, page))) {
 		/* Read barrier done in page_ref_count / READ_ONCE */
+
+		if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
+			page_pool_dma_sync_for_device(pool, page,
+						      dma_sync_size);
 
 		if (allow_direct && in_serving_softirq())
 			if (__page_pool_recycle_direct(page, pool))
@@ -356,9 +430,12 @@ static void page_pool_free(struct page_pool *pool)
 	kfree(pool);
 }
 
-static void page_pool_scrub(struct page_pool *pool)
+static void page_pool_empty_alloc_cache_once(struct page_pool *pool)
 {
 	struct page *page;
+
+	if (pool->destroy_cnt)
+		return;
 
 	/* Empty alloc cache, assume caller made sure this is
 	 * no-longer in use, and page_pool_alloc_pages() cannot be
@@ -368,6 +445,12 @@ static void page_pool_scrub(struct page_pool *pool)
 		page = pool->alloc.cache[--pool->alloc.count];
 		__page_pool_return_page(pool, page);
 	}
+}
+
+static void page_pool_scrub(struct page_pool *pool)
+{
+	page_pool_empty_alloc_cache_once(pool);
+	pool->destroy_cnt++;
 
 	/* No more consumers should exist, but producers could still
 	 * be in-flight.
@@ -434,3 +517,19 @@ void page_pool_destroy(struct page_pool *pool)
 	schedule_delayed_work(&pool->release_dw, DEFER_TIME);
 }
 EXPORT_SYMBOL(page_pool_destroy);
+
+/* Caller must provide appropriate safe context, e.g. NAPI. */
+void page_pool_update_nid(struct page_pool *pool, int new_nid)
+{
+	struct page *page;
+
+	trace_page_pool_update_nid(pool, new_nid);
+	pool->p.nid = new_nid;
+
+	/* Flush pool alloc cache, as refill will check NUMA node */
+	while (pool->alloc.count) {
+		page = pool->alloc.cache[--pool->alloc.count];
+		__page_pool_return_page(pool, page);
+	}
+}
+EXPORT_SYMBOL(page_pool_update_nid);

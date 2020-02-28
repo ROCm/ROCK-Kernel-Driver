@@ -10,15 +10,18 @@
 #ifndef _UAPI__LINUX_UIO_H
 #define _UAPI__LINUX_UIO_H
 
+#include <linux/libc-compat.h>
 #include <linux/compiler.h>
 #include <linux/types.h>
 
 
+#if __UAPI_DEF_IOVEC
 struct iovec
 {
 	void __user *iov_base;	/* BSD uses caddr_t (1003.1g requires void *) */
 	__kernel_size_t iov_len; /* Must be size_t (1003.1g) */
 };
+#endif /* __UAPI_DEF_IOVEC */
 
 /*
  *	UIO_MAXIOV shall be at least 16 1003.1g (5.4.1.1)

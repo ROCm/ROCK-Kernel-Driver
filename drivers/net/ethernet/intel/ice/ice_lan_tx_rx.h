@@ -199,6 +199,14 @@ enum ice_rxdid {
 /* Receive Flex Descriptor Rx opcode values */
 #define ICE_RX_OPC_MDID		0x01
 
+/* Receive Descriptor MDID values that access packet flags */
+enum ice_flex_mdid_pkt_flags {
+	ICE_RX_MDID_PKT_FLAGS_15_0	= 20,
+	ICE_RX_MDID_PKT_FLAGS_31_16,
+	ICE_RX_MDID_PKT_FLAGS_47_32,
+	ICE_RX_MDID_PKT_FLAGS_63_48,
+};
+
 /* Receive Descriptor MDID values */
 enum ice_flex_rx_mdid {
 	ICE_RX_MDID_FLOW_ID_LOWER	= 5,
@@ -211,7 +219,7 @@ enum ice_flex_rx_mdid {
 /* Rx/Tx Flag64 packet flag bits */
 enum ice_flg64_bits {
 	ICE_FLG_PKT_DSI		= 0,
-	ICE_FLG_EVLAN_x8100	= 15,
+	ICE_FLG_EVLAN_x8100	= 14,
 	ICE_FLG_EVLAN_x9100,
 	ICE_FLG_VLAN_x8100,
 	ICE_FLG_TNL_MAC		= 22,
@@ -290,6 +298,7 @@ struct ice_rlan_ctx {
 	u8 tphdata_ena;
 	u8 tphhead_ena;
 	u16 lrxqthresh; /* bigger than needed, see above for reason */
+	u8 prefena;	/* NOTE: normally must be set to 1 at init */
 };
 
 struct ice_ctx_ele {
@@ -427,6 +436,7 @@ struct ice_tlan_ctx {
 #define ICE_TLAN_CTX_VMVF_TYPE_PF	2
 	u16 src_vsi;
 	u8 tsyn_ena;
+	u8 internal_usage_flag;
 	u8 alt_vlan;
 	u16 cpuid;		/* bigger than needed, see above for reason */
 	u8 wb_mode;

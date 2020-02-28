@@ -208,6 +208,34 @@ static struct bin_attribute notes_attr __ro_after_init  = {
 struct kobject *kernel_kobj;
 EXPORT_SYMBOL_GPL(kernel_kobj);
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+const char *supported_printable(int taint)
+{
+#ifdef CONFIG_SUSE_KERNEL_RELEASE
+	int mask = (1 << TAINT_PROPRIETARY_MODULE) | (1 << TAINT_NO_SUPPORT);
+	if ((taint & mask) == mask)
+		return "No, Proprietary and Unsupported modules are loaded";
+	else if (taint & (1 << TAINT_PROPRIETARY_MODULE))
+		return "No, Proprietary modules are loaded";
+	else if (taint & (1 << TAINT_NO_SUPPORT))
+		return "No, Unsupported modules are loaded";
+	else if (taint & (1 << TAINT_EXTERNAL_SUPPORT))
+		return "Yes, External";
+	else
+		return "Yes";
+#else
+		return "No, Unreleased kernel";
+#endif
+}
+
+static ssize_t supported_show(struct kobject *kobj,
+			      struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%s\n", supported_printable(get_taint()));
+}
+KERNEL_ATTR_RO(supported);
+#endif
+
 static struct attribute * kernel_attrs[] = {
 	&fscaps_attr.attr,
 	&uevent_seqnum_attr.attr,
@@ -228,6 +256,9 @@ static struct attribute * kernel_attrs[] = {
 #ifndef CONFIG_TINY_RCU
 	&rcu_expedited_attr.attr,
 	&rcu_normal_attr.attr,
+#endif
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
+	&supported_attr.attr,
 #endif
 	NULL
 };

@@ -1208,6 +1208,8 @@ static void disable_ch_napi(struct dpaa2_eth_priv *priv)
 	}
 }
 
+static void update_tx_fqids(struct dpaa2_eth_priv *priv);
+
 static int link_state_update(struct dpaa2_eth_priv *priv)
 {
 	struct dpni_link_state state = {0};
@@ -1226,6 +1228,7 @@ static int link_state_update(struct dpaa2_eth_priv *priv)
 
 	priv->link_state = state;
 	if (state.up) {
+		update_tx_fqids(priv);
 		netif_carrier_on(priv->net_dev);
 		netif_tx_start_all_queues(priv->net_dev);
 	} else {
@@ -1706,11 +1709,8 @@ static int setup_xdp(struct net_device *dev, struct bpf_prog *prog)
 	if (prog && !xdp_mtu_valid(priv, dev->mtu))
 		return -EINVAL;
 
-	if (prog) {
-		prog = bpf_prog_add(prog, priv->num_channels);
-		if (IS_ERR(prog))
-			return PTR_ERR(prog);
-	}
+	if (prog)
+		bpf_prog_add(prog, priv->num_channels);
 
 	up = netif_running(dev);
 	need_update = (!!priv->xdp_prog != !!prog);
@@ -2449,6 +2449,47 @@ static void set_enqueue_mode(struct dpaa2_eth_priv *priv)
 		priv->enqueue = dpaa2_eth_enqueue_qd;
 	else
 		priv->enqueue = dpaa2_eth_enqueue_fq;
+}
+
+static void update_tx_fqids(struct dpaa2_eth_priv *priv)
+{
+	struct dpni_queue_id qid = {0};
+	struct dpaa2_eth_fq *fq;
+	struct dpni_queue queue;
+	int i, j, err;
+
+	/* We only use Tx FQIDs for FQID-based enqueue, so check
+	 * if DPNI version supports it before updating FQIDs
+	 */
+	if (dpaa2_eth_cmp_dpni_ver(priv, DPNI_ENQUEUE_FQID_VER_MAJOR,
+				   DPNI_ENQUEUE_FQID_VER_MINOR) < 0)
+		return;
+
+	for (i = 0; i < priv->num_fqs; i++) {
+		fq = &priv->fq[i];
+		if (fq->type != DPAA2_TX_CONF_FQ)
+			continue;
+		for (j = 0; j < dpaa2_eth_tc_count(priv); j++) {
+			err = dpni_get_queue(priv->mc_io, 0, priv->mc_token,
+					     DPNI_QUEUE_TX, j, fq->flowid,
+					     &queue, &qid);
+			if (err)
+				goto out_err;
+
+			fq->tx_fqid[j] = qid.fqid;
+			if (fq->tx_fqid[j] == 0)
+				goto out_err;
+		}
+	}
+
+	priv->enqueue = dpaa2_eth_enqueue_fq;
+
+	return;
+
+out_err:
+	netdev_info(priv->net_dev,
+		    "Error reading Tx FQID, fallback to QDID-based enqueue\n");
+	priv->enqueue = dpaa2_eth_enqueue_qd;
 }
 
 /* Configure the DPNI object this interface is associated with */

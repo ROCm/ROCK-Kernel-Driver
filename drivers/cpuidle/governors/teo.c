@@ -96,7 +96,6 @@ struct teo_idle_state {
  * @time_span_ns: Time between idle state selection and post-wakeup update.
  * @sleep_length_ns: Time till the closest timer event (at the selection time).
  * @states: Idle states data corresponding to this CPU.
- * @last_state: Idle state entered by the CPU last time.
  * @interval_idx: Index of the most recent saved idle interval.
  * @intervals: Saved idle duration values.
  */
@@ -104,7 +103,6 @@ struct teo_cpu {
 	u64 time_span_ns;
 	u64 sleep_length_ns;
 	struct teo_idle_state states[CPUIDLE_STATE_MAX];
-	int last_state;
 	int interval_idx;
 	unsigned int intervals[INTERVALS];
 };
@@ -130,7 +128,9 @@ static void teo_update(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 		 */
 		measured_us = sleep_length_us;
 	} else {
-		unsigned int lat = drv->states[cpu_data->last_state].exit_latency;
+		unsigned int lat;
+
+		lat = drv->states[dev->last_state_idx].exit_latency;
 
 		measured_us = ktime_to_us(cpu_data->time_span_ns);
 		/*
@@ -242,12 +242,12 @@ static int teo_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	struct teo_cpu *cpu_data = per_cpu_ptr(&teo_cpus, dev->cpu);
 	int latency_req = cpuidle_governor_latency_req(dev->cpu);
 	unsigned int duration_us, hits, misses, early_hits;
-	int max_early_idx, constraint_idx, idx, i;
+	int max_early_idx, prev_max_early_idx, constraint_idx, idx, i;
 	ktime_t delta_tick;
 
-	if (cpu_data->last_state >= 0) {
+	if (dev->last_state_idx >= 0) {
 		teo_update(drv, dev);
-		cpu_data->last_state = -1;
+		dev->last_state_idx = -1;
 	}
 
 	cpu_data->time_span_ns = local_clock();
@@ -259,6 +259,7 @@ static int teo_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	misses = 0;
 	early_hits = 0;
 	max_early_idx = -1;
+	prev_max_early_idx = -1;
 	constraint_idx = drv->state_count;
 	idx = -1;
 
@@ -311,6 +312,7 @@ static int teo_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 			 */
 			if (!(tick_nohz_tick_stopped() &&
 			      drv->states[idx].target_residency < TICK_USEC)) {
+				prev_max_early_idx = max_early_idx;
 				early_hits = cpu_data->states[i].early_hits;
 				max_early_idx = idx;
 			}
@@ -337,6 +339,7 @@ static int teo_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		if (early_hits < cpu_data->states[i].early_hits &&
 		    !(tick_nohz_tick_stopped() &&
 		      drv->states[i].target_residency < TICK_USEC)) {
+			prev_max_early_idx = max_early_idx;
 			early_hits = cpu_data->states[i].early_hits;
 			max_early_idx = i;
 		}
@@ -350,9 +353,19 @@ static int teo_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	 * "early hits" metric, but if that cannot be determined, just use the
 	 * state selected so far.
 	 */
-	if (hits <= misses && max_early_idx >= 0) {
-		idx = max_early_idx;
-		duration_us = drv->states[idx].target_residency;
+	if (hits <= misses) {
+		/*
+		 * The current candidate state is not suitable, so take the one
+		 * whose "early hits" metric is the maximum for the range of
+		 * shallower states.
+		 */
+		if (idx == max_early_idx)
+			max_early_idx = prev_max_early_idx;
+
+		if (max_early_idx >= 0) {
+			idx = max_early_idx;
+			duration_us = drv->states[idx].target_residency;
+		}
 	}
 
 	/*
@@ -434,7 +447,7 @@ static void teo_reflect(struct cpuidle_device *dev, int state)
 {
 	struct teo_cpu *cpu_data = per_cpu_ptr(&teo_cpus, dev->cpu);
 
-	cpu_data->last_state = state;
+	dev->last_state_idx = state;
 	/*
 	 * If the wakeup was not "natural", but triggered by one of the safety
 	 * nets, assume that the CPU might have been idle for the entire sleep

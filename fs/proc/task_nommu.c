@@ -156,7 +156,7 @@ static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma)
 
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
-		dev = inode->i_sb->s_dev;
+		dev = inode_get_dev(inode);
 		ino = inode->i_ino;
 		pgoff = (loff_t)vma->vm_pgoff << PAGE_SHIFT;
 	}

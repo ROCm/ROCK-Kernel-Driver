@@ -402,7 +402,7 @@ static void osd_req_op_data_release(struct ceph_osd_request *osd_req,
 	case CEPH_OSD_OP_LIST_WATCHERS:
 		ceph_osd_data_release(&op->list_watchers.response_data);
 		break;
-	case CEPH_OSD_OP_COPY_FROM:
+	case CEPH_OSD_OP_COPY_FROM2:
 		ceph_osd_data_release(&op->copy_from.osd_data);
 		break;
 	default:
@@ -697,7 +697,7 @@ static void get_num_data_items(struct ceph_osd_request *req,
 		case CEPH_OSD_OP_SETXATTR:
 		case CEPH_OSD_OP_CMPXATTR:
 		case CEPH_OSD_OP_NOTIFY_ACK:
-		case CEPH_OSD_OP_COPY_FROM:
+		case CEPH_OSD_OP_COPY_FROM2:
 			*num_request_data_items += 1;
 			break;
 
@@ -841,6 +841,7 @@ int osd_req_op_cls_init(struct ceph_osd_request *osd_req, unsigned int which,
 	struct ceph_pagelist *pagelist;
 	size_t payload_len = 0;
 	size_t size;
+	int ret;
 
 	op = _osd_req_op_init(osd_req, which, CEPH_OSD_OP_CALL, 0);
 
@@ -852,20 +853,27 @@ int osd_req_op_cls_init(struct ceph_osd_request *osd_req, unsigned int which,
 	size = strlen(class);
 	BUG_ON(size > (size_t) U8_MAX);
 	op->cls.class_len = size;
-	ceph_pagelist_append(pagelist, class, size);
+	ret = ceph_pagelist_append(pagelist, class, size);
+	if (ret)
+		goto err_pagelist_free;
 	payload_len += size;
 
 	op->cls.method_name = method;
 	size = strlen(method);
 	BUG_ON(size > (size_t) U8_MAX);
 	op->cls.method_len = size;
-	ceph_pagelist_append(pagelist, method, size);
+	ret = ceph_pagelist_append(pagelist, method, size);
+	if (ret)
+		goto err_pagelist_free;
 	payload_len += size;
 
 	osd_req_op_cls_request_info_pagelist(osd_req, which, pagelist);
-
 	op->indata_len = payload_len;
 	return 0;
+
+err_pagelist_free:
+	ceph_pagelist_release(pagelist);
+	return ret;
 }
 EXPORT_SYMBOL(osd_req_op_cls_init);
 
@@ -877,6 +885,7 @@ int osd_req_op_xattr_init(struct ceph_osd_request *osd_req, unsigned int which,
 						      opcode, 0);
 	struct ceph_pagelist *pagelist;
 	size_t payload_len;
+	int ret;
 
 	BUG_ON(opcode != CEPH_OSD_OP_SETXATTR && opcode != CEPH_OSD_OP_CMPXATTR);
 
@@ -886,10 +895,14 @@ int osd_req_op_xattr_init(struct ceph_osd_request *osd_req, unsigned int which,
 
 	payload_len = strlen(name);
 	op->xattr.name_len = payload_len;
-	ceph_pagelist_append(pagelist, name, payload_len);
+	ret = ceph_pagelist_append(pagelist, name, payload_len);
+	if (ret)
+		goto err_pagelist_free;
 
 	op->xattr.value_len = size;
-	ceph_pagelist_append(pagelist, value, size);
+	ret = ceph_pagelist_append(pagelist, value, size);
+	if (ret)
+		goto err_pagelist_free;
 	payload_len += size;
 
 	op->xattr.cmp_op = cmp_op;
@@ -898,6 +911,10 @@ int osd_req_op_xattr_init(struct ceph_osd_request *osd_req, unsigned int which,
 	ceph_osd_data_pagelist_init(&op->xattr.osd_data, pagelist);
 	op->indata_len = payload_len;
 	return 0;
+
+err_pagelist_free:
+	ceph_pagelist_release(pagelist);
+	return ret;
 }
 EXPORT_SYMBOL(osd_req_op_xattr_init);
 
@@ -1012,7 +1029,7 @@ static u32 osd_req_encode_op(struct ceph_osd_op *dst,
 	case CEPH_OSD_OP_CREATE:
 	case CEPH_OSD_OP_DELETE:
 		break;
-	case CEPH_OSD_OP_COPY_FROM:
+	case CEPH_OSD_OP_COPY_FROM2:
 		dst->copy_from.snapid = cpu_to_le64(src->copy_from.snapid);
 		dst->copy_from.src_version =
 			cpu_to_le64(src->copy_from.src_version);
@@ -1488,7 +1505,6 @@ enum calc_target_result {
 
 static enum calc_target_result calc_target(struct ceph_osd_client *osdc,
 					   struct ceph_osd_request_target *t,
-					   struct ceph_connection *con,
 					   bool any_change)
 {
 	struct ceph_pg_pool_info *pi;
@@ -1950,7 +1966,7 @@ static void setup_request_data(struct ceph_osd_request *req)
 			ceph_osdc_msg_data_add(request_msg,
 					       &op->notify_ack.request_data);
 			break;
-		case CEPH_OSD_OP_COPY_FROM:
+		case CEPH_OSD_OP_COPY_FROM2:
 			ceph_osdc_msg_data_add(request_msg,
 					       &op->copy_from.osd_data);
 			break;
@@ -2272,7 +2288,7 @@ static void __submit_request(struct ceph_osd_request *req, bool wrlocked)
 	dout("%s req %p wrlocked %d\n", __func__, req, wrlocked);
 
 again:
-	ct_res = calc_target(osdc, &req->r_t, NULL, false);
+	ct_res = calc_target(osdc, &req->r_t, false);
 	if (ct_res == CALC_TARGET_POOL_DNE && !wrlocked)
 		goto promote;
 
@@ -2475,6 +2491,14 @@ void ceph_osdc_abort_requests(struct ceph_osd_client *osdc, int err)
 	up_write(&osdc->lock);
 }
 EXPORT_SYMBOL(ceph_osdc_abort_requests);
+
+void ceph_osdc_clear_abort_err(struct ceph_osd_client *osdc)
+{
+	down_write(&osdc->lock);
+	osdc->abort_err = 0;
+	up_write(&osdc->lock);
+}
+EXPORT_SYMBOL(ceph_osdc_clear_abort_err);
 
 static void update_epoch_barrier(struct ceph_osd_client *osdc, u32 eb)
 {
@@ -3087,7 +3111,7 @@ static void linger_submit(struct ceph_osd_linger_request *lreq)
 		lreq->reg_req->r_ops[0].notify.cookie = lreq->linger_id;
 	}
 
-	calc_target(osdc, &lreq->t, NULL, false);
+	calc_target(osdc, &lreq->t, false);
 	osd = lookup_create_osd(osdc, lreq->t.osd, true);
 	link_linger(osd, lreq);
 
@@ -3704,7 +3728,7 @@ recalc_linger_target(struct ceph_osd_linger_request *lreq)
 	struct ceph_osd_client *osdc = lreq->osdc;
 	enum calc_target_result ct_res;
 
-	ct_res = calc_target(osdc, &lreq->t, NULL, true);
+	ct_res = calc_target(osdc, &lreq->t, true);
 	if (ct_res == CALC_TARGET_NEED_RESEND) {
 		struct ceph_osd *osd;
 
@@ -3776,8 +3800,7 @@ static void scan_requests(struct ceph_osd *osd,
 		n = rb_next(n); /* unlink_request(), check_pool_dne() */
 
 		dout("%s req %p tid %llu\n", __func__, req, req->r_tid);
-		ct_res = calc_target(osdc, &req->r_t, &req->r_osd->o_con,
-				     false);
+		ct_res = calc_target(osdc, &req->r_t, false);
 		switch (ct_res) {
 		case CALC_TARGET_NO_ACTION:
 			force_resend_writes = cleared_full ||
@@ -3886,7 +3909,7 @@ static void kick_requests(struct ceph_osd_client *osdc,
 		n = rb_next(n);
 
 		if (req->r_t.epoch < osdc->osdmap->epoch) {
-			ct_res = calc_target(osdc, &req->r_t, NULL, false);
+			ct_res = calc_target(osdc, &req->r_t, false);
 			if (ct_res == CALC_TARGET_POOL_DNE) {
 				erase_request(need_resend, req);
 				check_pool_dne(req);
@@ -5087,6 +5110,24 @@ out_put_req:
 EXPORT_SYMBOL(ceph_osdc_call);
 
 /*
+ * reset all osd connections
+ */
+void ceph_osdc_reopen_osds(struct ceph_osd_client *osdc)
+{
+	struct rb_node *n;
+
+	down_write(&osdc->lock);
+	for (n = rb_first(&osdc->osds); n; ) {
+		struct ceph_osd *osd = rb_entry(n, struct ceph_osd, o_node);
+
+		n = rb_next(n);
+		if (!reopen_osd(osd))
+			kick_osd_requests(osd);
+	}
+	up_write(&osdc->lock);
+}
+
+/*
  * init, shutdown
  */
 int ceph_osdc_init(struct ceph_osd_client *osdc, struct ceph_client *client)
@@ -5274,6 +5315,7 @@ static int osd_req_op_copy_from_init(struct ceph_osd_request *req,
 				     struct ceph_object_locator *src_oloc,
 				     u32 src_fadvise_flags,
 				     u32 dst_fadvise_flags,
+				     u32 truncate_seq, u64 truncate_size,
 				     u8 copy_from_flags)
 {
 	struct ceph_osd_req_op *op;
@@ -5284,7 +5326,8 @@ static int osd_req_op_copy_from_init(struct ceph_osd_request *req,
 	if (IS_ERR(pages))
 		return PTR_ERR(pages);
 
-	op = _osd_req_op_init(req, 0, CEPH_OSD_OP_COPY_FROM, dst_fadvise_flags);
+	op = _osd_req_op_init(req, 0, CEPH_OSD_OP_COPY_FROM2,
+			      dst_fadvise_flags);
 	op->copy_from.snapid = src_snapid;
 	op->copy_from.src_version = src_version;
 	op->copy_from.flags = copy_from_flags;
@@ -5294,6 +5337,8 @@ static int osd_req_op_copy_from_init(struct ceph_osd_request *req,
 	end = p + PAGE_SIZE;
 	ceph_encode_string(&p, end, src_oid->name, src_oid->name_len);
 	encode_oloc(&p, end, src_oloc);
+	ceph_encode_32(&p, truncate_seq);
+	ceph_encode_64(&p, truncate_size);
 	op->indata_len = PAGE_SIZE - (end - p);
 
 	ceph_osd_data_pages_init(&op->copy_from.osd_data, pages,
@@ -5309,6 +5354,7 @@ int ceph_osdc_copy_from(struct ceph_osd_client *osdc,
 			struct ceph_object_id *dst_oid,
 			struct ceph_object_locator *dst_oloc,
 			u32 dst_fadvise_flags,
+			u32 truncate_seq, u64 truncate_size,
 			u8 copy_from_flags)
 {
 	struct ceph_osd_request *req;
@@ -5325,7 +5371,8 @@ int ceph_osdc_copy_from(struct ceph_osd_client *osdc,
 
 	ret = osd_req_op_copy_from_init(req, src_snapid, src_version, src_oid,
 					src_oloc, src_fadvise_flags,
-					dst_fadvise_flags, copy_from_flags);
+					dst_fadvise_flags, truncate_seq,
+					truncate_size, copy_from_flags);
 	if (ret)
 		goto out;
 

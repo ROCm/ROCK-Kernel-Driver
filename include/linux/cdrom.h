@@ -126,6 +126,7 @@ extern void init_cdrom_command(struct packet_command *cgc,
 			       void *buffer, int len, int type);
 extern int cdrom_dummy_generic_packet(struct cdrom_device_info *cdi,
 				      struct packet_command *cgc);
+int cdrom_autoclose(struct cdrom_device_info *cdi);
 
 /* The SCSI spec says there could be 256 slots. */
 #define CDROM_MAX_SLOTS	256

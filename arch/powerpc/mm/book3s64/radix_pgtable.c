@@ -33,19 +33,6 @@
 unsigned int mmu_pid_bits;
 unsigned int mmu_base_pid;
 
-static int native_register_process_table(unsigned long base, unsigned long pg_sz,
-					 unsigned long table_size)
-{
-	unsigned long patb0, patb1;
-
-	patb0 = be64_to_cpu(partition_tb[0].patb0);
-	patb1 = base | table_size | PATB_GR;
-
-	mmu_partition_table_set_entry(0, patb0, patb1);
-
-	return 0;
-}
-
 static __ref void *early_alloc_pgtable(unsigned long size, int nid,
 			unsigned long region_start, unsigned long region_end)
 {
@@ -348,7 +335,11 @@ static void __init radix_init_pgtable(void)
 	}
 
 	/* Find out how many PID bits are supported */
-	if (cpu_has_feature(CPU_FTR_HVMODE)) {
+	if (!cpu_has_feature(CPU_FTR_P9_RADIX_PREFETCH_BUG)) {
+		if (!mmu_pid_bits)
+			mmu_pid_bits = 20;
+		mmu_base_pid = 1;
+	} else if (cpu_has_feature(CPU_FTR_HVMODE)) {
 		if (!mmu_pid_bits)
 			mmu_pid_bits = 20;
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
@@ -380,18 +371,8 @@ static void __init radix_init_pgtable(void)
 	 */
 	rts_field = radix__get_tree_size();
 	process_tb->prtb0 = cpu_to_be64(rts_field | __pa(init_mm.pgd) | RADIX_PGD_INDEX_SIZE);
-	/*
-	 * Fill in the partition table. We are suppose to use effective address
-	 * of process table here. But our linear mapping also enable us to use
-	 * physical address here.
-	 */
-	register_process_table(__pa(process_tb), 0, PRTB_SIZE_SHIFT - 12);
+
 	pr_info("Process table %p and radix root for kernel: %p\n", process_tb, init_mm.pgd);
-	asm volatile("ptesync" : : : "memory");
-	asm volatile(PPC_TLBIE_5(%0,%1,2,1,1) : :
-		     "r" (TLBIEL_INVAL_SET_LPID), "r" (0));
-	asm volatile("eieio; tlbsync; ptesync" : : : "memory");
-	trace_tlbie(0, 0, TLBIEL_INVAL_SET_LPID, 0, 2, 1, 1);
 
 	/*
 	 * The init_mm context is given the first available (non-zero) PID,
@@ -412,20 +393,22 @@ static void __init radix_init_pgtable(void)
 
 static void __init radix_init_partition_table(void)
 {
-	unsigned long rts_field, dw0;
+	unsigned long rts_field, dw0, dw1;
 
 	mmu_partition_table_init();
 	rts_field = radix__get_tree_size();
 	dw0 = rts_field | __pa(init_mm.pgd) | RADIX_PGD_INDEX_SIZE | PATB_HR;
-	mmu_partition_table_set_entry(0, dw0, 0);
+	dw1 = __pa(process_tb) | (PRTB_SIZE_SHIFT - 12) | PATB_GR;
+	mmu_partition_table_set_entry(0, dw0, dw1);
+
+	asm volatile("ptesync" : : : "memory");
+	asm volatile(PPC_TLBIE_5(%0,%1,2,1,1) : :
+		     "r" (TLBIEL_INVAL_SET_LPID), "r" (0));
+	asm volatile("eieio; tlbsync; ptesync" : : : "memory");
+	trace_tlbie(0, 0, TLBIEL_INVAL_SET_LPID, 0, 2, 1, 1);
 
 	pr_info("Initializing Radix MMU\n");
 	pr_info("Partition table %p\n", partition_tb);
-}
-
-void __init radix_init_native(void)
-{
-	register_process_table = native_register_process_table;
 }
 
 static int __init get_idx_from_shift(unsigned int shift)
@@ -621,8 +604,9 @@ void __init radix__early_init_mmu(void)
 	__pmd_frag_nr = RADIX_PMD_FRAG_NR;
 	__pmd_frag_size_shift = RADIX_PMD_FRAG_SIZE_SHIFT;
 
+	radix_init_pgtable();
+
 	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
-		radix_init_native();
 		lpcr = mfspr(SPRN_LPCR);
 		mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
 		radix_init_partition_table();
@@ -633,11 +617,9 @@ void __init radix__early_init_mmu(void)
 
 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
 
-	radix_init_pgtable();
 	/* Switch to the guard PID before turning on MMU */
 	radix__switch_mmu_context(NULL, &init_mm);
-	if (cpu_has_feature(CPU_FTR_HVMODE))
-		tlbiel_all();
+	tlbiel_all();
 }
 
 void radix__early_init_mmu_secondary(void)
@@ -656,8 +638,7 @@ void radix__early_init_mmu_secondary(void)
 	}
 
 	radix__switch_mmu_context(NULL, &init_mm);
-	if (cpu_has_feature(CPU_FTR_HVMODE))
-		tlbiel_all();
+	tlbiel_all();
 }
 
 void radix__mmu_cleanup_all(void)
@@ -737,8 +718,8 @@ static int __meminit stop_machine_change_mapping(void *data)
 
 	spin_unlock(&init_mm.page_table_lock);
 	pte_clear(&init_mm, params->aligned_start, params->pte);
-	create_physical_mapping(params->aligned_start, params->start, -1);
-	create_physical_mapping(params->end, params->aligned_end, -1);
+	create_physical_mapping(__pa(params->aligned_start), __pa(params->start), -1);
+	create_physical_mapping(__pa(params->end), __pa(params->aligned_end), -1);
 	spin_lock(&init_mm.page_table_lock);
 	return 0;
 }

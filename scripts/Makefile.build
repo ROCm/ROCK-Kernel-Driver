@@ -125,6 +125,7 @@ cmd_gensymtypes_c =                                                         \
     scripts/genksyms/genksyms $(if $(1), -T $(2))                           \
      $(patsubst y,-R,$(CONFIG_MODULE_REL_CRCS))                             \
      $(if $(KBUILD_PRESERVE),-p)                                            \
+     $(if $(KBUILD_OVERRIDE),-o)                                            \
      -r $(firstword $(wildcard $(2:.symtypes=.symref) /dev/null))
 
 quiet_cmd_cc_symtypes_c = SYM $(quiet_modtag) $@

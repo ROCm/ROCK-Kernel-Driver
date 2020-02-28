@@ -134,7 +134,7 @@ int hclge_mac_mdio_config(struct hclge_dev *hdev)
 			 "no phy device is connected to mdio bus\n");
 		return 0;
 	} else if (hdev->hw.mac.phy_addr >= PHY_MAX_ADDR) {
-		dev_err(&hdev->pdev->dev, "phy_addr(%d) is too large.\n",
+		dev_err(&hdev->pdev->dev, "phy_addr(%u) is too large.\n",
 			hdev->hw.mac.phy_addr);
 		return -EINVAL;
 	}
@@ -230,6 +230,8 @@ int hclge_mac_connect_phy(struct hnae3_handle *handle)
 	 */
 	linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
 			   phydev->advertising);
+
+	phy_attached_info(phydev);
 
 	return 0;
 }

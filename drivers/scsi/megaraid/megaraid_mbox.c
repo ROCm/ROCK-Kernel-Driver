@@ -1538,13 +1538,20 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 		case MODE_SENSE:
 		{
 			struct scatterlist	*sgl;
-			caddr_t			vaddr;
+			struct page		*pg;
+			unsigned char		*vaddr;
+			unsigned long		flags;
 
 			sgl = scsi_sglist(scp);
-			if (sg_page(sgl)) {
-				vaddr = (caddr_t) sg_virt(&sgl[0]);
+			pg = sg_page(sgl);
+			if (pg) {
+				local_irq_save(flags);
+				vaddr = kmap_atomic(pg) + sgl->offset;
 
 				memset(vaddr, 0, scp->cmnd[4]);
+
+				kunmap_atomic(vaddr);
+				local_irq_restore(flags);
 			}
 			else {
 				con_log(CL_ANN, (KERN_WARNING
@@ -2257,9 +2264,20 @@ megaraid_mbox_dpc(unsigned long devp)
 		if (scp->cmnd[0] == INQUIRY && status == 0 && islogical == 0
 				&& IS_RAID_CH(raid_dev, scb->dev_channel)) {
 
+			struct page		*pg;
+			unsigned char		*vaddr;
+			unsigned long		flags;
+
 			sgl = scsi_sglist(scp);
-			if (sg_page(sgl)) {
-				c = *(unsigned char *) sg_virt(&sgl[0]);
+			pg = sg_page(sgl);
+			if (pg) {
+				local_irq_save(flags);
+				vaddr = kmap_atomic(pg) + sgl->offset;
+
+				c = *vaddr;
+
+				kunmap_atomic(vaddr);
+				local_irq_restore(flags);
 			} else {
 				con_log(CL_ANN, (KERN_WARNING
 						 "megaraid mailbox: invalid sg:%d\n",

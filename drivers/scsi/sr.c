@@ -58,6 +58,7 @@
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */
+#include <scsi/scsi_devinfo.h>
 
 #include "scsi_logging.h"
 #include "sr.h"
@@ -521,29 +522,58 @@ static blk_status_t sr_init_command(struct scsi_cmnd *SCpnt)
 	return ret;
 }
 
-static int sr_block_open(struct block_device *bdev, fmode_t mode)
+static int __sr_block_open(struct block_device *bdev, fmode_t mode)
 {
-	struct scsi_cd *cd;
-	struct scsi_device *sdev;
-	int ret = -ENXIO;
+	struct scsi_cd *cd = scsi_cd(bdev->bd_disk);
+	int ret;
 
-	cd = scsi_cd_get(bdev->bd_disk);
-	if (!cd)
-		goto out;
-
-	sdev = cd->device;
-	scsi_autopm_get_device(sdev);
 	check_disk_change(bdev);
 
 	mutex_lock(&sr_mutex);
 	ret = cdrom_open(&cd->cdi, bdev, mode);
 	mutex_unlock(&sr_mutex);
 
+	return ret;
+}
+
+static int sr_block_open(struct block_device *bdev, fmode_t mode)
+{
+	struct scsi_cd *cd = scsi_cd_get(bdev->bd_disk);
+	struct scsi_device *sdev;
+	int ret;
+
+	if (!cd)
+		return -ENXIO;
+
+	sdev = cd->device;
+	scsi_autopm_get_device(sdev);
+	ret = __sr_block_open(bdev, mode);
 	scsi_autopm_put_device(sdev);
-	if (ret)
+
+	if ((ret == -ERESTARTSYS) || (ret == -ENXIO))
 		scsi_cd_put(cd);
 
-out:
+	return ret;
+}
+
+static int sr_block_open_finish(struct block_device *bdev, fmode_t mode,
+				int ret)
+{
+	struct scsi_cd *cd = scsi_cd(bdev->bd_disk);
+
+	/* wait for drive to get ready */
+	if ((ret == -ENOMEDIUM) && !(mode & FMODE_NDELAY)) {
+		struct scsi_device *sdev = cd->device;
+		/*
+		 * Cannot use sr_block_ioctl because it locks sr_mutex blocking
+		 * out any processes trying to access the drive
+		 */
+		scsi_autopm_get_device(sdev);
+		cdrom_autoclose(&cd->cdi);
+		ret = __sr_block_open(bdev, mode);
+		scsi_autopm_put_device(sdev);
+	}
+
 	return ret;
 }
 
@@ -639,6 +669,7 @@ static const struct block_device_operations sr_bdops =
 {
 	.owner		= THIS_MODULE,
 	.open		= sr_block_open,
+	.open_finish	= sr_block_open_finish,
 	.release	= sr_block_release,
 	.ioctl		= sr_block_ioctl,
 	.check_events	= sr_block_check_events,
@@ -922,6 +953,11 @@ static void get_capabilities(struct scsi_cd *cd)
 		  buffer[n + 4] & 0x20 ? "xa/form2 " : "",	/* can read xa/from2 */
 		  buffer[n + 5] & 0x01 ? "cdda " : "", /* can read audio data */
 		  loadmech[buffer[n + 6] >> 5]);
+	if (cd->device->sdev_bflags & BLIST_NO_TRAY) {
+		buffer[n + 6] &= ~(0xff << 5);
+		sr_printk(KERN_INFO, cd,
+			  "Tray emulation bug workaround: tray -> caddy\n");
+	}
 	if ((buffer[n + 6] >> 5) == 0)
 		/* caddy drives can't close tray... */
 		cd->cdi.mask |= CDC_CLOSE_TRAY;

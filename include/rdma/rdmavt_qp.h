@@ -640,34 +640,14 @@ static inline int rvt_cmp_msn(u32 a, u32 b)
 	return (((int)a) - ((int)b)) << 8;
 }
 
-/**
- * rvt_compute_aeth - compute the AETH (syndrome + MSN)
- * @qp: the queue pair to compute the AETH for
- *
- * Returns the AETH.
- */
 __be32 rvt_compute_aeth(struct rvt_qp *qp);
 
-/**
- * rvt_get_credit - flush the send work queue of a QP
- * @qp: the qp who's send work queue to flush
- * @aeth: the Acknowledge Extended Transport Header
- *
- * The QP s_lock should be held.
- */
 void rvt_get_credit(struct rvt_qp *qp, u32 aeth);
 
-/**
- * rvt_restart_sge - rewind the sge state for a wqe
- * @ss: the sge state pointer
- * @wqe: the wqe to rewind
- * @len: the data length from the start of the wqe in bytes
- *
- * Returns the remaining data length.
- */
 u32 rvt_restart_sge(struct rvt_sge_state *ss, struct rvt_swqe *wqe, u32 len);
 
 /**
+ * rvt_div_round_up_mtu - round up divide
  * @qp - the qp pair
  * @len - the length
  *
@@ -971,6 +951,41 @@ static inline void rvt_free_rq(struct rvt_rq *rq)
 	rq->kwq = NULL;
 	vfree(rq->wq);
 	rq->wq = NULL;
+}
+
+/**
+ * rvt_to_iport - Get the ibport pointer
+ * @qp: the qp pointer
+ *
+ * This function returns the ibport pointer from the qp pointer.
+ */
+static inline struct rvt_ibport *rvt_to_iport(struct rvt_qp *qp)
+{
+	struct rvt_dev_info *rdi = ib_to_rvt(qp->ibqp.device);
+
+	return rdi->ports[qp->port_num - 1];
+}
+
+/**
+ * rvt_rc_credit_avail - Check if there are enough RC credits for the request
+ * @qp: the qp
+ * @wqe: the request
+ *
+ * This function returns false when there are not enough credits for the given
+ * request and true otherwise.
+ */
+static inline bool rvt_rc_credit_avail(struct rvt_qp *qp, struct rvt_swqe *wqe)
+{
+	lockdep_assert_held(&qp->s_lock);
+	if (!(qp->s_flags & RVT_S_UNLIMITED_CREDIT) &&
+	    rvt_cmp_msn(wqe->ssn, qp->s_lsn + 1) > 0) {
+		struct rvt_ibport *rvp = rvt_to_iport(qp);
+
+		qp->s_flags |= RVT_S_WAIT_SSN_CREDIT;
+		rvp->n_rc_crwaits++;
+		return false;
+	}
+	return true;
 }
 
 struct rvt_qp_iter *rvt_qp_iter_init(struct rvt_dev_info *rdi,

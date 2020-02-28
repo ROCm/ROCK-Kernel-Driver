@@ -49,8 +49,22 @@ module_param_named(eh_deadline, shost_eh_deadline, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(eh_deadline,
 		 "SCSI EH timeout in seconds (should be between 0 and 2^31-1)");
 
+static char *shost_async_drv_names;
+module_param_named(disable_async_probing, shost_async_drv_names,
+		   charp, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(disable_async_probing,
+		 "Disable asynchronous device probing for drivers");
+
 static DEFINE_IDA(host_index_ida);
 
+static inline bool cmdline_disable_async_probing(struct scsi_host_template *sht)
+{
+	const char *drv_name = sht->proc_name ? sht->proc_name : sht->name;
+
+	if (!shost_async_drv_names || !strlen(shost_async_drv_names))
+		return false;
+	return parse_option_str(shost_async_drv_names, drv_name);
+}
 
 static void scsi_host_cls_release(struct device *dev)
 {
@@ -418,6 +432,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->cmd_per_lun = sht->cmd_per_lun;
 	shost->unchecked_isa_dma = sht->unchecked_isa_dma;
 	shost->no_write_same = sht->no_write_same;
+	shost->async_device_scan = !cmdline_disable_async_probing(sht);
 
 	if (shost_eh_deadline == -1 || !sht->eh_host_reset_handler)
 		shost->eh_deadline = -1;

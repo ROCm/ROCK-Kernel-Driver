@@ -1426,16 +1426,11 @@ static bool arm_smmu_capable(enum iommu_cap cap)
 	}
 }
 
-static int arm_smmu_match_node(struct device *dev, const void *data)
-{
-	return dev->fwnode == data;
-}
-
 static
 struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
 {
-	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
-						fwnode, arm_smmu_match_node);
+	struct device *dev = driver_find_device_by_fwnode(&arm_smmu_driver.driver,
+							  fwnode);
 	put_device(dev);
 	return dev ? dev_get_drvdata(dev) : NULL;
 }
@@ -2224,10 +2219,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 	for (i = 0; i < num_irqs; ++i) {
 		int irq = platform_get_irq(pdev, i);
 
-		if (irq < 0) {
-			dev_err(dev, "failed to get irq index %d\n", i);
+		if (irq < 0)
 			return -ENODEV;
-		}
 		smmu->irqs[i] = irq;
 	}
 

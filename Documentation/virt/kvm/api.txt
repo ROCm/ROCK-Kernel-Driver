@@ -753,8 +753,8 @@ in-kernel irqchip (GIC), and for in-kernel irqchip can tell the GIC to
 use PPIs designated for specific cpus.  The irq field is interpreted
 like this:
 
-  bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
-  field: | irq_type  | vcpu_index |     irq_id     |
+  bits:  |  31 ... 28  | 27 ... 24 | 23  ... 16 | 15 ... 0 |
+  field: | vcpu2_index | irq_type  | vcpu_index |  irq_id  |
 
 The irq_type field has the following values:
 - irq_type[0]: out-of-kernel GIC: irq_id 0 is IRQ, irq_id 1 is FIQ
@@ -765,6 +765,14 @@ The irq_type field has the following values:
 (The irq_id field thus corresponds nicely to the IRQ ID in the ARM GIC specs)
 
 In both cases, level is used to assert/deassert the line.
+
+When KVM_CAP_ARM_IRQ_LINE_LAYOUT_2 is supported, the target vcpu is
+identified as (256 * vcpu2_index + vcpu_index). Otherwise, vcpu2_index
+must be zero.
+
+Note that on arm/arm64, the KVM_CAP_IRQCHIP capability only conditions
+injection of interrupts for the in-kernel irqchip. KVM_IRQ_LINE can always
+be used for a userspace interrupt controller.
 
 struct kvm_irq_level {
 	union {
@@ -5294,3 +5302,16 @@ Architectures: x86
 This capability indicates that KVM supports paravirtualized Hyper-V IPI send
 hypercalls:
 HvCallSendSyntheticClusterIpi, HvCallSendSyntheticClusterIpiEx.
+8.21 KVM_CAP_HYPERV_DIRECT_TLBFLUSH
+
+Architecture: x86
+
+This capability indicates that KVM running on top of Hyper-V hypervisor
+enables Direct TLB flush for its guests meaning that TLB flush
+hypercalls are handled by Level 0 hypervisor (Hyper-V) bypassing KVM.
+Due to the different ABI for hypercall parameters between Hyper-V and
+KVM, enabling this capability effectively disables all hypercall
+handling by KVM (as some KVM hypercall may be mistakenly treated as TLB
+flush hypercalls by Hyper-V) so userspace should disable KVM identification
+in CPUID and only exposes Hyper-V identification. In this case, guest
+thinks it's running on Hyper-V and only use Hyper-V hypercalls.

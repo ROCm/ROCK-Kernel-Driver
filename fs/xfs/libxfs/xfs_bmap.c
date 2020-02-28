@@ -553,7 +553,7 @@ __xfs_bmap_add_free(
 #endif
 	ASSERT(xfs_bmap_free_item_zone != NULL);
 
-	new = kmem_zone_alloc(xfs_bmap_free_item_zone, KM_SLEEP);
+	new = kmem_zone_alloc(xfs_bmap_free_item_zone, 0);
 	new->xefi_startblock = bno;
 	new->xefi_blockcount = (xfs_extlen_t)len;
 	if (oinfo)
@@ -792,6 +792,7 @@ out_root_realloc:
  */
 void
 xfs_bmap_local_to_extents_empty(
+	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,
 	int			whichfork)
 {
@@ -808,6 +809,7 @@ xfs_bmap_local_to_extents_empty(
 	ifp->if_u1.if_root = NULL;
 	ifp->if_height = 0;
 	XFS_IFORK_FMT_SET(ip, whichfork, XFS_DINODE_FMT_EXTENTS);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 }
 
 
@@ -840,7 +842,7 @@ xfs_bmap_local_to_extents(
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL);
 
 	if (!ifp->if_bytes) {
-		xfs_bmap_local_to_extents_empty(ip, whichfork);
+		xfs_bmap_local_to_extents_empty(tp, ip, whichfork);
 		flags = XFS_ILOG_CORE;
 		goto done;
 	}
@@ -887,7 +889,7 @@ xfs_bmap_local_to_extents(
 
 	/* account for the change in fork size */
 	xfs_idata_realloc(ip, -ifp->if_bytes, whichfork);
-	xfs_bmap_local_to_extents_empty(ip, whichfork);
+	xfs_bmap_local_to_extents_empty(tp, ip, whichfork);
 	flags |= XFS_ILOG_CORE;
 
 	ifp->if_u1.if_root = NULL;
@@ -1099,7 +1101,7 @@ xfs_bmap_add_attrfork(
 	if (error)
 		goto trans_cancel;
 	ASSERT(ip->i_afp == NULL);
-	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
+	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, 0);
 	ip->i_afp->if_flags = XFS_IFEXTENTS;
 	logflags = 0;
 	switch (ip->i_d.di_format) {
@@ -6094,7 +6096,7 @@ __xfs_bmap_add(
 			bmap->br_blockcount,
 			bmap->br_state);
 
-	bi = kmem_alloc(sizeof(struct xfs_bmap_intent), KM_SLEEP | KM_NOFS);
+	bi = kmem_alloc(sizeof(struct xfs_bmap_intent), KM_NOFS);
 	INIT_LIST_HEAD(&bi->bi_list);
 	bi->bi_type = type;
 	bi->bi_owner = ip;

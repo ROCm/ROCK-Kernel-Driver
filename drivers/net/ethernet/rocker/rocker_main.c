@@ -2991,7 +2991,7 @@ static int rocker_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * the device, so no need to pass a callback.
 	 */
 	rocker->fib_nb.notifier_call = rocker_router_fib_event;
-	err = register_fib_notifier(&rocker->fib_nb, NULL);
+	err = register_fib_notifier(&init_net, &rocker->fib_nb, NULL, NULL);
 	if (err)
 		goto err_register_fib_notifier;
 
@@ -3018,7 +3018,7 @@ static int rocker_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 err_register_switchdev_blocking_notifier:
 	unregister_switchdev_notifier(&rocker_switchdev_notifier);
 err_register_switchdev_notifier:
-	unregister_fib_notifier(&rocker->fib_nb);
+	unregister_fib_notifier(&init_net, &rocker->fib_nb);
 err_register_fib_notifier:
 	rocker_remove_ports(rocker);
 err_probe_ports:
@@ -3054,7 +3054,7 @@ static void rocker_remove(struct pci_dev *pdev)
 	unregister_switchdev_blocking_notifier(nb);
 
 	unregister_switchdev_notifier(&rocker_switchdev_notifier);
-	unregister_fib_notifier(&rocker->fib_nb);
+	unregister_fib_notifier(&init_net, &rocker->fib_nb);
 	rocker_remove_ports(rocker);
 	rocker_write32(rocker, CONTROL, ROCKER_CONTROL_RESET);
 	destroy_workqueue(rocker->rocker_owq);

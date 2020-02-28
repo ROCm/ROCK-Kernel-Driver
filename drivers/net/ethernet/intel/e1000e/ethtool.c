@@ -894,8 +894,9 @@ static int e1000_reg_test(struct e1000_adapter *adapter, u64 *data)
 	case e1000_pch2lan:
 	case e1000_pch_lpt:
 	case e1000_pch_spt:
-		/* fall through */
 	case e1000_pch_cnp:
+		/* fall through */
+	case e1000_pch_tgp:
 		mask |= BIT(18);
 		break;
 	default:
@@ -1126,8 +1127,7 @@ static void e1000_free_desc_rings(struct e1000_adapter *adapter)
 						 buffer_info->dma,
 						 buffer_info->length,
 						 DMA_TO_DEVICE);
-			if (buffer_info->skb)
-				dev_kfree_skb(buffer_info->skb);
+			dev_kfree_skb(buffer_info->skb);
 		}
 	}
 
@@ -1139,8 +1139,7 @@ static void e1000_free_desc_rings(struct e1000_adapter *adapter)
 				dma_unmap_single(&pdev->dev,
 						 buffer_info->dma,
 						 2048, DMA_FROM_DEVICE);
-			if (buffer_info->skb)
-				dev_kfree_skb(buffer_info->skb);
+			dev_kfree_skb(buffer_info->skb);
 		}
 	}
 
@@ -1561,6 +1560,7 @@ static void e1000_loopback_cleanup(struct e1000_adapter *adapter)
 	switch (hw->mac.type) {
 	case e1000_pch_spt:
 	case e1000_pch_cnp:
+	case e1000_pch_tgp:
 		fext_nvm11 = er32(FEXTNVM11);
 		fext_nvm11 &= ~E1000_FEXTNVM11_DISABLE_MULR_FIX;
 		ew32(FEXTNVM11, fext_nvm11);

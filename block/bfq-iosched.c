@@ -2016,7 +2016,7 @@ static void bfq_add_request(struct request *rq)
 		     (bfqq->last_serv_time_ns > 0 &&
 		      bfqd->rqs_injected && bfqd->rq_in_driver > 0)) &&
 		    time_is_before_eq_jiffies(bfqq->decrease_time_jif +
-					      msecs_to_jiffies(100))) {
+					      msecs_to_jiffies(10))) {
 			bfqd->last_empty_occupied_ns = ktime_get_ns();
 			/*
 			 * Start the state machine for measuring the
@@ -2025,7 +2025,21 @@ static void bfq_add_request(struct request *rq)
 			 * be set when rq will be dispatched.
 			 */
 			bfqd->wait_dispatch = true;
-			bfqd->rqs_injected = false;
+			/*
+			 * If there is no I/O in service in the drive,
+			 * then possible injection occurred before the
+			 * arrival of rq will not affect the total
+			 * service time of rq. So the injection limit
+			 * must not be updated as a function of such
+			 * total service time, unless new injection
+			 * occurs before rq is completed. To have the
+			 * injection limit updated only in the latter
+			 * case, reset rqs_injected here (rqs_injected
+			 * will be set in case injection is performed
+			 * on bfqq before rq is completed).
+			 */
+			if (bfqd->rq_in_driver == 0)
+				bfqd->rqs_injected = false;
 		}
 	}
 
@@ -3430,6 +3444,10 @@ static void bfq_dispatch_remove(struct request_queue *q, struct request *rq)
 static bool idling_needed_for_service_guarantees(struct bfq_data *bfqd,
 						 struct bfq_queue *bfqq)
 {
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
+
 	return (bfqq->wr_coeff > 1 &&
 		(bfqd->wr_busy_queues <
 		 bfq_tot_busy_queues(bfqd) ||
@@ -4063,6 +4081,10 @@ static bool idling_boosts_thr_without_issues(struct bfq_data *bfqd,
 		bfqq_sequential_and_IO_bound,
 		idling_boosts_thr;
 
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
+
 	bfqq_sequential_and_IO_bound = !BFQQ_SEEKY(bfqq) &&
 		bfq_bfqq_IO_bound(bfqq) && bfq_bfqq_has_short_ttime(bfqq);
 
@@ -4155,6 +4177,10 @@ static bool bfq_better_to_idle(struct bfq_queue *bfqq)
 {
 	struct bfq_data *bfqd = bfqq->bfqd;
 	bool idling_boosts_thr_with_no_issue, idling_needed_for_service_guar;
+
+	/* No point in idling for bfqq if it won't get requests any longer */
+	if (unlikely(!bfqq_process_refs(bfqq)))
+		return false;
 
 	if (unlikely(bfqd->strict_guarantees))
 		return true;
@@ -5804,14 +5830,14 @@ static void bfq_update_inject_limit(struct bfq_data *bfqd,
 	u64 tot_time_ns = ktime_get_ns() - bfqd->last_empty_occupied_ns;
 	unsigned int old_limit = bfqq->inject_limit;
 
-	if (bfqq->last_serv_time_ns > 0) {
+	if (bfqq->last_serv_time_ns > 0 && bfqd->rqs_injected) {
 		u64 threshold = (bfqq->last_serv_time_ns * 3)>>1;
 
 		if (tot_time_ns >= threshold && old_limit > 0) {
 			bfqq->inject_limit--;
 			bfqq->decrease_time_jif = jiffies;
 		} else if (tot_time_ns < threshold &&
-			   old_limit < bfqd->max_rq_in_driver<<1)
+			   old_limit <= bfqd->max_rq_in_driver)
 			bfqq->inject_limit++;
 	}
 
@@ -5852,6 +5878,7 @@ static void bfq_update_inject_limit(struct bfq_data *bfqd,
 
 	/* update complete, not waiting for any request completion any longer */
 	bfqd->waited_rq = NULL;
+	bfqd->rqs_injected = false;
 }
 
 /*

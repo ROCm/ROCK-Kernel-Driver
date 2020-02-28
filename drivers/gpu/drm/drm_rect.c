@@ -54,7 +54,12 @@ EXPORT_SYMBOL(drm_rect_intersect);
 
 static u32 clip_scaled(u32 src, u32 dst, u32 clip)
 {
-	u64 tmp = mul_u32_u32(src, dst - clip);
+	u64 tmp;
+
+	if (dst == 0)
+		return 0;
+
+	tmp = mul_u32_u32(src, dst - clip);
 
 	/*
 	 * Round toward 1.0 when clipping so that we don't accidentally
@@ -73,11 +78,13 @@ static u32 clip_scaled(u32 src, u32 dst, u32 clip)
  * @clip: clip rectangle
  *
  * Clip rectangle @dst by rectangle @clip. Clip rectangle @src by the
- * same amounts multiplied by @hscale and @vscale.
+ * the corresponding amounts, retaining the vertical and horizontal scaling
+ * factors from @src to @dst.
  *
  * RETURNS:
+ *
  * %true if rectangle @dst is still visible after being clipped,
- * %false otherwise
+ * %false otherwise.
  */
 bool drm_rect_clip_scaled(struct drm_rect *src, struct drm_rect *dst,
 			  const struct drm_rect *clip)

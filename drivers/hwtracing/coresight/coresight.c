@@ -1029,9 +1029,7 @@ static void coresight_fixup_device_conns(struct coresight_device *csdev)
 		struct coresight_connection *conn = &csdev->pdata->conns[i];
 		struct device *dev = NULL;
 
-		dev = bus_find_device(&coresight_bustype, NULL,
-				      (void *)conn->child_fwnode,
-				      coresight_device_fwnode_match);
+		dev = bus_find_device_by_fwnode(&coresight_bustype, conn->child_fwnode);
 		if (dev) {
 			conn->child_dev = to_coresight_device(dev);
 			/* and put reference from 'bus_find_device()' */
@@ -1291,6 +1289,12 @@ static inline int coresight_search_device_idx(struct coresight_dev_list *dict,
 		if (dict->fwnode_list[i] == fwnode)
 			return i;
 	return -ENOENT;
+}
+
+bool coresight_loses_context_with_cpu(struct device *dev)
+{
+	return fwnode_property_present(dev_fwnode(dev),
+				       "arm,coresight-loses-context-with-cpu");
 }
 
 /*

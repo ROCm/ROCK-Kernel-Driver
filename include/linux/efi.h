@@ -692,6 +692,9 @@ void efi_native_runtime_setup(void);
 #define LINUX_EFI_TPM_FINAL_LOG_GUID		EFI_GUID(0x1e2ed096, 0x30e2, 0x4254,  0xbd, 0x89, 0x86, 0x3b, 0xbe, 0xf8, 0x23, 0x25)
 #define LINUX_EFI_MEMRESERVE_TABLE_GUID		EFI_GUID(0x888eb0c6, 0x8ede, 0x4ff5,  0xa8, 0xf0, 0x9a, 0xee, 0x5c, 0xb9, 0x77, 0xc2)
 
+/* OEM GUIDs */
+#define DELLEMC_EFI_RCI2_TABLE_GUID		EFI_GUID(0x2d9f28a2, 0xa886, 0x456a,  0x97, 0xa8, 0xf1, 0x1e, 0xf2, 0x4f, 0xf4, 0x55)
+
 typedef struct {
 	efi_guid_t guid;
 	u64 table;
@@ -1201,6 +1204,14 @@ extern int __init efi_setup_pcdp_console(char *);
 #define EFI_DBG			8	/* Print additional debug info at runtime */
 #define EFI_NX_PE_DATA		9	/* Can runtime data regions be mapped non-executable? */
 #define EFI_MEM_ATTR		10	/* Did firmware publish an EFI_MEMORY_ATTRIBUTES table? */
+#define EFI_SECURE_BOOT		11	/* Are we in Secure Boot mode? */
+
+enum efi_secureboot_mode {
+	efi_secureboot_mode_unset,
+	efi_secureboot_mode_unknown,
+	efi_secureboot_mode_disabled,
+	efi_secureboot_mode_enabled,
+};
 
 #ifdef CONFIG_EFI
 /*
@@ -1212,7 +1223,7 @@ static inline bool efi_enabled(int feature)
 }
 extern void efi_reboot(enum reboot_mode reboot_mode, const char *__unused);
 
-extern bool efi_is_table_address(unsigned long phys_addr);
+extern void __init efi_set_secure_boot(enum efi_secureboot_mode mode);
 #else
 static inline bool efi_enabled(int feature)
 {
@@ -1227,13 +1238,11 @@ efi_capsule_pending(int *reset_type)
 	return false;
 }
 
-static inline bool efi_is_table_address(unsigned long phys_addr)
-{
-	return false;
-}
+static inline void efi_set_secure_boot(enum efi_secureboot_mode mode) {}
 #endif
 
 extern int efi_status_to_err(efi_status_t status);
+extern const char *efi_status_to_str(efi_status_t status);
 
 /*
  * Variable Attributes
@@ -1636,12 +1645,6 @@ static inline bool efi_runtime_disabled(void) { return true; }
 extern void efi_call_virt_check_flags(unsigned long flags, const char *call);
 extern unsigned long efi_call_virt_save_flags(void);
 
-enum efi_secureboot_mode {
-	efi_secureboot_mode_unset,
-	efi_secureboot_mode_unknown,
-	efi_secureboot_mode_disabled,
-	efi_secureboot_mode_enabled,
-};
 enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table);
 
 #ifdef CONFIG_RESET_ATTACK_MITIGATION
@@ -1736,6 +1739,8 @@ struct efi_tcg2_final_events_table {
 };
 extern int efi_tpm_final_log_size;
 
+extern unsigned long rci2_table_phys;
+
 /*
  * efi_runtime_service() function identifiers.
  * "NONE" is used by efi_recover_from_page_fault() to check if the page
@@ -1797,4 +1802,33 @@ struct linux_efi_memreserve {
 #define EFI_MEMRESERVE_COUNT(size) (((size) - sizeof(struct linux_efi_memreserve)) \
 	/ sizeof(((struct linux_efi_memreserve *)0)->entry[0]))
 
+#ifdef CONFIG_EFI_SECRET_KEY
+#define EFI_SECRET_GUID \
+	EFI_GUID(0x8c136d32, 0x039a, 0x4016, 0x8b, 0xb4, 0x9e, 0x98, 0x5e, 0x62, 0x78, 0x6f)
+#define SECRET_KEY_SIZE        64
+#define EFI_SECRET_KEY_REGEN \
+	((efi_char16_t [15]) { 'S', 'e', 'c', 'r', 'e', 't', 'K', 'e', 'y', 'R', 'e', 'g', 'e', 'n', 0 })
+#define EFI_SECRET_KEY_REGEN_ATTRIBUTE (EFI_VARIABLE_NON_VOLATILE | \
+					EFI_VARIABLE_BOOTSERVICE_ACCESS | \
+					EFI_VARIABLE_RUNTIME_ACCESS)
+struct efi_skey_setup_data {
+	unsigned long detect_status;
+	unsigned long final_status;
+	unsigned long key_size;
+	u8 secret_key[SECRET_KEY_SIZE];
+};
+extern void *get_efi_secret_key(void);
+extern void efi_skey_stop_regen(void);
+extern void efi_skey_set_regen(void);
+extern int efi_skey_sysfs_init(struct kobject *efi_kobj);
+#else
+#define SECRET_KEY_SIZE        0
+static inline void *get_efi_secret_key(void)
+{
+	return NULL;
+}
+static inline void efi_skey_stop_regen(void) {}
+static inline void efi_skey_set_regen(void) {}
+static inline int efi_skey_sysfs_init(struct kobject *efi_kobj) { return 0; }
+#endif /* CONFIG_EFI_SECRET_KEY */
 #endif /* _LINUX_EFI_H */

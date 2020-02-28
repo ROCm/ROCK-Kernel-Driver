@@ -93,9 +93,7 @@
  * minimal so we rely on the page allocators per cpu caches for
  * fast frees and allocs.
  *
- * Overloading of page flags that are otherwise used for LRU management.
- *
- * PageActive 		The slab is frozen and exempt from list processing.
+ * page->frozen		The slab is frozen and exempt from list processing.
  * 			This means that the slab is dedicated to a purpose
  * 			such as satisfying allocations for a specific
  * 			processor. Objects may be freed in the slab while
@@ -111,7 +109,7 @@
  * 			free objects in addition to the regular freelist
  * 			that requires the slab lock.
  *
- * PageError		Slab requires special handling due to debug
+ * SLAB_DEBUG_FLAGS	Slab requires special handling due to debug
  * 			options set. This moves	slab handling out of
  * 			the fast path and disables lockless freelists.
  */
@@ -290,7 +288,7 @@ static inline void *get_freepointer_safe(struct kmem_cache *s, void *object)
 	unsigned long freepointer_addr;
 	void *p;
 
-	if (!debug_pagealloc_enabled())
+	if (!debug_pagealloc_enabled_static())
 		return get_freepointer(s, object);
 
 	freepointer_addr = (unsigned long)object + s->offset;
@@ -736,6 +734,7 @@ static int check_bytes_and_report(struct kmem_cache *s, struct page *page,
 {
 	u8 *fault;
 	u8 *end;
+	u8 *addr = page_address(page);
 
 	metadata_access_enable();
 	fault = memchr_inv(start, value, bytes);
@@ -748,8 +747,9 @@ static int check_bytes_and_report(struct kmem_cache *s, struct page *page,
 		end--;
 
 	slab_bug(s, "%s overwritten", what);
-	pr_err("INFO: 0x%p-0x%p. First byte 0x%x instead of 0x%x\n",
-					fault, end - 1, fault[0], value);
+	pr_err("INFO: 0x%p-0x%p @offset=%tu. First byte 0x%x instead of 0x%x\n",
+					fault, end - 1, fault - addr,
+					fault[0], value);
 	print_trailer(s, page, object);
 
 	restore_bytes(s, what, value, fault, end);
@@ -829,7 +829,7 @@ static int slab_pad_check(struct kmem_cache *s, struct page *page)
 		return 1;
 
 	start = page_address(page);
-	length = PAGE_SIZE << compound_order(page);
+	length = page_size(page);
 	end = start + length;
 	remainder = length % s->size;
 	if (!remainder)
@@ -844,7 +844,8 @@ static int slab_pad_check(struct kmem_cache *s, struct page *page)
 	while (end > fault && end[-1] == POISON_INUSE)
 		end--;
 
-	slab_err(s, page, "Padding overwritten. 0x%p-0x%p", fault, end - 1);
+	slab_err(s, page, "Padding overwritten. 0x%p-0x%p @offset=%tu",
+			fault, end - 1, fault - start);
 	print_section(KERN_ERR, "Padding ", pad, remainder);
 
 	restore_bytes(s, "slab padding", POISON_INUSE, fault, end);
@@ -1074,13 +1075,14 @@ static void setup_object_debug(struct kmem_cache *s, struct page *page,
 	init_tracking(s, object);
 }
 
-static void setup_page_debug(struct kmem_cache *s, void *addr, int order)
+static
+void setup_page_debug(struct kmem_cache *s, struct page *page, void *addr)
 {
 	if (!(s->flags & SLAB_POISON))
 		return;
 
 	metadata_access_enable();
-	memset(addr, POISON_INUSE, PAGE_SIZE << order);
+	memset(addr, POISON_INUSE, page_size(page));
 	metadata_access_disable();
 }
 
@@ -1340,8 +1342,8 @@ slab_flags_t kmem_cache_flags(unsigned int object_size,
 #else /* !CONFIG_SLUB_DEBUG */
 static inline void setup_object_debug(struct kmem_cache *s,
 			struct page *page, void *object) {}
-static inline void setup_page_debug(struct kmem_cache *s,
-			void *addr, int order) {}
+static inline
+void setup_page_debug(struct kmem_cache *s, struct page *page, void *addr) {}
 
 static inline int alloc_debug_processing(struct kmem_cache *s,
 	struct page *page, void *object, unsigned long addr) { return 0; }
@@ -1618,7 +1620,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	struct kmem_cache_order_objects oo = s->oo;
 	gfp_t alloc_gfp;
 	void *start, *p, *next;
-	int idx, order;
+	int idx;
 	bool shuffle;
 
 	flags &= gfp_allowed_mask;
@@ -1652,7 +1654,6 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 	page->objects = oo_objects(oo);
 
-	order = compound_order(page);
 	page->slab_cache = s;
 	__SetPageSlab(page);
 	if (page_is_pfmemalloc(page))
@@ -1662,7 +1663,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 
 	start = page_address(page);
 
-	setup_page_debug(s, start, order);
+	setup_page_debug(s, page, start);
 
 	shuffle = shuffle_freelist(s, page);
 
@@ -3808,11 +3809,15 @@ static void *kmalloc_large_node(size_t size, gfp_t flags, int node)
 {
 	struct page *page;
 	void *ptr = NULL;
+	unsigned int order = get_order(size);
 
 	flags |= __GFP_COMP;
-	page = alloc_pages_node(node, flags, get_order(size));
-	if (page)
+	page = alloc_pages_node(node, flags, order);
+	if (page) {
 		ptr = page_address(page);
+		mod_node_page_state(page_pgdat(page), NR_SLAB_UNRECLAIMABLE,
+				    1 << order);
+	}
 
 	return kmalloc_large_node_hook(ptr, size, flags);
 }
@@ -3919,7 +3924,7 @@ size_t __ksize(const void *object)
 
 	if (unlikely(!PageSlab(page))) {
 		WARN_ON(!PageCompound(page));
-		return PAGE_SIZE << compound_order(page);
+		return page_size(page);
 	}
 
 	return slab_ksize(page->slab_cache);
@@ -3938,9 +3943,13 @@ void kfree(const void *x)
 
 	page = virt_to_head_page(x);
 	if (unlikely(!PageSlab(page))) {
+		unsigned int order = compound_order(page);
+
 		BUG_ON(!PageCompound(page));
 		kfree_hook(object);
-		__free_pages(page, compound_order(page));
+		mod_node_page_state(page_pgdat(page), NR_SLAB_UNRECLAIMABLE,
+				    -(1 << order));
+		__free_pages(page, order);
 		return;
 	}
 	slab_free(page->slab_cache, page, object, NULL, 1, _RET_IP_);
@@ -4373,31 +4382,26 @@ static int count_total(struct page *page)
 #endif
 
 #ifdef CONFIG_SLUB_DEBUG
-static int validate_slab(struct kmem_cache *s, struct page *page,
+static void validate_slab(struct kmem_cache *s, struct page *page,
 						unsigned long *map)
 {
 	void *p;
 	void *addr = page_address(page);
 
-	if (!check_slab(s, page) ||
-			!on_freelist(s, page, NULL))
-		return 0;
+	if (!check_slab(s, page) || !on_freelist(s, page, NULL))
+		return;
 
 	/* Now we know that a valid freelist exists */
 	bitmap_zero(map, page->objects);
 
 	get_map(s, page, map);
 	for_each_object(p, s, addr, page->objects) {
-		if (test_bit(slab_index(p, s, addr), map))
-			if (!check_object(s, page, p, SLUB_RED_INACTIVE))
-				return 0;
-	}
+		u8 val = test_bit(slab_index(p, s, addr), map) ?
+			 SLUB_RED_INACTIVE : SLUB_RED_ACTIVE;
 
-	for_each_object(p, s, addr, page->objects)
-		if (!test_bit(slab_index(p, s, addr), map))
-			if (!check_object(s, page, p, SLUB_RED_ACTIVE))
-				return 0;
-	return 1;
+		if (!check_object(s, page, p, val))
+			break;
+	}
 }
 
 static void validate_slab_slab(struct kmem_cache *s, struct page *page,

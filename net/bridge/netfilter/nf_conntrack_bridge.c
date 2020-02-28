@@ -15,6 +15,7 @@
 #include <net/netfilter/nf_conntrack_core.h>
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_bridge.h>
+#include <net/netfilter/nf_conntrack_seqadj.h>
 
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/ipv6/nf_defrag_ipv6.h>
@@ -356,6 +357,26 @@ static int nf_ct_bridge_refrag_post(struct net *net, struct sock *sk,
 	return br_dev_queue_push_xmit(net, sk, skb);
 }
 
+static int nf_ct_bridge_skb_protoff(struct sk_buff *skb)
+{
+	if (skb->protocol == ETH_P_IP)
+		return skb_network_offset(skb) + ip_hdrlen(skb);
+
+	if (skb->protocol == ETH_P_IPV6) {
+		unsigned char pnum = ipv6_hdr(skb)->nexthdr;
+		__be16 frag_off;
+		int protoff;
+
+		protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &pnum,
+					   &frag_off);
+		if (protoff < 0 || (frag_off & htons(~0x7)) != 0)
+			return -EINVAL;
+		return protoff;
+	}
+
+	return -EOPNOTSUPP;
+}
+
 static unsigned int nf_ct_bridge_confirm(struct sk_buff *skb)
 {
 	enum ip_conntrack_info ctinfo;
@@ -364,26 +385,25 @@ static unsigned int nf_ct_bridge_confirm(struct sk_buff *skb)
 
 	ct = nf_ct_get(skb, &ctinfo);
 	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
-		return nf_conntrack_confirm(skb);
+		goto out;
 
-	switch (skb->protocol) {
-	case htons(ETH_P_IP):
-		protoff = skb_network_offset(skb) + ip_hdrlen(skb);
-		break;
-	case htons(ETH_P_IPV6): {
-		 unsigned char pnum = ipv6_hdr(skb)->nexthdr;
-		__be16 frag_off;
-
-		protoff = ipv6_skip_exthdr(skb, sizeof(struct ipv6hdr), &pnum,
-					   &frag_off);
-		if (protoff < 0 || (frag_off & htons(~0x7)) != 0)
-			return nf_conntrack_confirm(skb);
-		}
-		break;
-	default:
+	protoff = nf_ct_bridge_skb_protoff(skb);
+	if (protoff == -EOPNOTSUPP)
 		return NF_ACCEPT;
+	if (protoff < 0)
+		goto out;
+
+	/* adjust seqs for loopback traffic only in outgoing direction */
+	if (test_bit(IPS_SEQ_ADJUST_BIT, &ct->status) &&
+	    !nf_is_loopback_packet(skb)) {
+		if (!nf_ct_seq_adjust(skb, ct, ctinfo, protoff)) {
+			NF_CT_STAT_INC_ATOMIC(nf_ct_net(ct), drop);
+			return NF_DROP;
+		}
 	}
-	return nf_confirm(skb, protoff, ct, ctinfo);
+out:
+	/* We've seen it coming out the other side: confirm it */
+	return nf_conntrack_confirm(skb);
 }
 
 static unsigned int nf_ct_bridge_post(void *priv, struct sk_buff *skb,
@@ -398,12 +418,47 @@ static unsigned int nf_ct_bridge_post(void *priv, struct sk_buff *skb,
 	return nf_ct_bridge_refrag(skb, state, nf_ct_bridge_refrag_post);
 }
 
+static unsigned int nf_ct_bridge_helper(void *priv, struct sk_buff *skb,
+					const struct nf_hook_state *state)
+{
+	const struct nf_conntrack_helper *helper;
+	const struct nf_conn_help *help;
+	enum ip_conntrack_info ctinfo;
+	struct nf_conn *ct;
+	int protoff;
+
+	/* This is where we call the helper: as the packet goes out. */
+	ct = nf_ct_get(skb, &ctinfo);
+	if (!ct || ctinfo == IP_CT_RELATED_REPLY)
+		return NF_ACCEPT;
+
+	help = nfct_help(ct);
+	if (!help)
+		return NF_ACCEPT;
+	/* rcu_read_lock()ed by nf_hook_thresh */
+	helper = rcu_dereference(help->helper);
+	if (!helper)
+		return NF_ACCEPT;
+
+	protoff = nf_ct_bridge_skb_protoff(skb);
+	if (protoff < 0)
+		return NF_ACCEPT;
+
+	return helper->help(skb, protoff, ct, ctinfo);
+}
+
 static struct nf_hook_ops nf_ct_bridge_hook_ops[] __read_mostly = {
 	{
 		.hook		= nf_ct_bridge_pre,
 		.pf		= NFPROTO_BRIDGE,
 		.hooknum	= NF_BR_PRE_ROUTING,
 		.priority	= NF_IP_PRI_CONNTRACK,
+	},
+	{
+		.hook		= nf_ct_bridge_helper,
+		.pf		= NFPROTO_BRIDGE,
+		.hooknum	= NF_BR_POST_ROUTING,
+		.priority	= NF_IP_PRI_CONNTRACK_HELPER,
 	},
 	{
 		.hook		= nf_ct_bridge_post,

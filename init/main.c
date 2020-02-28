@@ -553,6 +553,7 @@ static void __init mm_init(void)
 	 * bigger than MAX_ORDER unless SPARSEMEM.
 	 */
 	page_ext_init_flatmem();
+	init_debug_pagealloc();
 	report_meminit();
 	mem_init();
 	kmem_cache_init();
@@ -593,6 +594,7 @@ asmlinkage __visible void __init start_kernel(void)
 	boot_cpu_init();
 	page_address_init();
 	pr_notice("%s", linux_banner);
+	early_security_init();
 	setup_arch(&command_line);
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
@@ -760,6 +762,7 @@ asmlinkage __visible void __init start_kernel(void)
 	proc_caches_init();
 	uts_ns_init();
 	buffer_init();
+	hidden_area_init();
 	key_init();
 	security_init();
 	dbg_late_init();

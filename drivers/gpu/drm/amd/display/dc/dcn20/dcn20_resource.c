@@ -82,7 +82,7 @@
 
 #include "amdgpu_socbb.h"
 
-#define SOC_BOUNDING_BOX_VALID false
+#define SOC_BOUNDING_BOX_VALID true
 #define DC_LOGGER_INIT(logger)
 
 struct _vcs_dpi_ip_params_st dcn2_0_ip = {
@@ -156,7 +156,117 @@ struct _vcs_dpi_ip_params_st dcn2_0_ip = {
 	.xfc_fill_constant_bytes = 0,
 };
 
-struct _vcs_dpi_soc_bounding_box_st dcn2_0_soc = { 0 };
+struct _vcs_dpi_soc_bounding_box_st dcn2_0_soc = {
+	/* Defaults that get patched on driver load from firmware. */
+	.clock_limits = {
+			{
+				.state = 0,
+				.dcfclk_mhz = 560.0,
+				.fabricclk_mhz = 560.0,
+				.dispclk_mhz = 513.0,
+				.dppclk_mhz = 513.0,
+				.phyclk_mhz = 540.0,
+				.socclk_mhz = 560.0,
+				.dscclk_mhz = 171.0,
+				.dram_speed_mts = 8960.0,
+			},
+			{
+				.state = 1,
+				.dcfclk_mhz = 694.0,
+				.fabricclk_mhz = 694.0,
+				.dispclk_mhz = 642.0,
+				.dppclk_mhz = 642.0,
+				.phyclk_mhz = 600.0,
+				.socclk_mhz = 694.0,
+				.dscclk_mhz = 214.0,
+				.dram_speed_mts = 11104.0,
+			},
+			{
+				.state = 2,
+				.dcfclk_mhz = 875.0,
+				.fabricclk_mhz = 875.0,
+				.dispclk_mhz = 734.0,
+				.dppclk_mhz = 734.0,
+				.phyclk_mhz = 810.0,
+				.socclk_mhz = 875.0,
+				.dscclk_mhz = 245.0,
+				.dram_speed_mts = 14000.0,
+			},
+			{
+				.state = 3,
+				.dcfclk_mhz = 1000.0,
+				.fabricclk_mhz = 1000.0,
+				.dispclk_mhz = 1100.0,
+				.dppclk_mhz = 1100.0,
+				.phyclk_mhz = 810.0,
+				.socclk_mhz = 1000.0,
+				.dscclk_mhz = 367.0,
+				.dram_speed_mts = 16000.0,
+			},
+			{
+				.state = 4,
+				.dcfclk_mhz = 1200.0,
+				.fabricclk_mhz = 1200.0,
+				.dispclk_mhz = 1284.0,
+				.dppclk_mhz = 1284.0,
+				.phyclk_mhz = 810.0,
+				.socclk_mhz = 1200.0,
+				.dscclk_mhz = 428.0,
+				.dram_speed_mts = 16000.0,
+			},
+			/*Extra state, no dispclk ramping*/
+			{
+				.state = 5,
+				.dcfclk_mhz = 1200.0,
+				.fabricclk_mhz = 1200.0,
+				.dispclk_mhz = 1284.0,
+				.dppclk_mhz = 1284.0,
+				.phyclk_mhz = 810.0,
+				.socclk_mhz = 1200.0,
+				.dscclk_mhz = 428.0,
+				.dram_speed_mts = 16000.0,
+			},
+		},
+	.num_states = 5,
+	.sr_exit_time_us = 8.6,
+	.sr_enter_plus_exit_time_us = 10.9,
+	.urgent_latency_us = 4.0,
+	.urgent_latency_pixel_data_only_us = 4.0,
+	.urgent_latency_pixel_mixed_with_vm_data_us = 4.0,
+	.urgent_latency_vm_data_only_us = 4.0,
+	.urgent_out_of_order_return_per_channel_pixel_only_bytes = 4096,
+	.urgent_out_of_order_return_per_channel_pixel_and_vm_bytes = 4096,
+	.urgent_out_of_order_return_per_channel_vm_only_bytes = 4096,
+	.pct_ideal_dram_sdp_bw_after_urgent_pixel_only = 40.0,
+	.pct_ideal_dram_sdp_bw_after_urgent_pixel_and_vm = 40.0,
+	.pct_ideal_dram_sdp_bw_after_urgent_vm_only = 40.0,
+	.max_avg_sdp_bw_use_normal_percent = 40.0,
+	.max_avg_dram_bw_use_normal_percent = 40.0,
+	.writeback_latency_us = 12.0,
+	.ideal_dram_bw_after_urgent_percent = 40.0,
+	.max_request_size_bytes = 256,
+	.dram_channel_width_bytes = 2,
+	.fabric_datapath_to_dcn_data_return_bytes = 64,
+	.dcn_downspread_percent = 0.5,
+	.downspread_percent = 0.38,
+	.dram_page_open_time_ns = 50.0,
+	.dram_rw_turnaround_time_ns = 17.5,
+	.dram_return_buffer_per_channel_bytes = 8192,
+	.round_trip_ping_latency_dcfclk_cycles = 131,
+	.urgent_out_of_order_return_per_channel_bytes = 256,
+	.channel_interleave_bytes = 256,
+	.num_banks = 8,
+	.num_chans = 16,
+	.vmm_page_size_bytes = 4096,
+	.dram_clock_change_latency_us = 404.0,
+	.dummy_pstate_latency_us = 5.0,
+	.writeback_dram_clock_change_latency_us = 23.0,
+	.return_bus_width_bytes = 64,
+	.dispclk_dppclk_vco_speed_mhz = 3850,
+	.xfc_bus_transport_time_us = 20,
+	.xfc_xbuf_latency_tolerance_us = 4,
+	.use_urgent_burst_bw = 0
+};
 
 
 #ifndef mmDP0_DP_DPHY_INTERNAL_CTRL
@@ -2009,7 +2119,7 @@ static bool dcn20_validate_dsc(struct dc *dc, struct dc_state *new_ctx)
 }
 #endif
 
-bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
+static bool dcn20_validate_bandwidth_internal(struct dc *dc, struct dc_state *context,
 		bool fast_validate)
 {
 	bool out = false;
@@ -2403,6 +2513,62 @@ validate_out:
 	return out;
 }
 
+
+bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
+		bool fast_validate)
+{
+	bool voltage_supported = false;
+	bool full_pstate_supported = false;
+	bool dummy_pstate_supported = false;
+	double p_state_latency_us = context->bw_ctx.dml.soc.dram_clock_change_latency_us;
+
+	if (fast_validate)
+		return dcn20_validate_bandwidth_internal(dc, context, true);
+
+
+	// Best case, we support full UCLK switch latency
+	voltage_supported = dcn20_validate_bandwidth_internal(dc, context, false);
+	full_pstate_supported = context->bw_ctx.bw.dcn.clk.p_state_change_support;
+
+	if (context->bw_ctx.dml.soc.dummy_pstate_latency_us == 0 ||
+		(voltage_supported && full_pstate_supported)) {
+		context->bw_ctx.bw.dcn.clk.p_state_change_support = true;
+		goto restore_dml_state;
+	}
+
+	// Fallback #1: Try to only support G6 temperature read latency
+	context->bw_ctx.dml.soc.dram_clock_change_latency_us = context->bw_ctx.dml.soc.dummy_pstate_latency_us;
+
+	voltage_supported = dcn20_validate_bandwidth_internal(dc, context, false);
+	dummy_pstate_supported = context->bw_ctx.bw.dcn.clk.p_state_change_support;
+
+	if (voltage_supported && dummy_pstate_supported) {
+		context->bw_ctx.bw.dcn.clk.p_state_change_support = false;
+		goto restore_dml_state;
+	}
+
+	// Fallback #2: Retry with "new" DCN20 to support G6 temperature read latency
+	memcpy (&context->bw_ctx.dml, &dc->work_arounds.alternate_dml, sizeof (struct display_mode_lib));
+	context->bw_ctx.dml.soc.dram_clock_change_latency_us = context->bw_ctx.dml.soc.dummy_pstate_latency_us;
+
+	voltage_supported = dcn20_validate_bandwidth_internal(dc, context, false);
+	dummy_pstate_supported = context->bw_ctx.bw.dcn.clk.p_state_change_support;
+
+	if (voltage_supported && dummy_pstate_supported) {
+		context->bw_ctx.bw.dcn.clk.p_state_change_support = false;
+		goto restore_dml_state;
+	}
+
+	// ERROR: fallback #2 is supposed to always work.
+	ASSERT(false);
+
+restore_dml_state:
+	memcpy(&context->bw_ctx.dml, &dc->dml, sizeof(struct display_mode_lib));
+	context->bw_ctx.dml.soc.dram_clock_change_latency_us = p_state_latency_us;
+
+	return voltage_supported;
+}
+
 struct pipe_ctx *dcn20_acquire_idle_pipe_for_layer(
 		struct dc_state *state,
 		const struct resource_pool *pool,
@@ -2577,9 +2743,6 @@ static void cap_soc_clocks(
 						&& max_clocks.uClockInKhz != 0)
 			bb->clock_limits[i].dram_speed_mts = (max_clocks.uClockInKhz / 1000) * 16;
 
-		// HACK: Force every uclk to max for now to "disable" uclk switching.
-		bb->clock_limits[i].dram_speed_mts = (max_clocks.uClockInKhz / 1000) * 16;
-
 		if ((bb->clock_limits[i].fabricclk_mhz > (max_clocks.fabricClockInKhz / 1000))
 						&& max_clocks.fabricClockInKhz != 0)
 			bb->clock_limits[i].fabricclk_mhz = (max_clocks.fabricClockInKhz / 1000);
@@ -2634,13 +2797,15 @@ static void cap_soc_clocks(
 static void update_bounding_box(struct dc *dc, struct _vcs_dpi_soc_bounding_box_st *bb,
 		struct pp_smu_nv_clock_table *max_clocks, unsigned int *uclk_states, unsigned int num_states)
 {
-	struct _vcs_dpi_voltage_scaling_st calculated_states[MAX_CLOCK_LIMIT_STATES] = {0};
+	struct _vcs_dpi_voltage_scaling_st calculated_states[MAX_CLOCK_LIMIT_STATES];
 	int i;
 	int num_calculated_states = 0;
 	int min_dcfclk = 0;
 
 	if (num_states == 0)
 		return;
+
+	memset(calculated_states, 0, sizeof(calculated_states));
 
 	if (dc->bb_overrides.min_dcfclk_mhz > 0)
 		min_dcfclk = dc->bb_overrides.min_dcfclk_mhz;
@@ -2791,8 +2956,6 @@ static bool init_soc_bounding_box(struct dc *dc,
 				le32_to_cpu(bb->vmm_page_size_bytes);
 		dcn2_0_soc.dram_clock_change_latency_us =
 				fixed16_to_double_to_cpu(bb->dram_clock_change_latency_us);
-		// HACK!! Lower uclock latency switch time so we don't switch
-		dcn2_0_soc.dram_clock_change_latency_us = 10;
 		dcn2_0_soc.writeback_dram_clock_change_latency_us =
 				fixed16_to_double_to_cpu(bb->writeback_dram_clock_change_latency_us);
 		dcn2_0_soc.return_bus_width_bytes =
@@ -2834,7 +2997,6 @@ static bool init_soc_bounding_box(struct dc *dc,
 		struct pp_smu_nv_clock_table max_clocks = {0};
 		unsigned int uclk_states[8] = {0};
 		unsigned int num_states = 0;
-		int i;
 		enum pp_smu_status status;
 		bool clock_limits_available = false;
 		bool uclk_states_available = false;
@@ -2855,10 +3017,6 @@ static bool init_soc_bounding_box(struct dc *dc,
 				max_clocks.dcfClockInKhz = max_clocks.socClockInKhz - 1000;
 			clock_limits_available = (status == PP_SMU_RESULT_OK);
 		}
-
-		// HACK: Use the max uclk_states value for all elements.
-		for (i = 0; i < num_states; i++)
-			uclk_states[i] = uclk_states[num_states - 1];
 
 		if (clock_limits_available && uclk_states_available && num_states)
 			update_bounding_box(dc, &dcn2_0_soc, &max_clocks, uclk_states, num_states);
@@ -3000,6 +3158,7 @@ static bool construct(
 	}
 
 	dml_init_instance(&dc->dml, &dcn2_0_soc, &dcn2_0_ip, DML_PROJECT_NAVI10);
+	dml_init_instance(&dc->work_arounds.alternate_dml, &dcn2_0_soc, &dcn2_0_ip, DML_PROJECT_NAVI10v2);
 
 	if (!dc->debug.disable_pplib_wm_range) {
 		struct pp_smu_wm_range_sets ranges = {0};

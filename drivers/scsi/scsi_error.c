@@ -577,7 +577,8 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 		 * if the device is in the process of becoming ready, we
 		 * should retry.
 		 */
-		if ((sshdr.asc == 0x04) && (sshdr.ascq == 0x01))
+		if ((sshdr.asc == 0x04) &&
+		    (sshdr.ascq == 0x01 || sshdr.ascq == 0x0a))
 			return NEEDS_RETRY;
 		/*
 		 * if the device is not started, we need to wake
@@ -1927,8 +1928,11 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		return SUCCESS;
 
 	case RESERVATION_CONFLICT:
-		sdev_printk(KERN_INFO, scmd->device,
-			    "reservation conflict\n");
+		if (scmd->cmnd[0] != TEST_UNIT_READY)
+			sdev_printk(KERN_INFO, scmd->device,
+				    "reservation conflict\n");
+		else
+			scmd->request->rq_flags |= RQF_QUIET;
 		set_host_byte(scmd, DID_NEXUS_FAILURE);
 		return SUCCESS; /* causes immediate i/o error */
 	default:

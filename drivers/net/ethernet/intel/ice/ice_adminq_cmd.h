@@ -33,11 +33,22 @@ struct ice_aqc_get_ver {
 	u8 api_patch;
 };
 
+/* Send driver version (indirect 0x0002) */
+struct ice_aqc_driver_ver {
+	u8 major_ver;
+	u8 minor_ver;
+	u8 build_ver;
+	u8 subbuild_ver;
+	u8 reserved[4];
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
 /* Queue Shutdown (direct 0x0003) */
 struct ice_aqc_q_shutdown {
-	__le32 driver_unloading;
+	u8 driver_unloading;
 #define ICE_AQC_DRIVER_UNLOADING	BIT(0)
-	u8 reserved[12];
+	u8 reserved[15];
 };
 
 /* Request resource ownership (direct 0x0008)
@@ -91,6 +102,7 @@ struct ice_aqc_list_caps_elem {
 #define ICE_AQC_CAPS_SRIOV				0x0012
 #define ICE_AQC_CAPS_VF					0x0013
 #define ICE_AQC_CAPS_VSI				0x0017
+#define ICE_AQC_CAPS_DCB				0x0018
 #define ICE_AQC_CAPS_RSS				0x0040
 #define ICE_AQC_CAPS_RXQS				0x0041
 #define ICE_AQC_CAPS_TXQS				0x0042
@@ -220,6 +232,13 @@ struct ice_aqc_get_sw_cfg_resp {
  */
 #define ICE_AQC_RES_TYPE_VSI_LIST_REP			0x03
 #define ICE_AQC_RES_TYPE_VSI_LIST_PRUNE			0x04
+#define ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID		0x60
+#define ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM		0x61
+
+#define ICE_AQC_RES_TYPE_FLAG_SCAN_BOTTOM		BIT(12)
+#define ICE_AQC_RES_TYPE_FLAG_IGNORE_INDEX		BIT(13)
+
+#define ICE_AQC_RES_TYPE_FLAG_DEDICATED			0x00
 
 /* Allocate Resources command (indirect 0x0208)
  * Free Resources command (indirect 0x0209)
@@ -730,6 +749,10 @@ struct ice_aqc_add_elem {
 	struct ice_aqc_txsched_elem_data generic[1];
 };
 
+struct ice_aqc_conf_elem {
+	struct ice_aqc_txsched_elem_data generic[1];
+};
+
 struct ice_aqc_get_elem {
 	struct ice_aqc_txsched_elem_data generic[1];
 };
@@ -769,6 +792,44 @@ struct ice_aqc_port_ets_elem {
 #define ICE_TC_NODE_PRIO_S	0x4
 	u8 reserved1[4];
 	__le32 tc_node_teid[8]; /* Used for response, reserved in command */
+};
+
+/* Rate limiting profile for
+ * Add RL profile (indirect 0x0410)
+ * Query RL profile (indirect 0x0411)
+ * Remove RL profile (indirect 0x0415)
+ * These indirect commands acts on single or multiple
+ * RL profiles with specified data.
+ */
+struct ice_aqc_rl_profile {
+	__le16 num_profiles;
+	__le16 num_processed; /* Only for response. Reserved in Command. */
+	u8 reserved[4];
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
+struct ice_aqc_rl_profile_elem {
+	u8 level;
+	u8 flags;
+#define ICE_AQC_RL_PROFILE_TYPE_S	0x0
+#define ICE_AQC_RL_PROFILE_TYPE_M	(0x3 << ICE_AQC_RL_PROFILE_TYPE_S)
+#define ICE_AQC_RL_PROFILE_TYPE_CIR	0
+#define ICE_AQC_RL_PROFILE_TYPE_EIR	1
+#define ICE_AQC_RL_PROFILE_TYPE_SRL	2
+/* The following flag is used for Query RL Profile Data */
+#define ICE_AQC_RL_PROFILE_INVAL_S	0x7
+#define ICE_AQC_RL_PROFILE_INVAL_M	(0x1 << ICE_AQC_RL_PROFILE_INVAL_S)
+
+	__le16 profile_id;
+	__le16 max_burst_size;
+	__le16 rl_multiply;
+	__le16 wake_up_calc;
+	__le16 rl_encode;
+};
+
+struct ice_aqc_rl_profile_generic_elem {
+	struct ice_aqc_rl_profile_elem generic[1];
 };
 
 /* Query Scheduler Resource Allocation (indirect 0x0412)
@@ -1032,6 +1093,10 @@ struct ice_aqc_get_link_status_data {
 #define ICE_AQ_LINK_TOPO_CONFLICT	BIT(0)
 #define ICE_AQ_LINK_MEDIA_CONFLICT	BIT(1)
 #define ICE_AQ_LINK_TOPO_CORRUPT	BIT(2)
+#define ICE_AQ_LINK_TOPO_UNREACH_PRT	BIT(4)
+#define ICE_AQ_LINK_TOPO_UNDRUTIL_PRT	BIT(5)
+#define ICE_AQ_LINK_TOPO_UNDRUTIL_MEDIA	BIT(6)
+#define ICE_AQ_LINK_TOPO_UNSUPP_MEDIA	BIT(7)
 	u8 reserved1;
 	u8 link_info;
 #define ICE_AQ_LINK_UP			BIT(0)	/* Link Status */
@@ -1133,6 +1198,33 @@ struct ice_aqc_set_port_id_led {
 #define ICE_AQC_PORT_IDENT_LED_BLINK	BIT(0)
 #define ICE_AQC_PORT_IDENT_LED_ORIG	0
 	u8 rsvd[13];
+};
+
+/* Read/Write SFF EEPROM command (indirect 0x06EE) */
+struct ice_aqc_sff_eeprom {
+	u8 lport_num;
+	u8 lport_num_valid;
+#define ICE_AQC_SFF_PORT_NUM_VALID	BIT(0)
+	__le16 i2c_bus_addr;
+#define ICE_AQC_SFF_I2CBUS_7BIT_M	0x7F
+#define ICE_AQC_SFF_I2CBUS_10BIT_M	0x3FF
+#define ICE_AQC_SFF_I2CBUS_TYPE_M	BIT(10)
+#define ICE_AQC_SFF_I2CBUS_TYPE_7BIT	0
+#define ICE_AQC_SFF_I2CBUS_TYPE_10BIT	ICE_AQC_SFF_I2CBUS_TYPE_M
+#define ICE_AQC_SFF_SET_EEPROM_PAGE_S	11
+#define ICE_AQC_SFF_SET_EEPROM_PAGE_M	(0x3 << ICE_AQC_SFF_SET_EEPROM_PAGE_S)
+#define ICE_AQC_SFF_NO_PAGE_CHANGE	0
+#define ICE_AQC_SFF_SET_23_ON_MISMATCH	1
+#define ICE_AQC_SFF_SET_22_ON_MISMATCH	2
+#define ICE_AQC_SFF_IS_WRITE		BIT(15)
+	__le16 i2c_mem_addr;
+	__le16 eeprom_page;
+#define  ICE_AQC_SFF_EEPROM_BANK_S 0
+#define  ICE_AQC_SFF_EEPROM_BANK_M (0xFF << ICE_AQC_SFF_EEPROM_BANK_S)
+#define  ICE_AQC_SFF_EEPROM_PAGE_S 8
+#define  ICE_AQC_SFF_EEPROM_PAGE_M (0xFF << ICE_AQC_SFF_EEPROM_PAGE_S)
+	__le32 addr_high;
+	__le32 addr_low;
 };
 
 /* NVM Read command (indirect 0x0701)
@@ -1518,6 +1610,57 @@ struct ice_aqc_get_clear_fw_log {
 	__le32 addr_low;
 };
 
+/* Download Package (indirect 0x0C40) */
+/* Also used for Update Package (indirect 0x0C42) */
+struct ice_aqc_download_pkg {
+	u8 flags;
+#define ICE_AQC_DOWNLOAD_PKG_LAST_BUF	0x01
+	u8 reserved[3];
+	__le32 reserved1;
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
+struct ice_aqc_download_pkg_resp {
+	__le32 error_offset;
+	__le32 error_info;
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
+/* Get Package Info List (indirect 0x0C43) */
+struct ice_aqc_get_pkg_info_list {
+	__le32 reserved1;
+	__le32 reserved2;
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
+/* Version format for packages */
+struct ice_pkg_ver {
+	u8 major;
+	u8 minor;
+	u8 update;
+	u8 draft;
+};
+
+#define ICE_PKG_NAME_SIZE	32
+
+struct ice_aqc_get_pkg_info {
+	struct ice_pkg_ver ver;
+	char name[ICE_PKG_NAME_SIZE];
+	u8 is_in_nvm;
+	u8 is_active;
+	u8 is_active_at_boot;
+	u8 is_modified;
+};
+
+/* Get Package Info List response buffer format (0x0C43) */
+struct ice_aqc_get_pkg_info_resp {
+	__le32 count;
+	struct ice_aqc_get_pkg_info pkg_info[1];
+};
+
 /**
  * struct ice_aq_desc - Admin Queue (AQ) descriptor
  * @flags: ICE_AQ_FLAG_* flags
@@ -1546,6 +1689,7 @@ struct ice_aq_desc {
 		u8 raw[16];
 		struct ice_aqc_generic generic;
 		struct ice_aqc_get_ver get_ver;
+		struct ice_aqc_driver_ver driver_ver;
 		struct ice_aqc_q_shutdown q_shutdown;
 		struct ice_aqc_req_res res_owner;
 		struct ice_aqc_manage_mac_read mac_read;
@@ -1555,6 +1699,7 @@ struct ice_aq_desc {
 		struct ice_aqc_get_phy_caps get_phy;
 		struct ice_aqc_set_phy_cfg set_phy;
 		struct ice_aqc_restart_an restart_an;
+		struct ice_aqc_sff_eeprom read_write_sff_param;
 		struct ice_aqc_set_port_id_led set_port_id_led;
 		struct ice_aqc_get_sw_cfg get_sw_conf;
 		struct ice_aqc_sw_rules sw_rules;
@@ -1562,6 +1707,7 @@ struct ice_aq_desc {
 		struct ice_aqc_sched_elem_cmd sched_elem_cmd;
 		struct ice_aqc_query_txsched_res query_sched_res;
 		struct ice_aqc_query_port_ets port_ets;
+		struct ice_aqc_rl_profile rl_profile;
 		struct ice_aqc_nvm nvm;
 		struct ice_aqc_nvm_checksum nvm_checksum;
 		struct ice_aqc_pf_vf_msg virt;
@@ -1579,6 +1725,7 @@ struct ice_aq_desc {
 		struct ice_aqc_add_update_free_vsi_resp add_update_free_vsi_res;
 		struct ice_aqc_fw_logging fw_logging;
 		struct ice_aqc_get_clear_fw_log get_clear_fw_log;
+		struct ice_aqc_download_pkg download_pkg;
 		struct ice_aqc_set_mac_lb set_mac_lb;
 		struct ice_aqc_alloc_free_res_cmd sw_res_ctrl;
 		struct ice_aqc_set_event_mask set_event_mask;
@@ -1610,12 +1757,19 @@ enum ice_aq_err {
 	ICE_AQ_RC_EBUSY		= 12, /* Device or resource busy */
 	ICE_AQ_RC_EEXIST	= 13, /* Object already exists */
 	ICE_AQ_RC_ENOSPC	= 16, /* No space left or allocation failure */
+	ICE_AQ_RC_ENOSYS	= 17, /* Function not implemented */
+	ICE_AQ_RC_ENOSEC	= 24, /* Missing security manifest */
+	ICE_AQ_RC_EBADSIG	= 25, /* Bad RSA signature */
+	ICE_AQ_RC_ESVN		= 26, /* SVN number prohibits this package */
+	ICE_AQ_RC_EBADMAN	= 27, /* Manifest hash mismatch */
+	ICE_AQ_RC_EBADBUF	= 28, /* Buffer hash mismatches manifest */
 };
 
 /* Admin Queue command opcodes */
 enum ice_adminq_opc {
 	/* AQ commands */
 	ice_aqc_opc_get_ver				= 0x0001,
+	ice_aqc_opc_driver_ver				= 0x0002,
 	ice_aqc_opc_q_shutdown				= 0x0003,
 
 	/* resource ownership */
@@ -1655,12 +1809,15 @@ enum ice_adminq_opc {
 	/* transmit scheduler commands */
 	ice_aqc_opc_get_dflt_topo			= 0x0400,
 	ice_aqc_opc_add_sched_elems			= 0x0401,
+	ice_aqc_opc_cfg_sched_elems			= 0x0403,
 	ice_aqc_opc_get_sched_elems			= 0x0404,
 	ice_aqc_opc_suspend_sched_elems			= 0x0409,
 	ice_aqc_opc_resume_sched_elems			= 0x040A,
 	ice_aqc_opc_query_port_ets			= 0x040E,
 	ice_aqc_opc_delete_sched_elems			= 0x040F,
+	ice_aqc_opc_add_rl_profiles			= 0x0410,
 	ice_aqc_opc_query_sched_res			= 0x0412,
+	ice_aqc_opc_remove_rl_profiles			= 0x0415,
 
 	/* PHY commands */
 	ice_aqc_opc_get_phy_caps			= 0x0600,
@@ -1670,6 +1827,7 @@ enum ice_adminq_opc {
 	ice_aqc_opc_set_event_mask			= 0x0613,
 	ice_aqc_opc_set_mac_lb				= 0x0620,
 	ice_aqc_opc_set_port_id_led			= 0x06E9,
+	ice_aqc_opc_sff_eeprom				= 0x06EE,
 
 	/* NVM commands */
 	ice_aqc_opc_nvm_read				= 0x0701,
@@ -1696,6 +1854,11 @@ enum ice_adminq_opc {
 	/* Tx queue handling commands/events */
 	ice_aqc_opc_add_txqs				= 0x0C30,
 	ice_aqc_opc_dis_txqs				= 0x0C31,
+
+	/* package commands */
+	ice_aqc_opc_download_pkg			= 0x0C40,
+	ice_aqc_opc_update_pkg				= 0x0C42,
+	ice_aqc_opc_get_pkg_info_list			= 0x0C43,
 
 	/* debug commands */
 	ice_aqc_opc_fw_logging				= 0xFF09,

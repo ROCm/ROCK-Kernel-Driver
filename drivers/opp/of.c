@@ -660,6 +660,11 @@ static int _of_add_opp_table_v2(struct device *dev, struct opp_table *opp_table)
 		return 0;
 	}
 
+	/*
+	 * Re-initialize list_kref every time we add static OPPs to the OPP
+	 * table as the reference count may be 0 after the last tie static OPPs
+	 * were removed.
+	 */
 	kref_init(&opp_table->list_kref);
 
 	/* We have opp-table node now, iterate over it and add OPPs */
@@ -728,8 +733,6 @@ static int _of_add_opp_table_v1(struct device *dev, struct opp_table *opp_table)
 		dev_err(dev, "%s: Invalid OPP table\n", __func__);
 		return -EINVAL;
 	}
-
-	kref_init(&opp_table->list_kref);
 
 	val = prop->value;
 	while (nr) {

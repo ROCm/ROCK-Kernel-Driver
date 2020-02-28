@@ -140,6 +140,7 @@ config ARM64
 	select HAVE_CMPXCHG_DOUBLE
 	select HAVE_CMPXCHG_LOCAL
 	select HAVE_CONTEXT_TRACKING
+	select HAVE_COPY_THREAD_TLS
 	select HAVE_DEBUG_BUGVERBOSE
 	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DMA_CONTIGUOUS
@@ -180,7 +181,6 @@ config ARM64
 	select PCI_SYSCALL if PCI
 	select POWER_RESET
 	select POWER_SUPPLY
-	select REFCOUNT_FULL
 	select SPARSE_IRQ
 	select SWIOTLB
 	select SYSCTL_EXCEPTION_TRACE
@@ -265,6 +265,10 @@ config GENERIC_CSUM
 
 config GENERIC_CALIBRATE_DELAY
 	def_bool y
+
+config ZONE_DMA
+	bool "Support DMA zone" if EXPERT
+	default y
 
 config ZONE_DMA32
 	bool "Support DMA32 zone" if EXPERT
@@ -540,6 +544,22 @@ config ARM64_ERRATUM_1463225
 	  Work around the erratum by triggering a dummy step exception
 	  when handling a system call from a task that is being stepped
 	  in a VHE configuration of the kernel.
+
+	  If unsure, say Y.
+
+config ARM64_ERRATUM_1542419
+	bool "Neoverse-N1: workaround mis-ordering of instruction fetches"
+	default y
+	help
+	  This option adds a workaround for ARM Neoverse-N1 erratum
+	  1542419.
+
+	  Affected Neoverse-N1 cores could execute a stale instruction when
+	  modified by another CPU. The workaround depends on a firmware
+	  counterpart.
+
+	  Workaround the issue by hiding the DIC feature from EL0. This
+	  forces user-space to perform cache maintenance.
 
 	  If unsure, say Y.
 
@@ -981,7 +1001,7 @@ config KEXEC_FILE
 	  for kernel and initramfs as opposed to list of segments as
 	  accepted by previous system call.
 
-config KEXEC_VERIFY_SIG
+config KEXEC_SIG
 	bool "Verify kernel signature during kexec_file_load() syscall"
 	depends on KEXEC_FILE
 	help
@@ -996,13 +1016,13 @@ config KEXEC_VERIFY_SIG
 config KEXEC_IMAGE_VERIFY_SIG
 	bool "Enable Image signature verification support"
 	default y
-	depends on KEXEC_VERIFY_SIG
+	depends on KEXEC_SIG
 	depends on EFI && SIGNED_PE_FILE_VERIFICATION
 	help
 	  Enable Image signature verification support.
 
 comment "Support for PE file signature verification disabled"
-	depends on KEXEC_VERIFY_SIG
+	depends on KEXEC_SIG
 	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
 
 config CRASH_DUMP

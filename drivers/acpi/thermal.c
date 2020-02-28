@@ -23,6 +23,7 @@
 #include <linux/kmod.h>
 #include <linux/reboot.h>
 #include <linux/device.h>
+#include <linux/dmi.h>
 #include <linux/thermal.h>
 #include <linux/acpi.h>
 #include <linux/workqueue.h>
@@ -1060,6 +1061,87 @@ static void acpi_thermal_check_fn(struct work_struct *work)
 	acpi_thermal_check(tz);
 }
 
+static struct dmi_system_id thermal_psv_dmi_table[] = {
+	{
+		.ident = "IBM ThinkPad T41",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T41"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T42",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T42"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T43",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T43"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T41p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T41p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T42p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T42p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad T43p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad T43p"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad R40",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad R40"),
+		},
+	},
+	{
+		.ident = "IBM ThinkPad R50p",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+			DMI_MATCH(DMI_PRODUCT_VERSION,"ThinkPad R50p"),
+		},
+	},
+	{},
+};
+
+static int acpi_thermal_set_polling(struct acpi_thermal *tz, int seconds)
+{
+       if (!tz)
+	       return -EINVAL;
+
+       /* Convert value to deci-seconds */
+       tz->polling_frequency = seconds * 10;
+
+       tz->thermal_zone->polling_delay = seconds * 1000;
+
+       if (tz->tz_enabled)
+	       thermal_zone_device_update(tz->thermal_zone,
+					  THERMAL_EVENT_UNSPECIFIED);
+
+       ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+			 "Polling frequency set to %lu seconds\n",
+			 tz->polling_frequency/10));
+
+       return 0;
+}
+
 static int acpi_thermal_add(struct acpi_device *device)
 {
 	int result = 0;
@@ -1088,6 +1170,18 @@ static int acpi_thermal_add(struct acpi_device *device)
 	result = acpi_thermal_register_thermal_zone(tz);
 	if (result)
 		goto free_memory;
+
+	if (dmi_check_system(thermal_psv_dmi_table)) {
+		if (tz->trips.passive.flags.valid &&
+		    tz->trips.passive.temperature > CELSIUS_TO_DECI_KELVIN(85)) {
+			printk (KERN_INFO "Adjust passive trip point from %lu"
+				" to %lu\n",
+				DECI_KELVIN_TO_CELSIUS(tz->trips.passive.temperature),
+				DECI_KELVIN_TO_CELSIUS(tz->trips.passive.temperature - 150));
+			tz->trips.passive.temperature -= 150;
+			acpi_thermal_set_polling(tz, 5);
+		}
+	}
 
 	INIT_WORK(&tz->thermal_check_work, acpi_thermal_check_fn);
 

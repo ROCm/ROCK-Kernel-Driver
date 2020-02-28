@@ -27,7 +27,7 @@ bool json_output;
 bool show_pinned;
 bool block_mount;
 bool verifier_logs;
-int bpf_flags;
+bool relaxed_maps;
 struct pinned_obj_table prog_table;
 struct pinned_obj_table map_table;
 
@@ -139,7 +139,7 @@ int detect_common_prefix(const char *arg, ...)
 	strncat(msg, "'", sizeof(msg) - strlen(msg) - 1);
 
 	if (count >= 2) {
-		p_err(msg);
+		p_err("%s", msg);
 		return -1;
 	}
 
@@ -396,7 +396,7 @@ int main(int argc, char **argv)
 			show_pinned = true;
 			break;
 		case 'm':
-			bpf_flags = MAPS_RELAX_COMPAT;
+			relaxed_maps = true;
 			break;
 		case 'n':
 			block_mount = true;

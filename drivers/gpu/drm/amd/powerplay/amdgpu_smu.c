@@ -694,6 +694,8 @@ static int smu_sw_init(void *handle)
 	smu->smu_baco.state = SMU_BACO_STATE_EXIT;
 	smu->smu_baco.platform_support = false;
 
+	mutex_init(&smu->metrics_lock);
+
 	smu->watermarks_bitmap = 0;
 	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 	smu->default_power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
@@ -769,8 +771,7 @@ static int smu_init_fb_allocations(struct smu_context *smu)
 	struct smu_table_context *smu_table = &smu->smu_table;
 	struct smu_table *tables = smu_table->tables;
 	uint32_t table_count = smu_table->table_count;
-	uint32_t i = 0;
-	int32_t ret = 0;
+	int ret, i;
 
 	if (table_count <= 0)
 		return -EINVAL;
@@ -791,7 +792,7 @@ static int smu_init_fb_allocations(struct smu_context *smu)
 
 	return 0;
 failed:
-	for (; i > 0; i--) {
+	while (--i >= 0) {
 		if (tables[i].size == 0)
 			continue;
 		amdgpu_bo_free_kernel(&tables[i].bo,
@@ -1165,7 +1166,10 @@ static int smu_suspend(void *handle)
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
-	bool baco_feature_is_enabled = smu_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT);
+	bool baco_feature_is_enabled = false;
+
+	if(!(adev->flags & AMD_IS_APU))
+		baco_feature_is_enabled = smu_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT);
 
 	ret = smu_system_features_control(smu, false);
 	if (ret)

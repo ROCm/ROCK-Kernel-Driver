@@ -48,6 +48,8 @@ include scripts/Kbuild.include
 kernelsymfile := $(objtree)/Module.symvers
 modulesymfile := $(firstword $(KBUILD_EXTMOD))/Module.symvers
 
+MODVERDIR := $(if $(KBUILD_EXTMOD),$(firstword $(KBUILD_EXTMOD))/).tmp_versions
+
 MODPOST = scripts/mod/modpost						\
 	$(if $(CONFIG_MODVERSIONS),-m)					\
 	$(if $(CONFIG_MODULE_SRCVERSION_ALL),-a)			\
@@ -56,7 +58,10 @@ MODPOST = scripts/mod/modpost						\
 	$(if $(KBUILD_EXTMOD),$(addprefix -e ,$(KBUILD_EXTRA_SYMBOLS)))	\
 	$(if $(KBUILD_EXTMOD),-o $(modulesymfile))			\
 	$(if $(CONFIG_SECTION_MISMATCH_WARN_ONLY),,-E)			\
-	$(if $(KBUILD_MODPOST_WARN),-w)
+	$(if $(KBUILD_MODPOST_WARN),-w)					\
+	$(if $(CONFIG_SUSE_KERNEL_SUPPORTED),				\
+		-N $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
+		$(if $(KBUILD_EXTMOD),,$(srctree)/Module.supported) /dev/null)))
 
 ifdef MODPOST_VMLINUX
 
@@ -92,7 +97,8 @@ modules := $(sort $(shell cat $(MODORDER)))
 __modpost: $(if $(KBUILD_MODPOST_NOFINAL), $(modules:.ko:.o),$(modules))
 	@:
 
-MODPOST += $(subst -i,-n,$(filter -i,$(MAKEFLAGS))) -s -T - $(wildcard vmlinux)
+MODPOST += $(subst -i,-n,$(filter -i,$(MAKEFLAGS))) -s -T - \
+ 		  $(if $(KBUILD_NSDEPS),-d $(MODULES_NSDEPS)) $(wildcard vmlinux)
 
 # We can go over command line length here, so be careful.
 quiet_cmd_modpost = MODPOST $(words $(modules)) modules
@@ -133,7 +139,6 @@ $(modules): %.ko :%.o %.mod.o FORCE
 	+$(call if_changed,ld_ko_o)
 
 targets += $(modules)
-
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------

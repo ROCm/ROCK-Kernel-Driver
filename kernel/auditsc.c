@@ -1922,7 +1922,7 @@ static void audit_copy_inode(struct audit_names *name,
 			     struct inode *inode, unsigned int flags)
 {
 	name->ino   = inode->i_ino;
-	name->dev   = inode->i_sb->s_dev;
+	name->dev   = inode_get_dev(inode);
 	name->mode  = inode->i_mode;
 	name->uid   = inode->i_uid;
 	name->gid   = inode->i_gid;
@@ -1994,7 +1994,7 @@ void __audit_inode(struct filename *name, const struct dentry *dentry,
 		if (n->ino) {
 			/* valid inode number, use that for the comparison */
 			if (n->ino != inode->i_ino ||
-			    n->dev != inode->i_sb->s_dev)
+			    n->dev != inode_get_dev(inode))
 				continue;
 		} else if (n->name) {
 			/* inode number has not been set, check the name */
@@ -2099,7 +2099,7 @@ void __audit_inode_child(struct inode *parent,
 		     n->type != AUDIT_TYPE_UNKNOWN))
 			continue;
 
-		if (n->ino == parent->i_ino && n->dev == parent->i_sb->s_dev &&
+		if (n->ino == parent->i_ino && n->dev == inode_get_dev(parent) &&
 		    !audit_compare_dname_path(dname,
 					      n->name->name, n->name_len)) {
 			if (n->type == AUDIT_TYPE_UNKNOWN)

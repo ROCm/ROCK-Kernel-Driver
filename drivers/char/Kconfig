@@ -543,6 +543,12 @@ config DEVPORT
 
 source "drivers/s390/char/Kconfig"
 
+config CRASHER
+	tristate "Crasher Module"
+	depends on m
+	help
+	  Slab cache memory tester and crasher on will.
+
 source "drivers/char/xillybus/Kconfig"
 
 config ADI

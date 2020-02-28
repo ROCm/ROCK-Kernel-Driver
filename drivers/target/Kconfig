@@ -43,6 +43,12 @@ config TCM_USER2
 	process to handle requests. This is version 2 of the ABI; version 1
 	is obsolete.
 
+config TCM_RBD
+	tristate "TCM/RBD Subsystem Plugin for Linux/RBD"
+	depends on BLK_DEV_RBD
+	help
+	Say Y here to enable the TCM/RBD subsystem plugin for Ceph RBD	access.
+
 source "drivers/target/loopback/Kconfig"
 source "drivers/target/tcm_fc/Kconfig"
 source "drivers/target/iscsi/Kconfig"

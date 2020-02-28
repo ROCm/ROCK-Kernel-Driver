@@ -18,6 +18,7 @@
 #include <asm/cpufeature.h>
 #include <asm/hardirq.h>
 #include <asm/intel-family.h>
+#include <asm/intel_pt.h>
 #include <asm/apic.h>
 #include <asm/cpu_device_id.h>
 
@@ -3298,6 +3299,13 @@ static int intel_pmu_hw_config(struct perf_event *event)
 		}
 	}
 
+	if (event->attr.aux_output) {
+		if (!event->attr.precise_ip)
+			return -EINVAL;
+
+		event->hw.flags |= PERF_X86_EVENT_PEBS_VIA_PT;
+	}
+
 	if (event->attr.type != PERF_TYPE_RAW)
 		return 0;
 
@@ -3816,6 +3824,14 @@ static int intel_pmu_check_period(struct perf_event *event, u64 value)
 	return intel_pmu_has_bts_period(event, value) ? -EINVAL : 0;
 }
 
+static int intel_pmu_aux_output_match(struct perf_event *event)
+{
+	if (!x86_pmu.intel_cap.pebs_output_pt_available)
+		return 0;
+
+	return is_intel_pt_event(event);
+}
+
 PMU_FORMAT_ATTR(offcore_rsp, "config1:0-63");
 
 PMU_FORMAT_ATTR(ldlat, "config1:0-15");
@@ -3940,6 +3956,8 @@ static __initconst const struct x86_pmu intel_pmu = {
 	.sched_task		= intel_pmu_sched_task,
 
 	.check_period		= intel_pmu_check_period,
+
+	.aux_output_match	= intel_pmu_aux_output_match,
 };
 
 static __init void intel_clovertown_quirk(void)
@@ -4965,6 +4983,8 @@ __init int intel_pmu_init(void)
 	case INTEL_FAM6_SKYLAKE_DESKTOP:
 	case INTEL_FAM6_KABYLAKE_MOBILE:
 	case INTEL_FAM6_KABYLAKE_DESKTOP:
+	case INTEL_FAM6_COMETLAKE_L:
+	case INTEL_FAM6_COMETLAKE:
 		x86_add_quirk(intel_pebs_isolation_quirk);
 		x86_pmu.late_ack = true;
 		memcpy(hw_cache_event_ids, skl_hw_cache_event_ids, sizeof(hw_cache_event_ids));

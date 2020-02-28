@@ -597,7 +597,6 @@ struct fc_vft_header {
 #define ELS_CMD_ADISC     0x52000000
 #define ELS_CMD_FARP      0x54000000
 #define ELS_CMD_FARPR     0x55000000
-#define ELS_CMD_RPS       0x56000000
 #define ELS_CMD_RPL       0x57000000
 #define ELS_CMD_FAN       0x60000000
 #define ELS_CMD_RSCN      0x61040000
@@ -639,7 +638,6 @@ struct fc_vft_header {
 #define ELS_CMD_ADISC     0x52
 #define ELS_CMD_FARP      0x54
 #define ELS_CMD_FARPR     0x55
-#define ELS_CMD_RPS       0x56
 #define ELS_CMD_RPL       0x57
 #define ELS_CMD_FAN       0x60
 #define ELS_CMD_RSCN      0x0461
@@ -843,7 +841,7 @@ typedef struct _ADISC {		/* Structure is in Big Endian format */
 	struct lpfc_name portName;
 	struct lpfc_name nodeName;
 	uint32_t DID;
-} ADISC;
+} __packed ADISC;
 
 typedef struct _FARP {		/* Structure is in Big Endian format */
 	uint32_t Mflags:8;
@@ -873,7 +871,7 @@ typedef struct _FAN {		/* Structure is in Big Endian format */
 	uint32_t Fdid;
 	struct lpfc_name FportName;
 	struct lpfc_name FnodeName;
-} FAN;
+} __packed FAN;
 
 typedef struct _SCR {		/* Structure is in Big Endian format */
 	uint8_t resvd1;
@@ -917,25 +915,7 @@ typedef struct _RNID {		/* Structure is in Big Endian format */
 	union {
 		RNID_TOP_DISC topologyDisc;	/* topology disc (0xdf) */
 	} un;
-} RNID;
-
-typedef struct  _RPS {		/* Structure is in Big Endian format */
-	union {
-		uint32_t portNum;
-		struct lpfc_name portName;
-	} un;
-} RPS;
-
-typedef struct  _RPS_RSP {	/* Structure is in Big Endian format */
-	uint16_t rsvd1;
-	uint16_t portStatus;
-	uint32_t linkFailureCnt;
-	uint32_t lossSyncCnt;
-	uint32_t lossSignalCnt;
-	uint32_t primSeqErrCnt;
-	uint32_t invalidXmitWord;
-	uint32_t crcCnt;
-} RPS_RSP;
+} __packed RNID;
 
 struct RLS {			/* Structure is in Big Endian format */
 	uint32_t rls;
@@ -1340,24 +1320,7 @@ struct fc_rdp_res_frame {
 /* lpfc_sli_ct_request defines the CT_IU preamble for FDMI commands */
 #define  SLI_CT_FDMI_Subtypes     0x10	/* Management Service Subtype */
 
-/*
- * Registered Port List Format
- */
-struct lpfc_fdmi_reg_port_list {
-	uint32_t EntryCnt;
-	uint32_t pe;		/* Variable-length array */
-};
-
-
 /* Definitions for HBA / Port attribute entries */
-
-struct lpfc_fdmi_attr_def { /* Defined in TLV format */
-	/* Structure is in Big Endian format */
-	uint32_t AttrType:16;
-	uint32_t AttrLen:16;
-	uint32_t AttrValue;  /* Marks start of Value (ATTRIBUTE_ENTRY) */
-};
-
 
 /* Attribute Entry */
 struct lpfc_fdmi_attr_entry {
@@ -1369,7 +1332,13 @@ struct lpfc_fdmi_attr_entry {
 	} un;
 };
 
-#define LPFC_FDMI_MAX_AE_SIZE	sizeof(struct lpfc_fdmi_attr_entry)
+struct lpfc_fdmi_attr_def { /* Defined in TLV format */
+	/* Structure is in Big Endian format */
+	uint32_t AttrType:16;
+	uint32_t AttrLen:16;
+	/* Marks start of Value (ATTRIBUTE_ENTRY) */
+	struct lpfc_fdmi_attr_entry AttrValue;
+} __packed;
 
 /*
  * HBA Attribute Block
@@ -1394,12 +1363,19 @@ struct lpfc_fdmi_hba_ident {
 };
 
 /*
+ * Registered Port List Format
+ */
+struct lpfc_fdmi_reg_port_list {
+	uint32_t EntryCnt;
+	struct lpfc_fdmi_port_entry pe;
+} __packed;
+
+/*
  * Register HBA(RHBA)
  */
 struct lpfc_fdmi_reg_hba {
 	struct lpfc_fdmi_hba_ident hi;
-	struct lpfc_fdmi_reg_port_list rpl;	/* variable-length array */
-/* struct lpfc_fdmi_attr_block   ab; */
+	struct lpfc_fdmi_reg_port_list rpl;
 };
 
 /*

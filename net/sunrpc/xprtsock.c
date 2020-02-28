@@ -562,10 +562,14 @@ xs_read_stream_call(struct sock_xprt *transport, struct msghdr *msg, int flags)
 		printk(KERN_WARNING "Callback slot table overflowed\n");
 		return -ESHUTDOWN;
 	}
+	if (transport->recv.copied && !req->rq_private_buf.len)
+		return -ESHUTDOWN;
 
 	ret = xs_read_stream_request(transport, msg, flags, req);
 	if (msg->msg_flags & (MSG_EOR|MSG_TRUNC))
 		xprt_complete_bc_request(req, transport->recv.copied);
+	else
+		req->rq_private_buf.len = transport->recv.copied;
 
 	return ret;
 }
@@ -587,7 +591,7 @@ xs_read_stream_reply(struct sock_xprt *transport, struct msghdr *msg, int flags)
 	/* Look up and lock the request corresponding to the given XID */
 	spin_lock(&xprt->queue_lock);
 	req = xprt_lookup_rqst(xprt, transport->recv.xid);
-	if (!req) {
+	if (!req || (transport->recv.copied && !req->rq_private_buf.len)) {
 		msg->msg_flags |= MSG_TRUNC;
 		goto out;
 	}
@@ -599,6 +603,8 @@ xs_read_stream_reply(struct sock_xprt *transport, struct msghdr *msg, int flags)
 	spin_lock(&xprt->queue_lock);
 	if (msg->msg_flags & (MSG_EOR|MSG_TRUNC))
 		xprt_complete_rqst(req->rq_task, transport->recv.copied);
+	else
+		req->rq_private_buf.len = transport->recv.copied;
 	xprt_unpin_rqst(req);
 out:
 	spin_unlock(&xprt->queue_lock);
@@ -2653,6 +2659,8 @@ static int bc_sendto(struct rpc_rqst *req)
 		.iov_len	= sizeof(marker),
 	};
 
+	req->rq_xtime = ktime_get();
+
 	len = kernel_sendmsg(transport->sock, &msg, &iov, 1, iov.iov_len);
 	if (len != iov.iov_len)
 		return -EAGAIN;
@@ -2678,7 +2686,6 @@ static int bc_send_request(struct rpc_rqst *req)
 	struct svc_xprt	*xprt;
 	int len;
 
-	dprintk("sending request with xid: %08x\n", ntohl(req->rq_xid));
 	/*
 	 * Get the server socket associated with this callback xprt
 	 */

@@ -105,6 +105,7 @@ config S390
 	select ARCH_INLINE_WRITE_UNLOCK_IRQRESTORE
 	select ARCH_KEEP_MEMBLOCK
 	select ARCH_SAVE_PAGE_KEYS if HIBERNATION
+	select ARCH_STACKWALK
 	select ARCH_SUPPORTS_ATOMIC_RMW
 	select ARCH_SUPPORTS_NUMA_BALANCING
 	select ARCH_USE_BUILTIN_BSWAP
@@ -170,6 +171,7 @@ config S390
 	select HAVE_PERF_EVENTS
 	select HAVE_RCU_TABLE_FREE
 	select HAVE_REGS_AND_STACK_ACCESS_API
+	select HAVE_RELIABLE_STACKTRACE
 	select HAVE_RSEQ
 	select HAVE_SYSCALL_TRACEPOINTS
 	select HAVE_VIRT_CPU_ACCOUNTING
@@ -235,6 +237,10 @@ config HAVE_MARCH_Z13_FEATURES
 config HAVE_MARCH_Z14_FEATURES
 	def_bool n
 	select HAVE_MARCH_Z13_FEATURES
+
+config HAVE_MARCH_Z15_FEATURES
+	def_bool n
+	select HAVE_MARCH_Z14_FEATURES
 
 choice
 	prompt "Processor type"
@@ -307,6 +313,14 @@ config MARCH_Z14
 	  and 3906 series). The kernel will be slightly faster but will not
 	  work on older machines.
 
+config MARCH_Z15
+	bool "IBM z15"
+	select HAVE_MARCH_Z15_FEATURES
+	help
+	  Select this to enable optimizations for IBM z15 (8562
+	  and 8561 series). The kernel will be slightly faster but will not
+	  work on older machines.
+
 endchoice
 
 config MARCH_Z900_TUNE
@@ -332,6 +346,9 @@ config MARCH_Z13_TUNE
 
 config MARCH_Z14_TUNE
 	def_bool TUNE_Z14 || MARCH_Z14 && TUNE_DEFAULT
+
+config MARCH_Z15_TUNE
+	def_bool TUNE_Z15 || MARCH_Z15 && TUNE_DEFAULT
 
 choice
 	prompt "Tune code generation"
@@ -376,6 +393,9 @@ config TUNE_Z13
 
 config TUNE_Z14
 	bool "IBM z14"
+
+config TUNE_Z15
+	bool "IBM z15"
 
 endchoice
 
@@ -536,9 +556,9 @@ config ARCH_HAS_KEXEC_PURGATORY
 	def_bool y
 	depends on KEXEC_FILE
 
-config KEXEC_VERIFY_SIG
+config KEXEC_SIG
 	bool "Verify kernel signature during kexec_file_load() syscall"
-	depends on KEXEC_FILE && SYSTEM_DATA_VERIFICATION
+	depends on KEXEC_FILE && MODULE_SIG_FORMAT
 	help
 	  This option makes kernel signature verification mandatory for
 	  the kexec_file_load() syscall.

@@ -2004,10 +2004,8 @@ int ceph_parse_ips(const char *c, const char *end,
 	return 0;
 
 bad:
-	pr_err("parse_ips bad ip '%.*s'\n", (int)(end - c), c);
 	return ret;
 }
-EXPORT_SYMBOL(ceph_parse_ips);
 
 static int process_banner(struct ceph_connection *con)
 {
@@ -3031,6 +3029,12 @@ static void con_fault(struct ceph_connection *con)
 }
 
 
+void ceph_messenger_reset_nonce(struct ceph_messenger *msgr)
+{
+	u32 nonce = le32_to_cpu(msgr->inst.addr.nonce) + 1000000;
+	msgr->inst.addr.nonce = cpu_to_le32(nonce);
+	encode_my_addr(msgr);
+}
 
 /*
  * initialize a new messenger instance

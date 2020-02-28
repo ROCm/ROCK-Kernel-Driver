@@ -58,7 +58,6 @@ enum mem_cgroup_protection {
 
 struct mem_cgroup_reclaim_cookie {
 	pg_data_t *pgdat;
-	int priority;
 	unsigned int generation;
 };
 
@@ -81,7 +80,6 @@ struct mem_cgroup_id {
 enum mem_cgroup_events_target {
 	MEM_CGROUP_TARGET_THRESH,
 	MEM_CGROUP_TARGET_SOFTLIMIT,
-	MEM_CGROUP_TARGET_NUMAINFO,
 	MEM_CGROUP_NTARGETS,
 };
 
@@ -112,7 +110,7 @@ struct memcg_shrinker_map {
 };
 
 /*
- * per-zone information in memory controller.
+ * per-node information in memory controller.
  */
 struct mem_cgroup_per_node {
 	struct lruvec		lruvec;
@@ -126,18 +124,14 @@ struct mem_cgroup_per_node {
 
 	unsigned long		lru_zone_size[MAX_NR_ZONES][NR_LRU_LISTS];
 
-	struct mem_cgroup_reclaim_iter	iter[DEF_PRIORITY + 1];
+	struct mem_cgroup_reclaim_iter	iter;
 
-#ifdef CONFIG_MEMCG_KMEM
 	struct memcg_shrinker_map __rcu	*shrinker_map;
-#endif
+
 	struct rb_node		tree_node;	/* RB tree node */
 	unsigned long		usage_in_excess;/* Set to the value by which */
 						/* the soft limit is exceeded*/
 	bool			on_tree;
-	bool			congested;	/* memcg has many dirty pages */
-						/* backed by a congested BDI */
-
 	struct mem_cgroup	*memcg;		/* Back pointer, we cannot */
 						/* use container_of	   */
 };
@@ -182,6 +176,23 @@ struct memcg_padding {
 #else
 #define MEMCG_PADDING(name)
 #endif
+
+/*
+ * Remember four most recent foreign writebacks with dirty pages in this
+ * cgroup.  Inode sharing is expected to be uncommon and, even if we miss
+ * one in a given round, we're likely to catch it later if it keeps
+ * foreign-dirtying, so a fairly low count should be enough.
+ *
+ * See mem_cgroup_track_foreign_dirty_slowpath() for details.
+ */
+#define MEMCG_CGWB_FRN_CNT	4
+
+struct memcg_cgwb_frn {
+	u64 bdi_id;			/* bdi->id of the foreign inode */
+	int memcg_id;			/* memcg->css.id of foreign inode */
+	u64 at;				/* jiffies_64 at the time of dirtying */
+	struct wb_completion done;	/* tracks in-flight foreign writebacks */
+};
 
 /*
  * The memory controller data structure. The memory controller controls both
@@ -297,21 +308,19 @@ struct mem_cgroup {
 	struct list_head kmem_caches;
 #endif
 
-	int last_scanned_node;
-#if MAX_NUMNODES > 1
-	nodemask_t	scan_nodes;
-	atomic_t	numainfo_events;
-	atomic_t	numainfo_updating;
-#endif
-
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct list_head cgwb_list;
 	struct wb_domain cgwb_domain;
+	struct memcg_cgwb_frn cgwb_frn[MEMCG_CGWB_FRN_CNT];
 #endif
 
 	/* List of events which userspace want to receive */
 	struct list_head event_list;
 	spinlock_t event_list_lock;
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	struct deferred_split deferred_split_queue;
+#endif
 
 	struct mem_cgroup_per_node *nodeinfo[0];
 	/* WARNING: nodeinfo must be the last member here */
@@ -333,6 +342,19 @@ static inline bool mem_cgroup_is_root(struct mem_cgroup *memcg)
 static inline bool mem_cgroup_disabled(void)
 {
 	return !cgroup_subsys_enabled(memory_cgrp_subsys);
+}
+
+static inline unsigned long mem_cgroup_protection(struct mem_cgroup *memcg,
+						  bool in_low_reclaim)
+{
+	if (mem_cgroup_disabled())
+		return 0;
+
+	if (in_low_reclaim)
+		return READ_ONCE(memcg->memory.emin);
+
+	return max(READ_ONCE(memcg->memory.emin),
+		   READ_ONCE(memcg->memory.elow));
 }
 
 enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
@@ -360,24 +382,26 @@ mem_cgroup_nodeinfo(struct mem_cgroup *memcg, int nid)
 }
 
 /**
- * mem_cgroup_lruvec - get the lru list vector for a node or a memcg zone
- * @node: node of the wanted lruvec
+ * mem_cgroup_lruvec - get the lru list vector for a memcg & node
  * @memcg: memcg of the wanted lruvec
  *
- * Returns the lru list vector holding pages for a given @node or a given
- * @memcg and @zone. This can be the node lruvec, if the memory controller
- * is disabled.
+ * Returns the lru list vector holding pages for a given @memcg &
+ * @node combination. This can be the node lruvec, if the memory
+ * controller is disabled.
  */
-static inline struct lruvec *mem_cgroup_lruvec(struct pglist_data *pgdat,
-				struct mem_cgroup *memcg)
+static inline struct lruvec *mem_cgroup_lruvec(struct mem_cgroup *memcg,
+					       struct pglist_data *pgdat)
 {
 	struct mem_cgroup_per_node *mz;
 	struct lruvec *lruvec;
 
 	if (mem_cgroup_disabled()) {
-		lruvec = node_lruvec(pgdat);
+		lruvec = &pgdat->__lruvec;
 		goto out;
 	}
+
+	if (!memcg)
+		memcg = root_mem_cgroup;
 
 	mz = mem_cgroup_nodeinfo(memcg, pgdat->node_id);
 	lruvec = &mz->lruvec;
@@ -515,6 +539,8 @@ unsigned long mem_cgroup_get_zone_lru_size(struct lruvec *lruvec,
 void mem_cgroup_handle_over_high(void);
 
 unsigned long mem_cgroup_get_max(struct mem_cgroup *memcg);
+
+unsigned long mem_cgroup_size(struct mem_cgroup *memcg);
 
 void mem_cgroup_print_oom_context(struct mem_cgroup *memcg,
 				struct task_struct *p);
@@ -692,7 +718,7 @@ static inline void __mod_lruvec_page_state(struct page *page,
 		return;
 	}
 
-	lruvec = mem_cgroup_lruvec(pgdat, page->mem_cgroup);
+	lruvec = mem_cgroup_lruvec(page->mem_cgroup, pgdat);
 	__mod_lruvec_state(lruvec, idx, val);
 }
 
@@ -808,6 +834,12 @@ static inline void memcg_memory_event_mm(struct mm_struct *mm,
 {
 }
 
+static inline unsigned long mem_cgroup_protection(struct mem_cgroup *memcg,
+						  bool in_low_reclaim)
+{
+	return 0;
+}
+
 static inline enum mem_cgroup_protection mem_cgroup_protected(
 	struct mem_cgroup *root, struct mem_cgroup *memcg)
 {
@@ -857,16 +889,21 @@ static inline void mem_cgroup_migrate(struct page *old, struct page *new)
 {
 }
 
-static inline struct lruvec *mem_cgroup_lruvec(struct pglist_data *pgdat,
-				struct mem_cgroup *memcg)
+static inline struct lruvec *mem_cgroup_lruvec(struct mem_cgroup *memcg,
+					       struct pglist_data *pgdat)
 {
-	return node_lruvec(pgdat);
+	return &pgdat->__lruvec;
 }
 
 static inline struct lruvec *mem_cgroup_page_lruvec(struct page *page,
 						    struct pglist_data *pgdat)
 {
-	return &pgdat->lruvec;
+	return &pgdat->__lruvec;
+}
+
+static inline struct mem_cgroup *parent_mem_cgroup(struct mem_cgroup *memcg)
+{
+	return NULL;
 }
 
 static inline bool mm_match_cgroup(struct mm_struct *mm,
@@ -943,6 +980,11 @@ unsigned long mem_cgroup_get_zone_lru_size(struct lruvec *lruvec,
 }
 
 static inline unsigned long mem_cgroup_get_max(struct mem_cgroup *memcg)
+{
+	return 0;
+}
+
+static inline unsigned long mem_cgroup_size(struct mem_cgroup *memcg)
 {
 	return 0;
 }
@@ -1237,6 +1279,21 @@ void mem_cgroup_wb_stats(struct bdi_writeback *wb, unsigned long *pfilepages,
 			 unsigned long *pheadroom, unsigned long *pdirty,
 			 unsigned long *pwriteback);
 
+void mem_cgroup_track_foreign_dirty_slowpath(struct page *page,
+					     struct bdi_writeback *wb);
+
+static inline void mem_cgroup_track_foreign_dirty(struct page *page,
+						  struct bdi_writeback *wb)
+{
+	if (mem_cgroup_disabled())
+		return;
+
+	if (unlikely(&page->mem_cgroup->css != wb->memcg_css))
+		mem_cgroup_track_foreign_dirty_slowpath(page, wb);
+}
+
+void mem_cgroup_flush_foreign(struct bdi_writeback *wb);
+
 #else	/* CONFIG_CGROUP_WRITEBACK */
 
 static inline struct wb_domain *mem_cgroup_wb_domain(struct bdi_writeback *wb)
@@ -1249,6 +1306,15 @@ static inline void mem_cgroup_wb_stats(struct bdi_writeback *wb,
 				       unsigned long *pheadroom,
 				       unsigned long *pdirty,
 				       unsigned long *pwriteback)
+{
+}
+
+static inline void mem_cgroup_track_foreign_dirty(struct page *page,
+						  struct bdi_writeback *wb)
+{
+}
+
+static inline void mem_cgroup_flush_foreign(struct bdi_writeback *wb)
 {
 }
 
@@ -1272,6 +1338,11 @@ static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 	} while ((memcg = parent_mem_cgroup(memcg)));
 	return false;
 }
+
+extern int memcg_expand_shrinker_maps(int new_id);
+
+extern void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
+				   int nid, int shrinker_id);
 #else
 #define mem_cgroup_sockets_enabled 0
 static inline void mem_cgroup_sk_alloc(struct sock *sk) { };
@@ -1279,6 +1350,11 @@ static inline void mem_cgroup_sk_free(struct sock *sk) { };
 static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 {
 	return false;
+}
+
+static inline void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
+					  int nid, int shrinker_id)
+{
 }
 #endif
 
@@ -1351,10 +1427,6 @@ static inline int memcg_cache_id(struct mem_cgroup *memcg)
 	return memcg ? memcg->kmemcg_id : -1;
 }
 
-extern int memcg_expand_shrinker_maps(int new_id);
-
-extern void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
-				   int nid, int shrinker_id);
 #else
 
 static inline int memcg_kmem_charge(struct page *page, gfp_t gfp, int order)
@@ -1396,8 +1468,6 @@ static inline void memcg_put_cache_ids(void)
 {
 }
 
-static inline void memcg_set_shrinker_bit(struct mem_cgroup *memcg,
-					  int nid, int shrinker_id) { }
 #endif /* CONFIG_MEMCG_KMEM */
 
 #endif /* _LINUX_MEMCONTROL_H */

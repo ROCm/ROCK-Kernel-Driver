@@ -1261,9 +1261,8 @@ void ata_sff_flush_pio_task(struct ata_port *ap)
 	 */
 	spin_lock_irq(ap->lock);
 	ap->hsm_task_state = HSM_ST_IDLE;
-	spin_unlock_irq(ap->lock);
-
 	ap->sff_pio_task_link = NULL;
+	spin_unlock_irq(ap->lock);
 
 	if (ata_msg_ctl(ap))
 		ata_port_dbg(ap, "%s: EXIT\n", __func__);
@@ -1273,14 +1272,17 @@ static void ata_sff_pio_task(struct work_struct *work)
 {
 	struct ata_port *ap =
 		container_of(work, struct ata_port, sff_pio_task.work);
-	struct ata_link *link = ap->sff_pio_task_link;
+	struct ata_link *link;
 	struct ata_queued_cmd *qc;
 	u8 status;
 	int poll_next;
 
 	spin_lock_irq(ap->lock);
 
-	BUG_ON(ap->sff_pio_task_link == NULL);
+	link = ap->sff_pio_task_link;
+	if (WARN_ON(!link))
+		goto out_unlock;
+
 	/* qc can be NULL if timeout occurred */
 	qc = ata_qc_from_tag(ap, link->active_tag);
 	if (!qc) {

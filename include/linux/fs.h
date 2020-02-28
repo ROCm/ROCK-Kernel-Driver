@@ -1403,6 +1403,14 @@ struct sb_writers {
 	struct percpu_rw_semaphore	rw_sem[SB_FREEZE_LEVELS];
 };
 
+/* we can expand this to help the VFS layer with modern filesystems */
+/* To be used only used by btrfs */
+struct super_block_dev {
+	struct super_block	*sb;
+	struct list_head	entry;		/* For struct sb->s_sbdevs */
+	dev_t			anon_dev;
+};
+
 struct super_block {
 	struct list_head	s_list;		/* Keep this first */
 	dev_t			s_dev;		/* search index; _not_ kdev_t */
@@ -1429,6 +1437,7 @@ struct super_block {
 	const struct fscrypt_operations	*s_cop;
 #endif
 	struct hlist_bl_head	s_roots;	/* alternate root dentries for NFS */
+	struct list_head	s_sbdevs;	/* internal fs dev_t */
 	struct list_head	s_mounts;	/* list of mounts; _not_ for fs use */
 	struct block_device	*s_bdev;
 	struct backing_dev_info *s_bdi;
@@ -1702,6 +1711,13 @@ int vfs_mkobj(struct dentry *, umode_t,
 
 extern long vfs_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
+#ifdef CONFIG_COMPAT
+extern long compat_ptr_ioctl(struct file *file, unsigned int cmd,
+					unsigned long arg);
+#else
+#define compat_ptr_ioctl NULL
+#endif
+
 /*
  * VFS file helper functions.
  */
@@ -1940,6 +1956,7 @@ struct super_operations {
 				  struct shrink_control *);
 	long (*free_cached_objects)(struct super_block *,
 				    struct shrink_control *);
+	dev_t (*get_inode_dev)(const struct inode *);
 };
 
 /*
@@ -2246,6 +2263,17 @@ int set_anon_super(struct super_block *s, void *data);
 int set_anon_super_fc(struct super_block *s, struct fs_context *fc);
 int get_anon_bdev(dev_t *);
 void free_anon_bdev(dev_t);
+
+/* These two are to be used only by btrfs */
+int insert_anon_sbdev(struct super_block *sb, struct super_block_dev *sbdev);
+void remove_anon_sbdev(struct super_block_dev *sbdev);
+static inline void init_anon_sbdev(struct super_block_dev *sbdev)
+{
+	sbdev->sb = NULL;
+	INIT_LIST_HEAD(&sbdev->entry);
+	sbdev->anon_dev = 0;
+}
+
 struct super_block *sget_fc(struct fs_context *fc,
 			    int (*test)(struct super_block *, struct fs_context *),
 			    int (*set)(struct super_block *, struct fs_context *));
@@ -3553,6 +3581,25 @@ static inline void simple_fill_fsxattr(struct fsxattr *fa, __u32 xflags)
 {
 	memset(fa, 0, sizeof(*fa));
 	fa->fsx_xflags = xflags;
+}
+
+/*
+ * Flush file data before changing attributes.  Caller must hold any locks
+ * required to prevent further writes to this file until we're done setting
+ * flags.
+ */
+static inline int inode_drain_writes(struct inode *inode)
+{
+	inode_dio_wait(inode);
+	return filemap_write_and_wait(inode->i_mapping);
+}
+
+static inline dev_t inode_get_dev(const struct inode *inode)
+{
+	if (inode->i_sb->s_op->get_inode_dev)
+		return inode->i_sb->s_op->get_inode_dev(inode);
+
+	return inode->i_sb->s_dev;
 }
 
 #endif /* _LINUX_FS_H */

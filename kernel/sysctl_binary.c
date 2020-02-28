@@ -141,6 +141,7 @@ static const struct bin_table bin_kern_table[] = {
 	{ CTL_INT,	KERN_PANIC_ON_NMI,		"panic_on_unrecovered_nmi" },
 	{ CTL_INT,	KERN_PANIC_ON_WARN,		"panic_on_warn" },
 	{ CTL_ULONG,	KERN_PANIC_PRINT,		"panic_print" },
+	{ CTL_INT,	KERN_SETUID_DUMPABLE,		"suid_dumpable" },
 	{}
 };
 

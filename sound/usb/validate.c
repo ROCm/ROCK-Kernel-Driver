@@ -110,7 +110,7 @@ static bool validate_processing_unit(const void *p,
 	default:
 		if (v->type == UAC1_EXTENSION_UNIT)
 			return true; /* OK */
-		switch (d->wProcessType) {
+		switch (le16_to_cpu(d->wProcessType)) {
 		case UAC_PROCESS_UP_DOWNMIX:
 		case UAC_PROCESS_DOLBY_PROLOGIC:
 			if (d->bLength < len + 1) /* bNrModes */
@@ -125,7 +125,7 @@ static bool validate_processing_unit(const void *p,
 	case UAC_VERSION_2:
 		if (v->type == UAC2_EXTENSION_UNIT_V2)
 			return true; /* OK */
-		switch (d->wProcessType) {
+		switch (le16_to_cpu(d->wProcessType)) {
 		case UAC2_PROCESS_UP_DOWNMIX:
 		case UAC2_PROCESS_DOLBY_PROLOCIC: /* SiC! */
 			if (d->bLength < len + 1) /* bNrModes */
@@ -142,7 +142,7 @@ static bool validate_processing_unit(const void *p,
 			len += 2; /* wClusterDescrID */
 			break;
 		}
-		switch (d->wProcessType) {
+		switch (le16_to_cpu(d->wProcessType)) {
 		case UAC3_PROCESS_UP_DOWNMIX:
 			if (d->bLength < len + 1) /* bNrModes */
 				return false;
@@ -322,11 +322,28 @@ static bool validate_desc(unsigned char *hdr, int protocol,
 
 bool snd_usb_validate_audio_desc(void *p, int protocol)
 {
-	return validate_desc(p, protocol, audio_validators);
+	unsigned char *c = p;
+	bool valid;
+
+	valid = validate_desc(p, protocol, audio_validators);
+	if (!valid && snd_usb_skip_validation) {
+		print_hex_dump(KERN_ERR, "USB-audio: buggy audio desc: ",
+			       DUMP_PREFIX_NONE, 16, 1, c, c[0], true);
+		valid = true;
+	}
+	return valid;
 }
 
 bool snd_usb_validate_midi_desc(void *p)
 {
-	return validate_desc(p, UAC_VERSION_1, midi_validators);
-}
+	unsigned char *c = p;
+	bool valid;
 
+	valid = validate_desc(p, UAC_VERSION_1, midi_validators);
+	if (!valid && snd_usb_skip_validation) {
+		print_hex_dump(KERN_ERR, "USB-audio: buggy midi desc: ",
+			       DUMP_PREFIX_NONE, 16, 1, c, c[0], true);
+		valid = true;
+	}
+	return valid;
+}

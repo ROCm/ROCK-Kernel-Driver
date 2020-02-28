@@ -180,6 +180,36 @@ config RESET_ATTACK_MITIGATION
 	  have been evicted, since otherwise it will trigger even on clean
 	  reboots.
 
+config EFI_RCI2_TABLE
+	bool "EFI Runtime Configuration Interface Table Version 2 Support"
+	depends on X86 || COMPILE_TEST
+	help
+	  Displays the content of the Runtime Configuration Interface
+	  Table version 2 on Dell EMC PowerEdge systems as a binary
+	  attribute 'rci2' under /sys/firmware/efi/tables directory.
+
+	  RCI2 table contains BIOS HII in XML format and is used to populate
+	  BIOS setup page in Dell EMC OpenManage Server Administrator tool.
+	  The BIOS setup page contains BIOS tokens which can be configured.
+
+	  Say Y here for Dell EMC PowerEdge systems.
+
+config EFI_SECRET_KEY
+	bool "EFI secret key"
+	default n
+	depends on EFI_STUB && X86
+	select HIDDEN_AREA
+	help
+	  This option enables the EFI secret key function in EFI stub. EFI
+	  stub wll generate a 512-bit random number that it can be used as
+	  a secret key by HMAC or AES. The secret key will be kept in EFI
+	  oot service variable which is secure when secre boot is enabled.
+	  At runtime, the secret key will be kept in hidden area to prevent
+	  leak from accessing by user space. Hibernation uses EFI secret key
+	  to encrypt hidden area and sign the snapshot image.
+
+	  If unsure, say N.
+
 endmenu
 
 config UEFI_CPER

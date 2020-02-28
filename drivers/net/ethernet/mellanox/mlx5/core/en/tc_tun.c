@@ -31,29 +31,36 @@ static int get_route_and_out_devs(struct mlx5e_priv *priv,
 
 	real_dev = is_vlan_dev(dev) ? vlan_dev_real_dev(dev) : dev;
 	uplink_dev = mlx5_eswitch_uplink_get_proto_dev(esw, REP_ETH);
-	uplink_upper = netdev_master_upper_dev_get(uplink_dev);
+
+	rcu_read_lock();
+	uplink_upper = netdev_master_upper_dev_get_rcu(uplink_dev);
+	/* mlx5_lag_is_sriov() is a blocking function which can't be called
+	 * while holding rcu read lock. Take the net_device for correctness
+	 * sake.
+	 */
+	if (uplink_upper)
+		dev_hold(uplink_upper);
+	rcu_read_unlock();
+
 	dst_is_lag_dev = (uplink_upper &&
 			  netif_is_lag_master(uplink_upper) &&
 			  real_dev == uplink_upper &&
 			  mlx5_lag_is_sriov(priv->mdev));
+	if (uplink_upper)
+		dev_put(uplink_upper);
 
 	/* if the egress device isn't on the same HW e-switch or
 	 * it's a LAG device, use the uplink
 	 */
+	*route_dev = dev;
 	if (!netdev_port_same_parent_id(priv->netdev, real_dev) ||
-	    dst_is_lag_dev) {
-		*route_dev = dev;
+	    dst_is_lag_dev || is_vlan_dev(*route_dev))
 		*out_dev = uplink_dev;
-	} else {
-		*route_dev = dev;
-		if (is_vlan_dev(*route_dev))
-			*out_dev = uplink_dev;
-		else if (mlx5e_eswitch_rep(dev) &&
-			 mlx5e_is_valid_eswitch_fwd_dev(priv, dev))
-			*out_dev = *route_dev;
-		else
-			return -EOPNOTSUPP;
-	}
+	else if (mlx5e_eswitch_rep(dev) &&
+		 mlx5e_is_valid_eswitch_fwd_dev(priv, dev))
+		*out_dev = *route_dev;
+	else
+		return -EOPNOTSUPP;
 
 	if (!(mlx5e_eswitch_rep(*out_dev) &&
 	      mlx5e_is_uplink_rep(netdev_priv(*out_dev))))
@@ -70,8 +77,8 @@ static int mlx5e_route_lookup_ipv4(struct mlx5e_priv *priv,
 				   struct neighbour **out_n,
 				   u8 *out_ttl)
 {
+	struct neighbour *n;
 	struct rtable *rt;
-	struct neighbour *n = NULL;
 
 #if IS_ENABLED(CONFIG_INET)
 	struct mlx5_core_dev *mdev = priv->mdev;
@@ -123,46 +130,6 @@ static const char *mlx5e_netdev_kind(struct net_device *dev)
 		return "unknown";
 }
 
-static int mlx5e_route_lookup_ipv6(struct mlx5e_priv *priv,
-				   struct net_device *mirred_dev,
-				   struct net_device **out_dev,
-				   struct net_device **route_dev,
-				   struct flowi6 *fl6,
-				   struct neighbour **out_n,
-				   u8 *out_ttl)
-{
-	struct neighbour *n = NULL;
-	struct dst_entry *dst;
-
-#if IS_ENABLED(CONFIG_INET) && IS_ENABLED(CONFIG_IPV6)
-	int ret;
-
-	dst = ipv6_stub->ipv6_dst_lookup_flow(dev_net(mirred_dev), NULL, fl6,
-					      NULL);
-	if (IS_ERR(dst))
-		return PTR_ERR(dst);
-
-	if (!(*out_ttl))
-		*out_ttl = ip6_dst_hoplimit(dst);
-
-	ret = get_route_and_out_devs(priv, dst->dev, route_dev, out_dev);
-	if (ret < 0) {
-		dst_release(dst);
-		return ret;
-	}
-#else
-	return -EOPNOTSUPP;
-#endif
-
-	n = dst_neigh_lookup(dst, &fl6->daddr);
-	dst_release(dst);
-	if (!n)
-		return -ENOMEM;
-
-	*out_n = n;
-	return 0;
-}
-
 static int mlx5e_gen_ip_tunnel_header(char buf[], __u8 *ip_proto,
 				      struct mlx5e_encap_entry *e)
 {
@@ -205,8 +172,8 @@ int mlx5e_tc_tun_create_header_ipv4(struct mlx5e_priv *priv,
 	int max_encap_size = MLX5_CAP_ESW(priv->mdev, max_encap_header_size);
 	const struct ip_tunnel_key *tun_key = &e->tun_info->key;
 	struct net_device *out_dev, *route_dev;
-	struct neighbour *n = NULL;
 	struct flowi4 fl4 = {};
+	struct neighbour *n;
 	int ipv4_encap_size;
 	char *encap_header;
 	u8 nud_state, ttl;
@@ -233,13 +200,13 @@ int mlx5e_tc_tun_create_header_ipv4(struct mlx5e_priv *priv,
 		mlx5_core_warn(priv->mdev, "encap size %d too big, max supported is %d\n",
 			       ipv4_encap_size, max_encap_size);
 		err = -EOPNOTSUPP;
-		goto out;
+		goto release_neigh;
 	}
 
 	encap_header = kzalloc(ipv4_encap_size, GFP_KERNEL);
 	if (!encap_header) {
 		err = -ENOMEM;
-		goto out;
+		goto release_neigh;
 	}
 
 	/* used by mlx5e_detach_encap to lookup a neigh hash table
@@ -291,16 +258,16 @@ int mlx5e_tc_tun_create_header_ipv4(struct mlx5e_priv *priv,
 		/* the encap entry will be made valid on neigh update event
 		 * and not used before that.
 		 */
-		goto out;
+		goto release_neigh;
 	}
-
-	err = mlx5_packet_reformat_alloc(priv->mdev,
-					 e->reformat_type,
-					 ipv4_encap_size, encap_header,
-					 MLX5_FLOW_NAMESPACE_FDB,
-					 &e->encap_id);
-	if (err)
+	e->pkt_reformat = mlx5_packet_reformat_alloc(priv->mdev,
+						     e->reformat_type,
+						     ipv4_encap_size, encap_header,
+						     MLX5_FLOW_NAMESPACE_FDB);
+	if (IS_ERR(e->pkt_reformat)) {
+		err = PTR_ERR(e->pkt_reformat);
 		goto destroy_neigh_entry;
+	}
 
 	e->flags |= MLX5_ENCAP_ENTRY_VALID;
 	mlx5e_rep_queue_neigh_stats_work(netdev_priv(out_dev));
@@ -311,10 +278,46 @@ destroy_neigh_entry:
 	mlx5e_rep_encap_entry_detach(netdev_priv(e->out_dev), e);
 free_encap:
 	kfree(encap_header);
-out:
-	if (n)
-		neigh_release(n);
+release_neigh:
+	neigh_release(n);
 	return err;
+}
+
+#if IS_ENABLED(CONFIG_INET) && IS_ENABLED(CONFIG_IPV6)
+static int mlx5e_route_lookup_ipv6(struct mlx5e_priv *priv,
+				   struct net_device *mirred_dev,
+				   struct net_device **out_dev,
+				   struct net_device **route_dev,
+				   struct flowi6 *fl6,
+				   struct neighbour **out_n,
+				   u8 *out_ttl)
+{
+	struct dst_entry *dst;
+	struct neighbour *n;
+
+	int ret;
+
+	dst = ipv6_stub->ipv6_dst_lookup_flow(dev_net(mirred_dev), NULL, fl6,
+					      NULL);
+	if (IS_ERR(dst))
+		return PTR_ERR(dst);
+
+	if (!(*out_ttl))
+		*out_ttl = ip6_dst_hoplimit(dst);
+
+	ret = get_route_and_out_devs(priv, dst->dev, route_dev, out_dev);
+	if (ret < 0) {
+		dst_release(dst);
+		return ret;
+	}
+
+	n = dst_neigh_lookup(dst, &fl6->daddr);
+	dst_release(dst);
+	if (!n)
+		return -ENOMEM;
+
+	*out_n = n;
+	return 0;
 }
 
 int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
@@ -324,9 +327,9 @@ int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
 	int max_encap_size = MLX5_CAP_ESW(priv->mdev, max_encap_header_size);
 	const struct ip_tunnel_key *tun_key = &e->tun_info->key;
 	struct net_device *out_dev, *route_dev;
-	struct neighbour *n = NULL;
 	struct flowi6 fl6 = {};
 	struct ipv6hdr *ip6h;
+	struct neighbour *n;
 	int ipv6_encap_size;
 	char *encap_header;
 	u8 nud_state, ttl;
@@ -352,13 +355,13 @@ int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
 		mlx5_core_warn(priv->mdev, "encap size %d too big, max supported is %d\n",
 			       ipv6_encap_size, max_encap_size);
 		err = -EOPNOTSUPP;
-		goto out;
+		goto release_neigh;
 	}
 
 	encap_header = kzalloc(ipv6_encap_size, GFP_KERNEL);
 	if (!encap_header) {
 		err = -ENOMEM;
-		goto out;
+		goto release_neigh;
 	}
 
 	/* used by mlx5e_detach_encap to lookup a neigh hash table
@@ -409,16 +412,17 @@ int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
 		/* the encap entry will be made valid on neigh update event
 		 * and not used before that.
 		 */
-		goto out;
+		goto release_neigh;
 	}
 
-	err = mlx5_packet_reformat_alloc(priv->mdev,
-					 e->reformat_type,
-					 ipv6_encap_size, encap_header,
-					 MLX5_FLOW_NAMESPACE_FDB,
-					 &e->encap_id);
-	if (err)
+	e->pkt_reformat = mlx5_packet_reformat_alloc(priv->mdev,
+						     e->reformat_type,
+						     ipv6_encap_size, encap_header,
+						     MLX5_FLOW_NAMESPACE_FDB);
+	if (IS_ERR(e->pkt_reformat)) {
+		err = PTR_ERR(e->pkt_reformat);
 		goto destroy_neigh_entry;
+	}
 
 	e->flags |= MLX5_ENCAP_ENTRY_VALID;
 	mlx5e_rep_queue_neigh_stats_work(netdev_priv(out_dev));
@@ -429,11 +433,11 @@ destroy_neigh_entry:
 	mlx5e_rep_encap_entry_detach(netdev_priv(e->out_dev), e);
 free_encap:
 	kfree(encap_header);
-out:
-	if (n)
-		neigh_release(n);
+release_neigh:
+	neigh_release(n);
 	return err;
 }
+#endif
 
 bool mlx5e_tc_tun_device_to_offload(struct mlx5e_priv *priv,
 				    struct net_device *netdev)

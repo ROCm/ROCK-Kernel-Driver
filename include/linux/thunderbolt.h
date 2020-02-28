@@ -80,6 +80,7 @@ struct tb {
 	int index;
 	enum tb_security_level security_level;
 	size_t nboot_acl;
+	void *suse_kabi_padding;
 	unsigned long privdata[0];
 };
 
@@ -104,6 +105,7 @@ static inline unsigned int tb_phy_port_from_link(unsigned int link)
 struct tb_property_dir {
 	const uuid_t *uuid;
 	struct list_head properties;
+	void *suse_kabi_padding;
 };
 
 enum tb_property_type {
@@ -137,6 +139,7 @@ struct tb_property {
 		char *text;
 		u32 immediate;
 	} value;
+	void *suse_kabi_padding;
 };
 
 struct tb_property_dir *tb_property_parse_dir(const u32 *block,
@@ -429,6 +432,7 @@ static inline struct tb_xdomain *tb_service_parent(struct tb_service *svc)
  * @lock: Must be held during ring creation/destruction. Is acquired by
  *	  interrupt_work when dispatching interrupts to individual rings.
  * @pdev: Pointer to the PCI device
+ * @ops: NHI specific optional ops
  * @iobase: MMIO space of the NHI
  * @tx_rings: All Tx rings available on this host controller
  * @rx_rings: All Rx rings available on this host controller
@@ -442,6 +446,7 @@ static inline struct tb_xdomain *tb_service_parent(struct tb_service *svc)
 struct tb_nhi {
 	spinlock_t lock;
 	struct pci_dev *pdev;
+	const struct tb_nhi_ops *ops;
 	void __iomem *iobase;
 	struct tb_ring **tx_rings;
 	struct tb_ring **rx_rings;
@@ -449,6 +454,7 @@ struct tb_nhi {
 	bool going_away;
 	struct work_struct interrupt_work;
 	u32 hop_count;
+	void *suse_kabi_padding;
 };
 
 /**
@@ -496,6 +502,7 @@ struct tb_ring {
 	u16 eof_mask;
 	void (*start_poll)(void *data);
 	void *poll_data;
+	void *suse_kabi_padding;
 };
 
 /* Leave ring interrupt enabled on suspend */

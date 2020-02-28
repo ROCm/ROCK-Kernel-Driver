@@ -36,7 +36,7 @@ static const struct nla_policy sample_policy[TCA_SAMPLE_MAX + 1] = {
 static int tcf_sample_init(struct net *net, struct nlattr *nla,
 			   struct nlattr *est, struct tc_action **a, int ovr,
 			   int bind, bool rtnl_held, struct tcf_proto *tp,
-			   struct netlink_ext_ack *extack)
+			   u32 flags, struct netlink_ext_ack *extack)
 {
 	struct tc_action_net *tn = net_generic(net, sample_net_id);
 	struct nlattr *tb[TCA_SAMPLE_MAX + 1];
@@ -69,7 +69,7 @@ static int tcf_sample_init(struct net *net, struct nlattr *nla,
 
 	if (!exists) {
 		ret = tcf_idr_create(tn, index, est, a,
-				     &act_sample_ops, bind, true);
+				     &act_sample_ops, bind, true, 0);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
@@ -102,8 +102,8 @@ static int tcf_sample_init(struct net *net, struct nlattr *nla,
 	goto_ch = tcf_action_set_ctrlact(*a, parm->action, goto_ch);
 	s->rate = rate;
 	s->psample_group_num = psample_group_num;
-	rcu_swap_protected(s->psample_group, psample_group,
-			   lockdep_is_held(&s->tcf_lock));
+	psample_group = rcu_replace_pointer(s->psample_group, psample_group,
+					    lockdep_is_held(&s->tcf_lock));
 
 	if (tb[TCA_SAMPLE_TRUNC_SIZE]) {
 		s->truncate = true;
@@ -253,6 +253,32 @@ static int tcf_sample_search(struct net *net, struct tc_action **a, u32 index)
 	return tcf_idr_search(tn, a, index);
 }
 
+static void tcf_psample_group_put(void *priv)
+{
+	struct psample_group *group = priv;
+
+	psample_group_put(group);
+}
+
+static struct psample_group *
+tcf_sample_get_group(const struct tc_action *a,
+		     tc_action_priv_destructor *destructor)
+{
+	struct tcf_sample *s = to_sample(a);
+	struct psample_group *group;
+
+	spin_lock_bh(&s->tcf_lock);
+	group = rcu_dereference_protected(s->psample_group,
+					  lockdep_is_held(&s->tcf_lock));
+	if (group) {
+		psample_group_take(group);
+		*destructor = tcf_psample_group_put;
+	}
+	spin_unlock_bh(&s->tcf_lock);
+
+	return group;
+}
+
 static struct tc_action_ops act_sample_ops = {
 	.kind	  = "sample",
 	.id	  = TCA_ID_SAMPLE,
@@ -263,6 +289,7 @@ static struct tc_action_ops act_sample_ops = {
 	.cleanup  = tcf_sample_cleanup,
 	.walk	  = tcf_sample_walker,
 	.lookup	  = tcf_sample_search,
+	.get_psample_group = tcf_sample_get_group,
 	.size	  = sizeof(struct tcf_sample),
 };
 

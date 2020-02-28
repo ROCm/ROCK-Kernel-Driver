@@ -1,0 +1,96 @@
+config SUSE_KERNEL
+	def_bool y
+
+menu "SUSE Release Details"
+choice SUSE_PRODUCT_CODE
+	prompt "SUSE Product Family"
+	default SUSE_PRODUCT_SLE
+	depends on SUSE_KERNEL
+	help
+	  This option defines the SUSE product family that owns this
+	  kernel release.
+
+config SUSE_PRODUCT_SLE
+	bool "SUSE Linux Enteprise"
+
+config SUSE_PRODUCT_OPENSUSE_LEAP
+	bool "openSUSE Leap"
+
+config SUSE_PRODUCT_OPENSUSE_TUMBLEWEED
+	bool "openSUSE Tumbleweed"
+endchoice
+
+config SUSE_PRODUCT_CODE
+	int
+	range 1 3
+	default 1 if SUSE_PRODUCT_SLE
+	default 2 if SUSE_PRODUCT_OPENSUSE_LEAP
+	default 3 if SUSE_PRODUCT_OPENSUSE_TUMBLEWEED
+
+if SUSE_PRODUCT_SLE
+config SUSE_VERSION
+	int "Release Version"
+	range 0 255
+	default 255
+
+config SUSE_PATCHLEVEL
+	int "Service Pack Version"
+	range 0 255
+	default 255
+endif
+
+if SUSE_PRODUCT_OPENSUSE_LEAP
+config SUSE_VERSION
+	int "Release Major Version"
+	range 0 255
+	default 255
+
+config SUSE_PATCHLEVEL
+	int "Release Minor Version"
+	range 0 255
+	default 255
+endif
+
+# Tumbleweed doesn't currently use version information, but we should
+# still have the values defined even if zeroed out.
+if SUSE_PRODUCT_OPENSUSE_TUMBLEWEED
+config SUSE_VERSION
+	int
+	range 0 255
+	default 0
+
+config SUSE_PATCHLEVEL
+	int
+	range 0 255
+	default 0
+endif
+
+config SUSE_AUXRELEASE
+	int
+	range 0 255
+	default 0
+
+config SUSE_KERNEL_SUPPORTED
+	bool "Enable enterprise support facility"
+	depends on SUSE_KERNEL
+	help
+	  This feature enables the handling of the "supported" module flag.
+	  This flag can be used to report unsupported module loads or even
+	  refuse them entirely. It is useful when ensuring that the kernel
+	  remains in a state that SUSE, or its technical partners, is
+	  prepared to support.
+
+	  Modules in the list of supported modules will be marked supported
+	  on build. The default enforcement mode is to report, but not
+	  deny, loading of unsupported modules.
+
+	  If you aren't building a kernel for an enterprise distribution,
+	  say n.
+
+config SUSE_KERNEL_RELEASE
+	bool "Release kernel"
+	default n
+	help
+	  This kernel is built for release through official channels.
+
+endmenu
