@@ -6,7 +6,16 @@ SRC="amd/dkms"
 
 KERNELVER=$1
 KERNELVER_BASE=${KERNELVER%%-*}
-SRCTREE=/lib/modules/$KERNELVER/build
+SRCTREE=/lib/modules/$KERNELVER
+
+if [ -L $SRCTREE/source ]; then
+	BLDTREE="$SRCTREE/build"
+	SRCTREE="$SRCTREE/source"
+else
+	SRCTREE="$SRCTREE/build"
+	BLDTREE="$SRCTREE"
+fi
+
 SRCARCH=$(uname -m | sed -e "s/i.86/x86/" -e "s/x86_64/x86/" \
         -e "s/sun4u/sparc64/" -e "s/arm.*/arm/" -e "s/sa110/arm/" \
         -e "s/s390x/s390/" -e "s/parisc64/parisc/" \
@@ -74,8 +83,9 @@ done
 
 export KERNELVER
 CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
-	-I$SRCTREE/arch/$SRCARCH/include/generated \
+	-I$BLDTREE/arch/$SRCARCH/include/generated \
 	-I$SRCTREE/include \
+	-I$BLDTREE/include \
 	-I$SRCTREE/include/uapi \
 	-include linux/kconfig.h" \
 	./configure
