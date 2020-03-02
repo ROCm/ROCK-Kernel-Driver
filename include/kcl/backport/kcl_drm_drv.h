@@ -28,4 +28,29 @@
 #define __KCL_BACKPORT_KCL_DRM_DRV_H__
 
 #include <kcl/kcl_drm_drv.h>
+
+#ifdef HAVE_DRM_DEV_UNPLUG
+/*
+ * v5.1-rc5-1150-gbd53280ef042 drm/drv: Fix incorrect resolution of merge conflict
+ * v5.1-rc2-5-g3f04e0a6cfeb drm: Fix drm_release() and device unplug
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(5, 2, 0)
+static inline
+void _kcl_drm_dev_unplug(struct drm_device *dev)
+{
+	unsigned int prev, post;
+
+	drm_dev_get(dev);
+
+	prev = kref_read(&dev->ref);
+	drm_dev_unplug(dev);
+	post = kref_read(&dev->ref);
+
+	if (prev == post)
+		drm_dev_put(dev);
+}
+#define drm_dev_unplug _kcl_drm_dev_unplug
+#endif
+#endif
+
 #endif
