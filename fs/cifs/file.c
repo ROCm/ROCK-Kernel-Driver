@@ -1733,7 +1733,6 @@ int cifs_lock(struct file *file, int cmd, struct file_lock *flock)
 	struct cifs_tcon *tcon;
 	struct cifsInodeInfo *cinode;
 	struct cifsFileInfo *cfile;
-	__u16 netfid;
 	__u32 type;
 
 	rc = -EACCES;
@@ -1749,7 +1748,6 @@ int cifs_lock(struct file *file, int cmd, struct file_lock *flock)
 	cifs_read_flock(flock, &type, &lock, &unlock, &wait_flag,
 			tcon->ses->server);
 	cifs_sb = CIFS_FILE_SB(file);
-	netfid = cfile->fid.netfid;
 	cinode = CIFS_I(file_inode(file));
 
 	if (cap_unix(tcon->ses) &&
