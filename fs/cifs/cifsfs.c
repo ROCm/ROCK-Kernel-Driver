@@ -110,6 +110,7 @@ extern mempool_t *cifs_mid_poolp;
 
 struct workqueue_struct	*cifsiod_wq;
 struct workqueue_struct	*fileinfo_put_wq;
+struct workqueue_struct	*decrypt_wq;
 struct workqueue_struct	*cifsoplockd_wq;
 __u32 cifs_lock_secret;
 
@@ -1508,11 +1509,22 @@ init_cifs(void)
 		goto out_destroy_cifsiod_wq;
 	}
 
+	/*
+	 * BB Consider setting limit!=0 maybe to min(num_of_cores - 1, 3) so we
+	 * don't launch too many worker threads
+	 */
+	decrypt_wq = alloc_workqueue("smb3decryptd",
+				     WQ_FREEZABLE|WQ_MEM_RECLAIM, 0);
+	if (!decrypt_wq) {
+		rc = -ENOMEM;
+		goto out_destroy_fileinfo_put_wq;
+	}
+
 	cifsoplockd_wq = alloc_workqueue("cifsoplockd",
 					 WQ_FREEZABLE|WQ_MEM_RECLAIM, 0);
 	if (!cifsoplockd_wq) {
 		rc = -ENOMEM;
-		goto out_destroy_fileinfo_put_wq;
+		goto out_destroy_decrypt_wq;
 	}
 
 	rc = cifs_fscache_register();
@@ -1578,6 +1590,8 @@ out_unreg_fscache:
 	cifs_fscache_unregister();
 out_destroy_cifsoplockd_wq:
 	destroy_workqueue(cifsoplockd_wq);
+out_destroy_decrypt_wq:
+	destroy_workqueue(decrypt_wq);
 out_destroy_fileinfo_put_wq:
 	destroy_workqueue(fileinfo_put_wq);
 out_destroy_cifsiod_wq:
@@ -1606,6 +1620,7 @@ exit_cifs(void)
 	cifs_destroy_inodecache();
 	cifs_fscache_unregister();
 	destroy_workqueue(cifsoplockd_wq);
+	destroy_workqueue(decrypt_wq);
 	destroy_workqueue(fileinfo_put_wq);
 	destroy_workqueue(cifsiod_wq);
 	cifs_proc_clean();

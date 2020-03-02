@@ -1902,6 +1902,7 @@ void cifs_queue_oplock_break(struct cifsFileInfo *cfile);
 extern const struct slow_work_ops cifs_oplock_break_ops;
 extern struct workqueue_struct *cifsiod_wq;
 extern struct workqueue_struct *fileinfo_put_wq;
+extern struct workqueue_struct *decrypt_wq;
 extern struct workqueue_struct *cifsoplockd_wq;
 extern __u32 cifs_lock_secret;
 
