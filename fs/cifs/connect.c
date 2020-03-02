@@ -91,7 +91,7 @@ enum {
 	Opt_serverino, Opt_noserverino,
 	Opt_rwpidforward, Opt_cifsacl, Opt_nocifsacl,
 	Opt_acl, Opt_noacl, Opt_locallease,
-	Opt_sign, Opt_seal, Opt_noac,
+	Opt_sign, Opt_ignore_signature, Opt_seal, Opt_noac,
 	Opt_fsc, Opt_mfsymlinks,
 	Opt_multiuser, Opt_sloppy, Opt_nosharesock,
 	Opt_persistent, Opt_nopersistent,
@@ -184,6 +184,7 @@ static const match_table_t cifs_mount_option_tokens = {
 	{ Opt_noacl, "noacl" },
 	{ Opt_locallease, "locallease" },
 	{ Opt_sign, "sign" },
+	{ Opt_ignore_signature, "signloosely" },
 	{ Opt_seal, "seal" },
 	{ Opt_noac, "noac" },
 	{ Opt_fsc, "fsc" },
@@ -1889,6 +1890,10 @@ cifs_parse_mount_options(const char *mountdata, const char *devname,
 		case Opt_sign:
 			vol->sign = true;
 			break;
+		case Opt_ignore_signature:
+			vol->sign = true;
+			vol->ignore_signature = true;
+			break;
 		case Opt_seal:
 			/* we do not do the following in secFlags because seal
 			 * is a per tree connection (mount) not a per socket
@@ -2620,6 +2625,9 @@ static int match_server(struct TCP_Server_Info *server, struct smb_vol *vol)
 	if (server->rdma != vol->rdma)
 		return 0;
 
+	if (server->ignore_signature != vol->ignore_signature)
+		return 0;
+
 	return 1;
 }
 
@@ -2797,7 +2805,7 @@ smbd_connected:
 	tcp_ses->tcpStatus = CifsNeedNegotiate;
 
 	tcp_ses->nr_targets = 1;
-
+	tcp_ses->ignore_signature = volume_info->ignore_signature;
 	/* thread spawned, put it on the list */
 	spin_lock(&cifs_tcp_ses_lock);
 	list_add(&tcp_ses->tcp_ses_list, &cifs_tcp_ses_list);
@@ -3247,7 +3255,6 @@ cifs_get_smb_ses(struct TCP_Server_Info *server, struct smb_vol *volume_info)
 
 	ses->sectype = volume_info->sectype;
 	ses->sign = volume_info->sign;
-
 	mutex_lock(&ses->session_mutex);
 	rc = cifs_negotiate_protocol(xid, ses);
 	if (!rc)
