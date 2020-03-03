@@ -712,46 +712,14 @@ static int ibmveth_close(struct net_device *netdev)
 	return 0;
 }
 
-static bool
-ibmveth_validate_ethtool_cmd(const struct ethtool_link_ksettings *cmd)
-{
-	struct ethtool_link_ksettings diff1 = *cmd;
-	struct ethtool_link_ksettings diff2 = {};
-
-	diff2.base.port = PORT_OTHER;
-	diff1.base.speed = 0;
-	diff1.base.duplex = 0;
-	diff1.base.cmd = 0;
-	diff1.base.link_mode_masks_nwords = 0;
-	ethtool_link_ksettings_zero_link_mode(&diff1, advertising);
-
-	return !memcmp(&diff1.base, &diff2.base, sizeof(diff1.base)) &&
-		bitmap_empty(diff1.link_modes.supported,
-			     __ETHTOOL_LINK_MODE_MASK_NBITS) &&
-		bitmap_empty(diff1.link_modes.advertising,
-			     __ETHTOOL_LINK_MODE_MASK_NBITS) &&
-		bitmap_empty(diff1.link_modes.lp_advertising,
-			     __ETHTOOL_LINK_MODE_MASK_NBITS);
-}
-
 static int ibmveth_set_link_ksettings(struct net_device *dev,
 				      const struct ethtool_link_ksettings *cmd)
 {
 	struct ibmveth_adapter *adapter = netdev_priv(dev);
-	u32 speed;
-	u8 duplex;
 
-	speed = cmd->base.speed;
-	duplex = cmd->base.duplex;
-	/* don't allow custom speed and duplex */
-	if (!ethtool_validate_speed(speed) ||
-	    !ethtool_validate_duplex(duplex) ||
-	    !ibmveth_validate_ethtool_cmd(cmd))
-		return -EINVAL;
-	adapter->speed = speed;
-	adapter->duplex = duplex;
-
-	return 0;
+	return ethtool_virtdev_set_link_ksettings(dev, cmd,
+						  &adapter->speed,
+						  &adapter->duplex);
 }
 
 static int ibmveth_get_link_ksettings(struct net_device *dev,
@@ -766,14 +734,16 @@ static int ibmveth_get_link_ksettings(struct net_device *dev,
 	return 0;
 }
 
-static void ibmveth_init_link_settings(struct ibmveth_adapter *adapter)
+static void ibmveth_init_link_settings(struct net_device *dev)
 {
-	adapter->duplex = DUPLEX_UNKNOWN;
-	adapter->speed = SPEED_UNKNOWN;
+	struct ibmveth_adapter *adapter = netdev_priv(dev);
+
+	adapter->speed = SPEED_1000;
+	adapter->duplex = DUPLEX_FULL;
 }
 
-static void ibmveth_get_drvinfo(struct net_device *dev,
-				struct ethtool_drvinfo *info)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
 	strlcpy(info->driver, ibmveth_driver_name, sizeof(info->driver));
 	strlcpy(info->version, ibmveth_driver_version, sizeof(info->version));
@@ -1002,13 +972,13 @@ static void ibmveth_get_ethtool_stats(struct net_device *dev,
 }
 
 static const struct ethtool_ops netdev_ethtool_ops = {
-	.get_drvinfo		= ibmveth_get_drvinfo,
-	.get_link		= ethtool_op_get_link,
-	.get_strings		= ibmveth_get_strings,
-	.get_sset_count		= ibmveth_get_sset_count,
-	.get_ethtool_stats	= ibmveth_get_ethtool_stats,
-	.get_link_ksettings	= ibmveth_get_link_ksettings,
-	.set_link_ksettings	= ibmveth_set_link_ksettings
+	.get_drvinfo		         = netdev_get_drvinfo,
+	.get_link		         = ethtool_op_get_link,
+	.get_strings		         = ibmveth_get_strings,
+	.get_sset_count		         = ibmveth_get_sset_count,
+	.get_ethtool_stats	         = ibmveth_get_ethtool_stats,
+	.get_link_ksettings	         = ibmveth_get_link_ksettings,
+	.set_link_ksettings              = ibmveth_set_link_ksettings,
 };
 
 static int ibmveth_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
@@ -1712,7 +1682,7 @@ static int ibmveth_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	adapter->netdev = netdev;
 	adapter->mcastFilterSize = be32_to_cpu(*mcastFilterSize_p);
 	adapter->pool_config = 0;
-	ibmveth_init_link_settings(adapter);
+	ibmveth_init_link_settings(netdev);
 
 	netif_napi_add(netdev, &adapter->napi, ibmveth_poll, 16);
 
