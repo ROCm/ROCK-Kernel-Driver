@@ -57,7 +57,6 @@
 #include "smb2proto.h"
 #include "smbdirect.h"
 #include "dns_resolve.h"
-#include "cifsfs.h"
 #ifdef CONFIG_CIFS_DFS_UPCALL
 #include "dfs_cache.h"
 #endif
@@ -384,54 +383,7 @@ static inline int reconn_set_ipaddr(struct TCP_Server_Info *server)
 #endif
 
 #ifdef CONFIG_CIFS_DFS_UPCALL
-struct super_cb_data {
-	struct TCP_Server_Info *server;
-	struct super_block *sb;
-};
-
 /* These functions must be called with server->srv_mutex held */
-
-static void super_cb(struct super_block *sb, void *arg)
-{
-	struct super_cb_data *d = arg;
-	struct cifs_sb_info *cifs_sb;
-	struct cifs_tcon *tcon;
-
-	if (d->sb)
-		return;
-
-	cifs_sb = CIFS_SB(sb);
-	tcon = cifs_sb_master_tcon(cifs_sb);
-	if (tcon->ses->server == d->server)
-		d->sb = sb;
-}
-
-static struct super_block *get_tcp_super(struct TCP_Server_Info *server)
-{
-	struct super_cb_data d = {
-		.server = server,
-		.sb = NULL,
-	};
-
-	iterate_supers_type(&cifs_fs_type, super_cb, &d);
-
-	if (unlikely(!d.sb))
-		return ERR_PTR(-ENOENT);
-	/*
-	 * Grab an active reference in order to prevent automounts (DFS links)
-	 * of expiring and then freeing up our cifs superblock pointer while
-	 * we're doing failover.
-	 */
-	cifs_sb_active(d.sb);
-	return d.sb;
-}
-
-static inline void put_tcp_super(struct super_block *sb)
-{
-	if (!IS_ERR_OR_NULL(sb))
-		cifs_sb_deactive(sb);
-}
-
 static void reconn_inval_dfs_target(struct TCP_Server_Info *server,
 				    struct cifs_sb_info *cifs_sb,
 				    struct dfs_cache_tgt_list *tgt_list,
@@ -503,7 +455,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	server->nr_targets = 1;
 #ifdef CONFIG_CIFS_DFS_UPCALL
 	spin_unlock(&GlobalMid_Lock);
-	sb = get_tcp_super(server);
+	sb = cifs_get_tcp_super(server);
 	if (IS_ERR(sb)) {
 		rc = PTR_ERR(sb);
 		cifs_dbg(FYI, "%s: will not do DFS failover: rc = %d\n",
@@ -530,7 +482,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		spin_unlock(&GlobalMid_Lock);
 #ifdef CONFIG_CIFS_DFS_UPCALL
 		dfs_cache_free_tgts(&tgt_list);
-		put_tcp_super(sb);
+		cifs_put_tcp_super(sb);
 #endif
 		return rc;
 	} else
@@ -661,7 +613,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 
 	}
 
-	put_tcp_super(sb);
+	cifs_put_tcp_super(sb);
 #endif
 	if (server->tcpStatus == CifsNeedNegotiate)
 		mod_delayed_work(cifsiod_wq, &server->echo, 0);
@@ -4927,6 +4879,15 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb_vol *vol)
 	 * dentry revalidation to think the dentry are stale (ESTALE).
 	 */
 	cifs_autodisable_serverino(cifs_sb);
+	/*
+	 * Force the use of prefix path to support failover on DFS paths that
+	 * resolve to targets that have different prefix paths.
+	 */
+	cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_USE_PREFIX_PATH;
+	kfree(cifs_sb->prepath);
+	cifs_sb->prepath = vol->prepath;
+	vol->prepath = NULL;
+
 out:
 	free_xid(xid);
 	return mount_setup_tlink(cifs_sb, ses, tcon);
