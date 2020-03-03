@@ -41,6 +41,7 @@ struct phylink_link_state;
 #define DSA_TAG_PROTO_TRAILER_VALUE		11
 #define DSA_TAG_PROTO_8021Q_VALUE		12
 #define DSA_TAG_PROTO_SJA1105_VALUE		13
+#define DSA_TAG_PROTO_OCELOT_VALUE		15
 
 enum dsa_tag_protocol {
 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
@@ -57,6 +58,7 @@ enum dsa_tag_protocol {
 	DSA_TAG_PROTO_TRAILER		= DSA_TAG_PROTO_TRAILER_VALUE,
 	DSA_TAG_PROTO_8021Q		= DSA_TAG_PROTO_8021Q_VALUE,
 	DSA_TAG_PROTO_SJA1105		= DSA_TAG_PROTO_SJA1105_VALUE,
+	DSA_TAG_PROTO_OCELOT		= DSA_TAG_PROTO_OCELOT_VALUE,
 };
 
 struct packet_type;
@@ -272,6 +274,11 @@ struct dsa_switch {
 	 * should be retrieved from here and not from the per-port settings.
 	 */
 	bool			vlan_filtering;
+
+	/* MAC PCS does not provide link state change interrupt, and requires
+	 * polling. Flag passed on to PHYLINK.
+	 */
+	bool			pcs_poll;
 
 	unsigned long		*bitmap;
 	unsigned long		_bitmap;
