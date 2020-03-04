@@ -160,8 +160,19 @@ cifs_read_super(struct super_block *sb)
 	else
 		sb->s_maxbytes = MAX_NON_LFS;
 
-	/* BB FIXME fix time_gran to be larger for LANMAN sessions */
-	sb->s_time_gran = 100;
+	/* Some very old servers like DOS and OS/2 used 2 second granularity */
+	if ((tcon->ses->server->vals->protocol_id == SMB10_PROT_ID) &&
+	    ((tcon->ses->capabilities &
+	      tcon->ses->server->vals->cap_nt_find) == 0) &&
+	    !tcon->unix_ext) {
+		sb->s_time_gran = 1000000000; /* 1 second is max allowed gran */
+	} else {
+		/*
+		 * Almost every server, including all SMB2+, uses DCE TIME
+		 * ie 100 nanosecond units, since 1601.  See MS-DTYP and MS-FSCC
+		 */
+		sb->s_time_gran = 100;
+	}
 
 	sb->s_magic = CIFS_MAGIC_NUMBER;
 	sb->s_op = &cifs_super_ops;
