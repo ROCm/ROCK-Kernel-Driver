@@ -95,6 +95,7 @@ struct dm_comressor_info {
  * Describe the backlight support for ACPI or eDP AUX.
  */
 struct amdgpu_dm_backlight_caps {
+#ifdef HAVE_HDR_SINK_METADATA
 	/**
 	 * @ext_caps: Keep the data struct with all the information about the
 	 * display support for HDR.
@@ -109,6 +110,7 @@ struct amdgpu_dm_backlight_caps {
 	 * in nits.
 	 */
 	u32 aux_max_input_signal;
+#endif
 	/**
 	 * @min_input_signal: minimum possible input in range 0-255.
 	 */
@@ -124,7 +126,9 @@ struct amdgpu_dm_backlight_caps {
 	/**
 	 * @aux_support: Describes if the display supports AUX backlight.
 	 */
+#ifdef HAVE_HDR_SINK_METADATA
 	bool aux_support;
+#endif
 };
 
 /**
