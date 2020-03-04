@@ -1726,6 +1726,20 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 				    NULL, NULL);
 	if (r)
 		return r;
+
+	/*
+	 * reserve one TMR (64K) memory at the top of VRAM which holds
+	 * IP Discovery data and is protected by PSP.
+	 */
+	r = amdgpu_bo_create_kernel_at(adev,
+				       adev->gmc.real_vram_size - DISCOVERY_TMR_SIZE,
+				       DISCOVERY_TMR_SIZE,
+				       AMDGPU_GEM_DOMAIN_VRAM,
+				       &adev->discovery_memory,
+				       NULL);
+	if (r)
+		return r;
+
 	DRM_INFO("amdgpu: %uM of VRAM memory ready\n",
 		 (unsigned) (adev->gmc.real_vram_size / (1024 * 1024)));
 
@@ -1789,6 +1803,9 @@ void amdgpu_ttm_late_init(struct amdgpu_device *adev)
 {
 	/* return the VGA stolen memory (if any) back to VRAM */
 	amdgpu_bo_free_kernel(&adev->stolen_vga_memory, NULL, NULL);
+
+	/* return the IP Discovery TMR memory back to VRAM */
+	amdgpu_bo_free_kernel(&adev->discovery_memory, NULL, NULL);
 }
 
 /**
