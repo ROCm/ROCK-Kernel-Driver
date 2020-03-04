@@ -854,12 +854,24 @@ skip_rio:
 		break;
 
 	case MBA_SYSTEM_ERR:		/* System Error */
-		mbx = (IS_QLA81XX(ha) || IS_QLA83XX(ha) || IS_QLA27XX(ha) ||
-		    IS_QLA28XX(ha)) ?
-			RD_REG_WORD(&reg24->mailbox7) : 0;
-		ql_log(ql_log_warn, vha, 0x5003,
-		    "ISP System Error - mbx1=%xh mbx2=%xh mbx3=%xh "
-		    "mbx7=%xh.\n", mb[1], mb[2], mb[3], mbx);
+		mbx = 0;
+		if (IS_QLA81XX(ha) || IS_QLA83XX(ha) ||
+		    IS_QLA27XX(ha) || IS_QLA28XX(ha)) {
+			u16 m[4];
+
+			m[0] = RD_REG_WORD(&reg24->mailbox4);
+			m[1] = RD_REG_WORD(&reg24->mailbox5);
+			m[2] = RD_REG_WORD(&reg24->mailbox6);
+			mbx = m[3] = RD_REG_WORD(&reg24->mailbox7);
+
+			ql_log(ql_log_warn, vha, 0x5003,
+			    "ISP System Error - mbx1=%xh mbx2=%xh mbx3=%xh mbx4=%xh mbx5=%xh mbx6=%xh mbx7=%xh.\n",
+			    mb[1], mb[2], mb[3], m[0], m[1], m[2], m[3]);
+		} else
+			ql_log(ql_log_warn, vha, 0x5003,
+			    "ISP System Error - mbx1=%xh mbx2=%xh mbx3=%xh.\n ",
+			    mb[1], mb[2], mb[3]);
+
 		ha->fw_dump_mpi =
 		    (IS_QLA27XX(ha) || IS_QLA28XX(ha)) &&
 		    RD_REG_WORD(&reg24->mailbox7) & BIT_8;
@@ -960,10 +972,6 @@ skip_rio:
 		vha->flags.management_server_logged_in = 0;
 		qla2x00_post_aen_work(vha, FCH_EVT_LINKUP, ha->link_data_rate);
 
-		if (AUTO_DETECT_SFP_SUPPORT(vha)) {
-			set_bit(DETECT_SFP_CHANGE, &vha->dpc_flags);
-			qla2xxx_wake_dpc(vha);
-		}
 		break;
 
 	case MBA_LOOP_DOWN:		/* Loop Down Event */
@@ -1436,6 +1444,11 @@ global_port_update:
 	case MBA_TRANS_INSERT:
 		ql_dbg(ql_dbg_async, vha, 0x5091,
 		    "Transceiver Insertion: %04x\n", mb[1]);
+		set_bit(DETECT_SFP_CHANGE, &vha->dpc_flags);
+		break;
+
+	case MBA_TRANS_REMOVE:
+		ql_dbg(ql_dbg_async, vha, 0x5091, "Transceiver Removal\n");
 		break;
 
 	default:
@@ -2051,6 +2064,7 @@ static void qla24xx_nvme_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	struct nvmefc_fcp_req *fd;
 	uint16_t        ret = QLA_SUCCESS;
 	uint16_t	comp_status = le16_to_cpu(sts->comp_status);
+	int		logit = 0;
 
 	iocb = &sp->u.iocb_cmd;
 	fcport = sp->fcport;
@@ -2060,6 +2074,12 @@ static void qla24xx_nvme_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 
 	if (unlikely(iocb->u.nvme.aen_op))
 		atomic_dec(&sp->vha->hw->nvme_active_aen_cnt);
+
+	if (unlikely(comp_status != CS_COMPLETE))
+		logit = 1;
+
+	fd->transferred_length = fd->payload_length -
+	    le32_to_cpu(sts->residual_len);
 
 	/*
 	 * State flags: Bit 6 and 0.
@@ -2071,8 +2091,20 @@ static void qla24xx_nvme_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 	 */
 	if (!(state_flags & (SF_FCP_RSP_DMA | SF_NVME_ERSP))) {
 		iocb->u.nvme.rsp_pyld_len = 0;
-	} else if ((state_flags & SF_FCP_RSP_DMA)) {
+	} else if ((state_flags & (SF_FCP_RSP_DMA | SF_NVME_ERSP)) ==
+			(SF_FCP_RSP_DMA | SF_NVME_ERSP)) {
+		/* Response already DMA'd to fd->rspaddr. */
 		iocb->u.nvme.rsp_pyld_len = le16_to_cpu(sts->nvme_rsp_pyld_len);
+	} else if ((state_flags & SF_FCP_RSP_DMA)) {
+		/*
+		 * Non-zero value in first 12 bytes of NVMe_RSP IU, treat this
+		 * as an error.
+		 */
+		iocb->u.nvme.rsp_pyld_len = 0;
+		fd->transferred_length = 0;
+		ql_dbg(ql_dbg_io, fcport->vha, 0x307a,
+			"Unexpected values in NVMe_RSP IU.\n");
+		logit = 1;
 	} else if (state_flags & SF_NVME_ERSP) {
 		uint32_t *inbuf, *outbuf;
 		uint16_t iter;
@@ -2095,16 +2127,28 @@ static void qla24xx_nvme_iocb_entry(scsi_qla_host_t *vha, struct req_que *req,
 		iter = iocb->u.nvme.rsp_pyld_len >> 2;
 		for (; iter; iter--)
 			*outbuf++ = swab32(*inbuf++);
-	} else { /* unhandled case */
-	    ql_log(ql_log_warn, fcport->vha, 0x503a,
-		"NVME-%s error. Unhandled state_flags of %x\n",
-		sp->name, state_flags);
 	}
 
-	fd->transferred_length = fd->payload_length -
-	    le32_to_cpu(sts->residual_len);
+	if (state_flags & SF_NVME_ERSP) {
+		struct nvme_fc_ersp_iu *rsp_iu = fd->rspaddr;
+		u32 tgt_xfer_len;
 
-	if (unlikely(comp_status != CS_COMPLETE))
+		tgt_xfer_len = be32_to_cpu(rsp_iu->xfrd_len);
+		if (fd->transferred_length != tgt_xfer_len) {
+			ql_dbg(ql_dbg_io, fcport->vha, 0x3079,
+				"Dropped frame(s) detected (sent/rcvd=%u/%u).\n",
+				tgt_xfer_len, fd->transferred_length);
+			logit = 1;
+		} else if (comp_status == CS_DATA_UNDERRUN) {
+			/*
+			 * Do not log if this is just an underflow and there
+			 * is no data loss.
+			 */
+			logit = 0;
+		}
+	}
+
+	if (unlikely(logit))
 		ql_log(ql_log_warn, fcport->vha, 0x5060,
 		   "NVME-%s ERR Handling - hdl=%x status(%x) tr_len:%x resid=%x  ox_id=%x\n",
 		   sp->name, sp->handle, comp_status,
@@ -2656,11 +2700,6 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 		}
 		return;
 	}
-
-	if (sp->abort)
-		sp->aborted = 1;
-	else
-		sp->completed = 1;
 
 	if (sp->cmd_type != TYPE_SRB) {
 		req->outstanding_cmds[handle] = NULL;
@@ -3601,6 +3640,25 @@ qla2xxx_msix_rsp_q(int irq, void *dev_id)
 {
 	struct qla_hw_data *ha;
 	struct qla_qpair *qpair;
+
+	qpair = dev_id;
+	if (!qpair) {
+		ql_log(ql_log_info, NULL, 0x505b,
+		    "%s: NULL response queue pointer.\n", __func__);
+		return IRQ_NONE;
+	}
+	ha = qpair->hw;
+
+	queue_work(ha->wq, &qpair->q_work);
+
+	return IRQ_HANDLED;
+}
+
+irqreturn_t
+qla2xxx_msix_rsp_q_hs(int irq, void *dev_id)
+{
+	struct qla_hw_data *ha;
+	struct qla_qpair *qpair;
 	struct device_reg_24xx __iomem *reg;
 	unsigned long flags;
 
@@ -3612,13 +3670,10 @@ qla2xxx_msix_rsp_q(int irq, void *dev_id)
 	}
 	ha = qpair->hw;
 
-	/* Clear the interrupt, if enabled, for this response queue */
-	if (unlikely(!ha->flags.disable_msix_handshake)) {
-		reg = &ha->iobase->isp24;
-		spin_lock_irqsave(&ha->hardware_lock, flags);
-		WRT_REG_DWORD(&reg->hccr, HCCRX_CLR_RISC_INT);
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	}
+	reg = &ha->iobase->isp24;
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	WRT_REG_DWORD(&reg->hccr, HCCRX_CLR_RISC_INT);
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	queue_work(ha->wq, &qpair->q_work);
 
@@ -3637,6 +3692,7 @@ static const struct qla_init_msix_entry msix_entries[] = {
 	{ "rsp_q", qla24xx_msix_rsp_q },
 	{ "atio_q", qla83xx_msix_atio_q },
 	{ "qpair_multiq", qla2xxx_msix_rsp_q },
+	{ "qpair_multiq_hs", qla2xxx_msix_rsp_q_hs },
 };
 
 static const struct qla_init_msix_entry qla82xx_msix_entries[] = {

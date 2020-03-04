@@ -596,6 +596,9 @@ qla24xx_pci_info_str(struct scsi_qla_host *vha, char *str, size_t str_len)
 		case 3:
 			speed_str = "8.0GT/s";
 			break;
+		case 4:
+			speed_str = "16.0GT/s";
+			break;
 		default:
 			speed_str = "<unknown>";
 			break;
@@ -1266,17 +1269,6 @@ qla2xxx_eh_abort(struct scsi_cmnd *cmd)
 		return SUCCESS;
 
 	spin_lock_irqsave(qpair->qp_lock_ptr, flags);
-	if (sp->completed) {
-		spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
-		return SUCCESS;
-	}
-
-	if (sp->abort || sp->aborted) {
-		spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
-		return FAILED;
-	}
-
-	sp->abort = 1;
 	sp->comp = &comp;
 	spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
 
@@ -1701,6 +1693,10 @@ qla2x00_loop_reset(scsi_qla_host_t *vha)
 	return QLA_SUCCESS;
 }
 
+/*
+ * The caller must ensure that no completion interrupts will happen
+ * while this function is in progress.
+ */
 static void qla2x00_abort_srb(struct qla_qpair *qp, srb_t *sp, const int res,
 			      unsigned long *flags)
 	__releases(qp->qp_lock_ptr)
@@ -1709,6 +1705,7 @@ static void qla2x00_abort_srb(struct qla_qpair *qp, srb_t *sp, const int res,
 	DECLARE_COMPLETION_ONSTACK(comp);
 	scsi_qla_host_t *vha = qp->vha;
 	struct qla_hw_data *ha = vha->hw;
+	struct scsi_cmnd *cmd = GET_CMD_SP(sp);
 	int rval;
 	bool ret_cmd;
 	uint32_t ratov_j;
@@ -1730,7 +1727,6 @@ static void qla2x00_abort_srb(struct qla_qpair *qp, srb_t *sp, const int res,
 		}
 
 		sp->comp = &comp;
-		sp->abort =  1;
 		spin_unlock_irqrestore(qp->qp_lock_ptr, *flags);
 
 		rval = ha->isp_ops->abort_command(sp);
@@ -1754,13 +1750,17 @@ static void qla2x00_abort_srb(struct qla_qpair *qp, srb_t *sp, const int res,
 		}
 
 		spin_lock_irqsave(qp->qp_lock_ptr, *flags);
-		if (ret_cmd && (!sp->completed || !sp->aborted))
+		if (ret_cmd && blk_mq_request_started(cmd->request))
 			sp->done(sp, res);
 	} else {
 		sp->done(sp, res);
 	}
 }
 
+/*
+ * The caller must ensure that no completion interrupts will happen
+ * while this function is in progress.
+ */
 static void
 __qla2x00_abort_all_cmds(struct qla_qpair *qp, int res)
 {
@@ -1807,6 +1807,10 @@ __qla2x00_abort_all_cmds(struct qla_qpair *qp, int res)
 	spin_unlock_irqrestore(qp->qp_lock_ptr, flags);
 }
 
+/*
+ * The caller must ensure that no completion interrupts will happen
+ * while this function is in progress.
+ */
 void
 qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 {
@@ -2300,7 +2304,7 @@ static struct isp_operations qla81xx_isp_ops = {
 	.config_rings		= qla24xx_config_rings,
 	.reset_adapter		= qla24xx_reset_adapter,
 	.nvram_config		= qla81xx_nvram_config,
-	.update_fw_options	= qla83xx_update_fw_options,
+	.update_fw_options	= qla24xx_update_fw_options,
 	.load_risc		= qla81xx_load_risc,
 	.pci_info_str		= qla24xx_pci_info_str,
 	.fw_version_str		= qla24xx_fw_version_str,
@@ -2417,7 +2421,7 @@ static struct isp_operations qla83xx_isp_ops = {
 	.config_rings		= qla24xx_config_rings,
 	.reset_adapter		= qla24xx_reset_adapter,
 	.nvram_config		= qla81xx_nvram_config,
-	.update_fw_options	= qla83xx_update_fw_options,
+	.update_fw_options	= qla24xx_update_fw_options,
 	.load_risc		= qla81xx_load_risc,
 	.pci_info_str		= qla24xx_pci_info_str,
 	.fw_version_str		= qla24xx_fw_version_str,
@@ -3137,7 +3141,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	host->max_id = ha->max_fibre_devices;
 	host->cmd_per_lun = 3;
 	host->unique_id = host->host_no;
-	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif && !ql2xnvmeenable)
+	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif)
 		host->max_cmd_len = 32;
 	else
 		host->max_cmd_len = MAX_CMDSZ;
@@ -3361,7 +3365,7 @@ skip_dpc:
 	    "Detected hba at address=%p.\n",
 	    ha);
 
-	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif && !ql2xnvmeenable) {
+	if (IS_T10_PI_CAPABLE(ha) && ql2xenabledif) {
 		if (ha->fw_attributes & BIT_4) {
 			int prot = 0, guard;
 
@@ -3453,13 +3457,6 @@ skip_dpc:
 
 	if (test_bit(UNLOADING, &base_vha->dpc_flags))
 		return -ENODEV;
-
-	if (ha->flags.detected_lr_sfp) {
-		ql_log(ql_log_info, base_vha, 0xffff,
-		    "Reset chip to pick up LR SFP setting\n");
-		set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags);
-		qla2xxx_wake_dpc(base_vha);
-	}
 
 	return 0;
 
@@ -4053,7 +4050,7 @@ qla2x00_mem_alloc(struct qla_hw_data *ha, uint16_t req_len, uint16_t rsp_len,
 	    "init_cb=%p gid_list=%p, srb_mempool=%p s_dma_pool=%p.\n",
 	    ha->init_cb, ha->gid_list, ha->srb_mempool, ha->s_dma_pool);
 
-	if (IS_P3P_TYPE(ha) || (ql2xenabledif && !ql2xnvmeenable)) {
+	if (IS_P3P_TYPE(ha) || ql2xenabledif) {
 		ha->dl_dma_pool = dma_pool_create(name, &ha->pdev->dev,
 			DSD_LIST_DMA_POOL_SIZE, 8, 0);
 		if (!ha->dl_dma_pool) {
@@ -5202,9 +5199,8 @@ void qla24xx_create_new_sess(struct scsi_qla_host *vha, struct qla_work_evt *e)
 					fcport->n2n_flag = 1;
 				}
 				fcport->fw_login_state = 0;
-				/*
-				 * wait link init done before sending login
-				 */
+
+				schedule_delayed_work(&vha->scan.scan_work, 5);
 			} else {
 				qla24xx_fcport_handle_login(vha, fcport);
 			}
@@ -5972,7 +5968,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 	    &bbc_dma, GFP_KERNEL);
 
 	/* Prepare Response IOCB */
-	memset(rsp_els, 0, sizeof(*rsp_els));
 	rsp_els->entry_type = ELS_IOCB_TYPE;
 	rsp_els->entry_count = 1;
 	rsp_els->sys_define = 0;
@@ -6019,6 +6014,11 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 	rsp_payload->ls_req_info_desc2.req_payload_word_0 =
 	    cpu_to_be32p((uint32_t *)purex->els_frame_payload);
 
+
+	rsp_payload->sfp_diag_desc.desc_tag = cpu_to_be32(0x10000);
+	rsp_payload->sfp_diag_desc.desc_len =
+		cpu_to_be32(RDP_DESC_LEN(rsp_payload->sfp_diag_desc));
+
 	if (sfp) {
 		/* SFP Flags */
 		memset(sfp, 0, SFP_RTDI_LEN);
@@ -6042,23 +6042,18 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 				sfp_flags |= BIT_6; /* sfp+ */
 		}
 
+		rsp_payload->sfp_diag_desc.sfp_flags = cpu_to_be16(sfp_flags);
+
 		/* SFP Diagnostics */
 		memset(sfp, 0, SFP_RTDI_LEN);
 		rval = qla2x00_read_sfp(vha, sfp_dma, sfp, 0xa2, 0x60, 10, 0);
-		if (!rval && sfp_flags) {
+		if (!rval) {
 			uint16_t *trx = (void *)sfp; /* already be16 */
-
-			rsp_payload->sfp_diag_desc.desc_tag =
-			    cpu_to_be32(0x10000);
-			rsp_payload->sfp_diag_desc.desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(rsp_payload->sfp_diag_desc));
 			rsp_payload->sfp_diag_desc.temperature = trx[0];
 			rsp_payload->sfp_diag_desc.vcc = trx[1];
 			rsp_payload->sfp_diag_desc.tx_bias = trx[2];
 			rsp_payload->sfp_diag_desc.tx_power = trx[3];
 			rsp_payload->sfp_diag_desc.rx_power = trx[4];
-			rsp_payload->sfp_diag_desc.sfp_flags =
-			    cpu_to_be16(sfp_flags);
 		}
 	}
 
@@ -6071,14 +6066,14 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 	rsp_payload->port_speed_desc.operating_speed = cpu_to_be16(
 	    qla25xx_rdp_port_speed_currently(ha));
 
+	/* Link Error Status Descriptor */
+	rsp_payload->ls_err_desc.desc_tag = cpu_to_be32(0x10002);
+	rsp_payload->ls_err_desc.desc_len =
+		cpu_to_be32(RDP_DESC_LEN(rsp_payload->ls_err_desc));
+
 	if (stat) {
 		rval = qla24xx_get_isp_stats(vha, stat, stat_dma, 0);
 		if (!rval) {
-			/* Link Error Status Descriptor */
-			rsp_payload->ls_err_desc.desc_tag =
-			    cpu_to_be32(0x10002);
-			rsp_payload->ls_err_desc.desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(rsp_payload->ls_err_desc));
 			rsp_payload->ls_err_desc.link_fail_cnt =
 			    cpu_to_be32(stat->link_fail_cnt);
 			rsp_payload->ls_err_desc.loss_sync_cnt =
@@ -6117,27 +6112,46 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 	    vha->fabric_port_name,
 	    sizeof(rsp_payload->port_name_direct_desc.WWPN));
 
+	/* Bufer Credit Descriptor */
+	rsp_payload->buffer_credit_desc.desc_tag = cpu_to_be32(0x10006);
+	rsp_payload->buffer_credit_desc.desc_len =
+		cpu_to_be32(RDP_DESC_LEN(rsp_payload->buffer_credit_desc));
+	rsp_payload->buffer_credit_desc.fcport_b2b = 0;
+	rsp_payload->buffer_credit_desc.attached_fcport_b2b = cpu_to_be32(0);
+	rsp_payload->buffer_credit_desc.fcport_rtt = cpu_to_be32(0);
+
 	if (bbc) {
 		memset(bbc, 0, sizeof(*bbc));
 		rval = qla24xx_get_buffer_credits(vha, bbc, bbc_dma);
 		if (!rval) {
-			/* Bufer Credit Descriptor */
-			rsp_payload->buffer_credit_desc.desc_tag =
-			    cpu_to_be32(0x10006);
-			rsp_payload->buffer_credit_desc.desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				rsp_payload->buffer_credit_desc));
 			rsp_payload->buffer_credit_desc.fcport_b2b =
 			    cpu_to_be32(LSW(bbc->parameter[0]));
-			rsp_payload->buffer_credit_desc.attached_fcport_b2b =
-			    cpu_to_be32(0);
-			rsp_payload->buffer_credit_desc.fcport_rtt =
-			    cpu_to_be32(0);
 		}
 	}
 
 	if (rsp_payload_length < sizeof(*rsp_payload))
 		goto send;
+
+	/* Optical Element Descriptor, Temperature */
+	rsp_payload->optical_elmt_desc[0].desc_tag = cpu_to_be32(0x10007);
+	rsp_payload->optical_elmt_desc[0].desc_len =
+		cpu_to_be32(RDP_DESC_LEN(*rsp_payload->optical_elmt_desc));
+	/* Optical Element Descriptor, Voltage */
+	rsp_payload->optical_elmt_desc[1].desc_tag = cpu_to_be32(0x10007);
+	rsp_payload->optical_elmt_desc[1].desc_len =
+		cpu_to_be32(RDP_DESC_LEN(*rsp_payload->optical_elmt_desc));
+	/* Optical Element Descriptor, Tx Bias Current */
+	rsp_payload->optical_elmt_desc[2].desc_tag = cpu_to_be32(0x10007);
+	rsp_payload->optical_elmt_desc[2].desc_len =
+		cpu_to_be32(RDP_DESC_LEN(*rsp_payload->optical_elmt_desc));
+	/* Optical Element Descriptor, Tx Power */
+	rsp_payload->optical_elmt_desc[3].desc_tag = cpu_to_be32(0x10007);
+	rsp_payload->optical_elmt_desc[3].desc_len =
+		cpu_to_be32(RDP_DESC_LEN(*rsp_payload->optical_elmt_desc));
+	/* Optical Element Descriptor, Rx Power */
+	rsp_payload->optical_elmt_desc[4].desc_tag = cpu_to_be32(0x10007);
+	rsp_payload->optical_elmt_desc[4].desc_len =
+		cpu_to_be32(RDP_DESC_LEN(*rsp_payload->optical_elmt_desc));
 
 	if (sfp) {
 		memset(sfp, 0, SFP_RTDI_LEN);
@@ -6146,11 +6160,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 			uint16_t *trx = (void *)sfp; /* already be16 */
 
 			/* Optical Element Descriptor, Temperature */
-			rsp_payload->optical_elmt_desc[0].desc_tag =
-			    cpu_to_be32(0x10007);
-			rsp_payload->optical_elmt_desc[0].desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				*rsp_payload->optical_elmt_desc));
 			rsp_payload->optical_elmt_desc[0].high_alarm = trx[0];
 			rsp_payload->optical_elmt_desc[0].low_alarm = trx[1];
 			rsp_payload->optical_elmt_desc[0].high_warn = trx[2];
@@ -6159,11 +6168,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 			    cpu_to_be32(1 << 28);
 
 			/* Optical Element Descriptor, Voltage */
-			rsp_payload->optical_elmt_desc[1].desc_tag =
-			    cpu_to_be32(0x10007);
-			rsp_payload->optical_elmt_desc[1].desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				*rsp_payload->optical_elmt_desc));
 			rsp_payload->optical_elmt_desc[1].high_alarm = trx[4];
 			rsp_payload->optical_elmt_desc[1].low_alarm = trx[5];
 			rsp_payload->optical_elmt_desc[1].high_warn = trx[6];
@@ -6172,11 +6176,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 			    cpu_to_be32(2 << 28);
 
 			/* Optical Element Descriptor, Tx Bias Current */
-			rsp_payload->optical_elmt_desc[2].desc_tag =
-			    cpu_to_be32(0x10007);
-			rsp_payload->optical_elmt_desc[2].desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				*rsp_payload->optical_elmt_desc));
 			rsp_payload->optical_elmt_desc[2].high_alarm = trx[8];
 			rsp_payload->optical_elmt_desc[2].low_alarm = trx[9];
 			rsp_payload->optical_elmt_desc[2].high_warn = trx[10];
@@ -6185,11 +6184,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 			    cpu_to_be32(3 << 28);
 
 			/* Optical Element Descriptor, Tx Power */
-			rsp_payload->optical_elmt_desc[3].desc_tag =
-			    cpu_to_be32(0x10007);
-			rsp_payload->optical_elmt_desc[3].desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				*rsp_payload->optical_elmt_desc));
 			rsp_payload->optical_elmt_desc[3].high_alarm = trx[12];
 			rsp_payload->optical_elmt_desc[3].low_alarm = trx[13];
 			rsp_payload->optical_elmt_desc[3].high_warn = trx[14];
@@ -6198,11 +6192,6 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 			    cpu_to_be32(4 << 28);
 
 			/* Optical Element Descriptor, Rx Power */
-			rsp_payload->optical_elmt_desc[4].desc_tag =
-			    cpu_to_be32(0x10007);
-			rsp_payload->optical_elmt_desc[4].desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				*rsp_payload->optical_elmt_desc));
 			rsp_payload->optical_elmt_desc[4].high_alarm = trx[16];
 			rsp_payload->optical_elmt_desc[4].low_alarm = trx[17];
 			rsp_payload->optical_elmt_desc[4].high_warn = trx[18];
@@ -6256,16 +6245,15 @@ void qla24xx_process_purex_rdp(struct scsi_qla_host *vha, void *pkt)
 		}
 	}
 
+	/* Optical Product Data Descriptor */
+	rsp_payload->optical_prod_desc.desc_tag = cpu_to_be32(0x10008);
+	rsp_payload->optical_prod_desc.desc_len =
+		cpu_to_be32(RDP_DESC_LEN(rsp_payload->optical_prod_desc));
+
 	if (sfp) {
 		memset(sfp, 0, SFP_RTDI_LEN);
 		rval = qla2x00_read_sfp(vha, sfp_dma, sfp, 0xa0, 20, 64, 0);
 		if (!rval) {
-			/* Optical Product Data Descriptor */
-			rsp_payload->optical_prod_desc.desc_tag =
-			    cpu_to_be32(0x10008);
-			rsp_payload->optical_prod_desc.desc_len =
-			    cpu_to_be32(RDP_DESC_LEN(
-				rsp_payload->optical_prod_desc));
 			memcpy(rsp_payload->optical_prod_desc.vendor_name,
 			    sfp + 0,
 			    sizeof(rsp_payload->optical_prod_desc.vendor_name));
@@ -6873,13 +6861,14 @@ qla2x00_do_dpc(void *data)
 		}
 
 		if (test_and_clear_bit(DETECT_SFP_CHANGE,
-			&base_vha->dpc_flags) &&
-		    !test_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags)) {
-			qla24xx_detect_sfp(base_vha);
-
-			if (ha->flags.detected_lr_sfp !=
-			    ha->flags.using_lr_setting)
-				set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags);
+		    &base_vha->dpc_flags)) {
+			/* Semantic:
+			 *  - NO-OP -- await next ISP-ABORT. Preferred method
+			 *             to minimize disruptions that will occur
+			 *             when a forced chip-reset occurs.
+			 *  - Force -- ISP-ABORT scheduled.
+			 */
+			/* set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags); */
 		}
 
 		if (test_and_clear_bit

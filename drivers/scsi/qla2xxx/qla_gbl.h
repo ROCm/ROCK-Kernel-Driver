@@ -31,8 +31,6 @@ extern int qla24xx_nvram_config(struct scsi_qla_host *);
 extern int qla81xx_nvram_config(struct scsi_qla_host *);
 extern void qla2x00_update_fw_options(struct scsi_qla_host *);
 extern void qla24xx_update_fw_options(scsi_qla_host_t *);
-extern void qla81xx_update_fw_options(scsi_qla_host_t *);
-extern void qla83xx_update_fw_options(scsi_qla_host_t *);
 
 extern int qla2x00_load_risc(struct scsi_qla_host *, uint32_t *);
 extern int qla24xx_load_risc(scsi_qla_host_t *, uint32_t *);
@@ -111,7 +109,7 @@ int qla24xx_async_notify_ack(scsi_qla_host_t *, fc_port_t *,
 int qla24xx_post_newsess_work(struct scsi_qla_host *, port_id_t *, u8 *, u8*,
     void *, u8);
 int qla24xx_fcport_handle_login(struct scsi_qla_host *, fc_port_t *);
-int qla24xx_detect_sfp(scsi_qla_host_t *vha);
+int qla24xx_detect_sfp(scsi_qla_host_t *);
 int qla24xx_post_gpdb_work(struct scsi_qla_host *, fc_port_t *, u8);
 
 extern void qla28xx_get_aux_images(struct scsi_qla_host *,
@@ -567,6 +565,8 @@ qla2x00_process_completed_request(struct scsi_qla_host *, struct req_que *,
 	uint32_t);
 extern irqreturn_t
 qla2xxx_msix_rsp_q(int irq, void *dev_id);
+extern irqreturn_t
+qla2xxx_msix_rsp_q_hs(int irq, void *dev_id);
 fc_port_t *qla2x00_find_fcport_by_loopid(scsi_qla_host_t *, uint16_t);
 fc_port_t *qla2x00_find_fcport_by_wwpn(scsi_qla_host_t *, u8 *, u8);
 fc_port_t *qla2x00_find_fcport_by_nportid(scsi_qla_host_t *, port_id_t *, u8);

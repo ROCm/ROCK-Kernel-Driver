@@ -117,10 +117,9 @@ qla2x00_mailbox_command(scsi_qla_host_t *vha, mbx_cmd_t *mcp)
 
 	ql_dbg(ql_dbg_mbx, vha, 0x1000, "Entered %s.\n", __func__);
 
-	if (ha->pdev->error_state > pci_channel_io_frozen) {
+	if (ha->pdev->error_state == pci_channel_io_perm_failure) {
 		ql_log(ql_log_warn, vha, 0x1001,
-		    "error_state is greater than pci_channel_io_frozen, "
-		    "exiting.\n");
+		    "PCI channel failed permanently, exiting.\n");
 		return QLA_FUNCTION_TIMEOUT;
 	}
 
@@ -644,28 +643,6 @@ qla2x00_load_ram(scsi_qla_host_t *vha, dma_addr_t req_dma, uint32_t risc_addr,
 }
 
 #define	NVME_ENABLE_FLAG	BIT_3
-static inline uint16_t qla25xx_set_sfp_lr_dist(struct qla_hw_data *ha)
-{
-	uint16_t mb4 = BIT_0;
-
-	if (IS_QLA83XX(ha) || IS_QLA27XX(ha) || IS_QLA28XX(ha))
-		mb4 |= ha->long_range_distance << LR_DIST_FW_POS;
-
-	return mb4;
-}
-
-static inline uint16_t qla25xx_set_nvr_lr_dist(struct qla_hw_data *ha)
-{
-	uint16_t mb4 = BIT_0;
-
-	if (IS_QLA83XX(ha) || IS_QLA27XX(ha) || IS_QLA28XX(ha)) {
-		struct nvram_81xx *nv = ha->nvram;
-
-		mb4 |= LR_DIST_FW_FIELD(nv->enhanced_features);
-	}
-
-	return mb4;
-}
 
 /*
  * qla2x00_execute_fw
@@ -689,10 +666,14 @@ qla2x00_execute_fw(scsi_qla_host_t *vha, uint32_t risc_addr)
 	struct qla_hw_data *ha = vha->hw;
 	mbx_cmd_t mc;
 	mbx_cmd_t *mcp = &mc;
+	u8 semaphore = 0;
+#define EXE_FW_FORCE_SEMAPHORE BIT_7
+	u8 retry = 3;
 
 	ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x1025,
 	    "Entered %s.\n", __func__);
 
+again:
 	mcp->mb[0] = MBC_EXECUTE_FIRMWARE;
 	mcp->out_mb = MBX_0;
 	mcp->in_mb = MBX_0;
@@ -702,25 +683,13 @@ qla2x00_execute_fw(scsi_qla_host_t *vha, uint32_t risc_addr)
 		mcp->mb[3] = 0;
 		mcp->mb[4] = 0;
 		mcp->mb[11] = 0;
-		ha->flags.using_lr_setting = 0;
-		if (IS_QLA25XX(ha) || IS_QLA81XX(ha) || IS_QLA83XX(ha) ||
-		    IS_QLA27XX(ha) || IS_QLA28XX(ha)) {
-			if (ql2xautodetectsfp) {
-				if (ha->flags.detected_lr_sfp) {
-					mcp->mb[4] |=
-					    qla25xx_set_sfp_lr_dist(ha);
-					ha->flags.using_lr_setting = 1;
-				}
-			} else {
-				struct nvram_81xx *nv = ha->nvram;
-				/* set LR distance if specified in nvram */
-				if (nv->enhanced_features &
-				    NEF_LR_DIST_ENABLE) {
-					mcp->mb[4] |=
-					    qla25xx_set_nvr_lr_dist(ha);
-					ha->flags.using_lr_setting = 1;
-				}
-			}
+
+		/* Enable BPM? */
+		if (ha->flags.lr_detected) {
+			mcp->mb[4] = BIT_0;
+			if (IS_BPM_RANGE_CAPABLE(ha))
+				mcp->mb[4] |=
+				    ha->lr_distance << LR_DIST_FW_POS;
 		}
 
 		if (ql2xnvmeenable && (IS_QLA27XX(ha) || IS_QLA28XX(ha)))
@@ -746,6 +715,9 @@ qla2x00_execute_fw(scsi_qla_host_t *vha, uint32_t risc_addr)
 		if (ha->flags.exchoffld_enabled)
 			mcp->mb[4] |= ENABLE_EXCHANGE_OFFLD;
 
+		if (semaphore)
+			mcp->mb[11] |= EXE_FW_FORCE_SEMAPHORE;
+
 		mcp->out_mb |= MBX_4 | MBX_3 | MBX_2 | MBX_1 | MBX_11;
 		mcp->in_mb |= MBX_3 | MBX_2 | MBX_1;
 	} else {
@@ -762,6 +734,15 @@ qla2x00_execute_fw(scsi_qla_host_t *vha, uint32_t risc_addr)
 	rval = qla2x00_mailbox_command(vha, mcp);
 
 	if (rval != QLA_SUCCESS) {
+		if (IS_QLA28XX(ha) && rval == QLA_COMMAND_ERROR &&
+		    mcp->mb[1] == 0x27 && retry) {
+			semaphore = 1;
+			retry--;
+			ql_dbg(ql_dbg_async, vha, 0x1026,
+			    "Exe FW: force semaphore.\n");
+			goto again;
+		}
+
 		ql_dbg(ql_dbg_mbx, vha, 0x1026,
 		    "Failed=%x mb[0]=%x.\n", rval, mcp->mb[0]);
 		return rval;
@@ -1136,11 +1117,13 @@ qla2x00_get_fw_version(scsi_qla_host_t *vha)
 		ha->fw_ddr_ram_start = (mcp->mb[23] << 16) | mcp->mb[22];
 		ha->fw_ddr_ram_end = (mcp->mb[25] << 16) | mcp->mb[24];
 		if (IS_QLA28XX(ha)) {
-			if (mcp->mb[16] & BIT_10) {
-				ql_log(ql_log_info, vha, 0xffff,
-				    "FW support secure flash updates\n");
+			if (mcp->mb[16] & BIT_10)
 				ha->flags.secure_fw = 1;
-			}
+
+			ql_log(ql_log_info, vha, 0xffff,
+			    "Secure Flash Update in FW: %s\n",
+			    (ha->flags.secure_fw) ? "Supported" :
+			    "Not Supported");
 		}
 	}
 
@@ -1404,7 +1387,7 @@ qla2x00_issue_iocb_timeout(scsi_qla_host_t *vha, void *buffer,
 	mbx_cmd_t	mc;
 	mbx_cmd_t	*mcp = &mc;
 
-	if (qla2x00_chip_is_down(vha))
+	if (!vha->hw->flags.fw_started)
 		return QLA_INVALID_COMMAND;
 
 	ql_dbg(ql_dbg_mbx + ql_dbg_verbose, vha, 0x1038,
@@ -2438,7 +2421,7 @@ qla24xx_login_fabric(scsi_qla_host_t *vha, uint16_t loop_id, uint8_t domain,
 
 	lg->entry_type = LOGINOUT_PORT_IOCB_TYPE;
 	lg->entry_count = 1;
-	lg->handle = MAKE_HANDLE(req->id, lg->handle);
+	lg->handle = make_handle(req->id, lg->handle);
 	lg->nport_handle = cpu_to_le16(loop_id);
 	lg->control_flags = cpu_to_le16(LCF_COMMAND_PLOGI);
 	if (opt & BIT_0)
@@ -2708,7 +2691,7 @@ qla24xx_fabric_logout(scsi_qla_host_t *vha, uint16_t loop_id, uint8_t domain,
 	req = vha->req;
 	lg->entry_type = LOGINOUT_PORT_IOCB_TYPE;
 	lg->entry_count = 1;
-	lg->handle = MAKE_HANDLE(req->id, lg->handle);
+	lg->handle = make_handle(req->id, lg->handle);
 	lg->nport_handle = cpu_to_le16(loop_id);
 	lg->control_flags =
 	    cpu_to_le16(LCF_COMMAND_LOGO|LCF_IMPL_LOGO|
@@ -3198,9 +3181,9 @@ qla24xx_abort_command(srb_t *sp)
 
 	abt->entry_type = ABORT_IOCB_TYPE;
 	abt->entry_count = 1;
-	abt->handle = MAKE_HANDLE(req->id, abt->handle);
+	abt->handle = make_handle(req->id, abt->handle);
 	abt->nport_handle = cpu_to_le16(fcport->loop_id);
-	abt->handle_to_abort = MAKE_HANDLE(req->id, handle);
+	abt->handle_to_abort = make_handle(req->id, handle);
 	abt->port_id[0] = fcport->d_id.b.al_pa;
 	abt->port_id[1] = fcport->d_id.b.area;
 	abt->port_id[2] = fcport->d_id.b.domain;
@@ -3277,7 +3260,7 @@ __qla24xx_issue_tmf(char *name, uint32_t type, struct fc_port *fcport,
 
 	tsk->p.tsk.entry_type = TSK_MGMT_IOCB_TYPE;
 	tsk->p.tsk.entry_count = 1;
-	tsk->p.tsk.handle = MAKE_HANDLE(req->id, tsk->p.tsk.handle);
+	tsk->p.tsk.handle = make_handle(req->id, tsk->p.tsk.handle);
 	tsk->p.tsk.nport_handle = cpu_to_le16(fcport->loop_id);
 	tsk->p.tsk.timeout = cpu_to_le16(ha->r_a_tov / 10 * 2);
 	tsk->p.tsk.control_flags = cpu_to_le32(type);
@@ -3941,10 +3924,28 @@ qla24xx_report_id_acquisition(scsi_qla_host_t *vha,
 				fcport->scan_state = QLA_FCPORT_SCAN;
 				fcport->n2n_flag = 0;
 			}
+			id.b24 = 0;
+			if (wwn_to_u64(vha->port_name) >
+			    wwn_to_u64(rptid_entry->u.f1.port_name)) {
+				vha->d_id.b24 = 0;
+				vha->d_id.b.al_pa = 1;
+				ha->flags.n2n_bigger = 1;
+
+				id.b.al_pa = 2;
+				ql_dbg(ql_dbg_async, vha, 0x5075,
+				    "Format 1: assign local id %x remote id %x\n",
+				    vha->d_id.b24, id.b24);
+			} else {
+				ql_dbg(ql_dbg_async, vha, 0x5075,
+				    "Format 1: Remote login - Waiting for WWPN %8phC.\n",
+				    rptid_entry->u.f1.port_name);
+				ha->flags.n2n_bigger = 0;
+			}
 
 			fcport = qla2x00_find_fcport_by_wwpn(vha,
 			    rptid_entry->u.f1.port_name, 1);
 			spin_unlock_irqrestore(&vha->hw->tgt.sess_lock, flags);
+
 
 			if (fcport) {
 				fcport->plogi_nack_done_deadline = jiffies + HZ;
@@ -3955,6 +3956,11 @@ qla24xx_report_id_acquisition(scsi_qla_host_t *vha,
 				fcport->fc4_type = FS_FC4TYPE_FCP;
 				if (vha->flags.nvme_enabled)
 					fcport->fc4_type |= FS_FC4TYPE_NVME;
+
+				if (wwn_to_u64(vha->port_name) >
+				    wwn_to_u64(fcport->port_name)) {
+					fcport->d_id = id;
+				}
 
 				switch (fcport->disc_state) {
 				case DSC_DELETED:
@@ -3968,25 +3974,6 @@ qla24xx_report_id_acquisition(scsi_qla_host_t *vha,
 					break;
 				}
 			} else {
-				id.b24 = 0;
-				if (wwn_to_u64(vha->port_name) >
-				    wwn_to_u64(rptid_entry->u.f1.port_name)) {
-					vha->d_id.b24 = 0;
-					vha->d_id.b.al_pa = 1;
-					ha->flags.n2n_bigger = 1;
-					ha->flags.n2n_ae = 0;
-
-					id.b.al_pa = 2;
-					ql_dbg(ql_dbg_async, vha, 0x5075,
-					    "Format 1: assign local id %x remote id %x\n",
-					    vha->d_id.b24, id.b24);
-				} else {
-					ql_dbg(ql_dbg_async, vha, 0x5075,
-					    "Format 1: Remote login - Waiting for WWPN %8phC.\n",
-					    rptid_entry->u.f1.port_name);
-					ha->flags.n2n_bigger = 0;
-					ha->flags.n2n_ae = 1;
-				}
 				qla24xx_post_newsess_work(vha, &id,
 				    rptid_entry->u.f1.port_name,
 				    rptid_entry->u.f1.node_name,
