@@ -6972,7 +6972,8 @@ exit:
 	return ret;
 }
 
-static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw)
+static int ath10k_cancel_remain_on_channel(struct ieee80211_hw *hw,
+					   struct ieee80211_vif *vif)
 {
 	struct ath10k *ar = hw->priv;
 
