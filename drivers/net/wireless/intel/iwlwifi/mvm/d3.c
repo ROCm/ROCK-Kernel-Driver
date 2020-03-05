@@ -735,29 +735,6 @@ iwl_mvm_get_wowlan_config(struct iwl_mvm *mvm,
 	return 0;
 }
 
-static void
-iwl_mvm_iter_d0i3_ap_keys(struct iwl_mvm *mvm,
-			  struct ieee80211_vif *vif,
-			  void (*iter)(struct ieee80211_hw *hw,
-				       struct ieee80211_vif *vif,
-				       struct ieee80211_sta *sta,
-				       struct ieee80211_key_conf *key,
-				       void *data),
-			  void *data)
-{
-	struct ieee80211_sta *ap_sta;
-
-	rcu_read_lock();
-
-	ap_sta = rcu_dereference(mvm->fw_id_to_mac_id[mvm->d0i3_ap_sta_id]);
-	if (IS_ERR_OR_NULL(ap_sta))
-		goto out;
-
-	ieee80211_iter_keys_rcu(mvm->hw, vif, iter, data);
-out:
-	rcu_read_unlock();
-}
-
 int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 				     struct ieee80211_vif *vif,
 				     bool d0i3,
@@ -799,9 +776,9 @@ int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 				    iwl_mvm_wowlan_program_keys,
 				    &key_data);
 	} else {
-		iwl_mvm_iter_d0i3_ap_keys(mvm, vif,
-					  iwl_mvm_wowlan_program_keys,
-					  &key_data);
+		//iwl_mvm_iter_d0i3_ap_keys(mvm, vif,
+		//			  iwl_mvm_wowlan_program_keys,
+		//			  &key_data);
 	}
 
 	if (key_data.error) {
