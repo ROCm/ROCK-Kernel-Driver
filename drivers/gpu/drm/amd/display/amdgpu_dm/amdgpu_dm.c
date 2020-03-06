@@ -4078,9 +4078,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_NV12:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb;
 		break;
+#ifdef DRM_FORMAT_P010
 	case DRM_FORMAT_P010:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb;
 		break;
+#endif
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %s\n",
@@ -6372,8 +6374,10 @@ static int get_plane_formats(const struct drm_plane *plane,
 
 		if (plane_cap && plane_cap->pixel_format_support.nv12)
 			formats[num_formats++] = DRM_FORMAT_NV12;
+#ifdef DRM_FORMAT_P010
 		if (plane_cap && plane_cap->pixel_format_support.p010)
 			formats[num_formats++] = DRM_FORMAT_P010;
+#endif
 		break;
 
 	case DRM_PLANE_TYPE_OVERLAY:
