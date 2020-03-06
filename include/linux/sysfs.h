@@ -503,10 +503,10 @@ static inline int __compat_only_sysfs_link_entry_to_kobj(
 	return 0;
 }
 
-static int compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
-						struct kobject *target_kobj,
-						const char *target_name,
-						const char *symlink_name)
+static inline int compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
+						       struct kobject *target_kobj,
+						       const char *target_name,
+						       const char *symlink_name)
 {
 	return 0;
 }

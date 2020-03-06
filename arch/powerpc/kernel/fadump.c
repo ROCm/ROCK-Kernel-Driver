@@ -1485,7 +1485,8 @@ static void fadump_init_files(void)
 		return;
 	}
 
-	/* The FADump sysfs are moved from kernel_kobj to fadump_kobj need to
+	/*
+	 * The FADump sysfs are moved from kernel_kobj to fadump_kobj need to
 	 * create symlink at old location to maintain backward compatibility.
 	 *
 	 *      - fadump_enabled -> fadump/enabled

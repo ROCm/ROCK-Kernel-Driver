@@ -426,7 +426,7 @@ int __compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 				      const char *target_name)
 {
 	return compat_only_sysfs_link_entry_to_kobj(kobj, target_kobj,
-						target_name, NULL);
+						    target_name, NULL);
 }
 EXPORT_SYMBOL_GPL(__compat_only_sysfs_link_entry_to_kobj);
 
