@@ -5299,9 +5299,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_NV12:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb;
 		break;
+#ifdef DRM_FORMAT_P010
 	case DRM_FORMAT_P010:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb;
 		break;
+#endif
 	case DRM_FORMAT_XRGB16161616F:
 	case DRM_FORMAT_ARGB16161616F:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616F;
