@@ -426,7 +426,7 @@ int __compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 				      const char *target_name)
 {
 	return compat_only_sysfs_link_entry_to_kobj(kobj, target_kobj,
-						target_name, NULL);
+						    target_name, NULL);
 }
 EXPORT_SYMBOL_GPL(__compat_only_sysfs_link_entry_to_kobj);
 
@@ -471,7 +471,7 @@ int compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 		symlink_name = target_name;
 
 	link = kernfs_create_link(kobj->sd, symlink_name, entry);
-	if (IS_ERR(link) && PTR_ERR(link) == -EEXIST)
+	if (PTR_ERR(link) == -EEXIST)
 		sysfs_warn_dup(kobj->sd, symlink_name);
 
 	kernfs_put(entry);
