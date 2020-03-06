@@ -5054,9 +5054,11 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_NV12:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_YCrCb;
 		break;
+#ifdef DRM_FORMAT_P010
 	case DRM_FORMAT_P010:
 		plane_info->format = SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb;
 		break;
+#endif
 	case DRM_FORMAT_XRGB16161616F:
 	case DRM_FORMAT_ARGB16161616F:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616F;
@@ -6035,7 +6037,6 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 }
 #endif /* CONFIG_DRM_AMD_DC_DCN */
 
-<<<<<<< HEAD
 static struct dc_stream_state *
 create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		       const struct drm_display_mode *drm_mode,
@@ -6060,25 +6061,6 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	struct dsc_dec_dpcd_caps dsc_caps;
 #endif
-=======
-static int
-amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
-#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE
-				 struct drm_atomic_state *state)
-{
-	struct drm_connector_state *new_con_state =
-		drm_atomic_get_new_connector_state(state, conn);
-#else
-				 struct drm_connector_state *new_con_state)
-{
-	struct drm_atomic_state *state = new_con_state->state;
-#endif
-	struct drm_connector_state *old_con_state =
-		drm_atomic_get_old_connector_state(state, conn);
-	struct drm_crtc *crtc = new_con_state->crtc;
-	struct drm_crtc_state *new_crtc_state;
-	int ret;
->>>>>>> 828cd24ff6db... drm/amdkcl: adapt for drm_connector_helper_funcs->atomic_check() prototype change
 
 	struct dc_sink *sink = NULL;
 

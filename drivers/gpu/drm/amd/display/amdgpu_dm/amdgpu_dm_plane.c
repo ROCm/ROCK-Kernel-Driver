@@ -702,8 +702,10 @@ static int get_plane_formats(const struct drm_plane *plane,
 
 		if (plane_cap && plane_cap->pixel_format_support.nv12)
 			formats[num_formats++] = DRM_FORMAT_NV12;
+#ifdef DRM_FORMAT_P010
 		if (plane_cap && plane_cap->pixel_format_support.p010)
 			formats[num_formats++] = DRM_FORMAT_P010;
+#endif
 		if (plane_cap && plane_cap->pixel_format_support.fp16) {
 			formats[num_formats++] = DRM_FORMAT_XRGB16161616F;
 			formats[num_formats++] = DRM_FORMAT_ARGB16161616F;
