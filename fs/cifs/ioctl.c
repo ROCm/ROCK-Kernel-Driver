@@ -65,7 +65,7 @@ static long cifs_ioctl_query_info(unsigned int xid, struct file *filep,
 
 	if (tcon->ses->server->ops->ioctl_query_info)
 		rc = tcon->ses->server->ops->ioctl_query_info(
-				xid, tcon, utf16_path,
+				xid, tcon, cifs_sb, utf16_path,
 				filep->private_data ? 0 : 1, p);
 	else
 		rc = -EOPNOTSUPP;
@@ -164,10 +164,12 @@ static long smb_mnt_get_fsinfo(unsigned int xid, struct cifs_tcon *tcon,
 long cifs_ioctl(struct file *filep, unsigned int command, unsigned long arg)
 {
 	struct inode *inode = file_inode(filep);
+	struct smb3_key_debug_info pkey_inf;
 	int rc = -ENOTTY; /* strange error - but the precedent */
 	unsigned int xid;
 	struct cifsFileInfo *pSMBFile = filep->private_data;
 	struct cifs_tcon *tcon;
+	struct cifs_sb_info *cifs_sb;
 	__u64	ExtAttrBits = 0;
 	__u64   caps;
 
@@ -268,6 +270,49 @@ long cifs_ioctl(struct file *filep, unsigned int command, unsigned long arg)
 				rc = tcon->ses->server->ops->enum_snapshots(xid, tcon,
 						pSMBFile, (void __user *)arg);
 			else
+				rc = -EOPNOTSUPP;
+			break;
+		case CIFS_DUMP_KEY:
+			if (pSMBFile == NULL)
+				break;
+			if (!capable(CAP_SYS_ADMIN)) {
+				rc = -EACCES;
+				break;
+			}
+
+			tcon = tlink_tcon(pSMBFile->tlink);
+			if (!smb3_encryption_required(tcon)) {
+				rc = -EOPNOTSUPP;
+				break;
+			}
+			pkey_inf.cipher_type =
+				le16_to_cpu(tcon->ses->server->cipher_type);
+			pkey_inf.Suid = tcon->ses->Suid;
+			memcpy(pkey_inf.auth_key, tcon->ses->auth_key.response,
+					16 /* SMB2_NTLMV2_SESSKEY_SIZE */);
+			memcpy(pkey_inf.smb3decryptionkey,
+			      tcon->ses->smb3decryptionkey, SMB3_SIGN_KEY_SIZE);
+			memcpy(pkey_inf.smb3encryptionkey,
+			      tcon->ses->smb3encryptionkey, SMB3_SIGN_KEY_SIZE);
+			if (copy_to_user((void __user *)arg, &pkey_inf,
+					sizeof(struct smb3_key_debug_info)))
+				rc = -EFAULT;
+			else
+				rc = 0;
+			break;
+		case CIFS_IOC_NOTIFY:
+			if (!S_ISDIR(inode->i_mode)) {
+				/* Notify can only be done on directories */
+				rc = -EOPNOTSUPP;
+				break;
+			}
+			cifs_sb = CIFS_SB(inode->i_sb);
+			tcon = tlink_tcon(cifs_sb_tlink(cifs_sb));
+			if (tcon && tcon->ses->server->ops->notify) {
+				rc = tcon->ses->server->ops->notify(xid,
+						filep, (void __user *)arg);
+				cifs_dbg(FYI, "ioctl notify rc %d\n", rc);
+			} else
 				rc = -EOPNOTSUPP;
 			break;
 		default:

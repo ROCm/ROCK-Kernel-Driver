@@ -25,6 +25,7 @@
 #define _SMB2PDU_H
 
 #include <net/sock.h>
+#include <cifsacl.h>
 
 /*
  * Note that, due to trying to use names similar to the protocol specifications,
@@ -143,7 +144,9 @@ struct smb2_transform_hdr {
 #define SMB2_FLAGS_ASYNC_COMMAND	cpu_to_le32(0x00000002)
 #define SMB2_FLAGS_RELATED_OPERATIONS	cpu_to_le32(0x00000004)
 #define SMB2_FLAGS_SIGNED		cpu_to_le32(0x00000008)
+#define SMB2_FLAGS_PRIORITY_MASK	cpu_to_le32(0x00000070) /* SMB3.1.1 */
 #define SMB2_FLAGS_DFS_OPERATIONS	cpu_to_le32(0x10000000)
+#define SMB2_FLAGS_REPLAY_OPERATION	cpu_to_le32(0x20000000) /* SMB3 & up */
 
 /*
  *	Definitions for SMB2 Protocol Data Units (network frames)
@@ -853,6 +856,15 @@ struct crt_query_id_ctxt {
 	__u8	Name[8];
 } __packed;
 
+struct crt_sd_ctxt {
+	struct create_context ccontext;
+	__u8	Name[8];
+	struct smb3_sd sd;
+	struct smb3_acl acl;
+	/* Followed by at least 4 ACEs */
+} __packed;
+
+
 #define COPY_CHUNK_RES_KEY_SIZE	24
 struct resume_key_req {
 	char ResumeKey[COPY_CHUNK_RES_KEY_SIZE];
@@ -1270,6 +1282,8 @@ struct smb2_echo_rsp {
 #define SMB2_INDEX_SPECIFIED		0x04
 #define SMB2_REOPEN			0x10
 
+#define SMB2_QUERY_DIRECTORY_IOV_SIZE 2
+
 struct smb2_query_directory_req {
 	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 33 */
@@ -1384,7 +1398,7 @@ struct smb2_oplock_break {
 struct smb2_lease_break {
 	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 44 */
-	__le16 Reserved;
+	__le16 Epoch;
 	__le32 Flags;
 	__u8   LeaseKey[16];
 	__le32 CurrentLeaseState;
@@ -1505,6 +1519,7 @@ struct smb3_fs_vol_info {
 #define FILE_NORMALIZED_NAME_INFORMATION 48
 #define FILEID_GLOBAL_TX_DIRECTORY_INFORMATION 50
 #define FILE_STANDARD_LINK_INFORMATION	54
+#define FILE_ID_INFORMATION		59
 
 struct smb2_file_internal_info {
 	__le64 IndexNumber;
@@ -1568,6 +1583,77 @@ struct smb2_file_eof_info { /* encoding of request for level 10 */
 	__le64 EndOfFile; /* new end of file value */
 } __packed; /* level 20 Set */
 
+struct smb2_file_network_open_info {
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 AllocationSize;
+	__le64 EndOfFile;
+	__le32 Attributes;
+	__le32 Reserved;
+} __packed; /* level 34 Query also similar returned in close rsp and open rsp */
+
+/* See MS-FSCC 2.4.43 */
+struct smb2_file_id_information {
+	__le64	VolumeSerialNumber;
+	__u64  PersistentFileId; /* opaque endianness */
+	__u64  VolatileFileId; /* opaque endianness */
+} __packed; /* level 59 */
+
 extern char smb2_padding[7];
+
+/* equivalent of the contents of SMB3.1.1 POSIX open context response */
+struct create_posix_rsp {
+	u32 nlink;
+	u32 reparse_tag;
+	u32 mode;
+	struct cifs_sid owner; /* var-sized on the wire */
+	struct cifs_sid group; /* var-sized on the wire */
+} __packed;
+
+/*
+ * SMB2-only POSIX info level
+ *
+ * See posix_info_sid_size(), posix_info_extra_size() and
+ * posix_info_parse() to help with the handling of this struct.
+ */
+struct smb2_posix_info {
+	__le32 NextEntryOffset;
+	__u32 Ignored;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 EndOfFile;
+	__le64 AllocationSize;
+	__le32 DosAttributes;
+	__le64 Inode;
+	__le32 DeviceId;
+	__le32 Zero;
+	/* beginning of POSIX Create Context Response */
+	__le32 HardLinks;
+	__le32 ReparseTag;
+	__le32 Mode;
+	/*
+	 * var sized owner SID
+	 * var sized group SID
+	 * le32 filenamelength
+	 * u8  filename[]
+	 */
+} __packed;
+
+/*
+ * Parsed version of the above struct. Allows direct access to the
+ * variable length fields
+ */
+struct smb2_posix_info_parsed {
+	const struct smb2_posix_info *base;
+	size_t size;
+	struct cifs_sid owner;
+	struct cifs_sid group;
+	int name_len;
+	const u8 *name;
+};
 
 #endif				/* _SMB2PDU_H */
