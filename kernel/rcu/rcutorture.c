@@ -1715,7 +1715,7 @@ static void rcu_torture_fwd_cb_cr(struct rcu_head *rhp)
 // Give the scheduler a chance, even on nohz_full CPUs.
 static void rcu_torture_fwd_prog_cond_resched(void)
 {
-	if (IS_ENABLED(CONFIG_PREEMPT) && IS_ENABLED(CONFIG_NO_HZ_FULL)) {
+	if (IS_ENABLED(CONFIG_PREEMPTION) && IS_ENABLED(CONFIG_NO_HZ_FULL)) {
 		if (need_resched())
 			schedule();
 	} else {
