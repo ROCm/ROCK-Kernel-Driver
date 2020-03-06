@@ -34,6 +34,22 @@
 #include <asm/hypervisor.h>
 #include <asm/tlb.h>
 
+/*
+ * SLE-specific.
+ *
+ * Allow disabling of PV spinlock in kernel command line (kernel param).
+ * Similar idea to what Xen does. Upstream, however, uses a different
+ * approach such that hypervisor admins can pass the VM_HINTS_DEDICATED
+ * via qemu.
+ */
+static bool kvm_pvspin = true;
+static __init int kvm_parse_nopvspin(char *arg)
+{
+	kvm_pvspin = false;
+	return 0;
+}
+early_param("kvm_nopvspin", kvm_parse_nopvspin);
+
 static int kvmapf = 1;
 
 static int __init parse_no_kvmapf(char *arg)
@@ -542,7 +558,7 @@ static void kvm_smp_send_call_func_ipi(const struct cpumask *mask)
 static void __init kvm_smp_prepare_cpus(unsigned int max_cpus)
 {
 	native_smp_prepare_cpus(max_cpus);
-	if (kvm_para_has_hint(KVM_HINTS_REALTIME))
+	if (!kvm_pvspin || kvm_para_has_hint(KVM_HINTS_REALTIME))
 		static_branch_disable(&virt_spin_lock_key);
 }
 
@@ -853,6 +869,11 @@ void __init kvm_spinlock_init(void)
 	/* Don't use the pvqspinlock code if there is only 1 vCPU. */
 	if (num_possible_cpus() == 1)
 		return;
+
+	if (!kvm_pvspin) {
+		printk(KERN_INFO "KVM: disabled paravirtual spinlock by kernel parameter\n");
+		return;
+	}
 
 	__pv_init_lock_hash();
 	pv_ops.lock.queued_spin_lock_slowpath = __pv_queued_spin_lock_slowpath;
