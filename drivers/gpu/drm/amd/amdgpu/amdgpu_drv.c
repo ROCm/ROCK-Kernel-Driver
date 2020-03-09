@@ -1374,14 +1374,19 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_dev->dev_private;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	/* we don't want the main rpm_idle to call suspend - we want to autosuspend */
 	int ret = 1;
+#else
+	struct drm_crtc *crtc;
+#endif
 
 	if (!adev->runpm) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	if (amdgpu_device_has_dc_support(adev)) {
 		struct drm_crtc *crtc;
 
@@ -1420,9 +1425,25 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 	if (ret == -EBUSY)
 		DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
 
+#else
+    list_for_each_entry(crtc, &drm_dev->mode_config.crtc_list, head) {
+        if (crtc->enabled) {
+                DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
+                return -EBUSY;
+		}
+	}
+#endif
+
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_autosuspend(dev);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	return ret;
+#else
+    /* we don't want the main rpm_idle to call suspend - we want to autosuspend */
+    return 1;
+#endif
+
+
 }
 
 long amdgpu_drm_ioctl(struct file *filp,
