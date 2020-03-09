@@ -33,11 +33,7 @@
 /* BRCM_PCIE_CAP_REGS - Offset for the mandatory capability config regs */
 #define BRCM_PCIE_CAP_REGS				0x00ac
 
-/*
- * Broadcom STB PCIe Register Offsets. The names are from the chip's RDB and we
- * use them here so that a script can correlate this code and the RDB to
- * prevent discrepancies.
- */
+/* Broadcom STB PCIe Register Offsets */
 #define PCIE_RC_CFG_VENDOR_VENDOR_SPECIFIC_REG1				0x0188
 #define  PCIE_RC_CFG_VENDOR_VENDOR_SPECIFIC_REG1_ENDIAN_MODE_BAR2_MASK	0xc
 #define  PCIE_RC_CFG_VENDOR_SPCIFIC_REG1_LITTLE_ENDIAN			0x0
@@ -630,9 +626,15 @@ static inline int brcm_pcie_get_rc_bar2_size_and_offset(struct brcm_pcie *pcie,
 	if (!entry)
 		return -ENODEV;
 
+
+	/*
+	 * The controller expects the inbound window offset to be calculated as
+	 * the difference between PCIe's address space and CPU's. The offset
+	 * provided by the firmware is calculated the opposite way, so we
+	 * negate it.
+	 */
 	*rc_bar2_offset = -entry->offset;
-	*rc_bar2_size = roundup_pow_of_two_u64(entry->res->end -
-					       entry->res->start + 1);
+	*rc_bar2_size = 1ULL << fls64(entry->res->end - entry->res->start);
 
 	/*
 	 * We validate the inbound memory view even though we should trust
@@ -796,7 +798,7 @@ static int brcm_pcie_setup(struct brcm_pcie *pcie)
 
 		brcm_pcie_set_outbound_win(pcie, num_out_wins, res->start,
 					   res->start - entry->offset,
-					   res->end - res->start + 1);
+					   resource_size(res));
 		num_out_wins++;
 	}
 
@@ -1010,4 +1012,3 @@ module_platform_driver(brcm_pcie_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Broadcom STB PCIe RC driver");
-MODULE_AUTHOR("Broadcom");
