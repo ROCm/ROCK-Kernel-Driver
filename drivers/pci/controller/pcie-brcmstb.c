@@ -381,7 +381,7 @@ static void brcm_msi_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 
 	msg->address_lo = lower_32_bits(msi->target_addr);
 	msg->address_hi = upper_32_bits(msi->target_addr);
-	msg->data = 0x6540 | data->hwirq;
+	msg->data = (0xffff & PCIE_MISC_MSI_DATA_CONFIG_VAL) | data->hwirq;
 }
 
 static int brcm_msi_set_affinity(struct irq_data *irq_data,
@@ -528,6 +528,7 @@ static int brcm_pcie_enable_msi(struct brcm_pcie *pcie)
 	if (!msi)
 		return -ENOMEM;
 
+	mutex_init(&msi->lock);
 	msi->dev = dev;
 	msi->base = pcie->base;
 	msi->np = pcie->np;
