@@ -258,38 +258,6 @@ enum iwl_mvm_smps_type_request {
 	NUM_IWL_MVM_SMPS_REQ,
 };
 
-enum iwl_mvm_ref_type {
-	IWL_MVM_REF_UCODE_DOWN,
-	IWL_MVM_REF_SCAN,
-	IWL_MVM_REF_ROC,
-	IWL_MVM_REF_ROC_AUX,
-	IWL_MVM_REF_P2P_CLIENT,
-	IWL_MVM_REF_AP_IBSS,
-	IWL_MVM_REF_USER,
-	IWL_MVM_REF_TX,
-	IWL_MVM_REF_TX_AGG,
-	IWL_MVM_REF_ADD_IF,
-	IWL_MVM_REF_START_AP,
-	IWL_MVM_REF_BSS_CHANGED,
-	IWL_MVM_REF_PREPARE_TX,
-	IWL_MVM_REF_PROTECT_TDLS,
-	IWL_MVM_REF_CHECK_CTKILL,
-	IWL_MVM_REF_PRPH_READ,
-	IWL_MVM_REF_PRPH_WRITE,
-	IWL_MVM_REF_NMI,
-	IWL_MVM_REF_TM_CMD,
-	IWL_MVM_REF_EXIT_WORK,
-	IWL_MVM_REF_PROTECT_CSA,
-	IWL_MVM_REF_FW_DBG_COLLECT,
-	IWL_MVM_REF_INIT_UCODE,
-	IWL_MVM_REF_SENDING_CMD,
-	IWL_MVM_REF_RX,
-
-	/* update debugfs.c when changing this */
-
-	IWL_MVM_REF_COUNT,
-};
-
 enum iwl_bt_force_ant_mode {
 	BT_FORCE_ANT_DIS = 0,
 	BT_FORCE_ANT_AUTO,
@@ -615,11 +583,6 @@ struct iwl_mvm_frame_stats {
 	u32 fail_frames;
 	u32 last_rates[IWL_MVM_NUM_LAST_FRAMES_UCODE_RATES];
 	int last_frame_idx;
-};
-
-enum {
-	D0I3_DEFER_WAKEUP,
-	D0I3_PENDING_WAKEUP,
 };
 
 #define IWL_MVM_DEBUG_SET_TEMPERATURE_DISABLE 0xff
@@ -1011,10 +974,6 @@ struct iwl_mvm {
 	unsigned long fw_key_table[BITS_TO_LONGS(STA_KEY_MAX_NUM)];
 	u8 fw_key_deleted[STA_KEY_MAX_NUM];
 
-	/* references taken by the driver and spinlock protecting them */
-	spinlock_t refs_lock;
-	u8 refs[IWL_MVM_REF_COUNT];
-
 	u8 vif_count;
 	struct ieee80211_vif __rcu *vif_id_to_mac[NUM_MAC_INDEX_DRIVER];
 
@@ -1048,17 +1007,6 @@ struct iwl_mvm {
 #endif
 #endif
 
-	/* d0i3 */
-	u8 d0i3_ap_sta_id;
-	bool d0i3_offloading;
-	struct work_struct d0i3_exit_work;
-	struct sk_buff_head d0i3_tx;
-	/* protect d0i3_suspend_flags */
-	struct mutex d0i3_suspend_mutex;
-	unsigned long d0i3_suspend_flags;
-	/* sync d0i3_tx queue and IWL_MVM_STATUS_IN_D0I3 status flag */
-	spinlock_t d0i3_tx_lock;
-	wait_queue_head_t d0i3_exit_waitq;
 	wait_queue_head_t rx_sync_waitq;
 
 	/* BT-Coex */
@@ -1201,7 +1149,6 @@ struct iwl_mvm {
  * @IWL_MVM_STATUS_ROC_RUNNING: remain-on-channel is running
  * @IWL_MVM_STATUS_HW_RESTART_REQUESTED: HW restart was requested
  * @IWL_MVM_STATUS_IN_HW_RESTART: HW restart is active
- * @IWL_MVM_STATUS_IN_D0I3: NIC is in D0i3
  * @IWL_MVM_STATUS_ROC_AUX_RUNNING: AUX remain-on-channel is running
  * @IWL_MVM_STATUS_FIRMWARE_RUNNING: firmware is running
  * @IWL_MVM_STATUS_NEED_FLUSH_P2P: need to flush P2P bcast STA
@@ -1212,7 +1159,6 @@ enum iwl_mvm_status {
 	IWL_MVM_STATUS_ROC_RUNNING,
 	IWL_MVM_STATUS_HW_RESTART_REQUESTED,
 	IWL_MVM_STATUS_IN_HW_RESTART,
-	IWL_MVM_STATUS_IN_D0I3,
 	IWL_MVM_STATUS_ROC_AUX_RUNNING,
 	IWL_MVM_STATUS_FIRMWARE_RUNNING,
 	IWL_MVM_STATUS_NEED_FLUSH_P2P,
@@ -1291,13 +1237,6 @@ iwl_mvm_rcu_dereference_vif_id(struct iwl_mvm *mvm, u8 vif_id, bool rcu)
 					 lockdep_is_held(&mvm->mutex));
 }
 
-static inline bool iwl_mvm_is_d0i3_supported(struct iwl_mvm *mvm)
-{
-	return !iwlwifi_mod_params.d0i3_disable &&
-		fw_has_capa(&mvm->fw->ucode_capa,
-			    IWL_UCODE_TLV_CAPA_D0I3_SUPPORT);
-}
-
 static inline bool iwl_mvm_is_adaptive_dwell_supported(struct iwl_mvm *mvm)
 {
 	return fw_has_api(&mvm->fw->ucode_capa,
@@ -1331,19 +1270,6 @@ static inline bool iwl_mvm_is_short_beacon_notif_supported(struct iwl_mvm *mvm)
 {
 	return fw_has_api(&mvm->fw->ucode_capa,
 			  IWL_UCODE_TLV_API_SHORT_BEACON_NOTIF);
-}
-
-static inline bool iwl_mvm_enter_d0i3_on_suspend(struct iwl_mvm *mvm)
-{
-	/* For now we only use this mode to differentiate between
-	 * slave transports, which handle D0i3 entry in suspend by
-	 * themselves in conjunction with runtime PM D0i3.  So, this
-	 * function is used to check whether we need to do anything
-	 * when entering suspend or if the transport layer has already
-	 * done it.
-	 */
-	return (mvm->trans->system_pm_mode == IWL_PLAT_PM_MODE_D0I3) &&
-		(mvm->trans->runtime_pm_mode != IWL_PLAT_PM_MODE_D0I3);
 }
 
 static inline bool iwl_mvm_is_dqa_data_queue(struct iwl_mvm *mvm, u8 queue)
@@ -1559,8 +1485,8 @@ int __must_check iwl_mvm_send_cmd_status(struct iwl_mvm *mvm,
 int __must_check iwl_mvm_send_cmd_pdu_status(struct iwl_mvm *mvm, u32 id,
 					     u16 len, const void *data,
 					     u32 *status);
-int iwl_mvm_tx_skb(struct iwl_mvm *mvm, struct sk_buff *skb,
-		   struct ieee80211_sta *sta);
+int iwl_mvm_tx_skb_sta(struct iwl_mvm *mvm, struct sk_buff *skb,
+		       struct ieee80211_sta *sta);
 int iwl_mvm_tx_skb_non_sta(struct iwl_mvm *mvm, struct sk_buff *skb);
 void iwl_mvm_set_tx_cmd(struct iwl_mvm *mvm, struct sk_buff *skb,
 			struct iwl_tx_cmd *tx_cmd,
@@ -1867,9 +1793,6 @@ int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 				     struct ieee80211_vif *vif,
 				     bool host_awake,
 				     u32 cmd_flags);
-void iwl_mvm_d0i3_update_keys(struct iwl_mvm *mvm,
-			      struct ieee80211_vif *vif,
-			      struct iwl_wowlan_status *status);
 void iwl_mvm_set_last_nonqos_seq(struct iwl_mvm *mvm,
 				 struct ieee80211_vif *vif);
 #else
@@ -1879,12 +1802,6 @@ static inline int iwl_mvm_wowlan_config_key_params(struct iwl_mvm *mvm,
 						   u32 cmd_flags)
 {
 	return 0;
-}
-
-static inline void iwl_mvm_d0i3_update_keys(struct iwl_mvm *mvm,
-					    struct ieee80211_vif *vif,
-					    struct iwl_wowlan_status *status)
-{
 }
 
 static inline void
@@ -1899,19 +1816,6 @@ int iwl_mvm_send_proto_offload(struct iwl_mvm *mvm,
 			       bool disable_offloading,
 			       bool offload_ns,
 			       u32 cmd_flags);
-
-/* D0i3 */
-void iwl_mvm_ref(struct iwl_mvm *mvm, enum iwl_mvm_ref_type ref_type);
-void iwl_mvm_unref(struct iwl_mvm *mvm, enum iwl_mvm_ref_type ref_type);
-int iwl_mvm_ref_sync(struct iwl_mvm *mvm, enum iwl_mvm_ref_type ref_type);
-bool iwl_mvm_ref_taken(struct iwl_mvm *mvm);
-
-#ifdef CONFIG_PM
-void iwl_mvm_d0i3_enable_tx(struct iwl_mvm *mvm, __le16 *qos_seq);
-int iwl_mvm_enter_d0i3(struct iwl_op_mode *op_mode);
-int iwl_mvm_exit_d0i3(struct iwl_op_mode *op_mode);
-int _iwl_mvm_exit_d0i3(struct iwl_mvm *mvm);
-#endif
 
 /* BT Coex */
 int iwl_mvm_send_bt_init_conf(struct iwl_mvm *mvm);
