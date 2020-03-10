@@ -329,38 +329,13 @@ static uint32_t read_doorbell_id(void *mqd)
 	return m->queue_doorbell_id0;
 }
 
-struct user_context_save_area_header {
-	/* Byte offset from start of user context
-	 * save area to the last saved top (lowest
-	 * address) of control stack data. Must be
-	 * 4 byte aligned.
-	 */
-	uint32_t control_stack_offset;
-
-	/* Byte size of the last saved control stack
-	 * data. Must be 4 byte aligned.
-	 */
-	uint32_t control_stack_size;
-
-	/* Byte offset from start of user context save
-	 * area to the last saved base (lowest address)
-	 * of wave state data. Must be 4 byte aligned.
-	 */
-	uint32_t wave_state_offset;
-
-	/* Byte size of the last saved wave state data.
-	 * Must be 4 byte aligned.
-	 */
-	uint32_t wave_state_size;
-};
-
 static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  void __user *ctl_stack,
 			  u32 *ctl_stack_used_size,
 			  u32 *save_area_used_size)
 {
 	struct v9_mqd *m;
-	struct user_context_save_area_header header;
+	struct mqd_user_context_save_area_header header;
 
 	/* Control stack is located one page after MQD. */
 	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
