@@ -1374,19 +1374,14 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_dev->dev_private;
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	/* we don't want the main rpm_idle to call suspend - we want to autosuspend */
 	int ret = 1;
-#else
-	struct drm_crtc *crtc;
-#endif
 
 	if (!adev->runpm) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}
 
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	if (amdgpu_device_has_dc_support(adev)) {
 		struct drm_crtc *crtc;
 
@@ -1403,20 +1398,28 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 
 	} else {
 		struct drm_connector *list_connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		struct drm_connector_list_iter iter;
+#endif
 
 		mutex_lock(&drm_dev->mode_config.mutex);
 		drm_modeset_lock(&drm_dev->mode_config.connection_mutex, NULL);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_begin(drm_dev, &iter);
 		drm_for_each_connector_iter(list_connector, &iter) {
+#else
+		drm_for_each_connector(list_connector, drm_dev) {
+#endif
 			if (list_connector->dpms ==  DRM_MODE_DPMS_ON) {
 				ret = -EBUSY;
 				break;
 			}
 		}
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_end(&iter);
+#endif
 
 		drm_modeset_unlock(&drm_dev->mode_config.connection_mutex);
 		mutex_unlock(&drm_dev->mode_config.mutex);
@@ -1425,25 +1428,9 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 	if (ret == -EBUSY)
 		DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
 
-#else
-    list_for_each_entry(crtc, &drm_dev->mode_config.crtc_list, head) {
-        if (crtc->enabled) {
-                DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
-                return -EBUSY;
-		}
-	}
-#endif
-
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_autosuspend(dev);
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	return ret;
-#else
-    /* we don't want the main rpm_idle to call suspend - we want to autosuspend */
-    return 1;
-#endif
-
-
 }
 
 long amdgpu_drm_ioctl(struct file *filp,
@@ -1552,10 +1539,10 @@ static struct drm_driver kms_driver = {
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
+#endif
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
-#endif
 #endif
 #endif
 	.irq_handler = amdgpu_irq_handler,
