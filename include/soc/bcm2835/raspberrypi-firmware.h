@@ -161,7 +161,7 @@ static inline struct rpi_firmware *rpi_firmware_get(struct device_node *firmware
 	return NULL;
 }
 
-static int rpi_firmware_init_vl805(struct pci_dev *pdev)
+static inline int rpi_firmware_init_vl805(struct pci_dev *pdev)
 {
 	return 0;
 }

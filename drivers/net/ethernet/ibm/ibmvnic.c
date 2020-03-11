@@ -2142,6 +2142,8 @@ static void __ibmvnic_reset(struct work_struct *work)
 {
 	struct ibmvnic_rwi *rwi;
 	struct ibmvnic_adapter *adapter;
+	bool saved_state = false;
+	unsigned long flags;
 	u32 reset_state;
 	int rc = 0;
 
@@ -2153,16 +2155,24 @@ static void __ibmvnic_reset(struct work_struct *work)
 		return;
 	}
 
-	reset_state = adapter->state;
-
 	rwi = get_next_rwi(adapter);
 	while (rwi) {
+		spin_lock_irqsave(&adapter->state_lock, flags);
+
 		if (adapter->state == VNIC_REMOVING ||
 		    adapter->state == VNIC_REMOVED) {
+			spin_unlock_irqrestore(&adapter->state_lock, flags);
 			kfree(rwi);
 			rc = EBUSY;
 			break;
 		}
+
+		if (!saved_state) {
+			reset_state = adapter->state;
+			adapter->state = VNIC_RESETTING;
+			saved_state = true;
+		}
+		spin_unlock_irqrestore(&adapter->state_lock, flags);
 
 		if (rwi->reset_reason == VNIC_RESET_CHANGE_PARAM) {
 			/* CHANGE_PARAM requestor holds rtnl_lock */
@@ -4544,13 +4554,14 @@ static int handle_query_phys_parms_rsp(union ibmvnic_crq *crq,
 {
 	struct net_device *netdev = adapter->netdev;
 	int rc;
+	__be32 rspeed = cpu_to_be32(crq->query_phys_parms_rsp.speed);
 
 	rc = crq->query_phys_parms_rsp.rc.code;
 	if (rc) {
 		netdev_err(netdev, "Error %d in QUERY_PHYS_PARMS\n", rc);
 		return rc;
 	}
-	switch (cpu_to_be32(crq->query_phys_parms_rsp.speed)) {
+	switch (rspeed) {
 	case IBMVNIC_10MBPS:
 		adapter->speed = SPEED_10;
 		break;
@@ -4576,8 +4587,8 @@ static int handle_query_phys_parms_rsp(union ibmvnic_crq *crq,
 		adapter->speed = SPEED_100000;
 		break;
 	default:
-		netdev_warn(netdev, "Unknown speed 0x%08x\n",
-			    cpu_to_be32(crq->query_phys_parms_rsp.speed));
+		if (netif_carrier_ok(netdev))
+			netdev_warn(netdev, "Unknown speed 0x%08x\n", rspeed);
 		adapter->speed = SPEED_UNKNOWN;
 	}
 	if (crq->query_phys_parms_rsp.flags1 & IBMVNIC_FULL_DUPLEX)
@@ -5090,6 +5101,7 @@ static int ibmvnic_probe(struct vio_dev *dev, const struct vio_device_id *id)
 			  __ibmvnic_delayed_reset);
 	INIT_LIST_HEAD(&adapter->rwi_list);
 	spin_lock_init(&adapter->rwi_lock);
+	spin_lock_init(&adapter->state_lock);
 	mutex_init(&adapter->fw_lock);
 	init_completion(&adapter->init_done);
 	init_completion(&adapter->fw_done);
@@ -5162,8 +5174,17 @@ static int ibmvnic_remove(struct vio_dev *dev)
 {
 	struct net_device *netdev = dev_get_drvdata(&dev->dev);
 	struct ibmvnic_adapter *adapter = netdev_priv(netdev);
+	unsigned long flags;
+
+	spin_lock_irqsave(&adapter->state_lock, flags);
+	if (adapter->state == VNIC_RESETTING) {
+		spin_unlock_irqrestore(&adapter->state_lock, flags);
+		return -EBUSY;
+	}
 
 	adapter->state = VNIC_REMOVING;
+	spin_unlock_irqrestore(&adapter->state_lock, flags);
+
 	rtnl_lock();
 	unregister_netdevice(netdev);
 
