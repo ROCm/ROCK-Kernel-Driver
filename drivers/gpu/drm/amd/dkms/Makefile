@@ -171,15 +171,16 @@ subdir-ccflags-y += \
 endif
 endif
 
-subdir-ccflags-y += -include $(src)/config/config.h
-DKMS_INCLUDE_PREFIX = \
+subdir-ccflags-y += -include $(src)/amd/dkms/config/config.h
+LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/drm \
 	-I$(src)/include/uapi \
 	-include $(src)/include/kcl/kcl_version.h \
-	-include $(src)/include/rename_symbol.h
+	-include $(src)/include/rename_symbol.h \
+	$(LINUXINCLUDE)
 
-export OS_NAME OS_VERSION DKMS_INCLUDE_PREFIX
+export OS_NAME OS_VERSION
 
 export CONFIG_HSA_AMD=y
 export CONFIG_DRM_TTM=m

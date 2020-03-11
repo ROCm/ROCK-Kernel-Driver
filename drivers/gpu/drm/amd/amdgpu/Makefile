@@ -23,17 +23,20 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
+ifeq ($(KBUILD_EXTMOD),)
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(srctree)/$(src))
+else
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(src))
+endif
 ifeq (,$(BUILD_AS_DKMS))
-FULL_AMD_PATH=$(srctree)/$(src)/..
 AMDKCL_KBUILD_TAKE_PATH=1
 else
-FULL_AMD_PATH=$(src)/..
 # commit v5.3-rc4-54-g54b8ae66ae1a
 # kbuild: change *FLAGS_<basetarget>.o to take the path relative to $(obj)
 AMDKCL_KBUILD_TAKE_PATH=$(shell grep -q "target-stem" scripts/Makefile.lib && echo "1" || echo "0")
 endif
-DISPLAY_FOLDER_NAME=display
-FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
+DISPLAY_FOLDER_NAME := display
+FULL_AMD_DISPLAY_PATH := $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
 ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/include \
@@ -220,7 +223,7 @@ amdgpu-y += $(AMD_POWERPLAY_FILES)
 
 ifneq ($(CONFIG_DRM_AMD_DC),)
 
-RELATIVE_AMD_DISPLAY_PATH = ../$(DISPLAY_FOLDER_NAME)
+RELATIVE_AMD_DISPLAY_PATH := ../$(DISPLAY_FOLDER_NAME)
 include $(FULL_AMD_DISPLAY_PATH)/Makefile
 
 amdgpu-y += $(AMD_DISPLAY_FILES)
