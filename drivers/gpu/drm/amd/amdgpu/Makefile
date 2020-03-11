@@ -28,8 +28,8 @@ FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(srctree)/$(src))
 else
 FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(src))
 endif
-DISPLAY_FOLDER_NAME=display
-FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
+DISPLAY_FOLDER_NAME := display
+FULL_AMD_DISPLAY_PATH := $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
 ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/include \
@@ -244,7 +244,7 @@ amdgpu-y += $(AMD_POWERPLAY_FILES)
 
 ifneq ($(CONFIG_DRM_AMD_DC),)
 
-RELATIVE_AMD_DISPLAY_PATH = ../$(DISPLAY_FOLDER_NAME)
+RELATIVE_AMD_DISPLAY_PATH := ../$(DISPLAY_FOLDER_NAME)
 include $(FULL_AMD_DISPLAY_PATH)/Makefile
 
 amdgpu-y += $(AMD_DISPLAY_FILES)
