@@ -238,7 +238,7 @@ void xen_efi_reset_system(int reset_type, efi_status_t status,
 			  unsigned long data_size, efi_char16_t *data);
 
 
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPTION
 
 static inline void xen_preemptible_hcall_begin(void)
 {
@@ -262,6 +262,6 @@ static inline void xen_preemptible_hcall_end(void)
 	__this_cpu_write(xen_in_preemptible_hcall, false);
 }
 
-#endif /* CONFIG_PREEMPT */
+#endif /* CONFIG_PREEMPTION */
 
 #endif /* INCLUDE_XEN_OPS_H */

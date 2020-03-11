@@ -7584,7 +7584,7 @@ static int detach_tasks(struct lb_env *env)
 
 		detached++;
 
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPTION
 		/*
 		 * NEWIDLE balancing is a source of latency, so preemptible
 		 * kernels will stop after the first task is detached to minimize

@@ -63,7 +63,7 @@
  * enough to patch inline, increasing performance.
  */
 
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPTION
 # define preempt_stop(clobbers)	DISABLE_INTERRUPTS(clobbers); TRACE_IRQS_OFF
 #else
 # define preempt_stop(clobbers)
@@ -1104,7 +1104,7 @@ restore_all:
 	INTERRUPT_RETURN
 
 restore_all_kernel:
-#ifdef CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPTION
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	cmpl	$0, PER_CPU_VAR(__preempt_count)
 	jnz	.Lno_preempt
@@ -1393,7 +1393,7 @@ ENTRY(xen_hypervisor_callback)
 	TRACE_IRQS_OFF
 	mov	%esp, %eax
 	call	xen_evtchn_do_upcall
-#ifndef CONFIG_PREEMPT
+#ifndef CONFIG_PREEMPTION
 	call	xen_maybe_preempt_hcall
 #endif
 	jmp	ret_from_intr
