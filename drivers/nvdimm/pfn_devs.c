@@ -546,7 +546,7 @@ int nd_pfn_validate(struct nd_pfn *nd_pfn, const char *sig)
 		return -ENXIO;
 	}
 
-	return nd_pfn_clear_memmap_errors(nd_pfn);
+	return 0;
 }
 EXPORT_SYMBOL(nd_pfn_validate);
 
@@ -679,6 +679,8 @@ static int nd_pfn_init(struct nd_pfn *nd_pfn)
 		sig = PFN_SIG;
 
 	rc = nd_pfn_validate(nd_pfn, sig);
+	if (rc == 0)
+		return nd_pfn_clear_memmap_errors(nd_pfn);
 	if (rc != -ENODEV)
 		return rc;
 
@@ -735,6 +737,10 @@ static int nd_pfn_init(struct nd_pfn *nd_pfn)
 	pfn_sb->align = cpu_to_le32(nd_pfn->align);
 	checksum = nd_sb_checksum((struct nd_gen_sb *) pfn_sb);
 	pfn_sb->checksum = cpu_to_le64(checksum);
+
+	rc = nd_pfn_clear_memmap_errors(nd_pfn);
+	if (rc)
+		return rc;
 
 	return nvdimm_write_bytes(ndns, SZ_4K, pfn_sb, sizeof(*pfn_sb), 0);
 }
