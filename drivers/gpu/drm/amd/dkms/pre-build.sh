@@ -73,10 +73,10 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 done
 
 export KERNELVER
-CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
+(cd $SRC && CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
 	-I$BLDTREE/arch/$SRCARCH/include/generated \
 	-I$SRCTREE/include \
 	-I$BLDTREE/include \
 	-I$SRCTREE/include/uapi \
-	-include linux/kconfig.h" \
-	./configure
+	-include $SRCTREE/include/linux/kconfig.h" \
+	./configure)
