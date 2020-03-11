@@ -29,6 +29,7 @@
 #include <linux/dynamic_debug.h>
 #include <linux/refcount.h>
 #include <linux/crc32c.h>
+#include <linux/unsupported-feature.h>
 #include "extent_io.h"
 #include "extent_map.h"
 #include "async-thread.h"
@@ -3729,6 +3730,13 @@ static inline int btrfs_is_testing(struct btrfs_fs_info *fs_info)
 {
 	return 0;
 }
+
+/*
+ * Module parameter
+ */
+DECLARE_SUSE_UNSUPPORTED_FEATURE(btrfs)
+#define btrfs_allow_unsupported btrfs_allow_unsupported()
+
 #endif
 
 static inline void cond_wake_up(struct wait_queue_head *wq)

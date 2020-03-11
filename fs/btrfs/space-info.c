@@ -376,6 +376,8 @@ void btrfs_dump_space_info(struct btrfs_fs_info *fs_info,
 		info->total_bytes, info->bytes_used, info->bytes_pinned,
 		info->bytes_reserved, info->bytes_may_use,
 		info->bytes_readonly);
+	btrfs_info(fs_info, "total_bytes_pinned=%lld",
+		   percpu_counter_sum(&info->total_bytes_pinned));
 	spin_unlock(&info->lock);
 
 	DUMP_BLOCK_RSV(fs_info, global_block_rsv);

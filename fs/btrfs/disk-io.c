@@ -2905,6 +2905,14 @@ int open_ctree(struct super_block *sb,
 	if (btrfs_super_flags(disk_super) & BTRFS_SUPER_FLAG_ERROR)
 		set_bit(BTRFS_FS_STATE_ERROR, &fs_info->fs_state);
 
+	if (btrfs_super_flags(disk_super) & BTRFS_SUPER_FLAG_SEEDING) {
+		if (!btrfs_allow_unsupported) {
+			printk(KERN_WARNING "btrfs: seeding mode is not supported, load module with allow_unsupported=1\n");
+			ret = -EOPNOTSUPP;
+			goto fail_csum;
+		}
+	}
+
 	/*
 	 * run through our array of backup supers and setup
 	 * our ring pointer to the oldest one
@@ -2976,6 +2984,13 @@ int open_ctree(struct super_block *sb,
 "unequal nodesize/sectorsize (%u != %u) are not allowed for mixed block groups",
 			nodesize, sectorsize);
 		goto fail_csum;
+	}
+
+	if (features & BTRFS_FEATURE_INCOMPAT_RAID56) {
+		if (!btrfs_allow_unsupported) {
+			printk(KERN_WARNING "btrfs: RAID56 is supported read-only, load module with allow_unsupported=1\n");
+			sb->s_flags |= SB_RDONLY;
+		}
 	}
 
 	/*
