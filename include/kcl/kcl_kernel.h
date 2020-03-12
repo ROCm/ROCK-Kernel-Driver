@@ -19,4 +19,8 @@
 #define __GFP_RETRY_MAYFAIL __GFP_REPEAT
 #endif
 
+#ifndef ALIGN_DOWN
+#define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
+#endif /* ALIGN_DOWN */
+
 #endif /* AMDKCL_KERNEL_H */
