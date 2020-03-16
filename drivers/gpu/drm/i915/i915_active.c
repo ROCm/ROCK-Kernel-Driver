@@ -337,6 +337,12 @@ out:
 	return err;
 }
 
+bool i915_active_acquire_if_busy(struct i915_active *ref)
+{
+	debug_active_assert(ref);
+	return atomic_add_unless(&ref->count, 1, 0);
+}
+
 int i915_active_acquire(struct i915_active *ref)
 {
 	int err;

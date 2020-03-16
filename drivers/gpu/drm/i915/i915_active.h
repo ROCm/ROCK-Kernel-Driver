@@ -381,6 +381,7 @@ int i915_request_await_active_request(struct i915_request *rq,
 				      struct i915_active_request *active);
 
 int i915_active_acquire(struct i915_active *ref);
+bool i915_active_acquire_if_busy(struct i915_active *ref);
 void i915_active_release(struct i915_active *ref);
 void __i915_active_release_nested(struct i915_active *ref, int subclass);
 
