@@ -1007,7 +1007,10 @@ static int handle_reserve_ticket(struct btrfs_fs_info *fs_info,
 	spin_lock(&space_info->lock);
 	ret = ticket->error;
 	if (ticket->bytes || ticket->error) {
-		list_del_init(&ticket->list);
+		if (!list_empty(&ticket->list)) {
+			list_del_init(&ticket->list);
+			btrfs_try_granting_tickets(fs_info, space_info);
+		}
 		if (!ret)
 			ret = -ENOSPC;
 	}
