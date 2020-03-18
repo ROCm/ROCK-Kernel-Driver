@@ -90,6 +90,9 @@ struct amdgpu_mn {
 #endif
 	struct mutex		read_lock;
 	atomic_t		recursion;
+#if !defined(HAVE_MMU_NOTIFIER_PUT)
+	struct rcu_head	rcu;
+#endif
 };
 
 /**
@@ -104,6 +107,18 @@ struct amdgpu_mn_node {
 	struct interval_tree_node	it;
 	struct list_head		bos;
 };
+
+#ifdef HAVE_MMU_NOTIFIER_PUT
+static void amdgpu_mn_free(struct mmu_notifier *mn)
+{
+	kfree(container_of(mn, struct amdgpu_mn, mn));
+}
+#else
+static void amdgpu_mn_free(struct rcu_head *rcu)
+{
+	kfree(container_of(rcu, struct amdgpu_mn, rcu));
+}
+#endif
 
 /**
  * amdgpu_mn_destroy - destroy the MMU notifier
@@ -136,8 +151,12 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 	}
 	up_write(&amn->lock);
 	mutex_unlock(&adev->mn_lock);
+#ifdef HAVE_MMU_NOTIFIER_PUT
+	mmu_notifier_put(&amn->mn);
+#else
 	mmu_notifier_unregister_no_release(&amn->mn, amn->mm);
-	kfree(amn);
+	mmu_notifier_call_srcu(&amn->rcu, amdgpu_mn_free);
+#endif
 }
 
 /**
@@ -188,6 +207,9 @@ void amdgpu_mn_unlock(struct amdgpu_mn *mn)
  */
 static void amdgpu_mn_read_lock(struct amdgpu_mn *amn)
 {
+	/* FIXME: Need figure out one way to detect
+	 * if we are in oom reaper context.
+	 */
 	mutex_lock(&amn->read_lock);
 	if (atomic_inc_return(&amn->recursion) == 1)
 		down_read_non_owner(&amn->lock);
@@ -201,11 +223,14 @@ static void amdgpu_mn_read_lock(struct amdgpu_mn *amn)
  */
 static int amdgpu_mn_read_lock(struct amdgpu_mn *amn, bool blockable)
 {
-	if (blockable)
-		mutex_lock(&amn->read_lock);
-	else if (!mutex_trylock(&amn->read_lock))
+	/* Non blockable occurs only in oom reaper context.
+	 * In this case, process is going to be killed anyway.
+	 * Let oom reaper fail at this stage.
+	 */
+	if (!blockable)
 		return -EAGAIN;
 
+	mutex_lock(&amn->read_lock);
 	if (atomic_inc_return(&amn->recursion) == 1)
 		down_read_non_owner(&amn->lock);
 	mutex_unlock(&amn->read_lock);
@@ -286,11 +311,6 @@ static int amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 	while (it) {
 		struct amdgpu_mn_node *node;
 
-		if (!mmu_notifier_range_blockable(range)) {
-			amdgpu_mn_read_unlock(amn);
-			return -EAGAIN;
-		}
-
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, range->start, end);
 
@@ -329,11 +349,6 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 	while (it) {
 		struct amdgpu_mn_node *node;
 		struct amdgpu_bo *bo;
-
-		if (!mmu_notifier_range_blockable(range)) {
-			amdgpu_mn_read_unlock(amn);
-			return -EAGAIN;
-		}
 
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, range->start, end);
@@ -394,13 +409,6 @@ static void amdgpu_mn_invalidate_range_start_gfx(struct mmu_notifier *mn,
 	while (it) {
 		struct amdgpu_mn_node *node;
 
-#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
-		if (!blockable) {
-			amdgpu_mn_read_unlock(amn);
-			return -EAGAIN;
-		}
-#endif
-
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, start, end);
 
@@ -456,13 +464,6 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 		struct amdgpu_mn_node *node;
 		struct amdgpu_bo *bo;
 
-#if defined(HAVE_5ARGS_INVALIDATE_RANGE_START)
-		if (!blockable) {
-			amdgpu_mn_read_unlock(amn);
-			return -EAGAIN;
-		}
-#endif
-
 		node = container_of(it, struct amdgpu_mn_node, it);
 		it = interval_tree_iter_next(it, start, end);
 
@@ -508,11 +509,17 @@ static void amdgpu_mn_invalidate_range_end(struct mmu_notifier *mn,
 
 static const struct mmu_notifier_ops amdgpu_mn_ops[] = {
 	[AMDGPU_MN_TYPE_GFX] = {
+#ifdef HAVE_MMU_NOTIFIER_PUT
+		.free_notifier = amdgpu_mn_free,
+#endif
 		.release = amdgpu_mn_release,
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_gfx,
 		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
 	},
 	[AMDGPU_MN_TYPE_HSA] = {
+#ifdef HAVE_MMU_NOTIFIER_PUT
+		.free_notifier = amdgpu_mn_free,
+#endif
 		.release = amdgpu_mn_release,
 		.invalidate_range_start = amdgpu_mn_invalidate_range_start_hsa,
 		.invalidate_range_end = amdgpu_mn_invalidate_range_end,
