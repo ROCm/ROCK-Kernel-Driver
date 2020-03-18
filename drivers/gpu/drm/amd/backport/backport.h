@@ -10,6 +10,7 @@
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_kernel.h>
+#include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_firmware.h>
