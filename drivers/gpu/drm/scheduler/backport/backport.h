@@ -6,4 +6,6 @@
 #include <kcl/reservation.h>
 #include <kcl/kcl_fence_backport.h>
 #include <kcl/kcl_kthread_backport.h>
+#include <kcl/kcl_compiler_attributes.h>
+
 #endif

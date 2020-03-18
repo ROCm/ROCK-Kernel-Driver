@@ -13,4 +13,5 @@
 #include <kcl/kcl_list.h>
 #include <kcl/kcl_mm_backport.h>
 #include <kcl/kcl_shrinker_backport.h>
+#include <kcl/kcl_compiler_attributes.h>
 #endif
