@@ -11,4 +11,5 @@
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_bitops.h>
+#include <kcl/kcl_compiler_attributes.h>
 #endif /* AMDGPU_BACKPORT_H */

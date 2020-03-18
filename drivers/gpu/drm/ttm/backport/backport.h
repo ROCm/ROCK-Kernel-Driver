@@ -5,4 +5,5 @@
 #include <linux/version.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_kernel.h>
+#include <kcl/kcl_compiler_attributes.h>
 #endif
