@@ -91,7 +91,6 @@
 #include "amdgpu_umc.h"
 #include "amdgpu_mmhub.h"
 #include "amdgpu_df.h"
-#include "amdgpu_tmz.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -925,9 +924,6 @@ struct amdgpu_device {
 	/* df */
 	struct amdgpu_df                df;
 
-	/* tmz */
-	struct amdgpu_tmz		tmz;
-
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	int				num_ip_blocks;
 	struct mutex	mn_lock;
@@ -1262,5 +1258,9 @@ _name##_show(struct device *dev,					\
 									\
 static struct device_attribute pmu_attr_##_name = __ATTR_RO(_name)
 
-#endif
+static inline bool amdgpu_is_tmz(struct amdgpu_device *adev)
+{
+       return adev->gmc.tmz_enabled;
+}
 
+#endif
