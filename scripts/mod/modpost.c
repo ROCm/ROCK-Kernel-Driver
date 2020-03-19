@@ -41,6 +41,8 @@ static int sec_mismatch_count = 0;
 static int sec_mismatch_fatal = 0;
 /* ignore missing files */
 static int ignore_missing_files;
+/* If set to 1, only warn (instead of error) about missing ns imports */
+static int allow_missing_ns_imports;
 
 enum export {
 	export_plain,      export_unused,     export_gpl,
@@ -2299,8 +2301,14 @@ static int check_exports(struct module *mod)
 
 		if (exp->namespace &&
 		    !module_imports_namespace(mod, exp->namespace)) {
-			warn("module %s uses symbol %s from namespace %s, but does not import it.\n",
-			     basename, exp->name, exp->namespace);
+			if (allow_missing_ns_imports) {
+				warn("module %s uses symbol %s from namespace %s, but does not import it.\n",
+				     basename, exp->name, exp->namespace);
+			} else {
+				merror("module %s uses symbol %s from namespace %s, but does not import it.\n",
+				       basename, exp->name, exp->namespace);
+				err = 1;
+			}
 			add_namespace(&mod->missing_namespaces, exp->namespace);
 		}
 
@@ -2675,7 +2683,7 @@ int main(int argc, char **argv)
 	struct ext_sym_list *extsym_iter;
 	struct ext_sym_list *extsym_start = NULL;
 
-	while ((opt = getopt(argc, argv, "i:I:e:mnsT:o:awEd:N:")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:e:mnsT:o:awEMd:N:")) != -1) {
 		switch (opt) {
 		case 'i':
 			kernel_read = optarg;
@@ -2715,6 +2723,9 @@ int main(int argc, char **argv)
 			break;
 		case 'E':
 			sec_mismatch_fatal = 1;
+			break;
+		case 'M':
+			allow_missing_ns_imports = 1;
 			break;
 		case 'd':
 			missing_namespace_deps = optarg;
