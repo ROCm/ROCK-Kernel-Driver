@@ -28,8 +28,12 @@ uint64_t amdgpu_csa_vaddr(struct amdgpu_device *adev)
 {
 	uint64_t addr = adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT;
 
-	addr -= AMDGPU_VA_RESERVED_SIZE;
-	addr = amdgpu_gmc_sign_extend(addr);
+	if (adev->asic_type >= CHIP_NAVI10) {
+		addr = AMDGPU_VA_RESERVED_SIZE - AMDGPU_CSA_SIZE;
+	} else {
+		addr -= AMDGPU_VA_RESERVED_SIZE;
+		addr = amdgpu_gmc_sign_extend(addr);
+	}
 
 	return addr;
 }
