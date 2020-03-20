@@ -1,6 +1,7 @@
 #include <kcl/kcl_drm_cache.h>
 #include "kcl_common.h"
 
+#include <linux/ioport.h>
 #include <xen/xen.h>
 
 #if !defined(HAVE_DRM_NEED_SWIOTLB)

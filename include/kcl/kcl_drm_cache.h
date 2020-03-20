@@ -1,5 +1,6 @@
 #ifndef AMDKCL_DRM_CACHE_H
 #define AMDKCL_DRM_CACHE_H
+#include <linux/types.h>
 #include <drm/drm_cache.h>
 
 #if !defined(HAVE_DRM_NEED_SWIOTLB)
