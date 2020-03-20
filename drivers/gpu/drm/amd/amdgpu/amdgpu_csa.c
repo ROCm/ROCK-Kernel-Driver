@@ -28,9 +28,13 @@
 
 uint64_t amdgpu_csa_vaddr(struct amdgpu_device *adev)
 {
-	uint64_t addr = AMDGPU_VA_RESERVED_CSA_START(adev);
-
-	addr = amdgpu_gmc_sign_extend(addr);
+	uint64_t addr;
+	if (adev->asic_type >= CHIP_NAVI10) {
+		addr = AMDGPU_VA_RESERVED_CSA_SIZE - AMDGPU_CSA_SIZE;
+	} else {
+		addr = AMDGPU_VA_RESERVED_CSA_START(adev);
+		addr = amdgpu_gmc_sign_extend(addr);
+	}
 
 	return addr;
 }
