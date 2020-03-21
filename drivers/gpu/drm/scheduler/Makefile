@@ -21,17 +21,16 @@
 #
 #
 
-ifneq (,$(BUILD_AS_DKMS))
-	SCHED_NAME = amd-sched
-else
-	SCHED_NAME = gpu-sched
-endif
+#
+# In DKMS mode the module can be renamed by passing SCHED_NAME as a parameter
+# to 'make' if required
+#
+SCHED_NAME = gpu-sched
 
 ccflags-y := -Iinclude/drm
 $(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
 
 obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
-gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
 ifeq ($(KBUILD_EXTMOD),)
 SCHED_FULL_PATH := $(srctree)/$(src)
