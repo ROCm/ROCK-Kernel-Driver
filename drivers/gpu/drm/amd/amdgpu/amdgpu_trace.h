@@ -574,5 +574,5 @@ TRACE_EVENT(amdgpu_runpm_reference_dumps,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu
+#define TRACE_INCLUDE_PATH .
 #include <trace/define_trace.h>
