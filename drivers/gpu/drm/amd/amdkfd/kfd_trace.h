@@ -147,9 +147,5 @@ TRACE_EVENT(kfd_restore_process_worker_end,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#ifdef BUILD_AS_DKMS
-#define TRACE_INCLUDE_PATH ./
-#else
-#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdkfd
-#endif
+#define TRACE_INCLUDE_PATH .
 #include <trace/define_trace.h>
