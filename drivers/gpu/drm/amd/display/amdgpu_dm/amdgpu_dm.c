@@ -5748,6 +5748,21 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 }
 #endif
 
+static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
+{
+#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
+	struct drm_encoder *encoder;
+
+	/* There is only one encoder per connector */
+	drm_connector_for_each_possible_encoder(connector, encoder)
+		return encoder;
+
+	return NULL;
+#else
+	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
+#endif
+}
+
 static const struct drm_connector_helper_funcs
 amdgpu_dm_connector_helper_funcs = {
 	/*
@@ -5761,21 +5776,7 @@ amdgpu_dm_connector_helper_funcs = {
 #ifdef HDMI_DRM_INFOFRAME_SIZE
 	.atomic_check = amdgpu_dm_connector_atomic_check,
 #endif
-#if (DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)) && defined(BUILD_AS_DKMS)
-	/*
-	 * why introduce BUILD_AS_DKMS control here?
-	 * patch "drm/amdgpu: Remove default best_encoder hook from DC" removed
-	 * assignment of .best_encoder from v5.0-rc1 on upstream branch,
-	 * but this patch was merged into drmnext branch previous its upstream
-	 * to get a DRM version, so the DRM_VERSION can't handle this situation,
-	 * in our case, drm_atomic_helper_best_encoder has already removed in our branch
-	 * with DRM version 4.20rc3, but if we only use DRM_VERSION(5, 0, 0) for code control,
-	 * customer kernel build will fail for implicit drm_atomic_helper_best_encoder, actually,
-	 * .best_encoder assignment code is unnecessary in customer kernel build, since
-	 * patch "drm/amdgpu: Remove default best_encoder hook from DC" intend to remove it.
-	*/
-	.best_encoder = drm_atomic_helper_best_encoder
-#endif
+	.best_encoder = amdgpu_dm_connector_to_encoder
 };
 
 static void dm_crtc_helper_disable(struct drm_crtc *crtc)
@@ -6542,21 +6543,6 @@ static int to_drm_connector_type(enum signal_type st)
 	default:
 		return DRM_MODE_CONNECTOR_Unknown;
 	}
-}
-
-static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
-{
-#ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
-	struct drm_encoder *encoder;
-
-	/* There is only one encoder per connector */
-	drm_connector_for_each_possible_encoder(connector, encoder)
-		return encoder;
-
-	return NULL;
-#else
-	return drm_encoder_find(connector->dev, NULL, connector->encoder_ids[0]);
-#endif
 }
 
 static void amdgpu_dm_get_native_mode(struct drm_connector *connector)
