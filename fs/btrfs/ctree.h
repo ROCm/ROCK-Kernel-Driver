@@ -3730,14 +3730,13 @@ static inline int btrfs_is_testing(struct btrfs_fs_info *fs_info)
 {
 	return 0;
 }
+#endif
 
 /*
  * Module parameter
  */
 DECLARE_SUSE_UNSUPPORTED_FEATURE(btrfs)
 #define btrfs_allow_unsupported btrfs_allow_unsupported()
-
-#endif
 
 static inline void cond_wake_up(struct wait_queue_head *wq)
 {
