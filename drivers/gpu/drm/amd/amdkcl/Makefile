@@ -6,4 +6,6 @@ amdkcl-y += kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o \
 	kcl_perf_event.o kcl_reservation.o dma-resv.o kcl_suspend.o kcl_workqueue.o \
 	kcl_seq_file.o kcl_connector.o
 
+ccflags-y += -include $(src)/../dkms/config/config.h
+
 obj-m += amdkcl.o
