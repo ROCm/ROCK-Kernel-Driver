@@ -46,9 +46,10 @@
  * 1.2 - Allow flag option to clear queue status on queue suspend
  * 1.3 - Fix race condition between clear on suspend and trap event handling
  * 1.4 - Fix bad kfifo free
+ * 1.5 - Fix ABA issue between queue snapshot and suspend
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	1
-#define KFD_IOCTL_DBG_MINOR_VERSION	4
+#define KFD_IOCTL_DBG_MINOR_VERSION	5
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */

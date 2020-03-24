@@ -683,9 +683,10 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 			pdd->process->pasid,
 			q->properties.queue_id);
 
-	if (q->properties.is_being_destroyed) {
-		pr_debug("Suspend: queue id is being destroyed %i\n",
-						q->properties.queue_id);
+	if (q->properties.is_new || q->properties.is_being_destroyed) {
+		pr_debug("Suspend: skip %s queue id %i\n",
+				q->properties.is_new ? "new" : "destroyed",
+				q->properties.queue_id);
 		return -EBUSY;
 	}
 
@@ -2275,16 +2276,21 @@ out_unlock:
 	return r;
 }
 
-bool queue_id_in_array(unsigned int queue_id,
+#define INVALID_QUEUE_ID	0xffffffff
+#define QUEUE_NOT_FOUND		-1
+static int queue_idx_in_array(unsigned int queue_id,
 		uint32_t num_queues,
 		uint32_t *queue_ids)
 {
 	int i;
 
+	if (queue_id == INVALID_QUEUE_ID)
+		return QUEUE_NOT_FOUND;
+
 	for (i = 0; i < num_queues; i++)
 		if (queue_id == queue_ids[i])
-			return true;
-	return false;
+			return i;
+	return QUEUE_NOT_FOUND;
 }
 
 struct copy_context_work_handler_workarea {
@@ -2338,88 +2344,6 @@ void copy_context_work_handler (struct work_struct *work)
 	mmput(mm);
 }
 
-int suspend_queues(struct kfd_process *p,
-			uint32_t num_queues,
-			uint32_t grace_period,
-			uint32_t flags,
-			uint32_t *queue_ids)
-{
-	int r = -ENODEV;
-	bool any_queues_suspended = false;
-	struct kfd_process_device *pdd;
-	struct queue *q;
-
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		bool queues_suspended_on_device = false;
-		struct device_queue_manager *dqm = pdd->dev->dqm;
-		struct qcm_process_device *qpd = &pdd->qpd;
-
-		dqm_lock(dqm);
-
-		/* We need to loop over all of the queues on this
-		 * device, and check if it is in the list passed in,
-		 * and if it is, we will evict it.
-		 */
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			if (queue_id_in_array(q->properties.queue_id,
-						num_queues,
-						queue_ids)) {
-				if (q->properties.is_suspended)
-					continue;
-				r = suspend_single_queue(dqm,
-						pdd,
-						q);
-				if (r) {
-					pr_err("Failed to suspend process queues. queue_id == %i\n",
-							q->properties.queue_id);
-					dqm_unlock(dqm);
-					return r;
-				}
-				queues_suspended_on_device = true;
-				any_queues_suspended = true;
-			}
-		}
-
-		if (queues_suspended_on_device) {
-			r = execute_queues_cpsch(dqm,
-				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
-				grace_period);
-			if (r) {
-				pr_err("Failed to suspend process queues.\n");
-				dqm_unlock(dqm);
-				return r;
-			}
-		}
-
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			bool is_q = queue_id_in_array(q->properties.queue_id,
-						      num_queues, queue_ids);
-			if ((flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) && is_q)
-				WRITE_ONCE(q->properties.debug_event_type, 0);
-		}
-
-		dqm_unlock(dqm);
-		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
-	}
-
-	if (any_queues_suspended) {
-		struct copy_context_work_handler_workarea copy_context_worker;
-
-		INIT_WORK_ONSTACK(
-				&copy_context_worker.copy_context_work,
-				copy_context_work_handler);
-
-		copy_context_worker.p = p;
-
-		schedule_work(&copy_context_worker.copy_context_work);
-
-
-		flush_work(&copy_context_worker.copy_context_work);
-		destroy_work_on_stack(&copy_context_worker.copy_context_work);
-	}
-	return r;
-}
-
 int resume_queues(struct kfd_process *p,
 		uint32_t num_queues,
 		uint32_t flags,
@@ -2441,9 +2365,9 @@ int resume_queues(struct kfd_process *p,
 		 * and if it is, we will restore it.
 		 */
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			if (queue_id_in_array(q->properties.queue_id,
-						num_queues,
-						queue_ids)) {
+			if (queue_idx_in_array(q->properties.queue_id,
+					num_queues,
+					queue_ids) != QUEUE_NOT_FOUND) {
 				if (!q->properties.is_suspended)
 					continue;
 				r = resume_single_queue(dqm,
@@ -2474,6 +2398,107 @@ int resume_queues(struct kfd_process *p,
 		dqm_unlock(dqm);
 	}
 	return r;
+}
+
+int suspend_queues(struct kfd_process *p,
+			uint32_t num_queues,
+			uint32_t grace_period,
+			uint32_t flags,
+			uint32_t *queue_ids)
+{
+	int err = 0, r = -ENODEV;
+	struct kfd_process_device *pdd;
+	struct queue *q;
+	int total_suspended = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		struct device_queue_manager *dqm = pdd->dev->dqm;
+		struct qcm_process_device *qpd = &pdd->qpd;
+		int per_device_suspended = 0;
+
+		dqm_lock(dqm);
+
+		/* We need to loop over all of the queues on this
+		 * device, and check if it is in the list passed in,
+		 * and if it is, we will evict it.
+		 */
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			int q_idx = queue_idx_in_array(q->properties.queue_id,
+							num_queues,
+							queue_ids);
+
+			if (q_idx == QUEUE_NOT_FOUND)
+				continue;
+
+			if (q->properties.is_suspended ||
+					suspend_single_queue(dqm, pdd, q))
+				queue_ids[q_idx] = INVALID_QUEUE_ID;
+			else
+				per_device_suspended++;
+		}
+
+		if (!per_device_suspended) {
+			dqm_unlock(dqm);
+			continue;
+		}
+
+		r = execute_queues_cpsch(dqm,
+			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
+			grace_period);
+
+		if (r)
+			pr_err("Failed to suspend process queues.\n");
+
+		list_for_each_entry(q, &qpd->queues_list, list) {
+			bool is_q = queue_idx_in_array(q->properties.queue_id,
+				num_queues, queue_ids) != QUEUE_NOT_FOUND;
+			/* unmark is_suspend on unexpected failure */
+			if (r && is_q) {
+				resume_single_queue(dqm, qpd, q);
+				q->properties.queue_id = INVALID_QUEUE_ID;
+			} else if ((flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) &&
+								!r && is_q)
+				WRITE_ONCE(q->properties.debug_event_type, 0);
+		}
+
+		dqm_unlock(dqm);
+
+		/* failed to suspend for unexpected reason */
+		if (r) {
+			wake_up_all(&dqm->destroy_wait);
+			per_device_suspended = 0;
+			err = r;
+		}
+
+		total_suspended += per_device_suspended;
+		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
+	}
+
+	/* rollback suspended queues */
+	if (total_suspended < num_queues) {
+		pr_debug("Failed to suspend requested queues.  Rolling back.\n");
+		r = resume_queues(p, num_queues, flags, queue_ids);
+		if (r)
+			return r;
+		return -EINVAL;
+	}
+
+	if (total_suspended) {
+		struct copy_context_work_handler_workarea copy_context_worker;
+
+		INIT_WORK_ONSTACK(
+				&copy_context_worker.copy_context_work,
+				copy_context_work_handler);
+
+		copy_context_worker.p = p;
+
+		schedule_work(&copy_context_worker.copy_context_work);
+
+
+		flush_work(&copy_context_worker.copy_context_work);
+		destroy_work_on_stack(&copy_context_worker.copy_context_work);
+	}
+	return err;
 }
 
 static uint32_t set_queue_type_for_user(struct queue_properties *q_props)
