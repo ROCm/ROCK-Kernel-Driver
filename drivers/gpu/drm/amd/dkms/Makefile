@@ -171,7 +171,6 @@ subdir-ccflags-y += \
 endif
 endif
 
-subdir-ccflags-y += -include $(src)/amd/dkms/config/config.h
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/drm \
@@ -187,7 +186,6 @@ export CONFIG_DRM_TTM=m
 export CONFIG_DRM_TTM_DMA_PAGE_POOL=y
 export CONFIG_DRM_AMDGPU=m
 export CONFIG_DRM_SCHED=m
-export BUILD_AS_DKMS=y
 export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
@@ -199,7 +197,6 @@ export CONFIG_DRM_AMD_DC_DCN2_1=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
-subdir-ccflags-y += -DBUILD_AS_DKMS
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
