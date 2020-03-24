@@ -59,6 +59,8 @@ struct pci_slot {
 	struct hotplug_slot	*hotplug;	/* Hotplug info (move here) */
 	unsigned char		number;		/* PCI_SLOT(pci_dev->devfn) */
 	struct kobject		kobj;
+
+	void* suse_kabi_padding;
 };
 
 static inline const char *pci_slot_name(const struct pci_slot *slot)
@@ -271,6 +273,9 @@ struct pci_cap_saved_data {
 	u16		cap_nr;
 	bool		cap_extended;
 	unsigned int	size;
+
+	void* suse_kabi_padding;
+
 	u32		data[0];
 };
 
@@ -467,6 +472,8 @@ struct pci_dev {
 	size_t		romlen;		/* Length if not from BAR */
 	char		*driver_override; /* Driver name to force a match */
 
+	void* suse_kabi_padding;
+
 	unsigned long	priv_flags;	/* Private flags for the PCI driver */
 };
 
@@ -510,6 +517,8 @@ struct pci_host_bridge {
 	unsigned int	native_pme:1;		/* OS may use PCIe PME */
 	unsigned int	native_ltr:1;		/* OS may use PCIe LTR */
 	unsigned int	preserve_config:1;	/* Preserve FW resource setup */
+
+	void* suse_kabi_padding;
 
 	/* Resource alignment requirements */
 	resource_size_t (*align_resource)(struct pci_dev *dev,
@@ -601,6 +610,8 @@ struct pci_bus {
 	struct bin_attribute	*legacy_io;	/* Legacy I/O for this bus */
 	struct bin_attribute	*legacy_mem;	/* Legacy mem */
 	unsigned int		is_added:1;
+
+	void* suse_kabi_padding;
 };
 
 #define to_pci_bus(n)	container_of(n, struct pci_bus, dev)
@@ -839,6 +850,9 @@ struct pci_driver {
 	int  (*sriov_configure)(struct pci_dev *dev, int num_vfs); /* On PF */
 	const struct pci_error_handlers *err_handler;
 	const struct attribute_group **groups;
+
+	void* suse_kabi_padding;
+
 	struct device_driver	driver;
 	struct pci_dynids	dynids;
 };
@@ -1909,6 +1923,7 @@ struct pci_fixup {
 #else
 	void (*hook)(struct pci_dev *dev);
 #endif
+	void* suse_kabi_padding;
 };
 
 enum pci_fixup_pass {

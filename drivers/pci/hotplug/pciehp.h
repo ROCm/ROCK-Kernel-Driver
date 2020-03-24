@@ -106,6 +106,8 @@ struct controller {
 	unsigned int ist_running;
 	int request_result;
 	wait_queue_head_t requester;
+
+	void* suse_kabi_padding;
 };
 
 /**
