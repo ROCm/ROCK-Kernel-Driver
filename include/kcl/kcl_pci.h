@@ -112,13 +112,13 @@ u32 pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
 }
 #endif
 
-#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev);
 #endif
 
 static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
-#if defined(BUILD_AS_DKMS) && (LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0))
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
 	_kcl_pci_configure_extended_tags(dev);
 #endif
 }

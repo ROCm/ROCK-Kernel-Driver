@@ -249,23 +249,34 @@ u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting
 EXPORT_SYMBOL(_kcl_pcie_bandwidth_available);
 #endif
 
+#if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 {
-	u32 dev_cap;
+	u32 cap;
+	u16 ctl;
 	int ret;
 
 	if (!pci_is_pcie(dev))
 		return;
 
-	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &dev_cap);
+	ret = pcie_capability_read_dword(dev, PCI_EXP_DEVCAP, &cap);
 	if (ret)
 		return;
 
-	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
+	if (!(cap & PCI_EXP_DEVCAP_EXT_TAG))
+		return;
+
+	ret = pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
+	if (ret)
+		return;
+
+	if (!(ctl & PCI_EXP_DEVCTL_EXT_TAG)) {
 		pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
-					 PCI_EXP_DEVCTL_EXT_TAG);
+					PCI_EXP_DEVCTL_EXT_TAG);
+	}
 }
 EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
+#endif
 
 #ifdef AMDKCL_CREATE_MEASURE_FILE
 static ssize_t max_link_speed_show(struct device *dev,
