@@ -513,6 +513,7 @@ struct queue_properties {
 	bool is_interop;
 	bool is_evicted;
 	bool is_suspended;
+	bool is_being_destroyed;
 	bool is_active;
 	bool is_new;
 	bool is_gws;

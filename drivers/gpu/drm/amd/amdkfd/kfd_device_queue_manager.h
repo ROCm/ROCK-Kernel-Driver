@@ -202,6 +202,9 @@ struct device_queue_manager {
 	struct kfd_mem_obj	hiq_sdma_mqd;
 	bool			sched_running;
 	uint32_t		wait_times;
+
+	/* sync destroy and suspend  */
+	wait_queue_head_t destroy_wait;
 };
 
 void device_queue_manager_init_cik(

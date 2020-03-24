@@ -679,11 +679,15 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 				      struct kfd_process_device *pdd,
 				      struct queue *q)
 {
-	int retval = 0;
-
 	pr_debug("Suspending PASID %u queue [%i]\n",
 			pdd->process->pasid,
 			q->properties.queue_id);
+
+	if (q->properties.is_being_destroyed) {
+		pr_debug("Suspend: queue id is being destroyed %i\n",
+						q->properties.queue_id);
+		return -EBUSY;
+	}
 
 	q->properties.is_suspended = true;
 	if (q->properties.is_active) {
@@ -695,7 +699,7 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 		}
 	}
 
-	return retval;
+	return 0;
 }
 
 /* resume_single_queue does not lock the dqm like the functions
@@ -1612,6 +1616,30 @@ static int execute_queues_cpsch(struct device_queue_manager *dqm,
 	return map_queues_cpsch(dqm);
 }
 
+/* assume this is called under dqm lock  */
+static int wait_on_destroy_queue(struct device_queue_manager *dqm,
+				 struct queue *q)
+{
+	struct kfd_process_device *pdd = kfd_get_process_device_data(q->device,
+								q->process);
+	int ret = 0;
+
+	if (pdd->qpd.is_debug)
+		return ret;
+
+	q->properties.is_being_destroyed = true;
+
+	if (pdd->debug_trap_enabled && q->properties.is_suspended) {
+		dqm_unlock(dqm);
+		ret = wait_event_interruptible(dqm->destroy_wait,
+						!q->properties.is_suspended);
+
+		dqm_lock(dqm);
+	}
+
+	return ret;
+}
+
 static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 				struct qcm_process_device *qpd,
 				struct queue *q)
@@ -1631,10 +1659,15 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 				q->properties.queue_id);
 	}
 
-	retval = 0;
-
 	/* remove queue from list to prevent rescheduling after preemption */
 	dqm_lock(dqm);
+
+	retval = wait_on_destroy_queue(dqm, q);
+
+	if (retval) {
+		dqm_unlock(dqm);
+		return retval;
+	}
 
 	if (qpd->is_debug) {
 		/*
@@ -2100,8 +2133,10 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		goto out_free;
 	}
 
-	if (!dqm->ops.initialize(dqm))
+	if (!dqm->ops.initialize(dqm)) {
+		init_waitqueue_head(&dqm->destroy_wait);
 		return dqm;
+	}
 
 out_free:
 	kfree(dqm);
@@ -2433,6 +2468,7 @@ int resume_queues(struct kfd_process *p,
 				dqm_unlock(dqm);
 				return r;
 			}
+			wake_up_all(&dqm->destroy_wait);
 		}
 
 		dqm_unlock(dqm);
