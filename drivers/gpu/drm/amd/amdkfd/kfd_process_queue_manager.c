@@ -518,6 +518,10 @@ int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid)
 
 		dqm = pqn->q->device->dqm;
 		retval = dqm->ops.destroy_queue(dqm, &pdd->qpd, pqn->q);
+
+		if (retval == -ERESTARTSYS)
+			return retval;
+
 		if (retval) {
 			pr_err("Pasid 0x%x destroy queue %d failed, ret %d\n",
 				pqm->process->pasid,
