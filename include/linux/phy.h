@@ -377,7 +377,6 @@ struct phy_device {
 	unsigned is_gigabit_capable:1;
 	unsigned has_fixups:1;
 	unsigned suspended:1;
-	unsigned suspended_by_mdio_bus:1;
 	unsigned sysfs_links:1;
 	unsigned loopback_enabled:1;
 
@@ -388,6 +387,9 @@ struct phy_device {
 
 	/* Interrupts are enabled */
 	unsigned interrupts:1;
+#ifndef __GENKSYMS__
+	unsigned suspended_by_mdio_bus:1;
+#endif
 
 	enum phy_state state;
 
