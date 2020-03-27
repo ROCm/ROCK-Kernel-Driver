@@ -45,18 +45,24 @@ static const struct file_operations kfd_dbg_ev_fops = {
 	.release = kfd_dbg_ev_release
 };
 
+struct kfd_debug_event_priv {
+	struct kfifo fifo;
+	wait_queue_head_t wait_queue;
+	int max_debug_events;
+};
+
 /* poll on wait queue of file */
 static __poll_t kfd_dbg_ev_poll(struct file *filep,
 				struct poll_table_struct *wait)
 {
-
-	struct kfd_debug_process_device *dpd = filep->private_data;
+	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
 
 	__poll_t mask = 0;
 
 	/* pending event have been queue'd via interrupt */
-	poll_wait(filep, &dpd->wait_queue, wait);
-	mask |= !kfifo_is_empty(&dpd->fifo) ? POLLIN | POLLRDNORM : mask;
+	poll_wait(filep, &dbg_ev_priv->wait_queue, wait);
+	mask |= !kfifo_is_empty(&dbg_ev_priv->fifo) ?
+						POLLIN | POLLRDNORM : mask;
 
 	return mask;
 }
@@ -66,9 +72,9 @@ static ssize_t kfd_dbg_ev_read(struct file *filep, char __user *user,
 			       size_t size, loff_t *offset)
 {
 	int ret, copied;
-	struct kfd_debug_process_device *dpd = filep->private_data;
+	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
 
-	ret = kfifo_to_user(&dpd->fifo, user, size, &copied);
+	ret = kfifo_to_user(&dbg_ev_priv->fifo, user, size, &copied);
 
 	if (ret || !copied) {
 		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i) (%i)\n",
@@ -81,9 +87,10 @@ static ssize_t kfd_dbg_ev_read(struct file *filep, char __user *user,
 
 static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
 {
-	struct kfd_debug_process_device *dpd = filep->private_data;
+	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
 
-	kfifo_free(&dpd->fifo);
+	kfifo_free(&dbg_ev_priv->fifo);
+	kfree(dbg_ev_priv);
 
 	return 0;
 }
@@ -169,7 +176,8 @@ out:
 }
 
 /* create event queue struct associated with process per device */
-static int kfd_create_event_queue(struct kfd_process_device *pdd)
+static int kfd_create_event_queue(struct kfd_process_device *pdd,
+				struct kfd_debug_event_priv *dbg_ev_priv)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
@@ -181,16 +189,16 @@ static int kfd_create_event_queue(struct kfd_process_device *pdd)
 
 	tdev = kfd_topology_device_by_id(pdd->dev->id);
 
-	pdd->dpd.max_debug_events = tdev->node_props.simd_count
+	dbg_ev_priv->max_debug_events = tdev->node_props.simd_count
 				* tdev->node_props.max_waves_per_simd;
 
-	ret = kfifo_alloc(&pdd->dpd.fifo, pdd->dpd.max_debug_events,
-			  GFP_KERNEL);
+	ret = kfifo_alloc(&dbg_ev_priv->fifo,
+				dbg_ev_priv->max_debug_events, GFP_KERNEL);
 
 	if (ret)
 		return ret;
 
-	init_waitqueue_head(&pdd->dpd.wait_queue);
+	init_waitqueue_head(&dbg_ev_priv->wait_queue);
 
 	pqm = &pdd->process->pqm;
 
@@ -221,6 +229,7 @@ static void kfd_dbg_ev_update_event_queue(struct kfd_process_device *pdd,
 	list_for_each_entry(pqn, &pqm->queues,
 				process_queue_list) {
 		long bit_to_set;
+		struct kfd_debug_event_priv *dbg_ev_priv;
 
 		if (!pqn->q)
 			continue;
@@ -239,9 +248,11 @@ static void kfd_dbg_ev_update_event_queue(struct kfd_process_device *pdd,
 
 		fifo_output = is_vmfault ? 'v' : 't';
 
-		kfifo_in(&pdd->dpd.fifo, &fifo_output, 1);
+		dbg_ev_priv = pdd->dbg_ev_file->private_data;
 
-		wake_up_all(&pdd->dpd.wait_queue);
+		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
+
+		wake_up_all(&dbg_ev_priv->wait_queue);
 
 		if (!is_vmfault)
 			break;
@@ -281,21 +292,35 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 /* enable debug and return file pointer struct */
 int kfd_dbg_ev_enable(struct kfd_process_device *pdd)
 {
+	struct kfd_debug_event_priv  *dbg_ev_priv;
 	int ret;
 
 	if (!pdd || !pdd->process)
 		return -ESRCH;
 
+	dbg_ev_priv = kzalloc(sizeof(struct kfd_debug_event_priv), GFP_KERNEL);
+
+	if (!dbg_ev_priv)
+		return -ENOMEM;
+
 	mutex_lock(&pdd->process->event_mutex);
 
-	ret = kfd_create_event_queue(pdd);
+	ret = kfd_create_event_queue(pdd, dbg_ev_priv);
 
 	mutex_unlock(&pdd->process->event_mutex);
 
 	if (ret)
 		return ret;
 
-	return anon_inode_getfd(kfd_dbg_name, &kfd_dbg_ev_fops,
-				(void *)&pdd->dpd, 0);
-}
+	ret = anon_inode_getfd(kfd_dbg_name, &kfd_dbg_ev_fops,
+				(void *)dbg_ev_priv, 0);
 
+	if (ret < 0) {
+		kfree(dbg_ev_priv);
+		return ret;
+	}
+
+	pdd->dbg_ev_file = fget(ret);
+
+	return ret;
+}
