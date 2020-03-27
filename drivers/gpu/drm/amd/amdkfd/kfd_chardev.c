@@ -2769,6 +2769,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		case 0:
 			pdd->debug_trap_enabled = false;
 			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			fput(pdd->dbg_ev_file);
+			pdd->dbg_ev_file = NULL;
 			break;
 		case 1:
 			pdd->debug_trap_enabled = true;

@@ -727,12 +727,6 @@ enum kfd_pdd_bound {
  */
 #define SDMA_ACTIVITY_DIVISOR  100
 
-struct kfd_debug_process_device {
-	struct kfifo fifo;
-	wait_queue_head_t wait_queue;
-	int max_debug_events;
-};
-
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/* The device that owns this data. */
@@ -741,8 +735,8 @@ struct kfd_process_device {
 	/* The process that owns this kfd_process_device. */
 	struct kfd_process *process;
 
-	/* per-process-per device debug event info */
-	struct kfd_debug_process_device dpd;
+	/* per-process-per device debug event fd file */
+	struct file *dbg_ev_file;
 
 	/* per-process-per device QCM data structure */
 	struct qcm_process_device qpd;
