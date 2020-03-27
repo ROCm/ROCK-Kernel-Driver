@@ -484,6 +484,16 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef DRM_NOTE
+#define DRM_NOTE(fmt, ...)						\
+	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
+#endif
+
+#ifndef DRM_NOTE_ONCE
+#define DRM_NOTE_ONCE(fmt, ...)						\
+	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
+#endif
+
 #ifndef DRM_ERROR
 #define DRM_ERROR(fmt, ...)                                            \
        drm_err(fmt, ##__VA_ARGS__)
