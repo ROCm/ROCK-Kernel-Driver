@@ -632,8 +632,12 @@ static void ttm_bo_release(struct kref *kref)
 	BUG_ON(bo->mem.mm_node != NULL);
 	atomic_dec(&ttm_bo_glob.bo_count);
 	dma_fence_put(bo->moving);
+#ifdef HAVE_DRM_GEM_OBJECT_RESV
 	if (!ttm_bo_uses_embedded_gem_object(bo))
 		dma_resv_fini(&amdkcl_ttm_resv(bo));
+#else
+	dma_resv_fini(&amdkcl_ttm_resv(bo));
+#endif
 	bo->destroy(bo);
 	ttm_mem_global_free(&ttm_mem_glob, acc_size);
 }
@@ -1306,6 +1310,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	} else {
 		amdkcl_ttm_resvp(bo) = &amdkcl_ttm_resv(bo);
 	}
+#ifdef HAVE_DRM_GEM_OBJECT_RESV
 	if (!ttm_bo_uses_embedded_gem_object(bo)) {
 		/*
 		 * bo.gem is not initialized, so we have to setup the
@@ -1314,6 +1319,9 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 		dma_resv_init(&amdkcl_ttm_resv(bo));
 		drm_vma_node_reset(&bo->base.vma_node);
 	}
+#else
+	dma_resv_init(&amdkcl_ttm_resv(bo));
+#endif
 	atomic_inc(&ttm_bo_glob.bo_count);
 
 	/*
