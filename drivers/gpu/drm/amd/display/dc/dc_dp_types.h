@@ -355,6 +355,12 @@ union downstream_port {
 	unsigned char raw;
 };
 
+/* These parameters are from PSR capabilities reported by Sink DPCD */
+struct psr_caps {
+	unsigned char psr_version;
+	unsigned int psr_rfb_setup_time;
+	bool psr_exit_link_training_required;
+};
 
 union sink_status {
 	struct {

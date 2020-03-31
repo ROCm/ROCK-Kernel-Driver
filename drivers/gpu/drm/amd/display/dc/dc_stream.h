@@ -173,8 +173,6 @@ struct dc_stream_state {
 
 	/* TODO: custom INFO packets */
 	/* TODO: ABM info (DMCU) */
-	/* PSR info */
-	unsigned char psr_version;
 	/* TODO: CEA VIC */
 
 	/* DMCU info */

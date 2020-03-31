@@ -1036,6 +1036,7 @@ struct dpcd_caps {
 	struct dpcd_dsc_capabilities dsc_caps;
 #endif
 	struct dc_lttpr_caps lttpr_caps;
+	struct psr_caps psr_caps;
 
 };
 
