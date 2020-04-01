@@ -991,7 +991,6 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 	 * local memory object
 	 */
 	idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
-		struct kfd_process_device *peer_pdd;
 
 		for (i = 0; i < p->n_pdds; i++) {
 			struct kfd_process_device *peer_pdd = p->pdds[i];
@@ -1665,6 +1664,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->sdma_past_activity_counter = 0;
 	pdd->user_gpu_id = dev->id;
 	atomic64_set(&pdd->evict_duration_counter, 0);
+	kfd_spm_init_process_device(pdd);
 
 	if (dev->shared_resources.enable_mes) {
 		retval = amdgpu_amdkfd_alloc_gtt_mem(dev->adev,
@@ -2083,24 +2083,24 @@ void kfd_process_schedule_restore(struct kfd_process *p)
 
 static void kfd_process_unmap_doorbells(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	struct mm_struct *mm = p->mm;
+	int i;
 
 	mmap_write_lock(mm);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		kfd_doorbell_unmap(pdd);
+	for (i = 0; i < p->n_pdds; i++)
+		kfd_doorbell_unmap(p->pdds[i]);
 
 	mmap_write_unlock(mm);
 }
 
 int kfd_process_remap_doorbells_locked(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	int ret = 0;
+	int i;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		ret = kfd_doorbell_remap(pdd);
+	for (i = 0; i < p->n_pdds; i++)
+		ret = kfd_doorbell_remap(p->pdds[i]);
 
 	return ret;
 }
@@ -2125,8 +2125,8 @@ static int kfd_process_remap_doorbells(struct kfd_process *p)
  */
 static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	bool busy = false;
+	int i;
 
 	if (!keep_idle_process_evicted)
 		return false;
@@ -2137,7 +2137,9 @@ static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
 	 */
 	kfd_process_unmap_doorbells(p);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		busy = check_if_queues_active(pdd->qpd.dqm, &pdd->qpd);
 		if (busy)
 			break;

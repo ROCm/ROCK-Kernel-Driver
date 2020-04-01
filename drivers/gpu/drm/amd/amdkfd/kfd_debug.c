@@ -57,7 +57,7 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct kfd_process_device *pdd;
+	int i;
 
 	if (!(process && process->debug_trap_enabled))
 		return -ENODATA;
@@ -88,7 +88,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 	}
 
 	/* find and report device events */
-	list_for_each_entry(pdd, &process->per_device_data, per_device_list) {
+	for (i = 0; i < process->n_pdds; i++) {
+		struct kfd_process_device *pdd = process->pdds[i];
 		uint64_t tmp = process->exception_enable_mask
 						& pdd->exception_status;
 
@@ -325,7 +326,6 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
  */
 static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int unwind_count)
 {
-	struct kfd_process_device *pdd;
 	int i, count = 0, resume_count;
 
 	if (!unwind) {
@@ -337,9 +337,8 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 		kfd_dbg_trap_set_precise_mem_ops(target, 0);
 	}
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		/* If this is an unwind, and we have unwound the required
 		 * enable calls on the pdd list, we need to stop now
@@ -403,12 +402,10 @@ int kfd_dbg_trap_disable(struct kfd_process *target)
 
 static int kfd_dbg_trap_activate(struct kfd_process *target)
 {
-	struct kfd_process_device *pdd;
 	int i, r = 0, unwind_count = 0;
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		/* Bind to prevent hang on reserve debug VMID during BACO. */
 		kfd_bind_process_to_device(pdd->dev, target);
@@ -545,8 +542,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t *trap_mask_prev,
 					uint32_t *trap_mask_supported)
 {
-	int r = 0;
-	struct kfd_process_device *pdd;
+	int r = 0, i;
 
 	r = kfd_dbg_validate_trap_override_request(target,
 						trap_override,
@@ -583,12 +579,10 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 					uint8_t wave_launch_mode)
 {
-	struct kfd_process_device *pdd;
 	int r = 0, i;
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
 		pdd->spi_dbg_launch_mode = pdd->dev->kfd2kgd->set_wave_launch_mode(
@@ -644,8 +638,7 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable)
 {
-	int r = 0;
-	struct kfd_process_device *pdd;
+	int r = 0, i;
 
 	if (!(enable == 0 || enable == 1)) {
 		pr_err("Invalid precise mem ops option: %i\n", enable);
