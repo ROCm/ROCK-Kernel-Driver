@@ -371,6 +371,15 @@ struct kfd_dev {
 	/* Compute Profile ref. count */
 	atomic_t compute_profile;
 
+	/*
+         * A bitmask to indicate which watch points have been allocated.
+         *   bit meaning:
+         *     0:  unallocated/available
+         *     1:  allocated/unavailable
+         */
+        uint32_t allocated_debug_watch_points;
+        spinlock_t watch_points_lock;
+
 	struct ida doorbell_ida;
 	unsigned int max_doorbell_slices;
 
@@ -1577,6 +1586,16 @@ int kfd_ipc_init(void);
 /* Compute profile */
 void kfd_inc_compute_active(struct kfd_node *dev);
 void kfd_dec_compute_active(struct kfd_node *dev);
+
+/* Allocate and free watch point IDs for debugger */
+int kfd_allocate_debug_watch_point(struct kfd_dev *kfd,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t *watch_point,
+					uint32_t watch_mode,
+					uint32_t debug_vmid);
+int kfd_release_debug_watch_points(struct kfd_dev *kfd,
+					uint32_t watch_point_bit_mask_to_free);
 
 /* Cgroup Support */
 /* Check with device cgroup if @kfd device is accessible */
