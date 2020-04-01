@@ -8388,7 +8388,7 @@ struct trace_array *trace_array_create(const char *name)
 
 	ret = event_trace_add_tracer(tr->dir, tr);
 	if (ret) {
-		tracefs_remove_recursive(tr->dir);
+		tracefs_remove(tr->dir);
 		goto out_free_tr;
 	}
 
@@ -8444,7 +8444,7 @@ static int __remove_instance(struct trace_array *tr)
 	event_trace_del_tracer(tr);
 	ftrace_clear_pids(tr);
 	ftrace_destroy_function_files(tr);
-	tracefs_remove_recursive(tr->dir);
+	tracefs_remove(tr->dir);
 	free_trace_buffers(tr);
 
 	for (i = 0; i < tr->nr_topts; i++) {

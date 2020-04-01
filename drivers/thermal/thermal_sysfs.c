@@ -772,6 +772,11 @@ void thermal_cooling_device_stats_update(struct thermal_cooling_device *cdev,
 
 	spin_lock(&stats->lock);
 
+	if (dev_WARN_ONCE(&cdev->device, new_state >= stats->max_states,
+			  "new state %ld exceeds max_state %ld",
+			  new_state, stats->max_states))
+		goto unlock;
+
 	if (stats->state == new_state)
 		goto unlock;
 
