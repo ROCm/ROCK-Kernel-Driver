@@ -1701,7 +1701,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
 	struct task_struct *thread = NULL;
-	int r = 0;
+	int r = 0, i;
 	struct kfd_process *target = NULL;
 	struct kfd_process_device *pdd = NULL;
 	struct pid *pid = NULL;
@@ -1822,11 +1822,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 	if (check_devices) {
-		struct kfd_process_device *pdd;
-
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
+		for (i = 0; i < target->n_pdds; i++) {
+			struct kfd_process_device *pdd = target->pdds[i];
 
 			if (!KFD_IS_SOC15(pdd->dev)) {
 				r = -ENODEV;
