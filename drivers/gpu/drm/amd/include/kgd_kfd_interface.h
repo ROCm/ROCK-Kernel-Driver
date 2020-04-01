@@ -311,6 +311,14 @@ struct kfd2kgd_calls {
 	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
+	void (*set_address_watch)(struct kgd_dev *kgd,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t watch_id,
+					uint32_t watch_mode,
+					uint32_t debug_vmid);
+	void (*clear_address_watch)(struct kgd_dev *kgd,
+			uint32_t watch_id);
 	void (*get_iq_wait_times)(struct kgd_dev *kgd,
 			uint32_t *wait_times);
 	void (*build_grace_period_packet_info)(struct kgd_dev *kgd,
