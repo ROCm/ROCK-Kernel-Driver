@@ -134,7 +134,7 @@ static struct slb_shadow * __init new_slb_shadow(int cpu, unsigned long limit)
 struct paca_struct **paca_ptrs __read_mostly;
 EXPORT_SYMBOL(paca_ptrs);
 
-void __init initialise_paca(struct paca_struct *new_paca, int cpu)
+void __init __nostackprotector initialise_paca(struct paca_struct *new_paca, int cpu)
 {
 #ifdef CONFIG_PPC_PSERIES
 	new_paca->lppaca_ptr = NULL;
@@ -163,7 +163,7 @@ void __init initialise_paca(struct paca_struct *new_paca, int cpu)
 }
 
 /* Put the paca pointer into r13 and SPRG_PACA */
-void setup_paca(struct paca_struct *new_paca)
+void __nostackprotector setup_paca(struct paca_struct *new_paca)
 {
 	/* Setup r13 */
 	local_paca = new_paca;
