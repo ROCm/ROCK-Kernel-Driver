@@ -2803,7 +2803,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
 	struct task_struct *thread = NULL;
-	int r = 0;
+	int r = 0, i;
 	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
 	uint32_t *user_array = NULL;
@@ -2910,11 +2910,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 	if (check_devices) {
-		struct kfd_process_device *pdd;
-
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
+		for (i = 0; i < target->n_pdds; i++) {
+			struct kfd_process_device *pdd = target->pdds[i];
 
 			if (pdd->dev->device_info->asic_family < CHIP_VEGA10) {
 				r = -ENODEV;

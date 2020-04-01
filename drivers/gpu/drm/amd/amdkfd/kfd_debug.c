@@ -126,7 +126,7 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct kfd_process_device *pdd;
+	int i;
 
 	if (!(process && process->debug_trap_enabled))
 		return -ENODATA;
@@ -155,7 +155,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 	}
 
 	/* find and report device events */
-	list_for_each_entry(pdd, &process->per_device_data, per_device_list) {
+	for (i = 0; i < process->n_pdds; i++) {
+		struct kfd_process_device *pdd = process->pdds[i];
 		uint64_t tmp = process->exception_enable_mask
 						& pdd->exception_status;
 
@@ -185,17 +186,14 @@ static int kfd_create_event_queue(struct kfd_process *process,
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct kfd_process_device *pdd;
-	int ret;
+	int ret, i;
 
 	if (!process)
 		return -ESRCH;
 
 	dbg_ev_priv->max_debug_events = 0;
-	list_for_each_entry(pdd,
-			&process->per_device_data,
-			per_device_list) {
-
+	for (i = 0; i < process->n_pdds; i++) {
+		struct kfd_process_device *pdd = process->pdds[i];
 		struct kfd_topology_device *tdev;
 
 		tdev = kfd_topology_device_by_id(pdd->dev->id);
@@ -233,6 +231,7 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 	struct kfd_debug_event_priv *dbg_ev_priv;
 	char fifo_output;
 	uint64_t ec_mask = KFD_EC_MASK(event_type);
+	int i;
 
 	if (!(process && process->debug_trap_enabled))
 		return;
@@ -263,10 +262,8 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 	}
 
 	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
-		struct kfd_process_device *pdd;
-
-		list_for_each_entry(pdd, &process->per_device_data,
-					per_device_list) {
+		for (i = 0; i < process->n_pdds; i++) {
+			struct kfd_process_device *pdd = process->pdds[i];
 
 			if (pdd->dev->id != source_id)
 				continue;
@@ -373,8 +370,7 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 		bool unwind,
 		int unwind_count)
 {
-	struct kfd_process_device *pdd;
-	int count = 0;
+	int count = 0, i;
 
 	kfd_release_debug_watch_points(target,
 				target->allocated_debug_watch_point_bitmask);
@@ -382,9 +378,8 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 	kfd_dbg_trap_set_wave_launch_mode(target, 0);
 	kfd_dbg_trap_set_precise_mem_ops(target, 0);
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		/* If this is an unwind, and we have unwound the required
 		 * enable calls on the pdd list, we need to stop now
@@ -416,16 +411,13 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 int kfd_dbg_trap_enable(struct kfd_process *target,
 		uint32_t *fd, uint32_t *ttmp_save)
 {
-	int r = 0;
-	struct kfd_process_device *pdd;
-	int unwind_count = 0;
+	int unwind_count = 0, r = 0, i;
 
 	if (target->debug_trap_enabled)
 		return -EINVAL;
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		/* Bind to prevent hang on reserve debug VMID during BACO. */
 		kfd_bind_process_to_device(pdd->dev, target);
@@ -474,13 +466,11 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t *trap_mask_prev,
 					uint32_t *trap_mask_supported)
 {
-	int r = 0;
-	struct kfd_process_device *pdd;
+	int r = 0, i;
 
 	/* FIXME: This assumes all GPUs are of the same type */
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		r = pdd->dev->kfd2kgd->set_wave_launch_trap_override(
 				pdd->dev->kgd,
@@ -503,11 +493,10 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 					uint8_t wave_launch_mode)
 {
-	struct kfd_process_device *pdd;
+	int i;
 
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		pdd->dev->kfd2kgd->set_wave_launch_mode(
 				pdd->dev->kgd,
@@ -564,14 +553,12 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable)
 {
-	int r = 0;
-	struct kfd_process_device *pdd;
+	int r = 0, i;
 
 	switch (enable) {
 	case 0:
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
+		for (i = 0; i < target->n_pdds; i++) {
+			struct kfd_process_device *pdd = target->pdds[i];
 
 			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
 					pdd->dev->kgd,
@@ -583,9 +570,8 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		break;
 	case 1:
 		/* FIXME: This assumes all GPUs are of the same type */
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
+		for (i = 0; i < target->n_pdds; i++) {
+			struct kfd_process_device *pdd = target->pdds[i];
 
 			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
 					pdd->dev->kgd,
@@ -614,7 +600,6 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 	int r = 0;
 	int i;
 	int watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
-	struct kfd_process_device *pdd;
 
 	if (!watch_point)
 		return -EFAULT;
@@ -644,7 +629,9 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 		goto out;
 	}
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		pdd->dev->kfd2kgd->set_address_watch(pdd->dev->kgd,
 				watch_address,
 				watch_address_mask,
@@ -661,9 +648,7 @@ out:
 static int kfd_release_debug_watch_points(struct kfd_process *p,
 		uint32_t watch_point_bit_mask_to_free)
 {
-	int r = 0;
-	int i;
-	struct kfd_process_device *pdd;
+	int r = 0, i, j;
 
 	spin_lock(&watch_points_lock);
 	if (~allocated_debug_watch_points & watch_point_bit_mask_to_free) {
@@ -680,14 +665,14 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 			watch_point_bit_mask_to_free);
 	allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
 
-	list_for_each_entry(pdd,
-			&p->per_device_data,
-			per_device_list) {
-		for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
-			if ((1<<i) & watch_point_bit_mask_to_free) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		for (j = 0; j < MAX_WATCH_ADDRESSES; j++)
+			if ((1<<j) & watch_point_bit_mask_to_free) {
 				pdd->dev->kfd2kgd->clear_address_watch(
 						pdd->dev->kgd,
-						i);
+						j);
 			}
 	}
 
