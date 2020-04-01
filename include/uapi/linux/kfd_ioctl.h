@@ -49,9 +49,10 @@
  * 1.5 - Fix ABA issue between queue snapshot and suspend
  * 2.0 - Return number of queues suspended/resumed and mask invalid/error
  *	 array slots
+ * 2.1 - Add Set Address Watch, and Clear Address Watch support.
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	2
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -324,12 +325,28 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT 6
 
 /* KFD_IOC_DBG_TRAP_GET_VERSION:
- * prt: unsused
+ * ptr: unsused
  * data1: major version (OUT)
  * data2: minor version (OUT)
  * data3: unused
  */
 #define KFD_IOC_DBG_TRAP_GET_VERSION	7
+
+/* KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
+ * ptr: unused
+ * data1: watch ID
+ * data2: unused
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH 8
+
+/* KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
+ * ptr:   Watch address
+ * data1: Watch ID (OUT)
+ * data2: watch_mode: 0=read, 1=nonread, 2=atomic, 3=all
+ * data3: watch address mask
+ */
+#define KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH 9
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */

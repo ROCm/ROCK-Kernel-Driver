@@ -1175,6 +1175,11 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 		/* New debugger for GFXv9 and later */
 		if (pdd->is_debugging_enabled) {
+			if (pdd->allocated_debug_watch_point_bitmask) {
+				kfd_release_debug_watch_points(dev,
+				    pdd->allocated_debug_watch_point_bitmask);
+				pdd->allocated_debug_watch_point_bitmask = 0;
+			}
 			if (pdd->debug_trap_enabled) {
 				dev->kfd2kgd->disable_debug_trap(dev->kgd);
 				pdd->debug_trap_enabled = false;

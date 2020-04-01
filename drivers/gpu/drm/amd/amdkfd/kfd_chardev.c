@@ -2767,6 +2767,9 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
+			kfd_release_debug_watch_points(dev,
+				pdd->allocated_debug_watch_point_bitmask);
+			pdd->allocated_debug_watch_point_bitmask = 0;
 			pdd->debug_trap_enabled = false;
 			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
 			fput(pdd->dbg_ev_file);
@@ -2869,6 +2872,38 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_GET_VERSION:
 		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
+		break;
+	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
+		/* check that we own watch id */
+		if (!((1<<data1) & pdd->allocated_debug_watch_point_bitmask)) {
+			pr_debug("Trying to free a watch point we don't own\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
+		kfd_release_debug_watch_points(dev, 1<<data1);
+		pdd->allocated_debug_watch_point_bitmask ^= (1<<data1);
+		break;
+	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
+		if (!args->ptr) {
+			pr_err("Invalid watch address option\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		r = kfd_allocate_debug_watch_point(dev,
+				args->ptr, /* watch address */
+				data3,     /* watch address mask */
+				&data1,    /* watch id */
+				data2,     /* watch mode */
+				dev->vm_info.last_vmid_kfd);
+		if (r)
+			goto unlock_out;
+
+		/* Save the watch id in our per-process area */
+		pdd->allocated_debug_watch_point_bitmask |= (1<<data1);
+
+		/* Save the watch point ID for the caller */
+		args->data1 = data1;
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
