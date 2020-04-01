@@ -2746,11 +2746,11 @@ static void copy_context_work_handler (struct work_struct *work)
 {
 	struct copy_context_work_handler_workarea *workarea;
 	struct mqd_manager *mqd_mgr;
-	struct kfd_process_device *pdd;
 	struct queue *q;
 	struct mm_struct *mm;
 	struct kfd_process *p;
 	uint32_t tmp_ctl_stack_used_size, tmp_save_area_used_size;
+	int i;
 
 	workarea = container_of(work,
 			struct copy_context_work_handler_workarea,
@@ -2763,7 +2763,8 @@ static void copy_context_work_handler (struct work_struct *work)
 		return;
 
 	kthread_use_mm(mm);
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 
@@ -2797,8 +2798,8 @@ int resume_queues(struct kfd_process *p,
 		uint32_t num_queues,
 		uint32_t *queue_ids)
 {
-	struct kfd_process_device *pdd;
 	int total_resumed = 0;
+	int i;
 
 	if (!resume_all_queues && queue_ids == NULL)
 		return -EINVAL;
@@ -2807,7 +2808,8 @@ int resume_queues(struct kfd_process *p,
 	if (!resume_all_queues)
 		q_array_invalidate(num_queues, queue_ids);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 		struct queue *q;
@@ -2875,13 +2877,14 @@ int suspend_queues(struct kfd_process *p,
 			uint64_t exception_clear_mask,
 			uint32_t *queue_ids)
 {
-	struct kfd_process_device *pdd;
 	int total_suspended = 0;
+	int i;
 
 	/* mask all queues as invalid.  umask on successful request */
 	q_array_invalidate(num_queues, queue_ids);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 		struct queue *q;
