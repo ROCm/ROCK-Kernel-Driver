@@ -326,6 +326,15 @@ struct kfd_dev {
 	/* Clients watching SMI events */
 	struct list_head smi_clients;
 	spinlock_t smi_lock;
+
+	/*
+	 * A bitmask to indicate which watch points have been allocated.
+	 *   bit meaning:
+	 *     0:  unallocated/available
+	 *     1:  allocated/unavailable
+	 */
+	uint32_t allocated_debug_watch_points;
+	spinlock_t watch_points_lock;
 };
 
 struct kfd_ipc_obj;
@@ -778,6 +787,9 @@ struct kfd_process_device {
 	/* Value of the wave launch mode if debugging is enabled */
 	uint32_t trap_debug_wave_launch_mode;
 
+	/* Allocated debug watch point IDs bitmask */
+	uint32_t allocated_debug_watch_point_bitmask;
+
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
 
@@ -1223,6 +1235,16 @@ int kfd_ipc_init(void);
 /* Compute profile */
 void kfd_inc_compute_active(struct kfd_dev *dev);
 void kfd_dec_compute_active(struct kfd_dev *dev);
+
+/* Allocate and free watch point IDs for debugger */
+int kfd_allocate_debug_watch_point(struct kfd_dev *kfd,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t *watch_point,
+					uint32_t watch_mode,
+					uint32_t debug_vmid);
+int kfd_release_debug_watch_points(struct kfd_dev *kfd,
+					uint32_t watch_point_bit_mask_to_free);
 
 /* Cgroup Support */
 /* Check with device cgroup if @kfd device is accessible */

@@ -68,6 +68,14 @@ uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
+void kgd_gfx_v9_set_address_watch(struct kgd_dev *kgd,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t watch_id,
+					uint32_t watch_mode,
+					uint32_t debug_vmid);
+void kgd_gfx_v9_clear_address_watch(struct kgd_dev *kgd,
+					uint32_t watch_id);
 void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd, uint32_t *wait_times);
 
 void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
