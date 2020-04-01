@@ -730,12 +730,6 @@ enum kfd_pdd_bound {
 
 /* Data that is per-process-per device. */
 struct kfd_process_device {
-	/*
-	 * List of all per-device data for a process.
-	 * Starts from kfd_process.per_device_data.
-	 */
-	struct list_head per_device_list;
-
 	/* The device that owns this data. */
 	struct kfd_dev *dev;
 
@@ -865,10 +859,11 @@ struct kfd_process {
 	u32 pasid;
 
 	/*
-	 * List of kfd_process_device structures,
+	 * Array of kfd_process_device pointers,
 	 * one for each device the process is using.
 	 */
-	struct list_head per_device_data;
+	struct kfd_process_device *pdds[MAX_GPU_INSTANCE];
+	uint32_t n_pdds;
 
 	struct process_queue_manager pqm;
 

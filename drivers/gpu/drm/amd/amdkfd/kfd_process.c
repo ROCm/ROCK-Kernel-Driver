@@ -520,7 +520,7 @@ static int kfd_sysfs_create_file(struct kfd_process *p, struct attribute *attr,
 static int kfd_procfs_add_sysfs_stats(struct kfd_process *p)
 {
 	int ret = 0;
-	struct kfd_process_device *pdd;
+	int i;
 	char stats_dir_filename[MAX_SYSFS_FILENAME_LEN];
 
 	if (!p)
@@ -535,7 +535,8 @@ static int kfd_procfs_add_sysfs_stats(struct kfd_process *p)
 	 * - proc/<pid>/stats_<gpuid>/evicted_ms
 	 * - proc/<pid>/stats_<gpuid>/cu_occupancy
 	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
 		struct kobject *kobj_stats;
 
 		snprintf(stats_dir_filename, MAX_SYSFS_FILENAME_LEN,
@@ -586,7 +587,7 @@ err:
 static int kfd_procfs_add_sysfs_files(struct kfd_process *p)
 {
 	int ret = 0;
-	struct kfd_process_device *pdd;
+	int i;
 
 	if (!p)
 		return -EINVAL;
@@ -599,7 +600,9 @@ static int kfd_procfs_add_sysfs_files(struct kfd_process *p)
 	 * - proc/<pid>/vram_<gpuid>
 	 * - proc/<pid>/sdma_<gpuid>
 	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		snprintf(pdd->vram_filename, MAX_SYSFS_FILENAME_LEN, "vram_%u",
 			 pdd->dev->id);
 		ret = kfd_sysfs_create_file(p, &pdd->attr_vram, pdd->vram_filename);
@@ -924,16 +927,17 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 	struct kfd_process *p = pdd->process;
 	struct kfd_bo *buf_obj;
 	int id;
+	int i;
 
 	/*
 	 * Remove all handles from idr and release appropriate
 	 * local memory object
 	 */
 	idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
-		struct kfd_process_device *peer_pdd;
 
-		list_for_each_entry(peer_pdd, &p->per_device_data,
-				    per_device_list) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *peer_pdd = p->pdds[i];
+
 			if (!peer_pdd->vm)
 				continue;
 			amdgpu_read_lock(peer_pdd->dev->ddev, false);
@@ -959,18 +963,19 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 
 static void kfd_process_free_outstanding_kfd_bos(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
+	int i;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		kfd_process_device_free_bos(pdd);
+	for (i = 0; i < p->n_pdds; i++)
+		kfd_process_device_free_bos(p->pdds[i]);
 }
 
 static void kfd_process_destroy_pdds(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd, *temp;
+	int i;
 
-	list_for_each_entry_safe(pdd, temp, &p->per_device_data,
-				 per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		pr_debug("Releasing pdd (topology id %d) for process (pasid 0x%x)\n",
 				pdd->dev->id, p->pasid);
 
@@ -982,8 +987,6 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		else if (pdd->vm)
 			amdgpu_amdkfd_gpuvm_destroy_process_vm(
 				pdd->dev->kgd, pdd->vm);
-
-		list_del(&pdd->per_device_list);
 
 		if (pdd->qpd.cwsr_kaddr && !pdd->qpd.cwsr_base)
 			free_pages((unsigned long)pdd->qpd.cwsr_kaddr,
@@ -1006,7 +1009,9 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		}
 
 		kfree(pdd);
+		p->pdds[i] = NULL;
 	}
+	p->n_pdds = 0;
 }
 
 /* No process locking is needed in this function, because the process
@@ -1018,7 +1023,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process *p = container_of(work, struct kfd_process,
 					     release_work);
-	struct kfd_process_device *pdd;
+	int i;
 
 	/* Remove the procfs files */
 	if (p->kobj) {
@@ -1027,7 +1032,9 @@ static void kfd_process_wq_release(struct work_struct *work)
 		kobject_put(p->kobj_queues);
 		p->kobj_queues = NULL;
 
-		list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *pdd = p->pdds[i];
+
 			sysfs_remove_file(p->kobj, &pdd->attr_vram);
 			sysfs_remove_file(p->kobj, &pdd->attr_sdma);
 			sysfs_remove_file(p->kobj, &pdd->attr_evict);
@@ -1096,7 +1103,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd = NULL;
+	int i;
 
 	/*
 	 * The kfd_process structure can not be free because the
@@ -1123,7 +1130,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	 * destroyed, which can race with the kfd_doorbell_close
 	 * vm_ops callback.
 	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
 		struct kfd_dev *dev = pdd->dev;
 
 		if (pdd->qpd.doorbell_vma)
@@ -1176,14 +1184,14 @@ static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
 int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep)
 {
 	unsigned long  offset;
-	struct kfd_process_device *pdd;
+	int i;
 
 	if (p->has_cwsr)
 		return 0;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		struct kfd_dev *dev = pdd->dev;
-		struct qcm_process_device *qpd = &pdd->qpd;
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_dev *dev = p->pdds[i]->dev;
+		struct qcm_process_device *qpd = &p->pdds[i]->qpd;
 
 		if (!dev->cwsr_enabled || qpd->cwsr_kaddr || qpd->cwsr_base)
 			continue;
@@ -1300,7 +1308,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	mutex_init(&process->mutex);
 	process->mm = thread->mm;
 	process->lead_thread = thread->group_leader;
-	INIT_LIST_HEAD(&process->per_device_data);
+	process->n_pdds = 0;
 	INIT_DELAYED_WORK(&process->eviction_work, evict_process_worker);
 	INIT_DELAYED_WORK(&process->restore_work, restore_process_worker);
 	process->last_restore_timestamp = get_jiffies_64();
@@ -1406,11 +1414,11 @@ static int init_doorbell_bitmap(struct qcm_process_device *qpd,
 struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p)
 {
-	struct kfd_process_device *pdd = NULL;
+	int i;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		if (pdd->dev == dev)
-			return pdd;
+	for (i = 0; i < p->n_pdds; i++)
+		if (p->pdds[i]->dev == dev)
+			return p->pdds[i];
 
 	return NULL;
 }
@@ -1420,6 +1428,8 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 {
 	struct kfd_process_device *pdd = NULL;
 
+	if (WARN_ON_ONCE(p->n_pdds >= MAX_GPU_INSTANCE))
+		return NULL;
 	pdd = kzalloc(sizeof(*pdd), GFP_KERNEL);
 	if (!pdd)
 		return NULL;
@@ -1449,8 +1459,8 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;
 	atomic64_set(&pdd->evict_duration_counter, 0);
-	list_add(&pdd->per_device_list, &p->per_device_data);
 	kfd_spm_init_process_device(pdd);
+	p->pdds[p->n_pdds++] = pdd;
 
 	/* Init idr used for memory handle translation */
 	idr_init(&pdd->alloc_idr);
@@ -1582,28 +1592,6 @@ out:
 	}
 
 	return ERR_PTR(err);
-}
-
-struct kfd_process_device *kfd_get_first_process_device_data(
-						struct kfd_process *p)
-{
-	return list_first_entry(&p->per_device_data,
-				struct kfd_process_device,
-				per_device_list);
-}
-
-struct kfd_process_device *kfd_get_next_process_device_data(
-						struct kfd_process *p,
-						struct kfd_process_device *pdd)
-{
-	if (list_is_last(&pdd->per_device_list, &p->per_device_data))
-		return NULL;
-	return list_next_entry(pdd, per_device_list);
-}
-
-bool kfd_has_process_device_data(struct kfd_process *p)
-{
-	return !(list_empty(&p->per_device_data));
 }
 
 /* Create specific handle mapped to mem from process local memory idr
@@ -1759,11 +1747,13 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
  */
 int kfd_process_evict_queues(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	int r = 0;
+	int i;
 	unsigned int n_evicted = 0;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		r = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
 							    &pdd->qpd);
 		if (r) {
@@ -1779,7 +1769,9 @@ fail:
 	/* To keep state consistent, roll back partial eviction by
 	 * restoring queues
 	 */
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		if (n_evicted == 0)
 			break;
 		if (pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
@@ -1795,10 +1787,12 @@ fail:
 /* kfd_process_restore_queues - Restore all user queues of a process */
 int kfd_process_restore_queues(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	int r, ret = 0;
+	int i;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		r = pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
 							      &pdd->qpd);
 		if (r) {
@@ -1833,24 +1827,24 @@ void kfd_process_schedule_restore(struct kfd_process *p)
 
 static void kfd_process_unmap_doorbells(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	struct mm_struct *mm = p->mm;
+	int i;
 
 	mmap_write_lock(mm);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		kfd_doorbell_unmap(pdd);
+	for (i = 0; i < p->n_pdds; i++)
+		kfd_doorbell_unmap(p->pdds[i]);
 
 	mmap_write_unlock(mm);
 }
 
 int kfd_process_remap_doorbells_locked(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	int ret = 0;
+	int i;
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
-		ret = kfd_doorbell_remap(pdd);
+	for (i = 0; i < p->n_pdds; i++)
+		ret = kfd_doorbell_remap(p->pdds[i]);
 
 	return ret;
 }
@@ -1875,8 +1869,8 @@ static int kfd_process_remap_doorbells(struct kfd_process *p)
  */
 static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
 {
-	struct kfd_process_device *pdd;
 	bool busy = false;
+	int i;
 
 	if (!keep_idle_process_evicted)
 		return false;
@@ -1887,7 +1881,9 @@ static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
 	 */
 	kfd_process_unmap_doorbells(p);
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
 		busy = check_if_queues_active(pdd->qpd.dqm, &pdd->qpd);
 		if (busy)
 			break;
