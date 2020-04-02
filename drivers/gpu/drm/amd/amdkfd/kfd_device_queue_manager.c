@@ -711,13 +711,12 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
  * called on multipe queues in a loop, so rather than locking/unlocking
  * multiple times, we will just keep the dqm locked for all of the calls.
  */
-static int resume_single_queue(struct device_queue_manager *dqm,
+static void resume_single_queue(struct device_queue_manager *dqm,
 				      struct qcm_process_device *qpd,
 				      struct queue *q)
 {
 	struct kfd_process_device *pdd;
 	uint64_t pd_base;
-	int retval = 0;
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
@@ -737,9 +736,8 @@ static int resume_single_queue(struct device_queue_manager *dqm,
 			qpd->mapped_gws_queue = true;
 		}
 	}
-
-	return retval;
 }
+
 static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
@@ -2370,14 +2368,9 @@ int resume_queues(struct kfd_process *p,
 					queue_ids) != QUEUE_NOT_FOUND) {
 				if (!q->properties.is_suspended)
 					continue;
-				r = resume_single_queue(dqm,
+				resume_single_queue(dqm,
 							&pdd->qpd,
 							q);
-				if (r) {
-					pr_err("Failed to resume process queues\n");
-					dqm_unlock(dqm);
-					return r;
-				}
 				queues_resumed_on_device = true;
 			}
 		}
