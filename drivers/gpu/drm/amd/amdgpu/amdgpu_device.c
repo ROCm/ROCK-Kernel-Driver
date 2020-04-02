@@ -3422,7 +3422,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 		drm_connector_list_iter_begin(dev, &iter);
 		drm_for_each_connector_iter(connector, &iter)
 #else
-		drm_for_each_connector(connector, dev)
+		list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
 #endif
 			drm_helper_connector_dpms(connector,
 						  DRM_MODE_DPMS_OFF);
@@ -3569,7 +3569,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 			drm_connector_list_iter_begin(dev, &iter);
 			drm_for_each_connector_iter(connector, &iter)
 #else
-			drm_for_each_connector(connector, dev)
+			list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
 #endif
 				drm_helper_connector_dpms(connector,
 							  DRM_MODE_DPMS_ON);
