@@ -1637,7 +1637,7 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_connector->connector_id == connector_id) {

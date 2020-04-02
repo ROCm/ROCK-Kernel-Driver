@@ -1042,7 +1042,7 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
@@ -2650,7 +2650,7 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
@@ -2790,7 +2790,7 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
@@ -3342,7 +3342,7 @@ static int dm_resume(struct amdgpu_ip_block *ip_block)
 	drm_connector_list_iter_begin(ddev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, ddev) {
+	list_for_each_entry(connector, &(ddev)->mode_config.connector_list, head) {
 #endif
 		if (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
