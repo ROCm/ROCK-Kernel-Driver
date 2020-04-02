@@ -9,4 +9,6 @@ KVM
 
    amd-memory-encryption
    cpuid
+   s390-pv
+   s390-pv-boot
    vcpu-requests
