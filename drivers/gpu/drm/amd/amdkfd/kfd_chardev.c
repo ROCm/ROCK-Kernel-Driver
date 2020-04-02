@@ -2625,7 +2625,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct kfd_dev *dev = NULL;
 	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
-	struct kfd_dbg_trap_watch_address watch_address;
 	uint32_t *queue_id_array = NULL;
 	uint32_t gpu_id;
 	uint32_t debug_trap_action;
@@ -2859,28 +2858,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_GET_VERSION:
 		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
-		break;
-	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
-		dev->kfd2kgd->clear_address_watch(dev->kgd, data1);
-		break;
-	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
-		if (!args->ptr) {
-			pr_err("Invalid watch address option\n");
-			r = -EINVAL;
-			goto unlock_out;
-		}
-		if (copy_from_user(&watch_address,
-				(struct kfd_dbg_trap_watch_address *) args->ptr,
-				sizeof(watch_address))) {
-			r = -EFAULT;
-			goto unlock_out;
-		}
-		dev->kfd2kgd->set_address_watch(dev->kgd,
-				watch_address.watch_address,
-				watch_address.watch_address_mask,
-				data1, /* watch id */
-				data2, /* watch mode */
-				dev->vm_info.last_vmid_kfd);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
