@@ -1892,9 +1892,11 @@ Type: vcpu ioctl
 Parameters: struct kvm_one_reg (in)
 Returns: 0 on success, negative value on failure
 Errors:
-  ENOENT:   no such register
-  EINVAL:   invalid register ID, or no such register
-  EPERM:    (arm64) register access not allowed before vcpu finalization
+  ENOENT   no such register
+  EINVAL   invalid register ID, or no such register or used with VMs in
+           protected virtualization mode on s390
+  EPERM    (arm64) register access not allowed before vcpu finalization
+
 (These error codes are indicative only: do not rely on a specific error
 code being returned in a specific situation.)
 
@@ -2285,9 +2287,11 @@ Type: vcpu ioctl
 Parameters: struct kvm_one_reg (in and out)
 Returns: 0 on success, negative value on failure
 Errors include:
-  ENOENT:   no such register
-  EINVAL:   invalid register ID, or no such register
-  EPERM:    (arm64) register access not allowed before vcpu finalization
+  ENOENT   no such register
+  EINVAL   invalid register ID, or no such register or used with VMs in
+           protected virtualization mode on s390
+  EPERM    (arm64) register access not allowed before vcpu finalization
+
 (These error codes are indicative only: do not rely on a specific error
 code being returned in a specific situation.)
 
