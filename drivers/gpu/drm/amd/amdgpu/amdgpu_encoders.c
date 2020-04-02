@@ -49,7 +49,7 @@ amdgpu_link_encoder_connector(struct drm_device *dev)
 	/* walk the list and link encoders to connectors */
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
@@ -79,8 +79,7 @@ void amdgpu_encoder_set_active_device(struct drm_encoder *encoder)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->encoder == encoder) {
 			struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
@@ -109,9 +108,8 @@ amdgpu_get_connector_for_encoder(struct drm_encoder *encoder)
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
-
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_encoder->active_device & amdgpu_connector->devices) {
@@ -140,7 +138,7 @@ amdgpu_get_connector_for_encoder_init(struct drm_encoder *encoder)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		if (amdgpu_encoder->devices & amdgpu_connector->devices) {
