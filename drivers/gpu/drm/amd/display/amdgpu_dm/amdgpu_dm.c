@@ -776,7 +776,7 @@ static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->audio_inst != port)
@@ -1732,7 +1732,7 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type == dc_connection_mst_branch &&
@@ -1817,7 +1817,7 @@ static void s3_handle_mst(struct drm_device *dev, bool suspend)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type != dc_connection_mst_branch ||
@@ -2354,7 +2354,7 @@ static int dm_resume(void *handle)
 	drm_connector_list_iter_begin(ddev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, ddev) {
+	list_for_each_entry(connector, &(ddev)->mode_config.connector_list, head) {
 #endif
 		aconnector = to_amdgpu_dm_connector(connector);
 

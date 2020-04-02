@@ -133,7 +133,7 @@ static void amdgpu_hotplug_work_func(struct work_struct *work)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
 #else
-	drm_for_each_connector(connector, dev)
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
 #endif
 		amdgpu_connector_hotplug(connector);
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN

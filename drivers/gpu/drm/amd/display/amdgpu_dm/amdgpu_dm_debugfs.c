@@ -3055,7 +3055,7 @@ static int mst_topo_show(struct seq_file *m, void *unused)
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->connector_type != DRM_MODE_CONNECTOR_DisplayPort)
 			continue;

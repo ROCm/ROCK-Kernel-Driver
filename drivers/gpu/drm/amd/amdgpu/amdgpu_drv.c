@@ -1731,7 +1731,7 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 		drm_connector_list_iter_begin(drm_dev, &iter);
 		drm_for_each_connector_iter(list_connector, &iter) {
 #else
-		drm_for_each_connector(list_connector, drm_dev) {
+		list_for_each_entry(list_connector, &(drm_dev)->mode_config.connector_list, head) {
 #endif
 			if (list_connector->dpms ==  DRM_MODE_DPMS_ON) {
 				ret = -EBUSY;

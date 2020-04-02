@@ -307,7 +307,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 		drm_connector_list_iter_begin(crtc->dev, &conn_iter);
 		drm_for_each_connector_iter(connector, &conn_iter) {
 #else
-		drm_for_each_connector(connector, crtc->dev) {
+		list_for_each_entry(connector, &(crtc->dev)->mode_config.connector_list, head) {
 #endif
 			if (!connector->state || connector->state->crtc != crtc)
 				continue;
