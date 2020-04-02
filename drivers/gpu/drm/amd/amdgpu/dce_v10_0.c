@@ -346,7 +346,7 @@ static void dce_v10_0_hpd_init(struct amdgpu_device *adev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 
@@ -409,7 +409,7 @@ static void dce_v10_0_hpd_fini(struct amdgpu_device *adev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		struct amdgpu_connector *amdgpu_connector = to_amdgpu_connector(connector);
 
@@ -1267,7 +1267,7 @@ static void dce_v10_0_audio_write_latency_fields(struct drm_encoder *encoder,
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->encoder == encoder) {
 			amdgpu_connector = to_amdgpu_connector(connector);
@@ -1322,7 +1322,7 @@ static void dce_v10_0_audio_write_speaker_allocation(struct drm_encoder *encoder
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->encoder == encoder) {
 			amdgpu_connector = to_amdgpu_connector(connector);
@@ -1400,7 +1400,7 @@ static void dce_v10_0_audio_write_sad_regs(struct drm_encoder *encoder)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		if (connector->encoder == encoder) {
 			amdgpu_connector = to_amdgpu_connector(connector);
