@@ -892,7 +892,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		struct amdgpu_dm_connector *amdgpu_dm_connector =
 				to_amdgpu_dm_connector(connector);
@@ -936,7 +936,7 @@ void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
 #else
-	drm_for_each_connector(connector, dev) {
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
 #endif
 		struct amdgpu_dm_connector *amdgpu_dm_connector =
 				to_amdgpu_dm_connector(connector);
