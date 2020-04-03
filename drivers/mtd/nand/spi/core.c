@@ -613,7 +613,6 @@ static int spinand_markbad(struct nand_device *nand, const struct nand_pos *pos)
 	};
 	int ret;
 
-	/* Erase block before marking it bad. */
 	ret = spinand_select_target(spinand, pos->target);
 	if (ret)
 		return ret;
@@ -621,8 +620,6 @@ static int spinand_markbad(struct nand_device *nand, const struct nand_pos *pos)
 	ret = spinand_write_enable_op(spinand);
 	if (ret)
 		return ret;
-
-	spinand_erase_op(spinand, pos);
 
 	return spinand_write_page(spinand, &req);
 }
