@@ -178,6 +178,7 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
 	struct page *page;
 	spinlock_t *ptl;
 	pte_t *ptep, pte;
+	int ret;
 
 retry:
 	if (unlikely(pmd_bad(*pmd)))
@@ -231,8 +232,6 @@ retry:
 		if (is_zero_pfn(pte_pfn(pte))) {
 			page = pte_page(pte);
 		} else {
-			int ret;
-
 			ret = follow_pfn_pte(vma, address, ptep, flags);
 			page = ERR_PTR(ret);
 			goto out;
@@ -240,7 +239,6 @@ retry:
 	}
 
 	if (flags & FOLL_SPLIT && PageTransCompound(page)) {
-		int ret;
 		get_page(page);
 		pte_unmap_unlock(ptep, ptl);
 		lock_page(page);
@@ -255,6 +253,18 @@ retry:
 	if (flags & FOLL_GET) {
 		if (unlikely(!try_get_page(page))) {
 			page = ERR_PTR(-ENOMEM);
+			goto out;
+		}
+	}
+	/*
+	 * We need to make the page accessible if and only if we are going
+	 * to access its content (the FOLL_GET case).
+	 */
+	if (flags & FOLL_GET) {
+		ret = arch_make_page_accessible(page);
+		if (ret) {
+			put_page(page);
+			page = ERR_PTR(ret);
 			goto out;
 		}
 	}
@@ -1848,6 +1858,17 @@ static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
 
 		VM_BUG_ON_PAGE(compound_head(page) != head, page);
 
+		/*
+		 * We need to make the page accessible if and only if we are
+		 * going to access its content (the FOLL_GET case).
+		 */
+		if (flags & FOLL_GET) {
+			ret = arch_make_page_accessible(page);
+			if (ret) {
+				put_page(page);
+				goto pte_unmap;
+			}
+		}
 		SetPageReferenced(page);
 		pages[*nr] = page;
 		(*nr)++;
