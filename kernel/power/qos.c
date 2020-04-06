@@ -862,6 +862,8 @@ EXPORT_SYMBOL_GPL(freq_qos_update_request);
  */
 int freq_qos_remove_request(struct freq_qos_request *req)
 {
+	int ret;
+
 	if (!req)
 		return -EINVAL;
 
@@ -869,7 +871,11 @@ int freq_qos_remove_request(struct freq_qos_request *req)
 		 "%s() called for unknown object\n", __func__))
 		return -EINVAL;
 
-	return freq_qos_apply(req, PM_QOS_REMOVE_REQ, PM_QOS_DEFAULT_VALUE);
+	ret = freq_qos_apply(req, PM_QOS_REMOVE_REQ, PM_QOS_DEFAULT_VALUE);
+	req->qos = NULL;
+	req->type = 0;
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(freq_qos_remove_request);
 
