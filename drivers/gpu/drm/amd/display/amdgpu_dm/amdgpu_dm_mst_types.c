@@ -41,7 +41,7 @@
 #include "amdgpu_dm_debugfs.h"
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dc/dcn20/dcn20_resource.h"
 #endif
 
@@ -147,7 +147,7 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 	.early_unregister = amdgpu_dm_mst_connector_early_unregister,
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
@@ -217,7 +217,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 			if (!validate_dsc_caps_on_connector(aconnector))
 				memset(&aconnector->dc_sink->dsc_caps,
 				       0, sizeof(aconnector->dc_sink->dsc_caps));
@@ -461,7 +461,7 @@ int dm_mst_get_pbn_divider(struct dc_link *link)
 			dc_link_get_link_cap(link)) / (8 * 1000 * 54);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;

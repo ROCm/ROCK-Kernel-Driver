@@ -233,7 +233,7 @@ struct dc_stream_status *dc_stream_get_status(
 
 static void delay_cursor_until_vupdate(struct pipe_ctx *pipe_ctx, struct dc *dc)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	unsigned int vupdate_line;
 	unsigned int lines_to_vupdate, us_to_vupdate, vpos, nvpos;
 	struct dc_stream_state *stream = pipe_ctx->stream;

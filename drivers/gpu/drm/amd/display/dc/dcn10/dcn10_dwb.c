@@ -23,7 +23,7 @@
  *
  */
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 
 #include "reg_helper.h"
 #include "resource.h"
