@@ -235,7 +235,7 @@ enum node_stat_item {
 	NR_SHMEM_THPS,
 	NR_SHMEM_PMDMAPPED,
 	NR_ANON_THPS,
-	NR_UNSTABLE_NFS,	/* NFS unstable pages */
+	NR_UNSTABLE_NFS,	/* NFS unstable pages - DEPRECATED DO NOT USE */
 	NR_VMSCAN_WRITE,
 	NR_VMSCAN_IMMEDIATE,	/* Prioritise for reclaim when writeback ends */
 	NR_DIRTIED,		/* page dirtyings since bootup */

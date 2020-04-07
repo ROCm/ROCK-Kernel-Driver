@@ -4973,7 +4973,7 @@ static long btrfs_ioctl_quota_rescan_status(struct file *file, void __user *arg)
 	if (!qsa)
 		return -ENOMEM;
 
-	if (fs_info->qgroup_rescan_ready || fs_info->qgroup_rescan_running) {
+	if (fs_info->qgroup_flags & BTRFS_QGROUP_STATUS_FLAG_RESCAN) {
 		qsa->flags = 1;
 		qsa->progress = fs_info->qgroup_rescan_progress.objectid;
 	}

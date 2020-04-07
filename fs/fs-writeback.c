@@ -1054,7 +1054,6 @@ static void bdi_split_work_to_wbs(struct backing_dev_info *bdi,
 static unsigned long get_nr_dirty_pages(void)
 {
 	return global_node_page_state(NR_FILE_DIRTY) +
-		global_node_page_state(NR_UNSTABLE_NFS) +
 		get_nr_dirty_inodes();
 }
 
