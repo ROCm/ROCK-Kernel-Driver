@@ -369,6 +369,9 @@ static int dt_cpufreq_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "failed register driver: %d\n", ret);
 
+	if (!ret)
+		cpufreq_disable_module_unload();
+
 	return ret;
 }
 
