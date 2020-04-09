@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/slab.h>
+#include <linux/cpufreq.h>
 
 /*
  * Setup the opps list with the divider for the max frequency, that
@@ -186,6 +187,8 @@ static int __init armada_8k_cpufreq_init(void)
 		goto remove_opp;
 
 	platform_set_drvdata(armada_8k_pdev, freq_tables);
+
+	cpufreq_disable_module_unload();
 
 	return 0;
 

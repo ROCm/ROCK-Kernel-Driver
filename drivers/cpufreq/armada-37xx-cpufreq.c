@@ -478,6 +478,8 @@ remove_opp:
 
 	kfree(armada37xx_cpufreq_state);
 
+	cpufreq_disable_module_unload();
+
 	return ret;
 }
 /* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
