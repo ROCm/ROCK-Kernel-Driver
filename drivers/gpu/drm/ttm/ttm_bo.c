@@ -364,7 +364,7 @@ bool ttm_bo_delayed_delete(struct ttm_device *bdev, bool remove_all)
 	INIT_LIST_HEAD(&removed);
 
 	spin_lock(&bdev->lru_lock);
-	while (!list_empty(&bdev->ddestroy)) {
+	while (!list_empty(&bdev->ddestroy) && !need_resched()) {
 		struct ttm_buffer_object *bo;
 
 		bo = list_first_entry(&bdev->ddestroy, struct ttm_buffer_object,
