@@ -28,8 +28,7 @@ config DRM_AMDGPU_USERPTR
 	bool "Always enable userptr write support"
 	depends on DRM_AMDGPU
 	depends on MMU
-	select HMM_MIRROR
-	select MMU_NOTIFIER
+	depends on HMM_MIRROR
 	help
 	  This option selects CONFIG_HMM and CONFIG_HMM_MIRROR if it
 	  isn't already selected to enabled full userptr support.
