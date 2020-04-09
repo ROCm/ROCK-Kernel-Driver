@@ -876,11 +876,10 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	struct mm_struct *mm = gtt->usertask->mm;
 	unsigned long start = gtt->userptr;
 	unsigned long end = start + ttm->num_pages * PAGE_SIZE;
-	struct vm_area_struct *vma = NULL, *vmas[MAX_NR_VMAS];
 	struct hmm_range *ranges;
-	unsigned long nr_pages, i;
+	struct vm_area_struct *vma = NULL, *vmas[MAX_NR_VMAS];
 	uint64_t *pfns, f;
-	int r = 0;
+	int r = 0, i, nr_pages;
 
 	if (!mm) /* Happens during process shutdown */
 		return -ESRCH;
@@ -956,14 +955,8 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	up_read(&mm->mmap_sem);
 
-	for (i = 0; i < ttm->num_pages; i++) {
+	for (i = 0; i < ttm->num_pages; i++)
 		pages[i] = hmm_pfn_to_page(&ranges[0], pfns[i]);
-		if (!pages[i]) {
-			pr_err("Page fault failed for pfn[%lu] = 0x%llx\n",
-			       i, pfns[i]);
-			goto out_invalid_pfn;
-		}
-	}
 	gtt->ranges = ranges;
 
 	return 0;
@@ -976,13 +969,6 @@ out:
 	up_read(&mm->mmap_sem);
 
 	return r;
-
-out_invalid_pfn:
-	for (i = 0; i < gtt->nr_ranges; i++)
-		hmm_vma_range_done(&ranges[i]);
-	kvfree(pfns);
-	kvfree(ranges);
-	return -ENOMEM;
 }
 
 /**
@@ -1027,7 +1013,7 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm)
  */
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
 {
-	unsigned long i;
+	unsigned i;
 
 	for (i = 0; i < ttm->num_pages; ++i)
 		ttm->pages[i] = pages ? pages[i] : NULL;
