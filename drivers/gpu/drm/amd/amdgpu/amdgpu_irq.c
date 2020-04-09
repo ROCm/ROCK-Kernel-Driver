@@ -273,7 +273,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		if (!r) {
 #endif
 			adev->irq.msi_enabled = true;
-			dev_dbg(adev->dev, "amdgpu: using MSI/MSI-X.\n");
+			dev_dbg(adev->dev, "using MSI/MSI-X.\n");
 		}
 	}
 
