@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0
+
+comment "Crypto library routines"
+
+config CRYPTO_LIB_ARC4
+	tristate
