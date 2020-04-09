@@ -25,6 +25,7 @@
 
 #include <linux/firmware.h>
 #include <linux/dma-mapping.h>
+#include <asm/cacheflush.h>
 
 #include "amdgpu.h"
 #include "amdgpu_psp.h"
