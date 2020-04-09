@@ -1792,14 +1792,15 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm,
 						   bo->tbo.ttm->pages);
 		if (ret) {
-			pr_debug("%s: Failed to get user pages: %d\n",
+			bo->tbo.ttm->pages[0] = NULL;
+			pr_info("%s: Failed to get user pages: %d\n",
 				__func__, ret);
-
-			/* Return error -EBUSY or -ENOMEM, retry restore */
-			return ret;
+			/* Pretend it succeeded. It will fail later
+			 * with a VM fault if the GPU tries to access
+			 * it. Better than hanging indefinitely with
+			 * stalled user mode queues.
+			 */
 		}
-
-		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
 
 		/* Mark the BO as valid unless it was invalidated
 		 * again concurrently.
@@ -1809,6 +1810,23 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 	}
 
 	return 0;
+}
+
+/* Remove invalid userptr BOs from hmm track list
+ *
+ * Stop HMM track the userptr update
+ */
+static void untrack_invalid_user_pages(struct amdkfd_process_info *process_info)
+{
+	struct kgd_mem *mem, *tmp_mem;
+	struct amdgpu_bo *bo;
+
+	list_for_each_entry_safe(mem, tmp_mem,
+				 &process_info->userptr_inval_list,
+				 validate_list.head) {
+		bo = mem->bo;
+		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
+	}
 }
 
 /* Validate invalid userptr BOs
@@ -1888,6 +1906,13 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 		list_move_tail(&mem->validate_list.head,
 			       &process_info->userptr_valid_list);
+
+		/* Stop HMM track the userptr update. We dont check the return
+		 * value for concurrent CPU page table update because we will
+		 * reschedule the restore worker if process_info->evicted_bos
+		 * is updated.
+		 */
+		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
 
 		/* Update mapping. If the BO was not validated
 		 * (because we couldn't get user pages), this will
@@ -1987,6 +2012,7 @@ static void amdgpu_amdkfd_restore_userptr_worker(struct work_struct *work)
 	}
 
 unlock_out:
+	untrack_invalid_user_pages(process_info);
 	mutex_unlock(&process_info->lock);
 	mmput(mm);
 	put_task_struct(usertask);
