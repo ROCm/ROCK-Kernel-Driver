@@ -439,6 +439,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	drm_connector_attach_encoder(&aconnector->base,
 				     &aconnector->mst_encoder->base);
 
+#if DRM_VERSION_CODE >= DRM_VERSION(5, 0, 0)
 	connector->max_bpc_property = master->base.max_bpc_property;
 	if (connector->max_bpc_property)
 		drm_connector_attach_max_bpc_property(connector, 8, 16);
@@ -446,6 +447,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	connector->vrr_capable_property = master->base.vrr_capable_property;
 	if (connector->vrr_capable_property)
 		drm_connector_attach_vrr_capable_property(connector);
+#endif
 
 	drm_object_attach_property(
 		&connector->base,
