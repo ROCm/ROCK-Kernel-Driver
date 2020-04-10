@@ -4,6 +4,7 @@ dnl #
 AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_KERNEL
 
+	AC_KERNEL_WAIT
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
 		KERNEL_MAKE="$KERNEL_MAKE O=$LINUX_OBJ"
 	])
@@ -164,7 +165,7 @@ dnl # fill in contents of conftest.h and $1 to conftest.c
 dnl # $1: contents to be filled in conftest.c
 dnl #
 AC_DEFUN([AC_KERNEL_CONFTEST_C], [
-cat confdefs.h - <<_ACEOF >conftest.c
+cat $ac_build_root_dir/confdefs.h - <<_ACEOF >conftest.c
 $1
 _ACEOF
 ])
@@ -197,16 +198,34 @@ dnl #
 AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
 	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
 	m4_ifvaln([$6], [AC_KERNEL_CONFTEST_H([$6])], [AC_KERNEL_CONFTEST_H([])])
-	rm -Rf build && mkdir -p build && touch build/conftest.mod.c
-	echo "obj-m := conftest.o" >build/Makefile
-	modpost_flag=''
-	test "x$enable_linux_builtin" = xyes && modpost_flag='modpost=true' # fake modpost stage
+	touch conftest.mod.c
+	echo "obj-m := conftest.o" >Makefile
+	kbuild_src_flag=''
+	kbuild_modpost_flag='KBUILD_MODPOST_NOFINAL=1 KBUILD_MODPOST_WARN=1'
+	kbuild_workaround_flag=''
+	test "x$enable_linux_builtin" = xyes && kbuild_src_flag='KBUILD_SRC=' # override KBUILD_SRC
+	test "x$enable_linux_builtin" = xyes && kbuild_workaround_flag='sub_make_done=' # override sub_make_done
 	AS_IF(
-		[AC_TRY_COMMAND(cp conftest.c conftest.h build && make [$2] -C $LINUX_OBJ EXTRA_CFLAGS="-Werror -Wno-error=uninitialized -Wno-error=unused-variable" M=$PWD/build $modpost_flag $kbuild_src_flag) >/dev/null && AC_TRY_COMMAND([$3])],
+		[AC_TRY_COMMAND(make [$2] -C $LINUX_OBJ EXTRA_CFLAGS="-Werror -Wno-error=uninitialized -Wno-error=unused-variable" M=$PWD $kbuild_src_flag $kbuild_workaround_flag $kbuild_modpost_flag) >/dev/null && AC_TRY_COMMAND([$3])],
 		[$4],
 		[_AC_MSG_LOG_CONFTEST m4_ifvaln([$5],[$5])]
 	)
-	rm -Rf build
+])
+
+dnl #
+dnl # AC_KERNEL_TMP_BUILD_DIR
+dnl # $1: contents to be executed in a temporary directory
+dnl #
+AC_DEFUN([AC_KERNEL_TMP_BUILD_DIR], [
+	local build_dir=$(mktemp -d -t build-XXXXXXXX -p .)
+	pushd $build_dir >/dev/null
+	$1
+	build_dir=$PWD
+	popd >/dev/null
+	AS_IF([test -s $build_dir/confdefs.h], [
+		cat $build_dir/confdefs.h >>$ac_build_root_dir/confdefs.h
+	])
+	rm -rf $build_dir
 ])
 
 dnl #
@@ -217,11 +236,15 @@ dnl # $3: run it if compile pass.
 dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
+	target='modules'
+	test "x$enable_linux_builtin" = xyes && target='conftest.o'
+	[AC_KERNEL_TMP_BUILD_DIR(
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
-	[modules],
-	[test -s build/conftest.o],
+	[$target],
+	[test -s conftest.o],
 	[$3], [$4])
+	])
 ])
 
 dnl #
@@ -322,3 +345,31 @@ AC_DEFUN([AC_KERNEL_TEST_HEADER_FILE_EXIST], [
 		$3
 	])
 ])
+
+dnl #
+dnl # AC_KERNEL_DO_BACKGROUND
+dnl # $1: contents to be executed
+dnl #
+AC_DEFUN([AC_KERNEL_DO_BACKGROUND], [
+	do_background() {
+		$1
+	}
+	do_background &
+	procs+=( "$!" )
+])
+
+dnl #
+dnl # AC_KERNEL_WAIT
+dnl # wait for all tests to be finished
+dnl #
+AC_DEFUN([AC_KERNEL_WAIT], [
+	AC_MSG_CHECKING([for module configuration])
+	wait ${procs[[@]]}
+	AS_IF([[[ $? -eq 0 ]]], [
+		AC_MSG_RESULT([done])
+	], [
+		AC_MSG_RESULT([failed])
+	])
+])
+
+ac_build_root_dir=$PWD
