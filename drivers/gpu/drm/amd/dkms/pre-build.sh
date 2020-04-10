@@ -2,6 +2,12 @@
 
 KERNELVER=$1
 KERNELVER_BASE=${KERNELVER%%-*}
+SRCTREE=/lib/modules/$KERNELVER/build
+SRCARCH=$(uname -m | sed -e "s/i.86/x86/" -e "s/x86_64/x86/" \
+        -e "s/sun4u/sparc64/" -e "s/arm.*/arm/" -e "s/sa110/arm/" \
+        -e "s/s390x/s390/" -e "s/parisc64/parisc/" \
+        -e "s/ppc.*/powerpc/" -e "s/mips.*/mips/" \
+        -e "s/sh[234].*/sh/" -e "s/aarch64.*/arm64/")
 
 version_lt () {
     newest=$((echo "$KERNELVER_BASE"; echo "$1") | sort -V | tail -n1)
@@ -50,4 +56,9 @@ for file in $FILES; do
 done
 
 export KERNELVER
-./configure
+CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
+	-I$SRCTREE/arch/$SRCARCH/include/generated \
+	-I$SRCTREE/include \
+	-I$SRCTREE/include/uapi \
+	-include linux/kconfig.h" \
+	./configure
