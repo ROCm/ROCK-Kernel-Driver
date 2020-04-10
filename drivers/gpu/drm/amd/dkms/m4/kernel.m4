@@ -345,6 +345,15 @@ AC_DEFUN([AC_KERNEL_TEST_HEADER_FILE_EXIST], [
 ])
 
 dnl #
+dnl # AC_KERNEL_CHECK_HEADERS
+dnl # check whether header file(s) is(are) present
+dnl # $1: header filei(s) to check
+dnl #
+AC_DEFUN([AC_KERNEL_CHECK_HEADERS], [
+	AC_CHECK_HEADERS([$1],[AS_TR_CPP([HAVE_$1])=1],,[-])
+])
+
+dnl #
 dnl # AC_KERNEL_DO_BACKGROUND
 dnl # $1: contents to be executed
 dnl #
