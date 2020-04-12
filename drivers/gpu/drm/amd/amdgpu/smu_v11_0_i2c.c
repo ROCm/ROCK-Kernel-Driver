@@ -621,11 +621,13 @@ static void unlock_bus(struct i2c_adapter *i2c, unsigned int flags)
 	control->bus_locked = false;
 }
 
+#if defined(HAVE_I2C_LOCK_OPERATIONS_STRUCT)
 static const struct i2c_lock_operations smu_v11_0_i2c_i2c_lock_ops = {
 	.lock_bus = lock_bus,
 	.trylock_bus = trylock_bus,
 	.unlock_bus = unlock_bus,
 };
+#endif
 
 static int smu_v11_0_i2c_eeprom_i2c_xfer(struct i2c_adapter *i2c_adap,
 			      struct i2c_msg *msgs, int num)
@@ -682,7 +684,9 @@ int smu_v11_0_i2c_eeprom_control_init(struct i2c_adapter *control)
 	control->dev.parent = &adev->pdev->dev;
 	control->algo = &smu_v11_0_i2c_eeprom_i2c_algo;
 	snprintf(control->name, sizeof(control->name), "AMDGPU EEPROM");
+#if defined(HAVE_I2C_LOCK_OPERATIONS_STRUCT)
 	control->lock_ops = &smu_v11_0_i2c_i2c_lock_ops;
+#endif
 
 	res = i2c_add_adapter(control);
 	if (res)
