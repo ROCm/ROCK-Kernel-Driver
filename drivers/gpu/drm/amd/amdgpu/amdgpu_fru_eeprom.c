@@ -20,8 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
-#include <linux/pci.h>
-
 #include "amdgpu.h"
 #include "amdgpu_i2c.h"
 #include "smu_v11_0_i2c.h"
@@ -33,16 +31,8 @@
 
 bool is_fru_eeprom_supported(struct amdgpu_device *adev)
 {
-	/* TODO: Gaming SKUs don't have the FRU EEPROM.
-	 * Use this hack to address hangs on modprobe on gaming SKUs
-	 * until a proper solution can be implemented by only supporting
-	 * it on Arcturus, and the explicit chip IDs for VG20 Server cards
-	 */
-	if ((adev->asic_type == CHIP_ARCTURUS) ||
-	    (adev->asic_type == CHIP_VEGA20 && adev->pdev->device == 0x66a0) ||
-	    (adev->asic_type == CHIP_VEGA20 && adev->pdev->device == 0x66a1) ||
-	    (adev->asic_type == CHIP_VEGA20 && adev->pdev->device == 0x66a4))
-		return true;
+	/* TODO: Resolve supported ASIC type */
+
 	return false;
 }
 
@@ -85,7 +75,7 @@ int amdgpu_fru_read_eeprom(struct amdgpu_device *adev, uint32_t addrptr,
 
 int amdgpu_fru_get_product_info(struct amdgpu_device *adev)
 {
-	unsigned char buff[34];
+	unsigned char buff[32];
 	int addrptr = 0, size = 0;
 
 	if (!is_fru_eeprom_supported(adev))
