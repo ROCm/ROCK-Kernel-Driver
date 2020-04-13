@@ -20,7 +20,7 @@
 #define PADATA_CPU_PARALLEL 0x02
 
 /**
- * struct padata_priv -  Embedded to the users data structure.
+ * struct padata_priv - Represents one job
  *
  * @list: List entry, to attach to the padata lists.
  * @pd: Pointer to the internal control structure.
@@ -43,7 +43,7 @@ struct padata_priv {
 };
 
 /**
- * struct padata_list
+ * struct padata_list - one per work type per CPU
  *
  * @list: List head.
  * @lock: List lock.
@@ -71,9 +71,6 @@ struct padata_serial_queue {
  *
  * @parallel: List to wait for parallelization.
  * @reorder: List to wait for reordering after parallel processing.
- * @serial: List to wait for serialization after reordering.
- * @pwork: work struct for parallelization.
- * @swork: work struct for serialization.
  * @work: work struct for parallelization.
  * @num_obj: Number of objects that are processed by this cpu.
  * @cpu_index: Index of the cpu.
@@ -101,12 +98,12 @@ struct padata_cpumask {
  * struct parallel_data - Internal control structure, covers everything
  * that depends on the cpumask in use.
  *
- * @sh: padata_shell object.
+ * @ps: padata_shell object.
  * @pqueue: percpu padata queues used for parallelization.
  * @squeue: percpu padata queues used for serialuzation.
  * @reorder_objects: Number of objects waiting in the reorder queues.
  * @refcnt: Number of objects holding a reference on this parallel_data.
- * @max_seq_nr:  Maximal used sequence number.
+ * @seq_nr: Sequence number of the parallelized data object.
  * @processed: Number of already processed objects.
  * @cpu: Next CPU to be processed.
  * @cpumask: The cpumasks in use for parallel and serial workers.
@@ -124,7 +121,7 @@ struct parallel_data {
 	int				cpu;
 	struct padata_cpumask		cpumask;
 	struct work_struct		reorder_work;
-	spinlock_t                      lock ____cacheline_aligned;
+	spinlock_t                      ____cacheline_aligned lock;
 };
 
 /**
@@ -147,7 +144,7 @@ struct padata_shell {
 /**
  * struct padata_instance - The overall control structure.
  *
- * @cpu_notifier: cpu hotplug notifier.
+ * @node: Used by CPU hotplug.
  * @parallel_wq: The workqueue used for parallel work.
  * @serial_wq: The workqueue used for serial work.
  * @pslist: List of padata_shell objects attached to this instance.
