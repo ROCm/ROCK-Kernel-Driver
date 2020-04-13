@@ -1,1 +1,9 @@
+linux/sched/mm.h kcl/kcl_sched_mm_h.h
+linux/sched/task.h kcl/kcl_sched_task_h.h
+uapi/linux/sched/types.h kcl/kcl_uapi_linux_sched_types_h.h
+linux/kfifo.h kcl/kcl_kfifo_h.h
+linux/bits.h kcl/kcl_bits_h.h
+asm/set_memory.h kcl/kcl_set_memory_h.h
+linux/sched/signal.h kcl/kcl_sched_signal_h.h
+linux/io-64-nonatomic-lo-hi.h kcl/kcl_linux_io_64_nonatomic_lo_hi_h.h
 
