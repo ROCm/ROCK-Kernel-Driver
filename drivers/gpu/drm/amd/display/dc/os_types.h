@@ -52,7 +52,11 @@
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #if defined(CONFIG_X86)
+#if defined(HAVE_ASM_FPU_API_H)
 #include <asm/fpu/api.h>
+#else
+#include <asm/i387.h>
+#endif
 #define DC_FP_START() kernel_fpu_begin()
 #define DC_FP_END() kernel_fpu_end()
 #elif defined(CONFIG_PPC64)
