@@ -1,0 +1,41 @@
+AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
+	dnl #
+	dnl # RHEL 7.x wrapper
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_backport.h])
+
+	dnl #
+	dnl # Optional devices ID for amdgpu driver
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/amdgpu_pciid.h])
+
+	dnl #
+	dnl # commit v4.9-rc2-477-gd8187177b0b1
+	dnl # drm: add helper for printing to log or seq_file
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_print.h])
+
+	dnl #
+	dnl # commit v5.0-rc1-342-gfcd70cd36b9b
+	dnl # drm: Split out drm_probe_helper.h
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_probe_helper.h])
+
+	dnl #
+	dnl # v5.4-rc1-214-g4e98f871bcff
+	dnl # drm: delete drmP.h + drm_os_linux.h
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drmP.h])
+
+	dnl #
+	dnl # commit v5.5-rc2-783-g368fd0aad1be
+	dnl # drm: Add Reusable task barrier.
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/task_barrier.h])
+
+	dnl #
+	dnl # v5.6-rc5-1258-gc6603c740e0e
+	dnl # drm: add managed resources tied to drm_device
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_managed.h])
+])
