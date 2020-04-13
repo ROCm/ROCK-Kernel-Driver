@@ -4,7 +4,8 @@ amdkcl-y += main.o symbols.o kcl_common.o
 amdkcl-y += kcl_kernel_params.o
 amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_kthread.o kcl_io.o kcl_perf_event.o \
-	kcl_suspend.o kcl_pci.o kcl_mm.o
+	kcl_suspend.o kcl_pci.o kcl_mm.o \
+	kcl_fence.o kcl_fence_array.o
 
 ccflags-y += \
 	-include $(src)/../dkms/config/config.h \
