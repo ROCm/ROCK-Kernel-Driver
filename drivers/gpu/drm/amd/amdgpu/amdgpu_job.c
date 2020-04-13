@@ -290,7 +290,11 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 	    (job->job_run_counter && job->gang_submit))
 		dma_fence_set_error(finished, -ECANCELED);
 
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
+	if (finished->status < 0) {
+#else
 	if (finished->error < 0) {
+#endif
 		DRM_INFO("Skip scheduling IBs!\n");
 	} else {
 		r = amdgpu_ib_schedule(ring, job->num_ibs, job->ibs, job,
