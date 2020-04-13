@@ -28,4 +28,6 @@ linux/interval_tree_generic.h kcl/kcl_interval_tree_generic.h
 linux/nospec.h kcl/kcl_nospec.h
 linux/pfn_t.h kcl/kcl_mm_types.h
 drm/task_barrier.h kcl/kcl_task_barrier.h
+linux/dma-fence.h kcl/backport/kcl_fence_backport.h
+linux/dma-fence-array.h kcl/backport/kcl_fence_backport.h
 
