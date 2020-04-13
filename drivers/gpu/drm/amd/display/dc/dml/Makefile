@@ -25,6 +25,16 @@
 # It provides the general basic services required by other DAL
 # subcomponents.
 
+ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
+AMDKCL_KBUILD_TAKE_PATH_DML=$(AMDDALPATH)/dc/dml/
+AMDKCL_KBUILD_TAKE_PATH_DML_DCN20=$(AMDDALPATH)/dc/dml/dcn20/
+AMDKCL_KBUILD_TAKE_PATH_DML_DCN21=$(AMDDALPATH)/dc/dml/dcn21/
+else
+AMDKCL_KBUILD_TAKE_PATH_DML=
+AMDKCL_KBUILD_TAKE_PATH_DML_DCN20=
+AMDKCL_KBUILD_TAKE_PATH_DML_DCN21=
+endif
+
 ifdef CONFIG_X86
 dml_ccflags := -mhard-float -msse
 endif
@@ -50,22 +60,22 @@ dml_ccflags += -msse2
 endif
 endif
 
-CFLAGS_$(AMDDALPATH)/dc/dml/display_mode_lib.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
 
 ifdef CONFIG_DRM_AMD_DC_DCN2_0
-CFLAGS_$(AMDDALPATH)/dc/dml/display_mode_vba.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20v2.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20v2.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_vba.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_ccflags)
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN2_1
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn21/display_mode_vba_21.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dcn21/display_rq_dlg_calc_21.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_ccflags)
 endif
-CFLAGS_$(AMDDALPATH)/dc/dml/dml1_display_rq_dlg_calc.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dml/dml_common_defs.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml_common_defs.o := $(dml_ccflags)
 
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
 	dml_common_defs.o

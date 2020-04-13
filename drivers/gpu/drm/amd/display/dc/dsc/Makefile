@@ -2,6 +2,12 @@
 #
 # Makefile for the 'dsc' sub-component of DAL.
 
+ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=$(AMDDALPATH)/dc/dsc/
+else
+AMDKCL_KBUILD_TAKE_PATH_CURRENT=
+endif
+
 ifdef CONFIG_X86
 dsc_ccflags := -mhard-float -msse
 endif
@@ -27,9 +33,9 @@ dsc_ccflags += -msse2
 endif
 endif
 
-CFLAGS_$(AMDDALPATH)/dc/dsc/rc_calc.o := $(dsc_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dsc/rc_calc_dpi.o := $(dsc_ccflags)
-CFLAGS_$(AMDDALPATH)/dc/dsc/dc_dsc.o := $(dsc_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rc_calc.o := $(dsc_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rc_calc_dpi.o := $(dsc_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dc_dsc.o := $(dsc_ccflags)
 
 DSC = dc_dsc.o rc_calc.o rc_calc_dpi.o
 
