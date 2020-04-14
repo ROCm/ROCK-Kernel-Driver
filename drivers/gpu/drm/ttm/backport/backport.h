@@ -3,4 +3,5 @@
 
 #include <linux/version.h>
 #include <kcl/reservation.h>
+#include <kcl/kcl_mm.h>
 #endif

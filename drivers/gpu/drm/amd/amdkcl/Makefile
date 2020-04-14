@@ -1,4 +1,4 @@
-amdkcl-y += main.o symbols.o kcl_mn.o kcl_reservation.o
+amdkcl-y += main.o symbols.o kcl_mn.o kcl_reservation.o kcl_memory.o
 
 ccflags-y += -include $(src)/../dkms/config/config.h
 
