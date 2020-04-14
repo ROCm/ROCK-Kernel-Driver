@@ -189,6 +189,15 @@ struct dm_pool_metadata {
 	sector_t data_block_size;
 
 	/*
+	 * Pre-commit callback.
+	 *
+	 * This allows the thin provisioning target to run a callback before
+	 * the metadata are committed.
+	 */
+	dm_pool_pre_commit_fn pre_commit_fn;
+	void *pre_commit_context;
+
+	/*
 	 * We reserve a section of the metadata for commit overhead.
 	 * All reported space does *not* include this.
 	 */
@@ -378,16 +387,15 @@ static int subtree_equal(void *context, const void *value1_le, const void *value
  * Variant that is used for in-core only changes or code that
  * shouldn't put the pool in service on its own (e.g. commit).
  */
-static inline void __pmd_write_lock(struct dm_pool_metadata *pmd)
+static inline void pmd_write_lock_in_core(struct dm_pool_metadata *pmd)
 	__acquires(pmd->root_lock)
 {
 	down_write(&pmd->root_lock);
 }
-#define pmd_write_lock_in_core(pmd) __pmd_write_lock((pmd))
 
 static inline void pmd_write_lock(struct dm_pool_metadata *pmd)
 {
-	__pmd_write_lock(pmd);
+	pmd_write_lock_in_core(pmd);
 	if (unlikely(!pmd->in_service))
 		pmd->in_service = true;
 }
@@ -822,9 +830,18 @@ static int __commit_transaction(struct dm_pool_metadata *pmd)
 	 * We need to know if the thin_disk_superblock exceeds a 512-byte sector.
 	 */
 	BUILD_BUG_ON(sizeof(struct thin_disk_superblock) > 512);
+	BUG_ON(!rwsem_is_locked(&pmd->root_lock));
 
 	if (unlikely(!pmd->in_service))
 		return 0;
+
+	if (pmd->pre_commit_fn) {
+		r = pmd->pre_commit_fn(pmd->pre_commit_context);
+		if (r < 0) {
+			DMERR("pre-commit callback failed");
+			return r;
+		}
+	}
 
 	r = __write_changed_details(pmd);
 	if (r < 0)
@@ -892,6 +909,8 @@ struct dm_pool_metadata *dm_pool_metadata_open(struct block_device *bdev,
 	pmd->in_service = false;
 	pmd->bdev = bdev;
 	pmd->data_block_size = data_block_size;
+	pmd->pre_commit_fn = NULL;
+	pmd->pre_commit_context = NULL;
 
 	r = __create_persistent_data_objects(pmd, format_device);
 	if (r) {
@@ -934,6 +953,7 @@ int dm_pool_metadata_close(struct dm_pool_metadata *pmd)
 		return -EBUSY;
 	}
 
+	pmd_write_lock_in_core(pmd);
 	if (!dm_bm_is_read_only(pmd->bm) && !pmd->fail_io) {
 		r = __commit_transaction(pmd);
 		if (r < 0)
@@ -942,6 +962,7 @@ int dm_pool_metadata_close(struct dm_pool_metadata *pmd)
 	}
 	if (!pmd->fail_io)
 		__destroy_persistent_data_objects(pmd);
+	pmd_write_unlock(pmd);
 
 	kfree(pmd);
 	return 0;
@@ -1822,7 +1843,7 @@ int dm_pool_commit_metadata(struct dm_pool_metadata *pmd)
 	 * Care is taken to not have commit be what
 	 * triggers putting the thin-pool in-service.
 	 */
-	__pmd_write_lock(pmd);
+	pmd_write_lock_in_core(pmd);
 	if (pmd->fail_io)
 		goto out;
 
@@ -2042,6 +2063,16 @@ int dm_pool_register_metadata_threshold(struct dm_pool_metadata *pmd,
 	pmd_write_unlock(pmd);
 
 	return r;
+}
+
+void dm_pool_register_pre_commit_callback(struct dm_pool_metadata *pmd,
+					  dm_pool_pre_commit_fn fn,
+					  void *context)
+{
+	pmd_write_lock_in_core(pmd);
+	pmd->pre_commit_fn = fn;
+	pmd->pre_commit_context = context;
+	pmd_write_unlock(pmd);
 }
 
 int dm_pool_metadata_set_needs_check(struct dm_pool_metadata *pmd)
