@@ -337,7 +337,16 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 	drm_fb_helper_prepare(adev_to_drm(adev), &rfbdev->helper,
 			      &amdgpu_fb_helper_funcs);
 
+#if defined(HAVE_DRM_FB_HELPER_INIT_2ARGS)
 	ret = drm_fb_helper_init(adev_to_drm(adev), &rfbdev->helper);
+#elif defined(HAVE_DRM_FB_HELPER_INIT_3ARGS)
+	ret = drm_fb_helper_init(adev_to_drm(adev), &rfbdev->helper,
+				 AMDGPUFB_CONN_LIMIT);
+#else
+	ret = drm_fb_helper_init(adev_to_drm(adev), &rfbdev->helper,
+				 adev->mode_info.num_crtc, AMDGPUFB_CONN_LIMIT);
+#endif
+
 	if (ret) {
 		kfree(rfbdev);
 		return ret;
