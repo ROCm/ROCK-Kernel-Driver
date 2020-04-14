@@ -113,6 +113,8 @@ static int tegra124_cpufreq_probe(struct platform_device *pdev)
 
 	of_node_put(np);
 
+	cpufreq_disable_module_unload();
+
 	return 0;
 
 out_put_pllp_clk:

@@ -57,6 +57,8 @@ static int raspberrypi_cpufreq_probe(struct platform_device *pdev)
 		goto remove_opp;
 	}
 
+	cpufreq_disable_module_unload();
+
 	return 0;
 
 remove_opp:

@@ -1923,7 +1923,6 @@ struct pci_fixup {
 #else
 	void (*hook)(struct pci_dev *dev);
 #endif
-	void* suse_kabi_padding;
 };
 
 enum pci_fixup_pass {
