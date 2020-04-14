@@ -169,14 +169,6 @@ void mddev_create_serial_pool(struct mddev *mddev, struct md_rdev *rdev,
 }
 EXPORT_SYMBOL_GPL(mddev_create_serial_pool);
 
-/* Just for KABI consistency */
-void mddev_create_wb_pool(struct mddev *mddev, struct md_rdev *rdev,
-			bool is_suspend)
-{
-	mddev_create_serial_pool(mddev, rdev, is_suspend);
-}
-EXPORT_SYMBOL_GPL(mddev_create_wb_pool);
-
 /*
  * Destroy serial_info_pool if rdev is the last device flaged with
  * CollisionCheck.

@@ -110,21 +110,13 @@ struct md_rdev {
 					   * in superblock.
 					   */
 
-#ifdef __GENKSYMS__
-	/*
-	 * The members for check collision of write behind IOs.
-	 */
-	struct list_head wb_list;
-	spinlock_t wb_list_lock;
-	wait_queue_head_t wb_io_wait;
-#else
 	/*
 	 * The members for check collision of write IOs.
 	 */
 	struct list_head serial_list;
 	spinlock_t serial_list_lock;
 	wait_queue_head_t serial_io_wait;
-#endif
+
 	struct work_struct del_work;	/* used for delayed sysfs removal */
 
 	struct kernfs_node *sysfs_state; /* handle for 'state'
@@ -498,20 +490,13 @@ struct mddev {
 					  */
 	struct work_struct flush_work;
 	struct work_struct event_work;	/* used by dm to report failure event */
-#ifdef __GENKSYMS__
-	mempool_t *wb_info_pool;
-#else
 	mempool_t *serial_info_pool;
-#endif
 	void (*sync_super)(struct mddev *mddev, struct md_rdev *rdev);
 	struct md_cluster_info		*cluster_info;
 	unsigned int			good_device_nr;	/* good device num within cluster raid */
 
 	bool	has_superblocks:1;
-
-#ifndef __GENKSYMS__
 	bool	fail_last_dev:1;
-#endif
 };
 
 enum recovery_flags {

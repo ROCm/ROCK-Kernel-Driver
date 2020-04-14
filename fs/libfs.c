@@ -19,9 +19,7 @@
 #include <linux/buffer_head.h> /* sync_mapping_buffers */
 #include <linux/fs_context.h>
 #include <linux/pseudo_fs.h>
-#ifndef __GENKSYMS__
 #include <linux/fsnotify.h>
-#endif
 
 #include <linux/uaccess.h>
 
