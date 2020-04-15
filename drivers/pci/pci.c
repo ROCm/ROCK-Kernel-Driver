@@ -1471,7 +1471,7 @@ void pci_restore_state(struct pci_dev *dev)
 	pci_restore_rebar_state(dev);
 	pci_restore_dpc_state(dev);
 
-	pci_cleanup_aer_error_status_regs(dev);
+	pci_aer_clear_status(dev);
 
 	pci_restore_config_space(dev);
 
