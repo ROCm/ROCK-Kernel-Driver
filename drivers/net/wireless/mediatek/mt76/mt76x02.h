@@ -117,7 +117,7 @@ struct mt76x02_dev {
 
 	bool no_2ghz;
 
-	u8 coverage_class;
+	s16 coverage_class;
 	u8 slottime;
 
 	struct mt76x02_dfs_pattern_detector dfs_pd;
