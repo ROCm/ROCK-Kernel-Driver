@@ -233,8 +233,6 @@ static int tegra186_cpufreq_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	cpufreq_disable_module_unload();
-
 	return 0;
 
 put_bpmp:
