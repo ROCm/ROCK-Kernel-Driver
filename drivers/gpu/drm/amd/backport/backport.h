@@ -22,5 +22,5 @@
 #include <kcl/kcl_workqueue.h>
 #include <kcl/kcl_backlight.h>
 #include <kcl/kcl_device.h>
-
+#include <kcl/kcl_fs.h>
 #endif /* AMDGPU_BACKPORT_H */
