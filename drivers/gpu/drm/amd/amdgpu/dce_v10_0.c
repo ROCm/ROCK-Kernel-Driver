@@ -2497,7 +2497,9 @@ static const struct drm_crtc_funcs dce_v10_0_crtc_funcs = {
 	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
 	.enable_vblank = amdgpu_enable_vblank_kms,
 	.disable_vblank = amdgpu_disable_vblank_kms,
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_vblank_timestamp = drm_crtc_vblank_helper_get_vblank_timestamp,
+#endif
 };
 
 static void dce_v10_0_crtc_dpms(struct drm_crtc *crtc, int mode)
@@ -2689,7 +2691,9 @@ static const struct drm_crtc_helper_funcs dce_v10_0_crtc_helper_funcs = {
 	.prepare = dce_v10_0_crtc_prepare,
 	.commit = dce_v10_0_crtc_commit,
 	.disable = dce_v10_0_crtc_disable,
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_scanout_position = amdgpu_crtc_get_scanout_position,
+#endif
 };
 
 static int dce_v10_0_crtc_init(struct amdgpu_device *adev, int index)
