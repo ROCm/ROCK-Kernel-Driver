@@ -962,8 +962,10 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 		return 0;
 	}
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (bo->tbo.base.import_attach)
 		dma_buf_pin(bo->tbo.base.import_attach);
+#endif
 
 	/* force to pin into visible video ram */
 	if (!(bo->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS))
@@ -1039,8 +1041,10 @@ void amdgpu_bo_unpin(struct amdgpu_bo *bo)
 
 	amdgpu_bo_subtract_pin_size(bo);
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (bo->tbo.base.import_attach)
 		dma_buf_unpin(bo->tbo.base.import_attach);
+#endif
 }
 
 /**
@@ -1292,9 +1296,11 @@ void amdgpu_bo_move_notify(struct ttm_buffer_object *bo,
 
 	amdgpu_bo_kunmap(abo);
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (abo->tbo.base.dma_buf && !abo->tbo.base.import_attach &&
 	    bo->mem.mem_type != TTM_PL_SYSTEM)
 		dma_buf_move_notify(abo->tbo.base.dma_buf);
+#endif
 
 	/* remember the eviction */
 	if (evict)
