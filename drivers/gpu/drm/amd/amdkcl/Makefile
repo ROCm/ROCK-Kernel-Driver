@@ -2,8 +2,7 @@
 amdkcl-y += main.o symbols.o kcl_common.o
 
 amdkcl-y += kcl_kernel_params.o
-
-amdkcl-y += kcl_backlight.o
+amdkcl-y += kcl_backlight.o kcl_ioctl.o
 
 ccflags-y += \
 	-include $(src)/../dkms/config/config.h \
