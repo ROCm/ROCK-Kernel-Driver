@@ -1376,6 +1376,10 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	dev->node_props.vendor_id = gpu->pdev->vendor;
 	dev->node_props.device_id = gpu->pdev->device;
+	dev->node_props.capability |=
+		((amdgpu_amdkfd_get_asic_rev_id(dev->gpu->kgd) <<
+			HSA_CAP_ASIC_REVISION_SHIFT) &
+			HSA_CAP_ASIC_REVISION_MASK);
 	dev->node_props.location_id = PCI_DEVID(gpu->pdev->bus->number,
 		gpu->pdev->devfn);
 	dev->node_props.domain = pci_domain_nr(gpu->pdev->bus);
