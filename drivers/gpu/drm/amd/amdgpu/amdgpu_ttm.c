@@ -1278,6 +1278,8 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm,
 	}
 
 	if (ttm->page_flags & TTM_PAGE_FLAG_SG) {
+#if defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) || \
+	defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
 		if (!ttm->sg) {
 			struct dma_buf_attachment *attach;
 			struct sg_table *sgt;
@@ -1289,6 +1291,7 @@ static int amdgpu_ttm_tt_populate(struct ttm_tt *ttm,
 
 			ttm->sg = sgt;
 		}
+#endif
 
 		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
 						 gtt->ttm.dma_address,
@@ -1326,6 +1329,8 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 		return;
 	}
 
+#if defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) || \
+	defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
 	if (ttm->sg && gtt->gobj->import_attach) {
 		struct dma_buf_attachment *attach;
 
@@ -1334,6 +1339,7 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 		ttm->sg = NULL;
 		return;
 	}
+#endif
 
 	if (ttm->page_flags & TTM_PAGE_FLAG_SG)
 		return;
