@@ -1969,7 +1969,6 @@ xlog_dealloc_log(
 /*
  * Update counters atomically now that memcpy is done.
  */
-/* ARGSUSED */
 static inline void
 xlog_state_finish_copy(
 	struct xlog		*log,
@@ -1977,16 +1976,11 @@ xlog_state_finish_copy(
 	int			record_cnt,
 	int			copy_bytes)
 {
-	spin_lock(&log->l_icloglock);
+	lockdep_assert_held(&log->l_icloglock);
 
 	be32_add_cpu(&iclog->ic_header.h_num_logops, record_cnt);
 	iclog->ic_offset += copy_bytes;
-
-	spin_unlock(&log->l_icloglock);
-}	/* xlog_state_finish_copy */
-
-
-
+}
 
 /*
  * print out info relating to regions written which consume
@@ -2268,7 +2262,9 @@ xlog_write_copy_finish(
 		 * This iclog has already been marked WANT_SYNC by
 		 * xlog_state_get_iclog_space.
 		 */
+		spin_lock(&log->l_icloglock);
 		xlog_state_finish_copy(log, iclog, *record_cnt, *data_cnt);
+		spin_unlock(&log->l_icloglock);
 		*record_cnt = 0;
 		*data_cnt = 0;
 		return xlog_state_release_iclog(log, iclog);
@@ -2279,11 +2275,11 @@ xlog_write_copy_finish(
 
 	if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
 		/* no more space in this iclog - push it. */
+		spin_lock(&log->l_icloglock);
 		xlog_state_finish_copy(log, iclog, *record_cnt, *data_cnt);
 		*record_cnt = 0;
 		*data_cnt = 0;
 
-		spin_lock(&log->l_icloglock);
 		xlog_state_want_sync(log, iclog);
 		spin_unlock(&log->l_icloglock);
 
@@ -2506,7 +2502,9 @@ next_lv:
 
 	ASSERT(len == 0);
 
+	spin_lock(&log->l_icloglock);
 	xlog_state_finish_copy(log, iclog, record_cnt, data_cnt);
+	spin_unlock(&log->l_icloglock);
 	if (!commit_iclog)
 		return xlog_state_release_iclog(log, iclog);
 
