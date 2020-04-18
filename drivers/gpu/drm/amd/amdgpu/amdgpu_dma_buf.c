@@ -519,10 +519,14 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 #endif
 
+	if (!IS_ERR(buf)) {
+#ifdef AMDKCL_DMA_BUF_SHARE_ADDR_SPACE
+		buf->file->f_mapping = gobj->dev->anon_inode->i_mapping;
+#endif
 #if defined(AMDKCL_AMDGPU_DMABUF_OPS)
-	if (!IS_ERR(buf))
 		buf->ops = &amdgpu_dmabuf_ops;
 #endif
+	}
 
 	return buf;
 }
