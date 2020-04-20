@@ -466,7 +466,7 @@ static int dm_blk_report_zones(struct gendisk *disk, sector_t sector,
 		return -EIO;
 
 	tgt = dm_table_find_target(map, sector);
-	if (!dm_target_is_valid(tgt)) {
+	if (!tgt) {
 		ret = -EIO;
 		goto out;
 	}
@@ -1086,7 +1086,7 @@ static struct dm_target *dm_dax_get_live_target(struct mapped_device *md,
 		return NULL;
 
 	ti = dm_table_find_target(map, sector);
-	if (!dm_target_is_valid(ti))
+	if (!ti)
 		return NULL;
 
 	return ti;
@@ -1586,7 +1586,7 @@ static int __split_and_process_non_flush(struct clone_info *ci)
 	int r;
 
 	ti = dm_table_find_target(ci->map, ci->sector);
-	if (!dm_target_is_valid(ti))
+	if (!ti)
 		return -EIO;
 
 	if (__process_abnormal_io(ci, ti, &r))
@@ -1762,7 +1762,7 @@ static blk_qc_t dm_process_bio(struct mapped_device *md,
 
 	if (!ti) {
 		ti = dm_table_find_target(map, bio->bi_iter.bi_sector);
-		if (unlikely(!ti || !dm_target_is_valid(ti))) {
+		if (unlikely(!ti)) {
 			bio_io_error(bio);
 			return ret;
 		}
