@@ -529,6 +529,7 @@ void clear_inode(struct inode *inode)
 	BUG_ON(!(inode->i_state & I_FREEING));
 	BUG_ON(inode->i_state & I_CLEAR);
 	BUG_ON(!list_empty(&inode->i_wb_list));
+	BUG_ON(!list_empty(&inode->i_io_list));
 	/* don't need i_lock here, no concurrent mods to i_state */
 	inode->i_state = I_FREEING | I_CLEAR;
 }
@@ -554,7 +555,13 @@ static void evict(struct inode *inode)
 	BUG_ON(!(inode->i_state & I_FREEING));
 	BUG_ON(!list_empty(&inode->i_lru));
 
-	if (!list_empty(&inode->i_io_list))
+	/*
+	 * We are the only holder of the inode so it cannot be marked dirty.
+	 * Flusher thread won't start new writeback but there can be still e.g.
+	 * redirty_tail() running from writeback_sb_inodes(). So we have to be
+	 * careful to remove inode from dirty/io list in all the cases.
+	 */
+	if (!list_empty_careful(&inode->i_io_list))
 		inode_io_list_del(inode);
 
 	inode_sb_list_del(inode);
