@@ -29,7 +29,6 @@
 #include "dc.h"
 #include "dc_types.h"
 #include "grph_object_defs.h"
-#include "dmub/inc/dmub_cmd_dal.h"
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_link_fec_state {
