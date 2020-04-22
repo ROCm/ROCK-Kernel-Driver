@@ -100,6 +100,7 @@ struct hw_sequencer_funcs {
 	void (*set_flip_control_gsl)(struct pipe_ctx *pipe_ctx,
 			bool flip_immediate);
 #endif
+	void (*cursor_lock)(struct dc *dc, struct pipe_ctx *pipe, bool lock);
 
 	/* Timing Related */
 	void (*get_position)(struct pipe_ctx **pipe_ctx, int num_pipes,
