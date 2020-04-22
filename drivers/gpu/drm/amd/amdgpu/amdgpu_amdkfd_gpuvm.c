@@ -1920,7 +1920,11 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 
 	adev = get_amdgpu_device(kgd);
 
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 	*dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
+#else
+	*dmabuf = amdgpu_gem_prime_export(adev->ddev, &mem->bo->tbo.base, 0);
+#endif
 	if (IS_ERR(*dmabuf))
 		return -EINVAL;
 
