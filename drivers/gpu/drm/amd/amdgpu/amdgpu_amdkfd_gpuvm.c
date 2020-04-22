@@ -2171,7 +2171,11 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
 		goto unlock_out;
 	}
 
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 	dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
+#else
+	dmabuf = amdgpu_gem_prime_export(adev_to_drm(adev), &mem->bo->tbo.base, 0);
+#endif
 	if (IS_ERR(dmabuf)) {
 		r = PTR_ERR(dmabuf);
 		goto unlock_out;
