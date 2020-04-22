@@ -13,8 +13,8 @@
 #define DEVCG_ACC_WRITE 4
 #endif
 
-#if defined(CONFIG_CGROUP_DEVICE)
 #ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
+#if defined(CONFIG_CGROUP_DEVICE)
 extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
 				short access);
 
@@ -30,6 +30,12 @@ static inline int _kcl_devcgroup_check_permission(short type, u32 major, u32 min
 
 	return __kcl_devcgroup_check_permission(type, major, minor, access);
 }
-#endif
-#endif
-#endif /*AMDKCL_DEVICE_CGROUP_H*/
+#else
+static inline int _kcl_devcgroup_check_permission(short type, u32 major, u32 minor,
+					short access)
+{
+	return 0;
+}
+#endif /* CONFIG_CGROUP_DEVICE */
+#endif /* HAVE_DEVCGROUP_CHECK_PERMISSION */
+#endif /* AMDKCL_DEVICE_CGROUP_H */

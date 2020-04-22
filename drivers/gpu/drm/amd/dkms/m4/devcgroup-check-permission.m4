@@ -1,5 +1,5 @@
 dnl #
-dnl # commit d16020d7429fffd47cfb2f3ab3b6b5b362108a6e
+dnl # commit v5.3-rc3-2427-g4b7d4d453fc4
 dnl # device_cgroup: Export devcgroup_check_permission
 dnl #
 AC_DEFUN([AC_AMDGPU_DEVCGROUP_CHECK_PERMISSION], [
