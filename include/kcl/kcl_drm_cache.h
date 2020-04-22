@@ -7,11 +7,16 @@
 bool drm_need_swiotlb(int dma_bits);
 #endif /* HAVE_DRM_NEED_SWIOTLB */
 
+/*
+ * v5.4-rc2-80-g268a2d600130 MIPS: Loongson64: Rename CPU TYPES
+ */
 static inline bool kcl_drm_arch_can_wc_memory(void)
 {
 #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
 	return false;
-#elif defined(CONFIG_MIPS) && defined(CONFIG_CPU_LOONGSON3)
+#elif defined(CONFIG_MIPS) && \
+	(defined(CONFIG_CPU_LOONGSON64) || defined(CPU_LOONGSON3))
+
 	return false;
 #elif defined(CONFIG_ARM) || defined(CONFIG_ARM64)
 	/*
@@ -35,5 +40,6 @@ static inline bool kcl_drm_arch_can_wc_memory(void)
 	return true;
 #endif
 }
+
 
 #endif /* AMDKCL_DRM_CACHE_H */
