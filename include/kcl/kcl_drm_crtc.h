@@ -105,4 +105,13 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 }
 #endif
 
+#ifndef HAVE_DRM_CRTC_FROM_INDEX
+struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx);
+static inline struct drm_crtc *
+drm_crtc_from_index(struct drm_device *dev, int idx)
+{
+	return _kcl_drm_crtc_from_index(dev, idx);
+}
+#endif
+
 #endif
