@@ -131,7 +131,7 @@ void dcn20_release_dsc(struct resource_context *res_ctx,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dcn20_validate_dsc(struct dc *dc, struct dc_state *new_ctx);
 #endif
-void dcn20_split_stream_for_mpc(
+bool dcn20_split_stream_for_mpc(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
 		struct pipe_ctx *primary_pipe,
