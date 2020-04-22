@@ -3543,6 +3543,7 @@ static const struct amdgpu_ring_funcs gfx_v6_0_ring_funcs_compute = {
 	.test_ib = gfx_v6_0_ring_test_ib,
 	.insert_nop = amdgpu_ring_insert_nop,
 	.emit_wreg = gfx_v6_0_ring_emit_wreg,
+	.emit_mem_sync = gfx_v6_0_emit_mem_sync,
 };
 
 static void gfx_v6_0_set_ring_funcs(struct amdgpu_device *adev)
