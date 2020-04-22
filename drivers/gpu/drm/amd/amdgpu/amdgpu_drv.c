@@ -1340,8 +1340,17 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
 		ddev->driver_features &= ~DRIVER_ATOMIC;
+#else
+	/* warn the user if they mix atomic and non-atomic capable GPUs */
+	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
+		DRM_ERROR("Mixing atomic and non-atomic capable GPUs!\n");
+	/* support atomic early so the atomic debugfs stuff gets created */
+	if (supports_atomic)
+		kms_driver.driver_features |= DRIVER_ATOMIC;
+#endif
 
 	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
@@ -1815,9 +1824,12 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 
 static const struct drm_driver amdgpu_kms_driver = {
 	.driver_features =
-	    DRIVER_ATOMIC |
-	    DRIVER_GEM |
-	    DRIVER_RENDER | DRIVER_MODESET
+	    0
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
+	    | DRIVER_ATOMIC
+#endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
+	    | DRIVER_GEM
+	    | DRIVER_RENDER | DRIVER_MODESET
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	    | DRIVER_SYNCOBJ
 #endif
