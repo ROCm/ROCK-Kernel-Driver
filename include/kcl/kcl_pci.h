@@ -44,6 +44,25 @@
 #ifndef PCI_EXP_DEVCTL2_ATOMIC_BLOCK
 #define PCI_EXP_DEVCTL2_ATOMIC_BLOCK	0x0040	/* Block AtomicOp on egress */
 #endif
+#ifndef PCI_EXP_LNKCTL2_ENTER_COMP
+#define  PCI_EXP_LNKCTL2_ENTER_COMP   0x0010 /* Enter Compliance */
+#endif
+#ifndef PCI_EXP_LNKCTL2_TX_MARGIN
+#define  PCI_EXP_LNKCTL2_TX_MARGIN    0x0380 /* Transmit Margin */
+#endif
+
+#ifndef PCI_EXP_LNKCTL2_TLS
+#define  PCI_EXP_LNKCTL2_TLS          0x000f
+#endif
+#ifndef PCI_EXP_LNKCTL2_TLS_2_5GT
+#define  PCI_EXP_LNKCTL2_TLS_2_5GT    0x0001 /* Supported Speed 2.5GT/s */
+#endif
+#ifndef PCI_EXP_LNKCTL2_TLS_5_0GT
+#define  PCI_EXP_LNKCTL2_TLS_5_0GT    0x0002 /* Supported Speed 5GT/s */
+#endif
+#ifndef PCI_EXP_LNKCTL2_TLS_8_0GT
+#define  PCI_EXP_LNKCTL2_TLS_8_0GT    0x0003 /* Supported Speed 8GT/s */
+#endif
 
 #ifndef PCIE_SPEED_16_0GT
 #define PCIE_SPEED_16_0GT		0x17
