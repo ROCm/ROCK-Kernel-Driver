@@ -2093,8 +2093,8 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 			}
 
 			if (state.bp_scratch) {
-				WARN("%s uses BP as a scratch register",
-				     func->name);
+				WARN_FUNC("BP used as a scratch register",
+					  insn->sec, insn->offset);
 				return 1;
 			}
 
