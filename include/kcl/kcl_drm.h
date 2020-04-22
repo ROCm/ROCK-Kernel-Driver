@@ -167,6 +167,15 @@ extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
+#ifndef HAVE_DRM_CRTC_FROM_INDEX
+struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx);
+static inline struct drm_crtc *
+drm_crtc_from_index(struct drm_device *dev, int idx)
+{
+	return _kcl_drm_crtc_from_index(dev, idx);
+}
+#endif
+
 #if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
 #if !defined(IS_REACHABLE)
 #define __ARG_PLACEHOLDER_1 0,
