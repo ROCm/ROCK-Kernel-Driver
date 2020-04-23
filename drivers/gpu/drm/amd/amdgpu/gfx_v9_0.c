@@ -3862,7 +3862,9 @@ static int gfx_v9_0_cp_resume(struct amdgpu_device *adev)
 
 	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
 		ring = &adev->gfx.compute_ring[i];
-		amdgpu_ring_test_helper(ring);
+		r = amdgpu_ring_test_helper(ring);
+		if (r)
+			return r;
 	}
 
 	gfx_v9_0_enable_gui_idle_interrupt(adev, true);
