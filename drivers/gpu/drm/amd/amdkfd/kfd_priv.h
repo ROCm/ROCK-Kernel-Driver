@@ -999,6 +999,7 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 					uint64_t last_addr);
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
+void run_rdma_free_callback(struct kfd_bo *buf_obj);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* Process device data iterator */
@@ -1266,6 +1267,10 @@ void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type);
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 bool kfd_is_locked(void);
+
+/* PeerDirect support */
+void kfd_init_peer_direct(void);
+void kfd_close_peer_direct(void);
 
 /* IPC Support */
 int kfd_ipc_init(void);
