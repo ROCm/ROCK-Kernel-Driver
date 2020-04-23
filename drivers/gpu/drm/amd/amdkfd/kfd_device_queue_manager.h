@@ -223,6 +223,8 @@ unsigned int get_queues_per_pipe(struct device_queue_manager *dqm);
 unsigned int get_pipes_per_mec(struct device_queue_manager *dqm);
 unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 unsigned int get_num_xgmi_sdma_queues(struct device_queue_manager *dqm);
+bool check_if_queues_active(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd);
 int reserve_debug_trap_vmid(struct device_queue_manager *dqm);
 int release_debug_trap_vmid(struct device_queue_manager *dqm);
 int suspend_queues(struct kfd_process *p,

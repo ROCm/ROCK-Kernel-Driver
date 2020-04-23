@@ -42,6 +42,31 @@ static inline struct cik_sdma_rlc_registers *get_sdma_mqd(void *mqd)
 	return (struct cik_sdma_rlc_registers *)mqd;
 }
 
+static bool check_sdma_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	struct cik_sdma_rlc_registers *m = get_sdma_mqd(q->mqd);
+
+	rptr = m->sdma_rlc_rb_rptr;
+	wptr = m->sdma_rlc_rb_wptr;
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+
+	return (rptr != wptr);
+}
+
+static bool check_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	struct cik_mqd *m = get_mqd(q->mqd);
+
+	rptr = m->cp_hqd_pq_rptr;
+	wptr = m->cp_hqd_pq_wptr;
+
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+
+	return (rptr != wptr);
+}
+
 static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
@@ -392,6 +417,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct cik_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -405,6 +431,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct cik_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -419,6 +446,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct cik_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -432,6 +460,7 @@ struct mqd_manager *mqd_manager_init_cik(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_sdma;
 		mqd->destroy_mqd = destroy_mqd_sdma;
 		mqd->is_occupied = is_occupied_sdma;
+		mqd->check_queue_active = check_sdma_queue_active;
 		mqd->mqd_size = sizeof(struct cik_sdma_rlc_registers);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd_sdma;

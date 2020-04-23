@@ -44,6 +44,45 @@ static inline struct vi_sdma_mqd *get_sdma_mqd(void *mqd)
 	return (struct vi_sdma_mqd *)mqd;
 }
 
+static bool check_sdma_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	struct vi_sdma_mqd *m = get_sdma_mqd(q->mqd);
+
+	rptr = m->sdmax_rlcx_rb_rptr;
+	wptr = m->sdmax_rlcx_rb_wptr;
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+
+	return (rptr != wptr);
+}
+
+static bool check_queue_active(struct queue *q)
+{
+	uint32_t rptr, wptr;
+	uint32_t cntl_stack_offset, cntl_stack_size;
+	struct vi_mqd *m = get_mqd(q->mqd);
+
+	rptr = m->cp_hqd_pq_rptr;
+	wptr = m->cp_hqd_pq_wptr;
+	cntl_stack_offset = m->cp_hqd_cntl_stack_offset;
+	cntl_stack_size = m->cp_hqd_cntl_stack_size;
+
+	pr_debug("rptr=%d, wptr=%d\n", rptr, wptr);
+	pr_debug("m->cp_hqd_cntl_stack_offset=0x%08x\n", cntl_stack_offset);
+	pr_debug("m->cp_hqd_cntl_stack_size=0x%08x\n", cntl_stack_size);
+
+	if ((rptr == 0 && wptr == 0) ||
+		cntl_stack_offset == 0xffffffff ||
+		cntl_stack_size > 0x5000)
+		return false;
+
+	/* Process is idle if both conditions are meet:
+	 * queue's rptr equals to wptr
+	 * control stack is empty, cntl_stack_offset = cntl_stack_size
+	 */
+	return (rptr != wptr || cntl_stack_offset != cntl_stack_size);
+}
+
 static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 			struct queue_properties *q)
 {
@@ -438,6 +477,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
 		mqd->get_wave_state = get_wave_state;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct vi_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -451,6 +491,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct vi_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -465,6 +506,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_hiq;
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
+		mqd->check_queue_active = check_queue_active;
 		mqd->mqd_size = sizeof(struct vi_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd;
@@ -478,6 +520,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->update_mqd = update_mqd_sdma;
 		mqd->destroy_mqd = destroy_mqd_sdma;
 		mqd->is_occupied = is_occupied_sdma;
+		mqd->check_queue_active = check_sdma_queue_active;
 		mqd->mqd_size = sizeof(struct vi_sdma_mqd);
 #if defined(CONFIG_DEBUG_FS)
 		mqd->debugfs_show_mqd = debugfs_show_mqd_sdma;
