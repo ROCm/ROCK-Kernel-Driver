@@ -743,6 +743,13 @@ bool no_system_mem_limit;
 module_param(no_system_mem_limit, bool, 0644);
 MODULE_PARM_DESC(no_system_mem_limit, "disable system memory limit (false = default)");
 
+/**
+ * DOC: priv_cp_queues (int)
+ * Enable privileged mode for CP queues. Default value: 0 (off)
+ */
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 #endif
 
 /**
