@@ -47,6 +47,11 @@
 #define HSA_CAP_DOORBELL_TYPE_1_0		0x1
 #define HSA_CAP_DOORBELL_TYPE_2_0		0x2
 #define HSA_CAP_AQL_QUEUE_DOUBLE_MAP		0x00004000
+#define HSA_CAP_TRAP_DEBUG_SUPPORT				0x00008000
+#define HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED	0x00010000
+#define HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED		0x00020000
+
+#define HSA_DBG_TRAP_DEBUG_TRAP_DATA_COUNT			0x00008000
 
 #define HSA_CAP_SRAM_EDCSUPPORTED		0x00080000
 #define HSA_CAP_MEM_EDCSUPPORTED		0x00100000
@@ -63,6 +68,7 @@ struct kfd_node_properties {
 	uint32_t cpu_core_id_base;
 	uint32_t simd_id_base;
 	uint32_t capability;
+	uint64_t debug_prop;
 	uint32_t max_waves_per_simd;
 	uint32_t lds_size_in_kb;
 	uint32_t gds_size_in_kb;

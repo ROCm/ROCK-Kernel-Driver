@@ -676,6 +676,11 @@ bool amdgpu_amdkfd_have_atomics_support(struct kgd_dev *kgd)
 	return adev->have_atomics_support;
 }
 
+void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd)
+{
+	amdgpu_asic_flush_hdp((struct amdgpu_device *) kgd, NULL);
+}
+
 #ifndef CONFIG_HSA_AMD
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
 {

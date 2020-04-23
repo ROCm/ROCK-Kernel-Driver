@@ -22,8 +22,12 @@
 
 #include "kfd_priv.h"
 #include "kfd_events.h"
+#include "kfd_debug_events.h"
 #include "soc15_int.h"
 #include "kfd_device_queue_manager.h"
+
+#define KFD_CONTEXT_ID_DEBUG_TRAP_MASK		0x000080
+#define KFD_CONTEXT_ID_DEBUG_DOORBELL_MASK	0x0003ff
 
 static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry,
@@ -87,21 +91,29 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry)
 {
 	uint16_t source_id, client_id, pasid, vmid;
-	uint32_t context_id;
+	uint32_t context_id0, context_id1;
 
 	source_id = SOC15_SOURCE_ID_FROM_IH_ENTRY(ih_ring_entry);
 	client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
-	context_id = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
+	context_id0 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
+	context_id1 = SOC15_CONTEXT_ID1_FROM_IH_ENTRY(ih_ring_entry);
 
 	if (source_id == SOC15_INTSRC_CP_END_OF_PIPE)
-		kfd_signal_event_interrupt(pasid, context_id, 32);
+		kfd_signal_event_interrupt(pasid, context_id0, 32);
 	else if (source_id == SOC15_INTSRC_SDMA_TRAP)
-		kfd_signal_event_interrupt(pasid, context_id & 0xfffffff, 28);
-	else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG)
-		kfd_signal_event_interrupt(pasid, context_id & 0xffffff, 24);
-	else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
+		kfd_signal_event_interrupt(pasid, context_id0 & 0xfffffff, 28);
+	else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG) {
+		if (context_id1 & KFD_CONTEXT_ID_DEBUG_TRAP_MASK) {
+			kfd_set_dbg_ev_from_interrupt(dev, pasid,
+					context_id0 &
+					KFD_CONTEXT_ID_DEBUG_DOORBELL_MASK,
+					false);
+		} else
+			kfd_signal_event_interrupt(pasid,
+						   context_id0 & 0xffffff, 24);
+	} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
 		kfd_signal_hw_exception_event(pasid);
 	else if (client_id == SOC15_IH_CLIENTID_VMC ||
 		client_id == SOC15_IH_CLIENTID_VMC1 ||
@@ -117,6 +129,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		info.prot_read  = ring_id & 0x10;
 		info.prot_write = ring_id & 0x20;
 
+		kfd_set_dbg_ev_from_interrupt(dev, pasid, -1, true);
 		kfd_process_vm_fault(dev->dqm, pasid);
 		kfd_signal_vm_fault_event(dev, pasid, &info);
 	}
