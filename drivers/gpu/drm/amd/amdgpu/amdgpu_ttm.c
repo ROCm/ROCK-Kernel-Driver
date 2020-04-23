@@ -2116,11 +2116,10 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		struct sysinfo si;
 
 		si_meminfo(&si);
-		gtt_size = min(max((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
-			       adev->gmc.mc_vram_size),
-			       ((uint64_t)si.totalram * si.mem_unit * 3/4));
-	}
-	else
+		gtt_size = max3((AMDGPU_DEFAULT_GTT_SIZE_MB << 20),
+				adev->gmc.mc_vram_size,
+				((uint64_t)si.totalram * si.mem_unit));
+	} else
 		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
 
 	/* reserve for DGMA import domain */
