@@ -429,6 +429,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 {
 	struct kfd_topology_device *dev;
 	uint32_t log_max_watch_addr;
+	struct kfd_local_mem_info local_mem_info;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
@@ -532,8 +533,19 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		sysfs_show_32bit_prop(buffer, "max_engine_clk_fcompute",
 			dev->node_props.max_engine_clk_fcompute);
 
-		sysfs_show_64bit_prop(buffer, "local_mem_size",
-				(unsigned long long int) 0);
+		/*
+		 * If the ASIC is APU except Kaveri, set local memory size
+		 * to 0 to disable local memory support
+		 */
+		if (!dev->gpu->device_info->needs_iommu_device
+			|| dev->gpu->device_info->asic_family == CHIP_KAVERI) {
+			amdgpu_amdkfd_get_local_mem_info(dev->gpu->kgd,
+				&local_mem_info);
+			sysfs_show_64bit_prop(buffer, "local_mem_size",
+					local_mem_info.local_mem_size_private +
+					local_mem_info.local_mem_size_public);
+		} else
+			sysfs_show_64bit_prop(buffer, "local_mem_size", 0ULL);
 
 		sysfs_show_32bit_prop(buffer, "fw_version",
 				dev->gpu->mec_fw_version);
