@@ -37,6 +37,7 @@
  */
 uint64_t amdgpu_amdkfd_total_mem_size;
 
+extern bool pcie_p2p;
 static bool kfd_initialized;
 
 int amdgpu_amdkfd_init(void)
