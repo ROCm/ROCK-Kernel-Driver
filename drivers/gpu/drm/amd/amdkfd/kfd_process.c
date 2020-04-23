@@ -42,6 +42,7 @@ struct mm_struct;
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
 #include "kfd_iommu.h"
+#include "kfd_trace.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -1391,6 +1392,7 @@ static void evict_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, eviction_work);
+	trace_kfd_evict_process_worker_start(p);
 	WARN_ONCE(p->last_eviction_seqno != p->ef->seqno,
 		  "Eviction fence mismatch\n");
 
@@ -1420,6 +1422,7 @@ static void evict_process_worker(struct work_struct *work)
 		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
+	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
 }
 
 static void restore_process_worker(struct work_struct *work)
@@ -1435,6 +1438,7 @@ static void restore_process_worker(struct work_struct *work)
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
 	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
+	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -1455,10 +1459,14 @@ static void restore_process_worker(struct work_struct *work)
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
+		trace_kfd_restore_process_worker_end(p, ret ?
+					"Rescheduled restore" :
+					"Failed to reschedule restore");
 		return;
 	}
 
 	ret = kfd_process_restore_queues(p);
+	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
 		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
 	else
