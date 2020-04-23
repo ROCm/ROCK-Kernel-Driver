@@ -123,11 +123,121 @@ void kfd_doorbell_fini(struct kfd_dev *kfd)
 		iounmap(kfd->doorbell_kernel_ptr);
 }
 
+static void kfd_doorbell_open(struct vm_area_struct *vma)
+{
+	/* Don't track the parent's PDD in a child process. We do set
+	 * VM_DONTCOPY, but that can be overridden from user mode.
+	 */
+	vma->vm_private_data = NULL;
+}
+
+static void kfd_doorbell_close(struct vm_area_struct *vma)
+{
+	struct kfd_process_device *pdd = vma->vm_private_data;
+
+	if (!pdd)
+		return;
+
+	mutex_lock(&pdd->qpd.doorbell_lock);
+	pdd->qpd.doorbell_vma = NULL;
+	/* Remember if the process was evicted without doorbells
+	 * mapped to user mode.
+	 */
+	if (pdd->qpd.doorbell_mapped == 0)
+		pdd->qpd.doorbell_mapped = -1;
+	mutex_unlock(&pdd->qpd.doorbell_lock);
+}
+
+static vm_fault_t kfd_doorbell_vm_fault(struct vm_fault *vmf)
+{
+	struct kfd_process_device *pdd = vmf->vma->vm_private_data;
+
+	if (!pdd)
+		return VM_FAULT_SIGBUS;
+
+	pr_debug("Process %d doorbell vm page fault\n", pdd->process->pasid);
+
+	kfd_process_remap_doorbells_locked(pdd->process);
+
+	kfd_process_schedule_restore(pdd->process);
+
+	return VM_FAULT_NOPAGE;
+}
+
+static const struct vm_operations_struct kfd_doorbell_vm_ops = {
+	.open = kfd_doorbell_open,
+	.close = kfd_doorbell_close,
+	.fault = kfd_doorbell_vm_fault,
+};
+
+void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
+{
+	struct kfd_process *process = pdd->process;
+	struct vm_area_struct *vma;
+	size_t size;
+
+	vma = pdd->qpd.doorbell_vma;
+	/* Remember if the process was evicted without doorbells
+	 * mapped to user mode.
+	 */
+	if (!vma) {
+		pdd->qpd.doorbell_mapped = -1;
+		return;
+	}
+
+	pr_debug("Process %d unmapping doorbell 0x%lx\n",
+			process->pasid, vma->vm_start);
+
+	size = kfd_doorbell_process_slice(pdd->dev);
+	zap_vma_ptes(vma, vma->vm_start, size);
+	pdd->qpd.doorbell_mapped = 0;
+}
+
+void kfd_doorbell_unmap(struct kfd_process_device *pdd)
+{
+	mutex_lock(&pdd->qpd.doorbell_lock);
+	kfd_doorbell_unmap_locked(pdd);
+	mutex_unlock(&pdd->qpd.doorbell_lock);
+}
+
+int kfd_doorbell_remap(struct kfd_process_device *pdd)
+{
+	struct kfd_process *process = pdd->process;
+	phys_addr_t address;
+	struct vm_area_struct *vma;
+	size_t size;
+	int ret = 0;
+
+	mutex_lock(&pdd->qpd.doorbell_lock);
+	if (pdd->qpd.doorbell_mapped != 0)
+		goto out_unlock;
+
+	/* Calculate physical address of doorbell */
+	address = kfd_get_process_doorbells(pdd);
+	vma = pdd->qpd.doorbell_vma;
+	size = kfd_doorbell_process_slice(pdd->dev);
+
+	pr_debug("Process %d remap doorbell 0x%lx\n", process->pasid,
+		vma->vm_start);
+
+	ret = vm_iomap_memory(vma, address, size);
+	if (ret)
+		pr_err("Process %d failed to remap doorbell 0x%lx\n",
+			process->pasid, vma->vm_start);
+
+out_unlock:
+	pdd->qpd.doorbell_mapped = 1;
+	mutex_unlock(&pdd->qpd.doorbell_lock);
+
+	return ret;
+}
+
 int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 		      struct vm_area_struct *vma)
 {
 	phys_addr_t address;
 	struct kfd_process_device *pdd;
+	int ret;
 
 	/*
 	 * For simplicitly we only allow mapping of the entire doorbell
@@ -147,20 +257,47 @@ int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	pr_debug("Mapping doorbell page\n"
+	pr_debug("Process %d mapping doorbell page\n"
 		 "     target user address == 0x%08llX\n"
 		 "     physical address    == 0x%08llX\n"
 		 "     vm_flags            == 0x%04lX\n"
 		 "     size                == 0x%04lX\n",
-		 (unsigned long long) vma->vm_start, address, vma->vm_flags,
-		 kfd_doorbell_process_slice(dev));
+		 process->pasid, (unsigned long long) vma->vm_start,
+		 address, vma->vm_flags, kfd_doorbell_process_slice(dev));
 
+	pdd = kfd_get_process_device_data(dev, process);
+	if (WARN_ON_ONCE(!pdd))
+		return 0;
 
-	return io_remap_pfn_range(vma,
+	mutex_lock(&pdd->qpd.doorbell_lock);
+
+	ret = io_remap_pfn_range(vma,
 				vma->vm_start,
 				address >> PAGE_SHIFT,
 				kfd_doorbell_process_slice(dev),
 				vma->vm_page_prot);
+
+	if (!ret && keep_idle_process_evicted) {
+		vma->vm_ops = &kfd_doorbell_vm_ops;
+		vma->vm_private_data = pdd;
+		pdd->qpd.doorbell_vma = vma;
+
+		/* If process is evicted before the first queue is created,
+		 * process will be restored by the page fault when the
+		 * doorbell is accessed the first time
+		 */
+		if (pdd->qpd.doorbell_mapped == -1) {
+			pr_debug("Process %d evicted, unmapping doorbell\n",
+				process->pasid);
+			kfd_doorbell_unmap_locked(pdd);
+		} else {
+			pdd->qpd.doorbell_mapped = 1;
+		}
+	}
+
+	mutex_unlock(&pdd->qpd.doorbell_lock);
+
+	return ret;
 }
 
 

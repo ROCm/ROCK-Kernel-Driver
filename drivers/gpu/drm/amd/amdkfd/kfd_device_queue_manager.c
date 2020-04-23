@@ -141,6 +141,31 @@ void program_sh_mem_settings(struct device_queue_manager *dqm,
 						qpd->sh_mem_bases);
 }
 
+bool check_if_queues_active(struct device_queue_manager *dqm,
+		struct qcm_process_device *qpd)
+{
+	bool busy = false;
+	struct queue *q;
+
+	dqm_lock(dqm);
+	list_for_each_entry(q, &qpd->queues_list, list) {
+		struct mqd_manager *mqd_mgr;
+		enum KFD_MQD_TYPE type;
+
+		type = get_mqd_type_from_queue_type(q->properties.type);
+		mqd_mgr = dqm->mqd_mgrs[type];
+		if (!mqd_mgr || !mqd_mgr->check_queue_active)
+			continue;
+
+		busy = mqd_mgr->check_queue_active(q);
+		if (busy)
+			break;
+	}
+	dqm_unlock(dqm);
+
+	return busy;
+}
+
 static void increment_queue_count(struct device_queue_manager *dqm,
 			enum kfd_queue_type type)
 {

@@ -1012,6 +1012,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		kfree(pdd->qpd.doorbell_bitmap);
 		idr_destroy(&pdd->alloc_idr);
+		mutex_destroy(&pdd->qpd.doorbell_lock);
 
 		kfd_free_process_doorbells(pdd->dev, pdd->doorbell_index);
 
@@ -1153,10 +1154,16 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	/* Iterate over all process device data structures and if the
 	 * pdd is in debug mode, we should first force unregistration,
-	 * then we will be able to destroy the queues
+	 * then we will be able to destroy the queues. Also invalidate
+	 * doorbell_vma private data because the pdds are about to be
+	 * destroyed, which can race with the kfd_doorbell_close
+	 * vm_ops callback.
 	 */
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_dev *dev = p->pdds[i]->dev;
+
+		if (pdd->qpd.doorbell_vma)
+			pdd->qpd.doorbell_vma->vm_private_data = NULL;
 
 		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());
@@ -1503,6 +1510,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->qpd.pqm = &p->pqm;
 	pdd->qpd.evicted = 0;
 	pdd->qpd.mapped_gws_queue = false;
+	mutex_init(&pdd->qpd.doorbell_lock);
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
@@ -1882,6 +1890,95 @@ kfd_process_gpuid_from_kgd(struct kfd_process *p, struct amdgpu_device *adev,
 	return -EINVAL;
 }
 
+void kfd_process_schedule_restore(struct kfd_process *p)
+{
+	int ret;
+	unsigned long evicted_jiffies;
+	unsigned long delay_jiffies = msecs_to_jiffies(PROCESS_RESTORE_TIME_MS);
+
+	/* wait at least PROCESS_RESTORE_TIME_MS before attempting to restore
+	 */
+	evicted_jiffies = get_jiffies_64() - p->last_evict_timestamp;
+	if (delay_jiffies > evicted_jiffies)
+		delay_jiffies -= evicted_jiffies;
+	else
+		delay_jiffies = 0;
+
+	pr_debug("Process %d schedule restore work\n", p->pasid);
+	ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
+				delay_jiffies);
+	WARN(!ret, "Schedule restore work failed\n");
+}
+
+static void kfd_process_unmap_doorbells(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	struct mm_struct *mm = p->mm;
+
+	mmap_write_lock(mm);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		kfd_doorbell_unmap(pdd);
+
+	mmap_write_unlock(mm);
+}
+
+int kfd_process_remap_doorbells_locked(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	int ret = 0;
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
+		ret = kfd_doorbell_remap(pdd);
+
+	return ret;
+}
+
+static int kfd_process_remap_doorbells(struct kfd_process *p)
+{
+	struct mm_struct *mm = p->mm;
+	int ret = 0;
+
+	mmap_write_lock(mm);
+	ret = kfd_process_remap_doorbells_locked(p);
+	mmap_write_unlock(mm);
+
+	return ret;
+}
+
+/**
+ * kfd_process_unmap_doorbells_if_idle - Check if queues are active
+ *
+ * Returns true if queues are idle, and unmap doorbells.
+ * Returns false if queues are active
+ */
+static bool kfd_process_unmap_doorbells_if_idle(struct kfd_process *p)
+{
+	struct kfd_process_device *pdd;
+	bool busy = false;
+
+	if (!keep_idle_process_evicted)
+		return false;
+
+	/* Unmap doorbell first to avoid race conditions. Otherwise while the
+	 * second queue is checked, the first queue may get more work, but we
+	 * won't detect that since it has been checked
+	 */
+	kfd_process_unmap_doorbells(p);
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		busy = check_if_queues_active(pdd->qpd.dqm, &pdd->qpd);
+		if (busy)
+			break;
+	}
+
+	/* Remap doorbell if process queue is not idle */
+	if (busy)
+		kfd_process_remap_doorbells(p);
+
+	return !busy;
+}
+
 static void evict_process_worker(struct work_struct *work)
 {
 	int ret;
@@ -1905,14 +2002,20 @@ static void evict_process_worker(struct work_struct *work)
 	 */
 	flush_delayed_work(&p->restore_work);
 
+	p->last_evict_timestamp = get_jiffies_64();
+
 	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
 		dma_fence_put(p->ef);
 		p->ef = NULL;
-		queue_delayed_work(kfd_restore_wq, &p->restore_work,
-				msecs_to_jiffies(PROCESS_RESTORE_TIME_MS));
+
+		if (!kfd_process_unmap_doorbells_if_idle(p))
+			kfd_process_schedule_restore(p);
+		else
+			pr_debug("Process %d queues idle, doorbell unmapped\n",
+				p->pasid);
 
 		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else

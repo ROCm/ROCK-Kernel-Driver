@@ -183,6 +183,11 @@ extern int queue_preemption_timeout_ms;
  */
 extern int amdgpu_no_queue_eviction_on_vm_fault;
 
+/*
+ * Restore evicted process only if queues are active
+ */
+extern bool keep_idle_process_evicted;
+
 /* Enable eviction debug messages */
 extern bool debug_evictions;
 
@@ -674,6 +679,17 @@ struct qcm_process_device {
 
 	/* doorbell resources per process per device */
 	unsigned long *doorbell_bitmap;
+	/* doorbell user mmap vma */
+	struct vm_area_struct *doorbell_vma;
+	/* lock to serialize doorbell unmap and remap */
+	struct mutex doorbell_lock;
+
+	/* Indicate if doorbell is mapped or unmapped
+	 * -1 means doorbells need to be unmapped because queue is evicted
+	 *  0 means doorbells are unmapped
+	 *  1 means doorbells are mapped
+	 */
+	int doorbell_mapped;
 };
 
 /* KFD Memory Eviction */
@@ -684,6 +700,9 @@ struct qcm_process_device {
 #define PROCESS_BACK_OFF_TIME_MS 100
 /* Approx. time before evicting the process again */
 #define PROCESS_ACTIVE_TIME_MS 10
+
+void kfd_process_schedule_restore(struct kfd_process *p);
+int kfd_process_remap_doorbells_locked(struct kfd_process *p);
 
 /* 8 byte handle containing GPU ID in the most significant 4 bytes and
  * idr_handle in the least significant 4 bytes
@@ -912,6 +931,7 @@ struct kfd_process {
 	 * restored after an eviction
 	 */
 	unsigned long last_restore_timestamp;
+	unsigned long last_evict_timestamp;
 
 	/* Kobj for our procfs */
 	struct kobject *kobj;
@@ -1029,6 +1049,8 @@ int kfd_doorbell_init(struct kfd_dev *kfd);
 void kfd_doorbell_fini(struct kfd_dev *kfd);
 int kfd_doorbell_mmap(struct kfd_dev *dev, struct kfd_process *process,
 		      struct vm_area_struct *vma);
+void kfd_doorbell_unmap(struct kfd_process_device *pdd);
+int kfd_doorbell_remap(struct kfd_process_device *pdd);
 void __iomem *kfd_get_kernel_doorbell(struct kfd_dev *kfd,
 					unsigned int *doorbell_off);
 void kfd_release_kernel_doorbell(struct kfd_dev *kfd, u32 __iomem *db_addr);

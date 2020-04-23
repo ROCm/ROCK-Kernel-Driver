@@ -809,6 +809,14 @@ module_param_named(no_queue_eviction_on_vm_fault, amdgpu_no_queue_eviction_on_vm
 int priv_cp_queues;
 module_param(priv_cp_queues, int, 0644);
 MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
+
+/**
+ * DOC: keep_idle_process_evicted (bool)
+ * Keep an evicted process evicted if it is idle. Default value: false (off)
+ */
+bool keep_idle_process_evicted;
+module_param(keep_idle_process_evicted, bool, 0444);
+MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if queues are active (N = off(default), Y = on)");
 #endif
 
 /**
