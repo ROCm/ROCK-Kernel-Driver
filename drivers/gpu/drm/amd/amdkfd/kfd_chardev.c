@@ -41,6 +41,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_svm.h"
+#include "kfd_ipc.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
 #include "amdgpu_dma_buf.h"
@@ -1049,6 +1050,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	long err;
 	uint64_t offset = args->mmap_offset;
 	uint32_t flags = args->flags;
+	uint64_t cpuva = 0;
+	unsigned int mem_type = 0;
 
 	if (args->size == 0)
 		return -EINVAL;
@@ -1137,7 +1140,13 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (err)
 		goto err_unlock;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	mem_type = flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+			    KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+			    KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+			args->va_addr, args->size, cpuva, mem_type, NULL);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
@@ -1181,7 +1190,8 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 {
 	struct kfd_ioctl_free_memory_of_gpu_args *args = data;
 	struct kfd_process_device *pdd;
-	void *mem;
+	struct kfd_bo *buf_obj;
+	struct kfd_dev *dev;
 	int ret;
 	uint64_t size = 0;
 
@@ -1203,15 +1213,15 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		goto err_pdd;
 	}
 
-	mem = kfd_process_device_translate_handle(
-		pdd, GET_IDR_HANDLE(args->handle));
-	if (!mem) {
+	buf_obj = kfd_process_device_find_bo(pdd,
+					GET_IDR_HANDLE(args->handle));
+	if (!buf_obj) {
 		ret = -EINVAL;
 		goto err_unlock;
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
-				(struct kgd_mem *)mem, pdd->drm_priv, &size);
+						buf_obj->mem, pdd->drm_priv, &size);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
@@ -1575,7 +1585,8 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 	if (r)
 		goto err_unlock;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+						args->va_addr, size, 0, 0, -1);
 	if (idr_handle < 0) {
 		r = -EFAULT;
 		goto err_free;
@@ -1589,9 +1600,49 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 
 err_free:
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, (struct kgd_mem *)mem,
-					       pdd->drm_priv, NULL);
+							pdd->drm_priv, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
+	return r;
+}
+
+static int kfd_ioctl_ipc_export_handle(struct file *filep,
+				       struct kfd_process *p,
+				       void *data)
+{
+	struct kfd_ioctl_ipc_export_handle_args *args = data;
+	struct kfd_dev *dev;
+	int r;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle);
+	if (r)
+		pr_err("Failed to export IPC handle\n");
+
+	return r;
+}
+
+static int kfd_ioctl_ipc_import_handle(struct file *filep,
+				       struct kfd_process *p,
+				       void *data)
+{
+	struct kfd_ioctl_ipc_import_handle_args *args = data;
+	struct kfd_dev *dev = NULL;
+	int r;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (!dev)
+		return -EINVAL;
+
+	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
+				  args->va_addr, &args->handle,
+				  &args->mmap_offset);
+	if (r)
+		pr_err("Failed to import IPC handle\n");
+
 	return r;
 }
 
@@ -3199,6 +3250,12 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_set_debug_trap, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
+				kfd_ioctl_ipc_import_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
+				kfd_ioctl_ipc_export_handle, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
