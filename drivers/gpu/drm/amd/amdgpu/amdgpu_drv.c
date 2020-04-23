@@ -715,6 +715,14 @@ MODULE_PARM_DESC(hws_gws_support, "Assume MEC2 FW supports GWS barriers (false =
 int queue_preemption_timeout_ms = 9000;
 module_param(queue_preemption_timeout_ms, int, 0644);
 MODULE_PARM_DESC(queue_preemption_timeout_ms, "queue preemption timeout in ms (1 = Minimum, 9000 = default)");
+
+/**
+ * DOC: priv_cp_queues (int)
+ * Enable privileged mode for CP queues. Default value: 0 (off)
+ */
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 #endif
 
 /**
