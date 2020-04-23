@@ -224,7 +224,9 @@ static void __update_mqd(struct mqd_manager *mm, void *mqd,
 		m->cp_hqd_pq_control |= CP_HQD_PQ_CONTROL__NO_UPDATE_RPTR_MASK |
 				2 << CP_HQD_PQ_CONTROL__SLOT_BASED_WPTR__SHIFT;
 	}
-
+	if (priv_cp_queues)
+		m->cp_hqd_pq_control |=
+			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
 	if (mm->dev->cwsr_enabled && q->ctx_save_restore_area_address)
 		m->cp_hqd_ctx_save_control =
 			atc_bit << CP_HQD_CTX_SAVE_CONTROL__ATC__SHIFT |

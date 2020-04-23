@@ -30,6 +30,7 @@
 #include "cik_regs.h"
 #include "cik_structs.h"
 #include "oss/oss_2_4_sh_mask.h"
+#include "gca/gfx_7_2_sh_mask.h"
 
 static inline struct cik_mqd *get_mqd(void *mqd)
 {
@@ -213,6 +214,9 @@ static void __update_mqd(struct mqd_manager *mm, void *mqd,
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL)
 		m->cp_hqd_pq_control |= NO_UPDATE_RPTR;
+	if (priv_cp_queues)
+		m->cp_hqd_pq_control |=
+			1 << CP_HQD_PQ_CONTROL__PRIV_STATE__SHIFT;
 
 	update_cu_mask(mm, mqd, q);
 	set_priority(m, q);
