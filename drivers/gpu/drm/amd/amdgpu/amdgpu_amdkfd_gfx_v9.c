@@ -23,6 +23,7 @@
 
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
+#include "amdgpu_amdkfd_gfx_v8.h"
 #include "gc/gc_9_0_offset.h"
 #include "gc/gc_9_0_sh_mask.h"
 #include "vega10_enum.h"
@@ -46,6 +47,13 @@ enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
 	RESET_WAVES
+};
+
+static const uint32_t watchRegs[MAX_WATCH_ADDRESSES * ADDRESS_WATCH_REG_MAX] = {
+	mmTCP_WATCH0_ADDR_H, mmTCP_WATCH0_ADDR_L, mmTCP_WATCH0_CNTL,
+	mmTCP_WATCH1_ADDR_H, mmTCP_WATCH1_ADDR_L, mmTCP_WATCH1_CNTL,
+	mmTCP_WATCH2_ADDR_H, mmTCP_WATCH2_ADDR_L, mmTCP_WATCH2_CNTL,
+	mmTCP_WATCH3_ADDR_H, mmTCP_WATCH3_ADDR_L, mmTCP_WATCH3_CNTL
 };
 
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
@@ -208,6 +216,16 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 
 	pr_debug("RLC register offset for SDMA%d RLC%d: 0x%x\n", engine_id,
 			queue_id, retval);
+
+	return retval;
+}
+
+static uint32_t get_watch_base_addr(struct amdgpu_device *adev)
+{
+	uint32_t retval = SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) -
+			mmTCP_WATCH0_ADDR_H;
+
+	pr_debug("kfd: reg watch base address: 0x%x\n", retval);
 
 	return retval;
 }
@@ -635,6 +653,25 @@ bool kgd_gfx_v9_get_atc_vmid_pasid_mapping_info(struct kgd_dev *kgd,
 
 int kgd_gfx_v9_address_watch_disable(struct kgd_dev *kgd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	unsigned int i;
+	uint32_t watch_base_addr;
+
+	cntl.u32All = 0;
+
+	cntl.bitfields.valid = 0;
+	cntl.bitfields.mask = ADDRESS_WATCH_REG_CNTL_DEFAULT_MASK;
+	cntl.bitfields.atc = 1;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	/* Turning off this address until we set all the registers */
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		WREG32(watch_base_addr +
+				watchRegs[i * ADDRESS_WATCH_REG_MAX +
+						ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -644,6 +681,32 @@ int kgd_gfx_v9_address_watch_execute(struct kgd_dev *kgd,
 					uint32_t addr_hi,
 					uint32_t addr_lo)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	union TCP_WATCH_CNTL_BITS cntl;
+	uint32_t watch_base_addr;
+
+	watch_base_addr = get_watch_base_addr(adev);
+	cntl.u32All = cntl_val;
+
+	/* Turning off this watch point until we set all the registers */
+	cntl.bitfields.valid = 0;
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_HI],
+			addr_hi);
+
+	WREG32(watch_base_addr + watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + ADDRESS_WATCH_REG_ADDR_LO],
+			addr_lo);
+
+	/* Enable the watch point */
+	cntl.bitfields.valid = 1;
+
+	WREG32(watch_base_addr +
+			watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX +
+				ADDRESS_WATCH_REG_CNTL],
+			cntl.u32All);
+
 	return 0;
 }
 
@@ -676,7 +739,8 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset)
 {
-	return 0;
+	return get_watch_base_addr(get_amdgpu_device(kgd)) +
+		watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
 uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,

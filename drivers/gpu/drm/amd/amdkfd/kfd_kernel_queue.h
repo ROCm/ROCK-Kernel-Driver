@@ -35,6 +35,12 @@
  * pending write pointer to that location so subsequent calls to
  * acquire_packet_buffer will get a correct write pointer
  *
+ * kq_acquire_inline_ib: Returns a pointer to the location in the kernel
+ * queue ring buffer where the calling function can write an inline IB. It is
+ * Guaranteed that there is enough space for that IB. It also updates the
+ * pending write pointer to that location so subsequent calls to
+ * acquire_packet_buffer will get a correct write pointer
+ *
  * kq_submit_packet: Update the write pointer and doorbell of a kernel queue.
  *
  * kq_rollback_packet: This routine is called if we failed to build an acquired
@@ -46,6 +52,10 @@
 int kq_acquire_packet_buffer(struct kernel_queue *kq,
 				size_t packet_size_in_dwords,
 				unsigned int **buffer_ptr);
+int kq_acquire_inline_ib(struct kernel_queue *kq,
+			     size_t size_in_dwords,
+			     unsigned int **buffer_ptr,
+			     uint64_t *gpu_addr);
 void kq_submit_packet(struct kernel_queue *kq);
 void kq_rollback_packet(struct kernel_queue *kq);
 

@@ -286,6 +286,39 @@ err_no_space:
 	return -ENOMEM;
 }
 
+int kq_acquire_inline_ib(struct kernel_queue *kq,
+			     size_t size_in_dwords,
+			     unsigned int **buffer_ptr,
+			     uint64_t *gpu_addr)
+{
+	int ret;
+	unsigned int *buf;
+	union PM4_MES_TYPE_3_HEADER nop;
+
+	if (size_in_dwords >= (1 << 14))
+		return -EINVAL;
+
+	/* Allocate size_in_dwords on the ring, plus an extra dword
+	 * for a NOP packet header
+	 */
+	ret = kq_acquire_packet_buffer(kq, size_in_dwords + 1,  &buf);
+	if (ret)
+		return ret;
+
+	/* Build a NOP packet that contains the IB as "payload". */
+	nop.u32all = 0;
+	nop.opcode = IT_NOP;
+	nop.count = size_in_dwords - 1;
+	nop.type = PM4_TYPE_3;
+
+	*buf = nop.u32all;
+	*buffer_ptr = buf + 1;
+	*gpu_addr = kq->pq_gpu_addr + ((unsigned long)*buffer_ptr -
+				       (unsigned long)kq->pq_kernel_addr);
+
+	return 0;
+}
+
 void kq_submit_packet(struct kernel_queue *kq)
 {
 #ifdef DEBUG
