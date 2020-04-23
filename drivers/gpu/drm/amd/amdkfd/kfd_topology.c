@@ -220,6 +220,8 @@ struct kfd_topology_device *kfd_create_topology_device(
 		sysfs_show_gen_prop(buffer, offs, "%s %llu\n", name, value)
 #define sysfs_show_32bit_val(buffer, offs, value) \
 		sysfs_show_gen_prop(buffer, offs, "%u\n", value)
+#define sysfs_show_64bit_val(buffer, offs, value) \
+		sysfs_show_gen_prop(buffer, offs, "%llu\n", value)
 #define sysfs_show_str_val(buffer, offs, value) \
 		sysfs_show_gen_prop(buffer, offs, "%s\n", value)
 
@@ -307,11 +309,25 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 {
 	int offs = 0;
 	struct kfd_mem_properties *mem;
+	uint64_t used_mem;
 
 	/* Making sure that the buffer is an empty string */
 	buffer[0] = 0;
 
-	mem = container_of(attr, struct kfd_mem_properties, attr);
+	if (strcmp(attr->name, "used_memory") == 0) {
+		mem = container_of(attr, struct kfd_mem_properties,
+				attr_used);
+		if (mem->gpu) {
+			if (kfd_devcgroup_check_permission(mem->gpu))
+				return -EPERM;
+			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->kgd);
+			return sysfs_show_64bit_val(buffer, offs, used_mem);
+		}
+		/* TODO: Report APU/CPU-allocated memory; For now return 0 */
+		return 0;
+	}
+
+	mem = container_of(attr, struct kfd_mem_properties, attr_props);
 	if (mem->gpu && kfd_devcgroup_check_permission(mem->gpu))
 		return -EPERM;
 	sysfs_show_32bit_prop(buffer, offs, "heap_type", mem->heap_type);
@@ -589,7 +605,12 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	if (dev->kobj_mem) {
 		list_for_each_entry(mem, &dev->mem_props, list)
 			if (mem->kobj) {
-				kfd_remove_sysfs_file(mem->kobj, &mem->attr);
+				/* TODO: Remove when CPU/APU supported */
+				if (dev->node_props.cpu_cores_count == 0)
+					sysfs_remove_file(mem->kobj,
+							&mem->attr_used);
+				kfd_remove_sysfs_file(mem->kobj,
+						&mem->attr_props);
 				mem->kobj = NULL;
 			}
 		kobject_del(dev->kobj_mem);
@@ -695,12 +716,23 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 			return ret;
 		}
 
-		mem->attr.name = "properties";
-		mem->attr.mode = KFD_SYSFS_FILE_MODE;
-		sysfs_attr_init(&mem->attr);
-		ret = sysfs_create_file(mem->kobj, &mem->attr);
+		mem->attr_props.name = "properties";
+		mem->attr_props.mode = KFD_SYSFS_FILE_MODE;
+		sysfs_attr_init(&mem->attr_props);
+		ret = sysfs_create_file(mem->kobj, &mem->attr_props);
 		if (ret < 0)
 			return ret;
+
+		/* TODO: Support APU/CPU memory usage */
+		if (dev->node_props.cpu_cores_count == 0) {
+			mem->attr_used.name = "used_memory";
+			mem->attr_used.mode = KFD_SYSFS_FILE_MODE;
+			sysfs_attr_init(&mem->attr_used);
+			ret = sysfs_create_file(mem->kobj, &mem->attr_used);
+			if (ret < 0)
+				return ret;
+		}
+
 		i++;
 	}
 
