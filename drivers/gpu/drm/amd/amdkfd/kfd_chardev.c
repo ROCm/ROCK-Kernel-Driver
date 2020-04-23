@@ -1259,6 +1259,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	long err;
 	uint64_t offset = args->mmap_offset;
 	uint32_t flags = args->flags;
+	struct vm_area_struct *vma;
 	uint64_t cpuva = 0;
 	unsigned int mem_type = 0;
 
@@ -1284,7 +1285,29 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto err_unlock;
 	}
 
-	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+		/* Check if the userptr corresponds to another (or third-party)
+		 * device local memory. If so treat is as a doorbell. User
+		 * space will be oblivious of this and will use this doorbell
+		 * BO as a regular userptr BO
+		 */
+		vma = find_vma(current->mm, args->mmap_offset);
+		if (vma && (vma->vm_flags & VM_IO)) {
+			unsigned long pfn;
+
+			follow_pfn(vma, args->mmap_offset, &pfn);
+			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
+			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
+			offset = (pfn << PAGE_SHIFT);
+		} else {
+			if (offset & (PAGE_SIZE - 1)) {
+				pr_debug("Unaligned userptr address:%llx\n",
+					 offset);
+				return -EINVAL;
+			}
+			cpuva = offset;
+		}
+	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
 		if (args->size != kfd_doorbell_process_slice(dev)) {
 			err = -EINVAL;
 			goto err_unlock;
