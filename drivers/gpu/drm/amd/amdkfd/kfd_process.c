@@ -1407,7 +1407,7 @@ static void evict_process_worker(struct work_struct *work)
 
 	p->last_evict_timestamp = get_jiffies_64();
 
-	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
+	pr_info("Started evicting pasid 0x%x\n", p->pasid);
 	ret = kfd_process_evict_queues(p);
 	if (!ret) {
 		dma_fence_signal(p->ef);
@@ -1420,7 +1420,7 @@ static void evict_process_worker(struct work_struct *work)
 			pr_debug("Process %d queues idle, doorbell unmapped\n",
 				p->pasid);
 
-		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
+		pr_info("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
 	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
@@ -1438,7 +1438,7 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
+	pr_info("Started restoring pasid 0x%x\n", p->pasid);
 	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
@@ -1455,7 +1455,7 @@ static void restore_process_worker(struct work_struct *work)
 	ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
 						     &p->ef);
 	if (ret) {
-		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
+		pr_info("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
@@ -1469,7 +1469,7 @@ static void restore_process_worker(struct work_struct *work)
 	ret = kfd_process_restore_queues(p);
 	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
-		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
+		pr_info("Finished restoring pasid 0x%x\n", p->pasid);
 	else
 		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
 }
