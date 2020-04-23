@@ -560,6 +560,11 @@ static int gmc_v8_0_mc_init(struct amdgpu_device *adev)
 			break;
 		}
 		adev->gmc.vram_width = numchan * chansize;
+		/* FIXME: The above calculation is outdated.
+		 * For HBM provide a temporary fix
+		 */
+		if (adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM)
+			adev->gmc.vram_width = AMDGPU_VRAM_TYPE_HBM_WIDTH;
 	}
 	/* size in MB on si */
 	adev->gmc.mc_vram_size = RREG32(mmCONFIG_MEMSIZE) * 1024ULL * 1024ULL;
