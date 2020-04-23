@@ -83,7 +83,8 @@ struct kfd_mem_properties {
 	uint32_t		mem_clk_max;
 	struct kfd_node		*gpu;
 	struct kobject		*kobj;
-	struct attribute	attr;
+	struct attribute	attr_props;
+	struct attribute	attr_used;
 };
 
 #define CACHE_SIBLINGMAP_SIZE 64
