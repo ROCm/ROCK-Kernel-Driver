@@ -1137,6 +1137,8 @@ struct drm_amdgpu_info_vbios {
 #define AMDGPU_VRAM_TYPE_LPDDR4 11
 #define AMDGPU_VRAM_TYPE_LPDDR5 12
 
+#define AMDGPU_VRAM_TYPE_HBM_WIDTH 4096
+
 struct drm_amdgpu_info_device {
 	/** PCI Device ID */
 	__u32 device_id;
