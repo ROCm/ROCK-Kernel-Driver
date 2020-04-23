@@ -38,6 +38,8 @@ static const unsigned int compute_vmid_bitmap = 0xFF00;
  */
 uint64_t amdgpu_amdkfd_total_mem_size;
 
+extern bool pcie_p2p;
+
 int amdgpu_amdkfd_init(void)
 {
 	struct sysinfo si;
@@ -386,7 +388,8 @@ void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 	resource_size_t aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
 
 	memset(mem_info, 0, sizeof(*mem_info));
-	if (!(adev->gmc.aper_base & address_mask || aper_limit & address_mask)) {
+	if (pcie_p2p && !(adev->gmc.aper_base & address_mask ||
+			  aper_limit & address_mask)) {
 		mem_info->local_mem_size_public = adev->gmc.visible_vram_size;
 		mem_info->local_mem_size_private = adev->gmc.real_vram_size -
 				adev->gmc.visible_vram_size;

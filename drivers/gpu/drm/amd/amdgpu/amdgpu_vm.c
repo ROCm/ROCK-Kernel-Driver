@@ -1661,6 +1661,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				      struct dma_fence **fence)
 {
 	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
+	uint64_t vram_base_offset = bo_adev->vm_manager.vram_base_offset;
 	unsigned min_linear_pages = 1 << adev->vm_manager.fragment_size;
 	uint64_t pfn, start = mapping->start;
 	int r;
@@ -1675,6 +1676,18 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 
 	/* Apply ASIC specific mapping flags */
 	amdgpu_gmc_get_vm_pte(adev, mapping, &flags);
+
+	if (adev != bo_adev &&
+	    !(flags & AMDGPU_PTE_SYSTEM) &&
+	    !mapping->bo_va->is_xgmi) {
+		if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+			flags |= AMDGPU_PTE_SYSTEM;
+			vram_base_offset = bo_adev->gmc.aper_base;
+		} else {
+			DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
+			return -EINVAL;
+		}
+	}
 
 	trace_amdgpu_vm_bo_update(mapping);
 
