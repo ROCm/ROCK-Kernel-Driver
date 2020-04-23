@@ -33,6 +33,7 @@
 #include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/file.h>
+#include "kfd_ipc.h"
 #include <linux/pm_runtime.h>
 #include "amdgpu_amdkfd.h"
 #include "amdgpu.h"
@@ -715,6 +716,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 {
 	struct kfd_dev *kdev = pdd->dev;
 	int err;
+	unsigned int mem_type;
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, gpu_va, size,
 						 pdd->drm_priv, mem, NULL,
@@ -950,7 +952,7 @@ struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
 static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 {
 	struct kfd_process *p = pdd->process;
-	void *mem;
+	struct kfd_bo *buf_obj;
 	int id;
 	int i;
 
@@ -958,7 +960,8 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 	 * Remove all handles from idr and release appropriate
 	 * local memory object
 	 */
-	idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+	idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
+		struct kfd_process_device *peer_pdd;
 
 		for (i = 0; i < p->n_pdds; i++) {
 			struct kfd_process_device *peer_pdd = p->pdds[i];
@@ -966,11 +969,11 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			if (!peer_pdd->drm_priv)
 				continue;
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->adev, mem, peer_pdd->drm_priv);
+				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
 		}
 
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, mem,
-						       pdd->drm_priv, NULL);
+						      buf_obj->mem, pdd->drm_priv, NULL);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }
@@ -1666,9 +1669,49 @@ out:
  * Assumes that the process lock is held.
  */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
-					void *mem)
+					void *mem, uint64_t start,
+					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
+					struct kfd_ipc_obj *ipc_obj)
 {
-	return idr_alloc(&pdd->alloc_idr, mem, 0, 0, GFP_KERNEL);
+	int handle;
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	buf_obj = kzalloc(sizeof(*buf_obj), GFP_KERNEL);
+
+	if (!buf_obj)
+		return -ENOMEM;
+
+	buf_obj->it.start = start;
+	buf_obj->it.last = start + length - 1;
+	interval_tree_insert(&buf_obj->it, &p->bo_interval_tree);
+
+	buf_obj->mem = mem;
+	buf_obj->dev = pdd->dev;
+	buf_obj->kfd_ipc_obj = ipc_obj;
+	buf_obj->cpuva = cpuva;
+	buf_obj->mem_type = mem_type;
+
+	INIT_LIST_HEAD(&buf_obj->cb_data_head);
+
+	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+
+	if (handle < 0)
+		kfree(buf_obj);
+
+	return handle;
+}
+
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle)
+{
+	if (handle < 0)
+		return NULL;
+
+	return (struct kfd_bo *)idr_find(&pdd->alloc_idr, handle);
 }
 
 /* Translate specific handle from process local memory idr
@@ -1677,10 +1720,37 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle < 0)
-		return NULL;
+	struct kfd_bo *buf_obj;
 
-	return idr_find(&pdd->alloc_idr, handle);
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	return buf_obj->mem;
+}
+
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr)
+{
+	struct interval_tree_node *it_node;
+	struct kfd_bo *buf_obj;
+
+	it_node = interval_tree_iter_first(&p->bo_interval_tree,
+			start_addr, last_addr);
+	if (!it_node) {
+		pr_err("0x%llx-0x%llx does not relate to an existing buffer\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	if (interval_tree_iter_next(it_node, start_addr, last_addr)) {
+		pr_err("0x%llx-0x%llx spans more than a single BO\n",
+				start_addr, last_addr);
+		return NULL;
+	}
+
+	buf_obj = container_of(it_node, struct kfd_bo, it);
+
+	return buf_obj;
 }
 
 /* Remove specific handle from process local memory idr
@@ -1689,8 +1759,24 @@ void *kfd_process_device_translate_handle(struct kfd_process_device *pdd,
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle)
 {
-	if (handle >= 0)
-		idr_remove(&pdd->alloc_idr, handle);
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = pdd->process;
+
+	if (handle < 0)
+		return;
+
+	buf_obj = kfd_process_device_find_bo(pdd, handle);
+
+	if (buf_obj->kfd_ipc_obj)
+		ipc_obj_put(&buf_obj->kfd_ipc_obj);
+
+	idr_remove(&pdd->alloc_idr, handle);
+
+	interval_tree_remove(&buf_obj->it, &p->bo_interval_tree);
+
+	kfree(buf_obj);
 }
 
 /* This increments the process->ref counter. */
