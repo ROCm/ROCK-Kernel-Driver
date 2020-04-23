@@ -1713,12 +1713,14 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	INIT_LIST_HEAD(&(*mem)->bo_va_list);
 	mutex_init(&(*mem)->lock);
-	
-	(*mem)->alloc_flags =
-		((bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
-		KFD_IOC_ALLOC_MEM_FLAGS_VRAM : KFD_IOC_ALLOC_MEM_FLAGS_GTT)
-		| KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE
-		| KFD_IOC_ALLOC_MEM_FLAGS_EXECUTABLE;
+	if (bo->kfd_bo)
+		(*mem)->alloc_flags = bo->kfd_bo->alloc_flags;
+	else
+		(*mem)->alloc_flags =
+			((bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
+			KFD_IOC_ALLOC_MEM_FLAGS_VRAM : KFD_IOC_ALLOC_MEM_FLAGS_GTT)
+			| KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE
+			| KFD_IOC_ALLOC_MEM_FLAGS_EXECUTABLE;
 
 	(*mem)->bo = amdgpu_bo_ref(bo);
 	(*mem)->va = va;
@@ -1728,6 +1730,24 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	(*mem)->process_info = avm->process_info;
 	add_kgd_mem_to_kfd_bo_list(*mem, avm->process_info, false);
 	amdgpu_sync_create(&(*mem)->sync);
+
+	return 0;
+}
+
+int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
+				      struct kgd_mem *mem,
+				      struct dma_buf **dmabuf)
+{
+	struct amdgpu_device *adev = NULL;
+
+	if (!dmabuf || !kgd || !vm || !mem)
+		return -EINVAL;
+
+	adev = get_amdgpu_device(kgd);
+
+	*dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
+	if (IS_ERR(*dmabuf))
+		return -EINVAL;
 
 	return 0;
 }
