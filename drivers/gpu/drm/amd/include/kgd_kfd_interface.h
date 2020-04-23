@@ -204,6 +204,11 @@ struct tile_config {
  * IH ring entry. This function allows the KFD ISR to get the VMID
  * from the fault status register as early as possible.
  *
+ * @get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
+ *
+ * @build_grace_period_packet_info: build a IQ_WAUT_TIME2 reg value with an
+ * updated grace period value.
+ *
  * @get_cu_occupancy: Function pointer that returns to caller the number
  * of wave fronts that are in flight for all of the queues of a process
  * as identified by its pasid. It is important to note that the value
