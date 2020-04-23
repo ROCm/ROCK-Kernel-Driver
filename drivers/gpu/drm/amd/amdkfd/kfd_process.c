@@ -42,6 +42,7 @@ struct mm_struct;
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_svm.h"
+#include "kfd_trace.h"
 #include "kfd_smi_events.h"
 #include "kfd_debug.h"
 
@@ -2121,6 +2122,7 @@ static void evict_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, eviction_work);
+	trace_kfd_evict_process_worker_start(p);
 
 	p->last_evict_timestamp = get_jiffies_64();
 
@@ -2143,6 +2145,7 @@ static void evict_process_worker(struct work_struct *work)
 				p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
+	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
 }
 
 static int restore_process_helper(struct kfd_process *p)
@@ -2158,6 +2161,7 @@ static int restore_process_helper(struct kfd_process *p)
 	}
 
 	ret = kfd_process_restore_queues(p);
+	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
 		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
 	else
@@ -2179,6 +2183,7 @@ static void restore_process_worker(struct work_struct *work)
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
 	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
+	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -2199,6 +2204,9 @@ static void restore_process_worker(struct work_struct *work)
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
 		WARN(!ret, "reschedule restore work failed\n");
+		trace_kfd_restore_process_worker_end(p, ret ?
+					"Rescheduled restore" :
+					"Failed to reschedule restore");
 	}
 }
 
