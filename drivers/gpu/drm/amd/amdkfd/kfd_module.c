@@ -60,6 +60,8 @@ static int kfd_init(void)
 	if (err < 0)
 		goto err_create_wq;
 
+	kfd_init_peer_direct();
+
 	/* Ignore the return value, so that we can continue
 	 * to init the KFD, even if procfs isn't craated
 	 */
@@ -82,6 +84,7 @@ err_ioctl:
 static void kfd_exit(void)
 {
 	kfd_debugfs_fini();
+	kfd_close_peer_direct();
 	kfd_process_destroy_wq();
 	kfd_procfs_shutdown();
 	kfd_topology_shutdown();
