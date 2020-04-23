@@ -382,7 +382,6 @@ struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
 	struct kfd_dev *dev;
-	struct list_head cb_data_head;
 	struct kfd_ipc_obj *kfd_ipc_obj;
 	/* page-aligned VA address */
 	uint64_t cpuva;
@@ -1540,6 +1539,10 @@ int kfd_send_exception_to_runtime(struct kfd_process *p,
 				unsigned int queue_id,
 				uint64_t error_reason);
 bool kfd_is_locked(void);
+
+/* PeerDirect support */
+void kfd_init_peer_direct(void);
+void kfd_close_peer_direct(void);
 
 /* IPC Support */
 int kfd_ipc_init(void);
