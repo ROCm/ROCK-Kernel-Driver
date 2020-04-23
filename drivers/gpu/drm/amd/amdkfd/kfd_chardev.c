@@ -42,6 +42,8 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_svm.h"
 #include "kfd_ipc.h"
+#include "kfd_trace.h"
+
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
 #include "amdgpu_dma_buf.h"
@@ -1227,6 +1229,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	int i;
 	uint32_t *devices_arr = NULL;
 
+	trace_kfd_map_memory_to_gpu_start(p);
 	if (!args->n_devices) {
 		pr_debug("Device IDs array empty\n");
 		return -EINVAL;
@@ -1320,6 +1323,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	}
 	kfree(devices_arr);
 
+	trace_kfd_map_memory_to_gpu_end(p,
+			args->n_devices * sizeof(*devices_arr), "Success");
 	return err;
 
 get_process_device_data_failed:
@@ -1330,6 +1335,8 @@ map_memory_to_gpu_failed:
 copy_from_user_failed:
 sync_memory_failed:
 	kfree(devices_arr);
+	trace_kfd_map_memory_to_gpu_end(p,
+		args->n_devices * sizeof(*devices_arr), "Failed");
 
 	return err;
 }
