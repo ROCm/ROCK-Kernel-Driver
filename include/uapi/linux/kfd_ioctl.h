@@ -475,6 +475,22 @@ enum kfd_mmio_remap {
 	KFD_MMIO_REMAP_HDP_REG_FLUSH_CNTL = 4,
 };
 
+struct kfd_ioctl_ipc_export_handle_args {
+	__u64 handle;		/* to KFD */
+	__u32 share_handle[4];	/* from KFD */
+	__u32 gpu_id;		/* to KFD */
+	__u32 pad;
+};
+
+struct kfd_ioctl_ipc_import_handle_args {
+	__u64 handle;		/* from KFD */
+	__u64 va_addr;		/* to KFD */
+	__u64 mmap_offset;		/* from KFD */
+	__u32 share_handle[4];	/* to KFD */
+	__u32 gpu_id;		/* to KFD */
+	__u32 pad;
+};
+
 /* Guarantee host access to memory */
 #define KFD_IOCTL_SVM_FLAG_HOST_ACCESS 0x00000001
 /* Fine grained coherency between all devices with access */
@@ -741,6 +757,12 @@ struct kfd_ioctl_set_xnack_mode_args {
 
 #define AMDKFD_IOC_SET_XNACK_MODE		\
 		AMDKFD_IOWR(0x21, struct kfd_ioctl_set_xnack_mode_args)
+
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
+		AMDKFD_IOWR(0x80, struct kfd_ioctl_ipc_import_handle_args)
+
+#define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
+		AMDKFD_IOWR(0x81, struct kfd_ioctl_ipc_export_handle_args)
 
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x22

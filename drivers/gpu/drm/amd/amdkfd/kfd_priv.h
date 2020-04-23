@@ -330,6 +330,19 @@ struct kfd_dev {
 	struct dev_pagemap pgmap;
 };
 
+struct kfd_ipc_obj;
+
+struct kfd_bo {
+	void *mem;
+	struct interval_tree_node it;
+	struct kfd_dev *dev;
+	struct list_head cb_data_head;
+	struct kfd_ipc_obj *kfd_ipc_obj;
+	/* page-aligned VA address */
+	uint64_t cpuva;
+	unsigned int mem_type;
+};
+
 enum kfd_mempool {
 	KFD_MEMPOOL_SYSTEM_CACHEABLE = 1,
 	KFD_MEMPOOL_SYSTEM_WRITECOMBINE = 2,
@@ -814,6 +827,8 @@ struct kfd_process {
 	size_t signal_event_count;
 	bool signal_event_limit_reached;
 
+	struct rb_root_cached bo_interval_tree;
+
 	/* Information used for memory eviction */
 	void *kgd_process_info;
 	/* Eviction fence that is attached to all the BOs of this process. The
@@ -910,9 +925,17 @@ int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 
 /* KFD process API for creating and translating handles */
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
-					void *mem);
+					void *mem, uint64_t start,
+					uint64_t length, uint64_t cpuva,
+					unsigned int mem_type,
+					struct kfd_ipc_obj *ipc_obj);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
+struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,
+					int handle);
+void *kfd_process_find_bo_from_interval(struct kfd_process *p,
+					uint64_t start_addr,
+					uint64_t last_addr);
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
 
@@ -1163,6 +1186,9 @@ void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type);
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 bool kfd_is_locked(void);
+
+/* IPC Support */
+int kfd_ipc_init(void);
 
 /* Compute profile */
 void kfd_inc_compute_active(struct kfd_dev *dev);
