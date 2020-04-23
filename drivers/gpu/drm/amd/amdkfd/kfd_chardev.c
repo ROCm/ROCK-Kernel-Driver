@@ -26,6 +26,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/sched.h>
+#include <linux/sched/mm.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/compat.h>
@@ -36,6 +37,8 @@
 #include <linux/dma-buf.h>
 #include <asm/processor.h>
 #include <linux/ptrace.h>
+#include <linux/pagemap.h>
+
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"

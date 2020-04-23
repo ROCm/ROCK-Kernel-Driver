@@ -31,6 +31,9 @@
 #include <linux/types.h>
 #include <linux/bitmap.h>
 #include <linux/dma-fence.h>
+#include <linux/dma-buf.h>
+#include <linux/mm_types.h>
+#include <linux/scatterlist.h>
 
 struct pci_dev;
 

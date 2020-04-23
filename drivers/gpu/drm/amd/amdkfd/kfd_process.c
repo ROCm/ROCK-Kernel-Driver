@@ -31,6 +31,7 @@
 #include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/file.h>
+#include <asm/page.h>
 #include "kfd_ipc.h"
 #include <linux/pm_runtime.h>
 #include "amdgpu_amdkfd.h"

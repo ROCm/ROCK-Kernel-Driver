@@ -23,7 +23,7 @@
 #ifndef KFD_IOCTL_H_INCLUDED
 #define KFD_IOCTL_H_INCLUDED
 
-#include <drm/drm.h>
+#include <linux/types.h>
 #include <linux/ioctl.h>
 
 #define KFD_IOCTL_MAJOR_VERSION 1

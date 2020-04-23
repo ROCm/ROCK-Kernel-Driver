@@ -35,7 +35,7 @@
 #include <linux/kfifo.h>
 #include <linux/seq_file.h>
 #include <linux/kref.h>
-#include <linux/sysfs.h>
+#include <linux/pid.h>
 #include <linux/interval_tree.h>
 #include <linux/device_cgroup.h>
 #include <drm/drm_file.h>
