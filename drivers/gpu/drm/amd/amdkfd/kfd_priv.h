@@ -164,6 +164,11 @@ extern int ignore_crat;
 /* Set sh_mem_config.retry_disable on GFX v9 */
 extern int amdgpu_noretry;
 
+/*
+ * Enable privileged mode for all CP queues including user queues
+ */
+extern int priv_cp_queues;
+
 /* Halt if HWS hang is detected */
 extern int halt_if_hws_hang;
 

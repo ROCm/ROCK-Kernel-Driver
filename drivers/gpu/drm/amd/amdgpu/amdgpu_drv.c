@@ -801,6 +801,14 @@ MODULE_PARM_DESC(no_system_mem_limit, "disable system memory limit (false = defa
 int amdgpu_no_queue_eviction_on_vm_fault = 0;
 MODULE_PARM_DESC(no_queue_eviction_on_vm_fault, "No queue eviction on VM fault (0 = queue eviction, 1 = no queue eviction)");
 module_param_named(no_queue_eviction_on_vm_fault, amdgpu_no_queue_eviction_on_vm_fault, int, 0444);
+
+/**
+ * DOC: priv_cp_queues (int)
+ * Enable privileged mode for CP queues. Default value: 0 (off)
+ */
+int priv_cp_queues;
+module_param(priv_cp_queues, int, 0644);
+MODULE_PARM_DESC(priv_cp_queues, "Enable privileged mode for CP queues (0 = off (default), 1 = on)");
 #endif
 
 /**
