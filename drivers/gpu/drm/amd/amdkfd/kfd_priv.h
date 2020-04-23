@@ -343,6 +343,38 @@ struct kfd_bo {
 	unsigned int mem_type;
 };
 
+struct cma_system_bo {
+	struct kgd_mem *mem;
+	struct sg_table *sg;
+	struct kfd_dev *dev;
+	struct list_head list;
+};
+
+/* Similar to iov_iter */
+struct cma_iter {
+	/* points to current entry of range array */
+	struct kfd_memory_range *array;
+	/* total number of entries in the initial array */
+	unsigned long nr_segs;
+	/* total amount of data pointed by kfd array*/
+	unsigned long total;
+	/* offset into the entry pointed by cma_iter.array */
+	unsigned long offset;
+	struct kfd_process *p;
+	struct mm_struct *mm;
+	struct task_struct *task;
+	/* current kfd_bo associated with cma_iter.array.va_addr */
+	struct kfd_bo *cur_bo;
+	/* offset w.r.t cur_bo */
+	unsigned long bo_offset;
+	/* If cur_bo is a userptr BO, then a shadow system BO is created
+	 * using its underlying pages. cma_bo holds this BO. cma_list is a
+	 * list cma_bos created in one session
+	 */
+	struct cma_system_bo *cma_bo;
+	struct list_head cma_list;
+};
+
 enum kfd_mempool {
 	KFD_MEMPOOL_SYSTEM_CACHEABLE = 1,
 	KFD_MEMPOOL_SYSTEM_WRITECOMBINE = 2,

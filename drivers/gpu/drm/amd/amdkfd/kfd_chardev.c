@@ -1302,7 +1302,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->drm_priv, (struct kgd_mem **) &mem, &offset,
+		pdd->drm_priv, NULL, (struct kgd_mem **) &mem, &offset,
 		flags);
 
 	if (err)
@@ -1741,6 +1741,843 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 		pr_err("Failed to import IPC handle\n");
 
 	return r;
+}
+
+/* Maximum number of entries for process pages array which lives on stack */
+#define MAX_PP_STACK_COUNT 16
+/* Maximum number of pages kmalloc'd to hold struct page's during copy */
+#define MAX_KMALLOC_PAGES (PAGE_SIZE * 2)
+#define MAX_PP_KMALLOC_COUNT (MAX_KMALLOC_PAGES/sizeof(struct page *))
+
+static void kfd_put_sg_table(struct sg_table *sg)
+{
+	unsigned int i;
+	struct scatterlist *s;
+
+	for_each_sg(sg->sgl, s, sg->nents, i)
+		put_page(sg_page(s));
+}
+
+
+/* Create a sg table for the given userptr BO by pinning its system pages
+ * @bo: userptr BO
+ * @offset: Offset into BO
+ * @mm/@task: mm_struct & task_struct of the process that holds the BO
+ * @size: in/out: desired size / actual size which could be smaller
+ * @sg_size: out: Size of sg table. This is ALIGN_UP(@size)
+ * @ret_sg: out sg table
+ */
+static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
+					       int64_t offset, int cma_write,
+					       struct mm_struct *mm,
+					       struct task_struct *task,
+					       uint64_t *size,
+					       uint64_t *sg_size,
+					       struct sg_table **ret_sg)
+{
+	int ret, locked = 1;
+	struct sg_table *sg = NULL;
+	unsigned int i, offset_in_page, flags = 0;
+	unsigned long nents, n;
+	unsigned long pa = (bo->cpuva + offset) & PAGE_MASK;
+	unsigned int cur_page = 0;
+	struct scatterlist *s;
+	uint64_t sz = *size;
+	struct page **process_pages;
+
+	*sg_size = 0;
+	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
+	if (!sg)
+		return -ENOMEM;
+
+	offset_in_page = offset & (PAGE_SIZE - 1);
+	nents = (sz + offset_in_page + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	ret = sg_alloc_table(sg, nents, GFP_KERNEL);
+	if (unlikely(ret)) {
+		ret = -ENOMEM;
+		goto sg_alloc_fail;
+	}
+	process_pages = kmalloc_array(nents, sizeof(struct pages *),
+				      GFP_KERNEL);
+	if (!process_pages) {
+		ret = -ENOMEM;
+		goto page_alloc_fail;
+	}
+
+	if (cma_write)
+		flags = FOLL_WRITE;
+	locked = 1;
+	mmap_read_lock(mm);
+	n = get_user_pages_remote(mm, pa, nents, flags, process_pages,
+				  NULL, &locked);
+	if (locked)
+		mmap_read_unlock(mm);
+	if (n <= 0) {
+		pr_err("CMA: Invalid virtual address 0x%lx\n", pa);
+		ret = -EFAULT;
+		goto get_user_fail;
+	}
+	if (n != nents) {
+		/* Pages pinned < requested. Set the size accordingly */
+		*size = (n * PAGE_SIZE) - offset_in_page;
+		pr_debug("Requested %lx but pinned %lx\n", nents, n);
+	}
+
+	sz = 0;
+	for_each_sg(sg->sgl, s, n, i) {
+		sg_set_page(s, process_pages[cur_page], PAGE_SIZE,
+			    offset_in_page);
+		sg_dma_address(s) = page_to_phys(process_pages[cur_page]);
+		offset_in_page = 0;
+		cur_page++;
+		sz += PAGE_SIZE;
+	}
+	*ret_sg = sg;
+	*sg_size = sz;
+
+	kfree(process_pages);
+	return 0;
+
+get_user_fail:
+	kfree(process_pages);
+page_alloc_fail:
+	sg_free_table(sg);
+sg_alloc_fail:
+	kfree(sg);
+	return ret;
+}
+
+static void kfd_free_cma_bos(struct cma_iter *ci)
+{
+	struct cma_system_bo *cma_bo, *tmp;
+
+	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
+		struct kfd_dev *dev = cma_bo->dev;
+
+		/* sg table is deleted by free_memory_of_gpu */
+		if (cma_bo->sg)
+			kfd_put_sg_table(cma_bo->sg);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
+		list_del(&cma_bo->list);
+		kfree(cma_bo);
+	}
+}
+
+/* 1 second timeout */
+#define CMA_WAIT_TIMEOUT msecs_to_jiffies(1000)
+
+static int kfd_cma_fence_wait(struct dma_fence *f)
+{
+	int ret;
+
+	ret = dma_fence_wait_timeout(f, false, CMA_WAIT_TIMEOUT);
+	if (likely(ret > 0))
+		return 0;
+	if (!ret)
+		ret = -ETIME;
+	return ret;
+}
+
+/* Put previous (old) fence @pf but it waits for @pf to signal if the context
+ * of the current fence @cf is different.
+ */
+static int kfd_fence_put_wait_if_diff_context(struct dma_fence *cf,
+					      struct dma_fence *pf)
+{
+	int ret = 0;
+
+	if (pf && cf && cf->context != pf->context)
+		ret = kfd_cma_fence_wait(pf);
+	dma_fence_put(pf);
+	return ret;
+}
+
+#define MAX_SYSTEM_BO_SIZE (512*PAGE_SIZE)
+
+/* Create an equivalent system BO for the given @bo. If @bo is a userptr then
+ * create a new system BO by pinning underlying system pages of the given
+ * userptr BO. If @bo is in Local Memory then create an empty system BO and
+ * then copy @bo into this new BO.
+ * @bo: Userptr BO or Local Memory BO
+ * @offset: Offset into bo
+ * @size: in/out: The size of the new BO could be less than requested if all
+ *        the pages couldn't be pinned or size > MAX_SYSTEM_BO_SIZE. This would
+ *        be reflected in @size
+ * @mm/@task: mm/task to which @bo belongs to
+ * @cma_bo: out: new system BO
+ */
+static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
+				    uint64_t *size, uint64_t offset,
+				    int cma_write, struct kfd_process *p,
+				    struct mm_struct *mm,
+				    struct task_struct *task,
+				    struct cma_system_bo **cma_bo)
+{
+	int ret;
+	struct kfd_process_device *pdd = NULL;
+	struct cma_system_bo *cbo;
+	uint64_t bo_size = 0;
+	struct dma_fence *f;
+
+	uint32_t flags = KFD_IOC_ALLOC_MEM_FLAGS_GTT | KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE |
+			 KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	*cma_bo = NULL;
+	cbo = kzalloc(sizeof(**cma_bo), GFP_KERNEL);
+	if (!cbo)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&cbo->list);
+	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+		bo_size = min_t(uint64_t, *size, MAX_SYSTEM_BO_SIZE);
+	else if (bo->cpuva) {
+		ret = kfd_create_sg_table_from_userptr_bo(bo, offset,
+							  cma_write, mm, task,
+							  size, &bo_size,
+							  &cbo->sg);
+		if (ret) {
+			pr_err("CMA: BO create with sg failed %d\n", ret);
+			goto sg_fail;
+		}
+	} else {
+		WARN_ON(1);
+		ret = -EINVAL;
+		goto sg_fail;
+	}
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(kdev, p);
+	if (!pdd) {
+		mutex_unlock(&p->mutex);
+		pr_err("Process device data doesn't exist\n");
+		ret = -EINVAL;
+		goto pdd_fail;
+	}
+
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
+						      pdd->drm_priv, cbo->sg,
+						      &cbo->mem, NULL, flags);
+	mutex_unlock(&p->mutex);
+	if (ret) {
+		pr_err("Failed to create shadow system BO %d\n", ret);
+		goto pdd_fail;
+	}
+
+	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->kgd, bo->mem,
+						    offset, cbo->mem, 0,
+						    bo_size, &f, size);
+		if (ret) {
+			pr_err("CMA: Intermediate copy failed %d\n", ret);
+			goto copy_fail;
+		}
+
+		/* Wait for the copy to finish as subsequent copy will be done
+		 * by different device
+		 */
+		ret = kfd_cma_fence_wait(f);
+		dma_fence_put(f);
+		if (ret) {
+			pr_err("CMA: Intermediate copy timed out %d\n", ret);
+			goto copy_fail;
+		}
+	}
+
+	cbo->dev = kdev;
+	*cma_bo = cbo;
+
+	return ret;
+
+copy_fail:
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
+pdd_fail:
+	if (cbo->sg) {
+		kfd_put_sg_table(cbo->sg);
+		sg_free_table(cbo->sg);
+		kfree(cbo->sg);
+	}
+sg_fail:
+	kfree(cbo);
+	return ret;
+}
+
+/* Update cma_iter.cur_bo with KFD BO that is assocaited with
+ * cma_iter.array.va_addr
+ */
+static int kfd_cma_iter_update_bo(struct cma_iter *ci)
+{
+	struct kfd_memory_range *arr = ci->array;
+	uint64_t va_end = arr->va_addr + arr->size - 1;
+
+	mutex_lock(&ci->p->mutex);
+	ci->cur_bo = kfd_process_find_bo_from_interval(ci->p, arr->va_addr,
+						       va_end);
+	mutex_unlock(&ci->p->mutex);
+
+	if (!ci->cur_bo || va_end > ci->cur_bo->it.last) {
+		pr_err("CMA failed. Range out of bounds\n");
+		return -EFAULT;
+	}
+	return 0;
+}
+
+/* Advance iter by @size bytes. */
+static int kfd_cma_iter_advance(struct cma_iter *ci, unsigned long size)
+{
+	int ret = 0;
+
+	ci->offset += size;
+	if (WARN_ON(size > ci->total || ci->offset > ci->array->size))
+		return -EFAULT;
+	ci->total -= size;
+	/* If current range is copied, move to next range if available. */
+	if (ci->offset == ci->array->size) {
+
+		/* End of all ranges */
+		if (!(--ci->nr_segs))
+			return 0;
+
+		ci->array++;
+		ci->offset = 0;
+		ret = kfd_cma_iter_update_bo(ci);
+		if (ret)
+			return ret;
+	}
+	ci->bo_offset = (ci->array->va_addr + ci->offset) -
+			   ci->cur_bo->it.start;
+	return ret;
+}
+
+static int kfd_cma_iter_init(struct kfd_memory_range *arr, unsigned long segs,
+			     struct kfd_process *p, struct mm_struct *mm,
+			     struct task_struct *task, struct cma_iter *ci)
+{
+	int ret;
+	int nr;
+
+	if (!arr || !segs)
+		return -EINVAL;
+
+	memset(ci, 0, sizeof(*ci));
+	INIT_LIST_HEAD(&ci->cma_list);
+	ci->array = arr;
+	ci->nr_segs = segs;
+	ci->p = p;
+	ci->offset = 0;
+	ci->mm = mm;
+	ci->task = task;
+	for (nr = 0; nr < segs; nr++)
+		ci->total += arr[nr].size;
+
+	/* Valid but size is 0. So copied will also be 0 */
+	if (!ci->total)
+		return 0;
+
+	ret = kfd_cma_iter_update_bo(ci);
+	if (!ret)
+		ci->bo_offset = arr->va_addr - ci->cur_bo->it.start;
+	return ret;
+}
+
+static bool kfd_cma_iter_end(struct cma_iter *ci)
+{
+	if (!(ci->nr_segs) || !(ci->total))
+		return true;
+	return false;
+}
+
+/* Copies @size bytes from si->cur_bo to di->cur_bo BO. The function assumes
+ * both source and dest. BOs are userptr BOs. Both BOs can either belong to
+ * current process or one of the BOs can belong to a differnt
+ * process. @Returns 0 on success, -ve on failure
+ *
+ * @si: Source iter
+ * @di: Dest. iter
+ * @cma_write: Indicates if it is write to remote or read from remote
+ * @size: amount of bytes to be copied
+ * @copied: Return number of bytes actually copied.
+ */
+static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
+				bool cma_write, uint64_t size,
+				uint64_t *copied)
+{
+	int i, ret = 0, locked;
+	unsigned int nents, nl;
+	unsigned int offset_in_page;
+	struct page *pp_stack[MAX_PP_STACK_COUNT];
+	struct page **process_pages = pp_stack;
+	unsigned long rva, lva = 0, flags = 0;
+	uint64_t copy_size, to_copy = size;
+	struct cma_iter *li, *ri;
+
+	if (cma_write) {
+		ri = di;
+		li = si;
+		flags |= FOLL_WRITE;
+	} else {
+		li = di;
+		ri = si;
+	}
+	/* rva: remote virtual address. Page aligned to start page.
+	 * rva + offset_in_page: Points to remote start address
+	 * lva: local virtual address. Points to the start address.
+	 * nents: computes number of remote pages to request
+	 */
+	offset_in_page = ri->bo_offset & (PAGE_SIZE - 1);
+	rva = (ri->cur_bo->cpuva + ri->bo_offset) & PAGE_MASK;
+	lva = li->cur_bo->cpuva + li->bo_offset;
+
+	nents = (size + offset_in_page + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	copy_size = min_t(uint64_t, size, PAGE_SIZE - offset_in_page);
+	*copied = 0;
+
+	if (nents > MAX_PP_STACK_COUNT) {
+		/* For reliability kmalloc only 2 pages worth */
+		process_pages = kmalloc(min_t(size_t, MAX_KMALLOC_PAGES,
+					      sizeof(struct pages *)*nents),
+					GFP_KERNEL);
+
+		if (!process_pages)
+			return -ENOMEM;
+	}
+
+	while (nents && to_copy) {
+		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
+		locked = 1;
+		mmap_read_lock(ri->mm);
+		nl = get_user_pages_remote(ri->mm, rva, nl,
+					   flags, process_pages, NULL,
+					   &locked);
+		if (locked)
+			mmap_read_unlock(ri->mm);
+		if (nl <= 0) {
+			pr_err("CMA: Invalid virtual address 0x%lx\n", rva);
+			ret = -EFAULT;
+			break;
+		}
+
+		for (i = 0; i < nl; i++) {
+			unsigned int n;
+			void *kaddr = kmap(process_pages[i]);
+
+			if (cma_write) {
+				n = copy_from_user(kaddr+offset_in_page,
+						   (void *)lva, copy_size);
+				set_page_dirty(process_pages[i]);
+			} else {
+				n = copy_to_user((void *)lva,
+						 kaddr+offset_in_page,
+						 copy_size);
+			}
+			kunmap(kaddr);
+			if (n) {
+				ret = -EFAULT;
+				break;
+			}
+			to_copy -= copy_size;
+			if (!to_copy)
+				break;
+			lva += copy_size;
+			rva += (copy_size + offset_in_page);
+			WARN_ONCE(rva & (PAGE_SIZE - 1),
+				  "CMA: Error in remote VA computation");
+			offset_in_page = 0;
+			copy_size = min_t(uint64_t, to_copy, PAGE_SIZE);
+		}
+
+		for (i = 0; i < nl; i++)
+			put_page(process_pages[i]);
+
+		if (ret)
+			break;
+		nents -= nl;
+	}
+
+	if (process_pages != pp_stack)
+		kfree(process_pages);
+
+	*copied = (size - to_copy);
+	return ret;
+
+}
+
+static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
+			      struct kfd_process *p, struct kgd_mem **mem)
+{
+	int ret;
+	struct kfd_process_device *pdd = NULL;
+	uint32_t flags = KFD_IOC_ALLOC_MEM_FLAGS_GTT | KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE |
+			 KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+
+	if (!mem || !size || !p || !kdev)
+		return -EINVAL;
+
+	*mem = NULL;
+
+	mutex_lock(&p->mutex);
+	pdd = kfd_get_process_device_data(kdev, p);
+	if (!pdd) {
+		mutex_unlock(&p->mutex);
+		pr_err("Process device data doesn't exist\n");
+		return -EINVAL;
+	}
+
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
+						      pdd->drm_priv, NULL,
+						      mem, NULL, flags);
+	mutex_unlock(&p->mutex);
+	if (ret) {
+		pr_err("Failed to create shadow system BO %d\n", ret);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
+{
+	if (!mem)
+		return -EINVAL;
+
+	/* param adev is not used*/
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
+}
+
+/* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
+ * respective offset.
+ * @si: Source iter
+ * @di: Dest. iter
+ * @cma_write: Indicates if it is write to remote or read from remote
+ * @size: amount of bytes to be copied
+ * @f: Return the last fence if any
+ * @copied: Return number of bytes actually copied.
+ */
+static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
+			int cma_write, uint64_t size,
+			struct dma_fence **f, uint64_t *copied,
+			struct kgd_mem **tmp_mem)
+{
+	int err = 0;
+	struct kfd_bo *dst_bo = di->cur_bo, *src_bo = si->cur_bo;
+	uint64_t src_offset = si->bo_offset, dst_offset = di->bo_offset;
+	struct kgd_mem *src_mem = src_bo->mem, *dst_mem = dst_bo->mem;
+	struct kfd_dev *dev = dst_bo->dev;
+	int d2d = 0;
+
+	*copied = 0;
+	if (f)
+		*f = NULL;
+	if (src_bo->cpuva && dst_bo->cpuva)
+		return kfd_copy_userptr_bos(si, di, cma_write, size, copied);
+
+	/* If either source or dest. is userptr, create a shadow system BO
+	 * by using the underlying userptr BO pages. Then use this shadow
+	 * BO for copy. src_offset & dst_offset are adjusted because the new BO
+	 * is only created for the window (offset, size) requested.
+	 * The shadow BO is created on the other device. This means if the
+	 * other BO is a device memory, the copy will be using that device.
+	 * The BOs are stored in cma_list for deferred cleanup. This minimizes
+	 * fence waiting just to the last fence.
+	 */
+	if (src_bo->cpuva) {
+		dev = dst_bo->dev;
+		err = kfd_create_cma_system_bo(dev, src_bo, &size,
+					       si->bo_offset, cma_write,
+					       si->p, si->mm, si->task,
+					       &si->cma_bo);
+		src_mem = si->cma_bo->mem;
+		src_offset = si->bo_offset & (PAGE_SIZE - 1);
+		list_add_tail(&si->cma_bo->list, &si->cma_list);
+	} else if (dst_bo->cpuva) {
+		dev = src_bo->dev;
+		err = kfd_create_cma_system_bo(dev, dst_bo, &size,
+					       di->bo_offset, cma_write,
+					       di->p, di->mm, di->task,
+					       &di->cma_bo);
+		dst_mem = di->cma_bo->mem;
+		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
+		list_add_tail(&di->cma_bo->list, &di->cma_list);
+	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+		/* This indicates that atleast on of the BO is in local mem.
+		 * If both are in local mem of different devices then create an
+		 * intermediate System BO and do a double copy
+		 * [VRAM]--gpu1-->[System BO]--gpu2-->[VRAM].
+		 * If only one BO is in VRAM then use that GPU to do the copy
+		 */
+		if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM &&
+		    dst_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+			dev = dst_bo->dev;
+			size = min_t(uint64_t, size, MAX_SYSTEM_BO_SIZE);
+			d2d = 1;
+
+			if (*tmp_mem == NULL) {
+				if (kfd_create_kgd_mem(src_bo->dev,
+							MAX_SYSTEM_BO_SIZE,
+							si->p,
+							tmp_mem))
+					return -EINVAL;
+			}
+
+			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->kgd,
+						src_bo->mem, si->bo_offset,
+						*tmp_mem, 0,
+						size, f, &size))
+				/* tmp_mem will be freed in caller.*/
+				return -EINVAL;
+
+			kfd_cma_fence_wait(*f);
+			dma_fence_put(*f);
+
+			src_mem = *tmp_mem;
+			src_offset = 0;
+		} else if (src_bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			dev = src_bo->dev;
+		/* else already set to dst_bo->dev */
+	}
+
+	if (err) {
+		pr_err("Failed to create system BO %d", err);
+		return -EINVAL;
+	}
+
+	err = amdgpu_amdkfd_copy_mem_to_mem(dev->kgd, src_mem, src_offset,
+					    dst_mem, dst_offset, size, f,
+					    copied);
+	/* The tmp_bo allocates additional memory. So it is better to wait and
+	 * delete. Also since multiple GPUs are involved the copies are
+	 * currently not pipelined.
+	 */
+	if (*tmp_mem && d2d) {
+		if (!err) {
+			kfd_cma_fence_wait(*f);
+			dma_fence_put(*f);
+			*f = NULL;
+		}
+	}
+	return err;
+}
+
+/* Copy single range from source iterator @si to destination iterator @di.
+ * @si will move to next range and @di will move by bytes copied.
+ * @return : 0 for success or -ve for failure
+ * @f: The last fence if any
+ * @copied: out: number of bytes copied
+ */
+static int kfd_copy_single_range(struct cma_iter *si, struct cma_iter *di,
+				 bool cma_write, struct dma_fence **f,
+				 uint64_t *copied, struct kgd_mem **tmp_mem)
+{
+	int err = 0;
+	uint64_t copy_size, n;
+	uint64_t size = si->array->size;
+	struct kfd_bo *src_bo = si->cur_bo;
+	struct dma_fence *lfence = NULL;
+
+	if (!src_bo || !di || !copied)
+		return -EINVAL;
+	*copied = 0;
+	if (f)
+		*f = NULL;
+
+	while (size && !kfd_cma_iter_end(di)) {
+		struct dma_fence *fence = NULL;
+
+		copy_size = min(size, (di->array->size - di->offset));
+
+		err = kfd_copy_bos(si, di, cma_write, copy_size,
+				&fence, &n, tmp_mem);
+		if (err) {
+			pr_err("CMA %d failed\n", err);
+			break;
+		}
+
+		if (fence) {
+			err = kfd_fence_put_wait_if_diff_context(fence,
+								 lfence);
+			lfence = fence;
+			if (err)
+				break;
+		}
+
+		size -= n;
+		*copied += n;
+		err = kfd_cma_iter_advance(si, n);
+		if (err)
+			break;
+		err = kfd_cma_iter_advance(di, n);
+		if (err)
+			break;
+	}
+
+	if (f)
+		*f = dma_fence_get(lfence);
+	dma_fence_put(lfence);
+
+	return err;
+}
+
+static int kfd_ioctl_cross_memory_copy(struct file *filep,
+				       struct kfd_process *local_p, void *data)
+{
+	struct kfd_ioctl_cross_memory_copy_args *args = data;
+	struct kfd_memory_range *src_array, *dst_array;
+	struct kfd_process *remote_p;
+	struct task_struct *remote_task;
+	struct mm_struct *remote_mm;
+	struct pid *remote_pid;
+	struct dma_fence *lfence = NULL;
+	uint64_t copied = 0, total_copied = 0;
+	struct cma_iter di, si;
+	const char *cma_op;
+	int err = 0;
+	struct kgd_mem *tmp_mem = NULL;
+
+	/* Check parameters */
+	if (args->src_mem_range_array == 0 || args->dst_mem_range_array == 0 ||
+		args->src_mem_array_size == 0 || args->dst_mem_array_size == 0)
+		return -EINVAL;
+	args->bytes_copied = 0;
+
+	/* Allocate space for source and destination arrays */
+	src_array = kmalloc_array((args->src_mem_array_size +
+				  args->dst_mem_array_size),
+				  sizeof(struct kfd_memory_range),
+				  GFP_KERNEL);
+	if (!src_array)
+		return -ENOMEM;
+	dst_array = &src_array[args->src_mem_array_size];
+
+	if (copy_from_user(src_array, (void __user *)args->src_mem_range_array,
+			   args->src_mem_array_size *
+			   sizeof(struct kfd_memory_range))) {
+		err = -EFAULT;
+		goto copy_from_user_fail;
+	}
+	if (copy_from_user(dst_array, (void __user *)args->dst_mem_range_array,
+			   args->dst_mem_array_size *
+			   sizeof(struct kfd_memory_range))) {
+		err = -EFAULT;
+		goto copy_from_user_fail;
+	}
+
+	/* Get remote process */
+	remote_pid = find_get_pid(args->pid);
+	if (!remote_pid) {
+		pr_err("Cross mem copy failed. Invalid PID %d\n", args->pid);
+		err = -ESRCH;
+		goto copy_from_user_fail;
+	}
+
+	remote_task = get_pid_task(remote_pid, PIDTYPE_PID);
+	if (!remote_pid) {
+		pr_err("Cross mem copy failed. Invalid PID or task died %d\n",
+			args->pid);
+		err = -ESRCH;
+		goto get_pid_task_fail;
+	}
+
+	/* Check access permission */
+	remote_mm = mm_access(remote_task, PTRACE_MODE_ATTACH_REALCREDS);
+	if (!remote_mm || IS_ERR(remote_mm)) {
+		err = IS_ERR(remote_mm) ? PTR_ERR(remote_mm) : -ESRCH;
+		if (err == -EACCES) {
+			pr_err("Cross mem copy failed. Permission error\n");
+			err = -EPERM;
+		} else
+			pr_err("Cross mem copy failed. Invalid task %d\n",
+			       err);
+		goto mm_access_fail;
+	}
+
+	remote_p = kfd_get_process(remote_task);
+	if (IS_ERR(remote_p)) {
+		pr_err("Cross mem copy failed. Invalid kfd process %d\n",
+		       args->pid);
+		err = -EINVAL;
+		goto kfd_process_fail;
+	}
+	/* Initialise cma_iter si & @di with source & destination range. */
+	if (KFD_IS_CROSS_MEMORY_WRITE(args->flags)) {
+		cma_op = "WRITE";
+		pr_debug("CMA WRITE: local -> remote\n");
+		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
+					remote_p, remote_mm, remote_task, &di);
+		if (err)
+			goto kfd_process_fail;
+		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
+					local_p, current->mm, current, &si);
+		if (err)
+			goto kfd_process_fail;
+	} else {
+		cma_op = "READ";
+		pr_debug("CMA READ: remote -> local\n");
+
+		err = kfd_cma_iter_init(dst_array, args->dst_mem_array_size,
+					local_p, current->mm, current, &di);
+		if (err)
+			goto kfd_process_fail;
+		err = kfd_cma_iter_init(src_array, args->src_mem_array_size,
+					remote_p, remote_mm, remote_task, &si);
+		if (err)
+			goto kfd_process_fail;
+	}
+
+	/* Copy one si range at a time into di. After each call to
+	 * kfd_copy_single_range() si will move to next range. di will be
+	 * incremented by bytes copied
+	 */
+	while (!kfd_cma_iter_end(&si) && !kfd_cma_iter_end(&di)) {
+		struct dma_fence *fence = NULL;
+
+		err = kfd_copy_single_range(&si, &di,
+					KFD_IS_CROSS_MEMORY_WRITE(args->flags),
+					&fence, &copied, &tmp_mem);
+		total_copied += copied;
+
+		if (err)
+			break;
+
+		/* Release old fence if a later fence is created. If no
+		 * new fence is created, then keep the preivous fence
+		 */
+		if (fence) {
+			err = kfd_fence_put_wait_if_diff_context(fence,
+								 lfence);
+			lfence = fence;
+			if (err)
+				break;
+		}
+	}
+
+	/* Wait for the last fence irrespective of error condition */
+	if (lfence) {
+		err = kfd_cma_fence_wait(lfence);
+		dma_fence_put(lfence);
+		if (err)
+			pr_err("CMA %s failed. BO timed out\n", cma_op);
+	}
+
+	if (tmp_mem)
+		kfd_destroy_kgd_mem(tmp_mem);
+
+	kfd_free_cma_bos(&si);
+	kfd_free_cma_bos(&di);
+
+kfd_process_fail:
+	mmput(remote_mm);
+mm_access_fail:
+	put_task_struct(remote_task);
+get_pid_task_fail:
+	put_pid(remote_pid);
+copy_from_user_fail:
+	kfree(src_array);
+
+	/* An error could happen after partial copy. In that case this will
+	 * reflect partial amount of bytes copied
+	 */
+	args->bytes_copied = total_copied;
+	return err;
 }
 
 static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
@@ -2182,6 +3019,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
 				kfd_ioctl_ipc_export_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY,
+				kfd_ioctl_cross_memory_copy, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_dbg_set_debug_trap, 0),

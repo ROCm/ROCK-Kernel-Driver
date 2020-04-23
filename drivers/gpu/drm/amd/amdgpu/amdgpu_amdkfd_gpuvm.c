@@ -1128,6 +1128,17 @@ static struct sg_table *create_doorbell_sg(uint64_t addr, uint32_t size)
 	return sg;
 }
 
+static bool check_sg_size(struct sg_table *sgt, uint64_t size)
+{
+	unsigned int count;
+	struct scatterlist *sg;
+
+	for_each_sg(sgt->sgl, sg, sgt->nents, count)
+		size -= sg->length;
+
+	return (size == 0);
+}
+
 static int process_validate_vms(struct amdkfd_process_info *process_info)
 {
 	struct amdgpu_vm *peer_vm;
@@ -1381,13 +1392,12 @@ uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *drm_priv)
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct kgd_dev *kgd, uint64_t va, uint64_t size,
-		void *drm_priv, struct kgd_mem **mem,
+		void *drm_priv, struct sg_table *sg, struct kgd_mem **mem,
 		uint64_t *offset, uint32_t flags)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
-	struct sg_table *sg = NULL;
 	uint64_t user_addr = 0;
 	struct amdgpu_bo *bo;
 	struct drm_gem_object *gobj;
@@ -1406,6 +1416,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_GTT) {
 		domain = alloc_domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_flags = 0;
+		if (sg && !check_sg_size(sg, size))
+			return -EINVAL;
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
@@ -1421,6 +1433,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		alloc_flags = 0;
 		if (size > UINT_MAX)
 			return -EINVAL;
+		WARN_ON(sg);
 		sg = create_doorbell_sg(*offset, size);
 		if (!sg)
 			return -ENOMEM;
@@ -1428,6 +1441,10 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		return -EINVAL;
 	}
 
+	if (sg) {
+		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
+		bo_type = ttm_bo_type_sg;
+	}
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem) {
 		ret = -ENOMEM;
@@ -1448,6 +1465,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	amdgpu_sync_create(&(*mem)->sync);
 
+	size = ALIGN(size, PAGE_SIZE);
 	ret = amdgpu_amdkfd_reserve_mem_limit(adev, size, alloc_domain, !!sg);
 	if (ret) {
 		pr_debug("Insufficient memory\n");
@@ -2520,6 +2538,85 @@ int amdgpu_amdkfd_remove_gws_from_process(void *info, void *mem)
 	mutex_destroy(&kgd_mem->lock);
 	kfree(mem);
 	return 0;
+}
+
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+				  uint64_t src_offset, struct kgd_mem *dst_mem,
+				  uint64_t dst_offset, uint64_t size,
+				  struct dma_fence **f, uint64_t *actual_size)
+{
+	struct amdgpu_device *adev = NULL;
+	struct amdgpu_copy_mem src, dst;
+	struct ww_acquire_ctx ticket;
+	struct list_head list, duplicates;
+	struct ttm_validate_buffer resv_list[2];
+	struct dma_fence *fence = NULL;
+	int i, r;
+
+	if (!kgd || !src_mem || !dst_mem || !actual_size)
+		return -EINVAL;
+
+	*actual_size = 0;
+
+	adev = get_amdgpu_device(kgd);
+	INIT_LIST_HEAD(&list);
+	INIT_LIST_HEAD(&duplicates);
+
+	src.bo = &src_mem->bo->tbo;
+	dst.bo = &dst_mem->bo->tbo;
+	src.mem = &src.bo->mem;
+	dst.mem = &dst.bo->mem;
+	src.offset = src_offset;
+	dst.offset = dst_offset;
+
+	resv_list[0].bo = src.bo;
+	resv_list[1].bo = dst.bo;
+
+	for (i = 0; i < 2; i++) {
+		resv_list[i].num_shared = 1;
+		list_add_tail(&resv_list[i].head, &list);
+	}
+
+	r = ttm_eu_reserve_buffers(&ticket, &list, false, &duplicates);
+	if (r) {
+		pr_err("Copy buffer failed. Unable to reserve bo (%d)\n", r);
+		return r;
+	}
+
+	/* The process to which the Source and Dest BOs belong to could be
+	 * evicted and the BOs invalidated. So validate BOs before use
+	 */
+	r = amdgpu_amdkfd_bo_validate(src_mem->bo, src_mem->domain, false);
+	if (r) {
+		pr_err("CMA fail: SRC BO validate failed %d\n", r);
+		goto validate_fail;
+	}
+
+
+	r = amdgpu_amdkfd_bo_validate(dst_mem->bo, dst_mem->domain, false);
+	if (r) {
+		pr_err("CMA fail: DST BO validate failed %d\n", r);
+		goto validate_fail;
+	}
+
+
+	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst, size, false, NULL,
+				       &fence);
+	if (r)
+		pr_err("Copy buffer failed %d\n", r);
+	else
+		*actual_size = size;
+	if (fence) {
+		amdgpu_bo_fence(src_mem->bo, fence, true);
+		amdgpu_bo_fence(dst_mem->bo, fence, true);
+	}
+	if (f)
+		*f = dma_fence_get(fence);
+	dma_fence_put(fence);
+
+validate_fail:
+	ttm_eu_backoff_reservation(&ticket, &list);
+	return r;
 }
 
 /* Returns GPU-specific tiling mode information */
