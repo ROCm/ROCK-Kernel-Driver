@@ -36,6 +36,9 @@
 #define KFD_IOCTL_MAJOR_VERSION 1
 #define KFD_IOCTL_MINOR_VERSION 6
 
+#define KFD_IOCTL_DBG_MAJOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
+
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
 	__u32 minor_version;	/* from KFD */
@@ -96,6 +99,19 @@ struct kfd_ioctl_get_queue_wave_state_args {
 	__u32 save_area_used_size;	/* from KFD */
 	__u32 queue_id;			/* to KFD */
 	__u32 pad;
+};
+
+struct kfd_queue_snapshot_entry {
+	__u64 ring_base_address;
+	__u64 write_pointer_address;
+	__u64 read_pointer_address;
+	__u64 ctx_save_restore_address;
+	__u32 queue_id;
+	__u32 gpu_id;
+	__u32 ring_size;
+	__u32 queue_type;
+	__u32 queue_status;
+	__u32 reserved[19];
 };
 
 /* For kfd_ioctl_set_memory_policy_args.default_policy and alternate_policy */
@@ -192,6 +208,89 @@ struct kfd_ioctl_dbg_wave_control_args {
 	__u64 content_ptr;		/* a pointer to the actual content */
 	__u32 gpu_id;		/* to KFD */
 	__u32 buf_size_in_bytes;	/*including gpu_id and buf_size */
+};
+
+/* mapping event types to API spec */
+#define	KFD_DBG_EV_STATUS_TRAP		1
+#define	KFD_DBG_EV_STATUS_VMFAULT	2
+#define	KFD_DBG_EV_STATUS_SUSPENDED	4
+#define KFD_DBG_EV_STATUS_NEW_QUEUE	8
+#define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1
+
+#define KFD_INVALID_QUEUEID	0xffffffff
+
+/* KFD_IOC_DBG_TRAP_ENABLE:
+ * ptr:   unused
+ * data1: 0=disable, 1=enable
+ * data2: queue ID (for future use)
+ * data3: return value for fd
+ */
+#define KFD_IOC_DBG_TRAP_ENABLE 0
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+ * ptr:   unused
+ * data1: override mode: 0=OR, 1=REPLACE
+ * data2: mask
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 1
+
+/* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+ * ptr:   unused
+ * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
+ * data2: unused
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 2
+
+/* KFD_IOC_DBG_TRAP_NODE_SUSPEND:
+ * ptr:   pointer to an array of Queues IDs
+ * data1: flags
+ * data2: number of queues
+ * data3: grace period
+ */
+#define KFD_IOC_DBG_TRAP_NODE_SUSPEND 3
+
+/* KFD_IOC_DBG_TRAP_NODE_RESUME:
+ * ptr:   pointer to an array of Queues IDs
+ * data1: flags
+ * data2: number of queues
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_NODE_RESUME 4
+
+/* KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
+ * ptr: unused
+ * data1: queue id (IN/OUT)
+ * data2: flags (IN)
+ * data3: suspend[2:2], event type [1:0] (OUT)
+ */
+#define KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT 5
+
+/* KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT:
+ * ptr: user buffer (IN)
+ * data1: flags (IN)
+ * data2: number of queue snapshots (IN/OUT) - 0 for IN ignores buffer writes
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT 6
+
+/* KFD_IOC_DBG_TRAP_GET_VERSION:
+ * prt: unsused
+ * data1: major version (OUT)
+ * data2: minor version (OUT)
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_GET_VERSION	7
+
+struct kfd_ioctl_dbg_trap_args {
+	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
+	__u32 pid;     /* to KFD */
+	__u32 gpu_id;  /* to KFD */
+	__u32 op;      /* to KFD */
+	__u32 data1;   /* to KFD */
+	__u32 data2;   /* to KFD */
+	__u32 data3;   /* to KFD */
 };
 
 /* Matching HSA_EVENTTYPE */
@@ -763,6 +862,9 @@ struct kfd_ioctl_set_xnack_mode_args {
 
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
 		AMDKFD_IOWR(0x81, struct kfd_ioctl_ipc_export_handle_args)
+
+#define AMDKFD_IOC_DBG_TRAP			\
+		AMDKFD_IOWR(0x21, struct kfd_ioctl_dbg_trap_args)
 
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x22

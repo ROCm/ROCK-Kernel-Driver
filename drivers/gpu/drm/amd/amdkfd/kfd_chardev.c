@@ -35,6 +35,7 @@
 #include <linux/mman.h>
 #include <linux/dma-buf.h>
 #include <asm/processor.h>
+#include <linux/ptrace.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
@@ -1742,6 +1743,267 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	return r;
 }
 
+static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_dbg_trap_args *args = data;
+	struct kfd_process_device *pdd = NULL;
+	int r = 0;
+	struct kfd_dev *dev = NULL;
+	struct kfd_process *target = NULL;
+	struct pid *pid = NULL;
+	uint32_t *queue_id_array = NULL;
+	uint32_t gpu_id;
+	uint32_t debug_trap_action;
+	uint32_t data1;
+	uint32_t data2;
+	uint32_t data3;
+	bool need_device;
+	bool need_qid_array;
+
+	debug_trap_action = args->op;
+	gpu_id = args->gpu_id;
+	data1 = args->data1;
+	data2 = args->data2;
+	data3 = args->data3;
+
+	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
+		pr_err("Unsupported sched_policy: %i", sched_policy);
+		r = -EINVAL;
+		goto out;
+	}
+
+	need_device =
+		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_SUSPEND &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_RESUME &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION;
+
+	need_qid_array =
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
+		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
+
+	pid = find_get_pid(args->pid);
+	if (!pid) {
+		pr_err("Cannot find pid info for %i\n",
+				args->pid);
+		r =  -ESRCH;
+		goto out;
+	}
+
+	target = kfd_lookup_process_by_pid(pid);
+	if (!target) {
+		pr_err("Cannot find process info info for %i\n",
+				args->pid);
+		r = -ESRCH;
+		goto out;
+	}
+
+	if (target != p) {
+		bool is_debugger_attached = false;
+
+		rcu_read_lock();
+		if (ptrace_parent(target->lead_thread) == current)
+			is_debugger_attached = true;
+		rcu_read_unlock();
+
+		if (!is_debugger_attached) {
+			pr_err("Cannot debug process\n");
+			r = -ESRCH;
+			goto out;
+		}
+	}
+
+	mutex_lock(&target->mutex);
+
+	if (need_device) {
+
+		dev = kfd_device_by_id(args->gpu_id);
+		if (!dev) {
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		if (dev->device_info->asic_family < CHIP_VEGA10) {
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		pdd = kfd_get_process_device_data(dev, target);
+
+		if (!pdd) {
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		if ((pdd->is_debugging_enabled == false) &&
+				((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE
+				  && data1 == 1) ||
+				 (debug_trap_action ==
+				  KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
+				  data1 != 0))) {
+
+			/* We need to reserve the debug trap vmid if we haven't
+			 * yet, and are enabling trap debugging, or we are
+			 * setting the wave launch mode to something other than
+			 * normal==0.
+			 */
+			r = reserve_debug_trap_vmid(dev->dqm);
+			if (r)
+				goto unlock_out;
+
+			pdd->is_debugging_enabled = true;
+		}
+
+		if (!pdd->is_debugging_enabled) {
+			pr_err("Debugging is not enabled for this device\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
+	} else if (need_qid_array) {
+		/* data 2 has the number of queue IDs */
+		size_t queue_id_array_size = sizeof(uint32_t) * data2;
+
+		queue_id_array = kzalloc(queue_id_array_size, GFP_KERNEL);
+		if (!queue_id_array) {
+			r = -ENOMEM;
+			goto unlock_out;
+		}
+		/* We need to copy the queue IDs from userspace */
+		if (copy_from_user(queue_id_array,
+					(uint32_t *) args->ptr,
+					queue_id_array_size)) {
+			r = -EFAULT;
+			goto unlock_out;
+		}
+	}
+
+	switch (debug_trap_action) {
+	case KFD_IOC_DBG_TRAP_ENABLE:
+		switch (data1) {
+		case 0:
+			pdd->debug_trap_enabled = false;
+			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			break;
+		case 1:
+			pdd->debug_trap_enabled = true;
+			r = dev->kfd2kgd->enable_debug_trap(dev->kgd,
+					pdd->trap_debug_wave_launch_mode,
+					dev->vm_info.last_vmid_kfd);
+			if (r)
+				break;
+
+			r = kfd_dbg_ev_enable(pdd);
+			if (r >= 0) {
+				args->data3 = r;
+				r = 0;
+			} else {
+				pdd->debug_trap_enabled = false;
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			}
+
+			break;
+		default:
+			pr_err("Invalid trap enable option: %i\n",
+					data1);
+			r = -EINVAL;
+		}
+		break;
+
+	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
+		if (data2 != 0) {
+			/* On current hardware, we only support a trap
+			 * mask value of 0.  This is because the debug
+			 * trap mask is global and shared by all processes
+			 * on current hardware.
+			 */
+			pr_err("Invalid trap override option: %i\n",
+					data2);
+			r = -EINVAL;
+			goto unlock_out;
+		}
+		r = dev->kfd2kgd->set_wave_launch_trap_override(
+				dev->kgd,
+				data1,
+				data2);
+		break;
+
+	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
+		pdd->trap_debug_wave_launch_mode = data1;
+		r = dev->kfd2kgd->set_wave_launch_mode(
+				dev->kgd,
+				data1,
+				dev->vm_info.last_vmid_kfd);
+		break;
+
+	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
+		r = suspend_queues(target,
+				data2, /* Number of queues */
+				data3, /* Grace Period */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
+		break;
+
+	case KFD_IOC_DBG_TRAP_NODE_RESUME:
+		r = resume_queues(target,
+				data2, /* Number of queues */
+				data1, /* Flags */
+				queue_id_array); /* array of queue ids */
+		if (r)
+			goto unlock_out;
+		break;
+	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
+		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,
+						 args->data2,
+						 &args->data3);
+		break;
+	case KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT:
+		r = pqm_get_queue_snapshot(&target->pqm, args->data1,
+					   (void __user *)args->ptr,
+					   args->data2);
+
+		args->data2 = r < 0 ? 0 : r;
+		if (r > 0)
+			r = 0;
+
+		break;
+	case KFD_IOC_DBG_TRAP_GET_VERSION:
+		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
+		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
+		break;
+	default:
+		pr_err("Invalid option: %i\n", debug_trap_action);
+		r = -EINVAL;
+	}
+
+	if (pdd && pdd->trap_debug_wave_launch_mode == 0 &&
+			!pdd->debug_trap_enabled) {
+		int result;
+
+		result = release_debug_trap_vmid(dev->dqm);
+		if (result) {
+			pr_err("Failed to release debug VMID\n");
+			r = result;
+			goto unlock_out;
+		}
+
+		pdd->is_debugging_enabled = false;
+	}
+
+unlock_out:
+	mutex_unlock(&target->mutex);
+
+out:
+	if (pid)
+		put_pid(pid);
+	if (target)
+		kfd_unref_process(target);
+	kfree(queue_id_array);
+	return r;
+}
+
 /* Handle requests for watching SMI events */
 static int kfd_ioctl_smi_events(struct file *filep,
 				struct kfd_process *p, void *data)
@@ -1920,6 +2182,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
 				kfd_ioctl_ipc_export_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
+			kfd_ioctl_dbg_set_debug_trap, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)

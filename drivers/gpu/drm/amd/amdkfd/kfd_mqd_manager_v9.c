@@ -315,12 +315,38 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 		pipe_id, queue_id);
 }
 
+struct user_context_save_area_header {
+	/* Byte offset from start of user context
+	 * save area to the last saved top (lowest
+	 * address) of control stack data. Must be
+	 * 4 byte aligned.
+	 */
+	uint32_t control_stack_offset;
+
+	/* Byte size of the last saved control stack
+	 * data. Must be 4 byte aligned.
+	 */
+	uint32_t control_stack_size;
+
+	/* Byte offset from start of user context save
+	 * area to the last saved base (lowest address)
+	 * of wave state data. Must be 4 byte aligned.
+	 */
+	uint32_t wave_state_offset;
+
+	/* Byte size of the last saved wave state data.
+	 * Must be 4 byte aligned.
+	 */
+	uint32_t wave_state_size;
+};
+
 static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  void __user *ctl_stack,
 			  u32 *ctl_stack_used_size,
 			  u32 *save_area_used_size)
 {
 	struct v9_mqd *m;
+	struct user_context_save_area_header header;
 
 	/* Control stack is located one page after MQD. */
 	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
@@ -332,7 +358,19 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	*save_area_used_size = m->cp_hqd_wg_state_offset -
 		m->cp_hqd_cntl_stack_size;
 
-	if (copy_to_user(ctl_stack, mqd_ctl_stack, m->cp_hqd_cntl_stack_size))
+	header.control_stack_size = *ctl_stack_used_size;
+	header.wave_state_size = *save_area_used_size;
+
+	header.wave_state_offset = m->cp_hqd_wg_state_offset;
+	header.control_stack_offset = m->cp_hqd_cntl_stack_offset;
+
+	if (copy_to_user(ctl_stack, &header, sizeof(header)))
+		return -EFAULT;
+
+	if (copy_to_user(ctl_stack + m->cp_hqd_cntl_stack_offset,
+				mqd_ctl_stack + m->cp_hqd_cntl_stack_offset,
+				*ctl_stack_used_size))
+
 		return -EFAULT;
 
 	return 0;

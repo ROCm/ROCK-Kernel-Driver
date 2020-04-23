@@ -65,7 +65,8 @@ static struct workqueue_struct *kfd_process_wq;
  */
 static struct workqueue_struct *kfd_restore_wq;
 
-static struct kfd_process *find_process(const struct task_struct *thread);
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref);
 static void kfd_process_ref_release(struct kref *ref);
 static struct kfd_process *create_process(const struct task_struct *thread);
 static int kfd_process_init_cwsr_apu(struct kfd_process *p, struct file *filep);
@@ -822,7 +823,7 @@ struct kfd_process *kfd_create_process(struct file *filep)
 	mutex_lock(&kfd_processes_mutex);
 
 	/* A prior open of /dev/kfd could have already created the process. */
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (process) {
 		pr_debug("Process already found\n");
 	} else {
@@ -890,7 +891,7 @@ struct kfd_process *kfd_get_process(const struct task_struct *thread)
 	if (thread->group_leader->mm != thread->mm)
 		return ERR_PTR(-EINVAL);
 
-	process = find_process(thread);
+	process = find_process(thread, false);
 	if (!process)
 		return ERR_PTR(-EINVAL);
 
@@ -909,13 +910,16 @@ static struct kfd_process *find_process_by_mm(const struct mm_struct *mm)
 	return NULL;
 }
 
-static struct kfd_process *find_process(const struct task_struct *thread)
+static struct kfd_process *find_process(const struct task_struct *thread,
+		bool ref)
 {
 	struct kfd_process *p;
 	int idx;
 
 	idx = srcu_read_lock(&kfd_processes_srcu);
 	p = find_process_by_mm(thread->mm);
+	if (p && ref)
+		kref_get(&p->ref);
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 
 	return p;
@@ -926,6 +930,26 @@ void kfd_unref_process(struct kfd_process *p)
 	kref_put(&p->ref, kfd_process_ref_release);
 }
 
+/* This increments the process->ref counter. */
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid)
+{
+	struct task_struct *task = NULL;
+	struct kfd_process *p    = NULL;
+
+	if (!pid) {
+		task = current;
+		get_task_struct(task);
+	} else {
+		task = get_pid_task(pid, PIDTYPE_PID);
+	}
+
+	if (task) {
+		p = find_process(task, true);
+		put_task_struct(task);
+	}
+
+	return p;
+}
 
 static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 {
@@ -1132,6 +1156,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_dev *dev = p->pdds[i]->dev;
 
+		/* Old (deprecated) debugger for GFXv8 and older */
 		mutex_lock(kfd_get_dbgmgr_mutex());
 		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
 			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
@@ -1140,6 +1165,22 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
+
+		/* New debugger for GFXv9 and later */
+		if (pdd->is_debugging_enabled) {
+			if (pdd->debug_trap_enabled) {
+				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				pdd->debug_trap_enabled = false;
+			}
+			if (pdd->trap_debug_wave_launch_mode != 0) {
+				dev->kfd2kgd->set_wave_launch_mode(
+					dev->kgd, 0,
+					dev->vm_info.last_vmid_kfd);
+				pdd->trap_debug_wave_launch_mode = 0;
+			}
+			release_debug_trap_vmid(dev->dqm);
+			pdd->is_debugging_enabled = false;
+		}
 	}
 
 	kfd_process_dequeue_from_all_devices(p);
@@ -1458,6 +1499,9 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
+	pdd->is_debugging_enabled = false;
+	pdd->debug_trap_enabled = false;
+	pdd->trap_debug_wave_launch_mode = 0;
 	pdd->runtime_inuse = false;
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;

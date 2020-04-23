@@ -317,6 +317,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 
 	if (q) {
 		pr_debug("PQM done creating queue\n");
+		q->properties.is_new = true;
 		kfd_procfs_add_queue(q);
 		print_queue_properties(&q->properties);
 	}
@@ -506,6 +507,42 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 						       ctl_stack,
 						       ctl_stack_used_size,
 						       save_area_used_size);
+}
+
+int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
+			   int flags,
+			   struct kfd_queue_snapshot_entry __user *buf,
+			   int num_qss_entries)
+{
+	struct process_queue_node *pqn;
+	int r, qss_entry_count = 0;
+
+	mutex_lock(&pqm->process->event_mutex);
+
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
+		if (!pqn->q)
+			continue;
+
+		if (qss_entry_count < num_qss_entries) {
+
+			struct kfd_queue_snapshot_entry src = {0};
+
+			set_queue_snapshot_entry(pqn->q->device->dqm,
+						 pqn->q, flags, &src);
+
+			r = copy_to_user(buf++, &src, sizeof(src));
+
+			if (r) {
+				qss_entry_count = -EFAULT;
+				goto unlock;
+			}
+		}
+
+		qss_entry_count++;
+	}
+unlock:
+	mutex_unlock(&pqm->process->event_mutex);
+	return qss_entry_count;
 }
 
 #if defined(CONFIG_DEBUG_FS)

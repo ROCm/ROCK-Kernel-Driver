@@ -470,7 +470,9 @@ struct queue_properties {
 	uint32_t doorbell_off;
 	bool is_interop;
 	bool is_evicted;
+	bool is_suspended;
 	bool is_active;
+	bool is_new;
 	bool is_gws;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -489,12 +491,14 @@ struct queue_properties {
 	/* Relevant for CU */
 	uint32_t cu_mask_count; /* Must be a multiple of 32 */
 	uint32_t *cu_mask;
+	unsigned int debug_event_type;
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
 			    (q).queue_address != 0 &&	\
 			    (q).queue_percent > 0 &&	\
-			    !(q).is_evicted)
+			    !(q).is_evicted && \
+			    !(q).is_suspended)
 
 /**
  * struct queue
@@ -667,6 +671,12 @@ enum kfd_pdd_bound {
  */
 #define SDMA_ACTIVITY_DIVISOR  100
 
+struct kfd_debug_process_device {
+	struct kfifo fifo;
+	wait_queue_head_t wait_queue;
+	int max_debug_events;
+};
+
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/* The device that owns this data. */
@@ -674,6 +684,9 @@ struct kfd_process_device {
 
 	/* The process that owns this kfd_process_device. */
 	struct kfd_process *process;
+
+	/* per-process-per device debug event info */
+	struct kfd_debug_process_device dpd;
 
 	/* per-process-per device QCM data structure */
 	struct qcm_process_device qpd;
@@ -700,6 +713,22 @@ struct kfd_process_device {
 	 */
 	bool already_dequeued;
 	bool runtime_inuse;
+
+	/* Flag to indicate if debugging is active on this device for this
+	 * process.  This is for the new GFX9+ debugging, and indicates that
+	 * any of the debug features are enabled, ie: wave launch mode,
+	 * address watch, or trap debug.  It also indicates that a debug
+	 * VMID has been allocated.
+	 */
+	bool is_debugging_enabled;
+
+	/* Flag to indicate if trap debugging is active on this device for
+	 * this process.  This is for the GFX9_ debugging features
+	 */
+	bool debug_trap_enabled;
+
+	/* Value of the wave launch mode if debugging is enabled */
+	uint32_t trap_debug_wave_launch_mode;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
@@ -938,6 +967,15 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 					uint64_t last_addr);
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
+struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
+
+/* Process device data iterator */
+struct kfd_process_device *kfd_get_first_process_device_data(
+							struct kfd_process *p);
+struct kfd_process_device *kfd_get_next_process_device_data(
+						struct kfd_process *p,
+						struct kfd_process_device *pdd);
+bool kfd_has_process_device_data(struct kfd_process *p);
 
 /* PASIDs */
 int kfd_pasid_init(void);
@@ -1071,6 +1109,11 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       u32 *ctl_stack_used_size,
 		       u32 *save_area_used_size);
 
+int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
+			   int flags,
+			   struct kfd_queue_snapshot_entry __user *buf,
+			   int num_qss_entries);
+
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
@@ -1107,6 +1150,8 @@ struct packet_manager_funcs {
 			enum kfd_unmap_queues_filter mode,
 			uint32_t filter_param, bool reset,
 			unsigned int sdma_engine);
+	int (*set_grace_period)(struct packet_manager *pm, uint32_t *buffer,
+			uint32_t grace_period);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint64_t fence_value);
 	int (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
@@ -1117,6 +1162,7 @@ struct packet_manager_funcs {
 	int set_resources_size;
 	int map_queues_size;
 	int unmap_queues_size;
+	int set_grace_period_size;
 	int query_status_size;
 	int release_mem_size;
 };
@@ -1139,6 +1185,8 @@ int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 			unsigned int sdma_engine);
 
 void pm_release_ib(struct packet_manager *pm);
+
+int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period);
 
 /* Following PM funcs can be shared among VI and AI */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);

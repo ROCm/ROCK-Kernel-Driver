@@ -291,6 +291,8 @@ int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
 				      struct kgd_mem *mem,
 				      struct dma_buf **dmabuf);
 
+void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
+
 int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
 				struct tile_config *config);
 #if IS_ENABLED(CONFIG_HSA_AMD)
