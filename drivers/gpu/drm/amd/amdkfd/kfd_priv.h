@@ -1087,6 +1087,14 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
+/* Process device data iterator */
+struct kfd_process_device *kfd_get_first_process_device_data(
+							struct kfd_process *p);
+struct kfd_process_device *kfd_get_next_process_device_data(
+						struct kfd_process *p,
+						struct kfd_process_device *pdd);
+bool kfd_has_process_device_data(struct kfd_process *p);
+
 /* PASIDs */
 int kfd_pasid_init(void);
 void kfd_pasid_exit(void);

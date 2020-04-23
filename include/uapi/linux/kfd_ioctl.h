@@ -236,6 +236,16 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 #define KFD_INVALID_FD     0xffffffff
 
+struct kfd_ioctl_dbg_trap_args {
+	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
+	__u32 pid;     /* to KFD */
+	__u32 gpu_id;  /* to KFD */
+	__u32 op;      /* to KFD */
+	__u32 data1;   /* to KFD */
+	__u32 data2;   /* to KFD */
+	__u32 data3;   /* to KFD */
+};
+
 /* Matching HSA_EVENTTYPE */
 #define KFD_IOC_EVENT_SIGNAL			0
 #define KFD_IOC_EVENT_NODECHANGE		1

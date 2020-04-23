@@ -26,6 +26,7 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/mmu_context.h>
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
@@ -1624,6 +1625,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->active_cp_queue_count = 0;
 	dqm->gws_queue_count = 0;
 	dqm->active_runlist = false;
+
 	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
 	dqm->trap_debug_vmid = 0;
 
@@ -1967,11 +1969,9 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		if (retval)
 			return retval;
 	}
-
 	retval = pm_send_unmap_queue(&dqm->packet_mgr, filter, filter_param, reset);
 	if (retval)
 		return retval;
-
 	*dqm->fence_addr = KFD_FENCE_INIT;
 	pm_send_query_status(&dqm->packet_mgr, dqm->fence_gpu_addr,
 				KFD_FENCE_COMPLETED);
