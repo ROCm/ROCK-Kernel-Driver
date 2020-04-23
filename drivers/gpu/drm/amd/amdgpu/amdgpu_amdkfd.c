@@ -29,7 +29,7 @@
 #include "amdgpu_xgmi.h"
 #include <uapi/linux/kfd_ioctl.h>
 
-static const unsigned int compute_vmid_bitmap = 0xFF00;
+static unsigned int compute_vmid_bitmap = 0xFF00;
 
 /* Total memory size in system memory and all GPU VRAM. Used to
  * estimate worst case amount of memory to reserve for page tables
@@ -218,9 +218,16 @@ int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev)
 void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	if (amdgpu_device_should_recover_gpu(adev))
 		amdgpu_device_gpu_recover(adev, NULL);
+}
+
+u32 pool_to_domain(enum kgd_memory_pool p)
+{
+	switch (p) {
+	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
+	default: return AMDGPU_GEM_DOMAIN_GTT;
+	}
 }
 
 int amdgpu_amdkfd_alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
@@ -380,10 +387,13 @@ uint32_t amdgpu_amdkfd_get_fw_version(struct kgd_dev *kgd,
 void amdgpu_amdkfd_get_local_mem_info(struct kgd_dev *kgd,
 				      struct kfd_local_mem_info *mem_info)
 {
+	uint64_t address_mask;
+	resource_size_t aper_limit;
 	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	uint64_t address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
+
+	address_mask = adev->dev->dma_mask ? ~*adev->dev->dma_mask :
 					     ~((1ULL << 32) - 1);
-	resource_size_t aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
+	aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
 
 	memset(mem_info, 0, sizeof(*mem_info));
 	if (pcie_p2p && !(adev->gmc.aper_base & address_mask ||

@@ -24,7 +24,6 @@
 #include <linux/pagemap.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/task.h>
-
 #include "amdgpu_object.h"
 #include "amdgpu_vm.h"
 #include "amdgpu_amdkfd.h"
@@ -1269,7 +1268,9 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	bp.flags = alloc_flags;
 	bp.type = bo_type;
 	bp.resv = NULL;
+
 	ret = amdgpu_bo_create(adev, &bp, &bo);
+
 	if (ret) {
 		pr_debug("Failed to create BO on domain %s. ret %d\n",
 				domain_string(alloc_domain), ret);
@@ -2259,6 +2260,7 @@ unlock_out:
  * 7.  Add fence to all PD and PT BOs.
  * 8.  Unreserve all BOs
  */
+
 int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 {
 	struct amdgpu_bo_list_entry *pd_bo_list;

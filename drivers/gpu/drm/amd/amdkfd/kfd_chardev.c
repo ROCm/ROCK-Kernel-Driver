@@ -1070,6 +1070,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		}
 	}
 
+
 	err = kfd_event_create(filp, p, args->event_type,
 				args->auto_reset != 0, args->node_id,
 				&args->event_id, &args->event_trigger_data,

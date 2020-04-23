@@ -934,6 +934,7 @@ void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
 
 	/* Workaround on Raven to not kill the process when memory is freed
 	 * before IOMMU is able to finish processing all the excessive PPRs
+	 * triggered due to HW flaws.
 	 */
 	if (dev->device_info->asic_family != CHIP_RAVEN &&
 	    dev->device_info->asic_family != CHIP_RENOIR) {

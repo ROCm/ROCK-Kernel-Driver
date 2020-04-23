@@ -651,7 +651,7 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_SET_SCRATCH_BACKING_VA	\
 		AMDKFD_IOWR(0x11, struct kfd_ioctl_set_scratch_backing_va_args)
 
-#define AMDKFD_IOC_GET_TILE_CONFIG                                      \
+#define AMDKFD_IOC_GET_TILE_CONFIG		\
 		AMDKFD_IOWR(0x12, struct kfd_ioctl_get_tile_config_args)
 
 #define AMDKFD_IOC_SET_TRAP_HANDLER		\

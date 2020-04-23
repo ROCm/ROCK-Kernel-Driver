@@ -282,6 +282,7 @@ struct kfd_dev {
 	struct device_queue_manager *dqm;
 
 	bool init_complete;
+
 	/*
 	 * Interrupts of interest to KFD are copied
 	 * from the HW ring into a SW ring.
@@ -594,6 +595,13 @@ enum KFD_PIPE_PRIORITY {
 	KFD_PIPE_PRIORITY_CS_HIGH
 };
 
+enum KFD_SPI_PRIORITY {
+	KFD_SPI_PRIORITY_EXTRA_LOW = 0,
+	KFD_SPI_PRIORITY_LOW,
+	KFD_SPI_PRIORITY_MEDIUM,
+	KFD_SPI_PRIORITY_HIGH
+};
+
 struct scheduling_resources {
 	unsigned int vmid_mask;
 	enum kfd_queue_type type;
@@ -806,6 +814,9 @@ struct kfd_process {
 
 	/* We want to receive a notification when the mm_struct is destroyed */
 	struct mmu_notifier mmu_notifier;
+
+	/* Use for delayed freeing of kfd_process structure */
+	struct rcu_head	rcu;
 
 	uint16_t pasid;
 	unsigned int doorbell_index;
@@ -1067,8 +1078,8 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   int num_qss_entries);
 
 int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
-			      unsigned int fence_value,
-			      unsigned int timeout_ms);
+				unsigned int fence_value,
+				unsigned int timeout_ms);
 
 /* Packet Manager */
 

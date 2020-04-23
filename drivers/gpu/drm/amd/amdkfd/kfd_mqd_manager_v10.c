@@ -42,7 +42,7 @@ static inline struct v10_sdma_mqd *get_sdma_mqd(void *mqd)
 }
 
 static void update_cu_mask(struct mqd_manager *mm, void *mqd,
-			   struct queue_properties *q)
+			struct queue_properties *q)
 {
 	struct v10_compute_mqd *m;
 	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
@@ -225,13 +225,13 @@ static void update_mqd(struct mqd_manager *mm, void *mqd,
 }
 
 static int destroy_mqd(struct mqd_manager *mm, void *mqd,
-		       enum kfd_preempt_type type,
-		       unsigned int timeout, uint32_t pipe_id,
-		       uint32_t queue_id)
+                        enum kfd_preempt_type type,
+                        unsigned int timeout, uint32_t pipe_id,
+                        uint32_t queue_id)
 {
 	return mm->dev->kfd2kgd->hqd_destroy
 		(mm->dev->kgd, mqd, type, timeout,
-		 pipe_id, queue_id);
+		pipe_id, queue_id);
 }
 
 static void free_mqd(struct mqd_manager *mm, void *mqd,

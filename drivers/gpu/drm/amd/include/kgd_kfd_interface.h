@@ -41,6 +41,7 @@ struct pci_dev;
 
 struct kfd_dev;
 struct kgd_dev;
+struct drm_device;
 
 struct kgd_mem;
 

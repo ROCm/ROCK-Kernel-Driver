@@ -31,7 +31,6 @@
 #include "kfd_priv.h"
 #include "kfd_mqd_manager.h"
 
-
 #define VMID_NUM 16
 
 #define USE_DEFAULT_GRACE_PERIOD 0xffffffff

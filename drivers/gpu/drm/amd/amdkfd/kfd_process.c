@@ -1439,8 +1439,8 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	pr_info("Started restoring pasid 0x%x\n", p->pasid);
 	trace_kfd_restore_process_worker_start(p);
+	pr_info("Started restoring pasid 0x%x\n", p->pasid);
 
 	/* Setting last_restore_timestamp before successful restoration.
 	 * Otherwise this would have to be set by KGD (restore_process_bos)
@@ -1458,9 +1458,10 @@ static void restore_process_worker(struct work_struct *work)
 	if (ret) {
 		pr_info("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
+
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
-		WARN(!ret, "reschedule restore work failed\n");
+		WARN(!ret, "Reschedule restore work failed\n");
 		trace_kfd_restore_process_worker_end(p, ret ?
 					"Rescheduled restore" :
 					"Failed to reschedule restore");

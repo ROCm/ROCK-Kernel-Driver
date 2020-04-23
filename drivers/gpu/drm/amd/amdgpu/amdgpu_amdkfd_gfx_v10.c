@@ -123,7 +123,7 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 
 	pr_debug("pasid 0x%x vmid %d, reg value %x\n", pasid, vmid, pasid_mapping);
 
-	pr_debug("ATHUB, reg %x\n", SOC15_REG_OFFSET(ATHUB, 0, mmATC_VMID0_PASID_MAPPING) + vmid);
+	pr_debug("ATHUB, reg %x\n",SOC15_REG_OFFSET(ATHUB, 0, mmATC_VMID0_PASID_MAPPING) + vmid);
 	WREG32(SOC15_REG_OFFSET(ATHUB, 0, mmATC_VMID0_PASID_MAPPING) + vmid,
 	       pasid_mapping);
 

@@ -1184,6 +1184,7 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 			dev->gpu = gpu;
 			out_dev = dev;
 
+			/* Assign mem->gpu */
 			list_for_each_entry(mem, &dev->mem_props, list)
 				mem->gpu = dev->gpu;
 			list_for_each_entry(cache, &dev->cache_props, list)
