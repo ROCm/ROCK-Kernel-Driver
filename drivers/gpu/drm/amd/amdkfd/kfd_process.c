@@ -972,7 +972,8 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
 		}
 
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, mem,
+		run_rdma_free_callback(buf_obj);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
 						      buf_obj->mem, pdd->drm_priv, NULL);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
@@ -1425,6 +1426,11 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	kfd_unref_process(process);
 	get_task_struct(process->lead_thread);
 
+	/* If PeerDirect interface was not detected try to detect it again
+	 * in case if network driver was loaded later.
+	 */
+	kfd_init_peer_direct();
+
 	return process;
 
 err_register_notifier:
@@ -1697,8 +1703,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->kfd_ipc_obj = ipc_obj;
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
-
-	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 
 	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
 
