@@ -102,6 +102,8 @@ struct mqd_manager {
 				  u32 *ctl_stack_used_size,
 				  u32 *save_area_used_size);
 
+	bool	(*check_queue_active)(struct queue *q);
+
 	void	(*get_checkpoint_info)(struct mqd_manager *mm, void *mqd, uint32_t *ctl_stack_size);
 
 	void	(*checkpoint_mqd)(struct mqd_manager *mm,
@@ -115,7 +117,6 @@ struct mqd_manager {
 				const void *mqd_src,
 				const void *ctl_stack_src,
 				const u32 ctl_stack_size);
-
 #if defined(CONFIG_DEBUG_FS)
 	int	(*debugfs_show_mqd)(struct seq_file *m, void *data);
 #endif
