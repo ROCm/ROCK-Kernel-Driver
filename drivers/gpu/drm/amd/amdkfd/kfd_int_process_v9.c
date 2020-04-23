@@ -23,6 +23,7 @@
 
 #include "kfd_priv.h"
 #include "kfd_events.h"
+#include "kfd_debug_events.h"
 #include "soc15_int.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_smi_events.h"
@@ -89,6 +90,9 @@ enum SQ_INTERRUPT_ERROR_TYPE {
 
 #define KFD_SQ_INT_DATA__ERR_TYPE_MASK 0xF00000
 #define KFD_SQ_INT_DATA__ERR_TYPE__SHIFT 20
+
+#define KFD_CONTEXT_ID_DEBUG_TRAP_MASK		0x000080
+#define KFD_CONTEXT_ID_DEBUG_DOORBELL_MASK	0x0003ff
 
 static void event_interrupt_poison_consumption_v9(struct kfd_dev *dev,
 				uint16_t pasid, uint16_t client_id)
@@ -360,6 +364,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		info.prot_read  = ring_id & 0x10;
 		info.prot_write = ring_id & 0x20;
 
+		kfd_set_dbg_ev_from_interrupt(dev, pasid, -1, true);
 		kfd_smi_event_update_vmfault(dev, pasid);
 		kfd_dqm_evict_pasid(dev->dqm, pasid);
 		kfd_signal_vm_fault_event(dev, pasid, &info);

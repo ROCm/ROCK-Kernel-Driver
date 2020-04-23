@@ -213,6 +213,11 @@ struct tile_config {
  * IH ring entry. This function allows the KFD ISR to get the VMID
  * from the fault status register as early as possible.
  *
+ * @get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
+ *
+ * @build_grace_period_packet_info: build a IQ_WAUT_TIME2 reg value with an
+ * updated grace period value.
+ *
  * @get_cu_occupancy: Function pointer that returns to caller the number
  * of wave fronts that are in flight for all of the queues of a process
  * as identified by its pasid. It is important to note that the value
@@ -288,6 +293,24 @@ struct kfd2kgd_calls {
 	void (*set_vm_context_page_table_base)(struct amdgpu_device *adev,
 			uint32_t vmid, uint64_t page_table_base);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct amdgpu_device *adev);
+
+	uint32_t (*enable_debug_trap)(struct amdgpu_deivce *adev,
+					uint32_t trap_debug_wave_launch_mode,
+					uint32_t vmid);
+	uint32_t (*disable_debug_trap)(struct amdgpu_device *adev);
+	uint32_t (*set_wave_launch_trap_override)(struct amdgpu_device *adev,
+						uint32_t trap_override,
+						uint32_t trap_mask);
+	uint32_t (*set_wave_launch_mode)(struct amdgpu_device *adev,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
+	void (*get_iq_wait_times)(struct amdgpu_device *adev,
+			uint32_t *wait_times);
+	void (*build_grace_period_packet_info)(struct amdgpu_device *adev,
+			uint32_t wait_times,
+			uint32_t grace_period,
+			uint32_t *reg_offset,
+			uint32_t *reg_data);
 
 	void (*get_cu_occupancy)(struct amdgpu_device *adev, int pasid,
 			int *wave_cnt, int *max_waves_per_cu);
