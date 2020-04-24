@@ -2,8 +2,7 @@
 #include <linux/sched.h>
 #include <kcl/kcl_mn.h>
 
-#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU) && \
-	!defined(HAVE_MMU_NOTIFIER_PUT)
+#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU)
 /*
  * Modifications [2017-03-14] (c) [2017]
  */
