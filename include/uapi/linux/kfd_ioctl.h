@@ -1006,6 +1006,10 @@ struct kfd_ioctl_set_xnack_mode_args {
 #define AMDKFD_IOC_AVAILABLE_MEMORY		\
 		AMDKFD_IOWR(0x23, struct kfd_ioctl_get_available_memory_args)
 
+#define AMDKFD_COMMAND_START		0x01
+#define AMDKFD_COMMAND_END		0x24
+
+/* non-upstream ioctls */
 #define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
 		AMDKFD_IOWR(0x80, struct kfd_ioctl_ipc_import_handle_args)
 
@@ -1013,9 +1017,9 @@ struct kfd_ioctl_set_xnack_mode_args {
 		AMDKFD_IOWR(0x81, struct kfd_ioctl_ipc_export_handle_args)
 
 #define AMDKFD_IOC_DBG_TRAP			\
-		AMDKFD_IOWR(0x21, struct kfd_ioctl_dbg_trap_args)
+		AMDKFD_IOWR(0x82, struct kfd_ioctl_dbg_trap_args)
 
-#define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x24
+#define AMDKFD_COMMAND_START_2		0x80
+#define AMDKFD_COMMAND_END_2		0x84
 
 #endif

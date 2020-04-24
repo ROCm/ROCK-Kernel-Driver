@@ -3084,8 +3084,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 			kfd_ioctl_dbg_set_debug_trap, 0),
 };
 
-#define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
-
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kfd_process *process;
@@ -3098,10 +3096,8 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	int retcode = -EINVAL;
 	bool ptrace_attached = false;
 
-	if (nr >= AMDKFD_CORE_IOCTL_COUNT)
-		goto err_i1;
-
-	if ((nr >= AMDKFD_COMMAND_START) && (nr < AMDKFD_COMMAND_END)) {
+	if (((nr >= AMDKFD_COMMAND_START) && (nr < AMDKFD_COMMAND_END)) ||
+	    ((nr >= AMDKFD_COMMAND_START_2) && (nr < AMDKFD_COMMAND_END_2))) {
 		u32 amdkfd_size;
 
 		ioctl = &amdkfd_ioctls[nr];
