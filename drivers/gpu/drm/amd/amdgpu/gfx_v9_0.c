@@ -2547,7 +2547,7 @@ static void gfx_v9_0_init_sq_config(struct amdgpu_device *adev)
 		break;
 	default:
 		break;
-	};
+	}
 }
 
 static void gfx_v9_0_constants_init(struct amdgpu_device *adev)
