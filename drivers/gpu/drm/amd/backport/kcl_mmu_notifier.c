@@ -14,7 +14,7 @@ void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
 		spinlock_t lock;
 	};
 	lock = &((struct _kcl_mmu_notifier_subscriptions *)(mm->notifier_subscriptions))->lock;
-#elif defined(HAVE_STRUCT_MMU_NOTIFIER_MM_EXPORTED)
+#elif !defined(HAVE_STRUCT_MMU_NOTIFIER_MM_EXPORTED)
 	struct _kcl_mmu_notifier_subscriptions {
 		struct hlist_head list;
 		bool has_itree;
