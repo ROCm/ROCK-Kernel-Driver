@@ -12,9 +12,13 @@ static inline u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsi
 static inline u32 kcl_amdgpu_get_vblank_counter_kms(struct drm_device *dev, int crtc)
 #endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_crtc *drm_crtc = drm_crtc_from_index(dev, crtc);
 
 	return amdgpu_get_vblank_counter_kms(drm_crtc);
+#else
+	return amdgpu_get_vblank_counter_kms(dev, crtc);
+#endif
 }
 
 #if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
@@ -23,9 +27,13 @@ static inline int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned 
 static inline int kcl_amdgpu_enable_vblank_kms(struct drm_device *dev, int crtc)
 #endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_crtc *drm_crtc = drm_crtc_from_index(dev, crtc);
 
 	return amdgpu_enable_vblank_kms(drm_crtc);
+#else
+	return amdgpu_enable_vblank_kms(dev, crtc);
+#endif
 }
 
 #if defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
@@ -34,9 +42,13 @@ static inline void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, unsigne
 static inline void kcl_amdgpu_disable_vblank_kms(struct drm_device *dev, int crtc)
 #endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_crtc *drm_crtc = drm_crtc_from_index(dev, crtc);
 
 	return amdgpu_disable_vblank_kms(drm_crtc);
+#else
+	return amdgpu_disable_vblank_kms(dev, crtc);
+#endif
 }
 
 #if defined(HAVE_GET_SCANOUT_POSITION_RETURN_BOOL)

@@ -1162,10 +1162,16 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
  * Gets the frame count on the requested crtc (all asics).
  * Returns frame count on success, -EINVAL on failure.
  */
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc)
+#else
+u32 amdgpu_get_vblank_counter_kms(struct drm_device *dev, unsigned int pipe)
+#endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_device *dev = crtc->dev;
 	unsigned int pipe = crtc->index;
+#endif
 	struct amdgpu_device *adev = dev->dev_private;
 	int vpos, hpos, stat;
 	u32 count;
@@ -1230,10 +1236,16 @@ u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc)
  * Enable the interrupt on the requested crtc (all asics).
  * Returns 0 on success, -EINVAL on failure.
  */
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 int amdgpu_enable_vblank_kms(struct drm_crtc *crtc)
+#else
+int amdgpu_enable_vblank_kms(struct drm_device *dev, unsigned int pipe)
+#endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_device *dev = crtc->dev;
 	unsigned int pipe = crtc->index;
+#endif
 	struct amdgpu_device *adev = dev->dev_private;
 	int idx = amdgpu_display_crtc_idx_to_irq_type(adev, pipe);
 
@@ -1247,10 +1259,16 @@ int amdgpu_enable_vblank_kms(struct drm_crtc *crtc)
  *
  * Disable the interrupt on the requested crtc (all asics).
  */
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 void amdgpu_disable_vblank_kms(struct drm_crtc *crtc)
+#else
+void amdgpu_disable_vblank_kms(struct drm_device *dev, unsigned int pipe)
+#endif
 {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	struct drm_device *dev = crtc->dev;
 	unsigned int pipe = crtc->index;
+#endif
 	struct amdgpu_device *adev = dev->dev_private;
 	int idx = amdgpu_display_crtc_idx_to_irq_type(adev, pipe);
 

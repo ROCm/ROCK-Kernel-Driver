@@ -216,7 +216,11 @@ static void amdgpu_display_flip_work_func(struct work_struct *__work)
 	     & (DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_IN_VBLANK)) ==
 	    (DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_IN_VBLANK) &&
 	    (int)(work->target_vblank -
-		  amdgpu_get_vblank_counter_kms(crtc)) > 0) {
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
+		amdgpu_get_vblank_counter_kms(crtc)) > 0) {
+#else
+		amdgpu_get_vblank_counter_kms(dm->ddev, acrtc_attach->crtc_id)) > 0) {
+#endif
 		schedule_delayed_work(&work->flip_work, usecs_to_jiffies(1000));
 		return;
 	}
@@ -342,7 +346,11 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 	if (!adev->enable_virtual_display)
 		work->base = amdgpu_bo_gpu_offset(new_abo);
 	work->target_vblank = target - (uint32_t)drm_crtc_vblank_count(crtc) +
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 		amdgpu_get_vblank_counter_kms(crtc);
+#else
+		amdgpu_get_vblank_counter_kms(dm->ddev, acrtc_attach->crtc_id);
+#endif
 
 	/* we borrow the event spin lock for protecting flip_wrok */
 	spin_lock_irqsave(&crtc->dev->event_lock, flags);
@@ -1275,6 +1283,7 @@ int amdgpu_display_crtc_idx_to_irq_type(struct amdgpu_device *adev, int crtc)
 	}
 }
 
+#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 			bool in_vblank_irq, int *vpos,
 			int *hpos, ktime_t *stime, ktime_t *etime,
@@ -1286,6 +1295,7 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 	return amdgpu_display_get_crtc_scanoutpos(dev, pipe, 0, vpos, hpos,
 						  stime, etime, mode);
 }
+#endif
 
 int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *filp)

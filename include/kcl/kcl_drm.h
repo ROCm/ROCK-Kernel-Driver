@@ -167,7 +167,7 @@ extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
 #endif
 
-#ifndef HAVE_DRM_CRTC_FROM_INDEX
+#if !defined(HAVE_DRM_CRTC_FROM_INDEX) && defined(HAVE_STRUCT_DRM_CRTC_INDEX)
 struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx);
 static inline struct drm_crtc *
 drm_crtc_from_index(struct drm_device *dev, int idx)
