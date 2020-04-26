@@ -29,7 +29,7 @@ AC_DEFUN([AC_AMDGPU_FENCE_SET_ERROR], [
 	], [
 		fence_set_error(NULL, 0);
 	], [
-		AC_DEFINE(HAVE_FENCE_SET_ERROR, 1,
+		AC_DEFINE(HAVE_DMA_FENCE_SET_ERROR, 1,
 			[fence_set_error() is available])
 
 	])
