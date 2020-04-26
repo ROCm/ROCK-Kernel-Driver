@@ -1,7 +1,8 @@
 #include <linux/sched/mm.h>
 #include <linux/mmu_notifier.h>
 
-#if !defined(HAVE_MMU_NOTIFIER_PUT)
+#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU) && \
+	!defined(HAVE_MMU_NOTIFIER_PUT)
 void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
 {

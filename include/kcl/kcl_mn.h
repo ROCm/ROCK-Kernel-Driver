@@ -3,7 +3,8 @@
 
 #include <linux/mmu_notifier.h>
 
-#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU)
+#if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU) && \
+	!defined(HAVE_MMU_NOTIFIER_PUT)
 extern void mmu_notifier_call_srcu(struct rcu_head *rcu,
                             void (*func)(struct rcu_head *rcu));
 #endif
