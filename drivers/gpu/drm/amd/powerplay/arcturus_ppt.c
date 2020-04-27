@@ -293,6 +293,7 @@ static int arcturus_get_workload_type(struct smu_context *smu, enum PP_SMC_POWER
 static int arcturus_tables_init(struct smu_context *smu, struct smu_table *tables)
 {
 	struct smu_table_context *smu_table = &smu->smu_table;
+	uint32_t top32, bottom32;
 
 	SMU_TABLE_INIT(tables, SMU_TABLE_PPTABLE, sizeof(PPTable_t),
 		       PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM);
@@ -315,6 +316,15 @@ static int arcturus_tables_init(struct smu_context *smu, struct smu_table *table
 		return -ENOMEM;
 	smu_table->metrics_time = 0;
 
+	if (smu->adev->asic_type == CHIP_ARCTURUS) {
+		/* Get the SN to turn into a Unique ID */
+		smu_send_smc_msg(smu, SMU_MSG_ReadSerialNumTop32,
+				 &top32);
+		smu_send_smc_msg(smu, SMU_MSG_ReadSerialNumBottom32,
+				 &bottom32);
+
+		smu->adev->unique_id = ((uint64_t)bottom32 << 32) | top32;
+	}
 	return 0;
 }
 
