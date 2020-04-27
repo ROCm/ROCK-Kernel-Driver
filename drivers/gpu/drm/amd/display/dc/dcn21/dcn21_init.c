@@ -87,8 +87,9 @@ static const struct hw_sequencer_funcs dcn21_funcs = {
 	.exit_optimized_pwr_state = dcn21_exit_optimized_pwr_state,
 	.get_vupdate_offset_from_vsync = dcn10_get_vupdate_offset_from_vsync,
 	.power_down = dce110_power_down,
-	.set_backlight_level = dce110_set_backlight_level,
-	.set_abm_immediate_disable = dce110_set_abm_immediate_disable,
+	.set_backlight_level = dcn21_set_backlight_level,
+	.set_abm_immediate_disable = dcn21_set_abm_immediate_disable,
+	.set_pipe = dcn21_set_pipe,
 };
 
 static const struct hwseq_private_funcs dcn21_private_funcs = {
