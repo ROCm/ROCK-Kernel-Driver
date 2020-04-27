@@ -792,6 +792,9 @@
 /* vm_operations_struct->fault() wants 2 args */
 /* #undef HAVE_VM_OPERATIONS_STRUCT_FAULT_2ARG */
 
+/* struct drm_crtc has index */
+#define HAVE_STRUCT_DRM_CRTC_INDEX 1
+
 /* wait_queue_entry_t exists */
 #define HAVE_WAIT_QUEUE_ENTRY 1
 
