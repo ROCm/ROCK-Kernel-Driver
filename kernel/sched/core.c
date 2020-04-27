@@ -631,6 +631,16 @@ void wake_up_nohz_cpu(int cpu)
 		wake_up_idle_cpu(cpu);
 }
 
+/*
+ * Returns true if a CPU is idling on average more that the cost of
+ * migration. This is used to avoid entering nohz for very short
+ * durations as the exit cost from a nohz idle is substantial.
+ */
+bool nohz_sched_idling_cpu(int cpu)
+{
+	return cpu_rq(cpu)->avg_idle >= sysctl_sched_migration_cost;
+}
+
 static inline bool got_nohz_idle_kick(void)
 {
 	int cpu = smp_processor_id();
@@ -1996,12 +2006,6 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 		cpu = select_fallback_rq(task_cpu(p), p);
 
 	return cpu;
-}
-
-static void update_avg(u64 *avg, u64 sample)
-{
-	s64 diff = sample - *avg;
-	*avg += diff >> 3;
 }
 
 void sched_set_stop_task(int cpu, struct task_struct *stop)

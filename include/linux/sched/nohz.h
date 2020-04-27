@@ -9,6 +9,11 @@
 #if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ_COMMON)
 extern void nohz_balance_enter_idle(int cpu);
 extern int get_nohz_timer_target(void);
+#ifdef CONFIG_SMP
+extern bool nohz_sched_idling_cpu(int cpu);
+#else
+static inline bool nohz_sched_idling_cpu(int cpu) { return false; }
+#endif
 #else
 static inline void nohz_balance_enter_idle(int cpu) { }
 #endif
