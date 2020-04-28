@@ -85,12 +85,11 @@
  * - 3.34.0 - Non-DC can flip correctly between buffers with different pitches
  * - 3.35.0 - Add drm_amdgpu_info_device::tcc_disabled_mask
  * - 3.36.0 - Allow reading more status registers on si/cik
- * - 3.37.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
- * - 3.38.0 - L2 is invalidated before SDMA IBs, needed for correctness
- * - 3.39.0 - AMDGPU_IB_FLAG_EMIT_MEM_SYNC also affects compute IBs
+ * - 3.37.0 - L2 is invalidated before SDMA IBs, needed for correctness
+ * - 3.38.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	39
+#define KMS_DRIVER_MINOR	38
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.6.0"
