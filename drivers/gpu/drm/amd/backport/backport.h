@@ -24,5 +24,6 @@
 #include <kcl/kcl_device.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/backport/kcl_kthread_backport.h>
+#include <kcl/kcl_list.h>
 
 #endif /* AMDGPU_BACKPORT_H */
