@@ -52,4 +52,5 @@
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_compiler_attributes.h>
+#include <kcl/kcl_list.h>
 #endif /* AMDGPU_BACKPORT_H */

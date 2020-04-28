@@ -597,6 +597,12 @@
 /* list_bulk_move_tail() is available */
 #define HAVE_LIST_BULK_MOVE_TAIL 1
 
+/* list_is_first() is available */
+#define HAVE_LIST_IS_FIRST 1
+
+/* list_rotate_to_front() is available */
+#define HAVE_LIST_ROTATE_TO_FRONT 1
+
 /* memalloc_nofs_{save,restore}() are available */
 #define HAVE_MEMALLOC_NOFS_SAVE 1
 
