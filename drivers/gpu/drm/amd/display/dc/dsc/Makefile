@@ -32,8 +32,6 @@ endif
 endif
 
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rc_calc.o := $(dsc_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rc_calc_dpi.o := $(dsc_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dc_dsc.o := $(dsc_ccflags)
 
 DSC = dc_dsc.o rc_calc.o rc_calc_dpi.o
 
