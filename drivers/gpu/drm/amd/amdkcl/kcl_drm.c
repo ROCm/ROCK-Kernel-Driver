@@ -241,7 +241,7 @@ struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx)
 	struct drm_crtc *crtc;
 
 	drm_for_each_crtc(crtc, dev)
-		if (idx == crtc->index)
+		if (idx == drm_crtc_index(crtc))
 			return crtc;
 
 	return NULL;
