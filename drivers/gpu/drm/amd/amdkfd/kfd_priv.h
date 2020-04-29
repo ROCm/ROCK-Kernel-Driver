@@ -713,6 +713,8 @@ enum kfd_pdd_bound {
 	PDD_BOUND_SUSPENDED,
 };
 
+#define MAX_VRAM_FILENAME_LEN 11
+
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/*
@@ -774,6 +776,11 @@ struct kfd_process_device {
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
+
+	/* VRAM usage */
+	uint64_t vram_usage;
+	struct attribute attr_vram;
+	char vram_filename[MAX_VRAM_FILENAME_LEN];
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
