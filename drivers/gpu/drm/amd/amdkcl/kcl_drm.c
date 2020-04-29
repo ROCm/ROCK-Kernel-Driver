@@ -235,7 +235,7 @@ out:
 EXPORT_SYMBOL(drm_crtc_force_disable_all);
 #endif
 
-#if !defined(HAVE_DRM_CRTC_FROM_INDEX) && defined(HAVE_STRUCT_DRM_CRTC_INDEX)
+#ifndef HAVE_DRM_CRTC_FROM_INDEX
 struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx)
 {
 	struct drm_crtc *crtc;

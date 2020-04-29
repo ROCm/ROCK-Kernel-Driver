@@ -399,14 +399,8 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	 * of pageflip completion, so last_flip_vblank is the forbidden count
 	 * for queueing new pageflips if vsync + VRR is enabled.
 	 */
-#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 	amdgpu_crtc->last_flip_vblank =
 		amdgpu_get_vblank_counter_kms(&amdgpu_crtc->base);
-#else
-	amdgpu_crtc->last_flip_vblank =
-		amdgpu_get_vblank_counter_kms(adev->ddev, amdgpu_crtc->crtc_id);
-#endif
-
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
 #if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
@@ -7644,11 +7638,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			 * clients using the GLX_OML_sync_control extension or
 			 * DRI3/Present extension with defined target_msc.
 			 */
-#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 			last_flip_vblank = amdgpu_get_vblank_counter_kms(pcrtc);
-#else
-			last_flip_vblank = amdgpu_get_vblank_counter_kms(dm->ddev, acrtc_attach->crtc_id);
-#endif
 		}
 		else {
 			/* For variable refresh rate mode only:
@@ -7677,11 +7667,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			 & (DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_IN_VBLANK)) ==
 			(DRM_SCANOUTPOS_VALID | DRM_SCANOUTPOS_IN_VBLANK) &&
 			(int)(target_vblank -
-#ifdef HAVE_STRUCT_DRM_CRTC_INDEX
 			  amdgpu_get_vblank_counter_kms(pcrtc)) > 0)) {
-#else
-			  amdgpu_get_vblank_counter_kms(dm->ddev, acrtc_attach->crtc_id)) > 0)) {
-#endif
 			usleep_range(1000, 1100);
 		}
 
