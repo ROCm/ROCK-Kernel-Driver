@@ -1165,7 +1165,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = crtc->index;
+	unsigned int pipe = drm_crtc_index(crtc);
 	struct amdgpu_device *adev = dev->dev_private;
 	int vpos, hpos, stat;
 	u32 count;
@@ -1233,7 +1233,7 @@ u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc)
 int amdgpu_enable_vblank_kms(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = crtc->index;
+	unsigned int pipe = drm_crtc_index(crtc);
 	struct amdgpu_device *adev = dev->dev_private;
 	int idx = amdgpu_display_crtc_idx_to_irq_type(adev, pipe);
 
@@ -1250,7 +1250,7 @@ int amdgpu_enable_vblank_kms(struct drm_crtc *crtc)
 void amdgpu_disable_vblank_kms(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = crtc->index;
+	unsigned int pipe = drm_crtc_index(crtc);
 	struct amdgpu_device *adev = dev->dev_private;
 	int idx = amdgpu_display_crtc_idx_to_irq_type(adev, pipe);
 
