@@ -1657,7 +1657,7 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 			const struct drm_display_mode *mode)
 {
 	struct drm_device *dev = crtc->dev;
-	unsigned int pipe = crtc->index;
+	unsigned int pipe = drm_crtc_index(crtc);
 
 	return amdgpu_display_get_crtc_scanoutpos(dev, pipe, 0, vpos, hpos,
 						  stime, etime, mode);
