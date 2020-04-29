@@ -133,10 +133,17 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
  *    VM_FAULT_RETRY if blocking wait.
  *    VM_FAULT_NOPAGE if blocking wait and retrying was not allowed.
  */
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			     struct vm_fault *vmf,
 			     struct vm_area_struct *vma)
 {
+#else
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
+				 struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+#endif
 	/*
 	 * Work around locking order reversal in fault / nopfn
 	 * between mmap_sem and bo_reserve: Perform a trylock operation
@@ -187,11 +194,19 @@ EXPORT_SYMBOL(ttm_bo_vm_reserve);
  *   VM_FAULT_OOM on out-of-memory
  *   VM_FAULT_RETRY if retryable wait
  */
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				    struct vm_area_struct *vma,
 				    pgprot_t prot,
 				    pgoff_t num_prefault)
 {
+#else
+vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
+				    pgprot_t prot,
+				    pgoff_t num_prefault)
+{
+	struct vm_area_struct *vma = vmf->vma;
+#endif
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	struct ttm_bo_device *bdev = bo->bdev;
 	unsigned long page_offset;
@@ -353,12 +368,20 @@ vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	vm_fault_t ret;
 
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 	ret = ttm_bo_vm_reserve(bo, vmf, vma);
+#else
+	ret = ttm_bo_vm_reserve(bo, vmf);
+#endif
 	if (ret)
 		return ret;
 
 	prot = vma->vm_page_prot;
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 	ret = ttm_bo_vm_fault_reserved(vmf, vma, prot, TTM_BO_VM_NUM_PREFAULT);
+#else
+	ret = ttm_bo_vm_fault_reserved(vmf, prot, TTM_BO_VM_NUM_PREFAULT);
+#endif
 #ifdef FAULT_FLAG_RETRY_NOWAIT
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
 #else

@@ -44,6 +44,7 @@
 
 #ifndef HAVE_CONFIG_H
 #define HAVE_DRM_GEM_OBJECT_RESV	1
+#define HAVE_VM_FAULT_ADDRESS_VMA	1
 #endif
 
 struct ttm_bo_global;
@@ -740,6 +741,7 @@ static inline bool ttm_bo_uses_embedded_gem_object(struct ttm_buffer_object *bo)
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
 
+#ifndef HAVE_VM_FAULT_ADDRESS_VMA
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			     struct vm_fault *vmf,
 			     struct vm_area_struct *vma);
@@ -748,6 +750,16 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				    struct vm_area_struct *vma,
 				    pgprot_t prot,
 				    pgoff_t num_prefault);
+
+#else
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
+			     struct vm_fault *vmf);
+
+vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
+				    pgprot_t prot,
+				    pgoff_t num_prefault);
+
+#endif
 
 #if defined(HAVE_VM_OPERATIONS_STRUCT_FAULT_2ARG)
 vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
