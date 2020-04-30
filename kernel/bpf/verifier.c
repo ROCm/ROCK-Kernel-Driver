@@ -2881,6 +2881,9 @@ static int check_ptr_to_btf_access(struct bpf_verifier_env *env,
 	if (ret < 0)
 		return ret;
 
+	if (value_regno < 0)
+		return 0;
+
 	if (ret == SCALAR_VALUE) {
 		mark_reg_unknown(env, regs, value_regno);
 		return 0;
