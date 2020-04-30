@@ -526,12 +526,12 @@ static int intel_fbc_alloc_cfb(struct intel_crtc *crtc)
 
 		fbc->compressed_llb = compressed_llb;
 
-		GEM_BUG_ON(range_overflows_t(u64, dev_priv->dsm.start,
-					     fbc->compressed_fb.start,
-					     U32_MAX));
-		GEM_BUG_ON(range_overflows_t(u64, dev_priv->dsm.start,
-					     fbc->compressed_llb->start,
-					     U32_MAX));
+		GEM_BUG_ON(range_overflows_end_t(u64, dev_priv->dsm.start,
+						 fbc->compressed_fb.start,
+						 U32_MAX));
+		GEM_BUG_ON(range_overflows_end_t(u64, dev_priv->dsm.start,
+						 fbc->compressed_llb->start,
+						 U32_MAX));
 		I915_WRITE(FBC_CFB_BASE,
 			   dev_priv->dsm.start + fbc->compressed_fb.start);
 		I915_WRITE(FBC_LL_BASE,

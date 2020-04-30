@@ -642,6 +642,13 @@ static void software_node_release(struct kobject *kobj)
 {
 	struct swnode *swnode = kobj_to_swnode(kobj);
 
+	if (swnode->parent) {
+		ida_simple_remove(&swnode->parent->child_ids, swnode->id);
+		list_del(&swnode->entry);
+	} else {
+		ida_simple_remove(&swnode_root_ids, swnode->id);
+	}
+
 	if (swnode->allocated) {
 		property_entries_free(swnode->node->properties);
 		kfree(swnode->node);
@@ -806,13 +813,6 @@ void fwnode_remove_software_node(struct fwnode_handle *fwnode)
 
 	if (!swnode)
 		return;
-
-	if (swnode->parent) {
-		ida_simple_remove(&swnode->parent->child_ids, swnode->id);
-		list_del(&swnode->entry);
-	} else {
-		ida_simple_remove(&swnode_root_ids, swnode->id);
-	}
 
 	kobject_put(&swnode->kobj);
 }

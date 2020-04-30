@@ -7740,10 +7740,10 @@ static void valleyview_setup_pctx(struct drm_i915_private *dev_priv)
 		goto out;
 	}
 
-	GEM_BUG_ON(range_overflows_t(u64,
-				     dev_priv->dsm.start,
-				     pctx->stolen->start,
-				     U32_MAX));
+	GEM_BUG_ON(range_overflows_end_t(u64,
+					 dev_priv->dsm.start,
+					 pctx->stolen->start,
+					 U32_MAX));
 	pctx_paddr = dev_priv->dsm.start + pctx->stolen->start;
 	I915_WRITE(VLV_PCBR, pctx_paddr);
 

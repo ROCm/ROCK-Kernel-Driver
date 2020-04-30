@@ -1445,9 +1445,12 @@ static int intel_th_msc_init(struct msc *msc)
 	return 0;
 }
 
-static void msc_win_switch(struct msc *msc)
+static int msc_win_switch(struct msc *msc)
 {
 	struct msc_window *first;
+
+	if (list_empty(&msc->win_list))
+		return -EINVAL;
 
 	first = list_first_entry(&msc->win_list, struct msc_window, entry);
 
@@ -1460,6 +1463,8 @@ static void msc_win_switch(struct msc *msc)
 	msc->base_addr = msc_win_baddr(msc->cur_win, 0);
 
 	intel_th_trace_switch(msc->thdev);
+
+	return 0;
 }
 
 static irqreturn_t intel_th_msc_interrupt(struct intel_th_device *thdev)
@@ -1666,11 +1671,15 @@ win_switch_store(struct device *dev, struct device_attribute *attr,
 	if (val != 1)
 		return -EINVAL;
 
+	ret = -EINVAL;
 	mutex_lock(&msc->buf_mutex);
-	if (msc->mode != MSC_MODE_MULTI)
-		ret = -ENOTSUPP;
-	else
-		msc_win_switch(msc);
+	/*
+	 * Window switch can only happen in the "multi" mode.
+	 * If a external buffer is engaged, they have the full
+	 * control over window switching.
+	 */
+	if (msc->mode == MSC_MODE_MULTI)
+		ret = msc_win_switch(msc);
 	mutex_unlock(&msc->buf_mutex);
 
 	return ret ? ret : size;
