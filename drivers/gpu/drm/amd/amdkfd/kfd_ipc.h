@@ -45,7 +45,7 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *kfd, struct kfd_process *p,
 int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 			     uint64_t handle, uint32_t *ipc_handle);
 
-void ipc_obj_get(struct kfd_ipc_obj *obj);
+struct kfd_ipc_obj *ipc_obj_get(struct kfd_ipc_obj *obj);
 void ipc_obj_put(struct kfd_ipc_obj **obj);
 
 #endif /* KFD_IPC_H_ */
