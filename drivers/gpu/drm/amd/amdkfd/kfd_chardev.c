@@ -2829,8 +2829,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data3, /* Grace Period */
 				data1, /* Flags */
 				queue_id_array); /* array of queue ids */
-		if (r)
+
+		if (copy_to_user((void __user *)args->ptr, queue_id_array,
+				sizeof(uint32_t) * data2)) {
+			r = -EFAULT;
 			goto unlock_out;
+		}
+
 		break;
 
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
@@ -2838,8 +2843,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data2, /* Number of queues */
 				data1, /* Flags */
 				queue_id_array); /* array of queue ids */
-		if (r)
+
+		if (copy_to_user((void __user *)args->ptr, queue_id_array,
+				sizeof(uint32_t) * data2)) {
+			r = -EFAULT;
 			goto unlock_out;
+		}
+
 		break;
 	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
 		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,

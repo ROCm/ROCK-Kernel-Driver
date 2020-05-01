@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
+#include <uapi/linux/kfd_ioctl.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_mqd_manager.h"
@@ -679,6 +680,9 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 				      struct kfd_process_device *pdd,
 				      struct queue *q)
 {
+	if (q->properties.is_suspended)
+		return 0;
+
 	pr_debug("Suspending PASID %u queue [%i]\n",
 			pdd->process->pasid,
 			q->properties.queue_id);
@@ -717,6 +721,9 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 {
 	struct kfd_process_device *pdd;
 	uint64_t pd_base;
+
+	if (!q->properties.is_suspended)
+		return;
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
@@ -2274,20 +2281,27 @@ out_unlock:
 	return r;
 }
 
-#define INVALID_QUEUE_ID	0xffffffff
 #define QUEUE_NOT_FOUND		-1
-static int queue_idx_in_array(unsigned int queue_id,
+/* invalidate queue operation in array */
+static void q_array_invalidate(uint32_t num_queues, uint32_t *queue_ids)
+{
+	int i;
+
+	for (i = 0; i < num_queues; i++)
+		queue_ids[i] |= KFD_DBG_QUEUE_INVALID_MASK;
+}
+
+/* find queue index in array */
+static int q_array_get_index(unsigned int queue_id,
 		uint32_t num_queues,
 		uint32_t *queue_ids)
 {
 	int i;
 
-	if (queue_id == INVALID_QUEUE_ID)
-		return QUEUE_NOT_FOUND;
-
 	for (i = 0; i < num_queues; i++)
-		if (queue_id == queue_ids[i])
+		if (queue_id == (queue_ids[i] & ~KFD_DBG_QUEUE_INVALID_MASK))
 			return i;
+
 	return QUEUE_NOT_FOUND;
 }
 
@@ -2347,50 +2361,65 @@ int resume_queues(struct kfd_process *p,
 		uint32_t flags,
 		uint32_t *queue_ids)
 {
-	int r = -ENODEV;
 	struct kfd_process_device *pdd;
-	struct queue *q;
+	int total_resumed = 0;
+
+	/* mask all queues as invalid.  unmask per successful request */
+	q_array_invalidate(num_queues, queue_ids);
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		bool queues_resumed_on_device = false;
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
+		struct queue *q;
+		int r, per_device_resumed = 0;
 
 		dqm_lock(dqm);
 
-		/* We need to loop over all of the queues on this
-		 * device, and check if it is in the list passed in,
-		 * and if it is, we will restore it.
-		 */
+		/* unmask queues that resume or already resumed as valid */
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			if (queue_idx_in_array(q->properties.queue_id,
+			int q_idx = q_array_get_index(q->properties.queue_id,
 					num_queues,
-					queue_ids) != QUEUE_NOT_FOUND) {
-				if (!q->properties.is_suspended)
-					continue;
-				resume_single_queue(dqm,
-							&pdd->qpd,
-							q);
-				queues_resumed_on_device = true;
+					queue_ids);
+
+			if (q_idx != QUEUE_NOT_FOUND) {
+				resume_single_queue(dqm, &pdd->qpd, q);
+				queue_ids[q_idx] &=
+						~KFD_DBG_QUEUE_INVALID_MASK;
+				per_device_resumed++;
 			}
 		}
 
-		if (queues_resumed_on_device) {
-			r = execute_queues_cpsch(dqm,
+		if (!per_device_resumed) {
+			dqm_unlock(dqm);
+			continue;
+		}
+
+		r = execute_queues_cpsch(dqm,
 					KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
 					0,
 					USE_DEFAULT_GRACE_PERIOD);
-			if (r) {
-				pr_err("Failed to resume process queues\n");
-				dqm_unlock(dqm);
-				return r;
+		if (r) {
+			pr_err("Failed to resume process queues\n");
+			list_for_each_entry(q, &qpd->queues_list, list) {
+				int q_idx = q_array_get_index(
+							q->properties.queue_id,
+							num_queues,
+							queue_ids);
+
+				/* mask queue as error on resume fail */
+				if (q_idx != QUEUE_NOT_FOUND)
+					queue_ids[q_idx] |=
+						KFD_DBG_QUEUE_ERROR_MASK;
 			}
+		} else {
 			wake_up_all(&dqm->destroy_wait);
+			total_resumed += per_device_resumed;
 		}
 
 		dqm_unlock(dqm);
 	}
-	return r;
+
+	return total_resumed;
 }
 
 int suspend_queues(struct kfd_process *p,
@@ -2399,35 +2428,32 @@ int suspend_queues(struct kfd_process *p,
 			uint32_t flags,
 			uint32_t *queue_ids)
 {
-	int err = 0, r = -ENODEV;
 	struct kfd_process_device *pdd;
-	struct queue *q;
 	int total_suspended = 0;
+
+	/* mask all queues as invalid.  umask on successful request */
+	q_array_invalidate(num_queues, queue_ids);
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
-		int per_device_suspended = 0;
+		struct queue *q;
+		int r, per_device_suspended = 0;
 
 		dqm_lock(dqm);
 
-		/* We need to loop over all of the queues on this
-		 * device, and check if it is in the list passed in,
-		 * and if it is, we will evict it.
-		 */
+		/* unmask queues that suspend or already suspended */
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = queue_idx_in_array(q->properties.queue_id,
+			int q_idx = q_array_get_index(q->properties.queue_id,
 							num_queues,
 							queue_ids);
 
-			if (q_idx == QUEUE_NOT_FOUND)
-				continue;
-
-			if (q->properties.is_suspended ||
-					suspend_single_queue(dqm, pdd, q))
-				queue_ids[q_idx] = INVALID_QUEUE_ID;
-			else
+			if (q_idx != QUEUE_NOT_FOUND &&
+					!suspend_single_queue(dqm, pdd, q)) {
+				queue_ids[q_idx] &=
+					~KFD_DBG_QUEUE_INVALID_MASK;
 				per_device_suspended++;
+			}
 		}
 
 		if (!per_device_suspended) {
@@ -2441,39 +2467,25 @@ int suspend_queues(struct kfd_process *p,
 
 		if (r)
 			pr_err("Failed to suspend process queues.\n");
+		else
+			total_suspended += per_device_suspended;
 
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			bool is_q = queue_idx_in_array(q->properties.queue_id,
-				num_queues, queue_ids) != QUEUE_NOT_FOUND;
-			/* unmark is_suspend on unexpected failure */
-			if (r && is_q) {
-				resume_single_queue(dqm, qpd, q);
-				q->properties.queue_id = INVALID_QUEUE_ID;
-			} else if ((flags & KFD_DBG_EV_FLAG_CLEAR_STATUS) &&
-								!r && is_q)
+			int q_idx = q_array_get_index(q->properties.queue_id,
+						num_queues, queue_ids);
+
+			if (q_idx == QUEUE_NOT_FOUND)
+				continue;
+
+			/* mask queue as error on suspend fail */
+			if (r)
+				queue_ids[q_idx] |= KFD_DBG_QUEUE_ERROR_MASK;
+			else if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
 				WRITE_ONCE(q->properties.debug_event_type, 0);
 		}
 
 		dqm_unlock(dqm);
-
-		/* failed to suspend for unexpected reason */
-		if (r) {
-			wake_up_all(&dqm->destroy_wait);
-			per_device_suspended = 0;
-			err = r;
-		}
-
-		total_suspended += per_device_suspended;
 		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
-	}
-
-	/* rollback suspended queues */
-	if (total_suspended < num_queues) {
-		pr_debug("Failed to suspend requested queues.  Rolling back.\n");
-		r = resume_queues(p, num_queues, flags, queue_ids);
-		if (r)
-			return r;
-		return -EINVAL;
 	}
 
 	if (total_suspended) {
@@ -2491,7 +2503,8 @@ int suspend_queues(struct kfd_process *p,
 		flush_work(&copy_context_worker.copy_context_work);
 		destroy_work_on_stack(&copy_context_worker.copy_context_work);
 	}
-	return err;
+
+	return total_suspended;
 }
 
 static uint32_t set_queue_type_for_user(struct queue_properties *q_props)
