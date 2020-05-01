@@ -8149,7 +8149,8 @@ static const struct amdgpu_ring_funcs gfx_v10_0_ring_funcs_compute = {
 		SOC15_FLUSH_GPU_TLB_NUM_WREG * 5 +
 		SOC15_FLUSH_GPU_TLB_NUM_REG_WAIT * 7 +
 		2 + /* gfx_v10_0_ring_emit_vm_flush */
-		8 + 8 + 8, /* gfx_v10_0_ring_emit_fence x3 for user fence, vm fence */
+		8 + 8 + 8 + /* gfx_v10_0_ring_emit_fence x3 for user fence, vm fence */
+		8, /* gfx_v10_0_emit_mem_sync */
 	.emit_ib_size =	7, /* gfx_v10_0_ring_emit_ib_compute */
 	.emit_ib = gfx_v10_0_ring_emit_ib_compute,
 	.emit_fence = gfx_v10_0_ring_emit_fence,

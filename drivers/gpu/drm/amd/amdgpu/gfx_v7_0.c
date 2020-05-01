@@ -5089,7 +5089,8 @@ static const struct amdgpu_ring_funcs gfx_v7_0_ring_funcs_compute = {
 		5 + /* hdp invalidate */
 		7 + /* gfx_v7_0_ring_emit_pipeline_sync */
 		CIK_FLUSH_GPU_TLB_NUM_WREG * 5 + 7 + /* gfx_v7_0_ring_emit_vm_flush */
-		7 + 7 + 7, /* gfx_v7_0_ring_emit_fence_compute x3 for user fence, vm fence */
+		7 + 7 + 7 + /* gfx_v7_0_ring_emit_fence_compute x3 for user fence, vm fence */
+		7, /* gfx_v7_0_emit_mem_sync_compute */
 	.emit_ib_size =	7, /* gfx_v7_0_ring_emit_ib_compute */
 	.emit_ib = gfx_v7_0_ring_emit_ib_compute,
 	.emit_fence = gfx_v7_0_ring_emit_fence_compute,
