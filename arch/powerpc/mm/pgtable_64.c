@@ -27,6 +27,7 @@
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/stddef.h>
+#include <linux/mmzone.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 #include <linux/hugetlb.h>
@@ -299,6 +300,26 @@ EXPORT_SYMBOL(__ioremap_at);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(__iounmap);
 EXPORT_SYMBOL(__iounmap_at);
+
+#ifdef CONFIG_ZONE_DEVICE
+/*
+ * Override the generic version in mm/memremap.c.
+ *
+ * With hash translation, the direct-map range is mapped with just one
+ * page size selected by htab_init_page_sizes(). Consult
+ * mmu_psize_defs[] to determine the minimum page size alignment.
+*/
+unsigned long memremap_compat_align(void)
+{
+	unsigned int shift = mmu_psize_defs[mmu_linear_psize].shift;
+
+	if (radix_enabled())
+		return SUBSECTION_SIZE;
+	return max(SUBSECTION_SIZE, 1UL << shift);
+
+}
+EXPORT_SYMBOL_GPL(memremap_compat_align);
+#endif
 
 #ifndef __PAGETABLE_PUD_FOLDED
 /* 4 level page table */
