@@ -20,5 +20,6 @@
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_workqueue.h>
+#include <kcl/kcl_backlight.h>
 
 #endif /* AMDGPU_BACKPORT_H */
