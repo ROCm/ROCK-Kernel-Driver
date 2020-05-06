@@ -52,6 +52,9 @@
 /* backlight_properties->type is available */
 #define HAVE_BACKLIGHT_PROPERTIES_TYPE 1
 
+/* backlight_device_set_brightness is available */
+#define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
+
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
