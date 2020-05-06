@@ -2678,7 +2678,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	target = need_proc_create ?
 		kfd_create_process(thread) : kfd_lookup_process_by_pid(pid);
 	if (!target) {
-		pr_err("Cannot find process info info for %i\n",
+		pr_debug("Cannot find process info for %i\n",
 				args->pid);
 		r = -ESRCH;
 		goto out;
