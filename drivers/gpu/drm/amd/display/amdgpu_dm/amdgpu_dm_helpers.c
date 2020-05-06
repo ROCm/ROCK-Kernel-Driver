@@ -893,7 +893,9 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		struct dc_sink *sink)
 {
 	struct amdgpu_dm_connector *aconnector = link->priv;
+#ifdef HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM
 	struct drm_connector *connector = &aconnector->base;
+#endif
 	struct i2c_adapter *ddc;
 	int retry = 3;
 	enum dc_edid_status edid_status;
@@ -911,6 +913,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 
 		edid = drm_get_edid(&aconnector->base, ddc);
 
+#ifdef HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM
 		/* DP Compliance Test 4.2.2.6 */
 		if (link->aux_mode && connector->edid_corrupt)
 			drm_dp_send_real_edid_checksum(&aconnector->dm_dp_aux.aux, connector->real_edid_checksum);
@@ -919,6 +922,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 			connector->edid_corrupt = false;
 			return EDID_BAD_CHECKSUM;
 		}
+#endif
 
 		if (!edid)
 			return EDID_NO_RESPONSE;
@@ -966,7 +970,6 @@ enum dc_edid_status dm_helpers_read_local_edid(
 					DP_TEST_RESPONSE,
 					&test_response.raw,
 					sizeof(test_response));
-
 	}
 
 	return edid_status;
