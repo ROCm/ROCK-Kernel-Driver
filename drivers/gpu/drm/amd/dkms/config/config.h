@@ -294,6 +294,9 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
+/* drm_dp_send_real_edid_checksum is available */
+#define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
+
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
