@@ -592,7 +592,7 @@ static const struct cstate_model glm_cstates __initconst = {
 
 
 #define X86_CSTATES_MODEL(model, states)				\
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long) &(states) }
+	{ X86_VENDOR_INTEL, 6, model, X86_STEPPING_ANY, X86_FEATURE_ANY, (unsigned long) &(states) }
 
 static const struct x86_cpu_id intel_cstates_match[] __initconst = {
 	X86_CSTATES_MODEL(INTEL_FAM6_NEHALEM,    nhm_cstates),
