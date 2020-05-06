@@ -4,6 +4,6 @@
 #ifdef HAVE_DRM_UTIL_H
 #include <drm/drm_util.h>
 #else
-#include <kcl/kcl_drmP_h.h>
+#include <kcl/header/kcl_drmP_h.h>
 #endif
 #endif
