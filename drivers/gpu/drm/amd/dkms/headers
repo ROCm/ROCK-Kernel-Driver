@@ -21,8 +21,8 @@ drm/drm_irq.h kcl/header/kcl_drm_irq_h.h
 drm/drm_connector.h kcl/header/kcl_drm_connector_h.h
 drm/drm_encoder.h kcl/header/kcl_drm_encoder_h.h
 drm/drm_plane.h kcl/header/kcl_drm_plane_h.h
-linux/dma-fence.h kcl/kcl_fence_backport.h
-linux/dma-fence-array.h kcl/kcl_fence_backport.h
+linux/dma-fence.h kcl/backport/kcl_fence_backport.h
+linux/dma-fence-array.h kcl/backport/kcl_fence_backport.h
 linux/interval_tree_generic.h kcl/kcl_interval_tree_generic.h
 linux/pfn_t.h kcl/kcl_mm_types.h
 linux/nospec.h kcl/kcl_nospec.h
