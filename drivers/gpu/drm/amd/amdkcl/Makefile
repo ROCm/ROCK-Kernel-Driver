@@ -7,6 +7,9 @@ amdkcl-y += kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o \
 	kcl_seq_file.o kcl_connector.o
 amdkcl-y += dma-buf/dma-resv.o
 
+# for trace-points
+CFLAGS_kcl_fence.o := -I$(src)
+
 ccflags-y += -include $(src)/../dkms/config/config.h
 
 obj-m += amdkcl.o
