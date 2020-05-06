@@ -1945,7 +1945,7 @@ static const struct pstate_funcs knl_funcs = {
 };
 
 #define ICPU(model, policy) \
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_APERFMPERF,\
+	{ X86_VENDOR_INTEL, 6, model, X86_STEPPING_ANY, X86_FEATURE_APERFMPERF,\
 			(unsigned long)&policy }
 
 static const struct x86_cpu_id intel_pstate_cpu_ids[] = {

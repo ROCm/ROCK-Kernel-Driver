@@ -1394,7 +1394,7 @@ err:
 
 
 #define X86_UNCORE_MODEL_MATCH(model, init)	\
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&init }
+	{ X86_VENDOR_INTEL, 6, model, X86_STEPPING_ANY, X86_FEATURE_ANY, (unsigned long)&init }
 
 struct intel_uncore_init_fun {
 	void	(*cpu_init)(void);

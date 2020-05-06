@@ -669,7 +669,7 @@ static int __init init_rapl_pmus(void)
 }
 
 #define X86_RAPL_MODEL_MATCH(model, init)	\
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&init }
+	{ X86_VENDOR_INTEL, 6, model, X86_STEPPING_ANY, X86_FEATURE_ANY, (unsigned long)&init }
 
 static struct rapl_model model_snb = {
 	.events		= BIT(PERF_RAPL_PP0) |
