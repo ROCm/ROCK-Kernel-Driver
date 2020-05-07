@@ -146,7 +146,9 @@ struct nd_region {
 	struct device *btt_seed;
 	struct device *pfn_seed;
 	struct device *dax_seed;
+#ifndef __GENKSYMS__
 	unsigned long align;
+#endif
 	u16 ndr_mappings;
 	u64 ndr_size;
 	u64 ndr_start;
