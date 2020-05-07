@@ -60,6 +60,19 @@ static inline unsigned long nvdimm_security_flags(
 		return 0;
 
 	flags = nvdimm->sec.ops->get_flags(nvdimm, ptype);
+	/*
+	 * The old function returns 0 for disabled and < 0 for error.
+	 * The new function returns 0 for error and has disabled flag.
+	 * This interprets unsupported security state as disabled. The
+	 * specification states that the device should abort all security
+	 * related commands in this case.
+	 */
+	if (flags & (1 << 31)) /* 32bit sign */
+		flags = 0;
+	/* Convert old enum value into flags */
+	flags &= UINT_MAX;
+	if (flags < (1 << NVDIMM_SECURITY_DISABLED))
+		flags = 1 << (flags + NVDIMM_SECURITY_DISABLED);
 	/* disabled, locked, unlocked, and overwrite are mutually exclusive */
 	dev_WARN_ONCE(&nvdimm->dev, hweight64(flags & state_flags) > 1,
 			"reported invalid security state: %#llx\n",

@@ -162,17 +162,33 @@ static inline struct nd_blk_region_desc *to_blk_region_desc(
 
 }
 
-/*
- * Note that separate bits for locked + unlocked are defined so that
- * 'flags == 0' corresponds to an error / not-supported state.
- */
-enum nvdimm_security_bits {
+enum nvdimm_security_state {
+	NVDIMM_SECURITY_ERROR = -1,
+#ifdef __GENKSYMS__
 	NVDIMM_SECURITY_DISABLED,
 	NVDIMM_SECURITY_UNLOCKED,
 	NVDIMM_SECURITY_LOCKED,
 	NVDIMM_SECURITY_FROZEN,
 	NVDIMM_SECURITY_OVERWRITE,
+#endif
 };
+/*
+ * Note that separate bits for locked + unlocked are defined so that
+ * 'flags == 0' corresponds to an error / not-supported state.
+ */
+enum nvdimm_security_bits {
+	NVDIMM_SECURITY_DISABLED = 3,
+	NVDIMM_SECURITY_UNLOCKED,
+	NVDIMM_SECURITY_LOCKED,
+	NVDIMM_SECURITY_FROZEN,
+	NVDIMM_SECURITY_OVERWRITE,
+	NVDIMM_SECURITY_NFLAGS
+};
+
+static inline void nvdimm_security_bits_check(void)
+{
+    BUILD_BUG_ON(NVDIMM_SECURITY_NFLAGS >= 30);
+}
 
 #define NVDIMM_PASSPHRASE_LEN		32
 #define NVDIMM_KEY_DESC_LEN		22
@@ -187,8 +203,13 @@ enum nvdimm_passphrase_type {
 };
 
 struct nvdimm_security_ops {
+#ifdef __GENKSYMS__
+	enum nvdimm_security_state (*state)(struct nvdimm *nvdimm,
+			enum nvdimm_passphrase_type pass_type);
+#else
 	unsigned long (*get_flags)(struct nvdimm *nvdimm,
 			enum nvdimm_passphrase_type pass_type);
+#endif
 	int (*freeze)(struct nvdimm *nvdimm);
 	int (*change_key)(struct nvdimm *nvdimm,
 			const struct nvdimm_key_data *old_data,
