@@ -37,8 +37,6 @@ static inline u64 ktime_get_raw_ns(void)
 }
 #endif
 
-#endif
-
 #ifndef HAVE_KTIME_GET_REAL_SECONDS
 static inline time64_t ktime_get_real_seconds(void)
 {
@@ -47,4 +45,13 @@ static inline time64_t ktime_get_real_seconds(void)
 	do_gettimeofday(&ts);
 	return (time64_t)ts.tv_sec;
 }
+#endif
+
+#if !defined(HAVE_KTIME_GET_MONO_FAST_NS)
+static inline u64 ktime_get_mono_fast_ns(void)
+{
+	return ktime_to_ns(ktime_get());
+}
+#endif
+
 #endif
