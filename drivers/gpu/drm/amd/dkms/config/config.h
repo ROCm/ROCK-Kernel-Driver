@@ -573,6 +573,9 @@
 /* ktime_get_real_seconds() is available */
 #define HAVE_KTIME_GET_REAL_SECONDS 1
 
+/* ktime_get_mono_fast_ns is available */
+#define HAVE_KTIME_GET_MONO_FAST_NS 1
+
 /* kvcalloc() is available */
 #define HAVE_KVCALLOC 1
 
