@@ -586,10 +586,4 @@ int drm_helper_force_disable_all(struct drm_device *dev)
 }
 #endif
 
-/* commit fc1424c2ec813080aa1eaa2948070902b1a0e507 
- * drm: Correct DP DSC macro typo */
-#ifdef DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
-#define DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
-#endif
-
 #endif /* AMDKCL_DRM_H */
