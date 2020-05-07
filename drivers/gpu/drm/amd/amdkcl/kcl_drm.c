@@ -450,13 +450,11 @@ struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 	if (ret)
 		goto err_release;
 
-#ifdef HAVE_FB_INFO_APERTURES
 	info->apertures = alloc_apertures(1);
 	if (!info->apertures) {
 		ret = -ENOMEM;
 		goto err_free_cmap;
 	}
-#endif
 
 	fb_helper->fbdev = info;
 
