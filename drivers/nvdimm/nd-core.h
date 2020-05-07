@@ -39,8 +39,13 @@ struct nvdimm {
 	const char *dimm_id;
 	struct {
 		const struct nvdimm_security_ops *ops;
+#ifndef __GENKSYMS__
 		unsigned long flags;
 		unsigned long ext_flags;
+#else
+		enum nvdimm_security_state state;
+		enum nvdimm_security_state ext_state;
+#endif
 		unsigned int overwrite_tmo;
 		struct kernfs_node *overwrite_state;
 	} sec;
