@@ -45,6 +45,9 @@ struct amd_p2p_info {
 	void		*priv;		/**< Pointer set by AMD kernel
 					  * driver
 					  */
+	struct kfd_process *kfd_proc;  /**< Reference to kfd_process that
+					 * corresponds to this P2P access
+					 */
 };
 
 /**
