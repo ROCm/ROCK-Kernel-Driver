@@ -25,120 +25,121 @@
 #include <drm/drm_crtc_helper.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
-#define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
+#define DP_ADJUST_REQUEST_POST_CURSOR2 0x20c
 #endif
 
 #ifndef DP_TEST_MISC0
-#define DP_TEST_MISC0                       0x232
+#define DP_TEST_MISC0 0x232
 #endif
 
 #ifndef DP_TEST_PHY_PATTERN
-#define DP_TEST_PHY_PATTERN                 0x248
+#define DP_TEST_PHY_PATTERN 0x248
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_7_0
-#define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
+#define DP_TEST_80BIT_CUSTOM_PATTERN_7_0 0x250
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_15_8
-#define DP_TEST_80BIT_CUSTOM_PATTERN_15_8   0x251
+#define DP_TEST_80BIT_CUSTOM_PATTERN_15_8 0x251
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_23_16
-#define DP_TEST_80BIT_CUSTOM_PATTERN_23_16  0x252
+#define DP_TEST_80BIT_CUSTOM_PATTERN_23_16 0x252
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_31_24
-#define DP_TEST_80BIT_CUSTOM_PATTERN_31_24  0x253
+#define DP_TEST_80BIT_CUSTOM_PATTERN_31_24 0x253
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_39_32
-#define DP_TEST_80BIT_CUSTOM_PATTERN_39_32  0x254
+#define DP_TEST_80BIT_CUSTOM_PATTERN_39_32 0x254
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_47_40
-#define DP_TEST_80BIT_CUSTOM_PATTERN_47_40  0x255
+#define DP_TEST_80BIT_CUSTOM_PATTERN_47_40 0x255
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_55_48
-#define DP_TEST_80BIT_CUSTOM_PATTERN_55_48  0x256
+#define DP_TEST_80BIT_CUSTOM_PATTERN_55_48 0x256
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_63_56
-#define DP_TEST_80BIT_CUSTOM_PATTERN_63_56  0x257
+#define DP_TEST_80BIT_CUSTOM_PATTERN_63_56 0x257
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_71_64
-#define DP_TEST_80BIT_CUSTOM_PATTERN_71_64  0x258
+#define DP_TEST_80BIT_CUSTOM_PATTERN_71_64 0x258
 #endif
 #ifndef DP_TEST_80BIT_CUSTOM_PATTERN_79_72
-#define DP_TEST_80BIT_CUSTOM_PATTERN_79_72  0x259
+#define DP_TEST_80BIT_CUSTOM_PATTERN_79_72 0x259
 #endif
 
 #ifndef DP_BRANCH_REVISION_START
-#define DP_BRANCH_REVISION_START            0x509
+#define DP_BRANCH_REVISION_START 0x509
 #endif
 
 #ifndef DP_DP13_DPCD_REV
-#define DP_DP13_DPCD_REV                    0x2200
+#define DP_DP13_DPCD_REV 0x2200
 #endif
 #ifndef DP_DP13_MAX_LINK_RATE
-#define DP_DP13_MAX_LINK_RATE               0x2201
+#define DP_DP13_MAX_LINK_RATE 0x2201
 #endif
 
 #ifndef DP_LANE0_1_STATUS_ESI
-#define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
+#define DP_LANE0_1_STATUS_ESI 0x200c /* status same as 0x202 */
 #endif
 #ifndef DP_LANE2_3_STATUS_ESI
-#define DP_LANE2_3_STATUS_ESI                  0x200d /* status same as 0x203 */
+#define DP_LANE2_3_STATUS_ESI 0x200d /* status same as 0x203 */
 #endif
 #ifndef DP_LANE_ALIGN_STATUS_UPDATED_ESI
-#define DP_LANE_ALIGN_STATUS_UPDATED_ESI       0x200e /* status same as 0x204 */
+#define DP_LANE_ALIGN_STATUS_UPDATED_ESI 0x200e /* status same as 0x204 */
 #endif
 #ifndef DP_SINK_STATUS_ESI
-#define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
+#define DP_SINK_STATUS_ESI 0x200f /* status same as 0x205 */
 #endif
 
 #ifndef DRM_MODE_ROTATE_0
-#define DRM_MODE_ROTATE_0       (1<<0)
+#define DRM_MODE_ROTATE_0 (1 << 0)
 #endif
 #ifndef DRM_MODE_ROTATE_90
-#define DRM_MODE_ROTATE_90      (1<<1)
+#define DRM_MODE_ROTATE_90 (1 << 1)
 #endif
 #ifndef DRM_MODE_ROTATE_180
-#define DRM_MODE_ROTATE_180     (1<<2)
+#define DRM_MODE_ROTATE_180 (1 << 2)
 #endif
 #ifndef DRM_MODE_ROTATE_270
-#define DRM_MODE_ROTATE_270     (1<<3)
+#define DRM_MODE_ROTATE_270 (1 << 3)
 #endif
 
 #ifndef DRM_MODE_ROTATE_MASK
-#define DRM_MODE_ROTATE_MASK (\
-		DRM_MODE_ROTATE_0  | \
-		DRM_MODE_ROTATE_90  | \
-		DRM_MODE_ROTATE_180 | \
-		DRM_MODE_ROTATE_270)
+#define DRM_MODE_ROTATE_MASK                                                   \
+	(DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_180 |        \
+	 DRM_MODE_ROTATE_270)
 #endif
 
 /* helper for handling conditionals in various for_each macros */
 #ifndef for_each_if
-#define for_each_if(condition) if (!(condition)) {} else
+#define for_each_if(condition)                                                 \
+	if (!(condition)) {                                                    \
+	} else
 #endif
 
 #ifndef drm_for_each_plane
-#define drm_for_each_plane(plane, dev) \
-	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
+#define drm_for_each_plane(plane, dev)                                         \
+	list_for_each_entry (plane, &(dev)->mode_config.plane_list, head)
 #endif
 
 #ifndef drm_for_each_crtc
-#define drm_for_each_crtc(crtc, dev) \
-	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+#define drm_for_each_crtc(crtc, dev)                                           \
+	list_for_each_entry (crtc, &(dev)->mode_config.crtc_list, head)
 #endif
 
 #ifndef drm_for_each_connector
-#define drm_for_each_connector(connector, dev) \
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#define drm_for_each_connector(connector, dev)                                 \
+	list_for_each_entry (connector, &(dev)->mode_config.connector_list,    \
+			     head)
 #endif
 
 #ifndef drm_for_each_encoder
-#define drm_for_each_encoder(encoder, dev) \
-	list_for_each_entry(encoder, &(dev)->mode_config.encoder_list, head)
+#define drm_for_each_encoder(encoder, dev)                                     \
+	list_for_each_entry (encoder, &(dev)->mode_config.encoder_list, head)
 #endif
 
 #ifndef drm_for_each_fb
-#define drm_for_each_fb(fb, dev) \
-	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#define drm_for_each_fb(fb, dev)                                               \
+	list_for_each_entry (fb, &(dev)->mode_config.fb_list, head)
 #endif
 
 #if !defined(HAVE_DRM_MODESET_LOCK_ALL_CTX)
@@ -153,8 +154,8 @@ extern int drm_crtc_force_disable_all(struct drm_device *dev);
 
 #ifndef HAVE_DRM_CRTC_FROM_INDEX
 struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx);
-static inline struct drm_crtc *
-drm_crtc_from_index(struct drm_device *dev, int idx)
+static inline struct drm_crtc *drm_crtc_from_index(struct drm_device *dev,
+						   int idx)
 {
 	return _kcl_drm_crtc_from_index(dev, idx);
 }
@@ -169,23 +170,23 @@ drm_crtc_from_index(struct drm_device *dev, int idx)
  * The use of "&&" / "||" is limited in certain expressions.
  * The followings enable to calculate "and" / "or" with macro expansion only.
  */
-#define __and(x, y)			___and(x, y)
-#define ___and(x, y)			____and(__ARG_PLACEHOLDER_##x, y)
-#define ____and(arg1_or_junk, y)	__take_second_arg(arg1_or_junk y, 0)
+#define __and(x, y) ___and(x, y)
+#define ___and(x, y) ____and(__ARG_PLACEHOLDER_##x, y)
+#define ____and(arg1_or_junk, y) __take_second_arg(arg1_or_junk y, 0)
 
-#define __or(x, y)			___or(x, y)
-#define ___or(x, y)			____or(__ARG_PLACEHOLDER_##x, y)
-#define ____or(arg1_or_junk, y)		__take_second_arg(arg1_or_junk 1, y)
+#define __or(x, y) ___or(x, y)
+#define ___or(x, y) ____or(__ARG_PLACEHOLDER_##x, y)
+#define ____or(arg1_or_junk, y) __take_second_arg(arg1_or_junk 1, y)
 
-#define IS_REACHABLE(option) __or(IS_BUILTIN(option), \
-				__and(IS_MODULE(option), __is_defined(MODULE)))
+#define IS_REACHABLE(option)                                                   \
+	__or(IS_BUILTIN(option), __and(IS_MODULE(option), __is_defined(MODULE)))
 #endif /*IS_REACHABLE*/
 
 extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id,
 					       const char *name);
 static inline int
 _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
-						  const char *name)
+						       const char *name)
 {
 #if IS_REACHABLE(CONFIG_FB)
 	return remove_conflicting_pci_framebuffers(pdev, 0, name);
@@ -196,21 +197,19 @@ _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 #elif !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP)
 static inline int
 _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
-						  const char *name)
+						       const char *name)
 {
 	return drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, name);
 }
 #endif
 
 #if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
-static inline void
-drm_gem_object_put_unlocked(struct drm_gem_object *obj)
+static inline void drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
 	return drm_gem_object_unreference_unlocked(obj);
 }
 
-static inline void
-drm_gem_object_get(struct drm_gem_object *obj)
+static inline void drm_gem_object_get(struct drm_gem_object *obj)
 {
 	kref_get(&obj->refcount);
 }
@@ -294,57 +293,56 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 
 #ifndef HAVE_DRM_FB_HELPER_CFB_XX
 extern void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
-				const struct fb_fillrect *rect);
+					    const struct fb_fillrect *rect);
 extern void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
-				const struct fb_copyarea *area);
+					    const struct fb_copyarea *area);
 extern void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
-				 const struct fb_image *image);
+					     const struct fb_image *image);
 
-static inline
-void drm_fb_helper_cfb_fillrect(struct fb_info *info,
-				const struct fb_fillrect *rect)
+static inline void drm_fb_helper_cfb_fillrect(struct fb_info *info,
+					      const struct fb_fillrect *rect)
 {
 	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
 }
 
-static inline
-void drm_fb_helper_cfb_copyarea(struct fb_info *info,
-				const struct fb_copyarea *area)
+static inline void drm_fb_helper_cfb_copyarea(struct fb_info *info,
+					      const struct fb_copyarea *area)
 {
 	_kcl_drm_fb_helper_cfb_copyarea(info, area);
 }
 
-static inline
-void drm_fb_helper_cfb_imageblit(struct fb_info *info,
-				 const struct fb_image *image)
+static inline void drm_fb_helper_cfb_imageblit(struct fb_info *info,
+					       const struct fb_image *image)
 {
 	_kcl_drm_fb_helper_cfb_imageblit(info, image);
 }
 #endif
 
 #ifndef HAVE_DRM_FB_HELPER_XX_FBI
-extern struct fb_info *_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper);
+extern struct fb_info *
+_kcl_drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper);
 extern void _kcl_drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper);
 
-static inline
-struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+static inline struct fb_info *
+drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
 
 {
 	return _kcl_drm_fb_helper_alloc_fbi(fb_helper);
 }
 
-static inline
-void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
+static inline void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
 	_kcl_drm_fb_helper_unregister_fbi(fb_helper);
 }
 #endif
 
 #ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
-extern void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state);
-static inline
-void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
-					bool suspend)
+extern void
+_kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
+					int state);
+static inline void
+drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
+				   bool suspend)
 
 {
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, suspend);
@@ -365,60 +363,53 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 
 #ifndef HAVE_DRM_MODE_IS_420_XXX
 bool drm_mode_is_420_only(const struct drm_display_info *display,
-		const struct drm_display_mode *mode);
+			  const struct drm_display_mode *mode);
 bool drm_mode_is_420_also(const struct drm_display_info *display,
-		const struct drm_display_mode *mode);
+			  const struct drm_display_mode *mode);
 #endif
 
 #ifndef _DRM_PRINTK
-#define _DRM_PRINTK(once, level, fmt, ...)				\
-	do {								\
-		printk##once(KERN_##level "[" DRM_NAME "] " fmt,	\
-			     ##__VA_ARGS__);				\
+#define _DRM_PRINTK(once, level, fmt, ...)                                     \
+	do {                                                                   \
+		printk##once(KERN_##level "[" DRM_NAME "] " fmt,               \
+			     ##__VA_ARGS__);                                   \
 	} while (0)
 #endif
 
 #ifndef DRM_WARN
-#define DRM_WARN(fmt, ...)						\
-	_DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
+#define DRM_WARN(fmt, ...) _DRM_PRINTK(, WARNING, fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef DRM_WARN_ONCE
-#define DRM_WARN_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
+#define DRM_WARN_ONCE(fmt, ...) _DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef DRM_NOTE
-#define DRM_NOTE(fmt, ...)						\
-	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
+#define DRM_NOTE(fmt, ...) _DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef DRM_NOTE_ONCE
-#define DRM_NOTE_ONCE(fmt, ...)						\
-	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
+#define DRM_NOTE_ONCE(fmt, ...) _DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef DRM_ERROR
-#define DRM_ERROR(fmt, ...)                                            \
-       drm_err(fmt, ##__VA_ARGS__)
+#define DRM_ERROR(fmt, ...) drm_err(fmt, ##__VA_ARGS__)
 #endif
 
 #if !defined(DRM_DEV_DEBUG)
-#define DRM_DEV_DEBUG(dev, fmt, ...)					\
-	DRM_DEBUG(fmt, ##__VA_ARGS__)
+#define DRM_DEV_DEBUG(dev, fmt, ...) DRM_DEBUG(fmt, ##__VA_ARGS__)
 #endif
 
 #if !defined(DRM_DEV_ERROR)
-#define DRM_DEV_ERROR(dev, fmt, ...)					\
-	DRM_ERROR(fmt, ##__VA_ARGS__)
+#define DRM_DEV_ERROR(dev, fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef DRM_DEBUG_VBL
-#define DRM_UT_VBL		0x20
-#define DRM_DEBUG_VBL(fmt, args...)					\
-	do {								\
-		if (unlikely(drm_debug & DRM_UT_VBL))			\
-			drm_ut_debug_printk(__func__, fmt, ##args);	\
+#define DRM_UT_VBL 0x20
+#define DRM_DEBUG_VBL(fmt, args...)                                            \
+	do {                                                                   \
+		if (unlikely(drm_debug & DRM_UT_VBL))                          \
+			drm_ut_debug_printk(__func__, fmt, ##args);            \
 	} while (0)
 #endif
 
@@ -433,26 +424,24 @@ bool drm_mode_is_420_also(const struct drm_display_info *display,
  * v4.10-rc8-1367-g0f3bbe074dd1 drm/fb-helper: implement ioctl FBIO_WAITFORVSYNC
  */
 #ifndef DRM_FB_HELPER_DEFAULT_OPS
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display
+#define DRM_FB_HELPER_DEFAULT_OPS                                              \
+	.fb_check_var = drm_fb_helper_check_var,                               \
+	.fb_set_par = drm_fb_helper_set_par,                                   \
+	.fb_setcmap = drm_fb_helper_setcmap, .fb_blank = drm_fb_helper_blank,  \
+	.fb_pan_display = drm_fb_helper_pan_display
 #endif
 
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
-static inline
-int drm_helper_force_disable_all(struct drm_device *dev)
+static inline int drm_helper_force_disable_all(struct drm_device *dev)
 {
-       return drm_crtc_force_disable_all(dev);
+	return drm_crtc_force_disable_all(dev);
 }
 #endif
 
 #ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
-void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
-				    struct drm_framebuffer *fb,
-				    const struct drm_mode_fb_cmd2 *mode_cmd);
+void _kcl_drm_helper_mode_fill_fb_struct(
+	struct drm_device *dev, struct drm_framebuffer *fb,
+	const struct drm_mode_fb_cmd2 *mode_cmd);
 #endif
 
 #ifndef HAVE_DRM_MODE_GET_HV_TIMING
