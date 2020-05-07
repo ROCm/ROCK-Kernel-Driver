@@ -113,6 +113,7 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 	rdma_cb_data->amd_p2p_data.pid = pid;
 	rdma_cb_data->amd_p2p_data.priv = buf_obj;
 	rdma_cb_data->amd_p2p_data.pages = sg_table_tmp;
+	rdma_cb_data->amd_p2p_data.kfd_proc = p;
 
 	rdma_cb_data->free_callback = free_callback;
 	rdma_cb_data->client_priv = client_priv;
@@ -128,7 +129,6 @@ free_mem:
 	kfree(rdma_cb_data);
 out:
 	mutex_unlock(&p->mutex);
-	kfd_unref_process(p);
 
 	return ret;
 }
@@ -186,7 +186,6 @@ void run_rdma_free_callback(struct kfd_bo *buf_obj)
  */
 static int put_pages(struct amd_p2p_info **p_p2p_data)
 {
-	struct kfd_process *p = NULL;
 	int ret = 0;
 
 	if (!(*p_p2p_data)) {
@@ -194,18 +193,13 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 		return -EINVAL;
 	}
 
-	p = kfd_lookup_process_by_pid((*p_p2p_data)->pid);
-	if (!p) {
-		pr_err("Could not find the process\n");
-		return -EINVAL;
-	}
-
 	ret = put_pages_helper(*p_p2p_data);
 
-	if (!ret)
+	if (!ret) {
+		kfd_unref_process((*p_p2p_data)->kfd_proc);
 		*p_p2p_data = NULL;
 
-	kfd_unref_process(p);
+	}
 
 	return ret;
 }
