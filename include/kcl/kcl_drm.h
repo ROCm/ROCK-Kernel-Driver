@@ -533,49 +533,23 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 	} while (0)
 #endif
 
+/*
+ * Don't add fb_debug_* since the legacy drm_fb_helper_debug_* has segfault
+ * history:
+ * v2.6.35-21-gd219adc1228a fb: add hooks to handle KDB enter/exit
+ * v2.6.35-22-g1a7aba7f4e45 drm: add KGDB/KDB support
+ * v4.8-rc8-1391-g74064893901a drm/fb-helper: add DRM_FB_HELPER_DEFAULT_OPS for fb_ops
+ * v4.9-rc4-808-g1e0089288b9b drm/fb-helper: add fb_debug_* to DRM_FB_HELPER_DEFAULT_OPS
+ * v4.9-rc4-807-g1b99b72489c6 drm/fb-helper: fix segfaults in drm_fb_helper_debug_*
+ * v4.10-rc8-1367-g0f3bbe074dd1 drm/fb-helper: implement ioctl FBIO_WAITFORVSYNC
+ */
 #ifndef DRM_FB_HELPER_DEFAULT_OPS
-#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_debug_enter = drm_fb_helper_debug_enter, \
-	.fb_debug_leave = drm_fb_helper_debug_leave,\
-	.fb_ioctl	= drm_fb_helper_ioctl
-#endif
-#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_ioctl	= drm_fb_helper_ioctl
-#endif
-#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		!defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_debug_enter = drm_fb_helper_debug_enter, \
-	.fb_debug_leave = drm_fb_helper_debug_leave
-#endif
-#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		!defined(HAVE_DRM_FB_HELPER_IOCTL)
 #define DRM_FB_HELPER_DEFAULT_OPS \
 	.fb_check_var	= drm_fb_helper_check_var, \
 	.fb_set_par	= drm_fb_helper_set_par, \
 	.fb_setcmap	= drm_fb_helper_setcmap, \
 	.fb_blank	= drm_fb_helper_blank, \
 	.fb_pan_display	= drm_fb_helper_pan_display
-#endif
 #endif
 
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
