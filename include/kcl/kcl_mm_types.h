@@ -31,38 +31,6 @@ static inline unsigned long pfn_t_to_pfn(pfn_t pfn)
 
 #ifndef HAVE_VMF_INSERT
 typedef int vm_fault_t;
-
-static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
-				unsigned long addr,
-				pfn_t pfn)
-{
-	int err;
-#if !defined(HAVE_PFN_T_VM_INSERT_MIXED)
-	err = vm_insert_mixed(vma, addr, pfn_t_to_pfn(pfn));
-#else
-	err = vm_insert_mixed(vma, addr, pfn);
-#endif
-	if (err == -ENOMEM)
-		return VM_FAULT_OOM;
-	if (err < 0 && err != -EBUSY)
-		return VM_FAULT_SIGBUS;
-
-	return VM_FAULT_NOPAGE;
-}
-
-static inline vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma,
-				unsigned long addr, unsigned long pfn)
-{
-		int err = vm_insert_pfn(vma, addr, pfn);
-
-		if (err == -ENOMEM)
-			return VM_FAULT_OOM;
-		if (err < 0 && err != -EBUSY)
-			return VM_FAULT_SIGBUS;
-
-		return VM_FAULT_NOPAGE;
-}
-
 #endif
 
 #endif /* AMDKCL_MM_TYPES_H */
