@@ -17,6 +17,7 @@
 #include "core_status.h"
 #include "dpcd_defs.h"
 
+#include "resource.h"
 #define DC_LOGGER \
 	link->ctx->logger
 
