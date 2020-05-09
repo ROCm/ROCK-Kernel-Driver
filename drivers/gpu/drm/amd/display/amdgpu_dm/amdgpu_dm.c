@@ -6208,8 +6208,10 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.set_crc_source = amdgpu_dm_crtc_set_crc_source,
 	.verify_crc_source = amdgpu_dm_crtc_verify_crc_source,
 	.get_crc_sources = amdgpu_dm_crtc_get_crc_sources,
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK
 	.enable_vblank = dm_enable_vblank,
 	.disable_vblank = dm_disable_vblank,
+#endif
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_vblank_counter = amdgpu_get_vblank_counter_kms,
 	.get_vblank_timestamp = drm_crtc_vblank_helper_get_vblank_timestamp,
