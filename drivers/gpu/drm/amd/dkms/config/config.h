@@ -717,6 +717,9 @@
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
 
+/* drm_crtc_funcs->enable_vblank() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
+
 /* struct drm_crtc_funcs->get_vblank_timestamp() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP 1
 
