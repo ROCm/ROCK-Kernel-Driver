@@ -266,7 +266,7 @@ void kfd_procfs_del_queue(struct queue *q)
 int kfd_process_create_wq(void)
 {
 	if (!kfd_process_wq)
-		kfd_process_wq = create_workqueue("kfd_process_wq");
+		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
 
 	if (!kfd_restore_wq)
 #ifdef HAVE_ALLOC_ORDERED_WORKQUEUE
