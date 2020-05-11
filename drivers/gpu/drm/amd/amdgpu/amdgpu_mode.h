@@ -346,6 +346,12 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
+#ifndef HAVE_DRM_VRR_SUPPORTED
+	/* Support for upstream vrr_capable connector property */
+	struct drm_property *vrr_capable_property;
+	/* Support for upstream vrr_enabled CRTC property */
+	struct drm_property *vrr_enabled_property;
+#endif
 	/* hardcoded DFP edid from BIOS */
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
