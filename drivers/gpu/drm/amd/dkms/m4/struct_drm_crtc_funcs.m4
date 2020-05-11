@@ -62,8 +62,44 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES], [
 	])
 ])
 
+dnl #
+dnl # v4.18-rc3-781-gc0811a7d5bef drm/crc: Cleanup crtc_crc_open function
+dnl # v4.16-rc1-363-g31aec354f92c drm/amd/display: Implement interface for CRC on CRTC
+dnl # v4.8-rc8-1429-g9edbf1fa600a drm: Add API for capturing frame CRCs
+dnl #
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_crtc.h>
+		], [
+			struct drm_crtc *crtc = NULL;
+			int ret;
+
+			ret = crtc->funcs->set_crc_source(NULL, NULL);
+		], [
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE, 1,
+				[crtc->funcs->set_crc_source() is available])
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS, 1,
+				[crtc->funcs->set_crc_source() wants 2 args])
+		], [
+			AC_KERNEL_TRY_COMPILE([
+				#include <drm/drm_crtc.h>
+			], [
+				struct drm_crtc *crtc = NULL;
+				int ret;
+
+				ret = crtc->funcs->set_crc_source(NULL, NULL, NULL);
+			], [
+				AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE, 1,
+					[crtc->funcs->set_crc_source() is available])
+			])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
+	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 ])

@@ -101,7 +101,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
 					enum amdgpu_dm_pipe_crc_source source)
@@ -144,7 +144,7 @@ unlock:
 	return ret;
 }
 
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 #else
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
@@ -285,6 +285,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 
 	crtc_state->crc_src = source;
 
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS
+	*values_cnt = 3;
+#endif
 	/* Reset crc_skipped on dm state */
 	crtc_state->crc_skip_count = 0;
 

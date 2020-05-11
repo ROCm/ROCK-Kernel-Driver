@@ -4,9 +4,6 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
-/* crtc->funcs->set_crc_source() wants 2 args */
-#define HAVE_2ARGS_SET_CRC_SOURCE 1
-
 /* get_user_pages() wants 5 args */
 #define HAVE_5ARGS_GET_USER_PAGES 1
 
@@ -725,6 +722,12 @@
 
 /* drm_crtc_funcs->{get,verify}_crc_sources() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
+
+/* crtc->funcs->set_crc_source() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
+
+/* crtc->funcs->set_crc_source() wants 2 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS 1
 
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
