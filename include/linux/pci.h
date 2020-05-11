@@ -450,11 +450,6 @@ struct pci_dev {
 	const struct attribute_group **msi_irq_groups;
 #endif
 	struct pci_vpd *vpd;
-#ifdef CONFIG_PCIE_DPC
-	u16		dpc_cap;
-	unsigned int	dpc_rp_extensions:1;
-	u8		dpc_rp_log_size;
-#endif
 #ifdef CONFIG_PCI_ATS
 	union {
 		struct pci_sriov	*sriov;		/* PF: SR-IOV info */
@@ -480,6 +475,14 @@ struct pci_dev {
 	void* suse_kabi_padding;
 
 	unsigned long	priv_flags;	/* Private flags for the PCI driver */
+
+#ifdef CONFIG_PCIE_DPC
+#ifndef __GENKSYMS__
+	u16		dpc_cap;
+	unsigned int	dpc_rp_extensions:1;
+	u8		dpc_rp_log_size;
+#endif /* __GENKSYMS__ */
+#endif
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
@@ -521,7 +524,6 @@ struct pci_host_bridge {
 	unsigned int	native_shpc_hotplug:1;	/* OS may use SHPC hotplug */
 	unsigned int	native_pme:1;		/* OS may use PCIe PME */
 	unsigned int	native_ltr:1;		/* OS may use PCIe LTR */
-	unsigned int	native_dpc:1;		/* OS may use PCIe DPC */
 	unsigned int	preserve_config:1;	/* Preserve FW resource setup */
 
 	void* suse_kabi_padding;
@@ -533,6 +535,10 @@ struct pci_host_bridge {
 			resource_size_t size,
 			resource_size_t align);
 	unsigned long	private[0] ____cacheline_aligned;
+
+#ifndef __GENKSYMS__
+	unsigned int	native_dpc:1;		/* OS may use PCIe DPC */
+#endif
 };
 
 #define	to_pci_host_bridge(n) container_of(n, struct pci_host_bridge, dev)

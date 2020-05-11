@@ -398,6 +398,12 @@ int pci_aer_clear_nonfatal_status(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pci_aer_clear_nonfatal_status);
 
+int pci_cleanup_aer_uncorrect_error_status(struct pci_dev *dev)
+{
+	return pci_aer_clear_nonfatal_status(dev);
+}
+EXPORT_SYMBOL_GPL(pci_cleanup_aer_uncorrect_error_status);
+
 void pci_aer_clear_fatal_status(struct pci_dev *dev)
 {
 	int pos;

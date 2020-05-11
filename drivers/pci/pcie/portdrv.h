@@ -90,6 +90,9 @@ struct pcie_port_service_driver {
 	/* Device driver may resume normal operations */
 	void (*error_resume)(struct pci_dev *dev);
 
+	/* Link Reset Capability - AER service driver specific */
+	pci_ers_result_t (*reset_link)(struct pci_dev *dev);
+
 	int port_type;  /* Type of the port this driver can handle */
 	u32 service;    /* Port service this device represents */
 
