@@ -449,7 +449,7 @@ struct dm_crtc_state {
 	int crc_skip_count;
 	enum amdgpu_dm_pipe_crc_source crc_src;
 
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_VRR_SUPPORTED
 	bool base_vrr_enabled;
 #endif
 

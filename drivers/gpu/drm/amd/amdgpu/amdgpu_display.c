@@ -992,7 +992,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 						 "freesync_capable");
 		if (!adev->mode_info.freesync_capable_property)
 			return -ENOMEM;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_VRR_SUPPORTED
 		adev->mode_info.vrr_capable_property =
 			drm_property_create_bool(adev->ddev,
 						 DRM_MODE_PROP_IMMUTABLE,
