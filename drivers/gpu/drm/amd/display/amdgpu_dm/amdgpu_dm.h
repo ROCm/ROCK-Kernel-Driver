@@ -349,6 +349,7 @@ struct amdgpu_display_manager {
 #endif
 
 	struct drm_atomic_state *cached_state;
+	struct dc_state *cached_dc_state;
 
 	struct dm_comressor_info compressor;
 
