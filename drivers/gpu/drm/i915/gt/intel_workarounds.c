@@ -873,11 +873,6 @@ icl_gt_workarounds_init(struct drm_i915_private *i915, struct i915_wa_list *wal)
 			    SLICE_UNIT_LEVEL_CLKGATE,
 			    MSCUNIT_CLKGATE_DIS);
 
-	/* Wa_1406680159:icl */
-	wa_write_or(wal,
-		    SUBSLICE_UNIT_LEVEL_CLKGATE,
-		    GWUNIT_CLKGATE_DIS);
-
 	/* Wa_1406838659:icl (pre-prod) */
 	if (IS_ICL_REVID(i915, ICL_REVID_A0, ICL_REVID_B0))
 		wa_write_or(wal,
@@ -1336,6 +1331,11 @@ rcs_engine_wa_init(struct intel_engine_cs *engine, struct i915_wa_list *wal)
 				   GEN11_SCRATCH2,
 				   GEN11_COHERENT_PARTIAL_WRITE_MERGE_ENABLE,
 				   0);
+
+		/* Wa_1406680159:icl,ehl */
+		wa_write_or(wal,
+			    SUBSLICE_UNIT_LEVEL_CLKGATE,
+			    GWUNIT_CLKGATE_DIS);
 	}
 
 	if (IS_GEN_RANGE(i915, 9, 11)) {

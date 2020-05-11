@@ -3573,11 +3573,7 @@ static int __rbd_notify_op_lock(struct rbd_device *rbd_dev,
 static void rbd_notify_op_lock(struct rbd_device *rbd_dev,
 			       enum rbd_notify_op notify_op)
 {
-	struct page **reply_pages;
-	size_t reply_len;
-
-	__rbd_notify_op_lock(rbd_dev, notify_op, &reply_pages, &reply_len);
-	ceph_release_page_vector(reply_pages, calc_pages_for(0, reply_len));
+	__rbd_notify_op_lock(rbd_dev, notify_op, NULL, NULL);
 }
 
 static void rbd_notify_acquired_lock(struct work_struct *work)
@@ -6752,7 +6748,7 @@ static void rbd_print_dne(struct rbd_device *rbd_dev, bool is_snap)
 
 static void rbd_dev_image_release(struct rbd_device *rbd_dev)
 {
-	if (rbd_dev->opts)
+	if (!rbd_is_ro(rbd_dev))
 		rbd_unregister_watch(rbd_dev);
 
 	rbd_dev_unprobe(rbd_dev);
