@@ -56,11 +56,13 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 				  size_t *values_cnt);
 #endif
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 int amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc,
 				     const char *src_name,
 				     size_t *values_cnt);
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count);
+#endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES */
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 #else
 #define amdgpu_dm_crtc_configure_crc_source NULL
