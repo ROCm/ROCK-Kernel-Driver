@@ -3009,18 +3009,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_QUEUE_GWS,
 			kfd_ioctl_alloc_queue_gws, 0),
 
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE_old,
-				kfd_ioctl_ipc_import_handle, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE_old,
-				kfd_ioctl_ipc_export_handle, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_old,
-				kfd_ioctl_cross_memory_copy, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP_old,
-				kfd_ioctl_dbg_set_debug_trap, 0),
-
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),
 
