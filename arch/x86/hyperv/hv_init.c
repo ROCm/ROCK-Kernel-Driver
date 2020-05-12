@@ -48,7 +48,9 @@ EXPORT_SYMBOL_GPL(hv_alloc_hyperv_page);
 
 void *hv_alloc_hyperv_zeroed_page(void)
 {
-	return NULL;
+        BUILD_BUG_ON(PAGE_SIZE != HV_HYP_PAGE_SIZE);
+
+        return (void *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
 }
 EXPORT_SYMBOL_GPL(hv_alloc_hyperv_zeroed_page);
 
