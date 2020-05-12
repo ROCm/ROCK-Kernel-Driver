@@ -113,6 +113,9 @@
 /* drm_atomic_helper_duplicate_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
 
+/* drm_atomic_helper_legacy_gamma_set() is available */
+#define HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET 1
+
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
@@ -719,6 +722,12 @@
 
 /* drm_crtc_funcs->enable_vblank() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
+
+/* crtc->funcs->gamma_set() wants 5 args */
+/* #undef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS */
+
+/* crtc->funcs->gamma_set() wants 6 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS 1
 
 /* struct drm_crtc_funcs->get_vblank_timestamp() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP 1
