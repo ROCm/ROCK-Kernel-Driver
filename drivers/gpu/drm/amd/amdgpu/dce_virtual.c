@@ -101,12 +101,34 @@ static void dce_virtual_bandwidth_update(struct amdgpu_device *adev)
 	return;
 }
 
-static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
-				      u16 *green, u16 *blue, uint32_t size,
-				      struct drm_modeset_acquire_ctx *ctx)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size,
+				   struct drm_modeset_acquire_ctx *ctx)
 {
 	return 0;
 }
+#elif defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size)
+{
+	return 0;
+}
+#else
+static void dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t start, uint32_t size)
+{
+	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+	int end = (start + size > 256) ? 256 : start + size, i;
+
+	/* userspace palettes are always correct as is */
+	for (i = start; i < end; i++) {
+		amdgpu_crtc->lut_r[i] = red[i] >> 6;
+		amdgpu_crtc->lut_g[i] = green[i] >> 6;
+		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
+	}
+}
+#endif
 
 static void dce_virtual_crtc_destroy(struct drm_crtc *crtc)
 {
