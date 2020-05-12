@@ -1358,6 +1358,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto err_free;
 	}
 
+	/* Update the VRAM usage count */
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+		WRITE_ONCE(pdd->vram_usage, pdd->vram_usage + args->size);
+
 	mutex_unlock(&p->mutex);
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
@@ -1373,7 +1377,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1387,6 +1391,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	struct kfd_bo *buf_obj;
 	struct kfd_dev *dev;
 	int ret;
+	uint64_t size = 0;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (!dev)
@@ -1409,7 +1414,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	}
 	run_rdma_free_callback(buf_obj);
 
-	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, buf_obj->mem);
+	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, buf_obj->mem, &size);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
@@ -1417,6 +1422,8 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	if (!ret)
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
+
+	WRITE_ONCE(pdd->vram_usage, pdd->vram_usage - size);
 
 err_unlock:
 	mutex_unlock(&p->mutex);
@@ -1897,7 +1904,7 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -2028,7 +2035,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2280,7 +2287,7 @@ static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 		return -EINVAL;
 
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
@@ -2681,7 +2688,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	target = need_proc_create ?
 		kfd_create_process(thread) : kfd_lookup_process_by_pid(pid);
 	if (!target) {
-		pr_err("Cannot find process info info for %i\n",
+		pr_debug("Cannot find process info for %i\n",
 				args->pid);
 		r = -ESRCH;
 		goto out;
@@ -2832,8 +2839,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data3, /* Grace Period */
 				data1, /* Flags */
 				queue_id_array); /* array of queue ids */
-		if (r)
+
+		if (copy_to_user((void __user *)args->ptr, queue_id_array,
+				sizeof(uint32_t) * data2)) {
+			r = -EFAULT;
 			goto unlock_out;
+		}
+
 		break;
 
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
@@ -2841,8 +2853,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data2, /* Number of queues */
 				data1, /* Flags */
 				queue_id_array); /* array of queue ids */
-		if (r)
+
+		if (copy_to_user((void __user *)args->ptr, queue_id_array,
+				sizeof(uint32_t) * data2)) {
+			r = -EFAULT;
 			goto unlock_out;
+		}
+
 		break;
 	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
 		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,
@@ -2992,6 +3009,18 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_QUEUE_GWS,
 			kfd_ioctl_alloc_queue_gws, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE_old,
+				kfd_ioctl_ipc_import_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE_old,
+				kfd_ioctl_ipc_export_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_old,
+				kfd_ioctl_cross_memory_copy, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP_old,
+				kfd_ioctl_dbg_set_debug_trap, 0),
+
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),
 
@@ -3005,8 +3034,6 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 			kfd_ioctl_dbg_set_debug_trap, 0),
 };
 
-#define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
-
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 {
 	struct kfd_process *process;
@@ -3018,10 +3045,8 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	unsigned int usize, asize;
 	int retcode = -EINVAL;
 
-	if (nr >= AMDKFD_CORE_IOCTL_COUNT)
-		goto err_i1;
-
-	if ((nr >= AMDKFD_COMMAND_START) && (nr < AMDKFD_COMMAND_END)) {
+	if (((nr >= AMDKFD_COMMAND_START) && (nr < AMDKFD_COMMAND_END)) ||
+	    ((nr >= AMDKFD_COMMAND_START_2) && (nr < AMDKFD_COMMAND_END_2))) {
 		u32 amdkfd_size;
 
 		ioctl = &amdkfd_ioctls[nr];

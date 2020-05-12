@@ -63,6 +63,7 @@ const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count);
 void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc);
 #else
+#define amdgpu_dm_crtc_configure_crc_source NULL
 #define amdgpu_dm_crtc_set_crc_source NULL
 #define amdgpu_dm_crtc_verify_crc_source NULL
 #define amdgpu_dm_crtc_get_crc_sources NULL

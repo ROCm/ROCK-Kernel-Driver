@@ -52,6 +52,9 @@
 /* backlight_properties->type is available */
 #define HAVE_BACKLIGHT_PROPERTIES_TYPE 1
 
+/* backlight_device_set_brightness is available */
+#define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
+
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
@@ -293,6 +296,9 @@
 
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
+
+/* drm_dp_send_real_edid_checksum is available */
+#define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
@@ -567,6 +573,9 @@
 /* ktime_get_real_seconds() is available */
 #define HAVE_KTIME_GET_REAL_SECONDS 1
 
+/* ktime_get_mono_fast_ns is available */
+#define HAVE_KTIME_GET_MONO_FAST_NS 1
+
 /* kvcalloc() is available */
 #define HAVE_KVCALLOC 1
 
@@ -596,6 +605,12 @@
 
 /* list_bulk_move_tail() is available */
 #define HAVE_LIST_BULK_MOVE_TAIL 1
+
+/* list_is_first() is available */
+#define HAVE_LIST_IS_FIRST 1
+
+/* list_rotate_to_front() is available */
+#define HAVE_LIST_ROTATE_TO_FRONT 1
 
 /* memalloc_nofs_{save,restore}() are available */
 #define HAVE_MEMALLOC_NOFS_SAVE 1

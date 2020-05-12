@@ -1293,8 +1293,6 @@ static int navi10_set_power_profile_mode(struct smu_context *smu, long *input, u
 	}
 
 	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_CUSTOM) {
-		if (size < 0)
-			return -EINVAL;
 
 		ret = smu_update_table(smu,
 				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
@@ -1817,7 +1815,8 @@ static int navi10_get_power_limit(struct smu_context *smu,
 	int power_src;
 
 	if (!smu->power_limit) {
-		if (smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT)) {
+		if (smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT) &&
+			!amdgpu_sriov_vf(smu->adev)) {
 			power_src = smu_power_get_index(smu, SMU_POWER_SOURCE_AC);
 			if (power_src < 0)
 				return -EINVAL;
@@ -1959,6 +1958,9 @@ static bool navi10_is_baco_supported(struct smu_context *smu)
 static int navi10_set_default_od_settings(struct smu_context *smu, bool initialize) {
 	OverDriveTable_t *od_table, *boot_od_table;
 	int ret = 0;
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
 
 	ret = smu_v11_0_set_default_od_settings(smu, initialize, sizeof(OverDriveTable_t));
 	if (ret)

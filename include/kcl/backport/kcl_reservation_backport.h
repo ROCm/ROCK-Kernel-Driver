@@ -4,7 +4,7 @@
 #include <kcl/kcl_reservation.h>
 #include <asm/barrier.h>
 #include <linux/ww_mutex.h>
-#include <kcl/kcl_fence_backport.h>
+#include <kcl/backport/kcl_fence_backport.h>
 #include <linux/seqlock.h>
 #include <linux/rcupdate.h>
 #include <asm/barrier.h>

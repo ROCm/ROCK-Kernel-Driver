@@ -40,9 +40,11 @@
  * 1.3 - Fix race condition between clear on suspend and trap event handling
  * 1.4 - Fix bad kfifo free
  * 1.5 - Fix ABA issue between queue snapshot and suspend
+ * 2.0 - Return number of queues suspended/resumed and mask invalid/error
+ *	 array slots
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	1
-#define KFD_IOCTL_DBG_MINOR_VERSION	5
+#define KFD_IOCTL_DBG_MAJOR_VERSION	2
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -224,6 +226,12 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_DBG_EV_STATUS_NEW_QUEUE	8
 #define	KFD_DBG_EV_FLAG_CLEAR_STATUS	1
 
+/* queue states for suspend/resume */
+#define KFD_DBG_QUEUE_ERROR_BIT		30
+#define KFD_DBG_QUEUE_INVALID_BIT	31
+#define KFD_DBG_QUEUE_ERROR_MASK	(1 << KFD_DBG_QUEUE_ERROR_BIT)
+#define KFD_DBG_QUEUE_INVALID_MASK	(1 << KFD_DBG_QUEUE_INVALID_BIT)
+
 #define KFD_INVALID_QUEUEID	0xffffffff
 
 /* KFD_IOC_DBG_TRAP_ENABLE:
@@ -251,18 +259,44 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 2
 
 /* KFD_IOC_DBG_TRAP_NODE_SUSPEND:
- * ptr:   pointer to an array of Queues IDs
- * data1: flags
- * data2: number of queues
- * data3: grace period
+ * ptr:   pointer to an array of Queues IDs (IN/OUT)
+ * data1: flags (IN)
+ * data2: number of queues (IN)
+ * data3: grace period (IN)
+ *
+ * Returns the number of queues suspended from array of Queue IDs (ptr).
+ * Requested queues that fail to suspend are masked in the array:
+ *
+ * KFD_DBG_QUEUE_INVALID_MASK - requested queue does not exist or cannot be
+ * suspended (new or being destroyed).
+ *
+ * KFD_DBG_QUEUE_ERROR_MASK - bad internal operation occurred on requested
+ * queue.
+ *
+ * NOTE!  All queue destroy requests will be blocked on a suspended queue.
+ * Queue resume will unblock.
+ *
+ * KFD_DBG_EV_FLAG_CLEAR_STATUS can be passed as a flag (data1) to clear
+ * pending events.
+ *
+ * Grace period (data3) is time allowed for waves to complete before CWSR.
+ * 0 can be entered for immediate preemption.
  */
 #define KFD_IOC_DBG_TRAP_NODE_SUSPEND 3
 
 /* KFD_IOC_DBG_TRAP_NODE_RESUME:
- * ptr:   pointer to an array of Queues IDs
- * data1: flags
- * data2: number of queues
- * data3: unused
+ * ptr:   pointer to an array of Queues IDs (IN/OUT)
+ * data1: flags (IN)
+ * data2: number of queues (IN)
+ * data3: unused (IN)
+ *
+ * Returns the number of queues resumed from array of Queue IDs (ptr).
+ * Requested queues that fail to resume are masked in the array:
+ *
+ * KFD_DBG_QUEUE_INVALID_MASK - requested queue does not exist.
+ *
+ * KFD_DBG_QUEUE_ERROR_MASK - bad internal operation occurred on requested
+ * queue.
  */
 #define KFD_IOC_DBG_TRAP_NODE_RESUME 4
 
@@ -706,19 +740,35 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_ALLOC_QUEUE_GWS		\
 		AMDKFD_IOWR(0x1E, struct kfd_ioctl_alloc_queue_gws_args)
 
-#define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE_old	\
 		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_import_handle_args)
 
-#define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
+#define AMDKFD_IOC_IPC_EXPORT_HANDLE_old	\
 		AMDKFD_IOWR(0x20, struct kfd_ioctl_ipc_export_handle_args)
 
-#define AMDKFD_IOC_DBG_TRAP			\
+#define AMDKFD_IOC_DBG_TRAP_old			\
 		AMDKFD_IOWR(0x21, struct kfd_ioctl_dbg_trap_args)
 
-#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+#define AMDKFD_IOC_CROSS_MEMORY_COPY_old	\
 		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
 
 #define AMDKFD_COMMAND_START		0x01
 #define AMDKFD_COMMAND_END		0x23
+
+/* non-upstream ioctls */
+#define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \
+		AMDKFD_IOWR(0x80, struct kfd_ioctl_ipc_import_handle_args)
+
+#define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
+		AMDKFD_IOWR(0x81, struct kfd_ioctl_ipc_export_handle_args)
+
+#define AMDKFD_IOC_DBG_TRAP			\
+		AMDKFD_IOWR(0x82, struct kfd_ioctl_dbg_trap_args)
+
+#define AMDKFD_IOC_CROSS_MEMORY_COPY		\
+		AMDKFD_IOWR(0x83, struct kfd_ioctl_cross_memory_copy_args)
+
+#define AMDKFD_COMMAND_START_2		0x80
+#define AMDKFD_COMMAND_END_2		0x84
 
 #endif

@@ -515,6 +515,10 @@ enum dcn20_clk_src_array_id {
 	.block ## _ ## reg_name[id] = BASE(mm ## block ## id ## _ ## reg_name ## _BASE_IDX) + \
 					mm ## block ## id ## _ ## reg_name
 
+#define VUPDATE_SRII(reg_name, block, id)\
+	.reg_name[id] = BASE(mm ## reg_name ## _ ## block ## id ## _BASE_IDX) + \
+					mm ## reg_name ## _ ## block ## id
+
 /* NBIO */
 #define NBIO_BASE_INNER(seg) \
 	NBIO_BASE__INST0_SEG ## seg
@@ -1667,24 +1671,6 @@ enum dc_status dcn20_build_mapped_resource(const struct dc *dc, struct dc_state 
 	enum dc_status status = DC_OK;
 	struct pipe_ctx *pipe_ctx = resource_get_head_pipe_for_stream(&context->res_ctx, stream);
 
-	/*TODO Seems unneeded anymore */
-	/*	if (old_context && resource_is_stream_unchanged(old_context, stream)) {
-			if (stream != NULL && old_context->streams[i] != NULL) {
-				 todo: shouldn't have to copy missing parameter here
-				resource_build_bit_depth_reduction_params(stream,
-						&stream->bit_depth_params);
-				stream->clamping.pixel_encoding =
-						stream->timing.pixel_encoding;
-
-				resource_build_bit_depth_reduction_params(stream,
-								&stream->bit_depth_params);
-				build_clamping_params(stream);
-
-				continue;
-			}
-		}
-	*/
-
 	if (!pipe_ctx)
 		return DC_ERROR_UNEXPECTED;
 
@@ -1997,8 +1983,6 @@ void dcn20_split_stream_for_mpc(
 	secondary_pipe->top_pipe = primary_pipe;
 
 	ASSERT(primary_pipe->plane_state);
-	resource_build_scaling_params(primary_pipe);
-	resource_build_scaling_params(secondary_pipe);
 }
 
 void dcn20_populate_dml_writeback_from_context(
@@ -2634,11 +2618,32 @@ static void dcn20_merge_pipes_for_validate(
 	}
 }
 
+int dcn20_find_previous_split_count(struct pipe_ctx *pipe)
+{
+	int previous_split = 1;
+	struct pipe_ctx *current_pipe = pipe;
+
+	while (current_pipe->bottom_pipe) {
+		if (current_pipe->plane_state != current_pipe->bottom_pipe->plane_state)
+			break;
+		previous_split++;
+		current_pipe = current_pipe->bottom_pipe;
+	}
+	current_pipe = pipe;
+	while (current_pipe->top_pipe) {
+		if (current_pipe->plane_state != current_pipe->top_pipe->plane_state)
+			break;
+		previous_split++;
+		current_pipe = current_pipe->top_pipe;
+	}
+	return previous_split;
+}
+
 int dcn20_validate_apply_pipe_split_flags(
 		struct dc *dc,
 		struct dc_state *context,
 		int vlevel,
-		bool *split,
+		int *split,
 		bool *merge)
 {
 	int i, pipe_idx, vlevel_split;
@@ -2665,19 +2670,24 @@ int dcn20_validate_apply_pipe_split_flags(
 
 	/* Avoid split loop looks for lowest voltage level that allows most unsplit pipes possible */
 	if (avoid_split) {
+		int max_mpc_comb = context->bw_ctx.dml.vba.maxMpcComb;
+
 		for (i = 0, pipe_idx = 0; i < dc->res_pool->pipe_count; i++) {
 			if (!context->res_ctx.pipe_ctx[i].stream)
 				continue;
 
 			for (vlevel_split = vlevel; vlevel <= context->bw_ctx.dml.soc.num_states; vlevel++)
-				if (context->bw_ctx.dml.vba.NoOfDPP[vlevel][0][pipe_idx] == 1)
+				if (context->bw_ctx.dml.vba.NoOfDPP[vlevel][0][pipe_idx] == 1 &&
+						context->bw_ctx.dml.vba.ModeSupport[vlevel][0])
 					break;
 			/* Impossible to not split this pipe */
 			if (vlevel > context->bw_ctx.dml.soc.num_states)
 				vlevel = vlevel_split;
+			else
+				max_mpc_comb = 0;
 			pipe_idx++;
 		}
-		context->bw_ctx.dml.vba.maxMpcComb = 0;
+		context->bw_ctx.dml.vba.maxMpcComb = max_mpc_comb;
 	}
 
 	/* Split loop sets which pipe should be split based on dml outputs and dc flags */
@@ -2688,8 +2698,14 @@ int dcn20_validate_apply_pipe_split_flags(
 		if (!context->res_ctx.pipe_ctx[i].stream)
 			continue;
 
-		if (force_split || context->bw_ctx.dml.vba.NoOfDPP[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_plane] > 1)
-			split[i] = true;
+		if (force_split
+				|| context->bw_ctx.dml.vba.NoOfDPP[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_plane] > 1) {
+			if (context->stream_count == 1 && plane_count == 1
+					&& dc->config.enable_4to1MPC && dc->res_pool->pipe_count >= 4)
+				split[i] = 4;
+			else
+				split[i] = 2;
+		}
 		if ((pipe->stream->view_format ==
 				VIEW_3D_FORMAT_SIDE_BY_SIDE ||
 				pipe->stream->view_format ==
@@ -2698,9 +2714,9 @@ int dcn20_validate_apply_pipe_split_flags(
 				TIMING_3D_FORMAT_TOP_AND_BOTTOM ||
 				 pipe->stream->timing.timing_3d_format ==
 				TIMING_3D_FORMAT_SIDE_BY_SIDE))
-			split[i] = true;
+			split[i] = 2;
 		if (dc->debug.force_odm_combine & (1 << pipe->stream_res.tg->inst)) {
-			split[i] = true;
+			split[i] = 2;
 			context->bw_ctx.dml.vba.ODMCombineEnablePerState[vlevel][pipe_plane] = dm_odm_combine_mode_2to1;
 		}
 		context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_plane] =
@@ -2708,39 +2724,58 @@ int dcn20_validate_apply_pipe_split_flags(
 
 		if (pipe->prev_odm_pipe && context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_plane] != dm_odm_combine_mode_disabled) {
 			/*Already split odm pipe tree, don't try to split again*/
-			split[i] = false;
-			split[pipe->prev_odm_pipe->pipe_idx] = false;
+			split[i] = 0;
+			split[pipe->prev_odm_pipe->pipe_idx] = 0;
 		} else if (pipe->top_pipe && pipe->plane_state == pipe->top_pipe->plane_state
 				&& context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_plane] == dm_odm_combine_mode_disabled) {
-			/*Already split mpc tree, don't try to split again, assumes only 2x mpc combine*/
-			split[i] = false;
-			split[pipe->top_pipe->pipe_idx] = false;
-		} else if (pipe->prev_odm_pipe || (pipe->top_pipe && pipe->plane_state == pipe->top_pipe->plane_state)) {
-			if (split[i] == false) {
+			/*If 2 way split but can support 4 way split, then split each pipe again*/
+			if (context->stream_count == 1 && plane_count == 1
+					&& dc->config.enable_4to1MPC && dc->res_pool->pipe_count >= 4) {
+				split[i] = 2;
+			} else {
+				split[i] = 0;
+				split[pipe->top_pipe->pipe_idx] = 0;
+			}
+		} else if (pipe->prev_odm_pipe || (dcn20_find_previous_split_count(pipe) == 2 && pipe->top_pipe)) {
+			if (split[i] == 0) {
 				/*Exiting mpc/odm combine*/
 				merge[i] = true;
-				if (pipe->prev_odm_pipe) {
-					ASSERT(0); /*should not actually happen yet*/
-					merge[pipe->prev_odm_pipe->pipe_idx] = true;
-				} else
-					merge[pipe->top_pipe->pipe_idx] = true;
 			} else {
 				/*Transition from mpc combine to odm combine or vice versa*/
 				ASSERT(0); /*should not actually happen yet*/
-				split[i] = true;
+				split[i] = 2;
 				merge[i] = true;
 				if (pipe->prev_odm_pipe) {
-					split[pipe->prev_odm_pipe->pipe_idx] = true;
+					split[pipe->prev_odm_pipe->pipe_idx] = 2;
 					merge[pipe->prev_odm_pipe->pipe_idx] = true;
 				} else {
-					split[pipe->top_pipe->pipe_idx] = true;
+					split[pipe->top_pipe->pipe_idx] = 2;
 					merge[pipe->top_pipe->pipe_idx] = true;
 				}
+			}
+		} else if (dcn20_find_previous_split_count(pipe) == 3) {
+			if (split[i] == 0 && !pipe->top_pipe) {
+				merge[pipe->bottom_pipe->pipe_idx] = true;
+				merge[pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+			} else if (split[i] == 2 && !pipe->top_pipe) {
+				merge[pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+				split[i] = 0;
+			}
+		} else if (dcn20_find_previous_split_count(pipe) == 4) {
+			if (split[i] == 0 && !pipe->top_pipe) {
+				merge[pipe->bottom_pipe->pipe_idx] = true;
+				merge[pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+				merge[pipe->bottom_pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+			} else if (split[i] == 2 && !pipe->top_pipe) {
+				merge[pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+				merge[pipe->bottom_pipe->bottom_pipe->bottom_pipe->pipe_idx] = true;
+				split[i] = 0;
 			}
 		}
 
 		/* Adjust dppclk when split is forced, do not bother with dispclk */
-		if (split[i] && context->bw_ctx.dml.vba.NoOfDPP[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_idx] == 1)
+		if (split[i] != 0
+				&& context->bw_ctx.dml.vba.NoOfDPP[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_idx] == 1)
 			context->bw_ctx.dml.vba.RequiredDPPCLK[vlevel][context->bw_ctx.dml.vba.maxMpcComb][pipe_idx] /= 2;
 		pipe_idx++;
 	}
@@ -2757,7 +2792,7 @@ bool dcn20_fast_validate_bw(
 		int *vlevel_out)
 {
 	bool out = false;
-	bool split[MAX_PIPES] = { false };
+	int split[MAX_PIPES] = { 0 };
 	int pipe_cnt, i, pipe_idx, vlevel;
 
 	ASSERT(pipes);
@@ -2817,7 +2852,7 @@ bool dcn20_fast_validate_bw(
 				&& context->bw_ctx.dml.vba.ODMCombineEnabled[pipe_idx])
 			goto validate_fail;
 
-		if (split[i]) {
+		if (split[i] == 2) {
 			if (!hsplit_pipe || hsplit_pipe->plane_state != pipe->plane_state) {
 				/* pipe not split previously needs split */
 				hsplit_pipe = dcn20_find_secondary_pipe(dc, &context->res_ctx, dc->res_pool, pipe);
@@ -2832,10 +2867,13 @@ bool dcn20_fast_validate_bw(
 							pipe, hsplit_pipe))
 						goto validate_fail;
 					dcn20_build_mapped_resource(dc, context, pipe->stream);
-				} else
+				} else {
 					dcn20_split_stream_for_mpc(
-						&context->res_ctx, dc->res_pool,
-						pipe, hsplit_pipe);
+							&context->res_ctx, dc->res_pool,
+							pipe, hsplit_pipe);
+					if (!resource_build_scaling_params(pipe) || !resource_build_scaling_params(hsplit_pipe))
+						goto validate_fail;
+				}
 				pipe_split_from[hsplit_pipe->pipe_idx] = pipe_idx;
 			}
 		} else if (hsplit_pipe && hsplit_pipe->plane_state == pipe->plane_state) {
@@ -3146,25 +3184,34 @@ validate_out:
 	return out;
 }
 
-
-bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
-		bool fast_validate)
+/*
+ * This must be noinline to ensure anything that deals with FP registers
+ * is contained within this call; previously our compiling with hard-float
+ * would result in fp instructions being emitted outside of the boundaries
+ * of the DC_FP_START/END macros, which makes sense as the compiler has no
+ * idea about what is wrapped and what is not
+ *
+ * This is largely just a workaround to avoid breakage introduced with 5.6,
+ * ideally all fp-using code should be moved into its own file, only that
+ * should be compiled with hard-float, and all code exported from there
+ * should be strictly wrapped with DC_FP_START/END
+ */
+static noinline bool dcn20_validate_bandwidth_fp(struct dc *dc,
+		struct dc_state *context, bool fast_validate)
 {
 	bool voltage_supported = false;
 	bool full_pstate_supported = false;
 	bool dummy_pstate_supported = false;
 	double p_state_latency_us;
 
-	DC_FP_START();
 	p_state_latency_us = context->bw_ctx.dml.soc.dram_clock_change_latency_us;
 	context->bw_ctx.dml.soc.disable_dram_clock_change_vactive_support =
 		dc->debug.disable_dram_clock_change_vactive_support;
+	context->bw_ctx.dml.soc.allow_dram_clock_one_display_vactive =
+		dc->debug.enable_dram_clock_change_one_display_vactive;
 
 	if (fast_validate) {
-		voltage_supported = dcn20_validate_bandwidth_internal(dc, context, true);
-
-		DC_FP_END();
-		return voltage_supported;
+		return dcn20_validate_bandwidth_internal(dc, context, true);
 	}
 
 	// Best case, we support full UCLK switch latency
@@ -3193,7 +3240,15 @@ bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
 
 restore_dml_state:
 	context->bw_ctx.dml.soc.dram_clock_change_latency_us = p_state_latency_us;
+	return voltage_supported;
+}
 
+bool dcn20_validate_bandwidth(struct dc *dc, struct dc_state *context,
+		bool fast_validate)
+{
+	bool voltage_supported = false;
+	DC_FP_START();
+	voltage_supported = dcn20_validate_bandwidth_fp(dc, context, fast_validate);
 	DC_FP_END();
 	return voltage_supported;
 }
@@ -3252,8 +3307,6 @@ static struct dc_cap_funcs cap_funcs = {
 
 enum dc_status dcn20_patch_unknown_plane_state(struct dc_plane_state *plane_state)
 {
-	enum dc_status result = DC_OK;
-
 	enum surface_pixel_format surf_pix_format = plane_state->format;
 	unsigned int bpp = resource_pixel_format_to_bpp(surf_pix_format);
 
@@ -3265,7 +3318,7 @@ enum dc_status dcn20_patch_unknown_plane_state(struct dc_plane_state *plane_stat
 		swizzle = DC_SW_64KB_S;
 
 	plane_state->tiling_info.gfx9.swizzle = swizzle;
-	return result;
+	return DC_OK;
 }
 
 static struct resource_funcs dcn20_res_pool_funcs = {
@@ -3510,6 +3563,13 @@ void dcn20_patch_bounding_box(struct dc *dc, struct _vcs_dpi_soc_bounding_box_st
 		bb->dram_clock_change_latency_us =
 				dc->bb_overrides.dram_clock_change_latency_ns / 1000.0;
 	}
+
+	if ((int)(bb->dummy_pstate_latency_us * 1000)
+				!= dc->bb_overrides.dummy_clock_change_latency_ns
+			&& dc->bb_overrides.dummy_clock_change_latency_ns) {
+		bb->dummy_pstate_latency_us =
+				dc->bb_overrides.dummy_clock_change_latency_ns / 1000.0;
+	}
 }
 
 static struct _vcs_dpi_soc_bounding_box_st *get_asic_rev_soc_bb(
@@ -3745,8 +3805,41 @@ static bool dcn20_resource_construct(
 	dc->caps.max_slave_planes = 1;
 	dc->caps.post_blend_color_processing = true;
 	dc->caps.force_dp_tps4_for_cp2520 = true;
-	dc->caps.hw_3d_lut = true;
 	dc->caps.extended_aux_timeout_support = true;
+
+	/* Color pipeline capabilities */
+	dc->caps.color.dpp.dcn_arch = 1;
+	dc->caps.color.dpp.input_lut_shared = 0;
+	dc->caps.color.dpp.icsc = 1;
+	dc->caps.color.dpp.dgam_ram = 1;
+	dc->caps.color.dpp.dgam_rom_caps.srgb = 1;
+	dc->caps.color.dpp.dgam_rom_caps.bt2020 = 1;
+	dc->caps.color.dpp.dgam_rom_caps.gamma2_2 = 0;
+	dc->caps.color.dpp.dgam_rom_caps.pq = 0;
+	dc->caps.color.dpp.dgam_rom_caps.hlg = 0;
+	dc->caps.color.dpp.post_csc = 0;
+	dc->caps.color.dpp.gamma_corr = 0;
+
+	dc->caps.color.dpp.hw_3d_lut = 1;
+	dc->caps.color.dpp.ogam_ram = 1;
+	// no OGAM ROM on DCN2, only MPC ROM
+	dc->caps.color.dpp.ogam_rom_caps.srgb = 0;
+	dc->caps.color.dpp.ogam_rom_caps.bt2020 = 0;
+	dc->caps.color.dpp.ogam_rom_caps.gamma2_2 = 0;
+	dc->caps.color.dpp.ogam_rom_caps.pq = 0;
+	dc->caps.color.dpp.ogam_rom_caps.hlg = 0;
+	dc->caps.color.dpp.ocsc = 0;
+
+	dc->caps.color.mpc.gamut_remap = 0;
+	dc->caps.color.mpc.num_3dluts = 0;
+	dc->caps.color.mpc.shared_3d_lut = 0;
+	dc->caps.color.mpc.ogam_ram = 1;
+	dc->caps.color.mpc.ogam_rom_caps.srgb = 0;
+	dc->caps.color.mpc.ogam_rom_caps.bt2020 = 0;
+	dc->caps.color.mpc.ogam_rom_caps.gamma2_2 = 0;
+	dc->caps.color.mpc.ogam_rom_caps.pq = 0;
+	dc->caps.color.mpc.ogam_rom_caps.hlg = 0;
+	dc->caps.color.mpc.ocsc = 1;
 
 	if (dc->ctx->dce_environment == DCE_ENV_PRODUCTION_DRV) {
 		dc->debug = debug_defaults_drv;

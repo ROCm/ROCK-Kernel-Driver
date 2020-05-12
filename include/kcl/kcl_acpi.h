@@ -4,6 +4,10 @@
 /**
  * interface change in mainline kernel 3.13
  * but only affect RHEL6 without backport
+ * v3.7-rc5-12-g95f8a082b9b1 ACPI / driver core: Introduce struct acpi_dev_node
+ * and related macros
+ * v3.12-8048-g7b1998116bbb ACPI / driver core: Store an ACPI device pointer in
+ * struct acpi_dev_node
  */
 
 #include <linux/acpi.h>

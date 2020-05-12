@@ -27,8 +27,8 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 
-#include <kcl/kcl_drm_connector_h.h>
-#include <kcl/kcl_drm_device_h.h>
+#include <kcl/header/kcl_drm_connector_h.h>
+#include <kcl/header/kcl_drm_device_h.h>
 #include <drm/drm_dp_helper.h>
 
 #if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
@@ -177,4 +177,11 @@ static inline void _kcl_drm_dp_cec_register_connector(struct drm_dp_aux *aux,
 #endif
 }
 #endif
+
+/* commit fc1424c2ec813080aa1eaa2948070902b1a0e507
+ * drm: Correct DP DSC macro typo */
+#ifdef DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
+#define DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
+#endif
+
 #endif /* _KCL_DRM_DP_HELPER_H_ */

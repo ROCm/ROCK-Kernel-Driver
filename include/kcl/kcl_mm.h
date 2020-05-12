@@ -1,7 +1,7 @@
 #ifndef AMDKCL_MM_H
 #define AMDKCL_MM_H
 
-#include <kcl/kcl_sched_mm_h.h>
+#include <kcl/header/kcl_sched_mm_h.h>
 #include <asm/page.h>
 #include <linux/mm_types.h>
 #include <linux/mm.h>
@@ -149,6 +149,40 @@ static inline unsigned long zone_managed_pages(struct zone *zone)
 #endif
 }
 #endif /* HAVE_ZONE_MANAGED_PAGES */
+
+#ifndef HAVE_VMF_INSERT
+static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
+				unsigned long addr,
+				pfn_t pfn)
+{
+	int err;
+#if !defined(HAVE_PFN_T_VM_INSERT_MIXED)
+	err = vm_insert_mixed(vma, addr, pfn_t_to_pfn(pfn));
+#else
+	err = vm_insert_mixed(vma, addr, pfn);
+#endif
+	if (err == -ENOMEM)
+		return VM_FAULT_OOM;
+	if (err < 0 && err != -EBUSY)
+		return VM_FAULT_SIGBUS;
+
+	return VM_FAULT_NOPAGE;
+}
+
+static inline vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma,
+				unsigned long addr, unsigned long pfn)
+{
+		int err = vm_insert_pfn(vma, addr, pfn);
+
+		if (err == -ENOMEM)
+			return VM_FAULT_OOM;
+		if (err < 0 && err != -EBUSY)
+			return VM_FAULT_SIGBUS;
+
+		return VM_FAULT_NOPAGE;
+}
+
+#endif /* HAVE_VMF_INSERT */
 
 #ifndef HAVE_VMF_INSERT_MIXED_PROT
 vm_fault_t _kcl_vmf_insert_mixed_prot(struct vm_area_struct *vma, unsigned long addr,

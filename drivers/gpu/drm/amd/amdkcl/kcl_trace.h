@@ -66,5 +66,5 @@ DEFINE_EVENT(kcl_fence, kcl_fence_wait_end,
 
 /* This part must be outside protection */
 #undef TRACE_INCLUDE_PATH
-#define TRACE_INCLUDE_PATH kcl
+#define TRACE_INCLUDE_PATH .
 #include <trace/define_trace.h>

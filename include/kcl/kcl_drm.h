@@ -9,19 +9,19 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_vma_manager.h>
-#include <kcl/kcl_drmP_h.h>
+#include <kcl/header/kcl_drmP_h.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_rect.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_modes.h>
-#include <kcl/kcl_drm_print_h.h>
+#include <kcl/header/kcl_drm_print_h.h>
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
 #include <uapi/drm/drm_mode.h>
-#include <kcl/kcl_drm_drv_h.h>
+#include <kcl/header/kcl_drm_drv_h.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -223,6 +223,12 @@ static inline void
 drm_gem_object_put_unlocked(struct drm_gem_object *obj)
 {
 	return drm_gem_object_unreference_unlocked(obj);
+}
+
+static inline void
+drm_gem_object_get(struct drm_gem_object *obj)
+{
+	kref_get(&obj->refcount);
 }
 #endif
 

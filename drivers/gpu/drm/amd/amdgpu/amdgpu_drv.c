@@ -85,10 +85,11 @@
  * - 3.34.0 - Non-DC can flip correctly between buffers with different pitches
  * - 3.35.0 - Add drm_amdgpu_info_device::tcc_disabled_mask
  * - 3.36.0 - Allow reading more status registers on si/cik
- * - 3.37.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
+ * - 3.37.0 - L2 is invalidated before SDMA IBs, needed for correctness
+ * - 3.38.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	37
+#define KMS_DRIVER_MINOR	38
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.6.0"
@@ -1232,14 +1233,6 @@ static int amdgpu_pmops_resume(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	/* GPU comes up enabled by the bios on resume */
-	if (amdgpu_device_supports_boco(drm_dev) ||
-	    amdgpu_device_supports_baco(drm_dev)) {
-		pm_runtime_disable(dev);
-		pm_runtime_set_active(dev);
-		pm_runtime_enable(dev);
-	}
-
 	return amdgpu_device_resume(drm_dev, true);
 }
 
@@ -1249,7 +1242,9 @@ static int amdgpu_pmops_freeze(struct device *dev)
 	struct amdgpu_device *adev = drm_dev->dev_private;
 	int r;
 
+	adev->in_hibernate = true;
 	r = amdgpu_device_suspend(drm_dev, true);
+	adev->in_hibernate = false;
 	if (r)
 		return r;
 	return amdgpu_asic_reset(adev);
@@ -1507,11 +1502,10 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP
+	    DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
 #endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
-	    | DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
 	    | DRIVER_IRQ_SHARED
 #endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */

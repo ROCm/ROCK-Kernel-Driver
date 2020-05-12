@@ -88,9 +88,11 @@ static void ipc_obj_release(struct kref *r)
 	kfree(obj);
 }
 
-void ipc_obj_get(struct kfd_ipc_obj *obj)
+struct kfd_ipc_obj *ipc_obj_get(struct kfd_ipc_obj *obj)
 {
-	kref_get(&obj->ref);
+	if (kref_get_unless_zero(&obj->ref))
+		return obj;
+	return NULL;
 }
 
 void ipc_obj_put(struct kfd_ipc_obj **obj)
@@ -155,7 +157,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return r;
@@ -196,7 +198,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
 		if (!memcmp(entry->share_handle, share_handle,
 			    sizeof(entry->share_handle))) {
-			found = entry;
+			found = ipc_obj_get(entry);
 			break;
 		}
 	}
@@ -204,7 +206,6 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 
 	if (!found)
 		return -EINVAL;
-	ipc_obj_get(found);
 
 	pr_debug("Found ipc_dma_buf: %p\n", found->data);
 
