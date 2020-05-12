@@ -105,12 +105,25 @@ static void dce_virtual_bandwidth_update(struct amdgpu_device *adev)
 	return;
 }
 
-static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
-				      u16 *green, u16 *blue, uint32_t size,
-				      struct drm_modeset_acquire_ctx *ctx)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size,
+				   struct drm_modeset_acquire_ctx *ctx)
 {
 	return 0;
 }
+#elif defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size)
+{
+	return 0;
+}
+#else
+static void dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				    u16 *blue, uint32_t start, uint32_t size)
+{
+}
+#endif
 
 static void dce_virtual_crtc_destroy(struct drm_crtc *crtc)
 {
