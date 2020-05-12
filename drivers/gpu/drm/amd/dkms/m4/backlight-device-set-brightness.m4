@@ -1,5 +1,5 @@
 dnl #
-dnl # commit f6a4790a5471d7cba406d87f6b41323f40bb93d2 
+dnl # commit v4.6-rc6-1-gf6a4790a5471
 dnl # video / backlight: add two APIs for drivers to use
 dnl #
 AC_DEFUN([AC_AMDGPU_BACKLIGHT_DEVICE_SET_BRIGHTNESS], [
