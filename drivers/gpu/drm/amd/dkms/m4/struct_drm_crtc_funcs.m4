@@ -149,6 +149,53 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE], [
 	])
 ])
 
+dnl #
+dnl # v4.11-rc5-1392-g6d124ff84533 drm: Add acquire ctx to ->gamma_set hook
+dnl # 		int (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
+dnl # 	-                        uint32_t size);
+dnl # 	+                        uint32_t size,
+dnl # 	+                        struct drm_modeset_acquire_ctx *ctx);
+dnl # v4.7-rc1-260-g7ea772838782 drm/core: Change declaration for gamma_set.
+dnl # 	-       void (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
+dnl # 	-                         uint32_t start, uint32_t size);
+dnl # 	+       int (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
+dnl # 	+                        uint32_t size);
+dnl # v2.6.35-260-g7203425a943e drm: expand gamma_set
+dnl # 		void (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
+dnl # 	-                         uint32_t size);
+dnl # 	+                         uint32_t start, uint32_t size);
+dnl # v2.6.28-8-gf453ba046074 DRM: add mode setting support
+dnl # 	+       void (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
+dnl # 	+                         uint32_t size);
+dnl #
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_crtc.h>
+		], [
+			struct drm_crtc *crtc = NULL;
+			int ret;
+
+			ret = crtc->funcs->gamma_set(NULL, NULL, NULL, NULL, 0, NULL);
+		], [
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS, 1,
+				[crtc->funcs->gamma_set() wants 6 args])
+		], [
+			AC_KERNEL_TRY_COMPILE([
+				#include <drm/drm_crtc.h>
+			], [
+				struct drm_crtc *crtc = NULL;
+				int ret;
+
+				ret = crtc->funcs->gamma_set(NULL, NULL, NULL, NULL, 0);
+			], [
+				AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS, 1,
+					[crtc->funcs->gamma_set() wants 5 args])
+			])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK
@@ -156,4 +203,5 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
+	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET
 ])
