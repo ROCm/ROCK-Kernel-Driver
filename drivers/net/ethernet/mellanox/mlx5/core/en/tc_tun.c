@@ -329,7 +329,7 @@ int mlx5e_tc_tun_create_header_ipv6(struct mlx5e_priv *priv,
 	struct net_device *out_dev, *route_dev;
 	struct flowi6 fl6 = {};
 	struct ipv6hdr *ip6h;
-	struct neighbour *n;
+	struct neighbour *n = NULL;
 	int ipv6_encap_size;
 	char *encap_header;
 	u8 nud_state, ttl;
