@@ -1008,7 +1008,7 @@ static int iwl_mvm_sar_geo_init(struct iwl_mvm *mvm)
 #else /* CONFIG_ACPI */
 static int iwl_mvm_sar_get_wrds_table(struct iwl_mvm *mvm)
 {
-	return -ENOENT;
+	return 0;
 }
 
 static int iwl_mvm_sar_get_ewrd_table(struct iwl_mvm *mvm)
