@@ -163,7 +163,8 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
  * Need to add support for DRM < 4.14 as DP1.1 does
  * 4.13 DRM uses .set_property hook, while 4.15 doesn't
  */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1) && \
+!defined(OS_NAME_SUSE_15_2)
         .dpms = drm_atomic_helper_connector_dpms,
         .set_property = drm_atomic_helper_connector_set_property,
 #endif

@@ -25,10 +25,10 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
-ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap" "amzn" "custom-rhel" "fedora"),)
+ifneq ($(findstring $(OS_NAME), "ubuntu" "amzn" "custom-rhel" "fedora"),)
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else ifeq ("debian", $(OS_NAME))
+else ifneq ($(findstring $(OS_NAME), "debian" "sled" "sles" "opensuse-leap"),)
 ifneq ($(realpath $(shell echo $(kdir) | sed "s/build/source/")), )
 real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
 else
@@ -57,8 +57,6 @@ else ifeq ("rhel",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_RHEL
 else ifeq ("steamos",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_STEAMOS
-else ifeq ("opensuse",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("sled",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_SLE
 else ifeq ("sles",$(OS_NAME))
@@ -76,8 +74,8 @@ subdir-ccflags-y += \
 	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
 
 ifeq ($(OS_NAME),"opensuse-leap")
-ifeq ($(OS_VERSION),"15.1")
-subdir-ccflags-y += -DOS_NAME_SUSE_15
+ifeq ($(OS_VERSION),"15.2")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_2
 endif
 endif
 
@@ -88,8 +86,8 @@ endif
 endif
 
 ifeq ($(OS_NAME),"sled")
-ifeq ($(OS_VERSION),"15")
-subdir-ccflags-y += -DOS_NAME_SUSE_15
+ifeq ($(OS_VERSION),"15.2")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_2
 endif
 endif
 
@@ -100,20 +98,14 @@ endif
 endif
 
 ifeq ($(OS_NAME),"sles")
-ifeq ($(OS_VERSION),"15")
-subdir-ccflags-y += -DOS_NAME_SUSE_15
+ifeq ($(OS_VERSION),"15.2")
+subdir-ccflags-y += -DOS_NAME_SUSE_15_2
 endif
 endif
 
 ifeq ($(OS_NAME),"sles")
 ifeq ($(OS_VERSION),"15.1")
 subdir-ccflags-y += -DOS_NAME_SUSE_15_1
-endif
-endif
-
-ifeq ($(OS_NAME),"opensuse")
-ifeq ($(OS_VERSION),"42.3")
-subdir-ccflags-y += -DOS_NAME_SUSE_42_3
 endif
 endif
 
