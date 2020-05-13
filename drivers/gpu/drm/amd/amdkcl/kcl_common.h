@@ -28,4 +28,16 @@ static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 
 	return fp;
 }
+
+/*
+ * create dummy func
+ */
+#define amdkcl_dummy_symbol(name, ret_type, ret, ...) \
+ret_type name(__VA_ARGS__) \
+{ \
+	pr_warn_once("%s is not supported\n", #name); \
+	ret ;\
+} \
+EXPORT_SYMBOL(name);
+
 #endif
