@@ -646,6 +646,17 @@ struct kfd_ioctl_smi_events_args {
 	__u32 anon_fd; /* from KFD */
 };
 
+/*
+ * KFD SMI(System Management Interface) events
+ */
+/* Event type (defined by bitmask) */
+#define KFD_SMI_EVENT_VMFAULT 0x0000000000000001
+
+struct kfd_ioctl_smi_events_args {
+	__u32 gpuid; /* to KFD */
+	__u32 anon_fd; /* from KFD */
+};
+
 /* Register offset inside the remapped mmio page
  */
 enum kfd_mmio_remap {

@@ -38,7 +38,7 @@ struct kfd_smi_client {
 	spinlock_t lock;
 };
 
-#define MAX_KFIFO_SIZE	1024
+#define MAX_KFIFO_SIZE 1024
 
 static __poll_t kfd_smi_ev_poll(struct file *, struct poll_table_struct *);
 static ssize_t kfd_smi_ev_read(struct file *, char __user *, size_t, loff_t *);
@@ -169,19 +169,18 @@ void kfd_smi_event_update_vmfault(struct kfd_dev *dev, uint16_t pasid)
 		return;
 
 	len = snprintf(fifo_in, 43, "%x %x:%s\n", KFD_SMI_EVENT_VMFAULT,
-		task_info.pid, task_info.task_name);
+		       task_info.pid, task_info.task_name);
 
 	rcu_read_lock();
 
-	list_for_each_entry_rcu(client, &dev->smi_clients, list) {
+	list_for_each_entry_rcu (client, &dev->smi_clients, list) {
 		if (!(READ_ONCE(client->events) & KFD_SMI_EVENT_VMFAULT))
 			continue;
 		spin_lock(&client->lock);
 		if (kfifo_avail(&client->fifo) >= len) {
 			kfifo_in(&client->fifo, fifo_in, len);
 			wake_up_all(&client->wait_queue);
-		}
-		else
+		} else
 			pr_debug("smi_event(vmfault): no space left\n");
 		spin_unlock(&client->lock);
 	}
