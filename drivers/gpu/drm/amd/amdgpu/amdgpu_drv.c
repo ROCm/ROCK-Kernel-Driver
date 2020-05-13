@@ -1214,6 +1214,10 @@ static const struct pci_device_id pciidlist[] = {
 	/* CYAN_SKILLFISH */
 	{0x1002, 0x13FE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_CYAN_SKILLFISH|AMD_IS_APU},
 
+#ifdef HAVE_DRM_AMDGPU_PCIID_H
+#include <drm/amdgpu_pciid.h>
+#endif
+
 	{0, 0, 0}
 };
 
