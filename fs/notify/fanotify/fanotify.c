@@ -317,7 +317,12 @@ struct fanotify_event *fanotify_alloc_event(struct fsnotify_group *group,
 	if (!event)
 		goto out;
 init: __maybe_unused
-	fsnotify_init_event(&event->fse, inode);
+	/*
+	 * Use the victim inode instead of the watching inode as the id for
+	 * event queue, so event reported on parent is merged with event
+	 * reported on child when both directory and child watches exist.
+	 */
+	fsnotify_init_event(&event->fse, id);
 	event->mask = mask;
 	if (FAN_GROUP_FLAG(group, FAN_REPORT_TID))
 		event->pid = get_pid(task_pid(current));
