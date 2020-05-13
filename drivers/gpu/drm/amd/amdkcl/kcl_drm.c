@@ -603,20 +603,8 @@ EXPORT_SYMBOL(_kcl_drm_atomic_helper_update_legacy_modeset_state);
 #endif
 
 #ifndef HAVE_DRM_MODE_IS_420_XXX
-bool _kcl_drm_mode_is_420_only(const struct drm_display_info *display,
-		const struct drm_display_mode *mode)
-{
-        /* DRM < 4.4 ,un-support this pixel format */
-	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_only!\n");
-	return false;
-}
-EXPORT_SYMBOL(_kcl_drm_mode_is_420_only);
-
-bool _kcl_drm_mode_is_420_also(const struct drm_display_info *display,
-		const struct drm_display_mode *mode)
-{
-	printk_once(KERN_WARNING "This kernel version not support API: drm_mode_is_420_also!\n");
-	return false;
-}
-EXPORT_SYMBOL(_kcl_drm_mode_is_420_also);
+amdkcl_dummy_symbol(drm_mode_is_420_only, bool, return false,
+				  const struct drm_display_info *display, const struct drm_display_mode *mode)
+amdkcl_dummy_symbol(drm_mode_is_420_also, bool, return false,
+			 const struct drm_display_info *display, const struct drm_display_mode *mode)
 #endif
