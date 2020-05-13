@@ -1201,6 +1201,10 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x740C, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ALDEBARAN},
 	{0x1002, 0x740F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_ALDEBARAN},
 
+#ifdef HAVE_DRM_AMDGPU_PCIID_H
+#include <drm/amdgpu_pciid.h>
+#endif
+
 	{0, 0, 0}
 };
 
