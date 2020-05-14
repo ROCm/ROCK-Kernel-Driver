@@ -5729,7 +5729,6 @@ get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
 		}
 	}
 	highest_refresh = drm_mode_vrefresh(m_pref);
-
 	/*
 	 * Find the mode with highest refresh rate with same resolution.
 	 * For some monitors, preferred mode is not the mode with highest
@@ -5744,6 +5743,7 @@ get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
 			highest_refresh = current_refresh;
 			m_pref = m;
 		}
+
 	}
 
 	drm_mode_copy(&aconnector->freesync_vid_base, m_pref);
@@ -5755,7 +5755,6 @@ static bool is_freesync_video_mode(const struct drm_display_mode *mode,
 {
 	struct drm_display_mode *high_mode;
 	int timing_diff;
-
 	high_mode = get_highest_refresh_rate_mode(aconnector, false);
 	if (!high_mode || !mode)
 		return false;
@@ -5878,7 +5877,6 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_EDP &&
 	    !aconnector->dc_link->panel_config.dsc.disable_dsc_edp &&
 	    dc->caps.edp_dsc_support && aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE) {
-
 		apply_dsc_policy_for_edp(aconnector, sink, stream, dsc_caps, max_dsc_target_bpp_limit_override);
 
 	} else if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
@@ -5924,7 +5922,6 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 
 	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_num_slices_v)
 		stream->timing.dsc_cfg.num_slices_v = aconnector->dsc_settings.dsc_num_slices_v;
-
 	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_bits_per_pixel)
 		stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
 }
@@ -6051,7 +6048,6 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported)
 		apply_dsc_policy_for_stream(aconnector, sink, stream, &dsc_caps);
 #endif
-
 	update_stream_scaling_settings(&mode, dm_state, stream);
 
 	fill_audio_info(
@@ -6162,6 +6158,11 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		dm_new_state->underscan_enable = val;
 		ret = 0;
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+	} else if (property == adev->mode_info.max_bpc_property) {
+		dm_new_state->max_bpc = val;
+		ret = 0;
+#endif
 	} else if (property == adev->mode_info.abm_level_property) {
 		dm_new_state->abm_level = val;
 		ret = 0;
@@ -6213,6 +6214,11 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.underscan_property) {
 		*val = dm_state->underscan_enable;
 		ret = 0;
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+	} else if (property == adev->mode_info.max_bpc_property) {
+		*val = dm_state->max_bpc;
+		ret = 0;
+#endif
 	} else if (property == adev->mode_info.abm_level_property) {
 		*val = dm_state->abm_level;
 		ret = 0;
@@ -6296,7 +6302,11 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		state->underscan_enable = false;
 		state->underscan_hborder = 0;
 		state->underscan_vborder = 0;
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		state->base.max_requested_bpc = 8;
+#else
+		state->max_bpc = 8;
+#endif
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 		state->vcpi_slots = 0;
 		state->pbn = 0;
@@ -6332,6 +6342,9 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	new_state->vcpi_slots = state->vcpi_slots;
 	new_state->pbn = state->pbn;
+#endif
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+	new_state->max_bpc = state->max_bpc;
 #endif
 	return &new_state->base;
 }
@@ -6505,8 +6518,12 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	struct drm_connector *connector = &aconnector->base;
 	struct amdgpu_device *adev = drm_to_adev(connector->dev);
 	struct dc_stream_state *stream;
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+	int requested_bpc = dm_state ? dm_state->max_bpc : 8;
+#else
 	const struct drm_connector_state *drm_state = dm_state ? &dm_state->base : NULL;
 	int requested_bpc = drm_state ? drm_state->max_requested_bpc : 8;
+#endif
 	enum dc_status dc_result = DC_OK;
 
 	do {
@@ -6770,7 +6787,11 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 		return 0;
 
 	if (!state->duplicated) {
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+		int max_bpc = dm_new_connector_state->max_bpc;
+#else
 		int max_bpc = conn_state->max_requested_bpc;
+#endif
 		is_y420 = drm_mode_is_420_also(&connector->display_info, adjusted_mode) &&
 			  aconnector->force_yuv420_output;
 		color_depth = convert_color_depth_from_display_info(connector,
@@ -7292,12 +7313,18 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 				adev->mode_info.underscan_vborder_property,
 				0);
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	if (!aconnector->mst_port)
 		drm_connector_attach_max_bpc_property(&aconnector->base, 8, 16);
 
 	/* This defaults to the max in the range, but we want 8bpc for non-edp. */
 	aconnector->base.state->max_bpc = (connector_type == DRM_MODE_CONNECTOR_eDP) ? 16 : 8;
 	aconnector->base.state->max_requested_bpc = aconnector->base.state->max_bpc;
+#else
+	drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.max_bpc_property,
+				0);
+#endif
 
 	if (connector_type == DRM_MODE_CONNECTOR_eDP &&
 	    (dc_is_dmcu_initialized(adev->dm.dc) || adev->dm.dc->ctx->dmub_srv)) {
