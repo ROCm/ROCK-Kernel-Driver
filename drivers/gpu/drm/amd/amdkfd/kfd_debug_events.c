@@ -122,8 +122,6 @@ uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
 	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
 		WRITE_ONCE(q->properties.debug_event_type, 0);
 
-	q->properties.is_new = false;
-
 	return queue_status_word;
 }
 
@@ -153,17 +151,22 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 		}
 
 		*event_status = kfd_dbg_get_queue_status_word(q, flags);
-
+		q->properties.is_new = false;
 		goto out;
 	}
 
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		unsigned int tmp_status =
-				kfd_dbg_get_queue_status_word(pqn->q, flags);
-		if (pqn->q && (tmp_status & (KFD_DBG_EV_STATUS_TRAP |
-						KFD_DBG_EV_STATUS_VMFAULT))) {
+		unsigned int tmp_status;
+
+		if (!pqn->q)
+			continue;
+
+		tmp_status = kfd_dbg_get_queue_status_word(pqn->q, flags);
+		if (tmp_status & (KFD_DBG_EV_STATUS_TRAP |
+						KFD_DBG_EV_STATUS_VMFAULT)) {
 			*queue_id = pqn->q->properties.queue_id;
 			*event_status = tmp_status;
+			q->properties.is_new = false;
 			goto out;
 		}
 	}
