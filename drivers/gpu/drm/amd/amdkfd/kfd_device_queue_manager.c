@@ -2541,6 +2541,7 @@ void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 	qss_entry->ring_size = (uint32_t)q->properties.queue_size;
 	qss_entry->queue_type = set_queue_type_for_user(&q->properties);
 	qss_entry->queue_status = kfd_dbg_get_queue_status_word(q, flags);
+	q->properties.is_new = false;
 
 	dqm_unlock(dqm);
 }

@@ -172,6 +172,7 @@ static int init_user_queue(struct process_queue_manager *pqm,
 
 	/* Doorbell initialized in user space*/
 	q_properties->doorbell_ptr = NULL;
+	q_properties->is_new = true;
 
 	/* let DQM handle it*/
 	q_properties->vmid = 0;
@@ -317,7 +318,6 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 
 	if (q) {
 		pr_debug("PQM done creating queue\n");
-		q->properties.is_new = true;
 		kfd_procfs_add_queue(q);
 		print_queue_properties(&q->properties);
 	}
