@@ -152,7 +152,7 @@ static struct res_config skx_cfg = {
 };
 
 static const struct x86_cpu_id skx_cpuids[] = {
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_SKYLAKE_X, X86_STEPPING_ANY, 0, (kernel_ulong_t)&skx_cfg },
+	X86_MATCH_INTEL_FAM6_MODEL(SKYLAKE_X,	&skx_cfg),
 	{ }
 };
 MODULE_DEVICE_TABLE(x86cpu, skx_cpuids);

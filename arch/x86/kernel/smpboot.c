@@ -470,7 +470,7 @@ static bool match_smt(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
  */
 
 static const struct x86_cpu_id snc_cpu[] = {
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_SKYLAKE_X },
+	X86_MATCH_INTEL_FAM6_MODEL(SKYLAKE_X, NULL),
 	{}
 };
 
@@ -1870,7 +1870,7 @@ static const struct x86_cpu_id has_skx_turbo_ratio_limits[] = {
 
 static const struct x86_cpu_id has_glm_turbo_ratio_limits[] = {
 	ICPU(INTEL_FAM6_ATOM_GOLDMONT),
-	ICPU(INTEL_FAM6_ATOM_GOLDMONT_X),
+	ICPU(INTEL_FAM6_ATOM_GOLDMONT_D),
 	ICPU(INTEL_FAM6_ATOM_GOLDMONT_PLUS),
 	{}
 };

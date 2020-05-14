@@ -135,10 +135,10 @@ static struct res_config i10nm_cfg1 = {
 };
 
 static const struct x86_cpu_id i10nm_cpuids[] = {
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ATOM_TREMONT_X, X86_STEPPING_ANY, 0,	(kernel_ulong_t)&i10nm_cfg0 },
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ICELAKE_X,	  X86_STEPPING_ANY, 0,	(kernel_ulong_t)&i10nm_cfg0 },
-	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ICELAKE_XEON_D, X86_STEPPING_ANY, 0,	(kernel_ulong_t)&i10nm_cfg1 },
-	{ }
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_TREMONT_D,	&i10nm_cfg0),
+	X86_MATCH_INTEL_FAM6_MODEL(ICELAKE_X,		&i10nm_cfg0),
+	X86_MATCH_INTEL_FAM6_MODEL(ICELAKE_D,		&i10nm_cfg1),
+	{}
 };
 MODULE_DEVICE_TABLE(x86cpu, i10nm_cpuids);
 
