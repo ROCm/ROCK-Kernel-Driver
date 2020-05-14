@@ -429,9 +429,15 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					     &adev->dm.mst_encoders[i].base);
 	}
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	connector->max_bpc_property = master->base.max_bpc_property;
 	if (connector->max_bpc_property)
 		drm_connector_attach_max_bpc_property(connector, 8, 16);
+#else
+	drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.max_bpc_property,
+				0);
+#endif
 
 #ifdef HAVE_DRM_VRR_SUPPORTED
 	connector->vrr_capable_property = master->base.vrr_capable_property;

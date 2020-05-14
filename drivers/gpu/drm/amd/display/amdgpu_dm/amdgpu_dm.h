@@ -606,6 +606,9 @@ struct dm_connector_state {
 	enum amdgpu_rmx_type scaling;
 	uint8_t underscan_vborder;
 	uint8_t underscan_hborder;
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+	uint8_t max_bpc;
+#endif
 	bool underscan_enable;
 	bool freesync_enable;
 	bool freesync_capable;
