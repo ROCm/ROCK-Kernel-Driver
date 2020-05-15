@@ -21,7 +21,8 @@ void uv_query_info(void)
 	if (!test_facility(158))
 		return;
 
-	if (uv_call(0, (uint64_t)&uvcb))
+	/* rc==0x100 means that there is additional data we do not process */
+	if (uv_call(0, (uint64_t)&uvcb) && uvcb.header.rc != 0x100)
 		return;
 
 	if (IS_ENABLED(CONFIG_KVM)) {
