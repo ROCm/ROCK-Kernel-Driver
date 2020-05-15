@@ -1400,7 +1400,7 @@ static void fnic_cleanup_io(struct fnic *fnic, int exclude_id)
 		}
 		if (!io_req) {
 			spin_unlock_irqrestore(io_lock, flags);
-			goto cleanup_scsi_cmd;
+			continue;
 		}
 
 		CMD_SP(sc) = NULL;
