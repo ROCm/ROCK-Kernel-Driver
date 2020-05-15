@@ -31,7 +31,7 @@
  * - 1.3 - Add SMI events support
  */
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 2
+#define KFD_IOCTL_MINOR_VERSION 3
 
 /*
  * Debug revision change log
@@ -49,7 +49,6 @@
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	2
 #define KFD_IOCTL_DBG_MINOR_VERSION	0
-#define KFD_IOCTL_MINOR_VERSION 3
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
