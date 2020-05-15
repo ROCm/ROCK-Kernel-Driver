@@ -166,7 +166,7 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
 						KFD_DBG_EV_STATUS_VMFAULT)) {
 			*queue_id = pqn->q->properties.queue_id;
 			*event_status = tmp_status;
-			q->properties.is_new = false;
+			pqn->q->properties.is_new = false;
 			goto out;
 		}
 	}
