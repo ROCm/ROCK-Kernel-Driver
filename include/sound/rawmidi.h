@@ -53,6 +53,9 @@ struct snd_rawmidi_runtime {
 	struct snd_rawmidi_substream *substream;
 	unsigned int drain: 1,	/* drain stage */
 		     oss: 1;	/* OSS compatible mode */
+#ifndef __GENKSYMS__
+	unsigned int buffer_ref:8;	/* buffer reference count */
+#endif
 	/* midi stream buffer */
 	unsigned char *buffer;	/* buffer for MIDI data */
 	size_t buffer_size;	/* size of buffer */
@@ -61,7 +64,6 @@ struct snd_rawmidi_runtime {
 	size_t avail_min;	/* min avail for wakeup */
 	size_t avail;		/* max used buffer for wakeup */
 	size_t xruns;		/* over/underruns counter */
-	int buffer_ref;		/* buffer reference count */
 	/* misc */
 	spinlock_t lock;
 	wait_queue_head_t sleep;
