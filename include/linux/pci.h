@@ -475,6 +475,14 @@ struct pci_dev {
 	void* suse_kabi_padding;
 
 	unsigned long	priv_flags;	/* Private flags for the PCI driver */
+
+#ifdef CONFIG_PCIE_DPC
+#ifndef __GENKSYMS__
+	u16		dpc_cap;
+	unsigned int	dpc_rp_extensions:1;
+	u8		dpc_rp_log_size;
+#endif /* __GENKSYMS__ */
+#endif
 };
 
 static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
@@ -527,6 +535,10 @@ struct pci_host_bridge {
 			resource_size_t size,
 			resource_size_t align);
 	unsigned long	private[0] ____cacheline_aligned;
+
+#ifndef __GENKSYMS__
+	unsigned int	native_dpc:1;		/* OS may use PCIe DPC */
+#endif
 };
 
 #define	to_pci_host_bridge(n) container_of(n, struct pci_host_bridge, dev)
