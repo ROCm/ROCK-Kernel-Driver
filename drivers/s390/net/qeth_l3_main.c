@@ -1264,7 +1264,6 @@ static int qeth_l3_process_inbound_buffer(struct qeth_card *card,
 	struct qeth_hdr *hdr;
 
 	*done = 0;
-	WARN_ON_ONCE(!budget);
 	while (budget) {
 		skb = qeth_core_get_next_skb(card,
 			&card->qdio.in_q->bufs[card->rx.b_index],
@@ -1308,11 +1307,12 @@ static void qeth_l3_stop_card(struct qeth_card *card)
 	}
 	if (card->state == CARD_STATE_HARDSETUP) {
 		qeth_drain_output_queues(card);
-		qeth_clear_working_pool_list(card);
+		cancel_delayed_work_sync(&card->buffer_reclaim_work);
 		card->state = CARD_STATE_DOWN;
 	}
 
 	qeth_qdio_clear_card(card, 0);
+	qeth_clear_working_pool_list(card);
 	flush_workqueue(card->event_wq);
 	card->info.promisc_mode = 0;
 }
@@ -2221,12 +2221,6 @@ static int qeth_l3_set_online(struct ccwgroup_device *gdev)
 			QETH_CARD_TEXT_(card, 2, "5err%04x", rc);
 	}
 
-	rc = qeth_init_qdio_queues(card);
-	if (rc) {
-		QETH_CARD_TEXT_(card, 2, "6err%d", rc);
-		rc = -ENODEV;
-		goto out_remove;
-	}
 	card->state = CARD_STATE_SOFTSETUP;
 
 	qeth_set_allowed_threads(card, 0xffffffff, 0);
@@ -2426,9 +2420,6 @@ static int qeth_l3_ip_event(struct notifier_block *this,
 	struct net_device *dev = ifa->ifa_dev->dev;
 	struct qeth_ipaddr addr;
 	struct qeth_card *card;
-
-	if (dev_net(dev) != &init_net)
-		return NOTIFY_DONE;
 
 	card = qeth_l3_get_card_from_dev(dev);
 	if (!card)
