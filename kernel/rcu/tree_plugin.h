@@ -623,7 +623,7 @@ static void rcu_read_unlock_special(struct task_struct *t)
 
 		t->rcu_read_unlock_special.b.exp_hint = false;
 		exp = (t->rcu_blocked_node && t->rcu_blocked_node->exp_tasks) ||
-		      (rdp->grpmask & rnp->expmask) ||
+		      (rdp->grpmask & READ_ONCE(rnp->expmask)) ||
 		      tick_nohz_full_cpu(rdp->cpu);
 		// Need to defer quiescent state until everything is enabled.
 		if ((exp || in_irq()) && irqs_were_disabled && use_softirq &&
@@ -767,7 +767,7 @@ dump_blkd_tasks(struct rcu_node *rnp, int ncheck)
 	raw_lockdep_assert_held_rcu_node(rnp);
 	pr_info("%s: grp: %d-%d level: %d ->gp_seq %ld ->completedqs %ld\n",
 		__func__, rnp->grplo, rnp->grphi, rnp->level,
-		(long)rnp->gp_seq, (long)rnp->completedqs);
+		(long)READ_ONCE(rnp->gp_seq), (long)rnp->completedqs);
 	for (rnp1 = rnp; rnp1; rnp1 = rnp1->parent)
 		pr_info("%s: %d:%d ->qsmask %#lx ->qsmaskinit %#lx ->qsmaskinitnext %#lx\n",
 			__func__, rnp1->grplo, rnp1->grphi, rnp1->qsmask, rnp1->qsmaskinit, rnp1->qsmaskinitnext);
