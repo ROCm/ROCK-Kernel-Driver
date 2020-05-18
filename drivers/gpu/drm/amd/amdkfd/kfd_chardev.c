@@ -47,6 +47,7 @@
 #include "kfd_trace.h"
 
 #include "amdgpu_amdkfd.h"
+#include "kfd_smi_events.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -2913,6 +2914,20 @@ out:
 	return r;
 }
 
+/* Handle requests for watching SMI events */
+static int kfd_ioctl_smi_events(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_smi_events_args *args = data;
+	struct kfd_dev *dev;
+
+	dev = kfd_device_by_id(args->gpuid);
+	if (!dev)
+		return -EINVAL;
+
+	return kfd_smi_event_open(dev, &args->anon_fd);
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -3009,17 +3024,8 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_ALLOC_QUEUE_GWS,
 			kfd_ioctl_alloc_queue_gws, 0),
 
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE_old,
-				kfd_ioctl_ipc_import_handle, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE_old,
-				kfd_ioctl_ipc_export_handle, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_old,
-				kfd_ioctl_cross_memory_copy, 0),
-
-	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP_old,
-				kfd_ioctl_dbg_set_debug_trap, 0),
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SMI_EVENTS,
+			kfd_ioctl_smi_events, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),

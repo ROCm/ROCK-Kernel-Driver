@@ -29,7 +29,11 @@ ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 else ifeq ("debian", $(OS_NAME))
+ifneq ($(realpath $(shell echo $(kdir) | sed "s/build/source/")), )
 real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
+else
+real_kdir=$(kdir)
+endif
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(real_kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(real_kdir)/Makefile)
 else ifeq ("rhel",$(OS_NAME))

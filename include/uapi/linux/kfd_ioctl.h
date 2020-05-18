@@ -26,8 +26,12 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
+/*
+ * - 1.1 - initial version
+ * - 1.3 - Add SMI events support
+ */
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 2
+#define KFD_IOCTL_MINOR_VERSION 3
 
 /*
  * Debug revision change log
@@ -589,6 +593,17 @@ struct kfd_ioctl_import_dmabuf_args {
 	__u32 dmabuf_fd;	/* to KFD */
 };
 
+/*
+ * KFD SMI(System Management Interface) events
+ */
+/* Event type (defined by bitmask) */
+#define KFD_SMI_EVENT_VMFAULT     0x0000000000000001
+
+struct kfd_ioctl_smi_events_args {
+	__u32 gpuid;	/* to KFD */
+	__u32 anon_fd;	/* from KFD */
+};
+
 /* Register offset inside the remapped mmio page
  */
 enum kfd_mmio_remap {
@@ -740,20 +755,11 @@ struct kfd_ioctl_cross_memory_copy_args {
 #define AMDKFD_IOC_ALLOC_QUEUE_GWS		\
 		AMDKFD_IOWR(0x1E, struct kfd_ioctl_alloc_queue_gws_args)
 
-#define AMDKFD_IOC_IPC_IMPORT_HANDLE_old	\
-		AMDKFD_IOWR(0x1F, struct kfd_ioctl_ipc_import_handle_args)
-
-#define AMDKFD_IOC_IPC_EXPORT_HANDLE_old	\
-		AMDKFD_IOWR(0x20, struct kfd_ioctl_ipc_export_handle_args)
-
-#define AMDKFD_IOC_DBG_TRAP_old			\
-		AMDKFD_IOWR(0x21, struct kfd_ioctl_dbg_trap_args)
-
-#define AMDKFD_IOC_CROSS_MEMORY_COPY_old	\
-		AMDKFD_IOWR(0x22, struct kfd_ioctl_cross_memory_copy_args)
+#define AMDKFD_IOC_SMI_EVENTS			\
+		AMDKFD_IOWR(0x1F, struct kfd_ioctl_smi_events_args)
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x23
+#define AMDKFD_COMMAND_END		0x20
 
 /* non-upstream ioctls */
 #define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \

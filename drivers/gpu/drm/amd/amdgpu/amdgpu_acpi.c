@@ -478,9 +478,7 @@ static int amdgpu_atif_handler(struct amdgpu_device *adev,
 				 * hardwired to post BACKLIGHT_UPDATE_SYSFS.
 				 * It probably should accept 'reason' parameter.
 				 */
-#ifdef HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS
 				backlight_device_set_brightness(bd, req.backlight_level);
-#endif
 			}
 		}
 #endif
