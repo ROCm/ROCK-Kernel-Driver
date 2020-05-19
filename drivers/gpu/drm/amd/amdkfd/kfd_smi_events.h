@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2020 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -18,34 +18,12 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
  */
 
-#ifndef KFD_IPC_H_
-#define KFD_IPC_H_
+#ifndef KFD_SMI_EVENTS_H_INCLUDED
+#define KFD_SMI_EVENTS_H_INCLUDED
 
-#include <linux/types.h>
-#include "kfd_priv.h"
+int kfd_smi_event_open(struct kfd_dev *dev, uint32_t *fd);
+void kfd_smi_event_update_vmfault(struct kfd_dev *dev, uint16_t pasid);
 
-struct kfd_ipc_obj {
-	struct hlist_node node;
-	struct kref ref;
-	void *data;
-	uint32_t share_handle[4];
-};
-
-int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
-			  uint32_t gpu_id, uint32_t *share_handle,
-			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset);
-int kfd_ipc_import_dmabuf(struct kfd_dev *kfd, struct kfd_process *p,
-			  uint32_t gpu_id, int dmabuf_fd,
-			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset);
-int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
-			     uint64_t handle, uint32_t *ipc_handle);
-
-struct kfd_ipc_obj *ipc_obj_get(struct kfd_ipc_obj *obj);
-void ipc_obj_put(struct kfd_ipc_obj **obj);
-
-#endif /* KFD_IPC_H_ */
+#endif
