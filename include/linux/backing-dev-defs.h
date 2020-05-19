@@ -227,6 +227,9 @@ struct backing_dev_info {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debug_dir;
 #endif
+#ifndef __GENKSYMS__
+	char dev_name[64];
+#endif
 };
 
 enum {
