@@ -1505,7 +1505,8 @@ bool intel_hdmi_hdcp_check_link(struct intel_digital_port *intel_dig_port)
 	I915_WRITE(PORT_HDCP_RPRIME(port), ri.reg);
 
 	/* Wait for Ri prime match */
-	if (wait_for(I915_READ(PORT_HDCP_STATUS(port)) &
+	if (wait_for((I915_READ(PORT_HDCP_STATUS(port)) &
+		      (HDCP_STATUS_RI_MATCH | HDCP_STATUS_ENC)) ==
 		     (HDCP_STATUS_RI_MATCH | HDCP_STATUS_ENC), 1)) {
 		DRM_ERROR("Ri' mismatch detected, link check failed (%x)\n",
 			  I915_READ(PORT_HDCP_STATUS(port)));
