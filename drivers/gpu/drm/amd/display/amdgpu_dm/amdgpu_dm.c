@@ -439,7 +439,11 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		 */
 
 		/* sequence will be replaced by real count during send-out. */
+#ifdef HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE
 		e->sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
+#else
+		e->event.sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
+#endif
 		e->pipe = amdgpu_crtc->crtc_id;
 
 		list_add_tail(&e->base.link, &adev_to_drm(adev)->vblank_event_list);
