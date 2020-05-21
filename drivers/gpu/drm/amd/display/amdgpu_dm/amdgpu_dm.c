@@ -4503,17 +4503,6 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 	}
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
-	struct dm_connector_state *dm_conn_state =
-			to_dm_connector_state(state);
-#endif
-
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
-	/* TODO: Remove this when there's support for max_bpc in drm */
-	if (dm_conn_state && bpc > dm_conn_state->max_bpc)
-		/* Round down to nearest even number. */
-		bpc = dm_conn_state->max_bpc - (dm_conn_state->max_bpc & 1);
-#else
 	if (requested_bpc > 0) {
 		/*
 		 * Cap display bpc based on the user requested value.
@@ -4528,7 +4517,6 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 		/* Round down to the nearest even number. */
 		bpc = bpc - (bpc & 1);
 	}
-#endif
 
 	switch (bpc) {
 	case 0:
@@ -5751,7 +5739,11 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	struct drm_connector *connector = &aconnector->base;
 	struct amdgpu_device *adev = connector->dev->dev_private;
 	struct dc_stream_state *stream;
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+	int requested_bpc = dm_state ? dm_state->max_bpc : 8;
+#else
 	int requested_bpc = connector->state ? connector->state->max_requested_bpc : 8;
+#endif
 	enum dc_status dc_result = DC_OK;
 
 	do {
@@ -6168,7 +6160,11 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 		return 0;
 
 	if (!state->duplicated) {
+#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+		int max_bpc = dm_new_connector_state->max_bpc;
+#else
 		int max_bpc = conn_state->max_requested_bpc;
+#endif
 		is_y420 = drm_mode_is_420_also(&connector->display_info, adjusted_mode) &&
 				aconnector->force_yuv420_output;
 		color_depth = convert_color_depth_from_display_info(connector,
