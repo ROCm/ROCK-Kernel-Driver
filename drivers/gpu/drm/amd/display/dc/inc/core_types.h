@@ -155,6 +155,20 @@ struct resource_funcs {
 			struct dc *dc,
 			struct clk_bw_params *bw_params);
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	bool (*acquire_post_bldn_3dlut)(
+			struct resource_context *res_ctx,
+			const struct resource_pool *pool,
+			int mpcc_id,
+			struct dc_3dlut **lut,
+			struct dc_transfer_func **shaper);
+
+	bool (*release_post_bldn_3dlut)(
+			struct resource_context *res_ctx,
+			const struct resource_pool *pool,
+			struct dc_3dlut **lut,
+			struct dc_transfer_func **shaper);
+#endif
 
 };
 
@@ -201,6 +215,10 @@ struct resource_pool {
 	unsigned int underlay_pipe_index;
 	unsigned int stream_enc_count;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	struct dc_3dlut *mpc_lut[MAX_PIPES];
+	struct dc_transfer_func *mpc_shaper[MAX_PIPES];
+#endif
 	struct {
 		unsigned int xtalin_clock_inKhz;
 		unsigned int dccg_ref_clock_inKhz;
@@ -337,6 +355,9 @@ struct resource_context {
 	uint8_t dp_clock_source_ref_count;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	bool is_dsc_acquired[MAX_PIPES];
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	bool is_mpc_3dlut_acquired[MAX_PIPES];
 #endif
 };
 
