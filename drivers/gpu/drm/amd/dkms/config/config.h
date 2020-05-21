@@ -122,6 +122,11 @@
 /* drm_atomic_helper_update_legacy_modeset_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE 1
 
+/* {drm_atomic_helper_crtc_set_property, drm_atomic_helper_plane_set_property,
+   drm_atomic_helper_connector_set_property, drm_atomic_helper_connector_dpms}
+   is available */
+/* #undef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY */
+
 /* drm_atomic_nonblocking_commit() is available */
 #define HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT 1
 
