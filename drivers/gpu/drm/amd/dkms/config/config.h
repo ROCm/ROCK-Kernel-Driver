@@ -32,7 +32,7 @@
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
-/* #undef HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
+#define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
 
 /* Define to 1 if you have the <asm/fpu/api.h> header file. */
 #define HAVE_ASM_FPU_API_H 1
