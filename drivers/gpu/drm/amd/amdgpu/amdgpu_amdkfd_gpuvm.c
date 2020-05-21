@@ -1344,14 +1344,14 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 		return -EBUSY;
 	}
 
-	/* No more MMU notifiers */
-	amdgpu_mn_unregister(mem->bo);
-
 	/* Make sure restore workers don't access the BO any more */
 	bo_list_entry = &mem->validate_list;
 	mutex_lock(&process_info->lock);
 	list_del(&bo_list_entry->head);
 	mutex_unlock(&process_info->lock);
+
+	/* No more MMU notifiers */
+	amdgpu_mn_unregister(mem->bo);
 
 	/* Free user pages if necessary */
 	if (mem->user_pages) {
