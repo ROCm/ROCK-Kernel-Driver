@@ -28,9 +28,6 @@
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
-/* alloc_ordered_workqueue() is available */
-#define HAVE_ALLOC_ORDERED_WORKQUEUE 1
-
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
@@ -46,13 +43,7 @@
 /* attribute_group->bin_attrs is available */
 #define HAVE_ATTRIBUTE_GROUP_BIN_ATTRS 1
 
-/* backlight_device_register() with 5 args is available */
-#define HAVE_BACKLIGHT_DEVICE_REGISTER_WITH_5ARGS 1
-
-/* backlight_properties->type is available */
-#define HAVE_BACKLIGHT_PROPERTIES_TYPE 1
-
-/* backlight_device_set_brightness is available */
+/* backlight_device_set_brightness() is available */
 #define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
 
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
@@ -82,7 +73,7 @@
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
-/* dma_fence_set_error() is available */
+/* fence_set_error() is available */
 #define HAVE_DMA_FENCE_SET_ERROR 1
 
 /* linux/dma-resv.h is available */
@@ -297,7 +288,7 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
-/* drm_dp_send_real_edid_checksum is available */
+/* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
 /* drm_driver->gem_prime_res_obj() is available */
@@ -335,6 +326,10 @@
 
 /* drm_encoder_init() wants name */
 #define HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME 1
+
+/* drm_fb_helper_single_add_all_connectors() &&
+   drm_fb_helper_remove_one_connector() are symbol */
+/* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
 
 /* drm_fb_helper_cfb_{fillrect/copyarea/imageblit}() is available */
 #define HAVE_DRM_FB_HELPER_CFB_XX 1
@@ -480,15 +475,6 @@
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
 
-/* fb_info_apertures() is available */
-#define HAVE_FB_INFO_APERTURES 1
-
-/* fb_ops->fb_debug_xx is available */
-#define HAVE_FB_OPS_FB_DEBUG_XX 1
-
-/* fence_set_error() is available */
-/* #undef HAVE_FENCE_SET_ERROR */
-
 /* drm_mode_object->free_cb is available */
 /* #undef HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT */
 
@@ -564,6 +550,9 @@
 /* ktime_get_boottime_ns() is available */
 #define HAVE_KTIME_GET_BOOTTIME_NS 1
 
+/* ktime_get_mono_fast_ns is available */
+#define HAVE_KTIME_GET_MONO_FAST_NS 1
+
 /* ktime_get_ns is available */
 #define HAVE_KTIME_GET_NS 1
 
@@ -572,9 +561,6 @@
 
 /* ktime_get_real_seconds() is available */
 #define HAVE_KTIME_GET_REAL_SECONDS 1
-
-/* ktime_get_mono_fast_ns is available */
-#define HAVE_KTIME_GET_MONO_FAST_NS 1
 
 /* kvcalloc() is available */
 #define HAVE_KVCALLOC 1
@@ -809,9 +795,6 @@
 
 /* wait_queue_entry_t exists */
 #define HAVE_WAIT_QUEUE_ENTRY 1
-
-/* WQ_HIGHPRI is available */
-#define HAVE_WQ_HIGHPRI 1
 
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
