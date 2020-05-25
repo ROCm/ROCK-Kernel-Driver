@@ -54,6 +54,6 @@
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_list.h>
 #include <kcl/kcl_backlight.h>
-#include <kcl/kcl_drm_atomic_helper.h>
+#include <kcl/backport/kcl_drm_atomic_helper_backport.h>
 #include <kcl/kcl_drm_atomic.h>
 #endif /* AMDGPU_BACKPORT_H */
