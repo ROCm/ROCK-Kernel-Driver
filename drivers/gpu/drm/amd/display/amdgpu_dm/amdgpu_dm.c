@@ -3613,9 +3613,7 @@ fail:
 		goto retry;
 	}
 
-#if defined(HAVE_DRM_ATOMIC_STATE_PUT)
 	drm_atomic_state_put(state);
-#endif
 
 out:
 	drm_modeset_drop_locks(&ctx);
@@ -5206,11 +5204,7 @@ fail:
 	if (ret == -EDEADLK)
 		goto backoff;
 
-#if !defined(HAVE_DRM_ATOMIC_STATE_PUT)
-	drm_atomic_state_free(state);
-#else
 	drm_atomic_state_put(state);
-#endif
 
 	return ret;
 backoff:
@@ -8668,11 +8662,7 @@ static int dm_force_atomic_commit(struct drm_connector *connector)
 
 err:
 	DRM_ERROR("Restoring old state failed with %i\n", ret);
-#if !defined(HAVE_DRM_ATOMIC_STATE_PUT)
-	drm_atomic_state_free(state);
-#else
 	drm_atomic_state_put(state);
-#endif
 
 	return ret;
 }
