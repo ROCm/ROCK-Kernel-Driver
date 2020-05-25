@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_VMA_MANAGER_H
 #define AMDKCL_DRM_VMA_MANAGER_H
 

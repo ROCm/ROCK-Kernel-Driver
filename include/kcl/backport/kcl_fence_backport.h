@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_FENCE_BACKPORT_H
 #define AMDKCL_FENCE_BACKPORT_H
 #include <kcl/kcl_fence.h>

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_TASK_BARRIER_H
 #define AMDKCL_DRM_TASK_BARRIER_H
 

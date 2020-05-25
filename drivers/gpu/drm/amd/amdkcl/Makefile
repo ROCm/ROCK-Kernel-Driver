@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 amdkcl-y += main.o symbols.o kcl_mn.o kcl_memory.o \
 	kcl_ioctl.o
 

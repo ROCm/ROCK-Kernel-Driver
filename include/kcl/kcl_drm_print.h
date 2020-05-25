@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_PRINT_H
 #define AMDKCL_DRM_PRINT_H
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_MM_BACKPORT_H
 #define AMDKCL_MM_BACKPORT_H
 #include <kcl/kcl_mm.h>

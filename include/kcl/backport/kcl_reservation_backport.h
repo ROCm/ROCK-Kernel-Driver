@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_RESERVATION_BACKPORT_H
 #define AMDKCL_RESERVATION_BACKPORT_H
 

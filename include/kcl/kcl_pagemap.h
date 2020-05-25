@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_PAGEMAP_H
 #define AMDKCL_PAGEMAP_H
 

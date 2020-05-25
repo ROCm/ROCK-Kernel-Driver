@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 ccflags-y += \
 	-I$(TTM_FULL_PATH) \
 	-I$(TTM_FULL_PATH)/../amd/dkms \

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_HIGHMEM_BACKPORT_H
 #define AMDKCL_HIGHMEM_BACKPORT_H
 

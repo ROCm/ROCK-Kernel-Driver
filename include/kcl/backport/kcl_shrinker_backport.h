@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_SHRINKER_BACKPORT_H
 #define AMDKCL_SHRINKER_BACKPORT_H
 

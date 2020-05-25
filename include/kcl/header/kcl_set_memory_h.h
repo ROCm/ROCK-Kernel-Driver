@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_SET_MEMORY_H_H
 #define AMDKCL_SET_MEMORY_H_H
 

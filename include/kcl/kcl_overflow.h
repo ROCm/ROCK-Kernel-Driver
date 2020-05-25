@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /* SPDX-License-Identifier: GPL-2.0 OR MIT */
 #ifndef AMDKCL_OVERFLOW_H
 #define AMDKCL_OVERFLOW_H

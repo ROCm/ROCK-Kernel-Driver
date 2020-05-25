@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_UAPI_LINUX_SCHED_TYPES_H_H
 #define AMDKCL_UAPI_LINUX_SCHED_TYPES_H_H
 

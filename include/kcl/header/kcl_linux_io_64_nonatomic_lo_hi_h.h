@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_IO_64_NONATOMIC_LO_HI_H_H
 #define AMDKCL_IO_64_NONATOMIC_LO_HI_H_H
 

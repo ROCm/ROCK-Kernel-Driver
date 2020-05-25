@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_backlight.h>
 #include "kcl_common.h"
 

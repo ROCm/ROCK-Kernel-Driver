@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DEVICE_CGROUP_H
 #define AMDKCL_DEVICE_CGROUP_H
 

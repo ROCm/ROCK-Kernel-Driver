@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_RCUPDATE_H
 #define AMDKCL_RCUPDATE_H
 

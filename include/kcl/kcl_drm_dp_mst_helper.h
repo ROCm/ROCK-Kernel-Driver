@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_DP_MST_HELPER_H
 #define AMDKCL_DRM_DP_MST_HELPER_H
 

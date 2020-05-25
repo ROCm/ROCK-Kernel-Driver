@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_HASHTABLE_H
 #define AMDKCL_HASHTABLE_H
 

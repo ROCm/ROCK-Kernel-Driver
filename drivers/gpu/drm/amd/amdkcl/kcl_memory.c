@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_mm.h>
 
 #ifndef HAVE_VMF_INSERT_MIXED_PROT
