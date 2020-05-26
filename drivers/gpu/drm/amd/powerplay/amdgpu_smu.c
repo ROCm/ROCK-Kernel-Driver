@@ -1350,7 +1350,7 @@ static int smu_hw_init(void *handle)
 	if (ret)
 		goto failed;
 
-	ret = smu_start_thermal_control(smu);
+	ret = smu_enable_thermal_alert(smu);
 	if (ret)
 		goto failed;
 
@@ -1396,7 +1396,7 @@ static int smu_hw_fini(void *handle)
 
 	smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
 
-	ret = smu_stop_thermal_control(smu);
+	ret = smu_disable_thermal_alert(smu);
 	if (ret) {
 		pr_warn("Fail to stop thermal control!\n");
 		return ret;
@@ -1537,7 +1537,7 @@ static int smu_suspend(void *handle)
 
 	smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
 
-	ret = smu_stop_thermal_control(smu);
+	ret = smu_disable_thermal_alert(smu);
 	if (ret) {
 		pr_warn("Fail to stop thermal control!\n");
 		return ret;
@@ -1582,7 +1582,7 @@ static int smu_resume(void *handle)
 	if (ret)
 		goto failed;
 
-	ret = smu_start_thermal_control(smu);
+	ret = smu_enable_thermal_alert(smu);
 	if (ret)
 		goto failed;
 
