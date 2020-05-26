@@ -1537,6 +1537,12 @@ static int smu_suspend(void *handle)
 
 	smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
 
+	ret = smu_stop_thermal_control(smu);
+	if (ret) {
+		pr_warn("Fail to stop thermal control!\n");
+		return ret;
+	}
+
 	ret = smu_disable_dpm(smu);
 	if (ret)
 		return ret;
