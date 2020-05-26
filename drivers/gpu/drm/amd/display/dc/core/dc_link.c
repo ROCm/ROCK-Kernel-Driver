@@ -691,10 +691,9 @@ static bool detect_dp(struct dc_link *link,
 	if (sink_caps->transaction_type == DDC_TRANSACTION_TYPE_I2C_OVER_AUX) {
 		sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT;
 
-		dpcd_set_source_specific_data(link);
-
 		if (!detect_dp_sink_caps(link))
 			return false;
+		dpcd_set_source_specific_data(link);
 
 		if (is_mst_supported(link)) {
 			sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
@@ -3259,6 +3258,10 @@ void core_link_enable_stream(
 
 	}
 #endif
+
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+		core_link_set_avmute(pipe_ctx, false);
+	}
 }
 
 void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
@@ -3270,6 +3273,10 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 	if (!IS_DIAG_DC(dc->ctx->dce_environment) &&
 			dc_is_virtual_signal(pipe_ctx->stream->signal))
 		return;
+
+	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
+		core_link_set_avmute(pipe_ctx, true);
+	}
 
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
 	update_psp_stream_config(pipe_ctx, true);

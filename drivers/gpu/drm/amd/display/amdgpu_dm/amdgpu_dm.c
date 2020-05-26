@@ -383,7 +383,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		 */
 
 		/* sequence will be replaced by real count during send-out. */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 15, 0) || defined(OS_NAME_SUSE_15_1)
+#ifdef HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE
 		e->sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
 #else
 		e->event.sequence = drm_crtc_vblank_count(&amdgpu_crtc->base);
@@ -960,6 +960,23 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		goto error;
 	}
 
+	if (amdgpu_dc_debug_mask & DC_DISABLE_PIPE_SPLIT) {
+		adev->dm.dc->debug.force_single_disp_pipe_split = false;
+		adev->dm.dc->debug.pipe_split_policy = MPC_SPLIT_AVOID;
+	}
+
+	if (adev->asic_type != CHIP_CARRIZO && adev->asic_type != CHIP_STONEY)
+		adev->dm.dc->debug.disable_stutter = amdgpu_pp_feature_mask & PP_STUTTER_MODE ? false : true;
+
+	if (amdgpu_dc_debug_mask & DC_DISABLE_STUTTER)
+		adev->dm.dc->debug.disable_stutter = true;
+
+	if (amdgpu_dc_debug_mask & DC_DISABLE_DSC)
+		adev->dm.dc->debug.disable_dsc = true;
+
+	if (amdgpu_dc_debug_mask & DC_DISABLE_CLOCK_GATING)
+		adev->dm.dc->debug.disable_clock_gate = true;
+
 	r = dm_dmub_hw_init(adev);
 	if (r) {
 		DRM_ERROR("DMUB interface failed to initialize: status=%d\n", r);
@@ -1257,10 +1274,10 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 					PSP_HEADER_BYTES - PSP_FOOTER_BYTES;
 	region_params.bss_data_size = le32_to_cpu(hdr->bss_data_bytes);
 	region_params.vbios_size = adev->bios_size;
-	region_params.fw_bss_data =
+	region_params.fw_bss_data = region_params.bss_data_size ?
 		adev->dm.dmub_fw->data +
 		le32_to_cpu(hdr->header.ucode_array_offset_bytes) +
-		le32_to_cpu(hdr->inst_const_bytes);
+		le32_to_cpu(hdr->inst_const_bytes) : NULL;
 	region_params.fw_inst_const =
 		adev->dm.dmub_fw->data +
 		le32_to_cpu(hdr->header.ucode_array_offset_bytes) +
@@ -3246,9 +3263,6 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		goto fail;
 	}
 
-	if (adev->asic_type != CHIP_CARRIZO && adev->asic_type != CHIP_STONEY)
-		dm->dc->debug.disable_stutter = amdgpu_pp_feature_mask & PP_STUTTER_MODE ? false : true;
-
 	/* No userspace support. */
 	dm->dc->debug.disable_tri_buf = true;
 
@@ -3723,7 +3737,8 @@ fill_plane_dcc_attributes(struct amdgpu_device *adev,
 			  const union dc_tiling_info *tiling_info,
 			  const uint64_t info,
 			  struct dc_plane_dcc_param *dcc,
-			  struct dc_plane_address *address)
+			  struct dc_plane_address *address,
+			  bool force_disable_dcc)
 {
 	struct dc *dc = adev->dm.dc;
 	struct dc_dcc_surface_param input;
@@ -3734,6 +3749,9 @@ fill_plane_dcc_attributes(struct amdgpu_device *adev,
 
 	memset(&input, 0, sizeof(input));
 	memset(&output, 0, sizeof(output));
+
+	if (force_disable_dcc)
+		return 0;
 
 	if (!offset)
 		return 0;
@@ -3785,7 +3803,8 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			     struct plane_size *plane_size,
 			     struct dc_plane_dcc_param *dcc,
 			     struct dc_plane_address *address,
-			     bool tmz_surface)
+			     bool tmz_surface,
+			     bool force_disable_dcc)
 {
 	const struct drm_framebuffer *fb = &afb->base;
 	int ret;
@@ -3907,7 +3926,8 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 
 		ret = fill_plane_dcc_attributes(adev, afb, format, rotation,
 						plane_size, tiling_info,
-						tiling_flags, dcc, address);
+						tiling_flags, dcc, address,
+						force_disable_dcc);
 		if (ret)
 			return ret;
 	}
@@ -4006,7 +4026,8 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 			    const uint64_t tiling_flags,
 			    struct dc_plane_info *plane_info,
 			    struct dc_plane_address *address,
-			    bool tmz_surface)
+			    bool tmz_surface,
+			    bool force_disable_dcc)
 {
 	const struct drm_framebuffer *fb = plane_state->fb;
 	const struct amdgpu_framebuffer *afb =
@@ -4059,6 +4080,10 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_ARGB16161616F:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616F;
 		break;
+	case DRM_FORMAT_XBGR16161616F:
+	case DRM_FORMAT_ABGR16161616F:
+		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F;
+		break;
 #endif
 	default:
 		DRM_ERROR(
@@ -4103,7 +4128,8 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 					   plane_info->rotation, tiling_flags,
 					   &plane_info->tiling_info,
 					   &plane_info->plane_size,
-					   &plane_info->dcc, address, tmz_surface);
+					   &plane_info->dcc, address,
+					   tmz_surface, force_disable_dcc);
 	if (ret)
 		return ret;
 
@@ -4159,6 +4185,9 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	uint64_t tiling_flags;
 	int ret;
 	bool tmz_surface = false;
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+	bool force_disable_dcc = false;
+#endif
 
 	ret = fill_dc_scaling_info(plane_state, &scaling_info);
 	if (ret)
@@ -4174,10 +4203,12 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 		return ret;
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
+	force_disable_dcc = adev->asic_type == CHIP_RAVEN && adev->in_suspend;
 	ret = fill_dc_plane_info_and_addr(adev, plane_state, tiling_flags,
 					  &plane_info,
 					  &dc_plane_state->address,
-					  tmz_surface);
+					  tmz_surface,
+					  force_disable_dcc);
 	if (ret)
 		return ret;
 
@@ -5157,7 +5188,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
 	.set_property = drm_atomic_helper_crtc_set_property,
 #endif
 #if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
@@ -5469,7 +5500,7 @@ amdgpu_dm_connector_late_register(struct drm_connector *connector)
 #endif
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
 	.dpms = drm_atomic_helper_connector_dpms,
 	.set_property = drm_atomic_helper_connector_set_property,
 #endif
@@ -6104,7 +6135,7 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
 	.destroy	= drm_primary_helper_destroy,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
+#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
 	.set_property	= drm_atomic_helper_plane_set_property,
 #endif
 	.reset = dm_drm_plane_reset,
@@ -6136,6 +6167,7 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	uint32_t domain;
 	int r;
 	bool tmz_surface = false;
+	bool force_disable_dcc = false;
 
 	dm_plane_state_old = to_dm_plane_state(plane->state);
 	dm_plane_state_new = to_dm_plane_state(new_state);
@@ -6196,11 +6228,13 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 			dm_plane_state_old->dc_state != dm_plane_state_new->dc_state) {
 		struct dc_plane_state *plane_state = dm_plane_state_new->dc_state;
 
+		force_disable_dcc = adev->asic_type == CHIP_RAVEN && adev->in_suspend;
 		fill_plane_buffer_attributes(
 			adev, afb, plane_state->format, plane_state->rotation,
 			tiling_flags, &plane_state->tiling_info,
 			&plane_state->plane_size, &plane_state->dcc,
-			&plane_state->address, tmz_surface);
+			&plane_state->address, tmz_surface,
+			force_disable_dcc);
 	}
 
 	return 0;
@@ -6365,6 +6399,8 @@ static int get_plane_formats(const struct drm_plane *plane,
 		if (plane_cap && plane_cap->pixel_format_support.fp16) {
 			formats[num_formats++] = DRM_FORMAT_XRGB16161616F;
 			formats[num_formats++] = DRM_FORMAT_ARGB16161616F;
+			formats[num_formats++] = DRM_FORMAT_XBGR16161616F;
+			formats[num_formats++] = DRM_FORMAT_ABGR16161616F;
 		}
 #endif
 		break;
@@ -7550,7 +7586,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		fill_dc_plane_info_and_addr(
 			dm->adev, new_plane_state, tiling_flags,
 			&bundle->plane_infos[planes_count],
-			&bundle->flip_addrs[planes_count].address, tmz_surface);
+			&bundle->flip_addrs[planes_count].address, tmz_surface,
+			false);
+
+		DRM_DEBUG_DRIVER("plane: id=%d dcc_en=%d\n",
+				 new_plane_state->plane->index,
+				 bundle->plane_infos[planes_count].dcc.enable);
 
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
@@ -9213,7 +9254,8 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				ret = fill_dc_plane_info_and_addr(
 					dm->adev, new_plane_state, tiling_flags,
 					plane_info,
-					&flip_addr->address, tmz_surface);
+					&flip_addr->address, tmz_surface,
+					false);
 				if (ret)
 					goto cleanup;
 

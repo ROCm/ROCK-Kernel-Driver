@@ -26,7 +26,10 @@
 #define __DISPLAY_MODE_LIB_H__
 
 
-#include "dml_common_defs.h"
+#include "dm_services.h"
+#include "dc_features.h"
+#include "display_mode_structs.h"
+#include "display_mode_enums.h"
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 #include "display_mode_vba.h"
 #endif

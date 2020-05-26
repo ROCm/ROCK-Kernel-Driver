@@ -811,7 +811,7 @@ static const struct resource_caps res_cap_rn = {
 		.num_pll = 5,  // maybe 3 because the last two used for USB-c
 		.num_dwb = 1,
 		.num_ddc = 5,
-		.num_vmid = 1,
+		.num_vmid = 16,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 3,
 #endif
@@ -890,7 +890,6 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.scl_reset_length10 = true,
 		.sanity_checks = true,
 		.disable_48mhz_pwrdwn = false,
-		.nv12_iflip_vm_wa = true,
 		.usbc_combo_phy_reset_wa = true
 };
 
@@ -1311,6 +1310,7 @@ static struct hubbub *dcn21_hubbub_create(struct dc_context *ctx)
 		vmid->shifts = &vmid_shifts;
 		vmid->masks = &vmid_masks;
 	}
+	hubbub->num_vmid = res_cap_rn.num_vmid;
 
 	return &hubbub->base;
 }

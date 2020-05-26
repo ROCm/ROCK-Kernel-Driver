@@ -46,7 +46,6 @@
 #include "asic_reg/smuio/smuio_11_0_0_offset.h"
 #include "asic_reg/smuio/smuio_11_0_0_sh_mask.h"
 
-MODULE_FIRMWARE("amdgpu/vega20_smc.bin");
 MODULE_FIRMWARE("amdgpu/arcturus_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi10_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi14_smc.bin");
@@ -148,9 +147,6 @@ int smu_v11_0_init_microcode(struct smu_context *smu)
 	struct amdgpu_firmware_info *ucode = NULL;
 
 	switch (adev->asic_type) {
-	case CHIP_VEGA20:
-		chip_name = "vega20";
-		break;
 	case CHIP_ARCTURUS:
 		chip_name = "arcturus";
 		break;
@@ -270,9 +266,6 @@ int smu_v11_0_check_fw_version(struct smu_context *smu)
 	smu_debug = (smu_version >> 0) & 0xff;
 
 	switch (smu->adev->asic_type) {
-	case CHIP_VEGA20:
-		smu->smc_driver_if_version = SMU11_DRIVER_IF_VERSION_VG20;
-		break;
 	case CHIP_ARCTURUS:
 		smu->smc_driver_if_version = SMU11_DRIVER_IF_VERSION_ARCT;
 		break;
@@ -1385,8 +1378,6 @@ int smu_v11_0_gfx_off_control(struct smu_context *smu, bool enable)
 	struct amdgpu_device *adev = smu->adev;
 
 	switch (adev->asic_type) {
-	case CHIP_VEGA20:
-		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
@@ -1565,40 +1556,28 @@ static int smu_v11_0_irq_process(struct amdgpu_device *adev,
 	if (client_id == SOC15_IH_CLIENTID_THM) {
 		switch (src_id) {
 		case THM_11_0__SRCID__THM_DIG_THERM_L2H:
-			pr_warn("GPU over temperature range detected on PCIe %d:%d.%d!\n",
-				PCI_BUS_NUM(adev->pdev->devfn),
-				PCI_SLOT(adev->pdev->devfn),
-				PCI_FUNC(adev->pdev->devfn));
+			dev_emerg(adev->dev, "ERROR: GPU over temperature range(SW CTF) detected!\n");
 			/*
 			 * SW CTF just occurred.
 			 * Try to do a graceful shutdown to prevent further damage.
 			 */
-			dev_emerg(adev->dev, "System is going to shutdown due to SW CTF!\n");
+			dev_emerg(adev->dev, "ERROR: System is going to shutdown due to GPU SW CTF!\n");
 			orderly_poweroff(true);
 		break;
 		case THM_11_0__SRCID__THM_DIG_THERM_H2L:
-			pr_warn("GPU under temperature range detected on PCIe %d:%d.%d!\n",
-				PCI_BUS_NUM(adev->pdev->devfn),
-				PCI_SLOT(adev->pdev->devfn),
-				PCI_FUNC(adev->pdev->devfn));
+			dev_emerg(adev->dev, "ERROR: GPU under temperature range detected\n");
 		break;
 		default:
-			pr_warn("GPU under temperature range unknown src id (%d), detected on PCIe %d:%d.%d!\n",
-				src_id,
-				PCI_BUS_NUM(adev->pdev->devfn),
-				PCI_SLOT(adev->pdev->devfn),
-				PCI_FUNC(adev->pdev->devfn));
+			dev_emerg(adev->dev, "ERROR: GPU under temperature range unknown src id (%d)\n",
+				src_id);
 		break;
 		}
 	} else if (client_id == SOC15_IH_CLIENTID_ROM_SMUIO) {
-		pr_warn("GPU Critical Temperature Fault detected on PCIe %d:%d.%d!\n",
-				PCI_BUS_NUM(adev->pdev->devfn),
-				PCI_SLOT(adev->pdev->devfn),
-				PCI_FUNC(adev->pdev->devfn));
+		dev_emerg(adev->dev, "ERROR: GPU HW Critical Temperature Fault(aka CTF) detected!\n");
 		/*
 		 * HW CTF just occurred. Shutdown to prevent further damage.
 		 */
-		dev_emerg(adev->dev, "System is going to shutdown due to HW CTF!\n");
+		dev_emerg(adev->dev, "ERROR: System is going to shutdown due to GPU HW CTF!\n");
 		orderly_poweroff(true);
 	} else if (client_id == SOC15_IH_CLIENTID_MP1) {
 		if (src_id == 0xfe) {

@@ -62,6 +62,7 @@
 #define DMUB_CW0_BASE (0x60000000)
 #define DMUB_CW1_BASE (0x61000000)
 #define DMUB_CW3_BASE (0x63000000)
+#define DMUB_CW4_BASE (0x64000000)
 #define DMUB_CW5_BASE (0x65000000)
 #define DMUB_CW6_BASE (0x66000000)
 
@@ -98,12 +99,12 @@ dmub_get_fw_meta_info(const struct dmub_srv_region_params *params)
 	uint32_t blob_size = 0;
 	uint32_t meta_offset = 0;
 
-	if (params->fw_bss_data) {
+	if (params->fw_bss_data && params->bss_data_size) {
 		/* Legacy metadata region. */
 		blob = params->fw_bss_data;
 		blob_size = params->bss_data_size;
 		meta_offset = DMUB_FW_META_OFFSET;
-	} else if (params->fw_inst_const) {
+	} else if (params->fw_inst_const && params->inst_const_size) {
 		/* Combined metadata region. */
 		blob = params->fw_inst_const;
 		blob_size = params->inst_const_size;
@@ -172,6 +173,7 @@ enum dmub_status dmub_srv_create(struct dmub_srv *dmub,
 	dmub->funcs = params->funcs;
 	dmub->user_ctx = params->user_ctx;
 	dmub->asic = params->asic;
+	dmub->fw_version = params->fw_version;
 	dmub->is_virtual = params->is_virtual;
 
 	/* Setup asic dependent hardware funcs. */
@@ -402,7 +404,7 @@ enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 		cw3.region.top = cw3.region.base + bios_fb->size;
 
 		cw4.offset.quad_part = mail_fb->gpu_addr;
-		cw4.region.base = cw3.region.top + 1;
+		cw4.region.base = DMUB_CW4_BASE;
 		cw4.region.top = cw4.region.base + mail_fb->size;
 
 		inbox1.base = cw4.region.base;

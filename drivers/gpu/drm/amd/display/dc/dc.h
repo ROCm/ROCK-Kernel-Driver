@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.84"
+#define DC_VER "3.2.85"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -276,7 +276,7 @@ struct dc_config {
 	bool edp_not_connected;
 	bool force_enum_edp;
 	bool forced_clocks;
-	bool disable_extended_timeout_support; // Used to disable extended timeout and lttpr feature as well
+	bool allow_lttpr_non_transparent_mode;
 	bool multi_mon_pp_mclk_switch;
 	bool disable_dmcu;
 	bool enable_4to1MPC;
@@ -481,7 +481,6 @@ struct dc_debug_options {
 #endif
 	int force_clock_mode;/*every mode change.*/
 
-	bool nv12_iflip_vm_wa;
 	bool disable_dram_clock_change_vactive_support;
 	bool validate_dml_output;
 	bool enable_dmcub_surface_flip;

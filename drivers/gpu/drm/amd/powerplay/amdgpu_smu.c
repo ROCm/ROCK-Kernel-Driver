@@ -29,7 +29,6 @@
 #include "smu_v11_0.h"
 #include "smu_v12_0.h"
 #include "atom.h"
-#include "vega20_ppt.h"
 #include "arcturus_ppt.h"
 #include "navi10_ppt.h"
 #include "renoir_ppt.h"
@@ -567,22 +566,10 @@ int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int
 
 bool is_support_sw_smu(struct amdgpu_device *adev)
 {
-	if (adev->asic_type == CHIP_VEGA20)
-		return (amdgpu_dpm == 2) ? true : false;
-	else if (adev->asic_type >= CHIP_ARCTURUS) {
+	if (adev->asic_type >= CHIP_ARCTURUS) {
 	      if (amdgpu_sriov_is_pp_one_vf(adev) || !amdgpu_sriov_vf(adev))
 			return true;
 	}
-	return false;
-}
-
-bool is_support_sw_smu_xgmi(struct amdgpu_device *adev)
-{
-	if (!is_support_sw_smu(adev))
-		return false;
-
-	if (adev->asic_type == CHIP_VEGA20)
-		return true;
 
 	return false;
 }
@@ -771,10 +758,6 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		smu->od_enabled = true;
 
 	switch (adev->asic_type) {
-	case CHIP_VEGA20:
-		adev->pm.pp_feature &= ~PP_GFXOFF_MASK;
-		vega20_set_ppt_funcs(smu);
-		break;
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
@@ -1380,9 +1363,11 @@ static int smu_hw_init(void *handle)
 	if (ret)
 		goto failed;
 
-	ret = smu_i2c_eeprom_init(smu, &adev->pm.smu_i2c);
-	if (ret)
-		goto failed;
+	if (!amdgpu_sriov_vf(adev)) {
+		ret = smu_i2c_eeprom_init(smu, &adev->pm.smu_i2c);
+		if (ret)
+			goto failed;
+	}
 
 	adev->pm.dpm_enabled = true;
 
@@ -1423,9 +1408,9 @@ static int smu_hw_fini(void *handle)
 
 	adev->pm.dpm_enabled = false;
 
-	smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
-
 	if (!amdgpu_sriov_vf(adev)){
+		smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
+
 		ret = smu_stop_thermal_control(smu);
 		if (ret) {
 			pr_warn("Fail to stop thermal control!\n");
@@ -1566,9 +1551,9 @@ static int smu_suspend(void *handle)
 
 	adev->pm.dpm_enabled = false;
 
-	smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
+	if (!amdgpu_sriov_vf(adev)) {
+		smu_i2c_eeprom_fini(smu, &adev->pm.smu_i2c);
 
-	if(!amdgpu_sriov_vf(adev)) {
 		ret = smu_disable_dpm(smu);
 		if (ret)
 			return ret;
@@ -1613,9 +1598,11 @@ static int smu_resume(void *handle)
 	if (ret)
 		goto failed;
 
-	ret = smu_i2c_eeprom_init(smu, &adev->pm.smu_i2c);
-	if (ret)
-		goto failed;
+	if (!amdgpu_sriov_vf(adev)) {
+		ret = smu_i2c_eeprom_init(smu, &adev->pm.smu_i2c);
+		if (ret)
+			goto failed;
+	}
 
 	if (smu->is_apu)
 		smu_set_gfx_cgpg(&adev->smu, true);
