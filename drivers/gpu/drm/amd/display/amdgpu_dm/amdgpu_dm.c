@@ -7757,7 +7757,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 			false);
 
 		DRM_DEBUG_DRIVER("plane: id=%d dcc_en=%d\n",
-				 new_plane_state->plane->index,
+				 drm_plane_index(new_plane_state->plane),
 				 bundle->plane_infos[planes_count].dcc.enable);
 
 		bundle->surface_updates[planes_count].plane_info =
