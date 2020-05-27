@@ -1054,7 +1054,7 @@ static int amdgpu_cs_process_fence_dep(struct amdgpu_cs_parser *p,
 			dma_fence_put(old);
 		}
 
-		r = amdgpu_sync_fence(&p->job->sync, fence, true);
+		r = amdgpu_sync_fence(&p->job->sync, fence);
 		dma_fence_put(fence);
 		if (r)
 			return r;
@@ -1077,7 +1077,7 @@ static int amdgpu_syncobj_lookup_and_add_to_sync(struct amdgpu_cs_parser *p,
 		return r;
 	}
 
-	r = amdgpu_sync_fence(&p->job->sync, fence, true);
+	r = amdgpu_sync_fence(&p->job->sync, fence);
 	dma_fence_put(fence);
 
 	return r;
