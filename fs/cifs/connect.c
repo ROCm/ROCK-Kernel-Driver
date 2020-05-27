@@ -1466,8 +1466,8 @@ cifs_parse_smb_version(char *value, struct smb_vol *vol, bool is_smb3)
 			cifs_dbg(VFS, "vers=1.0 (cifs) not permitted when mounting with smb3\n");
 			return 1;
 		}
-		printk_once(KERN_WARNING "Use of the less secure dialect "
-			   "vers=1.0 is not recommended unless required for "
+		cifs_dbg(VFS, "Use of the less secure dialect vers=1.0 "
+			   "is not recommended unless required for "
 			   "access to very old servers\n");
 		vol->ops = &smb1_operations;
 		vol->vals = &smb1_values;
