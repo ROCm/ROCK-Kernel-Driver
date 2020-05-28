@@ -1541,7 +1541,7 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 
 	adev->firmware.gpu_info_fw = NULL;
 
-	if (amdgpu_discovery && adev->asic_type >= CHIP_NAVI10) {
+	if (adev->discovery_bin) {
 		amdgpu_discovery_get_gfx_info(adev);
 		return 0;
 	}
@@ -3403,7 +3403,7 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	device_remove_file(adev->dev, &dev_attr_serial_number);
 	if (IS_ENABLED(CONFIG_PERF_EVENTS))
 		amdgpu_pmu_fini(adev);
-	if (amdgpu_discovery && adev->asic_type >= CHIP_NAVI10)
+	if (adev->discovery_bin)
 		amdgpu_discovery_fini(adev);
 }
 
