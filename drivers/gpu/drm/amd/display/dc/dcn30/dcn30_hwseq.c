@@ -719,8 +719,10 @@ bool dcn30_apply_idle_power_optimizations(struct dc *dc, bool enable)
 
 			// TODO: remove hard code size
 			if (surface_size < 128 * 1024 * 1024) {
-				refresh_hz = (unsigned long long) dc->current_state->streams[0]->timing.pix_clk_100hz * 100LL /
-						(dc->current_state->streams[0]->timing.v_total * dc->current_state->streams[0]->timing.h_total);
+				refresh_hz = div_u64((unsigned long long) dc->current_state->streams[0]->timing.pix_clk_100hz *
+						     100LL,
+						     (dc->current_state->streams[0]->timing.v_total *
+						      dc->current_state->streams[0]->timing.h_total));
 
 				/*
 				 * Delay_Us = 65.28 * (64 + MallFrameCacheTmrDly) * 2^MallFrameCacheTmrScale
@@ -734,7 +736,7 @@ bool dcn30_apply_idle_power_optimizations(struct dc *dc, bool enable)
 				 * need to round up the result of the division before the subtraction
 				 */
 				denom = refresh_hz * 6528;
-				tmr_delay = (100000000LL + denom - 1) / denom - 64LL;
+				tmr_delay = div_u64((100000000LL + denom - 1), denom) - 64LL;
 
 				/* scale should be increased until it fits into 6 bits */
 				while (tmr_delay & ~0x3F) {
@@ -747,7 +749,7 @@ bool dcn30_apply_idle_power_optimizations(struct dc *dc, bool enable)
 					}
 
 					denom *= 2;
-					tmr_delay = (100000000LL + denom - 1) / denom - 64LL;
+					tmr_delay = div_u64((100000000LL + denom - 1), denom) - 64LL;
 				}
 
 				/* Enable MALL */
