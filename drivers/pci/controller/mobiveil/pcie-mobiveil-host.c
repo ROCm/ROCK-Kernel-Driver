@@ -3,10 +3,10 @@
  * PCIe host controller driver for Mobiveil PCIe Host controller
  *
  * Copyright (c) 2018 Mobiveil Inc.
- * Copyright 2019 NXP
+ * Copyright 2019-2020 NXP
  *
  * Author: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
- * Recode: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+ *	   Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
  */
 
 #include <linux/init.h>
@@ -30,7 +30,7 @@
 static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
 {
 	struct mobiveil_pcie *pcie = bus->sysdata;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 
 	/* Only one device down on each root port */
 	if ((bus->number == rp->root_bus_nr) && (devfn > 0))
@@ -54,7 +54,7 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
 					   unsigned int devfn, int where)
 {
 	struct mobiveil_pcie *pcie = bus->sysdata;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	u32 value;
 
 	if (!mobiveil_pcie_valid_device(bus, devfn))
@@ -83,7 +83,7 @@ static int mobiveil_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
 				     int where, int size, u32 *val)
 {
 	struct mobiveil_pcie *pcie = bus->sysdata;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 
 	if (bus->number > rp->root_bus_nr && rp->ops->read_other_conf)
 		return rp->ops->read_other_conf(bus, devfn, where, size, val);
@@ -102,7 +102,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct mobiveil_pcie *pcie = irq_desc_get_handler_data(desc);
 	struct device *dev = &pcie->pdev->dev;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	struct mobiveil_msi *msi = &rp->msi;
 	u32 msi_data, msi_addr_lo, msi_addr_hi;
 	u32 intr_status, msi_status;
@@ -188,7 +188,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
 	struct device *dev = &pcie->pdev->dev;
 	struct platform_device *pdev = pcie->pdev;
 	struct device_node *node = dev->of_node;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	struct resource *res;
 
 	/* map config resource */
@@ -235,7 +235,7 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
 
 int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
 {
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	struct pci_host_bridge *bridge = rp->bridge;
 	u32 value, pab_ctrl, type;
 	struct resource_entry *win;
@@ -327,7 +327,7 @@ static void mobiveil_mask_intx_irq(struct irq_data *data)
 {
 	struct irq_desc *desc = irq_to_desc(data->irq);
 	struct mobiveil_pcie *pcie;
-	struct root_port *rp;
+	struct mobiveil_root_port *rp;
 	unsigned long flags;
 	u32 mask, shifted_val;
 
@@ -345,7 +345,7 @@ static void mobiveil_unmask_intx_irq(struct irq_data *data)
 {
 	struct irq_desc *desc = irq_to_desc(data->irq);
 	struct mobiveil_pcie *pcie;
-	struct root_port *rp;
+	struct mobiveil_root_port *rp;
 	unsigned long flags;
 	u32 shifted_val, mask;
 
@@ -498,7 +498,7 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
 {
 	struct device *dev = &pcie->pdev->dev;
 	struct device_node *node = dev->of_node;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	int ret;
 
 	/* setup INTx */
@@ -520,16 +520,13 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
 	return 0;
 }
 
-static int mobiveil_pcie_interrupt_init(struct mobiveil_pcie *pcie)
+static int mobiveil_pcie_integrated_interrupt_init(struct mobiveil_pcie *pcie)
 {
 	struct platform_device *pdev = pcie->pdev;
 	struct device *dev = &pdev->dev;
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	struct resource *res;
 	int ret;
-
-	if (rp->ops->interrupt_init)
-		return rp->ops->interrupt_init(pcie);
 
 	/* map MSI config resource */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "apb_csr");
@@ -563,9 +560,29 @@ static int mobiveil_pcie_interrupt_init(struct mobiveil_pcie *pcie)
 	return 0;
 }
 
+static int mobiveil_pcie_interrupt_init(struct mobiveil_pcie *pcie)
+{
+	struct mobiveil_root_port *rp = &pcie->rp;
+
+	if (rp->ops->interrupt_init)
+		return rp->ops->interrupt_init(pcie);
+
+	return mobiveil_pcie_integrated_interrupt_init(pcie);
+}
+
+static bool mobiveil_pcie_is_bridge(struct mobiveil_pcie *pcie)
+{
+	u32 header_type;
+
+	header_type = mobiveil_csr_readb(pcie, PCI_HEADER_TYPE);
+	header_type &= 0x7f;
+
+	return header_type == PCI_HEADER_TYPE_BRIDGE;
+}
+
 int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
 {
-	struct root_port *rp = &pcie->rp;
+	struct mobiveil_root_port *rp = &pcie->rp;
 	struct pci_host_bridge *bridge = rp->bridge;
 	struct device *dev = &pcie->pdev->dev;
 	struct pci_bus *bus;
@@ -577,6 +594,9 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
 		dev_err(dev, "Parsing DT failed, ret: %x\n", ret);
 		return ret;
 	}
+
+	if (!mobiveil_pcie_is_bridge(pcie))
+		return -ENODEV;
 
 	/* parse the host bridge base addresses from the device tree file */
 	ret = pci_parse_request_of_pci_ranges(dev, &bridge->windows,

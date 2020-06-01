@@ -2,7 +2,7 @@
 /*
  * PCIe Gen4 host controller driver for NXP Layerscape SoCs
  *
- * Copyright 2019 NXP
+ * Copyright 2019-2020 NXP
  *
  * Author: Zhiqiang Hou <Zhiqiang.Hou@nxp.com>
  */
@@ -70,17 +70,6 @@ static inline void ls_pcie_g4_pf_writel(struct ls_pcie_g4 *pcie,
 	iowrite32(val, pcie->pci.csr_axi_slave_base + PCIE_PF_OFF + off);
 }
 
-static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
-{
-	struct mobiveil_pcie *mv_pci = &pcie->pci;
-	u32 header_type;
-
-	header_type = mobiveil_csr_readb(mv_pci, PCI_HEADER_TYPE);
-	header_type &= 0x7f;
-
-	return header_type == PCI_HEADER_TYPE_BRIDGE;
-}
-
 static void workaround_A011451(struct ls_pcie_g4 *pcie)
 {
 	struct mobiveil_pcie *mv_pci = &pcie->pci;
@@ -139,7 +128,7 @@ static void ls_pcie_g4_enable_interrupt(struct ls_pcie_g4 *pcie)
 	mobiveil_csr_writel(mv_pci, val, PAB_INTP_AMBA_MISC_ENB);
 }
 
-static void ls_pcie_g4_reinit_hw(struct ls_pcie_g4 *pcie)
+static int ls_pcie_g4_reinit_hw(struct ls_pcie_g4 *pcie)
 {
 	struct mobiveil_pcie *mv_pci = &pcie->pci;
 	struct device *dev = &mv_pci->pdev->dev;
@@ -154,7 +143,7 @@ static void ls_pcie_g4_reinit_hw(struct ls_pcie_g4 *pcie)
 	} while (((val & PF_INT_STAT_PABRST) == 0 || act_stat) && to--);
 	if (to < 0) {
 		dev_err(dev, "Poll PABRST&PABACT timeout\n");
-		return;
+		return -EIO;
 	}
 
 	/* clear PEX_RESET bit in PEX_PF0_DBG register */
@@ -175,8 +164,12 @@ static void ls_pcie_g4_reinit_hw(struct ls_pcie_g4 *pcie)
 	to = 100;
 	while (!ls_pcie_g4_link_up(mv_pci) && to--)
 		usleep_range(200, 250);
-	if (to < 0)
+	if (to < 0) {
 		dev_err(dev, "PCIe link training timeout\n");
+		return -EIO;
+	}
+
+	return 0;
 }
 
 static irqreturn_t ls_pcie_g4_isr(int irq, void *dev_id)
@@ -232,7 +225,10 @@ static void ls_pcie_g4_reset(struct work_struct *work)
 	ctrl = mobiveil_csr_readw(mv_pci, PCI_BRIDGE_CONTROL);
 	ctrl &= ~PCI_BRIDGE_CTL_BUS_RESET;
 	mobiveil_csr_writew(mv_pci, ctrl, PCI_BRIDGE_CONTROL);
-	ls_pcie_g4_reinit_hw(pcie);
+
+	if (!ls_pcie_g4_reinit_hw(pcie))
+		return;
+
 	ls_pcie_g4_enable_interrupt(pcie);
 }
 
@@ -301,9 +297,6 @@ static int __init ls_pcie_g4_probe(struct platform_device *pdev)
 		dev_err(dev, "Fail to probe\n");
 		return  ret;
 	}
-
-	if (!ls_pcie_g4_is_bridge(pcie))
-		return -ENODEV;
 
 	ls_pcie_g4_enable_interrupt(pcie);
 
