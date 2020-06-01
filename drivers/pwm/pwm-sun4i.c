@@ -205,6 +205,8 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 			   struct pwm_state *state)
 {
 	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
+	u32 period = 0, duty = 0, val = 0;
+	unsigned int prescaler = 0;
 	struct pwm_state cstate;
 	u32 ctrl;
 	int ret;
@@ -221,24 +223,24 @@ static int sun4i_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		}
 	}
 
-	spin_lock(&sun4i_pwm->ctrl_lock);
-	ctrl = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-
 	if ((cstate.period != state->period) ||
 	    (cstate.duty_cycle != state->duty_cycle)) {
-		u32 period, duty, val;
-		unsigned int prescaler;
 
 		ret = sun4i_pwm_calculate(sun4i_pwm, state,
 					  &duty, &period, &prescaler);
 		if (ret) {
 			dev_err(chip->dev, "period exceeds the maximum value\n");
-			spin_unlock(&sun4i_pwm->ctrl_lock);
 			if (!cstate.enabled)
 				clk_disable_unprepare(sun4i_pwm->clk);
 			return ret;
 		}
+	}
 
+	spin_lock(&sun4i_pwm->ctrl_lock);
+	ctrl = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+
+	if ((cstate.period != state->period) ||
+	    (cstate.duty_cycle != state->duty_cycle)) {
 		if (PWM_REG_PRESCAL(ctrl, pwm->hwpwm) != prescaler) {
 			/* Prescaler changed, the clock has to be gated */
 			ctrl &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
