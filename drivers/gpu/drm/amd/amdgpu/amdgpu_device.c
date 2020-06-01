@@ -3521,7 +3521,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 * for throttling interrupt) = 60 seconds.
 	 */
 	ratelimit_state_init(&adev->throttling_logging_rs, (60 - 1) * HZ, 1);
+#ifdef RATELIMIT_MSG_ON_RELEASE
 	ratelimit_set_flags(&adev->throttling_logging_rs, RATELIMIT_MSG_ON_RELEASE);
+#endif
 
 	/* Registers mapping */
 	/* TODO: block userspace mapping of io register */
