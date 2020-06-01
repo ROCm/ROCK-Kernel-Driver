@@ -39,7 +39,7 @@
 
 #define SPI_MCR		0x00
 #define SPI_MCR_MASTER		(1 << 31)
-#define SPI_MCR_PCSIS		(0x3F << 16)
+#define SPI_MCR_PCSIS(x)		((x) << 16)
 #define SPI_MCR_CLR_TXF	(1 << 11)
 #define SPI_MCR_CLR_RXF	(1 << 10)
 #define SPI_MCR_XSPI		(1 << 3)
@@ -988,7 +988,10 @@ static const struct regmap_config dspi_xspi_regmap_config[] = {
 
 static void dspi_init(struct fsl_dspi *dspi)
 {
-	unsigned int mcr = SPI_MCR_PCSIS;
+	unsigned int mcr;
+
+	/* Set idle states for all chip select signals to high */
+	mcr = SPI_MCR_PCSIS(GENMASK(dspi->master->num_chipselect - 1, 0));
 
 	if (dspi->devtype_data->xspi_mode)
 		mcr |= SPI_MCR_XSPI;
