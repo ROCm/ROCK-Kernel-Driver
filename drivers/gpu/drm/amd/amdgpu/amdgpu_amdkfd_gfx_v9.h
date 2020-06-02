@@ -62,9 +62,12 @@ void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 				      uint32_t trap_debug_wave_launch_mode,
 				      uint32_t vmid);
 void kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd);
-void kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
-						  uint32_t trap_override,
-						  uint32_t trap_mask);
+int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+					     uint32_t trap_override,
+					     uint32_t trap_mask_bits,
+					     uint32_t trap_mask_request,
+					     uint32_t *trap_mask_prev,
+					     uint32_t *trap_mask_supported);
 void kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
