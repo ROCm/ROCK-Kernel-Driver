@@ -708,32 +708,7 @@ static void set_vm_context_page_table_base(struct amdgpu_device *adev,
 	adev->gfxhub.funcs->setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
-static void program_trap_handler_settings(struct amdgpu_device *adev,
-		uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr)
-{
-	lock_srbm(adev, 0, 0, 0, vmid);
-
-	/*
-	 * Program TBA registers
-	 */
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_LO),
-			lower_32_bits(tba_addr >> 8));
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_HI),
-			upper_32_bits(tba_addr >> 8) |
-			(1 << SQ_SHADER_TBA_HI__TRAP_EN__SHIFT));
-
-	/*
-	 * Program TMA registers
-	 */
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_LO),
-			lower_32_bits(tma_addr >> 8));
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_HI),
-			upper_32_bits(tma_addr >> 8));
-
-	unlock_srbm(adev);
-}
-
-uint32_t kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
+void kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
 				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
@@ -760,22 +735,18 @@ uint32_t kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
-
-	return 0;
 }
 
-uint32_t kgd_gfx_v10_disable_debug_trap(struct amdgpu_device *adev)
+void kgd_gfx_v10_disable_debug_trap(struct amdgpu_device *adev)
 {
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
-
-	return 0;
 }
 
-uint32_t kgd_gfx_v10_set_wave_launch_trap_override(struct amdgpu_device *adev,
+void kgd_gfx_v10_set_wave_launch_trap_override(struct amdgpu_device *adev,
 						uint32_t trap_override,
 						uint32_t trap_mask)
 {
@@ -799,11 +770,9 @@ uint32_t kgd_gfx_v10_set_wave_launch_trap_override(struct amdgpu_device *adev,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
-
-	return 0;
 }
 
-uint32_t kgd_gfx_v10_set_wave_launch_mode(struct amdgpu_device *adev,
+void kgd_gfx_v10_set_wave_launch_mode(struct amdgpu_device *adev,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
@@ -830,8 +799,6 @@ uint32_t kgd_gfx_v10_set_wave_launch_mode(struct amdgpu_device *adev,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
-
-	return 0;
 }
 
 /* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
@@ -866,6 +833,31 @@ void kgd_gfx_v10_build_grace_period_packet_info(struct amdgpu_device *adev,
 			grace_period);
 
 	*reg_offset = mmCP_IQ_WAIT_TIME2;
+}
+
+static void program_trap_handler_settings(struct amdgpu_device *adev,
+		uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr)
+{
+	lock_srbm(adev, 0, 0, 0, vmid);
+
+	/*
+	 * Program TBA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_LO),
+			lower_32_bits(tba_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_HI),
+			upper_32_bits(tba_addr >> 8) |
+			(1 << SQ_SHADER_TBA_HI__TRAP_EN__SHIFT));
+
+	/*
+	 * Program TMA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_LO),
+			lower_32_bits(tma_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_HI),
+			upper_32_bits(tma_addr >> 8));
+
+	unlock_srbm(adev);
 }
 
 const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
