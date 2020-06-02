@@ -301,14 +301,14 @@ struct kfd2kgd_calls {
 			uint32_t vmid, uint64_t page_table_base);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 
-	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
+	void (*enable_debug_trap)(struct kgd_dev *kgd,
 					uint32_t trap_debug_wave_launch_mode,
 					uint32_t vmid);
-	uint32_t (*disable_debug_trap)(struct kgd_dev *kgd);
-	uint32_t (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
+	void (*disable_debug_trap)(struct kgd_dev *kgd);
+	void (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
 						uint32_t trap_override,
 						uint32_t trap_mask);
-	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
+	void (*set_wave_launch_mode)(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
 	void (*set_address_watch)(struct kgd_dev *kgd,
