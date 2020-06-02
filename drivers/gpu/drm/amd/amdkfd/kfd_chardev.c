@@ -2801,21 +2801,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
-		if (data2 != 0) {
-			/* On current hardware, we only support a trap
-			 * mask value of 0.  This is because the debug
-			 * trap mask is global and shared by all processes
-			 * on current hardware.
-			 */
-			pr_err("Invalid trap override option: %i\n",
-					data2);
-			r = -EINVAL;
-			goto unlock_out;
-		}
-		dev->kfd2kgd->set_wave_launch_trap_override(
+		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
 				data1,
-				data2);
+				data2,
+				data3,
+				&args->data2,
+				&args->data3);
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:

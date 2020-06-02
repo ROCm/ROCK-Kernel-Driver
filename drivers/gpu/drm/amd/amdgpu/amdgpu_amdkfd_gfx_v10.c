@@ -31,6 +31,7 @@
 #include "v10_structs.h"
 #include "nv.h"
 #include "nvd.h"
+#include <uapi/linux/kfd_ioctl.h>
 
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
@@ -794,12 +795,28 @@ void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd)
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
 
-void kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
-						uint32_t trap_override,
-						uint32_t trap_mask)
+int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
+					      uint32_t trap_override,
+					      uint32_t trap_mask_bits,
+					      uint32_t trap_mask_request,
+					      uint32_t *trap_mask_prev,
+					      uint32_t *trap_mask_supported)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
+
+	/* The SPI_GDBG_TRAP_MASK register is global and affects all
+	 * processes. Only allow OR-ing the address-watch bit, since
+	 * this only affects processes under the debugger. Other bits
+	 * should stay 0 to avoid the debugger interfering with other
+	 * processes.
+	 */
+	if (trap_override != KFD_DBG_TRAP_OVERRIDE_OR)
+		return -EPERM;
+
+	*trap_mask_supported = KFD_DBG_TRAP_MASK_DBG_ADDRESS_WATCH;
+	if (trap_mask_request & ~*trap_mask_supported)
+		return -EACCES;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
@@ -807,9 +824,13 @@ void kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
-	data = 0;
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
+	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
+
+	trap_mask_bits = (trap_mask_bits & trap_mask_request) |
+		(*trap_mask_prev & ~trap_mask_request);
 	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
-			EXCP_EN, trap_mask);
+			EXCP_EN, trap_mask_bits);
 	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
 			REPLACE, trap_override);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
@@ -819,6 +840,8 @@ void kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
 void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,

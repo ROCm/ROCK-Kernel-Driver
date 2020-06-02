@@ -50,9 +50,10 @@
  * 2.0 - Return number of queues suspended/resumed and mask invalid/error
  *	 array slots
  * 2.1 - Add Set Address Watch, and Clear Address Watch support.
+ * 3.0 - Overhaul set wave launch override API
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	2
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MAJOR_VERSION	3
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -242,6 +243,22 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 #define KFD_INVALID_QUEUEID	0xffffffff
 
+enum kfd_dbg_trap_override_mode {
+	KFD_DBG_TRAP_OVERRIDE_OR = 0,
+	KFD_DBG_TRAP_OVERRIDE_REPLACE = 1
+};
+enum kfd_dbg_trap_mask {
+	KFD_DBG_TRAP_MASK_FP_INVALID = 1,
+	KFD_DBG_TRAP_MASK_FP_INPUT_DENORMAL = 2,
+	KFD_DBG_TRAP_MASK_FP_DIVIDE_BY_ZERO = 4,
+	KFD_DBG_TRAP_MASK_FP_OVERFLOW = 8,
+	KFD_DBG_TRAP_MASK_FP_UNDERFLOW = 16,
+	KFD_DBG_TRAP_MASK_FP_INEXACT = 32,
+	KFD_DBG_TRAP_MASK_INT_DIVIDE_BY_ZERO = 64,
+	KFD_DBG_TRAP_MASK_DBG_ADDRESS_WATCH = 128,
+	KFD_DBG_TRAP_MASK_DBG_MEMORY_VIOLATION = 256
+};
+
 /* KFD_IOC_DBG_TRAP_ENABLE:
  * ptr:   unused
  * data1: 0=disable, 1=enable
@@ -252,9 +269,17 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 /* KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
  * ptr:   unused
- * data1: override mode: 0=OR, 1=REPLACE
- * data2: mask
- * data3: unused
+ * data1: override mode (see enum kfd_dbg_trap_override_mode)
+ * data2: [in/out] trap mask (see enum kfd_dbg_trap_mask)
+ * data3: [in] requested mask, [out] supported mask
+ *
+ * May fail with -EPERM if the requested mode is not supported.
+ *
+ * May fail with -EACCES if requested trap mask bits are not supported.
+ * In that case the supported trap mask bits are returned in data3.
+ *
+ * If successful, output parameters return the previous trap mask
+ * value and the hardware-dependent mask of supported trap mask bits.
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE 1
 
