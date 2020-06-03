@@ -21,7 +21,7 @@
 */
 
 #include <linux/rbtree.h>
-#if defined(HAVE_INTERVAL_TREE_DEFINE)
+#if defined(HAVE_LINUX_INTERVAL_TREE_GENERIC_H)
 #include <linux/interval_tree_generic.h>
 #else
 
