@@ -2371,13 +2371,6 @@ static int validate_functions(struct objtool_file *file)
 	struct insn_state state;
 	int ret, warnings = 0;
 
-	clear_insn_state(&state);
-
-	state.cfa = initial_func_cfi.cfa;
-	memcpy(&state.regs, &initial_func_cfi.regs,
-	       CFI_NUM_REGS * sizeof(struct cfi_reg));
-	state.stack_size = initial_func_cfi.cfa.offset;
-
 	for_each_sec(file, sec) {
 		list_for_each_entry(func, &sec->symbol_list, list) {
 			if (func->type != STT_FUNC)
@@ -2395,6 +2388,12 @@ static int validate_functions(struct objtool_file *file)
 			insn = find_insn(file, sec, func->offset);
 			if (!insn || insn->ignore || insn->visited)
 				continue;
+
+			clear_insn_state(&state);
+			state.cfa = initial_func_cfi.cfa;
+			memcpy(&state.regs, &initial_func_cfi.regs,
+			       CFI_NUM_REGS * sizeof(struct cfi_reg));
+			state.stack_size = initial_func_cfi.cfa.offset;
 
 			state.uaccess = func->uaccess_safe;
 
