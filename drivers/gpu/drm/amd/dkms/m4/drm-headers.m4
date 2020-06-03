@@ -176,4 +176,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_AMDGPU_DRM_IOCTL_H
 	AC_AMDGPU_DRM_DEBUGFS_H
 	AC_KERNEL_CHECK_HEADERS([drm/amdgpu_pciid.h])
+	dnl # for rhel 7.x
+	AC_KERNEL_CHECK_HEADERS([drm/drm_backport.h])
 ])

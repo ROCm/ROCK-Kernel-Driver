@@ -308,6 +308,9 @@
 /* Define to 1 if you have the <drm/drmP.h> header file. */
 /* #undef HAVE_DRM_DRMP_H */
 
+/* Define to 1 if you have the <drm/drm_backport.h> header file. */
+/* #undef HAVE_DRM_DRM_BACKPORT_H */
+
 /* Define to 1 if you have the <drm/drm_drv.h> header file. */
 #define HAVE_DRM_DRM_DRV_H 1
 
