@@ -4,7 +4,7 @@
 
 #include <linux/compat.h>
 
-#if !defined(in_compat_syscall) && !defined(HAVE_IN_COMPAT_SYSCALL)
+#if !defined(HAVE_IN_COMPAT_SYSCALL)
 #ifdef CONFIG_COMPAT
 static inline bool in_compat_syscall(void) { return is_compat_task(); }
 #else
