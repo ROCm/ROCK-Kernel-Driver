@@ -462,6 +462,10 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
+/* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
+   available */
+#define HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE 1
+
 /* drm_send_event_locked() function is available */
 #define HAVE_DRM_SEND_EVENT_LOCKED 1
 
