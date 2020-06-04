@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_suspend.h>
 #include "kcl_common.h"
 

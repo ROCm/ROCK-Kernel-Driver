@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DMA_MAPPING_H
 #define AMDKCL_DMA_MAPPING_H
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_IO_H
 #define AMDKCL_IO_H
 #include <linux/version.h>

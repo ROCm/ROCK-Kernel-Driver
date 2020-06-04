@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /*
   Interval Trees
   (C) 2012  Michel Lespinasse <walken@google.com>

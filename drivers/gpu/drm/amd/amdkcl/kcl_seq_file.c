@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_seq_file.h>
 
 #ifndef HAVE_SEQ_HEX_DUMP

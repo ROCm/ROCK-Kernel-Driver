@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_NOSPEC_H
 #define AMDKCL_NOSPEC_H
 

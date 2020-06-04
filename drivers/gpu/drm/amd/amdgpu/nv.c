@@ -41,6 +41,7 @@
 #include "hdp/hdp_5_0_0_offset.h"
 #include "hdp/hdp_5_0_0_sh_mask.h"
 #include "smuio/smuio_11_0_0_offset.h"
+#include "mp/mp_11_0_offset.h"
 
 #include "soc15.h"
 #include "soc15_common.h"
@@ -52,6 +53,7 @@
 #include "navi10_ih.h"
 #include "gfx_v10_0.h"
 #include "sdma_v5_0.h"
+#include "sdma_v5_2.h"
 #include "vcn_v2_0.h"
 #include "jpeg_v2_0.h"
 #include "dce_virtual.h"
@@ -188,10 +190,8 @@ static struct soc15_allowed_register_entry nv_allowed_read_registers[] = {
 	{ SOC15_REG_ENTRY(GC, 0, mmGRBM_STATUS_SE1)},
 	{ SOC15_REG_ENTRY(GC, 0, mmGRBM_STATUS_SE2)},
 	{ SOC15_REG_ENTRY(GC, 0, mmGRBM_STATUS_SE3)},
-#if 0	/* TODO: will set it when SDMA header is available */
 	{ SOC15_REG_ENTRY(SDMA0, 0, mmSDMA0_STATUS_REG)},
 	{ SOC15_REG_ENTRY(SDMA1, 0, mmSDMA1_STATUS_REG)},
-#endif
 	{ SOC15_REG_ENTRY(GC, 0, mmCP_STAT)},
 	{ SOC15_REG_ENTRY(GC, 0, mmCP_STALLED_STAT1)},
 	{ SOC15_REG_ENTRY(GC, 0, mmCP_STALLED_STAT2)},
@@ -256,31 +256,6 @@ static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
 	return -EINVAL;
 }
 
-#if 0
-static void nv_gpu_pci_config_reset(struct amdgpu_device *adev)
-{
-	u32 i;
-
-	dev_info(adev->dev, "GPU pci config reset\n");
-
-	/* disable BM */
-	pci_clear_master(adev->pdev);
-	/* reset */
-	amdgpu_pci_config_reset(adev);
-
-	udelay(100);
-
-	/* wait for asic to come out of reset */
-	for (i = 0; i < adev->usec_timeout; i++) {
-		u32 memsize = nbio_v2_3_get_memsize(adev);
-		if (memsize != 0xffffffff)
-			break;
-		udelay(1);
-	}
-
-}
-#endif
-
 static int nv_asic_mode1_reset(struct amdgpu_device *adev)
 {
 	u32 i;
@@ -338,15 +313,6 @@ nv_asic_reset_method(struct amdgpu_device *adev)
 
 static int nv_asic_reset(struct amdgpu_device *adev)
 {
-
-	/* FIXME: it doesn't work since vega10 */
-#if 0
-	amdgpu_atombios_scratch_regs_engine_hung(adev, true);
-
-	nv_gpu_pci_config_reset(adev);
-
-	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
-#endif
 	int ret = 0;
 	struct smu_context *smu = &adev->smu;
 
@@ -442,6 +408,9 @@ legacy_init:
 	case CHIP_NAVI12:
 		navi12_reg_base_init(adev);
 		break;
+	case CHIP_SIENNA_CICHLID:
+		sienna_cichlid_reg_base_init(adev);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -515,6 +484,18 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 		if (!amdgpu_sriov_vf(adev))
 			amdgpu_device_ip_block_add(adev, &jpeg_v2_0_ip_block);
 		break;
+	case CHIP_SIENNA_CICHLID:
+		amdgpu_device_ip_block_add(adev, &nv_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &navi10_ih_ip_block);
+		if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP &&
+		    is_support_sw_smu(adev))
+			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_device_ip_block_add(adev, &dce_virtual_ip_block);
+		amdgpu_device_ip_block_add(adev, &gfx_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v5_2_ip_block);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -550,7 +531,6 @@ static bool nv_need_full_reset(struct amdgpu_device *adev)
 
 static bool nv_need_reset_on_init(struct amdgpu_device *adev)
 {
-#if 0
 	u32 sol_reg;
 
 	if (adev->flags & AMD_IS_APU)
@@ -562,8 +542,7 @@ static bool nv_need_reset_on_init(struct amdgpu_device *adev)
 	sol_reg = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_81);
 	if (sol_reg)
 		return true;
-#endif
-	/* TODO: re-enable it when mode1 reset is functional */
+
 	return false;
 }
 
@@ -594,6 +573,8 @@ static void nv_init_doorbell_index(struct amdgpu_device *adev)
 	adev->doorbell_index.gfx_ring1 = AMDGPU_NAVI10_DOORBELL_GFX_RING1;
 	adev->doorbell_index.sdma_engine[0] = AMDGPU_NAVI10_DOORBELL_sDMA_ENGINE0;
 	adev->doorbell_index.sdma_engine[1] = AMDGPU_NAVI10_DOORBELL_sDMA_ENGINE1;
+	adev->doorbell_index.sdma_engine[2] = AMDGPU_NAVI10_DOORBELL_sDMA_ENGINE2;
+	adev->doorbell_index.sdma_engine[3] = AMDGPU_NAVI10_DOORBELL_sDMA_ENGINE3;
 	adev->doorbell_index.ih = AMDGPU_NAVI10_DOORBELL_IH;
 	adev->doorbell_index.vcn.vcn_ring0_1 = AMDGPU_NAVI10_DOORBELL64_VCN0_1;
 	adev->doorbell_index.vcn.vcn_ring2_3 = AMDGPU_NAVI10_DOORBELL64_VCN2_3;
@@ -722,6 +703,11 @@ static int nv_common_early_init(void *handle)
 		if (amdgpu_sriov_vf(adev))
 			adev->rev_id = 0;
 		adev->external_rev_id = adev->rev_id + 0xa;
+		break;
+	case CHIP_SIENNA_CICHLID:
+		adev->cg_flags = 0;
+		adev->pg_flags = 0;
+		adev->external_rev_id = adev->rev_id + 0x28;
 		break;
 	default:
 		/* FIXME: not supported yet */
@@ -938,6 +924,7 @@ static int nv_common_set_clockgating_state(void *handle,
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
+	case CHIP_SIENNA_CICHLID:
 		adev->nbio.funcs->update_medium_grain_clock_gating(adev,
 				state == AMD_CG_STATE_GATE);
 		adev->nbio.funcs->update_medium_grain_light_sleep(adev,

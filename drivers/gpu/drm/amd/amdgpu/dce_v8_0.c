@@ -2433,7 +2433,24 @@ static void dce_v8_0_cursor_reset(struct drm_crtc *crtc)
 	}
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS)
+static int dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size,
+				   struct drm_modeset_acquire_ctx *ctx)
+{
+	dce_v8_0_crtc_load_lut(crtc);
+
+	return 0;
+}
+#elif defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS)
+static int dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size)
+{
+	dce_v8_0_crtc_load_lut(crtc);
+
+	return 0;
+}
+#else
 static void dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				    u16 *blue, uint32_t start, uint32_t size)
 {
@@ -2447,20 +2464,6 @@ static void dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
 	}
 	dce_v8_0_crtc_load_lut(crtc);
-}
-#else
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-static int dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
-				   u16 *blue, uint32_t size,
-				   struct drm_modeset_acquire_ctx *ctx)
-#else
-static int dce_v8_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
-				   u16 *blue, uint32_t size)
-#endif
-{
-	dce_v8_0_crtc_load_lut(crtc);
-
-	return 0;
 }
 #endif
 

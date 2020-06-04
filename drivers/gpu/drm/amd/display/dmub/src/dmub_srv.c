@@ -26,7 +26,7 @@
 #include "../dmub_srv.h"
 #include "dmub_dcn20.h"
 #include "dmub_dcn21.h"
-#include "dmub_fw_meta.h"
+#include "dmub_cmd.h"
 #include "os_types.h"
 /*
  * Note: the DMUB service is standalone. No additional headers should be
@@ -47,10 +47,10 @@
 #define DMUB_MAILBOX_SIZE (DMUB_RB_SIZE)
 
 /* Default state size if meta is absent. */
-#define DMUB_FW_STATE_SIZE (1024)
+#define DMUB_FW_STATE_SIZE (64 * 1024)
 
 /* Default tracebuffer size if meta is absent. */
-#define DMUB_TRACE_BUFFER_SIZE (1024)
+#define DMUB_TRACE_BUFFER_SIZE (64 * 1024)
 
 /* Default scratch mem size. */
 #define DMUB_SCRATCH_MEM_SIZE (256)

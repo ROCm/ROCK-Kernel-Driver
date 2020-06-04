@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_CACHE_H
 #define AMDKCL_DRM_CACHE_H
 #include <linux/types.h>

@@ -4,9 +4,6 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
-/* crtc->funcs->set_crc_source() wants 2 args */
-#define HAVE_2ARGS_SET_CRC_SOURCE 1
-
 /* get_user_pages() wants 5 args */
 #define HAVE_5ARGS_GET_USER_PAGES 1
 
@@ -35,7 +32,7 @@
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
-#define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
+/* #undef HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
 
 /* asm/fpu/api.h is available */
 #define HAVE_ASM_FPU_API_H 1
@@ -115,6 +112,9 @@
 
 /* drm_atomic_helper_duplicate_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
+
+/* drm_atomic_helper_legacy_gamma_set() is available */
+#define HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET 1
 
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
@@ -196,6 +196,9 @@
 
 /* drm_connector_list_iter_begin() is available */
 #define HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN 1
+
+/* connector property "max bpc" is available */
+#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
 
 /* drm_connector_put() is available */
 #define HAVE_DRM_CONNECTOR_PUT 1
@@ -483,6 +486,9 @@
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
 
+/* Variable refresh rate(vrr) is supported */
+#define HAVE_DRM_VRR_SUPPORTED 1
+
 /* drm_mode_object->free_cb is available */
 /* #undef HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT */
 
@@ -717,8 +723,26 @@
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
 
+/* drm_crtc_funcs->enable_vblank() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
+
+/* crtc->funcs->gamma_set() wants 5 args */
+/* #undef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS */
+
+/* crtc->funcs->gamma_set() wants 6 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS 1
+
 /* struct drm_crtc_funcs->get_vblank_timestamp() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP 1
+
+/* drm_crtc_funcs->{get,verify}_crc_sources() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
+
+/* crtc->funcs->set_crc_source() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
+
+/* crtc->funcs->set_crc_source() wants 2 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS 1
 
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1

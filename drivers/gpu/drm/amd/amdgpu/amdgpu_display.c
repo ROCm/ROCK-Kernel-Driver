@@ -810,7 +810,8 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 			break;
 		case CHIP_RAVEN:
 			/* enable S/G on PCO and RV2 */
-			if (adev->rev_id >= 0x8 || adev->pdev->device == 0x15d8)
+			if ((adev->apu_flags & AMD_APU_IS_RAVEN2) ||
+			    (adev->apu_flags & AMD_APU_IS_PICASSO))
 				domain |= AMDGPU_GEM_DOMAIN_GTT;
 			break;
 		default:
@@ -970,7 +971,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 					 amdgpu_dither_enum_list, sz);
 
 	if (amdgpu_device_has_dc_support(adev)) {
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		adev->mode_info.max_bpc_property =
 			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)
@@ -991,7 +992,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 						 "freesync_capable");
 		if (!adev->mode_info.freesync_capable_property)
 			return -ENOMEM;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_VRR_SUPPORTED
 		adev->mode_info.vrr_capable_property =
 			drm_property_create_bool(adev->ddev,
 						 DRM_MODE_PROP_IMMUTABLE,

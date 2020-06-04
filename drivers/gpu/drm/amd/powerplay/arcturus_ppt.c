@@ -48,8 +48,8 @@
 #define CTF_OFFSET_HOTSPOT		5
 #define CTF_OFFSET_HBM			5
 
-#define MSG_MAP(msg, index) \
-	[SMU_MSG_##msg] = {1, (index)}
+#define MSG_MAP(msg, index, valid_in_vf) \
+	[SMU_MSG_##msg] = {1, (index), (valid_in_vf)}
 #define ARCTURUS_FEA_MAP(smu_feature, arcturus_feature) \
 	[smu_feature] = {1, (arcturus_feature)}
 
@@ -70,65 +70,67 @@
 /* possible frequency drift (1Mhz) */
 #define EPSILON				1
 
-static struct smu_11_0_cmn2aisc_mapping arcturus_message_map[SMU_MSG_MAX_COUNT] = {
-	MSG_MAP(TestMessage,			     PPSMC_MSG_TestMessage),
-	MSG_MAP(GetSmuVersion,			     PPSMC_MSG_GetSmuVersion),
-	MSG_MAP(GetDriverIfVersion,		     PPSMC_MSG_GetDriverIfVersion),
-	MSG_MAP(SetAllowedFeaturesMaskLow,	     PPSMC_MSG_SetAllowedFeaturesMaskLow),
-	MSG_MAP(SetAllowedFeaturesMaskHigh,	     PPSMC_MSG_SetAllowedFeaturesMaskHigh),
-	MSG_MAP(EnableAllSmuFeatures,		     PPSMC_MSG_EnableAllSmuFeatures),
-	MSG_MAP(DisableAllSmuFeatures,		     PPSMC_MSG_DisableAllSmuFeatures),
-	MSG_MAP(EnableSmuFeaturesLow,		     PPSMC_MSG_EnableSmuFeaturesLow),
-	MSG_MAP(EnableSmuFeaturesHigh,		     PPSMC_MSG_EnableSmuFeaturesHigh),
-	MSG_MAP(DisableSmuFeaturesLow,		     PPSMC_MSG_DisableSmuFeaturesLow),
-	MSG_MAP(DisableSmuFeaturesHigh,		     PPSMC_MSG_DisableSmuFeaturesHigh),
-	MSG_MAP(GetEnabledSmuFeaturesLow,	     PPSMC_MSG_GetEnabledSmuFeaturesLow),
-	MSG_MAP(GetEnabledSmuFeaturesHigh,	     PPSMC_MSG_GetEnabledSmuFeaturesHigh),
-	MSG_MAP(SetDriverDramAddrHigh,		     PPSMC_MSG_SetDriverDramAddrHigh),
-	MSG_MAP(SetDriverDramAddrLow,		     PPSMC_MSG_SetDriverDramAddrLow),
-	MSG_MAP(SetToolsDramAddrHigh,		     PPSMC_MSG_SetToolsDramAddrHigh),
-	MSG_MAP(SetToolsDramAddrLow,		     PPSMC_MSG_SetToolsDramAddrLow),
-	MSG_MAP(TransferTableSmu2Dram,		     PPSMC_MSG_TransferTableSmu2Dram),
-	MSG_MAP(TransferTableDram2Smu,		     PPSMC_MSG_TransferTableDram2Smu),
-	MSG_MAP(UseDefaultPPTable,		     PPSMC_MSG_UseDefaultPPTable),
-	MSG_MAP(UseBackupPPTable,		     PPSMC_MSG_UseBackupPPTable),
-	MSG_MAP(SetSystemVirtualDramAddrHigh,	     PPSMC_MSG_SetSystemVirtualDramAddrHigh),
-	MSG_MAP(SetSystemVirtualDramAddrLow,	     PPSMC_MSG_SetSystemVirtualDramAddrLow),
-	MSG_MAP(EnterBaco,			     PPSMC_MSG_EnterBaco),
-	MSG_MAP(ExitBaco,			     PPSMC_MSG_ExitBaco),
-	MSG_MAP(ArmD3,				     PPSMC_MSG_ArmD3),
-	MSG_MAP(SetSoftMinByFreq,		     PPSMC_MSG_SetSoftMinByFreq),
-	MSG_MAP(SetSoftMaxByFreq,		     PPSMC_MSG_SetSoftMaxByFreq),
-	MSG_MAP(SetHardMinByFreq,		     PPSMC_MSG_SetHardMinByFreq),
-	MSG_MAP(SetHardMaxByFreq,		     PPSMC_MSG_SetHardMaxByFreq),
-	MSG_MAP(GetMinDpmFreq,			     PPSMC_MSG_GetMinDpmFreq),
-	MSG_MAP(GetMaxDpmFreq,			     PPSMC_MSG_GetMaxDpmFreq),
-	MSG_MAP(GetDpmFreqByIndex,		     PPSMC_MSG_GetDpmFreqByIndex),
-	MSG_MAP(SetWorkloadMask,		     PPSMC_MSG_SetWorkloadMask),
-	MSG_MAP(SetDfSwitchType,		     PPSMC_MSG_SetDfSwitchType),
-	MSG_MAP(GetVoltageByDpm,		     PPSMC_MSG_GetVoltageByDpm),
-	MSG_MAP(GetVoltageByDpmOverdrive,	     PPSMC_MSG_GetVoltageByDpmOverdrive),
-	MSG_MAP(SetPptLimit,			     PPSMC_MSG_SetPptLimit),
-	MSG_MAP(GetPptLimit,			     PPSMC_MSG_GetPptLimit),
-	MSG_MAP(PowerUpVcn0,			     PPSMC_MSG_PowerUpVcn0),
-	MSG_MAP(PowerDownVcn0,			     PPSMC_MSG_PowerDownVcn0),
-	MSG_MAP(PowerUpVcn1,			     PPSMC_MSG_PowerUpVcn1),
-	MSG_MAP(PowerDownVcn1,			     PPSMC_MSG_PowerDownVcn1),
-	MSG_MAP(PrepareMp1ForUnload,		     PPSMC_MSG_PrepareMp1ForUnload),
-	MSG_MAP(PrepareMp1ForReset,		     PPSMC_MSG_PrepareMp1ForReset),
-	MSG_MAP(PrepareMp1ForShutdown,		     PPSMC_MSG_PrepareMp1ForShutdown),
-	MSG_MAP(SoftReset,			     PPSMC_MSG_SoftReset),
-	MSG_MAP(RunAfllBtc,			     PPSMC_MSG_RunAfllBtc),
-	MSG_MAP(RunDcBtc,			     PPSMC_MSG_RunDcBtc),
-	MSG_MAP(DramLogSetDramAddrHigh,		     PPSMC_MSG_DramLogSetDramAddrHigh),
-	MSG_MAP(DramLogSetDramAddrLow,		     PPSMC_MSG_DramLogSetDramAddrLow),
-	MSG_MAP(DramLogSetDramSize,		     PPSMC_MSG_DramLogSetDramSize),
-	MSG_MAP(GetDebugData,			     PPSMC_MSG_GetDebugData),
-	MSG_MAP(WaflTest,			     PPSMC_MSG_WaflTest),
-	MSG_MAP(SetXgmiMode,			     PPSMC_MSG_SetXgmiMode),
-	MSG_MAP(SetMemoryChannelEnable,		     PPSMC_MSG_SetMemoryChannelEnable),
-	MSG_MAP(DFCstateControl,		     PPSMC_MSG_DFCstateControl),
-	MSG_MAP(GmiPwrDnControl,		     PPSMC_MSG_GmiPwrDnControl),
+static struct smu_11_0_msg_mapping arcturus_message_map[SMU_MSG_MAX_COUNT] = {
+	MSG_MAP(TestMessage,			     PPSMC_MSG_TestMessage,			0),
+	MSG_MAP(GetSmuVersion,			     PPSMC_MSG_GetSmuVersion,			1),
+	MSG_MAP(GetDriverIfVersion,		     PPSMC_MSG_GetDriverIfVersion,		1),
+	MSG_MAP(SetAllowedFeaturesMaskLow,	     PPSMC_MSG_SetAllowedFeaturesMaskLow,	0),
+	MSG_MAP(SetAllowedFeaturesMaskHigh,	     PPSMC_MSG_SetAllowedFeaturesMaskHigh,	0),
+	MSG_MAP(EnableAllSmuFeatures,		     PPSMC_MSG_EnableAllSmuFeatures,		0),
+	MSG_MAP(DisableAllSmuFeatures,		     PPSMC_MSG_DisableAllSmuFeatures,		0),
+	MSG_MAP(EnableSmuFeaturesLow,		     PPSMC_MSG_EnableSmuFeaturesLow,		1),
+	MSG_MAP(EnableSmuFeaturesHigh,		     PPSMC_MSG_EnableSmuFeaturesHigh,		1),
+	MSG_MAP(DisableSmuFeaturesLow,		     PPSMC_MSG_DisableSmuFeaturesLow,		0),
+	MSG_MAP(DisableSmuFeaturesHigh,		     PPSMC_MSG_DisableSmuFeaturesHigh,		0),
+	MSG_MAP(GetEnabledSmuFeaturesLow,	     PPSMC_MSG_GetEnabledSmuFeaturesLow,	0),
+	MSG_MAP(GetEnabledSmuFeaturesHigh,	     PPSMC_MSG_GetEnabledSmuFeaturesHigh,	0),
+	MSG_MAP(SetDriverDramAddrHigh,		     PPSMC_MSG_SetDriverDramAddrHigh,		1),
+	MSG_MAP(SetDriverDramAddrLow,		     PPSMC_MSG_SetDriverDramAddrLow,		1),
+	MSG_MAP(SetToolsDramAddrHigh,		     PPSMC_MSG_SetToolsDramAddrHigh,		0),
+	MSG_MAP(SetToolsDramAddrLow,		     PPSMC_MSG_SetToolsDramAddrLow,		0),
+	MSG_MAP(TransferTableSmu2Dram,		     PPSMC_MSG_TransferTableSmu2Dram,		1),
+	MSG_MAP(TransferTableDram2Smu,		     PPSMC_MSG_TransferTableDram2Smu,		0),
+	MSG_MAP(UseDefaultPPTable,		     PPSMC_MSG_UseDefaultPPTable,		0),
+	MSG_MAP(UseBackupPPTable,		     PPSMC_MSG_UseBackupPPTable,		0),
+	MSG_MAP(SetSystemVirtualDramAddrHigh,	     PPSMC_MSG_SetSystemVirtualDramAddrHigh,	0),
+	MSG_MAP(SetSystemVirtualDramAddrLow,	     PPSMC_MSG_SetSystemVirtualDramAddrLow,	0),
+	MSG_MAP(EnterBaco,			     PPSMC_MSG_EnterBaco,			0),
+	MSG_MAP(ExitBaco,			     PPSMC_MSG_ExitBaco,			0),
+	MSG_MAP(ArmD3,				     PPSMC_MSG_ArmD3,				0),
+	MSG_MAP(SetSoftMinByFreq,		     PPSMC_MSG_SetSoftMinByFreq,		0),
+	MSG_MAP(SetSoftMaxByFreq,		     PPSMC_MSG_SetSoftMaxByFreq,		0),
+	MSG_MAP(SetHardMinByFreq,		     PPSMC_MSG_SetHardMinByFreq,		0),
+	MSG_MAP(SetHardMaxByFreq,		     PPSMC_MSG_SetHardMaxByFreq,		0),
+	MSG_MAP(GetMinDpmFreq,			     PPSMC_MSG_GetMinDpmFreq,			0),
+	MSG_MAP(GetMaxDpmFreq,			     PPSMC_MSG_GetMaxDpmFreq,			0),
+	MSG_MAP(GetDpmFreqByIndex,		     PPSMC_MSG_GetDpmFreqByIndex,		1),
+	MSG_MAP(SetWorkloadMask,		     PPSMC_MSG_SetWorkloadMask,			1),
+	MSG_MAP(SetDfSwitchType,		     PPSMC_MSG_SetDfSwitchType,			0),
+	MSG_MAP(GetVoltageByDpm,		     PPSMC_MSG_GetVoltageByDpm,			0),
+	MSG_MAP(GetVoltageByDpmOverdrive,	     PPSMC_MSG_GetVoltageByDpmOverdrive,	0),
+	MSG_MAP(SetPptLimit,			     PPSMC_MSG_SetPptLimit,			0),
+	MSG_MAP(GetPptLimit,			     PPSMC_MSG_GetPptLimit,			1),
+	MSG_MAP(PowerUpVcn0,			     PPSMC_MSG_PowerUpVcn0,			0),
+	MSG_MAP(PowerDownVcn0,			     PPSMC_MSG_PowerDownVcn0,			0),
+	MSG_MAP(PowerUpVcn1,			     PPSMC_MSG_PowerUpVcn1,			0),
+	MSG_MAP(PowerDownVcn1,			     PPSMC_MSG_PowerDownVcn1,			0),
+	MSG_MAP(PrepareMp1ForUnload,		     PPSMC_MSG_PrepareMp1ForUnload,		0),
+	MSG_MAP(PrepareMp1ForReset,		     PPSMC_MSG_PrepareMp1ForReset,		0),
+	MSG_MAP(PrepareMp1ForShutdown,		     PPSMC_MSG_PrepareMp1ForShutdown,		0),
+	MSG_MAP(SoftReset,			     PPSMC_MSG_SoftReset,			0),
+	MSG_MAP(RunAfllBtc,			     PPSMC_MSG_RunAfllBtc,			0),
+	MSG_MAP(RunDcBtc,			     PPSMC_MSG_RunDcBtc,			0),
+	MSG_MAP(DramLogSetDramAddrHigh,		     PPSMC_MSG_DramLogSetDramAddrHigh,		0),
+	MSG_MAP(DramLogSetDramAddrLow,		     PPSMC_MSG_DramLogSetDramAddrLow,		0),
+	MSG_MAP(DramLogSetDramSize,		     PPSMC_MSG_DramLogSetDramSize,		0),
+	MSG_MAP(GetDebugData,			     PPSMC_MSG_GetDebugData,			0),
+	MSG_MAP(WaflTest,			     PPSMC_MSG_WaflTest,			0),
+	MSG_MAP(SetXgmiMode,			     PPSMC_MSG_SetXgmiMode,			0),
+	MSG_MAP(SetMemoryChannelEnable,		     PPSMC_MSG_SetMemoryChannelEnable,		0),
+	MSG_MAP(DFCstateControl,		     PPSMC_MSG_DFCstateControl,			0),
+	MSG_MAP(GmiPwrDnControl,		     PPSMC_MSG_GmiPwrDnControl,			0),
+	MSG_MAP(ReadSerialNumTop32,		     PPSMC_MSG_ReadSerialNumTop32,		1),
+	MSG_MAP(ReadSerialNumBottom32,		     PPSMC_MSG_ReadSerialNumBottom32,		1),
 };
 
 static struct smu_11_0_cmn2aisc_mapping arcturus_clk_map[SMU_CLK_COUNT] = {
@@ -199,7 +201,7 @@ static struct smu_11_0_cmn2aisc_mapping arcturus_workload_map[PP_SMC_POWER_PROFI
 
 static int arcturus_get_smu_msg_index(struct smu_context *smc, uint32_t index)
 {
-	struct smu_11_0_cmn2aisc_mapping mapping;
+	struct smu_11_0_msg_mapping mapping;
 
 	if (index >= SMU_MSG_MAX_COUNT)
 		return -EINVAL;
@@ -207,6 +209,9 @@ static int arcturus_get_smu_msg_index(struct smu_context *smc, uint32_t index)
 	mapping = arcturus_message_map[index];
 	if (!(mapping.valid_mapping))
 		return -EINVAL;
+
+	if (amdgpu_sriov_vf(smc->adev) && !mapping.valid_in_vf)
+		return -EACCES;
 
 	return mapping.map_to;
 }
@@ -382,11 +387,6 @@ arcturus_set_single_dpm_table(struct smu_context *smu,
 		return ret;
 	}
 
-	if (!num_of_levels) {
-		pr_err("[%s] number of clk levels is invalid!\n", __func__);
-		return -EINVAL;
-	}
-
 	single_dpm_table->count = num_of_levels;
 	for (i = 0; i < num_of_levels; i++) {
 		ret = smu_send_smc_msg_with_param(smu,
@@ -396,10 +396,6 @@ arcturus_set_single_dpm_table(struct smu_context *smu,
 		if (ret) {
 			pr_err("[%s] failed to get dpm freq by index!\n", __func__);
 			return ret;
-		}
-		if (!clk) {
-			pr_err("[%s] clk value is invalid!\n", __func__);
-			return -EINVAL;
 		}
 		single_dpm_table->dpm_levels[i].value = clk;
 		single_dpm_table->dpm_levels[i].enabled = true;
@@ -1341,7 +1337,6 @@ static int arcturus_get_power_limit(struct smu_context *smu,
 static int arcturus_get_power_profile_mode(struct smu_context *smu,
 					   char *buf)
 {
-	struct amdgpu_device *adev = smu->adev;
 	DpmActivityMonitorCoeffInt_t activity_monitor;
 	static const char *profile_name[] = {
 					"BOOTUP_DEFAULT",
@@ -1375,7 +1370,7 @@ static int arcturus_get_power_profile_mode(struct smu_context *smu,
 	if (result)
 		return result;
 
-	if (smu_version >= 0x360d00 && !amdgpu_sriov_vf(adev))
+	if (smu_version >= 0x360d00)
 		size += sprintf(buf + size, "%16s %s %s %s %s %s %s %s %s %s %s\n",
 			title[0], title[1], title[2], title[3], title[4], title[5],
 			title[6], title[7], title[8], title[9], title[10]);
@@ -1392,7 +1387,7 @@ static int arcturus_get_power_profile_mode(struct smu_context *smu,
 		if (workload_type < 0)
 			continue;
 
-		if (smu_version >= 0x360d00 && !amdgpu_sriov_vf(adev)) {
+		if (smu_version >= 0x360d00) {
 			result = smu_update_table(smu,
 						  SMU_TABLE_ACTIVITY_MONITOR_COEFF,
 						  workload_type,
@@ -1407,7 +1402,7 @@ static int arcturus_get_power_profile_mode(struct smu_context *smu,
 		size += sprintf(buf + size, "%2d %14s%s\n",
 			i, profile_name[i], (i == smu->power_profile_mode) ? "*" : " ");
 
-		if (smu_version >= 0x360d00 && !amdgpu_sriov_vf(adev)) {
+		if (smu_version >= 0x360d00) {
 			size += sprintf(buf + size, "%19s %d(%13s) %7d %7d %7d %7d %7d %7d %7d %7d %7d\n",
 				" ",
 				0,
@@ -2230,10 +2225,21 @@ static const struct i2c_algorithm arcturus_i2c_eeprom_i2c_algo = {
 	.functionality = arcturus_i2c_eeprom_i2c_func,
 };
 
+static bool arcturus_i2c_adapter_is_added(struct i2c_adapter *control)
+{
+	struct amdgpu_device *adev = to_amdgpu_device(control);
+
+	return control->dev.parent == &adev->pdev->dev;
+}
+
 static int arcturus_i2c_eeprom_control_init(struct i2c_adapter *control)
 {
 	struct amdgpu_device *adev = to_amdgpu_device(control);
 	int res;
+
+	/* smu_i2c_eeprom_init may be called twice in sriov */
+	if (arcturus_i2c_adapter_is_added(control))
+		return 0;
 
 	control->owner = THIS_MODULE;
 	control->class = I2C_CLASS_SPD;
@@ -2250,7 +2256,41 @@ static int arcturus_i2c_eeprom_control_init(struct i2c_adapter *control)
 
 static void arcturus_i2c_eeprom_control_fini(struct i2c_adapter *control)
 {
+	if (!arcturus_i2c_adapter_is_added(control))
+		return;
+
 	i2c_del_adapter(control);
+}
+
+static void arcturus_get_unique_id(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+	uint32_t top32, bottom32, smu_version, size;
+	char sn[16];
+	uint64_t id;
+
+	if (smu_get_smc_version(smu, NULL, &smu_version)) {
+		pr_warn("Failed to get smu version, cannot get unique_id or serial_number\n");
+		return;
+	}
+
+	/* PPSMC_MSG_ReadSerial* is supported by 54.23.0 and onwards */
+	if (smu_version < 0x361700) {
+		pr_warn("ReadSerial is only supported by PMFW 54.23.0 and onwards\n");
+		return;
+	}
+
+	/* Get the SN to turn into a Unique ID */
+	smu_send_smc_msg(smu, SMU_MSG_ReadSerialNumTop32, &top32);
+	smu_send_smc_msg(smu, SMU_MSG_ReadSerialNumBottom32, &bottom32);
+
+	id = ((uint64_t)bottom32 << 32) | top32;
+	adev->unique_id = id;
+	/* For Arcturus-and-later, unique_id == serial_number, so convert it to a
+	 * 16-digit HEX string for convenience and backwards-compatibility
+	 */
+	size = sprintf(sn, "%llx", id);
+	memcpy(adev->serial, &sn, size);
 }
 
 static bool arcturus_is_baco_supported(struct smu_context *smu)
@@ -2322,6 +2362,49 @@ static int arcturus_allow_xgmi_power_down(struct smu_context *smu, bool en)
 					   NULL);
 }
 
+static const struct throttling_logging_label {
+	uint32_t feature_mask;
+	const char *label;
+} logging_label[] = {
+	{(1U << THROTTLER_TEMP_HOTSPOT_BIT), "GPU"},
+	{(1U << THROTTLER_TEMP_MEM_BIT), "HBM"},
+	{(1U << THROTTLER_TEMP_VR_GFX_BIT), "VR of GFX rail"},
+	{(1U << THROTTLER_TEMP_VR_MEM_BIT), "VR of HBM rail"},
+	{(1U << THROTTLER_TEMP_VR_SOC_BIT), "VR of SOC rail"},
+	{(1U << THROTTLER_VRHOT0_BIT), "VR0 HOT"},
+	{(1U << THROTTLER_VRHOT1_BIT), "VR1 HOT"},
+};
+static void arcturus_log_thermal_throttling_event(struct smu_context *smu)
+{
+	int throttler_idx, throtting_events = 0, buf_idx = 0;
+	struct amdgpu_device *adev = smu->adev;
+	SmuMetrics_t metrics;
+	char log_buf[256];
+
+	arcturus_get_metrics_table(smu, &metrics);
+
+	memset(log_buf, 0, sizeof(log_buf));
+	for (throttler_idx = 0; throttler_idx < ARRAY_SIZE(logging_label);
+	     throttler_idx++) {
+		if (metrics.ThrottlerStatus & logging_label[throttler_idx].feature_mask) {
+			throtting_events++;
+			buf_idx += snprintf(log_buf + buf_idx,
+					    sizeof(log_buf) - buf_idx,
+					    "%s%s",
+					    throtting_events > 1 ? " and " : "",
+					    logging_label[throttler_idx].label);
+			if (buf_idx >= sizeof(log_buf)) {
+				pr_err("buffer overflow!\n");
+				log_buf[sizeof(log_buf) - 1] = '\0';
+				break;
+			}
+		}
+	}
+
+	dev_warn(adev->dev, "WARN: GPU thermal throttling temperature reached, expect performance decrease. %s.\n",
+			log_buf);
+}
+
 static const struct pptable_funcs arcturus_ppt_funcs = {
 	/* translate smu index into arcturus specific index */
 	.get_smu_msg_index = arcturus_get_smu_msg_index,
@@ -2364,6 +2447,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.dpm_set_uvd_enable = arcturus_dpm_set_uvd_enable,
 	.i2c_eeprom_init = arcturus_i2c_eeprom_control_init,
 	.i2c_eeprom_fini = arcturus_i2c_eeprom_control_fini,
+	.get_unique_id = arcturus_get_unique_id,
 	.init_microcode = smu_v11_0_init_microcode,
 	.load_microcode = smu_v11_0_load_microcode,
 	.init_smc_tables = smu_v11_0_init_smc_tables,
@@ -2392,8 +2476,8 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.set_power_limit = smu_v11_0_set_power_limit,
 	.get_current_clk_freq = smu_v11_0_get_current_clk_freq,
 	.init_max_sustainable_clocks = smu_v11_0_init_max_sustainable_clocks,
-	.start_thermal_control = smu_v11_0_start_thermal_control,
-	.stop_thermal_control = smu_v11_0_stop_thermal_control,
+	.enable_thermal_alert = smu_v11_0_enable_thermal_alert,
+	.disable_thermal_alert = smu_v11_0_disable_thermal_alert,
 	.set_deep_sleep_dcefclk = smu_v11_0_set_deep_sleep_dcefclk,
 	.display_clock_voltage_request = smu_v11_0_display_clock_voltage_request,
 	.get_fan_control_mode = smu_v11_0_get_fan_control_mode,
@@ -2416,6 +2500,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.get_pptable_power_limit = arcturus_get_pptable_power_limit,
 	.set_df_cstate = arcturus_set_df_cstate,
 	.allow_xgmi_power_down = arcturus_allow_xgmi_power_down,
+	.log_thermal_throttling_event = arcturus_log_thermal_throttling_event,
 };
 
 void arcturus_set_ppt_funcs(struct smu_context *smu)

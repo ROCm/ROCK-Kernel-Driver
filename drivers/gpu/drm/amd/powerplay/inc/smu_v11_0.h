@@ -26,10 +26,11 @@
 #include "amdgpu_smu.h"
 
 #define SMU11_DRIVER_IF_VERSION_INV 0xFFFFFFFF
-#define SMU11_DRIVER_IF_VERSION_ARCT 0x14
+#define SMU11_DRIVER_IF_VERSION_ARCT 0x17
 #define SMU11_DRIVER_IF_VERSION_NV10 0x36
 #define SMU11_DRIVER_IF_VERSION_NV12 0x33
 #define SMU11_DRIVER_IF_VERSION_NV14 0x36
+#define SMU11_DRIVER_IF_VERSION_Sienna_Cichlid 0x30
 
 /* MP Apertures */
 #define MP0_Public			0x03800000
@@ -68,6 +69,12 @@ static const struct smu_temperature_range smu11_thermal_policy[] =
 {
 	{-273150,  99000, 99000, -273150, 99000, 99000, -273150, 99000, 99000},
 	{ 120000, 120000, 120000, 120000, 120000, 120000, 120000, 120000, 120000},
+};
+
+struct smu_11_0_msg_mapping {
+	int	valid_mapping;
+	int	map_to;
+	int	valid_in_vf;
 };
 
 struct smu_11_0_cmn2aisc_mapping {
@@ -201,9 +208,9 @@ int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
 
 int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu);
 
-int smu_v11_0_start_thermal_control(struct smu_context *smu);
+int smu_v11_0_enable_thermal_alert(struct smu_context *smu);
 
-int smu_v11_0_stop_thermal_control(struct smu_context *smu);
+int smu_v11_0_disable_thermal_alert(struct smu_context *smu);
 
 int smu_v11_0_read_sensor(struct smu_context *smu,
 				 enum amd_pp_sensors sensor,

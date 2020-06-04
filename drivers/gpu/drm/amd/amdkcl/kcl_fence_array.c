@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /*
  * fence-array: aggregate fences to be waited together
  *

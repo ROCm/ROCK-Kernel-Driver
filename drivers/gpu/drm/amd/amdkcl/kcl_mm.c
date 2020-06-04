@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include "kcl_common.h"
 
 #ifndef HAVE_MM_ACCESS

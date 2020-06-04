@@ -1,11 +1,11 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_BACKPORT_H
 #define AMDKCL_DRM_BACKPORT_H
 
-#include <drm/drm_atomic_helper.h>
+#include <drm/drm_crtc.h>
 #include <kcl/header/kcl_drm_encoder_h.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_fb_helper.h>
-#include <drm/drm_crtc.h>
 #include <drm/drm_cache.h>
 #include <kcl/header/kcl_drmP_h.h>
 #include <drm/drm_gem.h>

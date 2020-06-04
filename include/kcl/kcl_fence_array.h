@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 /*
  * this file is the copy of include/linux/fence-array.h, don't modify it
  *

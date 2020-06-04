@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #if !defined(_TRACE_KCL_FENCE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_KCL_FENCE_H
 

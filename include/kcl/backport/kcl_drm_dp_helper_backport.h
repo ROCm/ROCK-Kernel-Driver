@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef _KCL_DRM_DP_HELPER_BACKPORT_H_
 #define _KCL_DRM_DP_HELPER_BACKPORT_H_
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_BACKLIGHT_H
 #define AMDKCL_BACKLIGHT_H
 

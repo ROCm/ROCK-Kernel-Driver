@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_SCHED_SIGNAL_H_H
 #define AMDKCL_SCHED_SIGNAL_H_H
 

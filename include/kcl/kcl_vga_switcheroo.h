@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_VGA_SWITCHEROO_H
 #define AMDKCL_VGA_SWITCHEROO_H
 

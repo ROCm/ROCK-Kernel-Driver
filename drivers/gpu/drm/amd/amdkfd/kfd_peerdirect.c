@@ -182,7 +182,6 @@ static int amd_acquire(unsigned long addr, size_t size,
 	int ret;
 	struct amd_mem_context *mem_context;
 	struct pid *pid;
-	unsigned long page_size;
 
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);

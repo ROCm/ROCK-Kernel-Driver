@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_drm_connector.h>
 
 #ifndef HAVE_DRM_CONNECTOR_INIT_WITH_DDC

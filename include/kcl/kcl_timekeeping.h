@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef _KCL_LINUX_TIMEKEEPING_H
 #define _KCL_LINUX_TIMEKEEPING_H
 #include <linux/ktime.h>

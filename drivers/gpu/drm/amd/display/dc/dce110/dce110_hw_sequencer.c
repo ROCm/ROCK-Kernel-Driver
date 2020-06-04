@@ -1447,6 +1447,8 @@ static void power_down_encoders(struct dc *dc)
 
 		dc->links[i]->link_enc->funcs->disable_output(
 				dc->links[i]->link_enc, signal);
+
+		dc->links[i]->link_status.link_active = false;
 	}
 }
 

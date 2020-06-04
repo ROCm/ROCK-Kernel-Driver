@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_UACCESS_BACKPORT_H
 #define AMDKCL_UACCESS_BACKPORT_H
 #include <linux/uaccess.h>

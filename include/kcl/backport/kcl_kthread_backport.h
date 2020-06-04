@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_KTHREAD_BACKPORT_H
 #define AMDKCL_KTHREAD_BACKPORT_H
 #include <linux/sched.h>
