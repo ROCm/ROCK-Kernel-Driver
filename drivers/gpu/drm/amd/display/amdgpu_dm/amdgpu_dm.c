@@ -4181,7 +4181,7 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 		return 0;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
 
 	switch (plane_state->color_encoding) {
@@ -6654,7 +6654,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
 #endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY &&
 	    plane_cap &&
 	    (plane_cap->pixel_format_support.nv12 ||
