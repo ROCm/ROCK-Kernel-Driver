@@ -296,7 +296,7 @@ out:
 	return ret;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+#ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
 void amdgpu_fb_output_poll_changed(struct amdgpu_device *adev)
 {
 	if (adev->mode_info.rfbdev)

@@ -685,7 +685,7 @@ void amdgpu_fbdev_fini(struct amdgpu_device *adev);
 void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state);
 int amdgpu_fbdev_total_size(struct amdgpu_device *adev);
 bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+#ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
 void amdgpu_fbdev_restore_mode(struct amdgpu_device *adev);
 void amdgpu_fb_output_poll_changed(struct amdgpu_device *adev);
 #endif

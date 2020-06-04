@@ -889,7 +889,7 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	return &amdgpu_fb->base;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+#ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
 void amdgpu_output_poll_changed(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = dev->dev_private;
@@ -899,7 +899,7 @@ void amdgpu_output_poll_changed(struct drm_device *dev)
 
 const struct drm_mode_config_funcs amdgpu_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 16, 0)
+#ifdef HAVE_DRM_FB_HELPER_LASTCLOSE
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
 #else
 	.output_poll_changed = amdgpu_output_poll_changed,

@@ -48,7 +48,7 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 #else
 				       const struct drm_mode_fb_cmd2 *mode_cmd);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
+#ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
 void amdgpu_output_poll_changed(struct drm_device *dev);
 #endif
 
