@@ -4226,7 +4226,7 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*per_pixel_alpha = false;
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -6667,7 +6667,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	if (res)
 		return res;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -9158,6 +9158,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		if (old_other_state->rotation != new_other_state->rotation)
 			return true;
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 		/* Blending updates. */
 		if (old_other_state->pixel_blend_mode !=
 		    new_other_state->pixel_blend_mode)
@@ -9166,6 +9167,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		/* Alpha updates. */
 		if (old_other_state->alpha != new_other_state->alpha)
 			return true;
+#endif
 
 		/* Colorspace changes. */
 		if (old_other_state->color_range != new_other_state->color_range ||
