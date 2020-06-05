@@ -23,6 +23,11 @@
 # 
 # 
 
+ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
+AMDKCL_KBUILD_TAKE_PATH_DCN30=$(AMDDALPATH)/dc/dcn30/
+else
+AMDKCL_KBUILD_TAKE_PATH_DCN30=
+endif
 
 DCN30 = dcn30_init.o dcn30_hubbub.o dcn30_hubp.o dcn30_dpp.o dcn30_optc.o \
 	dcn30_dccg.o dcn30_hwseq.o dcn30_mpc.o dcn30_vpg.o \
@@ -31,9 +36,9 @@ DCN30 = dcn30_init.o dcn30_hubbub.o dcn30_hubp.o dcn30_dpp.o dcn30_optc.o \
 	dcn30_dio_link_encoder.o dcn30_resource.o
 
 
-CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o := -mhard-float -msse -mpreferred-stack-boundary=4
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -msse -mpreferred-stack-boundary=4
 
-CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o := -mhard-float -msse
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mhard-float -msse
 ifdef CONFIG_CC_IS_GCC
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
@@ -44,9 +49,9 @@ ifdef IS_OLD_GCC
 # Stack alignment mismatch, proceed with caution.
 # GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
 # (8B stack alignment).
-CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o += -mpreferred-stack-boundary=4
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -mpreferred-stack-boundary=4
 else
-CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o += -msse2
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -msse2
 endif
 
 AMD_DAL_DCN30 = $(addprefix $(AMDDALPATH)/dc/dcn30/,$(DCN30))
