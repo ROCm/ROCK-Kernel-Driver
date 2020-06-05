@@ -214,6 +214,7 @@ static bool faulty_make_request(struct mddev *mddev, struct bio *bio)
 	} else
 		bio_set_dev(bio, conf->rdev->bdev);
 
+	md_io_acct(mddev, bio_op(bio), bio_sectors(bio));
 	generic_make_request(bio);
 	return true;
 }

@@ -5309,6 +5309,7 @@ static struct bio *chunk_aligned_read(struct mddev *mddev, struct bio *raid_bio)
 	if (!raid5_read_one_chunk(mddev, raid_bio))
 		return raid_bio;
 
+	md_io_acct(mddev, bio_op(raid_bio), bio_sectors(raid_bio));
 	return NULL;
 }
 
@@ -5626,6 +5627,8 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 	logical_sector = bi->bi_iter.bi_sector & ~((sector_t)STRIPE_SECTORS-1);
 	last_sector = bio_end_sector(bi);
 	bi->bi_next = NULL;
+
+	md_io_acct(mddev, bio_op(bi), bio_sectors(bi));
 
 	prepare_to_wait(&conf->wait_for_overlap, &w, TASK_UNINTERRUPTIBLE);
 	for (;logical_sector < last_sector; logical_sector += STRIPE_SECTORS) {
