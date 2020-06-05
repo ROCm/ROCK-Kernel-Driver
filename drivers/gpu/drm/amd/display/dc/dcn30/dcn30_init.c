@@ -118,7 +118,9 @@ static const struct hwseq_private_funcs dcn30_private_funcs = {
 	.hubp_pg_control = dcn20_hubp_pg_control,
 	.program_all_writeback_pipes_in_tree = dcn30_program_all_writeback_pipes_in_tree,
 	.update_odm = dcn20_update_odm,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.dsc_pg_control = dcn20_dsc_pg_control,
+#endif
 	.get_surface_visual_confirm_color = dcn10_get_surface_visual_confirm_color,
 	.get_hdr_visual_confirm_color = dcn10_get_hdr_visual_confirm_color,
 	.set_hdr_multiplier = dcn10_set_hdr_multiplier,

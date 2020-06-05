@@ -225,7 +225,6 @@ struct stream_encoder_funcs {
 		enum dc_pixel_encoding *encoding,
 		enum dc_color_depth *depth);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	void (*enc_read_state)(struct stream_encoder *enc, struct enc_state *s);
 
@@ -240,6 +239,7 @@ struct stream_encoder_funcs {
 				uint8_t *dsc_packed_pps);
 #endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	void (*set_dynamic_metadata)(struct stream_encoder *enc,
 			bool enable,
 			uint32_t hubp_requestor_id,
