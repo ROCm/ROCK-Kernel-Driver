@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2017-2019 Broadcom. All Rights Reserved. The term *
+ * Copyright (C) 2017-2020 Broadcom. All Rights Reserved. The term *
  * “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.  *
  * Copyright (C) 2004-2016 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
@@ -2811,7 +2811,7 @@ lpfc_nvme_unsol_ls_handler(struct lpfc_hba *phba, struct lpfc_iocbq *piocb)
 	struct lpfc_async_xchg_ctx *axchg = NULL;
 	char *failwhy = NULL;
 	uint32_t oxid, sid, did, fctl, size;
-	int ret;
+	int ret = 1;
 
 	d_buf = piocb->context2;
 
@@ -2895,14 +2895,16 @@ lpfc_nvme_unsol_ls_handler(struct lpfc_hba *phba, struct lpfc_iocbq *piocb)
 			(phba->nvmet_support) ? "T" : "I", ret);
 
 out_fail:
-	kfree(axchg);
 
 	/* recycle receive buffer */
 	lpfc_in_buf_free(phba, &nvmebuf->dbuf);
 
 	/* If start of new exchange, abort it */
-	if (fctl & FC_FC_FIRST_SEQ && !(fctl & FC_FC_EX_CTX))
-		lpfc_nvme_unsol_ls_issue_abort(phba, axchg, sid, oxid);
+	if (axchg && (fctl & FC_FC_FIRST_SEQ && !(fctl & FC_FC_EX_CTX)))
+		ret = lpfc_nvme_unsol_ls_issue_abort(phba, axchg, sid, oxid);
+
+	if (ret)
+		kfree(axchg);
 }
 
 /**
@@ -8646,7 +8648,7 @@ lpfc_sli4_async_mbox_unblock(struct lpfc_hba *phba)
 	psli->sli_flag &= ~LPFC_SLI_ASYNC_MBX_BLK;
 	spin_unlock_irq(&phba->hbalock);
 
-	/* wake up worker thread to post asynchronlous mailbox command */
+	/* wake up worker thread to post asynchronous mailbox command */
 	lpfc_worker_wake_up(phba);
 }
 
@@ -8914,7 +8916,7 @@ lpfc_sli_issue_mbox_s4(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq,
 		return rc;
 	}
 
-	/* Now, interrupt mode asynchrous mailbox command */
+	/* Now, interrupt mode asynchronous mailbox command */
 	rc = lpfc_mbox_cmd_check(phba, mboxq);
 	if (rc) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_MBOX | LOG_SLI,
@@ -13203,11 +13205,11 @@ lpfc_cq_event_setup(struct lpfc_hba *phba, void *entry, int size)
 }
 
 /**
- * lpfc_sli4_sp_handle_async_event - Handle an asynchroous event
+ * lpfc_sli4_sp_handle_async_event - Handle an asynchronous event
  * @phba: Pointer to HBA context object.
  * @cqe: Pointer to mailbox completion queue entry.
  *
- * This routine process a mailbox completion queue entry with asynchrous
+ * This routine process a mailbox completion queue entry with asynchronous
  * event.
  *
  * Return: true if work posted to worker thread, otherwise false.
@@ -13361,7 +13363,7 @@ out_no_mqe_complete:
  * @cqe: Pointer to mailbox completion queue entry.
  *
  * This routine process a mailbox completion queue entry, it invokes the
- * proper mailbox complete handling or asynchrous event handling routine
+ * proper mailbox complete handling or asynchronous event handling routine
  * according to the MCQE's async bit.
  *
  * Return: true if work posted to worker thread, otherwise false.

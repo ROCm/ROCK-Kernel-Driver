@@ -2163,10 +2163,6 @@ lpfc_debugfs_lockstat_write(struct file *file, const char __user *buf,
 	char *pbuf;
 	int i;
 
-	/* Protect copy from user */
-	if (!access_ok(buf, nbytes))
-		return -EFAULT;
-
 	memset(mybuf, 0, sizeof(mybuf));
 
 	if (copy_from_user(mybuf, buf, nbytes))
@@ -2619,10 +2615,6 @@ lpfc_debugfs_multixripools_write(struct file *file, const char __user *buf,
 	if (nbytes > 64)
 		nbytes = 64;
 
-	/* Protect copy from user */
-	if (!access_ok(buf, nbytes))
-		return -EFAULT;
-
 	memset(mybuf, 0, sizeof(mybuf));
 
 	if (copy_from_user(mybuf, buf, nbytes))
@@ -2784,10 +2776,6 @@ lpfc_debugfs_scsistat_write(struct file *file, const char __user *buf,
 	struct lpfc_hba *phba = vport->phba;
 	char mybuf[6] = {0};
 	int i;
-
-	/* Protect copy from user */
-	if (!access_ok(buf, nbytes))
-		return -EFAULT;
 
 	if (copy_from_user(mybuf, buf, (nbytes >= sizeof(mybuf)) ?
 				       (sizeof(mybuf) - 1) : nbytes))
@@ -5506,7 +5494,6 @@ static const struct file_operations lpfc_debugfs_ras_log = {
 	.read =         lpfc_debugfs_read,
 	.release =      lpfc_debugfs_ras_log_release,
 };
-#endif
 
 #undef lpfc_debugfs_op_dumpHBASlim
 static const struct file_operations lpfc_debugfs_op_dumpHBASlim = {
@@ -5678,7 +5665,7 @@ static const struct file_operations lpfc_idiag_op_extAcc = {
 	.write =        lpfc_idiag_extacc_write,
 	.release =      lpfc_idiag_cmd_release,
 };
-
+#endif
 
 /* lpfc_idiag_mbxacc_dump_bsg_mbox - idiag debugfs dump bsg mailbox command
  * @phba: Pointer to HBA context object.

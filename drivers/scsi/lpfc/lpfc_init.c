@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2017-2019 Broadcom. All Rights Reserved. The term *
+ * Copyright (C) 2017-2020 Broadcom. All Rights Reserved. The term *
  * “Broadcom” refers to Broadcom Inc. and/or its subsidiaries.  *
  * Copyright (C) 2004-2016 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
@@ -5906,7 +5906,7 @@ void lpfc_sli4_async_event_proc(struct lpfc_hba *phba)
 			break;
 		default:
 			lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
-					"1804 Invalid asynchrous event code: "
+					"1804 Invalid asynchronous event code: "
 					"x%x\n", bf_get(lpfc_trailer_code,
 					&cq_event->cqe.mcqe_cmpl));
 			break;
