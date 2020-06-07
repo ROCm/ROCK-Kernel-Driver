@@ -633,6 +633,7 @@ static bool raid0_make_request(struct mddev *mddev, struct bio *bio)
 				disk_devt(mddev->gendisk), bio_sector);
 	mddev_check_writesame(mddev, bio);
 	mddev_check_write_zeroes(mddev, bio);
+	md_io_acct(mddev, bio_op(bio), bio_sectors(bio));
 	generic_make_request(bio);
 	return true;
 }
