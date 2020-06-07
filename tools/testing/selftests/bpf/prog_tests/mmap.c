@@ -253,8 +253,6 @@ void test_mmap(void)
 	if (CHECK(tmp1 == MAP_FAILED, "last_mmap", "failed %d\n", errno))
 		goto cleanup;
 
-	test_mmap__destroy(skel);
-	skel = NULL;
 	CHECK_FAIL(munmap(bss_mmaped, bss_sz));
 	bss_mmaped = NULL;
 	CHECK_FAIL(munmap(map_mmaped, map_sz));
