@@ -2660,7 +2660,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	pid = find_get_pid(args->pid);
 	if (!pid) {
-		pr_err("Cannot find pid info for %i\n",
+		pr_debug("Cannot find pid info for %i\n",
 				args->pid);
 		r =  -ESRCH;
 		goto out;
