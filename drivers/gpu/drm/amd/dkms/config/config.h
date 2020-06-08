@@ -763,12 +763,6 @@
 /* drm_pending_vblank_event->sequence is available */
 #define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
 
-/* struct mmu_notifier_mm is exported */
-/* #undef HAVE_STRUCT_MMU_NOTIFIER_MM_EXPORTED */
-
-/* struct mmu_notifier_subscriptions is available */
-#define HAVE_STRUCT_MMU_NOTIFIER_SUBSCRIPTIONS 1
-
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 

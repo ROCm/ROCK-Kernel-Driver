@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef AMDKCL_MN_H
-#define AMDKCL_MN_H
+#ifndef AMDGPU_BACKPORT_KCL_AMDGPU_MMU_NOTIFIER_H
+#define AMDGPU_BACKPORT_KCL_AMDGPU_MMU_NOTIFIER_H
 
 #include <linux/mmu_notifier.h>
 
