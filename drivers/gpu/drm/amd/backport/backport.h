@@ -42,7 +42,6 @@
 #include <kcl/backport/kcl_uaccess_backport.h>
 #include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/kcl_types.h>
-#include <kcl/kcl_amdgpu.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
 #include "kcl/kcl_backport_amdgpu.h"
 #include <kcl/kcl_overflow.h>
