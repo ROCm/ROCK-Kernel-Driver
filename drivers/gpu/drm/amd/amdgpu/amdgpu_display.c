@@ -889,21 +889,9 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	return &amdgpu_fb->base;
 }
 
-#ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
-void amdgpu_output_poll_changed(struct drm_device *dev)
-{
-	struct amdgpu_device *adev = dev->dev_private;
-	amdgpu_fb_output_poll_changed(adev);
-}
-#endif
-
 const struct drm_mode_config_funcs amdgpu_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
-#ifdef HAVE_DRM_FB_HELPER_LASTCLOSE
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
-#else
-	.output_poll_changed = amdgpu_output_poll_changed,
-#endif
 };
 
 static const struct drm_prop_enum_list amdgpu_underscan_enum_list[] =
