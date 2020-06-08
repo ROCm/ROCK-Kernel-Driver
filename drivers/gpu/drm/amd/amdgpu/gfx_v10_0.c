@@ -55,6 +55,7 @@
  * 2. Async ring
  */
 #define GFX10_NUM_GFX_RINGS_NV1X	1
+#define GFX10_NUM_GFX_RINGS_Sienna_Cichlid	1
 #define GFX10_MEC_HPD_SIZE	2048
 
 #define F32_CE_PROGRAM_RAM_SIZE		65536
@@ -62,6 +63,10 @@
 
 #define mmCGTT_GS_NGG_CLK_CTRL	0x5087
 #define mmCGTT_GS_NGG_CLK_CTRL_BASE_IDX	1
+#define mmCGTT_SPI_RA0_CLK_CTRL 0x507a
+#define mmCGTT_SPI_RA0_CLK_CTRL_BASE_IDX 1
+#define mmCGTT_SPI_RA1_CLK_CTRL 0x507b
+#define mmCGTT_SPI_RA1_CLK_CTRL_BASE_IDX 1
 
 #define GB_ADDR_CONFIG__NUM_PKRS__SHIFT                                                                       0x8
 #define GB_ADDR_CONFIG__NUM_PKRS_MASK                                                                         0x00000700L
@@ -91,7 +96,21 @@
 #define CP_RB_DOORBELL_RANGE_LOWER__DOORBELL_RANGE_LOWER_Sienna_Cichlid_MASK	0x00000FFCL
 #define CP_RB_DOORBELL_RANGE_LOWER__DOORBELL_RANGE_LOWER_Sienna_Cichlid__SHIFT	0x2
 #define CP_RB_DOORBELL_RANGE_UPPER__DOORBELL_RANGE_UPPER_Sienna_Cichlid_MASK	0x00000FFCL
-#define PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC_Sienna_Cichlid_MASK	0x00300000L
+#define mmGCR_GENERAL_CNTL_Sienna_Cichlid			0x1580
+#define mmGCR_GENERAL_CNTL_Sienna_Cichlid_BASE_IDX	0
+
+#define mmCP_HYP_PFP_UCODE_ADDR			0x5814
+#define mmCP_HYP_PFP_UCODE_ADDR_BASE_IDX	1
+#define mmCP_HYP_PFP_UCODE_DATA			0x5815
+#define mmCP_HYP_PFP_UCODE_DATA_BASE_IDX	1
+#define mmCP_HYP_CE_UCODE_ADDR			0x5818
+#define mmCP_HYP_CE_UCODE_ADDR_BASE_IDX		1
+#define mmCP_HYP_CE_UCODE_DATA			0x5819
+#define mmCP_HYP_CE_UCODE_DATA_BASE_IDX		1
+#define mmCP_HYP_ME_UCODE_ADDR			0x5816
+#define mmCP_HYP_ME_UCODE_ADDR_BASE_IDX		1
+#define mmCP_HYP_ME_UCODE_DATA			0x5817
+#define mmCP_HYP_ME_UCODE_DATA_BASE_IDX		1
 
 MODULE_FIRMWARE("amdgpu/navi10_ce.bin");
 MODULE_FIRMWARE("amdgpu/navi10_pfp.bin");
@@ -3050,6 +3069,51 @@ static const struct soc15_reg_golden golden_settings_gc_rlc_spm_10_1_2_nv12[] =
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGRBM_GFX_INDEX, 0xFFFFFFFF, 0xe0000000)
 };
 
+static const struct soc15_reg_golden golden_settings_gc_10_3[] =
+{
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_PS_CLK_CTRL, 0xff7f0fff, 0x78000100),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_RA0_CLK_CTRL, 0xff7f0fff, 0x30000100),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_RA1_CLK_CTRL, 0xff7f0fff, 0x7e000100),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCPF_GCR_CNTL, 0x0007ffff, 0x0000c000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmDB_DEBUG3, 0xffffffff, 0x00000200),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmDB_DEBUG4, 0xffffffff, 0x00800000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmDB_EXCEPTION_CONTROL, 0x7fff0f1f, 0x00b80000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGCR_GENERAL_CNTL_Sienna_Cichlid, 0x1ff1ffff, 0x00000500),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGE_PC_CNTL, 0x003fffff, 0x00280400),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGL2A_ADDR_MATCH_MASK, 0xffffffff, 0xffffffcf),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGL2C_ADDR_MATCH_MASK, 0xffffffff, 0xffffffcf),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGL2C_CM_CTRL1, 0xff8fff0f, 0x580f1008),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmGL2C_CTRL3, 0xf7ffffff, 0x10f80988),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_CL_ENHANCE, 0xf17fffff, 0x01200007),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_SC_BINNER_TIMEOUT_COUNTER, 0xffffffff, 0x00000800),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmPA_SC_ENHANCE_2, 0xffffffbf, 0x00000820),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSPI_CONFIG_CNTL_1, 0xffffffff, 0x00070104),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_CONFIG, 0xe07df47f, 0x00180070),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER0_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER1_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER10_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER11_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER12_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER13_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER14_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER15_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER2_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER3_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER4_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER5_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER6_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER7_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER8_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmSQ_PERFCOUNTER9_SELECT, 0xf0f001ff, 0x00000000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmTA_CNTL_AUX, 0xfff7ffff, 0x01030000),
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmUTCL1_CTRL, 0xffbfffff, 0x00a00000)
+};
+
+static const struct soc15_reg_golden golden_settings_gc_10_3_sienna_cichlid[] =
+{
+	/* Pending on emulation bring up */
+};
+
 #define DEFAULT_SH_MEM_CONFIG \
 	((SH_MEM_ADDRESS_MODE_64 << SH_MEM_CONFIG__ADDRESS_MODE__SHIFT) | \
 	 (SH_MEM_ALIGNMENT_MODE_UNALIGNED << SH_MEM_CONFIG__ALIGNMENT_MODE__SHIFT) | \
@@ -3230,6 +3294,14 @@ static void gfx_v10_0_init_golden_registers(struct amdgpu_device *adev)
 						golden_settings_gc_rlc_spm_10_1_2_nv12,
 						(const u32)ARRAY_SIZE(golden_settings_gc_rlc_spm_10_1_2_nv12));
 		break;
+	case CHIP_SIENNA_CICHLID:
+		soc15_program_register_sequence(adev,
+						golden_settings_gc_10_3,
+						(const u32)ARRAY_SIZE(golden_settings_gc_10_3));
+		soc15_program_register_sequence(adev,
+						golden_settings_gc_10_3_sienna_cichlid,
+						(const u32)ARRAY_SIZE(golden_settings_gc_10_3_sienna_cichlid));
+		break;
 	default:
 		break;
 	}
@@ -3409,6 +3481,9 @@ static void gfx_v10_0_check_fw_write_wait(struct amdgpu_device *adev)
 		    (adev->gfx.mec_fw_version >= 0x0000005b) &&
 		    (adev->gfx.mec_feature_version >= 27))
 			adev->gfx.cp_fw_write_wait = true;
+		break;
+	case CHIP_SIENNA_CICHLID:
+		adev->gfx.cp_fw_write_wait = true;
 		break;
 	default:
 		break;
@@ -4147,13 +4222,20 @@ static int gfx_v10_0_sw_init(void *handle)
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
-	case CHIP_SIENNA_CICHLID:
 		adev->gfx.me.num_me = 1;
 		adev->gfx.me.num_pipe_per_me = 1;
 		adev->gfx.me.num_queue_per_pipe = 1;
 		adev->gfx.mec.num_mec = 2;
 		adev->gfx.mec.num_pipe_per_mec = 4;
 		adev->gfx.mec.num_queue_per_pipe = 8;
+		break;
+	case CHIP_SIENNA_CICHLID:
+		adev->gfx.me.num_me = 1;
+		adev->gfx.me.num_pipe_per_me = 1;
+		adev->gfx.me.num_queue_per_pipe = 1;
+		adev->gfx.mec.num_mec = 2;
+		adev->gfx.mec.num_pipe_per_mec = 4;
+		adev->gfx.mec.num_queue_per_pipe = 4;
 		break;
 	default:
 		adev->gfx.me.num_me = 1;
@@ -4324,12 +4406,6 @@ static int gfx_v10_0_sw_fini(void *handle)
 	return 0;
 }
 
-
-static void gfx_v10_0_tiling_mode_table_init(struct amdgpu_device *adev)
-{
-	/* TODO */
-}
-
 static void gfx_v10_0_select_se_sh(struct amdgpu_device *adev, u32 se_num,
 				   u32 sh_num, u32 instance)
 {
@@ -4406,6 +4482,11 @@ static u32 gfx_v10_0_init_pa_sc_tile_steering_override(struct amdgpu_device *ade
 	uint32_t num_packer_per_sc;
 	uint32_t pa_sc_tile_steering_override;
 
+	/* for ASICs that integrates GFX v10.3
+	 * pa_sc_tile_steering_override should be set to 0 */
+	if (adev->asic_type == CHIP_SIENNA_CICHLID)
+		return 0;
+
 	/* init num_sc */
 	num_sc = adev->gfx.config.max_shader_engines * adev->gfx.config.max_sh_per_se *
 			adev->gfx.config.num_sc_per_sh;
@@ -4423,18 +4504,9 @@ static u32 gfx_v10_0_init_pa_sc_tile_steering_override(struct amdgpu_device *ade
 	pa_sc_tile_steering_override |=
 		(order_base_2(num_rb_per_sc) << PA_SC_TILE_STEERING_OVERRIDE__NUM_RB_PER_SC__SHIFT) &
 		PA_SC_TILE_STEERING_OVERRIDE__NUM_RB_PER_SC_MASK;
-	switch (adev->asic_type) {
-	case CHIP_SIENNA_CICHLID:
-		pa_sc_tile_steering_override |=
-			(order_base_2(num_packer_per_sc) << PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC__SHIFT) &
-			PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC_Sienna_Cichlid_MASK;
-		break;
-	default:
-		pa_sc_tile_steering_override |=
-			(order_base_2(num_packer_per_sc) << PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC__SHIFT) &
-			PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC_MASK;
-		break;
-	}
+	pa_sc_tile_steering_override |=
+		(order_base_2(num_packer_per_sc) << PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC__SHIFT) &
+		PA_SC_TILE_STEERING_OVERRIDE__NUM_PACKER_PER_SC_MASK;
 
 	return pa_sc_tile_steering_override;
 }
@@ -4598,8 +4670,6 @@ static void gfx_v10_0_constants_init(struct amdgpu_device *adev)
 	int i;
 
 	WREG32_FIELD15(GC, 0, GRBM_CNTL, READ_TIMEOUT, 0xff);
-
-	gfx_v10_0_tiling_mode_table_init(adev);
 
 	gfx_v10_0_setup_rb(adev);
 	gfx_v10_0_get_cu_info(adev, &adev->gfx.cu_info);
@@ -5352,6 +5422,14 @@ static int gfx_v10_0_cp_gfx_load_pfp_microcode(struct amdgpu_device *adev)
 	WREG32_SOC15(GC, 0, mmCP_PFP_IC_BASE_HI,
 		upper_32_bits(adev->gfx.pfp.pfp_fw_gpu_addr));
 
+	WREG32_SOC15(GC, 0, mmCP_HYP_PFP_UCODE_ADDR, 0);
+
+	for (i = 0; i < pfp_hdr->jt_size; i++)
+		WREG32_SOC15(GC, 0, mmCP_HYP_PFP_UCODE_DATA,
+			     le32_to_cpup(fw_data + pfp_hdr->jt_offset + i));
+
+	WREG32_SOC15(GC, 0, mmCP_HYP_PFP_UCODE_ADDR, adev->gfx.pfp_fw_version);
+
 	return 0;
 }
 
@@ -5421,6 +5499,14 @@ static int gfx_v10_0_cp_gfx_load_ce_microcode(struct amdgpu_device *adev)
 	WREG32_SOC15(GC, 0, mmCP_CE_IC_BASE_HI,
 		upper_32_bits(adev->gfx.ce.ce_fw_gpu_addr));
 
+	WREG32_SOC15(GC, 0, mmCP_HYP_CE_UCODE_ADDR, 0);
+
+	for (i = 0; i < ce_hdr->jt_size; i++)
+		WREG32_SOC15(GC, 0, mmCP_HYP_CE_UCODE_DATA,
+			     le32_to_cpup(fw_data + ce_hdr->jt_offset + i));
+
+	WREG32_SOC15(GC, 0, mmCP_HYP_CE_UCODE_ADDR, adev->gfx.ce_fw_version);
+
 	return 0;
 }
 
@@ -5489,6 +5575,14 @@ static int gfx_v10_0_cp_gfx_load_me_microcode(struct amdgpu_device *adev)
 		adev->gfx.me.me_fw_gpu_addr & 0xFFFFF000);
 	WREG32_SOC15(GC, 0, mmCP_ME_IC_BASE_HI,
 		upper_32_bits(adev->gfx.me.me_fw_gpu_addr));
+
+	WREG32_SOC15(GC, 0, mmCP_HYP_ME_UCODE_ADDR, 0);
+
+	for (i = 0; i < me_hdr->jt_size; i++)
+		WREG32_SOC15(GC, 0, mmCP_HYP_ME_UCODE_DATA,
+			     le32_to_cpup(fw_data + me_hdr->jt_offset + i));
+
+	WREG32_SOC15(GC, 0, mmCP_HYP_ME_UCODE_ADDR, adev->gfx.me_fw_version);
 
 	return 0;
 }
@@ -6982,7 +7076,18 @@ static int gfx_v10_0_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	adev->gfx.num_gfx_rings = GFX10_NUM_GFX_RINGS_NV1X;
+	switch (adev->asic_type) {
+	case CHIP_NAVI10:
+	case CHIP_NAVI14:
+	case CHIP_NAVI12:
+		adev->gfx.num_gfx_rings = GFX10_NUM_GFX_RINGS_NV1X;
+		break;
+	case CHIP_SIENNA_CICHLID:
+		adev->gfx.num_gfx_rings = GFX10_NUM_GFX_RINGS_Sienna_Cichlid;
+		break;
+	default:
+		break;
+	}
 
 	adev->gfx.num_compute_rings = AMDGPU_MAX_COMPUTE_RINGS;
 
@@ -7351,6 +7456,7 @@ static int gfx_v10_0_set_powergating_state(void *handle,
 	case CHIP_NAVI10:
 	case CHIP_NAVI12:
 	case CHIP_NAVI14:
+	case CHIP_SIENNA_CICHLID:
 		amdgpu_gfx_off_ctrl(adev, enable);
 		break;
 	default:

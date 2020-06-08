@@ -99,6 +99,7 @@ static int psp_early_init(void *handle)
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
+	case CHIP_SIENNA_CICHLID:
 		psp_v11_0_set_psp_funcs(psp);
 		psp->autoload_supported = true;
 		break;
@@ -433,7 +434,7 @@ static int psp_asd_load(struct psp_context *psp)
 	 * add workaround to bypass it for sriov now.
 	 * TODO: add version check to make it common
 	 */
-	if (amdgpu_sriov_vf(psp->adev))
+	if (amdgpu_sriov_vf(psp->adev) || (psp->adev->asic_type == CHIP_SIENNA_CICHLID))
 		return 0;
 
 	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
@@ -1355,6 +1356,14 @@ static int psp_hw_start(struct psp_context *psp)
 			}
 		}
 
+		if (psp->spl_bin_size) {
+			ret = psp_bootloader_load_spl(psp);
+			if (ret) {
+				DRM_ERROR("PSP load spl failed!\n");
+				return ret;
+			}
+		}
+
 		ret = psp_bootloader_load_sysdrv(psp);
 		if (ret) {
 			DRM_ERROR("PSP load sysdrv failed!\n");
@@ -1427,6 +1436,12 @@ static int psp_get_fw_type(struct amdgpu_firmware_info *ucode,
 		break;
 	case AMDGPU_UCODE_ID_SDMA7:
 		*type = GFX_FW_TYPE_SDMA7;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES:
+		*type = GFX_FW_TYPE_CP_MES;
+		break;
+	case AMDGPU_UCODE_ID_CP_MES_DATA:
+		*type = GFX_FW_TYPE_MES_STACK;
 		break;
 	case AMDGPU_UCODE_ID_CP_CE:
 		*type = GFX_FW_TYPE_CP_CE;
@@ -1675,6 +1690,15 @@ static int psp_np_fw_load(struct psp_context *psp)
 		}
 
 		if (fw_load_skip_check(psp, ucode))
+			continue;
+
+		if (psp->autoload_supported &&
+		    adev->asic_type == CHIP_SIENNA_CICHLID &&
+		    (ucode->ucode_id == AMDGPU_UCODE_ID_SDMA1 ||
+		     ucode->ucode_id == AMDGPU_UCODE_ID_SDMA2 ||
+		     ucode->ucode_id == AMDGPU_UCODE_ID_SDMA3))
+			/* PSP only receive one SDMA fw for sienna_cichlid,
+			 * as all four sdma fw are same */
 			continue;
 
 		psp_print_fw_hdr(psp, ucode);
@@ -2093,6 +2117,7 @@ int psp_init_sos_microcode(struct psp_context *psp,
 	const struct psp_firmware_header_v1_0 *sos_hdr;
 	const struct psp_firmware_header_v1_1 *sos_hdr_v1_1;
 	const struct psp_firmware_header_v1_2 *sos_hdr_v1_2;
+	const struct psp_firmware_header_v1_3 *sos_hdr_v1_3;
 	int err = 0;
 
 	if (!chip_name) {
@@ -2136,6 +2161,18 @@ int psp_init_sos_microcode(struct psp_context *psp,
 			adev->psp.kdb_bin_size = le32_to_cpu(sos_hdr_v1_2->kdb_size_bytes);
 			adev->psp.kdb_start_addr = (uint8_t *)adev->psp.sys_start_addr +
 						    le32_to_cpu(sos_hdr_v1_2->kdb_offset_bytes);
+		}
+		if (sos_hdr->header.header_version_minor == 3) {
+			sos_hdr_v1_3 = (const struct psp_firmware_header_v1_3 *)adev->psp.sos_fw->data;
+			adev->psp.toc_bin_size = le32_to_cpu(sos_hdr_v1_3->v1_1.toc_size_bytes);
+			adev->psp.toc_start_addr = (uint8_t *)adev->psp.sys_start_addr +
+				le32_to_cpu(sos_hdr_v1_3->v1_1.toc_offset_bytes);
+			adev->psp.kdb_bin_size = le32_to_cpu(sos_hdr_v1_3->v1_1.kdb_size_bytes);
+			adev->psp.kdb_start_addr = (uint8_t *)adev->psp.sys_start_addr +
+				le32_to_cpu(sos_hdr_v1_3->v1_1.kdb_offset_bytes);
+			adev->psp.spl_bin_size = le32_to_cpu(sos_hdr_v1_3->spl_size_bytes);
+			adev->psp.spl_start_addr = (uint8_t *)adev->psp.sys_start_addr +
+				le32_to_cpu(sos_hdr_v1_3->spl_offset_bytes);
 		}
 		break;
 	default:

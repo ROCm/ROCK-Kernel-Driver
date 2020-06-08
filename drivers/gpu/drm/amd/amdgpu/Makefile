@@ -162,15 +162,18 @@ amdgpu-y += \
 	vcn_v1_0.o \
 	vcn_v2_0.o \
 	vcn_v2_5.o \
+	vcn_v3_0.o \
 	amdgpu_jpeg.o \
 	jpeg_v1_0.o \
 	jpeg_v2_0.o \
-	jpeg_v2_5.o
+	jpeg_v2_5.o \
+	jpeg_v3_0.o
 
 # add ATHUB block
 amdgpu-y += \
 	athub_v1_0.o \
-	athub_v2_0.o
+	athub_v2_0.o \
+	athub_v2_1.o
 
 # add amdkfd interfaces
 amdgpu-y += amdgpu_amdkfd.o
@@ -180,12 +183,13 @@ AMDKFD_PATH := ../amdkfd
 include $(FULL_AMD_PATH)/amdkfd/Makefile
 amdgpu-y += $(AMDKFD_FILES)
 amdgpu-y += \
-	 amdgpu_amdkfd_fence.o \
-	 amdgpu_amdkfd_gpuvm.o \
-	 amdgpu_amdkfd_gfx_v8.o \
-	 amdgpu_amdkfd_gfx_v9.o \
-	 amdgpu_amdkfd_arcturus.o \
-	 amdgpu_amdkfd_gfx_v10.o
+	amdgpu_amdkfd_fence.o \
+	amdgpu_amdkfd_gpuvm.o \
+	amdgpu_amdkfd_gfx_v8.o \
+	amdgpu_amdkfd_gfx_v9.o \
+	amdgpu_amdkfd_arcturus.o \
+	amdgpu_amdkfd_gfx_v10.o \
+	amdgpu_amdkfd_gfx_v10_3.o
 
 ifneq ($(CONFIG_DRM_AMDGPU_CIK),)
 amdgpu-y += amdgpu_amdkfd_gfx_v7.o

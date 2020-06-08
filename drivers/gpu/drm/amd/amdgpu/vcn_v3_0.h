@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,21 +21,9 @@
  *
  */
 
-#ifndef __AMDGPU_ATOMFIRMWARE_H__
-#define __AMDGPU_ATOMFIRMWARE_H__
+#ifndef __VCN_V3_0_H__
+#define __VCN_V3_0_H__
 
-#define get_index_into_master_table(master_table, table_name) (offsetof(struct master_table, table_name) / sizeof(uint16_t))
+extern const struct amdgpu_ip_block_version vcn_v3_0_ip_block;
 
-bool amdgpu_atomfirmware_gpu_supports_virtualization(struct amdgpu_device *adev);
-void amdgpu_atomfirmware_scratch_regs_init(struct amdgpu_device *adev);
-int amdgpu_atomfirmware_allocate_fb_scratch(struct amdgpu_device *adev);
-int amdgpu_atomfirmware_get_vram_info(struct amdgpu_device *adev,
-	int *vram_width, int *vram_type, int *vram_vendor);
-int amdgpu_atomfirmware_get_clock_info(struct amdgpu_device *adev);
-int amdgpu_atomfirmware_get_gfx_info(struct amdgpu_device *adev);
-bool amdgpu_atomfirmware_mem_ecc_supported(struct amdgpu_device *adev);
-bool amdgpu_atomfirmware_sram_ecc_supported(struct amdgpu_device *adev);
-int amdgpu_atomfirmware_get_fw_reserved_fb_size(struct amdgpu_device *adev);
-int amdgpu_mem_train_support(struct amdgpu_device *adev);
-
-#endif
+#endif /* __VCN_V3_0_H__ */

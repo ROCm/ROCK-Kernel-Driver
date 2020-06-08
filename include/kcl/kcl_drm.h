@@ -223,7 +223,7 @@ bool drm_is_current_master(struct drm_file *fpriv);
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINT_H)
+#if !defined(HAVE_DRM_DRM_PRINT_H)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -283,7 +283,7 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if !defined(HAVE_DRM_PRINT_H)
+#if !defined(HAVE_DRM_DRM_PRINT_H)
 		.prefix = prefix
 #endif
 	};

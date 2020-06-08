@@ -2782,13 +2782,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				pdd->allocated_debug_watch_point_bitmask);
 			pdd->allocated_debug_watch_point_bitmask = 0;
 			pdd->debug_trap_enabled = false;
-			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			dev->kfd2kgd->disable_debug_trap(dev->kgd);
 			fput(pdd->dbg_ev_file);
 			pdd->dbg_ev_file = NULL;
 			break;
 		case 1:
 			pdd->debug_trap_enabled = true;
-			r = dev->kfd2kgd->enable_debug_trap(dev->kgd,
+			dev->kfd2kgd->enable_debug_trap(dev->kgd,
 					pdd->trap_debug_wave_launch_mode,
 					dev->vm_info.last_vmid_kfd);
 			if (r)
@@ -2812,26 +2812,18 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
-		if (data2 != 0) {
-			/* On current hardware, we only support a trap
-			 * mask value of 0.  This is because the debug
-			 * trap mask is global and shared by all processes
-			 * on current hardware.
-			 */
-			pr_err("Invalid trap override option: %i\n",
-					data2);
-			r = -EINVAL;
-			goto unlock_out;
-		}
 		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
 				data1,
-				data2);
+				data2,
+				data3,
+				&args->data2,
+				&args->data3);
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
 		pdd->trap_debug_wave_launch_mode = data1;
-		r = dev->kfd2kgd->set_wave_launch_mode(
+		dev->kfd2kgd->set_wave_launch_mode(
 				dev->kgd,
 				data1,
 				dev->vm_info.last_vmid_kfd);

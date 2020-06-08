@@ -2,7 +2,7 @@
 #ifndef AMDKCL_DRM_TASK_BARRIER_H
 #define AMDKCL_DRM_TASK_BARRIER_H
 
-#ifdef HAVE_TASK_BARRIER_H
+#ifdef HAVE_DRM_TASK_BARRIER_H
 #include <drm/task_barrier.h>
 #else
 /*
