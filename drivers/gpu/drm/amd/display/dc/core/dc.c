@@ -1044,10 +1044,12 @@ static void program_timing_sync(
 		for (j = 0; j < group_size; j++) {
 			bool is_blanked;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 			if (pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked)
 				is_blanked =
 					pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked(pipe_set[j]->stream_res.opp);
 			else
+#endif
 				is_blanked =
 					pipe_set[j]->stream_res.tg->funcs->is_blanked(pipe_set[j]->stream_res.tg);
 			if (!is_blanked) {
@@ -1075,10 +1077,12 @@ static void program_timing_sync(
 		for (j = j + 1; j < group_size; j++) {
 			bool is_blanked;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 			if (pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked)
 				is_blanked =
 					pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked(pipe_set[j]->stream_res.opp);
 			else
+#endif
 				is_blanked =
 					pipe_set[j]->stream_res.tg->funcs->is_blanked(pipe_set[j]->stream_res.tg);
 			if (!is_blanked) {
