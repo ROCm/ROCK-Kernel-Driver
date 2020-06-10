@@ -748,14 +748,14 @@ static int zynqmp_firmware_probe(struct platform_device *pdev)
 	/* Assign eemi_ops_table */
 	eemi_ops_tbl = &eemi_ops;
 
-	zynqmp_pm_api_debugfs_init();
-
 	ret = mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE, firmware_devs,
 			      ARRAY_SIZE(firmware_devs), NULL, 0, NULL);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
 		return ret;
 	}
+
+	zynqmp_pm_api_debugfs_init();
 
 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
 }
