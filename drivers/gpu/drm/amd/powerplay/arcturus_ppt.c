@@ -2265,8 +2265,7 @@ static void arcturus_i2c_eeprom_control_fini(struct i2c_adapter *control)
 static void arcturus_get_unique_id(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
-	uint32_t top32, bottom32, smu_version, size;
-	char sn[16];
+	uint32_t top32, bottom32, smu_version;
 	uint64_t id;
 
 	if (smu_get_smc_version(smu, NULL, &smu_version)) {
@@ -2289,8 +2288,7 @@ static void arcturus_get_unique_id(struct smu_context *smu)
 	/* For Arcturus-and-later, unique_id == serial_number, so convert it to a
 	 * 16-digit HEX string for convenience and backwards-compatibility
 	 */
-	size = sprintf(sn, "%llx", id);
-	memcpy(adev->serial, &sn, size);
+	sprintf(adev->serial, "%llx", id);
 }
 
 static bool arcturus_is_baco_supported(struct smu_context *smu)
