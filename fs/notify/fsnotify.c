@@ -145,12 +145,6 @@ int __fsnotify_parent(const struct path *path, struct dentry *dentry, __u32 mask
 	struct inode *p_inode;
 	int ret = 0;
 
-	if (!dentry)
-		dentry = path->dentry;
-
-	if (!(dentry->d_flags & DCACHE_FSNOTIFY_PARENT_WATCHED))
-		return 0;
-
 	parent = dget_parent(dentry);
 	p_inode = parent->d_inode;
 
@@ -317,17 +311,12 @@ int fsnotify(struct inode *to_tell, __u32 mask, const void *data, int data_is,
 	struct fsnotify_iter_info iter_info = {};
 	struct super_block *sb = to_tell->i_sb;
 	struct mount *mnt = NULL;
-	__u32 mnt_or_sb_mask = sb->s_fsnotify_mask;
+	__u32 mnt_or_sb_mask;
 	int ret = 0;
-	__u32 test_mask = (mask & ALL_FSNOTIFY_EVENTS);
+	__u32 test_mask;
 
-	if (data_is == FSNOTIFY_EVENT_PATH) {
+	if (data_is == FSNOTIFY_EVENT_PATH)
 		mnt = real_mount(((const struct path *)data)->mnt);
-		mnt_or_sb_mask |= mnt->mnt_fsnotify_mask;
-	}
-	/* An event "on child" is not intended for a mount/sb mark */
-	if (mask & FS_EVENT_ON_CHILD)
-		mnt_or_sb_mask = 0;
 
 	/*
 	 * Optimization: srcu_read_lock() has a memory barrier which can
@@ -339,11 +328,21 @@ int fsnotify(struct inode *to_tell, __u32 mask, const void *data, int data_is,
 	if (!to_tell->i_fsnotify_marks && !sb->s_fsnotify_marks &&
 	    (!mnt || !mnt->mnt_fsnotify_marks))
 		return 0;
+
+	/* An event "on child" is not intended for a mount/sb mark */
+	mnt_or_sb_mask = 0;
+	if (!(mask & FS_EVENT_ON_CHILD)) {
+		mnt_or_sb_mask = sb->s_fsnotify_mask;
+		if (data_is == FSNOTIFY_EVENT_PATH)
+			mnt_or_sb_mask |= mnt->mnt_fsnotify_mask;
+	}
+
 	/*
 	 * if this is a modify event we may need to clear the ignored masks
 	 * otherwise return if neither the inode nor the vfsmount/sb care about
 	 * this type of event.
 	 */
+	test_mask = (mask & ALL_FSNOTIFY_EVENTS);
 	if (!(mask & FS_MODIFY) &&
 	    !(test_mask & (to_tell->i_fsnotify_mask | mnt_or_sb_mask)))
 		return 0;

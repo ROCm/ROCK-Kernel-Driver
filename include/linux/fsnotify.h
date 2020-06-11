@@ -37,6 +37,9 @@ static inline int fsnotify_parent(const struct path *path,
 	if (!dentry)
 		dentry = path->dentry;
 
+	if (!(dentry->d_flags & DCACHE_FSNOTIFY_PARENT_WATCHED))
+		return 0;
+
 	return __fsnotify_parent(path, dentry, mask);
 }
 
