@@ -189,6 +189,11 @@ extern int queue_preemption_timeout_ms;
  */
 extern bool keep_idle_process_evicted;
 
+/*
+ * Enable eviction debug messages
+ */
+extern bool debug_evictions;
+
 enum cache_policy {
 	cache_policy_coherent,
 	cache_policy_noncoherent
