@@ -25,7 +25,7 @@
 
 MOD_COLOR = color_gamma.o
 
-ifdef CONFIG_DRM_AMD_DC_DCN
+ifdef CONFIG_DRM_AMD_DC_DCN1_0
 MOD_COLOR += color_table.o
 endif
 
