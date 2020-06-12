@@ -5760,7 +5760,8 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 #ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	int requested_bpc = dm_state ? dm_state->max_bpc : 8;
 #else
-	int requested_bpc = connector->state ? connector->state->max_requested_bpc : 8;
+	const struct drm_connector_state *drm_state = dm_state ? &dm_state->base : NULL;
+	int requested_bpc = drm_state ? drm_state->max_requested_bpc : 8;
 #endif
 	enum dc_status dc_result = DC_OK;
 
