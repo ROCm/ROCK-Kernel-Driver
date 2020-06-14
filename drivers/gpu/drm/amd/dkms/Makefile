@@ -25,10 +25,7 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
-ifneq ($(findstring $(OS_NAME), "ubuntu" "sled" "sles" "opensuse" "opensuse-leap" "amzn" "custom-rhel" "fedora"),)
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else ifeq ("debian", $(OS_NAME))
+ifeq ("debian", $(OS_NAME))
 real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(real_kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(real_kdir)/Makefile)
@@ -40,6 +37,9 @@ else
 DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 endif
+else
+DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 endif
 
 subdir-ccflags-y += \
