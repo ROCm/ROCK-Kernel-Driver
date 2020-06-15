@@ -8,15 +8,15 @@
 #include <linux/kallsyms.h>
 #include <linux/bug.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33) &&                           \
-	LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
 #endif
 static inline unsigned long kcl_kallsyms_lookup_name(const char *name)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33) &&                           \
-	LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
 	return _kcl_kallsyms_lookup_name(name);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+	return (unsigned long)__symbol_get(name);
 #else
 	return kallsyms_lookup_name(name);
 #endif
