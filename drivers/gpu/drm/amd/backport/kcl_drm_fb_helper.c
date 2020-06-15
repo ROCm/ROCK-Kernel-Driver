@@ -74,4 +74,22 @@ struct drm_gem_object *drm_gem_fb_get_obj(struct drm_framebuffer *fb,
 	else
 		return NULL;
 }
+
+void drm_gem_fb_destroy(struct drm_framebuffer *fb)
+{
+	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
+
+	drm_gem_object_put(amdgpu_fb->obj);
+
+	drm_framebuffer_cleanup(fb);
+	kfree(fb);
+}
+
+int drm_gem_fb_create_handle(struct drm_framebuffer *fb, struct drm_file *file,
+			     unsigned int *handle)
+{
+	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
+
+	return drm_gem_handle_create(file, amdgpu_fb->obj, handle);
+}
 #endif
