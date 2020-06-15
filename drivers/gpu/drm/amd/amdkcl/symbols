@@ -1,5 +1,5 @@
 SYMS=""
 
-if version_lt 2.6.33 || version_gt 5.7.0; then
+if version_lt 2.6.33; then
     SYMS+=" kallsyms_lookup_name"
 fi
