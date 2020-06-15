@@ -80,6 +80,11 @@ nfs_file_open(struct inode *inode, struct file *filp)
 int
 nfs_file_release(struct inode *inode, struct file *filp)
 {
+	if (!nfs_file_open_context(filp)) {
+		dprintk("NFS: buggy mvfs module called fput after failed open\n");
+		return 0;
+	}
+
 	dprintk("NFS: release(%pD2)\n", filp);
 
 	if (filp->f_mode & FMODE_WRITE)
