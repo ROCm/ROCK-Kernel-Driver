@@ -55,6 +55,9 @@ void kcl_drm_gem_fb_set_obj(struct drm_framebuffer *fb, int index, struct drm_ge
 #ifndef HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H
 struct drm_gem_object *drm_gem_fb_get_obj(struct drm_framebuffer *fb,
 					  unsigned int plane);
+void drm_gem_fb_destroy(struct drm_framebuffer *fb);
+int drm_gem_fb_create_handle(struct drm_framebuffer *fb, struct drm_file *file,
+			     unsigned int *handle);
 #endif
 
 #endif
