@@ -754,35 +754,10 @@ bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,
 	}
 	return true;
 }
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
-static void amdgpu_display_user_framebuffer_destroy(struct drm_framebuffer *fb)
-{
-	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
-
-	drm_gem_object_put_unlocked(amdgpu_fb->obj);
-	drm_framebuffer_cleanup(fb);
-	kfree(amdgpu_fb);
-}
-
-static int amdgpu_display_user_framebuffer_create_handle(
-			struct drm_framebuffer *fb,
-			struct drm_file *file_priv,
-			unsigned int *handle)
-{
-	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
-
-	return drm_gem_handle_create(file_priv, amdgpu_fb->obj, handle);
-}
-#endif
 
 static const struct drm_framebuffer_funcs amdgpu_fb_funcs = {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	.destroy = drm_gem_fb_destroy,
 	.create_handle = drm_gem_fb_create_handle,
-#else
-	.destroy = amdgpu_display_user_framebuffer_destroy,
-	.create_handle = amdgpu_display_user_framebuffer_create_handle,
-#endif
 };
 
 uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
