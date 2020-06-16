@@ -7792,7 +7792,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
+	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 #endif
 		/*
@@ -7800,17 +7801,15 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		 * change FB pitch, DCC state, rotation or mirroing.
 		 */
 		bundle->flip_addrs[planes_count].flip_immediate =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
-#else
-#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 			crtc->state->async_flip &&
-#else
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 			(crtc->state->pageflip_flags &
 			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#else
+			(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
 #endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST;
-#endif
 
 		timestamp_ns = ktime_get_ns();
 		bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
@@ -7905,11 +7904,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
+	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+	/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
-			/*clean up the flags for next usage*/
-			acrtc_attach->flip_flags = 0;
+	/*clean up the flags for next usage*/
+	acrtc_attach->flip_flags = 0;
 #endif
 	/* Update the planes if changed or disable if we don't have any. */
 	if ((planes_count || acrtc_state->active_planes == 0) &&
@@ -8547,15 +8547,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
-#else
-#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 		if (new_crtc_state->async_flip)
-#else
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
-#endif
+#else
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
 #endif
 			wait_for_vblank = false;
 	}
