@@ -136,6 +136,9 @@
 /* drm_atomic_nonblocking_commit() is available */
 #define HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT 1
 
+/* drm_atomic_plane_disabling() wants drm_plane_state * arg */
+#define HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE 1
+
 /* drm_atomic_private_obj_init() has p,p,p,p interface */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_P_P_P_P 1
 
