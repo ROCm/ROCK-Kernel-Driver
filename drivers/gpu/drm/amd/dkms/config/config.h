@@ -796,6 +796,9 @@
 /* drm_pending_vblank_event->sequence is available */
 #define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
 
+/* drm_plane_helper_funcs->atomic_async_check() is available */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK 1
+
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
