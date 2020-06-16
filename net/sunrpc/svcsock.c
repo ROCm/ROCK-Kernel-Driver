@@ -611,6 +611,8 @@ svc_udp_sendto(struct svc_rqst *rqstp)
 {
 	int		error;
 
+	svc_release_udp_skb(rqstp);
+
 	error = svc_sendto(rqstp, &rqstp->rq_res);
 	if (error == -ECONNREFUSED)
 		/* ICMP error on earlier request. */
@@ -1150,6 +1152,8 @@ static int svc_tcp_sendto(struct svc_rqst *rqstp)
 	 */
 	reclen = htonl(0x80000000|((xbufp->len ) - 4));
 	memcpy(xbufp->head[0].iov_base, &reclen, 4);
+
+	svc_release_skb(rqstp);
 
 	sent = svc_sendto(rqstp, &rqstp->rq_res);
 	if (sent != xbufp->len) {
