@@ -159,6 +159,24 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET], [
 ])
 
 dnl #
+dnl # v4.11-rc3-950-ga4eff9aa6db8
+dnl # drm: Add acquire ctx parameter to ->set_config
+dnl #
+AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_crtc.h>
+		], [
+			struct drm_crtc_funcs *funcs = NULL;
+			funcs->set_config(NULL, NULL);
+		], [
+			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX, 1,
+				[drm_crtc_funcs->set_config() wants ctx parameter])
+		])
+	])
+])
+
+dnl #
 dnl # v4.11-rc3-945-g41292b1fa13a
 dnl # drm: Add acquire ctx parameter to ->page_flip(_target)
 dnl #
@@ -198,5 +216,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET
+	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 ])

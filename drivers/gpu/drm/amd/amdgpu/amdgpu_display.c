@@ -512,7 +512,7 @@ cleanup:
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx)
 #else
@@ -534,7 +534,7 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 	if (ret < 0)
 		goto out;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 	ret = drm_crtc_helper_set_config(set, ctx);
 #else
 	ret = drm_crtc_helper_set_config(set);
