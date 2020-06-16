@@ -766,6 +766,12 @@
 /* drm_crtc_funcs->{get,verify}_crc_sources() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
 
+/* drm_crtc_funcs->page_flip_target() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET 1
+
+/* drm_crtc_funcs->page_flip_target() wants ctx parameter */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX 1
+
 /* crtc->funcs->set_crc_source() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
 

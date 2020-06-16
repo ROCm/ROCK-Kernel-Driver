@@ -2481,7 +2481,7 @@ static const struct drm_crtc_funcs dce_v8_0_crtc_funcs = {
 	.gamma_set = dce_v8_0_crtc_gamma_set,
 	.set_config = amdgpu_display_crtc_set_config,
 	.destroy = dce_v8_0_crtc_destroy,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	.page_flip_target = amdgpu_display_crtc_page_flip_target,
 #else
 	.page_flip = amdgpu_crtc_page_flip,

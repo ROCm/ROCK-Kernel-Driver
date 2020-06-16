@@ -263,11 +263,11 @@ static void amdgpu_display_unpin_work_func(struct work_struct *__work)
 	kfree(work);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX
 				uint32_t page_flip_flags, uint32_t target,
 				struct drm_modeset_acquire_ctx *ctx)
 #else
