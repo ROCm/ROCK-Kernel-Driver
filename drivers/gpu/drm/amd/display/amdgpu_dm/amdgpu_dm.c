@@ -8882,7 +8882,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 	/* TODO This hack should go away */
 	if (aconnector && enable) {
 		/* Make sure fake sink is created in plug-in scenario */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 		drm_new_conn_state = drm_atomic_get_new_connector_state(state,
 							    &aconnector->base);
 		drm_old_conn_state = drm_atomic_get_old_connector_state(state,
@@ -8898,7 +8898,7 @@ static int dm_update_crtc_state(struct amdgpu_display_manager *dm,
 		}
 
 		dm_new_conn_state = to_dm_connector_state(drm_new_conn_state);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 		dm_old_conn_state = to_dm_connector_state(drm_old_conn_state);
 #endif
 
@@ -9057,7 +9057,7 @@ skip_modeset:
 	 */
 	BUG_ON(dm_new_crtc_state->stream == NULL);
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 	/* Scaling or underscan settings */
 	if (is_scaling_state_different(dm_old_conn_state, dm_new_conn_state))
 		update_stream_scaling_settings(
@@ -9825,7 +9825,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		/* Skip any modesets/resets */
 		if (!acrtc || drm_atomic_crtc_needs_modeset(
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#ifndef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 				acrtc->base.state))
 #else
 				drm_atomic_get_new_crtc_state(state, &acrtc->base)))
