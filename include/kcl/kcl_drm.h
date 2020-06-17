@@ -22,6 +22,7 @@
 #endif
 #include <uapi/drm/drm_mode.h>
 #include <kcl/header/kcl_drm_drv_h.h>
+#include <drm/drm_modeset_helper.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -448,4 +449,9 @@ int drm_helper_force_disable_all(struct drm_device *dev)
 }
 #endif
 
+#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
+void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
+				    struct drm_framebuffer *fb,
+				    const struct drm_mode_fb_cmd2 *mode_cmd);
+#endif
 #endif /* AMDKCL_DRM_H */

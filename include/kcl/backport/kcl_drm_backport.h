@@ -13,6 +13,7 @@
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
 #endif
+#include <drm/drm_modeset_helper.h>
 #include <kcl/kcl_drm.h>
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
@@ -169,5 +170,9 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
  */
 #if DRM_VERSION_CODE < DRM_VERSION(5, 5, 0)
 #define AMDKCL_DMA_BUF_SHARE_ADDR_SPACE
+#endif
+
+#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
+#define drm_helper_mode_fill_fb_struct _kcl_drm_helper_mode_fill_fb_struct
 #endif
 #endif/*AMDKCL_DRM_BACKPORT_H*/

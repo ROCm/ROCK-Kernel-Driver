@@ -444,6 +444,9 @@
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
+/* drm_helper_mode_fill_fb_struct() wants dev arg */
+#define HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV 1
+
 /* drm_is_current_master() is available */
 #define HAVE_DRM_IS_CURRENT_MASTER 1
 
