@@ -39,6 +39,13 @@
 
 #include <linux/pm_runtime.h>
 
+#ifndef HAVE_DRM_KMS_HELPER_IS_POLL_WORKER
+bool inline drm_kms_helper_is_poll_worker(void)
+{
+	return false;
+}
+#endif
+
 void amdgpu_connector_hotplug(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
