@@ -2012,6 +2012,7 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 	struct alternative *alt;
 	struct instruction *insn, *next_insn;
 	struct section *sec;
+	struct cfi_state old_cfi;
 	u8 visited;
 	int ret;
 
@@ -2203,13 +2204,15 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 			return 0;
 
 		case INSN_STACK:
-			if (insn->alt_group) {
-				WARN_FUNC("alternative modifies stack", sec, insn->offset);
-				return -1;
-			}
+			old_cfi = state.cfi;
 
 			if (update_cfi_state(insn, &state.cfi))
 				return 1;
+
+			if (insn->alt_group && memcmp(&state.cfi, &old_cfi, sizeof(struct cfi_state))) {
+				WARN_FUNC("alternative modifies stack", sec, insn->offset);
+				return -1;
+			}
 
 			if (insn->stack_op.dest.type == OP_DEST_PUSHF) {
 				if (!state.uaccess_stack) {
