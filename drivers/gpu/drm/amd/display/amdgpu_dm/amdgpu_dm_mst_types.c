@@ -582,7 +582,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV
 		dm->adev->dev,
 #else
 		dm->adev->ddev,
