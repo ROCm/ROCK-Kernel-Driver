@@ -4007,7 +4007,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[0] / (fb->bits_per_pixel / 8);
 #else
 			fb->pitches[0] / fb->format->cpp[0];
@@ -4023,7 +4023,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[0] / (fb->bits_per_pixel / 8);
 #else
 			fb->pitches[0] / fb->format->cpp[0];
@@ -4036,7 +4036,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->chroma_size.height = fb->height / 2;
 
 		plane_size->chroma_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
 #else
 			fb->pitches[1] / fb->format->cpp[1];
@@ -4229,7 +4229,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	int ret;
 
 	memset(plane_info, 0, sizeof(*plane_info));
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 	switch (fb->pixel_format) {
 #else
 	switch (fb->format->format) {
@@ -4281,7 +4281,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %s\n",
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			drm_get_format_name(fb->pixel_format, &format_name));
 #else
 			drm_get_format_name(fb->format->format, &format_name));
@@ -9139,7 +9139,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 
 		/* TODO: Remove this once we can handle fast format changes. */
 		if (old_other_state->fb && new_other_state->fb &&
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 		    old_other_state->fb->pixel_format != new_other_state->fb->pixel_format)
 #else
 		    old_other_state->fb->format != new_other_state->fb->format)
