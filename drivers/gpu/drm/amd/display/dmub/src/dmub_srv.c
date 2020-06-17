@@ -27,6 +27,9 @@
 #include "dmub_dcn20.h"
 #include "dmub_dcn21.h"
 #include "dmub_cmd.h"
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#include "dmub_dcn30.h"
+#endif
 #include "os_types.h"
 /*
  * Note: the DMUB service is standalone. No additional headers should be
@@ -133,6 +136,9 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 	switch (asic) {
 	case DMUB_ASIC_DCN20:
 	case DMUB_ASIC_DCN21:
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+	case DMUB_ASIC_DCN30:
+#endif
 		dmub->regs = &dmub_srv_dcn20_regs;
 
 		funcs->reset = dmub_dcn20_reset;
@@ -154,6 +160,15 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 			funcs->is_auto_load_done = dmub_dcn21_is_auto_load_done;
 			funcs->is_phy_init = dmub_dcn21_is_phy_init;
 		}
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+		if (asic == DMUB_ASIC_DCN30) {
+			dmub->regs = &dmub_srv_dcn30_regs;
+
+			funcs->is_auto_load_done = dmub_dcn30_is_auto_load_done;
+			funcs->backdoor_load = dmub_dcn30_backdoor_load;
+			funcs->setup_windows = dmub_dcn30_setup_windows;
+		}
+#endif
 		break;
 
 	default:
@@ -184,13 +199,13 @@ enum dmub_status dmub_srv_create(struct dmub_srv *dmub,
 
 	/* Override (some) hardware funcs based on user params. */
 	if (params->hw_funcs) {
-		if (params->hw_funcs->get_inbox1_rptr)
-			dmub->hw_funcs.get_inbox1_rptr =
-				params->hw_funcs->get_inbox1_rptr;
+		if (params->hw_funcs->emul_get_inbox1_rptr)
+			dmub->hw_funcs.emul_get_inbox1_rptr =
+				params->hw_funcs->emul_get_inbox1_rptr;
 
-		if (params->hw_funcs->set_inbox1_wptr)
-			dmub->hw_funcs.set_inbox1_wptr =
-				params->hw_funcs->set_inbox1_wptr;
+		if (params->hw_funcs->emul_set_inbox1_wptr)
+			dmub->hw_funcs.emul_set_inbox1_wptr =
+				params->hw_funcs->emul_set_inbox1_wptr;
 
 		if (params->hw_funcs->is_supported)
 			dmub->hw_funcs.is_supported =
@@ -487,7 +502,7 @@ enum dmub_status dmub_srv_cmd_execute(struct dmub_srv *dmub)
 	 */
 	dmub_rb_flush_pending(&dmub->inbox1_rb);
 
-	dmub->hw_funcs.set_inbox1_wptr(dmub, dmub->inbox1_rb.wrpt);
+		dmub->hw_funcs.set_inbox1_wptr(dmub, dmub->inbox1_rb.wrpt);
 	return DMUB_STATUS_OK;
 }
 
@@ -542,7 +557,7 @@ enum dmub_status dmub_srv_wait_for_idle(struct dmub_srv *dmub,
 		return DMUB_STATUS_INVALID;
 
 	for (i = 0; i <= timeout_us; ++i) {
-		dmub->inbox1_rb.rptr = dmub->hw_funcs.get_inbox1_rptr(dmub);
+			dmub->inbox1_rb.rptr = dmub->hw_funcs.get_inbox1_rptr(dmub);
 		if (dmub_rb_empty(&dmub->inbox1_rb))
 			return DMUB_STATUS_OK;
 

@@ -1,17 +1,17 @@
 /* SPDX-License-Identifier: MIT */
 #include <linux/module.h>
-#include <kcl/kcl_io.h>
+#include <linux/io.h>
 #include "kcl_common.h"
 
 #if !defined(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC) && \
-	defined(CONFIG_X86_PAT)
+	defined(CONFIG_X86)
 #include <asm/pgtable_types.h>
 
 static int (*_kcl_io_reserve_memtype)(resource_size_t start, resource_size_t end,
 			enum page_cache_mode *type);
 static void (*_kcl_io_free_memtype)(resource_size_t start, resource_size_t end);
 
-int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
+int _kcl_arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
 {
 #ifdef _PAGE_CACHE_WC
 	unsigned long type = _PAGE_CACHE_WC;
@@ -21,13 +21,13 @@ int arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
 
 	return _kcl_io_reserve_memtype(start, start + size, &type);
 }
-EXPORT_SYMBOL(arch_io_reserve_memtype_wc);
+EXPORT_SYMBOL(_kcl_arch_io_reserve_memtype_wc);
 
-void arch_io_free_memtype_wc(resource_size_t start, resource_size_t size)
+void _kcl_arch_io_free_memtype_wc(resource_size_t start, resource_size_t size)
 {
 	_kcl_io_free_memtype(start, start + size);
 }
-EXPORT_SYMBOL(arch_io_free_memtype_wc);
+EXPORT_SYMBOL(_kcl_arch_io_free_memtype_wc);
 
 void amdkcl_io_init(void)
 {

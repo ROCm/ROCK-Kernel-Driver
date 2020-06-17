@@ -29,7 +29,7 @@
 #include <kcl/kcl_firmware.h>
 #include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_interval_tree_generic.h>
-#include <kcl/kcl_io.h>
+#include <kcl/backport/kcl_io_backport.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/backport/kcl_kthread_backport.h>
 #include <kcl/kcl_mmu_notifier.h>
@@ -42,9 +42,8 @@
 #include <kcl/backport/kcl_uaccess_backport.h>
 #include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/kcl_types.h>
-#include <kcl/kcl_amdgpu.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
-#include "kcl/kcl_backport_amdgpu.h"
+#include "kcl/kcl_amdgpu_mmu_notifier.h"
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_ptrace.h>
@@ -57,4 +56,5 @@
 #include <kcl/kcl_backlight.h>
 #include <kcl/backport/kcl_drm_atomic_helper_backport.h>
 #include <kcl/kcl_drm_atomic.h>
+#include <kcl/kcl_amdgpu_drm_fb_helper.h>
 #endif /* AMDGPU_BACKPORT_H */

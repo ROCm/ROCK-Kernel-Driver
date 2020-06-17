@@ -106,4 +106,14 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 #endif
 }
 
+/*
+ * v4.19-rc1-206-ge267364a6e1b
+ * drm/atomic: Initialise planes with opaque alpha values
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#define AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
+void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
+							struct drm_plane_state *state);
+#endif
+
 #endif

@@ -27,6 +27,8 @@
 
 #define smu_init_microcode(smu) \
 	((smu)->ppt_funcs->init_microcode ? (smu)->ppt_funcs->init_microcode((smu)) : 0)
+#define smu_fini_microcode(smu) \
+	((smu)->ppt_funcs->fini_microcode ? (smu)->ppt_funcs->fini_microcode((smu)) : 0)
 #define smu_init_smc_tables(smu) \
 	((smu)->ppt_funcs->init_smc_tables ? (smu)->ppt_funcs->init_smc_tables((smu)) : 0)
 #define smu_fini_smc_tables(smu) \
@@ -40,27 +42,15 @@
 	((smu)->ppt_funcs->setup_pptable ? (smu)->ppt_funcs->setup_pptable((smu)) : 0)
 #define smu_powergate_sdma(smu, gate) \
 	((smu)->ppt_funcs->powergate_sdma ? (smu)->ppt_funcs->powergate_sdma((smu), (gate)) : 0)
-#define smu_powergate_vcn(smu, gate) \
-	((smu)->ppt_funcs->powergate_vcn ? (smu)->ppt_funcs->powergate_vcn((smu), (gate)) : 0)
-#define smu_powergate_jpeg(smu, gate) \
-	((smu)->ppt_funcs->powergate_jpeg ? (smu)->ppt_funcs->powergate_jpeg((smu), (gate)) : 0)
 
 #define smu_get_vbios_bootup_values(smu) \
 	((smu)->ppt_funcs->get_vbios_bootup_values ? (smu)->ppt_funcs->get_vbios_bootup_values((smu)) : 0)
-#define smu_get_clk_info_from_vbios(smu) \
-	((smu)->ppt_funcs->get_clk_info_from_vbios ? (smu)->ppt_funcs->get_clk_info_from_vbios((smu)) : 0)
-#define smu_check_pptable(smu) \
-	((smu)->ppt_funcs->check_pptable ? (smu)->ppt_funcs->check_pptable((smu)) : 0)
-#define smu_parse_pptable(smu) \
-	((smu)->ppt_funcs->parse_pptable ? (smu)->ppt_funcs->parse_pptable((smu)) : 0)
-#define smu_populate_smc_tables(smu) \
-	((smu)->ppt_funcs->populate_smc_tables ? (smu)->ppt_funcs->populate_smc_tables((smu)) : 0)
 #define smu_check_fw_version(smu) \
 	((smu)->ppt_funcs->check_fw_version ? (smu)->ppt_funcs->check_fw_version((smu)) : 0)
 #define smu_write_pptable(smu) \
 	((smu)->ppt_funcs->write_pptable ? (smu)->ppt_funcs->write_pptable((smu)) : 0)
-#define smu_set_min_dcef_deep_sleep(smu) \
-	((smu)->ppt_funcs->set_min_dcef_deep_sleep ? (smu)->ppt_funcs->set_min_dcef_deep_sleep((smu)) : 0)
+#define smu_set_min_dcef_deep_sleep(smu, clk) \
+	((smu)->ppt_funcs->set_min_dcef_deep_sleep ? (smu)->ppt_funcs->set_min_dcef_deep_sleep((smu), (clk)) : 0)
 #define smu_set_driver_table_location(smu) \
 	((smu)->ppt_funcs->set_driver_table_location ? (smu)->ppt_funcs->set_driver_table_location((smu)) : 0)
 #define smu_set_tool_table_location(smu) \
@@ -76,8 +66,8 @@
 	((smu)->ppt_funcs->system_features_control ? (smu)->ppt_funcs->system_features_control((smu), (en)) : 0)
 #define smu_init_max_sustainable_clocks(smu) \
 	((smu)->ppt_funcs->init_max_sustainable_clocks ? (smu)->ppt_funcs->init_max_sustainable_clocks((smu)) : 0)
-#define smu_set_default_od_settings(smu, initialize) \
-	((smu)->ppt_funcs->set_default_od_settings ? (smu)->ppt_funcs->set_default_od_settings((smu), (initialize)) : 0)
+#define smu_set_default_od_settings(smu) \
+	((smu)->ppt_funcs->set_default_od_settings ? (smu)->ppt_funcs->set_default_od_settings((smu)) : 0)
 
 #define smu_send_smc_msg_with_param(smu, msg, param, read_arg) \
 	((smu)->ppt_funcs->send_smc_msg_with_param? (smu)->ppt_funcs->send_smc_msg_with_param((smu), (msg), (param), (read_arg)) : 0)
@@ -98,12 +88,6 @@ static inline int smu_send_smc_msg(struct smu_context *smu, enum smu_message_typ
 	((smu)->ppt_funcs->is_dpm_running ? (smu)->ppt_funcs->is_dpm_running((smu)) : 0)
 #define smu_notify_display_change(smu) \
 	((smu)->ppt_funcs->notify_display_change? (smu)->ppt_funcs->notify_display_change((smu)) : 0)
-#define smu_store_powerplay_table(smu) \
-	((smu)->ppt_funcs->store_powerplay_table ? (smu)->ppt_funcs->store_powerplay_table((smu)) : 0)
-#define smu_check_powerplay_table(smu) \
-	((smu)->ppt_funcs->check_powerplay_table ? (smu)->ppt_funcs->check_powerplay_table((smu)) : 0)
-#define smu_append_powerplay_table(smu) \
-	((smu)->ppt_funcs->append_powerplay_table ? (smu)->ppt_funcs->append_powerplay_table((smu)) : 0)
 #define smu_set_default_dpm_table(smu) \
 	((smu)->ppt_funcs->set_default_dpm_table ? (smu)->ppt_funcs->set_default_dpm_table((smu)) : 0)
 #define smu_populate_umd_state_clk(smu) \
@@ -171,10 +155,8 @@ static inline int smu_send_smc_msg(struct smu_context *smu, enum smu_message_typ
 #define smu_get_current_shallow_sleep_clocks(smu, clocks) \
 	((smu)->ppt_funcs->get_current_shallow_sleep_clocks ? (smu)->ppt_funcs->get_current_shallow_sleep_clocks((smu), (clocks)) : 0)
 
-#define smu_dpm_set_uvd_enable(smu, enable) \
-	((smu)->ppt_funcs->dpm_set_uvd_enable ? (smu)->ppt_funcs->dpm_set_uvd_enable((smu), (enable)) : 0)
-#define smu_dpm_set_vce_enable(smu, enable) \
-	((smu)->ppt_funcs->dpm_set_vce_enable ? (smu)->ppt_funcs->dpm_set_vce_enable((smu), (enable)) : 0)
+#define smu_dpm_set_vcn_enable(smu, enable) \
+	((smu)->ppt_funcs->dpm_set_vcn_enable ? (smu)->ppt_funcs->dpm_set_vcn_enable((smu), (enable)) : 0)
 #define smu_dpm_set_jpeg_enable(smu, enable) \
 	((smu)->ppt_funcs->dpm_set_jpeg_enable ? (smu)->ppt_funcs->dpm_set_jpeg_enable((smu), (enable)) : 0)
 
@@ -208,6 +190,9 @@ static inline int smu_send_smc_msg(struct smu_context *smu, enum smu_message_typ
 #define smu_update_pcie_parameters(smu, pcie_gen_cap, pcie_width_cap) \
 		((smu)->ppt_funcs->update_pcie_parameters ? (smu)->ppt_funcs->update_pcie_parameters((smu), (pcie_gen_cap), (pcie_width_cap)) : 0)
 
+#define smu_set_thermal_range(smu, range) \
+		((smu)->ppt_funcs->set_thermal_range ? (smu)->ppt_funcs->set_thermal_range((smu), (range)) : 0)
+
 #define smu_disable_umc_cdr_12gbps_workaround(smu) \
 	((smu)->ppt_funcs->disable_umc_cdr_12gbps_workaround ? (smu)->ppt_funcs->disable_umc_cdr_12gbps_workaround((smu)) : 0)
 
@@ -223,4 +208,8 @@ static inline int smu_send_smc_msg(struct smu_context *smu, enum smu_message_typ
 
 #define smu_log_thermal_throttling(smu) \
 		((smu)->ppt_funcs->log_thermal_throttling_event ? (smu)->ppt_funcs->log_thermal_throttling_event((smu)) : 0)
+
+#define smu_get_asic_power_limits(smu) \
+		((smu)->ppt_funcs->get_power_limit ? (smu)->ppt_funcs->get_power_limit((smu)) : 0)
+
 #endif

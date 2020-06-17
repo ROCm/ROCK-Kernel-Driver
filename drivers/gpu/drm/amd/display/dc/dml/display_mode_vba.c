@@ -301,6 +301,9 @@ static void fetch_ip_params(struct display_mode_lib *mode_lib)
 
 	// IP Parameters
 	mode_lib->vba.UseMinimumRequiredDCFCLK = ip->use_min_dcfclk;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+	mode_lib->vba.ClampMinDCFCLK = ip->clamp_min_dcfclk;
+#endif
 	mode_lib->vba.MaxNumDPP = ip->max_num_dpp;
 	mode_lib->vba.MaxNumOTG = ip->max_num_otg;
 	mode_lib->vba.MaxNumHDMIFRLOutputs = ip->max_num_hdmi_frl_outputs;
@@ -621,14 +624,14 @@ static void fetch_pipe_params(struct display_mode_lib *mode_lib)
 						mode_lib->vba.ViewportWidth[mode_lib->vba.NumberOfActivePlanes] +=
 								src_k->viewport_width;
 						mode_lib->vba.ViewportWidthChroma[mode_lib->vba.NumberOfActivePlanes] +=
-								src_k->viewport_width;
+								src_k->viewport_width_c;
 						mode_lib->vba.ScalerRecoutWidth[mode_lib->vba.NumberOfActivePlanes] +=
 								dst_k->recout_width;
 					} else {
 						mode_lib->vba.ViewportHeight[mode_lib->vba.NumberOfActivePlanes] +=
 								src_k->viewport_height;
 						mode_lib->vba.ViewportHeightChroma[mode_lib->vba.NumberOfActivePlanes] +=
-								src_k->viewport_height;
+								src_k->viewport_height_c;
 					}
 					mode_lib->vba.NumberOfDSCSlices[mode_lib->vba.NumberOfActivePlanes] +=
 							dout_k->dsc_slices;

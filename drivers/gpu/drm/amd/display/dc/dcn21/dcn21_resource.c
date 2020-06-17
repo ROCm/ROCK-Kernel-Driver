@@ -88,7 +88,6 @@
 #include "dce/dmub_psr.h"
 #include "dce/dmub_abm.h"
 
-#define SOC_BOUNDING_BOX_VALID false
 #define DC_LOGGER_INIT(logger)
 
 
@@ -1825,7 +1824,7 @@ static bool dcn21_resource_construct(
 	dc->caps.max_slave_planes = 1;
 	dc->caps.post_blend_color_processing = true;
 	dc->caps.force_dp_tps4_for_cp2520 = true;
-	dc->caps.extended_aux_timeout_support = true;
+	dc->caps.extended_aux_timeout_support = false;
 	dc->caps.dmcub_support = true;
 	dc->caps.is_apu = true;
 
@@ -1925,6 +1924,8 @@ static bool dcn21_resource_construct(
 			BREAK_TO_DEBUGGER();
 			goto create_fail;
 		}
+
+		dc->debug.dmub_command_table = false;
 	}
 
 	if (dc->config.disable_dmcu) {

@@ -21,7 +21,10 @@
 #ifndef _gc_10_1_0_OFFSET_HEADER
 #define _gc_10_1_0_OFFSET_HEADER
 
-
+#define mmSQ_DEBUG_STS_GLOBAL                                                                          0x0309
+#define mmSQ_DEBUG_STS_GLOBAL_BASE_IDX                                                                 0
+#define mmSQ_DEBUG_STS_GLOBAL2                                                                         0x0310
+#define mmSQ_DEBUG_STS_GLOBAL2_BASE_IDX                                                                0
 
 // addressBlock: gc_sdma0_sdma0dec
 // base address: 0x4980
@@ -11165,6 +11168,7 @@
 
 // addressBlock: sqind
 // base address: 0x0
+#define ixSQ_DEBUG_STS_LOCAL                                                                           0x0008
 #define ixSQ_WAVE_MODE                                                                                 0x0101
 #define ixSQ_WAVE_STATUS                                                                               0x0102
 #define ixSQ_WAVE_TRAPSTS                                                                              0x0103

@@ -30,7 +30,7 @@
 #define SMU11_DRIVER_IF_VERSION_NV10 0x36
 #define SMU11_DRIVER_IF_VERSION_NV12 0x33
 #define SMU11_DRIVER_IF_VERSION_NV14 0x36
-#define SMU11_DRIVER_IF_VERSION_Sienna_Cichlid 0x30
+#define SMU11_DRIVER_IF_VERSION_Sienna_Cichlid 0x31
 
 /* MP Apertures */
 #define MP0_Public			0x03800000
@@ -146,6 +146,8 @@ enum smu_v11_0_baco_seq {
 
 int smu_v11_0_init_microcode(struct smu_context *smu);
 
+void smu_v11_0_fini_microcode(struct smu_context *smu);
+
 int smu_v11_0_load_microcode(struct smu_context *smu);
 
 int smu_v11_0_init_smc_tables(struct smu_context *smu);
@@ -162,19 +164,9 @@ int smu_v11_0_setup_pptable(struct smu_context *smu);
 
 int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu);
 
-int smu_v11_0_get_clk_info_from_vbios(struct smu_context *smu);
-
-int smu_v11_0_check_pptable(struct smu_context *smu);
-
-int smu_v11_0_parse_pptable(struct smu_context *smu);
-
-int smu_v11_0_populate_smc_pptable(struct smu_context *smu);
-
 int smu_v11_0_check_fw_version(struct smu_context *smu);
 
 int smu_v11_0_write_pptable(struct smu_context *smu);
-
-int smu_v11_0_set_min_dcef_deep_sleep(struct smu_context *smu);
 
 int smu_v11_0_set_driver_table_location(struct smu_context *smu);
 
@@ -200,6 +192,9 @@ int smu_v11_0_get_enabled_mask(struct smu_context *smu,
 
 int smu_v11_0_notify_display_change(struct smu_context *smu);
 
+int smu_v11_0_get_current_power_limit(struct smu_context *smu,
+				      uint32_t *power_limit);
+
 int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n);
 
 int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
@@ -216,7 +211,7 @@ int smu_v11_0_read_sensor(struct smu_context *smu,
 				 enum amd_pp_sensors sensor,
 				 void *data, uint32_t *size);
 
-int smu_v11_0_set_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk);
+int smu_v11_0_set_min_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk);
 
 int
 smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
@@ -264,10 +259,6 @@ int smu_v11_0_set_soft_freq_limited_range(struct smu_context *smu, enum smu_clk_
 			    uint32_t min, uint32_t max);
 
 int smu_v11_0_override_pcie_parameters(struct smu_context *smu);
-
-int smu_v11_0_set_default_od_settings(struct smu_context *smu, bool initialize, size_t overdrive_table_size);
-
-uint32_t smu_v11_0_get_max_power_limit(struct smu_context *smu);
 
 int smu_v11_0_set_performance_level(struct smu_context *smu,
 				    enum amd_dpm_forced_level level);

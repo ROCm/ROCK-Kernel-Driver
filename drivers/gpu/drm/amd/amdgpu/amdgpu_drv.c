@@ -719,6 +719,14 @@ module_param(queue_preemption_timeout_ms, int, 0644);
 MODULE_PARM_DESC(queue_preemption_timeout_ms, "queue preemption timeout in ms (1 = Minimum, 9000 = default)");
 
 /**
+ * DOC: debug_evictions(bool)
+ * Enable extra debug messages to help determine the cause of evictions
+ */
+bool debug_evictions;
+module_param(debug_evictions, bool, 0644);
+MODULE_PARM_DESC(debug_evictions, "enable eviction debug messages (false = default)");
+
+/**
  * DOC: priv_cp_queues (int)
  * Enable privileged mode for CP queues. Default value: 0 (off)
  */
@@ -1165,7 +1173,9 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, dev);
 
-	amdgpu_driver_load_kms(dev, ent->driver_data);
+	ret = amdgpu_driver_load_kms(dev, ent->driver_data);
+	if (ret)
+		goto err_pci;
 
 retry_init:
 	ret = drm_dev_register(dev, ent->driver_data);

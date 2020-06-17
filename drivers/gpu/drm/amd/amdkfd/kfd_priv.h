@@ -42,6 +42,7 @@
 #include <drm/drm_file.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_device.h>
+#include <drm/drm_ioctl.h>
 #include <kgd_kfd_interface.h>
 #include <linux/swap.h>
 
@@ -187,6 +188,11 @@ extern int queue_preemption_timeout_ms;
  * Restore evicted process only if queues are active
  */
 extern bool keep_idle_process_evicted;
+
+/*
+ * Enable eviction debug messages
+ */
+extern bool debug_evictions;
 
 enum cache_policy {
 	cache_policy_coherent,

@@ -33,7 +33,6 @@
 #include "atomfirmware.h"
 #include "amdgpu_atomfirmware.h"
 #include "smu_v11_0.h"
-#include "smu_v11_0_pptable.h"
 #include "soc15_common.h"
 #include "atom.h"
 #include "amd_pcie.h"
@@ -45,6 +44,16 @@
 #include "asic_reg/mp/mp_11_0_sh_mask.h"
 #include "asic_reg/smuio/smuio_11_0_0_offset.h"
 #include "asic_reg/smuio/smuio_11_0_0_sh_mask.h"
+
+/*
+ * DO NOT use these for err/warn/info/debug messages.
+ * Use dev_err, dev_warn, dev_info and dev_dbg instead.
+ * They are more MGPU friendly.
+ */
+#undef pr_err
+#undef pr_warn
+#undef pr_info
+#undef pr_debug
 
 MODULE_FIRMWARE("amdgpu/arcturus_smc.bin");
 MODULE_FIRMWARE("amdgpu/navi10_smc.bin");
@@ -106,7 +115,7 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 	mutex_lock(&smu->message_lock);
 	ret = smu_v11_0_wait_for_response(smu);
 	if (ret) {
-		pr_err("Msg issuing pre-check failed and "
+		dev_err(adev->dev, "Msg issuing pre-check failed and "
 		       "SMU may be not in the right state!\n");
 		goto out;
 	}
@@ -119,7 +128,7 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 
 	ret = smu_v11_0_wait_for_response(smu);
 	if (ret) {
-		pr_err("failed send message: %10s (%d) \tparam: 0x%08x response %#x\n",
+		dev_err(adev->dev, "failed send message: %10s (%d) \tparam: 0x%08x response %#x\n",
 		       smu_get_message_name(smu, msg), index, param, ret);
 		goto out;
 	}
@@ -127,7 +136,7 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 	if (read_arg) {
 		ret = smu_v11_0_read_arg(smu, read_arg);
 		if (ret) {
-			pr_err("failed to read message arg: %10s (%d) \tparam: 0x%08x response %#x\n",
+			dev_err(adev->dev, "failed to read message arg: %10s (%d) \tparam: 0x%08x response %#x\n",
 			       smu_get_message_name(smu, msg), index, param, ret);
 			goto out;
 		}
@@ -197,6 +206,15 @@ out:
 		adev->pm.fw = NULL;
 	}
 	return err;
+}
+
+void smu_v11_0_fini_microcode(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+
+	release_firmware(adev->pm.fw);
+	adev->pm.fw = NULL;
+	adev->pm.fw_version = 0;
 }
 
 int smu_v11_0_load_microcode(struct smu_context *smu)
@@ -286,7 +304,7 @@ int smu_v11_0_check_fw_version(struct smu_context *smu)
 		smu->smc_driver_if_version = SMU11_DRIVER_IF_VERSION_Sienna_Cichlid;
 		break;
 	default:
-		pr_err("smu unsupported asic type:%d.\n", smu->adev->asic_type);
+		dev_err(smu->adev->dev, "smu unsupported asic type:%d.\n", smu->adev->asic_type);
 		smu->smc_driver_if_version = SMU11_DRIVER_IF_VERSION_INV;
 		break;
 	}
@@ -300,11 +318,11 @@ int smu_v11_0_check_fw_version(struct smu_context *smu)
 	 * of halt driver loading.
 	 */
 	if (if_version != smu->smc_driver_if_version) {
-		pr_info("smu driver if version = 0x%08x, smu fw if version = 0x%08x, "
+		dev_info(smu->adev->dev, "smu driver if version = 0x%08x, smu fw if version = 0x%08x, "
 			"smu fw version = 0x%08x (%d.%d.%d)\n",
 			smu->smc_driver_if_version, if_version,
 			smu_version, smu_major, smu_minor, smu_debug);
-		pr_warn("SMU driver if version not matched\n");
+		dev_warn(smu->adev->dev, "SMU driver if version not matched\n");
 	}
 
 	return ret;
@@ -367,7 +385,7 @@ int smu_v11_0_setup_pptable(struct smu_context *smu)
 	version_major = le16_to_cpu(hdr->header.header_version_major);
 	version_minor = le16_to_cpu(hdr->header.header_version_minor);
 	if (version_major == 2 && smu->smu_table.boot_values.pp_table_id > 0) {
-		pr_info("use driver provided pptable %d\n", smu->smu_table.boot_values.pp_table_id);
+		dev_info(adev->dev, "use driver provided pptable %d\n", smu->smu_table.boot_values.pp_table_id);
 		switch (version_minor) {
 		case 0:
 			ret = smu_v11_0_set_pptable_v2_0(smu, &table, &size);
@@ -384,7 +402,7 @@ int smu_v11_0_setup_pptable(struct smu_context *smu)
 			return ret;
 
 	} else {
-		pr_info("use vbios provided pptable\n");
+		dev_info(adev->dev, "use vbios provided pptable\n");
 		index = get_index_into_master_table(atom_master_list_of_data_tables_v2_1,
 						    powerplayinfo);
 
@@ -439,25 +457,67 @@ int smu_v11_0_init_smc_tables(struct smu_context *smu)
 	struct smu_table *tables = NULL;
 	int ret = 0;
 
-	if (smu_table->tables)
-		return -EINVAL;
-
 	tables = kcalloc(SMU_TABLE_COUNT, sizeof(struct smu_table),
 			 GFP_KERNEL);
-	if (!tables)
-		return -ENOMEM;
-
+	if (!tables) {
+		ret = -ENOMEM;
+		goto err0_out;
+	}
 	smu_table->tables = tables;
 
 	ret = smu_tables_init(smu, tables);
 	if (ret)
-		return ret;
+		goto err1_out;
 
 	ret = smu_v11_0_init_dpm_context(smu);
 	if (ret)
-		return ret;
+		goto err1_out;
+
+	smu_table->driver_pptable =
+		kzalloc(tables[SMU_TABLE_PPTABLE].size, GFP_KERNEL);
+	if (!smu_table->driver_pptable) {
+		ret = -ENOMEM;
+		goto err2_out;
+	}
+
+	smu_table->max_sustainable_clocks =
+		kzalloc(sizeof(struct smu_11_0_max_sustainable_clocks), GFP_KERNEL);
+	if (!smu_table->max_sustainable_clocks) {
+		ret = -ENOMEM;
+		goto err3_out;
+	}
+
+	/* Arcturus does not support OVERDRIVE */
+	if (tables[SMU_TABLE_OVERDRIVE].size) {
+		smu_table->overdrive_table =
+			kzalloc(tables[SMU_TABLE_OVERDRIVE].size, GFP_KERNEL);
+		if (!smu_table->overdrive_table) {
+			ret = -ENOMEM;
+			goto err4_out;
+		}
+
+		smu_table->boot_overdrive_table =
+			kzalloc(tables[SMU_TABLE_OVERDRIVE].size, GFP_KERNEL);
+		if (!smu_table->boot_overdrive_table) {
+			ret = -ENOMEM;
+			goto err5_out;
+		}
+	}
 
 	return 0;
+
+err5_out:
+	kfree(smu_table->overdrive_table);
+err4_out:
+	kfree(smu_table->max_sustainable_clocks);
+err3_out:
+	kfree(smu_table->driver_pptable);
+err2_out:
+	smu_v11_0_fini_dpm_context(smu);
+err1_out:
+	kfree(tables);
+err0_out:
+	return ret;
 }
 
 int smu_v11_0_fini_smc_tables(struct smu_context *smu)
@@ -467,6 +527,17 @@ int smu_v11_0_fini_smc_tables(struct smu_context *smu)
 
 	if (!smu_table->tables)
 		return -EINVAL;
+
+	kfree(smu_table->boot_overdrive_table);
+	kfree(smu_table->overdrive_table);
+	kfree(smu_table->max_sustainable_clocks);
+	kfree(smu_table->driver_pptable);
+	smu_table->boot_overdrive_table = NULL;
+	smu_table->overdrive_table = NULL;
+	smu_table->max_sustainable_clocks = NULL;
+	smu_table->driver_pptable = NULL;
+	kfree(smu_table->hardcode_pptable);
+	smu_table->hardcode_pptable = NULL;
 
 	kfree(smu_table->tables);
 	kfree(smu_table->metrics_table);
@@ -512,6 +583,32 @@ int smu_v11_0_fini_power(struct smu_context *smu)
 	return 0;
 }
 
+static int smu_v11_0_atom_get_smu_clockinfo(struct amdgpu_device *adev,
+					    uint8_t clk_id,
+					    uint8_t syspll_id,
+					    uint32_t *clk_freq)
+{
+	struct atom_get_smu_clock_info_parameters_v3_1 input = {0};
+	struct atom_get_smu_clock_info_output_parameters_v3_1 *output;
+	int ret, index;
+
+	input.clk_id = clk_id;
+	input.syspll_id = syspll_id;
+	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
+	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
+					    getsmuclockinfo);
+
+	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
+					(uint32_t *)&input);
+	if (ret)
+		return -EINVAL;
+
+	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
+	*clk_freq = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
+
+	return 0;
+}
+
 int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu)
 {
 	int ret, index;
@@ -530,7 +627,7 @@ int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu)
 		return ret;
 
 	if (header->format_revision != 3) {
-		pr_err("unknown atom_firmware_info version! for smu11\n");
+		dev_err(smu->adev->dev, "unknown atom_firmware_info version! for smu11\n");
 		return -EINVAL;
 	}
 
@@ -570,102 +667,37 @@ int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu)
 	smu->smu_table.boot_values.format_revision = header->format_revision;
 	smu->smu_table.boot_values.content_revision = header->content_revision;
 
-	return 0;
-}
+	smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+					 (uint8_t)SMU11_SYSPLL0_SOCCLK_ID,
+					 (uint8_t)0,
+					 &smu->smu_table.boot_values.socclk);
 
-int smu_v11_0_get_clk_info_from_vbios(struct smu_context *smu)
-{
-	int ret, index;
-	struct amdgpu_device *adev = smu->adev;
-	struct atom_get_smu_clock_info_parameters_v3_1 input = {0};
-	struct atom_get_smu_clock_info_output_parameters_v3_1 *output;
+	smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+					 (uint8_t)SMU11_SYSPLL0_DCEFCLK_ID,
+					 (uint8_t)0,
+					 &smu->smu_table.boot_values.dcefclk);
 
-	input.clk_id = SMU11_SYSPLL0_SOCCLK_ID;
-	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-					    getsmuclockinfo);
+	smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+					 (uint8_t)SMU11_SYSPLL0_ECLK_ID,
+					 (uint8_t)0,
+					 &smu->smu_table.boot_values.eclk);
 
-	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-					(uint32_t *)&input);
-	if (ret)
-		return -EINVAL;
+	smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+					 (uint8_t)SMU11_SYSPLL0_VCLK_ID,
+					 (uint8_t)0,
+					 &smu->smu_table.boot_values.vclk);
 
-	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-	smu->smu_table.boot_values.socclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
-
-	memset(&input, 0, sizeof(input));
-	input.clk_id = SMU11_SYSPLL0_DCEFCLK_ID;
-	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-					    getsmuclockinfo);
-
-	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-					(uint32_t *)&input);
-	if (ret)
-		return -EINVAL;
-
-	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-	smu->smu_table.boot_values.dcefclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
-
-	memset(&input, 0, sizeof(input));
-	input.clk_id = SMU11_SYSPLL0_ECLK_ID;
-	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-					    getsmuclockinfo);
-
-	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-					(uint32_t *)&input);
-	if (ret)
-		return -EINVAL;
-
-	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-	smu->smu_table.boot_values.eclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
-
-	memset(&input, 0, sizeof(input));
-	input.clk_id = SMU11_SYSPLL0_VCLK_ID;
-	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-					    getsmuclockinfo);
-
-	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-					(uint32_t *)&input);
-	if (ret)
-		return -EINVAL;
-
-	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-	smu->smu_table.boot_values.vclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
-
-	memset(&input, 0, sizeof(input));
-	input.clk_id = SMU11_SYSPLL0_DCLK_ID;
-	input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-	index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-					    getsmuclockinfo);
-
-	ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-					(uint32_t *)&input);
-	if (ret)
-		return -EINVAL;
-
-	output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-	smu->smu_table.boot_values.dclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
+	smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+					 (uint8_t)SMU11_SYSPLL0_DCLK_ID,
+					 (uint8_t)0,
+					 &smu->smu_table.boot_values.dclk);
 
 	if ((smu->smu_table.boot_values.format_revision == 3) &&
-	    (smu->smu_table.boot_values.content_revision >= 2)) {
-		memset(&input, 0, sizeof(input));
-		input.clk_id = SMU11_SYSPLL1_0_FCLK_ID;
-		input.syspll_id = SMU11_SYSPLL1_2_ID;
-		input.command = GET_SMU_CLOCK_INFO_V3_1_GET_CLOCK_FREQ;
-		index = get_index_into_master_table(atom_master_list_of_command_functions_v2_1,
-						    getsmuclockinfo);
-
-		ret = amdgpu_atom_execute_table(adev->mode_info.atom_context, index,
-						(uint32_t *)&input);
-		if (ret)
-			return -EINVAL;
-
-		output = (struct atom_get_smu_clock_info_output_parameters_v3_1 *)&input;
-		smu->smu_table.boot_values.fclk = le32_to_cpu(output->atom_smu_outputclkfreq.smu_clock_freq_hz) / 10000;
-	}
+	    (smu->smu_table.boot_values.content_revision >= 2))
+		smu_v11_0_atom_get_smu_clockinfo(smu->adev,
+						 (uint8_t)SMU11_SYSPLL1_0_FCLK_ID,
+						 (uint8_t)SMU11_SYSPLL1_2_ID,
+						 &smu->smu_table.boot_values.fclk);
 
 	return 0;
 }
@@ -718,48 +750,6 @@ int smu_v11_0_notify_memory_pool_location(struct smu_context *smu)
 	return ret;
 }
 
-int smu_v11_0_check_pptable(struct smu_context *smu)
-{
-	int ret;
-
-	ret = smu_check_powerplay_table(smu);
-	return ret;
-}
-
-int smu_v11_0_parse_pptable(struct smu_context *smu)
-{
-	int ret;
-
-	struct smu_table_context *table_context = &smu->smu_table;
-	struct smu_table *table = &table_context->tables[SMU_TABLE_PPTABLE];
-
-	/* during TDR we need to free and alloc the pptable */
-	if (table_context->driver_pptable)
-		kfree(table_context->driver_pptable);
-
-	table_context->driver_pptable = kzalloc(table->size, GFP_KERNEL);
-
-	if (!table_context->driver_pptable)
-		return -ENOMEM;
-
-	ret = smu_store_powerplay_table(smu);
-	if (ret)
-		return -EINVAL;
-
-	ret = smu_append_powerplay_table(smu);
-
-	return ret;
-}
-
-int smu_v11_0_populate_smc_pptable(struct smu_context *smu)
-{
-	int ret;
-
-	ret = smu_set_default_dpm_table(smu);
-
-	return ret;
-}
-
 int smu_v11_0_write_pptable(struct smu_context *smu)
 {
 	struct smu_table_context *table_context = &smu->smu_table;
@@ -771,26 +761,16 @@ int smu_v11_0_write_pptable(struct smu_context *smu)
 	return ret;
 }
 
-int smu_v11_0_set_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk)
+int smu_v11_0_set_min_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk)
 {
 	int ret;
 
 	ret = smu_send_smc_msg_with_param(smu,
 					  SMU_MSG_SetMinDeepSleepDcefclk, clk, NULL);
 	if (ret)
-		pr_err("SMU11 attempt to set divider for DCEFCLK Failed!");
+		dev_err(smu->adev->dev, "SMU11 attempt to set divider for DCEFCLK Failed!");
 
 	return ret;
-}
-
-int smu_v11_0_set_min_dcef_deep_sleep(struct smu_context *smu)
-{
-	struct smu_table_context *table_context = &smu->smu_table;
-
-	if (!table_context)
-		return -EINVAL;
-
-	return smu_v11_0_set_deep_sleep_dcefclk(smu, table_context->boot_values.dcefclk / 100);
 }
 
 int smu_v11_0_set_driver_table_location(struct smu_context *smu)
@@ -836,11 +816,6 @@ int smu_v11_0_set_tool_table_location(struct smu_context *smu)
 int smu_v11_0_init_display_count(struct smu_context *smu, uint32_t count)
 {
 	int ret = 0;
-	struct amdgpu_device *adev = smu->adev;
-
-	/* Sienna_Cichlid do not support to change display num currently */
-	if (adev->asic_type == CHIP_SIENNA_CICHLID)
-		return 0;
 
 	if (!smu->pm_enabled)
 		return ret;
@@ -967,7 +942,7 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDcModeMaxDpmFreq,
 					  clk_id << 16, clock);
 	if (ret) {
-		pr_err("[GetMaxSustainableClock] Failed to get max DC clock from SMC!");
+		dev_err(smu->adev->dev, "[GetMaxSustainableClock] Failed to get max DC clock from SMC!");
 		return ret;
 	}
 
@@ -978,7 +953,7 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMaxDpmFreq,
 					  clk_id << 16, clock);
 	if (ret) {
-		pr_err("[GetMaxSustainableClock] failed to get max AC clock from SMC!");
+		dev_err(smu->adev->dev, "[GetMaxSustainableClock] failed to get max AC clock from SMC!");
 		return ret;
 	}
 
@@ -987,16 +962,9 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 
 int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 {
-	struct smu_11_0_max_sustainable_clocks *max_sustainable_clocks;
+	struct smu_11_0_max_sustainable_clocks *max_sustainable_clocks =
+			smu->smu_table.max_sustainable_clocks;
 	int ret = 0;
-
-	if (!smu->smu_table.max_sustainable_clocks)
-		max_sustainable_clocks = kzalloc(sizeof(struct smu_11_0_max_sustainable_clocks),
-					 GFP_KERNEL);
-	else
-		max_sustainable_clocks = smu->smu_table.max_sustainable_clocks;
-
-	smu->smu_table.max_sustainable_clocks = (void *)max_sustainable_clocks;
 
 	max_sustainable_clocks->uclock = smu->smu_table.boot_values.uclk / 100;
 	max_sustainable_clocks->soc_clock = smu->smu_table.boot_values.socclk / 100;
@@ -1010,7 +978,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->uclock),
 							  SMU_UCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max UCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max UCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1021,7 +989,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->soc_clock),
 							  SMU_SOCCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max SOCCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max SOCCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1032,7 +1000,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->dcef_clock),
 							  SMU_DCEFCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max DCEFCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max DCEFCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1041,7 +1009,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->display_clock),
 							  SMU_DISPCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max DISPCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max DISPCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1049,7 +1017,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->phy_clock),
 							  SMU_PHYCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max PHYCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max PHYCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1057,7 +1025,7 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 							  &(max_sustainable_clocks->pixel_clock),
 							  SMU_PIXCLK);
 		if (ret) {
-			pr_err("[%s] failed to get max PIXCLK from SMC!",
+			dev_err(smu->adev->dev, "[%s] failed to get max PIXCLK from SMC!",
 			       __func__);
 			return ret;
 		}
@@ -1069,61 +1037,48 @@ int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
 	return 0;
 }
 
-uint32_t smu_v11_0_get_max_power_limit(struct smu_context *smu) {
-	uint32_t od_limit, max_power_limit;
-	struct smu_11_0_powerplay_table *powerplay_table = NULL;
-	struct smu_table_context *table_context = &smu->smu_table;
-	powerplay_table = table_context->power_play_table;
+int smu_v11_0_get_current_power_limit(struct smu_context *smu,
+				      uint32_t *power_limit)
+{
+	int power_src;
+	int ret = 0;
 
-	max_power_limit = smu_get_pptable_power_limit(smu);
+	if (!smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT))
+		return -EINVAL;
 
-	if (!max_power_limit) {
-		// If we couldn't get the table limit, fall back on first-read value
-		if (!smu->default_power_limit)
-			smu->default_power_limit = smu->power_limit;
-		max_power_limit = smu->default_power_limit;
-	}
+	power_src = smu_power_get_index(smu,
+					smu->adev->pm.ac_power ?
+					SMU_POWER_SOURCE_AC :
+					SMU_POWER_SOURCE_DC);
+	if (power_src < 0)
+		return -EINVAL;
 
-	if (smu->od_enabled) {
-		od_limit = le32_to_cpu(powerplay_table->overdrive_table.max[SMU_11_0_ODSETTING_POWERPERCENTAGE]);
+	ret = smu_send_smc_msg_with_param(smu,
+					  SMU_MSG_GetPptLimit,
+					  power_src << 16,
+					  power_limit);
+	if (ret)
+		dev_err(smu->adev->dev, "[%s] get PPT limit failed!", __func__);
 
-		pr_debug("ODSETTING_POWERPERCENTAGE: %d (default: %d)\n", od_limit, smu->default_power_limit);
-
-		max_power_limit *= (100 + od_limit);
-		max_power_limit /= 100;
-	}
-
-	return max_power_limit;
+	return ret;
 }
 
 int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n)
 {
 	int ret = 0;
-	uint32_t max_power_limit;
-
-	max_power_limit = smu_v11_0_get_max_power_limit(smu);
-
-	if (n > max_power_limit) {
-		pr_err("New power limit (%d) is over the max allowed %d\n",
-				n,
-				max_power_limit);
-		return -EINVAL;
-	}
-
-	if (n == 0)
-		n = smu->default_power_limit;
 
 	if (!smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT)) {
-		pr_err("Setting new power limit is not supported!\n");
+		dev_err(smu->adev->dev, "Setting new power limit is not supported!\n");
 		return -EOPNOTSUPP;
 	}
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetPptLimit, n, NULL);
 	if (ret) {
-		pr_err("[%s] Set power limit Failed!\n", __func__);
+		dev_err(smu->adev->dev, "[%s] Set power limit Failed!\n", __func__);
 		return ret;
 	}
-	smu->power_limit = n;
+
+	smu->current_power_limit = n;
 
 	return 0;
 }
@@ -1134,58 +1089,18 @@ int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
 {
 	int ret = 0;
 	uint32_t freq = 0;
-	int asic_clk_id;
 
 	if (clk_id >= SMU_CLK_COUNT || !value)
 		return -EINVAL;
 
-	asic_clk_id = smu_clk_get_index(smu, clk_id);
-	if (asic_clk_id < 0)
-		return -EINVAL;
-
-	/* if don't has GetDpmClockFreq Message, try get current clock by SmuMetrics_t */
-	if (smu_msg_get_index(smu, SMU_MSG_GetDpmClockFreq) < 0)
-		ret =  smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
-	else {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDpmClockFreq,
-						  (asic_clk_id << 16), &freq);
-		if (ret)
-			return ret;
-	}
+	ret =  smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
+	if (ret)
+		return ret;
 
 	freq *= 100;
 	*value = freq;
 
 	return ret;
-}
-
-static int smu_v11_0_set_thermal_range(struct smu_context *smu,
-				       struct smu_temperature_range range)
-{
-	struct amdgpu_device *adev = smu->adev;
-	int low = SMU_THERMAL_MINIMUM_ALERT_TEMP;
-	int high = SMU_THERMAL_MAXIMUM_ALERT_TEMP;
-	uint32_t val;
-	struct smu_table_context *table_context = &smu->smu_table;
-	struct smu_11_0_powerplay_table *powerplay_table = table_context->power_play_table;
-
-	low = max(SMU_THERMAL_MINIMUM_ALERT_TEMP,
-			range.min / SMU_TEMPERATURE_UNITS_PER_CENTIGRADES);
-	high = min((uint16_t)SMU_THERMAL_MAXIMUM_ALERT_TEMP, powerplay_table->software_shutdown_temp);
-
-	if (low > high)
-		return -EINVAL;
-
-	val = RREG32_SOC15(THM, 0, mmTHM_THERMAL_INT_CTRL);
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, MAX_IH_CREDIT, 5);
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, THERM_IH_HW_ENA, 1);
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTH, (high & 0xff));
-	val = REG_SET_FIELD(val, THM_THERMAL_INT_CTRL, DIG_THERM_INTL, (low & 0xff));
-	val = val & (~THM_THERMAL_INT_CTRL__THERM_TRIGGER_MASK_MASK);
-
-	WREG32_SOC15(THM, 0, mmTHM_THERMAL_INT_CTRL, val);
-
-	return 0;
 }
 
 int smu_v11_0_enable_thermal_alert(struct smu_context *smu)
@@ -1201,11 +1116,11 @@ int smu_v11_0_enable_thermal_alert(struct smu_context *smu)
 		return ret;
 
 	if (smu->smu_table.thermal_controller_type) {
-		ret = smu_v11_0_set_thermal_range(smu, range);
+		ret = smu_set_thermal_range(smu, range);
 		if (ret)
 			return ret;
 
-		ret = amdgpu_irq_get(adev, smu->irq_source, 0);
+		ret = amdgpu_irq_get(adev, &smu->irq_source, 0);
 		if (ret)
 			return ret;
 
@@ -1229,7 +1144,7 @@ int smu_v11_0_enable_thermal_alert(struct smu_context *smu)
 
 int smu_v11_0_disable_thermal_alert(struct smu_context *smu)
 {
-	return amdgpu_irq_put(smu->adev, smu->irq_source, 0);
+	return amdgpu_irq_put(smu->adev, &smu->irq_source, 0);
 }
 
 static uint16_t convert_to_vddc(uint8_t vid)
@@ -1278,12 +1193,8 @@ int smu_v11_0_read_sensor(struct smu_context *smu,
 		ret = smu_v11_0_get_gfx_vdd(smu, (uint32_t *)data);
 		*size = 4;
 		break;
-	case AMDGPU_PP_SENSOR_MIN_FAN_RPM:
-		*(uint32_t *)data = 0;
-		*size = 4;
-		break;
 	default:
-		ret = smu_common_read_sensor(smu, sensor, data, size);
+		ret = -EOPNOTSUPP;
 		break;
 	}
 
@@ -1322,7 +1233,7 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 			clk_select = SMU_UCLK;
 			break;
 		default:
-			pr_info("[%s] Invalid Clock Type!", __func__);
+			dev_info(smu->adev->dev, "[%s] Invalid Clock Type!", __func__);
 			ret = -EINVAL;
 			break;
 		}
@@ -1386,7 +1297,7 @@ smu_v11_0_auto_fan_control(struct smu_context *smu, bool auto_fan_control)
 
 	ret = smu_feature_set_enabled(smu, SMU_FEATURE_FAN_CONTROL_BIT, auto_fan_control);
 	if (ret)
-		pr_err("[%s]%s smc FAN CONTROL feature failed!",
+		dev_err(smu->adev->dev, "[%s]%s smc FAN CONTROL feature failed!",
 		       __func__, (auto_fan_control ? "Start" : "Stop"));
 
 	return ret;
@@ -1457,7 +1368,7 @@ smu_v11_0_set_fan_control_mode(struct smu_context *smu,
 	}
 
 	if (ret) {
-		pr_err("[%s]Set fan control mode failed!", __func__);
+		dev_err(smu->adev->dev, "[%s]Set fan control mode failed!", __func__);
 		return -EINVAL;
 	}
 
@@ -1627,7 +1538,7 @@ static int smu_v11_0_irq_process(struct amdgpu_device *adev,
 					return 0;
 
 				if (__ratelimit(&adev->throttling_logging_rs))
-					smu_log_thermal_throttling(smu);
+					schedule_work(&smu->throttling_logging_work);
 
 				break;
 			}
@@ -1646,17 +1557,8 @@ static const struct amdgpu_irq_src_funcs smu_v11_0_irq_funcs =
 int smu_v11_0_register_irq_handler(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
-	struct amdgpu_irq_src *irq_src = smu->irq_source;
+	struct amdgpu_irq_src *irq_src = &smu->irq_source;
 	int ret = 0;
-
-	/* already register */
-	if (irq_src)
-		return 0;
-
-	irq_src = kzalloc(sizeof(struct amdgpu_irq_src), GFP_KERNEL);
-	if (!irq_src)
-		return -ENOMEM;
-	smu->irq_source = irq_src;
 
 	irq_src->num_types = 1;
 	irq_src->funcs = &smu_v11_0_irq_funcs;
@@ -1931,43 +1833,10 @@ int smu_v11_0_override_pcie_parameters(struct smu_context *smu)
 	ret = smu_update_pcie_parameters(smu, pcie_gen, pcie_width);
 
 	if (ret)
-		pr_err("[%s] Attempt to override pcie params failed!\n", __func__);
+		dev_err(adev->dev, "[%s] Attempt to override pcie params failed!\n", __func__);
 
 	return ret;
 
-}
-
-int smu_v11_0_set_default_od_settings(struct smu_context *smu, bool initialize, size_t overdrive_table_size)
-{
-	struct smu_table_context *table_context = &smu->smu_table;
-	int ret = 0;
-
-	if (initialize) {
-		if (table_context->overdrive_table) {
-			return -EINVAL;
-		}
-		table_context->overdrive_table = kzalloc(overdrive_table_size, GFP_KERNEL);
-		if (!table_context->overdrive_table) {
-			return -ENOMEM;
-		}
-		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, false);
-		if (ret) {
-			pr_err("Failed to export overdrive table!\n");
-			return ret;
-		}
-		if (!table_context->boot_overdrive_table) {
-			table_context->boot_overdrive_table = kmemdup(table_context->overdrive_table, overdrive_table_size, GFP_KERNEL);
-			if (!table_context->boot_overdrive_table) {
-				return -ENOMEM;
-			}
-		}
-	}
-	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, table_context->overdrive_table, true);
-	if (ret) {
-		pr_err("Failed to import overdrive table!\n");
-		return ret;
-	}
-	return ret;
 }
 
 int smu_v11_0_set_performance_level(struct smu_context *smu,

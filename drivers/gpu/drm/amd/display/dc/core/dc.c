@@ -741,6 +741,9 @@ static bool dc_construct(struct dc *dc,
 	dc->clk_mgr = dc_clk_mgr_create(dc->ctx, dc->res_pool->pp_smu, dc->res_pool->dccg);
 	if (!dc->clk_mgr)
 		goto fail;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+	dc->clk_mgr->force_smu_not_present = init_params->force_smu_not_present;
+#endif
 
 #ifdef CONFIG_DRM_AMD_DC_DCN2_1
 	if (dc->res_pool->funcs->update_bw_bounding_box)
@@ -1037,9 +1040,19 @@ static void program_timing_sync(
 			}
 		}
 
-		/* set first pipe with plane as master */
+		/* set first unblanked pipe as master */
 		for (j = 0; j < group_size; j++) {
-			if (pipe_set[j]->plane_state) {
+			bool is_blanked;
+
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+			if (pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked)
+				is_blanked =
+					pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked(pipe_set[j]->stream_res.opp);
+			else
+#endif
+				is_blanked =
+					pipe_set[j]->stream_res.tg->funcs->is_blanked(pipe_set[j]->stream_res.tg);
+			if (!is_blanked) {
 				if (j == 0)
 					break;
 
@@ -1060,9 +1073,19 @@ static void program_timing_sync(
 				status->timing_sync_info.master = false;
 
 		}
-		/* remove any other pipes with plane as they have already been synced */
+		/* remove any other unblanked pipes as they have already been synced */
 		for (j = j + 1; j < group_size; j++) {
-			if (pipe_set[j]->plane_state) {
+			bool is_blanked;
+
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+			if (pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked)
+				is_blanked =
+					pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked(pipe_set[j]->stream_res.opp);
+			else
+#endif
+				is_blanked =
+					pipe_set[j]->stream_res.tg->funcs->is_blanked(pipe_set[j]->stream_res.tg);
+			if (!is_blanked) {
 				group_size--;
 				pipe_set[j] = pipe_set[group_size];
 				j--;
@@ -1249,7 +1272,6 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	int i, k, l;
 	struct dc_stream_state *dc_streams[MAX_STREAMS] = {0};
 
-	disable_dangling_plane(dc, context);
 
 	for (i = 0; i < context->stream_count; i++)
 		dc_streams[i] =  context->streams[i];
@@ -1265,6 +1287,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	if (dc->optimize_seamless_boot_streams == 0)
 		dc->hwss.prepare_bandwidth(dc, context);
 
+	disable_dangling_plane(dc, context);
 	/* re-program planes for existing stream, in case we need to
 	 * free up plane resource for later use
 	 */
@@ -1389,6 +1412,43 @@ bool dc_commit_state(struct dc *dc, struct dc_state *context)
 	return (result == DC_OK);
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+bool dc_acquire_release_mpc_3dlut(
+		struct dc *dc, bool acquire,
+		struct dc_stream_state *stream,
+		struct dc_3dlut **lut,
+		struct dc_transfer_func **shaper)
+{
+	int pipe_idx;
+	bool ret = false;
+	bool found_pipe_idx = false;
+	const struct resource_pool *pool = dc->res_pool;
+	struct resource_context *res_ctx = &dc->current_state->res_ctx;
+	int mpcc_id = 0;
+
+	if (pool && res_ctx) {
+		if (acquire) {
+			/*find pipe idx for the given stream*/
+			for (pipe_idx = 0; pipe_idx < pool->pipe_count; pipe_idx++) {
+				if (res_ctx->pipe_ctx[pipe_idx].stream == stream) {
+					found_pipe_idx = true;
+					mpcc_id = res_ctx->pipe_ctx[pipe_idx].plane_res.hubp->inst;
+					break;
+				}
+			}
+		} else
+			found_pipe_idx = true;/*for release pipe_idx is not required*/
+
+		if (found_pipe_idx) {
+			if (acquire && pool->funcs->acquire_post_bldn_3dlut)
+				ret = pool->funcs->acquire_post_bldn_3dlut(res_ctx, pool, mpcc_id, lut, shaper);
+			else if (acquire == false && pool->funcs->release_post_bldn_3dlut)
+				ret = pool->funcs->release_post_bldn_3dlut(res_ctx, pool, lut, shaper);
+		}
+	}
+	return ret;
+}
+#endif
 static bool is_flip_pending_in_pipes(struct dc *dc, struct dc_state *context)
 {
 	int i;
@@ -2576,6 +2636,12 @@ void dc_commit_updates_for_stream(struct dc *dc,
 
 	copy_stream_update_to_stream(dc, context, stream, stream_update);
 
+	if (!dc->res_pool->funcs->validate_bandwidth(dc, context, false)) {
+		DC_ERROR("Mode validation failed for stream update!\n");
+		dc_release_state(context);
+		return;
+	}
+
 	commit_planes_for_stream(
 				dc,
 				srf_updates,
@@ -2901,3 +2967,51 @@ void dc_get_clock(struct dc *dc, enum dc_clock_type clock_type, struct dc_clock_
 	if (dc->hwss.get_clock)
 		dc->hwss.get_clock(dc, clock_type, clock_cfg);
 }
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+
+void dc_allow_idle_optimizations(struct dc *dc, bool allow)
+{
+	if (dc->debug.disable_idle_power_optimizations)
+		return;
+
+	if (allow == dc->idle_optimizations_allowed)
+		return;
+
+	if (dc->hwss.apply_idle_power_optimizations && dc->hwss.apply_idle_power_optimizations(dc, allow))
+		dc->idle_optimizations_allowed = allow;
+}
+
+/*
+ * blank all streams, and set min and max memory clock to
+ * lowest and highest DPM level, respectively
+ */
+void dc_unlock_memory_clock_frequency(struct dc *dc)
+{
+	unsigned int i;
+
+	for (i = 0; i < MAX_PIPES; i++)
+		if (dc->current_state->res_ctx.pipe_ctx[i].plane_state)
+			core_link_disable_stream(&dc->current_state->res_ctx.pipe_ctx[i]);
+
+	dc->clk_mgr->funcs->set_hard_min_memclk(dc->clk_mgr, false);
+	dc->clk_mgr->funcs->set_hard_max_memclk(dc->clk_mgr);
+}
+
+/*
+ * set min memory clock to the min required for current mode,
+ * max to maxDPM, and unblank streams
+ */
+void dc_lock_memory_clock_frequency(struct dc *dc)
+{
+	unsigned int i;
+
+	dc->clk_mgr->funcs->get_memclk_states_from_smu(dc->clk_mgr);
+	dc->clk_mgr->funcs->set_hard_min_memclk(dc->clk_mgr, true);
+	dc->clk_mgr->funcs->set_hard_max_memclk(dc->clk_mgr);
+
+	for (i = 0; i < MAX_PIPES; i++)
+		if (dc->current_state->res_ctx.pipe_ctx[i].plane_state)
+			core_link_enable_stream(dc->current_state, &dc->current_state->res_ctx.pipe_ctx[i]);
+}
+#endif

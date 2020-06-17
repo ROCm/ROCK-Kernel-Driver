@@ -48,9 +48,6 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 #else
 				       const struct drm_mode_fb_cmd2 *mode_cmd);
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
-void amdgpu_output_poll_changed(struct drm_device *dev);
-#endif
 
 int amdgpu_sem_ioctl(struct drm_device *dev, void *data,
 		     struct drm_file *filp);

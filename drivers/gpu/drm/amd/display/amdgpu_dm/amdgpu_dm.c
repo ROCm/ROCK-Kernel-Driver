@@ -101,6 +101,10 @@
 
 #define FIRMWARE_RENOIR_DMUB "amdgpu/renoir_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_RENOIR_DMUB);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#define FIRMWARE_SIENNA_CICHLID_DMUB "amdgpu/sienna_cichlid_dmcub.bin"
+MODULE_FIRMWARE(FIRMWARE_SIENNA_CICHLID_DMUB);
+#endif
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
@@ -1116,6 +1120,9 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_RENOIR:
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	case CHIP_SIENNA_CICHLID:
+#endif
 		return 0;
 	case CHIP_NAVI12:
 		fw_name_dmcu = FIRMWARE_NAVI12_DMCU;
@@ -1212,6 +1219,12 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		dmub_asic = DMUB_ASIC_DCN21;
 		fw_name_dmub = FIRMWARE_RENOIR_DMUB;
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	case CHIP_SIENNA_CICHLID:
+		dmub_asic = DMUB_ASIC_DCN30;
+		fw_name_dmub = FIRMWARE_SIENNA_CICHLID_DMUB;
+		break;
+#endif
 
 	default:
 		/* ASIC doesn't support DMUB. */
@@ -2142,11 +2155,7 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 16, 0)
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
-#else
-	.output_poll_changed = amdgpu_output_poll_changed,
-#endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit,
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
@@ -3424,6 +3433,9 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	case CHIP_RENOIR:
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	case CHIP_SIENNA_CICHLID:
+#endif
 		if (dcn10_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			goto fail;
@@ -3726,6 +3738,9 @@ static int dm_early_init(void *handle)
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	case CHIP_NAVI10:
 	case CHIP_NAVI12:
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	case CHIP_SIENNA_CICHLID:
+#endif
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
@@ -4073,6 +4088,9 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 	    adev->asic_type == CHIP_NAVI14 ||
 	    adev->asic_type == CHIP_NAVI12 ||
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+		adev->asic_type == CHIP_SIENNA_CICHLID ||
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	    adev->asic_type == CHIP_RENOIR ||
 #endif
@@ -4094,6 +4112,11 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
 		tiling_info->gfx9.shaderEnable = 1;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+		if (adev->asic_type == CHIP_SIENNA_CICHLID)
+			tiling_info->gfx9.num_pkrs = adev->gfx.config.gb_addr_config_fields.num_pkrs;
+
+#endif
 		ret = fill_plane_dcc_attributes(adev, afb, format, rotation,
 						plane_size, tiling_info,
 						tiling_flags, dcc, address,
@@ -4113,7 +4136,7 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*per_pixel_alpha = false;
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -4154,7 +4177,7 @@ fill_plane_color_attributes(const struct drm_plane_state *plane_state,
 	if (format < SURFACE_PIXEL_FORMAT_VIDEO_BEGIN)
 		return 0;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	full_range = (plane_state->color_range == DRM_COLOR_YCBCR_FULL_RANGE);
 
 	switch (plane_state->color_encoding) {
@@ -5755,11 +5778,12 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		dc_result = dc_validate_stream(adev->dm.dc, stream);
 
 		if (dc_result != DC_OK) {
-			DRM_DEBUG_KMS("Mode %dx%d (clk %d) failed DC validation with error %d\n",
+			DRM_DEBUG_KMS("Mode %dx%d (clk %d) failed DC validation with error %d (%s)\n",
 				      drm_mode->hdisplay,
 				      drm_mode->vdisplay,
 				      drm_mode->clock,
-				      dc_result);
+				      dc_result,
+				      dc_status_to_str(dc_result));
 
 			dc_stream_release(stream);
 			stream = NULL;
@@ -6268,22 +6292,8 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 	amdgpu_state = kzalloc(sizeof(*amdgpu_state), GFP_KERNEL);
 	WARN_ON(amdgpu_state == NULL);
 
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
-	if (amdgpu_state) {
-		plane->state = &amdgpu_state->base;
-		plane->state->plane = plane;
-		plane->state->rotation = DRM_MODE_ROTATE_0;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 18, 0)
-		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
-		plane->state->pixel_blend_mode = DRM_MODE_BLEND_PREMULTI;
-#endif
-	}
-#else
 	if (amdgpu_state)
 		__drm_atomic_helper_plane_reset(plane, &amdgpu_state->base);
-#endif
 }
 
 static struct drm_plane_state *
@@ -6631,7 +6641,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	if (res)
 		return res;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -6641,7 +6651,7 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
 #endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY &&
 	    plane_cap &&
 	    (plane_cap->pixel_format_support.nv12 ||
@@ -9555,6 +9565,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 	enum surface_update_type overall_update_type = UPDATE_TYPE_FAST;
 #endif
+	enum dc_status status;
 
 	int ret, i;
 
@@ -9845,7 +9856,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #endif
 #endif
 
-		if (dc_validate_global_state(dc, dm_state->context, false) != DC_OK) {
+		status = dc_validate_global_state(dc, dm_state->context, false);
+		if (status != DC_OK) {
+			DC_LOG_WARNING("DC global validation failure: %s (%d)",
+				       dc_status_to_str(status), status);
 			ret = -EINVAL;
 			goto fail;
 		}

@@ -32,7 +32,7 @@
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
-/* #undef HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
+#define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
 
 /* Define to 1 if you have the <asm/fpu/api.h> header file. */
 #define HAVE_ASM_FPU_API_H 1
@@ -462,6 +462,13 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
+/* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
+   available */
+#define HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE 1
+
+/* drm_plane_create_color_properties is available */
+#define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
+
 /* drm_send_event_locked() function is available */
 #define HAVE_DRM_SEND_EVENT_LOCKED 1
 
@@ -755,12 +762,6 @@
 
 /* drm_pending_vblank_event->sequence is available */
 #define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
-
-/* struct mmu_notifier_mm is exported */
-/* #undef HAVE_STRUCT_MMU_NOTIFIER_MM_EXPORTED */
-
-/* struct mmu_notifier_subscriptions is available */
-#define HAVE_STRUCT_MMU_NOTIFIER_SUBSCRIPTIONS 1
 
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
