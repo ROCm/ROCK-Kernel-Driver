@@ -1977,6 +1977,30 @@ static int validate_sibling_call(struct instruction *insn, struct insn_state *st
 }
 
 /*
+ * Alternatives should not contain any ORC entries, this in turn means they
+ * should not contain any CFI ops, which implies all instructions should have
+ * the same same CFI state.
+ *
+ * It is possible to constuct alternatives that have unreachable holes that go
+ * unreported (because they're NOPs), such holes would result in CFI_UNDEFINED
+ * states which then results in ORC entries, which we just said we didn't want.
+ *
+ * Avoid them by copying the CFI entry of the first instruction into the whole
+ * alternative.
+ */
+static void fill_alternative_cfi(struct objtool_file *file, struct instruction *insn)
+{
+	struct instruction *first_insn = insn;
+	int alt_group = insn->alt_group;
+
+	sec_for_each_insn_continue(file, insn) {
+		if (insn->alt_group != alt_group)
+			break;
+		insn->cfi = first_insn->cfi;
+	}
+}
+
+/*
  * Follow the branch starting at the given instruction, and recursively follow
  * any other branches (jumps).  Meanwhile, track the frame pointer state at
  * each instruction and validate all the rules described in
@@ -2063,7 +2087,7 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 
 		insn->visited |= visited;
 
-		if (!insn->ignore_alts) {
+		if (!insn->ignore_alts && !list_empty(&insn->alts)) {
 			bool skip_orig = false;
 
 			list_for_each_entry(alt, &insn->alts, list) {
@@ -2077,6 +2101,9 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 					return ret;
 				}
 			}
+
+			if (insn->alt_group)
+				fill_alternative_cfi(file, insn);
 
 			if (skip_orig)
 				return 0;
@@ -2176,6 +2203,11 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 			return 0;
 
 		case INSN_STACK:
+			if (insn->alt_group) {
+				WARN_FUNC("alternative modifies stack", sec, insn->offset);
+				return -1;
+			}
+
 			if (update_cfi_state(insn, &state.cfi))
 				return 1;
 
