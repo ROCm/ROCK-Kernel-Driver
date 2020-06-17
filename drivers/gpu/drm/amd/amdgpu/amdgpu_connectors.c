@@ -38,7 +38,7 @@
 
 #include <linux/pm_runtime.h>
 
-#if DRM_VERSION_CODE < DRM_VERSION(4 ,16, 0)
+#ifndef HAVE_DRM_KMS_HELPER_IS_POLL_WORKER
 bool inline drm_kms_helper_is_poll_worker(void)
 {
 	return false;
