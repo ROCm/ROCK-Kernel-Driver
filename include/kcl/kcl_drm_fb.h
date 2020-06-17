@@ -4,6 +4,7 @@
 
 #include <linux/fb.h>
 #include <linux/pci.h>
+#include <drm/drm_crtc.h>
 #include <drm/drm_fb_helper.h>
 
 /*
@@ -130,6 +131,12 @@ _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper *fb_helper,
 			     struct drm_fb_helper_surface_size *sizes);
+#endif
+
+#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
+void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
+				    struct drm_framebuffer *fb,
+				    const struct drm_mode_fb_cmd2 *mode_cmd);
 #endif
 
 #endif
