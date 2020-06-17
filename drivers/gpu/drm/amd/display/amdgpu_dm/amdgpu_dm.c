@@ -2053,6 +2053,7 @@ const struct amdgpu_ip_block_version dm_ip_block =
 };
 
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
+#ifdef HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC
 static struct drm_atomic_state *
 dm_atomic_state_alloc(struct drm_device *dev)
 {
@@ -2091,7 +2092,7 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 	drm_atomic_state_default_release(state);
 	kfree(dm_state);
 }
-
+#endif
 #endif
 
 /**
@@ -2106,7 +2107,7 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = amdgpu_dm_atomic_commit,
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0) || defined(OS_NAME_RHEL_6)
+#ifdef HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC
 	.atomic_state_alloc = dm_atomic_state_alloc,
 	.atomic_state_clear = dm_atomic_state_clear,
 	.atomic_state_free = dm_atomic_state_alloc_free
