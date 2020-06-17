@@ -486,6 +486,9 @@
 /* drm_modeset_lock_all_ctx() is available */
 #define HAVE_DRM_MODESET_LOCK_ALL_CTX 1
 
+/* drm_mode_config_funcs->atomic_state_alloc() is available */
+#define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
+
 /* drm_mode_get_hv_timing is available */
 #define HAVE_DRM_MODE_GET_HV_TIMING 1
 
