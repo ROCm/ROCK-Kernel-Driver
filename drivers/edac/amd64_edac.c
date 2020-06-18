@@ -2259,6 +2259,15 @@ static struct amd64_family_type family_types[] = {
 			.dbam_to_cs		= f17_base_addr_to_cs_size,
 		}
 	},
+	[F17_M70H_CPUS] = {
+		.ctl_name = "F17h_M70h",
+		.f0_id = PCI_DEVICE_ID_AMD_17H_M70H_DF_F0,
+		.f6_id = PCI_DEVICE_ID_AMD_17H_M70H_DF_F6,
+		.ops = {
+			.early_channel_count	= f17_early_channel_count,
+			.dbam_to_cs		= f17_base_addr_to_cs_size,
+		}
+	},
 	[F19_CPUS] = {
 		.ctl_name = "F19h",
 		.f0_id = PCI_DEVICE_ID_AMD_19H_DF_F0,
@@ -3266,6 +3275,10 @@ static struct amd64_family_type *per_family_init(struct amd64_pvt *pvt)
 		} else if (pvt->model >= 0x30 && pvt->model <= 0x3f) {
 			fam_type = &family_types[F17_M30H_CPUS];
 			pvt->ops = &family_types[F17_M30H_CPUS].ops;
+			break;
+		} else if (pvt->model >= 0x70 && pvt->model <= 0x7f) {
+			fam_type = &family_types[F17_M70H_CPUS];
+			pvt->ops = &family_types[F17_M70H_CPUS].ops;
 			break;
 		}
 		/* fall through */

@@ -18,6 +18,7 @@
 #include <linux/pci.h>
 #include <linux/platform_data/dma-dw.h>
 
+#define WAIT_RETRIES	5
 #define RX_BUSY		0
 #define TX_BUSY		1
 
@@ -124,6 +125,33 @@ static enum dma_slave_buswidth convert_dma_width(u32 dma_width) {
 	return DMA_SLAVE_BUSWIDTH_UNDEFINED;
 }
 
+static inline bool dw_spi_dma_tx_busy(struct dw_spi *dws)
+{
+	return !(dw_readl(dws, DW_SPI_SR) & SR_TF_EMPT);
+}
+
+static int dw_spi_dma_wait_tx_done(struct dw_spi *dws,
+				   struct spi_transfer *xfer)
+{
+	int retry = WAIT_RETRIES;
+	struct spi_delay delay;
+	u32 nents;
+
+	nents = dw_readl(dws, DW_SPI_TXFLR);
+	delay.unit = SPI_DELAY_UNIT_SCK;
+	delay.value = nents * dws->n_bytes * BITS_PER_BYTE;
+
+	while (dw_spi_dma_tx_busy(dws) && retry--)
+		spi_delay_exec(&delay, xfer);
+
+	if (retry < 0) {
+		dev_err(&dws->master->dev, "Tx hanged up\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
 /*
  * dws->dma_chan_busy is set before the dma transfer starts, callback for tx
  * channel will clear a corresponding bit.
@@ -147,6 +175,7 @@ static struct dma_async_tx_descriptor *dw_spi_dma_prepare_tx(struct dw_spi *dws,
 	if (!xfer->tx_buf)
 		return NULL;
 
+	memset(&txconf, 0, sizeof(txconf));
 	txconf.direction = DMA_MEM_TO_DEV;
 	txconf.dst_addr = dws->dma_addr;
 	txconf.dst_maxburst = 16;
@@ -168,6 +197,49 @@ static struct dma_async_tx_descriptor *dw_spi_dma_prepare_tx(struct dw_spi *dws,
 	txdesc->callback_param = dws;
 
 	return txdesc;
+}
+
+static inline bool dw_spi_dma_rx_busy(struct dw_spi *dws)
+{
+	return !!(dw_readl(dws, DW_SPI_SR) & SR_RF_NOT_EMPT);
+}
+
+static int dw_spi_dma_wait_rx_done(struct dw_spi *dws)
+{
+	int retry = WAIT_RETRIES;
+	struct spi_delay delay;
+	unsigned long ns, us;
+	u32 nents;
+
+	/*
+	 * It's unlikely that DMA engine is still doing the data fetching, but
+	 * if it's let's give it some reasonable time. The timeout calculation
+	 * is based on the synchronous APB/SSI reference clock rate, on a
+	 * number of data entries left in the Rx FIFO, times a number of clock
+	 * periods normally needed for a single APB read/write transaction
+	 * without PREADY signal utilized (which is true for the DW APB SSI
+	 * controller).
+	 */
+	nents = dw_readl(dws, DW_SPI_RXFLR);
+	ns = 4U * NSEC_PER_SEC / dws->max_freq * nents;
+	if (ns <= NSEC_PER_USEC) {
+		delay.unit = SPI_DELAY_UNIT_NSECS;
+		delay.value = ns;
+	} else {
+		us = DIV_ROUND_UP(ns, NSEC_PER_USEC);
+		delay.unit = SPI_DELAY_UNIT_USECS;
+		delay.value = clamp_val(us, 0, USHRT_MAX);
+	}
+
+	while (dw_spi_dma_rx_busy(dws) && retry--)
+		spi_delay_exec(&delay, NULL);
+
+	if (retry < 0) {
+		dev_err(&dws->master->dev, "Rx hanged up\n");
+		return -EIO;
+	}
+
+	return 0;
 }
 
 /*
@@ -193,6 +265,7 @@ static struct dma_async_tx_descriptor *dw_spi_dma_prepare_rx(struct dw_spi *dws,
 	if (!xfer->rx_buf)
 		return NULL;
 
+	memset(&rxconf, 0, sizeof(rxconf));
 	rxconf.direction = DMA_DEV_TO_MEM;
 	rxconf.src_addr = dws->dma_addr;
 	rxconf.src_maxburst = 16;
@@ -260,7 +333,16 @@ static int mid_spi_dma_transfer(struct dw_spi *dws, struct spi_transfer *xfer)
 		dma_async_issue_pending(dws->txchan);
 	}
 
-	return 0;
+	if (txdesc && dws->master->cur_msg->status == -EINPROGRESS) {
+		ret = dw_spi_dma_wait_tx_done(dws, xfer);
+		if (ret)
+			return ret;
+	}
+
+	if (rxdesc && dws->master->cur_msg->status == -EINPROGRESS)
+		ret = dw_spi_dma_wait_rx_done(dws);
+
+	return ret;
 }
 
 static void mid_spi_dma_stop(struct dw_spi *dws)

@@ -6,7 +6,7 @@
  * Copyright 2019 NXP
  *
  * Author: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
- * Recode: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+ *	   Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
  */
 
 #ifndef _PCIE_MOBIVEIL_H
@@ -154,7 +154,7 @@ struct mobiveil_rp_ops {
 			       int where, int size, u32 *val);
 };
 
-struct root_port {
+struct mobiveil_root_port {
 	char root_bus_nr;
 	void __iomem *config_axi_slave_base;	/* endpoint config base */
 	struct resource *ob_io_res;
@@ -181,7 +181,7 @@ struct mobiveil_pcie {
 	int ob_wins_configured;		/* configured outbound windows */
 	int ib_wins_configured;		/* configured inbound windows */
 	const struct mobiveil_pab_ops *ops;
-	struct root_port rp;
+	struct mobiveil_root_port rp;
 };
 
 int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie);
@@ -201,12 +201,12 @@ static inline u32 mobiveil_csr_readl(struct mobiveil_pcie *pcie, u32 off)
 	return mobiveil_csr_read(pcie, off, 0x4);
 }
 
-static inline u32 mobiveil_csr_readw(struct mobiveil_pcie *pcie, u32 off)
+static inline u16 mobiveil_csr_readw(struct mobiveil_pcie *pcie, u32 off)
 {
 	return mobiveil_csr_read(pcie, off, 0x2);
 }
 
-static inline u32 mobiveil_csr_readb(struct mobiveil_pcie *pcie, u32 off)
+static inline u8 mobiveil_csr_readb(struct mobiveil_pcie *pcie, u32 off)
 {
 	return mobiveil_csr_read(pcie, off, 0x1);
 }
@@ -218,13 +218,13 @@ static inline void mobiveil_csr_writel(struct mobiveil_pcie *pcie, u32 val,
 	mobiveil_csr_write(pcie, val, off, 0x4);
 }
 
-static inline void mobiveil_csr_writew(struct mobiveil_pcie *pcie, u32 val,
+static inline void mobiveil_csr_writew(struct mobiveil_pcie *pcie, u16 val,
 				       u32 off)
 {
 	mobiveil_csr_write(pcie, val, off, 0x2);
 }
 
-static inline void mobiveil_csr_writeb(struct mobiveil_pcie *pcie, u32 val,
+static inline void mobiveil_csr_writeb(struct mobiveil_pcie *pcie, u8 val,
 				       u32 off)
 {
 	mobiveil_csr_write(pcie, val, off, 0x1);

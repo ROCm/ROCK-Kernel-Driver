@@ -178,6 +178,7 @@
 #define GCC_PCIE_CLKREF_CLK					169
 #define GCC_RX1_USB2_CLKREF_CLK					170
 #define GCC_BIMC_GFX_CLK					176
+#define UFS_UNIPRO_CORE_CLK_SRC					177
 
 #define PCIE_0_GDSC						0
 #define UFS_GDSC						1

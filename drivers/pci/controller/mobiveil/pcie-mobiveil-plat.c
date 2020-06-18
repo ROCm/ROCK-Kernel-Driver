@@ -6,7 +6,7 @@
  * Copyright 2019 NXP
  *
  * Author: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
- * Recode: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+ *	   Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
  */
 
 #include <linux/init.h>
@@ -25,6 +25,7 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
 	struct pci_host_bridge *bridge;
 	struct device *dev = &pdev->dev;
 
+	/* allocate the PCIe port */
 	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
 	if (!bridge)
 		return -ENOMEM;
