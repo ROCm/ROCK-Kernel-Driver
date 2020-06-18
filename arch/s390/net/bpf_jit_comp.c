@@ -502,7 +502,8 @@ static void bpf_jit_epilogue(struct bpf_jit *jit, u32 stack_depth)
  * NOTE: Use noinline because for gcov (-fprofile-arcs) gcc allocates a lot of
  * stack space for the large switch statement.
  */
-static noinline int bpf_jit_insn(struct bpf_jit *jit, struct bpf_prog *fp, int i)
+static noinline int bpf_jit_insn(struct bpf_jit *jit, struct bpf_prog *fp,
+				 int i, u32 stack_depth)
 {
 	struct bpf_insn *insn = &fp->insnsi[i];
 	int jmp_off, last, insn_count = 1;
@@ -1059,7 +1060,7 @@ static noinline int bpf_jit_insn(struct bpf_jit *jit, struct bpf_prog *fp, int i
 		 */
 
 		if (jit->seen & SEEN_STACK)
-			off = STK_OFF_TCCNT + STK_OFF + fp->aux->stack_depth;
+			off = STK_OFF_TCCNT + STK_OFF + stack_depth;
 		else
 			off = STK_OFF_TCCNT;
 		/* lhi %w0,1 */
@@ -1089,7 +1090,7 @@ static noinline int bpf_jit_insn(struct bpf_jit *jit, struct bpf_prog *fp, int i
 		/*
 		 * Restore registers before calling function
 		 */
-		save_restore_regs(jit, REGS_RESTORE, fp->aux->stack_depth);
+		save_restore_regs(jit, REGS_RESTORE, stack_depth);
 
 		/*
 		 * goto *(prog->bpf_func + tail_call_start);
@@ -1283,22 +1284,23 @@ branch_oc:
 /*
  * Compile eBPF program into s390x code
  */
-static int bpf_jit_prog(struct bpf_jit *jit, struct bpf_prog *fp)
+static int bpf_jit_prog(struct bpf_jit *jit, struct bpf_prog *fp,
+			u32 stack_depth)
 {
 	int i, insn_count;
 
 	jit->lit = jit->lit_start;
 	jit->prg = 0;
 
-	bpf_jit_prologue(jit, fp->aux->stack_depth);
+	bpf_jit_prologue(jit, stack_depth);
 	for (i = 0; i < fp->len; i += insn_count) {
-		insn_count = bpf_jit_insn(jit, fp, i);
+		insn_count = bpf_jit_insn(jit, fp, i, stack_depth);
 		if (insn_count < 0)
 			return -1;
 		/* Next instruction address */
 		jit->addrs[i + insn_count] = jit->prg;
 	}
-	bpf_jit_epilogue(jit, fp->aux->stack_depth);
+	bpf_jit_epilogue(jit, stack_depth);
 
 	jit->lit_start = jit->prg;
 	jit->size = jit->lit;
@@ -1316,6 +1318,7 @@ bool bpf_jit_needs_zext(void)
  */
 struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
 {
+	u32 stack_depth = round_up(fp->aux->stack_depth, 8);
 	struct bpf_prog *tmp, *orig_fp = fp;
 	struct bpf_binary_header *header;
 	bool tmp_blinded = false;
@@ -1349,7 +1352,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
 	 *   - 3:   Calculate program size and addrs arrray
 	 */
 	for (pass = 1; pass <= 3; pass++) {
-		if (bpf_jit_prog(&jit, fp)) {
+		if (bpf_jit_prog(&jit, fp, stack_depth)) {
 			fp = orig_fp;
 			goto free_addrs;
 		}
@@ -1366,7 +1369,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
 		fp = orig_fp;
 		goto free_addrs;
 	}
-	if (bpf_jit_prog(&jit, fp)) {
+	if (bpf_jit_prog(&jit, fp, stack_depth)) {
 		bpf_jit_binary_free(header);
 		fp = orig_fp;
 		goto free_addrs;
