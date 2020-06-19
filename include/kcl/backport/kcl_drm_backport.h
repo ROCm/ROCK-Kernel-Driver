@@ -155,6 +155,14 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
 #endif
 
+/*
+ * commit v4.9-rc4-949-g949f08862d66
+ * drm: Make the connector .detect() callback optional
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
+#endif
+
 #ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
 static inline struct drm_gem_object *
 _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
