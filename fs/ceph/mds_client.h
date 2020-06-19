@@ -196,8 +196,12 @@ struct ceph_mds_session {
 	struct list_head  s_cap_releases; /* waiting cap_release messages */
 	struct work_struct s_cap_release_work;
 
-	/* protected by mutex */
+	/* See ceph_inode_info->i_dirty_item. */
+	struct list_head  s_cap_dirty;	      /* inodes w/ dirty caps */
+
+	/* See ceph_inode_info->i_flushing_item. */
 	struct list_head  s_cap_flushing;     /* inodes w/ flushing caps */
+
 	unsigned long     s_renew_requested; /* last time we sent a renew req */
 	u64               s_renew_seq;
 
@@ -419,7 +423,6 @@ struct ceph_mds_client {
 
 	u64               last_cap_flush_tid;
 	struct list_head  cap_flush_list;
-	struct list_head  cap_dirty;        /* inodes with dirty caps */
 	struct list_head  cap_dirty_migrating; /* ...that are migration... */
 	int               num_cap_flushing; /* # caps we are flushing */
 	spinlock_t        cap_dirty_lock;   /* protects above items */
@@ -497,6 +500,7 @@ extern int ceph_mdsc_do_request(struct ceph_mds_client *mdsc,
 				struct inode *dir,
 				struct ceph_mds_request *req);
 extern void ceph_mdsc_release_dir_caps(struct ceph_mds_request *req);
+extern void ceph_mdsc_release_dir_caps_no_check(struct ceph_mds_request *req);
 static inline void ceph_mdsc_get_request(struct ceph_mds_request *req)
 {
 	kref_get(&req->r_kref);
