@@ -5628,7 +5628,13 @@ static bool adjust_colour_depth_from_display_info(
 			/* The above depths are the only ones valid for HDMI. */
 			return false;
 		}
+
+#ifndef HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK
+		struct drm_connector * connector = container_of(info, struct drm_connector, display_info);
+		if (normalized_clk <= connector->max_tmds_clock) {
+#else
 		if (normalized_clk <= info->max_tmds_clock) {
+#endif
 			timing_out->display_color_depth = depth;
 			return true;
 		}
