@@ -5,8 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_HELPER_MODE_FILL_FB_STRUCT], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#include <linux/stddef.h>
-			#include <drm/drm_modeset_helper.h>
+			#include <drm/drm_crtc_helper.h>
 		], [
 			drm_helper_mode_fill_fb_struct(NULL, NULL, NULL);
 		], [

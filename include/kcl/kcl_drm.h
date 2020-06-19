@@ -22,7 +22,7 @@
 #endif
 #include <uapi/drm/drm_mode.h>
 #include <kcl/header/kcl_drm_drv_h.h>
-#include <drm/drm_modeset_helper.h>
+#include <drm/drm_crtc_helper.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c

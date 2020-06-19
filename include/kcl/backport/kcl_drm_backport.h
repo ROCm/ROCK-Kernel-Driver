@@ -13,7 +13,7 @@
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
 #endif
-#include <drm/drm_modeset_helper.h>
+#include <drm/drm_crtc_helper.h>
 #include <kcl/kcl_drm.h>
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
