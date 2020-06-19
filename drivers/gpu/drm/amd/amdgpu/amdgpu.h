@@ -418,7 +418,7 @@ void amdgpu_fence_slab_fini(void);
  */
 
 struct amdgpu_flip_work {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	struct delayed_work		flip_work;
 #else
 	struct work_struct		flip_work;

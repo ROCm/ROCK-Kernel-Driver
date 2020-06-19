@@ -47,7 +47,7 @@ static void amdgpu_display_flip_callback(struct dma_fence *f,
 		container_of(cb, struct amdgpu_flip_work, cb);
 
 	dma_fence_put(f);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	schedule_work(&work->flip_work.work);
 #else
 	schedule_work(&work->flip_work);
@@ -100,7 +100,7 @@ static void amdgpu_display_flip_work_func(struct work_struct *__work)
 	/* Do the flip (mmio) */
 	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
 }
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#elif !defined(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET)
 static void amdgpu_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
