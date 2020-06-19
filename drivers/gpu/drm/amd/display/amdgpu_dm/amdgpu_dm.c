@@ -4575,7 +4575,7 @@ static bool adjust_colour_depth_from_display_info(
 			return false;
 		}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#ifndef HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK
 		struct drm_connector * connector = container_of(info, struct drm_connector, display_info);
 		if (normalized_clk <= connector->max_tmds_clock) {
 #else
