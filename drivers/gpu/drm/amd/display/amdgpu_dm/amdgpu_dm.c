@@ -6342,10 +6342,10 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
 };
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      struct drm_plane_state *new_state)
-#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+#elif defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      const struct drm_plane_state *new_state)
 #else
@@ -6439,10 +6439,10 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
-#elif DRM_VERSION_CODE >= DRM_VERSION(4, 4, 0)
+#elif defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       const struct drm_plane_state *old_state)
 #else

@@ -830,6 +830,12 @@
 /* drm_plane_helper_funcs->atomic_async_check() is available */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK 1
 
+/* drm_plane_helper_funcs->prepare_fb() wants const p arg */
+/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
+
+/* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
+
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
