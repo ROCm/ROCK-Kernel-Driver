@@ -7309,8 +7309,17 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.format_mod_supported = dm_plane_format_mod_supported,
 };
 
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP)
 static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 				      struct drm_plane_state *new_state)
+#elif defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST)
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      const struct drm_plane_state *new_state)
+#else
+static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
+				      struct drm_framebuffer *fb,
+				      const struct drm_plane_state *new_state)
+#endif
 {
 	struct amdgpu_framebuffer *afb;
 	struct drm_gem_object *obj;
@@ -7399,8 +7408,17 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	return 0;
 }
 
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP)
 static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
 				       struct drm_plane_state *old_state)
+#elif defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST)
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       const struct drm_plane_state *old_state)
+#else
+static void dm_plane_helper_cleanup_fb(struct drm_plane *plane,
+				       struct drm_framebuffer *fb,
+				       const struct drm_plane_state *old_state)
+#endif
 {
 	struct amdgpu_bo *rbo;
 	int r;
