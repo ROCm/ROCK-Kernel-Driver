@@ -76,6 +76,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_drv.h])
 
 	dnl #
+	dnl # v4.13-rc2-421-g4c3dbb2c312c
+	dnl # drm: Add GEM backed framebuffer library
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_framebuffer_helper.h])
+
+	dnl #
 	dnl # commit v4.13-rc2-387-ge4672e55d6f3
 	dnl # drm: Extract drm_device.h
 	dnl #

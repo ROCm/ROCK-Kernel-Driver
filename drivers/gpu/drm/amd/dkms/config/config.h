@@ -350,6 +350,10 @@
 /* Define to 1 if you have the <drm/drm_file.h> header file. */
 #define HAVE_DRM_DRM_FILE_H 1
 
+/* Define to 1 if you have the <drm/drm_gem_framebuffer_helper.h> header file.
+   */
+#define HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H 1
+
 /* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
 #define HAVE_DRM_DRM_IOCTL_H 1
 

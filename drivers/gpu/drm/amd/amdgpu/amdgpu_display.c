@@ -36,9 +36,7 @@
 #include <linux/pm_runtime.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_edid.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4 ,14, 0)
 #include <drm/drm_gem_framebuffer_helper.h>
-#endif
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_vblank.h>
 
