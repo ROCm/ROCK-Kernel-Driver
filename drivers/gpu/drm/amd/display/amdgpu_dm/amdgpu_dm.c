@@ -6531,7 +6531,6 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			stream = NULL;
 			requested_bpc -= 2; /* lower bpc to retry validation */
 		}
-
 	} while (stream == NULL && requested_bpc >= 6);
 
 	if (dc_result == DC_FAIL_ENC_VALIDATE && !aconnector->force_yuv420_output) {
