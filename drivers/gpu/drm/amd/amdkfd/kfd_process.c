@@ -560,6 +560,7 @@ struct kfd_process *kfd_create_process(struct task_struct *thread)
 					   (int)process->lead_thread->pid);
 		if (ret) {
 			pr_warn("Creating procfs pid directory failed");
+			kobject_put(process->kobj);
 			goto out;
 		}
 
