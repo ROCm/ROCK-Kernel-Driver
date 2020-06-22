@@ -30,5 +30,6 @@
 #include <kcl/kcl_pagemap.h>
 #include <kcl/kcl_pm.h>
 #include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/backport/kcl_ttm_tt_backport.h>
 
 #endif /* AMDGPU_BACKPORT_H */
