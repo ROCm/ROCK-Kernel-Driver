@@ -87,9 +87,10 @@
  * - 3.36.0 - Allow reading more status registers on si/cik
  * - 3.37.0 - L2 is invalidated before SDMA IBs, needed for correctness
  * - 3.38.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
+ * - 3.39.0 - DMABUF implicit sync does a full pipeline sync
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	38
+#define KMS_DRIVER_MINOR	39
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.6.6"
@@ -1459,11 +1460,12 @@ long amdgpu_drm_ioctl(struct file *filp,
 	dev = file_priv->minor->dev;
 	ret = pm_runtime_get_sync(dev->dev);
 	if (ret < 0)
-		return ret;
+		goto out;
 
 	ret = drm_ioctl(filp, cmd, arg);
 
 	pm_runtime_mark_last_busy(dev->dev);
+out:
 	pm_runtime_put_autosuspend(dev->dev);
 	return ret;
 }

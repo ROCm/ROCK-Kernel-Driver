@@ -167,7 +167,7 @@ bool check_if_queues_active(struct device_queue_manager *dqm,
 	return busy;
 }
 
-void increment_queue_count(struct device_queue_manager *dqm,
+static void increment_queue_count(struct device_queue_manager *dqm,
 			enum kfd_queue_type type)
 {
 	dqm->active_queue_count++;
@@ -175,7 +175,7 @@ void increment_queue_count(struct device_queue_manager *dqm,
 		dqm->active_cp_queue_count++;
 }
 
-void decrement_queue_count(struct device_queue_manager *dqm,
+static void decrement_queue_count(struct device_queue_manager *dqm,
 			enum kfd_queue_type type)
 {
 	dqm->active_queue_count--;

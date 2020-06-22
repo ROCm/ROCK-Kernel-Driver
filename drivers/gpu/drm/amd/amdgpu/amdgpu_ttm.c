@@ -1091,7 +1091,7 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_tt *ttm)
 	sg_free_table(ttm->sg);
 }
 
-int amdgpu_ttm_gart_bind(struct amdgpu_device *adev,
+static int amdgpu_ttm_gart_bind(struct amdgpu_device *adev,
 				struct ttm_buffer_object *tbo,
 				uint64_t flags)
 {

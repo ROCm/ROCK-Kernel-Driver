@@ -481,7 +481,8 @@ struct amdgpu_crtc {
 	enum amdgpu_interrupt_state vsync_timer_enabled;
 
 	int otg_inst;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
+	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 	uint32_t flip_flags;
 #endif
 	struct drm_pending_vblank_event *event;
@@ -691,18 +692,18 @@ int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tile
 /* amdgpu_display.c */
 void amdgpu_display_print_display_setup(struct drm_device *dev);
 int amdgpu_display_modeset_create_props(struct amdgpu_device *adev);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx);
 #else
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set);
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX
 				uint32_t page_flip_flags, uint32_t target,
 				struct drm_modeset_acquire_ctx *ctx);
 #else

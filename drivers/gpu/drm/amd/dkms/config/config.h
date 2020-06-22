@@ -128,6 +128,9 @@
 /* drm_atomic_helper_update_legacy_modeset_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE 1
 
+/* drm_atomic_helper_wait_for_flip_done() is available */
+#define HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE 1
+
 /* {drm_atomic_helper_crtc_set_property, drm_atomic_helper_plane_set_property,
    drm_atomic_helper_connector_set_property, drm_atomic_helper_connector_dpms}
    is available */
@@ -135,6 +138,9 @@
 
 /* drm_atomic_nonblocking_commit() is available */
 #define HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT 1
+
+/* drm_atomic_plane_disabling() wants drm_plane_state * arg */
+#define HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE 1
 
 /* drm_atomic_private_obj_init() has p,p,p,p interface */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_P_P_P_P 1
@@ -284,11 +290,17 @@
 /* struct drm_dp_mst_topology_cbs->register_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR */
 
+/* drm_dp_mst_topology_mgr_init() wants drm_device arg */
+#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV 1
+
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
+
+/* drm_dp_start_crc() is available */
+#define HAVE_DRM_DP_START_CRC 1
 
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
@@ -441,8 +453,14 @@
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
+/* drm_helper_mode_fill_fb_struct() wants dev arg */
+#define HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV 1
+
 /* drm_is_current_master() is available */
 #define HAVE_DRM_IS_CURRENT_MASTER 1
+
+/* drm_kms_helper_is_poll_worker() is available */
+#define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
 
 /* drm_malloc_ab() is available */
 /* #undef HAVE_DRM_MALLOC_AB */
@@ -736,6 +754,9 @@
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
 
+/* drm_connector->ycbcr_420_allowed is available */
+#define HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED 1
+
 /* drm_crtc_funcs->enable_vblank() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
 
@@ -751,6 +772,15 @@
 /* drm_crtc_funcs->{get,verify}_crc_sources() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
 
+/* drm_crtc_funcs->page_flip_target() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET 1
+
+/* drm_crtc_funcs->page_flip_target() wants ctx parameter */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX 1
+
+/* drm_crtc_funcs->set_config() wants ctx parameter */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX 1
+
 /* crtc->funcs->set_crc_source() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
 
@@ -760,8 +790,14 @@
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
+/* struct drm_crtc_state->pageflip_flags is available */
+/* #undef HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS */
+
 /* drm_pending_vblank_event->sequence is available */
 #define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
+
+/* drm_plane_helper_funcs->atomic_async_check() is available */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK 1
 
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */

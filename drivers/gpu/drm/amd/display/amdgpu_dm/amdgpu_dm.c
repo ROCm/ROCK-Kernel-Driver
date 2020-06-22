@@ -736,7 +736,7 @@ static void amdgpu_dm_audio_fini(struct amdgpu_device *adev)
 	adev->mode_info.audio.enabled = false;
 }
 
-void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
+static  void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
 {
 	struct drm_audio_component *acomp = adev->dm.audio_component;
 
@@ -1648,7 +1648,7 @@ static void dm_gpureset_toggle_interrupts(struct amdgpu_device *adev,
 
 }
 
-enum dc_status amdgpu_dm_commit_zero_streams(struct dc *dc)
+static enum dc_status amdgpu_dm_commit_zero_streams(struct dc *dc)
 {
 	struct dc_state *context = NULL;
 	enum dc_status res = DC_ERROR_UNEXPECTED;
@@ -2868,7 +2868,7 @@ static int dm_atomic_get_state(struct drm_atomic_state *state,
 	return 0;
 }
 
-struct dm_atomic_state *
+static struct dm_atomic_state *
 dm_atomic_get_new_state(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
@@ -2886,7 +2886,7 @@ dm_atomic_get_new_state(struct drm_atomic_state *state)
 	return NULL;
 }
 
-struct dm_atomic_state *
+static struct dm_atomic_state *
 dm_atomic_get_old_state(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
@@ -4007,7 +4007,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[0] / (fb->bits_per_pixel / 8);
 #else
 			fb->pitches[0] / fb->format->cpp[0];
@@ -4023,7 +4023,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[0] / (fb->bits_per_pixel / 8);
 #else
 			fb->pitches[0] / fb->format->cpp[0];
@@ -4036,7 +4036,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->chroma_size.height = fb->height / 2;
 
 		plane_size->chroma_pitch =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
 #else
 			fb->pitches[1] / fb->format->cpp[1];
@@ -4229,7 +4229,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	int ret;
 
 	memset(plane_info, 0, sizeof(*plane_info));
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 	switch (fb->pixel_format) {
 #else
 	switch (fb->format->format) {
@@ -4281,7 +4281,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %s\n",
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 			drm_get_format_name(fb->pixel_format, &format_name));
 #else
 			drm_get_format_name(fb->format->format, &format_name));
@@ -6316,7 +6316,7 @@ dm_drm_plane_duplicate_state(struct drm_plane *plane)
 	return &dm_plane_state->base;
 }
 
-void dm_drm_plane_destroy_state(struct drm_plane *plane,
+static void dm_drm_plane_destroy_state(struct drm_plane *plane,
 				struct drm_plane_state *state)
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(state);
@@ -6490,7 +6490,7 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 	return -EINVAL;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 static int dm_plane_atomic_async_check(struct drm_plane *plane,
 				       struct drm_plane_state *new_plane_state)
 {
@@ -6526,7 +6526,7 @@ static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = dm_plane_helper_prepare_fb,
 	.cleanup_fb = dm_plane_helper_cleanup_fb,
 	.atomic_check = dm_plane_atomic_check,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 	.atomic_async_check = dm_plane_atomic_async_check,
 	.atomic_async_update = dm_plane_atomic_async_update
 #endif
@@ -6963,14 +6963,14 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	switch (connector_type) {
 	case DRM_MODE_CONNECTOR_HDMIA:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED
 		aconnector->base.ycbcr_420_allowed =
 			link->link_enc->features.hdmi_ycbcr420_supported ? true : false;
 #endif
 		break;
 	case DRM_MODE_CONNECTOR_DisplayPort:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED
 		aconnector->base.ycbcr_420_allowed =
 			link->link_enc->features.dp_ycbcr420_supported ? true : false;
 #endif
@@ -7792,7 +7792,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
+	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 #endif
 		/*
@@ -7800,17 +7801,15 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		 * change FB pitch, DCC state, rotation or mirroing.
 		 */
 		bundle->flip_addrs[planes_count].flip_immediate =
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-				(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0;
-#else
-#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 			crtc->state->async_flip &&
-#else
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 			(crtc->state->pageflip_flags &
 			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#else
+			(acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
 #endif
 			acrtc_state->update_type == UPDATE_TYPE_FAST;
-#endif
 
 		timestamp_ns = ktime_get_ns();
 		bundle->flip_addrs[planes_count].flip_timestamp_in_us = div_u64(timestamp_ns, 1000);
@@ -7905,11 +7904,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-			/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
+	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+	/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
-			/*clean up the flags for next usage*/
-			acrtc_attach->flip_flags = 0;
+	/*clean up the flags for next usage*/
+	acrtc_attach->flip_flags = 0;
 #endif
 	/* Update the planes if changed or disable if we don't have any. */
 	if ((planes_count || acrtc_state->active_planes == 0) &&
@@ -8547,15 +8547,13 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, j) {
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
-	  struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
-		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
-#else
-#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 		if (new_crtc_state->async_flip)
-#else
+#elif defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
 		if (new_crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
-#endif
+#else
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+		if (acrtc->flip_flags & DRM_MODE_PAGE_FLIP_ASYNC)
 #endif
 			wait_for_vblank = false;
 	}
@@ -8609,7 +8607,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 
 	if (wait_for_vblank)
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#ifndef HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE
 		drm_atomic_helper_wait_for_vblanks(dev, state);
 #else
 		drm_atomic_helper_wait_for_flip_done(dev, state);
@@ -9139,7 +9137,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 
 		/* TODO: Remove this once we can handle fast format changes. */
 		if (old_other_state->fb && new_other_state->fb &&
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
 		    old_other_state->fb->pixel_format != new_other_state->fb->pixel_format)
 #else
 		    old_other_state->fb->format != new_other_state->fb->format)
@@ -9239,7 +9237,7 @@ static int dm_update_plane_state(struct dc *dc,
 	} else { /* Add new planes */
 		struct dc_plane_state *dc_new_plane_state;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 12, 0)
+#ifndef HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE
 		if (drm_atomic_plane_disabling(plane, old_plane_state))
 #else
 		if (drm_atomic_plane_disabling(plane->state, new_plane_state))

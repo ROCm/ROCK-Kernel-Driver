@@ -459,8 +459,7 @@ int amdgpu_fence_driver_init_ring(struct amdgpu_ring *ring,
 	if (!adev)
 		return -EINVAL;
 
-	/* Check that num_hw_submission is a power of two */
-	if ((num_hw_submission & (num_hw_submission - 1)) != 0)
+	if (!is_power_of_2(num_hw_submission))
 		return -EINVAL;
 
 	ring->fence_drv.cpu_addr = NULL;
@@ -770,8 +769,10 @@ static int amdgpu_debugfs_gpu_recover(struct seq_file *m, void *data)
 	int r;
 
 	r = pm_runtime_get_sync(dev->dev);
-	if (r < 0)
+	if (r < 0) {
+		pm_runtime_put_autosuspend(dev->dev);
 		return 0;
+	}
 
 	seq_printf(m, "gpu recover\n");
 	amdgpu_device_gpu_recover(adev, NULL);
