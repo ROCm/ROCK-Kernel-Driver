@@ -181,6 +181,11 @@ extern int queue_preemption_timeout_ms;
  */
 extern bool keep_idle_process_evicted;
 
+/*
+ * Don't evict process queues on vm fault
+ */
+extern int amdgpu_no_queue_eviction_on_vm_fault;
+
 /* Enable eviction debug messages */
 extern bool debug_evictions;
 
