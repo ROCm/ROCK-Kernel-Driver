@@ -642,9 +642,10 @@ static int uvd_v3_1_hw_init(void *handle)
 	uvd_v3_1_start(adev);
 
 	r = amdgpu_ring_test_helper(ring);
-	if (r)
+	if (r) {
 		DRM_ERROR("amdgpu: UVD ring test fail (%d).\n", r);
-	goto done;
+		goto done;
+	}
 
 	r = amdgpu_ring_alloc(ring, 10);
 	if (r) {
