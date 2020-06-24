@@ -6763,7 +6763,7 @@ static int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 	acrtc->otg_inst = -1;
 
 	dm->adev->mode_info.crtcs[crtc_index] = acrtc;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_CRTC_ENABLE_COLOR_MGMT
 	drm_crtc_enable_color_mgmt(&acrtc->base, MAX_COLOR_LUT_ENTRIES,
 				   true, MAX_COLOR_LUT_ENTRIES);
 #endif

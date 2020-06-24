@@ -227,6 +227,9 @@
 /* drm_crtc_accurate_vblank_count() is available */
 #define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
 
+/* drm_crtc_enable_color_mgmt() is available */
+#define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
+
 /* drm_crtc_force_disable_all() is available */
 /* #undef HAVE_DRM_CRTC_FORCE_DISABLE_ALL */
 
