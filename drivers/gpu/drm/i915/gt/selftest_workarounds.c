@@ -600,6 +600,8 @@ err_request:
 				err = -EINVAL;
 				goto out_unpin;
 			}
+		} else {
+			rsvd = 0;
 		}
 
 		expect = results[0];

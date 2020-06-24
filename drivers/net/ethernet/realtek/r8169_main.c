@@ -2148,7 +2148,8 @@ static void rtl_enable_eee(struct rtl8169_private *tp)
 		rtl_set_eee_adv(tp, supported);
 }
 
-static void rtl8169_get_mac_version(struct rtl8169_private *tp)
+static void rtl8169_get_mac_version(struct rtl8169_private *tp,
+				    u8 default_version)
 {
 	/*
 	 * The driver currently handles the 8168Bf and the 8168Be identically
@@ -2254,6 +2255,7 @@ static void rtl8169_get_mac_version(struct rtl8169_private *tp)
 
 	if (tp->mac_version == RTL_GIGA_MAC_NONE) {
 		dev_err(tp_to_dev(tp), "unknown chip XID %03x\n", reg & 0xfcf);
+		tp->mac_version = default_version;
 	} else if (!tp->supports_gmii) {
 		if (tp->mac_version == RTL_GIGA_MAC_VER_42)
 			tp->mac_version = RTL_GIGA_MAC_VER_43;
@@ -6841,6 +6843,7 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct net_device *dev;
 	int chipset, region;
 	int jumbo_max, rc;
+	u8 default_version;
 
 	dev = devm_alloc_etherdev(&pdev->dev, sizeof (*tp));
 	if (!dev)
@@ -6898,7 +6901,12 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tp->mmio_addr = pcim_iomap_table(pdev)[region];
 
 	/* Identify chip attached to board */
-	rtl8169_get_mac_version(tp);
+	/* XXX: ugly hack for allowing some backward compatibility with the
+	 * still unsupported chip version for 5.3.y code (bsc#1173085)
+	 */
+	default_version = (ent->device == 0x8168) ?
+		RTL_GIGA_MAC_VER_11 : RTL_GIGA_MAC_NONE;
+	rtl8169_get_mac_version(tp, default_version);
 	if (tp->mac_version == RTL_GIGA_MAC_NONE)
 		return -ENODEV;
 
