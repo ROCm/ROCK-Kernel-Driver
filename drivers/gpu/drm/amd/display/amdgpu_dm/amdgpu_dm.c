@@ -2170,7 +2170,7 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 #endif
 };
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail
 };
@@ -3027,7 +3027,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 	adev->mode_info.mode_config_initialized = true;
 
 	adev_to_drm(adev)->mode_config.funcs = (void *)&amdgpu_dm_mode_funcs;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE
 	adev_to_drm(adev)->mode_config.helper_private = &amdgpu_dm_mode_config_helperfuncs;
 #endif
 
