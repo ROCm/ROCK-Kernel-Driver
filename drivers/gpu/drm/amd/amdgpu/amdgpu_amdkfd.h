@@ -67,6 +67,7 @@ struct kfd_mem_attachment {
 struct kgd_mem {
 	struct mutex lock;
 	struct amdgpu_bo *bo;
+	struct kfd_ipc_obj *ipc_obj;
 	struct dma_buf *dmabuf;
 	struct hmm_range *range;
 	struct list_head attachments;
@@ -328,14 +329,15 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 				      struct dma_buf *dmabuf,
+				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *drm_priv,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset);
 int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_mem *mem,
 				      struct dma_buf **dmabuf);
-int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
-				      struct kgd_mem *mem,
-				      struct dma_buf **dmabuf);
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+				       struct kgd_mem *mem,
+				       struct kfd_ipc_obj **ipc_obj);
 void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev);
 int amdgpu_amdkfd_get_tile_config(struct amdgpu_device *adev,
 				struct tile_config *config);

@@ -35,6 +35,7 @@
 #include "amdgpu_hmm.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_dma_buf.h"
+#include "kfd_ipc.h"
 #include <uapi/linux/kfd_ioctl.h>
 #include "amdgpu_xgmi.h"
 #include "kfd_priv.h"
@@ -1940,6 +1941,9 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 			*size = 0;
 	}
 
+	/* Unreference the ipc_obj if applicable */
+	kfd_ipc_obj_put(&mem->ipc_obj);
+
 	/* Free the BO*/
 	drm_vma_node_revoke(&mem->bo->tbo.base.vma_node, drm_priv);
 	if (mem->dmabuf)
@@ -2526,6 +2530,7 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 				      struct dma_buf *dma_buf,
+				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *drm_priv,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset)
@@ -2577,6 +2582,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 	get_dma_buf(dma_buf);
 	(*mem)->dmabuf = dma_buf;
 	(*mem)->bo = bo;
+	(*mem)->ipc_obj = ipc_obj;
 	(*mem)->va = va;
 	(*mem)->domain = (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) && !adev->gmc.is_app_apu ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
@@ -2625,22 +2631,40 @@ out:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
-				      struct kgd_mem *mem,
-				      struct dma_buf **dmabuf)
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+				       struct kgd_mem *mem,
+				       struct kfd_ipc_obj **ipc_obj)
 {
 	struct amdgpu_device *adev = NULL;
+	struct dma_buf *dmabuf;
+	int r = 0;
 
-	if (!dmabuf || !kgd || !vm || !mem)
+	if (!kgd || !vm || !mem)
 		return -EINVAL;
 
 	adev = get_amdgpu_device(kgd);
+	mutex_lock(&mem->lock);
 
-	*dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
-	if (IS_ERR(*dmabuf))
-		return -EINVAL;
+	if (mem->ipc_obj) {
+		*ipc_obj = mem->ipc_obj;
+		goto unlock_out;
+	}
 
-	return 0;
+	dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
+	if (IS_ERR(dmabuf)) {
+		r = PTR_ERR(dmabuf);
+		goto unlock_out;
+	}
+
+	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj);
+	if (r)
+		dma_buf_put(dmabuf);
+	else
+		*ipc_obj = mem->ipc_obj;
+
+unlock_out:
+	mutex_unlock(&mem->lock);
+	return r;
 }
 
 /* Evict a userptr BO by stopping the queues if necessary
