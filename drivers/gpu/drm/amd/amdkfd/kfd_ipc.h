@@ -25,12 +25,16 @@
 #define KFD_IPC_H_
 
 #include <linux/types.h>
-#include "kfd_priv.h"
+#include <linux/dma-buf.h>
+
+/* avoid including kfd_priv.h */
+struct kfd_dev;
+struct kfd_process;
 
 struct kfd_ipc_obj {
 	struct hlist_node node;
 	struct kref ref;
-	void *data;
+	struct dma_buf *dmabuf;
 	uint32_t share_handle[4];
 };
 
@@ -45,7 +49,7 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *kfd, struct kfd_process *p,
 int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 			     uint64_t handle, uint32_t *ipc_handle);
 
-struct kfd_ipc_obj *ipc_obj_get(struct kfd_ipc_obj *obj);
-void ipc_obj_put(struct kfd_ipc_obj **obj);
+int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj);
+void kfd_ipc_obj_put(struct kfd_ipc_obj **obj);
 
 #endif /* KFD_IPC_H_ */
