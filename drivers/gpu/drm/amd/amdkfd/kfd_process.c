@@ -32,7 +32,6 @@
 #include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/file.h>
-#include "kfd_ipc.h"
 #include <linux/pm_runtime.h>
 #include "amdgpu_amdkfd.h"
 #include "amdgpu.h"
@@ -740,7 +739,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	 * created and the ioctls have not had the chance to run.
 	 */
 	handle = kfd_process_device_create_obj_handle(
-			pdd, mem, gpu_va, size, 0, mem_type, NULL);
+			pdd, mem, gpu_va, size, 0, mem_type);
 
 	if (handle < 0) {
 		err = handle;
@@ -1662,8 +1661,7 @@ out:
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
-					unsigned int mem_type,
-					struct kfd_ipc_obj *ipc_obj)
+					unsigned int mem_type)
 {
 	int handle;
 	struct kfd_bo *buf_obj;
@@ -1682,7 +1680,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 
 	buf_obj->mem = mem;
 	buf_obj->dev = pdd->dev;
-	buf_obj->kfd_ipc_obj = ipc_obj;
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
 
@@ -1759,9 +1756,6 @@ void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 		return;
 
 	buf_obj = kfd_process_device_find_bo(pdd, handle);
-
-	if (buf_obj->kfd_ipc_obj)
-		ipc_obj_put(&buf_obj->kfd_ipc_obj);
 
 	idr_remove(&pdd->alloc_idr, handle);
 

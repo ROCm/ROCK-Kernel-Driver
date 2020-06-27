@@ -1344,7 +1344,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, cpuva, mem_type, NULL);
+			args->va_addr, args->size, cpuva, mem_type);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
