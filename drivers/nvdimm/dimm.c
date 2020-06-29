@@ -43,7 +43,6 @@ static int nvdimm_probe(struct device *dev)
 	if (!ndd)
 		return -ENOMEM;
 
-	dev_set_drvdata(dev, ndd);
 	ndd->dpa.name = dev_name(dev);
 	ndd->ns_current = -1;
 	ndd->ns_next = -1;
@@ -99,12 +98,14 @@ static int nvdimm_probe(struct device *dev)
 	if (ndd->ns_current >= 0) {
 		rc = nd_label_reserve_dpa(ndd);
 		if (rc == 0)
-			nvdimm_set_aliasing(dev);
+			nvdimm_set_labeling(dev);
 	}
 	nvdimm_bus_unlock(dev);
 
 	if (rc)
 		goto err;
+
+	dev_set_drvdata(dev, ndd);
 
 	return 0;
 
