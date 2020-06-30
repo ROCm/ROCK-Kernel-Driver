@@ -1640,6 +1640,7 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 	struct kfd_ioctl_alloc_queue_gws_args *args = data;
 	struct queue *q;
 	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
 
 	mutex_lock(&p->mutex);
 	q = pqm_get_user_queue(&p->pqm, args->queue_id);
@@ -1651,6 +1652,12 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		retval = -ESRCH;
+		goto out_unlock;
+	}
+
 	if (!dev->gws) {
 		retval = -ENODEV;
 		goto out_unlock;
@@ -1658,6 +1665,11 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
 		retval = -ENODEV;
+		goto out_unlock;
+	}
+
+	if (dev->gws_debug_workaround && pdd->is_debugging_enabled) {
+		retval = -EBUSY;
 		goto out_unlock;
 	}
 
@@ -2729,6 +2741,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 		if (!pdd) {
 			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		if (dev->gws_debug_workaround && pdd->qpd.num_gws) {
+			r = -EBUSY;
 			goto unlock_out;
 		}
 
