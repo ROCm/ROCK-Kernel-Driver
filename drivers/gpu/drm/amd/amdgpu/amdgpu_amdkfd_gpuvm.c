@@ -1903,6 +1903,7 @@ static int pin_bo_wo_map(struct kgd_mem *mem)
 		return ret;
 
 	ret = amdgpu_bo_pin(bo, mem->domain);
+	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 	amdgpu_bo_unreserve(bo);
 
 	return ret;
