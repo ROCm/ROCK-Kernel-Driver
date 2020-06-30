@@ -1505,6 +1505,12 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		retval = -ESRCH;
+		goto out_unlock;
+	}
+
 	if (!dev->gws) {
 		retval = -ENODEV;
 		goto out_unlock;
