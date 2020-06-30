@@ -324,6 +324,7 @@ struct kfd_dev {
 
 	/* Global GWS resource shared between processes */
 	void *gws;
+	bool gws_debug_workaround;
 
 	/* Clients watching SMI events */
 	struct list_head smi_clients;
