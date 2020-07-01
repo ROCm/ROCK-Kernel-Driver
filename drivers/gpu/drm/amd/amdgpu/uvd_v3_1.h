@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2020 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,33 +19,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
 
-#ifndef DM_CP_PSP_IF__H
-#define DM_CP_PSP_IF__H
+#ifndef __UVD_V3_1_H__
+#define __UVD_V3_1_H__
 
-struct dc_link;
+extern const struct amdgpu_ip_block_version uvd_v3_1_ip_block;
 
-struct cp_psp_stream_config {
-	uint8_t otg_inst;
-	uint8_t link_enc_inst;
-	uint8_t stream_enc_inst;
-	uint8_t mst_supported;
-	void *dm_stream_ctx;
-	bool dpms_off;
-};
-
-struct cp_psp_funcs {
-	bool (*enable_assr)(void *handle, struct dc_link *link);
-	void (*update_stream_config)(void *handle, struct cp_psp_stream_config *config);
-};
-
-struct cp_psp {
-	void *handle;
-	struct cp_psp_funcs funcs;
-};
-
-
-#endif /* DM_CP_PSP_IF__H */
+#endif

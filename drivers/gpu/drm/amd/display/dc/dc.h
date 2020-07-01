@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.89"
+#define DC_VER "3.2.92"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -285,7 +285,7 @@ struct dc_config {
 	bool edp_not_connected;
 	bool force_enum_edp;
 	bool forced_clocks;
-	bool disable_extended_timeout_support; // Used to disable extended timeout and lttpr feature as well
+	bool allow_lttpr_non_transparent_mode;
 	bool multi_mon_pp_mclk_switch;
 	bool disable_dmcu;
 	bool enable_4to1MPC;
@@ -339,6 +339,7 @@ enum dcn_pwr_state {
 struct dc_clocks {
 	int dispclk_khz;
 	int dppclk_khz;
+	int disp_dpp_voltage_level_khz;
 	int dcfclk_khz;
 	int socclk_khz;
 	int dcfclk_deep_sleep_khz;
@@ -469,6 +470,7 @@ struct dc_debug_options {
 	bool scl_reset_length10;
 	bool hdmi20_disable;
 	bool skip_detection_link_training;
+	bool edid_read_retry_times;
 	bool remove_disconnect_edp;
 	unsigned int force_odm_combine; //bit vector based on otg inst
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)

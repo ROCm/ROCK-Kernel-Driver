@@ -36,11 +36,7 @@
  * space. Therefore PASIDs are allocated using a global IDA. VMs are
  * looked up from the PASID per amdgpu_device.
  */
-#ifndef DEFINE_IDA2
 static DEFINE_IDA(amdgpu_pasid_ida);
-#else
-static DEFINE_IDA2(amdgpu_pasid_ida);
-#endif
 
 /* Helper to free pasid from a fence callback */
 struct amdgpu_pasid_cb {
@@ -575,6 +571,9 @@ void amdgpu_vmid_mgr_init(struct amdgpu_device *adev)
 		mutex_init(&id_mgr->lock);
 		INIT_LIST_HEAD(&id_mgr->ids_lru);
 		atomic_set(&id_mgr->reserved_vmid_num, 0);
+
+		/* manage only VMIDs not used by KFD */
+		id_mgr->num_ids = adev->vm_manager.first_kfd_vmid;
 
 		/* skip over VMID 0, since it is the system VM */
 		for (j = 1; j < id_mgr->num_ids; ++j) {

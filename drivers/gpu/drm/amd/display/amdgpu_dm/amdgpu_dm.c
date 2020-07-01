@@ -1364,15 +1364,11 @@ static int dm_sw_fini(void *handle)
 		adev->dm.dmub_srv = NULL;
 	}
 
-	if (adev->dm.dmub_fw) {
-		release_firmware(adev->dm.dmub_fw);
-		adev->dm.dmub_fw = NULL;
-	}
+	release_firmware(adev->dm.dmub_fw);
+	adev->dm.dmub_fw = NULL;
 
-	if(adev->dm.fw_dmcu) {
-		release_firmware(adev->dm.fw_dmcu);
-		adev->dm.fw_dmcu = NULL;
-	}
+	release_firmware(adev->dm.fw_dmcu);
+	adev->dm.fw_dmcu = NULL;
 
 	return 0;
 }
@@ -5060,10 +5056,8 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 				stream->use_vsc_sdp_for_colorimetry =
 					aconnector->dc_sink->is_vsc_sdp_colorimetry_supported;
 			} else {
-				if (stream->link->dpcd_caps.dpcd_rev.raw >= 0x14 &&
-					stream->link->dpcd_caps.dprx_feature.bits.VSC_SDP_COLORIMETRY_SUPPORTED) {
+				if (stream->link->dpcd_caps.dprx_feature.bits.VSC_SDP_COLORIMETRY_SUPPORTED)
 					stream->use_vsc_sdp_for_colorimetry = true;
-				}
 			}
 			mod_build_vsc_infopacket(stream, &stream->vsc_infopacket);
 		}
@@ -5762,7 +5756,8 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 #ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	int requested_bpc = dm_state ? dm_state->max_bpc : 8;
 #else
-	int requested_bpc = connector->state ? connector->state->max_requested_bpc : 8;
+	const struct drm_connector_state *drm_state = dm_state ? &dm_state->base : NULL;
+	int requested_bpc = drm_state ? drm_state->max_requested_bpc : 8;
 #endif
 	enum dc_status dc_result = DC_OK;
 
@@ -6199,7 +6194,7 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 									   mst_mgr,
 									   mst_port,
 									   dm_new_connector_state->pbn,
-									   0);
+									   dm_mst_get_pbn_divider(aconnector->dc_link));
 	if (dm_new_connector_state->vcpi_slots < 0) {
 		DRM_DEBUG_ATOMIC("failed finding vcpi slots: %d\n", (int)dm_new_connector_state->vcpi_slots);
 		return dm_new_connector_state->vcpi_slots;

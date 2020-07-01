@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2019 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,29 +23,35 @@
  *
  */
 
-#ifndef DM_CP_PSP_IF__H
-#define DM_CP_PSP_IF__H
+#include "dmub_hw_lock_mgr.h"
+#include "dc_dmub_srv.h"
+#include "dc_types.h"
+#include "core_types.h"
 
-struct dc_link;
+void dmub_hw_lock_mgr_cmd(struct dc_dmub_srv *dmub_srv,
+				bool lock,
+				union dmub_hw_lock_flags *hw_locks,
+				struct dmub_hw_lock_inst_flags *inst_flags)
+{
+	union dmub_rb_cmd cmd = { 0 };
 
-struct cp_psp_stream_config {
-	uint8_t otg_inst;
-	uint8_t link_enc_inst;
-	uint8_t stream_enc_inst;
-	uint8_t mst_supported;
-	void *dm_stream_ctx;
-	bool dpms_off;
-};
+	cmd.lock_hw.header.type = DMUB_CMD__HW_LOCK;
+	cmd.lock_hw.header.sub_type = 0;
+	cmd.lock_hw.header.payload_bytes = sizeof(struct dmub_cmd_lock_hw_data);
+	cmd.lock_hw.lock_hw_data.client = HW_LOCK_CLIENT_DRIVER;
+	cmd.lock_hw.lock_hw_data.lock = lock;
+	cmd.lock_hw.lock_hw_data.hw_locks.u8All = hw_locks->u8All;
+	memcpy(&cmd.lock_hw.lock_hw_data.inst_flags, inst_flags, sizeof(struct dmub_hw_lock_inst_flags));
 
-struct cp_psp_funcs {
-	bool (*enable_assr)(void *handle, struct dc_link *link);
-	void (*update_stream_config)(void *handle, struct cp_psp_stream_config *config);
-};
+	if (!lock)
+		cmd.lock_hw.lock_hw_data.should_release = 1;
 
-struct cp_psp {
-	void *handle;
-	struct cp_psp_funcs funcs;
-};
+	dc_dmub_srv_cmd_queue(dmub_srv, &cmd);
+	dc_dmub_srv_cmd_execute(dmub_srv);
+	dc_dmub_srv_wait_idle(dmub_srv);
+}
 
-
-#endif /* DM_CP_PSP_IF__H */
+bool should_use_dmub_lock(struct dc_link *link)
+{
+	return false;
+}

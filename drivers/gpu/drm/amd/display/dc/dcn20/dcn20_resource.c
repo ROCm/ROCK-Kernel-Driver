@@ -2136,11 +2136,20 @@ int dcn20_populate_dml_pipes_from_context(
 		if (res_ctx->pipe_ctx[i].top_pipe && res_ctx->pipe_ctx[i].top_pipe->plane_state
 				== res_ctx->pipe_ctx[i].plane_state) {
 			struct pipe_ctx *first_pipe = res_ctx->pipe_ctx[i].top_pipe;
+			int split_idx = 0;
 
 			while (first_pipe->top_pipe && first_pipe->top_pipe->plane_state
-					== res_ctx->pipe_ctx[i].plane_state)
+					== res_ctx->pipe_ctx[i].plane_state) {
 				first_pipe = first_pipe->top_pipe;
-			pipes[pipe_cnt].pipe.src.hsplit_grp = first_pipe->pipe_idx;
+				split_idx++;
+			}
+			/* Treat 4to1 mpc combine as an mpo of 2 2-to-1 combines */
+			if (split_idx == 0)
+				pipes[pipe_cnt].pipe.src.hsplit_grp = first_pipe->pipe_idx;
+			else if (split_idx == 1)
+				pipes[pipe_cnt].pipe.src.hsplit_grp = res_ctx->pipe_ctx[i].pipe_idx;
+			else if (split_idx == 2)
+				pipes[pipe_cnt].pipe.src.hsplit_grp = res_ctx->pipe_ctx[i].top_pipe->pipe_idx;
 		} else if (res_ctx->pipe_ctx[i].prev_odm_pipe) {
 			struct pipe_ctx *first_pipe = res_ctx->pipe_ctx[i].prev_odm_pipe;
 
@@ -2295,6 +2304,14 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].pipe.src.is_hsplit = (res_ctx->pipe_ctx[i].bottom_pipe && res_ctx->pipe_ctx[i].bottom_pipe->plane_state == pln)
 					|| (res_ctx->pipe_ctx[i].top_pipe && res_ctx->pipe_ctx[i].top_pipe->plane_state == pln)
 					|| pipes[pipe_cnt].pipe.dest.odm_combine != dm_odm_combine_mode_disabled;
+
+			/* stereo is not split */
+			if (pln->stereo_format == PLANE_STEREO_FORMAT_SIDE_BY_SIDE ||
+			    pln->stereo_format == PLANE_STEREO_FORMAT_TOP_AND_BOTTOM) {
+				pipes[pipe_cnt].pipe.src.is_hsplit = false;
+				pipes[pipe_cnt].pipe.src.hsplit_grp = res_ctx->pipe_ctx[i].pipe_idx;
+			}
+
 			pipes[pipe_cnt].pipe.src.source_scan = pln->rotation == ROTATION_ANGLE_90
 					|| pln->rotation == ROTATION_ANGLE_270 ? dm_vert : dm_horz;
 			pipes[pipe_cnt].pipe.src.viewport_y_y = scl->viewport_unadjusted.y;
@@ -2755,12 +2772,11 @@ int dcn20_validate_apply_pipe_split_flags(
 		if (!context->res_ctx.pipe_ctx[i].stream)
 			continue;
 
-		if (force_split || v->NoOfDPP[vlevel][max_mpc_comb][pipe_plane] > 1) {
-			if (split4mpc)
-				split[i] = 4;
-			else
+		if (split4mpc || v->NoOfDPP[vlevel][max_mpc_comb][pipe_plane] == 4)
+			split[i] = 4;
+		else if (force_split || v->NoOfDPP[vlevel][max_mpc_comb][pipe_plane] == 2)
 				split[i] = 2;
-		}
+
 		if ((pipe->stream->view_format ==
 				VIEW_3D_FORMAT_SIDE_BY_SIDE ||
 				pipe->stream->view_format ==
@@ -2778,6 +2794,11 @@ int dcn20_validate_apply_pipe_split_flags(
 		if (dc->debug.force_odm_combine_4to1 & (1 << pipe->stream_res.tg->inst)) {
 			split[i] = 4;
 			v->ODMCombineEnablePerState[vlevel][pipe_plane] = dm_odm_combine_mode_4to1;
+		}
+		/*420 format workaround*/
+		if (pipe->stream->timing.h_addressable > 7680 &&
+				pipe->stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
+			split[i] = 4;
 		}
 #endif
 		v->ODMCombineEnabled[pipe_plane] =

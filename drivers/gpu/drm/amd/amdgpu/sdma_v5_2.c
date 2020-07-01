@@ -115,8 +115,8 @@ static void sdma_v5_2_destroy_inst_ctx(struct amdgpu_device *adev)
 	int i;
 
 	for (i = 0; i < adev->sdma.num_instances; i++) {
-		if (adev->sdma.instance[i].fw != NULL)
-			release_firmware(adev->sdma.instance[i].fw);
+		release_firmware(adev->sdma.instance[i].fw);
+		adev->sdma.instance[i].fw = NULL;
 
 		if (adev->asic_type == CHIP_SIENNA_CICHLID)
 			break;
@@ -1244,6 +1244,10 @@ static int sdma_v5_2_sw_init(void *handle)
 static int sdma_v5_2_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	int i;
+
+	for (i = 0; i < adev->sdma.num_instances; i++)
+		amdgpu_ring_fini(&adev->sdma.instance[i].ring);
 
 	sdma_v5_2_destroy_inst_ctx(adev);
 

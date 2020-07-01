@@ -1945,7 +1945,7 @@ static ssize_t amdgpu_set_thermal_throttling_logging(struct device *dev,
 
 static struct amdgpu_device_attr amdgpu_device_attrs[] = {
 	AMDGPU_DEVICE_ATTR_RW(power_dpm_state,				ATTR_FLAG_BASIC|ATTR_FLAG_ONEVF),
-	AMDGPU_DEVICE_ATTR_RW(power_dpm_force_performance_level,	ATTR_FLAG_BASIC|ATTR_FLAG_ONEVF),
+	AMDGPU_DEVICE_ATTR_RW(power_dpm_force_performance_level,	ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RO(pp_num_states,				ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RO(pp_cur_state,				ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RW(pp_force_state,				ATTR_FLAG_BASIC),
@@ -3558,21 +3558,36 @@ void amdgpu_dpm_enable_uvd(struct amdgpu_device *adev, bool enable)
 {
 	int ret = 0;
 
-	ret = amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_UVD, !enable);
-	if (ret)
-		DRM_ERROR("Dpm %s uvd failed, ret = %d. \n",
-			  enable ? "enable" : "disable", ret);
+	if (adev->family == AMDGPU_FAMILY_SI) {
+		if (enable) {
+			mutex_lock(&adev->pm.mutex);
+			adev->pm.dpm.uvd_active = true;
+			adev->pm.dpm.state = POWER_STATE_TYPE_INTERNAL_UVD;
+			mutex_unlock(&adev->pm.mutex);
+		} else {
+			mutex_lock(&adev->pm.mutex);
+			adev->pm.dpm.uvd_active = false;
+			mutex_unlock(&adev->pm.mutex);
+		}
 
-	/* enable/disable Low Memory PState for UVD (4k videos) */
-	if (adev->asic_type == CHIP_STONEY &&
-		adev->uvd.decode_image_width >= WIDTH_4K) {
-		struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+		amdgpu_pm_compute_clocks(adev);
+	} else {
+		ret = amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_UVD, !enable);
+		if (ret)
+			DRM_ERROR("Dpm %s uvd failed, ret = %d. \n",
+				  enable ? "enable" : "disable", ret);
 
-		if (hwmgr && hwmgr->hwmgr_func &&
-		    hwmgr->hwmgr_func->update_nbdpm_pstate)
-			hwmgr->hwmgr_func->update_nbdpm_pstate(hwmgr,
-							       !enable,
-							       true);
+		/* enable/disable Low Memory PState for UVD (4k videos) */
+		if (adev->asic_type == CHIP_STONEY &&
+			adev->uvd.decode_image_width >= WIDTH_4K) {
+			struct pp_hwmgr *hwmgr = adev->powerplay.pp_handle;
+
+			if (hwmgr && hwmgr->hwmgr_func &&
+			    hwmgr->hwmgr_func->update_nbdpm_pstate)
+				hwmgr->hwmgr_func->update_nbdpm_pstate(hwmgr,
+								       !enable,
+								       true);
+		}
 	}
 }
 
@@ -3580,10 +3595,26 @@ void amdgpu_dpm_enable_vce(struct amdgpu_device *adev, bool enable)
 {
 	int ret = 0;
 
-	ret = amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_VCE, !enable);
-	if (ret)
-		DRM_ERROR("Dpm %s vce failed, ret = %d. \n",
-			  enable ? "enable" : "disable", ret);
+	if (adev->family == AMDGPU_FAMILY_SI) {
+		if (enable) {
+			mutex_lock(&adev->pm.mutex);
+			adev->pm.dpm.vce_active = true;
+			/* XXX select vce level based on ring/task */
+			adev->pm.dpm.vce_level = AMD_VCE_LEVEL_AC_ALL;
+			mutex_unlock(&adev->pm.mutex);
+		} else {
+			mutex_lock(&adev->pm.mutex);
+			adev->pm.dpm.vce_active = false;
+			mutex_unlock(&adev->pm.mutex);
+		}
+
+		amdgpu_pm_compute_clocks(adev);
+	} else {
+		ret = amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_VCE, !enable);
+		if (ret)
+			DRM_ERROR("Dpm %s vce failed, ret = %d. \n",
+				  enable ? "enable" : "disable", ret);
+	}
 }
 
 void amdgpu_pm_print_power_states(struct amdgpu_device *adev)

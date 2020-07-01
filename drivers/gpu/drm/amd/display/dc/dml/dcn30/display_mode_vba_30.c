@@ -3989,6 +3989,11 @@ void dml30_ModeSupportAndSystemConfigurationFull(struct display_mode_lib *mode_l
 				} else {
 					v->ODMCombineEnablePerState[i][k] = dm_odm_combine_mode_disabled;
 					v->PlaneRequiredDISPCLK = v->PlaneRequiredDISPCLKWithoutODMCombine;
+					/*420 format workaround*/
+					if (v->HActive[k] > 4096 && v->OutputFormat[k] == dm_420) {
+						v->ODMCombineEnablePerState[i][k] = dm_odm_combine_mode_2to1;
+						v->PlaneRequiredDISPCLK = v->PlaneRequiredDISPCLKWithODMCombine2To1;
+					}
 				}
 
 				if (v->ODMCombineEnablePerState[i][k] == dm_odm_combine_mode_4to1) {

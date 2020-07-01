@@ -68,9 +68,6 @@
 #define HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION__PRI_VIEWPORT_WIDTH_MASK                                          0x00003FFFL
 #define HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION__PRI_VIEWPORT_HEIGHT_MASK                                         0x3FFF0000L
 
-/* XXX Move this macro to VEGA10 header file, which is like vid.h for VI.*/
-#define AMDGPU_NUM_OF_VMIDS			8
-
 static const u32 golden_settings_vega10_hdp[] =
 {
 	0xf64, 0x0fffffff, 0x00000000,
@@ -1248,12 +1245,15 @@ static int gmc_v9_0_sw_init(void *handle)
 	/*
 	 * number of VMs
 	 * VMID 0 is reserved for System
-	 * amdgpu graphics/compute will use VMIDs 1-7
-	 * amdkfd will use VMIDs 8-15
+	 * amdgpu graphics/compute will use VMIDs 1..n-1
+	 * amdkfd will use VMIDs n..15
+	 *
+	 * The first KFD VMID is 8 for GPUs with graphics, 3 for
+	 * compute-only GPUs. On compute-only GPUs that leaves 2 VMIDs
+	 * for video processing.
 	 */
-	adev->vm_manager.id_mgr[AMDGPU_GFXHUB_0].num_ids = AMDGPU_NUM_OF_VMIDS;
-	adev->vm_manager.id_mgr[AMDGPU_MMHUB_0].num_ids = AMDGPU_NUM_OF_VMIDS;
-	adev->vm_manager.id_mgr[AMDGPU_MMHUB_1].num_ids = AMDGPU_NUM_OF_VMIDS;
+	adev->vm_manager.first_kfd_vmid =
+		adev->asic_type == CHIP_ARCTURUS ? 3 : 8;
 
 	amdgpu_vm_manager_init(adev);
 
