@@ -1029,8 +1029,9 @@ static int netsec_process_rx(struct netsec_priv *priv, int budget)
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 next:
-		if ((skb && napi_gro_receive(&priv->napi, skb) != GRO_DROP) ||
-		    xdp_result & NETSEC_XDP_RX_OK) {
+		if (skb)
+			napi_gro_receive(&priv->napi, skb);
+		if (skb || (xdp_result & NETSEC_XDP_RX_OK)) {
 			ndev->stats.rx_packets++;
 			ndev->stats.rx_bytes += xdp.data_end - xdp.data;
 		}
