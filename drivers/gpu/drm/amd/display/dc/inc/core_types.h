@@ -173,7 +173,11 @@ struct resource_funcs {
 			struct dc_3dlut **lut,
 			struct dc_transfer_func **shaper);
 #endif
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	enum dc_status (*add_dsc_to_stream_resource)(
+			struct dc *dc, struct dc_state *state,
+			struct dc_stream_state *stream);
+#endif
 };
 
 struct audio_support{

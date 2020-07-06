@@ -680,6 +680,19 @@ bool dc_stream_set_dynamic_metadata(struct dc *dc,
 }
 #endif
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
+		struct dc_state *state,
+		struct dc_stream_state *stream)
+{
+	if (dc->res_pool->funcs->add_dsc_to_stream_resource) {
+		return dc->res_pool->funcs->add_dsc_to_stream_resource(dc, state, stream);
+	} else {
+		return DC_NO_DSC_RESOURCE;
+	}
+}
+#endif
+
 void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream)
 {
 	DC_LOG_DC(
