@@ -107,6 +107,9 @@
 /* drm_atomic_get_new_plane_state() is available */
 #define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
 
+/* drm_atomic_helper_check_plane_state() is available */
+#define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
+
 /* __drm_atomic_helper_connector_reset() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET 1
 
@@ -482,6 +485,9 @@
 
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
+
+/* drm_plane_helper_check_state is available */
+/* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
 
 /* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
    available */
