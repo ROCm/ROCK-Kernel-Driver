@@ -512,12 +512,24 @@ handle_t *jbd2_journal_start(journal_t *journal, int nblocks)
 }
 EXPORT_SYMBOL(jbd2_journal_start);
 
-void jbd2_journal_free_reserved(handle_t *handle)
+static void __jbd2_journal_unreserve_handle(handle_t *handle, transaction_t *t)
 {
 	journal_t *journal = handle->h_journal;
 
 	WARN_ON(!handle->h_reserved);
 	sub_reserved_credits(journal, handle->h_buffer_credits);
+	if (t)
+		atomic_sub(handle->h_buffer_credits, &t->t_outstanding_credits);
+}
+
+void jbd2_journal_free_reserved(handle_t *handle)
+{
+	journal_t *journal = handle->h_journal;
+
+	/* Get j_state_lock to pin running transaction if it exists */
+	read_lock(&journal->j_state_lock);
+	__jbd2_journal_unreserve_handle(handle, journal->j_running_transaction);
+	read_unlock(&journal->j_state_lock);
 	jbd2_free_handle(handle);
 }
 EXPORT_SYMBOL(jbd2_journal_free_reserved);
@@ -694,8 +706,8 @@ int jbd2__journal_restart(handle_t *handle, int nblocks, gfp_t gfp_mask)
 	atomic_sub(handle->h_buffer_credits,
 		   &transaction->t_outstanding_credits);
 	if (handle->h_rsv_handle) {
-		sub_reserved_credits(journal,
-				     handle->h_rsv_handle->h_buffer_credits);
+		__jbd2_journal_unreserve_handle(handle->h_rsv_handle,
+								transaction);
 	}
 	if (atomic_dec_and_test(&transaction->t_updates))
 		wake_up(&journal->j_wait_updates);
@@ -1802,6 +1814,9 @@ int jbd2_journal_stop(handle_t *handle)
 	current->journal_info = NULL;
 	atomic_sub(handle->h_buffer_credits,
 		   &transaction->t_outstanding_credits);
+	if (handle->h_rsv_handle)
+		__jbd2_journal_unreserve_handle(handle->h_rsv_handle,
+						transaction);
 
 	/*
 	 * If the handle is marked SYNC, we need to set another commit
@@ -1849,7 +1864,7 @@ int jbd2_journal_stop(handle_t *handle)
 		err = jbd2_log_wait_commit(journal, tid);
 
 	if (handle->h_rsv_handle)
-		jbd2_journal_free_reserved(handle->h_rsv_handle);
+		jbd2_free_handle(handle->h_rsv_handle);
 free_and_exit:
 	/*
 	 * Scope of the GFP_NOFS context is over here and so we can restore the
