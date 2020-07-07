@@ -311,7 +311,16 @@ static int mid_spi_dma_setup(struct dw_spi *dws, struct spi_transfer *xfer)
 
 	dws->transfer_handler = dma_transfer;
 
-	return 0;
+	if (txdesc && dws->master->cur_msg->status == -EINPROGRESS) {
+		ret = dw_spi_dma_wait_tx_done(dws, xfer);
+		if (ret)
+			return ret;
+	}
+
+	if (rxdesc && dws->master->cur_msg->status == -EINPROGRESS)
+		ret = dw_spi_dma_wait_rx_done(dws);
+
+	return ret;
 }
 
 static int mid_spi_dma_transfer(struct dw_spi *dws, struct spi_transfer *xfer)
@@ -337,16 +346,7 @@ static int mid_spi_dma_transfer(struct dw_spi *dws, struct spi_transfer *xfer)
 		dma_async_issue_pending(dws->txchan);
 	}
 
-	if (txdesc && dws->master->cur_msg->status == -EINPROGRESS) {
-		ret = dw_spi_dma_wait_tx_done(dws, xfer);
-		if (ret)
-			return ret;
-	}
-
-	if (rxdesc && dws->master->cur_msg->status == -EINPROGRESS)
-		ret = dw_spi_dma_wait_rx_done(dws);
-
-	return ret;
+	return 1;
 }
 
 static void mid_spi_dma_stop(struct dw_spi *dws)
