@@ -1131,6 +1131,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_RENOIR:
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 #endif
 		return 0;
 	case CHIP_NAVI12:
@@ -1230,6 +1231,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		break;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 		dmub_asic = DMUB_ASIC_DCN30;
 		fw_name_dmub = FIRMWARE_SIENNA_CICHLID_DMUB;
 		break;
@@ -3435,6 +3437,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 #endif
 		if (dcn10_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -3739,6 +3742,7 @@ static int dm_early_init(void *handle)
 	case CHIP_NAVI12:
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 #endif
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
@@ -4077,6 +4081,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 		adev->asic_type == CHIP_SIENNA_CICHLID ||
+		adev->asic_type == CHIP_NAVY_FLOUNDER ||
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	    adev->asic_type == CHIP_RENOIR ||
@@ -4100,9 +4105,9 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		tiling_info->gfx9.shaderEnable = 1;
 
 #ifdef CONFIG_DRM_AMD_DC_DCN3_0
-		if (adev->asic_type == CHIP_SIENNA_CICHLID)
+		if (adev->asic_type == CHIP_SIENNA_CICHLID ||
+		    adev->asic_type == CHIP_NAVY_FLOUNDER)
 			tiling_info->gfx9.num_pkrs = adev->gfx.config.gb_addr_config_fields.num_pkrs;
-
 #endif
 		ret = fill_plane_dcc_attributes(adev, afb, format, rotation,
 						plane_size, tiling_info,
