@@ -1331,6 +1331,9 @@ err:
 		sg_free_table(sg);
 		kfree(sg);
 	}
+
+	up_read(&adev->reset_sem);
+
 	return ret;
 }
 
@@ -1910,6 +1913,9 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 		/* Only VRAM and GTT BOs are supported */
 		return -EINVAL;
 
+	if (!down_read_trylock(&adev->reset_sem))
+		return -EIO;
+
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem)
 		return -ENOMEM;
@@ -1943,6 +1949,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	amdgpu_sync_create(&(*mem)->sync);
 	(*mem)->is_imported = true;
 
+	up_read(&adev->reset_sem);
 	return 0;
 }
 

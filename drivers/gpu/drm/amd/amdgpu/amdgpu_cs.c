@@ -1454,6 +1454,8 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	parser.adev = adev;
 	parser.filp = filp;
 
+	down_read(&adev->reset_sem);
+
 	r = amdgpu_cs_parser_init(&parser, data);
 	if (r) {
 		DRM_ERROR("Failed to initialize parser %d!\n", r);
@@ -1766,6 +1768,8 @@ err_free_fence_array:
 	for (i = 0; i < fence_count; i++)
 		dma_fence_put(array[i]);
 	kfree(array);
+
+	up_read(&adev->reset_sem);
 
 	return r;
 }
