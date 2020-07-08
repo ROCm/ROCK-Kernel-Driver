@@ -94,6 +94,7 @@ nfs_file_release(struct inode *inode, struct file *filp)
 		 */
 		vfs_fsync(filp, 0);
 	nfs_inc_stats(inode, NFSIOS_VFSRELEASE);
+	inode_dio_wait(inode);
 	nfs_file_clear_open_context(filp);
 	return 0;
 }
