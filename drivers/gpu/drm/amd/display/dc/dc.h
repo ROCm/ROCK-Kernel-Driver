@@ -1314,6 +1314,8 @@ void dc_lock_memory_clock_frequency(struct dc *dc);
 
 #endif
 
+bool dc_set_psr_allow_active(struct dc *dc, bool enable);
+
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 /*******************************************************************************
  * DSC Interfaces
