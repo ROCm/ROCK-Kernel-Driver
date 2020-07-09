@@ -1587,7 +1587,9 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	uint32_t formats[32];
 	int num_formats;
 	int res = -EPERM;
+#ifdef HAVE_DRM_PLANE_PROPERTY_ROTATION
 	unsigned int supported_rotations;
+#endif
 	uint64_t *modifiers = NULL;
 
 	num_formats = get_plane_formats(plane, plane_cap, formats,
@@ -1636,6 +1638,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	}
 #endif
 
+#ifdef HAVE_DRM_PLANE_PROPERTY_ROTATION
 	supported_rotations =
 		DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 |
 		DRM_MODE_ROTATE_180 | DRM_MODE_ROTATE_270;
@@ -1644,7 +1647,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	    plane->type != DRM_PLANE_TYPE_CURSOR)
 		drm_plane_create_rotation_property(plane, DRM_MODE_ROTATE_0,
 						   supported_rotations);
-
+#endif
 	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
 
 #ifdef CONFIG_DRM_AMD_DC_HDR

@@ -22,9 +22,22 @@ AC_DEFUN([AC_AMDGPU_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE], [
 	])
 ])
 
+dnl #
+dnl # v4.8-rc8-1454-d138dd3c0c70 drm: Add support for optional per-plane rotation property
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_PLANE_PROPERTY_ROTATION], [
+	AC_KERNEL_CHECK_SYMBOL_EXPORT(
+		[drm_plane_create_rotation_property],
+		[drivers/gpu/drm/drm_blend.c],[
+		AC_DEFINE(HAVE_DRM_PLANE_PROPERTY_ROTATION, 1,
+			[drm_plane_create_rotation_property is available])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_PLANE_PROPERTY], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_AMDGPU_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 		AC_AMDGPU_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
+		AC_AMDGPU_DRM_PLANE_PROPERTY_ROTATION
 	])
 ])
