@@ -474,6 +474,9 @@
 /* drm_modeset_lock_all_ctx() is available */
 #define HAVE_DRM_MODESET_LOCK_ALL_CTX 1
 
+/* drm_mode_get_hv_timing is available */
+#define HAVE_DRM_MODE_GET_HV_TIMING 1
+
 /* drm_mode_is_420_xxx() is available */
 #define HAVE_DRM_MODE_IS_420_XXX 1
 
