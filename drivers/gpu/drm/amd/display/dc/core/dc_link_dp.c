@@ -2446,6 +2446,12 @@ static bool decide_edp_link_settings(struct dc_link *link, struct dc_link_settin
 	return false;
 }
 
+static bool decide_mst_link_settings(const struct dc_link *link, struct dc_link_settings *link_setting)
+{
+	*link_setting = link->verified_link_cap;
+	return true;
+}
+
 void decide_link_settings(struct dc_stream_state *stream,
 	struct dc_link_settings *link_setting)
 {
@@ -2471,11 +2477,9 @@ void decide_link_settings(struct dc_stream_state *stream,
 	 * TODO: add MST specific link training routine
 	 */
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
-		*link_setting = link->verified_link_cap;
-		return;
-	}
-
-	if (link->connector_signal == SIGNAL_TYPE_EDP) {
+		if (decide_mst_link_settings(link, link_setting))
+			return;
+	} else if (link->connector_signal == SIGNAL_TYPE_EDP) {
 		if (decide_edp_link_settings(link, link_setting, req_bw))
 			return;
 	} else if (decide_dp_link_settings(link, link_setting, req_bw))
