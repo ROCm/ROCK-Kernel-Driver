@@ -2207,7 +2207,7 @@ int reserve_debug_trap_vmid(struct device_queue_manager *dqm)
 
 	if (dqm->trap_debug_vmid != 0) {
 		pr_err("Trap debug id already reserved\n");
-		r = -EINVAL;
+		r = -EBUSY;
 		goto out_unlock;
 	}
 
