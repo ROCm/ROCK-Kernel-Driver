@@ -761,6 +761,9 @@ struct mlx5_cmd_work_ent {
 	struct delayed_work	cb_timeout_work;
 	void		       *context;
 	int			idx;
+#ifndef __GENKSYMS__
+	struct completion	handling;
+#endif
 	struct completion	done;
 	struct mlx5_cmd        *cmd;
 	struct work_struct	work;
