@@ -4,7 +4,9 @@
 
 #include <linux/types.h>
 #include <linux/nmi.h>
+#ifndef __GENKSYMS__
 #include <linux/msi.h>
+#endif
 #include <asm/io.h>
 #include <asm/hyperv-tlfs.h>
 #include <asm/nospec-branch.h>
