@@ -36,7 +36,11 @@ struct amdgpu_bo_list_entry {
 	struct amdgpu_bo_va		*bo_va;
 	uint32_t			priority;
 	struct page			**user_pages;
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	bool				user_invalidated;
+#else
+	int				user_invalidated;
+#endif
 };
 
 struct amdgpu_bo_list {

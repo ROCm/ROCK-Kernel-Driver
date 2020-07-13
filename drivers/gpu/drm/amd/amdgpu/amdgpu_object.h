@@ -101,12 +101,19 @@ struct amdgpu_bo {
 	struct amdgpu_bo		*shadow;
 
 
-
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 #ifdef CONFIG_MMU_NOTIFIER
 	struct mmu_interval_notifier	notifier;
 #endif
 
 	struct list_head		shadow_list;
+
+#else
+	union {
+		struct list_head	mn_list;
+		struct list_head	shadow_list;
+	};
+#endif
 
 	struct kgd_mem                  *kfd_bo;
 

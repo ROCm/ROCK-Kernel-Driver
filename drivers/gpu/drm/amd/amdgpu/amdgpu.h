@@ -1092,7 +1092,9 @@ struct amdgpu_device {
 	struct rw_semaphore reset_sem;
 	struct amdgpu_doorbell_index doorbell_index;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	struct mutex			notifier_lock;
+#endif
 
 	int asic_reset_res;
 	struct work_struct		xgmi_reset_work;
