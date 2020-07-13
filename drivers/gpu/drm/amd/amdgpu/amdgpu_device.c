@@ -3552,7 +3552,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	atomic_set(&adev->in_gpu_reset, 0);
 	init_rwsem(&adev->reset_sem);
 	mutex_init(&adev->psp.mutex);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	mutex_init(&adev->notifier_lock);
+#endif
 	mutex_init(&adev->pm.stable_pstate_ctx_lock);
 
 	amdgpu_device_init_apu_flags(adev);

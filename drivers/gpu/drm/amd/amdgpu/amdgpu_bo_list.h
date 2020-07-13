@@ -37,7 +37,11 @@ struct amdgpu_bo_list_entry {
 	struct dma_fence_chain		*chain;
 	uint32_t			priority;
 	struct page			**user_pages;
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	bool				user_invalidated;
+#else
+	int				user_invalidated;
+#endif
 };
 
 struct amdgpu_bo_list {

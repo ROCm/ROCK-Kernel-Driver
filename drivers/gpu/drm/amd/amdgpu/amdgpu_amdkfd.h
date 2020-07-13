@@ -77,6 +77,9 @@ struct kgd_mem {
 
 	atomic_t invalid;
 	struct amdkfd_process_info *process_info;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	struct page **user_pages;
+#endif
 
 	struct amdgpu_sync sync;
 
