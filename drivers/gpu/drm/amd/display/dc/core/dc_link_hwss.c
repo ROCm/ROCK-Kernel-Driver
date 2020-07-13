@@ -18,6 +18,7 @@
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #include "resource.h"
 #endif
+#include "clk_mgr.h"
 
 static uint8_t convert_to_count(uint8_t lttpr_repeater_count)
 {
@@ -127,6 +128,11 @@ void dp_enable_link_phy(
 		}
 	}
 
+	link->cur_link_settings = *link_settings;
+
+	if (dc->clk_mgr->funcs->notify_link_rate_change)
+		dc->clk_mgr->funcs->notify_link_rate_change(dc->clk_mgr, link);
+
 	if (dmcu != NULL && dmcu->funcs->lock_phy)
 		dmcu->funcs->lock_phy(dmcu);
 
@@ -145,8 +151,6 @@ void dp_enable_link_phy(
 	if (dmcu != NULL && dmcu->funcs->unlock_phy)
 		dmcu->funcs->unlock_phy(dmcu);
 
-	link->cur_link_settings = *link_settings;
-
 	dp_receiver_power_ctrl(link, true);
 }
 
@@ -155,7 +159,8 @@ bool edp_receiver_ready_T9(struct dc_link *link)
 	unsigned int tries = 0;
 	unsigned char sinkstatus = 0;
 	unsigned char edpRev = 0;
-	enum dc_status result = DC_OK;
+	enum dc_status result;
+
 	result = core_link_read_dpcd(link, DP_EDP_DPCD_REV, &edpRev, sizeof(edpRev));
 
      /* start from eDP version 1.2, SINK_STAUS indicate the sink is ready.*/
@@ -181,7 +186,7 @@ bool edp_receiver_ready_T7(struct dc_link *link)
 {
 	unsigned char sinkstatus = 0;
 	unsigned char edpRev = 0;
-	enum dc_status result = DC_OK;
+	enum dc_status result;
 
 	/* use absolute time stamp to constrain max T7*/
 	unsigned long long enter_timestamp = 0;
@@ -237,6 +242,9 @@ void dp_disable_link_phy(struct dc_link *link, enum signal_type signal)
 	/* Clear current link setting.*/
 	memset(&link->cur_link_settings, 0,
 			sizeof(link->cur_link_settings));
+
+	if (dc->clk_mgr->funcs->notify_link_rate_change)
+		dc->clk_mgr->funcs->notify_link_rate_change(dc->clk_mgr, link);
 }
 
 void dp_disable_link_phy_mst(struct dc_link *link, enum signal_type signal)

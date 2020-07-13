@@ -28,6 +28,7 @@
 #include "amdgpu_vm.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_dma_buf.h"
+#include "kfd_ipc.h"
 #include <uapi/linux/kfd_ioctl.h>
 
 /* BO flag to indicate a KFD userptr BO */
@@ -1404,6 +1405,9 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 			*size = 0;
 	}
 
+	/* Unreference the ipc_obj if applicable */
+	kfd_ipc_obj_put(&mem->ipc_obj);
+
 	/* Free the BO*/
 	drm_gem_object_put_unlocked(&mem->bo->tbo.base);
 	mutex_destroy(&mem->lock);
@@ -1862,6 +1866,7 @@ void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
 
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 				      struct dma_buf *dma_buf,
+				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *vm,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset)
@@ -1911,6 +1916,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 
 	drm_gem_object_get(&bo->tbo.base);
 	(*mem)->bo = bo;
+	(*mem)->ipc_obj = ipc_obj;
 	(*mem)->va = va;
 	(*mem)->domain = (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
@@ -1923,26 +1929,44 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_dev *kgd, void *vm,
-				      struct kgd_mem *mem,
-				      struct dma_buf **dmabuf)
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+				       struct kgd_mem *mem,
+				       struct kfd_ipc_obj **ipc_obj)
 {
 	struct amdgpu_device *adev = NULL;
+	struct dma_buf *dmabuf;
+	int r = 0;
 
-	if (!dmabuf || !kgd || !vm || !mem)
+	if (!kgd || !vm || !mem)
 		return -EINVAL;
 
 	adev = get_amdgpu_device(kgd);
+	mutex_lock(&mem->lock);
+
+	if (mem->ipc_obj) {
+		*ipc_obj = mem->ipc_obj;
+		goto unlock_out;
+	}
 
 #ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
-	*dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
+	dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
 #else
-	*dmabuf = amdgpu_gem_prime_export(adev->ddev, &mem->bo->tbo.base, 0);
+	dmabuf = amdgpu_gem_prime_export(adev->ddev, &mem->bo->tbo.base, 0);
 #endif
-	if (IS_ERR(*dmabuf))
-		return -EINVAL;
+	if (IS_ERR(dmabuf)) {
+		r = PTR_ERR(dmabuf);
+		goto unlock_out;
+	}
 
-	return 0;
+	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj);
+	if (r)
+		dma_buf_put(dmabuf);
+	else
+		*ipc_obj = mem->ipc_obj;
+
+unlock_out:
+	mutex_unlock(&mem->lock);
+	return r;
 }
 
 /* Evict a userptr BO by stopping the queues if necessary

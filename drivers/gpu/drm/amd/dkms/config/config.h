@@ -487,6 +487,9 @@
 /* drm_plane_create_color_properties is available */
 #define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
 
+/* drm_plane_create_rotation_property is available */
+#define HAVE_DRM_PLANE_PROPERTY_ROTATION 1
+
 /* drm_send_event_locked() function is available */
 #define HAVE_DRM_SEND_EVENT_LOCKED 1
 
