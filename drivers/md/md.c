@@ -376,8 +376,12 @@ EXPORT_SYMBOL(md_handle_request);
  * we can't reliably call generic_end_io_acct, the inflight counter
  * would also be unreliable and it's better to keep it at 0.
  */
-void md_io_acct(struct mddev *mddev, int sgrp, unsigned int sectors)
+void md_io_acct(struct mddev *mddev, int op, unsigned int sectors)
 {
+	int sgrp = op_stat_group(op);
+
+	if (!mddev->gendisk)
+		return;
 	part_stat_lock();
 	part_stat_inc(&mddev->gendisk->part0, ios[sgrp]);
 	part_stat_add(&mddev->gendisk->part0, sectors[sgrp], sectors);
