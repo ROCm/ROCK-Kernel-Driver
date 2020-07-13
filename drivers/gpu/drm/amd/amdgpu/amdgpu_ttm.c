@@ -32,6 +32,9 @@
 
 #include <linux/dma-mapping.h>
 #include <linux/iommu.h>
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+#include <linux/hmm.h>
+#endif
 #include <linux/pagemap.h>
 #include <linux/sched/task.h>
 #include <linux/sched/mm.h>
@@ -669,6 +672,13 @@ uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type)
 /*
  * TTM backend functions.
  */
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+struct amdgpu_ttm_gup_task_list {
+	struct list_head	list;
+	struct task_struct	*task;
+};
+#endif
+
 struct amdgpu_ttm_tt {
 	struct ttm_tt	ttm;
 	struct drm_gem_object	*gobj;
@@ -678,11 +688,21 @@ struct amdgpu_ttm_tt {
 	uint32_t		userflags;
 	bool			bound;
 #if IS_ENABLED(CONFIG_DRM_AMDGPU_USERPTR)
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	struct hmm_range	*range;
 #endif
+#endif
+
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	spinlock_t		guptasklock;
+	struct list_head	guptasks;
+	atomic_t		mmu_invalidations;
+	uint32_t		last_set_pages;
+#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 };
 
 #ifdef CONFIG_DRM_AMDGPU_USERPTR
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 /*
  * amdgpu_ttm_tt_get_user_pages - get device accessible pages that back user
  * memory and start HMM tracking CPU page table update
@@ -767,8 +787,89 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm)
 
 	return !r;
 }
-#endif
 
+#else
+/*
+ * amdgpu_ttm_tt_get_user_pages - Pin pages of memory pointed to by a USERPTR
+ * pointer to memory
+ *
+ * Called by amdgpu_gem_userptr_ioctl() and amdgpu_cs_parser_bos().
+ * This provides a wrapper around the get_user_pages() call to provide
+ * device accessible pages that back user memory.
+ */
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
+{
+	struct ttm_tt *ttm = bo->tbo.ttm;
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct mm_struct *mm = gtt->usertask->mm;
+	unsigned int flags = 0;
+	unsigned pinned = 0;
+	int r;
+
+	if (!mm) /* Happens during process shutdown */
+		return -ESRCH;
+
+	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
+		flags |= FOLL_WRITE;
+
+	down_read(&mm->mmap_sem);
+
+	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
+		/*
+		 * check that we only use anonymous memory to prevent problems
+		 * with writeback
+		 */
+		unsigned long end = gtt->userptr + ttm->num_pages * PAGE_SIZE;
+		struct vm_area_struct *vma;
+
+		vma = find_vma(mm, gtt->userptr);
+		if (!vma || vma->vm_file || vma->vm_end < end) {
+			up_read(&mm->mmap_sem);
+			return -EPERM;
+		}
+	}
+
+	/* loop enough times using contiguous pages of memory */
+	do {
+		unsigned num_pages = ttm->num_pages - pinned;
+		uint64_t userptr = gtt->userptr + pinned * PAGE_SIZE;
+		struct page **p = pages + pinned;
+		struct amdgpu_ttm_gup_task_list guptask;
+
+		guptask.task = current;
+		spin_lock(&gtt->guptasklock);
+		list_add(&guptask.list, &gtt->guptasks);
+		spin_unlock(&gtt->guptasklock);
+
+		if (mm == current->mm)
+			r = get_user_pages(userptr, num_pages, flags, p, NULL);
+		else
+			r = get_user_pages_remote(mm, userptr, num_pages,
+					flags, p, NULL, NULL);
+
+		spin_lock(&gtt->guptasklock);
+		list_del(&guptask.list);
+		spin_unlock(&gtt->guptasklock);
+
+		if (r < 0)
+			goto release_pages;
+
+		pinned += r;
+
+	} while (pinned < ttm->num_pages);
+
+	up_read(&mm->mmap_sem);
+	return 0;
+
+release_pages:
+	release_pages(pages, pinned);
+	up_read(&mm->mmap_sem);
+	return r;
+}
+#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
+#endif /* CONFIG_DRM_AMDGPU_USERPTR */
+
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 /*
  * amdgpu_ttm_tt_set_user_pages - Copy pages in, putting old pages as necessary.
  *
@@ -783,6 +884,52 @@ void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
 	for (i = 0; i < ttm->num_pages; ++i)
 		ttm->pages[i] = pages ? pages[i] : NULL;
 }
+
+#else
+/**
+ * amdgpu_ttm_tt_set_user_pages - Copy pages in, putting old pages as necessary.
+ *
+ * Called by amdgpu_cs_list_validate(). This creates the page list
+ * that backs user memory and will ultimately be mapped into the device
+ * address space.
+ */
+void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	unsigned i;
+
+	gtt->last_set_pages = atomic_read(&gtt->mmu_invalidations);
+	for (i = 0; i < ttm->num_pages; ++i) {
+		if (ttm->pages[i])
+			put_page(ttm->pages[i]);
+
+		ttm->pages[i] = pages ? pages[i] : NULL;
+	}
+}
+
+/**
+ * amdgpu_ttm_tt_mark_user_page - Mark pages as dirty
+ *
+ * Called while unpinning userptr pages
+ */
+void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	unsigned i;
+
+	for (i = 0; i < ttm->num_pages; ++i) {
+		struct page *page = ttm->pages[i];
+
+		if (!page)
+			continue;
+
+		if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
+			set_page_dirty(page);
+
+		mark_page_accessed(page);
+	}
+}
+#endif
 
 /*
  * amdgpu_ttm_tt_pin_userptr - prepare the sg table with the user pages
@@ -841,6 +988,8 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_device *bdev,
 
 	/* unmap the pages mapped to the device */
 	dma_unmap_sgtable(adev->dev, ttm->sg, direction, 0);
+
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	sg_free_table(ttm->sg);
 
 #if IS_ENABLED(CONFIG_DRM_AMDGPU_USERPTR)
@@ -856,7 +1005,14 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_device *bdev,
 		WARN((i == ttm->num_pages), "Missing get_user_page_done\n");
 	}
 #endif
+#else
+	/* mark the pages as dirty */
+	amdgpu_ttm_tt_mark_user_pages(ttm);
+
+	sg_free_table(ttm->sg);
+#endif
 }
+
 
 static int amdgpu_ttm_gart_bind(struct amdgpu_device *adev,
 				struct ttm_buffer_object *tbo,
@@ -1232,6 +1388,13 @@ int amdgpu_ttm_tt_set_userptr(struct ttm_buffer_object *bo,
 	gtt->usertask = current->group_leader;
 	get_task_struct(gtt->usertask);
 
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	spin_lock_init(&gtt->guptasklock);
+	INIT_LIST_HEAD(&gtt->guptasks);
+	atomic_set(&gtt->mmu_invalidations, 0);
+	gtt->last_set_pages = 0;
+#endif
+
 	return 0;
 }
 
@@ -1251,6 +1414,7 @@ struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm)
 	return gtt->usertask->mm;
 }
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 /*
  * amdgpu_ttm_tt_affect_userptr - Determine if a ttm_tt object lays inside an
  * address range for the current task.
@@ -1287,6 +1451,74 @@ bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm)
 
 	return true;
 }
+
+#else
+/*
+ * amdgpu_ttm_tt_affect_userptr - Determine if a ttm_tt object lays inside an
+ * address range for the current task.
+ *
+ */
+bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
+				  unsigned long end)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	struct amdgpu_ttm_gup_task_list *entry;
+	unsigned long size;
+
+	if (gtt == NULL || !gtt->userptr)
+		return false;
+
+	/* Return false if no part of the ttm_tt object lies within
+	 * the range
+	 */
+	size = (unsigned long)gtt->ttm.num_pages * PAGE_SIZE;
+	if (gtt->userptr > end || gtt->userptr + size <= start)
+		return false;
+
+	/* Search the lists of tasks that hold this mapping and see
+	 * if current is one of them.  If it is return false.
+	 */
+	spin_lock(&gtt->guptasklock);
+	list_for_each_entry(entry, &gtt->guptasks, list) {
+		if (entry->task == current) {
+			spin_unlock(&gtt->guptasklock);
+			return false;
+		}
+	}
+	spin_unlock(&gtt->guptasklock);
+
+	atomic_inc(&gtt->mmu_invalidations);
+
+	return true;
+}
+
+/**
+ * amdgpu_ttm_tt_userptr_invalidated - Has the ttm_tt object been invalidated?
+ */
+bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
+				       int *last_invalidated)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+	int prev_invalidated = *last_invalidated;
+
+	*last_invalidated = atomic_read(&gtt->mmu_invalidations);
+	return prev_invalidated != *last_invalidated;
+}
+
+/**
+ * amdgpu_ttm_tt_userptr_needs_pages - Have the pages backing this ttm_tt object
+ * been invalidated since the last time they've been set?
+ */
+bool amdgpu_ttm_tt_userptr_needs_pages(struct ttm_tt *ttm)
+{
+	struct amdgpu_ttm_tt *gtt = (void *)ttm;
+
+	if (gtt == NULL || !gtt->userptr)
+		return false;
+
+	return atomic_read(&gtt->mmu_invalidations) != gtt->last_set_pages;
+}
+#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 
 /*
  * amdgpu_ttm_tt_is_readonly - Is the ttm_tt object read only?

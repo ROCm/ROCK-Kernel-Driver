@@ -193,9 +193,14 @@ bool amdgpu_ttm_tt_has_userptr(struct ttm_tt *ttm);
 struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm);
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 				  unsigned long end);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm);
+#else
 bool amdgpu_ttm_tt_userptr_invalidated(struct ttm_tt *ttm,
 				       int *last_invalidated);
-bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm);
+void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm);
+bool amdgpu_ttm_tt_userptr_needs_pages(struct ttm_tt *ttm);
+#endif
 bool amdgpu_ttm_tt_is_readonly(struct ttm_tt *ttm);
 uint64_t amdgpu_ttm_tt_pde_flags(struct ttm_tt *ttm, struct ttm_resource *mem);
 uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
