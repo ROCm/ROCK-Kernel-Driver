@@ -732,6 +732,8 @@ void kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
+	/* FIXME: requires register to tell that wave allocation is done */
+
 	data = 0;
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
@@ -750,6 +752,7 @@ void kgd_gfx_v10_disable_debug_trap(struct amdgpu_device *adev)
 }
 
 int kgd_gfx_v10_set_wave_launch_trap_override(struct amdgpu_device *adev,
+					      uint32_t vmid,
 					      uint32_t trap_override,
 					      uint32_t trap_mask_bits,
 					      uint32_t trap_mask_request,
@@ -776,6 +779,8 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct amdgpu_device *adev,
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	/* FIXME: requires register to tell that wave allocation is done */
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
 	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
