@@ -106,9 +106,14 @@ struct amdgpu_bo {
 	/* Constant after initialization */
 	struct amdgpu_bo		*parent;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 #ifdef CONFIG_MMU_NOTIFIER
 	struct mmu_interval_notifier	notifier;
 #endif
+#else
+	struct list_head		mn_list;
+#endif
+
 	struct kgd_mem                  *kfd_bo;
 
 	/* DGMA imported buffer info */
