@@ -28,6 +28,9 @@
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
+/* hmm support is enabled */
+#define HAVE_AMDKCL_HMM_MIRROR_ENABLED 1
+
 /* amd_iommu_pc_supported() is available */
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 

@@ -53,6 +53,7 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 /**
  * struct amdgpu_mn
  *
@@ -703,4 +704,110 @@ void amdgpu_mn_unregister(struct amdgpu_bo *bo)
 	up_write(&amn->lock);
 	mutex_unlock(&adev->mn_lock);
 }
+#else
+/**
+ * amdgpu_mn_invalidate_gfx - callback to notify about mm change
+ *
+ * @mni: the range (mm) is about to update
+ * @range: details on the invalidation
+ * @cur_seq: Value to pass to mmu_interval_set_seq()
+ *
+ * Block for operations on BOs to finish and mark pages as accessed and
+ * potentially dirty.
+ */
+static bool amdgpu_mn_invalidate_gfx(struct mmu_interval_notifier *mni,
+				     const struct mmu_notifier_range *range,
+				     unsigned long cur_seq)
+{
+	struct amdgpu_bo *bo = container_of(mni, struct amdgpu_bo, notifier);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	long r;
 
+	if (!mmu_notifier_range_blockable(range))
+		return false;
+
+	mutex_lock(&adev->notifier_lock);
+
+	mmu_interval_set_seq(mni, cur_seq);
+
+	r = dma_resv_wait_timeout_rcu(bo->tbo.base.resv, true, false,
+				      MAX_SCHEDULE_TIMEOUT);
+	mutex_unlock(&adev->notifier_lock);
+	if (r <= 0)
+		DRM_ERROR("(%ld) failed to wait for user bo\n", r);
+	return true;
+}
+
+static const struct mmu_interval_notifier_ops amdgpu_mn_gfx_ops = {
+	.invalidate = amdgpu_mn_invalidate_gfx,
+};
+
+/**
+ * amdgpu_mn_invalidate_hsa - callback to notify about mm change
+ *
+ * @mni: the range (mm) is about to update
+ * @range: details on the invalidation
+ * @cur_seq: Value to pass to mmu_interval_set_seq()
+ *
+ * We temporarily evict the BO attached to this range. This necessitates
+ * evicting all user-mode queues of the process.
+ */
+static bool amdgpu_mn_invalidate_hsa(struct mmu_interval_notifier *mni,
+				     const struct mmu_notifier_range *range,
+				     unsigned long cur_seq)
+{
+	struct amdgpu_bo *bo = container_of(mni, struct amdgpu_bo, notifier);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+
+	if (!mmu_notifier_range_blockable(range))
+		return false;
+
+	mutex_lock(&adev->notifier_lock);
+
+	mmu_interval_set_seq(mni, cur_seq);
+
+	amdgpu_amdkfd_evict_userptr(bo->kfd_bo, bo->notifier.mm);
+	mutex_unlock(&adev->notifier_lock);
+
+	return true;
+}
+
+static const struct mmu_interval_notifier_ops amdgpu_mn_hsa_ops = {
+	.invalidate = amdgpu_mn_invalidate_hsa,
+};
+
+/**
+ * amdgpu_mn_register - register a BO for notifier updates
+ *
+ * @bo: amdgpu buffer object
+ * @addr: userptr addr we should monitor
+ *
+ * Registers a mmu_notifier for the given BO at the specified address.
+ * Returns 0 on success, -ERRNO if anything goes wrong.
+ */
+int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
+{
+	if (bo->kfd_bo)
+		return mmu_interval_notifier_insert(&bo->notifier, current->mm,
+						    addr, amdgpu_bo_size(bo),
+						    &amdgpu_mn_hsa_ops);
+	return mmu_interval_notifier_insert(&bo->notifier, current->mm, addr,
+					    amdgpu_bo_size(bo),
+					    &amdgpu_mn_gfx_ops);
+}
+
+/**
+ * amdgpu_mn_unregister - unregister a BO for notifier updates
+ *
+ * @bo: amdgpu buffer object
+ *
+ * Remove any registration of mmu notifier updates from the buffer object.
+ */
+void amdgpu_mn_unregister(struct amdgpu_bo *bo)
+{
+	if (!bo->notifier.mm)
+		return;
+	mmu_interval_notifier_remove(&bo->notifier);
+	bo->notifier.mm = NULL;
+}
+#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */

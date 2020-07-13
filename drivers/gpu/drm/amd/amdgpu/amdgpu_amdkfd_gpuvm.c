@@ -577,6 +577,13 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
 		goto out;
 	}
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages);
+	if (ret) {
+		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
+		goto unregister_out;
+	}
+#else
 	/* If no restore worker is running concurrently, user_pages
 	 * should not be allocated
 	 */
@@ -598,6 +605,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
 	}
 
 	amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, mem->user_pages);
+#endif
 
 	ret = amdgpu_bo_reserve(bo, true);
 	if (ret) {
@@ -611,11 +619,15 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
 	amdgpu_bo_unreserve(bo);
 
 release_out:
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
+#else
 	if (ret)
 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
 free_out:
 	kvfree(mem->user_pages);
 	mem->user_pages = NULL;
+#endif
 unregister_out:
 	if (ret)
 		amdgpu_mn_unregister(bo);
@@ -674,7 +686,9 @@ static int reserve_bo_and_vm(struct kgd_mem *mem,
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
 	ctx->kfd_bo.tv.num_shared = 1;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	ctx->kfd_bo.user_pages = NULL;
+#endif
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
 	amdgpu_vm_get_pd_bo(vm, &ctx->list, &ctx->vm_pd[0]);
@@ -738,7 +752,9 @@ static int reserve_bo_and_cond_vms(struct kgd_mem *mem,
 	ctx->kfd_bo.priority = 0;
 	ctx->kfd_bo.tv.bo = &bo->tbo;
 	ctx->kfd_bo.tv.num_shared = 1;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	ctx->kfd_bo.user_pages = NULL;
+#endif
 	list_add(&ctx->kfd_bo.tv.head, &ctx->list);
 
 	i = 0;
@@ -1353,6 +1369,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	/* No more MMU notifiers */
 	amdgpu_mn_unregister(mem->bo);
 
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	/* Free user pages if necessary */
 	if (mem->user_pages) {
 		pr_debug("%s: Freeing user_pages array\n", __func__);
@@ -1361,6 +1378,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 					mem->bo->tbo.ttm->num_pages);
 		kvfree(mem->user_pages);
 	}
+#endif
 
 	ret = reserve_bo_and_cond_vms(mem, NULL, BO_VM_ALL, &ctx);
 	if (unlikely(ret))
@@ -2055,6 +2073,23 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 
 		bo = mem->bo;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+		/* Get updated user pages */
+		ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages);
+		if (ret) {
+			pr_debug("%s: Failed to get user pages: %d\n",
+				__func__, ret);
+
+			/* Return error -EBUSY or -ENOMEM, retry restore */
+			return ret;
+		}
+
+		/*
+		 * FIXME: Cannot ignore the return code, must hold
+		 * notifier_lock
+		 */
+		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
+#else
 		if (!mem->user_pages) {
 			mem->user_pages =
 				kvmalloc_array(bo->tbo.ttm->num_pages,
@@ -2081,6 +2116,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			 * stalled user mode queues.
 			 */
 		}
+#endif
 
 		/* Mark the BO as valid unless it was invalidated
 		 * again concurrently.
@@ -2116,7 +2152,8 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 				     GFP_KERNEL);
 	if (!pd_bo_list_entries) {
 		pr_err("%s: Failed to allocate PD BO list entries\n", __func__);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out_no_mem;
 	}
 
 	INIT_LIST_HEAD(&resv_list);
@@ -2140,7 +2177,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 	ret = ttm_eu_reserve_buffers(&ticket, &resv_list, false, &duplicates);
 	WARN(!list_empty(&duplicates), "Duplicates should be empty");
 	if (ret)
-		goto out;
+		goto out_free;
 
 	amdgpu_sync_create(&sync);
 
@@ -2156,6 +2193,17 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 		bo = mem->bo;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+		/* Validate the BO if we got user pages */
+		if (bo->tbo.ttm->pages[0]) {
+			amdgpu_bo_placement_from_domain(bo, mem->domain);
+			ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+			if (ret) {
+				pr_err("%s: failed to validate BO\n", __func__);
+				goto unreserve_out;
+			}
+		}
+#else
 		/* Copy pages array and validate the BO if we got user pages */
 		if (mem->user_pages[0]) {
 			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
@@ -2175,6 +2223,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		 */
 		kvfree(mem->user_pages);
 		mem->user_pages = NULL;
+#endif
 		list_move_tail(&mem->validate_list.head,
 			       &process_info->userptr_valid_list);
 
@@ -2207,8 +2256,9 @@ unreserve_out:
 	ttm_eu_backoff_reservation(&ticket, &resv_list);
 	amdgpu_sync_wait(&sync, false);
 	amdgpu_sync_free(&sync);
-out:
+out_free:
 	kfree(pd_bo_list_entries);
+out_no_mem:
 
 	return ret;
 }

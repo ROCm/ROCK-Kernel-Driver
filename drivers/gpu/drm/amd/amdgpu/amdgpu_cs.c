@@ -61,7 +61,9 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	p->uf_entry.tv.bo = &bo->tbo;
 	/* One for TTM and one for the CS job */
 	p->uf_entry.tv.num_shared = 2;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	p->uf_entry.user_pages = NULL;
+#endif
 
 	drm_gem_object_put_unlocked(gobj);
 
@@ -494,9 +496,14 @@ static int amdgpu_cs_list_validate(struct amdgpu_cs_parser *p,
 		if (usermm && usermm != current->mm)
 			return -EPERM;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+		if (amdgpu_ttm_tt_is_userptr(bo->tbo.ttm) &&
+		    lobj->user_invalidated && lobj->user_pages) {
+#else
 		/* Check if we have user pages and nobody bound the BO already */
 		if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
 		    lobj->user_pages) {
+#endif
 			amdgpu_bo_placement_from_domain(bo,
 							AMDGPU_GEM_DOMAIN_CPU);
 			r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
@@ -526,7 +533,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	struct amdgpu_bo *gds;
 	struct amdgpu_bo *gws;
 	struct amdgpu_bo *oa;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	unsigned tries = 10;
+#endif
 	int r;
 
 	INIT_LIST_HEAD(&p->validated);
@@ -553,8 +562,10 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		e->tv.num_shared = 2;
 
 	amdgpu_bo_list_get_list(p->bo_list, &p->validated);
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	if (p->bo_list->first_userptr != p->bo_list->num_entries)
 		p->mn = amdgpu_mn_get(p->adev, AMDGPU_MN_TYPE_GFX);
+#endif
 
 	INIT_LIST_HEAD(&duplicates);
 	amdgpu_vm_get_pd_bo(&fpriv->vm, &p->validated, &p->vm_pd);
@@ -562,6 +573,48 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	if (p->uf_entry.tv.bo && !ttm_to_amdgpu_bo(p->uf_entry.tv.bo)->parent)
 		list_add(&p->uf_entry.tv.head, &p->validated);
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	/* Get userptr backing pages. If pages are updated after registered
+	 * in amdgpu_gem_userptr_ioctl(), amdgpu_cs_list_validate() will do
+	 * amdgpu_ttm_backend_bind() to flush and invalidate new pages
+	 */
+	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
+		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+		bool userpage_invalidated = false;
+		int i;
+
+		e->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
+					sizeof(struct page *),
+					GFP_KERNEL | __GFP_ZERO);
+		if (!e->user_pages) {
+			DRM_ERROR("calloc failure\n");
+			return -ENOMEM;
+		}
+
+		r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages);
+		if (r) {
+			kvfree(e->user_pages);
+			e->user_pages = NULL;
+			return r;
+		}
+
+		for (i = 0; i < bo->tbo.ttm->num_pages; i++) {
+			if (bo->tbo.ttm->pages[i] != e->user_pages[i]) {
+				userpage_invalidated = true;
+				break;
+			}
+		}
+		e->user_invalidated = userpage_invalidated;
+	}
+
+	r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true,
+				   &duplicates);
+	if (unlikely(r != 0)) {
+		if (r != -ERESTARTSYS)
+			DRM_ERROR("ttm_eu_reserve_buffers failed.\n");
+		goto out;
+	}
+#else
 	while (1) {
 		struct list_head need_pages;
 
@@ -636,6 +689,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		/* And try again. */
 		list_splice(&need_pages, &p->validated);
 	}
+#endif
 
 	amdgpu_cs_get_threshold_for_moves(p->adev, &p->bytes_moved_threshold,
 					  &p->bytes_moved_vis_threshold);
@@ -697,6 +751,9 @@ error_validate:
 	if (r)
 		ttm_eu_backoff_reservation(&p->ticket, &p->validated);
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+out:
+#else
 error_free_pages:
 
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
@@ -706,6 +763,7 @@ error_free_pages:
 		release_pages(e->user_pages, e->tv.bo->ttm->num_pages);
 		kvfree(e->user_pages);
 	}
+#endif
 
 	return r;
 }
@@ -1302,6 +1360,26 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	if (r)
 		goto error_unlock;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	/* No memory allocation is allowed while holding the notifier lock.
+	 * The lock is held until amdgpu_cs_submit is finished and fence is
+	 * added to BOs.
+	 */
+	mutex_lock(&p->adev->notifier_lock);
+
+	/* If userptr are invalidated after amdgpu_cs_parser_bos(), return
+	 * -EAGAIN, drmIoctl in libdrm will restart the amdgpu_cs_ioctl.
+	 */
+	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
+		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+
+		r |= !amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
+	}
+	if (r) {
+		r = -EAGAIN;
+		goto error_abort;
+	}
+#else
 	/* No memory allocation is allowed while holding the mn lock */
 	amdgpu_mn_lock(p->mn);
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
@@ -1312,6 +1390,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			goto error_abort;
 		}
 	}
+#endif
 
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
@@ -1338,13 +1417,20 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	amdgpu_vm_move_to_lru_tail(p->adev, &fpriv->vm);
 
 	ttm_eu_fence_buffer_objects(&p->ticket, &p->validated, p->fence);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	mutex_unlock(&p->adev->notifier_lock);
+#else
 	amdgpu_mn_unlock(p->mn);
-
+#endif
 	return 0;
 
 error_abort:
 	drm_sched_job_cleanup(&job->base);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	mutex_unlock(&p->adev->notifier_lock);
+#else
 	amdgpu_mn_unlock(p->mn);
+#endif
 
 error_unlock:
 	amdgpu_job_free(job);
