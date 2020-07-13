@@ -692,31 +692,62 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 	return 0;
 }
 
+/*
+ * For pre-Arcturus GFX9 chips, wave launch disable/enable uses
+ * SPI_GDBG_WAVE_CNTL.stall_ra for a global wave launch stall.  Arcturus uses
+ * per-VMID stall.
+ *
+ * stall:
+ *   0-unstall wave launch (enable), 1-stall wave launch (disable)
+ *
+ * need_spi_drain:
+ *   After wavefront launch has been stalled, allocated waves must drain from
+ *   SPI in order for debug trap settings to take effect on those waves.
+ *   This is roughly a ~96 clock cycle wait on SPI where a read on
+ *   SPI_GDBG_WAVE_CNTL translates to ~32 clock cycles.
+ *   KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY indicates the number of reads
+ *   required.
+ *
+ */
+#define KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY	3
+static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
+					uint32_t vmid,
+					bool stall,
+					bool need_spi_drain)
+{
+	int i;
+	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+
+	if (adev->asic_type == CHIP_ARCTURUS)
+		data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_VMID,
+							stall ? 1 << vmid : 0);
+	else
+		data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA,
+							stall ? 1 : 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	if (!(stall && need_spi_drain))
+		return;
+
+	for (i = 0; i < KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY; i++)
+		RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+
+}
+
 void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data = 0;
-	uint32_t orig_wave_cntl_value;
-	uint32_t orig_stall_vmid;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
-							0,
-							mmSPI_GDBG_WAVE_CNTL));
-	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
-					SPI_GDBG_WAVE_CNTL,
-					STALL_VMID);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true, true);
 
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
-	data = 0;
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
-
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
@@ -733,6 +764,7 @@ void kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd)
 }
 
 int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+					     uint32_t vmid,
 					     uint32_t trap_override,
 					     uint32_t trap_mask_bits,
 					     uint32_t trap_mask_request,
@@ -740,7 +772,7 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t *trap_mask_supported)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data = 0;
+	uint32_t data;
 
 	/* The SPI_GDBG_TRAP_MASK register is global and affects all
 	 * processes. Only allow OR-ing the address-watch bit, since
@@ -757,9 +789,7 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true, true);
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
 	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
@@ -772,9 +802,7 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 		REPLACE, trap_override);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 
@@ -802,12 +830,7 @@ void kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 		MODE, is_mode_set ? wave_launch_mode : 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
-		STALL_VMID, is_stall_mode ? 1 << vmid : 0);
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
-		STALL_RA, is_stall_mode ? 1 : 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, is_stall_mode, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }

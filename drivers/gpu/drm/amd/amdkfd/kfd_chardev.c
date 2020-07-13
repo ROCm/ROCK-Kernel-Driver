@@ -2820,6 +2820,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
 		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
+				dev->vm_info.last_vmid_kfd,
 				data1,
 				data2,
 				data3,
