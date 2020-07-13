@@ -107,7 +107,7 @@ int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
 int amdgpu_ttm_alloc_gart(struct ttm_buffer_object *bo);
 int amdgpu_ttm_recover_gart(struct ttm_buffer_object *tbo);
 
-int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages);
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages);
 void amdgpu_ttm_tt_set_user_pages(struct ttm_tt *ttm, struct page **pages);
 void amdgpu_ttm_tt_mark_user_pages(struct ttm_tt *ttm);
 int amdgpu_ttm_tt_set_userptr(struct ttm_tt *ttm, uint64_t addr,

@@ -555,8 +555,7 @@ static void remove_kgd_mem_from_kfd_bo_list(struct kgd_mem *mem,
  *
  * Returns 0 for success, negative errno for errors.
  */
-static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
-			   uint64_t user_addr)
+static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
 	struct amdgpu_bo *bo = mem->bo;
@@ -592,7 +591,7 @@ static int init_user_pages(struct kgd_mem *mem, struct mm_struct *mm,
 		goto unregister_out;
 	}
 
-	ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm, mem->user_pages);
+	ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages);
 	if (ret) {
 		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
 		goto free_out;
@@ -1291,7 +1290,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	add_kgd_mem_to_kfd_bo_list(*mem, avm->process_info, user_addr);
 
 	if (user_addr) {
-		ret = init_user_pages(*mem, current->mm, user_addr);
+		ret = init_user_pages(*mem, user_addr);
 		if (ret)
 			goto allocate_init_user_pages_failed;
 	}
@@ -2071,8 +2070,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		}
 
 		/* Get updated user pages */
-		ret = amdgpu_ttm_tt_get_user_pages(bo->tbo.ttm,
-						   mem->user_pages);
+		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages);
 		if (ret) {
 			mem->user_pages[0] = NULL;
 			pr_info("%s: Failed to get user pages: %d\n",

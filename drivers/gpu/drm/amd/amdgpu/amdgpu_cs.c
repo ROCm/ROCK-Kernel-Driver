@@ -613,9 +613,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 		/* Fill the page arrays for all userptrs. */
 		list_for_each_entry(e, &need_pages, tv.head) {
-			struct ttm_tt *ttm = e->tv.bo->ttm;
+			struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 
-			e->user_pages = kvmalloc_array(ttm->num_pages,
+			e->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
 							 sizeof(struct page*),
 							 GFP_KERNEL | __GFP_ZERO);
 			if (!e->user_pages) {
@@ -624,7 +624,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto error_free_pages;
 			}
 
-			r = amdgpu_ttm_tt_get_user_pages(ttm, e->user_pages);
+			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages);
 			if (r) {
 				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
 				kvfree(e->user_pages);
