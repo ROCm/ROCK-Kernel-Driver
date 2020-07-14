@@ -828,6 +828,7 @@ static void __padata_free(struct padata_instance *pinst)
 	cpuhp_state_remove_instance_nocalls(CPUHP_PADATA_DEAD,
 					    &pinst->cpu_dead_node);
 	cpuhp_state_remove_instance_nocalls(hp_online, &pinst->cpu_online_node);
+	pinst->node = pinst->cpu_dead_node;
 #endif
 
 	WARN_ON(!list_empty(&pinst->pslist));
@@ -1039,6 +1040,7 @@ static struct padata_instance *padata_alloc(const char *name,
 						    &pinst->cpu_online_node);
 	cpuhp_state_add_instance_nocalls_cpuslocked(CPUHP_PADATA_DEAD,
 						    &pinst->cpu_dead_node);
+	pinst->node = pinst->cpu_dead_node;
 #endif
 
 	put_online_cpus();
