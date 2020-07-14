@@ -979,7 +979,6 @@ static int exfat_rmdir(struct inode *dir, struct dentry *dentry)
 		goto unlock;
 	}
 
-	exfat_set_vol_flags(sb, VOL_DIRTY);
 	exfat_chain_set(&clu_to_free, ei->start_clu,
 		EXFAT_B_TO_CLU_ROUND_UP(i_size_read(inode), sbi), ei->flags);
 
@@ -1007,6 +1006,7 @@ static int exfat_rmdir(struct inode *dir, struct dentry *dentry)
 	num_entries++;
 	brelse(bh);
 
+	exfat_set_vol_flags(sb, VOL_DIRTY);
 	err = exfat_remove_entries(dir, &cdir, entry, 0, num_entries);
 	if (err) {
 		exfat_msg(sb, KERN_ERR,
