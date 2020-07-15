@@ -30,7 +30,7 @@
 #define SMU11_DRIVER_IF_VERSION_NV10 0x36
 #define SMU11_DRIVER_IF_VERSION_NV12 0x33
 #define SMU11_DRIVER_IF_VERSION_NV14 0x36
-#define SMU11_DRIVER_IF_VERSION_Sienna_Cichlid 0x32
+#define SMU11_DRIVER_IF_VERSION_Sienna_Cichlid 0x33
 
 /* MP Apertures */
 #define MP0_Public			0x03800000
@@ -197,19 +197,13 @@ int smu_v11_0_get_current_power_limit(struct smu_context *smu,
 
 int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n);
 
-int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
-					  enum smu_clk_type clk_id,
-					  uint32_t *value);
-
 int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu);
 
 int smu_v11_0_enable_thermal_alert(struct smu_context *smu);
 
 int smu_v11_0_disable_thermal_alert(struct smu_context *smu);
 
-int smu_v11_0_read_sensor(struct smu_context *smu,
-				 enum amd_pp_sensors sensor,
-				 void *data, uint32_t *size);
+int smu_v11_0_get_gfx_vdd(struct smu_context *smu, uint32_t *value);
 
 int smu_v11_0_set_min_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk);
 
@@ -258,6 +252,11 @@ int smu_v11_0_get_dpm_ultimate_freq(struct smu_context *smu, enum smu_clk_type c
 int smu_v11_0_set_soft_freq_limited_range(struct smu_context *smu, enum smu_clk_type clk_type,
 			    uint32_t min, uint32_t max);
 
+int smu_v11_0_set_hard_freq_limited_range(struct smu_context *smu,
+					  enum smu_clk_type clk_type,
+					  uint32_t min,
+					  uint32_t max);
+
 int smu_v11_0_override_pcie_parameters(struct smu_context *smu);
 
 int smu_v11_0_set_performance_level(struct smu_context *smu,
@@ -265,5 +264,19 @@ int smu_v11_0_set_performance_level(struct smu_context *smu,
 
 int smu_v11_0_set_power_source(struct smu_context *smu,
 			       enum smu_power_src_type power_src);
+
+int smu_v11_0_get_dpm_freq_by_index(struct smu_context *smu,
+				    enum smu_clk_type clk_type,
+				    uint16_t level,
+				    uint32_t *value);
+
+int smu_v11_0_get_dpm_level_count(struct smu_context *smu,
+				  enum smu_clk_type clk_type,
+				  uint32_t *value);
+
+int smu_v11_0_get_dpm_level_range(struct smu_context *smu,
+				  enum smu_clk_type clk_type,
+				  uint32_t *min_value,
+				  uint32_t *max_value);
 
 #endif

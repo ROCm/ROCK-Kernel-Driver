@@ -1084,26 +1084,6 @@ int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n)
 	return 0;
 }
 
-int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
-					  enum smu_clk_type clk_id,
-					  uint32_t *value)
-{
-	int ret = 0;
-	uint32_t freq = 0;
-
-	if (clk_id >= SMU_CLK_COUNT || !value)
-		return -EINVAL;
-
-	ret =  smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
-	if (ret)
-		return ret;
-
-	freq *= 100;
-	*value = freq;
-
-	return ret;
-}
-
 int smu_v11_0_enable_thermal_alert(struct smu_context *smu)
 {
 	int ret = 0;
@@ -1153,7 +1133,7 @@ static uint16_t convert_to_vddc(uint8_t vid)
 	return (uint16_t) ((6200 - (vid * 25)) / SMU11_VOLTAGE_SCALE);
 }
 
-static int smu_v11_0_get_gfx_vdd(struct smu_context *smu, uint32_t *value)
+int smu_v11_0_get_gfx_vdd(struct smu_context *smu, uint32_t *value)
 {
 	struct amdgpu_device *adev = smu->adev;
 	uint32_t vdd = 0, val_vid = 0;
@@ -1170,39 +1150,6 @@ static int smu_v11_0_get_gfx_vdd(struct smu_context *smu, uint32_t *value)
 
 	return 0;
 
-}
-
-int smu_v11_0_read_sensor(struct smu_context *smu,
-				 enum amd_pp_sensors sensor,
-				 void *data, uint32_t *size)
-{
-	int ret = 0;
-
-	if(!data || !size)
-		return -EINVAL;
-
-	switch (sensor) {
-	case AMDGPU_PP_SENSOR_GFX_MCLK:
-		ret = smu_get_current_clk_freq(smu, SMU_UCLK, (uint32_t *)data);
-		*size = 4;
-		break;
-	case AMDGPU_PP_SENSOR_GFX_SCLK:
-		ret = smu_get_current_clk_freq(smu, SMU_GFXCLK, (uint32_t *)data);
-		*size = 4;
-		break;
-	case AMDGPU_PP_SENSOR_VDDGFX:
-		ret = smu_v11_0_get_gfx_vdd(smu, (uint32_t *)data);
-		*size = 4;
-		break;
-	default:
-		ret = -EOPNOTSUPP;
-		break;
-	}
-
-	if (ret)
-		*size = 0;
-
-	return ret;
 }
 
 int
@@ -1245,7 +1192,7 @@ smu_v11_0_display_clock_voltage_request(struct smu_context *smu,
 		if (clk_select == SMU_UCLK && smu->disable_uclk_switch)
 			return 0;
 
-		ret = smu_set_hard_freq_range(smu, clk_select, clk_freq, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, clk_select, clk_freq, 0);
 
 		if(clk_select == SMU_UCLK)
 			smu->hard_min_uclk_req_from_dal = clk_freq;
@@ -1746,6 +1693,34 @@ int smu_v11_0_get_dpm_ultimate_freq(struct smu_context *smu, enum smu_clk_type c
 {
 	int ret = 0, clk_id = 0;
 	uint32_t param = 0;
+	uint32_t clock_limit;
+
+	if (!smu_clk_dpm_is_enabled(smu, clk_type)) {
+		switch (clk_type) {
+		case SMU_MCLK:
+		case SMU_UCLK:
+			clock_limit = smu->smu_table.boot_values.uclk;
+			break;
+		case SMU_GFXCLK:
+		case SMU_SCLK:
+			clock_limit = smu->smu_table.boot_values.gfxclk;
+			break;
+		case SMU_SOCCLK:
+			clock_limit = smu->smu_table.boot_values.socclk;
+			break;
+		default:
+			clock_limit = 0;
+			break;
+		}
+
+		/* clock in Mhz unit */
+		if (min)
+			*min = clock_limit / 100;
+		if (max)
+			*max = clock_limit / 100;
+
+		return 0;
+	}
 
 	clk_id = smu_clk_get_index(smu, clk_type);
 	if (clk_id < 0) {
@@ -1791,6 +1766,43 @@ int smu_v11_0_set_soft_freq_limited_range(struct smu_context *smu, enum smu_clk_
 	if (min > 0) {
 		param = (uint32_t)((clk_id << 16) | (min & 0xffff));
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMinByFreq,
+						  param, NULL);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}
+
+int smu_v11_0_set_hard_freq_limited_range(struct smu_context *smu,
+					  enum smu_clk_type clk_type,
+					  uint32_t min,
+					  uint32_t max)
+{
+	int ret = 0, clk_id = 0;
+	uint32_t param;
+
+	if (min <= 0 && max <= 0)
+		return -EINVAL;
+
+	if (!smu_clk_dpm_is_enabled(smu, clk_type))
+		return 0;
+
+	clk_id = smu_clk_get_index(smu, clk_type);
+	if (clk_id < 0)
+		return clk_id;
+
+	if (max > 0) {
+		param = (uint32_t)((clk_id << 16) | (max & 0xffff));
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetHardMaxByFreq,
+						  param, NULL);
+		if (ret)
+			return ret;
+	}
+
+	if (min > 0) {
+		param = (uint32_t)((clk_id << 16) | (min & 0xffff));
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinByFreq,
 						  param, NULL);
 		if (ret)
 			return ret;
@@ -1893,3 +1905,87 @@ int smu_v11_0_set_power_source(struct smu_context *smu,
 					NULL);
 }
 
+int smu_v11_0_get_dpm_freq_by_index(struct smu_context *smu,
+				    enum smu_clk_type clk_type,
+				    uint16_t level,
+				    uint32_t *value)
+{
+	int ret = 0, clk_id = 0;
+	uint32_t param;
+
+	if (!value)
+		return -EINVAL;
+
+	if (!smu_clk_dpm_is_enabled(smu, clk_type))
+		return 0;
+
+	clk_id = smu_clk_get_index(smu, clk_type);
+	if (clk_id < 0)
+		return clk_id;
+
+	param = (uint32_t)(((clk_id & 0xffff) << 16) | (level & 0xffff));
+
+	ret = smu_send_smc_msg_with_param(smu,
+					  SMU_MSG_GetDpmFreqByIndex,
+					  param,
+					  value);
+	if (ret)
+		return ret;
+
+	/*
+	 * BIT31:  0 - Fine grained DPM, 1 - Dicrete DPM
+	 * now, we un-support it
+	 */
+	*value = *value & 0x7fffffff;
+
+	return ret;
+}
+
+int smu_v11_0_get_dpm_level_count(struct smu_context *smu,
+				  enum smu_clk_type clk_type,
+				  uint32_t *value)
+{
+	return smu_v11_0_get_dpm_freq_by_index(smu,
+					       clk_type,
+					       0xff,
+					       value);
+}
+
+int smu_v11_0_get_dpm_level_range(struct smu_context *smu,
+				  enum smu_clk_type clk_type,
+				  uint32_t *min_value,
+				  uint32_t *max_value)
+{
+	uint32_t level_count = 0;
+	int ret = 0;
+
+	if (!min_value && !max_value)
+		return -EINVAL;
+
+	if (min_value) {
+		/* by default, level 0 clock value as min value */
+		ret = smu_v11_0_get_dpm_freq_by_index(smu,
+						      clk_type,
+						      0,
+						      min_value);
+		if (ret)
+			return ret;
+	}
+
+	if (max_value) {
+		ret = smu_v11_0_get_dpm_level_count(smu,
+						    clk_type,
+						    &level_count);
+		if (ret)
+			return ret;
+
+		ret = smu_v11_0_get_dpm_freq_by_index(smu,
+						      clk_type,
+						      level_count - 1,
+						      max_value);
+		if (ret)
+			return ret;
+	}
+
+	return ret;
+}

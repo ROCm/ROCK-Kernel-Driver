@@ -877,20 +877,17 @@ static int navi10_print_clk_levels(struct smu_context *smu,
 	case SMU_UCLK:
 	case SMU_FCLK:
 	case SMU_DCEFCLK:
-		ret = smu_get_current_clk_freq(smu, clk_type, &cur_value);
+		ret = navi10_get_current_clk_freq_by_table(smu, clk_type, &cur_value);
 		if (ret)
 			return size;
 
-		/* 10KHz -> MHz */
-		cur_value = cur_value / 100;
-
-		ret = smu_get_dpm_level_count(smu, clk_type, &count);
+		ret = smu_v11_0_get_dpm_level_count(smu, clk_type, &count);
 		if (ret)
 			return size;
 
 		if (!navi10_is_support_fine_grained_dpm(smu, clk_type)) {
 			for (i = 0; i < count; i++) {
-				ret = smu_get_dpm_freq_by_index(smu, clk_type, i, &value);
+				ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, i, &value);
 				if (ret)
 					return size;
 
@@ -898,10 +895,10 @@ static int navi10_print_clk_levels(struct smu_context *smu,
 						cur_value == value ? "*" : "");
 			}
 		} else {
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
 			if (ret)
 				return size;
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
 			if (ret)
 				return size;
 
@@ -1061,15 +1058,15 @@ static int navi10_force_clk_levels(struct smu_context *smu,
 			soft_min_level = (soft_min_level >= 1 ? 1 : 0);
 		}
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
 		if (ret)
 			return size;
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
 		if (ret)
 			return size;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			return size;
 		break;
@@ -1085,13 +1082,13 @@ static int navi10_populate_umd_state_clk(struct smu_context *smu)
 	int ret = 0;
 	uint32_t min_sclk_freq = 0, min_mclk_freq = 0;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_SCLK, &min_sclk_freq, NULL, false);
+	ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_SCLK, &min_sclk_freq, NULL);
 	if (ret)
 		return ret;
 
 	smu->pstate_sclk = min_sclk_freq * 100;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_MCLK, &min_mclk_freq, NULL, false);
+	ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_MCLK, &min_mclk_freq, NULL);
 	if (ret)
 		return ret;
 
@@ -1113,7 +1110,7 @@ static int navi10_get_clock_by_type_with_latency(struct smu_context *smu,
 	case SMU_SOCCLK:
 	case SMU_MCLK:
 	case SMU_UCLK:
-		ret = smu_get_dpm_level_count(smu, clk_type, &level_count);
+		ret = smu_v11_0_get_dpm_level_count(smu, clk_type, &level_count);
 		if (ret)
 			return ret;
 
@@ -1121,7 +1118,7 @@ static int navi10_get_clock_by_type_with_latency(struct smu_context *smu,
 		clocks->num_levels = level_count;
 
 		for (i = 0; i < level_count; i++) {
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, i, &freq);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, i, &freq);
 			if (ret)
 				return ret;
 
@@ -1146,10 +1143,10 @@ static int navi10_pre_display_config_changed(struct smu_context *smu)
 		return ret;
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_get_dpm_freq_range(smu, SMU_UCLK, NULL, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_UCLK, NULL, &max_freq);
 		if (ret)
 			return ret;
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, max_freq);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -1188,12 +1185,12 @@ static int navi10_force_dpm_limit_value(struct smu_context *smu, bool highest)
 
 	for (i = 0; i < ARRAY_SIZE(clks); i++) {
 		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
 		force_freq = highest ? max_freq : min_freq;
-		ret = smu_set_soft_freq_range(smu, clk_type, force_freq, force_freq, false);
+		ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, force_freq, force_freq);
 		if (ret)
 			return ret;
 	}
@@ -1215,11 +1212,11 @@ static int navi10_unforce_dpm_levels(struct smu_context *smu)
 
 	for (i = 0; i < ARRAY_SIZE(clks); i++) {
 		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -1496,21 +1493,21 @@ static int navi10_get_profiling_clk_mask(struct smu_context *smu,
 			*mclk_mask = 0;
 	} else if (level == AMD_DPM_FORCED_LEVEL_PROFILE_PEAK) {
 		if(sclk_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_SCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_SCLK, &level_count);
 			if (ret)
 				return ret;
 			*sclk_mask = level_count - 1;
 		}
 
 		if(mclk_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_MCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_MCLK, &level_count);
 			if (ret)
 				return ret;
 			*mclk_mask = level_count - 1;
 		}
 
 		if(soc_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_SOCCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_SOCCLK, &level_count);
 			if (ret)
 				return ret;
 			*soc_mask = level_count - 1;
@@ -1552,7 +1549,7 @@ static int navi10_notify_smc_display_config(struct smu_context *smu)
 	}
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
 		if (ret) {
 			dev_err(smu->adev->dev, "[%s] Set hard min uclk failed!", __func__);
 			return ret;
@@ -1700,8 +1697,23 @@ static int navi10_read_sensor(struct smu_context *smu,
 		ret = navi10_thermal_get_temperature(smu, sensor, (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GFX_MCLK:
+		ret = navi10_get_current_clk_freq_by_table(smu, SMU_UCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_GFX_SCLK:
+		ret = navi10_get_current_clk_freq_by_table(smu, SMU_GFXCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_VDDGFX:
+		ret = smu_v11_0_get_gfx_vdd(smu, (uint32_t *)data);
+		*size = 4;
+		break;
 	default:
-		ret = smu_v11_0_read_sensor(smu, sensor, data, size);
+		ret = -EOPNOTSUPP;
+		break;
 	}
 	mutex_unlock(&smu->sensor_lock);
 
@@ -1760,10 +1772,10 @@ static int navi10_set_standard_performance_level(struct smu_context *smu)
 		return navi10_set_performance_level(smu, AMD_DPM_FORCED_LEVEL_AUTO);
 	}
 
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
+	ret = smu_v11_0_set_soft_freq_limited_range(smu, SMU_SCLK, sclk_freq, sclk_freq);
 	if (ret)
 		return ret;
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
+	ret = smu_v11_0_set_soft_freq_limited_range(smu, SMU_UCLK, uclk_freq, uclk_freq);
 	if (ret)
 		return ret;
 
@@ -1819,19 +1831,25 @@ static int navi10_set_peak_performance_level(struct smu_context *smu)
 		sclk_freq = NAVI12_UMD_PSTATE_PEAK_GFXCLK;
 		break;
 	default:
-		ret = smu_get_dpm_level_range(smu, SMU_SCLK, NULL, &sclk_freq);
+		ret = smu_v11_0_get_dpm_level_range(smu,
+						    SMU_SCLK,
+						    NULL,
+						    &sclk_freq);
 		if (ret)
 			return ret;
 	}
 
-	ret = smu_get_dpm_level_range(smu, SMU_UCLK, NULL, &uclk_freq);
+	ret = smu_v11_0_get_dpm_level_range(smu,
+					    SMU_UCLK,
+					    NULL,
+					    &uclk_freq);
 	if (ret)
 		return ret;
 
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
+	ret = smu_v11_0_set_soft_freq_limited_range(smu, SMU_SCLK, sclk_freq, sclk_freq);
 	if (ret)
 		return ret;
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
+	ret = smu_v11_0_set_soft_freq_limited_range(smu, SMU_UCLK, uclk_freq, uclk_freq);
 	if (ret)
 		return ret;
 
@@ -1909,9 +1927,9 @@ static int navi10_display_disable_memory_clock_switch(struct smu_context *smu,
 		return 0;
 
 	if(disable_memory_clock_switch)
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, max_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, max_memory_clock, 0);
 	else
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_memory_clock, 0);
 
 	if(!ret)
 		smu->disable_uclk_switch = disable_memory_clock_switch;
@@ -2319,25 +2337,25 @@ static int navi10_disable_umc_cdr_12gbps_workaround(struct smu_context *smu)
 	if (smu_version < 0x2A3200)
 		return 0;
 
-	ret = smu_get_dpm_level_count(smu, SMU_UCLK, &uclk_count);
+	ret = smu_v11_0_get_dpm_level_count(smu, SMU_UCLK, &uclk_count);
 	if (ret)
 		return ret;
 
-	ret = smu_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)0, &uclk_min);
+	ret = smu_v11_0_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)0, &uclk_min);
 	if (ret)
 		return ret;
 
-	ret = smu_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)(uclk_count - 1), &uclk_max);
+	ret = smu_v11_0_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)(uclk_count - 1), &uclk_max);
 	if (ret)
 		return ret;
 
 	/* Force UCLK out of the highest DPM */
-	ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, uclk_min);
+	ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, uclk_min);
 	if (ret)
 		return ret;
 
 	/* Revert the UCLK Hardmax */
-	ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, uclk_max);
+	ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, uclk_max);
 	if (ret)
 		return ret;
 
@@ -2392,7 +2410,6 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.set_default_dpm_table = navi10_set_default_dpm_table,
 	.dpm_set_vcn_enable = navi10_dpm_set_vcn_enable,
 	.dpm_set_jpeg_enable = navi10_dpm_set_jpeg_enable,
-	.get_current_clk_freq_by_table = navi10_get_current_clk_freq_by_table,
 	.print_clk_levels = navi10_print_clk_levels,
 	.force_clk_levels = navi10_force_clk_levels,
 	.populate_umd_state_clk = navi10_populate_umd_state_clk,
@@ -2438,7 +2455,6 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.get_enabled_mask = smu_v11_0_get_enabled_mask,
 	.notify_display_change = smu_v11_0_notify_display_change,
 	.set_power_limit = smu_v11_0_set_power_limit,
-	.get_current_clk_freq = smu_v11_0_get_current_clk_freq,
 	.init_max_sustainable_clocks = smu_v11_0_init_max_sustainable_clocks,
 	.enable_thermal_alert = smu_v11_0_enable_thermal_alert,
 	.disable_thermal_alert = smu_v11_0_disable_thermal_alert,

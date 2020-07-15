@@ -476,9 +476,6 @@ struct pptable_funcs {
 	int (*get_fan_speed_rpm)(struct smu_context *smu, uint32_t *speed);
 	int (*set_watermarks_table)(struct smu_context *smu, void *watermarks,
 				    struct dm_pp_wm_sets_with_clock_ranges_soc15 *clock_ranges);
-	int (*get_current_clk_freq_by_table)(struct smu_context *smu,
-					     enum smu_clk_type clk_type,
-					     uint32_t *value);
 	int (*get_thermal_temperature_range)(struct smu_context *smu, struct smu_temperature_range *range);
 	int (*get_uclk_dpm_states)(struct smu_context *smu, uint32_t *clocks_in_khz, uint32_t *num_states);
 	int (*set_default_od_settings)(struct smu_context *smu);
@@ -521,7 +518,6 @@ struct pptable_funcs {
 	int (*get_enabled_mask)(struct smu_context *smu, uint32_t *feature_mask, uint32_t num);
 	int (*notify_display_change)(struct smu_context *smu);
 	int (*set_power_limit)(struct smu_context *smu, uint32_t n);
-	int (*get_current_clk_freq)(struct smu_context *smu, enum smu_clk_type clk_id, uint32_t *value);
 	int (*init_max_sustainable_clocks)(struct smu_context *smu);
 	int (*enable_thermal_alert)(struct smu_context *smu);
 	int (*disable_thermal_alert)(struct smu_context *smu);
@@ -719,18 +715,10 @@ int smu_switch_power_profile(struct smu_context *smu,
 			     enum PP_SMC_POWER_PROFILE type,
 			     bool en);
 int smu_get_smc_version(struct smu_context *smu, uint32_t *if_version, uint32_t *smu_version);
-int smu_get_dpm_freq_by_index(struct smu_context *smu, enum smu_clk_type clk_type,
-			      uint16_t level, uint32_t *value);
-int smu_get_dpm_level_count(struct smu_context *smu, enum smu_clk_type clk_type,
-			    uint32_t *value);
 int smu_get_dpm_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
-			   uint32_t *min, uint32_t *max, bool lock_needed);
+			   uint32_t *min, uint32_t *max);
 int smu_set_soft_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
-			    uint32_t min, uint32_t max, bool lock_needed);
-int smu_set_hard_freq_range(struct smu_context *smu, enum smu_clk_type clk_type,
 			    uint32_t min, uint32_t max);
-int smu_get_dpm_level_range(struct smu_context *smu, enum smu_clk_type clk_type,
-			    uint32_t *min_value, uint32_t *max_value);
 enum amd_dpm_forced_level smu_get_performance_level(struct smu_context *smu);
 int smu_force_performance_level(struct smu_context *smu, enum amd_dpm_forced_level level);
 int smu_set_display_count(struct smu_context *smu, uint32_t count);

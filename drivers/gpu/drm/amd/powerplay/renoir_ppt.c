@@ -264,7 +264,7 @@ static int renoir_print_clk_levels(struct smu_context *smu,
 	case SMU_SCLK:
 		/* retirve table returned paramters unit is MHz */
 		cur_value = metrics.ClockFrequency[CLOCK_GFXCLK];
-		ret = smu_get_dpm_freq_range(smu, SMU_GFXCLK, &min, &max, false);
+		ret = smu_v12_0_get_dpm_ultimate_freq(smu, SMU_GFXCLK, &min, &max);
 		if (!ret) {
 			/* driver only know min/max gfx_clk, Add level 1 for all other gfx clks */
 			if (cur_value  == max)
@@ -434,12 +434,12 @@ static int renoir_force_dpm_limit_value(struct smu_context *smu, bool highest)
 
 	for (i = 0; i < ARRAY_SIZE(clks); i++) {
 		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v12_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
 		force_freq = highest ? max_freq : min_freq;
-		ret = smu_set_soft_freq_range(smu, clk_type, force_freq, force_freq, false);
+		ret = smu_v12_0_set_soft_freq_limited_range(smu, clk_type, force_freq, force_freq);
 		if (ret)
 			return ret;
 	}
@@ -468,11 +468,11 @@ static int renoir_unforce_dpm_levels(struct smu_context *smu) {
 
 		clk_type = clk_feature_map[i].clk_type;
 
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v12_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = smu_v12_0_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -633,7 +633,7 @@ static int renoir_force_clk_levels(struct smu_context *smu,
 			return -EINVAL;
 		}
 
-		ret = smu_get_dpm_freq_range(smu, SMU_GFXCLK, &min_freq, &max_freq, false);
+		ret = smu_v12_0_get_dpm_ultimate_freq(smu, SMU_GFXCLK, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxGfxClk,
@@ -716,19 +716,19 @@ static int renoir_set_peak_clock_by_device(struct smu_context *smu)
 	int ret = 0;
 	uint32_t sclk_freq = 0, uclk_freq = 0;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_SCLK, NULL, &sclk_freq, false);
+	ret = smu_v12_0_get_dpm_ultimate_freq(smu, SMU_SCLK, NULL, &sclk_freq);
 	if (ret)
 		return ret;
 
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
+	ret = smu_v12_0_set_soft_freq_limited_range(smu, SMU_SCLK, sclk_freq, sclk_freq);
 	if (ret)
 		return ret;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_UCLK, NULL, &uclk_freq, false);
+	ret = smu_v12_0_get_dpm_ultimate_freq(smu, SMU_UCLK, NULL, &uclk_freq);
 	if (ret)
 		return ret;
 
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
+	ret = smu_v12_0_set_soft_freq_limited_range(smu, SMU_UCLK, uclk_freq, uclk_freq);
 	if (ret)
 		return ret;
 
@@ -896,8 +896,19 @@ static int renoir_read_sensor(struct smu_context *smu,
 		ret = renoir_get_gpu_temperature(smu, (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GFX_MCLK:
+		ret = renoir_get_current_clk_freq_by_table(smu, SMU_UCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_GFX_SCLK:
+		ret = renoir_get_current_clk_freq_by_table(smu, SMU_GFXCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
 	default:
-		ret = smu_v12_0_read_sensor(smu, sensor, data, size);
+		ret = -EOPNOTSUPP;
+		break;
 	}
 	mutex_unlock(&smu->sensor_lock);
 
@@ -931,7 +942,6 @@ static const struct pptable_funcs renoir_ppt_funcs = {
 	.get_current_power_state = renoir_get_current_power_state,
 	.dpm_set_vcn_enable = renoir_dpm_set_vcn_enable,
 	.dpm_set_jpeg_enable = renoir_dpm_set_jpeg_enable,
-	.get_current_clk_freq_by_table = renoir_get_current_clk_freq_by_table,
 	.force_dpm_limit_value = renoir_force_dpm_limit_value,
 	.unforce_dpm_levels = renoir_unforce_dpm_levels,
 	.get_workload_type = renoir_get_workload_type,
@@ -953,7 +963,6 @@ static const struct pptable_funcs renoir_ppt_funcs = {
 	.fini_smc_tables = smu_v12_0_fini_smc_tables,
 	.set_default_dpm_table = smu_v12_0_set_default_dpm_tables,
 	.get_enabled_mask = smu_v12_0_get_enabled_mask,
-	.get_current_clk_freq = smu_v12_0_get_current_clk_freq,
 	.get_dpm_ultimate_freq = smu_v12_0_get_dpm_ultimate_freq,
 	.mode2_reset = smu_v12_0_mode2_reset,
 	.set_soft_freq_limited_range = smu_v12_0_set_soft_freq_limited_range,

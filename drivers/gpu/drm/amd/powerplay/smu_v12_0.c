@@ -203,35 +203,6 @@ int smu_v12_0_set_gfx_cgpg(struct smu_context *smu, bool enable)
 		NULL);
 }
 
-int smu_v12_0_read_sensor(struct smu_context *smu,
-				 enum amd_pp_sensors sensor,
-				 void *data, uint32_t *size)
-{
-	int ret = 0;
-
-	if(!data || !size)
-		return -EINVAL;
-
-	switch (sensor) {
-	case AMDGPU_PP_SENSOR_GFX_MCLK:
-		ret = smu_get_current_clk_freq(smu, SMU_UCLK, (uint32_t *)data);
-		*size = 4;
-		break;
-	case AMDGPU_PP_SENSOR_GFX_SCLK:
-		ret = smu_get_current_clk_freq(smu, SMU_GFXCLK, (uint32_t *)data);
-		*size = 4;
-		break;
-	default:
-		ret = -EOPNOTSUPP;
-		break;
-	}
-
-	if (ret)
-		*size = 0;
-
-	return ret;
-}
-
 /**
  * smu_v12_0_get_gfxoff_status - get gfxoff status
  *
@@ -345,31 +316,39 @@ int smu_v12_0_get_enabled_mask(struct smu_context *smu,
 	return ret;
 }
 
-int smu_v12_0_get_current_clk_freq(struct smu_context *smu,
-					  enum smu_clk_type clk_id,
-					  uint32_t *value)
-{
-	int ret = 0;
-	uint32_t freq = 0;
-
-	if (clk_id >= SMU_CLK_COUNT || !value)
-		return -EINVAL;
-
-	ret = smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
-	if (ret)
-		return ret;
-
-	freq *= 100;
-	*value = freq;
-
-	return ret;
-}
-
 int smu_v12_0_get_dpm_ultimate_freq(struct smu_context *smu, enum smu_clk_type clk_type,
 						 uint32_t *min, uint32_t *max)
 {
 	int ret = 0;
 	uint32_t mclk_mask, soc_mask;
+	uint32_t clock_limit;
+
+	if (!smu_clk_dpm_is_enabled(smu, clk_type)) {
+		switch (clk_type) {
+		case SMU_MCLK:
+		case SMU_UCLK:
+			clock_limit = smu->smu_table.boot_values.uclk;
+			break;
+		case SMU_GFXCLK:
+		case SMU_SCLK:
+			clock_limit = smu->smu_table.boot_values.gfxclk;
+			break;
+		case SMU_SOCCLK:
+			clock_limit = smu->smu_table.boot_values.socclk;
+			break;
+		default:
+			clock_limit = 0;
+			break;
+		}
+
+		/* clock in Mhz unit */
+		if (min)
+			*min = clock_limit / 100;
+		if (max)
+			*max = clock_limit / 100;
+
+		return 0;
+	}
 
 	if (max) {
 		ret = smu_get_profiling_clk_mask(smu, AMD_DPM_FORCED_LEVEL_PROFILE_PEAK,

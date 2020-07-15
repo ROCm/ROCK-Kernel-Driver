@@ -781,24 +781,21 @@ static int sienna_cichlid_print_clk_levels(struct smu_context *smu,
 	case SMU_UCLK:
 	case SMU_FCLK:
 	case SMU_DCEFCLK:
-		ret = smu_get_current_clk_freq(smu, clk_type, &cur_value);
+		ret = sienna_cichlid_get_current_clk_freq_by_table(smu, clk_type, &cur_value);
 		if (ret)
 			goto print_clk_out;
-
-		/* 10KHz -> MHz */
-		cur_value = cur_value / 100;
 
 		/* no need to disable gfxoff when retrieving the current gfxclk */
 		if ((clk_type == SMU_GFXCLK) || (clk_type == SMU_SCLK))
 			amdgpu_gfx_off_ctrl(adev, false);
 
-		ret = smu_get_dpm_level_count(smu, clk_type, &count);
+		ret = smu_v11_0_get_dpm_level_count(smu, clk_type, &count);
 		if (ret)
 			goto print_clk_out;
 
 		if (!sienna_cichlid_is_support_fine_grained_dpm(smu, clk_type)) {
 			for (i = 0; i < count; i++) {
-				ret = smu_get_dpm_freq_by_index(smu, clk_type, i, &value);
+				ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, i, &value);
 				if (ret)
 					goto print_clk_out;
 
@@ -806,10 +803,10 @@ static int sienna_cichlid_print_clk_levels(struct smu_context *smu,
 						cur_value == value ? "*" : "");
 			}
 		} else {
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
 			if (ret)
 				goto print_clk_out;
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
 			if (ret)
 				goto print_clk_out;
 
@@ -861,6 +858,22 @@ print_clk_out:
 	return size;
 }
 
+int sienna_cichlid_set_soft_freq_limited_range(struct smu_context *smu,
+				      enum smu_clk_type clk_type,
+				      uint32_t min, uint32_t max)
+{
+	struct amdgpu_device *adev = smu->adev;
+	int ret;
+
+	if (clk_type == SMU_GFXCLK)
+		amdgpu_gfx_off_ctrl(adev, false);
+	ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, min, max);
+	if (clk_type == SMU_GFXCLK)
+		amdgpu_gfx_off_ctrl(adev, true);
+
+	return ret;
+}
+
 static int sienna_cichlid_force_clk_levels(struct smu_context *smu,
 				   enum smu_clk_type clk_type, uint32_t mask)
 {
@@ -888,15 +901,15 @@ static int sienna_cichlid_force_clk_levels(struct smu_context *smu,
 			soft_min_level = (soft_min_level >= 1 ? 1 : 0);
 		}
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
 		if (ret)
 			goto forec_level_out;
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
 		if (ret)
 			goto forec_level_out;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = sienna_cichlid_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			goto forec_level_out;
 		break;
@@ -916,13 +929,13 @@ static int sienna_cichlid_populate_umd_state_clk(struct smu_context *smu)
 	int ret = 0;
 	uint32_t min_sclk_freq = 0, min_mclk_freq = 0;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_SCLK, &min_sclk_freq, NULL, false);
+	ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_SCLK, &min_sclk_freq, NULL);
 	if (ret)
 		return ret;
 
 	smu->pstate_sclk = min_sclk_freq * 100;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_MCLK, &min_mclk_freq, NULL, false);
+	ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_MCLK, &min_mclk_freq, NULL);
 	if (ret)
 		return ret;
 
@@ -945,10 +958,10 @@ static int sienna_cichlid_pre_display_config_changed(struct smu_context *smu)
 #endif
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_get_dpm_freq_range(smu, SMU_UCLK, NULL, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_UCLK, NULL, &max_freq);
 		if (ret)
 			return ret;
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, max_freq);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -989,12 +1002,12 @@ static int sienna_cichlid_force_dpm_limit_value(struct smu_context *smu, bool hi
 
 	for (i = 0; i < ARRAY_SIZE(clks); i++) {
 		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
 		force_freq = highest ? max_freq : min_freq;
-		ret = smu_set_soft_freq_range(smu, clk_type, force_freq, force_freq, false);
+		ret = sienna_cichlid_set_soft_freq_limited_range(smu, clk_type, force_freq, force_freq);
 		if (ret)
 			return ret;
 	}
@@ -1016,11 +1029,11 @@ static int sienna_cichlid_unforce_dpm_levels(struct smu_context *smu)
 
 	for (i = 0; i < ARRAY_SIZE(clks); i++) {
 		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, clk_type, &min_freq, &max_freq);
 		if (ret)
 			return ret;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = sienna_cichlid_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -1299,7 +1312,7 @@ static int sienna_cichlid_get_profiling_clk_mask(struct smu_context *smu,
 	} else if (level == AMD_DPM_FORCED_LEVEL_PROFILE_PEAK) {
 		if(sclk_mask) {
 			amdgpu_gfx_off_ctrl(adev, false);
-			ret = smu_get_dpm_level_count(smu, SMU_SCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_SCLK, &level_count);
 			amdgpu_gfx_off_ctrl(adev, true);
 			if (ret)
 				return ret;
@@ -1307,14 +1320,14 @@ static int sienna_cichlid_get_profiling_clk_mask(struct smu_context *smu,
 		}
 
 		if(mclk_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_MCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_MCLK, &level_count);
 			if (ret)
 				return ret;
 			*mclk_mask = level_count - 1;
 		}
 
 		if(soc_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_SOCCLK, &level_count);
+			ret = smu_v11_0_get_dpm_level_count(smu, SMU_SOCCLK, &level_count);
 			if (ret)
 				return ret;
 			*soc_mask = level_count - 1;
@@ -1356,7 +1369,7 @@ static int sienna_cichlid_notify_smc_display_config(struct smu_context *smu)
 	}
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
 		if (ret) {
 			dev_err(smu->adev->dev, "[%s] Set hard min uclk failed!", __func__);
 			return ret;
@@ -1503,8 +1516,23 @@ static int sienna_cichlid_read_sensor(struct smu_context *smu,
 		ret = sienna_cichlid_thermal_get_temperature(smu, sensor, (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GFX_MCLK:
+		ret = sienna_cichlid_get_current_clk_freq_by_table(smu, SMU_UCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_GFX_SCLK:
+		ret = sienna_cichlid_get_current_clk_freq_by_table(smu, SMU_GFXCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_VDDGFX:
+		ret = smu_v11_0_get_gfx_vdd(smu, (uint32_t *)data);
+		*size = 4;
+		break;
 	default:
-		ret = smu_v11_0_read_sensor(smu, sensor, data, size);
+		ret = -EOPNOTSUPP;
+		break;
 	}
 	mutex_unlock(&smu->sensor_lock);
 
@@ -1556,10 +1584,10 @@ static int sienna_cichlid_set_standard_performance_level(struct smu_context *smu
 		return sienna_cichlid_set_performance_level(smu, AMD_DPM_FORCED_LEVEL_AUTO);
 	}
 
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
+	ret = sienna_cichlid_set_soft_freq_limited_range(smu, SMU_SCLK, sclk_freq, sclk_freq);
 	if (ret)
 		return ret;
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
+	ret = sienna_cichlid_set_soft_freq_limited_range(smu, SMU_UCLK, uclk_freq, uclk_freq);
 	if (ret)
 		return ret;
 
@@ -1645,9 +1673,9 @@ static int sienna_cichlid_display_disable_memory_clock_switch(struct smu_context
 		return 0;
 
 	if(disable_memory_clock_switch)
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, max_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, max_memory_clock, 0);
 	else
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_memory_clock, 0);
 
 	if(!ret)
 		smu->disable_uclk_switch = disable_memory_clock_switch;
@@ -1733,22 +1761,6 @@ static int sienna_cichlid_get_dpm_ultimate_freq(struct smu_context *smu,
 	if (clk_type == SMU_GFXCLK)
 		amdgpu_gfx_off_ctrl(adev, false);
 	ret = smu_v11_0_get_dpm_ultimate_freq(smu, clk_type, min, max);
-	if (clk_type == SMU_GFXCLK)
-		amdgpu_gfx_off_ctrl(adev, true);
-
-	return ret;
-}
-
-static int sienna_cichlid_set_soft_freq_limited_range(struct smu_context *smu,
-				      enum smu_clk_type clk_type,
-				      uint32_t min, uint32_t max)
-{
-	struct amdgpu_device *adev = smu->adev;
-	int ret;
-
-	if (clk_type == SMU_GFXCLK)
-		amdgpu_gfx_off_ctrl(adev, false);
-	ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, min, max);
 	if (clk_type == SMU_GFXCLK)
 		amdgpu_gfx_off_ctrl(adev, true);
 
@@ -2317,7 +2329,6 @@ static void sienna_cichlid_dump_pptable(struct smu_context *smu)
 	dev_info(smu->adev->dev, "SkuReserved[11] = 0x%x\n", pptable->SkuReserved[11]);
 	dev_info(smu->adev->dev, "SkuReserved[12] = 0x%x\n", pptable->SkuReserved[12]);
 	dev_info(smu->adev->dev, "SkuReserved[13] = 0x%x\n", pptable->SkuReserved[13]);
-	dev_info(smu->adev->dev, "SkuReserved[14] = 0x%x\n", pptable->SkuReserved[14]);
 
 	dev_info(smu->adev->dev, "GamingClk[0] = 0x%x\n", pptable->GamingClk[0]);
 	dev_info(smu->adev->dev, "GamingClk[1] = 0x%x\n", pptable->GamingClk[1]);
@@ -2473,7 +2484,6 @@ static const struct pptable_funcs sienna_cichlid_ppt_funcs = {
 	.set_default_dpm_table = sienna_cichlid_set_default_dpm_table,
 	.dpm_set_vcn_enable = sienna_cichlid_dpm_set_vcn_enable,
 	.dpm_set_jpeg_enable = sienna_cichlid_dpm_set_jpeg_enable,
-	.get_current_clk_freq_by_table = sienna_cichlid_get_current_clk_freq_by_table,
 	.print_clk_levels = sienna_cichlid_print_clk_levels,
 	.force_clk_levels = sienna_cichlid_force_clk_levels,
 	.populate_umd_state_clk = sienna_cichlid_populate_umd_state_clk,
@@ -2518,7 +2528,6 @@ static const struct pptable_funcs sienna_cichlid_ppt_funcs = {
 	.get_enabled_mask = smu_v11_0_get_enabled_mask,
 	.notify_display_change = NULL,
 	.set_power_limit = smu_v11_0_set_power_limit,
-	.get_current_clk_freq = smu_v11_0_get_current_clk_freq,
 	.init_max_sustainable_clocks = smu_v11_0_init_max_sustainable_clocks,
 	.enable_thermal_alert = smu_v11_0_enable_thermal_alert,
 	.disable_thermal_alert = smu_v11_0_disable_thermal_alert,
