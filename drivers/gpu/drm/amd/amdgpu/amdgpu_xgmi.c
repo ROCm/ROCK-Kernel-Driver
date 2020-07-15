@@ -325,9 +325,18 @@ success:
 static void amdgpu_xgmi_sysfs_rem_dev_info(struct amdgpu_device *adev,
 					  struct amdgpu_hive_info *hive)
 {
+	char node[10];
+	memset(node, 0, sizeof(node));
+
 	device_remove_file(adev->dev, &dev_attr_xgmi_device_id);
-	sysfs_remove_link(&adev->dev->kobj, adev->ddev->unique);
-	sysfs_remove_link(hive->kobj, adev->ddev->unique);
+	device_remove_file(adev->dev, &dev_attr_xgmi_error);
+
+	if (adev != hive->adev)
+		sysfs_remove_link(&adev->dev->kobj,"xgmi_hive_info");
+
+	sprintf(node, "node%d", hive->number_devices);
+	sysfs_remove_link(hive->kobj, node);
+
 }
 
 
@@ -441,7 +450,7 @@ out:
 
 int amdgpu_xgmi_update_topology(struct amdgpu_hive_info *hive, struct amdgpu_device *adev)
 {
-	int ret = -EINVAL;
+	int ret;
 
 	/* Each psp need to set the latest topology */
 	ret = psp_xgmi_set_topology_info(&adev->psp,
@@ -583,14 +592,14 @@ int amdgpu_xgmi_remove_device(struct amdgpu_device *adev)
 	if (!hive)
 		return -EINVAL;
 
-	if (!(hive->number_devices--)) {
+	task_barrier_rem_task(&hive->tb);
+	amdgpu_xgmi_sysfs_rem_dev_info(adev, hive);
+	mutex_unlock(&hive->hive_lock);
+
+	if(!(--hive->number_devices)){
 		amdgpu_xgmi_sysfs_destroy(adev, hive);
 		mutex_destroy(&hive->hive_lock);
 		mutex_destroy(&hive->reset_lock);
-	} else {
-		task_barrier_rem_task(&hive->tb);
-		amdgpu_xgmi_sysfs_rem_dev_info(adev, hive);
-		mutex_unlock(&hive->hive_lock);
 	}
 
 	return psp_xgmi_terminate(&adev->psp);
@@ -649,31 +658,8 @@ void amdgpu_xgmi_ras_fini(struct amdgpu_device *adev)
 uint64_t amdgpu_xgmi_get_relative_phy_addr(struct amdgpu_device *adev,
 					   uint64_t addr)
 {
-	uint32_t df_inst_id;
-	uint64_t dram_base_addr = 0;
-	const struct amdgpu_df_funcs *df_funcs = adev->df.funcs;
-
-	if ((!df_funcs)                 ||
-	    (!df_funcs->get_df_inst_id) ||
-	    (!df_funcs->get_dram_base_addr)) {
-		dev_warn(adev->dev,
-			 "XGMI: relative phy_addr algorithm is not supported\n");
-		return addr;
-	}
-
-	if (amdgpu_dpm_set_df_cstate(adev, DF_CSTATE_DISALLOW)) {
-		dev_warn(adev->dev,
-			 "failed to disable DF-Cstate, DF register may not be accessible\n");
-		return addr;
-	}
-
-	df_inst_id = df_funcs->get_df_inst_id(adev);
-	dram_base_addr = df_funcs->get_dram_base_addr(adev, df_inst_id);
-
-	if (amdgpu_dpm_set_df_cstate(adev, DF_CSTATE_ALLOW))
-		dev_warn(adev->dev, "failed to enable DF-Cstate\n");
-
-	return addr + dram_base_addr;
+	struct amdgpu_xgmi *xgmi = &adev->gmc.xgmi;
+	return (addr + xgmi->physical_node_id * xgmi->node_segment_size);
 }
 
 static void pcs_clear_status(struct amdgpu_device *adev, uint32_t pcs_status_reg)

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_BITOPS_H
 #define AMDKCL_BITOPS_H
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDGPU_BACKPORT_KCL_AMDGPU_H
 #define AMDGPU_BACKPORT_KCL_AMDGPU_H
 

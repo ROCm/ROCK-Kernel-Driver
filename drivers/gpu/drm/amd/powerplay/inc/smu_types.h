@@ -170,6 +170,7 @@
 	__SMU_DUMMY_MAP(SetSoftMinJpeg),              \
 	__SMU_DUMMY_MAP(SetHardMinFclkByFreq),        \
 	__SMU_DUMMY_MAP(DFCstateControl), \
+	__SMU_DUMMY_MAP(GmiPwrDnControl), \
 	__SMU_DUMMY_MAP(DAL_DISABLE_DUMMY_PSTATE_CHANGE), \
 	__SMU_DUMMY_MAP(DAL_ENABLE_DUMMY_PSTATE_CHANGE), \
 
@@ -184,6 +185,8 @@ enum smu_clk_type {
 	SMU_GFXCLK,
 	SMU_VCLK,
 	SMU_DCLK,
+	SMU_VCLK1,
+	SMU_DCLK1,
 	SMU_ECLK,
 	SMU_SOCCLK,
 	SMU_UCLK,
@@ -244,6 +247,7 @@ enum smu_clk_type {
        __SMU_DUMMY_MAP(FW_DSTATE),                     	\
        __SMU_DUMMY_MAP(BACO),                          	\
        __SMU_DUMMY_MAP(VCN_PG),                        	\
+       __SMU_DUMMY_MAP(MM_DPM_PG),                     	\
        __SMU_DUMMY_MAP(JPEG_PG),                       	\
        __SMU_DUMMY_MAP(USB_PG),                        	\
        __SMU_DUMMY_MAP(RSMU_SMN_CG),                   	\
@@ -256,6 +260,7 @@ enum smu_clk_type {
        __SMU_DUMMY_MAP(MMHUB_PG),                      	\
        __SMU_DUMMY_MAP(ATHUB_PG),                      	\
        __SMU_DUMMY_MAP(APCC_DFLL),                     	\
+       __SMU_DUMMY_MAP(DPM_GFX_GPO),                    \
        __SMU_DUMMY_MAP(WAFL_CG),
 
 #undef __SMU_DUMMY_MAP

@@ -1319,37 +1319,39 @@ err:
 }
 
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
-		struct kgd_dev *kgd, struct kgd_mem *mem)
+		struct kgd_dev *kgd, struct kgd_mem *mem, uint64_t *size)
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
 	unsigned long bo_size = mem->bo->tbo.mem.size;
 	struct kfd_bo_va_list *entry, *tmp;
 	struct bo_vm_reservation_context ctx;
 	struct ttm_validate_buffer *bo_list_entry;
+	unsigned int mapped_to_gpu_memory;
 	int ret;
+	bool is_imported = 0;
 
 	mutex_lock(&mem->lock);
-
-	if (mem->mapped_to_gpu_memory > 0) {
-		pr_debug("BO VA 0x%llx size 0x%lx is still mapped.\n",
-				mem->va, bo_size);
-		mutex_unlock(&mem->lock);
-		return -EBUSY;
-	}
-
+	mapped_to_gpu_memory = mem->mapped_to_gpu_memory;
+	is_imported = mem->is_imported;
 	mutex_unlock(&mem->lock);
 	/* lock is not needed after this, since mem is unused and will
 	 * be freed anyway
 	 */
 
-	/* No more MMU notifiers */
-	amdgpu_mn_unregister(mem->bo);
+	if (mapped_to_gpu_memory > 0) {
+		pr_debug("BO VA 0x%llx size 0x%lx is still mapped.\n",
+				mem->va, bo_size);
+		return -EBUSY;
+	}
 
 	/* Make sure restore workers don't access the BO any more */
 	bo_list_entry = &mem->validate_list;
 	mutex_lock(&process_info->lock);
 	list_del(&bo_list_entry->head);
 	mutex_unlock(&process_info->lock);
+
+	/* No more MMU notifiers */
+	amdgpu_mn_unregister(mem->bo);
 
 	/* Free user pages if necessary */
 	if (mem->user_pages) {
@@ -1389,6 +1391,17 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	if (mem->bo->tbo.sg) {
 		sg_free_table(mem->bo->tbo.sg);
 		kfree(mem->bo->tbo.sg);
+	}
+
+	/* Update the size of the BO being freed if it was allocated from
+	 * VRAM and is not imported.
+	 */
+	if (size) {
+		if ((mem->bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) &&
+		    (!is_imported))
+			*size = bo_size;
+		else
+			*size = 0;
 	}
 
 	/* Free the BO*/
@@ -1904,6 +1917,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	(*mem)->process_info = avm->process_info;
 	add_kgd_mem_to_kfd_bo_list(*mem, avm->process_info, false);
 	amdgpu_sync_create(&(*mem)->sync);
+	(*mem)->is_imported = true;
 
 	return 0;
 }

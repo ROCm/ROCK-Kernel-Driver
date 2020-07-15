@@ -73,10 +73,8 @@ CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_ccf
 endif
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml_common_defs.o := $(dml_ccflags)
 
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
-	dml_common_defs.o
 
 ifdef CONFIG_DRM_AMD_DC_DCN2_0
 DML += display_mode_vba.o dcn20/display_rq_dlg_calc_20.o dcn20/display_mode_vba_20.o

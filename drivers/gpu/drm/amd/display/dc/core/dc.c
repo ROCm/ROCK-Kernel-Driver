@@ -70,7 +70,7 @@
 
 #include "dce/dce_i2c.h"
 
-#include "dmub/inc/dmub_cmd_dal.h"
+#include "dmub/dmub_srv.h"
 
 #define CTX \
 	dc->ctx
@@ -190,9 +190,10 @@ static bool create_links(
 			bool should_destory_link = false;
 
 			if (link->connector_signal == SIGNAL_TYPE_EDP) {
-				if (dc->config.edp_not_connected)
-					should_destory_link = true;
-				else if (dc->debug.remove_disconnect_edp) {
+				if (dc->config.edp_not_connected) {
+					if (!IS_DIAG_DC(dc->ctx->dce_environment))
+						should_destory_link = true;
+				} else {
 					enum dc_connection_type type;
 					dc_link_detect_sink(link, &type);
 					if (type == dc_connection_none)
@@ -354,7 +355,7 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe = &dc->current_state->res_ctx.pipe_ctx[i];
-		if (pipe->stream == stream)
+		if (pipe->stream == stream && !pipe->top_pipe && !pipe->prev_odm_pipe)
 			break;
 	}
 	/* Stream not found */
@@ -370,6 +371,11 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
 	param.windowb_y_start = 0;
 	param.windowb_x_end = pipe->stream->timing.h_addressable;
 	param.windowb_y_end = pipe->stream->timing.v_addressable;
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	param.dsc_mode = pipe->stream->timing.flags.DSC ? 1:0;
+#endif
+	param.odm_mode = pipe->next_odm_pipe ? 1:0;
 
 	/* Default to the union of both windows */
 	param.selection = UNION_WINDOW_A_B;
@@ -854,11 +860,10 @@ static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 static void wait_for_no_pipes_pending(struct dc *dc, struct dc_state *context)
 {
 	int i;
-	int count = 0;
-	struct pipe_ctx *pipe;
 	PERF_TRACE();
 	for (i = 0; i < MAX_PIPES; i++) {
-		pipe = &context->res_ctx.pipe_ctx[i];
+		int count = 0;
+		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 
 		if (!pipe->plane_state)
 			continue;
@@ -2246,7 +2251,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 				if (should_program_abm) {
 					if (*stream_update->abm_level == ABM_LEVEL_IMMEDIATE_DISABLE) {
-						pipe_ctx->stream_res.abm->funcs->set_abm_immediate_disable(pipe_ctx->stream_res.abm);
+						dc->hwss.set_abm_immediate_disable(pipe_ctx);
 					} else {
 						pipe_ctx->stream_res.abm->funcs->set_abm_level(
 							pipe_ctx->stream_res.abm, stream->abm_level);

@@ -75,7 +75,7 @@ amdgpu-$(CONFIG_DRM_AMDGPU_SI)+= si.o gmc_v6_0.o gfx_v6_0.o si_ih.o si_dma.o dce
 amdgpu-y += \
 	vi.o mxgpu_vi.o nbio_v6_1.o soc15.o emu_soc.o mxgpu_ai.o nbio_v7_0.o vega10_reg_init.o \
 	vega20_reg_init.o nbio_v7_4.o nbio_v2_3.o nv.o navi10_reg_init.o navi14_reg_init.o \
-	arct_reg_init.o navi12_reg_init.o mxgpu_nv.o
+	arct_reg_init.o navi12_reg_init.o mxgpu_nv.o sienna_cichlid_reg_init.o
 
 # add DF block
 amdgpu-y += \
@@ -87,7 +87,7 @@ amdgpu-y += \
 	gmc_v7_0.o \
 	gmc_v8_0.o \
 	gfxhub_v1_0.o mmhub_v1_0.o gmc_v9_0.o gfxhub_v1_1.o mmhub_v9_4.o \
-	gfxhub_v2_0.o mmhub_v2_0.o gmc_v10_0.o
+	gfxhub_v2_0.o mmhub_v2_0.o gmc_v10_0.o gfxhub_v2_1.o
 
 # add UMC block
 amdgpu-y += \
@@ -136,7 +136,8 @@ amdgpu-y += \
 	sdma_v2_4.o \
 	sdma_v3_0.o \
 	sdma_v4_0.o \
-	sdma_v5_0.o
+	sdma_v5_0.o \
+	sdma_v5_2.o
 
 # add MES block
 amdgpu-y += \
@@ -161,15 +162,18 @@ amdgpu-y += \
 	vcn_v1_0.o \
 	vcn_v2_0.o \
 	vcn_v2_5.o \
+	vcn_v3_0.o \
 	amdgpu_jpeg.o \
 	jpeg_v1_0.o \
 	jpeg_v2_0.o \
-	jpeg_v2_5.o
+	jpeg_v2_5.o \
+	jpeg_v3_0.o
 
 # add ATHUB block
 amdgpu-y += \
 	athub_v1_0.o \
-	athub_v2_0.o
+	athub_v2_0.o \
+	athub_v2_1.o
 
 # add amdkfd interfaces
 amdgpu-y += amdgpu_amdkfd.o
@@ -179,12 +183,13 @@ AMDKFD_PATH := ../amdkfd
 include $(FULL_AMD_PATH)/amdkfd/Makefile
 amdgpu-y += $(AMDKFD_FILES)
 amdgpu-y += \
-	 amdgpu_amdkfd_fence.o \
-	 amdgpu_amdkfd_gpuvm.o \
-	 amdgpu_amdkfd_gfx_v8.o \
-	 amdgpu_amdkfd_gfx_v9.o \
-	 amdgpu_amdkfd_arcturus.o \
-	 amdgpu_amdkfd_gfx_v10.o
+	amdgpu_amdkfd_fence.o \
+	amdgpu_amdkfd_gpuvm.o \
+	amdgpu_amdkfd_gfx_v8.o \
+	amdgpu_amdkfd_gfx_v9.o \
+	amdgpu_amdkfd_arcturus.o \
+	amdgpu_amdkfd_gfx_v10.o \
+	amdgpu_amdkfd_gfx_v10_3.o
 
 ifneq ($(CONFIG_DRM_AMDGPU_CIK),)
 amdgpu-y += amdgpu_amdkfd_gfx_v7.o

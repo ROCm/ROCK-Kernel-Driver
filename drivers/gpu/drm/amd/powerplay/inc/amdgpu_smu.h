@@ -491,9 +491,11 @@ struct pptable_funcs {
 	int (*get_dpm_clk_limited)(struct smu_context *smu, enum smu_clk_type clk_type,
 				   uint32_t dpm_level, uint32_t *freq);
 	int (*set_df_cstate)(struct smu_context *smu, enum pp_df_cstate state);
+	int (*allow_xgmi_power_down)(struct smu_context *smu, bool en);
 	int (*update_pcie_parameters)(struct smu_context *smu, uint32_t pcie_gen_cap, uint32_t pcie_width_cap);
 	int (*i2c_eeprom_init)(struct i2c_adapter *control);
 	void (*i2c_eeprom_fini)(struct i2c_adapter *control);
+	void (*get_unique_id)(struct smu_context *smu);
 	int (*get_dpm_clock_table)(struct smu_context *smu, struct dpm_clocks *clock_table);
 	int (*init_microcode)(struct smu_context *smu);
 	int (*load_microcode)(struct smu_context *smu);
@@ -529,8 +531,8 @@ struct pptable_funcs {
 	int (*set_power_limit)(struct smu_context *smu, uint32_t n);
 	int (*get_current_clk_freq)(struct smu_context *smu, enum smu_clk_type clk_id, uint32_t *value);
 	int (*init_max_sustainable_clocks)(struct smu_context *smu);
-	int (*start_thermal_control)(struct smu_context *smu);
-	int (*stop_thermal_control)(struct smu_context *smu);
+	int (*enable_thermal_alert)(struct smu_context *smu);
+	int (*disable_thermal_alert)(struct smu_context *smu);
 	int (*set_deep_sleep_dcefclk)(struct smu_context *smu, uint32_t clk);
 	int (*set_active_display_count)(struct smu_context *smu, uint32_t count);
 	int (*store_cc6_data)(struct smu_context *smu, uint32_t separation_time,
@@ -574,6 +576,7 @@ struct pptable_funcs {
 	uint32_t (*get_pptable_power_limit)(struct smu_context *smu);
 	int (*disable_umc_cdr_12gbps_workaround)(struct smu_context *smu);
 	int (*set_power_source)(struct smu_context *smu, enum smu_power_src_type power_src);
+	void (*log_thermal_throttling_event)(struct smu_context *smu);
 };
 
 int smu_load_microcode(struct smu_context *smu);
@@ -674,7 +677,6 @@ int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int
 		     void *table_data, bool drv2smu);
 
 bool is_support_sw_smu(struct amdgpu_device *adev);
-bool is_support_sw_smu_xgmi(struct amdgpu_device *adev);
 int smu_reset(struct smu_context *smu);
 int smu_common_read_sensor(struct smu_context *smu, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size);
@@ -731,6 +733,7 @@ int smu_set_mp1_state(struct smu_context *smu,
 		      enum pp_mp1_state mp1_state);
 int smu_set_df_cstate(struct smu_context *smu,
 		      enum pp_df_cstate state);
+int smu_allow_xgmi_power_down(struct smu_context *smu, bool en);
 
 int smu_get_max_sustainable_clocks_by_dc(struct smu_context *smu,
 					 struct pp_smu_nv_clock_table *max_clocks);

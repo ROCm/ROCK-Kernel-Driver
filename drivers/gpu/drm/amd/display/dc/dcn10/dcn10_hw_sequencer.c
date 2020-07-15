@@ -748,7 +748,8 @@ void dcn10_bios_golden_init(struct dc *dc)
 	if (dc->res_pool->hubbub->funcs->allow_self_refresh_control)
 		if (allow_self_fresh_force_enable == false &&
 				dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled(dc->res_pool->hubbub))
-			dc->res_pool->hubbub->funcs->allow_self_refresh_control(dc->res_pool->hubbub, true);
+			dc->res_pool->hubbub->funcs->allow_self_refresh_control(dc->res_pool->hubbub,
+										!dc->res_pool->hubbub->ctx->dc->debug.disable_stutter);
 
 }
 
@@ -837,6 +838,14 @@ enum dc_status dcn10_enable_stream_timing(
 	color_space = stream->output_color_space;
 	color_space_to_black_color(dc, color_space, &black_color);
 
+	/*
+	 * The way 420 is packed, 2 channels carry Y component, 1 channel
+	 * alternate between Cb and Cr, so both channels need the pixel
+	 * value for Y
+	 */
+	if (stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		black_color.color_r_cr = black_color.color_g_y;
+
 	if (pipe_ctx->stream_res.tg->funcs->set_blank_color)
 		pipe_ctx->stream_res.tg->funcs->set_blank_color(
 				pipe_ctx->stream_res.tg,
@@ -914,7 +923,7 @@ static void dcn10_reset_back_end_for_pipe(
 	if (pipe_ctx->top_pipe == NULL) {
 
 		if (pipe_ctx->stream_res.abm)
-			pipe_ctx->stream_res.abm->funcs->set_abm_immediate_disable(pipe_ctx->stream_res.abm);
+			dc->hwss.set_abm_immediate_disable(pipe_ctx);
 
 		pipe_ctx->stream_res.tg->funcs->disable_crtc(pipe_ctx->stream_res.tg);
 
@@ -1255,6 +1264,7 @@ void dcn10_init_hw(struct dc *dc)
 	struct dce_hwseq *hws = dc->hwseq;
 	struct dc_bios *dcb = dc->ctx->dc_bios;
 	struct resource_pool *res_pool = dc->res_pool;
+	uint32_t backlight = MAX_BACKLIGHT_LEVEL;
 
 	if (dc->clk_mgr && dc->clk_mgr->funcs->init_clocks)
 		dc->clk_mgr->funcs->init_clocks(dc->clk_mgr);
@@ -1423,10 +1433,15 @@ void dcn10_init_hw(struct dc *dc)
 		audio->funcs->hw_init(audio);
 	}
 
-	if (abm != NULL) {
-		abm->funcs->init_backlight(abm);
-		abm->funcs->abm_init(abm);
+	for (i = 0; i < dc->link_count; i++) {
+		struct dc_link *link = dc->links[i];
+
+		if (link->panel_cntl)
+			backlight = link->panel_cntl->funcs->hw_init(link->panel_cntl);
 	}
+
+	if (abm != NULL)
+		abm->funcs->abm_init(abm, backlight);
 
 	if (dmcu != NULL && !dmcu->auto_load_dmcu)
 		dmcu->funcs->dmcu_init(dmcu);
@@ -1679,6 +1694,85 @@ void dcn10_pipe_control_lock(
 
 	if (dc->debug.sanity_checks)
 		hws->funcs.verify_allow_pstate_change_high(dc);
+}
+
+/**
+ * delay_cursor_until_vupdate() - Delay cursor update if too close to VUPDATE.
+ *
+ * Software keepout workaround to prevent cursor update locking from stalling
+ * out cursor updates indefinitely or from old values from being retained in
+ * the case where the viewport changes in the same frame as the cursor.
+ *
+ * The idea is to calculate the remaining time from VPOS to VUPDATE. If it's
+ * too close to VUPDATE, then stall out until VUPDATE finishes.
+ *
+ * TODO: Optimize cursor programming to be once per frame before VUPDATE
+ *       to avoid the need for this workaround.
+ */
+static void delay_cursor_until_vupdate(struct dc *dc, struct pipe_ctx *pipe_ctx)
+{
+	struct dc_stream_state *stream = pipe_ctx->stream;
+	struct crtc_position position;
+	uint32_t vupdate_start, vupdate_end;
+	unsigned int lines_to_vupdate, us_to_vupdate, vpos;
+	unsigned int us_per_line, us_vupdate;
+
+	if (!dc->hwss.calc_vupdate_position || !dc->hwss.get_position)
+		return;
+
+	if (!pipe_ctx->stream_res.stream_enc || !pipe_ctx->stream_res.tg)
+		return;
+
+	dc->hwss.calc_vupdate_position(dc, pipe_ctx, &vupdate_start,
+				       &vupdate_end);
+
+	dc->hwss.get_position(&pipe_ctx, 1, &position);
+	vpos = position.vertical_count;
+
+	/* Avoid wraparound calculation issues */
+	vupdate_start += stream->timing.v_total;
+	vupdate_end += stream->timing.v_total;
+	vpos += stream->timing.v_total;
+
+	if (vpos <= vupdate_start) {
+		/* VPOS is in VACTIVE or back porch. */
+		lines_to_vupdate = vupdate_start - vpos;
+	} else if (vpos > vupdate_end) {
+		/* VPOS is in the front porch. */
+		return;
+	} else {
+		/* VPOS is in VUPDATE. */
+		lines_to_vupdate = 0;
+	}
+
+	/* Calculate time until VUPDATE in microseconds. */
+	us_per_line =
+		stream->timing.h_total * 10000u / stream->timing.pix_clk_100hz;
+	us_to_vupdate = lines_to_vupdate * us_per_line;
+
+	/* 70 us is a conservative estimate of cursor update time*/
+	if (us_to_vupdate > 70)
+		return;
+
+	/* Stall out until the cursor update completes. */
+	if (vupdate_end < vupdate_start)
+		vupdate_end += stream->timing.v_total;
+	us_vupdate = (vupdate_end - vupdate_start + 1) * us_per_line;
+	udelay(us_to_vupdate + us_vupdate);
+}
+
+void dcn10_cursor_lock(struct dc *dc, struct pipe_ctx *pipe, bool lock)
+{
+	/* cursor lock is per MPCC tree, so only need to lock one pipe per stream */
+	if (!pipe || pipe->top_pipe)
+		return;
+
+	/* Prevent cursor lock from stalling out cursor updates. */
+	if (lock)
+		delay_cursor_until_vupdate(dc, pipe);
+
+	dc->res_pool->mpc->funcs->cursor_lock(dc->res_pool->mpc,
+			pipe->stream_res.opp->inst, lock);
 }
 
 static bool wait_for_reset_trigger_to_occur(
@@ -2255,6 +2349,14 @@ void dcn10_update_mpcc(struct dc *dc, struct pipe_ctx *pipe_ctx)
 				&blnd_cfg.black_color);
 	}
 
+	/*
+	 * The way 420 is packed, 2 channels carry Y component, 1 channel
+	 * alternate between Cb and Cr, so both channels need the pixel
+	 * value for Y
+	 */
+	if (pipe_ctx->stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420)
+		blnd_cfg.black_color.color_r_cr = blnd_cfg.black_color.color_g_y;
+
 	if (per_pixel_alpha)
 		blnd_cfg.alpha_mode = MPCC_ALPHA_BLEND_MODE_PER_PIXEL_ALPHA;
 	else
@@ -2491,14 +2593,15 @@ void dcn10_blank_pixel_data(
 		if (stream_res->tg->funcs->set_blank)
 			stream_res->tg->funcs->set_blank(stream_res->tg, blank);
 		if (stream_res->abm) {
-			stream_res->abm->funcs->set_pipe(stream_res->abm, stream_res->tg->inst + 1);
+			dc->hwss.set_pipe(pipe_ctx);
 			stream_res->abm->funcs->set_abm_level(stream_res->abm, stream->abm_level);
 		}
 	} else if (blank) {
-		if (stream_res->abm)
-			stream_res->abm->funcs->set_abm_immediate_disable(stream_res->abm);
-		if (stream_res->tg->funcs->set_blank)
+		dc->hwss.set_abm_immediate_disable(pipe_ctx);
+		if (stream_res->tg->funcs->set_blank) {
+			stream_res->tg->funcs->wait_for_state(stream_res->tg, CRTC_STATE_VBLANK);
 			stream_res->tg->funcs->set_blank(stream_res->tg, blank);
+		}
 	}
 }
 
@@ -3288,7 +3391,7 @@ int dcn10_get_vupdate_offset_from_vsync(struct pipe_ctx *pipe_ctx)
 	return vertical_line_start;
 }
 
-static void dcn10_calc_vupdate_position(
+void dcn10_calc_vupdate_position(
 		struct dc *dc,
 		struct pipe_ctx *pipe_ctx,
 		uint32_t *start_line,

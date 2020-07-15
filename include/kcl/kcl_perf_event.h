@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMD_KCL_PERF_EVENT_H
 #define AMD_KCL_PERF_EVENT_H
 #include <linux/perf_event.h>

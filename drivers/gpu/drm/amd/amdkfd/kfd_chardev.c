@@ -1359,6 +1359,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto err_free;
 	}
 
+	/* Update the VRAM usage count */
+	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+		WRITE_ONCE(pdd->vram_usage, pdd->vram_usage + args->size);
+
 	mutex_unlock(&p->mutex);
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
@@ -1374,7 +1378,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1388,6 +1392,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	struct kfd_bo *buf_obj;
 	struct kfd_dev *dev;
 	int ret;
+	uint64_t size = 0;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (!dev)
@@ -1410,7 +1415,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	}
 	run_rdma_free_callback(buf_obj);
 
-	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, buf_obj->mem);
+	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, buf_obj->mem, &size);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
@@ -1418,6 +1423,8 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	if (!ret)
 		kfd_process_device_remove_obj_handle(
 			pdd, GET_IDR_HANDLE(args->handle));
+
+	WRITE_ONCE(pdd->vram_usage, pdd->vram_usage - size);
 
 err_unlock:
 	mutex_unlock(&p->mutex);
@@ -1898,7 +1905,7 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -2029,7 +2036,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2281,7 +2288,7 @@ static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 		return -EINVAL;
 
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
@@ -2664,7 +2671,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	pid = find_get_pid(args->pid);
 	if (!pid) {
-		pr_err("Cannot find pid info for %i\n",
+		pr_debug("Cannot find pid info for %i\n",
 				args->pid);
 		r =  -ESRCH;
 		goto out;
@@ -2771,14 +2778,17 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
+			kfd_release_debug_watch_points(dev,
+				pdd->allocated_debug_watch_point_bitmask);
+			pdd->allocated_debug_watch_point_bitmask = 0;
 			pdd->debug_trap_enabled = false;
-			r = dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			dev->kfd2kgd->disable_debug_trap(dev->kgd);
 			fput(pdd->dbg_ev_file);
 			pdd->dbg_ev_file = NULL;
 			break;
 		case 1:
 			pdd->debug_trap_enabled = true;
-			r = dev->kfd2kgd->enable_debug_trap(dev->kgd,
+			dev->kfd2kgd->enable_debug_trap(dev->kgd,
 					pdd->trap_debug_wave_launch_mode,
 					dev->vm_info.last_vmid_kfd);
 			if (r)
@@ -2802,26 +2812,18 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
-		if (data2 != 0) {
-			/* On current hardware, we only support a trap
-			 * mask value of 0.  This is because the debug
-			 * trap mask is global and shared by all processes
-			 * on current hardware.
-			 */
-			pr_err("Invalid trap override option: %i\n",
-					data2);
-			r = -EINVAL;
-			goto unlock_out;
-		}
 		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
 				data1,
-				data2);
+				data2,
+				data3,
+				&args->data2,
+				&args->data3);
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
 		pdd->trap_debug_wave_launch_mode = data1;
-		r = dev->kfd2kgd->set_wave_launch_mode(
+		dev->kfd2kgd->set_wave_launch_mode(
 				dev->kgd,
 				data1,
 				dev->vm_info.last_vmid_kfd);
@@ -2873,6 +2875,38 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_GET_VERSION:
 		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
+		break;
+	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
+		/* check that we own watch id */
+		if (!((1<<data1) & pdd->allocated_debug_watch_point_bitmask)) {
+			pr_debug("Trying to free a watch point we don't own\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
+		kfd_release_debug_watch_points(dev, 1<<data1);
+		pdd->allocated_debug_watch_point_bitmask ^= (1<<data1);
+		break;
+	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
+		if (!args->ptr) {
+			pr_err("Invalid watch address option\n");
+			r = -EINVAL;
+			goto unlock_out;
+		}
+
+		r = kfd_allocate_debug_watch_point(dev,
+				args->ptr, /* watch address */
+				data3,     /* watch address mask */
+				&data1,    /* watch id */
+				data2,     /* watch mode */
+				dev->vm_info.last_vmid_kfd);
+		if (r)
+			goto unlock_out;
+
+		/* Save the watch id in our per-process area */
+		pdd->allocated_debug_watch_point_bitmask |= (1<<data1);
+
+		/* Save the watch point ID for the caller */
+		args->data1 = data1;
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

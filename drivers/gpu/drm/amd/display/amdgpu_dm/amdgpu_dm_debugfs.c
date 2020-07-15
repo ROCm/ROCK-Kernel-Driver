@@ -32,7 +32,7 @@
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_debugfs.h"
 #include "dm_helpers.h"
-#include "dmub/inc/dmub_srv.h"
+#include "dmub/dmub_srv.h"
 
 struct dmub_debugfs_trace_header {
 	uint32_t entry_count;
@@ -859,8 +859,8 @@ static int hdcp_sink_capability_show(struct seq_file *m, void *data)
 
 	seq_printf(m, "%s:%d HDCP version: ", connector->name, connector->base.id);
 
-	hdcp_cap = dc_link_is_hdcp14(aconnector->dc_link);
-	hdcp2_cap = dc_link_is_hdcp22(aconnector->dc_link);
+	hdcp_cap = dc_link_is_hdcp14(aconnector->dc_link, aconnector->dc_sink->sink_signal);
+	hdcp2_cap = dc_link_is_hdcp22(aconnector->dc_link, aconnector->dc_sink->sink_signal);
 
 
 	if (hdcp_cap)

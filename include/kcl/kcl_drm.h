@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_DRM_H
 #define AMDKCL_DRM_H
 
@@ -9,19 +10,18 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_vma_manager.h>
-#include <kcl/kcl_drmP_h.h>
+#include <kcl/header/kcl_drmP_h.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_rect.h>
-#include <drm/drm_atomic_helper.h>
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_modes.h>
-#include <kcl/kcl_drm_print_h.h>
+#include <kcl/header/kcl_drm_print_h.h>
 #if defined(HAVE_DRM_COLOR_LUT_SIZE)
 #include <drm/drm_color_mgmt.h>
 #endif
 #include <uapi/drm/drm_mode.h>
-#include <kcl/kcl_drm_drv_h.h>
+#include <kcl/header/kcl_drm_drv_h.h>
 
 #ifndef DP_ADJUST_REQUEST_POST_CURSOR2
 #define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
@@ -145,23 +145,6 @@ int drm_modeset_lock_all_ctx(struct drm_device *dev,
 			     struct drm_modeset_acquire_ctx *ctx);
 #endif
 
-#if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
-int drm_atomic_helper_disable_all(struct drm_device *dev,
-				  struct drm_modeset_acquire_ctx *ctx);
-#endif
-
-#if !defined(HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE)
-struct drm_atomic_state *
-drm_atomic_helper_duplicate_state(struct drm_device *dev,
-				  struct drm_modeset_acquire_ctx *ctx);
-#endif
-
-#if !defined(HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME)
-struct drm_atomic_state *drm_atomic_helper_suspend(struct drm_device *dev);
-int drm_atomic_helper_resume(struct drm_device *dev,
-			     struct drm_atomic_state *state);
-#endif
-
 #if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
 extern int drm_crtc_force_disable(struct drm_crtc *crtc);
 extern int drm_crtc_force_disable_all(struct drm_device *dev);
@@ -236,24 +219,11 @@ drm_gem_object_get(struct drm_gem_object *obj)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif
 
-#if !defined(HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET)
-extern void
-__kcl_drm_atomic_helper_connector_reset(struct drm_connector *connector,
-				    struct drm_connector_state *conn_state);
-
-static inline void
-__drm_atomic_helper_connector_reset(struct drm_connector *connector,
-				    struct drm_connector_state *conn_state)
-{
-	return __kcl_drm_atomic_helper_connector_reset(connector, conn_state);
-}
-#endif
-
 #if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void);
 #endif
 
-#if !defined(HAVE_DRM_PRINT_H)
+#if !defined(HAVE_DRM_DRM_PRINT_H)
 struct drm_printer {
 	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
 	void *arg;
@@ -280,65 +250,6 @@ static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 	return blob->length / sizeof(struct drm_color_lut);
 }
 #endif
-
-static inline struct drm_crtc_state *
-kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
-					    struct drm_crtc *crtc)
-{
-#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
-	return drm_atomic_get_old_crtc_state(state, crtc);
-#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
-	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
-#else
-	return state->crtcs[drm_crtc_index(crtc)]->state;
-#endif
-}
-
-static inline struct drm_crtc_state *
-kcl_drm_atomic_get_old_crtc_state_after_commit(struct drm_atomic_state *state,
-				  struct drm_crtc *crtc)
-{
-#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
-	return drm_atomic_get_old_crtc_state(state, crtc);
-#else
-	return drm_atomic_get_existing_crtc_state(state, crtc);
-#endif
-}
-
-static inline struct drm_crtc_state *
-kcl_drm_atomic_get_new_crtc_state_before_commit(struct drm_atomic_state *state,
-				  struct drm_crtc *crtc)
-{
-#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
-	return drm_atomic_get_new_crtc_state(state,crtc);
-#else
-	return drm_atomic_get_existing_crtc_state(state, crtc);
-#endif
-}
-
-static inline struct drm_crtc_state *
-kcl_drm_atomic_get_new_crtc_state_after_commit(struct drm_atomic_state *state,
-					    struct drm_crtc *crtc)
-{
-#if defined(HAVE_DRM_ATOMIC_GET_CRTC_STATE)
-	return drm_atomic_get_new_crtc_state(state,crtc);
-#elif defined(HAVE_DRM_CRTCS_STATE_MEMBER)
-	return state->crtcs[drm_crtc_index(crtc)].ptr->state;
-#else
-	return state->crtcs[drm_crtc_index(crtc)]->state;
-#endif
-}
-
-static inline struct drm_plane_state *
-kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
-							struct drm_plane *plane)
-{
-#if defined(HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE)
-	return drm_atomic_get_new_plane_state(state, plane);
-#else
-	return drm_atomic_get_existing_plane_state(state, plane);
-#endif
-}
 
 #ifndef HAVE_DRM_FB_HELPER_FILL_INFO
 void drm_fb_helper_fill_info(struct fb_info *info,
@@ -372,7 +283,7 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 {
 	struct drm_printer p = {
 		.printfn = __drm_printfn_debug,
-#if !defined(HAVE_DRM_PRINT_H)
+#if !defined(HAVE_DRM_DRM_PRINT_H)
 		.prefix = prefix
 #endif
 	};
@@ -439,18 +350,6 @@ void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 }
 #endif
 
-#ifndef HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE
-extern void _kcl_drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
-					      struct drm_atomic_state *old_state);
-
-static inline void
-drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
-					      struct drm_atomic_state *old_state)
-{
-	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
-}
-#endif
-
 #if !defined(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT)
 static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 {
@@ -464,21 +363,10 @@ static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
 #endif
 
 #ifndef HAVE_DRM_MODE_IS_420_XXX
-bool _kcl_drm_mode_is_420_only(const struct drm_display_info *display,
+bool drm_mode_is_420_only(const struct drm_display_info *display,
 		const struct drm_display_mode *mode);
-bool _kcl_drm_mode_is_420_also(const struct drm_display_info *display,
+bool drm_mode_is_420_also(const struct drm_display_info *display,
 		const struct drm_display_mode *mode);
-
-static inline bool drm_mode_is_420_only(const struct drm_display_info *display,
-		const struct drm_display_mode *mode)
-{
-	return _kcl_drm_mode_is_420_only(display, mode);
-}
-static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
-		const struct drm_display_mode *mode)
-{
-	return _kcl_drm_mode_is_420_also(display, mode);
-}
 #endif
 
 #ifndef _DRM_PRINTK
@@ -533,49 +421,23 @@ static inline bool drm_mode_is_420_also(const struct drm_display_info *display,
 	} while (0)
 #endif
 
+/*
+ * Don't add fb_debug_* since the legacy drm_fb_helper_debug_* has segfault
+ * history:
+ * v2.6.35-21-gd219adc1228a fb: add hooks to handle KDB enter/exit
+ * v2.6.35-22-g1a7aba7f4e45 drm: add KGDB/KDB support
+ * v4.8-rc8-1391-g74064893901a drm/fb-helper: add DRM_FB_HELPER_DEFAULT_OPS for fb_ops
+ * v4.9-rc4-808-g1e0089288b9b drm/fb-helper: add fb_debug_* to DRM_FB_HELPER_DEFAULT_OPS
+ * v4.9-rc4-807-g1b99b72489c6 drm/fb-helper: fix segfaults in drm_fb_helper_debug_*
+ * v4.10-rc8-1367-g0f3bbe074dd1 drm/fb-helper: implement ioctl FBIO_WAITFORVSYNC
+ */
 #ifndef DRM_FB_HELPER_DEFAULT_OPS
-#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_debug_enter = drm_fb_helper_debug_enter, \
-	.fb_debug_leave = drm_fb_helper_debug_leave,\
-	.fb_ioctl	= drm_fb_helper_ioctl
-#endif
-#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_ioctl	= drm_fb_helper_ioctl
-#endif
-#if defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		!defined(HAVE_DRM_FB_HELPER_IOCTL)
-#define DRM_FB_HELPER_DEFAULT_OPS \
-	.fb_check_var	= drm_fb_helper_check_var, \
-	.fb_set_par	= drm_fb_helper_set_par, \
-	.fb_setcmap	= drm_fb_helper_setcmap, \
-	.fb_blank	= drm_fb_helper_blank, \
-	.fb_pan_display	= drm_fb_helper_pan_display, \
-	.fb_debug_enter = drm_fb_helper_debug_enter, \
-	.fb_debug_leave = drm_fb_helper_debug_leave
-#endif
-#if !defined(HAVE_FB_OPS_FB_DEBUG_XX) && \
-		!defined(HAVE_DRM_FB_HELPER_IOCTL)
 #define DRM_FB_HELPER_DEFAULT_OPS \
 	.fb_check_var	= drm_fb_helper_check_var, \
 	.fb_set_par	= drm_fb_helper_set_par, \
 	.fb_setcmap	= drm_fb_helper_setcmap, \
 	.fb_blank	= drm_fb_helper_blank, \
 	.fb_pan_display	= drm_fb_helper_pan_display
-#endif
 #endif
 
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)

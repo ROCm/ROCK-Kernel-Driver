@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_FIRMWARE_H
 #define AMDKCL_FIRMWARE_H
 

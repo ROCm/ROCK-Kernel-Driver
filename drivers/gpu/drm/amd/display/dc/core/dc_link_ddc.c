@@ -599,7 +599,7 @@ bool dal_ddc_submit_aux_command(struct ddc_service *ddc,
 	do {
 		struct aux_payload current_payload;
 		bool is_end_of_payload = (retrieved + DEFAULT_AUX_MAX_DATA_SIZE) >
-			payload->length ? true : false;
+			payload->length;
 
 		current_payload.address = payload->address;
 		current_payload.data = &payload->data[retrieved];
@@ -648,16 +648,17 @@ bool dc_link_aux_transfer_with_retries(struct ddc_service *ddc,
 }
 
 
-uint32_t dc_link_aux_configure_timeout(struct ddc_service *ddc,
+bool dc_link_aux_try_to_configure_timeout(struct ddc_service *ddc,
 		uint32_t timeout)
 {
-	uint32_t prev_timeout = 0;
+	bool result = false;
 	struct ddc *ddc_pin = ddc->ddc_pin;
 
-	if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout)
-		prev_timeout =
-				ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout);
-	return prev_timeout;
+	if (ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout) {
+		ddc->ctx->dc->res_pool->engines[ddc_pin->pin_data->en]->funcs->configure_timeout(ddc, timeout);
+		result = true;
+	}
+	return result;
 }
 
 /*test only function*/

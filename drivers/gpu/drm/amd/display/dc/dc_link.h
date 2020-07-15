@@ -29,7 +29,6 @@
 #include "dc.h"
 #include "dc_types.h"
 #include "grph_object_defs.h"
-#include "dmub/inc/dmub_cmd_dal.h"
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_link_fec_state {
@@ -74,7 +73,7 @@ struct link_trace {
 struct psr_settings {
 	bool psr_feature_enabled;		// PSR is supported by sink
 	bool psr_allow_active;			// PSR is currently active
-	enum psr_version psr_version;		// Internal PSR version, determined based on DPCD
+	enum dc_psr_version psr_version;		// Internal PSR version, determined based on DPCD
 
 	/* These parameters are calculated in Driver,
 	 * based on display timing and Sink capabilities.
@@ -104,6 +103,7 @@ struct dc_link {
 	bool aux_access_disabled;
 	bool sync_lt_in_progress;
 	bool is_lttpr_mode_transparent;
+	bool lttpr_non_transparent_mode;
 
 	/* caps is the same as reported_link_cap. link_traing use
 	 * reported_link_cap. Will clean up.  TODO
@@ -224,8 +224,6 @@ int dc_link_get_backlight_level(const struct dc_link *dc_link);
 
 int dc_link_get_target_backlight_pwm(const struct dc_link *link);
 
-bool dc_link_set_abm_disable(const struct dc_link *dc_link);
-
 bool dc_link_set_psr_allow_active(struct dc_link *dc_link, bool enable, bool wait);
 
 bool dc_link_get_psr_state(const struct dc_link *dc_link, uint32_t *psr_state);
@@ -318,8 +316,8 @@ bool dc_link_detect_sink(struct dc_link *link, enum dc_connection_type *type);
  */
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-bool dc_link_is_hdcp14(struct dc_link *link);
-bool dc_link_is_hdcp22(struct dc_link *link);
+bool dc_link_is_hdcp14(struct dc_link *link, enum signal_type signal);
+bool dc_link_is_hdcp22(struct dc_link *link, enum signal_type signal);
 #endif
 void dc_link_set_drive_settings(struct dc *dc,
 				struct link_training_settings *lt_settings,

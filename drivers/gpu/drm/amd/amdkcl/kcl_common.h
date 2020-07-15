@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_COMMON_H
 #define AMDKCL_COMMON_H
 
@@ -8,26 +9,12 @@
 #include <linux/kallsyms.h>
 #include <linux/bug.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
-extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
-#endif
-static inline unsigned long kcl_kallsyms_lookup_name(const char *name)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
-	return _kcl_kallsyms_lookup_name(name);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
-	return (unsigned long)__symbol_get(name);
-#else
-	return kallsyms_lookup_name(name);
-#endif
-}
-
 static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 {
 	unsigned long addr;
 	void *fp = NULL;
 
-	addr = kcl_kallsyms_lookup_name(symbol);
+	addr = kallsyms_lookup_name(symbol);
 	if (addr == 0) {
 		fp = fp_stup;
 		if (fp != NULL)
@@ -46,4 +33,16 @@ static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 
 	return fp;
 }
+
+/*
+ * create dummy func
+ */
+#define amdkcl_dummy_symbol(name, ret_type, ret, ...) \
+ret_type name(__VA_ARGS__) \
+{ \
+	pr_warn_once("%s is not supported\n", #name); \
+	ret ;\
+} \
+EXPORT_SYMBOL(name);
+
 #endif

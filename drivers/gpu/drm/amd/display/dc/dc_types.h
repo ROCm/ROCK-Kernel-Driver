@@ -868,4 +868,9 @@ struct dsc_dec_dpcd_caps {
 };
 #endif
 
+enum dc_psr_version {
+	DC_PSR_VERSION_1			= 0,
+	DC_PSR_VERSION_UNSUPPORTED		= 0xFFFFFFFF,
+};
+
 #endif /* DC_TYPES_H_ */

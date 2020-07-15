@@ -30,6 +30,7 @@
 #include "amdgpu_dm.h"
 #include "dc.h"
 
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 static const char *const pipe_crc_sources[] = {
 	"none",
 	"crtc",
@@ -38,6 +39,7 @@ static const char *const pipe_crc_sources[] = {
 	"dprx dither",
 	"auto",
 };
+#endif
 
 static enum amdgpu_dm_pipe_crc_source dm_parse_crc_source(const char *source)
 {
@@ -74,16 +76,14 @@ static bool dm_need_crc_dither(enum amdgpu_dm_pipe_crc_source src)
 	       (src == AMDGPU_DM_PIPE_CRC_SOURCE_NONE);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 const char *const *amdgpu_dm_crtc_get_crc_sources(struct drm_crtc *crtc,
 						  size_t *count)
 {
 	*count = ARRAY_SIZE(pipe_crc_sources);
 	return pipe_crc_sources;
 }
-#endif
 
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
 int
 amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 				 size_t *values_cnt)
@@ -101,7 +101,7 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 10, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
 					enum amdgpu_dm_pipe_crc_source source)
@@ -144,7 +144,7 @@ unlock:
 	return ret;
 }
 
-#if defined(HAVE_2ARGS_SET_CRC_SOURCE)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS)
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name)
 #else
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
@@ -285,6 +285,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 
 	crtc_state->crc_src = source;
 
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS
+	*values_cnt = 3;
+#endif
 	/* Reset crc_skipped on dm state */
 	crtc_state->crc_skip_count = 0;
 

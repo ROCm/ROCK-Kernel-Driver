@@ -85,13 +85,14 @@
  * - 3.34.0 - Non-DC can flip correctly between buffers with different pitches
  * - 3.35.0 - Add drm_amdgpu_info_device::tcc_disabled_mask
  * - 3.36.0 - Allow reading more status registers on si/cik
- * - 3.37.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
+ * - 3.37.0 - L2 is invalidated before SDMA IBs, needed for correctness
+ * - 3.38.0 - Add AMDGPU_IB_FLAG_EMIT_MEM_SYNC
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	37
+#define KMS_DRIVER_MINOR	38
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"5.6.0"
+#define AMDGPU_VERSION		"5.6.5"
 
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
@@ -144,6 +145,7 @@ int amdgpu_emu_mode = 0;
 uint amdgpu_smu_memory_pool_size = 0;
 /* FBC (bit 0) disabled by default*/
 uint amdgpu_dc_feature_mask = 0;
+uint amdgpu_dc_debug_mask = 0;
 int amdgpu_async_gfx_ring = 1;
 int amdgpu_mcbp = 0;
 int amdgpu_discovery = -1;
@@ -750,6 +752,13 @@ MODULE_PARM_DESC(dcfeaturemask, "all stable DC features enabled (default))");
 module_param_named(dcfeaturemask, amdgpu_dc_feature_mask, uint, 0444);
 
 /**
+ * DOC: dcdebugmask (uint)
+ * Override display features enabled. See enum DC_DEBUG_MASK in drivers/gpu/drm/amd/include/amd_shared.h.
+ */
+MODULE_PARM_DESC(dcdebugmask, "all debug options disabled (default))");
+module_param_named(dcdebugmask, amdgpu_dc_debug_mask, uint, 0444);
+
+/**
  * DOC: abmlevel (uint)
  * Override the default ABM (Adaptive Backlight Management) level used for DC
  * enabled hardware. Requires DMCU to be supported and loaded.
@@ -1057,6 +1066,10 @@ static const struct pci_device_id pciidlist[] = {
 	{0x1002, 0x7360, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI12},
 	{0x1002, 0x7362, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_NAVI12},
 
+#ifdef HAVE_DRM_AMDGPU_PCIID_H
+#include <drm/amdgpu_pciid.h>
+#endif
+
 	{0, 0, 0}
 };
 
@@ -1232,14 +1245,6 @@ static int amdgpu_pmops_resume(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 
-	/* GPU comes up enabled by the bios on resume */
-	if (amdgpu_device_supports_boco(drm_dev) ||
-	    amdgpu_device_supports_baco(drm_dev)) {
-		pm_runtime_disable(dev);
-		pm_runtime_set_active(dev);
-		pm_runtime_enable(dev);
-	}
-
 	return amdgpu_device_resume(drm_dev, true);
 }
 
@@ -1249,7 +1254,9 @@ static int amdgpu_pmops_freeze(struct device *dev)
 	struct amdgpu_device *adev = drm_dev->dev_private;
 	int r;
 
+	adev->in_hibernate = true;
 	r = amdgpu_device_suspend(drm_dev, true);
+	adev->in_hibernate = false;
 	if (r)
 		return r;
 	return amdgpu_asic_reset(adev);
@@ -1507,11 +1514,10 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP
+	    DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
 #endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
-	    | DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
 	    | DRIVER_IRQ_SHARED
 #endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */

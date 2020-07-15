@@ -32,9 +32,7 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_edid.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 11, 0)
 #include <drm/drm_encoder.h>
-#endif
 #include <drm/drm_dp_helper.h>
 #include <drm/drm_fixed.h>
 #include <drm/drm_crtc_helper.h>
@@ -371,7 +369,7 @@ struct amdgpu_mode_info {
 	struct drm_property *audio_property;
 	/* FMT dithering */
 	struct drm_property *dither_property;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	/* maximum number of bits per channel for monitor color */
 	struct drm_property *max_bpc_property;
 #endif
@@ -381,7 +379,7 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_VRR_SUPPORTED
 	/* Support for upstream vrr_capable connector property */
 	struct drm_property *vrr_capable_property;
 	/* Support for upstream vrr_enabled CRTC property */

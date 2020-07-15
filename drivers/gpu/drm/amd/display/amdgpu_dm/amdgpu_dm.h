@@ -349,6 +349,7 @@ struct amdgpu_display_manager {
 #endif
 
 	struct drm_atomic_state *cached_state;
+	struct dc_state *cached_dc_state;
 
 	struct dm_comressor_info compressor;
 
@@ -448,7 +449,7 @@ struct dm_crtc_state {
 	int crc_skip_count;
 	enum amdgpu_dm_pipe_crc_source crc_src;
 
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_VRR_SUPPORTED
 	bool base_vrr_enabled;
 #endif
 
@@ -483,7 +484,7 @@ struct dm_connector_state {
 	enum amdgpu_rmx_type scaling;
 	uint8_t underscan_vborder;
 	uint8_t underscan_hborder;
-#if DRM_VERSION_CODE < DRM_VERSION(5, 0, 0)
+#ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	uint8_t max_bpc;
 #endif
 	bool underscan_enable;

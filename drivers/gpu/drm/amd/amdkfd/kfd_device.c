@@ -46,6 +46,7 @@ extern const struct kfd2kgd_calls gfx_v8_kfd2kgd;
 extern const struct kfd2kgd_calls gfx_v9_kfd2kgd;
 extern const struct kfd2kgd_calls arcturus_kfd2kgd;
 extern const struct kfd2kgd_calls gfx_v10_kfd2kgd;
+extern const struct kfd2kgd_calls gfx_v10_3_kfd2kgd;
 
 static const struct kfd2kgd_calls *kfd2kgd_funcs[] = {
 #ifdef KFD_SUPPORT_IOMMU_V2
@@ -72,6 +73,7 @@ static const struct kfd2kgd_calls *kfd2kgd_funcs[] = {
 	[CHIP_NAVI10] = &gfx_v10_kfd2kgd,
 	[CHIP_NAVI12] = &gfx_v10_kfd2kgd,
 	[CHIP_NAVI14] = &gfx_v10_kfd2kgd,
+	[CHIP_SIENNA_CICHLID] = &gfx_v10_3_kfd2kgd,
 };
 
 #ifdef KFD_SUPPORT_IOMMU_V2
@@ -458,6 +460,24 @@ static const struct kfd_device_info navi14_device_info = {
 	.num_sdma_queues_per_engine = 8,
 };
 
+static const struct kfd_device_info sienna_cichlid_device_info = {
+	.asic_family = CHIP_SIENNA_CICHLID,
+	.asic_name = "sienna_cichlid",
+	.max_pasid_bits = 16,
+	.max_no_of_hqd  = 24,
+	.doorbell_size  = 8,
+	.ih_ring_entry_size = 8 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_v9,
+	.num_of_watch_points = 4,
+	.mqd_size_aligned = MQD_SIZE_ALIGNED,
+	.needs_iommu_device = false,
+	.supports_cwsr = true,
+	.needs_pci_atomics = false,
+	.num_sdma_engines = 4,
+	.num_xgmi_sdma_engines = 0,
+	.num_sdma_queues_per_engine = 8,
+};
+
 /* For each entry, [0] is regular and [1] is virtualisation device. */
 static const struct kfd_device_info *kfd_supported_devices[][2] = {
 #ifdef KFD_SUPPORT_IOMMU_V2
@@ -480,6 +500,7 @@ static const struct kfd_device_info *kfd_supported_devices[][2] = {
 	[CHIP_NAVI10] = {&navi10_device_info, NULL},
 	[CHIP_NAVI12] = {&navi12_device_info, &navi12_device_info},
 	[CHIP_NAVI14] = {&navi14_device_info, NULL},
+	[CHIP_SIENNA_CICHLID] = {&sienna_cichlid_device_info, &sienna_cichlid_device_info},
 };
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
@@ -559,6 +580,10 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 			BUILD_BUG_ON(sizeof(cwsr_trap_gfx9_hex) > PAGE_SIZE);
 			kfd->cwsr_isa = cwsr_trap_gfx9_hex;
 			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx9_hex);
+		} else if (kfd->device_info->asic_family < CHIP_SIENNA_CICHLID) {
+			BUILD_BUG_ON(sizeof(cwsr_trap_nv1x_hex) > PAGE_SIZE);
+			kfd->cwsr_isa = cwsr_trap_nv1x_hex;
+			kfd->cwsr_isa_size = sizeof(cwsr_trap_nv1x_hex);
 		} else {
 			BUILD_BUG_ON(sizeof(cwsr_trap_gfx10_hex) > PAGE_SIZE);
 			kfd->cwsr_isa = cwsr_trap_gfx10_hex;
@@ -706,6 +731,10 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	kfd_smi_init(kfd);
+	/* init the debugger watchpoint bitmask */
+	kfd->allocated_debug_watch_points =
+			~((1 << kfd->device_info->num_of_watch_points) - 1);
+	spin_lock_init(&kfd->watch_points_lock);
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->pdev->vendor,
@@ -1193,6 +1222,88 @@ void kfd_dec_compute_active(struct kfd_dev *kfd)
 	WARN_ONCE(count < 0, "Compute profile ref. count error");
 }
 
+#define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
+int kfd_allocate_debug_watch_point(struct kfd_dev *kfd,
+		uint64_t watch_address,
+		uint32_t watch_address_mask,
+		uint32_t *watch_point,
+		uint32_t watch_mode,
+		uint32_t debug_vmid)
+
+{
+	int r = 0;
+	int i;
+	int watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
+
+	if (!watch_point)
+		return -EFAULT;
+
+	spin_lock(&kfd->watch_points_lock);
+	for (i = 0; i < kfd->device_info->num_of_watch_points; i++)
+		if (!(kfd->allocated_debug_watch_points & (1<<i))) {
+			/* Found one at [i]. */
+			watch_point_to_allocate = i;
+			break;
+		}
+	if (watch_point_to_allocate != KFD_DEBUGGER_INVALID_WATCH_POINT_ID) {
+		kfd->allocated_debug_watch_points |=
+						(1<<watch_point_to_allocate);
+		*watch_point = watch_point_to_allocate;
+		pr_debug("Allocated watch point id %i\n",
+				watch_point_to_allocate);
+	} else {
+		pr_debug("Failed to allocate watch point address. "
+				"num_of_watch_points == %i "
+				"allocated_debug_watch_points == 0x%08x "
+				"i == %i\n",
+				kfd->device_info->num_of_watch_points,
+				kfd->allocated_debug_watch_points,
+				i);
+		r = -ENOMEM;
+		goto out;
+	}
+
+	kfd->kfd2kgd->set_address_watch(kfd->kgd,
+			watch_address,
+			watch_address_mask,
+			*watch_point,
+			watch_mode,
+			debug_vmid);
+
+out:
+	spin_unlock(&kfd->watch_points_lock);
+	return r;
+}
+
+int kfd_release_debug_watch_points(struct kfd_dev *kfd,
+		uint32_t watch_point_bit_mask_to_free)
+{
+	int r = 0;
+	int i;
+
+	spin_lock(&kfd->watch_points_lock);
+	if (~kfd->allocated_debug_watch_points & watch_point_bit_mask_to_free) {
+		pr_err("Tried to free a free watch point! "
+				"allocated_debug_watch_points == 0x%08x "
+				"watch_point_bit_mask_to_free = 0x%08x\n",
+				kfd->allocated_debug_watch_points,
+				watch_point_bit_mask_to_free);
+		r = -EFAULT;
+		goto out;
+	}
+
+	pr_debug("Freeing watchpoint bitmask :0x%08x\n",
+			watch_point_bit_mask_to_free);
+	kfd->allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
+
+	for (i = 0; i < kfd->device_info->num_of_watch_points; i++)
+		if ((1<<i) & watch_point_bit_mask_to_free)
+			kfd->kfd2kgd->clear_address_watch(kfd->kgd, i);
+
+out:
+	spin_unlock(&kfd->watch_points_lock);
+	return r;
+}
 #if defined(CONFIG_DEBUG_FS)
 
 /* This function will send a package to HIQ to hang the HWS

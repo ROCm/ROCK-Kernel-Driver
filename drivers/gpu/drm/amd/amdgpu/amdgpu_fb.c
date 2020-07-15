@@ -135,8 +135,7 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 	u32 cpp;
 	u64 flags = AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED |
 			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS     |
-			       AMDGPU_GEM_CREATE_VRAM_CLEARED 	     |
-			       AMDGPU_GEM_CREATE_CPU_GTT_USWC;
+			       AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
 #ifdef HAVE_DRM_GET_FORMAT_INFO
 	info = drm_get_format_info(adev->ddev, mode_cmd);
@@ -261,13 +260,8 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	drm_fb_helper_fill_info(info, &rfbdev->helper, sizes);
 
 	/* setup aperture base/size for vesafb takeover */
-#ifndef HAVE_FB_INFO_APERTURES
-	info->aperture_base = adev->ddev->mode_config.fb_base;
-	info->aperture_size = adev->gmc.aper_size;
-#else
 	info->apertures->ranges[0].base = adev->ddev->mode_config.fb_base;
 	info->apertures->ranges[0].size = adev->gmc.aper_size;
-#endif
 
 	/* Use default scratch pixmap (info->pixmap.flags = FB_PIXMAP_SYSTEM) */
 

@@ -60,7 +60,10 @@ void amdgpu_virt_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
 	amdgpu_ring_alloc(ring, 32);
 	amdgpu_ring_emit_reg_write_reg_wait(ring, reg0, reg1,
 					    ref, mask);
-	amdgpu_fence_emit_polling(ring, &seq);
+	r = amdgpu_fence_emit_polling(ring, &seq, MAX_KIQ_REG_WAIT);
+	if (r)
+		goto failed_undo;
+
 	amdgpu_ring_commit(ring);
 	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 
@@ -82,6 +85,9 @@ void amdgpu_virt_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
 
 	return;
 
+failed_undo:
+	amdgpu_ring_undo(ring);
+	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 failed_kiq:
 	pr_err("failed to write reg %x wait reg %x\n", reg0, reg1);
 }
@@ -315,6 +321,7 @@ void amdgpu_detect_virtualization(struct amdgpu_device *adev)
 	case CHIP_VEGA20:
 	case CHIP_NAVI10:
 	case CHIP_NAVI12:
+	case CHIP_SIENNA_CICHLID:
 	case CHIP_ARCTURUS:
 		reg = RREG32(mmRCC_IOV_FUNC_IDENTIFIER);
 		break;
@@ -363,4 +370,20 @@ void amdgpu_virt_disable_access_debugfs(struct amdgpu_device *adev)
 {
 	if (amdgpu_sriov_vf(adev))
 		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+}
+
+enum amdgpu_sriov_vf_mode amdgpu_virt_get_sriov_vf_mode(struct amdgpu_device *adev)
+{
+	enum amdgpu_sriov_vf_mode mode;
+
+	if (amdgpu_sriov_vf(adev)) {
+		if (amdgpu_sriov_is_pp_one_vf(adev))
+			mode = SRIOV_VF_MODE_ONE_VF;
+		else
+			mode = SRIOV_VF_MODE_MULTI_VF;
+	} else {
+		mode = SRIOV_VF_MODE_BARE_METAL;
+	}
+
+	return mode;
 }

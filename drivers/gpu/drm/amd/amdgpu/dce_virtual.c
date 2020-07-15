@@ -101,7 +101,20 @@ static void dce_virtual_bandwidth_update(struct amdgpu_device *adev)
 	return;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size,
+				   struct drm_modeset_acquire_ctx *ctx)
+{
+	return 0;
+}
+#elif defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS)
+static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
+				   u16 *blue, uint32_t size)
+{
+	return 0;
+}
+#else
 static void dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				    u16 *blue, uint32_t start, uint32_t size)
 {
@@ -114,18 +127,6 @@ static void dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *gre
 		amdgpu_crtc->lut_g[i] = green[i] >> 6;
 		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
 	}
-}
-#else
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
-static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
-				      u16 *green, u16 *blue, uint32_t size,
-				      struct drm_modeset_acquire_ctx *ctx)
-#else
-static int dce_virtual_crtc_gamma_set(struct drm_crtc *crtc, u16 *red,
-				      u16 *green, u16 *blue, uint32_t size)
-#endif
-{
-	return 0;
 }
 #endif
 

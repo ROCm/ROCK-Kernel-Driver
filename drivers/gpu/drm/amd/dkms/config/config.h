@@ -4,9 +4,6 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
-/* crtc->funcs->set_crc_source() wants 2 args */
-#define HAVE_2ARGS_SET_CRC_SOURCE 1
-
 /* get_user_pages() wants 5 args */
 #define HAVE_5ARGS_GET_USER_PAGES 1
 
@@ -28,9 +25,6 @@
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
-/* alloc_ordered_workqueue() is available */
-#define HAVE_ALLOC_ORDERED_WORKQUEUE 1
-
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
@@ -38,19 +32,19 @@
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
-#define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
+/* #undef HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC */
 
-/* asm/fpu/api.h is available */
+/* Define to 1 if you have the <asm/fpu/api.h> header file. */
 #define HAVE_ASM_FPU_API_H 1
+
+/* Define to 1 if you have the <asm/set_memory.h> header file. */
+#define HAVE_ASM_SET_MEMORY_H 1
 
 /* attribute_group->bin_attrs is available */
 #define HAVE_ATTRIBUTE_GROUP_BIN_ATTRS 1
 
-/* backlight_device_register() with 5 args is available */
-#define HAVE_BACKLIGHT_DEVICE_REGISTER_WITH_5ARGS 1
-
-/* backlight_properties->type is available */
-#define HAVE_BACKLIGHT_PROPERTIES_TYPE 1
+/* backlight_device_set_brightness() is available */
+#define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
 
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
@@ -79,7 +73,7 @@
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
-/* dma_fence_set_error() is available */
+/* fence_set_error() is available */
 #define HAVE_DMA_FENCE_SET_ERROR 1
 
 /* linux/dma-resv.h is available */
@@ -103,6 +97,9 @@
 /* DRM_AMDGPU_FENCE_TO_HANDLE is defined */
 #define HAVE_DRM_AMDGPU_FENCE_TO_HANDLE 1
 
+/* Define to 1 if you have the <drm/amdgpu_pciid.h> header file. */
+/* #undef HAVE_DRM_AMDGPU_PCIID_H */
+
 /* drm_atomic_get_old_crtc_state() and drm_atomic_get_new_crtc_state() are
    available */
 #define HAVE_DRM_ATOMIC_GET_CRTC_STATE 1
@@ -119,6 +116,9 @@
 /* drm_atomic_helper_duplicate_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
 
+/* drm_atomic_helper_legacy_gamma_set() is available */
+#define HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET 1
+
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
@@ -127,6 +127,11 @@
 
 /* drm_atomic_helper_update_legacy_modeset_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE 1
+
+/* {drm_atomic_helper_crtc_set_property, drm_atomic_helper_plane_set_property,
+   drm_atomic_helper_connector_set_property, drm_atomic_helper_connector_dpms}
+   is available */
+/* #undef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY */
 
 /* drm_atomic_nonblocking_commit() is available */
 #define HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT 1
@@ -143,14 +148,8 @@
 /* drm_atomic_state_put() is available */
 #define HAVE_DRM_ATOMIC_STATE_PUT 1
 
-/* drm/drm_atomic_uapi.h is available */
-#define HAVE_DRM_ATOMIC_UAPI_HEADER 1
-
 /* whether drm/drm_audio_component.h is defined */
 #define HAVE_DRM_AUDIO_COMPONENT_HEADER 1
-
-/* drm/drm_auth.h is available */
-#define HAVE_DRM_AUTH_H 1
 
 /* drm_calc_vbltimestamp_from_scanoutpos() drop mode arg */
 /* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_DROP_MOD_ARG */
@@ -182,9 +181,6 @@
 /* struct drm_connector_funcs has register members */
 #define HAVE_DRM_CONNECTOR_FUNCS_REGISTER 1
 
-/* drm/drm_connector.h is available */
-#define HAVE_DRM_CONNECTOR_H 1
-
 /* drm_connector_helper_funcs->atomic_check() wants struct drm_atomic_state
    arg */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
@@ -194,6 +190,9 @@
 
 /* drm_connector_list_iter_begin() is available */
 #define HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN 1
+
+/* connector property "max bpc" is available */
+#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
 
 /* drm_connector_put() is available */
 #define HAVE_DRM_CONNECTOR_PUT 1
@@ -219,9 +218,6 @@
 /* drm_crtc_init_with_planes() wants name */
 #define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
 
-/* drm/drm_debugfs.h is available */
-#define HAVE_DRM_DEBUGFS_H 1
-
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
 
@@ -233,9 +229,6 @@
 
 /* drm_device->filelist_mutex is available */
 #define HAVE_DRM_DEVICE_FILELIST_MUTEX 1
-
-/* drm/drm_device.h is available */
-#define HAVE_DRM_DEVICE_H 1
 
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
@@ -294,14 +287,62 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
+/* drm_dp_send_real_edid_checksum() is available */
+#define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
+
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
 /* Define to 1 if you have the <drm/drmP.h> header file. */
 /* #undef HAVE_DRM_DRMP_H */
 
+/* Define to 1 if you have the <drm/drm_atomic_uapi.h> header file. */
+#define HAVE_DRM_DRM_ATOMIC_UAPI_H 1
+
+/* Define to 1 if you have the <drm/drm_auth.h> header file. */
+#define HAVE_DRM_DRM_AUTH_H 1
+
+/* Define to 1 if you have the <drm/drm_backport.h> header file. */
+/* #undef HAVE_DRM_DRM_BACKPORT_H */
+
+/* Define to 1 if you have the <drm/drm_connector.h> header file. */
+#define HAVE_DRM_DRM_CONNECTOR_H 1
+
+/* Define to 1 if you have the <drm/drm_debugfs.h> header file. */
+#define HAVE_DRM_DRM_DEBUGFS_H 1
+
+/* Define to 1 if you have the <drm/drm_device.h> header file. */
+#define HAVE_DRM_DRM_DEVICE_H 1
+
 /* Define to 1 if you have the <drm/drm_drv.h> header file. */
 #define HAVE_DRM_DRM_DRV_H 1
+
+/* Define to 1 if you have the <drm/drm_encoder.h> header file. */
+#define HAVE_DRM_DRM_ENCODER_H 1
+
+/* Define to 1 if you have the <drm/drm_file.h> header file. */
+#define HAVE_DRM_DRM_FILE_H 1
+
+/* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
+#define HAVE_DRM_DRM_IOCTL_H 1
+
+/* Define to 1 if you have the <drm/drm_irq.h> header file. */
+#define HAVE_DRM_DRM_IRQ_H 1
+
+/* Define to 1 if you have the <drm/drm_plane.h> header file. */
+#define HAVE_DRM_DRM_PLANE_H 1
+
+/* Define to 1 if you have the <drm/drm_print.h> header file. */
+#define HAVE_DRM_DRM_PRINT_H 1
+
+/* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
+#define HAVE_DRM_DRM_PROBE_HELPER_H 1
+
+/* Define to 1 if you have the <drm/drm_util.h> header file. */
+#define HAVE_DRM_DRM_UTIL_H 1
+
+/* Define to 1 if you have the <drm/drm_vblank.h> header file. */
+#define HAVE_DRM_DRM_VBLANK_H 1
 
 /* drm_driver_feature DRIVER_ATOMIC is available */
 #define HAVE_DRM_DRV_DRIVER_ATOMIC 1
@@ -324,11 +365,12 @@
 /* drm_encoder_find() wants file_priv */
 #define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
 
-/* drm/drm_encoder.h is available */
-#define HAVE_DRM_ENCODER_H 1
-
 /* drm_encoder_init() wants name */
 #define HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME 1
+
+/* drm_fb_helper_single_add_all_connectors() &&
+   drm_fb_helper_remove_one_connector() are symbol */
+/* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
 
 /* drm_fb_helper_cfb_{fillrect/copyarea/imageblit}() is available */
 #define HAVE_DRM_FB_HELPER_CFB_XX 1
@@ -359,9 +401,6 @@
 
 /* drm_fb_helper_{alloc/unregister}_fbi is available */
 #define HAVE_DRM_FB_HELPER_XX_FBI 1
-
-/* drm/drm_file.h is available */
-#define HAVE_DRM_FILE_H 1
 
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
@@ -402,12 +441,6 @@
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
-/* drm/drm_ioctl.h is available */
-#define HAVE_DRM_IOCTL_H 1
-
-/* drm/drm_irq.h is available */
-#define HAVE_DRM_IRQ_H 1
-
 /* drm_is_current_master() is available */
 #define HAVE_DRM_IS_CURRENT_MASTER 1
 
@@ -429,15 +462,6 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
-/* drm/drm_plane.h is available */
-#define HAVE_DRM_PLANE_H 1
-
-/* drm/drm_print.h is available */
-#define HAVE_DRM_PRINT_H 1
-
-/* drm/drm_probe_helper.h is available */
-#define HAVE_DRM_PROBE_HELPER_H 1
-
 /* drm_send_event_locked() function is available */
 #define HAVE_DRM_SEND_EVENT_LOCKED 1
 
@@ -456,6 +480,9 @@
 /* whether drm_syncobj_find_fence() wants 5 args */
 #define HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS 1
 
+/* Define to 1 if you have the <drm/task_barrier.h> header file. */
+#define HAVE_DRM_TASK_BARRIER_H 1
+
 /* drm_universal_plane_init() wants 7 args */
 /* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_7ARGS */
 
@@ -465,23 +492,11 @@
 /* drm_universal_plane_init() wants 9 args */
 #define HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS 1
 
-/* drm/drm_util.h is available */
-#define HAVE_DRM_UTIL_H 1
-
-/* drm/drm_vblank.h is available */
-#define HAVE_DRM_VBLANK_H 1
-
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
 
-/* fb_info_apertures() is available */
-#define HAVE_FB_INFO_APERTURES 1
-
-/* fb_ops->fb_debug_xx is available */
-#define HAVE_FB_OPS_FB_DEBUG_XX 1
-
-/* fence_set_error() is available */
-/* #undef HAVE_FENCE_SET_ERROR */
+/* Variable refresh rate(vrr) is supported */
+#define HAVE_DRM_VRR_SUPPORTED 1
 
 /* drm_mode_object->free_cb is available */
 /* #undef HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT */
@@ -522,9 +537,6 @@
 /* idr_remove return void pointer */
 #define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
 
-/* whether INTERVAL_TREE_DEFINE() is defined */
-#define HAVE_INTERVAL_TREE_DEFINE 1
-
 /* in_compat_syscall is defined */
 #define HAVE_IN_COMPAT_SYSCALL 1
 
@@ -536,9 +548,6 @@
 
 /* kallsyms_lookup_name is available */
 #define HAVE_KALLSYMS_LOOKUP_NAME 1
-
-/* kfifo_new.h is available */
-/* #undef HAVE_KFIFO_NEW_H */
 
 /* kmap_atomic() have one argument */
 #define HAVE_KMAP_ATOMIC_ONE_ARG 1
@@ -557,6 +566,9 @@
 
 /* ktime_get_boottime_ns() is available */
 #define HAVE_KTIME_GET_BOOTTIME_NS 1
+
+/* ktime_get_mono_fast_ns is available */
+#define HAVE_KTIME_GET_MONO_FAST_NS 1
 
 /* ktime_get_ns is available */
 #define HAVE_KTIME_GET_NS 1
@@ -579,7 +591,7 @@
 /* kv[mz]alloc() are available */
 #define HAVE_KVZALLOC_KVMALLOC 1
 
-/* whether linux/bits.h is available */
+/* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
 
 /* Define to 1 if you have the <linux/dma-fence.h> header file. */
@@ -588,14 +600,38 @@
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
 
-/* linux/io-64-nonatomic-lo-hi.h is available */
+/* Define to 1 if you have the <linux/interval_tree_generic.h> header file. */
+#define HAVE_LINUX_INTERVAL_TREE_GENERIC_H 1
+
+/* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
 
-/* linux/nospec.h is available */
+/* Define to 1 if you have the <linux/kfifo-new.h> header file. */
+/* #undef HAVE_LINUX_KFIFO_NEW_H */
+
+/* Define to 1 if you have the <linux/nospec.h> header file. */
 #define HAVE_LINUX_NOSPEC_H 1
+
+/* Define to 1 if you have the <linux/overflow.h> header file. */
+#define HAVE_LINUX_OVERFLOW_H 1
+
+/* Define to 1 if you have the <linux/sched/mm.h> header file. */
+#define HAVE_LINUX_SCHED_MM_H 1
+
+/* Define to 1 if you have the <linux/sched/signal.h> header file. */
+#define HAVE_LINUX_SCHED_SIGNAL_H 1
+
+/* Define to 1 if you have the <linux/sched/task.h> header file. */
+#define HAVE_LINUX_SCHED_TASK_H 1
 
 /* list_bulk_move_tail() is available */
 #define HAVE_LIST_BULK_MOVE_TAIL 1
+
+/* list_is_first() is available */
+#define HAVE_LIST_IS_FIRST 1
+
+/* list_rotate_to_front() is available */
+#define HAVE_LIST_ROTATE_TO_FRONT 1
 
 /* memalloc_nofs_{save,restore}() are available */
 #define HAVE_MEMALLOC_NOFS_SAVE 1
@@ -618,17 +654,11 @@
 /* mm_access() is available */
 #define HAVE_MM_ACCESS 1
 
-/* linux/sched/mm.h is available */
-#define HAVE_MM_H 1
-
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 
 /* num_u32_u32 is available */
 #define HAVE_MUL_U32_U32 1
-
-/* linux/overflow.h is available */
-#define HAVE_OVERFLOW_H 1
 
 /* pcie_bandwidth_available() is available */
 #define HAVE_PCIE_BANDWIDTH_AVAILABLE 1
@@ -684,20 +714,11 @@
 /* reservation_object->staged is dropped */
 /* #undef HAVE_RESERVATION_OBJECT_DROP_STAGED */
 
-/* sched/types.h is available */
-#define HAVE_SCHED_TYPES_H 1
-
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
 /* drm_driver have set_busid */
 /* #undef HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER */
-
-/* asm/set_memory.h is available */
-#define HAVE_SET_MEMORY_H 1
-
-/* linux/sched/signal.h is available */
-#define HAVE_SIGNAL_H 1
 
 /* whether si_mem_available() is available */
 #define HAVE_SI_MEM_AVAILABLE 1
@@ -708,11 +729,32 @@
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
 
+/* drm_crtc_funcs->enable_vblank() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
+
+/* crtc->funcs->gamma_set() wants 5 args */
+/* #undef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS */
+
+/* crtc->funcs->gamma_set() wants 6 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS 1
+
 /* struct drm_crtc_funcs->get_vblank_timestamp() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP 1
 
+/* drm_crtc_funcs->{get,verify}_crc_sources() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
+
+/* crtc->funcs->set_crc_source() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
+
+/* crtc->funcs->set_crc_source() wants 2 args */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS 1
+
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
+
+/* drm_pending_vblank_event->sequence is available */
+#define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
 
 /* struct mmu_notifier_mm is exported */
 /* #undef HAVE_STRUCT_MMU_NOTIFIER_MM_EXPORTED */
@@ -729,12 +771,6 @@
 /* system_highpri_wq is exported */
 #define HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED 1
 
-/* include/drm/task_barrier.h is available */
-#define HAVE_TASK_BARRIER_H 1
-
-/* linux/sched/task.h is available */
-#define HAVE_TASK_H 1
-
 /* timer_setup() is available */
 #define HAVE_TIMER_SETUP 1
 
@@ -743,6 +779,9 @@
 
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1
+
+/* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
+#define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
 
 /* vga_switcheroo_handler->get_client_id() return int */
 /* #undef HAVE_VGA_SWITCHEROO_GET_CLIENT_ID_RETURN_INT */
@@ -794,9 +833,6 @@
 
 /* wait_queue_entry_t exists */
 #define HAVE_WAIT_QUEUE_ENTRY 1
-
-/* WQ_HIGHPRI is available */
-#define HAVE_WQ_HIGHPRI 1
 
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1

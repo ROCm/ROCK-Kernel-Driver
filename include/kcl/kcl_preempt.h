@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef AMDKCL_PREEMPT_H
 #define AMDKCL_PREEMPT_H
 #include <linux/preempt.h>

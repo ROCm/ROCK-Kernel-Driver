@@ -176,6 +176,7 @@ extern int amdgpu_gpu_recovery;
 extern int amdgpu_emu_mode;
 extern uint amdgpu_smu_memory_pool_size;
 extern uint amdgpu_dc_feature_mask;
+extern uint amdgpu_dc_debug_mask;
 extern uint amdgpu_dm_abm_level;
 extern struct amdgpu_mgpu_info mgpu_info;
 extern int amdgpu_ras_enable;
@@ -540,7 +541,7 @@ static inline void amdgpu_set_ib_value(struct amdgpu_cs_parser *p,
 /*
  * Writeback
  */
-#define AMDGPU_MAX_WB 128	/* Reserve at most 128 WB slots for amdgpu-owned rings. */
+#define AMDGPU_MAX_WB 256	/* Reserve at most 256 WB slots for amdgpu-owned rings. */
 
 struct amdgpu_wb {
 	struct amdgpu_bo	*wb_obj;
@@ -672,10 +673,6 @@ struct amdgpu_fw_vram_usage {
 	u64 size;
 	struct amdgpu_bo *reserved_bo;
 	void *va;
-
-	/* GDDR6 training support flag.
-	*/
-	bool mem_train_support;
 };
 
 /*
@@ -784,6 +781,7 @@ struct amdgpu_device {
 	uint32_t			rev_id;
 	uint32_t			external_rev_id;
 	unsigned long			flags;
+	unsigned long			apu_flags;
 	int				usec_timeout;
 	const struct amdgpu_asic_funcs	*asic_funcs;
 	bool				shutdown;
@@ -811,7 +809,6 @@ struct amdgpu_device {
 	uint8_t				*bios;
 	uint32_t			bios_size;
 	struct amdgpu_bo		*stolen_vga_memory;
-	struct amdgpu_bo		*discovery_memory;
 	uint32_t			bios_scratch_reg_offset;
 	uint32_t			bios_scratch[AMDGPU_BIOS_NUM_SCRATCH];
 
@@ -969,7 +966,9 @@ struct amdgpu_device {
 	struct amdgpu_display_manager dm;
 
 	/* discovery */
-	uint8_t				*discovery;
+	uint8_t				*discovery_bin;
+	uint32_t			discovery_tmr_size;
+	struct amdgpu_bo		*discovery_memory;
 
 	/* mes */
 	bool                            enable_mes;
@@ -1008,6 +1007,7 @@ struct amdgpu_device {
 
 	/* s3/s4 mask */
 	bool                            in_suspend;
+	bool				in_hibernate;
 
 	bool                            in_gpu_reset;
 	enum pp_mp1_state               mp1_state;
@@ -1035,7 +1035,12 @@ struct amdgpu_device {
 	/* Chip product information */
 	char				product_number[16];
 	char				product_name[32];
-	char				serial[16];
+	char				serial[20];
+
+	struct amdgpu_autodump		autodump;
+
+	atomic_t			throttling_logging_enabled;
+	struct ratelimit_state		throttling_logging_rs;
 };
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_bo_device *bdev)

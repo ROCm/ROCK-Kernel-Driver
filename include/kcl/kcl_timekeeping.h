@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MIT */
 #ifndef _KCL_LINUX_TIMEKEEPING_H
 #define _KCL_LINUX_TIMEKEEPING_H
 #include <linux/ktime.h>
@@ -43,6 +44,13 @@ static inline time64_t ktime_get_real_seconds(void)
 
 	do_gettimeofday(&ts);
 	return (time64_t)ts.tv_sec;
+}
+#endif
+
+#if !defined(HAVE_KTIME_GET_MONO_FAST_NS)
+static inline u64 ktime_get_mono_fast_ns(void)
+{
+	return ktime_to_ns(ktime_get());
 }
 #endif
 

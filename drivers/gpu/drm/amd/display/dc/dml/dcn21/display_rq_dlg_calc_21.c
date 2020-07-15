@@ -937,11 +937,6 @@ static void dml_rq_dlg_get_dlg_params(
 	double refcyc_per_req_delivery_c;
 
 	unsigned int full_recout_width;
-	double xfc_transfer_delay;
-	double xfc_precharge_delay;
-	double xfc_remote_surface_flip_latency;
-	double xfc_dst_y_delta_drq_limit;
-	double xfc_prefetch_margin;
 	double refcyc_per_req_delivery_pre_cur0;
 	double refcyc_per_req_delivery_cur0;
 	double refcyc_per_req_delivery_pre_cur1;
@@ -1201,7 +1196,7 @@ static void dml_rq_dlg_get_dlg_params(
 	min_hratio_fact_l = 1.0;
 	min_hratio_fact_c = 1.0;
 
-	if (htaps_l <= 1)
+	if (hratio_l <= 1)
 		min_hratio_fact_l = 2.0;
 	else if (htaps_l <= 6) {
 		if ((hratio_l * 2.0) > 4.0)
@@ -1217,7 +1212,7 @@ static void dml_rq_dlg_get_dlg_params(
 
 	hscale_pixel_rate_l = min_hratio_fact_l * dppclk_freq_in_mhz;
 
-	if (htaps_c <= 1)
+	if (hratio_c <= 1)
 		min_hratio_fact_c = 2.0;
 	else if (htaps_c <= 6) {
 		if ((hratio_c * 2.0) > 4.0)
@@ -1413,25 +1408,6 @@ static void dml_rq_dlg_get_dlg_params(
 		ASSERT(refcyc_per_req_delivery_c < dml_pow(2, 13));
 	}
 
-	// XFC
-	xfc_transfer_delay = get_xfc_transfer_delay(mode_lib, e2e_pipe_param, num_pipes, pipe_idx);
-	xfc_precharge_delay = get_xfc_precharge_delay(
-			mode_lib,
-			e2e_pipe_param,
-			num_pipes,
-			pipe_idx);
-	xfc_remote_surface_flip_latency = get_xfc_remote_surface_flip_latency(
-			mode_lib,
-			e2e_pipe_param,
-			num_pipes,
-			pipe_idx);
-	xfc_dst_y_delta_drq_limit = xfc_remote_surface_flip_latency;
-	xfc_prefetch_margin = get_xfc_prefetch_margin(
-			mode_lib,
-			e2e_pipe_param,
-			num_pipes,
-			pipe_idx);
-
 	// TTU - Cursor
 	refcyc_per_req_delivery_pre_cur0 = 0.0;
 	refcyc_per_req_delivery_cur0 = 0.0;
@@ -1534,8 +1510,8 @@ static void dml_rq_dlg_get_dlg_params(
 
 	disp_dlg_regs->refcyc_per_vm_group_vblank   = get_refcyc_per_vm_group_vblank(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz;
 	disp_dlg_regs->refcyc_per_vm_group_flip     = get_refcyc_per_vm_group_flip(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz;
-	disp_dlg_regs->refcyc_per_vm_req_vblank     = get_refcyc_per_vm_req_vblank(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz;
-	disp_dlg_regs->refcyc_per_vm_req_flip       = get_refcyc_per_vm_req_flip(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz;
+	disp_dlg_regs->refcyc_per_vm_req_vblank     = get_refcyc_per_vm_req_vblank(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz * dml_pow(2, 10);
+	disp_dlg_regs->refcyc_per_vm_req_flip       = get_refcyc_per_vm_req_flip(mode_lib, e2e_pipe_param, num_pipes, pipe_idx) * refclk_freq_in_mhz * dml_pow(2, 10);
 
 	// Clamp to max for now
 	if (disp_dlg_regs->refcyc_per_vm_group_vblank >= (unsigned int)dml_pow(2, 23))
@@ -1622,17 +1598,7 @@ static void dml_rq_dlg_get_dlg_params(
 	disp_dlg_regs->chunk_hdl_adjust_cur1 = 3;
 	disp_dlg_regs->dst_y_offset_cur1 = 0;
 
-	disp_dlg_regs->xfc_reg_transfer_delay = xfc_transfer_delay;
-	disp_dlg_regs->xfc_reg_precharge_delay = xfc_precharge_delay;
-	disp_dlg_regs->xfc_reg_remote_surface_flip_latency = xfc_remote_surface_flip_latency;
-	disp_dlg_regs->xfc_reg_prefetch_margin = dml_ceil(
-			xfc_prefetch_margin * refclk_freq_in_mhz, 1);
-
-	// slave has to have this value also set to off
-	if (src->xfc_enable && !src->xfc_slave)
-		disp_dlg_regs->dst_y_delta_drq_limit = dml_ceil(xfc_dst_y_delta_drq_limit, 1);
-	else
-		disp_dlg_regs->dst_y_delta_drq_limit = 0x7fff; // off
+	disp_dlg_regs->dst_y_delta_drq_limit = 0x7fff; // off
 
 	disp_ttu_regs->refcyc_per_req_delivery_pre_l = (unsigned int) (refcyc_per_req_delivery_pre_l
 			* dml_pow(2, 10));
