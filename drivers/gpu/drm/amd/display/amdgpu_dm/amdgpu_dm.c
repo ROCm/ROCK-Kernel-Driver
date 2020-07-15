@@ -3776,10 +3776,6 @@ static int dm_early_init(void *handle)
 	return 0;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
-#define AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET 1
-#endif
-
 static bool modeset_required(struct drm_crtc_state *crtc_state,
 			     struct dc_stream_state *new_stream,
 			     struct dc_stream_state *old_stream)
@@ -4319,38 +4315,6 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	return 0;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
-static void fill_gamma_from_crtc(
-	const struct drm_crtc *crtc,
-	struct dc_plane_state *plane_state)
-{
-	int i;
-	struct dc_gamma *gamma;
-	uint16_t *red, *green, *blue;
-	int end = (crtc->gamma_size > GAMMA_RGB_256_ENTRIES) ?
-			GAMMA_RGB_256_ENTRIES : crtc->gamma_size;
-
-	red = crtc->gamma_store;
-	green = red + crtc->gamma_size;
-	blue = green + crtc->gamma_size;
-
-	gamma = dc_create_gamma();
-
-	if (gamma == NULL)
-		return;
-
-	gamma->type = GAMMA_RGB_256;
-	gamma->num_entries = GAMMA_RGB_256_ENTRIES;
-	for (i = 0; i < end; i++) {
-		gamma->entries.red[i] = dc_fixpt_from_int((unsigned short)red[i]);
-		gamma->entries.green[i] = dc_fixpt_from_int((unsigned short)green[i]);
-		gamma->entries.blue[i] = dc_fixpt_from_int((unsigned short)blue[i]);
-	}
-
-	plane_state->gamma_correction = gamma;
-}
-#endif
-
 static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 				    struct dc_plane_state *dc_plane_state,
 				    struct drm_plane_state *plane_state,
@@ -4364,9 +4328,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	uint64_t tiling_flags;
 	int ret;
 	bool tmz_surface = false;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	bool force_disable_dcc = false;
-#endif
 
 	ret = fill_dc_scaling_info(plane_state, &scaling_info);
 	if (ret)
@@ -4381,7 +4343,6 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	force_disable_dcc = adev->asic_type == CHIP_RAVEN && adev->in_suspend;
 	ret = fill_dc_plane_info_and_addr(adev, plane_state, tiling_flags,
 					  &plane_info,
@@ -4414,19 +4375,6 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	if (ret)
 		return ret;
 
-#else
-#if DRM_VERSION_CODE <= DRM_VERSION(4, 4, 0)
-	dc_plane_state->in_transfer_func->type = TF_TYPE_PREDEFINED;
-	dc_plane_state->in_transfer_func->tf = TRANSFER_FUNCTION_SRGB;
-#endif
-
-	if (crtc->mode.private_flags & AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET) {
-		fill_gamma_from_crtc(crtc, dc_plane_state);
-		/* reset trigger of gamma */
-		crtc->mode.private_flags &=
-			~AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
-	}
-#endif
 	return 0;
 }
 
@@ -5059,23 +5007,6 @@ static void amdgpu_dm_crtc_destroy(struct drm_crtc *crtc)
 	drm_crtc_cleanup(crtc);
 	kfree(crtc);
 }
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
-static void amdgpu_dm_atomic_crtc_gamma_set(
-		struct drm_crtc *crtc,
-		u16 *red,
-		u16 *green,
-		u16 *blue,
-		uint32_t start,
-		uint32_t size)
-{
-	struct drm_device *dev = crtc->dev;
-	struct drm_property *prop = dev->mode_config.prop_crtc_id;
-
-	crtc->mode.private_flags |= AMDGPU_CRTC_MODE_PRIVATE_FLAGS_GAMMASET;
-
-	drm_atomic_helper_crtc_set_property(crtc, prop, 0);
-}
-#endif
 
 #ifndef HAVE_DRM_VRR_SUPPORTED
 static int dm_crtc_funcs_atomic_set_property(
@@ -5087,19 +5018,7 @@ static int dm_crtc_funcs_atomic_set_property(
 	struct drm_device *dev = crtc->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 	struct dm_crtc_state *dm_state = to_dm_crtc_state(crtc_state);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 6, 0)
-	struct drm_plane_state *plane_state;
 
-	crtc_state->planes_changed = true;
-
-	plane_state =
-		drm_atomic_get_plane_state(
-			crtc_state->state,
-			crtc->primary);
-
-	if (!plane_state)
-		return -EINVAL;
-#endif
 	if (property == adev->mode_info.vrr_enabled_property) {
 		dm_state->base_vrr_enabled = val;
 	}
@@ -5331,12 +5250,7 @@ static void dm_disable_vblank(struct drm_crtc *crtc)
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
-#else
-	.gamma_set = amdgpu_dm_atomic_crtc_gamma_set,
-	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
-#endif
 #ifndef HAVE_DRM_VRR_SUPPORTED
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
@@ -7737,13 +7651,11 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		dc_plane = dm_new_plane_state->dc_state;
 
 		bundle->surface_updates[planes_count].surface = dc_plane;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		if (new_pcrtc_state->color_mgmt_changed) {
 			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
 			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
 			bundle->surface_updates[planes_count].gamut_remap_matrix = &dc_plane->gamut_remap_matrix;
 		}
-#endif
 
 		fill_dc_scaling_info(new_plane_state,
 				     &bundle->scaling_infos[planes_count]);
@@ -7835,12 +7747,6 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 					acrtc_attach->crtc_id);
 			continue;
 		}
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-		if (new_pcrtc_state->color_mgmt_changed) {
-			bundle->surface_updates[planes_count].gamma = dc_plane->gamma_correction;
-			bundle->surface_updates[planes_count].in_transfer_func = dc_plane->in_transfer_func;
-		}
-#endif
 
 		if (plane == pcrtc->primary)
 			update_freesync_state_on_stream(
@@ -7947,10 +7853,6 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 				acrtc_state->stream->out_transfer_func;
 		}
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
-		if (new_pcrtc_state->color_mgmt_changed)
-			bundle->stream_update.out_transfer_func = acrtc_state->stream->out_transfer_func;
-#endif
 		acrtc_state->stream->abm_level = acrtc_state->abm_level;
 		if (acrtc_state->abm_level != dm_old_crtc_state->abm_level)
 			bundle->stream_update.abm_level = &acrtc_state->abm_level;
@@ -9041,7 +8943,6 @@ skip_modeset:
 	if (!(enable && aconnector && new_crtc_state->enable &&
 	      new_crtc_state->active))
 		return 0;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	/*
 	 * Given above conditions, the dc state cannot be NULL because:
 	 * 1. We're in the process of enabling CRTCs (just been added
@@ -9072,7 +8973,6 @@ skip_modeset:
 		if (ret)
 			goto fail;
 	}
-#endif
 
 	/* Update Freesync settings. */
 	get_freesync_config_for_crtc(dm_new_crtc_state,
@@ -9331,7 +9231,6 @@ static int dm_update_plane_state(struct dc *dc,
 	return ret;
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 static int
 dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 				    struct drm_atomic_state *state,
@@ -9508,7 +9407,6 @@ cleanup:
 	*out_type = update_type;
 	return ret;
 }
-#endif
 
 #if defined(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS)
 static int add_affected_mst_dsc_crtcs(struct drm_atomic_state *state, struct drm_crtc *crtc)
@@ -9577,10 +9475,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	enum surface_update_type update_type = UPDATE_TYPE_FAST;
 	enum surface_update_type overall_update_type = UPDATE_TYPE_FAST;
-#endif
 	enum dc_status status;
 
 	int ret, i;
@@ -9616,9 +9512,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		struct dm_crtc_state *dm_old_crtc_state  = to_dm_crtc_state(old_crtc_state);
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		    && !new_crtc_state->color_mgmt_changed
-#endif
 #ifdef HAVE_DRM_VRR_SUPPORTED
 		    && old_crtc_state->vrr_enabled == new_crtc_state->vrr_enabled)
 #else
@@ -9810,13 +9704,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (!is_scaling_state_different(dm_new_con_state, dm_old_con_state))
 			continue;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 		overall_update_type = UPDATE_TYPE_FULL;
-#endif
 		lock_and_validation_needed = true;
 	}
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	ret = dm_determine_update_type_for_commit(&adev->dm, state, &update_type);
 	if (ret)
 		goto fail;
@@ -9834,9 +9725,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		WARN(1, "Global lock should be Set, overall_update_type should be UPDATE_TYPE_MED or UPDATE_TYPE_FULL");
 
 	if (overall_update_type > UPDATE_TYPE_FAST) {
-#else
-	if (lock_and_validation_needed) {
-#endif
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret)

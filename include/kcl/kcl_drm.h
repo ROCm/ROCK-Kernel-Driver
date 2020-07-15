@@ -245,7 +245,7 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
  * Returns:
  * The number of entries in the color LUT stored in @blob.
  */
-#if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
+#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
 static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 {
 	return blob->length / sizeof(struct drm_color_lut);

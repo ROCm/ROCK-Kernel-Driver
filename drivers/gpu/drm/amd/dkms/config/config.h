@@ -175,9 +175,6 @@
 /* drm_calloc_large() is available */
 /* #undef HAVE_DRM_CALLOC_LARGE */
 
-/* drm_color_lut structure is defined */
-#define HAVE_DRM_COLOR_LUT 1
-
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
