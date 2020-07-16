@@ -46,7 +46,6 @@
 #define TTM_MAX_BO_PRIORITY	4U
 
 #define TTM_MEMTYPE_FLAG_FIXED         (1 << 0)	/* Fixed (on-card) PCI memory */
-#define TTM_MEMTYPE_FLAG_MAPPABLE      (1 << 1)	/* Memory mappable */
 
 #ifndef HAVE_CONFIG_H
 #define HAVE_DRM_MM_PRINT	1
