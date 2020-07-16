@@ -2979,10 +2979,7 @@ void vmx_set_cr3(struct kvm_vcpu *vcpu, unsigned long cr3)
 			spin_unlock(&to_kvm_vmx(kvm)->ept_pointer_lock);
 		}
 
-		/* Loading vmcs02.GUEST_CR3 is handled by nested VM-Enter. */
-		if (is_guest_mode(vcpu))
-			update_guest_cr3 = false;
-		else if (enable_unrestricted_guest || is_paging(vcpu))
+		if (enable_unrestricted_guest || is_paging(vcpu))
 			guest_cr3 = kvm_read_cr3(vcpu);
 		else
 			guest_cr3 = to_kvm_vmx(kvm)->ept_identity_map_addr;
