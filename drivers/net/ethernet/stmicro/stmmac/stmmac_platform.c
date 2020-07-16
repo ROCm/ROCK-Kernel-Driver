@@ -383,7 +383,7 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
 		*mac = NULL;
 	}
 
-	plat->interface = of_get_phy_mode(np);
+	plat->interface = device_get_phy_mode(&pdev->dev);
 
 	/* Some wrapper drivers still rely on phy_node. Let's save it while
 	 * they are not converted to phylink. */
