@@ -399,6 +399,7 @@ int qdio_setup_get_ssqd(struct qdio_irq *irq_ptr,
 			struct subchannel_id *schid,
 			struct qdio_ssqd_desc *data);
 int qdio_setup_irq(struct qdio_initialize *init_data);
+void qdio_shutdown_irq(struct qdio_irq *irq);
 void qdio_print_subchannel_info(struct qdio_irq *irq_ptr,
 				struct ccw_device *cdev);
 void qdio_release_memory(struct qdio_irq *irq_ptr);
