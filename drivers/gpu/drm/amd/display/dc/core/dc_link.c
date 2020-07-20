@@ -1542,6 +1542,9 @@ static bool dc_link_construct(struct dc_link *link,
 		}
 	}
 
+	if (bios->funcs->get_atom_dc_golden_table)
+		bios->funcs->get_atom_dc_golden_table(bios);
+
 	/*
 	 * TODO check if GPIO programmed correctly
 	 *
