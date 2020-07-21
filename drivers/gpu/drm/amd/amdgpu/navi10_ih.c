@@ -58,11 +58,13 @@ static void
 force_update_wptr_for_self_int(struct amdgpu_device *adev,
 			       u32 threshold, u32 timeout, bool enabled)
 {
+	u32 ih_cntl, ih_rb_cntl;
+
 	if (adev->asic_type < CHIP_SIENNA_CICHLID)
 		return;
 
-	u32 ih_cntl = RREG32_SOC15(OSSSYS, 0, mmIH_CNTL2);
-	u32 ih_rb_cntl = RREG32_SOC15(OSSSYS, 0, mmIH_RB_CNTL_RING1);
+	ih_cntl = RREG32_SOC15(OSSSYS, 0, mmIH_CNTL2);
+	ih_rb_cntl = RREG32_SOC15(OSSSYS, 0, mmIH_RB_CNTL_RING1);
 
 	ih_cntl = REG_SET_FIELD(ih_cntl, IH_CNTL2,
 				SELF_IV_FORCE_WPTR_UPDATE_TIMEOUT, timeout);
