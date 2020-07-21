@@ -889,6 +889,9 @@
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
 
+/* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
+#define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
+
 /* __kthread_should_park() is available */
 #define HAVE___KTHREAD_SHOULD_PARK 1
 

@@ -5476,7 +5476,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		to_dm_connector_state(connector->state);
 
 	if (connector->state)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
+#ifdef HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P
 		__drm_atomic_helper_connector_destroy_state(connector->state);
 #else
 		__drm_atomic_helper_connector_destroy_state(connector, connector->state);
