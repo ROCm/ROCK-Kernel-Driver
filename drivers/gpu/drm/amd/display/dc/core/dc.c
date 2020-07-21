@@ -1262,6 +1262,14 @@ bool dc_enable_stereo(
 	return ret;
 }
 
+void dc_trigger_sync(struct dc *dc, struct dc_state *context)
+{
+	if (context->stream_count > 1 && !dc->debug.disable_timing_sync) {
+		enable_timing_multisync(dc, context);
+		program_timing_sync(dc, context);
+	}
+}
+
 /*
  * Applies given context to HW and copy it into current context.
  * It's up to the user to release the src context afterwards.
@@ -1321,10 +1329,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	if (result != DC_OK)
 		return result;
 
-	if (context->stream_count > 1 && !dc->debug.disable_timing_sync) {
-		enable_timing_multisync(dc, context);
-		program_timing_sync(dc, context);
-	}
+	dc_trigger_sync(dc, context);
 
 	/* Program all planes within new context*/
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
