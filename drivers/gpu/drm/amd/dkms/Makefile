@@ -25,24 +25,12 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
-ifneq ($(findstring $(OS_NAME), "ubuntu" "amzn" "custom-rhel" "fedora"),)
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else ifneq ($(findstring $(OS_NAME), "debian" "sled" "sles" "opensuse-leap"),)
-ifneq ($(realpath $(shell echo $(kdir) | sed "s/build/source/")), )
-real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
-else
-real_kdir=$(kdir)
-endif
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(real_kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(real_kdir)/Makefile)
-else ifeq ("rhel",$(OS_NAME))
+DRM_VER = $(VERSION)
+DRM_PATCH = $(PATCHLEVEL)
+ifeq ("rhel",$(OS_NAME))
 ifneq ($(OS_VERSION),"8.0")
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 endif
 endif
 
