@@ -107,6 +107,9 @@
 /* drm_atomic_get_new_plane_state() is available */
 #define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
 
+/* drm_atomic_helper_check_plane_state() is available */
+#define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
+
 /* __drm_atomic_helper_connector_reset() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET 1
 
@@ -171,9 +174,6 @@
 
 /* drm_calloc_large() is available */
 /* #undef HAVE_DRM_CALLOC_LARGE */
-
-/* drm_color_lut structure is defined */
-#define HAVE_DRM_COLOR_LUT 1
 
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
@@ -474,11 +474,17 @@
 /* drm_modeset_lock_all_ctx() is available */
 #define HAVE_DRM_MODESET_LOCK_ALL_CTX 1
 
+/* drm_mode_get_hv_timing is available */
+#define HAVE_DRM_MODE_GET_HV_TIMING 1
+
 /* drm_mode_is_420_xxx() is available */
 #define HAVE_DRM_MODE_IS_420_XXX 1
 
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
+
+/* drm_plane_helper_check_state is available */
+/* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
 
 /* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
    available */

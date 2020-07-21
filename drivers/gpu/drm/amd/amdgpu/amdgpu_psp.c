@@ -100,6 +100,7 @@ static int psp_early_init(void *handle)
 	case CHIP_NAVI14:
 	case CHIP_NAVI12:
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 		psp_v11_0_set_psp_funcs(psp);
 		psp->autoload_supported = true;
 		break;
@@ -499,7 +500,9 @@ static int psp_asd_load(struct psp_context *psp)
 	 * add workaround to bypass it for sriov now.
 	 * TODO: add version check to make it common
 	 */
-	if (amdgpu_sriov_vf(psp->adev) || (psp->adev->asic_type == CHIP_SIENNA_CICHLID))
+	if (amdgpu_sriov_vf(psp->adev) ||
+	    (psp->adev->asic_type == CHIP_SIENNA_CICHLID) ||
+	    (psp->adev->asic_type == CHIP_NAVY_FLOUNDER))
 		return 0;
 
 	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
@@ -1764,7 +1767,8 @@ static int psp_np_fw_load(struct psp_context *psp)
 			continue;
 
 		if (psp->autoload_supported &&
-		    adev->asic_type == CHIP_SIENNA_CICHLID &&
+		    (adev->asic_type == CHIP_SIENNA_CICHLID ||
+		     adev->asic_type == CHIP_NAVY_FLOUNDER) &&
 		    (ucode->ucode_id == AMDGPU_UCODE_ID_SDMA1 ||
 		     ucode->ucode_id == AMDGPU_UCODE_ID_SDMA2 ||
 		     ucode->ucode_id == AMDGPU_UCODE_ID_SDMA3))
@@ -2287,7 +2291,9 @@ int parse_ta_bin_descriptor(struct psp_context *psp,
 	if (!psp || !desc || !ta_hdr)
 		return -EINVAL;
 
-	ucode_start_addr  = (uint8_t *)ta_hdr + le32_to_cpu(desc->offset_bytes);
+	ucode_start_addr  = (uint8_t *)ta_hdr +
+			    le32_to_cpu(desc->offset_bytes) +
+			    le32_to_cpu(ta_hdr->header.ucode_array_offset_bytes);
 
 	switch (desc->fw_type) {
 	case TA_FW_TYPE_PSP_ASD:

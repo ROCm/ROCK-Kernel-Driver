@@ -33,6 +33,7 @@
 #include "navi10_ppt.h"
 #include "sienna_cichlid_ppt.h"
 #include "renoir_ppt.h"
+#include "amd_pcie.h"
 
 /*
  * DO NOT use these for err/warn/info/debug messages.
@@ -601,6 +602,7 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		smu->od_enabled =false;
 		break;
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 		sienna_cichlid_set_ppt_funcs(smu);
 		break;
 	case CHIP_RENOIR:
@@ -990,9 +992,37 @@ static int smu_sw_fini(void *handle)
 	return 0;
 }
 
+static int smu_get_thermal_temperature_range(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+	struct smu_temperature_range *range =
+				&smu->thermal_range;
+	int ret = 0;
+
+	if (!smu->ppt_funcs->get_thermal_temperature_range)
+		return 0;
+
+	ret = smu->ppt_funcs->get_thermal_temperature_range(smu, range);
+	if (ret)
+		return ret;
+
+	adev->pm.dpm.thermal.min_temp = range->min;
+	adev->pm.dpm.thermal.max_temp = range->max;
+	adev->pm.dpm.thermal.max_edge_emergency_temp = range->edge_emergency_max;
+	adev->pm.dpm.thermal.min_hotspot_temp = range->hotspot_min;
+	adev->pm.dpm.thermal.max_hotspot_crit_temp = range->hotspot_crit_max;
+	adev->pm.dpm.thermal.max_hotspot_emergency_temp = range->hotspot_emergency_max;
+	adev->pm.dpm.thermal.min_mem_temp = range->mem_min;
+	adev->pm.dpm.thermal.max_mem_crit_temp = range->mem_crit_max;
+	adev->pm.dpm.thermal.max_mem_emergency_temp = range->mem_emergency_max;
+
+	return ret;
+}
+
 static int smu_smc_hw_setup(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
+	uint32_t pcie_gen = 0, pcie_width = 0;
 	int ret;
 
 	if (smu_is_dpm_running(smu) && adev->in_suspend) {
@@ -1062,9 +1092,42 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 	if (!smu_is_dpm_running(smu))
 		dev_info(adev->dev, "dpm has been disabled\n");
 
-	ret = smu_override_pcie_parameters(smu);
-	if (ret)
+	if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN4)
+		pcie_gen = 3;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)
+		pcie_gen = 2;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2)
+		pcie_gen = 1;
+	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1)
+		pcie_gen = 0;
+
+	/* Bit 31:16: LCLK DPM level. 0 is DPM0, and 1 is DPM1
+	 * Bit 15:8:  PCIE GEN, 0 to 3 corresponds to GEN1 to GEN4
+	 * Bit 7:0:   PCIE lane width, 1 to 7 corresponds is x1 to x32
+	 */
+	if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X16)
+		pcie_width = 6;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X12)
+		pcie_width = 5;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X8)
+		pcie_width = 4;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X4)
+		pcie_width = 3;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X2)
+		pcie_width = 2;
+	else if (adev->pm.pcie_mlw_mask & CAIL_PCIE_LINK_WIDTH_SUPPORT_X1)
+		pcie_width = 1;
+	ret = smu_update_pcie_parameters(smu, pcie_gen, pcie_width);
+	if (ret) {
+		dev_err(adev->dev, "Attempt to override pcie params failed!\n");
 		return ret;
+	}
+
+	ret = smu_get_thermal_temperature_range(smu);
+	if (ret) {
+		dev_err(adev->dev, "Failed to get thermal temperature ranges!\n");
+		return ret;
+	}
 
 	ret = smu_enable_thermal_alert(smu);
 	if (ret) {
@@ -1764,8 +1827,7 @@ int smu_set_display_count(struct smu_context *smu, uint32_t count)
 
 int smu_force_clk_levels(struct smu_context *smu,
 			 enum smu_clk_type clk_type,
-			 uint32_t mask,
-			 bool lock_needed)
+			 uint32_t mask)
 {
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
 	int ret = 0;
@@ -1778,14 +1840,12 @@ int smu_force_clk_levels(struct smu_context *smu,
 		return -EINVAL;
 	}
 
-	if (lock_needed)
-		mutex_lock(&smu->mutex);
+	mutex_lock(&smu->mutex);
 
 	if (smu->ppt_funcs && smu->ppt_funcs->force_clk_levels)
 		ret = smu->ppt_funcs->force_clk_levels(smu, clk_type, mask);
 
-	if (lock_needed)
-		mutex_unlock(&smu->mutex);
+	mutex_unlock(&smu->mutex);
 
 	return ret;
 }
@@ -2168,6 +2228,8 @@ int smu_read_sensor(struct smu_context *smu,
 		    enum amd_pp_sensors sensor,
 		    void *data, uint32_t *size)
 {
+	struct smu_umd_pstate_table *pstate_table =
+				&smu->pstate_table;
 	int ret = 0;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
@@ -2180,11 +2242,11 @@ int smu_read_sensor(struct smu_context *smu,
 
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_STABLE_PSTATE_SCLK:
-		*((uint32_t *)data) = smu->pstate_sclk;
+		*((uint32_t *)data) = pstate_table->gfxclk_pstate.standard * 100;
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_STABLE_PSTATE_MCLK:
-		*((uint32_t *)data) = smu->pstate_mclk;
+		*((uint32_t *)data) = pstate_table->uclk_pstate.standard * 100;
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_ENABLED_SMC_FEATURES_MASK:
@@ -2612,6 +2674,40 @@ int smu_baco_exit(struct smu_context *smu)
 
 	if (ret)
 		dev_err(smu->adev->dev, "Failed to exit BACO state!\n");
+
+	return ret;
+}
+
+bool smu_mode1_reset_is_support(struct smu_context *smu)
+{
+	bool ret = false;
+
+	if (!smu->pm_enabled)
+		return false;
+
+	mutex_lock(&smu->mutex);
+
+	if (smu->ppt_funcs && smu->ppt_funcs->mode1_reset_is_support)
+		ret = smu->ppt_funcs->mode1_reset_is_support(smu);
+
+	mutex_unlock(&smu->mutex);
+
+	return ret;
+}
+
+int smu_mode1_reset(struct smu_context *smu)
+{
+	int ret = 0;
+
+	if (!smu->pm_enabled)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&smu->mutex);
+
+	if (smu->ppt_funcs->mode1_reset)
+		ret = smu->ppt_funcs->mode1_reset(smu);
+
+	mutex_unlock(&smu->mutex);
 
 	return ret;
 }

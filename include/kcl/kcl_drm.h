@@ -245,7 +245,7 @@ void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
  * Returns:
  * The number of entries in the color LUT stored in @blob.
  */
-#if defined(HAVE_DRM_COLOR_LUT) && !defined(HAVE_DRM_COLOR_LUT_SIZE)
+#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
 static inline int drm_color_lut_size(const struct drm_property_blob *blob)
 {
 	return blob->length / sizeof(struct drm_color_lut);
@@ -453,5 +453,9 @@ int drm_helper_force_disable_all(struct drm_device *dev)
 void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
 				    struct drm_framebuffer *fb,
 				    const struct drm_mode_fb_cmd2 *mode_cmd);
+#endif
+
+#ifndef HAVE_DRM_MODE_GET_HV_TIMING
+#define drm_mode_get_hv_timing drm_crtc_get_hv_timing
 #endif
 #endif /* AMDKCL_DRM_H */
