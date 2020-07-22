@@ -297,7 +297,7 @@ struct kfd2kgd_calls {
 	void (*enable_debug_trap)(struct amdgpu_deivce *adev,
 					uint32_t trap_debug_wave_launch_mode,
 					uint32_t vmid);
-	void (*disable_debug_trap)(struct amdgpu_device *adev);
+	void (*disable_debug_trap)(struct amdgpu_device *adev, uint32_t vmid);
 	int (*set_wave_launch_trap_override)(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,
