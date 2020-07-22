@@ -75,6 +75,15 @@ for file in $FILES; do
 	}' $file | sort -u >>$INC/rename_symbol.h
 done
 
+# rename CONFIG_xxx to CONFIG_xxx_AMDKCL
+# otherwise kernel config would override dkms package config
+for config in $(find -name Kconfig -exec grep -h '^config' {} + | sed 's/ /_/' | tr 'a-z' 'A-Z'); do
+	for file in $(grep -rl $config ./); do
+		sed -i "s/\<$config\>/&_AMDKCL/" $file
+	done
+	sed -i "/subdir-ccflags-y += -D${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
+done
+
 export KERNELVER
 (cd $SRC && CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
 	-I$BLDTREE/arch/$SRCARCH/include/generated \
