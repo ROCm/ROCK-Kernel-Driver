@@ -693,14 +693,17 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 }
 
 /*
+ * GFX9 helper for wave launch stall requirements on debug trap setting.
+ *
  * For pre-Arcturus GFX9 chips, wave launch disable/enable uses
  * SPI_GDBG_WAVE_CNTL.stall_ra for a global wave launch stall.  Arcturus uses
  * per-VMID stall.
  *
- * stall:
- *   0-unstall wave launch (enable), 1-stall wave launch (disable)
+ * vmid:
+ *   Target VMID to stall/unstall.
  *
- * need_spi_drain:
+ * stall:
+ *   0-unstall wave launch (enable), 1-stall wave launch (disable).
  *   After wavefront launch has been stalled, allocated waves must drain from
  *   SPI in order for debug trap settings to take effect on those waves.
  *   This is roughly a ~96 clock cycle wait on SPI where a read on
@@ -708,12 +711,16 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
  *   KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY indicates the number of reads
  *   required.
  *
+ *   NOTE: We can afford to clear the entire STALL_VMID field on unstall
+ *   because Arcturus cannot support multi-process debugging due to trap
+ *   configuration and masking being limited to global scope.  Always assume
+ *   single process conditions.
+ *
  */
 #define KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY	3
 static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 					uint32_t vmid,
-					bool stall,
-					bool need_spi_drain)
+					bool stall)
 {
 	int i;
 	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
@@ -727,12 +734,11 @@ static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
 
-	if (!(stall && need_spi_drain))
+	if (!stall)
 		return;
 
 	for (i = 0; i < KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY; i++)
 		RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-
 }
 
 void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
@@ -743,22 +749,26 @@ void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true, true);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
-	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false, false);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
 
-void kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd)
+void kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
+
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
@@ -772,7 +782,7 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t *trap_mask_supported)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data;
+	uint32_t data, wave_cntl_prev;
 
 	/* The SPI_GDBG_TRAP_MASK register is global and affects all
 	 * processes. Only allow OR-ing the address-watch bit, since
@@ -789,7 +799,9 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true, true);
+	wave_cntl_prev = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
 	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
@@ -802,7 +814,8 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 		REPLACE, trap_override);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
-	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false, false);
+	/* We need to preserve wave launch mode stall settings. */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), wave_cntl_prev);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 
@@ -824,13 +837,21 @@ void kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
+	/*
+	 * FIXME: Pre-Arcturus shouldn't stall processes it's not attached to.
+	 * This is an old bug and we'll have to work out a way to deny the
+	 * is_stall_mode request from the debugger for these chips.
+	 */
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
+
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
 		VMID_MASK, is_mode_set ? 1 << vmid : 0);
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
 		MODE, is_mode_set ? wave_launch_mode : 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
 
-	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, is_stall_mode, false);
+	if (!is_stall_mode)
+		kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
