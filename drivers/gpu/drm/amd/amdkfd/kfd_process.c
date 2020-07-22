@@ -1180,7 +1180,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 				pdd->allocated_debug_watch_point_bitmask = 0;
 			}
 			if (pdd->debug_trap_enabled) {
-				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				dev->kfd2kgd->disable_debug_trap(dev->kgd,
+						dev->vm_info.last_vmid_kfd);
 				pdd->debug_trap_enabled = false;
 			}
 			if (pdd->trap_debug_wave_launch_mode != 0) {

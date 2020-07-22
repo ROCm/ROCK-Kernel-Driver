@@ -2788,7 +2788,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				pdd->allocated_debug_watch_point_bitmask);
 			pdd->allocated_debug_watch_point_bitmask = 0;
 			pdd->debug_trap_enabled = false;
-			dev->kfd2kgd->disable_debug_trap(dev->kgd);
+			dev->kfd2kgd->disable_debug_trap(dev->kgd,
+						dev->vm_info.last_vmid_kfd);
 			fput(pdd->dbg_ev_file);
 			pdd->dbg_ev_file = NULL;
 			break;
@@ -2806,7 +2807,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				r = 0;
 			} else {
 				pdd->debug_trap_enabled = false;
-				dev->kfd2kgd->disable_debug_trap(dev->kgd);
+				dev->kfd2kgd->disable_debug_trap(dev->kgd,
+						dev->vm_info.last_vmid_kfd);
 			}
 
 			break;

@@ -757,44 +757,73 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	adev->gfxhub.funcs->setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
+/*
+ * GFX10 helper for wave launch stall requirements on debug trap setting.
+ *
+ * vmid:
+ *   Target VMID to stall/unstall.
+ *
+ * stall:
+ *   0-unstall wave launch (enable), 1-stall wave launch (disable).
+ *   After wavefront launch has been stalled, allocated waves must drain from
+ *   SPI in order for debug trap settings to take effect on those waves.
+ *
+ *   NOTE: We can afford to clear the entire STALL_VMID field on unstall
+ *   because current GFX10 chips cannot support multi-process debugging due to
+ *   trap configuration and masking being limited to global scope.  Always
+ *   assume single process conditions.
+ *
+ *   TBD: Allocation happens at the work group level meaning there is no way
+ *   to determine when allocation is complete unless HW provides a register to
+ *   poll.  We may also have to consider clocking requirements for a proper
+ *   Wave32/64 SPI drain.
+ *
+ */
+static void kgd_gfx_v10_set_wave_launch_stall(struct amdgpu_device *adev,
+					uint32_t vmid,
+					bool stall)
+{
+	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_VMID,
+							stall ? 1 << vmid : 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	if (!stall)
+		return;
+
+	/* FIXME - see TBD in notes above. */
+}
+
 void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data = 0;
-	uint32_t orig_wave_cntl_value;
-	uint32_t orig_stall_vmid;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	orig_wave_cntl_value = RREG32(SOC15_REG_OFFSET(GC,
-				0,
-				mmSPI_GDBG_WAVE_CNTL));
-	orig_stall_vmid = REG_GET_FIELD(orig_wave_cntl_value,
-			SPI_GDBG_WAVE_CNTL,
-			STALL_VMID);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
 
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
-	/* FIXME: requires register to tell that wave allocation is done */
-
-	data = 0;
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
-
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), orig_stall_vmid);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
 
-void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd)
+void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
@@ -808,7 +837,7 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					      uint32_t *trap_mask_supported)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data = 0;
+	uint32_t data, wave_cntl_prev;
 
 	/* The SPI_GDBG_TRAP_MASK register is global and affects all
 	 * processes. Only allow OR-ing the address-watch bit, since
@@ -825,11 +854,9 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	wave_cntl_prev = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
 
-	/* FIXME: requires register to tell that wave allocation is done */
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
 	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
@@ -842,9 +869,8 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 			REPLACE, trap_override);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_RA, 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	/* We need to preserve wave launch mode stall settings. */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), wave_cntl_prev);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 
@@ -865,18 +891,16 @@ void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
 			VMID_MASK, is_mode_set ? 1 << vmid : 0);
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
 			MODE, is_mode_set ? wave_launch_mode : 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
 
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
-			STALL_VMID, is_stall_mode ? 1 << vmid : 0);
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL,
-			STALL_RA, is_stall_mode ? 1 : 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+	if (!is_stall_mode)
+		kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }

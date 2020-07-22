@@ -304,7 +304,7 @@ struct kfd2kgd_calls {
 	void (*enable_debug_trap)(struct kgd_dev *kgd,
 					uint32_t trap_debug_wave_launch_mode,
 					uint32_t vmid);
-	void (*disable_debug_trap)(struct kgd_dev *kgd);
+	void (*disable_debug_trap)(struct kgd_dev *kgd, uint32_t vmid);
 	int (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
 					     uint32_t vmid,
 					     uint32_t trap_override,
