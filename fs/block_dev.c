@@ -1679,6 +1679,7 @@ static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 		}
 	}
 	if (ret) {
+		bdgrab(bdev);	/* workaround after commit 2d3a8e2dedde */
 		__blkdev_put(bdev, mode, for_part);
 		return ret;
 	}
