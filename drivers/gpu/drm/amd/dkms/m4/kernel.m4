@@ -189,7 +189,7 @@ $2
 dnl #
 dnl # AC_KERNEL_COMPILE_IFELSE / like AC_COMPILE_IFELSE
 dnl # $1: contents to be filled in conftest.c
-dnl # $2: make target. "modules" for most case
+dnl # $2: make target.
 dnl # $3: user defined commands. It "AND" the make command to check the result. If true, expands to $4. Otherwise $5.
 dnl # $4: run it if make & $3 pass.
 dnl # $5: run it if make & $3 fail.
@@ -236,7 +236,7 @@ dnl # $3: run it if compile pass.
 dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
-	target='modules'
+	target=''
 	test "x$enable_linux_builtin" = xyes && target='conftest.o'
 	[AC_KERNEL_TMP_BUILD_DIR(
 	[AC_KERNEL_COMPILE_IFELSE(
