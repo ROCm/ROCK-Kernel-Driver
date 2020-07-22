@@ -235,6 +235,8 @@ struct hw_sequencer_funcs {
 
 	void (*set_pipe)(struct pipe_ctx *pipe_ctx);
 
+	void (*get_dcc_en_bits)(struct dc *dc, int *dcc_en_bits);
+
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* Idle Optimization Related */
 	bool (*apply_idle_power_optimizations)(struct dc *dc, bool enable);
