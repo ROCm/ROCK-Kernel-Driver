@@ -390,7 +390,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct drm_connector *connector;
 	int i;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_dm_connector(connector);
@@ -489,7 +489,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					struct drm_connector *connector)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
@@ -507,7 +507,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		aconnector->dc_sink = NULL;
 		aconnector->dc_link->cur_link_settings.lane_count = 0;
 	}
-#if defined(HAVE_DRM_CONNECTOR_PUT) || defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
 #ifdef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS
 	if (adev->mode_info.rfbdev)

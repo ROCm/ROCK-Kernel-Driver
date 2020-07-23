@@ -422,7 +422,7 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	bool mst_connected;
 #endif
 #ifdef CONFIG_DEBUG_FS
