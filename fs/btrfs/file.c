@@ -1929,6 +1929,8 @@ static ssize_t btrfs_file_write_iter(struct kiocb *iocb,
 			inode_unlock(inode);
 			return -EAGAIN;
 		}
+		/* check_can_nocow() locks the snapshot lock on success */
+		btrfs_end_write_no_snapshotting(root);
 	}
 
 	current->backing_dev_info = inode_to_bdi(inode);
