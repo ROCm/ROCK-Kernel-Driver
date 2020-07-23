@@ -36,12 +36,16 @@
 #if !defined(HAVE_DRM_CONNECTOR_PUT)
 static inline void drm_connector_put(struct drm_connector *connector)
 {
-#if defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
+#if defined(HAVE_DRM_CONNECTOR_UNREFERENCE)
+	drm_connector_unreference(NULL);
+#elif defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
 	struct drm_mode_object *obj = &connector->base;
 	if (obj->free_cb) {
 		DRM_DEBUG("OBJ ID: %d (%d)\n", obj->id, kref_read(&obj->refcount));
 		kref_put(&obj->refcount, obj->free_cb);
 	}
+#else
+	pr_warn_once("drm_connector_put is not supported\n");
 #endif
 }
 #endif

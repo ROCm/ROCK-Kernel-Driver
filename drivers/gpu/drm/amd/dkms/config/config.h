@@ -206,8 +206,14 @@
 /* drm_connector_put() is available */
 #define HAVE_DRM_CONNECTOR_PUT 1
 
+/* connector reference counting is available */
+#define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
+
 /* drm_connector_set_path_property() is available */
 #define HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY 1
+
+/* drm_connector_unreference() is available */
+/* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
 /* drm_connector_update_edid_property() is available */
 #define HAVE_DRM_CONNECTOR_UPDATE_EDID_PROPERTY 1
