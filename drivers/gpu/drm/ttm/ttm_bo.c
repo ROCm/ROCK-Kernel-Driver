@@ -664,10 +664,9 @@ static int ttm_bo_evict(struct ttm_buffer_object *bo,
 	bdev->driver->evict_flags(bo, &placement);
 
 	if (!placement.num_placement && !placement.num_busy_placement) {
-		ret = ttm_bo_pipeline_gutting(bo);
-		if (ret)
-			return ret;
+		ttm_bo_wait(bo, false, false);
 
+		ttm_bo_cleanup_memtype_use(bo);
 		return ttm_tt_create(bo, false);
 	}
 
