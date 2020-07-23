@@ -65,69 +65,48 @@
 
 #define AMDGPU_TTM_VRAM_MAX_DW_READ	(size_t)128
 
-
-/**
- * amdgpu_init_mem_type - Initialize a memory manager for a specific type of
- * memory request.
- *
- * @bdev: The TTM BO device object (contains a reference to amdgpu_device)
- * @type: The type of memory requested
- * @man: The memory type manager for each domain
- *
- * This is called by ttm_bo_init_mm() when a buffer object is being
- * initialized.
- */
 static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 				struct ttm_mem_type_manager *man)
 {
-	struct amdgpu_device *adev;
-
-	adev = amdgpu_ttm_adev(bdev);
-
-	switch (type) {
-	case TTM_PL_SYSTEM:
-		/* System memory */
-		break;
-	case TTM_PL_TT:
-		/* GTT memory  */
-		man->use_tt = true;
-		man->func = &amdgpu_gtt_mgr_func;
-		man->available_caching = TTM_PL_MASK_CACHING;
-		man->default_caching = TTM_PL_FLAG_CACHED;
-		break;
-	case TTM_PL_VRAM:
-		/* "On-card" video ram */
-		man->func = &amdgpu_vram_mgr_func;
-		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
-		man->default_caching = TTM_PL_FLAG_WC;
-		break;
-	case AMDGPU_PL_GDS:
-	case AMDGPU_PL_GWS:
-	case AMDGPU_PL_OA:
-		/* On-chip GDS memory*/
-		man->func = &ttm_bo_manager_func;
-		man->available_caching = TTM_PL_FLAG_UNCACHED;
-		man->default_caching = TTM_PL_FLAG_UNCACHED;
-		break;
-	case AMDGPU_PL_DGMA:
-		/* reserved visible VRAM for direct GMA */
-		man->func = &ttm_bo_manager_func;
-		man->flags = TTM_MEMTYPE_FLAG_FIXED | TTM_MEMTYPE_FLAG_MAPPABLE;
-		man->available_caching = TTM_PL_FLAG_UNCACHED;
-		man->default_caching = TTM_PL_FLAG_UNCACHED;
-		break;
-	case AMDGPU_PL_DGMA_IMPORT:
-		/* reserved GTT space for direct GMA */
-		man->func = &ttm_bo_manager_func;
-		man->flags = TTM_MEMTYPE_FLAG_FIXED | TTM_MEMTYPE_FLAG_MAPPABLE;
-		man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
-		man->default_caching = TTM_PL_FLAG_WC;
-		break;
-	default:
-		DRM_ERROR("Unsupported memory type %u\n", (unsigned)type);
-		return -EINVAL;
-	}
 	return 0;
+}
+
+static int amdgpu_ttm_init_vram(struct amdgpu_device *adev)
+{
+	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_VRAM];
+
+	man->func = &amdgpu_vram_mgr_func;
+	man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
+	man->default_caching = TTM_PL_FLAG_WC;
+
+	return ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_VRAM,
+			      adev->gmc.real_vram_size >> PAGE_SHIFT);
+}
+
+static int amdgpu_ttm_init_gtt(struct amdgpu_device *adev, uint64_t gtt_size)
+{
+	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_TT];
+
+	man->use_tt = true;
+	man->func = &amdgpu_gtt_mgr_func;
+	man->available_caching = TTM_PL_MASK_CACHING;
+	man->default_caching = TTM_PL_FLAG_CACHED;
+
+	return ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_TT,
+			      gtt_size >> PAGE_SHIFT);
+}
+
+static int amdgpu_ttm_init_on_chip(struct amdgpu_device *adev,
+				   unsigned int type,
+				   uint64_t size)
+{
+	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[type];
+
+	man->func = &ttm_bo_manager_func;
+	man->available_caching = TTM_PL_FLAG_UNCACHED;
+	man->default_caching = TTM_PL_FLAG_UNCACHED;
+
+	return ttm_bo_init_mm(&adev->mman.bdev, type, size);
 }
 
 /**
@@ -2467,8 +2446,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	adev->mman.bdev.no_retry = true;
 
 	/* Initialize VRAM pool with all of VRAM divided into pages */
-	r = ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_VRAM,
-				adev->gmc.real_vram_size >> PAGE_SHIFT);
+	r = amdgpu_ttm_init_vram(adev);
 	if (r) {
 		DRM_ERROR("Failed initializing VRAM heap.\n");
 		return r;
@@ -2544,7 +2522,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	gtt_size -= (uint64_t)amdgpu_direct_gma_size << 20;
 
 	/* Initialize GTT memory pool */
-	r = ttm_bo_init_mm(&adev->mman.bdev, TTM_PL_TT, gtt_size >> PAGE_SHIFT);
+	r = amdgpu_ttm_init_gtt(adev, gtt_size);
 	if (r) {
 		DRM_ERROR("Failed initializing GTT heap.\n");
 		return r;
@@ -2556,22 +2534,19 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	amdgpu_ssg_init(adev);
 
 	/* Initialize various on-chip memory pools */
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GDS,
-			   adev->gds.gds_size);
+	r = amdgpu_ttm_init_on_chip(adev, AMDGPU_PL_GDS, adev->gds.gds_size);
 	if (r) {
 		DRM_ERROR("Failed initializing GDS heap.\n");
 		return r;
 	}
 
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_GWS,
-			   adev->gds.gws_size);
+	r = amdgpu_ttm_init_on_chip(adev, AMDGPU_PL_GWS, adev->gds.gws_size);
 	if (r) {
 		DRM_ERROR("Failed initializing gws heap.\n");
 		return r;
 	}
 
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_OA,
-			   adev->gds.oa_size);
+	r = amdgpu_ttm_init_on_chip(adev, AMDGPU_PL_OA, adev->gds.oa_size);
 	if (r) {
 		DRM_ERROR("Failed initializing oa heap.\n");
 		return r;
