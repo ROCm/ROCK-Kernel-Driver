@@ -165,8 +165,29 @@ pci_ers_result_t pcie_do_recovery(struct pci_dev *dev,
 	pci_dbg(dev, "broadcast error_detected message\n");
 	if (state == pci_channel_io_frozen) {
 		pci_walk_bus(bus, report_frozen_detected, &status);
+		/*
+		 * After resetting the link using reset_link() call, the
+		 * possible value of error status is either
+		 * PCI_ERS_RESULT_DISCONNECT (failure case) or
+		 * PCI_ERS_RESULT_NEED_RESET (success case).
+		 * So ignore the return value of report_error_detected()
+		 * call for fatal errors.
+		 *
+		 * In EDR mode, since AER and DPC Capabilities are owned by
+		 * firmware, reported_error_detected() will return error
+		 * status PCI_ERS_RESULT_NO_AER_DRIVER. Continuing
+		 * pcie_do_recovery() with error status as
+		 * PCI_ERS_RESULT_NO_AER_DRIVER will report recovery failure
+		 * irrespective of recovery status. But successful reset_link()
+		 * call usually recovers all fatal errors. So ignoring the
+		 * status result of report_error_detected() also helps EDR based
+		 * error recovery.
+		 */
 		status = reset_link(dev);
-		if (status != PCI_ERS_RESULT_RECOVERED) {
+		if (status == PCI_ERS_RESULT_RECOVERED) {
+			status = PCI_ERS_RESULT_NEED_RESET;
+		} else {
+			status = PCI_ERS_RESULT_DISCONNECT;
 			pci_warn(dev, "link reset failed\n");
 			goto failed;
 		}
@@ -182,10 +203,22 @@ pci_ers_result_t pcie_do_recovery(struct pci_dev *dev,
 
 	if (status == PCI_ERS_RESULT_NEED_RESET) {
 		/*
-		 * TODO: Should call platform-specific
-		 * functions to reset slot before calling
-		 * drivers' slot_reset callbacks?
+		 * TODO: Optimize the call to pci_reset_bus()
+		 *
+		 * There are two components to pci_reset_bus().
+		 *
+		 * 1. Do platform specific slot/bus reset.
+		 * 2. Save/Restore all devices in the bus.
+		 *
+		 * For hotplug capable devices and fatal errors,
+		 * device is already in reset state due to link
+		 * reset. So repeating platform specific slot/bus
+		 * reset via pci_reset_bus() call is redundant. So
+		 * can optimize this logic and conditionally call
+		 * pci_reset_bus().
 		 */
+		pci_reset_bus(dev);
+
 		status = PCI_ERS_RESULT_RECOVERED;
 		pci_dbg(dev, "broadcast slot_reset message\n");
 		pci_walk_bus(bus, report_slot_reset, &status);
