@@ -1,5 +1,5 @@
 define get_rhel_version
-	find -L $(kdir) -name 'version.h' -exec grep $(1) {} + | sort -u | awk -F ' ' '{print $$NF}'
+(echo "#include <linux/version.h>"; echo "int amdkcl_ver=$(1);") | cpp $(LINUXINCLUDE) | sed -n 's/int amdkcl_ver=\([0-9]*\);/\1/p'
 endef
 RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
 RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
@@ -25,13 +25,11 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
+DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
+ifeq ($(DRM_VER),)
 DRM_VER = $(VERSION)
 DRM_PATCH = $(PATCHLEVEL)
-ifeq ("rhel",$(OS_NAME))
-ifneq ($(OS_VERSION),"8.0")
-DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-endif
 endif
 
 subdir-ccflags-y += \
