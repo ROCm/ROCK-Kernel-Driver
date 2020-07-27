@@ -730,6 +730,15 @@ bool debug_evictions;
 module_param(debug_evictions, bool, 0644);
 MODULE_PARM_DESC(debug_evictions, "enable eviction debug messages (false = default)");
 
+
+/**
+ * DOC: no_system_mem_limit(bool)
+ * Disable system memory limit, to support multiple process shared memory
+ */
+bool no_system_mem_limit;
+module_param(no_system_mem_limit, bool, 0644);
+MODULE_PARM_DESC(no_system_mem_limit, "disable system memory limit (false = default)");
+
 /**
  * DOC: priv_cp_queues (int)
  * Enable privileged mode for CP queues. Default value: 0 (off)
