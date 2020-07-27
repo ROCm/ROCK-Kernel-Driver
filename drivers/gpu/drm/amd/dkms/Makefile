@@ -1,3 +1,11 @@
+ifndef CONFIG_DRM
+$(error CONFIG_DRM disabled, exit...)
+endif
+
+ifeq (y,$(CONFIG_DRM_AMDGPU))
+$(error DRM_AMDGPU is built-in, exit...)
+endif
+
 define get_rhel_version
 (echo "#include <linux/version.h>"; echo "int amdkcl_ver=$(1);") | cpp $(LINUXINCLUDE) | sed -n 's/int amdkcl_ver=\([0-9]*\);/\1/p'
 endef
