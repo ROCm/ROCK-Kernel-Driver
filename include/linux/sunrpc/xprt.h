@@ -103,9 +103,20 @@ struct rpc_rqst {
 							 * used in the softirq.
 							 */
 	unsigned long		rq_majortimeo;	/* major timeout alarm */
+#ifdef __GENKSYMS__
 	unsigned long		rq_timeout;	/* Current timeout value */
+#else
+	unsigned long		rq_minortimeo;	/* minor timeout alarm */
+#endif
 	ktime_t			rq_rtt;		/* round-trip time */
+#ifdef __GENKSYMS__
 	unsigned int		rq_retries;	/* # of retries */
+#else
+	unsigned int		rq_retries:8;	/* # of retries */
+	unsigned int		rq_timeout:24;	/* Current timeout value -
+						 * Upto a few minutes in jiffies
+						 */
+#endif
 	unsigned int		rq_connect_cookie;
 						/* A cookie used to track the
 						   state of the transport
