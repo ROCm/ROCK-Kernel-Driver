@@ -3984,8 +3984,17 @@ static int fill_dc_scaling_info(const struct drm_plane_state *state,
 static int get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 		       uint64_t *tiling_flags, bool *tmz_surface)
 {
-	struct amdgpu_bo *rbo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(&amdgpu_fb->base, 0));
-	int r = amdgpu_bo_reserve(rbo, false);
+	struct amdgpu_bo *rbo;
+	int r;
+
+	if (!amdgpu_fb) {
+		*tiling_flags = 0;
+		*tmz_surface = false;
+		return 0;
+	}
+
+	rbo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(&amdgpu_fb->base, 0));
+	r = amdgpu_bo_reserve(rbo, false);
 
 	if (unlikely(r)) {
 		/* Don't show error message when returning -ERESTARTSYS */
@@ -4439,13 +4448,10 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 				    struct drm_crtc_state *crtc_state)
 {
 	struct dm_crtc_state *dm_crtc_state = to_dm_crtc_state(crtc_state);
-	const struct amdgpu_framebuffer *amdgpu_fb =
-		to_amdgpu_framebuffer(plane_state->fb);
+	struct dm_plane_state *dm_plane_state = to_dm_plane_state(plane_state);
 	struct dc_scaling_info scaling_info;
 	struct dc_plane_info plane_info;
-	uint64_t tiling_flags;
 	int ret;
-	bool tmz_surface = false;
 	bool force_disable_dcc = false;
 
 	ret = fill_dc_scaling_info(plane_state, &scaling_info);
@@ -4457,15 +4463,12 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 	dc_plane_state->clip_rect = scaling_info.clip_rect;
 	dc_plane_state->scaling_quality = scaling_info.scaling_quality;
 
-	ret = get_fb_info(amdgpu_fb, &tiling_flags, &tmz_surface);
-	if (ret)
-		return ret;
-
 	force_disable_dcc = adev->asic_type == CHIP_RAVEN && adev->in_suspend;
-	ret = fill_dc_plane_info_and_addr(adev, plane_state, tiling_flags,
+	ret = fill_dc_plane_info_and_addr(adev, plane_state,
+					  dm_plane_state->tiling_flags,
 					  &plane_info,
 					  &dc_plane_state->address,
-					  tmz_surface,
+					  dm_plane_state->tmz_surface,
 					  force_disable_dcc);
 	if (ret)
 		return ret;
@@ -6323,6 +6326,10 @@ dm_drm_plane_duplicate_state(struct drm_plane *plane)
 		dm_plane_state->dc_state = old_dm_plane_state->dc_state;
 		dc_plane_state_retain(dm_plane_state->dc_state);
 	}
+
+	/* Framebuffer hasn't been updated yet, so retain old flags. */
+	dm_plane_state->tiling_flags = old_dm_plane_state->tiling_flags;
+	dm_plane_state->tmz_surface = old_dm_plane_state->tmz_surface;
 
 	return &dm_plane_state->base;
 }
@@ -9407,13 +9414,9 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 #else
 		for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, j) {
 #endif
-			const struct amdgpu_framebuffer *amdgpu_fb =
-				to_amdgpu_framebuffer(new_plane_state->fb);
 			struct dc_plane_info *plane_info = &bundle->plane_infos[num_plane];
 			struct dc_flip_addrs *flip_addr = &bundle->flip_addrs[num_plane];
 			struct dc_scaling_info *scaling_info = &bundle->scaling_infos[num_plane];
-			uint64_t tiling_flags;
-			bool tmz_surface = false;
 
 			new_plane_crtc = new_plane_state->crtc;
 			new_dm_plane_state = to_dm_plane_state(new_plane_state);
@@ -9460,16 +9463,12 @@ dm_determine_update_type_for_commit(struct amdgpu_display_manager *dm,
 
 			bundle->surface_updates[num_plane].scaling_info = scaling_info;
 
-			if (amdgpu_fb) {
-				ret = get_fb_info(amdgpu_fb, &tiling_flags, &tmz_surface);
-				if (ret)
-					goto cleanup;
-
+			if (new_plane_state->fb) {
 				ret = fill_dc_plane_info_and_addr(
-					dm->adev, new_plane_state, tiling_flags,
-					plane_info,
-					&flip_addr->address, tmz_surface,
-					false);
+					dm->adev, new_plane_state,
+					new_dm_plane_state->tiling_flags,
+					plane_info, &flip_addr->address,
+					new_dm_plane_state->tmz_surface, false);
 				if (ret)
 					goto cleanup;
 
@@ -9713,6 +9712,21 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				goto fail;
 			}
 		}
+	}
+
+	/* Prepass for updating tiling flags on new planes. */
+#if !defined(for_each_new_plane_in_state)
+	for_each_plane_in_state(state, plane, new_plane_state, i) {
+#else
+	for_each_new_plane_in_state(state, plane, new_plane_state, i) {
+#endif
+		struct dm_plane_state *new_dm_plane_state = to_dm_plane_state(new_plane_state);
+		struct amdgpu_framebuffer *new_afb = to_amdgpu_framebuffer(new_plane_state->fb);
+
+		ret = get_fb_info(new_afb, &new_dm_plane_state->tiling_flags,
+				  &new_dm_plane_state->tmz_surface);
+		if (ret)
+			goto fail;
 	}
 
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
