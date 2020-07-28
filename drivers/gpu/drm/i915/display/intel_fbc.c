@@ -56,19 +56,6 @@ static inline bool no_fbc_on_multiple_pipes(struct drm_i915_private *dev_priv)
 }
 
 /*
- * In some platforms where the CRTC's x:0/y:0 coordinates doesn't match the
- * frontbuffer's x:0/y:0 coordinates we lie to the hardware about the plane's
- * origin so the x and y offsets can actually fit the registers. As a
- * consequence, the fence doesn't really start exactly at the display plane
- * address we program because it starts at the real start of the buffer, so we
- * have to take this into consideration here.
- */
-static unsigned int get_crtc_fence_y_offset(struct intel_fbc *fbc)
-{
-	return fbc->state_cache.plane.y - fbc->state_cache.plane.adjusted_y;
-}
-
-/*
  * For SKL+, the plane source size used by the hardware is based on the value we
  * write to the PLANE_SIZE register. For BDW-, the hardware looks at the value
  * we wrote to PIPESRC.
@@ -146,7 +133,7 @@ static void i8xx_fbc_activate(struct drm_i915_private *dev_priv)
 		fbc_ctl2 = FBC_CTL_FENCE_DBL | FBC_CTL_IDLE_IMM | FBC_CTL_CPU_FENCE;
 		fbc_ctl2 |= FBC_CTL_PLANE(params->crtc.i9xx_plane);
 		I915_WRITE(FBC_CONTROL2, fbc_ctl2);
-		I915_WRITE(FBC_FENCE_OFF, params->crtc.fence_y_offset);
+		I915_WRITE(FBC_FENCE_OFF, params->fence_y_offset);
 	}
 
 	/* enable it... */
@@ -178,7 +165,7 @@ static void g4x_fbc_activate(struct drm_i915_private *dev_priv)
 
 	if (params->flags & PLANE_HAS_FENCE) {
 		dpfc_ctl |= DPFC_CTL_FENCE_EN | params->vma->fence->id;
-		I915_WRITE(DPFC_FENCE_YOFF, params->crtc.fence_y_offset);
+		I915_WRITE(DPFC_FENCE_YOFF, params->fence_y_offset);
 	} else {
 		I915_WRITE(DPFC_FENCE_YOFF, 0);
 	}
@@ -243,7 +230,7 @@ static void ilk_fbc_activate(struct drm_i915_private *dev_priv)
 				   SNB_CPU_FENCE_ENABLE |
 				   params->vma->fence->id);
 			I915_WRITE(DPFC_CPU_FENCE_OFFSET,
-				   params->crtc.fence_y_offset);
+				   params->fence_y_offset);
 		}
 	} else {
 		if (IS_GEN(dev_priv, 6)) {
@@ -252,7 +239,7 @@ static void ilk_fbc_activate(struct drm_i915_private *dev_priv)
 		}
 	}
 
-	I915_WRITE(ILK_DPFC_FENCE_YOFF, params->crtc.fence_y_offset);
+	I915_WRITE(ILK_DPFC_FENCE_YOFF, params->fence_y_offset);
 	I915_WRITE(ILK_FBC_RT_BASE,
 		   i915_ggtt_offset(params->vma) | ILK_FBC_RT_VALID);
 	/* enable it... */
@@ -322,7 +309,8 @@ static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 		I915_WRITE(SNB_DPFC_CTL_SA,
 			   SNB_CPU_FENCE_ENABLE |
 			   params->vma->fence->id);
-		I915_WRITE(DPFC_CPU_FENCE_OFFSET, params->crtc.fence_y_offset);
+		I915_WRITE(DPFC_CPU_FENCE_OFFSET,
+			   params->fence_y_offset);
 	} else {
 		I915_WRITE(SNB_DPFC_CTL_SA,0);
 		I915_WRITE(DPFC_CPU_FENCE_OFFSET, 0);
@@ -623,8 +611,8 @@ static bool pixel_format_is_valid(struct drm_i915_private *dev_priv,
 /*
  * For some reason, the hardware tracking starts looking at whatever we
  * programmed as the display plane base address register. It does not look at
- * the X and Y offset registers. That's why we look at the crtc->adjusted{x,y}
- * variables instead of just looking at the pipe/plane size.
+ * the X and Y offset registers. That's why we include the src x/y offsets
+ * instead of just looking at the plane size.
  */
 static bool intel_fbc_hw_tracking_covers_screen(struct intel_crtc *crtc)
 {
@@ -681,7 +669,6 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc,
 	cache->plane.visible = plane_state->base.visible;
 	cache->plane.adjusted_x = plane_state->color_plane[0].x;
 	cache->plane.adjusted_y = plane_state->color_plane[0].y;
-	cache->plane.y = plane_state->base.src.y1 >> 16;
 
 	cache->plane.pixel_blend_mode = plane_state->base.pixel_blend_mode;
 
@@ -690,6 +677,8 @@ static void intel_fbc_update_state_cache(struct intel_crtc *crtc,
 
 	cache->fb.format = fb->format;
 	cache->fb.stride = fb->pitches[0];
+
+	cache->fence_y_offset = intel_plane_fence_y_offset(plane_state);
 
 	cache->vma = plane_state->vma;
 	cache->flags = plane_state->flags;
@@ -839,9 +828,10 @@ static void intel_fbc_get_reg_params(struct intel_crtc *crtc,
 	params->vma = cache->vma;
 	params->flags = cache->flags;
 
+	params->fence_y_offset = cache->fence_y_offset;
+
 	params->crtc.pipe = crtc->pipe;
 	params->crtc.i9xx_plane = to_intel_plane(crtc->base.primary)->i9xx_plane;
-	params->crtc.fence_y_offset = get_crtc_fence_y_offset(fbc);
 
 	params->fb.format = cache->fb.format;
 	params->fb.stride = cache->fb.stride;
