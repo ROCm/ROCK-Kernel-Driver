@@ -33,6 +33,23 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
+ifdef CONFIG_CC_IS_GCC
+# Use -dumpfullversion -dumpversion to ensure that we get the right format
+# -dumpfullversion is newer, but has the same format as the old -dumpversion
+# Newer -dumpversion only reports the GCC Major version, while the older
+# -dumpversion and the newer -dumpfullversion return MAJ.MIN.PAT
+GCCVER=$(shell $(CC) -dumpfullversion -dumpversion)
+GCCMAJ=$(shell echo $(GCCVER) | cut -f1 -d.)
+GCCMIN=$(shell echo $(GCCVER) | cut -f2 -d.)
+GCCPAT=$(shell echo $(GCCVER) | cut -f3 -d.)
+# CONFIG_GCC_VERSION returns x.xx.xx as the version format
+GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
+ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
+$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
+$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
+endif
+endif
+
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
 ifeq ($(DRM_VER),)
