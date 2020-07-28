@@ -3479,26 +3479,16 @@ static void virtual_engine_initial_hint(struct virtual_engine *ve)
 	 * typically be the first we inspect for submission.
 	 */
 	swp = prandom_u32_max(ve->num_siblings);
-	if (!swp)
-		return;
-
-	swap(ve->siblings[swp], ve->siblings[0]);
-	virtual_update_register_offsets(ve->context.lrc_reg_state,
-					ve->siblings[0]);
+	if (swp)
+		swap(ve->siblings[swp], ve->siblings[0]);
 }
 
 static int virtual_context_pin(struct intel_context *ce)
 {
 	struct virtual_engine *ve = container_of(ce, typeof(*ve), context);
-	int err;
 
 	/* Note: we must use a real engine class for setting up reg state */
-	err = __execlists_context_pin(ce, ve->siblings[0]);
-	if (err)
-		return err;
-
-	virtual_engine_initial_hint(ve);
-	return 0;
+	return __execlists_context_pin(ce, ve->siblings[0]);
 }
 
 static void virtual_context_enter(struct intel_context *ce)
@@ -3851,6 +3841,7 @@ intel_execlists_create_virtual(struct i915_gem_context *ctx,
 
 	__set_bit(CONTEXT_ALLOC_BIT, &ve->context.flags);
 
+	virtual_engine_initial_hint(ve);
 	return &ve->context;
 
 err_put:
