@@ -3570,6 +3570,16 @@ static void nvme_ns_remove(struct nvme_ns *ns)
 	nvme_put_ns(ns);
 }
 
+static void nvme_ns_remove_by_nsid(struct nvme_ctrl *ctrl, u32 nsid)
+{
+	struct nvme_ns *ns = nvme_find_get_ns(ctrl, nsid);
+
+	if (ns) {
+		nvme_ns_remove(ns);
+		nvme_put_ns(ns);
+	}
+}
+
 static void nvme_validate_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 {
 	struct nvme_ns *ns;
@@ -3603,7 +3613,6 @@ static void nvme_remove_invalid_namespaces(struct nvme_ctrl *ctrl,
 
 static int nvme_scan_ns_list(struct nvme_ctrl *ctrl, unsigned nn)
 {
-	struct nvme_ns *ns;
 	__le32 *ns_list;
 	unsigned i, j, nsid, prev = 0;
 	unsigned num_lists = DIV_ROUND_UP_ULL((u64)nn, 1024);
@@ -3628,13 +3637,8 @@ static int nvme_scan_ns_list(struct nvme_ctrl *ctrl, unsigned nn)
 
 			nvme_validate_ns(ctrl, nsid);
 
-			while (++prev < nsid) {
-				ns = nvme_find_get_ns(ctrl, prev);
-				if (ns) {
-					nvme_ns_remove(ns);
-					nvme_put_ns(ns);
-				}
-			}
+			while (++prev < nsid)
+				nvme_ns_remove_by_nsid(ctrl, prev);
 		}
 		nn -= j;
 	}
