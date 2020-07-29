@@ -2756,16 +2756,11 @@ intel_hdmi_connector_register(struct drm_connector *connector)
 	return ret;
 }
 
-static void intel_hdmi_destroy(struct drm_connector *connector)
+static void intel_hdmi_connector_unregister(struct drm_connector *connector)
 {
 	if (intel_attached_hdmi(connector)->cec_notifier)
 		cec_notifier_put(intel_attached_hdmi(connector)->cec_notifier);
 
-	intel_connector_destroy(connector);
-}
-
-static void intel_hdmi_connector_unregister(struct drm_connector *connector)
-{
 	intel_hdmi_remove_i2c_symlink(connector);
 
 	intel_connector_unregister(connector);
@@ -2779,7 +2774,7 @@ static const struct drm_connector_funcs intel_hdmi_connector_funcs = {
 	.atomic_set_property = intel_digital_connector_atomic_set_property,
 	.late_register = intel_hdmi_connector_register,
 	.early_unregister = intel_hdmi_connector_unregister,
-	.destroy = intel_hdmi_destroy,
+	.destroy = intel_connector_destroy,
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 	.atomic_duplicate_state = intel_digital_connector_duplicate_state,
 };
