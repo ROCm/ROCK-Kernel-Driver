@@ -562,7 +562,6 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			aconnector->port = port;
 			drm_mode_connector_set_path_property(connector, pathprop);
 			drm_modeset_unlock(&dev->mode_config.connection_mutex);
-			aconnector->mst_connected = true;
 			return &aconnector->base;
 		}
 	}
