@@ -242,7 +242,6 @@ void aa_free_profile(struct aa_profile *profile)
 
 	kzfree(profile->hash);
 	aa_put_loaddata(profile->rawdata);
-	aa_label_destroy(&profile->label);
 
 	kzfree(profile);
 }
