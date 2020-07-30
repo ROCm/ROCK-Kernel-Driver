@@ -1661,7 +1661,7 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
-	if (dev->gws_debug_workaround && pdd->is_debugging_enabled) {
+	if (dev->gws_debug_workaround && pdd->debug_trap_enabled) {
 		retval = -EBUSY;
 		goto out_unlock;
 	}
@@ -2714,6 +2714,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	mutex_lock(&target->mutex);
 
 	if (need_device) {
+		bool is_debug_enable_op =
+				debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE;
 
 		dev = kfd_device_by_id(args->gpu_id);
 		if (!dev) {
@@ -2738,26 +2740,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			goto unlock_out;
 		}
 
-		if ((pdd->is_debugging_enabled == false) &&
-				((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE
-				  && data1 == 1) ||
-				 (debug_trap_action ==
-				  KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE &&
-				  data1 != 0))) {
-
-			/* We need to reserve the debug trap vmid if we haven't
-			 * yet, and are enabling trap debugging, or we are
-			 * setting the wave launch mode to something other than
-			 * normal==0.
-			 */
-			r = reserve_debug_trap_vmid(dev->dqm);
-			if (r)
-				goto unlock_out;
-
-			pdd->is_debugging_enabled = true;
-		}
-
-		if (!pdd->is_debugging_enabled) {
+		if (!(is_debug_enable_op || pdd->debug_trap_enabled)) {
 			pr_err("Debugging is not enabled for this device\n");
 			r = -EINVAL;
 			goto unlock_out;
@@ -2784,6 +2767,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
+			if (!pdd->debug_trap_enabled) {
+				r = -EINVAL;
+				break;
+			}
+
 			kfd_release_debug_watch_points(dev,
 				pdd->allocated_debug_watch_point_bitmask);
 			pdd->allocated_debug_watch_point_bitmask = 0;
@@ -2792,25 +2780,34 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 						dev->vm_info.last_vmid_kfd);
 			fput(pdd->dbg_ev_file);
 			pdd->dbg_ev_file = NULL;
+			r = release_debug_trap_vmid(dev->dqm);
 			break;
 		case 1:
+			if (pdd->debug_trap_enabled) {
+				r = -EINVAL;
+				break;
+			}
+
+			r = reserve_debug_trap_vmid(dev->dqm);
+			if (r)
+				break;
+
 			pdd->debug_trap_enabled = true;
 			dev->kfd2kgd->enable_debug_trap(dev->kgd,
 					pdd->trap_debug_wave_launch_mode,
 					dev->vm_info.last_vmid_kfd);
-			if (r)
-				break;
 
 			r = kfd_dbg_ev_enable(pdd);
 			if (r >= 0) {
 				args->data3 = r;
 				r = 0;
-			} else {
-				pdd->debug_trap_enabled = false;
-				dev->kfd2kgd->disable_debug_trap(dev->kgd,
-						dev->vm_info.last_vmid_kfd);
+				break;
 			}
 
+			pdd->debug_trap_enabled = false;
+			dev->kfd2kgd->disable_debug_trap(dev->kgd,
+					dev->vm_info.last_vmid_kfd);
+			release_debug_trap_vmid(dev->dqm);
 			break;
 		default:
 			pr_err("Invalid trap enable option: %i\n",
@@ -2920,20 +2917,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
 		r = -EINVAL;
-	}
-
-	if (pdd && pdd->trap_debug_wave_launch_mode == 0 &&
-			!pdd->debug_trap_enabled) {
-		int result;
-
-		result = release_debug_trap_vmid(dev->dqm);
-		if (result) {
-			pr_err("Failed to release debug VMID\n");
-			r = result;
-			goto unlock_out;
-		}
-
-		pdd->is_debugging_enabled = false;
 	}
 
 unlock_out:

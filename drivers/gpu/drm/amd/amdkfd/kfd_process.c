@@ -1173,17 +1173,15 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		mutex_unlock(kfd_get_dbgmgr_mutex());
 
 		/* New debugger for GFXv9 and later */
-		if (pdd->is_debugging_enabled) {
+		if (pdd->debug_trap_enabled) {
 			if (pdd->allocated_debug_watch_point_bitmask) {
 				kfd_release_debug_watch_points(dev,
 				    pdd->allocated_debug_watch_point_bitmask);
 				pdd->allocated_debug_watch_point_bitmask = 0;
 			}
-			if (pdd->debug_trap_enabled) {
-				dev->kfd2kgd->disable_debug_trap(dev->kgd,
+			pdd->debug_trap_enabled = false;
+			dev->kfd2kgd->disable_debug_trap(dev->kgd,
 						dev->vm_info.last_vmid_kfd);
-				pdd->debug_trap_enabled = false;
-			}
 			if (pdd->trap_debug_wave_launch_mode != 0) {
 				dev->kfd2kgd->set_wave_launch_mode(
 					dev->kgd, 0,
@@ -1191,7 +1189,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 				pdd->trap_debug_wave_launch_mode = 0;
 			}
 			release_debug_trap_vmid(dev->dqm);
-			pdd->is_debugging_enabled = false;
 		}
 	}
 
@@ -1522,7 +1519,6 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
-	pdd->is_debugging_enabled = false;
 	pdd->debug_trap_enabled = false;
 	pdd->trap_debug_wave_launch_mode = 0;
 	pdd->runtime_inuse = false;

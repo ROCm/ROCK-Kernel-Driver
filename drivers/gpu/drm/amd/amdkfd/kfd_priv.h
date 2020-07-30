@@ -774,17 +774,7 @@ struct kfd_process_device {
 	bool already_dequeued;
 	bool runtime_inuse;
 
-	/* Flag to indicate if debugging is active on this device for this
-	 * process.  This is for the new GFX9+ debugging, and indicates that
-	 * any of the debug features are enabled, ie: wave launch mode,
-	 * address watch, or trap debug.  It also indicates that a debug
-	 * VMID has been allocated.
-	 */
-	bool is_debugging_enabled;
-
-	/* Flag to indicate if trap debugging is active on this device for
-	 * this process.  This is for the GFX9_ debugging features
-	 */
+	/* Indicates device process is debug attached with reserved vmid. */
 	bool debug_trap_enabled;
 
 	/* Value of the wave launch mode if debugging is enabled */
