@@ -194,9 +194,6 @@ export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
 export CONFIG_DRM_AMD_DC_DCN1_01=y
-export CONFIG_DRM_AMD_DC_DCN2_0=y
-export CONFIG_DRM_AMD_DC_DCN2_1=y
-export CONFIG_DRM_AMD_DC_DCN3_0=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
@@ -206,8 +203,19 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
+
+
+# Trying to enable DCN2/3 with core2 optimizations will result in
+# older versions of GCC hanging during building/installing. Check
+# if the compiler is using core2 optimizations and only build DCN2/3
+# if core2 isn't in the compiler flags
+ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
+export CONFIG_DRM_AMD_DC_DCN2_0=y
+export CONFIG_DRM_AMD_DC_DCN2_1=y
+export CONFIG_DRM_AMD_DC_DCN3_0=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_0
+endif
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
