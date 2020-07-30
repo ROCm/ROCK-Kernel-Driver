@@ -1527,7 +1527,6 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
-	pdd->is_debugging_enabled = false;
 	pdd->debug_trap_enabled = false;
 	pdd->trap_debug_wave_launch_mode = 0;
 	pdd->runtime_inuse = false;
