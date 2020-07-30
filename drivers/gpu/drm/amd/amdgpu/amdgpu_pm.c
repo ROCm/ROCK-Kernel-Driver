@@ -842,14 +842,12 @@ static ssize_t amdgpu_set_pp_od_clk_voltage(struct device *dev,
 		tmp_str++;
 	while (isspace(*++tmp_str));
 
-	while ((sub_str = strsep(&tmp_str, delimiter)) && *sub_str) {
+	while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 		ret = kstrtol(sub_str, 0, &parameter[parameter_size]);
 		if (ret)
 			return -EINVAL;
 		parameter_size++;
 
-		if (!tmp_str)
-			break;
 		while (isspace(*tmp_str))
 			tmp_str++;
 	}
@@ -1743,14 +1741,11 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 			i++;
 		memcpy(buf_cpy, buf, count-i);
 		tmp_str = buf_cpy;
-		while ((sub_str = strsep(&tmp_str, delimiter)) && *sub_str) {
+		while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 			ret = kstrtol(sub_str, 0, &parameter[parameter_size]);
 			if (ret)
 				return -EINVAL;
 			parameter_size++;
-
-			if (!tmp_str)
-				break;
 			while (isspace(*tmp_str))
 				tmp_str++;
 		}
