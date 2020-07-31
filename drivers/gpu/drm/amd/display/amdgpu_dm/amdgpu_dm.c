@@ -80,7 +80,9 @@
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 #include <drm/drm_audio_component.h>
 #endif
+#ifdef CONFIG_DRM_AMD_DC_HDCP
 #include <drm/drm_hdcp.h>
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "ivsrcid/dcn/irqsrcs_dcn_1_0.h"
