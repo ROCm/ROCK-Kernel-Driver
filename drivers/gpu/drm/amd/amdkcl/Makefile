@@ -12,6 +12,8 @@ amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_drm_crtc.o kcl_connector.o kcl_drm_atomic_helper.o \
 	kcl_device_cgroup.o kcl_mn.o
 
+amdkcl-$(CONFIG_DRM_AMD_DC_HDCP) += kcl_drm_hdcp.o
+
 CFLAGS_kcl_fence.o := -I$(src)
 
 ccflags-y += \
