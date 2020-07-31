@@ -504,7 +504,10 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					   aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
-		aconnector->dc_link->cur_link_settings.lane_count = 0;
+		mutex_lock(&mgr->lock);
+		if (!mgr->mst_state)
+			aconnector->dc_link->cur_link_settings.lane_count = 0;
+		mutex_unlock(&mgr->lock);
 	}
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
