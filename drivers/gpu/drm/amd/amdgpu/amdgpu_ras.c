@@ -34,6 +34,8 @@
 #include "amdgpu_xgmi.h"
 #include "ivsrcid/nbio/irqsrcs_nbif_7_4.h"
 
+static const char *RAS_FS_NAME = "ras";
+
 const char *ras_error_string[] = {
 	"none",
 	"parity",
@@ -1037,7 +1039,7 @@ static int amdgpu_ras_sysfs_create_feature_node(struct amdgpu_device *adev)
 		NULL
 	};
 	struct attribute_group group = {
-		.name = "ras",
+		.name = RAS_FS_NAME,
 		.attrs = attrs,
 #if defined(HAVE_ATTRIBUTE_GROUP_BIN_ATTRS)
 		.bin_attrs = bin_attrs,
@@ -1080,7 +1082,7 @@ static int amdgpu_ras_sysfs_remove_feature_node(struct amdgpu_device *adev)
 		NULL
 	};
 	struct attribute_group group = {
-		.name = "ras",
+		.name = RAS_FS_NAME,
 		.attrs = attrs,
 #if defined(HAVE_ATTRIBUTE_GROUP_BIN_ATTRS)
 		.bin_attrs = bin_attrs,
@@ -1117,7 +1119,7 @@ int amdgpu_ras_sysfs_create(struct amdgpu_device *adev,
 
 	if (sysfs_add_file_to_group(&adev->dev->kobj,
 				&obj->sysfs_attr.attr,
-				"ras")) {
+				RAS_FS_NAME)) {
 		put_obj(obj);
 		return -EINVAL;
 	}
@@ -1137,7 +1139,7 @@ int amdgpu_ras_sysfs_remove(struct amdgpu_device *adev,
 
 	sysfs_remove_file_from_group(&adev->dev->kobj,
 				&obj->sysfs_attr.attr,
-				"ras");
+				RAS_FS_NAME);
 	obj->attr_inuse = 0;
 	put_obj(obj);
 
@@ -1183,7 +1185,7 @@ static void amdgpu_ras_debugfs_create_ctrl_node(struct amdgpu_device *adev)
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct drm_minor *minor = adev->ddev->primary;
 
-	con->dir = debugfs_create_dir("ras", minor->debugfs_root);
+	con->dir = debugfs_create_dir(RAS_FS_NAME, minor->debugfs_root);
 	debugfs_create_file("ras_ctrl", S_IWUGO | S_IRUGO, con->dir,
 				adev, &amdgpu_ras_debugfs_ctrl_ops);
 	debugfs_create_file("ras_eeprom_reset", S_IWUGO | S_IRUGO, con->dir,
