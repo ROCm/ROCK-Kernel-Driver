@@ -54,5 +54,6 @@
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
 #include <kcl/backport/kcl_drm_atomic_helper_backport.h>
 #include <kcl/kcl_drm_atomic.h>
+#include <kcl/kcl_drm_hdcp.h>
 
 #endif /* AMDGPU_BACKPORT_H */

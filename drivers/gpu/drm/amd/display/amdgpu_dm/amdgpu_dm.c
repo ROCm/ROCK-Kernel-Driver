@@ -89,6 +89,9 @@
 #include <drm/drm_audio_component.h>
 #include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_plane_helper.h>
+#ifdef CONFIG_DRM_AMD_DC_HDCP
+#include <drm/drm_hdcp.h>
+#endif
 
 #include <acpi/video.h>
 
