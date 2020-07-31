@@ -390,7 +390,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct drm_connector *connector;
 	int i;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_dm_connector(connector);
@@ -489,7 +489,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					struct drm_connector *connector)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = dev->dev_private;
@@ -507,7 +507,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		aconnector->dc_sink = NULL;
 		aconnector->dc_link->cur_link_settings.lane_count = 0;
 	}
-#if defined(HAVE_DRM_CONNECTOR_PUT) || defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
 #ifdef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS
 	if (adev->mode_info.rfbdev)
@@ -609,6 +609,8 @@ struct dsc_mst_fairness_params {
 	struct dc_dsc_bw_range bw_range;
 	bool compression_possible;
 	struct drm_dp_mst_port *port;
+	bool clock_overwrite;
+	uint32_t slice_width_overwrite;
 };
 
 struct dsc_mst_fairness_vars {
@@ -643,6 +645,10 @@ static void set_dsc_configs_from_fairness_vars(struct dsc_mst_fairness_params *p
 					&params[i].timing->dsc_cfg)) {
 			params[i].timing->flags.DSC = 1;
 			params[i].timing->dsc_cfg.bits_per_pixel = vars[i].bpp_x16;
+			if (params[i].slice_width_overwrite)
+				params[i].timing->dsc_cfg.num_slices_h = DIV_ROUND_UP(
+										params[i].timing->h_addressable,
+										params[i].slice_width_overwrite);
 		} else {
 			params[i].timing->flags.DSC = 0;
 		}
@@ -774,7 +780,9 @@ static void try_disable_dsc(struct drm_atomic_state *state,
 	int remaining_to_try = 0;
 
 	for (i = 0; i < count; i++) {
-		if (vars[i].dsc_enabled && vars[i].bpp_x16 == params[i].bw_range.max_target_bpp_x16) {
+		if (vars[i].dsc_enabled
+				&& vars[i].bpp_x16 == params[i].bw_range.max_target_bpp_x16
+				&& !params[i].clock_overwrite) {
 			kbps_increase[i] = params[i].bw_range.stream_kbps - params[i].bw_range.max_kbps;
 			tried[i] = false;
 			remaining_to_try += 1;
@@ -835,6 +843,7 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
 	struct amdgpu_dm_connector *aconnector;
 	int count = 0;
+	bool debugfs_overwrite = false;
 
 	memset(params, 0, sizeof(params));
 
@@ -853,6 +862,10 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 		params[count].sink = stream->sink;
 		aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 		params[count].port = aconnector->port;
+		params[count].clock_overwrite = aconnector->dsc_settings.dsc_clock_en;
+		if (params[count].clock_overwrite)
+			debugfs_overwrite = true;
+		params[count].slice_width_overwrite = aconnector->dsc_settings.dsc_slice_width;
 		params[count].compression_possible = stream->sink->dsc_caps.dsc_dec_caps.is_dsc_supported;
 		dc_dsc_get_policy_for_timing(params[count].timing, &dsc_policy);
 		if (!dc_dsc_compute_bandwidth_range(
@@ -878,7 +891,7 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 						 dm_mst_get_pbn_divider(dc_link)) < 0)
 			return false;
 	}
-	if (!drm_dp_mst_atomic_check(state)) {
+	if (!drm_dp_mst_atomic_check(state) && !debugfs_overwrite) {
 		set_dsc_configs_from_fairness_vars(params, vars, count);
 		return true;
 	}
@@ -965,7 +978,7 @@ bool compute_mst_dsc_configs_for_state(struct drm_atomic_state *state,
 		stream = dc_state->streams[i];
 
 		if (stream->timing.flags.DSC == 1)
-			dcn20_add_dsc_to_stream_resource(stream->ctx->dc, dc_state, stream);
+			dc_stream_add_dsc_to_resource(stream->ctx->dc, dc_state, stream);
 	}
 
 	return true;

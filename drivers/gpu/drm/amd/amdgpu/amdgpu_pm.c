@@ -694,6 +694,52 @@ static ssize_t amdgpu_set_pp_table(struct device *dev,
  * in each power level within a power state.  The pp_od_clk_voltage is used for
  * this.
  *
+ * Note that the actual memory controller clock rate are exposed, not
+ * the effective memory clock of the DRAMs. To translate it, use the
+ * following formula:
+ *
+ * Clock conversion (Mhz):
+ *
+ * HBM: effective_memory_clock = memory_controller_clock * 1
+ *
+ * G5: effective_memory_clock = memory_controller_clock * 1
+ *
+ * G6: effective_memory_clock = memory_controller_clock * 2
+ *
+ * DRAM data rate (MT/s):
+ *
+ * HBM: effective_memory_clock * 2 = data_rate
+ *
+ * G5: effective_memory_clock * 4 = data_rate
+ *
+ * G6: effective_memory_clock * 8 = data_rate
+ *
+ * Bandwidth (MB/s):
+ *
+ * data_rate * vram_bit_width / 8 = memory_bandwidth
+ *
+ * Some examples:
+ *
+ * G5 on RX460:
+ *
+ * memory_controller_clock = 1750 Mhz
+ *
+ * effective_memory_clock = 1750 Mhz * 1 = 1750 Mhz
+ *
+ * data rate = 1750 * 4 = 7000 MT/s
+ *
+ * memory_bandwidth = 7000 * 128 bits / 8 = 112000 MB/s
+ *
+ * G6 on RX5700:
+ *
+ * memory_controller_clock = 875 Mhz
+ *
+ * effective_memory_clock = 875 Mhz * 2 = 1750 Mhz
+ *
+ * data rate = 1750 * 8 = 14000 MT/s
+ *
+ * memory_bandwidth = 14000 * 256 bits / 8 = 448000 MB/s
+ *
  * < For Vega10 and previous ASICs >
  *
  * Reading the file will display:
@@ -796,8 +842,7 @@ static ssize_t amdgpu_set_pp_od_clk_voltage(struct device *dev,
 		tmp_str++;
 	while (isspace(*++tmp_str));
 
-	while (tmp_str[0]) {
-		sub_str = strsep(&tmp_str, delimiter);
+	while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 		ret = kstrtol(sub_str, 0, &parameter[parameter_size]);
 		if (ret)
 			return -EINVAL;
@@ -1067,8 +1112,7 @@ static ssize_t amdgpu_read_mask(const char *buf, size_t count, uint32_t *mask)
 	memcpy(buf_cpy, buf, bytes);
 	buf_cpy[bytes] = '\0';
 	tmp = buf_cpy;
-	while (tmp[0]) {
-		sub_str = strsep(&tmp, delimiter);
+	while ((sub_str = strsep(&tmp, delimiter)) != NULL) {
 		if (strlen(sub_str)) {
 			ret = kstrtol(sub_str, 0, &level);
 			if (ret)
@@ -1697,8 +1741,7 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 			i++;
 		memcpy(buf_cpy, buf, count-i);
 		tmp_str = buf_cpy;
-		while (tmp_str[0]) {
-			sub_str = strsep(&tmp_str, delimiter);
+		while ((sub_str = strsep(&tmp_str, delimiter)) != NULL) {
 			ret = kstrtol(sub_str, 0, &parameter[parameter_size]);
 			if (ret)
 				return -EINVAL;
@@ -3879,11 +3922,6 @@ static int amdgpu_debugfs_pm_info(struct seq_file *m, void *data)
 		return r;
 	}
 
-	amdgpu_device_ip_get_clockgating_state(adev, &flags);
-	seq_printf(m, "Clock Gating Flags Mask: 0x%x\n", flags);
-	amdgpu_parse_cg_state(m, flags);
-	seq_printf(m, "\n");
-
 	if (!adev->pm.dpm_enabled) {
 		seq_printf(m, "dpm not enabled\n");
 		pm_runtime_mark_last_busy(dev->dev);
@@ -3904,6 +3942,15 @@ static int amdgpu_debugfs_pm_info(struct seq_file *m, void *data)
 		r = amdgpu_debugfs_pm_info_pp(m, adev);
 	}
 
+	if (r)
+		goto out;
+
+	amdgpu_device_ip_get_clockgating_state(adev, &flags);
+	seq_printf(m, "Clock Gating Flags Mask: 0x%x\n", flags);
+	amdgpu_parse_cg_state(m, flags);
+	seq_printf(m, "\n");
+
+out:
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
 

@@ -2785,6 +2785,12 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 {
 	switch (asic_type) {
 #if defined(CONFIG_DRM_AMD_DC)
+#if defined(CONFIG_DRM_AMD_DC_SI)
+	case CHIP_TAHITI:
+	case CHIP_PITCAIRN:
+	case CHIP_VERDE:
+	case CHIP_OLAND:
+#endif
 	case CHIP_BONAIRE:
 	case CHIP_KAVERI:
 	case CHIP_KABINI:
@@ -3052,6 +3058,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	hash_init(adev->mn_hash);
 	mutex_init(&adev->lock_reset);
 	mutex_init(&adev->psp.mutex);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	mutex_init(&adev->notifier_lock);
+#endif
 
 	r = amdgpu_device_check_arguments(adev);
 	if (r)

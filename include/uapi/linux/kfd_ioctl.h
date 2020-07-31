@@ -48,9 +48,10 @@
  *	 array slots
  * 2.1 - Add Set Address Watch, and Clear Address Watch support.
  * 3.0 - Overhaul set wave launch override API
+ * 3.1 - Add support for GFX10
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	3
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -639,7 +640,8 @@ struct kfd_ioctl_import_dmabuf_args {
  * KFD SMI(System Management Interface) events
  */
 /* Event type (defined by bitmask) */
-#define KFD_SMI_EVENT_VMFAULT     0x0000000000000001
+#define KFD_SMI_EVENT_VMFAULT			0x0000000000000001
+#define KFD_SMI_EVENT_THERMAL_THROTTLE		0x0000000000000002
 
 struct kfd_ioctl_smi_events_args {
 	__u32 gpuid;	/* to KFD */

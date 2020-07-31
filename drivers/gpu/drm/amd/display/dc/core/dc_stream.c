@@ -246,6 +246,23 @@ struct dc_stream_status *dc_stream_get_status(
 	return dc_stream_get_status_from_state(dc->current_state, stream);
 }
 
+#ifndef TRIM_FSFT
+/**
+ * dc_optimize_timing_for_fsft() - dc to optimize timing
+ */
+bool dc_optimize_timing_for_fsft(
+	struct dc_stream_state *pStream,
+	unsigned int max_input_rate_in_khz)
+{
+	struct dc  *dc;
+
+	dc = pStream->ctx->dc;
+
+	return (dc->hwss.optimize_timing_for_fsft &&
+		dc->hwss.optimize_timing_for_fsft(dc, &pStream->timing, max_input_rate_in_khz));
+}
+#endif
+
 /**
  * dc_stream_set_cursor_attributes() - Update cursor attributes and set cursor surface address
  */
@@ -658,6 +675,19 @@ bool dc_stream_set_dynamic_metadata(struct dc *dc,
 	}
 
 	return true;
+}
+#endif
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
+		struct dc_state *state,
+		struct dc_stream_state *stream)
+{
+	if (dc->res_pool->funcs->add_dsc_to_stream_resource) {
+		return dc->res_pool->funcs->add_dsc_to_stream_resource(dc, state, stream);
+	} else {
+		return DC_NO_DSC_RESOURCE;
+	}
 }
 #endif
 

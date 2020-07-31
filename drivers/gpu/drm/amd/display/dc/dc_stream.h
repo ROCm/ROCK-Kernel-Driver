@@ -378,6 +378,12 @@ bool dc_stream_remove_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		uint32_t dwb_pipe_inst);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
+		struct dc_state *state,
+		struct dc_stream_state *stream);
+#endif
+
 bool dc_stream_warmup_writeback(struct dc *dc,
 		int num_dwb,
 		struct dc_writeback_info *wb_info);
@@ -434,6 +440,12 @@ struct dc_stream_status *dc_stream_get_status_from_state(
 	struct dc_stream_state *stream);
 struct dc_stream_status *dc_stream_get_status(
 	struct dc_stream_state *dc_stream);
+
+#ifndef TRIM_FSFT
+bool dc_optimize_timing_for_fsft(
+	struct dc_stream_state *pStream,
+	unsigned int max_input_rate_in_khz);
+#endif
 
 /*******************************************************************************
  * Cursor interfaces - To manages the cursor within a stream

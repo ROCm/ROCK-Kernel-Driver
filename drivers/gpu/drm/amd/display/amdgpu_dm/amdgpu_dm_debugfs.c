@@ -33,6 +33,9 @@
 #include "amdgpu_dm_debugfs.h"
 #include "dm_helpers.h"
 #include "dmub/dmub_srv.h"
+#include "resource.h"
+#include "dsc.h"
+#include "dc_link_dp.h"
 
 struct dmub_debugfs_trace_header {
 	uint32_t entry_count;
@@ -995,6 +998,644 @@ static ssize_t dp_dpcd_data_read(struct file *f, char __user *buf,
 	return read_size - r;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+/* function: read DSC status on the connector
+ *
+ * The read function: dp_dsc_clock_en_read
+ * returns current status of DSC clock on the connector.
+ * The return is a boolean flag: 1 or 0.
+ *
+ * Access it with the following command (you need to specify
+ * connector like DP-1):
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_clock_en
+ *
+ * Expected output:
+ * 1 - means that DSC is currently enabled
+ * 0 - means that DSC is disabled
+ */
+static ssize_t dp_dsc_clock_en_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 10;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_clock_en);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+/* function: write force DSC on the connector
+ *
+ * The write function: dp_dsc_clock_en_write
+ * enables to force DSC on the connector.
+ * User can write to either force enable DSC
+ * on the next modeset or set it to driver default
+ *
+ * Writing DSC settings is done with the following command:
+ * - To force enable DSC (you need to specify
+ * connector like DP-1):
+ *
+ *	echo 0x1 > /sys/kernel/debug/dri/0/DP-X/dsc_clock_en
+ *
+ * - To return to default state set the flag to zero and
+ * let driver deal with DSC automatically
+ * (you need to specify connector like DP-1):
+ *
+ *	echo 0x0 > /sys/kernel/debug/dri/0/DP-X/dsc_clock_en
+ *
+ */
+static ssize_t dp_dsc_clock_en_write(struct file *f, const char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct pipe_ctx *pipe_ctx;
+	int i;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	long param[1] = {0};
+	uint8_t param_nums = 0;
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+					    (long *)param, buf,
+					    max_param_num,
+					    &param_nums)) {
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx || !pipe_ctx->stream)
+		goto done;
+
+	aconnector->dsc_settings.dsc_clock_en = param[0];
+
+done:
+	kfree(wr_buf);
+	return size;
+}
+
+/* function: read DSC slice width parameter on the connector
+ *
+ * The read function: dp_dsc_slice_width_read
+ * returns dsc slice width used in the current configuration
+ * The return is an integer: 0 or other positive number
+ *
+ * Access the status with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_slice_width
+ *
+ * 0 - means that DSC is disabled
+ *
+ * Any other number more than zero represents the
+ * slice width currently used by DSC in pixels
+ *
+ */
+static ssize_t dp_dsc_slice_width_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_slice_width);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+/* function: write DSC slice width parameter
+ *
+ * The write function: dp_dsc_slice_width_write
+ * overwrites automatically generated DSC configuration
+ * of slice width.
+ *
+ * The user has to write the slice width divisible by the
+ * picture width.
+ *
+ * Also the user has to write width in hexidecimal
+ * rather than in decimal.
+ *
+ * Writing DSC settings is done with the following command:
+ * - To force overwrite slice width: (example sets to 1920 pixels)
+ *
+ *	echo 0x780 > /sys/kernel/debug/dri/0/DP-X/dsc_slice_width
+ *
+ *  - To stop overwriting and let driver find the optimal size,
+ * set the width to zero:
+ *
+ *	echo 0x0 > /sys/kernel/debug/dri/0/DP-X/dsc_slice_width
+ *
+ */
+static ssize_t dp_dsc_slice_width_write(struct file *f, const char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct pipe_ctx *pipe_ctx;
+	int i;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	long param[1] = {0};
+	uint8_t param_nums = 0;
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+					    (long *)param, buf,
+					    max_param_num,
+					    &param_nums)) {
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx || !pipe_ctx->stream)
+		goto done;
+
+	aconnector->dsc_settings.dsc_slice_width = param[0];
+
+done:
+	kfree(wr_buf);
+	return size;
+}
+
+static ssize_t dp_dsc_slice_height_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_slice_height);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+static ssize_t dp_dsc_bits_per_pixel_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_bits_per_pixel);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+static ssize_t dp_dsc_pic_width_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_pic_width);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+static ssize_t dp_dsc_pic_height_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_pic_height);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+static ssize_t dp_dsc_chunk_size_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_chunk_size);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+
+static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
+				    size_t size, loff_t *pos)
+{
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct display_stream_compressor *dsc;
+	struct dcn_dsc_state dsc_state = {0};
+	const uint32_t rd_buf_size = 100;
+	struct pipe_ctx *pipe_ctx;
+	ssize_t result = 0;
+	int i, r, str_len = 30;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	rd_buf_ptr = rd_buf;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx)
+		return -ENXIO;
+
+	dsc = pipe_ctx->stream_res.dsc;
+	if (dsc)
+		dsc->funcs->dsc_read_state(dsc, &dsc_state);
+
+	snprintf(rd_buf_ptr, str_len,
+		"%d\n",
+		dsc_state.dsc_slice_bpg_offset);
+	rd_buf_ptr += str_len;
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r)
+			return r; /* r = -EFAULT */
+
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+
+	kfree(rd_buf);
+	return result;
+}
+#endif
+
 #ifdef DEFINE_SHOW_ATTRIBUTE
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
@@ -1003,6 +1644,58 @@ DEFINE_SHOW_ATTRIBUTE(vrr_range);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 #endif
+#endif
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+static const struct file_operations dp_dsc_clock_en_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_clock_en_read,
+	.write = dp_dsc_clock_en_write,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_slice_width_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_slice_width_read,
+	.write = dp_dsc_slice_width_write,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_slice_height_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_slice_height_read,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_bits_per_pixel_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_bits_per_pixel_read,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_pic_width_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_pic_width_read,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_pic_height_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_pic_height_read,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_chunk_size_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_chunk_size_read,
+	.llseek = default_llseek
+};
+
+static const struct file_operations dp_dsc_slice_bpg_offset_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_dsc_slice_bpg_offset_read,
+	.llseek = default_llseek
+};
 #endif
 
 static const struct file_operations dp_link_settings_debugfs_fops = {
@@ -1064,7 +1757,19 @@ static const struct {
 		{"sdp_message", &sdp_message_fops},
 		{"aux_dpcd_address", &dp_dpcd_address_debugfs_fops},
 		{"aux_dpcd_size", &dp_dpcd_size_debugfs_fops},
+#ifndef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops}
+#else
+		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
+		{"dsc_clock_en", &dp_dsc_clock_en_debugfs_fops},
+		{"dsc_slice_width", &dp_dsc_slice_width_debugfs_fops},
+		{"dsc_slice_height", &dp_dsc_slice_height_debugfs_fops},
+		{"dsc_bits_per_pixel", &dp_dsc_bits_per_pixel_debugfs_fops},
+		{"dsc_pic_width", &dp_dsc_pic_width_debugfs_fops},
+		{"dsc_pic_height", &dp_dsc_pic_height_debugfs_fops},
+		{"dsc_chunk_size", &dp_dsc_chunk_size_debugfs_fops},
+		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops}
+#endif
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP

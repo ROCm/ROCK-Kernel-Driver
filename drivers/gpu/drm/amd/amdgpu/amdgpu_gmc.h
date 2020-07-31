@@ -74,6 +74,12 @@ struct amdgpu_gmc_fault {
 /*
  * VMHUB structures, functions & helpers
  */
+struct amdgpu_vmhub_funcs {
+	void (*print_l2_protection_fault_status)(struct amdgpu_device *adev,
+						 uint32_t status);
+	uint32_t (*get_invalidate_req)(unsigned int vmid, uint32_t flush_type);
+};
+
 struct amdgpu_vmhub {
 	uint32_t	ctx0_ptb_addr_lo32;
 	uint32_t	ctx0_ptb_addr_hi32;
@@ -92,6 +98,10 @@ struct amdgpu_vmhub {
 	uint32_t	ctx_addr_distance; /* include LO32/HI32 */
 	uint32_t	eng_distance;
 	uint32_t	eng_addr_distance; /* include LO32/HI32 */
+
+	uint32_t	vm_cntx_cntl_vm_fault;
+
+	const struct amdgpu_vmhub_funcs *vmhub_funcs;
 };
 
 /*
@@ -288,5 +298,9 @@ void amdgpu_gmc_ras_fini(struct amdgpu_device *adev);
 int amdgpu_gmc_allocate_vm_inv_eng(struct amdgpu_device *adev);
 
 extern void amdgpu_gmc_tmz_set(struct amdgpu_device *adev);
+
+extern void
+amdgpu_gmc_set_vm_fault_masks(struct amdgpu_device *adev, int hub_type,
+			      bool enable);
 
 #endif

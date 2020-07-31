@@ -378,6 +378,11 @@ struct amdgpu_display_manager {
 	struct amdgpu_encoder mst_encoders[AMDGPU_DM_MAX_CRTC];
 };
 
+struct dsc_preferred_settings {
+	bool dsc_clock_en;
+	uint32_t dsc_slice_width;
+};
+
 struct amdgpu_dm_connector {
 
 	struct drm_connector base;
@@ -422,7 +427,7 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
+#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	bool mst_connected;
 #endif
 #ifdef CONFIG_DEBUG_FS
@@ -430,6 +435,7 @@ struct amdgpu_dm_connector {
 	uint32_t debugfs_dpcd_size;
 #endif
 	bool force_yuv420_output;
+	struct dsc_preferred_settings dsc_settings;
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)

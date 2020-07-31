@@ -28,6 +28,9 @@
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
+/* hmm support is enabled */
+#define HAVE_AMDKCL_HMM_MIRROR_ENABLED 1
+
 /* amd_iommu_pc_supported() is available */
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
@@ -203,8 +206,14 @@
 /* drm_connector_put() is available */
 #define HAVE_DRM_CONNECTOR_PUT 1
 
+/* connector reference counting is available */
+#define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
+
 /* drm_connector_set_path_property() is available */
 #define HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY 1
+
+/* drm_connector_unreference() is available */
+/* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
 /* drm_connector_update_edid_property() is available */
 #define HAVE_DRM_CONNECTOR_UPDATE_EDID_PROPERTY 1
@@ -247,6 +256,9 @@
 
 /* display_info->hdmi.scdc.scrambling are available */
 #define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
+
+/* display_info->max_tmds_clock is available */
+#define HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK 1
 
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
@@ -882,6 +894,12 @@
 
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
+
+/* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
+#define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
+
+/* __drm_atomic_helper_crtc_destroy_state() wants 1 arg */
+#define HAVE___DRM_ATOMIC_HELPER_CRTC_DESTROY_STATE_P 1
 
 /* __kthread_should_park() is available */
 #define HAVE___KTHREAD_SHOULD_PARK 1

@@ -1,5 +1,13 @@
+ifndef CONFIG_DRM
+$(error CONFIG_DRM disabled, exit...)
+endif
+
+ifeq (y,$(CONFIG_DRM_AMDGPU))
+$(error DRM_AMDGPU is built-in, exit...)
+endif
+
 define get_rhel_version
-	find -L $(kdir) -name 'version.h' -exec grep $(1) {} + | sort -u | awk -F ' ' '{print $$NF}'
+(echo "#include <linux/version.h>"; echo "int amdkcl_ver=$(1);") | cpp $(LINUXINCLUDE) | sed -n 's/int amdkcl_ver=\([0-9]*\);/\1/p'
 endef
 RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
 RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
@@ -25,25 +33,28 @@ OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
 
-ifneq ($(findstring $(OS_NAME), "ubuntu" "amzn" "custom-rhel" "fedora"),)
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else ifneq ($(findstring $(OS_NAME), "debian" "sled" "sles" "opensuse-leap"),)
-ifneq ($(realpath $(shell echo $(kdir) | sed "s/build/source/")), )
-real_kdir=$(shell echo $(kdir) | sed "s/build/source/")
-else
-real_kdir=$(kdir)
+ifdef CONFIG_CC_IS_GCC
+# Use -dumpfullversion -dumpversion to ensure that we get the right format
+# -dumpfullversion is newer, but has the same format as the old -dumpversion
+# Newer -dumpversion only reports the GCC Major version, while the older
+# -dumpversion and the newer -dumpfullversion return MAJ.MIN.PAT
+GCCVER=$(shell $(CC) -dumpfullversion -dumpversion)
+GCCMAJ=$(shell echo $(GCCVER) | cut -f1 -d.)
+GCCMIN=$(shell echo $(GCCVER) | cut -f2 -d.)
+GCCPAT=$(shell echo $(GCCVER) | cut -f3 -d.)
+# CONFIG_GCC_VERSION returns x.xx.xx as the version format
+GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
+ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
+$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
+$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
 endif
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(real_kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(real_kdir)/Makefile)
-else ifeq ("rhel",$(OS_NAME))
-ifneq ($(OS_VERSION),"8.0")
-DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
-else
-DRM_VER=$(shell sed -n 's/^VERSION = \(.*\)/\1/p' $(kdir)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^PATCHLEVEL = \(.*\)/\1/p' $(kdir)/Makefile)
 endif
+
+DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
+ifeq ($(DRM_VER),)
+DRM_VER = $(VERSION)
+DRM_PATCH = $(PATCHLEVEL)
 endif
 
 subdir-ccflags-y += \

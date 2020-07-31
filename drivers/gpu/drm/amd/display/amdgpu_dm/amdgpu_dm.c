@@ -104,6 +104,8 @@ MODULE_FIRMWARE(FIRMWARE_RENOIR_DMUB);
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 #define FIRMWARE_SIENNA_CICHLID_DMUB "amdgpu/sienna_cichlid_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_SIENNA_CICHLID_DMUB);
+#define FIRMWARE_NAVY_FLOUNDER_DMUB "amdgpu/navy_flounder_dmcub.bin"
+MODULE_FIRMWARE(FIRMWARE_NAVY_FLOUNDER_DMUB);
 #endif
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
@@ -1110,6 +1112,12 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	const struct dmcu_firmware_header_v1_0 *hdr;
 
 	switch(adev->asic_type) {
+#if defined(CONFIG_DRM_AMD_DC_SI)
+	case CHIP_TAHITI:
+	case CHIP_PITCAIRN:
+	case CHIP_VERDE:
+	case CHIP_OLAND:
+#endif
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
 	case CHIP_KAVERI:
@@ -1231,9 +1239,12 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		break;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
-	case CHIP_NAVY_FLOUNDER:
 		dmub_asic = DMUB_ASIC_DCN30;
 		fw_name_dmub = FIRMWARE_SIENNA_CICHLID_DMUB;
+		break;
+	case CHIP_NAVY_FLOUNDER:
+		dmub_asic = DMUB_ASIC_DCN30;
+		fw_name_dmub = FIRMWARE_NAVY_FLOUNDER_DMUB;
 		break;
 #endif
 
@@ -1430,7 +1441,7 @@ static int dm_late_init(void *handle)
 	unsigned int linear_lut[16];
 	int i;
 	struct dmcu *dmcu = NULL;
-	bool ret;
+	bool ret = true;
 
 	if (!adev->dm.fw_dmcu)
 		return detect_mst_link_for_all_connectors(adev->ddev);
@@ -1451,7 +1462,14 @@ static int dm_late_init(void *handle)
 	 */
 	params.min_abm_backlight = 0x28F;
 
-	ret = dmcu_load_iram(dmcu, params);
+	/* In the case where abm is implemented on dmcub,
+	 * dmcu object will be null.
+	 * ABM 2.4 and up are implemented on dmcub.
+	 */
+	if (dmcu)
+		ret = dmcu_load_iram(dmcu, params);
+	else if (adev->dm.dc->ctx->dmub_srv)
+		ret = dmub_init_abm_config(adev->dm.dc->res_pool->abm, params);
 
 	if (!ret)
 		return -EINVAL;
@@ -1548,22 +1566,11 @@ static int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev)
 		return 0;
 	}
 
-	mutex_lock(&smu->mutex);
-
-	/* pass data to smu controller */
-	if ((smu->watermarks_bitmap & WATERMARKS_EXIST) &&
-			!(smu->watermarks_bitmap & WATERMARKS_LOADED)) {
-		ret = smu_write_watermarks_table(smu);
-
-		if (ret) {
-			mutex_unlock(&smu->mutex);
-			DRM_ERROR("Failed to update WMTABLE!\n");
-			return ret;
-		}
-		smu->watermarks_bitmap |= WATERMARKS_LOADED;
+	ret = smu_write_watermarks_table(smu);
+	if (ret) {
+		DRM_ERROR("Failed to update WMTABLE!\n");
+		return ret;
 	}
-
-	mutex_unlock(&smu->mutex);
 
 	return 0;
 }
@@ -2623,6 +2630,89 @@ static void register_hpd_handlers(struct amdgpu_device *adev)
 	}
 }
 
+#if defined(CONFIG_DRM_AMD_DC_SI)
+/* Register IRQ sources and initialize IRQ callbacks */
+static int dce60_register_irq_handlers(struct amdgpu_device *adev)
+{
+	struct dc *dc = adev->dm.dc;
+	struct common_irq_params *c_irq_params;
+	struct dc_interrupt_params int_params = {0};
+	int r;
+	int i;
+	unsigned client_id = AMDGPU_IRQ_CLIENTID_LEGACY;
+
+	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
+	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
+
+	/*
+	 * Actions of amdgpu_irq_add_id():
+	 * 1. Register a set() function with base driver.
+	 *    Base driver will call set() function to enable/disable an
+	 *    interrupt in DC hardware.
+	 * 2. Register amdgpu_dm_irq_handler().
+	 *    Base driver will call amdgpu_dm_irq_handler() for ALL interrupts
+	 *    coming from DC hardware.
+	 *    amdgpu_dm_irq_handler() will re-direct the interrupt to DC
+	 *    for acknowledging and handling. */
+
+	/* Use VBLANK interrupt */
+	for (i = 0; i < adev->mode_info.num_crtc; i++) {
+		r = amdgpu_irq_add_id(adev, client_id, i+1 , &adev->crtc_irq);
+		if (r) {
+			DRM_ERROR("Failed to add crtc irq id!\n");
+			return r;
+		}
+
+		int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+		int_params.irq_source =
+			dc_interrupt_to_irq_source(dc, i+1 , 0);
+
+		c_irq_params = &adev->dm.vblank_params[int_params.irq_source - DC_IRQ_SOURCE_VBLANK1];
+
+		c_irq_params->adev = adev;
+		c_irq_params->irq_src = int_params.irq_source;
+
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+				dm_crtc_high_irq, c_irq_params);
+	}
+
+	/* Use GRPH_PFLIP interrupt */
+	for (i = VISLANDS30_IV_SRCID_D1_GRPH_PFLIP;
+			i <= VISLANDS30_IV_SRCID_D6_GRPH_PFLIP; i += 2) {
+		r = amdgpu_irq_add_id(adev, client_id, i, &adev->pageflip_irq);
+		if (r) {
+			DRM_ERROR("Failed to add page flip irq id!\n");
+			return r;
+		}
+
+		int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
+		int_params.irq_source =
+			dc_interrupt_to_irq_source(dc, i, 0);
+
+		c_irq_params = &adev->dm.pflip_params[int_params.irq_source - DC_IRQ_SOURCE_PFLIP_FIRST];
+
+		c_irq_params->adev = adev;
+		c_irq_params->irq_src = int_params.irq_source;
+
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+				dm_pflip_high_irq, c_irq_params);
+
+	}
+
+	/* HPD */
+	r = amdgpu_irq_add_id(adev, client_id,
+			VISLANDS30_IV_SRCID_HOTPLUG_DETECT_A, &adev->hpd_irq);
+	if (r) {
+		DRM_ERROR("Failed to add hpd irq id!\n");
+		return r;
+	}
+
+	register_hpd_handlers(adev);
+
+	return 0;
+}
+#endif
+
 /* Register IRQ sources and initialize IRQ callbacks */
 static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 {
@@ -3404,6 +3494,17 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {
+#if defined(CONFIG_DRM_AMD_DC_SI)
+	case CHIP_TAHITI:
+	case CHIP_PITCAIRN:
+	case CHIP_VERDE:
+	case CHIP_OLAND:
+		if (dce60_register_irq_handlers(dm->adev)) {
+			DRM_ERROR("DM: Failed to initialize IRQ\n");
+			goto fail;
+		}
+		break;
+#endif
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
 	case CHIP_KAVERI:
@@ -3678,6 +3779,20 @@ static int dm_early_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	switch (adev->asic_type) {
+#if defined(CONFIG_DRM_AMD_DC_SI)
+	case CHIP_TAHITI:
+	case CHIP_PITCAIRN:
+	case CHIP_VERDE:
+		adev->mode_info.num_crtc = 6;
+		adev->mode_info.num_hpd = 6;
+		adev->mode_info.num_dig = 6;
+		break;
+	case CHIP_OLAND:
+		adev->mode_info.num_crtc = 2;
+		adev->mode_info.num_hpd = 2;
+		adev->mode_info.num_dig = 2;
+		break;
+#endif
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
 		adev->mode_info.num_crtc = 6;
@@ -3789,21 +3904,12 @@ static bool modeset_required(struct drm_crtc_state *crtc_state,
 			     struct dc_stream_state *new_stream,
 			     struct dc_stream_state *old_stream)
 {
-	if (!drm_atomic_crtc_needs_modeset(crtc_state))
-		return false;
-
-	if (!crtc_state->enable)
-		return false;
-
-	return crtc_state->active;
+	return crtc_state->active && drm_atomic_crtc_needs_modeset(crtc_state);
 }
 
 static bool modereset_required(struct drm_crtc_state *crtc_state)
 {
-	if (!drm_atomic_crtc_needs_modeset(crtc_state))
-		return false;
-
-	return !crtc_state->enable || !crtc_state->active;
+	return !crtc_state->active && drm_atomic_crtc_needs_modeset(crtc_state);
 }
 
 static void amdgpu_dm_encoder_destroy(struct drm_encoder *encoder)
@@ -4586,7 +4692,7 @@ static bool adjust_colour_depth_from_display_info(
 			return false;
 		}
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#ifndef HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK
 		struct drm_connector * connector = container_of(info, struct drm_connector, display_info);
 		if (normalized_clk <= connector->max_tmds_clock) {
 #else
@@ -4961,14 +5067,14 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
 				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
-				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_ext_caps.raw,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
 				      &dsc_caps);
 #endif
 		link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
 							     dc_link_get_link_cap(aconnector->dc_link));
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-		if (dsc_caps.is_dsc_supported)
+		if (dsc_caps.is_dsc_supported) {
 			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
 						  &dsc_caps,
 						  aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
@@ -4976,6 +5082,13 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 						  &stream->timing,
 						  &stream->timing.dsc_cfg))
 				stream->timing.flags.DSC = 1;
+			/* Overwrite the stream flag if DSC is enabled through debugfs */
+			if (aconnector->dsc_settings.dsc_clock_en)
+				stream->timing.flags.DSC = 1;
+			if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_slice_width)
+				stream->timing.dsc_cfg.num_slices_h = DIV_ROUND_UP(stream->timing.h_addressable,
+										   aconnector->dsc_settings.dsc_slice_width);
+		}
 #endif
 	}
 #endif
@@ -5141,7 +5254,7 @@ static void dm_crtc_destroy_state(struct drm_crtc *crtc,
 	if (cur->stream)
 		dc_stream_release(cur->stream);
 
-#if DRM_VERSION_CODE > DRM_VERSION(4, 7, 0)
+#ifdef HAVE___DRM_ATOMIC_HELPER_CRTC_DESTROY_STATE_P
 	__drm_atomic_helper_crtc_destroy_state(state);
 #else
 	__drm_atomic_helper_crtc_destroy_state(crtc, state);
@@ -5489,7 +5602,7 @@ void amdgpu_dm_connector_funcs_reset(struct drm_connector *connector)
 		to_dm_connector_state(connector->state);
 
 	if (connector->state)
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
+#ifdef HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P
 		__drm_atomic_helper_connector_destroy_state(connector->state);
 #else
 		__drm_atomic_helper_connector_destroy_state(connector, connector->state);
@@ -6584,8 +6697,9 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 |
 		DRM_MODE_ROTATE_180 | DRM_MODE_ROTATE_270;
 
-	drm_plane_create_rotation_property(plane, DRM_MODE_ROTATE_0,
-					   supported_rotations);
+	if (dm->adev->asic_type >= CHIP_BONAIRE)
+		drm_plane_create_rotation_property(plane, DRM_MODE_ROTATE_0,
+						   supported_rotations);
 #endif
 
 	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
@@ -6931,7 +7045,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 #endif
 
 	if (connector_type == DRM_MODE_CONNECTOR_eDP &&
-	    dc_is_dmcu_initialized(adev->dm.dc)) {
+	    (dc_is_dmcu_initialized(adev->dm.dc) || adev->dm.dc->ctx->dmub_srv)) {
 		drm_object_attach_property(&aconnector->base.base,
 				adev->mode_info.abm_level_property, 0);
 	}
@@ -8938,8 +9052,7 @@ skip_modeset:
 	 * We want to do dc stream updates that do not require a
 	 * full modeset below.
 	 */
-	if (!(enable && aconnector && new_crtc_state->enable &&
-	      new_crtc_state->active))
+	if (!(enable && aconnector && new_crtc_state->active))
 		return 0;
 	/*
 	 * Given above conditions, the dc state cannot be NULL because:
@@ -9488,6 +9601,34 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	ret = drm_atomic_helper_check_modeset(dev, state);
 	if (ret)
 		goto fail;
+
+	/* Check connector changes */
+#if !defined(for_each_oldnew_connector_in_state)
+	for_each_connector_in_state(state, connector, new_con_state, i) {
+		old_con_state = connector->state;
+#else
+	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+#endif
+		struct dm_connector_state *dm_old_con_state = to_dm_connector_state(old_con_state);
+		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
+
+		/* Skip connectors that are disabled or part of modeset already. */
+		if (!old_con_state->crtc && !new_con_state->crtc)
+			continue;
+
+		if (!new_con_state->crtc)
+			continue;
+
+		new_crtc_state = drm_atomic_get_crtc_state(state, new_con_state->crtc);
+		if (IS_ERR(new_crtc_state)) {
+			ret = PTR_ERR(new_crtc_state);
+			goto fail;
+		}
+
+		if (dm_old_con_state->abm_level !=
+		    dm_new_con_state->abm_level)
+			new_crtc_state->connectors_changed = true;
+	}
 
 #if defined(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS)
 	if (adev->asic_type >= CHIP_NAVI10) {

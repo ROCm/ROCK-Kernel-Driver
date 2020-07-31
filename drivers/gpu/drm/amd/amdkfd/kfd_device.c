@@ -29,6 +29,7 @@
 #include "cwsr_trap_handler.h"
 #include "kfd_iommu.h"
 #include "amdgpu_amdkfd.h"
+#include "kfd_smi_events.h"
 
 #define MQD_SIZE_ALIGNED 768
 
@@ -414,7 +415,7 @@ static const struct kfd_device_info navi10_device_info = {
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
 	.ih_ring_entry_size = 8 * sizeof(uint32_t),
-	.event_interrupt_class = &event_interrupt_class_v9,
+	.event_interrupt_class = &event_interrupt_class_v10,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.needs_iommu_device = false,
@@ -432,7 +433,7 @@ static const struct kfd_device_info navi12_device_info = {
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
 	.ih_ring_entry_size = 8 * sizeof(uint32_t),
-	.event_interrupt_class = &event_interrupt_class_v9,
+	.event_interrupt_class = &event_interrupt_class_v10,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.needs_iommu_device = false,
@@ -450,7 +451,7 @@ static const struct kfd_device_info navi14_device_info = {
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
 	.ih_ring_entry_size = 8 * sizeof(uint32_t),
-	.event_interrupt_class = &event_interrupt_class_v9,
+	.event_interrupt_class = &event_interrupt_class_v10,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.needs_iommu_device = false,
@@ -468,7 +469,7 @@ static const struct kfd_device_info sienna_cichlid_device_info = {
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
 	.ih_ring_entry_size = 8 * sizeof(uint32_t),
-	.event_interrupt_class = &event_interrupt_class_v9,
+	.event_interrupt_class = &event_interrupt_class_v10,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.needs_iommu_device = false,
@@ -486,7 +487,7 @@ static const struct kfd_device_info navy_flounder_device_info = {
 	.max_no_of_hqd  = 24,
 	.doorbell_size  = 8,
 	.ih_ring_entry_size = 8 * sizeof(uint32_t),
-	.event_interrupt_class = &event_interrupt_class_v9,
+	.event_interrupt_class = &event_interrupt_class_v10,
 	.num_of_watch_points = 4,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED,
 	.needs_iommu_device = false,
@@ -1256,6 +1257,12 @@ void kfd_dec_compute_active(struct kfd_dev *kfd)
 	if (count == 0)
 		amdgpu_amdkfd_set_compute_idle(kfd->kgd, true);
 	WARN_ONCE(count < 0, "Compute profile ref. count error");
+}
+
+void kgd2kfd_smi_event_throttle(struct kfd_dev *kfd, uint32_t throttle_bitmask)
+{
+	if (kfd)
+		kfd_smi_event_update_thermal_throttling(kfd, throttle_bitmask);
 }
 
 #define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1

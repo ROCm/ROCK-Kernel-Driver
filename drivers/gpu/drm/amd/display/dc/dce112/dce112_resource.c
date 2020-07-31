@@ -424,7 +424,9 @@ static const struct dc_plane_cap plane_cap = {
 			.argb8888 = 250,
 			.nv12 = 1,
 			.fp16 = 1
-	}
+	},
+	64,
+	64
 };
 
 #define CTX  ctx
@@ -1015,7 +1017,7 @@ enum dc_status dce112_add_stream_to_ctx(
 		struct dc_state *new_ctx,
 		struct dc_stream_state *dc_stream)
 {
-	enum dc_status result = DC_ERROR_UNEXPECTED;
+	enum dc_status result;
 
 	result = resource_map_pool_resources(dc, new_ctx, dc_stream);
 

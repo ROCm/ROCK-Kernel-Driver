@@ -407,6 +407,7 @@ L_SAVE_HWREG:
 
 	// Not used on Sienna_Cichlid but keep layout same for debugger.
 	write_hwreg_to_mem(s_save_xnack_mask, s_save_buf_rsrc0, s_save_mem_offset)
+	s_add_u32	s_save_mem_offset, s_save_mem_offset, 4
 
 	s_getreg_b32	s_save_m0, hwreg(HW_REG_MODE)
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
@@ -894,6 +895,11 @@ L_RESTORE_SGPR:
 	s_cmp_eq_u32	m0, 0							//scc = (m0 < s_sgpr_save_num) ? 1 : 0
 	s_cbranch_scc0	L_RESTORE_SGPR_LOOP
 
+	// s_barrier with MODE.DEBUG_EN=1, STATUS.PRIV=1 incorrectly asserts debug exception.
+	// Clear DEBUG_EN before and restore MODE after the barrier.
+	s_setreg_imm32_b32	hwreg(HW_REG_MODE), 0
+	s_barrier								//barrier to ensure the readiness of LDS before access attemps from any other wave in the same TG
+
 	/* restore HW registers */
 L_RESTORE_HWREG:
 	// HWREG SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)
@@ -912,6 +918,7 @@ L_RESTORE_HWREG:
 	read_hwreg_from_mem(s_restore_status, s_restore_buf_rsrc0, s_restore_mem_offset)
 	read_hwreg_from_mem(s_restore_trapsts, s_restore_buf_rsrc0, s_restore_mem_offset)
 	read_hwreg_from_mem(s_restore_xnack_mask, s_restore_buf_rsrc0, s_restore_mem_offset)
+	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 4
 	read_hwreg_from_mem(s_restore_mode, s_restore_buf_rsrc0, s_restore_mem_offset)
 	read_hwreg_from_mem(s_restore_flat_scratch, s_restore_buf_rsrc0, s_restore_mem_offset)
 	s_waitcnt	lgkmcnt(0)
@@ -975,8 +982,6 @@ L_RESTORE_HWREG:
 	s_and_b64	exec, exec, exec					// Restore STATUS.EXECZ, not writable by s_setreg_b32
 	s_and_b64	vcc, vcc, vcc						// Restore STATUS.VCCZ, not writable by s_setreg_b32
 	s_setreg_b32	hwreg(HW_REG_STATUS), s_restore_status			// SCC is included, which is changed by previous salu
-
-	s_barrier								//barrier to ensure the readiness of LDS before access attemps from any other wave in the same TG
 
 	s_rfe_b64	s_restore_pc_lo						//Return to the main shader program and resume execution
 
