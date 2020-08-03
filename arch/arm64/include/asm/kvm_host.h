@@ -340,12 +340,14 @@ struct kvm_vcpu_arch {
 	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
 	bool sysregs_loaded_on_cpu;
 
+#ifndef __GENKSYMS__
 	/* Guest PV state */
 	struct {
 		u64 steal;
 		u64 last_steal;
 		gpa_t base;
 	} steal;
+#endif
 };
 
 /* Pointer to the vcpu's SVE FFR for sve_{save,load}_state() */
