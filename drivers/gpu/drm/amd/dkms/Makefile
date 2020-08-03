@@ -34,14 +34,9 @@ OS_VERSION = "0.0"
 endif
 
 ifdef CONFIG_CC_IS_GCC
-# Use -dumpfullversion -dumpversion to ensure that we get the right format
-# -dumpfullversion is newer, but has the same format as the old -dumpversion
-# Newer -dumpversion only reports the GCC Major version, while the older
-# -dumpversion and the newer -dumpfullversion return MAJ.MIN.PAT
-GCCVER=$(shell $(CC) -dumpfullversion -dumpversion)
-GCCMAJ=$(shell echo $(GCCVER) | cut -f1 -d.)
-GCCMIN=$(shell echo $(GCCVER) | cut -f2 -d.)
-GCCPAT=$(shell echo $(GCCVER) | cut -f3 -d.)
+GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
+GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCCPAT=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
 # CONFIG_GCC_VERSION returns x.xx.xx as the version format
 GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
 ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
