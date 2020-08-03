@@ -138,7 +138,6 @@ enum cpuhp_state {
 	/* Must be the last timer callback */
 	CPUHP_AP_DUMMY_TIMER_STARTING,
 	CPUHP_AP_ARM_XEN_STARTING,
-	CPUHP_AP_ARM_KVMPV_STARTING,
 	CPUHP_AP_ARM_CORESIGHT_STARTING,
 	CPUHP_AP_ARM64_ISNDEP_STARTING,
 	CPUHP_AP_SMPCFD_DYING,
@@ -186,6 +185,9 @@ enum cpuhp_state {
 	CPUHP_AP_X86_KVM_CLK_ONLINE,
 	CPUHP_AP_ACTIVE,
 	CPUHP_ONLINE,
+#ifndef __GENKSYMS__
+	CPUHP_AP_ARM_KVMPV_STARTING,
+#endif
 };
 
 int __cpuhp_setup_state(enum cpuhp_state state,	const char *name, bool invoke,
