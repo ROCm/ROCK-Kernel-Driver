@@ -1268,7 +1268,11 @@ extern unsigned int halt_poll_ns_grow_start;
 extern unsigned int halt_poll_ns_shrink;
 
 struct kvm_device {
+ #ifndef __GENKSYMS__
 	const struct kvm_device_ops *ops;
+#else
+	struct kvm_device_ops *ops;
+#endif
 	struct kvm *kvm;
 	void *private;
 	struct list_head vm_node;
