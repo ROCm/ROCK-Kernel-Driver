@@ -130,7 +130,6 @@ struct ttm_resource_manager_func {
  * @default_caching: The default caching policy used for a buffer object
  * placed in this memory type if the user doesn't provide one.
  * @func: structure pointer implementing the range manager. See above
- * @priv: Driver private closure for @func.
  * @io_reserve_mutex: Mutex optionally protecting shared io_reserve structures
  * @use_io_reserve_lru: Use an lru list to try to unreserve io_mem_regions
  * reserved by the TTM vm system.
@@ -155,7 +154,6 @@ struct ttm_resource_manager {
 	uint32_t available_caching;
 	uint32_t default_caching;
 	const struct ttm_resource_manager_func *func;
-	void *priv;
 	struct mutex io_reserve_mutex;
 	bool use_io_reserve_lru;
 	spinlock_t move_lock;
