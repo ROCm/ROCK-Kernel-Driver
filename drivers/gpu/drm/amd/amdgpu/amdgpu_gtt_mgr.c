@@ -49,8 +49,9 @@ static ssize_t amdgpu_mem_info_gtt_total_show(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
+	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_TT);
 	return snprintf(buf, PAGE_SIZE, "%llu\n",
-			(adev->mman.bdev.man[TTM_PL_TT].size) * PAGE_SIZE);
+			man->size * PAGE_SIZE);
 }
 
 /**
@@ -67,8 +68,9 @@ static ssize_t amdgpu_mem_info_gtt_used_show(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
+	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_TT);
 	return snprintf(buf, PAGE_SIZE, "%llu\n",
-			amdgpu_gtt_mgr_usage(&adev->mman.bdev.man[TTM_PL_TT]));
+			amdgpu_gtt_mgr_usage(man));
 }
 
 static DEVICE_ATTR(mem_info_gtt_total, S_IRUGO,
@@ -87,7 +89,7 @@ static const struct ttm_mem_type_manager_func amdgpu_gtt_mgr_func;
  */
 int amdgpu_gtt_mgr_init(struct amdgpu_device *adev, uint64_t gtt_size)
 {
-	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_TT];
+	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_TT);
 	struct amdgpu_gtt_mgr *mgr;
 	uint64_t start, size;
 	int ret;
@@ -135,7 +137,7 @@ int amdgpu_gtt_mgr_init(struct amdgpu_device *adev, uint64_t gtt_size)
  */
 void amdgpu_gtt_mgr_fini(struct amdgpu_device *adev)
 {
-	struct ttm_mem_type_manager *man = &adev->mman.bdev.man[TTM_PL_TT];
+	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_TT);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 	int ret;
 
