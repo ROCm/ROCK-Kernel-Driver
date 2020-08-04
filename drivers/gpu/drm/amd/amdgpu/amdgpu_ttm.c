@@ -2582,7 +2582,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
  */
 void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 {
-	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
+	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
 	uint64_t size;
 	int r;
 
@@ -2805,12 +2805,12 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
 #if !defined(HAVE_DRM_MM_PRINT)
-	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, ttm_pl);
+	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, ttm_pl);
 	struct drm_mm *mm = (struct drm_mm *)man->priv;
 	struct ttm_bo_global *glob = &ttm_bo_glob;
 	int ret;
 #else
-	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, ttm_pl);
+	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, ttm_pl);
 	struct drm_printer p = drm_seq_file_printer(m);
 #endif
 

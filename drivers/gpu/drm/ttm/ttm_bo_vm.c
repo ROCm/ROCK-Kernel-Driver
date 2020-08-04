@@ -308,7 +308,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 #else
 	unsigned long address = vmf->address;
 #endif
-	struct ttm_mem_type_manager *man =
+	struct ttm_resource_manager *man =
 		ttm_manager_type(bdev, bo->mem.mem_type);
 
 	/*

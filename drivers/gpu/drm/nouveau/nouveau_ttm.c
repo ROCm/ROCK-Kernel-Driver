@@ -32,7 +32,7 @@
 #include <core/tegra.h>
 
 static void
-nouveau_manager_del(struct ttm_mem_type_manager *man, struct ttm_mem_reg *reg)
+nouveau_manager_del(struct ttm_resource_manager *man, struct ttm_mem_reg *reg)
 {
 	nouveau_mem_del(reg);
 }
@@ -44,7 +44,7 @@ nouveau_manager_debug(struct ttm_mem_type_manager *man,
 }
 
 static int
-nouveau_vram_manager_new(struct ttm_mem_type_manager *man,
+nouveau_vram_manager_new(struct ttm_resource_manager *man,
 			 struct ttm_buffer_object *bo,
 			 const struct ttm_place *place,
 			 struct ttm_mem_reg *reg)
@@ -69,14 +69,14 @@ nouveau_vram_manager_new(struct ttm_mem_type_manager *man,
 	return 0;
 }
 
-const struct ttm_mem_type_manager_func nouveau_vram_manager = {
+const struct ttm_resource_manager_func nouveau_vram_manager = {
 	.get_node = nouveau_vram_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug,
 };
 
 static int
-nouveau_gart_manager_new(struct ttm_mem_type_manager *man,
+nouveau_gart_manager_new(struct ttm_resource_manager *man,
 			 struct ttm_buffer_object *bo,
 			 const struct ttm_place *place,
 			 struct ttm_mem_reg *reg)
@@ -93,14 +93,14 @@ nouveau_gart_manager_new(struct ttm_mem_type_manager *man,
 	return 0;
 }
 
-const struct ttm_mem_type_manager_func nouveau_gart_manager = {
+const struct ttm_resource_manager_func nouveau_gart_manager = {
 	.get_node = nouveau_gart_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug
 };
 
 static int
-nv04_gart_manager_new(struct ttm_mem_type_manager *man,
+nv04_gart_manager_new(struct ttm_resource_manager *man,
 		      struct ttm_buffer_object *bo,
 		      const struct ttm_place *place,
 		      struct ttm_mem_reg *reg)
@@ -126,7 +126,7 @@ nv04_gart_manager_new(struct ttm_mem_type_manager *man,
 	return 0;
 }
 
-const struct ttm_mem_type_manager_func nv04_gart_manager = {
+const struct ttm_resource_manager_func nv04_gart_manager = {
 	.get_node = nv04_gart_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug
@@ -169,7 +169,7 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
 	if (drm->client.device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
 		/* Some BARs do not support being ioremapped WC */
 		const u8 type = mmu->type[drm->ttm.type_vram].type;
-		struct ttm_mem_type_manager *man = kzalloc(sizeof(*man), GFP_KERNEL);
+		struct ttm_resource_manager *man = kzalloc(sizeof(*man), GFP_KERNEL);
 		if (!man)
 			return -ENOMEM;
 
@@ -184,10 +184,10 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
 		man->func = &nouveau_vram_manager;
 		man->use_io_reserve_lru = true;
 
-		ttm_mem_type_manager_init(man,
+		ttm_resource_manager_init(man,
 					  drm->gem.vram_available >> PAGE_SHIFT);
 		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, man);
-		ttm_mem_type_manager_set_used(man, true);
+		ttm_resource_manager_set_used(man, true);
 		return 0;
 	} else {
 		return ttm_range_man_init(&drm->ttm.bdev, TTM_PL_VRAM,
@@ -200,12 +200,12 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
 static void
 nouveau_ttm_fini_vram(struct nouveau_drm *drm)
 {
-	struct ttm_mem_type_manager *man = ttm_manager_type(&drm->ttm.bdev, TTM_PL_VRAM);
+	struct ttm_resource_manager *man = ttm_manager_type(&drm->ttm.bdev, TTM_PL_VRAM);
 
 	if (drm->client.device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
-		ttm_mem_type_manager_set_used(man, false);
-		ttm_mem_type_manager_force_list_clean(&drm->ttm.bdev, man);
-		ttm_mem_type_manager_cleanup(man);
+		ttm_resource_manager_set_used(man, false);
+		ttm_resource_manager_force_list_clean(&drm->ttm.bdev, man);
+		ttm_resource_manager_cleanup(man);
 		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_VRAM, NULL);
 		kfree(man);
 	} else
@@ -215,10 +215,10 @@ nouveau_ttm_fini_vram(struct nouveau_drm *drm)
 static int
 nouveau_ttm_init_gtt(struct nouveau_drm *drm)
 {
-	struct ttm_mem_type_manager *man;
+	struct ttm_resource_manager *man;
 	unsigned long size_pages = drm->gem.gart_available >> PAGE_SHIFT;
 	unsigned available_caching, default_caching;
-	const struct ttm_mem_type_manager_func *func = NULL;
+	const struct ttm_resource_manager_func *func = NULL;
 	if (drm->agp.bridge) {
 		available_caching = TTM_PL_FLAG_UNCACHED |
 			TTM_PL_FLAG_WC;
@@ -246,24 +246,24 @@ nouveau_ttm_init_gtt(struct nouveau_drm *drm)
 	man->available_caching = available_caching;
 	man->default_caching = default_caching;
 	man->use_tt = true;
-	ttm_mem_type_manager_init(man, size_pages);
+	ttm_resource_manager_init(man, size_pages);
 	ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_TT, man);
-	ttm_mem_type_manager_set_used(man, true);
+	ttm_resource_manager_set_used(man, true);
 	return 0;
 }
 
 static void
 nouveau_ttm_fini_gtt(struct nouveau_drm *drm)
 {
-	struct ttm_mem_type_manager *man = ttm_manager_type(&drm->ttm.bdev, TTM_PL_TT);
+	struct ttm_resource_manager *man = ttm_manager_type(&drm->ttm.bdev, TTM_PL_TT);
 
 	if (drm->client.device.info.family < NV_DEVICE_INFO_V0_TESLA &&
 	    drm->agp.bridge)
 		ttm_range_man_fini(&drm->ttm.bdev, TTM_PL_TT);
 	else {
-		ttm_mem_type_manager_set_used(man, false);
-		ttm_mem_type_manager_force_list_clean(&drm->ttm.bdev, man);
-		ttm_mem_type_manager_cleanup(man);
+		ttm_resource_manager_set_used(man, false);
+		ttm_resource_manager_force_list_clean(&drm->ttm.bdev, man);
+		ttm_resource_manager_cleanup(man);
 		ttm_set_driver_manager(&drm->ttm.bdev, TTM_PL_TT, NULL);
 		kfree(man);
 	}
