@@ -923,6 +923,102 @@ await_fence:
 					     I915_FENCE_GFP);
 }
 
+static bool intel_timeline_sync_has_start(struct intel_timeline *tl,
+					  struct dma_fence *fence)
+{
+	return __intel_timeline_sync_is_later(tl,
+					      fence->context,
+					      fence->seqno - 1);
+}
+
+static int intel_timeline_sync_set_start(struct intel_timeline *tl,
+					 const struct dma_fence *fence)
+{
+	return __intel_timeline_sync_set(tl, fence->context, fence->seqno - 1);
+}
+
+static int
+__i915_request_await_execution(struct i915_request *to,
+			       struct i915_request *from,
+			       void (*hook)(struct i915_request *rq,
+					    struct dma_fence *signal))
+{
+	int err;
+
+	/* Submit both requests at the same time */
+	err = __await_execution(to, from, hook, I915_FENCE_GFP);
+	if (err)
+		return err;
+
+	/* Squash repeated depenendices to the same timelines */
+	if (intel_timeline_sync_has_start(i915_request_timeline(to),
+					  &from->fence))
+		return 0;
+
+	/* Ensure both start together [after all semaphores in signal] */
+	if (intel_engine_has_semaphores(to->engine))
+		err = __emit_semaphore_wait(to, from, from->fence.seqno - 1);
+	else
+		err = i915_request_await_start(to, from);
+	if (err < 0)
+		return err;
+
+	/* Couple the dependency tree for PI on this exposed to->fence */
+	if (to->engine->schedule) {
+		err = i915_sched_node_add_dependency(&to->sched, &from->sched);
+		if (err < 0)
+			return err;
+	}
+
+	return intel_timeline_sync_set_start(i915_request_timeline(to),
+					     &from->fence);
+}
+
+int
+i915_request_await_execution(struct i915_request *rq,
+			     struct dma_fence *fence,
+			     void (*hook)(struct i915_request *rq,
+					  struct dma_fence *signal))
+{
+	struct dma_fence **child = &fence;
+	unsigned int nchild = 1;
+	int ret;
+
+	if (dma_fence_is_array(fence)) {
+		struct dma_fence_array *array = to_dma_fence_array(fence);
+
+		/* XXX Error for signal-on-any fence arrays */
+
+		child = array->fences;
+		nchild = array->num_fences;
+		GEM_BUG_ON(!nchild);
+	}
+
+	do {
+		fence = *child++;
+		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
+			continue;
+
+		/*
+		 * We don't squash repeated fence dependencies here as we
+		 * want to run our callback in all cases.
+		 */
+
+		if (dma_fence_is_i915(fence))
+			ret = __i915_request_await_execution(rq,
+							     to_request(fence),
+							     hook);
+		else
+			ret = i915_sw_fence_await_dma_fence(&rq->submit, fence,
+							    I915_FENCE_TIMEOUT,
+							    GFP_KERNEL);
+		if (ret < 0)
+			return ret;
+	} while (--nchild);
+
+	return 0;
+}
+
 static int
 await_request_submit(struct i915_request *to, struct i915_request *from)
 {
@@ -1041,102 +1137,6 @@ i915_request_await_dma_fence(struct i915_request *rq, struct dma_fence *fence)
 		if (fence->context)
 			intel_timeline_sync_set(i915_request_timeline(rq),
 						fence);
-	} while (--nchild);
-
-	return 0;
-}
-
-static bool intel_timeline_sync_has_start(struct intel_timeline *tl,
-					  struct dma_fence *fence)
-{
-	return __intel_timeline_sync_is_later(tl,
-					      fence->context,
-					      fence->seqno - 1);
-}
-
-static int intel_timeline_sync_set_start(struct intel_timeline *tl,
-					 const struct dma_fence *fence)
-{
-	return __intel_timeline_sync_set(tl, fence->context, fence->seqno - 1);
-}
-
-static int
-__i915_request_await_execution(struct i915_request *to,
-			       struct i915_request *from,
-			       void (*hook)(struct i915_request *rq,
-					    struct dma_fence *signal))
-{
-	int err;
-
-	/* Submit both requests at the same time */
-	err = __await_execution(to, from, hook, I915_FENCE_GFP);
-	if (err)
-		return err;
-
-	/* Squash repeated depenendices to the same timelines */
-	if (intel_timeline_sync_has_start(i915_request_timeline(to),
-					  &from->fence))
-		return 0;
-
-	/* Ensure both start together [after all semaphores in signal] */
-	if (intel_engine_has_semaphores(to->engine))
-		err = __emit_semaphore_wait(to, from, from->fence.seqno - 1);
-	else
-		err = i915_request_await_start(to, from);
-	if (err < 0)
-		return err;
-
-	/* Couple the dependency tree for PI on this exposed to->fence */
-	if (to->engine->schedule) {
-		err = i915_sched_node_add_dependency(&to->sched, &from->sched);
-		if (err < 0)
-			return err;
-	}
-
-	return intel_timeline_sync_set_start(i915_request_timeline(to),
-					     &from->fence);
-}
-
-int
-i915_request_await_execution(struct i915_request *rq,
-			     struct dma_fence *fence,
-			     void (*hook)(struct i915_request *rq,
-					  struct dma_fence *signal))
-{
-	struct dma_fence **child = &fence;
-	unsigned int nchild = 1;
-	int ret;
-
-	if (dma_fence_is_array(fence)) {
-		struct dma_fence_array *array = to_dma_fence_array(fence);
-
-		/* XXX Error for signal-on-any fence arrays */
-
-		child = array->fences;
-		nchild = array->num_fences;
-		GEM_BUG_ON(!nchild);
-	}
-
-	do {
-		fence = *child++;
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
-			continue;
-
-		/*
-		 * We don't squash repeated fence dependencies here as we
-		 * want to run our callback in all cases.
-		 */
-
-		if (dma_fence_is_i915(fence))
-			ret = __i915_request_await_execution(rq,
-							     to_request(fence),
-							     hook);
-		else
-			ret = i915_sw_fence_await_dma_fence(&rq->submit, fence,
-							    I915_FENCE_TIMEOUT,
-							    GFP_KERNEL);
-		if (ret < 0)
-			return ret;
 	} while (--nchild);
 
 	return 0;
