@@ -533,7 +533,7 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = dev->dev_private;
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_lock_all(dev);
 #endif
 	if (adev->mode_info.rfbdev)
@@ -541,7 +541,7 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_unlock_all(dev);
 #endif
 
