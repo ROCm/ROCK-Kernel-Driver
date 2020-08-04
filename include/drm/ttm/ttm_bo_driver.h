@@ -59,7 +59,7 @@ struct ttm_resource_manager_func {
 	 * @bo: Pointer to the buffer object we're allocating space for.
 	 * @placement: Placement details.
 	 * @flags: Additional placement flags.
-	 * @mem: Pointer to a struct ttm_mem_reg to be filled in.
+	 * @mem: Pointer to a struct ttm_resource to be filled in.
 	 *
 	 * This function should allocate space in the memory type managed
 	 * by @man. Placement details if
@@ -83,20 +83,20 @@ struct ttm_resource_manager_func {
 	int  (*get_node)(struct ttm_resource_manager *man,
 			 struct ttm_buffer_object *bo,
 			 const struct ttm_place *place,
-			 struct ttm_mem_reg *mem);
+			 struct ttm_resource *mem);
 
 	/**
 	 * struct ttm_resource_manager member put_node
 	 *
 	 * @man: Pointer to a memory type manager.
-	 * @mem: Pointer to a struct ttm_mem_reg to be filled in.
+	 * @mem: Pointer to a struct ttm_resource to be filled in.
 	 *
 	 * This function frees memory type resources previously allocated
 	 * and that are identified by @mem::mm_node and @mem::start. May not
 	 * be called from within atomic context.
 	 */
 	void (*put_node)(struct ttm_resource_manager *man,
-			 struct ttm_mem_reg *mem);
+			 struct ttm_resource *mem);
 
 	/**
 	 * struct ttm_resource_manager member debug
@@ -259,7 +259,7 @@ struct ttm_bo_driver {
 	 */
 	int (*move)(struct ttm_buffer_object *bo, bool evict,
 		    struct ttm_operation_ctx *ctx,
-		    struct ttm_mem_reg *new_mem);
+		    struct ttm_resource *new_mem);
 
 	/**
 	 * struct ttm_bo_driver_member verify_access
@@ -285,7 +285,7 @@ struct ttm_bo_driver {
 	 */
 	void (*move_notify)(struct ttm_buffer_object *bo,
 			    bool evict,
-			    struct ttm_mem_reg *new_mem);
+			    struct ttm_resource *new_mem);
 	/* notify the driver we are taking a fault on this BO
 	 * and have reserved it */
 	int (*fault_reserve_notify)(struct ttm_buffer_object *bo);
@@ -302,9 +302,9 @@ struct ttm_bo_driver {
 	 * are balanced.
 	 */
 	int (*io_mem_reserve)(struct ttm_bo_device *bdev,
-			      struct ttm_mem_reg *mem);
+			      struct ttm_resource *mem);
 	void (*io_mem_free)(struct ttm_bo_device *bdev,
-			    struct ttm_mem_reg *mem);
+			    struct ttm_resource *mem);
 
 	/**
 	 * Return the pfn for a given page_offset inside the BO.
@@ -516,7 +516,7 @@ ttm_flag_masked(uint32_t *old, uint32_t new, uint32_t mask)
  * @bo: Pointer to a struct ttm_buffer_object. the data of which
  * we want to allocate space for.
  * @proposed_placement: Proposed new placement for the buffer object.
- * @mem: A struct ttm_mem_reg.
+ * @mem: A struct ttm_resource.
  * @interruptible: Sleep interruptible when sliping.
  * @no_wait_gpu: Return immediately if the GPU is busy.
  *
@@ -531,10 +531,10 @@ ttm_flag_masked(uint32_t *old, uint32_t new, uint32_t mask)
  */
 int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 		     struct ttm_placement *placement,
-		     struct ttm_mem_reg *mem,
+		     struct ttm_resource *mem,
 		     struct ttm_operation_ctx *ctx);
 
-void ttm_bo_mem_put(struct ttm_buffer_object *bo, struct ttm_mem_reg *mem);
+void ttm_bo_mem_put(struct ttm_buffer_object *bo, struct ttm_resource *mem);
 
 int ttm_bo_device_release(struct ttm_bo_device *bdev);
 
@@ -730,16 +730,16 @@ int ttm_resource_manager_force_list_clean(struct ttm_bo_device *bdev,
  */
 
 int ttm_mem_io_reserve(struct ttm_bo_device *bdev,
-		       struct ttm_mem_reg *mem);
+		       struct ttm_resource *mem);
 void ttm_mem_io_free(struct ttm_bo_device *bdev,
-		     struct ttm_mem_reg *mem);
+		     struct ttm_resource *mem);
 /**
  * ttm_bo_move_ttm
  *
  * @bo: A pointer to a struct ttm_buffer_object.
  * @interruptible: Sleep interruptible if waiting.
  * @no_wait_gpu: Return immediately if the GPU is busy.
- * @new_mem: struct ttm_mem_reg indicating where to move.
+ * @new_mem: struct ttm_resource indicating where to move.
  *
  * Optimized move function for a buffer object with both old and
  * new placement backed by a TTM. The function will, if successful,
@@ -753,7 +753,7 @@ void ttm_mem_io_free(struct ttm_bo_device *bdev,
 
 int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 		    struct ttm_operation_ctx *ctx,
-		    struct ttm_mem_reg *new_mem);
+		    struct ttm_resource *new_mem);
 
 /**
  * ttm_bo_move_memcpy
@@ -761,7 +761,7 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
  * @bo: A pointer to a struct ttm_buffer_object.
  * @interruptible: Sleep interruptible if waiting.
  * @no_wait_gpu: Return immediately if the GPU is busy.
- * @new_mem: struct ttm_mem_reg indicating where to move.
+ * @new_mem: struct ttm_resource indicating where to move.
  *
  * Fallback move function for a mappable buffer object in mappable memory.
  * The function will, if successful,
@@ -775,7 +775,7 @@ int ttm_bo_move_ttm(struct ttm_buffer_object *bo,
 
 int ttm_bo_move_memcpy(struct ttm_buffer_object *bo,
 		       struct ttm_operation_ctx *ctx,
-		       struct ttm_mem_reg *new_mem);
+		       struct ttm_resource *new_mem);
 
 /**
  * ttm_bo_free_old_node
@@ -792,7 +792,7 @@ void ttm_bo_free_old_node(struct ttm_buffer_object *bo);
  * @bo: A pointer to a struct ttm_buffer_object.
  * @fence: A fence object that signals when moving is complete.
  * @evict: This is an evict move. Don't return until the buffer is idle.
- * @new_mem: struct ttm_mem_reg indicating where to move.
+ * @new_mem: struct ttm_resource indicating where to move.
  *
  * Accelerated move function to be called when an accelerated move
  * has been scheduled. The function will create a new temporary buffer object
@@ -803,7 +803,7 @@ void ttm_bo_free_old_node(struct ttm_buffer_object *bo);
  */
 int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 			      struct dma_fence *fence, bool evict,
-			      struct ttm_mem_reg *new_mem);
+			      struct ttm_resource *new_mem);
 
 /**
  * ttm_bo_pipeline_move.
@@ -811,14 +811,14 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
  * @bo: A pointer to a struct ttm_buffer_object.
  * @fence: A fence object that signals when moving is complete.
  * @evict: This is an evict move. Don't return until the buffer is idle.
- * @new_mem: struct ttm_mem_reg indicating where to move.
+ * @new_mem: struct ttm_resource indicating where to move.
  *
  * Function for pipelining accelerated moves. Either free the memory
  * immediately or hang it on a temporary buffer object.
  */
 int ttm_bo_pipeline_move(struct ttm_buffer_object *bo,
 			 struct dma_fence *fence, bool evict,
-			 struct ttm_mem_reg *new_mem);
+			 struct ttm_resource *new_mem);
 
 /**
  * ttm_bo_pipeline_gutting.

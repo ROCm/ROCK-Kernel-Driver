@@ -86,7 +86,7 @@ struct ttm_bus_placement {
 
 
 /**
- * struct ttm_mem_reg
+ * struct ttm_resource
  *
  * @mm_node: Memory manager node.
  * @size: Requested size of memory region.
@@ -99,7 +99,7 @@ struct ttm_bus_placement {
  * buffer object.
  */
 
-struct ttm_mem_reg {
+struct ttm_resource {
 	void *mm_node;
 	unsigned long start;
 	unsigned long size;
@@ -193,7 +193,7 @@ struct ttm_buffer_object {
 	 * Members protected by the bo::resv::reserved lock.
 	 */
 
-	struct ttm_mem_reg mem;
+	struct ttm_resource mem;
 	struct file *persistent_swap_storage;
 	struct ttm_tt *ttm;
 	bool evicted;
@@ -327,12 +327,12 @@ int ttm_bo_wait(struct ttm_buffer_object *bo, bool interruptible, bool no_wait);
  * ttm_bo_mem_compat - Check if proposed placement is compatible with a bo
  *
  * @placement:  Return immediately if buffer is busy.
- * @mem:  The struct ttm_mem_reg indicating the region where the bo resides
+ * @mem:  The struct ttm_resource indicating the region where the bo resides
  * @new_flags: Describes compatible placement found
  *
  * Returns true if the placement is compatible
  */
-bool ttm_bo_mem_compat(struct ttm_placement *placement, struct ttm_mem_reg *mem,
+bool ttm_bo_mem_compat(struct ttm_placement *placement, struct ttm_resource *mem,
 		       uint32_t *new_flags);
 
 /**
