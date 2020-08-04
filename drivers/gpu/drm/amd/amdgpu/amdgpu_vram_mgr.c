@@ -34,6 +34,7 @@ struct amdgpu_vram_mgr {
 	spinlock_t lock;
 	atomic64_t usage;
 	atomic64_t vis_usage;
+	struct amdgpu_device *adev;
 };
 
 static inline struct amdgpu_vram_mgr *to_vram_mgr(struct ttm_resource_manager *man)
@@ -197,6 +198,8 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	drm_mm_init(&mgr->mm, 0, man->size);
 	spin_lock_init(&mgr->lock);
 
+	mgr->adev = adev;
+
 	/* Add the two VRAM-related sysfs files */
 	ret = sysfs_create_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
 	if (ret)
@@ -324,8 +327,8 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 			       const struct ttm_place *place,
 			       struct ttm_resource *mem)
 {
-	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
+	struct amdgpu_device *adev = mgr->adev;
 	struct drm_mm *mm = &mgr->mm;
 	struct drm_mm_node *nodes;
 #ifndef HAVE_DRM_MM_INSERT_MODE
@@ -470,8 +473,8 @@ error:
 static void amdgpu_vram_mgr_del(struct ttm_resource_manager *man,
 				struct ttm_resource *mem)
 {
-	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
+	struct amdgpu_device *adev = mgr->adev;
 	struct drm_mm_node *nodes = mem->mm_node;
 	uint64_t usage = 0, vis_usage = 0;
 	unsigned pages = mem->num_pages;
