@@ -69,12 +69,9 @@ static int amdgpu_ttm_init_on_chip(struct amdgpu_device *adev,
 				    unsigned int type,
 				    uint64_t size)
 {
-	struct ttm_mem_type_manager *man = ttm_manager_type(&adev->mman.bdev, type);
-
-	man->available_caching = TTM_PL_FLAG_UNCACHED;
-	man->default_caching = TTM_PL_FLAG_UNCACHED;
-
-	return ttm_range_man_init(&adev->mman.bdev, man, size >> PAGE_SHIFT);
+	return ttm_range_man_init(&adev->mman.bdev, type,
+				  TTM_PL_FLAG_UNCACHED, TTM_PL_FLAG_UNCACHED,
+				  false, size >> PAGE_SHIFT);
 }
 
 /**
@@ -2574,9 +2571,9 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	amdgpu_direct_gma_fini(adev);
 	amdgpu_vram_mgr_fini(adev);
 	amdgpu_gtt_mgr_fini(adev);
-	ttm_range_man_fini(&adev->mman.bdev, ttm_manager_type(&adev->mman.bdev, AMDGPU_PL_GDS));
-	ttm_range_man_fini(&adev->mman.bdev, ttm_manager_type(&adev->mman.bdev, AMDGPU_PL_GWS));
-	ttm_range_man_fini(&adev->mman.bdev, ttm_manager_type(&adev->mman.bdev, AMDGPU_PL_OA));
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_GDS);
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_GWS);
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_OA);
 	ttm_bo_device_release(&adev->mman.bdev);
 	adev->mman.initialized = false;
 	DRM_INFO("amdgpu: ttm finalized\n");
