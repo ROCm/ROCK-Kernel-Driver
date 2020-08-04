@@ -309,7 +309,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 	unsigned long address = vmf->address;
 #endif
 	struct ttm_mem_type_manager *man =
-		&bdev->man[bo->mem.mem_type];
+		ttm_manager_type(bdev, bo->mem.mem_type);
 
 	/*
 	 * Refuse to fault imported pages. This should be handled
