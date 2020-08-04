@@ -31,12 +31,6 @@
 
 #include <core/tegra.h>
 
-static int
-nouveau_manager_fini(struct ttm_mem_type_manager *man)
-{
-	return 0;
-}
-
 static void
 nouveau_manager_del(struct ttm_mem_type_manager *man, struct ttm_mem_reg *reg)
 {
@@ -76,7 +70,6 @@ nouveau_vram_manager_new(struct ttm_mem_type_manager *man,
 }
 
 const struct ttm_mem_type_manager_func nouveau_vram_manager = {
-	.takedown = nouveau_manager_fini,
 	.get_node = nouveau_vram_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug,
@@ -101,7 +94,6 @@ nouveau_gart_manager_new(struct ttm_mem_type_manager *man,
 }
 
 const struct ttm_mem_type_manager_func nouveau_gart_manager = {
-	.takedown = nouveau_manager_fini,
 	.get_node = nouveau_gart_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug
@@ -135,7 +127,6 @@ nv04_gart_manager_new(struct ttm_mem_type_manager *man,
 }
 
 const struct ttm_mem_type_manager_func nv04_gart_manager = {
-	.takedown = nouveau_manager_fini,
 	.get_node = nv04_gart_manager_new,
 	.put_node = nouveau_manager_del,
 	.debug = nouveau_manager_debug
@@ -201,6 +192,19 @@ nouveau_ttm_init_vram(struct nouveau_drm *drm)
 	}
 }
 
+static void
+nouveau_ttm_fini_vram(struct nouveau_drm *drm)
+{
+	struct ttm_mem_type_manager *man = &drm->ttm.bdev.man[TTM_PL_VRAM];
+
+	if (drm->client.device.info.family >= NV_DEVICE_INFO_V0_TESLA) {
+		ttm_mem_type_manager_disable(man);
+		ttm_mem_type_manager_force_list_clean(&drm->ttm.bdev, man);
+		ttm_mem_type_manager_cleanup(man);
+	} else
+		ttm_range_man_fini(&drm->ttm.bdev, man);
+}
+
 static int
 nouveau_ttm_init_gtt(struct nouveau_drm *drm)
 {
@@ -228,6 +232,21 @@ nouveau_ttm_init_gtt(struct nouveau_drm *drm)
 				  size_pages);
 	ttm_mem_type_manager_set_used(man, true);
 	return 0;
+}
+
+static void
+nouveau_ttm_fini_gtt(struct nouveau_drm *drm)
+{
+	struct ttm_mem_type_manager *man = &drm->ttm.bdev.man[TTM_PL_TT];
+
+	if (drm->client.device.info.family < NV_DEVICE_INFO_V0_TESLA &&
+	    drm->agp.bridge)
+		ttm_range_man_fini(&drm->ttm.bdev, man);
+	else {
+		ttm_mem_type_manager_disable(man);
+		ttm_mem_type_manager_force_list_clean(&drm->ttm.bdev, man);
+		ttm_mem_type_manager_cleanup(man);
+	}
 }
 
 int
@@ -319,8 +338,8 @@ nouveau_ttm_fini(struct nouveau_drm *drm)
 {
 	struct nvkm_device *device = nvxx_device(&drm->client.device);
 
-	ttm_bo_clean_mm(&drm->ttm.bdev, TTM_PL_VRAM);
-	ttm_bo_clean_mm(&drm->ttm.bdev, TTM_PL_TT);
+	nouveau_ttm_fini_vram(drm);
+	nouveau_ttm_fini_gtt(drm);
 
 	ttm_bo_device_release(&drm->ttm.bdev);
 
