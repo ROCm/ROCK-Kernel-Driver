@@ -72,35 +72,7 @@ static bool amdgpu_display_flip_handle_fence(struct amdgpu_flip_work *work,
 	return false;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-static void amdgpu_display_flip_work_func(struct work_struct *__work)
-{
-	struct amdgpu_flip_work *work =
-		container_of(__work, struct amdgpu_flip_work, flip_work);
-	struct amdgpu_device *adev = work->adev;
-	struct amdgpu_crtc *amdgpuCrtc = adev->mode_info.crtcs[work->crtc_id];
-
-	struct drm_crtc *crtc = &amdgpuCrtc->base;
-	unsigned long flags;
-	unsigned i;
-
-	if (amdgpu_display_flip_handle_fence(work, &work->excl))
-		return;
-
-	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
-			return;
-
-	/* We borrow the event spin lock for protecting flip_status */
-	spin_lock_irqsave(&crtc->dev->event_lock, flags);
-	/* Set the flip status */
-	amdgpuCrtc->pflip_status = AMDGPU_FLIP_SUBMITTED;
-	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
-
-	/* Do the flip (mmio) */
-	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
-}
-#elif !defined(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET)
+#if !defined(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET)
 static void amdgpu_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -1134,11 +1106,7 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 	}
 	else {
 		/* No: Fake something reasonable which gives at least ok results. */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-		vbl_start = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vdisplay;
-#else
 		vbl_start = mode->crtc_vdisplay;
-#endif
 		vbl_end = 0;
 	}
 
@@ -1184,11 +1152,7 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 
 	/* Inside "upper part" of vblank area? Apply corrective offset if so: */
 	if (in_vbl && (*vpos >= vbl_start)) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-		vtotal = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vtotal;
-#else
 		vtotal = mode->crtc_vtotal;
-#endif
 
 		/* With variable refresh rate displays the vpos can exceed
 		 * the vtotal value. Clamp to 0 to return -vbl_end instead
