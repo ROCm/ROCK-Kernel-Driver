@@ -219,7 +219,6 @@ static bool i915_request_retire(struct i915_request *rq)
 {
 	struct i915_active_request *active, *next;
 
-	lockdep_assert_held(&rq->timeline->mutex);
 	if (!i915_request_completed(rq))
 		return false;
 
@@ -240,7 +239,8 @@ static bool i915_request_retire(struct i915_request *rq)
 	 * Note this requires that we are always called in request
 	 * completion order.
 	 */
-	GEM_BUG_ON(!list_is_first(&rq->link, &rq->timeline->requests));
+	GEM_BUG_ON(!list_is_first(&rq->link,
+				  &i915_request_timeline(rq)->requests));
 	rq->ring->head = rq->postfix;
 
 	/*
@@ -312,7 +312,7 @@ static bool i915_request_retire(struct i915_request *rq)
 
 void i915_request_retire_upto(struct i915_request *rq)
 {
-	struct intel_timeline * const tl = rq->timeline;
+	struct intel_timeline * const tl = i915_request_timeline(rq);
 	struct i915_request *tmp;
 
 	GEM_TRACE("%s fence %llx:%lld, current %d\n",
@@ -320,7 +320,6 @@ void i915_request_retire_upto(struct i915_request *rq)
 		  rq->fence.context, rq->fence.seqno,
 		  hwsp_seqno(rq));
 
-	lockdep_assert_held(&tl->mutex);
 	GEM_BUG_ON(!i915_request_completed(rq));
 
 	do {
@@ -688,9 +687,11 @@ __i915_request_create(struct intel_context *ce, gfp_t gfp)
 	rq->gem_context = ce->gem_context;
 	rq->engine = ce->engine;
 	rq->ring = ce->ring;
-	rq->timeline = tl;
+
+	rcu_assign_pointer(rq->timeline, tl);
 	rq->hwsp_seqno = tl->hwsp_seqno;
 	rq->hwsp_cacheline = tl->hwsp_cacheline;
+
 	rq->rcustate = get_state_synchronize_rcu(); /* acts as smp_mb() */
 
 	spin_lock_init(&rq->lock);
@@ -798,7 +799,8 @@ i915_request_await_start(struct i915_request *rq, struct i915_request *signal)
 		return 0;
 
 	signal = list_prev_entry(signal, link);
-	if (intel_timeline_sync_is_later(rq->timeline, &signal->fence))
+	if (intel_timeline_sync_is_later(i915_request_timeline(rq),
+					 &signal->fence))
 		return 0;
 
 	return i915_sw_fence_await_dma_fence(&rq->submit,
@@ -983,7 +985,8 @@ i915_request_await_dma_fence(struct i915_request *rq, struct dma_fence *fence)
 
 		/* Squash repeated waits to the same timelines */
 		if (fence->context &&
-		    intel_timeline_sync_is_later(rq->timeline, fence))
+		    intel_timeline_sync_is_later(i915_request_timeline(rq),
+						 fence))
 			continue;
 
 		if (dma_fence_is_i915(fence))
@@ -997,7 +1000,8 @@ i915_request_await_dma_fence(struct i915_request *rq, struct dma_fence *fence)
 
 		/* Record the latest fence used against each timeline */
 		if (fence->context)
-			intel_timeline_sync_set(rq->timeline, fence);
+			intel_timeline_sync_set(i915_request_timeline(rq),
+						fence);
 	} while (--nchild);
 
 	return 0;
@@ -1139,7 +1143,7 @@ void i915_request_skip(struct i915_request *rq, int error)
 static struct i915_request *
 __i915_request_add_to_timeline(struct i915_request *rq)
 {
-	struct intel_timeline *timeline = rq->timeline;
+	struct intel_timeline *timeline = i915_request_timeline(rq);
 	struct i915_request *prev;
 
 	/*
@@ -1252,7 +1256,7 @@ void __i915_request_queue(struct i915_request *rq,
 void i915_request_add(struct i915_request *rq)
 {
 	struct i915_sched_attr attr = rq->gem_context->sched;
-	struct intel_timeline * const tl = rq->timeline;
+	struct intel_timeline * const tl = i915_request_timeline(rq);
 	struct i915_request *prev;
 
 	lockdep_assert_held(&tl->mutex);
@@ -1307,7 +1311,9 @@ void i915_request_add(struct i915_request *rq)
 	 * work on behalf of others -- but instead we should benefit from
 	 * improved resource management. (Well, that's the theory at least.)
 	 */
-	if (prev && i915_request_completed(prev) && prev->timeline == tl)
+	if (prev &&
+	    i915_request_completed(prev) &&
+	    rcu_access_pointer(prev->timeline) == tl)
 		i915_request_retire_upto(prev);
 
 	mutex_unlock(&tl->mutex);
