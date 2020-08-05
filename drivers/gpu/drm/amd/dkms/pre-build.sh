@@ -77,11 +77,14 @@ done
 
 # rename CONFIG_xxx to CONFIG_xxx_AMDKCL
 # otherwise kernel config would override dkms package config
-for config in $(find -name Kconfig -exec grep -h '^config' {} + | sed 's/ /_/' | tr 'a-z' 'A-Z'); do
+AMDGPU_CONFIG=$(find -name Kconfig -exec grep -h '^config' {} + | sed 's/ /_/' | tr 'a-z' 'A-Z')
+TTM_CONFIG=$(awk '/CONFIG_DRM/{gsub(".*\\(CONFIG_DRM","CONFIG_DRM");gsub("\\).*","");print $0}' ttm/Makefile)
+SCHED_CONFIG=$(awk '/CONFIG_DRM/{gsub(".*\\(CONFIG_DRM","CONFIG_DRM");gsub("\\).*","");print $0}' scheduler/Makefile)
+for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	for file in $(grep -rl $config ./); do
 		sed -i "s/\<$config\>/&_AMDKCL/" $file
 	done
-	sed -i "/subdir-ccflags-y += -D${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
+	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
 done
 
 export KERNELVER
