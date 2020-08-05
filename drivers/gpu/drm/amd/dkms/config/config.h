@@ -770,11 +770,8 @@
 /* request_firmware_direct() is available */
 #define HAVE_REQUEST_FIRMWARE_DIRECT 1
 
-/* reservation_object->seq is dropped */
-/* #undef HAVE_RESERVATION_OBJECT_DROP_SEQ */
-
-/* reservation_object->staged is dropped */
-/* #undef HAVE_RESERVATION_OBJECT_DROP_STAGED */
+/* reservation_object->staged is available */
+/* #undef HAVE_RESERVATION_OBJECT_STAGED */
 
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1

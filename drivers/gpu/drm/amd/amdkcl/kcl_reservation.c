@@ -31,16 +31,6 @@
  */
 #include <linux/ww_mutex.h>
 #include "kcl_common.h"
-#include <kcl/kcl_reservation.h>
-
-#ifndef DEFINE_WD_CLASS
-#define DEFINE_WD_CLASS(classname) \
-	struct ww_class classname = __WW_CLASS_INITIALIZER(classname)
-#endif
-
-DEFINE_WD_CLASS(_kcl_reservation_ww_class_stub);
-struct lock_class_key _kcl_reservation_seqcount_class_stub;
-const char _kcl_reservation_seqcount_string_stub[] = "reservation_seqcount";
 
 struct ww_class *_kcl_reservation_ww_class;
 EXPORT_SYMBOL(_kcl_reservation_ww_class);
@@ -51,10 +41,7 @@ EXPORT_SYMBOL(_kcl_reservation_seqcount_string);
 
 void amdkcl_reservation_init(void)
 {
-	_kcl_reservation_ww_class = amdkcl_fp_setup("reservation_ww_class",
-						    &_kcl_reservation_ww_class_stub);
-	_kcl_reservation_seqcount_class = amdkcl_fp_setup("reservation_seqcount_class",
-							  &_kcl_reservation_seqcount_class_stub);
-	_kcl_reservation_seqcount_string = amdkcl_fp_setup("reservation_seqcount_string",
-							  &_kcl_reservation_seqcount_string_stub);
+	_kcl_reservation_ww_class = amdkcl_fp_setup("reservation_ww_class", NULL);
+	_kcl_reservation_seqcount_class = amdkcl_fp_setup("reservation_seqcount_class", NULL);
+	_kcl_reservation_seqcount_string = amdkcl_fp_setup("reservation_seqcount_string", NULL);
 }

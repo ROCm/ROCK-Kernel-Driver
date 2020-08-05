@@ -6,6 +6,10 @@ ifeq (y,$(CONFIG_DRM_AMDGPU))
 $(error DRM_AMDGPU is built-in, exit...)
 endif
 
+ifeq ($(shell grep "HAVE_DMA_RESV_SEQ" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),n)
+$(error dma_resv->seq is missing., exit...)
+endif
+
 ifdef CONFIG_CC_IS_GCC
 GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
 GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
