@@ -79,9 +79,6 @@
 /* fence_set_error() is available */
 #define HAVE_DMA_FENCE_SET_ERROR 1
 
-/* linux/dma-resv.h is available */
-#define HAVE_DMA_RESV_H 1
-
 /* dma_resv->seq is available */
 #define HAVE_DMA_RESV_SEQ 1
 
@@ -658,6 +655,9 @@
 
 /* Define to 1 if you have the <linux/dma-fence.h> header file. */
 #define HAVE_LINUX_DMA_FENCE_H 1
+
+/* Define to 1 if you have the <linux/dma-resv.h> header file. */
+#define HAVE_LINUX_DMA_RESV_H 1
 
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */

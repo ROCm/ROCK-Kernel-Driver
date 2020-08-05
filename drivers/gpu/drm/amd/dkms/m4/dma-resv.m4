@@ -5,8 +5,6 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DMA_RESV], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TEST_HEADER_FILE_EXIST([linux/dma-resv.h], [
-			AC_DEFINE(HAVE_DMA_RESV_H, 1, [linux/dma-resv.h is available])
-
 			dnl #
 			dnl # commit v5.3-rc1-476-gb016cd6ed4b7
 			dnl # dma-buf: Restore seqlock around dma_resv updates

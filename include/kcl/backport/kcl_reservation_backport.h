@@ -14,7 +14,7 @@
 #define reservation_seqcount_class (*_kcl_reservation_seqcount_class)
 #define reservation_seqcount_string (_kcl_reservation_seqcount_string)
 
-#if defined(HAVE_DMA_RESV_H)
+#if defined(HAVE_LINUX_DMA_RESV_H)
 #if defined(HAVE_DMA_RESV_SEQ)
 struct dma_resv {
 	struct ww_mutex lock;

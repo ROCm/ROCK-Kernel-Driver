@@ -2,7 +2,7 @@
 #ifndef AMDKCL_RESERVATION_H
 #define AMDKCL_RESERVATION_H
 
-#ifndef HAVE_DMA_RESV_H
+#ifndef HAVE_LINUX_DMA_RESV_H
 #include <linux/dma-resv.h>
 #define reservation_object dma_resv
 
@@ -16,5 +16,5 @@ reservation_object_fini(struct reservation_object *obj)
 }
 #define amddma_resv_fini reservation_object_fini
 #endif /* !HAVE_RESERVATION_OBJECT_DROP_SEQ/STAGED */
-#endif /* HAVE_DMA_RESV_H */
+#endif /* HAVE_LINUX_DMA_RESV_H */
 #endif
