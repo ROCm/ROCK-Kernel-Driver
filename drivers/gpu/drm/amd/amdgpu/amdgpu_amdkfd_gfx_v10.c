@@ -796,6 +796,50 @@ static void kgd_gfx_v10_set_wave_launch_stall(struct amdgpu_device *adev,
 	/* FIXME - see TBD in notes above. */
 }
 
+static bool kgd_gfx_v10_is_rlc_restore_supported(struct amdgpu_device *adev)
+{
+	bool is_supported = true;
+
+	switch (adev->asic_type) {
+	case CHIP_NAVI10:
+	case CHIP_NAVI14:
+		/*
+		 * TBD - Navi14 restore list update in progress.
+		 * Will have to version check later.
+		 */
+		is_supported = false;
+		break;
+	default:
+		break;
+	};
+
+	return is_supported;
+}
+
+static void kgd_gfx_v10_set_gfxoff_and_debug_config(struct amdgpu_device *adev,
+						uint32_t vmid,
+						bool enable_debug_trap)
+{
+	uint32_t data = 0;
+
+	if (kgd_gfx_v10_is_rlc_restore_supported(adev))
+		return;
+
+	amdgpu_gfx_off_ctrl(adev, !enable_debug_trap);
+
+	if (!enable_debug_trap)
+		return;
+
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+			VMID_SEL, 1 << vmid);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+			TRAP_EN, 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
+}
+
 void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
@@ -805,6 +849,8 @@ void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+
+	kgd_gfx_v10_set_gfxoff_and_debug_config(adev, vmid, true);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
@@ -820,6 +866,8 @@ void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+
+	kgd_gfx_v10_set_gfxoff_and_debug_config(adev, vmid, false);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
