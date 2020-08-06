@@ -5177,7 +5177,7 @@ static int dm_crtc_funcs_atomic_get_property(struct drm_crtc *crtc,
 }
 #endif
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG
 static int amdgpu_atomic_helper_page_flip(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
@@ -5391,7 +5391,7 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 #ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
 	.set_property = drm_atomic_helper_crtc_set_property,
 #endif
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG
 	.page_flip = amdgpu_atomic_helper_page_flip,
 #else
 	.page_flip = drm_atomic_helper_page_flip,
@@ -7839,8 +7839,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		bundle->surface_updates[planes_count].plane_info =
 			&bundle->plane_infos[planes_count];
 
-#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
-	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG)
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 #endif
 		/*
@@ -7954,8 +7953,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		}
 	}
 
-#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP) && \
-	!defined(HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS)
+#if !defined(HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG)
 	/*TODO BUG remove ASAP in 4.12 to avoid race between worker and flip IOCTL */
 
 	/*clean up the flags for next usage*/

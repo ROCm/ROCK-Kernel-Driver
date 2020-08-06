@@ -1,5 +1,5 @@
 dnl #
-dnl # commit b837ba0ad95bb5c08626a49321f07f271bdaf512
+dnl # commit v4.6-rc3-385-gb837ba0ad95b
 dnl # drm/atomic: Rename drm_atomic_async_commit to nonblocking.
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_ATOMIC_NONBLOCKING_COMMIT], [
