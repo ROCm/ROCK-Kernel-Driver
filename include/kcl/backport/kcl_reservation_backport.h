@@ -17,6 +17,8 @@ extern const char *_kcl_reservation_seqcount_string;
 #define reservation_seqcount_class (*_kcl_reservation_seqcount_class)
 #define reservation_seqcount_string (_kcl_reservation_seqcount_string)
 
+struct dma_resv_list;
+
 #if defined(HAVE_RESERVATION_OBJECT_STAGED)
 struct dma_resv {
 	struct ww_mutex lock;
