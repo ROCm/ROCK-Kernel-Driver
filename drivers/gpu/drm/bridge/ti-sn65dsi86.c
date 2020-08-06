@@ -378,7 +378,7 @@ static void ti_sn_bridge_set_refclk_freq(struct ti_sn_bridge *pdata)
 			   REFCLK_FREQ(i));
 }
 
-/**
+/*
  * LUT index corresponds to register value and
  * LUT values corresponds to dp data rate supported
  * by the bridge in Mbps unit.
