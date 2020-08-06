@@ -45,6 +45,22 @@
 
 #define AMDGPU_POISON	0xd0bed0be
 
+struct amdgpu_vram_mgr {
+	struct ttm_resource_manager manager;
+	struct drm_mm mm;
+	spinlock_t lock;
+	atomic64_t usage;
+	atomic64_t vis_usage;
+	struct amdgpu_device *adev;
+};
+
+struct amdgpu_gtt_mgr {
+	struct ttm_resource_manager manager;
+	struct drm_mm mm;
+	spinlock_t lock;
+	atomic64_t available;
+};
+
 struct amdgpu_mman {
 	struct ttm_bo_device		bdev;
 	bool				initialized;
@@ -62,6 +78,9 @@ struct amdgpu_mman {
 	struct mutex				gtt_window_lock;
 	/* Scheduler entity for buffer moves */
 	struct drm_sched_entity			entity;
+
+	struct amdgpu_vram_mgr vram_mgr;
+	struct amdgpu_gtt_mgr gtt_mgr;
 
 	uint64_t		stolen_vga_size;
 	struct amdgpu_bo	*stolen_vga_memory;
