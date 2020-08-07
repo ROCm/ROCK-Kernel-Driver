@@ -135,7 +135,7 @@ static int lm36274_probe(struct platform_device *pdev)
 	lm36274_data->pdev = pdev;
 	lm36274_data->dev = lmu->dev;
 	lm36274_data->regmap = lmu->regmap;
-	dev_set_drvdata(&pdev->dev, lm36274_data);
+	platform_set_drvdata(pdev, lm36274_data);
 
 	ret = lm36274_parse_dt(lm36274_data);
 	if (ret) {
@@ -149,8 +149,16 @@ static int lm36274_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	return devm_led_classdev_register(lm36274_data->dev,
-					 &lm36274_data->led_dev);
+	return led_classdev_register(lm36274_data->dev, &lm36274_data->led_dev);
+}
+
+static int lm36274_remove(struct platform_device *pdev)
+{
+	struct lm36274 *lm36274_data = platform_get_drvdata(pdev);
+
+	led_classdev_unregister(&lm36274_data->led_dev);
+
+	return 0;
 }
 
 static const struct of_device_id of_lm36274_leds_match[] = {
@@ -161,6 +169,7 @@ MODULE_DEVICE_TABLE(of, of_lm36274_leds_match);
 
 static struct platform_driver lm36274_driver = {
 	.probe  = lm36274_probe,
+	.remove = lm36274_remove,
 	.driver = {
 		.name = "lm36274-leds",
 	},
