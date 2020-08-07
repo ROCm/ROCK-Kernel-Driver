@@ -547,11 +547,6 @@ enum {
 	 */
 	BTRFS_FS_EXCL_OP,
 	/*
-	 * To info transaction_kthread we need an immediate commit so it
-	 * doesn't need to wait for commit_interval
-	 */
-	BTRFS_FS_NEED_ASYNC_COMMIT,
-	/*
 	 * Indicate that balance has been set up from the ioctl and is in the
 	 * main phase. The fs_info::balance_ctl is initialized.
 	 * Set and cleared while holding fs_info::balance_mutex.
@@ -982,6 +977,8 @@ enum {
 	BTRFS_ROOT_DEAD_RELOC_TREE,
 	/* Mark dead root stored on device whose cleanup needs to be resumed */
 	BTRFS_ROOT_DEAD_TREE,
+	/* Qgroup flushing is in progress */
+	BTRFS_ROOT_QGROUP_FLUSHING,
 };
 
 /*
@@ -1129,6 +1126,7 @@ struct btrfs_root {
 	spinlock_t qgroup_meta_rsv_lock;
 	u64 qgroup_meta_rsv_pertrans;
 	u64 qgroup_meta_rsv_prealloc;
+	wait_queue_head_t qgroup_flush_wait;
 
 	/* Number of active swapfiles */
 	atomic_t nr_swapfiles;
@@ -2243,7 +2241,8 @@ static inline unsigned int leaf_data_end(const struct extent_buffer *leaf)
 }
 
 /* struct btrfs_file_extent_item */
-BTRFS_SETGET_FUNCS(file_extent_type, struct btrfs_file_extent_item, type, 8);
+BTRFS_SETGET_STACK_FUNCS(stack_file_extent_type, struct btrfs_file_extent_item,
+			 type, 8);
 BTRFS_SETGET_STACK_FUNCS(stack_file_extent_disk_bytenr,
 			 struct btrfs_file_extent_item, disk_bytenr, 64);
 BTRFS_SETGET_STACK_FUNCS(stack_file_extent_offset,
@@ -2252,6 +2251,8 @@ BTRFS_SETGET_STACK_FUNCS(stack_file_extent_generation,
 			 struct btrfs_file_extent_item, generation, 64);
 BTRFS_SETGET_STACK_FUNCS(stack_file_extent_num_bytes,
 			 struct btrfs_file_extent_item, num_bytes, 64);
+BTRFS_SETGET_STACK_FUNCS(stack_file_extent_ram_bytes,
+			 struct btrfs_file_extent_item, ram_bytes, 64);
 BTRFS_SETGET_STACK_FUNCS(stack_file_extent_disk_num_bytes,
 			 struct btrfs_file_extent_item, disk_num_bytes, 64);
 BTRFS_SETGET_STACK_FUNCS(stack_file_extent_compression,
@@ -2268,6 +2269,7 @@ static inline u32 btrfs_file_extent_calc_inline_size(u32 datasize)
 	return BTRFS_FILE_EXTENT_INLINE_DATA_START + datasize;
 }
 
+BTRFS_SETGET_FUNCS(file_extent_type, struct btrfs_file_extent_item, type, 8);
 BTRFS_SETGET_FUNCS(file_extent_disk_bytenr, struct btrfs_file_extent_item,
 		   disk_bytenr, 64);
 BTRFS_SETGET_FUNCS(file_extent_generation, struct btrfs_file_extent_item,

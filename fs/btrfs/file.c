@@ -1503,7 +1503,7 @@ lock_and_cleanup_extent_if_need(struct btrfs_inode *inode, struct page **pages,
 		ordered = btrfs_lookup_ordered_range(inode, start_pos,
 						     last_pos - start_pos + 1);
 		if (ordered &&
-		    ordered->file_offset + ordered->len > start_pos &&
+		    ordered->file_offset + ordered->num_bytes > start_pos &&
 		    ordered->file_offset <= last_pos) {
 			unlock_extent_cached(&inode->io_tree, start_pos,
 					last_pos, cached_state);
@@ -2456,7 +2456,7 @@ static int btrfs_punch_hole_lock_range(struct inode *inode,
 		 * we need to try again.
 		 */
 		if ((!ordered ||
-		    (ordered->file_offset + ordered->len <= lockstart ||
+		    (ordered->file_offset + ordered->num_bytes <= lockstart ||
 		     ordered->file_offset > lockend)) &&
 		     !filemap_range_has_page(inode->i_mapping,
 					     lockstart, lockend)) {
@@ -3146,12 +3146,12 @@ reserve_space:
 		if (ret < 0)
 			goto out;
 		space_reserved = true;
-		ret = btrfs_qgroup_reserve_data(inode, &data_reserved,
-						alloc_start, bytes_to_reserve);
-		if (ret)
-			goto out;
 		ret = btrfs_punch_hole_lock_range(inode, lockstart, lockend,
 						  &cached_state);
+		if (ret)
+			goto out;
+		ret = btrfs_qgroup_reserve_data(inode, &data_reserved,
+						alloc_start, bytes_to_reserve);
 		if (ret)
 			goto out;
 		ret = btrfs_prealloc_file_range(inode, mode, alloc_start,
@@ -3278,7 +3278,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 		ordered = btrfs_lookup_first_ordered_extent(inode, locked_end);
 
 		if (ordered &&
-		    ordered->file_offset + ordered->len > alloc_start &&
+		    ordered->file_offset + ordered->num_bytes > alloc_start &&
 		    ordered->file_offset < alloc_end) {
 			btrfs_put_ordered_extent(ordered);
 			unlock_extent_cached(&BTRFS_I(inode)->io_tree,
