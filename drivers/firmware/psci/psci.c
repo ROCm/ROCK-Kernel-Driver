@@ -46,16 +46,13 @@
  * require cooperation with a Trusted OS driver.
  */
 static int resident_cpu = -1;
+struct psci_operations psci_ops;
+static enum arm_smccc_conduit psci_conduit = SMCCC_CONDUIT_NONE;
 
 bool psci_tos_resident_on(int cpu)
 {
 	return cpu == resident_cpu;
 }
-
-struct psci_operations psci_ops = {
-	.conduit = PSCI_CONDUIT_NONE,
-	.smccc_version = SMCCC_VERSION_1_0,
-};
 
 typedef unsigned long (psci_fn)(unsigned long, unsigned long,
 				unsigned long, unsigned long);
@@ -82,6 +79,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
 
 static u32 psci_cpu_suspend_feature;
 static bool psci_system_reset2_supported;
+void __init arm_smccc_version_init(u32 version, enum arm_smccc_conduit conduit);
 
 static inline bool psci_has_ext_power_state(void)
 {
@@ -212,20 +210,20 @@ static unsigned long psci_migrate_info_up_cpu(void)
 			      0, 0, 0);
 }
 
-static void set_conduit(enum psci_conduit conduit)
+static void set_conduit(enum arm_smccc_conduit conduit)
 {
 	switch (conduit) {
-	case PSCI_CONDUIT_HVC:
+	case SMCCC_CONDUIT_HVC:
 		invoke_psci_fn = __invoke_psci_fn_hvc;
 		break;
-	case PSCI_CONDUIT_SMC:
+	case SMCCC_CONDUIT_SMC:
 		invoke_psci_fn = __invoke_psci_fn_smc;
 		break;
 	default:
 		WARN(1, "Unexpected PSCI conduit %d\n", conduit);
 	}
 
-	psci_ops.conduit = conduit;
+	psci_conduit = conduit;
 }
 
 static int get_set_conduit_method(struct device_node *np)
@@ -240,9 +238,9 @@ static int get_set_conduit_method(struct device_node *np)
 	}
 
 	if (!strcmp("hvc", method)) {
-		set_conduit(PSCI_CONDUIT_HVC);
+		set_conduit(SMCCC_CONDUIT_HVC);
 	} else if (!strcmp("smc", method)) {
-		set_conduit(PSCI_CONDUIT_SMC);
+		set_conduit(SMCCC_CONDUIT_SMC);
 	} else {
 		pr_warn("invalid \"method\" property: %s\n", method);
 		return -EINVAL;
@@ -545,8 +543,8 @@ static void __init psci_init_smccc(void)
 	if (feature != PSCI_RET_NOT_SUPPORTED) {
 		u32 ret;
 		ret = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
-		if (ret == ARM_SMCCC_VERSION_1_1) {
-			psci_ops.smccc_version = SMCCC_VERSION_1_1;
+		if (ret >= ARM_SMCCC_VERSION_1_1) {
+			arm_smccc_version_init(ret, psci_conduit);
 			ver = ret;
 		}
 	}
@@ -734,9 +732,9 @@ int __init psci_acpi_init(void)
 	pr_info("probing for conduit method from ACPI.\n");
 
 	if (acpi_psci_use_hvc())
-		set_conduit(PSCI_CONDUIT_HVC);
+		set_conduit(SMCCC_CONDUIT_HVC);
 	else
-		set_conduit(PSCI_CONDUIT_SMC);
+		set_conduit(SMCCC_CONDUIT_SMC);
 
 	return psci_probe();
 }
