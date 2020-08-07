@@ -13,9 +13,9 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_SEQ], [
 			#endif
 		], [
 			#ifdef HAVE_LINUX_DMA_RESV_H
-			struct dma_resv *resv;
+			struct dma_resv *resv = NULL;
 			#else
-			struct reservation_object *resv;
+			struct reservation_object *resv = NULL;
 			#endif
 			write_seqcount_begin(&resv->seq);
 		], [
@@ -35,7 +35,7 @@ AC_DEFUN([AC_AMDGPU_RESERVATION_OBJECT_STAGED], [
 			AC_KERNEL_TRY_COMPILE([
 				#include <linux/reservation.h>
 			], [
-				struct reservation_object *resv;
+				struct reservation_object *resv = NULL;
 				resv->staged = NULL;
 			], [
 				AC_DEFINE(HAVE_RESERVATION_OBJECT_STAGED, 1,
