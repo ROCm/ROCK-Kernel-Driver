@@ -19,6 +19,10 @@ ifdef CONFIG_PPC64
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn21_resource.o := -mhard-float -maltivec
 endif
 
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)dcn21_resource.o := -mgeneral-regs-only
+endif
+
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
 endif

@@ -45,6 +45,10 @@ ifdef CONFIG_PPC64
 dml_ccflags := -mhard-float -maltivec
 endif
 
+ifdef CONFIG_ARM64
+dml_rcflags := -mgeneral-regs-only
+endif
+
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
 endif
@@ -68,10 +72,17 @@ CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_ccflag
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_vba.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_rcflags)
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN2_1
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_mode_vba_21.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_rq_dlg_calc_21.o := $(dml_rcflags)
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN3_0
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_ccflags) -Wframe-larger-than=2048
@@ -79,6 +90,8 @@ CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_ccf
 endif
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_rcflags)
 
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
 
