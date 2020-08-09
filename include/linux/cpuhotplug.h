@@ -185,6 +185,9 @@ enum cpuhp_state {
 	CPUHP_AP_X86_KVM_CLK_ONLINE,
 	CPUHP_AP_ACTIVE,
 	CPUHP_ONLINE,
+#ifndef __GENKSYMS__
+	CPUHP_AP_ARM_KVMPV_STARTING,
+#endif
 };
 
 int __cpuhp_setup_state(enum cpuhp_state state,	const char *name, bool invoke,
