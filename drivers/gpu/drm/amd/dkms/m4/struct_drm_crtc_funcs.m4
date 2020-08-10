@@ -108,10 +108,6 @@ dnl # 	-       void (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
 dnl # 	-                         uint32_t start, uint32_t size);
 dnl # 	+       int (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
 dnl # 	+                        uint32_t size);
-dnl # v4.5-rc3-706-g5488dc16fde7 drm: introduce pipe color correction properties
-dnl # 	+void drm_atomic_helper_legacy_gamma_set(struct drm_crtc *crtc,
-dnl # 	+                                       u16 *red, u16 *green, u16 *blue,
-dnl # 	+                                       uint32_t start, uint32_t size)
 dnl # v2.6.35-260-g7203425a943e drm: expand gamma_set
 dnl # 		void (*gamma_set)(struct drm_crtc *crtc, u16 *r, u16 *g, u16 *b,
 dnl # 	-                         uint32_t size);
@@ -132,8 +128,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET], [
 		], [
 			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS, 1,
 				[crtc->funcs->gamma_set() wants 6 args])
-			AC_DEFINE(HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET, 1,
-				[drm_atomic_helper_legacy_gamma_set() is available])
 		], [
 			AC_KERNEL_TRY_COMPILE([
 				#include <drm/drm_crtc.h>
@@ -145,14 +139,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET], [
 			], [
 				AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS, 1,
 					[crtc->funcs->gamma_set() wants 5 args])
-				AC_DEFINE(HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET, 1,
-					[drm_atomic_helper_legacy_gamma_set() is available])
-			], [
-				AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_atomic_helper_legacy_gamma_set],
-				[drivers/gpu/drm/drm_atomic_helper.c],[
-					AC_DEFINE(HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET, 1,
-						[drm_atomic_helper_legacy_gamma_set() is available])
-				])
 			])
 		])
 	])

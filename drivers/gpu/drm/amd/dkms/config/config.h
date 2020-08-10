@@ -119,9 +119,6 @@
 /* drm_atomic_helper_duplicate_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
 
-/* drm_atomic_helper_legacy_gamma_set() is available */
-#define HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET 1
-
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
