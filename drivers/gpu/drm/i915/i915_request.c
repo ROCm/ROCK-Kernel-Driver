@@ -1426,8 +1426,6 @@ void i915_request_add(struct i915_request *rq)
 	 * Allow interactive/synchronous clients to jump ahead of
 	 * the bulk clients. (FQ_CODEL)
 	 */
-	if (list_empty(&rq->sched.signalers_list))
-		attr.priority |= I915_PRIORITY_WAIT;
 
 	local_bh_disable();
 	__i915_request_queue(rq, &attr);
@@ -1636,7 +1634,6 @@ long i915_request_wait(struct i915_request *rq,
 	if (flags & I915_WAIT_PRIORITY) {
 		if (!i915_request_started(rq) && INTEL_GEN(rq->i915) >= 6)
 			gen6_rps_boost(rq);
-		i915_schedule_bump_priority(rq, I915_PRIORITY_WAIT);
 	}
 
 	wait.tsk = current;
