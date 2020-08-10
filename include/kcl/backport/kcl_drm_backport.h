@@ -14,6 +14,7 @@
 #include <drm/drm_syncobj.h>
 #endif
 #include <drm/drm_crtc_helper.h>
+#include <kcl/header/kcl_drm_drv_h.h>
 #include <kcl/kcl_drm.h>
 
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
@@ -183,4 +184,17 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 #ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
 #define drm_helper_mode_fill_fb_struct _kcl_drm_helper_mode_fill_fb_struct
 #endif
+
+#ifdef HAVE_DRM_DEV_UNPLUG
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+static inline
+void _kcl_drm_dev_unplug(struct drm_device *dev)
+{
+	drm_dev_get(dev);
+	drm_dev_unplug(dev);
+}
+#define drm_dev_unplug _kcl_drm_dev_unplug
+#endif
+#endif
+
 #endif/*AMDKCL_DRM_BACKPORT_H*/
