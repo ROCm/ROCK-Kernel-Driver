@@ -1427,9 +1427,7 @@ void i915_request_add(struct i915_request *rq)
 	 * the bulk clients. (FQ_CODEL)
 	 */
 
-	local_bh_disable();
 	__i915_request_queue(rq, &attr);
-	local_bh_enable(); /* Kick the execlists tasklet if just scheduled */
 
 	/*
 	 * In typical scenarios, we do not expect the previous request on
