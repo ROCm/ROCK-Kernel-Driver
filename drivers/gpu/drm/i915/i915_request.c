@@ -1052,6 +1052,9 @@ i915_request_await_execution(struct i915_request *rq,
 		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags))
 			continue;
 
+		if (fence->context == rq->fence.context)
+			continue;
+
 		/*
 		 * We don't squash repeated fence dependencies here as we
 		 * want to run our callback in all cases.
