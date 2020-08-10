@@ -186,12 +186,24 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 #endif
 
 #ifdef HAVE_DRM_DEV_UNPLUG
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+/*
+ * v5.1-rc5-1150-gbd53280ef042 drm/drv: Fix incorrect resolution of merge conflict
+ * v5.1-rc2-5-g3f04e0a6cfeb drm: Fix drm_release() and device unplug
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(5, 2, 0)
 static inline
 void _kcl_drm_dev_unplug(struct drm_device *dev)
 {
+	unsigned int prev, post;
+
 	drm_dev_get(dev);
+
+	prev = kref_read(&dev->ref);
 	drm_dev_unplug(dev);
+	post = kref_read(&dev->ref);
+
+	if (prev == post)
+		drm_dev_put(dev);
 }
 #define drm_dev_unplug _kcl_drm_dev_unplug
 #endif
