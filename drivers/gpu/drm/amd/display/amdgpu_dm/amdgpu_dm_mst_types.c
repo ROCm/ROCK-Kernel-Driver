@@ -191,6 +191,19 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 	aconnector->dsc_aux = drm_dp_mst_dsc_aux_for_port(port);
+
+	/*
+	 * drm_dp_mst_dsc_aux_for_port() will return NULL for certain configs
+	 * because it only check the dsc/fec caps of the "port variable" and not the dock
+	 *
+	 * This case will return NULL: DSC capabe MST dock connected to a non fec/dsc capable display
+	 *
+	 * Workaround: explicitly check the use case above and use the mst dock's aux as dsc_aux
+	 *
+	 */
+	if (!aconnector->dsc_aux && !port->parent->port_parent)
+		aconnector->dsc_aux = &aconnector->mst_port->dm_dp_aux.aux;
+
 #endif
 
 	if (!aconnector->dsc_aux)
