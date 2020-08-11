@@ -762,6 +762,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 	struct ttm_resource backup;
 
 	backup = *mem;
+	size_t bus_size = (size_t)mem->num_pages << PAGE_SHIFT;
 
 	switch (mem->mem_type) {
 	case TTM_PL_SYSTEM:
@@ -775,7 +776,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 				amdgpu_ttm_domain_start(adev, mem->mem_type) -
 				adev->gmc.vram_start;
 		/* check if it's visible */
-		if ((mem->bus.offset + mem->bus.size) > adev->gmc.visible_vram_size)
+		if ((mem->bus.offset + bus_size) > adev->gmc.visible_vram_size)
 			return -EINVAL;
 		/* Only physically contiguous buffers apply. In a contiguous
 		 * buffer, size of the first mm_node would match the number of
