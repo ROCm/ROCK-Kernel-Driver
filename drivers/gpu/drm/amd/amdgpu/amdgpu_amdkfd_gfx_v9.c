@@ -562,7 +562,7 @@ int kgd_gfx_v9_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	uint32_t temp;
 	struct v9_mqd *m = get_mqd(mqd);
 
-	if (amdgpu_in_reset(adev))
+	if (adev->in_gpu_reset)
 		return -EIO;
 
 	acquire_queue(kgd, pipe_id, queue_id);
