@@ -79,9 +79,6 @@
 /* fence_set_error() is available */
 #define HAVE_DMA_FENCE_SET_ERROR 1
 
-/* linux/dma-resv.h is available */
-#define HAVE_DMA_RESV_H 1
-
 /* dma_resv->seq is available */
 #define HAVE_DMA_RESV_SEQ 1
 
@@ -147,6 +144,9 @@
 
 /* drm_atomic_plane_disabling() wants drm_plane_state * arg */
 #define HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE 1
+
+/* drm_atomic_private_obj_init() is available */
+#define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT 1
 
 /* drm_atomic_private_obj_init() has p,p,p,p interface */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_P_P_P_P 1
@@ -223,6 +223,9 @@
 
 /* drm_crtc_accurate_vblank_count() is available */
 #define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
+
+/* drm_crtc_enable_color_mgmt() is available */
+#define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
 
 /* drm_crtc_force_disable_all() is available */
 /* #undef HAVE_DRM_CRTC_FORCE_DISABLE_ALL */
@@ -346,6 +349,10 @@
 
 /* Define to 1 if you have the <drm/drm_file.h> header file. */
 #define HAVE_DRM_DRM_FILE_H 1
+
+/* Define to 1 if you have the <drm/drm_gem_framebuffer_helper.h> header file.
+   */
+#define HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H 1
 
 /* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
 #define HAVE_DRM_DRM_IOCTL_H 1
@@ -485,6 +492,12 @@
 
 /* drm_modeset_lock_all_ctx() is available */
 #define HAVE_DRM_MODESET_LOCK_ALL_CTX 1
+
+/* drm_mode_config_funcs->atomic_state_alloc() is available */
+#define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
+
+/* drm_mode_config->helper_private is available */
+#define HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE 1
 
 /* drm_mode_get_hv_timing is available */
 #define HAVE_DRM_MODE_GET_HV_TIMING 1
@@ -643,6 +656,9 @@
 /* Define to 1 if you have the <linux/dma-fence.h> header file. */
 #define HAVE_LINUX_DMA_FENCE_H 1
 
+/* Define to 1 if you have the <linux/dma-resv.h> header file. */
+#define HAVE_LINUX_DMA_RESV_H 1
+
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
 
@@ -754,11 +770,8 @@
 /* request_firmware_direct() is available */
 #define HAVE_REQUEST_FIRMWARE_DIRECT 1
 
-/* reservation_object->seq is dropped */
-/* #undef HAVE_RESERVATION_OBJECT_DROP_SEQ */
-
-/* reservation_object->staged is dropped */
-/* #undef HAVE_RESERVATION_OBJECT_DROP_STAGED */
+/* reservation_object->staged is available */
+/* #undef HAVE_RESERVATION_OBJECT_STAGED */
 
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
@@ -811,6 +824,9 @@
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
+/* struct drm_crtc_state has flag for flip */
+#define HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG 1
+
 /* struct drm_crtc_state->pageflip_flags is available */
 /* #undef HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS */
 
@@ -819,6 +835,12 @@
 
 /* drm_plane_helper_funcs->atomic_async_check() is available */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK 1
+
+/* drm_plane_helper_funcs->prepare_fb() wants const p arg */
+/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
+
+/* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
 
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */

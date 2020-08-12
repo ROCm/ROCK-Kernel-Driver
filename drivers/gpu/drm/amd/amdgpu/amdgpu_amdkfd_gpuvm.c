@@ -148,8 +148,12 @@ static int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 
+	if (kfd_mem_limit.system_mem_used + system_mem_needed >
+	    kfd_mem_limit.max_system_mem_limit)
+		pr_debug("Set no_system_mem_limit=1 if using shared memory\n");
+
 	if ((kfd_mem_limit.system_mem_used + system_mem_needed >
-	     kfd_mem_limit.max_system_mem_limit) ||
+	     kfd_mem_limit.max_system_mem_limit && !no_system_mem_limit) ||
 	    (kfd_mem_limit.ttm_mem_used + ttm_mem_needed >
 	     kfd_mem_limit.max_ttm_mem_limit) ||
 	    (adev->kfd.vram_used + vram_needed >
@@ -1241,10 +1245,14 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		return -EINVAL;
 	}
 
+	if (!down_read_trylock(&adev->reset_sem))
+		return -EIO;
+
 	if (sg) {
 		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
 		bo_type = ttm_bo_type_sg;
 	}
+
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
 	if (!*mem) {
 		ret = -ENOMEM;
@@ -1314,6 +1322,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
 
+	up_read(&adev->reset_sem);
 	return 0;
 
 allocate_init_user_pages_failed:
@@ -1331,6 +1340,9 @@ err:
 		sg_free_table(sg);
 		kfree(sg);
 	}
+
+	up_read(&adev->reset_sem);
+
 	return ret;
 }
 

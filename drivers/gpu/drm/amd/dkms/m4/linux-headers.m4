@@ -65,4 +65,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-fence.h])
+
+	dnl #
+	dnl # v5.3-rc1-449-g52791eeec1d9
+	dnl $ dma-buf: rename reservation_object to dma_resv
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/dma-resv.h])
 ])

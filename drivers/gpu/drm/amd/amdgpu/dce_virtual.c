@@ -370,7 +370,7 @@ dce_virtual_dpms(struct drm_connector *connector, int mode)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
 static enum drm_connector_status
 dce_virtual_detect(struct drm_connector *connector, bool force)
 {
@@ -407,7 +407,7 @@ static const struct drm_connector_helper_funcs dce_virtual_connector_helper_func
 static const struct drm_connector_funcs dce_virtual_connector_funcs = {
 	.dpms = dce_virtual_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)
+#ifdef AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
 	.detect = dce_virtual_detect,
 #endif
 	.set_property = dce_virtual_set_property,

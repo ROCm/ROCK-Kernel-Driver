@@ -1293,6 +1293,22 @@ done:
 	return size;
 }
 
+/* function: read DSC slice height parameter on the connector
+ *
+ * The read function: dp_dsc_slice_height_read
+ * returns dsc slice height used in the current configuration
+ * The return is an integer: 0 or other positive number
+ *
+ * Access the status with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_slice_height
+ *
+ * 0 - means that DSC is disabled
+ *
+ * Any other number more than zero represents the
+ * slice height currently used by DSC in pixels
+ *
+ */
 static ssize_t dp_dsc_slice_height_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -1350,6 +1366,94 @@ static ssize_t dp_dsc_slice_height_read(struct file *f, char __user *buf,
 	return result;
 }
 
+/* function: write DSC slice height parameter
+ *
+ * The write function: dp_dsc_slice_height_write
+ * overwrites automatically generated DSC configuration
+ * of slice height.
+ *
+ * The user has to write the slice height divisible by the
+ * picture height.
+ *
+ * Also the user has to write height in hexidecimal
+ * rather than in decimal.
+ *
+ * Writing DSC settings is done with the following command:
+ * - To force overwrite slice height (example sets to 128 pixels):
+ *
+ *	echo 0x80 > /sys/kernel/debug/dri/0/DP-X/dsc_slice_height
+ *
+ *  - To stop overwriting and let driver find the optimal size,
+ * set the height to zero:
+ *
+ *	echo 0x0 > /sys/kernel/debug/dri/0/DP-X/dsc_slice_height
+ *
+ */
+static ssize_t dp_dsc_slice_height_write(struct file *f, const char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct pipe_ctx *pipe_ctx;
+	int i;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	uint8_t param_nums = 0;
+	long param[1] = {0};
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+					    (long *)param, buf,
+					    max_param_num,
+					    &param_nums)) {
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx || !pipe_ctx->stream)
+		goto done;
+
+	aconnector->dsc_settings.dsc_slice_height = param[0];
+
+done:
+	kfree(wr_buf);
+	return size;
+}
+
+/* function: read DSC target rate on the connector in bits per pixel
+ *
+ * The read function: dp_dsc_bits_per_pixel_read
+ * returns target rate of compression in bits per pixel
+ * The return is an integer: 0 or other positive integer
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_bits_per_pixel
+ *
+ *  0 - means that DSC is disabled
+ */
 static ssize_t dp_dsc_bits_per_pixel_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -1407,6 +1511,94 @@ static ssize_t dp_dsc_bits_per_pixel_read(struct file *f, char __user *buf,
 	return result;
 }
 
+/* function: write DSC target rate in bits per pixel
+ *
+ * The write function: dp_dsc_bits_per_pixel_write
+ * overwrites automatically generated DSC configuration
+ * of DSC target bit rate.
+ *
+ * Also the user has to write bpp in hexidecimal
+ * rather than in decimal.
+ *
+ * Writing DSC settings is done with the following command:
+ * - To force overwrite rate (example sets to 256 bpp x 1/16):
+ *
+ *	echo 0x100 > /sys/kernel/debug/dri/0/DP-X/dsc_bits_per_pixel
+ *
+ *  - To stop overwriting and let driver find the optimal rate,
+ * set the rate to zero:
+ *
+ *	echo 0x0 > /sys/kernel/debug/dri/0/DP-X/dsc_bits_per_pixel
+ *
+ */
+static ssize_t dp_dsc_bits_per_pixel_write(struct file *f, const char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct pipe_ctx *pipe_ctx;
+	int i;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	uint8_t param_nums = 0;
+	long param[1] = {0};
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+					    (long *)param, buf,
+					    max_param_num,
+					    &param_nums)) {
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
+			if (pipe_ctx && pipe_ctx->stream &&
+			    pipe_ctx->stream->link == aconnector->dc_link)
+				break;
+	}
+
+	if (!pipe_ctx || !pipe_ctx->stream)
+		goto done;
+
+	aconnector->dsc_settings.dsc_bits_per_pixel = param[0];
+
+done:
+	kfree(wr_buf);
+	return size;
+}
+
+/* function: read DSC picture width parameter on the connector
+ *
+ * The read function: dp_dsc_pic_width_read
+ * returns dsc picture width used in the current configuration
+ * It is the same as h_addressable of the current
+ * display's timing
+ * The return is an integer: 0 or other positive integer
+ * If 0 then DSC is disabled.
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_pic_width
+ *
+ * 0 - means that DSC is disabled
+ */
 static ssize_t dp_dsc_pic_width_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -1521,6 +1713,21 @@ static ssize_t dp_dsc_pic_height_read(struct file *f, char __user *buf,
 	return result;
 }
 
+/* function: read DSC chunk size parameter on the connector
+ *
+ * The read function: dp_dsc_chunk_size_read
+ * returns dsc chunk size set in the current configuration
+ * The value is calculated automatically by DSC code
+ * and depends on slice parameters and bpp target rate
+ * The return is an integer: 0 or other positive integer
+ * If 0 then DSC is disabled.
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_chunk_size
+ *
+ * 0 - means that DSC is disabled
+ */
 static ssize_t dp_dsc_chunk_size_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -1578,6 +1785,21 @@ static ssize_t dp_dsc_chunk_size_read(struct file *f, char __user *buf,
 	return result;
 }
 
+/* function: read DSC slice bpg offset on the connector
+ *
+ * The read function: dp_dsc_slice_bpg_offset_read
+ * returns dsc bpg slice offset set in the current configuration
+ * The value is calculated automatically by DSC code
+ * and depends on slice parameters and bpp target rate
+ * The return is an integer: 0 or other positive integer
+ * If 0 then DSC is disabled.
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dsc_slice_bpg_offset
+ *
+ * 0 - means that DSC is disabled
+ */
 static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -1664,12 +1886,14 @@ static const struct file_operations dp_dsc_slice_width_debugfs_fops = {
 static const struct file_operations dp_dsc_slice_height_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.read = dp_dsc_slice_height_read,
+	.write = dp_dsc_slice_height_write,
 	.llseek = default_llseek
 };
 
 static const struct file_operations dp_dsc_bits_per_pixel_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.read = dp_dsc_bits_per_pixel_read,
+	.write = dp_dsc_bits_per_pixel_write,
 	.llseek = default_llseek
 };
 
@@ -2007,6 +2231,40 @@ static const struct drm_info_list amdgpu_dm_debugfs_list[] = {
 };
 
 /*
+ * Sets the force_timing_sync debug optino from the given string.
+ * All connected displays will be force synchronized immediately.
+ * Usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_force_timing_sync
+ */
+static int force_timing_sync_set(void *data, u64 val)
+{
+	struct amdgpu_device *adev = data;
+
+	adev->dm.force_timing_sync = (bool)val;
+
+	amdgpu_dm_trigger_timing_sync(adev->ddev);
+
+	return 0;
+}
+
+/*
+ * Gets the force_timing_sync debug option value into the given buffer.
+ * Usage: cat /sys/kernel/debug/dri/0/amdgpu_dm_force_timing_sync
+ */
+static int force_timing_sync_get(void *data, u64 *val)
+{
+	struct amdgpu_device *adev = data;
+
+	*val = adev->dm.force_timing_sync;
+
+	return 0;
+}
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
+DEFINE_DEBUGFS_ATTRIBUTE(force_timing_sync_ops, force_timing_sync_get,
+			 force_timing_sync_set, "%llu\n");
+#endif
+
+/*
  * Sets the DC visual confirm debug option from the given string.
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_visual_confirm
  */
@@ -2067,6 +2325,9 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 
 	debugfs_create_file_unsafe("amdgpu_dm_dmub_fw_state", 0644, root,
 				   adev, &dmub_fw_state_fops);
+
+	debugfs_create_file_unsafe("amdgpu_dm_force_timing_sync", 0644, root,
+				   adev, &force_timing_sync_ops);
 #endif
 
 	return 0;

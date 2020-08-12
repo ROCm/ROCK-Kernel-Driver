@@ -414,7 +414,6 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			aconnector->port = port;
 			drm_mode_connector_set_path_property(connector, pathprop);
 			drm_modeset_unlock(&dev->mode_config.connection_mutex);
-			aconnector->mst_connected = true;
 			return &aconnector->base;
 		}
 	}
@@ -518,7 +517,10 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					   aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
-		aconnector->dc_link->cur_link_settings.lane_count = 0;
+		mutex_lock(&mgr->lock);
+		if (!mgr->mst_state)
+			aconnector->dc_link->cur_link_settings.lane_count = 0;
+		mutex_unlock(&mgr->lock);
 	}
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
@@ -624,6 +626,8 @@ struct dsc_mst_fairness_params {
 	struct drm_dp_mst_port *port;
 	bool clock_overwrite;
 	uint32_t slice_width_overwrite;
+	uint32_t slice_height_overwrite;
+	uint32_t bpp_overwrite;
 };
 
 struct dsc_mst_fairness_vars {
@@ -657,11 +661,21 @@ static void set_dsc_configs_from_fairness_vars(struct dsc_mst_fairness_params *p
 					params[i].timing,
 					&params[i].timing->dsc_cfg)) {
 			params[i].timing->flags.DSC = 1;
-			params[i].timing->dsc_cfg.bits_per_pixel = vars[i].bpp_x16;
+
+			if (params[i].bpp_overwrite)
+				params[i].timing->dsc_cfg.bits_per_pixel = params[i].bpp_overwrite;
+			else
+				params[i].timing->dsc_cfg.bits_per_pixel = vars[i].bpp_x16;
+
 			if (params[i].slice_width_overwrite)
 				params[i].timing->dsc_cfg.num_slices_h = DIV_ROUND_UP(
 										params[i].timing->h_addressable,
 										params[i].slice_width_overwrite);
+
+			if (params[i].slice_height_overwrite)
+				params[i].timing->dsc_cfg.num_slices_v = DIV_ROUND_UP(
+										params[i].timing->v_addressable,
+										params[i].slice_height_overwrite);
 		} else {
 			params[i].timing->flags.DSC = 0;
 		}
@@ -879,6 +893,8 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 		if (params[count].clock_overwrite)
 			debugfs_overwrite = true;
 		params[count].slice_width_overwrite = aconnector->dsc_settings.dsc_slice_width;
+		params[count].slice_height_overwrite = aconnector->dsc_settings.dsc_slice_height;
+		params[count].bpp_overwrite = aconnector->dsc_settings.dsc_bits_per_pixel;
 		params[count].compression_possible = stream->sink->dsc_caps.dsc_dec_caps.is_dsc_supported;
 		dc_dsc_get_policy_for_timing(params[count].timing, &dsc_policy);
 		if (!dc_dsc_compute_bandwidth_range(

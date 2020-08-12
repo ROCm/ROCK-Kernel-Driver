@@ -36,9 +36,7 @@
 #include <linux/pm_runtime.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_edid.h>
-#if DRM_VERSION_CODE >= DRM_VERSION(4 ,14, 0)
 #include <drm/drm_gem_framebuffer_helper.h>
-#endif
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_vblank.h>
 
@@ -49,7 +47,7 @@ static void amdgpu_display_flip_callback(struct dma_fence *f,
 		container_of(cb, struct amdgpu_flip_work, cb);
 
 	dma_fence_put(f);
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 	schedule_work(&work->flip_work.work);
 #else
 	schedule_work(&work->flip_work);
@@ -74,35 +72,7 @@ static bool amdgpu_display_flip_handle_fence(struct amdgpu_flip_work *work,
 	return false;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-static void amdgpu_display_flip_work_func(struct work_struct *__work)
-{
-	struct amdgpu_flip_work *work =
-		container_of(__work, struct amdgpu_flip_work, flip_work);
-	struct amdgpu_device *adev = work->adev;
-	struct amdgpu_crtc *amdgpuCrtc = adev->mode_info.crtcs[work->crtc_id];
-
-	struct drm_crtc *crtc = &amdgpuCrtc->base;
-	unsigned long flags;
-	unsigned i;
-
-	if (amdgpu_display_flip_handle_fence(work, &work->excl))
-		return;
-
-	for (i = 0; i < work->shared_count; ++i)
-		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
-			return;
-
-	/* We borrow the event spin lock for protecting flip_status */
-	spin_lock_irqsave(&crtc->dev->event_lock, flags);
-	/* Set the flip status */
-	amdgpuCrtc->pflip_status = AMDGPU_FLIP_SUBMITTED;
-	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
-
-	/* Do the flip (mmio) */
-	adev->mode_info.funcs->page_flip(adev, work->crtc_id, work->base, work->async);
-}
-#elif DRM_VERSION_CODE < DRM_VERSION(4, 9, 0)
+#if !defined(HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET)
 static void amdgpu_flip_work_func(struct work_struct *__work)
 {
 	struct amdgpu_flip_work *work =
@@ -298,12 +268,12 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 
 	/* schedule unpin of the old buffer */
 
-	obj = kcl_drm_fb_get_gem_obj(crtc->primary->fb, 0);
+	obj = drm_gem_fb_get_obj(crtc->primary->fb, 0);
 	/* take a reference to the old object */
 	work->old_abo = gem_to_amdgpu_bo(obj);
 	amdgpu_bo_ref(work->old_abo);
 
-	obj = kcl_drm_fb_get_gem_obj(fb, 0);
+	obj = drm_gem_fb_get_obj(fb, 0);
 	new_abo = gem_to_amdgpu_bo(obj);
 
 	/* pin the new buffer */
@@ -756,35 +726,10 @@ bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,
 	}
 	return true;
 }
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
-static void amdgpu_display_user_framebuffer_destroy(struct drm_framebuffer *fb)
-{
-	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
-
-	drm_gem_object_put_unlocked(amdgpu_fb->obj);
-	drm_framebuffer_cleanup(fb);
-	kfree(amdgpu_fb);
-}
-
-static int amdgpu_display_user_framebuffer_create_handle(
-			struct drm_framebuffer *fb,
-			struct drm_file *file_priv,
-			unsigned int *handle)
-{
-	struct amdgpu_framebuffer *amdgpu_fb = to_amdgpu_framebuffer(fb);
-
-	return drm_gem_handle_create(file_priv, amdgpu_fb->obj, handle);
-}
-#endif
 
 static const struct drm_framebuffer_funcs amdgpu_fb_funcs = {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
 	.destroy = drm_gem_fb_destroy,
 	.create_handle = drm_gem_fb_create_handle,
-#else
-	.destroy = amdgpu_display_user_framebuffer_destroy,
-	.create_handle = amdgpu_display_user_framebuffer_create_handle,
-#endif
 };
 
 uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
@@ -830,11 +775,11 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct drm_gem_object *obj)
 {
 	int ret;
-	kcl_drm_fb_set_gem_obj(&rfb->base, 0, obj);
+	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
-		kcl_drm_fb_set_gem_obj(&rfb->base, 0, NULL);
+		kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 		return ret;
 	}
 	return 0;
@@ -1161,11 +1106,7 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 	}
 	else {
 		/* No: Fake something reasonable which gives at least ok results. */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-		vbl_start = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vdisplay;
-#else
 		vbl_start = mode->crtc_vdisplay;
-#endif
 		vbl_end = 0;
 	}
 
@@ -1211,11 +1152,7 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 
 	/* Inside "upper part" of vblank area? Apply corrective offset if so: */
 	if (in_vbl && (*vpos >= vbl_start)) {
-#if DRM_VERSION_CODE < DRM_VERSION(4, 4, 0)
-		vtotal = adev->mode_info.crtcs[pipe]->base.hwmode.crtc_vtotal;
-#else
 		vtotal = mode->crtc_vtotal;
-#endif
 
 		/* With variable refresh rate displays the vpos can exceed
 		 * the vtotal value. Clamp to 0 to return -vbl_end instead

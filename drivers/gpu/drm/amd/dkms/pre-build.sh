@@ -52,11 +52,12 @@ for sym in $SYMS; do
 	}' /boot/System.map-$KERNELVER >>$KCL/symbols.c
 done
 
-sed -i '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' $KCL/dma-buf/dma-resv.c
-sed -i 's/linux\/sched\/mm\.h/kcl\/header\/kcl_sched_mm_h\.h/' $KCL/dma-buf/dma-resv.c
-sed -i '/define _LINUX_RESERVATION_H/i #include <kcl/backport/kcl_reservation_backport.h>' $INC/linux/dma-resv.h
-sed -i 's/reservation_seqcount_string\[\]/*reservation_seqcount_string/' $INC/linux/dma-resv.h
-sed -i '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
+sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' \
+       -e 's/linux\/sched\/mm\.h/kcl\/header\/kcl_sched_mm_h\.h/' \
+       -e '/dma_resv_lockdep/,/subsys_initcall/d' $KCL/dma-buf/dma-resv.c
+sed -i -e '/define _LINUX_RESERVATION_H/a #include <kcl/backport/kcl_reservation_backport.h>' \
+       -e '/extern struct ww_class reservation_ww_class/,/extern const char reservation_seqcount_string/d' \
+       -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
 
 while read from to; do
 	[[ -z "$from" ]] && continue
@@ -77,11 +78,14 @@ done
 
 # rename CONFIG_xxx to CONFIG_xxx_AMDKCL
 # otherwise kernel config would override dkms package config
-for config in $(find -name Kconfig -exec grep -h '^config' {} + | sed 's/ /_/' | tr 'a-z' 'A-Z'); do
+AMDGPU_CONFIG=$(find -name Kconfig -exec grep -h '^config' {} + | sed 's/ /_/' | tr 'a-z' 'A-Z')
+TTM_CONFIG=$(awk '/CONFIG_DRM/{gsub(".*\\(CONFIG_DRM","CONFIG_DRM");gsub("\\).*","");print $0}' ttm/Makefile)
+SCHED_CONFIG=$(awk '/CONFIG_DRM/{gsub(".*\\(CONFIG_DRM","CONFIG_DRM");gsub("\\).*","");print $0}' scheduler/Makefile)
+for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	for file in $(grep -rl $config ./); do
 		sed -i "s/\<$config\>/&_AMDKCL/" $file
 	done
-	sed -i "/subdir-ccflags-y += -D${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
+	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
 done
 
 export KERNELVER

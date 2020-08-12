@@ -9,9 +9,7 @@
 #include <drm/drm_vma_manager.h>
 #include <kcl/header/kcl_drmP_h.h>
 
-#if (BITS_PER_LONG == 64) && \
-	(!defined(DRM_FILE_PAGE_OFFSET_SIZE) || \
-	(DRM_FILE_PAGE_OFFSET_SIZE == ((0xFFFFFFFUL >> PAGE_SHIFT) * 16)))
+#if (BITS_PER_LONG == 64)
 #ifdef DRM_FILE_PAGE_OFFSET_START
 #undef DRM_FILE_PAGE_OFFSET_START
 #endif
@@ -19,8 +17,8 @@
 #undef DRM_FILE_PAGE_OFFSET_SIZE
 #endif
 
-#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFUL >> PAGE_SHIFT) + 1)
-#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFUL >> PAGE_SHIFT) * 256)
+#define DRM_FILE_PAGE_OFFSET_START ((0xFFFFFFFFULL >> PAGE_SHIFT) + 1)
+#define DRM_FILE_PAGE_OFFSET_SIZE ((0xFFFFFFFFULL >> PAGE_SHIFT) * 4096)
 
 static inline void
 kcl_drm_vma_offset_manager_init(struct drm_vma_offset_manager *mgr)

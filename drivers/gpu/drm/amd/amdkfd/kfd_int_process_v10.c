@@ -117,7 +117,7 @@ static void event_interrupt_wq_v10(struct kfd_dev *dev,
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
 	context_id0 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
-	context_id1 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
+	context_id1 = SOC15_CONTEXT_ID1_FROM_IH_ENTRY(ih_ring_entry);
 
 	if (source_id == SOC15_INTSRC_CP_END_OF_PIPE)
 		kfd_signal_event_interrupt(pasid, context_id0, 32);

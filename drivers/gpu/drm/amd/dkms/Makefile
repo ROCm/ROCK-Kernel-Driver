@@ -6,8 +6,36 @@ ifeq (y,$(CONFIG_DRM_AMDGPU))
 $(error DRM_AMDGPU is built-in, exit...)
 endif
 
+ifeq ($(shell grep "HAVE_DMA_RESV_SEQ" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),n)
+$(error dma_resv->seq is missing., exit...)
+endif
+
+ifdef CONFIG_CC_IS_GCC
+GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
+GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCCPAT=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+# CONFIG_GCC_VERSION returns x.xx.xx as the version format
+GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
+ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
+$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
+$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
+endif
+endif
+
+DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
+DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
+ifeq ($(DRM_VER),)
+DRM_VER = $(VERSION)
+DRM_PATCH = $(PATCHLEVEL)
+endif
+
+subdir-ccflags-y += \
+	-DDRM_VER=$(DRM_VER) \
+	-DDRM_PATCH=$(DRM_PATCH) \
+	-DDRM_SUB="0"
+
 define get_rhel_version
-(echo "#include <linux/version.h>"; echo "int amdkcl_ver=$(1);") | cpp $(LINUXINCLUDE) | sed -n 's/int amdkcl_ver=\([0-9]*\);/\1/p'
+printf "#include <linux/version.h>\n$(1)" | $(CC) $(LINUXINCLUDE) -E -x c - | tail -n 1 | grep -v $(1)
 endef
 RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
 RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
@@ -32,35 +60,6 @@ else
 OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
-
-ifdef CONFIG_CC_IS_GCC
-# Use -dumpfullversion -dumpversion to ensure that we get the right format
-# -dumpfullversion is newer, but has the same format as the old -dumpversion
-# Newer -dumpversion only reports the GCC Major version, while the older
-# -dumpversion and the newer -dumpfullversion return MAJ.MIN.PAT
-GCCVER=$(shell $(CC) -dumpfullversion -dumpversion)
-GCCMAJ=$(shell echo $(GCCVER) | cut -f1 -d.)
-GCCMIN=$(shell echo $(GCCVER) | cut -f2 -d.)
-GCCPAT=$(shell echo $(GCCVER) | cut -f3 -d.)
-# CONFIG_GCC_VERSION returns x.xx.xx as the version format
-GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
-ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
-$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
-$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
-endif
-endif
-
-DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
-ifeq ($(DRM_VER),)
-DRM_VER = $(VERSION)
-DRM_PATCH = $(PATCHLEVEL)
-endif
-
-subdir-ccflags-y += \
-	-DDRM_VER=$(DRM_VER) \
-	-DDRM_PATCH=$(DRM_PATCH) \
-	-DDRM_SUB="0"
 
 ifeq ("ubuntu",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_UBUNTU
@@ -199,9 +198,6 @@ export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
 export CONFIG_DRM_AMD_DC_DCN1_01=y
-export CONFIG_DRM_AMD_DC_DCN2_0=y
-export CONFIG_DRM_AMD_DC_DCN2_1=y
-export CONFIG_DRM_AMD_DC_DCN3_0=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
@@ -211,8 +207,19 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
+
+
+# Trying to enable DCN2/3 with core2 optimizations will result in
+# older versions of GCC hanging during building/installing. Check
+# if the compiler is using core2 optimizations and only build DCN2/3
+# if core2 isn't in the compiler flags
+ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
+export CONFIG_DRM_AMD_DC_DCN2_0=y
+export CONFIG_DRM_AMD_DC_DCN2_1=y
+export CONFIG_DRM_AMD_DC_DCN3_0=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_0
+endif
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/

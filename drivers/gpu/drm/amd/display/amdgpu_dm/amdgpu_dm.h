@@ -246,7 +246,7 @@ struct amdgpu_display_manager {
 	struct drm_device *ddev;
 	u16 display_indexes_num;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	/**
 	 * @atomic_obj:
 	 *
@@ -376,11 +376,14 @@ struct amdgpu_display_manager {
 	 * fake encoders used for DP MST.
 	 */
 	struct amdgpu_encoder mst_encoders[AMDGPU_DM_MAX_CRTC];
+        bool force_timing_sync;
 };
 
 struct dsc_preferred_settings {
 	bool dsc_clock_en;
 	uint32_t dsc_slice_width;
+	uint32_t dsc_slice_height;
+	uint32_t dsc_bits_per_pixel;
 };
 
 struct amdgpu_dm_connector {
@@ -427,9 +430,7 @@ struct amdgpu_dm_connector {
 	struct mutex hpd_lock;
 
 	bool fake_enable;
-#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
-	bool mst_connected;
-#endif
+
 #ifdef CONFIG_DEBUG_FS
 	uint32_t debugfs_dpcd_address;
 	uint32_t debugfs_dpcd_size;
@@ -450,6 +451,8 @@ struct dc_plane_state;
 struct dm_plane_state {
 	struct drm_plane_state base;
 	struct dc_plane_state *dc_state;
+	uint64_t tiling_flags;
+	bool tmz_surface;
 };
 
 struct dm_crtc_state {
@@ -483,7 +486,7 @@ struct dm_crtc_state {
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)
 
 struct dm_atomic_state {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 14, 0)
+#ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	struct drm_private_state base;
 #else
 	struct drm_atomic_state base;
@@ -545,6 +548,8 @@ void dm_restore_drm_connector_state(struct drm_device *dev,
 
 void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 					struct edid *edid);
+
+void amdgpu_dm_trigger_timing_sync(struct drm_device *dev);
 
 #define MAX_COLOR_LUT_ENTRIES 4096
 /* Legacy gamm LUT users such as X doesn't like large LUT sizes */

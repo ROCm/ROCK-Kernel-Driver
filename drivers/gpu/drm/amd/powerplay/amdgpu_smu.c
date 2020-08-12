@@ -133,6 +133,78 @@ int smu_get_dpm_freq_range(struct smu_context *smu,
 	return ret;
 }
 
+static int smu_dpm_set_vcn_enable_locked(struct smu_context *smu,
+					 bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	if (!smu->ppt_funcs->dpm_set_vcn_enable)
+		return 0;
+
+	if (atomic_read(&power_gate->vcn_gated) ^ enable)
+		return 0;
+
+	ret = smu->ppt_funcs->dpm_set_vcn_enable(smu, enable);
+	if (!ret)
+		atomic_set(&power_gate->vcn_gated, !enable);
+
+	return ret;
+}
+
+static int smu_dpm_set_vcn_enable(struct smu_context *smu,
+				  bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	mutex_lock(&power_gate->vcn_gate_lock);
+
+	ret = smu_dpm_set_vcn_enable_locked(smu, enable);
+
+	mutex_unlock(&power_gate->vcn_gate_lock);
+
+	return ret;
+}
+
+static int smu_dpm_set_jpeg_enable_locked(struct smu_context *smu,
+					  bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	if (!smu->ppt_funcs->dpm_set_jpeg_enable)
+		return 0;
+
+	if (atomic_read(&power_gate->jpeg_gated) ^ enable)
+		return 0;
+
+	ret = smu->ppt_funcs->dpm_set_jpeg_enable(smu, enable);
+	if (!ret)
+		atomic_set(&power_gate->jpeg_gated, !enable);
+
+	return ret;
+}
+
+static int smu_dpm_set_jpeg_enable(struct smu_context *smu,
+				   bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	mutex_lock(&power_gate->jpeg_gate_lock);
+
+	ret = smu_dpm_set_jpeg_enable_locked(smu, enable);
+
+	mutex_unlock(&power_gate->jpeg_gate_lock);
+
+	return ret;
+}
+
 /**
  * smu_dpm_set_power_gate - power gate/ungate the specific IP block
  *
@@ -351,6 +423,45 @@ static int smu_early_init(void *handle)
 	mutex_init(&smu->mutex);
 
 	return smu_set_funcs(adev);
+}
+
+static int smu_set_default_dpm_table(struct smu_context *smu)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int vcn_gate, jpeg_gate;
+	int ret = 0;
+
+	if (!smu->ppt_funcs->set_default_dpm_table)
+		return 0;
+
+	mutex_lock(&power_gate->vcn_gate_lock);
+	mutex_lock(&power_gate->jpeg_gate_lock);
+
+	vcn_gate = atomic_read(&power_gate->vcn_gated);
+	jpeg_gate = atomic_read(&power_gate->jpeg_gated);
+
+	ret = smu_dpm_set_vcn_enable_locked(smu, true);
+	if (ret)
+		goto err0_out;
+
+	ret = smu_dpm_set_jpeg_enable_locked(smu, true);
+	if (ret)
+		goto err1_out;
+
+	ret = smu->ppt_funcs->set_default_dpm_table(smu);
+	if (ret)
+		dev_err(smu->adev->dev,
+			"Failed to setup default dpm clock tables!\n");
+
+	smu_dpm_set_jpeg_enable_locked(smu, !jpeg_gate);
+err1_out:
+	smu_dpm_set_vcn_enable_locked(smu, !vcn_gate);
+err0_out:
+	mutex_unlock(&power_gate->jpeg_gate_lock);
+	mutex_unlock(&power_gate->vcn_gate_lock);
+
+	return ret;
 }
 
 static int smu_late_init(void *handle)
@@ -579,12 +690,18 @@ static int smu_smc_table_sw_init(struct smu_context *smu)
 	if (ret)
 		return ret;
 
+	ret = smu_i2c_init(smu, &smu->adev->pm.smu_i2c);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
 static int smu_smc_table_sw_fini(struct smu_context *smu)
 {
 	int ret;
+
+	smu_i2c_fini(smu, &smu->adev->pm.smu_i2c);
 
 	ret = smu_free_memory_pool(smu);
 	if (ret)
@@ -643,6 +760,11 @@ static int smu_sw_init(void *handle)
 	smu->watermarks_bitmap = 0;
 	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
 	smu->default_power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
+
+	atomic_set(&smu->smu_power.power_gate.vcn_gated, 1);
+	atomic_set(&smu->smu_power.power_gate.jpeg_gated, 1);
+	mutex_init(&smu->smu_power.power_gate.vcn_gate_lock);
+	mutex_init(&smu->smu_power.power_gate.jpeg_gate_lock);
 
 	smu->workload_mask = 1 << smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT];
 	smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT] = 0;
@@ -845,10 +967,6 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 		return ret;
 	}
 
-	ret = smu_i2c_init(smu, &adev->pm.smu_i2c);
-	if (ret)
-		return ret;
-
 	ret = smu_disable_umc_cdr_12gbps_workaround(smu);
 	if (ret) {
 		dev_err(adev->dev, "Workaround failed to disable UMC CDR feature on 12Gbps SKU!\n");
@@ -992,7 +1110,7 @@ static int smu_disable_dpms(struct smu_context *smu)
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
 	bool use_baco = !smu->is_apu &&
-		((adev->in_gpu_reset &&
+		((amdgpu_in_reset(adev) &&
 		  (amdgpu_asic_reset_method(adev) == AMD_RESET_METHOD_BACO)) ||
 		 ((adev->in_runpm || adev->in_hibernate) && amdgpu_asic_supports_baco(adev)));
 
@@ -1046,8 +1164,6 @@ static int smu_smc_hw_cleanup(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
-
-	smu_i2c_fini(smu, &adev->pm.smu_i2c);
 
 	cancel_work_sync(&smu->throttling_logging_work);
 
@@ -1974,7 +2090,7 @@ int smu_read_sensor(struct smu_context *smu,
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_VCN_POWER_STATE:
-		*(uint32_t *)data = smu->smu_power.power_gate.vcn_gated ? 0 : 1;
+		*(uint32_t *)data = atomic_read(&smu->smu_power.power_gate.vcn_gated) ? 0: 1;
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_MIN_FAN_RPM:
@@ -2515,4 +2631,24 @@ int smu_get_dpm_clock_table(struct smu_context *smu,
 	mutex_unlock(&smu->mutex);
 
 	return ret;
+}
+
+ssize_t smu_sys_get_gpu_metrics(struct smu_context *smu,
+				void **table)
+{
+	ssize_t size;
+
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
+		return -EOPNOTSUPP;
+
+	if (!smu->ppt_funcs->get_gpu_metrics)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&smu->mutex);
+
+	size = smu->ppt_funcs->get_gpu_metrics(smu, table);
+
+	mutex_unlock(&smu->mutex);
+
+	return size;
 }

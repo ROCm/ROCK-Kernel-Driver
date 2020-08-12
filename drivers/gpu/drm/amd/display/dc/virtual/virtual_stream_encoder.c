@@ -91,6 +91,17 @@ static void virtual_enc_dp_set_odm_combine(
 #endif
 #endif
 
+static void virtual_dig_connect_to_otg(
+		struct stream_encoder *enc,
+		int tg_inst)
+{}
+
+static void virtual_setup_stereo_sync(
+			struct stream_encoder *enc,
+			int tg_inst,
+			bool enable)
+{}
+
 static const struct stream_encoder_funcs virtual_str_enc_funcs = {
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
@@ -122,6 +133,8 @@ static const struct stream_encoder_funcs virtual_str_enc_funcs = {
 	.audio_mute_control = virtual_audio_mute_control,
 	.set_avmute = virtual_stream_encoder_set_avmute,
 	.hdmi_reset_stream_attribute = virtual_stream_encoder_reset_hdmi_stream_attribute,
+	.dig_connect_to_otg = virtual_dig_connect_to_otg,
+	.setup_stereo_sync = virtual_setup_stereo_sync,
 };
 
 bool virtual_stream_encoder_construct(
