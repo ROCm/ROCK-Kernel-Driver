@@ -286,18 +286,7 @@ static int effective_prio(const struct i915_request *rq)
 	if (i915_request_has_nopreempt(rq))
 		prio = I915_PRIORITY_UNPREEMPTABLE;
 
-	/*
-	 * On unwinding the active request, we give it a priority bump
-	 * if it has completed waiting on any semaphore. If we know that
-	 * the request has already started, we can prevent an unwanted
-	 * preempt-to-idle cycle by taking that into account now.
-	 */
-	if (__i915_request_has_started(rq))
-		prio |= I915_PRIORITY_NOSEMAPHORE;
-
-	/* Restrict mere WAIT boosts from triggering preemption */
-	BUILD_BUG_ON(__NO_PREEMPTION & ~I915_PRIORITY_MASK); /* only internal */
-	return prio | __NO_PREEMPTION;
+	return prio;
 }
 
 static int queue_prio(const struct intel_engine_execlists *execlists)
@@ -507,6 +496,8 @@ __unwind_incomplete_requests(struct intel_engine_cs *engine)
 			GEM_BUG_ON(RB_EMPTY_ROOT(&engine->execlists.queue.rb_root));
 
 			list_move(&rq->sched.link, pl);
+			set_bit(I915_FENCE_FLAG_PQUEUE, &rq->fence.flags);
+
 			active = rq;
 		} else {
 			/*
@@ -1662,11 +1653,12 @@ static void execlists_submission_timer(struct timer_list *timer)
 }
 
 static void queue_request(struct intel_engine_cs *engine,
-			  struct i915_sched_node *node,
-			  int prio)
+			  struct i915_request *rq)
 {
-	GEM_BUG_ON(!list_empty(&node->link));
-	list_add_tail(&node->link, i915_sched_lookup_priolist(engine, prio));
+	GEM_BUG_ON(!list_empty(&rq->sched.link));
+	list_add_tail(&rq->sched.link,
+		      i915_sched_lookup_priolist(engine, rq_prio(rq)));
+	set_bit(I915_FENCE_FLAG_PQUEUE, &rq->fence.flags);
 }
 
 static void __submit_queue_imm(struct intel_engine_cs *engine)
@@ -1676,10 +1668,7 @@ static void __submit_queue_imm(struct intel_engine_cs *engine)
 	if (reset_in_progress(execlists))
 		return; /* defer until we restart the engine following reset */
 
-	if (execlists->tasklet.func == execlists_submission_tasklet)
-		__execlists_submission_tasklet(engine);
-	else
-		tasklet_hi_schedule(&execlists->tasklet);
+	__execlists_submission_tasklet(engine);
 }
 
 static void submit_queue(struct intel_engine_cs *engine,
@@ -1702,7 +1691,7 @@ static void execlists_submit_request(struct i915_request *request)
 	/* Will be called from irq-context when using foreign fences. */
 	spin_lock_irqsave(&engine->active.lock, flags);
 
-	queue_request(engine, &request->sched, rq_prio(request));
+	queue_request(engine, request);
 
 	GEM_BUG_ON(RB_EMPTY_ROOT(&engine->execlists.queue.rb_root));
 	GEM_BUG_ON(list_empty(&request->sched.link));
@@ -1881,7 +1870,7 @@ static int gen8_emit_init_breadcrumb(struct i915_request *rq)
 {
 	u32 *cs;
 
-	GEM_BUG_ON(!rq->timeline->has_initial_breadcrumb);
+	GEM_BUG_ON(!i915_request_timeline(rq)->has_initial_breadcrumb);
 
 	cs = intel_ring_begin(rq, 6);
 	if (IS_ERR(cs))
@@ -1897,7 +1886,7 @@ static int gen8_emit_init_breadcrumb(struct i915_request *rq)
 	*cs++ = MI_NOOP;
 
 	*cs++ = MI_STORE_DWORD_IMM_GEN4 | MI_USE_GGTT;
-	*cs++ = rq->timeline->hwsp_offset;
+	*cs++ = i915_request_timeline(rq)->hwsp_offset;
 	*cs++ = 0;
 	*cs++ = rq->fence.seqno - 1;
 
@@ -2445,14 +2434,14 @@ static void reset_csb_pointers(struct intel_engine_cs *engine)
 
 static struct i915_request *active_request(struct i915_request *rq)
 {
+	const struct list_head * const list =
+		&i915_request_active_timeline(rq)->requests;
 	const struct intel_context * const ce = rq->hw_context;
 	struct i915_request *active = NULL;
-	struct list_head *list;
 
 	if (!i915_request_is_active(rq)) /* unwound, but incomplete! */
 		return rq;
 
-	list = &rq->timeline->requests;
 	list_for_each_entry_from_reverse(rq, list, link) {
 		if (i915_request_completed(rq))
 			break;
@@ -2953,7 +2942,7 @@ static u32 *gen8_emit_fini_breadcrumb(struct i915_request *request, u32 *cs)
 {
 	cs = gen8_emit_ggtt_write(cs,
 				  request->fence.seqno,
-				  request->timeline->hwsp_offset,
+				  i915_request_active_timeline(request)->hwsp_offset,
 				  0);
 
 	return gen8_emit_fini_breadcrumb_footer(request, cs);
@@ -2963,7 +2952,7 @@ static u32 *gen8_emit_fini_breadcrumb_rcs(struct i915_request *request, u32 *cs)
 {
 	cs = gen8_emit_ggtt_write_rcs(cs,
 				      request->fence.seqno,
-				      request->timeline->hwsp_offset,
+				      i915_request_active_timeline(request)->hwsp_offset,
 				      PIPE_CONTROL_RENDER_TARGET_CACHE_FLUSH |
 				      PIPE_CONTROL_DEPTH_CACHE_FLUSH |
 				      PIPE_CONTROL_DC_FLUSH_ENABLE);
@@ -2982,7 +2971,7 @@ static u32 *gen11_emit_fini_breadcrumb_rcs(struct i915_request *request,
 {
 	cs = gen8_emit_ggtt_write_rcs(cs,
 				      request->fence.seqno,
-				      request->timeline->hwsp_offset,
+				      i915_request_active_timeline(request)->hwsp_offset,
 				      PIPE_CONTROL_CS_STALL |
 				      PIPE_CONTROL_TILE_CACHE_FLUSH |
 				      PIPE_CONTROL_RENDER_TARGET_CACHE_FLUSH |

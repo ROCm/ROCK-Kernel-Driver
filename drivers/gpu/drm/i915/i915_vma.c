@@ -902,7 +902,7 @@ int i915_vma_move_to_active(struct i915_vma *vma,
 	 * add the active reference first and queue for it to be dropped
 	 * *last*.
 	 */
-	err = i915_active_ref(&vma->active, rq->timeline, rq);
+	err = i915_active_add_request(&vma->active, rq);
 	if (unlikely(err))
 		return err;
 
@@ -912,8 +912,7 @@ int i915_vma_move_to_active(struct i915_vma *vma,
 		front = __intel_frontbuffer_get(obj);
 		if (unlikely(front)) {
 			if (intel_frontbuffer_invalidate(front, ORIGIN_CS))
-				i915_active_ref(&front->write,
-						rq->timeline, rq);
+				i915_active_add_request(&front->write, rq);
 			intel_frontbuffer_put(front);
 		}
 

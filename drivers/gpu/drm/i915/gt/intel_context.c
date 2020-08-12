@@ -298,7 +298,7 @@ int intel_context_prepare_remote_request(struct intel_context *ce,
 	/* Only suitable for use in remotely modifying this context */
 	GEM_BUG_ON(rq->hw_context == ce);
 
-	if (rq->timeline != tl) { /* beware timeline sharing */
+	if (rcu_access_pointer(rq->timeline) != tl) { /* timeline sharing! */
 		/*
 		 * Ideally, we just want to insert our foreign fence as
 		 * a barrier into the remove context, such that this operation
@@ -332,7 +332,7 @@ int intel_context_prepare_remote_request(struct intel_context *ce,
 	 * words transfer the pinned ce object to tracked active request.
 	 */
 	GEM_BUG_ON(i915_active_is_idle(&ce->active));
-	return i915_active_ref(&ce->active, rq->timeline, rq);
+	return i915_active_add_request(&ce->active, rq);
 }
 
 struct i915_request *intel_context_create_request(struct intel_context *ce)

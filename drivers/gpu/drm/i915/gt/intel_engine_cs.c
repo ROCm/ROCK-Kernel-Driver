@@ -680,6 +680,8 @@ static int measure_breadcrumb_dw(struct intel_engine_cs *engine)
 				engine->status_page.vma))
 		goto out_frame;
 
+	mutex_lock(&frame->timeline.mutex);
+
 	frame->ring.vaddr = frame->cs;
 	frame->ring.size = sizeof(frame->cs);
 	frame->ring.effective_size = frame->ring.size;
@@ -688,18 +690,22 @@ static int measure_breadcrumb_dw(struct intel_engine_cs *engine)
 	frame->rq.i915 = engine->i915;
 	frame->rq.engine = engine;
 	frame->rq.ring = &frame->ring;
-	frame->rq.timeline = &frame->timeline;
+	rcu_assign_pointer(frame->rq.timeline, &frame->timeline);
 
 	dw = intel_timeline_pin(&frame->timeline);
 	if (dw < 0)
 		goto out_timeline;
 
+	spin_lock_irq(&engine->active.lock);
 	dw = engine->emit_fini_breadcrumb(&frame->rq, frame->cs) - frame->cs;
+	spin_unlock_irq(&engine->active.lock);
+
 	GEM_BUG_ON(dw & 1); /* RING_TAIL must be qword aligned */
 
 	intel_timeline_unpin(&frame->timeline);
 
 out_timeline:
+	mutex_unlock(&frame->timeline.mutex);
 	intel_timeline_fini(&frame->timeline);
 out_frame:
 	kfree(frame);
@@ -1031,6 +1037,25 @@ static bool ring_is_idle(struct intel_engine_cs *engine)
 	return idle;
 }
 
+void intel_engine_flush_submission(struct intel_engine_cs *engine)
+{
+	struct tasklet_struct *t = &engine->execlists.tasklet;
+
+	if (__tasklet_is_scheduled(t)) {
+		local_bh_disable();
+		if (tasklet_trylock(t)) {
+			/* Must wait for any GPU reset in progress. */
+			if (__tasklet_is_enabled(t))
+				t->func(t->data);
+			tasklet_unlock(t);
+		}
+		local_bh_enable();
+	}
+
+	/* Otherwise flush the tasklet if it was running on another cpu */
+	tasklet_unlock_wait(t);
+}
+
 /**
  * intel_engine_is_idle() - Report if the engine has finished process all work
  * @engine: the intel_engine_cs
@@ -1049,21 +1074,9 @@ bool intel_engine_is_idle(struct intel_engine_cs *engine)
 
 	/* Waiting to drain ELSP? */
 	if (execlists_active(&engine->execlists)) {
-		struct tasklet_struct *t = &engine->execlists.tasklet;
-
 		synchronize_hardirq(engine->i915->drm.pdev->irq);
 
-		local_bh_disable();
-		if (tasklet_trylock(t)) {
-			/* Must wait for any GPU reset in progress. */
-			if (__tasklet_is_enabled(t))
-				t->func(t->data);
-			tasklet_unlock(t);
-		}
-		local_bh_enable();
-
-		/* Otherwise flush the tasklet if it was on another cpu */
-		tasklet_unlock_wait(t);
+		intel_engine_flush_submission(engine);
 
 		if (execlists_active(&engine->execlists))
 			return false;
@@ -1193,6 +1206,27 @@ static void hexdump(struct drm_printer *m, const void *buf, size_t len)
 	}
 }
 
+static struct intel_timeline *get_timeline(struct i915_request *rq)
+{
+	struct intel_timeline *tl;
+
+	/*
+	 * Even though we are holding the engine->active.lock here, there
+	 * is no control over the submission queue per-se and we are
+	 * inspecting the active state at a random point in time, with an
+	 * unknown queue. Play safe and make sure the timeline remains valid.
+	 * (Only being used for pretty printing, one extra kref shouldn't
+	 * cause a camel stampede!)
+	 */
+	rcu_read_lock();
+	tl = rcu_dereference(rq->timeline);
+	if (!kref_get_unless_zero(&tl->kref))
+		tl = NULL;
+	rcu_read_unlock();
+
+	return tl;
+}
+
 static void intel_engine_print_registers(struct intel_engine_cs *engine,
 					 struct drm_printer *m)
 {
@@ -1286,27 +1320,37 @@ static void intel_engine_print_registers(struct intel_engine_cs *engine,
 			int len;
 
 			len = snprintf(hdr, sizeof(hdr),
-				       "\t\tActive[%d: ",
+				       "\t\tActive[%d]: ",
 				       (int)(port - execlists->active));
-			if (!i915_request_signaled(rq))
+			if (!i915_request_signaled(rq)) {
+				struct intel_timeline *tl = get_timeline(rq);
+
 				len += snprintf(hdr + len, sizeof(hdr) - len,
 						"ring:{start:%08x, hwsp:%08x, seqno:%08x}, ",
 						i915_ggtt_offset(rq->ring->vma),
-						rq->timeline->hwsp_offset,
+						tl ? tl->hwsp_offset : 0,
 						hwsp_seqno(rq));
+
+				if (tl)
+					intel_timeline_put(tl);
+			}
 			snprintf(hdr + len, sizeof(hdr) - len, "rq: ");
 			print_request(m, rq, hdr);
 		}
 		for (port = execlists->pending; (rq = *port); port++) {
+			struct intel_timeline *tl = get_timeline(rq);
 			char hdr[80];
 
 			snprintf(hdr, sizeof(hdr),
 				 "\t\tPending[%d] ring:{start:%08x, hwsp:%08x, seqno:%08x}, rq: ",
 				 (int)(port - execlists->pending),
 				 i915_ggtt_offset(rq->ring->vma),
-				 rq->timeline->hwsp_offset,
+				 tl ? tl->hwsp_offset : 0,
 				 hwsp_seqno(rq));
 			print_request(m, rq, hdr);
+
+			if (tl)
+				intel_timeline_put(tl);
 		}
 		rcu_read_unlock();
 		execlists_active_unlock_bh(execlists);
@@ -1385,6 +1429,8 @@ void intel_engine_dump(struct intel_engine_cs *engine,
 	spin_lock_irqsave(&engine->active.lock, flags);
 	rq = intel_engine_find_active_request(engine);
 	if (rq) {
+		struct intel_timeline *tl = get_timeline(rq);
+
 		print_request(m, rq, "\t\tactive ");
 
 		drm_printf(m, "\t\tring->start:  0x%08x\n",
@@ -1397,8 +1443,12 @@ void intel_engine_dump(struct intel_engine_cs *engine,
 			   rq->ring->emit);
 		drm_printf(m, "\t\tring->space:  0x%08x\n",
 			   rq->ring->space);
-		drm_printf(m, "\t\tring->hwsp:   0x%08x\n",
-			   rq->timeline->hwsp_offset);
+
+		if (tl) {
+			drm_printf(m, "\t\tring->hwsp:   0x%08x\n",
+				   tl->hwsp_offset);
+			intel_timeline_put(tl);
+		}
 
 		print_request_ring(m, rq);
 	}
