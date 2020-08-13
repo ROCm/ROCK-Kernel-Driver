@@ -39,6 +39,9 @@
 #define UPLL_DIV		2
 #define PLL_MUL_MAX		(FIELD_GET(PMC_PLL_CTRL1_MUL_MSK, UINT_MAX) + 1)
 
+#define FCORE_MIN		(600000000)
+#define FCORE_MAX		(1200000000)
+
 #define PLL_MAX_ID		1
 
 struct sam9x60_pll {
@@ -181,6 +184,7 @@ static long sam9x60_pll_get_best_div_mul(struct sam9x60_pll *pll,
 	unsigned long bestdiv = 0;
 	unsigned long bestmul = 0;
 	unsigned long bestfrac = 0;
+	u64 fcore = 0;
 
 	if (rate < characteristics->output[0].min ||
 	    rate > characteristics->output[0].max)
@@ -225,6 +229,11 @@ static long sam9x60_pll_get_best_div_mul(struct sam9x60_pll *pll,
 				remainder = rate - tmprate;
 		}
 
+		fcore = parent_rate * (tmpmul + 1) +
+			((u64)parent_rate * tmpfrac >> 22);
+		if (fcore < FCORE_MIN || fcore > FCORE_MAX)
+			continue;
+
 		/*
 		 * Compare the remainder with the best remainder found until
 		 * now and elect a new best multiplier/divider pair if the
@@ -244,7 +253,8 @@ static long sam9x60_pll_get_best_div_mul(struct sam9x60_pll *pll,
 	}
 
 	/* Check if bestrate is a valid output rate  */
-	if (bestrate < characteristics->output[0].min &&
+	if (fcore < FCORE_MIN || fcore > FCORE_MAX ||
+	    bestrate < characteristics->output[0].min ||
 	    bestrate > characteristics->output[0].max)
 		return -ERANGE;
 

@@ -22,7 +22,7 @@ static const struct clk_master_layout sam9x60_master_layout = {
 };
 
 static const struct clk_range plla_outputs[] = {
-	{ .min = 300000000, .max = 600000000 },
+	{ .min = 2343750, .max = 1200000000 },
 };
 
 static const struct clk_pll_characteristics plla_characteristics = {
@@ -189,7 +189,7 @@ static void __init sam9x60_pmc_setup(struct device_node *np)
 	if (!sam9x60_pmc)
 		return;
 
-	hw = at91_clk_register_main_rc_osc(regmap, "main_rc_osc", 24000000,
+	hw = at91_clk_register_main_rc_osc(regmap, "main_rc_osc", 12000000,
 					   50000000);
 	if (IS_ERR(hw))
 		goto err_free;
