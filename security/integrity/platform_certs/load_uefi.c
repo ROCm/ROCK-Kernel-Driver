@@ -154,7 +154,7 @@ static int __init load_uefi_certs(void)
 	unsigned long dbsize = 0, dbxsize = 0, moksize = 0, mokxsize = 0;
 	int rc = 0;
 
-	if (!efi.get_variable)
+	if (!efi_rt_services_supported(EFI_RT_SUPPORTED_GET_VARIABLE))
 		return false;
 
 	/* Get db, MokListRT, and dbx.  They might not exist, so it isn't
