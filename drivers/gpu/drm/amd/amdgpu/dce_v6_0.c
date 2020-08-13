@@ -2435,6 +2435,11 @@ static void dce_v6_0_cursor_reset(struct drm_crtc *crtc)
 	}
 }
 
+/*
+ * TODO: drm_fb_helper_setcmap() prev commit v4.12-rc7-1385-g964c60063bff
+ * ("drm/fb-helper: separate the fb_setcmap helper into atomic and legacy paths")
+ * don't work as expected.
+ */
 #if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS)
 static int dce_v6_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				   u16 *blue, uint32_t size,
@@ -2456,15 +2461,6 @@ static int dce_v6_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 static void dce_v6_0_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
 				    u16 *blue, uint32_t start, uint32_t size)
 {
-	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
-	int end = (start + size > 256) ? 256 : start + size, i;
-
-	/* userspace palettes are always correct as is */
-	for (i = start; i < end; i++) {
-		amdgpu_crtc->lut_r[i] = red[i] >> 6;
-		amdgpu_crtc->lut_g[i] = green[i] >> 6;
-		amdgpu_crtc->lut_b[i] = blue[i] >> 6;
-	}
 	dce_v6_0_crtc_load_lut(crtc);
 }
 #endif
