@@ -933,7 +933,7 @@ void kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
 	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
 			TCP_WATCH0_CNTL,
 			MASK,
-			watch_address_mask >> 6);
+			watch_address_mask >> 7);
 
 	/* Turning off this watch point until we set all the registers */
 	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
