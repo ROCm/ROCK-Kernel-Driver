@@ -245,7 +245,7 @@ int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 #endif
 {
 	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	struct drm_gem_object *obj;
 	struct amdgpu_flip_work *work;
@@ -516,7 +516,7 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 
 	pm_runtime_mark_last_busy(dev->dev);
 
-	adev = dev->dev_private;
+	adev = drm_to_adev(dev);
 	/* if we have active crtcs and we don't have a power ref,
 	   take the current one */
 	if (active && !adev->have_disp_power_ref) {
@@ -1076,7 +1076,7 @@ int amdgpu_display_get_crtc_scanoutpos(struct drm_device *dev,
 	int vbl_start, vbl_end, vtotal, ret = 0;
 	bool in_vbl = true;
 
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	/* preempt_disable_rt() should go right here in PREEMPT_RT patchset. */
 
@@ -1206,7 +1206,7 @@ int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *filp)
 {
 	int ret = -EPERM;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	if (adev->mode_info.funcs->notify_freesync)
 		ret = adev->mode_info.funcs->notify_freesync(dev,data,filp);
