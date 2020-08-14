@@ -1881,8 +1881,8 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 	xfrm_mark_get(attrs, &m);
 
 	if (p->index)
-		xp = xfrm_policy_byid(net, &m, if_id, type, p->dir,
-				      p->index, delete, &err);
+		xp = __kabi__xfrm_policy_byid(net, &m, if_id, type, p->dir,
+					      p->index, delete, &err);
 	else {
 		struct nlattr *rt = attrs[XFRMA_SEC_CTX];
 		struct xfrm_sec_ctx *ctx;
@@ -1899,8 +1899,8 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 			if (err)
 				return err;
 		}
-		xp = xfrm_policy_bysel_ctx(net, &m, if_id, type, p->dir,
-					   &p->sel, ctx, delete, &err);
+		xp = __kabi__xfrm_policy_bysel_ctx(net, &m, if_id, type, p->dir,
+						   &p->sel, ctx, delete, &err);
 		security_xfrm_policy_free(ctx);
 	}
 	if (xp == NULL)
@@ -2183,8 +2183,8 @@ static int xfrm_add_pol_expire(struct sk_buff *skb, struct nlmsghdr *nlh,
 	xfrm_mark_get(attrs, &m);
 
 	if (p->index)
-		xp = xfrm_policy_byid(net, &m, if_id, type, p->dir, p->index,
-				      0, &err);
+		xp = __kabi__xfrm_policy_byid(net, &m, if_id, type, p->dir, p->index,
+					      0, &err);
 	else {
 		struct nlattr *rt = attrs[XFRMA_SEC_CTX];
 		struct xfrm_sec_ctx *ctx;
@@ -2201,8 +2201,8 @@ static int xfrm_add_pol_expire(struct sk_buff *skb, struct nlmsghdr *nlh,
 			if (err)
 				return err;
 		}
-		xp = xfrm_policy_bysel_ctx(net, &m, if_id, type, p->dir,
-					   &p->sel, ctx, 0, &err);
+		xp = __kabi__xfrm_policy_bysel_ctx(net, &m, if_id, type, p->dir,
+						   &p->sel, ctx, 0, &err);
 		security_xfrm_policy_free(ctx);
 	}
 	if (xp == NULL)

@@ -1623,9 +1623,9 @@ __xfrm_policy_bysel_ctx(struct hlist_head *chain, const struct xfrm_mark *mark,
 }
 
 struct xfrm_policy *
-xfrm_policy_bysel_ctx(struct net *net, const struct xfrm_mark *mark, u32 if_id,
-		      u8 type, int dir, struct xfrm_selector *sel,
-		      struct xfrm_sec_ctx *ctx, int delete, int *err)
+__kabi__xfrm_policy_bysel_ctx(struct net *net, const struct xfrm_mark *mark, u32 if_id,
+			      u8 type, int dir, struct xfrm_selector *sel,
+			      struct xfrm_sec_ctx *ctx, int delete, int *err)
 {
 	struct xfrm_pol_inexact_bin *bin = NULL;
 	struct xfrm_policy *pol, *ret = NULL;
@@ -1690,11 +1690,22 @@ xfrm_policy_bysel_ctx(struct net *net, const struct xfrm_mark *mark, u32 if_id,
 		xfrm_policy_inexact_prune_bin(bin);
 	return ret;
 }
+EXPORT_SYMBOL(__kabi__xfrm_policy_bysel_ctx);
+
+/* kABI compatibility wrapper */
+struct xfrm_policy *xfrm_policy_bysel_ctx(struct net *net, u32 mark, u32 if_id,
+					  u8 type, int dir,
+					  struct xfrm_selector *sel,
+					  struct xfrm_sec_ctx *ctx, int delete,
+					  int *err)
+{
+	return __kabi__xfrm_policy_bysel_ctx(net, (const struct xfrm_mark *) &mark, if_id, type, dir, sel, ctx, delete, err);
+}
 EXPORT_SYMBOL(xfrm_policy_bysel_ctx);
 
 struct xfrm_policy *
-xfrm_policy_byid(struct net *net, const struct xfrm_mark *mark, u32 if_id,
-		 u8 type, int dir, u32 id, int delete, int *err)
+__kabi__xfrm_policy_byid(struct net *net, const struct xfrm_mark *mark, u32 if_id,
+			 u8 type, int dir, u32 id, int delete, int *err)
 {
 	struct xfrm_policy *pol, *ret;
 	struct hlist_head *chain;
@@ -1729,6 +1740,15 @@ xfrm_policy_byid(struct net *net, const struct xfrm_mark *mark, u32 if_id,
 	if (ret && delete)
 		xfrm_policy_kill(ret);
 	return ret;
+}
+EXPORT_SYMBOL(__kabi__xfrm_policy_byid);
+
+/* kABI compatibility wrapper */
+struct xfrm_policy *xfrm_policy_byid(struct net *net, u32 mark, u32 if_id,
+				     u8 type, int dir, u32 id, int delete,
+				     int *err)
+{
+	return __kabi__xfrm_policy_byid(net, (const struct xfrm_mark *) &mark, if_id, type, dir, id, delete, err);
 }
 EXPORT_SYMBOL(xfrm_policy_byid);
 

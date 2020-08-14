@@ -2407,9 +2407,9 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, const struct sa
 			return err;
 	}
 
-	xp = xfrm_policy_bysel_ctx(net, &dummy_mark, 0, XFRM_POLICY_TYPE_MAIN,
-				   pol->sadb_x_policy_dir - 1, &sel, pol_ctx,
-				   1, &err);
+	xp = __kabi__xfrm_policy_bysel_ctx(net, &dummy_mark, 0, XFRM_POLICY_TYPE_MAIN,
+					   pol->sadb_x_policy_dir - 1, &sel, pol_ctx,
+					   1, &err);
 	security_xfrm_policy_free(pol_ctx);
 	if (xp == NULL)
 		return -ENOENT;
@@ -2658,8 +2658,8 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, const struct sadb_
 		return -EINVAL;
 
 	delete = (hdr->sadb_msg_type == SADB_X_SPDDELETE2);
-	xp = xfrm_policy_byid(net, &dummy_mark, 0, XFRM_POLICY_TYPE_MAIN,
-			      dir, pol->sadb_x_policy_id, delete, &err);
+	xp = __kabi__xfrm_policy_byid(net, &dummy_mark, 0, XFRM_POLICY_TYPE_MAIN,
+				      dir, pol->sadb_x_policy_id, delete, &err);
 	if (xp == NULL)
 		return -ENOENT;
 
