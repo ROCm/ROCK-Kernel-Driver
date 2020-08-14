@@ -991,7 +991,7 @@ struct dc_flip_addrs {
 	/* TODO: add flip duration for FreeSync */
 	bool triplebuffer_flips;
 };
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 /*
  * Optimized flip address update function.
  *

@@ -328,7 +328,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev_to_drm(adev)->event_lock, flags);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	struct amdgpu_flip_work *works = amdgpu_crtc->pflip_works;
 #endif
 
@@ -407,7 +407,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		amdgpu_get_vblank_counter_kms(&amdgpu_crtc->base);
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	amdgpu_crtc->pflip_works = NULL;
 #endif
 
@@ -417,7 +417,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 			 amdgpu_crtc->crtc_id, amdgpu_crtc,
 			 vrr_active, (int) !e);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	schedule_work(&works->unpin_work);
 #endif
 
@@ -3582,7 +3582,7 @@ static void dm_bandwidth_update(struct amdgpu_device *adev)
 	/* TODO: implement later */
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 /**
  * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
  *                via DRM IOTCL, by user mode.
@@ -3718,7 +3718,7 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	.page_flip = dm_page_flip,
 #endif
 	.page_flip_get_scanoutpos =
@@ -7497,7 +7497,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 {
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	assert_spin_locked(&acrtc->base.dev->event_lock);
 #endif
 	WARN_ON(acrtc->event);
@@ -8175,7 +8175,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * unset legacy_cursor_update
 	 */
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	return drm_atomic_helper_commit(dev, state, nonblock);
 
 	/*TODO Handle EINTR, reenable IRQ*/
@@ -8587,7 +8587,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						dm, crtc, wait_for_vblank);
 	}
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
@@ -8611,10 +8611,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		new_crtc_state->event = NULL;
 	}
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
-#endif
 
 	/* Signal HW programming completion */
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	drm_atomic_helper_commit_hw_done(state);
 #endif
 
@@ -8625,7 +8623,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		drm_atomic_helper_wait_for_flip_done(dev, state);
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	drm_atomic_helper_cleanup_planes(dev, state);
 #endif
 
@@ -8740,7 +8738,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 				 struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	struct drm_crtc_commit *commit;
 #endif
 	long ret;
@@ -8754,7 +8752,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		spin_lock(&crtc->commit_lock);
 		commit = list_first_entry_or_null(&crtc->commit_list,

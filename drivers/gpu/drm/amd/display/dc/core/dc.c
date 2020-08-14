@@ -2744,7 +2744,7 @@ struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i)
 	return NULL;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 void dc_flip_plane_addrs(
 		struct dc *dc,
 		struct dc_plane_state *const plane_states[],
