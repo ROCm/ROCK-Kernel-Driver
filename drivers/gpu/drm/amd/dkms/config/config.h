@@ -505,6 +505,9 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
+/* drm atomic nonblocking commit support is available */
+#define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT 1
+
 /* drm_plane_helper_check_state is available */
 /* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
 

@@ -14,6 +14,8 @@ AC_DEFUN([AC_AMDGPU_DRM_MODE_CONFIG], [
 		], [
 			AC_DEFINE(HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE, 1,
 				[drm_mode_config->helper_private is available])
+			AC_DEFINE(HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT, 1,
+				[drm atomic nonblocking commit support is available])
 		])
 	])
 ])
