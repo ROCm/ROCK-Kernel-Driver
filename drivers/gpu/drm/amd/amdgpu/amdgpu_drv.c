@@ -1125,7 +1125,7 @@ static struct drm_driver kms_driver;
 static int amdgpu_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
-	struct drm_device *dev;
+	struct drm_device *ddev;
 	struct amdgpu_device *adev;
 	unsigned long flags = ent->driver_data;
 	int ret, retry = 0;
@@ -1181,15 +1181,22 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
-	dev = drm_dev_alloc(&kms_driver, &pdev->dev);
-	if (IS_ERR(dev))
-		return PTR_ERR(dev);
+	adev = kzalloc(sizeof(*adev), GFP_KERNEL);
+	if (!adev)
+		return -ENOMEM;
+
+	adev->dev  = &pdev->dev;
+	adev->pdev = pdev;
+	ddev = adev_to_drm(adev);
+	ret = drm_dev_init(ddev, &kms_driver, &pdev->dev);
+	if (ret)
+		goto err_free;
 	kcl_drm_vma_offset_manager_init(dev->vma_offset_manager);
 
 #ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
-		dev->driver_features &= ~DRIVER_ATOMIC;
+		ddev->driver_features &= ~DRIVER_ATOMIC;
 #else
 	/* warn the user if they mix atomic and non-atomic capable GPUs */
 	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
@@ -1206,25 +1213,24 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		goto err_free;
 
-	dev->pdev = pdev;
+	ddev->pdev = pdev;
+	pci_set_drvdata(pdev, ddev);
 
-	pci_set_drvdata(pdev, dev);
-
-	ret = amdgpu_driver_load_kms(dev, ent->driver_data);
+	ret = amdgpu_driver_load_kms(adev, ent->driver_data);
 	if (ret)
 		goto err_pci;
 
 retry_init:
-	ret = drm_dev_register(dev, ent->driver_data);
+	ret = drm_dev_register(ddev, ent->driver_data);
 	if (ret == -EAGAIN && ++retry <= 3) {
 		DRM_INFO("retry init %d\n", retry);
 		/* Don't request EX mode too frequently which is attacking */
 		msleep(5000);
 		goto retry_init;
-	} else if (ret)
+	} else if (ret) {
 		goto err_pci;
+	}
 
-	adev = drm_to_adev(dev);
 	ret = amdgpu_debugfs_init(adev);
 	if (ret)
 		DRM_ERROR("Creating debugfs files failed (%d).\n", ret);
@@ -1234,7 +1240,7 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
-	drm_dev_put(dev);
+	drm_dev_put(ddev);
 	return ret;
 }
 
@@ -1257,6 +1263,14 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 	drm_dev_put(dev);
+}
+
+static void amdgpu_driver_release(struct drm_device *ddev)
+{
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+
+	drm_dev_fini(ddev);
+	kfree(adev);
 }
 
 static void
@@ -1597,6 +1611,7 @@ static struct drm_driver kms_driver = {
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
+	.release   = amdgpu_driver_release,
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 #ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
@@ -1648,8 +1663,6 @@ static struct pci_driver amdgpu_kms_pci_driver = {
 	.shutdown = amdgpu_pci_shutdown,
 	.driver.pm = &amdgpu_pm_ops,
 };
-
-
 
 static int __init amdgpu_init(void)
 {
