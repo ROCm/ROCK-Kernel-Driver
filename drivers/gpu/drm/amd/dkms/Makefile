@@ -16,6 +16,84 @@ endef
 RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
 RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
 
+ifneq (,$(RHEL_MAJOR))
+OS_NAME = "rhel"
+OS_VERSION = "$(RHEL_MAJOR).$(RHEL_MINOR)"
+else ifneq (,$(wildcard /etc/os-release))
+OS_NAME = "$(shell sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | tr -d '\"')"
+# On CentOS/RHEL, users could have installed a kernel not distributed from RHEL
+ifeq ("centos",$(OS_NAME))
+OS_NAME="custom-rhel"
+else ifeq ("rhel",$(OS_NAME))
+OS_NAME="custom-rhel"
+else ifeq ("linuxmint",$(OS_NAME))
+OS_NAME="ubuntu"
+endif
+OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
+else
+OS_NAME = "unknown"
+OS_VERSION = "0.0"
+endif
+
+OS_VERSION_STR = $(subst .,_,$(OS_VERSION))
+
+ifeq ("ubuntu",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_UBUNTU
+else ifeq ("rhel",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_RHEL
+else ifeq ("steamos",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_STEAMOS
+else ifeq ("sled",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_SLE
+else ifeq ("sles",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_SLE
+else ifeq ("amzn",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_AMZ
+else ifeq ("debian",$(OS_NAME))
+subdir-ccflags-y += -DOS_NAME_DEBIAN
+else
+subdir-ccflags-y += -DOS_NAME_UNKNOWN
+endif
+
+subdir-ccflags-y += \
+	-DOS_VERSION_MAJOR=$(shell echo $(OS_VERSION).0 | cut -d. -f1) \
+	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
+
+ifeq ($(OS_NAME),"opensuse-leap")
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
+endif
+
+ifeq ($(OS_NAME),"sled")
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
+endif
+
+ifeq ($(OS_NAME),"sles")
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
+endif
+
+ifeq ($(OS_NAME),"ubuntu")
+OS_BUILD_NUM = $(shell echo $(KERNELRELEASE) | cut -d '-' -f 2)
+subdir-ccflags-y += -DUBUNTU_BUILD_NUM=$(OS_BUILD_NUM)
+OS_OEM = "$(shell echo $(KERNELRELEASE) | cut -d '-' -f 3)"
+ifeq ($(OS_OEM),"oem")
+subdir-ccflags-y += -DOS_NAME_UBUNTU_OEM
+endif
+subdir-ccflags-y += -DOS_NAME_UBUNTU_$(OS_VERSION_STR)
+endif
+
+ifeq ($(OS_NAME),"rhel")
+subdir-ccflags-y += -DOS_NAME_RHEL_$(OS_VERSION_STR)
+
+ifeq ($(RHEL_MAJOR),7)
+subdir-ccflags-y += -DOS_NAME_RHEL_7_X \
+	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
+else ifeq ($(RHEL_MAJOR),8)
+subdir-ccflags-y += -DOS_NAME_RHEL_8_X
+endif
+endif
+
+export OS_NAME OS_VERSION
+
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/uapi \
