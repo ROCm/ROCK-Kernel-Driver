@@ -10,6 +10,12 @@ subdir-ccflags-y += \
 	-DDRM_PATCH=$(DRM_PATCH) \
 	-DDRM_SUB="0"
 
+define get_rhel_version
+printf "#include <linux/version.h>\n$(1)" | $(CC) $(LINUXINCLUDE) -E -x c - | tail -n 1 | grep -v $(1)
+endef
+RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
+RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
+
 LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/uapi \
