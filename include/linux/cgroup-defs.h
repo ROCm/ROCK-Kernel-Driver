@@ -797,9 +797,13 @@ struct sock_cgroup_data {
 	union {
 #ifdef __LITTLE_ENDIAN
 		struct {
+#ifdef __GENKSYMS__
+			u8	is_data;
+#else
 			u8	is_data : 1;
 			u8	no_refcnt : 1;
 			u8	unused : 6;
+#endif
 			u8	padding;
 			u16	prioidx;
 			u32	classid;
@@ -809,9 +813,13 @@ struct sock_cgroup_data {
 			u32	classid;
 			u16	prioidx;
 			u8	padding;
+#ifdef __GENKSYMS__
+			u8	is_data;
+#else
 			u8	unused : 6;
 			u8	no_refcnt : 1;
 			u8	is_data : 1;
+#endif
 		} __packed;
 #endif
 		u64		val;
