@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2020 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,10 +19,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ *
  */
-#ifndef __MMHUB_V9_4_H__
-#define __MMHUB_V9_4_H__
+#ifndef _AMDGPU_RAP_H
+#define _AMDGPU_RAP_H
 
-extern const struct amdgpu_mmhub_funcs mmhub_v9_4_funcs;
+#include "amdgpu.h"
 
+void amdgpu_rap_debugfs_init(struct amdgpu_device *adev);
 #endif

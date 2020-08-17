@@ -119,9 +119,6 @@
 /* drm_atomic_helper_duplicate_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
 
-/* drm_atomic_helper_legacy_gamma_set() is available */
-#define HAVE_DRM_ATOMIC_HELPER_LEGACY_GAMMA_SET 1
-
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
@@ -856,6 +853,9 @@
 
 /* interval_tree_insert have struct rb_root_cached */
 #define HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED 1
+
+/* ttm_sg_tt_init() is available */
+#define HAVE_TTM_SG_TT_INIT 1
 
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1

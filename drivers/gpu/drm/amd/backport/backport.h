@@ -58,4 +58,5 @@
 #include <kcl/kcl_drm_atomic.h>
 #include <kcl/kcl_amdgpu_drm_fb_helper.h>
 #include <kcl/kcl_eventpoll.h>
+#include <kcl/backport/kcl_ttm_tt_backport.h>
 #endif /* AMDGPU_BACKPORT_H */

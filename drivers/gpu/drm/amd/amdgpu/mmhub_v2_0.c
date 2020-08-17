@@ -83,7 +83,7 @@ mmhub_v2_0_print_l2_protection_fault_status(struct amdgpu_device *adev,
 		MMVM_L2_PROTECTION_FAULT_STATUS, RW));
 }
 
-void mmhub_v2_0_setup_vm_pt_regs(struct amdgpu_device *adev, uint32_t vmid,
+static void mmhub_v2_0_setup_vm_pt_regs(struct amdgpu_device *adev, uint32_t vmid,
 				uint64_t page_table_base)
 {
 	struct amdgpu_vmhub *hub = &adev->vmhub[AMDGPU_MMHUB_0];
@@ -181,6 +181,12 @@ static void mmhub_v2_0_init_cache_regs(struct amdgpu_device *adev)
 {
 	uint32_t tmp;
 
+	/* These registers are not accessible to VF-SRIOV.
+	 * The PF will program them instead.
+	 */
+	if (amdgpu_sriov_vf(adev))
+		return;
+
 	/* Setup L2 cache */
 	tmp = RREG32_SOC15(MMHUB, 0, mmMMVM_L2_CNTL);
 	tmp = REG_SET_FIELD(tmp, MMVM_L2_CNTL, ENABLE_L2_CACHE, 1);
@@ -236,6 +242,12 @@ static void mmhub_v2_0_enable_system_domain(struct amdgpu_device *adev)
 
 static void mmhub_v2_0_disable_identity_aperture(struct amdgpu_device *adev)
 {
+	/* These registers are not accessible to VF-SRIOV.
+	 * The PF will program them instead.
+	 */
+	if (amdgpu_sriov_vf(adev))
+		return;
+
 	WREG32_SOC15(MMHUB, 0,
 		     mmMMVM_L2_CONTEXT1_IDENTITY_APERTURE_LOW_ADDR_LO32,
 		     0xFFFFFFFF);
@@ -315,7 +327,7 @@ static void mmhub_v2_0_program_invalidation(struct amdgpu_device *adev)
 	}
 }
 
-int mmhub_v2_0_gart_enable(struct amdgpu_device *adev)
+static int mmhub_v2_0_gart_enable(struct amdgpu_device *adev)
 {
 	/* GART Enable. */
 	mmhub_v2_0_init_gart_aperture_regs(adev);
@@ -331,7 +343,7 @@ int mmhub_v2_0_gart_enable(struct amdgpu_device *adev)
 	return 0;
 }
 
-void mmhub_v2_0_gart_disable(struct amdgpu_device *adev)
+static void mmhub_v2_0_gart_disable(struct amdgpu_device *adev)
 {
 	struct amdgpu_vmhub *hub = &adev->vmhub[AMDGPU_MMHUB_0];
 	u32 tmp;
@@ -362,9 +374,16 @@ void mmhub_v2_0_gart_disable(struct amdgpu_device *adev)
  * @adev: amdgpu_device pointer
  * @value: true redirects VM faults to the default page
  */
-void mmhub_v2_0_set_fault_enable_default(struct amdgpu_device *adev, bool value)
+static void mmhub_v2_0_set_fault_enable_default(struct amdgpu_device *adev, bool value)
 {
 	u32 tmp;
+
+	/* These registers are not accessible to VF-SRIOV.
+	 * The PF will program them instead.
+	 */
+	if (amdgpu_sriov_vf(adev))
+		return;
+
 	tmp = RREG32_SOC15(MMHUB, 0, mmMMVM_L2_PROTECTION_FAULT_CNTL);
 	tmp = REG_SET_FIELD(tmp, MMVM_L2_PROTECTION_FAULT_CNTL,
 			    RANGE_PROTECTION_FAULT_ENABLE_DEFAULT, value);
@@ -403,7 +422,7 @@ static const struct amdgpu_vmhub_funcs mmhub_v2_0_vmhub_funcs = {
 	.get_invalidate_req = mmhub_v2_0_get_invalidate_req,
 };
 
-void mmhub_v2_0_init(struct amdgpu_device *adev)
+static void mmhub_v2_0_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_vmhub *hub = &adev->vmhub[AMDGPU_MMHUB_0];
 
@@ -533,7 +552,7 @@ static void mmhub_v2_0_update_medium_grain_light_sleep(struct amdgpu_device *ade
 	}
 }
 
-int mmhub_v2_0_set_clockgating(struct amdgpu_device *adev,
+static int mmhub_v2_0_set_clockgating(struct amdgpu_device *adev,
 			       enum amd_clockgating_state state)
 {
 	if (amdgpu_sriov_vf(adev))
@@ -557,7 +576,7 @@ int mmhub_v2_0_set_clockgating(struct amdgpu_device *adev,
 	return 0;
 }
 
-void mmhub_v2_0_get_clockgating(struct amdgpu_device *adev, u32 *flags)
+static void mmhub_v2_0_get_clockgating(struct amdgpu_device *adev, u32 *flags)
 {
 	int data, data1;
 
@@ -590,3 +609,14 @@ void mmhub_v2_0_get_clockgating(struct amdgpu_device *adev, u32 *flags)
 	if (data & MM_ATC_L2_MISC_CG__MEM_LS_ENABLE_MASK)
 		*flags |= AMD_CG_SUPPORT_MC_LS;
 }
+
+const struct amdgpu_mmhub_funcs mmhub_v2_0_funcs = {
+	.ras_late_init = amdgpu_mmhub_ras_late_init,
+	.init = mmhub_v2_0_init,
+	.gart_enable = mmhub_v2_0_gart_enable,
+	.set_fault_enable_default = mmhub_v2_0_set_fault_enable_default,
+	.gart_disable = mmhub_v2_0_gart_disable,
+	.set_clockgating = mmhub_v2_0_set_clockgating,
+	.get_clockgating = mmhub_v2_0_get_clockgating,
+	.setup_vm_pt_regs = mmhub_v2_0_setup_vm_pt_regs,
+};

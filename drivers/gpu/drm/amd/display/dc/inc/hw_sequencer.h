@@ -73,6 +73,10 @@ struct hw_sequencer_funcs {
 	void (*program_front_end_for_ctx)(struct dc *dc,
 			struct dc_state *context);
 #endif
+	bool (*disconnect_pipes)(struct dc *dc,
+			struct dc_state *context);
+	void (*wait_for_pending_cleared)(struct dc *dc,
+			struct dc_state *context);
 	void (*post_unlock_program_front_end)(struct dc *dc,
 			struct dc_state *context);
 	void (*update_plane_addr)(const struct dc *dc,
@@ -89,10 +93,6 @@ struct hw_sequencer_funcs {
 	void (*program_triplebuffer)(const struct dc *dc,
 		struct pipe_ctx *pipe_ctx, bool enableTripleBuffer);
 #endif
-	bool (*disconnect_pipes)(struct dc *dc,
-			struct dc_state *context);
-	void (*wait_for_pending_cleared)(struct dc *dc,
-			struct dc_state *context);
 	void (*update_pending_status)(struct pipe_ctx *pipe_ctx);
 	void (*power_down)(struct dc *dc);
 
