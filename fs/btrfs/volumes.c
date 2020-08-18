@@ -16,6 +16,7 @@
 #include <linux/list_sort.h>
 #include "ctree.h"
 #include "extent_map.h"
+#include "extent_io.h"
 #include "disk-io.h"
 #include "transaction.h"
 #include "print-tree.h"
@@ -4874,6 +4875,10 @@ again:
 	}
 
 	mutex_lock(&fs_info->chunk_mutex);
+	/* Clear all state bits beyond the shrunk device size */
+	clear_extent_bits(&device->alloc_state, new_size, (u64)-1,
+			  CHUNK_STATE_MASK);
+
 	btrfs_device_set_disk_total_bytes(device, new_size);
 	if (list_empty(&device->post_commit_list))
 		list_add_tail(&device->post_commit_list,
