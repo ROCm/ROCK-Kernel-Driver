@@ -69,7 +69,7 @@
  * 16kB.
  */
 #if PAGE_SIZE > SZ_16K
-#define ENA_PAGE_SIZE SZ_16K
+#define ENA_PAGE_SIZE (_AC(SZ_16K, UL))
 #else
 #define ENA_PAGE_SIZE PAGE_SIZE
 #endif
@@ -104,8 +104,6 @@
 #define ENA_RX_RSS_TABLE_LOG_SIZE  7
 #define ENA_RX_RSS_TABLE_SIZE	(1 << ENA_RX_RSS_TABLE_LOG_SIZE)
 
-#define ENA_HASH_KEY_SIZE	40
-
 /* The number of tx packet completions that will be handled each NAPI poll
  * cycle is ring_size / ENA_TX_POLL_BUDGET_DIVIDER.
  */
@@ -136,6 +134,8 @@
 #define ENA_MGMNT_IRQ_IDX		0
 #define ENA_IO_IRQ_FIRST_IDX		1
 #define ENA_IO_IRQ_IDX(q)		(ENA_IO_IRQ_FIRST_IDX + (q))
+
+#define ENA_ADMIN_POLL_DELAY_US 100
 
 /* ENA device should send keep alive msg every 1 sec.
  * We wait for 6 sec just to be on the safe side.
@@ -172,6 +172,7 @@ struct ena_napi {
 	struct ena_ring *rx_ring;
 	struct ena_ring *xdp_ring;
 	bool first_interrupt;
+	bool interrupts_masked;
 	u32 qid;
 	struct dim dim;
 };
@@ -248,6 +249,7 @@ struct ena_stats_tx {
 	u64 bad_req_id;
 	u64 llq_buffer_copy;
 	u64 missed_tx;
+	u64 unmask_interrupt;
 };
 
 struct ena_stats_rx {
@@ -301,6 +303,7 @@ struct ena_ring {
 	u8 tx_max_header_size;
 
 	bool first_interrupt;
+	bool disable_meta_caching;
 	u16 no_interrupt_event_cnt;
 
 	/* cpu for TPH */
@@ -333,6 +336,7 @@ struct ena_stats_dev {
 	u64 interface_down;
 	u64 admin_q_pause;
 	u64 rx_drops;
+	u64 tx_drops;
 };
 
 enum ena_flags_t {
@@ -401,6 +405,7 @@ struct ena_adapter {
 
 	bool wd_state;
 	bool dev_up_before_reset;
+	bool disable_meta_caching;
 	unsigned long last_keep_alive_jiffies;
 
 	struct u64_stats_sync syncp;
