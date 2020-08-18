@@ -820,7 +820,7 @@ static int mipi_dbi_spi1_transfer(struct mipi_dbi *mipi, int dc,
 			}
 		}
 
-		tr.len = chunk;
+		tr.len = chunk * 2;
 		len -= chunk;
 
 		tinydrm_dbg_spi_message(spi, &m);
