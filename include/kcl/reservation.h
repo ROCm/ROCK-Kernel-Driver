@@ -1,10 +1,9 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef AMDKCL_RESERVATION_H
-#define AMDKCL_RESERVATION_H
+#ifndef KCL_RESERVATION_H
+#define KCL_RESERVATION_H
 
 #ifndef HAVE_LINUX_DMA_RESV_H
-#include <linux/dma-resv.h>
-#define reservation_object dma_resv
+#include <kcl/kcl_reservation.h>
 
 #if defined(HAVE_RESERVATION_OBJECT_STAGED)
 static inline void

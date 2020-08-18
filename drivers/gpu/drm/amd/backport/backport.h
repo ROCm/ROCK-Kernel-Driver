@@ -7,7 +7,9 @@
  * linux/reservation.h must before all drm headers,
  * otherwise struct reservation_object is undefined.
  */
-#include <kcl/reservation.h>
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
+#include <linux/reservation.h>
+#endif
 #include <kcl/backport/kcl_fence_backport.h>
 #include <kcl/backport/kcl_drm_backport.h>
 #include <kcl/kcl_mn.h>
