@@ -2790,11 +2790,6 @@ __dw_hdmi_probe(struct platform_device *pdev,
 	return hdmi;
 
 err_iahb:
-	if (hdmi->i2c) {
-		i2c_del_adapter(&hdmi->i2c->adap);
-		hdmi->ddc = NULL;
-	}
-
 	if (hdmi->cec_notifier)
 		cec_notifier_put(hdmi->cec_notifier);
 
