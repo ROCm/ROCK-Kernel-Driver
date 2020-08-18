@@ -30,6 +30,7 @@
  *
  */
 #include <linux/ww_mutex.h>
+#include <kcl/kcl_reservation.h>
 #include "kcl_common.h"
 
 struct ww_class *_kcl_reservation_ww_class;
