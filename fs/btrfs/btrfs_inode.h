@@ -60,11 +60,14 @@ struct btrfs_inode {
 	 */
 	struct extent_io_tree io_failure_tree;
 
+	/*
+	 * Keep track of where the inode has extent items mapped in order to
+	 * make sure the i_size adjustments are accurate
+	 */
+	struct extent_io_tree file_extent_tree;
+
 	/* held while logging the inode in tree-log.c */
 	struct mutex log_mutex;
-
-	/* held while doing delalloc reservations */
-	struct mutex delalloc_mutex;
 
 	/* used to order data wrt metadata */
 	struct btrfs_ordered_inode_tree ordered_tree;

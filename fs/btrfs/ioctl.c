@@ -3316,8 +3316,10 @@ static int clone_finish_inode_update(struct btrfs_trans_handle *trans,
 	 */
 	if (endoff > destoff + olen)
 		endoff = destoff + olen;
-	if (endoff > inode->i_size)
-		btrfs_i_size_write(BTRFS_I(inode), endoff);
+	if (endoff > inode->i_size) {
+		i_size_write(inode, endoff);
+		btrfs_inode_safe_disk_i_size_write(inode, 0);
+	}
 
 	ret = btrfs_update_inode(trans, root, inode);
 	if (ret) {
@@ -3471,8 +3473,7 @@ copy_inline_extent:
 			    size);
 	inode_add_bytes(dst, datal);
 	set_bit(BTRFS_INODE_NEEDS_FULL_SYNC, &BTRFS_I(dst)->runtime_flags);
-
-	return 0;
+	return btrfs_inode_set_file_extent_range(BTRFS_I(dst), 0, aligned_end);
 }
 
 /**
