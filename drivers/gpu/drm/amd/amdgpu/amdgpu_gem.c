@@ -122,7 +122,7 @@ retry:
 
 void amdgpu_gem_force_release(struct amdgpu_device *adev)
 {
-	struct drm_device *ddev = adev->ddev;
+	struct drm_device *ddev = adev_to_drm(adev);
 	struct drm_file *file;
 
 #ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX

@@ -358,7 +358,7 @@ static const struct drm_encoder_funcs amdgpu_dm_encoder_funcs = {
 void
 dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev)
 {
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	int i;
 
 	for (i = 0; i < adev->dm.display_indexes_num; i++) {
@@ -586,7 +586,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 #ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV
 		dm->adev->dev,
 #else
-		dm->adev->ddev,
+		adev_to_drm(dm->adev),
 #endif
 		&aconnector->dm_dp_aux.aux,
 		16,

@@ -1602,7 +1602,7 @@ amdgpu_connector_add(struct amdgpu_device *adev,
 		      struct amdgpu_hpd *hpd,
 		      struct amdgpu_router *router)
 {
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
