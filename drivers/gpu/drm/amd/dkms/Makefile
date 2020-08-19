@@ -6,6 +6,10 @@ ifeq (y,$(CONFIG_DRM_AMDGPU))
 $(error DRM_AMDGPU is built-in, exit...)
 endif
 
+ifndef CONFIG_KALLSYMS
+$(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
+endif
+
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
 ifeq ($(DRM_VER),)
