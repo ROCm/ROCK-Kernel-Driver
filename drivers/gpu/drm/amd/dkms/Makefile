@@ -179,6 +179,7 @@ endif
 
 LINUXINCLUDE := \
 	-I$(src)/include \
+	-I$(src)/include/drm \
 	-I$(src)/include/uapi \
 	-include $(src)/include/kcl/kcl_version.h \
 	-include $(src)/include/rename_symbol.h \
