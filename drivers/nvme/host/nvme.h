@@ -126,6 +126,13 @@ enum nvme_quirks {
 	 * Don't change the value of the temperature threshold feature
 	 */
 	NVME_QUIRK_NO_TEMP_THRESH_CHANGE	= (1 << 14),
+
+	/*
+	 * The controller doesn't handle the Identify Namespace
+	 * Identification Descriptor list subcommand despite claiming
+	 * NVMe 1.3 compliance.
+	 */
+	NVME_QUIRK_NO_NS_DESC_LIST		= (1 << 15),
 };
 
 /*
@@ -295,6 +302,9 @@ struct nvme_ctrl {
 	unsigned long discard_page_busy;
 
 	struct nvme_fault_inject fault_inject;
+#if !defined(GENKSYMS)
+	bool created;
+#endif
 };
 
 enum nvme_iopolicy {
@@ -351,6 +361,7 @@ struct nvme_ns_head {
 	struct nvme_ns_ids	ids;
 	struct list_head	entry;
 	struct kref		ref;
+	bool			shared;
 	int			instance;
 #ifdef CONFIG_NVME_MULTIPATH
 	struct gendisk		*disk;
@@ -387,7 +398,6 @@ struct nvme_ns {
 #define NVME_NS_REMOVING	0
 #define NVME_NS_DEAD     	1
 #define NVME_NS_ANA_PENDING	2
-	u16 noiob;
 
 	struct nvme_fault_inject fault_inject;
 
@@ -446,6 +456,14 @@ static inline u64 nvme_sect_to_lba(struct nvme_ns *ns, sector_t sector)
 static inline sector_t nvme_lba_to_sect(struct nvme_ns *ns, u64 lba)
 {
 	return lba << (ns->lba_shift - SECTOR_SHIFT);
+}
+
+/*
+ * Convert byte length to nvme's 0-based num dwords
+ */
+static inline u32 nvme_bytes_to_numd(size_t len)
+{
+	return (len >> 2) - 1;
 }
 
 static inline void nvme_end_request(struct request *req, __le16 status,

@@ -3,6 +3,7 @@
  * Copyright (c) 2017-2018 Christoph Hellwig.
  */
 
+#include <linux/backing-dev.h>
 #include <linux/moduleparam.h>
 #include <trace/events/block.h>
 #include "nvme.h"
@@ -223,7 +224,7 @@ static struct nvme_ns *nvme_next_ns(struct nvme_ns_head *head,
 static struct nvme_ns *nvme_round_robin_path(struct nvme_ns_head *head,
 		int node, struct nvme_ns *old)
 {
-	struct nvme_ns *ns, *found, *fallback = NULL;
+	struct nvme_ns *ns, *found = NULL;
 
 	if (list_is_singular(&head->list)) {
 		if (nvme_path_is_disabled(old))
@@ -242,12 +243,22 @@ static struct nvme_ns *nvme_round_robin_path(struct nvme_ns_head *head,
 			goto out;
 		}
 		if (ns->ana_state == NVME_ANA_NONOPTIMIZED)
-			fallback = ns;
+			found = ns;
 	}
 
-	if (!fallback)
+	/*
+	 * The loop above skips the current path for round-robin semantics.
+	 * Fall back to the current path if either:
+	 *  - no other optimized path found and current is optimized,
+	 *  - no other usable path found and current is usable.
+	 */
+	if (!nvme_path_is_disabled(old) &&
+	    (old->ana_state == NVME_ANA_OPTIMIZED ||
+	     (!found && old->ana_state == NVME_ANA_NONOPTIMIZED)))
+		return old;
+
+	if (!found)
 		return NULL;
-	found = fallback;
 out:
 	rcu_assign_pointer(head->current_path[node], found);
 	return found;
@@ -265,10 +276,13 @@ inline struct nvme_ns *nvme_find_path(struct nvme_ns_head *head)
 	struct nvme_ns *ns;
 
 	ns = srcu_dereference(head->current_path[node], &head->srcu);
-	if (READ_ONCE(head->subsys->iopolicy) == NVME_IOPOLICY_RR && ns)
-		ns = nvme_round_robin_path(head, node, ns);
-	if (unlikely(!ns || !nvme_path_is_optimized(ns)))
-		ns = __nvme_find_path(head, node);
+	if (unlikely(!ns))
+		return __nvme_find_path(head, node);
+
+	if (READ_ONCE(head->subsys->iopolicy) == NVME_IOPOLICY_RR)
+		return nvme_round_robin_path(head, node, ns);
+	if (unlikely(!nvme_path_is_optimized(ns)))
+		return __nvme_find_path(head, node);
 	return ns;
 }
 
@@ -666,6 +680,14 @@ void nvme_mpath_add_disk(struct nvme_ns *ns, struct nvme_id_ns *id)
 		ns->ana_state = NVME_ANA_OPTIMIZED; 
 		nvme_mpath_set_live(ns);
 		mutex_unlock(&ns->head->lock);
+	}
+
+	if (bdi_cap_stable_pages_required(ns->queue->backing_dev_info)) {
+		struct gendisk *disk = ns->head->disk;
+
+		if (disk)
+			disk->queue->backing_dev_info->capabilities |=
+					BDI_CAP_STABLE_WRITES;
 	}
 }
 
