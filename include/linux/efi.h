@@ -992,7 +992,6 @@ extern struct efi {
 	efi_system_table_t *systab;	/* EFI system table */
 	unsigned int runtime_version;	/* Runtime services version */
 	unsigned long mps;		/* MPS table */
-	unsigned int  runtime_supported_mask;
 	unsigned long acpi;		/* ACPI table  (IA64 ext 0.71) */
 	unsigned long acpi20;		/* ACPI table  (ACPI 2.0) */
 	unsigned long smbios;		/* SMBIOS table (32 bit entry point) */
@@ -1029,6 +1028,9 @@ extern struct efi {
 	efi_set_virtual_address_map_t *set_virtual_address_map;
 	struct efi_memory_map memmap;
 	unsigned long flags;
+#ifndef __GENKSYMS__
+	unsigned int  runtime_supported_mask;
+#endif
 } efi;
 
 #define EFI_RT_SUPPORTED_GET_TIME 				0x0001
