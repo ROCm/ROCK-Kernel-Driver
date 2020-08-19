@@ -6,6 +6,10 @@ ifeq (y,$(CONFIG_DRM_AMDGPU))
 $(error DRM_AMDGPU is built-in, exit...)
 endif
 
+ifndef CONFIG_KALLSYMS
+$(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
+endif
+
 ifdef CONFIG_CC_IS_GCC
 GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
 GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
