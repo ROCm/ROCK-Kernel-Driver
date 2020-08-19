@@ -33,6 +33,7 @@
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
+#include <linux/ptrace.h>
 #include <linux/dma-buf.h>
 #include <asm/processor.h>
 #include "kfd_priv.h"
@@ -1802,6 +1803,37 @@ static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
 	return -EPERM;
 }
 #endif
+static int kfd_ioctl_criu_dumper(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	pr_info("Inside %s\n",__func__);
+
+	return 0;
+}
+
+static int kfd_ioctl_criu_restorer(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	pr_info("Inside %s\n",__func__);
+
+	return 0;
+}
+
+static int kfd_ioctl_criu_helper(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	pr_info("Inside %s\n",__func__);
+
+	return 0;
+}
+
+static int kfd_ioctl_criu_resume(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	pr_info("Inside %s\n",__func__);
+
+	return 0;
+}
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
@@ -1906,6 +1938,18 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_XNACK_MODE,
 			kfd_ioctl_set_xnack_mode, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CRIU_DUMPER,
+			 kfd_ioctl_criu_dumper, KFD_IOC_FLAG_PTRACE_ATTACHED),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CRIU_RESTORER,
+			 kfd_ioctl_criu_restorer, KFD_IOC_FLAG_ROOT_ONLY),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CRIU_HELPER,
+			 kfd_ioctl_criu_helper, KFD_IOC_FLAG_PTRACE_ATTACHED),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CRIU_RESUME,
+			 kfd_ioctl_criu_resume, KFD_IOC_FLAG_ROOT_ONLY),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
@@ -1920,6 +1964,7 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	char *kdata = NULL;
 	unsigned int usize, asize;
 	int retcode = -EINVAL;
+	bool ptrace_attached = false;
 
 	if (nr >= AMDKFD_CORE_IOCTL_COUNT)
 		goto err_i1;
@@ -1945,7 +1990,15 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	 * processes need to create their own KFD device context.
 	 */
 	process = filep->private_data;
-	if (process->lead_thread != current->group_leader) {
+
+	rcu_read_lock();
+	if ((ioctl->flags & KFD_IOC_FLAG_PTRACE_ATTACHED) &&
+	    ptrace_parent(process->lead_thread) == current)
+		ptrace_attached = true;
+	rcu_read_unlock();
+
+	if (process->lead_thread != current->group_leader
+	    && !ptrace_attached) {
 		dev_dbg(kfd_device, "Using KFD FD in wrong process\n");
 		retcode = -EBADF;
 		goto err_i1;
@@ -1959,6 +2012,11 @@ static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		retcode = -EINVAL;
 		goto err_i1;
 	}
+
+	/* KFD_IOC_FLAG_ROOT_ONLY is only for CAP_SYS_ADMIN */
+	if (unlikely((ioctl->flags & KFD_IOC_FLAG_ROOT_ONLY) &&
+		     !capable(CAP_SYS_ADMIN)))
+		return -EACCES;
 
 	if (cmd & (IOC_IN | IOC_OUT)) {
 		if (asize <= sizeof(stack_kdata)) {

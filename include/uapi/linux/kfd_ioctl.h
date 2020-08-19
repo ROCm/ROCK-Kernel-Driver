@@ -467,6 +467,102 @@ struct kfd_ioctl_smi_events_args {
 	__u32 anon_fd;	/* from KFD */
 };
 
+struct kfd_criu_devinfo_bucket {
+	__u32 user_gpu_id;
+	__u32 actual_gpu_id;
+	__u32 drm_fd;
+};
+
+struct kfd_criu_bo_buckets {
+	__u64 bo_addr;  /* from KFD */
+	__u64 bo_size;  /* from KFD */
+	__u64 bo_offset;/* from KFD */
+	__u64 user_addr; /* from KFD */
+	__u32 bo_alloc_flags;/* from KFD */
+	__u32 gpu_id;/* from KFD */
+	__u32 idr_handle;/* from KFD */
+};
+
+struct kfd_criu_q_bucket {
+	__u64 q_address;
+	__u64 q_size;
+	__u64 read_ptr_addr;
+	__u64 write_ptr_addr;
+	__u64 doorbell_off;
+	__u64 eop_ring_buffer_address;		/* Relevant only for VI */
+	__u64 ctx_save_restore_area_address;	/* Relevant only for VI */
+	__u64 queues_data_offset;
+	__u32 gpu_id;
+	__u32 type;
+	__u32 format;
+	__u32 q_id;
+	__u32 priority;
+	__u32 q_percent;
+	__u32 doorbell_id;
+	__u32 is_gws;				/* TODO Implement me */
+	__u32 sdma_id;			/* Relevant only for sdma queues*/
+	__u32 eop_ring_buffer_size;		/* Relevant only for VI */
+	__u32 ctx_save_restore_area_size;	/* Relevant only for VI */
+	__u32 ctl_stack_size;			/* Relevant only for VI */
+	__u32 cu_mask_size;
+	__u32 mqd_size;
+};
+
+struct kfd_criu_ev_bucket {
+	__u32 event_id;
+	__u32 auto_reset;
+	__u32 type;
+	__u32 signaled;
+
+	union {
+		struct kfd_hsa_memory_exception_data memory_exception_data;
+		struct kfd_hsa_hw_exception_data hw_exception_data;
+	};
+};
+
+struct kfd_ioctl_criu_dumper_args {
+	__u64 num_of_bos;
+	__u64 kfd_criu_bo_buckets_ptr;
+	__u64 kfd_criu_q_buckets_ptr;
+	__u64 kfd_criu_ev_buckets_ptr;
+	__u64 kfd_criu_devinfo_buckets_ptr;
+	__u64 queues_data_size;
+	__u64 queues_data_ptr;
+	__u64 event_page_offset;
+	__u32 num_of_queues;
+	__u32 num_of_devices;
+	__u32 num_of_events;
+};
+
+struct kfd_ioctl_criu_restorer_args {
+	__u64 handle;   /* from KFD */
+	__u64 num_of_bos;
+	__u64 kfd_criu_bo_buckets_ptr;
+	__u64 restored_bo_array_ptr;
+	__u64 kfd_criu_q_buckets_ptr;
+	__u64 kfd_criu_ev_buckets_ptr;
+	__u64 kfd_criu_devinfo_buckets_ptr;
+	__u64 queues_data_size;
+	__u64 queues_data_ptr;
+	__u64 event_page_offset;
+	__u32 num_of_devices;
+	__u32 num_of_queues;
+	__u32 num_of_events;
+};
+
+struct kfd_ioctl_criu_helper_args {
+	__u64 num_of_bos;	/* from KFD */
+	__u64 queues_data_size;
+	__u32 task_pid;
+	__u32 num_of_devices;
+	__u32 num_of_queues;    /* from KFD */
+	__u32 num_of_events;	/* from KFD */
+};
+
+struct kfd_ioctl_criu_resume_args {
+	__u32 pid;	/* to KFD */
+};
+
 /* Register offset inside the remapped mmio page
  */
 enum kfd_mmio_remap {
@@ -740,7 +836,19 @@ struct kfd_ioctl_set_xnack_mode_args {
 #define AMDKFD_IOC_SET_XNACK_MODE		\
 		AMDKFD_IOWR(0x21, struct kfd_ioctl_set_xnack_mode_args)
 
+#define AMDKFD_IOC_CRIU_DUMPER			\
+		AMDKFD_IOWR(0x22, struct kfd_ioctl_criu_dumper_args)
+
+#define AMDKFD_IOC_CRIU_RESTORER			\
+		AMDKFD_IOWR(0x23, struct kfd_ioctl_criu_restorer_args)
+
+#define AMDKFD_IOC_CRIU_HELPER			\
+		AMDKFD_IOWR(0x24, struct kfd_ioctl_criu_helper_args)
+
+#define AMDKFD_IOC_CRIU_RESUME			\
+		AMDKFD_IOWR(0x25, struct kfd_ioctl_criu_resume_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x22
+#define AMDKFD_COMMAND_END		0x26
 
 #endif

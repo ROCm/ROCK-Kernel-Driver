@@ -121,7 +121,35 @@
  */
 #define KFD_QUEUE_DOORBELL_MIRROR_OFFSET 512
 
+/**
+ * enum kfd_ioctl_flags - KFD ioctl flags
+ * Various flags that can be set in &amdkfd_ioctl_desc.flags to control how
+ * userspace can use a given ioctl.
+ */
+enum kfd_ioctl_flags {
+	/**
+	 * @KFD_IOC_FLAG_ROOT_ONLY:
+	 * Certain KFD ioctls such as AMDKFD_IOC_CRIU_RESTORER can potentially
+	 * perform privileged operations and load arbitrary data into MQDs and
+	 * eventually HQD registers when the queue is mapped by HWS. In order to
+	 * prevent this we should perform additional security checks. In other
+	 * cases, certain ioctls such as AMDKFD_IOC_CRIU_RESUME might be called
+	 * by an external process e.g. CRIU restore process, for each resuming
+	 * tasks and thus require elevated privileges.
+	 *
+	 * This is equivalent to callers with the SYSADMIN capability.
+	 */
+	KFD_IOC_FLAG_ROOT_ONLY = BIT(0),
+	/**
+	 * @KFD_IOC_FLAG_PTRACE_ATTACHED:
+	 * Certain KFD ioctls such as AMDKFD_IOC_CRIU_HELPER and
+	 * AMDKFD_IOC_CRIU_DUMPER are expected to be called during a Checkpoint
+	 * operation triggered by CRIU. Since, these are expected to be called
+	 * from a PTRACE attched context, we must authenticate these.
+	 */
+	KFD_IOC_FLAG_PTRACE_ATTACHED = BIT(1),
 
+};
 /*
  * Kernel module parameter to specify maximum number of supported queues per
  * device
