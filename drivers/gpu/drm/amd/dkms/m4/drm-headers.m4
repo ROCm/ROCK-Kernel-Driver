@@ -120,4 +120,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # RHEL 7.x wrapper
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_backport.h])
+
+	dnl #
+	dnl # commit v4.15-rc4-1351-g495eb7f877ab
+	dnl # drm: Add some HDCP related #defines
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_hdcp.h])
 ])

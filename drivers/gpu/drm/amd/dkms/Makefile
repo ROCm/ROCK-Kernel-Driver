@@ -197,7 +197,6 @@ export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
 export CONFIG_DRM_AMD_DC_DCN1_0=y
 export CONFIG_DRM_AMD_DC_DCN1_01=y
-export CONFIG_DRM_AMD_DC_HDCP=y
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
@@ -207,8 +206,11 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 
+ifeq ($(shell grep "HAVE_DRM_DRM_HDCP_H" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),y)
+export CONFIG_DRM_AMD_DC_HDCP=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
+endif
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
 # older versions of GCC hanging during building/installing. Check
