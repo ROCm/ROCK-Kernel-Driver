@@ -209,6 +209,9 @@
 /* drm_connector_set_path_property() is available */
 #define HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY 1
 
+/* struct drm_connector_state has hdcp_content_type */
+#define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
+
 /* drm_connector_unreference() is available */
 /* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
