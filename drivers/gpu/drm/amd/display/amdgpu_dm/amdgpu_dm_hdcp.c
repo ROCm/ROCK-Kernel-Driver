@@ -313,6 +313,7 @@ static void event_property_update(struct work_struct *work)
 
 	if (aconnector->base.state) {
 		if (hdcp_work->encryption_status != MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF) {
+			#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			if (aconnector->base.state->hdcp_content_type ==
 				DRM_MODE_HDCP_CONTENT_TYPE0 &&
 			hdcp_work->encryption_status <=
@@ -325,6 +326,9 @@ static void event_property_update(struct work_struct *work)
 					MOD_HDCP_ENCRYPTION_STATUS_HDCP2_TYPE1_ON)
 				drm_hdcp_update_content_protection(&aconnector->base,
 					DRM_MODE_CONTENT_PROTECTION_ENABLED);
+			#else
+			drm_hdcp_update_content_protection(&aconnector->base, DRM_MODE_CONTENT_PROTECTION_ENABLED);
+			#endif
 		} else {
 			drm_hdcp_update_content_protection(&aconnector->base,
 				DRM_MODE_CONTENT_PROTECTION_DESIRED);
