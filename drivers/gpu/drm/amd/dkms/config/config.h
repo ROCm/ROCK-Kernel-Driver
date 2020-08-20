@@ -463,6 +463,9 @@
 /* ddrm_get_max_iome() is available */
 /* #undef HAVE_DRM_GET_MAX_IOMEM */
 
+/* drm_hdcp_update_content_protection is available */
+#define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
+
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,b interface */
 /* #undef HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B */
 
