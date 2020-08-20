@@ -29,4 +29,5 @@ linux/pfn_t.h kcl/kcl_mm_types.h
 linux/nospec.h kcl/kcl_nospec.h
 drm/task_barrier.h kcl/kcl_task_barrier.h
 linux/hashtable.h kcl/kcl_hashtable.h
+drm/drm_hdcp.h kcl/kcl_drm_hdcp.h
 
