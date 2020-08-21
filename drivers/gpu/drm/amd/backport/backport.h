@@ -4,4 +4,5 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <kcl/kcl_hashtable.h>
 #endif /* AMDGPU_BACKPORT_H */
