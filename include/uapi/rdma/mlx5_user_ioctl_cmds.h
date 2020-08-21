@@ -218,7 +218,7 @@ enum mlx5_ib_create_flow_attrs {
 	MLX5_IB_ATTR_CREATE_FLOW_ARR_COUNTERS_DEVX_OFFSET,
 };
 
-enum mlx5_ib_destoy_flow_attrs {
+enum mlx5_ib_destroy_flow_attrs {
 	MLX5_IB_ATTR_DESTROY_FLOW_HANDLE = (1U << UVERBS_ID_NS_SHIFT),
 };
 
