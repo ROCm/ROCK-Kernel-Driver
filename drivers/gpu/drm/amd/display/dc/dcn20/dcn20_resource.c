@@ -1089,7 +1089,6 @@ static const struct dc_debug_options debug_defaults_drv = {
 		.disable_pplib_wm_range = false,
 		.scl_reset_length10 = true,
 		.sanity_checks = false,
-		.disable_tri_buf = true,
 		.underflow_assert_delay_us = 0xFFFFFFFF,
 };
 
@@ -1106,6 +1105,7 @@ static const struct dc_debug_options debug_defaults_diags = {
 		.disable_stutter = true,
 		.scl_reset_length10 = true,
 		.underflow_assert_delay_us = 0xFFFFFFFF,
+		.enable_tri_buf = true,
 };
 
 void dcn20_dpp_destroy(struct dpp **dpp)
