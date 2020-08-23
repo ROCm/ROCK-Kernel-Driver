@@ -4766,6 +4766,8 @@ static int igc_probe(struct pci_dev *pdev,
 	hw->fc.requested_mode = igc_fc_default;
 	hw->fc.current_mode = igc_fc_default;
 
+	igc_ptp_init(adapter);
+
 	/* reset the hardware with the new settings */
 	igc_reset(adapter);
 
@@ -4781,9 +4783,6 @@ static int igc_probe(struct pci_dev *pdev,
 
 	 /* carrier off reporting is important to ethtool even BEFORE open */
 	netif_carrier_off(netdev);
-
-	/* do hw tstamp init after resetting */
-	igc_ptp_init(adapter);
 
 	/* Check if Media Autosense is enabled */
 	adapter->ei = *ei;
