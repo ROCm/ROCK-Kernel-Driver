@@ -8,14 +8,20 @@
 #include <linux/mm.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
-#ifdef HAVE_DRM_MALLOC_AB
-#include <drm/drm_mem_util.h>
-#endif
-#include <kcl/kcl_overflow.h>
 #include <kcl/kcl_mm_types.h>
 
 #ifndef untagged_addr
 #define untagged_addr(addr) (addr)
+#endif
+
+#ifndef HAVE_KVFREE
+static inline void kvfree(const void *addr)
+{
+	if (is_vmalloc_addr(addr))
+		vfree(addr);
+	else
+		kfree(addr);
+}
 #endif
 
 #ifndef HAVE_KVZALLOC_KVMALLOC
@@ -35,43 +41,14 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVZALLOC_KVMALLOC */
 
-#ifndef HAVE_KVFREE
-#ifdef HAVE_DRM_FREE_LARGE
-static inline void kvfree(const void *addr)
-{
-	return drm_free_large(addr);
-}
-#else
-static inline void kvfree(const void *addr)
-{
-	if (is_vmalloc_addr(addr))
-		vfree(addr);
-	else
-		kfree(addr);
-}
-#endif /* HAVE_DRM_FREE_LARGE */
-#endif /* HAVE_KVFREE */
-
 #ifndef HAVE_KVMALLOC_ARRAY
-#if defined(HAVE_DRM_MALLOC_AB) && defined(HAVE_DRM_CALLOC_LARGE)
 static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
-	if (flags & __GFP_ZERO)
-		return drm_calloc_large(n, size);
-	else
-		return drm_malloc_ab(n, size);
-}
-#else
-static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
-{
-	size_t bytes;
-
-	if (unlikely(check_mul_overflow(n, size, &bytes)))
+	if (size != 0 && n > SIZE_MAX / size)
 		return NULL;
 
-	return kvmalloc(bytes, flags);
+	return kvmalloc(n * size, flags);
 }
-#endif /* HAVE_DRM_MALLOC_AB && HAVE_DRM_CALLOC_LARGE */
 #endif /* HAVE_KVMALLOC_ARRAY */
 
 #ifndef HAVE_KVCALLOC

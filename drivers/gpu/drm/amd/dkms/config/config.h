@@ -172,9 +172,6 @@
 /* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
 /* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_USE_KTIMER_T_ARG */
 
-/* drm_calloc_large() is available */
-/* #undef HAVE_DRM_CALLOC_LARGE */
-
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
@@ -439,9 +436,6 @@
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
 
-/* drm_free_large() is available */
-/* #undef HAVE_DRM_FREE_LARGE */
-
 /* drm_gem_map_attach() wants 2 arguments */
 /* #undef HAVE_DRM_GEM_MAP_ATTACH_2ARGS */
 
@@ -486,9 +480,6 @@
 
 /* drm_kms_helper_is_poll_worker() is available */
 #define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
-
-/* drm_malloc_ab() is available */
-/* #undef HAVE_DRM_MALLOC_AB */
 
 /* whether drm_mm_insert_mode is available */
 #define HAVE_DRM_MM_INSERT_MODE 1
