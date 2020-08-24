@@ -223,8 +223,6 @@ struct tile_config {
  * @build_grace_period_packet_info: build a IQ_WAUT_TIME2 reg value with an
  * updated grace period value.
  *
- * @get_unique_id: Returns uuid id of current  device
- * 
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -300,7 +298,6 @@ struct kfd2kgd_calls {
 			uint32_t vmid, uint64_t page_table_base);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 	uint64_t (*get_hive_id)(struct kgd_dev *kgd);
-	uint64_t (*get_unique_id)(struct kgd_dev *kgd);
 
 	void (*enable_debug_trap)(struct kgd_dev *kgd,
 					uint32_t trap_debug_wave_launch_mode,

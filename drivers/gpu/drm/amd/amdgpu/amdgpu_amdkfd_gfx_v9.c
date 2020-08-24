@@ -1079,5 +1079,4 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.clear_address_watch = kgd_gfx_v9_clear_address_watch,
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
-	.get_unique_id = amdgpu_amdkfd_get_unique_id,
 };
