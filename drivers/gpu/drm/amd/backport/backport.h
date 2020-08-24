@@ -24,5 +24,6 @@
 #include <kcl/kcl_suspend.h>
 #include <kcl/backport/kcl_pci_backport.h>
 #include <kcl/kcl_timekeeping.h>
+#include <kcl/kcl_mm.h>
 
 #endif /* AMDGPU_BACKPORT_H */
