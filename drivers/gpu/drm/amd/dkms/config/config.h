@@ -82,6 +82,9 @@
 /* dma_resv->seq is available */
 #define HAVE_DMA_RESV_SEQ 1
 
+/* down_read_killable() is available */
+#define HAVE_DOWN_READ_KILLABLE 1
+
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
