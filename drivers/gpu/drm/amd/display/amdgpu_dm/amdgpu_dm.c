@@ -180,7 +180,7 @@ static void amdgpu_dm_set_psr_caps(struct dc_link *link);
 static bool amdgpu_dm_psr_enable(struct dc_stream_state *stream);
 static bool amdgpu_dm_link_setup_psr(struct dc_stream_state *stream);
 static bool amdgpu_dm_psr_disable(struct dc_stream_state *stream);
-
+static bool amdgpu_dm_psr_disable_all(struct amdgpu_display_manager *dm);
 
 /*
  * dm_vblank_get_counter
@@ -330,7 +330,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 	}
 
 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	struct amdgpu_flip_work *works = amdgpu_crtc->pflip_works;
 #endif
 
@@ -409,7 +409,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 		amdgpu_get_vblank_counter_kms(&amdgpu_crtc->base);
 
 	amdgpu_crtc->pflip_status = AMDGPU_FLIP_NONE;
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	amdgpu_crtc->pflip_works = NULL;
 #endif
 
@@ -419,7 +419,7 @@ static void dm_pflip_high_irq(void *interrupt_params)
 			 amdgpu_crtc->crtc_id, amdgpu_crtc,
 			 vrr_active, (int) !e);
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	schedule_work(&works->unpin_work);
 #endif
 
@@ -1469,7 +1469,7 @@ static int dm_late_init(void *handle)
 	if (dmcu)
 		ret = dmcu_load_iram(dmcu, params);
 	else if (adev->dm.dc->ctx->dmub_srv)
-		ret = dmub_init_abm_config(adev->dm.dc->res_pool->abm, params);
+		ret = dmub_init_abm_config(adev->dm.dc->res_pool, params);
 
 	if (!ret)
 		return -EINVAL;
@@ -3094,6 +3094,8 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
 #if defined(CONFIG_ACPI)
 	struct amdgpu_dm_backlight_caps caps;
 
+	memset(&caps, 0, sizeof(caps));
+
 	if (dm->backlight_caps.caps_valid)
 		return;
 
@@ -3137,53 +3139,51 @@ static int set_backlight_via_aux(struct dc_link *link, uint32_t brightness)
 	return rc ? 0 : 1;
 }
 
-static u32 convert_brightness(const struct amdgpu_dm_backlight_caps *caps,
-			      const uint32_t user_brightness)
+static int get_brightness_range(const struct amdgpu_dm_backlight_caps *caps,
+				unsigned *min, unsigned *max)
 {
-	u32 min, max, conversion_pace;
-	u32 brightness = user_brightness;
-
 	if (!caps)
-		goto out;
+		return 0;
 
-	if (!caps->aux_support) {
-		max = caps->max_input_signal;
-		min = caps->min_input_signal;
-		/*
-		 * The brightness input is in the range 0-255
-		 * It needs to be rescaled to be between the
-		 * requested min and max input signal
-		 * It also needs to be scaled up by 0x101 to
-		 * match the DC interface which has a range of
-		 * 0 to 0xffff
-		 */
-		conversion_pace = 0x101;
-		brightness =
-			user_brightness
-			* conversion_pace
-			* (max - min)
-			/ AMDGPU_MAX_BL_LEVEL
-			+ min * conversion_pace;
+	if (caps->aux_support) {
+		// Firmware limits are in nits, DC API wants millinits.
+		*max = 1000 * caps->aux_max_input_signal;
+		*min = 1000 * caps->aux_min_input_signal;
 	} else {
-		/* TODO
-		 * We are doing a linear interpolation here, which is OK but
-		 * does not provide the optimal result. We probably want
-		 * something close to the Perceptual Quantizer (PQ) curve.
-		 */
-		max = caps->aux_max_input_signal;
-		min = caps->aux_min_input_signal;
-
-		brightness = (AMDGPU_MAX_BL_LEVEL - user_brightness) * min
-			       + user_brightness * max;
-		// Multiple the value by 1000 since we use millinits
-		brightness *= 1000;
-		brightness = DIV_ROUND_CLOSEST(brightness, AMDGPU_MAX_BL_LEVEL);
+		// Firmware limits are 8-bit, PWM control is 16-bit.
+		*max = 0x101 * caps->max_input_signal;
+		*min = 0x101 * caps->min_input_signal;
 	}
-
-out:
-	return brightness;
+	return 1;
 }
 
+static u32 convert_brightness_from_user(const struct amdgpu_dm_backlight_caps *caps,
+					uint32_t brightness)
+{
+	unsigned min, max;
+
+	if (!get_brightness_range(caps, &min, &max))
+		return brightness;
+
+	// Rescale 0..255 to min..max
+	return min + DIV_ROUND_CLOSEST((max - min) * brightness,
+				       AMDGPU_MAX_BL_LEVEL);
+}
+
+static u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *caps,
+				      uint32_t brightness)
+{
+	unsigned min, max;
+
+	if (!get_brightness_range(caps, &min, &max))
+		return brightness;
+
+	if (brightness < min)
+		return 0;
+	// Rescale min..max to 0..255
+	return DIV_ROUND_CLOSEST(AMDGPU_MAX_BL_LEVEL * (brightness - min),
+				 max - min);
+}
 #endif
 
 static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
@@ -3204,7 +3204,7 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 #ifdef HAVE_HDR_SINK_METADATA
 	link = (struct dc_link *)dm->backlight_link;
 
-	brightness = convert_brightness(&caps, bd->props.brightness);
+	brightness = convert_brightness_from_user(&caps, bd->props.brightness);
 	// Change brightness based on AUX property
 	if (caps.aux_support)
 		return set_backlight_via_aux(link, brightness);
@@ -3245,7 +3245,11 @@ static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 
 	if (ret == DC_ERROR_UNEXPECTED)
 		return bd->props.brightness;
+#ifdef HAVE_HDR_SINK_METADATA
+	return convert_brightness_to_user(&dm->backlight_caps, ret);
+#else
 	return ret;
+#endif
 }
 
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
@@ -3572,7 +3576,7 @@ static void dm_bandwidth_update(struct amdgpu_device *adev)
 	/* TODO: implement later */
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 /**
  * dm_page_flip - called by amdgpu_flip_work_func(), which is triggered
  *                via DRM IOTCL, by user mode.
@@ -3708,7 +3712,7 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 	.hpd_sense = NULL,/* called unconditionally */
 	.hpd_set_polarity = NULL, /* called unconditionally */
 	.hpd_get_gpio_reg = NULL, /* VBIOS parsing. DAL does it. */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	.page_flip = dm_page_flip,
 #endif
 	.page_flip_get_scanoutpos =
@@ -5051,6 +5055,9 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (dsc_caps.is_dsc_supported) {
+			/* Set DSC policy according to dsc_clock_en */
+			dc_dsc_policy_set_enable_dsc_when_not_needed(aconnector->dsc_settings.dsc_clock_en);
+
 			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
 						  &dsc_caps,
 						  aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
@@ -7482,7 +7489,7 @@ static void handle_cursor_update(struct drm_plane *plane,
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc)
 {
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	assert_spin_locked(&acrtc->base.dev->event_lock);
 #endif
 	WARN_ON(acrtc->event);
@@ -8161,7 +8168,7 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 	 * unset legacy_cursor_update
 	 */
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	return drm_atomic_helper_commit(dev, state, nonblock);
 
 	/*TODO Handle EINTR, reenable IRQ*/
@@ -8178,10 +8185,6 @@ static int amdgpu_dm_atomic_commit(struct drm_device *dev,
 		if (ret)
 			goto cleanup;
 	}
-#if defined(OS_NAME_RHEL_6) || defined(OS_NAME_SLE_12_3)
-	else	// Temporary fix for pflip conflict between block and nonblock call
-		return -EBUSY;
-#endif
 
 	drm_atomic_helper_swap_state(dev, state);
 
@@ -8227,6 +8230,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	struct drm_connector_state *old_con_state, *new_con_state;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 	int crtc_disable_count = 0;
+	bool mode_set_reset_required = false;
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
 
@@ -8312,19 +8316,21 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 			acrtc->enabled = true;
 			acrtc->hw_mode = new_crtc_state->mode;
 			crtc->hwmode = new_crtc_state->mode;
+			mode_set_reset_required = true;
 		} else if (modereset_required(new_crtc_state)) {
 			DRM_DEBUG_DRIVER("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
 			/* i.e. reset mode */
-			if (dm_old_crtc_state->stream) {
-				if (dm_old_crtc_state->stream->link->psr_settings.psr_allow_active)
-					amdgpu_dm_psr_disable(dm_old_crtc_state->stream);
-
+			if (dm_old_crtc_state->stream)
 				remove_stream(adev, acrtc, dm_old_crtc_state->stream);
-			}
+			mode_set_reset_required = true;
 		}
 	} /* for_each_crtc_in_state() */
 
 	if (dc_state) {
+		/* if there mode set or reset, disable eDP PSR */
+		if (mode_set_reset_required)
+			amdgpu_dm_psr_disable_all(dm);
+
 		dm_enable_per_frame_crtc_master_sync(dc_state);
 		mutex_lock(&dm->dc_lock);
 		WARN_ON(!dc_commit_state(dm->dc, dc_state));
@@ -8570,7 +8576,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 						dm, crtc, wait_for_vblank);
 	}
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
@@ -8594,9 +8600,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		new_crtc_state->event = NULL;
 	}
 	spin_unlock_irqrestore(&adev->ddev->event_lock, flags);
-#endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
 	/* Signal HW programming completion */
 	drm_atomic_helper_commit_hw_done(state);
 #endif
@@ -8608,7 +8612,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		drm_atomic_helper_wait_for_flip_done(dev, state);
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	drm_atomic_helper_cleanup_planes(dev, state);
 #endif
 
@@ -8723,7 +8727,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 				 struct drm_atomic_state *state)
 {
 	struct drm_crtc *crtc;
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	struct drm_crtc_commit *commit;
 #endif
 	long ret;
@@ -8737,7 +8741,7 @@ static int do_aquire_global_lock(struct drm_device *dev,
 	if (ret)
 		return ret;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 8, 0)
+#ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		spin_lock(&crtc->commit_lock);
 		commit = list_first_entry_or_null(&crtc->commit_list,
@@ -10055,6 +10059,18 @@ static bool amdgpu_dm_psr_disable(struct dc_stream_state *stream)
 	DRM_DEBUG_DRIVER("Disabling psr...\n");
 
 	return dc_link_set_psr_allow_active(stream->link, false, true);
+}
+
+/*
+ * amdgpu_dm_psr_disable() - disable psr f/w
+ * if psr is enabled on any stream
+ *
+ * Return: true if success
+ */
+static bool amdgpu_dm_psr_disable_all(struct amdgpu_display_manager *dm)
+{
+	DRM_DEBUG_DRIVER("Disabling psr if psr is enabled on any stream\n");
+	return dc_set_psr_allow_active(dm->dc, false);
 }
 
 void amdgpu_dm_trigger_timing_sync(struct drm_device *dev)

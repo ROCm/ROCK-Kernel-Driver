@@ -796,5 +796,5 @@ failed_undo:
 	amdgpu_ring_undo(ring);
 	spin_unlock_irqrestore(&kiq->ring_lock, flags);
 failed_kiq_write:
-	dev_warn(adev->dev, "failed to write reg:%x\n", reg);
+	pr_err("failed to write reg:%x\n", reg);
 }

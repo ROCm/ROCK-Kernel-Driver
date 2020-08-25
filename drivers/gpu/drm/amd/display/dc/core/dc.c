@@ -2693,7 +2693,7 @@ void dc_commit_updates_for_stream(struct dc *dc,
 
 	copy_stream_update_to_stream(dc, context, stream, stream_update);
 
-	if (update_type > UPDATE_TYPE_FAST) {
+	if (update_type >= UPDATE_TYPE_FULL) {
 		if (!dc->res_pool->funcs->validate_bandwidth(dc, context, false)) {
 			DC_ERROR("Mode validation failed for stream update!\n");
 			dc_release_state(context);
@@ -2744,7 +2744,7 @@ struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i)
 	return NULL;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 void dc_flip_plane_addrs(
 		struct dc *dc,
 		struct dc_plane_state *const plane_states[],
@@ -3032,6 +3032,30 @@ void dc_get_clock(struct dc *dc, enum dc_clock_type clock_type, struct dc_clock_
 {
 	if (dc->hwss.get_clock)
 		dc->hwss.get_clock(dc, clock_type, clock_cfg);
+}
+
+/* enable/disable eDP PSR without specify stream for eDP */
+bool dc_set_psr_allow_active(struct dc *dc, bool enable)
+{
+	int i;
+
+	for (i = 0; i < dc->current_state->stream_count ; i++) {
+		struct dc_link *link;
+		struct dc_stream_state *stream = dc->current_state->streams[i];
+
+		link = stream->link;
+		if (!link)
+			continue;
+
+		if (link->psr_settings.psr_feature_enabled) {
+			if (enable && !link->psr_settings.psr_allow_active)
+				return dc_link_set_psr_allow_active(link, true, false);
+			else if (!enable && link->psr_settings.psr_allow_active)
+				return dc_link_set_psr_allow_active(link, false, false);
+		}
+	}
+
+	return true;
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)

@@ -341,10 +341,6 @@ enum amdgpu_pcie_gen {
 		((adev)->powerplay.pp_funcs->reset_power_profile_state(\
 			(adev)->powerplay.pp_handle, request))
 
-#define amdgpu_dpm_set_clockgating_by_smu(adev, msg_id) \
-		((adev)->powerplay.pp_funcs->set_clockgating_by_smu(\
-			(adev)->powerplay.pp_handle, msg_id))
-
 #define amdgpu_dpm_get_power_profile_mode(adev, buf) \
 		((adev)->powerplay.pp_funcs->get_power_profile_mode(\
 			(adev)->powerplay.pp_handle, buf))
@@ -356,10 +352,6 @@ enum amdgpu_pcie_gen {
 #define amdgpu_dpm_odn_edit_dpm_table(adev, type, parameter, size) \
 		((adev)->powerplay.pp_funcs->odn_edit_dpm_table(\
 			(adev)->powerplay.pp_handle, type, parameter, size))
-
-#define amdgpu_dpm_enable_mgpu_fan_boost(adev) \
-		((adev)->powerplay.pp_funcs->enable_mgpu_fan_boost(\
-			(adev)->powerplay.pp_handle))
 
 #define amdgpu_dpm_get_ppfeature_status(adev, buf) \
 		((adev)->powerplay.pp_funcs->get_ppfeature_status(\
@@ -547,5 +539,27 @@ int amdgpu_dpm_set_df_cstate(struct amdgpu_device *adev,
 			     uint32_t cstate);
 
 int amdgpu_dpm_allow_xgmi_power_down(struct amdgpu_device *adev, bool en);
+
+int amdgpu_dpm_enable_mgpu_fan_boost(struct amdgpu_device *adev);
+
+int amdgpu_dpm_set_clockgating_by_smu(struct amdgpu_device *adev,
+				      uint32_t msg_id);
+
+int amdgpu_dpm_smu_i2c_bus_access(struct amdgpu_device *adev,
+				  bool acquire);
+
+void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev);
+
+int amdgpu_dpm_read_sensor(struct amdgpu_device *adev, enum amd_pp_sensors sensor,
+			   void *data, uint32_t *size);
+
+void amdgpu_dpm_thermal_work_handler(struct work_struct *work);
+
+void amdgpu_pm_compute_clocks(struct amdgpu_device *adev);
+void amdgpu_dpm_enable_uvd(struct amdgpu_device *adev, bool enable);
+void amdgpu_dpm_enable_vce(struct amdgpu_device *adev, bool enable);
+void amdgpu_dpm_enable_jpeg(struct amdgpu_device *adev, bool enable);
+void amdgpu_pm_print_power_states(struct amdgpu_device *adev);
+int amdgpu_pm_load_smu_firmware(struct amdgpu_device *adev, uint32_t *smu_version);
 
 #endif

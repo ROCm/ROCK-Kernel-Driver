@@ -397,7 +397,6 @@ int amdgpu_xgmi_set_pstate(struct amdgpu_device *adev, int pstate)
 						hive->hi_req_gpu : adev;
 	bool is_hi_req = pstate == AMDGPU_XGMI_PSTATE_MAX_VEGA20;
 	bool init_low = hive->pstate == AMDGPU_XGMI_PSTATE_UNKNOWN;
-	bool locked;
 
 	/* fw bug so temporarily disable pstate switching */
 	return 0;
@@ -405,9 +404,7 @@ int amdgpu_xgmi_set_pstate(struct amdgpu_device *adev, int pstate)
 	if (!hive || adev->asic_type != CHIP_VEGA20)
 		return 0;
 
-	locked = atomic_read(&hive->in_reset) ? false : true;
-	if (locked)
-		mutex_lock(&hive->hive_lock);
+	mutex_lock(&hive->hive_lock);
 
 	if (is_hi_req)
 		hive->hi_req_count++;
@@ -442,8 +439,7 @@ int amdgpu_xgmi_set_pstate(struct amdgpu_device *adev, int pstate)
 							adev : NULL;
 	}
 out:
-	if (locked)
-		mutex_unlock(&hive->hive_lock);
+	mutex_unlock(&hive->hive_lock);
 	return ret;
 }
 

@@ -1245,9 +1245,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		return -EINVAL;
 	}
 
-	if (!down_read_trylock(&adev->reset_sem))
-		return -EIO;
-
 	if (sg) {
 		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
 		bo_type = ttm_bo_type_sg;
@@ -1322,7 +1319,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
 
-	up_read(&adev->reset_sem);
 	return 0;
 
 allocate_init_user_pages_failed:
@@ -1340,9 +1336,6 @@ err:
 		sg_free_table(sg);
 		kfree(sg);
 	}
-
-	up_read(&adev->reset_sem);
-
 	return ret;
 }
 

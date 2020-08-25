@@ -1437,13 +1437,24 @@ error_unlock:
 	return r;
 }
 
+static void trace_amdgpu_cs_ibs(struct amdgpu_cs_parser *parser)
+{
+	int i;
+
+	if (!trace_amdgpu_cs_enabled())
+		return;
+
+	for (i = 0; i < parser->job->num_ibs; i++)
+		trace_amdgpu_cs(parser, i);
+}
+
 int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 {
 	struct amdgpu_device *adev = dev->dev_private;
 	union drm_amdgpu_cs *cs = data;
 	struct amdgpu_cs_parser parser = {};
 	bool reserved_buffers = false;
-	int i, r;
+	int r;
 
 	if (amdgpu_ras_intr_triggered())
 		return -EHWPOISON;
@@ -1454,11 +1465,10 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	parser.adev = adev;
 	parser.filp = filp;
 
-	down_read(&adev->reset_sem);
-
 	r = amdgpu_cs_parser_init(&parser, data);
 	if (r) {
-		DRM_ERROR("Failed to initialize parser %d!\n", r);
+		if (printk_ratelimit())
+			DRM_ERROR("Failed to initialize parser %d!\n", r);
 		goto out;
 	}
 
@@ -1483,8 +1493,7 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 	reserved_buffers = true;
 
-	for (i = 0; i < parser.job->num_ibs; i++)
-		trace_amdgpu_cs(&parser, i);
+	trace_amdgpu_cs_ibs(&parser);
 
 	r = amdgpu_cs_vm_handling(&parser);
 	if (r)
@@ -1494,8 +1503,6 @@ int amdgpu_cs_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 
 out:
 	amdgpu_cs_parser_fini(&parser, r, reserved_buffers);
-
-	up_read(&adev->reset_sem);
 
 	return r;
 }

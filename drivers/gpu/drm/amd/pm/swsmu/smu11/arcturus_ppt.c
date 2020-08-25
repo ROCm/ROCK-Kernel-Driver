@@ -2208,14 +2208,17 @@ static const struct throttling_logging_label {
 };
 static void arcturus_log_thermal_throttling_event(struct smu_context *smu)
 {
+	int ret;
 	int throttler_idx, throtting_events = 0, buf_idx = 0;
 	struct amdgpu_device *adev = smu->adev;
 	uint32_t throttler_status;
 	char log_buf[256];
 
-	arcturus_get_smu_metrics_data(smu,
-				      METRICS_THROTTLER_STATUS,
-				      &throttler_status);
+	ret = arcturus_get_smu_metrics_data(smu,
+					    METRICS_THROTTLER_STATUS,
+					    &throttler_status);
+	if (ret)
+		return;
 
 	memset(log_buf, 0, sizeof(log_buf));
 	for (throttler_idx = 0; throttler_idx < ARRAY_SIZE(logging_label);
@@ -2388,6 +2391,8 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
 	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,
 	.get_gpu_metrics = arcturus_get_gpu_metrics,
+	.gfx_ulv_control = smu_v11_0_gfx_ulv_control,
+	.deep_sleep_control = smu_v11_0_deep_sleep_control,
 };
 
 void arcturus_set_ppt_funcs(struct smu_context *smu)

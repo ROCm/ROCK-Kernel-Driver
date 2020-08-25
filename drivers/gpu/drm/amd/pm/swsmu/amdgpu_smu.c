@@ -1440,6 +1440,8 @@ static int smu_enable_umd_pstate(void *handle,
 			amdgpu_device_ip_set_clockgating_state(smu->adev,
 							       AMD_IP_BLOCK_TYPE_GFX,
 							       AMD_CG_STATE_UNGATE);
+			smu_gfx_ulv_control(smu, false);
+			smu_deep_sleep_control(smu, false);
 		}
 	} else {
 		/* exit umd pstate, restore level, enable gfx cg*/
@@ -1447,6 +1449,8 @@ static int smu_enable_umd_pstate(void *handle,
 			if (*level == AMD_DPM_FORCED_LEVEL_PROFILE_EXIT)
 				*level = smu_dpm_ctx->saved_dpm_level;
 			smu_dpm_ctx->enable_umd_pstate = false;
+			smu_deep_sleep_control(smu, true);
+			smu_gfx_ulv_control(smu, true);
 			amdgpu_device_ip_set_clockgating_state(smu->adev,
 							       AMD_IP_BLOCK_TYPE_GFX,
 							       AMD_CG_STATE_GATE);
@@ -2651,4 +2655,21 @@ ssize_t smu_sys_get_gpu_metrics(struct smu_context *smu,
 	mutex_unlock(&smu->mutex);
 
 	return size;
+}
+
+int smu_enable_mgpu_fan_boost(struct smu_context *smu)
+{
+	int ret = 0;
+
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
+		return -EOPNOTSUPP;
+
+	mutex_lock(&smu->mutex);
+
+	if (smu->ppt_funcs->enable_mgpu_fan_boost)
+		ret = smu->ppt_funcs->enable_mgpu_fan_boost(smu);
+
+	mutex_unlock(&smu->mutex);
+
+	return ret;
 }

@@ -55,7 +55,7 @@ done
 sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_seqcount_string)/d' \
        -e 's/linux\/sched\/mm\.h/kcl\/header\/kcl_sched_mm_h\.h/' \
        -e '/dma_resv_lockdep/,/subsys_initcall/d' $KCL/dma-buf/dma-resv.c
-sed -i -e '/define _LINUX_RESERVATION_H/a #include <kcl/backport/kcl_reservation_backport.h>' \
+sed -i -e '/define _LINUX_RESERVATION_H/a #include <kcl/kcl_dma-resv.h>' \
        -e '/extern struct ww_class reservation_ww_class/,/extern const char reservation_seqcount_string/d' \
        -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
 

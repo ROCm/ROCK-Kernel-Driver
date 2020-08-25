@@ -1000,9 +1000,9 @@ struct amdgpu_device {
 	bool                            in_suspend;
 	bool				in_hibernate;
 
-	atomic_t                        in_gpu_reset;
+	atomic_t 			in_gpu_reset;
 	enum pp_mp1_state               mp1_state;
-	struct rw_semaphore	reset_sem;
+	struct mutex  lock_reset;
 	struct amdgpu_doorbell_index doorbell_index;
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -1186,6 +1186,7 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
 #define amdgpu_inc_vram_lost(adev) atomic_inc(&((adev)->vram_lost_counter));
 
 /* Common functions */
+bool amdgpu_device_has_job_running(struct amdgpu_device *adev);
 bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev);
 int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 			      struct amdgpu_job* job);
@@ -1339,9 +1340,8 @@ static inline bool amdgpu_is_tmz(struct amdgpu_device *adev)
        return adev->gmc.tmz_enabled;
 }
 
-static inline bool amdgpu_in_reset(struct amdgpu_device *adev)
+static inline int amdgpu_in_reset(struct amdgpu_device *adev)
 {
-	return atomic_read(&adev->in_gpu_reset) ? true : false;
+	return atomic_read(&adev->in_gpu_reset);
 }
-
 #endif

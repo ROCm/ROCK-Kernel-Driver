@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.97"
+#define DC_VER "3.2.98"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -991,7 +991,7 @@ struct dc_flip_addrs {
 	/* TODO: add flip duration for FreeSync */
 	bool triplebuffer_flips;
 };
-#if DRM_VERSION_CODE < DRM_VERSION(4, 8, 0)
+#ifndef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
 /*
  * Optimized flip address update function.
  *
@@ -1313,6 +1313,8 @@ void dc_unlock_memory_clock_frequency(struct dc *dc);
 void dc_lock_memory_clock_frequency(struct dc *dc);
 
 #endif
+
+bool dc_set_psr_allow_active(struct dc *dc, bool enable);
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 /*******************************************************************************

@@ -3,7 +3,6 @@
 #define AMDTTM_BACKPORT_H
 
 #include <linux/version.h>
-#include <kcl/reservation.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/backport/kcl_drm_backport.h>

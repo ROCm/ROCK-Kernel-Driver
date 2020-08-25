@@ -102,7 +102,7 @@ struct kfd_sdma_activity_handler_workarea {
 };
 
 struct temp_sdma_queue_list {
-	uint64_t rptr;
+	uint64_t __user *rptr;
 	uint64_t sdma_val;
 	unsigned int queue_id;
 	struct list_head list;
@@ -174,7 +174,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 		}
 
 		INIT_LIST_HEAD(&sdma_q->list);
-		sdma_q->rptr = (uint64_t)q->properties.read_ptr;
+		sdma_q->rptr = (uint64_t __user *)q->properties.read_ptr;
 		sdma_q->queue_id = q->properties.queue_id;
 		list_add_tail(&sdma_q->list, &sdma_q_list.list);
 	}
@@ -233,7 +233,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 			continue;
 
 		list_for_each_entry_safe(sdma_q, next, &sdma_q_list.list, list) {
-			if (((uint64_t)q->properties.read_ptr == sdma_q->rptr) &&
+			if (((uint64_t __user *)q->properties.read_ptr == sdma_q->rptr) &&
 			     (sdma_q->queue_id == q->properties.queue_id)) {
 				list_del(&sdma_q->list);
 				kfree(sdma_q);
@@ -285,6 +285,7 @@ static ssize_t kfd_procfs_show(struct kobject *kobj, struct attribute *attr,
 					kfd_sdma_activity_worker);
 
 		sdma_activity_work_handler.pdd = pdd;
+		sdma_activity_work_handler.sdma_activity_counter = 0;
 
 		schedule_work(&sdma_activity_work_handler.sdma_activity_work);
 
@@ -1835,10 +1836,6 @@ int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 void kfd_flush_tlb(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;
-	struct device_queue_manager *dqm = dev->dqm;
-
-	if (dqm->is_resetting)
-		return;
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
 		/* Nothing to flush until a VMID is assigned, which
