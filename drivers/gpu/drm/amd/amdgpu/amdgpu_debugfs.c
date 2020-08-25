@@ -1767,9 +1767,13 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 		return -ENOMEM;
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
+#ifdef HAVE_DOWN_READ_KILLABLE
 	r = down_read_killable(&adev->reset_domain->sem);
 	if (r)
 		goto pro_end;
+#else
+	down_read(&adev->reset_sem);
+#endif
 
 	/* stop the scheduler */
 	kthread_park(ring->sched.thread);
