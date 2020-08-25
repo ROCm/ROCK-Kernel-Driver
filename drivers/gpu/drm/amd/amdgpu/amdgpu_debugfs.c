@@ -63,9 +63,13 @@ static int amdgpu_debugfs_autodump_open(struct inode *inode, struct file *file)
 
 	file->private_data = adev;
 
+#ifdef HAVE_DOWN_READ_KILLABLE
 	ret = down_read_killable(&adev->reset_sem);
 	if (ret)
 		return ret;
+#else
+	down_read(&adev->reset_sem);
+#endif
 
 	if (adev->autodump.dumping.done) {
 		reinit_completion(&adev->autodump.dumping);
@@ -1225,9 +1229,13 @@ static int amdgpu_debugfs_test_ib_show(struct seq_file *m, void *unused)
 	}
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
+#ifdef HAVE_DOWN_READ_KILLABLE
 	r = down_read_killable(&adev->reset_sem);
 	if (r)
 		return r;
+#else
+	down_read(&adev->reset_sem);
+#endif
 
 	/* hold on the scheduler */
 	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
@@ -1473,9 +1481,13 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 		return -ENOMEM;
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
+#ifdef HAVE_DOWN_READ_KILLABLE
 	r = down_read_killable(&adev->reset_sem);
 	if (r)
 		goto pro_end;
+#else
+	down_read(&adev->reset_sem);
+#endif
 
 	/* stop the scheduler */
 	kthread_park(ring->sched.thread);
