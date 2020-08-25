@@ -32,6 +32,45 @@
 #include <kcl/header/kcl_drm_device_h.h>
 #include <drm/drm_dp_helper.h>
 
+/*
+ * v4.13-rc5-840-gc673fe7f0cd5
+ * drm/dp: DPCD register defines for link status within ESI field
+ */
+#ifndef DP_LANE0_1_STATUS_ESI
+#define DP_LANE0_1_STATUS_ESI                  0x200c /* status same as 0x202 */
+#define DP_LANE2_3_STATUS_ESI                  0x200d /* status same as 0x203 */
+#define DP_LANE_ALIGN_STATUS_UPDATED_ESI       0x200e /* status same as 0x204 */
+#define DP_SINK_STATUS_ESI                     0x200f /* status same as 0x205 */
+#endif
+
+/*
+ * v4.13-rc5-1383-gac58fff15516
+ * drm/dp-helper: add missing defines needed by AMD display core.
+ */
+#ifndef DP_ADJUST_REQUEST_POST_CURSOR2
+#define DP_ADJUST_REQUEST_POST_CURSOR2      0x20c
+
+#define DP_TEST_MISC0                       0x232
+
+#define DP_TEST_PHY_PATTERN                 0x248
+#define DP_TEST_80BIT_CUSTOM_PATTERN_7_0    0x250
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_15_8   0x251
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_23_16  0x252
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_31_24  0x253
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_39_32  0x254
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_47_40  0x255
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_55_48  0x256
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_63_56  0x257
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_71_64  0x258
+#define	DP_TEST_80BIT_CUSTOM_PATTERN_79_72  0x259
+
+#define DP_BRANCH_REVISION_START            0x509
+
+#define DP_DP13_DPCD_REV                    0x2200
+#define DP_DP13_MAX_LINK_RATE               0x2201
+#endif
+
+
 #if !defined(DP_DPRX_FEATURE_ENUMERATION_LIST)
 #define DP_DPRX_FEATURE_ENUMERATION_LIST    0x2210  /* DP 1.3 */
 #endif
