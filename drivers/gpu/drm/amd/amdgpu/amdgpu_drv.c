@@ -1191,7 +1191,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	ret = drm_dev_init(ddev, &kms_driver, &pdev->dev);
 	if (ret)
 		goto err_free;
-	kcl_drm_vma_offset_manager_init(dev->vma_offset_manager);
+	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
 #ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES

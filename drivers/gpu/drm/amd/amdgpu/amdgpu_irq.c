@@ -300,7 +300,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 #ifdef PCI_IRQ_MSI
 	r = drm_irq_install(adev_to_drm(adev), pci_irq_vector(adev->pdev, 0));
 #else
-	r = drm_irq_install(adev_to_drm(adev), adev->ddev->pdev->irq);
+	r = drm_irq_install(adev_to_drm(adev), adev_to_drm(adev)->pdev->irq);
 #endif
 	if (r) {
 		adev->irq.installed = false;

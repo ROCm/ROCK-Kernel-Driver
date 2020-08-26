@@ -114,7 +114,7 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 		 * start in hpos, and to the "fudged earlier" vblank start in
 		 * vpos.
 		 */
-		stat = amdgpu_display_get_crtc_scanoutpos(adev->ddev, work->crtc_id,
+		stat = amdgpu_display_get_crtc_scanoutpos(adev_to_drm(adev), work->crtc_id,
 						  GET_DISTANCE_TO_VBLANKSTART,
 						  &vpos, &hpos, NULL, NULL,
 						  &crtc->hwmode);
@@ -895,7 +895,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 	if (amdgpu_device_has_dc_support(adev)) {
 #ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		adev->mode_info.max_bpc_property =
-			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
+			drm_property_create_range(adev_to_drm(adev), 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)
 			return -ENOMEM;
 #endif
@@ -916,14 +916,14 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 			return -ENOMEM;
 #ifndef HAVE_DRM_VRR_SUPPORTED
 		adev->mode_info.vrr_capable_property =
-			drm_property_create_bool(adev->ddev,
+			drm_property_create_bool(adev_to_drm(adev),
 						 DRM_MODE_PROP_IMMUTABLE,
 						 "vrr_capable");
 		if (!adev->mode_info.vrr_capable_property)
 			return -ENOMEM;
 
 		adev->mode_info.vrr_enabled_property =
-			drm_property_create_bool(adev->ddev,
+			drm_property_create_bool(adev_to_drm(adev),
 						 0,
 						 "VRR_ENABLED");
 		if (!adev->mode_info.vrr_enabled_property)
