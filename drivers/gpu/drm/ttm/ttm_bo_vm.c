@@ -74,7 +74,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 
 		ttm_bo_get(bo);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-                mmap_read_unlock(mm);
+                mmap_read_unlock(vma->vm_mm);
 #else
 		up_read(&vma->vm_mm->mmap_sem);
 #endif
@@ -154,7 +154,7 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo, struct vm_fault *vmf)
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-                                mmap_read_unlock(mm);
+                                mmap_read_unlock(vma->vm_mm);
 #else
 				up_read(&vma->vm_mm->mmap_sem);
 #endif
