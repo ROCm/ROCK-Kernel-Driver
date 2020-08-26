@@ -5,7 +5,12 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DRIVER_GEM_PRIME_RES_OBJ], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DRMP_H
+			struct vm_area_struct;
+			#include <drm/drmP.h>
+			#else
 			#include <drm/drm_drv.h>
+			#endif
 		], [
 			struct drm_driver *drv = NULL;
 			drv->gem_prime_res_obj(NULL);

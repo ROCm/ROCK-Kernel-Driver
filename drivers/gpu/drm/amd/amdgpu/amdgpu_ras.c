@@ -86,7 +86,7 @@ void amdgpu_ras_set_error_query_ready(struct amdgpu_device *adev, bool ready)
 		amdgpu_ras_get_context(adev)->error_query_ready = ready;
 }
 
-bool amdgpu_ras_get_error_query_ready(struct amdgpu_device *adev)
+static bool amdgpu_ras_get_error_query_ready(struct amdgpu_device *adev)
 {
 	if (adev && amdgpu_ras_get_context(adev))
 		return amdgpu_ras_get_context(adev)->error_query_ready;
@@ -505,7 +505,7 @@ struct ras_manager *amdgpu_ras_find_obj(struct amdgpu_device *adev,
 }
 /* obj end */
 
-void amdgpu_ras_parse_status_code(struct amdgpu_device* adev,
+static void amdgpu_ras_parse_status_code(struct amdgpu_device *adev,
 				  const char* 		invoke_type,
 				  const char* 		block_name,
 				  enum ta_ras_status 	ret)
@@ -815,7 +815,7 @@ int amdgpu_ras_error_query(struct amdgpu_device *adev,
 }
 
 /* Trigger XGMI/WAFL error */
-int amdgpu_ras_error_inject_xgmi(struct amdgpu_device *adev,
+static int amdgpu_ras_error_inject_xgmi(struct amdgpu_device *adev,
 				 struct ta_ras_trigger_error_input *block_info)
 {
 	int ret;
@@ -2134,4 +2134,15 @@ void amdgpu_ras_global_ras_isr(struct amdgpu_device *adev)
 
 		amdgpu_ras_reset_gpu(adev);
 	}
+}
+
+bool amdgpu_ras_need_emergency_restart(struct amdgpu_device *adev)
+{
+	if (adev->asic_type == CHIP_VEGA20 &&
+	    adev->pm.fw_version <= 0x283400) {
+		return !(amdgpu_asic_reset_method(adev) == AMD_RESET_METHOD_BACO) &&
+				amdgpu_ras_intr_triggered();
+	}
+
+	return false;
 }

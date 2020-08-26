@@ -24,6 +24,7 @@
  */
 
 #include "dc_features.h"
+#include "display_mode_enums.h"
 
 #ifndef __DISPLAY_MODE_STRUCTS_H__
 #define __DISPLAY_MODE_STRUCTS_H__
@@ -120,10 +121,14 @@ struct _vcs_dpi_soc_bounding_box_st {
 	double urgent_latency_adjustment_fabric_clock_reference_mhz;
 	bool disable_dram_clock_change_vactive_support;
 	bool allow_dram_clock_one_display_vactive;
+	enum self_refresh_affinity allow_dram_self_refresh_or_dram_clock_change_in_vblank;
 };
 
 struct _vcs_dpi_ip_params_st {
 	bool use_min_dcfclk;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+	bool clamp_min_dcfclk;
+#endif
 	bool gpuvm_enable;
 	bool hostvm_enable;
 	bool dsc422_native_support;

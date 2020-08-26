@@ -173,6 +173,7 @@ enum {
 	NV_NAVI10_P_A0      = 1,
 	NV_NAVI12_P_A0      = 10,
 	NV_NAVI14_M_A0      = 20,
+	NV_SIENNA_CICHLID_P_A0      = 40,
 	NV_UNKNOWN          = 0xFF
 };
 
@@ -182,6 +183,9 @@ enum {
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define ASICREV_IS_RENOIR(eChipRev) ((eChipRev >= RENOIR_A0) && (eChipRev < RAVEN1_F0))
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#define ASICREV_IS_SIENNA_CICHLID_P(eChipRev)        ((eChipRev >= NV_SIENNA_CICHLID_P_A0))
 #endif
 
 /*

@@ -111,13 +111,10 @@ static void
 dm_dp_mst_connector_destroy(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *amdgpu_dm_connector = to_amdgpu_dm_connector(connector);
-	struct amdgpu_encoder *amdgpu_encoder = amdgpu_dm_connector->mst_encoder;
 
 	kfree(amdgpu_dm_connector->edid);
 	amdgpu_dm_connector->edid = NULL;
 
-	drm_encoder_cleanup(&amdgpu_encoder->base);
-	kfree(amdgpu_encoder);
 	drm_connector_cleanup(connector);
 #if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
 	drm_dp_mst_put_port_malloc(amdgpu_dm_connector->port);
@@ -283,7 +280,11 @@ static struct drm_encoder *
 dm_mst_atomic_best_encoder(struct drm_connector *connector,
 			   struct drm_connector_state *connector_state)
 {
-	return &to_amdgpu_dm_connector(connector)->mst_encoder->base;
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(connector_state->crtc);
+
+	return &adev->dm.mst_encoders[acrtc->crtc_id].base;
 }
 
 #ifdef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
@@ -354,31 +355,27 @@ static const struct drm_encoder_funcs amdgpu_dm_encoder_funcs = {
 	.destroy = amdgpu_dm_encoder_destroy,
 };
 
-static struct amdgpu_encoder *
-dm_dp_create_fake_mst_encoder(struct amdgpu_dm_connector *connector)
+void
+dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev)
 {
-	struct drm_device *dev = connector->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
-	struct amdgpu_encoder *amdgpu_encoder;
-	struct drm_encoder *encoder;
+	struct drm_device *dev = adev->ddev;
+	int i;
 
-	amdgpu_encoder = kzalloc(sizeof(*amdgpu_encoder), GFP_KERNEL);
-	if (!amdgpu_encoder)
-		return NULL;
+	for (i = 0; i < adev->dm.display_indexes_num; i++) {
+		struct amdgpu_encoder *amdgpu_encoder = &adev->dm.mst_encoders[i];
+		struct drm_encoder *encoder = &amdgpu_encoder->base;
 
-	encoder = &amdgpu_encoder->base;
-	encoder->possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
+		encoder->possible_crtcs = amdgpu_dm_get_encoder_crtc_mask(adev);
 
-	drm_encoder_init(
-		dev,
-		&amdgpu_encoder->base,
-		&amdgpu_dm_encoder_funcs,
-		DRM_MODE_ENCODER_DPMST,
-		NULL);
+		drm_encoder_init(
+			dev,
+			&amdgpu_encoder->base,
+			&amdgpu_dm_encoder_funcs,
+			DRM_MODE_ENCODER_DPMST,
+			NULL);
 
-	drm_encoder_helper_add(encoder, &amdgpu_dm_encoder_helper_funcs);
-
-	return amdgpu_encoder;
+		drm_encoder_helper_add(encoder, &amdgpu_dm_encoder_helper_funcs);
+	}
 }
 
 static struct drm_connector *
@@ -391,6 +388,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct amdgpu_device *adev = dev->dev_private;
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+	int i;
 
 #if DRM_VERSION_CODE < DRM_VERSION(4, 7, 0)
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
@@ -435,9 +433,10 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		master->dc_link,
 		master->connector_id);
 
-	aconnector->mst_encoder = dm_dp_create_fake_mst_encoder(master);
-	drm_connector_attach_encoder(&aconnector->base,
-				     &aconnector->mst_encoder->base);
+	for (i = 0; i < adev->dm.display_indexes_num; i++) {
+		drm_connector_attach_encoder(&aconnector->base,
+					     &adev->dm.mst_encoders[i].base);
+	}
 
 #ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 	connector->max_bpc_property = master->base.max_bpc_property;
@@ -582,7 +581,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(
 		&aconnector->mst_mgr,
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV
 		dm->adev->dev,
 #else
 		dm->adev->ddev,
@@ -681,6 +680,8 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 	int link_timeslots_used;
 	int fair_pbn_alloc;
 
+	pbn_per_timeslot = dm_mst_get_pbn_divider(dc_link);
+
 	for (i = 0; i < count; i++) {
 		if (vars[i].dsc_enabled) {
 			initial_slack[i] = kbps_to_peak_pbn(params[i].bw_range.max_kbps) - vars[i].pbn;
@@ -691,9 +692,6 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 			bpp_increased[i] = true;
 		}
 	}
-
-	pbn_per_timeslot = dc_link_bandwidth_kbps(dc_link,
-			dc_link_get_link_cap(dc_link)) / (8 * 1000 * 54);
 
 	while (remaining_to_increase) {
 		next_index = -1;
@@ -723,7 +721,7 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 							  params[next_index].port->mgr,
 							  params[next_index].port,
 							  vars[next_index].pbn,
-							  dm_mst_get_pbn_divider(dc_link)) < 0)
+							  pbn_per_timeslot) < 0)
 				return;
 			if (!drm_dp_mst_atomic_check(state)) {
 				vars[next_index].bpp_x16 = bpp_x16_from_pbn(params[next_index], vars[next_index].pbn);
@@ -733,7 +731,7 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 								  params[next_index].port->mgr,
 								  params[next_index].port,
 								  vars[next_index].pbn,
-								  dm_mst_get_pbn_divider(dc_link)) < 0)
+								  pbn_per_timeslot) < 0)
 					return;
 			}
 		} else {
@@ -742,7 +740,7 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 							  params[next_index].port->mgr,
 							  params[next_index].port,
 							  vars[next_index].pbn,
-							  dm_mst_get_pbn_divider(dc_link)) < 0)
+							  pbn_per_timeslot) < 0)
 				return;
 			if (!drm_dp_mst_atomic_check(state)) {
 				vars[next_index].bpp_x16 = params[next_index].bw_range.max_target_bpp_x16;
@@ -752,7 +750,7 @@ static void increase_dsc_bpp(struct drm_atomic_state *state,
 								  params[next_index].port->mgr,
 								  params[next_index].port,
 								  vars[next_index].pbn,
-								  dm_mst_get_pbn_divider(dc_link)) < 0)
+								  pbn_per_timeslot) < 0)
 					return;
 			}
 		}
@@ -806,7 +804,7 @@ static void try_disable_dsc(struct drm_atomic_state *state,
 						  params[next_index].port->mgr,
 						  params[next_index].port,
 						  vars[next_index].pbn,
-						  0) < 0)
+						  dm_mst_get_pbn_divider(dc_link)) < 0)
 			return;
 
 		if (!drm_dp_mst_atomic_check(state)) {
@@ -877,7 +875,7 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 						 params[i].port->mgr,
 						 params[i].port,
 						 vars[i].pbn,
-						 0) < 0)
+						 dm_mst_get_pbn_divider(dc_link)) < 0)
 			return false;
 	}
 	if (!drm_dp_mst_atomic_check(state)) {
@@ -905,7 +903,7 @@ static bool compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 							  params[i].port->mgr,
 							  params[i].port,
 							  vars[i].pbn,
-							  0) < 0)
+							  dm_mst_get_pbn_divider(dc_link)) < 0)
 				return false;
 		}
 	}

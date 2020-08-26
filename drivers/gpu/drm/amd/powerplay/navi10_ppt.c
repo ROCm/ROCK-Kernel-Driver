@@ -37,8 +37,20 @@
 #include "smu_v11_0_ppsmc.h"
 #include "nbio/nbio_2_3_offset.h"
 #include "nbio/nbio_2_3_sh_mask.h"
+#include "thm/thm_11_0_2_offset.h"
+#include "thm/thm_11_0_2_sh_mask.h"
 
 #include "asic_reg/mp/mp_11_0_sh_mask.h"
+
+/*
+ * DO NOT use these for err/warn/info/debug messages.
+ * Use dev_err, dev_warn, dev_info and dev_dbg instead.
+ * They are more MGPU friendly.
+ */
+#undef pr_err
+#undef pr_warn
+#undef pr_info
+#undef pr_debug
 
 #define FEATURE_MASK(feature) (1ULL << feature)
 #define SMC_DPM_FEATURE ( \
@@ -417,6 +429,29 @@ navi10_get_allowed_feature_mask(struct smu_context *smu,
 
 static int navi10_check_powerplay_table(struct smu_context *smu)
 {
+	struct smu_table_context *table_context = &smu->smu_table;
+	struct smu_11_0_powerplay_table *powerplay_table =
+		table_context->power_play_table;
+	struct smu_baco_context *smu_baco = &smu->smu_baco;
+
+	if (powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_HARDWAREDC)
+		smu->dc_controlled_by_gpio = true;
+
+	mutex_lock(&smu_baco->mutex);
+	if (powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_BACO ||
+	    powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_MACO)
+		smu_baco->platform_support = true;
+	mutex_unlock(&smu_baco->mutex);
+
+	table_context->thermal_controller_type =
+		powerplay_table->thermal_controller_type;
+
+	/*
+	 * Instead of having its own buffer space and get overdrive_table copied,
+	 * smu->od_settings just points to the actual overdrive_table
+	 */
+	smu->od_settings = &powerplay_table->overdrive_table;
+
 	return 0;
 }
 
@@ -437,12 +472,12 @@ static int navi10_append_powerplay_table(struct smu_context *smu)
 	if (ret)
 		return ret;
 
-	pr_info("smc_dpm_info table revision(format.content): %d.%d\n",
+	dev_info(adev->dev, "smc_dpm_info table revision(format.content): %d.%d\n",
 			smc_dpm_table->table_header.format_revision,
 			smc_dpm_table->table_header.content_revision);
 
 	if (smc_dpm_table->table_header.format_revision != 4) {
-		pr_err("smc_dpm_info table format revision is not 4!\n");
+		dev_err(adev->dev, "smc_dpm_info table format revision is not 4!\n");
 		return -EINVAL;
 	}
 
@@ -460,7 +495,7 @@ static int navi10_append_powerplay_table(struct smu_context *smu)
 			sizeof(*smc_dpm_table_v4_7) - sizeof(smc_dpm_table_v4_7->table_header));
 		break;
 	default:
-		pr_err("smc_dpm_info with unsupported content revision %d!\n",
+		dev_err(smu->adev->dev, "smc_dpm_info with unsupported content revision %d!\n",
 				smc_dpm_table->table_header.content_revision);
 		return -EINVAL;
 	}
@@ -475,30 +510,37 @@ static int navi10_append_powerplay_table(struct smu_context *smu)
 
 static int navi10_store_powerplay_table(struct smu_context *smu)
 {
-	struct smu_11_0_powerplay_table *powerplay_table = NULL;
 	struct smu_table_context *table_context = &smu->smu_table;
-	struct smu_baco_context *smu_baco = &smu->smu_baco;
-
-	if (!table_context->power_play_table)
-		return -EINVAL;
-
-	powerplay_table = table_context->power_play_table;
+	struct smu_11_0_powerplay_table *powerplay_table =
+		table_context->power_play_table;
 
 	memcpy(table_context->driver_pptable, &powerplay_table->smc_pptable,
 	       sizeof(PPTable_t));
 
-	table_context->thermal_controller_type = powerplay_table->thermal_controller_type;
-
-	if (powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_HARDWAREDC)
-		smu->dc_controlled_by_gpio = true;
-
-	mutex_lock(&smu_baco->mutex);
-	if (powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_BACO ||
-	    powerplay_table->platform_caps & SMU_11_0_PP_PLATFORM_CAP_MACO)
-		smu_baco->platform_support = true;
-	mutex_unlock(&smu_baco->mutex);
-
 	return 0;
+}
+
+static int navi10_setup_pptable(struct smu_context *smu)
+{
+	int ret = 0;
+
+	ret = smu_v11_0_setup_pptable(smu);
+	if (ret)
+		return ret;
+
+	ret = navi10_store_powerplay_table(smu);
+	if (ret)
+		return ret;
+
+	ret = navi10_append_powerplay_table(smu);
+	if (ret)
+		return ret;
+
+	ret = navi10_check_powerplay_table(smu);
+	if (ret)
+		return ret;
+
+	return ret;
 }
 
 static int navi10_tables_init(struct smu_context *smu, struct smu_table *tables)
@@ -531,25 +573,98 @@ static int navi10_tables_init(struct smu_context *smu, struct smu_table *tables)
 	return 0;
 }
 
-static int navi10_get_metrics_table(struct smu_context *smu,
-				    SmuMetrics_t *metrics_table)
+static int navi10_get_smu_metrics_data(struct smu_context *smu,
+				       MetricsMember_t member,
+				       uint32_t *value)
 {
 	struct smu_table_context *smu_table= &smu->smu_table;
+	SmuMetrics_t *metrics = (SmuMetrics_t *)smu_table->metrics_table;
 	int ret = 0;
 
 	mutex_lock(&smu->metrics_lock);
-	if (!smu_table->metrics_time || time_after(jiffies, smu_table->metrics_time + msecs_to_jiffies(100))) {
-		ret = smu_update_table(smu, SMU_TABLE_SMU_METRICS, 0,
-				(void *)smu_table->metrics_table, false);
+	if (!smu_table->metrics_time ||
+	     time_after(jiffies, smu_table->metrics_time + msecs_to_jiffies(1))) {
+		ret = smu_update_table(smu,
+				       SMU_TABLE_SMU_METRICS,
+				       0,
+				       smu_table->metrics_table,
+				       false);
 		if (ret) {
-			pr_info("Failed to export SMU metrics table!\n");
+			dev_info(smu->adev->dev, "Failed to export SMU metrics table!\n");
 			mutex_unlock(&smu->metrics_lock);
 			return ret;
 		}
 		smu_table->metrics_time = jiffies;
 	}
 
-	memcpy(metrics_table, smu_table->metrics_table, sizeof(SmuMetrics_t));
+	switch (member) {
+	case METRICS_CURR_GFXCLK:
+		*value = metrics->CurrClock[PPCLK_GFXCLK];
+		break;
+	case METRICS_CURR_SOCCLK:
+		*value = metrics->CurrClock[PPCLK_SOCCLK];
+		break;
+	case METRICS_CURR_UCLK:
+		*value = metrics->CurrClock[PPCLK_UCLK];
+		break;
+	case METRICS_CURR_VCLK:
+		*value = metrics->CurrClock[PPCLK_VCLK];
+		break;
+	case METRICS_CURR_DCLK:
+		*value = metrics->CurrClock[PPCLK_DCLK];
+		break;
+	case METRICS_CURR_DCEFCLK:
+		*value = metrics->CurrClock[PPCLK_DCEFCLK];
+		break;
+	case METRICS_AVERAGE_GFXCLK:
+		*value = metrics->AverageGfxclkFrequency;
+		break;
+	case METRICS_AVERAGE_SOCCLK:
+		*value = metrics->AverageSocclkFrequency;
+		break;
+	case METRICS_AVERAGE_UCLK:
+		*value = metrics->AverageUclkFrequency;
+		break;
+	case METRICS_AVERAGE_GFXACTIVITY:
+		*value = metrics->AverageGfxActivity;
+		break;
+	case METRICS_AVERAGE_MEMACTIVITY:
+		*value = metrics->AverageUclkActivity;
+		break;
+	case METRICS_AVERAGE_SOCKETPOWER:
+		*value = metrics->AverageSocketPower << 8;
+		break;
+	case METRICS_TEMPERATURE_EDGE:
+		*value = metrics->TemperatureEdge *
+			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		break;
+	case METRICS_TEMPERATURE_HOTSPOT:
+		*value = metrics->TemperatureHotspot *
+			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		break;
+	case METRICS_TEMPERATURE_MEM:
+		*value = metrics->TemperatureMem *
+			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		break;
+	case METRICS_TEMPERATURE_VRGFX:
+		*value = metrics->TemperatureVrGfx *
+			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		break;
+	case METRICS_TEMPERATURE_VRSOC:
+		*value = metrics->TemperatureVrSoc *
+			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		break;
+	case METRICS_THROTTLER_STATUS:
+		*value = metrics->ThrottlerStatus;
+		break;
+	case METRICS_CURR_FANSPEED:
+		*value = metrics->CurrFanSpeed;
+		break;
+	default:
+		*value = UINT_MAX;
+		break;
+	}
+
 	mutex_unlock(&smu->metrics_lock);
 
 	return ret;
@@ -574,50 +689,177 @@ static int navi10_allocate_dpm_context(struct smu_context *smu)
 
 static int navi10_set_default_dpm_table(struct smu_context *smu)
 {
-	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
-	struct smu_table_context *table_context = &smu->smu_table;
-	struct smu_11_0_dpm_context *dpm_context = smu_dpm->dpm_context;
-	PPTable_t *driver_ppt = NULL;
-	int i;
+	struct smu_11_0_dpm_context *dpm_context = smu->smu_dpm.dpm_context;
+	PPTable_t *driver_ppt = smu->smu_table.driver_pptable;
+	struct smu_11_0_dpm_table *dpm_table;
+	int ret = 0;
 
-	driver_ppt = table_context->driver_pptable;
+	/* socclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.soc_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_SOCCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_SOCCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_SOCCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.socclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.soc_table.min = driver_ppt->FreqTableSocclk[0];
-	dpm_context->dpm_tables.soc_table.max = driver_ppt->FreqTableSocclk[NUM_SOCCLK_DPM_LEVELS - 1];
+	/* gfxclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.gfx_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_GFXCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_GFXCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_GFXCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.gfxclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.gfx_table.min = driver_ppt->FreqTableGfx[0];
-	dpm_context->dpm_tables.gfx_table.max = driver_ppt->FreqTableGfx[NUM_GFXCLK_DPM_LEVELS - 1];
+	/* uclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.uclk_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_UCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_UCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.uclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.uclk_table.min = driver_ppt->FreqTableUclk[0];
-	dpm_context->dpm_tables.uclk_table.max = driver_ppt->FreqTableUclk[NUM_UCLK_DPM_LEVELS - 1];
+	/* vclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.vclk_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_VCN_PG_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_VCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_VCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.vclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.vclk_table.min = driver_ppt->FreqTableVclk[0];
-	dpm_context->dpm_tables.vclk_table.max = driver_ppt->FreqTableVclk[NUM_VCLK_DPM_LEVELS - 1];
+	/* dclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.dclk_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_VCN_PG_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_DCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_DCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.dclk_table.min = driver_ppt->FreqTableDclk[0];
-	dpm_context->dpm_tables.dclk_table.max = driver_ppt->FreqTableDclk[NUM_DCLK_DPM_LEVELS - 1];
+	/* dcefclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.dcef_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_DCEFCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_DCEFCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_DCEFCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dcefclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.dcef_table.min = driver_ppt->FreqTableDcefclk[0];
-	dpm_context->dpm_tables.dcef_table.max = driver_ppt->FreqTableDcefclk[NUM_DCEFCLK_DPM_LEVELS - 1];
+	/* pixelclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.pixel_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_DCEFCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_PIXCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_PIXCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dcefclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.pixel_table.min = driver_ppt->FreqTablePixclk[0];
-	dpm_context->dpm_tables.pixel_table.max = driver_ppt->FreqTablePixclk[NUM_PIXCLK_DPM_LEVELS - 1];
+	/* displayclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.display_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_DCEFCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_DISPCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_DISPCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dcefclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
 
-	dpm_context->dpm_tables.display_table.min = driver_ppt->FreqTableDispclk[0];
-	dpm_context->dpm_tables.display_table.max = driver_ppt->FreqTableDispclk[NUM_DISPCLK_DPM_LEVELS - 1];
-
-	dpm_context->dpm_tables.phy_table.min = driver_ppt->FreqTablePhyclk[0];
-	dpm_context->dpm_tables.phy_table.max = driver_ppt->FreqTablePhyclk[NUM_PHYCLK_DPM_LEVELS - 1];
-
-	for (i = 0; i < MAX_PCIE_CONF; i++) {
-		dpm_context->dpm_tables.pcie_table.pcie_gen[i] = driver_ppt->PcieGenSpeed[i];
-		dpm_context->dpm_tables.pcie_table.pcie_lane[i] = driver_ppt->PcieLaneCount[i];
+	/* phyclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.phy_table;
+	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_DCEFCLK_BIT)) {
+		ret = smu_v11_0_set_single_dpm_table(smu,
+						     SMU_PHYCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+		dpm_table->is_fine_grained =
+			!driver_ppt->DpmDescriptor[PPCLK_PHYCLK].SnapToDiscrete;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dcefclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
 	}
 
 	return 0;
 }
 
-static int navi10_dpm_set_uvd_enable(struct smu_context *smu, bool enable)
+static int navi10_dpm_set_vcn_enable(struct smu_context *smu, bool enable)
 {
 	struct smu_power_context *smu_power = &smu->smu_power;
 	struct smu_power_gate *power_gate = &smu_power->power_gate;
@@ -672,20 +914,39 @@ static int navi10_get_current_clk_freq_by_table(struct smu_context *smu,
 				       enum smu_clk_type clk_type,
 				       uint32_t *value)
 {
-	int ret = 0, clk_id = 0;
-	SmuMetrics_t metrics;
-
-	ret = navi10_get_metrics_table(smu, &metrics);
-	if (ret)
-		return ret;
+	MetricsMember_t member_type;
+	int clk_id = 0;
 
 	clk_id = smu_clk_get_index(smu, clk_type);
 	if (clk_id < 0)
 		return clk_id;
 
-	*value = metrics.CurrClock[clk_id];
+	switch (clk_id) {
+	case PPCLK_GFXCLK:
+		member_type = METRICS_CURR_GFXCLK;
+		break;
+	case PPCLK_UCLK:
+		member_type = METRICS_CURR_UCLK;
+		break;
+	case PPCLK_SOCCLK:
+		member_type = METRICS_CURR_SOCCLK;
+		break;
+	case PPCLK_VCLK:
+		member_type = METRICS_CURR_VCLK;
+		break;
+	case PPCLK_DCLK:
+		member_type = METRICS_CURR_DCLK;
+		break;
+	case PPCLK_DCEFCLK:
+		member_type = METRICS_CURR_DCEFCLK;
+		break;
+	default:
+		return -EINVAL;
+	}
 
-	return ret;
+	return navi10_get_smu_metrics_data(smu,
+					   member_type,
+					   value);
 }
 
 static bool navi10_is_support_fine_grained_dpm(struct smu_context *smu, enum smu_clk_type clk_type)
@@ -743,20 +1004,17 @@ static int navi10_print_clk_levels(struct smu_context *smu,
 	case SMU_UCLK:
 	case SMU_FCLK:
 	case SMU_DCEFCLK:
-		ret = smu_get_current_clk_freq(smu, clk_type, &cur_value);
+		ret = navi10_get_current_clk_freq_by_table(smu, clk_type, &cur_value);
 		if (ret)
 			return size;
 
-		/* 10KHz -> MHz */
-		cur_value = cur_value / 100;
-
-		ret = smu_get_dpm_level_count(smu, clk_type, &count);
+		ret = smu_v11_0_get_dpm_level_count(smu, clk_type, &count);
 		if (ret)
 			return size;
 
 		if (!navi10_is_support_fine_grained_dpm(smu, clk_type)) {
 			for (i = 0; i < count; i++) {
-				ret = smu_get_dpm_freq_by_index(smu, clk_type, i, &value);
+				ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, i, &value);
 				if (ret)
 					return size;
 
@@ -764,10 +1022,10 @@ static int navi10_print_clk_levels(struct smu_context *smu,
 						cur_value == value ? "*" : "");
 			}
 		} else {
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, 0, &freq_values[0]);
 			if (ret)
 				return size;
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, count - 1, &freq_values[2]);
 			if (ret)
 				return size;
 
@@ -844,7 +1102,7 @@ static int navi10_print_clk_levels(struct smu_context *smu,
 			default:
 				break;
 			}
-			size += sprintf(buf + size, "%d: %uMHz @ %umV\n", i, curve_settings[0], curve_settings[1] / NAVI10_VOLTAGE_SCALE);
+			size += sprintf(buf + size, "%d: %uMHz %umV\n", i, curve_settings[0], curve_settings[1] / NAVI10_VOLTAGE_SCALE);
 		}
 		break;
 	case SMU_OD_RANGE:
@@ -927,15 +1185,15 @@ static int navi10_force_clk_levels(struct smu_context *smu,
 			soft_min_level = (soft_min_level >= 1 ? 1 : 0);
 		}
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_min_level, &min_freq);
 		if (ret)
 			return size;
 
-		ret = smu_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
+		ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, soft_max_level, &max_freq);
 		if (ret)
 			return size;
 
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
+		ret = smu_v11_0_set_soft_freq_limited_range(smu, clk_type, min_freq, max_freq);
 		if (ret)
 			return size;
 		break;
@@ -948,22 +1206,93 @@ static int navi10_force_clk_levels(struct smu_context *smu,
 
 static int navi10_populate_umd_state_clk(struct smu_context *smu)
 {
-	int ret = 0;
-	uint32_t min_sclk_freq = 0, min_mclk_freq = 0;
+	struct smu_11_0_dpm_context *dpm_context =
+				smu->smu_dpm.dpm_context;
+	struct smu_11_0_dpm_table *gfx_table =
+				&dpm_context->dpm_tables.gfx_table;
+	struct smu_11_0_dpm_table *mem_table =
+				&dpm_context->dpm_tables.uclk_table;
+	struct smu_11_0_dpm_table *soc_table =
+				&dpm_context->dpm_tables.soc_table;
+	struct smu_umd_pstate_table *pstate_table =
+				&smu->pstate_table;
+	struct amdgpu_device *adev = smu->adev;
+	uint32_t sclk_freq;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_SCLK, &min_sclk_freq, NULL, false);
-	if (ret)
-		return ret;
+	pstate_table->gfxclk_pstate.min = gfx_table->min;
+	switch (adev->asic_type) {
+	case CHIP_NAVI10:
+		switch (adev->pdev->revision) {
+		case 0xf0: /* XTX */
+		case 0xc0:
+			sclk_freq = NAVI10_PEAK_SCLK_XTX;
+			break;
+		case 0xf1: /* XT */
+		case 0xc1:
+			sclk_freq = NAVI10_PEAK_SCLK_XT;
+			break;
+		default: /* XL */
+			sclk_freq = NAVI10_PEAK_SCLK_XL;
+			break;
+		}
+		break;
+	case CHIP_NAVI14:
+		switch (adev->pdev->revision) {
+		case 0xc7: /* XT */
+		case 0xf4:
+			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XT_GFXCLK;
+			break;
+		case 0xc1: /* XTM */
+		case 0xf2:
+			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XTM_GFXCLK;
+			break;
+		case 0xc3: /* XLM */
+		case 0xf3:
+			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XLM_GFXCLK;
+			break;
+		case 0xc5: /* XTX */
+		case 0xf6:
+			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XLM_GFXCLK;
+			break;
+		default: /* XL */
+			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XL_GFXCLK;
+			break;
+		}
+		break;
+	case CHIP_NAVI12:
+		sclk_freq = NAVI12_UMD_PSTATE_PEAK_GFXCLK;
+		break;
+	default:
+		sclk_freq = gfx_table->dpm_levels[gfx_table->count - 1].value;
+		break;
+	}
+	pstate_table->gfxclk_pstate.peak = sclk_freq;
 
-	smu->pstate_sclk = min_sclk_freq * 100;
+	pstate_table->uclk_pstate.min = mem_table->min;
+	pstate_table->uclk_pstate.peak = mem_table->max;
 
-	ret = smu_get_dpm_freq_range(smu, SMU_MCLK, &min_mclk_freq, NULL, false);
-	if (ret)
-		return ret;
+	pstate_table->socclk_pstate.min = soc_table->min;
+	pstate_table->socclk_pstate.peak = soc_table->max;
 
-	smu->pstate_mclk = min_mclk_freq * 100;
+	if (gfx_table->max > NAVI10_UMD_PSTATE_PROFILING_GFXCLK &&
+	    mem_table->max > NAVI10_UMD_PSTATE_PROFILING_MEMCLK &&
+	    soc_table->max > NAVI10_UMD_PSTATE_PROFILING_SOCCLK) {
+		pstate_table->gfxclk_pstate.standard =
+			NAVI10_UMD_PSTATE_PROFILING_GFXCLK;
+		pstate_table->uclk_pstate.standard =
+			NAVI10_UMD_PSTATE_PROFILING_MEMCLK;
+		pstate_table->socclk_pstate.standard =
+			NAVI10_UMD_PSTATE_PROFILING_SOCCLK;
+	} else {
+		pstate_table->gfxclk_pstate.standard =
+			pstate_table->gfxclk_pstate.min;
+		pstate_table->uclk_pstate.standard =
+			pstate_table->uclk_pstate.min;
+		pstate_table->socclk_pstate.standard =
+			pstate_table->socclk_pstate.min;
+	}
 
-	return ret;
+	return 0;
 }
 
 static int navi10_get_clock_by_type_with_latency(struct smu_context *smu,
@@ -979,7 +1308,7 @@ static int navi10_get_clock_by_type_with_latency(struct smu_context *smu,
 	case SMU_SOCCLK:
 	case SMU_MCLK:
 	case SMU_UCLK:
-		ret = smu_get_dpm_level_count(smu, clk_type, &level_count);
+		ret = smu_v11_0_get_dpm_level_count(smu, clk_type, &level_count);
 		if (ret)
 			return ret;
 
@@ -987,7 +1316,7 @@ static int navi10_get_clock_by_type_with_latency(struct smu_context *smu,
 		clocks->num_levels = level_count;
 
 		for (i = 0; i < level_count; i++) {
-			ret = smu_get_dpm_freq_by_index(smu, clk_type, i, &freq);
+			ret = smu_v11_0_get_dpm_freq_by_index(smu, clk_type, i, &freq);
 			if (ret)
 				return ret;
 
@@ -1012,10 +1341,10 @@ static int navi10_pre_display_config_changed(struct smu_context *smu)
 		return ret;
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_get_dpm_freq_range(smu, SMU_UCLK, NULL, &max_freq, false);
+		ret = smu_v11_0_get_dpm_ultimate_freq(smu, SMU_UCLK, NULL, &max_freq);
 		if (ret)
 			return ret;
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, max_freq);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, max_freq);
 		if (ret)
 			return ret;
 	}
@@ -1040,74 +1369,14 @@ static int navi10_display_config_changed(struct smu_context *smu)
 	return ret;
 }
 
-static int navi10_force_dpm_limit_value(struct smu_context *smu, bool highest)
-{
-	int ret = 0, i = 0;
-	uint32_t min_freq, max_freq, force_freq;
-	enum smu_clk_type clk_type;
-
-	enum smu_clk_type clks[] = {
-		SMU_GFXCLK,
-		SMU_MCLK,
-		SMU_SOCCLK,
-	};
-
-	for (i = 0; i < ARRAY_SIZE(clks); i++) {
-		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
-		if (ret)
-			return ret;
-
-		force_freq = highest ? max_freq : min_freq;
-		ret = smu_set_soft_freq_range(smu, clk_type, force_freq, force_freq, false);
-		if (ret)
-			return ret;
-	}
-
-	return ret;
-}
-
-static int navi10_unforce_dpm_levels(struct smu_context *smu)
-{
-	int ret = 0, i = 0;
-	uint32_t min_freq, max_freq;
-	enum smu_clk_type clk_type;
-
-	enum smu_clk_type clks[] = {
-		SMU_GFXCLK,
-		SMU_MCLK,
-		SMU_SOCCLK,
-	};
-
-	for (i = 0; i < ARRAY_SIZE(clks); i++) {
-		clk_type = clks[i];
-		ret = smu_get_dpm_freq_range(smu, clk_type, &min_freq, &max_freq, false);
-		if (ret)
-			return ret;
-
-		ret = smu_set_soft_freq_range(smu, clk_type, min_freq, max_freq, false);
-		if (ret)
-			return ret;
-	}
-
-	return ret;
-}
-
 static int navi10_get_gpu_power(struct smu_context *smu, uint32_t *value)
 {
-	int ret = 0;
-	SmuMetrics_t metrics;
-
 	if (!value)
 		return -EINVAL;
 
-	ret = navi10_get_metrics_table(smu, &metrics);
-	if (ret)
-		return ret;
-
-	*value = metrics.AverageSocketPower << 8;
-
-	return 0;
+	return navi10_get_smu_metrics_data(smu,
+					   METRICS_AVERAGE_SOCKETPOWER,
+					   value);
 }
 
 static int navi10_get_current_activity_percent(struct smu_context *smu,
@@ -1115,28 +1384,27 @@ static int navi10_get_current_activity_percent(struct smu_context *smu,
 					       uint32_t *value)
 {
 	int ret = 0;
-	SmuMetrics_t metrics;
 
 	if (!value)
 		return -EINVAL;
 
-	ret = navi10_get_metrics_table(smu, &metrics);
-	if (ret)
-		return ret;
-
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_GPU_LOAD:
-		*value = metrics.AverageGfxActivity;
+		ret = navi10_get_smu_metrics_data(smu,
+						  METRICS_AVERAGE_GFXACTIVITY,
+						  value);
 		break;
 	case AMDGPU_PP_SENSOR_MEM_LOAD:
-		*value = metrics.AverageUclkActivity;
+		ret = navi10_get_smu_metrics_data(smu,
+						  METRICS_AVERAGE_MEMACTIVITY,
+						  value);
 		break;
 	default:
-		pr_err("Invalid sensor for retrieving clock activity\n");
+		dev_err(smu->adev->dev, "Invalid sensor for retrieving clock activity\n");
 		return -EINVAL;
 	}
 
-	return 0;
+	return ret;
 }
 
 static bool navi10_is_dpm_running(struct smu_context *smu)
@@ -1153,19 +1421,12 @@ static bool navi10_is_dpm_running(struct smu_context *smu)
 static int navi10_get_fan_speed_rpm(struct smu_context *smu,
 				    uint32_t *speed)
 {
-	SmuMetrics_t metrics;
-	int ret = 0;
-
 	if (!speed)
 		return -EINVAL;
 
-	ret = navi10_get_metrics_table(smu, &metrics);
-	if (ret)
-		return ret;
-
-	*speed = metrics.CurrFanSpeed;
-
-	return ret;
+	return navi10_get_smu_metrics_data(smu,
+					   METRICS_CURR_FANSPEED,
+					   speed);
 }
 
 static int navi10_get_fan_speed_percent(struct smu_context *smu,
@@ -1230,7 +1491,7 @@ static int navi10_get_power_profile_mode(struct smu_context *smu, char *buf)
 					  SMU_TABLE_ACTIVITY_MONITOR_COEFF, workload_type,
 					  (void *)(&activity_monitor), false);
 		if (result) {
-			pr_err("[%s] Failed to get activity monitor!", __func__);
+			dev_err(smu->adev->dev, "[%s] Failed to get activity monitor!", __func__);
 			return result;
 		}
 
@@ -1291,7 +1552,7 @@ static int navi10_set_power_profile_mode(struct smu_context *smu, long *input, u
 	smu->power_profile_mode = input[size];
 
 	if (smu->power_profile_mode > PP_SMC_POWER_PROFILE_CUSTOM) {
-		pr_err("Invalid power profile mode %d\n", smu->power_profile_mode);
+		dev_err(smu->adev->dev, "Invalid power profile mode %d\n", smu->power_profile_mode);
 		return -EINVAL;
 	}
 
@@ -1301,7 +1562,7 @@ static int navi10_set_power_profile_mode(struct smu_context *smu, long *input, u
 				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), false);
 		if (ret) {
-			pr_err("[%s] Failed to get activity monitor!", __func__);
+			dev_err(smu->adev->dev, "[%s] Failed to get activity monitor!", __func__);
 			return ret;
 		}
 
@@ -1345,7 +1606,7 @@ static int navi10_set_power_profile_mode(struct smu_context *smu, long *input, u
 				       SMU_TABLE_ACTIVITY_MONITOR_COEFF, WORKLOAD_PPLIB_CUSTOM_BIT,
 				       (void *)(&activity_monitor), true);
 		if (ret) {
-			pr_err("[%s] Failed to set activity monitor!", __func__);
+			dev_err(smu->adev->dev, "[%s] Failed to set activity monitor!", __func__);
 			return ret;
 		}
 	}
@@ -1356,47 +1617,6 @@ static int navi10_set_power_profile_mode(struct smu_context *smu, long *input, u
 		return -EINVAL;
 	smu_send_smc_msg_with_param(smu, SMU_MSG_SetWorkloadMask,
 				    1 << workload_type, NULL);
-
-	return ret;
-}
-
-static int navi10_get_profiling_clk_mask(struct smu_context *smu,
-					 enum amd_dpm_forced_level level,
-					 uint32_t *sclk_mask,
-					 uint32_t *mclk_mask,
-					 uint32_t *soc_mask)
-{
-	int ret = 0;
-	uint32_t level_count = 0;
-
-	if (level == AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK) {
-		if (sclk_mask)
-			*sclk_mask = 0;
-	} else if (level == AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK) {
-		if (mclk_mask)
-			*mclk_mask = 0;
-	} else if (level == AMD_DPM_FORCED_LEVEL_PROFILE_PEAK) {
-		if(sclk_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_SCLK, &level_count);
-			if (ret)
-				return ret;
-			*sclk_mask = level_count - 1;
-		}
-
-		if(mclk_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_MCLK, &level_count);
-			if (ret)
-				return ret;
-			*mclk_mask = level_count - 1;
-		}
-
-		if(soc_mask) {
-			ret = smu_get_dpm_level_count(smu, SMU_SOCCLK, &level_count);
-			if (ret)
-				return ret;
-			*soc_mask = level_count - 1;
-		}
-	}
 
 	return ret;
 }
@@ -1423,19 +1643,19 @@ static int navi10_notify_smc_display_config(struct smu_context *smu)
 								  min_clocks.dcef_clock_in_sr/100,
 								  NULL);
 				if (ret) {
-					pr_err("Attempt to set divider for DCEFCLK Failed!");
+					dev_err(smu->adev->dev, "Attempt to set divider for DCEFCLK Failed!");
 					return ret;
 				}
 			}
 		} else {
-			pr_info("Attempt to set Hard Min for DCEFCLK Failed!");
+			dev_info(smu->adev->dev, "Attempt to set Hard Min for DCEFCLK Failed!");
 		}
 	}
 
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT)) {
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_clocks.memory_clock/100, 0);
 		if (ret) {
-			pr_err("[%s] Set hard min uclk failed!", __func__);
+			dev_err(smu->adev->dev, "[%s] Set hard min uclk failed!", __func__);
 			return ret;
 		}
 	}
@@ -1507,7 +1727,7 @@ static int navi10_set_watermarks_table(struct smu_context *smu,
 	if (!(smu->watermarks_bitmap & WATERMARKS_LOADED)) {
 		ret = smu_write_watermarks_table(smu);
 		if (ret) {
-			pr_err("Failed to update WMTABLE!");
+			dev_err(smu->adev->dev, "Failed to update WMTABLE!");
 			return ret;
 		}
 		smu->watermarks_bitmap |= WATERMARKS_LOADED;
@@ -1520,35 +1740,33 @@ static int navi10_thermal_get_temperature(struct smu_context *smu,
 					     enum amd_pp_sensors sensor,
 					     uint32_t *value)
 {
-	SmuMetrics_t metrics;
 	int ret = 0;
 
 	if (!value)
 		return -EINVAL;
 
-	ret = navi10_get_metrics_table(smu, &metrics);
-	if (ret)
-		return ret;
-
 	switch (sensor) {
 	case AMDGPU_PP_SENSOR_HOTSPOT_TEMP:
-		*value = metrics.TemperatureHotspot *
-			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		ret = navi10_get_smu_metrics_data(smu,
+						  METRICS_TEMPERATURE_HOTSPOT,
+						  value);
 		break;
 	case AMDGPU_PP_SENSOR_EDGE_TEMP:
-		*value = metrics.TemperatureEdge *
-			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		ret = navi10_get_smu_metrics_data(smu,
+						  METRICS_TEMPERATURE_EDGE,
+						  value);
 		break;
 	case AMDGPU_PP_SENSOR_MEM_TEMP:
-		*value = metrics.TemperatureMem *
-			SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+		ret = navi10_get_smu_metrics_data(smu,
+						  METRICS_TEMPERATURE_MEM,
+						  value);
 		break;
 	default:
-		pr_err("Invalid sensor for retrieving temp\n");
+		dev_err(smu->adev->dev, "Invalid sensor for retrieving temp\n");
 		return -EINVAL;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int navi10_read_sensor(struct smu_context *smu,
@@ -1583,8 +1801,23 @@ static int navi10_read_sensor(struct smu_context *smu,
 		ret = navi10_thermal_get_temperature(smu, sensor, (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GFX_MCLK:
+		ret = navi10_get_current_clk_freq_by_table(smu, SMU_UCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_GFX_SCLK:
+		ret = navi10_get_current_clk_freq_by_table(smu, SMU_GFXCLK, (uint32_t *)data);
+		*(uint32_t *)data *= 100;
+		*size = 4;
+		break;
+	case AMDGPU_PP_SENSOR_VDDGFX:
+		ret = smu_v11_0_get_gfx_vdd(smu, (uint32_t *)data);
+		*size = 4;
+		break;
 	default:
-		ret = smu_v11_0_read_sensor(smu, sensor, data, size);
+		ret = -EOPNOTSUPP;
+		break;
 	}
 	mutex_unlock(&smu->sensor_lock);
 
@@ -1620,160 +1853,32 @@ static int navi10_get_uclk_dpm_states(struct smu_context *smu, uint32_t *clocks_
 	return 0;
 }
 
-static int navi10_set_performance_level(struct smu_context *smu,
-					enum amd_dpm_forced_level level);
-
-static int navi10_set_standard_performance_level(struct smu_context *smu)
-{
-	struct amdgpu_device *adev = smu->adev;
-	int ret = 0;
-	uint32_t sclk_freq = 0, uclk_freq = 0;
-
-	switch (adev->asic_type) {
-	case CHIP_NAVI10:
-		sclk_freq = NAVI10_UMD_PSTATE_PROFILING_GFXCLK;
-		uclk_freq = NAVI10_UMD_PSTATE_PROFILING_MEMCLK;
-		break;
-	case CHIP_NAVI14:
-		sclk_freq = NAVI14_UMD_PSTATE_PROFILING_GFXCLK;
-		uclk_freq = NAVI14_UMD_PSTATE_PROFILING_MEMCLK;
-		break;
-	default:
-		/* by default, this is same as auto performance level */
-		return navi10_set_performance_level(smu, AMD_DPM_FORCED_LEVEL_AUTO);
-	}
-
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
-	if (ret)
-		return ret;
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
-	if (ret)
-		return ret;
-
-	return ret;
-}
-
-static int navi10_set_peak_performance_level(struct smu_context *smu)
-{
-	struct amdgpu_device *adev = smu->adev;
-	int ret = 0;
-	uint32_t sclk_freq = 0, uclk_freq = 0;
-
-	switch (adev->asic_type) {
-	case CHIP_NAVI10:
-		switch (adev->pdev->revision) {
-		case 0xf0: /* XTX */
-		case 0xc0:
-			sclk_freq = NAVI10_PEAK_SCLK_XTX;
-			break;
-		case 0xf1: /* XT */
-		case 0xc1:
-			sclk_freq = NAVI10_PEAK_SCLK_XT;
-			break;
-		default: /* XL */
-			sclk_freq = NAVI10_PEAK_SCLK_XL;
-			break;
-		}
-		break;
-	case CHIP_NAVI14:
-		switch (adev->pdev->revision) {
-		case 0xc7: /* XT */
-		case 0xf4:
-			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XT_GFXCLK;
-			break;
-		case 0xc1: /* XTM */
-		case 0xf2:
-			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XTM_GFXCLK;
-			break;
-		case 0xc3: /* XLM */
-		case 0xf3:
-			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XLM_GFXCLK;
-			break;
-		case 0xc5: /* XTX */
-		case 0xf6:
-			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XLM_GFXCLK;
-			break;
-		default: /* XL */
-			sclk_freq = NAVI14_UMD_PSTATE_PEAK_XL_GFXCLK;
-			break;
-		}
-		break;
-	case CHIP_NAVI12:
-		sclk_freq = NAVI12_UMD_PSTATE_PEAK_GFXCLK;
-		break;
-	default:
-		ret = smu_get_dpm_level_range(smu, SMU_SCLK, NULL, &sclk_freq);
-		if (ret)
-			return ret;
-	}
-
-	ret = smu_get_dpm_level_range(smu, SMU_UCLK, NULL, &uclk_freq);
-	if (ret)
-		return ret;
-
-	ret = smu_set_soft_freq_range(smu, SMU_SCLK, sclk_freq, sclk_freq, false);
-	if (ret)
-		return ret;
-	ret = smu_set_soft_freq_range(smu, SMU_UCLK, uclk_freq, uclk_freq, false);
-	if (ret)
-		return ret;
-
-	return ret;
-}
-
-static int navi10_set_performance_level(struct smu_context *smu,
-					enum amd_dpm_forced_level level)
-{
-	int ret = 0;
-	uint32_t sclk_mask, mclk_mask, soc_mask;
-
-	switch (level) {
-	case AMD_DPM_FORCED_LEVEL_HIGH:
-		ret = smu_force_dpm_limit_value(smu, true);
-		break;
-	case AMD_DPM_FORCED_LEVEL_LOW:
-		ret = smu_force_dpm_limit_value(smu, false);
-		break;
-	case AMD_DPM_FORCED_LEVEL_AUTO:
-		ret = smu_unforce_dpm_levels(smu);
-		break;
-	case AMD_DPM_FORCED_LEVEL_PROFILE_STANDARD:
-		ret = navi10_set_standard_performance_level(smu);
-		break;
-	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK:
-	case AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK:
-		ret = smu_get_profiling_clk_mask(smu, level,
-						 &sclk_mask,
-						 &mclk_mask,
-						 &soc_mask);
-		if (ret)
-			return ret;
-		smu_force_clk_levels(smu, SMU_SCLK, 1 << sclk_mask, false);
-		smu_force_clk_levels(smu, SMU_MCLK, 1 << mclk_mask, false);
-		smu_force_clk_levels(smu, SMU_SOCCLK, 1 << soc_mask, false);
-		break;
-	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
-		ret = navi10_set_peak_performance_level(smu);
-		break;
-	case AMD_DPM_FORCED_LEVEL_MANUAL:
-	case AMD_DPM_FORCED_LEVEL_PROFILE_EXIT:
-	default:
-		break;
-	}
-	return ret;
-}
-
 static int navi10_get_thermal_temperature_range(struct smu_context *smu,
 						struct smu_temperature_range *range)
 {
 	struct smu_table_context *table_context = &smu->smu_table;
-	struct smu_11_0_powerplay_table *powerplay_table = table_context->power_play_table;
+	struct smu_11_0_powerplay_table *powerplay_table =
+				table_context->power_play_table;
+	PPTable_t *pptable = smu->smu_table.driver_pptable;
 
-	if (!range || !powerplay_table)
+	if (!range)
 		return -EINVAL;
 
-	range->max = powerplay_table->software_shutdown_temp *
+	memcpy(range, &smu11_thermal_policy[0], sizeof(struct smu_temperature_range));
+
+	range->max = pptable->TedgeLimit *
 		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->edge_emergency_max = (pptable->TedgeLimit + CTF_OFFSET_EDGE) *
+		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->hotspot_crit_max = pptable->ThotspotLimit *
+		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->hotspot_emergency_max = (pptable->ThotspotLimit + CTF_OFFSET_HOTSPOT) *
+		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->mem_crit_max = pptable->TmemLimit *
+		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->mem_emergency_max = (pptable->TmemLimit + CTF_OFFSET_MEM)*
+		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->software_shutdown_temp = powerplay_table->software_shutdown_temp;
 
 	return 0;
 }
@@ -1792,9 +1897,9 @@ static int navi10_display_disable_memory_clock_switch(struct smu_context *smu,
 		return 0;
 
 	if(disable_memory_clock_switch)
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, max_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, max_memory_clock, 0);
 	else
-		ret = smu_set_hard_freq_range(smu, SMU_UCLK, min_memory_clock, 0);
+		ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, min_memory_clock, 0);
 
 	if(!ret)
 		smu->disable_uclk_switch = disable_memory_clock_switch;
@@ -1802,50 +1907,35 @@ static int navi10_display_disable_memory_clock_switch(struct smu_context *smu,
 	return ret;
 }
 
-static uint32_t navi10_get_pptable_power_limit(struct smu_context *smu)
+static int navi10_get_power_limit(struct smu_context *smu)
 {
+	struct smu_11_0_powerplay_table *powerplay_table =
+		(struct smu_11_0_powerplay_table *)smu->smu_table.power_play_table;
+	struct smu_11_0_overdrive_table *od_settings = smu->od_settings;
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	return pptable->SocketPowerLimitAc[PPT_THROTTLER_PPT0];
-}
+	uint32_t power_limit, od_percent;
 
-static int navi10_get_power_limit(struct smu_context *smu,
-				     uint32_t *limit,
-				     bool cap)
-{
-	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	uint32_t asic_default_power_limit = 0;
-	int ret = 0;
-	int power_src;
-
-	if (!smu->power_limit) {
-		if (smu_feature_is_enabled(smu, SMU_FEATURE_PPT_BIT)) {
-			power_src = smu_power_get_index(smu, SMU_POWER_SOURCE_AC);
-			if (power_src < 0)
-				return -EINVAL;
-
-			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetPptLimit,
-				power_src << 16, &asic_default_power_limit);
-			if (ret) {
-				pr_err("[%s] get PPT limit failed!", __func__);
-				return ret;
-			}
-		} else {
-			/* the last hope to figure out the ppt limit */
-			if (!pptable) {
-				pr_err("Cannot get PPT limit due to pptable missing!");
-				return -EINVAL;
-			}
-			asic_default_power_limit =
-				pptable->SocketPowerLimitAc[PPT_THROTTLER_PPT0];
+	if (smu_v11_0_get_current_power_limit(smu, &power_limit)) {
+		/* the last hope to figure out the ppt limit */
+		if (!pptable) {
+			dev_err(smu->adev->dev, "Cannot get PPT limit due to pptable missing!");
+			return -EINVAL;
 		}
-
-		smu->power_limit = asic_default_power_limit;
+		power_limit =
+			pptable->SocketPowerLimitAc[PPT_THROTTLER_PPT0];
 	}
+	smu->current_power_limit = power_limit;
 
-	if (cap)
-		*limit = smu_v11_0_get_max_power_limit(smu);
-	else
-		*limit = smu->power_limit;
+	if (smu->od_enabled &&
+	    navi10_od_feature_is_supported(od_settings, SMU_11_0_ODCAP_POWER_LIMIT)) {
+		od_percent = le32_to_cpu(powerplay_table->overdrive_table.max[SMU_11_0_ODSETTING_POWERPERCENTAGE]);
+
+		dev_dbg(smu->adev->dev, "ODSETTING_POWERPERCENTAGE: %d (default: %d)\n", od_percent, power_limit);
+
+		power_limit *= (100 + od_percent);
+		power_limit /= 100;
+	}
+	smu->max_power_limit = power_limit;
 
 	return 0;
 }
@@ -1854,12 +1944,16 @@ static int navi10_update_pcie_parameters(struct smu_context *smu,
 				     uint32_t pcie_gen_cap,
 				     uint32_t pcie_width_cap)
 {
+	struct smu_11_0_dpm_context *dpm_context = smu->smu_dpm.dpm_context;
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	int ret, i;
 	uint32_t smu_pcie_arg;
+	int ret, i;
 
-	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
-	struct smu_11_0_dpm_context *dpm_context = smu_dpm->dpm_context;
+	/* lclk dpm table setup */
+	for (i = 0; i < MAX_PCIE_CONF; i++) {
+		dpm_context->dpm_tables.pcie_table.pcie_gen[i] = pptable->PcieGenSpeed[i];
+		dpm_context->dpm_tables.pcie_table.pcie_lane[i] = pptable->PcieLaneCount[i];
+	}
 
 	for (i = 0; i < NUM_LINK_LEVELS; i++) {
 		smu_pcie_arg = (i << 16) |
@@ -1883,23 +1977,28 @@ static int navi10_update_pcie_parameters(struct smu_context *smu,
 	return 0;
 }
 
-static inline void navi10_dump_od_table(OverDriveTable_t *od_table) {
-	pr_debug("OD: Gfxclk: (%d, %d)\n", od_table->GfxclkFmin, od_table->GfxclkFmax);
-	pr_debug("OD: Gfx1: (%d, %d)\n", od_table->GfxclkFreq1, od_table->GfxclkVolt1);
-	pr_debug("OD: Gfx2: (%d, %d)\n", od_table->GfxclkFreq2, od_table->GfxclkVolt2);
-	pr_debug("OD: Gfx3: (%d, %d)\n", od_table->GfxclkFreq3, od_table->GfxclkVolt3);
-	pr_debug("OD: UclkFmax: %d\n", od_table->UclkFmax);
-	pr_debug("OD: OverDrivePct: %d\n", od_table->OverDrivePct);
+static inline void navi10_dump_od_table(struct smu_context *smu,
+					OverDriveTable_t *od_table)
+{
+	dev_dbg(smu->adev->dev, "OD: Gfxclk: (%d, %d)\n", od_table->GfxclkFmin, od_table->GfxclkFmax);
+	dev_dbg(smu->adev->dev, "OD: Gfx1: (%d, %d)\n", od_table->GfxclkFreq1, od_table->GfxclkVolt1);
+	dev_dbg(smu->adev->dev, "OD: Gfx2: (%d, %d)\n", od_table->GfxclkFreq2, od_table->GfxclkVolt2);
+	dev_dbg(smu->adev->dev, "OD: Gfx3: (%d, %d)\n", od_table->GfxclkFreq3, od_table->GfxclkVolt3);
+	dev_dbg(smu->adev->dev, "OD: UclkFmax: %d\n", od_table->UclkFmax);
+	dev_dbg(smu->adev->dev, "OD: OverDrivePct: %d\n", od_table->OverDrivePct);
 }
 
-static int navi10_od_setting_check_range(struct smu_11_0_overdrive_table *od_table, enum SMU_11_0_ODSETTING_ID setting, uint32_t value)
+static int navi10_od_setting_check_range(struct smu_context *smu,
+					 struct smu_11_0_overdrive_table *od_table,
+					 enum SMU_11_0_ODSETTING_ID setting,
+					 uint32_t value)
 {
 	if (value < od_table->min[setting]) {
-		pr_warn("OD setting (%d, %d) is less than the minimum allowed (%d)\n", setting, value, od_table->min[setting]);
+		dev_warn(smu->adev->dev, "OD setting (%d, %d) is less than the minimum allowed (%d)\n", setting, value, od_table->min[setting]);
 		return -EINVAL;
 	}
 	if (value > od_table->max[setting]) {
-		pr_warn("OD setting (%d, %d) is greater than the maximum allowed (%d)\n", setting, value, od_table->max[setting]);
+		dev_warn(smu->adev->dev, "OD setting (%d, %d) is greater than the maximum allowed (%d)\n", setting, value, od_table->max[setting]);
 		return -EINVAL;
 	}
 	return 0;
@@ -1918,7 +2017,7 @@ static int navi10_overdrive_get_gfx_clk_base_voltage(struct smu_context *smu,
 					  param,
 					  &value);
 	if (ret) {
-		pr_err("[GetBaseVoltage] failed to get GFXCLK AVFS voltage from SMU!");
+		dev_err(smu->adev->dev, "[GetBaseVoltage] failed to get GFXCLK AVFS voltage from SMU!");
 		return ret;
 	}
 
@@ -1927,90 +2026,61 @@ static int navi10_overdrive_get_gfx_clk_base_voltage(struct smu_context *smu,
 	return 0;
 }
 
-static int navi10_setup_od_limits(struct smu_context *smu) {
-	struct smu_11_0_overdrive_table *overdrive_table = NULL;
-	struct smu_11_0_powerplay_table *powerplay_table = NULL;
-
-	if (!smu->smu_table.power_play_table) {
-		pr_err("powerplay table uninitialized!\n");
-		return -ENOENT;
-	}
-	powerplay_table = (struct smu_11_0_powerplay_table *)smu->smu_table.power_play_table;
-	overdrive_table = &powerplay_table->overdrive_table;
-	if (!smu->od_settings) {
-		smu->od_settings = kmemdup(overdrive_table, sizeof(struct smu_11_0_overdrive_table), GFP_KERNEL);
-	} else {
-		memcpy(smu->od_settings, overdrive_table, sizeof(struct smu_11_0_overdrive_table));
-	}
-	return 0;
-}
-
 static bool navi10_is_baco_supported(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	uint32_t val;
 
-	if (!smu_v11_0_baco_is_support(smu))
+	if (amdgpu_sriov_vf(adev) || (!smu_v11_0_baco_is_support(smu)))
 		return false;
 
 	val = RREG32_SOC15(NBIO, 0, mmRCC_BIF_STRAP0);
 	return (val & RCC_BIF_STRAP0__STRAP_PX_CAPABLE_MASK) ? true : false;
 }
 
-static int navi10_set_default_od_settings(struct smu_context *smu, bool initialize) {
-	OverDriveTable_t *od_table, *boot_od_table;
+static int navi10_set_default_od_settings(struct smu_context *smu)
+{
+	OverDriveTable_t *od_table =
+		(OverDriveTable_t *)smu->smu_table.overdrive_table;
+	OverDriveTable_t *boot_od_table =
+		(OverDriveTable_t *)smu->smu_table.boot_overdrive_table;
 	int ret = 0;
 
-	ret = smu_v11_0_set_default_od_settings(smu, initialize, sizeof(OverDriveTable_t));
-	if (ret)
+	ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, (void *)od_table, false);
+	if (ret) {
+		dev_err(smu->adev->dev, "Failed to get overdrive table!\n");
 		return ret;
+	}
 
-	od_table = (OverDriveTable_t *)smu->smu_table.overdrive_table;
-	boot_od_table = (OverDriveTable_t *)smu->smu_table.boot_overdrive_table;
-	if (initialize) {
-		ret = navi10_setup_od_limits(smu);
-		if (ret) {
-			pr_err("Failed to retrieve board OD limits\n");
+	if (!od_table->GfxclkVolt1) {
+		ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
+								&od_table->GfxclkVolt1,
+								od_table->GfxclkFreq1);
+		if (ret)
 			return ret;
-		}
-		if (od_table) {
-			if (!od_table->GfxclkVolt1) {
-				ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
-										&od_table->GfxclkVolt1,
-										od_table->GfxclkFreq1);
-				if (ret)
-					od_table->GfxclkVolt1 = 0;
-				if (boot_od_table)
-					boot_od_table->GfxclkVolt1 = od_table->GfxclkVolt1;
-			}
-
-			if (!od_table->GfxclkVolt2) {
-				ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
-										&od_table->GfxclkVolt2,
-										od_table->GfxclkFreq2);
-				if (ret)
-					od_table->GfxclkVolt2 = 0;
-				if (boot_od_table)
-					boot_od_table->GfxclkVolt2 = od_table->GfxclkVolt2;
-			}
-
-			if (!od_table->GfxclkVolt3) {
-				ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
-										&od_table->GfxclkVolt3,
-										od_table->GfxclkFreq3);
-				if (ret)
-					od_table->GfxclkVolt3 = 0;
-				if (boot_od_table)
-					boot_od_table->GfxclkVolt3 = od_table->GfxclkVolt3;
-			}
-		}
 	}
 
-	if (od_table) {
-		navi10_dump_od_table(od_table);
+	if (!od_table->GfxclkVolt2) {
+		ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
+								&od_table->GfxclkVolt2,
+								od_table->GfxclkFreq2);
+		if (ret)
+			return ret;
 	}
 
-	return ret;
+	if (!od_table->GfxclkVolt3) {
+		ret = navi10_overdrive_get_gfx_clk_base_voltage(smu,
+								&od_table->GfxclkVolt3,
+								od_table->GfxclkFreq3);
+		if (ret)
+			return ret;
+	}
+
+	memcpy(boot_od_table, od_table, sizeof(OverDriveTable_t));
+
+	navi10_dump_od_table(smu, od_table);
+
+	return 0;
 }
 
 static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABLE_COMMAND type, long input[], uint32_t size) {
@@ -2024,12 +2094,12 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 	od_table = (OverDriveTable_t *)table_context->overdrive_table;
 
 	if (!smu->od_enabled) {
-		pr_warn("OverDrive is not enabled!\n");
+		dev_warn(smu->adev->dev, "OverDrive is not enabled!\n");
 		return -EINVAL;
 	}
 
 	if (!smu->od_settings) {
-		pr_err("OD board limits are not set!\n");
+		dev_err(smu->adev->dev, "OD board limits are not set!\n");
 		return -ENOENT;
 	}
 
@@ -2038,16 +2108,16 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 	switch (type) {
 	case PP_OD_EDIT_SCLK_VDDC_TABLE:
 		if (!navi10_od_feature_is_supported(od_settings, SMU_11_0_ODCAP_GFXCLK_LIMITS)) {
-			pr_warn("GFXCLK_LIMITS not supported!\n");
+			dev_warn(smu->adev->dev, "GFXCLK_LIMITS not supported!\n");
 			return -ENOTSUPP;
 		}
 		if (!table_context->overdrive_table) {
-			pr_err("Overdrive is not initialized\n");
+			dev_err(smu->adev->dev, "Overdrive is not initialized\n");
 			return -EINVAL;
 		}
 		for (i = 0; i < size; i += 2) {
 			if (i + 2 > size) {
-				pr_info("invalid number of input parameters %d\n", size);
+				dev_info(smu->adev->dev, "invalid number of input parameters %d\n", size);
 				return -EINVAL;
 			}
 			switch (input[i]) {
@@ -2055,7 +2125,7 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 				freq_setting = SMU_11_0_ODSETTING_GFXCLKFMIN;
 				freq_ptr = &od_table->GfxclkFmin;
 				if (input[i + 1] > od_table->GfxclkFmax) {
-					pr_info("GfxclkFmin (%ld) must be <= GfxclkFmax (%u)!\n",
+					dev_info(smu->adev->dev, "GfxclkFmin (%ld) must be <= GfxclkFmax (%u)!\n",
 						input[i + 1],
 						od_table->GfxclkFmin);
 					return -EINVAL;
@@ -2065,18 +2135,18 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 				freq_setting = SMU_11_0_ODSETTING_GFXCLKFMAX;
 				freq_ptr = &od_table->GfxclkFmax;
 				if (input[i + 1] < od_table->GfxclkFmin) {
-					pr_info("GfxclkFmax (%ld) must be >= GfxclkFmin (%u)!\n",
+					dev_info(smu->adev->dev, "GfxclkFmax (%ld) must be >= GfxclkFmin (%u)!\n",
 						input[i + 1],
 						od_table->GfxclkFmax);
 					return -EINVAL;
 				}
 				break;
 			default:
-				pr_info("Invalid SCLK_VDDC_TABLE index: %ld\n", input[i]);
-				pr_info("Supported indices: [0:min,1:max]\n");
+				dev_info(smu->adev->dev, "Invalid SCLK_VDDC_TABLE index: %ld\n", input[i]);
+				dev_info(smu->adev->dev, "Supported indices: [0:min,1:max]\n");
 				return -EINVAL;
 			}
-			ret = navi10_od_setting_check_range(od_settings, freq_setting, input[i + 1]);
+			ret = navi10_od_setting_check_range(smu, od_settings, freq_setting, input[i + 1]);
 			if (ret)
 				return ret;
 			*freq_ptr = input[i + 1];
@@ -2084,35 +2154,35 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 		break;
 	case PP_OD_EDIT_MCLK_VDDC_TABLE:
 		if (!navi10_od_feature_is_supported(od_settings, SMU_11_0_ODCAP_UCLK_MAX)) {
-			pr_warn("UCLK_MAX not supported!\n");
+			dev_warn(smu->adev->dev, "UCLK_MAX not supported!\n");
 			return -ENOTSUPP;
 		}
 		if (size < 2) {
-			pr_info("invalid number of parameters: %d\n", size);
+			dev_info(smu->adev->dev, "invalid number of parameters: %d\n", size);
 			return -EINVAL;
 		}
 		if (input[0] != 1) {
-			pr_info("Invalid MCLK_VDDC_TABLE index: %ld\n", input[0]);
-			pr_info("Supported indices: [1:max]\n");
+			dev_info(smu->adev->dev, "Invalid MCLK_VDDC_TABLE index: %ld\n", input[0]);
+			dev_info(smu->adev->dev, "Supported indices: [1:max]\n");
 			return -EINVAL;
 		}
-		ret = navi10_od_setting_check_range(od_settings, SMU_11_0_ODSETTING_UCLKFMAX, input[1]);
+		ret = navi10_od_setting_check_range(smu, od_settings, SMU_11_0_ODSETTING_UCLKFMAX, input[1]);
 		if (ret)
 			return ret;
 		od_table->UclkFmax = input[1];
 		break;
 	case PP_OD_RESTORE_DEFAULT_TABLE:
 		if (!(table_context->overdrive_table && table_context->boot_overdrive_table)) {
-			pr_err("Overdrive table was not initialized!\n");
+			dev_err(smu->adev->dev, "Overdrive table was not initialized!\n");
 			return -EINVAL;
 		}
 		memcpy(table_context->overdrive_table, table_context->boot_overdrive_table, sizeof(OverDriveTable_t));
 		break;
 	case PP_OD_COMMIT_DPM_TABLE:
-		navi10_dump_od_table(od_table);
+		navi10_dump_od_table(smu, od_table);
 		ret = smu_update_table(smu, SMU_TABLE_OVERDRIVE, 0, (void *)od_table, true);
 		if (ret) {
-			pr_err("Failed to import overdrive table!\n");
+			dev_err(smu->adev->dev, "Failed to import overdrive table!\n");
 			return ret;
 		}
 		// no lock needed because smu_od_edit_dpm_table has it
@@ -2125,15 +2195,15 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 		break;
 	case PP_OD_EDIT_VDDC_CURVE:
 		if (!navi10_od_feature_is_supported(od_settings, SMU_11_0_ODCAP_GFXCLK_CURVE)) {
-			pr_warn("GFXCLK_CURVE not supported!\n");
+			dev_warn(smu->adev->dev, "GFXCLK_CURVE not supported!\n");
 			return -ENOTSUPP;
 		}
 		if (size < 3) {
-			pr_info("invalid number of parameters: %d\n", size);
+			dev_info(smu->adev->dev, "invalid number of parameters: %d\n", size);
 			return -EINVAL;
 		}
 		if (!od_table) {
-			pr_info("Overdrive is not initialized\n");
+			dev_info(smu->adev->dev, "Overdrive is not initialized\n");
 			return -EINVAL;
 		}
 
@@ -2157,28 +2227,28 @@ static int navi10_od_edit_dpm_table(struct smu_context *smu, enum PP_OD_DPM_TABL
 			voltage_ptr = &od_table->GfxclkVolt3;
 			break;
 		default:
-			pr_info("Invalid VDDC_CURVE index: %ld\n", input[0]);
-			pr_info("Supported indices: [0, 1, 2]\n");
+			dev_info(smu->adev->dev, "Invalid VDDC_CURVE index: %ld\n", input[0]);
+			dev_info(smu->adev->dev, "Supported indices: [0, 1, 2]\n");
 			return -EINVAL;
 		}
-		ret = navi10_od_setting_check_range(od_settings, freq_setting, input[1]);
+		ret = navi10_od_setting_check_range(smu, od_settings, freq_setting, input[1]);
 		if (ret)
 			return ret;
 		// Allow setting zero to disable the OverDrive VDDC curve
 		if (input[2] != 0) {
-			ret = navi10_od_setting_check_range(od_settings, voltage_setting, input[2]);
+			ret = navi10_od_setting_check_range(smu, od_settings, voltage_setting, input[2]);
 			if (ret)
 				return ret;
 			*freq_ptr = input[1];
 			*voltage_ptr = ((uint16_t)input[2]) * NAVI10_VOLTAGE_SCALE;
-			pr_debug("OD: set curve %ld: (%d, %d)\n", input[0], *freq_ptr, *voltage_ptr);
+			dev_dbg(smu->adev->dev, "OD: set curve %ld: (%d, %d)\n", input[0], *freq_ptr, *voltage_ptr);
 		} else {
 			// If setting 0, disable all voltage curve settings
 			od_table->GfxclkVolt1 = 0;
 			od_table->GfxclkVolt2 = 0;
 			od_table->GfxclkVolt3 = 0;
 		}
-		navi10_dump_od_table(od_table);
+		navi10_dump_od_table(smu, od_table);
 		break;
 	default:
 		return -ENOSYS;
@@ -2192,7 +2262,7 @@ static int navi10_run_btc(struct smu_context *smu)
 
 	ret = smu_send_smc_msg(smu, SMU_MSG_RunBtc, NULL);
 	if (ret)
-		pr_err("RunBtc failed!\n");
+		dev_err(smu->adev->dev, "RunBtc failed!\n");
 
 	return ret;
 }
@@ -2209,11 +2279,29 @@ static int navi10_dummy_pstate_control(struct smu_context *smu, bool enable)
 	return result;
 }
 
+static inline bool navi10_need_umc_cdr_12gbps_workaround(struct amdgpu_device *adev)
+{
+	if (adev->asic_type != CHIP_NAVI10)
+		return false;
+
+	if (adev->pdev->device == 0x731f &&
+	    (adev->pdev->revision == 0xc2 ||
+	     adev->pdev->revision == 0xc3 ||
+	     adev->pdev->revision == 0xca ||
+	     adev->pdev->revision == 0xcb))
+		return true;
+	else
+		return false;
+}
+
 static int navi10_disable_umc_cdr_12gbps_workaround(struct smu_context *smu)
 {
 	uint32_t uclk_count, uclk_min, uclk_max;
 	uint32_t smu_version;
 	int ret = 0;
+
+	if (!navi10_need_umc_cdr_12gbps_workaround(smu->adev))
+		return 0;
 
 	ret = smu_get_smc_version(smu, NULL, &smu_version);
 	if (ret)
@@ -2223,25 +2311,25 @@ static int navi10_disable_umc_cdr_12gbps_workaround(struct smu_context *smu)
 	if (smu_version < 0x2A3200)
 		return 0;
 
-	ret = smu_get_dpm_level_count(smu, SMU_UCLK, &uclk_count);
+	ret = smu_v11_0_get_dpm_level_count(smu, SMU_UCLK, &uclk_count);
 	if (ret)
 		return ret;
 
-	ret = smu_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)0, &uclk_min);
+	ret = smu_v11_0_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)0, &uclk_min);
 	if (ret)
 		return ret;
 
-	ret = smu_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)(uclk_count - 1), &uclk_max);
+	ret = smu_v11_0_get_dpm_freq_by_index(smu, SMU_UCLK, (uint16_t)(uclk_count - 1), &uclk_max);
 	if (ret)
 		return ret;
 
 	/* Force UCLK out of the highest DPM */
-	ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, uclk_min);
+	ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, uclk_min);
 	if (ret)
 		return ret;
 
 	/* Revert the UCLK Hardmax */
-	ret = smu_set_hard_freq_range(smu, SMU_UCLK, 0, uclk_max);
+	ret = smu_v11_0_set_hard_freq_limited_range(smu, SMU_UCLK, 0, uclk_max);
 	if (ret)
 		return ret;
 
@@ -2255,9 +2343,6 @@ static int navi10_disable_umc_cdr_12gbps_workaround(struct smu_context *smu)
 static const struct pptable_funcs navi10_ppt_funcs = {
 	.tables_init = navi10_tables_init,
 	.alloc_dpm_context = navi10_allocate_dpm_context,
-	.store_powerplay_table = navi10_store_powerplay_table,
-	.check_powerplay_table = navi10_check_powerplay_table,
-	.append_powerplay_table = navi10_append_powerplay_table,
 	.get_smu_msg_index = navi10_get_smu_msg_index,
 	.get_smu_clk_index = navi10_get_smu_clk_index,
 	.get_smu_feature_index = navi10_get_smu_feature_index,
@@ -2266,9 +2351,8 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.get_workload_type = navi10_get_workload_type,
 	.get_allowed_feature_mask = navi10_get_allowed_feature_mask,
 	.set_default_dpm_table = navi10_set_default_dpm_table,
-	.dpm_set_uvd_enable = navi10_dpm_set_uvd_enable,
+	.dpm_set_vcn_enable = navi10_dpm_set_vcn_enable,
 	.dpm_set_jpeg_enable = navi10_dpm_set_jpeg_enable,
-	.get_current_clk_freq_by_table = navi10_get_current_clk_freq_by_table,
 	.print_clk_levels = navi10_print_clk_levels,
 	.force_clk_levels = navi10_force_clk_levels,
 	.populate_umd_state_clk = navi10_populate_umd_state_clk,
@@ -2276,38 +2360,31 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.pre_display_config_changed = navi10_pre_display_config_changed,
 	.display_config_changed = navi10_display_config_changed,
 	.notify_smc_display_config = navi10_notify_smc_display_config,
-	.force_dpm_limit_value = navi10_force_dpm_limit_value,
-	.unforce_dpm_levels = navi10_unforce_dpm_levels,
 	.is_dpm_running = navi10_is_dpm_running,
 	.get_fan_speed_percent = navi10_get_fan_speed_percent,
 	.get_fan_speed_rpm = navi10_get_fan_speed_rpm,
 	.get_power_profile_mode = navi10_get_power_profile_mode,
 	.set_power_profile_mode = navi10_set_power_profile_mode,
-	.get_profiling_clk_mask = navi10_get_profiling_clk_mask,
 	.set_watermarks_table = navi10_set_watermarks_table,
 	.read_sensor = navi10_read_sensor,
 	.get_uclk_dpm_states = navi10_get_uclk_dpm_states,
-	.set_performance_level = navi10_set_performance_level,
+	.set_performance_level = smu_v11_0_set_performance_level,
 	.get_thermal_temperature_range = navi10_get_thermal_temperature_range,
 	.display_disable_memory_clock_switch = navi10_display_disable_memory_clock_switch,
 	.get_power_limit = navi10_get_power_limit,
 	.update_pcie_parameters = navi10_update_pcie_parameters,
 	.init_microcode = smu_v11_0_init_microcode,
 	.load_microcode = smu_v11_0_load_microcode,
+	.fini_microcode = smu_v11_0_fini_microcode,
 	.init_smc_tables = smu_v11_0_init_smc_tables,
 	.fini_smc_tables = smu_v11_0_fini_smc_tables,
 	.init_power = smu_v11_0_init_power,
 	.fini_power = smu_v11_0_fini_power,
 	.check_fw_status = smu_v11_0_check_fw_status,
-	.setup_pptable = smu_v11_0_setup_pptable,
+	.setup_pptable = navi10_setup_pptable,
 	.get_vbios_bootup_values = smu_v11_0_get_vbios_bootup_values,
-	.get_clk_info_from_vbios = smu_v11_0_get_clk_info_from_vbios,
-	.check_pptable = smu_v11_0_check_pptable,
-	.parse_pptable = smu_v11_0_parse_pptable,
-	.populate_smc_tables = smu_v11_0_populate_smc_pptable,
 	.check_fw_version = smu_v11_0_check_fw_version,
 	.write_pptable = smu_v11_0_write_pptable,
-	.set_min_dcef_deep_sleep = smu_v11_0_set_min_dcef_deep_sleep,
 	.set_driver_table_location = smu_v11_0_set_driver_table_location,
 	.set_tool_table_location = smu_v11_0_set_tool_table_location,
 	.notify_memory_pool_location = smu_v11_0_notify_memory_pool_location,
@@ -2318,11 +2395,10 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.get_enabled_mask = smu_v11_0_get_enabled_mask,
 	.notify_display_change = smu_v11_0_notify_display_change,
 	.set_power_limit = smu_v11_0_set_power_limit,
-	.get_current_clk_freq = smu_v11_0_get_current_clk_freq,
 	.init_max_sustainable_clocks = smu_v11_0_init_max_sustainable_clocks,
 	.enable_thermal_alert = smu_v11_0_enable_thermal_alert,
 	.disable_thermal_alert = smu_v11_0_disable_thermal_alert,
-	.set_deep_sleep_dcefclk = smu_v11_0_set_deep_sleep_dcefclk,
+	.set_min_dcef_deep_sleep = smu_v11_0_set_min_deep_sleep_dcefclk,
 	.display_clock_voltage_request = smu_v11_0_display_clock_voltage_request,
 	.get_fan_control_mode = smu_v11_0_get_fan_control_mode,
 	.set_fan_control_mode = smu_v11_0_set_fan_control_mode,
@@ -2340,10 +2416,8 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.baco_exit = smu_v11_0_baco_exit,
 	.get_dpm_ultimate_freq = smu_v11_0_get_dpm_ultimate_freq,
 	.set_soft_freq_limited_range = smu_v11_0_set_soft_freq_limited_range,
-	.override_pcie_parameters = smu_v11_0_override_pcie_parameters,
 	.set_default_od_settings = navi10_set_default_od_settings,
 	.od_edit_dpm_table = navi10_od_edit_dpm_table,
-	.get_pptable_power_limit = navi10_get_pptable_power_limit,
 	.run_btc = navi10_run_btc,
 	.disable_umc_cdr_12gbps_workaround = navi10_disable_umc_cdr_12gbps_workaround,
 	.set_power_source = smu_v11_0_set_power_source,

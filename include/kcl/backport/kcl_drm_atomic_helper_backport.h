@@ -31,4 +31,9 @@ int _kcl_drm_atomic_helper_resume(struct drm_device *dev,
 }
 #define drm_atomic_helper_resume _kcl_drm_atomic_helper_resume
 #endif
+
+#ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
+#define __drm_atomic_helper_plane_reset _kcl__drm_atomic_helper_plane_reset
+#endif /* AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET */
+
 #endif

@@ -69,6 +69,7 @@
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define DC_LOG_DSC(...) DRM_DEBUG_KMS(__VA_ARGS__)
 #endif
+#define DC_LOG_SMU(...) pr_debug("[SMU_MSG]:"__VA_ARGS__)
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0) || defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #define DC_LOG_DWB(...) DRM_DEBUG_KMS(__VA_ARGS__)
 #endif
@@ -119,6 +120,7 @@ enum dc_log_type {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	LOG_DSC,
 #endif
+	LOG_SMU_MSG,
 	LOG_DWB,
 	LOG_GAMMA_DEBUG,
 	LOG_MAX_HW_POINTS,
@@ -153,11 +155,11 @@ enum dc_log_type {
 		(1ULL << LOG_I2C_AUX) | \
 		(1ULL << LOG_IF_TRACE) | \
 		(1ULL << LOG_HDMI_FRL) | \
+		(1ULL << LOG_SCALER) | \
 		(1ULL << LOG_DTN) /* | \
 		(1ULL << LOG_DEBUG) | \
 		(1ULL << LOG_BIOS) | \
 		(1ULL << LOG_SURFACE) | \
-		(1ULL << LOG_SCALER) | \
 		(1ULL << LOG_DML) | \
 		(1ULL << LOG_HW_LINK_TRAINING) | \
 		(1ULL << LOG_HW_AUDIO)| \

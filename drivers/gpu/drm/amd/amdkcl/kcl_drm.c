@@ -339,3 +339,14 @@ amdkcl_dummy_symbol(drm_mode_is_420_only, bool, return false,
 amdkcl_dummy_symbol(drm_mode_is_420_also, bool, return false,
 			 const struct drm_display_info *display, const struct drm_display_mode *mode)
 #endif
+
+#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
+void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
+				    struct drm_framebuffer *fb,
+				    const struct drm_mode_fb_cmd2 *mode_cmd)
+{
+	fb->dev = dev;
+	drm_helper_mode_fill_fb_struct(fb, mode_cmd);
+}
+EXPORT_SYMBOL(_kcl_drm_helper_mode_fill_fb_struct);
+#endif

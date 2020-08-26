@@ -35,6 +35,9 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 				       struct amdgpu_dm_connector *aconnector,
 				       int link_index);
 
+void
+dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev);
+
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 bool compute_mst_dsc_configs_for_state(struct drm_atomic_state *state,

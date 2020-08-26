@@ -263,11 +263,11 @@ static void amdgpu_display_unpin_work_func(struct work_struct *__work)
 	kfree(work);
 }
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 9, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,
 				struct drm_pending_vblank_event *event,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_PAGE_FLIP_TARGET_CTX
 				uint32_t page_flip_flags, uint32_t target,
 				struct drm_modeset_acquire_ctx *ctx)
 #else
@@ -512,7 +512,7 @@ cleanup:
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx)
 #else
@@ -532,9 +532,9 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 
 	ret = pm_runtime_get_sync(dev->dev);
 	if (ret < 0)
-		return ret;
+		goto out;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 12, 0)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 	ret = drm_crtc_helper_set_config(set, ctx);
 #else
 	ret = drm_crtc_helper_set_config(set);
@@ -551,7 +551,7 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 	   take the current one */
 	if (active && !adev->have_disp_power_ref) {
 		adev->have_disp_power_ref = true;
-		return ret;
+		goto out;
 	}
 	/* if we have no active crtcs, then drop the power ref
 	   we got before */
@@ -560,6 +560,7 @@ int amdgpu_display_crtc_set_config(struct drm_mode_set *set)
 		adev->have_disp_power_ref = false;
 	}
 
+out:
 	/* drop the power reference we got coming in here */
 	pm_runtime_put_autosuspend(dev->dev);
 	return ret;
@@ -825,20 +826,12 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
 				    const struct drm_mode_fb_cmd2 *mode_cmd,
-#else
-				    struct drm_mode_fb_cmd2 *mode_cmd,
-#endif
 				    struct drm_gem_object *obj)
 {
 	int ret;
 	kcl_drm_fb_set_gem_obj(&rfb->base, 0, obj);
-#if DRM_VERSION_CODE < DRM_VERSION(4, 11, 0)
-	drm_helper_mode_fill_fb_struct(&rfb->base, mode_cmd);
-#else
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
-#endif
 	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret) {
 		kcl_drm_fb_set_gem_obj(&rfb->base, 0, NULL);
@@ -850,11 +843,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 struct drm_framebuffer *
 amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 				       struct drm_file *file_priv,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 5, 0)
 				       const struct drm_mode_fb_cmd2 *mode_cmd)
-#else
-				       struct drm_mode_fb_cmd2 *mode_cmd)
-#endif
 {
 	struct drm_gem_object *obj;
 	struct amdgpu_framebuffer *amdgpu_fb;
@@ -889,21 +878,9 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	return &amdgpu_fb->base;
 }
 
-#if DRM_VERSION_CODE < DRM_VERSION(4, 16, 0)
-void amdgpu_output_poll_changed(struct drm_device *dev)
-{
-	struct amdgpu_device *adev = dev->dev_private;
-	amdgpu_fb_output_poll_changed(adev);
-}
-#endif
-
 const struct drm_mode_config_funcs amdgpu_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 16, 0)
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
-#else
-	.output_poll_changed = amdgpu_output_poll_changed,
-#endif
 };
 
 static const struct drm_prop_enum_list amdgpu_underscan_enum_list[] =

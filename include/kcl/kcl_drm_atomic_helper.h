@@ -4,6 +4,8 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
+#include <drm/drm_plane_helper.h>
+#include <kcl/kcl_drm.h>
 
 #if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
 int drm_atomic_helper_disable_all(struct drm_device *dev,
@@ -105,5 +107,37 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 	return drm_atomic_get_existing_plane_state(state, plane);
 #endif
 }
+
+#ifndef HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE
+static inline int
+drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
+					const struct drm_crtc_state *crtc_state,
+					int min_scale,
+					int max_scale,
+					bool can_position,
+					bool can_update_disabled)
+{
+#ifdef HAVE_DRM_PLANE_HELPER_CHECK_STATE
+	struct drm_rect clip = {};
+	struct drm_crtc *crtc = crtc_state->crtc;
+	if (crtc->enabled)
+		drm_mode_get_hv_timing(&crtc->mode, &clip.x2, &clip.y2);
+	return drm_plane_helper_check_state(plane_state, &clip, min_scale,
+				max_scale, can_position, can_update_disabled);
+#else
+	return 0;
+#endif
+}
+#endif
+
+/*
+ * v4.19-rc1-206-ge267364a6e1b
+ * drm/atomic: Initialise planes with opaque alpha values
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+#define AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
+void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
+							struct drm_plane_state *state);
+#endif
 
 #endif

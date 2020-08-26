@@ -41,6 +41,10 @@ ifdef CONFIG_DRM_AMD_DC_DCN2_1
 DC_LIBS += dcn21
 endif
 
+ifdef CONFIG_DRM_AMD_DC_DCN3_0
+DC_LIBS += dcn30
+endif
+
 DC_LIBS += dce120
 
 DC_LIBS += dce112

@@ -1,8 +1,6 @@
 dnl #
-dnl #commit 7e9e8927330672c0c1c2b6a83d82343ce283294a
-dnl #Author: Kevin Wang <Kevin1.Wang@amd.com>
-dnl #Date:   Mon Aug 13 17:21:10 2018 +0800
-dnl #drm/amdkcl: [4.16] fix drm .last code, .output_poll_changed conflict
+dnl # v4.14-rc3-576-g304a4f6accac
+dnl # drm/fb-helper: Add .last_close and .output_poll_changed helpers
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_LASTCLOSE], [
 	AC_KERNEL_DO_BACKGROUND([

@@ -36,10 +36,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0x718f63a96
-#define DMUB_FW_VERSION_MAJOR 1
+#define DMUB_FW_VERSION_GIT_HASH 0xf675c6448
+#define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 12
+#define DMUB_FW_VERSION_REVISION 24
 #define DMUB_FW_VERSION_UCODE ((DMUB_FW_VERSION_MAJOR << 24) | (DMUB_FW_VERSION_MINOR << 16) | DMUB_FW_VERSION_REVISION)
 #endif
 
@@ -86,10 +86,11 @@ union dmub_addr {
 
 union dmub_psr_debug_flags {
 	struct {
-		uint8_t visual_confirm : 1;
+		uint32_t visual_confirm : 1;
+		uint32_t use_hw_lock_mgr : 1;
 	} bitfields;
 
-	unsigned int u32All;
+	uint32_t u32All;
 };
 
 #if defined(__cplusplus)
@@ -122,12 +123,15 @@ union dmub_psr_debug_flags {
  * @fw_region_size: size of the firmware state region
  * @trace_buffer_size: size of the tracebuffer region
  * @fw_version: the firmware version information
+ * @dal_fw: 1 if the firmware is DAL
  */
 struct dmub_fw_meta_info {
 	uint32_t magic_value;
 	uint32_t fw_region_size;
 	uint32_t trace_buffer_size;
 	uint32_t fw_version;
+	uint8_t dal_fw;
+	uint8_t reserved[3];
 };
 
 /* Ensure that the structure remains 64 bytes. */
@@ -137,8 +141,55 @@ union dmub_fw_meta {
 };
 
 #pragma pack(pop)
+
 //==============================================================================
-//</DMUB_META>==================================================================
+//< DMUB_STATUS>================================================================
+//==============================================================================
+
+/**
+ * DMCUB scratch registers can be used to determine firmware status.
+ * Current scratch register usage is as follows:
+ *
+ * SCRATCH0: FW Boot Status register
+ * SCRATCH15: FW Boot Options register
+ */
+
+/* Register bit definition for SCRATCH0 */
+union dmub_fw_boot_status {
+	struct {
+		uint32_t dal_fw : 1;
+		uint32_t mailbox_rdy : 1;
+		uint32_t optimized_init_done : 1;
+		uint32_t reserved : 29;
+	} bits;
+	uint32_t all;
+};
+
+enum dmub_fw_boot_status_bit {
+	DMUB_FW_BOOT_STATUS_BIT_DAL_FIRMWARE = (1 << 0),
+	DMUB_FW_BOOT_STATUS_BIT_MAILBOX_READY = (1 << 1),
+	DMUB_FW_BOOT_STATUS_BIT_OPTIMIZED_INIT_DONE = (1 << 2),
+};
+
+/* Register bit definition for SCRATCH15 */
+union dmub_fw_boot_options {
+	struct {
+		uint32_t pemu_env : 1;
+		uint32_t fpga_env : 1;
+		uint32_t optimized_init : 1;
+		uint32_t reserved : 29;
+	} bits;
+	uint32_t all;
+};
+
+enum dmub_fw_boot_options_bit {
+	DMUB_FW_BOOT_OPTION_BIT_PEMU_ENV = (1 << 0),
+	DMUB_FW_BOOT_OPTION_BIT_FPGA_ENV = (1 << 1),
+	DMUB_FW_BOOT_OPTION_BIT_OPTIMIZED_INIT_DONE = (1 << 2),
+};
+
+//==============================================================================
+//</DMUB_STATUS>================================================================
 //==============================================================================
 //< DMUB_VBIOS>=================================================================
 //==============================================================================
@@ -203,6 +254,11 @@ enum dmub_gpint_command {
 	DMUB_GPINT__GET_FW_VERSION = 1,
 	DMUB_GPINT__STOP_FW = 2,
 	DMUB_GPINT__GET_PSR_STATE = 7,
+	/**
+	 * DESC: Notifies DMCUB of the currently active streams.
+	 * ARGS: Stream mask, 1 bit per active stream index.
+	 */
+	DMUB_GPINT__IDLE_OPT_NOTIFY_STREAM_MASK = 8,
 };
 
 //==============================================================================
@@ -230,6 +286,7 @@ enum dmub_cmd_type {
 	DMUB_CMD__PLAT_54186_WA = 5,
 	DMUB_CMD__PSR = 64,
 	DMUB_CMD__ABM = 66,
+	DMUB_CMD__HW_LOCK = 69,
 	DMUB_CMD__VBIOS = 128,
 };
 
@@ -421,6 +478,8 @@ struct dmub_cmd_psr_copy_settings_data {
 	uint8_t frame_delay;
 	uint8_t frame_cap_ind;
 	uint8_t pad[3];
+	uint16_t init_sdp_deadline;
+	uint16_t pad2;
 };
 
 struct dmub_rb_cmd_psr_copy_settings {
@@ -449,6 +508,44 @@ struct dmub_cmd_psr_set_version_data {
 struct dmub_rb_cmd_psr_set_version {
 	struct dmub_cmd_header header;
 	struct dmub_cmd_psr_set_version_data psr_set_version_data;
+};
+
+union dmub_hw_lock_flags {
+	struct {
+		uint8_t lock_pipe   : 1;
+		uint8_t lock_cursor : 1;
+		uint8_t lock_dig    : 1;
+		uint8_t triple_buffer_lock : 1;
+	} bits;
+
+	uint8_t u8All;
+};
+
+struct dmub_hw_lock_inst_flags {
+	uint8_t otg_inst;
+	uint8_t opp_inst;
+	uint8_t dig_inst;
+	uint8_t pad;
+};
+
+enum hw_lock_client {
+	HW_LOCK_CLIENT_DRIVER = 0,
+	HW_LOCK_CLIENT_FW,
+	HW_LOCK_CLIENT_INVALID = 0xFFFFFFFF,
+};
+
+struct dmub_cmd_lock_hw_data {
+	enum hw_lock_client client;
+	struct dmub_hw_lock_inst_flags inst_flags;
+	union dmub_hw_lock_flags hw_locks;
+	uint8_t lock;
+	uint8_t should_release;
+	uint8_t pad;
+};
+
+struct dmub_rb_cmd_lock_hw {
+	struct dmub_cmd_header header;
+	struct dmub_cmd_lock_hw_data lock_hw_data;
 };
 
 enum dmub_cmd_abm_type {
@@ -555,6 +652,7 @@ struct dmub_rb_cmd_abm_init_config {
 };
 
 union dmub_rb_cmd {
+	struct dmub_rb_cmd_lock_hw lock_hw;
 	struct dmub_rb_cmd_read_modify_write read_modify_write;
 	struct dmub_rb_cmd_reg_field_update_sequence reg_field_update_seq;
 	struct dmub_rb_cmd_burst_write burst_write;

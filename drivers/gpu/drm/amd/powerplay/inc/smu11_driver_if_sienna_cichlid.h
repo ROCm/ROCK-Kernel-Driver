@@ -27,9 +27,9 @@
 // *** IMPORTANT ***
 // SMU TEAM: Always increment the interface version if 
 // any structure is changed in this file
-#define SMU11_DRIVER_IF_VERSION 0x30
+#define SMU11_DRIVER_IF_VERSION 0x33
 
-#define PPTABLE_Sienna_Cichlid_SMU_VERSION 4
+#define PPTABLE_Sienna_Cichlid_SMU_VERSION 5
 
 #define NUM_GFXCLK_DPM_LEVELS  16
 #define NUM_SMNCLK_DPM_LEVELS  2
@@ -128,7 +128,7 @@
 #define FEATURE_2_STEP_PSTATE_BIT       46
 #define FEATURE_SMNCLK_DPM_BIT          47
 #define FEATURE_SPARE_48_BIT            48
-#define FEATURE_SPARE_49_BIT            49
+#define FEATURE_GFX_EDC_BIT             49
 #define FEATURE_SPARE_50_BIT            50
 #define FEATURE_SPARE_51_BIT            51
 #define FEATURE_SPARE_52_BIT            52
@@ -564,6 +564,12 @@ typedef enum {
   TDC_THROTTLER_COUNT
 } TDC_THROTTLER_e;
 
+typedef enum {
+  CUSTOMER_VARIANT_ROW,
+  CUSTOMER_VARIANT_FALCON,
+  CUSTOMER_VARIANT_COUNT,
+} CUSTOMER_VARIANT_e;
+	 
 // Used for 2-step UCLK DPM change workaround
 typedef struct {
   uint16_t Fmin;
@@ -786,7 +792,10 @@ typedef struct {
   QuadraticInt_t    ReservedEquation3; 
 
   // SECTION: Sku Reserved
-  uint32_t         SkuReserved[15];
+  uint8_t          CustomerVariant;
+  uint8_t          Spare[3];
+  uint32_t         SkuReserved[14];
+
 
   // MAJOR SECTION: BOARD PARAMETERS
 
@@ -865,8 +874,7 @@ typedef struct {
   uint16_t     DfllGfxclkSpreadFreq;      // kHz
   
   // UCLK Spread Spectrum
-  uint8_t      UclkSpreadEnabled;   // on or off
-  uint8_t      UclkSpreadPercent;   // Q4.4
+  uint16_t     UclkSpreadPadding;
   uint16_t     UclkSpreadFreq;      // kHz
 
   // FCLK Spread Spectrum
@@ -896,8 +904,11 @@ typedef struct {
   uint8_t      VddqOffEnabled;
   uint8_t      PaddingUmcFlags[2];
 
+  // UCLK Spread Spectrum
+  uint8_t      UclkSpreadPercent[16];   
+
   // SECTION: Board Reserved
-  uint32_t     BoardReserved[15];
+  uint32_t     BoardReserved[11];
 
   // SECTION: Structure Padding
 
@@ -914,12 +925,14 @@ typedef struct {
   uint16_t     GfxActivityLpfTau;
   uint16_t     UclkActivityLpfTau;
   uint16_t     SocketPowerLpfTau;  
+  uint16_t     VcnClkAverageLpfTau;
+  uint16_t     padding16; 
 } DriverSmuConfig_t;
 
 typedef struct {
   DriverSmuConfig_t DriverSmuConfig;
 
-  uint32_t     Spare[8];  
+  uint32_t     Spare[7];  
   // Padding - ignore
   uint32_t     MmHubPadding[8]; // SMU internal use
 } DriverSmuConfigExternal_t;
@@ -934,10 +947,12 @@ typedef struct {
   int16_t                OverDrivePct;         // %
   uint16_t               FanMaximumRpm;
   uint16_t               FanMinimumPwm;
+  uint16_t               FanAcousticLimitRpm;
   uint16_t               FanTargetTemperature; // Degree Celcius 
   uint8_t                FanLinearPwmPoints[NUM_OD_FAN_MAX_POINTS];
   uint8_t                FanLinearTempPoints[NUM_OD_FAN_MAX_POINTS];
   uint16_t               MaxOpTemp;            // Degree Celcius
+  uint16_t               Padding_16[1];
   uint8_t                FanZeroRpmEnable;
   uint8_t                FanZeroRpmStopTemp;
   uint8_t                FanMode;
@@ -984,11 +999,20 @@ typedef struct {
   uint8_t D3HotEntryCountPerMode[D3HOT_SEQUENCE_COUNT];
   uint8_t D3HotExitCountPerMode[D3HOT_SEQUENCE_COUNT];
   uint8_t ArmMsgReceivedCountPerMode[D3HOT_SEQUENCE_COUNT];
+
+  //PMFW-4362
+  uint32_t EnergyAccumulator;
+  uint16_t AverageVclk0Frequency  ;
+  uint16_t AverageDclk0Frequency  ;  
+  uint16_t AverageVclk1Frequency  ;
+  uint16_t AverageDclk1Frequency  ;  
+  uint16_t VcnActivityPercentage ; //place holder, David N. to provide full sequence
+  uint16_t padding16_2;
 } SmuMetrics_t;
 
 typedef struct {
   SmuMetrics_t SmuMetrics;
-  uint32_t Spare[5];
+  uint32_t Spare[1];
 
   // Padding - ignore
   uint32_t     MmHubPadding[8]; // SMU internal use  

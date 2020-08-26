@@ -460,7 +460,6 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		const struct dc_link *link,
 		bool boot)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -478,16 +477,12 @@ bool dm_helpers_dp_mst_start_top_mgr(
 			aconnector, aconnector->base.base.id);
 
 	return (drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true) == 0);
-#else
-	return false;
-#endif
 }
 
 void dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		const struct dc_link *link)
 {
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 6, 0)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
@@ -500,7 +495,6 @@ void dm_helpers_dp_mst_stop_top_mgr(
 
 	if (aconnector->mst_mgr.mst_state == true)
 		drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, false);
-#endif
 }
 
 bool dm_helpers_dp_read_dpcd(
@@ -731,3 +725,23 @@ void dm_set_dcn_clocks(struct dc_context *ctx, struct dc_clocks *clks)
 {
 	/* TODO: something */
 }
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+
+void *dm_helpers_allocate_gpu_mem(
+		struct dc_context *ctx,
+		enum dc_gpu_mem_alloc_type type,
+		size_t size,
+		long long *addr)
+{
+	// TODO
+	return NULL;
+}
+
+void dm_helpers_free_gpu_mem(
+		struct dc_context *ctx,
+		enum dc_gpu_mem_alloc_type type,
+		void *pvMem)
+{
+	// TODO
+}
+#endif

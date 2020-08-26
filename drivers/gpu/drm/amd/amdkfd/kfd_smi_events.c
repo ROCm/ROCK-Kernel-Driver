@@ -59,13 +59,14 @@ static const struct file_operations kfd_smi_ev_fops = {
 static __poll_t kfd_smi_ev_poll(struct file *filep,
 				struct poll_table_struct *wait)
 {
-	__poll_t mask;
 	struct kfd_smi_client *client = filep->private_data;
+	__poll_t mask = 0;
 
 	poll_wait(filep, &client->wait_queue, wait);
 
 	spin_lock(&client->lock);
-	mask = kfifo_is_empty(&client->fifo) ? 0 : POLLIN | POLLRDNORM;
+	if (!kfifo_is_empty(&client->fifo))
+		mask = EPOLLIN | EPOLLRDNORM;
 	spin_unlock(&client->lock);
 
 	return mask;

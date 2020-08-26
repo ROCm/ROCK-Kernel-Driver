@@ -1353,7 +1353,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, cpuva, mem_type, NULL);
+			args->va_addr, args->size, cpuva, mem_type);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
@@ -1640,6 +1640,7 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 	struct kfd_ioctl_alloc_queue_gws_args *args = data;
 	struct queue *q;
 	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
 
 	mutex_lock(&p->mutex);
 	q = pqm_get_user_queue(&p->pqm, args->queue_id);
@@ -1651,6 +1652,12 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		retval = -ESRCH;
+		goto out_unlock;
+	}
+
 	if (!dev->gws) {
 		retval = -ENODEV;
 		goto out_unlock;
@@ -1658,6 +1665,11 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
 		retval = -ENODEV;
+		goto out_unlock;
+	}
+
+	if (dev->gws_debug_workaround && pdd->is_debugging_enabled) {
+		retval = -EBUSY;
 		goto out_unlock;
 	}
 
@@ -2732,6 +2744,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			goto unlock_out;
 		}
 
+		if (dev->gws_debug_workaround && pdd->qpd.num_gws) {
+			r = -EBUSY;
+			goto unlock_out;
+		}
+
 		if ((pdd->is_debugging_enabled == false) &&
 				((debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE
 				  && data1 == 1) ||
@@ -2814,6 +2831,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
 		r = dev->kfd2kgd->set_wave_launch_trap_override(
 				dev->kgd,
+				dev->vm_info.last_vmid_kfd,
 				data1,
 				data2,
 				data3,

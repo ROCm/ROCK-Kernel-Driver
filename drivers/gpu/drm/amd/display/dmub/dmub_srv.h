@@ -88,6 +88,9 @@ enum dmub_asic {
 	DMUB_ASIC_NONE = 0,
 	DMUB_ASIC_DCN20,
 	DMUB_ASIC_DCN21,
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+	DMUB_ASIC_DCN30,
+#endif
 	DMUB_ASIC_MAX,
 };
 
@@ -252,6 +255,10 @@ struct dmub_srv_hw_funcs {
 	uint32_t (*get_inbox1_rptr)(struct dmub_srv *dmub);
 
 	void (*set_inbox1_wptr)(struct dmub_srv *dmub, uint32_t wptr_offset);
+
+	uint32_t (*emul_get_inbox1_rptr)(struct dmub_srv *dmub);
+
+	void (*emul_set_inbox1_wptr)(struct dmub_srv *dmub, uint32_t wptr_offset);
 
 	bool (*is_supported)(struct dmub_srv *dmub);
 
