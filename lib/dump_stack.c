@@ -52,7 +52,7 @@ void dump_stack_print_info(const char *log_lvl)
 	       init_utsname()->release,
 	       (int)strcspn(init_utsname()->version, " "),
 	       init_utsname()->version, SUSE_PRODUCT_SHORTNAME,
-#ifndef CONFIG_SUSE_KERNEL_RELEASE
+#ifndef CONFIG_SUSE_KERNEL_RELEASED
 	       " (unreleased)"
 #else
 	       ""
