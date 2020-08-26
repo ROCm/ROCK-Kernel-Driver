@@ -930,7 +930,11 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
 		flags |= FOLL_WRITE;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        mmap_read_lock(mm);
+#else
 	down_read(&mm->mmap_sem);
+#endif
 
 	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
 		/*
@@ -942,7 +946,11 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 		vma = find_vma(mm, gtt->userptr);
 		if (!vma || vma->vm_file || vma->vm_end < end) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                        mmap_read_unlock(mm);
+#else
 			up_read(&mm->mmap_sem);
+#endif
 			return -EPERM;
 		}
 	}
@@ -973,12 +981,20 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	} while (pinned < ttm->num_pages);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        mmap_read_unlock(mm);
+#else
 	up_read(&mm->mmap_sem);
+#endif
 	return 0;
 
 release_pages:
 	release_pages(pages, pinned);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        mmap_read_unlock(mm);
+#else
 	up_read(&mm->mmap_sem);
+#endif
 	return r;
 }
 

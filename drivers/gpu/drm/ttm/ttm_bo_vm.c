@@ -73,7 +73,11 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			goto out_unlock;
 
 		ttm_bo_get(bo);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                mmap_read_unlock(mm);
+#else
 		up_read(&vma->vm_mm->mmap_sem);
+#endif
 		(void)dma_fence_wait(bo->moving, true);
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		ttm_bo_put(bo);
@@ -149,7 +153,11 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo, struct vm_fault *vmf)
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                                mmap_read_unlock(mm);
+#else
 				up_read(&vma->vm_mm->mmap_sem);
+#endif
 				if (!dma_resv_lock_interruptible(
 					    amdkcl_ttm_resvp(bo), NULL))
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
