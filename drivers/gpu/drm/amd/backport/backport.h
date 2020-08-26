@@ -33,6 +33,7 @@
 #include <kcl/backport/kcl_ttm_tt_backport.h>
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_drm_print.h>
+#include <kcl/kcl_drm_crtc.h>
 #include <kcl/backport/kcl_drm_plane.h>
 #include <kcl/backport/kcl_drm_backport.h>
 #include <kcl/backport/kcl_drm_fourcc.h>
