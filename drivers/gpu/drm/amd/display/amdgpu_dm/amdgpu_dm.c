@@ -3068,13 +3068,19 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 #endif
 #endif
 	r = amdgpu_display_modeset_create_props(adev);
-	if (r)
+	if (r) {
+		dc_release_state(state->context);
+		kfree(state);
 		return r;
+	}
 
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	r = amdgpu_dm_audio_init(adev);
-	if (r)
+	if (r) {
+		dc_release_state(state->context);
+		kfree(state);
 		return r;
+	}
 #endif
 
 	return 0;
