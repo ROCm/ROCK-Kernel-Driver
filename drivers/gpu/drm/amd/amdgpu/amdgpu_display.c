@@ -1395,7 +1395,7 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 	if (amdgpu_device_has_dc_support(adev)) {
 #ifndef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		adev->mode_info.max_bpc_property =
-			drm_property_create_range(adev->ddev, 0, "max bpc", 8, 16);
+			drm_property_create_range(adev_to_drm(adev), 0, "max bpc", 8, 16);
 		if (!adev->mode_info.max_bpc_property)
 			return -ENOMEM;
 #endif
@@ -1416,14 +1416,14 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 			return -ENOMEM;
 #ifndef HAVE_DRM_VRR_SUPPORTED
 		adev->mode_info.vrr_capable_property =
-			drm_property_create_bool(adev->ddev,
+			drm_property_create_bool(adev_to_drm(adev),
 						 DRM_MODE_PROP_IMMUTABLE,
 						 "vrr_capable");
 		if (!adev->mode_info.vrr_capable_property)
 			return -ENOMEM;
 
 		adev->mode_info.vrr_enabled_property =
-			drm_property_create_bool(adev->ddev,
+			drm_property_create_bool(adev_to_drm(adev),
 						 0,
 						 "VRR_ENABLED");
 		if (!adev->mode_info.vrr_enabled_property)
