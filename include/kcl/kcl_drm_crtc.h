@@ -80,6 +80,21 @@
 #define for_each_if(condition) if (!(condition)) {} else
 #endif
 
+#ifndef drm_for_each_crtc
+#define drm_for_each_crtc(crtc, dev) \
+	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
+#endif
+
+#ifndef drm_for_each_encoder
+#define drm_for_each_encoder(encoder, dev) \
+	list_for_each_entry(encoder, &(dev)->mode_config.encoder_list, head)
+#endif
+
+#ifndef drm_for_each_fb
+#define drm_for_each_fb(fb, dev) \
+	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
+#endif
+
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
 int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
@@ -88,5 +103,6 @@ int drm_helper_force_disable_all(struct drm_device *dev)
 	return _kcl_drm_helper_force_disable_all(dev);
 }
 #endif
+
 
 #endif
