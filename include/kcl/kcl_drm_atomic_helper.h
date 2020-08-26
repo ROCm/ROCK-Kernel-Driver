@@ -5,6 +5,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_plane_helper.h>
+#include <kcl/kcl_drm_modes.h>
 #include <kcl/kcl_drm_crtc.h>
 
 #if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
@@ -46,6 +47,29 @@ drm_atomic_helper_update_legacy_modeset_state(struct drm_device *dev,
 					      struct drm_atomic_state *old_state)
 {
 	_kcl_drm_atomic_helper_update_legacy_modeset_state(dev, old_state);
+}
+#endif
+
+#ifndef HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE
+static inline int
+drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
+					const struct drm_crtc_state *crtc_state,
+					int min_scale,
+					int max_scale,
+					bool can_position,
+					bool can_update_disabled)
+{
+#ifdef HAVE_DRM_PLANE_HELPER_CHECK_STATE
+	struct drm_rect clip = {};
+	struct drm_crtc *crtc = crtc_state->crtc;
+	if (crtc->enabled)
+		drm_mode_get_hv_timing(&crtc->mode, &clip.x2, &clip.y2);
+	return drm_plane_helper_check_state(plane_state, &clip, min_scale,
+				max_scale, can_position, can_update_disabled);
+#else
+	pr_warn_once("%s is not supported\n", __func__);
+	return 0;
+#endif
 }
 #endif
 
