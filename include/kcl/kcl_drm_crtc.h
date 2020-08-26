@@ -1,0 +1,76 @@
+/*
+ * Copyright © 2006 Keith Packard
+ * Copyright © 2007-2008 Dave Airlie
+ * Copyright © 2007-2008 Intel Corporation
+ *   Jesse Barnes <jesse.barnes@intel.com>
+ *   For codes copied from include/drm/drm_crtc.h
+ *
+ * Copyright © 2006 Keith Packard
+ * Copyright © 2007-2008 Dave Airlie
+ * Copyright © 2007-2008 Intel Corporation
+ *   Jesse Barnes <jesse.barnes@intel.com>
+ *   For codes copied from include/drm/drm_crtc_helper.h
+ *
+ * Copyright (c) 2007 Dave Airlie <airlied@linux.ie>
+ * Copyright (c) 2007 Jakob Bornecrantz <wallbraker@gmail.com>
+ * Copyright (c) 2008 Red Hat Inc.
+ * Copyright (c) 2007-2008 Tungsten Graphics, Inc., Cedar Park, TX., USA
+ * Copyright (c) 2007-2008 Intel Corporation
+ *   For codes copied from include/drm/drm_mode.h
+ *
+ * Copyright 2018 Intel Corporation
+ *   For codes copied from include/drm/drm_util.h
+ *
+ * Copyright (c) 2016 Intel Corporation
+ *   For codes copied from include/drm/drm_encoder.h
+ *
+ * Copyright (c) 2016 Intel Corporation
+ *   For codes copied from include/drm/drm_framebuffer.h
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+#ifndef KCL_KCL_DRM_CRTC_H
+#define KCL_KCL_DRM_CRTC_H
+
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
+
+/* Copied from include/drm/drm_mode.h */
+#ifndef DRM_MODE_ROTATE_0
+#define DRM_MODE_ROTATE_0       (1<<0)
+#endif
+#ifndef DRM_MODE_ROTATE_90
+#define DRM_MODE_ROTATE_90      (1<<1)
+#endif
+#ifndef DRM_MODE_ROTATE_180
+#define DRM_MODE_ROTATE_180     (1<<2)
+#endif
+#ifndef DRM_MODE_ROTATE_270
+#define DRM_MODE_ROTATE_270     (1<<3)
+#endif
+
+#ifndef DRM_MODE_ROTATE_MASK
+#define DRM_MODE_ROTATE_MASK (\
+		DRM_MODE_ROTATE_0  | \
+		DRM_MODE_ROTATE_90  | \
+		DRM_MODE_ROTATE_180 | \
+		DRM_MODE_ROTATE_270)
+#endif
+
+#endif
