@@ -195,6 +195,24 @@ uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct kgd_dev *dst, struct kgd_dev *s
  * the first place. This resolves a circular lock dependency involving
  * four locks, including the DQM lock and mmap_sem.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+#define read_user_wptr(mmptr, wptr, dst)				\
+	({								\
+		bool valid = false;					\
+		if ((mmptr) && (wptr)) {				\
+			pagefault_disable();				\
+			if ((mmptr) == current->mm) {			\
+				valid = !get_user((dst), (wptr));	\
+			} else if (current->mm == NULL) {		\
+				kthread_use_mm(mmptr);				\
+				valid = !get_user((dst), (wptr));	\
+				kthread_unuse_mm(mmptr);			\
+			}						\
+			pagefault_enable();				\
+		}							\
+		valid;							\
+	})
+#else
 #define read_user_wptr(mmptr, wptr, dst)				\
 	({								\
 		bool valid = false;					\
@@ -211,6 +229,7 @@ uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct kgd_dev *dst, struct kgd_dev *s
 		}							\
 		valid;							\
 	})
+#endif
 
 /* GPUVM API */
 int amdgpu_amdkfd_gpuvm_create_process_vm(struct kgd_dev *kgd, unsigned int pasid,

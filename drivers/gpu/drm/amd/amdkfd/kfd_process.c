@@ -199,7 +199,11 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 	if (!mm)
 		goto cleanup;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	kthread_use_mm(mm);
+#else
 	use_mm(mm);
+#endif
 
 	list_for_each_entry(sdma_q, &sdma_q_list.list, list) {
 		val = 0;
@@ -213,7 +217,11 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 		}
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
 	unuse_mm(mm);
+#else
+	unuse_mm(mm);
+#endif
 	mmput(mm);
 
 	/*
