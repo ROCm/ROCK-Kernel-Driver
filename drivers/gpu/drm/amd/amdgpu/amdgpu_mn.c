@@ -557,7 +557,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	down_write(&mm->mmap_sem);
 #endif
 #else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	if (mmap_write_lock_killable(mm)) {
+#else
 	if (down_write_killable(&mm->mmap_sem)) {
+#endif
 		mutex_unlock(&adev->mn_lock);
 		return ERR_PTR(-EINTR);
 	}
