@@ -47,7 +47,6 @@
 #include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/kcl_types.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
-#include "kcl/kcl_amdgpu_mmu_notifier.h"
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_ptrace.h>

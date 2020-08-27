@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-amdkcl-y += main.o symbols.o kcl_mn.o kcl_memory.o \
+amdkcl-y += main.o symbols.o kcl_memory.o \
 	kcl_ioctl.o
 
 amdkcl-y += kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o \
@@ -7,6 +7,7 @@ amdkcl-y += kcl_device_cgroup.o kcl_drm_cache.o kcl_drm.o \
 	kcl_perf_event.o kcl_reservation.o kcl_suspend.o kcl_workqueue.o \
 	kcl_seq_file.o kcl_connector.o kcl_backlight.o kcl_drm_atomic_helper.o \
 	kcl_drm_crtc.o kcl_drm_fb.o kcl_drm_modeset_lock.o kcl_drm_modes.o
+amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
 amdkcl-y += dma-buf/dma-resv.o
 
 # for trace-points
