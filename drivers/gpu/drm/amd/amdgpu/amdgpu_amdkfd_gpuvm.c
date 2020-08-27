@@ -1436,9 +1436,17 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(struct kgd_dev *kgd,
 	 * concurrently and the queues are actually stopped
 	 */
 	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        	mmap_write_lock(current->mm);
+#else
 		down_write(&current->mm->mmap_sem);
+#endif
 		is_invalid_userptr = atomic_read(&mem->invalid);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	        mmap_write_unlock(current->mm);
+#else
 		up_write(&current->mm->mmap_sem);
+#endif
 	}
 
 	mutex_lock(&mem->lock);

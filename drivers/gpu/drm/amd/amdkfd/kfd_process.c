@@ -1618,12 +1618,20 @@ static void kfd_process_unmap_doorbells(struct kfd_process *p)
 	struct kfd_process_device *pdd;
 	struct mm_struct *mm = p->mm;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_lock(mm);
+#else
 	down_write(&mm->mmap_sem);
+#endif
 
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
 		kfd_doorbell_unmap(pdd);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_unlock(mm);
+#else
 	up_write(&mm->mmap_sem);
+#endif
 }
 
 int kfd_process_remap_doorbells_locked(struct kfd_process *p)
@@ -1642,9 +1650,17 @@ static int kfd_process_remap_doorbells(struct kfd_process *p)
 	struct mm_struct *mm = p->mm;
 	int ret = 0;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_lock(mm);
+#else
 	down_write(&mm->mmap_sem);
+#endif
 	ret = kfd_process_remap_doorbells_locked(p);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_unlock(mm);
+#else
 	up_write(&mm->mmap_sem);
+#endif
 
 	return ret;
 }
