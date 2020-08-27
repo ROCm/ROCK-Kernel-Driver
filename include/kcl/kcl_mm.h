@@ -18,4 +18,12 @@
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
 
+#ifndef HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST
+static inline bool fault_flag_allow_retry_first(unsigned int flags)
+{
+	return (flags & FAULT_FLAG_ALLOW_RETRY) &&
+	    (!(flags & FAULT_FLAG_TRIED));
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
