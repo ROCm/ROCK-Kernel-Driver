@@ -61,7 +61,8 @@ int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj)
 	get_random_bytes(obj->share_handle, sizeof(obj->share_handle));
 
 	mutex_lock(&kfd_ipc_handles.lock);
-	hlist_add_head(&obj->node,
+	hlist_add_head(
+		&obj->node,
 		&kfd_ipc_handles.handles[HANDLE_TO_KEY(obj->share_handle)]);
 	mutex_unlock(&kfd_ipc_handles.lock);
 
@@ -107,12 +108,11 @@ int kfd_ipc_init(void)
 	return 0;
 }
 
-static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
-			  struct kfd_process *p,
-			  uint32_t gpu_id,
-			  struct dma_buf *dmabuf, struct kfd_ipc_obj *ipc_obj,
-			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset)
+static int
+kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev, struct kfd_process *p,
+				uint32_t gpu_id, struct dma_buf *dmabuf,
+				struct kfd_ipc_obj *ipc_obj, uint64_t va_addr,
+				uint64_t *handle, uint64_t *mmap_offset)
 {
 	int r;
 	void *mem;
@@ -135,14 +135,14 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	}
 
 	r = amdgpu_amdkfd_gpuvm_import_dmabuf(dev->kgd, dmabuf, ipc_obj,
-					va_addr, pdd->vm,
-					(struct kgd_mem **)&mem, &size,
-					mmap_offset);
+					      va_addr, pdd->vm,
+					      (struct kgd_mem **)&mem, &size,
+					      mmap_offset);
 	if (r)
 		goto err_unlock;
 
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-							  va_addr, size, 0, 0);
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem, va_addr,
+							  size, 0, 0);
 	if (idr_handle < 0) {
 		r = -EFAULT;
 		goto err_free;
@@ -155,17 +155,16 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem,
+					       NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return r;
 }
 
-int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
-					   struct kfd_process *p,
-					   uint32_t gpu_id, int dmabuf_fd,
-					   uint64_t va_addr, uint64_t *handle,
-					   uint64_t *mmap_offset)
+int kfd_ipc_import_dmabuf(struct kfd_dev *dev, struct kfd_process *p,
+			  uint32_t gpu_id, int dmabuf_fd, uint64_t va_addr,
+			  uint64_t *handle, uint64_t *mmap_offset)
 {
 	int r;
 	struct dma_buf *dmabuf = dma_buf_get(dmabuf_fd);
@@ -191,8 +190,9 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 	/* Convert the user provided handle to hash key and search only in that
 	 * bucket
 	 */
-	hlist_for_each_entry(entry,
-		&kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)], node) {
+	hlist_for_each_entry (
+		entry, &kfd_ipc_handles.handles[HANDLE_TO_KEY(share_handle)],
+		node) {
 		if (!memcmp(entry->share_handle, share_handle,
 			    sizeof(entry->share_handle))) {
 			found = ipc_obj_get(entry);
@@ -206,9 +206,9 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 
 	pr_debug("Found ipc_dma_buf: %p\n", found->dmabuf);
 
-	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id,
-					    found->dmabuf, found,
-					    va_addr, handle, mmap_offset);
+	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, found->dmabuf,
+					    found, va_addr, handle,
+					    mmap_offset);
 	if (r)
 		goto error_unref;
 

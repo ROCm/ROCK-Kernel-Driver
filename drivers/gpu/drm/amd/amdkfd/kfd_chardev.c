@@ -1867,11 +1867,19 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 	if (cma_write)
 		flags = FOLL_WRITE;
 	locked = 1;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+        mmap_read_lock(mm);
+#else
 	down_read(&mm->mmap_sem);
+#endif
 	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                mmap_read_unlock(mm);
+#else
 		up_read(&mm->mmap_sem);
+#endif
 	if (n <= 0) {
 		pr_err("CMA: Invalid virtual address 0x%lx\n", pa);
 		ret = -EFAULT;
@@ -2204,12 +2212,20 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 	while (nents && to_copy) {
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                mmap_read_lock(ri->mm);
+#else
 		down_read(&ri->mm->mmap_sem);
+#endif
 		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
 					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                        mmap_read_lock(ri->mm);
+#else
 			up_read(&ri->mm->mmap_sem);
+#endif
 		if (nl <= 0) {
 			pr_err("CMA: Invalid virtual address 0x%lx\n", rva);
 			ret = -EFAULT;

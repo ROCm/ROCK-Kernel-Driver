@@ -48,8 +48,8 @@
 #endif
 
 static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
-				struct vm_fault *vmf,
-				struct vm_area_struct *vma)
+				       struct vm_fault *vmf,
+				       struct vm_area_struct *vma)
 {
 	vm_fault_t ret = 0;
 	int err = 0;
@@ -73,8 +73,12 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 			goto out_unlock;
 
 		ttm_bo_get(bo);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                mmap_read_unlock(vma->vm_mm);
+#else
 		up_read(&vma->vm_mm->mmap_sem);
-		(void) dma_fence_wait(bo->moving, true);
+#endif
+		(void)dma_fence_wait(bo->moving, true);
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		ttm_bo_put(bo);
 		goto out_unlock;
@@ -85,8 +89,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	 */
 	err = dma_fence_wait(bo->moving, true);
 	if (unlikely(err != 0)) {
-		ret = (err != -ERESTARTSYS) ? VM_FAULT_SIGBUS :
-			VM_FAULT_NOPAGE;
+		ret = (err != -ERESTARTSYS) ? VM_FAULT_SIGBUS : VM_FAULT_NOPAGE;
 		goto out_unlock;
 	}
 
@@ -106,8 +109,8 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 	if (bdev->driver->io_mem_pfn)
 		return bdev->driver->io_mem_pfn(bo, page_offset);
 
-	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
-		+ page_offset;
+	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT) +
+	       page_offset;
 }
 
 /**
@@ -132,13 +135,11 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
  *    VM_FAULT_NOPAGE if blocking wait and retrying was not allowed.
  */
 #ifndef HAVE_VM_FAULT_ADDRESS_VMA
-vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
-			     struct vm_fault *vmf,
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo, struct vm_fault *vmf,
 			     struct vm_area_struct *vma)
 {
 #else
-vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
-				 struct vm_fault *vmf)
+vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo, struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
 #endif
@@ -152,9 +153,13 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 		if (vmf->flags & FAULT_FLAG_ALLOW_RETRY) {
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+                                mmap_read_unlock(vma->vm_mm);
+#else
 				up_read(&vma->vm_mm->mmap_sem);
-				if (!dma_resv_lock_interruptible(amdkcl_ttm_resvp(bo),
-								 NULL))
+#endif
+				if (!dma_resv_lock_interruptible(
+					    amdkcl_ttm_resvp(bo), NULL))
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
 				ttm_bo_put(bo);
 			}
@@ -190,13 +195,11 @@ EXPORT_SYMBOL(ttm_bo_vm_reserve);
  */
 #ifndef HAVE_VM_FAULT_ADDRESS_VMA
 vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
-				    struct vm_area_struct *vma,
-				    pgprot_t prot,
+				    struct vm_area_struct *vma, pgprot_t prot,
 				    pgoff_t num_prefault)
 {
 #else
-vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
-				    pgprot_t prot,
+vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf, pgprot_t prot,
 				    pgoff_t num_prefault)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -216,8 +219,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 #else
 	unsigned long address = vmf->address;
 #endif
-	struct ttm_mem_type_manager *man =
-		&bdev->man[bo->mem.mem_type];
+	struct ttm_mem_type_manager *man = &bdev->man[bo->mem.mem_type];
 
 	/*
 	 * Refuse to fault imported pages. This should be handled
@@ -266,9 +268,9 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 	}
 
 	page_offset = ((address - vma->vm_start) >> PAGE_SHIFT) +
-		vma->vm_pgoff - drm_vma_node_start(&bo->base.vma_node);
+		      vma->vm_pgoff - drm_vma_node_start(&bo->base.vma_node);
 	page_last = vma_pages(vma) + vma->vm_pgoff -
-		drm_vma_node_start(&bo->base.vma_node);
+		    drm_vma_node_start(&bo->base.vma_node);
 
 	if (unlikely(page_offset >= bo->num_pages)) {
 		ret = VM_FAULT_SIGBUS;
@@ -312,7 +314,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				break;
 			}
 			page->index = drm_vma_node_start(&bo->base.vma_node) +
-				page_offset;
+				      page_offset;
 			pfn = page_to_pfn(page);
 		}
 
@@ -325,9 +327,12 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 		 * See vmf_insert_mixed_prot() for a discussion.
 		 */
 		if (vma->vm_flags & VM_MIXEDMAP)
-			ret = vmf_insert_mixed_prot(vma, address,
-						    __pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)),
-						    prot);
+			ret = vmf_insert_mixed_prot(
+				vma, address,
+				__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ?
+								       PFN_MAP :
+								       0)),
+				prot);
 		else
 			ret = vmf_insert_pfn_prot(vma, address, pfn, prot);
 
@@ -405,8 +410,8 @@ void ttm_bo_vm_close(struct vm_area_struct *vma)
 EXPORT_SYMBOL(ttm_bo_vm_close);
 
 static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
-				 unsigned long offset,
-				 uint8_t *buf, int len, int write)
+				 unsigned long offset, uint8_t *buf, int len,
+				 int write)
 {
 	unsigned long page = offset >> PAGE_SHIFT;
 	unsigned long bytes_left = len;
@@ -443,10 +448,10 @@ static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
 	return len;
 }
 
-int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
-		     void *buf, int len, int write)
+int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr, void *buf,
+		     int len, int write)
 {
-	unsigned long offset = (addr) - vma->vm_start;
+	unsigned long offset = (addr)-vma->vm_start;
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	int ret;
 
@@ -470,8 +475,8 @@ int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
 		break;
 	default:
 		if (bo->bdev->driver->access_memory)
-			ret = bo->bdev->driver->access_memory(
-				bo, offset, buf, len, write);
+			ret = bo->bdev->driver->access_memory(bo, offset, buf,
+							      len, write);
 		else
 			ret = -EIO;
 	}
@@ -513,7 +518,8 @@ static struct ttm_buffer_object *ttm_bo_vm_lookup(struct ttm_bo_device *bdev,
 	return bo;
 }
 
-static void ttm_bo_mmap_vma_setup(struct ttm_buffer_object *bo, struct vm_area_struct *vma)
+static void ttm_bo_mmap_vma_setup(struct ttm_buffer_object *bo,
+				  struct vm_area_struct *vma)
 {
 	vma->vm_ops = &ttm_bo_vm_ops;
 
@@ -532,7 +538,8 @@ static void ttm_bo_mmap_vma_setup(struct ttm_buffer_object *bo, struct vm_area_s
 	 * VM_MIXEDMAP on all mappings. See freedesktop.org bug #75719
 	 */
 	vma->vm_flags |= VM_MIXEDMAP;
-	vma->vm_flags |= (bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
+	vma->vm_flags |=
+		(bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
 }
 
 int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,

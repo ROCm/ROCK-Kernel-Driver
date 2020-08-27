@@ -43,9 +43,8 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 			  uint64_t va_addr, uint64_t *handle,
 			  uint64_t *mmap_offset);
 int kfd_ipc_import_dmabuf(struct kfd_dev *kfd, struct kfd_process *p,
-			  uint32_t gpu_id, int dmabuf_fd,
-			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset);
+			  uint32_t gpu_id, int dmabuf_fd, uint64_t va_addr,
+			  uint64_t *handle, uint64_t *mmap_offset);
 int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 			     uint64_t handle, uint32_t *ipc_handle);
 

@@ -207,7 +207,11 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 		/* only need to skip on ATPX */
 		if (amdgpu_device_supports_boco(dev) &&
 		    !amdgpu_is_atpx_hybrid())
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+			dev_pm_set_driver_flags(dev->dev, DPM_FLAG_NO_DIRECT_COMPLETE);
+#else
 			dev_pm_set_driver_flags(dev->dev, DPM_FLAG_NEVER_SKIP);
+#endif
 		pm_runtime_use_autosuspend(dev->dev);
 		pm_runtime_set_autosuspend_delay(dev->dev, 5000);
 		pm_runtime_allow(dev->dev);

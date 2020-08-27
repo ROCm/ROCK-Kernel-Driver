@@ -551,7 +551,9 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
 	.destroy_connector = dm_dp_destroy_mst_connector,
+#endif
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
 	.hotplug = dm_dp_mst_hotplug,
 #endif

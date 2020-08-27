@@ -9,6 +9,20 @@
 #include <linux/kallsyms.h>
 #include <linux/bug.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+extern unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
+#endif
+static inline unsigned long kcl_kallsyms_lookup_name(const char *name)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+	return _kcl_kallsyms_lookup_name(name);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+	return (unsigned long)__symbol_get(name);
+#else
+	return kallsyms_lookup_name(name);
+#endif
+}
+
 static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 {
 	unsigned long addr;
@@ -18,9 +32,13 @@ static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 	if (addr == 0) {
 		fp = fp_stup;
 		if (fp != NULL)
-			printk_once(KERN_WARNING "Warning: fail to get symbol %s, replace it with kcl stub\n", symbol);
+			printk_once(
+				KERN_WARNING
+				"Warning: fail to get symbol %s, replace it with kcl stub\n",
+				symbol);
 		else {
-			printk_once(KERN_ERR "Error: fail to get symbol %s\n", symbol);
+			printk_once(KERN_ERR "Error: fail to get symbol %s\n",
+				    symbol);
 			BUG();
 		}
 	} else {
@@ -33,12 +51,12 @@ static inline void *amdkcl_fp_setup(const char *symbol, void *fp_stup)
 /*
  * create dummy func
  */
-#define amdkcl_dummy_symbol(name, ret_type, ret, ...) \
-ret_type name(__VA_ARGS__) \
-{ \
-	pr_warn_once("%s is not supported\n", #name); \
-	ret ;\
-} \
-EXPORT_SYMBOL(name);
+#define amdkcl_dummy_symbol(name, ret_type, ret, ...)                          \
+	ret_type name(__VA_ARGS__)                                             \
+	{                                                                      \
+		pr_warn_once("%s is not supported\n", #name);                  \
+		ret;                                                           \
+	}                                                                      \
+	EXPORT_SYMBOL(name);
 
 #endif

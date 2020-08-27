@@ -2319,7 +2319,11 @@ void copy_context_work_handler (struct work_struct *work)
 
 	p = workarea->p;
 	mm = get_task_mm(p->lead_thread);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	kthread_use_mm(mm);
+#else
 	use_mm(mm);
+#endif
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
@@ -2345,7 +2349,11 @@ void copy_context_work_handler (struct work_struct *work)
 
 		dqm_unlock(dqm);
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	kthread_use_mm(mm);
+#else
 	unuse_mm(mm);
+#endif
 	mmput(mm);
 }
 
