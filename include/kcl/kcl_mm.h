@@ -87,4 +87,12 @@ static inline unsigned long zone_managed_pages(struct zone *zone)
 }
 #endif /* HAVE_ZONE_MANAGED_PAGES */
 
+#ifndef HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST
+static inline bool fault_flag_allow_retry_first(unsigned int flags)
+{
+	return (flags & FAULT_FLAG_ALLOW_RETRY) &&
+	    (!(flags & FAULT_FLAG_TRIED));
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
