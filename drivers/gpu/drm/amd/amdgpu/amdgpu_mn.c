@@ -551,7 +551,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 
 	mutex_lock(&adev->mn_lock);
 #ifndef HAVE_DOWN_WRITE_KILLABLE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_lock(mm);
+#else
 	down_write(&mm->mmap_sem);
+#endif
 #else
 	if (down_write_killable(&mm->mmap_sem)) {
 		mutex_unlock(&adev->mn_lock);
@@ -589,13 +593,21 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	hash_add(adev->mn_hash, &amn->node, AMDGPU_MN_KEY(mm, type));
 
 release_locks:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_unlock(mm);
+#else
 	up_write(&mm->mmap_sem);
+#endif
 	mutex_unlock(&adev->mn_lock);
 
 	return amn;
 
 free_amn:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+	mmap_write_unlock(mm);
+#else
 	up_write(&mm->mmap_sem);
+#endif
 	mutex_unlock(&adev->mn_lock);
 	kfree(amn);
 
