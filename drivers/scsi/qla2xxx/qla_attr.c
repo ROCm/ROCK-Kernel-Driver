@@ -1922,9 +1922,8 @@ static char *mode_to_str[] = {
 };
 
 #define NEED_EXCH_OFFLOAD(_exchg) ((_exchg) > FW_DEF_EXCHANGES_CNT)
-static int qla_set_ini_mode(scsi_qla_host_t *vha, int op)
+static void qla_set_ini_mode(scsi_qla_host_t *vha, int op)
 {
-	int rc = 0;
 	enum {
 		NO_ACTION,
 		MODE_CHANGE_ACCEPT,
@@ -2197,8 +2196,6 @@ static int qla_set_ini_mode(scsi_qla_host_t *vha, int op)
 		    vha->ql2xexchoffld, vha->u_ql2xexchoffld);
 		break;
 	}
-
-	return rc;
 }
 
 static ssize_t
