@@ -13,6 +13,7 @@
 #include <linux/mm.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
+#include <kcl/kcl_mmap_lock.h>
 #include <kcl/kcl_mm_types.h>
 #include <kcl/kcl_memory.h>
 
