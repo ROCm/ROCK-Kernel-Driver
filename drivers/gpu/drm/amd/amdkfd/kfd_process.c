@@ -218,7 +218,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-	unuse_mm(mm);
+	kthread_unuse_mm(mm);
 #else
 	unuse_mm(mm);
 #endif
