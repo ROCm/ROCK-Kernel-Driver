@@ -3,6 +3,7 @@
 #define AMDKCL_MM_H
 
 #include <linux/mm.h>
+#include <kcl/kcl_mmap_lock.h>
 
 #ifndef untagged_addr
 #define untagged_addr(addr) (addr)
