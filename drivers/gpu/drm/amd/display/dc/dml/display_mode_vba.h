@@ -924,7 +924,6 @@ struct vba_vars_st {
 	bool ClampMinDCFCLK;
 #endif
 	bool AllowDramClockChangeOneDisplayVactive;
-	bool SynchronizeTimingsIfSingleRefreshRate;
 
 };
 
