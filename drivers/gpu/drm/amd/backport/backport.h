@@ -38,5 +38,6 @@
 #include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_pagemap.h>
+#include <kcl/kcl_pm.h>
 
 #endif /* AMDGPU_BACKPORT_H */
