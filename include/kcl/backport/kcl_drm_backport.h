@@ -2,91 +2,12 @@
 #ifndef AMDKCL_DRM_BACKPORT_H
 #define AMDKCL_DRM_BACKPORT_H
 
-#include <drm/drm_crtc.h>
-#include <kcl/header/kcl_drm_encoder_h.h>
-#include <drm/drm_edid.h>
-#include <drm/drm_fb_helper.h>
-#include <drm/drm_cache.h>
-#include <kcl/header/kcl_drmP_h.h>
-#include <drm/drm_gem.h>
+#include <linux/ctype.h>
+#include <drm/drm_fourcc.h>
+#include <kcl/kcl_drm.h>
 #include <kcl/header/kcl_drm_file_h.h>
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
-#endif
-#include <drm/drm_crtc_helper.h>
-#include <kcl/header/kcl_drm_drv_h.h>
-#include <kcl/kcl_drm.h>
-
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
-#define AMDKCL_AMDGPU_DMABUF_OPS
-#endif
-
-#if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
-#define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
-#endif
-
-#if defined(HAVE_DRM_EDID_TO_ELD)
-static inline
-int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
-{
-	int ret;
-
-	ret = drm_add_edid_modes(connector, edid);
-
-	if (drm_edid_is_valid(edid))
-		drm_edid_to_eld(connector, edid);
-
-	return ret;
-}
-#define drm_add_edid_modes _kcl_drm_add_edid_modes
-#endif
-
-#if !defined(HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP)
-#define drm_fb_helper_remove_conflicting_pci_framebuffers _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers
-#endif
-
-#if !defined(HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME)
-static inline int _kcl_drm_encoder_init(struct drm_device *dev,
-		      struct drm_encoder *encoder,
-		      const struct drm_encoder_funcs *funcs,
-		      int encoder_type, const char *name, ...)
-{
-	return drm_encoder_init(dev, encoder, funcs, encoder_type);
-}
-#define drm_encoder_init _kcl_drm_encoder_init
-#endif
-
-#if !defined(HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME)
-static inline
-int _kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
-			      struct drm_plane *primary,
-			      struct drm_plane *cursor,
-			      const struct drm_crtc_funcs *funcs,
-			      const char *name, ...)
-{
-	return drm_crtc_init_with_planes(dev, crtc, primary, cursor, funcs);
-}
-#define drm_crtc_init_with_planes _kcl_drm_crtc_init_with_planes
-#endif
-
-#ifndef HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS
-static inline int _kcl_drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
-			     unsigned long possible_crtcs,
-			     const struct drm_plane_funcs *funcs,
-			     const uint32_t *formats, unsigned int format_count,
-			     const uint64_t *format_modifiers,
-			     enum drm_plane_type type,
-			     const char *name, ...)
-{
-#if defined(HAVE_DRM_UNIVERSAL_PLANE_INIT_8ARGS)
-	return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-			 formats, format_count, type, name);
-#else
-	return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-			 formats, format_count, type);
-#endif
-}
-#define drm_universal_plane_init _kcl_drm_universal_plane_init
 #endif
 
 #if !defined(HAVE_DRM_GET_FORMAT_NAME_I_P)
@@ -156,14 +77,6 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
 #endif
 
-/*
- * commit v4.9-rc4-949-g949f08862d66
- * drm: Make the connector .detect() callback optional
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-#define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
-#endif
-
 #ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
 static inline struct drm_gem_object *
 _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
@@ -171,6 +84,10 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 	return drm_gem_object_lookup(filp->minor->dev, filp, handle);
 }
 #define drm_gem_object_lookup _kcl_drm_gem_object_lookup
+#endif
+
+#if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
+#define AMDKCL_AMDGPU_DMABUF_OPS
 #endif
 
 /*
@@ -181,9 +98,6 @@ _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
 #define AMDKCL_DMA_BUF_SHARE_ADDR_SPACE
 #endif
 
-#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
-#define drm_helper_mode_fill_fb_struct _kcl_drm_helper_mode_fill_fb_struct
-#endif
 
 #ifdef HAVE_DRM_DEV_UNPLUG
 /*

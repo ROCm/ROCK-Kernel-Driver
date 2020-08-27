@@ -7,6 +7,14 @@
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_drm.h>
 
+/*
+ * commit v4.9-rc4-949-g949f08862d66
+ * drm: Make the connector .detect() callback optional
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
+#define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
+#endif
+
 #ifndef HAVE_DRM_CONNECTOR_UPDATE_EDID_PROPERTY
 #define drm_connector_update_edid_property drm_mode_connector_update_edid_property
 #endif
