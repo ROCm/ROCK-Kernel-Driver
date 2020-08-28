@@ -5,7 +5,7 @@
 #include <drm/drm_crtc.h>
 #include <kcl/header/kcl_drm_connector_h.h>
 #include <kcl/kcl_kref.h>
-#include <kcl/kcl_drm.h>
+#include <kcl/kcl_drm_crtc.h>
 
 /*
  * commit v4.9-rc4-949-g949f08862d66
