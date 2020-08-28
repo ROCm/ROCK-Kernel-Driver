@@ -2,7 +2,7 @@
 #ifndef AMDKCL_EVENTPOLL_H
 #define AMDKCL_EVENTPOLL_H
 
-#include <uapi/linux/eventpoll.h>
+#include <linux/poll.h>
 #ifndef EPOLLIN
 #define EPOLLIN        0x00000001
 #define EPOLLPRI       0x00000002
