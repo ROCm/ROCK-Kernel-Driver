@@ -74,6 +74,11 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
+/* Copied from include/drm/drm_util.h */
+/* helper for handling conditionals in various for_each macros */
+#ifndef for_each_if
+#define for_each_if(condition) if (!(condition)) {} else
+#endif
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
