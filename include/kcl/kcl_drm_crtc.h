@@ -26,4 +26,9 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
+/* helper for handling conditionals in various for_each macros */
+#ifndef for_each_if
+#define for_each_if(condition) if (!(condition)) {} else
+#endif
+
 #endif
