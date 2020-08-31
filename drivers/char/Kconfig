@@ -139,8 +139,9 @@ source "drivers/tty/hvc/Kconfig"
 
 config VIRTIO_CONSOLE
 	tristate "Virtio console"
-	depends on VIRTIO && TTY
+	depends on TTY
 	select HVC_DRIVER
+	select VIRTIO
 	help
 	  Virtio console for use with hypervisors.
 
