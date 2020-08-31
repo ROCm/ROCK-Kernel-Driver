@@ -24,14 +24,14 @@ static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
 static inline vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma,
 				unsigned long addr, unsigned long pfn)
 {
-		int err = vm_insert_pfn(vma, addr, pfn);
+	int err = vm_insert_pfn(vma, addr, pfn);
 
-		if (err == -ENOMEM)
-			return VM_FAULT_OOM;
-		if (err < 0 && err != -EBUSY)
-			return VM_FAULT_SIGBUS;
+	if (err == -ENOMEM)
+		return VM_FAULT_OOM;
+	if (err < 0 && err != -EBUSY)
+		return VM_FAULT_SIGBUS;
 
-		return VM_FAULT_NOPAGE;
+	return VM_FAULT_NOPAGE;
 }
 
 #endif /* HAVE_VMF_INSERT */
@@ -57,5 +57,12 @@ vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
 	return _kcl_vmf_insert_pfn_prot(vma, addr, pfn, pgprot);
 }
 #endif /* HAVE_VMF_INSERT_PFN_PROT */
+
+#ifndef HAVE_VMF_INSERT_PFN_PMD_PROT
+vm_fault_t vmf_insert_pfn_pmd_prot(struct vm_fault *vmf, pfn_t pfn,
+				   pgprot_t pgprot, bool write);
+vm_fault_t vmf_insert_pfn_pud_prot(struct vm_fault *vmf, pfn_t pfn,
+				   pgprot_t pgprot, bool write);
+#endif /* HAVE_VMF_INSERT_PFN_PMD_PROT */
 
 #endif
