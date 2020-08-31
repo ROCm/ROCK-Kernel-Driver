@@ -1,4 +1,19 @@
 dnl #
+dnl # v5.6-rc3-21-g6bfef2f91945
+dnl # mm/hmm: remove HMM_FAULT_SNAPSHOT
+dnl #
+AC_DEFUN([AC_AMDGPU_HMM_RANGE_FAULT], [
+	AC_KERNEL_TRY_COMPILE([
+		#include <linux/hmm.h>
+	], [
+		hmm_range_fault(NULL);
+	], [
+		AC_DEFINE(HAVE_HMM_RANGE_FAULT_1ARG, 1,
+			[hmm_range_fault() wants 1 arg])
+	])
+])
+
+dnl #
 dnl # 93f4e735b6d9 - mm/hmm: remove hmm_range_dma_map and hmm_range_dma_unmap <Christoph Hellwig> 2019-11-23 19:56:45 -0400
 dnl # d28c2c9a4877 - mm/hmm: make full use of walk_page_range() <Ralph Campbell> 2019-11-23 19:56:45 -0400
 dnl # d3eeb1d77c5d - xen/gntdev: use mmu_interval_notifier_insert <Jason Gunthorpe> 2019-11-23 19:56:45 -0400
@@ -30,6 +45,7 @@ AC_DEFUN([AC_AMDGPU_HMM], [
 		], [
 			AC_DEFINE(HAVE_AMDKCL_HMM_MIRROR_ENABLED, 1,
 				[hmm support is enabled])
+			AC_AMDGPU_HMM_RANGE_FAULT
 		])
 	])
 ])
