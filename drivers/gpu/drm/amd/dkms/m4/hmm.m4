@@ -1,15 +1,33 @@
 dnl #
-dnl # v5.6-rc3-21-g6bfef2f91945
-dnl # mm/hmm: remove HMM_FAULT_SNAPSHOT
+dnl # v5.7-rc4-4-g2733ea144dcc mm/hmm: remove the customizable pfn format from hmm_range_fault
+dnl # v5.7-rc4-3-g5c8f3c4cf18a mm/hmm: remove HMM_PFN_SPECIAL
+dnl # v5.7-rc4-2-g4e2490843d55 drm/amdgpu: remove dead code after hmm_range_fault()
+dnl # v5.7-rc4-1-gbe957c886d92 mm/hmm: make hmm_range_fault return 0 or -1
 dnl #
 AC_DEFUN([AC_AMDGPU_HMM_RANGE_FAULT], [
 	AC_KERNEL_TRY_COMPILE([
 		#include <linux/hmm.h>
 	], [
-		hmm_range_fault(NULL);
+		enum hmm_pfn_flags flag;
+		flag = HMM_PFN_REQ_FAULT;
 	], [
+		AC_DEFINE(HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT, 1,
+			[hmm remove the customizable pfn format])
 		AC_DEFINE(HAVE_HMM_RANGE_FAULT_1ARG, 1,
-			[hmm_range_fault() wants 1 arg])
+				[hmm_range_fault() wants 1 arg])
+	], [
+		dnl #
+		dnl # v5.6-rc3-21-g6bfef2f91945
+		dnl # mm/hmm: remove HMM_FAULT_SNAPSHOT
+		dnl #
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/hmm.h>
+		], [
+			hmm_range_fault(NULL);;
+		], [
+			AC_DEFINE(HAVE_HMM_RANGE_FAULT_1ARG, 1,
+				[hmm_range_fault() wants 1 arg])
+		])
 	])
 ])
 
