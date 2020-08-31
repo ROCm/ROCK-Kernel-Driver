@@ -39,6 +39,7 @@
 #include <kcl/backport/kcl_fence_backport.h>
 #include <kcl/backport/kcl_ttm_tt_backport.h>
 #include <kcl/backport/kcl_device_cgroup_backport.h>
+#include <kcl/backport/kcl_hmm.h>
 #include <kcl/kcl_mn.h>
 #ifdef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ
 #include <linux/reservation.h>
