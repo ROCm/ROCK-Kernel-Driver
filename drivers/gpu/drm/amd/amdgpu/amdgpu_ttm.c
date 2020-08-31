@@ -790,6 +790,20 @@ struct amdgpu_ttm_tt {
 
 #ifdef CONFIG_DRM_AMDGPU_USERPTR
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+/* flags used by HMM internal, not related to CPU/GPU PTE flags */
+static const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
+	(1 << 0), /* HMM_PFN_VALID */
+	(1 << 1), /* HMM_PFN_WRITE */
+	0 /* HMM_PFN_DEVICE_PRIVATE */
+};
+
+static const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
+	0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
+	0, /* HMM_PFN_NONE */
+	0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
+};
+#endif
 /*
  * amdgpu_ttm_tt_get_user_pages - get device accessible pages that back user
  * memory and start HMM tracking CPU page table update
@@ -830,13 +844,31 @@ int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 	range->notifier = &bo->notifier;
 	range->start = bo->notifier.interval_tree.start;
 	range->end = bo->notifier.interval_tree.last + 1;
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	range->flags = hmm_range_flags;
+	range->values = hmm_range_values;
+	range->pfn_shift = PAGE_SHIFT;
+	range->default_flags = hmm_range_flags[HMM_PFN_VALID];
+#else
 	range->default_flags = HMM_PFN_REQ_FAULT;
+#endif
 	if (!amdgpu_ttm_tt_is_readonly(ttm))
-		range->default_flags |= HMM_PFN_REQ_WRITE;
+		range->default_flags |=
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		range->flags[HMM_PFN_WRITE];
+#else
+		HMM_PFN_REQ_WRITE;
+#endif
 
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	range->pfns = kvmalloc_array(ttm->num_pages, sizeof(*range->pfns),
+				     GFP_KERNEL);
+	if (unlikely(!range->pfns)) {
+#else
 	range->hmm_pfns = kvmalloc_array(ttm->num_pages,
 					 sizeof(*range->hmm_pfns), GFP_KERNEL);
 	if (unlikely(!range->hmm_pfns)) {
+#endif
 		r = -ENOMEM;
 		goto out_free_ranges;
 	}
@@ -861,12 +893,20 @@ retry:
 	mmap_read_lock(mm);
 	r = hmm_range_fault(range);
 	mmap_read_unlock(mm);
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	if (unlikely(r <= 0)) {
+#else
 	if (unlikely(r)) {
+#endif
 		/*
 		 * FIXME: This timeout should encompass the retry from
 		 * mmu_interval_read_retry() as well.
 		 */
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		if ((r == 0 || r == -EBUSY) && !time_after(jiffies, timeout))
+#else
 		if (r == -EBUSY && !time_after(jiffies, timeout))
+#endif
 			goto retry;
 		goto out_free_pfns;
 	}
@@ -876,8 +916,21 @@ retry:
 	 * hmm_range_fault() fails. FIXME: The pages cannot be touched outside
 	 * the notifier_lock, and mmu_interval_read_retry() must be done first.
 	 */
-	for (i = 0; i < ttm->num_pages; i++)
+	for (i = 0; i < ttm->num_pages; i++) {
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		pages[i] = hmm_device_entry_to_page(range, range->pfns[i]);
+		if (unlikely(!pages[i])) {
+			pr_err("Page fault failed for pfn[%lu] = 0x%llx\n",
+			       i, range->pfns[i]);
+			r = -ENOMEM;
+
+			goto out_free_pfns;
+		}
+
+#else
 		pages[i] = hmm_pfn_to_page(range->hmm_pfns[i]);
+#endif
+	}
 
 	gtt->range = range;
 	mmput(mm);
@@ -887,7 +940,11 @@ retry:
 out_unlock:
 	mmap_read_unlock(mm);
 out_free_pfns:
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	kvfree(range->pfns);
+#else
 	kvfree(range->hmm_pfns);
+#endif
 out_free_ranges:
 	kfree(range);
 out:
@@ -912,7 +969,11 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm)
 	DRM_DEBUG_DRIVER("user_pages_done 0x%llx pages 0x%x\n",
 		gtt->userptr, ttm->num_pages);
 
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+	WARN_ONCE(!gtt->range || !gtt->range->pfns,
+#else
 	WARN_ONCE(!gtt->range || !gtt->range->hmm_pfns,
+#endif
 		"No user pages to check\n");
 
 	if (gtt->range) {
@@ -922,7 +983,11 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm)
 		 */
 		r = mmu_interval_read_retry(gtt->range->notifier,
 					 gtt->range->notifier_seq);
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+		kvfree(gtt->range->pfns);
+#else
 		kvfree(gtt->range->hmm_pfns);
+#endif
 		kfree(gtt->range);
 		gtt->range = NULL;
 	}
@@ -1142,7 +1207,12 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_device *bdev,
 
 		for (i = 0; i < ttm->num_pages; i++) {
 			if (ttm->pages[i] !=
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+				hmm_device_entry_to_page(gtt->range,
+					      gtt->range->pfns[i]))
+#else
 			    hmm_pfn_to_page(gtt->range->hmm_pfns[i]))
+#endif
 				break;
 		}
 
