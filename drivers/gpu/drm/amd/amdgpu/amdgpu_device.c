@@ -3493,9 +3493,6 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 #endif
 	int r;
 
-	if (!dev)
-		return -ENODEV;
-
 	adev = drm_to_adev(dev);
 
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
