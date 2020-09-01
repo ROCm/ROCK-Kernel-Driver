@@ -765,7 +765,6 @@ struct dc_transfer_func {
 	enum dc_transfer_func_predefined tf;
 	/* FP16 1.0 reference level in nits, default is 80 nits, only for PQ*/
 	uint32_t sdr_ref_white_level;
-	struct dc_context *ctx;
 	union {
 		struct pwl_params pwl;
 		struct dc_transfer_func_distributed_points tf_pts;
@@ -793,7 +792,6 @@ struct dc_3dlut {
 	struct tetrahedral_params lut_3d;
 	struct fixed31_32 hdr_multiplier;
 	union dc_3dlut_state state;
-	struct dc_context *ctx;
 };
 #endif
 /*
