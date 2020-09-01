@@ -3621,7 +3621,7 @@ static int delete_block_group_cache(struct btrfs_fs_info *fs_info,
 	key.type = BTRFS_INODE_ITEM_KEY;
 	key.offset = 0;
 
-	inode = btrfs_iget(fs_info->sb, &key, root, NULL);
+	inode = btrfs_iget(fs_info->sb, &key, root);
 	if (IS_ERR(inode))
 		return -ENOENT;
 
@@ -4319,7 +4319,7 @@ struct inode *create_reloc_inode(struct btrfs_fs_info *fs_info,
 	key.objectid = objectid;
 	key.type = BTRFS_INODE_ITEM_KEY;
 	key.offset = 0;
-	inode = btrfs_iget(fs_info->sb, &key, root, NULL);
+	inode = btrfs_iget(fs_info->sb, &key, root);
 	BUG_ON(IS_ERR(inode));
 	BTRFS_I(inode)->index_cnt = group->key.objectid;
 
