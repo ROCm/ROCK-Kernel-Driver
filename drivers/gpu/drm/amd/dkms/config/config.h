@@ -4,23 +4,8 @@
 /* whether invalidate_range_start() wants 2 args */
 #define HAVE_2ARGS_INVALIDATE_RANGE_START 1
 
-/* get_user_pages() wants 5 args */
-#define HAVE_5ARGS_GET_USER_PAGES 1
-
 /* whether invalidate_range_start() wants 5 args */
 /* #undef HAVE_5ARGS_INVALIDATE_RANGE_START */
-
-/* get_user_pages() wants 6 args */
-/* #undef HAVE_6ARGS_GET_USER_PAGES */
-
-/* get_user_pages_remote() wants 7 args */
-/* #undef HAVE_7ARGS_GET_USER_PAGES_REMOTE */
-
-/* get_user_pages() wants 8 args */
-/* #undef HAVE_8ARGS_GET_USER_PAGES */
-
-/* get_user_pages_remote() wants 8 args */
-#define HAVE_8ARGS_GET_USER_PAGES_REMOTE 1
 
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
@@ -574,6 +559,18 @@
 
 /* get_scanout_position return bool */
 /* #undef HAVE_GET_SCANOUT_POSITION_RETURN_BOOL */
+
+/* get_user_pages() wants 6 args */
+/* #undef HAVE_GET_USER_PAGES_6ARGS */
+
+/* get_user_pages() wants gup_flags parameter */
+#define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+
+/* get_user_pages_remote() wants gup_flags parameter */
+/* #undef HAVE_GET_USER_PAGES_REMOTE_GUP_FLAGS */
+
+/* get_user_pages_remote() wants locked parameter */
+#define HAVE_GET_USER_PAGES_REMOTE_LOCKED 1
 
 /* get_vblank_timestamp has bool in_vblank_irq arg */
 /* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_HAS_BOOL_IN_VBLANK_IRQ */
