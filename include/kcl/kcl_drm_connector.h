@@ -66,4 +66,17 @@ int drm_connector_init_with_ddc(struct drm_device *dev,
 	return _kcl_drm_connector_init_with_ddc(dev, connector, funcs, connector_type, ddc);
 }
 #endif
+
+#ifdef CONFIG_DRM_AMD_DC_HDCP
+#ifndef HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION
+void _kcl_drm_hdcp_update_content_protection(struct drm_connector *connector,
+                                       u64 val);
+static inline
+void drm_hdcp_update_content_protection(struct drm_connector *connector,
+                                       u64 val)
+{
+	_kcl_drm_hdcp_update_content_protection(connector, val);
+}
+#endif
+#endif
 #endif /* AMDKCL_DRM_CONNECTOR_H */

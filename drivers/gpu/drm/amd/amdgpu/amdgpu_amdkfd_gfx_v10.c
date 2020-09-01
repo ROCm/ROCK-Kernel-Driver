@@ -1086,7 +1086,6 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.get_atc_vmid_pasid_mapping_info =
 			get_atc_vmid_pasid_mapping_info,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
-	.get_hive_id = amdgpu_amdkfd_get_hive_id,
 	.enable_debug_trap = kgd_gfx_v10_enable_debug_trap,
 	.disable_debug_trap = kgd_gfx_v10_disable_debug_trap,
 	.set_wave_launch_trap_override = kgd_gfx_v10_set_wave_launch_trap_override,
@@ -1095,5 +1094,4 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.clear_address_watch = kgd_gfx_v10_clear_address_watch,
 	.get_iq_wait_times = kgd_gfx_v10_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v10_build_grace_period_packet_info,
-	.get_unique_id = amdgpu_amdkfd_get_unique_id,
 };

@@ -3068,13 +3068,19 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 #endif
 #endif
 	r = amdgpu_display_modeset_create_props(adev);
-	if (r)
+	if (r) {
+		dc_release_state(state->context);
+		kfree(state);
 		return r;
+	}
 
 #if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
 	r = amdgpu_dm_audio_init(adev);
-	if (r)
+	if (r) {
+		dc_release_state(state->context);
+		kfree(state);
 		return r;
+	}
 #endif
 
 	return 0;
@@ -5094,7 +5100,8 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	update_stream_signal(stream, sink);
 
 	if (stream->signal == SIGNAL_TYPE_HDMI_TYPE_A)
-		mod_build_hf_vsif_infopacket(stream, &stream->vsp_infopacket, false, false);
+		mod_build_hf_vsif_infopacket(stream, &stream->vsp_infopacket);
+
 	if (stream->link->psr_settings.psr_feature_enabled) {
 		//
 		// should decide stream support vsc sdp colorimetry capability
@@ -7065,7 +7072,11 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 #endif
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 		if (adev->dm.hdcp_workqueue)
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			drm_connector_attach_content_protection_property(&aconnector->base, true);
+#else
+			drm_connector_attach_content_protection_property(&aconnector->base);
+#endif
 #endif
 		drm_object_attach_property(&aconnector->base.base,
 					adev->mode_info.freesync_property, 0);
@@ -7329,11 +7340,13 @@ static bool is_content_protection_different(struct drm_connector_state *state,
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 	if (old_state->hdcp_content_type != state->hdcp_content_type &&
 	    state->content_protection != DRM_MODE_CONTENT_PROTECTION_UNDESIRED) {
 		state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
 		return true;
 	}
+#endif
 
 	/* CP is being re enabled, ignore this */
 	if (old_state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED &&
@@ -8384,7 +8397,11 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		if (is_content_protection_different(new_con_state, old_con_state, connector, adev->dm.hdcp_workqueue))
 			hdcp_update_display(
 				adev->dm.hdcp_workqueue, aconnector->dc_link->link_index, aconnector,
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 				new_con_state->hdcp_content_type,
+#else
+				DRM_MODE_HDCP_CONTENT_TYPE0,
+#endif
 				new_con_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED ? true
 													 : false);
 	}

@@ -49,6 +49,10 @@ struct dmub_debugfs_trace_entry {
 	uint32_t param1;
 };
 
+static inline const char *yesno(bool v)
+{
+	return v ? "yes" : "no";
+}
 
 /* parse_write_buffer_into_params - Helper function to parse debugfs write buffer into an array
  *
@@ -999,6 +1003,148 @@ static ssize_t dp_dpcd_data_read(struct file *f, char __user *buf,
 }
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+/* function: Read link's DSC & FEC capabilities
+ *
+ *
+ * Access it with the following command (you need to specify
+ * connector like DP-1):
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/dp_dsc_fec_support
+ *
+ */
+static int dp_dsc_fec_support_show(struct seq_file *m, void *data)
+{
+	struct drm_connector *connector = m->private;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	int ret = 0;
+	bool try_again = false;
+	bool is_fec_supported = false;
+	bool is_dsc_supported = false;
+	struct dpcd_caps dpcd_caps;
+
+	drm_modeset_acquire_init(&ctx, DRM_MODESET_ACQUIRE_INTERRUPTIBLE);
+	do {
+		try_again = false;
+		ret = drm_modeset_lock(&dev->mode_config.connection_mutex, &ctx);
+		if (ret) {
+			if (ret == -EDEADLK) {
+				ret = drm_modeset_backoff(&ctx);
+				if (!ret) {
+					try_again = true;
+					continue;
+				}
+			}
+			break;
+		}
+		if (connector->status != connector_status_connected) {
+			ret = -ENODEV;
+			break;
+		}
+		dpcd_caps = aconnector->dc_link->dpcd_caps;
+		if (aconnector->port) {
+			/* aconnector sets dsc_aux during get_modes call
+			 * if MST connector has it means it can either
+			 * enable DSC on the sink device or on MST branch
+			 * its connected to.
+			 */
+			if (aconnector->dsc_aux) {
+				is_fec_supported = true;
+				is_dsc_supported = true;
+			}
+		} else {
+			is_fec_supported = dpcd_caps.fec_cap.raw & 0x1;
+			is_dsc_supported = dpcd_caps.dsc_caps.dsc_basic_caps.raw[0] & 0x1;
+		}
+	} while (try_again);
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	seq_printf(m, "FEC_Sink_Support: %s\n", yesno(is_fec_supported));
+	seq_printf(m, "DSC_Sink_Support: %s\n", yesno(is_dsc_supported));
+
+	return ret;
+}
+#endif
+
+/* function: Trigger virtual HPD redetection on connector
+ *
+ * This function will perform link rediscovery, link disable
+ * and enable, and dm connector state update.
+ *
+ * Retrigger HPD on an existing connector by echoing 1 into
+ * its respectful "trigger_hotplug" debugfs entry:
+ *
+ *	echo 1 > /sys/kernel/debug/dri/0/DP-X/trigger_hotplug
+ *
+ */
+static ssize_t dp_trigger_hotplug(struct file *f, const char __user *buf,
+							size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	enum dc_connection_type new_connection_type = dc_connection_none;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	long param[1] = {0};
+	uint8_t param_nums = 0;
+
+	if (!aconnector || !aconnector->dc_link)
+		return -EINVAL;
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+						(long *)param, buf,
+						max_param_num,
+						&param_nums))
+		return -EINVAL;
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param[0] == 1) {
+		mutex_lock(&aconnector->hpd_lock);
+
+		if (!dc_link_detect_sink(aconnector->dc_link, &new_connection_type) &&
+			new_connection_type != dc_connection_none)
+			goto unlock;
+
+		if (!dc_link_detect(aconnector->dc_link, DETECT_REASON_HPD))
+			goto unlock;
+
+		amdgpu_dm_update_connector_after_detect(aconnector);
+
+		drm_modeset_lock_all(dev);
+		dm_restore_drm_connector_state(dev, connector);
+		drm_modeset_unlock_all(dev);
+
+		drm_kms_helper_hotplug_event(dev);
+
+unlock:
+		mutex_unlock(&aconnector->hpd_lock);
+	}
+
+	kfree(wr_buf);
+	return size;
+}
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* function: read DSC status on the connector
  *
  * The read function: dp_dsc_clock_en_read
@@ -1859,6 +2005,9 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 #endif
 
 #ifdef DEFINE_SHOW_ATTRIBUTE
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
+#endif
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
 DEFINE_SHOW_ATTRIBUTE(output_bpc);
@@ -1921,6 +2070,12 @@ static const struct file_operations dp_dsc_slice_bpg_offset_debugfs_fops = {
 	.llseek = default_llseek
 };
 #endif
+
+static const struct file_operations dp_trigger_hotplug_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.write = dp_trigger_hotplug,
+	.llseek = default_llseek
+};
 
 static const struct file_operations dp_link_settings_debugfs_fops = {
 	.owner = THIS_MODULE,
@@ -1992,7 +2147,8 @@ static const struct {
 		{"dsc_pic_width", &dp_dsc_pic_width_debugfs_fops},
 		{"dsc_pic_height", &dp_dsc_pic_height_debugfs_fops},
 		{"dsc_chunk_size", &dp_dsc_chunk_size_debugfs_fops},
-		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops}
+		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops},
+		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops}
 #endif
 };
 

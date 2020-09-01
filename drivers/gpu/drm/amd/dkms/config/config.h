@@ -82,6 +82,9 @@
 /* dma_resv->seq is available */
 #define HAVE_DMA_RESV_SEQ 1
 
+/* down_read_killable() is available */
+#define HAVE_DOWN_READ_KILLABLE 1
+
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
@@ -172,9 +175,6 @@
 /* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
 /* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_USE_KTIMER_T_ARG */
 
-/* drm_calloc_large() is available */
-/* #undef HAVE_DRM_CALLOC_LARGE */
-
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
@@ -208,6 +208,9 @@
 
 /* drm_connector_set_path_property() is available */
 #define HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY 1
+
+/* struct drm_connector_state has hdcp_content_type */
+#define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
 /* drm_connector_unreference() is available */
 /* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
@@ -351,6 +354,9 @@
    */
 #define HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H 1
 
+/* Define to 1 if you have the <drm/drm_hdcp.h> header file. */
+#define HAVE_DRM_DRM_HDCP_H 1
+
 /* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
 #define HAVE_DRM_DRM_IOCTL_H 1
 
@@ -433,9 +439,6 @@
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
 
-/* drm_free_large() is available */
-/* #undef HAVE_DRM_FREE_LARGE */
-
 /* drm_gem_map_attach() wants 2 arguments */
 /* #undef HAVE_DRM_GEM_MAP_ATTACH_2ARGS */
 
@@ -457,6 +460,9 @@
 /* ddrm_get_max_iome() is available */
 /* #undef HAVE_DRM_GET_MAX_IOMEM */
 
+/* drm_hdcp_update_content_protection is available */
+#define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
+
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,b interface */
 /* #undef HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B */
 
@@ -477,9 +483,6 @@
 
 /* drm_kms_helper_is_poll_worker() is available */
 #define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
-
-/* drm_malloc_ab() is available */
-/* #undef HAVE_DRM_MALLOC_AB */
 
 /* whether drm_mm_insert_mode is available */
 #define HAVE_DRM_MM_INSERT_MODE 1

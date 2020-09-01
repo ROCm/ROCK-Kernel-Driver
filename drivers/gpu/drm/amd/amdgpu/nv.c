@@ -364,6 +364,7 @@ nv_asic_reset_method(struct amdgpu_device *adev)
 
 	switch (adev->asic_type) {
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
 		return AMD_RESET_METHOD_MODE1;
 	default:
 		if (smu_baco_is_support(smu))
@@ -691,6 +692,10 @@ static void nv_init_doorbell_index(struct amdgpu_device *adev)
 	adev->doorbell_index.sdma_doorbell_range = 20;
 }
 
+static void nv_pre_asic_init(struct amdgpu_device *adev)
+{
+}
+
 static const struct amdgpu_asic_funcs nv_asic_funcs =
 {
 	.read_disabled_bios = &nv_read_disabled_bios,
@@ -710,6 +715,7 @@ static const struct amdgpu_asic_funcs nv_asic_funcs =
 	.need_reset_on_init = &nv_need_reset_on_init,
 	.get_pcie_replay_count = &nv_get_pcie_replay_count,
 	.supports_baco = &nv_asic_supports_baco,
+	.pre_asic_init = &nv_pre_asic_init,
 };
 
 static int nv_common_early_init(void *handle)

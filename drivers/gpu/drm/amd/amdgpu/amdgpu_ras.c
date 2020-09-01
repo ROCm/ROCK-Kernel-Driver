@@ -1554,9 +1554,10 @@ static void amdgpu_ras_do_recovery(struct work_struct *work)
 	struct amdgpu_device *remote_adev = NULL;
 	struct amdgpu_device *adev = ras->adev;
 	struct list_head device_list, *device_list_handle =  NULL;
-	struct amdgpu_hive_info *hive = amdgpu_get_xgmi_hive(adev, false);
 
 	if (!ras->disable_ras_err_cnt_harvest) {
+		struct amdgpu_hive_info *hive = amdgpu_get_xgmi_hive(adev);
+
 		/* Build list of devices to query RAS related errors */
 		if  (hive && adev->gmc.xgmi.num_physical_nodes > 1) {
 			device_list_handle = &hive->device_list;
@@ -1569,6 +1570,8 @@ static void amdgpu_ras_do_recovery(struct work_struct *work)
 		list_for_each_entry(remote_adev,
 				device_list_handle, gmc.xgmi.head)
 			amdgpu_ras_log_on_err_counter(remote_adev);
+
+		amdgpu_put_xgmi_hive(hive);
 	}
 
 	if (amdgpu_device_should_recover_gpu(ras->adev))
@@ -1960,6 +1963,17 @@ int amdgpu_ras_request_reset_on_boot(struct amdgpu_device *adev,
 	return 0;
 }
 
+static int amdgpu_ras_check_asic_type(struct amdgpu_device *adev)
+{
+	if (adev->asic_type != CHIP_VEGA10 &&
+		adev->asic_type != CHIP_VEGA20 &&
+		adev->asic_type != CHIP_ARCTURUS &&
+		adev->asic_type != CHIP_SIENNA_CICHLID)
+		return 1;
+	else
+		return 0;
+}
+
 /*
  * check hardware's ras ability which will be saved in hw_supported.
  * if hardware does not support ras, we can skip some ras initializtion and
@@ -1976,9 +1990,7 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev,
 	*supported = 0;
 
 	if (amdgpu_sriov_vf(adev) || !adev->is_atom_fw ||
-	    (adev->asic_type != CHIP_VEGA20   &&
-	     adev->asic_type != CHIP_ARCTURUS &&
-	     adev->asic_type != CHIP_SIENNA_CICHLID))
+		amdgpu_ras_check_asic_type(adev))
 		return;
 
 	if (amdgpu_atomfirmware_mem_ecc_supported(adev)) {
@@ -2000,6 +2012,7 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev,
 
 	*supported = amdgpu_ras_enable == 0 ?
 			0 : *hw_supported & amdgpu_ras_mask;
+	adev->ras_features = *supported;
 }
 
 int amdgpu_ras_init(struct amdgpu_device *adev)
@@ -2022,9 +2035,9 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 
 	amdgpu_ras_check_supported(adev, &con->hw_supported,
 			&con->supported);
-	if (!con->hw_supported) {
+	if (!con->hw_supported || (adev->asic_type == CHIP_VEGA10)) {
 		r = 0;
-		goto err_out;
+		goto release_con;
 	}
 
 	con->features = 0;
@@ -2035,25 +2048,25 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 	if (adev->nbio.funcs->init_ras_controller_interrupt) {
 		r = adev->nbio.funcs->init_ras_controller_interrupt(adev);
 		if (r)
-			goto err_out;
+			goto release_con;
 	}
 
 	if (adev->nbio.funcs->init_ras_err_event_athub_interrupt) {
 		r = adev->nbio.funcs->init_ras_err_event_athub_interrupt(adev);
 		if (r)
-			goto err_out;
+			goto release_con;
 	}
 
 	if (amdgpu_ras_fs_init(adev)) {
 		r = -EINVAL;
-		goto err_out;
+		goto release_con;
 	}
 
 	dev_info(adev->dev, "RAS INFO: ras initialized successfully, "
 			"hardware ability[%x] ras_mask[%x]\n",
 			con->hw_supported, con->supported);
 	return 0;
-err_out:
+release_con:
 	amdgpu_ras_set_context(adev, NULL);
 	kfree(con);
 
