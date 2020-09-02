@@ -4,8 +4,25 @@
 
 #include <kcl/header/kcl_drmP_h.h>
 #include <drm/drm_gem.h>
+#include <kcl/header/kcl_drm_device_h.h>
 #include <kcl/header/kcl_drm_print_h.h>
 #include <kcl/header/kcl_drm_file_h.h>
+
+/*
+ * commit v5.5-rc2-1531-ge62bf83aa1bb
+ * drm/irq: remove check on dev->dev_private
+ */
+static inline
+void kcl_drm_dev_init_private(struct drm_device *dev, void *priv)
+{
+       dev->dev_private = priv;
+}
+
+static inline
+void kcl_drm_dev_fini_private(struct drm_device *dev)
+{
+       dev->dev_private = NULL;
+}
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
 struct drm_printer {

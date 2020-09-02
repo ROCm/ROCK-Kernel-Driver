@@ -1187,12 +1187,22 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	adev->dev  = &pdev->dev;
 	adev->pdev = pdev;
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	ddev = adev_to_drm(adev);
 	ret = drm_dev_init(ddev, &kms_driver, &pdev->dev);
 	if (ret)
 		goto err_free;
 
+#ifdef HAVE_DRM_DRM_MANAGED_H
 	drmm_add_final_kfree(ddev, adev);
+#endif
+#else
+	ddev = drm_dev_alloc(&kms_driver, &pdev->dev);
+	if (IS_ERR(ddev))
+		return PTR_ERR(ddev);
+	adev->ddev = ddev;
+#endif
+	kcl_drm_dev_init_private(ddev, (void *)adev);
 
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
@@ -1243,6 +1253,10 @@ retry_init:
 err_pci:
 	pci_disable_device(pdev);
 err_free:
+#ifndef HAVE_DRM_DRIVER_RELEASE
+	kfree(adev);
+	kcl_drm_dev_fini_private(ddev);
+#endif
 	drm_dev_put(ddev);
 	return ret;
 }
@@ -1265,8 +1279,26 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
+#ifndef HAVE_DRM_DRIVER_RELEASE
+	if (dev) {
+		kfree(drm_to_adev(dev));
+		kcl_drm_dev_fini_private(dev);
+	}
+#endif
 	drm_dev_put(dev);
 }
+
+#ifdef HAVE_DRM_DRIVER_RELEASE
+#ifndef HAVE_DRM_DRM_MANAGED_H
+static void amdgpu_driver_release(struct drm_device *ddev)
+{
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+
+	drm_dev_fini(ddev);
+	kfree(adev);
+}
+#endif
+#endif
 
 static void
 amdgpu_pci_shutdown(struct pci_dev *pdev)
@@ -1597,6 +1629,11 @@ static struct drm_driver kms_driver = {
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
+#endif
+#endif
+#ifdef HAVE_DRM_DRIVER_RELEASE
+#ifndef HAVE_DRM_DRM_MANAGED_H
+	.release   = amdgpu_driver_release,
 #endif
 #endif
 	.irq_handler = amdgpu_irq_handler,
