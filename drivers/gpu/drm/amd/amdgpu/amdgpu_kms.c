@@ -160,6 +160,8 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	if (adev == NULL) {
 		return -ENOMEM;
 	}
+#endif
+#ifdef AMDKCL_CHECK_DRM_DEVICE_DEV_PRIVATE
 	dev->dev_private = (void *)adev;
 #endif
 
