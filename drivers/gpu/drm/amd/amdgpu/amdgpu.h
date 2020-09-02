@@ -782,7 +782,11 @@ struct amdgpu_reset_domain;
 struct amdgpu_device {
 	struct device			*dev;
 	struct pci_dev			*pdev;
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	struct drm_device		ddev;
+#else
+	struct drm_device		*ddev;
+#endif
 
 #ifdef CONFIG_DRM_AMD_ACP
 	struct amdgpu_acp		acp;
@@ -1099,12 +1103,20 @@ struct amdgpu_device {
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
 {
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	return container_of(ddev, struct amdgpu_device, ddev);
+#else
+	return ddev->dev_private;
+#endif
 }
 
 static inline struct drm_device *adev_to_drm(struct amdgpu_device *adev)
 {
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	return &adev->ddev;
+#else
+	return adev->ddev;
+#endif
 }
 
 static inline struct amdgpu_device *amdgpu_ttm_adev(struct ttm_device *bdev)
