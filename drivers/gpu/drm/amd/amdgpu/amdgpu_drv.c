@@ -2223,7 +2223,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
+#ifndef AMDKCL_DEVM_DRM_DEV_ALLOC
 		return ret;
+#else
+		goto err_free;
+#endif
 
 	pci_set_drvdata(pdev, ddev);
 
@@ -2309,6 +2313,10 @@ retry_init:
 
 err_pci:
 	pci_disable_device(pdev);
+#ifdef AMDKCL_DEVM_DRM_DEV_ALLOC
+err_free:
+	amdkcl_drm_dev_release(ddev);
+#endif
 	return ret;
 }
 
@@ -2318,14 +2326,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct amdgpu_device *adev = drm_to_adev(dev);
 
-#ifdef MODULE
-	if (THIS_MODULE->state != MODULE_STATE_GOING)
-#endif
-		DRM_ERROR("Hotplug removal is not supported\n");
-
 	amdgpu_xcp_dev_unplug(adev);
-	drm_dev_unplug(dev);
-
 	if (adev->pm.rpm_mode != AMDGPU_RUNPM_NONE) {
 		pm_runtime_get_sync(dev->dev);
 		pm_runtime_forbid(dev->dev);
@@ -2373,6 +2374,18 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 	pci_wait_for_pending_transaction(pdev);
 }
+
+#ifdef HAVE_DRM_DRIVER_RELEASE
+#ifndef HAVE_DRM_DRM_MANAGED_H
+static void amdgpu_driver_release(struct drm_device *ddev)
+{
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+
+	drm_dev_fini(ddev);
+	kfree(adev);
+}
+#endif
+#endif
 
 static void
 amdgpu_pci_shutdown(struct pci_dev *pdev)
@@ -2908,11 +2921,13 @@ static const struct drm_driver amdgpu_kms_driver = {
 #if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
 	.set_busid = drm_pci_set_busid,
 #endif
+
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
+
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
@@ -2926,7 +2941,9 @@ static const struct drm_driver amdgpu_kms_driver = {
 	.dumb_create = amdgpu_mode_dumb_create,
 	.dumb_map_offset = amdgpu_mode_dumb_mmap,
 	.fops = &amdgpu_driver_kms_fops,
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	.release = &amdgpu_driver_release_kms,
+#endif
 
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
