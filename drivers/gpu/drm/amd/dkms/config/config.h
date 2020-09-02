@@ -305,6 +305,9 @@
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
+/* drm_dev_fini() is available */
+#define HAVE_DRM_DRIVER_RELEASE 1
+
 /* Define to 1 if you have the <drm/drmP.h> header file. */
 /* #undef HAVE_DRM_DRMP_H */
 

@@ -86,7 +86,11 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 	amdgpu_unregister_gpu_instance(adev);
 
 	if (adev->rmmio == NULL)
+#ifdef HAVE_DRM_DRIVER_RELEASE
 		return;
+#else
+		goto done_free;
+#endif
 
 	if (adev->runpm) {
 		pm_runtime_get_sync(dev->dev);
@@ -95,6 +99,11 @@ void amdgpu_driver_unload_kms(struct drm_device *dev)
 
 	amdgpu_acpi_fini(adev);
 	amdgpu_device_fini(adev);
+#ifndef HAVE_DRM_DRIVER_RELEASE
+done_free:
+       kfree(adev);
+       dev->dev_private = NULL;
+#endif
 }
 
 void amdgpu_register_gpu_instance(struct amdgpu_device *adev)
@@ -131,12 +140,28 @@ void amdgpu_register_gpu_instance(struct amdgpu_device *adev)
  * This is the main load function for KMS (all asics).
  * Returns 0 on success, error on failure.
  */
+#ifdef HAVE_DRM_DRIVER_RELEASE
 int amdgpu_driver_load_kms(struct amdgpu_device *adev, unsigned long flags)
+#else
+int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
+#endif
 {
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	struct drm_device *dev;
+#else
+	struct amdgpu_device *adev;
+#endif
 	int r, acpi_status;
 
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	dev = adev_to_drm(adev);
+#else
+	adev = kzalloc(sizeof(struct amdgpu_device), GFP_KERNEL);
+	if (adev == NULL) {
+		return -ENOMEM;
+	}
+	dev->dev_private = (void *)adev;
+#endif
 
 	if (amdgpu_has_atpx() &&
 	    (amdgpu_is_atpx_hybrid() ||

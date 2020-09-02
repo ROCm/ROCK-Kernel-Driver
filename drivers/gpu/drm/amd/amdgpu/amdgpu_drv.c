@@ -1181,6 +1181,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	adev = kzalloc(sizeof(*adev), GFP_KERNEL);
 	if (!adev)
 		return -ENOMEM;
@@ -1191,6 +1192,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	ret = drm_dev_init(ddev, &kms_driver, &pdev->dev);
 	if (ret)
 		goto err_free;
+#else
+	ddev = drm_dev_alloc(&kms_driver, &pdev->dev);
+	if (IS_ERR(ddev))
+		return PTR_ERR(ddev);
+#endif
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
 #ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
@@ -1216,7 +1222,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	ddev->pdev = pdev;
 	pci_set_drvdata(pdev, ddev);
 
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	ret = amdgpu_driver_load_kms(adev, ent->driver_data);
+#else
+	ret = amdgpu_driver_load_kms(ddev, ent->driver_data);
+#endif
 	if (ret)
 		goto err_pci;
 
@@ -1231,6 +1241,9 @@ retry_init:
 		goto err_pci;
 	}
 
+#ifndef HAVE_DRM_DRIVER_RELEASE
+	adev = drm_to_adev(ddev);
+#endif
 	ret = amdgpu_debugfs_init(adev);
 	if (ret)
 		DRM_ERROR("Creating debugfs files failed (%d).\n", ret);
@@ -1265,6 +1278,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	drm_dev_put(dev);
 }
 
+#ifdef HAVE_DRM_DRIVER_RELEASE
 static void amdgpu_driver_release(struct drm_device *ddev)
 {
 	struct amdgpu_device *adev = drm_to_adev(ddev);
@@ -1272,6 +1286,7 @@ static void amdgpu_driver_release(struct drm_device *ddev)
 	drm_dev_fini(ddev);
 	kfree(adev);
 }
+#endif
 
 static void
 amdgpu_pci_shutdown(struct pci_dev *pdev)
@@ -1611,7 +1626,9 @@ static struct drm_driver kms_driver = {
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
 #endif
 #endif
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	.release   = amdgpu_driver_release,
+#endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
 #ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
