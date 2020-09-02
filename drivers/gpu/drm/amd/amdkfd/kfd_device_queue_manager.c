@@ -1432,7 +1432,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	if (q->properties.is_active) {
 		increment_queue_count(dqm, q->properties.type);
 
-		retval = execute_queues_cpsch(dqm,
+		execute_queues_cpsch(dqm,
 				KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
 				USE_DEFAULT_GRACE_PERIOD);
 	}
