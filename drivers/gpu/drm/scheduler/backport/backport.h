@@ -5,5 +5,6 @@
 #include <linux/version.h>
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/backport/kcl_kthread_backport.h>
+#include <kcl/kcl_sched.h>
 
 #endif
