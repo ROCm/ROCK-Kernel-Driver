@@ -33,7 +33,6 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 #include <kcl/kcl_reservation.h>
-#include "kcl_common.h"
 
 void amdkcl_reservation_init(void)
 {
@@ -41,6 +40,10 @@ void amdkcl_reservation_init(void)
 }
 
 #if defined(HAVE_RESERVATION_OBJECT_STAGED)
+/*
+ * Copied from v4.19-rc6-1514-g27836b641c1b^:drivers/dma-buf/reservation.c
+ * and modified for KCL
+ */
 static void
 reservation_object_add_shared_inplace(struct reservation_object *obj,
 				      struct reservation_object_list *fobj,
