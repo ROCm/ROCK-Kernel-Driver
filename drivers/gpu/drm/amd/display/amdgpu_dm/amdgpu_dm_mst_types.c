@@ -521,7 +521,7 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 #ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_lock_all(dev);
