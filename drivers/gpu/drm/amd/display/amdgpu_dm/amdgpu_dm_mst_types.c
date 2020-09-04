@@ -491,7 +491,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 #endif
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
@@ -533,7 +533,7 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 #ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_lock_all(dev);

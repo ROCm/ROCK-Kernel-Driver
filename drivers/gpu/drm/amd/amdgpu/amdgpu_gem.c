@@ -433,7 +433,7 @@ release_object:
 int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *filp)
 {
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct drm_amdgpu_gem_dgma *args = data;
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *abo;

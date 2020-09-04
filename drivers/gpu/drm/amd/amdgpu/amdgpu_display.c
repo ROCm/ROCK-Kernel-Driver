@@ -365,7 +365,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 			  uint32_t page_flip_flags)
 {
 	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
 	struct amdgpu_framebuffer *old_amdgpu_fb;
 	struct amdgpu_framebuffer *new_amdgpu_fb;

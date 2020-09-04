@@ -5137,7 +5137,7 @@ static int dm_crtc_funcs_atomic_set_property(
 	uint64_t val)
 {
 	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct dm_crtc_state *dm_state = to_dm_crtc_state(crtc_state);
 
 	if (property == adev->mode_info.vrr_enabled_property) {
@@ -5153,7 +5153,7 @@ static int dm_crtc_funcs_atomic_get_property(struct drm_crtc *crtc,
 	uint64_t *val)
 {
 	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct dm_crtc_state *dm_state = to_dm_crtc_state(state);
 
 	if (property == adev->mode_info.vrr_enabled_property) {

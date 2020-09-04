@@ -1317,7 +1317,7 @@ int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
 				     unsigned flags)
 {
 	struct drm_crtc *crtc;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	if (pipe >= dev->num_crtcs) {
 		DRM_ERROR("Invalid crtc %u\n", pipe);
