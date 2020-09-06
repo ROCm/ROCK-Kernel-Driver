@@ -290,16 +290,16 @@ static ssize_t raid_bytes_show(struct kobject *kobj,
 
 {
 	struct btrfs_space_info *sinfo = to_space_info(kobj->parent);
-	struct btrfs_block_group_cache *block_group;
+	struct btrfs_block_group *block_group;
 	int index = btrfs_bg_flags_to_raid_index(to_raid_kobj(kobj)->flags);
 	u64 val = 0;
 
 	down_read(&sinfo->groups_sem);
 	list_for_each_entry(block_group, &sinfo->block_groups[index], list) {
 		if (&attr->attr == BTRFS_ATTR_PTR(raid, total_bytes))
-			val += block_group->key.offset;
+			val += block_group->length;
 		else
-			val += btrfs_block_group_used(&block_group->item);
+			val += block_group->used;
 	}
 	up_read(&sinfo->groups_sem);
 	return snprintf(buf, PAGE_SIZE, "%llu\n", val);
