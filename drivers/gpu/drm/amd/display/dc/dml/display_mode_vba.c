@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 
 #include "display_mode_lib.h"
 #include "display_mode_vba.h"
@@ -880,3 +881,4 @@ double CalculateWriteBackDISPCLK(
 	return CalculateWriteBackDISPCLK;
 }
 
+#endif

@@ -34,7 +34,7 @@
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 #define MAX_DWB		2
-#else
+#elif defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #define MAX_DWB		1
 #endif
 
@@ -69,12 +69,14 @@ struct mpcc_blnd_cfg {
 	int global_alpha;
 	bool overlap_only;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	/* MPCC top/bottom gain settings */
 	int bottom_gain_mode;
 	int background_color_bpc;
 	int top_gain;
 	int bottom_inside_gain;
 	int bottom_outside_gain;
+#endif
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
@@ -97,6 +99,7 @@ struct mpcc_sm_cfg {
 	int force_next_field_polarity;
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 struct mpc_denorm_clamp {
 	int clamp_max_r_cr;
 	int clamp_min_r_cr;
@@ -105,6 +108,7 @@ struct mpc_denorm_clamp {
 	int clamp_max_b_cb;
 	int clamp_min_b_cb;
 };
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 struct mpc_dwb_flow_control {
@@ -141,8 +145,10 @@ struct mpc {
 	struct dc_context *ctx;
 
 	struct mpcc mpcc_array[MAX_MPCC];
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct pwl_params blender_params;
 	bool cm_bypass_mode;
+#endif
 };
 
 struct mpcc_state {
@@ -303,6 +309,7 @@ struct mpc_funcs {
 		struct mpc *mpc,
 		struct mpc_tree *tree);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	void (*set_denorm)(struct mpc *mpc,
 			int opp_id,
 			enum dc_color_depth output_depth);
@@ -330,6 +337,7 @@ struct mpc_funcs {
 			struct mpc *mpc,
 			int mpcc_id,
 			bool power_on);
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	void (*set_dwb_mux)(
 			struct mpc *mpc,

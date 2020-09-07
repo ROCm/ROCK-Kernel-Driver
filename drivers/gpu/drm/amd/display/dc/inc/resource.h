@@ -46,8 +46,12 @@ struct resource_caps {
 	int num_pll;
 	int num_dwb;
 	int num_ddc;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	int num_vmid;
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	int num_dsc;
+#endif
 	unsigned int num_dig_link_enc; // Total number of DIGs (digital encoders) in DIO (Display Input/Output).
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	int num_mpc_3dlut;
