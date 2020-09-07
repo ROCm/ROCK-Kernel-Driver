@@ -8460,6 +8460,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	bool mode_set_reset_required = false;
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+	drm_atomic_helper_calc_timestamping_constants(state);
 
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	dm_state = to_dm_atomic_state(state);
