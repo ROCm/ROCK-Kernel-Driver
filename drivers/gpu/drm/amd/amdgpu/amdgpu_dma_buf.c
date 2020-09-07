@@ -100,8 +100,10 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	int r;
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER
 	if (pci_p2pdma_distance_many(adev->pdev, &attach->dev, 1, true) < 0)
 		attach->peer2peer = false;
+#endif
 
 	if (attach->dev->driver == adev->dev->driver)
 		return 0;
@@ -228,11 +230,13 @@ static struct sg_table *amdgpu_dma_buf_map(struct dma_buf_attachment *attach,
 		struct ttm_operation_ctx ctx = { false, false };
 		unsigned domains = AMDGPU_GEM_DOMAIN_GTT;
 
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER
 		if (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM &&
 		    attach->peer2peer) {
 			bo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 			domains |= AMDGPU_GEM_DOMAIN_VRAM;
 		}
+#endif
 		amdgpu_bo_placement_from_domain(bo, domains);
 		r = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
 		if (r)
@@ -493,7 +497,9 @@ amdgpu_dma_buf_move_notify(struct dma_buf_attachment *attach)
 }
 
 static const struct dma_buf_attach_ops amdgpu_dma_buf_attach_ops = {
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER
 	.allow_peer2peer = true,
+#endif
 	.move_notify = amdgpu_dma_buf_move_notify
 };
 
