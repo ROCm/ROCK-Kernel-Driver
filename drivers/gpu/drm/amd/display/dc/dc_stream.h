@@ -52,6 +52,7 @@ struct freesync_context {
 	bool dummy;
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 enum hubp_dmdata_mode {
 	DMDATA_SW_MODE,
 	DMDATA_HW_MODE
@@ -81,7 +82,9 @@ struct dc_dmdata_attributes {
 	/* An unbounded array of uint32s, represents software dmdata to be loaded */
 	uint32_t *dmdata_sw_data;
 };
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 struct dc_writeback_info {
 	bool wb_enabled;
 	int dwb_pipe_inst;
@@ -100,6 +103,7 @@ struct dc_writeback_update {
 	unsigned int num_wb_info;
 	struct dc_writeback_info writeback_info[MAX_DWB_PIPES];
 };
+#endif
 
 enum vertical_interrupt_ref_point {
 	START_V_UPDATE = 0,
@@ -124,7 +128,9 @@ union stream_update_flags {
 		uint32_t abm_level:1;
 		uint32_t dpms_off:1;
 		uint32_t gamut_remap:1;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		uint32_t wb_update:1;
+#endif
 		uint32_t dsc_changed : 1;
 	} bits;
 
@@ -204,9 +210,11 @@ struct dc_stream_state {
 
 	struct crtc_trigger_info triggered_crtc_reset;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	/* writeback */
 	unsigned int num_wb_info;
 	struct dc_writeback_info writeback_info[MAX_DWB_PIPES];
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	const struct dc_transfer_func *func_shaper;
 	const struct dc_3dlut *lut3d_func;
@@ -229,7 +237,9 @@ struct dc_stream_state {
 	bool apply_seamless_boot_optimization;
 
 	uint32_t stream_id;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool is_dsc_enabled;
+#endif
 	union stream_update_flags update_flags;
 };
 
@@ -260,8 +270,12 @@ struct dc_stream_update {
 
 	struct dc_csc_transform *output_csc_transform;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct dc_writeback_update *wb_update;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	struct dc_dsc_config *dsc_config;
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	struct dc_transfer_func *func_shaper;
 	struct dc_3dlut *lut3d_func;
@@ -355,6 +369,7 @@ bool dc_add_all_planes_for_stream(
 		int plane_count,
 		struct dc_state *context);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 bool dc_stream_add_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		struct dc_writeback_info *wb_info);
@@ -363,9 +378,11 @@ bool dc_stream_remove_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		uint32_t dwb_pipe_inst);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
 		struct dc_state *state,
 		struct dc_stream_state *stream);
+#endif
 
 bool dc_stream_warmup_writeback(struct dc *dc,
 		int num_dwb,
@@ -376,6 +393,7 @@ bool dc_stream_dmdata_status_done(struct dc *dc, struct dc_stream_state *stream)
 bool dc_stream_set_dynamic_metadata(struct dc *dc,
 		struct dc_stream_state *stream,
 		struct dc_dmdata_attributes *dmdata_attr);
+#endif
 
 enum dc_status dc_validate_stream(struct dc *dc, struct dc_stream_state *stream);
 

@@ -32,6 +32,7 @@
 #define DCN_MINIMUM_DISPCLK_Khz 100000
 #define DCN_MINIMUM_DPPCLK_Khz 100000
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_1
 /* Constants */
 #define DDR4_DRAM_WIDTH   64
 #define WM_A 0
@@ -39,6 +40,7 @@
 #define WM_C 2
 #define WM_D 3
 #define WM_SET_COUNT 4
+#endif
 
 #define DCN_MINIMUM_DISPCLK_Khz 100000
 #define DCN_MINIMUM_DPPCLK_Khz 100000
@@ -62,6 +64,8 @@ struct dcn3_clk_internal {
 };
 
 #endif
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_1
 /* Will these bw structures be ASIC specific? */
 
 #define MAX_NUM_DPM_LVL		8
@@ -210,6 +214,7 @@ struct clk_bw_params {
 	struct wm_table wm_table;
 	struct dummy_pstate_entry dummy_pstate_table[4];
 };
+#endif
 /* Public interfaces */
 
 struct clk_states {
@@ -272,8 +277,10 @@ struct clk_mgr {
 #endif
 	int dprefclk_khz; // Used by program pixel clock in clock source funcs, need to figureout where this goes
 	int dentist_vco_freq_khz;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_1
 	struct clk_state_registers_and_bypass boot_snapshot;
 	struct clk_bw_params *bw_params;
+#endif
 	struct pp_smu_wm_range_sets ranges;
 };
 

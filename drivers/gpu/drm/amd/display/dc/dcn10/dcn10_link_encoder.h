@@ -72,7 +72,9 @@
 struct dcn10_link_enc_aux_registers {
 	uint32_t AUX_CONTROL;
 	uint32_t AUX_DPHY_RX_CONTROL0;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	uint32_t AUX_DPHY_TX_CONTROL;
+#endif
 	uint32_t AUX_DPHY_RX_CONTROL1;
 };
 
@@ -105,6 +107,7 @@ struct dcn10_link_enc_registers {
 	uint32_t DP_DPHY_HBR2_PATTERN_CONTROL;
 	uint32_t DP_SEC_CNTL1;
 	uint32_t TMDS_CTL_BITS;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	/* DCCG  */
 	uint32_t CLOCK_ENABLE;
 	/* DIG */
@@ -154,6 +157,7 @@ struct dcn10_link_enc_registers {
 	uint32_t RAWLANE2_DIG_PCS_XF_RX_OVRD_IN_3;
 	uint32_t RAWLANE3_DIG_PCS_XF_RX_OVRD_IN_2;
 	uint32_t RAWLANE3_DIG_PCS_XF_RX_OVRD_IN_3;
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	uint32_t TMDS_DCBALANCER_CONTROL;
 	uint32_t PHYA_LINK_CNTL2;
@@ -265,6 +269,7 @@ struct dcn10_link_enc_registers {
 	type AUX_LS_READ_EN;\
 	type AUX_RX_RECEIVE_WINDOW
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 
 #define DCN20_LINK_ENCODER_DPCS_REG_FIELD_LIST(type) \
 		type RDPCS_PHY_DP_TX0_DATA_EN;\
@@ -448,15 +453,20 @@ struct dcn10_link_enc_registers {
 	type AUX_RX_PRECHARGE_SKIP;\
 	type AUX_RX_TIMEOUT_LEN;\
 	type AUX_RX_TIMEOUT_LEN_MUL
+#endif
 
 struct dcn10_link_enc_shift {
 	DCN_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	DCN20_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#endif
 };
 
 struct dcn10_link_enc_mask {
 	DCN_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	DCN20_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#endif
 };
 
 struct dcn10_link_encoder {

@@ -22,6 +22,7 @@
  * Author: AMD
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/drm_dsc.h>
 #include "dc_hw_types.h"
 #include "dsc.h"
@@ -983,3 +984,4 @@ void dc_dsc_policy_set_enable_dsc_when_not_needed(bool enable)
 {
 	dsc_policy_enable_dsc_when_not_needed = enable;
 }
+#endif /* CONFIG_DRM_AMD_DC_DSC_SUPPORT */

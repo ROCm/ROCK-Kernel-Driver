@@ -120,10 +120,12 @@ void dcn20_init_vm_ctx(
 void dcn20_set_flip_control_gsl(
 		struct pipe_ctx *pipe_ctx,
 		bool flip_immediate);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn20_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
 		bool power_on);
+#endif
 void dcn20_fpga_init_hw(struct dc *dc);
 bool dcn20_wait_for_blank_complete(
 		struct output_pixel_processor *opp);

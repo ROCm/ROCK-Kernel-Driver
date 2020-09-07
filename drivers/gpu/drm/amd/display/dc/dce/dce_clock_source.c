@@ -905,7 +905,7 @@ static bool dce112_program_pix_clk(
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
 	struct bp_pixel_clock_parameters bp_pc_params = {0};
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (IS_FPGA_MAXIMUS_DC(clock_source->ctx->dce_environment)) {
 		unsigned int inst = pix_clk_params->controller_id - CONTROLLER_ID_D0;
 		unsigned dp_dto_ref_100hz = 7000000;
@@ -1056,6 +1056,7 @@ const struct pixel_rate_range_table_entry *look_up_in_video_optimized_rate_tlb(
 }
 #endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 static bool dcn20_program_pix_clk(
 		struct clock_source *clock_source,
 		struct pixel_clk_params *pix_clk_params,
@@ -1072,6 +1073,7 @@ static const struct clock_source_funcs dcn20_clk_src_funcs = {
 	.get_pix_clk_dividers = dce112_get_pix_clk_dividers,
 	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz
 };
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 static bool dcn3_program_pix_clk(
@@ -1521,6 +1523,7 @@ bool dce112_clk_src_construct(
 	return true;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 bool dcn20_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -1536,6 +1539,7 @@ bool dcn20_clk_src_construct(
 
 	return ret;
 }
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 bool dcn3_clk_src_construct(

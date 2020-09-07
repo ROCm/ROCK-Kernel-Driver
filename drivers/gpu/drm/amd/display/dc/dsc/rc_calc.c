@@ -1,3 +1,4 @@
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
@@ -390,3 +391,4 @@ u32 calc_dsc_bpp_x16(u32 stream_bandwidth_kbps, u32 pix_clk_100hz,
 	DC_FP_END();
 	return dsc_bpp;
 }
+#endif

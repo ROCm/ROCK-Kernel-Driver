@@ -166,11 +166,13 @@ struct dcn_optc_registers {
 	uint32_t OTG_CRC0_WINDOWB_X_CONTROL;
 	uint32_t OTG_CRC0_WINDOWB_Y_CONTROL;
 	uint32_t GSL_SOURCE_SELECT;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 	uint32_t DWB_SOURCE_SELECT;
 	uint32_t OTG_DSC_START_POSITION;
 	uint32_t OPTC_DATA_FORMAT_CONTROL;
 	uint32_t OPTC_BYTES_PER_PIXEL;
 	uint32_t OPTC_WIDTH_CONTROL;
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	uint32_t OTG_BLANK_DATA_COLOR;
 	uint32_t OTG_BLANK_DATA_COLOR_EXT;
@@ -517,8 +519,8 @@ struct dcn_optc_registers {
 	type OTG_CRC_DATA_STREAM_COMBINE_MODE;\
 	type OTG_CRC_DATA_STREAM_SPLIT_MODE;\
 	type OTG_CRC_DATA_FORMAT;
-#else
 
+#elif defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #define TG_REG_FIELD_LIST(type) \
 	TG_REG_FIELD_LIST_DCN1_0(type)\
 	type MASTER_UPDATE_LOCK_DB_X;\
@@ -543,6 +545,11 @@ struct dcn_optc_registers {
 	type OTG_CRC_DATA_STREAM_COMBINE_MODE;\
 	type OTG_CRC_DATA_STREAM_SPLIT_MODE;\
 	type OTG_CRC_DATA_FORMAT;
+#else
+
+#define TG_REG_FIELD_LIST(type) \
+	TG_REG_FIELD_LIST_DCN1_0(type)
+
 #endif
 
 

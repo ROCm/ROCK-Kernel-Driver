@@ -1,3 +1,4 @@
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef DC_DSC_H_
 #define DC_DSC_H_
 /*
@@ -83,4 +84,5 @@ void dc_dsc_policy_set_max_target_bpp_limit(uint32_t limit);
 
 void dc_dsc_policy_set_enable_dsc_when_not_needed(bool enable);
 
+#endif
 #endif

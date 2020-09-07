@@ -492,6 +492,9 @@ struct cm_grph_csc_adjustment {
 	enum cm_gamut_coef_format gamut_coef_format;
 };
 #endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0) || \
+	defined(CONFIG_DRM_AMD_DC_DCN3_0)
 /* writeback */
 struct dwb_stereo_params {
 	bool				stereo_enabled;		/* false: normal mode, true: 3D stereo */
@@ -534,6 +537,7 @@ struct dc_dwb_params {
 	enum dwb_subsample_position	subsample_position;
 	struct dc_transfer_func *out_transfer_func;
 };
+#endif
 
 /* audio*/
 
@@ -645,7 +649,9 @@ enum dc_infoframe_type {
 	DC_HDMI_INFOFRAME_TYPE_AVI = 0x82,
 	DC_HDMI_INFOFRAME_TYPE_SPD = 0x83,
 	DC_HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	DC_DP_INFOFRAME_TYPE_PPS = 0x10,
+#endif
 };
 
 struct dc_info_packet {
@@ -821,6 +827,7 @@ struct dc_clock_config {
 	uint32_t current_clock_khz;/*current clock in use*/
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* DSC DPCD capabilities */
 union dsc_slice_caps1 {
 	struct {
@@ -890,6 +897,7 @@ struct dsc_dec_dpcd_caps {
 	uint32_t branch_overall_throughput_1_mps; /* In MPs */
 	uint32_t branch_max_line_width;
 };
+#endif
 
 struct dc_golden_table {
 	uint16_t dc_golden_table_ver;

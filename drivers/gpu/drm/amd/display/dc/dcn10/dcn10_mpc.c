@@ -479,10 +479,12 @@ static const struct mpc_funcs dcn10_mpc_funcs = {
 	.init_mpcc_list_from_hw = mpc1_init_mpcc_list_from_hw,
 	.update_blending = mpc1_update_blending,
 	.cursor_lock = mpc1_cursor_lock,
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	.set_denorm = NULL,
 	.set_denorm_clamp = NULL,
 	.set_output_csc = NULL,
 	.set_output_gamma = NULL,
+#endif
 };
 
 void dcn10_mpc_construct(struct dcn10_mpc *mpc10,

@@ -4,7 +4,9 @@
 #include "dc_link_dp.h"
 #include "dm_helpers.h"
 #include "opp.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
+#endif
 #include "resource.h"
 
 #include "inc/core_types.h"
@@ -1505,7 +1507,9 @@ enum link_training_result dc_link_dp_perform_link_training(
 	enum link_training_result status = LINK_TRAINING_SUCCESS;
 	struct link_training_settings lt_settings;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
+#endif
 	uint8_t repeater_cnt;
 	uint8_t repeater_id;
 
@@ -1525,12 +1529,14 @@ enum link_training_result dc_link_dp_perform_link_training(
 	/* 1. set link rate, lane count and spread. */
 	dpcd_set_link_settings(link, &lt_settings);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable != NULL)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
 		fec_enable = true;
 
 	dp_set_fec_ready(link, fec_enable);
+#endif
 
 	if (link->lttpr_non_transparent_mode) {
 
@@ -1713,7 +1719,9 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 	enum link_training_result lt_status = LINK_TRAINING_SUCCESS;
 	enum dp_panel_mode panel_mode = DP_PANEL_MODE_DEFAULT;
 	enum clock_source_id dp_cs_id = CLOCK_SOURCE_ID_EXTERNAL;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable = false;
+#endif
 
 	initialize_training_settings(
 		link,
@@ -1733,9 +1741,11 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 	dp_enable_link_phy(link, link->connector_signal,
 		dp_cs_id, link_settings);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Set FEC enable */
 	fec_enable = lt_overrides->fec_enable && *lt_overrides->fec_enable;
 	dp_set_fec_ready(link, fec_enable);
+#endif
 
 	if (lt_overrides->alternate_scrambler_reset) {
 		if (*lt_overrides->alternate_scrambler_reset)
@@ -1778,7 +1788,9 @@ bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down)
 	 */
 	if (link_down == true) {
 		dp_disable_link_phy(link, link->connector_signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		dp_set_fec_ready(link, false);
+#endif
 	}
 
 	link->sync_lt_in_progress = false;
@@ -3554,6 +3566,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 		dp_hw_fw_revision.ieee_fw_rev,
 		sizeof(dp_hw_fw_revision.ieee_fw_rev));
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	memset(&link->dpcd_caps.dsc_caps, '\0',
 			sizeof(link->dpcd_caps.dsc_caps));
 	memset(&link->dpcd_caps.fec_cap, '\0', sizeof(link->dpcd_caps.fec_cap));
@@ -3575,6 +3588,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 				link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
 				sizeof(link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw));
 	}
+#endif
 
 	if (!dpcd_read_sink_ext_caps(link))
 		link->dpcd_sink_ext_caps.raw = 0;
@@ -3771,12 +3785,14 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		stream->timing.display_color_depth;
 	struct bit_depth_reduction_params params;
 	struct output_pixel_processor *opp = pipe_ctx->stream_res.opp;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	int width = pipe_ctx->stream->timing.h_addressable +
 		pipe_ctx->stream->timing.h_border_left +
 		pipe_ctx->stream->timing.h_border_right;
 	int height = pipe_ctx->stream->timing.v_addressable +
 		pipe_ctx->stream->timing.v_border_bottom +
 		pipe_ctx->stream->timing.v_border_top;
+#endif
 
 	memset(&params, 0, sizeof(params));
 
@@ -3820,6 +3836,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				controller_test_pattern, color_depth);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		else if (opp->funcs->opp_set_disp_pattern_generator) {
 			struct pipe_ctx *odm_pipe;
 			enum controller_dp_color_space controller_color_space;
@@ -3873,6 +3890,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 				offset += offset;
 			}
 		}
+#endif
 	}
 	break;
 	case DP_TEST_PATTERN_VIDEO_MODE:
@@ -3885,6 +3903,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
 				color_depth);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		else if (opp->funcs->opp_set_disp_pattern_generator) {
 			struct pipe_ctx *odm_pipe;
 			int opp_cnt = 1;
@@ -3916,6 +3935,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 				height,
 				0);
 		}
+#endif
 	}
 	break;
 
@@ -4273,6 +4293,7 @@ enum dp_panel_mode dp_get_panel_mode(struct dc_link *link)
 	return DP_PANEL_MODE_DEFAULT;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dp_set_fec_ready(struct dc_link *link, bool ready)
 {
 	/* FEC has to be "set ready" before the link training.
@@ -4340,6 +4361,7 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 		}
 	}
 }
+#endif
 
 void dpcd_set_source_specific_data(struct dc_link *link)
 {

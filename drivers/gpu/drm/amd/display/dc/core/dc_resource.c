@@ -50,9 +50,13 @@
 #include "dce110/dce110_resource.h"
 #include "dce112/dce112_resource.h"
 #include "dce120/dce120_resource.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dcn10/dcn10_resource.h"
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #include "dcn20/dcn20_resource.h"
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #include "dcn21/dcn21_resource.h"
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
@@ -113,16 +117,19 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 		else
 			dc_version = DCE_VERSION_12_0;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case FAMILY_RV:
 		dc_version = DCN_VERSION_1_0;
 		if (ASICREV_IS_RAVEN2(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_1_01;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 		if (ASICREV_IS_RENOIR(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_2_1;
+#endif
 		break;
 #endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	case FAMILY_NV:
 		dc_version = DCN_VERSION_2_0;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
@@ -130,6 +137,7 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 			dc_version = DCN_VERSION_3_0;
 #endif
 		break;
+#endif
 	default:
 		dc_version = DCE_VERSION_UNKNOWN;
 		break;
@@ -190,16 +198,20 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 				init_data->num_virtual_links, dc);
 		break;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case DCN_VERSION_1_0:
 	case DCN_VERSION_1_01:
 		res_pool = dcn10_create_resource_pool(init_data, dc);
 		break;
+#endif
 
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	case DCN_VERSION_2_0:
 		res_pool = dcn20_create_resource_pool(init_data, dc);
 		break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	case DCN_VERSION_2_1:
 		res_pool = dcn21_create_resource_pool(init_data, dc);
 		break;
@@ -1366,7 +1378,7 @@ static struct pipe_ctx *acquire_free_pipe_for_head(
 	return pool->funcs->acquire_idle_pipe_for_layer(context, pool, head_pipe->stream);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static int acquire_first_split_pipe(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -1444,7 +1456,7 @@ bool dc_add_plane_to_context(
 	while (head_pipe) {
 		free_pipe = acquire_free_pipe_for_head(context, pool, head_pipe);
 
-	#if defined(CONFIG_DRM_AMD_DC_DCN)
+	#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (!free_pipe) {
 			int pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
 			if (pipe_idx >= 0)
@@ -2077,7 +2089,7 @@ enum dc_status resource_map_pool_resources(
 		/* acquire new resources */
 		pipe_idx = acquire_first_free_pipe(&context->res_ctx, pool, stream);
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 	if (pipe_idx < 0)
 		pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
 #endif
@@ -2166,7 +2178,11 @@ void dc_resource_state_construct(
 
 bool dc_resource_is_dsc_encoding_supported(const struct dc *dc)
 {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	return dc->res_pool->res_cap->num_dsc > 0;
+#else
+	return 0;
+#endif
 }
 
 
@@ -2755,8 +2771,10 @@ bool pipe_need_reprogram(
 		false == pipe_ctx_old->stream->dpms_off)
 		return true;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx_old->stream_res.dsc != pipe_ctx->stream_res.dsc)
 		return true;
+#endif
 
 	return false;
 }

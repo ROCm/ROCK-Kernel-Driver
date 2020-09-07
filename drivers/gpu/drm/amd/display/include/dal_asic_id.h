@@ -164,7 +164,9 @@
 #define RAVEN2_A0 0x81
 #define RAVEN1_F0 0xF0
 #define RAVEN_UNKNOWN 0xFF
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define RENOIR_A0 0x91
+#endif
 #ifndef ASICREV_IS_RAVEN
 #define ASICREV_IS_RAVEN(eChipRev) ((eChipRev >= RAVEN_A0) && eChipRev < RAVEN_UNKNOWN)
 #endif
@@ -181,13 +183,17 @@
 
 #define ASICREV_IS_PICASSO(eChipRev) ((eChipRev >= PICASSO_A0) && (eChipRev < RAVEN2_A0))
 #ifndef ASICREV_IS_RAVEN2
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RENOIR_A0))
+#else
+#define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RAVEN1_F0))
+#endif
 #endif
 #define ASICREV_IS_RV1_F0(eChipRev) ((eChipRev >= RAVEN1_F0) && (eChipRev < RAVEN_UNKNOWN))
 
 #define FAMILY_RV 142 /* DCN 1*/
 
-
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #define FAMILY_NV 143 /* DCN 2*/
 
 enum {
@@ -201,7 +207,10 @@ enum {
 #define ASICREV_IS_NAVI10_P(eChipRev)        (eChipRev < NV_NAVI12_P_A0)
 #define ASICREV_IS_NAVI12_P(eChipRev)        ((eChipRev >= NV_NAVI12_P_A0) && (eChipRev < NV_NAVI14_M_A0))
 #define ASICREV_IS_NAVI14_M(eChipRev)        ((eChipRev >= NV_NAVI14_M_A0) && (eChipRev < NV_UNKNOWN))
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define ASICREV_IS_RENOIR(eChipRev) ((eChipRev >= RENOIR_A0) && (eChipRev < RAVEN1_F0))
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 #define ASICREV_IS_SIENNA_CICHLID_P(eChipRev)        ((eChipRev >= NV_SIENNA_CICHLID_P_A0))
 #endif
@@ -226,7 +235,9 @@ enum {
 #define DEVICE_ID_TEMASH_983D 0x983D
 
 /* RENOIR */
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define DEVICE_ID_RENOIR_1636 0x1636
+#endif
 
 /* Asic Family IDs for different asic family. */
 #define FAMILY_SI 110 /* Southern Islands: Tahiti (P), Pitcairn (PM), Cape Verde (M), Oland (M), Hainan (V) */

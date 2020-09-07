@@ -50,7 +50,9 @@
 #include "clk_mgr.h"
 #include "link_hwss.h"
 #include "dpcd_defs.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
+#endif
 #include "dce/dmub_hw_lock_mgr.h"
 
 #define DC_LOGGER_INIT(logger)
@@ -345,6 +347,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 		/*
 		 * For DCN2 and greater, a register on the OPP is used to
 		 * determine if the CRTC is blanked instead of the OTG. So use
@@ -356,6 +359,9 @@ void dcn10_log_hw_state(struct dc *dc,
 			s.blank_enabled = pool->opps[i]->funcs->dpg_is_blanked(pool->opps[i]);
 		else
 			s.blank_enabled = tg->funcs->is_blanked(tg);
+#else
+		s.blank_enabled = tg->funcs->is_blanked(tg);
+#endif
 
 		//only print if OTG master is enabled
 		if ((s.otg_enabled & 1) == 0)
@@ -390,6 +396,7 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	// dcn_dsc_state struct field bytes_per_pixel was renamed to bits_per_pixel
 	// TODO: Update golden log header to reflect this name change
 	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
@@ -446,6 +453,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		}
 	}
 	DTN_INFO("\n");
+#endif
 
 	DTN_INFO("\nCALCULATED Clocks: dcfclk_khz:%d  dcfclk_deep_sleep_khz:%d  dispclk_khz:%d\n"
 		"dppclk_khz:%d  max_supported_dppclk_khz:%d  fclk_khz:%d  socclk_khz:%d\n\n",
@@ -707,14 +715,17 @@ static void apply_DEGVIDCN10_253_wa(struct dc *dc)
 
 void dcn10_bios_golden_init(struct dc *dc)
 {
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	struct dce_hwseq *hws = dc->hwseq;
+#endif
 	struct dc_bios *bp = dc->ctx->dc_bios;
 	int i;
 	bool allow_self_fresh_force_enable = true;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	if (hws->funcs.s0i3_golden_init_wa && hws->funcs.s0i3_golden_init_wa(dc))
 		return;
-
+#endif
 	if (dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled)
 		allow_self_fresh_force_enable =
 				dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled(dc->res_pool->hubbub);
@@ -1292,7 +1303,6 @@ void dcn10_init_hw(struct dc *dc)
 		hws->funcs.disable_vga(dc->hwseq);
 
 	hws->funcs.bios_golden_init(dc);
-
 	if (dc->ctx->dc_bios->fw_info_valid) {
 		res_pool->ref_clocks.xtalin_clock_inKhz =
 				dc->ctx->dc_bios->fw_info.pll_info.crystal_frequency;
@@ -1335,11 +1345,13 @@ void dcn10_init_hw(struct dc *dc)
 	}
 
 	/* Power gate DSCs */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (!is_optimized_init_done) {
 		for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 			if (hws->funcs.dsc_pg_control != NULL)
 				hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
 	}
+#endif
 
 	/* we want to turn off all dp displays before doing detection */
 	if (dc->config.power_down_display_on_boot) {
@@ -1393,7 +1405,6 @@ void dcn10_init_hw(struct dc *dc)
 	}
 
 	if (!is_optimized_init_done) {
-
 		for (i = 0; i < res_pool->audio_count; i++) {
 			struct audio *audio = res_pool->audios[i];
 
@@ -2345,8 +2356,12 @@ static void dcn10_update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_0
 			plane_state->color_space,
 			NULL);
+#else
+			plane_state->color_space);
+#endif
 
 	//set scale and bias registers
 	build_prescale_params(&bns_params, plane_state);
@@ -2974,9 +2989,11 @@ void dcn10_apply_ctx_for_surface(
 	if (num_planes > 0)
 		dcn10_program_all_pipe_in_tree(dc, top_pipe_to_program, context);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	/* Program secondary blending tree and writeback pipes */
 	if ((stream->num_wb_info > 0) && (hws->funcs.program_all_writeback_pipes_in_tree))
 		hws->funcs.program_all_writeback_pipes_in_tree(dc, stream, context);
+#endif
 	if (interdependent_update)
 		for (i = 0; i < dc->res_pool->pipe_count; i++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
