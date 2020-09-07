@@ -976,8 +976,12 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 	attachment = READ_ONCE(bo->tbo.base.import_attach);
 
 	if (attachment)
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER
 		seq_printf(m, " imported from %p%s", dma_buf,
 			   attachment->peer2peer ? " P2P" : "");
+#else
+		seq_printf(m, " imported from %p", dma_buf);
+#endif
 	else if (dma_buf)
 		seq_printf(m, " exported as %p", dma_buf);
 
