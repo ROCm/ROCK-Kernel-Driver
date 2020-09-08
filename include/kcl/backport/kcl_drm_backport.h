@@ -77,14 +77,6 @@ int _kcl_drm_syncobj_find_fence(struct drm_file *file_private,
 #define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
 #endif
 
-/*
- * commit v5.5-rc2-1531-ge62bf83aa1bb
- * drm/irq: remove check on dev->dev_private
- */
-#if DRM_VERSION_CODE < DRM_VERSION(5, 6, 0)
-#define AMDKCL_CHECK_DRM_DEVICE_DEV_PRIVATE
-#endif
-
 #ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
 static inline struct drm_gem_object *
 _kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)

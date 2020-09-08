@@ -1198,9 +1198,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		return PTR_ERR(ddev);
 	adev->ddev = ddev;
 #endif
-#ifdef AMDKCL_CHECK_DRM_DEVICE_DEV_PRIVATE
-	ddev->dev_private = (void *)adev;
-#endif
+	kcl_drm_dev_init_private(ddev, (void *)adev);
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
 #ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
@@ -1251,10 +1249,8 @@ err_pci:
 	pci_disable_device(pdev);
 err_free:
 #ifndef HAVE_DRM_DRIVER_RELEASE
-#ifdef AMDKCL_CHECK_DRM_DEVICE_DEV_PRIVATE
-	ddev->dev_private = NULL;
-#endif
 	kfree(adev);
+	kcl_drm_dev_fini_private(ddev);
 #endif
 	drm_dev_put(ddev);
 	return ret;
@@ -1280,10 +1276,8 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 #ifndef HAVE_DRM_DRIVER_RELEASE
 	if (dev) {
-#ifdef AMDKCL_CHECK_DRM_DEVICE_DEV_PRIVATE
-		dev->dev_private = NULL;
-#endif
 		kfree(drm_to_adev(dev));
+		kcl_drm_dev_fini_private(dev);
 	}
 #endif
 	drm_dev_put(dev);
