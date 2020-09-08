@@ -53,7 +53,7 @@ static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 	return (struct amdgpu_device *)kgd;
 }
 
-static void lock_srbm(struct kgd_dev *kgd, uint32_t mec, uint32_t pipe,
+void kgd_gfx_v9_lock_srbm(struct kgd_dev *kgd, uint32_t mec, uint32_t pipe,
 			uint32_t queue, uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -62,7 +62,7 @@ static void lock_srbm(struct kgd_dev *kgd, uint32_t mec, uint32_t pipe,
 	soc15_grbm_select(adev, mec, pipe, queue, vmid);
 }
 
-static void unlock_srbm(struct kgd_dev *kgd)
+void kgd_gfx_v9_unlock_srbm(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
@@ -78,7 +78,7 @@ static void acquire_queue(struct kgd_dev *kgd, uint32_t pipe_id,
 	uint32_t mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
 	uint32_t pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
-	lock_srbm(kgd, mec, pipe, queue_id, 0);
+	kgd_gfx_v9_lock_srbm(kgd, mec, pipe, queue_id, 0);
 }
 
 static uint64_t get_queue_mask(struct amdgpu_device *adev,
@@ -92,7 +92,7 @@ static uint64_t get_queue_mask(struct amdgpu_device *adev,
 
 static void release_queue(struct kgd_dev *kgd)
 {
-	unlock_srbm(kgd);
+	kgd_gfx_v9_unlock_srbm(kgd);
 }
 
 void kgd_gfx_v9_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
@@ -103,13 +103,13 @@ void kgd_gfx_v9_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid,
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
-	lock_srbm(kgd, 0, 0, 0, vmid);
+	kgd_gfx_v9_lock_srbm(kgd, 0, 0, 0, vmid);
 
 	WREG32_RLC(SOC15_REG_OFFSET(GC, 0, mmSH_MEM_CONFIG), sh_mem_config);
 	WREG32_RLC(SOC15_REG_OFFSET(GC, 0, mmSH_MEM_BASES), sh_mem_bases);
 	/* APE1 no longer exists on GFX9 */
 
-	unlock_srbm(kgd);
+	kgd_gfx_v9_unlock_srbm(kgd);
 }
 
 int kgd_gfx_v9_set_pasid_vmid_mapping(struct kgd_dev *kgd, u32 pasid,
@@ -182,13 +182,13 @@ int kgd_gfx_v9_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
 	pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
 
-	lock_srbm(kgd, mec, pipe, 0, 0);
+	kgd_gfx_v9_lock_srbm(kgd, mec, pipe, 0, 0);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmCPC_INT_CNTL),
 		CP_INT_CNTL_RING0__TIME_STAMP_INT_ENABLE_MASK |
 		CP_INT_CNTL_RING0__OPCODE_ERROR_INT_ENABLE_MASK);
 
-	unlock_srbm(kgd);
+	kgd_gfx_v9_unlock_srbm(kgd);
 
 	return 0;
 }
@@ -917,7 +917,6 @@ void kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
 	uint32_t data = 0;
 	bool is_stall_mode;
 	bool is_mode_set;
-
 
 	is_stall_mode = (wave_launch_mode == 4);
 	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
