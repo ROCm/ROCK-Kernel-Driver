@@ -1189,7 +1189,7 @@ struct drm_amdgpu_capability {
 
 struct drm_amdgpu_freesync {
 	__u32 op;			/* AMDGPU_FREESYNC_FULLSCREEN_ENTER or */
-				        /* AMDGPU_FREESYNC_FULLSCREEN_ENTER */
+					/* AMDGPU_FREESYNC_FULLSCREEN_EXIT */
 	__u32 spare[7];
 };
 
