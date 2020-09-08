@@ -28,7 +28,7 @@
  */
 struct amdgpu_autodump {
 	struct completion		dumping;
-	struct wait_queue_head		gpu_hang;
+	wait_queue_head_t		gpu_hang;
 };
 
 #if defined(CONFIG_DEBUG_FS)
