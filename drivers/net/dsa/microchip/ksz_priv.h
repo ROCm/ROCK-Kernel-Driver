@@ -121,7 +121,7 @@ struct ksz_dev_ops {
 	void (*cfg_port_member)(struct ksz_device *dev, int port, u8 member);
 	void (*flush_dyn_mac_table)(struct ksz_device *dev, int port);
 	void (*phy_setup)(struct ksz_device *dev, int port,
-			  struct phy_device *phy);
+			struct phy_device *phy); /* kABI; unused */
 	void (*port_cleanup)(struct ksz_device *dev, int port);
 	void (*port_setup)(struct ksz_device *dev, int port, bool cpu_port);
 	void (*r_phy)(struct ksz_device *dev, u16 phy, u16 reg, u16 *val);
