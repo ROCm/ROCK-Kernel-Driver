@@ -699,7 +699,6 @@ static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 }
 
 void kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
-				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
 	mutex_lock(&adev->grbm_idx_mutex);
