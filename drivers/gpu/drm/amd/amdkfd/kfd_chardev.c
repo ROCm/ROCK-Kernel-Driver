@@ -2794,7 +2794,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 			pdd->debug_trap_enabled = true;
 			dev->kfd2kgd->enable_debug_trap(dev->kgd,
-					pdd->trap_debug_wave_launch_mode,
 					dev->vm_info.last_vmid_kfd);
 
 			r = kfd_dbg_ev_enable(pdd);
