@@ -841,7 +841,6 @@ static void kgd_gfx_v10_set_gfxoff_and_debug_config(struct amdgpu_device *adev,
 }
 
 void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
-				uint32_t trap_debug_wave_launch_mode,
 				uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
