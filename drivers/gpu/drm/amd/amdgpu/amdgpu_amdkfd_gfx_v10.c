@@ -757,45 +757,6 @@ static void set_vm_context_page_table_base(struct kgd_dev *kgd, uint32_t vmid,
 	adev->gfxhub.funcs->setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
-/*
- * GFX10 helper for wave launch stall requirements on debug trap setting.
- *
- * vmid:
- *   Target VMID to stall/unstall.
- *
- * stall:
- *   0-unstall wave launch (enable), 1-stall wave launch (disable).
- *   After wavefront launch has been stalled, allocated waves must drain from
- *   SPI in order for debug trap settings to take effect on those waves.
- *
- *   NOTE: We can afford to clear the entire STALL_VMID field on unstall
- *   because current GFX10 chips cannot support multi-process debugging due to
- *   trap configuration and masking being limited to global scope.  Always
- *   assume single process conditions.
- *
- *   TBD: Allocation happens at the work group level meaning there is no way
- *   to determine when allocation is complete unless HW provides a register to
- *   poll.  We may also have to consider clocking requirements for a proper
- *   Wave32/64 SPI drain.
- *
- */
-static void kgd_gfx_v10_set_wave_launch_stall(struct amdgpu_device *adev,
-					uint32_t vmid,
-					bool stall)
-{
-	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
-
-	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_VMID,
-							stall ? 1 << vmid : 0);
-
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
-
-	if (!stall)
-		return;
-
-	/* FIXME - see TBD in notes above. */
-}
-
 static bool kgd_gfx_v10_is_rlc_restore_supported(struct amdgpu_device *adev)
 {
 	bool is_supported = true;
@@ -816,19 +777,10 @@ static bool kgd_gfx_v10_is_rlc_restore_supported(struct amdgpu_device *adev)
 	return is_supported;
 }
 
-static void kgd_gfx_v10_set_gfxoff_and_debug_config(struct amdgpu_device *adev,
-						uint32_t vmid,
-						bool enable_debug_trap)
+static void kgd_gfx_v10_reset_debug_config(struct amdgpu_device *adev,
+						uint32_t vmid)
 {
 	uint32_t data = 0;
-
-	if (kgd_gfx_v10_is_rlc_restore_supported(adev))
-		return;
-
-	amdgpu_gfx_off_ctrl(adev, !enable_debug_trap);
-
-	if (!enable_debug_trap)
-		return;
 
 	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
 			VMID_SEL, 1 << vmid);
@@ -840,6 +792,75 @@ static void kgd_gfx_v10_set_gfxoff_and_debug_config(struct amdgpu_device *adev,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
 }
 
+/*
+ * GFX10 helper for wave launch stall requirements on debug trap setting.
+ *
+ * vmid:
+ *   Target VMID to stall/unstall.
+ *
+ * stall:
+ *   0-unstall wave launch (enable), 1-stall wave launch (disable).
+ *   After wavefront launch has been stalled, allocated waves must drain from
+ *   SPI in order for debug trap settings to take effect on those waves.
+ *   This is roughly a ~3500 clock cycle wait on SPI where a read on
+ *   SPI_GDBG_WAVE_CNTL translates to ~32 clock cycles.
+ *   KGD_GFX_V10_WAVE_LAUNCH_SPI_DRAIN_LATENCY indicates the number of reads
+ *   required.  Because of the substantial increase in drain time since GFX9,
+ *   GFX off can cause the ASIC to hang during polling thus requires GFX off
+ *   to be temporarily disabled.
+ *
+ * init_release_debug_state:
+ *   RLC FW maintains a per-chip list of registers whose values are restored
+ *   on return from GFX off.  If this list does not contain the required debug
+ *   registers, prevent GFX off re-enable on attach after stalling on SPI drain
+ *   and reset these registers. Ensure that GFX off is re-enabled on detach
+ *   after unstalling on SPI drain.
+ *
+ *   NOTE: We can afford to clear the entire STALL_VMID field on unstall
+ *   because current GFX10 chips cannot support multi-process debugging due to
+ *   trap configuration and masking being limited to global scope.  Always
+ *   assume single process conditions.
+ *
+ */
+
+#define KGD_GFX_V10_WAVE_LAUNCH_SPI_DRAIN_LATENCY	110
+static void kgd_gfx_v10_set_wave_launch_stall(struct amdgpu_device *adev,
+					uint32_t vmid,
+					bool stall,
+					bool init_release_debug_state)
+{
+	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+	int i;
+
+	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_VMID,
+							stall ? 1 << vmid : 0);
+
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL), data);
+
+	if (!stall) {
+		/* Re-enable GFX Off on detach*/
+		if (init_release_debug_state &&
+				!kgd_gfx_v10_is_rlc_restore_supported(adev))
+			amdgpu_gfx_off_ctrl(adev, true);
+		return;
+	}
+
+	/* Prevent ASIC hang on long SPI drain wait. */
+	amdgpu_gfx_off_ctrl(adev, false);
+
+	for (i = 0; i < KGD_GFX_V10_WAVE_LAUNCH_SPI_DRAIN_LATENCY; i++)
+		RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
+
+	/* Keep GFX Off disabled on attach and restore debug registers. */
+	if (init_release_debug_state &&
+			!kgd_gfx_v10_is_rlc_restore_supported(adev)) {
+		kgd_gfx_v10_reset_debug_config(adev, vmid);
+		return;
+	}
+
+	amdgpu_gfx_off_ctrl(adev, true);
+}
+
 void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t vmid)
 {
@@ -847,13 +868,11 @@ void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
-
-	kgd_gfx_v10_set_gfxoff_and_debug_config(adev, vmid, true);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true, true);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
@@ -864,13 +883,11 @@ void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
-
-	kgd_gfx_v10_set_gfxoff_and_debug_config(adev, vmid, false);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true, false);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, true);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
@@ -903,7 +920,7 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 
 	wave_cntl_prev = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true, false);
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK));
 	*trap_mask_prev = REG_GET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN);
@@ -938,7 +955,7 @@ void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true);
+	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, true, false);
 
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
 			VMID_MASK, is_mode_set ? 1 << vmid : 0);
@@ -947,7 +964,7 @@ void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
 
 	if (!is_stall_mode)
-		kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false);
+		kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
