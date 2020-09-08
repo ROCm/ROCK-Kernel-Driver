@@ -52,9 +52,10 @@
  * 2.1 - Add Set Address Watch, and Clear Address Watch support.
  * 3.0 - Overhaul set wave launch override API
  * 3.1 - Add support for GFX10
+ * 3.2 - Add support for GFX10.3
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	3
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	2
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
