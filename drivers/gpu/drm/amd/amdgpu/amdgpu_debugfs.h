@@ -25,7 +25,6 @@
 /*
  * Debugfs
  */
-
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 void amdgpu_debugfs_cleanup(struct drm_minor *minor);
