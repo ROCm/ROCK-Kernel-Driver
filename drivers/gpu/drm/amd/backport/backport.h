@@ -14,4 +14,5 @@
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_eventpoll.h>
+#include <kcl/kcl_i2c.h>
 #endif /* AMDGPU_BACKPORT_H */
