@@ -5,7 +5,8 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_plane_helper.h>
-#include <kcl/kcl_drm.h>
+#include <kcl/kcl_drm_modes.h>
+#include <kcl/kcl_drm_crtc.h>
 
 #if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
 int drm_atomic_helper_disable_all(struct drm_device *dev,

@@ -504,6 +504,8 @@ static int smu_late_init(void *handle)
 
 	smu_get_unique_id(smu);
 
+	smu_get_fan_parameters(smu);
+
 	smu_handle_task(&adev->smu,
 			smu->smu_dpm.dpm_level,
 			AMD_PP_TASK_COMPLETE_INIT,
@@ -2190,16 +2192,24 @@ int smu_set_fan_control_mode(struct smu_context *smu, int value)
 int smu_get_fan_speed_percent(struct smu_context *smu, uint32_t *speed)
 {
 	int ret = 0;
+	uint32_t percent;
+	uint32_t current_rpm;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_speed_percent)
-		ret = smu->ppt_funcs->get_fan_speed_percent(smu, speed);
+	if (smu->ppt_funcs->get_fan_speed_rpm) {
+		ret = smu->ppt_funcs->get_fan_speed_rpm(smu, &current_rpm);
+		if (!ret) {
+			percent = current_rpm * 100 / smu->fan_max_rpm;
+			*speed = percent > 100 ? 100 : percent;
+		}
+	}
 
 	mutex_unlock(&smu->mutex);
+
 
 	return ret;
 }
@@ -2207,14 +2217,19 @@ int smu_get_fan_speed_percent(struct smu_context *smu, uint32_t *speed)
 int smu_set_fan_speed_percent(struct smu_context *smu, uint32_t speed)
 {
 	int ret = 0;
+	uint32_t rpm;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_speed_percent)
-		ret = smu->ppt_funcs->set_fan_speed_percent(smu, speed);
+	if (smu->ppt_funcs->set_fan_speed_rpm) {
+		if (speed > 100)
+			speed = 100;
+		rpm = speed * smu->fan_max_rpm / 100;
+		ret = smu->ppt_funcs->set_fan_speed_rpm(smu, rpm);
+	}
 
 	mutex_unlock(&smu->mutex);
 

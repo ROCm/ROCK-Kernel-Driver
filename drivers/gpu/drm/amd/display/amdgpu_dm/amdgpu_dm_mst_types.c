@@ -294,7 +294,7 @@ dm_mst_atomic_best_encoder(struct drm_connector *connector,
 			   struct drm_connector_state *connector_state)
 {
 	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(connector_state->crtc);
 
 	return &adev->dm.mst_encoders[acrtc->crtc_id].base;
@@ -371,7 +371,7 @@ static const struct drm_encoder_funcs amdgpu_dm_encoder_funcs = {
 void
 dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev)
 {
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	int i;
 
 	for (i = 0; i < adev->dm.display_indexes_num; i++) {
@@ -398,7 +398,7 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 {
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
 	int i;
@@ -504,7 +504,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 #endif
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
@@ -546,7 +546,7 @@ static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 #ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_lock_all(dev);
@@ -599,7 +599,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 #ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV
 		dm->adev->dev,
 #else
-		dm->adev->ddev,
+		adev_to_drm(dm->adev),
 #endif
 		&aconnector->dm_dp_aux.aux,
 		16,

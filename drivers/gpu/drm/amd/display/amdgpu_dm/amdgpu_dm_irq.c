@@ -719,7 +719,7 @@ void amdgpu_dm_set_irq_funcs(struct amdgpu_device *adev)
  */
 void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
 {
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
@@ -763,7 +763,7 @@ void amdgpu_dm_hpd_init(struct amdgpu_device *adev)
  */
 void amdgpu_dm_hpd_fini(struct amdgpu_device *adev)
 {
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;

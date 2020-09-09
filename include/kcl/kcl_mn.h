@@ -8,6 +8,8 @@
 	!defined(HAVE_MMU_NOTIFIER_PUT)
 extern void mmu_notifier_call_srcu(struct rcu_head *rcu,
                             void (*func)(struct rcu_head *rcu));
+extern void mmu_notifier_unregister_no_release(struct mmu_notifier *mn,
+					struct mm_struct *mm);
 #endif
 
 #endif /* AMDKCL_MN_H */

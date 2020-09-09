@@ -2,6 +2,9 @@
 #ifndef AMDKCL_KERNEL_H
 #define AMDKCL_KERNEL_H
 
+#include <linux/kernel.h>
+#include <linux/gfp.h>
+
 #ifndef u64_to_user_ptr
 #define u64_to_user_ptr(x) (	\
 {					\

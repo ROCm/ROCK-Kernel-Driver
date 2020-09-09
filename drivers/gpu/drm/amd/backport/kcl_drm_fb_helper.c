@@ -5,7 +5,7 @@
 #ifndef HAVE_DRM_FB_HELPER_LASTCLOSE
 void drm_fb_helper_lastclose(struct drm_device *dev)
 {
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_fbdev *afbdev;
 	struct drm_fb_helper *fb_helper;
 	int ret;
@@ -27,7 +27,7 @@ void drm_fb_helper_lastclose(struct drm_device *dev)
 
 void drm_fb_helper_output_poll_changed(struct drm_device *dev)
 {
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_hotplug_event(&adev->mode_info.rfbdev->helper);

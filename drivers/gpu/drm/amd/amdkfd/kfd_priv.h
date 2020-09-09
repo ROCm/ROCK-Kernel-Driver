@@ -327,6 +327,7 @@ struct kfd_dev {
 	struct list_head smi_clients;
 	spinlock_t smi_lock;
 
+	uint32_t reset_seq_num;
 	/*
 	 * A bitmask to indicate which watch points have been allocated.
 	 *   bit meaning:

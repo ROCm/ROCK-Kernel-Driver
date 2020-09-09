@@ -2322,7 +2322,7 @@ static int current_backlight_read(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *)m->private;
 	struct drm_device *dev = node->minor->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_display_manager *dm = &adev->dm;
 
 	unsigned int backlight = dc_link_get_backlight_level(dm->backlight_link);
@@ -2340,7 +2340,7 @@ static int target_backlight_read(struct seq_file *m, void *data)
 {
 	struct drm_info_node *node = (struct drm_info_node *)m->private;
 	struct drm_device *dev = node->minor->dev;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_display_manager *dm = &adev->dm;
 
 	unsigned int backlight = dc_link_get_target_backlight_pwm(dm->backlight_link);
@@ -2397,7 +2397,7 @@ static int force_timing_sync_set(void *data, u64 val)
 
 	adev->dm.force_timing_sync = (bool)val;
 
-	amdgpu_dm_trigger_timing_sync(adev->ddev);
+	amdgpu_dm_trigger_timing_sync(adev_to_drm(adev));
 
 	return 0;
 }
@@ -2460,7 +2460,7 @@ int dtn_debugfs_init(struct amdgpu_device *adev)
 		.llseek = default_llseek
 	};
 
-	struct drm_minor *minor = adev->ddev->primary;
+	struct drm_minor *minor = adev_to_drm(adev)->primary;
 	struct dentry *root = minor->debugfs_root;
 	int ret;
 

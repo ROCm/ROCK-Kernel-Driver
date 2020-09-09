@@ -85,7 +85,7 @@ static void amdgpu_hotplug_work_func(struct work_struct *work)
 {
 	struct amdgpu_device *adev = container_of(work, struct amdgpu_device,
 						  hotplug_work);
-	struct drm_device *dev = adev->ddev;
+	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct drm_connector *connector;
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
@@ -159,7 +159,7 @@ void amdgpu_irq_disable_all(struct amdgpu_device *adev)
 irqreturn_t amdgpu_irq_handler(int irq, void *arg)
 {
 	struct drm_device *dev = (struct drm_device *) arg;
-	struct amdgpu_device *adev = dev->dev_private;
+	struct amdgpu_device *adev = drm_to_adev(dev);
 	irqreturn_t ret;
 
 	ret = amdgpu_ih_process(adev, &adev->irq.ih);
@@ -281,9 +281,9 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		if (!adev->enable_virtual_display)
 			/* Disable vblank IRQs aggressively for power-saving */
 			/* XXX: can this be enabled for DC? */
-			adev->ddev->vblank_disable_immediate = true;
+			adev_to_drm(adev)->vblank_disable_immediate = true;
 
-		r = drm_vblank_init(adev->ddev, adev->mode_info.num_crtc);
+		r = drm_vblank_init(adev_to_drm(adev), adev->mode_info.num_crtc);
 		if (r)
 			return r;
 
@@ -298,9 +298,9 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	adev->irq.installed = true;
 	/* Use vector 0 for MSI-X */
 #ifdef PCI_IRQ_MSI
-	r = drm_irq_install(adev->ddev, pci_irq_vector(adev->pdev, 0));
+	r = drm_irq_install(adev_to_drm(adev), pci_irq_vector(adev->pdev, 0));
 #else
-	r = drm_irq_install(adev->ddev, adev->ddev->pdev->irq);
+	r = drm_irq_install(adev_to_drm(adev), adev_to_drm(adev)->pdev->irq);
 #endif
 	if (r) {
 		adev->irq.installed = false;
@@ -308,7 +308,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 			flush_work(&adev->hotplug_work);
 		return r;
 	}
-	adev->ddev->max_vblank_count = 0x00ffffff;
+	adev_to_drm(adev)->max_vblank_count = 0x00ffffff;
 
 	DRM_DEBUG("amdgpu: irq initialized.\n");
 	return 0;
@@ -328,7 +328,7 @@ void amdgpu_irq_fini(struct amdgpu_device *adev)
 	unsigned i, j;
 
 	if (adev->irq.installed) {
-		drm_irq_uninstall(adev->ddev);
+		drm_irq_uninstall(adev_to_drm(adev));
 		adev->irq.installed = false;
 		if (adev->irq.msi_enabled)
 #ifdef PCI_IRQ_MSI
@@ -544,7 +544,7 @@ void amdgpu_irq_gpu_reset_resume_helper(struct amdgpu_device *adev)
 int amdgpu_irq_get(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 		   unsigned type)
 {
-	if (!adev->ddev->irq_enabled)
+	if (!adev_to_drm(adev)->irq_enabled)
 		return -ENOENT;
 
 	if (type >= src->num_types)
@@ -574,7 +574,7 @@ int amdgpu_irq_get(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 int amdgpu_irq_put(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 		   unsigned type)
 {
-	if (!adev->ddev->irq_enabled)
+	if (!adev_to_drm(adev)->irq_enabled)
 		return -ENOENT;
 
 	if (type >= src->num_types)
@@ -605,7 +605,7 @@ int amdgpu_irq_put(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 bool amdgpu_irq_enabled(struct amdgpu_device *adev, struct amdgpu_irq_src *src,
 			unsigned type)
 {
-	if (!adev->ddev->irq_enabled)
+	if (!adev_to_drm(adev)->irq_enabled)
 		return false;
 
 	if (type >= src->num_types)

@@ -9,6 +9,7 @@
 #include <linux/gfp.h>
 #include <linux/slab.h>
 #include <kcl/kcl_mm_types.h>
+#include <kcl/kcl_memory.h>
 
 #ifndef untagged_addr
 #define untagged_addr(addr) (addr)
@@ -80,41 +81,6 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 }
 #endif
 
-static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
-				unsigned long start, unsigned long nr_pages,
-				int write, int force, struct page **pages,
-				struct vm_area_struct **vmas, int *locked)
-{
-#if !defined(HAVE_8ARGS_GET_USER_PAGES)
-	if (mm == current->mm) {
-#if defined(HAVE_5ARGS_GET_USER_PAGES)
-		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
-		return get_user_pages(start, nr_pages, write, pages, vmas);
-#else
-		return get_user_pages(start, nr_pages, write, force, pages,
-				vmas);
-#endif
-	} else {
-#if defined(HAVE_8ARGS_GET_USER_PAGES_REMOTE)
-		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
-		return get_user_pages_remote(tsk, mm, start, nr_pages,
-				write, pages, vmas, locked);
-#elif defined(HAVE_7ARGS_GET_USER_PAGES_REMOTE)
-		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
-		return get_user_pages_remote(tsk, mm, start, nr_pages,
-				write, pages, vmas);
-#else
-		return get_user_pages_remote(tsk, mm, start, nr_pages,
-				write, force, pages, vmas);
-#endif
-	}
-#else
-	write = !!(write & FOLL_WRITE);
-	return get_user_pages(tsk, mm, start, nr_pages,
-			write, force, pages, vmas);
-#endif
-}
-
 #if !defined(HAVE_ZONE_MANAGED_PAGES)
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
@@ -128,59 +94,4 @@ static inline unsigned long zone_managed_pages(struct zone *zone)
 }
 #endif /* HAVE_ZONE_MANAGED_PAGES */
 
-#ifndef HAVE_VMF_INSERT
-static inline vm_fault_t vmf_insert_mixed(struct vm_area_struct *vma,
-				unsigned long addr,
-				pfn_t pfn)
-{
-	int err;
-#if !defined(HAVE_PFN_T_VM_INSERT_MIXED)
-	err = vm_insert_mixed(vma, addr, pfn_t_to_pfn(pfn));
-#else
-	err = vm_insert_mixed(vma, addr, pfn);
-#endif
-	if (err == -ENOMEM)
-		return VM_FAULT_OOM;
-	if (err < 0 && err != -EBUSY)
-		return VM_FAULT_SIGBUS;
-
-	return VM_FAULT_NOPAGE;
-}
-
-static inline vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma,
-				unsigned long addr, unsigned long pfn)
-{
-		int err = vm_insert_pfn(vma, addr, pfn);
-
-		if (err == -ENOMEM)
-			return VM_FAULT_OOM;
-		if (err < 0 && err != -EBUSY)
-			return VM_FAULT_SIGBUS;
-
-		return VM_FAULT_NOPAGE;
-}
-
-#endif /* HAVE_VMF_INSERT */
-
-#ifndef HAVE_VMF_INSERT_MIXED_PROT
-vm_fault_t _kcl_vmf_insert_mixed_prot(struct vm_area_struct *vma, unsigned long addr,
-				      pfn_t pfn, pgprot_t pgprot);
-static inline
-vm_fault_t vmf_insert_mixed_prot(struct vm_area_struct *vma, unsigned long addr,
-			pfn_t pfn, pgprot_t pgprot)
-{
-	return _kcl_vmf_insert_mixed_prot(vma, addr, pfn, pgprot);
-}
-#endif /* HAVE_VMF_INSERT_MIXED_PROT */
-
-#ifndef HAVE_VMF_INSERT_PFN_PROT
-vm_fault_t _kcl_vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
-					unsigned long pfn, pgprot_t pgprot);
-static inline
-vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
-					unsigned long pfn, pgprot_t pgprot)
-{
-	return _kcl_vmf_insert_pfn_prot(vma, addr, pfn, pgprot);
-}
-#endif /* HAVE_VMF_INSERT_PFN_PROT */
 #endif /* AMDKCL_MM_H */

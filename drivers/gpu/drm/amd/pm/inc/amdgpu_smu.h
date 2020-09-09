@@ -452,6 +452,9 @@ struct smu_context
 
 	struct work_struct throttling_logging_work;
 	atomic64_t throttle_int_counter;
+
+	unsigned fan_max_rpm;
+	unsigned manual_fan_speed_rpm;
 };
 
 struct i2c_adapter;
@@ -495,7 +498,6 @@ struct pptable_funcs {
 	int (*notify_smc_display_config)(struct smu_context *smu);
 	int (*set_cpu_power_state)(struct smu_context *smu);
 	bool (*is_dpm_running)(struct smu_context *smu);
-	int (*get_fan_speed_percent)(struct smu_context *smu, uint32_t *speed);
 	int (*get_fan_speed_rpm)(struct smu_context *smu, uint32_t *speed);
 	int (*set_watermarks_table)(struct smu_context *smu,
 				    struct dm_pp_wm_sets_with_clock_ranges_soc15 *clock_ranges);
@@ -571,7 +573,6 @@ struct pptable_funcs {
 	int (*conv_power_profile_to_pplib_workload)(int power_profile);
 	uint32_t (*get_fan_control_mode)(struct smu_context *smu);
 	int (*set_fan_control_mode)(struct smu_context *smu, uint32_t mode);
-	int (*set_fan_speed_percent)(struct smu_context *smu, uint32_t speed);
 	int (*set_fan_speed_rpm)(struct smu_context *smu, uint32_t speed);
 	int (*set_xgmi_pstate)(struct smu_context *smu, uint32_t pstate);
 	int (*gfx_off_control)(struct smu_context *smu, bool enable);
@@ -598,6 +599,7 @@ struct pptable_funcs {
 	int (*enable_mgpu_fan_boost)(struct smu_context *smu);
 	int (*gfx_ulv_control)(struct smu_context *smu, bool enablement);
 	int (*deep_sleep_control)(struct smu_context *smu, bool enablement);
+	int (*get_fan_parameters)(struct smu_context *smu);
 };
 
 typedef enum {

@@ -1123,29 +1123,23 @@ static int arcturus_get_fan_speed_rpm(struct smu_context *smu,
 	if (!speed)
 		return -EINVAL;
 
-	return arcturus_get_smu_metrics_data(smu,
-					     METRICS_CURR_FANSPEED,
-					     speed);
+	switch (smu_v11_0_get_fan_control_mode(smu)) {
+	case AMD_FAN_CTRL_AUTO:
+		return arcturus_get_smu_metrics_data(smu,
+						     METRICS_CURR_FANSPEED,
+						     speed);
+	default:
+		return smu_v11_0_get_fan_speed_rpm(smu, speed);
+	}
 }
 
-static int arcturus_get_fan_speed_percent(struct smu_context *smu,
-					  uint32_t *speed)
+static int arcturus_get_fan_parameters(struct smu_context *smu)
 {
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
-	uint32_t percent, current_rpm;
-	int ret = 0;
 
-	if (!speed)
-		return -EINVAL;
+	smu->fan_max_rpm = pptable->FanMaximumRpm;
 
-	ret = arcturus_get_fan_speed_rpm(smu, &current_rpm);
-	if (ret)
-		return ret;
-
-	percent = current_rpm * 100 / pptable->FanMaximumRpm;
-	*speed = percent > 100 ? 100 : percent;
-
-	return ret;
+	return 0;
 }
 
 static int arcturus_get_power_limit(struct smu_context *smu)
@@ -2329,7 +2323,6 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.print_clk_levels = arcturus_print_clk_levels,
 	.force_clk_levels = arcturus_force_clk_levels,
 	.read_sensor = arcturus_read_sensor,
-	.get_fan_speed_percent = arcturus_get_fan_speed_percent,
 	.get_fan_speed_rpm = arcturus_get_fan_speed_rpm,
 	.get_power_profile_mode = arcturus_get_power_profile_mode,
 	.set_power_profile_mode = arcturus_set_power_profile_mode,
@@ -2375,7 +2368,6 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.display_clock_voltage_request = smu_v11_0_display_clock_voltage_request,
 	.get_fan_control_mode = smu_v11_0_get_fan_control_mode,
 	.set_fan_control_mode = smu_v11_0_set_fan_control_mode,
-	.set_fan_speed_percent = smu_v11_0_set_fan_speed_percent,
 	.set_fan_speed_rpm = smu_v11_0_set_fan_speed_rpm,
 	.set_xgmi_pstate = smu_v11_0_set_xgmi_pstate,
 	.gfx_off_control = smu_v11_0_gfx_off_control,
@@ -2397,6 +2389,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.get_gpu_metrics = arcturus_get_gpu_metrics,
 	.gfx_ulv_control = smu_v11_0_gfx_ulv_control,
 	.deep_sleep_control = smu_v11_0_deep_sleep_control,
+	.get_fan_parameters = arcturus_get_fan_parameters,
 };
 
 void arcturus_set_ppt_funcs(struct smu_context *smu)

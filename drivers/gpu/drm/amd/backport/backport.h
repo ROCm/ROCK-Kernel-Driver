@@ -17,6 +17,8 @@
 #include <kcl/kcl_fs.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_kref.h>
+#include <kcl/backport/kcl_drm_crtc.h>
+#include <kcl/kcl_drm_modes.h>
 #include <kcl/kcl_amdgpu.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_bitops.h>
@@ -45,7 +47,6 @@
 #include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/kcl_types.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
-#include "kcl/kcl_amdgpu_mmu_notifier.h"
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_ptrace.h>
@@ -61,4 +62,9 @@
 #include <kcl/kcl_amdgpu_drm_fb_helper.h>
 #include <kcl/kcl_eventpoll.h>
 #include <kcl/backport/kcl_ttm_tt_backport.h>
+#include <kcl/backport/kcl_drm_encoder.h>
+#include <kcl/backport/kcl_drm_fb.h>
+#include <kcl/backport/kcl_drm_plane.h>
+#include <kcl/kcl_drm_modeset_lock.h>
+
 #endif /* AMDGPU_BACKPORT_H */
