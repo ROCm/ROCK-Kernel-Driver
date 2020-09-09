@@ -4551,6 +4551,7 @@ static int amd_ir_set_vcpu_affinity(struct irq_data *data, void *vcpu_info)
 	} else {
 		/* Un-Setting */
 		struct irq_cfg *cfg = irqd_cfg(data);
+		u64 valid = irte->lo.fields_remap.valid;
 
 		irte->hi.val = 0;
 		irte->lo.val = 0;
@@ -4561,6 +4562,7 @@ static int amd_ir_set_vcpu_affinity(struct irq_data *data, void *vcpu_info)
 		irte->hi.fields.destination =
 				APICID_TO_IRTE_DEST_HI(cfg->dest_apicid);
 		irte->lo.fields_remap.int_type = apic->irq_delivery_mode;
+		irte->lo.fields_remap.valid       = valid;
 		irte->lo.fields_remap.dm = apic->irq_dest_mode;
 
 		/*
