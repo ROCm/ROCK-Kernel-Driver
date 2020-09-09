@@ -586,6 +586,7 @@ struct request_queue {
 
 	size_t			cmd_size;
 
+	/* Not remove to keep kabi consisntecy */
 	struct work_struct	release_work;
 
 #define BLK_MAX_WRITE_HINTS	5
