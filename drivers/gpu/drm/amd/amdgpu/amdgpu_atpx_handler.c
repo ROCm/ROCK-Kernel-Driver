@@ -631,7 +631,7 @@ static bool amdgpu_atpx_detect(void)
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
 		vga_count++;
 
-		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
+		has_atpx |= amdgpu_atpx_pci_probe_handle(pdev);
 
 #ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
@@ -643,7 +643,7 @@ static bool amdgpu_atpx_detect(void)
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_OTHER << 8, pdev)) != NULL) {
 		vga_count++;
 
-		has_atpx |= (amdgpu_atpx_pci_probe_handle(pdev) == true);
+		has_atpx |= amdgpu_atpx_pci_probe_handle(pdev);
 
 #ifdef AMDKCL_PCIE_BRIDGE_PM_USABLE
 		parent_pdev = pci_upstream_bridge(pdev);
