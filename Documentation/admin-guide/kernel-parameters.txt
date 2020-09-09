@@ -866,6 +866,10 @@
 	disable_radix	[PPC]
 			Disable RADIX MMU mode on POWER9
 
+	radix_hcall_invalidate=on  [PPC/PSERIES]
+			Disable RADIX GTSE feature and use hcall for TLB
+			invalidate.
+
 	disable_cpu_apicid= [X86,APIC,SMP]
 			Format: <int>
 			The number of initial APIC ID for the

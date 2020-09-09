@@ -792,6 +792,7 @@ struct qeth_rx {
 	struct qdio_buffer_element *b_element;
 	int e_offset;
 	int qdio_err;
+	u8 bufs_refill;
 };
 
 struct carrier_info {
@@ -853,7 +854,6 @@ struct qeth_card {
 	struct napi_struct napi;
 	struct qeth_rx rx;
 	struct delayed_work buffer_reclaim_work;
-	int reclaim_index;
 	struct work_struct close_dev_work;
 };
 
