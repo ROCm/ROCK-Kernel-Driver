@@ -10,6 +10,7 @@
 #include <linux/syscalls.h>
 #include <linux/utime.h>
 #include <linux/file.h>
+#include <linux/namei.h>
 
 static ssize_t __init xwrite(int fd, const char *p, size_t count)
 {
@@ -564,59 +565,6 @@ static inline bool kexec_free_initrd(void)
 #endif /* CONFIG_KEXEC_CORE */
 
 #ifdef CONFIG_BLK_DEV_RAM
-#define BUF_SIZE 1024
-static void __init clean_rootfs(void)
-{
-	int fd;
-	void *buf;
-	struct linux_dirent64 *dirp;
-	int num;
-
-	fd = ksys_open("/", O_RDONLY, 0);
-	WARN_ON(fd < 0);
-	if (fd < 0)
-		return;
-	buf = kzalloc(BUF_SIZE, GFP_KERNEL);
-	WARN_ON(!buf);
-	if (!buf) {
-		ksys_close(fd);
-		return;
-	}
-
-	dirp = buf;
-	num = ksys_getdents64(fd, dirp, BUF_SIZE);
-	while (num > 0) {
-		while (num > 0) {
-			struct kstat st;
-			int ret;
-
-			ret = vfs_lstat(dirp->d_name, &st);
-			WARN_ON_ONCE(ret);
-			if (!ret) {
-				if (S_ISDIR(st.mode))
-					ksys_rmdir(dirp->d_name);
-				else
-					ksys_unlink(dirp->d_name);
-			}
-
-			num -= dirp->d_reclen;
-			dirp = (void *)dirp + dirp->d_reclen;
-		}
-		dirp = buf;
-		memset(buf, 0, BUF_SIZE);
-		num = ksys_getdents64(fd, dirp, BUF_SIZE);
-	}
-
-	ksys_close(fd);
-	kfree(buf);
-}
-#else
-static inline void clean_rootfs(void)
-{
-}
-#endif /* CONFIG_BLK_DEV_RAM */
-
-#ifdef CONFIG_BLK_DEV_RAM
 static void __init populate_initrd_image(char *err)
 {
 	ssize_t written;
@@ -635,11 +583,6 @@ static void __init populate_initrd_image(char *err)
 		pr_err("/initrd.image: incomplete write (%zd != %ld)\n",
 		       written, initrd_end - initrd_start);
 	ksys_close(fd);
-}
-#else
-static void __init populate_initrd_image(char *err)
-{
-	printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
 }
 #endif /* CONFIG_BLK_DEV_RAM */
 
@@ -660,8 +603,11 @@ static int __init populate_rootfs(void)
 
 	err = unpack_to_rootfs((char *)initrd_start, initrd_end - initrd_start);
 	if (err) {
-		clean_rootfs();
+#ifdef CONFIG_BLK_DEV_RAM
 		populate_initrd_image(err);
+#else
+		printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
+#endif
 	}
 
 done:
