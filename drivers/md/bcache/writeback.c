@@ -802,7 +802,7 @@ void bch_sectors_dirty_init(struct bcache_device *d)
 			schedule_timeout_interruptible(
 				msecs_to_jiffies(INIT_KEYS_SLEEP_MS));
 		else if (ret < 0) {
-			pr_warn("sectors dirty init failed, ret=%d!", ret);
+			pr_warn("sectors dirty init failed, ret=%d!\n", ret);
 			break;
 		}
 	} while (ret == -EAGAIN);
