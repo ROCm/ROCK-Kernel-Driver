@@ -54,6 +54,7 @@
 #include "dsc.h"
 #endif
 #include "dce/dmub_hw_lock_mgr.h"
+#include "dc_trace.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -1031,15 +1032,17 @@ static bool dcn10_hw_wa_force_recovery(struct dc *dc)
 
 }
 
-
 void dcn10_verify_allow_pstate_change_high(struct dc *dc)
 {
 	static bool should_log_hw_state; /* prevent hw state log by default */
 
 	if (!hubbub1_verify_allow_pstate_change_high(dc->res_pool->hubbub)) {
-		if (should_log_hw_state) {
+		int i = 0;
+
+		if (should_log_hw_state)
 			dcn10_log_hw_state(dc, NULL);
-		}
+
+		TRACE_DC_PIPE_STATE(pipe_ctx, i, MAX_PIPES);
 		BREAK_TO_DEBUGGER();
 		if (dcn10_hw_wa_force_recovery(dc)) {
 		/*check again*/
