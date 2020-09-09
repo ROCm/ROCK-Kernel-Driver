@@ -819,11 +819,18 @@ EXPORT_SYMBOL(device_add_disk_no_queue_reg);
  * The final removal of the struct gendisk happens when its refcount reaches 0
  * with put_disk(), which should be called after del_gendisk(), if
  * __device_add_disk() was used.
+ *
+ * Drivers exist which depend on the release of the gendisk to be synchronous,
+ * it should not be deferred.
+ *
+ * Context: can sleep
  */
 void del_gendisk(struct gendisk *disk)
 {
 	struct disk_part_iter piter;
 	struct hd_struct *part;
+
+	might_sleep();
 
 	blk_integrity_del(disk);
 	disk_del_events(disk);
@@ -1386,10 +1393,14 @@ int disk_expand_part_tbl(struct gendisk *disk, int partno)
  * drivers we also call blk_put_queue() for them, and we expect the
  * request_queue refcount to reach 0 at this point, and so the request_queue
  * will also be freed prior to the disk.
+ *
+ * Context: can sleep
  */
 static void disk_release(struct device *dev)
 {
 	struct gendisk *disk = dev_to_disk(dev);
+
+	might_sleep();
 
 	blk_free_devt(dev->devt);
 	disk_release_events(disk);
@@ -1615,6 +1626,9 @@ EXPORT_SYMBOL(get_disk_and_module);
  *
  * This decrements the refcount for the struct gendisk. When this reaches 0
  * we'll have disk_release() called.
+ *
+ * Context: Any context, but the last reference must not be dropped from
+ *          atomic context.
  */
 void put_disk(struct gendisk *disk)
 {
@@ -1629,6 +1643,9 @@ EXPORT_SYMBOL(put_disk);
  *
  * This is a counterpart of get_disk_and_module() and thus also of
  * get_gendisk().
+ *
+ * Context: Any context, but the last reference must not be dropped from
+ *          atomic context.
  */
 void put_disk_and_module(struct gendisk *disk)
 {
