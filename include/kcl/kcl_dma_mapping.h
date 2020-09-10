@@ -27,6 +27,38 @@ void _kcl_convert_long_to_dma_attrs(struct dma_attrs *dma_attrs,
 			dma_set_attr(i, dma_attrs);
 	}
 }
+
+static inline
+void *kcl_dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		gfp_t flag, unsigned long attrs)
+{
+	struct dma_attrs dma_attrs;
+
+	_kcl_convert_long_to_dma_attrs(&dma_attrs, attrs);
+	return dma_alloc_attrs(dev, size, dma_handle, flag, &dma_attrs);
+}
+
+static inline
+void kcl_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+		dma_addr_t dma_handle, unsigned long attrs)
+{
+	struct dma_attrs dma_attrs;
+
+	_kcl_convert_long_to_dma_attrs(&dma_attrs, attrs);
+	dma_free_attrs(dev, size, cpu_addr, dma_handle, &dma_attrs);
+}
+#else
+static inline void *kcl_dma_alloc_attrs(struct device *dev, size_t size,
+                                      dma_addr_t *dma_handle, gfp_t flag,
+                                      unsigned long attrs)
+{
+	return dma_alloc_attrs(dev, size, dma_handle, flag, attrs);
+}
+static inline void kcl_dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+		dma_addr_t dma_handle, unsigned long attrs)
+{
+	return dma_free_attrs(dev, size, cpu_addr, dma_handle, attrs);
+}
 #endif
 
 #ifndef HAVE_DMA_MAP_SGTABLE
