@@ -2543,10 +2543,13 @@ again:
 					struct btrfs_root, root_list);
 
 		root = read_fs_root(fs_info, reloc_root->root_key.offset);
+		if (!IS_ERR(root))
+			BUG_ON(!btrfs_grab_fs_root(root));
 		if (btrfs_root_refs(&reloc_root->root_item) > 0) {
 			BUG_ON(IS_ERR(root));
 			BUG_ON(root->reloc_root != reloc_root);
 			ret = merge_reloc_root(rc, root);
+			btrfs_put_fs_root(root);
 			if (ret) {
 				if (list_empty(&reloc_root->root_list))
 					list_add_tail(&reloc_root->root_list,
@@ -2557,9 +2560,11 @@ again:
 			if (!IS_ERR(root)) {
 				if (root->reloc_root == reloc_root) {
 					root->reloc_root = NULL;
+					btrfs_put_fs_root(reloc_root);
 				}
 				clear_bit(BTRFS_ROOT_DEAD_RELOC_TREE,
 					  &root->state);
+				btrfs_put_fs_root(root);
 			}
 
 			list_del_init(&reloc_root->root_list);
