@@ -6794,11 +6794,6 @@ long btrfs_ioctl_send(struct file *mnt_file, struct btrfs_ioctl_send_args *arg)
 				ret = PTR_ERR(clone_root);
 				goto out;
 			}
-			if (!btrfs_grab_fs_root(clone_root)) {
-				srcu_read_unlock(&fs_info->subvol_srcu, index);
-				ret = -ENOENT;
-				goto out;
-			}
 			spin_lock(&clone_root->root_item_lock);
 			if (!btrfs_root_readonly(clone_root) ||
 			    btrfs_root_dead(clone_root)) {
@@ -6838,12 +6833,6 @@ long btrfs_ioctl_send(struct file *mnt_file, struct btrfs_ioctl_send_args *arg)
 		if (IS_ERR(sctx->parent_root)) {
 			srcu_read_unlock(&fs_info->subvol_srcu, index);
 			ret = PTR_ERR(sctx->parent_root);
-			goto out;
-		}
-		if (!btrfs_grab_fs_root(sctx->parent_root)) {
-			srcu_read_unlock(&fs_info->subvol_srcu, index);
-			ret = -ENOENT;
-			sctx->parent_root = ERR_PTR(ret);
 			goto out;
 		}
 
