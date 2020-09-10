@@ -105,7 +105,7 @@ static struct page *ttm_pool_alloc_page(struct ttm_pool *pool, gfp_t gfp_flags,
 	if (order)
 		attr |= DMA_ATTR_NO_WARN;
 
-	vaddr = dma_alloc_attrs(pool->dev, (1ULL << order) * PAGE_SIZE,
+	vaddr = kcl_dma_alloc_attrs(pool->dev, (1ULL << order) * PAGE_SIZE,
 				&dma->addr, gfp_flags, attr);
 	if (!vaddr)
 		goto error_free;
@@ -153,7 +153,7 @@ static void ttm_pool_free_page(struct ttm_pool *pool, enum ttm_caching caching,
 
 	dma = (void *)p->private;
 	vaddr = (void *)(dma->vaddr & PAGE_MASK);
-	dma_free_attrs(pool->dev, (1UL << order) * PAGE_SIZE, vaddr, dma->addr,
+	kcl_dma_free_attrs(pool->dev, (1UL << order) * PAGE_SIZE, vaddr, dma->addr,
 		       attr);
 	kfree(dma);
 }
