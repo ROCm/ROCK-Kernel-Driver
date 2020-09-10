@@ -198,7 +198,7 @@ void btrfs_free_dummy_root(struct btrfs_root *root)
 		/* One for allocate_extent_buffer */
 		free_extent_buffer(root->node);
 	}
-	kfree(root);
+	btrfs_put_fs_root(root);
 }
 
 struct btrfs_block_group *
