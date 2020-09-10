@@ -18,3 +18,11 @@ config LIVEPATCH
 	  module uses the interface provided by this option to register
 	  a patch, causing calls to patched functions to be redirected
 	  to new function code contained in the patch module.
+
+config LIVEPATCH_IPA_CLONES
+	bool "Kernel Live Patching - Dump IPA Clones"
+	depends on LIVEPATCH
+	depends on $(cc-option, -fdump-ipa-clones)
+	help
+	  Let GCC dump IPA clones during compilation.
+	  Say N if you are unsure.
