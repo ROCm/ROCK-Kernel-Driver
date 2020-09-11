@@ -3274,7 +3274,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		}
 	}
 
-	pci_enable_pcie_error_reporting(adev->ddev.pdev);
+	pci_enable_pcie_error_reporting(adev_to_drm(adev)->pdev);
 
 	/* Post card if necessary */
 	if (amdgpu_device_need_post(adev)) {
