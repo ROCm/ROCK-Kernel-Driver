@@ -91,7 +91,7 @@ struct btrfs_root *btrfs_alloc_dummy_root(struct btrfs_fs_info *fs_info);
  * If you want to ensure the whole tree is safe, you should use
  * 	fs_info->subvol_srcu
  */
-static inline struct btrfs_root *btrfs_grab_fs_root(struct btrfs_root *root)
+static inline struct btrfs_root *btrfs_grab_root(struct btrfs_root *root)
 {
 	if (!root)
 		return NULL;
@@ -100,7 +100,7 @@ static inline struct btrfs_root *btrfs_grab_fs_root(struct btrfs_root *root)
 	return NULL;
 }
 
-static inline void btrfs_put_fs_root(struct btrfs_root *root)
+static inline void btrfs_put_root(struct btrfs_root *root)
 {
 	if (!root)
 		return;

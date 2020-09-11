@@ -4635,7 +4635,7 @@ static int btrfs_check_uuid_tree_entry(struct btrfs_fs_info *fs_info,
 			ret = 1;
 		break;
 	}
-	btrfs_put_fs_root(subvol_root);
+	btrfs_put_root(subvol_root);
 out:
 	return ret;
 }
