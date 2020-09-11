@@ -937,6 +937,10 @@ struct btrfs_fs_info {
 	spinlock_t ref_verify_lock;
 	struct rb_root block_tree;
 #endif
+
+#ifdef CONFIG_BTRFS_DEBUG
+	struct list_head allocated_roots;
+#endif
 };
 
 static inline struct btrfs_fs_info *btrfs_sb(struct super_block *sb)
@@ -1140,6 +1144,10 @@ struct btrfs_root {
 
 #ifdef CONFIG_BTRFS_FS_RUN_SANITY_TESTS
 	u64 alloc_bytenr;
+#endif
+
+#ifdef CONFIG_BTRFS_DEBUG
+	struct list_head leak_list;
 #endif
 };
 
