@@ -2691,10 +2691,8 @@ static int __cold init_tree_roots(struct btrfs_fs_info *fs_info)
 	return ret;
 }
 
-static int init_fs_info(struct btrfs_fs_info *fs_info, struct super_block *sb)
+void btrfs_init_fs_info(struct btrfs_fs_info *fs_info)
 {
-	int ret;
-
 	INIT_RADIX_TREE(&fs_info->fs_roots_radix, GFP_ATOMIC);
 	INIT_RADIX_TREE(&fs_info->buffer_radix, GFP_ATOMIC);
 	INIT_LIST_HEAD(&fs_info->trans_list);
@@ -2737,7 +2735,6 @@ static int init_fs_info(struct btrfs_fs_info *fs_info, struct super_block *sb)
 	atomic_set(&fs_info->reada_works_cnt, 0);
 	atomic_set(&fs_info->nr_delayed_iputs, 0);
 	atomic64_set(&fs_info->tree_mod_seq, 0);
-	fs_info->sb = sb;
 	fs_info->max_inline = BTRFS_DEFAULT_MAX_INLINE;
 	fs_info->metadata_ratio = 0;
 	fs_info->defrag_inodes = RB_ROOT;
@@ -2762,9 +2759,6 @@ static int init_fs_info(struct btrfs_fs_info *fs_info, struct super_block *sb)
 #endif
 	btrfs_init_balance(fs_info);
 	btrfs_init_async_reclaim_work(&fs_info->async_reclaim_work);
-
-	sb->s_blocksize = BTRFS_BDEV_BLOCKSIZE;
-	sb->s_blocksize_bits = blksize_bits(BTRFS_BDEV_BLOCKSIZE);
 
 	spin_lock_init(&fs_info->block_group_cache_lock);
 	fs_info->block_group_cache_tree = RB_ROOT;
@@ -2809,6 +2803,15 @@ static int init_fs_info(struct btrfs_fs_info *fs_info, struct super_block *sb)
 	fs_info->swapfile_pins = RB_ROOT;
 
 	fs_info->send_in_progress = 0;
+}
+
+static int init_mount_fs_info(struct btrfs_fs_info *fs_info, struct super_block *sb)
+{
+	int ret;
+
+	fs_info->sb = sb;
+	sb->s_blocksize = BTRFS_BDEV_BLOCKSIZE;
+	sb->s_blocksize_bits = blksize_bits(BTRFS_BDEV_BLOCKSIZE);
 
 	ret = init_srcu_struct(&fs_info->subvol_srcu);
 	if (ret)
@@ -2872,7 +2875,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	int clear_free_space_tree = 0;
 	int level;
 
-	ret = init_fs_info(fs_info, sb);
+	ret = init_mount_fs_info(fs_info, sb);
 	if (ret) {
 		err = ret;
 		goto fail;
