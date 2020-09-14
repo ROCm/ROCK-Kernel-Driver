@@ -998,7 +998,6 @@ static void bnxt_re_free_res(struct bnxt_re_dev *rdev)
 static int bnxt_re_alloc_res(struct bnxt_re_dev *rdev)
 {
 	struct bnxt_re_ring_attr rattr = {};
-	struct bnxt_qplib_ctx *qplib_ctx;
 	int num_vec_created = 0;
 	int rc = 0, i;
 	u8 type;
@@ -1021,7 +1020,6 @@ static int bnxt_re_alloc_res(struct bnxt_re_dev *rdev)
 	if (rc)
 		goto dealloc_res;
 
-	qplib_ctx = &rdev->qplib_ctx;
 	for (i = 0; i < rdev->num_msix - 1; i++) {
 		struct bnxt_qplib_nq *nq;
 
