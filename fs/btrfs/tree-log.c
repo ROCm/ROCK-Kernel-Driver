@@ -3321,7 +3321,7 @@ static void free_log_tree(struct btrfs_trans_handle *trans,
 			  EXTENT_DIRTY | EXTENT_NEW | EXTENT_NEED_WAIT);
 	extent_io_tree_release(&log->log_csum_range);
 	free_extent_buffer(log->node);
-	kfree(log);
+	btrfs_put_root(log);
 }
 
 /*
@@ -6217,7 +6217,7 @@ again:
 		if (found_key.objectid != BTRFS_TREE_LOG_OBJECTID)
 			break;
 
-		log = btrfs_read_fs_root(log_root_tree, &found_key);
+		log = btrfs_read_tree_root(log_root_tree, &found_key);
 		if (IS_ERR(log)) {
 			ret = PTR_ERR(log);
 			btrfs_handle_fs_error(fs_info, ret,
@@ -6229,7 +6229,7 @@ again:
 		tmp_key.type = BTRFS_ROOT_ITEM_KEY;
 		tmp_key.offset = (u64)-1;
 
-		wc.replay_dest = btrfs_read_fs_root_no_name(fs_info, &tmp_key);
+		wc.replay_dest = btrfs_get_fs_root(fs_info, &tmp_key, true);
 		if (IS_ERR(wc.replay_dest)) {
 			ret = PTR_ERR(wc.replay_dest);
 
@@ -6250,7 +6250,7 @@ again:
 							log->node->len);
 			free_extent_buffer(log->node);
 			free_extent_buffer(log->commit_root);
-			kfree(log);
+			btrfs_put_root(log);
 
 			if (!ret)
 				goto next;
@@ -6286,9 +6286,10 @@ again:
 		}
 
 		wc.replay_dest->log_root = NULL;
+		btrfs_put_root(wc.replay_dest);
 		free_extent_buffer(log->node);
 		free_extent_buffer(log->commit_root);
-		kfree(log);
+		btrfs_put_root(log);
 
 		if (ret)
 			goto error;
@@ -6322,7 +6323,7 @@ next:
 	free_extent_buffer(log_root_tree->node);
 	log_root_tree->log_root = NULL;
 	clear_bit(BTRFS_FS_LOG_RECOVERING, &fs_info->flags);
-	kfree(log_root_tree);
+	btrfs_put_root(log_root_tree);
 
 	return 0;
 error:

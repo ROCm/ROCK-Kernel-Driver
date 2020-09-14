@@ -77,7 +77,7 @@ static struct dentry *btrfs_get_dentry(struct super_block *sb, u64 objectid,
 
 	index = srcu_read_lock(&fs_info->subvol_srcu);
 
-	root = btrfs_read_fs_root_no_name(fs_info, &key);
+	root = btrfs_get_fs_root(fs_info, &key, true);
 	if (IS_ERR(root)) {
 		err = PTR_ERR(root);
 		goto fail;
@@ -88,6 +88,7 @@ static struct dentry *btrfs_get_dentry(struct super_block *sb, u64 objectid,
 	key.offset = 0;
 
 	inode = btrfs_iget(sb, &key, root);
+	btrfs_put_root(root);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		goto fail;

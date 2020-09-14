@@ -2514,7 +2514,7 @@ static noinline int record_one_backref(u64 inum, u64 offset, u64 root_id,
 	key.type = BTRFS_ROOT_ITEM_KEY;
 	key.offset = (u64)-1;
 
-	root = btrfs_read_fs_root_no_name(fs_info, &key);
+	root = btrfs_get_fs_root(fs_info, &key, true);
 	if (IS_ERR(root)) {
 		if (PTR_ERR(root) == -ENOENT)
 			return 0;
@@ -2698,7 +2698,7 @@ static noinline int relink_extent_backref(struct btrfs_path *path,
 
 	index = srcu_read_lock(&fs_info->subvol_srcu);
 
-	root = btrfs_read_fs_root_no_name(fs_info, &key);
+	root = btrfs_get_fs_root(fs_info, &key, true);
 	if (IS_ERR(root)) {
 		srcu_read_unlock(&fs_info->subvol_srcu, index);
 		if (PTR_ERR(root) == -ENOENT)
@@ -5219,7 +5219,7 @@ int btrfs_cont_expand(struct inode *inode, loff_t oldsize, loff_t size)
 	cur_offset = hole_start;
 	while (1) {
 		em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, cur_offset,
-				block_end - cur_offset, 0);
+				      block_end - cur_offset);
 		if (IS_ERR(em)) {
 			err = PTR_ERR(em);
 			em = NULL;
@@ -5749,7 +5749,7 @@ static int fixup_tree_root_location(struct btrfs_fs_info *fs_info,
 
 	btrfs_release_path(path);
 
-	new_root = btrfs_read_fs_root_no_name(fs_info, location);
+	new_root = btrfs_get_fs_root(fs_info, location, true);
 	if (IS_ERR(new_root)) {
 		err = PTR_ERR(new_root);
 		goto out;
@@ -5992,6 +5992,8 @@ struct inode *btrfs_lookup_dentry(struct inode *dir, struct dentry *dentry)
 	} else {
 		inode = btrfs_iget(dir->i_sb, &location, sub_root);
 	}
+	if (root != sub_root)
+		btrfs_put_root(sub_root);
 	srcu_read_unlock(&fs_info->subvol_srcu, index);
 
 	if (!IS_ERR(inode) && root != sub_root) {
@@ -7007,18 +7009,27 @@ static noinline int uncompress_inline(struct btrfs_path *path,
 	return ret;
 }
 
-/*
- * a bit scary, this does extent mapping from logical file offset to the disk.
- * the ugly parts come from merging extents from the disk with the in-ram
- * representation.  This gets more complex because of the data=ordered code,
- * where the in-ram extents might be locked pending data=ordered completion.
+/**
+ * btrfs_get_extent - Lookup the first extent overlapping a range in a file.
+ * @inode:	file to search in
+ * @page:	page to read extent data into if the extent is inline
+ * @pg_offset:	offset into @page to copy to
+ * @start:	file offset
+ * @len:	length of range starting at @start
  *
- * This also copies inline extents directly into the page.
+ * This returns the first &struct extent_map which overlaps with the given
+ * range, reading it from the B-tree and caching it if necessary. Note that
+ * there may be more extents which overlap the given range after the returned
+ * extent_map.
+ *
+ * If @page is not NULL and the extent is inline, this also reads the extent
+ * data directly into the page and marks the extent up to date in the io_tree.
+ *
+ * Return: ERR_PTR on error, non-NULL extent_map on success.
  */
 struct extent_map *btrfs_get_extent(struct btrfs_inode *inode,
-				    struct page *page,
-				    size_t pg_offset, u64 start, u64 len,
-				    int create)
+				    struct page *page, size_t pg_offset,
+				    u64 start, u64 len)
 {
 	struct btrfs_fs_info *fs_info = inode->root->fs_info;
 	int ret;
@@ -7035,7 +7046,6 @@ struct extent_map *btrfs_get_extent(struct btrfs_inode *inode,
 	struct extent_map *em = NULL;
 	struct extent_map_tree *em_tree = &inode->extent_tree;
 	struct extent_io_tree *io_tree = &inode->io_tree;
-	const bool new_inline = !page || create;
 
 	read_lock(&em_tree->lock);
 	em = lookup_extent_mapping(em_tree, start, len);
@@ -7153,8 +7163,7 @@ next:
 		goto insert;
 	}
 
-	btrfs_extent_item_to_extent_map(inode, path, item,
-			new_inline, em);
+	btrfs_extent_item_to_extent_map(inode, path, item, !page, em);
 
 	if (extent_type == BTRFS_FILE_EXTENT_REG ||
 	    extent_type == BTRFS_FILE_EXTENT_PREALLOC) {
@@ -7166,7 +7175,7 @@ next:
 		size_t extent_offset;
 		size_t copy_size;
 
-		if (new_inline)
+		if (!page)
 			goto out;
 
 		size = btrfs_file_extent_ram_bytes(leaf, item);
@@ -7249,7 +7258,7 @@ struct extent_map *btrfs_get_extent_fiemap(struct btrfs_inode *inode,
 	u64 delalloc_end;
 	int err = 0;
 
-	em = btrfs_get_extent(inode, NULL, 0, start, len, 0);
+	em = btrfs_get_extent(inode, NULL, 0, start, len);
 	if (IS_ERR(em))
 		return em;
 	/*
@@ -7875,7 +7884,7 @@ static int btrfs_get_blocks_direct(struct inode *inode, sector_t iblock,
 		goto err;
 	}
 
-	em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, start, len, 0);
+	em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, start, len);
 	if (IS_ERR(em)) {
 		ret = PTR_ERR(em);
 		goto unlock_err;
@@ -10309,14 +10318,14 @@ int btrfs_start_delalloc_roots(struct btrfs_fs_info *fs_info, int nr)
 	while (!list_empty(&splice) && nr) {
 		root = list_first_entry(&splice, struct btrfs_root,
 					delalloc_root);
-		root = btrfs_grab_fs_root(root);
+		root = btrfs_grab_root(root);
 		BUG_ON(!root);
 		list_move_tail(&root->delalloc_root,
 			       &fs_info->delalloc_roots);
 		spin_unlock(&fs_info->delalloc_root_lock);
 
 		ret = start_delalloc_inodes(root, nr, false);
-		btrfs_put_fs_root(root);
+		btrfs_put_root(root);
 		if (ret < 0)
 			goto out;
 
@@ -10919,7 +10928,7 @@ static int btrfs_swap_activate(struct swap_info_struct *sis, struct file *file,
 		struct btrfs_block_group *bg;
 		u64 len = isize - start;
 
-		em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, start, len, 0);
+		em = btrfs_get_extent(BTRFS_I(inode), NULL, 0, start, len);
 		if (IS_ERR(em)) {
 			ret = PTR_ERR(em);
 			goto out;

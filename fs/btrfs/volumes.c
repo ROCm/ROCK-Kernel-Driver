@@ -2092,7 +2092,7 @@ static struct btrfs_device * btrfs_find_next_active_device(
  * where this function called, there should be always be another device (or
  * this_dev) which is active.
  */
-void btrfs_assign_next_active_device(struct btrfs_device *device,
+void __cold btrfs_assign_next_active_device(struct btrfs_device *device,
 				     struct btrfs_device *this_dev)
 {
 	struct btrfs_fs_info *fs_info = device->fs_info;
@@ -4616,7 +4616,7 @@ static int btrfs_check_uuid_tree_entry(struct btrfs_fs_info *fs_info,
 	key.objectid = subid;
 	key.type = BTRFS_ROOT_ITEM_KEY;
 	key.offset = (u64)-1;
-	subvol_root = btrfs_read_fs_root_no_name(fs_info, &key);
+	subvol_root = btrfs_get_fs_root(fs_info, &key, true);
 	if (IS_ERR(subvol_root)) {
 		ret = PTR_ERR(subvol_root);
 		if (ret == -ENOENT)
@@ -4635,7 +4635,7 @@ static int btrfs_check_uuid_tree_entry(struct btrfs_fs_info *fs_info,
 			ret = 1;
 		break;
 	}
-
+	btrfs_put_root(subvol_root);
 out:
 	return ret;
 }
