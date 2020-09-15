@@ -888,7 +888,7 @@ release_out:
 	amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
 #else
 	if (ret)
-		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
+		amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm, NULL);
 free_out:
 	kvfree(mem->user_pages);
 	mem->user_pages = NULL;
