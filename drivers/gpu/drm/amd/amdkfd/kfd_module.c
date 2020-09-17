@@ -86,6 +86,7 @@ err_ipc:
 err_topology:
 	kfd_chardev_exit();
 err_ioctl:
+	pr_err("KFD is disabled due to module initialization failure\n");
 	return err;
 }
 
