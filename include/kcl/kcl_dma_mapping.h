@@ -87,4 +87,24 @@ static inline void dma_unmap_sgtable(struct device *dev, struct sg_table *sgt,
 }
 #endif
 
+#ifndef HAVE_DMA_MAP_RESOURCE
+static inline dma_addr_t dma_map_resource(struct device *dev,
+                                          phys_addr_t phys_addr,
+                                          size_t size,
+                                          enum dma_data_direction dir,
+                                          unsigned long attrs)
+{
+        pr_warn_once("%s is not supported\n", __func__);
+
+        return phys_addr;
+}
+
+static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
+                                      size_t size, enum dma_data_direction dir,
+                                      unsigned long attrs)
+{
+        pr_warn_once("%s is not supported\n", __func__);
+}
+#endif
+
 #endif
