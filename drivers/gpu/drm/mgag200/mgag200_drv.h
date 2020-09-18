@@ -254,7 +254,6 @@ void mgag200_i2c_destroy(struct mga_i2c_chan *i2c);
 
 int mgag200_mm_init(struct mga_device *mdev);
 void mgag200_mm_fini(struct mga_device *mdev);
-int mgag200_mmap(struct file *filp, struct vm_area_struct *vma);
 
 int mga_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
 						uint32_t handle, uint32_t width, uint32_t height);
