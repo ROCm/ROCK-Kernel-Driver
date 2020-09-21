@@ -148,6 +148,14 @@
 #endif
 
 /*
+ * v5.6-1624-g8811d9eb4dfa
+ * drm/amd/display: Align macro name as per DP spec
+ */
+#ifdef DP_TEST_PHY_PATTERN
+#define DP_PHY_TEST_PATTERN DP_TEST_PHY_PATTERN
+#endif
+
+/*
  * commit v4.19-rc1-100-g5ce70c799ac2
  * drm_dp_cec: check that aux has a transfer function
  */
