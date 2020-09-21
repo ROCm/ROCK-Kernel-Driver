@@ -35,8 +35,6 @@
 
 var SINGLE_STEP_MISSED_WORKAROUND		= 1	//workaround for lost MODE.DEBUG_EN exception when SAVECTX raised
 
-var SQ_WAVE_STATUS_INST_ATC_SHIFT		= 23
-var SQ_WAVE_STATUS_INST_ATC_MASK		= 0x00800000
 var SQ_WAVE_STATUS_SPI_PRIO_MASK		= 0x00000006
 var SQ_WAVE_STATUS_HALT_MASK			= 0x2000
 
@@ -76,9 +74,6 @@ var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG	= 0x00007FFF
 
 var SQ_WAVE_MODE_DEBUG_EN_MASK			= 0x800
 
-var SQ_BUF_RSRC_WORD1_ATC_SHIFT			= 24
-var SQ_BUF_RSRC_WORD3_MTYPE_SHIFT		= 27
-
 // bits [31:24] unused by SPI debug data
 var TTMP11_SAVE_REPLAY_W64H_SHIFT		= 31
 var TTMP11_SAVE_REPLAY_W64H_MASK		= 0x80000000
@@ -90,10 +85,6 @@ var TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK		= 0x7F000000
 var S_SAVE_BUF_RSRC_WORD1_STRIDE		= 0x00040000
 var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
 
-var S_SAVE_SPI_INIT_ATC_MASK			= 0x08000000
-var S_SAVE_SPI_INIT_ATC_SHIFT			= 27
-var S_SAVE_SPI_INIT_MTYPE_MASK			= 0x70000000
-var S_SAVE_SPI_INIT_MTYPE_SHIFT			= 28
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 
@@ -130,10 +121,6 @@ var s_save_ttmps_hi				= s_save_trapsts
 var S_RESTORE_BUF_RSRC_WORD1_STRIDE		= S_SAVE_BUF_RSRC_WORD1_STRIDE
 var S_RESTORE_BUF_RSRC_WORD3_MISC		= S_SAVE_BUF_RSRC_WORD3_MISC
 
-var S_RESTORE_SPI_INIT_ATC_MASK			= 0x08000000
-var S_RESTORE_SPI_INIT_ATC_SHIFT		= 27
-var S_RESTORE_SPI_INIT_MTYPE_MASK		= 0x70000000
-var S_RESTORE_SPI_INIT_MTYPE_SHIFT		= 28
 var S_RESTORE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_RESTORE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 var S_WAVE_SIZE					= 25
@@ -326,12 +313,6 @@ L_SLEEP:
 	s_or_b32	s_save_buf_rsrc1, s_save_buf_rsrc1, S_SAVE_BUF_RSRC_WORD1_STRIDE
 	s_mov_b32	s_save_buf_rsrc2, 0					//NUM_RECORDS initial value = 0 (in bytes) although not neccessarily inited
 	s_mov_b32	s_save_buf_rsrc3, S_SAVE_BUF_RSRC_WORD3_MISC
-	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_ATC_MASK
-	s_lshr_b32	s_save_tmp, s_save_tmp, (S_SAVE_SPI_INIT_ATC_SHIFT-SQ_BUF_RSRC_WORD1_ATC_SHIFT)
-	s_or_b32	s_save_buf_rsrc3, s_save_buf_rsrc3, s_save_tmp		//or ATC
-	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_MTYPE_MASK
-	s_lshr_b32	s_save_tmp, s_save_tmp, (S_SAVE_SPI_INIT_MTYPE_SHIFT-SQ_BUF_RSRC_WORD3_MTYPE_SHIFT)
-	s_or_b32	s_save_buf_rsrc3, s_save_buf_rsrc3, s_save_tmp		//or MTYPE
 
 	s_mov_b32	s_save_m0, m0
 
@@ -674,12 +655,7 @@ L_RESTORE:
 	s_or_b32	s_restore_buf_rsrc1, s_restore_buf_rsrc1, S_RESTORE_BUF_RSRC_WORD1_STRIDE
 	s_mov_b32	s_restore_buf_rsrc2, 0					//NUM_RECORDS initial value = 0 (in bytes)
 	s_mov_b32	s_restore_buf_rsrc3, S_RESTORE_BUF_RSRC_WORD3_MISC
-	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_ATC_MASK
-	s_lshr_b32	s_restore_tmp, s_restore_tmp, (S_RESTORE_SPI_INIT_ATC_SHIFT-SQ_BUF_RSRC_WORD1_ATC_SHIFT)
-	s_or_b32	s_restore_buf_rsrc3, s_restore_buf_rsrc3, s_restore_tmp	//or ATC
-	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_MTYPE_MASK
-	s_lshr_b32	s_restore_tmp, s_restore_tmp, (S_RESTORE_SPI_INIT_MTYPE_SHIFT-SQ_BUF_RSRC_WORD3_MTYPE_SHIFT)
-	s_or_b32	s_restore_buf_rsrc3, s_restore_buf_rsrc3, s_restore_tmp	//or MTYPE
+
 	//determine it is wave32 or wave64
 	get_wave_size(s_restore_size)
 
@@ -971,8 +947,6 @@ L_RESTORE_HWREG:
 	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT
 	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
 
-	s_and_b32	s_restore_m0, s_restore_status, SQ_WAVE_STATUS_INST_ATC_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, SQ_WAVE_STATUS_INST_ATC_SHIFT
 	s_setreg_b32 	hwreg(HW_REG_IB_STS), s_restore_tmp
 #endif
 
