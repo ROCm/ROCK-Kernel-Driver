@@ -98,4 +98,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-mapping: use unsigned long for dma_attrs
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-attrs.h])
+
+	dnl #
+	dnl # v4.13-rc1-41-g7744ccdbc16f
+	dnl # x86/mm: Add Secure Memory Encryption (SME) support
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/mem_encrypt.h])
 ])

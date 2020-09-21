@@ -710,6 +710,9 @@
 /* Define to 1 if you have the <linux/kfifo-new.h> header file. */
 /* #undef HAVE_LINUX_KFIFO_NEW_H */
 
+/* Define to 1 if you have the <linux/mem_encrypt.h> header file. */
+#define HAVE_LINUX_MEM_ENCRYPT_H 1
+
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
 
@@ -742,6 +745,9 @@
 
 /* memalloc_nofs_{save,restore}() are available */
 #define HAVE_MEMALLOC_NOFS_SAVE 1
+
+/* mem_encrypt_active() is available */
+#define HAVE_MEM_ENCRYPT_ACTIVE 1
 
 /* mmgrab() is available in linux/sched.h */
 #define HAVE_MMGRAB 1
