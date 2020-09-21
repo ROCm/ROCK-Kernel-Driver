@@ -1397,7 +1397,7 @@ int kfd_create_crat_image_virtual(void **crat_image, size_t *size,
 		if (!pcrat_image)
 			return -ENOMEM;
 		*size = dyn_size;
-		pr_debug("CRAT size is %d", dyn_size);
+		pr_debug("CRAT size is %ld", dyn_size);
 		ret = kfd_create_vcrat_image_cpu(pcrat_image, size);
 		break;
 	case COMPUTE_UNIT_GPU:
