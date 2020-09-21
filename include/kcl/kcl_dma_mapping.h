@@ -3,6 +3,7 @@
 #define AMDKCL_DMA_MAPPING_H
 
 #include <linux/dma-mapping.h>
+#include <kcl/kcl_mem_encrypt.h>
 
 /*
  * commit v4.8-11962-ga9a62c938441
