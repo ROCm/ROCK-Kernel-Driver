@@ -46,3 +46,16 @@ void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
 }
 EXPORT_SYMBOL(_kcl__drm_atomic_helper_plane_reset);
 #endif
+
+#ifndef HAVE___DRM_ATOMIC_HELPER_CRTC_RESET
+void
+__drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
+                              struct drm_crtc_state *crtc_state)
+{
+       if (crtc_state)
+               crtc_state->crtc = crtc;
+
+       crtc->state = crtc_state;
+}
+EXPORT_SYMBOL(__drm_atomic_helper_crtc_reset);
+#endif
