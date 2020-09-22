@@ -44,4 +44,15 @@ static inline int _kcl_drm_universal_plane_init(struct drm_device *dev, struct d
 #define drm_universal_plane_init _kcl_drm_universal_plane_init
 #endif
 
+#ifndef HAVE_DRM_PLANE_MASK
+/**
+ * drm_plane_mask - find the mask of a registered plane
+ * @plane: plane to find mask for
+ */
+static inline u32 drm_plane_mask(const struct drm_plane *plane)
+{
+	return 1 << drm_plane_index(plane);
+}
+#endif
+
 #endif
