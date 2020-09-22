@@ -78,4 +78,9 @@ void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
 							struct drm_plane_state *state);
 #endif
 
+#ifndef HAVE___DRM_ATOMIC_HELPER_CRTC_RESET
+void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
+                              struct drm_crtc_state *crtc_state);
+#endif
+
 #endif
