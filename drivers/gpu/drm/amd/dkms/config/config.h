@@ -1015,3 +1015,6 @@
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "19.40"
+
+/* drm_plane_mask is available */
+#define HAVE_DRM_PLANE_MASK 1
