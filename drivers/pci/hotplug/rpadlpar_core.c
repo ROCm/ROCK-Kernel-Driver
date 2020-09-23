@@ -479,3 +479,4 @@ void rpadlpar_io_exit(void)
 module_init(rpadlpar_io_init);
 module_exit(rpadlpar_io_exit);
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("RPA Dynamic Logical Partitioning driver for I/O slots");
