@@ -152,7 +152,7 @@ int amdgpu_async_gfx_ring = 1;
 int amdgpu_mcbp = 0;
 int amdgpu_discovery = -1;
 int amdgpu_mes = 0;
-int amdgpu_noretry = 1;
+int amdgpu_noretry = -1;
 int amdgpu_force_asic_type = -1;
 int amdgpu_tmz = 0;
 int amdgpu_reset_method = -1; /* auto */
@@ -608,8 +608,13 @@ MODULE_PARM_DESC(mes,
 	"Enable Micro Engine Scheduler (0 = disabled (default), 1 = enabled)");
 module_param_named(mes, amdgpu_mes, int, 0444);
 
+/**
+ * DOC: noretry (int)
+ * Disable retry faults in the GPU memory controller.
+ * (0 = retry enabled, 1 = retry disabled, -1 auto (default))
+ */
 MODULE_PARM_DESC(noretry,
-	"Disable retry faults (0 = retry enabled, 1 = retry disabled (default))");
+	"Disable retry faults (0 = retry enabled, 1 = retry disabled, -1 auto (default))");
 module_param_named(noretry, amdgpu_noretry, int, 0644);
 
 /**
