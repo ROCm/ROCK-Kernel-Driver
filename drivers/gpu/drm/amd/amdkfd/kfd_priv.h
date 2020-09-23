@@ -337,6 +337,8 @@ struct kfd_dev {
 	spinlock_t watch_points_lock;
 	struct ida doorbell_ida;
 	unsigned int max_doorbell_slices;
+
+	int noretry;
 };
 
 struct kfd_ipc_obj;
