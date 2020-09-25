@@ -103,6 +103,12 @@ static void virtual_setup_stereo_sync(
 			bool enable)
 {}
 
+static void virtual_stream_encoder_set_dsc_pps_info_packet(
+		struct stream_encoder *enc,
+		bool enable,
+		uint8_t *dsc_packed_pps)
+{}
+
 static const struct stream_encoder_funcs virtual_str_enc_funcs = {
 #ifdef CONFIG_DRM_AMD_DC_DCN2_0
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
@@ -136,6 +142,7 @@ static const struct stream_encoder_funcs virtual_str_enc_funcs = {
 	.hdmi_reset_stream_attribute = virtual_stream_encoder_reset_hdmi_stream_attribute,
 	.dig_connect_to_otg = virtual_dig_connect_to_otg,
 	.setup_stereo_sync = virtual_setup_stereo_sync,
+	.dp_set_dsc_pps_info_packet = virtual_stream_encoder_set_dsc_pps_info_packet,
 };
 
 bool virtual_stream_encoder_construct(
