@@ -1722,7 +1722,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				addr = 0;
 				dma_addr = pages_addr;
 			} else {
-				addr += bo_adev->vm_manager.vram_base_offset +
+				addr += vram_base_offset +
 					amdgpu_ttm_domain_start(adev, mem->mem_type) -
 					amdgpu_ttm_domain_start(adev, TTM_PL_VRAM);
 				addr += pfn << PAGE_SHIFT;
@@ -1751,7 +1751,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				}
 
 			} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
-				addr += bo_adev->vm_manager.vram_base_offset;
+				addr += vram_base_offset;
 				addr += pfn << PAGE_SHIFT;
 			}
 		}
