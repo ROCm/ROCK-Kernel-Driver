@@ -158,7 +158,7 @@ static int nvdimm_key_revalidate(struct nvdimm *nvdimm)
 	}
 
 	nvdimm_put_key(key);
-	nvdimm->sec.state = nvdimm_security_state(nvdimm, NVDIMM_USER);
+	nvdimm->sec.flags = nvdimm_security_flags(nvdimm, NVDIMM_USER);
 	return 0;
 }
 
@@ -174,11 +174,11 @@ static int __nvdimm_security_unlock(struct nvdimm *nvdimm)
 	lockdep_assert_held(&nvdimm_bus->reconfig_mutex);
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->unlock
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return -EIO;
 
 	/* No need to go further if security is disabled */
-	if (nvdimm->sec.state == NVDIMM_SECURITY_DISABLED)
+	if (test_bit(NVDIMM_SECURITY_DISABLED, &nvdimm->sec.flags))
 		return 0;
 
 	if (test_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags)) {
@@ -193,7 +193,7 @@ static int __nvdimm_security_unlock(struct nvdimm *nvdimm)
 	 * freeze of the security configuration. I.e. if the OS does not
 	 * have the key, security is being managed pre-OS.
 	 */
-	if (nvdimm->sec.state == NVDIMM_SECURITY_UNLOCKED) {
+	if (test_bit(NVDIMM_SECURITY_UNLOCKED, &nvdimm->sec.flags)) {
 		if (!key_revalidate)
 			return 0;
 
@@ -206,7 +206,7 @@ static int __nvdimm_security_unlock(struct nvdimm *nvdimm)
 			rc == 0 ? "success" : "fail");
 
 	nvdimm_put_key(key);
-	nvdimm->sec.state = nvdimm_security_state(nvdimm, NVDIMM_USER);
+	nvdimm->sec.flags = nvdimm_security_flags(nvdimm, NVDIMM_USER);
 	return rc;
 }
 
@@ -221,6 +221,24 @@ int nvdimm_security_unlock(struct device *dev)
 	return rc;
 }
 
+static int check_security_state(struct nvdimm *nvdimm)
+{
+	struct device *dev = &nvdimm->dev;
+
+	if (test_bit(NVDIMM_SECURITY_FROZEN, &nvdimm->sec.flags)) {
+		dev_dbg(dev, "Incorrect security state: %#lx\n",
+				nvdimm->sec.flags);
+		return -EIO;
+	}
+
+	if (test_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags)) {
+		dev_dbg(dev, "Security operation in progress.\n");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
 int nvdimm_security_disable(struct nvdimm *nvdimm, unsigned int keyid)
 {
 	struct device *dev = &nvdimm->dev;
@@ -233,19 +251,12 @@ int nvdimm_security_disable(struct nvdimm *nvdimm, unsigned int keyid)
 	lockdep_assert_held(&nvdimm_bus->reconfig_mutex);
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->disable
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return -EOPNOTSUPP;
 
-	if (nvdimm->sec.state >= NVDIMM_SECURITY_FROZEN) {
-		dev_dbg(dev, "Incorrect security state: %d\n",
-				nvdimm->sec.state);
-		return -EIO;
-	}
-
-	if (test_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags)) {
-		dev_dbg(dev, "Security operation in progress.\n");
-		return -EBUSY;
-	}
+	rc = check_security_state(nvdimm);
+	if (rc)
+		return rc;
 
 	data = nvdimm_get_user_key_payload(nvdimm, keyid,
 			NVDIMM_BASE_KEY, &key);
@@ -257,7 +268,7 @@ int nvdimm_security_disable(struct nvdimm *nvdimm, unsigned int keyid)
 			rc == 0 ? "success" : "fail");
 
 	nvdimm_put_key(key);
-	nvdimm->sec.state = nvdimm_security_state(nvdimm, NVDIMM_USER);
+	nvdimm->sec.flags = nvdimm_security_flags(nvdimm, NVDIMM_USER);
 	return rc;
 }
 
@@ -275,14 +286,12 @@ int nvdimm_security_update(struct nvdimm *nvdimm, unsigned int keyid,
 	lockdep_assert_held(&nvdimm_bus->reconfig_mutex);
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->change_key
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return -EOPNOTSUPP;
 
-	if (nvdimm->sec.state >= NVDIMM_SECURITY_FROZEN) {
-		dev_dbg(dev, "Incorrect security state: %d\n",
-				nvdimm->sec.state);
-		return -EIO;
-	}
+	rc = check_security_state(nvdimm);
+	if (rc)
+		return rc;
 
 	data = nvdimm_get_user_key_payload(nvdimm, keyid,
 			NVDIMM_BASE_KEY, &key);
@@ -305,10 +314,10 @@ int nvdimm_security_update(struct nvdimm *nvdimm, unsigned int keyid,
 	nvdimm_put_key(newkey);
 	nvdimm_put_key(key);
 	if (pass_type == NVDIMM_MASTER)
-		nvdimm->sec.ext_state = nvdimm_security_state(nvdimm,
+		nvdimm->sec.ext_flags = nvdimm_security_flags(nvdimm,
 				NVDIMM_MASTER);
 	else
-		nvdimm->sec.state = nvdimm_security_state(nvdimm,
+		nvdimm->sec.flags = nvdimm_security_flags(nvdimm,
 				NVDIMM_USER);
 	return rc;
 }
@@ -326,7 +335,7 @@ int nvdimm_security_erase(struct nvdimm *nvdimm, unsigned int keyid,
 	lockdep_assert_held(&nvdimm_bus->reconfig_mutex);
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->erase
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return -EOPNOTSUPP;
 
 	if (atomic_read(&nvdimm->busy)) {
@@ -334,18 +343,11 @@ int nvdimm_security_erase(struct nvdimm *nvdimm, unsigned int keyid,
 		return -EBUSY;
 	}
 
-	if (nvdimm->sec.state >= NVDIMM_SECURITY_FROZEN) {
-		dev_dbg(dev, "Incorrect security state: %d\n",
-				nvdimm->sec.state);
-		return -EIO;
-	}
+	rc = check_security_state(nvdimm);
+	if (rc)
+		return rc;
 
-	if (test_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags)) {
-		dev_dbg(dev, "Security operation in progress.\n");
-		return -EBUSY;
-	}
-
-	if (nvdimm->sec.ext_state != NVDIMM_SECURITY_UNLOCKED
+	if (!test_bit(NVDIMM_SECURITY_UNLOCKED, &nvdimm->sec.ext_flags)
 			&& pass_type == NVDIMM_MASTER) {
 		dev_dbg(dev,
 			"Attempt to secure erase in wrong master state.\n");
@@ -363,7 +365,7 @@ int nvdimm_security_erase(struct nvdimm *nvdimm, unsigned int keyid,
 			rc == 0 ? "success" : "fail");
 
 	nvdimm_put_key(key);
-	nvdimm->sec.state = nvdimm_security_state(nvdimm, NVDIMM_USER);
+	nvdimm->sec.flags = nvdimm_security_flags(nvdimm, NVDIMM_USER);
 	return rc;
 }
 
@@ -379,7 +381,7 @@ int nvdimm_security_overwrite(struct nvdimm *nvdimm, unsigned int keyid)
 	lockdep_assert_held(&nvdimm_bus->reconfig_mutex);
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->overwrite
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return -EOPNOTSUPP;
 
 	if (atomic_read(&nvdimm->busy)) {
@@ -392,16 +394,9 @@ int nvdimm_security_overwrite(struct nvdimm *nvdimm, unsigned int keyid)
 		return -EINVAL;
 	}
 
-	if (nvdimm->sec.state >= NVDIMM_SECURITY_FROZEN) {
-		dev_dbg(dev, "Incorrect security state: %d\n",
-				nvdimm->sec.state);
-		return -EIO;
-	}
-
-	if (test_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags)) {
-		dev_dbg(dev, "Security operation in progress.\n");
-		return -EBUSY;
-	}
+	rc = check_security_state(nvdimm);
+	if (rc)
+		return rc;
 
 	data = nvdimm_get_user_key_payload(nvdimm, keyid,
 			NVDIMM_BASE_KEY, &key);
@@ -416,7 +411,7 @@ int nvdimm_security_overwrite(struct nvdimm *nvdimm, unsigned int keyid)
 	if (rc == 0) {
 		set_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags);
 		set_bit(NDD_WORK_PENDING, &nvdimm->flags);
-		nvdimm->sec.state = NVDIMM_SECURITY_OVERWRITE;
+		set_bit(NVDIMM_SECURITY_OVERWRITE, &nvdimm->sec.flags);
 		/*
 		 * Make sure we don't lose device while doing overwrite
 		 * query.
@@ -447,7 +442,7 @@ void __nvdimm_security_overwrite_query(struct nvdimm *nvdimm)
 	tmo = nvdimm->sec.overwrite_tmo;
 
 	if (!nvdimm->sec.ops || !nvdimm->sec.ops->query_overwrite
-			|| nvdimm->sec.state < 0)
+			|| !nvdimm->sec.flags)
 		return;
 
 	rc = nvdimm->sec.ops->query_overwrite(nvdimm);
@@ -471,8 +466,8 @@ void __nvdimm_security_overwrite_query(struct nvdimm *nvdimm)
 	clear_bit(NDD_SECURITY_OVERWRITE, &nvdimm->flags);
 	clear_bit(NDD_WORK_PENDING, &nvdimm->flags);
 	put_device(&nvdimm->dev);
-	nvdimm->sec.state = nvdimm_security_state(nvdimm, NVDIMM_USER);
-	nvdimm->sec.ext_state = nvdimm_security_state(nvdimm, NVDIMM_MASTER);
+	nvdimm->sec.flags = nvdimm_security_flags(nvdimm, NVDIMM_USER);
+	nvdimm->sec.ext_flags = nvdimm_security_flags(nvdimm, NVDIMM_MASTER);
 }
 
 void nvdimm_security_overwrite_query(struct work_struct *work)

@@ -39,21 +39,50 @@ struct nvdimm {
 	const char *dimm_id;
 	struct {
 		const struct nvdimm_security_ops *ops;
+#ifndef __GENKSYMS__
+		unsigned long flags;
+		unsigned long ext_flags;
+#else
 		enum nvdimm_security_state state;
 		enum nvdimm_security_state ext_state;
+#endif
 		unsigned int overwrite_tmo;
 		struct kernfs_node *overwrite_state;
 	} sec;
 	struct delayed_work dwork;
 };
 
-static inline enum nvdimm_security_state nvdimm_security_state(
+static inline unsigned long nvdimm_security_flags(
 		struct nvdimm *nvdimm, enum nvdimm_passphrase_type ptype)
 {
-	if (!nvdimm->sec.ops)
-		return -ENXIO;
+	u64 flags;
+	const u64 state_flags = 1UL << NVDIMM_SECURITY_DISABLED
+		| 1UL << NVDIMM_SECURITY_LOCKED
+		| 1UL << NVDIMM_SECURITY_UNLOCKED
+		| 1UL << NVDIMM_SECURITY_OVERWRITE;
 
-	return nvdimm->sec.ops->state(nvdimm, ptype);
+	if (!nvdimm->sec.ops)
+		return 0;
+
+	flags = nvdimm->sec.ops->get_flags(nvdimm, ptype);
+	/*
+	 * The old function returns 0 for disabled and < 0 for error.
+	 * The new function returns 0 for error and has disabled flag.
+	 * This interprets unsupported security state as disabled. The
+	 * specification states that the device should abort all security
+	 * related commands in this case.
+	 */
+	if (flags & (1 << 31)) /* 32bit sign */
+		flags = 0;
+	/* Convert old enum value into flags */
+	flags &= UINT_MAX;
+	if (flags < (1 << NVDIMM_SECURITY_DISABLED))
+		flags = 1 << (flags + NVDIMM_SECURITY_DISABLED);
+	/* disabled, locked, unlocked, and overwrite are mutually exclusive */
+	dev_WARN_ONCE(&nvdimm->dev, hweight64(flags & state_flags) > 1,
+			"reported invalid security state: %#llx\n",
+			(unsigned long long) flags);
+	return flags;
 }
 int nvdimm_security_freeze(struct nvdimm *nvdimm);
 #if IS_ENABLED(CONFIG_NVDIMM_KEYS)
