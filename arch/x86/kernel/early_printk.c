@@ -324,6 +324,25 @@ static struct console early_serial_console = {
 	.index =	-1,
 };
 
+static void early_ioport_write(struct console *con, const char *s, unsigned n)
+{
+	/* mark the start */
+	outl(0x5F535452, early_serial_base);
+
+	for (; n > 0; s++, n--)
+		outb(*s, early_serial_base);
+
+	/* mark the end */
+	outl(0x5F454E44, early_serial_base);
+}
+
+static struct console early_ioport_console = {
+	.name =		"ioport",
+	.write =	early_ioport_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
+};
+
 static void early_console_register(struct console *con, int keep_early)
 {
 	if (con->index != -1) {
@@ -362,6 +381,10 @@ static int __init setup_early_printk(char *buf)
 		if (!strncmp(buf, "ttyS", 4)) {
 			early_serial_init(buf + 4);
 			early_console_register(&early_serial_console, keep);
+		}
+		if (!strncmp(buf, "ioport", 6)) {
+			early_serial_base = 0x80;
+			early_console_register(&early_ioport_console, keep);
 		}
 #ifdef CONFIG_PCI
 		if (!strncmp(buf, "pciserial", 9)) {
