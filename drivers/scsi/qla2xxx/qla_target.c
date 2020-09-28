@@ -2025,7 +2025,7 @@ static void qlt_do_tmr_work(struct work_struct *work)
 	struct qla_tgt_mgmt_cmd *mcmd =
 		container_of(work, struct qla_tgt_mgmt_cmd, work);
 	struct qla_hw_data *ha = mcmd->vha->hw;
-	int rc = EIO;
+	int rc;
 	uint32_t tag;
 	unsigned long flags;
 
@@ -3781,7 +3781,7 @@ int qlt_abort_cmd(struct qla_tgt_cmd *cmd)
 		    "multiple abort. %p transport_state %x, t_state %x, "
 		    "se_cmd_flags %x\n", cmd, cmd->se_cmd.transport_state,
 		    cmd->se_cmd.t_state, cmd->se_cmd.se_cmd_flags);
-		return EIO;
+		return -EIO;
 	}
 	cmd->aborted = 1;
 	cmd->trc_flags |= TRC_ABORT;
@@ -5668,7 +5668,7 @@ static int qlt_chk_unresolv_exchg(struct scsi_qla_host *vha,
 		/* found existing exchange */
 		qpair->retry_term_cnt++;
 		if (qpair->retry_term_cnt >= 5) {
-			rc = EIO;
+			rc = -EIO;
 			qpair->retry_term_cnt = 0;
 			ql_log(ql_log_warn, vha, 0xffff,
 			    "Unable to send ABTS Respond. Dumping firmware.\n");

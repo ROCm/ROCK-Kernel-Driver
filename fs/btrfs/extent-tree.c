@@ -5168,9 +5168,7 @@ static noinline int walk_up_tree(struct btrfs_trans_handle *trans,
  *
  * If called with for_reloc == 0, may exit early with -EAGAIN
  */
-int btrfs_drop_snapshot(struct btrfs_root *root,
-			 struct btrfs_block_rsv *block_rsv, int update_ref,
-			 int for_reloc)
+int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_path *path;
@@ -5208,9 +5206,6 @@ int btrfs_drop_snapshot(struct btrfs_root *root,
 	err = btrfs_run_delayed_items(trans);
 	if (err)
 		goto out_end_trans;
-
-	if (block_rsv)
-		trans->block_rsv = block_rsv;
 
 	/*
 	 * This will help us catch people modifying the fs tree while we're
@@ -5339,8 +5334,6 @@ int btrfs_drop_snapshot(struct btrfs_root *root,
 				err = PTR_ERR(trans);
 				goto out_free;
 			}
-			if (block_rsv)
-				trans->block_rsv = block_rsv;
 		}
 	}
 	btrfs_release_path(path);

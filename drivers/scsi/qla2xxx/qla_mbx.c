@@ -4925,8 +4925,6 @@ qla25xx_set_els_cmds_supported(scsi_qla_host_t *vha)
 		return QLA_MEMORY_ALLOC_FAILED;
 	}
 
-	memset(els_cmd_map, 0, ELS_CMD_MAP_SIZE);
-
 	/* List of Purex ELS */
 	cmd_opcode[0] = ELS_FPIN;
 	cmd_opcode[1] = ELS_RDP;
@@ -4958,7 +4956,7 @@ qla25xx_set_els_cmds_supported(scsi_qla_host_t *vha)
 		    "Done %s.\n", __func__);
 	}
 
-	dma_free_coherent(&ha->pdev->dev, DMA_POOL_SIZE,
+	dma_free_coherent(&ha->pdev->dev, ELS_CMD_MAP_SIZE,
 	   els_cmd_map, els_cmd_map_dma);
 
 	return rval;
