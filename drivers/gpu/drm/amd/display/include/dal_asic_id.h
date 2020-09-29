@@ -201,6 +201,7 @@ enum {
 	NV_NAVI12_P_A0      = 10,
 	NV_NAVI14_M_A0      = 20,
 	NV_SIENNA_CICHLID_P_A0      = 40,
+	NV_DIMGREY_CAVEFISH_P_A0      = 60,
 	NV_UNKNOWN          = 0xFF
 };
 
@@ -212,7 +213,10 @@ enum {
 #define ASICREV_IS_RENOIR(eChipRev) ((eChipRev >= RENOIR_A0) && (eChipRev < RAVEN1_F0))
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
-#define ASICREV_IS_SIENNA_CICHLID_P(eChipRev)        ((eChipRev >= NV_SIENNA_CICHLID_P_A0))
+#define ASICREV_IS_SIENNA_CICHLID_P(eChipRev)        ((eChipRev >= NV_SIENNA_CICHLID_P_A0) && (eChipRev < NV_DIMGREY_CAVEFISH_P_A0))
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_02)
+#define ASICREV_IS_DIMGREY_CAVEFISH_P(eChipRev)        ((eChipRev >= NV_DIMGREY_CAVEFISH_P_A0) && (eChipRev < NV_UNKNOWN))
 #endif
 #if defined(CONFIG_DRM_AMD_DC_GREEN_SARDINE)
 #define GREEN_SARDINE_A0 0xA1
