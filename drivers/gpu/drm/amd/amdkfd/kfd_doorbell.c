@@ -219,7 +219,7 @@ int kfd_doorbell_remap(struct kfd_process_device *pdd)
 		goto out_unlock;
 
 	/* Calculate physical address of doorbell */
-	address = kfd_get_process_doorbells(pdd->dev, process);
+	address = kfd_get_process_doorbells(pdd);
 	vma = pdd->qpd.doorbell_vma;
 	size = kfd_doorbell_process_slice(pdd->dev);
 
