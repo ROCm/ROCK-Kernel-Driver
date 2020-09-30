@@ -62,15 +62,10 @@ var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT		= 11
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE		= 21
 var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK		= 0x800
 
-var SQ_WAVE_IB_STS_RCNT_SHIFT			= 16
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT		= 15
 var SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT		= 25
-var SQ_WAVE_IB_STS_REPLAY_W64H_SIZE		= 1
 var SQ_WAVE_IB_STS_REPLAY_W64H_MASK		= 0x02000000
-var SQ_WAVE_IB_STS_FIRST_REPLAY_SIZE		= 1
-var SQ_WAVE_IB_STS_RCNT_SIZE			= 6
 var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK	= 0x003F8000
-var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG	= 0x00007FFF
 
 var SQ_WAVE_MODE_DEBUG_EN_MASK			= 0x800
 
@@ -87,13 +82,6 @@ var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
 
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
-
-var S_SAVE_PC_HI_RCNT_SHIFT			= 26
-var S_SAVE_PC_HI_RCNT_MASK			= 0xFC000000
-var S_SAVE_PC_HI_FIRST_REPLAY_SHIFT		= 25
-var S_SAVE_PC_HI_FIRST_REPLAY_MASK		= 0x02000000
-var S_SAVE_PC_HI_REPLAY_W64H_SHIFT		= 24
-var S_SAVE_PC_HI_REPLAY_W64H_MASK		= 0x01000000
 
 var s_sgpr_save_num				= 108
 
@@ -124,11 +112,6 @@ var S_RESTORE_BUF_RSRC_WORD3_MISC		= S_SAVE_BUF_RSRC_WORD3_MISC
 var S_RESTORE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_RESTORE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 var S_WAVE_SIZE					= 25
-
-var S_RESTORE_PC_HI_RCNT_SHIFT			= S_SAVE_PC_HI_RCNT_SHIFT
-var S_RESTORE_PC_HI_RCNT_MASK			= S_SAVE_PC_HI_RCNT_MASK
-var S_RESTORE_PC_HI_FIRST_REPLAY_SHIFT		= S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-var S_RESTORE_PC_HI_FIRST_REPLAY_MASK		= S_SAVE_PC_HI_FIRST_REPLAY_MASK
 
 var s_restore_spi_init_lo			= exec_lo
 var s_restore_spi_init_hi			= exec_hi
@@ -198,19 +181,7 @@ end
 L_FETCH_2ND_TRAP:
 
 #if ASIC_TARGET_NAVI1X
-	// Preserve and clear scalar XNACK state before issuing scalar loads.
-	// Save IB_STS.REPLAY_W64H[25], RCNT[21:16], FIRST_REPLAY[15] into
-	// unused space ttmp11[31:24].
-	s_andn2_b32	ttmp11, ttmp11, (TTMP11_SAVE_REPLAY_W64H_MASK | TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK)
-	s_getreg_b32	ttmp2, hwreg(HW_REG_IB_STS)
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
-	s_lshl_b32	ttmp3, ttmp3, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
-	s_or_b32	ttmp11, ttmp11, ttmp3
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
-	s_lshl_b32	ttmp3, ttmp3, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
-	s_or_b32	ttmp11, ttmp11, ttmp3
-	s_andn2_b32	ttmp2, ttmp2, (SQ_WAVE_IB_STS_REPLAY_W64H_MASK | SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK)
-	s_setreg_b32	hwreg(HW_REG_IB_STS), ttmp2
+	save_and_clear_ib_sts(ttmp14, ttmp15)
 #endif
 
 	// Read second-level TBA/TMA from first-level TMA and jump if available.
@@ -237,13 +208,7 @@ L_EXCP_CASE:
 	s_and_b32	ttmp1, ttmp1, 0xFFFF
 
 #if ASIC_TARGET_NAVI1X
-	// Restore SQ_WAVE_IB_STS.
-	s_lshr_b32	ttmp2, ttmp11, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
-	s_lshr_b32	ttmp2, ttmp11, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
-	s_and_b32	ttmp2, ttmp2, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
-	s_or_b32	ttmp2, ttmp2, ttmp3
-	s_setreg_b32	hwreg(HW_REG_IB_STS), ttmp2
+	restore_ib_sts(ttmp14, ttmp15)
 #endif
 
 	// Restore SQ_WAVE_STATUS.
@@ -259,19 +224,7 @@ L_SAVE:
 	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT, 1), s_save_tmp	//clear saveCtx bit
 
 #if ASIC_TARGET_NAVI1X
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_RCNT_SHIFT, SQ_WAVE_IB_STS_RCNT_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_RCNT_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT, SQ_WAVE_IB_STS_FIRST_REPLAY_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT, SQ_WAVE_IB_STS_REPLAY_W64H_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_REPLAY_W64H_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS)			//clear RCNT and FIRST_REPLAY and REPLAY_W64H in IB_STS
-	s_and_b32	s_save_tmp, s_save_tmp, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG
-
-	s_setreg_b32	hwreg(HW_REG_IB_STS), s_save_tmp
+	save_and_clear_ib_sts(s_save_tmp, s_save_trapsts)
 #endif
 
 	/* inform SPI the readiness and wait for SPI's go signal */
@@ -933,21 +886,7 @@ L_RESTORE_HWREG:
 	s_waitcnt	lgkmcnt(0)
 
 #if ASIC_TARGET_NAVI1X
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_RCNT_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_RCNT_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_RCNT_SHIFT
-	s_mov_b32	s_restore_tmp, 0x0
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_FIRST_REPLAY_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_REPLAY_W64H_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_REPLAY_W64H_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-
-	s_setreg_b32 	hwreg(HW_REG_IB_STS), s_restore_tmp
+	restore_ib_sts(s_restore_tmp, s_restore_m0)
 #endif
 
 	s_and_b32	s_restore_pc_hi, s_restore_pc_hi, 0x0000ffff		//pc[47:32] //Do it here in order not to affect STATUS
@@ -1064,4 +1003,29 @@ function get_wave_size(s_reg)
 	s_getreg_b32	s_reg, hwreg(HW_REG_IB_STS2,SQ_WAVE_IB_STS2_WAVE64_SHIFT,SQ_WAVE_IB_STS2_WAVE64_SIZE)
 	s_lshl_b32	s_reg, s_reg, S_WAVE_SIZE
 	s_or_b32	s_reg, s_save_spi_init_hi, s_reg			//share with exec_hi, it's at bit25
+end
+
+function save_and_clear_ib_sts(tmp1, tmp2)
+	// Preserve and clear scalar XNACK state before issuing scalar loads.
+	// Save IB_STS.REPLAY_W64H[25], RCNT[21:16], FIRST_REPLAY[15] into
+	// unused space ttmp11[31:24].
+	s_andn2_b32	ttmp11, ttmp11, (TTMP11_SAVE_REPLAY_W64H_MASK | TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK)
+	s_getreg_b32	tmp1, hwreg(HW_REG_IB_STS)
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
+	s_lshl_b32	tmp2, tmp2, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
+	s_or_b32	ttmp11, ttmp11, tmp2
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+	s_lshl_b32	tmp2, tmp2, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+	s_or_b32	ttmp11, ttmp11, tmp2
+	s_andn2_b32	tmp1, tmp1, (SQ_WAVE_IB_STS_REPLAY_W64H_MASK | SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK)
+	s_setreg_b32	hwreg(HW_REG_IB_STS), tmp1
+end
+
+function restore_ib_sts(tmp1, tmp2)
+	s_lshr_b32	tmp1, ttmp11, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+	s_lshr_b32	tmp1, ttmp11, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
+	s_and_b32	tmp1, tmp1, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
+	s_or_b32	tmp1, tmp1, tmp2
+	s_setreg_b32	hwreg(HW_REG_IB_STS), tmp1
 end
