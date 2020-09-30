@@ -2435,7 +2435,7 @@ static const struct {
 		{"aux_dpcd_address", &dp_dpcd_address_debugfs_fops},
 		{"aux_dpcd_size", &dp_dpcd_size_debugfs_fops},
 #ifndef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops}
+		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
 #else
 		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
 		{"dsc_clock_en", &dp_dsc_clock_en_debugfs_fops},
