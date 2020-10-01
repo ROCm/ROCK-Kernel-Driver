@@ -253,6 +253,20 @@ L_SLEEP:
 	s_lshl_b32	s_save_tmp, s_save_tmp, (S_SAVE_PC_HI_FIRST_WAVE_SHIFT - S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT)
 	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
 
+#if NO_SQC_STORE
+	// Trap temporaries must be saved via VGPR but all VGPRs are in use.
+	// There is no ttmp space to hold the resource constant for VGPR save.
+	// Save v0 by itself since it requires only two SGPRs.
+	s_mov_b32	s_save_ttmps_lo, exec_lo
+	s_and_b32	s_save_ttmps_hi, exec_hi, 0xFFFF
+	s_mov_b32	exec_lo, 0xFFFFFFFF
+	s_mov_b32	exec_hi, 0xFFFFFFFF
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] slc:1 glc:1
+	v_mov_b32	v0, 0x0
+	s_mov_b32	exec_lo, s_save_ttmps_lo
+	s_mov_b32	exec_hi, s_save_ttmps_hi
+#endif
+
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
 	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
 	get_wave_size(s_save_ttmps_hi)
@@ -262,7 +276,27 @@ L_SLEEP:
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_spi_init_lo
 	s_addc_u32	s_save_ttmps_hi, s_save_ttmps_hi, 0x0
 
-#if ASIC_TARGET_NAVI1X
+#if NO_SQC_STORE
+	v_writelane_b32	v0, ttmp4, 0x4
+	v_writelane_b32	v0, ttmp5, 0x5
+	v_writelane_b32	v0, ttmp6, 0x6
+	v_writelane_b32	v0, ttmp7, 0x7
+	v_writelane_b32	v0, ttmp8, 0x8
+	v_writelane_b32	v0, ttmp9, 0x9
+	v_writelane_b32	v0, ttmp10, 0xA
+	v_writelane_b32	v0, ttmp11, 0xB
+	v_writelane_b32	v0, ttmp13, 0xD
+	v_writelane_b32	v0, exec_lo, 0xE
+	v_writelane_b32	v0, exec_hi, 0xF
+
+	s_mov_b32	exec_lo, 0x3FFF
+	s_mov_b32	exec_hi, 0x0
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] inst_offset:0x40 slc:1 glc:1
+	v_readlane_b32	ttmp14, v0, 0xE
+	v_readlane_b32	ttmp15, v0, 0xF
+	s_mov_b32	exec_lo, ttmp14
+	s_mov_b32	exec_hi, ttmp15
+#else
 	s_store_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_save_ttmps_lo, s_save_ttmps_hi], 0x50 glc:1
 	s_store_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_save_ttmps_lo, s_save_ttmps_hi], 0x60 glc:1
 	s_store_dword   ttmp13, [s_save_ttmps_lo, s_save_ttmps_hi], 0x74 glc:1
@@ -303,7 +337,9 @@ L_SAVE_4VGPR_WAVE32:
 
 	// VGPR Allocated in 4-GPR granularity
 
+#if !NO_SQC_STORE
 	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+#endif
 	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*2
 	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*3
@@ -314,7 +350,9 @@ L_SAVE_4VGPR_WAVE64:
 
 	// VGPR Allocated in 4-GPR granularity
 
+#if !NO_SQC_STORE
 	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+#endif
 	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*2
 	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*3
@@ -361,9 +399,13 @@ L_SAVE_HWREG:
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 
 #if NO_SQC_STORE
-	// Write HWREG/SGPRs with 32 VGPR lanes, wave32 is common case.
+	// Write HWREGs with 16 VGPR lanes. TTMPs occupy space after this.
+	s_mov_b32       exec_lo, 0xFFFF
 	s_mov_b32	exec_hi, 0x0
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+
+	// Write SGPRs with 32 VGPR lanes. This works in wave32 and wave64 mode.
+	s_mov_b32       exec_lo, 0xFFFFFFFF
 #endif
 
 	/* save SGPRs */
