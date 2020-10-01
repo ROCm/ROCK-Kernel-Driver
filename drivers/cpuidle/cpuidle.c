@@ -361,6 +361,8 @@ void cpuidle_reflect(struct cpuidle_device *dev, int index)
 		cpuidle_curr_governor->reflect(dev, index);
 }
 
+#define MIN_POLL_TIME (30 * NSEC_PER_USEC)
+
 /**
  * cpuidle_poll_time - return amount of time to poll for,
  * governors can override dev->poll_limit_ns if necessary
@@ -373,21 +375,39 @@ u64 cpuidle_poll_time(struct cpuidle_driver *drv,
 		      struct cpuidle_device *dev)
 {
 	int i;
-	u64 limit_ns;
+	u64 limit_ns, max_limit;
 
 	if (dev->poll_limit_ns)
 		return dev->poll_limit_ns;
 
 	limit_ns = TICK_NSEC;
+	max_limit = 0;
 	for (i = 1; i < drv->state_count; i++) {
+		u64 state_limit;
+
 		if (drv->states[i].disabled || dev->states_usage[i].disable)
 			continue;
 
-		limit_ns = (u64)drv->states[i].target_residency * NSEC_PER_USEC;
-		break;
+		state_limit = (u64)drv->states[i].target_residency * NSEC_PER_USEC;
+		if (limit_ns == TICK_NSEC)
+			limit_ns = state_limit;
+		max_limit = state_limit;
 	}
 
-	dev->poll_limit_ns = limit_ns;
+	dev->poll_limit_ns = max_t(u64, MIN_POLL_TIME, limit_ns);
+
+	/*
+	 * If the deepest state is below the minimum, assume that c-states
+	 * are limited by the driver or kernel command line and that latency
+	 * is a concern. In this case, poll for longer periods;
+	 */
+	if (max_limit < MIN_POLL_TIME) {
+		pr_info("cpuidle deepest latency of %llu below min %llu, idling based on tick\n",
+			max_limit, (u64)MIN_POLL_TIME);
+		dev->poll_limit_ns = TICK_NSEC;
+	}
+
+	pr_info("cpuidle polling time = %llu ns\n", dev->poll_limit_ns);
 
 	return dev->poll_limit_ns;
 }
