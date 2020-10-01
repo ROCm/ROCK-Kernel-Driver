@@ -3320,7 +3320,6 @@ static void free_log_tree(struct btrfs_trans_handle *trans,
 	clear_extent_bits(&log->dirty_log_pages, 0, (u64)-1,
 			  EXTENT_DIRTY | EXTENT_NEW | EXTENT_NEED_WAIT);
 	extent_io_tree_release(&log->log_csum_range);
-	free_extent_buffer(log->node);
 	btrfs_put_root(log);
 }
 
@@ -6248,8 +6247,6 @@ again:
 				ret = btrfs_pin_extent_for_log_replay(fs_info,
 							log->node->start,
 							log->node->len);
-			free_extent_buffer(log->node);
-			free_extent_buffer(log->commit_root);
 			btrfs_put_root(log);
 
 			if (!ret)
@@ -6287,8 +6284,6 @@ again:
 
 		wc.replay_dest->log_root = NULL;
 		btrfs_put_root(wc.replay_dest);
-		free_extent_buffer(log->node);
-		free_extent_buffer(log->commit_root);
 		btrfs_put_root(log);
 
 		if (ret)
@@ -6320,7 +6315,6 @@ next:
 	if (ret)
 		return ret;
 
-	free_extent_buffer(log_root_tree->node);
 	log_root_tree->log_root = NULL;
 	clear_bit(BTRFS_FS_LOG_RECOVERING, &fs_info->flags);
 	btrfs_put_root(log_root_tree);
