@@ -83,6 +83,9 @@ var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 
+var S_SAVE_PC_HI_FIRST_WAVE_MASK		= 0x80000000
+var S_SAVE_PC_HI_FIRST_WAVE_SHIFT		= 31
+
 var s_sgpr_save_num				= 108
 
 var s_save_spi_init_lo				= exec_lo
@@ -245,6 +248,11 @@ L_SLEEP:
 	s_waitcnt	lgkmcnt(0)
 #endif
 
+	// Save first_wave flag so we can clear high bits of save address.
+	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_FIRST_WAVE_MASK
+	s_lshl_b32	s_save_tmp, s_save_tmp, (S_SAVE_PC_HI_FIRST_WAVE_SHIFT - S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT)
+	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
+
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
 	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
 	get_wave_size(s_save_ttmps_hi)
@@ -331,7 +339,8 @@ L_SAVE_HWREG:
 
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_pc_lo, s_save_buf_rsrc0, s_save_mem_offset)
-	write_hwreg_to_mem(s_save_pc_hi, s_save_buf_rsrc0, s_save_mem_offset)
+	s_andn2_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
+	write_hwreg_to_mem(s_save_tmp, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_exec_lo, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_exec_hi, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_status, s_save_buf_rsrc0, s_save_mem_offset)
@@ -440,7 +449,7 @@ L_SAVE_LDS_NORMAL:
 	s_cbranch_scc0	L_SAVE_LDS_DONE						//no lds used? jump to L_SAVE_DONE
 
 	s_barrier								//LDS is used? wait for other waves in the same TG
-	s_and_b32	s_save_tmp, s_wave_size, S_SAVE_SPI_INIT_FIRST_WAVE_MASK
+	s_and_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
 	s_cbranch_scc0	L_SAVE_LDS_DONE
 
 	// first wave do LDS save;
@@ -1002,7 +1011,6 @@ end
 function get_wave_size(s_reg)
 	s_getreg_b32	s_reg, hwreg(HW_REG_IB_STS2,SQ_WAVE_IB_STS2_WAVE64_SHIFT,SQ_WAVE_IB_STS2_WAVE64_SIZE)
 	s_lshl_b32	s_reg, s_reg, S_WAVE_SIZE
-	s_or_b32	s_reg, s_save_spi_init_hi, s_reg			//share with exec_hi, it's at bit25
 end
 
 function save_and_clear_ib_sts(tmp1, tmp2)
