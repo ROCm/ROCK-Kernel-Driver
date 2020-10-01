@@ -341,6 +341,7 @@ static const struct pptable_funcs vangogh_ppt_funcs = {
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
 	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,
 	.disable_all_features_with_exception = smu_cmn_disable_all_features_with_exception,
+	.interrupt_work = smu_v11_0_interrupt_work,
 };
 
 void vangogh_set_ppt_funcs(struct smu_context *smu)
