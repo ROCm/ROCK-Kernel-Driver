@@ -8764,17 +8764,19 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu)
 	case group_has_spare:
 		if (sd->flags & SD_NUMA) {
 #ifdef CONFIG_NUMA_BALANCING
-			int idlest_cpu;
-			/*
-			 * If there is spare capacity at NUMA, try to select
-			 * the preferred node
-			 */
-			if (cpu_to_node(this_cpu) == p->numa_preferred_nid)
-				return NULL;
+			if (static_branch_likely(&sched_numa_balancing)) {
+				int idlest_cpu;
+				/*
+				 * If there is spare capacity at NUMA, try to select
+				 * the preferred node
+				 */
+				if (cpu_to_node(this_cpu) == p->numa_preferred_nid)
+					return NULL;
 
-			idlest_cpu = cpumask_first(sched_group_span(idlest));
-			if (cpu_to_node(idlest_cpu) == p->numa_preferred_nid)
-				return idlest;
+				idlest_cpu = cpumask_first(sched_group_span(idlest));
+				if (cpu_to_node(idlest_cpu) == p->numa_preferred_nid)
+					return idlest;
+			}
 #endif
 			/*
 			 * Otherwise, keep the task on this node to stay close
