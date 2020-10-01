@@ -2684,7 +2684,6 @@ static noinline int relink_extent_backref(struct btrfs_path *path,
 	u64 lock_start;
 	u64 lock_end;
 	bool merge = false;
-	int index;
 
 	if (prev && prev->root_id == backref->root_id &&
 	    prev->inum == backref->inum &&
@@ -2696,20 +2695,15 @@ static noinline int relink_extent_backref(struct btrfs_path *path,
 	key.type = BTRFS_ROOT_ITEM_KEY;
 	key.offset = (u64)-1;
 
-	index = srcu_read_lock(&fs_info->subvol_srcu);
-
 	root = btrfs_get_fs_root(fs_info, &key, true);
 	if (IS_ERR(root)) {
-		srcu_read_unlock(&fs_info->subvol_srcu, index);
 		if (PTR_ERR(root) == -ENOENT)
 			return 0;
 		return PTR_ERR(root);
 	}
 
-	if (btrfs_root_readonly(root)) {
-		srcu_read_unlock(&fs_info->subvol_srcu, index);
+	if (btrfs_root_readonly(root))
 		return 0;
-	}
 
 	/* step 2: get inode */
 	key.objectid = backref->inum;
@@ -2717,12 +2711,8 @@ static noinline int relink_extent_backref(struct btrfs_path *path,
 	key.offset = 0;
 
 	inode = btrfs_iget(fs_info->sb, &key, root);
-	if (IS_ERR(inode)) {
-		srcu_read_unlock(&fs_info->subvol_srcu, index);
+	if (IS_ERR(inode))
 		return 0;
-	}
-
-	srcu_read_unlock(&fs_info->subvol_srcu, index);
 
 	/* step 3: relink backref */
 	lock_start = backref->file_pos;
@@ -5955,7 +5945,6 @@ struct inode *btrfs_lookup_dentry(struct inode *dir, struct dentry *dentry)
 	struct btrfs_root *sub_root = root;
 	struct btrfs_key location;
 	u8 di_type = 0;
-	int index;
 	int ret = 0;
 
 	if (dentry->d_name.len > BTRFS_NAME_LEN)
@@ -5982,7 +5971,6 @@ struct inode *btrfs_lookup_dentry(struct inode *dir, struct dentry *dentry)
 		return inode;
 	}
 
-	index = srcu_read_lock(&fs_info->subvol_srcu);
 	ret = fixup_tree_root_location(fs_info, dir, dentry,
 				       &location, &sub_root);
 	if (ret < 0) {
@@ -5995,7 +5983,6 @@ struct inode *btrfs_lookup_dentry(struct inode *dir, struct dentry *dentry)
 	}
 	if (root != sub_root)
 		btrfs_put_root(sub_root);
-	srcu_read_unlock(&fs_info->subvol_srcu, index);
 
 	if (!IS_ERR(inode) && root != sub_root) {
 		down_read(&fs_info->cleanup_work_sem);
