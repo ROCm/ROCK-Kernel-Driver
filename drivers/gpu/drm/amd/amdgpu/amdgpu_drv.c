@@ -1230,7 +1230,6 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
-#ifdef HAVE_DRM_DRV_DRIVER_ATOMIC
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	if (!supports_atomic)
 		ddev->driver_features &= ~DRIVER_ATOMIC;
@@ -1241,7 +1240,6 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	/* support atomic early so the atomic debugfs stuff gets created */
 	if (supports_atomic)
 		kms_driver.driver_features |= DRIVER_ATOMIC;
-#endif
 #endif
 
 	kcl_pci_create_measure_file(pdev);
