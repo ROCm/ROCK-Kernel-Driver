@@ -662,6 +662,12 @@ static inline bool rwsem_can_spin_on_owner(struct rw_semaphore *sem,
 
 	BUILD_BUG_ON(!(RWSEM_OWNER_UNKNOWN & RWSEM_NONSPINNABLE));
 
+	/*
+	 * Force readers down the slowpath.
+	 */
+	if (nonspinnable == RWSEM_RD_NONSPINNABLE)
+		return false;
+
 	if (need_resched()) {
 		lockevent_inc(rwsem_opt_fail);
 		return false;

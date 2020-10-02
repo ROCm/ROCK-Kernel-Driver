@@ -8670,9 +8670,6 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu)
 			.group_type = group_overloaded,
 	};
 
-	imbalance = scale_load_down(NICE_0_LOAD) *
-				(sd->imbalance_pct-100) / 100;
-
 	do {
 		int local_group;
 
@@ -8726,6 +8723,11 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu)
 	switch (local_sgs.group_type) {
 	case group_overloaded:
 	case group_fully_busy:
+
+		/* Calculate allowed imbalance based on load */
+		imbalance = scale_load_down(NICE_0_LOAD) *
+				(sd->imbalance_pct-100) / 100;
+
 		/*
 		 * When comparing groups across NUMA domains, it's possible for
 		 * the local domain to be very lightly loaded relative to the
@@ -8764,25 +8766,38 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p, int this_cpu)
 	case group_has_spare:
 		if (sd->flags & SD_NUMA) {
 #ifdef CONFIG_NUMA_BALANCING
-			int idlest_cpu;
-			/*
-			 * If there is spare capacity at NUMA, try to select
-			 * the preferred node
-			 */
-			if (cpu_to_node(this_cpu) == p->numa_preferred_nid)
-				return NULL;
+			if (static_branch_likely(&sched_numa_balancing)) {
+				int idlest_cpu;
+				/*
+				 * If there is spare capacity at NUMA, try to select
+				 * the preferred node
+				 */
+				if (cpu_to_node(this_cpu) == p->numa_preferred_nid)
+					return NULL;
 
-			idlest_cpu = cpumask_first(sched_group_span(idlest));
-			if (cpu_to_node(idlest_cpu) == p->numa_preferred_nid)
-				return idlest;
+				idlest_cpu = cpumask_first(sched_group_span(idlest));
+				if (cpu_to_node(idlest_cpu) == p->numa_preferred_nid)
+					return idlest;
+			}
 #endif
+
 			/*
 			 * Otherwise, keep the task on this node to stay close
-			 * its wakeup source and improve locality. If there is
-			 * a real need of migration, periodic load balance will
-			 * take care of it.
+			 * to its wakeup source if it would not cause a large
+			 * imbalance. If there is a real need of migration,
+			 * periodic load balance will take care of it.
 			 */
-			if (local_sgs.idle_cpus)
+
+			/* See adjust_numa_imbalance */
+			imbalance = 2;
+
+			/*
+			 * Allow an imbalance if the node is not nearly full
+			 * and the imbalance between local and idlest is not
+			 * excessive.
+			 */
+			if (local_sgs.idle_cpus >= imbalance &&
+			    idlest_sgs.idle_cpus - local_sgs.idle_cpus <= imbalance)
 				return NULL;
 		}
 
