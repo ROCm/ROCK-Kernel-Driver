@@ -1,28 +1,10 @@
 dnl #
-dnl # commit 88a48e297b3a3bac6022c03babfb038f1a886cea
-dnl # drm: add atomic properties
 dnl # commit 0e2a933b02c972919f7478364177eb76cd4ae00d
 dnl # drm: Switch DRIVER_ flags to an enum
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drmP.h>
-			], [
-				int _ = DRIVER_ATOMIC;
-			], [
-				AC_DEFINE(HAVE_DRM_DRV_DRIVER_ATOMIC, 1, [
-					drm_driver_feature DRIVER_ATOMIC is available])
-			])
-		], [
-			AC_DEFINE(HAVE_DRM_DRV_DRIVER_ATOMIC, 1, [
-				drm_driver_feature DRIVER_ATOMIC is available])
-		])
-	])
-
 	dnl #
-	dnl # commit: 060cebb20cdbcd3185d593e7194fa7a738201817
+	dnl # commit: v5.1-rc5-1467-g060cebb20cdb
 	dnl # drm: introduce a capability flag for syncobj timeline support
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
@@ -42,7 +24,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	])
 
 	dnl #
-	dnl # commit: 1ff494813bafa127ecba1160262ba39b2fdde7ba
+	dnl # commit: v5.0-rc1-390-g1ff494813baf
 	dnl # drm/irq: Ditch DRIVER_IRQ_SHARED
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
