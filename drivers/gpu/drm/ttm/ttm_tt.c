@@ -334,7 +334,7 @@ int ttm_tt_populate(struct ttm_device *bdev,
 	       atomic_long_read(&ttm_dma32_pages_allocated) >
 	       ttm_dma32_pages_limit) {
 
-		ret = ttm_bo_swapout(ctx, GFP_KERNEL);
+		ret = ttm_global_swapout(ctx, GFP_KERNEL);
 		if (ret)
 			goto error;
 	}
