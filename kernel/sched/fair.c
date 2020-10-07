@@ -1493,6 +1493,7 @@ enum numa_type {
 /* Cached statistics for all CPUs within a node */
 struct numa_stats {
 	unsigned long load;
+	unsigned long runnable;
 	unsigned long util;
 	/* Total compute capacity of CPUs on a node */
 	unsigned long compute_capacity;
@@ -1536,19 +1537,22 @@ struct task_numa_env {
 };
 
 static unsigned long cpu_load(struct rq *rq);
+static unsigned long cpu_runnable(struct rq *rq);
 static unsigned long cpu_util(int cpu);
-static inline long adjust_numa_imbalance(int imbalance, int src_nr_running);
+static inline long adjust_numa_imbalance(int imbalance, int nr_running);
 
 static inline enum
 numa_type numa_classify(unsigned int imbalance_pct,
 			 struct numa_stats *ns)
 {
 	if ((ns->nr_running > ns->weight) &&
-	    ((ns->compute_capacity * 100) < (ns->util * imbalance_pct)))
+	    (((ns->compute_capacity * 100) < (ns->util * imbalance_pct)) ||
+	     ((ns->compute_capacity * imbalance_pct) < (ns->runnable * 100))))
 		return node_overloaded;
 
 	if ((ns->nr_running < ns->weight) ||
-	    ((ns->compute_capacity * 100) > (ns->util * imbalance_pct)))
+	    (((ns->compute_capacity * 100) > (ns->util * imbalance_pct)) &&
+	     ((ns->compute_capacity * imbalance_pct) > (ns->runnable * 100))))
 		return node_has_spare;
 
 	return node_fully_busy;
@@ -1599,6 +1603,7 @@ static void update_numa_stats(struct task_numa_env *env,
 		struct rq *rq = cpu_rq(cpu);
 
 		ns->load += cpu_load(rq);
+		ns->runnable += cpu_runnable(rq);
 		ns->util += cpu_util(cpu);
 		ns->nr_running += rq->cfs.h_nr_running;
 		ns->compute_capacity += capacity_of(cpu);
@@ -1914,7 +1919,7 @@ static void task_numa_find_cpu(struct task_numa_env *env,
 		src_running = env->src_stats.nr_running - 1;
 		dst_running = env->dst_stats.nr_running + 1;
 		imbalance = max(0, dst_running - src_running);
-		imbalance = adjust_numa_imbalance(imbalance, src_running);
+		imbalance = adjust_numa_imbalance(imbalance, dst_running);
 
 		/* Use idle CPU if there is no imbalance */
 		if (!imbalance) {
@@ -7343,6 +7348,10 @@ static int task_hot(struct task_struct *p, struct lb_env *env)
 	if (unlikely(task_has_idle_policy(p)))
 		return 0;
 
+	/* SMT siblings share cache */
+	if (env->sd->flags & SD_SHARE_CPUCAPACITY)
+		return 0;
+
 	/*
 	 * Buddy candidates are cache hot:
 	 */
@@ -8899,7 +8908,7 @@ next_group:
 	}
 }
 
-static inline long adjust_numa_imbalance(int imbalance, int src_nr_running)
+static inline long adjust_numa_imbalance(int imbalance, int nr_running)
 {
 	unsigned int imbalance_min;
 
@@ -8908,7 +8917,7 @@ static inline long adjust_numa_imbalance(int imbalance, int src_nr_running)
 	 * tasks that remain local when the source domain is almost idle.
 	 */
 	imbalance_min = 2;
-	if (src_nr_running <= imbalance_min)
+	if (nr_running <= imbalance_min)
 		return 0;
 
 	return imbalance;
