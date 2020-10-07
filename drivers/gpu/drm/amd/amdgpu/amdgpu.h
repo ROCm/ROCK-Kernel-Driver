@@ -1095,6 +1095,9 @@ struct amdgpu_device {
 
 	bool                            in_pci_err_recovery;
 	struct pci_saved_state          *pci_state;
+
+	/* Track auto wait count on s_barrier settings */
+	bool				barrier_has_auto_waitcnt;
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)

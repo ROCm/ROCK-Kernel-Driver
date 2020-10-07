@@ -741,6 +741,71 @@ static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 		RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
 }
 
+/*
+ * Helper used to suspend/resume gfx pipe for image post process work to set
+ * barrier behaviour.
+ */
+static int kgd_gfx_v9_suspend_resume_compute_scheduler(
+						struct amdgpu_device *adev,
+						bool suspend)
+{
+	int i, r = 0;
+
+	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
+		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
+
+		if (!(ring && ring->sched.thread))
+			continue;
+
+		/* stop secheduler and drain ring. */
+		if (suspend) {
+			drm_sched_stop(&ring->sched, NULL);
+			r = amdgpu_fence_wait_empty(ring);
+			if (r)
+				goto out;
+		} else {
+			drm_sched_start(&ring->sched, false);
+		}
+	}
+
+out:
+	/* return on resume or failure to drain rings. */
+	if (!suspend || r)
+		return r;
+
+	return amdgpu_device_ip_wait_for_idle(adev, GC_HWIP);
+}
+
+static void kgd_gfx_v9_set_barrier_auto_waitcnt(struct amdgpu_device *adev,
+						bool enable_waitcnt)
+{
+	uint32_t data;
+
+	if (adev->asic_type != CHIP_ARCTURUS)
+		return;
+
+	WRITE_ONCE(adev->barrier_has_auto_waitcnt, enable_waitcnt);
+
+	if (!down_read_trylock(&adev->reset_sem))
+		return;
+
+	amdgpu_amdkfd_suspend(adev, false);
+
+	if (kgd_gfx_v9_suspend_resume_compute_scheduler(adev, true))
+		goto out;
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_CONFIG));
+	data = REG_SET_FIELD(data, SQ_CONFIG, DISABLE_BARRIER_WAITCNT,
+						enable_waitcnt ? 0 : 1);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_CONFIG), data);
+
+out:
+	kgd_gfx_v9_suspend_resume_compute_scheduler(adev, false);
+	amdgpu_amdkfd_resume(adev, false);
+
+	up_read(&adev->reset_sem);
+}
+
 void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t vmid)
 {
@@ -749,6 +814,8 @@ void kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
+
+	kgd_gfx_v9_set_barrier_auto_waitcnt(adev, true);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
@@ -764,6 +831,8 @@ void kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
+
+	kgd_gfx_v9_set_barrier_auto_waitcnt(adev, false);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
