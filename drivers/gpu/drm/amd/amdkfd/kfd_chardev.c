@@ -1111,7 +1111,11 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		if (vma && (vma->vm_flags & VM_IO)) {
 			unsigned long pfn;
 
-			follow_pfn(vma, args->mmap_offset, &pfn);
+			err = follow_pfn(vma, args->mmap_offset, &pfn);
+			if (err) {
+				pr_debug("Failed to get PFN: %ld\n", err);
+				return err;
+			}
 			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
 			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
 			offset = (pfn << PAGE_SHIFT);
