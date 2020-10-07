@@ -1125,6 +1125,9 @@ struct amdgpu_device {
 	bool                            no_hw_access;
 	struct pci_saved_state          *pci_state;
 
+	/* Track auto wait count on s_barrier settings */
+	bool				barrier_has_auto_waitcnt;
+
 	struct amdgpu_reset_control     *reset_cntl;
 };
 
