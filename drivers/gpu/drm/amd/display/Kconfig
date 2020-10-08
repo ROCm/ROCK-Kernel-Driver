@@ -50,6 +50,8 @@ config DRM_AMD_DC_DCN3_0
         default y
         depends on DRM_AMD_DC && X86
         depends on DRM_AMD_DC_DCN1_0
+        depends on DRM_AMD_DC_DCN2_0
+        depends on DRM_AMD_DC_DCN2_1
         help
             Choose this option if you want to have
             sienna_cichlid support for display engine
