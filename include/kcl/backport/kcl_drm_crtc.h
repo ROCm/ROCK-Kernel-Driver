@@ -17,4 +17,9 @@ int _kcl_drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc
 }
 #define drm_crtc_init_with_planes _kcl_drm_crtc_init_with_planes
 #endif
+
+#if DRM_VERSION_CODE == DRM_VERSION(4, 10, 0) && defined(OS_NAME_RHEL_7_4)
+#define AMDKCL_WORKAROUND_DRM_4_10_0_RHEL_7_4
+#endif
+
 #endif
