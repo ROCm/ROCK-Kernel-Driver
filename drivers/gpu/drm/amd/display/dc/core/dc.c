@@ -751,7 +751,6 @@ static bool dc_construct(struct dc *dc,
 	if (dc->res_pool->funcs->update_bw_bounding_box)
 		dc->res_pool->funcs->update_bw_bounding_box(dc, dc->clk_mgr->bw_params);
 #endif
-	dc->debug.force_ignore_link_settings = init_params->force_ignore_link_settings;
 
 	/* Creation of current_state must occur after dc->dml
 	 * is initialized in dc_create_resource_pool because
