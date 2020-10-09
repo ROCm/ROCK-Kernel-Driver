@@ -3356,12 +3356,12 @@ next:
 	return ret;
 }
 
-void btrfs_get_block_group_trimming(struct btrfs_block_group *cache)
+void btrfs_freeze_block_group(struct btrfs_block_group *cache)
 {
-	atomic_inc(&cache->trimming);
+	atomic_inc(&cache->frozen);
 }
 
-void btrfs_put_block_group_trimming(struct btrfs_block_group *block_group)
+void btrfs_unfreeze_block_group(struct btrfs_block_group *block_group)
 {
 	struct btrfs_fs_info *fs_info = block_group->fs_info;
 	struct extent_map_tree *em_tree;
@@ -3369,7 +3369,7 @@ void btrfs_put_block_group_trimming(struct btrfs_block_group *block_group)
 	bool cleanup;
 
 	spin_lock(&block_group->lock);
-	cleanup = (atomic_dec_and_test(&block_group->trimming) &&
+	cleanup = (atomic_dec_and_test(&block_group->frozen) &&
 		   block_group->removed);
 	spin_unlock(&block_group->lock);
 
@@ -3389,8 +3389,9 @@ void btrfs_put_block_group_trimming(struct btrfs_block_group *block_group)
 		free_extent_map(em);
 
 		/*
-		 * We've left one free space entry and other tasks trimming
-		 * this block group have left 1 entry each one. Free them.
+		 * We may have left one free space entry and other possible
+		 * tasks trimming this block group have left 1 entry each one.
+		 * Free them if any.
 		 */
 		__btrfs_remove_free_space_cache(block_group->free_space_ctl);
 	}
@@ -3408,7 +3409,7 @@ int btrfs_trim_block_group(struct btrfs_block_group *block_group,
 		spin_unlock(&block_group->lock);
 		return 0;
 	}
-	btrfs_get_block_group_trimming(block_group);
+	btrfs_freeze_block_group(block_group);
 	spin_unlock(&block_group->lock);
 
 	ret = trim_no_bitmap(block_group, trimmed, start, end, minlen);
@@ -3417,7 +3418,7 @@ int btrfs_trim_block_group(struct btrfs_block_group *block_group,
 
 	ret = trim_bitmaps(block_group, trimmed, start, end, minlen);
 out:
-	btrfs_put_block_group_trimming(block_group);
+	btrfs_unfreeze_block_group(block_group);
 	return ret;
 }
 
