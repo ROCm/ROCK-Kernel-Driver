@@ -255,6 +255,9 @@ static inline int btrfs_block_group_done(struct btrfs_block_group *cache)
 		cache->cached == BTRFS_CACHE_ERROR;
 }
 
+void btrfs_freeze_block_group(struct btrfs_block_group *cache);
+void btrfs_unfreeze_block_group(struct btrfs_block_group *cache);
+
 int __btrfs_inc_block_group_ro(struct btrfs_block_group *cache, int force);
 u64 btrfs_get_restripe_target(struct btrfs_fs_info *fs_info, u64 flags);
 
