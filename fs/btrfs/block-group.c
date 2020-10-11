@@ -157,6 +157,8 @@ static int btrfs_add_block_group_cache(struct btrfs_fs_info *info,
 	struct rb_node *parent = NULL;
 	struct btrfs_block_group *cache;
 
+	ASSERT(block_group->length != 0);
+
 	spin_lock(&info->block_group_cache_lock);
 	p = &info->block_group_cache_tree.rb_node;
 
@@ -850,11 +852,34 @@ static void clear_incompat_bg_bits(struct btrfs_fs_info *fs_info, u64 flags)
 	}
 }
 
+static int remove_block_group_item(struct btrfs_trans_handle *trans,
+				   struct btrfs_path *path,
+				   struct btrfs_block_group *block_group)
+{
+	struct btrfs_fs_info *fs_info = trans->fs_info;
+	struct btrfs_root *root;
+	struct btrfs_key key;
+	int ret;
+
+	root = fs_info->extent_root;
+	key.objectid = block_group->start;
+	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
+	key.offset = block_group->length;
+
+	ret = btrfs_search_slot(trans, root, &key, path, -1, 1);
+	if (ret > 0)
+		ret = -ENOENT;
+	if (ret < 0)
+		return ret;
+
+	ret = btrfs_del_item(trans, root, path);
+	return ret;
+}
+
 int btrfs_remove_block_group(struct btrfs_trans_handle *trans,
 			     u64 group_start, struct extent_map *em)
 {
 	struct btrfs_fs_info *fs_info = trans->fs_info;
-	struct btrfs_root *root = fs_info->extent_root;
 	struct btrfs_path *path;
 	struct btrfs_block_group *block_group;
 	struct btrfs_free_cluster *cluster;
@@ -1070,35 +1095,28 @@ int btrfs_remove_block_group(struct btrfs_trans_handle *trans,
 	if (ret)
 		goto out;
 
-	key.objectid = block_group->start;
-	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
-	key.offset = block_group->length;
-	ret = btrfs_search_slot(trans, root, &key, path, -1, 1);
-	if (ret > 0)
-		ret = -EIO;
+	ret = remove_block_group_item(trans, path, block_group);
 	if (ret < 0)
 		goto out;
 
-	ret = btrfs_del_item(trans, root, path);
-	if (ret)
-		goto out;
-
-	mutex_lock(&fs_info->chunk_mutex);
 	spin_lock(&block_group->lock);
 	block_group->removed = 1;
 	/*
-	 * At this point trimming can't start on this block group, because we
-	 * removed the block group from the tree fs_info->block_group_cache_tree
-	 * so no one can't find it anymore and even if someone already got this
-	 * block group before we removed it from the rbtree, they have already
-	 * incremented block_group->trimming - if they didn't, they won't find
-	 * any free space entries because we already removed them all when we
-	 * called btrfs_remove_free_space_cache().
+	 * At this point trimming or scrub can't start on this block group,
+	 * because we removed the block group from the rbtree
+	 * fs_info->block_group_cache_tree so no one can't find it anymore and
+	 * even if someone already got this block group before we removed it
+	 * from the rbtree, they have already incremented block_group->frozen -
+	 * if they didn't, for the trimming case they won't find any free space
+	 * entries because we already removed them all when we called
+	 * btrfs_remove_free_space_cache().
 	 *
 	 * And we must not remove the extent map from the fs_info->mapping_tree
 	 * to prevent the same logical address range and physical device space
-	 * ranges from being reused for a new block group. This is because our
-	 * fs trim operation (btrfs_trim_fs() / btrfs_ioctl_fitrim()) is
+	 * ranges from being reused for a new block group. This is needed to
+	 * avoid races with trimming and scrub.
+	 *
+	 * An fs trim operation (btrfs_trim_fs() / btrfs_ioctl_fitrim()) is
 	 * completely transactionless, so while it is trimming a range the
 	 * currently running transaction might finish and a new one start,
 	 * allowing for new block groups to be created that can reuse the same
@@ -1109,10 +1127,8 @@ int btrfs_remove_block_group(struct btrfs_trans_handle *trans,
 	 * in place until the extents have been discarded completely when
 	 * the transaction commit has completed.
 	 */
-	remove_em = (atomic_read(&block_group->trimming) == 0);
+	remove_em = (atomic_read(&block_group->frozen) == 0);
 	spin_unlock(&block_group->lock);
-
-	mutex_unlock(&fs_info->chunk_mutex);
 
 	if (remove_em) {
 		struct extent_map_tree *em_tree;
@@ -1375,7 +1391,7 @@ void btrfs_delete_unused_bgs(struct btrfs_fs_info *fs_info)
 
 		/* Implicit trim during transaction commit. */
 		if (trimming)
-			btrfs_get_block_group_trimming(block_group);
+			btrfs_freeze_block_group(block_group);
 
 		/*
 		 * Btrfs_remove_chunk will abort the transaction if things go
@@ -1385,7 +1401,7 @@ void btrfs_delete_unused_bgs(struct btrfs_fs_info *fs_info)
 
 		if (ret) {
 			if (trimming)
-				btrfs_put_block_group_trimming(block_group);
+				btrfs_unfreeze_block_group(block_group);
 			goto end_trans;
 		}
 
@@ -1627,7 +1643,7 @@ static void link_block_group(struct btrfs_block_group *cache)
 }
 
 static struct btrfs_block_group *btrfs_create_block_group_cache(
-		struct btrfs_fs_info *fs_info, u64 start, u64 size)
+		struct btrfs_fs_info *fs_info, u64 start)
 {
 	struct btrfs_block_group *cache;
 
@@ -1643,11 +1659,9 @@ static struct btrfs_block_group *btrfs_create_block_group_cache(
 	}
 
 	cache->start = start;
-	cache->length = size;
 
 	cache->fs_info = fs_info;
 	cache->full_stripe_len = btrfs_full_stripe_len(fs_info, start);
-	set_free_space_tree_thresholds(cache);
 
 	atomic_set(&cache->count, 1);
 	spin_lock_init(&cache->lock);
@@ -1659,7 +1673,7 @@ static struct btrfs_block_group *btrfs_create_block_group_cache(
 	INIT_LIST_HEAD(&cache->dirty_list);
 	INIT_LIST_HEAD(&cache->io_list);
 	btrfs_init_free_space_ctl(cache);
-	atomic_set(&cache->trimming, 0);
+	atomic_set(&cache->frozen, 0);
 	mutex_init(&cache->free_space_lock);
 	btrfs_init_full_stripe_locks_tree(&cache->full_stripe_locks_root);
 
@@ -1720,24 +1734,45 @@ static int check_chunk_block_group_mappings(struct btrfs_fs_info *fs_info)
 	return ret;
 }
 
+static int read_block_group_item(struct btrfs_block_group *cache,
+				 struct btrfs_path *path,
+				 const struct btrfs_key *key)
+{
+	struct extent_buffer *leaf = path->nodes[0];
+	struct btrfs_block_group_item bgi;
+	int slot = path->slots[0];
+
+	cache->length = key->offset;
+
+	read_extent_buffer(leaf, &bgi, btrfs_item_ptr_offset(leaf, slot),
+			   sizeof(bgi));
+	cache->used = btrfs_stack_block_group_used(&bgi);
+	cache->flags = btrfs_stack_block_group_flags(&bgi);
+
+	return 0;
+}
+
 static int read_one_block_group(struct btrfs_fs_info *info,
 				struct btrfs_path *path,
 				const struct btrfs_key *key,
 				int need_clear)
 {
-	struct extent_buffer *leaf = path->nodes[0];
 	struct btrfs_block_group *cache;
 	struct btrfs_space_info *space_info;
-	struct btrfs_block_group_item bgi;
 	const bool mixed = btrfs_fs_incompat(info, MIXED_GROUPS);
-	int slot = path->slots[0];
 	int ret;
 
 	ASSERT(key->type == BTRFS_BLOCK_GROUP_ITEM_KEY);
 
-	cache = btrfs_create_block_group_cache(info, key->objectid, key->offset);
+	cache = btrfs_create_block_group_cache(info, key->objectid);
 	if (!cache)
 		return -ENOMEM;
+
+	ret = read_block_group_item(cache, path, key);
+	if (ret < 0)
+		goto error;
+
+	set_free_space_tree_thresholds(cache);
 
 	if (need_clear) {
 		/*
@@ -1753,10 +1788,6 @@ static int read_one_block_group(struct btrfs_fs_info *info,
 		if (btrfs_test_opt(info, SPACE_CACHE))
 			cache->disk_cache_state = BTRFS_DC_CLEAR;
 	}
-	read_extent_buffer(leaf, &bgi, btrfs_item_ptr_offset(leaf, slot),
-			   sizeof(bgi));
-	cache->used = btrfs_stack_block_group_used(&bgi);
-	cache->flags = btrfs_stack_block_group_flags(&bgi);
 	if (!mixed && ((cache->flags & BTRFS_BLOCK_GROUP_METADATA) &&
 	    (cache->flags & BTRFS_BLOCK_GROUP_DATA))) {
 			btrfs_err(info,
@@ -1784,15 +1815,15 @@ static int read_one_block_group(struct btrfs_fs_info *info,
 	 * are empty, and we can just add all the space in and be done with it.
 	 * This saves us _a_lot_ of time, particularly in the full case.
 	 */
-	if (key->offset == cache->used) {
+	if (cache->length == cache->used) {
 		cache->last_byte_to_unpin = (u64)-1;
 		cache->cached = BTRFS_CACHE_FINISHED;
 		btrfs_free_excluded_extents(cache);
 	} else if (cache->used == 0) {
 		cache->last_byte_to_unpin = (u64)-1;
 		cache->cached = BTRFS_CACHE_FINISHED;
-		add_new_free_space(cache, key->objectid,
-				   key->objectid + key->offset);
+		add_new_free_space(cache, cache->start,
+				   cache->start + cache->length);
 		btrfs_free_excluded_extents(cache);
 	}
 
@@ -1802,7 +1833,7 @@ static int read_one_block_group(struct btrfs_fs_info *info,
 		goto error;
 	}
 	trace_btrfs_add_block_group(info, cache, 0);
-	btrfs_update_space_info(info, cache->flags, key->offset,
+	btrfs_update_space_info(info, cache->flags, cache->length,
 				cache->used, cache->bytes_super, &space_info);
 
 	cache->space_info = space_info;
@@ -1838,7 +1869,6 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 	path = btrfs_alloc_path();
 	if (!path)
 		return -ENOMEM;
-	path->reada = READA_FORWARD;
 
 	cache_gen = btrfs_super_cache_generation(info->super_copy);
 	if (btrfs_test_opt(info, SPACE_CACHE) &&
@@ -1891,13 +1921,32 @@ error:
 	return ret;
 }
 
+static int insert_block_group_item(struct btrfs_trans_handle *trans,
+				   struct btrfs_block_group *block_group)
+{
+	struct btrfs_fs_info *fs_info = trans->fs_info;
+	struct btrfs_block_group_item bgi;
+	struct btrfs_root *root;
+	struct btrfs_key key;
+
+	spin_lock(&block_group->lock);
+	btrfs_set_stack_block_group_used(&bgi, block_group->used);
+	btrfs_set_stack_block_group_chunk_objectid(&bgi,
+				BTRFS_FIRST_CHUNK_TREE_OBJECTID);
+	btrfs_set_stack_block_group_flags(&bgi, block_group->flags);
+	key.objectid = block_group->start;
+	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
+	key.offset = block_group->length;
+	spin_unlock(&block_group->lock);
+
+	root = fs_info->extent_root;
+	return btrfs_insert_item(trans, root, &key, &bgi, sizeof(bgi));
+}
+
 void btrfs_create_pending_block_groups(struct btrfs_trans_handle *trans)
 {
 	struct btrfs_fs_info *fs_info = trans->fs_info;
 	struct btrfs_block_group *block_group;
-	struct btrfs_root *extent_root = fs_info->extent_root;
-	struct btrfs_block_group_item item;
-	struct btrfs_key key;
 	int ret = 0;
 
 	if (!trans->can_flush_pending_bgs)
@@ -1910,21 +1959,11 @@ void btrfs_create_pending_block_groups(struct btrfs_trans_handle *trans)
 		if (ret)
 			goto next;
 
-		spin_lock(&block_group->lock);
-		btrfs_set_stack_block_group_used(&item, block_group->used);
-		btrfs_set_stack_block_group_chunk_objectid(&item,
-				BTRFS_FIRST_CHUNK_TREE_OBJECTID);
-		btrfs_set_stack_block_group_flags(&item, block_group->flags);
-		key.objectid = block_group->start;
-		key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
-		key.offset = block_group->length;
-		spin_unlock(&block_group->lock);
-
-		ret = btrfs_insert_item(trans, extent_root, &key, &item,
-					sizeof(item));
+		ret = insert_block_group_item(trans, block_group);
 		if (ret)
 			btrfs_abort_transaction(trans, ret);
-		ret = btrfs_finish_chunk_alloc(trans, key.objectid, key.offset);
+		ret = btrfs_finish_chunk_alloc(trans, block_group->start,
+					block_group->length);
 		if (ret)
 			btrfs_abort_transaction(trans, ret);
 		add_block_group_free_space(trans, block_group);
@@ -1945,10 +1984,12 @@ int btrfs_make_block_group(struct btrfs_trans_handle *trans, u64 bytes_used,
 
 	btrfs_set_log_full_commit(trans);
 
-	cache = btrfs_create_block_group_cache(fs_info, chunk_offset, size);
+	cache = btrfs_create_block_group_cache(fs_info, chunk_offset);
 	if (!cache)
 		return -ENOMEM;
 
+	cache->length = size;
+	set_free_space_tree_thresholds(cache);
 	cache->used = bytes_used;
 	cache->flags = type;
 	cache->last_byte_to_unpin = (u64)-1;
@@ -2160,13 +2201,13 @@ void btrfs_dec_block_group_ro(struct btrfs_block_group *cache)
 	spin_unlock(&sinfo->lock);
 }
 
-static int write_one_cache_group(struct btrfs_trans_handle *trans,
-				 struct btrfs_path *path,
-				 struct btrfs_block_group *cache)
+static int update_block_group_item(struct btrfs_trans_handle *trans,
+				   struct btrfs_path *path,
+				   struct btrfs_block_group *cache)
 {
 	struct btrfs_fs_info *fs_info = trans->fs_info;
 	int ret;
-	struct btrfs_root *extent_root = fs_info->extent_root;
+	struct btrfs_root *root = fs_info->extent_root;
 	unsigned long bi;
 	struct extent_buffer *leaf;
 	struct btrfs_block_group_item bgi;
@@ -2176,7 +2217,7 @@ static int write_one_cache_group(struct btrfs_trans_handle *trans,
 	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
 	key.offset = cache->length;
 
-	ret = btrfs_search_slot(trans, extent_root, &key, path, 0, 1);
+	ret = btrfs_search_slot(trans, root, &key, path, 0, 1);
 	if (ret) {
 		if (ret > 0)
 			ret = -ENOENT;
@@ -2488,7 +2529,7 @@ again:
 			}
 		}
 		if (!ret) {
-			ret = write_one_cache_group(trans, path, cache);
+			ret = update_block_group_item(trans, path, cache);
 			/*
 			 * Our block group might still be attached to the list
 			 * of new block groups in the transaction handle of some
@@ -2637,7 +2678,7 @@ int btrfs_write_dirty_block_groups(struct btrfs_trans_handle *trans)
 			}
 		}
 		if (!ret) {
-			ret = write_one_cache_group(trans, path, cache);
+			ret = update_block_group_item(trans, path, cache);
 			/*
 			 * One of the free space endio workers might have
 			 * created a new block group while updating a free space
@@ -2654,7 +2695,7 @@ int btrfs_write_dirty_block_groups(struct btrfs_trans_handle *trans)
 			if (ret == -ENOENT) {
 				wait_event(cur_trans->writer_wait,
 				   atomic_read(&cur_trans->num_writers) == 1);
-				ret = write_one_cache_group(trans, path, cache);
+				ret = update_block_group_item(trans, path, cache);
 			}
 			if (ret)
 				btrfs_abort_transaction(trans, ret);
@@ -3242,4 +3283,43 @@ int btrfs_free_block_groups(struct btrfs_fs_info *info)
 		kobject_put(&space_info->kobj);
 	}
 	return 0;
+}
+
+void btrfs_freeze_block_group(struct btrfs_block_group *cache)
+{
+	atomic_inc(&cache->frozen);
+}
+
+void btrfs_unfreeze_block_group(struct btrfs_block_group *block_group)
+{
+	struct btrfs_fs_info *fs_info = block_group->fs_info;
+	struct extent_map_tree *em_tree;
+	struct extent_map *em;
+	bool cleanup;
+
+	spin_lock(&block_group->lock);
+	cleanup = (atomic_dec_and_test(&block_group->frozen) &&
+		   block_group->removed);
+	spin_unlock(&block_group->lock);
+
+	if (cleanup) {
+		em_tree = &fs_info->mapping_tree;
+		write_lock(&em_tree->lock);
+		em = lookup_extent_mapping(em_tree, block_group->start,
+					   1);
+		BUG_ON(!em); /* logic error, can't happen */
+		remove_extent_mapping(em_tree, em);
+		write_unlock(&em_tree->lock);
+
+		/* once for us and once for the tree */
+		free_extent_map(em);
+		free_extent_map(em);
+
+		/*
+		 * We may have left one free space entry and other possible
+		 * tasks trimming this block group have left 1 entry each one.
+		 * Free them if any.
+		 */
+		__btrfs_remove_free_space_cache(block_group->free_space_ctl);
+	}
 }
