@@ -934,3 +934,6 @@
 
 /* drm_plane_mask is available */
 #define HAVE_DRM_PLANE_MASK 1
+
+/* __print_array for trace is available */
+#define HAVE___PRINT_ARRAY 1
