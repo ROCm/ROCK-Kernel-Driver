@@ -224,9 +224,11 @@ ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
 export CONFIG_DRM_AMD_DC_DCN2_0=y
 export CONFIG_DRM_AMD_DC_DCN2_1=y
 export CONFIG_DRM_AMD_DC_DCN3_0=y
+export CONFIG_DRM_AMD_DC_DCN3_01=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_0
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_01
 endif
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
