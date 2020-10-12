@@ -49,7 +49,9 @@
 	(enc10->link_regs->index)
 
 static const struct link_encoder_funcs dcn301_link_enc_funcs = {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.read_state = link_enc2_read_state,
+#endif
 	.validate_output_with_stream = dcn10_link_encoder_validate_output_with_stream,
 	.hw_init = enc3_hw_init,
 	.setup = dcn10_link_encoder_setup,
