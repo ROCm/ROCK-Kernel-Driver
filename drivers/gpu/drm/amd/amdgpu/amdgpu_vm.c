@@ -1570,7 +1570,8 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
 /**
  * amdgpu_vm_bo_update_mapping - update a mapping in the vm page table
  *
- * @adev: amdgpu_device pointer
+ * @adev: amdgpu_device pointer of the VM
+ * @bo_adev: amdgpu_device pointer of the mapped BO
  * @vm: requested vm
  * @immediate: immediate submission in a page fault
  * @unlocked: unlocked invalidation during MM callback
@@ -1578,9 +1579,11 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  * @start: start of mapped range
  * @last: last mapped entry
  * @flags: flags for the entries
- * @addr: addr to set the area to
+ * @offset: offset into nodes and pages_addr
+ * @nodes: array of drm_mm_nodes with the MC addresses
  * @pages_addr: DMA addresses to use for mapping
  * @fence: optional resulting fence
+ * @vram_base_offset: pcie p2p support
  *
  * Fill in the page table entries between @start and @last.
  *
@@ -1591,12 +1594,15 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 				       struct amdgpu_vm *vm, bool immediate,
 				       bool unlocked, struct dma_resv *resv,
 				       uint64_t start, uint64_t last,
-				       uint64_t flags, uint64_t addr,
+				       uint64_t flags, uint64_t offset,
+				       struct ttm_mem_reg *mem,
 				       dma_addr_t *pages_addr,
-				       struct dma_fence **fence)
+				       struct dma_fence **fence, uint64_t vram_base_offset)
 {
+	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
 	struct amdgpu_vm_update_params params;
 	enum amdgpu_sync_mode sync_mode;
+	uint64_t pfn;
 	int r;
 
 	memset(&params, 0, sizeof(params));
@@ -1613,6 +1619,14 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		sync_mode = AMDGPU_SYNC_EQ_OWNER;
 	else
 		sync_mode = AMDGPU_SYNC_EXPLICIT;
+
+	pfn = offset >> PAGE_SHIFT;
+	if (nodes) {
+		while (pfn >= nodes->size) {
+			pfn -= nodes->size;
+			++nodes;
+		}
+	}
 
 	amdgpu_vm_eviction_lock(vm);
 	if (vm->evicting) {
@@ -1632,95 +1646,14 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	if (r)
 		goto error_unlock;
 
-	r = amdgpu_vm_update_ptes(&params, start, last + 1, addr, flags);
-	if (r)
-		goto error_unlock;
-
-	r = vm->update_funcs->commit(&params, fence);
-
-error_unlock:
-	amdgpu_vm_eviction_unlock(vm);
-	return r;
-}
-
-/**
- * amdgpu_vm_bo_split_mapping - split a mapping into smaller chunks
- *
- * @adev: amdgpu_device pointer
- * @resv: fences we need to sync to
- * @pages_addr: DMA addresses to use for mapping
- * @vm: requested vm
- * @mapping: mapped range and flags to use for the update
- * @flags: HW flags for the mapping
- * @bo_adev: amdgpu_device pointer that bo actually been allocated
- * @nodes: array of drm_mm_nodes with the MC addresses
- * @fence: optional resulting fence
- *
- * Split the mapping into smaller chunks so that each update fits
- * into a SDMA IB.
- *
- * Returns:
- * 0 for success, -EINVAL for failure.
- */
-static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
-				      struct dma_resv *resv,
-				      dma_addr_t *pages_addr,
-				      struct amdgpu_vm *vm,
-				      struct amdgpu_bo_va_mapping *mapping,
-				      uint64_t flags,
-				      struct amdgpu_device *bo_adev,
-				      struct ttm_mem_reg *mem,
-				      struct dma_fence **fence)
-{
-	struct drm_mm_node *nodes = mem ? mem->mm_node : NULL;
-	uint64_t vram_base_offset = bo_adev->vm_manager.vram_base_offset;
-	unsigned min_linear_pages = 1 << adev->vm_manager.fragment_size;
-	uint64_t pfn, start = mapping->start;
-	int r;
-
-	/* normally,bo_va->flags only contians READABLE and WIRTEABLE bit go here
-	 * but in case of something, we filter the flags in first place
-	 */
-	if (!(mapping->flags & AMDGPU_PTE_READABLE))
-		flags &= ~AMDGPU_PTE_READABLE;
-	if (!(mapping->flags & AMDGPU_PTE_WRITEABLE))
-		flags &= ~AMDGPU_PTE_WRITEABLE;
-
-	/* Apply ASIC specific mapping flags */
-	amdgpu_gmc_get_vm_pte(adev, mapping, &flags);
-
-	if (adev != bo_adev &&
-	    !(flags & AMDGPU_PTE_SYSTEM) &&
-	    !mapping->bo_va->is_xgmi) {
-		if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
-			flags |= AMDGPU_PTE_SYSTEM;
-			vram_base_offset = bo_adev->gmc.aper_base;
-		} else {
-			DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
-			return -EINVAL;
-		}
-	}
-
-	trace_amdgpu_vm_bo_update(mapping);
-
-	pfn = mapping->offset >> PAGE_SHIFT;
-	if (nodes) {
-		while (pfn >= nodes->size) {
-			pfn -= nodes->size;
-			++nodes;
-		}
-	}
-
 	do {
-		dma_addr_t *dma_addr = NULL;
-		uint64_t max_entries;
-		uint64_t addr, last;
+		uint64_t tmp, num_entries, addr;
 
-		max_entries = mapping->last - start + 1;
+		num_entries = last - start + 1;
 		if (nodes) {
 			addr = nodes->start << PAGE_SHIFT;
-			max_entries = min((nodes->size - pfn) *
-				AMDGPU_GPU_PAGES_IN_CPU_PAGE, max_entries);
+			num_entries = min((nodes->size - pfn) *
+				AMDGPU_GPU_PAGES_IN_CPU_PAGE, num_entries);
 		} else {
 			addr = 0;
 		}
@@ -1729,59 +1662,68 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 				mem->mem_type == AMDGPU_PL_DGMA)) {
 			if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
 				addr = 0;
-				dma_addr = pages_addr;
 			} else {
 				addr += vram_base_offset +
 					amdgpu_ttm_domain_start(adev, mem->mem_type) -
 					amdgpu_ttm_domain_start(adev, TTM_PL_VRAM);
 				addr += pfn << PAGE_SHIFT;
+				params.pages_addr = NULL;
 			}
 		} else {
 			if (pages_addr) {
-				uint64_t count;
+				bool contiguous = true;
 
-				for (count = 1;
-				     count < max_entries / AMDGPU_GPU_PAGES_IN_CPU_PAGE;
-				     ++count) {
-					uint64_t idx = pfn + count;
+				if (num_entries > AMDGPU_GPU_PAGES_IN_CPU_PAGE) {
+					uint64_t count;
 
-					if (pages_addr[idx] !=
-					    (pages_addr[idx - 1] + PAGE_SIZE))
-						break;
-				}
+					contiguous = pages_addr[pfn + 1] ==
+						pages_addr[pfn] + PAGE_SIZE;
 
-				if (count < min_linear_pages) {
-					addr = pfn << PAGE_SHIFT;
-					dma_addr = pages_addr;
-				} else {
-					addr = pages_addr[pfn];
-					max_entries = count *
+					tmp = num_entries /
+						AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+					for (count = 2; count < tmp; ++count) {
+						uint64_t idx = pfn + count;
+
+						if (contiguous != (pages_addr[idx] ==
+							pages_addr[idx - 1] + PAGE_SIZE))
+							break;
+					}
+					num_entries = count *
 						AMDGPU_GPU_PAGES_IN_CPU_PAGE;
 				}
 
+				if (!contiguous) {
+					addr = pfn << PAGE_SHIFT;
+					params.pages_addr = pages_addr;
+				} else {
+					addr = pages_addr[pfn];
+					params.pages_addr = NULL;
+				}
 			} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
-				addr += vram_base_offset;
-				addr += pfn << PAGE_SHIFT;
+						addr += vram_base_offset;
+						addr += pfn << PAGE_SHIFT;
 			}
 		}
 
-		last = start + max_entries - 1;
-		r = amdgpu_vm_bo_update_mapping(adev, vm, false, false, resv,
-						start, last, flags, addr,
-						dma_addr, fence);
+		tmp = start + num_entries;
+		r = amdgpu_vm_update_ptes(&params, start, tmp, addr, flags);
 		if (r)
-			return r;
+			goto error_unlock;
 
-		pfn += (last - start + 1) / AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+		pfn += num_entries / AMDGPU_GPU_PAGES_IN_CPU_PAGE;
 		if (nodes && nodes->size == pfn) {
 			pfn = 0;
 			++nodes;
 		}
-		start = last + 1;
+		start = tmp;
 
-	} while (unlikely(start != mapping->last + 1));
+	} while (unlikely(start != last + 1));
 
-	return 0;
+	r = vm->update_funcs->commit(&params, fence);
+
+error_unlock:
+	amdgpu_vm_eviction_unlock(vm);
+	return r;
 }
 
 /**
@@ -1864,9 +1806,39 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	}
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
-		r = amdgpu_vm_bo_split_mapping(adev, resv, pages_addr, vm,
-					       mapping, flags, bo_adev, mem,
-					       last_update);
+		uint64_t update_flags = flags;
+		uint64_t vram_base_offset = bo_adev->vm_manager.vram_base_offset;
+
+		/* normally,bo_va->flags only contians READABLE and WIRTEABLE bit go here
+		 * but in case of something, we filter the flags in first place
+		 */
+		if (!(mapping->flags & AMDGPU_PTE_READABLE))
+			update_flags &= ~AMDGPU_PTE_READABLE;
+		if (!(mapping->flags & AMDGPU_PTE_WRITEABLE))
+			update_flags &= ~AMDGPU_PTE_WRITEABLE;
+
+		/* Apply ASIC specific mapping flags */
+		amdgpu_gmc_get_vm_pte(adev, mapping, &update_flags);
+
+		if (adev != bo_adev &&
+			!(update_flags & AMDGPU_PTE_SYSTEM) &&
+			!mapping->bo_va->is_xgmi) {
+			if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+				update_flags |= AMDGPU_PTE_SYSTEM;
+				vram_base_offset = bo_adev->gmc.aper_base;
+			} else {
+				DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
+				return -EINVAL;
+			}
+		}
+
+		trace_amdgpu_vm_bo_update(mapping);
+
+		r = amdgpu_vm_bo_update_mapping(adev, vm, false, false,
+						resv, mapping->start,
+						mapping->last, update_flags,
+						mapping->offset, mem,
+						pages_addr, last_update, vram_base_offset);
 		if (r)
 			return r;
 	}
@@ -2074,9 +2046,10 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 		    mapping->start < AMDGPU_GMC_HOLE_START)
 			init_pte_value = AMDGPU_PTE_DEFAULT_ATC;
 
-		r = amdgpu_vm_bo_update_mapping(adev, vm, false, false, resv,
-						mapping->start, mapping->last,
-						init_pte_value, 0, NULL, &f);
+		r = amdgpu_vm_bo_update_mapping(adev, vm, false, false,
+						resv, mapping->start,
+						mapping->last, init_pte_value,
+						0, NULL, NULL, &f, 0);
 		amdgpu_vm_free_mapping(adev, vm, mapping, f);
 		if (r) {
 			dma_fence_put(f);
@@ -3417,7 +3390,8 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, unsigned int pasid,
 	}
 
 	r = amdgpu_vm_bo_update_mapping(adev, vm, true, false, NULL, addr,
-					addr + 1, flags, value, NULL, NULL);
+					addr + 1, flags, value, NULL, NULL,
+					NULL, 0);
 	if (r)
 		goto error_unlock;
 
