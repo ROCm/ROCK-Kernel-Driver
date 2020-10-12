@@ -2736,7 +2736,8 @@ pnfs_try_to_read_data(struct nfs_pgio_header *hdr,
 }
 
 /* Resend all requests through pnfs. */
-void pnfs_read_resend_pnfs(struct nfs_pgio_header *hdr)
+void pnfs_read_resend_pnfs(struct nfs_pgio_header *hdr,
+			   unsigned int mirror_idx)
 {
 	struct nfs_pageio_descriptor pgio;
 
@@ -2747,6 +2748,7 @@ void pnfs_read_resend_pnfs(struct nfs_pgio_header *hdr)
 
 		nfs_pageio_init_read(&pgio, hdr->inode, false,
 					hdr->completion_ops);
+		pgio.pg_mirror_idx = mirror_idx;
 		hdr->task.tk_status = nfs_pageio_resend(&pgio, hdr);
 	}
 }
