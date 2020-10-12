@@ -114,7 +114,15 @@ struct btrfs_block_group {
 	/* For read-only block groups */
 	struct list_head ro_list;
 
-	atomic_t trimming;
+	/*
+	 * When non-zero it means the block group's logical address and its
+	 * device extents can not be reused for future block group allocations
+	 * until the counter goes down to 0. This is to prevent them from being
+	 * reused while some task is still using the block group after it was
+	 * deleted - we want to make sure they can only be reused for new block
+	 * groups after that task is done with the deleted block group.
+	 */
+	atomic_t frozen;
 
 	/* For dirty block groups */
 	struct list_head dirty_list;
@@ -246,6 +254,9 @@ static inline int btrfs_block_group_done(struct btrfs_block_group *cache)
 	return cache->cached == BTRFS_CACHE_FINISHED ||
 		cache->cached == BTRFS_CACHE_ERROR;
 }
+
+void btrfs_freeze_block_group(struct btrfs_block_group *cache);
+void btrfs_unfreeze_block_group(struct btrfs_block_group *cache);
 
 int __btrfs_inc_block_group_ro(struct btrfs_block_group *cache, int force);
 u64 btrfs_get_restripe_target(struct btrfs_fs_info *fs_info, u64 flags);
