@@ -47,7 +47,9 @@
 #include "dcn30/dcn30_hwseq.h"
 #include "dce110/dce110_hw_sequencer.h"
 #include "dcn30/dcn30_opp.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dcn20/dcn20_dsc.h"
+#endif
 #include "dcn30/dcn30_vpg.h"
 #include "dcn30/dcn30_afmt.h"
 #include "dce/dce_clock_source.h"
@@ -99,7 +101,9 @@ struct _vcs_dpi_ip_params_st dcn3_01_ip = {
 	.hostvm_max_page_table_levels = 2,
 	.hostvm_cached_page_table_levels = 0,
 	.pte_group_size_bytes = 2048,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 3,
+#endif
 	.rob_buffer_size_kbytes = 184,
 	.det_buffer_size_kbytes = 184,
 	.dpte_buffer_size_in_pte_reqs_luma = 64,
@@ -661,6 +665,7 @@ static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
 	MCIF_WB_COMMON_MASK_SH_LIST_DCN30(_MASK)
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -679,6 +684,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 static const struct dcn30_mpc_registers mpc_regs = {
 		MPC_REG_LIST_DCN3_0(0),
@@ -820,7 +826,9 @@ static const struct resource_caps res_cap_dcn301 = {
 	.num_ddc = 4,
 	.num_vmid = 16,
 	.num_mpc_3dlut = 2,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 3,
+#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
@@ -1252,10 +1260,12 @@ static void dcn301_destruct(struct dcn301_resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
+#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1424,6 +1434,7 @@ bool dcn301_mmhubbub_create(struct dc_context *ctx, struct resource_pool *pool)
 	return true;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct display_stream_compressor *dcn301_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
 {
@@ -1438,7 +1449,7 @@ static struct display_stream_compressor *dcn301_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
-
+#endif
 
 static void dcn301_destroy_resource_pool(struct resource_pool **pool)
 {
@@ -1968,6 +1979,7 @@ static bool dcn301_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn301_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -1976,6 +1988,7 @@ static bool dcn301_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	/* DWB and MMHUBBUB */
 	if (!dcn301_dwbc_create(ctx, &pool->base)) {
