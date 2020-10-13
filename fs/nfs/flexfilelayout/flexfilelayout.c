@@ -1127,7 +1127,7 @@ static void ff_layout_resend_pnfs_read(struct nfs_pgio_header *hdr)
 		ff_layout_send_layouterror(hdr->lseg);
 	else
 		pnfs_error_mark_layout_for_return(hdr->inode, hdr->lseg);
-	pnfs_read_resend_pnfs(hdr, new_idx);
+	pnfs_read_resend_pnfs2(hdr, new_idx);
 }
 
 static void ff_layout_reset_read(struct nfs_pgio_header *hdr)
