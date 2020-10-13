@@ -1649,6 +1649,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data3;
 	bool need_device;
 	bool need_qid_array;
+	bool is_attach;
 	bool need_proc_create = false;
 
 	debug_trap_action = args->op;
@@ -1683,11 +1684,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	thread = get_pid_task(pid, PIDTYPE_PID);
 
+	is_attach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 1;
+
 	rcu_read_lock();
-	need_proc_create =
-		debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
-		data1 == 1 && thread && thread != current &&
-		ptrace_parent(thread) == current;
+	need_proc_create = is_attach && thread && thread != current &&
+					ptrace_parent(thread) == current;
 	rcu_read_unlock();
 
 	target = need_proc_create ?
@@ -1731,9 +1732,9 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			goto unlock_out;
 		}
 
-		pdd = kfd_get_process_device_data(dev, target);
+		pdd = kfd_bind_process_to_device(dev, target);
 
-		if (!pdd) {
+		if (IS_ERR(pdd)) {
 			r = -EINVAL;
 			goto unlock_out;
 		}
@@ -1929,8 +1930,12 @@ out:
 		put_task_struct(thread);
 	if (pid)
 		put_pid(pid);
-	if (target)
+	/* hold the target reference for the entire debug session. */
+	if (!is_attach && target) {
 		kfd_unref_process(target);
+		if (debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE)
+			kfd_unref_process(target);
+	}
 	kfree(queue_id_array);
 	return r;
 }
