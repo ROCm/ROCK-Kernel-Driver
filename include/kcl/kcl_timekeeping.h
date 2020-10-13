@@ -54,4 +54,8 @@ static inline u64 ktime_get_mono_fast_ns(void)
 }
 #endif
 
+#ifndef HAVE_JIFFIES64_TO_MSECS
+extern u64 jiffies64_to_msecs(u64 j);
+#endif
+
 #endif
