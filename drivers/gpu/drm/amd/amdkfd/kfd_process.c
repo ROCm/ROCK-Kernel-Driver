@@ -1498,9 +1498,11 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	if (err)
 		goto out;
 
-	err = kfd_process_device_init_vm(pdd, NULL);
-	if (err)
-		goto out;
+	if (pdd->process->lead_thread == current) {
+		err = kfd_process_device_init_vm(pdd, NULL);
+		if (err)
+			goto out;
+	}
 
 	/*
 	 * make sure that runtime_usage counter is incremented just once
