@@ -9,7 +9,7 @@ amdkcl-y += kcl_workqueue.o kcl_backlight.o kcl_ioctl.o \
 	kcl_fence.o kcl_fence_array.o kcl_reservation.o kcl_drm_cache.o \
 	kcl_drm.o kcl_drm_modeset_lock.o kcl_drm_fb.o \
 	kcl_drm_crtc.o kcl_connector.o kcl_drm_atomic_helper.o \
-	kcl_device_cgroup.o kcl_mn.o kcl_drm_modes.o
+	kcl_device_cgroup.o kcl_mn.o kcl_drm_modes.o kcl_time.o
 
 # for trace-points
 CFLAGS_kcl_fence.o := -I$(src)

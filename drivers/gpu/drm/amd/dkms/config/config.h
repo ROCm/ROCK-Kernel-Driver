@@ -635,6 +635,9 @@
 /* IRQ translation domains exist */
 #define HAVE_IRQ_DOMAIN 1
 
+/* jiffies64_to_msecs() is available */
+#define HAVE_JIFFIES64_TO_MSECS 1
+
 /* kallsyms_lookup_name is available */
 /* #undef HAVE_KALLSYMS_LOOKUP_NAME */
 
