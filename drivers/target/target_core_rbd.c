@@ -421,9 +421,83 @@ static sense_reason_t tcm_rbd_execute_unmap(struct se_cmd *cmd,
 				   true);
 }
 
-static sense_reason_t tcm_rbd_execute_write_same(struct se_cmd *cmd)
+static bool
+tcm_rbd_write_same_can_zero_out(struct se_cmd *cmd)
 {
-	return TCM_UNSUPPORTED_SCSI_OPCODE;
+	struct scatterlist *sg = &cmd->t_data_sg[0];
+	unsigned char *buf, *not_zero;
+
+	buf = kmap_atomic(sg_page(sg));
+	/*
+	 * Fall back to slow-path if incoming WRITE_SAME payload does not
+	 * contain zeros.
+	 */
+	not_zero = memchr_inv(buf + sg->offset, 0x00, cmd->data_length);
+	kunmap_atomic(buf);
+
+	return (not_zero == NULL);
+}
+
+static sense_reason_t
+tcm_rbd_execute_write_same(struct se_cmd *cmd)
+{
+	struct se_device *dev = cmd->se_dev;
+	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(dev);
+	struct rbd_device *rbd_dev = tcm_rbd_dev->rbd_dev;
+	struct scatterlist *sg;
+	struct scatterlist *ws_sgl = NULL;
+	u32 ws_sgl_nents = 0;
+	u64 ws_off_bytes = rbd_lba_shift(dev, cmd->t_task_lba);
+	u64 ws_len_bytes = rbd_lba_shift(dev, sbc_get_write_same_sectors(cmd));
+	sense_reason_t sense;
+	u32 i;
+
+	if (!ws_len_bytes) {
+		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		return 0;
+	}
+	if (cmd->prot_op) {
+		pr_err("WRITE_SAME: Protection information not supported\n");
+		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	}
+	sg = &cmd->t_data_sg[0];
+
+	if (cmd->t_data_nents > 1 ||
+	    sg->length != cmd->se_dev->dev_attrib.block_size ||
+	    sg->length != cmd->data_length) {
+		pr_err("WRITE_SAME: Illegal SGL t_data_nents: %u length: %u"
+			" block_size: %u\n", cmd->t_data_nents, sg->length,
+			cmd->se_dev->dev_attrib.block_size);
+		return TCM_INVALID_CDB_FIELD;
+	}
+
+	if (tcm_rbd_write_same_can_zero_out(cmd)) {
+		pr_debug("WRITE_SAME: mapped to zero-out for fast path\n");
+		return tcm_rbd_execute_cmd(cmd, rbd_dev, NULL, 0,
+					   OBJ_OP_ZEROOUT,
+					   ws_off_bytes,
+					   ws_len_bytes,
+					   false);
+	}
+
+	pr_debug("WRITE_SAME: slow path for non-zero buffer\n");
+	/*  I/O could be up to max_write_same_len */
+	ws_sgl_nents = div_u64(ws_len_bytes, sg->length);
+	ws_sgl = kzalloc(ws_sgl_nents * sizeof(*sg), GFP_KERNEL);
+	if (!ws_sgl) {
+		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+	}
+	sg_init_table(ws_sgl, ws_sgl_nents);
+	for (i = 0; i < ws_sgl_nents; i++)
+		sg_set_page(&ws_sgl[i], sg_page(sg), sg->length, sg->offset);
+
+	sense = tcm_rbd_execute_cmd(cmd, rbd_dev, ws_sgl, ws_sgl_nents,
+				    OBJ_OP_WRITE,
+				    ws_off_bytes,
+				    ws_len_bytes,
+				    false);
+	kfree(ws_sgl);
+	return sense;
 }
 
 enum {
