@@ -411,7 +411,8 @@ static sense_reason_t tcm_rbd_execute_unmap(struct se_cmd *cmd,
 	}
 
 	return tcm_rbd_execute_cmd(cmd, rbd_dev, NULL, 0, OBJ_OP_DISCARD,
-				   lba << SECTOR_SHIFT, nolb << SECTOR_SHIFT,
+				   rbd_lba_shift(cmd->se_dev, lba),
+				   rbd_lba_shift(cmd->se_dev, nolb),
 				   true);
 }
 
