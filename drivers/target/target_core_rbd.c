@@ -147,108 +147,20 @@ static void tcm_rbd_destroy_device(struct se_device *dev)
 		blkdev_put(tcm_rbd_dev->bd, FMODE_WRITE|FMODE_READ|FMODE_EXCL);
 }
 
-static unsigned long long tcm_rbd_get_blocks(
-	struct se_device *dev)
+static sector_t tcm_rbd_get_blocks(struct se_device *dev)
 {
 	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(dev);
-	unsigned long long blocks_long = tcm_rbd_dev->rbd_dev->mapping.size >>
-								SECTOR_SHIFT;
-
-	if (SECTOR_SIZE == dev->dev_attrib.block_size)
-		return blocks_long;
-
-	switch (SECTOR_SIZE) {
-	case 4096:
-		switch (dev->dev_attrib.block_size) {
-		case 2048:
-			blocks_long <<= 1;
-			break;
-		case 1024:
-			blocks_long <<= 2;
-			break;
-		case 512:
-			blocks_long <<= 3;
-		default:
-			break;
-		}
-		break;
-	case 2048:
-		switch (dev->dev_attrib.block_size) {
-		case 4096:
-			blocks_long >>= 1;
-			break;
-		case 1024:
-			blocks_long <<= 1;
-			break;
-		case 512:
-			blocks_long <<= 2;
-			break;
-		default:
-			break;
-		}
-		break;
-	case 1024:
-		switch (dev->dev_attrib.block_size) {
-		case 4096:
-			blocks_long >>= 2;
-			break;
-		case 2048:
-			blocks_long >>= 1;
-			break;
-		case 512:
-			blocks_long <<= 1;
-			break;
-		default:
-			break;
-		}
-		break;
-	case 512:
-		switch (dev->dev_attrib.block_size) {
-		case 4096:
-			blocks_long >>= 3;
-			break;
-		case 2048:
-			blocks_long >>= 2;
-			break;
-		case 1024:
-			blocks_long >>= 1;
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
+	u64 blocks_long = div_u64(tcm_rbd_dev->rbd_dev->mapping.size,
+				  dev->dev_attrib.block_size);
 
 	return blocks_long;
 }
 
 struct tcm_rbd_cmd {
 	struct rbd_img_request *img_request;
-	/* following are used for sgl->bvec conversion */
-	struct ceph_file_extent img_extent;
+	/* for sgl->bvec conversion */
 	struct bio_vec *bvecs;
 };
-
-static void rbd_complete_cmd(struct se_cmd *cmd, int result)
-{
-	struct tcm_rbd_cmd *trc = cmd->priv;
-	u8 status;
-
-	if (result)
-		status = SAM_STAT_CHECK_CONDITION;
-	else
-		status = SAM_STAT_GOOD;
-
-	cmd->priv = NULL;
-	target_complete_cmd(cmd, status);
-	if (trc) {
-		rbd_img_request_put(trc->img_request);
-		kfree(trc->bvecs);
-		kfree(trc);
-	}
-}
 
 static sense_reason_t tcm_rbd_execute_sync_cache(struct se_cmd *cmd)
 {
@@ -283,29 +195,45 @@ static int tcm_rbd_sgl_to_bvecs(struct scatterlist *sgl, u32 sgl_nents,
 
 /*
  * Convert the blocksize advertised to the initiator to the RBD offset.
+ * Returns the equivalent of task_lba << ilog2(blocksize) for the fixed set of
+ * blocksizes supported by LIO.
  */
 static u64 rbd_lba_shift(struct se_device *dev, unsigned long long task_lba)
 {
-	sector_t block_lba;
-
-	/* convert to linux block which uses 512 byte sectors */
-	if (dev->dev_attrib.block_size == 4096)
-		block_lba = task_lba << 3;
-	else if (dev->dev_attrib.block_size == 2048)
-		block_lba = task_lba << 2;
-	else if (dev->dev_attrib.block_size == 1024)
-		block_lba = task_lba << 1;
-	else
-		block_lba = task_lba;
-
-	/* convert to RBD offset */
-	return block_lba << SECTOR_SHIFT;
+	switch (dev->dev_attrib.block_size) {
+	case 4096:
+		return task_lba << 12;
+	case 2048:
+		return task_lba << 11;
+	case 1024:
+		return task_lba << 10;
+	case 512:
+		return task_lba << 9;
+	default:
+		WARN_ON(1);
+	}
+	return task_lba << 9;
 }
 
 static void tcm_rbd_async_callback(struct rbd_img_request *img_request,
 				   int result)
 {
-	rbd_complete_cmd(img_request->lio_cmd_data, result);
+	struct se_cmd *cmd = img_request->lio_cmd_data;
+	struct tcm_rbd_cmd *trc = cmd->priv;
+	u8 status;
+
+	if (result)
+		status = SAM_STAT_CHECK_CONDITION;
+	else
+		status = SAM_STAT_GOOD;
+
+	cmd->priv = NULL;
+	target_complete_cmd(cmd, status);
+	if (trc) {
+		rbd_img_request_put(trc->img_request);
+		kfree(trc->bvecs);
+		kfree(trc);
+	}
 }
 
 struct tcm_rbd_sync_notify {
@@ -360,16 +288,16 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 	 * sending it if we already know.
 	 */
 	if (!test_bit(RBD_DEV_FLAG_EXISTS, &rbd_dev->flags)) {
-		dout("request for non-existent snapshot");
+		pr_warn("request for non-existent snapshot");
 		BUG_ON(rbd_dev->spec->snap_id == CEPH_NOSNAP);
 		sense = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-		goto err_rq;
+		goto err;
 	}
 
 	if (offset && length > U64_MAX - offset + 1) {
 		pr_warn("bad request range (%llu~%llu)", offset, length);
 		sense = TCM_INVALID_CDB_FIELD;
-		goto err_rq;	/* Shouldn't happen */
+		goto err;	/* Shouldn't happen */
 	}
 
 	down_read(&rbd_dev->header_rwsem);
@@ -384,13 +312,13 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 		pr_warn("beyond EOD (%llu~%llu > %llu)", offset,
 			length, mapping_size);
 		sense = TCM_ADDRESS_OUT_OF_RANGE;
-		goto err_rq;
+		goto err_snapc;
 	}
 
 	trc = kzalloc(sizeof(struct tcm_rbd_cmd), GFP_KERNEL);
 	if (!trc) {
 		sense = TCM_OUT_OF_RESOURCES;
-		goto err_rq;
+		goto err_snapc;
 	}
 
 	img_request = rbd_img_request_create(rbd_dev, op_type, snapc,
@@ -408,13 +336,14 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 	if (op_type == OBJ_OP_DISCARD || op_type == OBJ_OP_ZEROOUT)
 		result = rbd_img_fill_nodata(img_request, offset, length);
 	else {
-		trc->img_extent.fe_off = offset;
-		trc->img_extent.fe_len = length;
-
+		struct ceph_file_extent img_extent = {
+			.fe_off = offset,
+			.fe_len = length,
+		};
 		result = tcm_rbd_sgl_to_bvecs(sgl, sgl_nents, &trc->bvecs);
 		if (!result) {
 			result = rbd_img_fill_from_bvecs(img_request,
-							 &trc->img_extent, 1,
+							 &img_extent, 1,
 							 trc->bvecs);
 		}
 	}
@@ -428,10 +357,8 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 
 	if (sync) {
 		img_request->lio_cmd_data = &sync_notify;
-		img_request->callback = tcm_rbd_sync_callback;
 	} else {
 		img_request->lio_cmd_data = cmd;
-		img_request->callback = tcm_rbd_async_callback;
 		cmd->priv = trc;
 	}
 
@@ -453,7 +380,7 @@ err_img_request:
 err_trc:
 	kfree(trc->bvecs);
 	kfree(trc);
-err_rq:
+err_snapc:
 	if (sense)
 		pr_warn("RBD op type %d %llx at %llx sense %d",
 			op_type, length, offset, sense);
@@ -600,8 +527,8 @@ tcm_rbd_execute_rw(struct se_cmd *cmd, struct scatterlist *sgl, u32 sgl_nents,
 	enum obj_operation_type op_type;
 
 	if (!sgl_nents) {
-		 rbd_complete_cmd(cmd, 0);
-		 return 0;
+		target_complete_cmd(cmd, SAM_STAT_GOOD);
+		return 0;
 	}
 
 	if (data_direction == DMA_FROM_DEVICE) {
