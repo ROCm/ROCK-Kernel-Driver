@@ -215,6 +215,11 @@ struct rbd_obj_request {
 			struct ceph_bvec_iter	bvec_pos;
 			u32			bvec_count;
 			u32			bvec_idx;
+			/*
+			 * iter for cmp portion of compare and write, which
+			 * refers to bvecs in @bvec_pos.
+			 */
+			struct bvec_iter	cmp_bvec_iter;
 		};
 	};
 
@@ -2296,6 +2301,8 @@ union rbd_img_fill_iter {
 	struct ceph_bvec_iter	bvec_iter;
 };
 
+typedef void (*reset_fill_ctx_iter_fn_t)(union rbd_img_fill_iter *iter);
+
 struct rbd_img_fill_ctx {
 	enum obj_request_type	pos_type;
 	union rbd_img_fill_iter	*pos;
@@ -2303,6 +2310,7 @@ struct rbd_img_fill_ctx {
 	ceph_object_extent_fn_t	set_pos_fn;
 	ceph_object_extent_fn_t	count_fn;
 	ceph_object_extent_fn_t	copy_fn;
+	reset_fill_ctx_iter_fn_t reset_iter_fn;
 };
 
 static struct ceph_object_extent *alloc_object_extent(void *arg)
@@ -2344,7 +2352,10 @@ static int rbd_img_fill_request_nocopy(struct rbd_img_request *img_req,
 	 * Create object requests and set each object request's starting
 	 * position in the provided bio (list) or bio_vec array.
 	 */
-	fctx->iter = *fctx->pos;
+	if (fctx->reset_iter_fn)
+		fctx->reset_iter_fn(&fctx->iter);
+	else
+		fctx->iter = *fctx->pos;
 	for (i = 0; i < num_img_extents; i++) {
 		ret = ceph_file_to_extents(&img_req->rbd_dev->layout,
 					   img_extents[i].fe_off,
@@ -2396,7 +2407,10 @@ static int rbd_img_fill_request(struct rbd_img_request *img_req,
 	 * or bio_vec array because when mapped, those bio_vecs can straddle
 	 * stripe unit boundaries.
 	 */
-	fctx->iter = *fctx->pos;
+	if (fctx->reset_iter_fn)
+		fctx->reset_iter_fn(&fctx->iter);
+	else
+		fctx->iter = *fctx->pos;
 	for (i = 0; i < num_img_extents; i++) {
 		ret = ceph_file_to_extents(&rbd_dev->layout,
 					   img_extents[i].fe_off,
@@ -2420,7 +2434,10 @@ static int rbd_img_fill_request(struct rbd_img_request *img_req,
 	 * Fill in each object request's private bio_vec array, splitting and
 	 * rearranging the provided bio_vecs in stripe unit chunks as needed.
 	 */
-	fctx->iter = *fctx->pos;
+	if (fctx->reset_iter_fn)
+		fctx->reset_iter_fn(&fctx->iter);
+	else
+		fctx->iter = *fctx->pos;
 	for (i = 0; i < num_img_extents; i++) {
 		ret = ceph_iterate_extents(&rbd_dev->layout,
 					   img_extents[i].fe_off,
@@ -2577,6 +2594,188 @@ int rbd_img_fill_from_bvecs(struct rbd_img_request *img_req,
 					 &it);
 }
 EXPORT_SYMBOL(rbd_img_fill_from_bvecs);
+
+struct ceph_bvec_dual_iter {
+	struct ceph_bvec_iter cmp_iter;
+	/* cur_cmp_iter carried as fctx->iter */
+	struct ceph_bvec_iter write_iter;
+	struct ceph_bvec_iter cur_write_iter;
+	struct rbd_img_fill_ctx fctx;
+};
+
+static void set_dual_bvec_pos(struct ceph_object_extent *ex, u32 bytes, void *arg)
+{
+	struct rbd_obj_request *obj_req =
+	    container_of(ex, struct rbd_obj_request, ex);
+	struct ceph_bvec_iter *cur_cmp_iter = arg;
+	struct rbd_img_fill_ctx *fctx =
+		container_of(arg, struct rbd_img_fill_ctx, iter);
+	struct ceph_bvec_dual_iter *dual =
+		container_of(fctx, struct ceph_bvec_dual_iter, fctx);
+
+	BUG_ON(obj_req->img_request->op_type != OBJ_OP_CMP_AND_WRITE);
+
+	pr_debug("set dual bvec pos: old bi_size: %d, bi_idx: %u, bi_bvec_done: %u, "
+		" new bi_size: %d, bi_idx: %u, bi_bvec_done: %u\n",
+		obj_req->bvec_pos.iter.bi_size,
+		/* current index into bvl_vec */
+		obj_req->bvec_pos.iter.bi_idx,
+		/* number of bytes completed in current bvec */
+		obj_req->bvec_pos.iter.bi_bvec_done,
+		cur_cmp_iter->iter.bi_size, cur_cmp_iter->iter.bi_idx,
+		cur_cmp_iter->iter.bi_bvec_done);
+
+	obj_req->cmp_bvec_iter = cur_cmp_iter->iter;
+	obj_req->bvec_pos = dual->cur_write_iter;
+
+	pr_debug("obj_req %p: shortening dual bvec pos from %u to %u\n",
+		 obj_req, cur_cmp_iter->iter.bi_size, bytes);
+
+	BUG_ON(bytes > obj_req->cmp_bvec_iter.bi_size);
+	obj_req->cmp_bvec_iter.bi_size = bytes;
+	ceph_bvec_iter_shorten(&obj_req->bvec_pos, bytes);
+	ceph_bvec_iter_advance(cur_cmp_iter, bytes);
+	ceph_bvec_iter_advance(&dual->cur_write_iter, bytes);
+}
+
+static void count_dual_bvecs(struct ceph_object_extent *ex, u32 bytes, void *arg)
+{
+	struct rbd_obj_request *obj_req =
+	    container_of(ex, struct rbd_obj_request, ex);
+	struct ceph_bvec_iter *cur_cmp_iter = arg;
+	struct rbd_img_fill_ctx *fctx =
+		container_of(arg, struct rbd_img_fill_ctx, iter);
+	struct ceph_bvec_dual_iter *dual =
+		container_of(fctx, struct ceph_bvec_dual_iter, fctx);
+
+	pr_debug("counting %u bytes from dual bvec for obj_req %p\n",
+		 bytes, obj_req);
+
+	ceph_bvec_iter_advance_step(cur_cmp_iter, bytes, ({
+		obj_req->bvec_count++;
+	}));
+	ceph_bvec_iter_advance_step(&dual->cur_write_iter, bytes, ({
+		obj_req->bvec_count++;
+	}));
+}
+
+static void copy_dual_bvecs(struct ceph_object_extent *ex, u32 bytes, void *arg)
+{
+	struct rbd_obj_request *obj_req =
+	    container_of(ex, struct rbd_obj_request, ex);
+	struct ceph_bvec_iter *cur_cmp_iter = arg;
+	struct rbd_img_fill_ctx *fctx =
+		container_of(arg, struct rbd_img_fill_ctx, iter);
+	struct ceph_bvec_dual_iter *dual =
+		container_of(fctx, struct ceph_bvec_dual_iter, fctx);
+
+	pr_debug("obj_req %p: copying %u bytes from cmp bvec %u [%u] (%u done)\n",
+		obj_req, bytes,
+		cur_cmp_iter->iter.bi_size,
+		cur_cmp_iter->iter.bi_idx,
+		cur_cmp_iter->iter.bi_bvec_done);
+
+	/* we might be placing the same bv for cmp and write */
+	ceph_bvec_iter_advance_step(cur_cmp_iter, bytes, ({
+		obj_req->bvec_pos.bvecs[obj_req->bvec_idx++] = bv;
+		obj_req->cmp_bvec_iter.bi_size += bv.bv_len;
+	}));
+
+	pr_debug("obj_req %p: copied cmp bvec to %u [%u] (%u done)\n",
+		obj_req,
+		obj_req->cmp_bvec_iter.bi_size,
+		obj_req->cmp_bvec_iter.bi_idx,
+		obj_req->cmp_bvec_iter.bi_bvec_done);
+
+	pr_debug("obj_req %p: copying %u bytes from write bvec %u [%u] (%u done)\n",
+		obj_req, bytes,
+		dual->cur_write_iter.iter.bi_size,
+		dual->cur_write_iter.iter.bi_idx,
+		dual->cur_write_iter.iter.bi_bvec_done);
+
+	/* init write-data iter to point to start of separate write section */
+	obj_req->bvec_pos.iter.bi_idx = obj_req->bvec_idx;
+	ceph_bvec_iter_advance_step(&dual->cur_write_iter, bytes, ({
+		obj_req->bvec_pos.bvecs[obj_req->bvec_idx++] = bv;
+		obj_req->bvec_pos.iter.bi_size += bv.bv_len;
+	}));
+
+	pr_debug("obj_req %p: copied write bvec to %u [%u] (%u done)\n",
+		obj_req,
+		obj_req->bvec_pos.iter.bi_size,
+		obj_req->bvec_pos.iter.bi_idx,
+		obj_req->bvec_pos.iter.bi_bvec_done);
+}
+
+static void reset_fill_ctx_dual_iter(union rbd_img_fill_iter *cur_cmp_iter)
+{
+	struct rbd_img_fill_ctx *fctx =
+		container_of(cur_cmp_iter, struct rbd_img_fill_ctx, iter);
+	struct ceph_bvec_dual_iter *dual =
+		container_of(fctx, struct ceph_bvec_dual_iter, fctx);
+
+	pr_debug("resetting cmp bvec from %u [%u] (%u done) to "
+		"%u [%u] (%u done)\n",
+		cur_cmp_iter->bvec_iter.iter.bi_size,
+		cur_cmp_iter->bvec_iter.iter.bi_idx,
+		cur_cmp_iter->bvec_iter.iter.bi_bvec_done,
+		dual->cmp_iter.iter.bi_size,
+		dual->cmp_iter.iter.bi_idx,
+		dual->cmp_iter.iter.bi_bvec_done);
+
+	pr_debug("resetting write bvec from %u [%u] (%u done) to "
+		"%u [%u] (%u done)\n",
+		dual->cur_write_iter.iter.bi_size,
+		dual->cur_write_iter.iter.bi_idx,
+		dual->cur_write_iter.iter.bi_bvec_done,
+		dual->write_iter.iter.bi_size,
+		dual->write_iter.iter.bi_idx,
+		dual->write_iter.iter.bi_bvec_done);
+
+	cur_cmp_iter->bvec_iter = dual->cmp_iter;
+	dual->cur_write_iter = dual->write_iter;
+}
+
+/*
+ * compare and write consumes 2 * extent_bytes. Once for the compare op and
+ * extent_bytes again for the write op. @bvecs must provide compare data
+ * at range [0, img_extent->fe_len) and write data at range
+ * [img_extent->fe_len, img_extent->fe_len * 2)
+ */
+int rbd_img_fill_cmp_and_write_from_bvecs(struct rbd_img_request *img_req,
+					  struct ceph_file_extent *img_extent,
+					  struct bio_vec *bvecs)
+{
+	struct ceph_bvec_dual_iter dual = {
+		.cmp_iter = {
+			.bvecs = bvecs,
+			.iter = { .bi_size = img_extent->fe_len },
+		},
+		.write_iter = {
+			.bvecs = bvecs,
+			.iter = { .bi_size = img_extent->fe_len * 2 },
+		},
+		.fctx = {
+			.pos_type = OBJ_REQUEST_BVECS,
+			/*
+			 * pos is only used to reset fctx.iter, not needed with
+			 * reset cb.
+			 */
+			.pos = NULL,
+			.set_pos_fn = set_dual_bvec_pos,
+			.count_fn = count_dual_bvecs,
+			.copy_fn = copy_dual_bvecs,
+			.reset_iter_fn = reset_fill_ctx_dual_iter,
+		},
+	};
+	BUG_ON(img_req->op_type != OBJ_OP_CMP_AND_WRITE);
+
+	/* advance to write portion of bvecs */
+	ceph_bvec_iter_advance(&dual.write_iter, img_extent->fe_len);
+
+	return rbd_img_fill_request(img_req, img_extent, 1, &dual.fctx);
+}
+EXPORT_SYMBOL(rbd_img_fill_cmp_and_write_from_bvecs);
 
 static void rbd_img_handle_request_work(struct work_struct *work)
 {
