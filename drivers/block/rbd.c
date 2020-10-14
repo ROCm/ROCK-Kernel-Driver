@@ -680,6 +680,8 @@ static char* obj_op_name(enum obj_operation_type op_type)
 		return "discard";
 	case OBJ_OP_ZEROOUT:
 		return "zeroout";
+	case OBJ_OP_CMP_AND_WRITE:
+		return "compare-and-write";
 	default:
 		return "???";
 	}
@@ -1207,6 +1209,7 @@ static bool rbd_img_is_write(struct rbd_img_request *img_req)
 	case OBJ_OP_WRITE:
 	case OBJ_OP_DISCARD:
 	case OBJ_OP_ZEROOUT:
+	case OBJ_OP_CMP_AND_WRITE:
 		return true;
 	default:
 		BUG();
@@ -2213,6 +2216,68 @@ static int rbd_obj_init_zeroout(struct rbd_obj_request *obj_req)
 	return 0;
 }
 
+static void __rbd_osd_setup_cmp_and_write_ops(struct ceph_osd_request *osd_req,
+				      int which)
+{
+	struct rbd_obj_request *obj_req = osd_req->r_priv;
+	struct rbd_device *rbd_dev = obj_req->img_request->rbd_dev;
+	/* cmp and write iters point to different ranges within same bvecs */
+	struct ceph_bvec_iter cmp_bvec_pos = {
+		.bvecs = obj_req->bvec_pos.bvecs,
+		.iter  = obj_req->cmp_bvec_iter,
+	};
+	struct ceph_bvec_iter *write_bvec_pos = &obj_req->bvec_pos;
+	u16 opcode;
+
+	BUG_ON(obj_req->img_request->data_type != OBJ_REQUEST_BVECS
+		&& obj_req->img_request->data_type != OBJ_REQUEST_OWN_BVECS);
+
+	if (!use_object_map(rbd_dev) ||
+	    !(obj_req->flags & RBD_OBJ_FLAG_MAY_EXIST)) {
+		osd_req_op_alloc_hint_init(osd_req, which++,
+					   rbd_dev->layout.object_size,
+					   rbd_dev->layout.object_size);
+	}
+
+	osd_req_op_extent_init(osd_req, which, CEPH_OSD_OP_CMPEXT,
+			       obj_req->ex.oe_off, obj_req->ex.oe_len, 0, 0);
+	/*
+	 * Regular rbd_osd_setup_data() can't be used here - separate bvec iters
+	 * need to be used for compare op and write op data.
+	 */
+	osd_req_op_extent_osd_data_bvec_pos(osd_req, which, &cmp_bvec_pos);
+	which++;
+
+	if (rbd_obj_is_entire(obj_req))
+		opcode = CEPH_OSD_OP_WRITEFULL;
+	else
+		opcode = CEPH_OSD_OP_WRITE;
+
+	osd_req_op_extent_init(osd_req, which, opcode,
+			       obj_req->ex.oe_off, obj_req->ex.oe_len, 0, 0);
+	osd_req_op_extent_osd_data_bvec_pos(osd_req, which, write_bvec_pos);
+}
+
+static int rbd_obj_init_cmp_and_write(struct rbd_obj_request *obj_req)
+{
+	int ret;
+
+	/* reverse map the entire object onto the parent */
+	ret = rbd_obj_calc_img_extents(obj_req, true);
+	if (ret)
+		return ret;
+
+	if (rbd_obj_copyup_enabled(obj_req))
+		obj_req->flags |= RBD_OBJ_FLAG_COPYUP_ENABLED;
+
+	/*
+	 * FIXME ensure that copyup *always* occurs for clones,
+	 * regardless of the I/O size.
+	 */
+	obj_req->write_state = RBD_OBJ_WRITE_START;
+	return 0;
+}
+
 static int count_write_ops(struct rbd_obj_request *obj_req)
 {
 	struct rbd_img_request *img_req = obj_req->img_request;
@@ -2232,6 +2297,12 @@ static int count_write_ops(struct rbd_obj_request *obj_req)
 			return 2; /* create + truncate */
 
 		return 1; /* delete/truncate/zero */
+	case OBJ_OP_CMP_AND_WRITE:
+		if (!use_object_map(img_req->rbd_dev) ||
+		    !(obj_req->flags & RBD_OBJ_FLAG_MAY_EXIST))
+			return 3; /* setallochint + cmpext + write/writefull */
+
+		return 2; /* cmpext + write/writefull */
 	default:
 		BUG();
 	}
@@ -2251,6 +2322,9 @@ static void rbd_osd_setup_write_ops(struct ceph_osd_request *osd_req,
 		break;
 	case OBJ_OP_ZEROOUT:
 		__rbd_osd_setup_zeroout_ops(osd_req, which);
+		break;
+	case OBJ_OP_CMP_AND_WRITE:
+		__rbd_osd_setup_cmp_and_write_ops(osd_req, which);
 		break;
 	default:
 		BUG();
@@ -2280,6 +2354,9 @@ static int __rbd_img_fill_request(struct rbd_img_request *img_req)
 			break;
 		case OBJ_OP_ZEROOUT:
 			ret = rbd_obj_init_zeroout(obj_req);
+			break;
+		case OBJ_OP_CMP_AND_WRITE:
+			ret = rbd_obj_init_cmp_and_write(obj_req);
 			break;
 		default:
 			BUG();
@@ -3434,9 +3511,24 @@ static bool __rbd_obj_handle_request(struct rbd_obj_request *obj_req,
 
 	if (done && *result) {
 		rbd_assert(*result < 0);
-		rbd_warn(rbd_dev, "%s at objno %llu %llu~%llu result %d",
-			 obj_op_name(img_req->op_type), obj_req->ex.oe_objno,
-			 obj_req->ex.oe_off, obj_req->ex.oe_len, *result);
+		if (img_req->op_type == OBJ_OP_CMP_AND_WRITE &&
+		    *result <= -MAX_ERRNO) {
+			/*
+			 * don't warn on miscompare. cmpext returns:
+			 * (-MAX_ERRNO - offset_of_miscompare)
+			 */
+			pr_debug("%s at objno %llu %llu~%llu: miscompare at %d",
+				 obj_op_name(img_req->op_type),
+				 obj_req->ex.oe_objno, obj_req->ex.oe_off,
+				 obj_req->ex.oe_len,
+				 (*result + MAX_ERRNO) * -1);
+		} else {
+			rbd_warn(rbd_dev,
+				 "%s at objno %llu %llu~%llu result %d",
+				 obj_op_name(img_req->op_type),
+				 obj_req->ex.oe_objno, obj_req->ex.oe_off,
+				 obj_req->ex.oe_len, *result);
+		}
 	}
 	return done;
 }
@@ -3614,7 +3706,7 @@ static bool __rbd_img_handle_request(struct rbd_img_request *img_req,
 		mutex_unlock(&img_req->state_mutex);
 	}
 
-	if (done && *result) {
+	if (done && *result && img_req->op_type != OBJ_OP_CMP_AND_WRITE) {
 		rbd_assert(*result < 0);
 		rbd_warn(rbd_dev, "%s%s result %d",
 		      test_bit(IMG_REQ_CHILD, &img_req->flags) ? "child " : "",

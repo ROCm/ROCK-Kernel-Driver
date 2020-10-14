@@ -91,6 +91,7 @@ enum obj_operation_type {
 	OBJ_OP_WRITE,
 	OBJ_OP_DISCARD,
 	OBJ_OP_ZEROOUT,
+	OBJ_OP_CMP_AND_WRITE,
 };
 
 enum rbd_img_state {
