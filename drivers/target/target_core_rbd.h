@@ -13,6 +13,7 @@ struct tcm_rbd_dev {
 	u32 bd_flags;
 	struct block_device *bd;
 	bool bd_readonly;
+	bool emulate_legacy_capacity;
 } ____cacheline_aligned;
 
 #endif /* TARGET_CORE_TCM_RBD_H */

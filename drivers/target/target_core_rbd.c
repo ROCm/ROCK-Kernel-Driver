@@ -68,6 +68,8 @@ static struct se_device *tcm_rbd_alloc_device(struct se_hba *hba, const char *na
 		return NULL;
 	}
 
+	tcm_rbd_dev->emulate_legacy_capacity = true;
+
 	pr_debug( "TCM RBD: Allocated tcm_rbd_dev for %s\n", name);
 
 	return &tcm_rbd_dev->dev;
@@ -599,7 +601,7 @@ static bool tcm_rbd_get_write_cache(struct se_device *dev)
 	return false;
 }
 
-static const struct target_backend_ops tcm_rbd_ops = {
+static struct target_backend_ops tcm_rbd_ops = {
 	.name			= "rbd",
 	.inquiry_prod		= "RBD",
 	.inquiry_rev		= TCM_RBD_VERSION,
@@ -620,17 +622,84 @@ static const struct target_backend_ops tcm_rbd_ops = {
 	.get_io_min		= tcm_rbd_get_io_min,
 	.get_io_opt		= tcm_rbd_get_io_opt,
 	.get_write_cache	= tcm_rbd_get_write_cache,
-	.tb_dev_attrib_attrs	= sbc_attrib_attrs,
+};
+
+static ssize_t tcm_rbd_emulate_legacy_capacity_show(struct config_item *item,
+						     char *page)
+{
+	struct se_dev_attrib *da = container_of(to_config_group(item),
+					struct se_dev_attrib, da_group);
+	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(da->da_dev);
+
+	return snprintf(page, PAGE_SIZE, "%d\n",
+			tcm_rbd_dev->emulate_legacy_capacity);
+}
+
+static ssize_t tcm_rbd_emulate_legacy_capacity_store(struct config_item *item,
+						      const char *page,
+						      size_t count)
+{
+	struct se_dev_attrib *da = container_of(to_config_group(item),
+					struct se_dev_attrib, da_group);
+	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(da->da_dev);
+	bool flag = 0;
+	int ret;
+
+	ret = strtobool(page, &flag);
+	if (ret < 0)
+		return ret;
+
+	tcm_rbd_dev->emulate_legacy_capacity = flag;
+	pr_debug("dev[%p]: tcm_rbd_emulate_legacy_capacity: %s\n",
+		da->da_dev, flag ? "Enabled" : "Disabled");
+
+	return count;
+}
+CONFIGFS_ATTR(tcm_rbd_, emulate_legacy_capacity);
+
+static struct configfs_attribute *tcm_rbd_attrib_attrs[] = {
+	&tcm_rbd_attr_emulate_legacy_capacity,
+	NULL,
 };
 
 static int __init tcm_rbd_module_init(void)
 {
-	return transport_backend_register(&tcm_rbd_ops);
+	struct configfs_attribute **tcm_rbd_attrs;
+	int i, k, ret, len = 0;
+
+	for (i = 0; sbc_attrib_attrs[i] != NULL; i++) {
+		len += sizeof(struct configfs_attribute *);
+	}
+	for (i = 0; tcm_rbd_attrib_attrs[i] != NULL; i++) {
+		len += sizeof(struct configfs_attribute *);
+	}
+	len += sizeof(struct configfs_attribute *);
+
+	tcm_rbd_attrs = kzalloc(len, GFP_KERNEL);
+	if (!tcm_rbd_attrs) {
+		return -ENOMEM;
+	}
+
+	for (i = 0; sbc_attrib_attrs[i] != NULL; i++) {
+		tcm_rbd_attrs[i] = sbc_attrib_attrs[i];
+	}
+	for (k = 0; tcm_rbd_attrib_attrs[k] != NULL; k++) {
+		tcm_rbd_attrs[i] = tcm_rbd_attrib_attrs[k];
+		i++;
+	}
+	tcm_rbd_ops.tb_dev_attrib_attrs = tcm_rbd_attrs;
+	ret = transport_backend_register(&tcm_rbd_ops);
+	if (ret) {
+		kfree(tcm_rbd_ops.tb_dev_attrib_attrs);
+		tcm_rbd_ops.tb_dev_attrib_attrs = NULL;
+	}
+	return ret;
 }
 
 static void __exit tcm_rbd_module_exit(void)
 {
 	target_backend_unregister(&tcm_rbd_ops);
+	kfree(tcm_rbd_ops.tb_dev_attrib_attrs);
 }
 
 MODULE_DESCRIPTION("TCM Ceph RBD subsystem plugin");
