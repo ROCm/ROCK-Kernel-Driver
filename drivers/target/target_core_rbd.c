@@ -403,6 +403,7 @@ static sense_reason_t tcm_rbd_execute_unmap(struct se_cmd *cmd,
 {
 	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(cmd->se_dev);
 	struct rbd_device *rbd_dev = tcm_rbd_dev->rbd_dev;
+	enum obj_operation_type type = OBJ_OP_DISCARD;
 
 	if (nolb == 0) {
 		pr_debug("ignoring zero length unmap at lba: %llu\n",
@@ -410,7 +411,11 @@ static sense_reason_t tcm_rbd_execute_unmap(struct se_cmd *cmd,
 		return TCM_NO_SENSE;
 	}
 
-	return tcm_rbd_execute_cmd(cmd, rbd_dev, NULL, 0, OBJ_OP_DISCARD,
+	/* RBD discard is best effort. zeroout provides zeroing guarantees */
+	if (cmd->se_dev->dev_attrib.unmap_zeroes_data)
+		type = OBJ_OP_ZEROOUT;
+
+	return tcm_rbd_execute_cmd(cmd, rbd_dev, NULL, 0, type,
 				   rbd_lba_shift(cmd->se_dev, lba),
 				   rbd_lba_shift(cmd->se_dev, nolb),
 				   true);
