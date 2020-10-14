@@ -273,6 +273,9 @@ extern const char *ceph_osd_state_name(int s);
 	/* hints */							    \
 	f(SETALLOCHINT,	__CEPH_OSD_OP(WR, DATA, 35),	"set-alloc-hint")   \
 									    \
+	/* ESX/SCSI */							    \
+	f(CMPEXT,       __CEPH_OSD_OP(RD, DATA, 32),    "cmpext")	    \
+									    \
 	/** multi **/							    \
 	f(CLONERANGE,	__CEPH_OSD_OP(WR, MULTI, 1),	"clonerange")	    \
 	f(ASSERT_SRC_VERSION, __CEPH_OSD_OP(RD, MULTI, 2), "assert-src-version") \
