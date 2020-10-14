@@ -99,8 +99,12 @@ bool nvme_failover_req(struct request *req)
 		nvme_mpath_clear_current_path(ns);
 		break;
 	default:
-		/* This was a non-ANA error so follow the normal error path. */
-		return false;
+		/*
+		 * This was a non-ANA error so follow the normal error path
+		 * if it's not a multipathed namespace.
+		 */
+		if (!ns->head->disk)
+			return false;
 	}
 
 	spin_lock_irqsave(&ns->head->requeue_lock, flags);

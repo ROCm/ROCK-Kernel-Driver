@@ -1863,9 +1863,11 @@ static int domain_init(struct dmar_domain *domain, struct intel_iommu *iommu,
 	/* calculate AGAW */
 	if (guest_width > cap_mgaw(iommu->cap))
 		guest_width = cap_mgaw(iommu->cap);
-	domain->gaw = guest_width;
 	adjust_width = guestwidth_to_adjustwidth(guest_width);
 	agaw = width_to_agaw(adjust_width);
+	if (agaw > iommu->agaw)
+		agaw = iommu->agaw;
+	domain->gaw = agaw_to_width(agaw);
 	sagaw = cap_sagaw(iommu->cap);
 	if (!test_bit(agaw, &sagaw)) {
 		/* hardware doesn't support it, choose a bigger one */
