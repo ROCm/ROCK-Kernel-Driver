@@ -6419,6 +6419,10 @@ static int rtl8169_resume(struct device *device)
 
 	clk_prepare_enable(tp->clk);
 
+	/* Reportedly at least Asus X453MA truncates packets otherwise */
+	if (tp->mac_version == RTL_GIGA_MAC_VER_37)
+		rtl_init_rxcfg(tp);
+
 	if (netif_running(dev))
 		__rtl8169_resume(dev);
 
