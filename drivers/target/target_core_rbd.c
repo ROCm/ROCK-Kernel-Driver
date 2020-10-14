@@ -155,6 +155,10 @@ static sector_t tcm_rbd_get_blocks(struct se_device *dev)
 	u64 blocks_long = div_u64(tcm_rbd_dev->rbd_dev->mapping.size,
 				  dev->dev_attrib.block_size);
 
+	/* READ CAPACITY should return the LUN's last LBA */
+	if (blocks_long && !tcm_rbd_dev->emulate_legacy_capacity)
+		blocks_long -= 1;
+
 	return blocks_long;
 }
 
@@ -259,6 +263,7 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 		    enum obj_operation_type op_type,
 		    u64 offset, u64 length, bool sync)
 {
+	struct tcm_rbd_dev *tcm_rbd_dev = TCM_RBD_DEV(cmd->se_dev);
 	struct tcm_rbd_cmd *trc;
 	struct rbd_img_request *img_request;
 	struct ceph_snap_context *snapc = NULL;
@@ -313,8 +318,10 @@ tcm_rbd_execute_cmd(struct se_cmd *cmd, struct rbd_device *rbd_dev,
 	if (offset + length > mapping_size) {
 		pr_warn("beyond EOD (%llu~%llu > %llu)", offset,
 			length, mapping_size);
-		sense = TCM_ADDRESS_OUT_OF_RANGE;
-		goto err_snapc;
+		if (!tcm_rbd_dev->emulate_legacy_capacity) {
+			sense = TCM_ADDRESS_OUT_OF_RANGE;
+			goto err_snapc;
+		}
 	}
 
 	trc = kzalloc(sizeof(struct tcm_rbd_cmd), GFP_KERNEL);
