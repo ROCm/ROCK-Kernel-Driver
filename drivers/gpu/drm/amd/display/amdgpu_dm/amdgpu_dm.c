@@ -5634,9 +5634,6 @@ static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
 	struct amdgpu_device *adev = drm_to_adev(connector->dev);
 	struct amdgpu_display_manager *dm = &adev->dm;
 
-#ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
-	drm_atomic_private_obj_fini(&aconnector->mst_mgr.base);
-#endif
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||\
 	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
 
