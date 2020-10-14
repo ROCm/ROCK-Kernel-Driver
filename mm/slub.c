@@ -1381,10 +1381,6 @@ slab_flags_t kmem_cache_flags(unsigned int object_size,
 	char *next_block;
 	slab_flags_t block_flags;
 
-	/* If slub_debug = 0, it folds into the if conditional. */
-	if (!slub_debug_string)
-		return flags | slub_debug;
-
 	len = strlen(name);
 	next_block = slub_debug_string;
 	/* Go through all blocks of debug options, see if any matches our slab's name */
@@ -1418,7 +1414,7 @@ slab_flags_t kmem_cache_flags(unsigned int object_size,
 		}
 	}
 
-	return slub_debug;
+	return flags | slub_debug;
 }
 #else /* !CONFIG_SLUB_DEBUG */
 static inline void setup_object_debug(struct kmem_cache *s,
