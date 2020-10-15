@@ -120,10 +120,18 @@ static int tcm_rbd_configure_device(struct se_device *dev)
 	dev->dev_attrib.max_write_same_len = 0xFFFF;
 	dev->dev_attrib.is_nonrot = 1;
 
-	/*
-	 * TODO fail if RBD stripe unit isn't a multiple of SCSI block size:
-	 * multi-object compare-and-write isn't atomic.
-	 */
+	if (tcm_rbd_dev->rbd_dev->layout.stripe_unit % 4096) {
+		/*
+		 * SCSI compare-and-write must be handled atomically, but this
+		 * won't be the case if the single-block SCSI I/O spans multiple
+		 * RADOS objects. Can't use dev_attrib.block_size here, as it
+		 * may not be configured yet.
+		 */
+		pr_err("RBD: stripe unit %u must be a multiple of 4K\n",
+			tcm_rbd_dev->rbd_dev->layout.stripe_unit);
+		/* blkdev_put() called in destroy_device */
+		return -EINVAL;
+	}
 
 	/* disable standalone reservation handling */
 	dev->dev_attrib.emulate_pr = 0;
