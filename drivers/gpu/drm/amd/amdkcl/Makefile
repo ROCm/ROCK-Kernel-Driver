@@ -11,6 +11,8 @@ amdkcl-y += kcl_workqueue.o kcl_backlight.o kcl_ioctl.o \
 	kcl_drm_crtc.o kcl_connector.o kcl_drm_atomic_helper.o \
 	kcl_device_cgroup.o kcl_mn.o kcl_drm_modes.o kcl_time.o
 
+amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
+
 # for trace-points
 CFLAGS_kcl_fence.o := -I$(src)
 
