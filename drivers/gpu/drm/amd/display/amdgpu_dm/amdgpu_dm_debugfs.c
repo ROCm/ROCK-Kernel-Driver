@@ -1256,6 +1256,10 @@ static ssize_t dp_dsc_clock_en_write(struct file *f, const char __user *buf,
 				     size_t size, loff_t *pos)
 {
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct drm_crtc *crtc = NULL;
+	struct dm_crtc_state *dm_crtc_state = NULL;
 	struct pipe_ctx *pipe_ctx;
 	int i;
 	char *wr_buf = NULL;
@@ -1298,12 +1302,39 @@ static ssize_t dp_dsc_clock_en_write(struct file *f, const char __user *buf,
 	if (!pipe_ctx || !pipe_ctx->stream)
 		goto done;
 
+	// Get CRTC state
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	crtc = connector->state->crtc;
+	if (crtc == NULL)
+		goto unlock;
+
+	drm_modeset_lock(&crtc->mutex, NULL);
+	if (crtc->state == NULL)
+		goto unlock;
+
+	dm_crtc_state = to_dm_crtc_state(crtc->state);
+	if (dm_crtc_state->stream == NULL)
+		goto unlock;
+
 	if (param[0] == 1)
 		aconnector->dsc_settings.dsc_force_enable = DSC_CLK_FORCE_ENABLE;
 	else if (param[0] == 2)
 		aconnector->dsc_settings.dsc_force_enable = DSC_CLK_FORCE_DISABLE;
 	else
 		aconnector->dsc_settings.dsc_force_enable = DSC_CLK_FORCE_DEFAULT;
+
+	dm_crtc_state->dsc_force_changed = true;
+
+unlock:
+	if (crtc)
+		drm_modeset_unlock(&crtc->mutex);
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
 
 done:
 	kfree(wr_buf);
@@ -1411,6 +1442,10 @@ static ssize_t dp_dsc_slice_width_write(struct file *f, const char __user *buf,
 {
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
 	struct pipe_ctx *pipe_ctx;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct drm_crtc *crtc = NULL;
+	struct dm_crtc_state *dm_crtc_state = NULL;
 	int i;
 	char *wr_buf = NULL;
 	uint32_t wr_buf_size = 42;
@@ -1452,12 +1487,39 @@ static ssize_t dp_dsc_slice_width_write(struct file *f, const char __user *buf,
 	if (!pipe_ctx || !pipe_ctx->stream)
 		goto done;
 
+	// Safely get CRTC state
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	crtc = connector->state->crtc;
+	if (crtc == NULL)
+		goto unlock;
+
+	drm_modeset_lock(&crtc->mutex, NULL);
+	if (crtc->state == NULL)
+		goto unlock;
+
+	dm_crtc_state = to_dm_crtc_state(crtc->state);
+	if (dm_crtc_state->stream == NULL)
+		goto unlock;
+
 	if (param[0] > 0)
 		aconnector->dsc_settings.dsc_num_slices_h = DIV_ROUND_UP(
 					pipe_ctx->stream->timing.h_addressable,
 					param[0]);
 	else
 		aconnector->dsc_settings.dsc_num_slices_h = 0;
+
+	dm_crtc_state->dsc_force_changed = true;
+
+unlock:
+	if (crtc)
+		drm_modeset_unlock(&crtc->mutex);
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
 
 done:
 	kfree(wr_buf);
@@ -1564,6 +1626,10 @@ static ssize_t dp_dsc_slice_height_write(struct file *f, const char __user *buf,
 				     size_t size, loff_t *pos)
 {
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct drm_crtc *crtc = NULL;
+	struct dm_crtc_state *dm_crtc_state = NULL;
 	struct pipe_ctx *pipe_ctx;
 	int i;
 	char *wr_buf = NULL;
@@ -1606,12 +1672,39 @@ static ssize_t dp_dsc_slice_height_write(struct file *f, const char __user *buf,
 	if (!pipe_ctx || !pipe_ctx->stream)
 		goto done;
 
+	// Get CRTC state
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	crtc = connector->state->crtc;
+	if (crtc == NULL)
+		goto unlock;
+
+	drm_modeset_lock(&crtc->mutex, NULL);
+	if (crtc->state == NULL)
+		goto unlock;
+
+	dm_crtc_state = to_dm_crtc_state(crtc->state);
+	if (dm_crtc_state->stream == NULL)
+		goto unlock;
+
 	if (param[0] > 0)
 		aconnector->dsc_settings.dsc_num_slices_v = DIV_ROUND_UP(
 					pipe_ctx->stream->timing.v_addressable,
 					param[0]);
 	else
 		aconnector->dsc_settings.dsc_num_slices_v = 0;
+
+	dm_crtc_state->dsc_force_changed = true;
+
+unlock:
+	if (crtc)
+		drm_modeset_unlock(&crtc->mutex);
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
 
 done:
 	kfree(wr_buf);
@@ -1711,6 +1804,10 @@ static ssize_t dp_dsc_bits_per_pixel_write(struct file *f, const char __user *bu
 				     size_t size, loff_t *pos)
 {
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct drm_crtc *crtc = NULL;
+	struct dm_crtc_state *dm_crtc_state = NULL;
 	struct pipe_ctx *pipe_ctx;
 	int i;
 	char *wr_buf = NULL;
@@ -1753,7 +1850,34 @@ static ssize_t dp_dsc_bits_per_pixel_write(struct file *f, const char __user *bu
 	if (!pipe_ctx || !pipe_ctx->stream)
 		goto done;
 
+	// Get CRTC state
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	crtc = connector->state->crtc;
+	if (crtc == NULL)
+		goto unlock;
+
+	drm_modeset_lock(&crtc->mutex, NULL);
+	if (crtc->state == NULL)
+		goto unlock;
+
+	dm_crtc_state = to_dm_crtc_state(crtc->state);
+	if (dm_crtc_state->stream == NULL)
+		goto unlock;
+
 	aconnector->dsc_settings.dsc_bits_per_pixel = param[0];
+
+	dm_crtc_state->dsc_force_changed = true;
+
+unlock:
+	if (crtc)
+		drm_modeset_unlock(&crtc->mutex);
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
 
 done:
 	kfree(wr_buf);
