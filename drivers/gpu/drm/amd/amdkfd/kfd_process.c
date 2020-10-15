@@ -199,7 +199,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 	if (!mm)
 		goto cleanup;
 
-	use_mm(mm);
+	kthread_use_mm(mm);
 
 	list_for_each_entry(sdma_q, &sdma_q_list.list, list) {
 		val = 0;
@@ -213,7 +213,7 @@ static void kfd_sdma_activity_worker(struct work_struct *work)
 		}
 	}
 
-	unuse_mm(mm);
+	kthread_unuse_mm(mm);
 	mmput(mm);
 
 	/*
