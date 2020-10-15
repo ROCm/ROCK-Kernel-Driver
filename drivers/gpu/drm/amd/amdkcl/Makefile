@@ -14,6 +14,7 @@ amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_acpi_table.o
 
 amdkcl-$(CONFIG_DRM_AMD_DC_HDCP) += kcl_drm_hdcp.o
+amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
 
 CFLAGS_kcl_fence.o := -I$(src)
 
