@@ -10857,7 +10857,11 @@ static int dm_update_plane_state(struct dc *dc,
 
 	if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 		if (!enable || !new_plane_crtc ||
-			drm_atomic_plane_disabling(plane->state, new_plane_state))
+#ifdef HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE
+ 			drm_atomic_plane_disabling(plane->state, new_plane_state))
+#else
+			drm_atomic_plane_disabling(plane, old_plane_state))
+#endif
 			return 0;
 
 		new_acrtc = to_amdgpu_crtc(new_plane_crtc);
