@@ -6701,9 +6701,12 @@ static int l2cap_data_rcv(struct l2cap_chan *chan, struct sk_buff *skb)
 		goto drop;
 	}
 
-	if ((chan->mode == L2CAP_MODE_ERTM ||
-	     chan->mode == L2CAP_MODE_STREAMING) && sk_filter(chan->data, skb))
-		goto drop;
+	/* XXX: kABI workaround for SLE15-SP2; checking the special flag */
+	if (test_bit(FLAG_CHAN_OPS_SK_FILTER, &chan->flags) &&
+	    chan->ops->filter) {
+		if (chan->ops->filter(chan, skb))
+			goto drop;
+	}
 
 	if (!control->sframe) {
 		int err;

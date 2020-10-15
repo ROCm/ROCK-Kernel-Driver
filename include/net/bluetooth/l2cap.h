@@ -623,6 +623,13 @@ struct l2cap_ops {
 	struct sk_buff		*(*alloc_skb) (struct l2cap_chan *chan,
 					       unsigned long hdr_len,
 					       unsigned long len, int nb);
+#ifndef __GENKSYMS__
+	/* XXX: kABI workaround for SLE15-SP2; for enabling this ops,
+	 * you need to set FLAG_CHAN_OPS_SK_FILTER to chan->flags, too
+	 */
+	int			(*filter) (struct l2cap_chan * chan,
+					   struct sk_buff *skb);
+#endif
 };
 
 struct l2cap_conn {
@@ -727,6 +734,9 @@ enum {
 	FLAG_PENDING_SECURITY,
 	FLAG_HOLD_HCI_CONN,
 };
+
+/* XXX: a special flag for SLE15-SP2 kABI workaround */
+#define FLAG_CHAN_OPS_SK_FILTER		30
 
 /* Lock nesting levels for L2CAP channels. We need these because lockdep
  * otherwise considers all channels equal and will e.g. complain about a
