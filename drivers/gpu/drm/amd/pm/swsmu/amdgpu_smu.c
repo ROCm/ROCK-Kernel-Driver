@@ -33,6 +33,7 @@
 #include "navi10_ppt.h"
 #include "sienna_cichlid_ppt.h"
 #include "renoir_ppt.h"
+#include "vangogh_ppt.h"
 #include "amd_pcie.h"
 
 /*
@@ -396,10 +397,14 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		break;
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
+	case CHIP_DIMGREY_CAVEFISH:
 		sienna_cichlid_set_ppt_funcs(smu);
 		break;
 	case CHIP_RENOIR:
 		renoir_set_ppt_funcs(smu);
+		break;
+	case CHIP_VANGOGH:
+		vangogh_set_ppt_funcs(smu);
 		break;
 	default:
 		return -EINVAL;
@@ -466,6 +471,9 @@ static int smu_late_init(void *handle)
 	struct smu_context *smu = &adev->smu;
 	int ret = 0;
 
+	if (adev->asic_type == CHIP_VANGOGH)
+		return 0;
+
 	if (!smu->pm_enabled)
 		return 0;
 
@@ -478,17 +486,6 @@ static int smu_late_init(void *handle)
 	ret = smu_set_default_od_settings(smu);
 	if (ret) {
 		dev_err(adev->dev, "Failed to setup default OD settings!\n");
-		return ret;
-	}
-
-	/*
-	 * Set initialized values (get from vbios) to dpm tables context such as
-	 * gfxclk, memclk, dcefclk, and etc. And enable the DPM feature for each
-	 * type of clks.
-	 */
-	ret = smu_set_default_dpm_table(smu);
-	if (ret) {
-		dev_err(adev->dev, "Failed to setup default dpm clock tables!\n");
 		return ret;
 	}
 
@@ -780,6 +777,19 @@ static void smu_throttling_logging_work_fn(struct work_struct *work)
 	smu_log_thermal_throttling(smu);
 }
 
+static void smu_interrupt_work_fn(struct work_struct *work)
+{
+	struct smu_context *smu = container_of(work, struct smu_context,
+					       interrupt_work);
+
+	mutex_lock(&smu->mutex);
+
+	if (smu->ppt_funcs && smu->ppt_funcs->interrupt_work)
+		smu->ppt_funcs->interrupt_work(smu);
+
+	mutex_unlock(&smu->mutex);
+}
+
 static int smu_sw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -802,6 +812,7 @@ static int smu_sw_init(void *handle)
 	mutex_init(&smu->message_lock);
 
 	INIT_WORK(&smu->throttling_logging_work, smu_throttling_logging_work_fn);
+	INIT_WORK(&smu->interrupt_work, smu_interrupt_work_fn);
 	atomic64_set(&smu->throttle_int_counter, 0);
 	smu->watermarks_bitmap = 0;
 	smu->power_profile_mode = PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT;
@@ -832,10 +843,13 @@ static int smu_sw_init(void *handle)
 
 	smu->smu_dpm.dpm_level = AMD_DPM_FORCED_LEVEL_AUTO;
 	smu->smu_dpm.requested_dpm_level = AMD_DPM_FORCED_LEVEL_AUTO;
-	ret = smu_init_microcode(smu);
-	if (ret) {
-		dev_err(adev->dev, "Failed to load smu firmware!\n");
-		return ret;
+
+	if (!amdgpu_sriov_vf(adev)) {
+		ret = smu_init_microcode(smu);
+		if (ret) {
+			dev_err(adev->dev, "Failed to load smu firmware!\n");
+			return ret;
+		}
 	}
 
 	ret = smu_smc_table_sw_init(smu);
@@ -1013,6 +1027,17 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 		return ret;
 	}
 
+	/*
+	 * Set initialized values (get from vbios) to dpm tables context such as
+	 * gfxclk, memclk, dcefclk, and etc. And enable the DPM feature for each
+	 * type of clks.
+	 */
+	ret = smu_set_default_dpm_table(smu);
+	if (ret) {
+		dev_err(adev->dev, "Failed to setup default dpm clock tables!\n");
+		return ret;
+	}
+
 	ret = smu_notify_display_change(smu);
 	if (ret)
 		return ret;
@@ -1086,6 +1111,9 @@ static int smu_hw_init(void *handle)
 		smu_dpm_set_jpeg_enable(smu, true);
 		smu_set_gfx_cgpg(&adev->smu, true);
 	}
+
+	if (adev->asic_type == CHIP_VANGOGH)
+		return 0;
 
 	if (!smu->pm_enabled)
 		return 0;
@@ -1194,6 +1222,7 @@ static int smu_smc_hw_cleanup(struct smu_context *smu)
 	int ret = 0;
 
 	cancel_work_sync(&smu->throttling_logging_work);
+	cancel_work_sync(&smu->interrupt_work);
 
 	ret = smu_disable_thermal_alert(smu);
 	if (ret) {
@@ -1214,7 +1243,6 @@ static int smu_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
-	int ret = 0;
 
 	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
 		return 0;
@@ -1230,11 +1258,7 @@ static int smu_hw_fini(void *handle)
 
 	adev->pm.dpm_enabled = false;
 
-	ret = smu_smc_hw_cleanup(smu);
-	if (ret)
-		return ret;
-
-	return 0;
+	return smu_smc_hw_cleanup(smu);
 }
 
 int smu_reset(struct smu_context *smu)
@@ -1347,94 +1371,9 @@ int smu_display_configuration_change(struct smu_context *smu,
 			num_of_active_display++;
 	}
 
-	smu_set_active_display_count(smu, num_of_active_display);
-
-	smu_store_cc6_data(smu, display_config->cpu_pstate_separation_time,
-			   display_config->cpu_cc6_disable,
-			   display_config->cpu_pstate_disable,
-			   display_config->nb_pstate_switch_disable);
-
 	mutex_unlock(&smu->mutex);
 
 	return 0;
-}
-
-static int smu_get_clock_info(struct smu_context *smu,
-			      struct smu_clock_info *clk_info,
-			      enum smu_perf_level_designation designation)
-{
-	int ret;
-	struct smu_performance_level level = {0};
-
-	if (!clk_info)
-		return -EINVAL;
-
-	ret = smu_get_perf_level(smu, PERF_LEVEL_ACTIVITY, &level);
-	if (ret)
-		return -EINVAL;
-
-	clk_info->min_mem_clk = level.memory_clock;
-	clk_info->min_eng_clk = level.core_clock;
-	clk_info->min_bus_bandwidth = level.non_local_mem_freq * level.non_local_mem_width;
-
-	ret = smu_get_perf_level(smu, designation, &level);
-	if (ret)
-		return -EINVAL;
-
-	clk_info->min_mem_clk = level.memory_clock;
-	clk_info->min_eng_clk = level.core_clock;
-	clk_info->min_bus_bandwidth = level.non_local_mem_freq * level.non_local_mem_width;
-
-	return 0;
-}
-
-int smu_get_current_clocks(struct smu_context *smu,
-			   struct amd_pp_clock_info *clocks)
-{
-	struct amd_pp_simple_clock_info simple_clocks = {0};
-	struct smu_clock_info hw_clocks;
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	smu_get_dal_power_level(smu, &simple_clocks);
-
-	if (smu->support_power_containment)
-		ret = smu_get_clock_info(smu, &hw_clocks,
-					 PERF_LEVEL_POWER_CONTAINMENT);
-	else
-		ret = smu_get_clock_info(smu, &hw_clocks, PERF_LEVEL_ACTIVITY);
-
-	if (ret) {
-		dev_err(smu->adev->dev, "Error in smu_get_clock_info\n");
-		goto failed;
-	}
-
-	clocks->min_engine_clock = hw_clocks.min_eng_clk;
-	clocks->max_engine_clock = hw_clocks.max_eng_clk;
-	clocks->min_memory_clock = hw_clocks.min_mem_clk;
-	clocks->max_memory_clock = hw_clocks.max_mem_clk;
-	clocks->min_bus_bandwidth = hw_clocks.min_bus_bandwidth;
-	clocks->max_bus_bandwidth = hw_clocks.max_bus_bandwidth;
-	clocks->max_engine_clock_in_sr = hw_clocks.max_eng_clk;
-	clocks->min_engine_clock_in_sr = hw_clocks.min_eng_clk;
-
-        if (simple_clocks.level == 0)
-                clocks->max_clocks_state = PP_DAL_POWERLEVEL_7;
-        else
-                clocks->max_clocks_state = simple_clocks.level;
-
-        if (!smu_get_current_shallow_sleep_clocks(smu, &hw_clocks)) {
-                clocks->max_engine_clock_in_sr = hw_clocks.max_eng_clk;
-                clocks->min_engine_clock_in_sr = hw_clocks.min_eng_clk;
-        }
-
-failed:
-	mutex_unlock(&smu->mutex);
-	return ret;
 }
 
 static int smu_set_clockgating_state(void *handle,
@@ -1567,9 +1506,6 @@ int smu_handle_task(struct smu_context *smu,
 	switch (task_id) {
 	case AMD_PP_TASK_DISPLAY_CONFIG_CHANGE:
 		ret = smu_pre_display_config_changed(smu);
-		if (ret)
-			goto out;
-		ret = smu_set_cpu_power_state(smu);
 		if (ret)
 			goto out;
 		ret = smu_adjust_power_state_dynamic(smu, level, false);
@@ -1823,18 +1759,12 @@ int smu_set_watermarks_for_clock_ranges(struct smu_context *smu,
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
+	if (smu->disable_watermark)
+		return 0;
+
 	mutex_lock(&smu->mutex);
 
-	if (!smu->disable_watermark &&
-			smu_feature_is_enabled(smu, SMU_FEATURE_DPM_DCEFCLK_BIT) &&
-			smu_feature_is_enabled(smu, SMU_FEATURE_DPM_SOCCLK_BIT)) {
-		ret = smu_set_watermarks_table(smu, clock_ranges);
-
-		if (!(smu->watermarks_bitmap & WATERMARKS_EXIST)) {
-			smu->watermarks_bitmap |= WATERMARKS_EXIST;
-			smu->watermarks_bitmap &= ~WATERMARKS_LOADED;
-		}
-	}
+	ret = smu_set_watermarks_table(smu, clock_ranges);
 
 	mutex_unlock(&smu->mutex);
 
@@ -2021,40 +1951,6 @@ int smu_print_clk_levels(struct smu_context *smu, enum smu_clk_type clk_type, ch
 
 	if (smu->ppt_funcs->print_clk_levels)
 		ret = smu->ppt_funcs->print_clk_levels(smu, clk_type, buf);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
-int smu_get_od_percentage(struct smu_context *smu, enum smu_clk_type type)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->get_od_percentage)
-		ret = smu->ppt_funcs->get_od_percentage(smu, type);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
-int smu_set_od_percentage(struct smu_context *smu, enum smu_clk_type type, uint32_t value)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->set_od_percentage)
-		ret = smu->ppt_funcs->set_od_percentage(smu, type, value);
 
 	mutex_unlock(&smu->mutex);
 
@@ -2301,43 +2197,6 @@ int smu_set_deep_sleep_dcefclk(struct smu_context *smu, int clk)
 	return ret;
 }
 
-int smu_get_clock_by_type(struct smu_context *smu,
-			  enum amd_pp_clock_type type,
-			  struct amd_pp_clocks *clocks)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->get_clock_by_type)
-		ret = smu->ppt_funcs->get_clock_by_type(smu, type, clocks);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
-int smu_get_max_high_clocks(struct smu_context *smu,
-			    struct amd_pp_simple_clock_info *clocks)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->get_max_high_clocks)
-		ret = smu->ppt_funcs->get_max_high_clocks(smu, clocks);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
 int smu_get_clock_by_type_with_latency(struct smu_context *smu,
 				       enum smu_clk_type clk_type,
 				       struct pp_clock_levels_with_latency *clocks)
@@ -2356,26 +2215,6 @@ int smu_get_clock_by_type_with_latency(struct smu_context *smu,
 
 	return ret;
 }
-
-int smu_get_clock_by_type_with_voltage(struct smu_context *smu,
-				       enum amd_pp_clock_type type,
-				       struct pp_clock_levels_with_voltage *clocks)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->get_clock_by_type_with_voltage)
-		ret = smu->ppt_funcs->get_clock_by_type_with_voltage(smu, type, clocks);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
 
 int smu_display_clock_voltage_request(struct smu_context *smu,
 				      struct pp_display_clock_request *clock_req)
@@ -2407,23 +2246,6 @@ int smu_display_disable_memory_clock_switch(struct smu_context *smu, bool disabl
 
 	if (smu->ppt_funcs->display_disable_memory_clock_switch)
 		ret = smu->ppt_funcs->display_disable_memory_clock_switch(smu, disable_memory_clock_switch);
-
-	mutex_unlock(&smu->mutex);
-
-	return ret;
-}
-
-int smu_notify_smu_enable_pwe(struct smu_context *smu)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	mutex_lock(&smu->mutex);
-
-	if (smu->ppt_funcs->notify_smu_enable_pwe)
-		ret = smu->ppt_funcs->notify_smu_enable_pwe(smu);
 
 	mutex_unlock(&smu->mutex);
 

@@ -2291,13 +2291,14 @@ static int navi10_run_umc_cdr_workaround(struct smu_context *smu)
 	}
 
 	/*
-	 * The messages below are only supported by 42.53.0 and later
-	 * PMFWs.
+	 * The messages below are only supported by Navi10 42.53.0 and later
+	 * PMFWs and Navi14 53.29.0 and later PMFWs.
 	 * - PPSMC_MSG_SetDriverDummyTableDramAddrHigh
 	 * - PPSMC_MSG_SetDriverDummyTableDramAddrLow
 	 * - PPSMC_MSG_GetUMCFWWA
 	 */
-	if (pmfw_version >= 0x2a3500) {
+	if (((adev->asic_type == CHIP_NAVI10) && (pmfw_version >= 0x2a3500)) ||
+	    ((adev->asic_type == CHIP_NAVI14) && (pmfw_version >= 0x351D00))) {
 		ret = smu_cmn_send_smc_msg_with_param(smu,
 						      SMU_MSG_GET_UMC_FW_WA,
 						      0,
@@ -2315,10 +2316,12 @@ static int navi10_run_umc_cdr_workaround(struct smu_context *smu)
 		if (umc_fw_greater_than_v136)
 			return 0;
 
-		if (umc_fw_disable_cdr && adev->asic_type == CHIP_NAVI10)
-			return navi10_umc_hybrid_cdr_workaround(smu);
-		else
+		if (umc_fw_disable_cdr) {
+			if (adev->asic_type == CHIP_NAVI10)
+				return navi10_umc_hybrid_cdr_workaround(smu);
+		} else {
 			return navi10_set_dummy_pstates_table_location(smu);
+		}
 	} else {
 		if (adev->asic_type == CHIP_NAVI10)
 			return navi10_umc_hybrid_cdr_workaround(smu);
@@ -2332,8 +2335,6 @@ static void navi10_fill_i2c_req(SwI2cRequest_t  *req, bool write,
 				  uint8_t *data)
 {
 	int i;
-
-	BUG_ON(numbytes > MAX_SW_I2C_COMMANDS);
 
 	req->I2CcontrollerPort = 0;
 	req->I2CSpeed = 2;
@@ -2372,6 +2373,12 @@ static int navi10_i2c_read_data(struct i2c_adapter *control,
 	struct smu_table_context *smu_table = &adev->smu.smu_table;
 	struct smu_table *table = &smu_table->driver_table;
 
+	if (numbytes > MAX_SW_I2C_COMMANDS) {
+		dev_err(adev->dev, "numbytes requested %d is over max allowed %d\n",
+			numbytes, MAX_SW_I2C_COMMANDS);
+		return -EINVAL;
+	}
+
 	memset(&req, 0, sizeof(req));
 	navi10_fill_i2c_req(&req, false, address, numbytes, data);
 
@@ -2407,6 +2414,12 @@ static int navi10_i2c_write_data(struct i2c_adapter *control,
 	uint32_t ret;
 	SwI2cRequest_t req;
 	struct amdgpu_device *adev = to_amdgpu_device(control);
+
+	if (numbytes > MAX_SW_I2C_COMMANDS) {
+		dev_err(adev->dev, "numbytes requested %d is over max allowed %d\n",
+			numbytes, MAX_SW_I2C_COMMANDS);
+		return -EINVAL;
+	}
 
 	memset(&req, 0, sizeof(req));
 	navi10_fill_i2c_req(&req, true, address, numbytes, data);
@@ -2752,6 +2765,7 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.deep_sleep_control = smu_v11_0_deep_sleep_control,
 	.get_fan_parameters = navi10_get_fan_parameters,
 	.post_init = navi10_post_smu_init,
+	.interrupt_work = smu_v11_0_interrupt_work,
 };
 
 void navi10_set_ppt_funcs(struct smu_context *smu)

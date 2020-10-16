@@ -36,9 +36,21 @@ DCN30 = dcn30_init.o dcn30_hubbub.o dcn30_hubp.o dcn30_dpp.o dcn30_optc.o \
 	dcn30_dio_link_encoder.o dcn30_resource.o
 
 
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -msse -mpreferred-stack-boundary=4
-
+ifdef CONFIG_X86
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mhard-float -msse
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -msse
+endif
+
+ifdef CONFIG_PPC64
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mhard-float -maltivec
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -maltivec
+endif
+
+ifdef CONFIG_ARM64
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mgeneral-regs-only
+endif
+
 ifdef CONFIG_CC_IS_GCC
 ifeq ($(call cc-ifversion, -lt, 0701, y), y)
 IS_OLD_GCC = 1
@@ -50,8 +62,10 @@ ifdef IS_OLD_GCC
 # GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
 # (8B stack alignment).
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -mpreferred-stack-boundary=4
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o += -mpreferred-stack-boundary=4
 else
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -msse2
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o += -msse2
 endif
 
 AMD_DAL_DCN30 = $(addprefix $(AMDDALPATH)/dc/dcn30/,$(DCN30))

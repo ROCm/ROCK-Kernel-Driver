@@ -156,6 +156,12 @@ struct hubbub_funcs {
 	void (*apply_DEDCN21_147_wa)(struct hubbub *hubbub);
 
 	void (*force_wm_propagate_to_pipes)(struct hubbub *hubbub);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+
+	void (*force_pstate_change_control)(struct hubbub *hubbub, bool force, bool allow);
+
+	void (*init_watermarks)(struct hubbub *hubbub);
+#endif
 };
 
 struct hubbub {

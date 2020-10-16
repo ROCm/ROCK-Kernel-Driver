@@ -1304,6 +1304,14 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		return -EINVAL;
 	}
 
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd)) {
+		err = PTR_ERR(pdd);
+		goto err_unlock;
+	}
+
 	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
 		/* Check if the userptr corresponds to another (or third-party)
 		 * device local memory. If so treat is as a doorbell. User
@@ -1314,7 +1322,11 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		if (vma && (vma->vm_flags & VM_IO)) {
 			unsigned long pfn;
 
-			follow_pfn(vma, args->mmap_offset, &pfn);
+			err = follow_pfn(vma, args->mmap_offset, &pfn);
+			if (err) {
+				pr_debug("Failed to get PFN: %ld\n", err);
+				return err;
+			}
 			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
 			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
 			offset = (pfn << PAGE_SHIFT);
@@ -1327,23 +1339,21 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			cpuva = offset;
 		}
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
-		if (args->size != kfd_doorbell_process_slice(dev))
-			return -EINVAL;
-		offset = kfd_get_process_doorbells(dev, p);
+		if (args->size != kfd_doorbell_process_slice(dev)) {
+			err = -EINVAL;
+			goto err_unlock;
+		}
+		offset = kfd_get_process_doorbells(pdd);
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
-		if (args->size != PAGE_SIZE)
-			return -EINVAL;
+		if (args->size != PAGE_SIZE) {
+			err = -EINVAL;
+			goto err_unlock;
+		}
 		offset = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->kgd);
-		if (!offset)
-			return -ENOMEM;
-	}
-
-	mutex_lock(&p->mutex);
-
-	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd)) {
-		err = PTR_ERR(pdd);
-		goto err_unlock;
+		if (!offset) {
+			err = -ENOMEM;
+			goto err_unlock;
+		}
 	}
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(

@@ -41,6 +41,7 @@
 #define PSP_DTM_SHARED_MEM_SIZE	0x4000
 #define PSP_RAP_SHARED_MEM_SIZE	0x4000
 #define PSP_SHARED_MEM_SIZE		0x4000
+#define PSP_FW_NAME_LEN		0x24
 
 struct psp_context;
 struct psp_xgmi_node_info;
@@ -253,6 +254,11 @@ struct psp_context
 	uint32_t			asd_ucode_size;
 	uint8_t				*asd_start_addr;
 
+	/* toc firmware */
+	const struct firmware		*toc_fw;
+	uint32_t			toc_fw_version;
+	uint32_t			toc_feature_version;
+
 	/* fence buffer */
 	struct amdgpu_bo		*fence_buf_bo;
 	uint64_t			fence_buf_mc_addr;
@@ -385,6 +391,8 @@ int psp_ring_cmd_submit(struct psp_context *psp,
 			uint64_t fence_mc_addr,
 			int index);
 int psp_init_asd_microcode(struct psp_context *psp,
+			   const char *chip_name);
+int psp_init_toc_microcode(struct psp_context *psp,
 			   const char *chip_name);
 int psp_init_sos_microcode(struct psp_context *psp,
 			   const char *chip_name);

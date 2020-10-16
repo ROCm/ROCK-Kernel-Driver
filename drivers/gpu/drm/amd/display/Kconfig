@@ -50,9 +50,20 @@ config DRM_AMD_DC_DCN3_0
         default y
         depends on DRM_AMD_DC && X86
         depends on DRM_AMD_DC_DCN1_0
+        depends on DRM_AMD_DC_DCN2_0
+        depends on DRM_AMD_DC_DCN2_1
         help
             Choose this option if you want to have
             sienna_cichlid support for display engine
+
+config DRM_AMD_DC_DCN3_01
+	bool "DCN 3.01 family"
+	depends on DRM_AMD_DC && X86
+	depends on DRM_AMD_DC_DCN1_0
+	depends on DRM_AMD_DC_DCN3_0
+	help
+	    Choose this option if you want to have
+	    Van Gogh support for display engine
 
 config DRM_AMD_DC_HDCP
 	bool "Enable HDCP support in DC"

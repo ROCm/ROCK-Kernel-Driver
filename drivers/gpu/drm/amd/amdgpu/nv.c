@@ -49,6 +49,7 @@
 #include "gfxhub_v2_0.h"
 #include "mmhub_v2_0.h"
 #include "nbio_v2_3.h"
+#include "nbio_v7_2.h"
 #include "nv.h"
 #include "navi10_ih.h"
 #include "gfx_v10_0.h"
@@ -69,73 +70,68 @@ static const struct amd_ip_funcs nv_common_ip_funcs;
  */
 static u32 nv_pcie_rreg(struct amdgpu_device *adev, u32 reg)
 {
-	unsigned long flags, address, data;
-	u32 r;
+	unsigned long address, data;
 	address = adev->nbio.funcs->get_pcie_index_offset(adev);
 	data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
-	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
-	WREG32(address, reg);
-	(void)RREG32(address);
-	r = RREG32(data);
-	spin_unlock_irqrestore(&adev->pcie_idx_lock, flags);
-	return r;
+	return amdgpu_device_indirect_rreg(adev, address, data, reg);
 }
 
 static void nv_pcie_wreg(struct amdgpu_device *adev, u32 reg, u32 v)
 {
-	unsigned long flags, address, data;
+	unsigned long address, data;
 
 	address = adev->nbio.funcs->get_pcie_index_offset(adev);
 	data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
-	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
-	WREG32(address, reg);
-	(void)RREG32(address);
-	WREG32(data, v);
-	(void)RREG32(data);
-	spin_unlock_irqrestore(&adev->pcie_idx_lock, flags);
+	amdgpu_device_indirect_wreg(adev, address, data, reg, v);
 }
 
 static u64 nv_pcie_rreg64(struct amdgpu_device *adev, u32 reg)
 {
-	unsigned long flags, address, data;
-	u64 r;
+	unsigned long address, data;
 	address = adev->nbio.funcs->get_pcie_index_offset(adev);
 	data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
+	return amdgpu_device_indirect_rreg64(adev, address, data, reg);
+}
+
+static u32 nv_pcie_port_rreg(struct amdgpu_device *adev, u32 reg)
+{
+	unsigned long flags, address, data;
+	u32 r;
+	address = adev->nbio.funcs->get_pcie_port_index_offset(adev);
+	data = adev->nbio.funcs->get_pcie_port_data_offset(adev);
+
 	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
-	/* read low 32 bit */
-	WREG32(address, reg);
+	WREG32(address, reg * 4);
 	(void)RREG32(address);
 	r = RREG32(data);
-
-	/* read high 32 bit*/
-	WREG32(address, reg + 4);
-	(void)RREG32(address);
-	r |= ((u64)RREG32(data) << 32);
 	spin_unlock_irqrestore(&adev->pcie_idx_lock, flags);
 	return r;
 }
 
 static void nv_pcie_wreg64(struct amdgpu_device *adev, u32 reg, u64 v)
 {
-	unsigned long flags, address, data;
+	unsigned long address, data;
 
 	address = adev->nbio.funcs->get_pcie_index_offset(adev);
 	data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
-	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
-	/* write low 32 bit */
-	WREG32(address, reg);
-	(void)RREG32(address);
-	WREG32(data, (u32)(v & 0xffffffffULL));
-	(void)RREG32(data);
+	amdgpu_device_indirect_wreg64(adev, address, data, reg, v);
+}
 
-	/* write high 32 bit */
-	WREG32(address, reg + 4);
+static void nv_pcie_port_wreg(struct amdgpu_device *adev, u32 reg, u32 v)
+{
+	unsigned long flags, address, data;
+
+	address = adev->nbio.funcs->get_pcie_port_index_offset(adev);
+	data = adev->nbio.funcs->get_pcie_port_data_offset(adev);
+
+	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
+	WREG32(address, reg * 4);
 	(void)RREG32(address);
-	WREG32(data, (u32)(v >> 32));
+	WREG32(data, v);
 	(void)RREG32(data);
 	spin_unlock_irqrestore(&adev->pcie_idx_lock, flags);
 }
@@ -289,7 +285,8 @@ static int nv_read_register(struct amdgpu_device *adev, u32 se_num,
 	*value = 0;
 	for (i = 0; i < ARRAY_SIZE(nv_allowed_read_registers); i++) {
 		en = &nv_allowed_read_registers[i];
-		if (reg_offset !=
+		if ((i == 7 && (adev->sdma.num_instances == 1)) || /* some asics don't have SDMA1 */
+		    reg_offset !=
 		    (adev->reg_offset[en->hwip][en->inst][en->seg] + en->reg_offset))
 			continue;
 
@@ -452,6 +449,10 @@ static int nv_reg_base_init(struct amdgpu_device *adev)
 {
 	int r;
 
+	/* IP discovery table is not available yet */
+	if (adev->asic_type == CHIP_VANGOGH)
+		goto legacy_init;
+
 	if (amdgpu_discovery) {
 		r = amdgpu_discovery_reg_base_init(adev);
 		if (r) {
@@ -478,6 +479,12 @@ legacy_init:
 	case CHIP_NAVY_FLOUNDER:
 		sienna_cichlid_reg_base_init(adev);
 		break;
+	case CHIP_VANGOGH:
+		vangogh_reg_base_init(adev);
+		break;
+	case CHIP_DIMGREY_CAVEFISH:
+		dimgrey_cavefish_reg_base_init(adev);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -494,8 +501,13 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 {
 	int r;
 
-	adev->nbio.funcs = &nbio_v2_3_funcs;
-	adev->nbio.hdp_flush_reg = &nbio_v2_3_hdp_flush_reg;
+	if (adev->flags & AMD_IS_APU) {
+		adev->nbio.funcs = &nbio_v7_2_funcs;
+		adev->nbio.hdp_flush_reg = &nbio_v7_2_hdp_flush_reg;
+	} else {
+		adev->nbio.funcs = &nbio_v2_3_funcs;
+		adev->nbio.hdp_flush_reg = &nbio_v2_3_hdp_flush_reg;
+	}
 
 	if (adev->asic_type == CHIP_SIENNA_CICHLID)
 		adev->gmc.xgmi.supported = true;
@@ -599,6 +611,40 @@ int nv_set_ip_blocks(struct amdgpu_device *adev)
 		if (adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT &&
 		    is_support_sw_smu(adev))
 			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		break;
+	case CHIP_VANGOGH:
+		amdgpu_device_ip_block_add(adev, &nv_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &navi10_ih_ip_block);
+		if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP))
+			amdgpu_device_ip_block_add(adev, &psp_v11_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_device_ip_block_add(adev, &dce_virtual_ip_block);
+		amdgpu_device_ip_block_add(adev, &gfx_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v5_2_ip_block);
+		amdgpu_device_ip_block_add(adev, &vcn_v3_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v3_0_ip_block);
+		break;
+	case CHIP_DIMGREY_CAVEFISH:
+		amdgpu_device_ip_block_add(adev, &nv_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &navi10_ih_ip_block);
+		if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP))
+			amdgpu_device_ip_block_add(adev, &psp_v11_0_ip_block);
+		if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP &&
+		    is_support_sw_smu(adev))
+			amdgpu_device_ip_block_add(adev, &smu_v11_0_ip_block);
+		if (adev->enable_virtual_display || amdgpu_sriov_vf(adev))
+			amdgpu_device_ip_block_add(adev, &dce_virtual_ip_block);
+#if defined(CONFIG_DRM_AMD_DC)
+                else if (amdgpu_device_has_dc_support(adev))
+                        amdgpu_device_ip_block_add(adev, &dm_ip_block);
+#endif
+		amdgpu_device_ip_block_add(adev, &gfx_v10_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v5_2_ip_block);
+		amdgpu_device_ip_block_add(adev, &vcn_v3_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v3_0_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -731,6 +777,8 @@ static int nv_common_early_init(void *handle)
 	adev->pcie_wreg = &nv_pcie_wreg;
 	adev->pcie_rreg64 = &nv_pcie_rreg64;
 	adev->pcie_wreg64 = &nv_pcie_wreg64;
+	adev->pciep_rreg = &nv_pcie_port_rreg;
+	adev->pciep_wreg = &nv_pcie_port_wreg;
 
 	/* TODO: will add them during VCN v2 implementation */
 	adev->uvd_ctx_rreg = NULL;
@@ -858,6 +906,32 @@ static int nv_common_early_init(void *handle)
 		adev->external_rev_id = adev->rev_id + 0x32;
 		break;
 
+	case CHIP_VANGOGH:
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_GFX_CGLS |
+			AMD_CG_SUPPORT_GFX_3D_CGCG |
+			AMD_CG_SUPPORT_GFX_3D_CGLS;
+		adev->pg_flags = AMD_PG_SUPPORT_GFX_PG;
+		adev->external_rev_id = adev->rev_id + 0x01;
+		break;
+	case CHIP_DIMGREY_CAVEFISH:
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
+			AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_GFX_3D_CGCG |
+			AMD_CG_SUPPORT_VCN_MGCG |
+			AMD_CG_SUPPORT_JPEG_MGCG |
+			AMD_CG_SUPPORT_MC_MGCG |
+			AMD_CG_SUPPORT_MC_LS |
+			AMD_CG_SUPPORT_HDP_MGCG |
+			AMD_CG_SUPPORT_HDP_LS |
+			AMD_CG_SUPPORT_IH_CG;
+		adev->pg_flags = AMD_PG_SUPPORT_VCN |
+			AMD_PG_SUPPORT_VCN_DPG |
+			AMD_PG_SUPPORT_JPEG |
+			AMD_PG_SUPPORT_ATHUB |
+			AMD_PG_SUPPORT_MMHUB;
+		adev->external_rev_id = adev->rev_id + 0x3c;
+		break;
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
@@ -1085,6 +1159,7 @@ static int nv_common_set_clockgating_state(void *handle,
 	case CHIP_NAVI12:
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
+	case CHIP_DIMGREY_CAVEFISH:
 		adev->nbio.funcs->update_medium_grain_clock_gating(adev,
 				state == AMD_CG_STATE_GATE);
 		adev->nbio.funcs->update_medium_grain_light_sleep(adev,

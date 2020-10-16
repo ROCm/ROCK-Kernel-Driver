@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.104"
+#define DC_VER "3.2.106"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -152,6 +152,7 @@ struct dc_caps {
 	uint32_t max_planes;
 	uint32_t max_downscale_ratio;
 	uint32_t i2c_speed_in_khz;
+	uint32_t i2c_speed_in_khz_hdcp;
 	uint32_t dmdata_alloc_size;
 	unsigned int max_cursor_size;
 	unsigned int max_video_width;
@@ -513,6 +514,7 @@ struct dc_debug_options {
 	bool usbc_combo_phy_reset_wa;
 	bool disable_dsc;
 	bool enable_dram_clock_change_one_display_vactive;
+	bool force_ignore_link_settings;
 };
 
 struct dc_debug_data {
@@ -678,6 +680,7 @@ struct dc_init_data {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	bool force_smu_not_present;
 #endif
+	bool force_ignore_link_settings;
 };
 
 struct dc_callback_init {
@@ -1312,6 +1315,9 @@ void dc_unlock_memory_clock_frequency(struct dc *dc);
  * max to maxDPM, and unblank streams
  */
 void dc_lock_memory_clock_frequency(struct dc *dc);
+
+/* cleanup on driver unload */
+void dc_hardware_release(struct dc *dc);
 
 #endif
 

@@ -35,8 +35,6 @@
 
 var SINGLE_STEP_MISSED_WORKAROUND		= 1	//workaround for lost MODE.DEBUG_EN exception when SAVECTX raised
 
-var SQ_WAVE_STATUS_INST_ATC_SHIFT		= 23
-var SQ_WAVE_STATUS_INST_ATC_MASK		= 0x00800000
 var SQ_WAVE_STATUS_SPI_PRIO_MASK		= 0x00000006
 var SQ_WAVE_STATUS_HALT_MASK			= 0x2000
 
@@ -64,20 +62,12 @@ var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT		= 11
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE		= 21
 var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK		= 0x800
 
-var SQ_WAVE_IB_STS_RCNT_SHIFT			= 16
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT		= 15
 var SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT		= 25
-var SQ_WAVE_IB_STS_REPLAY_W64H_SIZE		= 1
 var SQ_WAVE_IB_STS_REPLAY_W64H_MASK		= 0x02000000
-var SQ_WAVE_IB_STS_FIRST_REPLAY_SIZE		= 1
-var SQ_WAVE_IB_STS_RCNT_SIZE			= 6
 var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK	= 0x003F8000
-var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG	= 0x00007FFF
 
 var SQ_WAVE_MODE_DEBUG_EN_MASK			= 0x800
-
-var SQ_BUF_RSRC_WORD1_ATC_SHIFT			= 24
-var SQ_BUF_RSRC_WORD3_MTYPE_SHIFT		= 27
 
 // bits [31:24] unused by SPI debug data
 var TTMP11_SAVE_REPLAY_W64H_SHIFT		= 31
@@ -90,19 +80,11 @@ var TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK		= 0x7F000000
 var S_SAVE_BUF_RSRC_WORD1_STRIDE		= 0x00040000
 var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
 
-var S_SAVE_SPI_INIT_ATC_MASK			= 0x08000000
-var S_SAVE_SPI_INIT_ATC_SHIFT			= 27
-var S_SAVE_SPI_INIT_MTYPE_MASK			= 0x70000000
-var S_SAVE_SPI_INIT_MTYPE_SHIFT			= 28
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 
-var S_SAVE_PC_HI_RCNT_SHIFT			= 26
-var S_SAVE_PC_HI_RCNT_MASK			= 0xFC000000
-var S_SAVE_PC_HI_FIRST_REPLAY_SHIFT		= 25
-var S_SAVE_PC_HI_FIRST_REPLAY_MASK		= 0x02000000
-var S_SAVE_PC_HI_REPLAY_W64H_SHIFT		= 24
-var S_SAVE_PC_HI_REPLAY_W64H_MASK		= 0x01000000
+var S_SAVE_PC_HI_FIRST_WAVE_MASK		= 0x80000000
+var S_SAVE_PC_HI_FIRST_WAVE_SHIFT		= 31
 
 var s_sgpr_save_num				= 108
 
@@ -130,18 +112,9 @@ var s_save_ttmps_hi				= s_save_trapsts
 var S_RESTORE_BUF_RSRC_WORD1_STRIDE		= S_SAVE_BUF_RSRC_WORD1_STRIDE
 var S_RESTORE_BUF_RSRC_WORD3_MISC		= S_SAVE_BUF_RSRC_WORD3_MISC
 
-var S_RESTORE_SPI_INIT_ATC_MASK			= 0x08000000
-var S_RESTORE_SPI_INIT_ATC_SHIFT		= 27
-var S_RESTORE_SPI_INIT_MTYPE_MASK		= 0x70000000
-var S_RESTORE_SPI_INIT_MTYPE_SHIFT		= 28
 var S_RESTORE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_RESTORE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 var S_WAVE_SIZE					= 25
-
-var S_RESTORE_PC_HI_RCNT_SHIFT			= S_SAVE_PC_HI_RCNT_SHIFT
-var S_RESTORE_PC_HI_RCNT_MASK			= S_SAVE_PC_HI_RCNT_MASK
-var S_RESTORE_PC_HI_FIRST_REPLAY_SHIFT		= S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-var S_RESTORE_PC_HI_FIRST_REPLAY_MASK		= S_SAVE_PC_HI_FIRST_REPLAY_MASK
 
 var s_restore_spi_init_lo			= exec_lo
 var s_restore_spi_init_hi			= exec_hi
@@ -211,19 +184,7 @@ end
 L_FETCH_2ND_TRAP:
 
 #if ASIC_TARGET_NAVI1X
-	// Preserve and clear scalar XNACK state before issuing scalar loads.
-	// Save IB_STS.REPLAY_W64H[25], RCNT[21:16], FIRST_REPLAY[15] into
-	// unused space ttmp11[31:24].
-	s_andn2_b32	ttmp11, ttmp11, (TTMP11_SAVE_REPLAY_W64H_MASK | TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK)
-	s_getreg_b32	ttmp2, hwreg(HW_REG_IB_STS)
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
-	s_lshl_b32	ttmp3, ttmp3, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
-	s_or_b32	ttmp11, ttmp11, ttmp3
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
-	s_lshl_b32	ttmp3, ttmp3, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
-	s_or_b32	ttmp11, ttmp11, ttmp3
-	s_andn2_b32	ttmp2, ttmp2, (SQ_WAVE_IB_STS_REPLAY_W64H_MASK | SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK)
-	s_setreg_b32	hwreg(HW_REG_IB_STS), ttmp2
+	save_and_clear_ib_sts(ttmp14, ttmp15)
 #endif
 
 	// Read second-level TBA/TMA from first-level TMA and jump if available.
@@ -250,13 +211,7 @@ L_EXCP_CASE:
 	s_and_b32	ttmp1, ttmp1, 0xFFFF
 
 #if ASIC_TARGET_NAVI1X
-	// Restore SQ_WAVE_IB_STS.
-	s_lshr_b32	ttmp2, ttmp11, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
-	s_and_b32	ttmp3, ttmp2, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
-	s_lshr_b32	ttmp2, ttmp11, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
-	s_and_b32	ttmp2, ttmp2, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
-	s_or_b32	ttmp2, ttmp2, ttmp3
-	s_setreg_b32	hwreg(HW_REG_IB_STS), ttmp2
+	restore_ib_sts(ttmp14, ttmp15)
 #endif
 
 	// Restore SQ_WAVE_STATUS.
@@ -272,19 +227,7 @@ L_SAVE:
 	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT, 1), s_save_tmp	//clear saveCtx bit
 
 #if ASIC_TARGET_NAVI1X
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_RCNT_SHIFT, SQ_WAVE_IB_STS_RCNT_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_RCNT_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT, SQ_WAVE_IB_STS_FIRST_REPLAY_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS, SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT, SQ_WAVE_IB_STS_REPLAY_W64H_SIZE)
-	s_lshl_b32	s_save_tmp, s_save_tmp, S_SAVE_PC_HI_REPLAY_W64H_SHIFT
-	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_IB_STS)			//clear RCNT and FIRST_REPLAY and REPLAY_W64H in IB_STS
-	s_and_b32	s_save_tmp, s_save_tmp, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK_NEG
-
-	s_setreg_b32	hwreg(HW_REG_IB_STS), s_save_tmp
+	save_and_clear_ib_sts(s_save_tmp, s_save_trapsts)
 #endif
 
 	/* inform SPI the readiness and wait for SPI's go signal */
@@ -305,6 +248,25 @@ L_SLEEP:
 	s_waitcnt	lgkmcnt(0)
 #endif
 
+	// Save first_wave flag so we can clear high bits of save address.
+	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_FIRST_WAVE_MASK
+	s_lshl_b32	s_save_tmp, s_save_tmp, (S_SAVE_PC_HI_FIRST_WAVE_SHIFT - S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT)
+	s_or_b32	s_save_pc_hi, s_save_pc_hi, s_save_tmp
+
+#if NO_SQC_STORE
+	// Trap temporaries must be saved via VGPR but all VGPRs are in use.
+	// There is no ttmp space to hold the resource constant for VGPR save.
+	// Save v0 by itself since it requires only two SGPRs.
+	s_mov_b32	s_save_ttmps_lo, exec_lo
+	s_and_b32	s_save_ttmps_hi, exec_hi, 0xFFFF
+	s_mov_b32	exec_lo, 0xFFFFFFFF
+	s_mov_b32	exec_hi, 0xFFFFFFFF
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] slc:1 glc:1
+	v_mov_b32	v0, 0x0
+	s_mov_b32	exec_lo, s_save_ttmps_lo
+	s_mov_b32	exec_hi, s_save_ttmps_hi
+#endif
+
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
 	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
 	get_wave_size(s_save_ttmps_hi)
@@ -314,7 +276,27 @@ L_SLEEP:
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_spi_init_lo
 	s_addc_u32	s_save_ttmps_hi, s_save_ttmps_hi, 0x0
 
-#if ASIC_TARGET_NAVI1X
+#if NO_SQC_STORE
+	v_writelane_b32	v0, ttmp4, 0x4
+	v_writelane_b32	v0, ttmp5, 0x5
+	v_writelane_b32	v0, ttmp6, 0x6
+	v_writelane_b32	v0, ttmp7, 0x7
+	v_writelane_b32	v0, ttmp8, 0x8
+	v_writelane_b32	v0, ttmp9, 0x9
+	v_writelane_b32	v0, ttmp10, 0xA
+	v_writelane_b32	v0, ttmp11, 0xB
+	v_writelane_b32	v0, ttmp13, 0xD
+	v_writelane_b32	v0, exec_lo, 0xE
+	v_writelane_b32	v0, exec_hi, 0xF
+
+	s_mov_b32	exec_lo, 0x3FFF
+	s_mov_b32	exec_hi, 0x0
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] inst_offset:0x40 slc:1 glc:1
+	v_readlane_b32	ttmp14, v0, 0xE
+	v_readlane_b32	ttmp15, v0, 0xF
+	s_mov_b32	exec_lo, ttmp14
+	s_mov_b32	exec_hi, ttmp15
+#else
 	s_store_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_save_ttmps_lo, s_save_ttmps_hi], 0x50 glc:1
 	s_store_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_save_ttmps_lo, s_save_ttmps_hi], 0x60 glc:1
 	s_store_dword   ttmp13, [s_save_ttmps_lo, s_save_ttmps_hi], 0x74 glc:1
@@ -326,12 +308,6 @@ L_SLEEP:
 	s_or_b32	s_save_buf_rsrc1, s_save_buf_rsrc1, S_SAVE_BUF_RSRC_WORD1_STRIDE
 	s_mov_b32	s_save_buf_rsrc2, 0					//NUM_RECORDS initial value = 0 (in bytes) although not neccessarily inited
 	s_mov_b32	s_save_buf_rsrc3, S_SAVE_BUF_RSRC_WORD3_MISC
-	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_ATC_MASK
-	s_lshr_b32	s_save_tmp, s_save_tmp, (S_SAVE_SPI_INIT_ATC_SHIFT-SQ_BUF_RSRC_WORD1_ATC_SHIFT)
-	s_or_b32	s_save_buf_rsrc3, s_save_buf_rsrc3, s_save_tmp		//or ATC
-	s_and_b32	s_save_tmp, s_save_spi_init_hi, S_SAVE_SPI_INIT_MTYPE_MASK
-	s_lshr_b32	s_save_tmp, s_save_tmp, (S_SAVE_SPI_INIT_MTYPE_SHIFT-SQ_BUF_RSRC_WORD3_MTYPE_SHIFT)
-	s_or_b32	s_save_buf_rsrc3, s_save_buf_rsrc3, s_save_tmp		//or MTYPE
 
 	s_mov_b32	s_save_m0, m0
 
@@ -361,7 +337,9 @@ L_SAVE_4VGPR_WAVE32:
 
 	// VGPR Allocated in 4-GPR granularity
 
+#if !NO_SQC_STORE
 	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+#endif
 	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*2
 	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*3
@@ -372,7 +350,9 @@ L_SAVE_4VGPR_WAVE64:
 
 	// VGPR Allocated in 4-GPR granularity
 
+#if !NO_SQC_STORE
 	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+#endif
 	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*2
 	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*3
@@ -397,7 +377,8 @@ L_SAVE_HWREG:
 
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_pc_lo, s_save_buf_rsrc0, s_save_mem_offset)
-	write_hwreg_to_mem(s_save_pc_hi, s_save_buf_rsrc0, s_save_mem_offset)
+	s_andn2_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
+	write_hwreg_to_mem(s_save_tmp, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_exec_lo, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_exec_hi, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_status, s_save_buf_rsrc0, s_save_mem_offset)
@@ -418,9 +399,13 @@ L_SAVE_HWREG:
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 
 #if NO_SQC_STORE
-	// Write HWREG/SGPRs with 32 VGPR lanes, wave32 is common case.
+	// Write HWREGs with 16 VGPR lanes. TTMPs occupy space after this.
+	s_mov_b32       exec_lo, 0xFFFF
 	s_mov_b32	exec_hi, 0x0
 	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+
+	// Write SGPRs with 32 VGPR lanes. This works in wave32 and wave64 mode.
+	s_mov_b32       exec_lo, 0xFFFFFFFF
 #endif
 
 	/* save SGPRs */
@@ -506,7 +491,7 @@ L_SAVE_LDS_NORMAL:
 	s_cbranch_scc0	L_SAVE_LDS_DONE						//no lds used? jump to L_SAVE_DONE
 
 	s_barrier								//LDS is used? wait for other waves in the same TG
-	s_and_b32	s_save_tmp, s_wave_size, S_SAVE_SPI_INIT_FIRST_WAVE_MASK
+	s_and_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
 	s_cbranch_scc0	L_SAVE_LDS_DONE
 
 	// first wave do LDS save;
@@ -674,12 +659,7 @@ L_RESTORE:
 	s_or_b32	s_restore_buf_rsrc1, s_restore_buf_rsrc1, S_RESTORE_BUF_RSRC_WORD1_STRIDE
 	s_mov_b32	s_restore_buf_rsrc2, 0					//NUM_RECORDS initial value = 0 (in bytes)
 	s_mov_b32	s_restore_buf_rsrc3, S_RESTORE_BUF_RSRC_WORD3_MISC
-	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_ATC_MASK
-	s_lshr_b32	s_restore_tmp, s_restore_tmp, (S_RESTORE_SPI_INIT_ATC_SHIFT-SQ_BUF_RSRC_WORD1_ATC_SHIFT)
-	s_or_b32	s_restore_buf_rsrc3, s_restore_buf_rsrc3, s_restore_tmp	//or ATC
-	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_MTYPE_MASK
-	s_lshr_b32	s_restore_tmp, s_restore_tmp, (S_RESTORE_SPI_INIT_MTYPE_SHIFT-SQ_BUF_RSRC_WORD3_MTYPE_SHIFT)
-	s_or_b32	s_restore_buf_rsrc3, s_restore_buf_rsrc3, s_restore_tmp	//or MTYPE
+
 	//determine it is wave32 or wave64
 	get_wave_size(s_restore_size)
 
@@ -957,23 +937,7 @@ L_RESTORE_HWREG:
 	s_waitcnt	lgkmcnt(0)
 
 #if ASIC_TARGET_NAVI1X
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_RCNT_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_RCNT_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_RCNT_SHIFT
-	s_mov_b32	s_restore_tmp, 0x0
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_FIRST_REPLAY_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_FIRST_REPLAY_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-	s_and_b32	s_restore_m0, s_restore_pc_hi, S_SAVE_PC_HI_REPLAY_W64H_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, S_SAVE_PC_HI_REPLAY_W64H_SHIFT
-	s_lshl_b32	s_restore_m0, s_restore_m0, SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT
-	s_or_b32	s_restore_tmp, s_restore_tmp, s_restore_m0
-
-	s_and_b32	s_restore_m0, s_restore_status, SQ_WAVE_STATUS_INST_ATC_MASK
-	s_lshr_b32	s_restore_m0, s_restore_m0, SQ_WAVE_STATUS_INST_ATC_SHIFT
-	s_setreg_b32 	hwreg(HW_REG_IB_STS), s_restore_tmp
+	restore_ib_sts(s_restore_tmp, s_restore_m0)
 #endif
 
 	s_and_b32	s_restore_pc_hi, s_restore_pc_hi, 0x0000ffff		//pc[47:32] //Do it here in order not to affect STATUS
@@ -1089,5 +1053,29 @@ end
 function get_wave_size(s_reg)
 	s_getreg_b32	s_reg, hwreg(HW_REG_IB_STS2,SQ_WAVE_IB_STS2_WAVE64_SHIFT,SQ_WAVE_IB_STS2_WAVE64_SIZE)
 	s_lshl_b32	s_reg, s_reg, S_WAVE_SIZE
-	s_or_b32	s_reg, s_save_spi_init_hi, s_reg			//share with exec_hi, it's at bit25
+end
+
+function save_and_clear_ib_sts(tmp1, tmp2)
+	// Preserve and clear scalar XNACK state before issuing scalar loads.
+	// Save IB_STS.REPLAY_W64H[25], RCNT[21:16], FIRST_REPLAY[15] into
+	// unused space ttmp11[31:24].
+	s_andn2_b32	ttmp11, ttmp11, (TTMP11_SAVE_REPLAY_W64H_MASK | TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK)
+	s_getreg_b32	tmp1, hwreg(HW_REG_IB_STS)
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
+	s_lshl_b32	tmp2, tmp2, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
+	s_or_b32	ttmp11, ttmp11, tmp2
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+	s_lshl_b32	tmp2, tmp2, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+	s_or_b32	ttmp11, ttmp11, tmp2
+	s_andn2_b32	tmp1, tmp1, (SQ_WAVE_IB_STS_REPLAY_W64H_MASK | SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK)
+	s_setreg_b32	hwreg(HW_REG_IB_STS), tmp1
+end
+
+function restore_ib_sts(tmp1, tmp2)
+	s_lshr_b32	tmp1, ttmp11, (TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT - SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT)
+	s_and_b32	tmp2, tmp1, SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK
+	s_lshr_b32	tmp1, ttmp11, (TTMP11_SAVE_REPLAY_W64H_SHIFT - SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT)
+	s_and_b32	tmp1, tmp1, SQ_WAVE_IB_STS_REPLAY_W64H_MASK
+	s_or_b32	tmp1, tmp1, tmp2
+	s_setreg_b32	hwreg(HW_REG_IB_STS), tmp1
 end

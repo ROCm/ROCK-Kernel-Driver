@@ -1658,7 +1658,7 @@ void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 		// enable fastboot if backend is enabled on eDP
 		if (edp_link->link_enc->funcs->is_dig_enabled(edp_link->link_enc)) {
 			/* Set optimization flag on eDP stream*/
-			if (edp_stream) {
+			if (edp_stream && edp_link->link_status.link_active) {
 				edp_stream->apply_edp_fast_boot_optimization = true;
 				can_apply_edp_fast_boot = true;
 			}
@@ -2741,7 +2741,7 @@ static void program_output_csc(struct dc *dc,
 	}
 }
 
-void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
+static void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_position pos_cpy = pipe_ctx->stream->cursor_position;
 	struct input_pixel_processor *ipp = pipe_ctx->plane_res.ipp;
@@ -2786,7 +2786,7 @@ void dce110_set_cursor_position(struct pipe_ctx *pipe_ctx)
 		mi->funcs->set_cursor_position(mi, &pos_cpy, &param);
 }
 
-void dce110_set_cursor_attribute(struct pipe_ctx *pipe_ctx)
+static void dce110_set_cursor_attribute(struct pipe_ctx *pipe_ctx)
 {
 	struct dc_cursor_attributes *attributes = &pipe_ctx->stream->cursor_attributes;
 
