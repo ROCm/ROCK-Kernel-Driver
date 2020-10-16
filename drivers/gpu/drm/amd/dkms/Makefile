@@ -12,7 +12,7 @@ endif
 
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 
-ifeq ($(shell grep "HAVE_DMA_RESV_SEQ" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),n)
+ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ),n)
 $(error dma_resv->seq is missing., exit...)
 endif
 
@@ -156,10 +156,8 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 
-ifeq ($(shell grep "HAVE_DRM_DRM_HDCP_H" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),y)
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
-endif
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
 # older versions of GCC hanging during building/installing. Check
