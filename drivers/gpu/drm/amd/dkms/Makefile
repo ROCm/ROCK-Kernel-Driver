@@ -10,6 +10,8 @@ ifndef CONFIG_KALLSYMS
 $(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
 endif
 
+_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
+
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
 ifeq ($(DRM_VER),)
