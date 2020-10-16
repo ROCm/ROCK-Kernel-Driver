@@ -10,6 +10,8 @@ ifndef CONFIG_KALLSYMS
 $(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
 endif
 
+_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
+
 ifeq ($(shell grep "HAVE_DMA_RESV_SEQ" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),n)
 $(error dma_resv->seq is missing., exit...)
 endif
