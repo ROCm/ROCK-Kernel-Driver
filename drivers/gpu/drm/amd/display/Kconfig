@@ -45,14 +45,6 @@ config DRM_AMD_DC_DSC_SUPPORT
 	  Choose this option if you want to have
 	  Dynamic Stream Compression support
 
-config DRM_AMD_DC_GREEN_SARDINE
-	bool "Green Sardine support"
-	default y
-	depends on DRM_AMD_DC_DCN1_0
-        help
-            Choose this option if you want to have
-            Green Sardine support for display engine
-
 config DRM_AMD_DC_DCN3_0
         bool "DCN 3.0 family"
         default y
