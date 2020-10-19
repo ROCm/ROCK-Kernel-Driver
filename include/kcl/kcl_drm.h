@@ -6,7 +6,6 @@
 #include <drm/drm_gem.h>
 #include <kcl/header/kcl_drm_device_h.h>
 #include <kcl/header/kcl_drm_print_h.h>
-#include <kcl/header/kcl_drm_file_h.h>
 
 /*
  * commit v5.5-rc2-1531-ge62bf83aa1bb
@@ -148,10 +147,6 @@ static inline void drm_dev_put(struct drm_device *dev)
 
 #if !defined(HAVE_DRM_GET_MAX_IOMEM)
 u64 drm_get_max_iomem(void);
-#endif
-
-#if !defined(HAVE_DRM_SEND_EVENT_LOCKED)
-void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 #endif
 
 #endif /* AMDKCL_DRM_H */
