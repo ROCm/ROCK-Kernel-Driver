@@ -902,12 +902,6 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
-/* system_highpri_wq is declared */
-#define HAVE_SYSTEM_HIGHPRI_WQ_DECLARED 1
-
-/* system_highpri_wq is exported */
-#define HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED 1
-
 /* timer_setup() is available */
 #define HAVE_TIMER_SETUP 1
 
