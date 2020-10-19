@@ -794,9 +794,6 @@
 /* pm_genpd_remove_device() wants 2 arguments */
 /* #undef HAVE_PM_GENPD_REMOVE_DEVICE_2ARGS */
 
-/* ptrace_parent() is available */
-#define HAVE_PTRACE_PARENT 1
-
 /* register_shrinker() returns integer */
 #define HAVE_REGISTER_SHRINKER_RETURN_INT 1
 
