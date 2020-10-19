@@ -48,7 +48,7 @@ config DRM_AMD_DC_DSC_SUPPORT
 config DRM_AMD_DC_GREEN_SARDINE
 	bool "Green Sardine support"
 	default y
-	depends on DRM_AMD_DC_DCN
+	depends on DRM_AMD_DC_DCN1_0
         help
             Choose this option if you want to have
             Green Sardine support for display engine
