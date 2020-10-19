@@ -689,9 +689,6 @@
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
 
-/* Define to 1 if you have the <linux/interval_tree_generic.h> header file. */
-#define HAVE_LINUX_INTERVAL_TREE_GENERIC_H 1
-
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
 

@@ -24,7 +24,6 @@ drm/drm_encoder.h kcl/header/kcl_drm_encoder_h.h
 drm/drm_plane.h kcl/header/kcl_drm_plane_h.h
 drm/drm_gem_framebuffer_helper.h kcl/header/kcl_drm_gem_framebuffer_helper_h.h
 drm/drm_managed.h kcl/header/kcl_drm_managed_h.h
-linux/interval_tree_generic.h kcl/kcl_interval_tree_generic.h
 linux/nospec.h kcl/kcl_nospec.h
 linux/pfn_t.h kcl/kcl_mm_types.h
 drm/task_barrier.h kcl/kcl_task_barrier.h
