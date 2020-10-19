@@ -884,9 +884,6 @@
 /* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
 #define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
 
-/* vga_switcheroo_handler->get_client_id() return int */
-/* #undef HAVE_VGA_SWITCHEROO_GET_CLIENT_ID_RETURN_INT */
-
 /* enum vga_switcheroo_handler_flags_t is available */
 #define HAVE_VGA_SWITCHEROO_HANDLER_FLAGS_T_ENUM 1
 
