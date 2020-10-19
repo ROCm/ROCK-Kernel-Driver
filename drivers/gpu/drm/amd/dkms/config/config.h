@@ -887,18 +887,6 @@
 /* enum vga_switcheroo_handler_flags_t is available */
 #define HAVE_VGA_SWITCHEROO_HANDLER_FLAGS_T_ENUM 1
 
-/* struct vga_switcheroo_client_ops is available */
-#define HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_OPS 1
-
-/* vga_switcheroo_register_client() has p,p interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P */
-
-/* vga_switcheroo_register_client() has p,p,b interface */
-#define HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P_B 1
-
-/* vga_switcheroo_register_client() has p,p,p,p interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P_P_P */
-
 /* vga_switeroo_register_handler() p_c interface */
 /* #undef HAVE_VGA_SWITCHEROO_REGISTER_HANDLER_PC */
 
