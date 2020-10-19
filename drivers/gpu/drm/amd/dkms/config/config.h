@@ -632,9 +632,6 @@
 /* kmap_atomic() have one argument */
 #define HAVE_KMAP_ATOMIC_ONE_ARG 1
 
-/* kobj_to_dev() is available */
-#define HAVE_KOBJ_TO_DEV 1
-
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
 
