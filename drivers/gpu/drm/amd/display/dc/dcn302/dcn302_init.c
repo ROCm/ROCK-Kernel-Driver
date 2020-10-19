@@ -35,5 +35,7 @@ void dcn302_hw_sequencer_construct(struct dc *dc)
 
 	dc->hwseq->funcs.dpp_pg_control = dcn302_dpp_pg_control;
 	dc->hwseq->funcs.hubp_pg_control = dcn302_hubp_pg_control;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	dc->hwseq->funcs.dsc_pg_control = dcn302_dsc_pg_control;
+#endif
 }
