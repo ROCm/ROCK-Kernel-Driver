@@ -884,15 +884,6 @@
 /* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
 #define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
 
-/* enum vga_switcheroo_handler_flags_t is available */
-#define HAVE_VGA_SWITCHEROO_HANDLER_FLAGS_T_ENUM 1
-
-/* vga_switeroo_register_handler() p_c interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_HANDLER_PC */
-
-/* vga_switeroo_register_handler() has p,e interface */
-#define HAVE_VGA_SWITCHEROO_REGISTER_HANDLER_PC_E 1
-
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
 
