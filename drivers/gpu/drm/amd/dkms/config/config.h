@@ -746,9 +746,6 @@
 /* pci_is_thunderbolt_attached() is available */
 #define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
 
-/* pci_pcie_type() exist */
-#define HAVE_PCI_PCIE_TYPE 1
-
 /* pci_upstream_bridge() is available */
 #define HAVE_PCI_UPSTREAM_BRIDGE 1
 
