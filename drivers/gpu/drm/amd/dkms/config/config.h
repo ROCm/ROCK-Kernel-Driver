@@ -424,9 +424,6 @@
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
 
-/* drm_fb_helper_{alloc/unregister}_fbi is available */
-#define HAVE_DRM_FB_HELPER_XX_FBI 1
-
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
 
