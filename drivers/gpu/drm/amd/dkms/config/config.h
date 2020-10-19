@@ -602,9 +602,6 @@
 /* get_vblank_timestamp return bool */
 /* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_RETURN_BOOL */
 
-/* hash_for_each_xxx() drop the node parameter */
-#define HAVE_HASH_FOR_EACH_XXX_DROP_NODE 1
-
 /* drm_connector_hdr_sink_metadata() is available */
 #define HAVE_HDR_SINK_METADATA 1
 
