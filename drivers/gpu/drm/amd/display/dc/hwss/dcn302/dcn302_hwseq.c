@@ -156,6 +156,7 @@ void dcn302_hubp_pg_control(struct dce_hwseq *hws, unsigned int hubp_inst, bool 
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn302_dsc_pg_control(struct dce_hwseq *hws, unsigned int dsc_inst, bool power_on)
 {
 	uint32_t power_gate = power_on ? 0 : 1;
@@ -221,3 +222,4 @@ void dcn302_dsc_pg_control(struct dce_hwseq *hws, unsigned int dsc_inst, bool po
 	if (org_ip_request_cntl == 0)
 		REG_SET(DC_IP_REQUEST_CNTL, 0, IP_REQUEST_EN, 0);
 }
+#endif
