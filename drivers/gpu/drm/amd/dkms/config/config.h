@@ -623,9 +623,6 @@
 /* in_compat_syscall is defined */
 #define HAVE_IN_COMPAT_SYSCALL 1
 
-/* IRQ translation domains exist */
-#define HAVE_IRQ_DOMAIN 1
-
 /* jiffies64_to_msecs() is available */
 #define HAVE_JIFFIES64_TO_MSECS 1
 
