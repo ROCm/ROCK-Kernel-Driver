@@ -26,36 +26,6 @@
 	.fb_pan_display	= drm_fb_helper_pan_display
 #endif
 
-#ifndef HAVE_DRM_FB_HELPER_CFB_XX
-extern void _kcl_drm_fb_helper_cfb_fillrect(struct fb_info *info,
-				const struct fb_fillrect *rect);
-extern void _kcl_drm_fb_helper_cfb_copyarea(struct fb_info *info,
-				const struct fb_copyarea *area);
-extern void _kcl_drm_fb_helper_cfb_imageblit(struct fb_info *info,
-				 const struct fb_image *image);
-
-static inline
-void drm_fb_helper_cfb_fillrect(struct fb_info *info,
-				const struct fb_fillrect *rect)
-{
-	_kcl_drm_fb_helper_cfb_fillrect(info, rect);
-}
-
-static inline
-void drm_fb_helper_cfb_copyarea(struct fb_info *info,
-				const struct fb_copyarea *area)
-{
-	_kcl_drm_fb_helper_cfb_copyarea(info, area);
-}
-
-static inline
-void drm_fb_helper_cfb_imageblit(struct fb_info *info,
-				 const struct fb_image *image)
-{
-	_kcl_drm_fb_helper_cfb_imageblit(info, image);
-}
-#endif
-
 #ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
 extern void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, int state);
 static inline
