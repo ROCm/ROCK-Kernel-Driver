@@ -104,9 +104,6 @@
 /* drm_atomic_helper_check_plane_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
 
-/* __drm_atomic_helper_connector_reset() is available */
-#define HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET 1
-
 /* drm_atomic_helper_disable_all() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL 1
 
