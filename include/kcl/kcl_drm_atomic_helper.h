@@ -67,11 +67,6 @@ kcl_drm_atomic_get_new_plane_state_before_commit(struct drm_atomic_state *state,
 #endif
 }
 
-#if !defined(HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL)
-int drm_atomic_helper_disable_all(struct drm_device *dev,
-				  struct drm_modeset_acquire_ctx *ctx);
-#endif
-
 #ifndef HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE
 static inline int
 drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
