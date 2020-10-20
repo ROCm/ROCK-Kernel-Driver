@@ -107,9 +107,6 @@
 /* drm_atomic_helper_disable_all() is available */
 #define HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL 1
 
-/* drm_atomic_helper_duplicate_state() is available */
-#define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
-
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
