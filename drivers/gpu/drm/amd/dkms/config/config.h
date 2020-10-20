@@ -113,9 +113,6 @@
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
-/* drm_atomic_helper_suspend() is available */
-#define HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME 1
-
 /* drm_atomic_helper_wait_for_flip_done() is available */
 #define HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE 1
 
