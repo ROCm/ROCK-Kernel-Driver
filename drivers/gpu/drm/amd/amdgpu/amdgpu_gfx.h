@@ -111,6 +111,15 @@ struct amdgpu_kiq {
 	const struct kiq_pm4_funcs *pmf;
 };
 
+struct spm_funcs {
+	void (*start)(struct amdgpu_device *adev);
+	void (*stop)(struct amdgpu_device *adev);
+	void (*set_rdptr)(struct amdgpu_device *adev, u32 rptr);
+	void (*set_spm_perfmon_ring_buf)(struct amdgpu_device *adev, u64 gpu_rptr, u32 size);
+	/* Packet sizes */
+	int set_spm_config_size;
+};
+
 /*
  * GFX configurations
  */
@@ -287,6 +296,7 @@ struct amdgpu_gfx {
 	struct amdgpu_mec		mec;
 	struct amdgpu_kiq		kiq;
 	struct amdgpu_imu		imu;
+	const struct spm_funcs		*spmfuncs;
 	bool				rs64_enable; /* firmware format */
 	const struct firmware		*me_fw;	/* ME firmware */
 	uint32_t			me_fw_version;
@@ -329,6 +339,7 @@ struct amdgpu_gfx {
 	struct amdgpu_irq_src		priv_reg_irq;
 	struct amdgpu_irq_src		priv_inst_irq;
 	struct amdgpu_irq_src		cp_ecc_error_irq;
+	struct amdgpu_irq_src		spm_irq;
 	struct amdgpu_irq_src		sq_irq;
 	struct amdgpu_irq_src		rlc_gc_fed_irq;
 	struct sq_work			sq_work;
