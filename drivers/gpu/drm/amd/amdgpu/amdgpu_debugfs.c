@@ -1369,7 +1369,11 @@ static int amdgpu_debugfs_vm_info(struct seq_file *m, void *data)
 	struct drm_file *file;
 	int r;
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	r = mutex_lock_interruptible(&dev->struct_mutex);
+#else
 	r = mutex_lock_interruptible(&dev->filelist_mutex);
+#endif
 	if (r)
 		return r;
 
@@ -1386,7 +1390,11 @@ static int amdgpu_debugfs_vm_info(struct seq_file *m, void *data)
 		amdgpu_bo_unreserve(vm->root.base.bo);
 	}
 
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	mutex_unlock(&dev->struct_mutex);
+#else
 	mutex_unlock(&dev->filelist_mutex);
+#endif
 
 	return r;
 }
