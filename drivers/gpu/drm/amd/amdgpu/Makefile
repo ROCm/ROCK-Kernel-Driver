@@ -274,7 +274,8 @@ amdgpu-y += \
 	amdgpu_amdkfd_gc_9_4_3.o \
 	amdgpu_amdkfd_gfx_v10.o \
 	amdgpu_amdkfd_gfx_v10_3.o \
-	amdgpu_amdkfd_gfx_v11.o
+	amdgpu_amdkfd_gfx_v11.o \
+	amdgpu_amdkfd_rlc_spm.o
 
 ifneq ($(CONFIG_DRM_AMDGPU_CIK),)
 amdgpu-y += amdgpu_amdkfd_gfx_v7.o

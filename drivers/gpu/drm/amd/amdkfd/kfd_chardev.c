@@ -1803,6 +1803,12 @@ static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
 }
 #endif
 
+static int kfd_ioctl_rlc_spm(struct file *filep,
+				   struct kfd_process *p, void *data)
+{
+	return kfd_rlc_spm(p, data);
+}
+
 static int criu_checkpoint_process(struct kfd_process *p,
 			     uint8_t __user *user_priv_data,
 			     uint64_t *priv_offset)
@@ -3283,6 +3289,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
 				kfd_ioctl_ipc_export_handle, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
+			kfd_ioctl_rlc_spm, 0),
+
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
