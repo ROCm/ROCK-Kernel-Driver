@@ -1117,7 +1117,7 @@ static int start_nocpsch(struct device_queue_manager *dqm)
 {
 	pr_info("SW scheduler is used");
 	init_interrupts(dqm);
-	
+
 	if (dqm->dev->device_info->asic_family == CHIP_HAWAII)
 		return pm_init(&dqm->packet_mgr, dqm);
 	dqm->sched_running = true;
@@ -2006,7 +2006,7 @@ static int allocate_hiq_sdma_mqd(struct device_queue_manager *dqm)
 
 	retval = amdgpu_amdkfd_alloc_gtt_mem(dev->kgd, size,
 		&(mem_obj->gtt_mem), &(mem_obj->gpu_addr),
-		(void *)&(mem_obj->cpu_ptr), false);
+		(void *)&(mem_obj->cpu_ptr), false, true);
 
 	return retval;
 }

@@ -776,7 +776,8 @@ static int kfd_gws_init(struct kfd_dev *kfd)
 	return ret;
 }
 
-static void kfd_smi_init(struct kfd_dev *dev) {
+static void kfd_smi_init(struct kfd_dev *dev)
+{
 	INIT_LIST_HEAD(&dev->smi_clients);
 	spin_lock_init(&dev->smi_lock);
 }
@@ -837,7 +838,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	if (amdgpu_amdkfd_alloc_gtt_mem(
 			kfd->kgd, size, &kfd->gtt_mem,
 			&kfd->gtt_start_gpu_addr, &kfd->gtt_start_cpu_ptr,
-			false)) {
+			false, true)) {
 		dev_err(kfd_device, "Could not allocate %d bytes\n", size);
 		goto alloc_gtt_mem_failure;
 	}
