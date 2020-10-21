@@ -351,6 +351,9 @@ struct dmub_srv {
 	uint64_t fb_base;
 	uint64_t fb_offset;
 	uint32_t psp_version;
+
+	/* Feature capabilities reported by fw */
+	struct dmub_feature_caps feature_caps;
 };
 
 /**
@@ -613,6 +616,9 @@ void dmub_flush_buffer_mem(const struct dmub_fb *fb);
  */
 enum dmub_status dmub_srv_get_fw_boot_status(struct dmub_srv *dmub,
 					     union dmub_fw_boot_status *status);
+
+enum dmub_status dmub_srv_cmd_with_reply_data(struct dmub_srv *dmub,
+					      union dmub_rb_cmd *cmd);
 
 #if defined(__cplusplus)
 }
