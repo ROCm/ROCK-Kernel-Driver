@@ -216,7 +216,7 @@ int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 /* Shared API */
 int amdgpu_amdkfd_alloc_gtt_mem(struct amdgpu_device *adev, size_t size,
 				void **mem_obj, uint64_t *gpu_addr,
-				void **cpu_ptr, bool mqd_gfx9);
+				void **cpu_ptr, bool mqd_gfx9, bool is_uswc_mode);
 void amdgpu_amdkfd_free_gtt_mem(struct amdgpu_device *adev, void *mem_obj);
 int amdgpu_amdkfd_alloc_gws(struct amdgpu_device *adev, size_t size,
 				void **mem_obj);
