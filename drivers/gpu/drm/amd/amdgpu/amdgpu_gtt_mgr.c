@@ -79,8 +79,8 @@ static DEVICE_ATTR(mem_info_gtt_used, S_IRUGO,
 /**
  * amdgpu_gtt_mgr_init - init GTT manager and DRM MM
  *
- * @man: TTM memory type manager
- * @p_size: maximum size of GTT
+ * @adev: amdgpu_device pointer
+ * @gtt_size: maximum size of GTT
  *
  * Allocate and initialize the GTT manager.
  */
@@ -120,7 +120,7 @@ static int amdgpu_gtt_mgr_init(struct ttm_mem_type_manager *man,
 /**
  * amdgpu_gtt_mgr_fini - free and destroy GTT manager
  *
- * @man: TTM memory type manager
+ * @adev: amdgpu_device pointer
  *
  * Destroy and free the GTT manager, returns -EBUSY if ranges are still
  * allocated inside it.
