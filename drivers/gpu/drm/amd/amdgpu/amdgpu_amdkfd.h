@@ -271,6 +271,14 @@ void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
 int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
 				struct tile_config *config);
 
+void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl);
+int amdgpu_amdkfd_rlc_spm(struct kgd_dev *kgd, void *args);
+int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd,
+		struct amdgpu_vm *vm, u64 gpu_addr, u32 size);
+void amdgpu_amdkfd_rlc_spm_release(struct kgd_dev *kgd, struct amdgpu_vm *vm);
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr);
+void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
+
 /* KGD2KFD callbacks */
 int kgd2kfd_init(void);
 void kgd2kfd_exit(void);
@@ -291,5 +299,6 @@ int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,
 					       struct dma_fence *fence);
 void kgd2kfd_set_sram_ecc_flag(struct kfd_dev *kfd);
 void kgd2kfd_smi_event_throttle(struct kfd_dev *kfd, uint32_t throttle_bitmask);
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */

@@ -1388,6 +1388,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->sdma_past_activity_counter = 0;
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	list_add(&pdd->per_device_list, &p->per_device_data);
+	kfd_spm_init_process_device(pdd);
 
 	/* Init idr used for memory handle translation */
 	idr_init(&pdd->alloc_idr);
