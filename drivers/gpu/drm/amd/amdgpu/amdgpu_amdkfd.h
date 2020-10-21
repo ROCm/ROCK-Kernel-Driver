@@ -331,7 +331,17 @@ void amdgpu_amdkfd_unreserve_memory_limit(struct amdgpu_bo *bo)
 {
 }
 #endif
+
+void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl);
+int amdgpu_amdkfd_rlc_spm(struct kgd_dev *kgd, void *args);
+int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd,
+		struct amdgpu_vm *vm, u64 gpu_addr, u32 size);
+void amdgpu_amdkfd_rlc_spm_release(struct kgd_dev *kgd, struct amdgpu_vm *vm);
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr);
+void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
+
 /* KGD2KFD callbacks */
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd);
 int kgd2kfd_quiesce_mm(struct mm_struct *mm);
 int kgd2kfd_resume_mm(struct mm_struct *mm);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,

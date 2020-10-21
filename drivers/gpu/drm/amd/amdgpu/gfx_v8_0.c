@@ -1965,6 +1965,12 @@ static int gfx_v8_0_sw_init(void *handle)
 	adev->gfx.mec.num_pipe_per_mec = 4;
 	adev->gfx.mec.num_queue_per_pipe = 8;
 
+	/* SPM */
+	r = amdgpu_irq_add_id(adev, AMDGPU_IRQ_CLIENTID_LEGACY,
+			VISLANDS30_IV_SRCID_RLC_STRM_PERF_MONITOR, &adev->gfx.spm_irq);
+	if (r)
+		return r;
+
 	/* EOP Event */
 	r = amdgpu_irq_add_id(adev, AMDGPU_IRQ_CLIENTID_LEGACY, VISLANDS30_IV_SRCID_CP_END_OF_PIPE, &adev->gfx.eop_irq);
 	if (r)
@@ -4935,6 +4941,7 @@ static int gfx_v8_0_hw_fini(void *handle)
 	amdgpu_irq_put(adev, &adev->gfx.cp_ecc_error_irq, 0);
 
 	amdgpu_irq_put(adev, &adev->gfx.sq_irq, 0);
+	amdgpu_irq_put(adev, &adev->gfx.spm_irq, 0);
 
 	/* disable KCQ to avoid CPC touch memory not valid anymore */
 	gfx_v8_0_kcq_disable(adev);
@@ -5299,6 +5306,97 @@ static const struct amdgpu_gfx_funcs gfx_v8_0_gfx_funcs = {
 	.select_me_pipe_q = &gfx_v8_0_select_me_pipe_q
 };
 
+static void gfx_v8_0_write_data_to_reg(struct amdgpu_ring *ring, int eng_sel,
+				       bool wc, uint32_t reg, uint32_t val)
+{
+	amdgpu_ring_write(ring, PACKET3(PACKET3_WRITE_DATA, 3));
+	amdgpu_ring_write(ring, WRITE_DATA_ENGINE_SEL(eng_sel) |
+				WRITE_DATA_DST_SEL(0) |
+				(wc ? WR_CONFIRM : 0));
+	amdgpu_ring_write(ring, reg);
+	amdgpu_ring_write(ring, 0);
+	amdgpu_ring_write(ring, val);
+}
+
+static void gfx_v8_0_spm_start(struct amdgpu_device *adev)
+{
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	uint32_t data = 0;
+
+	data = REG_SET_FIELD(data, GRBM_GFX_INDEX, SE_INDEX, 0);
+	data = REG_SET_FIELD(data, GRBM_GFX_INDEX, SE_BROADCAST_WRITES, 1);
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmGRBM_GFX_INDEX, data);
+
+
+	data = RREG32(mmRLC_SPM_PERFMON_CNTL);
+	data |= RLC_SPM_PERFMON_CNTL__PERFMON_RING_MODE_MASK;
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmRLC_SPM_PERFMON_CNTL, data);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL,
+			SPM_PERFMON_STATE, CP_PERFMON_STATE_DISABLE_AND_RESET);
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, data);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL,
+			SPM_PERFMON_STATE, STRM_PERFMON_STATE_START_COUNTING);
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, data);
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmRLC_SPM_INT_CNTL, 1);
+}
+
+static void gfx_v8_0_spm_stop(struct amdgpu_device *adev)
+{
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	uint32_t data = 0;
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL,
+			PERFMON_STATE, CP_PERFMON_STATE_STOP_COUNTING);
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, data);
+
+	data = REG_SET_FIELD(0, CP_PERFMON_CNTL,
+			SPM_PERFMON_STATE, CP_PERFMON_STATE_DISABLE_AND_RESET);
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, data);
+}
+
+static void gfx_v8_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
+{
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmRLC_SPM_RING_RDPTR, rptr);
+}
+
+static void gfx_v8_0_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
+		u64 gpu_addr, u32 size)
+{
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false,
+			mmRLC_SPM_PERFMON_RING_BASE_LO, lower_32_bits(gpu_addr));
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false,
+			mmRLC_SPM_PERFMON_RING_BASE_HI, upper_32_bits(gpu_addr));
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false,
+			mmRLC_SPM_PERFMON_RING_SIZE, size);
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false,
+			mmRLC_SPM_SEGMENT_THRESHOLD, 0xff);
+
+	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, 0);
+}
+
+static const struct spm_funcs gfx_v8_0_spm_funcs = {
+	.start = &gfx_v8_0_spm_start,
+	.stop = &gfx_v8_0_spm_stop,
+	.set_rdptr = &gfx_v8_0_spm_set_rdptr,
+	.set_spm_perfmon_ring_buf = &gfx_v8_0_set_spm_perfmon_ring_buf,
+	.set_spm_config_size = 30,
+};
+
+static void gfx_v8_0_set_spm_funcs(struct amdgpu_device *adev)
+{
+	adev->gfx.spmfuncs = &gfx_v8_0_spm_funcs;
+}
+
 static int gfx_v8_0_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -5307,6 +5405,7 @@ static int gfx_v8_0_early_init(void *handle)
 	adev->gfx.num_compute_rings = min(amdgpu_gfx_get_num_kcq(adev),
 					  AMDGPU_MAX_COMPUTE_RINGS);
 	adev->gfx.funcs = &gfx_v8_0_gfx_funcs;
+	gfx_v8_0_set_spm_funcs(adev);
 	gfx_v8_0_set_ring_funcs(adev);
 	gfx_v8_0_set_irq_funcs(adev);
 	gfx_v8_0_set_gds_init(adev);
@@ -5346,6 +5445,10 @@ static int gfx_v8_0_late_init(void *handle)
 			r);
 		return r;
 	}
+
+	r = amdgpu_irq_get(adev, &adev->gfx.spm_irq, 0);
+	if (r)
+		return r;
 
 	return 0;
 }
@@ -6847,6 +6950,31 @@ static void gfx_v8_0_emit_mem_sync_compute(struct amdgpu_ring *ring)
 	amdgpu_ring_write(ring, 0x0000000A);	/* poll interval */
 }
 
+static int gfx_v8_0_spm_set_interrupt_state(struct amdgpu_device *adev,
+					     struct amdgpu_irq_src *src,
+					     unsigned int type,
+					     enum amdgpu_interrupt_state state)
+{
+	switch (state) {
+	case AMDGPU_IRQ_STATE_DISABLE:
+		WREG32(mmRLC_SPM_INT_CNTL, 0);
+		break;
+	case AMDGPU_IRQ_STATE_ENABLE:
+		WREG32(mmRLC_SPM_INT_CNTL, 1);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static int gfx_v8_0_spm_irq(struct amdgpu_device *adev,
+			     struct amdgpu_irq_src *source,
+			     struct amdgpu_iv_entry *entry)
+{
+	amdgpu_amdkfd_rlc_spm_interrupt(adev);
+	return 0;
+}
 
 /* mmSPI_WCL_PIPE_PERCENT_CS[0-7]_DEFAULT values are same */
 #define mmSPI_WCL_PIPE_PERCENT_CS_DEFAULT	0x0000007f
@@ -6904,7 +7032,6 @@ static void gfx_v8_0_emit_wave_limit(struct amdgpu_ring *ring, bool enable)
 			gfx_v8_0_emit_wave_limit_cs(ring, i, enable);
 
 	}
-
 }
 
 static const struct amd_ip_funcs gfx_v8_0_ip_funcs = {
@@ -7071,10 +7198,18 @@ static const struct amdgpu_irq_src_funcs gfx_v8_0_sq_irq_funcs = {
 	.process = gfx_v8_0_sq_irq,
 };
 
+static const struct amdgpu_irq_src_funcs gfx_v8_0_spm_irq_funcs = {
+	.set = gfx_v8_0_spm_set_interrupt_state,
+	.process = gfx_v8_0_spm_irq,
+};
+
 static void gfx_v8_0_set_irq_funcs(struct amdgpu_device *adev)
 {
 	adev->gfx.eop_irq.num_types = AMDGPU_CP_IRQ_LAST;
 	adev->gfx.eop_irq.funcs = &gfx_v8_0_eop_irq_funcs;
+
+	adev->gfx.spm_irq.num_types = 1;
+	adev->gfx.spm_irq.funcs = &gfx_v8_0_spm_irq_funcs;
 
 	adev->gfx.priv_reg_irq.num_types = 1;
 	adev->gfx.priv_reg_irq.funcs = &gfx_v8_0_priv_reg_irq_funcs;

@@ -658,6 +658,81 @@ struct kfd_ioctl_smi_events_args {
 	__u32 anon_fd;	/* from KFD */
 };
 
+/**
+ * kfd_ioctl_spm_op - SPM ioctl operations
+ *
+ * @KFD_IOCTL_SPM_OP_ACQUIRE: acquire exclusive access to SPM
+ * @KFD_IOCTL_SPM_OP_RELEASE: release exclusive access to SPM
+ * @KFD_IOCTL_SPM_OP_SET_DEST_BUF: set or unset destination buffer for SPM streaming
+ */
+enum kfd_ioctl_spm_op {
+	KFD_IOCTL_SPM_OP_ACQUIRE,
+	KFD_IOCTL_SPM_OP_RELEASE,
+	KFD_IOCTL_SPM_OP_SET_DEST_BUF
+};
+
+/**
+ * kfd_ioctl_spm_args - Arguments for SPM ioctl
+ *
+ * @op[in]:            specifies the operation to perform
+ * @gpu_id[in]:        GPU ID of the GPU to profile
+ * @dst_buf[in]:       used for the address of the destination buffer
+ *                      in @KFD_IOCTL_SPM_SET_DEST_BUFFER
+ * @buf_size[in]:      size of the destination buffer
+ * @timeout[in/out]:   [in]: timeout in milliseconds, [out]: amount of time left
+ *                      `in the timeout window
+ * @bytes_copied[out]: amount of data that was copied to the previous dest_buf
+ * @has_data_loss:     boolean indicating whether data was lost
+ *                      (e.g. due to a ring-buffer overflow)
+ *
+ * This ioctl performs different functions depending on the @op parameter.
+ *
+ * KFD_IOCTL_SPM_OP_ACQUIRE
+ * ------------------------
+ *
+ * Acquires exclusive access of SPM on the specified @gpu_id for the calling process.
+ * This must be called before using KFD_IOCTL_SPM_OP_SET_DEST_BUF.
+ *
+ * KFD_IOCTL_SPM_OP_RELEASE
+ * ------------------------
+ *
+ * Releases exclusive access of SPM on the specified @gpu_id for the calling process,
+ * which allows another process to acquire it in the future.
+ *
+ * KFD_IOCTL_SPM_OP_SET_DEST_BUF
+ * -----------------------------
+ *
+ * If @dst_buf is NULL, the destination buffer address is unset and copying of counters
+ * is stopped.
+ *
+ * If @dst_buf is not NULL, it specifies the pointer to a new destination buffer.
+ * @buf_size specifies the size of the buffer.
+ *
+ * If @timeout is non-0, the call will wait for up to @timeout ms for the previous
+ * buffer to be filled. If previous buffer to be filled before timeout, the @timeout
+ * will be updated value with the time remaining. If the timeout is exceeded, the function
+ * copies any partial data available into the previous user buffer and returns success.
+ * The amount of valid data in the previous user buffer is indicated by @bytes_copied.
+ *
+ * If @timeout is 0, the function immediately replaces the previous destination buffer
+ * without waiting for the previous buffer to be filled. That means the previous buffer
+ * may only be partially filled, and @bytes_copied will indicate how much data has been
+ * copied to it.
+ *
+ * If data was lost, e.g. due to a ring buffer overflow, @has_data_loss will be non-0.
+ *
+ * Returns negative error code on failure, 0 on success.
+ */
+struct kfd_ioctl_spm_args {
+	__u64 dest_buf;
+	__u32 buf_size;
+	__u32 op;
+	__u32 timeout;
+	__u32 gpu_id;
+	__u32 bytes_copied;
+	__u32 has_data_loss;
+};
+
 /* Register offset inside the remapped mmio page
  */
 enum kfd_mmio_remap {
@@ -995,7 +1070,11 @@ struct kfd_ioctl_set_xnack_mode_args {
 #define AMDKFD_IOC_CROSS_MEMORY_COPY		\
 		AMDKFD_IOWR(0x83, struct kfd_ioctl_cross_memory_copy_args)
 
+#define AMDKFD_IOC_RLC_SPM		\
+		AMDKFD_IOWR(0x84, struct kfd_ioctl_spm_args)
+
+
 #define AMDKFD_COMMAND_START_2		0x80
-#define AMDKFD_COMMAND_END_2		0x84
+#define AMDKFD_COMMAND_END_2		0x85
 
 #endif

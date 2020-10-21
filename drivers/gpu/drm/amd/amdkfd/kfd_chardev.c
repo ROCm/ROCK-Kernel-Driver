@@ -3006,6 +3006,12 @@ static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
 }
 #endif
 
+static int kfd_ioctl_rlc_spm(struct file *filep,
+				   struct kfd_process *p, void *data)
+{
+	return kfd_rlc_spm(p, data);
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -3121,6 +3127,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_dbg_set_debug_trap, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
+			kfd_ioctl_rlc_spm, 0),
+
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)

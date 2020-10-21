@@ -332,6 +332,9 @@ struct kfd_dev {
 
 	uint32_t reset_seq_num;
 
+	/*spm process id */
+	unsigned int spm_pasid;
+
 	/*
 	 * A bitmask to indicate which watch points have been allocated.
 	 *   bit meaning:
@@ -795,6 +798,12 @@ struct kfd_process_device {
 	uint64_t sdma_past_activity_counter;
 	struct attribute attr_sdma;
 	char sdma_filename[MAX_SYSFS_FILENAME_LEN];
+
+	/* spm data */
+	struct kfd_spm_cntr *spm_cntr;
+	struct mutex spm_mutex;
+	struct work_struct spm_work;
+	spinlock_t spm_irq_lock;
 
 	/* Eviction activity tracking */
 	uint64_t last_evict_timestamp;
@@ -1297,6 +1306,9 @@ void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type);
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 bool kfd_is_locked(void);
+
+void kfd_spm_init_process_device(struct kfd_process_device *pdd);
+int kfd_rlc_spm(struct kfd_process *p,  void __user *data);
 
 /* PeerDirect support */
 void kfd_init_peer_direct(void);
