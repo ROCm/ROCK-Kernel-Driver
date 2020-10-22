@@ -1005,7 +1005,7 @@ void dc_flip_plane_addrs(struct dc *dc,
 		struct dc_flip_addrs flip_addrs[],
 		uint32_t count);
 #endif
-bool dc_post_update_surfaces_to_stream(
+void dc_post_update_surfaces_to_stream(
 		struct dc *dc);
 
 #include "dc_stream.h"

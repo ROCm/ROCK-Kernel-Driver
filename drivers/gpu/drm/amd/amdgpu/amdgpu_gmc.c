@@ -424,7 +424,38 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 {
 	struct amdgpu_gmc *gmc = &adev->gmc;
 
-	gmc->noretry = amdgpu_noretry;
+	switch (adev->asic_type) {
+	case CHIP_VEGA20:
+	case CHIP_NAVI10:
+	case CHIP_NAVI14:
+		/*
+		 * noretry = 0 will cause kfd page fault tests fail
+		 * for some ASICs, so set default to 1 for these ASICs.
+		 */
+		if (amdgpu_noretry == -1)
+			gmc->noretry = 1;
+		else
+			gmc->noretry = amdgpu_noretry;
+		break;
+	case CHIP_RAVEN:
+	default:
+		/* Raven currently has issues with noretry
+		 * regardless of what we decide for other
+		 * asics, we should leave raven with
+		 * noretry = 0 until we root cause the
+		 * issues.
+		 *
+		 * default this to 0 for now, but we may want
+		 * to change this in the future for certain
+		 * GPUs as it can increase performance in
+		 * certain cases.
+		 */
+		if (amdgpu_noretry == -1)
+			gmc->noretry = 0;
+		else
+			gmc->noretry = amdgpu_noretry;
+		break;
+	}
 }
 
 void amdgpu_gmc_set_vm_fault_masks(struct amdgpu_device *adev, int hub_type,
