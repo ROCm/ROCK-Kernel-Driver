@@ -1811,7 +1811,7 @@ static int stm32_fmc2_parse_child(struct stm32_fmc2_nfc *fmc2,
 			return ret;
 		}
 
-		if (cs > FMC2_MAX_CE) {
+		if (cs >= FMC2_MAX_CE) {
 			dev_err(fmc2->dev, "invalid reg value: %d\n", cs);
 			return -EINVAL;
 		}

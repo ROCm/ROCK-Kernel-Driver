@@ -286,6 +286,17 @@ static struct clk_regmap g12a_cpu_clk_mux0_div = {
 		.ops = &clk_regmap_divider_ro_ops,
 		.parent_names = (const char *[]){ "cpu_clk_dyn0_sel" },
 		.num_parents = 1,
+		/*
+		 * Similar to fclk_div3, it seems that this clock is used by
+		 * the resident firmware and is required by the platform to
+		 * operate correctly.
+		 * Until the following condition are met, we need this clock to
+		 * be marked as critical:
+		 * a) Mark the clock used by a firmware resource, if possible
+		 * b) CCF has a clock hand-off mechanism to make the sure the
+		 *    clock stays on until the proper driver comes along
+		 */
+		.flags = CLK_IS_CRITICAL,
 	},
 };
 
