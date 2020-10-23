@@ -818,7 +818,8 @@ static inline int papr_scm_node(int node)
 static ssize_t perf_stats_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
-	int index, rc;
+	int index;
+	ssize_t rc;
 	struct seq_buf s;
 	struct papr_scm_perf_stat *stat;
 	struct papr_scm_perf_stats *stats;
@@ -853,7 +854,7 @@ static ssize_t perf_stats_show(struct device *dev,
 
 free_stats:
 	kfree(stats);
-	return rc ? rc : seq_buf_used(&s);
+	return rc ? rc : (ssize_t)seq_buf_used(&s);
 }
 DEVICE_ATTR_ADMIN_RO(perf_stats);
 
