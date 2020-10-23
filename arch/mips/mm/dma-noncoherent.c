@@ -49,7 +49,7 @@ void arch_dma_prep_coherent(struct page *page, size_t size)
 	dma_cache_wback_inv((unsigned long)page_address(page), size);
 }
 
-void *uncached_kernel_address(void *addr)
+void *arch_dma_set_uncached(void *addr, size_t size)
 {
 	return (void *)(__pa(addr) + UNCAC_BASE);
 }
@@ -57,20 +57,6 @@ void *uncached_kernel_address(void *addr)
 void *cached_kernel_address(void *addr)
 {
 	return __va(addr) - UNCAC_BASE;
-}
-
-long arch_dma_coherent_to_pfn(struct device *dev, void *cpu_addr,
-		dma_addr_t dma_addr)
-{
-	return page_to_pfn(virt_to_page(cached_kernel_address(cpu_addr)));
-}
-
-pgprot_t arch_dma_mmap_pgprot(struct device *dev, pgprot_t prot,
-		unsigned long attrs)
-{
-	if (attrs & DMA_ATTR_WRITE_COMBINE)
-		return pgprot_writecombine(prot);
-	return pgprot_noncached(prot);
 }
 
 static inline void dma_sync_virt(void *addr, size_t size,

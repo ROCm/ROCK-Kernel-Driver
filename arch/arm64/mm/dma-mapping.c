@@ -11,12 +11,6 @@
 
 #include <asm/cacheflush.h>
 
-pgprot_t arch_dma_mmap_pgprot(struct device *dev, pgprot_t prot,
-		unsigned long attrs)
-{
-	return pgprot_writecombine(prot);
-}
-
 void arch_sync_dma_for_device(struct device *dev, phys_addr_t paddr,
 		size_t size, enum dma_data_direction dir)
 {
@@ -33,12 +27,6 @@ void arch_dma_prep_coherent(struct page *page, size_t size)
 {
 	__dma_flush_area(page_address(page), size);
 }
-
-static int __init arm64_dma_init(void)
-{
-	return dma_atomic_pool_init(GFP_DMA32, __pgprot(PROT_NORMAL_NC));
-}
-arch_initcall(arm64_dma_init);
 
 #ifdef CONFIG_IOMMU_DMA
 void arch_teardown_dma_ops(struct device *dev)
