@@ -107,9 +107,6 @@ enum OID {
 	OID_gostTC26Sign512B,		/* 1.2.643.7.1.2.1.2.2 */
 	OID_gostTC26Sign512C,		/* 1.2.643.7.1.2.1.2.3 */
 
-	/* Extended key purpose OIDs [RFC 5280] */
-	OID_codeSigning,		/* 1.3.6.1.5.5.7.3.3 */
-
 	OID__NR
 };
 

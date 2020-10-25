@@ -186,8 +186,15 @@ verified:
  * May also return -ENOMEM.
  */
 int pkcs7_validate_trust(struct pkcs7_message *pkcs7,
-			 struct key *trust_keyring,
-			 enum key_being_used_for usage)
+			 struct key *trust_keyring)
+{
+	return __kabi__pkcs7_validate_trust(pkcs7, trust_keyring,
+					    NR__KEY_BEING_USED_FOR);
+}
+
+int __kabi__pkcs7_validate_trust(struct pkcs7_message *pkcs7,
+			 	 struct key *trust_keyring,
+			 	 enum key_being_used_for usage)
 {
 	struct pkcs7_signed_info *sinfo;
 	struct x509_certificate *p;
