@@ -96,4 +96,14 @@ config SIGNED_PE_FILE_VERIFICATION
 	  This option provides support for verifying the signature(s) on a
 	  signed PE binary.
 
+config CHECK_CODESIGN_EKU
+	bool "Check codeSigning extended key usage"
+	depends on PKCS7_MESSAGE_PARSER=y
+	depends on SYSTEM_DATA_VERIFICATION
+	help
+	  This option provides support for checking the codeSigning extended
+	  key usage extension when verifying the signature in PKCS#7. It
+	  affects kernel module verification and kexec PE binary verification
+	  now.
+
 endif # ASYMMETRIC_KEY_TYPE

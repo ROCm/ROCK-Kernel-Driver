@@ -28,6 +28,9 @@ struct public_key {
 	bool key_is_private;
 	const char *id_type;
 	const char *pkey_algo;
+#ifndef __GENKSYMS__
+	unsigned int eku : 9;      /* Extended Key Usage (9-bit) */
+#endif
 };
 
 extern void public_key_free(struct public_key *key);

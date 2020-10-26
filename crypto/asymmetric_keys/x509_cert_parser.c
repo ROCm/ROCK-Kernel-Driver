@@ -470,6 +470,8 @@ int x509_extract_key_data(void *context, size_t hdrlen,
 /* The keyIdentifier in AuthorityKeyIdentifier SEQUENCE is tag(CONT,PRIM,0) */
 #define SEQ_TAG_KEYID (ASN1_CONT << 6)
 
+static const unsigned char codesign_oid[8] = {43, 6, 1, 5, 5, 7, 3, 3};
+
 /*
  * Process certificate extensions that are used to qualify the certificate.
  */
@@ -480,6 +482,7 @@ int x509_process_extension(void *context, size_t hdrlen,
 	struct x509_parse_context *ctx = context;
 	struct asymmetric_key_id *kid;
 	const unsigned char *v = value;
+	int i = 0;
 
 	pr_debug("Extension: %u\n", ctx->last_oid);
 
@@ -506,6 +509,27 @@ int x509_process_extension(void *context, size_t hdrlen,
 		/* Get hold of the CA key fingerprint */
 		ctx->raw_akid = v;
 		ctx->raw_akid_size = vlen;
+		return 0;
+	}
+
+	if (ctx->last_oid == OID_extKeyUsage) {
+		if (v[0] != ((ASN1_UNIV << 6) | ASN1_CONS_BIT | ASN1_SEQ) ||
+		    v[1] != vlen - 2)
+			return -EBADMSG;
+		i += 2;
+
+		while (i < vlen) {
+			/* A 10 bytes EKU OID Octet blob =
+			 * ASN1_OID + size byte + 8 bytes OID */
+			if (v[i] != ASN1_OID || v[i + 1] != 8 || (i + 10) > vlen)
+				return -EBADMSG;
+
+			if (!memcmp(codesign_oid, v + i + 2, 8)) {
+				ctx->cert->pub->eku |= EKU_codeSigning;
+			}
+			i += 10;
+		}
+		pr_debug("extKeyUsage: %d\n", ctx->cert->pub->eku);
 		return 0;
 	}
 
