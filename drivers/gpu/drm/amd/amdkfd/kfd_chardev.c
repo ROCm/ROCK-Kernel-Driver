@@ -1297,7 +1297,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		 * BO as a regular userptr BO
 		 */
 		vma = find_vma(current->mm, args->mmap_offset);
-		if (vma && (vma->vm_flags & VM_IO)) {
+		if (vma && args->mmap_offset >= vma->vm_start &&
+		    (vma->vm_flags & VM_IO)) {
 			unsigned long pfn;
 
 			err = follow_pfn(vma, args->mmap_offset, &pfn);
