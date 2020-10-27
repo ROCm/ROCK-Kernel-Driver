@@ -953,9 +953,6 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	struct dc_callback_init init_params;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
-	struct dc_phy_addr_space_config pa_config;
-#endif
 	int r;
 
 	adev->dm.ddev = adev_to_drm(adev);
@@ -1068,6 +1065,8 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	if (adev->asic_type == CHIP_RENOIR) {
+		struct dc_phy_addr_space_config pa_config;
+
 		mmhub_read_system_context(adev, &pa_config);
 
 		// Call the DC init_memory func
