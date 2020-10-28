@@ -2243,24 +2243,22 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 
 	man = &adev->mman.bdev.man[AMDGPU_PL_DGMA];
 	/* reserved visible VRAM for direct GMA */
-	man->func = &ttm_bo_manager_func;
 	man->available_caching = TTM_PL_FLAG_UNCACHED;
 	man->default_caching = TTM_PL_FLAG_UNCACHED;
 
 	/* reserve in gtt */
 	atomic64_add(size, &adev->gart_pin_size);
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA, size >> PAGE_SHIFT);
+	r = ttm_range_man_init(&adev->mman.bdev, man, size >> PAGE_SHIFT);
 	if (unlikely(r))
 		goto error_put_node;
 
 	man = &adev->mman.bdev.man[AMDGPU_PL_DGMA_IMPORT];
 	/* reserved GTT space for direct GMA */
 	man->use_tt = true;
-	man->func = &ttm_bo_manager_func;
 	man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
 	man->default_caching = TTM_PL_FLAG_WC;
 
-	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT, size >> PAGE_SHIFT);
+	r = ttm_range_man_init(&adev->mman.bdev, man, size >> PAGE_SHIFT);
 	if (unlikely(r))
 		goto error_release_mm;
 
