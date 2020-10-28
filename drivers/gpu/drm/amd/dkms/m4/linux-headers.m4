@@ -55,14 +55,6 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([uapi/linux/sched/types.h])
 
-	dnl # commit 9826a516ff77c5820e591211e4f3e58ff36f46be
-	dnl # Author: Michel Lespinasse <walken@google.com>
-	dnl # Date: Mon Oct 8 16:31:35 2012 -0700
-	dnl # mm: interval tree updates
-	dnl # Update the generic interval tree code that was introduced in
-	dnl # "mm:replace  vma prio_tree with an interval tree".
-	AC_KERNEL_CHECK_HEADERS([linux/interval_tree_generic.h])
-
 	dnl #
 	dnl # v4.19-rc6-7-ga3f8a30f3f00
 	dnl # Compiler Attributes: use feature checks instead of version checks

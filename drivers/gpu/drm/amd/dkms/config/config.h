@@ -104,23 +104,8 @@
 /* drm_atomic_helper_check_plane_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
 
-/* __drm_atomic_helper_connector_reset() is available */
-#define HAVE_DRM_ATOMIC_HELPER_CONNECTOR_RESET 1
-
-/* drm_atomic_helper_disable_all() is available */
-#define HAVE_DRM_ATOMIC_HELPER_DISABLE_ALL 1
-
-/* drm_atomic_helper_duplicate_state() is available */
-#define HAVE_DRM_ATOMIC_HELPER_DUPLICATE_STATE 1
-
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
-
-/* drm_atomic_helper_suspend() is available */
-#define HAVE_DRM_ATOMIC_HELPER_SUSPEND_RESUME 1
-
-/* drm_atomic_helper_update_legacy_modeset_state() is available */
-#define HAVE_DRM_ATOMIC_HELPER_UPDATE_LEGACY_MODESET_STATE 1
 
 /* drm_atomic_helper_wait_for_flip_done() is available */
 #define HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE 1
@@ -375,9 +360,6 @@
 /* Define to 1 if you have the <drm/drm_vblank.h> header file. */
 #define HAVE_DRM_DRM_VBLANK_H 1
 
-/* drm_driver_feature DRIVER_ATOMIC is available */
-#define HAVE_DRM_DRV_DRIVER_ATOMIC 1
-
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
 
@@ -396,15 +378,9 @@
 /* drm_encoder_find() wants file_priv */
 #define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
 
-/* drm_encoder_init() wants name */
-#define HAVE_DRM_ENCODER_INIT_VALID_WITH_NAME 1
-
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
-
-/* drm_fb_helper_cfb_{fillrect/copyarea/imageblit}() is available */
-#define HAVE_DRM_FB_HELPER_CFB_XX 1
 
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
@@ -429,9 +405,6 @@
 
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
-
-/* drm_fb_helper_{alloc/unregister}_fbi is available */
-#define HAVE_DRM_FB_HELPER_XX_FBI 1
 
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
@@ -490,9 +463,6 @@
 /* drm_mm_print() is available */
 #define HAVE_DRM_MM_PRINT 1
 
-/* drm_modeset_lock_all_ctx() is available */
-#define HAVE_DRM_MODESET_LOCK_ALL_CTX 1
-
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 
@@ -523,9 +493,6 @@
 
 /* drm_plane_create_rotation_property is available */
 #define HAVE_DRM_PLANE_PROPERTY_ROTATION 1
-
-/* drm_send_event_locked() function is available */
-#define HAVE_DRM_SEND_EVENT_LOCKED 1
 
 /* drm_syncobj_fence_get() is available */
 /* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */
@@ -605,9 +572,6 @@
 /* get_vblank_timestamp return bool */
 /* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_RETURN_BOOL */
 
-/* hash_for_each_xxx() drop the node parameter */
-#define HAVE_HASH_FOR_EACH_XXX_DROP_NODE 1
-
 /* drm_connector_hdr_sink_metadata() is available */
 #define HAVE_HDR_SINK_METADATA 1
 
@@ -616,9 +580,6 @@
 
 /* hmm_range_fault() wants 1 arg */
 #define HAVE_HMM_RANGE_FAULT_1ARG 1
-
-/* hwmon_device_register_with_groups() is available */
-#define HAVE_HWMON_DEVICE_REGISTER_WITH_GROUPS 1
 
 /* struct i2c_lock_operations is defined */
 #define HAVE_I2C_LOCK_OPERATIONS_STRUCT 1
@@ -632,9 +593,6 @@
 /* in_compat_syscall is defined */
 #define HAVE_IN_COMPAT_SYSCALL 1
 
-/* IRQ translation domains exist */
-#define HAVE_IRQ_DOMAIN 1
-
 /* jiffies64_to_msecs() is available */
 #define HAVE_JIFFIES64_TO_MSECS 1
 
@@ -643,9 +601,6 @@
 
 /* kmap_atomic() have one argument */
 #define HAVE_KMAP_ATOMIC_ONE_ARG 1
-
-/* kobj_to_dev() is available */
-#define HAVE_KOBJ_TO_DEV 1
 
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
@@ -703,9 +658,6 @@
 
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
-
-/* Define to 1 if you have the <linux/interval_tree_generic.h> header file. */
-#define HAVE_LINUX_INTERVAL_TREE_GENERIC_H 1
 
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
@@ -794,9 +746,6 @@
 /* pci_is_thunderbolt_attached() is available */
 #define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
 
-/* pci_pcie_type() exist */
-#define HAVE_PCI_PCIE_TYPE 1
-
 /* pci_upstream_bridge() is available */
 #define HAVE_PCI_UPSTREAM_BRIDGE 1
 
@@ -811,12 +760,6 @@
 
 /* pm_genpd_remove_device() wants 2 arguments */
 /* #undef HAVE_PM_GENPD_REMOVE_DEVICE_2ARGS */
-
-/* ptrace_parent() is available */
-#define HAVE_PTRACE_PARENT 1
-
-/* register_shrinker() returns integer */
-#define HAVE_REGISTER_SHRINKER_RETURN_INT 1
 
 /* remove_conflicting_framebuffers() returns int */
 /* #undef HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT */
@@ -905,12 +848,6 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
-/* system_highpri_wq is declared */
-#define HAVE_SYSTEM_HIGHPRI_WQ_DECLARED 1
-
-/* system_highpri_wq is exported */
-#define HAVE_SYSTEM_HIGHPRI_WQ_EXPORTED 1
-
 /* timer_setup() is available */
 #define HAVE_TIMER_SETUP 1
 
@@ -925,30 +862,6 @@
 
 /* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
 #define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
-
-/* vga_switcheroo_handler->get_client_id() return int */
-/* #undef HAVE_VGA_SWITCHEROO_GET_CLIENT_ID_RETURN_INT */
-
-/* enum vga_switcheroo_handler_flags_t is available */
-#define HAVE_VGA_SWITCHEROO_HANDLER_FLAGS_T_ENUM 1
-
-/* struct vga_switcheroo_client_ops is available */
-#define HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_OPS 1
-
-/* vga_switcheroo_register_client() has p,p interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P */
-
-/* vga_switcheroo_register_client() has p,p,b interface */
-#define HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P_B 1
-
-/* vga_switcheroo_register_client() has p,p,p,p interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_CLIENT_P_P_P_P */
-
-/* vga_switeroo_register_handler() p_c interface */
-/* #undef HAVE_VGA_SWITCHEROO_REGISTER_HANDLER_PC */
-
-/* vga_switeroo_register_handler() has p,e interface */
-#define HAVE_VGA_SWITCHEROO_REGISTER_HANDLER_PC_E 1
 
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
@@ -1021,3 +934,6 @@
 
 /* drm_plane_mask is available */
 #define HAVE_DRM_PLANE_MASK 1
+
+/* __print_array for trace is available */
+#define HAVE___PRINT_ARRAY 1

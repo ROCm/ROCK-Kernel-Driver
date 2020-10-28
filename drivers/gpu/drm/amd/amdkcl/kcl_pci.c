@@ -228,11 +228,7 @@ int _kcl_pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps)
 		/*
 		 * Upstream ports may block AtomicOps on egress.
 		 */
-#if defined(HAVE_PCI_PCIE_TYPE)
-		if (pci_pcie_type(bridge) == PCI_EXP_TYPE_DOWNSTREAM) {
-#else
 		if (!bridge->has_secondary_link) {
-#endif
 			u32 ctl2;
 
 			pcie_capability_read_dword(bridge, PCI_EXP_DEVCTL2,

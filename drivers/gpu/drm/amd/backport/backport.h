@@ -5,7 +5,6 @@
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <kcl/kcl_types.h>
-#include <kcl/kcl_hashtable.h>
 #include <kcl/kcl_overflow.h>
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_kref.h>
@@ -16,7 +15,6 @@
 #include <kcl/kcl_eventpoll.h>
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_firmware.h>
-#include <kcl/kcl_hwmon.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_workqueue.h>
@@ -28,7 +26,6 @@
 #include <kcl/backport/kcl_io_backport.h>
 #include <kcl/backport/kcl_uaccess_backport.h>
 #include <kcl/backport/kcl_perf_event_backport.h>
-#include <kcl/kcl_ptrace.h>
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_seqlock.h>
 #include <kcl/kcl_mmu_notifier.h>
@@ -36,7 +33,6 @@
 #include <kcl/kcl_suspend.h>
 #include <kcl/backport/kcl_pci_backport.h>
 #include <kcl/kcl_timekeeping.h>
-#include <kcl/backport/kcl_vga_switcheroo_backport.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_pagemap.h>
 #include <kcl/kcl_pm.h>
@@ -65,5 +61,6 @@
 #include <kcl/kcl_drm_atomic.h>
 #include <kcl/kcl_amdgpu_drm_fb_helper.h>
 #include "kcl/kcl_amdgpu.h"
+#include <kcl/kcl_ftrace.h>
 
 #endif /* AMDGPU_BACKPORT_H */

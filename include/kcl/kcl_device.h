@@ -5,13 +5,6 @@
 #include <linux/ratelimit.h>
 #include <linux/device.h>
 
-#if !defined(HAVE_KOBJ_TO_DEV)
-static inline struct device *kobj_to_dev(struct kobject *kobj)
-{
-	return container_of(kobj, struct device, kobj);
-}
-#endif
-
 #if !defined(dev_err_once)
 #ifdef CONFIG_PRINTK
 #define dev_level_once(dev_level, dev, fmt, ...)			\

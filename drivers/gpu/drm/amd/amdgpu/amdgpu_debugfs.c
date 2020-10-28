@@ -1362,11 +1362,49 @@ static int amdgpu_debugfs_evict_gtt(struct seq_file *m, void *data)
 	return 0;
 }
 
+static int amdgpu_debugfs_vm_info(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *)m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct drm_file *file;
+	int r;
+
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	r = mutex_lock_interruptible(&dev->struct_mutex);
+#else
+	r = mutex_lock_interruptible(&dev->filelist_mutex);
+#endif
+	if (r)
+		return r;
+
+	list_for_each_entry(file, &dev->filelist, lhead) {
+		struct amdgpu_fpriv *fpriv = file->driver_priv;
+		struct amdgpu_vm *vm = &fpriv->vm;
+
+		seq_printf(m, "pid:%d\tProcess:%s ----------\n",
+				vm->task_info.pid, vm->task_info.process_name);
+		r = amdgpu_bo_reserve(vm->root.base.bo, true);
+		if (r)
+			break;
+		amdgpu_debugfs_vm_bo_info(vm, m);
+		amdgpu_bo_unreserve(vm->root.base.bo);
+	}
+
+#ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
+	mutex_unlock(&dev->struct_mutex);
+#else
+	mutex_unlock(&dev->filelist_mutex);
+#endif
+
+	return r;
+}
+
 static const struct drm_info_list amdgpu_debugfs_list[] = {
 	{"amdgpu_vbios", amdgpu_debugfs_get_vbios_dump},
 	{"amdgpu_test_ib", &amdgpu_debugfs_test_ib},
 	{"amdgpu_evict_vram", &amdgpu_debugfs_evict_vram},
 	{"amdgpu_evict_gtt", &amdgpu_debugfs_evict_gtt},
+	{"amdgpu_vm_info", &amdgpu_debugfs_vm_info},
 };
 
 static void amdgpu_ib_preempt_fences_swap(struct amdgpu_ring *ring,

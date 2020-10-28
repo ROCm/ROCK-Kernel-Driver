@@ -10,7 +10,9 @@ ifndef CONFIG_KALLSYMS
 $(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
 endif
 
-ifeq ($(shell grep "HAVE_DMA_RESV_SEQ" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),n)
+_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
+
+ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ),n)
 $(error dma_resv->seq is missing., exit...)
 endif
 
@@ -211,7 +213,7 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_01
 
-ifeq ($(shell grep "HAVE_DRM_DRM_HDCP_H" $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n"),y)
+ifeq ($(call _is_kcl_macro_defined,HAVE_DRM_DRM_HDCP_H),y)
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 endif

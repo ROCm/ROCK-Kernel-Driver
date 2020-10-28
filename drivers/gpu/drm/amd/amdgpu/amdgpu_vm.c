@@ -300,7 +300,7 @@ static void amdgpu_vm_bo_relocated(struct amdgpu_vm_bo_base *vm_bo)
 static void amdgpu_vm_bo_done(struct amdgpu_vm_bo_base *vm_bo)
 {
 	spin_lock(&vm_bo->vm->invalidated_lock);
-	list_del_init(&vm_bo->vm_status);
+	list_move(&vm_bo->vm_status, &vm_bo->vm->done);
 	spin_unlock(&vm_bo->vm->invalidated_lock);
 }
 
@@ -1515,19 +1515,26 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
 		entry_end = min(entry_end, end);
 
 		do {
+			struct amdgpu_vm *vm = params->vm;
 			uint64_t upd_end = min(entry_end, frag_end);
 			unsigned nptes = (upd_end - frag_start) >> shift;
+			uint64_t upd_flags = flags | AMDGPU_PTE_FRAG(frag);
 
 			/* This can happen when we set higher level PDs to
 			 * silent to stop fault floods.
 			 */
 			nptes = max(nptes, 1u);
+
+			trace_amdgpu_vm_update_ptes(params, frag_start, upd_end,
+						    nptes, dst, incr, upd_flags,
+						    vm->task_info.pid,
+						    vm->immediate.fence_context);
 			amdgpu_vm_update_flags(params, pt, cursor.level,
 					       pe_start, dst, nptes, incr,
-					       flags | AMDGPU_PTE_FRAG(frag));
+					       upd_flags);
 
 			pe_start += nptes * 8;
-			dst += (uint64_t)nptes * AMDGPU_GPU_PAGE_SIZE << shift;
+			dst += nptes * incr;
 
 			frag_start = upd_end;
 			if (frag_start >= frag_end) {
@@ -2849,7 +2856,7 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	INIT_LIST_HEAD(&vm->invalidated);
 	spin_lock_init(&vm->invalidated_lock);
 	INIT_LIST_HEAD(&vm->freed);
-
+	INIT_LIST_HEAD(&vm->done);
 
 	/* create scheduler entities for page table updates */
 	r = drm_sched_entity_init(&vm->immediate, DRM_SCHED_PRIORITY_NORMAL,
@@ -3426,3 +3433,99 @@ error_unref:
 
 	return false;
 }
+
+#if defined(CONFIG_DEBUG_FS)
+/**
+ * amdgpu_debugfs_vm_bo_info  - print BO info for the VM
+ *
+ * @vm: Requested VM for printing BO info
+ * @m: debugfs file
+ *
+ * Print BO information in debugfs file for the VM
+ */
+void amdgpu_debugfs_vm_bo_info(struct amdgpu_vm *vm, struct seq_file *m)
+{
+	struct amdgpu_bo_va *bo_va, *tmp;
+	u64 total_idle = 0;
+	u64 total_evicted = 0;
+	u64 total_relocated = 0;
+	u64 total_moved = 0;
+	u64 total_invalidated = 0;
+	u64 total_done = 0;
+	unsigned int total_idle_objs = 0;
+	unsigned int total_evicted_objs = 0;
+	unsigned int total_relocated_objs = 0;
+	unsigned int total_moved_objs = 0;
+	unsigned int total_invalidated_objs = 0;
+	unsigned int total_done_objs = 0;
+	unsigned int id = 0;
+
+	seq_puts(m, "\tIdle BOs:\n");
+	list_for_each_entry_safe(bo_va, tmp, &vm->idle, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_idle += amdgpu_bo_print_info(id++, bo_va->base.bo, m);
+	}
+	total_idle_objs = id;
+	id = 0;
+
+	seq_puts(m, "\tEvicted BOs:\n");
+	list_for_each_entry_safe(bo_va, tmp, &vm->evicted, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_evicted += amdgpu_bo_print_info(id++, bo_va->base.bo, m);
+	}
+	total_evicted_objs = id;
+	id = 0;
+
+	seq_puts(m, "\tRelocated BOs:\n");
+	list_for_each_entry_safe(bo_va, tmp, &vm->relocated, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_relocated += amdgpu_bo_print_info(id++, bo_va->base.bo, m);
+	}
+	total_relocated_objs = id;
+	id = 0;
+
+	seq_puts(m, "\tMoved BOs:\n");
+	list_for_each_entry_safe(bo_va, tmp, &vm->moved, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_moved += amdgpu_bo_print_info(id++, bo_va->base.bo, m);
+	}
+	total_moved_objs = id;
+	id = 0;
+
+	seq_puts(m, "\tInvalidated BOs:\n");
+	spin_lock(&vm->invalidated_lock);
+	list_for_each_entry_safe(bo_va, tmp, &vm->invalidated, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_invalidated += amdgpu_bo_print_info(id++,	bo_va->base.bo, m);
+	}
+	total_invalidated_objs = id;
+	id = 0;
+
+	seq_puts(m, "\tDone BOs:\n");
+	list_for_each_entry_safe(bo_va, tmp, &vm->done, base.vm_status) {
+		if (!bo_va->base.bo)
+			continue;
+		total_done += amdgpu_bo_print_info(id++, bo_va->base.bo, m);
+	}
+	spin_unlock(&vm->invalidated_lock);
+	total_done_objs = id;
+
+	seq_printf(m, "\tTotal idle size:        %12lld\tobjs:\t%d\n", total_idle,
+		   total_idle_objs);
+	seq_printf(m, "\tTotal evicted size:     %12lld\tobjs:\t%d\n", total_evicted,
+		   total_evicted_objs);
+	seq_printf(m, "\tTotal relocated size:   %12lld\tobjs:\t%d\n", total_relocated,
+		   total_relocated_objs);
+	seq_printf(m, "\tTotal moved size:       %12lld\tobjs:\t%d\n", total_moved,
+		   total_moved_objs);
+	seq_printf(m, "\tTotal invalidated size: %12lld\tobjs:\t%d\n", total_invalidated,
+		   total_invalidated_objs);
+	seq_printf(m, "\tTotal done size:        %12lld\tobjs:\t%d\n", total_done,
+		   total_done_objs);
+}
+#endif
