@@ -322,6 +322,8 @@ struct kfd2kgd_calls {
 					uint32_t debug_vmid);
 	void (*clear_address_watch)(struct kgd_dev *kgd,
 			uint32_t watch_id);
+	int (*set_precise_mem_ops)(struct kgd_dev *kgd, uint32_t vmid,
+				bool enable);
 	void (*get_iq_wait_times)(struct kgd_dev *kgd,
 			uint32_t *wait_times);
 	void (*build_grace_period_packet_info)(struct kgd_dev *kgd,

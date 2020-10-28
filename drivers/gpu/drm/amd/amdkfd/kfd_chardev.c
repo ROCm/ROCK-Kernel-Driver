@@ -2919,6 +2919,23 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		/* Save the watch point ID for the caller */
 		args->data1 = data1;
 		break;
+	case KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS:
+		switch (data1) {
+		case 0:
+			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+					dev->vm_info.last_vmid_kfd, false);
+			break;
+		case 1:
+			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+					dev->vm_info.last_vmid_kfd, true);
+			break;
+		default:
+			pr_err("Invalid precise mem ops option: %i\n", data1);
+			r = -EINVAL;
+			break;
+		}
+
+		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
 		r = -EINVAL;

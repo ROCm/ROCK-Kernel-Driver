@@ -659,6 +659,23 @@ static void set_vm_context_page_table_base_v10_3(struct kgd_dev *kgd, uint32_t v
 	adev->gfxhub.funcs->setup_vm_pt_regs(adev, vmid, page_table_base);
 }
 
+static int set_precise_mem_ops_v10_3(struct kgd_dev *kgd, uint32_t vmid,
+				bool enable)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data;
+
+	lock_srbm(kgd, 0, 0, 0, vmid);
+
+	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_DEBUG));
+	data = REG_SET_FIELD(data, SQ_DEBUG, SINGLE_MEMOP, enable ? 1 : 0);
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_DEBUG), data);
+
+	unlock_srbm(kgd);
+
+	return 0;
+}
+
 const struct kfd2kgd_calls gfx_v10_3_kfd2kgd = {
 	.program_sh_mem_settings = program_sh_mem_settings_v10_3,
 	.set_pasid_vmid_mapping = set_pasid_vmid_mapping_v10_3,
@@ -685,6 +702,7 @@ const struct kfd2kgd_calls gfx_v10_3_kfd2kgd = {
 	.set_wave_launch_mode = kgd_gfx_v10_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v10_set_address_watch,
 	.clear_address_watch = kgd_gfx_v10_clear_address_watch,
+	.set_precise_mem_ops = set_precise_mem_ops_v10_3,
 	.get_iq_wait_times = kgd_gfx_v10_get_iq_wait_times,
 	.build_grace_period_packet_info =
 				kgd_gfx_v10_build_grace_period_packet_info,

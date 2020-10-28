@@ -53,9 +53,10 @@
  * 3.0 - Overhaul set wave launch override API
  * 3.1 - Add support for GFX10
  * 3.2 - Add support for GFX10.3
+ * 3.3 - Add precise memory operations enable
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	3
-#define KFD_IOCTL_DBG_MINOR_VERSION	2
+#define KFD_IOCTL_DBG_MINOR_VERSION	3
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -374,6 +375,14 @@ enum kfd_dbg_trap_mask {
  * data3: watch address mask
  */
 #define KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH 9
+
+/* KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS
+ * ptr:   unused
+ * data1: 0=disable, 1=enable (IN)
+ * data2: unused
+ * data3: unused
+ */
+#define KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS 10
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
