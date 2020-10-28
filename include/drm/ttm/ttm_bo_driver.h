@@ -657,13 +657,13 @@ static inline int ttm_bo_reserve_slowpath(struct ttm_buffer_object *bo,
 					  struct ww_acquire_ctx *ticket)
 {
 	if (interruptible) {
-		int ret = dma_resv_lock_slow_interruptible(bo->base.resv,
+		int ret = dma_resv_lock_slow_interruptible(amdkcl_ttm_resvp(bo),
 							   ticket);
 		if (ret == -EINTR)
 			ret = -ERESTARTSYS;
 		return ret;
 	}
-	dma_resv_lock_slow(bo->base.resv, ticket);
+	dma_resv_lock_slow(amdkcl_ttm_resvp(bo), ticket);
 	return 0;
 }
 
