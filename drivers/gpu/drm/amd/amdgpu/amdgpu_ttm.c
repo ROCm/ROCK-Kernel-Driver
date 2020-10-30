@@ -2203,7 +2203,6 @@ static int amdgpu_ttm_reserve_tmr(struct amdgpu_device *adev)
 static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_bo *abo;
-	struct ttm_mem_type_manager *man;
 	struct amdgpu_bo_param bp;
 	unsigned long size;
 	int r;
@@ -2238,24 +2237,17 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 
 	adev->direct_gma.dgma_bo = abo;
 
-	man = &adev->mman.bdev.man[AMDGPU_PL_DGMA];
-	/* reserved visible VRAM for direct GMA */
-	man->available_caching = TTM_PL_FLAG_UNCACHED;
-	man->default_caching = TTM_PL_FLAG_UNCACHED;
-
 	/* reserve in gtt */
 	atomic64_add(size, &adev->gart_pin_size);
-	r = ttm_range_man_init(&adev->mman.bdev, man, size >> PAGE_SHIFT);
+	r = ttm_range_man_init(&adev->mman.bdev, AMDGPU_PL_DGMA,
+					  TTM_PL_FLAG_UNCACHED, TTM_PL_FLAG_UNCACHED,
+					  false, size >> PAGE_SHIFT);
 	if (unlikely(r))
 		goto error_put_node;
 
-	man = &adev->mman.bdev.man[AMDGPU_PL_DGMA_IMPORT];
-	/* reserved GTT space for direct GMA */
-	man->use_tt = true;
-	man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
-	man->default_caching = TTM_PL_FLAG_WC;
-
-	r = ttm_range_man_init(&adev->mman.bdev, man, size >> PAGE_SHIFT);
+	r = ttm_range_man_init(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT,
+					  TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC, TTM_PL_FLAG_WC,
+					  true, size >> PAGE_SHIFT);
 	if (unlikely(r))
 		goto error_release_mm;
 
