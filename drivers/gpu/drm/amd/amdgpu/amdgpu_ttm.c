@@ -2255,7 +2255,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	return 0;
 
 error_release_mm:
-	ttm_range_man_fini(&adev->mman.bdev, &adev->mman.bdev.man[AMDGPU_PL_DGMA]);
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA);
 
 error_put_node:
 	atomic64_sub(size, &adev->gart_pin_size);
@@ -2276,8 +2276,8 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 	if (amdgpu_direct_gma_size == 0)
 		return;
 
-	ttm_range_man_fini(&adev->mman.bdev, &adev->mman.bdev.man[AMDGPU_PL_DGMA]);
-	ttm_range_man_fini(&adev->mman.bdev, &adev->mman.bdev.man[AMDGPU_PL_DGMA_IMPORT]);
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA);
+	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT);
 
 	r = amdgpu_bo_reserve(adev->direct_gma.dgma_bo, false);
 	if (r == 0) {
