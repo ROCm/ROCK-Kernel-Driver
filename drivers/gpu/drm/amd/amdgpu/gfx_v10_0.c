@@ -152,6 +152,9 @@
 #define CPC_PSP_DEBUG__GPA_OVERRIDE_MASK	0x00000008L
 #define CPG_PSP_DEBUG__GPA_OVERRIDE_MASK	0x00000008L
 
+#define mmCGTT_SPI_CS_CLK_CTRL			0x507c
+#define mmCGTT_SPI_CS_CLK_CTRL_BASE_IDX         1
+
 MODULE_FIRMWARE("amdgpu/navi10_ce.bin");
 MODULE_FIRMWARE("amdgpu/navi10_pfp.bin");
 MODULE_FIRMWARE("amdgpu/navi10_me.bin");
@@ -3132,6 +3135,7 @@ static const struct soc15_reg_golden golden_settings_gc_rlc_spm_10_1_2_nv12[] =
 
 static const struct soc15_reg_golden golden_settings_gc_10_3[] =
 {
+	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_CS_CLK_CTRL, 0x78000000, 0x78000100),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_PS_CLK_CTRL, 0xff7f0fff, 0x78000100),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_RA0_CLK_CTRL, 0xff7f0fff, 0x30000100),
 	SOC15_REG_GOLDEN_VALUE(GC, 0, mmCGTT_SPI_RA1_CLK_CTRL, 0xff7f0fff, 0x7e000100),
