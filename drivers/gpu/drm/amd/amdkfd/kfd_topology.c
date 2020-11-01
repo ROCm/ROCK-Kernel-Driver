@@ -604,6 +604,18 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_perf_properties *perf;
 
+	if (dev->kobj_p2plink) {
+		list_for_each_entry(p2plink, &dev->p2p_link_props, list)
+			if (p2plink->kobj) {
+				kfd_remove_sysfs_file(p2plink->kobj,
+							&p2plink->attr);
+				p2plink->kobj = NULL;
+			}
+		kobject_del(dev->kobj_p2plink);
+		kobject_put(dev->kobj_p2plink);
+		dev->kobj_p2plink = NULL;
+	}
+
 	if (dev->kobj_iolink) {
 		list_for_each_entry(iolink, &dev->io_link_props, list)
 			if (iolink->kobj) {
