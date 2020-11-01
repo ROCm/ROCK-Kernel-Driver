@@ -137,6 +137,7 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 	struct kfd_mem_properties *mem;
 	struct kfd_cache_properties *cache;
 	struct kfd_iolink_properties *iolink;
+	struct kfd_iolink_properties *p2plink;
 	struct kfd_perf_properties *perf;
 
 	list_del(&dev->list);
@@ -160,6 +161,13 @@ static void kfd_release_topology_device(struct kfd_topology_device *dev)
 				struct kfd_iolink_properties, list);
 		list_del(&iolink->list);
 		kfree(iolink);
+	}
+
+	while (dev->p2p_link_props.next != &dev->p2p_link_props) {
+		p2plink = container_of(dev->p2p_link_props.next,
+				struct kfd_iolink_properties, list);
+		list_del(&p2plink->list);
+		kfree(p2plink);
 	}
 
 	while (dev->perf_props.next != &dev->perf_props) {
@@ -203,6 +211,7 @@ struct kfd_topology_device *kfd_create_topology_device(
 	INIT_LIST_HEAD(&dev->mem_props);
 	INIT_LIST_HEAD(&dev->cache_props);
 	INIT_LIST_HEAD(&dev->io_link_props);
+	INIT_LIST_HEAD(&dev->p2p_link_props);
 	INIT_LIST_HEAD(&dev->perf_props);
 
 	list_add_tail(&dev->list, device_list);
@@ -470,6 +479,8 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 			      dev->node_props.caches_count);
 	sysfs_show_32bit_prop(buffer, offs, "io_links_count",
 			      dev->node_props.io_links_count);
+	sysfs_show_32bit_prop(buffer, offs, "p2p_links_count",
+			      dev->node_props.p2p_links_count);
 	sysfs_show_32bit_prop(buffer, offs, "cpu_core_id_base",
 			      dev->node_props.cpu_core_id_base);
 	sysfs_show_32bit_prop(buffer, offs, "simd_id_base",
@@ -573,10 +584,23 @@ static void kfd_remove_sysfs_file(struct kobject *kobj, struct attribute *attr)
 
 static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 {
+	struct kfd_iolink_properties *p2plink;
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
 	struct kfd_perf_properties *perf;
+
+	if (dev->kobj_p2plink) {
+		list_for_each_entry(p2plink, &dev->p2p_link_props, list)
+			if (p2plink->kobj) {
+				kfd_remove_sysfs_file(p2plink->kobj,
+							&p2plink->attr);
+				p2plink->kobj = NULL;
+			}
+		kobject_del(dev->kobj_p2plink);
+		kobject_put(dev->kobj_p2plink);
+		dev->kobj_p2plink = NULL;
+	}
 
 	if (dev->kobj_iolink) {
 		list_for_each_entry(iolink, &dev->io_link_props, list)
@@ -641,6 +665,7 @@ static void kfd_remove_sysfs_node_entry(struct kfd_topology_device *dev)
 static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		uint32_t id)
 {
+	struct kfd_iolink_properties *p2plink;
 	struct kfd_iolink_properties *iolink;
 	struct kfd_cache_properties *cache;
 	struct kfd_mem_properties *mem;
@@ -676,6 +701,10 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 
 	dev->kobj_iolink = kobject_create_and_add("io_links", dev->kobj_node);
 	if (!dev->kobj_iolink)
+		return -ENOMEM;
+
+	dev->kobj_p2plink = kobject_create_and_add("p2p_links", dev->kobj_node);
+	if (!dev->kobj_p2plink)
 		return -ENOMEM;
 
 	dev->kobj_perf = kobject_create_and_add("perf", dev->kobj_node);
@@ -773,6 +802,27 @@ static int kfd_build_sysfs_node_entry(struct kfd_topology_device *dev,
 		iolink->attr.mode = KFD_SYSFS_FILE_MODE;
 		sysfs_attr_init(&iolink->attr);
 		ret = sysfs_create_file(iolink->kobj, &iolink->attr);
+		if (ret < 0)
+			return ret;
+		i++;
+	}
+
+	i = 0;
+	list_for_each_entry(p2plink, &dev->p2p_link_props, list) {
+		p2plink->kobj = kzalloc(sizeof(struct kobject), GFP_KERNEL);
+		if (!p2plink->kobj)
+			return -ENOMEM;
+		ret = kobject_init_and_add(p2plink->kobj, &iolink_type,
+				dev->kobj_p2plink, "%d", i);
+		if (ret < 0) {
+			kobject_put(p2plink->kobj);
+			return ret;
+		}
+
+		p2plink->attr.name = "properties";
+		p2plink->attr.mode = KFD_SYSFS_FILE_MODE;
+		sysfs_attr_init(&iolink->attr);
+		ret = sysfs_create_file(p2plink->kobj, &p2plink->attr);
 		if (ret < 0)
 			return ret;
 		i++;
@@ -1172,6 +1222,7 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 	struct kfd_mem_properties *mem;
 	struct kfd_cache_properties *cache;
 	struct kfd_iolink_properties *iolink;
+	struct kfd_iolink_properties *p2plink;
 
 	down_write(&topology_lock);
 	list_for_each_entry(dev, &topology_device_list, list) {
@@ -1192,6 +1243,8 @@ static struct kfd_topology_device *kfd_assign_gpu(struct kfd_dev *gpu)
 				cache->gpu = dev->gpu;
 			list_for_each_entry(iolink, &dev->io_link_props, list)
 				iolink->gpu = dev->gpu;
+			list_for_each_entry(p2plink, &dev->p2p_link_props, list)
+				p2plink->gpu = dev->gpu;
 			break;
 		}
 	}
@@ -1311,6 +1364,136 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 	}
 }
 
+static int kfd_build_p2p_node_entry(struct kfd_topology_device *dev,
+				struct kfd_iolink_properties *p2plink)
+{
+	int ret;
+
+	p2plink->kobj = kzalloc(sizeof(struct kobject), GFP_KERNEL);
+	if (!p2plink->kobj)
+		return -ENOMEM;
+
+	ret = kobject_init_and_add(p2plink->kobj, &iolink_type,
+			dev->kobj_p2plink, "%d", dev->node_props.p2p_links_count - 1);
+	if (ret < 0) {
+		kobject_put(p2plink->kobj);
+		return ret;
+	}
+
+	p2plink->attr.name = "properties";
+	p2plink->attr.mode = KFD_SYSFS_FILE_MODE;
+	sysfs_attr_init(&p2plink->attr);
+	ret = sysfs_create_file(p2plink->kobj, &p2plink->attr);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+static int kfd_add_peer_prop(struct kfd_topology_device *kdev,
+		struct kfd_topology_device *peer, int from, int to)
+{
+	struct kfd_iolink_properties *props = NULL;
+	struct kfd_iolink_properties *iolink1, *iolink2, *iolink3;
+	struct kfd_topology_device *cpu_dev;
+	int ret = 0;
+
+	if (!amdgpu_device_is_peer_accessible(
+				(struct amdgpu_device *)kdev->gpu->kgd,
+				(struct amdgpu_device *)peer->gpu->kgd))
+
+		return ret;
+
+	iolink1 = list_last_entry(&kdev->io_link_props,
+							struct kfd_iolink_properties, list);
+	if (!iolink1)
+		return -ENOMEM;
+
+	iolink2 = list_last_entry(&peer->io_link_props,
+							struct kfd_iolink_properties, list);
+	if (!iolink2)
+		return -ENOMEM;
+
+	props = kfd_alloc_struct(props);
+	if (!props)
+		return -ENOMEM;
+
+	memcpy(props, iolink1, sizeof(struct kfd_iolink_properties));
+
+	props->weight = iolink1->weight + iolink2->weight;
+	props->min_latency = iolink1->min_latency + iolink2->min_latency;
+	props->max_latency = iolink1->max_latency + iolink2->max_latency;
+	props->min_bandwidth = min(iolink1->min_bandwidth, iolink2->min_bandwidth);
+	props->max_bandwidth = min(iolink2->max_bandwidth, iolink2->max_bandwidth);
+
+	if (iolink1->node_to != iolink2->node_to) {
+		/* CPU->CPU  link*/
+		cpu_dev = kfd_topology_device_by_proximity_domain(iolink1->node_to);
+		list_for_each_entry(iolink3, &cpu_dev->io_link_props, list)
+			if (iolink3->node_to == iolink2->node_to)
+				break;
+		props->weight += iolink3->weight;
+		props->min_latency += iolink3->min_latency;
+		props->max_latency += iolink3->max_latency;
+		props->min_bandwidth = min(props->min_bandwidth,
+						iolink3->min_bandwidth);
+		props->max_bandwidth = min(props->max_bandwidth,
+						iolink3->max_bandwidth);
+	}
+
+	props->node_from = from;
+	props->node_to = to;
+	peer->node_props.p2p_links_count++;
+	list_add_tail(&props->list, &peer->p2p_link_props);
+	ret = kfd_build_p2p_node_entry(peer, props);
+
+	return ret;
+}
+
+static int kfd_dev_create_p2p_links(void)
+{
+	struct kfd_topology_device *dev;
+	struct kfd_topology_device *new_dev;
+	uint32_t i, k;
+	int ret = 0;
+
+	k = 0;
+	list_for_each_entry(dev, &topology_device_list, list)
+		k++;
+	if (k < 2)
+		return 0;
+
+	new_dev = list_last_entry(&topology_device_list, struct kfd_topology_device, list);
+	if (WARN_ON(!new_dev->gpu))
+		return 0;
+
+	k--;
+	i = 0;
+	list_for_each_entry(dev, &topology_device_list, list) {
+		if (dev == new_dev)
+			break;
+		if (!dev->gpu || !dev->gpu->kgd ||
+		    (dev->gpu->hive_id &&
+		     dev->gpu->hive_id == new_dev->gpu->hive_id))
+			goto next;
+
+		/* check if node(s) is/are peer accessible in one direction or bi-direction */
+		ret = kfd_add_peer_prop(new_dev, dev, i, k);
+		if (ret < 0)
+			goto out;
+
+		ret = kfd_add_peer_prop(dev, new_dev, k, i);
+		if (ret < 0)
+			goto out;
+next:
+		i++;
+	}
+
+out:
+	return ret;
+}
+
+
 int kfd_topology_add_device(struct kfd_dev *gpu)
 {
 	uint32_t gpu_id;
@@ -1380,6 +1563,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 
 	dev->gpu_id = gpu_id;
 	gpu->id = gpu_id;
+
+	kfd_dev_create_p2p_links();
 
 	/* TODO: Move the following lines to function
 	 *	kfd_add_non_crat_information
