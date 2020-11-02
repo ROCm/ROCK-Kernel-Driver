@@ -87,6 +87,10 @@ endif
 ifdef CONFIG_DRM_AMD_DC_DCN3_0
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_ccflags) -Wframe-larger-than=2048
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_ccflags)
+CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_rcflags)
 endif
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_ccflags)
