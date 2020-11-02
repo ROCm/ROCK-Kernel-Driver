@@ -313,4 +313,5 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.clear_address_watch = kgd_gfx_v9_clear_address_watch,
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
+	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy
 };
