@@ -1153,7 +1153,7 @@ static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb
 		return 0;
 	}
 
-	rbo = gem_to_amdgpu_bo(amdgpu_fb->base.obj[0]);
+	rbo = gem_to_amdgpu_bo(drm_gem_fb_get_obj(&amdgpu_fb->base, 0));
 	r = amdgpu_bo_reserve(rbo, false);
 
 	if (unlikely(r)) {
