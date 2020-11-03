@@ -705,7 +705,6 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 	btrfs_sysfs_rm_device_link(fs_info->fs_devices, src_device);
 	if (test_bit(BTRFS_DEV_STATE_WRITEABLE, &src_device->dev_state))
 		btrfs_scratch_superblocks(src_device->bdev, src_device->name->str);
-	btrfs_rm_dev_replace_free_srcdev(src_device);
 
 	/* write back the superblocks */
 	trans = btrfs_start_transaction(root, 0);
@@ -713,6 +712,8 @@ static int btrfs_dev_replace_finishing(struct btrfs_fs_info *fs_info,
 		btrfs_commit_transaction(trans);
 
 	mutex_unlock(&dev_replace->lock_finishing_cancel_unmount);
+
+	btrfs_rm_dev_replace_free_srcdev(src_device);
 
 	return 0;
 }
