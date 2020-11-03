@@ -467,7 +467,7 @@ KBUILD_AFLAGS   := -D__ASSEMBLY__ -fno-PIE
 KBUILD_CFLAGS   := -Wall -Wundef -Werror=strict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common -fshort-wchar -fno-PIE \
 		   -Werror=implicit-function-declaration -Werror=implicit-int \
-		   -Wno-format-security \
+		   -Werror=return-type -Wno-format-security \
 		   -std=gnu89
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_AFLAGS_KERNEL :=
@@ -849,7 +849,9 @@ KBUILD_CFLAGS += $(call cc-option, -flive-patching=inline-clone)
 endif
 
 ifdef CONFIG_LIVEPATCH_IPA_CLONES
+ifeq ($(KBUILD_EXTMOD),)
 KBUILD_CFLAGS += -fdump-ipa-clones
+endif
 endif
 
 # arch Makefile may override CC so keep this after arch Makefile is included
