@@ -1300,12 +1300,14 @@ static bool dcn21_fast_validate_bw(
 			ASSERT(0);
 		}
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		context->bw_ctx.dml.vba.ValidationStatus[context->bw_ctx.dml.vba.soc.num_states] =
 				DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
+#endif
 
 	*vlevel_out = vlevel;
 
