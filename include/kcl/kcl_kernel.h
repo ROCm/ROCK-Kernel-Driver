@@ -16,7 +16,7 @@
 #endif
 
 #ifndef __GFP_RETRY_MAYFAIL
-#define __GFP_RETRY_MAYFAIL __GFP_REPEAT
+#define __GFP_RETRY_MAYFAIL __GFP_NORETRY
 #endif
 
 #ifndef ALIGN_DOWN
