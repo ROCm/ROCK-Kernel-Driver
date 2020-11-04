@@ -1936,8 +1936,10 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	case IP_VERSION(2, 1, 0):
 		dmub_asic = DMUB_ASIC_DCN21;
 		fw_name_dmub = FIRMWARE_RENOIR_DMUB;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 		if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 			fw_name_dmub = FIRMWARE_GREEN_SARDINE_DMUB;
+#endif
 		break;
 	case IP_VERSION(3, 0, 0):
 		if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(10, 3, 0)) {
