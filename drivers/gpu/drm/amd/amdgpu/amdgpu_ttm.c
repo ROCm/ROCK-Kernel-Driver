@@ -759,7 +759,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bdev);
 	struct drm_mm_node *mm_node = mem->mm_node;
-	struct ttm_mem_reg backup;
+	struct ttm_resource backup;
 
 	backup = *mem;
 	mem->bus.addr = NULL;
