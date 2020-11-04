@@ -4413,6 +4413,7 @@ void dpcd_set_source_specific_data(struct dc_link *link)
 				(uint8_t *)(&amd_signature),
 				sizeof(amd_signature));
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 		if (link->ctx->dce_version >= DCN_VERSION_2_0 &&
 			link->dc->caps.min_horizontal_blanking_period != 0) {
 
@@ -4437,6 +4438,7 @@ void dpcd_set_source_specific_data(struct dc_link *link)
 							link->dpcd_caps.branch_dev_name[3],
 							link->dpcd_caps.branch_dev_name[4],
 							link->dpcd_caps.branch_dev_name[5]);
+#endif
 	} else {
 		core_link_write_dpcd(link, DP_SOURCE_OUI,
 				link->dc->vendor_signature.data.raw,
