@@ -2130,12 +2130,17 @@ void dcn10_enable_timing_synchronization(
 	struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
 	int i, width, height;
+#else
+	int i;
+#endif
 
 	DC_SYNC_INFO("Setting up OTG reset trigger\n");
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2143,6 +2148,7 @@ void dcn10_enable_timing_synchronization(
 		if (opp->funcs->opp_program_dpg_dimensions)
 			opp->funcs->opp_program_dpg_dimensions(opp, width, 2*(height) + 1);
 	}
+#endif
 
 	for (i = 0; i < group_size; i++) {
 		if (grouped_pipes[i]->stream == NULL)
@@ -2166,6 +2172,7 @@ void dcn10_enable_timing_synchronization(
 		grouped_pipes[i]->stream_res.tg->funcs->disable_reset_trigger(
 				grouped_pipes[i]->stream_res.tg);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2173,6 +2180,7 @@ void dcn10_enable_timing_synchronization(
 		if (opp->funcs->opp_program_dpg_dimensions)
 			opp->funcs->opp_program_dpg_dimensions(opp, width, height);
 	}
+#endif
 
 	DC_SYNC_INFO("Sync complete\n");
 }
