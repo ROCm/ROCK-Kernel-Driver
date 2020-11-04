@@ -599,9 +599,6 @@
 /* kallsyms_lookup_name is available */
 /* #undef HAVE_KALLSYMS_LOOKUP_NAME */
 
-/* kmap_atomic() have one argument */
-#define HAVE_KMAP_ATOMIC_ONE_ARG 1
-
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
 
