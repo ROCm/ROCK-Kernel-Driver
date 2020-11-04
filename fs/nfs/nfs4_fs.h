@@ -570,6 +570,14 @@ static inline bool nfs4_stateid_is_newer(const nfs4_stateid *s1, const nfs4_stat
 	return (s32)(be32_to_cpu(s1->seqid) - be32_to_cpu(s2->seqid)) > 0;
 }
 
+static inline bool nfs4_stateid_is_next(const nfs4_stateid *s1, const nfs4_stateid *s2)
+{
+	u32 seq1 = be32_to_cpu(s1->seqid);
+	u32 seq2 = be32_to_cpu(s2->seqid);
+
+	return seq2 == seq1 + 1U || (seq2 == 1U && seq1 == 0xffffffffU);
+}
+
 static inline bool nfs4_valid_open_stateid(const struct nfs4_state *state)
 {
 	return test_bit(NFS_STATE_RECOVERY_FAILED, &state->flags) == 0;
