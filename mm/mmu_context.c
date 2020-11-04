@@ -13,10 +13,10 @@
 #include <asm/mmu_context.h>
 
 /**
- * kthread_use_mm - make the calling kthread operate on an address space
+ * use_mm - make the calling kthread operate on an address space
  * @mm: address space to operate on
  */
-void kthread_use_mm(struct mm_struct *mm)
+void use_mm(struct mm_struct *mm)
 {
 	struct mm_struct *active_mm;
 	struct task_struct *tsk = current;
@@ -43,13 +43,13 @@ void kthread_use_mm(struct mm_struct *mm)
 	if (active_mm != mm)
 		mmdrop(active_mm);
 }
-EXPORT_SYMBOL_GPL(kthread_use_mm);
+EXPORT_SYMBOL_GPL(use_mm);
 
 /**
- * kthread_unuse_mm - reverse the effect of kthread_use_mm()
+ * unuse_mm - reverse the effect of use_mm()
  * @mm: address space to operate on
  */
-void kthread_unuse_mm(struct mm_struct *mm)
+void unuse_mm(struct mm_struct *mm)
 {
 	struct task_struct *tsk = current;
 
@@ -65,4 +65,4 @@ void kthread_unuse_mm(struct mm_struct *mm)
 	local_irq_enable();
 	task_unlock(tsk);
 }
-EXPORT_SYMBOL_GPL(kthread_unuse_mm);
+EXPORT_SYMBOL_GPL(unuse_mm);
