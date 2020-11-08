@@ -2865,7 +2865,7 @@ static inline char *fmt_multiple_name(struct device *dev,
 }
 
 /**
- * snd_soc_unregister_dai - Unregister DAIs from the ASoC core
+ * snd_soc_unregister_dais - Unregister DAIs from the ASoC core
  *
  * @component: The component for which the DAIs should be unregistered
  */
