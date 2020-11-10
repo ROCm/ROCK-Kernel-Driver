@@ -254,6 +254,8 @@ struct exfat_sb_info {
 	struct rcu_head rcu;
 };
 
+#define EXFAT_CACHE_VALID	0
+
 /*
  * EXFAT file system inode in-memory data
  */
@@ -375,7 +377,7 @@ static inline bool exfat_is_last_sector_in_cluster(struct exfat_sb_info *sbi,
 static inline sector_t exfat_cluster_to_sector(struct exfat_sb_info *sbi,
 		unsigned int clus)
 {
-	return ((clus - EXFAT_RESERVED_CLUSTERS) << sbi->sect_per_clus_bits) +
+	return ((sector_t)(clus - EXFAT_RESERVED_CLUSTERS) << sbi->sect_per_clus_bits) +
 		sbi->data_start_sector;
 }
 
@@ -432,7 +434,6 @@ extern const struct dentry_operations exfat_utf8_dentry_ops;
 /* cache.c */
 int exfat_cache_init(void);
 void exfat_cache_shutdown(void);
-void exfat_cache_init_inode(struct inode *inode);
 void exfat_cache_inval_inode(struct inode *inode);
 int exfat_get_cluster(struct inode *inode, unsigned int cluster,
 		unsigned int *fclus, unsigned int *dclus,
