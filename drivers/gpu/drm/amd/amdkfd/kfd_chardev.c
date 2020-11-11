@@ -1319,7 +1319,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		 * BO as a regular userptr BO
 		 */
 		vma = find_vma(current->mm, args->mmap_offset);
-		if (vma && (vma->vm_flags & VM_IO)) {
+		if (vma && args->mmap_offset >= vma->vm_start &&
+		    (vma->vm_flags & VM_IO)) {
 			unsigned long pfn;
 
 			err = follow_pfn(vma, args->mmap_offset, &pfn);
@@ -2675,6 +2676,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	uint32_t data3;
 	bool need_device;
 	bool need_qid_array;
+	bool is_attach;
 	bool need_proc_create = false;
 
 	debug_trap_action = args->op;
@@ -2709,11 +2711,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	thread = get_pid_task(pid, PIDTYPE_PID);
 
+	is_attach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 1;
+
 	rcu_read_lock();
-	need_proc_create =
-		debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE &&
-		data1 == 1 && thread && thread != current &&
-		ptrace_parent(thread) == current;
+	need_proc_create = is_attach && thread && thread != current &&
+					ptrace_parent(thread) == current;
 	rcu_read_unlock();
 
 	target = need_proc_create ?
@@ -2757,9 +2759,9 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			goto unlock_out;
 		}
 
-		pdd = kfd_get_process_device_data(dev, target);
+		pdd = kfd_bind_process_to_device(dev, target);
 
-		if (!pdd) {
+		if (IS_ERR(pdd)) {
 			r = -EINVAL;
 			goto unlock_out;
 		}
@@ -2942,6 +2944,23 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		/* Save the watch point ID for the caller */
 		args->data1 = data1;
 		break;
+	case KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS:
+		switch (data1) {
+		case 0:
+			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+					dev->vm_info.last_vmid_kfd, false);
+			break;
+		case 1:
+			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+					dev->vm_info.last_vmid_kfd, true);
+			break;
+		default:
+			pr_err("Invalid precise mem ops option: %i\n", data1);
+			r = -EINVAL;
+			break;
+		}
+
+		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
 		r = -EINVAL;
@@ -2955,8 +2974,12 @@ out:
 		put_task_struct(thread);
 	if (pid)
 		put_pid(pid);
-	if (target)
+	/* hold the target reference for the entire debug session. */
+	if (!is_attach && target) {
 		kfd_unref_process(target);
+		if (debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE)
+			kfd_unref_process(target);
+	}
 	kfree(queue_id_array);
 	return r;
 }
@@ -2973,6 +2996,12 @@ static int kfd_ioctl_smi_events(struct file *filep,
 		return -EINVAL;
 
 	return kfd_smi_event_open(dev, &args->anon_fd);
+}
+
+static int kfd_ioctl_rlc_spm(struct file *filep,
+				   struct kfd_process *p, void *data)
+{
+	return kfd_rlc_spm(p, data);
 }
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
@@ -3085,6 +3114,10 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_dbg_set_debug_trap, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
+			kfd_ioctl_rlc_spm, 0),
+
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)

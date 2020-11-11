@@ -458,7 +458,21 @@ bool dm_pp_notify_wm_clock_changes(
 	const struct dc_context *ctx,
 	struct dm_pp_wm_sets_with_clock_ranges *wm_with_clock_ranges)
 {
-	/* TODO: to be implemented */
+	struct amdgpu_device *adev = ctx->driver_context;
+	void *pp_handle = adev->powerplay.pp_handle;
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+
+	/*
+	 * Limit this watermark setting for Polaris for now
+	 * TODO: expand this to other ASICs
+	 */
+	if ((adev->asic_type >= CHIP_POLARIS10) && (adev->asic_type <= CHIP_VEGAM)
+	     && pp_funcs && pp_funcs->set_watermarks_for_clocks_ranges) {
+		if (!pp_funcs->set_watermarks_for_clocks_ranges(pp_handle,
+						(void *)wm_with_clock_ranges))
+			return true;
+	}
+
 	return false;
 }
 

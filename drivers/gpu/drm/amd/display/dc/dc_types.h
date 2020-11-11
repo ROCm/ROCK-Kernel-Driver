@@ -234,6 +234,8 @@ struct dc_panel_patch {
 	unsigned int delay_ignore_msa;
 	unsigned int disable_fec;
 	unsigned int extra_t3_ms;
+	unsigned int max_dsc_target_bpp_limit;
+	unsigned int skip_avmute;
 };
 
 struct dc_edid_caps {

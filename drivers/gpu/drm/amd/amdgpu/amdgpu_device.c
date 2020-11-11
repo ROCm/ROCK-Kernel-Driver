@@ -122,6 +122,8 @@ const char *amdgpu_asic_name[] = {
 	"LAST",
 };
 
+extern bool pcie_p2p;
+
 /**
  * DOC: pcie_replay_count
  *
@@ -4906,10 +4908,10 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 	resource_size_t aper_limit =
 		adev->gmc.aper_base + adev->gmc.aper_size - 1;
 
-	return adev->gmc.visible_vram_size &&
+	return pcie_p2p && (adev->gmc.visible_vram_size &&
 		adev->gmc.real_vram_size == adev->gmc.visible_vram_size &&
 		!(adev->gmc.aper_base & address_mask ||
-		  aper_limit & address_mask);
+		  aper_limit & address_mask));
 }
 
 int amdgpu_device_baco_enter(struct drm_device *dev)

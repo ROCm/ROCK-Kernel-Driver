@@ -1288,6 +1288,10 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 			return false;
 	}
 
+	if (link->dpcd_caps.dprx_feature.bits.VSC_SDP_COLORIMETRY_SUPPORTED) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -1590,8 +1594,8 @@ static void init_state(struct dc *dc, struct dc_state *context)
 
 struct dc_state *dc_create_state(struct dc *dc)
 {
-	struct dc_state *context = kzalloc(sizeof(struct dc_state),
-					   GFP_KERNEL);
+	struct dc_state *context = kvzalloc(sizeof(struct dc_state),
+					    GFP_KERNEL);
 
 	if (!context)
 		return NULL;
@@ -2451,9 +2455,6 @@ static void commit_planes_for_stream(struct dc *dc,
 		context_clock_trace(dc, context);
 	}
 
-	if (update_type != UPDATE_TYPE_FAST && dc->hwss.interdependent_update_lock && dc->hwss.wait_for_pending_cleared)
-		dc->hwss.disconnect_pipes(dc, context);
-
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
@@ -2491,7 +2492,6 @@ static void commit_planes_for_stream(struct dc *dc,
 		 *  top_pipe_to_program is expected to never be NULL
 		 */
 		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
-
 
 	// Stream updates
 	if (stream_update)
@@ -2684,9 +2684,8 @@ static void commit_planes_for_stream(struct dc *dc,
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
 		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
-		if (pipe_ctx->bottom_pipe ||
-				!pipe_ctx->stream ||
-				pipe_ctx->stream != stream ||
+		if (pipe_ctx->bottom_pipe || pipe_ctx->next_odm_pipe ||
+				!pipe_ctx->stream || pipe_ctx->stream != stream ||
 				!pipe_ctx->plane_state->update_flags.bits.addr_update)
 			continue;
 

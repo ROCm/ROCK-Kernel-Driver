@@ -307,6 +307,9 @@ struct amdgpu_framebuffer {
 	struct drm_gem_object *obj;
 #endif
 
+	uint64_t tiling_flags;
+	bool tmz_surface;
+
 	/* caching for later use */
 	uint64_t address;
 };

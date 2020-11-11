@@ -229,6 +229,7 @@ struct pp_smumgr_func {
 	bool (*is_hw_avfs_present)(struct pp_hwmgr  *hwmgr);
 	int (*update_dpm_settings)(struct pp_hwmgr *hwmgr, void *profile_setting);
 	int (*smc_table_manager)(struct pp_hwmgr *hwmgr, uint8_t *table, uint16_t table_id, bool rw); /*rw: true for read, false for write */
+	int (*stop_smc)(struct pp_hwmgr *hwmgr);
 };
 
 struct pp_hwmgr_func {
@@ -441,6 +442,7 @@ struct phm_cac_tdp_table {
 	uint8_t  ucPlx_I2C_Line;
 	uint32_t usBoostPowerLimit;
 	uint8_t  ucCKS_LDO_REFSEL;
+	uint8_t  ucHotSpotOnly;
 };
 
 struct phm_tdp_table {
