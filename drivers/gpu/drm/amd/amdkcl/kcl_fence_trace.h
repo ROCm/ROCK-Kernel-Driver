@@ -6,7 +6,7 @@
 
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM kcl_fence
-#define TRACE_INCLUDE_FILE kcl_trace
+#define TRACE_INCLUDE_FILE kcl_fence_trace
 
 struct dma_fence;
 
