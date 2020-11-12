@@ -676,10 +676,6 @@ void amdgpu_display_print_display_setup(struct drm_device *dev)
 #endif
 }
 
-/**
- * amdgpu_display_ddc_probe
- *
- */
 bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,
 			      bool use_aux)
 {
