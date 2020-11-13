@@ -1441,8 +1441,6 @@ static int smu10_set_fine_grain_clk_vol(struct pp_hwmgr *hwmgr,
 
 static int smu10_gfx_state_change(struct pp_hwmgr *hwmgr, uint32_t state)
 {
-	struct amdgpu_device *adev = hwmgr->adev;
-
 	smum_send_msg_to_smc_with_parameter(hwmgr, PPSMC_MSG_GpuChangeState, state, NULL);
 
 	return 0;
