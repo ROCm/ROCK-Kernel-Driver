@@ -2417,6 +2417,7 @@ static int amdgpu_mm_vram_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_VRAM);
 	struct drm_printer p = drm_seq_file_printer(m);
+
 	man->func->debug(man, &p);
 	return 0;
 }
