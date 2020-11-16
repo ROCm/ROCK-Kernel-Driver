@@ -1,9 +1,16 @@
 /* SPDX-License-Identifier: MIT */
+/*
+ * Copyright (C) 2017 Google, Inc.
+ *
+ * Authors:
+ * Sean Paul <seanpaul@chromium.org>
+ */
 #ifndef AMDKCL_DRM_HDCP_H
 #define AMDKCL_DRM_HDCP_H
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 #include <drm/drm_hdcp.h>
+#include <kcl/kcl_drm_connector.h>
 
 /* changed in v4.16-rc7-1717-gb8e47d87be65
  * drm: Fix HDCP downstream dev count read
@@ -292,6 +299,17 @@ struct hdcp2_dp_errata_stream_type {
 #define HDCP_2_2_DP_RXSTATUS_REAUTH_REQ(x)     ((x) & BIT(3))
 #define HDCP_2_2_DP_RXSTATUS_LINK_FAILED(x)    ((x) & BIT(4))
 #endif /* HDCP_2_2_CERT_TIMEOUT_MS */
+
+#ifndef HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION
+void _kcl_drm_hdcp_update_content_protection(struct drm_connector *connector,
+							      u64 val);
+static inline
+void drm_hdcp_update_content_protection(struct drm_connector *connector,
+					u64 val)
+{
+	_kcl_drm_hdcp_update_content_protection(connector, val);
+}
+#endif /* HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION */
 
 #endif /* CONFIG_DRM_AMD_DC_HDCP */
 
