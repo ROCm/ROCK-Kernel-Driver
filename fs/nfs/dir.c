@@ -1207,7 +1207,7 @@ nfs_do_lookup_revalidate(struct inode *dir, struct dentry *dentry,
 			 unsigned int flags)
 {
 	struct inode *inode;
-	int error;
+	int error = 0;
 
 	nfs_inc_stats(dir, NFSIOS_DENTRYREVALIDATE);
 	inode = d_inode(dentry);
@@ -1229,8 +1229,10 @@ nfs_do_lookup_revalidate(struct inode *dir, struct dentry *dentry,
 	    nfs_check_verifier(dir, dentry, flags & LOOKUP_RCU)) {
 		error = nfs_lookup_verify_inode(inode, flags);
 		if (error) {
-			if (error == -ESTALE)
+			if (error == -ESTALE) {
 				nfs_zap_caches(dir);
+				error = 0;
+			}
 			goto out_bad;
 		}
 		nfs_advise_use_readdirplus(dir);
@@ -1252,7 +1254,7 @@ out_valid:
 out_bad:
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
-	return nfs_lookup_revalidate_done(dir, dentry, inode, 0);
+	return nfs_lookup_revalidate_done(dir, dentry, inode, error);
 }
 
 static int
