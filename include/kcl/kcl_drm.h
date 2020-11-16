@@ -23,10 +23,6 @@ void kcl_drm_dev_fini_private(struct drm_device *dev)
        dev->dev_private = NULL;
 }
 
-#if !defined(HAVE_DRM_IS_CURRENT_MASTER)
-bool drm_is_current_master(struct drm_file *fpriv);
-#endif
-
 #if !defined(HAVE_DRM_GEM_OBJECT_PUT_LOCKED)
 #if defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
 static inline void
