@@ -3,17 +3,6 @@
 #include <kcl/kcl_drm.h>
 #include "kcl_common.h"
 
-static inline struct drm_plane_state *
-_kcl_drm_atomic_get_existing_plane_state(struct drm_atomic_state *state,
-							  struct drm_plane *plane)
-{
-#ifdef HAVE_DRM_ATOMIC_STATE_PLANE_STATES
-	return state->plane_states[drm_plane_index(plane)];
-#else
-	return state->planes[drm_plane_index(plane)].state;
-#endif
-}
-
 #ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
 void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
 							struct drm_plane_state *state)
