@@ -145,8 +145,4 @@ static inline void drm_dev_put(struct drm_device *dev)
 }
 #endif
 
-#if !defined(HAVE_DRM_GET_MAX_IOMEM)
-u64 drm_get_max_iomem(void);
-#endif
-
 #endif /* AMDKCL_DRM_H */

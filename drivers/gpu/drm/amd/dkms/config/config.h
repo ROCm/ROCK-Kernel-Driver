@@ -430,9 +430,6 @@
 /* drm_get_format_name() has i,p interface */
 #define HAVE_DRM_GET_FORMAT_NAME_I_P 1
 
-/* ddrm_get_max_iome() is available */
-/* #undef HAVE_DRM_GET_MAX_IOMEM */
-
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
