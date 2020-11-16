@@ -5,4 +5,6 @@
 #if defined(HAVE_DRM_DRM_PRINT_H)
 #include <drm/drm_print.h>
 #endif
+#include <kcl/header/kcl_drmP_h.h>
+
 #endif
