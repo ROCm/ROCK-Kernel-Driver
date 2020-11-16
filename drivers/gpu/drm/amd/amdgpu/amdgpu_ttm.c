@@ -2801,8 +2801,7 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 	struct drm_device *dev = node->minor->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
 #if !defined(HAVE_DRM_MM_PRINT)
-	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, ttm_pl);
-	struct drm_mm *mm = (struct drm_mm *)man->priv;
+	struct drm_mm *mm = kcl_ttm_get_drm_mm_by_mem_type(adev, ttm_pl);
 	struct ttm_bo_global *glob = &ttm_bo_glob;
 	int ret;
 #else

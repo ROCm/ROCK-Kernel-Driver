@@ -62,5 +62,6 @@
 #include <kcl/kcl_amdgpu_drm_fb_helper.h>
 #include "kcl/kcl_amdgpu.h"
 #include <kcl/kcl_ftrace.h>
+#include "kcl/kcl_amdgpu_ttm.h"
 
 #endif /* AMDGPU_BACKPORT_H */
