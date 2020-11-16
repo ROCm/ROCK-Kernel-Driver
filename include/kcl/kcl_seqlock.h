@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _KCL_KCL_SEQLOCK_H
 #define _KCL_KCL_SEQLOCK_H
 

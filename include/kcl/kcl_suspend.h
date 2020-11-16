@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_SUSPEND_H
 #define AMDKCL_SUSPEND_H
 

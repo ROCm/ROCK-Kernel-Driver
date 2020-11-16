@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_LIST_H
 #define AMDKCL_LIST_H
 
 #include <linux/list.h>
 
+/* Copied from include/linux/list.h */
 #if !defined(HAVE_LIST_BULK_MOVE_TAIL)
 static inline void list_bulk_move_tail(struct list_head *head,
 				       struct list_head *first,

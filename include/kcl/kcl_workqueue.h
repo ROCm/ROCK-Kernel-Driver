@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #ifndef KCL_LINUX_WORKQUEUE_H
 #define KCL_LINUX_WORKQUEUE_H

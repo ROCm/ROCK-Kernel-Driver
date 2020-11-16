@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Fence mechanism for dma-buf and to allow for asynchronous dma access
  *
@@ -25,6 +25,7 @@
 #define CREATE_TRACE_POINTS
 #include "kcl_fence_trace.h"
 
+/* Copied from drivers/dma-buf/dma-fence.c */
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 			    uint32_t *idx)
@@ -120,7 +121,6 @@ out:
 }
 EXPORT_SYMBOL(_kcl_fence_default_wait);
 #endif
-
 
 /*
  * Modifications [2017-09-19] (c) [2017]
@@ -243,6 +243,7 @@ void amdkcl_fence_init(void)
 }
 
 #if !defined(HAVE_DMA_FENCE_GET_STUB)
+/* Copied from drivers/dma-buf/dma-fence.c and modified for KCL */
 static DEFINE_SPINLOCK(dma_fence_stub_lock);
 static struct dma_fence dma_fence_stub;
 

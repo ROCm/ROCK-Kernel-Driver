@@ -1,7 +1,13 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ *  linux/fs/ioctl.c
+ *
+ *  Copyright (C) 1991, 1992  Linus Torvalds
+ */
 #include <linux/fs.h>
 #include <kcl/kcl_fs.h>
 
+/* Copied from v5.4-rc2-1-g2952db0fd51b fs/ioctl.c */
 #ifndef HAVE_COMPAT_PTR_IOCTL
 #ifdef CONFIG_COMPAT
 /**

@@ -1,10 +1,14 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
+// Copyright(c) 2018 Linus Torvalds. All rights reserved.
+// Copyright(c) 2018 Alexei Starovoitov. All rights reserved.
+// Copyright(c) 2018 Intel Corporation. All rights reserved.
 #ifndef AMDKCL_NOSPEC_H
 #define AMDKCL_NOSPEC_H
 
 #ifdef HAVE_LINUX_NOSPEC_H
 #include <linux/nospec.h>
 #else
+/* Copied from include/linux/nospec.h */
 /**
  * array_index_mask_nospec() - generate a ~0 mask when index < size, 0 otherwise
  * @index: array element index

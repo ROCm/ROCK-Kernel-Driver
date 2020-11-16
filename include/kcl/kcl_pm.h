@@ -1,4 +1,9 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ *  pm.h - Power management interface
+ *
+ *  Copyright (C) 2000 Andrew Henroid
+ */
 #ifndef KCL_KCL_PM_H
 #define KCL_KCL_PM_H
 

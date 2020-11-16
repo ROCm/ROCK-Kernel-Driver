@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_SEQ_FILE_H
 #define AMDKCL_SEQ_FILE_H
 
 #include <linux/seq_file.h>
 
+/* Copied from linux/seq_file.h */
 #ifndef DEFINE_SHOW_ATTRIBUTE
 #define DEFINE_SHOW_ATTRIBUTE(__name)                   \
 static int __name ## _open(struct inode *inode, struct file *file)  \

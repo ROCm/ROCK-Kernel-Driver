@@ -1,4 +1,25 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ *	pci.h
+ *
+ *	PCI defines and function prototypes
+ *	Copyright 1994, Drew Eckhardt
+ *	Copyright 1997--1999 Martin Mares <mj@ucw.cz>
+ *
+ *	PCI Express ASPM defines and function prototypes
+ *	Copyright (c) 2007 Intel Corp.
+ *		Zhang Yanmin (yanmin.zhang@intel.com)
+ *		Shaohua Li (shaohua.li@intel.com)
+ *
+ *	For more information, please consult the following manuals (look at
+ *	http://www.pcisig.com/ for how to get them):
+ *
+ *	PCI BIOS Specification
+ *	PCI Local Bus Specification
+ *	PCI to PCI Bridge Specification
+ *	PCI Express Specification
+ *	PCI System Design Guide
+ */
 #ifndef AMDKCL_PCI_H
 #define AMDKCL_PCI_H
 
@@ -108,6 +129,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask)
 }
 #endif
 
+/* Copied from v3.12-rc2-29-gc6bde215acfd include/linux/pci.h */
 #if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 {
@@ -166,6 +188,7 @@ static inline void kcl_pci_remove_measure_file(struct pci_dev *pdev)
 #endif
 }
 
+/* Copied from v5.1-rc1-5-g4e544bac8267 include/linux/pci.h */
 #if !defined(HAVE_PCI_DEV_ID)
 static inline u16 pci_dev_id(struct pci_dev *dev)
 {

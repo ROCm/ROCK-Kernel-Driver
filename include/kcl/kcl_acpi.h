@@ -1,4 +1,9 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ * acpi.h - ACPI Interface
+ *
+ * Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+ */
 #ifndef AMDKCL_ACPI_H
 #define AMDKCL_ACPI_H
 
@@ -13,6 +18,7 @@
 
 #include <linux/acpi.h>
 
+/* Copied from include/linux/acpi.h> */
 #ifndef ACPI_HANDLE
 #define ACPI_HANDLE(dev) DEVICE_ACPI_HANDLE(dev)
 #endif

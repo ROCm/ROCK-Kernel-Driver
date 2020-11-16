@@ -1,10 +1,11 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
 #include <linux/version.h>
 #include <linux/sched.h>
 #include <kcl/header/kcl_sched_mm_h.h>
 #include <linux/mmu_notifier.h>
 #include <kcl/kcl_mn.h>
 
+/* Copied from v3.16-6588-gb972216e27d1 mm/mmu_notifier.c */
 #if !defined(HAVE_MMU_NOTIFIER_CALL_SRCU) && \
 	!defined(HAVE_MMU_NOTIFIER_PUT)
 /*

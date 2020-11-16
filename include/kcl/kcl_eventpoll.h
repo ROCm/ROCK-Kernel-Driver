@@ -1,8 +1,22 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
+/*
+ *  include/linux/eventpoll.h ( Efficient event polling implementation )
+ *  Copyright (C) 2001,...,2006	 Davide Libenzi
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  Davide Libenzi <davidel@xmailserver.org>
+ *
+ */
 #ifndef AMDKCL_EVENTPOLL_H
 #define AMDKCL_EVENTPOLL_H
 
 #include <linux/poll.h>
+
+/* Copied from include/uapi/linux/eventpoll.h */
 #ifndef EPOLLIN
 #define EPOLLIN        0x00000001
 #define EPOLLPRI       0x00000002

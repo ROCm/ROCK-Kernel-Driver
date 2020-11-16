@@ -1,4 +1,14 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Fence mechanism for dma-buf to allow for asynchronous dma access
+ *
+ * Copyright (C) 2012 Canonical Ltd
+ * Copyright (C) 2012 Texas Instruments
+ *
+ * Authors:
+ * Rob Clark <robdclark@gmail.com>
+ * Maarten Lankhorst <maarten.lankhorst@canonical.com>
+ */
 #ifndef AMDKCL_FENCE_H
 #define AMDKCL_FENCE_H
 
@@ -135,6 +145,7 @@ bool _kcl_fence_enable_signaling(struct dma_fence *f);
 #endif
 
 #if !defined(HAVE_DMA_FENCE_SET_ERROR)
+/* Copied from include/linux/dma-fence.h and modified for KCL */
 static inline void dma_fence_set_error(struct dma_fence *fence,
 				       int error)
 {

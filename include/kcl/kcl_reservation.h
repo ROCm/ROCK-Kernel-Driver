@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef KCL_KCL_RESERVATION_H
 #define KCL_KCL_RESERVATION_H
 

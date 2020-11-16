@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_COMPILER_ATTRIBUTES_H
 #define AMDKCL_COMPILER_ATTRIBUTES_H
 

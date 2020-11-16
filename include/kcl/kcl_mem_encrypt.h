@@ -1,4 +1,11 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * AMD Memory Encryption Support
+ *
+ * Copyright (C) 2016 Advanced Micro Devices, Inc.
+ *
+ * Author: Tom Lendacky <thomas.lendacky@amd.com>
+ */
 #ifndef KCL_KCL_MEM_ENCRYPT_H
 #define KCL_KCL_MEM_ENCRYPT_H
 

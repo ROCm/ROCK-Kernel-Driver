@@ -1,8 +1,15 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * kernel/power/main.c - PM subsystem core functionality.
+ *
+ * Copyright (c) 2003 Patrick Mochel
+ * Copyright (c) 2003 Open Source Development Lab
+ */
 #include <linux/bug.h>
 #include <kcl/kcl_suspend.h>
 
 #ifndef HAVE_KSYS_SYNC_HELPER
+/* Copied from kernel/power/main.c */
 #ifdef CONFIG_PM_SLEEP
 long (*_kcl_ksys_sync)(void);
 

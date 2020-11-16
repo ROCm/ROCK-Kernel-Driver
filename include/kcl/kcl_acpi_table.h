@@ -1,4 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0 */
+/******************************************************************************
+ *
+ * Name: acpixf.h - External interfaces to the ACPI subsystem
+ *
+ * Copyright (C) 2000 - 2020, Intel Corp.
+ *
+ *****************************************************************************/
 #ifndef KCL_KCL_ACPI_TABLE_H
 #define KCL_KCL_ACPI_TABLE_H
 
