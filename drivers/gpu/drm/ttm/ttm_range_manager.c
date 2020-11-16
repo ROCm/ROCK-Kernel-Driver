@@ -183,6 +183,14 @@ int ttm_range_man_fini(struct ttm_device *bdev,
 }
 EXPORT_SYMBOL(ttm_range_man_fini);
 
+#if !defined(HAVE_DRM_MM_PRINT)
+struct drm_mm *kcl_ttm_range_res_manager_to_drm_mm(struct ttm_resource_manager *man)
+{
+	return &(container_of(man, struct ttm_range_manager, manager)->mm);
+}
+EXPORT_SYMBOL(kcl_ttm_range_res_manager_to_drm_mm);
+#endif
+
 static void ttm_range_man_debug(struct ttm_resource_manager *man,
 #if !defined(HAVE_DRM_MM_PRINT)
 			     const char *prefix)
