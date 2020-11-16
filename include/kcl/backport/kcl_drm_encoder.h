@@ -38,7 +38,13 @@
 #include <drm/drm_edid.h>
 
 #if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
-#define drm_encoder_find(dev, file, id) drm_encoder_find(dev, id)
+static inline struct drm_encoder *_kcl_drm_encoder_find(struct drm_device *dev,
+						   struct drm_file *file_priv,
+						   uint32_t id)
+{
+	return drm_encoder_find(dev, id);
+}
+#define drm_encoder_find _kcl_drm_encoder_find
 #endif
 
 #if defined(HAVE_DRM_EDID_TO_ELD)
