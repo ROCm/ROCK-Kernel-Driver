@@ -819,6 +819,7 @@ extract_render_dcc_offset(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 {
 	struct amdgpu_device *adev = drm_to_adev(afb->base.dev);
@@ -973,6 +974,7 @@ static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 	afb->base.flags |= DRM_MODE_FB_MODIFIERS;
 	return 0;
 }
+#endif
 
 static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 				      uint64_t *tiling_flags, bool *tmz_surface)
@@ -1023,6 +1025,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	 * This needs to happen before modifier conversion as that might change
 	 * the number of planes.
 	 */
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		if (mode_cmd->handles[i] != mode_cmd->handles[0]) {
 			drm_dbg_kms(dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
@@ -1031,11 +1034,13 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 			goto fail;
 		}
 	}
+#endif
 
 	ret = amdgpu_display_get_fb_info(rfb, &rfb->tiling_flags, &rfb->tmz_surface);
 	if (ret)
 		goto fail;
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	if (dev->mode_config.allow_fb_modifiers &&
 	    !(rfb->base.flags & DRM_MODE_FB_MODIFIERS)) {
 		ret = convert_tiling_flags_to_modifier(rfb);
@@ -1050,6 +1055,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 		rfb->base.obj[i] = rfb->base.obj[0];
 		drm_gem_object_get(rfb->base.obj[i]);
 	}
+#endif
 
 	return 0;
 
