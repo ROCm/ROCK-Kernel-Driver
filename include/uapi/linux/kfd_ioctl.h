@@ -60,9 +60,10 @@
  * 3.1 - Add support for GFX10
  * 3.2 - Add support for GFX10.3
  * 3.3 - Add precise memory operations enable
+ * 4.0 - Remove gpu_id from api:wq
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	3
-#define KFD_IOCTL_DBG_MINOR_VERSION	3
+#define KFD_IOCTL_DBG_MAJOR_VERSION	4
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -279,8 +280,9 @@ enum kfd_dbg_trap_mask {
 /* KFD_IOC_DBG_TRAP_ENABLE:
  * ptr:   unused
  * data1: 0=disable, 1=enable
- * data2: queue ID (for future use)
+ * data2: unused
  * data3: return value for fd
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
@@ -289,6 +291,7 @@ enum kfd_dbg_trap_mask {
  * data1: override mode (see enum kfd_dbg_trap_override_mode)
  * data2: [in/out] trap mask (see enum kfd_dbg_trap_mask)
  * data3: [in] requested mask, [out] supported mask
+ * data4: unused
  *
  * May fail with -EPERM if the requested mode is not supported.
  *
@@ -305,6 +308,7 @@ enum kfd_dbg_trap_mask {
  * data1: 0=normal, 1=halt, 2=kill, 3=singlestep, 4=disable
  * data2: unused
  * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE 2
 
@@ -313,6 +317,7 @@ enum kfd_dbg_trap_mask {
  * data1: flags (IN)
  * data2: number of queues (IN)
  * data3: grace period (IN)
+ * data4: unused
  *
  * Returns the number of queues suspended from array of Queue IDs (ptr).
  * Requested queues that fail to suspend are masked in the array:
@@ -339,6 +344,7 @@ enum kfd_dbg_trap_mask {
  * data1: flags (IN)
  * data2: number of queues (IN)
  * data3: unused (IN)
+ * data4: unused
  *
  * Returns the number of queues resumed from array of Queue IDs (ptr).
  * Requested queues that fail to resume are masked in the array:
@@ -355,6 +361,7 @@ enum kfd_dbg_trap_mask {
  * data1: queue id (IN/OUT)
  * data2: flags (IN)
  * data3: suspend[2:2], event type [1:0] (OUT)
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT 5
 
@@ -363,6 +370,7 @@ enum kfd_dbg_trap_mask {
  * data1: flags (IN)
  * data2: number of queue snapshots (IN/OUT) - 0 for IN ignores buffer writes
  * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT 6
 
@@ -371,6 +379,7 @@ enum kfd_dbg_trap_mask {
  * data1: major version (OUT)
  * data2: minor version (OUT)
  * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_GET_VERSION	7
 
@@ -379,6 +388,7 @@ enum kfd_dbg_trap_mask {
  * data1: watch ID
  * data2: unused
  * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH 8
 
@@ -387,6 +397,7 @@ enum kfd_dbg_trap_mask {
  * data1: Watch ID (OUT)
  * data2: watch_mode: 0=read, 1=nonread, 2=atomic, 3=all
  * data3: watch address mask
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH 9
 
@@ -395,17 +406,18 @@ enum kfd_dbg_trap_mask {
  * data1: 0=disable, 1=enable (IN)
  * data2: unused
  * data3: unused
+ * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS 10
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
 	__u32 pid;     /* to KFD */
-	__u32 gpu_id;  /* to KFD */
 	__u32 op;      /* to KFD */
 	__u32 data1;   /* to KFD */
 	__u32 data2;   /* to KFD */
 	__u32 data3;   /* to KFD */
+	__u32 data4;   /* to KFD */
 };
 
 /* Matching HSA_EVENTTYPE */
