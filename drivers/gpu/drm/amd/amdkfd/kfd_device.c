@@ -654,10 +654,6 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	kfd_smi_init(kfd);
-	/* init the debugger watchpoint bitmask */
-	kfd->allocated_debug_watch_points =
-			~((1 << kfd->device_info->num_of_watch_points) - 1);
-	spin_lock_init(&kfd->watch_points_lock);
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,

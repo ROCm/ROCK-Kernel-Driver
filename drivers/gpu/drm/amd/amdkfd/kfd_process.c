@@ -44,6 +44,7 @@ struct mm_struct;
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
 #include "kfd_trace.h"
+#include "kfd_debug.h"
 #include "kfd_smi_events.h"
 
 /*
@@ -1190,6 +1191,10 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
 
+	/* New debugger for GFXv9 and later */
+	if (p->debug_trap_enabled)
+		kfd_dbg_trap_disable(p, false, 0);
+
 	/* Indicate to other users that MM is no longer valid */
 	p->mm = NULL;
 
@@ -1382,6 +1387,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (err)
 		goto err_event_init;
 	process->is_32bit_user_mode = in_compat_syscall();
+	process->debug_trap_enabled = false;
+	process->trap_debug_wave_launch_mode = 0;
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0) {
@@ -1527,8 +1534,6 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
-	pdd->debug_trap_enabled = false;
-	pdd->trap_debug_wave_launch_mode = 0;
 	pdd->runtime_inuse = false;
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;
