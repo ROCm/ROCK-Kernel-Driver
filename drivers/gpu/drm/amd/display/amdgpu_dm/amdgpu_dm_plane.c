@@ -161,10 +161,12 @@ static void add_modifier(uint64_t **mods, uint64_t *size, uint64_t *cap, uint64_
 	*size += 1;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static bool modifier_has_dcc(uint64_t modifier)
 {
 	return IS_AMD_FMT_MOD(modifier) && AMD_FMT_MOD_GET(DCC, modifier);
 }
+#endif
 
 static unsigned modifier_gfx9_swizzle_mode(uint64_t modifier)
 {
@@ -300,6 +302,7 @@ static int validate_dcc(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 					  const struct amdgpu_framebuffer *afb,
 					  const enum surface_pixel_format format,
@@ -350,6 +353,7 @@ static int fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 
 	return ret;
 }
+#endif
 
 static void add_gfx10_1_modifiers(const struct amdgpu_device *adev,
 		      uint64_t **mods, uint64_t *size, uint64_t *capacity)
@@ -824,6 +828,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 	}
 
 	if (adev->family >= AMDGPU_FAMILY_AI) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		ret = fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
 								rotation, plane_size,
 								tiling_info, dcc,
@@ -831,6 +836,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 								force_disable_dcc);
 		if (ret)
 			return ret;
+#endif
 	} else {
 		fill_gfx8_tiling_info_from_flags(tiling_info, tiling_flags);
 	}
@@ -1459,7 +1465,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.reset = dm_drm_plane_reset,
 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = dm_plane_format_mod_supported,
+#endif
 };
 
 int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
@@ -1478,9 +1486,11 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = get_plane_formats(plane, plane_cap, formats,
 					ARRAY_SIZE(formats));
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	res = get_plane_modifiers(dm->adev, plane->type, &modifiers);
 	if (res)
 		return res;
+#endif
 
 	if (modifiers == NULL)
 		adev_to_drm(dm->adev)->mode_config.fb_modifiers_not_supported = true;

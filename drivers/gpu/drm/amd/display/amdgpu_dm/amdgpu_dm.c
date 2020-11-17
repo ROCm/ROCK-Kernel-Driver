@@ -3096,7 +3096,9 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.get_format_info = amdgpu_dm_plane_get_format_info,
+#endif
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
@@ -5724,7 +5726,6 @@ get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing)
 	case PIXEL_ENCODING_RGB:
 		color_space = COLOR_SPACE_SRGB;
 		break;
-
 	default:
 		WARN_ON(1);
 		break;
