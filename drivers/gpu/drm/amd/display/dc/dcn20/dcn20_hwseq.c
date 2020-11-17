@@ -1034,8 +1034,8 @@ void dcn20_blank_pixel_data(
 		test_pattern = CONTROLLER_DP_TEST_PATTERN_VIDEOMODE;
 	}
 
-	stream_res->opp->funcs->opp_set_disp_pattern_generator(
-			stream_res->opp,
+	dc->hwss.set_disp_pattern_generator(dc,
+			pipe_ctx,
 			test_pattern,
 			test_pattern_color_space,
 			stream->timing.display_color_depth,
@@ -1045,8 +1045,8 @@ void dcn20_blank_pixel_data(
 			0);
 
 	for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
-		odm_pipe->stream_res.opp->funcs->opp_set_disp_pattern_generator(
-				odm_pipe->stream_res.opp,
+		dc->hwss.set_disp_pattern_generator(dc,
+				odm_pipe,
 				dc->debug.visual_confirm != VISUAL_CONFIRM_DISABLE && blank ?
 						CONTROLLER_DP_TEST_PATTERN_COLORRAMP : test_pattern,
 				test_pattern_color_space,
@@ -1162,6 +1162,7 @@ void dcn20_pipe_control_lock(
 	struct pipe_ctx *pipe,
 	bool lock)
 {
+	struct pipe_ctx *temp_pipe;
 	bool flip_immediate = false;
 
 	/* use TG master update lock to lock everything on the TG
@@ -1172,6 +1173,13 @@ void dcn20_pipe_control_lock(
 
 	if (pipe->plane_state != NULL)
 		flip_immediate = pipe->plane_state->flip_immediate;
+
+	temp_pipe = pipe->bottom_pipe;
+	while (!flip_immediate && temp_pipe) {
+	    if (temp_pipe->plane_state != NULL)
+		flip_immediate = temp_pipe->plane_state->flip_immediate;
+	    temp_pipe = temp_pipe->bottom_pipe;
+	}
 
 	if (flip_immediate && lock) {
 		const int TIMEOUT_FOR_FLIP_PENDING = 100000;
@@ -1199,6 +1207,20 @@ void dcn20_pipe_control_lock(
 		if ((flip_immediate && pipe->stream_res.gsl_group == 0) ||
 		    (!flip_immediate && pipe->stream_res.gsl_group > 0))
 			dcn20_setup_gsl_group_as_lock(dc, pipe, flip_immediate);
+
+	if (pipe->plane_state != NULL)
+		flip_immediate = pipe->plane_state->flip_immediate;
+
+	temp_pipe = pipe->bottom_pipe;
+	while (flip_immediate && temp_pipe) {
+	    if (temp_pipe->plane_state != NULL)
+		flip_immediate = temp_pipe->plane_state->flip_immediate;
+	    temp_pipe = temp_pipe->bottom_pipe;
+	}
+
+	if (!lock && pipe->stream_res.gsl_group > 0 && pipe->plane_state &&
+		!flip_immediate)
+	    dcn20_setup_gsl_group_as_lock(dc, pipe, false);
 
 	if (pipe->stream && should_use_dmub_lock(pipe->stream->link)) {
 		union dmub_hw_lock_flags hw_locks = { 0 };
@@ -2557,3 +2579,15 @@ bool dcn20_optimize_timing_for_fsft(struct dc *dc,
 	return true;
 }
 #endif
+
+void dcn20_set_disp_pattern_generator(const struct dc *dc,
+		struct pipe_ctx *pipe_ctx,
+		enum controller_dp_test_pattern test_pattern,
+		enum controller_dp_color_space color_space,
+		enum dc_color_depth color_depth,
+		const struct tg_color *solid_color,
+		int width, int height, int offset)
+{
+	pipe_ctx->stream_res.opp->funcs->opp_set_disp_pattern_generator(pipe_ctx->stream_res.opp, test_pattern,
+			color_space, color_depth, solid_color, width, height, offset);
+}

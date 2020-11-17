@@ -95,6 +95,7 @@ static const struct hw_sequencer_funcs dcn30_funcs = {
 	.set_abm_immediate_disable = dcn21_set_abm_immediate_disable,
 	.hardware_release = dcn30_hardware_release,
 	.set_pipe = dcn21_set_pipe,
+	.set_disp_pattern_generator = dcn30_set_disp_pattern_generator,
 };
 
 static const struct hwseq_private_funcs dcn30_private_funcs = {

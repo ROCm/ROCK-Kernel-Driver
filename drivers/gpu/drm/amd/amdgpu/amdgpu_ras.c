@@ -516,9 +516,9 @@ struct ras_manager *amdgpu_ras_find_obj(struct amdgpu_device *adev,
 /* obj end */
 
 static void amdgpu_ras_parse_status_code(struct amdgpu_device *adev,
-				  const char* 		invoke_type,
-				  const char* 		block_name,
-				  enum ta_ras_status 	ret)
+					 const char* invoke_type,
+					 const char* block_name,
+					 enum ta_ras_status ret)
 {
 	switch (ret) {
 	case TA_RAS_STATUS__SUCCESS:
@@ -607,7 +607,7 @@ int amdgpu_ras_feature_enable(struct amdgpu_device *adev,
 	if (!con)
 		return -EINVAL;
 
-        info = kzalloc(sizeof(union ta_ras_cmd_input), GFP_KERNEL);
+	info = kzalloc(sizeof(union ta_ras_cmd_input), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
@@ -2153,7 +2153,7 @@ void amdgpu_ras_late_fini(struct amdgpu_device *adev,
 
 	amdgpu_ras_sysfs_remove(adev, ras_block);
 	if (ih_info->cb)
-                amdgpu_ras_interrupt_remove_handler(adev, ih_info);
+		amdgpu_ras_interrupt_remove_handler(adev, ih_info);
 	amdgpu_ras_feature_enable(adev, ras_block, 0);
 }
 

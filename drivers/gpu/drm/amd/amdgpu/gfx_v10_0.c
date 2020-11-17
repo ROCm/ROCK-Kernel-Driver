@@ -3301,7 +3301,7 @@ static void gfx_v10_0_set_irq_funcs(struct amdgpu_device *adev);
 static void gfx_v10_0_set_gds_init(struct amdgpu_device *adev);
 static void gfx_v10_0_set_rlc_funcs(struct amdgpu_device *adev);
 static int gfx_v10_0_get_cu_info(struct amdgpu_device *adev,
-                                 struct amdgpu_cu_info *cu_info);
+				 struct amdgpu_cu_info *cu_info);
 static uint64_t gfx_v10_0_get_gpu_clock_counter(struct amdgpu_device *adev);
 static void gfx_v10_0_select_se_sh(struct amdgpu_device *adev, u32 se_num,
 				   u32 sh_num, u32 instance);
@@ -4326,10 +4326,10 @@ static void gfx_v10_0_read_wave_vgprs(struct amdgpu_device *adev, uint32_t simd,
 }
 
 static void gfx_v10_0_select_me_pipe_q(struct amdgpu_device *adev,
-									  u32 me, u32 pipe, u32 q, u32 vm)
- {
-       nv_grbm_select(adev, me, pipe, q, vm);
- }
+				       u32 me, u32 pipe, u32 q, u32 vm)
+{
+	nv_grbm_select(adev, me, pipe, q, vm);
+}
 
 static void gfx_v10_0_update_perfmon_mgcg(struct amdgpu_device *adev,
 					  bool enable)
@@ -7779,12 +7779,50 @@ static void gfx_v10_0_update_coarse_grain_clock_gating(struct amdgpu_device *ade
 	}
 }
 
+static void gfx_v10_0_update_fine_grain_clock_gating(struct amdgpu_device *adev,
+						      bool enable)
+{
+	uint32_t def, data;
+
+	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_FGCG)) {
+		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
+		/* unset FGCG override */
+		data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK;
+		/* update FGCG override bits */
+		if (def != data)
+			WREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE, data);
+
+		def = data = RREG32_SOC15(GC, 0, mmRLC_CLK_CNTL);
+		/* unset RLC SRAM CLK GATER override */
+		data &= ~RLC_CLK_CNTL__RLC_SRAM_CLK_GATER_OVERRIDE_MASK;
+		/* update RLC SRAM CLK GATER override bits */
+		if (def != data)
+			WREG32_SOC15(GC, 0, mmRLC_CLK_CNTL, data);
+	} else {
+		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
+		/* reset FGCG bits */
+		data |= RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK;
+		/* disable FGCG*/
+		if (def != data)
+			WREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE, data);
+
+		def = data = RREG32_SOC15(GC, 0, mmRLC_CLK_CNTL);
+		/* reset RLC SRAM CLK GATER bits */
+		data |= RLC_CLK_CNTL__RLC_SRAM_CLK_GATER_OVERRIDE_MASK;
+		/* disable RLC SRAM CLK*/
+		if (def != data)
+			WREG32_SOC15(GC, 0, mmRLC_CLK_CNTL, data);
+	}
+}
+
 static int gfx_v10_0_update_gfx_clock_gating(struct amdgpu_device *adev,
 					    bool enable)
 {
 	amdgpu_gfx_rlc_enter_safe_mode(adev);
 
 	if (enable) {
+		/* enable FGCG firstly*/
+		gfx_v10_0_update_fine_grain_clock_gating(adev, enable);
 		/* CGCG/CGLS should be enabled after MGCG/MGLS
 		 * ===  MGCG + MGLS ===
 		 */
@@ -7802,6 +7840,8 @@ static int gfx_v10_0_update_gfx_clock_gating(struct amdgpu_device *adev,
 		gfx_v10_0_update_3d_clock_gating(adev, enable);
 		/* ===  MGCG + MGLS === */
 		gfx_v10_0_update_medium_grain_clock_gating(adev, enable);
+		/* disable fgcg at last*/
+		gfx_v10_0_update_fine_grain_clock_gating(adev, enable);
 	}
 
 	if (adev->cg_flags &
@@ -7970,6 +8010,11 @@ static void gfx_v10_0_get_clockgating_state(void *handle, u32 *flags)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int data;
+
+	/* AMD_CG_SUPPORT_GFX_FGCG */
+	data = RREG32_KIQ(SOC15_REG_OFFSET(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE));
+	if (!(data & RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK))
+		*flags |= AMD_CG_SUPPORT_GFX_FGCG;
 
 	/* AMD_CG_SUPPORT_GFX_MGCG */
 	data = RREG32_KIQ(SOC15_REG_OFFSET(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE));

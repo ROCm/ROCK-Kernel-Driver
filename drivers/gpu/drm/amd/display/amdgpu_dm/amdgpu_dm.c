@@ -5929,7 +5929,8 @@ enum drm_mode_status amdgpu_dm_connector_mode_valid(struct drm_connector *connec
 
 	dc_sink = to_amdgpu_dm_connector(connector)->dc_sink;
 
-	if (dc_sink == NULL) {
+	if (dc_sink == NULL && aconnector->base.force != DRM_FORCE_ON_DIGITAL &&
+				aconnector->base.force != DRM_FORCE_ON) {
 		DRM_ERROR("dc_sink is NULL!\n");
 		goto fail;
 	}
@@ -9563,6 +9564,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	enum dc_status status;
 	int ret, i;
 	bool lock_and_validation_needed = false;
+	struct dm_crtc_state *dm_old_crtc_state;
 
 	ret = drm_atomic_helper_check_modeset(dev, state);
 	if (ret)
@@ -9615,14 +9617,16 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 #endif
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
-		struct dm_crtc_state *dm_old_crtc_state  = to_dm_crtc_state(old_crtc_state);
+		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
+
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
 		    !new_crtc_state->color_mgmt_changed
 #ifdef HAVE_DRM_VRR_SUPPORTED
-		    && old_crtc_state->vrr_enabled == new_crtc_state->vrr_enabled)
+		    && old_crtc_state->vrr_enabled == new_crtc_state->vrr_enabled
 #else
-		    && dm_old_crtc_state->base_vrr_enabled == dm_new_crtc_state->base_vrr_enabled)
+		    && dm_old_crtc_state->base_vrr_enabled == dm_new_crtc_state->base_vrr_enabled
 #endif
+			&& dm_old_crtc_state->dsc_force_changed == false)
 			continue;
 
 		if (!new_crtc_state->enable)

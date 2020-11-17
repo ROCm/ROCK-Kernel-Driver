@@ -96,16 +96,16 @@
 
 #define AMDGPU_VERSION		"5.9.6"
 
-int amdgpu_vram_limit = 0;
-int amdgpu_vis_vram_limit = 0;
+int amdgpu_vram_limit;
+int amdgpu_vis_vram_limit;
 int amdgpu_gart_size = -1; /* auto */
 int amdgpu_gtt_size = -1; /* auto */
 int amdgpu_moverate = -1; /* auto */
-int amdgpu_benchmarking = 0;
-int amdgpu_testing = 0;
+int amdgpu_benchmarking;
+int amdgpu_testing;
 int amdgpu_audio = -1;
-int amdgpu_disp_priority = 0;
-int amdgpu_hw_i2c = 0;
+int amdgpu_disp_priority;
+int amdgpu_hw_i2c;
 int amdgpu_pcie_gen2 = -1;
 int amdgpu_msi = -1;
 char amdgpu_lockup_timeout[AMDGPU_MAX_TIMEOUT_PARAM_LENGTH];
@@ -115,22 +115,22 @@ int amdgpu_aspm = -1;
 int amdgpu_runtime_pm = -1;
 uint amdgpu_ip_block_mask = 0xffffffff;
 int amdgpu_bapm = -1;
-int amdgpu_deep_color = 0;
+int amdgpu_deep_color;
 int amdgpu_vm_size = -1;
 int amdgpu_vm_fragment_size = -1;
 int amdgpu_vm_block_size = -1;
-int amdgpu_vm_fault_stop = 0;
-int amdgpu_vm_debug = 0;
+int amdgpu_vm_fault_stop;
+int amdgpu_vm_debug;
 int amdgpu_vm_update_mode = -1;
-int amdgpu_exp_hw_support = 0;
+int amdgpu_exp_hw_support;
 int amdgpu_dc = -1;
 int amdgpu_sched_jobs = 32;
 int amdgpu_sched_hw_submission = 2;
 int amdgpu_no_evict = 0;
 int amdgpu_direct_gma_size = 0;
 int amdgpu_ssg_enabled = 0;
-uint amdgpu_pcie_gen_cap = 0;
-uint amdgpu_pcie_lane_cap = 0;
+uint amdgpu_pcie_gen_cap;
+uint amdgpu_pcie_lane_cap;
 uint amdgpu_cg_mask = 0xffffffff;
 uint amdgpu_pg_mask = 0xffffffff;
 uint amdgpu_sdma_phase_quantum = 32;
@@ -138,13 +138,13 @@ char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
 /* OverDrive(bit 14) disabled by default*/
 uint amdgpu_pp_feature_mask = 0xffffbfff;
-uint amdgpu_force_long_training = 0;
-int amdgpu_job_hang_limit = 0;
+uint amdgpu_force_long_training;
+int amdgpu_job_hang_limit;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
 int amdgpu_gpu_recovery = -1; /* auto */
-int amdgpu_emu_mode = 0;
-uint amdgpu_smu_memory_pool_size = 0;
+int amdgpu_emu_mode;
+uint amdgpu_smu_memory_pool_size;
 /*
  * FBC (bit 0) disabled by default
  * MULTI_MON_PP_MCLK_SWITCH (bit 1) enabled by default
@@ -155,14 +155,14 @@ uint amdgpu_smu_memory_pool_size = 0;
  * PSR (bit 3) disabled by default
  */
 uint amdgpu_dc_feature_mask = 2;
-uint amdgpu_dc_debug_mask = 0;
+uint amdgpu_dc_debug_mask;
 int amdgpu_async_gfx_ring = 1;
-int amdgpu_mcbp = 0;
+int amdgpu_mcbp;
 int amdgpu_discovery = -1;
-int amdgpu_mes = 0;
+int amdgpu_mes;
 int amdgpu_noretry = -1;
 int amdgpu_force_asic_type = -1;
-int amdgpu_tmz = 0;
+int amdgpu_tmz;
 int amdgpu_reset_method = -1; /* auto */
 int amdgpu_num_kcq = -1;
 
@@ -284,7 +284,7 @@ module_param_string(lockup_timeout, amdgpu_lockup_timeout, sizeof(amdgpu_lockup_
 /**
  * DOC: dpm (int)
  * Override for dynamic power management setting
- * (0 = disable, 1 = enable, 2 = enable sw smu driver for vega20)
+ * (0 = disable, 1 = enable)
  * The default is -1 (auto).
  */
 MODULE_PARM_DESC(dpm, "DPM support (1 = enable, 0 = disable, -1 = auto)");
@@ -807,7 +807,7 @@ module_param_named(dcdebugmask, amdgpu_dc_debug_mask, uint, 0444);
  * Defaults to 0, or disabled. Userspace can still override this level later
  * after boot.
  */
-uint amdgpu_dm_abm_level = 0;
+uint amdgpu_dm_abm_level;
 MODULE_PARM_DESC(abmlevel, "ABM level (0 = off (default), 1-4 = backlight reduction level) ");
 module_param_named(abmlevel, amdgpu_dm_abm_level, uint, 0444);
 
@@ -1616,7 +1616,7 @@ static const struct file_operations amdgpu_driver_kms_fops = {
 
 int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 {
-        struct drm_file *file;
+	struct drm_file *file;
 
 	if (!filp)
 		return -EINVAL;
