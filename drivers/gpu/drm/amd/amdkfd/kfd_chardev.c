@@ -1639,7 +1639,6 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 	struct kfd_ioctl_alloc_queue_gws_args *args = data;
 	struct queue *q;
 	struct kfd_dev *dev;
-	struct kfd_process_device *pdd;
 
 	mutex_lock(&p->mutex);
 	q = pqm_get_user_queue(&p->pqm, args->queue_id);
@@ -1648,12 +1647,6 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		dev = q->device;
 	} else {
 		retval = -EINVAL;
-		goto out_unlock;
-	}
-
-	pdd = kfd_bind_process_to_device(dev, p);
-	if (IS_ERR(pdd)) {
-		retval = -ESRCH;
 		goto out_unlock;
 	}
 
@@ -1667,7 +1660,7 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
-	if (dev->gws_debug_workaround && pdd->debug_trap_enabled) {
+	if (dev->gws_debug_workaround && p->debug_trap_enabled) {
 		retval = -EBUSY;
 		goto out_unlock;
 	}
@@ -2638,25 +2631,22 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_dbg_trap_args *args = data;
-	struct kfd_process_device *pdd = NULL;
 	struct task_struct *thread = NULL;
 	int r = 0;
-	struct kfd_dev *dev = NULL;
 	struct kfd_process *target = NULL;
 	struct pid *pid = NULL;
-	uint32_t *queue_id_array = NULL;
-	uint32_t gpu_id;
+	uint32_t *user_array = NULL;
 	uint32_t debug_trap_action;
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
-	bool need_device;
-	bool need_qid_array;
+	bool check_devices;
+	bool need_user_array;
+	uint32_t size_to_copy_to_user_array = 0;
 	bool is_attach;
 	bool need_proc_create = false;
 
 	debug_trap_action = args->op;
-	gpu_id = args->gpu_id;
 	data1 = args->data1;
 	data2 = args->data2;
 	data3 = args->data3;
@@ -2667,13 +2657,15 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
-	need_device =
+	is_attach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 1;
+
+	check_devices =
 		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_SUSPEND &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_RESUME &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION;
 
-	need_qid_array =
+	need_user_array =
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
 		debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME;
 
@@ -2686,8 +2678,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	}
 
 	thread = get_pid_task(pid, PIDTYPE_PID);
-
-	is_attach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 1;
 
 	rcu_read_lock();
 	need_proc_create = is_attach && thread && thread != current &&
@@ -2720,53 +2710,54 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	mutex_lock(&target->mutex);
 
-	if (need_device) {
-		bool is_debug_enable_op =
-				debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE;
+	if (need_user_array) {
+		/* data 2 has the number of IDs */
+		size_t user_array_size = sizeof(uint32_t) * data2;
 
-		dev = kfd_device_by_id(args->gpu_id);
-		if (!dev) {
-			r = -EINVAL;
-			goto unlock_out;
-		}
-
-		if (dev->device_info->asic_family < CHIP_VEGA10) {
-			r = -EINVAL;
-			goto unlock_out;
-		}
-
-		pdd = kfd_bind_process_to_device(dev, target);
-
-		if (IS_ERR(pdd)) {
-			r = -EINVAL;
-			goto unlock_out;
-		}
-
-		if (dev->gws_debug_workaround && pdd->qpd.num_gws) {
-			r = -EBUSY;
-			goto unlock_out;
-		}
-
-		if (!(is_debug_enable_op || pdd->debug_trap_enabled)) {
-			pr_err("Debugging is not enabled for this device\n");
-			r = -EINVAL;
-			goto unlock_out;
-		}
-	} else if (need_qid_array) {
-		/* data 2 has the number of queue IDs */
-		size_t queue_id_array_size = sizeof(uint32_t) * data2;
-
-		queue_id_array = kzalloc(queue_id_array_size, GFP_KERNEL);
-		if (!queue_id_array) {
+		user_array = kzalloc(user_array_size, GFP_KERNEL);
+		if (!user_array) {
 			r = -ENOMEM;
 			goto unlock_out;
 		}
 		/* We need to copy the queue IDs from userspace */
-		if (copy_from_user(queue_id_array,
+		if (copy_from_user(user_array,
 					(uint32_t *) args->ptr,
-					queue_id_array_size)) {
+					user_array_size)) {
 			r = -EFAULT;
 			goto unlock_out;
+		}
+	}
+
+	if (!is_attach &&
+			debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION &&
+			!target->debug_trap_enabled) {
+		pr_err("Debugging is not enabled for this process\n");
+		r = -EINVAL;
+		goto unlock_out;
+	}
+
+	if (check_devices) {
+		struct kfd_process_device *pdd;
+
+		list_for_each_entry(pdd,
+				&target->per_device_data,
+				per_device_list) {
+
+			if (pdd->dev->device_info->asic_family < CHIP_VEGA10) {
+				r = -ENODEV;
+				goto unlock_out;
+			}
+
+			if (!is_attach && !pdd->dev->dqm->trap_debug_vmid) {
+				r = -EBUSY;
+				goto unlock_out;
+			}
+
+			if (pdd->dev->gws_debug_workaround &&
+							pdd->qpd.num_gws) {
+				r = -EBUSY;
+				goto unlock_out;
+			}
 		}
 	}
 
@@ -2774,12 +2765,10 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
-			r = kfd_dbg_trap_disable(pdd);
+			r = kfd_dbg_trap_disable(target, false, 0);
 			break;
 		case 1:
-			r = kfd_dbg_trap_enable(pdd, &args->data3);
-			if (r)
-				break;
+			r = kfd_dbg_trap_enable(target, &args->data3);
 
 			break;
 		default:
@@ -2791,8 +2780,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
 		r = kfd_dbg_trap_set_wave_launch_override(
-				dev,
-				dev->vm_info.last_vmid_kfd,
+				target,
 				data1,
 				data2,
 				data3,
@@ -2801,7 +2789,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
-		r = kfd_dbg_trap_set_wave_launch_mode(pdd, data1);
+		r = kfd_dbg_trap_set_wave_launch_mode(target,
+						data1);
 		break;
 
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
@@ -2809,13 +2798,9 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data2, /* Number of queues */
 				data3, /* Grace Period */
 				data1, /* Flags */
-				queue_id_array); /* array of queue ids */
+				user_array); /* array of queue ids */
 
-		if (copy_to_user((void __user *)args->ptr, queue_id_array,
-				sizeof(uint32_t) * data2)) {
-			r = -EFAULT;
-			goto unlock_out;
-		}
+		size_to_copy_to_user_array = data2;
 
 		break;
 
@@ -2823,17 +2808,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = resume_queues(target,
 				data2, /* Number of queues */
 				data1, /* Flags */
-				queue_id_array); /* array of queue ids */
+				user_array); /* array of queue ids */
 
-		if (copy_to_user((void __user *)args->ptr, queue_id_array,
-				sizeof(uint32_t) * data2)) {
-			r = -EFAULT;
-			goto unlock_out;
-		}
+		size_to_copy_to_user_array = data2;
 
 		break;
 	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
-		r = kfd_dbg_ev_query_debug_event(pdd, &args->data1,
+		r = kfd_dbg_ev_query_debug_event(target, &args->data1,
 						 args->data2,
 						 &args->data3);
 		break;
@@ -2851,11 +2832,10 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
 		break;
 	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
-		r = kfd_dbg_trap_clear_address_watch(pdd,
-				data1);
+		r = kfd_dbg_trap_clear_address_watch(target, data1);
 		break;
 	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
-		r = kfd_dbg_trap_set_address_watch(pdd,
+		r = kfd_dbg_trap_set_address_watch(target,
 				args->ptr, /* watch address */
 				data3,     /* watch address mask */
 				&data1,    /* watch id */
@@ -2867,7 +2847,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		args->data1 = data1;
 		break;
 	case KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS:
-		r = kfd_dbg_trap_set_precise_mem_ops(dev, data1);
+		r = kfd_dbg_trap_set_precise_mem_ops(target, data1);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
@@ -2878,17 +2858,21 @@ unlock_out:
 	mutex_unlock(&target->mutex);
 
 out:
+	if (user_array && size_to_copy_to_user_array) {
+		/* Copy the user array to userspace even on error. */
+		if (copy_to_user((void __user *)args->ptr, user_array,
+				sizeof(uint32_t) * size_to_copy_to_user_array))
+			pr_err("copy_to_user failed\n");
+	}
+
 	if (thread)
 		put_task_struct(thread);
 	if (pid)
 		put_pid(pid);
-	/* hold the target reference for the entire debug session. */
-	if (!is_attach && target) {
+
+	if (target)
 		kfd_unref_process(target);
-		if (debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE)
-			kfd_unref_process(target);
-	}
-	kfree(queue_id_array);
+	kfree(user_array);
 	return r;
 }
 

@@ -1652,7 +1652,7 @@ static int wait_on_destroy_queue(struct device_queue_manager *dqm,
 
 	q->properties.is_being_destroyed = true;
 
-	if (pdd->debug_trap_enabled && q->properties.is_suspended) {
+	if (pdd->process->debug_trap_enabled && q->properties.is_suspended) {
 		dqm_unlock(dqm);
 		mutex_unlock(&q->process->mutex);
 		ret = wait_event_interruptible(dqm->destroy_wait,

@@ -335,15 +335,6 @@ struct kfd_dev {
 	/*spm process id */
 	unsigned int spm_pasid;
 
-	/*
-	 * A bitmask to indicate which watch points have been allocated.
-	 *   bit meaning:
-	 *     0:  unallocated/available
-	 *     1:  allocated/unavailable
-	 */
-	uint32_t allocated_debug_watch_points;
-	spinlock_t watch_points_lock;
-
 	struct ida doorbell_ida;
 	unsigned int max_doorbell_slices;
 
@@ -748,9 +739,6 @@ struct kfd_process_device {
 	/* The process that owns this kfd_process_device. */
 	struct kfd_process *process;
 
-	/* per-process-per device debug event fd file */
-	struct file *dbg_ev_file;
-
 	/* per-process-per device QCM data structure */
 	struct qcm_process_device qpd;
 
@@ -776,15 +764,6 @@ struct kfd_process_device {
 	 */
 	bool already_dequeued;
 	bool runtime_inuse;
-
-	/* Indicates device process is debug attached with reserved vmid. */
-	bool debug_trap_enabled;
-
-	/* Value of the wave launch mode if debugging is enabled */
-	uint32_t trap_debug_wave_launch_mode;
-
-	/* Allocated debug watch point IDs bitmask */
-	uint32_t allocated_debug_watch_point_bitmask;
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	enum kfd_pdd_bound bound;
@@ -938,6 +917,18 @@ struct kfd_process {
 	 */
 	unsigned long last_restore_timestamp;
 	unsigned long last_evict_timestamp;
+
+	/* Indicates device process is debug attached with reserved vmid. */
+	bool debug_trap_enabled;
+
+	/* Value of the wave launch mode if debugging is enabled */
+	uint32_t trap_debug_wave_launch_mode;
+
+	/* per-process-per device debug event fd file */
+	struct file *dbg_ev_file;
+
+	/* Allocated debug watch point IDs bitmask */
+	uint32_t allocated_debug_watch_point_bitmask;
 
 	/* Kobj for our procfs */
 	struct kobject *kobj;
@@ -1331,16 +1322,6 @@ int kfd_ipc_init(void);
 /* Compute profile */
 void kfd_inc_compute_active(struct kfd_dev *dev);
 void kfd_dec_compute_active(struct kfd_dev *dev);
-
-/* Allocate and free watch point IDs for debugger */
-int kfd_allocate_debug_watch_point(struct kfd_dev *kfd,
-					uint64_t watch_address,
-					uint32_t watch_address_mask,
-					uint32_t *watch_point,
-					uint32_t watch_mode,
-					uint32_t debug_vmid);
-int kfd_release_debug_watch_points(struct kfd_dev *kfd,
-					uint32_t watch_point_bit_mask_to_free);
 
 /* Cgroup Support */
 /* Check with device cgroup if @kfd device is accessible */

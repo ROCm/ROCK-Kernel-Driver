@@ -44,6 +44,7 @@ struct mm_struct;
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
 #include "kfd_trace.h"
+#include "kfd_debug.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -1177,28 +1178,11 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
-
-		/* New debugger for GFXv9 and later */
-		if (pdd->debug_trap_enabled) {
-			if (pdd->allocated_debug_watch_point_bitmask) {
-				kfd_release_debug_watch_points(dev,
-				    pdd->allocated_debug_watch_point_bitmask);
-				pdd->allocated_debug_watch_point_bitmask = 0;
-			}
-			pdd->debug_trap_enabled = false;
-			dev->kfd2kgd->disable_debug_trap(dev->kgd,
-						dev->vm_info.last_vmid_kfd);
-			if (pdd->trap_debug_wave_launch_mode != 0) {
-				dev->kfd2kgd->set_wave_launch_mode(
-					dev->kgd, 0,
-					dev->vm_info.last_vmid_kfd);
-				pdd->trap_debug_wave_launch_mode = 0;
-			}
-			release_debug_trap_vmid(dev->dqm);
-			/* Drop reference held by attach. */
-			kfd_unref_process(p);
-		}
 	}
+
+	/* New debugger for GFXv9 and later */
+	if (p->debug_trap_enabled)
+		kfd_dbg_trap_disable(p, false, 0);
 
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
@@ -1387,6 +1371,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	process->last_restore_timestamp = get_jiffies_64();
 	kfd_event_init_process(process);
 	process->is_32bit_user_mode = in_compat_syscall();
+	process->debug_trap_enabled = false;
+	process->trap_debug_wave_launch_mode = 0;
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)
@@ -1527,8 +1513,6 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->process = p;
 	pdd->bound = PDD_UNBOUND;
 	pdd->already_dequeued = false;
-	pdd->debug_trap_enabled = false;
-	pdd->trap_debug_wave_launch_mode = 0;
 	pdd->runtime_inuse = false;
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;
