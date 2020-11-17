@@ -2530,7 +2530,9 @@ dm_atomic_state_alloc_free(struct drm_atomic_state *state)
 
 static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 	.fb_create = amdgpu_display_user_framebuffer_create,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.get_format_info = amd_get_format_info,
+#endif
 	.output_poll_changed = drm_fb_helper_output_poll_changed,
 	.atomic_check = amdgpu_dm_atomic_check,
 	.atomic_commit = drm_atomic_helper_commit,
@@ -4737,6 +4739,7 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static bool
 modifier_has_dcc(uint64_t modifier)
 {
@@ -5245,6 +5248,7 @@ fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 
 	return ret;
 }
+#endif
 
 static int
 fill_plane_buffer_attributes(struct amdgpu_device *adev,
@@ -5324,6 +5328,7 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 	}
 
 	if (adev->family >= AMDGPU_FAMILY_AI) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		if (afb->base.flags & DRM_MODE_FB_MODIFIERS) {
 			ret = fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
 									rotation, plane_size,
@@ -5333,13 +5338,16 @@ fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			if (ret)
 				return ret;
 		} else {
+#endif
 			ret = fill_gfx9_plane_attributes_from_flags(adev, afb, format, rotation,
 								    plane_size, tiling_info, dcc,
 								    address, tiling_flags,
 								    force_disable_dcc);
 			if (ret)
 				return ret;
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		}
+#endif
 	} else {
 		fill_gfx8_tiling_info_from_flags(tiling_info, tiling_flags);
 	}
@@ -7663,7 +7671,9 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.reset = dm_drm_plane_reset,
 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = dm_plane_format_mod_supported,
+#endif
 };
 
 #if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP)
@@ -8044,9 +8054,11 @@ static int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	num_formats = get_plane_formats(plane, plane_cap, formats,
 					ARRAY_SIZE(formats));
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	res = get_plane_modifiers(dm->adev, plane->type, &modifiers);
 	if (res)
 		return res;
+#endif
 
 	res = drm_universal_plane_init(adev_to_drm(dm->adev), plane, possible_crtcs,
 				       &dm_plane_funcs, formats, num_formats,
