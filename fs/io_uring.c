@@ -1940,7 +1940,7 @@ restart:
 				ret = -EFAULT;
 			} else {
 				cur_mm = ctx->sqo_mm;
-				use_mm(cur_mm);
+				kthread_use_mm(cur_mm);
 				old_fs = get_fs();
 				set_fs(USER_DS);
 			}
@@ -2028,7 +2028,7 @@ restart:
 out:
 	if (cur_mm) {
 		set_fs(old_fs);
-		unuse_mm(cur_mm);
+		kthread_unuse_mm(cur_mm);
 		mmput(cur_mm);
 	}
 	revert_creds(old_cred);
@@ -2339,7 +2339,7 @@ static int io_submit_sqes(struct io_ring_ctx *ctx, unsigned int nr,
 		if (io_sqe_needs_user(s.sqe) && !*mm) {
 			mm_fault = mm_fault || !mmget_not_zero(ctx->sqo_mm);
 			if (!mm_fault) {
-				use_mm(ctx->sqo_mm);
+				kthread_use_mm(ctx->sqo_mm);
 				*mm = ctx->sqo_mm;
 			}
 		}
@@ -2429,7 +2429,7 @@ static int io_sq_thread(void *data)
 			 * may sleep.
 			 */
 			if (cur_mm) {
-				unuse_mm(cur_mm);
+				kthread_unuse_mm(cur_mm);
 				mmput(cur_mm);
 				cur_mm = NULL;
 			}
@@ -2480,7 +2480,7 @@ static int io_sq_thread(void *data)
 
 	set_fs(old_fs);
 	if (cur_mm) {
-		unuse_mm(cur_mm);
+		kthread_unuse_mm(cur_mm);
 		mmput(cur_mm);
 	}
 	revert_creds(old_cred);
