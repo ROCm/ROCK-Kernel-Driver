@@ -1373,6 +1373,9 @@ static void m_can_stop(struct net_device *dev)
 	/* disable all interrupts */
 	m_can_disable_all_interrupts(priv);
 
+	/* Set init mode to disengage from the network */
+	m_can_config_endisable(priv, true);
+
 	/* set the state as STOPPED */
 	priv->can.state = CAN_STATE_STOPPED;
 }
