@@ -37,6 +37,7 @@
 #include "cik_regs.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
+#include "kfd_debug.h"
 #include "mes_api_def.h"
 
 /* Size of the per-pipe EOP queue */
