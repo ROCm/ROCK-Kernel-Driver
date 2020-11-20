@@ -39,7 +39,7 @@ static DECLARE_WAIT_QUEUE_HEAD(exit_q);
 static atomic_t device_released;
 
 static struct device_type ttm_drm_class_type = {
-	.name = "amdttm",
+	.name = TTM_NAME,
 	/**
 	 * Add pm ops here.
 	 */
@@ -67,7 +67,7 @@ static int __init ttm_init(void)
 {
 	int ret;
 
-	ret = dev_set_name(&ttm_drm_class_device, "amdttm");
+	ret = dev_set_name(&ttm_drm_class_device, TTM_NAME);
 	if (unlikely(ret != 0))
 		return ret;
 
