@@ -25,7 +25,7 @@
 #include <linux/wait.h>
 #include <linux/anon_inodes.h>
 #include <uapi/linux/kfd_ioctl.h>
-#include "kfd_debug_events.h"
+#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_topology.h"
 

@@ -39,7 +39,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
-#include "kfd_debug_events.h"
+#include "kfd_debug.h"
 #include "kfd_ipc.h"
 #include "kfd_trace.h"
 
