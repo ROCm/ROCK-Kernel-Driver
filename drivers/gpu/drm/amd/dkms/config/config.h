@@ -928,3 +928,6 @@
 
 /* __print_array for trace is available */
 #define HAVE___PRINT_ARRAY 1
+
+/* acpi_put_table() is available */
+#define HAVE_ACPI_PUT_TABLE 1
