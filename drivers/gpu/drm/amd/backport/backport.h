@@ -56,5 +56,6 @@
 #include <kcl/kcl_drm_atomic.h>
 #include <kcl/kcl_drm_hdcp.h>
 #include <kcl/kcl_ftrace.h>
+#include <kcl/kcl_acpi_table.h>
 
 #endif /* AMDGPU_BACKPORT_H */
