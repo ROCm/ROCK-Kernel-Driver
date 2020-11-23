@@ -1189,6 +1189,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 				pdd->trap_debug_wave_launch_mode = 0;
 			}
 			release_debug_trap_vmid(dev->dqm);
+			/* Drop reference held by attach. */
+			kfd_unref_process(p);
 		}
 	}
 
