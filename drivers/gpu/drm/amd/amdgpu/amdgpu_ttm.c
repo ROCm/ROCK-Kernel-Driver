@@ -1538,6 +1538,7 @@ static struct ttm_backend_func amdgpu_backend_func = {
  * amdgpu_ttm_tt_create - Create a ttm_tt object for a given BO
  *
  * @bo: The buffer object to create a GTT ttm_tt object around
+ * @page_flags: Page flags to be added to the ttm_tt object
  *
  * Called by ttm_tt_create().
  */
