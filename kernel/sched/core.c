@@ -2349,8 +2349,46 @@ void scheduler_ipi(void)
 static void __ttwu_queue_wakelist(struct task_struct *p, int cpu, int wake_flags)
 {
 	struct rq *rq = cpu_rq(cpu);
+	int remote = !!(wake_flags & WF_MIGRATED);
 
-	p->sched_remote_wakeup = !!(wake_flags & WF_MIGRATED);
+	if (remote != p->sched_remote_wakeup) {
+#ifdef CONFIG_X86
+		/*
+		 * On x86 at least a plain store to a bitfield is still safe
+		 * even though the the bitfield is not protected by a rq
+		 * lock and will not be clobbered by a parallel update to
+		 * sched_reset_on_fork, sched_contributes_to_load or
+		 * sched_migrated. s390 should also be safe given that
+		 * smp_wmb is a simple compiler barrier.
+		 */
+		p->sched_remote_wakeup = remote;
+#else
+		/*
+		 * On ARM64, ppc64 and potentially s390, a store to a
+		 * bitfield can clobber adjacent bits so the the rq lock
+		 * is needed avoid lost updates. Ideally there would be
+		 * a KABI-safe way of moving the field but a large enough
+		 * hole is not guaranteed to exist on all supported
+		 * architectures in task_struct.
+		 *
+		 * Note, in theory it would be KABI safe to use an
+		 * anonymous union of an unsigned long and a struct
+		 * containing the bitfields. Within a cmpxchg loop,
+		 * take a READ_ONCE copy of the unsigned long on
+		 * the stack, cast it to the bitfield, update the bit
+		 * and cmpxchg the new value with the old value to
+		 * give an atomic update on a single bit. It's a
+		 * complex dance that may not be any cheaper than
+		 * the lock but worth bearing in in mind if there
+		 * is a regression related to slowdowns on task
+		 * wakeup.
+		 */
+		struct rq_flags rf;
+		rq_lock_irqsave(rq, &rf);
+		p->sched_remote_wakeup = remote;
+		rq_unlock_irqrestore(rq, &rf);
+#endif
+	}
 
 	if (llist_add(&p->wake_entry, &rq->wake_list)) {
 		if (!set_nr_if_polling(rq->idle))
