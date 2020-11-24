@@ -131,4 +131,8 @@ void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
                               struct drm_crtc_state *crtc_state);
 #endif
 
+#ifndef HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS
+void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state);
+#endif
+
 #endif
