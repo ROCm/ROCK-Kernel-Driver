@@ -27,6 +27,7 @@
  */
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_crtc.h>
+#include <drm/drm_vblank.h>
 
 #ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
 void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
@@ -58,4 +59,31 @@ __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
        crtc->state = crtc_state;
 }
 EXPORT_SYMBOL(__drm_atomic_helper_crtc_reset);
+#endif
+
+#ifndef HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS
+/*
+ * This implementation is duplicated from v5.9-rc5-1595-ge1ad957d45f7
+ * "Extract drm_atomic_helper_calc_timestamping_constants()"
+ *
+ */
+void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state)
+{
+	struct drm_device *dev = state->dev;
+	struct drm_crtc_state *new_crtc_state;
+	struct drm_crtc *crtc;
+	int i;
+
+#if !defined(for_each_new_crtc_in_state)
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		new_crtc_state = crtc->state;
+#else
+	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
+		if (new_crtc_state->enable)
+			drm_calc_timestamping_constants(crtc,
+							&new_crtc_state->adjusted_mode);
+	}
+}
+EXPORT_SYMBOL(drm_atomic_helper_calc_timestamping_constants);
 #endif
