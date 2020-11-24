@@ -8460,7 +8460,14 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	bool mode_set_reset_required = false;
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+#ifdef HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS
+	/* To avoid calculate the timestamp twice on legacy OS
+	 * where no drm_atomic_helper_calc_timestamping_constants defined,
+	 * just simply wrap the call under the macro rather than
+	 * implementing the KCL counterpart of the function.
+	 */
 	drm_atomic_helper_calc_timestamping_constants(state);
+#endif
 
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	dm_state = to_dm_atomic_state(state);
