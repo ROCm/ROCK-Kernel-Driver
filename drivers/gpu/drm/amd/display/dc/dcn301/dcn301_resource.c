@@ -1232,8 +1232,6 @@ static const struct resource_create_funcs res_create_maximus_funcs = {
 	.create_hwseq = dcn301_hwseq_create,
 };
 
-static void dcn301_pp_smu_destroy(struct pp_smu_funcs **pp_smu);
-
 static void dcn301_destruct(struct dcn301_resource_pool *pool)
 {
 	unsigned int i;
