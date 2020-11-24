@@ -1002,12 +1002,10 @@ static int do_sys_poll(struct pollfd __user *ufds, unsigned int nfds,
 	poll_freewait(&table);
 
 	for (walk = head; walk; walk = walk->next) {
-		struct pollfd *fds = walk->entries;
-		int j;
-
-		for (j = 0; j < walk->len; j++, ufds++)
-			if (__put_user(fds[j].revents, &ufds->revents))
-				goto out_fds;
+		if (copy_to_user(ufds, walk->entries,
+				 sizeof(struct pollfd) * walk->len))
+			goto out_fds;
+		ufds += walk->len;
   	}
 
 	err = fdcount;
