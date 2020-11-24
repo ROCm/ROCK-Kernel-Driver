@@ -1461,12 +1461,13 @@ static struct clock_source *dcn30_clock_source_create(
 
 int dcn30_populate_dml_pipes_from_context(
 	struct dc *dc, struct dc_state *context,
-	display_e2e_pipe_params_st *pipes)
+	display_e2e_pipe_params_st *pipes,
+	bool fast_validate)
 {
 	int i, pipe_cnt;
 	struct resource_context *res_ctx = &context->res_ctx;
 
-	dcn20_populate_dml_pipes_from_context(dc, context, pipes);
+	dcn20_populate_dml_pipes_from_context(dc, context, pipes, fast_validate);
 
 	for (i = 0, pipe_cnt = 0; i < dc->res_pool->pipe_count; i++) {
 		if (!res_ctx->pipe_ctx[i].stream)
@@ -1480,7 +1481,7 @@ int dcn30_populate_dml_pipes_from_context(
 }
 
 void dcn30_populate_dml_writeback_from_context(
-		struct dc *dc, struct resource_context *res_ctx, display_e2e_pipe_params_st *pipes)
+	struct dc *dc, struct resource_context *res_ctx, display_e2e_pipe_params_st *pipes)
 {
 	int pipe_cnt, i, j;
 	double max_calc_writeback_dispclk;
@@ -1970,7 +1971,7 @@ static struct pipe_ctx *dcn30_find_split_pipe(
 	return pipe;
 }
 
-static bool dcn30_internal_validate_bw(
+static noinline bool dcn30_internal_validate_bw(
 		struct dc *dc,
 		struct dc_state *context,
 		display_e2e_pipe_params_st *pipes,
@@ -1990,8 +1991,9 @@ static bool dcn30_internal_validate_bw(
 	if (!pipes)
 		return false;
 
-	pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes);
+	pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
 
+	DC_FP_START();
 	if (!pipe_cnt) {
 		out = true;
 		goto validate_out;
@@ -2208,7 +2210,7 @@ static bool dcn30_internal_validate_bw(
 #endif
 
 	if (repopulate_pipes)
-		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes);
+		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
 	*vlevel_out = vlevel;
 	*pipe_cnt_out = pipe_cnt;
 
@@ -2219,10 +2221,23 @@ validate_fail:
 	out = false;
 
 validate_out:
+	DC_FP_END();
 	return out;
 }
 
-void dcn30_calculate_wm_and_dlg(
+/*
+ * This must be noinline to ensure anything that deals with FP registers
+ * is contained within this call; previously our compiling with hard-float
+ * would result in fp instructions being emitted outside of the boundaries
+ * of the DC_FP_START/END macros, which makes sense as the compiler has no
+ * idea about what is wrapped and what is not
+ *
+ * This is largely just a workaround to avoid breakage introduced with 5.6,
+ * ideally all fp-using code should be moved into its own file, only that
+ * should be compiled with hard-float, and all code exported from there
+ * should be strictly wrapped with DC_FP_START/END
+ */
+static noinline void dcn30_calculate_wm_and_dlg_fp(
 		struct dc *dc, struct dc_state *context,
 		display_e2e_pipe_params_st *pipes,
 		int pipe_cnt,
@@ -2378,6 +2393,17 @@ void dcn30_calculate_wm_and_dlg(
 				dc->clk_mgr->bw_params->wm_table.nv_entries[WM_A].dml_input.pstate_latency_us;
 }
 
+void dcn30_calculate_wm_and_dlg(
+		struct dc *dc, struct dc_state *context,
+		display_e2e_pipe_params_st *pipes,
+		int pipe_cnt,
+		int vlevel)
+{
+	DC_FP_START();
+	dcn30_calculate_wm_and_dlg_fp(dc, context, pipes, pipe_cnt, vlevel);
+	DC_FP_END();
+}
+
 bool dcn30_validate_bandwidth(struct dc *dc,
 		struct dc_state *context,
 		bool fast_validate)
@@ -2429,7 +2455,7 @@ validate_out:
 	return out;
 }
 
-static void get_optimal_dcfclk_fclk_for_uclk(unsigned int uclk_mts,
+static noinline void get_optimal_dcfclk_fclk_for_uclk(unsigned int uclk_mts,
                                                        unsigned int *optimal_dcfclk,
                                                        unsigned int *optimal_fclk)
 {
@@ -2496,8 +2522,10 @@ void dcn30_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params
 
 		// Calculate optimal dcfclk for each uclk
 		for (i = 0; i < num_uclk_states; i++) {
+			DC_FP_START();
 			get_optimal_dcfclk_fclk_for_uclk(bw_params->clk_table.entries[i].memclk_mhz * 16,
 					&optimal_dcfclk_for_uclk[i], NULL);
+			DC_FP_END();
 			if (optimal_dcfclk_for_uclk[i] < bw_params->clk_table.entries[0].dcfclk_mhz) {
 				optimal_dcfclk_for_uclk[i] = bw_params->clk_table.entries[0].dcfclk_mhz;
 			}
@@ -2603,6 +2631,8 @@ static bool dcn30_resource_construct(
 	struct irq_service_init_data init_data;
 	struct ddc_service_init_data ddc_init_data;
 
+	DC_FP_START();
+
 	ctx->dc_bios->regs = &bios_regs;
 
 	pool->base.res_cap = &res_cap_dcn3;
@@ -2640,6 +2670,7 @@ static bool dcn30_resource_construct(
 	dc->caps.color.dpp.dgam_rom_caps.hlg = 1;
 	dc->caps.color.dpp.post_csc = 1;
 	dc->caps.color.dpp.gamma_corr = 1;
+	dc->caps.color.dpp.dgam_rom_for_yuv = 0;
 
 	dc->caps.color.dpp.hw_3d_lut = 1;
 	dc->caps.color.dpp.ogam_ram = 1;
@@ -2882,10 +2913,13 @@ static bool dcn30_resource_construct(
 		pool->base.oem_device = NULL;
 	}
 
+	DC_FP_END();
+
 	return true;
 
 create_fail:
 
+	DC_FP_END();
 	dcn30_resource_destruct(pool);
 
 	return false;

@@ -1595,7 +1595,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 				       bool unlocked, struct dma_resv *resv,
 				       uint64_t start, uint64_t last,
 				       uint64_t flags, uint64_t offset,
-				       struct ttm_mem_reg *mem,
+				       struct ttm_resource *mem,
 				       dma_addr_t *pages_addr,
 				       struct dma_fence **fence, uint64_t vram_base_offset)
 {
@@ -1745,7 +1745,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdgpu_bo_va_mapping *mapping;
 	dma_addr_t *pages_addr = NULL;
-	struct ttm_mem_reg *mem;
+	struct ttm_resource *mem;
 	struct drm_mm_node *nodes;
 	struct dma_fence **last_update;
 	struct dma_resv *resv;

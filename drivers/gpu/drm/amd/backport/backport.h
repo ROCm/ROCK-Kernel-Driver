@@ -9,7 +9,6 @@
 #include <kcl/kcl_idr.h>
 #include <kcl/kcl_kref.h>
 #include <kcl/kcl_kernel.h>
-#include <kcl/kcl_bitops.h>
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_eventpoll.h>
@@ -59,8 +58,10 @@
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
 #include <kcl/backport/kcl_drm_atomic_helper_backport.h>
 #include <kcl/kcl_drm_atomic.h>
-#include <kcl/kcl_amdgpu_drm_fb_helper.h>
-#include "kcl/kcl_amdgpu.h"
 #include <kcl/kcl_ftrace.h>
+#include <kcl/kcl_acpi_table.h>
+#include "kcl/kcl_amdgpu_drm_fb_helper.h"
+#include "kcl/kcl_amdgpu.h"
+#include "kcl/kcl_amdgpu_ttm.h"
 
 #endif /* AMDGPU_BACKPORT_H */

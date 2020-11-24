@@ -588,6 +588,7 @@ void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v)
  * @adev: amdgpu_device pointer
  * @pcie_index: mmio register offset
  * @pcie_data: mmio register offset
+ * @reg_addr: indirect register address to read from
  *
  * Returns the value of indirect register @reg_addr
  */
@@ -618,6 +619,7 @@ u32 amdgpu_device_indirect_rreg(struct amdgpu_device *adev,
  * @adev: amdgpu_device pointer
  * @pcie_index: mmio register offset
  * @pcie_data: mmio register offset
+ * @reg_addr: indirect register address to read from
  *
  * Returns the value of indirect register @reg_addr
  */
@@ -2660,8 +2662,10 @@ static int amdgpu_device_ip_suspend_phase1(struct amdgpu_device *adev)
 {
 	int i, r;
 
-	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
-	amdgpu_device_set_cg_state(adev, AMD_CG_STATE_UNGATE);
+	if (!amdgpu_acpi_is_s0ix_supported() || amdgpu_in_reset(adev)) {
+		amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
+		amdgpu_device_set_cg_state(adev, AMD_CG_STATE_UNGATE);
+	}
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
 		if (!adev->ip_blocks[i].status.valid)
@@ -3736,8 +3740,10 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 
 	amdgpu_fence_driver_suspend(adev);
 
-	r = amdgpu_device_ip_suspend_phase2(adev);
-
+	if (!amdgpu_acpi_is_s0ix_supported() || amdgpu_in_reset(adev))
+		r = amdgpu_device_ip_suspend_phase2(adev);
+	else
+		amdgpu_gfx_state_change_set(adev, sGpuChangeState_D3Entry);
 	/* evict remaining vram memory
 	 * This second call to evict vram is to evict the gart page table
 	 * using the CPU.
@@ -3769,6 +3775,9 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 		return 0;
+
+	if (amdgpu_acpi_is_s0ix_supported())
+		amdgpu_gfx_state_change_set(adev, sGpuChangeState_D0Entry);
 
 	/* post card */
 	if (amdgpu_device_need_post(adev)) {
@@ -4123,7 +4132,7 @@ static int amdgpu_device_reset_sriov(struct amdgpu_device *adev,
 
 	amdgpu_virt_init_data_exchange(adev);
 	/* we need recover gart prior to run SMC/CP/SDMA resume */
-	amdgpu_gtt_mgr_recover(&adev->mman.bdev.man[TTM_PL_TT]);
+	amdgpu_gtt_mgr_recover(ttm_manager_type(&adev->mman.bdev, TTM_PL_TT));
 
 	r = amdgpu_device_fw_loading(adev);
 	if (r)
@@ -4356,8 +4365,7 @@ static int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
 					amdgpu_inc_vram_lost(tmp_adev);
 				}
 
-				r = amdgpu_gtt_mgr_recover(
-					&tmp_adev->mman.bdev.man[TTM_PL_TT]);
+				r = amdgpu_gtt_mgr_recover(ttm_manager_type(&tmp_adev->mman.bdev, TTM_PL_TT));
 				if (r)
 					goto out;
 

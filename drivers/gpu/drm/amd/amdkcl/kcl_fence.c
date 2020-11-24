@@ -24,7 +24,7 @@
 #include "kcl_common.h"
 
 #define CREATE_TRACE_POINTS
-#include "kcl_trace.h"
+#include "kcl_fence_trace.h"
 
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,

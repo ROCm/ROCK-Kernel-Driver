@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.110"
+#define DC_VER "3.2.111"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -125,6 +125,7 @@ struct dpp_color_caps {
 	uint16_t hw_3d_lut : 1;
 	uint16_t ogam_ram : 1; // blnd gam
 	uint16_t ocsc : 1;
+	uint16_t dgam_rom_for_yuv : 1;
 	struct rom_curve_caps dgam_rom_caps;
 	struct rom_curve_caps ogam_rom_caps;
 };
@@ -343,7 +344,9 @@ enum dcn_pwr_state {
  */
 struct dc_clocks {
 	int dispclk_khz;
+	int actual_dispclk_khz;
 	int dppclk_khz;
+	int actual_dppclk_khz;
 	int disp_dpp_voltage_level_khz;
 	int dcfclk_khz;
 	int socclk_khz;

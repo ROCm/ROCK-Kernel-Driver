@@ -36,18 +36,3 @@ bool drm_is_current_master(struct drm_file *fpriv)
 }
 EXPORT_SYMBOL(drm_is_current_master);
 #endif
-
-#if !defined(HAVE_DRM_GET_MAX_IOMEM)
-u64 drm_get_max_iomem(void)
-{
-	struct resource *tmp;
-	resource_size_t max_iomem = 0;
-
-	for (tmp = iomem_resource.child; tmp; tmp = tmp->sibling) {
-		max_iomem = max(max_iomem,  tmp->end);
-	}
-
-	return max_iomem;
-}
-EXPORT_SYMBOL(drm_get_max_iomem);
-#endif

@@ -130,9 +130,6 @@
 /* whether struct drm_atomic_state have async_update */
 #define HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE 1
 
-/* drm_atomic_state->plane_states is available */
-/* #undef HAVE_DRM_ATOMIC_STATE_PLANE_STATES */
-
 /* drm_atomic_state_put() is available */
 #define HAVE_DRM_ATOMIC_STATE_PUT 1
 
@@ -429,9 +426,6 @@
 
 /* drm_get_format_name() has i,p interface */
 #define HAVE_DRM_GET_FORMAT_NAME_I_P 1
-
-/* ddrm_get_max_iome() is available */
-/* #undef HAVE_DRM_GET_MAX_IOMEM */
 
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
@@ -934,3 +928,6 @@
 
 /* __print_array for trace is available */
 #define HAVE___PRINT_ARRAY 1
+
+/* acpi_put_table() is available */
+#define HAVE_ACPI_PUT_TABLE 1

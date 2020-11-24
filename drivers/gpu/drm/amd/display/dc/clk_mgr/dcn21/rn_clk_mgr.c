@@ -158,10 +158,8 @@ void rn_update_clocks(struct clk_mgr *clk_mgr_base,
 
 	// workaround: Limit dppclk to 100Mhz to avoid lower eDP panel switch to plus 4K monitor underflow.
 	// Do not adjust dppclk if dppclk is 0 to avoid unexpected result
-	if (!IS_DIAG_DC(dc->ctx->dce_environment)) {
-		if (new_clocks->dppclk_khz < 100000 && new_clocks->dppclk_khz > 0)
-			new_clocks->dppclk_khz = 100000;
-	}
+	if (new_clocks->dppclk_khz < 100000 && new_clocks->dppclk_khz > 0)
+		new_clocks->dppclk_khz = 100000;
 
 	if (should_set_clock(safe_to_lower, new_clocks->dppclk_khz, clk_mgr->base.clks.dppclk_khz)) {
 		if (clk_mgr->base.clks.dppclk_khz > new_clocks->dppclk_khz)
@@ -172,7 +170,7 @@ void rn_update_clocks(struct clk_mgr *clk_mgr_base,
 
 	if (should_set_clock(safe_to_lower, new_clocks->dispclk_khz, clk_mgr_base->clks.dispclk_khz)) {
 		clk_mgr_base->clks.dispclk_khz = new_clocks->dispclk_khz;
-		rn_vbios_smu_set_dispclk(clk_mgr, clk_mgr_base->clks.dispclk_khz);
+		clk_mgr_base->clks.actual_dispclk_khz = rn_vbios_smu_set_dispclk(clk_mgr, clk_mgr_base->clks.dispclk_khz);
 
 		update_dispclk = true;
 	}
@@ -180,11 +178,14 @@ void rn_update_clocks(struct clk_mgr *clk_mgr_base,
 	if (dpp_clock_lowered) {
 		// increase per DPP DTO before lowering global dppclk
 		dcn20_update_clocks_update_dpp_dto(clk_mgr, context, safe_to_lower);
-		rn_vbios_smu_set_dppclk(clk_mgr, clk_mgr_base->clks.dppclk_khz);
+		clk_mgr_base->clks.actual_dppclk_khz =
+				rn_vbios_smu_set_dppclk(clk_mgr, clk_mgr_base->clks.dppclk_khz);
+
 	} else {
 		// increase global DPPCLK before lowering per DPP DTO
 		if (update_dppclk || update_dispclk)
-			rn_vbios_smu_set_dppclk(clk_mgr, clk_mgr_base->clks.dppclk_khz);
+			clk_mgr_base->clks.actual_dppclk_khz =
+					rn_vbios_smu_set_dppclk(clk_mgr, clk_mgr_base->clks.dppclk_khz);
 		// always update dtos unless clock is lowered and not safe to lower
 		if (new_clocks->dppclk_khz >= dc->current_state->bw_ctx.bw.dcn.clk.dppclk_khz)
 			dcn20_update_clocks_update_dpp_dto(clk_mgr, context, safe_to_lower);
