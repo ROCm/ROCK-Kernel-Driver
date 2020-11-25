@@ -1125,6 +1125,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	 * This needs to happen before modifier conversion as that might change
 	 * the number of planes.
 	 */
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		if (mode_cmd->handles[i] != mode_cmd->handles[0]) {
 			dev_err(&dev->pdev->dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
@@ -1133,6 +1134,7 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 			goto fail;
 		}
 	}
+#endif
 
 	ret = amdgpu_display_get_fb_info(rfb, &rfb->tiling_flags, &rfb->tmz_surface);
 	if (ret)
@@ -1147,10 +1149,12 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	}
 #endif
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		rfb->base.obj[i] = rfb->base.obj[0];
 		drm_gem_object_get(rfb->base.obj[i]);
 	}
+#endif
 
 	return 0;
 
