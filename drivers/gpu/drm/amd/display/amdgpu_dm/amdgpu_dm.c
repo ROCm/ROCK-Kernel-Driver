@@ -8496,14 +8496,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 #endif
 
-#ifdef HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS
-	/* To avoid calculate the timestamp twice on legacy OS
-	 * where no drm_atomic_helper_calc_timestamping_constants defined,
-	 * just simply wrap the call under the macro rather than
-	 * implementing the KCL counterpart of the function.
-	 */
 	drm_atomic_helper_calc_timestamping_constants(state);
-#endif
 
 	/* update changed items */
 #if !defined(for_each_oldnew_crtc_in_state)
