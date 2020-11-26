@@ -438,7 +438,7 @@ process_slot:
 
 		if (type == BTRFS_FILE_EXTENT_REG ||
 		    type == BTRFS_FILE_EXTENT_PREALLOC) {
-			struct btrfs_clone_extent_info clone_info;
+			struct btrfs_replace_extent_info clone_info;
 
 			/*
 			 *    a  | --- range to clone ---|  b
@@ -461,8 +461,8 @@ process_slot:
 			clone_info.data_len = datal;
 			clone_info.file_offset = new_key.offset;
 			clone_info.extent_buf = buf;
-			clone_info.item_size = size;
-			ret = btrfs_punch_hole_range(inode, path, drop_start,
+			clone_info.is_new_extent = false;
+			ret = btrfs_replace_file_extents(inode, path, drop_start,
 					new_key.offset + datal - 1, &clone_info,
 					&trans);
 			if (ret)
@@ -532,7 +532,7 @@ process_slot:
 		btrfs_release_path(path);
 		path->leave_spinning = 0;
 
-		ret = btrfs_punch_hole_range(inode, path, last_dest_end,
+		ret = btrfs_replace_file_extents(inode, path, last_dest_end,
 				destoff + len - 1, NULL, &trans);
 		if (ret)
 			goto out;
