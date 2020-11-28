@@ -1047,6 +1047,11 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 			init_data.flags.disable_dmcu = true;
 #endif
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	case CHIP_VANGOGH:
+		init_data.flags.gpu_vm_support = true;
+		break;
+#endif
 	default:
 		break;
 	}
