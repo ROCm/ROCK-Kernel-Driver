@@ -1822,9 +1822,47 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 static int kfd_ioctl_criu_helper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
-	pr_info("Inside %s\n",__func__);
+	struct kfd_ioctl_criu_helper_args *args = data;
+	struct kgd_mem *kgd_mem;
+	u64 num_of_bos = 0;
+	int id, i = 0;
+	void *mem;
+	int ret = 0;
 
-	return 0;
+	pr_debug("Inside %s\n", __func__);
+	mutex_lock(&p->mutex);
+
+	if (!kfd_has_process_device_data(p)) {
+		pr_err("No pdd for given process\n");
+		ret = -ENODEV;
+		goto err_unlock;
+	}
+
+	/* Run over all PDDs of the process */
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+			if (!mem) {
+				ret = -ENOMEM;
+				goto err_unlock;
+			}
+
+			kgd_mem = (struct kgd_mem *)mem;
+			if ((uint64_t)kgd_mem->va > pdd->gpuvm_base)
+				num_of_bos++;
+		}
+	}
+
+	args->task_pid = task_pid_nr_ns(p->lead_thread,
+					task_active_pid_ns(p->lead_thread));
+	args->num_of_devices = p->n_pdds;
+	args->num_of_bos = num_of_bos;
+	dev_dbg(kfd_device, "Num of bos = %llu\n", num_of_bos);
+
+err_unlock:
+	mutex_unlock(&p->mutex);
+	return ret;
 }
 
 static int kfd_ioctl_criu_resume(struct file *filep,
