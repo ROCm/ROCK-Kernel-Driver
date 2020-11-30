@@ -2426,6 +2426,9 @@ static void copy_stream_update_to_stream(struct dc *dc,
 
 	if (update->dither_option)
 		stream->dither_option = *update->dither_option;
+
+	if (update->pending_test_pattern)
+		stream->test_pattern = *update->pending_test_pattern;
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* update current stream with writeback info */
 	if (update->wb_update) {
@@ -2527,6 +2530,15 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					odm_pipe = odm_pipe->next_odm_pipe;
 				}
 #endif
+			}
+
+			if (stream_update->pending_test_pattern) {
+				dc_link_dp_set_test_pattern(stream->link,
+					stream->test_pattern.type,
+					stream->test_pattern.color_space,
+					stream->test_pattern.p_link_settings,
+					stream->test_pattern.p_custom_pattern,
+					stream->test_pattern.cust_pattern_size);
 			}
 
 			/* Full fe update*/
