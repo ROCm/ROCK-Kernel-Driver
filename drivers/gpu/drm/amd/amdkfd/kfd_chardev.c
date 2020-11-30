@@ -42,6 +42,7 @@
 #include "kfd_svm.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
+#include "amdgpu_object.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -1806,9 +1807,102 @@ static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
 static int kfd_ioctl_criu_dumper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
+	struct kfd_ioctl_criu_dumper_args *args = data;
+	struct kfd_criu_bo_buckets *bo_bucket;
+	struct amdgpu_bo *dumper_bo;
+	int ret, id, index, i = 0;
+	struct kgd_mem *kgd_mem;
+	void *mem;
+
 	pr_info("Inside %s\n",__func__);
 
-	return 0;
+	if (args->num_of_bos == 0) {
+		pr_err("No BOs to be dumped\n");
+		return -EINVAL;
+	}
+
+	if (p->n_pdds != args->num_of_devices) {
+		pr_err("Invalid number of devices %d (expected = %d)\n",
+								args->num_of_devices, p->n_pdds);
+		return -EINVAL;
+	}
+
+	pr_debug("num of bos = %llu\n", args->num_of_bos);
+
+	bo_bucket = kvzalloc((sizeof(struct kfd_criu_bo_buckets) *
+			     args->num_of_bos), GFP_KERNEL);
+	if (!bo_bucket)
+		return -ENOMEM;
+
+	mutex_lock(&p->mutex);
+
+	if (!kfd_has_process_device_data(p)) {
+		pr_err("No pdd for given process\n");
+		ret = -ENODEV;
+		goto err_unlock;
+	}
+
+	/* Run over all PDDs of the process */
+	for (index = 0; index < p->n_pdds; index++) {
+		struct kfd_process_device *pdd = p->pdds[index];
+
+		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+			if (!mem) {
+				ret = -ENOMEM;
+				goto err_unlock;
+			}
+
+			kgd_mem = (struct kgd_mem *)mem;
+			dumper_bo = kgd_mem->bo;
+
+			if ((uint64_t)kgd_mem->va > pdd->gpuvm_base) {
+				if (i >= args->num_of_bos) {
+					pr_err("Num of BOs changed since last helper ioctl call\n");
+					ret = -EINVAL;
+					goto err_unlock;
+				}
+
+				bo_bucket[i].bo_addr = (uint64_t)kgd_mem->va;
+				bo_bucket[i].bo_size = amdgpu_bo_size(dumper_bo);
+				bo_bucket[i].gpu_id = pdd->dev->id;
+				bo_bucket[i].bo_alloc_flags = (uint32_t)kgd_mem->alloc_flags;
+				bo_bucket[i].idr_handle = id;
+
+				if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL)
+					bo_bucket[i].bo_offset = KFD_MMAP_TYPE_DOORBELL |
+						KFD_MMAP_GPU_ID(pdd->dev->id);
+				else if (bo_bucket[i].bo_alloc_flags &
+				    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)
+					bo_bucket[i].bo_offset = KFD_MMAP_TYPE_MMIO |
+						KFD_MMAP_GPU_ID(pdd->dev->id);
+				else
+					bo_bucket[i].bo_offset = amdgpu_bo_mmap_offset(dumper_bo);
+
+				pr_debug("bo_size = 0x%llx, bo_addr = 0x%llx bo_offset = 0x%llx\n"
+					 "gpu_id = 0x%x alloc_flags = 0x%x idr_handle = 0x%x",
+					 bo_bucket[i].bo_size,
+					 bo_bucket[i].bo_addr,
+					 bo_bucket[i].bo_offset,
+					 bo_bucket[i].gpu_id,
+					 bo_bucket[i].bo_alloc_flags,
+					 bo_bucket[i].idr_handle);
+				i++;
+			}
+		}
+	}
+
+	ret = copy_to_user((void __user *)args->kfd_criu_bo_buckets_ptr,
+			bo_bucket,
+			(args->num_of_bos *
+			 sizeof(struct kfd_criu_bo_buckets)));
+	kvfree(bo_bucket);
+	mutex_unlock(&p->mutex);
+	return ret ? -EFAULT : 0;
+
+err_unlock:
+	mutex_unlock(&p->mutex);
+	pr_err("Dumper ioctl failed err:%d\n", ret);
+	return ret;
 }
 
 static int kfd_ioctl_criu_restorer(struct file *filep,
