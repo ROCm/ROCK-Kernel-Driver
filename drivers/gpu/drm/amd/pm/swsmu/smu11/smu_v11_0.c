@@ -339,8 +339,7 @@ int smu_v11_0_setup_pptable(struct smu_context *smu)
 		hdr = (const struct smc_firmware_header_v1_0 *) adev->pm.fw->data;
 		version_major = le16_to_cpu(hdr->header.header_version_major);
 		version_minor = le16_to_cpu(hdr->header.header_version_minor);
-		if ((version_major == 2 && smu->smu_table.boot_values.pp_table_id > 0) ||
-		    adev->asic_type == CHIP_DIMGREY_CAVEFISH) {
+		if (version_major == 2 && smu->smu_table.boot_values.pp_table_id > 0) {
 			dev_info(adev->dev, "use driver provided pptable %d\n", smu->smu_table.boot_values.pp_table_id);
 			switch (version_minor) {
 			case 0:
@@ -471,11 +470,11 @@ int smu_v11_0_init_power(struct smu_context *smu)
 {
 	struct smu_power_context *smu_power = &smu->smu_power;
 
-	smu_power->power_context = kzalloc(sizeof(struct smu_11_0_dpm_context),
+	smu_power->power_context = kzalloc(sizeof(struct smu_11_0_power_context),
 					   GFP_KERNEL);
 	if (!smu_power->power_context)
 		return -ENOMEM;
-	smu_power->power_context_size = sizeof(struct smu_11_0_dpm_context);
+	smu_power->power_context_size = sizeof(struct smu_11_0_power_context);
 
 	return 0;
 }
@@ -1486,6 +1485,9 @@ enum smu_baco_state smu_v11_0_baco_get_state(struct smu_context *smu)
 	return baco_state;
 }
 
+#define D3HOT_BACO_SEQUENCE 0
+#define D3HOT_BAMACO_SEQUENCE 2
+
 int smu_v11_0_baco_set_state(struct smu_context *smu, enum smu_baco_state state)
 {
 	struct smu_baco_context *smu_baco = &smu->smu_baco;
@@ -1500,15 +1502,34 @@ int smu_v11_0_baco_set_state(struct smu_context *smu, enum smu_baco_state state)
 	mutex_lock(&smu_baco->mutex);
 
 	if (state == SMU_BACO_STATE_ENTER) {
-		if (!ras || !ras->supported) {
-			data = RREG32_SOC15(THM, 0, mmTHM_BACO_CNTL);
-			data |= 0x80000000;
-			WREG32_SOC15(THM, 0, mmTHM_BACO_CNTL, data);
+		switch (adev->asic_type) {
+		case CHIP_SIENNA_CICHLID:
+		case CHIP_NAVY_FLOUNDER:
+		case CHIP_DIMGREY_CAVEFISH:
+			if (amdgpu_runtime_pm == 2)
+				ret = smu_cmn_send_smc_msg_with_param(smu,
+								      SMU_MSG_EnterBaco,
+								      D3HOT_BAMACO_SEQUENCE,
+								      NULL);
+			else
+				ret = smu_cmn_send_smc_msg_with_param(smu,
+								      SMU_MSG_EnterBaco,
+								      D3HOT_BACO_SEQUENCE,
+								      NULL);
+			break;
+		default:
+			if (!ras || !ras->supported) {
+				data = RREG32_SOC15(THM, 0, mmTHM_BACO_CNTL);
+				data |= 0x80000000;
+				WREG32_SOC15(THM, 0, mmTHM_BACO_CNTL, data);
 
-			ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 0, NULL);
-		} else {
-			ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 1, NULL);
+				ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 0, NULL);
+			} else {
+				ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 1, NULL);
+			}
+			break;
 		}
+
 	} else {
 		ret = smu_cmn_send_smc_msg(smu, SMU_MSG_ExitBaco, NULL);
 		if (ret)

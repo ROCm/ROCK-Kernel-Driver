@@ -167,6 +167,7 @@ struct hubbub_funcs {
 struct hubbub {
 	const struct hubbub_funcs *funcs;
 	struct dc_context *ctx;
+	bool riommu_active;
 };
 
 #endif

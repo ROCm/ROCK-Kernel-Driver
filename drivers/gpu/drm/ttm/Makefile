@@ -7,6 +7,8 @@
 # to 'make' if required
 #
 TTM_NAME = ttm
+ccflags-y += \
+	-DTTM_NAME="\"$(TTM_NAME)\""
 
 $(TTM_NAME)-y := ttm_memory.o ttm_tt.o ttm_bo.o \
 	ttm_bo_util.o ttm_bo_vm.o ttm_module.o \

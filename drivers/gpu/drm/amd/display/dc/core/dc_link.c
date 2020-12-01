@@ -1060,6 +1060,7 @@ static bool dc_link_detect_helper(struct dc_link *link,
 
 				return false;
 			}
+			break;
 		default:
 			break;
 		}
@@ -2764,6 +2765,7 @@ bool dc_link_setup_psr(struct dc_link *link,
 	 *  (Always set for DAL2, did not check ASIC)
 	 */
 	psr_context->allow_smu_optimizations = psr_config->allow_smu_optimizations;
+	psr_context->allow_multi_disp_optimizations = psr_config->allow_multi_disp_optimizations;
 
 	/* Complete PSR entry before aborting to prevent intermittent
 	 * freezes on certain eDPs
@@ -2790,6 +2792,18 @@ bool dc_link_setup_psr(struct dc_link *link,
 
 }
 
+void dc_link_get_psr_residency(const struct dc_link *link, uint32_t *residency)
+{
+	struct dc  *dc = link->ctx->dc;
+	struct dmub_psr *psr = dc->res_pool->psr;
+
+	// PSR residency measurements only supported on DMCUB
+	if (psr != NULL && link->psr_settings.psr_feature_enabled)
+		psr->funcs->psr_get_residency(psr, residency);
+	else
+		*residency = 0;
+}
+
 const struct dc_link_status *dc_link_get_status(const struct dc_link *link)
 {
 	return &link->link_status;
@@ -2813,14 +2827,11 @@ static struct fixed31_32 get_pbn_per_slot(struct dc_stream_state *stream)
 	return dc_fixpt_div_int(mbytes_per_sec, 54);
 }
 
-static struct fixed31_32 get_pbn_from_timing(struct pipe_ctx *pipe_ctx)
+static struct fixed31_32 get_pbn_from_bw_in_kbps(uint64_t kbps)
 {
-	uint64_t kbps;
 	struct fixed31_32 peak_kbps;
 	uint32_t numerator;
 	uint32_t denominator;
-
-	kbps = dc_bandwidth_in_kbps_from_timing(&pipe_ctx->stream->timing);
 
 	/*
 	 * margin 5300ppm + 300ppm ~ 0.6% as per spec, factor is 1.006
@@ -2839,6 +2850,14 @@ static struct fixed31_32 get_pbn_from_timing(struct pipe_ctx *pipe_ctx)
 	peak_kbps = dc_fixpt_from_fraction(kbps, denominator);
 
 	return peak_kbps;
+}
+
+static struct fixed31_32 get_pbn_from_timing(struct pipe_ctx *pipe_ctx)
+{
+	uint64_t kbps;
+
+	kbps = dc_bandwidth_in_kbps_from_timing(&pipe_ctx->stream->timing);
+	return get_pbn_from_bw_in_kbps(kbps);
 }
 
 static void update_mst_stream_alloc_table(
@@ -2868,6 +2887,7 @@ static void update_mst_stream_alloc_table(
 				proposed_table->stream_allocations[i].vcp_id) {
 
 				work_table[i] = *dc_alloc;
+				work_table[i].slot_count = proposed_table->stream_allocations[i].slot_count;
 				break; /* exit j loop */
 			}
 		}
@@ -3248,6 +3268,9 @@ void core_link_enable_stream(
 				return;
 			}
 		}
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#endif
 
 		dc->hwss.enable_audio_stream(pipe_ctx);
 

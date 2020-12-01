@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.111"
+#define DC_VER "3.2.112"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -421,6 +421,7 @@ struct dc_bw_validation_profile {
 
 union mem_low_power_enable_options {
 	struct {
+		bool i2c: 1;
 		bool mpc: 1;
 		bool optc: 1;
 	} bits;
@@ -486,7 +487,7 @@ struct dc_debug_options {
 	bool scl_reset_length10;
 	bool hdmi20_disable;
 	bool skip_detection_link_training;
-	bool edid_read_retry_times;
+	uint32_t edid_read_retry_times;
 	bool remove_disconnect_edp;
 	unsigned int force_odm_combine; //bit vector based on otg inst
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
@@ -1133,6 +1134,7 @@ struct dpcd_caps {
 	bool panel_mode_edp;
 	bool dpcd_display_control_capable;
 	bool ext_receiver_cap_field_present;
+	bool dynamic_backlight_capable_edp;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	union dpcd_fec_capability fec_cap;
 	struct dpcd_dsc_capabilities dsc_caps;

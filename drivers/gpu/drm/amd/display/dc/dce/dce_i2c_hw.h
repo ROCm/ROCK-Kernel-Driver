@@ -95,6 +95,13 @@ enum {
 	SR(DC_I2C_DATA),\
 	SR(MICROSECOND_TIME_BASE_DIV)
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#define I2C_HW_ENGINE_COMMON_REG_LIST_DCN30(id)\
+	I2C_HW_ENGINE_COMMON_REG_LIST(id),\
+	SR(DIO_MEM_PWR_CTRL),\
+	SR(DIO_MEM_PWR_STATUS)
+#endif
+
 #define I2C_SF(reg_name, field_name, post_fix)\
 	.field_name = reg_name ## __ ## field_name ## post_fix
 
@@ -181,6 +188,8 @@ struct dce_i2c_shift {
 	uint8_t DC_I2C_DDC1_SEND_RESET_LENGTH;
 #endif
 	uint8_t DC_I2C_REG_RW_CNTL_STATUS;
+	uint8_t I2C_LIGHT_SLEEP_FORCE;
+	uint8_t I2C_MEM_PWR_STATE;
 };
 
 struct dce_i2c_mask {
@@ -224,12 +233,21 @@ struct dce_i2c_mask {
 	uint32_t DC_I2C_DDC1_SEND_RESET_LENGTH;
 #endif
 	uint32_t DC_I2C_REG_RW_CNTL_STATUS;
+	uint32_t I2C_LIGHT_SLEEP_FORCE;
+	uint32_t I2C_MEM_PWR_STATE;
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 #define I2C_COMMON_MASK_SH_LIST_DCN2(mask_sh)\
 	I2C_COMMON_MASK_SH_LIST_DCE110(mask_sh),\
 	I2C_SF(DC_I2C_DDC1_SETUP, DC_I2C_DDC1_SEND_RESET_LENGTH, mask_sh)
+#endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#define I2C_COMMON_MASK_SH_LIST_DCN30(mask_sh)\
+	I2C_COMMON_MASK_SH_LIST_DCN2(mask_sh),\
+	I2C_SF(DIO_MEM_PWR_CTRL, I2C_LIGHT_SLEEP_FORCE, mask_sh),\
+	I2C_SF(DIO_MEM_PWR_STATUS, I2C_MEM_PWR_STATE, mask_sh)
 #endif
 
 struct dce_i2c_registers {
@@ -245,6 +263,8 @@ struct dce_i2c_registers {
 	uint32_t DC_I2C_TRANSACTION3;
 	uint32_t DC_I2C_DATA;
 	uint32_t MICROSECOND_TIME_BASE_DIV;
+	uint32_t DIO_MEM_PWR_CTRL;
+	uint32_t DIO_MEM_PWR_STATUS;
 };
 
 enum dce_i2c_transaction_address_space {
