@@ -848,7 +848,7 @@ static int ucsi_reset_ppm(struct ucsi *ucsi)
 			goto out;
 
 		/* If the PPM is still doing something else, reset it again. */
-		if (cci & ~UCSI_CCI_RESET_COMPLETE) {
+		if (cci & ~(UCSI_CCI_RESET_COMPLETE | UCSI_CCI_BUSY)) {
 			ret = ucsi->ops->async_write(ucsi, UCSI_CONTROL,
 						     &command,
 						     sizeof(command));
