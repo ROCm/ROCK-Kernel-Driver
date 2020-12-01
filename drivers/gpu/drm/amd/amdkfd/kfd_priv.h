@@ -758,6 +758,12 @@ struct kfd_process_device {
 	 *  number of CU's a device has along with number of other competing processes
 	 */
 	struct attribute attr_cu_occupancy;
+	/*
+	 * If this process has been checkpointed before, then the user
+	 * application will use the original gpu_id on the
+	 * checkpointed node to refer to this device.
+	 */
+	uint32_t user_gpu_id;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)

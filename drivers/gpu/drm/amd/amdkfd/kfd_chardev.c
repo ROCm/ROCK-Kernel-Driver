@@ -1804,6 +1804,94 @@ static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
 	return -EPERM;
 }
 #endif
+static int kfd_devinfo_dump(struct kfd_process *p, struct kfd_ioctl_criu_dumper_args *args)
+{
+	int ret = 0;
+	int index;
+	struct kfd_criu_devinfo_bucket *devinfos;
+
+	if (p->n_pdds != args->num_of_devices)
+		return -EINVAL;
+
+	devinfos = kvzalloc((sizeof(struct kfd_criu_devinfo_bucket) *
+			     args->num_of_devices), GFP_KERNEL);
+	if (!devinfos)
+		return -ENOMEM;
+
+	for (index = 0; index < p->n_pdds; index++) {
+		struct kfd_process_device *pdd = p->pdds[index];
+
+		devinfos[index].user_gpu_id = pdd->user_gpu_id;
+		devinfos[index].actual_gpu_id = pdd->dev->id;
+	}
+
+	ret = copy_to_user((void __user *)args->kfd_criu_devinfo_buckets_ptr,
+			devinfos,
+			(args->num_of_devices *
+			sizeof(struct kfd_criu_devinfo_bucket)));
+	if (ret)
+		ret = -EFAULT;
+
+	kvfree(devinfos);
+	return ret;
+}
+
+static int kfd_devinfo_restore(struct kfd_process *p, struct kfd_criu_devinfo_bucket *devinfos,
+			       uint32_t num_of_devices)
+{
+	int i;
+
+	if (p->n_pdds != num_of_devices)
+		return -EINVAL;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_dev *dev;
+		struct kfd_process_device *pdd;
+		struct file *drm_file;
+
+		dev = kfd_device_by_id(devinfos[i].actual_gpu_id);
+		if (!dev) {
+			pr_err("Failed to find device with gpu_id = %x\n",
+				devinfos[i].actual_gpu_id);
+			return -EINVAL;
+		}
+
+		pdd = kfd_get_process_device_data(dev, p);
+		if (!pdd) {
+			pr_err("Failed to get pdd for gpu_id = %x\n", devinfos[i].actual_gpu_id);
+			return -EINVAL;
+		}
+		pdd->user_gpu_id = devinfos[i].user_gpu_id;
+
+		drm_file = fget(devinfos[i].drm_fd);
+		if (!drm_file) {
+			pr_err("Invalid render node file descriptor sent from plugin (%d)\n",
+				devinfos[i].drm_fd);
+			return -EINVAL;
+		}
+
+		if (pdd->drm_file)
+			return -EINVAL;
+
+		/* create the vm using render nodes for kfd pdd */
+		if (kfd_process_device_init_vm(pdd, drm_file)) {
+			pr_err("could not init vm for given pdd\n");
+			/* On success, the PDD keeps the drm_file reference */
+			fput(drm_file);
+			return -EINVAL;
+		}
+		/*
+		 * pdd now already has the vm bound to render node so below api won't create a new
+		 * exclusive kfd mapping but use existing one with renderDXXX but is still needed
+		 * for iommu v2 binding  and runtime pm.
+		 */
+		pdd = kfd_bind_process_to_device(dev, p);
+		if (IS_ERR(pdd))
+			return PTR_ERR(pdd);
+	}
+	return 0;
+}
+
 static int kfd_ioctl_criu_dumper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
@@ -1841,6 +1929,10 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 		ret = -ENODEV;
 		goto err_unlock;
 	}
+
+	ret = kfd_devinfo_dump(p, args);
+	if (ret)
+		goto err_unlock;
 
 	/* Run over all PDDs of the process */
 	for (index = 0; index < p->n_pdds; index++) {
@@ -1908,9 +2000,234 @@ err_unlock:
 static int kfd_ioctl_criu_restorer(struct file *filep,
 				struct kfd_process *p, void *data)
 {
-	pr_info("Inside %s\n",__func__);
+	struct kfd_ioctl_criu_restorer_args *args = data;
+	struct kfd_criu_devinfo_bucket *devinfos = NULL;
+	uint64_t *restored_bo_offsets_arr = NULL;
+	struct kfd_criu_bo_buckets *bo_bucket = NULL;
+	long err = 0;
+	int ret, i, j = 0;
 
-	return 0;
+	devinfos = kvzalloc((sizeof(struct kfd_criu_devinfo_bucket) *
+			     args->num_of_devices), GFP_KERNEL);
+	if (!devinfos) {
+		err = -ENOMEM;
+		goto failed;
+	}
+
+	err = copy_from_user(devinfos,
+			     (void __user *)args->kfd_criu_devinfo_buckets_ptr,
+			     sizeof(struct kfd_criu_devinfo_bucket) *
+			     args->num_of_devices);
+	if (err != 0) {
+		err = -EFAULT;
+		goto failed;
+	}
+
+	mutex_lock(&p->mutex);
+	err = kfd_devinfo_restore(p, devinfos, args->num_of_devices);
+	if (err)
+		goto err_unlock;
+
+
+	bo_bucket = kvzalloc((sizeof(struct kfd_criu_bo_buckets) *
+			     args->num_of_bos), GFP_KERNEL);
+	if (!bo_bucket) {
+		err = -ENOMEM;
+		goto err_unlock;
+	}
+
+	err = copy_from_user(bo_bucket,
+			     (void __user *)args->kfd_criu_bo_buckets_ptr,
+			     args->num_of_bos * sizeof(struct kfd_criu_bo_buckets));
+	if (err != 0) {
+		err = -EFAULT;
+		goto err_unlock;
+	}
+
+	restored_bo_offsets_arr = kvmalloc_array(args->num_of_bos,
+					sizeof(*restored_bo_offsets_arr),
+					GFP_KERNEL);
+	if (!restored_bo_offsets_arr) {
+		err = -ENOMEM;
+		goto err_unlock;
+	}
+
+	/* Create and map new BOs */
+	for (i = 0; i < args->num_of_bos; i++) {
+		struct kfd_dev *dev;
+		struct kfd_process_device *pdd;
+		void *mem;
+		u64 offset;
+		int idr_handle;
+
+		dev = kfd_device_by_id(bo_bucket[i].gpu_id);
+		if (!dev) {
+			err = -EINVAL;
+			pr_err("Failed to get pdd\n");
+			goto err_unlock;
+		}
+		pdd = kfd_get_process_device_data(dev, p);
+		if (!pdd) {
+			err = -EINVAL;
+			pr_err("Failed to get pdd\n");
+			goto err_unlock;
+		}
+
+		pr_debug("kfd restore ioctl - bo_bucket[%d]:\n", i);
+		pr_debug("bo_size = 0x%llx, bo_addr = 0x%llx bo_offset = 0x%llx\n"
+			"gpu_id = 0x%x alloc_flags = 0x%x\n"
+			"idr_handle = 0x%x\n",
+			bo_bucket[i].bo_size,
+			bo_bucket[i].bo_addr,
+			bo_bucket[i].bo_offset,
+			bo_bucket[i].gpu_id,
+			bo_bucket[i].bo_alloc_flags,
+			bo_bucket[i].idr_handle);
+
+		if (bo_bucket[i].bo_alloc_flags &
+		    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
+			pr_debug("restore ioctl: KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL\n");
+			if (bo_bucket[i].bo_size !=
+			    kfd_doorbell_process_slice(dev)) {
+				err = -EINVAL;
+				goto err_unlock;
+			}
+			offset = kfd_get_process_doorbells(pdd);
+		} else if (bo_bucket[i].bo_alloc_flags &
+			   KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
+			/* MMIO BOs need remapped bus address */
+			pr_info("restore ioctl :KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP\n");
+			if (bo_bucket[i].bo_size != PAGE_SIZE) {
+				pr_err("Invalid page size\n");
+				err = -EINVAL;
+				goto err_unlock;
+			}
+			offset = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->kgd);
+			if (!offset) {
+				pr_err("amdgpu_amdkfd_get_mmio_remap_phys_addr failed\n");
+				err = -ENOMEM;
+				goto err_unlock;
+			}
+		}
+
+		/* Create the BO */
+		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->kgd,
+						bo_bucket[i].bo_addr,
+						bo_bucket[i].bo_size,
+						pdd->drm_priv,
+						(struct kgd_mem **) &mem,
+						&offset,
+						bo_bucket[i].bo_alloc_flags);
+		if (ret) {
+			pr_err("Could not create the BO\n");
+			err = -ENOMEM;
+			goto err_unlock;
+		}
+		pr_debug("New BO created: bo_size = 0x%llx, bo_addr = 0x%llx bo_offset = 0x%llx\n",
+			bo_bucket[i].bo_size, bo_bucket[i].bo_addr, offset);
+
+		/* Restore previuos IDR handle */
+		pr_debug("Restoring old IDR handle for the BO");
+		idr_handle = idr_alloc(&pdd->alloc_idr, mem,
+				       bo_bucket[i].idr_handle,
+				       bo_bucket[i].idr_handle + 1, GFP_KERNEL);
+		if (idr_handle < 0) {
+			pr_err("Could not allocate idr\n");
+			amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd,
+						(struct kgd_mem *)mem,
+						pdd->drm_priv, NULL);
+			goto err_unlock;
+		}
+
+		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL)
+			restored_bo_offsets_arr[i] = KFD_MMAP_TYPE_DOORBELL |
+				KFD_MMAP_GPU_ID(pdd->dev->id);
+		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
+			restored_bo_offsets_arr[i] = KFD_MMAP_TYPE_MMIO |
+				KFD_MMAP_GPU_ID(pdd->dev->id);
+		} else if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_GTT) {
+			restored_bo_offsets_arr[i] = offset;
+			pr_debug("updating offset for GTT\n");
+		} else if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+			restored_bo_offsets_arr[i] = offset;
+			/* Update the VRAM usage count */
+			WRITE_ONCE(pdd->vram_usage,
+				   pdd->vram_usage + bo_bucket[i].bo_size);
+			pr_debug("updating offset for VRAM\n");
+		}
+
+		/* now map these BOs to GPU/s */
+		for (j = 0; j < args->num_of_devices; j++) {
+			struct kfd_dev *peer;
+			struct kfd_process_device *peer_pdd;
+
+			peer = kfd_device_by_id(devinfos[j].actual_gpu_id);
+
+			pr_debug("Inside mapping loop with desired gpu_id = 0x%x\n",
+							devinfos[j].actual_gpu_id);
+			if (!peer) {
+				pr_debug("Getting device by id failed for 0x%x\n",
+				devinfos[j].actual_gpu_id);
+				err = -EINVAL;
+				goto err_unlock;
+			}
+
+			peer_pdd = kfd_bind_process_to_device(peer, p);
+			if (IS_ERR(peer_pdd)) {
+				err = PTR_ERR(peer_pdd);
+				goto err_unlock;
+			}
+			pr_debug("map mem in restore ioctl -> 0x%llx\n",
+				 ((struct kgd_mem *)mem)->va);
+			err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(peer->kgd,
+				(struct kgd_mem *)mem, peer_pdd->drm_priv);
+			if (err) {
+				pr_err("Failed to map to gpu %d/%d\n",
+				j, args->num_of_devices);
+				goto err_unlock;
+			}
+		}
+
+		err = amdgpu_amdkfd_gpuvm_sync_memory(dev->kgd,
+						      (struct kgd_mem *) mem, true);
+		if (err) {
+			pr_debug("Sync memory failed, wait interrupted by user signal\n");
+			goto err_unlock;
+		}
+
+		pr_info("map memory was successful for the BO\n");
+	} /* done */
+
+	/* Flush TLBs after waiting for the page table updates to complete */
+	for (j = 0; j < args->num_of_devices; j++) {
+		struct kfd_dev *peer;
+		struct kfd_process_device *peer_pdd;
+
+		peer = kfd_device_by_id(devinfos[j].actual_gpu_id);
+		if (WARN_ON_ONCE(!peer))
+			continue;
+		peer_pdd = kfd_get_process_device_data(peer, p);
+		if (WARN_ON_ONCE(!peer_pdd))
+			continue;
+		kfd_flush_tlb(peer_pdd);
+	}
+
+	ret = copy_to_user((void __user *)args->restored_bo_array_ptr,
+			   restored_bo_offsets_arr,
+			   (args->num_of_bos * sizeof(*restored_bo_offsets_arr)));
+	if (ret) {
+		err = -EFAULT;
+		goto err_unlock;
+	}
+
+err_unlock:
+	mutex_unlock(&p->mutex);
+failed:
+	kvfree(bo_bucket);
+	kvfree(restored_bo_offsets_arr);
+	kvfree(devinfos);
+
+	return err;
 }
 
 static int kfd_ioctl_criu_helper(struct file *filep,
