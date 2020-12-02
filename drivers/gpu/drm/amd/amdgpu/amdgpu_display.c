@@ -772,7 +772,6 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 	return domain;
 }
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 {
 	struct amdgpu_device *adev = drm_to_adev(afb->base.dev);
@@ -887,7 +886,6 @@ static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 	afb->base.flags |= DRM_MODE_FB_MODIFIERS;
 	return 0;
 }
-#endif
 
 static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 				      uint64_t *tiling_flags, bool *tmz_surface)
@@ -938,14 +936,12 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	if (dev->mode_config.allow_fb_modifiers &&
 	    !(rfb->base.flags & DRM_MODE_FB_MODIFIERS)) {
 		ret = convert_tiling_flags_to_modifier(rfb);
 		if (ret)
 			goto fail;
 	}
-#endif
 
 	return 0;
 
