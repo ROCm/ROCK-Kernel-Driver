@@ -153,27 +153,25 @@ struct amd_mem_context {
 	void *core_context;
 };
 
-
 static void free_callback(void *client_priv)
 {
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_priv;
 
-	pr_debug("data 0x%p\n", mem_context);
+	pr_debug("Client context: 0x%p\n", mem_context);
 
 	if (!mem_context) {
 		pr_warn("Invalid client context\n");
 		return;
 	}
 
-	pr_debug("mem_context->core_context 0x%p\n", mem_context->core_context);
+	pr_debug("IBCore context: 0x%p\n", mem_context->core_context);
 
 	/* amdkfd will free resources when we return from this callback.
 	 * Set flag to inform that there is nothing to do on "put_pages", etc.
 	 */
 	WRITE_ONCE(mem_context->free_callback_called, 1);
 }
-
 
 static int amd_acquire(unsigned long addr, size_t size,
 			void *peer_mem_private_data,
@@ -185,26 +183,20 @@ static int amd_acquire(unsigned long addr, size_t size,
 
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);
-
-	pr_debug("addr:0x%lx,size:0x%x, pid 0x%p\n",
-					addr, (unsigned int)size, pid);
+	pr_debug("addr: %#lx, size: %#lx, pid: 0x%p\n",
+		 addr, size, pid);
 
 	/* Check if address is handled by AMD GPU driver */
 	ret = rdma_interface->is_gpu_address(addr, pid);
-
 	if (!ret) {
-		pr_debug("Not GPU Address\n");
-		/* This is not GPU address */
+		pr_debug("Not a GPU Address\n");
 		return 0;
 	}
 
-	pr_debug("GPU address\n");
-
 	/* Initialize context used for operation with given address */
 	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
-
 	if (!mem_context)
-		return 0;	/* Error case handled as not GPU address  */
+		return 0;
 
 	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
@@ -215,7 +207,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 	 */
 	mem_context->pid  = pid;
 
-	pr_debug("Client context %p\n", mem_context);
+	pr_debug("Client context: 0x%p\n", mem_context);
 
 	/* Return pointer to allocated context */
 	*client_context = mem_context;
@@ -235,25 +227,25 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("addr:0x%lx,size:0x%x, core_context:%p\n",
-		addr, (unsigned int)size, core_context);
+	pr_debug("addr: %#lx, size: %#lx, core_context: 0x%p\n",
+		 addr, size, core_context);
 
 	if (!mem_context) {
 		pr_warn("Invalid client context");
 		return -EINVAL;
 	}
 
-	pr_debug("pid :0x%p\n", mem_context->pid);
+	pr_debug("pid: 0x%p\n", mem_context->pid);
 
 
 	if (addr != mem_context->va) {
-		pr_warn("Context address (0x%llx) is not the same\n",
+		pr_warn("Context address (%#llx) is not the same\n",
 			mem_context->va);
 		return -EINVAL;
 	}
 
 	if (size != mem_context->size) {
-		pr_warn("Context size (0x%llx) is not the same\n",
+		pr_warn("Context size (%#llx) is not the same\n",
 			mem_context->size);
 		return -EINVAL;
 	}
@@ -311,10 +303,10 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("Context 0x%p, sg_head 0x%p\n",
+	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -339,10 +331,10 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("Context 0x%p, sg_table 0x%p\n",
+	pr_debug("Client context: 0x%p, sg_table: 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -350,20 +342,21 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 	/* Assume success */
 	return 0;
 }
+
 static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 {
 	int ret = 0;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("sg_head %p client_context: 0x%p\n",
-			sg_head, client_context);
-	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
+			client_context, sg_head);
+	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
 
-	pr_debug("mem_context->p2p_info %p\n",
+	pr_debug("mem_context->p2p_info 0x%p\n",
 				mem_context->p2p_info);
 
 	if (mem_context->free_callback_called) {
@@ -382,6 +375,7 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 	} else
 		pr_err("Pointer to p2p info is null\n");
 }
+
 static unsigned long amd_get_page_size(void *client_context)
 {
 	unsigned long page_size;
@@ -389,8 +383,8 @@ static unsigned long amd_get_page_size(void *client_context)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("context: %p\n", client_context);
-	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("Client context: 0x%p\n", client_context);
+	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
@@ -418,8 +412,8 @@ static void amd_release(void *client_context)
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
-	pr_debug("context: 0x%p\n", client_context);
-	pr_debug("pid 0x%p, address 0x%llx, size:0x%llx\n",
+	pr_debug("Client context: 0x%p\n", client_context);
+	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
 			mem_context->pid,
 			mem_context->va,
 			mem_context->size);
