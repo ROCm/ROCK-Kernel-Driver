@@ -236,7 +236,6 @@ struct hda_gen_spec {
 	unsigned int power_down_unused:1; /* power down unused widgets */
 	unsigned int dac_min_mute:1; /* minimal = mute for DACs */
 	unsigned int suppress_vmaster:1; /* don't create vmaster kctls */
-	unsigned int obey_preferred_dacs:1; /* obey preferred_dacs assignment */
 
 	/* other internal flags */
 	unsigned int no_analog:1; /* digital I/O only */
@@ -245,6 +244,11 @@ struct hda_gen_spec {
 	unsigned int have_aamix_ctl:1;
 	unsigned int hp_mic_jack_modes:1;
 	unsigned int skip_verbs:1; /* don't apply verbs at snd_hda_gen_init() */
+
+#ifndef __GENKSYMS__
+	/* newly added flags: moved here due to kABI compatibility */
+	unsigned int obey_preferred_dacs:1; /* obey preferred_dacs assignment */
+#endif
 
 	/* additional mute flags (only effective with auto_mute_via_amp=1) */
 	u64 mute_bits;
