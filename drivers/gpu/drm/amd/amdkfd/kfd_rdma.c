@@ -85,14 +85,14 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 	if (!buf_obj) {
 		pr_err("Cannot find a kfd_bo for the range\n");
 		ret = -EINVAL;
-		goto out;
+		goto out_unref_proc;
 	}
 
 	rdma_cb_data = kmalloc(sizeof(*rdma_cb_data), GFP_KERNEL);
 	if (!rdma_cb_data) {
 		*amd_p2p_data = NULL;
 		ret = -ENOMEM;
-		goto out;
+		goto out_unref_proc;
 	}
 
 	mem = buf_obj->mem;
@@ -101,7 +101,6 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 
 	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, mem,
 			offset, length, &sg_table_tmp);
-
 	if (ret) {
 		pr_err("amdgpu_amdkfd_gpuvm_pin_get_sg_table failed.\n");
 		*amd_p2p_data = NULL;
@@ -127,6 +126,10 @@ static int get_pages(uint64_t address, uint64_t length, struct pid *pid,
 
 free_mem:
 	kfree(rdma_cb_data);
+out_unref_proc:
+	pr_debug("Decrement ref count for process with PID: %d\n",
+		 pid->numbers->nr);
+	kfd_unref_process(p);
 out:
 	mutex_unlock(&p->mutex);
 
