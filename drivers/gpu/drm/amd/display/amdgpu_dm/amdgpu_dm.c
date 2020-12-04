@@ -9704,7 +9704,11 @@ static int dm_check_cursor_fb(struct amdgpu_crtc *new_acrtc,
 	}
 
 	/* Pitch in pixels */
+#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 	pitch = fb->pitches[0] / fb->format->cpp[0];
+#else
+	pitch = fb->pitches[0] / (fb->bits_per_pixel / 8);
+#endif
 
 	if (fb->width != pitch) {
 		DRM_DEBUG_ATOMIC("Cursor FB width %d doesn't match pitch %d",
