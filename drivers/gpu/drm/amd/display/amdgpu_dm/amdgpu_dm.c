@@ -8178,7 +8178,11 @@ static void handle_cursor_update(struct drm_plane *plane,
 	attributes.rotation_angle    = 0;
 	attributes.attribute_flags.value = 0;
 
+#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 	attributes.pitch = afb->base.pitches[0] / afb->base.format->cpp[0];
+#else
+	attributes.pitch = afb->base.pitches[0] / (afb->base.bits_per_pixel / 8);
+#endif
 
 	if (crtc_state->stream) {
 		mutex_lock(&adev->dm.dc_lock);
@@ -10017,7 +10021,11 @@ static int dm_update_plane_state(struct dc *dc,
 			}
 
 			/* Pitch in pixels */
+#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 			pitch = new_plane_state->fb->pitches[0] / new_plane_state->fb->format->cpp[0];
+#else
+			pitch = new_plane_state->fb->pitches[0] / (new_plane_state->fb->bits_per_pixel / 8);
+#endif
 
 			if (new_plane_state->fb->width != pitch) {
 				DRM_DEBUG_ATOMIC("Cursor FB width %d doesn't match pitch %d",
