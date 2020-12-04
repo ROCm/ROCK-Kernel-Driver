@@ -2527,13 +2527,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 }
 
 /*
- * amdgpu_ttm_late_init - Handle any late initialization for amdgpu_ttm
- */
-void amdgpu_ttm_late_init(struct amdgpu_device *adev)
-{
-}
-
-/*
  * amdgpu_ttm_fini - De-initialize the TTM memory pools
  */
 void amdgpu_ttm_fini(struct amdgpu_device *adev)
