@@ -587,6 +587,7 @@ __iomap_write_begin(struct inode *inode, loff_t pos, unsigned len,
 					poff, plen, from, to, iomap);
 			if (status)
 				break;
+			iomap_set_range_uptodate(page, poff, plen);
 		}
 
 	} while ((block_start += plen) < block_end);
