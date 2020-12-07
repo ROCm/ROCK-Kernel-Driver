@@ -1065,11 +1065,6 @@ static bool dc_link_detect_helper(struct dc_link *link,
 			break;
 		}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-		if (link->local_sink->edid_caps.panel_patch.disable_fec)
-			link->ctx->dc->debug.disable_fec = true;
-#endif
-
 		// Check if edid is the same
 		if ((prev_sink) &&
 		    (edid_status == EDID_THE_SAME || edid_status == EDID_OK))
@@ -3652,7 +3647,7 @@ uint32_t dc_link_bandwidth_kbps(
 	link_bw_kbps *= link_setting->lane_count;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	if (dc_link_is_fec_supported(link) && !link->dc->debug.disable_fec) {
+	if (dc_link_should_enable_fec(link)) {
 		/* Account for FEC overhead.
 		 * We have to do it based on caps,
 		 * and not based on FEC being set ready,
@@ -3704,5 +3699,21 @@ bool dc_link_is_fec_supported(const struct dc_link *link)
 			link->link_enc->features.fec_supported &&
 			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE &&
 			!IS_FPGA_MAXIMUS_DC(link->ctx->dce_environment));
+}
+
+bool dc_link_should_enable_fec(const struct dc_link *link)
+{
+	bool is_fec_disable = false;
+	bool ret = false;
+
+	if (link->connector_signal != SIGNAL_TYPE_DISPLAY_PORT_MST &&
+			link->local_sink &&
+			link->local_sink->edid_caps.panel_patch.disable_fec)
+		is_fec_disable = true;
+
+	if (dc_link_is_fec_supported(link) && !link->dc->debug.disable_fec && !is_fec_disable)
+		ret = true;
+
+	return ret;
 }
 #endif
