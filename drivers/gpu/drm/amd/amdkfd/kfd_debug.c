@@ -28,6 +28,7 @@
 #include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_topology.h"
+#include "kfd_device_queue_manager.h"
 
 /* poll and read functions */
 static __poll_t kfd_dbg_ev_poll(struct file *, struct poll_table_struct *);
@@ -327,3 +328,146 @@ int kfd_dbg_ev_enable(struct kfd_process_device *pdd)
 
 	return ret;
 }
+
+int kfd_dbg_trap_disable(struct kfd_process_device *pdd)
+{
+	if (!pdd->debug_trap_enabled)
+		return -EINVAL;
+
+	kfd_release_debug_watch_points(pdd->dev,
+			pdd->allocated_debug_watch_point_bitmask);
+	pdd->allocated_debug_watch_point_bitmask = 0;
+	pdd->debug_trap_enabled = false;
+	pdd->dev->kfd2kgd->disable_debug_trap(pdd->dev->kgd,
+			pdd->dev->vm_info.last_vmid_kfd);
+	fput(pdd->dbg_ev_file);
+	pdd->dbg_ev_file = NULL;
+	return release_debug_trap_vmid(pdd->dev->dqm);
+}
+
+int kfd_dbg_trap_enable(struct kfd_process_device *pdd,
+		uint32_t *fd)
+{
+	int r = 0;
+
+	if (pdd->debug_trap_enabled)
+		return -EINVAL;
+
+	r = reserve_debug_trap_vmid(pdd->dev->dqm);
+	if (r)
+		return r;
+
+	pdd->debug_trap_enabled = true;
+	pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd,
+			pdd->dev->vm_info.last_vmid_kfd);
+
+	r = kfd_dbg_ev_enable(pdd);
+	if (r < 0)
+		goto error;
+
+	*fd = r;
+	return 0;
+error:
+	pdd->debug_trap_enabled = false;
+	pdd->dev->kfd2kgd->disable_debug_trap(pdd->dev->kgd,
+			pdd->dev->vm_info.last_vmid_kfd);
+	release_debug_trap_vmid(pdd->dev->dqm);
+	return r;
+}
+
+int kfd_dbg_trap_set_wave_launch_override(struct kfd_dev *dev,
+		uint32_t vmid,
+		uint32_t trap_override,
+		uint32_t trap_mask_bits,
+		uint32_t trap_mask_request,
+		uint32_t *trap_mask_prev,
+		uint32_t *trap_mask_supported)
+{
+	return dev->kfd2kgd->set_wave_launch_trap_override(
+			dev->kgd,
+			vmid,
+			trap_override,
+			trap_mask_bits,
+			trap_mask_request,
+			trap_mask_prev,
+			trap_mask_supported);
+}
+
+int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process_device *pdd,
+		uint8_t wave_launch_mode)
+{
+	pdd->trap_debug_wave_launch_mode = wave_launch_mode;
+	pdd->dev->kfd2kgd->set_wave_launch_mode(
+			pdd->dev->kgd,
+			wave_launch_mode,
+			pdd->dev->vm_info.last_vmid_kfd);
+
+	return 0;
+}
+
+int kfd_dbg_trap_clear_address_watch(struct kfd_process_device *pdd,
+		uint32_t watch_id)
+{
+	/* check that we own watch id */
+	if (!((1<<watch_id) & pdd->allocated_debug_watch_point_bitmask)) {
+		pr_debug("Trying to free a watch point we don't own\n");
+		return -EINVAL;
+	}
+	kfd_release_debug_watch_points(pdd->dev, 1<<watch_id);
+	pdd->allocated_debug_watch_point_bitmask ^= (1<<watch_id);
+
+	return 0;
+}
+
+int kfd_dbg_trap_set_address_watch(struct kfd_process_device *pdd,
+		uint64_t watch_address,
+		uint32_t watch_address_mask,
+		uint32_t *watch_id,
+		uint32_t watch_mode)
+{
+	int r = 0;
+
+	if (!watch_address) {
+		pr_debug("Invalid watch address option\n");
+		return -EINVAL;
+	}
+
+	r = kfd_allocate_debug_watch_point(pdd->dev,
+			watch_address,
+			watch_address_mask,
+			watch_id,
+			watch_mode,
+			pdd->dev->vm_info.last_vmid_kfd);
+	if (r)
+		return r;
+
+	/* Save the watch id in our per-process area */
+	pdd->allocated_debug_watch_point_bitmask |= (1 << *watch_id);
+
+	return 0;
+}
+
+int kfd_dbg_trap_set_precise_mem_ops(struct kfd_dev *dev,
+		uint32_t enable)
+{
+	int r = 0;
+
+	switch (enable) {
+	case 0:
+
+		r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+				dev->vm_info.last_vmid_kfd, false);
+		break;
+	case 1:
+		r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
+				dev->vm_info.last_vmid_kfd, true);
+		break;
+	default:
+		pr_err("Invalid precise mem ops option: %i\n", enable);
+		r = -EINVAL;
+		break;
+	}
+	return r;
+}
+
+
