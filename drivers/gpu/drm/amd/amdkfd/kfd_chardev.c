@@ -2774,46 +2774,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
-			if (!pdd->debug_trap_enabled) {
-				r = -EINVAL;
-				break;
-			}
-
-			kfd_release_debug_watch_points(dev,
-				pdd->allocated_debug_watch_point_bitmask);
-			pdd->allocated_debug_watch_point_bitmask = 0;
-			pdd->debug_trap_enabled = false;
-			dev->kfd2kgd->disable_debug_trap(dev->kgd,
-						dev->vm_info.last_vmid_kfd);
-			fput(pdd->dbg_ev_file);
-			pdd->dbg_ev_file = NULL;
-			r = release_debug_trap_vmid(dev->dqm);
+			r = kfd_dbg_trap_disable(pdd);
 			break;
 		case 1:
-			if (pdd->debug_trap_enabled) {
-				r = -EINVAL;
-				break;
-			}
-
-			r = reserve_debug_trap_vmid(dev->dqm);
+			r = kfd_dbg_trap_enable(pdd, &args->data3);
 			if (r)
 				break;
 
-			pdd->debug_trap_enabled = true;
-			dev->kfd2kgd->enable_debug_trap(dev->kgd,
-					dev->vm_info.last_vmid_kfd);
-
-			r = kfd_dbg_ev_enable(pdd);
-			if (r >= 0) {
-				args->data3 = r;
-				r = 0;
-				break;
-			}
-
-			pdd->debug_trap_enabled = false;
-			dev->kfd2kgd->disable_debug_trap(dev->kgd,
-					dev->vm_info.last_vmid_kfd);
-			release_debug_trap_vmid(dev->dqm);
 			break;
 		default:
 			pr_err("Invalid trap enable option: %i\n",
@@ -2823,8 +2790,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE:
-		r = dev->kfd2kgd->set_wave_launch_trap_override(
-				dev->kgd,
+		r = kfd_dbg_trap_set_wave_launch_override(
+				dev,
 				dev->vm_info.last_vmid_kfd,
 				data1,
 				data2,
@@ -2834,11 +2801,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 
 	case KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE:
-		pdd->trap_debug_wave_launch_mode = data1;
-		dev->kfd2kgd->set_wave_launch_mode(
-				dev->kgd,
-				data1,
-				dev->vm_info.last_vmid_kfd);
+		r = kfd_dbg_trap_set_wave_launch_mode(pdd, data1);
 		break;
 
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
@@ -2882,60 +2845,29 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		args->data2 = r < 0 ? 0 : r;
 		if (r > 0)
 			r = 0;
-
 		break;
 	case KFD_IOC_DBG_TRAP_GET_VERSION:
 		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
 		break;
 	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
-		/* check that we own watch id */
-		if (!((1<<data1) & pdd->allocated_debug_watch_point_bitmask)) {
-			pr_debug("Trying to free a watch point we don't own\n");
-			r = -EINVAL;
-			goto unlock_out;
-		}
-		kfd_release_debug_watch_points(dev, 1<<data1);
-		pdd->allocated_debug_watch_point_bitmask ^= (1<<data1);
+		r = kfd_dbg_trap_clear_address_watch(pdd,
+				data1);
 		break;
 	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
-		if (!args->ptr) {
-			pr_err("Invalid watch address option\n");
-			r = -EINVAL;
-			goto unlock_out;
-		}
-
-		r = kfd_allocate_debug_watch_point(dev,
+		r = kfd_dbg_trap_set_address_watch(pdd,
 				args->ptr, /* watch address */
 				data3,     /* watch address mask */
 				&data1,    /* watch id */
-				data2,     /* watch mode */
-				dev->vm_info.last_vmid_kfd);
+				data2);    /* watch mode */
 		if (r)
 			goto unlock_out;
-
-		/* Save the watch id in our per-process area */
-		pdd->allocated_debug_watch_point_bitmask |= (1<<data1);
 
 		/* Save the watch point ID for the caller */
 		args->data1 = data1;
 		break;
 	case KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS:
-		switch (data1) {
-		case 0:
-			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
-					dev->vm_info.last_vmid_kfd, false);
-			break;
-		case 1:
-			r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
-					dev->vm_info.last_vmid_kfd, true);
-			break;
-		default:
-			pr_err("Invalid precise mem ops option: %i\n", data1);
-			r = -EINVAL;
-			break;
-		}
-
+		r = kfd_dbg_trap_set_precise_mem_ops(dev, data1);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
