@@ -914,7 +914,6 @@ static int vc4_hdmi_audio_trigger(struct snd_pcm_substream *substream, int cmd,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		vc4_hdmi_set_audio_infoframe(encoder);
 		HDMI_WRITE(VC4_HDMI_TX_PHY_CTL0,
 			   HDMI_READ(VC4_HDMI_TX_PHY_CTL0) &
 			   ~VC4_HDMI_TX_PHY_RNG_PWRDN);
@@ -964,9 +963,13 @@ static int vc4_hdmi_audio_eld_ctl_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct vc4_hdmi *hdmi = snd_component_to_hdmi(component);
+	struct drm_encoder *encoder = hdmi->encoder;
+	struct drm_device *drm = encoder->dev;
 
 	memcpy(ucontrol->value.bytes.data, hdmi->connector->eld,
 	       sizeof(hdmi->connector->eld));
+
+	vc4_hdmi_set_audio_infoframe(encoder);
 
 	return 0;
 }
