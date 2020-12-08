@@ -828,5 +828,9 @@ int hwmgr_handle_task(struct pp_hwmgr *hwmgr,
 
 #define PHM_ENTIRE_REGISTER_MASK 0xFFFFFFFFU
 
+int smu7_init_function_pointers(struct pp_hwmgr *hwmgr);
+int smu8_init_function_pointers(struct pp_hwmgr *hwmgr);
+int vega12_hwmgr_init(struct pp_hwmgr *hwmgr);
+int vega20_hwmgr_init(struct pp_hwmgr *hwmgr);
 
 #endif /* _HWMGR_H_ */

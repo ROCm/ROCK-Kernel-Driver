@@ -934,3 +934,6 @@
 
 /* drm_atomic_helper_calc_timestamping_constants() is available*/
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
+
+/* block_w and block_h field is available in struct drm_format_info */
+#define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1

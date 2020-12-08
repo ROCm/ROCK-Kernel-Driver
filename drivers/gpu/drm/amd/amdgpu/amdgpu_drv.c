@@ -1226,29 +1226,15 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
-	adev = kzalloc(sizeof(*adev), GFP_KERNEL);
-	if (!adev)
-		return -ENOMEM;
+	adev = devm_drm_dev_alloc(&pdev->dev, &kms_driver, typeof(*adev), ddev);
+	if (IS_ERR(adev))
+		return PTR_ERR(adev);
 
 	adev->dev  = &pdev->dev;
 	adev->pdev = pdev;
-#ifdef HAVE_DRM_DRIVER_RELEASE
+
 	ddev = adev_to_drm(adev);
-	ret = drm_dev_init(ddev, &kms_driver, &pdev->dev);
-	if (ret)
-		goto err_free;
-
-#ifdef HAVE_DRM_DRM_MANAGED_H
-	drmm_add_final_kfree(ddev, adev);
-#endif
-#else
-	ddev = drm_dev_alloc(&kms_driver, &pdev->dev);
-	if (IS_ERR(ddev))
-		return PTR_ERR(ddev);
-	adev->ddev = ddev;
-#endif
 	kcl_drm_dev_init_private(ddev, (void *)adev);
-
 	kcl_drm_vma_offset_manager_init(ddev->vma_offset_manager);
 
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
@@ -1267,7 +1253,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	kcl_pci_configure_extended_tags(pdev);
 	ret = pci_enable_device(pdev);
 	if (ret)
+#ifndef AMDKCL_DEVM_DRM_DEV_ALLOC
+		return ret;
+#else
 		goto err_free;
+#endif
 
 	ddev->pdev = pdev;
 	pci_set_drvdata(pdev, ddev);
@@ -1295,12 +1285,14 @@ retry_init:
 
 err_pci:
 	pci_disable_device(pdev);
+#ifdef AMDKCL_DEVM_DRM_DEV_ALLOC
 err_free:
 #ifndef HAVE_DRM_DRIVER_RELEASE
 	kfree(adev);
 	kcl_drm_dev_fini_private(ddev);
 #endif
 	drm_dev_put(ddev);
+#endif
 	return ret;
 }
 
@@ -1322,6 +1314,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
+#ifdef AMDKCL_DEVM_DRM_DEV_ALLOC
 #ifndef HAVE_DRM_DRIVER_RELEASE
 	if (dev) {
 		kfree(drm_to_adev(dev));
@@ -1329,6 +1322,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	}
 #endif
 	drm_dev_put(dev);
+#endif
 }
 
 #ifdef HAVE_DRM_DRIVER_RELEASE

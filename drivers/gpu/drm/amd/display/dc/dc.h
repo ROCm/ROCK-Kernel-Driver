@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.112"
+#define DC_VER "3.2.114"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -169,6 +169,7 @@ struct dc_caps {
 	bool psp_setup_panel_mode;
 	bool extended_aux_timeout_support;
 	bool dmcub_support;
+	uint32_t num_of_internal_disp;
 	enum dp_protocol_version max_dp_protocol_version;
 	struct dc_plane_cap planes[MAX_PLANES];
 	struct dc_color_caps color;
@@ -422,6 +423,9 @@ struct dc_bw_validation_profile {
 union mem_low_power_enable_options {
 	struct {
 		bool i2c: 1;
+		bool dmcu: 1;
+		bool dscl: 1;
+		bool cm: 1;
 		bool mpc: 1;
 		bool optc: 1;
 	} bits;
