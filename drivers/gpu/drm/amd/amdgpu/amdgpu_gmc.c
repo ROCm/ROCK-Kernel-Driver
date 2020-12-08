@@ -599,6 +599,11 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 	case CHIP_VEGA20:
 	case CHIP_ARCTURUS:
 	case CHIP_ALDEBARAN:
+	case CHIP_NAVI10:
+	case CHIP_NAVI14:
+	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
+	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
 	case CHIP_YELLOW_CARP:
 	case CHIP_RENOIR:
