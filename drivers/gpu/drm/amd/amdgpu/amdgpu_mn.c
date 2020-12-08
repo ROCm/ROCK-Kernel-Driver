@@ -148,14 +148,23 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 		}
 		kfree(node);
 	}
+
+#ifndef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+	amn->objects = RB_ROOT;
+#else
+	amn->objects = RB_ROOT_CACHED;
+#endif
+
 	up_write(&amn->lock);
-	mutex_unlock(&adev->mn_lock);
+
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&amn->mn);
 #else
 	mmu_notifier_unregister_no_release(&amn->mn, amn->mm);
 	mmu_notifier_call_srcu(&amn->rcu, amdgpu_mn_free);
 #endif
+
+	mutex_unlock(&adev->mn_lock);
 }
 
 /**
