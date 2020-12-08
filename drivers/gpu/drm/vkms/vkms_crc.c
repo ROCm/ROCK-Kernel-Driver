@@ -30,7 +30,7 @@ static uint32_t compute_crc(void *vaddr_out, struct vkms_crc_data *crc_out)
 				     + (i * crc_out->pitch)
 				     + (j * crc_out->cpp);
 			/* XRGB format ignores Alpha channel */
-			memset(vaddr_out + src_offset + 24, 0,  8);
+			bitmap_clear(vaddr_out + src_offset, 24, 8);
 			crc = crc32_le(crc, vaddr_out + src_offset,
 				       sizeof(u32));
 		}
