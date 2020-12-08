@@ -568,6 +568,8 @@ static void domain_add_cpu(int cpu, struct rdt_resource *r)
 
 	if (d) {
 		cpumask_set_cpu(cpu, &d->cpu_mask);
+		if (r->cache.arch_has_per_cpu_cfg)
+			rdt_domain_reconfigure_cdp(r);
 		return;
 	}
 
@@ -921,6 +923,7 @@ static __init void rdt_init_res_defs_intel(void)
 		    r->rid == RDT_RESOURCE_L2CODE)
 			r->cbm_validate = cbm_validate_intel;
 		else if (r->rid == RDT_RESOURCE_MBA) {
+			r->cache.arch_has_per_cpu_cfg = false;
 			r->msr_base = MSR_IA32_MBA_THRTL_BASE;
 			r->msr_update = mba_wrmsr_intel;
 			r->parse_ctrlval = parse_bw_intel;
@@ -941,6 +944,7 @@ static __init void rdt_init_res_defs_amd(void)
 		    r->rid == RDT_RESOURCE_L2CODE)
 			r->cbm_validate = cbm_validate_amd;
 		else if (r->rid == RDT_RESOURCE_MBA) {
+			r->cache.arch_has_per_cpu_cfg = true;
 			r->msr_base = MSR_IA32_MBA_BW_BASE;
 			r->msr_update = mba_wrmsr_amd;
 			r->parse_ctrlval = parse_bw_amd;
