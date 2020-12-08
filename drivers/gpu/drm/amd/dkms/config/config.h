@@ -937,3 +937,6 @@
 
 /* block_w and block_h field is available in struct drm_format_info */
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
+
+/* drm_dev_dbg() is exported from drm_print.c */
+#define HAVE_DRM_DEV_DBG 1

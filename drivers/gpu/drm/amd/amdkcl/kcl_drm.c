@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_drm.h>
+#include <kcl/kcl_drm_print.h>
+#include <stdarg.h>
 #include "kcl_common.h"
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
@@ -35,4 +37,30 @@ bool drm_is_current_master(struct drm_file *fpriv)
 	return fpriv->is_master && fpriv->master == fpriv->minor->master;
 }
 EXPORT_SYMBOL(drm_is_current_master);
+#endif
+
+#if !defined(HAVE_DRM_DEV_DBG)
+void drm_dev_dbg(const struct device *dev, int category,
+		 const char *format, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	if (!drm_debug_enabled(category))
+		return;
+
+	va_start(args, format);
+	vaf.fmt = format;
+	vaf.va = &args;
+
+	if (dev)
+		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
+			   __builtin_return_address(0), &vaf);
+	else
+		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+		       __builtin_return_address(0), &vaf);
+
+	va_end(args);
+}
+EXPORT_SYMBOL(drm_dev_dbg);
 #endif
