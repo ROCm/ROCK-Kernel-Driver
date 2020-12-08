@@ -51,3 +51,29 @@ void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
+
+#if !defined(HAVE_DRM_DEV_DBG)
+void drm_dev_dbg(const struct device *dev, int category,
+		 const char *format, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	if (!drm_debug_enabled(category))
+		return;
+
+	va_start(args, format);
+	vaf.fmt = format;
+	vaf.va = &args;
+
+	if (dev)
+		dev_printk(KERN_DEBUG, dev, "[" DRM_NAME ":%ps] %pV",
+			   __builtin_return_address(0), &vaf);
+	else
+		printk(KERN_DEBUG "[" DRM_NAME ":%ps] %pV",
+		       __builtin_return_address(0), &vaf);
+
+	va_end(args);
+}
+EXPORT_SYMBOL(drm_dev_dbg);
+#endif
