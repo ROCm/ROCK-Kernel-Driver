@@ -113,6 +113,15 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 	} while (0)
 #endif
 
+#if !defined(HAVE_DRM_DEV_DBG)
+void drm_dev_dbg(const struct device *dev, int category, const char *format, ...);
+#endif
+
+#if !defined(drm_dbg_kms)
+#define drm_dbg_kms(drm, fmt, ...)				\
+	drm_dev_dbg((drm)->dev, 0x04, fmt, ##__VA_ARGS__)
+#endif
+
 #ifndef HAVE_DRM_DEBUG_ENABLED
 /* Copied from v5.3-rc1-708-gf0a8f533adc2 include/drm/drm_print.h */
 static  inline bool drm_debug_enabled(unsigned int category)
