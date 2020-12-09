@@ -1962,7 +1962,7 @@ bool dcn20_split_stream_for_odm(
 	else
 		next_odm_pipe->stream_res.opp = next_odm_pipe->top_pipe->stream_res.opp;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	if (next_odm_pipe->stream->timing.flags.DSC == 1) {
+	if (next_odm_pipe->stream->timing.flags.DSC == 1 && !next_odm_pipe->top_pipe) {
 		dcn20_acquire_dsc(dc, res_ctx, &next_odm_pipe->stream_res.dsc, next_odm_pipe->pipe_idx);
 		ASSERT(next_odm_pipe->stream_res.dsc);
 		if (next_odm_pipe->stream_res.dsc == NULL)
