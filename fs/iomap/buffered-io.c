@@ -31,7 +31,10 @@ iomap_page_create(struct inode *inode, struct page *page)
 	atomic_set(&iop->read_count, 0);
 	atomic_set(&iop->write_count, 0);
 	spin_lock_init(&iop->uptodate_lock);
-	bitmap_zero(iop->uptodate, PAGE_SIZE / SECTOR_SIZE);
+	if (PageUptodate(page))
+		bitmap_fill(iop->uptodate, PAGE_SIZE / SECTOR_SIZE);
+	else
+		bitmap_zero(iop->uptodate, PAGE_SIZE / SECTOR_SIZE);
 
 	/*
 	 * migrate_page_move_mapping() assumes that pages with private data have
@@ -573,6 +576,7 @@ __iomap_write_begin(struct inode *inode, loff_t pos, unsigned len,
 
 	if (PageUptodate(page))
 		return 0;
+	ClearPageError(page);
 
 	do {
 		iomap_adjust_read_range(inode, iop, &block_start,
@@ -586,6 +590,7 @@ __iomap_write_begin(struct inode *inode, loff_t pos, unsigned len,
 					poff, plen, from, to, iomap);
 			if (status)
 				break;
+			iomap_set_range_uptodate(page, poff, plen);
 		}
 
 	} while ((block_start += plen) < block_end);

@@ -32,6 +32,9 @@
 #include "cifs_unicode.h"
 #include "smb2pdu.h"
 #include "cifsfs.h"
+#ifdef CONFIG_CIFS_DFS_UPCALL
+#include "dns_resolve.h"
+#endif
 
 extern mempool_t *cifs_sm_req_poolp;
 extern mempool_t *cifs_req_poolp;
@@ -1025,59 +1028,151 @@ int copy_path_name(char *dst, const char *src)
 }
 
 struct super_cb_data {
-	struct TCP_Server_Info *server;
+	void *data;
 	struct super_block *sb;
 };
 
-static void super_cb(struct super_block *sb, void *arg)
+static void tcp_super_cb(struct super_block *sb, void *arg)
 {
-	struct super_cb_data *d = arg;
+	struct super_cb_data *sd = arg;
+	struct TCP_Server_Info *server = sd->data;
 	struct cifs_sb_info *cifs_sb;
 	struct cifs_tcon *tcon;
 
-	if (d->sb)
+	if (sd->sb)
 		return;
 
 	cifs_sb = CIFS_SB(sb);
 	tcon = cifs_sb_master_tcon(cifs_sb);
-	if (tcon->ses->server == d->server)
-		d->sb = sb;
+	if (tcon->ses->server == server)
+		sd->sb = sb;
 }
 
-struct super_block *cifs_get_tcp_super(struct TCP_Server_Info *server)
+static struct super_block *__cifs_get_super(void (*f)(struct super_block *, void *),
+					    void *data)
 {
-	struct super_cb_data d = {
-		.server = server,
+	struct super_cb_data sd = {
+		.data = data,
 		.sb = NULL,
 	};
 
-	iterate_supers_type(&cifs_fs_type, super_cb, &d);
+	iterate_supers_type(&cifs_fs_type, f, &sd);
 
-	if (unlikely(!d.sb))
-		return ERR_PTR(-ENOENT);
+	if (!sd.sb)
+		return ERR_PTR(-EINVAL);
 	/*
 	 * Grab an active reference in order to prevent automounts (DFS links)
 	 * of expiring and then freeing up our cifs superblock pointer while
 	 * we're doing failover.
 	 */
-	cifs_sb_active(d.sb);
-	return d.sb;
+	cifs_sb_active(sd.sb);
+	return sd.sb;
 }
 
-void cifs_put_tcp_super(struct super_block *sb)
+static void __cifs_put_super(struct super_block *sb)
 {
 	if (!IS_ERR_OR_NULL(sb))
 		cifs_sb_deactive(sb);
 }
 
-int update_super_prepath(struct cifs_tcon *tcon, const char *prefix,
-			 size_t prefix_len)
+struct super_block *cifs_get_tcp_super(struct TCP_Server_Info *server)
+{
+	return __cifs_get_super(tcp_super_cb, server);
+}
+
+void cifs_put_tcp_super(struct super_block *sb)
+{
+	__cifs_put_super(sb);
+}
+
+#ifdef CONFIG_CIFS_DFS_UPCALL
+int match_target_ip(struct TCP_Server_Info *server,
+		    const char *share, size_t share_len,
+		    bool *result)
+{
+	int rc;
+	char *target, *tip = NULL;
+	struct sockaddr tipaddr;
+
+	*result = false;
+
+	target = kzalloc(share_len + 3, GFP_KERNEL);
+	if (!target) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	scnprintf(target, share_len + 3, "\\\\%.*s", (int)share_len, share);
+
+	cifs_dbg(FYI, "%s: target name: %s\n", __func__, target + 2);
+
+	rc = dns_resolve_server_name_to_ip(target, &tip);
+	if (rc < 0)
+		goto out;
+
+	cifs_dbg(FYI, "%s: target ip: %s\n", __func__, tip);
+
+	if (!cifs_convert_address(&tipaddr, tip, strlen(tip))) {
+		cifs_dbg(VFS, "%s: failed to convert target ip address\n",
+			 __func__);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	*result = cifs_match_ipaddr((struct sockaddr *)&server->dstaddr,
+				    &tipaddr);
+	cifs_dbg(FYI, "%s: ip addresses match: %u\n", __func__, *result);
+	rc = 0;
+
+out:
+	kfree(target);
+	kfree(tip);
+
+	return rc;
+}
+
+static void tcon_super_cb(struct super_block *sb, void *arg)
+{
+	struct super_cb_data *sd = arg;
+	struct cifs_tcon *tcon = sd->data;
+	struct cifs_sb_info *cifs_sb;
+
+	if (sd->sb)
+		return;
+
+	cifs_sb = CIFS_SB(sb);
+	if (tcon->dfs_path && cifs_sb->origin_fullpath &&
+	    !strcasecmp(tcon->dfs_path, cifs_sb->origin_fullpath))
+		sd->sb = sb;
+}
+
+static inline struct super_block *cifs_get_tcon_super(struct cifs_tcon *tcon)
+{
+	return __cifs_get_super(tcon_super_cb, tcon);
+}
+
+static inline void cifs_put_tcon_super(struct super_block *sb)
+{
+	__cifs_put_super(sb);
+}
+#else
+static inline struct super_block *cifs_get_tcon_super(struct cifs_tcon *tcon)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+
+static inline void cifs_put_tcon_super(struct super_block *sb)
+{
+}
+#endif
+
+int update_super_prepath(struct cifs_tcon *tcon, char *prefix)
 {
 	struct super_block *sb;
 	struct cifs_sb_info *cifs_sb;
 	int rc = 0;
 
-	sb = cifs_get_tcp_super(tcon->ses->server);
+	sb = cifs_get_tcon_super(tcon);
 	if (IS_ERR(sb))
 		return PTR_ERR(sb);
 
@@ -1085,8 +1180,8 @@ int update_super_prepath(struct cifs_tcon *tcon, const char *prefix,
 
 	kfree(cifs_sb->prepath);
 
-	if (*prefix && prefix_len) {
-		cifs_sb->prepath = kstrndup(prefix, prefix_len, GFP_ATOMIC);
+	if (prefix && *prefix) {
+		cifs_sb->prepath = kstrndup(prefix, strlen(prefix), GFP_ATOMIC);
 		if (!cifs_sb->prepath) {
 			rc = -ENOMEM;
 			goto out;
@@ -1099,6 +1194,6 @@ int update_super_prepath(struct cifs_tcon *tcon, const char *prefix,
 	cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_USE_PREFIX_PATH;
 
 out:
-	cifs_put_tcp_super(sb);
+	cifs_put_tcon_super(sb);
 	return rc;
 }
