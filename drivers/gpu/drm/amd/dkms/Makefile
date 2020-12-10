@@ -162,6 +162,22 @@ export CONFIG_DRM_AMD_DC_DCN2_x=y
 export CONFIG_DRM_AMD_DC_DCN3_x=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_x
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_x
+
+export CONFIG_DRM_AMD_DC_DCN=y
+export CONFIG_DRM_AMD_DC_DCN2_0=y
+export CONFIG_DRM_AMD_DC_DCN2_1=y
+export CONFIG_DRM_AMD_DC_DCN3_0=y
+export CONFIG_DRM_AMD_DC_DCN3_01=y
+export CONFIG_DRM_AMD_DC_DCN3_02=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_0
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_1
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_0
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_01
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_02
 endif
+
+export CONFIG_DRM_AMD_DC_HDCP=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
