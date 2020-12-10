@@ -302,9 +302,6 @@ struct nvme_ctrl {
 	unsigned long discard_page_busy;
 
 	struct nvme_fault_inject fault_inject;
-#if !defined(GENKSYMS)
-	bool created;
-#endif
 };
 
 enum nvme_iopolicy {
@@ -369,6 +366,8 @@ struct nvme_ns_head {
 	spinlock_t		requeue_lock;
 	struct work_struct	requeue_work;
 	struct mutex		lock;
+	unsigned long		flags;
+#define NVME_NSHEAD_DISK_LIVE	0
 	struct nvme_ns __rcu	*current_path[];
 #endif
 };
