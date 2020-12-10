@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: MIT */
 /*
  * Copyright © 2008 Keith Packard
  *
@@ -20,6 +19,7 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
  * OF THIS SOFTWARE.
  */
+
 
 #ifndef _KCL_DRM_DP_HELPER_H_
 #define _KCL_DRM_DP_HELPER_H_
