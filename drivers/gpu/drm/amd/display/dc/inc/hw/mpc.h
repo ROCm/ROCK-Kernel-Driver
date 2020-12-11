@@ -382,6 +382,10 @@ struct mpc_funcs {
 
 #endif
 
+	unsigned int (*get_mpc_out_mux)(
+			struct mpc *mpc,
+			int opp_id);
+
 };
 
 #endif
