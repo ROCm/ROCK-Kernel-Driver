@@ -1412,14 +1412,23 @@ static void print_status_message(
 	case LINK_RATE_LOW:
 		link_rate = "RBR";
 		break;
+	case LINK_RATE_RATE_2:
+		link_rate = "R2";
+		break;
+	case LINK_RATE_RATE_3:
+		link_rate = "R3";
+		break;
 	case LINK_RATE_HIGH:
 		link_rate = "HBR";
 		break;
-	case LINK_RATE_HIGH2:
-		link_rate = "HBR2";
-		break;
 	case LINK_RATE_RBR2:
 		link_rate = "RBR2";
+		break;
+	case LINK_RATE_RATE_6:
+		link_rate = "R6";
+		break;
+	case LINK_RATE_HIGH2:
+		link_rate = "HBR2";
 		break;
 	case LINK_RATE_HIGH3:
 		link_rate = "HBR3";
@@ -1877,7 +1886,7 @@ static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 	return max_link_cap;
 }
 
-static enum dc_status read_hpd_rx_irq_data(
+enum dc_status read_hpd_rx_irq_data(
 	struct dc_link *link,
 	union hpd_irq_data *irq_data)
 {

@@ -107,6 +107,15 @@ static inline struct drm_printer drm_debug_printer(const char *prefix)
 	} while (0)
 #endif
 
+#if !defined(HAVE_DRM_DEV_DBG)
+void drm_dev_dbg(const struct device *dev, int category, const char *format, ...);
+#endif
+
+#if !defined(drm_dbg_kms)
+#define drm_dbg_kms(drm, fmt, ...)				\
+	drm_dev_dbg((drm)->dev, 0x04, fmt, ##__VA_ARGS__)
+#endif
+
 #if !defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif

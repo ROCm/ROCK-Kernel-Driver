@@ -3279,8 +3279,6 @@ void core_link_enable_stream(
 #if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 #endif
 
-		dc->hwss.enable_audio_stream(pipe_ctx);
-
 		/* turn off otg test pattern if enable */
 		if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
@@ -3321,6 +3319,7 @@ void core_link_enable_stream(
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
 		update_psp_stream_config(pipe_ctx, false);
 #endif
+		dc->hwss.enable_audio_stream(pipe_ctx);
 	}
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
@@ -3350,6 +3349,8 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 		if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
 			core_link_set_avmute(pipe_ctx, true);
 	}
+
+	dc->hwss.disable_audio_stream(pipe_ctx);
 
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
 	update_psp_stream_config(pipe_ctx, true);
@@ -3460,11 +3461,14 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 {
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
+	struct fixed31_32 link_bw_kbps;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC) {
-		kbps = (timing->pix_clk_100hz * timing->dsc_cfg.bits_per_pixel);
-		kbps = kbps / 160 + ((kbps % 160) ? 1 : 0);
+		link_bw_kbps = dc_fixpt_from_int(timing->pix_clk_100hz);
+		link_bw_kbps = dc_fixpt_div_int(link_bw_kbps, 160);
+		link_bw_kbps = dc_fixpt_mul_int(link_bw_kbps, timing->dsc_cfg.bits_per_pixel);
+		kbps = dc_fixpt_ceil(link_bw_kbps);
 		return kbps;
 	}
 #endif
@@ -3489,10 +3493,10 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 		bits_per_channel = 16;
 		break;
 	default:
+		ASSERT(bits_per_channel != 0);
+		bits_per_channel = 8;
 		break;
 	}
-
-	ASSERT(bits_per_channel != 0);
 
 	kbps = timing->pix_clk_100hz / 10;
 	kbps *= bits_per_channel;

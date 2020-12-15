@@ -759,6 +759,7 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 			break;
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 		case CHIP_RENOIR:
+		case CHIP_VANGOGH:
 			domain |= AMDGPU_GEM_DOMAIN_GTT;
 			break;
 #endif
@@ -1128,8 +1129,8 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	for (i = 1; i < rfb->base.format->num_planes; ++i) {
 		if (mode_cmd->handles[i] != mode_cmd->handles[0]) {
-			dev_err(&dev->pdev->dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
-				i, mode_cmd->handles[0], mode_cmd->handles[i]);
+			drm_dbg_kms(dev, "Plane 0 and %d have different BOs: %u vs. %u\n",
+				    i, mode_cmd->handles[0], mode_cmd->handles[i]);
 			ret = -EINVAL;
 			goto fail;
 		}
@@ -1144,8 +1145,11 @@ int amdgpu_display_framebuffer_init(struct drm_device *dev,
 	if (dev->mode_config.allow_fb_modifiers &&
 	    !(rfb->base.flags & DRM_MODE_FB_MODIFIERS)) {
 		ret = convert_tiling_flags_to_modifier(rfb);
-		if (ret)
+		if (ret) {
+			drm_dbg_kms(dev, "Failed to convert tiling flags 0x%llX to a modifier",
+				    rfb->tiling_flags);
 			goto fail;
+		}
 	}
 #endif
 
@@ -1174,14 +1178,14 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 
 	obj = drm_gem_object_lookup(file_priv, mode_cmd->handles[0]);
 	if (obj ==  NULL) {
-		dev_err(&dev->pdev->dev, "No GEM object associated to handle 0x%08X, "
-			"can't create framebuffer\n", mode_cmd->handles[0]);
+		drm_dbg_kms(dev, "No GEM object associated to handle 0x%08X, "
+			    "can't create framebuffer\n", mode_cmd->handles[0]);
 		return ERR_PTR(-ENOENT);
 	}
 
 	/* Handle is imported dma-buf, so cannot be migrated to VRAM for scanout */
 	if (obj->import_attach) {
-		DRM_DEBUG_KMS("Cannot create framebuffer from imported dma_buf\n");
+		drm_dbg_kms(dev, "Cannot create framebuffer from imported dma_buf\n");
 		return ERR_PTR(-EINVAL);
 	}
 
