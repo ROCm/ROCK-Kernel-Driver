@@ -38,6 +38,7 @@
 #include <drm/drm_atomic.h>
 
 #include "dc/inc/core_types.h"
+#include <kcl/backport/kcl_dm_tracepoint.h>
 
 DECLARE_EVENT_CLASS(amdgpu_dc_reg_template,
 		    TP_PROTO(unsigned long *count, uint32_t reg, uint32_t value),
@@ -98,6 +99,7 @@ TRACE_EVENT(amdgpu_dc_performance,
 			(unsigned long)__entry->writes)
 );
 
+#ifdef HAVE_DRM_VRR_SUPPORTED
 TRACE_EVENT(amdgpu_dm_connector_atomic_check,
 	    TP_PROTO(const struct drm_connector_state *state),
 	    TP_ARGS(state),
@@ -110,13 +112,19 @@ TRACE_EVENT(amdgpu_dm_connector_atomic_check,
 			     __field(uint32_t, crtc_id)
 			     __field(uint32_t, best_encoder_id)
 			     __field(enum drm_link_status, link_status)
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
 			     __field(bool, self_refresh_aware)
+#endif
 			     __field(enum hdmi_picture_aspect, picture_aspect_ratio)
 			     __field(unsigned int, content_type)
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			     __field(unsigned int, hdcp_content_type)
+#endif
 			     __field(unsigned int, content_protection)
 			     __field(unsigned int, scaling_mode)
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE
 			     __field(u32, colorspace)
+#endif
 			     __field(u8, max_requested_bpc)
 			     __field(u8, max_bpc)
 	    ),
@@ -130,28 +138,52 @@ TRACE_EVENT(amdgpu_dm_connector_atomic_check,
 			   __entry->best_encoder_id = state->best_encoder ?
 						      state->best_encoder->base.id : 0;
 			   __entry->link_status = state->link_status;
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
 			   __entry->self_refresh_aware = state->self_refresh_aware;
+#endif
 			   __entry->picture_aspect_ratio = state->picture_aspect_ratio;
 			   __entry->content_type = state->content_type;
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			   __entry->hdcp_content_type = state->hdcp_content_type;
+#endif
 			   __entry->content_protection = state->content_protection;
 			   __entry->scaling_mode = state->scaling_mode;
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE
 			   __entry->colorspace = state->colorspace;
+#endif
 			   __entry->max_requested_bpc = state->max_requested_bpc;
 			   __entry->max_bpc = state->max_bpc;
 	    ),
 
 	    TP_printk("conn_id=%u conn_state=%p state=%p commit=%p crtc_id=%u "
-		      "best_encoder_id=%u link_status=%d self_refresh_aware=%d "
+		      "best_encoder_id=%u link_status=%d "
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
+		      "self_refresh_aware=%d "
+#endif
 		      "picture_aspect_ratio=%d content_type=%u "
-		      "hdcp_content_type=%u content_protection=%u scaling_mode=%u "
-		      "colorspace=%u max_requested_bpc=%u max_bpc=%u",
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
+		      "hdcp_content_type=%u "
+#endif
+		      "content_protection=%u scaling_mode=%u "
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE
+		      "colorspace=%u "
+#endif
+		      "max_requested_bpc=%u max_bpc=%u",
 		      __entry->conn_id, __entry->conn_state, __entry->state,
 		      __entry->commit, __entry->crtc_id, __entry->best_encoder_id,
-		      __entry->link_status, __entry->self_refresh_aware,
+		      __entry->link_status,
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
+		      __entry->self_refresh_aware,
+#endif
 		      __entry->picture_aspect_ratio, __entry->content_type,
-		      __entry->hdcp_content_type, __entry->content_protection,
-		      __entry->scaling_mode, __entry->colorspace,
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
+		      __entry->hdcp_content_type,
+#endif
+		      __entry->content_protection,
+		      __entry->scaling_mode,
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE
+		      __entry->colorspace,
+#endif
 		      __entry->max_requested_bpc, __entry->max_bpc)
 );
 
@@ -173,9 +205,13 @@ TRACE_EVENT(amdgpu_dm_crtc_atomic_check,
 			     __field(bool, zpos_changed)
 			     __field(bool, color_mgmt_changed)
 			     __field(bool, no_vblank)
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
 			     __field(bool, async_flip)
+#endif
 			     __field(bool, vrr_enabled)
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
 			     __field(bool, self_refresh_active)
+#endif
 			     __field(u32, plane_mask)
 			     __field(u32, connector_mask)
 			     __field(u32, encoder_mask)
@@ -195,9 +231,13 @@ TRACE_EVENT(amdgpu_dm_crtc_atomic_check,
 			   __entry->zpos_changed = state->zpos_changed;
 			   __entry->color_mgmt_changed = state->color_mgmt_changed;
 			   __entry->no_vblank = state->no_vblank;
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
 			   __entry->async_flip = state->async_flip;
+#endif
 			   __entry->vrr_enabled = state->vrr_enabled;
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
 			   __entry->self_refresh_active = state->self_refresh_active;
+#endif
 			   __entry->plane_mask = state->plane_mask;
 			   __entry->connector_mask = state->connector_mask;
 			   __entry->encoder_mask = state->encoder_mask;
@@ -205,16 +245,29 @@ TRACE_EVENT(amdgpu_dm_crtc_atomic_check,
 
 	    TP_printk("crtc_id=%u crtc_state=%p state=%p commit=%p changed("
 		      "planes=%d mode=%d active=%d conn=%d zpos=%d color_mgmt=%d) "
-		      "state(enable=%d active=%d async_flip=%d vrr_enabled=%d "
-		      "self_refresh_active=%d no_vblank=%d) mask(plane=%x conn=%x "
+		      "state(enable=%d active=%d "
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+		      "async_flip=%d "
+#endif
+		      "vrr_enabled=%d "
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
+		      "self_refresh_active=%d "
+#endif
+		      "no_vblank=%d) mask(plane=%x conn=%x "
 		      "enc=%x)",
 		      __entry->crtc_id, __entry->crtc_state, __entry->state,
 		      __entry->commit, __entry->planes_changed,
 		      __entry->mode_changed, __entry->active_changed,
 		      __entry->connectors_changed, __entry->zpos_changed,
 		      __entry->color_mgmt_changed, __entry->enable, __entry->active,
-		      __entry->async_flip, __entry->vrr_enabled,
-		      __entry->self_refresh_active, __entry->no_vblank,
+#ifdef HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP
+		      __entry->async_flip,
+#endif
+		      __entry->vrr_enabled,
+#ifdef HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE
+		      __entry->self_refresh_active,
+#endif
+		      __entry->no_vblank,
 		      __entry->plane_mask, __entry->connector_mask,
 		      __entry->encoder_mask)
 );
@@ -320,7 +373,9 @@ TRACE_EVENT(amdgpu_dm_atomic_state_template,
 			     __field(bool, allow_modeset)
 			     __field(bool, legacy_cursor_update)
 			     __field(bool, async_update)
+#ifdef HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED
 			     __field(bool, duplicated)
+#endif
 			     __field(int, num_connector)
 			     __field(int, num_private_objs)
 	    ),
@@ -330,16 +385,26 @@ TRACE_EVENT(amdgpu_dm_atomic_state_template,
 			   __entry->allow_modeset = state->allow_modeset;
 			   __entry->legacy_cursor_update = state->legacy_cursor_update;
 			   __entry->async_update = state->async_update;
+#ifdef HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED
 			   __entry->duplicated = state->duplicated;
+#endif
 			   __entry->num_connector = state->num_connector;
 			   __entry->num_private_objs = state->num_private_objs;
 	    ),
 
 	    TP_printk("state=%p allow_modeset=%d legacy_cursor_update=%d "
-		      "async_update=%d duplicated=%d num_connector=%d "
+		      "async_update=%d "
+#ifdef HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED
+		      "duplicated=%d "
+#endif
+		      "num_connector=%d "
 		      "num_private_objs=%d",
 		      __entry->state, __entry->allow_modeset, __entry->legacy_cursor_update,
-		      __entry->async_update, __entry->duplicated, __entry->num_connector,
+		      __entry->async_update,
+#ifdef HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED
+		      __entry->duplicated,
+#endif
+		      __entry->num_connector,
 		      __entry->num_private_objs)
 );
 
@@ -377,6 +442,7 @@ TRACE_EVENT(amdgpu_dm_atomic_check_finish,
 		      __entry->state, __entry->res,
 		      __entry->async_update, __entry->allow_modeset)
 );
+#endif
 
 TRACE_EVENT(amdgpu_dm_dc_pipe_state,
 	    TP_PROTO(int pipe_idx, const struct dc_plane_state *plane_state,
