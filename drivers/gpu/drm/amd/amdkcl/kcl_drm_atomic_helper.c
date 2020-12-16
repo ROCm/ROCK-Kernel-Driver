@@ -26,7 +26,7 @@
  * Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 #include <kcl/kcl_drm_atomic_helper.h>
-#include <kcl/kcl_drm.h>
+#include <kcl/kcl_drm_crtc.h>
 #include <kcl/header/kcl_drm_vblank_h.h>
 
 #ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
