@@ -68,4 +68,5 @@ static struct platform_driver ve_spc_cpufreq_platdrv = {
 };
 module_platform_driver(ve_spc_cpufreq_platdrv);
 
+MODULE_ALIAS("platform:vexpress-spc-cpufreq");
 MODULE_LICENSE("GPL");
