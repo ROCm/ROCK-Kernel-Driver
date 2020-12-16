@@ -354,6 +354,7 @@ struct pipe_ctx {
 	struct dwbc *dwbc;
 	struct mcif_wb *mcif_wb;
 #endif
+	bool vtp_locked;
 };
 
 struct resource_context {
