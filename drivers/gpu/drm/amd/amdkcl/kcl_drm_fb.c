@@ -49,14 +49,3 @@ void _kcl_drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper, in
 }
 EXPORT_SYMBOL(_kcl_drm_fb_helper_set_suspend_unlocked);
 #endif
-
-#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
-void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
-				    struct drm_framebuffer *fb,
-				    const struct drm_mode_fb_cmd2 *mode_cmd)
-{
-	fb->dev = dev;
-	drm_helper_mode_fill_fb_struct(fb, mode_cmd);
-}
-EXPORT_SYMBOL(_kcl_drm_helper_mode_fill_fb_struct);
-#endif
