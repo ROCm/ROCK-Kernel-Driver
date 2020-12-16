@@ -85,10 +85,4 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper_surface_size *sizes);
 #endif
 
-#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
-void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
-				    struct drm_framebuffer *fb,
-				    const struct drm_mode_fb_cmd2 *mode_cmd);
-#endif
-
 #endif
