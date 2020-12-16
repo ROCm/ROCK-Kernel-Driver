@@ -40,20 +40,6 @@ static inline const char *_kcl_drm_get_format_name(uint32_t format, struct drm_f
 #define drm_get_format_name _kcl_drm_get_format_name
 #endif
 
-#if !defined(HAVE_DRM_GEM_OBJECT_PUT_LOCKED)
-#if defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
-#define drm_gem_object_put _kcl_drm_gem_object_put
-#endif
-#endif
-
-#ifndef HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS
-static inline struct drm_gem_object *
-_kcl_drm_gem_object_lookup(struct drm_file *filp, u32 handle)
-{
-	return drm_gem_object_lookup(filp->minor->dev, filp, handle);
-}
-#define drm_gem_object_lookup _kcl_drm_gem_object_lookup
-#endif
 
 #if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static inline
