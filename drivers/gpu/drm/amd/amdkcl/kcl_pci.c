@@ -19,6 +19,7 @@
 
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
+#include <linux/acpi.h>
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 const unsigned char *_kcl_pcie_link_speed;
@@ -297,3 +298,23 @@ void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
 #endif
+
+#ifndef HAVE_PCI_PR3_PRESENT
+#ifdef CONFIG_ACPI
+bool _kcl_pci_pr3_present(struct pci_dev *pdev)
+{
+	struct acpi_device *adev;
+
+	if (acpi_disabled)
+		return false;
+
+	adev = ACPI_COMPANION(&pdev->dev);
+	if (!adev)
+		return false;
+
+	return adev->power.flags.power_resources &&
+		acpi_has_method(adev->handle, "_PR3");
+}
+EXPORT_SYMBOL_GPL(_kcl_pci_pr3_present);
+#endif
+#endif /* HAVE_PCI_PR3_PRESENT */
