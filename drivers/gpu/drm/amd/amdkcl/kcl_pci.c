@@ -2,7 +2,6 @@
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
 #include <linux/acpi.h>
-#include "kcl_common.h"
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
 const unsigned char *_kcl_pcie_link_speed;

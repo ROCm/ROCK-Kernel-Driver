@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include <linux/module.h>
 #include <linux/io.h>
-#include "kcl_common.h"
 
 #if !defined(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC) && \
 	defined(CONFIG_X86)

@@ -30,7 +30,6 @@
  *
  */
 #include <kcl/kcl_reservation.h>
-#include "kcl_common.h"
 
 void amdkcl_reservation_init(void)
 {

@@ -17,7 +17,10 @@ amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
 # for trace-points
 CFLAGS_kcl_fence.o := -I$(src)
 
-ccflags-y += -include $(src)/../dkms/config/config.h
+ccflags-y += \
+	-include $(src)/../dkms/config/config.h \
+	-include $(src)/kcl_common.h
+
 ccflags-y += -DHAVE_CONFIG_H
 
 obj-m += amdkcl.o

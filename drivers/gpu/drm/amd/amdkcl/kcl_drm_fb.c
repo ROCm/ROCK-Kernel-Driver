@@ -6,7 +6,6 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fourcc.h>
 #include <kcl/kcl_drm_fb.h>
-#include "kcl_common.h"
 
 #ifndef HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED
 /**

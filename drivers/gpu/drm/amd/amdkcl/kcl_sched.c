@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_sched.h>
-#include "kcl_common.h"
 
 #ifndef HAVE_SCHED_SET_FIFO_LOW
 int (*_kcl_sched_setscheduler_nocheck)(struct task_struct *p, int policy,
