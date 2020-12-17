@@ -32,19 +32,9 @@
 #define for_each_if(condition) if (!(condition)) {} else
 #endif
 
-#ifndef drm_for_each_plane
-#define drm_for_each_plane(plane, dev) \
-	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
-#endif
-
 #ifndef drm_for_each_crtc
 #define drm_for_each_crtc(crtc, dev) \
 	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
-#endif
-
-#ifndef drm_for_each_connector
-#define drm_for_each_connector(connector, dev) \
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
 #endif
 
 #ifndef drm_for_each_encoder
