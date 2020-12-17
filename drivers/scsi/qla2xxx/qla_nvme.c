@@ -555,12 +555,11 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 
 	fcport = qla_rport->fcport;
 
-	if ((qpair && !qpair->fw_started) ||
-	    (fcport && fcport->deleted))
-		return -EBUSY;
-
 	if (!qpair || !fcport)
 		return -ENODEV;
+
+	if (!qpair->fw_started || fcport->deleted)
+		return -EBUSY;
 
 	vha = fcport->vha;
 
