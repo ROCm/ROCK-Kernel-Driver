@@ -542,7 +542,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 	fc_port_t *fcport;
 	struct srb_iocb *nvme;
 	struct scsi_qla_host *vha;
-	int rval = -ENODEV;
+	int rval;
 	srb_t *sp;
 	struct qla_qpair *qpair = hw_queue_handle;
 	struct nvme_private *priv = fd->private;
@@ -550,7 +550,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 
 	if (!priv) {
 		/* nvme association has been torn down */
-		return rval;
+		return -ENODEV;
 	}
 
 	fcport = qla_rport->fcport;
@@ -560,7 +560,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 		return -EBUSY;
 
 	if (!qpair || !fcport)
-		return rval;
+		return -ENODEV;
 
 	vha = fcport->vha;
 
