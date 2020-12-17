@@ -940,3 +940,6 @@
 
 /* drm_dev_dbg() is exported from drm_print.c */
 #define HAVE_DRM_DEV_DBG 1
+
+/* pci_pr3_present() is exported from pci.c */
+#define HAVE_PCI_PR3_PRESENT 1
