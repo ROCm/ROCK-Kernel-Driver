@@ -444,6 +444,7 @@ enum {
 struct ring_buffer_per_cpu {
 	int				cpu;
 	atomic_t			record_disabled;
+	atomic_t			resize_disabled;
 	struct ring_buffer		*buffer;
 	raw_spinlock_t			reader_lock;	/* serialize readers */
 	arch_spinlock_t			lock;
@@ -487,7 +488,6 @@ struct ring_buffer {
 	unsigned			flags;
 	int				cpus;
 	atomic_t			record_disabled;
-	atomic_t			resize_disabled;
 	cpumask_var_t			cpumask;
 
 	struct lock_class_key		*reader_lock_key;
@@ -1739,18 +1739,24 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size,
 
 	size = nr_pages * BUF_PAGE_SIZE;
 
-	/*
-	 * Don't succeed if resizing is disabled, as a reader might be
-	 * manipulating the ring buffer and is expecting a sane state while
-	 * this is true.
-	 */
-	if (atomic_read(&buffer->resize_disabled))
-		return -EBUSY;
-
 	/* prevent another thread from changing buffer sizes */
 	mutex_lock(&buffer->mutex);
 
+
 	if (cpu_id == RING_BUFFER_ALL_CPUS) {
+		/*
+		 * Don't succeed if resizing is disabled, as a reader might be
+		 * manipulating the ring buffer and is expecting a sane state while
+		 * this is true.
+		 */
+		for_each_buffer_cpu(buffer, cpu) {
+			cpu_buffer = buffer->buffers[cpu];
+			if (atomic_read(&cpu_buffer->resize_disabled)) {
+				err = -EBUSY;
+				goto out_err_unlock;
+			}
+		}
+
 		/* calculate the pages to update */
 		for_each_buffer_cpu(buffer, cpu) {
 			cpu_buffer = buffer->buffers[cpu];
@@ -1817,6 +1823,16 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size,
 
 		if (nr_pages == cpu_buffer->nr_pages)
 			goto out;
+
+		/*
+		 * Don't succeed if resizing is disabled, as a reader might be
+		 * manipulating the ring buffer and is expecting a sane state while
+		 * this is true.
+		 */
+		if (atomic_read(&cpu_buffer->resize_disabled)) {
+			err = -EBUSY;
+			goto out_err_unlock;
+		}
 
 		cpu_buffer->nr_pages_to_update = nr_pages -
 						cpu_buffer->nr_pages;
@@ -1887,6 +1903,7 @@ int ring_buffer_resize(struct ring_buffer *buffer, unsigned long size,
 			free_buffer_page(bpage);
 		}
 	}
+ out_err_unlock:
 	mutex_unlock(&buffer->mutex);
 	return err;
 }
@@ -4250,7 +4267,7 @@ ring_buffer_read_prepare(struct ring_buffer *buffer, int cpu, gfp_t flags)
 
 	iter->cpu_buffer = cpu_buffer;
 
-	atomic_inc(&buffer->resize_disabled);
+	atomic_inc(&cpu_buffer->resize_disabled);
 	atomic_inc(&cpu_buffer->record_disabled);
 
 	return iter;
@@ -4325,7 +4342,7 @@ ring_buffer_read_finish(struct ring_buffer_iter *iter)
 	raw_spin_unlock_irqrestore(&cpu_buffer->reader_lock, flags);
 
 	atomic_dec(&cpu_buffer->record_disabled);
-	atomic_dec(&cpu_buffer->buffer->resize_disabled);
+	atomic_dec(&cpu_buffer->resize_disabled);
 	kfree(iter);
 }
 EXPORT_SYMBOL_GPL(ring_buffer_read_finish);
@@ -4439,7 +4456,7 @@ void ring_buffer_reset_cpu(struct ring_buffer *buffer, int cpu)
 	if (!cpumask_test_cpu(cpu, buffer->cpumask))
 		return;
 
-	atomic_inc(&buffer->resize_disabled);
+	atomic_inc(&cpu_buffer->resize_disabled);
 	atomic_inc(&cpu_buffer->record_disabled);
 
 	/* Make sure all commits have finished */
@@ -4460,7 +4477,7 @@ void ring_buffer_reset_cpu(struct ring_buffer *buffer, int cpu)
 	raw_spin_unlock_irqrestore(&cpu_buffer->reader_lock, flags);
 
 	atomic_dec(&cpu_buffer->record_disabled);
-	atomic_dec(&buffer->resize_disabled);
+	atomic_dec(&cpu_buffer->resize_disabled);
 }
 EXPORT_SYMBOL_GPL(ring_buffer_reset_cpu);
 
