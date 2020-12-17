@@ -107,4 +107,16 @@ static inline bool pci_is_thunderbolt_attached(struct pci_dev *pdev)
 }
 #endif /* HAVE_PCI_IS_THUNDERBOLD_ATTACHED */
 
+#ifndef HAVE_PCI_PR3_PRESENT
+#ifdef CONFIG_ACPI
+bool _kcl_pci_pr3_present(struct pci_dev *pdev);
+static inline bool pci_pr3_present(struct pci_dev *pdev)
+{
+	return _kcl_pci_pr3_present(pdev);
+}
+#else
+static inline bool pci_pr3_present(struct pci_dev *pdev) { return false; }
+#endif
+#endif /* HAVE_PCI_PR3_PRESENT */
+
 #endif /* AMDKCL_PCI_H */
