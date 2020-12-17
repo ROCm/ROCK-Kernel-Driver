@@ -99,4 +99,17 @@ static inline u16 pci_dev_id(struct pci_dev *dev)
 	return PCI_DEVID(dev->bus->number, dev->devfn);
 }
 #endif /* HAVE_PCI_DEV_ID */
+
+#ifndef HAVE_PCI_PR3_PRESENT
+#ifdef CONFIG_ACPI
+bool _kcl_pci_pr3_present(struct pci_dev *pdev);
+static inline bool pci_pr3_present(struct pci_dev *pdev)
+{
+	return _kcl_pci_pr3_present(pdev);
+}
+#else
+static inline bool pci_pr3_present(struct pci_dev *pdev) { return false; }
+#endif
+#endif /* HAVE_PCI_PR3_PRESENT */
+
 #endif /* AMDKCL_PCI_H */
