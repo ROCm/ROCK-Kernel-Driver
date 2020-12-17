@@ -47,16 +47,12 @@
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
 
-#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
-extern int drm_crtc_force_disable(struct drm_crtc *crtc);
-extern int drm_crtc_force_disable_all(struct drm_device *dev);
-#endif
-
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
+int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
 int drm_helper_force_disable_all(struct drm_device *dev)
 {
-	return drm_crtc_force_disable_all(dev);
+	return _kcl_drm_helper_force_disable_all(dev);
 }
 #endif
 
