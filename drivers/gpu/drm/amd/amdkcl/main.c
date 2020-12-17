@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: MIT
 #include <linux/kernel.h>
 #include <linux/module.h>
 
