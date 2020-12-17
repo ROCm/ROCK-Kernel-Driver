@@ -74,11 +74,6 @@
 		DRM_MODE_ROTATE_270)
 #endif
 
-#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
-extern int drm_crtc_force_disable(struct drm_crtc *crtc);
-extern int drm_crtc_force_disable_all(struct drm_device *dev);
-#endif
-
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
@@ -115,10 +110,11 @@ drm_crtc_from_index(struct drm_device *dev, int idx)
 #endif
 
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
+int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
 int drm_helper_force_disable_all(struct drm_device *dev)
 {
-	return drm_crtc_force_disable_all(dev);
+	return _kcl_drm_helper_force_disable_all(dev);
 }
 #endif
 
