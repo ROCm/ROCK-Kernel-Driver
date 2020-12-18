@@ -23,7 +23,7 @@ EXPORT_SYMBOL(_kcl_ksys_sync_helper);
 
 static bool _kcl_sys_sync_stub(void)
 {
-	printk_once(KERN_WARNING "kernel symbol [k]sys_sync not found!\n");
+	pr_warn_once("kernel symbol [k]sys_sync not found!\n");
 	return false;
 }
 #endif /* CONFIG_PM_SLEEP */
@@ -43,7 +43,7 @@ void amdkcl_suspend_init(void)
 		return;
 	}
 
-	printk_once(KERN_ERR "Error: fail to get symbol [k]sys_sync!\n");
+	pr_err_once("Error: fail to get symbol [k]sys_sync!\n");
 	BUG();
 #endif /* CONFIG_PM_SLEEP */
 #endif /* HAVE_KSYS_SYNC_HELPER */

@@ -120,7 +120,7 @@ vm_fault_t vmf_insert_pfn_pud_prot(struct vm_fault *vmf, pfn_t pfn,
 
 	return vmf_insert_pfn_pud(&cvma, addr, cvmf.pud, pfn, write);
 #else
-	pr_warn_once("% is not available\n", __func__);
+	pr_warn_once("%s is not available\n", __func__);
 	return (vm_fault_t)0;
 #endif
 }

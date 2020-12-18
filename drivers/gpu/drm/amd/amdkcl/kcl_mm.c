@@ -12,7 +12,7 @@ EXPORT_SYMBOL(_kcl_mm_access);
 
 static struct mm_struct * __kcl_mm_access_stub(struct task_struct *task, unsigned int mode)
 {
-	printk_once(KERN_WARNING "This kernel version not support API: mm_access !\n");
+	pr_warn_once("This kernel version not support API: mm_access !\n");
 	return NULL;
 }
 #endif

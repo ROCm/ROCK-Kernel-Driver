@@ -56,7 +56,7 @@ do {									\
 #define DPM_FLAG_SMART_PREPARE BIT(1)
 static inline void dev_pm_set_driver_flags(struct device *dev, u32 flags)
 {
-	printk_once(KERN_WARNING "%s is not available\n", __func__);
+	pr_warn_once("%s is not available\n", __func__);
 }
 #endif
 
