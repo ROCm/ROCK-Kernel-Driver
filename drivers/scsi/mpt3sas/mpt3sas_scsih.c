@@ -3324,11 +3324,13 @@ _scsih_fw_event_cleanup_queue(struct MPT3SAS_ADAPTER *ioc)
 {
 	struct fw_event_work *fw_event;
 
-	if (list_empty(&ioc->fw_event_list) ||
+	if ((list_empty(&ioc->fw_event_list) && !ioc->current_event) ||
 	     !ioc->firmware_event_thread || in_interrupt())
 		return;
 
-	while ((fw_event = dequeue_next_fw_event(ioc))) {
+	ioc->fw_events_cleanup = 1;
+	while ((fw_event = dequeue_next_fw_event(ioc)) ||
+	     (fw_event = ioc->current_event)) {
 		/*
 		 * Wait on the fw_event to complete. If this returns 1, then
 		 * the event was never executed, and we need a put for the
@@ -3342,6 +3344,7 @@ _scsih_fw_event_cleanup_queue(struct MPT3SAS_ADAPTER *ioc)
 
 		fw_event_work_put(fw_event);
 	}
+	ioc->fw_events_cleanup = 0;
 }
 
 /**
@@ -9422,11 +9425,13 @@ mpt3sas_scsih_reset_done_handler(struct MPT3SAS_ADAPTER *ioc)
 static void
 _mpt3sas_fw_work(struct MPT3SAS_ADAPTER *ioc, struct fw_event_work *fw_event)
 {
+	ioc->current_event = fw_event;
 	_scsih_fw_event_del_from_list(ioc, fw_event);
 
 	/* the queue is being flushed so ignore this event */
 	if (ioc->remove_host || ioc->pci_error_recovery) {
 		fw_event_work_put(fw_event);
+		ioc->current_event = NULL;
 		return;
 	}
 
@@ -9440,10 +9445,10 @@ _mpt3sas_fw_work(struct MPT3SAS_ADAPTER *ioc, struct fw_event_work *fw_event)
 		while (scsi_host_in_recovery(ioc->shost) ||
 					 ioc->shost_recovery) {
 			/*
-			 * If we're unloading, bail. Otherwise, this can become
-			 * an infinite loop.
+			 * If we're unloading or cancelling the work, bail.
+			 * Otherwise, this can become an infinite loop.
 			 */
-			if (ioc->remove_host)
+			if (ioc->remove_host || ioc->fw_events_cleanup)
 				goto out;
 			ssleep(1);
 		}
@@ -9504,11 +9509,13 @@ _mpt3sas_fw_work(struct MPT3SAS_ADAPTER *ioc, struct fw_event_work *fw_event)
 		break;
 	case MPI2_EVENT_PCIE_TOPOLOGY_CHANGE_LIST:
 		_scsih_pcie_topology_change_event(ioc, fw_event);
+		ioc->current_event = NULL;
 			return;
 	break;
 	}
 out:
 	fw_event_work_put(fw_event);
+	ioc->current_event = NULL;
 }
 
 /**
