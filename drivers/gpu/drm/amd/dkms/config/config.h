@@ -269,6 +269,9 @@
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
 
+/* struct drm_dp_mst_topology_cbs->destroy_connector is available */
+/* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
+
 /* struct drm_dp_mst_topology_cbs has hotplug member */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG */
 
