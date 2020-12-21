@@ -228,7 +228,7 @@ static void qla_nvme_abort_work(struct work_struct *work)
 	       "%s called for sp=%p, hndl=%x on fcport=%p deleted=%d\n",
 	       __func__, sp, sp->handle, fcport, fcport->deleted);
 
-	if (!ha->flags.fw_started && fcport->deleted)
+	if (!ha->flags.fw_started || fcport->deleted)
 		goto out;
 
 	if (ha->flags.host_shutting_down) {
@@ -542,7 +542,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 	fc_port_t *fcport;
 	struct srb_iocb *nvme;
 	struct scsi_qla_host *vha;
-	int rval = -ENODEV;
+	int rval;
 	srb_t *sp;
 	struct qla_qpair *qpair = hw_queue_handle;
 	struct nvme_private *priv = fd->private;
@@ -550,25 +550,20 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 
 	if (!priv) {
 		/* nvme association has been torn down */
-		return rval;
+		return -ENODEV;
 	}
 
 	fcport = qla_rport->fcport;
 
-	if ((qpair && !qpair->fw_started) ||
-	    (fcport && fcport->deleted))
+	if (unlikely(!qpair || !fcport || fcport->deleted))
 		return -EBUSY;
 
-	if (!qpair || !fcport)
-		return rval;
+	if (!(fcport->nvme_flag & NVME_FLAG_REGISTERED))
+		return -ENODEV;
 
 	vha = fcport->vha;
 
-	if (!(fcport->nvme_flag & NVME_FLAG_REGISTERED))
-		return rval;
-
-	if (test_bit(ABORT_ISP_ACTIVE, &vha->dpc_flags) ||
-	    (qpair && !qpair->fw_started) || fcport->deleted)
+	if (test_bit(ABORT_ISP_ACTIVE, &vha->dpc_flags))
 		return -EBUSY;
 
 	/*
