@@ -3758,7 +3758,7 @@ struct ib_mr *bnxt_re_reg_user_mr(struct ib_pd *ib_pd, u64 start, u64 length,
 	}
 	mr->qplib_mr.total_size = length;
 
-	pbl_tbl = kcalloc(umem_pgs, sizeof(u64 *), GFP_KERNEL);
+	pbl_tbl = kcalloc(umem_pgs, sizeof(*pbl_tbl), GFP_KERNEL);
 	if (!pbl_tbl) {
 		rc = -ENOMEM;
 		goto free_umem;

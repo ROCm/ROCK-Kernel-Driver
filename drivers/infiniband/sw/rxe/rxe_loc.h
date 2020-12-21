@@ -103,8 +103,8 @@ enum copy_direction {
 	from_mem_obj,
 };
 
-int rxe_mem_init_dma(struct rxe_pd *pd,
-		     int access, struct rxe_mem *mem);
+void rxe_mem_init_dma(struct rxe_pd *pd,
+		      int access, struct rxe_mem *mem);
 
 int rxe_mem_init_user(struct rxe_pd *pd, u64 start,
 		      u64 length, u64 iova, int access, struct ib_udata *udata,
@@ -131,9 +131,6 @@ struct rxe_mem *lookup_mem(struct rxe_pd *pd, int access, u32 key,
 			   enum lookup_type type);
 
 int mem_check_range(struct rxe_mem *mem, u64 iova, size_t length);
-
-int rxe_mem_map_pages(struct rxe_dev *rxe, struct rxe_mem *mem,
-		      u64 *page, int num_pages, u64 iova);
 
 void rxe_mem_cleanup(struct rxe_pool_entry *arg);
 
