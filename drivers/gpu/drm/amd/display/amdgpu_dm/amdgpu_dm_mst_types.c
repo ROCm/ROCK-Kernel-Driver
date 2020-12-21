@@ -115,11 +115,13 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	struct amdgpu_dm_connector *aconnector =
 		to_amdgpu_dm_connector(connector);
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR
 	if (aconnector->dc_sink) {
 		dc_link_remove_remote_sink(aconnector->dc_link,
 					   aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
 	}
+#endif
 
 	kfree(aconnector->edid);
 
@@ -520,6 +522,42 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	return connector;
 }
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR
+static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
+						    struct drm_connector *connector)
+{
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
+	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
+	struct drm_device *dev = master->base.dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+#endif
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+
+	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
+		 aconnector, connector->base.id, aconnector->mst_port);
+
+	if (aconnector->dc_sink) {
+		amdgpu_dm_update_freesync_caps(connector, NULL);
+		dc_link_remove_remote_sink(aconnector->dc_link,
+		aconnector->dc_sink);
+		dc_sink_release(aconnector->dc_sink);
+		aconnector->dc_sink = NULL;
+		mutex_lock(&mgr->lock);
+		if (!mgr->mst_state)
+			aconnector->dc_link->cur_link_settings.lane_count = 0;
+		mutex_unlock(&mgr->lock);
+	}
+#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
+	drm_connector_unregister(connector);
+#ifdef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS
+	if (adev->mode_info.rfbdev)
+		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
+#endif
+	drm_connector_put(connector);
+#endif
+}
+#endif
+
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
 static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
 {
@@ -554,6 +592,9 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR
+	.destroy_connector = dm_dp_destroy_mst_connector,
+#endif
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
 	.hotplug = dm_dp_mst_hotplug,
 #endif
