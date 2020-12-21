@@ -1299,7 +1299,7 @@ bool blk_mq_dispatch_rq_list(struct request_queue *q, struct list_head *list,
 
 		if (unlikely(ret != BLK_STS_OK)) {
 			errors++;
-			blk_mq_end_request(rq, BLK_STS_IOERR);
+			blk_mq_end_request(rq, ret);
 			continue;
 		}
 
