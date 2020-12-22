@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 #include <linux/sched.h>
-#include "kcl_common.h"
 
 #ifndef HAVE_MM_ACCESS
 struct mm_struct* (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);

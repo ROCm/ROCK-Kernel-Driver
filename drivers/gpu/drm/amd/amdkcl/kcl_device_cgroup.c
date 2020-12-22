@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include <linux/module.h>
 #include <kcl/kcl_device_cgroup.h>
-#include "kcl_common.h"
 
 #if defined(CONFIG_CGROUP_DEVICE) && \
 	!defined(HAVE_DEVCGROUP_CHECK_PERMISSION)

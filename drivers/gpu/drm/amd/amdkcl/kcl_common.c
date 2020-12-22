@@ -4,7 +4,6 @@
 #include <linux/kprobes.h>
 #include <linux/printk.h>
 #include <linux/bug.h>
-#include "kcl_common.h"
 
 unsigned long (*_kcl_kallsyms_lookup_name)(const char *name);
 

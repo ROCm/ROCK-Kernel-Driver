@@ -6,7 +6,6 @@
 #include <linux/printk.h>
 #include <linux/version.h>
 #include <kcl/kcl_kthread.h>
-#include "kcl_common.h"
 
 #if !defined(HAVE___KTHREAD_SHOULD_PARK)
 bool __kcl_kthread_should_park(struct task_struct *k)

@@ -32,19 +32,9 @@
 #define for_each_if(condition) if (!(condition)) {} else
 #endif
 
-#ifndef drm_for_each_plane
-#define drm_for_each_plane(plane, dev) \
-	list_for_each_entry(plane, &(dev)->mode_config.plane_list, head)
-#endif
-
 #ifndef drm_for_each_crtc
 #define drm_for_each_crtc(crtc, dev) \
 	list_for_each_entry(crtc, &(dev)->mode_config.crtc_list, head)
-#endif
-
-#ifndef drm_for_each_connector
-#define drm_for_each_connector(connector, dev) \
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
 #endif
 
 #ifndef drm_for_each_encoder
@@ -57,16 +47,12 @@
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
 
-#if !defined(HAVE_DRM_CRTC_FORCE_DISABLE_ALL)
-extern int drm_crtc_force_disable(struct drm_crtc *crtc);
-extern int drm_crtc_force_disable_all(struct drm_device *dev);
-#endif
-
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
+int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
 int drm_helper_force_disable_all(struct drm_device *dev)
 {
-	return drm_crtc_force_disable_all(dev);
+	return _kcl_drm_helper_force_disable_all(dev);
 }
 #endif
 

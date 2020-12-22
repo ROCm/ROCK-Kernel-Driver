@@ -200,9 +200,6 @@
 /* drm_crtc_enable_color_mgmt() is available */
 #define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
 
-/* drm_crtc_force_disable_all() is available */
-/* #undef HAVE_DRM_CRTC_FORCE_DISABLE_ALL */
-
 /* drm_crtc_from_index() is available */
 #define HAVE_DRM_CRTC_FROM_INDEX 1
 
@@ -940,3 +937,15 @@
 
 /* drm_dev_dbg() is exported from drm_print.c */
 #define HAVE_DRM_DEV_DBG 1
+
+/* pci_pr3_present() is exported from pci.c */
+#define HAVE_PCI_PR3_PRESENT 1
+
+/* struct drm_connector_state->colorspace is available */
+#define HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE 1
+
+/* struct drm_crtc_state->self_refresh_active is available */
+#define HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1
+
+/* struct drm_atomic_state->duplicated is available */
+#define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1

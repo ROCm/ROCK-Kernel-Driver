@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: MIT */
 #include <kcl/kcl_perf_event.h>
-#include "kcl_common.h"
 
 #if !defined(HAVE_PERF_EVENT_UPDATE_USERPAGE)
 void (*_kcl_perf_event_update_userpage)(struct perf_event *event);

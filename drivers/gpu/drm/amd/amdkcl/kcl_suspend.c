@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include <linux/bug.h>
 #include <kcl/kcl_suspend.h>
-#include "kcl_common.h"
 
 #ifndef HAVE_KSYS_SYNC_HELPER
 #ifdef CONFIG_PM_SLEEP

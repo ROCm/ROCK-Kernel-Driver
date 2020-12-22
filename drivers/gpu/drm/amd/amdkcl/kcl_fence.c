@@ -21,7 +21,6 @@
 
 #include <linux/slab.h>
 #include <kcl/kcl_fence.h>
-#include "kcl_common.h"
 
 #define CREATE_TRACE_POINTS
 #include "kcl_fence_trace.h"

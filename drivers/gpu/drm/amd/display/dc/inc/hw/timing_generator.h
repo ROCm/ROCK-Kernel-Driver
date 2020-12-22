@@ -281,7 +281,7 @@ struct timing_generator_funcs {
 			struct dc_crtc_timing *hw_crtc_timing);
 
 	void (*set_vtg_params)(struct timing_generator *optc,
-			const struct dc_crtc_timing *dc_crtc_timing);
+			const struct dc_crtc_timing *dc_crtc_timing, bool program_fp2);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	void (*set_dsc_config)(struct timing_generator *optc,

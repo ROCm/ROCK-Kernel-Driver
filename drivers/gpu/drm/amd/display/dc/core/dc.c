@@ -74,6 +74,8 @@
 
 #include "dce/dmub_hw_lock_mgr.h"
 
+#include "dc_trace.h"
+
 #define CTX \
 	dc->ctx
 
@@ -1490,6 +1492,11 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 		dc->hwss.optimize_bandwidth(dc, context);
 	}
 
+	if (dc->ctx->dce_version >= DCE_VERSION_MAX)
+		TRACE_DCN_CLOCK_STATE(&context->bw_ctx.bw.dcn.clk);
+	else
+		TRACE_DCE_CLOCK_STATE(&context->bw_ctx.bw.dce);
+
 	context->stream_mask = get_stream_mask(dc, context);
 
 	if (context->stream_mask != dc->current_state->stream_mask)
@@ -2675,6 +2682,26 @@ static void commit_planes_for_stream(struct dc *dc,
 		}
 	}
 
+	if (update_type != UPDATE_TYPE_FAST) {
+		// If changing VTG FP2: wait until back in vactive to program FP2
+		// Need to ensure that pipe unlock happens soon after to minimize race condition
+		for (i = 0; i < dc->res_pool->pipe_count; i++) {
+			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+			if (pipe_ctx->top_pipe || pipe_ctx->stream != stream)
+				continue;
+
+			if (!pipe_ctx->update_flags.bits.global_sync)
+				continue;
+
+			pipe_ctx->stream_res.tg->funcs->wait_for_state(pipe_ctx->stream_res.tg, CRTC_STATE_VBLANK);
+			pipe_ctx->stream_res.tg->funcs->wait_for_state(pipe_ctx->stream_res.tg, CRTC_STATE_VACTIVE);
+
+			pipe_ctx->stream_res.tg->funcs->set_vtg_params(
+					pipe_ctx->stream_res.tg, &pipe_ctx->stream->timing, true);
+		}
+	}
+
 	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
 		dc->hwss.interdependent_update_lock(dc, context, false);
 	else
@@ -2797,6 +2824,8 @@ void dc_commit_updates_for_stream(struct dc *dc,
 		}
 	}
 
+	TRACE_DC_PIPE_STATE(pipe_ctx, i, MAX_PIPES);
+
 	commit_planes_for_stream(
 				dc,
 				srf_updates,
@@ -2821,8 +2850,14 @@ void dc_commit_updates_for_stream(struct dc *dc,
 		}
 	}
 	/*let's use current_state to update watermark etc*/
-	if (update_type >= UPDATE_TYPE_FULL)
+	if (update_type >= UPDATE_TYPE_FULL) {
 		dc_post_update_surfaces_to_stream(dc);
+
+		if (dc_ctx->dce_version >= DCE_VERSION_MAX)
+			TRACE_DCN_CLOCK_STATE(&context->bw_ctx.bw.dcn.clk);
+		else
+			TRACE_DCE_CLOCK_STATE(&context->bw_ctx.bw.dce);
+	}
 
 	return;
 
