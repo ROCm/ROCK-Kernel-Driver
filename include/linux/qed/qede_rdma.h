@@ -46,6 +46,9 @@ enum qede_rdma_event {
 	QEDE_DOWN,
 	QEDE_CHANGE_ADDR,
 	QEDE_CLOSE
+#ifndef __GENKSYMS__
+	, QEDE_CHANGE_MTU,
+#endif
 };
 
 struct qede_rdma_event_work {
@@ -79,6 +82,7 @@ void qede_rdma_dev_event_open(struct qede_dev *dev);
 void qede_rdma_dev_event_close(struct qede_dev *dev);
 void qede_rdma_dev_remove(struct qede_dev *dev, bool recovery);
 void qede_rdma_event_changeaddr(struct qede_dev *edr);
+void qede_rdma_event_change_mtu(struct qede_dev *edev);
 
 #else
 static inline int qede_rdma_dev_add(struct qede_dev *dev,

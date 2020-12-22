@@ -2494,6 +2494,8 @@ typedef struct fc_port {
 	int generation;
 
 	struct se_session *se_sess;
+	struct list_head sess_cmd_list;
+	spinlock_t sess_cmd_lock;
 	struct kref sess_kref;
 	struct qla_tgt *tgt;
 	unsigned long expires;
@@ -3295,8 +3297,10 @@ struct isp_operations {
 	void (*fw_dump)(struct scsi_qla_host *vha);
 	void (*mpi_fw_dump)(struct scsi_qla_host *, int);
 
+	/* Context: task, might sleep */
 	int (*beacon_on) (struct scsi_qla_host *);
 	int (*beacon_off) (struct scsi_qla_host *);
+
 	void (*beacon_blink) (struct scsi_qla_host *);
 
 	void *(*read_optrom)(struct scsi_qla_host *, void *,
@@ -3307,7 +3311,10 @@ struct isp_operations {
 	int (*get_flash_version) (struct scsi_qla_host *, void *);
 	int (*start_scsi) (srb_t *);
 	int (*start_scsi_mq) (srb_t *);
+
+	/* Context: task, might sleep */
 	int (*abort_isp) (struct scsi_qla_host *);
+
 	int (*iospace_config)(struct qla_hw_data *);
 	int (*initialize_adapter)(struct scsi_qla_host *);
 };
