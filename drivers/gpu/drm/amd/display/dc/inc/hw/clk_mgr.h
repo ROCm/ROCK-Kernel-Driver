@@ -32,7 +32,7 @@
 #define DCN_MINIMUM_DISPCLK_Khz 100000
 #define DCN_MINIMUM_DPPCLK_Khz 100000
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 /* Constants */
 #define DDR4_DRAM_WIDTH   64
 #define WM_A 0
@@ -45,7 +45,7 @@
 #define DCN_MINIMUM_DISPCLK_Khz 100000
 #define DCN_MINIMUM_DPPCLK_Khz 100000
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct dcn3_clk_internal {
 	int dummy;
 	/*TODO:
@@ -63,9 +63,6 @@ struct dcn3_clk_internal {
 	*/
 };
 
-#endif
-
-#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
 struct dcn301_clk_internal {
 	int dummy;
 	uint32_t CLK1_CLK0_CURRENT_CNT; //dispclk
@@ -83,7 +80,7 @@ struct dcn301_clk_internal {
 
 #endif
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 /* Will these bw structures be ASIC specific? */
 
 #define MAX_NUM_DPM_LVL		8
@@ -96,7 +93,7 @@ struct clk_limit_table_entry {
 	unsigned int fclk_mhz;
 	unsigned int memclk_mhz;
 	unsigned int socclk_mhz;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	unsigned int dtbclk_mhz;
 	unsigned int dispclk_mhz;
 	unsigned int dppclk_mhz;
@@ -119,7 +116,7 @@ struct wm_range_table_entry {
 	bool valid;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 struct nv_wm_range_entry {
 	bool valid;
@@ -210,12 +207,12 @@ struct clk_bypass {
  * D occupied, C will be emptry.
  */
 struct wm_table {
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	union {
 		struct nv_wm_range_entry nv_entries[WM_SET_COUNT];
 #endif
 	struct wm_range_table_entry entries[WM_SET_COUNT];
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	};
 #endif
 };
@@ -269,7 +266,7 @@ struct clk_mgr_funcs {
 
 	/* Notify clk_mgr of a change in link rate, update phyclk frequency if necessary */
 	void (*notify_link_rate_change)(struct clk_mgr *clk_mgr, struct dc_link *link);
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	/*
 	 * Send message to PMFW to set hard min memclk frequency
 	 * When current_mode = false, set DPM0
@@ -285,7 +282,7 @@ struct clk_mgr_funcs {
 #endif
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_01
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 struct dpm_clocks;
 struct wartermarks;
 
@@ -301,17 +298,17 @@ struct clk_mgr {
 	struct clk_mgr_funcs *funcs;
 	struct dc_clocks clks;
 	bool psr_allow_active_cache;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool force_smu_not_present;
 #endif
 	int dprefclk_khz; // Used by program pixel clock in clock source funcs, need to figureout where this goes
 	int dentist_vco_freq_khz;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct clk_state_registers_and_bypass boot_snapshot;
 	struct clk_bw_params *bw_params;
 #endif
 	struct pp_smu_wm_range_sets ranges;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_01
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	struct smu_watermark_set smu_wm_set;
 #endif
 };

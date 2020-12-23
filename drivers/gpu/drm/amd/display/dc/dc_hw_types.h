@@ -62,7 +62,7 @@ enum dc_plane_addr_type {
 	PLN_ADDR_TYPE_GRAPHICS = 0,
 	PLN_ADDR_TYPE_GRPH_STEREO,
 	PLN_ADDR_TYPE_VIDEO_PROGRESSIVE,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	PLN_ADDR_TYPE_RGBEA
 #endif
 };
@@ -87,7 +87,7 @@ struct dc_plane_address {
 			PHYSICAL_ADDRESS_LOC right_meta_addr;
 			union large_integer right_dcc_const_color;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			PHYSICAL_ADDRESS_LOC left_alpha_addr;
 			PHYSICAL_ADDRESS_LOC left_alpha_meta_addr;
 			union large_integer left_alpha_dcc_const_color;
@@ -110,7 +110,7 @@ struct dc_plane_address {
 			union large_integer chroma_dcc_const_color;
 		} video_progressive;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		struct {
 			PHYSICAL_ADDRESS_LOC addr;
 			PHYSICAL_ADDRESS_LOC meta_addr;
@@ -156,13 +156,13 @@ struct dc_plane_dcc_param {
 
 	int meta_pitch;
 	bool independent_64b_blks;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint8_t dcc_ind_blk;
 #endif
 
 	int meta_pitch_c;
 	bool independent_64b_blks_c;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint8_t dcc_ind_blk_c;
 #endif
 };
@@ -196,13 +196,13 @@ enum surface_pixel_format {
 	/*swaped & float*/
 	SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F,
 	/*grow graphics here if necessary */
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	SURFACE_PIXEL_FORMAT_GRPH_RGB111110_FIX,
 	SURFACE_PIXEL_FORMAT_GRPH_BGR101111_FIX,
 	SURFACE_PIXEL_FORMAT_GRPH_RGB111110_FLOAT,
 	SURFACE_PIXEL_FORMAT_GRPH_BGR101111_FLOAT,
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	SURFACE_PIXEL_FORMAT_GRPH_RGBE,
 	SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA,
 #endif
@@ -213,7 +213,7 @@ enum surface_pixel_format {
 	SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCbCr,
 	SURFACE_PIXEL_FORMAT_VIDEO_420_10bpc_YCrCb,
 		SURFACE_PIXEL_FORMAT_SUBSAMPLE_END,
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	SURFACE_PIXEL_FORMAT_VIDEO_ACrYCb2101010,
 	SURFACE_PIXEL_FORMAT_VIDEO_CrYCbA1010102,
 #endif
@@ -255,7 +255,7 @@ enum tile_split_values {
 	DC_ROTATED_MICRO_TILING = 0x3,
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum tripleBuffer_enable {
 	DC_TRIPLEBUFFER_DISABLE = 0x0,
 	DC_TRIPLEBUFFER_ENABLE = 0x1,
@@ -463,7 +463,7 @@ struct dc_csc_transform {
 	bool enable_adjustment;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 struct dc_rgb_fixed {
 	struct fixed31_32 red;
 	struct fixed31_32 green;
@@ -504,7 +504,7 @@ enum dc_cursor_color_format {
 	CURSOR_MODE_COLOR_1BIT_AND,
 	CURSOR_MODE_COLOR_PRE_MULTIPLIED_ALPHA,
 	CURSOR_MODE_COLOR_UN_PRE_MULTIPLIED_ALPHA,
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	CURSOR_MODE_COLOR_64BIT_FP_PRE_MULTIPLIED,
 	CURSOR_MODE_COLOR_64BIT_FP_UN_PRE_MULTIPLIED
 #endif
@@ -660,7 +660,7 @@ enum dc_color_depth {
 	COLOR_DEPTH_121212,
 	COLOR_DEPTH_141414,
 	COLOR_DEPTH_161616,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	COLOR_DEPTH_999,
 	COLOR_DEPTH_111111,
 #endif
@@ -835,7 +835,7 @@ enum vram_type {
 	VIDEO_MEMORY_TYPE_GDDR6  = 6,
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum dwb_cnv_out_bpc {
 	DWB_CNV_OUT_BPC_8BPC  = 0,
 	DWB_CNV_OUT_BPC_10BPC = 1,
@@ -875,7 +875,7 @@ enum dwb_stereo_type {
 	DWB_STEREO_TYPE_FRAME_SEQUENTIAL = 3,	/* Frame sequential */
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 enum dwb_out_format {
 	DWB_OUT_FORMAT_32BPP_ARGB = 0,
@@ -920,7 +920,7 @@ struct mcif_buf_params {
 	unsigned int		chroma_pitch;
 	unsigned int		warmup_pitch;
 	unsigned int		swlock;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	unsigned int		p_vmid;
 #endif
 };

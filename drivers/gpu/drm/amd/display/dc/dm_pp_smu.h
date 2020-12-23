@@ -42,7 +42,7 @@ enum pp_smu_ver {
 #ifndef CONFIG_TRIM_DRM_AMD_DC_DCN2_0
 	PP_SMU_VER_NV,
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	PP_SMU_VER_RN,
 #endif
 
@@ -284,7 +284,7 @@ struct pp_smu_funcs_rn {
 	enum pp_smu_status (*get_dpm_clock_table) (struct pp_smu *pp,
 			struct dpm_clocks *clock_table);
 };
-#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct pp_smu_funcs_vgh {
 	struct pp_smu pp_smu;
 
@@ -314,11 +314,11 @@ struct pp_smu_funcs {
 #ifndef CONFIG_TRIM_DRM_AMD_DC_DCN2_0
 		struct pp_smu_funcs_nv nv_funcs;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		struct pp_smu_funcs_rn rn_funcs;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		struct pp_smu_funcs_vgh vgh_funcs;
 #endif
 	};

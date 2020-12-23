@@ -31,7 +31,7 @@ enum dcc_control {
 	dcc_control__256_256_xxx,
 	dcc_control__128_128_xxx,
 	dcc_control__256_64_64,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dcc_control__256_128_128,
 #endif
 };
@@ -55,7 +55,7 @@ struct dcn_hubbub_wm {
 	struct dcn_hubbub_wm_set sets[4];
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum dcn_hubbub_page_table_depth {
 	DCN_PAGE_TABLE_DEPTH_1_LEVEL,
 	DCN_PAGE_TABLE_DEPTH_2_LEVEL,
@@ -66,7 +66,7 @@ enum dcn_hubbub_page_table_depth {
 enum dcn_hubbub_page_table_block_size {
 	DCN_PAGE_TABLE_BLOCK_SIZE_4KB = 0,
 	DCN_PAGE_TABLE_BLOCK_SIZE_64KB = 4,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN_PAGE_TABLE_BLOCK_SIZE_32KB = 3
 #endif
 };
@@ -113,7 +113,7 @@ struct hubbub_funcs {
 			struct hubbub *hubbub,
 			struct dchub_init_data *dh_data);
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int (*init_dchub_sys_ctx)(
 			struct hubbub *hubbub,
 			struct dcn_hubbub_phys_addr_config *pa_config);
@@ -156,7 +156,7 @@ struct hubbub_funcs {
 	void (*apply_DEDCN21_147_wa)(struct hubbub *hubbub);
 
 	void (*force_wm_propagate_to_pipes)(struct hubbub *hubbub);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 	void (*force_pstate_change_control)(struct hubbub *hubbub, bool force, bool allow);
 

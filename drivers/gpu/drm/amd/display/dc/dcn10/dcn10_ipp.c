@@ -53,7 +53,7 @@ static const struct ipp_funcs dcn10_ipp_funcs = {
 	.ipp_destroy			= dcn10_ipp_destroy
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static const struct ipp_funcs dcn20_ipp_funcs = {
 	.ipp_destroy			= dcn10_ipp_destroy
 };
@@ -76,7 +76,7 @@ void dcn10_ipp_construct(
 	ippn10->ipp_mask = ipp_mask;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 void dcn20_ipp_construct(
 	struct dcn10_ipp *ippn10,
 	struct dc_context *ctx,

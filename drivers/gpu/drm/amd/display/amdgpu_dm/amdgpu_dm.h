@@ -368,7 +368,7 @@ struct amdgpu_display_manager {
 	 * gpu_info FW provided soc bounding box struct or 0 if not
 	 * available in FW
 	 */
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
 

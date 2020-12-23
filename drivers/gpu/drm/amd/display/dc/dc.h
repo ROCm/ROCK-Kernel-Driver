@@ -176,7 +176,7 @@ struct dc_caps {
 };
 
 struct dc_bug_wa {
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool no_connect_phy_config;
 	bool dedcn20_305_wa;
 #endif
@@ -195,7 +195,7 @@ struct dc_dcc_setting {
 	unsigned int max_compressed_blk_size;
 	unsigned int max_uncompressed_blk_size;
 	bool independent_64b_blks;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	//These bitfields to be used starting with DCN 3.0
 	struct {
 		uint32_t dcc_256_64_64 : 1;//available in ASICs before DCN 3.0 (the worst compression case)
@@ -296,7 +296,7 @@ struct dc_config {
 	bool multi_mon_pp_mclk_switch;
 	bool disable_dmcu;
 	bool enable_4to1MPC;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool clamp_min_dcfclk;
 #endif
 };
@@ -494,14 +494,14 @@ struct dc_debug_options {
 	uint32_t edid_read_retry_times;
 	bool remove_disconnect_edp;
 	unsigned int force_odm_combine; //bit vector based on otg inst
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	unsigned int force_odm_combine_4to1; //bit vector based on otg inst
 #endif
 	unsigned int force_fclk_khz;
 	bool enable_tri_buf;
 	bool dmub_offload_enabled;
 	bool dmcub_emulation;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool disable_idle_power_optimizations;
 #endif
 	bool dmub_command_table; /* for testing only */
@@ -509,18 +509,18 @@ struct dc_debug_options {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_fec;
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool disable_48mhz_pwrdwn;
 #endif
 	/* This forces a hard min on the DCFCLK requested to SMU/PP
 	 * watermarks are not affected.
 	 */
 	unsigned int force_min_dcfclk_mhz;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int dwb_fi_phase;
 #endif
 	bool disable_timing_sync;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool cm_in_bypass;
 #endif
 	int force_clock_mode;/*every mode change.*/
@@ -541,7 +541,7 @@ struct dc_debug_data {
 	uint32_t auxErrorCount;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 struct dc_phy_addr_space_config {
 	struct {
 		uint64_t start_addr;
@@ -601,7 +601,7 @@ struct dc {
 	struct dc_bounding_box_overrides bb_overrides;
 	struct dc_bug_wa work_arounds;
 	struct dc_context *ctx;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct dc_phy_addr_space_config vm_pa_config;
 #endif
 
@@ -632,7 +632,7 @@ struct dc {
 	/* Require to optimize clocks and bandwidth for added/removed planes */
 	bool optimized_required;
 	bool wm_optimized_required;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool idle_optimizations_allowed;
 #endif
 
@@ -646,7 +646,7 @@ struct dc {
 	struct dpcd_vendor_signature vendor_signature;
 
 	const char *build_id;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct vm_helper *vm_helper;
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
@@ -687,7 +687,7 @@ struct dc_init_data {
 	struct dc_config flags;
 	uint64_t log_mask;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	/**
 	 * gpu_info FW provided soc bounding box struct or 0 if not
 	 * available in FW
@@ -695,7 +695,7 @@ struct dc_init_data {
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
 	struct dpcd_vendor_signature vendor_signature;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool force_smu_not_present;
 #endif
 	bool force_ignore_link_settings;
@@ -713,7 +713,7 @@ struct dc *dc_create(const struct dc_init_data *init_params);
 void dc_hardware_init(struct dc *dc);
 
 int dc_get_vmid_use_vector(struct dc *dc);
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 void dc_setup_vm_context(struct dc *dc, struct dc_virtual_addr_space_config *va_config, int vmid);
 /* Returns the number of vmids supported */
 int dc_setup_system_context(struct dc *dc, struct dc_phy_addr_space_config *pa_config);
@@ -792,7 +792,7 @@ struct dc_transfer_func {
 	};
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 
 union dc_3dlut_state {
 	struct {
@@ -866,7 +866,7 @@ union surface_update_flags {
 struct dc_plane_state {
 	struct dc_plane_address address;
 	struct dc_plane_flip_time time;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool triplebuffer_flips;
 #endif
 	struct scaling_taps scaling_quality;
@@ -892,13 +892,13 @@ struct dc_plane_state {
 
 	enum dc_color_space color_space;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dc_3dlut *lut3d_func;
 	struct dc_transfer_func *in_shaper_func;
 	struct dc_transfer_func *blend_tf;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct dc_transfer_func *gamcor_tf;
 #endif
 	enum surface_pixel_format format;
@@ -967,7 +967,7 @@ struct dc_surface_update {
 
 	const struct dc_csc_transform *input_csc_color_matrix;
 	const struct fixed31_32 *coeff_reduction_factor;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	const struct dc_transfer_func *func_shaper;
 	const struct dc_3dlut *lut3d_func;
 	const struct dc_transfer_func *blend_tf;
@@ -993,7 +993,7 @@ void dc_transfer_func_retain(struct dc_transfer_func *dc_tf);
 void dc_transfer_func_release(struct dc_transfer_func *dc_tf);
 struct dc_transfer_func *dc_create_transfer_func(void);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dc_3dlut *dc_create_3dlut_func(void);
 void dc_3dlut_func_release(struct dc_3dlut *lut);
 void dc_3dlut_func_retain(struct dc_3dlut *lut);
@@ -1062,7 +1062,7 @@ void dc_resource_state_construct(
 		const struct dc *dc,
 		struct dc_state *dst_ctx);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 bool dc_acquire_release_mpc_3dlut(
 		struct dc *dc, bool acquire,
 		struct dc_stream_state *stream,
@@ -1193,7 +1193,7 @@ struct hdcp_caps {
 
 #include "dc_link.h"
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 uint32_t dc_get_opp_for_plane(struct dc *dc, struct dc_plane_state *plane);
 
 #endif
@@ -1314,7 +1314,7 @@ bool dc_is_dmcu_initialized(struct dc *dc);
 
 enum dc_status dc_set_clock(struct dc *dc, enum dc_clock_type clock_type, uint32_t clk_khz, uint32_t stepping);
 void dc_get_clock(struct dc *dc, enum dc_clock_type clock_type, struct dc_clock_config *clock_cfg);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 bool dc_is_plane_eligible_for_idle_optimizations(struct dc *dc,
 						 struct dc_plane_state *plane);

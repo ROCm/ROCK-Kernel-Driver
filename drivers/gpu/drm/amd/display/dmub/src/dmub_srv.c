@@ -27,13 +27,9 @@
 #include "dmub_dcn20.h"
 #include "dmub_dcn21.h"
 #include "dmub_cmd.h"
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #include "dmub_dcn30.h"
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_01
 #include "dmub_dcn301.h"
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_02
 #include "dmub_dcn302.h"
 #endif
 #include "os_types.h"
@@ -142,13 +138,9 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 	switch (asic) {
 	case DMUB_ASIC_DCN20:
 	case DMUB_ASIC_DCN21:
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case DMUB_ASIC_DCN30:
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_01
 	case DMUB_ASIC_DCN301:
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_02
 	case DMUB_ASIC_DCN302:
 #endif
 		dmub->regs = &dmub_srv_dcn20_regs;
@@ -174,23 +166,19 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 
 			funcs->is_phy_init = dmub_dcn21_is_phy_init;
 		}
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (asic == DMUB_ASIC_DCN30) {
 			dmub->regs = &dmub_srv_dcn30_regs;
 
 			funcs->backdoor_load = dmub_dcn30_backdoor_load;
 			funcs->setup_windows = dmub_dcn30_setup_windows;
 		}
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_01
 		if (asic == DMUB_ASIC_DCN301) {
 			dmub->regs = &dmub_srv_dcn301_regs;
 
 			funcs->backdoor_load = dmub_dcn30_backdoor_load;
 			funcs->setup_windows = dmub_dcn30_setup_windows;
 		}
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_02
 		if (asic == DMUB_ASIC_DCN302) {
 			dmub->regs = &dmub_srv_dcn302_regs;
 

@@ -48,7 +48,7 @@
 	DDC_GPIO_REG_LIST(cd,id),\
 	.ddc_setup = REG(DC_I2C_DDC ## id ## _SETUP)
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	#define DDC_REG_LIST_DCN2(cd, id) \
 	DDC_GPIO_REG_LIST(cd, id),\
 	.ddc_setup = REG(DC_I2C_DDC ## id ## _SETUP),\
@@ -90,7 +90,7 @@
 	DDC_GPIO_I2C_REG_LIST(cd),\
 	.ddc_setup = 0
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define DDC_I2C_REG_LIST_DCN2(cd) \
 	DDC_GPIO_I2C_REG_LIST(cd),\
 	.ddc_setup = 0,\
@@ -110,7 +110,7 @@
 		SF_DDC(DC_GPIO_I2CPAD_MASK, DC_GPIO_SDA_PD_DIS, mask_sh),\
 		SF_DDC(DC_GPIO_I2CPAD_MASK, DC_GPIO_SCL_PD_DIS, mask_sh)
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define DDC_MASK_SH_LIST_DCN2(mask_sh, cd) \
 	{DDC_MASK_SH_LIST_COMMON(mask_sh),\
 	0,\
@@ -122,7 +122,7 @@
 struct ddc_registers {
 	struct gpio_registers gpio;
 	uint32_t ddc_setup;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	uint32_t phy_aux_cntl;
 	uint32_t dc_gpio_aux_ctrl_5;
 #endif
@@ -140,7 +140,7 @@ struct ddc_sh_mask {
 	/* i2cpad_mask */
 	uint32_t DC_GPIO_SDA_PD_DIS;
 	uint32_t DC_GPIO_SCL_PD_DIS;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	//phy_aux_cntl
 	uint32_t AUX_PAD_RXSEL;
 	uint32_t DDC_PAD_I2CMODE;
@@ -180,7 +180,7 @@ struct ddc_sh_mask {
 {\
 	DDC_I2C_REG_LIST(SCL)\
 }
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define ddc_data_regs_dcn2(id) \
 {\
 	DDC_REG_LIST_DCN2(DATA, id)\

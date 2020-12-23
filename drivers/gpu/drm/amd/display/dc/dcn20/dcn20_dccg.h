@@ -76,7 +76,7 @@
 	type REFCLK_CLOCK_EN;\
 	type REFCLK_SRC_SEL;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define DCCG3_REG_FIELD_LIST(type) \
 	type PHYASYMCLK_FORCE_EN;\
 	type PHYASYMCLK_FORCE_SRC_SEL;\
@@ -88,14 +88,14 @@
 
 struct dccg_shift {
 	DCCG_REG_FIELD_LIST(uint8_t)
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCCG3_REG_FIELD_LIST(uint8_t)
 #endif
 };
 
 struct dccg_mask {
 	DCCG_REG_FIELD_LIST(uint32_t)
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCCG3_REG_FIELD_LIST(uint32_t)
 #endif
 };
@@ -104,7 +104,7 @@ struct dccg_registers {
 	uint32_t DPPCLK_DTO_CTRL;
 	uint32_t DPPCLK_DTO_PARAM[6];
 	uint32_t REFCLK_CNTL;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t HDMICHARCLK_CLOCK_CNTL[6];
 	uint32_t PHYASYMCLK_CLOCK_CNTL;
 	uint32_t PHYBSYMCLK_CLOCK_CNTL;
