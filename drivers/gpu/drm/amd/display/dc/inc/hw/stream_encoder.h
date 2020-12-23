@@ -65,7 +65,7 @@ struct audio_clock_info {
 	uint32_t cts_48khz;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 enum dynamic_metadata_mode {
 	dmdata_dp,
 	dmdata_hdmi,
@@ -90,7 +90,7 @@ struct encoder_info_frame {
 struct encoder_unblank_param {
 	struct dc_link_settings link_settings;
 	struct dc_crtc_timing timing;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int opp_cnt;
 #endif
 };
@@ -108,7 +108,7 @@ struct stream_encoder {
 	struct dc_bios *bp;
 	enum engine_id id;
 	uint32_t stream_enc_inst;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct vpg *vpg;
 	struct afmt *afmt;
 #endif
@@ -239,7 +239,7 @@ struct stream_encoder_funcs {
 				uint8_t *dsc_packed_pps);
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void (*set_dynamic_metadata)(struct stream_encoder *enc,
 			bool enable,
 			uint32_t hubp_requestor_id,

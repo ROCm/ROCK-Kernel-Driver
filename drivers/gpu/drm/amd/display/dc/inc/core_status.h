@@ -43,7 +43,7 @@ enum dc_status {
 	DC_FAIL_BANDWIDTH_VALIDATE = 13, /* BW and Watermark validation */
 	DC_FAIL_SCALING = 14,
 	DC_FAIL_DP_LINK_TRAINING = 15,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	DC_FAIL_DSC_VALIDATE = 16,
 	DC_NO_DSC_RESOURCE = 17,
 #endif

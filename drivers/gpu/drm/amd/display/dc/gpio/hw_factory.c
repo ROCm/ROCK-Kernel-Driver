@@ -51,13 +51,11 @@
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dcn10/hw_factory_dcn10.h"
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #include "dcn20/hw_factory_dcn20.h"
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #include "dcn21/hw_factory_dcn21.h"
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #include "dcn30/hw_factory_dcn30.h"
 #endif
 
@@ -110,24 +108,18 @@ bool dal_hw_factory_init(
 		return true;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case DCN_VERSION_2_0:
 		dal_hw_factory_dcn20_init(factory);
 		return true;
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 	case DCN_VERSION_2_1:
 		dal_hw_factory_dcn21_init(factory);
 		return true;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case DCN_VERSION_3_0:
-#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
 	case DCN_VERSION_3_01:
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_02)
 	case DCN_VERSION_3_02:
-#endif
 		dal_hw_factory_dcn30_init(factory);
 		return true;
 #endif

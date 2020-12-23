@@ -827,7 +827,7 @@ static enum pp_smu_status pp_nv_get_uclk_dpm_states(struct pp_smu *pp,
 	return PP_SMU_RESULT_FAIL;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 static enum pp_smu_status pp_rn_get_dpm_clock_table(
 		struct pp_smu *pp, struct dpm_clocks *clock_table)
 {
@@ -879,7 +879,7 @@ void dm_pp_get_funcs(
 		funcs->rv_funcs.set_hard_min_fclk_by_freq =
 				pp_rv_set_hard_min_fclk_by_freq;
 		break;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case DCN_VERSION_2_0:
 		funcs->ctx.ver = PP_SMU_VER_NV;
 		funcs->nv_funcs.pp_smu.dm = ctx;
@@ -902,9 +902,6 @@ void dm_pp_get_funcs(
 		funcs->nv_funcs.get_uclk_dpm_states = pp_nv_get_uclk_dpm_states;
 		funcs->nv_funcs.set_pstate_handshake_support = pp_nv_set_pstate_handshake_support;
 		break;
-#endif
-
-#ifdef CONFIG_DRM_AMD_DC_DCN2_1
 	case DCN_VERSION_2_1:
 		funcs->ctx.ver = PP_SMU_VER_RN;
 		funcs->rn_funcs.pp_smu.dm = ctx;

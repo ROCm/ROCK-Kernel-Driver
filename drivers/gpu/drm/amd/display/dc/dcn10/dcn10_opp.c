@@ -373,7 +373,7 @@ void opp1_program_oppbuf(
 	 */
 	REG_UPDATE(OPPBUF_CONTROL, OPPBUF_PIXEL_REPETITION, oppbuf->pixel_repetition);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* Controls the number of padded pixels at the end of a segment */
 	if (REG(OPPBUF_CONTROL1))
 		REG_UPDATE(OPPBUF_CONTROL1, OPPBUF_NUM_SEGMENT_PADDED_PIXELS, oppbuf->num_segment_padded_pixels);
@@ -404,7 +404,7 @@ static const struct opp_funcs dcn10_opp_funcs = {
 		.opp_program_bit_depth_reduction = opp1_program_bit_depth_reduction,
 		.opp_program_stereo = opp1_program_stereo,
 		.opp_pipe_clock_control = opp1_pipe_clock_control,
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		.opp_set_disp_pattern_generator = NULL,
 		.opp_program_dpg_dimensions = NULL,
 		.dpg_is_blanked = NULL,

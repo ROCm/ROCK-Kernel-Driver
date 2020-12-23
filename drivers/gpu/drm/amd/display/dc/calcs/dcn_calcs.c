@@ -54,7 +54,7 @@
  * remain as-is as it provides us with a guarantee from HW that it is correct.
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 /* Defaults from spreadsheet rev#247.
  * RV2 delta: dram_clock_change_latency, max_num_dpp
  */
@@ -385,7 +385,7 @@ static void pipe_ctx_to_e2e_pipe_params (
 		input->src.viewport_width_c    = input->src.viewport_width;
 		input->src.viewport_height_c   = input->src.viewport_height;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA:
 		input->src.source_format = dm_rgbe_alpha;
 		input->src.viewport_width_c    = input->src.viewport_width;

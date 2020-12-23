@@ -46,7 +46,7 @@ enum vrr_packet_type {
 	PACKET_TYPE_VTEM
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 union lut3d_control_flags {
 	unsigned int raw;
 	struct {

@@ -49,7 +49,7 @@ static void dc_plane_construct(struct dc_context *ctx, struct dc_plane_state *pl
 	if (plane_state->in_transfer_func != NULL) {
 		plane_state->in_transfer_func->type = TF_TYPE_BYPASS;
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	plane_state->in_shaper_func = dc_create_transfer_func();
 	if (plane_state->in_shaper_func != NULL) {
 		plane_state->in_shaper_func->type = TF_TYPE_BYPASS;
@@ -75,7 +75,7 @@ static void dc_plane_destruct(struct dc_plane_state *plane_state)
 				plane_state->in_transfer_func);
 		plane_state->in_transfer_func = NULL;
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	if (plane_state->in_shaper_func != NULL) {
 		dc_transfer_func_release(
 				plane_state->in_shaper_func);
@@ -255,7 +255,7 @@ alloc_fail:
 	return NULL;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static void dc_3dlut_func_free(struct kref *kref)
 {
 	struct dc_3dlut *lut = container_of(kref, struct dc_3dlut, refcount);

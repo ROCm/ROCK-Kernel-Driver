@@ -1494,7 +1494,7 @@ void dpp1_cnv_setup (
 		enum surface_pixel_format format,
 		enum expansion_mode mode,
 		struct dc_csc_transform input_csc_color_matrix,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		enum dc_color_space input_color_space,
 		struct cnv_alpha_2bit_lut *alpha_2bit_lut);
 #else

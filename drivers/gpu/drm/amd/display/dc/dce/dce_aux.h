@@ -31,7 +31,7 @@
 
 enum aux_return_code_type;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define AUX_COMMON_REG_LIST0(id)\
 	SRI(AUX_CONTROL, DP_AUX, id), \
 	SRI(AUX_ARB_CONTROL, DP_AUX, id), \

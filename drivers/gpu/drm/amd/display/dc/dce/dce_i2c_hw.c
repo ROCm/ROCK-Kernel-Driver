@@ -292,7 +292,7 @@ static bool setup_engine(
 	struct dce_i2c_hw *dce_i2c_hw)
 {
 	uint32_t i2c_setup_limit = I2C_SETUP_TIME_LIMIT_DCE;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	uint32_t  reset_length = 0;
 #endif
 
@@ -330,7 +330,7 @@ static bool setup_engine(
 		REG_UPDATE_N(SETUP, 2,
 			     FN(DC_I2C_DDC1_SETUP, DC_I2C_DDC1_TIME_LIMIT), i2c_setup_limit,
 			     FN(DC_I2C_DDC1_SETUP, DC_I2C_DDC1_ENABLE), 1);
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	} else {
 		reset_length = dce_i2c_hw->send_reset_length;
 		REG_UPDATE_N(SETUP, 3,
@@ -686,7 +686,7 @@ void dcn1_i2c_hw_construct(
 	dce_i2c_hw->setup_limit = I2C_SETUP_TIME_LIMIT_DCN;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 void dcn2_i2c_hw_construct(
 	struct dce_i2c_hw *dce_i2c_hw,
 	struct dc_context *ctx,

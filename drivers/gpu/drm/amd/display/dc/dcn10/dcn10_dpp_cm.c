@@ -719,7 +719,7 @@ void dpp1_full_bypass(struct dpp *dpp_base)
 	/* COLOR_KEYER_CONTROL.COLOR_KEYER_EN = 0 this should be default */
 	if (dpp->tf_mask->CM_BYPASS_EN)
 		REG_SET(CM_CONTROL, 0, CM_BYPASS_EN, 1);
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	else
 		REG_SET(CM_CONTROL, 0, CM_BYPASS, 1);
 #endif

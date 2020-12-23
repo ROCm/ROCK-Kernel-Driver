@@ -50,7 +50,7 @@ enum dwb_source {
 	dwb_src_otg3,		/* for DCN1.x/DCN2.x */
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 /* DCN1.x, DCN2.x support 2 pipes */
 #else
 /* DCN1.x supports 2 pipes */
@@ -63,7 +63,7 @@ enum dwb_pipe {
 	dwb_pipe_max_num,
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 enum dwb_frame_capture_enable {
 	DWB_FRAME_CAPTURE_DISABLE = 0,
 	DWB_FRAME_CAPTURE_ENABLE = 1,
@@ -78,14 +78,12 @@ enum wbscl_coef_filter_type_sel {
 
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dwb_boundary_mode {
 	DWBSCL_BOUNDARY_MODE_EDGE  = 0,
 	DWBSCL_BOUNDARY_MODE_BLACK = 1
 };
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 enum dwb_output_csc_mode {
 	DWB_OUTPUT_CSC_DISABLE = 0,
 	DWB_OUTPUT_CSC_COEF_A = 1,
@@ -139,7 +137,7 @@ struct dwb_efc_display_settings {
 };
 
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dwb_warmup_params {
 	bool	warmup_en;	/* false: normal mode, true: enable pattern generator */
 	bool	warmup_mode;	/* false: 420, true: 444 */
@@ -211,7 +209,7 @@ struct dwbc_funcs {
 		struct dwbc *dwbc,
 		bool is_new_content);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 
 	void (*set_warmup)(
 		struct dwbc *dwbc,
@@ -219,7 +217,7 @@ struct dwbc_funcs {
 
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 	void (*dwb_program_output_csc)(
 		struct dwbc *dwbc,
