@@ -1314,7 +1314,7 @@ static int threshold_create_bank(unsigned int cpu, unsigned int bank)
 		return -ENODEV;
 
 	if (is_shared_bank(bank)) {
-		nb = node_to_amd_nb(amd_get_nb_id(cpu));
+		nb = node_to_amd_nb(topology_die_id(cpu));
 
 		/* threshold descriptor already initialized on this node? */
 		if (nb && nb->bank4) {
@@ -1425,7 +1425,7 @@ static void threshold_remove_bank(unsigned int cpu, int bank)
 			 * the last CPU on this node using the shared bank is
 			 * going away, remove that bank now.
 			 */
-			nb = node_to_amd_nb(amd_get_nb_id(cpu));
+			nb = node_to_amd_nb(topology_die_id(cpu));
 			nb->bank4 = NULL;
 		}
 	}
