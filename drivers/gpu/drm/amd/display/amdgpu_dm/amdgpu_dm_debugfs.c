@@ -1065,7 +1065,7 @@ static int dp_dsc_fec_support_show(struct seq_file *m, void *data)
  *	echo 0 > /sys/kernel/debug/dri/0/DP-X/trigger_hotplug
  *
  */
-static ssize_t dp_trigger_hotplug(struct file *f, const char __user *buf,
+static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 							size_t size, loff_t *pos)
 {
 	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
@@ -2224,9 +2224,9 @@ static const struct file_operations dp_dsc_slice_bpg_offset_debugfs_fops = {
 };
 #endif
 
-static const struct file_operations dp_trigger_hotplug_debugfs_fops = {
+static const struct file_operations trigger_hotplug_debugfs_fops = {
 	.owner = THIS_MODULE,
-	.write = dp_trigger_hotplug,
+	.write = trigger_hotplug,
 	.llseek = default_llseek
 };
 
@@ -2280,7 +2280,6 @@ static const struct {
 	const struct file_operations *fops;
 } dp_debugfs_entries[] = {
 		{"link_settings", &dp_link_settings_debugfs_fops},
-		{"trigger_hotplug", &dp_trigger_hotplug_debugfs_fops},
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
 		{"test_pattern", &dp_phy_test_pattern_fops},
 #ifdef CONFIG_DRM_AMD_DC_HDCP
@@ -2389,6 +2388,9 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 
 	debugfs_create_file("output_bpc", 0644, dir, connector,
 			    &output_bpc_fops);
+
+	debugfs_create_file("trigger_hotplug", 0644, dir, connector,
+			    &trigger_hotplug_debugfs_fops);
 
 	connector->debugfs_dpcd_address = 0;
 	connector->debugfs_dpcd_size = 0;
