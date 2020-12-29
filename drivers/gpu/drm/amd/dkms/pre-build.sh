@@ -93,5 +93,5 @@ export KERNELVER
 	-I$SRCTREE/include \
 	-I$BLDTREE/include \
 	-I$SRCTREE/include/uapi \
-	-include $SRCTREE/include/linux/kconfig.h" \
+	-include $SRCTREE/include/linux/kconfig.h -D__KERNEL__" \
 	./configure)

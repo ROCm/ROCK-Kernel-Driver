@@ -196,6 +196,8 @@ struct hubp_funcs {
 		struct hubp *hubp,
 		bool enable);
 #endif
+	bool (*hubp_in_blank)(struct hubp *hubp);
+	void (*hubp_soft_reset)(struct hubp *hubp, bool reset);
 
 };
 

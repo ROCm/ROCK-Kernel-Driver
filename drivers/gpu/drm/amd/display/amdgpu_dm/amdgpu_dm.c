@@ -2529,7 +2529,8 @@ void amdgpu_dm_update_connector_after_detect(
 
 			drm_connector_update_edid_property(connector,
 							   aconnector->edid);
-			drm_add_edid_modes(connector, aconnector->edid);
+			aconnector->num_modes = drm_add_edid_modes(connector, aconnector->edid);
+			drm_connector_list_update(connector);
 
 			if (aconnector->dc_link->aux_mode)
 				drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
@@ -2569,6 +2570,7 @@ static void handle_hpd_irq(void *param)
 	enum dc_connection_type new_connection_type = dc_connection_none;
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	struct amdgpu_device *adev = drm_to_adev(dev);
+	struct dm_connector_state *dm_con_state = to_dm_connector_state(connector->state);
 #endif
 
 	/*
@@ -2578,8 +2580,10 @@ static void handle_hpd_irq(void *param)
 	mutex_lock(&aconnector->hpd_lock);
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-	if (adev->dm.hdcp_workqueue)
+	if (adev->dm.hdcp_workqueue) {
 		hdcp_reset_display(adev->dm.hdcp_workqueue, aconnector->dc_link->link_index);
+		dm_con_state->update_hdcp = true;
+	}
 #endif
 	if (aconnector->fake_enable)
 		aconnector->fake_enable = false;
@@ -8056,8 +8060,10 @@ static bool is_content_protection_different(struct drm_connector_state *state,
 					    const struct drm_connector *connector, struct hdcp_workqueue *hdcp_w)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	struct dm_connector_state *dm_con_state = to_dm_connector_state(connector->state);
 
 #ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
+	/* Handle: Type0/1 change */
 	if (old_state->hdcp_content_type != state->hdcp_content_type &&
 	    state->content_protection != DRM_MODE_CONTENT_PROTECTION_UNDESIRED) {
 		state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
@@ -8065,31 +8071,54 @@ static bool is_content_protection_different(struct drm_connector_state *state,
 	}
 #endif
 
-	/* CP is being re enabled, ignore this */
+	/* CP is being re enabled, ignore this
+	 *
+	 * Handles:	ENABLED -> DESIRED
+	 */
 	if (old_state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED &&
 	    state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED) {
 		state->content_protection = DRM_MODE_CONTENT_PROTECTION_ENABLED;
 		return false;
 	}
 
-	/* S3 resume case, since old state will always be 0 (UNDESIRED) and the restored state will be ENABLED */
+	/* S3 resume case, since old state will always be 0 (UNDESIRED) and the restored state will be ENABLED
+	 *
+	 * Handles:	UNDESIRED -> ENABLED
+	 */
 	if (old_state->content_protection == DRM_MODE_CONTENT_PROTECTION_UNDESIRED &&
 	    state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED)
 		state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
 
 	/* Check if something is connected/enabled, otherwise we start hdcp but nothing is connected/enabled
 	 * hot-plug, headless s3, dpms
+	 *
+	 * Handles:	DESIRED -> DESIRED (Special case)
 	 */
-	if (state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED && connector->dpms == DRM_MODE_DPMS_ON &&
-	    aconnector->dc_sink != NULL)
+	if (dm_con_state->update_hdcp && state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED &&
+	    connector->dpms == DRM_MODE_DPMS_ON && aconnector->dc_sink != NULL) {
+		dm_con_state->update_hdcp = false;
 		return true;
+	}
 
+	/*
+	 * Handles:	UNDESIRED -> UNDESIRED
+	 *		DESIRED -> DESIRED
+	 *		ENABLED -> ENABLED
+	 */
 	if (old_state->content_protection == state->content_protection)
 		return false;
 
-	if (state->content_protection == DRM_MODE_CONTENT_PROTECTION_UNDESIRED)
+	/*
+	 * Handles:	UNDESIRED -> DESIRED
+	 *		DESIRED -> UNDESIRED
+	 *		ENABLED -> UNDESIRED
+	 */
+	if (state->content_protection != DRM_MODE_CONTENT_PROTECTION_ENABLED)
 		return true;
 
+	/*
+	 * Handles:	DESIRED -> ENABLED
+	 */
 	return false;
 }
 
@@ -9157,6 +9186,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		    connector->state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED) {
 			hdcp_reset_display(adev->dm.hdcp_workqueue, aconnector->dc_link->link_index);
 			new_con_state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
+			dm_new_con_state->update_hdcp = true;
 			continue;
 		}
 
@@ -10416,7 +10446,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (ret)
 			goto fail;
 
-		if (dm_old_crtc_state->dsc_force_changed && new_crtc_state)
+		if (dm_old_crtc_state->dsc_force_changed)
 			new_crtc_state->mode_changed = true;
 	}
 

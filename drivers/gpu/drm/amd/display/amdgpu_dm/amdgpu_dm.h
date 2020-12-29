@@ -553,6 +553,9 @@ struct dm_connector_state {
 	bool underscan_enable;
 	bool freesync_enable;
 	bool freesync_capable;
+#ifdef CONFIG_DRM_AMD_DC_HDCP
+	bool update_hdcp;
+#endif
 	uint8_t abm_level;
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	int vcpi_slots;

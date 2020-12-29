@@ -1,4 +1,5 @@
-/* Copyright 2018 Advanced Micro Devices, Inc.
+/*
+ * Copyright 2020 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -18,37 +19,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
 
-#ifndef MODULES_POWER_POWER_HELPERS_H_
-#define MODULES_POWER_POWER_HELPERS_H_
+#ifndef __VEGA20_IH_H__
+#define __VEGA20_IH_H__
 
-#include "dc/inc/hw/dmcu.h"
-#include "dc/inc/hw/abm.h"
+extern const struct amd_ip_funcs vega20_ih_ip_funcs;
+extern const struct amdgpu_ip_block_version vega20_ih_ip_block;
 
-struct resource_pool;
-
-
-enum abm_defines {
-	abm_defines_max_level = 4,
-	abm_defines_max_config = 4,
-};
-
-struct dmcu_iram_parameters {
-	unsigned int *backlight_lut_array;
-	unsigned int backlight_lut_array_size;
-	bool backlight_ramping_override;
-	unsigned int backlight_ramping_reduction;
-	unsigned int backlight_ramping_start;
-	unsigned int min_abm_backlight;
-	unsigned int set;
-};
-
-bool dmcu_load_iram(struct dmcu *dmcu,
-		struct dmcu_iram_parameters params);
-bool dmub_init_abm_config(struct resource_pool *res_pool,
-		struct dmcu_iram_parameters params);
-
-#endif /* MODULES_POWER_POWER_HELPERS_H_ */
+#endif
