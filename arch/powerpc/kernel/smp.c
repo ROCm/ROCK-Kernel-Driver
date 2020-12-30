@@ -818,7 +818,7 @@ out:
 	return err;
 }
 
-static int init_big_cores(void)
+static int __init init_big_cores(void)
 {
 	int cpu;
 
