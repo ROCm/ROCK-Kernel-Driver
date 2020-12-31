@@ -90,21 +90,6 @@ static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 	client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 
-	/* Only handle clients we care about */
-	if (client_id != SOC15_IH_CLIENTID_GRBM_CP &&
-	    client_id != SOC15_IH_CLIENTID_SDMA0 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA1 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA2 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA3 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA4 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA5 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA6 &&
-	    client_id != SOC15_IH_CLIENTID_SDMA7 &&
-	    client_id != SOC15_IH_CLIENTID_VMC &&
-	    client_id != SOC15_IH_CLIENTID_VMC1 &&
-	    client_id != SOC15_IH_CLIENTID_UTCL2)
-		return false;
-
 	/* This is a known issue for gfx9. Under non HWS, pasid is not set
 	 * in the interrupt payload, so we need to find out the pasid on our
 	 * own.
@@ -158,39 +143,30 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 	context_id0 = SOC15_CONTEXT_ID0_FROM_IH_ENTRY(ih_ring_entry);
 	context_id1 = SOC15_CONTEXT_ID1_FROM_IH_ENTRY(ih_ring_entry);
 
-	if (client_id == SOC15_IH_CLIENTID_GRBM_CP) {
-		if (source_id == SOC15_INTSRC_CP_END_OF_PIPE)
-			kfd_signal_event_interrupt(pasid, context_id0, 32);
-		else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG) {
-			uint32_t sq_int_data = KFD_CONTEXT_ID_GET_SQ_INT_DATA(
-									context_id0,
-									context_id1);
+	if (source_id == SOC15_INTSRC_CP_END_OF_PIPE)
+		kfd_signal_event_interrupt(pasid, context_id0, 32);
+	else if (source_id == SOC15_INTSRC_SDMA_TRAP)
+		kfd_signal_event_interrupt(pasid, context_id0 & 0xfffffff, 28);
+	else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG) {
+		uint32_t sq_int_data = KFD_CONTEXT_ID_GET_SQ_INT_DATA(
+								context_id0,
+								context_id1);
 
-			if ((context_id0 & KFD_CONTEXT_ID0_ENC_TYPE_WAVE_MASK) &&
-					(sq_int_data &
-						KFD_SQ_INT_DATA_DEBUG_TRAP_MASK)) {
-				if (context_id0 & KFD_CONTEXT_ID0_PRIV_MASK)
-					kfd_set_dbg_ev_from_interrupt(dev, pasid,
-						sq_int_data &
-						KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK,
-						false);
-			} else
-				kfd_signal_event_interrupt(pasid, sq_int_data, 24);
-		} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
-			kfd_signal_hw_exception_event(pasid);
-	} else if (client_id == SOC15_IH_CLIENTID_SDMA0 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA1 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA2 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA3 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA4 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA5 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA6 ||
-		   client_id == SOC15_IH_CLIENTID_SDMA7) {
-		if (source_id == SOC15_INTSRC_SDMA_TRAP)
-			kfd_signal_event_interrupt(pasid, context_id0 & 0xfffffff, 28);
-	} else if (client_id == SOC15_IH_CLIENTID_VMC ||
-		   client_id == SOC15_IH_CLIENTID_VMC1 ||
-		   client_id == SOC15_IH_CLIENTID_UTCL2) {
+		if ((context_id0 & KFD_CONTEXT_ID0_ENC_TYPE_WAVE_MASK) &&
+				(sq_int_data &
+					KFD_SQ_INT_DATA_DEBUG_TRAP_MASK)) {
+			if (context_id0 & KFD_CONTEXT_ID0_PRIV_MASK)
+				kfd_set_dbg_ev_from_interrupt(dev, pasid,
+					sq_int_data &
+					KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK,
+					false);
+		} else
+			kfd_signal_event_interrupt(pasid, sq_int_data, 24);
+	} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
+		kfd_signal_hw_exception_event(pasid);
+	else if (client_id == SOC15_IH_CLIENTID_VMC ||
+		client_id == SOC15_IH_CLIENTID_VMC1 ||
+		 client_id == SOC15_IH_CLIENTID_UTCL2) {
 		struct kfd_vm_fault_info info = {0};
 		uint16_t ring_id = SOC15_RING_ID_FROM_IH_ENTRY(ih_ring_entry);
 
