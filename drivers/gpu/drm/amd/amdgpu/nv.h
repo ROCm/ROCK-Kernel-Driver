@@ -39,5 +39,5 @@ int dimgrey_cavefish_reg_base_init(struct amdgpu_device *adev);
 int beige_goby_reg_base_init(struct amdgpu_device *adev);
 int yellow_carp_reg_base_init(struct amdgpu_device *adev);
 int cyan_skillfish_reg_base_init(struct amdgpu_device *adev);
-
+bool nv_is_headless_sku(struct pci_dev *pdev);
 #endif
