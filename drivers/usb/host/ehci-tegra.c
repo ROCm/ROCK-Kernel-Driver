@@ -489,7 +489,7 @@ static int tegra_ehci_probe(struct platform_device *pdev)
 	irq = platform_get_irq(pdev, 0);
 	if (!irq) {
 		dev_err(&pdev->dev, "Failed to get IRQ\n");
-		err = -ENODEV;
+		err = irq;
 		goto cleanup_phy;
 	}
 

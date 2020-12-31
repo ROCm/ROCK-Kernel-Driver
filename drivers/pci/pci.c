@@ -6001,7 +6001,7 @@ static resource_size_t pci_specified_resource_alignment(struct pci_dev *dev,
 			if (align_order == -1)
 				align = PAGE_SIZE;
 			else
-				align = 1 << align_order;
+				align = 1ULL << align_order;
 			break;
 		} else if (ret < 0) {
 			pr_err("PCI: Can't parse resource_alignment parameter: %s\n",
