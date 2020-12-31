@@ -5203,4 +5203,12 @@ bool amdgpu_device_load_pci_state(struct pci_dev *pdev)
 	return true;
 }
 
+bool amdgpu_device_is_headless(struct amdgpu_device *adev)
+{
+    /* If the pcie subclass is not VGA, it is headless */
+    if ((adev->pdev->class >> 8) != PCI_CLASS_DISPLAY_VGA)
+        return true;
 
+    /* Check if it is NV's VGA class while VCN is harvest, it is headless*/
+    return nv_is_headless_sku(adev->pdev);
+}
