@@ -427,7 +427,7 @@ bool amdgpu_get_bios(struct amdgpu_device *adev)
 		goto success;
 	}
 
-	if (amdgpu_acpi_vfct_bios(adev)) {
+	if (!amdgpu_device_is_headless(adev) && amdgpu_acpi_vfct_bios(adev)) {
 		dev_info(adev->dev, "Fetched VBIOS from VFCT\n");
 		goto success;
 	}
