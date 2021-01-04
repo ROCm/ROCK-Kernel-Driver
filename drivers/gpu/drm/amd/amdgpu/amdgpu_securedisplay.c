@@ -101,7 +101,9 @@ static ssize_t amdgpu_securedisplay_debugfs_write(struct file *f, const char __u
 		return -EINVAL;
 
 	memset(str,  0, sizeof(str));
-	copy_from_user(str, buf, size);
+	ret = copy_from_user(str, buf, size);
+	if (ret)
+		return -EFAULT;
 
 	ret = pm_runtime_get_sync(dev->dev);
 	if (ret < 0) {
