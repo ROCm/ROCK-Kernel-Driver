@@ -555,7 +555,7 @@ int amdgpu_mem_train_support(struct amdgpu_device *adev)
 	uint32_t major, minor, revision, hw_v;
 
 	if (gddr6_mem_train_vbios_support(adev)) {
-		amdgpu_discovery_get_ip_version(adev, MP0_HWID, &major, &minor, &revision);
+		amdgpu_discovery_get_ip_version(adev, MP0_HWID, 0, &major, &minor, &revision);
 		hw_v = HW_REV(major, minor, revision);
 		/*
 		 * treat 0 revision as a special case since register for MP0 and MMHUB is missing
