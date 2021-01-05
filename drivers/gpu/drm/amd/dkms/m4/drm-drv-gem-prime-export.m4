@@ -5,13 +5,12 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DRV_GEM_PRIME_EXPORT], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drm_drv.h>
+			#include <drm/drm_prime.h>
 		],[
-			struct drm_driver *test = NULL;
-			test->gem_prime_export(NULL, 0);
+			drm_gem_prime_export(NULL, 0);
 		],[
 			AC_DEFINE(HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI, 1,
-				[drm_driver->gem_prime_export with p,i arg is available])
+				[drm_gem_prime_export() with p,i arg is available])
 		])
 	])
 ])

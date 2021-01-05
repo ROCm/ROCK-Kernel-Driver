@@ -19,21 +19,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ *
  */
+#ifndef _AMDGPU_SECUREDISPLAY_H
+#define _AMDGPU_SECUREDISPLAY_H
 
-#ifndef __VANGOGH_PPT_H__
-#define __VANGOGH_PPT_H__
+#include "amdgpu.h"
+#include "ta_secureDisplay_if.h"
 
-
-extern void vangogh_set_ppt_funcs(struct smu_context *smu);
-
-/* UMD PState Vangogh Msg Parameters in MHz */
-#define VANGOGH_UMD_PSTATE_GFXCLK       700
-#define VANGOGH_UMD_PSTATE_SOCCLK       600
-#define VANGOGH_UMD_PSTATE_FCLK         800
-
-/* RLC Power Status */
-#define RLC_STATUS_OFF          0
-#define RLC_STATUS_NORMAL       1
+void amdgpu_securedisplay_debugfs_init(struct amdgpu_device *adev);
+void psp_securedisplay_parse_resp_status(struct psp_context *psp,
+		enum ta_securedisplay_status status);
+void psp_prep_securedisplay_cmd_buf(struct psp_context *psp, struct securedisplay_cmd **cmd,
+		enum ta_securedisplay_command command_id);
 
 #endif
