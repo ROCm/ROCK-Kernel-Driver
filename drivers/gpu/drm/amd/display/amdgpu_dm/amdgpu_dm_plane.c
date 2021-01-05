@@ -797,10 +797,10 @@ static int amdgpu_dm_plane_get_plane_formats(const struct drm_plane *plane,
 
 		if (plane_cap && plane_cap->pixel_format_support.nv12)
 			formats[num_formats++] = DRM_FORMAT_NV12;
-#ifdef DRM_FORMAT_P010
+
 		if (plane_cap && plane_cap->pixel_format_support.p010)
 			formats[num_formats++] = DRM_FORMAT_P010;
-#endif
+
 		if (plane_cap && plane_cap->pixel_format_support.fp16) {
 			formats[num_formats++] = DRM_FORMAT_XRGB16161616F;
 			formats[num_formats++] = DRM_FORMAT_ARGB16161616F;
@@ -1064,7 +1064,11 @@ static void amdgpu_dm_plane_get_min_max_dc_plane_scaling(struct drm_device *dev,
 	/* Caps for all supported planes are the same on DCE and DCN 1 - 3 */
 	struct dc_plane_cap *plane_cap = &dc->caps.planes[0];
 
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
+	switch (fb->pixel_format) {
+#else
 	switch (fb->format->format) {
+#endif
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
