@@ -64,16 +64,6 @@ static int amdgpu_ucode_id_vcns[] = {
 	AMDGPU_UCODE_ID_VCN1
 };
 
-#define VCN_BLOCK_ENCODE_DISABLE_MASK 0x80
-#define VCN_BLOCK_DECODE_DISABLE_MASK 0x40
-#define VCN_BLOCK_QUEUE_DISABLE_MASK 0xC0
-
-enum vcn_ring_type {
-	VCN_ENCODE_RING,
-	VCN_DECODE_RING,
-	VCN_UNIFIED_RING,
-};
-
 static bool vcn_v3_0_is_disabled_vcn(struct amdgpu_device *adev, enum vcn_ring_type type, uint32_t vcn_instance);
 static int vcn_v3_0_start_sriov(struct amdgpu_device *adev);
 static void vcn_v3_0_set_dec_ring_funcs(struct amdgpu_device *adev);
@@ -326,7 +316,7 @@ static int vcn_v3_0_hw_init(void *handle)
 				continue;
 
 			ring = &adev->vcn.inst[i].ring_dec;
-			if (vcn_v3_0_is_disabled_vcn(adev, VCN_DECODE_RING, i)) {
+			if (amdgpu_vcn_is_disabled_vcn(adev, VCN_DECODE_RING, i)) {
 				ring->sched.ready = false;
 				dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
 			} else {
@@ -338,7 +328,7 @@ static int vcn_v3_0_hw_init(void *handle)
 
 			for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
 				ring = &adev->vcn.inst[i].ring_enc[j];
-				if (vcn_v3_0_is_disabled_vcn(adev, VCN_ENCODE_RING, i)) {
+				if (amdgpu_vcn_is_disabled_vcn(adev, VCN_ENCODE_RING, i)) {
 					ring->sched.ready = false;
 					dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
 				} else {
@@ -1294,29 +1284,6 @@ static int vcn_v3_0_start(struct amdgpu_device *adev)
 	}
 
 	return 0;
-}
-
-static bool vcn_v3_0_is_disabled_vcn(struct amdgpu_device *adev, enum vcn_ring_type type, uint32_t vcn_instance)
-{
-	bool ret = false;
-
-	int major;
-	int minor;
-	int revision;
-
-	/* if cannot find IP data, then this VCN does not exist */
-	if (amdgpu_discovery_get_ip_version(adev, VCN_HWID, vcn_instance, &major, &minor, &revision) != 0)
-		return true;
-
-	if ((type == VCN_ENCODE_RING) && (revision & VCN_BLOCK_ENCODE_DISABLE_MASK)) {
-		ret = true;
-	} else if ((type == VCN_DECODE_RING) && (revision & VCN_BLOCK_DECODE_DISABLE_MASK)) {
-		ret = true;
-	} else if ((type == VCN_UNIFIED_RING) && (revision & VCN_BLOCK_QUEUE_DISABLE_MASK)) {
-		ret = true;
-	}
-
-	return ret;
 }
 
 static int vcn_v3_0_start_sriov(struct amdgpu_device *adev)
