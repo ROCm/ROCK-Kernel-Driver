@@ -6078,7 +6078,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	else
 		dm->active_vblank_irq_count--;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_allow_idle_optimizations(
 		adev->dm.dc, dm->active_vblank_irq_count == 0 ? true : false);
 
