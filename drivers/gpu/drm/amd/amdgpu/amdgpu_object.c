@@ -79,7 +79,7 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 
 	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
-		kfree(tbo->mem.bus.addr);
+		kfree(bo->addr);
 	if (bo->pin_count > 0)
 		amdgpu_bo_subtract_pin_size(bo);
 
