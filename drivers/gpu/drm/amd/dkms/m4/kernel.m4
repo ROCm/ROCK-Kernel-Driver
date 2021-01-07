@@ -367,7 +367,6 @@ dnl #
 dnl # AC_KERNEL_LANG_PROGRAM([PROLOGUE], [BODY])
 dnl #
 AC_DEFUN([AC_KERNEL_LANG_PROGRAM], [
-#include <linux/module.h>
 $1
 int
 main (void)
@@ -378,7 +377,6 @@ $2
   ;
   return 0;
 }
-MODULE_LICENSE("GPL v2");
 ])
 
 dnl #
