@@ -3,6 +3,7 @@ dnl # Default kernel configuration
 dnl #
 AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_KERNEL
+	AC_KERNEL_SINGLE_TARGET
 
 	AC_KERNEL_WAIT
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
@@ -200,6 +201,10 @@ AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
 	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
 	m4_ifvaln([$6], [AC_KERNEL_CONFTEST_H([$6])], [AC_KERNEL_CONFTEST_H([])])
 	touch conftest.mod.c
+	if test "x$SINGLE_TARGET_BUILD_NO_TMP_VERSIONS" = x1; then
+		test -d $SINGLE_TARGET_BUILD_MODVERDIR || mkdir $SINGLE_TARGET_BUILD_MODVERDIR
+		rm -f $SINGLE_TARGET_BUILD_MODVERDIR/*
+	fi
 	echo "obj-m := conftest.o" >Makefile
 	kbuild_src_flag=''
 	kbuild_modpost_flag='KBUILD_MODPOST_NOFINAL=1 KBUILD_MODPOST_WARN=1'
@@ -236,8 +241,7 @@ dnl # $3: run it if compile pass.
 dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
-	target=''
-	test "x$enable_linux_builtin" = xyes && target='conftest.o'
+	target='conftest.o'
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
 	[$target],
