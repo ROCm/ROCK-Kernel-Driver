@@ -46,7 +46,7 @@ void *__devm_drm_dev_alloc(struct device *parent, struct drm_driver *driver,
 	ret = drm_dev_init(drm, driver, parent);
 	if (ret) {
 		drm_dev_put(drm);
-		return ret;
+		return ERR_PTR(ret);
 	}
 #ifdef HAVE_DRM_DRM_MANAGED_H
 	drmm_add_final_kfree(drm, container);
