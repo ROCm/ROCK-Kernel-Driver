@@ -373,7 +373,7 @@ struct amdgpu_display_manager {
 #endif
 
 	/**
-	 * @active_vblank_irq_count
+	 * @active_vblank_irq_count:
 	 *
 	 * number of currently active vblank irqs
 	 */
