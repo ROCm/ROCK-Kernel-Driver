@@ -722,9 +722,6 @@ static bool dc_construct(struct dc *dc,
 	}
 
 	dc->dcn_ip = dcn_ip;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	dc->soc_bounding_box = init_params->soc_bounding_box;
-#endif
 #endif
 
 	if (!dc_construct_ctx(dc, init_params)) {

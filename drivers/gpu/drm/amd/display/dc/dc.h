@@ -653,7 +653,6 @@ struct dc {
 	const char *build_id;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct vm_helper *vm_helper;
-	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
 };
 
@@ -692,13 +691,6 @@ struct dc_init_data {
 	struct dc_config flags;
 	uint64_t log_mask;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	/**
-	 * gpu_info FW provided soc bounding box struct or 0 if not
-	 * available in FW
-	 */
-	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
-#endif
 	struct dpcd_vendor_signature vendor_signature;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool force_smu_not_present;
