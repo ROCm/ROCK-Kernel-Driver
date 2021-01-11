@@ -1,5 +1,5 @@
 dnl #
-dnl # extract cc, cppflags
+dnl # extract cc, cflags, cppflags
 dnl #
 AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 	AS_IF([test -s .conftest.o.cmd], [
@@ -8,20 +8,25 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 		_conftest_cmd=$(head -1 .conftest.o.cmd)
 
 		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[3]}')
-		CPPFLAGS=$(echo $_conftest_cmd | \
-			   sed -e 's| -|\n&|g' | \
-			   sed -n -e "s|\./|${LINUX_OBJ}/|" \
-				  -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|" \
-				  -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|" \
-				  -e '/conftest/d' \
-				  -e '/KBUILD_/d' \
-				  -e "/$_base_dir/d" \
-				  -e '/-I/p; /-include/p; /-D/p' | \
-			  xargs)
+		CFLAGS=$(echo $_conftest_cmd | \
+			 sed -e 's| -|\n&|g' | \
+			 sed -e "s|\./|${LINUX_OBJ}/|" \
+			     -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|" \
+			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|" \
+			     -e '/conftest/d' \
+			     -e '/KBUILD_/d' \
+			     -e "/$_base_dir/d" | \
+			 xargs)
+		CPPFLAGS=$(echo $CFLAGS | \
+			   sed 's| -|\n&|g' | \
+			   sed -n '/-I/p; /-include/p; /-D/p' | \
+			   xargs)
 
+		CFLAGS="$CFLAGS $_base_cflags"
 		CPPFLAGS="$CPPFLAGS $_base_cflags"
 
 		AC_SUBST(CC)
+		AC_SUBST(CFLAGS)
 		AC_SUBST(CPPFLAGS)
 	], [
 		AC_MSG_ERROR([cannot detect CFLAGS...])
@@ -34,7 +39,7 @@ dnl # kbuild: fix single target build for external module
 dnl #
 AC_DEFUN([AC_KERNEL_SINGLE_TARGET], [
 	AC_KERNEL_TMP_BUILD_DIR([
-		AC_KERNEL_TRY_COMPILE([], [], [], [
+		AC_KERNEL_TRY_COMPILE_MODULE([], [], [], [
 			SINGLE_TARGET_BUILD_MODVERDIR=.tmp_versions
 			AS_IF([test ! -d $SINGLE_TARGET_BUILD_MODVERDIR], [
 				SINGLE_TARGET_BUILD_NO_TMP_VERSIONS=1
