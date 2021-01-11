@@ -39,7 +39,7 @@ dnl # kbuild: fix single target build for external module
 dnl #
 AC_DEFUN([AC_KERNEL_SINGLE_TARGET], [
 	AC_KERNEL_TMP_BUILD_DIR([
-		AC_KERNEL_TRY_COMPILE([], [], [], [
+		AC_KERNEL_TRY_COMPILE_MODULE([], [], [], [
 			SINGLE_TARGET_BUILD_MODVERDIR=.tmp_versions
 			AS_IF([test ! -d $SINGLE_TARGET_BUILD_MODVERDIR], [
 				SINGLE_TARGET_BUILD_NO_TMP_VERSIONS=1
