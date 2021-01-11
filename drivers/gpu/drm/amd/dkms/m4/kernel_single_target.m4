@@ -1,4 +1,34 @@
 dnl #
+dnl # extract cc, cppflags
+dnl #
+AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
+	AS_IF([test -s .conftest.o.cmd], [
+		_base_cflags="-DKBUILD_BASENAME='\"conftest\"' -DKBUILD_MODNAME='\"conftest\"'"
+		_base_dir=$(basename $PWD)
+		_conftest_cmd=$(head -1 .conftest.o.cmd)
+
+		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[3]}')
+		CPPFLAGS=$(echo $_conftest_cmd | \
+			   sed -e 's| -|\n&|g' | \
+			   sed -n -e "s|\./|${LINUX_OBJ}/|" \
+				  -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|" \
+				  -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|" \
+				  -e '/conftest/d' \
+				  -e '/KBUILD_/d' \
+				  -e "/$_base_dir/d" \
+				  -e '/-I/p; /-include/p; /-D/p' | \
+			  xargs)
+
+		CPPFLAGS="$CPPFLAGS $_base_cflags"
+
+		AC_SUBST(CC)
+		AC_SUBST(CPPFLAGS)
+	], [
+		AC_MSG_ERROR([cannot detect CFLAGS...])
+	])
+])
+
+dnl #
 dnl # v4.20-rc2-10-ge07db28eea38
 dnl # kbuild: fix single target build for external module
 dnl #
@@ -12,5 +42,6 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET], [
 				AC_MSG_WARN([compile single target fail expectedly])
 			])
 		])
+		AC_KERNEL_SINGLE_TARGET_CFLAGS
 	])
 ])
