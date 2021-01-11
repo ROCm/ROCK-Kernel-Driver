@@ -1301,7 +1301,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
 		pdd->drm_priv, (struct kgd_mem **) &mem, &offset,
-		flags);
+		flags, false);
 
 	if (err)
 		goto err_unlock;
@@ -1959,6 +1959,14 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 				bo_bucket[i].gpu_id = pdd->dev->id;
 				bo_bucket[i].bo_alloc_flags = (uint32_t)kgd_mem->alloc_flags;
 				bo_bucket[i].idr_handle = id;
+				if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+					ret = amdgpu_ttm_tt_get_userptr(&dumper_bo->tbo,
+									&bo_bucket[i].user_addr);
+					if (ret) {
+						pr_err("Failed to obtain user address for user-pointer bo\n");
+						goto err_unlock;
+					}
+				}
 
 				if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL)
 					bo_bucket[i].bo_offset = KFD_MMAP_TYPE_DOORBELL |
@@ -2004,6 +2012,7 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 	struct kfd_criu_devinfo_bucket *devinfos = NULL;
 	uint64_t *restored_bo_offsets_arr = NULL;
 	struct kfd_criu_bo_buckets *bo_bucket = NULL;
+	const bool criu_resume = true;
 	long err = 0;
 	int ret, i, j = 0;
 
@@ -2051,6 +2060,9 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 		err = -ENOMEM;
 		goto err_unlock;
 	}
+
+	/* Prevent MMU notifications until stage-4 IOCTL is received */
+	amdgpu_amdkfd_block_mmu_notifications(p->kgd_process_info);
 
 	/* Create and map new BOs */
 	for (i = 0; i < args->num_of_bos; i++) {
@@ -2108,7 +2120,11 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 				err = -ENOMEM;
 				goto err_unlock;
 			}
+		} else if (bo_bucket[i].bo_alloc_flags &
+			   KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
+			offset = bo_bucket[i].user_addr;
 		}
+
 
 		/* Create the BO */
 		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->kgd,
@@ -2117,7 +2133,8 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 						pdd->drm_priv,
 						(struct kgd_mem **) &mem,
 						&offset,
-						bo_bucket[i].bo_alloc_flags);
+						bo_bucket[i].bo_alloc_flags,
+						criu_resume);
 		if (ret) {
 			pr_err("Could not create the BO\n");
 			err = -ENOMEM;
@@ -2230,6 +2247,40 @@ failed:
 	return err;
 }
 
+static int kfd_ioctl_criu_resume(struct file *filep,
+				struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_criu_resume_args *args = data;
+	struct kfd_process *target = NULL;
+	struct pid *pid = NULL;
+	int ret = 0;
+
+	pr_debug("Inside %s, target pid for criu restore: %d\n", __func__,
+		 args->pid);
+
+	pid = find_get_pid(args->pid);
+	if (!pid) {
+		pr_err("Cannot find pid info for %i\n", args->pid);
+		return -ESRCH;
+	}
+
+	pr_debug("calling kfd_lookup_process_by_pid\n");
+	target = kfd_lookup_process_by_pid(pid);
+	if (!target) {
+		pr_debug("Cannot find process info for %i\n", args->pid);
+		put_pid(pid);
+		return -ESRCH;
+	}
+
+	mutex_lock(&target->mutex);
+	ret =  amdgpu_amdkfd_criu_resume(target->kgd_process_info);
+	mutex_unlock(&target->mutex);
+
+	put_pid(pid);
+	kfd_unref_process(target);
+	return ret;
+}
+
 static int kfd_ioctl_criu_helper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
@@ -2274,14 +2325,6 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return ret;
-}
-
-static int kfd_ioctl_criu_resume(struct file *filep,
-				struct kfd_process *p, void *data)
-{
-	pr_info("Inside %s\n",__func__);
-
-	return 0;
 }
 
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
