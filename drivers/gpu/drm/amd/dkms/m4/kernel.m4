@@ -189,7 +189,7 @@ $2
 ])
 
 dnl #
-dnl # AC_KERNEL_COMPILE_IFELSE / like AC_COMPILE_IFELSE
+dnl # AC_KERNEL_COMPILE_MODULE_IFELSE / like AC_COMPILE_IFELSE
 dnl # $1: contents to be filled in conftest.c
 dnl # $2: make target.
 dnl # $3: user defined commands. It "AND" the make command to check the result. If true, expands to $4. Otherwise $5.
@@ -197,7 +197,7 @@ dnl # $4: run it if make & $3 pass.
 dnl # $5: run it if make & $3 fail.
 dnl # $6: contents to be filled in conftest.h. Could be null.
 dnl #
-AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
+AC_DEFUN([AC_KERNEL_COMPILE_MODULE_IFELSE], [
 	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
 	m4_ifvaln([$6], [AC_KERNEL_CONFTEST_H([$6])], [AC_KERNEL_CONFTEST_H([])])
 	touch conftest.mod.c
@@ -234,6 +234,39 @@ AC_DEFUN([AC_KERNEL_TMP_BUILD_DIR], [
 ])
 
 dnl #
+dnl # AC_KERNEL_TRY_COMPILE_MODULE like AC_TRY_COMPILE
+dnl # $1: Prologue for conftest.c. including header files, extends, etc
+dnl # $2: Body for conftest.c.
+dnl # $3: run it if compile pass.
+dnl # $4: run it if compile fail.
+dnl #
+AC_DEFUN([AC_KERNEL_TRY_COMPILE_MODULE],
+	target='conftest.o'
+	[AC_KERNEL_COMPILE_MODULE_IFELSE(
+	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
+	[$target],
+	[test -s conftest.o],
+	[$3], [$4])
+])
+
+dnl #
+dnl # AC_KERNEL_COMPILE_IFELSE / like AC_COMPILE_IFELSE
+dnl # $1: contents to be filled in conftest.c
+dnl # $2: user defined commands. It "AND" the make command to check the result. If true, expands to $4. Otherwise $5.
+dnl # $3: run it if make & $3 pass.
+dnl # $4: run it if make & $3 fail.
+dnl # $5: contents to be filled in conftest.h. Could be null.
+dnl #
+AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
+	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
+	m4_ifvaln([$5], [AC_KERNEL_CONFTEST_H([$5])], [AC_KERNEL_CONFTEST_H([])])
+	AS_IF(
+		[AC_TRY_COMMAND($CC $CFLAGS -o conftest.o conftest.c) >/dev/null && AC_TRY_COMMAND([$2])],
+		[$3],
+		[_AC_MSG_LOG_CONFTEST m4_ifvaln([$4],[$4])]
+	)
+])
+dnl #
 dnl # AC_KERNEL_TRY_COMPILE like AC_TRY_COMPILE
 dnl # $1: Prologue for conftest.c. including header files, extends, etc
 dnl # $2: Body for conftest.c.
@@ -241,10 +274,8 @@ dnl # $3: run it if compile pass.
 dnl # $4: run it if compile fail.
 dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
-	target='conftest.o'
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
-	[$target],
 	[test -s conftest.o],
 	[$3], [$4])
 ])
