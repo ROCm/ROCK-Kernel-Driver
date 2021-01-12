@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_MM_TYPES_H
 #define AMDKCL_MM_TYPES_H
 
@@ -6,6 +6,7 @@
 #ifdef HAVE_PFN_T
 #include <linux/pfn_t.h>
 #else
+/* Copied from include/linux/pfn_t.h */
 typedef struct {
 	u64 val;
 } pfn_t;

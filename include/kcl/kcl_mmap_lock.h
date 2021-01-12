@@ -1,10 +1,10 @@
-/* SPDX-License-Identifier: MIT */
 #ifndef KCL_KCL_MMAP_LOCK_H
 #define KCL_KCL_MMAP_LOCK_H
 
 #ifdef HAVE_LINUX_MMAP_LOCK_H
 #include <linux/mmap_lock.h>
 #else
+/* Copied from include/linux/mmap_lock.h */
 static inline void mmap_init_lock(struct mm_struct *mm)
 {
 	init_rwsem(&mm->mmap_sem);

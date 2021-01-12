@@ -1,4 +1,10 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Backlight Lowlevel Control Abstraction
+ *
+ * Copyright (C) 2003,2004 Hewlett-Packard Company
+ *
+ */
 #ifndef AMDKCL_BACKLIGHT_H
 #define AMDKCL_BACKLIGHT_H
 

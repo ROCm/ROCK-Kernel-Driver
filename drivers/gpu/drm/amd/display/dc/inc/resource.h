@@ -46,13 +46,13 @@ struct resource_caps {
 	int num_pll;
 	int num_dwb;
 	int num_ddc;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int num_vmid;
 #endif
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	int num_dsc;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int num_mpc_3dlut;
 #endif
 };

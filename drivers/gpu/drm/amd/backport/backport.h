@@ -45,9 +45,13 @@
 #endif
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_drm_print.h>
+#include <kcl/kcl_drm_auth.h>
 #include <kcl/backport/kcl_drm_crtc.h>
 #include <kcl/backport/kcl_drm_plane.h>
 #include <kcl/backport/kcl_drm_backport.h>
+#include <kcl/backport/kcl_drm_gem.h>
+#include <kcl/backport/kcl_drm_drv.h>
+#include <kcl/backport/kcl_drm_syncobj.h>
 #include <kcl/backport/kcl_drm_vma_manager_backport.h>
 #include <kcl/backport/kcl_drm_fb.h>
 #include <kcl/kcl_drm_modes.h>
@@ -59,9 +63,11 @@
 #include <kcl/kcl_drm_atomic.h>
 #include <kcl/kcl_ftrace.h>
 #include <kcl/kcl_acpi_table.h>
-#include <kcl/kcl_drm_fourcc.h>
+#include <kcl/backport/kcl_drm_fourcc.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
+#include "kcl/kcl_amdgpu_drm_gem_framebuffer_helper.h"
 #include "kcl/kcl_amdgpu.h"
+#include "kcl/kcl_amdgpu_drm_drv.h"
 #include "kcl/kcl_amdgpu_ttm.h"
 
 #endif /* AMDGPU_BACKPORT_H */

@@ -120,12 +120,4 @@ static inline int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, in
 #endif
 #endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP */
 
-#ifndef devm_drm_dev_alloc
-#define AMDKCL_DEVM_DRM_DEV_ALLOC 1
-void *__devm_drm_dev_alloc(struct device *parent, struct drm_driver *driver,
-						   size_t size, size_t offset);
-#define devm_drm_dev_alloc(parent, driver, type, member) \
-	((type *) __devm_drm_dev_alloc(parent, driver, sizeof(type), \
-									offsetof(type, member)))
-#endif
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_H */

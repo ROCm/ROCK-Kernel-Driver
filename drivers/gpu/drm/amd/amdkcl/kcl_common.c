@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: MIT
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/kprobes.h>

@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2012-2013 Canonical Ltd
+ * Copyright (C) 2012-2014 Canonical Ltd (Maarten Lankhorst)
  *
  * Based on bo.c which bears the following copyright notice,
  * but is dual licensed:
@@ -28,6 +28,9 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
+ **************************************************************************/
+/*
+ * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 #include <kcl/kcl_reservation.h>
 
@@ -37,6 +40,10 @@ void amdkcl_reservation_init(void)
 }
 
 #if defined(HAVE_RESERVATION_OBJECT_STAGED)
+/*
+ * Copied from v4.19-rc6-1514-g27836b641c1b^:drivers/dma-buf/reservation.c
+ * and modified for KCL
+ */
 static void
 reservation_object_add_shared_inplace(struct reservation_object *obj,
 				      struct reservation_object_list *fobj,

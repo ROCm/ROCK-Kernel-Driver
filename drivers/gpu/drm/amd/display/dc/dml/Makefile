@@ -66,7 +66,7 @@ endif
 
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
 
-ifdef CONFIG_DRM_AMD_DC_DCN2_0
+ifdef CONFIG_DRM_AMD_DC_DCN2_x
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_vba.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_ccflags)
@@ -77,14 +77,12 @@ CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml
 CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_rcflags)
 CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_rcflags)
 CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_rcflags)
-endif
-ifdef CONFIG_DRM_AMD_DC_DCN2_1
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_ccflags)
 CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_rcflags)
 CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_rcflags)
 endif
-ifdef CONFIG_DRM_AMD_DC_DCN3_0
+ifdef CONFIG_DRM_AMD_DC_DCN3_x
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_ccflags) -Wframe-larger-than=2048
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_ccflags)
 CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
@@ -99,15 +97,13 @@ CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_rc
 
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
 
-ifdef CONFIG_DRM_AMD_DC_DCN2_0
+ifdef CONFIG_DRM_AMD_DC_DCN2_x
 DML += display_mode_vba.o dcn20/display_rq_dlg_calc_20.o dcn20/display_mode_vba_20.o
 DML += dcn20/display_rq_dlg_calc_20v2.o dcn20/display_mode_vba_20v2.o
-endif
-ifdef CONFIG_DRM_AMD_DC_DCN2_1
 DML += dcn21/display_rq_dlg_calc_21.o dcn21/display_mode_vba_21.o
 endif
 
-ifdef CONFIG_DRM_AMD_DC_DCN3_0
+ifdef CONFIG_DRM_AMD_DC_DCN3_x
 DML += dcn30/display_mode_vba_30.o dcn30/display_rq_dlg_calc_30.o
 endif
 

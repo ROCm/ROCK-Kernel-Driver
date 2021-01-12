@@ -348,7 +348,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		/*
 		 * For DCN2 and greater, a register on the OPP is used to
 		 * determine if the CRTC is blanked instead of the OTG. So use
@@ -716,14 +716,14 @@ static void apply_DEGVIDCN10_253_wa(struct dc *dc)
 
 void dcn10_bios_golden_init(struct dc *dc)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dce_hwseq *hws = dc->hwseq;
 #endif
 	struct dc_bios *bp = dc->ctx->dc_bios;
 	int i;
 	bool allow_self_fresh_force_enable = true;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	if (hws->funcs.s0i3_golden_init_wa && hws->funcs.s0i3_golden_init_wa(dc))
 		return;
 #endif
@@ -1858,7 +1858,7 @@ void dcn10_enable_timing_synchronization(
 	struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
 	int i, width, height;
@@ -1868,7 +1868,7 @@ void dcn10_enable_timing_synchronization(
 
 	DC_SYNC_INFO("Setting up OTG reset trigger\n");
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -1894,7 +1894,7 @@ void dcn10_enable_timing_synchronization(
 		grouped_pipes[i]->stream_res.tg->funcs->disable_reset_trigger(
 				grouped_pipes[i]->stream_res.tg);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2378,7 +2378,7 @@ static void dcn10_update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 			plane_state->color_space,
 			NULL);
 #else
@@ -2897,7 +2897,7 @@ void dcn10_apply_ctx_for_surface(
 	if (num_planes > 0)
 		dcn10_program_all_pipe_in_tree(dc, top_pipe_to_program, context);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* Program secondary blending tree and writeback pipes */
 	if ((stream->num_wb_info > 0) && (hws->funcs.program_all_writeback_pipes_in_tree))
 		hws->funcs.program_all_writeback_pipes_in_tree(dc, stream, context);

@@ -1403,7 +1403,7 @@ static struct dpp_funcs dcn30_dpp_funcs = {
 	.dpp_program_degamma_pwl	= NULL,
 	.dpp_program_cm_dealpha = dpp3_program_cm_dealpha,
 	.dpp_program_cm_bias = dpp3_program_cm_bias,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	.dpp_program_blnd_lut = dpp3_program_blnd_lut,
 	.dpp_program_shaper_lut = dpp3_program_shaper,
 	.dpp_program_3dlut = dpp3_program_3dlut,

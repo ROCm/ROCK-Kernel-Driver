@@ -35,7 +35,7 @@
 
 struct dp_mst_stream_allocation_table;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 /*
  * Allocate memory accessible by the GPU
  *

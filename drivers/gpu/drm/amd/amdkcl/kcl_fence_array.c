@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * fence-array: aggregate fences to be waited together
  *

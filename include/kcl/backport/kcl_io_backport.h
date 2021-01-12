@@ -1,10 +1,16 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * Copyright 2006 PathScale, Inc.  All Rights Reserved.
+ */
 #ifndef AMDKCL_IO_H
 #define AMDKCL_IO_H
 
 #include <linux/types.h>
 #include <linux/io.h>
 
+/* Copied from arch/x86/include/asm/io.h
+ * include/linux/io.h
+ */
 #if !defined(HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC)
 
 #ifdef CONFIG_X86

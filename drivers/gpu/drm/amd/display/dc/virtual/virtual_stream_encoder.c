@@ -83,7 +83,7 @@ static void virtual_stream_encoder_reset_hdmi_stream_attribute(
 		struct stream_encoder *enc)
 {}
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static void virtual_enc_dp_set_odm_combine(
 	struct stream_encoder *enc,
@@ -112,7 +112,7 @@ static void virtual_stream_encoder_set_dsc_pps_info_packet(
 #endif
 
 static const struct stream_encoder_funcs virtual_str_enc_funcs = {
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.dp_set_odm_combine =
 		virtual_enc_dp_set_odm_combine,

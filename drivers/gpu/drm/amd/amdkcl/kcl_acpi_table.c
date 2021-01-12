@@ -1,4 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+// SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0
+/******************************************************************************
+ *
+ * Module Name: tbxface - ACPI table-oriented external interfaces
+ *
+ * Copyright (C) 2000 - 2020, Intel Corp.
+ *
+ *****************************************************************************/
 #include <linux/acpi.h>
 #include <kcl/kcl_acpi_table.h>
 

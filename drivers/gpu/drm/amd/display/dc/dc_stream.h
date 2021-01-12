@@ -53,7 +53,7 @@ struct freesync_context {
 	bool dummy;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 enum hubp_dmdata_mode {
 	DMDATA_SW_MODE,
 	DMDATA_HW_MODE
@@ -85,13 +85,13 @@ struct dc_dmdata_attributes {
 };
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dc_writeback_info {
 	bool wb_enabled;
 	int dwb_pipe_inst;
 	struct dc_dwb_params dwb_params;
 	struct mcif_buf_params mcif_buf_params;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct mcif_warmup_params mcif_warmup_params;
 	/* the plane that is the input to TOP_MUX for MPCC that is the DWB source */
 	struct dc_plane_state *writeback_source_plane;
@@ -129,7 +129,7 @@ union stream_update_flags {
 		uint32_t abm_level:1;
 		uint32_t dpms_off:1;
 		uint32_t gamut_remap:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		uint32_t wb_update:1;
 #endif
 		uint32_t dsc_changed : 1;
@@ -211,12 +211,12 @@ struct dc_stream_state {
 
 	struct crtc_trigger_info triggered_crtc_reset;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* writeback */
 	unsigned int num_wb_info;
 	struct dc_writeback_info writeback_info[MAX_DWB_PIPES];
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	const struct dc_transfer_func *func_shaper;
 	const struct dc_3dlut *lut3d_func;
 #endif
@@ -271,13 +271,13 @@ struct dc_stream_update {
 
 	struct dc_csc_transform *output_csc_transform;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dc_writeback_update *wb_update;
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	struct dc_dsc_config *dsc_config;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct dc_transfer_func *func_shaper;
 	struct dc_3dlut *lut3d_func;
 #endif
@@ -371,7 +371,7 @@ bool dc_add_all_planes_for_stream(
 		int plane_count,
 		struct dc_state *context);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 bool dc_stream_add_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		struct dc_writeback_info *wb_info);

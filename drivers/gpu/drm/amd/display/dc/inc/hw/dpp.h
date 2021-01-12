@@ -36,11 +36,8 @@ struct dpp {
 	struct dpp_caps *caps;
 	struct pwl_params regamma_params;
 	struct pwl_params degamma_params;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dpp_cursor_attributes cur_attr;
-#endif
-
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
 	struct pwl_params shaper_params;
 	bool cm_bypass_mode;
 #endif
@@ -76,7 +73,7 @@ struct dpp_grph_csc_adjustment {
 	enum graphics_gamut_adjust_type gamut_adjust_type;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 struct cnv_color_keyer_params {
 	int color_keyer_en;
 	int color_keyer_mode;
@@ -127,7 +124,7 @@ struct CM_bias_params {
 };
 
 struct dpp_funcs {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool (*dpp_program_gamcor_lut)(
 		struct dpp *dpp_base, const struct pwl_params *params);
 
@@ -217,7 +214,7 @@ struct dpp_funcs {
 			enum surface_pixel_format format,
 			enum expansion_mode mode,
 			struct dc_csc_transform input_csc_color_matrix,
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 			enum dc_color_space input_color_space,
 			struct cnv_alpha_2bit_lut *alpha_2bit_lut);
 #else
@@ -251,7 +248,7 @@ struct dpp_funcs {
 			bool dppclk_div,
 			bool enable);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool (*dpp_program_blnd_lut)(
 			struct dpp *dpp,
 			const struct pwl_params *params);

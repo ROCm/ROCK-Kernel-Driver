@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * trace_output.c
+ *
+ * Copyright (C) 2008 Red Hat Inc, Steven Rostedt <srostedt@redhat.com>
+ *
+ */
 #include <linux/trace_seq.h>
 
+/* Copied from v3.19-rc1-6-g6ea22486ba46 kernel/trace/trace_output.c */
 #if !defined(HAVE___PRINT_ARRAY)
 const char *
 ftrace_print_array_seq(struct trace_seq *p, const void *buf, int count,

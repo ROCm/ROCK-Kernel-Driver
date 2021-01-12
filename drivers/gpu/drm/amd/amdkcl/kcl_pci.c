@@ -1,9 +1,28 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * PCI Bus Services, see include/linux/pci.h for further explanation.
+ *
+ * Copyright 1993 -- 1997 Drew Eckhardt, Frederic Potter,
+ * David Mosberger-Tang
+ *
+ * Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+ *   For codes copied from drivers/pci/pci.c
+ *
+ * (C) Copyright 2002-2004 Greg Kroah-Hartman <greg@kroah.com>
+ * (C) Copyright 2002-2004 IBM Corp.
+ * (C) Copyright 2003 Matthew Wilcox
+ * (C) Copyright 2003 Hewlett-Packard
+ * (C) Copyright 2004 Jon Smirl <jonsmirl@yahoo.com>
+ * (C) Copyright 2004 Silicon Graphics, Inc. Jesse Barnes <jbarnes@sgi.com>
+ *   For codes copied from drivers/pci/pci-sysfs.c
+ */
+
 #include <kcl/kcl_pci.h>
 #include <linux/version.h>
 #include <linux/acpi.h>
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
+/* Copied from drivers/pci/probe.c and modified for KCL */
 const unsigned char *_kcl_pcie_link_speed;
 
 const unsigned char _kcl_pcie_link_speed_stub[] = {
@@ -25,6 +44,7 @@ const unsigned char _kcl_pcie_link_speed_stub[] = {
 	PCI_SPEED_UNKNOWN               /* F */
 };
 
+/* Copied from drivers/pci/pci.c */
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation
@@ -278,6 +298,7 @@ EXPORT_SYMBOL(_kcl_pci_configure_extended_tags);
 #endif
 
 #ifdef AMDKCL_CREATE_MEASURE_FILE
+/* Copied from drivers/pci/pci-sysfs.c */
 static ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {

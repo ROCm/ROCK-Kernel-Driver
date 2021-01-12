@@ -102,14 +102,14 @@ enum dentist_divider_range {
 	.MP1_SMN_C2PMSG_83 = mmMP1_SMN_C2PMSG_83, \
 	.MP1_SMN_C2PMSG_67 = mmMP1_SMN_C2PMSG_67
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define CLK_REG_LIST_NV10() \
 	SR(DENTIST_DISPCLK_CNTL), \
 	CLK_SRI(CLK3_CLK_PLL_REQ, CLK3, 0), \
 	CLK_SRI(CLK3_CLK2_DFS_CNTL, CLK3, 0)
 #endif
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 // TODO:
 #define CLK_REG_LIST_DCN3()	  \
 	SR(DENTIST_DISPCLK_CNTL)
@@ -138,7 +138,7 @@ enum dentist_divider_range {
 	CLK_SF(MP1_SMN_C2PMSG_83, CONTENT, mask_sh),\
 	CLK_SF(MP1_SMN_C2PMSG_91, CONTENT, mask_sh),
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define CLK_COMMON_MASK_SH_LIST_DCN20_BASE(mask_sh) \
 	CLK_COMMON_MASK_SH_LIST_DCN_COMMON_BASE(mask_sh),\
 	CLK_SF(DENTIST_DISPCLK_CNTL, DENTIST_DPPCLK_WDIVIDER, mask_sh),\
@@ -161,7 +161,7 @@ enum dentist_divider_range {
  ****************** Clock Manager Private Structures ***********************************
  ***************************************************************************************
  */
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define CLK20_REG_FIELD_LIST(type) \
 	type DENTIST_DPPCLK_WDIVIDER; \
 	type DENTIST_DPPCLK_CHG_DONE; \
@@ -174,7 +174,7 @@ enum dentist_divider_range {
 
 struct clk_mgr_shift {
 	CLK_REG_FIELD_LIST(uint8_t)
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	CLK20_REG_FIELD_LIST(uint8_t)
 #endif
 	VBIOS_SMU_REG_FIELD_LIST(uint32_t)
@@ -182,7 +182,7 @@ struct clk_mgr_shift {
 
 struct clk_mgr_mask {
 	CLK_REG_FIELD_LIST(uint32_t)
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	CLK20_REG_FIELD_LIST(uint32_t)
 #endif
 	VBIOS_SMU_REG_FIELD_LIST(uint32_t)
@@ -192,12 +192,12 @@ struct clk_mgr_registers {
 	uint32_t DPREFCLK_CNTL;
 	uint32_t DENTIST_DISPCLK_CNTL;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	uint32_t CLK3_CLK2_DFS_CNTL;
 	uint32_t CLK3_CLK_PLL_REQ;
 #endif
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	uint32_t CLK0_CLK2_DFS_CNTL;
 	uint32_t CLK0_CLK_PLL_REQ;
 #endif
@@ -297,7 +297,7 @@ struct clk_mgr_internal {
 	bool periodic_retraining_disabled;
 
 	unsigned int cur_phyclk_req_table[MAX_PIPES * 2];
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 	bool smu_present;
 	void *wm_range_table;

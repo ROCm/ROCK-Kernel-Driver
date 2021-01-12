@@ -25,7 +25,6 @@
 
 #include <linux/string.h>
 #include <linux/acpi.h>
-#include <linux/version.h>
 #include <linux/i2c.h>
 
 #include <drm/drm_probe_helper.h>
@@ -739,7 +738,7 @@ void dm_set_dcn_clocks(struct dc_context *ctx, struct dc_clocks *clks)
 {
 	/* TODO: something */
 }
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 void *dm_helpers_allocate_gpu_mem(
 		struct dc_context *ctx,

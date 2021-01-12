@@ -1,4 +1,9 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ *  linux/kernel/fork.c
+ *
+ *  Copyright (C) 1991, 1992  Linus Torvalds
+ */
 #include <linux/sched.h>
 
 #ifndef HAVE_MM_ACCESS
@@ -7,7 +12,7 @@ EXPORT_SYMBOL(_kcl_mm_access);
 
 static struct mm_struct * __kcl_mm_access_stub(struct task_struct *task, unsigned int mode)
 {
-	printk_once(KERN_WARNING "This kernel version not support API: mm_access !\n");
+	pr_warn_once("This kernel version not support API: mm_access !\n");
 	return NULL;
 }
 #endif

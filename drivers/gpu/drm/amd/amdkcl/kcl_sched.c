@@ -1,6 +1,15 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ *  kernel/sched/core.c
+ *
+ *  Core kernel scheduler code and related syscalls
+ *
+ *  Copyright (C) 1991-2002  Linus Torvalds
+ */
+
 #include <kcl/kcl_sched.h>
 
+/* Copied from kernel/sched/core.c and modified for KCL */
 #ifndef HAVE_SCHED_SET_FIFO_LOW
 int (*_kcl_sched_setscheduler_nocheck)(struct task_struct *p, int policy,
 					       const struct sched_param *param);

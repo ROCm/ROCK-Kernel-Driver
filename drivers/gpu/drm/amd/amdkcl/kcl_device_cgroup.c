@@ -1,4 +1,9 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * device_cgroup.c - device cgroup subsystem
+ *
+ * Copyright 2007 IBM Corp
+ */
 #include <linux/module.h>
 #include <kcl/kcl_device_cgroup.h>
 

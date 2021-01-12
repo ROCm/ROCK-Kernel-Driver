@@ -1,4 +1,5 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copied from include/trace/events/dma_fence.h */
 #if !defined(_TRACE_KCL_FENCE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_KCL_FENCE_H
 

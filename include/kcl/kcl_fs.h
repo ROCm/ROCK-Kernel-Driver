@@ -1,10 +1,11 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_FS_H
 #define AMDKCL_FS_H
 
 #include <linux/fs.h>
 #include <asm/compat.h>
 
+/* Copied from v5.4-rc2-1-g2952db0fd51b linux/fs.h */
 #ifndef HAVE_COMPAT_PTR_IOCTL
 #ifdef CONFIG_COMPAT
 extern long _kcl_compat_ptr_ioctl(struct file *file, unsigned int cmd,

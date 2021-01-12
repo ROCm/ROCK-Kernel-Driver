@@ -36,7 +36,7 @@
 
 #define MAX_AUDIOS 7
 #define MAX_PIPES 6
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define MAX_DWB_PIPES	1
 #endif
 
@@ -81,7 +81,7 @@ struct pwl_result_data {
 	uint32_t delta_blue_reg;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dc_rgb {
 	uint32_t red;
 	uint32_t green;
@@ -154,7 +154,7 @@ enum ipp_degamma_mode {
 	IPP_DEGAMMA_MODE_USER_PWL
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum gamcor_mode {
 	GAMCOR_MODE_BYPASS,
 	GAMCOR_MODE_RESERVED_1,
@@ -233,7 +233,7 @@ enum test_pattern_mode {
 	TEST_PATTERN_MODE_VERTICALBARS,
 	TEST_PATTERN_MODE_HORIZONTALBARS,
 	TEST_PATTERN_MODE_SINGLERAMP_RGB,
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	TEST_PATTERN_MODE_DUALRAMP_RGB,
 	TEST_PATTERN_MODE_XR_BIAS_RGB
 #else

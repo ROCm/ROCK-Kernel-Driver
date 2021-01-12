@@ -22,7 +22,7 @@
  * Authors: AMD
  *
  */
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #ifndef __DAL_HW_TRANSLATE_DCN20_H__
 #define __DAL_HW_TRANSLATE_DCN20_H__
 

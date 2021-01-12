@@ -150,7 +150,7 @@ static enum gpio_result set_config(
 					AUX_PAD1_MODE, 0);
 		}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ddc->regs->dc_gpio_aux_ctrl_5 != 0) {
 				REG_UPDATE(dc_gpio_aux_ctrl_5, DDC_PAD_I2CMODE, 1);
 		}
@@ -166,7 +166,7 @@ static enum gpio_result set_config(
 			REG_SET(gpio.MASK_reg, regval,
 					AUX_PAD1_MODE, 1);
 		}
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ddc->regs->dc_gpio_aux_ctrl_5 != 0) {
 			REG_UPDATE(dc_gpio_aux_ctrl_5,
 					DDC_PAD_I2CMODE, 0);

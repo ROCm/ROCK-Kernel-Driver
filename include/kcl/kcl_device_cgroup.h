@@ -1,9 +1,10 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_DEVICE_CGROUP_H
 #define AMDKCL_DEVICE_CGROUP_H
 
 #include <linux/device_cgroup.h>
 
+/* Copied from include/linux/device_cgroup.h */
 #ifndef DEVCG_DEV_CHAR
 #define DEVCG_DEV_CHAR  2
 #endif
@@ -14,6 +15,7 @@
 #define DEVCG_ACC_WRITE 4
 #endif
 
+/* Copied from security/device_cgroup.c and modified for KCL */
 #ifndef HAVE_DEVCGROUP_CHECK_PERMISSION
 #if defined(CONFIG_CGROUP_DEVICE)
 extern int (*__kcl_devcgroup_check_permission)(short type, u32 major, u32 minor,
@@ -39,4 +41,5 @@ static inline int _kcl_devcgroup_check_permission(short type, u32 major, u32 min
 }
 #endif /* CONFIG_CGROUP_DEVICE */
 #endif /* HAVE_DEVCGROUP_CHECK_PERMISSION */
+
 #endif /* AMDKCL_DEVICE_CGROUP_H */

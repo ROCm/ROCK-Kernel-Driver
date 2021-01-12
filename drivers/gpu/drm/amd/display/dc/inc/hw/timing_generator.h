@@ -98,7 +98,7 @@ enum crc_selection {
 	INTERSECT_WINDOW_NOT_A_NOT_B,
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 enum otg_out_mux_dest {
 	OUT_MUX_DIO = 0,
 };
@@ -107,7 +107,7 @@ enum otg_out_mux_dest {
 enum h_timing_div_mode {
 	H_TIMING_NO_DIV,
 	H_TIMING_DIV_BY2,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	H_TIMING_RESERVED,
 	H_TIMING_DIV_BY4,
 #endif
@@ -210,7 +210,7 @@ struct timing_generator_funcs {
 	void (*lock)(struct timing_generator *tg);
 	void (*lock_doublebuffer_disable)(struct timing_generator *tg);
 	void (*lock_doublebuffer_enable)(struct timing_generator *tg);
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void(*triplebuffer_unlock)(struct timing_generator *tg);
 	void(*triplebuffer_lock)(struct timing_generator *tg);
 #endif
@@ -251,7 +251,7 @@ struct timing_generator_funcs {
 	bool (*is_optc_underflow_occurred)(struct timing_generator *tg);
 	void (*clear_optc_underflow)(struct timing_generator *tg);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void (*set_dwb_source)(struct timing_generator *optc,
 		uint32_t dwb_pipe_inst);
 
@@ -289,7 +289,7 @@ struct timing_generator_funcs {
 			       uint32_t dsc_bytes_per_pixel,
 			       uint32_t dsc_slice_width);
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*set_odm_bypass)(struct timing_generator *optc, const struct dc_crtc_timing *dc_crtc_timing);
 	void (*set_odm_combine)(struct timing_generator *optc, int *opp_id, int opp_cnt,
 			struct dc_crtc_timing *timing);
@@ -298,7 +298,7 @@ struct timing_generator_funcs {
 			int group_idx,
 			uint32_t gsl_ready_signal);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*set_out_mux)(struct timing_generator *tg, enum otg_out_mux_dest dest);
 	void (*set_vrr_m_const)(struct timing_generator *optc,
 			double vtotal_avg);

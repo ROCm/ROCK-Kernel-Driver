@@ -458,10 +458,8 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 
 		for (i = 0; i < abo->tbo.num_pages; i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
-		abo->tbo.mem.bus.base = args->addr;
-		abo->tbo.mem.bus.offset = 0;
-		abo->tbo.mem.bus.addr = (void *)dma_addr;
-
+		abo->base = args->addr;
+		abo->addr = (void *)dma_addr;
 		r = drm_gem_handle_create(filp, gobj, &handle);
 		args->handle = handle;
 		break;

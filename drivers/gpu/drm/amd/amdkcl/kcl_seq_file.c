@@ -1,6 +1,13 @@
-/* SPDX-License-Identifier: MIT */
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * linux/fs/seq_file.c
+ *
+ * helper functions for making synthetic files from sequences of records.
+ * initial implementation -- AV, Oct 2001.
+ */
 #include <kcl/kcl_seq_file.h>
 
+/* Copied from fs/seq_file.c */
 #ifndef HAVE_SEQ_HEX_DUMP
 static void seq_set_overflow(struct seq_file *m)
 {

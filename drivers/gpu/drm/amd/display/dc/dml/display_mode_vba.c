@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_0
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 
 #include "display_mode_lib.h"
 #include "display_mode_vba.h"
@@ -289,7 +289,7 @@ static void fetch_ip_params(struct display_mode_lib *mode_lib)
 
 	// IP Parameters
 	mode_lib->vba.UseMinimumRequiredDCFCLK = ip->use_min_dcfclk;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_0
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	mode_lib->vba.ClampMinDCFCLK = ip->clamp_min_dcfclk;
 #endif
 	mode_lib->vba.MaxNumDPP = ip->max_num_dpp;

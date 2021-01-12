@@ -251,7 +251,7 @@ bool hubp3_construct(
 		const struct dcn_hubp2_shift *hubp_shift,
 		const struct dcn_hubp2_mask *hubp_mask);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void hubp3_set_vm_system_aperture_settings(struct hubp *hubp,
 	struct vm_system_aperture_param *apt);
 #endif
