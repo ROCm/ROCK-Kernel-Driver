@@ -59,3 +59,10 @@ done
 
 export KERNELVER
 (cd $SRC && ./configure)
+
+# rename CFLAGS_<path>target.o to CFLAGS_target.o
+if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
+	for file in $(grep -rl 'CFLAGS_' amd/display/); do
+		sed -i 's|$(AMDDALPATH)/.*/\(.*\.o\)|\1|' $file
+	done
+fi
