@@ -34,6 +34,17 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 ])
 
 dnl #
+dnl # v5.3-rc4-54-g54b8ae66ae1a
+dnl # kbuild: change *FLAGS_<basetarget>.o to take the path relative to $(obj)
+dnl #
+AC_DEFUN([AC_KERNEL_FLAGS_TAKE_PATH], [
+	AS_IF([grep -qsm 1 "target-stem" ${LINUX}/scripts/Makefile.lib], [
+		AC_DEFINE(HAVE_AMDKCL_FLAGS_TAKE_PATH, 1,
+			[*FLAGS_<basetarget>.o support to take the path relative to $(obj)])
+	])
+])
+
+dnl #
 dnl # v4.20-rc2-10-ge07db28eea38
 dnl # kbuild: fix single target build for external module
 dnl #
@@ -48,5 +59,6 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET], [
 			])
 		])
 		AC_KERNEL_SINGLE_TARGET_CFLAGS
+		AC_KERNEL_FLAGS_TAKE_PATH
 	])
 ])
