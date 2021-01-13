@@ -13,6 +13,9 @@
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
+/* *FLAGS_<basetarget>.o support to take the path relative to $(obj) */
+#define HAVE_AMDKCL_FLAGS_TAKE_PATH 1
+
 /* hmm support is enabled */
 #define HAVE_AMDKCL_HMM_MIRROR_ENABLED 1
 
