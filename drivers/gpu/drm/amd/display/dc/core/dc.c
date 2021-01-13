@@ -819,7 +819,8 @@ static void disable_all_writeback_pipes_for_stream(
 }
 #endif
 
-void apply_ctx_interdependent_lock(struct dc *dc, struct dc_state *context, struct dc_stream_state *stream, bool lock)
+static void apply_ctx_interdependent_lock(struct dc *dc, struct dc_state *context,
+					  struct dc_stream_state *stream, bool lock)
 {
 	int i = 0;
 
