@@ -1408,6 +1408,20 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 			kfd_set_iolink_non_coherent(peer_dev, link, inbound_link);
 		}
 	}
+
+	/* Create CPU<->GPU indirect links so apply flags setting to all */
+	list_for_each_entry(link, &dev->p2p_link_props, list) {
+		cpu_dev = kfd_topology_device_by_proximity_domain(
+				link->node_to);
+		if (cpu_dev && !cpu_dev->gpu) {
+			list_for_each_entry(cpu_link,
+					    &cpu_dev->p2p_link_props, list)
+				if (cpu_link->node_to == link->node_from) {
+					link->flags = flag;
+					cpu_link->flags = cpu_flag;
+				}
+		}
+	}
 }
 
 static int kfd_build_p2p_node_entry(struct kfd_topology_device *dev,
