@@ -1362,6 +1362,20 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 			kfd_set_iolink_non_coherent(peer_dev, link, inbound_link);
 		}
 	}
+
+	/* Create CPU<->GPU indirect links so apply flags setting to all */
+	list_for_each_entry(link, &dev->p2p_link_props, list) {
+		cpu_dev = kfd_topology_device_by_proximity_domain(
+				link->node_to);
+		if (cpu_dev && !cpu_dev->gpu) {
+			list_for_each_entry(cpu_link,
+					    &cpu_dev->p2p_link_props, list)
+				if (cpu_link->node_to == link->node_from) {
+					link->flags = flag;
+					cpu_link->flags = cpu_flag;
+				}
+		}
+	}
 }
 
 static int kfd_build_p2p_node_entry(struct kfd_topology_device *dev,
@@ -1388,6 +1402,86 @@ static int kfd_build_p2p_node_entry(struct kfd_topology_device *dev,
 		return ret;
 
 	return 0;
+}
+
+static int kfd_create_in_direct_link_prop(struct kfd_topology_device *kdev, int gpu_node)
+{
+	struct kfd_iolink_properties *props = NULL, *props2 = NULL;
+	struct kfd_iolink_properties *gpu_link, *cpu_link;
+	struct kfd_topology_device *cpu_dev;
+	int ret = 0;
+	int i, num_cpu;
+
+	/* need Large BAR GPU */
+	if (!kfd_dev_is_large_bar(kdev->gpu))
+		return 0;
+
+	num_cpu = 0;
+	list_for_each_entry(cpu_dev, &topology_device_list, list) {
+		if (cpu_dev->gpu)
+			break;
+		num_cpu++;
+	}
+
+	gpu_link = list_last_entry(&kdev->io_link_props,
+					struct kfd_iolink_properties, list);
+	if (!gpu_link)
+		return -ENOMEM;
+
+	for (i = 0; i < num_cpu; i++) {
+		/* CPU <--> GPU */
+		if (gpu_link->node_to == i)
+			continue;
+
+		/* find CPU <-->  CPU links */
+		cpu_dev = kfd_topology_device_by_proximity_domain(i);
+		if (cpu_dev) {
+			list_for_each_entry(cpu_link,
+					&cpu_dev->io_link_props, list) {
+				if (cpu_link->node_to == gpu_link->node_to)
+					break;
+			}
+		}
+
+		if (cpu_link->node_to != gpu_link->node_to)
+			return -ENOMEM;
+
+		/* CPU <--> CPU <--> GPU, GPU node*/
+		props = kfd_alloc_struct(props);
+		if (!props)
+			return -ENOMEM;
+
+		memcpy(props, gpu_link, sizeof(struct kfd_iolink_properties));
+		props->weight = gpu_link->weight + cpu_link->weight;
+		props->min_latency = gpu_link->min_latency + cpu_link->min_latency;
+		props->max_latency = gpu_link->max_latency + cpu_link->max_latency;
+		props->min_bandwidth = min(gpu_link->min_bandwidth, cpu_link->min_bandwidth);
+		props->max_bandwidth = min(gpu_link->max_bandwidth, cpu_link->max_bandwidth);
+
+		props->node_from = gpu_node;
+		props->node_to = i;
+		kdev->node_props.p2p_links_count++;
+		list_add_tail(&props->list, &kdev->p2p_link_props);
+		ret = kfd_build_p2p_node_entry(kdev, props);
+		if (ret < 0)
+			return ret;
+
+		/* CPU <--> CPU <--> GPU, CPU node*/
+		props2 = kfd_alloc_struct(props2);
+		if (!props2)
+			return -ENOMEM;
+
+		memcpy(props2, props, sizeof(struct kfd_iolink_properties));
+		props2->node_from = i;
+		props2->node_to = gpu_node;
+		props2->kobj = NULL;
+		cpu_dev->node_props.p2p_links_count++;
+		list_add_tail(&props2->list, &cpu_dev->p2p_link_props);
+		ret = kfd_build_p2p_node_entry(cpu_dev, props2);
+		if (ret < 0)
+			return ret;
+	}
+	return ret;
 }
 
 static int kfd_add_peer_prop(struct kfd_topology_device *kdev,
@@ -1469,6 +1563,13 @@ static int kfd_dev_create_p2p_links(void)
 
 	k--;
 	i = 0;
+
+	/* create in-direct links */
+	ret = kfd_create_in_direct_link_prop(new_dev, k);
+	if (ret < 0)
+		goto out;
+
+	/* create p2p links */
 	list_for_each_entry(dev, &topology_device_list, list) {
 		if (dev == new_dev)
 			break;
