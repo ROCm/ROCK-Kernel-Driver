@@ -73,18 +73,8 @@ static int amdgpu_ttm_init_on_chip(struct amdgpu_device *adev,
 				    unsigned int type,
 				    uint64_t size_in_page)
 {
-	uint32_t available_caching;
-	uint32_t default_caching;
-
-	if (adev->gmc.xgmi.connected_to_cpu) {
-		available_caching = TTM_PL_FLAG_CACHED;
-		default_caching = TTM_PL_FLAG_CACHED;
-	} else {
-		available_caching = TTM_PL_FLAG_UNCACHED;
-		default_caching = TTM_PL_FLAG_UNCACHED;
-	}
 	return ttm_range_man_init(&adev->mman.bdev, type,
-				  available_caching, default_caching,
+				  TTM_PL_FLAG_UNCACHED, TTM_PL_FLAG_UNCACHED,
 				  false, size_in_page);
 }
 
