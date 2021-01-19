@@ -585,11 +585,11 @@ bool dm_helpers_submit_i2c(
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
-		bool enable
-)
+		bool enable)
 {
 	uint8_t enable_dsc = enable ? 1 : 0;
 	struct amdgpu_dm_connector *aconnector;
+	uint8_t ret;
 
 	if (!stream)
 		return false;
@@ -600,13 +600,13 @@ bool dm_helpers_dp_write_dsc_enable(
 		if (!aconnector->dsc_aux)
 			return false;
 
-		return (drm_dp_dpcd_write(aconnector->dsc_aux, DP_DSC_ENABLE, &enable_dsc, 1) >= 0);
+		ret = drm_dp_dpcd_write(aconnector->dsc_aux, DP_DSC_ENABLE, &enable_dsc, 1);
 	}
 
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT)
 		return dm_helpers_dp_write_dpcd(ctx, stream->link, DP_DSC_ENABLE, &enable_dsc, 1);
 
-	return false;
+	return (ret > 0);
 }
 #endif
 
