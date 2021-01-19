@@ -25,18 +25,6 @@
 # It provides the general basic services required by other DAL
 # subcomponents.
 
-ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
-AMDKCL_KBUILD_TAKE_PATH_DML=$(AMDDALPATH)/dc/dml/
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN20=$(AMDDALPATH)/dc/dml/dcn20/
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN21=$(AMDDALPATH)/dc/dml/dcn21/
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN30=$(AMDDALPATH)/dc/dml/dcn30/
-else
-AMDKCL_KBUILD_TAKE_PATH_DML=
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN20=
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN21=
-AMDKCL_KBUILD_TAKE_PATH_DML_DCN30=
-endif
-
 ifdef CONFIG_X86
 dml_ccflags := -mhard-float -msse
 endif
@@ -64,36 +52,36 @@ dml_ccflags += -msse2
 endif
 endif
 
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/display_mode_lib.o := $(dml_ccflags)
 
 ifdef CONFIG_DRM_AMD_DC_DCN2_x
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_vba.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_ccflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_vba.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_mode_vba_20v2.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN20)display_rq_dlg_calc_20v2.o := $(dml_rcflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_ccflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_mode_vba_21.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN21)display_rq_dlg_calc_21.o := $(dml_rcflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/display_mode_vba.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20v2.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20v2.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_mode_vba.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_mode_vba_20v2.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn20/display_rq_dlg_calc_20v2.o := $(dml_rcflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn21/display_mode_vba_21.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn21/display_rq_dlg_calc_21.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_mode_vba_21.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn21/display_rq_dlg_calc_21.o := $(dml_rcflags)
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN3_x
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_ccflags) -Wframe-larger-than=2048
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_ccflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_mode_vba_30.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML_DCN30)display_rq_dlg_calc_30.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_mode_lib.o := $(dml_rcflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn30/display_mode_vba_30.o := $(dml_ccflags) -Wframe-larger-than=2048
+CFLAGS_$(AMDDALPATH)/dc/dml/dcn30/display_rq_dlg_calc_30.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/display_mode_lib.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_mode_vba_30.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dcn30/display_rq_dlg_calc_30.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_mode_lib.o := $(dml_rcflags)
 endif
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_ccflags)
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_ccflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)dml1_display_rq_dlg_calc.o := $(dml_rcflags)
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DML)display_rq_dlg_helpers.o := $(dml_rcflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/dml1_display_rq_dlg_calc.o := $(dml_ccflags)
+CFLAGS_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_ccflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/dml1_display_rq_dlg_calc.o := $(dml_rcflags)
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_rcflags)
 
 DML = display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o \
 

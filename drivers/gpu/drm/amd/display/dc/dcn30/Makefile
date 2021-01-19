@@ -23,12 +23,6 @@
 # 
 # 
 
-ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
-AMDKCL_KBUILD_TAKE_PATH_DCN30=$(AMDDALPATH)/dc/dcn30/
-else
-AMDKCL_KBUILD_TAKE_PATH_DCN30=
-endif
-
 DCN30 = dcn30_init.o dcn30_hubbub.o dcn30_hubp.o dcn30_dpp.o dcn30_optc.o \
 	dcn30_dccg.o dcn30_hwseq.o dcn30_mpc.o dcn30_vpg.o \
 	dcn30_afmt.o dcn30_dio_stream_encoder.o dcn30_dwb.o \
@@ -37,18 +31,18 @@ DCN30 = dcn30_init.o dcn30_hubbub.o dcn30_hubp.o dcn30_dpp.o dcn30_optc.o \
 
 
 ifdef CONFIG_X86
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mhard-float -msse
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -msse
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o := -mhard-float -msse
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o := -mhard-float -msse
 endif
 
 ifdef CONFIG_PPC64
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mhard-float -maltivec
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mhard-float -maltivec
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o := -mhard-float -maltivec
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o := -mhard-float -maltivec
 endif
 
 ifdef CONFIG_ARM64
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o := -mgeneral-regs-only
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o := -mgeneral-regs-only
 endif
 
 ifdef CONFIG_CC_IS_GCC
@@ -62,11 +56,11 @@ ifdef IS_OLD_GCC
 # Stack alignment mismatch, proceed with caution.
 # GCC < 7.1 cannot compile code using `double` and -mpreferred-stack-boundary=3
 # (8B stack alignment).
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -mpreferred-stack-boundary=4
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o += -mpreferred-stack-boundary=4
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o += -mpreferred-stack-boundary=4
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o += -mpreferred-stack-boundary=4
 else
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_resource.o += -msse2
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_DCN30)dcn30_optc.o += -msse2
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_resource.o += -msse2
+CFLAGS_$(AMDDALPATH)/dc/dcn30/dcn30_optc.o += -msse2
 endif
 endif
 

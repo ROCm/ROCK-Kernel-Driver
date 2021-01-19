@@ -3050,7 +3050,7 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 #endif
 	default:
 		if (amdgpu_dc > 0)
-			DRM_INFO("Display Core has been requested via kernel parameter "
+			DRM_INFO_ONCE("Display Core has been requested via kernel parameter "
 					 "but isn't supported by ASIC, ignoring\n");
 		return false;
 	}
@@ -3133,7 +3133,10 @@ static int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 	 */
 	adev->gfx_timeout = msecs_to_jiffies(10000);
 	adev->sdma_timeout = adev->video_timeout = adev->gfx_timeout;
-	if (amdgpu_sriov_vf(adev) || amdgpu_passthrough(adev))
+	if (amdgpu_sriov_vf(adev))
+		adev->compute_timeout = amdgpu_sriov_is_pp_one_vf(adev) ?
+					msecs_to_jiffies(60000) : msecs_to_jiffies(10000);
+	else if (amdgpu_passthrough(adev))
 		adev->compute_timeout =  msecs_to_jiffies(60000);
 	else
 		adev->compute_timeout = MAX_SCHEDULE_TIMEOUT;
@@ -4244,6 +4247,8 @@ bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev)
 		case CHIP_NAVI14:
 		case CHIP_NAVI12:
 		case CHIP_SIENNA_CICHLID:
+		case CHIP_NAVY_FLOUNDER:
+		case CHIP_VANGOGH:
 			break;
 		default:
 			goto disabled;

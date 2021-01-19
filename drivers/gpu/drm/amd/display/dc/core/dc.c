@@ -2301,6 +2301,9 @@ static void copy_stream_update_to_stream(struct dc *dc,
 	if (update->dither_option)
 		stream->dither_option = *update->dither_option;
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
+
+	if (update->pending_test_pattern)
+		stream->test_pattern = *update->pending_test_pattern;
 	/* update current stream with writeback info */
 	if (update->wb_update) {
 		int i;
@@ -2402,6 +2405,15 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					odm_pipe = odm_pipe->next_odm_pipe;
 				}
 #endif
+			}
+
+			if (stream_update->pending_test_pattern) {
+				dc_link_dp_set_test_pattern(stream->link,
+					stream->test_pattern.type,
+					stream->test_pattern.color_space,
+					stream->test_pattern.p_link_settings,
+					stream->test_pattern.p_custom_pattern,
+					stream->test_pattern.cust_pattern_size);
 			}
 
 			/* Full fe update*/
@@ -3224,9 +3236,11 @@ void dc_lock_memory_clock_frequency(struct dc *dc)
 			core_link_enable_stream(dc->current_state, &dc->current_state->res_ctx.pipe_ctx[i]);
 }
 
-bool dc_is_plane_eligible_for_idle_optimizaitons(struct dc *dc,
-						 struct dc_plane_state *plane)
+bool dc_is_plane_eligible_for_idle_optimizaitons(struct dc *dc, struct dc_plane_state *plane)
 {
+	if (dc->hwss.does_plane_fit_in_mall && dc->hwss.does_plane_fit_in_mall(dc, plane))
+		return true;
+
 	return false;
 }
 

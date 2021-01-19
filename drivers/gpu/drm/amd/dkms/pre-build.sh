@@ -6,21 +6,6 @@ SRC="amd/dkms"
 
 KERNELVER=$1
 KERNELVER_BASE=${KERNELVER%%-*}
-SRCTREE=/lib/modules/$KERNELVER
-
-if [ -L $SRCTREE/source ]; then
-	BLDTREE="$SRCTREE/build"
-	SRCTREE="$SRCTREE/source"
-else
-	SRCTREE="$SRCTREE/build"
-	BLDTREE="$SRCTREE"
-fi
-
-SRCARCH=$(uname -m | sed -e "s/i.86/x86/" -e "s/x86_64/x86/" \
-        -e "s/sun4u/sparc64/" -e "s/arm.*/arm/" -e "s/sa110/arm/" \
-        -e "s/s390x/s390/" -e "s/parisc64/parisc/" \
-        -e "s/ppc.*/powerpc/" -e "s/mips.*/mips/" \
-        -e "s/sh[234].*/sh/" -e "s/aarch64.*/arm64/")
 
 version_lt () {
     newest=$((echo "$KERNELVER_BASE"; echo "$1") | sort -V | tail -n1)
@@ -88,10 +73,11 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 done
 
 export KERNELVER
-(cd $SRC && CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
-	-I$BLDTREE/arch/$SRCARCH/include/generated \
-	-I$SRCTREE/include \
-	-I$BLDTREE/include \
-	-I$SRCTREE/include/uapi \
-	-include $SRCTREE/include/linux/kconfig.h -D__KERNEL__" \
-	./configure)
+(cd $SRC && ./configure)
+
+# rename CFLAGS_<path>target.o to CFLAGS_target.o
+if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
+	for file in $(grep -rl 'CFLAGS_' amd/display/); do
+		sed -i 's|$(AMDDALPATH)/.*/\(.*\.o\)|\1|' $file
+	done
+fi

@@ -13,6 +13,9 @@
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
+/* *FLAGS_<basetarget>.o support to take the path relative to $(obj) */
+#define HAVE_AMDKCL_FLAGS_TAKE_PATH 1
+
 /* hmm support is enabled */
 #define HAVE_AMDKCL_HMM_MIRROR_ENABLED 1
 
@@ -268,6 +271,9 @@
 
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
+
+/* struct drm_dp_mst_topology_cbs->destroy_connector is available */
+/* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
 
 /* struct drm_dp_mst_topology_cbs has hotplug member */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG */

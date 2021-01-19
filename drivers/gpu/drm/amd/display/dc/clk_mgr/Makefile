@@ -100,23 +100,17 @@ AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN20)
 ###############################################################################
 CLK_MGR_DCN21 = rn_clk_mgr.o rn_clk_mgr_vbios_smu.o
 
-ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
-AMDKCL_KBUILD_TAKE_PATH_CURRENT=$(AMDDALPATH)/dc/clk_mgr/dcn21/
-else
-AMDKCL_KBUILD_TAKE_PATH_CURRENT=
-endif
-
 # prevent build errors regarding soft-float vs hard-float FP ABI tags
 # this code is currently unused on ppc64, as it applies to Renoir APUs only
 ifdef CONFIG_PPC64
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rn_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
+CFLAGS_$(AMDDALPATH)/dc/clk_mgr/dcn21/rn_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
 endif
 
 # prevent build errors:
 # ...: '-mgeneral-regs-only' is incompatible with the use of floating-point types
 # this file is unused on arm64, just like on ppc64
 ifdef CONFIG_ARM64
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT)rn_clk_mgr.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn21/rn_clk_mgr.o := -mgeneral-regs-only
 endif
 
 AMD_DAL_CLK_MGR_DCN21 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn21/,$(CLK_MGR_DCN21))
@@ -129,22 +123,17 @@ ifdef CONFIG_DRM_AMD_DC_DCN3_x
 ###############################################################################
 CLK_MGR_DCN30 = dcn30_clk_mgr.o dcn30_clk_mgr_smu_msg.o
 
-ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
-AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN30=$(AMDDALPATH)/dc/clk_mgr/dcn30/
-else
-AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN30=
-endif
 # prevent build errors regarding soft-float vs hard-float FP ABI tags
 # this code is currently unused on ppc64, as it applies to VanGogh APUs only
 ifdef CONFIG_PPC64
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN30)dcn30_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
+CFLAGS_$(AMDDALPATH)/dc/clk_mgr/dcn30/dcn30_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
 endif
 
 # prevent build errors:
 # ...: '-mgeneral-regs-only' is incompatible with the use of floating-point types
 # this file is unused on arm64, just like on ppc64
 ifdef CONFIG_ARM64
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN30)dcn30_clk_mgr.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn30/dcn30_clk_mgr.o := -mgeneral-regs-only
 endif
 
 AMD_DAL_CLK_MGR_DCN30 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn30/,$(CLK_MGR_DCN30))
@@ -156,22 +145,17 @@ AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN30)
 ###############################################################################
 CLK_MGR_DCN301 = vg_clk_mgr.o dcn301_smu.o
 
-ifeq (1,$(AMDKCL_KBUILD_TAKE_PATH))
-AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN301=$(AMDDALPATH)/dc/clk_mgr/dcn301/
-else
-AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN301=
-endif
 # prevent build errors regarding soft-float vs hard-float FP ABI tags
 # this code is currently unused on ppc64, as it applies to VanGogh APUs only
 ifdef CONFIG_PPC64
-CFLAGS_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN301)vg_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
+CFLAGS_$(AMDDALPATH)/dc/clk_mgr/dcn301/vg_clk_mgr.o := $(call cc-option,-mno-gnu-attribute)
 endif
 
 # prevent build errors:
 # ...: '-mgeneral-regs-only' is incompatible with the use of floating-point types
 # this file is unused on arm64, just like on ppc64
 ifdef CONFIG_ARM64
-CFLAGS_REMOVE_$(AMDKCL_KBUILD_TAKE_PATH_CURRENT_DCN301)vg_clk_mgr.o := -mgeneral-regs-only
+CFLAGS_REMOVE_$(AMDDALPATH)/dc/clk_mgr/dcn301/vg_clk_mgr.o := -mgeneral-regs-only
 endif
 
 AMD_DAL_CLK_MGR_DCN301 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn301/,$(CLK_MGR_DCN301))

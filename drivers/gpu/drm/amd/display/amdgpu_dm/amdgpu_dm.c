@@ -1858,6 +1858,11 @@ static int dm_suspend(void *handle)
 
 	if (amdgpu_in_reset(adev)) {
 		mutex_lock(&dm->dc_lock);
+
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+		dc_allow_idle_optimizations(adev->dm.dc, false);
+#endif
+
 		dm->cached_dc_state = dc_copy_state(dm->dc->current_state);
 
 		dm_gpureset_toggle_interrupts(adev, dm->cached_dc_state, false);
@@ -2518,8 +2523,7 @@ void amdgpu_dm_update_connector_after_detect(
 
 			drm_connector_update_edid_property(connector,
 							   aconnector->edid);
-			aconnector->num_modes = drm_add_edid_modes(connector, aconnector->edid);
-			drm_connector_list_update(connector);
+			drm_add_edid_modes(connector, aconnector->edid);
 
 			if (aconnector->dc_link->aux_mode)
 				drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
@@ -6052,6 +6056,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
+	struct amdgpu_display_manager *dm = &adev->dm;
 	int rc = 0;
 
 	if (enable) {
@@ -6067,7 +6072,32 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 		return rc;
 
 	irq_source = IRQ_TYPE_VBLANK + acrtc->otg_inst;
-	return dc_interrupt_set(adev->dm.dc, irq_source, enable) ? 0 : -EBUSY;
+
+	if (!dc_interrupt_set(adev->dm.dc, irq_source, enable))
+		return -EBUSY;
+
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	if (amdgpu_in_reset(adev))
+		return 0;
+
+	mutex_lock(&dm->dc_lock);
+
+	if (enable)
+		dm->active_vblank_irq_count++;
+	else
+		dm->active_vblank_irq_count--;
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	dc_allow_idle_optimizations(
+		adev->dm.dc, dm->active_vblank_irq_count == 0 ? true : false);
+
+	DRM_DEBUG_DRIVER("Allow idle optimizations (MALL): %d\n", dm->active_vblank_irq_count == 0);
+#endif
+
+	mutex_unlock(&dm->dc_lock);
+
+#endif
+	return 0;
 }
 
 static int dm_enable_vblank(struct drm_crtc *crtc)
