@@ -119,87 +119,64 @@ static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
-/* query pending events and return queue_id, event_type and is_suspended */
-#define KFD_DBG_EV_SET_SUSPEND_STATE(x, s)			\
-	((x) = (s) ? (x) | KFD_DBG_EV_STATUS_SUSPENDED :	\
-		(x) & ~KFD_DBG_EV_STATUS_SUSPENDED)
-
-#define KFD_DBG_EV_SET_EVENT_TYPE(x, e)				\
-	((x) = ((x) & ~(KFD_DBG_EV_STATUS_TRAP			\
-		| KFD_DBG_EV_STATUS_VMFAULT)) | (e))
-
-#define KFD_DBG_EV_SET_NEW_QUEUE_STATE(x, n)			\
-	((x) = (n) ? (x) | KFD_DBG_EV_STATUS_NEW_QUEUE :	\
-		(x) & ~KFD_DBG_EV_STATUS_NEW_QUEUE)
-
-uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
-{
-	uint32_t queue_status_word = 0;
-
-	KFD_DBG_EV_SET_EVENT_TYPE(queue_status_word,
-				  READ_ONCE(q->properties.debug_event_type));
-	KFD_DBG_EV_SET_SUSPEND_STATE(queue_status_word,
-				  q->properties.is_suspended);
-	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
-				  q->properties.is_new);
-
-	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
-		WRITE_ONCE(q->properties.debug_event_type, 0);
-
-	return queue_status_word;
-}
-
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
-		      unsigned int *queue_id,
-		      unsigned int flags,
-		      uint32_t *event_status)
+		      unsigned int *source_id,
+		      uint64_t exception_clear_mask,
+		      uint64_t *event_status)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct queue *q;
-	int ret = 0;
+	struct kfd_process_device *pdd;
 
-	if (!process)
+	if (!(process && process->debug_trap_enabled))
 		return -ENODATA;
 
-	/* lock process events to update event queues */
 	mutex_lock(&process->event_mutex);
+	*event_status = 0;
+	*source_id = 0;
+
+	/* find and report queue events */
 	pqm = &process->pqm;
-
-	if (*queue_id != KFD_INVALID_QUEUEID) {
-		q = pqm_get_user_queue(pqm, *queue_id);
-
-		if (!q) {
-			ret = -EINVAL;
-			goto out;
-		}
-
-		*event_status = kfd_dbg_get_queue_status_word(q, flags);
-		q->properties.is_new = false;
-		goto out;
-	}
-
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		unsigned int tmp_status;
+		uint64_t tmp = process->exception_enable_mask;
 
 		if (!pqn->q)
 			continue;
 
-		tmp_status = kfd_dbg_get_queue_status_word(pqn->q, flags);
-		if (tmp_status & (KFD_DBG_EV_STATUS_TRAP |
-						KFD_DBG_EV_STATUS_VMFAULT)) {
-			*queue_id = pqn->q->properties.queue_id;
-			*event_status = tmp_status;
-			pqn->q->properties.is_new = false;
-			goto out;
-		}
+		tmp &= pqn->q->properties.exception_status;
+
+		if (!tmp)
+			continue;
+
+		*event_status = pqn->q->properties.exception_status;
+		*source_id = pqn->q->properties.queue_id;
+		pqn->q->properties.exception_status &= ~exception_clear_mask;
+		goto out;
 	}
 
-	ret = -EAGAIN;
+	/* find and report device events */
+	list_for_each_entry(pdd, &process->per_device_data, per_device_list) {
+		uint64_t tmp = process->exception_enable_mask
+						& pdd->exception_status;
+
+		if (!tmp)
+			continue;
+
+		*event_status = pdd->exception_status;
+		*source_id = pdd->dev->id;
+		pdd->exception_status &= ~exception_clear_mask;
+		goto out;
+	}
+
+	/* report process events */
+	if (process->exception_enable_mask & process->exception_status) {
+		*event_status = process->exception_status;
+		process->exception_status &= ~exception_clear_mask;
+	}
 
 out:
 	mutex_unlock(&process->event_mutex);
-	return ret;
+	return *event_status ? 0 : -EAGAIN;
 }
 
 /* create event queue struct associated with process per device */
@@ -245,53 +222,88 @@ static int kfd_create_event_queue(struct kfd_process *process,
 	return ret;
 }
 
-/* update process device, write to kfifo and wake up wait queue  */
-static void kfd_dbg_ev_update_event_queue(struct kfd_dev *dev,
-					  struct kfd_process *process,
-					  unsigned int doorbell_id,
-					  bool is_vmfault)
+/* update process/device/queue exception status, write to kfifo and wake up
+ * wait queue on only if exception_status is enabled.
+ */
+void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+			unsigned int source_id)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
+	struct kfd_debug_event_priv *dbg_ev_priv;
 	char fifo_output;
+	uint64_t ec_mask = KFD_EC_MASK(event_type);
 
-	if (!process->debug_trap_enabled)
+	if (!(process && process->debug_trap_enabled))
 		return;
 
-	pqm = &process->pqm;
+	mutex_lock(&process->event_mutex);
+	dbg_ev_priv = process->dbg_ev_file->private_data;
 
-	/* iterate through each queue */
-	list_for_each_entry(pqn, &pqm->queues,
-				process_queue_list) {
-		long bit_to_set;
-		struct kfd_debug_event_priv *dbg_ev_priv;
-
-		if (!pqn->q)
-			continue;
-
-		if (pqn->q->device != dev)
-			continue;
-
-		if (pqn->q->doorbell_id != doorbell_id && !is_vmfault)
-			continue;
-
-		bit_to_set = is_vmfault ?
-			KFD_DBG_EV_STATUS_VMFAULT_BIT :
-			KFD_DBG_EV_STATUS_TRAP_BIT;
-
-		set_bit(bit_to_set, &pqn->q->properties.debug_event_type);
-
-		fifo_output = is_vmfault ? 'v' : 't';
-
-		dbg_ev_priv = process->dbg_ev_file->private_data;
-
-		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
-
-		wake_up_all(&dbg_ev_priv->wait_queue);
-
-		if (!is_vmfault)
-			break;
+	/* NOTE: The debugger disregards character assignments and
+	 * fifo overrun. Character assignment to events are for KFD
+	 * testing and debugging.
+	 */
+	switch (event_type) {
+	case EC_QUEUE_NEW: /* queue */
+		fifo_output = 'n';
+		break;
+	case EC_TRAP_HANDLER: /* queue */
+		fifo_output = 't';
+		break;
+	case EC_MEMORY_VIOLATION: /* device */
+		fifo_output = 'v';
+		break;
+	case EC_QUEUE_DELETE: /* device */
+		fifo_output = 'd';
+		break;
+	default:
+		mutex_unlock(&process->event_mutex);
+		return;
 	}
+
+	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
+		struct kfd_process_device *pdd;
+
+		list_for_each_entry(pdd, &process->per_device_data,
+					per_device_list) {
+
+			if (pdd->dev->id != source_id)
+				continue;
+
+			pdd->exception_status |= ec_mask;
+			break;
+		}
+	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(event_type)) {
+		process->exception_status |= ec_mask;
+	} else {
+		pqm = &process->pqm;
+		list_for_each_entry(pqn, &pqm->queues,
+				process_queue_list) {
+			int target_id;
+			bool need_queue_id = event_type == EC_QUEUE_NEW;
+
+			if (!pqn->q)
+				continue;
+
+			target_id = need_queue_id ?
+					pqn->q->properties.queue_id :
+							pqn->q->doorbell_id;
+
+			if (target_id != source_id)
+				continue;
+
+			pqn->q->properties.exception_status |= ec_mask;
+			break;
+		}
+	}
+
+	if (process->exception_enable_mask & ec_mask) {
+		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
+		wake_up_all(&dbg_ev_priv->wait_queue);
+	}
+
+	mutex_unlock(&process->event_mutex);
 }
 
 /* set pending event queue entry from ring entry  */
@@ -307,11 +319,8 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 	if (!p)
 		return;
 
-	mutex_lock(&p->event_mutex);
-
-	kfd_dbg_ev_update_event_queue(dev, p, doorbell_id, is_vmfault);
-
-	mutex_unlock(&p->event_mutex);
+	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
+					p, is_vmfault ? dev->id : doorbell_id);
 
 	kfd_unref_process(p);
 }
