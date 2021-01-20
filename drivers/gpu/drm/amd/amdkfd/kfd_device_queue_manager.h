@@ -233,16 +233,15 @@ int release_debug_trap_vmid(struct device_queue_manager *dqm);
 int suspend_queues(struct kfd_process *p,
 			uint32_t num_queues,
 			uint32_t grace_period,
-			uint32_t flags,
+			uint64_t exception_clear_mask,
 			uint32_t *queue_ids);
 int resume_queues(struct kfd_process *p,
 		uint32_t num_queues,
-		uint32_t flags,
 		uint32_t *queue_ids);
 
 void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 			      struct queue *q,
-			      int flags,
+			      uint64_t exception_clear_mask,
 			      struct kfd_queue_snapshot_entry *qss_entry);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)

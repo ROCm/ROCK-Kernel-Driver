@@ -28,15 +28,16 @@
 uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags);
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
-			unsigned int *queue_id,
-			unsigned int flags,
-			uint32_t *event_status);
+			unsigned int *source_id,
+			uint64_t exception_clear_mask,
+			uint64_t *event_status);
 
 void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
 				   bool is_vmfault);
-
+void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+			unsigned int source_id);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
 int kfd_dbg_trap_disable(struct kfd_process *target,
