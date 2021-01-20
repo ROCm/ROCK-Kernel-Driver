@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef AMDKCL_DRM_ENCODER_H_H
-#define AMDKCL_DRM_ENCODER_H_H
+#ifndef _KCL_HEADER_DRM_ENCODER_H_H_
+#define _KCL_HEADER_DRM_ENCODER_H_H_
 
 #ifdef HAVE_DRM_DRM_ENCODER_H
-#include <drm/drm_encoder.h>
+#include_next <drm/drm_encoder.h>
 #else
 #include <drm/drm_crtc.h>
 #endif
+
 #endif

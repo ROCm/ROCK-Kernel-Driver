@@ -27,6 +27,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include <drm/drmP.h>
 #include <kcl/kcl_drm_auth.h>
 
 #if !defined(HAVE_DRM_IS_CURRENT_MASTER)

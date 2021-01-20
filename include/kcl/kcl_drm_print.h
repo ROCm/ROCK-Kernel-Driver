@@ -25,8 +25,8 @@
 #ifndef AMDKCL_DRM_PRINT_H
 #define AMDKCL_DRM_PRINT_H
 
-#include <kcl/header/kcl_drm_print_h.h>
-#include <kcl/header/kcl_drm_drv_h.h>
+#include <drm/drm_print.h>
+#include <drm/drm_drv.h>
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
 /* Copied from include/drm/drm_print.h */

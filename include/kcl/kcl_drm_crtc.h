@@ -50,7 +50,7 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
-#include <kcl/header/kcl_drm_device_h.h>
+#include <drm/drm_device.h>
 
 /* Copied from include/drm/drm_mode.h */
 #ifndef DRM_MODE_ROTATE_0

@@ -27,7 +27,7 @@
  */
 #include <kcl/kcl_drm_atomic_helper.h>
 #include <kcl/kcl_drm_crtc.h>
-#include <kcl/header/kcl_drm_vblank_h.h>
+#include <drm/drm_vblank.h>
 
 #ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
 /* Copied from drivers/gpu/drm/drm_atomic_state_helper.c and modified for KCL */

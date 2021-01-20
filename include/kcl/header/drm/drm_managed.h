@@ -3,7 +3,7 @@
 #define _KCL_HEADER_KCL_DRM_MANAGED_H_H
 
 #ifdef HAVE_DRM_DRM_MANAGED_H
-#include <drm/drm_managed.h>
+#include_next <drm/drm_managed.h>
 #endif
 
 #endif

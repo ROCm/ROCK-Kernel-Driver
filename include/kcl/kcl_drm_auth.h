@@ -27,7 +27,7 @@
 #ifndef _KCL_KCL_DRM_AUTH_H
 #define _KCL_KCL_DRM_AUTH_H
 
-#include <kcl/header/kcl_drm_file_h.h>
+#include <drm/drm_file.h>
 
 #if !defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv);

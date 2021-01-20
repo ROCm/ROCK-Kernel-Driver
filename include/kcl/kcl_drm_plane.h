@@ -22,7 +22,7 @@
 #ifndef __KCL_KCL_DRM_PLANE_H__
 #define __KCL_KCL_DRM_PLANE_H__
 
-#include <kcl/header/kcl_drm_plane_h.h>
+#include <drm/drm_plane.h>
 
 #ifndef HAVE_DRM_PLANE_MASK
 /* Copied from include/drm/drm_plane.h */
