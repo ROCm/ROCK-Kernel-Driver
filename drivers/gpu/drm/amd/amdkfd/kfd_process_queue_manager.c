@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include "kfd_device_queue_manager.h"
+#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
@@ -172,7 +173,7 @@ static int init_user_queue(struct process_queue_manager *pqm,
 
 	/* Doorbell initialized in user space*/
 	q_properties->doorbell_ptr = NULL;
-	q_properties->is_new = true;
+	q_properties->exception_status = KFD_EC_MASK(EC_QUEUE_NEW);
 
 	/* let DQM handle it*/
 	q_properties->vmid = 0;
@@ -514,7 +515,7 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 }
 
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
-			   int flags,
+			   uint64_t exception_clear_mask,
 			   struct kfd_queue_snapshot_entry __user *buf,
 			   int num_qss_entries)
 {
@@ -532,7 +533,7 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			struct kfd_queue_snapshot_entry src = {0};
 
 			set_queue_snapshot_entry(pqn->q->device->dqm,
-						 pqn->q, flags, &src);
+					pqn->q, exception_clear_mask, &src);
 
 			r = copy_to_user(buf++, &src, sizeof(src));
 

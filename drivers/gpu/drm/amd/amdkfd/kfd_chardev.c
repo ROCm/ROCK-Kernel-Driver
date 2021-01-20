@@ -350,6 +350,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("Write ptr address   == 0x%016llX\n",
 			args->write_pointer_address);
 
+	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, queue_id);
 	return 0;
 
 err_create_queue:
@@ -2637,6 +2638,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct pid *pid = NULL;
 	uint32_t *user_array = NULL;
 	uint32_t debug_trap_action;
+	uint64_t exception_mask;
 	uint32_t data1;
 	uint32_t data2;
 	uint32_t data3;
@@ -2650,6 +2652,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	data1 = args->data1;
 	data2 = args->data2;
 	data3 = args->data3;
+	exception_mask = args->exception_mask;
 
 	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
 		pr_err("Unsupported sched_policy: %i", sched_policy);
@@ -2711,8 +2714,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	mutex_lock(&target->mutex);
 
 	if (need_user_array) {
-		/* data 2 has the number of IDs */
-		size_t user_array_size = sizeof(uint32_t) * data2;
+		/* data 1 has the number of IDs */
+		size_t user_array_size = sizeof(uint32_t) * data1;
 
 		user_array = kzalloc(user_array_size, GFP_KERNEL);
 		if (!user_array) {
@@ -2768,8 +2771,9 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = kfd_dbg_trap_disable(target, false, 0);
 			break;
 		case 1:
-			r = kfd_dbg_trap_enable(target, &args->data3);
-
+			r = kfd_dbg_trap_enable(target, &args->data2);
+			if (!r)
+				target->exception_enable_mask = exception_mask;
 			break;
 		default:
 			pr_err("Invalid trap enable option: %i\n",
@@ -2795,35 +2799,37 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	case KFD_IOC_DBG_TRAP_NODE_SUSPEND:
 		r = suspend_queues(target,
-				data2, /* Number of queues */
-				data3, /* Grace Period */
-				data1, /* Flags */
+				data1, /* Number of queues */
+				data2, /* Grace Period */
+				exception_mask, /* Clear mask */
 				user_array); /* array of queue ids */
 
-		size_to_copy_to_user_array = data2;
+		size_to_copy_to_user_array = data1;
 
 		break;
 
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
 		r = resume_queues(target,
-				data2, /* Number of queues */
-				data1, /* Flags */
+				data1, /* Number of queues */
 				user_array); /* array of queue ids */
 
-		size_to_copy_to_user_array = data2;
+		size_to_copy_to_user_array = data1;
 
 		break;
 	case KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
-		r = kfd_dbg_ev_query_debug_event(target, &args->data1,
-						 args->data2,
-						 &args->data3);
+		r = kfd_dbg_ev_query_debug_event(target,
+				/* data1 = 0 (process) or gpu_id or queue_id */
+				&args->data1,
+				exception_mask, /* Clear mask */
+				&args->exception_mask /* Status mask */);
 		break;
 	case KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT:
-		r = pqm_get_queue_snapshot(&target->pqm, args->data1,
+		r = pqm_get_queue_snapshot(&target->pqm,
+					   exception_mask, /* Clear mask  */
 					   (void __user *)args->ptr,
-					   args->data2);
+					   args->data1);
 
-		args->data2 = r < 0 ? 0 : r;
+		args->data1 = r < 0 ? 0 : r;
 		if (r > 0)
 			r = 0;
 		break;
