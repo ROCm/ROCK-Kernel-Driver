@@ -120,12 +120,20 @@ endif
 
 export OS_NAME OS_VERSION
 
+LINUX_SRCTREE_INCLUDE := \
+	$(filter-out -I%/uapi -include %/kconfig.h,$(LINUXINCLUDE))
+USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(LINUXINCLUDE))
+
 LINUXINCLUDE := \
 	-I$(src)/include \
-	-I$(src)/include/uapi \
+	-I$(src)/include/kcl/header \
 	-include $(src)/include/kcl/kcl_version.h \
 	-include $(src)/include/rename_symbol.h \
-	$(LINUXINCLUDE)
+	-include $(src)/amd/dkms/config/config.h \
+	$(LINUX_SRCTREE_INCLUDE) \
+	-I$(src)/include/uapi \
+	-I$(src)/include/kcl/header/uapi \
+	$(USER_INCLUDE)
 
 export CONFIG_HSA_AMD=y
 export CONFIG_DRM_TTM=m
