@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef AMDKCL_SET_MEMORY_H_H
-#define AMDKCL_SET_MEMORY_H_H
+#ifndef _KCL_HEADER__ASM_SET_MEMORY_H_H_
+#define _KCL_HEADER__ASM_SET_MEMORY_H_H_
 
 #if defined(HAVE_ASM_SET_MEMORY_H)
-#include <asm/set_memory.h>
+#include_next <asm/set_memory.h>
 #else
 #include <asm/cacheflush.h>
 #endif
+
 #endif

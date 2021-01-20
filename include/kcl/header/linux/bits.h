@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MIT */
-#ifndef AMDKCL_BITS_H_H
-#define AMDKCL_BITS_H_H
+#ifndef _KCL_HEADER__LINUX_BITS_H_H_
+#define _KCL_HEADER__LINUX_BITS_H_H_
 
 #if defined(HAVE_LINUX_BITS_H)
-#include <linux/bits.h>
+#include_next <linux/bits.h>
 #else
 #include <linux/bitops.h>
 #endif
+
 #endif

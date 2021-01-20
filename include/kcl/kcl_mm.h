@@ -7,7 +7,7 @@
 #ifndef AMDKCL_MM_H
 #define AMDKCL_MM_H
 
-#include <kcl/header/kcl_sched_mm_h.h>
+#include <linux/sched/mm.h>
 #include <asm/page.h>
 #include <linux/mm_types.h>
 #include <linux/mm.h>
