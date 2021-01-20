@@ -237,6 +237,7 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_INVALID_FD     0xffffffff
 
 struct kfd_ioctl_dbg_trap_args {
+	__u64 exception_mask; /* to KFD */
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
 	__u32 pid;     /* to KFD */
 	__u32 op;      /* to KFD */
