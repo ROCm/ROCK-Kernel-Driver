@@ -30,7 +30,7 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
-#include <uapi/linux/kfd_ioctl.h>
+#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_mqd_manager.h"
@@ -960,6 +960,8 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 				      struct kfd_process_device *pdd,
 				      struct queue *q)
 {
+	bool is_new;
+
 	if (q->properties.is_suspended)
 		return 0;
 
@@ -967,9 +969,11 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 			pdd->process->pasid,
 			q->properties.queue_id);
 
-	if (q->properties.is_new || q->properties.is_being_destroyed) {
+	is_new = q->properties.exception_status & KFD_EC_MASK(EC_QUEUE_NEW);
+
+	if (is_new || q->properties.is_being_destroyed) {
 		pr_debug("Suspend: skip %s queue id %i\n",
-				q->properties.is_new ? "new" : "destroyed",
+				is_new ? "new" : "destroyed",
 				q->properties.queue_id);
 		return -EBUSY;
 	}
@@ -2094,7 +2098,11 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 
 	dqm_unlock(dqm);
 
-	/* Do free_mqd after dqm_unlock(dqm) to avoid circular locking */
+	/*
+	 * Do free_mqd and delete raise event after dqm_unlock(dqm) to avoid
+	 * circular locking
+	 */
+	kfd_dbg_ev_raise(EC_QUEUE_DELETE, qpd->pqm->process, q->device->id);
 	mqd_mgr->free_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 
 	return retval;
@@ -2777,7 +2785,6 @@ void copy_context_work_handler (struct work_struct *work)
 
 int resume_queues(struct kfd_process *p,
 		uint32_t num_queues,
-		uint32_t flags,
 		uint32_t *queue_ids)
 {
 	struct kfd_process_device *pdd;
@@ -2844,7 +2851,7 @@ int resume_queues(struct kfd_process *p,
 int suspend_queues(struct kfd_process *p,
 			uint32_t num_queues,
 			uint32_t grace_period,
-			uint32_t flags,
+			uint64_t exception_clear_mask,
 			uint32_t *queue_ids)
 {
 	struct kfd_process_device *pdd;
@@ -2859,6 +2866,7 @@ int suspend_queues(struct kfd_process *p,
 		struct queue *q;
 		int r, per_device_suspended = 0;
 
+		mutex_lock(&p->event_mutex);
 		dqm_lock(dqm);
 
 		/* unmask queues that suspend or already suspended */
@@ -2877,6 +2885,7 @@ int suspend_queues(struct kfd_process *p,
 
 		if (!per_device_suspended) {
 			dqm_unlock(dqm);
+			mutex_unlock(&p->event_mutex);
 			continue;
 		}
 
@@ -2899,11 +2908,13 @@ int suspend_queues(struct kfd_process *p,
 			/* mask queue as error on suspend fail */
 			if (r)
 				queue_ids[q_idx] |= KFD_DBG_QUEUE_ERROR_MASK;
-			else if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
-				WRITE_ONCE(q->properties.debug_event_type, 0);
+			else if (exception_clear_mask)
+				q->properties.exception_status &=
+							~exception_clear_mask;
 		}
 
 		dqm_unlock(dqm);
+		mutex_unlock(&p->event_mutex);
 		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
 	}
 
@@ -2945,7 +2956,7 @@ static uint32_t set_queue_type_for_user(struct queue_properties *q_props)
 
 void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 			      struct queue *q,
-			      int flags,
+			      uint64_t exception_clear_mask,
 			      struct kfd_queue_snapshot_entry *qss_entry)
 {
 	dqm_lock(dqm);
@@ -2955,12 +2966,12 @@ void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 	qss_entry->read_pointer_address = (uint64_t)q->properties.read_ptr,
 	qss_entry->ctx_save_restore_address =
 				q->properties.ctx_save_restore_area_address;
+	qss_entry->exception_status = q->properties.exception_status;
 	qss_entry->queue_id = q->properties.queue_id;
 	qss_entry->gpu_id = q->device->id;
 	qss_entry->ring_size = (uint32_t)q->properties.queue_size;
 	qss_entry->queue_type = set_queue_type_for_user(&q->properties);
-	qss_entry->queue_status = kfd_dbg_get_queue_status_word(q, flags);
-	q->properties.is_new = false;
+	q->properties.exception_status &= ~exception_clear_mask;
 
 	dqm_unlock(dqm);
 }
