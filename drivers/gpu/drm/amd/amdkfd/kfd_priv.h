@@ -508,7 +508,6 @@ struct queue_properties {
 	bool is_suspended;
 	bool is_being_destroyed;
 	bool is_active;
-	bool is_new;
 	bool is_gws;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -528,6 +527,7 @@ struct queue_properties {
 	uint32_t cu_mask_count; /* Must be a multiple of 32 */
 	uint32_t *cu_mask;
 	unsigned long debug_event_type;
+	uint64_t exception_status; /* Exception code status */
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
@@ -812,6 +812,9 @@ struct kfd_process_device {
 	 *  number of CU's a device has along with number of other competing processes
 	 */
 	struct attribute attr_cu_occupancy;
+
+	/* Exception code status*/
+	uint64_t exception_status;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -920,6 +923,10 @@ struct kfd_process {
 
 	/* Keep track cwsr init */
 	bool has_cwsr;
+
+	/* Exception code enable mask and status */
+	uint64_t exception_enable_mask;
+	uint64_t exception_status;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
@@ -1142,7 +1149,7 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       u32 *save_area_used_size);
 
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
-			   int flags,
+			   uint64_t exception_clear_mask,
 			   struct kfd_queue_snapshot_entry __user *buf,
 			   int num_qss_entries);
 
