@@ -671,9 +671,6 @@
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
 
-/* Define to 1 if you have the <linux/kfifo-new.h> header file. */
-/* #undef HAVE_LINUX_KFIFO_NEW_H */
-
 /* Define to 1 if you have the <linux/mem_encrypt.h> header file. */
 #define HAVE_LINUX_MEM_ENCRYPT_H 1
 

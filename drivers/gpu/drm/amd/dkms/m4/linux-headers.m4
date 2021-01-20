@@ -19,12 +19,6 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([linux/nospec.h])
 
 	dnl #
-	dnl # commit 4201d9a8e86b51dd40aa8a0dabd093376c859985
-	dnl # kfifo: add the new generic kfifo API
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/kfifo-new.h])
-
-	dnl #
 	dnl # commit 8bd9cb51daac89337295b6f037b0486911e1b408
 	dnl # locking/atomics, asm-generic: Move some macros from <linux/bitops.h>
 	dnl # to a new <linux/bits.h> file

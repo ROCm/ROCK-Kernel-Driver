@@ -1,7 +1,6 @@
 linux/sched/mm.h kcl/header/kcl_sched_mm_h.h
 linux/sched/task.h kcl/header/kcl_sched_task_h.h
 uapi/linux/sched/types.h kcl/header/kcl_uapi_linux_sched_types_h.h
-linux/kfifo.h kcl/header/kcl_kfifo_h.h
 linux/bits.h kcl/header/kcl_bits_h.h
 asm/set_memory.h kcl/header/kcl_set_memory_h.h
 linux/sched/signal.h kcl/header/kcl_sched_signal_h.h
