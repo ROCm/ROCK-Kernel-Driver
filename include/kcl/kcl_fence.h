@@ -14,13 +14,8 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_rcupdate.h>
-#if !defined(HAVE_LINUX_DMA_FENCE_H)
-#include <linux/fence.h>
-#include <kcl/kcl_fence_array.h>
-#else
 #include <linux/dma-fence.h>
-#include <linux/dma-fence-array.h>
-#endif
+#include <kcl/kcl_fence_array.h>
 
 #if !defined(HAVE_LINUX_DMA_FENCE_H)
 #define dma_fence_cb fence_cb
