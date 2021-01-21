@@ -38,21 +38,9 @@ for sym in $SYMS; do
 done
 
 sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_ww_class)/d' \
-       -e 's/linux\/sched\/mm\.h/kcl\/header\/kcl_sched_mm_h\.h/' \
        -e '/dma_resv_lockdep/,/subsys_initcall/d' $KCL/dma-buf/dma-resv.c
 sed -i -e '/extern struct ww_class reservation_ww_class/i #include <kcl/kcl_dma-resv.h>' \
        -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
-
-while read from to; do
-	[[ -z "$from" ]] && continue
-	file=${from//\//\\/}
-	file=${file//\./\\.}
-	list=$(grep -rl "$file" amd/* scheduler/* ttm/* include/* | \
-		sed '/^include\/kcl/d; /^amd\/dkms/d; /^amd\/amdkcl/d' | sort -u)
-	for file in $list; do
-		sed -i "s|$from|$to|" $file
-	done
-done < $SRC/headers
 
 for file in $FILES; do
 	awk -F'[()]' '/EXPORT_SYMBOL/ {
