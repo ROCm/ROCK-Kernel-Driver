@@ -12345,8 +12345,11 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 				if (range->flags != 1)
 					continue;
 
+
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 				connector->display_info.monitor_range.min_vfreq = range->min_vfreq;
 				connector->display_info.monitor_range.max_vfreq = range->max_vfreq;
+
 
 				if (edid->revision >= 4) {
 					if (data->pad2 & DRM_EDID_RANGE_OFFSET_MIN_VFREQ)
@@ -12359,6 +12362,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 					connector->display_info.monitor_range.min_vfreq;
 				amdgpu_dm_connector->max_vfreq =
 					connector->display_info.monitor_range.max_vfreq;
+#else
+				amdgpu_dm_connector->min_vfreq = range->min_vfreq;
+				amdgpu_dm_connector->max_vfreq = range->max_vfreq;
+#endif
 
 				break;
 			}
