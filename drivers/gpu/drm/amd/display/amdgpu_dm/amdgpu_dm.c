@@ -12541,10 +12541,12 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 
 	if (edid && (sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT ||
 		     sink->sink_signal == SIGNAL_TYPE_EDP)) {
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 		amdgpu_dm_connector->min_vfreq = connector->display_info.monitor_range.min_vfreq;
 		amdgpu_dm_connector->max_vfreq = connector->display_info.monitor_range.max_vfreq;
 		if (amdgpu_dm_connector->max_vfreq - amdgpu_dm_connector->min_vfreq > 10)
 			freesync_capable = true;
+#endif
 		parse_amd_vsdb(amdgpu_dm_connector, edid, &vsdb_info);
 
 		if (vsdb_info.replay_mode) {
