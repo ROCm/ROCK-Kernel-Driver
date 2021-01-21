@@ -1,6 +1,4 @@
 linux/pfn_t.h kcl/kcl_mm_types.h
 drm/task_barrier.h kcl/kcl_task_barrier.h
-linux/dma-fence.h kcl/backport/kcl_fence_backport.h
-linux/dma-fence-array.h kcl/backport/kcl_fence_backport.h
 drm/drm_hdcp.h kcl/kcl_drm_hdcp.h
 
