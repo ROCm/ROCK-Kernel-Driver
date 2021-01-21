@@ -245,6 +245,9 @@
 /* display_info->max_tmds_clock is available */
 #define HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK 1
 
+/* struct drm_display_info has monitor_range member */
+#define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
+
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 
