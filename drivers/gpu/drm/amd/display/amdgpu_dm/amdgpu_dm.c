@@ -1009,7 +1009,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 			init_data.flags.disable_dmcu = true;
 #endif
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_VANGOGH:
 		init_data.flags.gpu_vm_support = true;
 		break;
@@ -1820,7 +1820,7 @@ static int dm_suspend(void *handle)
 	if (amdgpu_in_reset(adev)) {
 		mutex_lock(&dm->dc_lock);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		dc_allow_idle_optimizations(adev->dm.dc, false);
 #endif
 
@@ -5985,7 +5985,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	if (!dc_interrupt_set(adev->dm.dc, irq_source, enable))
 		return -EBUSY;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (amdgpu_in_reset(adev))
 		return 0;
 
