@@ -29,6 +29,7 @@
 #include "i2caux_interface.h"
 #include "inc/hw/aux_engine.h"
 
+enum aux_return_code_type;
 
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define AUX_COMMON_REG_LIST0(id)\
@@ -304,7 +305,7 @@ bool dce110_aux_engine_acquire(
 
 int dce_aux_transfer_raw(struct ddc_service *ddc,
 		struct aux_payload *cmd,
-		enum aux_channel_operation_result *operation_result);
+		enum aux_return_code_type *operation_result);
 
 bool dce_aux_transfer_with_retries(struct ddc_service *ddc,
 		struct aux_payload *cmd);
