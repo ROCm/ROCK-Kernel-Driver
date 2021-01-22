@@ -64,9 +64,9 @@
 #define  PCI_EXP_LNKCTL2_TLS_8_0GT    0x0003 /* Supported Speed 8GT/s */
 #endif
 
-#ifndef PCIE_SPEED_16_0GT
 #define PCIE_SPEED_16_0GT		0x17
-#endif
+#define PCIE_SPEED_32_0GT		0x18
+
 #ifndef PCI_EXP_LNKCAP2_SLS_16_0GB
 #define PCI_EXP_LNKCAP2_SLS_16_0GB	0x00000010	/* Supported Speed 16GT/s */
 #endif
