@@ -98,6 +98,9 @@ struct mqd_manager {
 				  u32 *ctl_stack_used_size,
 				  u32 *save_area_used_size);
 
+	void	(*get_dump_info)(struct mqd_manager *mm, void *mqd,
+				uint32_t *ctl_stack_size);
+
 	void	(*dump_mqd)(struct mqd_manager *mm, void *mqd,
 				struct queue_restore_data *qrd);
 

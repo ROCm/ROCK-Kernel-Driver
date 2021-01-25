@@ -478,6 +478,8 @@ struct queue_restore_data {
 	uint32_t cu_mask_size;
 	void *mqd;
 	uint32_t mqd_size;
+	void *mqd_ctl_stack;
+	uint32_t ctl_stack_size;
 };
 
 struct queue_properties {
@@ -1090,8 +1092,8 @@ int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
 int pqm_get_queue_dump_info(struct process_queue_manager *pqm,
-			unsigned int qid,
-			u32 *mqd_size);
+			    unsigned int qid,
+			    u32 *mqd_size, u32 *ctl_stack_size);
 int pqm_dump_mqd(struct process_queue_manager *pqm,
 		       unsigned int qid,
 		       struct queue_restore_data* qrd);

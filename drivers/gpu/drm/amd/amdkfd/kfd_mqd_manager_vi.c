@@ -303,6 +303,13 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	return 0;
 }
 
+static void get_dump_info(struct mqd_manager *mm, void *mqd,
+                       u32 *ctl_stack_size)
+{
+	/* Control stack is stored in user mode */
+	*ctl_stack_size = 0;
+}
+
 static void dump_mqd(struct mqd_manager *mm, void *mqd,
                        struct queue_restore_data *qrd)
 {
@@ -499,6 +506,7 @@ struct mqd_manager *mqd_manager_init_vi(enum KFD_MQD_TYPE type,
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
 		mqd->get_wave_state = get_wave_state;
+		mqd->get_dump_info = get_dump_info;
 		mqd->dump_mqd = dump_mqd;
 		mqd->restore_mqd = restore_mqd;
 		mqd->mqd_size = sizeof(struct vi_mqd);

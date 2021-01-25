@@ -137,8 +137,8 @@ struct device_queue_manager_ops {
 				  u32 *save_area_used_size);
 
 	void	(*get_queue_dump_info)(struct device_queue_manager *dqm,
-				  const struct queue *q,
-				  u32 *mqd_size);
+				  const struct queue *q, u32 *mqd_size,
+				  u32 *ctl_stack_size);
 
 	int	(*dump_mqd)(struct device_queue_manager *dqm,
 				  const struct queue *q,

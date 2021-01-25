@@ -1756,14 +1756,22 @@ dqm_unlock:
 
 static void get_queue_dump_info(struct device_queue_manager *dqm,
 			const struct queue *q,
-			u32 *mqd_size)
+			u32 *mqd_size,
+			u32 *ctl_stack_size)
 {
 	struct mqd_manager *mqd_mgr;
 	enum KFD_MQD_TYPE mqd_type =
 			get_mqd_type_from_queue_type(q->properties.type);
 
+	dqm_lock(dqm);
 	mqd_mgr = dqm->mqd_mgrs[mqd_type];
 	*mqd_size = mqd_mgr->mqd_size;
+	*ctl_stack_size = 0;
+
+	if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE && mqd_mgr->get_dump_info)
+		mqd_mgr->get_dump_info(mqd_mgr, q->mqd, ctl_stack_size);
+
+	dqm_unlock(dqm);
 }
 
 static int dump_mqd(struct device_queue_manager *dqm,

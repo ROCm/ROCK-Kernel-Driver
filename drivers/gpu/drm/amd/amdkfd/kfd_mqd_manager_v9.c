@@ -338,13 +338,24 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	return 0;
 }
 
+static void get_dump_info(struct mqd_manager *mm, void *mqd, u32 *ctl_stack_size)
+{
+	struct v9_mqd *m = get_mqd(mqd);
+
+	*ctl_stack_size = m->cp_hqd_cntl_stack_size;
+}
+
 static void dump_mqd(struct mqd_manager *mm, void *mqd,
                        struct queue_restore_data *qrd)
 {
 	struct v9_mqd *m;
+	/* Control stack is located one page after MQD. */
+	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
+
 	m = get_mqd(mqd);
 
 	memcpy(qrd->mqd, m, sizeof(struct v9_mqd));
+	memcpy(qrd->mqd_ctl_stack, mqd_ctl_stack, m->cp_hqd_cntl_stack_size);
 }
 
 static void restore_mqd(struct mqd_manager *mm, void **mqd,
@@ -354,6 +365,8 @@ static void restore_mqd(struct mqd_manager *mm, void **mqd,
 {
 	uint64_t addr;
 	struct v9_mqd *m;
+	void *mqd_ctl_stack;
+
 	m = (struct v9_mqd *) mqd_mem_obj->cpu_ptr;
 	addr = mqd_mem_obj->gpu_addr;
 
@@ -364,6 +377,10 @@ static void restore_mqd(struct mqd_manager *mm, void **mqd,
 		*gart_addr = addr;
 
 	/* Control stack is located one page after MQD. */
+	mqd_ctl_stack = (void *)((uintptr_t)*mqd + PAGE_SIZE);
+	memcpy(mqd_ctl_stack, qrd->mqd_ctl_stack, qrd->ctl_stack_size);
+
+	/* TODO: Confirm that qp->doorbell_off is restored properly */
 	m->cp_hqd_pq_doorbell_control =
 		qp->doorbell_off <<
 			CP_HQD_PQ_DOORBELL_CONTROL__DOORBELL_OFFSET__SHIFT;
@@ -531,6 +548,7 @@ struct mqd_manager *mqd_manager_init_v9(enum KFD_MQD_TYPE type,
 		mqd->destroy_mqd = destroy_mqd;
 		mqd->is_occupied = is_occupied;
 		mqd->get_wave_state = get_wave_state;
+		mqd->get_dump_info = get_dump_info;
 		mqd->dump_mqd = dump_mqd;
 		mqd->restore_mqd = restore_mqd;
 		mqd->mqd_size = sizeof(struct v9_mqd);

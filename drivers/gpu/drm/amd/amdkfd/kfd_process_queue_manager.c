@@ -527,9 +527,8 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 						       save_area_used_size);
 }
 
-int pqm_get_queue_dump_info(struct process_queue_manager *pqm,
-			unsigned int qid,
-			u32 *mqd_size)
+int pqm_get_queue_dump_info(struct process_queue_manager *pqm, unsigned int qid,
+			u32 *mqd_size, u32 *ctl_stack_size)
 {
 	struct process_queue_node *pqn;
 
@@ -545,7 +544,8 @@ int pqm_get_queue_dump_info(struct process_queue_manager *pqm,
 	}
 
 	pqn->q->device->dqm->ops.get_queue_dump_info(pqn->q->device->dqm,
-						       pqn->q, mqd_size);
+						       pqn->q, mqd_size,
+						       ctl_stack_size);
 	return 0;
 }
 
