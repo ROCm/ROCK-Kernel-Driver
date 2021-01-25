@@ -527,6 +527,48 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 						       save_area_used_size);
 }
 
+int pqm_get_queue_dump_info(struct process_queue_manager *pqm,
+			unsigned int qid,
+			u32 *mqd_size)
+{
+	struct process_queue_node *pqn;
+
+	pqn = get_queue_by_qid(pqm, qid);
+	if (!pqn) {
+		pr_debug("amdkfd: No queue %d exists for operation\n", qid);
+		return -EFAULT;
+	}
+
+	if (!pqn->q->device->dqm->ops.get_queue_dump_info) {
+		pr_err("amdkfd: queue dumping not supported on this device\n");
+		return -ENOTSUPP;
+	}
+
+	pqn->q->device->dqm->ops.get_queue_dump_info(pqn->q->device->dqm,
+						       pqn->q, mqd_size);
+	return 0;
+}
+
+int pqm_dump_mqd(struct process_queue_manager *pqm,
+		       unsigned int qid, struct queue_restore_data* qrd)
+{
+	struct process_queue_node *pqn;
+
+	pqn = get_queue_by_qid(pqm, qid);
+	if (!pqn) {
+		pr_debug("amdkfd: No queue %d exists for operation\n", qid);
+		return -EFAULT;
+	}
+
+	if (!pqn->q->device->dqm->ops.dump_mqd) {
+		pr_err("amdkfd: queue dumping not supported on this device\n");
+		return -ENOTSUPP;
+	}
+
+	return pqn->q->device->dqm->ops.dump_mqd(pqn->q->device->dqm,
+						       pqn->q, qrd);
+}
+
 #if defined(CONFIG_DEBUG_FS)
 
 int pqm_debugfs_mqds(struct seq_file *m, void *data)

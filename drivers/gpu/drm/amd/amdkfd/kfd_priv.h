@@ -476,6 +476,8 @@ struct queue_restore_data {
 
 	void *cu_mask;
 	uint32_t cu_mask_size;
+	void *mqd;
+	uint32_t mqd_size;
 };
 
 struct queue_properties {
@@ -1087,6 +1089,12 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
+int pqm_get_queue_dump_info(struct process_queue_manager *pqm,
+			unsigned int qid,
+			u32 *mqd_size);
+int pqm_dump_mqd(struct process_queue_manager *pqm,
+		       unsigned int qid,
+		       struct queue_restore_data* qrd);
 
 /* Packet Manager */
 

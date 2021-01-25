@@ -135,6 +135,14 @@ struct device_queue_manager_ops {
 				  void __user *ctl_stack,
 				  u32 *ctl_stack_used_size,
 				  u32 *save_area_used_size);
+
+	void	(*get_queue_dump_info)(struct device_queue_manager *dqm,
+				  const struct queue *q,
+				  u32 *mqd_size);
+
+	int	(*dump_mqd)(struct device_queue_manager *dqm,
+				  const struct queue *q,
+				  struct queue_restore_data *qrd);
 };
 
 struct device_queue_manager_asic_ops {

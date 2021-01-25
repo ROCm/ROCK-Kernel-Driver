@@ -1893,11 +1893,18 @@ static int kfd_devinfo_restore(struct kfd_process *p, struct kfd_criu_devinfo_bu
 
 static int get_queue_data_sizes(struct kfd_process_device *pdd,
 				struct queue *q,
-				uint32_t *cu_mask_size)
+				uint32_t *cu_mask_size,
+				uint32_t *mqd_size)
 {
 	int ret = 0;
 
 	*cu_mask_size = sizeof(uint32_t) * (q->properties.cu_mask_count / 32);
+
+	ret = pqm_get_queue_dump_info(&pdd->process->pqm, q->properties.queue_id, mqd_size);
+	if (ret) {
+		pr_err("Failed to get queue dump info (%d)\n", ret);
+		return ret;
+	}
 	return ret;
 }
 
@@ -1906,6 +1913,8 @@ static int criu_dump_queue(struct kfd_process_device *pdd,
                            struct kfd_criu_q_bucket *q_bucket,
 			   struct queue_restore_data *qrd)
 {
+	int ret = 0;
+
 	q_bucket->gpu_id = pdd->dev->id;
 	q_bucket->type = q->properties.type;
 	q_bucket->format = q->properties.format;
@@ -1935,8 +1944,15 @@ static int criu_dump_queue(struct kfd_process_device *pdd,
 	if (qrd->cu_mask_size)
 		memcpy(qrd->cu_mask, q->properties.cu_mask, qrd->cu_mask_size);
 
+	ret = pqm_dump_mqd(&pdd->process->pqm, q->properties.queue_id, qrd);
+	if (ret) {
+		pr_err("Failed dump queue_mqd (%d)\n", ret);
+		return ret;
+	}
+
 	q_bucket->cu_mask_size = qrd->cu_mask_size;
-	return 0;
+	q_bucket->mqd_size = qrd->mqd_size;
+	return ret;
 }
 
 static int criu_dump_queues_device(struct kfd_process_device *pdd,
@@ -1975,14 +1991,14 @@ static int criu_dump_queues_device(struct kfd_process_device *pdd,
 		memset(&q_bucket, 0, sizeof(q_bucket));
 		memset(&qrd, 0, sizeof(qrd));
 
-		ret = get_queue_data_sizes(pdd, q, &qrd.cu_mask_size);
+		ret = get_queue_data_sizes(pdd, q, &qrd.cu_mask_size, &qrd.mqd_size);
 		if (ret) {
 			pr_err("Failed to get queue dump info (%d)\n", ret);
 			ret = -EFAULT;
 			break;
 		}
 
-		q_data_size = qrd.cu_mask_size;
+		q_data_size = qrd.cu_mask_size + qrd.mqd_size;
 
 		/* Increase local buffer space if needed */
 		if (data_ptr_size < q_data_size) {
@@ -1998,6 +2014,7 @@ static int criu_dump_queues_device(struct kfd_process_device *pdd,
 		}
 
 		qrd.cu_mask = data_ptr;
+		qrd.mqd = data_ptr + qrd.cu_mask_size;
 		ret = criu_dump_queue(pdd, q, &q_bucket, &qrd);
 		if (ret)
 			break;
@@ -2317,7 +2334,7 @@ static int criu_restore_queues(struct kfd_process *p,
 			return ret;
 		}
 
-		q_data_size = q_bucket.cu_mask_size;
+		q_data_size = q_bucket.cu_mask_size + q_bucket.mqd_size;
 
 		/* Increase local buffer space if needed */
 		if (q_data_size > data_ptr_size) {
@@ -2342,6 +2359,9 @@ static int criu_restore_queues(struct kfd_process *p,
 
 		qrd.cu_mask_size = q_bucket.cu_mask_size;
 		qrd.cu_mask = data_ptr;
+
+		qrd.mqd_size = q_bucket.mqd_size;
+		qrd.mqd = data_ptr + qrd.cu_mask_size;
 
 		ret = criu_restore_queue(p, dev, pdd, &q_bucket, &qrd);
 		if (ret) {
@@ -2680,11 +2700,12 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 				q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) {
 
 				u32 cu_mask_size = 0;
-				ret = get_queue_data_sizes(pdd, q, &cu_mask_size);
+				u32 mqd_size = 0;
+				ret = get_queue_data_sizes(pdd, q, &cu_mask_size, &mqd_size);
 				if (ret)
 					goto err_unlock;
 
-				queues_data_size += cu_mask_size;
+				queues_data_size += cu_mask_size + mqd_size;
 				q_index++;
 			} else {
 				pr_err("Unsupported queue type (%d)\n", q->properties.type);
