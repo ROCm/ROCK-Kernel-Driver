@@ -472,6 +472,7 @@ enum KFD_QUEUE_PRIORITY {
 struct queue_restore_data {
 	uint32_t qid;
 	uint32_t sdma_id;
+	uint32_t doorbell_id;
 };
 
 struct queue_properties {
