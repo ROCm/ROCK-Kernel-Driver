@@ -2152,6 +2152,7 @@ int criu_restore_queue(struct kfd_process *p,
 	print_queue_properties(&qp);
 
 	qrd->qid = q_bucket->q_id;
+	qrd->sdma_id = q_bucket->sdma_id;
 
 	ret = pqm_create_queue(&p->pqm, dev, NULL, &qp, &queue_id, qrd, NULL);
 	if (ret) {
