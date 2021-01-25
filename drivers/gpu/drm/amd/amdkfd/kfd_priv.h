@@ -1355,6 +1355,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			    struct queue_properties *properties,
 			    unsigned int *qid,
 			    const struct kfd_criu_queue_priv_data *q_data,
+			    const void *restore_mqd,
 			    uint32_t *p_doorbell_offset_in_process);
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue_properties(struct process_queue_manager *pqm, unsigned int qid,
@@ -1384,6 +1385,10 @@ int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 
 struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
 				     unsigned int qid);
+int pqm_get_queue_checkpoint_info(struct process_queue_manager *pqm,
+				  unsigned int qid,
+				  u32 *mqd_size);
+
 /* Packet Manager */
 
 #define KFD_FENCE_COMPLETED (100)
