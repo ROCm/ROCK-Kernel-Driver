@@ -412,7 +412,7 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 }
 
 int kfd_dbg_trap_enable(struct kfd_process *target,
-		uint32_t *fd)
+		uint32_t *fd, uint32_t *ttmp_save)
 {
 	int r = 0;
 	struct kfd_process_device *pdd;
@@ -451,6 +451,7 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 	kref_get(&target->ref);
 	*fd = r;
 	target->debug_trap_enabled = true;
+	*ttmp_save = 0; /* TBD - set based on runtime enable */
 
 	return 0;
 
