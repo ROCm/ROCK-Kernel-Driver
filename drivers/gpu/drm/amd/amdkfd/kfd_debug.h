@@ -43,7 +43,8 @@ int kfd_dbg_ev_enable(struct kfd_process *process);
 int kfd_dbg_trap_disable(struct kfd_process *target,
 			bool unwind,
 			int unwind_count);
-int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t *fd);
+int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t *fd,
+			uint32_t *ttmp_save);
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
 					uint32_t trap_mask_bits,
