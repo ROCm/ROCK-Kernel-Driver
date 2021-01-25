@@ -2771,7 +2771,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = kfd_dbg_trap_disable(target, false, 0);
 			break;
 		case 1:
-			r = kfd_dbg_trap_enable(target, &args->data2);
+			r = kfd_dbg_trap_enable(target, &args->data2,
+						&args->data3);
 			if (!r)
 				target->exception_enable_mask = exception_mask;
 			break;

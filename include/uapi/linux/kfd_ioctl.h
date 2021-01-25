@@ -306,8 +306,11 @@ enum kfd_dbg_trap_exception_code {
  * ptr:   unused
  * data1: 0=disable, 1=enable
  * data2: return value for fd
- * data3: unused
+ * data3: return ttmp/dispatch ptr save enabled (0=disabled, 1=enabled)
  * data4: unused
+ *
+ * FIXME: data3 will always return 0 as runtime enable is still not implemented
+ * so ignore the return value for now.
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
