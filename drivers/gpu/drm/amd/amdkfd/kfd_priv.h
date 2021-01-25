@@ -473,6 +473,9 @@ struct queue_restore_data {
 	uint32_t qid;
 	uint32_t sdma_id;
 	uint32_t doorbell_id;
+
+	void *cu_mask;
+	uint32_t cu_mask_size;
 };
 
 struct queue_properties {

@@ -1890,9 +1890,21 @@ static int kfd_devinfo_restore(struct kfd_process *p, struct kfd_criu_devinfo_bu
 	}
 	return 0;
 }
-static void criu_dump_queue(struct kfd_process_device *pdd,
+
+static int get_queue_data_sizes(struct kfd_process_device *pdd,
+				struct queue *q,
+				uint32_t *cu_mask_size)
+{
+	int ret = 0;
+
+	*cu_mask_size = sizeof(uint32_t) * (q->properties.cu_mask_count / 32);
+	return ret;
+}
+
+static int criu_dump_queue(struct kfd_process_device *pdd,
                            struct queue *q,
-                           struct kfd_criu_q_bucket *q_bucket)
+                           struct kfd_criu_q_bucket *q_bucket,
+			   struct queue_restore_data *qrd)
 {
 	q_bucket->gpu_id = pdd->dev->id;
 	q_bucket->type = q->properties.type;
@@ -1920,18 +1932,30 @@ static void criu_dump_queue(struct kfd_process_device *pdd,
 		q->properties.ctx_save_restore_area_size;
 
 	q_bucket->ctl_stack_size = q->properties.ctl_stack_size;
+	if (qrd->cu_mask_size)
+		memcpy(qrd->cu_mask, q->properties.cu_mask, qrd->cu_mask_size);
+
+	q_bucket->cu_mask_size = qrd->cu_mask_size;
+	return 0;
 }
 
 static int criu_dump_queues_device(struct kfd_process_device *pdd,
 				unsigned *q_index,
 				unsigned int max_num_queues,
-				struct kfd_criu_q_bucket *user_buckets)
+				struct kfd_criu_q_bucket *user_buckets,
+				uint8_t *queues_data,
+				uint32_t *queues_data_offset,
+				uint32_t queues_data_size)
 {
 	struct queue *q;
+	struct queue_restore_data qrd;
 	struct kfd_criu_q_bucket q_bucket;
+	uint8_t *data_ptr = NULL;
+	unsigned int data_ptr_size = 0;
 	int ret = 0;
 
 	list_for_each_entry(q, &pdd->qpd.queues_list, list) {
+		unsigned int q_data_size;
 		if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE &&
 			q->properties.type != KFD_QUEUE_TYPE_SDMA &&
 			q->properties.type != KFD_QUEUE_TYPE_SDMA_XGMI) {
@@ -1949,7 +1973,49 @@ static int criu_dump_queues_device(struct kfd_process_device *pdd,
 		}
 
 		memset(&q_bucket, 0, sizeof(q_bucket));
-		criu_dump_queue(pdd, q, &q_bucket);
+		memset(&qrd, 0, sizeof(qrd));
+
+		ret = get_queue_data_sizes(pdd, q, &qrd.cu_mask_size);
+		if (ret) {
+			pr_err("Failed to get queue dump info (%d)\n", ret);
+			ret = -EFAULT;
+			break;
+		}
+
+		q_data_size = qrd.cu_mask_size;
+
+		/* Increase local buffer space if needed */
+		if (data_ptr_size < q_data_size) {
+			if (data_ptr)
+				kfree(data_ptr);
+
+			data_ptr = (uint8_t*)kzalloc(q_data_size, GFP_KERNEL);
+			if (!data_ptr) {
+				ret = -ENOMEM;
+				break;
+			}
+			data_ptr_size = q_data_size;
+		}
+
+		qrd.cu_mask = data_ptr;
+		ret = criu_dump_queue(pdd, q, &q_bucket, &qrd);
+		if (ret)
+			break;
+
+		if (*queues_data_offset + q_data_size > queues_data_size) {
+			pr_err("Required memory exceeds user provided\n");
+			ret = -ENOSPC;
+			break;
+		}
+		ret = copy_to_user((void __user *) (queues_data + *queues_data_offset),
+				data_ptr, q_data_size);
+		if (ret) {
+			ret = -EFAULT;
+			break;
+		}
+		q_bucket.queues_data_offset = *queues_data_offset;
+		*queues_data_offset += q_data_size;
+
 		ret = copy_to_user((void __user *)&user_buckets[*q_index],
 					&q_bucket, sizeof(q_bucket));
 		if (ret) {
@@ -1959,6 +2025,10 @@ static int criu_dump_queues_device(struct kfd_process_device *pdd,
 		}
 		*q_index = *q_index + 1;
 	}
+
+	if (data_ptr)
+		kfree(data_ptr);
+
 	return ret;
 }
 
@@ -1976,6 +2046,8 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 	struct kfd_criu_q_bucket *user_buckets =
 		(struct kfd_criu_q_bucket*) args->kfd_criu_q_buckets_ptr;
 
+	uint8_t *queues_data = (uint8_t*)args->queues_data_ptr;
+	uint32_t queues_data_offset = 0;
 
 	pr_info("Inside %s\n",__func__);
 
@@ -2076,7 +2148,10 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 		}
 
 		ret = criu_dump_queues_device(pdd, &q_index,
-					args->num_of_queues, user_buckets);
+					args->num_of_queues, user_buckets,
+					queues_data, &queues_data_offset,
+					args->queues_data_size);
+
 		if (ret)
 			goto err_unlock;
 	}
@@ -2098,8 +2173,9 @@ err_unlock:
 	return ret;
 }
 
-static void set_queue_properties_from_criu(struct queue_properties *qp,
-                                       struct kfd_criu_q_bucket *q_bucket)
+static int set_queue_properties_from_criu(struct queue_properties *qp,
+                                       struct kfd_criu_q_bucket *q_bucket,
+				       struct queue_restore_data *qrd)
 {
 	qp->is_interop = false;
 	qp->is_gws = q_bucket->is_gws;
@@ -2116,6 +2192,19 @@ static void set_queue_properties_from_criu(struct queue_properties *qp,
 	qp->ctl_stack_size = q_bucket->ctl_stack_size;
 	qp->type = q_bucket->type;
 	qp->format = q_bucket->format;
+
+	if (qrd->cu_mask_size) {
+		qp->cu_mask = kzalloc(qrd->cu_mask_size, GFP_KERNEL);
+		if (!qp->cu_mask) {
+			pr_err("Failed to allocate memory for CU mask\n");
+			return -ENOMEM;
+		}
+
+		memcpy(qp->cu_mask, qrd->cu_mask, qrd->cu_mask_size);
+		qp->cu_mask_count = (qrd->cu_mask_size / sizeof(uint32_t)) * 32;
+	}
+
+	return 0;
 }
 
 /* criu_restore_queue runs with the process mutex locked */
@@ -2148,7 +2237,10 @@ int criu_restore_queue(struct kfd_process *p,
 			q_bucket->q_address);
 
 	memset(&qp, 0, sizeof(qp));
-	set_queue_properties_from_criu(&qp, q_bucket);
+	ret = set_queue_properties_from_criu(&qp, q_bucket, qrd);
+	if (ret)
+		goto err_create_queue;
+
 	print_queue_properties(&qp);
 
 	qrd->qid = q_bucket->q_id;
@@ -2158,12 +2250,18 @@ int criu_restore_queue(struct kfd_process *p,
 	ret = pqm_create_queue(&p->pqm, dev, NULL, &qp, &queue_id, qrd, NULL);
 	if (ret) {
 		pr_err("Failed to create new queue err:%d\n", ret);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_create_queue;
 	}
 
 	pr_debug("Queue id %d was restored successfully\n", queue_id);
 
 	return 0;
+err_create_queue:
+	if (qp.cu_mask)
+		kfree(qp.cu_mask);
+
+	return ret;
 }
 
 /* criu_restore_queues runs with the process mutex locked */
@@ -2176,6 +2274,11 @@ static int criu_restore_queues(struct kfd_process *p,
 	int ret;
 	struct kfd_criu_q_bucket *user_buckets =
 		(struct kfd_criu_q_bucket*) args->kfd_criu_q_buckets_ptr;
+
+	uint8_t *queues_data = (uint8_t*)args->queues_data_ptr;
+	uint8_t *data_ptr = NULL;
+	uint32_t data_ptr_size = 0;
+
 	/*
          * This process will not have any queues at this point, but we are
          * setting all the dqm's for this process to evicted state.
@@ -2185,6 +2288,7 @@ static int criu_restore_queues(struct kfd_process *p,
 	for (i = 0; i < args->num_of_queues; i++) {
 		struct kfd_criu_q_bucket q_bucket;
 		struct queue_restore_data qrd;
+		uint32_t q_data_size;
 
 		memset(&qrd, 0, sizeof(qrd));
 
@@ -2212,12 +2316,42 @@ static int criu_restore_queues(struct kfd_process *p,
 			ret = -EFAULT;
 			return ret;
 		}
+
+		q_data_size = q_bucket.cu_mask_size;
+
+		/* Increase local buffer space if needed */
+		if (q_data_size > data_ptr_size) {
+			if (data_ptr)
+				kfree(data_ptr);
+
+			data_ptr = (uint8_t*)kzalloc(q_data_size, GFP_KERNEL);
+			if (!data_ptr) {
+				ret = -ENOMEM;
+				break;
+			}
+			data_ptr_size = q_data_size;
+		}
+
+		ret = copy_from_user(data_ptr,
+				(void __user *) queues_data + q_bucket.queues_data_offset,
+				q_data_size);
+		if (ret) {
+			ret = -EFAULT;
+			break;
+		}
+
+		qrd.cu_mask_size = q_bucket.cu_mask_size;
+		qrd.cu_mask = data_ptr;
+
 		ret = criu_restore_queue(p, dev, pdd, &q_bucket, &qrd);
 		if (ret) {
 			pr_err("Failed to restore queue (%d)\n", ret);
 			break;
 		}
 	}
+
+	if (data_ptr)
+		kfree(data_ptr);
 	return ret;
 }
 
@@ -2507,6 +2641,7 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_criu_helper_args *args = data;
+	u32 queues_data_size = 0;
 	struct kgd_mem *kgd_mem;
 	struct queue *q;
 	u64 num_of_bos = 0;
@@ -2544,6 +2679,12 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 				q->properties.type == KFD_QUEUE_TYPE_SDMA ||
 				q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) {
 
+				u32 cu_mask_size = 0;
+				ret = get_queue_data_sizes(pdd, q, &cu_mask_size);
+				if (ret)
+					goto err_unlock;
+
+				queues_data_size += cu_mask_size;
 				q_index++;
 			} else {
 				pr_err("Unsupported queue type (%d)\n", q->properties.type);
@@ -2558,6 +2699,7 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 	args->num_of_devices = p->n_pdds;
 	args->num_of_bos = num_of_bos;
 	args->num_of_queues = q_index;
+	args->queues_data_size = queues_data_size;
 	dev_dbg(kfd_device, "Num of bos = %llu\n", num_of_bos);
 
 err_unlock:
