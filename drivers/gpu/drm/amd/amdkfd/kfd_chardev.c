@@ -313,7 +313,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 			dev->id);
 
 	err = pqm_create_queue(&p->pqm, dev, filep, &q_properties, &queue_id,
-			&doorbell_offset_in_process);
+			NULL, &doorbell_offset_in_process);
 	if (err != 0)
 		goto err_create_queue;
 
@@ -1905,7 +1905,7 @@ static void criu_dump_queue(struct kfd_process_device *pdd,
 	q_bucket->read_ptr_addr = (uint64_t)q->properties.read_ptr;
 	q_bucket->write_ptr_addr = (uint64_t)q->properties.write_ptr;
 	q_bucket->doorbell_id = q->doorbell_id;
-	q_bucket->doorbell_off = q->properties.doorbell_off;
+
 	q_bucket->sdma_id = q->sdma_id;
 
 	q_bucket->eop_ring_buffer_address =
@@ -2122,7 +2122,8 @@ static void set_queue_properties_from_criu(struct queue_properties *qp,
 int criu_restore_queue(struct kfd_process *p,
 					struct kfd_dev *dev,
 					struct kfd_process_device *pdd,
-					struct kfd_criu_q_bucket *q_bucket)
+					struct kfd_criu_q_bucket *q_bucket,
+					struct queue_restore_data *qrd)
 {
 	int ret = 0;
 	unsigned int queue_id;
@@ -2150,11 +2151,14 @@ int criu_restore_queue(struct kfd_process *p,
 	set_queue_properties_from_criu(&qp, q_bucket);
 	print_queue_properties(&qp);
 
-	ret = pqm_create_queue(&p->pqm, dev, NULL, &qp, &queue_id, NULL);
+	qrd->qid = q_bucket->q_id;
+
+	ret = pqm_create_queue(&p->pqm, dev, NULL, &qp, &queue_id, qrd, NULL);
 	if (ret) {
 		pr_err("Failed to create new queue err:%d\n", ret);
 		return -EINVAL;
 	}
+
 	pr_debug("Queue id %d was restored successfully\n", queue_id);
 
 	return 0;
@@ -2178,6 +2182,10 @@ static int criu_restore_queues(struct kfd_process *p,
 
 	for (i = 0; i < args->num_of_queues; i++) {
 		struct kfd_criu_q_bucket q_bucket;
+		struct queue_restore_data qrd;
+
+		memset(&qrd, 0, sizeof(qrd));
+
 		ret = copy_from_user(&q_bucket, (void __user *)&user_buckets[i],
 				sizeof(struct kfd_criu_q_bucket));
 
@@ -2202,7 +2210,7 @@ static int criu_restore_queues(struct kfd_process *p,
 			ret = -EFAULT;
 			return ret;
 		}
-		ret = criu_restore_queue(p, dev, pdd, &q_bucket);
+		ret = criu_restore_queue(p, dev, pdd, &q_bucket, &qrd);
 		if (ret) {
 			pr_err("Failed to restore queue (%d)\n", ret);
 			break;
