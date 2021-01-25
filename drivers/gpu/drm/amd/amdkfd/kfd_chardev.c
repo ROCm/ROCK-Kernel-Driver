@@ -1840,7 +1840,6 @@ static int kfd_devinfo_restore(struct kfd_process *p, struct kfd_criu_devinfo_bu
 			       uint32_t num_of_devices)
 {
 	int i;
-
 	if (p->n_pdds != num_of_devices)
 		return -EINVAL;
 
@@ -1891,6 +1890,77 @@ static int kfd_devinfo_restore(struct kfd_process *p, struct kfd_criu_devinfo_bu
 	}
 	return 0;
 }
+static void criu_dump_queue(struct kfd_process_device *pdd,
+                           struct queue *q,
+                           struct kfd_criu_q_bucket *q_bucket)
+{
+	q_bucket->gpu_id = pdd->dev->id;
+	q_bucket->type = q->properties.type;
+	q_bucket->format = q->properties.format;
+	q_bucket->q_id =  q->properties.queue_id;
+	q_bucket->q_address = q->properties.queue_address;
+	q_bucket->q_size = q->properties.queue_size;
+	q_bucket->priority = q->properties.priority;
+	q_bucket->q_percent = q->properties.queue_percent;
+	q_bucket->read_ptr_addr = (uint64_t)q->properties.read_ptr;
+	q_bucket->write_ptr_addr = (uint64_t)q->properties.write_ptr;
+	q_bucket->doorbell_id = q->doorbell_id;
+	q_bucket->doorbell_off = q->properties.doorbell_off;
+	q_bucket->sdma_id = q->sdma_id;
+
+	q_bucket->eop_ring_buffer_address =
+		q->properties.eop_ring_buffer_address;
+
+	q_bucket->eop_ring_buffer_size = q->properties.eop_ring_buffer_size;
+
+	q_bucket->ctx_save_restore_area_address =
+		q->properties.ctx_save_restore_area_address;
+
+	q_bucket->ctx_save_restore_area_size =
+		q->properties.ctx_save_restore_area_size;
+
+	q_bucket->ctl_stack_size = q->properties.ctl_stack_size;
+}
+
+static int criu_dump_queues_device(struct kfd_process_device *pdd,
+				unsigned *q_index,
+				unsigned int max_num_queues,
+				struct kfd_criu_q_bucket *user_buckets)
+{
+	struct queue *q;
+	struct kfd_criu_q_bucket q_bucket;
+	int ret = 0;
+
+	list_for_each_entry(q, &pdd->qpd.queues_list, list) {
+		if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE &&
+			q->properties.type != KFD_QUEUE_TYPE_SDMA &&
+			q->properties.type != KFD_QUEUE_TYPE_SDMA_XGMI) {
+
+			pr_err("Unsupported queue type (%d)\n", q->properties.type);
+			return -ENOTSUPP;
+		}
+
+		if (*q_index >= max_num_queues) {
+			pr_err("Number of queues(%d) exceed allocated(%d)\n",
+				*q_index, max_num_queues);
+
+			ret = -ENOMEM;
+			break;
+		}
+
+		memset(&q_bucket, 0, sizeof(q_bucket));
+		criu_dump_queue(pdd, q, &q_bucket);
+		ret = copy_to_user((void __user *)&user_buckets[*q_index],
+					&q_bucket, sizeof(q_bucket));
+		if (ret) {
+			pr_err("Failed to copy queue information to user\n");
+			ret = -EFAULT;
+			break;
+		}
+		*q_index = *q_index + 1;
+	}
+	return ret;
+}
 
 static int kfd_ioctl_criu_dumper(struct file *filep,
 				struct kfd_process *p, void *data)
@@ -1900,7 +1970,12 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 	struct amdgpu_bo *dumper_bo;
 	int ret, id, index, i = 0;
 	struct kgd_mem *kgd_mem;
+	int q_index = 0;
 	void *mem;
+
+	struct kfd_criu_q_bucket *user_buckets =
+		(struct kfd_criu_q_bucket*) args->kfd_criu_q_buckets_ptr;
+
 
 	pr_info("Inside %s\n",__func__);
 
@@ -1922,6 +1997,8 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 	if (!bo_bucket)
 		return -ENOMEM;
 
+	pr_debug("num of queues = %u\n", args->num_of_queues);
+
 	mutex_lock(&p->mutex);
 
 	if (!kfd_has_process_device_data(p)) {
@@ -1930,9 +2007,17 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 		goto err_unlock;
 	}
 
-	ret = kfd_devinfo_dump(p, args);
-	if (ret)
+	ret = kfd_process_evict_queues(p);
+	if (ret) {
+		pr_err("Failed to evict queues\n");
 		goto err_unlock;
+	}
+
+	ret = kfd_devinfo_dump(p, args);
+	if (ret) {
+		pr_err("Failed to dump devices\n");
+		goto err_unlock;
+	}
 
 	/* Run over all PDDs of the process */
 	for (index = 0; index < p->n_pdds; index++) {
@@ -1989,6 +2074,11 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 				i++;
 			}
 		}
+
+		ret = criu_dump_queues_device(pdd, &q_index,
+					args->num_of_queues, user_buckets);
+		if (ret)
+			goto err_unlock;
 	}
 
 	ret = copy_to_user((void __user *)args->kfd_criu_bo_buckets_ptr,
@@ -1996,12 +2086,128 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 			(args->num_of_bos *
 			 sizeof(struct kfd_criu_bo_buckets)));
 	kvfree(bo_bucket);
+
+	kfd_process_restore_queues(p);
 	mutex_unlock(&p->mutex);
-	return ret ? -EFAULT : 0;
+	return 0;
 
 err_unlock:
+	kfd_process_restore_queues(p);
 	mutex_unlock(&p->mutex);
 	pr_err("Dumper ioctl failed err:%d\n", ret);
+	return ret;
+}
+
+static void set_queue_properties_from_criu(struct queue_properties *qp,
+                                       struct kfd_criu_q_bucket *q_bucket)
+{
+	qp->is_interop = false;
+	qp->is_gws = q_bucket->is_gws;
+	qp->queue_percent = q_bucket->q_percent;
+	qp->priority = q_bucket->priority;
+	qp->queue_address = q_bucket->q_address;
+	qp->queue_size = q_bucket->q_size;
+	qp->read_ptr = (uint32_t *) q_bucket->read_ptr_addr;
+	qp->write_ptr = (uint32_t *) q_bucket->write_ptr_addr;
+	qp->eop_ring_buffer_address = q_bucket->eop_ring_buffer_address;
+	qp->eop_ring_buffer_size = q_bucket->eop_ring_buffer_size;
+	qp->ctx_save_restore_area_address = q_bucket->ctx_save_restore_area_address;
+	qp->ctx_save_restore_area_size = q_bucket->ctx_save_restore_area_size;
+	qp->ctl_stack_size = q_bucket->ctl_stack_size;
+	qp->type = q_bucket->type;
+	qp->format = q_bucket->format;
+}
+
+/* criu_restore_queue runs with the process mutex locked */
+int criu_restore_queue(struct kfd_process *p,
+					struct kfd_dev *dev,
+					struct kfd_process_device *pdd,
+					struct kfd_criu_q_bucket *q_bucket)
+{
+	int ret = 0;
+	unsigned int queue_id;
+	struct queue_properties qp;
+
+	pr_debug("Restoring Queue: gpu_id:%x type:%x format:%x queue_id:%u "
+			"address:%llx size:%llx priority:%u percent:%u "
+			"read_ptr:%llx write_ptr:%llx doorbell_id:%x "
+			"doorbell_off:%llx queue_address:%llx\n",
+			q_bucket->gpu_id,
+			q_bucket->type,
+			q_bucket->format,
+			q_bucket->q_id,
+			q_bucket->q_address,
+			q_bucket->q_size,
+			q_bucket->priority,
+			q_bucket->q_percent,
+			q_bucket->read_ptr_addr,
+			q_bucket->write_ptr_addr,
+			q_bucket->doorbell_id,
+			q_bucket->doorbell_off,
+			q_bucket->q_address);
+
+	memset(&qp, 0, sizeof(qp));
+	set_queue_properties_from_criu(&qp, q_bucket);
+	print_queue_properties(&qp);
+
+	ret = pqm_create_queue(&p->pqm, dev, NULL, &qp, &queue_id, NULL);
+	if (ret) {
+		pr_err("Failed to create new queue err:%d\n", ret);
+		return -EINVAL;
+	}
+	pr_debug("Queue id %d was restored successfully\n", queue_id);
+
+	return 0;
+}
+
+/* criu_restore_queues runs with the process mutex locked */
+static int criu_restore_queues(struct kfd_process *p,
+			struct kfd_ioctl_criu_restorer_args *args)
+{
+	struct kfd_process_device *pdd;
+	struct kfd_dev *dev;
+	int i;
+	int ret;
+	struct kfd_criu_q_bucket *user_buckets =
+		(struct kfd_criu_q_bucket*) args->kfd_criu_q_buckets_ptr;
+	/*
+         * This process will not have any queues at this point, but we are
+         * setting all the dqm's for this process to evicted state.
+         */
+        kfd_process_evict_queues(p);
+
+	for (i = 0; i < args->num_of_queues; i++) {
+		struct kfd_criu_q_bucket q_bucket;
+		ret = copy_from_user(&q_bucket, (void __user *)&user_buckets[i],
+				sizeof(struct kfd_criu_q_bucket));
+
+		if (ret) {
+			ret = -EFAULT;
+			pr_err("Failed to access");
+			return ret;
+		}
+
+		dev = kfd_device_by_id(q_bucket.gpu_id);
+		if (!dev) {
+			pr_err("Could not get kfd_dev from gpu_id = 0x%x\n",
+			q_bucket.gpu_id);
+
+			ret = -EINVAL;
+			return ret;
+		}
+
+		pdd = kfd_get_process_device_data(dev, p);
+		if (!pdd) {
+			pr_err("Failed to get pdd\n");
+			ret = -EFAULT;
+			return ret;
+		}
+		ret = criu_restore_queue(p, dev, pdd, &q_bucket);
+		if (ret) {
+			pr_err("Failed to restore queue (%d)\n", ret);
+			break;
+		}
+	}
 	return ret;
 }
 
@@ -2229,6 +2435,12 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 		kfd_flush_tlb(peer_pdd);
 	}
 
+	ret = criu_restore_queues(p, args);
+	if (ret) {
+		err = ret;
+		goto err_unlock;
+	}
+
 	ret = copy_to_user((void __user *)args->restored_bo_array_ptr,
 			   restored_bo_offsets_arr,
 			   (args->num_of_bos * sizeof(*restored_bo_offsets_arr)));
@@ -2286,8 +2498,10 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 {
 	struct kfd_ioctl_criu_helper_args *args = data;
 	struct kgd_mem *kgd_mem;
+	struct queue *q;
 	u64 num_of_bos = 0;
 	int id, i = 0;
+	u32 q_index = 0;
 	void *mem;
 	int ret = 0;
 
@@ -2314,12 +2528,26 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 			if ((uint64_t)kgd_mem->va > pdd->gpuvm_base)
 				num_of_bos++;
 		}
+
+		list_for_each_entry(q, &pdd->qpd.queues_list, list) {
+			if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE ||
+				q->properties.type == KFD_QUEUE_TYPE_SDMA ||
+				q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) {
+
+				q_index++;
+			} else {
+				pr_err("Unsupported queue type (%d)\n", q->properties.type);
+				ret = -ENOTSUPP;
+				goto err_unlock;
+			}
+		}
 	}
 
 	args->task_pid = task_pid_nr_ns(p->lead_thread,
 					task_active_pid_ns(p->lead_thread));
 	args->num_of_devices = p->n_pdds;
 	args->num_of_bos = num_of_bos;
+	args->num_of_queues = q_index;
 	dev_dbg(kfd_device, "Num of bos = %llu\n", num_of_bos);
 
 err_unlock:
