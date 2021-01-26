@@ -549,6 +549,7 @@ static int dwc3_setup_role_switch(struct dwc3 *dwc)
 	}
 
 	dwc3_role_switch.fwnode = dev_fwnode(dwc->dev);
+	dwc3_role_switch.allow_userspace_control = true;
 	dwc3_role_switch.set = dwc3_usb_role_switch_set;
 	dwc3_role_switch.get = dwc3_usb_role_switch_get;
 	dwc3_role_switch.driver_data = dwc;
