@@ -4070,6 +4070,78 @@ static void dm_bandwidth_update(struct amdgpu_device *adev)
 	/* TODO: implement later */
 }
 
+static int amdgpu_notify_freesync(struct drm_device *dev, void *data,
+				struct drm_file *filp)
+{
+	struct drm_amdgpu_freesync *args = data;
+	struct drm_atomic_state *state;
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_crtc *crtc;
+	struct drm_connector *connector;
+	struct drm_connector_state *old_con_state, *new_con_state;
+	int ret = 0;
+	uint8_t i;
+	bool enable = false;
+
+	if (args->op == AMDGPU_FREESYNC_FULLSCREEN_ENTER)
+		enable = true;
+
+	drm_modeset_acquire_init(&ctx, 0);
+
+	state = drm_atomic_state_alloc(dev);
+	if (!state) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	state->acquire_ctx = &ctx;
+
+retry:
+	drm_for_each_crtc(crtc, dev) {
+		ret = drm_atomic_add_affected_connectors(state, crtc);
+		if (ret)
+			goto fail;
+
+		/* TODO rework amdgpu_dm_commit_planes so we don't need this */
+		ret = drm_atomic_add_affected_planes(state, crtc);
+		if (ret)
+			goto fail;
+	}
+
+	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
+		struct drm_crtc_state *new_crtc_state;
+		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
+		struct dm_crtc_state *dm_new_crtc_state;
+
+		if (!acrtc) {
+			ASSERT(0);
+			continue;
+		}
+
+		new_crtc_state = drm_atomic_get_new_crtc_state(state, &acrtc->base);
+		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
+
+		dm_new_crtc_state->base.vrr_enabled =
+			dm_new_con_state->freesync_enable && enable;
+	}
+
+	ret = drm_atomic_commit(state);
+
+fail:
+	if (ret == -EDEADLK) {
+		drm_atomic_state_clear(state);
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
+	drm_atomic_state_put(state);
+
+out:
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+	return ret;
+}
+
 static const struct amdgpu_display_funcs dm_display_funcs = {
 	.bandwidth_update = dm_bandwidth_update, /* called unconditionally */
 	.vblank_get_counter = dm_vblank_get_counter,/* called unconditionally */
@@ -4082,6 +4154,7 @@ static const struct amdgpu_display_funcs dm_display_funcs = {
 		dm_crtc_get_scanoutpos,/* called unconditionally */
 	.add_encoder = NULL, /* VBIOS parsing. DAL does it. */
 	.add_connector = NULL, /* VBIOS parsing. DAL does it. */
+	.notify_freesync = amdgpu_notify_freesync,
 };
 
 #if defined(CONFIG_DEBUG_KERNEL_DC)
@@ -6408,6 +6481,12 @@ int amdgpu_dm_connector_atomic_set_property(struct drm_connector *connector,
 	} else if (property == adev->mode_info.abm_level_property) {
 		dm_new_state->abm_level = val;
 		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		dm_new_state->freesync_enable = val;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		dm_new_state->freesync_capable = val;
+		ret = 0;
 	}
 
 	return ret;
@@ -6452,6 +6531,12 @@ int amdgpu_dm_connector_atomic_get_property(struct drm_connector *connector,
 		ret = 0;
 	} else if (property == adev->mode_info.abm_level_property) {
 		*val = dm_state->abm_level;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_property) {
+		*val = dm_state->freesync_enable;
+		ret = 0;
+	} else if (property == adev->mode_info.freesync_capable_property) {
+		*val = dm_state->freesync_capable;
 		ret = 0;
 	}
 
@@ -6550,6 +6635,7 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 
 	__drm_atomic_helper_connector_duplicate_state(connector, &new_state->base);
 
+	new_state->freesync_enable = state->freesync_enable;
 	new_state->freesync_capable = state->freesync_capable;
 	new_state->abm_level = state->abm_level;
 	new_state->scaling = state->scaling;
@@ -8034,6 +8120,10 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		if (adev->dm.hdcp_workqueue)
 			drm_connector_attach_content_protection_property(&aconnector->base, true);
 #endif
+		drm_object_attach_property(&aconnector->base.base,
+					adev->mode_info.freesync_property, 0);
+		drm_object_attach_property(&aconnector->base.base,
+				adev->mode_info.freesync_capable_property, 0);
 	}
 }
 

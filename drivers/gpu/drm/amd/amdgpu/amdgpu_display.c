@@ -1398,6 +1398,16 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 						  "abm level", 0, 4);
 		if (!adev->mode_info.abm_level_property)
 			return -ENOMEM;
+		adev->mode_info.freesync_property =
+			drm_property_create_bool(adev_to_drm(adev), 0, "freesync");
+		if (!adev->mode_info.freesync_property)
+			return -ENOMEM;
+		adev->mode_info.freesync_capable_property =
+			drm_property_create_bool(adev_to_drm(adev),
+						 0,
+						 "freesync_capable");
+		if (!adev->mode_info.freesync_capable_property)
+			return -ENOMEM;
 	}
 
 	return 0;
@@ -1759,3 +1769,16 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 	return 0;
 }
 
+int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,
+				  struct drm_file *filp)
+{
+	int ret = -EPERM;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+
+	if (adev->mode_info.funcs->notify_freesync)
+		ret = adev->mode_info.funcs->notify_freesync(dev,data,filp);
+	else
+		DRM_DEBUG("amdgpu no notify_freesync ioctl\n");
+
+	return ret;
+}
