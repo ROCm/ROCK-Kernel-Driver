@@ -101,41 +101,6 @@ amdgpu_dm_crtc_verify_crc_source(struct drm_crtc *crtc, const char *src_name,
 }
 #endif
 
-static void amdgpu_dm_set_crc_window_default(struct dm_crtc_state *dm_crtc_state)
-{
-	dm_crtc_state->crc_window.x_start = 0;
-	dm_crtc_state->crc_window.y_start = 0;
-	dm_crtc_state->crc_window.x_end = 0;
-	dm_crtc_state->crc_window.y_end = 0;
-}
-
-bool amdgpu_dm_crc_window_is_default(struct dm_crtc_state *dm_crtc_state)
-{
-	bool ret = true;
-
-	if ((dm_crtc_state->crc_window.x_start != 0) ||
-		(dm_crtc_state->crc_window.y_start != 0) ||
-		(dm_crtc_state->crc_window.x_end != 0) ||
-		(dm_crtc_state->crc_window.y_end != 0))
-		ret = false;
-
-	return ret;
-}
-
-bool amdgpu_dm_crc_window_changed(struct dm_crtc_state *dm_new_crtc_state,
-					struct dm_crtc_state *dm_old_crtc_state)
-{
-	bool ret = false;
-
-	if ((dm_new_crtc_state->crc_window.x_start != dm_old_crtc_state->crc_window.x_start) ||
-		(dm_new_crtc_state->crc_window.y_start != dm_old_crtc_state->crc_window.y_start) ||
-		(dm_new_crtc_state->crc_window.x_end != dm_old_crtc_state->crc_window.x_end) ||
-		(dm_new_crtc_state->crc_window.y_end != dm_old_crtc_state->crc_window.y_end))
-		ret = true;
-
-	return ret;
-}
-
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
@@ -145,7 +110,6 @@ int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 	struct dc_stream_state *stream_state = dm_crtc_state->stream;
 	bool enable = amdgpu_dm_is_valid_crc_source(source);
 	int ret = 0;
-	struct crc_params *crc_window = NULL, tmp_window;
 
 	/* Configuration will be deferred to stream enable. */
 	if (!stream_state)
@@ -155,24 +119,8 @@ int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 
 	/* Enable CRTC CRC generation if necessary. */
 	if (dm_is_crc_source_crtc(source) || source == AMDGPU_DM_PIPE_CRC_SOURCE_NONE) {
-		if (!enable)
-			amdgpu_dm_set_crc_window_default(dm_crtc_state);
-
-		if (!amdgpu_dm_crc_window_is_default(dm_crtc_state)) {
-			crc_window = &tmp_window;
-
-			tmp_window.windowa_x_start = dm_crtc_state->crc_window.x_start;
-			tmp_window.windowa_y_start = dm_crtc_state->crc_window.y_start;
-			tmp_window.windowa_x_end = dm_crtc_state->crc_window.x_end;
-			tmp_window.windowa_y_end = dm_crtc_state->crc_window.y_end;
-			tmp_window.windowb_x_start = dm_crtc_state->crc_window.x_start;
-			tmp_window.windowb_y_start = dm_crtc_state->crc_window.y_start;
-			tmp_window.windowb_x_end = dm_crtc_state->crc_window.x_end;
-			tmp_window.windowb_y_end = dm_crtc_state->crc_window.y_end;
-		}
-
 		if (!dc_stream_configure_crc(stream_state->ctx->dc,
-					     stream_state, crc_window, enable, enable)) {
+					     stream_state, NULL, enable, enable)) {
 			ret = -EINVAL;
 			goto unlock;
 		}

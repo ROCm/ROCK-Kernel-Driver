@@ -112,6 +112,7 @@ int amdgpu_atomfirmware_allocate_fb_scratch(struct amdgpu_device *adev)
 union igp_info {
 	struct atom_integrated_system_info_v1_11 v11;
 	struct atom_integrated_system_info_v1_12 v12;
+	struct atom_integrated_system_info_v2_1 v21;
 };
 
 union umc_info {
@@ -209,24 +210,42 @@ amdgpu_atomfirmware_get_vram_info(struct amdgpu_device *adev,
 		if (adev->flags & AMD_IS_APU) {
 			igp_info = (union igp_info *)
 				(mode_info->atom_context->bios + data_offset);
-			switch (crev) {
-			case 11:
-				mem_channel_number = igp_info->v11.umachannelnumber;
-				/* channel width is 64 */
-				if (vram_width)
-					*vram_width = mem_channel_number * 64;
-				mem_type = igp_info->v11.memorytype;
-				if (vram_type)
-					*vram_type = convert_atom_mem_type_to_vram_type(adev, mem_type);
+			switch (frev) {
+			case 1:
+				switch (crev) {
+				case 11:
+				case 12:
+					mem_channel_number = igp_info->v11.umachannelnumber;
+					if (!mem_channel_number)
+						mem_channel_number = 1;
+					/* channel width is 64 */
+					if (vram_width)
+						*vram_width = mem_channel_number * 64;
+					mem_type = igp_info->v11.memorytype;
+					if (vram_type)
+						*vram_type = convert_atom_mem_type_to_vram_type(adev, mem_type);
+					break;
+				default:
+					return -EINVAL;
+				}
 				break;
-			case 12:
-				mem_channel_number = igp_info->v12.umachannelnumber;
-				/* channel width is 64 */
-				if (vram_width)
-					*vram_width = mem_channel_number * 64;
-				mem_type = igp_info->v12.memorytype;
-				if (vram_type)
-					*vram_type = convert_atom_mem_type_to_vram_type(adev, mem_type);
+			case 2:
+				switch (crev) {
+				case 1:
+				case 2:
+					mem_channel_number = igp_info->v21.umachannelnumber;
+					if (!mem_channel_number)
+						mem_channel_number = 1;
+					/* channel width is 64 */
+					if (vram_width)
+						*vram_width = mem_channel_number * 64;
+					mem_type = igp_info->v21.memorytype;
+					if (vram_type)
+						*vram_type = convert_atom_mem_type_to_vram_type(adev, mem_type);
+					break;
+				default:
+					return -EINVAL;
+				}
 				break;
 			default:
 				return -EINVAL;
@@ -536,7 +555,7 @@ int amdgpu_mem_train_support(struct amdgpu_device *adev)
 	uint32_t major, minor, revision, hw_v;
 
 	if (gddr6_mem_train_vbios_support(adev)) {
-		amdgpu_discovery_get_ip_version(adev, MP0_HWID, &major, &minor, &revision);
+		amdgpu_discovery_get_ip_version(adev, MP0_HWID, 0, &major, &minor, &revision);
 		hw_v = HW_REV(major, minor, revision);
 		/*
 		 * treat 0 revision as a special case since register for MP0 and MMHUB is missing

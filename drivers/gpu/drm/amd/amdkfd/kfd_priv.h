@@ -868,11 +868,6 @@ struct kfd_process {
 	/* We want to receive a notification when the mm_struct is destroyed */
 	struct mmu_notifier mmu_notifier;
 
-#if defined(DRM_VER) && defined(DRM_PATCH) && DRM_VER == 5 && DRM_PATCH == 6 \
-	&& LINUX_VERSION_CODE == KERNEL_VERSION(4, 18, 0)
-	/* mmu_notifier_put in the RH DRM backport from 5.6 is broken */
-#	undef HAVE_MMU_NOTIFIER_PUT
-#endif
 #ifndef HAVE_MMU_NOTIFIER_PUT
 	/* Use for delayed freeing of kfd_process structure */
 	struct rcu_head	rcu;

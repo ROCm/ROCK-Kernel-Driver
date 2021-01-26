@@ -179,6 +179,8 @@ static bool create_links(
 
 	connectors_num = bios->funcs->get_connectors_number(bios);
 
+	DC_LOG_DC("BIOS object table - number of connectors: %d", connectors_num);
+
 	if (connectors_num > ENUM_ID_COUNT) {
 		dm_error(
 			"DC: Number of connectors %d exceeds maximum of %d!\n",
@@ -196,6 +198,8 @@ static bool create_links(
 	for (i = 0; i < connectors_num; i++) {
 		struct link_init_data link_init_params = {0};
 		struct dc_link *link;
+
+		DC_LOG_DC("BIOS object table - printing link object info for connector number: %d, link_index: %d", i, dc->link_count);
 
 		link_init_params.ctx = dc->ctx;
 		/* next BIOS object table connector */
@@ -228,6 +232,8 @@ static bool create_links(
 			}
 		}
 	}
+
+	DC_LOG_DC("BIOS object table - end");
 
 	for (i = 0; i < num_virtual_links; i++) {
 		struct dc_link *link = kzalloc(sizeof(*link), GFP_KERNEL);
@@ -288,20 +294,16 @@ static void dc_perf_trace_destroy(struct dc_perf_trace **perf_trace)
 }
 
 /**
- *****************************************************************************
- *  Function: dc_stream_adjust_vmin_vmax
+ *  dc_stream_adjust_vmin_vmax:
  *
- *  @brief
- *     Looks up the pipe context of dc_stream_state and updates the
- *     vertical_total_min and vertical_total_max of the DRR, Dynamic Refresh
- *     Rate, which is a power-saving feature that targets reducing panel
- *     refresh rate while the screen is static
+ *  Looks up the pipe context of dc_stream_state and updates the
+ *  vertical_total_min and vertical_total_max of the DRR, Dynamic Refresh
+ *  Rate, which is a power-saving feature that targets reducing panel
+ *  refresh rate while the screen is static
  *
- *  @param [in] dc: dc reference
- *  @param [in] stream: Initial dc stream state
- *  @param [in] adjust: Updated parameters for vertical_total_min and
- *  vertical_total_max
- *****************************************************************************
+ *  @dc:     dc reference
+ *  @stream: Initial dc stream state
+ *  @adjust: Updated parameters for vertical_total_min and vertical_total_max
  */
 bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 		struct dc_stream_state *stream,
@@ -359,6 +361,7 @@ bool dc_stream_get_crtc_position(struct dc *dc,
  * @dc: DC Object
  * @stream: The stream to configure CRC on.
  * @enable: Enable CRC if true, disable otherwise.
+ * @crc_window: CRC window (x/y start/end) information
  * @continuous: Capture CRC on every frame if true. Otherwise, only capture
  *              once.
  *
@@ -426,7 +429,9 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
  * dc_stream_get_crc() - Get CRC values for the given stream.
  * @dc: DC object
  * @stream: The DC stream state of the stream to get CRCs from.
- * @r_cr, g_y, b_cb: CRC values for the three channels are stored here.
+ * @r_cr: CRC value for the first of the 3 channels stored here.
+ * @g_y:  CRC value for the second of the 3 channels stored here.
+ * @b_cb: CRC value for the third of the 3 channels stored here.
  *
  * dc_stream_configure_crc needs to be called beforehand to enable CRCs.
  * Return false if stream is not found, or if CRCs are not enabled.
@@ -819,7 +824,8 @@ static void disable_all_writeback_pipes_for_stream(
 }
 #endif
 
-void apply_ctx_interdependent_lock(struct dc *dc, struct dc_state *context, struct dc_stream_state *stream, bool lock)
+static void apply_ctx_interdependent_lock(struct dc *dc, struct dc_state *context,
+					  struct dc_stream_state *stream, bool lock)
 {
 	int i = 0;
 
@@ -2042,7 +2048,7 @@ static enum surface_update_type check_update_surfaces_for_stream(
 	return overall_type;
 }
 
-/**
+/*
  * dc_check_update_surfaces_for_stream() - Determine update type (fast, med, or full)
  *
  * See :c:type:`enum surface_update_type <surface_update_type>` for explanation of update types
@@ -2910,7 +2916,7 @@ enum dc_irq_source dc_interrupt_to_irq_source(
 	return dal_irq_service_to_irq_source(dc->res_pool->irqs, src_id, ext_id);
 }
 
-/**
+/*
  * dc_interrupt_set() - Enable/disable an AMD hw interrupt source
  */
 bool dc_interrupt_set(struct dc *dc, enum dc_irq_source src, bool enable)
@@ -3046,7 +3052,7 @@ static bool link_add_remote_sink_helper(struct dc_link *dc_link, struct dc_sink 
 	return true;
 }
 
-/**
+/*
  * dc_link_add_remote_sink() - Create a sink and attach it to an existing link
  *
  * EDID length is in bytes
@@ -3109,7 +3115,7 @@ fail_add_sink:
 	return NULL;
 }
 
-/**
+/*
  * dc_link_remove_remote_sink() - Remove a remote sink from a dc_link
  *
  * Note that this just removes the struct dc_sink - it doesn't
@@ -3236,11 +3242,11 @@ void dc_lock_memory_clock_frequency(struct dc *dc)
 			core_link_enable_stream(dc->current_state, &dc->current_state->res_ctx.pipe_ctx[i]);
 }
 
-bool dc_is_plane_eligible_for_idle_optimizaitons(struct dc *dc, struct dc_plane_state *plane)
+bool dc_is_plane_eligible_for_idle_optimizations(struct dc *dc, struct dc_plane_state *plane,
+		struct dc_cursor_attributes *cursor_attr)
 {
-	if (dc->hwss.does_plane_fit_in_mall && dc->hwss.does_plane_fit_in_mall(dc, plane))
+	if (dc->hwss.does_plane_fit_in_mall && dc->hwss.does_plane_fit_in_mall(dc, plane, cursor_attr))
 		return true;
-
 	return false;
 }
 

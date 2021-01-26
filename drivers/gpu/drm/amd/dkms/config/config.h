@@ -10,6 +10,9 @@
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
+/* acpi_put_table() is available */
+#define HAVE_ACPI_PUT_TABLE 1
+
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
@@ -103,6 +106,9 @@
 
 /* drm_atomic_get_new_plane_state() is available */
 #define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
+
+/* drm_atomic_helper_calc_timestamping_constants() is available */
+#define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
 
 /* drm_atomic_helper_check_plane_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
@@ -224,6 +230,9 @@
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
 
+/* drm_dev_dbg() is available */
+#define HAVE_DRM_DEV_DBG 1
+
 /* drm_dev_put() is available */
 #define HAVE_DRM_DEV_PUT 1
 
@@ -235,6 +244,9 @@
 
 /* display_info->max_tmds_clock is available */
 #define HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK 1
+
+/* struct drm_display_info has monitor_range member */
+#define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
@@ -369,7 +381,7 @@
 /* drm_driver_feature DRIVER_SYNCOBJ_TIMELINE is available */
 #define HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE 1
 
-/* drm_driver->gem_prime_export with p,i arg is available */
+/* drm_gem_prime_export() with p,i arg is available */
 #define HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI 1
 
 /* drm_edid_to_eld() are available */
@@ -405,6 +417,9 @@
 
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
+
+/* drm_format_info.block_w and rm_format_info.block_h is available */
+#define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
 /* whether struct drm_framebuffer have format */
 #define HAVE_DRM_FRAMEBUFFER_FORMAT 1
@@ -480,6 +495,9 @@
 
 /* drm_plane_helper_check_state is available */
 /* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
+
+/* drm_plane_mask is available */
+#define HAVE_DRM_PLANE_MASK 1
 
 /* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
    available */
@@ -656,9 +674,6 @@
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
 
-/* Define to 1 if you have the <linux/kfifo-new.h> header file. */
-/* #undef HAVE_LINUX_KFIFO_NEW_H */
-
 /* Define to 1 if you have the <linux/mem_encrypt.h> header file. */
 #define HAVE_LINUX_MEM_ENCRYPT_H 1
 
@@ -740,6 +755,9 @@
 /* pci_is_thunderbolt_attached() is available */
 #define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
 
+/* pci_pr3_present() is available */
+#define HAVE_PCI_PR3_PRESENT 1
+
 /* pci_upstream_bridge() is available */
 #define HAVE_PCI_UPSTREAM_BRIDGE 1
 
@@ -784,6 +802,15 @@
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
+
+/* struct drm_connector_state->duplicated is available */
+#define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
+
+/* struct drm_connector_state->colorspace is available */
+#define HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE 1
+
+/* struct drm_connector_state->self_refresh_aware is available */
+#define HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1
 
 /* drm_connector->ycbcr_420_allowed is available */
 #define HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED 1
@@ -908,6 +935,9 @@
 /* __kthread_should_park() is available */
 #define HAVE___KTHREAD_SHOULD_PARK 1
 
+/* __print_array is available */
+#define HAVE___PRINT_ARRAY 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
@@ -925,33 +955,3 @@
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "19.40"
-
-/* drm_plane_mask is available */
-#define HAVE_DRM_PLANE_MASK 1
-
-/* __print_array for trace is available */
-#define HAVE___PRINT_ARRAY 1
-
-/* acpi_put_table() is available */
-#define HAVE_ACPI_PUT_TABLE 1
-
-/* drm_atomic_helper_calc_timestamping_constants() is available*/
-#define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
-
-/* block_w and block_h field is available in struct drm_format_info */
-#define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
-
-/* drm_dev_dbg() is exported from drm_print.c */
-#define HAVE_DRM_DEV_DBG 1
-
-/* pci_pr3_present() is exported from pci.c */
-#define HAVE_PCI_PR3_PRESENT 1
-
-/* struct drm_connector_state->colorspace is available */
-#define HAVE_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE 1
-
-/* struct drm_crtc_state->self_refresh_active is available */
-#define HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1
-
-/* struct drm_atomic_state->duplicated is available */
-#define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1

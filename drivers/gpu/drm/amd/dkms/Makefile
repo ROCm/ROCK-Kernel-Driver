@@ -56,16 +56,16 @@ ifeq ("centos",$(OS_NAME))
 OS_NAME="custom-rhel"
 else ifeq ("rhel",$(OS_NAME))
 OS_NAME="custom-rhel"
-else
-ifeq ("linuxmint",$(OS_NAME))
+else ifeq ("linuxmint",$(OS_NAME))
 OS_NAME="ubuntu"
 endif
 OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
-endif
 else
 OS_NAME = "unknown"
 OS_VERSION = "0.0"
 endif
+
+OS_VERSION_STR = $(subst .,_,$(OS_VERSION))
 
 ifeq ("ubuntu",$(OS_NAME))
 subdir-ccflags-y += -DOS_NAME_UBUNTU
@@ -90,51 +90,15 @@ subdir-ccflags-y += \
 	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
 
 ifeq ($(OS_NAME),"opensuse-leap")
-ifeq ($(OS_VERSION),"15.2")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_2
-endif
-endif
-
-ifeq ($(OS_NAME),"opensuse-leap")
-ifeq ($(OS_VERSION),"15.1")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_1
-endif
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
 endif
 
 ifeq ($(OS_NAME),"sled")
-ifeq ($(OS_VERSION),"15.2")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_2
-endif
-endif
-
-ifeq ($(OS_NAME),"sled")
-ifeq ($(OS_VERSION),"15.1")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_1
-endif
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
 endif
 
 ifeq ($(OS_NAME),"sles")
-ifeq ($(OS_VERSION),"15.2")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_2
-endif
-endif
-
-ifeq ($(OS_NAME),"sles")
-ifeq ($(OS_VERSION),"15.1")
-subdir-ccflags-y += -DOS_NAME_SUSE_15_1
-endif
-endif
-
-ifeq ($(OS_NAME),"sled")
-ifeq ($(OS_VERSION),"12.3")
-subdir-ccflags-y += -DOS_NAME_SLE_12_3
-endif
-endif
-
-ifeq ($(OS_NAME),"sles")
-ifeq ($(OS_VERSION),"12.3")
-subdir-ccflags-y += -DOS_NAME_SLE_12_3
-endif
+subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
 endif
 
 ifeq ($(OS_NAME),"ubuntu")
@@ -144,42 +108,17 @@ OS_OEM = "$(shell echo $(KERNELRELEASE) | cut -d '-' -f 3)"
 ifeq ($(OS_OEM),"oem")
 subdir-ccflags-y += -DOS_NAME_UBUNTU_OEM
 endif
-ifeq ($(OS_VERSION),"14.04")
-subdir-ccflags-y += -DOS_NAME_UBUNTU_1404
-else
-subdir-ccflags-y += -DOS_NAME_UBUNTU_1604
-endif
+subdir-ccflags-y += -DOS_NAME_UBUNTU_$(OS_VERSION_STR)
 endif
 
 ifeq ($(OS_NAME),"rhel")
-ifeq ($(OS_VERSION),"6.8")
-subdir-ccflags-y += -DOS_NAME_RHEL_6
-else ifeq ($(OS_VERSION),"6.9")
-subdir-ccflags-y += -DOS_NAME_RHEL_6
-else ifeq ($(OS_VERSION),"6.10")
-subdir-ccflags-y += -DOS_NAME_RHEL_6
-else ifeq ($(OS_VERSION),"7.2")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_2
-else ifeq ($(OS_VERSION),"7.3")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_3
-else ifeq ($(OS_VERSION),"7.4")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_4
-subdir-ccflags-y += -DOS_NAME_RHEL_7_X
-else ifeq ($(OS_VERSION),"7.5")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_5
-subdir-ccflags-y += -DOS_NAME_RHEL_7_X
-else ifeq ($(OS_VERSION),"7.6")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_6
-subdir-ccflags-y += -DOS_NAME_RHEL_7_X
-else ifeq ($(OS_VERSION),"7.7")
-subdir-ccflags-y += -DOS_NAME_RHEL_7_7
-subdir-ccflags-y += -DOS_NAME_RHEL_7_X
-else ifeq ($(OS_VERSION),"8.0")
-subdir-ccflags-y += -DOS_NAME_RHEL_8_0
-endif
-ifneq ($(RHEL_MAJOR),8)
-subdir-ccflags-y += \
+subdir-ccflags-y += -DOS_NAME_RHEL_$(OS_VERSION_STR)
+
+ifeq ($(RHEL_MAJOR),7)
+subdir-ccflags-y += -DOS_NAME_RHEL_7_X \
 	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
+else ifeq ($(RHEL_MAJOR),8)
+subdir-ccflags-y += -DOS_NAME_RHEL_8_X
 endif
 endif
 

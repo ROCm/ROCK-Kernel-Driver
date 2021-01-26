@@ -82,7 +82,6 @@ MODULE_FIRMWARE("amdgpu/navi10_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/navi14_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/navi12_gpu_info.bin");
 MODULE_FIRMWARE("amdgpu/vangogh_gpu_info.bin");
-MODULE_FIRMWARE("amdgpu/green_sardine_gpu_info.bin");
 
 #define AMDGPU_RESUME_MS		2000
 
@@ -4829,7 +4828,13 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
 						  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN3);
 		} else {
-			if (speed_cap == PCIE_SPEED_16_0GT)
+			if (speed_cap == PCIE_SPEED_32_0GT)
+				adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
+							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
+							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN3 |
+							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN4 |
+							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN5);
+			else if (speed_cap == PCIE_SPEED_16_0GT)
 				adev->pm.pcie_gen_mask |= (CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN2 |
 							  CAIL_ASIC_PCIE_LINK_SPEED_SUPPORT_GEN3 |
@@ -4849,7 +4854,13 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
 			adev->pm.pcie_gen_mask |= (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 						   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2);
 		} else {
-			if (platform_speed_cap == PCIE_SPEED_16_0GT)
+			if (platform_speed_cap == PCIE_SPEED_32_0GT)
+				adev->pm.pcie_gen_mask |= (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1 |
+							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2 |
+							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3 |
+							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN4 |
+							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN5);
+			else if (platform_speed_cap == PCIE_SPEED_16_0GT)
 				adev->pm.pcie_gen_mask |= (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN1 |
 							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2 |
 							   CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3 |

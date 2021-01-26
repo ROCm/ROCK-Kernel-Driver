@@ -18,7 +18,7 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CONNECTOR_STATE_COLORSPACE], [
 				struct drm_connector_state *state = NULL;
 				state->self_refresh_aware = 0;
 			],[
-				AC_DEFINE(HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1,
+				AC_DEFINE(HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE, 1,
 					[struct drm_connector_state->self_refresh_aware is available])
 			])
 		])

@@ -166,13 +166,13 @@ enum pcie_link_width pcie_get_width_cap(struct pci_dev *dev)
 
 	return PCIE_LNK_WIDTH_UNKNOWN;
 }
-#endif
 
 enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
 enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
+#endif
 
 void amdkcl_pci_init(void)
 {

@@ -238,7 +238,8 @@ struct hw_sequencer_funcs {
 	bool (*apply_idle_power_optimizations)(struct dc *dc, bool enable);
 #endif
 
-	bool (*does_plane_fit_in_mall)(struct dc *dc, struct dc_plane_state *plane);
+	bool (*does_plane_fit_in_mall)(struct dc *dc, struct dc_plane_state *plane,
+			struct dc_cursor_attributes *cursor_attr);
 
 	bool (*is_abm_supported)(struct dc *dc,
 			struct dc_state *context, struct dc_stream_state *stream);

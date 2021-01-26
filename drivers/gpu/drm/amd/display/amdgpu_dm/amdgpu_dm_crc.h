@@ -46,17 +46,12 @@ static inline bool amdgpu_dm_is_valid_crc_source(enum amdgpu_dm_pipe_crc_source 
 }
 
 /* amdgpu_dm_crc.c */
-bool amdgpu_dm_crc_window_is_default(struct dm_crtc_state *dm_crtc_state);
-bool amdgpu_dm_crc_window_changed(struct dm_crtc_state *dm_new_crtc_state,
-					struct dm_crtc_state *dm_old_crtc_state);
+#ifdef CONFIG_DEBUG_FS
 #if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE)
 int amdgpu_dm_crtc_configure_crc_source(struct drm_crtc *crtc,
 					struct dm_crtc_state *dm_crtc_state,
 					enum amdgpu_dm_pipe_crc_source source);
-#endif
 
-#ifdef CONFIG_DEBUG_FS
-#if defined(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE)
 #ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS
 int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name);
 #else
