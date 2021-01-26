@@ -94,7 +94,7 @@
 #define KMS_DRIVER_MINOR	40
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"5.9.16"
+#define AMDGPU_VERSION		"5.9.17"
 
 int amdgpu_vram_limit;
 int amdgpu_vis_vram_limit;
