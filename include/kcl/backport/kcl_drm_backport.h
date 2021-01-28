@@ -10,14 +10,6 @@
 #define AMDKCL_AMDGPU_DEBUGFS_CLEANUP
 #endif
 
-/*
- * commit d3252ace0bc652a1a244455556b6a549f969bf99
- * PCI: Restore resized BAR state on resume
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
-#define AMDKCL_ENABLE_RESIZE_FB_BAR
-#endif
-
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 17, 0)
 #define AMDKCL_AMDGPU_DMABUF_OPS
 #endif
