@@ -1171,8 +1171,8 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   struct kfd_queue_snapshot_entry __user *buf,
 			   int num_qss_entries);
 
-int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
-			      unsigned int fence_value,
+int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
+			      uint64_t fence_value,
 			      unsigned int timeout_ms);
 
 struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
@@ -1212,7 +1212,7 @@ struct packet_manager_funcs {
 	int (*set_grace_period)(struct packet_manager *pm, uint32_t *buffer,
 			uint32_t grace_period);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
-			uint64_t fence_address,	uint32_t fence_value);
+			uint64_t fence_address,	uint64_t fence_value);
 	int (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
 
 	/* Packet sizes */
@@ -1235,7 +1235,7 @@ int pm_send_set_resources(struct packet_manager *pm,
 				struct scheduling_resources *res);
 int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues);
 int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
-				uint32_t fence_value);
+				uint64_t fence_value);
 
 int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter mode,
