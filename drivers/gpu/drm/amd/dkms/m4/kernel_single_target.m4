@@ -19,7 +19,7 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 			 xargs)
 		CPPFLAGS=$(echo $CFLAGS | \
 			   sed 's| -|\n&|g' | \
-			   sed -n '/-I/p; /-include/p; /-D/p' | \
+			   sed -n '/-I/p; /-include/p; /-isystem/p; /-D/p' | \
 			   xargs)
 
 		CFLAGS="$CFLAGS $_base_cflags"
