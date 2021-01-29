@@ -1776,7 +1776,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 			ttm = container_of(bo->tbo.ttm, struct ttm_dma_tt, ttm);
 			pages_addr = ttm->dma_address;
 		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
-			pages_addr = (dma_addr_t *)bo_va->base.bo->addr;
+			pages_addr = bo->dgma_addr;
 		}
 	}
 

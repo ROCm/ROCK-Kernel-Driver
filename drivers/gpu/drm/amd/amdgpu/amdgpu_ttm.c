@@ -778,7 +778,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 	case AMDGPU_PL_DGMA:
 		mem->bus.offset = (mem->start << PAGE_SHIFT) +
 				amdgpu_ttm_domain_start(adev, mem->mem_type) -
-				adev->gmc.vram_start;
+				amdgpu_ttm_domain_start(adev, TTM_PL_VRAM);
 		/* check if it's visible */
 		if ((mem->bus.offset + bus_size) > adev->gmc.visible_vram_size)
 			return -EINVAL;
@@ -797,9 +797,9 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 	case AMDGPU_PL_DGMA_IMPORT:
 		node = container_of(mm_node, struct amdgpu_dgma_node, node);
 		abo = ttm_to_amdgpu_bo(node->tbo);
-		mem->bus.addr = abo->addr;
+		mem->bus.addr = abo->dgma_addr;
 		mem->bus.offset = 0;
-		mem->bus.base = abo->base;
+		mem->bus.base = abo->dgma_import_base;
 		mem->bus.is_iomem = true;
 		break;
 	default:
@@ -2204,27 +2204,27 @@ static int amdgpu_ttm_reserve_tmr(struct amdgpu_device *adev)
 	return 0;
 }
 
-static inline struct amdgpu_dgma_mgr *to_direct_gma_mgr(struct ttm_resource_manager *man)
+static inline struct amdgpu_dgma_import_mgr *to_dgma_import_mgr(struct ttm_resource_manager *man)
 {
-	return container_of(man, struct amdgpu_dgma_mgr, manager);
+	return container_of(man, struct amdgpu_dgma_import_mgr, manager);
 }
 
-static const struct ttm_resource_manager_func amdgpu_direct_gma_mgr_func;
+static const struct ttm_resource_manager_func amdgpu_dgma_import_mgr_func;
 /**
- * amdgpu_direct_gma_mgr_init - init DGMA manager and DRM MM
+ * amdgpu_dgma_import_mgr_init - init DGMA_import manager and DRM MM
  *
  * @adev: amdgpu_device pointer
  * @dgma_size: maximum size of DGMA
  *
  * Allocate and initialize the DGMA manager.
  */
-static int amdgpu_direct_gma_mgr_init(struct amdgpu_device *adev, uint64_t p_size)
+static int amdgpu_dgma_import_mgr_init(struct amdgpu_device *adev, uint64_t p_size)
 {
-	struct amdgpu_dgma_mgr *mgr = &adev->mman.dgma_mgr;
+	struct amdgpu_dgma_import_mgr *mgr = &adev->mman.dgma_import_mgr;
 	struct ttm_resource_manager *man = &mgr->manager;
 
 	man->use_tt = false;
-	man->func = &amdgpu_direct_gma_mgr_func;
+	man->func = &amdgpu_dgma_import_mgr_func;
 	man->available_caching = TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_WC;
 	man->default_caching = TTM_PL_FLAG_WC;
 
@@ -2239,16 +2239,16 @@ static int amdgpu_direct_gma_mgr_init(struct amdgpu_device *adev, uint64_t p_siz
 }
 
 /**
- * amdgpu_direct_gma_mgr_fini - free and destroy DGMA import manager
+ * amdgpu_dgma_import_mgr_fini - free and destroy DGMA import manager
  *
  * @adev: amdgpu_device pointer
  *
  * Destroy and free the DGMA import manager, returns -EBUSY if ranges are still
  * allocated inside it.
  */
-static void amdgpu_direct_gma_mgr_fini(struct amdgpu_device *adev)
+static void amdgpu_dgma_import_mgr_fini(struct amdgpu_device *adev)
 {
-	struct amdgpu_dgma_mgr *mgr = &adev->mman.dgma_mgr;
+	struct amdgpu_dgma_import_mgr *mgr = &adev->mman.dgma_import_mgr;
 	struct ttm_resource_manager *man = &mgr->manager;
 	int ret;
 
@@ -2266,19 +2266,19 @@ static void amdgpu_direct_gma_mgr_fini(struct amdgpu_device *adev)
 }
 
 /**
- * amdgpu_direct_gma_mgr_new - allocate a new node
+ * amdgpu_dgma_import_mgr_new - allocate a new node
  *
  * @man: TTM memory type manager
  * @tbo: TTM BO we need this range for
  * @place: placement flags and restrictions
  * @mem: the resulting mem object
  */
-static int amdgpu_direct_gma_mgr_new(struct ttm_resource_manager *man,
+static int amdgpu_dgma_import_mgr_new(struct ttm_resource_manager *man,
 			      struct ttm_buffer_object *tbo,
 			      const struct ttm_place *place,
 			      struct ttm_resource *mem)
 {
-	struct amdgpu_dgma_mgr *mgr = to_direct_gma_mgr(man);
+	struct amdgpu_dgma_import_mgr *mgr = to_dgma_import_mgr(man);
 	struct amdgpu_dgma_node *node;
 	unsigned long lpfn;
 	int r;
@@ -2336,17 +2336,17 @@ err_out:
 }
 
 /**
- * amdgpu_direct_gma_mgr_del - free ranges
+ * amdgpu_dgma_import_mgr_del - free ranges
  *
  * @man: TTM memory type manager
  * @mem: TTM memory object
  *
  * Free the allocated node.
  */
-static void amdgpu_direct_gma_mgr_del(struct ttm_resource_manager *man,
+static void amdgpu_dgma_import_mgr_del(struct ttm_resource_manager *man,
 			       struct ttm_resource *mem)
 {
-	struct amdgpu_dgma_mgr *mgr = to_direct_gma_mgr(man);
+	struct amdgpu_dgma_import_mgr *mgr = to_dgma_import_mgr(man);
 	struct amdgpu_dgma_node *node = mem->mm_node;
 
 	if (node) {
@@ -2359,9 +2359,9 @@ static void amdgpu_direct_gma_mgr_del(struct ttm_resource_manager *man,
 	atomic64_add(mem->num_pages, &mgr->available);
 }
 
-static const struct ttm_resource_manager_func amdgpu_direct_gma_mgr_func = {
-	.alloc = amdgpu_direct_gma_mgr_new,
-	.free = amdgpu_direct_gma_mgr_del,
+static const struct ttm_resource_manager_func amdgpu_dgma_import_mgr_func = {
+	.alloc = amdgpu_dgma_import_mgr_new,
+	.free = amdgpu_dgma_import_mgr_del,
 };
 
 static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
@@ -2409,7 +2409,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 	if (unlikely(r))
 		goto error_put_node;
 
-	r = amdgpu_direct_gma_mgr_init(adev, size >> PAGE_SHIFT);
+	r = amdgpu_dgma_import_mgr_init(adev, size >> PAGE_SHIFT);
 	if (unlikely(r))
 		goto error_release_mm;
 
@@ -2439,7 +2439,7 @@ static void amdgpu_direct_gma_fini(struct amdgpu_device *adev)
 		return;
 
 	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_DGMA);
-	amdgpu_direct_gma_mgr_fini(adev);
+	amdgpu_dgma_import_mgr_fini(adev);
 
 	r = amdgpu_bo_reserve(adev->direct_gma.dgma_bo, false);
 	if (r == 0) {
