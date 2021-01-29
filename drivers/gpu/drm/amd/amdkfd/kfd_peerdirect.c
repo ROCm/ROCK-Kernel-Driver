@@ -49,9 +49,13 @@
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
 #include <linux/module.h>
-#include <drm/amd_rdma.h>
 
 #include "kfd_priv.h"
+
+/* The AMD RDMA interface is being removed and the code integrated into
+ * the Peerdirect implementation.
+ */
+#include "kfd_rdma.c"
 
 
 
@@ -137,8 +141,6 @@ static void (*pfn_ib_unregister_peer_memory_client)(void *reg_handle);
 static int (*pfn_ib_invalidate_peer_memory)(void *reg_handle,
 					    void *core_context);
 
-static const struct amd_rdma_interface *rdma_interface;
-
 static void *ib_reg_handle;
 
 struct amd_mem_context {
@@ -207,7 +209,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 		 addr, size, pid);
 
 	/* Check if address is handled by AMD GPU driver */
-	ret = rdma_interface->is_gpu_address(addr, pid);
+	ret = is_gpu_address(addr, pid);
 	if (!ret) {
 		pr_debug("Not a GPU Address\n");
 		return 0;
@@ -275,10 +277,10 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	to register size < page_size or addr starts at some offset. Fix
 	it by aligning the size to page size and addr to page boundary.
 	*/
-	rdma_interface->get_page_size(addr, size, mem_context->pid,
+	get_page_size(addr, size, mem_context->pid,
 				      &page_size);
 
-	ret = rdma_interface->get_pages(
+	ret = get_pages(
 					ALIGN_DOWN(addr, page_size),
 					ALIGN(size, page_size),
 					mem_context->pid,
@@ -386,7 +388,7 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 	}
 
 	if (mem_context->p2p_info) {
-		ret = rdma_interface->put_pages(&mem_context->p2p_info);
+		ret = put_pages(&mem_context->p2p_info);
 		mem_context->p2p_info = NULL;
 
 		if (ret)
@@ -410,7 +412,7 @@ static unsigned long amd_get_page_size(void *client_context)
 			mem_context->size);
 
 
-	result = rdma_interface->get_page_size(
+	result = get_page_size(
 				mem_context->va,
 				mem_context->size,
 				mem_context->pid,
@@ -462,8 +464,6 @@ static struct peer_memory_client amd_mem_client = {
  */
 void kfd_init_peer_direct(void)
 {
-	int result;
-
 	if (pfn_ib_unregister_peer_memory_client) {
 		pr_debug("PeerDirect support was already initialized\n");
 		return;
@@ -484,13 +484,6 @@ void kfd_init_peer_direct(void)
 		pr_debug("PeerDirect interface was not detected\n");
 		/* Do cleanup */
 		kfd_close_peer_direct();
-		return;
-	}
-
-	result = amdkfd_query_rdma_interface(&rdma_interface);
-
-	if (result < 0) {
-		pr_err("Cannot get RDMA Interface (result = %d)\n", result);
 		return;
 	}
 
