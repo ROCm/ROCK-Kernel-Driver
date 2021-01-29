@@ -56,7 +56,6 @@ AMDKFD_FILES	:= $(AMDKFD_PATH)/kfd_module.o \
 		$(AMDKFD_PATH)/kfd_dbgmgr.o \
 		$(AMDKFD_PATH)/kfd_smi_events.o \
 		$(AMDKFD_PATH)/kfd_crat.o \
-		$(AMDKFD_PATH)/kfd_rdma.o \
 		$(AMDKFD_PATH)/kfd_peerdirect.o \
 		$(AMDKFD_PATH)/kfd_ipc.o \
 		$(AMDKFD_PATH)/kfd_trace.o \
