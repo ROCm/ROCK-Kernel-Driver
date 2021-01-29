@@ -25,9 +25,32 @@
 #include <linux/pid.h>
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <drm/amd_rdma.h>
 #include "kfd_priv.h"
 #include "amdgpu_amdkfd.h"
+
+/**
+ * Structure describing information needed to P2P access from another device
+ * to specific location of GPU memory
+ */
+struct amd_p2p_info {
+	uint64_t	va;		/**< Specify user virt. address
+					  * which this page table
+					  * described
+					  */
+	uint64_t	size;		/**< Specify total size of
+					  * allocation
+					  */
+	struct pid	*pid;		/**< Specify process pid to which
+					  * virtual address belongs
+					  */
+	struct sg_table *pages;		/**< Specify DMA/Bus addresses */
+	void		*priv;		/**< Pointer set by AMD kernel
+					  * driver
+					  */
+	struct kfd_process *kfd_proc;  /**< Reference to kfd_process that
+					 * corresponds to this P2P access
+					 */
+};
 
 struct rdma_cb {
 	struct list_head node;
@@ -262,34 +285,4 @@ static int get_page_size(uint64_t address, uint64_t length, struct pid *pid,
 
 	return 0;
 }
-
-
-/**
- * Singleton object: rdma interface function pointers
- */
-static const struct amd_rdma_interface  rdma_ops = {
-	.get_pages = get_pages,
-	.put_pages = put_pages,
-	.is_gpu_address = is_gpu_address,
-	.get_page_size = get_page_size,
-};
-
-/**
- * amdkfd_query_rdma_interface - Return interface (function pointers table) for
- *				 rdma interface
- *
- *
- * \param interace     - OUT: Pointer to interface
- *
- * \return 0 if operation was successful.
- */
-int amdkfd_query_rdma_interface(const struct amd_rdma_interface **ops)
-{
-	*ops  = &rdma_ops;
-
-	return 0;
-}
-EXPORT_SYMBOL(amdkfd_query_rdma_interface);
-
-
 
