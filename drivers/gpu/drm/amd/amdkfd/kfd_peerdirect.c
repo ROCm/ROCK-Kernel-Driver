@@ -44,7 +44,6 @@
 
 #include <linux/device.h>
 #include <linux/export.h>
-#include <linux/pid.h>
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/scatterlist.h>
@@ -142,7 +141,6 @@ struct amd_mem_context {
 
 	uint64_t	va;
 	uint64_t	size;
-	struct pid	*pid;
 	struct kfd_process *kfd_proc;
 	struct kfd_bo	*buf_obj;
 
@@ -157,17 +155,17 @@ struct amd_mem_context {
 
 static void put_pages_helper(struct amd_mem_context *mem_context)
 {
-	struct kfd_bo *buf_obj = mem_context->buf_obj;
-	struct kfd_dev *dev = buf_obj->dev;
-	struct sg_table *sg_table_tmp = mem_context->pages;
-	struct kfd_process *kfd_proc = mem_context->kfd_proc;
+	if (mem_context->pages) {
+		struct kfd_bo *buf_obj = mem_context->buf_obj;
+
+		amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem,
+						       mem_context->pages);
+		mem_context->pages = NULL;
+		kfd_dec_compute_active(buf_obj->dev);
+	}
 
 	list_del(&mem_context->callback_node);
-
-	amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem, sg_table_tmp);
-	kfd_dec_compute_active(dev);
-
-	kfd_unref_process(kfd_proc);
+	kfd_unref_process(mem_context->kfd_proc);
 }
 
 static void free_callback(struct amd_mem_context *mem_context)
@@ -235,7 +233,6 @@ static int amd_acquire(unsigned long addr, size_t size,
 	struct kfd_process *p;
 	struct kfd_bo *buf_obj;
 	struct amd_mem_context *mem_context;
-	struct pid *pid;
 
 	p = kfd_get_process(current);
 	if (!p) {
@@ -248,30 +245,30 @@ static int amd_acquire(unsigned long addr, size_t size,
 	mutex_lock(&p->mutex);
 	buf_obj = kfd_process_find_bo_from_interval(p, addr,
 			addr + size - 1);
-	mutex_unlock(&p->mutex);
 	if (!buf_obj) {
 		pr_debug("Cannot find a kfd_bo for the range\n");
-		return 0;
+		goto out_unlock;
 	}
 
 	/* Initialize context used for operation with given address */
 	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
 	if (!mem_context)
-		return 0;
+		goto out_unlock;
 
-	/* Get pointer to structure describing current process */
-	pid = get_task_pid(current, PIDTYPE_PID);
-	pr_debug("addr: %#lx, size: %#lx, pid: 0x%p\n",
-		 addr, size, pid);
+	pr_debug("addr: %#lx, size: %#lx, pid: %d\n",
+		 addr, size, p->lead_thread->pid);
 
 	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
 	mem_context->size = size;
 
-	/* Save PID. It is guaranteed that the function will be
-	 * called in the correct process context as opposite to others.
-	 */
-	mem_context->pid  = pid;
+	mem_context->buf_obj = buf_obj;
+	list_add(&mem_context->callback_node, &buf_obj->cb_data_head);
+
+	mem_context->kfd_proc = p;
+	kref_get(&p->ref);
+
+	mutex_unlock(&p->mutex);
 
 	pr_debug("Client context: 0x%p\n", mem_context);
 
@@ -282,6 +279,10 @@ static int amd_acquire(unsigned long addr, size_t size,
 	 * by AMD GPU driver
 	 */
 	return 1;
+
+out_unlock:
+	mutex_unlock(&p->mutex);
+	return 0;
 }
 
 static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
@@ -291,9 +292,9 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	int ret;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
-	struct kfd_process *p;
-	struct kfd_bo *buf_obj;
-	struct kfd_dev *dev;
+	struct kfd_process *p = mem_context->kfd_proc;
+	struct kfd_bo *buf_obj = mem_context->buf_obj;
+	struct kfd_dev *dev = buf_obj->dev;
 	struct sg_table *sg_table_tmp;
 	unsigned long offset;
 
@@ -307,7 +308,7 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	pr_debug("pid: 0x%p\n", mem_context->pid);
+	pr_debug("pid: %d\n", p->lead_thread->pid);
 
 
 	if (addr != mem_context->va) {
@@ -322,34 +323,16 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	p = kfd_lookup_process_by_pid(mem_context->pid);
-	if (!p) {
-		pr_err("Could not find the process\n");
-		return -EINVAL;
-	}
-
 	mutex_lock(&p->mutex);
-	buf_obj = kfd_process_find_bo_from_interval(p, addr, addr + size - 1);
-	if (!buf_obj) {
-		pr_err("Cannot find a kfd_bo for the range\n");
-		ret = -EFAULT;
-		goto out_unref_proc;
-	}
-
-	dev = buf_obj->dev;
 	offset = addr - buf_obj->it.start;
-
 	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, buf_obj->mem,
 			offset, size, &sg_table_tmp);
 	if (ret) {
 		pr_err("amdgpu_amdkfd_gpuvm_pin_get_sg_table failed.\n");
-		goto out_unref_proc;
+		goto out_unlock;
 	}
 
-	mem_context->buf_obj = buf_obj;
-	mem_context->kfd_proc = p;
 	mem_context->pages = sg_table_tmp;
-	list_add(&mem_context->callback_node, &buf_obj->cb_data_head);
 
 	kfd_inc_compute_active(buf_obj->dev);
 	mutex_unlock(&p->mutex);
@@ -359,11 +342,8 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	/* Note: At this stage it is OK not to fill sg_table */
 	return 0;
 
-out_unref_proc:
-	pr_debug("Decrement ref count for process with PID: %d\n",
-		 mem_context->pid->numbers->nr);
+out_unlock:
 	mutex_unlock(&p->mutex);
-	kfd_unref_process(p);
 	return ret;
 }
 
@@ -396,8 +376,8 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
-			mem_context->pid,
+	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
+			mem_context->kfd_proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
@@ -424,8 +404,8 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 	pr_debug("Client context: 0x%p, sg_table: 0x%p\n",
 			client_context, sg_head);
 
-	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
-			mem_context->pid,
+	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
+			mem_context->kfd_proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
@@ -440,8 +420,8 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 
 	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
 			client_context, sg_head);
-	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
-			mem_context->pid,
+	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
+			mem_context->kfd_proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
@@ -464,8 +444,8 @@ static void amd_release(void *client_context)
 		(struct amd_mem_context *)client_context;
 
 	pr_debug("Client context: 0x%p\n", client_context);
-	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
-			mem_context->pid,
+	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
+			mem_context->kfd_proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
