@@ -52,12 +52,6 @@
 
 #include "kfd_priv.h"
 
-/* The AMD RDMA interface is being removed and the code integrated into
- * the Peerdirect implementation.
- */
-#include "kfd_rdma.c"
-
-
 
 /* ----------------------- PeerDirect interface ------------------------------*/
 
@@ -144,11 +138,15 @@ static int (*pfn_ib_invalidate_peer_memory)(void *reg_handle,
 static void *ib_reg_handle;
 
 struct amd_mem_context {
+	struct list_head callback_node;
+
 	uint64_t	va;
 	uint64_t	size;
 	struct pid	*pid;
+	struct kfd_process *kfd_proc;
+	struct kfd_bo	*buf_obj;
 
-	struct amd_p2p_info  *p2p_info;
+	struct sg_table *pages;
 
 	/* Flag that free callback was called */
 	int free_callback_called;
@@ -157,11 +155,23 @@ struct amd_mem_context {
 	void *core_context;
 };
 
-static void free_callback(void *client_priv)
+static void put_pages_helper(struct amd_mem_context *mem_context)
 {
-	struct amd_mem_context *mem_context =
-		(struct amd_mem_context *)client_priv;
+	struct kfd_bo *buf_obj = mem_context->buf_obj;
+	struct kfd_dev *dev = buf_obj->dev;
+	struct sg_table *sg_table_tmp = mem_context->pages;
+	struct kfd_process *kfd_proc = mem_context->kfd_proc;
 
+	list_del(&mem_context->callback_node);
+
+	amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem, sg_table_tmp);
+	kfd_dec_compute_active(dev);
+
+	kfd_unref_process(kfd_proc);
+}
+
+static void free_callback(struct amd_mem_context *mem_context)
+{
 	pr_debug("Client context: 0x%p\n", mem_context);
 
 	if (!mem_context) {
@@ -189,10 +199,20 @@ static void free_callback(void *client_priv)
 
 	pr_debug("IBCore context: 0x%p\n", mem_context->core_context);
 
-	/* amdkfd will free resources when we return from this callback.
-	 * Set flag to inform that there is nothing to do on "put_pages", etc.
+	/* Set flag to inform that there is nothing to do on "put_pages", etc.
 	 */
 	WRITE_ONCE(mem_context->free_callback_called, 1);
+
+	put_pages_helper(mem_context);
+}
+
+void run_rdma_free_callback(struct kfd_bo *buf_obj)
+{
+	struct amd_mem_context *tmp, *mem_context;
+
+	list_for_each_entry_safe(mem_context, tmp,
+			&buf_obj->cb_data_head, callback_node)
+		free_callback(mem_context);
 }
 
 /* Workaround: Mellanox peerdirect driver expects sg lists at
@@ -271,6 +291,11 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	int ret;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
+	struct kfd_process *p;
+	struct kfd_bo *buf_obj;
+	struct kfd_dev *dev;
+	struct sg_table *sg_table_tmp;
+	unsigned long offset;
 
 	align_addr_size(&addr, &size);
 
@@ -297,23 +322,49 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	ret = get_pages(
-					addr,
-					size,
-					mem_context->pid,
-					&mem_context->p2p_info,
-					free_callback,
-					mem_context);
-
-	if (ret || !mem_context->p2p_info) {
-		pr_err("Could not rdma::get_pages failure: %d\n", ret);
-		return ret;
+	p = kfd_lookup_process_by_pid(mem_context->pid);
+	if (!p) {
+		pr_err("Could not find the process\n");
+		return -EINVAL;
 	}
+
+	mutex_lock(&p->mutex);
+	buf_obj = kfd_process_find_bo_from_interval(p, addr, addr + size - 1);
+	if (!buf_obj) {
+		pr_err("Cannot find a kfd_bo for the range\n");
+		ret = -EFAULT;
+		goto out_unref_proc;
+	}
+
+	dev = buf_obj->dev;
+	offset = addr - buf_obj->it.start;
+
+	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, buf_obj->mem,
+			offset, size, &sg_table_tmp);
+	if (ret) {
+		pr_err("amdgpu_amdkfd_gpuvm_pin_get_sg_table failed.\n");
+		goto out_unref_proc;
+	}
+
+	mem_context->buf_obj = buf_obj;
+	mem_context->kfd_proc = p;
+	mem_context->pages = sg_table_tmp;
+	list_add(&mem_context->callback_node, &buf_obj->cb_data_head);
+
+	kfd_inc_compute_active(buf_obj->dev);
+	mutex_unlock(&p->mutex);
 
 	mem_context->core_context = core_context;
 
 	/* Note: At this stage it is OK not to fill sg_table */
 	return 0;
+
+out_unref_proc:
+	pr_debug("Decrement ref count for process with PID: %d\n",
+		 mem_context->pid->numbers->nr);
+	mutex_unlock(&p->mutex);
+	kfd_unref_process(p);
+	return ret;
 }
 
 
@@ -350,16 +401,16 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 			mem_context->va,
 			mem_context->size);
 
-	if (!mem_context->p2p_info) {
+	if (!mem_context->pages) {
 		pr_err("No sg table were allocated\n");
 		return -EINVAL;
 	}
 
 	/* Copy information about previosly allocated sg_table */
-	*sg_head = *mem_context->p2p_info->pages;
+	*sg_head = *mem_context->pages;
 
 	/* Return number of pages */
-	*nmap = mem_context->p2p_info->pages->nents;
+	*nmap = mem_context->pages->nents;
 
 	return 0;
 }
@@ -384,7 +435,6 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 
 static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 {
-	int ret = 0;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
 
@@ -395,24 +445,12 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 			mem_context->va,
 			mem_context->size);
 
-	pr_debug("mem_context->p2p_info 0x%p\n",
-				mem_context->p2p_info);
-
-	if (mem_context->free_callback_called) {
-		READ_ONCE(mem_context->free_callback_called);
+	if (READ_ONCE(mem_context->free_callback_called)) {
 		pr_debug("Free callback was called\n");
 		return;
 	}
 
-	if (mem_context->p2p_info) {
-		ret = put_pages(&mem_context->p2p_info);
-		mem_context->p2p_info = NULL;
-
-		if (ret)
-			pr_err("Failure: %d (callback status %d)\n",
-					ret, mem_context->free_callback_called);
-	} else
-		pr_err("Pointer to p2p info is null\n");
+	put_pages_helper(mem_context);
 }
 
 static unsigned long amd_get_page_size(void *client_context)
