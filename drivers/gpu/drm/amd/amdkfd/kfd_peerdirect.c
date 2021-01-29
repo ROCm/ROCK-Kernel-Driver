@@ -234,15 +234,15 @@ static int amd_acquire(unsigned long addr, size_t size,
 		return 0;
 	}
 
-	/* Get pointer to structure describing current process */
-	pid = get_task_pid(current, PIDTYPE_PID);
-	pr_debug("addr: %#lx, size: %#lx, pid: 0x%p\n",
-		 addr, size, pid);
-
 	/* Initialize context used for operation with given address */
 	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
 	if (!mem_context)
 		return 0;
+
+	/* Get pointer to structure describing current process */
+	pid = get_task_pid(current, PIDTYPE_PID);
+	pr_debug("addr: %#lx, size: %#lx, pid: 0x%p\n",
+		 addr, size, pid);
 
 	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
