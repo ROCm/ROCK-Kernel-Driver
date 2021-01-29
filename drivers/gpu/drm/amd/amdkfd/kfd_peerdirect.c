@@ -417,33 +417,7 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 
 static unsigned long amd_get_page_size(void *client_context)
 {
-	unsigned long page_size;
-	int result;
-	struct amd_mem_context *mem_context =
-		(struct amd_mem_context *)client_context;
-
-	pr_debug("Client context: 0x%p\n", client_context);
-	pr_debug("pid: 0x%p, address: %#llx, size: %#llx\n",
-			mem_context->pid,
-			mem_context->va,
-			mem_context->size);
-
-
-	result = get_page_size(
-				mem_context->va,
-				mem_context->size,
-				mem_context->pid,
-				&page_size);
-
-	if (result) {
-		pr_err("Could not get page size. %d\n", result);
-		/* If we failed to get page size then do not know what to do.
-		 * Let's return some default value
-		 */
-		return PAGE_SIZE;
-	}
-
-	return page_size;
+	return PAGE_SIZE;
 }
 
 static void amd_release(void *client_context)
