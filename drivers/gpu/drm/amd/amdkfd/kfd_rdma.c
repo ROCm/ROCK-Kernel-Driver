@@ -230,28 +230,3 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 
 	return ret;
 }
-
-/**
- * Return the single page size to be used when building scatter/gather table
- * for given range.
- *
- * \param   address   - Address
- * \param   length    - Range length
- * \param   pid       - Process id structure. Could be NULL if current one.
- * \param   page_size - On return: Page size
- *
- * \return  0 if operation was successful
- */
-static int get_page_size(uint64_t address, uint64_t length, struct pid *pid,
-			unsigned long *page_size)
-{
-	/*
-	 * As local memory is always consecutive, we can assume the local
-	 * memory page size to be arbitrary.
-	 * Currently we assume the local memory page size to be the same
-	 * as system memory, which is 4KB.
-	 */
-	*page_size = PAGE_SIZE;
-
-	return 0;
-}
