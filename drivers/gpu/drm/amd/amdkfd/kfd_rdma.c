@@ -142,6 +142,7 @@ static int put_pages_helper(struct amd_p2p_info *p2p_data)
 	struct kfd_dev *dev;
 	struct sg_table *sg_table_tmp;
 	struct rdma_cb *rdma_cb_data;
+	struct kfd_process *kfd_proc;
 
 	if (!p2p_data) {
 		pr_err("amd_p2p_info pointer is invalid.\n");
@@ -153,12 +154,15 @@ static int put_pages_helper(struct amd_p2p_info *p2p_data)
 	buf_obj = p2p_data->priv;
 	dev = buf_obj->dev;
 	sg_table_tmp = p2p_data->pages;
+	kfd_proc = p2p_data->kfd_proc;
 
 	list_del(&rdma_cb_data->node);
 	kfree(rdma_cb_data);
 
 	amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem, sg_table_tmp);
 	kfd_dec_compute_active(dev);
+
+	kfd_unref_process(kfd_proc);
 
 	return 0;
 }
@@ -198,11 +202,8 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 
 	ret = put_pages_helper(*p_p2p_data);
 
-	if (!ret) {
-		kfd_unref_process((*p_p2p_data)->kfd_proc);
+	if (!ret)
 		*p_p2p_data = NULL;
-
-	}
 
 	return ret;
 }
