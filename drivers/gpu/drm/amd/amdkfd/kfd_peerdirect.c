@@ -134,6 +134,8 @@ static void* (*pfn_ib_register_peer_memory_client)(struct peer_memory_client
 							*invalidate_callback);
 
 static void (*pfn_ib_unregister_peer_memory_client)(void *reg_handle);
+static int (*pfn_ib_invalidate_peer_memory)(void *reg_handle,
+					    void *core_context);
 
 static const struct amd_rdma_interface *rdma_interface;
 
@@ -163,6 +165,24 @@ static void free_callback(void *client_priv)
 	if (!mem_context) {
 		pr_warn("Invalid client context\n");
 		return;
+	}
+
+	if (pfn_ib_invalidate_peer_memory) {
+		int ret = pfn_ib_invalidate_peer_memory(ib_reg_handle,
+				mem_context->core_context);
+
+		if (ret) {
+			pr_warn("ib_invalidate_peer_memory failed: %d\n",
+					ret);
+		} else {
+			pr_debug("ib_invalidate_peer_memory ok\n");
+			/* At this point the dma_unmap and put_page functions
+			 * have been called already.
+			 */
+			return;
+		}
+	} else {
+		pr_debug("ib_invalidate_peer_memory is NULL\n");
 	}
 
 	pr_debug("IBCore context: 0x%p\n", mem_context->core_context);
@@ -478,7 +498,7 @@ void kfd_init_peer_direct(void)
 	strcpy(amd_mem_client.version, AMD_PEER_BRIDGE_DRIVER_VERSION);
 
 	ib_reg_handle = pfn_ib_register_peer_memory_client(&amd_mem_client,
-							   NULL);
+						&pfn_ib_invalidate_peer_memory);
 
 	if (!ib_reg_handle) {
 		pr_err("Cannot register peer memory client\n");
