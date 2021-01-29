@@ -232,36 +232,6 @@ static int put_pages(struct amd_p2p_info **p_p2p_data)
 }
 
 /**
- * Check if given address belongs to GPU address space.
- *
- * \param   address - Address to check
- * \param   pid     - Process to which given address belongs.
- *		      Could be NULL if current one.
- *
- * \return  0  - This is not GPU address managed by AMD driver
- *	    1  - This is GPU address managed by AMD driver
- */
-static int is_gpu_address(uint64_t address, struct pid *pid)
-{
-	struct kfd_bo *buf_obj;
-	struct kfd_process *p;
-
-	p = kfd_lookup_process_by_pid(pid);
-	if (!p) {
-		pr_debug("Could not find the process\n");
-		return 0;
-	}
-
-	buf_obj = kfd_process_find_bo_from_interval(p, address, address);
-
-	kfd_unref_process(p);
-	if (!buf_obj)
-		return 0;
-
-	return 1;
-}
-
-/**
  * Return the single page size to be used when building scatter/gather table
  * for given range.
  *
@@ -285,4 +255,3 @@ static int get_page_size(uint64_t address, uint64_t length, struct pid *pid,
 
 	return 0;
 }
-

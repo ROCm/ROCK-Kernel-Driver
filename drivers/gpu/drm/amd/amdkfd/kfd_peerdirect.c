@@ -195,25 +195,49 @@ static void free_callback(void *client_priv)
 	WRITE_ONCE(mem_context->free_callback_called, 1);
 }
 
+/* Workaround: Mellanox peerdirect driver expects sg lists at
+ * page granularity. This causes failures when an application tries
+ * to register size < PAGE_SIZE or addr starts at some offset. Fix
+ * it by aligning the size to page size and addr to page boundary.
+ */
+static void align_addr_size(unsigned long *addr, size_t *size)
+{
+	unsigned long end = ALIGN(*addr + *size, PAGE_SIZE);
+
+	*addr = ALIGN_DOWN(*addr, PAGE_SIZE);
+	*size = end - *addr;
+}
+
 static int amd_acquire(unsigned long addr, size_t size,
 			void *peer_mem_private_data,
 			char *peer_mem_name, void **client_context)
 {
-	int ret;
+	struct kfd_process *p;
+	struct kfd_bo *buf_obj;
 	struct amd_mem_context *mem_context;
 	struct pid *pid;
+
+	p = kfd_get_process(current);
+	if (!p) {
+		pr_debug("Not a KFD process\n");
+		return 0;
+	}
+
+	align_addr_size(&addr, &size);
+
+	mutex_lock(&p->mutex);
+	buf_obj = kfd_process_find_bo_from_interval(p, addr,
+			addr + size - 1);
+	mutex_unlock(&p->mutex);
+	if (!buf_obj) {
+		pr_debug("Cannot find a kfd_bo for the range\n");
+		return 0;
+	}
 
 	/* Get pointer to structure describing current process */
 	pid = get_task_pid(current, PIDTYPE_PID);
 	pr_debug("addr: %#lx, size: %#lx, pid: 0x%p\n",
 		 addr, size, pid);
-
-	/* Check if address is handled by AMD GPU driver */
-	ret = is_gpu_address(addr, pid);
-	if (!ret) {
-		pr_debug("Not a GPU Address\n");
-		return 0;
-	}
 
 	/* Initialize context used for operation with given address */
 	mem_context = kzalloc(sizeof(*mem_context), GFP_KERNEL);
@@ -245,9 +269,10 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 			  void *client_context, void *core_context)
 {
 	int ret;
-	unsigned long page_size;
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
+
+	align_addr_size(&addr, &size);
 
 	pr_debug("addr: %#lx, size: %#lx, core_context: 0x%p\n",
 		 addr, size, core_context);
@@ -272,17 +297,9 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	/* Workaround: Mellanox peerdirect driver expects sg lists at
-	page granularity. This causes failures when an application tries
-	to register size < page_size or addr starts at some offset. Fix
-	it by aligning the size to page size and addr to page boundary.
-	*/
-	get_page_size(addr, size, mem_context->pid,
-				      &page_size);
-
 	ret = get_pages(
-					ALIGN_DOWN(addr, page_size),
-					ALIGN(size, page_size),
+					addr,
+					size,
 					mem_context->pid,
 					&mem_context->p2p_info,
 					free_callback,
