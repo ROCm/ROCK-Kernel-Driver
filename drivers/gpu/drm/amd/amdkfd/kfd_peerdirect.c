@@ -146,8 +146,7 @@ struct amd_mem_context {
 
 	struct sg_table *pages;
 
-	/* Flag that free callback was called */
-	int free_callback_called;
+	struct task_struct *in_free_callback;
 
 	/* Context received from PeerDirect call */
 	void *core_context;
@@ -164,43 +163,48 @@ static void put_pages_helper(struct amd_mem_context *mem_context)
 		kfd_dec_compute_active(buf_obj->dev);
 	}
 
-	list_del(&mem_context->callback_node);
-	kfd_unref_process(mem_context->kfd_proc);
+	if (mem_context->buf_obj) {
+		list_del(&mem_context->callback_node);
+		mem_context->buf_obj = NULL;
+	}
 }
 
 static void free_callback(struct amd_mem_context *mem_context)
 {
+	int ret;
+
 	pr_debug("Client context: 0x%p\n", mem_context);
 
-	if (!mem_context) {
-		pr_warn("Invalid client context\n");
+	if (!mem_context || !mem_context->kfd_proc || !mem_context->buf_obj) {
+		WARN(1, "Invalid client context\n");
 		return;
 	}
 
-	if (pfn_ib_invalidate_peer_memory) {
-		int ret = pfn_ib_invalidate_peer_memory(ib_reg_handle,
-				mem_context->core_context);
+	/* avoid recursive locking of process->mutex in put_pages */
+	mem_context->in_free_callback = current;
+	ret = pfn_ib_invalidate_peer_memory(ib_reg_handle,
+					    mem_context->core_context);
+	mem_context->in_free_callback = NULL;
 
-		if (ret) {
-			pr_warn("ib_invalidate_peer_memory failed: %d\n",
-					ret);
-		} else {
-			pr_debug("ib_invalidate_peer_memory ok\n");
-			/* At this point the dma_unmap and put_page functions
-			 * have been called already.
-			 */
-			return;
-		}
+	if (ret) {
+		pr_debug("ib_invalidate_peer_memory failed: %d\n", ret);
 	} else {
-		pr_debug("ib_invalidate_peer_memory is NULL\n");
+		pr_debug("ib_invalidate_peer_memory ok\n");
+		/* At this point the dma_unmap and put_page functions
+		 * should have been called already.
+		 */
+		if (!WARN_ONCE(mem_context->pages, "put_pages was not called"))
+			return;
 	}
 
 	pr_debug("IBCore context: 0x%p\n", mem_context->core_context);
 
-	/* Set flag to inform that there is nothing to do on "put_pages", etc.
+	/* Assume IBcore was concurrently trying to call put_pages and
+	 * we got the kfd_proc->mutex first. Unpin the memory and take
+	 * the mem_context off the callback list of the BO that's going
+	 * away. Let the other call that is in flight take care of the
+	 * kfd_proc reference.
 	 */
-	WRITE_ONCE(mem_context->free_callback_called, 1);
-
 	put_pages_helper(mem_context);
 }
 
@@ -258,7 +262,6 @@ static int amd_acquire(unsigned long addr, size_t size,
 	pr_debug("addr: %#lx, size: %#lx, pid: %d\n",
 		 addr, size, p->lead_thread->pid);
 
-	mem_context->free_callback_called = 0;
 	mem_context->va   = addr;
 	mem_context->size = size;
 
@@ -303,7 +306,7 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	pr_debug("addr: %#lx, size: %#lx, core_context: 0x%p\n",
 		 addr, size, core_context);
 
-	if (!mem_context) {
+	if (!mem_context || !mem_context->kfd_proc || !mem_context->buf_obj) {
 		pr_warn("Invalid client context");
 		return -EINVAL;
 	}
@@ -324,6 +327,15 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	}
 
 	mutex_lock(&p->mutex);
+
+	/* Check if the memory was freed concurrently before we got the
+	 * process lock.
+	 */
+	if (!mem_context->buf_obj) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
 	offset = addr - buf_obj->it.start;
 	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, buf_obj->mem,
 			offset, size, &sg_table_tmp);
@@ -425,12 +437,17 @@ static void amd_put_pages(struct sg_table *sg_head, void *client_context)
 			mem_context->va,
 			mem_context->size);
 
-	if (READ_ONCE(mem_context->free_callback_called)) {
-		pr_debug("Free callback was called\n");
-		return;
-	}
+	/* avoid recursive locking if current thread is in free_callback */
+	if (mem_context->in_free_callback != current)
+		mutex_lock(&mem_context->kfd_proc->mutex);
 
 	put_pages_helper(mem_context);
+
+	if (mem_context->in_free_callback != current)
+		mutex_unlock(&mem_context->kfd_proc->mutex);
+
+	kfd_unref_process(mem_context->kfd_proc);
+	mem_context->kfd_proc = NULL;
 }
 
 static unsigned long amd_get_page_size(void *client_context)
@@ -448,6 +465,8 @@ static void amd_release(void *client_context)
 			mem_context->kfd_proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
+
+	WARN_ONCE(mem_context->kfd_proc, "put_pages was not called");
 
 	kfree(mem_context);
 }
@@ -502,7 +521,7 @@ void kfd_init_peer_direct(void)
 	ib_reg_handle = pfn_ib_register_peer_memory_client(&amd_mem_client,
 						&pfn_ib_invalidate_peer_memory);
 
-	if (!ib_reg_handle) {
+	if (!ib_reg_handle || !pfn_ib_invalidate_peer_memory) {
 		pr_err("Cannot register peer memory client\n");
 		/* Do cleanup */
 		kfd_close_peer_direct();
@@ -532,6 +551,7 @@ void kfd_close_peer_direct(void)
 	/* Reset pointers to be safe */
 	pfn_ib_unregister_peer_memory_client = NULL;
 	pfn_ib_register_peer_memory_client   = NULL;
+	pfn_ib_invalidate_peer_memory = NULL;
 	ib_reg_handle = NULL;
 }
 
