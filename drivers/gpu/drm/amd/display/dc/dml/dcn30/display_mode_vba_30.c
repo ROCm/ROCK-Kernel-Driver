@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
 #include "dc.h"
 #include "dc_link.h"
 #include "../display_mode_lib.h"
@@ -6870,4 +6870,4 @@ static void UseMinimumDCFCLK(
 	}
 }
 
-#endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif /* CONFIG_DRM_AMD_DC_DCN3_0 */

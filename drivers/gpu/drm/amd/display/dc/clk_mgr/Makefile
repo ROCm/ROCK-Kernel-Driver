@@ -107,6 +107,8 @@ endif
 AMD_DAL_CLK_MGR_DCN21 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn21/,$(CLK_MGR_DCN21))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN21)
+endif
+ifdef CONFIG_DRM_AMD_DC_DCN3_0
 ###############################################################################
 # DCN30
 ###############################################################################
@@ -121,6 +123,8 @@ endif
 AMD_DAL_CLK_MGR_DCN30 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn30/,$(CLK_MGR_DCN30))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN30)
+endif
+ifdef CONFIG_DRM_AMD_DC_DCN3_01
 ###############################################################################
 # DCN301
 ###############################################################################

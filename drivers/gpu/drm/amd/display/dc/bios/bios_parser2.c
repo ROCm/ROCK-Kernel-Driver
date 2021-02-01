@@ -1231,8 +1231,12 @@ static enum bp_result bios_parser_get_firmware_info(
 				result = get_firmware_info_v3_1(bp, info);
 				break;
 			case 2:
+				result = get_firmware_info_v3_2(bp, info);
+				break;
 			case 3:
+#ifdef CONFIG_DRM_AMD_DC_DCN3_0
 			case 4:
+#endif
 				result = get_firmware_info_v3_2(bp, info);
 				break;
 			default:
@@ -1806,6 +1810,7 @@ static enum bp_result get_integrated_info_v11(
 	return BP_RESULT_OK;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
 static enum bp_result get_integrated_info_v2_1(
 	struct bios_parser *bp,
 	struct integrated_info *info)
@@ -1965,6 +1970,7 @@ static enum bp_result get_integrated_info_v2_1(
 
 	return BP_RESULT_OK;
 }
+#endif
 
 /*
  * construct_integrated_info
@@ -1997,6 +2003,7 @@ static enum bp_result construct_integrated_info(
 
 		get_atom_data_table_revision(header, &revision);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_01)
 		switch (revision.major) {
 		case 1:
 			switch (revision.minor) {
@@ -2020,6 +2027,17 @@ static enum bp_result construct_integrated_info(
 		default:
 			return result;
 		}
+#else
+		/* Don't need to check major revision as they are all 1 */
+		switch (revision.minor) {
+		case 11:
+		case 12:
+			result = get_integrated_info_v11(bp, info);
+			break;
+		default:
+			return result;
+		}
+#endif
 	}
 
 	if (result != BP_RESULT_OK)

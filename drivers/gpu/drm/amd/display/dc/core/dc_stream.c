@@ -271,7 +271,7 @@ bool dc_stream_set_cursor_attributes(
 	struct dc  *dc;
 	struct resource_context *res_ctx;
 	struct pipe_ctx *pipe_to_program = NULL;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -293,7 +293,7 @@ bool dc_stream_set_cursor_attributes(
 	res_ctx = &dc->current_state->res_ctx;
 	stream->cursor_attributes = *attributes;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	/* disable idle optimizations while updating cursor */
 	if (dc->idle_optimizations_allowed) {
 		dc_allow_idle_optimizations(dc, false);
@@ -321,7 +321,7 @@ bool dc_stream_set_cursor_attributes(
 	if (pipe_to_program)
 		dc->hwss.cursor_lock(dc, pipe_to_program, false);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
@@ -338,7 +338,7 @@ bool dc_stream_set_cursor_position(
 	struct dc  *dc;
 	struct resource_context *res_ctx;
 	struct pipe_ctx *pipe_to_program = NULL;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -354,7 +354,7 @@ bool dc_stream_set_cursor_position(
 
 	dc = stream->ctx->dc;
 	res_ctx = &dc->current_state->res_ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 
 	/* disable idle optimizations if enabling cursor */
 	if (dc->idle_optimizations_allowed && !stream->cursor_position.enable && position->enable) {
@@ -386,7 +386,7 @@ bool dc_stream_set_cursor_position(
 	if (pipe_to_program)
 		dc->hwss.cursor_lock(dc, pipe_to_program, false);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
