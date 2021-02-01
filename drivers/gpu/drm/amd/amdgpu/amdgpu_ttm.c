@@ -2975,9 +2975,6 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 #endif
 }
 
-static int ttm_pl_dgma = AMDGPU_PL_DGMA;
-static int ttm_pl_dgma_import = AMDGPU_PL_DGMA_IMPORT;
-
 static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 	{"amdgpu_vram_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_VRAM},
 	{"amdgpu_gtt_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_TT},
@@ -2986,13 +2983,10 @@ static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 	{"amdgpu_oa_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_OA},
 	{"ttm_page_pool", ttm_page_alloc_debugfs, 0, NULL},
 #ifdef CONFIG_SWIOTLB
-	{"ttm_dma_page_pool", ttm_dma_page_alloc_debugfs, 0, NULL}
+	{"ttm_dma_page_pool", ttm_dma_page_alloc_debugfs, 0, NULL},
 #endif
-};
-
-static const struct drm_info_list amdgpu_ttm_dgma_debugfs_list[] = {
-	{"amdgpu_dgma_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma},
-	{"amdgpu_dgma_import_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma_import}
+	{"amdgpu_dgma_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_DGMA},
+	{"amdgpu_dgma_import_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_DGMA_IMPORT},
 };
 
 /*
@@ -3292,12 +3286,8 @@ int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 		--count;
 #endif
 
-	if (amdgpu_direct_gma_size) {
-		r = amdgpu_debugfs_add_files(adev, amdgpu_ttm_dgma_debugfs_list,
-					ARRAY_SIZE(amdgpu_ttm_dgma_debugfs_list));
-		if (unlikely(r))
-			return r;
-	}
+	if (!amdgpu_direct_gma_size)
+		count -= 2;
 
 	return amdgpu_debugfs_add_files(adev, amdgpu_ttm_debugfs_list, count);
 #else
