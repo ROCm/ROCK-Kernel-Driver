@@ -143,7 +143,11 @@ void kfd_iommu_unbind_process(struct kfd_process *p)
 }
 
 /* Callback for process shutdown invoked by the IOMMU driver */
+#ifdef HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32
 static void iommu_pasid_shutdown_callback(struct pci_dev *pdev, u32 pasid)
+#else
+static void iommu_pasid_shutdown_callback(struct pci_dev *pdev, int pasid)
+#endif
 {
 	struct kfd_dev *dev = kfd_device_by_pci_dev(pdev);
 	struct kfd_process *p;
@@ -189,8 +193,13 @@ static void iommu_pasid_shutdown_callback(struct pci_dev *pdev, u32 pasid)
 }
 
 /* This function called by IOMMU driver on PPR failure */
+#ifdef HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32
 static int iommu_invalid_ppr_cb(struct pci_dev *pdev, u32 pasid,
-				unsigned long address, u16 flags)
+		unsigned long address, u16 flags)
+#else
+static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
+		unsigned long address, u16 flags)
+#endif
 {
 	struct kfd_dev *dev;
 
