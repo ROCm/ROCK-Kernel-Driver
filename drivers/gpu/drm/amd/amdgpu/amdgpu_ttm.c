@@ -2226,9 +2226,15 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 		return rc;
 
 #if defined(HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP)
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	adev->ssg.pgmap.nr_range = 1;
 	adev->ssg.pgmap.range.start = res.start;
 	adev->ssg.pgmap.range.end = res.end;
+#else
+	adev->ssg.pgmap.res.start = res.start;
+	adev->ssg.pgmap.res.end = res.end;
+	adev->ssg.pgmap.res.name = res.name;
+#endif
 	adev->ssg.pgmap.ref = &adev->ssg.ref;
 	addr = devm_memremap_pages(adev->dev, &adev->ssg.pgmap);
 #else
