@@ -137,4 +137,11 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm: add managed resources tied to drm_device
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_managed.h])
+
+	dnl #
+	dnl # v5.3-rc1-623-gff540b76f14a
+	dnl # drm/ttm: add drm gem ttm helpers,
+	dnl # starting with drm_gem_ttm_print_info()
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_ttm_helper.h])
 ])

@@ -39,9 +39,13 @@
 #include "amdgpu_dma_buf.h"
 #include "amdgpu_xgmi.h"
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+void amdgpu_gem_object_free(struct drm_gem_object *gobj)
+#else
 static const struct drm_gem_object_funcs amdgpu_gem_object_funcs;
 
 static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
+#endif
 {
 	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(robj->tbo.bdev);
@@ -101,7 +105,9 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 		return r;
 
 	*obj = &bo->tbo.base;
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	(*obj)->funcs = &amdgpu_gem_object_funcs;
+#endif
 
 	if (initial_domain & AMDGPU_GEM_DOMAIN_DGMA)
 		atomic64_add(size, &adev->direct_gma.vram_usage);
@@ -151,8 +157,13 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
  * Call from drm_gem_handle_create which appear in both new and open ioctl
  * case.
  */
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+int amdgpu_gem_object_open(struct drm_gem_object *obj,
+						  struct drm_file *file_priv)
+#else
 static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 				  struct drm_file *file_priv)
+#endif
 {
 	struct amdgpu_bo *abo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
@@ -184,8 +195,13 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 	return 0;
 }
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+void amdgpu_gem_object_close(struct drm_gem_object *obj,
+							struct drm_file *file_priv)
+#else
 static void amdgpu_gem_object_close(struct drm_gem_object *obj,
 				    struct drm_file *file_priv)
+#endif
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -243,6 +259,7 @@ out_unlock:
 	ttm_eu_backoff_reservation(&ticket, &list);
 }
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.free = amdgpu_gem_object_free,
 	.open = amdgpu_gem_object_open,
@@ -251,6 +268,7 @@ static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.vmap = drm_gem_ttm_vmap,
 	.vunmap = drm_gem_ttm_vunmap,
 };
+#endif
 
 /*
  * GEM ioctls.
