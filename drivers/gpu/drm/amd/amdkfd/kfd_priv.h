@@ -46,6 +46,7 @@
 #include <kgd_kfd_interface.h>
 #include <linux/swap.h>
 
+#include "amdgpu_amdkfd.h"
 #include "amd_shared.h"
 #include "amdgpu.h"
 
