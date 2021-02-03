@@ -3046,6 +3046,11 @@ static const struct drm_driver amdgpu_kms_driver = {
 #endif
 	.irq_handler = amdgpu_irq_handler,
 	.ioctls = amdgpu_ioctls_kms,
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+	.gem_free_object_unlocked = amdgpu_gem_object_free,
+	.gem_open_object = amdgpu_gem_object_open,
+	.gem_close_object = amdgpu_gem_object_close,
+#endif
 	.num_ioctls = ARRAY_SIZE(amdgpu_ioctls_kms),
 	.dumb_create = amdgpu_mode_dumb_create,
 	.dumb_map_offset = amdgpu_mode_dumb_mmap,
@@ -3055,6 +3060,10 @@ static const struct drm_driver amdgpu_kms_driver = {
 #endif
 #ifdef CONFIG_PROC_FS
 	.show_fdinfo = amdgpu_show_fdinfo,
+#endif
+
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+	.gem_prime_export = amdgpu_gem_prime_export,
 #endif
 
 #if defined(AMDKCL_AMDGPU_DMABUF_OPS)
@@ -3071,6 +3080,11 @@ static const struct drm_driver amdgpu_kms_driver = {
 	!defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
 	.gem_prime_get_sg_table = amdgpu_gem_prime_get_sg_table,
 	.gem_prime_import_sg_table = amdgpu_gem_prime_import_sg_table,
+#endif
+
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+	.gem_prime_vmap = drm_gem_ttm_vmap,
+	.gem_prime_vunmap = drm_gem_ttm_vunmap,
 #endif
 
 	.gem_prime_mmap = drm_gem_prime_mmap,
