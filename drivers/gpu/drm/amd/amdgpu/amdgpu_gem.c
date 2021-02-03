@@ -152,6 +152,9 @@ amdgpu_gem_update_bo_mapping(struct drm_file *filp,
 		drm_syncobj_add_point(syncobj, chain, last_update, point);
 }
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+void amdgpu_gem_object_free(struct drm_gem_object *gobj)
+#else
 static vm_fault_t amdgpu_gem_fault(struct vm_fault *vmf)
 {
 	struct ttm_buffer_object *bo = vmf->vma->vm_private_data;
@@ -193,6 +196,7 @@ static const struct vm_operations_struct amdgpu_gem_vm_ops = {
 };
 
 static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
+#endif
 {
 	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(aobj->tbo.bdev);
@@ -303,8 +307,13 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
  * Call from drm_gem_handle_create which appear in both new and open ioctl
  * case.
  */
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+int amdgpu_gem_object_open(struct drm_gem_object *obj,
+						  struct drm_file *file_priv)
+#else
 static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 				  struct drm_file *file_priv)
+#endif
 {
 	struct amdgpu_bo *abo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
@@ -368,8 +377,13 @@ static int amdgpu_gem_object_open(struct drm_gem_object *obj,
 	return r;
 }
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+void amdgpu_gem_object_close(struct drm_gem_object *obj,
+							struct drm_file *file_priv)
+#else
 static void amdgpu_gem_object_close(struct drm_gem_object *obj,
 				    struct drm_file *file_priv)
+#endif
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -439,6 +453,7 @@ static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_str
 	return drm_gem_ttm_mmap(obj, vma);
 }
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.free = amdgpu_gem_object_free,
 	.open = amdgpu_gem_object_open,
@@ -449,6 +464,7 @@ const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.mmap = amdgpu_gem_object_mmap,
 	.vm_ops = &amdgpu_gem_vm_ops,
 };
+#endif
 
 /*
  * GEM ioctls.

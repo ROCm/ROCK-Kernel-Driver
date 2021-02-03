@@ -33,7 +33,9 @@
 #define AMDGPU_GEM_DOMAIN_MAX		0x3
 #define gem_to_amdgpu_bo(gobj) container_of((gobj), struct amdgpu_bo, tbo.base)
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 extern const struct drm_gem_object_funcs amdgpu_gem_object_funcs;
+#endif
 
 unsigned long amdgpu_gem_timeout(uint64_t timeout_ns);
 
