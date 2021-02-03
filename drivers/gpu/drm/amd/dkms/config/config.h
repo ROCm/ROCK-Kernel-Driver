@@ -55,6 +55,9 @@
 /* devm_memremap_pages() wants p,p,p,p interface */
 /* #undef HAVE_DEVM_MEMREMAP_PAGES_P_P_P_P */
 
+/* there is 'range' field within dev_pagemap structure */
+/* #undef HAVE_DEV_PAGEMAP_RANGE */
+
 /* dev_pm_set_driver_flags() is available */
 #define HAVE_DEV_PM_SET_DRIVER_FLAGS 1
 
