@@ -440,3 +440,54 @@ void _kcl_pci_remove_measure_file(struct pci_dev *pdev)
 }
 EXPORT_SYMBOL(_kcl_pci_remove_measure_file);
 #endif /* AMDKCL_CREATE_MEASURE_FILE */
+
+#ifdef AMDKCL_ENABLE_RESIZE_FB_BAR
+/* Copied from drivers/pci/pci.c */
+#ifndef HAVE_PCI_REBAR_BYTES_TO_SIZE
+static int _kcl_pci_rebar_find_pos(struct pci_dev *pdev, int bar)
+{
+	unsigned int pos, nbars, i;
+	u32 ctrl;
+
+	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_REBAR);
+	if (!pos)
+		return -ENOTSUPP;
+
+	pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+	nbars = (ctrl & PCI_REBAR_CTRL_NBAR_MASK) >>
+		    PCI_REBAR_CTRL_NBAR_SHIFT;
+
+	for (i = 0; i < nbars; i++, pos += 8) {
+		int bar_idx;
+
+		pci_read_config_dword(pdev, pos + PCI_REBAR_CTRL, &ctrl);
+		bar_idx = ctrl & PCI_REBAR_CTRL_BAR_IDX;
+		if (bar_idx == bar)
+			return pos;
+	}
+
+	return -ENOENT;
+}
+
+u32 _kcl_pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
+{
+	int pos;
+	u32 cap;
+
+	pos = _kcl_pci_rebar_find_pos(pdev, bar);
+	if (pos < 0)
+		return 0;
+
+	pci_read_config_dword(pdev, pos + PCI_REBAR_CAP, &cap);
+	cap &= PCI_REBAR_CAP_SIZES;
+
+	/* Sapphire RX 5600 XT Pulse has an invalid cap dword for BAR 0 */
+	if (pdev->vendor == PCI_VENDOR_ID_ATI && pdev->device == 0x731f &&
+	    bar == 0 && cap == 0x7000)
+		cap = 0x3f000;
+
+	return cap >> 4;
+}
+EXPORT_SYMBOL(_kcl_pci_rebar_get_possible_sizes);
+#endif /* HAVE_PCI_REBAR_BYTES_TO_SIZE */
+#endif /* AMDKCL_ENABLE_RESIZE_FB_BAR */
