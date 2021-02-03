@@ -231,7 +231,19 @@ static inline int pci_rebar_bytes_to_size(u64 bytes)
 	/* Return BAR size as defined in the resizable BAR specification */
 	return max(ilog2(bytes), 20) - 20;
 }
+
+/*
+ * 907830b0fc9e PCI: Add a REBAR size quirk for Sapphire RX 5600 XT Pulse
+ * 8fbdbb66f8c1 PCI: Export pci_rebar_get_possible_sizes()
+ */
+u32 _kcl_pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar);
+static inline
+u32 pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
+{
+	return _kcl_pci_rebar_get_possible_sizes(pdev, bar);
+}
 #endif
+
 #endif /* PCI_REBAR_CTRL_BAR_SHIFT */
 
 #endif /* AMDKCL_PCI_H */
