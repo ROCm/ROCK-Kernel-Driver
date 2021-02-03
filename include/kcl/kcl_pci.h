@@ -221,6 +221,17 @@ static inline void kcl_pci_remove_measure_file(struct pci_dev *pdev)
  */
 #ifdef PCI_REBAR_CTRL_BAR_SHIFT
 #define AMDKCL_ENABLE_RESIZE_FB_BAR
+
+/* Copied from 192f1bf7559e895d51f81c3976c5892c8b1e0601 include/linux/pci.h */
+#ifndef HAVE_PCI_REBAR_BYTES_TO_SIZE
+static inline int pci_rebar_bytes_to_size(u64 bytes)
+{
+	bytes = roundup_pow_of_two(bytes);
+
+	/* Return BAR size as defined in the resizable BAR specification */
+	return max(ilog2(bytes), 20) - 20;
+}
+#endif
 #endif /* PCI_REBAR_CTRL_BAR_SHIFT */
 
 #endif /* AMDKCL_PCI_H */
