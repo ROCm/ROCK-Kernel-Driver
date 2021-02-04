@@ -237,7 +237,7 @@
 #define HAVE_DRM_DEV_PUT 1
 
 /* drm_dev_unplug() is available */
-/* #undef HAVE_DRM_DEV_UNPLUG */
+#define HAVE_DRM_DEV_UNPLUG 1
 
 /* display_info->hdmi.scdc.scrambling are available */
 #define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
