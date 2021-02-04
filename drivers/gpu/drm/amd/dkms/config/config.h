@@ -713,7 +713,7 @@
 /* mem_encrypt_active() is available */
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
 
-/* mmgrab() is available in linux/sched.h */
+/* mmgrab() is available */
 #define HAVE_MMGRAB 1
 
 /* mmu_notifier_call_srcu() is available */
