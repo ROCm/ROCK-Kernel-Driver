@@ -1432,8 +1432,10 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 #endif
 
 	ret = amdgpu_device_suspend(drm_dev, false);
-	if (ret)
+	if (ret) {
+		adev->in_runpm = false;
 		return ret;
+	}
 
 	if (amdgpu_device_supports_atpx(drm_dev)) {
 		/* Only need to handle PCI state in the driver for ATPX
