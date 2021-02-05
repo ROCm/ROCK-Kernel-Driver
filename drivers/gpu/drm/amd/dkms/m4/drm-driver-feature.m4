@@ -8,16 +8,15 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl # drm: introduce a capability flag for syncobj timeline support
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drmP.h>
-			],[
-				int _ = DRIVER_SYNCOBJ_TIMELINE;
-			],[
-				AC_DEFINE(HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE, 1, [
-					drm_driver_feature DRIVER_SYNCOBJ_TIMELINE is available])
-			])
-		], [
+		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DRMP_H
+			struct vm_area_struct;
+			#include <drm/drmP.h>
+			#endif
+			#include <drm/drm_drv.h>
+		],[
+			int _ = DRIVER_SYNCOBJ_TIMELINE;
+		],[
 			AC_DEFINE(HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE, 1, [
 				drm_driver_feature DRIVER_SYNCOBJ_TIMELINE is available])
 		])
@@ -28,15 +27,17 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl # drm/irq: Ditch DRIVER_IRQ_SHARED
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drmP.h>
-			],[
-				int _ = DRIVER_IRQ_SHARED;
-			],[
-				AC_DEFINE(HAVE_DRM_DRV_DRIVER_IRQ_SHARED, 1, [
-					drm_driver_feature DRIVER_IRQ_SHARED is available])
-			])
+		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DRMP_H
+			struct vm_area_struct;
+			#include <drm/drmP.h>
+			#endif
+			#include <drm/drm_drv.h>
+		],[
+			int _ = DRIVER_IRQ_SHARED;
+		],[
+			AC_DEFINE(HAVE_DRM_DRV_DRIVER_IRQ_SHARED, 1, [
+				drm_driver_feature DRIVER_IRQ_SHARED is available])
 		])
 	])
 
@@ -45,15 +46,17 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl # drm/prime: Actually remove DRIVER_PRIME everywhere
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drmP.h>
-			],[
-				int _ = DRIVER_PRIME;
-			],[
-				AC_DEFINE(HAVE_DRM_DRV_DRIVER_PRIME, 1, [
-					drm_driver_feature DRIVER_PRIME is available])
-			])
+		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DRMP_H
+			struct vm_area_struct;
+			#include <drm/drmP.h>
+			#endif
+			#include <drm/drm_drv.h>
+		],[
+			int _ = DRIVER_PRIME;
+		],[
+			AC_DEFINE(HAVE_DRM_DRV_DRIVER_PRIME, 1, [
+				drm_driver_feature DRIVER_PRIME is available])
 		])
 	])
 ])
