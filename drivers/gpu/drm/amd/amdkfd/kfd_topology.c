@@ -1412,10 +1412,6 @@ static int kfd_create_in_direct_link_prop(struct kfd_topology_device *kdev, int 
 	int ret = 0;
 	int i, num_cpu;
 
-	/* need Large BAR GPU */
-	if (!kfd_dev_is_large_bar(kdev->gpu))
-		return 0;
-
 	num_cpu = 0;
 	list_for_each_entry(cpu_dev, &topology_device_list, list) {
 		if (cpu_dev->gpu)
@@ -1423,7 +1419,7 @@ static int kfd_create_in_direct_link_prop(struct kfd_topology_device *kdev, int 
 		num_cpu++;
 	}
 
-	gpu_link = list_last_entry(&kdev->io_link_props,
+	gpu_link = list_first_entry(&kdev->io_link_props,
 					struct kfd_iolink_properties, list);
 	if (!gpu_link)
 		return -ENOMEM;
@@ -1466,20 +1462,23 @@ static int kfd_create_in_direct_link_prop(struct kfd_topology_device *kdev, int 
 		if (ret < 0)
 			return ret;
 
-		/* CPU <--> CPU <--> GPU, CPU node*/
-		props2 = kfd_alloc_struct(props2);
-		if (!props2)
-			return -ENOMEM;
+		/* for small Bar, no CPU --> GPU in-direct links */
+		if (kfd_dev_is_large_bar(kdev->gpu)) {
+			/* CPU <--> CPU <--> GPU, CPU node*/
+			props2 = kfd_alloc_struct(props2);
+			if (!props2)
+				return -ENOMEM;
 
-		memcpy(props2, props, sizeof(struct kfd_iolink_properties));
-		props2->node_from = i;
-		props2->node_to = gpu_node;
-		props2->kobj = NULL;
-		cpu_dev->node_props.p2p_links_count++;
-		list_add_tail(&props2->list, &cpu_dev->p2p_link_props);
-		ret = kfd_build_p2p_node_entry(cpu_dev, props2);
-		if (ret < 0)
-			return ret;
+			memcpy(props2, props, sizeof(struct kfd_iolink_properties));
+			props2->node_from = i;
+			props2->node_to = gpu_node;
+			props2->kobj = NULL;
+			cpu_dev->node_props.p2p_links_count++;
+			list_add_tail(&props2->list, &cpu_dev->p2p_link_props);
+			ret = kfd_build_p2p_node_entry(cpu_dev, props2);
+			if (ret < 0)
+				return ret;
+		}
 	}
 	return ret;
 }
