@@ -1446,64 +1446,6 @@ void amdgpu_disable_vblank_kms(struct drm_crtc *crtc)
 	amdgpu_irq_put(adev, &adev->crtc_irq, idx);
 }
 
-#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
-#if !defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_USE_KTIMER_T_ARG)
-/**
- * amdgpu_get_vblank_timestamp_kms - get vblank timestamp
- *
- * @dev: drm dev pointer
- * @crtc: crtc to get the timestamp for
- * @max_error: max error
- * @vblank_time: time value
- * @flags: flags passed to the driver
- *
- * Gets the timestamp on the requested crtc based on the
- * scanout position.  (all asics).
- * Returns postive status flags on success, negative error on failure.
- */
-int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-				     int *max_error,
-				     struct timeval *vblank_time,
-				     unsigned flags)
-{
-	struct drm_crtc *crtc;
-	struct amdgpu_device *adev = drm_to_adev(dev);
-
-	if (pipe >= dev->num_crtcs) {
-		DRM_ERROR("Invalid crtc %u\n", pipe);
-		return -EINVAL;
-	}
-
-	/* Get associated drm_crtc: */
-	crtc = &adev->mode_info.crtcs[pipe]->base;
-	if (!crtc) {
-		/* This can occur on driver load if some component fails to
-		 * initialize completely and driver is unloaded */
-		DRM_ERROR("Uninitialized crtc %d\n", pipe);
-		return -EINVAL;
-	}
-
-	/* Helper routine in DRM core does all the work: */
-#if defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_DROP_MOD_ARG)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						vblank_time, flags);
-#elif defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_MODE_ARG)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						vblank_time, flags,
-						&crtc->hwmode);
-#elif defined(HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_CRTC_MODE_ARG)
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						vblank_time, flags,
-						crtc, &crtc->hwmode);
-#else
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error,
-						vblank_time, flags,
-						crtc);
-#endif
-}
-#endif
-#endif
-
 /*
  * Debugfs info
  */

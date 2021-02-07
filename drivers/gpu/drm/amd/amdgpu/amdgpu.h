@@ -1421,14 +1421,6 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon);
 u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc);
 int amdgpu_enable_vblank_kms(struct drm_crtc *crtc);
 void amdgpu_disable_vblank_kms(struct drm_crtc *crtc);
-#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
-#ifndef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_USE_KTIMER_T_ARG
-int amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-				     int *max_error,
-				     struct timeval *vblank_time,
-				     unsigned flags);
-#endif
-#endif
 
 long amdgpu_kms_compat_ioctl(struct file *filp, unsigned int cmd,
 			     unsigned long arg);
