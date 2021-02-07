@@ -12,31 +12,13 @@ dnl #
 
 AC_DEFUN([AC_AMDGPU_DRM_CRTC_ACCURATE_VBLANK_COUNT], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drm_vblank.h], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drm_vblank.h>
-			], [
-				drm_crtc_accurate_vblank_count(NULL);
-			], [
-				AC_DEFINE(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT, 1,
+		AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_crtc_accurate_vblank_count],
+		[drivers/gpu/drm/drm_vblank.c], [
+			AC_DEFINE(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT, 1,
 					[drm_crtc_accurate_vblank_count() is available])
-			], [
-				dnl # When drm_crtc_accurate_vblank_count() function is not available,
-				dnl # we can fall back to drm_accurate_vblank_count()
-				AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
-					[drm_accurate_vblank_count() is available])
-			])
 		], [
-			AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-				AC_KERNEL_TRY_COMPILE([
-					#include <drm/drmP.h>
-				], [
-					drm_accurate_vblank_count(NULL);
-				], [
-					AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
-						[drm_accurate_vblank_count() is available])
-				])
-			], [
+			AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_accurate_vblank_count],
+			[drivers/gpu/drm/drm_vblank.c drivers/gpu/drm/drm_irq.c], [
 				AC_DEFINE(HAVE_DRM_ACCURATE_VBLANK_COUNT, 1,
 					[drm_accurate_vblank_count() is available])
 			])
