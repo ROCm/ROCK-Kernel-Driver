@@ -142,18 +142,6 @@
 /* drm_atomic_state_put() is available */
 #define HAVE_DRM_ATOMIC_STATE_PUT 1
 
-/* drm_calc_vbltimestamp_from_scanoutpos() drop mode arg */
-/* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_DROP_MOD_ARG */
-
-/* drm_calc_vbltimestamp_from_scanoutpos() have the crtc & mode arg */
-/* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_CRTC_MODE_ARG */
-
-/* drm_calc_vbltimestamp_from_scanoutpos() remove crtc arg */
-/* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_HAVE_MODE_ARG */
-
-/* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
-/* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_USE_KTIMER_T_ARG */
-
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
@@ -304,6 +292,15 @@
 
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
+
+/* drm_driver->get_scanout_position() return bool */
+/* #undef HAVE_DRM_DRIVER_GET_SCANOUT_POSITION_RETURN_BOOL */
+
+/* drm_driver->get_vblank_timestamp() return bool */
+/* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_RETURN_BOOL */
+
+/* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
+/* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_USE_KTIMER_T_ARG */
 
 /* drm_driver->release() is available */
 #define HAVE_DRM_DRIVER_RELEASE 1
@@ -551,15 +548,6 @@
 /* drm_driver->gem_free_object_unlocked() is available */
 #define HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER 1
 
-/* get_scanout_position has struct drm_display_mode arg */
-/* #undef HAVE_GET_SCANOUT_POSITION_HAS_DRM_DISPLAY_MODE_ARG */
-
-/* get_scanout_position has timestamp arg */
-/* #undef HAVE_GET_SCANOUT_POSITION_HAS_TIMESTAMP_ARG */
-
-/* get_scanout_position return bool */
-/* #undef HAVE_GET_SCANOUT_POSITION_RETURN_BOOL */
-
 /* get_user_pages() wants 6 args */
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
 
@@ -577,15 +565,6 @@
 
 /* get_user_pages_remote() remove task_struct pointer */
 #define HAVE_GET_USER_PAGES_REMOTE_REMOVE_TASK_STRUCT 1
-
-/* get_vblank_timestamp has bool in_vblank_irq arg */
-/* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_HAS_BOOL_IN_VBLANK_IRQ */
-
-/* get_vblank_timestamp has ktime_t arg */
-/* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_HAS_KTIME_T */
-
-/* get_vblank_timestamp return bool */
-/* #undef HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_RETURN_BOOL */
 
 /* drm_connector_hdr_sink_metadata() is available */
 #define HAVE_HDR_SINK_METADATA 1
@@ -886,9 +865,6 @@
 
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
-
-/* get_scanout_position use unsigned int pipe */
-/* #undef HAVE_VGA_USE_UNSIGNED_INT_PIPE */
 
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1
