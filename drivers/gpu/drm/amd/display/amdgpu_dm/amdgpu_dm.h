@@ -293,7 +293,7 @@ struct amdgpu_display_manager {
 	 */
 	struct mutex dc_lock;
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	/**
 	 * @audio_lock:
 	 *
@@ -530,7 +530,7 @@ struct amdgpu_dm_connector {
 	int max_vfreq ;
 	int pixel_clock_mhz;
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	/* Audio instance - protected by audio_lock. */
 	int audio_inst;
 #endif

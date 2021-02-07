@@ -70,7 +70,7 @@
 #include <linux/pci.h>
 #include <linux/firmware.h>
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 #include <linux/component.h>
 #endif
 
@@ -82,7 +82,7 @@
 #include <drm/drm_fourcc.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_vblank.h>
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 #include <drm/drm_audio_component.h>
 #endif
 #ifdef CONFIG_DRM_AMD_DC_HDCP
@@ -755,7 +755,7 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 
 }
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 					  int pipe, bool *enabled,
 					  unsigned char *buf, int max_bytes)
@@ -1140,7 +1140,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	mutex_init(&adev->dm.dc_lock);
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_init(&adev->dm.audio_lock);
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN)
@@ -1406,7 +1406,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.freesync_module = NULL;
 	}
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_destroy(&adev->dm.audio_lock);
 #endif
 	mutex_destroy(&adev->dm.dc_lock);
@@ -3573,7 +3573,7 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 		return r;
 	}
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	r = amdgpu_dm_audio_init(adev);
 	if (r) {
 		dc_release_state(state->context);
@@ -8504,7 +8504,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	aconnector->base.stereo_allowed = false;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	aconnector->audio_inst = -1;
 #endif
 	mutex_init(&aconnector->hpd_lock);
@@ -9612,7 +9612,7 @@ cleanup:
 	kfree(bundle);
 }
 
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 static void amdgpu_dm_commit_audio(struct drm_device *dev,
 				   struct drm_atomic_state *state)
 {
@@ -10156,7 +10156,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 #ifdef HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT
-#if defined(HAVE_DRM_AUDIO_COMPONENT_HEADER)
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
 #endif
