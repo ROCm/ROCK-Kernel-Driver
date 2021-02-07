@@ -142,9 +142,6 @@
 /* drm_atomic_state_put() is available */
 #define HAVE_DRM_ATOMIC_STATE_PUT 1
 
-/* whether drm/drm_audio_component.h is defined */
-#define HAVE_DRM_AUDIO_COMPONENT_HEADER 1
-
 /* drm_calc_vbltimestamp_from_scanoutpos() drop mode arg */
 /* #undef HAVE_DRM_CALC_VBLTIMESTAMP_FROM_SCANOUTPOS_DROP_MOD_ARG */
 
@@ -316,6 +313,9 @@
 
 /* Define to 1 if you have the <drm/drm_atomic_uapi.h> header file. */
 #define HAVE_DRM_DRM_ATOMIC_UAPI_H 1
+
+/* Define to 1 if you have the <drm/drm_audio_component.h> header file. */
+#define HAVE_DRM_DRM_AUDIO_COMPONENT_H 1
 
 /* Define to 1 if you have the <drm/drm_auth.h> header file. */
 #define HAVE_DRM_DRM_AUTH_H 1
