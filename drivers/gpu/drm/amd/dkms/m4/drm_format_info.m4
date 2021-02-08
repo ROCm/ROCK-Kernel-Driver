@@ -8,6 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_FORMAT_INFO], [
 			#include <drm/drm_fourcc.h>
 		], [
 			struct drm_format_info format = {
+			    .format = DRM_FORMAT_XRGB16161616F,
 			    .block_w = {0},
 			    .block_h = {0},
 			};
