@@ -236,12 +236,12 @@ int amdgpu_amdkfd_resume_iommu(struct amdgpu_device *adev)
 	return r;
 }
 
-int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm)
+int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm, bool sync)
 {
 	int r = 0;
 
 	if (adev->kfd.dev)
-		r = kgd2kfd_resume(adev->kfd.dev, run_pm);
+		r = kgd2kfd_resume(adev->kfd.dev, run_pm, sync);
 
 	return r;
 }
