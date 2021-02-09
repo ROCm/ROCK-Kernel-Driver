@@ -3836,7 +3836,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 			}
 		}
 	}
-	r = amdgpu_amdkfd_resume(adev, !fbcon);
+	r = amdgpu_amdkfd_resume(adev, !fbcon, false);
 	if (r)
 		return r;
 

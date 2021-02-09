@@ -801,7 +801,26 @@ static void kgd_gfx_v9_set_barrier_auto_waitcnt(struct amdgpu_device *adev,
 
 out:
 	kgd_gfx_v9_suspend_resume_compute_scheduler(adev, false);
-	amdgpu_amdkfd_resume(adev, false);
+
+	/* When we call amdgpu_amdkfd_resume(), we need to wait for the
+	 * delayed work to complete before we complete, so pass true
+	 * for the 'sync' option.
+	 *
+	 * This is to prevent any subsequent calls amdgpu_amdkfd_suspend()
+	 * from cancelling any of the delayed work in amdgpu_amdkfd_resume().
+	 *
+	 * This can happen in a multi-gpu system.  If we enable the debugger
+	 * on one node, it will do the amdgpu_amdkfd_suspend() and
+	 * amdgpu_amdkfd_resume().  The call to enable the debugger will return
+	 * to the caller before the delayed work is complete.  If the debugger
+	 * is then enabled on another node, the next call to
+	 * amdgpu_amdkfd_suspend() will cancel any outstanding delayed work
+	 * from amdgpu_amdkfd_resume().
+	 *
+	 * To prevent this, we need to ensure that the delayed work in
+	 * amdgpu_amdkfd_resume() has completed before we return to the caller.
+	 */
+	amdgpu_amdkfd_resume(adev, false, true);
 
 	up_read(&adev->reset_sem);
 }
