@@ -152,8 +152,11 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 #endif
 {
 	enum amdgpu_dm_pipe_crc_source source = dm_parse_crc_source(src_name);
+	enum amdgpu_dm_pipe_crc_source cur_crc_src;
 	struct drm_crtc_commit *commit;
 	struct dm_crtc_state *crtc_state;
+	struct drm_device *drm_dev = crtc->dev;
+	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	struct drm_dp_aux *aux = NULL;
 	bool enable = false;
 	bool enabled = false;
@@ -192,6 +195,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 
 	enable = amdgpu_dm_is_valid_crc_source(source);
 	crtc_state = to_dm_crtc_state(crtc->state);
+	spin_lock_irq(&drm_dev->event_lock);
+	cur_crc_src = acrtc->dm_irq_params.crc_src;
+	spin_unlock_irq(&drm_dev->event_lock);
 
 	/*
 	 * USER REQ SRC | CURRENT SRC | BEHAVIOR
@@ -208,7 +214,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	 */
 	if (dm_is_crc_source_dprx(source) ||
 	    (source == AMDGPU_DM_PIPE_CRC_SOURCE_NONE &&
-	     dm_is_crc_source_dprx(crtc_state->crc_src))) {
+	     dm_is_crc_source_dprx(cur_crc_src))) {
 		struct amdgpu_dm_connector *aconn = NULL;
 		struct drm_connector *connector;
 #ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
@@ -255,7 +261,7 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 	 * Reading the CRC requires the vblank interrupt handler to be
 	 * enabled. Keep a reference until CRC capture stops.
 	 */
-	enabled = amdgpu_dm_is_valid_crc_source(crtc_state->crc_src);
+	enabled = amdgpu_dm_is_valid_crc_source(cur_crc_src);
 	if (!enabled && enable) {
 		ret = drm_crtc_vblank_get(crtc);
 		if (ret)
@@ -283,7 +289,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 		}
 	}
 
-	crtc_state->crc_src = source;
+	spin_lock_irq(&drm_dev->event_lock);
+	acrtc->dm_irq_params.crc_src = source;
+	spin_unlock_irq(&drm_dev->event_lock);
 
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS
 	*values_cnt = 3;
@@ -311,16 +319,26 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 {
 	struct dm_crtc_state *crtc_state;
 	struct dc_stream_state *stream_state;
+	struct drm_device *drm_dev = NULL;
+	enum amdgpu_dm_pipe_crc_source cur_crc_src;
+	struct amdgpu_crtc *acrtc = NULL;
 	uint32_t crcs[3];
+	unsigned long flags;
 
 	if (crtc == NULL)
 		return;
 
 	crtc_state = to_dm_crtc_state(crtc->state);
 	stream_state = crtc_state->stream;
+	acrtc = to_amdgpu_crtc(crtc);
+	drm_dev = crtc->dev;
+
+	spin_lock_irqsave(&drm_dev->event_lock, flags);
+	cur_crc_src = acrtc->dm_irq_params.crc_src;
+	spin_unlock_irqrestore(&drm_dev->event_lock, flags);
 
 	/* Early return if CRC capture is not enabled. */
-	if (!amdgpu_dm_is_valid_crc_source(crtc_state->crc_src))
+	if (!amdgpu_dm_is_valid_crc_source(cur_crc_src))
 		return;
 
 	/*
@@ -334,7 +352,7 @@ void amdgpu_dm_crtc_handle_crc_irq(struct drm_crtc *crtc)
 		return;
 	}
 
-	if (dm_is_crc_source_crtc(crtc_state->crc_src)) {
+	if (dm_is_crc_source_crtc(cur_crc_src)) {
 		if (!dc_stream_get_crc(stream_state->ctx->dc, stream_state,
 				       &crcs[0], &crcs[1], &crcs[2]))
 			return;

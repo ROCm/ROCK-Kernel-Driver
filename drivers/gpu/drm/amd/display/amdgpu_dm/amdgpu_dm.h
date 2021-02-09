@@ -491,7 +491,6 @@ struct dm_crtc_state {
 	int active_planes;
 
 	int crc_skip_count;
-	enum amdgpu_dm_pipe_crc_source crc_src;
 
 #ifndef HAVE_DRM_VRR_SUPPORTED
 	bool base_vrr_enabled;
