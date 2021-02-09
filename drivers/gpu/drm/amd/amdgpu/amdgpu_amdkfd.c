@@ -193,12 +193,12 @@ void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool run_pm)
 		kgd2kfd_suspend(adev->kfd.dev, run_pm);
 }
 
-int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm)
+int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm, bool sync)
 {
 	int r = 0;
 
 	if (adev->kfd.dev)
-		r = kgd2kfd_resume(adev->kfd.dev, run_pm);
+		r = kgd2kfd_resume(adev->kfd.dev, run_pm, sync);
 
 	return r;
 }

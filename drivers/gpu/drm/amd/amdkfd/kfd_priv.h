@@ -1002,7 +1002,18 @@ void kfd_unref_process(struct kfd_process *p);
 int kfd_process_evict_queues(struct kfd_process *p);
 int kfd_process_restore_queues(struct kfd_process *p);
 void kfd_suspend_all_processes(void);
-int kfd_resume_all_processes(void);
+/*
+ * kfd_resume_all_processes:
+ *	bool sync: If kfd_resume_all_processes() should wait for the
+ *		delayed work to complete or not.
+ *		If there will be multiple calls to kfd_suspend_all_processes()
+ *		and kfd_resume_all_processes(), we need to wait for the
+ *		delayed sync work for kfd_resume_all_processes() to complete
+ *		or else the subsequent call to kfd_suspend_all_processes()
+ *		may cancel any outstanding delayed work.  This can happen
+ *		when the kfd debugger is started on a multi-gpu system.
+ */
+int kfd_resume_all_processes(bool sync);
 
 int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 			       struct file *drm_file);

@@ -1020,7 +1020,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm)
 	kfd_iommu_suspend(kfd);
 }
 
-int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
+int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
 {
 	int ret, count;
 
@@ -1036,7 +1036,7 @@ int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
 		count = atomic_dec_return(&kfd_locked);
 		WARN_ONCE(count < 0, "KFD suspend / resume ref. error");
 		if (count == 0)
-			ret = kfd_resume_all_processes();
+			ret = kfd_resume_all_processes(sync);
 	}
 
 	return ret;
