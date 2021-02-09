@@ -2127,7 +2127,7 @@ void kfd_suspend_all_processes(void)
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 }
 
-int kfd_resume_all_processes(void)
+int kfd_resume_all_processes(bool sync)
 {
 	struct kfd_process *p;
 	unsigned int temp;
@@ -2139,6 +2139,16 @@ int kfd_resume_all_processes(void)
 			       p->pasid);
 			ret = -EFAULT;
 		}
+		/*
+		 * When there are multiple calls to kfd_suspend_all_processes()
+		 * and kfd_resume_all_processes(), we need to wait for the
+		 * delayed sync work for kfd_resume_all_processes() to complete
+		 * or else the subsequent call to kfd_suspend_all_processes()
+		 * may cancel any outstanding delayed work.  This can happen
+		 * when the kfd debugger is started on a multi-gpu system.
+		 */
+		if (sync)
+			flush_delayed_work(&p->restore_work);
 	}
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 	return ret;
