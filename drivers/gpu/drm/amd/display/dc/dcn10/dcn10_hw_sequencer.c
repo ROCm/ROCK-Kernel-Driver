@@ -1235,6 +1235,7 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 			// signals when OTG blanked. This is to prevent pipe from
 			// requesting data while in PSR.
 			tg->funcs->tg_init(tg);
+			hubp->power_gated = true;
 			continue;
 		}
 
@@ -3159,7 +3160,7 @@ void dcn10_setup_stereo(struct pipe_ctx *pipe_ctx, struct dc *dc)
 
 	pipe_ctx->stream_res.opp->funcs->opp_program_stereo(
 		pipe_ctx->stream_res.opp,
-		flags.PROGRAM_STEREO == 1 ? true:false,
+		flags.PROGRAM_STEREO == 1,
 		&stream->timing);
 
 	pipe_ctx->stream_res.tg->funcs->program_stereo(

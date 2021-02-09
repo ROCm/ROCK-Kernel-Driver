@@ -42,12 +42,13 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.119"
+#define DC_VER "3.2.121"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
 #define MAX_STREAMS 6
 #define MAX_SINKS_PER_LINK 4
+#define MIN_VIEWPORT_SIZE 12
 
 /*******************************************************************************
  * Display Core Interfaces
@@ -536,7 +537,6 @@ struct dc_debug_options {
 	bool usbc_combo_phy_reset_wa;
 	bool disable_dsc;
 	bool enable_dram_clock_change_one_display_vactive;
-	bool force_ignore_link_settings;
 	union mem_low_power_enable_options enable_mem_low_power;
 };
 
@@ -653,7 +653,6 @@ struct dc {
 	const char *build_id;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct vm_helper *vm_helper;
-	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
 #endif
 };
 
@@ -692,18 +691,10 @@ struct dc_init_data {
 	struct dc_config flags;
 	uint64_t log_mask;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	/**
-	 * gpu_info FW provided soc bounding box struct or 0 if not
-	 * available in FW
-	 */
-	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
-#endif
 	struct dpcd_vendor_signature vendor_signature;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool force_smu_not_present;
 #endif
-	bool force_ignore_link_settings;
 };
 
 struct dc_callback_init {

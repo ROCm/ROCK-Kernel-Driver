@@ -98,6 +98,10 @@
 #define mmGCR_GENERAL_CNTL_Sienna_Cichlid			0x1580
 #define mmGCR_GENERAL_CNTL_Sienna_Cichlid_BASE_IDX	0
 
+#define mmCGTS_TCC_DISABLE_Vangogh                0x5006
+#define mmCGTS_TCC_DISABLE_Vangogh_BASE_IDX       1
+#define mmCGTS_USER_TCC_DISABLE_Vangogh                0x5007
+#define mmCGTS_USER_TCC_DISABLE_Vangogh_BASE_IDX       1
 #define mmGOLDEN_TSC_COUNT_UPPER_Vangogh                0x0025
 #define mmGOLDEN_TSC_COUNT_UPPER_Vangogh_BASE_IDX       1
 #define mmGOLDEN_TSC_COUNT_LOWER_Vangogh                0x0026
@@ -4487,8 +4491,7 @@ static int gfx_v10_0_compute_ring_init(struct amdgpu_device *adev, int ring_id,
 	irq_type = AMDGPU_CP_IRQ_COMPUTE_MEC1_PIPE0_EOP
 		+ ((ring->me - 1) * adev->gfx.mec.num_pipe_per_mec)
 		+ ring->pipe;
-	hw_prio = amdgpu_gfx_is_high_priority_compute_queue(adev, ring->pipe,
-							    ring->queue) ?
+	hw_prio = amdgpu_gfx_is_high_priority_compute_queue(adev, ring) ?
 			AMDGPU_GFX_PIPE_PRIO_HIGH : AMDGPU_GFX_PIPE_PRIO_NORMAL;
 	/* type-2 packets are deprecated on MEC, use type-3 instead */
 	r = amdgpu_ring_init(adev, ring, 1024,
@@ -4956,8 +4959,18 @@ static void gfx_v10_0_tcp_harvest(struct amdgpu_device *adev)
 static void gfx_v10_0_get_tcc_info(struct amdgpu_device *adev)
 {
 	/* TCCs are global (not instanced). */
-	uint32_t tcc_disable = RREG32_SOC15(GC, 0, mmCGTS_TCC_DISABLE) |
-			       RREG32_SOC15(GC, 0, mmCGTS_USER_TCC_DISABLE);
+	uint32_t tcc_disable;
+
+	switch (adev->asic_type) {
+	case CHIP_VANGOGH:
+		tcc_disable = RREG32_SOC15(GC, 0, mmCGTS_TCC_DISABLE_Vangogh) |
+				RREG32_SOC15(GC, 0, mmCGTS_USER_TCC_DISABLE_Vangogh);
+		break;
+	default:
+		tcc_disable = RREG32_SOC15(GC, 0, mmCGTS_TCC_DISABLE) |
+				RREG32_SOC15(GC, 0, mmCGTS_USER_TCC_DISABLE);
+		break;
+	}
 
 	adev->gfx.config.tcc_disabled_mask =
 		REG_GET_FIELD(tcc_disable, CGTS_TCC_DISABLE, TCC_DISABLE) |
@@ -6553,8 +6566,7 @@ static void gfx_v10_0_compute_mqd_set_priority(struct amdgpu_ring *ring, struct 
 	struct amdgpu_device *adev = ring->adev;
 
 	if (ring->funcs->type == AMDGPU_RING_TYPE_COMPUTE) {
-		if (amdgpu_gfx_is_high_priority_compute_queue(adev, ring->pipe,
-							      ring->queue)) {
+		if (amdgpu_gfx_is_high_priority_compute_queue(adev, ring)) {
 			mqd->cp_hqd_pipe_priority = AMDGPU_GFX_PIPE_PRIO_HIGH;
 			mqd->cp_hqd_queue_priority =
 				AMDGPU_GFX_QUEUE_PRIORITY_MAXIMUM;

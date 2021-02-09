@@ -458,8 +458,8 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 
 		for (i = 0; i < abo->tbo.num_pages; i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
-		abo->base = args->addr;
-		abo->addr = (void *)dma_addr;
+		abo->dgma_import_base = args->addr;
+		abo->dgma_addr = (void *)dma_addr;
 		r = drm_gem_handle_create(filp, gobj, &handle);
 		args->handle = handle;
 		break;
@@ -473,9 +473,9 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			r = -EINVAL;
 			goto release_object;
 		}
-		args->addr = amdgpu_bo_gpu_offset(abo);
-		args->addr -= adev->gmc.vram_start;
-		args->addr += adev->gmc.aper_base;
+		args->addr = amdgpu_bo_gpu_offset(abo) -
+			amdgpu_ttm_domain_start(adev, TTM_PL_VRAM) +
+			adev->gmc.aper_base;
 		break;
 	default:
 		return -EINVAL;

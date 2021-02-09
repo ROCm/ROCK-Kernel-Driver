@@ -67,7 +67,7 @@ struct amdgpu_gtt_mgr {
 	atomic64_t available;
 };
 
-struct amdgpu_dgma_mgr {
+struct amdgpu_dgma_import_mgr {
 	struct ttm_resource_manager manager;
 	struct drm_mm mm;
 	spinlock_t lock;
@@ -94,7 +94,7 @@ struct amdgpu_mman {
 
 	struct amdgpu_vram_mgr vram_mgr;
 	struct amdgpu_gtt_mgr gtt_mgr;
-	struct amdgpu_dgma_mgr dgma_mgr;
+	struct amdgpu_dgma_import_mgr dgma_import_mgr;
 
 	uint64_t		stolen_vga_size;
 	struct amdgpu_bo	*stolen_vga_memory;

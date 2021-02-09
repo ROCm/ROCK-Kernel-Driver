@@ -28,8 +28,8 @@
  *      Jesse Barnes <jesse.barnes@intel.com>
  */
 #include <linux/console.h>
-#include <kcl/header/kcl_drm_device_h.h>
-#include <kcl/header/kcl_drm_drv_h.h>
+#include <drm/drm_device.h>
+#include <drm/drm_drv.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fourcc.h>

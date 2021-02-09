@@ -26,8 +26,8 @@
 #ifndef __KCL_KCL_DRM_DRV_H__
 #define __KCL_KCL_DRM_DRV_H__
 
-#include <kcl/header/kcl_drm_device_h.h>
-#include <kcl/header/kcl_drm_drv_h.h>
+#include <drm/drm_device.h>
+#include <drm/drm_drv.h>
 
 #ifndef HAVE_DRM_DEV_PUT
 static inline void drm_dev_get(struct drm_device *dev)

@@ -22,7 +22,7 @@
 #ifndef KCL_BACKPORT_KCL_DRM_PLANE_H
 #define KCL_BACKPORT_KCL_DRM_PLANE_H
 
-#include <kcl/header/kcl_drm_plane_h.h>
+#include <drm/drm_plane.h>
 #include <kcl/kcl_drm_plane.h>
 
 #ifndef HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS

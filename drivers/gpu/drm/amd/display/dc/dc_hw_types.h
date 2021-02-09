@@ -798,6 +798,7 @@ struct dc_crtc_timing {
 
 	struct dc_crtc_timing_flags flags;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	uint32_t dsc_fixed_bits_per_pixel_x16; /* DSC target bitrate in 1/16 of bpp (e.g. 128 -> 8bpp) */
 	struct dc_dsc_config dsc_cfg;
 #endif
 };

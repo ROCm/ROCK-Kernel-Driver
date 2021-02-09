@@ -34,7 +34,7 @@
 #ifndef KCL_BACKPORT_KCL_DRM_ENCODER_H
 #define KCL_BACKPORT_KCL_DRM_ENCODER_H
 
-#include <kcl/header/kcl_drm_encoder_h.h>
+#include <drm/drm_encoder.h>
 #include <drm/drm_edid.h>
 
 #if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)

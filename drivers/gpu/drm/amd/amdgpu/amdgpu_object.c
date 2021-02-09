@@ -78,8 +78,8 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 
-	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
-		kfree(bo->addr);
+	kfree(bo->dgma_addr);
+
 	if (bo->pin_count > 0)
 		amdgpu_bo_subtract_pin_size(bo);
 
@@ -933,7 +933,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 		return -EINVAL;
 
 	/* A shared bo cannot be migrated to VRAM */
-	if (bo->prime_shared_count) {
+	if (bo->prime_shared_count || bo->tbo.base.import_attach) {
 		if (domain & AMDGPU_GEM_DOMAIN_GTT)
 			domain = AMDGPU_GEM_DOMAIN_GTT;
 		else
@@ -947,8 +947,14 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 
 	if (bo->pin_count) {
 		uint32_t mem_type = bo->tbo.mem.mem_type;
+		uint32_t mem_flags = bo->tbo.mem.placement;
 
 		if (!(domain & amdgpu_mem_type_to_domain(mem_type)))
+			return -EINVAL;
+
+		if ((mem_type == TTM_PL_VRAM) &&
+		    (bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS) &&
+		    !(mem_flags & TTM_PL_FLAG_CONTIGUOUS))
 			return -EINVAL;
 
 		bo->pin_count++;
@@ -968,7 +974,6 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 		dma_buf_pin(bo->tbo.base.import_attach);
 #endif
 
-	bo->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 	/* force to pin into visible video ram */
 	if (!(bo->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS))
 		bo->flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
@@ -1022,6 +1027,7 @@ error:
  */
 int amdgpu_bo_pin(struct amdgpu_bo *bo, u32 domain)
 {
+	bo->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
 	return amdgpu_bo_pin_restricted(bo, domain, 0, 0);
 }
 

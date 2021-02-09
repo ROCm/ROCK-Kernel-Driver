@@ -491,11 +491,17 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 #ifndef HAVE_DRM_MM_INSERT_MODE
 		sflags |= DRM_MM_SEARCH_BEST;
 		uint32_t alignment = mem->page_alignment;
+		/* Limit maximum size to 2GB due to SG table limitations */
+		pages = min(pages, (2UL << (30 - PAGE_SHIFT)));
+
 		r = drm_mm_insert_node_in_range_generic(mm, &nodes[i], pages,
 					alignment, 0,
 					place->fpfn, lpfn,
 					sflags, aflags);
 #else
+		/* Limit maximum size to 2GB due to SG table limitations */
+		pages = min(pages, (2UL << (30 - PAGE_SHIFT)));
+
 		r = drm_mm_insert_node_in_range(mm, &nodes[i], pages,
 						pages_per_node, 0,
 						place->fpfn, lpfn,

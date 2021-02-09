@@ -27,7 +27,7 @@
  * that the faked up offset will fit
  */
 #include <drm/drm_vma_manager.h>
-#include <kcl/header/kcl_drmP_h.h>
+#include <drm/drm_file.h>
 
 /* Copied from include/drm/drm_vma_manager.h */
 #if (BITS_PER_LONG == 64)

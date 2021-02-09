@@ -121,8 +121,8 @@ struct amdgpu_bo {
 	struct kgd_mem                  *kfd_bo;
 
 	/* DGMA imported buffer info */
-	void				*addr;
-	phys_addr_t			base;
+	void				*dgma_addr;
+	phys_addr_t			dgma_import_base;
 };
 
 static inline struct amdgpu_bo *ttm_to_amdgpu_bo(struct ttm_buffer_object *tbo)
