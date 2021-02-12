@@ -280,7 +280,7 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 
 	ret = rdma_interface->get_pages(
 					ALIGN_DOWN(addr, page_size),
-					ALIGN(size, page_size),
+					ALIGN(size + addr%page_size, page_size),
 					mem_context->pid,
 					&mem_context->p2p_info,
 					free_callback,
