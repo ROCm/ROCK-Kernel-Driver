@@ -145,6 +145,7 @@ struct amd_mem_context {
 	struct kfd_bo	*buf_obj;
 
 	struct sg_table *pages;
+	struct device *dma_dev;
 
 	struct task_struct *in_free_callback;
 
@@ -152,21 +153,34 @@ struct amd_mem_context {
 	void *core_context;
 };
 
+static void dma_unmap_helper(struct amd_mem_context *mem_context)
+{
+	struct kgd_mem *mem;
+
+	/* The buffer object is already freed e.g. user space
+	 * thread has deleted the encapsulating buffer object
+	 */
+	if (!mem_context->pages)
+		return;
+
+	mem = mem_context->buf_obj->mem;
+	amdgpu_amdkfd_gpuvm_put_sg_table(mem, mem_context->dma_dev,
+				DMA_BIDIRECTIONAL, mem_context->pages);
+	mem_context->pages = NULL;
+}
+
 static void put_pages_helper(struct amd_mem_context *mem_context)
 {
-	if (mem_context->pages) {
-		struct kfd_bo *buf_obj = mem_context->buf_obj;
+	struct kfd_bo *buf_obj;
 
-		amdgpu_amdkfd_gpuvm_unpin_put_sg_table(buf_obj->mem,
-						       mem_context->pages);
-		mem_context->pages = NULL;
-		kfd_dec_compute_active(buf_obj->dev);
-	}
+	if (!mem_context->buf_obj)
+		return;
 
-	if (mem_context->buf_obj) {
-		list_del(&mem_context->callback_node);
-		mem_context->buf_obj = NULL;
-	}
+	buf_obj = mem_context->buf_obj;
+	mem_context->buf_obj = NULL;
+	list_del(&mem_context->callback_node);
+	amdgpu_amdkfd_gpuvm_unpin_bo(buf_obj->mem);
+	kfd_dec_compute_active(buf_obj->dev);
 }
 
 static void free_callback(struct amd_mem_context *mem_context)
@@ -205,6 +219,7 @@ static void free_callback(struct amd_mem_context *mem_context)
 	 * away. Let the other call that is in flight take care of the
 	 * kfd_proc reference.
 	 */
+	dma_unmap_helper(mem_context);
 	put_pages_helper(mem_context);
 }
 
@@ -297,8 +312,6 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		(struct amd_mem_context *)client_context;
 	struct kfd_process *p = mem_context->kfd_proc;
 	struct kfd_bo *buf_obj = mem_context->buf_obj;
-	struct kfd_dev *dev = buf_obj->dev;
-	struct sg_table *sg_table_tmp;
 	unsigned long offset;
 
 	align_addr_size(&addr, &size);
@@ -312,7 +325,6 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	}
 
 	pr_debug("pid: %d\n", p->lead_thread->pid);
-
 
 	if (addr != mem_context->va) {
 		pr_warn("Context address (%#llx) is not the same\n",
@@ -333,26 +345,21 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 	 */
 	if (!mem_context->buf_obj) {
 		ret = -EINVAL;
+		pr_warn("Buffer Object is NULL, has already been freed\n");
 		goto out_unlock;
 	}
 
 	offset = addr - buf_obj->it.start;
-	ret = amdgpu_amdkfd_gpuvm_pin_get_sg_table(dev->kgd, buf_obj->mem,
-			offset, size, &sg_table_tmp);
+	ret = amdgpu_amdkfd_gpuvm_pin_bo(buf_obj->mem);
 	if (ret) {
-		pr_err("amdgpu_amdkfd_gpuvm_pin_get_sg_table failed.\n");
+		pr_err("Pinning of buffer failed.\n");
 		goto out_unlock;
 	}
 
-	mem_context->pages = sg_table_tmp;
-
+	/* Mark the device as active */
 	kfd_inc_compute_active(buf_obj->dev);
-	mutex_unlock(&p->mutex);
 
 	mem_context->core_context = core_context;
-
-	/* Note: At this stage it is OK not to fill sg_table */
-	return 0;
 
 out_unlock:
 	mutex_unlock(&p->mutex);
@@ -363,6 +370,14 @@ out_unlock:
 static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 			struct device *dma_device, int dmasync, int *nmap)
 {
+	struct sg_table *sg_table_tmp;
+	struct kfd_process *proc;
+	struct kgd_mem *mem;
+	struct kfd_dev *dev;
+	uint64_t offset;
+	uint64_t length;
+	int ret;
+
 	/*
 	 * NOTE/TODO:
 	 * We could have potentially three cases for real memory
@@ -388,15 +403,42 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
 			client_context, sg_head);
 
+	if (!mem_context || !mem_context->kfd_proc || !mem_context->buf_obj) {
+		pr_warn("Invalid client context");
+		return -EINVAL;
+	}
+
+	proc = mem_context->kfd_proc;
 	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
-			mem_context->kfd_proc->lead_thread->pid,
+			proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
-	if (!mem_context->pages) {
-		pr_err("No sg table were allocated\n");
-		return -EINVAL;
+	mutex_lock(&proc->mutex);
+
+	if (!mem_context->buf_obj) {
+		ret = -EINVAL;
+		pr_warn("Buffer Object is NULL, has already been freed\n");
+		goto out_unlock;
 	}
+
+	/* Get handles of memory, device encapsulated by buffer object */
+	length = mem_context->size;
+	mem = mem_context->buf_obj->mem;
+	dev = mem_context->buf_obj->dev;
+	offset = mem_context->va - mem_context->buf_obj->it.start;
+
+	/* Build sg_table for buffer being exported, including DMA mapping */
+	ret = amdgpu_amdkfd_gpuvm_get_sg_table(dev->kgd, mem, offset, length,
+				dma_device, DMA_BIDIRECTIONAL, &sg_table_tmp);
+	if (ret) {
+		pr_err("Building of sg_table failed\n");
+		goto out_unlock;
+	}
+
+	/* Maintain a copy of the handle to sg_table */
+	mem_context->pages = sg_table_tmp;
+	mem_context->dma_dev = dma_device;
 
 	/* Copy information about previosly allocated sg_table */
 	*sg_head = *mem_context->pages;
@@ -404,7 +446,9 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	/* Return number of pages */
 	*nmap = mem_context->pages->nents;
 
-	return 0;
+out_unlock:
+	mutex_unlock(&proc->mutex);
+	return ret;
 }
 
 static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
@@ -412,17 +456,39 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 {
 	struct amd_mem_context *mem_context =
 		(struct amd_mem_context *)client_context;
+	struct kfd_process *proc;
+	int ret = 0;
 
 	pr_debug("Client context: 0x%p, sg_table: 0x%p\n",
 			client_context, sg_head);
 
+	if (!mem_context || !mem_context->kfd_proc || !mem_context->buf_obj) {
+		pr_warn("Invalid client context");
+		return -EINVAL;
+	}
+
+	proc = mem_context->kfd_proc;
 	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
-			mem_context->kfd_proc->lead_thread->pid,
+			proc->lead_thread->pid,
 			mem_context->va,
 			mem_context->size);
 
-	/* Assume success */
-	return 0;
+	if (mem_context->in_free_callback != current)
+		mutex_lock(&proc->mutex);
+
+	if (!mem_context->buf_obj) {
+		ret = -EINVAL;
+		pr_warn("Buffer Object is NULL, has already been freed\n");
+		goto out_unlock;
+	}
+
+	/* Release the mapped pages of buffer */
+	dma_unmap_helper(mem_context);
+
+out_unlock:
+	if (mem_context->in_free_callback != current)
+		mutex_unlock(&proc->mutex);
+	return ret;
 }
 
 static void amd_put_pages(struct sg_table *sg_head, void *client_context)

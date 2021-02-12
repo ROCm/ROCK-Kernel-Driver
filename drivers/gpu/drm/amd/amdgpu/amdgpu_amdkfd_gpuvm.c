@@ -1897,7 +1897,7 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 	return 0;
 }
 
-static int pin_bo_wo_map(struct kgd_mem *mem)
+int amdgpu_amdkfd_gpuvm_pin_bo(struct kgd_mem *mem)
 {
 	struct amdgpu_bo *bo = mem->bo;
 	int ret = 0;
@@ -1913,7 +1913,7 @@ static int pin_bo_wo_map(struct kgd_mem *mem)
 	return ret;
 }
 
-static void unpin_bo_wo_map(struct kgd_mem *mem)
+void amdgpu_amdkfd_gpuvm_unpin_bo(struct kgd_mem *mem)
 {
 	struct amdgpu_bo *bo = mem->bo;
 	int ret = 0;
@@ -1930,14 +1930,16 @@ static void unpin_bo_wo_map(struct kgd_mem *mem)
 #define AMD_GPU_PAGE_SIZE (_AC(1, UL) << AMD_GPU_PAGE_SHIFT)
 
 static int get_sg_table(struct amdgpu_device *adev,
-		struct kgd_mem *mem, uint64_t offset,
-		uint64_t size, struct sg_table **ret_sg)
+		struct kgd_mem *mem, uint64_t offset, uint64_t size,
+		struct device *dma_dev, enum dma_data_direction dir,
+		struct sg_table **ret_sg)
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct sg_table *sg = NULL;
 	unsigned long bus_addr, aper_limit;
+	dma_addr_t dma_addr;
 	unsigned int chunks;
-	unsigned int i;
+	unsigned int idx;
 	struct scatterlist *s;
 	uint64_t offset_in_page;
 	unsigned int page_size;
@@ -1965,6 +1967,9 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (unlikely(ret))
 		goto out;
 
+	for_each_sgtable_sg(sg, s, idx)
+		s->length = 0;
+
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		bus_addr = amdgpu_bo_gpu_offset(bo) - adev->gmc.vram_start
 			   + adev->gmc.aper_base + offset;
@@ -1975,14 +1980,21 @@ static int get_sg_table(struct amdgpu_device *adev,
 			goto out_of_range;
 		}
 
-		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
+		for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
 			uint64_t chunk_size, length;
 
 			chunk_size = page_size - offset_in_page;
 			length = min(size, chunk_size);
 
+			/* DMA map the exported addresses */
+			dma_addr = dma_map_resource(dma_dev, bus_addr,
+					page_size, dir, DMA_ATTR_SKIP_CPU_SYNC);
+			ret = dma_mapping_error(dma_dev, dma_addr);
+			if (ret)
+				goto error_unmap;
+
 			sg_set_page(s, NULL, length, offset_in_page);
-			s->dma_address = bus_addr;
+			s->dma_address = dma_addr;
 			s->dma_length = length;
 
 			size -= length;
@@ -1996,7 +2008,7 @@ static int get_sg_table(struct amdgpu_device *adev,
 		pages = bo->tbo.ttm->pages;
 
 		cur_page = offset / page_size;
-		for_each_sg(sg->sgl, s, sg->orig_nents, i) {
+		for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
 			uint64_t chunk_size, length;
 
 			chunk_size = page_size - offset_in_page;
@@ -2010,11 +2022,23 @@ static int get_sg_table(struct amdgpu_device *adev,
 			offset_in_page = 0;
 			cur_page++;
 		}
+		ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
+		if (ret)
+			goto out_of_range;
 	}
 
 	*ret_sg = sg;
 	return 0;
 
+error_unmap:
+	for_each_sgtable_sg(sg, s, idx) {
+		if (!s->length)
+			continue;
+
+		dma_unmap_resource(dma_dev, s->dma_address,
+				   s->length, dir,
+				   DMA_ATTR_SKIP_CPU_SYNC);
+	}
 out_of_range:
 	sg_free_table(sg);
 out:
@@ -2023,33 +2047,37 @@ out:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_pin_get_sg_table(struct kgd_dev *kgd,
-		struct kgd_mem *mem, uint64_t offset,
-		uint64_t size, struct sg_table **ret_sg)
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+		struct kgd_mem *mem, uint64_t offset, uint64_t size,
+		struct device *dma_dev, enum dma_data_direction dir,
+		struct sg_table **ret_sg)
 {
-	int ret;
 	struct amdgpu_device *adev;
 
-	ret = pin_bo_wo_map(mem);
-	if (unlikely(ret))
-		return ret;
-
 	adev = get_amdgpu_device(kgd);
-
-	ret = get_sg_table(adev, mem, offset, size, ret_sg);
-	if (ret)
-		unpin_bo_wo_map(mem);
-
-	return ret;
+	return get_sg_table(adev, mem, offset, size, dma_dev, dir, ret_sg);
 }
 
-void amdgpu_amdkfd_gpuvm_unpin_put_sg_table(
-		struct kgd_mem *mem, struct sg_table *sg)
+void amdgpu_amdkfd_gpuvm_put_sg_table(struct kgd_mem *mem,
+		struct device *dma_dev, enum dma_data_direction dir,
+		struct sg_table *sgt)
 {
-	sg_free_table(sg);
-	kfree(sg);
+	struct amdgpu_bo *bo = mem->bo;
+	struct scatterlist *sg;
+	int idx;
 
-	unpin_bo_wo_map(mem);
+	/* Unmap memory - Sysmem vs VRAM */
+	if (bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM) {
+		dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
+	} else {
+		for_each_sgtable_sg(sgt, sg, idx)
+			dma_unmap_resource(dma_dev, sg->dma_address,
+					   sg->length, dir,
+					   DMA_ATTR_SKIP_CPU_SYNC);
+	}
+
+	sg_free_table(sgt);
+	kfree(sgt);
 }
 
 int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
