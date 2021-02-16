@@ -136,8 +136,12 @@ uint amdgpu_pg_mask = 0xffffffff;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
-/* OverDrive(bit 14) disabled by default*/
-uint amdgpu_pp_feature_mask = 0xffffbfff;
+
+/*
+ * OverDrive(bit 14) disabled by default
+ * GFX DCS(bit 19) disabled by default
+ */
+uint amdgpu_pp_feature_mask = 0xfff7bfff;
 uint amdgpu_force_long_training;
 int amdgpu_job_hang_limit;
 int amdgpu_lbpw = -1;
@@ -823,9 +827,9 @@ module_param_named(tmz, amdgpu_tmz, int, 0444);
 
 /**
  * DOC: reset_method (int)
- * GPU reset method (-1 = auto (default), 0 = legacy, 1 = mode0, 2 = mode1, 3 = mode2, 4 = baco)
+ * GPU reset method (-1 = auto (default), 0 = legacy, 1 = mode0, 2 = mode1, 3 = mode2, 4 = baco, 5 = pci)
  */
-MODULE_PARM_DESC(reset_method, "GPU reset method (-1 = auto (default), 0 = legacy, 1 = mode0, 2 = mode1, 3 = mode2, 4 = baco/bamaco)");
+MODULE_PARM_DESC(reset_method, "GPU reset method (-1 = auto (default), 0 = legacy, 1 = mode0, 2 = mode1, 3 = mode2, 4 = baco/bamaco, 5 = pci)");
 module_param_named(reset_method, amdgpu_reset_method, int, 0444);
 
 /**
@@ -1423,14 +1427,15 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	adev->in_runpm = true;
 	if (amdgpu_device_supports_atpx(drm_dev))
 		drm_dev->switch_power_state = DRM_SWITCH_POWER_CHANGING;
-	drm_kms_helper_poll_disable(drm_dev);
 #if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
 	ret = amdgpu_device_suspend(drm_dev, false);
-	if (ret)
+	if (ret) {
+		adev->in_runpm = false;
 		return ret;
+	}
 
 	if (amdgpu_device_supports_atpx(drm_dev)) {
 		/* Only need to handle PCI state in the driver for ATPX
@@ -1483,7 +1488,6 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 		amdgpu_device_baco_exit(drm_dev);
 	}
 	ret = amdgpu_device_resume(drm_dev, false);
-	drm_kms_helper_poll_enable(drm_dev);
 #if defined(HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_ON);
 #endif
