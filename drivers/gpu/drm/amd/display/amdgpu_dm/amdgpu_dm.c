@@ -9182,8 +9182,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #else
 				DRM_MODE_HDCP_CONTENT_TYPE0,
 #endif
-				new_con_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED ? true
-													 : false);
+				new_con_state->content_protection == DRM_MODE_CONTENT_PROTECTION_DESIRED);
 	}
 #endif
 
