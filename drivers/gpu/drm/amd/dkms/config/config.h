@@ -151,9 +151,6 @@
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
-/* drm_connector_attach_encoder() is available */
-#define HAVE_DRM_CONNECTOR_ATTACH_ENCODER 1
-
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
 
@@ -179,17 +176,14 @@
 /* connector reference counting is available */
 #define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
 
-/* drm_connector_set_path_property() is available */
-#define HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY 1
-
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
 /* drm_connector_unreference() is available */
 /* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
-/* drm_connector_update_edid_property() is available */
-#define HAVE_DRM_CONNECTOR_UPDATE_EDID_PROPERTY 1
+/* drm_connector_xxx() drop _mode_ */
+#define HAVE_DRM_CONNECTOR_XXX_DROP_MODE 1
 
 /* ddrm_atomic_stat has __drm_crtcs_state */
 /* #undef HAVE_DRM_CRTCS_STATE_MEMBER */
