@@ -33,7 +33,7 @@
 #define drm_mode_get_hv_timing drm_crtc_get_hv_timing
 #endif
 
-#ifndef HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY
+#ifndef HAVE_DRM_CONNECTOR_XXX_DROP_MODE
 #define drm_connector_list_update drm_mode_connector_list_update
 #endif
 
