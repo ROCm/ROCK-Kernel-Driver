@@ -34,18 +34,6 @@
 #define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
 #endif
 
-#ifndef HAVE_DRM_CONNECTOR_UPDATE_EDID_PROPERTY
-#define drm_connector_update_edid_property drm_mode_connector_update_edid_property
-#endif
-
-#ifndef HAVE_DRM_CONNECTOR_ATTACH_ENCODER
-#define drm_connector_attach_encoder drm_mode_connector_attach_encoder
-#endif
-
-#ifndef HAVE_DRM_CONNECTOR_SET_PATH_PROPERTY
-#define drm_connector_set_path_property drm_mode_connector_set_path_property
-#endif
-
 /**
  * drm_connector_for_each_possible_encoder - iterate connector's possible encoders
  * @connector: &struct drm_connector pointer
