@@ -2777,7 +2777,6 @@ DEFINE_SHOW_ATTRIBUTE(amdgpu_ttm_page_pool);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_import_table);
 
-
 /*
  * amdgpu_ttm_vram_read - Linear read access to VRAM
  *
