@@ -2696,7 +2696,6 @@ static int amdgpu_mm_vram_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_VRAM);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
@@ -2714,7 +2713,6 @@ static int amdgpu_mm_tt_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_TT);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
@@ -2725,7 +2723,6 @@ static int amdgpu_mm_gds_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_GDS);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
@@ -2736,7 +2733,6 @@ static int amdgpu_mm_gws_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_GWS);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
@@ -2747,7 +2743,6 @@ static int amdgpu_mm_oa_table_show(struct seq_file *m, void *unused)
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_OA);
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
 }
@@ -2782,7 +2777,6 @@ DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_oa_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_ttm_page_pool);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_import_table);
-
 
 /*
  * amdgpu_ttm_vram_read - Linear read access to VRAM

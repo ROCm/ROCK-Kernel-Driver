@@ -1353,10 +1353,12 @@ static int amdgpu_debugfs_vm_info_show(struct seq_file *m, void *unused)
 
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_test_ib);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_vm_info);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_evict_vram_fops, amdgpu_debugfs_evict_vram,
 			 NULL, "%lld\n");
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_evict_gtt_fops, amdgpu_debugfs_evict_gtt,
 			 NULL, "%lld\n");
+#endif
 
 static void amdgpu_ib_preempt_fences_swap(struct amdgpu_ring *ring,
 					  struct dma_fence **fences)
@@ -1634,10 +1636,12 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	amdgpu_securedisplay_debugfs_init(adev);
 	amdgpu_fw_attestation_debugfs_init(adev);
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file("amdgpu_evict_vram", 0444, root, adev,
 			    &amdgpu_evict_vram_fops);
 	debugfs_create_file("amdgpu_evict_gtt", 0444, root, adev,
 			    &amdgpu_evict_gtt_fops);
+#endif
 	debugfs_create_file("amdgpu_test_ib", 0444, root, adev,
 			    &amdgpu_debugfs_test_ib_fops);
 	debugfs_create_file("amdgpu_vm_info", 0444, root, adev,

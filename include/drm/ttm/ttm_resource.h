@@ -94,12 +94,8 @@ struct ttm_resource_manager_func {
 	 * type manager to aid debugging of out-of-memory conditions.
 	 * It may not be called from within atomic context.
 	 */
-#if defined(HAVE_DRM_MM_PRINT)
 	void (*debug)(struct ttm_resource_manager *man,
 		      struct drm_printer *printer);
-#else
-	void (*debug)(struct ttm_resource_manager *man, const char *prefix);
-#endif
 };
 
 /**

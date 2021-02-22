@@ -799,8 +799,10 @@ static int gpu_recover_get(void *data, u64 *val)
 }
 
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_fence_info);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_debugfs_gpu_recover_fops, gpu_recover_get, NULL,
 			 "%lld\n");
+#endif
 
 #endif
 
@@ -813,9 +815,11 @@ void amdgpu_debugfs_fence_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_fence_info", 0444, root, adev,
 			    &amdgpu_debugfs_fence_info_fops);
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (!amdgpu_sriov_vf(adev))
 		debugfs_create_file("amdgpu_gpu_recover", 0444, root, adev,
 				    &amdgpu_debugfs_gpu_recover_fops);
+#endif
 #endif
 }
 
