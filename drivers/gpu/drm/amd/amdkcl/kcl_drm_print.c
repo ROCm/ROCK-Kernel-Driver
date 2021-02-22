@@ -38,15 +38,21 @@ void drm_printf(struct drm_printer *p, const char *f, ...)
 	va_end(args);
 }
 EXPORT_SYMBOL(drm_printf);
+
+void __drm_printfn_seq_file(struct drm_printer *p, struct va_format *vaf)
+{
+	seq_printf(p->arg, "%pV", vaf);
+}
+EXPORT_SYMBOL(__drm_printfn_seq_file);
 #endif
 
-#if !defined(HAVE_DRM_DEBUG_PRINTER)
+#if !defined(HAVE_DRM_PRINTER_PREFIX)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-#if !defined(HAVE_DRM_DRM_PRINT_H)
-	pr_debug("%s %pV", p->prefix, vaf);
+#ifndef HAVE_DRM_DRM_PRINT_H
+	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", p->prefix, vaf);
 #else
-	pr_debug("%s %pV", "no prefix < 4.11", vaf);
+	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", "no prefix", vaf);
 #endif
 }
 EXPORT_SYMBOL(__drm_printfn_debug);

@@ -72,7 +72,6 @@
 #include <kcl/kcl_drm_prime.h>
 #include <kcl/kcl_acpi_table.h>
 #include <kcl/kcl_drm_fourcc.h>
-#include "kcl/kcl_amdgpu_ttm.h"
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
