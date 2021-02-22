@@ -183,29 +183,13 @@ int ttm_range_man_fini(struct ttm_device *bdev,
 }
 EXPORT_SYMBOL(ttm_range_man_fini);
 
-#if !defined(HAVE_DRM_MM_PRINT)
-struct drm_mm *kcl_ttm_range_res_manager_to_drm_mm(struct ttm_resource_manager *man)
-{
-	return &(container_of(man, struct ttm_range_manager, manager)->mm);
-}
-EXPORT_SYMBOL(kcl_ttm_range_res_manager_to_drm_mm);
-#endif
-
 static void ttm_range_man_debug(struct ttm_resource_manager *man,
-#if !defined(HAVE_DRM_MM_PRINT)
-			     const char *prefix)
-#else
 			     struct drm_printer *printer)
-#endif
 {
 	struct ttm_range_manager *rman = to_range_manager(man);
 
 	spin_lock(&rman->lock);
-#if !defined(HAVE_DRM_MM_PRINT)
-	drm_mm_debug_table(&rman->mm, prefix);
-#else
 	drm_mm_print(&rman->mm, printer);
-#endif
 	spin_unlock(&rman->lock);
 }
 
