@@ -2953,28 +2953,17 @@ error_free:
 }
 
 #if defined(CONFIG_DEBUG_FS)
-
 static int amdgpu_mm_vram_table_show(struct seq_file *m, void *unused)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
-#if !defined(HAVE_DRM_MM_PRINT)
-	struct drm_mm *mm = kcl_ttm_get_drm_mm_by_mem_type(adev, TTM_PL_VRAM);
-	struct ttm_bo_global *glob = &ttm_bo_glob;
-	int ret;
-#else
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_VRAM);
+#if defined(HAVE_DRM_MM_PRINT)
 	struct drm_printer p = drm_seq_file_printer(m);
-#endif
-
-#if !defined(HAVE_DRM_MM_PRINT)
-	spin_lock(&glob->lru_lock);
-	ret = drm_mm_dump_table(m, mm);
-	spin_unlock(&glob->lru_lock);
-	return ret;
-#else
 	man->func->debug(man, &p);
 	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, TTM_PL_VRAM);
 #endif
 }
 
@@ -2983,10 +2972,13 @@ static int amdgpu_mm_tt_table_show(struct seq_file *m, void *unused)
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    TTM_PL_TT);
+#if defined(HAVE_DRM_MM_PRINT)
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, TTM_PL_TT);
+#endif
 }
 
 static int amdgpu_mm_gds_table_show(struct seq_file *m, void *unused)
@@ -2994,10 +2986,13 @@ static int amdgpu_mm_gds_table_show(struct seq_file *m, void *unused)
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_GDS);
+#if defined(HAVE_DRM_MM_PRINT)
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, AMDGPU_PL_GDS);
+#endif
 }
 
 static int amdgpu_mm_gws_table_show(struct seq_file *m, void *unused)
@@ -3005,10 +3000,13 @@ static int amdgpu_mm_gws_table_show(struct seq_file *m, void *unused)
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_GWS);
+#if defined(HAVE_DRM_MM_PRINT)
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, AMDGPU_PL_GWS);
+#endif
 }
 
 static int amdgpu_mm_oa_table_show(struct seq_file *m, void *unused)
@@ -3016,10 +3014,41 @@ static int amdgpu_mm_oa_table_show(struct seq_file *m, void *unused)
 	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
 							    AMDGPU_PL_OA);
+#if defined(HAVE_DRM_MM_PRINT)
 	struct drm_printer p = drm_seq_file_printer(m);
-
 	man->func->debug(man, &p);
 	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, AMDGPU_PL_OA);
+#endif
+}
+
+static int amdgpu_mm_dgma_table_show(struct seq_file *m, void *unused)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
+	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
+							    AMDGPU_PL_DGMA);
+#if defined(HAVE_DRM_MM_PRINT)
+	struct drm_printer p = drm_seq_file_printer(m);
+	man->func->debug(man, &p);
+	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, AMDGPU_PL_DGMA);
+#endif
+}
+
+static int amdgpu_mm_dgma_import_table_show(struct seq_file *m, void *unused)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
+	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev,
+							    AMDGPU_PL_DGMA_IMPORT);
+#if defined(HAVE_DRM_MM_PRINT)
+	struct drm_printer p = drm_seq_file_printer(m);
+	man->func->debug(man, &p);
+	return 0;
+#else
+	return kcl_amdgpu_mm_dump_table(m, adev, AMDGPU_PL_DGMA_IMPORT);
+#endif
 }
 
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_vram_table);
@@ -3027,6 +3056,8 @@ DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_tt_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_gds_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_gws_table);
 DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_oa_table);
+DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_table);
+DEFINE_SHOW_ATTRIBUTE(amdgpu_mm_dgma_import_table);
 
 /*
  * amdgpu_ttm_vram_read - Linear read access to VRAM
@@ -3287,5 +3318,11 @@ void amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 		debugfs_create_file("ttm_dma_page_pool", 0444, root, adev,
 				    &amdgpu_ttm_dma_page_debugfs_fops);
 #endif
+	if (amdgpu_direct_gma_size) {
+		debugfs_create_file("amdgpu_dgma_mm", 0444, root, adev,
+			    &amdgpu_mm_dgma_table_fops);
+		debugfs_create_file("amdgpu_dgma_import_mm", 0444, root, adev,
+			    &amdgpu_mm_dgma_import_table_fops);
+	}
 #endif
 }
