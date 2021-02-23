@@ -49,6 +49,9 @@
 /* compat_ptr_ioctl() is available */
 #define HAVE_COMPAT_PTR_IOCTL 1
 
+/* debugfs_create_file_size() is available */
+#define HAVE_DEBUGFS_CREATE_FILE_SIZE 1
+
 /* devcgroup_check_permission() is available */
 #define HAVE_DEVCGROUP_CHECK_PERMISSION 1
 
