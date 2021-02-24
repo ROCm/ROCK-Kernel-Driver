@@ -100,6 +100,9 @@ struct amdgpu_bo {
 	struct amdgpu_bo		*parent;
 	struct amdgpu_bo		*shadow;
 
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	struct amdgpu_mn                *mn;
+#endif
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 #ifdef CONFIG_MMU_NOTIFIER
