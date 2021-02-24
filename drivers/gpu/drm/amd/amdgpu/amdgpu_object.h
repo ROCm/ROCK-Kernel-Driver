@@ -102,6 +102,9 @@ struct amdgpu_bo {
 	struct amdgpu_bo		*shadow;
 
 	struct ttm_bo_kmap_obj		dma_buf_vmap;
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	struct amdgpu_mn                *mn;
+#endif
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 #ifdef CONFIG_MMU_NOTIFIER
