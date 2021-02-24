@@ -245,6 +245,10 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
 	})
 
 /* GPUVM API */
+#define drm_priv_to_vm(drm_priv)					\
+	(&((struct amdgpu_fpriv *)					\
+		((struct drm_file *)(drm_priv))->driver_priv)->vm)
+
 int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
 					struct file *filp, u32 pasid,
 					void **process_info,
