@@ -106,6 +106,10 @@ struct amdgpu_bo {
 	/* Constant after initialization */
 	struct amdgpu_bo		*parent;
 
+#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	struct amdgpu_mn                *mn;
+#endif
+
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 #ifdef CONFIG_MMU_NOTIFIER
 	struct mmu_interval_notifier	notifier;
