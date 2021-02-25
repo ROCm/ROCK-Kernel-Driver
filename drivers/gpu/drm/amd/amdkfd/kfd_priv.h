@@ -989,6 +989,9 @@ struct kfd_process {
 	/* Tracks debug per-vmid request for precise memory */
 	bool precise_mem_ops;
 
+	/* Work area for debugger event writer worker. */
+	struct work_struct debug_event_workarea;
+
 	atomic_t poison;
 
 	/* Queues are in paused stated because we are in the process of doing a CRIU checkpoint */
