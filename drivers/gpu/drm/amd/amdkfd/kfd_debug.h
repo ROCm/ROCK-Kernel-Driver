@@ -38,13 +38,14 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   bool is_vmfault);
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			struct kfd_dev *dev,
-			unsigned int source_id);
+			unsigned int source_id,
+			bool use_worker);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
 int kfd_dbg_trap_disable(struct kfd_process *target,
 			bool unwind,
 			int unwind_count);
-int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t *fd,
+int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
 			uint32_t *ttmp_save);
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
@@ -64,4 +65,10 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable);
 
+static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
+{
+	return dev->device_info->asic_family == CHIP_ALDEBARAN;
+}
+
+void debug_event_write_work_handler(struct work_struct *work);
 #endif

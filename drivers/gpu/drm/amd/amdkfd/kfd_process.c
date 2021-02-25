@@ -1201,8 +1201,9 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	}
 
 	/* New debugger for GFXv9 and later */
-	if (p->debug_trap_enabled)
+	if (p->debug_trap_enabled) {
 		kfd_dbg_trap_disable(p, false, 0);
+	}
 
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
@@ -1468,6 +1469,9 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	 * in case if network driver was loaded later.
 	 */
 	kfd_init_peer_direct();
+
+	INIT_WORK(&process->debug_event_workarea,
+			debug_event_write_work_handler);
 
 	return process;
 

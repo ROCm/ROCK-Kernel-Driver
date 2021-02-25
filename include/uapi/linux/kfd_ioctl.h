@@ -54,10 +54,11 @@
  * 3.1 - Add support for GFX10
  * 3.2 - Add support for GFX10.3
  * 3.3 - Add precise memory operations enable
- * 4.0 - Remove gpu_id from api:wq
+ * 4.0 - Remove gpu_id from api
  * 5.0 - Report exception codes to the debugger
+ * 6.0 - Pass event file descriptor from userspace.
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	5
+#define KFD_IOCTL_DBG_MAJOR_VERSION	6
 #define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
