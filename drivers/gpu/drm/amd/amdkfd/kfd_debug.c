@@ -20,10 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/kfifo.h>
-#include <linux/poll.h>
-#include <linux/wait.h>
-#include <linux/anon_inodes.h>
 #include <uapi/linux/kfd_ioctl.h>
 #include "kfd_debug.h"
 #include "kfd_priv.h"
@@ -44,28 +40,6 @@ enum {
 static uint32_t allocated_debug_watch_points = ~((1 << MAX_WATCH_ADDRESSES) - 1);
 static DEFINE_SPINLOCK(watch_points_lock);
 
-/* poll and read functions */
-static __poll_t kfd_dbg_ev_poll(struct file *, struct poll_table_struct *);
-static ssize_t kfd_dbg_ev_read(struct file *, char __user *, size_t, loff_t *);
-static int kfd_dbg_ev_release(struct inode *, struct file *);
-
-/* fd name */
-static const char kfd_dbg_name[] = "kfd_debug";
-
-/* fops for polling, read and ioctl */
-static const struct file_operations kfd_dbg_ev_fops = {
-	.owner = THIS_MODULE,
-	.poll = kfd_dbg_ev_poll,
-	.read = kfd_dbg_ev_read,
-	.release = kfd_dbg_ev_release
-};
-
-struct kfd_debug_event_priv {
-	struct kfifo fifo;
-	wait_queue_head_t wait_queue;
-	int max_debug_events;
-};
-
 /* Allocate and free watch point IDs for debugger */
 static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 					uint64_t watch_address,
@@ -74,50 +48,6 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 					uint32_t watch_mode);
 static int kfd_release_debug_watch_points(struct kfd_process *p,
 					uint32_t watch_point_bit_mask_to_free);
-
-/* poll on wait queue of file */
-static __poll_t kfd_dbg_ev_poll(struct file *filep,
-				struct poll_table_struct *wait)
-{
-	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
-
-	__poll_t mask = 0;
-
-	/* pending event have been queue'd via interrupt */
-	poll_wait(filep, &dbg_ev_priv->wait_queue, wait);
-	mask |= !kfifo_is_empty(&dbg_ev_priv->fifo) ?
-						POLLIN | POLLRDNORM : mask;
-
-	return mask;
-}
-
-/* read based on wait entries and return types found */
-static ssize_t kfd_dbg_ev_read(struct file *filep, char __user *user,
-			       size_t size, loff_t *offset)
-{
-	int ret, copied;
-	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
-
-	ret = kfifo_to_user(&dbg_ev_priv->fifo, user, size, &copied);
-
-	if (ret || !copied) {
-		pr_debug("KFD DEBUG EVENT: Failed to read poll fd (%i) (%i)\n",
-								ret, copied);
-		return ret ? ret : -EAGAIN;
-	}
-
-	return copied;
-}
-
-static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
-{
-	struct kfd_debug_event_priv *dbg_ev_priv = filep->private_data;
-
-	kfifo_free(&dbg_ev_priv->fifo);
-	kfree(dbg_ev_priv);
-
-	return 0;
-}
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 		      unsigned int *source_id,
@@ -180,87 +110,51 @@ out:
 	return *event_status ? 0 : -EAGAIN;
 }
 
-/* create event queue struct associated with process per device */
-static int kfd_create_event_queue(struct kfd_process *process,
-				struct kfd_debug_event_priv *dbg_ev_priv)
+void debug_event_write_work_handler(struct work_struct *work)
 {
-	struct process_queue_manager *pqm;
-	struct process_queue_node *pqn;
-	int ret, i;
+	struct kfd_process *process;
 
-	if (!process)
-		return -ESRCH;
+	static const char write_data = '.';
+	loff_t pos = 0;
 
-	dbg_ev_priv->max_debug_events = 0;
-	for (i = 0; i < process->n_pdds; i++) {
-		struct kfd_process_device *pdd = process->pdds[i];
-		struct kfd_topology_device *tdev;
+	process = container_of(work,
+			struct kfd_process,
+			debug_event_workarea);
 
-		tdev = kfd_topology_device_by_id(pdd->dev->id);
-
-		dbg_ev_priv->max_debug_events += tdev->node_props.simd_count
-					* tdev->node_props.max_waves_per_simd;
-	}
-
-	ret = kfifo_alloc(&dbg_ev_priv->fifo,
-				dbg_ev_priv->max_debug_events, GFP_KERNEL);
-
-	if (ret)
-		return ret;
-
-	init_waitqueue_head(&dbg_ev_priv->wait_queue);
-
-	pqm = &process->pqm;
-
-	/* to reset queue pending status - TBD need init in queue creation */
-	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		WRITE_ONCE(pqn->q->properties.debug_event_type, 0);
-	}
-
-	return ret;
+	kernel_write(process->dbg_ev_file, &write_data, 1, &pos);
 }
 
-/* update process/device/queue exception status, write to kfifo and wake up
- * wait queue on only if exception_status is enabled.
+/* update process/device/queue exception status, write to descriptor
+ * only if exception_status is enabled.
  */
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			struct kfd_dev *dev,
-			unsigned int source_id)
+			unsigned int source_id,
+			bool use_worker)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct kfd_debug_event_priv *dbg_ev_priv;
-	char fifo_output;
 	uint64_t ec_mask = KFD_EC_MASK(event_type);
 	int i;
+	static const char write_data = '.';
+	loff_t pos = 0;
 
 	if (!(process && process->debug_trap_enabled))
 		return;
 
 	mutex_lock(&process->event_mutex);
-	dbg_ev_priv = process->dbg_ev_file->private_data;
 
-	/* NOTE: The debugger disregards character assignments and
-	 * fifo overrun. Character assignment to events are for KFD
-	 * testing and debugging.
+	/* We only notify the debugger about the following events right now:
+	 * EC_QUEUE_NEW (per queue)
+	 * EC_TRAP_HANDLER (per queue)
+	 * EC_MEMORY_VIOLATION (per device)
+	 * EC_QUEUE_DELETE (per device)
 	 */
-	switch (event_type) {
-	case EC_QUEUE_NEW: /* queue */
-		fifo_output = 'n';
-		break;
-	case EC_TRAP_HANDLER: /* queue */
-		fifo_output = 't';
-		break;
-	case EC_MEMORY_VIOLATION: /* device */
-		fifo_output = 'v';
-		break;
-	case EC_QUEUE_DELETE: /* device */
-		fifo_output = 'd';
-		break;
-	default:
-		mutex_unlock(&process->event_mutex);
-		return;
-	}
+	if (event_type != EC_QUEUE_NEW &&
+			event_type != EC_TRAP_HANDLER &&
+			event_type != EC_MEMORY_VIOLATION &&
+			event_type != EC_QUEUE_DELETE)
+		goto out;
 
 	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
 		for (i = 0; i < process->n_pdds; i++) {
@@ -297,10 +191,15 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 	}
 
 	if (process->exception_enable_mask & ec_mask) {
-		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
-		wake_up_all(&dbg_ev_priv->wait_queue);
+		if (use_worker)
+			schedule_work(&process->debug_event_workarea);
+		else
+			kernel_write(process->dbg_ev_file,
+					&write_data,
+					1,
+					&pos);
 	}
-
+out:
 	mutex_unlock(&process->event_mutex);
 }
 
@@ -318,45 +217,9 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 		return;
 
 	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
-							p, dev, doorbell_id);
-
+							p, dev, doorbell_id,
+							true);
 	kfd_unref_process(p);
-}
-
-/* enable debug and return file pointer struct */
-int kfd_dbg_ev_enable(struct kfd_process *process)
-{
-	struct kfd_debug_event_priv  *dbg_ev_priv;
-	int ret;
-
-	if (!process)
-		return -ESRCH;
-
-	dbg_ev_priv = kzalloc(sizeof(struct kfd_debug_event_priv), GFP_KERNEL);
-
-	if (!dbg_ev_priv)
-		return -ENOMEM;
-
-	mutex_lock(&process->event_mutex);
-
-	ret = kfd_create_event_queue(process, dbg_ev_priv);
-
-	mutex_unlock(&process->event_mutex);
-
-	if (ret)
-		return ret;
-
-	ret = anon_inode_getfd(kfd_dbg_name, &kfd_dbg_ev_fops,
-				(void *)dbg_ev_priv, 0);
-
-	if (ret < 0) {
-		kfree(dbg_ev_priv);
-		return ret;
-	}
-
-	process->dbg_ev_file = fget(ret);
-
-	return ret;
 }
 
 /* kfd_dbg_trap_disable:
@@ -412,6 +275,11 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 		kfd_unref_process(target);
 		fput(target->dbg_ev_file);
 	}
+	/* Cancel any outstanding event worker work */
+	cancel_work_sync(&target->debug_event_workarea);
+
+	/* Drop the reference held by the debug session. */
+	kfd_unref_process(target);
 	target->debug_trap_enabled = false;
 	target->dbg_ev_file = NULL;
 
@@ -419,9 +287,10 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 }
 
 int kfd_dbg_trap_enable(struct kfd_process *target,
-		uint32_t *fd, uint32_t *ttmp_save)
+		uint32_t fd, uint32_t *ttmp_save)
 {
 	int unwind_count = 0, r = 0, i;
+	struct file *f;
 
 	if (target->debug_trap_enabled)
 		return -EINVAL;
@@ -453,16 +322,19 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		unwind_count++;
 	}
 
-	r = kfd_dbg_ev_enable(target);
-
-	if (r < 0)
+	f = fget(fd);
+	if (!f) {
+		pr_err("Failed to get file for (%i)\n", fd);
+		r = -EBADF;
 		goto unwind_err;
+	}
+
+	target->dbg_ev_file = f;
 
 	/* We already hold the process reference but hold another one for the
 	 * debug session.
 	 */
 	kref_get(&target->ref);
-	*fd = r;
 	target->debug_trap_enabled = true;
 	*ttmp_save = 0; /* TBD - set based on runtime enable */
 
