@@ -947,7 +947,7 @@ static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_
 
 }
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static void event_mall_stutter(struct work_struct *work)
 {
 
@@ -1012,7 +1012,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_init(&adev->dm.audio_lock);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	spin_lock_init(&adev->dm.vblank_lock);
 #endif
 
@@ -1131,7 +1131,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	amdgpu_dm_init_color_mod();
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->dm.dc->caps.max_links > 0) {
 		adev->dm.vblank_workqueue = vblank_create_workqueue(adev, adev->dm.dc);
 
@@ -6019,7 +6019,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
 	struct amdgpu_display_manager *dm = &adev->dm;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	unsigned long flags;
 #endif
 	int rc = 0;
