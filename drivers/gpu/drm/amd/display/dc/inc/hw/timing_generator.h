@@ -314,14 +314,12 @@ struct timing_generator_funcs {
 	void (*set_vtotal_change_limit)(struct timing_generator *optc,
 			uint32_t limit);
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*align_vblanks)(struct timing_generator *master_optc,
 			struct timing_generator *slave_optc,
 			uint32_t master_pixel_clock_100Hz,
 			uint32_t slave_pixel_clock_100Hz,
 			uint8_t master_clock_divider,
 			uint8_t slave_clock_divider);
-#endif
 
 };
 

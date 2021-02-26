@@ -315,12 +315,14 @@ struct opp_funcs {
 			int width,
 			int height,
 			int offset);
+#endif
 
 	void (*opp_program_dpg_dimensions)(
 				struct output_pixel_processor *opp,
 				int width,
 				int height);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool (*dpg_is_blanked)(
 			struct output_pixel_processor *opp);
 
