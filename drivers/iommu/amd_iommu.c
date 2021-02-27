@@ -2604,15 +2604,10 @@ static void __unmap_single(struct dma_ops_domain *dma_dom,
 	}
 }
 
-/*
- * The exported map_single function for dma_ops.
- */
-static dma_addr_t map_page(struct device *dev, struct page *page,
-			   unsigned long offset, size_t size,
-			   enum dma_data_direction dir,
-			   unsigned long attrs)
+static dma_addr_t map_helper(struct device *dev, phys_addr_t paddr,
+			       size_t size, enum dma_data_direction dir,
+			       unsigned long attrs)
 {
-	phys_addr_t paddr = page_to_phys(page) + offset;
 	struct protection_domain *domain;
 	struct dma_ops_domain *dma_dom;
 	u64 dma_mask;
@@ -2630,8 +2625,25 @@ static dma_addr_t map_page(struct device *dev, struct page *page,
 }
 
 /*
- * The exported unmap_single function for dma_ops.
+ * The exported map_single function for dma_ops.
  */
+static dma_addr_t map_page(struct device *dev, struct page *page,
+			   unsigned long offset, size_t size,
+			   enum dma_data_direction dir,
+			   unsigned long attrs)
+{
+	phys_addr_t paddr = page_to_phys(page) + offset;
+
+	return map_helper(dev, paddr, size, dir, attrs);
+}
+
+static dma_addr_t map_resource(struct device *dev, phys_addr_t paddr,
+			       size_t size, enum dma_data_direction dir,
+			       unsigned long attrs)
+{
+	return map_helper(dev, paddr, size, dir, attrs);
+}
+
 static void unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
 		       enum dma_data_direction dir, unsigned long attrs)
 {
@@ -2889,6 +2901,8 @@ static const struct dma_map_ops amd_iommu_dma_ops = {
 	.unmap_page	= unmap_page,
 	.map_sg		= map_sg,
 	.unmap_sg	= unmap_sg,
+	.map_resource	= map_resource,
+	.unmap_resource = unmap_page,
 	.dma_supported	= amd_iommu_dma_supported,
 	.mmap		= dma_common_mmap,
 	.get_sgtable	= dma_common_get_sgtable,
