@@ -218,6 +218,13 @@ static int ttm_resource_ioremap(struct ttm_bo_device *bdev,
 		if (mem->placement & TTM_PL_FLAG_WC)
 			addr = ioremap_wc(mem->bus.base + mem->bus.offset,
 					  bus_size);
+
+		if (mem->bus.caching == ttm_write_combined)
+			addr = ioremap_wc(mem->bus.offset, bus_size);
+#ifdef CONFIG_X86
+		else if (mem->bus.caching == ttm_cached)
+			addr = ioremap_cache(mem->bus.offset, bus_size);
+#endif
 		else
 			addr = ioremap(mem->bus.base + mem->bus.offset,
 				       bus_size);
@@ -519,6 +526,11 @@ static int ttm_bo_ioremap(struct ttm_buffer_object *bo,
 			map->virtual = ioremap_wc(bo->mem.bus.base +
 						  bo->mem.bus.offset + offset,
 						  size);
+#ifdef CONFIG_X86
+		else if (mem->bus.caching == ttm_cached)
+			map->virtual = ioremap_cache(bo->mem.bus.offset + offset,
+						  size);
+#endif
 		else
 			map->virtual = ioremap(bo->mem.bus.base +
 					       bo->mem.bus.offset + offset,
@@ -647,7 +659,6 @@ int ttm_bo_move_accel_cleanup(struct ttm_buffer_object *bo,
 		ret = ttm_bo_wait(bo, false, false);
 		if (ret)
 			return ret;
-
 		if (!man->use_tt) {
 			ttm_tt_destroy(bo->ttm);
 			bo->ttm = NULL;
