@@ -472,6 +472,9 @@
 /* whether drm_mm_insert_mode is available */
 #define HAVE_DRM_MM_INSERT_MODE 1
 
+/* drm_mm_insert_node has three parameters */
+#define HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS 1
+
 /* drm_mm_print() is available */
 #define HAVE_DRM_MM_PRINT 1
 
