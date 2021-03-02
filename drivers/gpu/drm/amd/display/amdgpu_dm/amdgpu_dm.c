@@ -5242,6 +5242,7 @@ static int fill_dc_plane_attributes(struct amdgpu_device *adev,
 
 	return 0;
 }
+
 /**
  * fill_dc_dirty_rects() - Fill DC dirty regions for PSR selective updates
  *
