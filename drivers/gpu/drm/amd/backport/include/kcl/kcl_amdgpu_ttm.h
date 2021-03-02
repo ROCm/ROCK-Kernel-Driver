@@ -21,6 +21,18 @@ static inline struct drm_mm *kcl_ttm_get_drm_mm_by_mem_type(struct amdgpu_device
 		return kcl_ttm_range_res_manager_to_drm_mm(man);
 	}
 }
+
+static inline int kcl_amdgpu_mm_dump_table(struct seq_file *m, struct amdgpu_device *adev, unsigned char ttm_pl)
+{
+	struct drm_mm *mm = kcl_ttm_get_drm_mm_by_mem_type(adev, ttm_pl);
+	struct ttm_bo_global *glob = &ttm_bo_glob;
+	int ret;
+
+	spin_lock(&glob->lru_lock);
+	ret = drm_mm_dump_table(m, mm);
+	spin_unlock(&glob->lru_lock);
+	return ret;
+}
 #endif
 
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_TTM_H */

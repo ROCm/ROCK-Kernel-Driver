@@ -42,7 +42,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.122"
+#define DC_VER "3.2.123"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -642,7 +642,6 @@ struct dc {
 #endif
 
 	/* Require to maintain clocks and bandwidth for UEFI enabled HW */
-	int optimize_seamless_boot_streams;
 
 	/* FBC compressor */
 	struct compressor *fbc_compressor;
