@@ -281,6 +281,53 @@ void amdgpu_job_stop_all_jobs_on_sched(struct drm_gpu_scheduler *sched)
 	}
 }
 
+int amdgpu_wait_resubmitted_jobs_completion(struct drm_gpu_scheduler *sched, long timeout, struct drm_sched_job **s_bad_job)
+{
+	struct drm_sched_job *s_job, *tmp;
+	int ret = 0;
+
+	list_for_each_entry_safe(s_job, tmp, &sched->ring_mirror_list, node) {
+		struct drm_sched_fence *s_fence = s_job->s_fence;
+
+			if (s_fence->parent == NULL) { /* fail to get a hw fence */
+				/* process a job */
+				atomic_dec(&sched->num_jobs);
+				dma_fence_get(&s_fence->finished);
+				dma_fence_signal(&s_fence->finished);
+				dma_fence_put(&s_fence->finished);
+
+				/* remove node from mirror_list and free the job */
+				spin_lock(&sched->job_list_lock);
+				list_del_init(&s_job->node);
+				spin_unlock(&sched->job_list_lock);
+				sched->ops->free_job(s_job);
+				continue;
+			}
+
+			ret = dma_fence_wait_timeout(s_fence->parent, false, timeout);
+
+			if (ret > 0) { /* succeed */
+				/* process a job */
+				atomic_dec(&sched->num_jobs);
+				dma_fence_get(&s_fence->finished);
+				dma_fence_signal(&s_fence->finished);
+				dma_fence_put(&s_fence->finished);
+
+				/* remove node from mirror_list and free the job */
+				spin_lock(&sched->job_list_lock);
+				list_del_init(&s_job->node);
+				spin_unlock(&sched->job_list_lock);
+				sched->ops->free_job(s_job);
+				continue;
+			} else if (ret == 0) {
+				*s_bad_job = s_job;
+				return -1; /* timeout */
+			}
+	}
+
+	return 0;
+}
+
 const struct drm_sched_backend_ops amdgpu_sched_ops = {
 	.dependency = amdgpu_job_dependency,
 	.run_job = amdgpu_job_run,
