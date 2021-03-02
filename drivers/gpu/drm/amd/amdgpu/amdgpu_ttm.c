@@ -586,6 +586,10 @@ static int amdgpu_move_vram_ram(struct ttm_buffer_object *bo, bool evict,
 
 	/* move BO (in tmp_mem) to new_mem */
 	r = ttm_bo_move_ttm(bo, ctx, new_mem);
+	/* amdgpu_move_blit has succeeded. In this case, BO holds tmp_mem.
+	 * Should NOT free tmp_mem.
+	 */
+	return r;
 out_cleanup:
 	ttm_resource_free(bo, &tmp_mem);
 	return r;
@@ -630,9 +634,10 @@ static int amdgpu_move_ram_vram(struct ttm_buffer_object *bo, bool evict,
 
 	/* copy to VRAM */
 	r = amdgpu_move_blit(bo, evict, ctx->no_wait_gpu, new_mem, old_mem);
-	if (unlikely(r)) {
-		goto out_cleanup;
-	}
+	/* ttm_bo_move_ttm has succeeded. In this case, BO holds tmp_mem.
+	 * Should NOT free tmp_mem.
+	 */
+	return r;
 out_cleanup:
 	ttm_resource_free(bo, &tmp_mem);
 	return r;
