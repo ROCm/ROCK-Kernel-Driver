@@ -206,9 +206,6 @@
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
 
-/* drm_debug_printer() function is available */
-#define HAVE_DRM_DEBUG_PRINTER 1
-
 /* dev_device->driver_features is available */
 #define HAVE_DRM_DEVICE_DRIVER_FEATURES 1
 
@@ -475,9 +472,6 @@
 /* drm_mm_insert_node has three parameters */
 #define HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS 1
 
-/* drm_mm_print() is available */
-#define HAVE_DRM_MM_PRINT 1
-
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 
@@ -511,6 +505,9 @@
 
 /* drm_plane_create_rotation_property is available */
 #define HAVE_DRM_PLANE_PROPERTY_ROTATION 1
+
+/* drm_printer->prefix is available */
+#define HAVE_DRM_PRINTER_PREFIX 1
 
 /* drm_syncobj_fence_get() is available */
 /* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */
