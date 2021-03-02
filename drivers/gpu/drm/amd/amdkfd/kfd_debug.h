@@ -64,4 +64,9 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable);
 
+static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
+{
+	return dev->device_info->asic_family == CHIP_ALDEBARAN;
+}
+
 #endif
