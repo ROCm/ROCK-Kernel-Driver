@@ -2358,9 +2358,20 @@ static void amdgpu_dgma_import_mgr_del(struct ttm_resource_manager *man,
 	atomic64_add(mem->num_pages, &mgr->available);
 }
 
+static void amdgpu_dgma_import_mgr_debug(struct ttm_resource_manager *man,
+			     struct drm_printer *printer)
+{
+	struct amdgpu_dgma_import_mgr *rman = to_dgma_import_mgr(man);
+
+	spin_lock(&rman->lock);
+	drm_mm_print(&rman->mm, printer);
+	spin_unlock(&rman->lock);
+}
+
 static const struct ttm_resource_manager_func amdgpu_dgma_import_mgr_func = {
 	.alloc = amdgpu_dgma_import_mgr_new,
 	.free = amdgpu_dgma_import_mgr_del,
+	.debug = amdgpu_dgma_import_mgr_debug
 };
 
 static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
