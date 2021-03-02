@@ -49,7 +49,11 @@ EXPORT_SYMBOL(__drm_printfn_seq_file);
 #if !defined(HAVE_DRM_PRINTER_PREFIX)
 void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
 {
-	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", ((struct kcl_drm_printer *)p)->prefix, vaf);
+#ifndef HAVE_DRM_DRM_PRINT_H
+	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", p->prefix, vaf);
+#else
+	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", "no prefix", vaf);
+#endif
 }
 EXPORT_SYMBOL(__drm_printfn_debug);
 #endif
