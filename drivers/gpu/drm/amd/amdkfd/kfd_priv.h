@@ -1092,6 +1092,8 @@ int kfd_process_init_cwsr_apu(struct kfd_process *process, struct file *filep);
 void kfd_process_set_trap_handler(struct qcm_process_device *qpd,
 				  uint64_t tba_addr,
 				  uint64_t tma_addr);
+void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
+				     bool enabled);
 
 /* Queue Context Management */
 int init_queue(struct queue **q, const struct queue_properties *properties);
