@@ -393,6 +393,8 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 		if (unwind && count == unwind_count)
 			break;
 
+		kfd_process_set_trap_debug_flag(&pdd->qpd, false);
+
 		pdd->dev->kfd2kgd->disable_debug_trap(
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
@@ -435,6 +437,8 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 
 		pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
+
+		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
 		/* Increment unwind_count as the last step */
 		unwind_count++;
