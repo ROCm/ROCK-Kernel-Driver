@@ -2454,6 +2454,7 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 }
 
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 /*
  * function description: Read max_requested_bpc property from the connector
  *
@@ -2595,6 +2596,7 @@ unlock:
 	kfree(wr_buf);
 	return size;
 }
+#endif /* HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC */
 
 /*
  * Backlight at this moment.  Read only.
@@ -2837,12 +2839,14 @@ static const struct file_operations sdp_message_fops = {
 	.llseek = default_llseek
 };
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 static const struct file_operations dp_max_bpc_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.read = dp_max_bpc_read,
 	.write = dp_max_bpc_write,
 	.llseek = default_llseek
 };
+#endif
 
 static const struct file_operations dp_dsc_disable_passthrough_debugfs_fops = {
 	.owner = THIS_MODULE,
@@ -2877,7 +2881,10 @@ static const struct {
 		{"dsc_chunk_size", &dp_dsc_chunk_size_debugfs_fops},
 		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops},
 		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
+
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		{"max_bpc", &dp_max_bpc_debugfs_fops},
+#endif
 		{"dsc_disable_passthrough", &dp_dsc_disable_passthrough_debugfs_fops},
 		{"is_mst_connector", &dp_is_mst_connector_fops},
 		{"mst_progress_status", &dp_mst_progress_status_fops},
