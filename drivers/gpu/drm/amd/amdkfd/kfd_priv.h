@@ -949,6 +949,12 @@ struct kfd_process {
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
+
+	/* The debugger will suspend/resume KFD on per-device attach/detach
+	 * call if the GPU requires a barrier behavior change so silence dmesg
+	 * process restore messages in this case.
+	 */
+	bool restore_silent;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
