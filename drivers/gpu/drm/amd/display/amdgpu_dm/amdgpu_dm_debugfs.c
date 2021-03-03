@@ -2157,6 +2157,7 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 }
 #endif
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 /*
  * function description: Read max_requested_bpc property from the connector
  *
@@ -2298,6 +2299,7 @@ unlock:
 	kfree(wr_buf);
 	return size;
 }
+#endif /* HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC */
 
 #ifdef DEFINE_SHOW_ATTRIBUTE
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
@@ -2416,12 +2418,14 @@ static const struct file_operations dp_dpcd_data_debugfs_fops = {
 	.llseek = default_llseek
 };
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 static const struct file_operations dp_max_bpc_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.read = dp_max_bpc_read,
 	.write = dp_max_bpc_write,
 	.llseek = default_llseek
 };
+#endif
 
 static const struct {
 	char *name;
@@ -2450,7 +2454,11 @@ static const struct {
 		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops},
 		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
 #endif
+
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
 		{"max_bpc", &dp_max_bpc_debugfs_fops}
+#endif
+
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
