@@ -74,6 +74,8 @@ var TTMP11_SAVE_REPLAY_W64H_SHIFT		= 31
 var TTMP11_SAVE_REPLAY_W64H_MASK		= 0x80000000
 var TTMP11_SAVE_RCNT_FIRST_REPLAY_SHIFT		= 24
 var TTMP11_SAVE_RCNT_FIRST_REPLAY_MASK		= 0x7F000000
+var TTMP11_DEBUG_TRAP_ENABLED_SHIFT		= 23
+var TTMP11_DEBUG_TRAP_ENABLED_MASK		= 0x800000
 
 // SQ_SEL_X/Y/Z/W, BUF_NUM_FORMAT_FLOAT, (0 for MUBUF stride[17:14]
 // when ADD_TID_ENABLE and BUF_DATA_FORMAT_32 for MTBUF), ADD_TID_ENABLE
@@ -193,10 +195,18 @@ L_FETCH_2ND_TRAP:
 	s_getreg_b32	ttmp14, hwreg(HW_REG_SHADER_TMA_LO)
 	s_getreg_b32	ttmp15, hwreg(HW_REG_SHADER_TMA_HI)
 	s_lshl_b64	[ttmp14, ttmp15], [ttmp14, ttmp15], 0x8
+
+	s_load_dword    ttmp2, [ttmp14, ttmp15], 0x10 glc:1			// debug trap enabled flag
+	s_waitcnt       lgkmcnt(0)
+	s_lshl_b32      ttmp2, ttmp2, TTMP11_DEBUG_TRAP_ENABLED_SHIFT
+	s_andn2_b32     ttmp11, ttmp11, TTMP11_DEBUG_TRAP_ENABLED_MASK
+	s_or_b32        ttmp11, ttmp11, ttmp2
+
 	s_load_dwordx2	[ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 glc:1		// second-level TBA
 	s_waitcnt	lgkmcnt(0)
 	s_load_dwordx2	[ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1		// second-level TMA
 	s_waitcnt	lgkmcnt(0)
+
 	s_and_b64	[ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
 	s_cbranch_scc0	L_NO_NEXT_TRAP						// second-level trap handler not been set
 	s_setpc_b64	[ttmp2, ttmp3]						// jump to second-level trap handler
