@@ -2149,7 +2149,7 @@ static void evict_process_worker(struct work_struct *work)
 				     msecs_to_jiffies(PROCESS_RESTORE_TIME_MS)))
 			kfd_process_restore_queues(p);
 
-		pr_info("Finished evicting pasid 0x%x\n", p->pasid);
+		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
 	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
@@ -2189,7 +2189,7 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	pr_info("Started restoring pasid 0x%x\n", p->pasid);
+	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
 	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
@@ -2206,7 +2206,7 @@ static void restore_process_worker(struct work_struct *work)
 
 	ret = restore_process_helper(p);
 	if (ret) {
-		pr_info("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
+		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 		if (mod_delayed_work(kfd_restore_wq, &p->restore_work,
 				     msecs_to_jiffies(PROCESS_RESTORE_TIME_MS)))
