@@ -997,6 +997,55 @@ out_unlock:
 	return 0;
 }
 
+static int kmap_event_page(struct kfd_process *p, uint64_t event_page_offset)
+{
+	struct kfd_dev *kfd;
+	struct kfd_process_device *pdd;
+	void *mem, *kern_addr;
+	uint64_t size;
+	int err = 0;
+
+	if (p->signal_page) {
+		pr_err("Event page is already set\n");
+		return -EINVAL;
+	}
+
+	kfd = kfd_device_by_id(GET_GPU_ID(event_page_offset));
+	if (!kfd) {
+		pr_err("Getting device by id failed in %s\n", __func__);
+		return -EINVAL;
+	}
+
+	pdd = kfd_bind_process_to_device(kfd, p);
+	if (IS_ERR(pdd)) {
+		mutex_unlock(&p->mutex);
+		return PTR_ERR(pdd);
+	}
+
+	mem = kfd_process_device_translate_handle(pdd,
+			GET_IDR_HANDLE(event_page_offset));
+	if (!mem) {
+		pr_err("Can't find BO, offset is 0x%llx\n", event_page_offset);
+
+		mutex_unlock(&p->mutex);
+		return -EINVAL;
+	}
+
+	err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kfd->kgd,
+					mem, &kern_addr, &size);
+	if (err) {
+		pr_err("Failed to map event page to kernel\n");
+		return err;
+	}
+
+	err = kfd_event_page_set(p, kern_addr, size, event_page_offset);
+	if (err) {
+		pr_err("Failed to set event page\n");
+		return err;
+	}
+	return err;
+}
+
 static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 					void *data)
 {
@@ -1008,51 +1057,11 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 	 * through the event_page_offset field.
 	 */
 	if (args->event_page_offset) {
-		struct kfd_dev *kfd;
-		struct kfd_process_device *pdd;
-		void *mem, *kern_addr;
-		uint64_t size;
-
-		if (p->signal_page) {
-			pr_err("Event page is already set\n");
-			return -EINVAL;
-		}
-
-		kfd = kfd_device_by_id(GET_GPU_ID(args->event_page_offset));
-		if (!kfd) {
-			pr_err("Getting device by id failed in %s\n", __func__);
-			return -EINVAL;
-		}
-
 		mutex_lock(&p->mutex);
-		pdd = kfd_bind_process_to_device(kfd, p);
-		if (IS_ERR(pdd)) {
-			err = PTR_ERR(pdd);
-			goto out_unlock;
-		}
-
-		mem = kfd_process_device_translate_handle(pdd,
-				GET_IDR_HANDLE(args->event_page_offset));
-		if (!mem) {
-			pr_err("Can't find BO, offset is 0x%llx\n",
-			       args->event_page_offset);
-			err = -EINVAL;
-			goto out_unlock;
-		}
+		err = kmap_event_page(p, args->event_page_offset);
 		mutex_unlock(&p->mutex);
-
-		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kfd->kgd,
-						mem, &kern_addr, &size);
-		if (err) {
-			pr_err("Failed to map event page to kernel\n");
+		if (err)
 			return err;
-		}
-
-		err = kfd_event_page_set(p, kern_addr, size);
-		if (err) {
-			pr_err("Failed to set event page\n");
-			return err;
-		}
 	}
 
 	err = kfd_event_create(filp, p, args->event_type,
@@ -1061,10 +1070,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 				&args->event_page_offset,
 				&args->event_slot_index);
 
-	return err;
-
-out_unlock:
-	mutex_unlock(&p->mutex);
+	pr_debug("Created event (id:0x%08x) (%s)\n", args->event_id, __func__);
 	return err;
 }
 
@@ -2062,6 +2068,7 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_criu_dumper_args *args = data;
+	struct kfd_criu_ev_bucket *ev_buckets = NULL;
 	struct kfd_criu_bo_buckets *bo_bucket;
 	struct amdgpu_bo *dumper_bo;
 	int ret, id, index, i = 0;
@@ -2088,14 +2095,22 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 		return -EINVAL;
 	}
 
-	pr_debug("num of bos = %llu\n", args->num_of_bos);
+	pr_debug("num of bos = %llu queues = %u events = %u\n", args->num_of_bos, args->num_of_queues, args->num_of_events);
 
 	bo_bucket = kvzalloc((sizeof(struct kfd_criu_bo_buckets) *
 			     args->num_of_bos), GFP_KERNEL);
 	if (!bo_bucket)
 		return -ENOMEM;
 
-	pr_debug("num of queues = %u\n", args->num_of_queues);
+	if (args->num_of_events) {
+		ev_buckets = kvzalloc((sizeof(struct kfd_criu_ev_bucket) *
+				args->num_of_events), GFP_KERNEL);
+
+		if (!ev_buckets) {
+			ret = -ENOMEM;
+			goto clean;
+		}
+	}
 
 	mutex_lock(&p->mutex);
 
@@ -2182,6 +2197,23 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 			goto err_unlock;
 	}
 
+	/* Dump events */
+	ret = kfd_event_dump(p, &args->event_page_offset, ev_buckets,
+				args->num_of_events);
+	if (ret) {
+		pr_err("failed to dump events, ret=%d\n", ret);
+		goto err_unlock;
+	}
+	ret = copy_to_user((void __user *)args->kfd_criu_ev_buckets_ptr,
+			ev_buckets,
+			(args->num_of_events *
+			sizeof(struct kfd_criu_ev_bucket)));
+	kvfree(ev_buckets);
+	if (ret) {
+		ret = -EFAULT;
+		goto err_unlock;
+	}
+
 	ret = copy_to_user((void __user *)args->kfd_criu_bo_buckets_ptr,
 			bo_bucket,
 			(args->num_of_bos *
@@ -2195,6 +2227,8 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 err_unlock:
 	kfd_process_restore_queues(p);
 	mutex_unlock(&p->mutex);
+clean:
+	kvfree(ev_buckets);
 	pr_err("Dumper ioctl failed err:%d\n", ret);
 	return ret;
 }
@@ -2385,6 +2419,47 @@ static int criu_restore_queues(struct kfd_process *p,
 
 	if (data_ptr)
 		kfree(data_ptr);
+	return ret;
+}
+
+/* criu_restore_queues_events runs with the process mutex locked */
+static int criu_restore_events(struct file *filp, struct kfd_process *p,
+			struct kfd_ioctl_criu_restorer_args *args)
+{
+	int i;
+	struct kfd_criu_ev_bucket *events;
+	int ret = 0;
+
+	if (args->event_page_offset) {
+		ret = kmap_event_page(p, args->event_page_offset);
+		if (ret)
+			return ret;
+	}
+
+	if (!args->num_of_events)
+		return 0;
+
+	events = kvmalloc_array(args->num_of_events,
+				sizeof(struct kfd_criu_ev_bucket),
+				GFP_KERNEL);
+	if (!events)
+		return -ENOMEM;
+
+	ret = copy_from_user(events, (void __user *) args->kfd_criu_ev_buckets_ptr,
+			args->num_of_events * sizeof(struct kfd_criu_ev_bucket));
+
+	if (ret) {
+		ret = -EFAULT;
+		goto exit;
+	}
+
+	for (i = 0; i < args->num_of_events; i++) {
+		ret = kfd_event_restore(filp, p, &events[i]);
+		if (ret)
+			pr_err("Failed to restore event with id (%d)\n", ret);
+	}
+exit:
+	kvfree(events);
 	return ret;
 }
 
@@ -2618,13 +2693,18 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 		goto err_unlock;
 	}
 
+	ret = criu_restore_events(filep, p, args);
+	if (ret) {
+		pr_err("Failed to restore events (%d)", ret);
+		err = ret;
+		goto err_unlock;
+	}
+
 	ret = copy_to_user((void __user *)args->restored_bo_array_ptr,
 			   restored_bo_offsets_arr,
 			   (args->num_of_bos * sizeof(*restored_bo_offsets_arr)));
-	if (ret) {
+	if (ret)
 		err = -EFAULT;
-		goto err_unlock;
-	}
 
 err_unlock:
 	mutex_unlock(&p->mutex);
@@ -2739,8 +2819,9 @@ static int kfd_ioctl_criu_helper(struct file *filep,
 	args->num_of_bos = num_of_bos;
 	args->num_of_queues = q_index;
 	args->queues_data_size = queues_data_size;
-	dev_dbg(kfd_device, "Num of bos = %llu\n", num_of_bos);
+	args->num_of_events = kfd_get_num_events(p);
 
+	dev_dbg(kfd_device, "Num of bos = %llu queues:%u events:%u\n", args->num_of_bos, args->num_of_queues, args->num_of_events);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return ret;

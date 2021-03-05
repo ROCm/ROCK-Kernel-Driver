@@ -1190,11 +1190,20 @@ void kfd_signal_hw_exception_event(u32 pasid);
 int kfd_set_event(struct kfd_process *p, uint32_t event_id);
 int kfd_reset_event(struct kfd_process *p, uint32_t event_id);
 int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
-		       uint64_t size);
+		       uint64_t size, uint64_t user_handle);
+
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, uint32_t *event_trigger_data,
 		     uint64_t *event_page_offset, uint32_t *event_slot_index);
+
+int kfd_event_restore(struct file *devkfd, struct kfd_process *p,
+		     struct kfd_criu_ev_bucket *restore_ev);
+
+int kfd_event_dump(struct kfd_process *p, uint64_t *user_handle,
+		    struct kfd_criu_ev_bucket *ev_buckets, uint32_t num_events);
+
+int kfd_get_num_events(struct kfd_process *p);
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
 
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, u32 pasid,

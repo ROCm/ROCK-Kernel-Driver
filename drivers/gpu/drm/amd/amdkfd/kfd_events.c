@@ -53,8 +53,8 @@ struct kfd_signal_page {
 	uint64_t *kernel_address;
 	uint64_t __user *user_address;
 	bool need_to_free_pages;
+	uint64_t user_handle; /* Needed for CRIU dumped and restore */
 };
-
 
 static uint64_t *page_slots(struct kfd_signal_page *page)
 {
@@ -92,7 +92,8 @@ fail_alloc_signal_store:
 }
 
 static int allocate_event_notification_slot(struct kfd_process *p,
-					    struct kfd_event *ev)
+					    struct kfd_event *ev,
+					    const int *restore_id)
 {
 	int id;
 
@@ -104,14 +105,19 @@ static int allocate_event_notification_slot(struct kfd_process *p,
 		p->signal_mapped_size = 256*8;
 	}
 
-	/*
-	 * Compatibility with old user mode: Only use signal slots
-	 * user mode has mapped, may be less than
-	 * KFD_SIGNAL_EVENT_LIMIT. This also allows future increase
-	 * of the event limit without breaking user mode.
-	 */
-	id = idr_alloc(&p->event_idr, ev, 0, p->signal_mapped_size / 8,
-		       GFP_KERNEL);
+	if (restore_id) {
+		id = idr_alloc(&p->event_idr, ev, *restore_id, *restore_id + 1,
+				GFP_KERNEL);
+	} else {
+		/*
+		 * Compatibility with old user mode: Only use signal slots
+		 * user mode has mapped, may be less than
+		 * KFD_SIGNAL_EVENT_LIMIT. This also allows future increase
+		 * of the event limit without breaking user mode.
+		 */
+		id = idr_alloc(&p->event_idr, ev, 0, p->signal_mapped_size / 8,
+				GFP_KERNEL);
+	}
 	if (id < 0)
 		return id;
 
@@ -178,9 +184,8 @@ static struct kfd_event *lookup_signaled_event_by_partial_id(
 	return ev;
 }
 
-static int create_signal_event(struct file *devkfd,
-				struct kfd_process *p,
-				struct kfd_event *ev)
+static int create_signal_event(struct file *devkfd, struct kfd_process *p,
+				struct kfd_event *ev, const int *restore_id)
 {
 	int ret;
 
@@ -193,7 +198,7 @@ static int create_signal_event(struct file *devkfd,
 		return -ENOSPC;
 	}
 
-	ret = allocate_event_notification_slot(p, ev);
+	ret = allocate_event_notification_slot(p, ev, restore_id);
 	if (ret) {
 		pr_warn("Signal event wasn't created because out of kernel memory\n");
 		return ret;
@@ -209,16 +214,21 @@ static int create_signal_event(struct file *devkfd,
 	return 0;
 }
 
-static int create_other_event(struct kfd_process *p, struct kfd_event *ev)
+static int create_other_event(struct kfd_process *p, struct kfd_event *ev, const int *restore_id)
 {
-	/* Cast KFD_LAST_NONSIGNAL_EVENT to uint32_t. This allows an
-	 * intentional integer overflow to -1 without a compiler
-	 * warning. idr_alloc treats a negative value as "maximum
-	 * signed integer".
-	 */
-	int id = idr_alloc(&p->event_idr, ev, KFD_FIRST_NONSIGNAL_EVENT_ID,
-			   (uint32_t)KFD_LAST_NONSIGNAL_EVENT_ID + 1,
-			   GFP_KERNEL);
+	int id;
+	if (restore_id)
+		id = idr_alloc(&p->event_idr, ev, *restore_id, *restore_id + 1,
+			GFP_KERNEL);
+	else
+		/* Cast KFD_LAST_NONSIGNAL_EVENT to uint32_t. This allows an
+		 * intentional integer overflow to -1 without a compiler
+		 * warning. idr_alloc treats a negative value as "maximum
+		 * signed integer".
+		 */
+		id = idr_alloc(&p->event_idr, ev, KFD_FIRST_NONSIGNAL_EVENT_ID,
+				(uint32_t)KFD_LAST_NONSIGNAL_EVENT_ID + 1,
+				GFP_KERNEL);
 
 	if (id < 0)
 		return id;
@@ -296,7 +306,7 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 }
 
 int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
-		       uint64_t size)
+		       uint64_t size, uint64_t user_handle)
 {
 	struct kfd_signal_page *page;
 
@@ -315,7 +325,7 @@ int kfd_event_page_set(struct kfd_process *p, void *kernel_address,
 
 	p->signal_page = page;
 	p->signal_mapped_size = size;
-
+	p->signal_page->user_handle = user_handle;
 	return 0;
 }
 
@@ -343,14 +353,14 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
 	case KFD_EVENT_TYPE_DEBUG:
-		ret = create_signal_event(devkfd, p, ev);
+		ret = create_signal_event(devkfd, p, ev, NULL);
 		if (!ret) {
 			*event_page_offset = KFD_MMAP_TYPE_EVENTS;
 			*event_slot_index = ev->event_id;
 		}
 		break;
 	default:
-		ret = create_other_event(p, ev);
+		ret = create_other_event(p, ev, NULL);
 		break;
 	}
 
@@ -364,6 +374,105 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	mutex_unlock(&p->event_mutex);
 
 	return ret;
+}
+
+int kfd_event_restore(struct file *devkfd, struct kfd_process *p,
+		     struct kfd_criu_ev_bucket *restore_ev)
+{
+	int ret = 0;
+	struct kfd_event *ev = kzalloc(sizeof(*ev), GFP_KERNEL);
+
+	if (!ev)
+		return -ENOMEM;
+
+	ev->type = restore_ev->type;
+	ev->auto_reset = restore_ev->auto_reset;
+	ev->signaled = restore_ev->signaled;
+
+	init_waitqueue_head(&ev->wq);
+
+	mutex_lock(&p->event_mutex);
+	switch (ev->type) {
+	case KFD_EVENT_TYPE_SIGNAL:
+	case KFD_EVENT_TYPE_DEBUG:
+		ret = create_signal_event(devkfd, p, ev, &restore_ev->event_id);
+		break;
+	case KFD_EVENT_TYPE_MEMORY:
+		memcpy(&ev->memory_exception_data,
+			&restore_ev->memory_exception_data,
+			sizeof(struct kfd_hsa_memory_exception_data));
+
+		ret = create_other_event(p, ev, &restore_ev->event_id);
+		break;
+	case KFD_EVENT_TYPE_HW_EXCEPTION:
+		memcpy(&ev->hw_exception_data,
+			&restore_ev->hw_exception_data,
+			sizeof(struct kfd_hsa_hw_exception_data));
+
+		ret = create_other_event(p, ev, &restore_ev->event_id);
+		break;
+	}
+
+	if (ret)
+		kfree(ev);
+
+	mutex_unlock(&p->event_mutex);
+
+	return ret;
+}
+
+int kfd_event_dump(struct kfd_process *p, uint64_t *user_handle,
+			struct kfd_criu_ev_bucket *ev_buckets,
+			uint32_t num_events)
+{
+	struct kfd_event *ev;
+	uint32_t ev_id;
+	int i = 0;
+
+	*user_handle = 0;
+
+	if (p->signal_page)
+		*user_handle = p->signal_page->user_handle;
+
+	idr_for_each_entry(&p->event_idr, ev, ev_id) {
+		if (i >= num_events) {
+			pr_err("Number of events exceeds number allocated\n");
+			return -ENOMEM;
+		}
+
+		ev_buckets[i].event_id = ev->event_id;
+		ev_buckets[i].auto_reset = ev->auto_reset;
+		ev_buckets[i].type = ev->type;
+		ev_buckets[i].signaled = ev->signaled;
+
+		if (ev_buckets[i].type == KFD_EVENT_TYPE_MEMORY) {
+			memcpy(&ev_buckets[i].memory_exception_data,
+				&ev->memory_exception_data,
+				sizeof(struct kfd_hsa_memory_exception_data));
+
+		} else if (ev_buckets[i].type == KFD_EVENT_TYPE_HW_EXCEPTION) {
+			memcpy(&ev_buckets[i].hw_exception_data,
+				&ev->hw_exception_data,
+				sizeof(struct kfd_hsa_hw_exception_data));
+		}
+		pr_debug("Dumped event[%d] id = 0x%08x auto_reset = %x type = %x signaled = %x\n",
+			i, ev_buckets[i].event_id, ev_buckets[i].auto_reset,
+			ev_buckets[i].type, ev_buckets[i].signaled);
+		i++;
+	}
+	return 0;
+}
+
+int kfd_get_num_events(struct kfd_process *p)
+{
+	struct kfd_event *ev;
+	uint32_t id;
+	u32 num_events = 0;
+
+	idr_for_each_entry(&p->event_idr, ev, id)
+		num_events++;
+
+	return num_events++;
 }
 
 /* Assumes that p is current. */
