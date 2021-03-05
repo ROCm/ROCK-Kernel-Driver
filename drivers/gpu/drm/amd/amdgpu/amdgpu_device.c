@@ -219,6 +219,60 @@ static ssize_t amdgpu_device_get_serial_number(struct device *dev,
 static DEVICE_ATTR(serial_number, S_IRUGO,
 		amdgpu_device_get_serial_number, NULL);
 
+int amdgpu_read_lock(struct drm_device *dev, bool interruptible)
+{
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	int ret = 0;
+
+	/**
+	 * if a thread hold the read lock, but recovery thread has started,
+	 * it should release the read lock and wait for recovery thread finished
+	 * Because pre-reset functions have begun, which stops old threads but no
+	 * include the current thread.
+	*/
+	if (interruptible) {
+		while (!(ret = down_read_killable(&adev->reset_sem)) &&
+			amdgpu_in_reset(adev)) {
+			up_read(&adev->reset_sem);
+			ret = wait_event_interruptible(adev->recovery_fini_event,
+							!amdgpu_in_reset(adev));
+			if (ret)
+				break;
+		}
+	} else {
+		down_read(&adev->reset_sem);
+		while (amdgpu_in_reset(adev)) {
+			up_read(&adev->reset_sem);
+			wait_event(adev->recovery_fini_event,
+				   !amdgpu_in_reset(adev));
+			down_read(&adev->reset_sem);
+		}
+	}
+
+	return ret;
+}
+
+void amdgpu_read_unlock(struct drm_device *dev)
+{
+	struct amdgpu_device *adev = drm_to_adev(dev);
+
+	up_read(&adev->reset_sem);
+}
+
+static void amdgpu_write_lock(struct amdgpu_device *adev, struct amdgpu_hive_info *hive)
+{
+	if (hive) {
+		down_write_nest_lock(&adev->reset_sem, &hive->hive_lock);
+	} else {
+		down_write(&adev->reset_sem);
+	}
+}
+
+static void amdgpu_write_unlock(struct amdgpu_device *adev)
+{
+	up_write(&adev->reset_sem);
+}
+
 /**
  * amdgpu_device_supports_px - Is the device a dGPU with ATPX power control
  *
@@ -3468,6 +3522,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	hash_init(adev->mn_hash);
 	atomic_set(&adev->in_gpu_reset, 0);
 	init_rwsem(&adev->reset_sem);
+	init_waitqueue_head(&adev->recovery_fini_event);
 	mutex_init(&adev->psp.mutex);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	mutex_init(&adev->notifier_lock);
@@ -4687,39 +4742,18 @@ end:
 	return r;
 }
 
-static bool amdgpu_device_lock_adev(struct amdgpu_device *adev,
-				struct amdgpu_hive_info *hive)
+static bool amdgpu_device_recovery_enter(struct amdgpu_device *adev)
 {
 	if (atomic_cmpxchg(&adev->in_gpu_reset, 0, 1) != 0)
 		return false;
 
-	if (hive) {
-		down_write_nest_lock(&adev->reset_sem, &hive->hive_lock);
-	} else {
-		down_write(&adev->reset_sem);
-	}
-
-	switch (amdgpu_asic_reset_method(adev)) {
-	case AMD_RESET_METHOD_MODE1:
-		adev->mp1_state = PP_MP1_STATE_SHUTDOWN;
-		break;
-	case AMD_RESET_METHOD_MODE2:
-		adev->mp1_state = PP_MP1_STATE_RESET;
-		break;
-	default:
-		adev->mp1_state = PP_MP1_STATE_NONE;
-		break;
-	}
-
 	return true;
 }
 
-static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
+static void amdgpu_device_recovery_exit(struct amdgpu_device *adev)
 {
-	amdgpu_vf_error_trans_all(adev);
-	adev->mp1_state = PP_MP1_STATE_NONE;
 	atomic_set(&adev->in_gpu_reset, 0);
-	up_write(&adev->reset_sem);
+	wake_up_interruptible_all(&adev->recovery_fini_event);
 }
 
 /*
@@ -4728,7 +4762,7 @@ static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
  *
  * unlock won't require roll back.
  */
-static int amdgpu_device_lock_hive_adev(struct amdgpu_device *adev, struct amdgpu_hive_info *hive)
+static int amdgpu_hive_recovery_enter(struct amdgpu_device *adev, struct amdgpu_hive_info *hive)
 {
 	struct amdgpu_device *tmp_adev = NULL;
 
@@ -4738,10 +4772,10 @@ static int amdgpu_device_lock_hive_adev(struct amdgpu_device *adev, struct amdgp
 			return -ENODEV;
 		}
 		list_for_each_entry(tmp_adev, &hive->device_list, gmc.xgmi.head) {
-			if (!amdgpu_device_lock_adev(tmp_adev, hive))
+			if (!amdgpu_device_recovery_enter(tmp_adev))
 				goto roll_back;
 		}
-	} else if (!amdgpu_device_lock_adev(adev, hive))
+	} else if (!amdgpu_device_recovery_enter(adev))
 		return -EAGAIN;
 
 	return 0;
@@ -4756,10 +4790,59 @@ roll_back:
 		 */
 		dev_warn(tmp_adev->dev, "Hive lock iteration broke in the middle. Rolling back to unlock");
 		list_for_each_entry_continue_reverse(tmp_adev, &hive->device_list, gmc.xgmi.head) {
-			amdgpu_device_unlock_adev(tmp_adev);
+			amdgpu_device_recovery_exit(tmp_adev);
 		}
 	}
 	return -EAGAIN;
+}
+
+static void amdgpu_device_lock_adev(struct amdgpu_device *adev,
+				struct amdgpu_hive_info *hive)
+{
+	amdgpu_write_lock(adev, hive);
+
+	switch (amdgpu_asic_reset_method(adev)) {
+	case AMD_RESET_METHOD_MODE1:
+		adev->mp1_state = PP_MP1_STATE_SHUTDOWN;
+		break;
+	case AMD_RESET_METHOD_MODE2:
+		adev->mp1_state = PP_MP1_STATE_RESET;
+		break;
+	default:
+		adev->mp1_state = PP_MP1_STATE_NONE;
+		break;
+	}
+}
+
+static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
+{
+	amdgpu_vf_error_trans_all(adev);
+	adev->mp1_state = PP_MP1_STATE_NONE;
+	amdgpu_write_unlock(adev);
+}
+
+/*
+ * to lockup a list of amdgpu devices in a hive safely, if not a hive
+ * with multiple nodes, it will be similar as amdgpu_device_lock_adev.
+ *
+ * unlock won't require roll back.
+ */
+static void amdgpu_device_lock_hive_adev(struct amdgpu_device *adev, struct amdgpu_hive_info *hive)
+{
+	struct amdgpu_device *tmp_adev = NULL;
+
+	if (adev->gmc.xgmi.num_physical_nodes > 1) {
+		if (!hive) {
+			dev_err(adev->dev, "Hive is NULL while device has multiple xgmi nodes");
+			return;
+		}
+
+		list_for_each_entry(tmp_adev, &hive->device_list, gmc.xgmi.head) {
+			amdgpu_device_lock_adev(tmp_adev, hive);
+		}
+	} else {
+		amdgpu_device_lock_adev(adev, hive);
+	}
 }
 
 static void amdgpu_device_resume_display_audio(struct amdgpu_device *adev)
@@ -4909,6 +4992,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	int i, r = 0;
 	bool need_emergency_restart = false;
 	bool audio_suspended = false;
+	bool locked = false;
 	int tmp_vram_lost_counter;
 	struct amdgpu_reset_context reset_context;
 
@@ -4964,7 +5048,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	 * if didn't get the device lock, don't touch the linked list since
 	 * others may iterating it.
 	 */
-	r = amdgpu_device_lock_hive_adev(adev, hive);
+	r = amdgpu_hive_recovery_enter(adev, hive);
 	if (r) {
 		dev_info(adev->dev, "Bailing on TDR for s_job:%llx, as another already in progress",
 					job ? job->base.id : -1);
@@ -5068,12 +5152,20 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 		}
 	}
 
+	/*
+	 * Pre reset functions called before lock, which make sure other threads
+	 * who own reset lock exit successfully. No other thread runs in the driver
+	 * while the recovery thread runs
+	 */
+	if (!locked) {
+		amdgpu_device_lock_hive_adev(adev, hive);
+		locked = true;
+	}
+
 	tmp_vram_lost_counter = atomic_read(&((adev)->vram_lost_counter));
 	/* Actual ASIC resets if needed.*/
 	/* TODO Implement XGMI hive reset logic for SRIOV */
 	if (amdgpu_sriov_vf(adev)) {
-		r = amdgpu_device_reset_sriov(adev, job ? false : true);
-		if (r)
 			adev->asic_reset_res = r;
 	} else {
 		r = amdgpu_do_asic_reset(device_list_handle, &reset_context);
@@ -5142,7 +5234,9 @@ skip_sched_resume:
 
 		if (audio_suspended)
 			amdgpu_device_resume_display_audio(tmp_adev);
-		amdgpu_device_unlock_adev(tmp_adev);
+		amdgpu_device_recovery_exit(tmp_adev);
+		if (locked)
+			amdgpu_device_unlock_adev(tmp_adev);
 	}
 
 skip_recovery:
@@ -5416,9 +5510,10 @@ pci_ers_result_t amdgpu_pci_error_detected(struct pci_dev *pdev, pci_channel_sta
 		 * Locking adev->reset_sem will prevent any external access
 		 * to GPU during PCI error recovery
 		 */
-		while (!amdgpu_device_lock_adev(adev, NULL))
+		while (!amdgpu_device_recovery_enter(adev))
 			amdgpu_cancel_all_tdr(adev);
 
+		amdgpu_device_lock_adev(adev, NULL);
 		/*
 		 * Block any work scheduling as we do for regular GPU reset
 		 * for the duration of the recovery

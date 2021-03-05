@@ -1099,6 +1099,8 @@ struct amdgpu_device {
 	atomic_t 			in_gpu_reset;
 	enum pp_mp1_state               mp1_state;
 	struct rw_semaphore reset_sem;
+	wait_queue_head_t recovery_fini_event;
+
 	struct amdgpu_doorbell_index doorbell_index;
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -1522,4 +1524,8 @@ static inline int amdgpu_in_reset(struct amdgpu_device *adev)
 {
 	return atomic_read(&adev->in_gpu_reset);
 }
+
+int amdgpu_read_lock(struct drm_device *dev, bool interruptible);
+void amdgpu_read_unlock(struct drm_device *dev);
+
 #endif
