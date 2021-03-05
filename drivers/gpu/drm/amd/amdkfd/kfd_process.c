@@ -2056,7 +2056,7 @@ static void evict_process_worker(struct work_struct *work)
 			pr_debug("Process %d queues idle, doorbell unmapped\n",
 				p->pasid);
 
-		pr_info("Finished evicting pasid 0x%x\n", p->pasid);
+		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
 	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
@@ -2074,8 +2074,7 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
-	if (!p->restore_silent)
-		pr_info("Started restoring pasid 0x%x\n", p->pasid);
+	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
 	trace_kfd_restore_process_worker_start(p);
 
 	/* Setting last_restore_timestamp before successful restoration.
@@ -2094,7 +2093,7 @@ static void restore_process_worker(struct work_struct *work)
 		ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
 							     &p->ef);
 	if (ret) {
-		pr_info("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
+		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
 		ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
 				msecs_to_jiffies(PROCESS_BACK_OFF_TIME_MS));
@@ -2107,14 +2106,10 @@ static void restore_process_worker(struct work_struct *work)
 
 	ret = kfd_process_restore_queues(p);
 	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
-	if (!ret) {
-		if (!p->restore_silent)
-			pr_info("Finished restoring pasid 0x%x\n", p->pasid);
-	} else {
+	if (!ret)
+		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
+	else
 		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
-	}
-
-	p->restore_silent = false;
 }
 
 void kfd_suspend_all_processes(void)
@@ -2144,7 +2139,6 @@ int kfd_resume_all_processes(bool sync)
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-		p->restore_silent = sync;
 		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
