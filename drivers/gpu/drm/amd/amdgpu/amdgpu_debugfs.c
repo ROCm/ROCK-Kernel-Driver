@@ -59,17 +59,14 @@ int amdgpu_debugfs_wait_dump(struct amdgpu_device *adev)
 static int amdgpu_debugfs_autodump_open(struct inode *inode, struct file *file)
 {
 	struct amdgpu_device *adev = inode->i_private;
+	struct drm_device *dev = adev_to_drm(adev);
 	int ret;
 
 	file->private_data = adev;
 
-#ifdef HAVE_DOWN_READ_KILLABLE
-	ret = down_read_killable(&adev->reset_sem);
+	ret = amdgpu_read_lock(dev, true);
 	if (ret)
 		return ret;
-#else
-	down_read(&adev->reset_sem);
-#endif
 
 	if (adev->autodump.dumping.done) {
 		reinit_completion(&adev->autodump.dumping);
@@ -78,7 +75,7 @@ static int amdgpu_debugfs_autodump_open(struct inode *inode, struct file *file)
 		ret = -EBUSY;
 	}
 
-	up_read(&adev->reset_sem);
+	amdgpu_read_unlock(dev);
 
 	return ret;
 }
@@ -1229,13 +1226,9 @@ static int amdgpu_debugfs_test_ib_show(struct seq_file *m, void *unused)
 	}
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
-#ifdef HAVE_DOWN_READ_KILLABLE
-	r = down_read_killable(&adev->reset_sem);
+	r = amdgpu_read_lock(dev, true);
 	if (r)
 		return r;
-#else
-	down_read(&adev->reset_sem);
-#endif
 
 	/* hold on the scheduler */
 	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
@@ -1262,7 +1255,7 @@ static int amdgpu_debugfs_test_ib_show(struct seq_file *m, void *unused)
 		kthread_unpark(ring->sched.thread);
 	}
 
-	up_read(&adev->reset_sem);
+	amdgpu_read_unlock(dev);
 
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
@@ -1464,6 +1457,7 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 	struct amdgpu_ring *ring;
 	struct dma_fence **fences = NULL;
 	struct amdgpu_device *adev = (struct amdgpu_device *)data;
+	struct drm_device *dev = adev_to_drm(adev);
 
 	if (val >= AMDGPU_MAX_RINGS)
 		return -EINVAL;
@@ -1483,13 +1477,9 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 		return -ENOMEM;
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
-#ifdef HAVE_DOWN_READ_KILLABLE
-	r = down_read_killable(&adev->reset_sem);
+	r = amdgpu_read_lock(dev, true);
 	if (r)
 		goto pro_end;
-#else
-	down_read(&adev->reset_sem);
-#endif
 
 	/* stop the scheduler */
 	kthread_park(ring->sched.thread);
@@ -1530,7 +1520,7 @@ failure:
 	/* restart the scheduler */
 	kthread_unpark(ring->sched.thread);
 
-	up_read(&adev->reset_sem);
+	amdgpu_read_unlock(dev);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 
