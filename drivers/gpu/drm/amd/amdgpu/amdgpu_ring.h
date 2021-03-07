@@ -350,5 +350,4 @@ int amdgpu_debugfs_ring_init(struct amdgpu_device *adev,
 			     struct amdgpu_ring *ring);
 void amdgpu_debugfs_ring_fini(struct amdgpu_ring *ring);
 
-int amdgpu_ring_set_affinity_group(struct amdgpu_ring *ring);
 #endif

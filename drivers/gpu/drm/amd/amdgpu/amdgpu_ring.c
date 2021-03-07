@@ -35,11 +35,6 @@
 #include "amdgpu.h"
 #include "atom.h"
 
-static char *amdgpu_affinity_group[] = {
-"gfx",
-"comp"
-};
-
 /*
  * Rings
  * Most engines on the GPU are fed via ring buffers.  Ring
@@ -194,7 +189,6 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 		ring->adev = adev;
 		ring->idx = adev->num_rings++;
 		adev->rings[ring->idx] = ring;
-		amdgpu_ring_set_affinity_group(ring);
 		r = amdgpu_fence_driver_init_ring(ring, sched_hw_submission);
 		if (r)
 			return r;
@@ -464,25 +458,4 @@ int amdgpu_ring_test_helper(struct amdgpu_ring *ring)
 
 	ring->sched.ready = !r;
 	return r;
-}
-
-int amdgpu_ring_set_affinity_group(struct amdgpu_ring *ring)
-{
-       struct amdgpu_device *adev = ring->adev;
-       int i;
-
-       for (i = 0; i < ARRAY_SIZE(amdgpu_affinity_group); i++) {
-               char *temp_name = amdgpu_affinity_group[i];
-
-               /* set ring's affinity_group bit if find it in affinity_group list */
-               if (strncmp(ring->name, temp_name, strlen(temp_name)) == 0) {
-                       DRM_DEV_INFO(adev->dev, "set ring:%s in affinity_group\n",
-                             ring->name);
-                       ring->sched.affinity_group = 1;
-                       return 0;
-               }
-       }
-
-       ring->sched.affinity_group = 0;
-       return 0;
 }

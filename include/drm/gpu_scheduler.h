@@ -301,7 +301,6 @@ struct drm_gpu_scheduler {
 	atomic_t                        _score;
 	bool				ready;
 	bool				free_guilty;
-	int				affinity_group;
 };
 
 int drm_sched_init(struct drm_gpu_scheduler *sched,

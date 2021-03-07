@@ -4188,37 +4188,6 @@ bool amdgpu_device_has_job_running(struct amdgpu_device *adev)
 	return false;
 }
 
-bool amdgpu_affinity_group_has_only_or_null_working_ring(struct amdgpu_device *adev, struct drm_sched_job *s_job)
-{
-       int i;
-       int working_ring_num = 0;
-
-	/*
-	 * The job is considered as the real bad one
-	 * if job's sched is not in affinity group
-	 */
-	if (s_job->sched.affinity_group == 0)
-			return true;
-
-       for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
-               struct amdgpu_ring *ring = adev->rings[i];
-
-               if (!ring || !ring->sched.thread)
-                       continue;
-
-               /* for non-empty affinity ring, increase working_ring_num */
-               if (ring->sched.affinity_group == s_job->sched.affinity_group) {
-                       if (!list_empty(&ring->sched.ring_mirror_list))
-                               working_ring_num++;
-               }
-       }
-
-       if (working_ring_num > 1) {
-               return false;
-       }
-       return true;
-}
-
 /**
  * amdgpu_device_should_recover_gpu - check if we should try GPU recovery
  *
@@ -4341,10 +4310,8 @@ static int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 		amdgpu_fence_driver_force_completion(ring);
 	}
 
-	if (amdgpu_gpu_recovery != 2) {
-		if (job)
-			drm_sched_increase_karma(&job->base);
-	}
+	if(job)
+		drm_sched_increase_karma(&job->base);
 
 	/* Don't suspend on bare metal if we are not going to HW reset the ASIC */
 	if (!amdgpu_sriov_vf(adev)) {
@@ -4672,7 +4639,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	int i, r = 0;
 	bool need_emergency_restart = false;
 	bool audio_suspended = false;
-	int	tmp_vram_lost_counter;
+
 	/*
 	 * Special case: RAS triggered and full reset isn't supported
 	 */
@@ -4723,16 +4690,8 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 					job ? job->base.id : -1);
 
 		/* even we skipped this reset, still need to set the job to guilty */
-		if (job) {
-			if (amdgpu_gpu_recovery == 2) {
-				if (&job->base) {
-					spin_lock(&job->base.sched->job_list_lock);
-					list_add(&job->base.node, &job->base.sched->ring_mirror_list);
-					spin_unlock(&job->base.sched->job_list_lock);
-				}
-			} else
-				drm_sched_increase_karma(&job->base);
-		}
+		if (job)
+			drm_sched_increase_karma(&job->base);
 		goto skip_recovery;
 	}
 
@@ -4829,7 +4788,6 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 		}
 	}
 
-	tmp_vram_lost_counter = atomic_read(&((adev)->vram_lost_counter));
 	/* Actual ASIC resets if needed.*/
 	/* TODO Implement XGMI hive reset logic for SRIOV */
 	if (amdgpu_sriov_vf(adev)) {
@@ -4846,64 +4804,18 @@ skip_hw_reset:
 
 	/* Post ASIC reset for all devs .*/
 	list_for_each_entry(tmp_adev, device_list_handle, gmc.xgmi.head) {
-		int step = 1;
 
-		if (amdgpu_gpu_recovery == 2) {
-			if (amdgpu_affinity_group_has_only_or_null_working_ring(adev,&job->base)
-				|| tmp_vram_lost_counter < atomic_read(&adev->vram_lost_counter)) {
-				DRM_INFO("Skip Stage0 Resubmit Stage\n");
-				/* set guilty */
-				drm_sched_increase_karma(&job->base);
-				step = 1;
-			} else {
-				DRM_INFO("Do Stage0 Resubmit Stage\n");
-				step = 0;
-			}
-		}
-
-retry_resubmit:
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			struct amdgpu_ring *ring = tmp_adev->rings[i];
-			int ret = 0;
-			struct drm_sched_job *s_bad_job = NULL;
 
 			if (!ring || !ring->sched.thread)
 				continue;
 
 			/* No point to resubmit jobs if we didn't HW reset*/
-			if (!tmp_adev->asic_reset_res && !job_signaled) {
-
+			if (!tmp_adev->asic_reset_res && !job_signaled)
 				drm_sched_resubmit_jobs(&ring->sched);
 
-				if (amdgpu_gpu_recovery == 2 && step == 0) {
-					ret = amdgpu_wait_resubmitted_jobs_completion(&ring->sched, ring->sched.timeout, &s_bad_job);
-					if (ret == -1) {
-						DRM_ERROR("Found the real bad job! ring:%s, job_id:%llx\n", ring->sched.name, s_bad_job->id);
-						/* set guilty */
-						drm_sched_increase_karma(s_bad_job);
-
-						/* do hw reset */
-						if (amdgpu_sriov_vf(adev)) {
-							amdgpu_virt_fini_data_exchange(adev);
-							r = amdgpu_device_reset_sriov(adev, false);
-							if (r)
-								adev->asic_reset_res = r;
-						} else {
-							r  = amdgpu_do_asic_reset(hive, device_list_handle, &need_full_reset, false);
-							if (r && r == -EAGAIN)
-								goto retry;
-						}
-
-						/* add reset counter so that the following resubmitted job could flush vmid */
-						atomic_inc(&tmp_adev->gpu_reset_counter);
-						step = 1;
-						goto retry_resubmit;
-					}
-				}
-			}
-
-			if (step == 1)
-				drm_sched_start(&ring->sched, !tmp_adev->asic_reset_res);
+			drm_sched_start(&ring->sched, !tmp_adev->asic_reset_res);
 		}
 
 		if (!amdgpu_device_has_dc_support(tmp_adev) && !job_signaled) {

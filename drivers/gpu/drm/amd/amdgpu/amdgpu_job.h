@@ -76,5 +76,5 @@ int amdgpu_job_submit_direct(struct amdgpu_job *job, struct amdgpu_ring *ring,
 			     struct dma_fence **fence);
 
 void amdgpu_job_stop_all_jobs_on_sched(struct drm_gpu_scheduler *sched);
-int amdgpu_wait_resubmitted_jobs_completion(struct drm_gpu_scheduler *sched, long timeout, struct drm_sched_job **s_bad_job);
+
 #endif
