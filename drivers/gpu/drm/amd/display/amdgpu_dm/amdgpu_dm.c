@@ -7405,10 +7405,15 @@ static void dm_update_crtc_active_planes(struct drm_crtc *crtc,
 }
 
 static int dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
+#ifdef HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE
 				       struct drm_atomic_state *state)
 {
 	struct drm_crtc_state *crtc_state = drm_atomic_get_new_crtc_state(state,
 									  crtc);
+#else
+				       struct drm_crtc_state *crtc_state)
+{
+#endif
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dc *dc = adev->dm.dc;
 	struct dm_crtc_state *dm_crtc_state = to_dm_crtc_state(crtc_state);
