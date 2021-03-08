@@ -30,6 +30,20 @@
 #include "kfd_topology.h"
 #include "kfd_device_queue_manager.h"
 
+enum {
+	MAX_TRAPID = 8,         /* 3 bits in the bitfield. */
+	MAX_WATCH_ADDRESSES = 4
+};
+
+/*
+ * A bitmask to indicate which watch points have been allocated.
+ *   bit meaning:
+ *     0:  unallocated/available
+ *     1:  allocated/unavailable
+ */
+static uint32_t allocated_debug_watch_points = ~((1 << MAX_WATCH_ADDRESSES) - 1);
+static DEFINE_SPINLOCK(watch_points_lock);
+
 /* poll and read functions */
 static __poll_t kfd_dbg_ev_poll(struct file *, struct poll_table_struct *);
 static ssize_t kfd_dbg_ev_read(struct file *, char __user *, size_t, loff_t *);
@@ -51,6 +65,15 @@ struct kfd_debug_event_priv {
 	wait_queue_head_t wait_queue;
 	int max_debug_events;
 };
+
+/* Allocate and free watch point IDs for debugger */
+static int kfd_allocate_debug_watch_point(struct kfd_process *p,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t *watch_point,
+					uint32_t watch_mode);
+static int kfd_release_debug_watch_points(struct kfd_process *p,
+					uint32_t watch_point_bit_mask_to_free);
 
 /* poll on wait queue of file */
 static __poll_t kfd_dbg_ev_poll(struct file *filep,
@@ -96,105 +119,90 @@ static int kfd_dbg_ev_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
-/* query pending events and return queue_id, event_type and is_suspended */
-#define KFD_DBG_EV_SET_SUSPEND_STATE(x, s)			\
-	((x) = (s) ? (x) | KFD_DBG_EV_STATUS_SUSPENDED :	\
-		(x) & ~KFD_DBG_EV_STATUS_SUSPENDED)
-
-#define KFD_DBG_EV_SET_EVENT_TYPE(x, e)				\
-	((x) = ((x) & ~(KFD_DBG_EV_STATUS_TRAP			\
-		| KFD_DBG_EV_STATUS_VMFAULT)) | (e))
-
-#define KFD_DBG_EV_SET_NEW_QUEUE_STATE(x, n)			\
-	((x) = (n) ? (x) | KFD_DBG_EV_STATUS_NEW_QUEUE :	\
-		(x) & ~KFD_DBG_EV_STATUS_NEW_QUEUE)
-
-uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags)
-{
-	uint32_t queue_status_word = 0;
-
-	KFD_DBG_EV_SET_EVENT_TYPE(queue_status_word,
-				  READ_ONCE(q->properties.debug_event_type));
-	KFD_DBG_EV_SET_SUSPEND_STATE(queue_status_word,
-				  q->properties.is_suspended);
-	KFD_DBG_EV_SET_NEW_QUEUE_STATE(queue_status_word,
-				  q->properties.is_new);
-
-	if (flags & KFD_DBG_EV_FLAG_CLEAR_STATUS)
-		WRITE_ONCE(q->properties.debug_event_type, 0);
-
-	return queue_status_word;
-}
-
-int kfd_dbg_ev_query_debug_event(struct kfd_process_device *pdd,
-		      unsigned int *queue_id,
-		      unsigned int flags,
-		      uint32_t *event_status)
+int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
+		      unsigned int *source_id,
+		      uint64_t exception_clear_mask,
+		      uint64_t *event_status)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct queue *q;
-	int ret = 0;
+	struct kfd_process_device *pdd;
 
-	if (!pdd || !pdd->process)
+	if (!(process && process->debug_trap_enabled))
 		return -ENODATA;
 
-	/* lock process events to update event queues */
-	mutex_lock(&pdd->process->event_mutex);
-	pqm = &pdd->process->pqm;
+	mutex_lock(&process->event_mutex);
+	*event_status = 0;
+	*source_id = 0;
 
-	if (*queue_id != KFD_INVALID_QUEUEID) {
-		q = pqm_get_user_queue(pqm, *queue_id);
-
-		if (!q) {
-			ret = -EINVAL;
-			goto out;
-		}
-
-		*event_status = kfd_dbg_get_queue_status_word(q, flags);
-		q->properties.is_new = false;
-		goto out;
-	}
-
+	/* find and report queue events */
+	pqm = &process->pqm;
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		unsigned int tmp_status;
+		uint64_t tmp = process->exception_enable_mask;
 
 		if (!pqn->q)
 			continue;
 
-		tmp_status = kfd_dbg_get_queue_status_word(pqn->q, flags);
-		if (tmp_status & (KFD_DBG_EV_STATUS_TRAP |
-						KFD_DBG_EV_STATUS_VMFAULT)) {
-			*queue_id = pqn->q->properties.queue_id;
-			*event_status = tmp_status;
-			pqn->q->properties.is_new = false;
-			goto out;
-		}
+		tmp &= pqn->q->properties.exception_status;
+
+		if (!tmp)
+			continue;
+
+		*event_status = pqn->q->properties.exception_status;
+		*source_id = pqn->q->properties.queue_id;
+		pqn->q->properties.exception_status &= ~exception_clear_mask;
+		goto out;
 	}
 
-	ret = -EAGAIN;
+	/* find and report device events */
+	list_for_each_entry(pdd, &process->per_device_data, per_device_list) {
+		uint64_t tmp = process->exception_enable_mask
+						& pdd->exception_status;
+
+		if (!tmp)
+			continue;
+
+		*event_status = pdd->exception_status;
+		*source_id = pdd->dev->id;
+		pdd->exception_status &= ~exception_clear_mask;
+		goto out;
+	}
+
+	/* report process events */
+	if (process->exception_enable_mask & process->exception_status) {
+		*event_status = process->exception_status;
+		process->exception_status &= ~exception_clear_mask;
+	}
 
 out:
-	mutex_unlock(&pdd->process->event_mutex);
-	return ret;
+	mutex_unlock(&process->event_mutex);
+	return *event_status ? 0 : -EAGAIN;
 }
 
 /* create event queue struct associated with process per device */
-static int kfd_create_event_queue(struct kfd_process_device *pdd,
+static int kfd_create_event_queue(struct kfd_process *process,
 				struct kfd_debug_event_priv *dbg_ev_priv)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	struct kfd_topology_device *tdev;
+	struct kfd_process_device *pdd;
 	int ret;
 
-	if (!pdd || !pdd->process)
+	if (!process)
 		return -ESRCH;
 
-	tdev = kfd_topology_device_by_id(pdd->dev->id);
+	dbg_ev_priv->max_debug_events = 0;
+	list_for_each_entry(pdd,
+			&process->per_device_data,
+			per_device_list) {
 
-	dbg_ev_priv->max_debug_events = tdev->node_props.simd_count
-				* tdev->node_props.max_waves_per_simd;
+		struct kfd_topology_device *tdev;
+
+		tdev = kfd_topology_device_by_id(pdd->dev->id);
+
+		dbg_ev_priv->max_debug_events += tdev->node_props.simd_count
+					* tdev->node_props.max_waves_per_simd;
+	}
 
 	ret = kfifo_alloc(&dbg_ev_priv->fifo,
 				dbg_ev_priv->max_debug_events, GFP_KERNEL);
@@ -204,63 +212,98 @@ static int kfd_create_event_queue(struct kfd_process_device *pdd,
 
 	init_waitqueue_head(&dbg_ev_priv->wait_queue);
 
-	pqm = &pdd->process->pqm;
+	pqm = &process->pqm;
 
 	/* to reset queue pending status - TBD need init in queue creation */
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		if (pqn->q->device == pdd->dev)
-			WRITE_ONCE(pqn->q->properties.debug_event_type, 0);
+		WRITE_ONCE(pqn->q->properties.debug_event_type, 0);
 	}
 
 	return ret;
 }
 
-/* update process device, write to kfifo and wake up wait queue  */
-static void kfd_dbg_ev_update_event_queue(struct kfd_process_device *pdd,
-					  unsigned int doorbell_id,
-					  bool is_vmfault)
+/* update process/device/queue exception status, write to kfifo and wake up
+ * wait queue on only if exception_status is enabled.
+ */
+void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+			unsigned int source_id)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
+	struct kfd_debug_event_priv *dbg_ev_priv;
 	char fifo_output;
+	uint64_t ec_mask = KFD_EC_MASK(event_type);
 
-	if (!pdd->debug_trap_enabled)
+	if (!(process && process->debug_trap_enabled))
 		return;
 
-	pqm = &pdd->process->pqm;
+	mutex_lock(&process->event_mutex);
+	dbg_ev_priv = process->dbg_ev_file->private_data;
 
-	/* iterate through each queue */
-	list_for_each_entry(pqn, &pqm->queues,
-				process_queue_list) {
-		long bit_to_set;
-		struct kfd_debug_event_priv *dbg_ev_priv;
-
-		if (!pqn->q)
-			continue;
-
-		if (pqn->q->device != pdd->dev)
-			continue;
-
-		if (pqn->q->doorbell_id != doorbell_id && !is_vmfault)
-			continue;
-
-		bit_to_set = is_vmfault ?
-			KFD_DBG_EV_STATUS_VMFAULT_BIT :
-			KFD_DBG_EV_STATUS_TRAP_BIT;
-
-		set_bit(bit_to_set, &pqn->q->properties.debug_event_type);
-
-		fifo_output = is_vmfault ? 'v' : 't';
-
-		dbg_ev_priv = pdd->dbg_ev_file->private_data;
-
-		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
-
-		wake_up_all(&dbg_ev_priv->wait_queue);
-
-		if (!is_vmfault)
-			break;
+	/* NOTE: The debugger disregards character assignments and
+	 * fifo overrun. Character assignment to events are for KFD
+	 * testing and debugging.
+	 */
+	switch (event_type) {
+	case EC_QUEUE_NEW: /* queue */
+		fifo_output = 'n';
+		break;
+	case EC_TRAP_HANDLER: /* queue */
+		fifo_output = 't';
+		break;
+	case EC_MEMORY_VIOLATION: /* device */
+		fifo_output = 'v';
+		break;
+	case EC_QUEUE_DELETE: /* device */
+		fifo_output = 'd';
+		break;
+	default:
+		mutex_unlock(&process->event_mutex);
+		return;
 	}
+
+	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
+		struct kfd_process_device *pdd;
+
+		list_for_each_entry(pdd, &process->per_device_data,
+					per_device_list) {
+
+			if (pdd->dev->id != source_id)
+				continue;
+
+			pdd->exception_status |= ec_mask;
+			break;
+		}
+	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(event_type)) {
+		process->exception_status |= ec_mask;
+	} else {
+		pqm = &process->pqm;
+		list_for_each_entry(pqn, &pqm->queues,
+				process_queue_list) {
+			int target_id;
+			bool need_queue_id = event_type == EC_QUEUE_NEW;
+
+			if (!pqn->q)
+				continue;
+
+			target_id = need_queue_id ?
+					pqn->q->properties.queue_id :
+							pqn->q->doorbell_id;
+
+			if (target_id != source_id)
+				continue;
+
+			pqn->q->properties.exception_status |= ec_mask;
+			break;
+		}
+	}
+
+	if (process->exception_enable_mask & ec_mask) {
+		kfifo_in(&dbg_ev_priv->fifo, &fifo_output, 1);
+		wake_up_all(&dbg_ev_priv->wait_queue);
+	}
+
+	mutex_unlock(&process->event_mutex);
 }
 
 /* set pending event queue entry from ring entry  */
@@ -270,36 +313,25 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   bool is_vmfault)
 {
 	struct kfd_process *p;
-	struct kfd_process_device *pdd;
 
 	p = kfd_lookup_process_by_pasid(pasid);
 
 	if (!p)
 		return;
 
-	pdd = kfd_get_process_device_data(dev, p);
-
-	if (!pdd) {
-		kfd_unref_process(p);
-		return;
-	}
-
-	mutex_lock(&p->event_mutex);
-
-	kfd_dbg_ev_update_event_queue(pdd, doorbell_id, is_vmfault);
-
-	mutex_unlock(&p->event_mutex);
+	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
+					p, is_vmfault ? dev->id : doorbell_id);
 
 	kfd_unref_process(p);
 }
 
 /* enable debug and return file pointer struct */
-int kfd_dbg_ev_enable(struct kfd_process_device *pdd)
+int kfd_dbg_ev_enable(struct kfd_process *process)
 {
 	struct kfd_debug_event_priv  *dbg_ev_priv;
 	int ret;
 
-	if (!pdd || !pdd->process)
+	if (!process)
 		return -ESRCH;
 
 	dbg_ev_priv = kzalloc(sizeof(struct kfd_debug_event_priv), GFP_KERNEL);
@@ -307,11 +339,11 @@ int kfd_dbg_ev_enable(struct kfd_process_device *pdd)
 	if (!dbg_ev_priv)
 		return -ENOMEM;
 
-	mutex_lock(&pdd->process->event_mutex);
+	mutex_lock(&process->event_mutex);
 
-	ret = kfd_create_event_queue(pdd, dbg_ev_priv);
+	ret = kfd_create_event_queue(process, dbg_ev_priv);
 
-	mutex_unlock(&pdd->process->event_mutex);
+	mutex_unlock(&process->event_mutex);
 
 	if (ret)
 		return ret;
@@ -324,106 +356,184 @@ int kfd_dbg_ev_enable(struct kfd_process_device *pdd)
 		return ret;
 	}
 
-	pdd->dbg_ev_file = fget(ret);
+	process->dbg_ev_file = fget(ret);
 
 	return ret;
 }
 
-int kfd_dbg_trap_disable(struct kfd_process_device *pdd)
+/* kfd_dbg_trap_disable:
+ *	target: target process
+ *	unwind: If this is unwinding a failed kfd_dbg_trap_enable()
+ *	unwind_count:
+ *		If unwind == true, how far down the pdd list we need
+ *				to unwind
+ *		else: ignored
+ */
+int kfd_dbg_trap_disable(struct kfd_process *target,
+		bool unwind,
+		int unwind_count)
 {
-	if (!pdd->debug_trap_enabled)
-		return -EINVAL;
+	struct kfd_process_device *pdd;
+	int count = 0;
 
-	kfd_release_debug_watch_points(pdd->dev,
-			pdd->allocated_debug_watch_point_bitmask);
-	pdd->allocated_debug_watch_point_bitmask = 0;
-	pdd->debug_trap_enabled = false;
-	pdd->dev->kfd2kgd->disable_debug_trap(pdd->dev->kgd,
-			pdd->dev->vm_info.last_vmid_kfd);
-	fput(pdd->dbg_ev_file);
-	pdd->dbg_ev_file = NULL;
-	return release_debug_trap_vmid(pdd->dev->dqm);
+	kfd_release_debug_watch_points(target,
+				target->allocated_debug_watch_point_bitmask);
+	target->allocated_debug_watch_point_bitmask = 0;
+	kfd_dbg_trap_set_wave_launch_mode(target, 0);
+	kfd_dbg_trap_set_precise_mem_ops(target, 0);
+
+	list_for_each_entry(pdd,
+			&target->per_device_data,
+			per_device_list) {
+
+		/* If this is an unwind, and we have unwound the required
+		 * enable calls on the pdd list, we need to stop now
+		 * otherwise we may mess up another debugger session.
+		 */
+		if (unwind && count == unwind_count)
+			break;
+
+		pdd->dev->kfd2kgd->disable_debug_trap(
+				pdd->dev->kgd,
+				pdd->dev->vm_info.last_vmid_kfd);
+		if (release_debug_trap_vmid(pdd->dev->dqm))
+			pr_err("Failed to release debug vmid on [%i]\n",
+					pdd->dev->id);
+		count++;
+	}
+
+	/* Drop the reference held by the debug session. */
+	kfd_unref_process(target);
+	target->debug_trap_enabled = false;
+	fput(target->dbg_ev_file);
+	target->dbg_ev_file = NULL;
+
+	return 0;
 }
 
-int kfd_dbg_trap_enable(struct kfd_process_device *pdd,
+int kfd_dbg_trap_enable(struct kfd_process *target,
 		uint32_t *fd)
 {
 	int r = 0;
+	struct kfd_process_device *pdd;
+	int unwind_count = 0;
 
-	if (pdd->debug_trap_enabled)
+	if (target->debug_trap_enabled)
 		return -EINVAL;
 
-	r = reserve_debug_trap_vmid(pdd->dev->dqm);
-	if (r)
-		return r;
+	list_for_each_entry(pdd,
+			&target->per_device_data,
+			per_device_list) {
 
-	pdd->debug_trap_enabled = true;
-	pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd,
-			pdd->dev->vm_info.last_vmid_kfd);
+		/* Bind to prevent hang on reserve debug VMID during BACO. */
+		kfd_bind_process_to_device(pdd->dev, target);
 
-	r = kfd_dbg_ev_enable(pdd);
+		r = reserve_debug_trap_vmid(pdd->dev->dqm);
+
+		if (r)
+			goto unwind_err;
+
+		pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd,
+				pdd->dev->vm_info.last_vmid_kfd);
+
+		/* Increment unwind_count as the last step */
+		unwind_count++;
+	}
+
+	r = kfd_dbg_ev_enable(target);
+
 	if (r < 0)
-		goto error;
+		goto unwind_err;
 
+	/* We already hold the process reference but hold another one for the
+	 * debug session.
+	 */
+	kref_get(&target->ref);
 	*fd = r;
+	target->debug_trap_enabled = true;
+
 	return 0;
-error:
-	pdd->debug_trap_enabled = false;
-	pdd->dev->kfd2kgd->disable_debug_trap(pdd->dev->kgd,
-			pdd->dev->vm_info.last_vmid_kfd);
-	release_debug_trap_vmid(pdd->dev->dqm);
+
+unwind_err:
+	/* Enabling debug failed, we need to disable on
+	 * all GPUs so the enable is all or nothing.
+	 */
+	kfd_dbg_trap_disable(target, true, unwind_count);
 	return r;
 }
 
-int kfd_dbg_trap_set_wave_launch_override(struct kfd_dev *dev,
-		uint32_t vmid,
-		uint32_t trap_override,
-		uint32_t trap_mask_bits,
-		uint32_t trap_mask_request,
-		uint32_t *trap_mask_prev,
-		uint32_t *trap_mask_supported)
+int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
+					uint32_t trap_override,
+					uint32_t trap_mask_bits,
+					uint32_t trap_mask_request,
+					uint32_t *trap_mask_prev,
+					uint32_t *trap_mask_supported)
 {
-	return dev->kfd2kgd->set_wave_launch_trap_override(
-			dev->kgd,
-			vmid,
-			trap_override,
-			trap_mask_bits,
-			trap_mask_request,
-			trap_mask_prev,
-			trap_mask_supported);
+	int r = 0;
+	struct kfd_process_device *pdd;
+
+	/* FIXME: This assumes all GPUs are of the same type */
+	list_for_each_entry(pdd,
+			&target->per_device_data,
+			per_device_list) {
+
+		r = pdd->dev->kfd2kgd->set_wave_launch_trap_override(
+				pdd->dev->kgd,
+				pdd->dev->vm_info.last_vmid_kfd,
+				trap_override,
+				trap_mask_bits,
+				trap_mask_request,
+				trap_mask_prev,
+				trap_mask_supported);
+		if (r) {
+			pr_err("failed to set wave launch override on [%i]\n",
+					pdd->dev->id);
+			break;
+		}
+	}
+
+	return r;
 }
 
-int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process_device *pdd,
-		uint8_t wave_launch_mode)
+int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
+					uint8_t wave_launch_mode)
 {
-	pdd->trap_debug_wave_launch_mode = wave_launch_mode;
-	pdd->dev->kfd2kgd->set_wave_launch_mode(
-			pdd->dev->kgd,
-			wave_launch_mode,
-			pdd->dev->vm_info.last_vmid_kfd);
+	struct kfd_process_device *pdd;
+
+	list_for_each_entry(pdd,
+			&target->per_device_data,
+			per_device_list) {
+
+		pdd->dev->kfd2kgd->set_wave_launch_mode(
+				pdd->dev->kgd,
+				wave_launch_mode,
+				pdd->dev->vm_info.last_vmid_kfd);
+	}
+
+	target->trap_debug_wave_launch_mode = wave_launch_mode;
 
 	return 0;
 }
 
-int kfd_dbg_trap_clear_address_watch(struct kfd_process_device *pdd,
-		uint32_t watch_id)
+int kfd_dbg_trap_clear_address_watch(struct kfd_process *target,
+					uint32_t watch_id)
 {
 	/* check that we own watch id */
-	if (!((1<<watch_id) & pdd->allocated_debug_watch_point_bitmask)) {
+	if (!((1<<watch_id) & target->allocated_debug_watch_point_bitmask)) {
 		pr_debug("Trying to free a watch point we don't own\n");
 		return -EINVAL;
 	}
-	kfd_release_debug_watch_points(pdd->dev, 1<<watch_id);
-	pdd->allocated_debug_watch_point_bitmask ^= (1<<watch_id);
+	kfd_release_debug_watch_points(target, 1<<watch_id);
+	target->allocated_debug_watch_point_bitmask ^= (1<<watch_id);
 
 	return 0;
 }
 
-int kfd_dbg_trap_set_address_watch(struct kfd_process_device *pdd,
-		uint64_t watch_address,
-		uint32_t watch_address_mask,
-		uint32_t *watch_id,
-		uint32_t watch_mode)
+int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t *watch_id,
+					uint32_t watch_mode)
 {
 	int r = 0;
 
@@ -432,42 +542,152 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process_device *pdd,
 		return -EINVAL;
 	}
 
-	r = kfd_allocate_debug_watch_point(pdd->dev,
+	r = kfd_allocate_debug_watch_point(target,
 			watch_address,
 			watch_address_mask,
 			watch_id,
-			watch_mode,
-			pdd->dev->vm_info.last_vmid_kfd);
+			watch_mode);
 	if (r)
 		return r;
 
 	/* Save the watch id in our per-process area */
-	pdd->allocated_debug_watch_point_bitmask |= (1 << *watch_id);
+	target->allocated_debug_watch_point_bitmask |= (1 << *watch_id);
 
 	return 0;
 }
 
-int kfd_dbg_trap_set_precise_mem_ops(struct kfd_dev *dev,
+int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable)
 {
 	int r = 0;
+	struct kfd_process_device *pdd;
 
 	switch (enable) {
 	case 0:
+		list_for_each_entry(pdd,
+				&target->per_device_data,
+				per_device_list) {
 
-		r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
-				dev->vm_info.last_vmid_kfd, false);
+			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
+					pdd->dev->kgd,
+					pdd->dev->vm_info.last_vmid_kfd,
+					false);
+			if (r)
+				goto out;
+		}
 		break;
 	case 1:
-		r = dev->kfd2kgd->set_precise_mem_ops(dev->kgd,
-				dev->vm_info.last_vmid_kfd, true);
+		/* FIXME: This assumes all GPUs are of the same type */
+		list_for_each_entry(pdd,
+				&target->per_device_data,
+				per_device_list) {
+
+			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
+					pdd->dev->kgd,
+					pdd->dev->vm_info.last_vmid_kfd,
+					true);
+			if (r)
+				goto out;
+		}
 		break;
 	default:
 		pr_err("Invalid precise mem ops option: %i\n", enable);
 		r = -EINVAL;
 		break;
 	}
+out:
 	return r;
 }
 
+#define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
+static int kfd_allocate_debug_watch_point(struct kfd_process *p,
+		uint64_t watch_address,
+		uint32_t watch_address_mask,
+		uint32_t *watch_point,
+		uint32_t watch_mode)
+{
+	int r = 0;
+	int i;
+	int watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
+	struct kfd_process_device *pdd;
+
+	if (!watch_point)
+		return -EFAULT;
+
+	spin_lock(&watch_points_lock);
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+		if (!(allocated_debug_watch_points & (1<<i))) {
+			/* Found one at [i]. */
+			watch_point_to_allocate = i;
+			break;
+		}
+	if (watch_point_to_allocate != KFD_DEBUGGER_INVALID_WATCH_POINT_ID) {
+		allocated_debug_watch_points |=
+			(1<<watch_point_to_allocate);
+		*watch_point = watch_point_to_allocate;
+		pr_debug("Allocated watch point id %i\n",
+				watch_point_to_allocate);
+	} else {
+		pr_debug("Failed to allocate watch point address. "
+				"num_of_watch_points == %i "
+				"allocated_debug_watch_points == 0x%08x "
+				"i == %i\n",
+				MAX_WATCH_ADDRESSES,
+				allocated_debug_watch_points,
+				i);
+		r = -ENOMEM;
+		goto out;
+	}
+
+	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
+		pdd->dev->kfd2kgd->set_address_watch(pdd->dev->kgd,
+				watch_address,
+				watch_address_mask,
+				*watch_point,
+				watch_mode,
+				pdd->dev->vm_info.last_vmid_kfd);
+	}
+
+out:
+	spin_unlock(&watch_points_lock);
+	return r;
+}
+
+static int kfd_release_debug_watch_points(struct kfd_process *p,
+		uint32_t watch_point_bit_mask_to_free)
+{
+	int r = 0;
+	int i;
+	struct kfd_process_device *pdd;
+
+	spin_lock(&watch_points_lock);
+	if (~allocated_debug_watch_points & watch_point_bit_mask_to_free) {
+		pr_err("Tried to free a free watch point! "
+				"allocated_debug_watch_points == 0x%08x "
+				"watch_point_bit_mask_to_free = 0x%08x\n",
+				allocated_debug_watch_points,
+				watch_point_bit_mask_to_free);
+		r = -EFAULT;
+		goto out;
+	}
+
+	pr_debug("Freeing watchpoint bitmask :0x%08x\n",
+			watch_point_bit_mask_to_free);
+	allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
+
+	list_for_each_entry(pdd,
+			&p->per_device_data,
+			per_device_list) {
+		for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+			if ((1<<i) & watch_point_bit_mask_to_free) {
+				pdd->dev->kfd2kgd->clear_address_watch(
+						pdd->dev->kgd,
+						i);
+			}
+	}
+
+out:
+	spin_unlock(&watch_points_lock);
+	return r;
+}
 

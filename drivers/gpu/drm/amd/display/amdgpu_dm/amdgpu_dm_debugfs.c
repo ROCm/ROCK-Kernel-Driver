@@ -2157,6 +2157,150 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 }
 #endif
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+/*
+ * function description: Read max_requested_bpc property from the connector
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/max_bpc
+ *
+ */
+static ssize_t dp_max_bpc_read(struct file *f, char __user *buf,
+		size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct dm_connector_state *state;
+	ssize_t result = 0;
+	char *rd_buf = NULL;
+	char *rd_buf_ptr = NULL;
+	const uint32_t rd_buf_size = 10;
+	int r;
+
+	rd_buf = kcalloc(rd_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!rd_buf)
+		return -ENOMEM;
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	state = to_dm_connector_state(connector->state);
+
+	rd_buf_ptr = rd_buf;
+	snprintf(rd_buf_ptr, rd_buf_size,
+		"%u\n",
+		state->base.max_requested_bpc);
+
+	while (size) {
+		if (*pos >= rd_buf_size)
+			break;
+
+		r = put_user(*(rd_buf + result), buf);
+		if (r) {
+			result = r; /* r = -EFAULT */
+			goto unlock;
+		}
+		buf += 1;
+		size -= 1;
+		*pos += 1;
+		result += 1;
+	}
+unlock:
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
+	kfree(rd_buf);
+	return result;
+}
+
+
+/*
+ * function description: Set max_requested_bpc property on the connector
+ *
+ * This function will not force the input BPC on connector, it will only
+ * change the max value. This is equivalent to setting max_bpc through
+ * xrandr.
+ *
+ * The BPC value written must be >= 6 and <= 16. Values outside of this
+ * range will result in errors.
+ *
+ * BPC values:
+ *	0x6 - 6 BPC
+ *	0x8 - 8 BPC
+ *	0xa - 10 BPC
+ *	0xc - 12 BPC
+ *	0x10 - 16 BPC
+ *
+ * Write the max_bpc in the following way:
+ *
+ * echo 0x6 > /sys/kernel/debug/dri/0/DP-X/max_bpc
+ *
+ */
+static ssize_t dp_max_bpc_write(struct file *f, const char __user *buf,
+				     size_t size, loff_t *pos)
+{
+	struct amdgpu_dm_connector *aconnector = file_inode(f)->i_private;
+	struct drm_connector *connector = &aconnector->base;
+	struct dm_connector_state *state;
+	struct drm_device *dev = connector->dev;
+	char *wr_buf = NULL;
+	uint32_t wr_buf_size = 42;
+	int max_param_num = 1;
+	long param[1] = {0};
+	uint8_t param_nums = 0;
+
+	if (size == 0)
+		return -EINVAL;
+
+	wr_buf = kcalloc(wr_buf_size, sizeof(char), GFP_KERNEL);
+
+	if (!wr_buf) {
+		DRM_DEBUG_DRIVER("no memory to allocate write buffer\n");
+		return -ENOSPC;
+	}
+
+	if (parse_write_buffer_into_params(wr_buf, size,
+					   (long *)param, buf,
+					   max_param_num,
+					   &param_nums)) {
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param_nums <= 0) {
+		DRM_DEBUG_DRIVER("user data not be read\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	if (param[0] < 6 || param[0] > 16) {
+		DRM_DEBUG_DRIVER("bad max_bpc value\n");
+		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
+
+	if (connector->state == NULL)
+		goto unlock;
+
+	state = to_dm_connector_state(connector->state);
+	state->base.max_requested_bpc = param[0];
+unlock:
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
+	mutex_unlock(&dev->mode_config.mutex);
+
+	kfree(wr_buf);
+	return size;
+}
+#endif /* HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC */
+
 #ifdef DEFINE_SHOW_ATTRIBUTE
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
@@ -2274,6 +2418,15 @@ static const struct file_operations dp_dpcd_data_debugfs_fops = {
 	.llseek = default_llseek
 };
 
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+static const struct file_operations dp_max_bpc_debugfs_fops = {
+	.owner = THIS_MODULE,
+	.read = dp_max_bpc_read,
+	.write = dp_max_bpc_write,
+	.llseek = default_llseek
+};
+#endif
+
 static const struct {
 	char *name;
 	const struct file_operations *fops;
@@ -2288,7 +2441,7 @@ static const struct {
 		{"aux_dpcd_address", &dp_dpcd_address_debugfs_fops},
 		{"aux_dpcd_size", &dp_dpcd_size_debugfs_fops},
 #ifndef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops}
+		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
 #else
 		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
 		{"dsc_clock_en", &dp_dsc_clock_en_debugfs_fops},
@@ -2299,8 +2452,13 @@ static const struct {
 		{"dsc_pic_height", &dp_dsc_pic_height_debugfs_fops},
 		{"dsc_chunk_size", &dp_dsc_chunk_size_debugfs_fops},
 		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops},
-		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops}
+		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
 #endif
+
+#ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
+		{"max_bpc", &dp_max_bpc_debugfs_fops}
+#endif
+
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
@@ -2361,6 +2519,17 @@ static int psr_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(psr_fops, psr_get, NULL, "%llu\n");
 #endif
 
+static const struct {
+	char *name;
+	const struct file_operations *fops;
+} connector_debugfs_entries[] = {
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
+		{"force_yuv420_output", &force_yuv420_output_fops},
+#endif
+		{"output_bpc", &output_bpc_fops},
+		{"trigger_hotplug", &trigger_hotplug_debugfs_fops}
+};
+
 void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 {
 	int i;
@@ -2380,16 +2549,11 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		debugfs_create_file_unsafe("psr_state", 0444, dir, connector, &psr_fops);
 #endif
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
-	debugfs_create_file_unsafe("force_yuv420_output", 0644, dir, connector,
-				   &force_yuv420_output_fops);
-#endif
-
-	debugfs_create_file("output_bpc", 0644, dir, connector,
-			    &output_bpc_fops);
-
-	debugfs_create_file("trigger_hotplug", 0644, dir, connector,
-			    &trigger_hotplug_debugfs_fops);
+	for (i = 0; i < ARRAY_SIZE(connector_debugfs_entries); i++) {
+		debugfs_create_file(connector_debugfs_entries[i].name,
+				    0644, dir, connector,
+				    connector_debugfs_entries[i].fops);
+	}
 
 	connector->debugfs_dpcd_address = 0;
 	connector->debugfs_dpcd_size = 0;

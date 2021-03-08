@@ -47,10 +47,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0xb959929e3
+#define DMUB_FW_VERSION_GIT_HASH 0x22538c5e3
 #define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 52
+#define DMUB_FW_VERSION_REVISION 54
 #define DMUB_FW_VERSION_TEST 0
 #define DMUB_FW_VERSION_VBIOS 0
 #define DMUB_FW_VERSION_HOTFIX 0
@@ -78,6 +78,9 @@
 
 /* Maximum number of planes on any ASIC. */
 #define DMUB_MAX_PLANES 6
+
+/* Trace buffer offset for entry */
+#define TRACE_BUFFER_ENTRY_OFFSET  16
 
 #ifndef PHYSICAL_ADDRESS_LOC
 #define PHYSICAL_ADDRESS_LOC union large_integer

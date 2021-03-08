@@ -68,10 +68,10 @@
 #include <kcl/kcl_acpi_table.h>
 #include <kcl/backport/kcl_drm_fourcc.h>
 #include <kcl/kcl_debugfs_inode.h>
+#include <kcl/backport/kcl_drm_mm_backport.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu_drm_gem_framebuffer_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
-#include "kcl/kcl_amdgpu_ttm.h"
 
 #endif /* AMDGPU_BACKPORT_H */

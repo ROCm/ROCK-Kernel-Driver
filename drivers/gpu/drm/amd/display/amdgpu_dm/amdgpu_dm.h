@@ -69,18 +69,6 @@ struct common_irq_params {
 };
 
 /**
- * struct irq_list_head - Linked-list for low context IRQ handlers.
- *
- * @head: The list_head within &struct handler_data
- * @work: A work_struct containing the deferred handler work
- */
-struct irq_list_head {
-	struct list_head head;
-	/* In case this interrupt needs post-processing, 'work' will be queued*/
-	struct work_struct work;
-};
-
-/**
  * struct dm_compressor_info - Buffer info used by frame buffer compression
  * @cpu_addr: MMIO cpu addr
  * @bo_ptr: Pointer to the buffer object
@@ -90,6 +78,20 @@ struct dm_compressor_info {
 	void *cpu_addr;
 	struct amdgpu_bo *bo_ptr;
 	uint64_t gpu_addr;
+};
+
+/**
+ * struct vblank_workqueue - Works to be executed in a separate thread during vblank
+ * @mall_work: work for mall stutter
+ * @dm: amdgpu display manager device
+ * @otg_inst: otg instance of which vblank is being set
+ * @enable: true if enable vblank
+ */
+struct vblank_workqueue {
+	struct work_struct mall_work;
+	struct amdgpu_display_manager *dm;
+	int otg_inst;
+	bool enable;
 };
 
 /**
@@ -293,6 +295,15 @@ struct amdgpu_display_manager {
 #endif
 
 	/**
+	 * @vblank_work_lock:
+	 *
+	 * Guards access to deferred vblank work state.
+	 */
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	spinlock_t vblank_lock;
+#endif
+
+	/**
 	 * @irq_handler_list_low_tab:
 	 *
 	 * Low priority IRQ handler table.
@@ -304,7 +315,7 @@ struct amdgpu_display_manager {
 	 * Note that handlers are called in the same order as they were
 	 * registered (FIFO).
 	 */
-	struct irq_list_head irq_handler_list_low_tab[DAL_IRQ_SOURCES_NUMBER];
+	struct list_head irq_handler_list_low_tab[DAL_IRQ_SOURCES_NUMBER];
 
 	/**
 	 * @irq_handler_list_high_tab:
@@ -353,6 +364,10 @@ struct amdgpu_display_manager {
 	struct mod_freesync *freesync_module;
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	struct hdcp_workqueue *hdcp_workqueue;
+#endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	struct vblank_workqueue *vblank_workqueue;
 #endif
 
 	struct drm_atomic_state *cached_state;
@@ -452,6 +467,8 @@ struct amdgpu_dm_connector {
 #endif
 	bool force_yuv420_output;
 	struct dsc_preferred_settings dsc_settings;
+	/* Cached display modes */
+	struct drm_display_mode freesync_vid_base;
 };
 
 #define to_amdgpu_dm_connector(x) container_of(x, struct amdgpu_dm_connector, base)

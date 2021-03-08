@@ -242,6 +242,9 @@ struct dc_stream_state {
 	bool is_dsc_enabled;
 #endif
 	union stream_update_flags update_flags;
+
+	bool has_non_synchronizable_pclk;
+	bool vblank_synchronized;
 };
 
 #define ABM_LEVEL_IMMEDIATE_DISABLE 255

@@ -461,8 +461,7 @@ static void amd_release(void *client_context)
 		(struct amd_mem_context *)client_context;
 
 	pr_debug("Client context: 0x%p\n", client_context);
-	pr_debug("pid: %d, address: %#llx, size: %#llx\n",
-			mem_context->kfd_proc->lead_thread->pid,
+	pr_debug("address: %#llx, size: %#llx\n",
 			mem_context->va,
 			mem_context->size);
 

@@ -72,6 +72,7 @@
 
 #include "dmub/dmub_srv.h"
 
+#include "i2caux_interface.h"
 #include "dce/dmub_hw_lock_mgr.h"
 
 #include "dc_trace.h"
@@ -1029,22 +1030,26 @@ destruct_dc:
 
 static void detect_edp_presence(struct dc *dc)
 {
-	struct dc_link *edp_link = get_edp_link(dc);
+	struct dc_link *edp_links[MAX_NUM_EDP];
+	struct dc_link *edp_link = NULL;
+	int i;
+	int edp_num;
 	bool edp_sink_present = true;
 
-	if (!edp_link)
+	get_edp_links(dc, edp_links, &edp_num);
+	if (!edp_num)
 		return;
 
 	if (dc->config.edp_not_connected) {
 			edp_sink_present = false;
 	} else {
 		enum dc_connection_type type;
-		dc_link_detect_sink(edp_link, &type);
-		if (type == dc_connection_none)
-			edp_sink_present = false;
+		for (i = 0; i < edp_num; i++) {
+			edp_link = edp_links[i];
+			dc_link_detect_sink(edp_link, &type);
+			edp_link->edp_sink_present = (type != dc_connection_none);
+		}
 	}
-
-	edp_link->edp_sink_present = edp_sink_present;
 }
 
 void dc_hardware_init(struct dc *dc)
@@ -1120,6 +1125,7 @@ static void program_timing_sync(
 
 	for (i = 0; i < pipe_count; i++) {
 		int group_size = 1;
+		enum timing_synchronization_type sync_type = NOT_SYNCHRONIZABLE;
 		struct pipe_ctx *pipe_set[MAX_PIPES];
 
 		if (!unsynced_pipes[i])
@@ -1134,10 +1140,22 @@ static void program_timing_sync(
 		for (j = i + 1; j < pipe_count; j++) {
 			if (!unsynced_pipes[j])
 				continue;
-
-			if (resource_are_streams_timing_synchronizable(
+			if (sync_type != TIMING_SYNCHRONIZABLE &&
+				dc->hwss.enable_vblanks_synchronization &&
+				unsynced_pipes[j]->stream_res.tg->funcs->align_vblanks &&
+				resource_are_vblanks_synchronizable(
 					unsynced_pipes[j]->stream,
 					pipe_set[0]->stream)) {
+				sync_type = VBLANK_SYNCHRONIZABLE;
+				pipe_set[group_size] = unsynced_pipes[j];
+				unsynced_pipes[j] = NULL;
+				group_size++;
+			} else
+			if (sync_type != VBLANK_SYNCHRONIZABLE &&
+				resource_are_streams_timing_synchronizable(
+					unsynced_pipes[j]->stream,
+					pipe_set[0]->stream)) {
+				sync_type = TIMING_SYNCHRONIZABLE;
 				pipe_set[group_size] = unsynced_pipes[j];
 				unsynced_pipes[j] = NULL;
 				group_size++;
@@ -1164,7 +1182,6 @@ static void program_timing_sync(
 				break;
 			}
 		}
-
 
 		for (k = 0; k < group_size; k++) {
 			struct dc_stream_status *status = dc_stream_get_status_from_state(ctx, pipe_set[k]->stream);
@@ -1197,8 +1214,14 @@ static void program_timing_sync(
 		}
 
 		if (group_size > 1) {
-			dc->hwss.enable_timing_synchronization(
-				dc, group_index, group_size, pipe_set);
+			if (sync_type == TIMING_SYNCHRONIZABLE) {
+				dc->hwss.enable_timing_synchronization(
+					dc, group_index, group_size, pipe_set);
+			} else
+				if (sync_type == VBLANK_SYNCHRONIZABLE) {
+				dc->hwss.enable_vblanks_synchronization(
+					dc, group_index, group_size, pipe_set);
+				}
 			group_index++;
 		}
 		num_group++;
@@ -1235,8 +1258,9 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 	unsigned int i, enc_inst, tg_inst = 0;
 
 	// Seamless port only support single DP and EDP so far
-	if (sink->sink_signal != SIGNAL_TYPE_DISPLAY_PORT &&
-		sink->sink_signal != SIGNAL_TYPE_EDP)
+	if ((sink->sink_signal != SIGNAL_TYPE_DISPLAY_PORT &&
+		sink->sink_signal != SIGNAL_TYPE_EDP) ||
+		sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		return false;
 
 	/* Check for enabled DIG to identify enabled display */
@@ -2366,7 +2390,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 		struct dc_state *context)
 {
 	int j;
-	bool should_program_abm;
 
 	// Stream updates
 	for (j = 0; j < dc->res_pool->pipe_count; j++) {
@@ -2437,7 +2460,8 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					if (pipe_ctx->stream_res.audio && !dc->debug.az_endpoint_mute_only)
 						pipe_ctx->stream_res.audio->funcs->az_disable(pipe_ctx->stream_res.audio);
 
-					dc->hwss.optimize_bandwidth(dc, dc->current_state);
+					dc->optimized_required = true;
+
 				} else {
 					if (get_seamless_boot_stream_count(context) == 0)
 						dc->hwss.prepare_bandwidth(dc, dc->current_state);
@@ -2447,7 +2471,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 			}
 
 			if (stream_update->abm_level && pipe_ctx->stream_res.abm) {
-				should_program_abm = true;
+				bool should_program_abm = true;
 
 				// if otg funcs defined check if blanked before programming
 				if (pipe_ctx->stream_res.tg->funcs->is_blanked)
@@ -3255,3 +3279,96 @@ void dc_hardware_release(struct dc *dc)
 		dc->hwss.hardware_release(dc);
 }
 #endif
+
+/**
+ *****************************************************************************
+ *  Function: dc_enable_dmub_notifications
+ *
+ *  @brief
+ *		Returns whether dmub notification can be enabled
+ *
+ *  @param
+ *		[in] dc: dc structure
+ *
+ *	@return
+ *		True to enable dmub notifications, False otherwise
+ *****************************************************************************
+ */
+bool dc_enable_dmub_notifications(struct dc *dc)
+{
+	/* dmub aux needs dmub notifications to be enabled */
+	return dc->debug.enable_dmub_aux_for_legacy_ddc;
+}
+
+/**
+ *****************************************************************************
+ *  Function: dc_process_dmub_aux_transfer_async
+ *
+ *  @brief
+ *		Submits aux command to dmub via inbox message
+ *		Sets port index appropriately for legacy DDC
+ *
+ *  @param
+ *		[in] dc: dc structure
+ *		[in] link_index: link index
+ *		[in] payload: aux payload
+ *
+ *	@return
+ *		True if successful, False if failure
+ *****************************************************************************
+ */
+bool dc_process_dmub_aux_transfer_async(struct dc *dc,
+				uint32_t link_index,
+				struct aux_payload *payload)
+{
+	uint8_t action;
+	union dmub_rb_cmd cmd = {0};
+	struct dc_dmub_srv *dmub_srv = dc->ctx->dmub_srv;
+
+	ASSERT(payload->length <= 16);
+
+	cmd.dp_aux_access.header.type = DMUB_CMD__DP_AUX_ACCESS;
+	cmd.dp_aux_access.header.payload_bytes = 0;
+	cmd.dp_aux_access.aux_control.type = AUX_CHANNEL_LEGACY_DDC;
+	cmd.dp_aux_access.aux_control.instance = dc->links[link_index]->ddc_hw_inst;
+	cmd.dp_aux_access.aux_control.sw_crc_enabled = 0;
+	cmd.dp_aux_access.aux_control.timeout = 0;
+	cmd.dp_aux_access.aux_control.dpaux.address = payload->address;
+	cmd.dp_aux_access.aux_control.dpaux.is_i2c_over_aux = payload->i2c_over_aux;
+	cmd.dp_aux_access.aux_control.dpaux.length = payload->length;
+
+	/* set aux action */
+	if (payload->i2c_over_aux) {
+		if (payload->write) {
+			if (payload->mot)
+				action = DP_AUX_REQ_ACTION_I2C_WRITE_MOT;
+			else
+				action = DP_AUX_REQ_ACTION_I2C_WRITE;
+		} else {
+			if (payload->mot)
+				action = DP_AUX_REQ_ACTION_I2C_READ_MOT;
+			else
+				action = DP_AUX_REQ_ACTION_I2C_READ;
+			}
+	} else {
+		if (payload->write)
+			action = DP_AUX_REQ_ACTION_DPCD_WRITE;
+		else
+			action = DP_AUX_REQ_ACTION_DPCD_READ;
+	}
+
+	cmd.dp_aux_access.aux_control.dpaux.action = action;
+
+	if (payload->length && payload->write) {
+		memcpy(cmd.dp_aux_access.aux_control.dpaux.data,
+			payload->data,
+			payload->length
+			);
+	}
+
+	dc_dmub_srv_cmd_queue(dmub_srv, &cmd);
+	dc_dmub_srv_cmd_execute(dmub_srv);
+	dc_dmub_srv_wait_idle(dmub_srv);
+
+	return true;
+}

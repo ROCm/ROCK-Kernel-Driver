@@ -42,13 +42,17 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.123"
+/* forward declaration */
+struct aux_payload;
+
+#define DC_VER "3.2.125"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
 #define MAX_STREAMS 6
 #define MAX_SINKS_PER_LINK 4
 #define MIN_VIEWPORT_SIZE 12
+#define MAX_NUM_EDP 2
 
 /*******************************************************************************
  * Display Core Interfaces
@@ -303,6 +307,10 @@ struct dc_config {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool clamp_min_dcfclk;
 #endif
+	uint64_t vblank_alignment_dto_params;
+	uint8_t  vblank_alignment_max_frame_time_diff;
+	bool is_asymmetric_memory;
+	bool is_single_rank_dimm;
 };
 
 enum visual_confirm {
@@ -538,6 +546,10 @@ struct dc_debug_options {
 	bool disable_dsc;
 	bool enable_dram_clock_change_one_display_vactive;
 	union mem_low_power_enable_options enable_mem_low_power;
+	bool force_vblank_alignment;
+
+	/* Enable dmub aux for legacy ddc */
+	bool enable_dmub_aux_for_legacy_ddc;
 };
 
 struct dc_debug_data {
@@ -1334,6 +1346,12 @@ void dc_hardware_release(struct dc *dc);
 #endif
 
 bool dc_set_psr_allow_active(struct dc *dc, bool enable);
+
+bool dc_enable_dmub_notifications(struct dc *dc);
+
+bool dc_process_dmub_aux_transfer_async(struct dc *dc,
+				uint32_t link_index,
+				struct aux_payload *payload);
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 /*******************************************************************************
