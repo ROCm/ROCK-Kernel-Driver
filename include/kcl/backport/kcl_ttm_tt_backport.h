@@ -2,6 +2,7 @@
 #ifndef AMDKCL_BACKPORT_KCL_TTM_TT_BACKPORT_H
 #define AMDKCL_BACKPORT_KCL_TTM_TT_BACKPORT_H
 
+#include <drm/ttm/ttm_bo_api.h>
 #include <drm/ttm/ttm_tt.h>
 
 #ifndef HAVE_TTM_SG_TT_INIT
