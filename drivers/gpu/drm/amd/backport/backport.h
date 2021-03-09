@@ -66,9 +66,10 @@
 #include <kcl/kcl_drm_atomic.h>
 #include <kcl/kcl_drm_hdcp.h>
 #include <kcl/kcl_ftrace.h>
-#include "kcl/kcl_amdgpu_ttm.h"
+#include <kcl/kcl_moduleparam.h>
 #include <kcl/kcl_acpi_table.h>
 #include <kcl/kcl_drm_fourcc.h>
+#include "kcl/kcl_amdgpu_ttm.h"
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
