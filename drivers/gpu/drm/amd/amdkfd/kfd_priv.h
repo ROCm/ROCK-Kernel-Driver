@@ -1169,6 +1169,8 @@ int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 			      unsigned int fence_value,
 			      unsigned int timeout_ms);
 
+struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
+				     unsigned int qid);
 /* Packet Manager */
 
 #define KFD_FENCE_COMPLETED (100)

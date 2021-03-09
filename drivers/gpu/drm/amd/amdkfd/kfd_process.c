@@ -936,8 +936,10 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 				    per_device_list) {
 			if (!peer_pdd->vm)
 				continue;
+			amdgpu_read_lock(peer_pdd->dev->ddev, false);
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->vm);
+			amdgpu_read_unlock(peer_pdd->dev->ddev);
 		}
 
 		/* There should be no more RDMA callbacks, because RDMA
@@ -947,8 +949,10 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 		 */
 		WARN_ONCE(!list_empty(&buf_obj->cb_data_head),
 			  "RDMA callback list not empty");
+		amdgpu_read_lock(pdd->dev->ddev, false);
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd,
 						      buf_obj->mem, NULL);
+		amdgpu_read_unlock(pdd->dev->ddev);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }
