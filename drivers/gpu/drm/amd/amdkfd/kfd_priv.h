@@ -1398,6 +1398,9 @@ int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
 
+struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
+				     unsigned int qid);
+
 int pqm_get_queue_checkpoint_info(struct process_queue_manager *pqm,
 				  unsigned int qid,
 				  u32 *mqd_size,
