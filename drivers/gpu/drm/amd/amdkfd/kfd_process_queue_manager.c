@@ -65,6 +65,23 @@ static int find_available_queue_slot(struct process_queue_manager *pqm,
 	return 0;
 }
 
+struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
+				     unsigned int qid)
+{
+	struct process_queue_node *pqn;
+
+	pqn = get_queue_by_qid(pqm, qid);
+	if (!pqn) {
+		pr_err("Queue id does not match any known queue\n");
+		return NULL;
+	}
+
+	if (pqn->q)
+		return pqn->q->device;
+
+	return NULL;
+}
+
 void kfd_process_dequeue_from_device(struct kfd_process_device *pdd)
 {
 	struct kfd_dev *dev = pdd->dev;

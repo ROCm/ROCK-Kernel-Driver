@@ -46,6 +46,7 @@
 
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
+#include "amdgpu.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -309,6 +310,9 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	}
 
 	mutex_lock(&p->mutex);
+	err = amdgpu_read_lock(dev->ddev, true);
+	if (err)
+		goto err_read_lock;
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -337,6 +341,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 		 */
 		args->doorbell_offset |= doorbell_offset_in_process;
 
+	amdgpu_read_unlock(dev->ddev);
 	mutex_unlock(&p->mutex);
 
 	pr_debug("Queue id %d was created successfully\n", args->queue_id);
@@ -355,6 +360,8 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 err_create_queue:
 err_bind_process:
+	amdgpu_read_unlock(dev->ddev);
+err_read_lock:
 	mutex_unlock(&p->mutex);
 	return err;
 }
@@ -364,6 +371,7 @@ static int kfd_ioctl_destroy_queue(struct file *filp, struct kfd_process *p,
 {
 	int retval;
 	struct kfd_ioctl_destroy_queue_args *args = data;
+	struct kfd_dev *dev;
 
 	pr_debug("Destroying queue id %d for pasid 0x%x\n",
 				args->queue_id,
@@ -371,8 +379,20 @@ static int kfd_ioctl_destroy_queue(struct file *filp, struct kfd_process *p,
 
 	mutex_lock(&p->mutex);
 
-	retval = pqm_destroy_queue(&p->pqm, args->queue_id);
+	dev = pqm_query_dev_by_qid(&p->pqm, args->queue_id);
+	if (!dev) {
+		retval = -EINVAL;
+		goto err_query_dev;
+	}
 
+	retval = amdgpu_read_lock(dev->ddev, true);
+	if (retval)
+		goto err_read_lock;
+	retval = pqm_destroy_queue(&p->pqm, args->queue_id);
+	amdgpu_read_unlock(dev->ddev);
+
+err_read_lock:
+err_query_dev:
 	mutex_unlock(&p->mutex);
 	return retval;
 }
@@ -383,6 +403,7 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 	int retval;
 	struct kfd_ioctl_update_queue_args *args = data;
 	struct queue_properties properties;
+	struct kfd_dev *dev;
 
 	if (args->queue_percentage > KFD_MAX_QUEUE_PERCENTAGE) {
 		pr_err("Queue percentage must be between 0 to KFD_MAX_QUEUE_PERCENTAGE\n");
@@ -416,10 +437,21 @@ static int kfd_ioctl_update_queue(struct file *filp, struct kfd_process *p,
 
 	mutex_lock(&p->mutex);
 
+	dev = pqm_query_dev_by_qid(&p->pqm, args->queue_id);
+	if (!dev) {
+		retval = -EINVAL;
+		goto err_query_dev;
+	}
+
+	retval = amdgpu_read_lock(dev->ddev, true);
+	if (retval)
+		goto err_read_lock;
 	retval = pqm_update_queue(&p->pqm, args->queue_id, &properties);
+	amdgpu_read_unlock(dev->ddev);
 
+err_read_lock:
+err_query_dev:
 	mutex_unlock(&p->mutex);
-
 	return retval;
 }
 
@@ -432,6 +464,7 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 	struct queue_properties properties;
 	uint32_t __user *cu_mask_ptr = (uint32_t __user *)args->cu_mask_ptr;
 	size_t cu_mask_size = sizeof(uint32_t) * (args->num_cu_mask / 32);
+	struct kfd_dev *dev;
 
 	if ((args->num_cu_mask % 32) != 0) {
 		pr_debug("num_cu_mask 0x%x must be a multiple of 32",
@@ -468,8 +501,20 @@ static int kfd_ioctl_set_cu_mask(struct file *filp, struct kfd_process *p,
 
 	mutex_lock(&p->mutex);
 
-	retval = pqm_set_cu_mask(&p->pqm, args->queue_id, &properties);
+	dev = pqm_query_dev_by_qid(&p->pqm, args->queue_id);
+	if (!dev) {
+		retval = -EINVAL;
+		goto err_query_dev;
+	}
 
+	retval = amdgpu_read_lock(dev->ddev, true);
+	if (retval)
+		goto err_read_lock;
+	retval = pqm_set_cu_mask(&p->pqm, args->queue_id, &properties);
+	amdgpu_read_unlock(dev->ddev);
+
+err_read_lock:
+err_query_dev:
 	mutex_unlock(&p->mutex);
 
 	if (retval)
@@ -483,14 +528,27 @@ static int kfd_ioctl_get_queue_wave_state(struct file *filep,
 {
 	struct kfd_ioctl_get_queue_wave_state_args *args = data;
 	int r;
+	struct kfd_dev *dev;
 
 	mutex_lock(&p->mutex);
 
+	dev = pqm_query_dev_by_qid(&p->pqm, args->queue_id);
+	if (!dev) {
+		r = -EINVAL;
+		goto err_query_dev;
+	}
+
+	r = amdgpu_read_lock(dev->ddev, true);
+	if (r)
+		goto err_read_lock;
 	r = pqm_get_wave_state(&p->pqm, args->queue_id,
 			       (void __user *)args->ctl_stack_address,
 			       &args->ctl_stack_used_size,
 			       &args->save_area_used_size);
+	amdgpu_read_unlock(dev->ddev);
 
+err_read_lock:
+err_query_dev:
 	mutex_unlock(&p->mutex);
 
 	return r;
@@ -521,6 +579,10 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 
 	mutex_lock(&p->mutex);
 
+	err = amdgpu_read_lock(dev->ddev, true);
+	if (err)
+		goto err_read_lock;
+
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
 		err = -ESRCH;
@@ -543,6 +605,9 @@ static int kfd_ioctl_set_memory_policy(struct file *filep,
 		err = -EINVAL;
 
 out:
+	amdgpu_read_unlock(dev->ddev);
+
+err_read_lock:
 	mutex_unlock(&p->mutex);
 
 	return err;
@@ -562,6 +627,10 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 
 	mutex_lock(&p->mutex);
 
+	err = amdgpu_read_lock(dev->ddev, true);
+	if (err)
+		goto err_read_lock;
+
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
 		err = -ESRCH;
@@ -571,6 +640,9 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 	kfd_process_set_trap_handler(&pdd->qpd, args->tba_addr, args->tma_addr);
 
 out:
+	amdgpu_read_unlock(dev->ddev);
+
+err_read_lock:
 	mutex_unlock(&p->mutex);
 
 	return err;
@@ -596,6 +668,11 @@ static int kfd_ioctl_dbg_register(struct file *filep,
 	}
 
 	mutex_lock(&p->mutex);
+
+	status = amdgpu_read_lock(dev->ddev, true);
+	if (status)
+		goto err_read_lock;
+
 	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	/*
@@ -625,6 +702,9 @@ static int kfd_ioctl_dbg_register(struct file *filep,
 
 out:
 	mutex_unlock(kfd_get_dbgmgr_mutex());
+	amdgpu_read_unlock(dev->ddev);
+
+err_read_lock:
 	mutex_unlock(&p->mutex);
 
 	return status;
@@ -646,6 +726,10 @@ static int kfd_ioctl_dbg_unregister(struct file *filep,
 		return -EINVAL;
 	}
 
+	status = amdgpu_read_lock(dev->ddev, true);
+	if (status)
+		return status;
+
 	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
@@ -655,6 +739,8 @@ static int kfd_ioctl_dbg_unregister(struct file *filep,
 	}
 
 	mutex_unlock(kfd_get_dbgmgr_mutex());
+
+	amdgpu_read_unlock(dev->ddev);
 
 	return status;
 }
@@ -755,15 +841,19 @@ static int kfd_ioctl_dbg_address_watch(struct file *filep,
 	/* Currently HSA Event is not supported for DBG */
 	aw_info.watch_event = NULL;
 
+	status = amdgpu_read_lock(dev->ddev, true);
+	if (status)
+		goto out;
+
 	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	status = kfd_dbgmgr_address_watch(dev->dbgmgr, &aw_info);
 
 	mutex_unlock(kfd_get_dbgmgr_mutex());
 
+	amdgpu_read_unlock(dev->ddev);
 out:
 	kfree(args_buff);
-
 	return status;
 }
 
@@ -834,6 +924,10 @@ static int kfd_ioctl_dbg_wave_control(struct file *filep,
 					*((uint32_t *)(&args_buff[args_idx]));
 	wac_info.dbgWave_msg.MemoryVA = NULL;
 
+	status = amdgpu_read_lock(dev->ddev, true);
+	if (status)
+		goto pro_end;
+
 	mutex_lock(kfd_get_dbgmgr_mutex());
 
 	pr_debug("Calling dbg manager process %p, operand %u, mode %u, trapId %u, message %u\n",
@@ -847,6 +941,9 @@ static int kfd_ioctl_dbg_wave_control(struct file *filep,
 
 	mutex_unlock(kfd_get_dbgmgr_mutex());
 
+	amdgpu_read_unlock(dev->ddev);
+
+pro_end:
 	kfree(args_buff);
 
 	return status;
@@ -859,10 +956,11 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 	struct kfd_dev *dev;
 
 	dev = kfd_device_by_id(args->gpu_id);
-	if (dev)
+	if (dev && !amdgpu_read_lock(dev->ddev, true)) {
 		/* Reading GPU clock counter from KGD */
 		args->gpu_clock_counter = amdgpu_amdkfd_get_gpu_clock_counter(dev->kgd);
-	else
+		amdgpu_read_unlock(dev->ddev);
+	} else
 		/* Node without GPU resource */
 		args->gpu_clock_counter = 0;
 
@@ -1050,12 +1148,19 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		}
 		mutex_unlock(&p->mutex);
 
+		err = amdgpu_read_lock(kfd->ddev, true);
+		if (err)
+			return err;
+
 		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kfd->kgd,
 						mem, &kern_addr, &size);
 		if (err) {
 			pr_err("Failed to map event page to kernel\n");
+			amdgpu_read_unlock(kfd->ddev);
 			return err;
 		}
+
+		amdgpu_read_unlock(kfd->ddev);
 
 		err = kfd_event_page_set(p, kern_addr, size);
 		if (err) {
@@ -1138,10 +1243,16 @@ static int kfd_ioctl_set_scratch_backing_va(struct file *filep,
 
 	mutex_unlock(&p->mutex);
 
+	err = amdgpu_read_lock(dev->ddev, true);
+	if (err)
+		return err;
+
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 	    pdd->qpd.vmid != 0 && dev->kfd2kgd->set_scratch_backing_va)
 		dev->kfd2kgd->set_scratch_backing_va(
 			dev->kgd, args->va_addr, pdd->qpd.vmid);
+
+	amdgpu_read_unlock(dev->ddev);
 
 	return 0;
 
@@ -1211,6 +1322,10 @@ static int kfd_ioctl_acquire_vm(struct file *filep, struct kfd_process *p,
 
 	mutex_lock(&p->mutex);
 
+	ret = amdgpu_read_lock(dev->ddev, true);
+	if (ret)
+		goto err_read_lock;
+
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
 		ret = -EINVAL;
@@ -1225,12 +1340,16 @@ static int kfd_ioctl_acquire_vm(struct file *filep, struct kfd_process *p,
 	ret = kfd_process_device_init_vm(pdd, drm_file);
 	if (ret)
 		goto err_unlock;
+
+	amdgpu_read_unlock(dev->ddev);
 	/* On success, the PDD keeps the drm_file reference */
 	mutex_unlock(&p->mutex);
 
 	return 0;
 
 err_unlock:
+	amdgpu_read_unlock(dev->ddev);
+err_read_lock:
 	mutex_unlock(&p->mutex);
 	fput(drm_file);
 	return ret;
@@ -1285,6 +1404,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	}
 
 	mutex_lock(&p->mutex);
+
+	err = amdgpu_read_lock(dev->ddev, true);
+	if (err)
+		goto err_read_lock;
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
@@ -1361,6 +1484,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 		WRITE_ONCE(pdd->vram_usage, pdd->vram_usage + args->size);
 
+	amdgpu_read_unlock(dev->ddev);
 	mutex_unlock(&p->mutex);
 
 	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
@@ -1379,6 +1503,8 @@ err_free:
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem,
 					       pdd->drm_priv, NULL);
 err_unlock:
+	amdgpu_read_unlock(dev->ddev);
+err_read_lock:
 	mutex_unlock(&p->mutex);
 	return err;
 }
@@ -1398,6 +1524,10 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		return -EINVAL;
 
 	mutex_lock(&p->mutex);
+
+	ret = amdgpu_read_lock(dev->ddev, true);
+	if (ret)
+		goto err_read_lock;
 
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
@@ -1427,6 +1557,8 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	WRITE_ONCE(pdd->vram_usage, pdd->vram_usage - size);
 
 err_unlock:
+	amdgpu_read_unlock(dev->ddev);
+err_read_lock:
 	mutex_unlock(&p->mutex);
 	return ret;
 }
@@ -1498,13 +1630,21 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			err = PTR_ERR(peer_pdd);
 			goto get_mem_obj_from_handle_failed;
 		}
+
+		err = amdgpu_read_lock(peer->ddev, true);
+		if (err)
+			goto map_memory_to_gpu_failed;
+
 		err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			peer->kgd, (struct kgd_mem *)mem, peer_pdd->drm_priv);
 		if (err) {
 			pr_err("Failed to map to gpu %d/%d\n",
 			       i, args->n_devices);
+			amdgpu_read_unlock(peer->ddev);
 			goto map_memory_to_gpu_failed;
 		}
+
+		amdgpu_read_unlock(peer->ddev);
 		args->n_success = i+1;
 	}
 
@@ -1524,7 +1664,10 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		peer_pdd = kfd_get_process_device_data(peer, p);
 		if (WARN_ON_ONCE(!peer_pdd))
 			continue;
-		kfd_flush_tlb(peer_pdd, TLB_FLUSH_LEGACY);
+		if (!amdgpu_read_lock(peer->ddev, true)) {
+			kfd_flush_tlb(peer_pdd, TLB_FLUSH_LEGACY);
+			amdgpu_read_unlock(peer->ddev);
+		}
 	}
 
 	kfree(devices_arr);
@@ -1609,13 +1752,20 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			err = -ENODEV;
 			goto get_mem_obj_from_handle_failed;
 		}
+
+		err = amdgpu_read_lock(peer->ddev, true);
+		if (err)
+			goto unmap_memory_from_gpu_failed;
+
 		err = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 			peer->kgd, (struct kgd_mem *)mem, peer_pdd->drm_priv);
 		if (err) {
 			pr_err("Failed to unmap from gpu %d/%d\n",
 			       i, args->n_devices);
+			amdgpu_read_unlock(peer->ddev);
 			goto unmap_memory_from_gpu_failed;
 		}
+		amdgpu_read_unlock(peer->ddev);
 		args->n_success = i+1;
 	}
 	kfree(devices_arr);
@@ -1666,7 +1816,13 @@ static int kfd_ioctl_alloc_queue_gws(struct file *filep,
 		goto out_unlock;
 	}
 
+	retval = amdgpu_read_lock(dev->ddev, true);
+	if (retval)
+		goto out_unlock;
+
 	retval = pqm_set_gws(&p->pqm, args->queue_id, args->num_gws ? dev->gws : NULL);
+
+	amdgpu_read_unlock(dev->ddev);
 	mutex_unlock(&p->mutex);
 
 	args->first_gws = 0;
@@ -1743,11 +1899,16 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
+	r = amdgpu_read_lock(dev->ddev, true);
+	if (r)
+		return r;
+
 	r = kfd_ipc_import_dmabuf(dev, p, args->gpu_id, args->dmabuf_fd,
 				  args->va_addr, &args->handle, NULL);
 	if (r)
 		pr_err("Failed to import dmabuf\n");
 
+	amdgpu_read_unlock(dev->ddev);
 	return r;
 }
 
@@ -1782,12 +1943,17 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
+	r = amdgpu_read_lock(dev->ddev, true);
+	if (r)
+		return r;
+
 	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
 				  args->va_addr, &args->handle,
 				  &args->mmap_offset);
 	if (r)
 		pr_err("Failed to import IPC handle\n");
 
+	amdgpu_read_unlock(dev->ddev);
 	return r;
 }
 
