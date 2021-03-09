@@ -36,6 +36,8 @@
 #include <linux/file.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/sched/mm.h>
+#include <linux/pagemap.h>
 #include <linux/shmem_fs.h>
 #include <drm/drm_cache.h>
 #include <drm/drm_device.h>
