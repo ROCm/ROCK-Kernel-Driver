@@ -215,10 +215,21 @@ static int ttm_resource_ioremap(struct ttm_bo_device *bdev,
 	} else {
 		size_t bus_size = (size_t)mem->num_pages << PAGE_SHIFT;
 
+#ifndef HAVE_TTM_BUS_PLACEMENT_CACHING
 		if (mem->placement & TTM_PL_FLAG_WC)
 			addr = ioremap_wc(mem->bus.base + mem->bus.offset,
 					  bus_size);
+		else
+			addr = ioremap(mem->bus.base + mem->bus.offset,
+				       bus_size);
 
+		if (!addr) {
+			(void) ttm_mem_io_lock(man, false);
+			ttm_mem_io_free(bdev, mem);
+			ttm_mem_io_unlock(man);
+			return -ENOMEM;
+		}
+#else
 		if (mem->bus.caching == ttm_write_combined)
 			addr = ioremap_wc(mem->bus.offset, bus_size);
 #ifdef CONFIG_X86
@@ -226,14 +237,12 @@ static int ttm_resource_ioremap(struct ttm_bo_device *bdev,
 			addr = ioremap_cache(mem->bus.offset, bus_size);
 #endif
 		else
-			addr = ioremap(mem->bus.base + mem->bus.offset,
-				       bus_size);
+			addr = ioremap(mem->bus.offset, bus_size);
 		if (!addr) {
-			(void) ttm_mem_io_lock(man, false);
 			ttm_mem_io_free(bdev, mem);
-			ttm_mem_io_unlock(man);
 			return -ENOMEM;
 		}
+#endif /* HAVE_TTM_BUS_PLACEMENT_CACHING */
 	}
 	*virtual = addr;
 	return 0;
@@ -522,9 +531,23 @@ static int ttm_bo_ioremap(struct ttm_buffer_object *bo,
 		map->virtual = (void *)(((u8 *)bo->mem.bus.addr) + offset);
 	} else {
 		map->bo_kmap_type = ttm_bo_map_iomap;
+
+#ifndef HAVE_TTM_BUS_PLACEMENT_CACHING
 		if (mem->placement & TTM_PL_FLAG_WC)
 			map->virtual = ioremap_wc(bo->mem.bus.base +
 						  bo->mem.bus.offset + offset,
+						  size);
+		else if (mem->placement & TTM_PL_FLAG_CACHED)
+			map->virtual = ioremap_cache(bo->mem.bus.base +
+						  bo->mem.bus.offset + offset,
+						  size);
+		else
+			map->virtual = ioremap(bo->mem.bus.base +
+					       bo->mem.bus.offset + offset,
+					       size);
+#else
+		if (mem->bus.caching == ttm_write_combined)
+			map->virtual = ioremap_wc(bo->mem.bus.offset + offset,
 						  size);
 #ifdef CONFIG_X86
 		else if (mem->bus.caching == ttm_cached)
@@ -532,9 +555,9 @@ static int ttm_bo_ioremap(struct ttm_buffer_object *bo,
 						  size);
 #endif
 		else
-			map->virtual = ioremap(bo->mem.bus.base +
-					       bo->mem.bus.offset + offset,
+			map->virtual = ioremap(bo->mem.bus.offset + offset,
 					       size);
+#endif /* HAVE_TTM_BUS_PLACEMENT_CACHING */
 	}
 	return (!map->virtual) ? -ENOMEM : 0;
 }

@@ -154,9 +154,18 @@ void amdgpu_bo_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 
 		places[c].fpfn = 0;
 		places[c].lpfn = 0;
-		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
-			TTM_PL_FLAG_VRAM;
 
+#ifndef HAVE_TTM_BUS_PLACEMENT_CACHING
+		places[c].flags = TTM_PL_FLAG_VRAM;
+
+		if (adev->gmc.xgmi.connected_to_cpu)
+			places[c].flags |= TTM_PL_FLAG_CACHED;
+		else
+			places[c].flags |= TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED;
+#else
+		places[c].mem_type = TTM_PL_VRAM;
+		places[c].flags = 0;
+#endif
 		if (flags & AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED)
 			places[c].lpfn = visible_pfn;
 		else

@@ -8,4 +8,14 @@
 #define amdttm_sg_tt_init ttm_dma_tt_init
 #endif
 
+/*
+ * adapt to kernel 5.11 ttm structure changes
+ * this kcl patch only exists in dkms-5.9 branch, don't
+ * be promoted to dkms-5.11 branch
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#define HAVE_TTM_BUS_PLACEMENT_CACHING
+#endif
+
+
 #endif
