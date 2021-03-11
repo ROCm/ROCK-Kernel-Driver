@@ -366,8 +366,9 @@ static int amdgpu_ras_debugfs_ctrl_parse_data(struct file *f,
  *	to see which blocks support RAS on a particular asic.
  *
  */
-static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f, const char __user *buf,
-		size_t size, loff_t *pos)
+static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f,
+					     const char __user *buf,
+					     size_t size, loff_t *pos)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)file_inode(f)->i_private;
 	struct ras_debug_if data;
@@ -381,7 +382,7 @@ static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f, const char __user *
 
 	ret = amdgpu_ras_debugfs_ctrl_parse_data(f, buf, size, pos, &data);
 	if (ret)
-		return -EINVAL;
+		return ret;
 
 	if (data.op == 3) {
 		ret = amdgpu_reserve_page_direct(adev, data.inject.address);
@@ -450,21 +451,24 @@ static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f, const char __user *
  * will reset EEPROM table to 0 entries.
  *
  */
-static ssize_t amdgpu_ras_debugfs_eeprom_write(struct file *f, const char __user *buf,
-		size_t size, loff_t *pos)
+static ssize_t amdgpu_ras_debugfs_eeprom_write(struct file *f,
+					       const char __user *buf,
+					       size_t size, loff_t *pos)
 {
 	struct amdgpu_device *adev =
 		(struct amdgpu_device *)file_inode(f)->i_private;
 	int ret;
 
 	ret = amdgpu_ras_eeprom_reset_table(
-			&(amdgpu_ras_get_context(adev)->eeprom_control));
+		&(amdgpu_ras_get_context(adev)->eeprom_control));
 
-	if (ret == 1) {
+	if (ret > 0) {
+		/* Something was written to EEPROM.
+		 */
 		amdgpu_ras_get_context(adev)->flags = RAS_DEFAULT_FLAGS;
 		return size;
 	} else {
-		return -EIO;
+		return ret;
 	}
 }
 
@@ -2011,7 +2015,7 @@ free:
 	kfree(*data);
 	con->eh_data = NULL;
 out:
-	dev_warn(adev->dev, "Failed to initialize ras recovery!\n");
+	dev_warn(adev->dev, "Failed to initialize ras recovery! (%d)\n", ret);
 
 	/*
 	 * Except error threshold exceeding case, other failure cases in this
