@@ -3862,7 +3862,7 @@ static int irq_remapping_select(struct irq_domain *d, struct irq_fwspec *fwspec,
 	else if (x86_fwspec_is_hpet(fwspec))
 		devid = get_hpet_devid(fwspec->param[0]);
 
-	if (devid < 0)
+	if (devid < 0 || !amd_iommu_rlookup_table)
 		return 0;
 
 	iommu = amd_iommu_rlookup_table[devid];
