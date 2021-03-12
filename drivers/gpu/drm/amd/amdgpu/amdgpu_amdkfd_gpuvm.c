@@ -2000,25 +2000,39 @@ int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_pin_bo(struct kgd_mem *mem)
+struct amdgpu_bo *amdgpu_amdkfd_gpuvm_get_bo_ref(struct kgd_mem *mem,
+						 uint32_t *flags)
 {
 	struct amdgpu_bo *bo = mem->bo;
+
+	if (flags)
+		*flags = mem->alloc_flags;
+	drm_gem_object_get(&bo->tbo.base);
+	return bo;
+}
+
+void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo)
+{
+	drm_gem_object_put(&bo->tbo.base);
+}
+
+int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo)
+{
 	int ret = 0;
 
 	ret = amdgpu_bo_reserve(bo, false);
 	if (unlikely(ret))
 		return ret;
 
-	ret = amdgpu_bo_pin_restricted(bo, mem->domain, 0, 0);
+	ret = amdgpu_bo_pin_restricted(bo, bo->preferred_domains, 0, 0);
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 	amdgpu_bo_unreserve(bo);
 
 	return ret;
 }
 
-void amdgpu_amdkfd_gpuvm_unpin_bo(struct kgd_mem *mem)
+void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 {
-	struct amdgpu_bo *bo = mem->bo;
 	int ret = 0;
 
 	ret = amdgpu_bo_reserve(bo, false);
@@ -2094,12 +2108,13 @@ static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
 	return 0;
 }
 
-static int get_sg_table(struct amdgpu_device *adev,
-		struct kgd_mem *mem, uint64_t offset, uint64_t size,
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+		struct amdgpu_bo *bo, uint32_t flags,
+		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table **ret_sg)
 {
-	struct amdgpu_bo *bo = mem->bo;
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct sg_table *sg = NULL;
 	struct scatterlist *s;
 	struct page **pages;
@@ -2129,9 +2144,9 @@ static int get_sg_table(struct amdgpu_device *adev,
 	 * resources from MMIO address space. The allocation flag of
 	 * BO fall in MMIO_REMAP / DOORBELL domain
 	 */
-	if ((bo->tbo.type == ttm_bo_type_sg) &&
-	    ((mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) ||
-	     (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
+	if (bo->tbo.type == ttm_bo_type_sg &&
+	    ((flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) ||
+	     (flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
 		ret = get_sg_table_of_mmio_or_doorbel_bo(bo, dma_dev, dir, &sg);
 		*ret_sg = (ret == 0) ?  sg : NULL;
 		return ret;
@@ -2201,23 +2216,12 @@ out:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
-		struct kgd_mem *mem, uint64_t offset, uint64_t size,
-		struct device *dma_dev, enum dma_data_direction dir,
-		struct sg_table **ret_sg)
-{
-	struct amdgpu_device *adev;
-
-	adev = get_amdgpu_device(kgd);
-	return get_sg_table(adev, mem, offset, size, dma_dev, dir, ret_sg);
-}
-
-void amdgpu_amdkfd_gpuvm_put_sg_table(struct kgd_mem *mem,
+void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table *sgt)
 {
 	/* Unmap GPU device memory */
-	if (mem->bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
+	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		amdgpu_vram_mgr_free_sgt(dma_dev, dir, sgt);
 		return;
 	}
