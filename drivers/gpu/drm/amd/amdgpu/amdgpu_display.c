@@ -1499,8 +1499,12 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
+#ifdef HAVE_DRM_GEN_FB_INIT_WITH_FUNCS
 	ret = amdgpu_display_gem_fb_verify_and_init(dev, amdgpu_fb, file_priv,
 						    mode_cmd, obj);
+#else
+	ret = amdgpu_display_gem_fb_init(dev, amdgpu_fb, mode_cmd, obj);
+#endif
 	if (ret) {
 		kfree(amdgpu_fb);
 		drm_gem_object_put(obj);
