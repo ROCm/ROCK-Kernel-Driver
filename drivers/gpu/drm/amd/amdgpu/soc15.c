@@ -73,6 +73,7 @@
 #include "jpeg_v2_5.h"
 #include "smuio_v9_0.h"
 #include "smuio_v11_0.h"
+#include "smuio_v13_0.h"
 #include "dce_virtual.h"
 #include "mxgpu_ai.h"
 #include "amdgpu_smu.h"
@@ -649,40 +650,6 @@ void soc15_program_register_sequence(struct amdgpu_device *adev,
 
 }
 
-static int soc15_asic_mode1_reset(struct amdgpu_device *adev)
-{
-	u32 i;
-	int ret = 0;
-
-	amdgpu_atombios_scratch_regs_engine_hung(adev, true);
-
-	dev_info(adev->dev, "GPU mode1 reset\n");
-
-	/* disable BM */
-	pci_clear_master(adev->pdev);
-
-	amdgpu_device_cache_pci_state(adev->pdev);
-
-	ret = psp_gpu_reset(adev);
-	if (ret)
-		dev_err(adev->dev, "GPU mode1 reset failed\n");
-
-	amdgpu_device_load_pci_state(adev->pdev);
-
-	/* wait for asic to come out of reset */
-	for (i = 0; i < adev->usec_timeout; i++) {
-		u32 memsize = adev->nbio.funcs->get_memsize(adev);
-
-		if (memsize != 0xffffffff)
-			break;
-		udelay(1);
-	}
-
-	amdgpu_atombios_scratch_regs_engine_hung(adev, false);
-
-	return ret;
-}
-
 static int soc15_asic_baco_reset(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
@@ -707,13 +674,21 @@ static enum amd_reset_method
 soc15_asic_reset_method(struct amdgpu_device *adev)
 {
 	bool baco_reset = false;
+	bool connected_to_cpu = false;
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
+
+        if (adev->gmc.xgmi.supported && adev->gmc.xgmi.connected_to_cpu)
+                connected_to_cpu = true;
 
 	if (amdgpu_reset_method == AMD_RESET_METHOD_MODE1 ||
 	    amdgpu_reset_method == AMD_RESET_METHOD_MODE2 ||
 	    amdgpu_reset_method == AMD_RESET_METHOD_BACO ||
-	    amdgpu_reset_method == AMD_RESET_METHOD_PCI)
-		return amdgpu_reset_method;
+	    amdgpu_reset_method == AMD_RESET_METHOD_PCI) {
+		/* If connected to cpu, driver only support mode2 */
+                if (connected_to_cpu)
+                        return AMD_RESET_METHOD_MODE2;
+                return amdgpu_reset_method;
+        }
 
 	if (amdgpu_reset_method != -1)
 		dev_warn(adev->dev, "Specified reset method:%d isn't supported, using AUTO instead.\n",
@@ -738,6 +713,14 @@ soc15_asic_reset_method(struct amdgpu_device *adev)
 		 */
 		if ((ras && ras->supported) && adev->pm.fw_version <= 0x283400)
 			baco_reset = false;
+		break;
+	case CHIP_ALDEBARAN:
+		 /*
+		 * 1.connected to cpu: driver issue mode2 reset
+		 * 2.discret gpu: driver issue mode1 reset
+		 */
+		if (connected_to_cpu)
+			return AMD_RESET_METHOD_MODE2;
 		break;
 	default:
 		break;
@@ -768,7 +751,7 @@ static int soc15_asic_reset(struct amdgpu_device *adev)
 		return amdgpu_dpm_mode2_reset(adev);
 	default:
 		dev_info(adev->dev, "MODE1 reset\n");
-		return soc15_asic_mode1_reset(adev);
+		return amdgpu_device_mode1_reset(adev);
 	}
 }
 
@@ -891,6 +874,9 @@ static void soc15_reg_base_init(struct amdgpu_device *adev)
 	case CHIP_ARCTURUS:
 		arct_reg_base_init(adev);
 		break;
+	case CHIP_ALDEBARAN:
+		aldebaran_reg_base_init(adev);
+		break;
 	default:
 		DRM_ERROR("Unsupported asic type: %d!\n", adev->asic_type);
 		break;
@@ -913,14 +899,12 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 	if (!amdgpu_sriov_vf(adev))
 		soc15_reg_base_init(adev);
 
-	if (adev->asic_type == CHIP_VEGA20 || adev->asic_type == CHIP_ARCTURUS)
-		adev->gmc.xgmi.supported = true;
-
 	if (adev->flags & AMD_IS_APU) {
 		adev->nbio.funcs = &nbio_v7_0_funcs;
 		adev->nbio.hdp_flush_reg = &nbio_v7_0_hdp_flush_reg;
 	} else if (adev->asic_type == CHIP_VEGA20 ||
-		   adev->asic_type == CHIP_ARCTURUS) {
+		   adev->asic_type == CHIP_ARCTURUS ||
+		   adev->asic_type == CHIP_ALDEBARAN) {
 		adev->nbio.funcs = &nbio_v7_4_funcs;
 		adev->nbio.hdp_flush_reg = &nbio_v7_4_hdp_flush_reg;
 	} else {
@@ -929,7 +913,9 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 	}
 	adev->hdp.funcs = &hdp_v4_0_funcs;
 
-	if (adev->asic_type == CHIP_VEGA20 || adev->asic_type == CHIP_ARCTURUS)
+	if (adev->asic_type == CHIP_VEGA20 ||
+	    adev->asic_type == CHIP_ARCTURUS ||
+	    adev->asic_type == CHIP_ALDEBARAN)
 		adev->df.funcs = &df_v3_6_funcs;
 	else
 		adev->df.funcs = &df_v1_7_funcs;
@@ -937,6 +923,8 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 	if (adev->asic_type == CHIP_VEGA20 ||
 	    adev->asic_type == CHIP_ARCTURUS)
 		adev->smuio.funcs = &smuio_v11_0_funcs;
+	else if (adev->asic_type == CHIP_ALDEBARAN)
+		adev->smuio.funcs = &smuio_v13_0_funcs;
 	else
 		adev->smuio.funcs = &smuio_v9_0_funcs;
 
@@ -1055,6 +1043,27 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 #endif
 		amdgpu_device_ip_block_add(adev, &vcn_v2_0_ip_block);
 		amdgpu_device_ip_block_add(adev, &jpeg_v2_0_ip_block);
+		break;
+	case CHIP_ALDEBARAN:
+		amdgpu_device_ip_block_add(adev, &vega10_common_ip_block);
+		amdgpu_device_ip_block_add(adev, &gmc_v9_0_ip_block);
+
+		if (amdgpu_sriov_vf(adev)) {
+			if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP))
+				amdgpu_device_ip_block_add(adev, &psp_v13_0_ip_block);
+			amdgpu_device_ip_block_add(adev, &vega20_ih_ip_block);
+		} else {
+			amdgpu_device_ip_block_add(adev, &vega20_ih_ip_block);
+			if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP))
+				amdgpu_device_ip_block_add(adev, &psp_v13_0_ip_block);
+		}
+
+		amdgpu_device_ip_block_add(adev, &gfx_v9_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &sdma_v4_0_ip_block);
+
+		amdgpu_device_ip_block_add(adev, &smu_v13_0_ip_block);
+		amdgpu_device_ip_block_add(adev, &vcn_v2_6_ip_block);
+		amdgpu_device_ip_block_add(adev, &jpeg_v2_6_ip_block);
 		break;
 	default:
 		return -EINVAL;
@@ -1476,6 +1485,21 @@ static int soc15_common_early_init(void *handle)
 				 AMD_PG_SUPPORT_JPEG |
 				 AMD_PG_SUPPORT_VCN_DPG;
 		break;
+	case CHIP_ALDEBARAN:
+		adev->asic_funcs = &vega20_asic_funcs;
+		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
+			AMD_CG_SUPPORT_GFX_MGLS |
+			AMD_CG_SUPPORT_GFX_CGCG |
+			AMD_CG_SUPPORT_GFX_CGLS |
+			AMD_CG_SUPPORT_GFX_CP_LS |
+			AMD_CG_SUPPORT_HDP_LS |
+			AMD_CG_SUPPORT_SDMA_MGCG |
+			AMD_CG_SUPPORT_SDMA_LS |
+			AMD_CG_SUPPORT_IH_CG;
+			/*AMD_CG_SUPPORT_VCN_MGCG |AMD_CG_SUPPORT_JPEG_MGCG;*/
+		adev->pg_flags = AMD_PG_SUPPORT_VCN_DPG;
+		adev->external_rev_id = adev->rev_id + 0x3c;
+		break;
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
@@ -1709,6 +1733,7 @@ static int soc15_common_set_clockgating_state(void *handle,
 				state == AMD_CG_STATE_GATE);
 		break;
 	case CHIP_ARCTURUS:
+	case CHIP_ALDEBARAN:
 		adev->hdp.funcs->update_clock_gating(adev,
 				state == AMD_CG_STATE_GATE);
 		break;
@@ -1730,15 +1755,18 @@ static void soc15_common_get_clockgating_state(void *handle, u32 *flags)
 
 	adev->hdp.funcs->get_clock_gating_state(adev, flags);
 
-	/* AMD_CG_SUPPORT_DRM_MGCG */
-	data = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_MISC_CGTT_CTRL0));
-	if (!(data & 0x01000000))
-		*flags |= AMD_CG_SUPPORT_DRM_MGCG;
+	if (adev->asic_type != CHIP_ALDEBARAN) {
 
-	/* AMD_CG_SUPPORT_DRM_LS */
-	data = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_MISC_LIGHT_SLEEP_CTRL));
-	if (data & 0x1)
-		*flags |= AMD_CG_SUPPORT_DRM_LS;
+		/* AMD_CG_SUPPORT_DRM_MGCG */
+		data = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_MISC_CGTT_CTRL0));
+		if (!(data & 0x01000000))
+			*flags |= AMD_CG_SUPPORT_DRM_MGCG;
+
+		/* AMD_CG_SUPPORT_DRM_LS */
+		data = RREG32(SOC15_REG_OFFSET(MP0, 0, mmMP0_MISC_LIGHT_SLEEP_CTRL));
+		if (data & 0x1)
+			*flags |= AMD_CG_SUPPORT_DRM_LS;
+	}
 
 	/* AMD_CG_SUPPORT_ROM_MGCG */
 	adev->smuio.funcs->get_clock_gating_state(adev, flags);

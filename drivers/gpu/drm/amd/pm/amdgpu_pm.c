@@ -292,6 +292,7 @@ static ssize_t amdgpu_get_power_dpm_force_performance_level(struct device *dev,
 			(level == AMD_DPM_FORCED_LEVEL_PROFILE_MIN_SCLK) ? "profile_min_sclk" :
 			(level == AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK) ? "profile_min_mclk" :
 			(level == AMD_DPM_FORCED_LEVEL_PROFILE_PEAK) ? "profile_peak" :
+			(level == AMD_DPM_FORCED_LEVEL_PERF_DETERMINISM) ? "perf_determinism" :
 			"unknown");
 }
 
@@ -328,6 +329,8 @@ static ssize_t amdgpu_set_power_dpm_force_performance_level(struct device *dev,
 		level = AMD_DPM_FORCED_LEVEL_PROFILE_MIN_MCLK;
 	} else if (strncmp("profile_peak", buf, strlen("profile_peak")) == 0) {
 		level = AMD_DPM_FORCED_LEVEL_PROFILE_PEAK;
+	} else if (strncmp("perf_determinism", buf, strlen("perf_determinism")) == 0) {
+		level = AMD_DPM_FORCED_LEVEL_PERF_DETERMINISM;
 	}  else {
 		return -EINVAL;
 	}
@@ -1750,7 +1753,7 @@ out:
 
 static struct amdgpu_device_attr amdgpu_device_attrs[] = {
 	AMDGPU_DEVICE_ATTR_RW(power_dpm_state,				ATTR_FLAG_BASIC|ATTR_FLAG_ONEVF),
-	AMDGPU_DEVICE_ATTR_RW(power_dpm_force_performance_level,	ATTR_FLAG_BASIC),
+	AMDGPU_DEVICE_ATTR_RW(power_dpm_force_performance_level,	ATTR_FLAG_BASIC|ATTR_FLAG_ONEVF),
 	AMDGPU_DEVICE_ATTR_RO(pp_num_states,				ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RO(pp_cur_state,				ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RW(pp_force_state,				ATTR_FLAG_BASIC),

@@ -852,8 +852,9 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 		return 0;
 
 	if (no_wait_gpu) {
+		ret = dma_fence_is_signaled(fence) ? 0 : -EBUSY;
 		dma_fence_put(fence);
-		return -EBUSY;
+		return ret;
 	}
 
 	dma_resv_add_shared_fence(amdkcl_ttm_resvp(bo), fence);
@@ -1098,9 +1099,8 @@ static int ttm_bo_move_buffer(struct ttm_buffer_object *bo,
 	 */
 	ret = ttm_bo_mem_space(bo, placement, &mem, ctx);
 	if (ret)
-		goto out_unlock;
+		return ret;
 	ret = ttm_bo_handle_move_mem(bo, &mem, false, ctx);
-out_unlock:
 	if (ret)
 		ttm_resource_free(bo, &mem);
 	return ret;

@@ -181,6 +181,11 @@ extern int queue_preemption_timeout_ms;
  */
 extern bool keep_idle_process_evicted;
 
+/*
+ * Don't evict process queues on vm fault
+ */
+extern int amdgpu_no_queue_eviction_on_vm_fault;
+
 /* Enable eviction debug messages */
 extern bool debug_evictions;
 
@@ -927,12 +932,6 @@ struct kfd_process {
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
-
-	/* The debugger will suspend/resume KFD on per-device attach/detach
-	 * call if the GPU requires a barrier behavior change so silence dmesg
-	 * process restore messages in this case.
-	 */
-	bool restore_silent;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
@@ -1094,6 +1093,12 @@ int kfd_init_apertures(struct kfd_process *process);
 
 /* CWSR initialization */
 int kfd_process_init_cwsr_apu(struct kfd_process *process, struct file *filep);
+
+void kfd_process_set_trap_handler(struct qcm_process_device *qpd,
+				  uint64_t tba_addr,
+				  uint64_t tma_addr);
+void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
+				     bool enabled);
 
 /* Queue Context Management */
 int init_queue(struct queue **q, const struct queue_properties *properties);

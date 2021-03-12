@@ -567,11 +567,7 @@ static int kfd_ioctl_set_trap_handler(struct file *filep,
 		goto out;
 	}
 
-	if (dev->dqm->ops.set_trap_handler(dev->dqm,
-					&pdd->qpd,
-					args->tba_addr,
-					args->tma_addr))
-		err = -EINVAL;
+	kfd_process_set_trap_handler(&pdd->qpd, args->tba_addr, args->tma_addr);
 
 out:
 	mutex_unlock(&p->mutex);
@@ -2795,7 +2791,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = kfd_dbg_trap_disable(target, false, 0);
 			break;
 		case 1:
-			r = kfd_dbg_trap_enable(target, &args->data2);
+			r = kfd_dbg_trap_enable(target, &args->data2,
+						&args->data3);
 			if (!r)
 				target->exception_enable_mask = exception_mask;
 			break;

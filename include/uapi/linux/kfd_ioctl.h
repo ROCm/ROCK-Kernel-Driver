@@ -303,8 +303,11 @@ enum kfd_dbg_trap_exception_code {
  * ptr:   unused
  * data1: 0=disable, 1=enable
  * data2: return value for fd
- * data3: unused
+ * data3: return ttmp/dispatch ptr save enabled (0=disabled, 1=enabled)
  * data4: unused
+ *
+ * FIXME: data3 will always return 0 as runtime enable is still not implemented
+ * so ignore the return value for now.
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
@@ -615,6 +618,7 @@ struct kfd_ioctl_acquire_vm_args {
 #define KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE	(1 << 28)
 #define KFD_IOC_ALLOC_MEM_FLAGS_AQL_QUEUE_MEM	(1 << 27)
 #define KFD_IOC_ALLOC_MEM_FLAGS_COHERENT	(1 << 26)
+#define KFD_IOC_ALLOC_MEM_FLAGS_UNCACHED	(1 << 25)
 
 /* Allocate memory for later SVM (shared virtual memory) mapping.
  *

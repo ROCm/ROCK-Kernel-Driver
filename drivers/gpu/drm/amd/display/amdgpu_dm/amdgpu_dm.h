@@ -346,6 +346,15 @@ struct amdgpu_display_manager {
 	vblank_params[DC_IRQ_SOURCE_VBLANK6 - DC_IRQ_SOURCE_VBLANK1 + 1];
 
 	/**
+	 * @vline0_params:
+	 *
+	 * OTG vertical interrupt0 IRQ parameters, passed to registered
+	 * handlers when triggered.
+	 */
+	struct common_irq_params
+	vline0_params[DC_IRQ_SOURCE_DC6_VLINE0 - DC_IRQ_SOURCE_DC1_VLINE0 + 1];
+
+	/**
 	 * @vupdate_params:
 	 *
 	 * Vertical update IRQ parameters, passed to registered handlers when
@@ -393,6 +402,9 @@ struct amdgpu_display_manager {
 	 * number of currently active vblank irqs
 	 */
 	uint32_t active_vblank_irq_count;
+#if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
+	struct crc_rd_work *crc_rd_wrk;
+#endif
 
 	/**
 	 * @mst_encoders:
@@ -491,7 +503,6 @@ struct dm_crtc_state {
 	int active_planes;
 
 	int crc_skip_count;
-	enum amdgpu_dm_pipe_crc_source crc_src;
 
 #ifndef HAVE_DRM_VRR_SUPPORTED
 	bool base_vrr_enabled;

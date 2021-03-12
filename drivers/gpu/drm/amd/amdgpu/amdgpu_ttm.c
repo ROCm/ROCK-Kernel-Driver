@@ -73,8 +73,18 @@ static int amdgpu_ttm_init_on_chip(struct amdgpu_device *adev,
 				    unsigned int type,
 				    uint64_t size_in_page)
 {
+	uint32_t available_caching;
+	uint32_t default_caching;
+
+	if (adev->gmc.xgmi.connected_to_cpu) {
+		available_caching = TTM_PL_FLAG_CACHED;
+		default_caching = TTM_PL_FLAG_CACHED;
+	} else {
+		available_caching = TTM_PL_FLAG_UNCACHED;
+		default_caching = TTM_PL_FLAG_UNCACHED;
+	}
 	return ttm_range_man_init(&adev->mman.bdev, type,
-				  TTM_PL_FLAG_UNCACHED, TTM_PL_FLAG_UNCACHED,
+				  available_caching, default_caching,
 				  false, size_in_page);
 }
 
@@ -586,6 +596,10 @@ static int amdgpu_move_vram_ram(struct ttm_buffer_object *bo, bool evict,
 
 	/* move BO (in tmp_mem) to new_mem */
 	r = ttm_bo_move_ttm(bo, ctx, new_mem);
+	/* amdgpu_move_blit has succeeded. In this case, BO holds tmp_mem.
+	 * Should NOT free tmp_mem.
+	 */
+	return r;
 out_cleanup:
 	ttm_resource_free(bo, &tmp_mem);
 	return r;
@@ -630,9 +644,10 @@ static int amdgpu_move_ram_vram(struct ttm_buffer_object *bo, bool evict,
 
 	/* copy to VRAM */
 	r = amdgpu_move_blit(bo, evict, ctx->no_wait_gpu, new_mem, old_mem);
-	if (unlikely(r)) {
-		goto out_cleanup;
-	}
+	/* ttm_bo_move_ttm has succeeded. In this case, BO holds tmp_mem.
+	 * Should NOT free tmp_mem.
+	 */
+	return r;
 out_cleanup:
 	ttm_resource_free(bo, &tmp_mem);
 	return r;
@@ -792,6 +807,14 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_reso
 
 		mem->bus.base = adev->gmc.aper_base;
 		mem->bus.is_iomem = true;
+
+#ifdef HAVE_TTM_BUS_PLACEMENT_CACHING
+		if (adev->gmc.xgmi.connected_to_cpu)
+			mem->bus.caching = ttm_cached;
+		else
+			mem->bus.caching = ttm_write_combined;
+#endif
+
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
 		node = container_of(mm_node, struct amdgpu_dgma_node, node);
@@ -1869,6 +1892,15 @@ uint64_t amdgpu_ttm_tt_pde_flags(struct ttm_tt *ttm, struct ttm_resource *mem)
 			flags |= AMDGPU_PTE_SNOOPED;
 	}
 
+#ifndef HAVE_TTM_BUS_PLACEMENT_CACHING
+	if (mem && mem->placement & TTM_PL_FLAG_CACHED)
+		flags |= AMDGPU_PTE_SNOOPED;
+#else
+	if (mem && mem->mem_type == TTM_PL_VRAM &&
+			mem->bus.caching == ttm_cached)
+		flags |= AMDGPU_PTE_SNOOPED;
+#endif
+
 	return flags;
 }
 
@@ -2612,8 +2644,13 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	/* Change the size here instead of the init above so only lpfn is affected */
 	amdgpu_ttm_set_buffer_funcs_status(adev, false);
 #ifdef CONFIG_64BIT
-	adev->mman.aper_base_kaddr = ioremap_wc(adev->gmc.aper_base,
-						adev->gmc.visible_vram_size);
+	if (adev->gmc.xgmi.connected_to_cpu)
+		adev->mman.aper_base_kaddr = ioremap_cache(adev->gmc.aper_base,
+				adev->gmc.visible_vram_size);
+
+	else
+		adev->mman.aper_base_kaddr = ioremap_wc(adev->gmc.aper_base,
+				adev->gmc.visible_vram_size);
 #endif
 
 	/*
@@ -2827,7 +2864,8 @@ int amdgpu_copy_buffer(struct amdgpu_ring *ring, uint64_t src_offset,
 		return r;
 
 	if (vm_needs_flush) {
-		job->vm_pd_addr = amdgpu_gmc_pd_addr(adev->gart.bo);
+		job->vm_pd_addr = amdgpu_gmc_pd_addr(adev->gmc.pdb0_bo ?
+					adev->gmc.pdb0_bo : adev->gart.bo);
 		job->vm_needs_flush = true;
 	}
 	if (resv) {
