@@ -4742,14 +4742,14 @@ retry:
 		}
 
 		/* got the hw fence, signal finished fence */
-		atomic_dec(&ring->sched.num_jobs);
+		atomic_dec(ring->sched.score);
 		dma_fence_get(&s_job->s_fence->finished);
 		dma_fence_signal(&s_job->s_fence->finished);
 		dma_fence_put(&s_job->s_fence->finished);
 
 		/* remove node from list and free the job */
 		spin_lock(&ring->sched.job_list_lock);
-		list_del_init(&s_job->node);
+		list_del_init(&s_job->list);
 		spin_unlock(&ring->sched.job_list_lock);
 		ring->sched.ops->free_job(s_job);
 	}
