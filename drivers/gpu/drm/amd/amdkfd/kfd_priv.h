@@ -351,7 +351,6 @@ struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
 	struct kfd_dev *dev;
-	struct list_head cb_data_head;
 	/* page-aligned VA address */
 	uint64_t cpuva;
 	unsigned int mem_type;
@@ -1072,7 +1071,6 @@ void *kfd_process_find_bo_from_interval(struct kfd_process *p,
 					uint64_t last_addr);
 void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd,
 					int handle);
-void run_rdma_free_callback(struct kfd_bo *buf_obj);
 struct kfd_process *kfd_lookup_process_by_pid(struct pid *pid);
 
 /* Process device data iterator */

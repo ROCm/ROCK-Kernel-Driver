@@ -979,13 +979,6 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			amdgpu_read_unlock(peer_pdd->dev->ddev);
 		}
 
-		/* There should be no more RDMA callbacks, because RDMA
-		 * memory references also hold a process reference. This
-		 * clean-up only runs when there are no more process
-		 * references.
-		 */
-		WARN_ONCE(!list_empty(&buf_obj->cb_data_head),
-			  "RDMA callback list not empty");
 		amdgpu_read_lock(pdd->dev->ddev, false);
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd,
 						      buf_obj->mem, pdd->drm_priv, NULL);
@@ -1756,8 +1749,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->dev = pdd->dev;
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
-
-	INIT_LIST_HEAD(&buf_obj->cb_data_head);
 
 	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
 

@@ -292,14 +292,19 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *process_info,
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 					      struct kfd_vm_fault_info *info);
 
-int amdgpu_amdkfd_gpuvm_pin_bo(struct kgd_mem *mem);
-void amdgpu_amdkfd_gpuvm_unpin_bo(struct kgd_mem *mem);
+struct amdgpu_bo *amdgpu_amdkfd_gpuvm_get_bo_ref(struct kgd_mem *mem,
+						 uint32_t *flags);
+void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo);
+
+int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo);
+void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo);
 
 int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
-		struct kgd_mem *mem, uint64_t offset, uint64_t size,
+		struct amdgpu_bo *bo, uint32_t flags,
+		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table **ret_sg);
-void amdgpu_amdkfd_gpuvm_put_sg_table(struct kgd_mem *mem,
+void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table *sg);
 

@@ -1543,7 +1543,6 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		ret = -EINVAL;
 		goto err_unlock;
 	}
-	run_rdma_free_callback(buf_obj);
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd,
 						buf_obj->mem, pdd->drm_priv, &size);
