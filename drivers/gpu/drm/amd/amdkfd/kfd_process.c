@@ -1774,8 +1774,6 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
 
-	INIT_LIST_HEAD(&buf_obj->cb_data_head);
-
 	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
 
 	if (handle < 0)
