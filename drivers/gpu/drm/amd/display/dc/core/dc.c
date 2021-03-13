@@ -49,6 +49,7 @@
 #include "timing_generator.h"
 #include "abm.h"
 #include "virtual/virtual_link_encoder.h"
+#include "hubp.h"
 
 #include "link_hwss.h"
 #include "link_encoder.h"
@@ -2119,6 +2120,10 @@ static enum surface_update_type check_update_surfaces_for_stream(
 	if (stream_status == NULL || stream_status->plane_count != surface_count)
 		overall_type = UPDATE_TYPE_FULL;
 
+	if (stream_update && stream_update->pending_test_pattern) {
+		overall_type = UPDATE_TYPE_FULL;
+	}
+
 	/* some stream updates require passive update */
 	if (stream_update) {
 		union stream_update_flags *su_flags = &stream_update->stream->update_flags;
@@ -2532,14 +2537,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 #endif
 			}
 
-			if (stream_update->pending_test_pattern) {
-				dc_link_dp_set_test_pattern(stream->link,
-					stream->test_pattern.type,
-					stream->test_pattern.color_space,
-					stream->test_pattern.p_link_settings,
-					stream->test_pattern.p_custom_pattern,
-					stream->test_pattern.cust_pattern_size);
-			}
 
 			/* Full fe update*/
 			if (update_type == UPDATE_TYPE_FAST)
@@ -2549,6 +2546,15 @@ static void commit_planes_do_stream_update(struct dc *dc,
 			if (stream_update->dsc_config)
 				dp_update_dsc_config(pipe_ctx);
 #endif
+
+			if (stream_update->pending_test_pattern) {
+				dc_link_dp_set_test_pattern(stream->link,
+					stream->test_pattern.type,
+					stream->test_pattern.color_space,
+					stream->test_pattern.p_link_settings,
+					stream->test_pattern.p_custom_pattern,
+					stream->test_pattern.cust_pattern_size);
+			}
 
 			if (stream_update->dpms_off) {
 				if (*stream_update->dpms_off) {
@@ -2635,6 +2641,16 @@ static void commit_planes_for_stream(struct dc *dc,
 			top_pipe_to_program = pipe_ctx;
 		}
 	}
+
+	if (stream->test_pattern.type != DP_TEST_PATTERN_VIDEO_MODE) {
+		struct pipe_ctx *mpcc_pipe;
+		struct pipe_ctx *odm_pipe;
+
+		for (mpcc_pipe = top_pipe_to_program; mpcc_pipe; mpcc_pipe = mpcc_pipe->bottom_pipe)
+			for (odm_pipe = mpcc_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
+				odm_pipe->ttu_regs.min_ttu_vblank = MAX_TTU;
+	}
+
 
 	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
 		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable) {
