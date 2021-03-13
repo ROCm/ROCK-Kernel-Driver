@@ -68,7 +68,7 @@ static inline void amdgpu_res_first(struct ttm_resource *res,
 		start -= node++->size << PAGE_SHIFT;
 
 	cur->start = (node->start << PAGE_SHIFT) + start;
-	cur->size = (node->size << PAGE_SHIFT) - start;
+	cur->size = min((node->size << PAGE_SHIFT) - start, size);
 	cur->remaining = size;
 	cur->node = node;
 }
