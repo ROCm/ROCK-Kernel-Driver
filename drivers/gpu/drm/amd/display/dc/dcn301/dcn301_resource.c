@@ -881,6 +881,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.underflow_assert_delay_us = 0xFFFFFFFF,
 	.dwb_fi_phase = -1, // -1 = disable
 	.dmub_command_table = true,
+	.use_max_lb = false,
 };
 
 static const struct dc_debug_options debug_defaults_diags = {
@@ -897,6 +898,7 @@ static const struct dc_debug_options debug_defaults_diags = {
 	.scl_reset_length10 = true,
 	.dwb_fi_phase = -1, // -1 = disable
 	.dmub_command_table = true,
+	.use_max_lb = false,
 };
 
 void dcn301_dpp_destroy(struct dpp **dpp)
@@ -1729,7 +1731,7 @@ static struct resource_funcs dcn301_res_pool_funcs = {
 	.link_enc_create = dcn301_link_encoder_create,
 	.panel_cntl_create = dcn301_panel_cntl_create,
 	.validate_bandwidth = dcn30_validate_bandwidth,
-	.calculate_wm_and_dlg = dcn301_calculate_wm_and_dlg,
+	.calculate_wm_and_dlg = dcn30_calculate_wm_and_dlg,
 	.populate_dml_pipes = dcn30_populate_dml_pipes_from_context,
 	.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 	.add_stream_to_ctx = dcn30_add_stream_to_ctx,
