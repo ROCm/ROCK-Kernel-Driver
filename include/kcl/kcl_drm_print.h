@@ -27,6 +27,7 @@
 
 #include <drm/drm_print.h>
 #include <drm/drm_drv.h>
+#include <drm/drm_device.h>
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
 /* Copied from d8187177b0b1 include/drm/drm_print.h */
@@ -102,10 +103,20 @@ void drm_mm_print(const struct drm_mm *mm, struct drm_printer *p)
 	_DRM_PRINTK(_once, NOTICE, fmt, ##__VA_ARGS__)
 #endif
 
-#ifndef DRM_ERROR
-#define DRM_ERROR(fmt, ...)                                            \
-	drm_printk(KERN_ERR, DRM_UT_NONE, fmt,  ##__VA_ARGS__)
-#endif
+#ifndef drm_err
+#define drm_err(drm, fmt, ...)           \
+	dev_err((drm)->dev, "[drm] " fmt, ##__VA_ARGS__)
+
+__printf(1, 2)
+void kcl_drm_err(const char *format, ...);
+
+#undef DRM_ERROR
+#define DRM_ERROR(fmt, ...)              \
+	kcl_drm_err(fmt, ##__VA_ARGS__)
+
+#else
+#define HAVE_DRM_ERR_MACRO
+#endif /* drm_err */
 
 #if !defined(DRM_DEV_DEBUG)
 #define DRM_DEV_DEBUG(dev, fmt, ...)					\
@@ -142,4 +153,5 @@ static  inline bool drm_debug_enabled(unsigned int category)
 	return unlikely(drm_debug & category);
 }
 #endif /* HAVE_DRM_DEBUG_ENABLED */
+
 #endif
