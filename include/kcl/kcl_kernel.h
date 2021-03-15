@@ -23,4 +23,9 @@
 #define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
 #endif /* ALIGN_DOWN */
 
+#ifndef ___GFP_KSWAPD_RECLAIM
+#define ___GFP_KSWAPD_RECLAIM	0x00u
+#define __GFP_KSWAPD_RECLAIM	((__force gfp_t)___GFP_KSWAPD_RECLAIM) /* kswapd can wake */
+#endif /* ___GFP_KSWAPD_RECLAIM */
+
 #endif /* AMDKCL_KERNEL_H */
