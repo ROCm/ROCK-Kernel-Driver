@@ -35,6 +35,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/highmem.h>
 #include <linux/sched/mm.h>
+#include <linux/debugfs.h>
 
 #ifdef CONFIG_X86
 #include <asm/set_memory.h>
