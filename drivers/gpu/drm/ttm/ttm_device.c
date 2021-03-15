@@ -28,6 +28,7 @@
 #define pr_fmt(fmt) "[TTM DEVICE] " fmt
 
 #include <linux/mm.h>
+#include <linux/debugfs.h>
 
 #include <drm/ttm/ttm_device.h>
 #include <drm/ttm/ttm_tt.h>
