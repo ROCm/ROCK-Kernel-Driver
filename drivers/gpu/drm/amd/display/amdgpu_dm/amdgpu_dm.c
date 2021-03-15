@@ -7994,8 +7994,8 @@ static void update_stream_irq_parameters(
 #else
 			config.state = new_crtc_state->base.vrr_enabled ?
 #endif
-				VRR_STATE_ACTIVE_VARIABLE :
-				VRR_STATE_INACTIVE;
+						     VRR_STATE_ACTIVE_VARIABLE :
+						     VRR_STATE_INACTIVE;
 		}
 	} else {
 		config.state = VRR_STATE_UNSUPPORTED;
@@ -9219,7 +9219,11 @@ static void get_freesync_config_for_crtc(
 			config.state = VRR_STATE_ACTIVE_FIXED;
 			config.fixed_refresh_in_uhz = new_crtc_state->freesync_config.fixed_refresh_in_uhz;
 			goto out;
+#ifndef HAVE_DRM_VRR_SUPPORTED
+		} else if (new_crtc_state->base_vrr_enabled) {
+#else
 		} else if (new_crtc_state->base.vrr_enabled) {
+#endif
 			config.state = VRR_STATE_ACTIVE_VARIABLE;
 		} else {
 			config.state = VRR_STATE_INACTIVE;
