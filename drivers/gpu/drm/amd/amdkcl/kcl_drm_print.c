@@ -83,3 +83,22 @@ void drm_dev_dbg(const struct device *dev, int category,
 }
 EXPORT_SYMBOL(drm_dev_dbg);
 #endif
+
+#if !defined(HAVE_DRM_ERR_MACRO)
+void kcl_drm_err(const char *format, ...)
+{
+        struct va_format vaf;
+        va_list args;
+
+        va_start(args, format);
+        vaf.fmt = format;
+        vaf.va = &args;
+
+        printk(KERN_ERR "[" DRM_NAME ":%ps] *ERROR* %pV",
+               __builtin_return_address(0), &vaf);
+
+        va_end(args);
+}
+EXPORT_SYMBOL(kcl_drm_err);
+
+#endif
