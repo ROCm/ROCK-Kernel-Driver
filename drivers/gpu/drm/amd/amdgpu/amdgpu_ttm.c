@@ -2693,12 +2693,22 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 	adev->mman.buffer_funcs_enabled = enable;
 }
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+static vm_fault_t amdgpu_ttm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct ttm_buffer_object *bo = vma->vm_private_data;
+#else
 static vm_fault_t amdgpu_ttm_fault(struct vm_fault *vmf)
 {
 	struct ttm_buffer_object *bo = vmf->vma->vm_private_data;
+#endif
 	vm_fault_t ret;
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+	ret = ttm_bo_vm_reserve(bo, vmf, vma);
+#else
 	ret = ttm_bo_vm_reserve(bo, vmf);
+#endif
 	if (ret)
 		return ret;
 
@@ -2706,8 +2716,12 @@ static vm_fault_t amdgpu_ttm_fault(struct vm_fault *vmf)
 	if (ret)
 		goto unlock;
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+	ret = ttm_bo_vm_fault_reserved(vmf, vma, vma->vm_page_prot, TTM_BO_VM_NUM_PREFAULT, 1);
+#else
 	ret = ttm_bo_vm_fault_reserved(vmf, vmf->vma->vm_page_prot,
 				       TTM_BO_VM_NUM_PREFAULT, 1);
+#endif
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
 		return ret;
 
