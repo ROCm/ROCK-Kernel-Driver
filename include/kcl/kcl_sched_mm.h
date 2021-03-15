@@ -29,7 +29,21 @@ static inline void __fs_reclaim_acquire(void) { }
 static inline void __fs_reclaim_release(void) { }
 static inline void fs_reclaim_acquire(gfp_t gfp_mask) { }
 static inline void fs_reclaim_release(gfp_t gfp_mask) { }
-#endif
-#endif
+#endif /* CONFIG_LOCKDEP */
+#endif /* HAVE_FS_RECLAIM_ACQUIRE */
+
+#ifndef HAVE_MEMALLOC_NORECLAIM_SAVE
+static inline unsigned int memalloc_noreclaim_save(void)
+{
+	unsigned int flags = current->flags & PF_MEMALLOC;
+	current->flags |= PF_MEMALLOC;
+	return flags;
+}
+
+static inline void memalloc_noreclaim_restore(unsigned int flags)
+{
+	current->flags = (current->flags & ~PF_MEMALLOC) | flags;
+}
+#endif /* HAVE_MEMALLOC_NORECLAIM_SAVE */
 
 #endif
