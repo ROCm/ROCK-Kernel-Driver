@@ -2433,8 +2433,8 @@ static bool amdgpu_device_check_vram_lost(struct amdgpu_device *adev)
  * Returns 0 on success, negative error code on failure.
  */
 
-static int amdgpu_device_set_cg_state(struct amdgpu_device *adev,
-						enum amd_clockgating_state state)
+int amdgpu_device_set_cg_state(struct amdgpu_device *adev,
+			       enum amd_clockgating_state state)
 {
 	int i, j, r;
 
@@ -2469,7 +2469,8 @@ static int amdgpu_device_set_cg_state(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int amdgpu_device_set_pg_state(struct amdgpu_device *adev, enum amd_powergating_state state)
+int amdgpu_device_set_pg_state(struct amdgpu_device *adev,
+			       enum amd_powergating_state state)
 {
 	int i, j, r;
 
