@@ -2106,7 +2106,9 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 			qpd->pqm->process,
 			q->device,
 			-1,
-			false);
+			false,
+			NULL,
+			0);
 	mqd_mgr->free_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 
 	return retval;
