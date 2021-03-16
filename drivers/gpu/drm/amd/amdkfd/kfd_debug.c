@@ -129,8 +129,8 @@ void debug_event_write_work_handler(struct work_struct *work)
  */
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			struct kfd_dev *dev,
-			unsigned int source_id,
-			bool use_worker)
+			unsigned int source_id, bool use_worker,
+			void *exception_data, size_t exception_data_size)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
@@ -164,6 +164,23 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 				continue;
 
 			pdd->exception_status |= ec_mask;
+
+			if (event_type == EC_MEMORY_VIOLATION) {
+				if (!pdd->vm_fault_exc_data) {
+					pdd->vm_fault_exc_data = kmemdup(
+							exception_data,
+							exception_data_size,
+							GFP_KERNEL);
+					if (!pdd->vm_fault_exc_data)
+						pr_debug("Failed to allocate exception data memory");
+				} else {
+					pr_debug("Debugger exception data not saved\n");
+					print_hex_dump_bytes("exception data: ",
+							DUMP_PREFIX_OFFSET,
+							exception_data,
+							exception_data_size);
+				}
+			}
 			break;
 		}
 	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(event_type)) {
@@ -207,7 +224,9 @@ out:
 void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault)
+				   bool is_vmfault,
+				   void *exception_data,
+				   size_t exception_data_size)
 {
 	struct kfd_process *p;
 
@@ -217,8 +236,9 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 		return;
 
 	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
-							p, dev, doorbell_id,
-							true);
+						p, dev, doorbell_id, true,
+						exception_data,
+						exception_data_size);
 	kfd_unref_process(p);
 }
 
@@ -594,5 +614,115 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 
 out:
 	spin_unlock(&watch_points_lock);
+	return r;
+}
+
+int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
+		uint32_t source_id,
+		uint32_t exception_code,
+		bool clear_exception,
+		void __user *info,
+		uint32_t *info_size)
+{
+	bool found = false;
+	int r = 0;
+	uint32_t actual_info_size = 0;
+	uint64_t *exception_status_ptr = NULL;
+
+	if (!target)
+		return -EINVAL;
+
+	if (!info || !info_size)
+		return -EINVAL;
+
+	mutex_lock(&target->event_mutex);
+	if (KFD_DBG_EC_TYPE_IS_QUEUE(exception_code)) {
+		/* Per queue exceptions */
+		struct queue *queue = NULL;
+		int i;
+
+		for (i = 0; i < target->n_pdds; i++) {
+			struct kfd_process_device *pdd = target->pdds[i];
+			struct qcm_process_device *qpd = &pdd->qpd;
+
+			list_for_each_entry(queue, &qpd->queues_list, list) {
+				if (!found && queue->properties.queue_id == source_id) {
+					found = true;
+					break;
+				}
+			}
+			if (found)
+				break;
+		}
+
+		if (!found) {
+			r = -EINVAL;
+			goto out;
+		}
+		if (!(queue->properties.exception_status &
+						KFD_EC_MASK(exception_code))) {
+			r = -ENODATA;
+			goto out;
+		}
+		exception_status_ptr = &queue->properties.exception_status;
+	} else if (KFD_DBG_EC_TYPE_IS_DEVICE(exception_code)) {
+		/* Per device exceptions */
+		struct kfd_process_device *pdd = NULL;
+		int i;
+
+		for (i = 0; i < target->n_pdds; i++) {
+			pdd = target->pdds[i];
+			if (pdd->dev->id == source_id) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			r = -EINVAL;
+			goto out;
+		}
+		if (!(pdd->exception_status &
+					KFD_EC_MASK(exception_code))) {
+			r = -ENODATA;
+			goto out;
+		}
+		if (exception_code == EC_MEMORY_VIOLATION) {
+			if (*info_size < pdd->vm_fault_exc_data_size) {
+				r = -ENOSPC;
+				goto out;
+			}
+			if (copy_to_user(info, pdd->vm_fault_exc_data,
+						pdd->vm_fault_exc_data_size)) {
+				r = -EFAULT;
+				goto out;
+			}
+			actual_info_size = pdd->vm_fault_exc_data_size;
+			if (clear_exception) {
+				kfree(pdd->vm_fault_exc_data);
+				pdd->vm_fault_exc_data = NULL;
+				pdd->vm_fault_exc_data_size = 0;
+			}
+		}
+		exception_status_ptr = &pdd->exception_status;
+	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(exception_code)) {
+		/* Per process exceptions */
+
+		if (!(target->exception_status &
+						KFD_EC_MASK(exception_code))) {
+			r = -ENODATA;
+			goto out;
+		}
+		exception_status_ptr = &target->exception_status;
+	} else {
+		pr_debug("Bad exception type [%i]\n", exception_code);
+		r = -EINVAL;
+		goto out;
+	}
+
+	*info_size = actual_info_size;
+	if (clear_exception)
+		*exception_status_ptr &= ~KFD_EC_MASK(exception_code);
+out:
+	mutex_unlock(&target->event_mutex);
 	return r;
 }

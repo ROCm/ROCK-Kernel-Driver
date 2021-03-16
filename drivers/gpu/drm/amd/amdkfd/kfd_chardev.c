@@ -355,7 +355,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("Write ptr address   == 0x%016llX\n",
 			args->write_pointer_address);
 
-	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, dev, queue_id, false);
+	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, dev, queue_id, false, NULL, 0);
 	return 0;
 
 err_create_queue:
@@ -3037,6 +3037,14 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		break;
 	case KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS:
 		r = kfd_dbg_trap_set_precise_mem_ops(target, data1);
+		break;
+	case KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO:
+		r = kfd_dbg_trap_query_exception_info(target,
+				data1,
+				data2,
+				data3 == 1,
+				(void __user *) args->ptr, /* info */
+				&args->data4);      /* info size */
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

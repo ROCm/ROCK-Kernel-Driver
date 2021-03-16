@@ -57,9 +57,10 @@
  * 4.0 - Remove gpu_id from api
  * 5.0 - Report exception codes to the debugger
  * 6.0 - Pass event file descriptor from userspace.
+ * 6.1 - Add KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO.
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	6
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -450,6 +451,17 @@ enum kfd_dbg_trap_exception_code {
  * data4: unused
  */
 #define KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS 10
+
+/* KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO
+ * exception_mask: unused
+ * ptr:  exception info pointer to copy to
+ * data1: source_id
+ * data2: exception_code
+ * data3: clear_exception (1 == true, 0 == false)
+ * data4: exception info data size
+ */
+#define KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO 11
+
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 exception_mask; /* to KFD */

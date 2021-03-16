@@ -829,6 +829,8 @@ struct kfd_process_device {
 
 	/* Exception code status*/
 	uint64_t exception_status;
+	void *vm_fault_exc_data;
+	size_t vm_fault_exc_data_size;
 
 	/* Tracks debug per-vmid request settings */
 	uint32_t spi_dbg_override;

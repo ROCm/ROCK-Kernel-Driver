@@ -265,6 +265,15 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, SIMD_ID),
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, CU_ID),
 					sq_int_data);
+				if (sq_int_data & KFD_SQ_INT_DATA_DEBUG_TRAP_MASK) {
+					if (context_id0 & SQ_INTERRUPT_WORD_WAVE_CTXID__PRIV_MASK)
+						kfd_set_dbg_ev_from_interrupt(dev, pasid,
+							sq_int_data & KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK,
+							false,
+							NULL,
+							0);
+					return;
+				}
 				break;
 			case SQ_INTERRUPT_WORD_ENCODING_ERROR:
 				sq_intr_err = REG_GET_FIELD(sq_int_data, KFD_SQ_INT_DATA, ERR_TYPE);
@@ -310,6 +319,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		   client_id == SOC15_IH_CLIENTID_UTCL2) {
 		struct kfd_vm_fault_info info = {0};
 		uint16_t ring_id = SOC15_RING_ID_FROM_IH_ENTRY(ih_ring_entry);
+		struct kfd_hsa_memory_exception_data exception_data;
 
 		info.vmid = vmid;
 		info.mc_id = client_id;
@@ -319,7 +329,20 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		info.prot_read  = ring_id & 0x10;
 		info.prot_write = ring_id & 0x20;
 
-		kfd_set_dbg_ev_from_interrupt(dev, pasid, -1, true);
+		memset(&exception_data, 0, sizeof(exception_data));
+		exception_data.gpu_id = dev->id;
+		exception_data.va = (info.page_addr) << PAGE_SHIFT;
+		exception_data.failure.NotPresent = info.prot_valid ? 1 : 0;
+		exception_data.failure.NoExecute = info.prot_exec ? 1 : 0;
+		exception_data.failure.ReadOnly = info.prot_write ? 1 : 0;
+		exception_data.failure.imprecise = 0;
+
+		kfd_set_dbg_ev_from_interrupt(dev,
+						pasid,
+						-1,
+						true,
+						&exception_data,
+						sizeof(exception_data));
 		kfd_smi_event_update_vmfault(dev, pasid);
 		kfd_process_vm_fault(dev->dqm, pasid);
 		kfd_signal_vm_fault_event(dev, pasid, &info);
