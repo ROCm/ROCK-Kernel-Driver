@@ -274,6 +274,7 @@ struct amdgpu_bo_va_mapping;
 struct amdgpu_atif;
 struct kfd_vm_fault_info;
 struct amdgpu_hive_info;
+struct amdgpu_reset_context;
 struct amdgpu_reset_control;
 
 enum amdgpu_cp_irq {
@@ -1199,13 +1200,10 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type);
 bool amdgpu_device_has_dc_support(struct amdgpu_device *adev);
 
 int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
-				  struct amdgpu_job *job,
-				  bool *need_full_reset_arg);
+				 struct amdgpu_reset_context *reset_context);
 
-int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
-			  struct list_head *device_list_handle,
-			  bool *need_full_reset_arg,
-			  bool skip_hw_reset);
+int amdgpu_do_asic_reset(struct list_head *device_list_handle,
+			 struct amdgpu_reset_context *reset_context);
 
 int emu_soc_asic_init(struct amdgpu_device *adev);
 
