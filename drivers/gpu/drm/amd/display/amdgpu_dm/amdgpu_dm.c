@@ -10978,7 +10978,8 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 
 	new_cursor_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->cursor);
 	new_primary_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->primary);
-	if (!new_cursor_state || !new_primary_state || !new_cursor_state->fb) {
+	if (!new_cursor_state || !new_primary_state ||
+	    !new_cursor_state->fb || !new_primary_state->fb) {
 		return 0;
 	}
 
