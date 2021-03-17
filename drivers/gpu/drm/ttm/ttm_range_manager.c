@@ -75,16 +75,9 @@ static int ttm_range_man_alloc(struct ttm_resource_manager *man,
 	if (!node)
 		return -ENOMEM;
 
-#ifndef HAVE_DRM_MM_INSERT_MODE
-	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
-		sflags = DRM_MM_SEARCH_BELOW;
-		aflags = DRM_MM_CREATE_TOP;
-	}
-#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
-#endif
 
 	ttm_resource_init(bo, place, &node->base);
 
