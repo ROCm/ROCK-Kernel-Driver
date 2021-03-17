@@ -2151,6 +2151,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		goto err_free;
 #endif
 
+	ddev->pdev = pdev;
 	pci_set_drvdata(pdev, ddev);
 
 	ret = amdgpu_driver_load_kms(adev, ent->driver_data);
