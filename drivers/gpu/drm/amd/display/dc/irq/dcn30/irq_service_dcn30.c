@@ -420,7 +420,6 @@ irq_source_info_dcn30[DAL_IRQ_SOURCES_NUMBER] = {
 	vline0_int_entry(3),
 	vline0_int_entry(4),
 	vline0_int_entry(5),
-	dmub_trace_int_entry(),
 };
 
 static const struct irq_service_funcs irq_service_funcs_dcn30 = {
