@@ -61,12 +61,7 @@ static int ttm_range_man_alloc(struct ttm_resource_manager *man,
 	struct ttm_range_manager *rman = to_range_manager(man);
 	struct drm_mm *mm = &rman->mm;
 	struct drm_mm_node *node;
-#ifndef HAVE_DRM_MM_INSERT_MODE
-	enum drm_mm_search_flags sflags = DRM_MM_SEARCH_BEST;
-	enum drm_mm_allocator_flags aflags = DRM_MM_CREATE_DEFAULT;
-#else
 	enum drm_mm_insert_mode mode;
-#endif
 	unsigned long lpfn;
 	int ret;
 
@@ -78,29 +73,16 @@ static int ttm_range_man_alloc(struct ttm_resource_manager *man,
 	if (!node)
 		return -ENOMEM;
 
-#ifndef HAVE_DRM_MM_INSERT_MODE
-	if (place->flags & TTM_PL_FLAG_TOPDOWN) {
-		sflags = DRM_MM_SEARCH_BELOW;
-		aflags = DRM_MM_CREATE_TOP;
-	}
-#else
 	mode = DRM_MM_INSERT_BEST;
 	if (place->flags & TTM_PL_FLAG_TOPDOWN)
 		mode = DRM_MM_INSERT_HIGH;
-#endif
 
 	spin_lock(&rman->lock);
-#ifndef HAVE_DRM_MM_INSERT_MODE
-	ret = drm_mm_insert_node_in_range_generic(mm, node, mem->num_pages,
-					  mem->page_alignment, 0,
-					  place->fpfn, lpfn,
-					  sflags, aflags);
-#else
 	ret = drm_mm_insert_node_in_range(mm, node,
 					  mem->num_pages,
 					  mem->page_alignment, 0,
 					  place->fpfn, lpfn, mode);
-#endif
+
 	spin_unlock(&rman->lock);
 
 	if (unlikely(ret)) {

@@ -8,7 +8,7 @@
  * with rbtrees
  */
 
-#include <drm/drm_mm.h>
+#include <kcl/kcl_drm_mm.h>
 
 #ifndef HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS
 static inline int _kcl_drm_mm_insert_node(struct drm_mm *mm,
@@ -19,5 +19,9 @@ static inline int _kcl_drm_mm_insert_node(struct drm_mm *mm,
 }
 #define drm_mm_insert_node _kcl_drm_mm_insert_node
 #endif /* HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS */
+
+#ifndef HAVE_DRM_MM_INSERT_MODE
+#define drm_mm_insert_node_in_range _kcl_drm_mm_insert_node_in_range
+#endif
 
 #endif /* AMDKCL_DRM_MM_H */

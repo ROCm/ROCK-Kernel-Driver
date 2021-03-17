@@ -206,18 +206,9 @@ static int amdgpu_gtt_mgr_new(struct ttm_resource_manager *man,
 	node->tbo = tbo;
 
 	spin_lock(&mgr->lock);
-#ifndef HAVE_DRM_MM_INSERT_MODE
-	r = drm_mm_insert_node_in_range_generic(&mgr->mm, &node->node,
-						mem->num_pages,
-						mem->page_alignment, 0,
-						place->fpfn, place->lpfn,
-						DRM_MM_SEARCH_BEST,
-						DRM_MM_CREATE_DEFAULT);
-#else
 	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, mem->num_pages,
 					mem->page_alignment, 0, place->fpfn,
 					place->lpfn, DRM_MM_INSERT_BEST);
-#endif
 	spin_unlock(&mgr->lock);
 
 	if (unlikely(r))
