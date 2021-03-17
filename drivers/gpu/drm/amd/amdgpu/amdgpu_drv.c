@@ -2317,6 +2317,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		goto err_free;
 #endif
 
+	ddev->pdev = pdev;
 	pci_set_drvdata(pdev, ddev);
 
 	amdgpu_init_debug_options(adev);
