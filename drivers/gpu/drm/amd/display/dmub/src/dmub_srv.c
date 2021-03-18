@@ -33,7 +33,6 @@
 #include "dmub_dcn302.h"
 #endif
 #include "os_types.h"
-#include "dmub_trace_buffer.h"
 /*
  * Note: the DMUB service is standalone. No additional headers should be
  * added below or above this line unless they reside within the DMUB
@@ -481,7 +480,7 @@ enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 		cw5.region.top = cw5.region.base + tracebuff_fb->size;
 
 		outbox0.base = DMUB_REGION5_BASE + TRACE_BUFFER_ENTRY_OFFSET;
-		outbox0.top = outbox0.base + sizeof(struct dmcub_trace_buf_entry) * PERF_TRACE_MAX_ENTRY;
+		outbox0.top = outbox0.base + tracebuff_fb->size - TRACE_BUFFER_ENTRY_OFFSET;
 
 
 		cw6.offset.quad_part = fw_state_fb->gpu_addr;
@@ -524,7 +523,7 @@ enum dmub_status dmub_srv_hw_init(struct dmub_srv *dmub,
 	dmub_memset(&outbox0_rb_params, 0, sizeof(outbox0_rb_params));
 	outbox0_rb_params.ctx = dmub;
 	outbox0_rb_params.base_address = (void *)((uint64_t)(tracebuff_fb->cpu_addr) + TRACE_BUFFER_ENTRY_OFFSET);
-	outbox0_rb_params.capacity = sizeof(struct dmcub_trace_buf_entry) * PERF_TRACE_MAX_ENTRY;
+	outbox0_rb_params.capacity = tracebuff_fb->size - dmub_align(TRACE_BUFFER_ENTRY_OFFSET, 64);
 	dmub_rb_init(&dmub->outbox0_rb, &outbox0_rb_params);
 
 	if (dmub->hw_funcs.reset_release)
@@ -726,24 +725,32 @@ enum dmub_status dmub_srv_cmd_with_reply_data(struct dmub_srv *dmub,
 	return status;
 }
 
-static inline void dmub_rb_out_trace_buffer_front(struct dmub_rb *rb,
+static inline bool dmub_rb_out_trace_buffer_front(struct dmub_rb *rb,
 				 void *entry)
 {
 	const uint64_t *src = (const uint64_t *)(rb->base_address) + rb->rptr / sizeof(uint64_t);
 	uint64_t *dst = (uint64_t *)entry;
 	uint8_t i;
+	uint8_t loop_count;
 
+	if (rb->rptr == rb->wrpt)
+		return false;
+
+	loop_count = sizeof(struct dmcub_trace_buf_entry) / sizeof(uint64_t);
 	// copying data
-	for (i = 0; i < sizeof(struct dmcub_trace_buf_entry) / sizeof(uint64_t); i++)
+	for (i = 0; i < loop_count; i++)
 		*dst++ = *src++;
 
+	rb->rptr += sizeof(struct dmcub_trace_buf_entry);
+
+	rb->rptr %= rb->capacity;
+
+	return true;
 }
 
-enum dmub_status dmub_srv_get_outbox0_msg(struct dmub_srv *dmub, struct dmcub_trace_buf_entry *entry)
+bool dmub_srv_get_outbox0_msg(struct dmub_srv *dmub, struct dmcub_trace_buf_entry *entry)
 {
 	dmub->outbox0_rb.wrpt = dmub->hw_funcs.get_outbox0_wptr(dmub);
 
-	dmub_rb_out_trace_buffer_front(&dmub->outbox0_rb, (void *)entry);
-
-	return DMUB_STATUS_OK;
+	return dmub_rb_out_trace_buffer_front(&dmub->outbox0_rb, (void *)entry);
 }

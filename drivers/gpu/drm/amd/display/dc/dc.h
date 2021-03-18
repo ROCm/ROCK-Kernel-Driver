@@ -45,7 +45,7 @@
 /* forward declaration */
 struct aux_payload;
 
-#define DC_VER "3.2.125"
+#define DC_VER "3.2.126"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -922,6 +922,7 @@ struct dc_plane_state {
 	int layer_index;
 
 	union surface_update_flags update_flags;
+	bool flip_int_enabled;
 	/* private to DC core */
 	struct dc_plane_status status;
 	struct dc_context *ctx;

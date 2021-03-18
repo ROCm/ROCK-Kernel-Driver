@@ -117,6 +117,8 @@ union igp_info {
 
 union umc_info {
 	struct atom_umc_info_v3_1 v31;
+	struct atom_umc_info_v3_2 v32;
+	struct atom_umc_info_v3_3 v33;
 };
 
 union vram_info {
@@ -359,19 +361,39 @@ bool amdgpu_atomfirmware_mem_ecc_supported(struct amdgpu_device *adev)
 	union umc_info *umc_info;
 	u8 frev, crev;
 	bool ecc_default_enabled = false;
+	u8 umc_config;
+	u32 umc_config1;
 
 	index = get_index_into_master_table(atom_master_list_of_data_tables_v2_1,
 			umc_info);
 
 	if (amdgpu_atom_parse_data_header(mode_info->atom_context,
 				index, &size, &frev, &crev, &data_offset)) {
-		/* support umc_info 3.1+ */
-		if ((frev == 3 && crev >= 1) || (frev > 3)) {
+		if (frev == 3) {
 			umc_info = (union umc_info *)
 				(mode_info->atom_context->bios + data_offset);
-			ecc_default_enabled =
-				(le32_to_cpu(umc_info->v31.umc_config) &
-				 UMC_CONFIG__DEFAULT_MEM_ECC_ENABLE) ? true : false;
+			switch (crev) {
+			case 1:
+				umc_config = le32_to_cpu(umc_info->v31.umc_config);
+				ecc_default_enabled =
+					(umc_config & UMC_CONFIG__DEFAULT_MEM_ECC_ENABLE) ? true : false;
+				break;
+			case 2:
+				umc_config = le32_to_cpu(umc_info->v32.umc_config);
+				ecc_default_enabled =
+					(umc_config & UMC_CONFIG__DEFAULT_MEM_ECC_ENABLE) ? true : false;
+				break;
+			case 3:
+				umc_config = le32_to_cpu(umc_info->v33.umc_config);
+				umc_config1 = le32_to_cpu(umc_info->v33.umc_config1);
+				ecc_default_enabled =
+					((umc_config & UMC_CONFIG__DEFAULT_MEM_ECC_ENABLE) ||
+					 (umc_config1 & UMC_CONFIG1__ENABLE_ECC_CAPABLE)) ? true : false;
+				break;
+			default:
+				/* unsupported crev */
+				return false;
+			}
 		}
 	}
 
