@@ -231,6 +231,7 @@ int amdgpu_read_lock(struct drm_device *dev, bool interruptible)
 	 * include the current thread.
 	*/
 	if (interruptible) {
+#ifdef HAVE_DOWN_READ_KILLABLE
 		while (!(ret = down_read_killable(&adev->reset_sem)) &&
 			amdgpu_in_reset(adev)) {
 			up_read(&adev->reset_sem);
@@ -239,6 +240,17 @@ int amdgpu_read_lock(struct drm_device *dev, bool interruptible)
 			if (ret)
 				break;
 		}
+#else
+		down_read(&adev->reset_sem);
+		while (amdgpu_in_reset(adev)) {
+			up_read(&adev->reset_sem);
+			ret = wait_event_interruptible(adev->recovery_fini_event,
+				   !amdgpu_in_reset(adev));
+			if (ret)
+				break;
+			down_read(&adev->reset_sem);
+		}
+#endif
 	} else {
 		down_read(&adev->reset_sem);
 		while (amdgpu_in_reset(adev)) {
