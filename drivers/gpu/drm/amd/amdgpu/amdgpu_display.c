@@ -1719,16 +1719,26 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_crtc *crtc;
 	struct drm_connector *connector;
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	int r;
 
 	/* turn off display hw */
 	drm_modeset_lock_all(dev);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
 		drm_helper_connector_dpms(connector,
 					  DRM_MODE_DPMS_OFF);
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 	drm_modeset_unlock_all(dev);
 	/* unpin the front buffers and cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
@@ -1765,7 +1775,9 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct drm_crtc *crtc;
 	int r;
 
@@ -1791,12 +1803,18 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 	/* turn on display hw */
 	drm_modeset_lock_all(dev);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
 		drm_helper_connector_dpms(connector,
 					  DRM_MODE_DPMS_ON);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
 
+#endif
 	drm_modeset_unlock_all(dev);
 
 	return 0;
