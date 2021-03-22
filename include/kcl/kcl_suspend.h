@@ -14,4 +14,9 @@ static inline void ksys_sync_helper(void)
 static inline void ksys_sync_helper(void) {}
 #endif /* CONFIG_PM_SLEEP */
 #endif /* HAVE_KSYS_SYNC_HELPER */
+
+#ifndef HAVE_PM_SUSPEND_VIA_FIRMWARE
+static inline bool pm_suspend_via_firmware(void) { return false; }
+#endif /* HAVE_PM_SUSPEND_VIA_FIRMWARE */
+
 #endif /* AMDKCL_SUSPEND_H */
