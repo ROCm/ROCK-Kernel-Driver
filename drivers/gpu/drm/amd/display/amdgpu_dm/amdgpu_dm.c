@@ -1372,7 +1372,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		dc_deinit_callbacks(adev->dm.dc);
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->dm.vblank_workqueue) {
 		adev->dm.vblank_workqueue->dm = NULL;
 		kfree(adev->dm.vblank_workqueue);
@@ -10047,7 +10047,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		dm_enable_per_frame_crtc_master_sync(dc_state);
 		mutex_lock(&dm->dc_lock);
 		WARN_ON(!dc_commit_state(dm->dc, dc_state));
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
                /* Allow idle optimization when vblank count is 0 for display off */
                if (dm->active_vblank_irq_count == 0)
                    dc_allow_idle_optimizations(dm->dc,true);
