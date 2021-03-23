@@ -1969,10 +1969,10 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 			}
 		}
 
-		if (!fb || !fb->obj[0])
+		if (!fb || !drm_gem_fb_get_obj(fb, 0))
 			continue;
 
-		robj = gem_to_amdgpu_bo(fb->obj[0]);
+		robj = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
 		if (!amdgpu_display_robj_is_fb(adev, robj)) {
 			r = amdgpu_bo_reserve(robj, true);
 			if (r == 0) {
