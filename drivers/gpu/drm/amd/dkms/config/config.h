@@ -11,7 +11,7 @@
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
 /* acpi_put_table() is available */
-/* #undef HAVE_ACPI_PUT_TABLE */
+#define HAVE_ACPI_PUT_TABLE 1
 
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
@@ -26,7 +26,7 @@
 #define HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 1
 
 /* amd_iommu_pc_supported() is available */
-/* #undef HAVE_AMD_IOMMU_PC_SUPPORTED */
+#define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
 #define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
@@ -448,6 +448,9 @@
 
 /* drm_gem_ttm_vmap() is available */
 #define HAVE_DRM_GEM_TTM_VMAP 1
+
+/* drm_gen_fb_init_with_funcs() is available */
+#define HAVE_DRM_GEN_FB_INIT_WITH_FUNCS 1
 
 /* drm_get_format_info() is available */
 #define HAVE_DRM_GET_FORMAT_INFO 1
