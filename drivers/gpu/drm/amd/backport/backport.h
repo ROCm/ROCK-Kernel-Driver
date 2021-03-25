@@ -20,6 +20,7 @@
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_workqueue.h>
 #include <kcl/kcl_backlight.h>
+#include <kcl/kcl_device.h>
 #include <kcl/kcl_fs.h>
 #include <kcl/backport/kcl_kthread_backport.h>
 #include <kcl/kcl_list.h>
@@ -38,7 +39,6 @@
 #include <kcl/kcl_pm.h>
 #include <kcl/kcl_nospec.h>
 #include <kcl/backport/kcl_fence_backport.h>
-#include <kcl/backport/kcl_ttm_tt_backport.h>
 #include <kcl/backport/kcl_device_cgroup_backport.h>
 #include <kcl/backport/kcl_hmm.h>
 #include <kcl/kcl_mn.h>

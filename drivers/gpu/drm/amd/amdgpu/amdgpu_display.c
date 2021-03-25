@@ -460,9 +460,8 @@ pflip_cleanup:
 		goto cleanup;
 	}
 unpin:
-	if (unlikely(amdgpu_bo_unpin(new_abo) != 0)) {
-		DRM_ERROR("failed to unpin new abo in error path\n");
-	}
+	amdgpu_bo_unpin(new_abo);
+
 unreserve:
 	amdgpu_bo_unreserve(new_abo);
 

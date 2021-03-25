@@ -56,7 +56,11 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 			adev->mode_info.num_crtc = 1;
 		adev->enable_virtual_display = true;
 	}
+#ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	ddev->driver_features &= ~DRIVER_ATOMIC;
+#else
+	ddev->driver->driver_features &= ~DRIVER_ATOMIC;
+#endif
 	adev->cg_flags = 0;
 	adev->pg_flags = 0;
 }

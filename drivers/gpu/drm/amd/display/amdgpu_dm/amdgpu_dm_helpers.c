@@ -752,6 +752,7 @@ void dm_helpers_smu_timeout(struct dc_context *ctx, unsigned int msg_id, unsigne
 	//amdgpu_device_gpu_recover(dc_context->driver-context, NULL);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 void *dm_helpers_allocate_gpu_mem(
 		struct dc_context *ctx,
 		enum dc_gpu_mem_alloc_type type,
@@ -803,6 +804,7 @@ void dm_helpers_free_gpu_mem(
 		}
 	}
 }
+#endif
 
 bool dm_helpers_dmub_outbox_interrupt_control(struct dc_context *ctx, bool enable)
 {
