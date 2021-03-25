@@ -15,5 +15,6 @@
 #include <kcl/kcl_drm_print.h>
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_sched_mm.h>
+#include <kcl/kcl_seq_file.h>
 
 #endif
