@@ -45,6 +45,13 @@
 #define HDCP_STREAM_TYPE0			0x00
 #define HDCP_STREAM_TYPE1			0x01
 
+/* introduced in v4.15-rc4-1351-g495eb7f877ab
+ * drm: Add some HDCP related #defines
+ */
+#ifndef DRM_HDCP_KSV_LEN
+#define DRM_HDCP_KSV_LEN			5
+#endif
+
 /* HDCP2.2 Msg IDs */
 #define HDCP_2_2_NULL_MSG			1
 #define HDCP_2_2_AKE_INIT			2

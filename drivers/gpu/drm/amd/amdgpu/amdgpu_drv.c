@@ -2016,7 +2016,7 @@ static const struct pci_device_id pciidlist[] = {
 
 MODULE_DEVICE_TABLE(pci, pciidlist);
 
-static const struct drm_driver amdgpu_kms_driver;
+static struct drm_driver amdgpu_kms_driver;
 
 static void amdgpu_get_secondary_funcs(struct amdgpu_device *adev)
 {
@@ -2134,11 +2134,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		ddev->driver_features &= ~DRIVER_ATOMIC;
 #else
 	/* warn the user if they mix atomic and non-atomic capable GPUs */
-	if ((kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
+	if ((amdgpu_kms_driver.driver_features & DRIVER_ATOMIC) && !supports_atomic)
 		DRM_ERROR("Mixing atomic and non-atomic capable GPUs!\n");
 	/* support atomic early so the atomic debugfs stuff gets created */
 	if (supports_atomic)
-		kms_driver.driver_features |= DRIVER_ATOMIC;
+		amdgpu_kms_driver.driver_features |= DRIVER_ATOMIC;
 #endif
 
 	kcl_pci_create_measure_file(pdev);
@@ -2810,7 +2810,7 @@ const struct drm_ioctl_desc amdgpu_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(AMDGPU_SEM, amdgpu_sem_ioctl, DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW)
 };
 
-static const struct drm_driver amdgpu_kms_driver = {
+static struct drm_driver amdgpu_kms_driver = {
 	.driver_features =
 	    0
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
