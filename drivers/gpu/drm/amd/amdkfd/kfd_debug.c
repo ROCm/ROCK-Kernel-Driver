@@ -224,6 +224,7 @@ static int kfd_create_event_queue(struct kfd_process *process,
  * wait queue on only if exception_status is enabled.
  */
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+			struct kfd_dev *dev,
 			unsigned int source_id)
 {
 	struct process_queue_manager *pqm;
@@ -265,7 +266,7 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 		for (i = 0; i < process->n_pdds; i++) {
 			struct kfd_process_device *pdd = process->pdds[i];
 
-			if (pdd->dev->id != source_id)
+			if (pdd->dev != dev)
 				continue;
 
 			pdd->exception_status |= ec_mask;
@@ -287,7 +288,7 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 					pqn->q->properties.queue_id :
 							pqn->q->doorbell_id;
 
-			if (target_id != source_id)
+			if (pqn->q->device != dev || target_id != source_id)
 				continue;
 
 			pqn->q->properties.exception_status |= ec_mask;
@@ -317,7 +318,7 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 		return;
 
 	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
-					p, is_vmfault ? dev->id : doorbell_id);
+							p, dev, doorbell_id);
 
 	kfd_unref_process(p);
 }
