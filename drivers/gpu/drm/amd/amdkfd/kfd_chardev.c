@@ -355,7 +355,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("Write ptr address   == 0x%016llX\n",
 			args->write_pointer_address);
 
-	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, queue_id);
+	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, dev, queue_id);
 	return 0;
 
 err_create_queue:
