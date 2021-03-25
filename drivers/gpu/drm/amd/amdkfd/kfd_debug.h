@@ -37,6 +37,7 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   uint32_t doorbell_id,
 				   bool is_vmfault);
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+			struct kfd_dev *dev,
 			unsigned int source_id);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
