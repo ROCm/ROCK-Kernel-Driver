@@ -49,6 +49,7 @@
 #include <asm/barrier.h>
 #include <kcl/backport/kcl_fence_backport.h>
 #include <kcl/kcl_seqlock.h>
+#include <kcl/kcl_overflow.h>
 
 struct dma_resv_list;
 
