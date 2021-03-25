@@ -31,8 +31,8 @@
 #ifndef _TTM_BO_API_H_
 #define _TTM_BO_API_H_
 
-#include <drm/drm_gem.h>
 #include <drm/drm_vma_manager.h>
+#include <drm/drm_gem.h>
 #include <linux/kref.h>
 #include <linux/list.h>
 #include <linux/wait.h>

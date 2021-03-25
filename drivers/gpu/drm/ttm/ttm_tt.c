@@ -188,10 +188,14 @@ int ttm_sg_tt_init(struct ttm_tt *ttm, struct ttm_buffer_object *bo,
 
 	ttm_tt_init_fields(ttm, bo, page_flags, caching, 0);
 
+#ifndef HAVE_TTM_SG_TT_INIT
+	ret = ttm_dma_tt_alloc_page_directory(ttm);
+#else
 	if (page_flags & TTM_TT_FLAG_EXTERNAL)
 		ret = ttm_sg_tt_alloc_page_directory(ttm);
 	else
 		ret = ttm_dma_tt_alloc_page_directory(ttm);
+#endif
 	if (ret) {
 		pr_err("Failed allocating page table\n");
 		return -ENOMEM;

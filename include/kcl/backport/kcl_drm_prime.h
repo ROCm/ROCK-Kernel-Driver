@@ -33,7 +33,11 @@
 #ifndef _KCL_BACKPORT_KCL__DRM_PRIME_H__H_
 #define _KCL_BACKPORT_KCL__DRM_PRIME_H__H_
 
+#ifdef HAVE_DRM_DRMP_H
+#include <drm/drmP.h>
+#else
 #include <drm/drm_prime.h>
+#endif
 
 #ifndef HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS
 static inline
