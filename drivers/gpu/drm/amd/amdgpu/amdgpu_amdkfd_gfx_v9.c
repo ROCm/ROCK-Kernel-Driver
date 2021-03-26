@@ -49,14 +49,14 @@ enum hqd_dequeue_request_type {
 
 #define TCP_WATCH_STRIDE (mmTCP_WATCH1_ADDR_H - mmTCP_WATCH0_ADDR_H)
 
-void kgd_gfx_v9_lock_srbm(struct amdgpu_device *adev, uint32_t mec, uint32_t pipe,
+static void kgd_gfx_v9_lock_srbm(struct amdgpu_device *adev, uint32_t mec, uint32_t pipe,
 			uint32_t queue, uint32_t vmid)
 {
 	mutex_lock(&adev->srbm_mutex);
 	soc15_grbm_select(adev, mec, pipe, queue, vmid);
 }
 
-void kgd_gfx_v9_unlock_srbm(struct amdgpu_device *adev)
+static void kgd_gfx_v9_unlock_srbm(struct amdgpu_device *adev)
 {
 	soc15_grbm_select(adev, 0, 0, 0, 0);
 	mutex_unlock(&adev->srbm_mutex);
@@ -782,7 +782,7 @@ out:
 	up_read(&adev->reset_sem);
 }
 
-void kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
+uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 				uint32_t vmid)
 {
 	mutex_lock(&adev->grbm_idx_mutex);
@@ -796,9 +796,11 @@ void kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
-void kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev, uint32_t vmid)
+uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev, uint32_t vmid)
 {
 
 	mutex_lock(&adev->grbm_idx_mutex);
@@ -812,6 +814,8 @@ void kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev, uint32_t vmid)
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
 int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
@@ -862,7 +866,7 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 	return 0;
 }
 
-void kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
@@ -892,9 +896,56 @@ void kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 		kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
-void kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
+static uint32_t kgd_gfx_set_multi_process_address_watch(
+					struct amdgpu_device *adev,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t watch_id,
+					uint32_t watch_mode)
+{
+	uint32_t watch_address_high;
+	uint32_t watch_address_low;
+	uint32_t watch_address_cntl;
+
+	watch_address_cntl = 0;
+	watch_address_low = lower_32_bits(watch_address);
+	watch_address_high = upper_32_bits(watch_address) & 0xffff;
+
+	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
+			TCP_WATCH0_CNTL,
+			MODE,
+			watch_mode);
+
+	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
+			TCP_WATCH0_CNTL,
+			MASK,
+			watch_address_mask >> 6);
+
+	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
+			TCP_WATCH0_CNTL,
+			VALID,
+			1);
+
+	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_CNTL) +
+			(watch_id * TCP_WATCH_STRIDE)),
+			watch_address_cntl);
+
+	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) +
+			(watch_id * TCP_WATCH_STRIDE)),
+			watch_address_high);
+
+	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_L) +
+			(watch_id * TCP_WATCH_STRIDE)),
+			watch_address_low);
+
+	return watch_address_cntl;
+}
+
+uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
@@ -904,6 +955,13 @@ void kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 	uint32_t watch_address_high;
 	uint32_t watch_address_low;
 	uint32_t watch_address_cntl;
+
+	if (adev->asic_type == CHIP_ALDEBARAN)
+		return kgd_gfx_set_multi_process_address_watch(adev,
+							watch_address,
+							watch_address_mask,
+							watch_id,
+							watch_mode);
 
 	watch_address_cntl = 0;
 
@@ -951,18 +1009,24 @@ void kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 			(watch_id * TCP_WATCH_STRIDE)),
 			watch_address_cntl);
 
+	return 0;
 }
 
-void kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
+uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 					uint32_t watch_id)
 {
 	uint32_t watch_address_cntl;
+
+	if (adev->asic_type == CHIP_ALDEBARAN)
+		return 0;
 
 	watch_address_cntl = 0;
 
 	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_CNTL) +
 			(watch_id * TCP_WATCH_STRIDE)),
 			watch_address_cntl);
+
+	return 0;
 }
 
 int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,

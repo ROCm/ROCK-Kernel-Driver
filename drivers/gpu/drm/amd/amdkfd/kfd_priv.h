@@ -838,6 +838,11 @@ struct kfd_process_device {
 	/* Exception code status*/
 	uint64_t exception_status;
 
+	/* Tracks debug per-vmid request settings */
+	uint32_t spi_dbg_override;
+	uint32_t spi_dbg_launch_mode;
+	uint32_t watch_points[4];
+
 	/*
 	 * If this process has been checkpointed before, then the user
 	 * application will use the original gpu_id on the
@@ -984,7 +989,11 @@ struct kfd_process {
 
 	bool xnack_enabled;
 
+	/* Tracks debug per-vmid request for precise memory */
+	bool precise_mem_ops;
+
 	atomic_t poison;
+
 	/* Queues are in paused stated because we are in the process of doing a CRIU checkpoint */
 	bool queues_paused;
 };
