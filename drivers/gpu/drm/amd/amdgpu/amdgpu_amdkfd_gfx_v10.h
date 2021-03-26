@@ -20,9 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				      uint32_t vmid);
-void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid);
+uint32_t kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid);
 int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t vmid,
 					     uint32_t trap_override,
@@ -30,16 +30,16 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
 					     uint32_t *trap_mask_supported);
-void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
-void kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
 					uint32_t watch_mode,
 					uint32_t debug_vmid);
-void kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
 					uint32_t watch_id);
 void kgd_gfx_v10_get_iq_wait_times(struct kgd_dev *kgd,
 				uint32_t *wait_times);
