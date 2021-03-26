@@ -187,7 +187,4 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_01
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_02
 endif
 
-export CONFIG_DRM_AMD_DC_HDCP=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
-
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
