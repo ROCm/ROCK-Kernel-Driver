@@ -2256,7 +2256,7 @@ int dcn20_populate_dml_pipes_from_context(
 #endif
 
 		/* todo: default max for now, until there is logic reflecting this in dc*/
-		pipes[pipe_cnt].dout.output_bpc = 12;
+		pipes[pipe_cnt].dout.dsc_input_bpc = 12;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		/*fill up the audio sample rate (unit in kHz)*/
 		get_audio_check(&res_ctx->pipe_ctx[i].stream->audio_info, &aud_check);
