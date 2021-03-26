@@ -243,6 +243,9 @@ void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 			      struct queue *q,
 			      uint64_t exception_clear_mask,
 			      struct kfd_queue_snapshot_entry *qss_entry);
+int debug_lock_and_unmap(struct device_queue_manager *dqm);
+int debug_map_and_unlock(struct device_queue_manager *dqm);
+int debug_refresh_runlist(struct device_queue_manager *dqm);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {

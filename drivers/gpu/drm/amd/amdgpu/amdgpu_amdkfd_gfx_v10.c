@@ -861,7 +861,7 @@ static void kgd_gfx_v10_set_wave_launch_stall(struct amdgpu_device *adev,
 	amdgpu_gfx_off_ctrl(adev, true);
 }
 
-void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -875,9 +875,11 @@ void kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
-void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
+uint32_t kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
@@ -890,6 +892,8 @@ void kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid)
 	kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, true);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
 int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
@@ -941,7 +945,7 @@ int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 	return 0;
 }
 
-void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
@@ -967,9 +971,11 @@ void kgd_gfx_v10_set_wave_launch_mode(struct kgd_dev *kgd,
 		kgd_gfx_v10_set_wave_launch_stall(adev, vmid, false, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
 }
 
-void kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
@@ -1027,9 +1033,10 @@ void kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
 			(watch_id * TCP_WATCH_STRIDE)),
 			watch_address_cntl);
 
+	return 0;
 }
 
-void kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
 					uint32_t watch_id)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
@@ -1041,6 +1048,8 @@ void kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
 	WREG32((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_CNTL) +
 			(watch_id * TCP_WATCH_STRIDE)),
 			watch_address_cntl);
+
+	return 0;
 }
 
 static int kgd_gfx_v10_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,

@@ -88,6 +88,7 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 	struct kfd_dev *kfd = pm->dqm->dev;
 	struct kfd_process_device *pdd =
 			container_of(qpd, struct kfd_process_device, qpd);
+	int i;
 
 	packet = (struct pm4_mes_map_process_aldebaran *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mes_map_process_aldebaran));
@@ -103,10 +104,16 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 	packet->bitfields14.sdma_enable = 1;
 	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
 
-	/* TBD - add multi-process support. */
-	if (kfd->dqm->trap_debug_vmid && pdd->process->debug_trap_enabled) {
-		packet->bitfields2.debug_vmid = kfd->dqm->trap_debug_vmid;
-		packet->bitfields2.new_debug = 1;
+	if (pdd->process->debug_trap_enabled) {
+		packet->spi_gdbg_per_vmid_cntl =
+				pdd->spi_dbg_override |
+						pdd->spi_dbg_launch_mode;
+
+		for (i = 0; i < kfd->device_info->num_of_watch_points; i++)
+			packet->tcp_watch_cntl[i] = pdd->watch_points[i];
+
+		packet->bitfields2.single_memops =
+				pdd->process->precise_mem_ops ? 1 : 0;
 	}
 
 	packet->sh_mem_config = qpd->sh_mem_config;
