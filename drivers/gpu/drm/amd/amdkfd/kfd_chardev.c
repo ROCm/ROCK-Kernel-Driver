@@ -2938,11 +2938,6 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				goto unlock_out;
 			}
 
-			if (!is_attach && !pdd->dev->dqm->trap_debug_vmid) {
-				r = -EBUSY;
-				goto unlock_out;
-			}
-
 			if (pdd->dev->gws_debug_workaround &&
 							pdd->qpd.num_gws) {
 				r = -EBUSY;

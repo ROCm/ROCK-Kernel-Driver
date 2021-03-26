@@ -829,6 +829,11 @@ struct kfd_process_device {
 
 	/* Exception code status*/
 	uint64_t exception_status;
+
+	/* Tracks debug per-vmid request settings */
+	uint32_t spi_dbg_override;
+	uint32_t spi_dbg_launch_mode;
+	uint32_t watch_points[4];
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -960,6 +965,9 @@ struct kfd_process {
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
+
+	/* Tracks debug per-vmid request for precise memory */
+	bool precise_mem_ops;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */

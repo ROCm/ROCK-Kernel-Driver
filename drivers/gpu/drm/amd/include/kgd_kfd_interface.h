@@ -301,9 +301,9 @@ struct kfd2kgd_calls {
 			uint32_t vmid, uint64_t page_table_base);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct kgd_dev *kgd);
 
-	void (*enable_debug_trap)(struct kgd_dev *kgd,
+	uint32_t (*enable_debug_trap)(struct kgd_dev *kgd,
 					uint32_t vmid);
-	void (*disable_debug_trap)(struct kgd_dev *kgd, uint32_t vmid);
+	uint32_t (*disable_debug_trap)(struct kgd_dev *kgd, uint32_t vmid);
 	int (*set_wave_launch_trap_override)(struct kgd_dev *kgd,
 					     uint32_t vmid,
 					     uint32_t trap_override,
@@ -311,16 +311,16 @@ struct kfd2kgd_calls {
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
 					     uint32_t *trap_mask_supported);
-	void (*set_wave_launch_mode)(struct kgd_dev *kgd,
+	uint32_t (*set_wave_launch_mode)(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
-	void (*set_address_watch)(struct kgd_dev *kgd,
+	uint32_t (*set_address_watch)(struct kgd_dev *kgd,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
 					uint32_t watch_mode,
 					uint32_t debug_vmid);
-	void (*clear_address_watch)(struct kgd_dev *kgd,
+	uint32_t (*clear_address_watch)(struct kgd_dev *kgd,
 			uint32_t watch_id);
 	int (*set_precise_mem_ops)(struct kgd_dev *kgd, uint32_t vmid,
 				bool enable);
