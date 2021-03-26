@@ -398,12 +398,17 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, false);
 
-		pdd->dev->kfd2kgd->disable_debug_trap(
+		pdd->spi_dbg_override =
+				pdd->dev->kfd2kgd->disable_debug_trap(
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
-		if (release_debug_trap_vmid(pdd->dev->dqm))
-			pr_err("Failed to release debug vmid on [%i]\n",
-					pdd->dev->id);
+
+		debug_refresh_runlist(pdd->dev->dqm);
+
+		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
+			if (release_debug_trap_vmid(pdd->dev->dqm))
+				pr_err("Failed to release debug vmid on [%i]\n",
+						pdd->dev->id);
 		count++;
 	}
 
@@ -435,15 +440,22 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		/* Bind to prevent hang on reserve debug VMID during BACO. */
 		kfd_bind_process_to_device(pdd->dev, target);
 
-		r = reserve_debug_trap_vmid(pdd->dev->dqm);
+		if (!kfd_dbg_is_per_vmid_supported(pdd->dev)) {
+			r = reserve_debug_trap_vmid(pdd->dev->dqm);
 
-		if (r)
-			goto unwind_err;
+			if (r)
+				goto unwind_err;
+		}
 
-		pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd,
-				pdd->dev->vm_info.last_vmid_kfd);
+		pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
+					pdd->dev->kgd,
+					pdd->dev->vm_info.last_vmid_kfd);
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
+
+		r = debug_refresh_runlist(pdd->dev->dqm);
+		if (r)
+			goto unwind_err;
 
 		/* Increment unwind_count as the last step */
 		unwind_count++;
@@ -495,10 +507,23 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 				trap_mask_request,
 				trap_mask_prev,
 				trap_mask_supported);
-		if (r) {
+
+		/*
+		 * NOTE: Per-VMID SPI debug control registers only occupy up to
+		 * 16 valid bits at the moment so this return check is ok for
+		 * now.
+		 */
+		if (r < 0) {
 			pr_err("failed to set wave launch override on [%i]\n",
 					pdd->dev->id);
 			break;
+		} else {
+			pdd->spi_dbg_override = r;
+			r = 0;
+
+			r = debug_refresh_runlist(pdd->dev->dqm);
+			if (r)
+				break;
 		}
 	}
 
@@ -509,20 +534,25 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 					uint8_t wave_launch_mode)
 {
 	struct kfd_process_device *pdd;
+	int r = 0, i;
 
 	list_for_each_entry(pdd,
 			&target->per_device_data,
 			per_device_list) {
 
-		pdd->dev->kfd2kgd->set_wave_launch_mode(
+		pdd->spi_dbg_launch_mode = pdd->dev->kfd2kgd->set_wave_launch_mode(
 				pdd->dev->kgd,
 				wave_launch_mode,
 				pdd->dev->vm_info.last_vmid_kfd);
+
+		r = debug_refresh_runlist(pdd->dev->dqm);
+		if (r)
+			break;
 	}
 
 	target->trap_debug_wave_launch_mode = wave_launch_mode;
 
-	return 0;
+	return r;
 }
 
 int kfd_dbg_trap_clear_address_watch(struct kfd_process *target,
@@ -572,40 +602,31 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 	int r = 0;
 	struct kfd_process_device *pdd;
 
-	switch (enable) {
-	case 0:
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
-
-			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
-					pdd->dev->kgd,
-					pdd->dev->vm_info.last_vmid_kfd,
-					false);
-			if (r)
-				goto out;
-		}
-		break;
-	case 1:
-		/* FIXME: This assumes all GPUs are of the same type */
-		list_for_each_entry(pdd,
-				&target->per_device_data,
-				per_device_list) {
-
-			r = pdd->dev->kfd2kgd->set_precise_mem_ops(
-					pdd->dev->kgd,
-					pdd->dev->vm_info.last_vmid_kfd,
-					true);
-			if (r)
-				goto out;
-		}
-		break;
-	default:
+	if (!(enable == 0 || enable == 1)) {
 		pr_err("Invalid precise mem ops option: %i\n", enable);
-		r = -EINVAL;
-		break;
+		return -EINVAL;
 	}
-out:
+
+	target->precise_mem_ops = enable == 1;
+
+	/* FIXME: This assumes all GPUs are of the same type */
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
+
+		r = pdd->dev->kfd2kgd->set_precise_mem_ops(pdd->dev->kgd,
+					pdd->dev->vm_info.last_vmid_kfd,
+					target->precise_mem_ops);
+		if (r)
+			break;
+
+		r = debug_refresh_runlist(pdd->dev->dqm);
+		if (r)
+			break;
+	}
+
+	if (r)
+		target->precise_mem_ops = false;
+
 	return r;
 }
 
@@ -649,13 +670,25 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 		goto out;
 	}
 
-	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
-		pdd->dev->kfd2kgd->set_address_watch(pdd->dev->kgd,
-				watch_address,
-				watch_address_mask,
-				*watch_point,
-				watch_mode,
-				pdd->dev->vm_info.last_vmid_kfd);
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		r = debug_lock_and_unmap(pdd->dev->dqm);
+		if (r)
+			break;
+
+		pdd->watch_points[*watch_point] =
+				pdd->dev->kfd2kgd->set_address_watch(
+					pdd->dev->kgd,
+					watch_address,
+					watch_address_mask,
+					*watch_point,
+					watch_mode,
+					pdd->dev->vm_info.last_vmid_kfd);
+
+		r = debug_map_and_unlock(pdd->dev->dqm);
+		if (r)
+			break;
 	}
 
 out:
@@ -685,19 +718,27 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 			watch_point_bit_mask_to_free);
 	allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
 
-	list_for_each_entry(pdd,
-			&p->per_device_data,
-			per_device_list) {
-		for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
-			if ((1<<i) & watch_point_bit_mask_to_free) {
-				pdd->dev->kfd2kgd->clear_address_watch(
-						pdd->dev->kgd,
-						i);
-			}
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		r = debug_lock_and_unmap(pdd->dev->dqm);
+		if (r)
+			break;
+
+		for (j = 0; j < MAX_WATCH_ADDRESSES; j++) {
+			if ((1<<j) & watch_point_bit_mask_to_free)
+				pdd->watch_points[j] =
+					pdd->dev->kfd2kgd->clear_address_watch(
+								pdd->dev->kgd,
+								j);
+		}
+
+		r = debug_map_and_unlock(pdd->dev->dqm);
+		if (r)
+			break;
 	}
 
 out:
 	spin_unlock(&watch_points_lock);
 	return r;
 }
-
