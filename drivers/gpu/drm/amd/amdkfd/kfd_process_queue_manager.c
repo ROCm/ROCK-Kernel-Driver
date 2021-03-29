@@ -292,6 +292,7 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			goto err_create_queue;
 		pqn->q = q;
 		pqn->kq = NULL;
+		kfd_process_drain_interrupts(pdd);
 		retval = dev->dqm->ops.create_queue(dev->dqm, q, &pdd->qpd);
 		print_queue(q);
 		break;
