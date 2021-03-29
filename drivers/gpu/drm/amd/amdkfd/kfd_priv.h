@@ -993,10 +993,14 @@ struct kfd_process {
 
 	/* Keep track cwsr init */
 	bool has_cwsr;
-
+	
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
+
+	/* Used to drain stale interrupts */
+	wait_queue_head_t wait_irq_drain;
+	bool irq_drain_is_open;
 
 	/* shared virtual memory registered by this process */
 	struct svm_range_list svms;
@@ -1189,12 +1193,19 @@ int kfd_numa_node_to_apic_id(int numa_node_id);
 void kfd_double_confirm_iommu_support(struct kfd_dev *gpu);
 
 /* Interrupts */
+#define KFD_IRQ_FENCE_CLIENTID	0xff
+#define KFD_IRQ_FENCE_SOURCEID	0xff
+#define KFD_IRQ_IS_FENCE(client, source)				\
+				((client) == KFD_IRQ_FENCE_CLIENTID &&	\
+				 (source) == KFD_IRQ_FENCE_SOURCEID)
 int kfd_interrupt_init(struct kfd_dev *dev);
 void kfd_interrupt_exit(struct kfd_dev *dev);
 bool enqueue_ih_ring_entry(struct kfd_dev *kfd,	const void *ih_ring_entry);
 bool interrupt_is_wanted(struct kfd_dev *dev,
 				const uint32_t *ih_ring_entry,
 				uint32_t *patched_ihre, bool *flag);
+void kfd_process_drain_interrupts(struct kfd_process_device *pdd);
+void kfd_process_close_interrupt_drain(unsigned int pasid);
 
 /* amdkfd Apertures */
 int kfd_init_apertures(struct kfd_process *process);

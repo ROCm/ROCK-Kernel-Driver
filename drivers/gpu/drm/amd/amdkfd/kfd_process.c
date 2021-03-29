@@ -871,6 +871,8 @@ struct kfd_process *kfd_create_process(struct task_struct *thread)
 		kfd_procfs_add_sysfs_stats(process);
 		kfd_procfs_add_sysfs_files(process);
 		kfd_procfs_add_sysfs_counters(process);
+
+		init_waitqueue_head(&process->wait_irq_drain);
 	}
 out:
 	if (!IS_ERR(process))
