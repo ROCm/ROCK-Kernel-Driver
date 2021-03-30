@@ -151,6 +151,7 @@ static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
 /*
  * v5.8-rc3-2-g68d237056e00 ("scatterlist: protect parameters of the sg_table related macros")
  * v5.7-rc5-33-g709d6d73c756 ("scatterlist: add generic wrappers for iterating over sgtable objects")
+ * Copied from include/linux/scatterlist.h
  */
 #ifndef for_each_sgtable_sg
 #define for_each_sgtable_sg(sgt, sg, i)		\

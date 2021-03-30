@@ -22,6 +22,7 @@
 #include <linux/acpi.h>
 
 #if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
+/* Copied from drivers/pci/probe.c and modified for KCL */
 const unsigned char *_kcl_pcie_link_speed;
 
 const unsigned char _kcl_pcie_link_speed_stub[] = {
@@ -43,6 +44,7 @@ const unsigned char _kcl_pcie_link_speed_stub[] = {
 	PCI_SPEED_UNKNOWN               /* F */
 };
 
+/* Copied from drivers/pci/pci.c */
 /**
  * pcie_bandwidth_available - determine minimum link settings of a PCIe
  *                           device and its bandwidth limitation
@@ -320,6 +322,7 @@ EXPORT_SYMBOL_GPL(_kcl_pci_pr3_present);
 #endif /* HAVE_PCI_PR3_PRESENT */
 
 #ifdef AMDKCL_CREATE_MEASURE_FILE
+/* Copied from drivers/pci/pci-sysfs.c */
 static ssize_t max_link_speed_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
