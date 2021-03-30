@@ -35,6 +35,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_fb_helper.h>
 
+/* Copied from include/drm/drm_fb_helper.h */
 /*
  * Don't add fb_debug_* since the legacy drm_fb_helper_debug_* has segfault
  * history:
