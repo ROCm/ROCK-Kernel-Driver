@@ -1,10 +1,15 @@
 /* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Definitions for the NVM Express interface
+ * Copyright (c) 2011-2014, Intel Corporation.
+ */
 #ifndef AMDKCL_DEVICE_H
 #define AMDKCL_DEVICE_H
 
 #include <linux/ratelimit.h>
 #include <linux/device.h>
 
+/* Copied from include/linux/dev_printk.h */
 #if !defined(dev_err_once)
 #ifdef CONFIG_PRINTK
 #define dev_level_once(dev_level, dev, fmt, ...)			\
@@ -51,7 +56,7 @@ do {									\
 #define DPM_FLAG_SMART_PREPARE BIT(1)
 static inline void dev_pm_set_driver_flags(struct device *dev, u32 flags)
 {
-	printk_once(KERN_WARNING "%s is not available\n", __func__);
+	pr_warn_once("%s is not available\n", __func__);
 }
 #endif
 
