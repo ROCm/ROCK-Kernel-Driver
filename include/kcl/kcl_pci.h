@@ -129,6 +129,7 @@ int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask)
 }
 #endif
 
+/* Copied from v3.12-rc2-29-gc6bde215acfd include/linux/pci.h */
 #if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
 {
@@ -164,6 +165,7 @@ static inline void kcl_pci_configure_extended_tags(struct pci_dev *dev)
 #endif
 }
 
+/* Copied from v5.1-rc1-5-g4e544bac8267 include/linux/pci.h */
 #if !defined(HAVE_PCI_DEV_ID)
 static inline u16 pci_dev_id(struct pci_dev *dev)
 {

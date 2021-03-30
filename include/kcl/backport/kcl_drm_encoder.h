@@ -47,6 +47,7 @@ static inline struct drm_encoder *_kcl_drm_encoder_find(struct drm_device *dev,
 #define drm_encoder_find _kcl_drm_encoder_find
 #endif
 
+/* Copied from drivers/gpu/drm/drm_edid.c and modified for KCL */
 #if defined(HAVE_DRM_EDID_TO_ELD)
 static inline
 int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)

@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef AMDKCL_PCI_BACKPORT_H
 #define AMDKCL_PCI_BACKPORT_H
 

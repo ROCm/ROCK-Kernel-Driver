@@ -16,6 +16,7 @@
 #endif
 
 #ifndef __GFP_RETRY_MAYFAIL
+/* Copied from include/linux/gfp.h and modified for KCL */
 #define __GFP_RETRY_MAYFAIL __GFP_NORETRY
 #endif
 
