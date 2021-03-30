@@ -35,6 +35,7 @@ static inline bool fault_flag_allow_retry_first(unsigned int flags)
 #endif
 
 #ifndef HAVE_KVFREE
+/* Copied from mm/util.c */
 static inline void kvfree(const void *addr)
 {
 	if (is_vmalloc_addr(addr))
@@ -45,6 +46,7 @@ static inline void kvfree(const void *addr)
 #endif
 
 #ifndef HAVE_KVZALLOC_KVMALLOC
+/* Copied from v4.11-10655-ga7c3e901a46f ipc/util.c */
 static inline void *kvmalloc(size_t size, gfp_t flags)
 {
 	void *out;
@@ -62,6 +64,7 @@ static inline void *kvzalloc(size_t size, gfp_t flags)
 #endif /* HAVE_KVZALLOC_KVMALLOC */
 
 #ifndef HAVE_KVMALLOC_ARRAY
+/* Copied from v4.11-10661-g752ade68cbd8 include/linux/mm.h */
 static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 {
 	if (size != 0 && n > SIZE_MAX / size)
@@ -72,6 +75,7 @@ static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 #endif /* HAVE_KVMALLOC_ARRAY */
 
 #ifndef HAVE_KVCALLOC
+/* Copied from v4.17-10379-g1c542f38ab8d include/linux/mm.h */
 static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 {
 	return kvmalloc_array(n, size, flags | __GFP_ZERO);
@@ -79,6 +83,7 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 #endif /* HAVE_KVCALLOC */
 
 #if !defined(HAVE_MMGRAB)
+/* Copied from v4.10-10392-gf1f1007644ff include/linux/sched.h */
 static inline void mmgrab(struct mm_struct *mm)
 {
 	atomic_inc(&mm->mm_count);
@@ -97,6 +102,7 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #endif
 
 #if !defined(HAVE_ZONE_MANAGED_PAGES)
+/* Copied from v4.20-6505-g9705bea5f833 include/linux/mmzone.h and modified for KCL */
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
 #if defined(HAVE_STRUCT_ZONE_MANAGED_PAGES)
