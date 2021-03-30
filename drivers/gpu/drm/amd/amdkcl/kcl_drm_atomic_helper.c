@@ -30,6 +30,7 @@
 #include <drm/drm_vblank.h>
 
 #ifdef AMDKCL__DRM_ATOMIC_HELPER_PLANE_RESET
+/* Copied from drivers/gpu/drm/drm_atomic_state_helper.c and modified for KCL */
 void _kcl__drm_atomic_helper_plane_reset(struct drm_plane *plane,
 							struct drm_plane_state *state)
 {
@@ -49,6 +50,7 @@ EXPORT_SYMBOL(_kcl__drm_atomic_helper_plane_reset);
 #endif
 
 #ifndef HAVE___DRM_ATOMIC_HELPER_CRTC_RESET
+/* Copied from drivers/gpu/drm/drm_atomic_state_helper.c */
 void
 __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
                               struct drm_crtc_state *crtc_state)
