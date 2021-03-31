@@ -897,6 +897,9 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
+/* sysfs_emit() is available */
+#define HAVE_SYSFS_EMIT 1
+
 /* timer_setup() is available */
 #define HAVE_TIMER_SETUP 1
 
