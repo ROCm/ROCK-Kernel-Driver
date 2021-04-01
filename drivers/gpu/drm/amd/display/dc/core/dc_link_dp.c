@@ -3061,7 +3061,10 @@ static void dp_test_send_link_test_pattern(struct dc_link *link)
 		pipe_ctx->stream->timing.display_color_depth = requestColorDepth;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	dp_update_dsc_config(pipe_ctx);
+#endif
+
 
 	dc_link_dp_set_test_pattern(
 			link,
