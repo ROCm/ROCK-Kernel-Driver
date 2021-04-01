@@ -654,6 +654,9 @@
 /* ktime_get_real_seconds() is available */
 #define HAVE_KTIME_GET_REAL_SECONDS 1
 
+/* ktime_t is union */
+/* #undef HAVE_KTIME_IS_UNION */
+
 /* kvcalloc() is available */
 #define HAVE_KVCALLOC 1
 
