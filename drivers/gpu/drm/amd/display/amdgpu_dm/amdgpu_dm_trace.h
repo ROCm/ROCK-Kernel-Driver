@@ -686,6 +686,7 @@ TRACE_EVENT(amdgpu_dmub_trace_high_irq,
 		  __entry->param0, __entry->param1)
 );
 
+#ifndef HAVE_KTIME_IS_UNION
 TRACE_EVENT(amdgpu_refresh_rate_track,
 	TP_PROTO(int crtc_index, ktime_t refresh_rate_ns, uint32_t refresh_rate_hz),
 	TP_ARGS(crtc_index, refresh_rate_ns, refresh_rate_hz),
@@ -704,6 +705,7 @@ TRACE_EVENT(amdgpu_refresh_rate_track,
 		  __entry->refresh_rate_hz,
 		  __entry->refresh_rate_ns)
 );
+#endif
 
 TRACE_EVENT(dcn_fpu,
 	    TP_PROTO(bool begin, const char *function, const int line, const int recursion_depth),
