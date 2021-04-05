@@ -1134,11 +1134,6 @@ static inline enum link_training_result perform_link_training_int(
 	enum link_training_result status)
 {
 	union lane_count_set lane_count_set = { {0} };
-	union dpcd_training_pattern dpcd_pattern = { {0} };
-
-	/* 3. set training not in progress*/
-	dpcd_pattern.v1_4.TRAINING_PATTERN_SET = DPCD_TRAINING_PATTERN_VIDEOIDLE;
-	dpcd_set_training_pattern(link, dpcd_pattern);
 
 	/* 4. mainlink output idle pattern*/
 	dp_set_hw_test_pattern(link, DP_TEST_PATTERN_VIDEO_MODE, NULL, 0);
@@ -1562,6 +1557,7 @@ enum link_training_result dc_link_dp_perform_link_training(
 {
 	enum link_training_result status = LINK_TRAINING_SUCCESS;
 	struct link_training_settings lt_settings;
+	union dpcd_training_pattern dpcd_pattern = { { 0 } };
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
@@ -1630,6 +1626,9 @@ enum link_training_result dc_link_dp_perform_link_training(
 		}
 	}
 
+	/* 3. set training not in progress*/
+	dpcd_pattern.v1_4.TRAINING_PATTERN_SET = DPCD_TRAINING_PATTERN_VIDEOIDLE;
+	dpcd_set_training_pattern(link, dpcd_pattern);
 	if ((status == LINK_TRAINING_SUCCESS) || !skip_video_pattern) {
 		status = perform_link_training_int(link,
 				&lt_settings,
