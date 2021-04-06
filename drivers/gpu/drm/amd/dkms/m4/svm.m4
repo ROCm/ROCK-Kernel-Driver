@@ -1,4 +1,19 @@
 dnl #
+dnl # v5.8-rc4-7-g5143192cd410 mm/migrate: add a flags parameter to migrate_vma
+dnl #
+AC_DEFUN([AC_AMDGPU_MIGRATE_VMA_PGMAP_OWNER], [
+	AC_KERNEL_TRY_COMPILE([
+		#include <linux/migrate.h>
+	], [
+		struct migrate_vma *migrate = NULL;
+		migrate->pgmap_owner = NULL;
+	], [
+		AC_DEFINE(HAVE_MIGRATE_VMA_PGMAP_OWNER, 1,
+			[migrate_vma->pgmap_owner is available])
+	])
+])
+
+dnl #
 dnl # v5.6-rc3-15-g800bb1c8dc80 mm: handle multiple owners of device private pages in migrate_vma
 dnl # v5.6-rc3-14-gf894ddd5ff01 memremap: add an owner field to struct dev_pagemap
 dnl #
@@ -15,6 +30,8 @@ AC_DEFUN([AC_AMDGPU_HSA_AMD_SVM], [
 		], [
 			AC_DEFINE(HAVE_HSA_AMD_SVM_ENABLED, 1,
 				[dev_pagemap->owner is available])
+
+			AC_AMDGPU_MIGRATE_VMA_PGMAP_OWNER
 		])
 	])
 ])
