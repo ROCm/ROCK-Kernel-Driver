@@ -1383,6 +1383,8 @@ static bool dc_link_construct(struct dc_link *link,
 	struct dc_bios *bios = init_params->dc->ctx->dc_bios;
 	const struct dc_vbios_funcs *bp_funcs = bios->funcs;
 	struct bp_disp_connector_caps_info disp_connect_caps_info = { 0 };
+	struct dc_link *edp_links[MAX_NUM_EDP];
+	int edp_num;
 
 	DC_LOGGER_INIT(dc_ctx->logger);
 
@@ -1506,7 +1508,11 @@ static bool dc_link_construct(struct dc_link *link,
 		(link->link_id.id == CONNECTOR_ID_EDP ||
 			link->link_id.id == CONNECTOR_ID_LVDS)) {
 		panel_cntl_init_data.ctx = dc_ctx;
-		panel_cntl_init_data.inst = link->link_index;
+		get_edp_links(panel_cntl_init_data.ctx->dc, edp_links, &edp_num);
+		if ((edp_num > 1) && (link->link_index > edp_links[0]->link_index))
+			panel_cntl_init_data.inst = 1;
+		else
+			panel_cntl_init_data.inst = 0;
 		link->panel_cntl =
 			link->dc->res_pool->funcs->panel_cntl_create(
 								&panel_cntl_init_data);
@@ -3511,18 +3517,18 @@ void dc_link_enable_hpd_filter(struct dc_link *link, bool enable)
 	}
 }
 
-uint32_t dc_dsc_stream_bandwidth_in_kbps(uint32_t pix_clk_100hz, uint32_t bpp_x16);
-
 uint32_t dc_bandwidth_in_kbps_from_timing(
 	const struct dc_crtc_timing *timing)
 {
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC) {
 		return dc_dsc_stream_bandwidth_in_kbps(timing->pix_clk_100hz, timing->dsc_cfg.bits_per_pixel);
 	}
+#endif
 #endif
 
 	switch (timing->display_color_depth) {

@@ -126,7 +126,8 @@ static const struct cmn2asic_msg_mapping aldebaran_message_map[SMU_MSG_MAX_COUNT
 	MSG_MAP(SetExecuteDMATest,		     PPSMC_MSG_SetExecuteDMATest,		0),
 	MSG_MAP(EnableDeterminism,		     PPSMC_MSG_EnableDeterminism,		0),
 	MSG_MAP(DisableDeterminism,		     PPSMC_MSG_DisableDeterminism,		0),
-	MSG_MAP(SetUclkDpmMode,				 PPSMC_MSG_SetUclkDpmMode,		0),
+	MSG_MAP(SetUclkDpmMode,			     PPSMC_MSG_SetUclkDpmMode,			0),
+	MSG_MAP(GfxDriverResetRecovery,		     PPSMC_MSG_GfxDriverResetRecovery,		0),
 };
 
 static const struct cmn2asic_mapping aldebaran_clk_map[SMU_CLK_COUNT] = {
@@ -1432,6 +1433,57 @@ static ssize_t aldebaran_get_gpu_metrics(struct smu_context *smu,
 	return sizeof(struct gpu_metrics_v1_1);
 }
 
+static int aldebaran_mode2_reset(struct smu_context *smu)
+{
+	u32 smu_version;
+	int ret = 0, index;
+	struct amdgpu_device *adev = smu->adev;
+	int timeout = 10;
+
+	smu_cmn_get_smc_version(smu, NULL, &smu_version);
+
+	index = smu_cmn_to_asic_specific_index(smu, CMN2ASIC_MAPPING_MSG,
+						SMU_MSG_GfxDeviceDriverReset);
+
+	mutex_lock(&smu->message_lock);
+	if (smu_version >= 0x00441400) {
+		ret = smu_cmn_send_msg_without_waiting(smu, (uint16_t)index, SMU_RESET_MODE_2);
+		/* This is similar to FLR, wait till max FLR timeout */
+		msleep(100);
+		dev_dbg(smu->adev->dev, "restore config space...\n");
+		/* Restore the config space saved during init */
+		amdgpu_device_load_pci_state(adev->pdev);
+
+		dev_dbg(smu->adev->dev, "wait for reset ack\n");
+		while (ret == -ETIME && timeout)  {
+			ret = smu_cmn_wait_for_response(smu);
+			/* Wait a bit more time for getting ACK */
+			if (ret == -ETIME) {
+				--timeout;
+				usleep_range(500, 1000);
+				continue;
+			}
+
+			if (ret != 1) {
+				dev_err(adev->dev, "failed to send mode2 message \tparam: 0x%08x response %#x\n",
+						SMU_RESET_MODE_2, ret);
+				goto out;
+			}
+		}
+
+	} else {
+		dev_err(adev->dev, "smu fw 0x%x does not support MSG_GfxDeviceDriverReset MSG\n",
+				smu_version);
+	}
+
+	if (ret == 1)
+		ret = 0;
+out:
+	mutex_unlock(&smu->message_lock);
+
+	return ret;
+}
+
 static bool aldebaran_is_mode1_reset_supported(struct smu_context *smu)
 {
 #if 0
@@ -1458,6 +1510,19 @@ static bool aldebaran_is_mode1_reset_supported(struct smu_context *smu)
 static bool aldebaran_is_mode2_reset_supported(struct smu_context *smu)
 {
 	return true;
+}
+
+static int aldebaran_set_mp1_state(struct smu_context *smu,
+				   enum pp_mp1_state mp1_state)
+{
+	switch (mp1_state) {
+	case PP_MP1_STATE_UNLOAD:
+		return smu_cmn_set_mp1_state(smu, mp1_state);
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 static const struct pptable_funcs aldebaran_ppt_funcs = {
@@ -1517,7 +1582,9 @@ static const struct pptable_funcs aldebaran_ppt_funcs = {
 	.mode1_reset_is_support = aldebaran_is_mode1_reset_supported,
 	.mode2_reset_is_support = aldebaran_is_mode2_reset_supported,
 	.mode1_reset = smu_v13_0_mode1_reset,
-	.mode2_reset = smu_v13_0_mode2_reset,
+	.set_mp1_state = aldebaran_set_mp1_state,
+	.mode2_reset = aldebaran_mode2_reset,
+	.wait_for_event = smu_v13_0_wait_for_event,
 };
 
 void aldebaran_set_ppt_funcs(struct smu_context *smu)

@@ -72,10 +72,12 @@
 #include <kcl/kcl_acpi_table.h>
 #include <kcl/kcl_drm_fourcc.h>
 #include <kcl/kcl_debugfs_inode.h>
+#include <kcl/kcl_sysfs_emit.h>
 #include <kcl/kcl_bitops.h>
 #include <kcl/backport/kcl_drm_mm_backport.h>
 #include <kcl/kcl_sched_mm.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
+#include "kcl/kcl_amdgpu_drm_gem_framebuffer_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
 #include "kcl/kcl_drm_gem_ttm_helper.h"

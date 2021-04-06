@@ -282,17 +282,6 @@ struct clk_mgr_funcs {
 #endif
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_x
-struct dpm_clocks;
-struct wartermarks;
-
-struct smu_watermark_set {
-	struct watermarks *wm_set;
-	union large_integer mc_address;
-};
-
-#endif
-
 struct clk_mgr {
 	struct dc_context *ctx;
 	struct clk_mgr_funcs *funcs;
@@ -308,9 +297,6 @@ struct clk_mgr {
 	struct clk_bw_params *bw_params;
 #endif
 	struct pp_smu_wm_range_sets ranges;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_x
-	struct smu_watermark_set smu_wm_set;
-#endif
 };
 
 /* forward declarations */

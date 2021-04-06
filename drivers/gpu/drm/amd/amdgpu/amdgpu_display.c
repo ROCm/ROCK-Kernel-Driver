@@ -1046,6 +1046,19 @@ int amdgpu_display_gem_fb_verify_and_init(
 					 &amdgpu_fb_funcs);
 	if (ret)
 		goto err;
+	/* Verify that the modifier is supported. */
+	if (!drm_any_plane_has_format(dev, mode_cmd->pixel_format,
+				      mode_cmd->modifier[0])) {
+		struct drm_format_name_buf format_name;
+		drm_dbg_kms(dev,
+			    "unsupported pixel format %s / modifier 0x%llx\n",
+			    drm_get_format_name(mode_cmd->pixel_format,
+						&format_name),
+			    mode_cmd->modifier[0]);
+
+		ret = -EINVAL;
+		goto err;
+	}
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
@@ -1529,6 +1542,112 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 
 	return amdgpu_display_get_crtc_scanoutpos(dev, pipe, 0, vpos, hpos,
 						  stime, etime, mode);
+}
+
+int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
+{
+	struct drm_device *dev = adev_to_drm(adev);
+	struct drm_crtc *crtc;
+	struct drm_connector *connector;
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	struct drm_connector_list_iter iter;
+#endif
+	int r;
+
+	/* turn off display hw */
+	drm_modeset_lock_all(dev);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	drm_connector_list_iter_begin(dev, &iter);
+	drm_for_each_connector_iter(connector, &iter)
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
+		drm_helper_connector_dpms(connector,
+					  DRM_MODE_DPMS_OFF);
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	drm_connector_list_iter_end(&iter);
+#endif
+	drm_modeset_unlock_all(dev);
+	/* unpin the front buffers and cursors */
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+		struct drm_framebuffer *fb = crtc->primary->fb;
+		struct amdgpu_bo *robj;
+
+		if (amdgpu_crtc->cursor_bo && !adev->enable_virtual_display) {
+			struct amdgpu_bo *aobj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
+			r = amdgpu_bo_reserve(aobj, true);
+			if (r == 0) {
+				amdgpu_bo_unpin(aobj);
+				amdgpu_bo_unreserve(aobj);
+			}
+		}
+
+		if (fb == NULL || drm_gem_fb_get_obj(fb, 0) == NULL) {
+			continue;
+		}
+		robj = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
+		/* don't unpin kernel fb objects */
+		if (!amdgpu_fbdev_robj_is_fb(adev, robj)) {
+			r = amdgpu_bo_reserve(robj, true);
+			if (r == 0) {
+				amdgpu_bo_unpin(robj);
+				amdgpu_bo_unreserve(robj);
+			}
+		}
+	}
+	return r;
+}
+
+int amdgpu_display_resume_helper(struct amdgpu_device *adev)
+{
+	struct drm_device *dev = adev_to_drm(adev);
+	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	struct drm_connector_list_iter iter;
+#endif
+	struct drm_crtc *crtc;
+	int r;
+
+	/* pin cursors */
+	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
+		struct amdgpu_crtc *amdgpu_crtc = to_amdgpu_crtc(crtc);
+
+		if (amdgpu_crtc->cursor_bo && !adev->enable_virtual_display) {
+			struct amdgpu_bo *aobj = gem_to_amdgpu_bo(amdgpu_crtc->cursor_bo);
+			r = amdgpu_bo_reserve(aobj, true);
+			if (r == 0) {
+				r = amdgpu_bo_pin(aobj, AMDGPU_GEM_DOMAIN_VRAM);
+				if (r != 0)
+					dev_err(adev->dev, "Failed to pin cursor BO (%d)\n", r);
+				amdgpu_crtc->cursor_addr = amdgpu_bo_gpu_offset(aobj);
+				amdgpu_bo_unreserve(aobj);
+			}
+		}
+	}
+
+	drm_helper_resume_force_mode(dev);
+
+	/* turn on display hw */
+	drm_modeset_lock_all(dev);
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	drm_connector_list_iter_begin(dev, &iter);
+	drm_for_each_connector_iter(connector, &iter)
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
+#endif
+		drm_helper_connector_dpms(connector,
+					  DRM_MODE_DPMS_ON);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+	drm_connector_list_iter_end(&iter);
+
+#endif
+	drm_modeset_unlock_all(dev);
+
+	return 0;
 }
 
 int amdgpu_display_freesync_ioctl(struct drm_device *dev, void *data,

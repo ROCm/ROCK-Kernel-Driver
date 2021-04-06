@@ -1,4 +1,11 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ * Copyright 2013 Red Hat Inc.
+ *
+ * Authors: Jérôme Glisse <jglisse@redhat.com>
+ *
+ * See Documentation/vm/hmm.rst for reasons and overview of what HMM is.
+ */
 #ifndef _KCL_BACKPORT_KCL_HMM_H
 #define _KCL_BACKPORT_KCL_HMM_H
 

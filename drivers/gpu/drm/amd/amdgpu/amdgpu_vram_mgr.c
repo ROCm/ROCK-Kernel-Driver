@@ -28,9 +28,6 @@
 #include "amdgpu_atomfirmware.h"
 #include "atom.h"
 
-static int amdgpu_vram_mgr_free_backup_pages(struct amdgpu_vram_mgr *mgr,
-					     uint32_t num_pages);
-
 static inline struct amdgpu_vram_mgr *to_vram_mgr(struct ttm_resource_manager *man)
 {
 	return container_of(man, struct amdgpu_vram_mgr, manager);
@@ -55,7 +52,7 @@ static ssize_t amdgpu_mem_info_vram_total_show(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
-	return snprintf(buf, PAGE_SIZE, "%llu\n", adev->gmc.real_vram_size);
+	return sysfs_emit(buf, "%llu\n", adev->gmc.real_vram_size);
 }
 
 /**
@@ -72,7 +69,7 @@ static ssize_t amdgpu_mem_info_vis_vram_total_show(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 
-	return snprintf(buf, PAGE_SIZE, "%llu\n", adev->gmc.visible_vram_size);
+	return sysfs_emit(buf, "%llu\n", adev->gmc.visible_vram_size);
 }
 
 /**
@@ -90,8 +87,7 @@ static ssize_t amdgpu_mem_info_vram_used_show(struct device *dev,
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
 
-	return snprintf(buf, PAGE_SIZE, "%llu\n",
-			amdgpu_vram_mgr_usage(man));
+	return sysfs_emit(buf, "%llu\n", amdgpu_vram_mgr_usage(man));
 }
 
 /**
@@ -109,8 +105,7 @@ static ssize_t amdgpu_mem_info_vis_vram_used_show(struct device *dev,
 	struct amdgpu_device *adev = drm_to_adev(ddev);
 	struct ttm_resource_manager *man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
 
-	return snprintf(buf, PAGE_SIZE, "%llu\n",
-			amdgpu_vram_mgr_vis_usage(man));
+	return sysfs_emit(buf, "%llu\n", amdgpu_vram_mgr_vis_usage(man));
 }
 
 static ssize_t amdgpu_mem_info_vram_vendor(struct device *dev,
@@ -122,27 +117,27 @@ static ssize_t amdgpu_mem_info_vram_vendor(struct device *dev,
 
 	switch (adev->gmc.vram_vendor) {
 	case SAMSUNG:
-		return snprintf(buf, PAGE_SIZE, "samsung\n");
+		return sysfs_emit(buf, "samsung\n");
 	case INFINEON:
-		return snprintf(buf, PAGE_SIZE, "infineon\n");
+		return sysfs_emit(buf, "infineon\n");
 	case ELPIDA:
-		return snprintf(buf, PAGE_SIZE, "elpida\n");
+		return sysfs_emit(buf, "elpida\n");
 	case ETRON:
-		return snprintf(buf, PAGE_SIZE, "etron\n");
+		return sysfs_emit(buf, "etron\n");
 	case NANYA:
-		return snprintf(buf, PAGE_SIZE, "nanya\n");
+		return sysfs_emit(buf, "nanya\n");
 	case HYNIX:
-		return snprintf(buf, PAGE_SIZE, "hynix\n");
+		return sysfs_emit(buf, "hynix\n");
 	case MOSEL:
-		return snprintf(buf, PAGE_SIZE, "mosel\n");
+		return sysfs_emit(buf, "mosel\n");
 	case WINBOND:
-		return snprintf(buf, PAGE_SIZE, "winbond\n");
+		return sysfs_emit(buf, "winbond\n");
 	case ESMT:
-		return snprintf(buf, PAGE_SIZE, "esmt\n");
+		return sysfs_emit(buf, "esmt\n");
 	case MICRON:
-		return snprintf(buf, PAGE_SIZE, "micron\n");
+		return sysfs_emit(buf, "micron\n");
 	default:
-		return snprintf(buf, PAGE_SIZE, "unknown\n");
+		return sysfs_emit(buf, "unknown\n");
 	}
 }
 
@@ -189,7 +184,6 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	spin_lock_init(&mgr->lock);
 	INIT_LIST_HEAD(&mgr->reservations_pending);
 	INIT_LIST_HEAD(&mgr->reserved_pages);
-	INIT_LIST_HEAD(&mgr->backup_pages);
 
 	/* Add the two VRAM-related sysfs files */
 	ret = sysfs_create_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
@@ -227,11 +221,6 @@ void amdgpu_vram_mgr_fini(struct amdgpu_device *adev)
 		kfree(rsv);
 
 	list_for_each_entry_safe(rsv, temp, &mgr->reserved_pages, node) {
-		drm_mm_remove_node(&rsv->mm_node);
-		kfree(rsv);
-	}
-
-	list_for_each_entry_safe(rsv, temp, &mgr->backup_pages, node) {
 		drm_mm_remove_node(&rsv->mm_node);
 		kfree(rsv);
 	}
@@ -306,14 +295,12 @@ static void amdgpu_vram_mgr_do_reserve(struct ttm_resource_manager *man)
 			continue;
 
 		dev_dbg(adev->dev, "Reservation 0x%llx - %lld, Succeeded\n",
-			rsv->mm_node.start << PAGE_SHIFT, rsv->mm_node.size);
+			rsv->mm_node.start, rsv->mm_node.size);
 
 		vis_usage = amdgpu_vram_mgr_vis_size(adev, &rsv->mm_node);
 		atomic64_add(vis_usage, &mgr->vis_usage);
 		atomic64_add(rsv->mm_node.size << PAGE_SHIFT, &mgr->usage);
 		list_move(&rsv->node, &mgr->reserved_pages);
-
-		amdgpu_vram_mgr_free_backup_pages(mgr, rsv->mm_node.size);
 	}
 }
 
@@ -330,7 +317,6 @@ int amdgpu_vram_mgr_reserve_range(struct ttm_resource_manager *man,
 				  uint64_t start, uint64_t size)
 {
 	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
-	struct amdgpu_device *adev = to_amdgpu_device(mgr);
 	struct amdgpu_vram_reservation *rsv;
 
 	rsv = kzalloc(sizeof(*rsv), GFP_KERNEL);
@@ -341,92 +327,12 @@ int amdgpu_vram_mgr_reserve_range(struct ttm_resource_manager *man,
 	rsv->mm_node.start = start >> PAGE_SHIFT;
 	rsv->mm_node.size = size >> PAGE_SHIFT;
 
-	dev_dbg(adev->dev, "Pending Reservation: 0x%llx\n", start);
-
 	spin_lock(&mgr->lock);
-	list_add_tail(&rsv->node, &mgr->reservations_pending);
+	list_add_tail(&mgr->reservations_pending, &rsv->node);
 	amdgpu_vram_mgr_do_reserve(man);
 	spin_unlock(&mgr->lock);
 
 	return 0;
-}
-
-static int amdgpu_vram_mgr_free_backup_pages(struct amdgpu_vram_mgr *mgr,
-					     uint32_t num_pages)
-{
-	struct amdgpu_device *adev = to_amdgpu_device(mgr);
-	struct amdgpu_vram_reservation *rsv;
-	uint32_t i;
-	uint64_t vis_usage = 0, total_usage = 0;
-
-	if (num_pages > mgr->num_backup_pages) {
-		dev_warn(adev->dev, "No enough backup pages\n");
-		return -EINVAL;
-	}
-
-	for (i = 0; i < num_pages; i++) {
-		rsv = list_first_entry(&mgr->backup_pages,
-				       struct amdgpu_vram_reservation, node);
-		vis_usage += amdgpu_vram_mgr_vis_size(adev, &rsv->mm_node);
-		total_usage += (rsv->mm_node.size << PAGE_SHIFT);
-		drm_mm_remove_node(&rsv->mm_node);
-		list_del(&rsv->node);
-		kfree(rsv);
-		mgr->num_backup_pages--;
-	}
-
-	atomic64_sub(total_usage, &mgr->usage);
-	atomic64_sub(vis_usage, &mgr->vis_usage);
-
-	return 0;
-}
-
-int amdgpu_vram_mgr_reserve_backup_pages(struct ttm_resource_manager *man,
-					 uint32_t num_pages)
-{
-	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
-	struct amdgpu_device *adev = to_amdgpu_device(mgr);
-	struct amdgpu_vram_reservation *rsv;
-	struct drm_mm *mm = &mgr->mm;
-	uint32_t i;
-	int ret = 0;
-	uint64_t vis_usage, total_usage;
-
-	for (i = 0; i < num_pages; i++) {
-		rsv = kzalloc(sizeof(*rsv), GFP_KERNEL);
-		if (!rsv) {
-			ret = -ENOMEM;
-			goto pro_end;
-		}
-
-		INIT_LIST_HEAD(&rsv->node);
-
-		ret = drm_mm_insert_node(mm, &rsv->mm_node, 1);
-		if (ret) {
-			dev_err(adev->dev, "failed to reserve backup page %d, ret 0x%x\n", i, ret);
-			kfree(rsv);
-			goto pro_end;
-		}
-
-		vis_usage = amdgpu_vram_mgr_vis_size(adev, &rsv->mm_node);
-		total_usage = (rsv->mm_node.size << PAGE_SHIFT);
-
-		spin_lock(&mgr->lock);
-		atomic64_add(vis_usage, &mgr->vis_usage);
-		atomic64_add(total_usage, &mgr->usage);
-		list_add_tail(&rsv->node, &mgr->backup_pages);
-		mgr->num_backup_pages++;
-		spin_unlock(&mgr->lock);
-	}
-
-pro_end:
-	if (ret) {
-		spin_lock(&mgr->lock);
-		amdgpu_vram_mgr_free_backup_pages(mgr, mgr->num_backup_pages);
-		spin_unlock(&mgr->lock);
-	}
-
-	return ret;
 }
 
 /**
