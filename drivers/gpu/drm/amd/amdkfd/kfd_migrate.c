@@ -399,8 +399,12 @@ svm_migrate_vma_to_vram(struct amdgpu_device *adev, struct svm_range *prange,
 	migrate.vma = vma;
 	migrate.start = start;
 	migrate.end = end;
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.flags = MIGRATE_VMA_SELECT_SYSTEM;
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
+#else
+	migrate.src_owner = NULL;
+#endif
 
 	size = 2 * sizeof(*migrate.src) + sizeof(uint64_t) + sizeof(dma_addr_t);
 	size *= npages;
@@ -625,8 +629,12 @@ svm_migrate_vma_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 	migrate.vma = vma;
 	migrate.start = start;
 	migrate.end = end;
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
+#else
+	migrate.src_owner = adev;
+#endif
 
 	size = 2 * sizeof(*migrate.src) + sizeof(uint64_t) + sizeof(dma_addr_t);
 	size *= npages;
@@ -904,7 +912,9 @@ int svm_migrate_init(struct amdgpu_device *adev)
 #endif
 	pgmap->ops = &svm_migrate_pgmap_ops;
 	pgmap->owner = SVM_ADEV_PGMAP_OWNER(adev);
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	pgmap->flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
+#endif
 	r = devm_memremap_pages(adev->dev, pgmap);
 	if (IS_ERR(r)) {
 		pr_err("failed to register HMM device memory\n");
