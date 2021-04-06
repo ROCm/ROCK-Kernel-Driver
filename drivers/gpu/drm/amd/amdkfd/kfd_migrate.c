@@ -407,8 +407,12 @@ svm_migrate_vma_to_vram(struct kfd_node *node, struct svm_range *prange,
 	migrate.vma = vma;
 	migrate.start = start;
 	migrate.end = end;
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.flags = MIGRATE_VMA_SELECT_SYSTEM;
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
+#else
+	migrate.src_owner = NULL;
+#endif
 
 	buf = kvcalloc(npages,
 		       2 * sizeof(*migrate.src) + sizeof(uint64_t) + sizeof(dma_addr_t),
@@ -707,11 +711,15 @@ svm_migrate_vma_to_ram(struct kfd_node *node, struct svm_range *prange,
 	migrate.vma = vma;
 	migrate.start = start;
 	migrate.end = end;
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
 	if (adev->gmc.xgmi.connected_to_cpu)
 		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_COHERENT;
 	else
 		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
+#else
+	migrate.src_owner = SVM_ADEV_PGMAP_OWNER(adev);
+#endif
 
 	buf = kvcalloc(npages,
 		       2 * sizeof(*migrate.src) + sizeof(uint64_t) + sizeof(dma_addr_t),
@@ -1073,6 +1081,7 @@ int kgd2kfd_init_zone_device(struct amdgpu_device *adev)
 	pgmap->ops = &svm_migrate_pgmap_ops;
 	pgmap->owner = SVM_ADEV_PGMAP_OWNER(adev);
 	pgmap->flags = 0;
+
 	/* Device manager releases device-specific resources, memory region and
 	 * pgmap when driver disconnects from device.
 	 */
