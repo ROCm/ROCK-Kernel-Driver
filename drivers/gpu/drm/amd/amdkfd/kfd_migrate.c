@@ -211,7 +211,11 @@ svm_migrate_copy_done(struct amdgpu_device *adev, struct dma_fence *mfence)
 unsigned long
 svm_migrate_addr_to_pfn(struct amdgpu_device *adev, unsigned long addr)
 {
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr + adev->kfd.dev->pgmap.range.start) >> PAGE_SHIFT;
+#else
+	return (addr + adev->kfd.dev->pgmap.res.start) >> PAGE_SHIFT;
+#endif
 }
 
 static void
@@ -241,7 +245,12 @@ svm_migrate_addr(struct amdgpu_device *adev, struct page *page)
 	unsigned long addr;
 
 	addr = page_to_pfn(page) << PAGE_SHIFT;
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr - adev->kfd.dev->pgmap.range.start);
+#else
+	return (addr - adev->kfd.dev->pgmap.res.start);
+#endif
+
 }
 
 static struct page *
@@ -1003,20 +1012,34 @@ int svm_migrate_init(struct amdgpu_device *adev)
 	 * should remove reserved size
 	 */
 	size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
+#ifdef HAVE_ZONE_DEVICE_PUBLIC
 	if (adev->gmc.xgmi.connected_to_cpu) {
+#ifdef HAVE_DEV_PAGEMAP_RANGE
+		pgmap->nr_range = 1;
 		pgmap->range.start = adev->gmc.aper_base;
 		pgmap->range.end = adev->gmc.aper_base + adev->gmc.aper_size - 1;
+#else
+		pgmap->res.start = adev->gmc.aper_base;
+		pgmap->res.end = adev->gmc.aper_base + adev->gmc.aper_size - 1;
+#endif
 		pgmap->type = MEMORY_DEVICE_COHERENT;
-	} else {
+	} else
+#endif
+	{
 		res = devm_request_free_mem_region(adev->dev, &iomem_resource, size);
 		if (IS_ERR(res))
 			return -ENOMEM;
+#ifdef HAVE_DEV_PAGEMAP_RANGE
+		pgmap->nr_range = 1;
 		pgmap->range.start = res->start;
 		pgmap->range.end = res->end;
+#else
+		pgmap->res.start = res->start;
+		pgmap->res.end = res->end;
+#endif
 		pgmap->type = MEMORY_DEVICE_PRIVATE;
 	}
 
-	pgmap->nr_range = 1;
 	pgmap->ops = &svm_migrate_pgmap_ops;
 	pgmap->owner = SVM_ADEV_PGMAP_OWNER(adev);
 	pgmap->flags = 0;
