@@ -738,6 +738,9 @@
 /* mem_encrypt_active() is available */
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
 
+/* migrate_vma->pgmap_owner is available */
+#define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
+
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1
 
