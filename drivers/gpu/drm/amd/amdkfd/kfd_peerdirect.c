@@ -51,7 +51,6 @@
 
 #include "kfd_priv.h"
 
-
 /* ----------------------- PeerDirect interface ------------------------------*/
 
 /*
@@ -124,6 +123,10 @@ void ib_unregister_peer_memory_client(void *reg_handle);
 #define AMD_PEER_BRIDGE_DRIVER_VERSION	"1.0"
 #define AMD_PEER_BRIDGE_DRIVER_NAME	"amdkfd"
 
+static int rdma_invalidate_cb(void *core_context);
+static void rdma_release_cb(void *core_context);
+static char rdma_name[] = "AMD RDMA";
+
 
 static void* (*pfn_ib_register_peer_memory_client)(struct peer_memory_client
 							*peer_client,
@@ -148,6 +151,8 @@ struct amd_mem_context {
 	struct device *dma_dev;
 
 	struct task_struct *in_free_callback;
+
+	bool is_rdma;
 
 	/* Context received from PeerDirect call */
 	void *core_context;
@@ -196,7 +201,10 @@ static void free_callback(struct amd_mem_context *mem_context)
 
 	/* avoid recursive locking of process->mutex in put_pages */
 	mem_context->in_free_callback = current;
-	ret = pfn_ib_invalidate_peer_memory(ib_reg_handle,
+	if (mem_context->is_rdma)
+		ret = rdma_invalidate_cb(mem_context->core_context);
+	else
+		ret = pfn_ib_invalidate_peer_memory(ib_reg_handle,
 					    mem_context->core_context);
 	mem_context->in_free_callback = NULL;
 
@@ -207,8 +215,12 @@ static void free_callback(struct amd_mem_context *mem_context)
 		/* At this point the dma_unmap and put_page functions
 		 * should have been called already.
 		 */
-		if (!WARN_ONCE(mem_context->pages, "put_pages was not called"))
+		if (!WARN_ONCE(mem_context->pages,
+			       "put_pages was not called")) {
+			if (mem_context->is_rdma)
+				rdma_release_cb(mem_context->core_context);
 			return;
+		}
 	}
 
 	pr_debug("IBCore context: 0x%p\n", mem_context->core_context);
@@ -252,11 +264,17 @@ static int amd_acquire(unsigned long addr, size_t size,
 	struct kfd_process *p;
 	struct kfd_bo *buf_obj;
 	struct amd_mem_context *mem_context;
+	bool is_rdma = false;
 
-	p = kfd_get_process(current);
-	if (!p) {
-		pr_debug("Not a KFD process\n");
-		return 0;
+	if (peer_mem_name == rdma_name) {
+		p = peer_mem_private_data;
+		is_rdma = true;
+	} else {
+		p = kfd_get_process(current);
+		if (!p) {
+			pr_debug("Not a KFD process\n");
+			return 0;
+		}
 	}
 
 	align_addr_size(&addr, &size);
@@ -277,6 +295,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 	pr_debug("addr: %#lx, size: %#lx, pid: %d\n",
 		 addr, size, p->lead_thread->pid);
 
+	mem_context->is_rdma = is_rdma;
 	mem_context->va   = addr;
 	mem_context->size = size;
 
@@ -620,3 +639,246 @@ void kfd_close_peer_direct(void)
 	ib_reg_handle = NULL;
 }
 
+/* ------------------------- AMD RDMA wrapper --------------------------------*/
+
+#include "drm/amd_rdma.h"
+
+struct rdma_p2p_data {
+	struct amd_p2p_info p2p_info;
+	void (*free_callback)(void *client_priv);
+	void *client_priv;
+};
+
+static int rdma_invalidate_cb(void *core_context)
+{
+	struct rdma_p2p_data *p2p_data = core_context;
+	int r;
+
+	if (p2p_data && p2p_data->free_callback)
+		p2p_data->free_callback(p2p_data->client_priv);
+
+	r = amd_dma_unmap(p2p_data->p2p_info.pages, p2p_data->p2p_info.priv,
+			  NULL);
+	if (r)
+		return r;
+	amd_put_pages(p2p_data->p2p_info.pages, p2p_data->p2p_info.priv);
+
+	return 0;
+}
+
+static void rdma_release_cb(void *core_context)
+{
+	struct rdma_p2p_data *p2p_data = core_context;
+
+	amd_release(p2p_data->p2p_info.priv);
+	kfree(p2p_data);
+}
+
+/**
+ * This function makes the pages underlying a range of GPU virtual memory
+ * accessible for DMA operations from another PCIe device
+ *
+ * \param   address       - The start address in the Unified Virtual Address
+ *			    space in the specified process
+ * \param   length        - The length of requested mapping
+ * \param   pid           - Pointer to structure pid to which address belongs.
+ *			    Could be NULL for current process address space.
+ * \param   p2p_data    - On return: Pointer to structure describing
+ *			    underlying pages/locations
+ * \param   free_callback - Pointer to callback which will be called when access
+ *			    to such memory must be stopped immediately: Memory
+ *			    was freed, GECC events, etc.
+ *			    Client should  immediately stop any transfer
+ *			    operations and returned as soon as possible.
+ *			    After return all resources associated with address
+ *			    will be release and no access will be allowed.
+ * \param   client_priv   - Pointer to be passed as parameter on
+ *			    'free_callback;
+ *
+ * \return  0 if operation was successful
+ */
+static int rdma_get_pages(uint64_t address, uint64_t length, struct pid *pid,
+			  struct device *dma_dev,
+			  struct amd_p2p_info **amd_p2p_data,
+			  void  (*free_callback)(void *client_priv),
+			  void  *client_priv)
+{
+	struct rdma_p2p_data *p2p_data;
+	struct kfd_process *p;
+	struct sg_table sg_head;
+	struct amd_mem_context *mem_context;
+	int nmap;
+	int r;
+
+	p2p_data = kzalloc(sizeof(*p2p_data), GFP_KERNEL);
+	if (!p2p_data)
+		return -ENOMEM;
+
+	p = kfd_lookup_process_by_pid(pid);
+	if (!p) {
+		pr_debug("pid lookup failed\n");
+		r = -ESRCH;
+		goto err_lookup_process;
+	}
+
+	r = amd_acquire(address, length, p, rdma_name, (void **)&mem_context);
+	kfd_unref_process(p);
+	if (r == 0) {
+		pr_debug("acquire failed: %d\n", r);
+		goto err_acquire;
+	}
+
+	r = amd_get_pages(address, length, 1, 0, &sg_head,
+			  mem_context, p2p_data);
+	if (r) {
+		pr_debug("get_pages failed: %d\n", r);
+		goto err_get_pages;
+	}
+
+	r = amd_dma_map(&sg_head, mem_context, dma_dev, 0, &nmap);
+	if (r) {
+		pr_debug("dma_map failed: %d\n", r);
+		goto err_dma_map;
+	}
+
+
+	p2p_data->free_callback = free_callback;
+	p2p_data->client_priv = client_priv;
+	p2p_data->p2p_info.va = address;
+	p2p_data->p2p_info.size = length;
+	p2p_data->p2p_info.pid = pid;
+	p2p_data->p2p_info.pages = mem_context->pages;
+	p2p_data->p2p_info.priv = mem_context;
+
+	*amd_p2p_data = &p2p_data->p2p_info;
+
+	return 0;
+
+err_dma_map:
+	amd_put_pages(&sg_head, mem_context);
+err_get_pages:
+	amd_release(mem_context);
+err_acquire:
+err_lookup_process:
+	kfree(p2p_data);
+
+	return r;
+}
+
+/**
+ *
+ * This function release resources previously allocated by get_pages() call.
+ *
+ * \param   p_p2p_data - A pointer to pointer to amd_p2p_info entries
+ *			allocated by get_pages() call.
+ *
+ * \return  0 if operation was successful
+ */
+static int rdma_put_pages(struct amd_p2p_info **p_p2p_data)
+{
+	struct rdma_p2p_data *p2p_data =
+		container_of(*p_p2p_data, struct rdma_p2p_data, p2p_info);
+	struct amd_mem_context *mem_context = p2p_data->p2p_info.priv;
+	int r;
+
+	if (mem_context->in_free_callback == current) {
+		*p_p2p_data = NULL;
+		return 0;
+	}
+
+	r = amd_dma_unmap(p2p_data->p2p_info.pages,
+			  p2p_data->p2p_info.priv,
+			  NULL);
+	if (r)
+		return r;
+	amd_put_pages(p2p_data->p2p_info.pages,
+		      p2p_data->p2p_info.priv);
+	amd_release(p2p_data->p2p_info.priv);
+	kfree(p2p_data);
+
+	*p_p2p_data = NULL;
+
+	return 0;
+}
+
+/**
+ * Check if given address belongs to GPU address space.
+ *
+ * \param   address - Address to check
+ * \param   pid     - Process to which given address belongs.
+ *		      Could be NULL if current one.
+ *
+ * \return  0  - This is not GPU address managed by AMD driver
+ *	    1  - This is GPU address managed by AMD driver
+ */
+static int rdma_is_gpu_address(uint64_t address, struct pid *pid)
+{
+	struct kfd_bo *buf_obj;
+	struct kfd_process *p;
+
+	p = kfd_lookup_process_by_pid(pid);
+	if (!p) {
+		pr_debug("Could not find the process\n");
+		return 0;
+	}
+
+	buf_obj = kfd_process_find_bo_from_interval(p, address, address);
+
+	kfd_unref_process(p);
+	if (!buf_obj)
+		return 0;
+
+	return 1;
+}
+
+/**
+ * Return the single page size to be used when building scatter/gather table
+ * for given range.
+ *
+ * \param   address   - Address
+ * \param   length    - Range length
+ * \param   pid       - Process id structure. Could be NULL if current one.
+ * \param   page_size - On return: Page size
+ *
+ * \return  0 if operation was successful
+ */
+static int rdma_get_page_size(uint64_t address, uint64_t length,
+			      struct pid *pid, unsigned long *page_size)
+{
+	/*
+	 * As local memory is always consecutive, we can assume the local
+	 * memory page size to be arbitrary.
+	 * Currently we assume the local memory page size to be the same
+	 * as system memory, which is 4KB.
+	 */
+	*page_size = PAGE_SIZE;
+
+	return 0;
+}
+
+/**
+ * Singleton object: rdma interface function pointers
+ */
+static const struct amd_rdma_interface rdma_ops = {
+	.get_pages = rdma_get_pages,
+	.put_pages = rdma_put_pages,
+	.is_gpu_address = rdma_is_gpu_address,
+	.get_page_size = rdma_get_page_size
+};
+
+/**
+ * amdkfd_query_rdma_interface - Return interface (function pointers table) for
+ *				 rdma interface
+ *
+ *
+ * \param interace     - OUT: Pointer to interface
+ *
+ * \return 0 if operation was successful.
+ */
+int amdkfd_query_rdma_interface(const struct amd_rdma_interface **ops)
+{
+	*ops  = &rdma_ops;
+
+	return 0;
+}
+EXPORT_SYMBOL(amdkfd_query_rdma_interface);
