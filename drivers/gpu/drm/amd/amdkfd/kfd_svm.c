@@ -1282,6 +1282,7 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 		     dma_addr_t *dma_addr, struct amdgpu_device *bo_adev,
 		     struct dma_fence **fence, bool flush_tlb)
 {
+	uint64_t vram_base_offset = 0;
 	struct amdgpu_device *adev = pdd->dev->adev;
 	struct amdgpu_vm *vm = drm_priv_to_vm(pdd->drm_priv);
 	uint64_t pte_flags;
@@ -1294,6 +1295,9 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 
 	pr_debug("svms 0x%p [0x%lx 0x%lx] readonly %d\n", prange->svms,
 		 last_start, last_start + npages - 1, readonly);
+
+	if (prange->svm_bo && prange->ttm_res) {
+		bo_va.is_xgmi = amdgpu_xgmi_same_hive(adev, bo_adev);
 
 	for (i = offset; i < offset + npages; i++) {
 		last_domain = dma_addr[i] & SVM_RANGE_VRAM_DOMAIN;
@@ -2524,7 +2528,8 @@ svm_range_best_restore_location(struct svm_range *prange,
 			return 0;
 
 		bo_adev = svm_range_get_adev_by_id(prange, prange->actual_loc);
-		if (amdgpu_xgmi_same_hive(adev, bo_adev))
+		if (amdgpu_xgmi_same_hive(adev, bo_adev) ||
+		    amdgpu_device_is_peer_accessible(bo_adev, adev))
 			return prange->actual_loc;
 		else
 			return 0;
