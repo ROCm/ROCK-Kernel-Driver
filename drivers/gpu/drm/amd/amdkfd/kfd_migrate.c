@@ -209,7 +209,11 @@ svm_migrate_copy_done(struct amdgpu_device *adev, struct dma_fence *mfence)
 unsigned long
 svm_migrate_addr_to_pfn(struct amdgpu_device *adev, unsigned long addr)
 {
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr + adev->kfd.dev->pgmap.range.start) >> PAGE_SHIFT;
+#else
+	return (addr + adev->kfd.dev->pgmap.res.start) >> PAGE_SHIFT;
+#endif
 }
 
 static void
@@ -240,7 +244,12 @@ svm_migrate_addr(struct amdgpu_device *adev, struct page *page)
 	unsigned long addr;
 
 	addr = page_to_pfn(page) << PAGE_SHIFT;
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	return (addr - adev->kfd.dev->pgmap.range.start);
+#else
+	return (addr - adev->kfd.dev->pgmap.res.start);
+#endif
+
 }
 
 static struct page *
@@ -885,9 +894,14 @@ int svm_migrate_init(struct amdgpu_device *adev)
 		return -ENOMEM;
 
 	pgmap->type = MEMORY_DEVICE_PRIVATE;
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	pgmap->nr_range = 1;
 	pgmap->range.start = res->start;
 	pgmap->range.end = res->end;
+#else
+	pgmap->res.start = res->start;
+	pgmap->res.end = res->end;
+#endif
 	pgmap->ops = &svm_migrate_pgmap_ops;
 	pgmap->owner = SVM_ADEV_PGMAP_OWNER(adev);
 	pgmap->flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
