@@ -665,7 +665,8 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
 	struct kfd_dev *dev = pdd->dev;
 
 	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->kgd, mem, pdd->drm_priv);
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, mem, pdd->drm_priv,
+					       NULL);
 }
 
 /* kfd_process_alloc_gpuvm - Allocate GPU VM for the KFD process
@@ -738,7 +739,8 @@ sync_memory_failed:
 	return err;
 
 err_map_mem:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, mem, pdd->drm_priv,
+					       NULL);
 err_alloc_mem:
 	*kptr = NULL;
 	return err;
@@ -959,7 +961,7 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			  "RDMA callback list not empty");
 		amdgpu_read_lock(pdd->dev->ddev, false);
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd,
-						      buf_obj->mem, NULL);
+						      buf_obj->mem, pdd->drm_priv, NULL);
 		amdgpu_read_unlock(pdd->dev->ddev);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}

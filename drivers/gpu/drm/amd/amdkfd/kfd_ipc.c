@@ -155,7 +155,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, pdd->drm_priv, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return r;
