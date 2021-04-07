@@ -986,9 +986,6 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 					pdd->dev->kgd, pdd->vm);
 			fput(pdd->drm_file);
 		}
-		else if (pdd->vm)
-			amdgpu_amdkfd_gpuvm_destroy_process_vm(
-				pdd->dev->kgd, pdd->vm);
 
 		if (pdd->qpd.cwsr_kaddr && !pdd->qpd.cwsr_base)
 			free_pages((unsigned long)pdd->qpd.cwsr_kaddr,
@@ -1495,19 +1492,18 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	struct kfd_dev *dev;
 	int ret;
 
+	if (!drm_file)
+		return -EINVAL;
+
 	if (pdd->vm)
-		return drm_file ? -EBUSY : 0;
+		return -EBUSY;
 
 	p = pdd->process;
 	dev = pdd->dev;
 
-	if (drm_file)
-		ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
-			dev->kgd, drm_file, p->pasid,
-			&pdd->vm, &p->kgd_process_info, &p->ef);
-	else
-		ret = amdgpu_amdkfd_gpuvm_create_process_vm(dev->kgd, p->pasid,
-			&pdd->vm, &p->kgd_process_info, &p->ef);
+	ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
+		dev->kgd, drm_file, p->pasid,
+		&pdd->vm, &p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
@@ -1529,8 +1525,6 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 err_init_cwsr:
 err_reserve_ib_mem:
 	kfd_process_device_free_bos(pdd);
-	if (!drm_file)
-		amdgpu_amdkfd_gpuvm_destroy_process_vm(dev->kgd, pdd->vm);
 	pdd->vm = NULL;
 
 	return ret;
@@ -1555,6 +1549,9 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
+	if (!pdd->vm)
+		return ERR_PTR(-ENODEV);
+
 	/*
 	 * signal runtime-pm system to auto resume and prevent
 	 * further runtime suspend once device pdd is created until
@@ -1571,12 +1568,6 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	err = kfd_iommu_bind_process_to_device(pdd);
 	if (err)
 		goto out;
-
-	if (pdd->process->lead_thread == current) {
-		err = kfd_process_device_init_vm(pdd, NULL);
-		if (err)
-			goto out;
-	}
 
 	/*
 	 * make sure that runtime_usage counter is incremented just once
