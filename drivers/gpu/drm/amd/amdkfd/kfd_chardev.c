@@ -2072,11 +2072,13 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 
 	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
 		struct kfd_dev *dev = cma_bo->dev;
+		struct kfd_process_device *pdd;
 
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
+		pdd = kfd_get_process_device_data(dev, ci->p);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, pdd->drm_priv, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -2207,7 +2209,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, pdd->drm_priv, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2444,6 +2446,7 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
 						      pdd->drm_priv, NULL,
 						      mem, NULL, flags);
+
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -2455,11 +2458,28 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 
 static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 {
+	struct amdgpu_device *adev;
+	struct task_struct *task;
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	uint32_t gpu_id, gpu_idx;
+	int r;
+
 	if (!mem)
 		return -EINVAL;
 
+	adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+	task = get_pid_task(mem->process_info->pid, PIDTYPE_PID);
+	p = kfd_get_process(task);
+	r = kfd_process_gpuid_from_kgd(p, adev, &gpu_id, &gpu_idx);
+	if (r < 0) {
+		pr_warn("no gpu id found, mem maybe leaking\n");
+		return -EINVAL;
+	}
+	pdd = kfd_process_device_from_gpuidx(p, gpu_idx);
+
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, mem, pdd->drm_priv, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
