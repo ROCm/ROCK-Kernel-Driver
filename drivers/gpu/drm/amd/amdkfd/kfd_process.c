@@ -664,7 +664,7 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
 {
 	struct kfd_dev *dev = pdd->dev;
 
-	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->kgd, mem, pdd->vm);
+	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->kgd, mem, pdd->drm_priv);
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, mem, NULL);
 }
 
@@ -685,12 +685,12 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	unsigned int mem_type;
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
-						 pdd->vm, NULL, &mem, NULL,
+						 pdd->drm_priv, NULL, &mem, NULL,
 						 flags);
 	if (err)
 		goto err_alloc_mem;
 
-	err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(kdev->kgd, mem, pdd->vm);
+	err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(kdev->kgd, mem, pdd->drm_priv);
 	if (err)
 		goto err_map_mem;
 
@@ -942,11 +942,11 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 		for (i = 0; i < p->n_pdds; i++) {
 			struct kfd_process_device *peer_pdd = p->pdds[i];
 
-			if (!peer_pdd->vm)
+			if (!peer_pdd->drm_priv)
 				continue;
 			amdgpu_read_lock(peer_pdd->dev->ddev, false);
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->vm);
+				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
 			amdgpu_read_unlock(peer_pdd->dev->ddev);
 		}
 
@@ -985,7 +985,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		if (pdd->drm_file) {
 			amdgpu_amdkfd_gpuvm_release_process_vm(
-					pdd->dev->kgd, pdd->vm);
+					pdd->dev->kgd, pdd->drm_priv);
 			fput(pdd->drm_file);
 		}
 
@@ -1505,7 +1505,7 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	if (!drm_file)
 		return -EINVAL;
 
-	if (pdd->vm)
+	if (pdd->drm_priv)
 		return -EBUSY;
 
 	p = pdd->process;
@@ -1513,13 +1513,12 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 
 	ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
 		dev->kgd, drm_file, p->pasid,
-		&pdd->vm, &p->kgd_process_info, &p->ef);
+		&p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
 	}
-
-	amdgpu_vm_set_task_info(pdd->vm);
+	pdd->drm_priv = drm_file->private_data;
 
 	ret = kfd_process_device_reserve_ib_mem(pdd);
 	if (ret)
@@ -1535,7 +1534,7 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 err_init_cwsr:
 err_reserve_ib_mem:
 	kfd_process_device_free_bos(pdd);
-	pdd->vm = NULL;
+	pdd->drm_priv = NULL;
 
 	return ret;
 }
@@ -1559,7 +1558,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	if (!pdd->vm)
+	if (!pdd->drm_priv)
 		return ERR_PTR(-ENODEV);
 
 	/*
