@@ -1796,6 +1796,7 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 
 	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
 		struct kfd_dev *dev = cma_bo->dev;
+		struct kfd_process_device *pdd;
 
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
