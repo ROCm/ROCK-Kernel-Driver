@@ -3413,6 +3413,7 @@ static int mst_topo_show(struct seq_file *m, void *unused)
 	return 0;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 /*
  * Sets trigger hpd for MST topologies.
  * All connected connectors will be rediscovered and re started as needed if val of 1 is sent.
@@ -3480,7 +3481,7 @@ static int trigger_hpd_mst_get(void *data, u64 *val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(trigger_hpd_mst_ops, trigger_hpd_mst_get,
 			 trigger_hpd_mst_set, "%llu\n");
-
+#endif
 
 /*
  * Sets the force_timing_sync debug option from the given string.
