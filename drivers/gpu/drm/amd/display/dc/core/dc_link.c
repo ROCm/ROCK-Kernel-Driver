@@ -1752,6 +1752,8 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	bool apply_seamless_boot_optimization = false;
 	uint32_t bl_oled_enable_delay = 50; // in ms
 	const uint32_t post_oui_delay = 30; // 30ms
+	/* Reduce link bandwidth between failed link training attempts. */
+	bool do_fallback = false;
 
 	// check for seamless boot
 	for (i = 0; i < state->stream_count; i++) {
@@ -1790,7 +1792,8 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 					       skip_video_pattern,
 					       LINK_TRAINING_ATTEMPTS,
 					       pipe_ctx,
-					       pipe_ctx->stream->signal)) {
+					       pipe_ctx->stream->signal,
+					       do_fallback)) {
 		link->cur_link_settings = link_settings;
 		status = DC_OK;
 	} else {
