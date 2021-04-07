@@ -406,6 +406,7 @@ static ssize_t dp_phy_settings_read(struct file *f, char __user *buf,
 	return result;
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 static int dp_lttpr_status_show(struct seq_file *m, void *d)
 {
 	char *data;
@@ -469,6 +470,7 @@ static int dp_lttpr_status_show(struct seq_file *m, void *d)
 	kfree(data);
 	return 0;
 }
+#endif
 
 static ssize_t dp_phy_settings_write(struct file *f, const char __user *buf,
 				 size_t size, loff_t *pos)
@@ -2540,7 +2542,9 @@ DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
 DEFINE_SHOW_ATTRIBUTE(output_bpc);
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_SHOW_ATTRIBUTE(dp_lttpr_status);
+#endif
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 #endif
@@ -2669,7 +2673,9 @@ static const struct {
 } dp_debugfs_entries[] = {
 		{"link_settings", &dp_link_settings_debugfs_fops},
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 		{"lttpr_status", &dp_lttpr_status_fops},
+#endif
 		{"test_pattern", &dp_phy_test_pattern_fops},
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 		{"hdcp_sink_capability", &hdcp_sink_capability_fops},
