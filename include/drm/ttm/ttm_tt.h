@@ -157,7 +157,8 @@ int ttm_tt_populate(struct ttm_device *bdev, struct ttm_tt *ttm, struct ttm_oper
  */
 void ttm_tt_unpopulate(struct ttm_device *bdev, struct ttm_tt *ttm);
 
-void ttm_tt_mgr_init(unsigned long num_pages, unsigned long num_dma32_pages);
+int ttm_tt_mgr_init(void);
+void ttm_tt_mgr_fini(void);
 
 #if IS_ENABLED(CONFIG_AGP)
 #include <linux/agp_backend.h>
