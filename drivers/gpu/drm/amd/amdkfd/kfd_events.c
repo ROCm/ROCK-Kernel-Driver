@@ -1231,7 +1231,7 @@ void kfd_signal_vm_fault_event(struct kfd_dev *dev, u32 pasid,
 	/* SoC15 chips will pass in data from now on. */
 	if (!data) {
 		memset(&memory_exception_data, 0, sizeof(memory_exception_data));
-		memory_exception_data.gpu_id = dev->id;
+		memory_exception_data.gpu_id = user_gpu_id;
 		memory_exception_data.failure.imprecise = true;
 
 		/* Set failure reason */

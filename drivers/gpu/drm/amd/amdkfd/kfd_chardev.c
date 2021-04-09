@@ -323,7 +323,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
 		err = -ESRCH;
-		goto err_bind_process;
+		goto err_pdd_bind;
 	}
 
 	pr_debug("Creating queue for PASID 0x%x on gpu 0x%x\n",
@@ -365,7 +365,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	return 0;
 
 err_create_queue:
-err_bind_process:
+err_pdd_bind:
 	amdgpu_read_unlock(dev->ddev);
 err_pdd:
 err_read_lock:
@@ -1255,7 +1255,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 					GET_IDR_HANDLE(args->handle));
 	if (!buf_obj) {
 		ret = -EINVAL;
-		goto err_unlock;
+		goto err_bo;
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
@@ -1270,8 +1270,9 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 
 	WRITE_ONCE(pdd->vram_usage, pdd->vram_usage - size);
 
-err_unlock:
+err_bo:
 	amdgpu_read_unlock(pdd->dev->ddev);
+err_unlock:
 err_pdd:
 err_read_lock:
 	mutex_unlock(&p->mutex);
@@ -1497,7 +1498,10 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			peer_pdd = kfd_process_device_data_by_id(p, devices_arr[i]);
 			if (WARN_ON_ONCE(!peer_pdd))
 				continue;
-			kfd_flush_tlb(peer_pdd, TLB_FLUSH_HEAVYWEIGHT);
+			if (!amdgpu_read_lock(peer_pdd->dev->ddev, true)) {
+				kfd_flush_tlb(peer_pdd, TLB_FLUSH_HEAVYWEIGHT);
+				amdgpu_read_unlock(peer_pdd->dev->ddev);
+			}
 		}
 	}
 	kfree(devices_arr);
@@ -1623,14 +1627,16 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 				   struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_import_dmabuf_args *args = data;
-	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
 	int r;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	mutex_unlock(&p->mutex);
+	if (!pdd)
 		return -EINVAL;
 
-	r = kfd_ipc_import_dmabuf(dev, p, args->gpu_id, args->dmabuf_fd,
+	r = kfd_ipc_import_dmabuf(pdd->dev, p, args->gpu_id, args->dmabuf_fd,
 				  args->va_addr, &args->handle, NULL);
 	if (r)
 		pr_err("Failed to import dmabuf\n");
@@ -1643,14 +1649,16 @@ static int kfd_ioctl_ipc_export_handle(struct file *filep,
 				       void *data)
 {
 	struct kfd_ioctl_ipc_export_handle_args *args = data;
-	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
 	int r;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	mutex_unlock(&p->mutex);
+	if (!pdd)
 		return -EINVAL;
 
-	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle,
+	r = kfd_ipc_export_as_handle(pdd->dev, p, args->handle, args->share_handle,
 				     args->flags);
 	if (r)
 		pr_err("Failed to export IPC handle\n");
@@ -3592,7 +3600,7 @@ static int criu_restore_bos(struct kfd_process *p,
 				break;
 
 			peer_pdd = kfd_process_device_data_by_id(p, bo_priv->mapped_gpuids[j]);
-			if (!peer_pdd) {
+			if (IS_ERR(peer_pdd)) {
 				ret = -EINVAL;
 				goto exit;
 			}
