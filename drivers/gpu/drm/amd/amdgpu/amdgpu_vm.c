@@ -1684,6 +1684,7 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  * @pages_addr: DMA addresses to use for mapping
  * @fence: optional resulting fence
  * @table_freed: return true if page table is freed
+ * @vram_base_offset: pcie p2p support
  *
  * Fill in the page table entries between @start and @last.
  *
@@ -1938,6 +1939,18 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 
 		/* Apply ASIC specific mapping flags */
 		amdgpu_gmc_get_vm_pte(adev, mapping, &update_flags);
+
+		if (adev != bo_adev &&
+			!(update_flags & AMDGPU_PTE_SYSTEM) &&
+			!mapping->bo_va->is_xgmi) {
+			if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+				update_flags |= AMDGPU_PTE_SYSTEM;
+				vram_base_offset = bo_adev->gmc.aper_base;
+			} else {
+				DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
+				return -EINVAL;
+			}
+		}
 
 		trace_amdgpu_vm_bo_update(mapping);
 
