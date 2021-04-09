@@ -1667,14 +1667,16 @@ static int kfd_ioctl_ipc_export_handle(struct file *filep,
 				       void *data)
 {
 	struct kfd_ioctl_ipc_export_handle_args *args = data;
-	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
 	int r;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	mutex_unlock(&p->mutex);
+	if (!pdd)
 		return -EINVAL;
 
-	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle,
+	r = kfd_ipc_export_as_handle(pdd->dev, p, args->handle, args->share_handle,
 				     args->flags);
 	if (r)
 		pr_err("Failed to export IPC handle\n");
@@ -2737,7 +2739,7 @@ static int criu_restore_bos(struct kfd_process *p,
 exit:
 	while (ret && i--) {
 		if (bo_buckets[i].alloc_flags
-		   & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM | KFD_IOC_ALLOC_MEM_FLAGS_GTT))
+		    & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM | KFD_IOC_ALLOC_MEM_FLAGS_GTT))
 			close_fd(bo_buckets[i].dmabuf_fd);
 	}
 	kvfree(bo_buckets);
