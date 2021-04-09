@@ -1424,6 +1424,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->runtime_inuse = false;
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;
+	pdd->user_gpu_id = dev->id;
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	p->pdds[p->n_pdds++] = pdd;
 
@@ -1895,6 +1896,23 @@ void kfd_flush_tlb(struct kfd_process_device *pdd)
 		amdgpu_amdkfd_flush_gpu_tlb_pasid(dev->kgd,
 						pdd->process->pasid);
 	}
+}
+
+struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *p, uint32_t gpu_id)
+{
+	int i;
+
+	if (gpu_id) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *pdd = p->pdds[i];
+
+			if (pdd->user_gpu_id == gpu_id)
+				return pdd;
+		}
+
+		WARN_ONCE(1, "Failed to find mapping for gpu = 0x%x\n",  gpu_id);
+	}
+	return NULL;
 }
 
 #if defined(CONFIG_DEBUG_FS)
