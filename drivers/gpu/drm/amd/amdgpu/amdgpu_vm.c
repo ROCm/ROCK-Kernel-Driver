@@ -993,6 +993,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	uint64_t vram_base;
 	uint64_t flags;
 	int r;
+	struct amdgpu_device *bo_adev;
 
 	if (clear || !bo) {
 		mem = NULL;
@@ -1018,8 +1019,6 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	}
 
 	if (bo) {
-		struct amdgpu_device *bo_adev;
-
 		flags = amdgpu_ttm_tt_pte_flags(adev, bo->tbo.ttm, mem);
 
 		if (amdgpu_bo_encrypted(bo))
@@ -1059,6 +1058,18 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 
 		/* Apply ASIC specific mapping flags */
 		amdgpu_gmc_get_vm_pte(adev, mapping, &update_flags);
+
+		if (adev != bo_adev &&
+			!(update_flags & AMDGPU_PTE_SYSTEM) &&
+			!mapping->bo_va->is_xgmi) {
+			if (amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+				update_flags |= AMDGPU_PTE_SYSTEM;
+				vram_base = bo_adev->gmc.aper_base;
+			} else {
+				DRM_DEBUG_DRIVER("Failed to map the VRAM for peer device access.\n");
+				return -EINVAL;
+			}
+		}
 
 		trace_amdgpu_vm_bo_update(mapping);
 
