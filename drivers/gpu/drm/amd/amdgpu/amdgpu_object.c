@@ -1182,7 +1182,7 @@ int amdgpu_bo_set_tiling_flags(struct amdgpu_bo *bo, u64 tiling_flags)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	struct amdgpu_bo_user *ubo;
 
-	BUG_ON(bo->tbo.type == ttm_bo_type_kernel);
+	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	if (adev->family <= AMDGPU_FAMILY_CZ &&
 	    AMDGPU_TILING_GET(tiling_flags, TILE_SPLIT) > 6)
 		return -EINVAL;
@@ -1204,7 +1204,7 @@ void amdgpu_bo_get_tiling_flags(struct amdgpu_bo *bo, u64 *tiling_flags)
 {
 	struct amdgpu_bo_user *ubo;
 
-	BUG_ON(bo->tbo.type == ttm_bo_type_kernel);
+	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
 	ubo = to_amdgpu_bo_user(bo);
 
@@ -1231,7 +1231,7 @@ int amdgpu_bo_set_metadata (struct amdgpu_bo *bo, void *metadata,
 	struct amdgpu_bo_user *ubo;
 	void *buffer;
 
-	BUG_ON(bo->tbo.type == ttm_bo_type_kernel);
+	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	ubo = to_amdgpu_bo_user(bo);
 	if (!metadata_size) {
 		if (ubo->metadata_size) {
@@ -1281,7 +1281,7 @@ int amdgpu_bo_get_metadata(struct amdgpu_bo *bo, void *buffer,
 	if (!buffer && !metadata_size)
 		return -EINVAL;
 
-	BUG_ON(bo->tbo.type == ttm_bo_type_kernel);
+	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	ubo = to_amdgpu_bo_user(bo);
 	if (buffer) {
 		if (buffer_size < ubo->metadata_size)
