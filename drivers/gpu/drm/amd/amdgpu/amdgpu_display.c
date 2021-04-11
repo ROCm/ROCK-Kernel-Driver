@@ -1150,7 +1150,11 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 		return ERR_PTR(ret);
 	}
 
+#ifdef HAVE_DRM_GEN_FB_INIT_WITH_FUNCS
+	/* amdgpu_display_gem_fb_verify_and_init() increase the reference count of obj, 
+	   but amdgpu_display_gem_fb_init() doesn't */
 	drm_gem_object_put(obj);
+#endif
 	return &amdgpu_fb->base;
 }
 
