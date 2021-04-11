@@ -77,7 +77,6 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
-	struct amdgpu_bo_user *ubo;
 
 	kfree(bo->dgma_addr);
 
@@ -97,11 +96,7 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 	}
 	amdgpu_bo_unref(&bo->parent);
 
-	if (bo->tbo.type == ttm_bo_type_device) {
-		ubo = to_amdgpu_bo_user(bo);
-		kfree(ubo->metadata);
-	}
-
+	kfree(bo->metadata);
 	kfree(bo);
 }
 
@@ -1180,15 +1175,12 @@ void amdgpu_bo_fini(struct amdgpu_device *adev)
 int amdgpu_bo_set_tiling_flags(struct amdgpu_bo *bo, u64 tiling_flags)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
-	struct amdgpu_bo_user *ubo;
 
-	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	if (adev->family <= AMDGPU_FAMILY_CZ &&
 	    AMDGPU_TILING_GET(tiling_flags, TILE_SPLIT) > 6)
 		return -EINVAL;
 
-	ubo = to_amdgpu_bo_user(bo);
-	ubo->tiling_flags = tiling_flags;
+	bo->tiling_flags = tiling_flags;
 	return 0;
 }
 
@@ -1202,14 +1194,10 @@ int amdgpu_bo_set_tiling_flags(struct amdgpu_bo *bo, u64 tiling_flags)
  */
 void amdgpu_bo_get_tiling_flags(struct amdgpu_bo *bo, u64 *tiling_flags)
 {
-	struct amdgpu_bo_user *ubo;
-
-	BUG_ON(bo->tbo.type != ttm_bo_type_device);
 	dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
-	ubo = to_amdgpu_bo_user(bo);
 
 	if (tiling_flags)
-		*tiling_flags = ubo->tiling_flags;
+		*tiling_flags = bo->tiling_flags;
 }
 
 /**
@@ -1228,16 +1216,13 @@ void amdgpu_bo_get_tiling_flags(struct amdgpu_bo *bo, u64 *tiling_flags)
 int amdgpu_bo_set_metadata (struct amdgpu_bo *bo, void *metadata,
 			    uint32_t metadata_size, uint64_t flags)
 {
-	struct amdgpu_bo_user *ubo;
 	void *buffer;
 
-	BUG_ON(bo->tbo.type != ttm_bo_type_device);
-	ubo = to_amdgpu_bo_user(bo);
 	if (!metadata_size) {
-		if (ubo->metadata_size) {
-			kfree(ubo->metadata);
-			ubo->metadata = NULL;
-			ubo->metadata_size = 0;
+		if (bo->metadata_size) {
+			kfree(bo->metadata);
+			bo->metadata = NULL;
+			bo->metadata_size = 0;
 		}
 		return 0;
 	}
@@ -1249,10 +1234,10 @@ int amdgpu_bo_set_metadata (struct amdgpu_bo *bo, void *metadata,
 	if (buffer == NULL)
 		return -ENOMEM;
 
-	kfree(ubo->metadata);
-	ubo->metadata_flags = flags;
-	ubo->metadata = buffer;
-	ubo->metadata_size = metadata_size;
+	kfree(bo->metadata);
+	bo->metadata_flags = flags;
+	bo->metadata = buffer;
+	bo->metadata_size = metadata_size;
 
 	return 0;
 }
@@ -1276,25 +1261,21 @@ int amdgpu_bo_get_metadata(struct amdgpu_bo *bo, void *buffer,
 			   size_t buffer_size, uint32_t *metadata_size,
 			   uint64_t *flags)
 {
-	struct amdgpu_bo_user *ubo;
-
 	if (!buffer && !metadata_size)
 		return -EINVAL;
 
-	BUG_ON(bo->tbo.type != ttm_bo_type_device);
-	ubo = to_amdgpu_bo_user(bo);
 	if (buffer) {
-		if (buffer_size < ubo->metadata_size)
+		if (buffer_size < bo->metadata_size)
 			return -EINVAL;
 
-		if (ubo->metadata_size)
-			memcpy(buffer, ubo->metadata, ubo->metadata_size);
+		if (bo->metadata_size)
+			memcpy(buffer, bo->metadata, bo->metadata_size);
 	}
 
 	if (metadata_size)
-		*metadata_size = ubo->metadata_size;
+		*metadata_size = bo->metadata_size;
 	if (flags)
-		*flags = ubo->metadata_flags;
+		*flags = bo->metadata_flags;
 
 	return 0;
 }
