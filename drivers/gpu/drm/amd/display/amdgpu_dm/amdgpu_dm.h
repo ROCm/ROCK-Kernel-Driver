@@ -66,6 +66,7 @@ struct dc_plane_state;
 struct common_irq_params {
 	struct amdgpu_device *adev;
 	enum dc_irq_source irq_src;
+	atomic64_t previous_timestamp;
 };
 
 /**
@@ -432,7 +433,7 @@ struct amdgpu_display_manager {
 
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 	/**
-	 * @crc_rd_wrk
+	 * @crc_rd_wrk:
 	 *
 	 * Work to be executed in a separate thread to communicate with PSP.
 	 */

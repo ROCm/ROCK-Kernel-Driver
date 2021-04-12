@@ -92,11 +92,14 @@ static void dc_link_destruct(struct dc_link *link)
 		link->panel_cntl->funcs->destroy(&link->panel_cntl);
 
 	if (link->link_enc) {
-		/* Update link encoder tracking variables. These are used for the dynamic
-		 * assignment of link encoders to streams.
+		/* Update link encoder resource tracking variables. These are used for
+		 * the dynamic assignment of link encoders to streams. Virtual links
+		 * are not assigned encoder resources on creation.
 		 */
-		link->dc->res_pool->link_encoders[link->link_enc->preferred_engine] = NULL;
-		link->dc->res_pool->dig_link_enc_count--;
+		if (link->link_id.id != CONNECTOR_ID_VIRTUAL) {
+			link->dc->res_pool->link_encoders[link->eng_id - ENGINE_ID_DIGA] = NULL;
+			link->dc->res_pool->dig_link_enc_count--;
+		}
 		link->link_enc->funcs->destroy(&link->link_enc);
 	}
 
@@ -1383,8 +1386,6 @@ static bool dc_link_construct(struct dc_link *link,
 	struct dc_bios *bios = init_params->dc->ctx->dc_bios;
 	const struct dc_vbios_funcs *bp_funcs = bios->funcs;
 	struct bp_disp_connector_caps_info disp_connect_caps_info = { 0 };
-	struct dc_link *edp_links[MAX_NUM_EDP];
-	int edp_num;
 
 	DC_LOGGER_INIT(dc_ctx->logger);
 
@@ -1408,6 +1409,8 @@ static bool dc_link_construct(struct dc_link *link,
 
 	link->link_id =
 		bios->funcs->get_connector_id(bios, init_params->connector_index);
+
+	link->ep_type = DISPLAY_ENDPOINT_PHY;
 
 	DC_LOG_DC("BIOS object table - link_id: %d", link->link_id.id);
 
@@ -1508,14 +1511,12 @@ static bool dc_link_construct(struct dc_link *link,
 		(link->link_id.id == CONNECTOR_ID_EDP ||
 			link->link_id.id == CONNECTOR_ID_LVDS)) {
 		panel_cntl_init_data.ctx = dc_ctx;
-		get_edp_links(panel_cntl_init_data.ctx->dc, edp_links, &edp_num);
-		if ((edp_num > 1) && (link->link_index > edp_links[0]->link_index))
-			panel_cntl_init_data.inst = 1;
-		else
-			panel_cntl_init_data.inst = 0;
+		panel_cntl_init_data.inst =
+			panel_cntl_init_data.ctx->dc_edp_id_count;
 		link->panel_cntl =
 			link->dc->res_pool->funcs->panel_cntl_create(
 								&panel_cntl_init_data);
+		panel_cntl_init_data.ctx->dc_edp_id_count++;
 
 		if (link->panel_cntl == NULL) {
 			DC_ERROR("Failed to create link panel_cntl!\n");
@@ -1547,7 +1548,8 @@ static bool dc_link_construct(struct dc_link *link,
 	/* Update link encoder tracking variables. These are used for the dynamic
 	 * assignment of link encoders to streams.
 	 */
-	link->dc->res_pool->link_encoders[link->link_enc->preferred_engine] = link->link_enc;
+	link->eng_id = link->link_enc->preferred_engine;
+	link->dc->res_pool->link_encoders[link->eng_id - ENGINE_ID_DIGA] = link->link_enc;
 	link->dc->res_pool->dig_link_enc_count++;
 
 	link->link_enc_hw_inst = link->link_enc->transmitter;
@@ -2894,8 +2896,8 @@ static struct fixed31_32 get_pbn_per_slot(struct dc_stream_state *stream)
 static struct fixed31_32 get_pbn_from_bw_in_kbps(uint64_t kbps)
 {
 	struct fixed31_32 peak_kbps;
-	uint32_t numerator;
-	uint32_t denominator;
+	uint32_t numerator = 0;
+	uint32_t denominator = 1;
 
 	/*
 	 * margin 5300ppm + 300ppm ~ 0.6% as per spec, factor is 1.006

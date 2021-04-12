@@ -1904,7 +1904,7 @@ uint64_t reduceSizeAndFraction(
 	num = *numerator;
 	denom = *denominator;
 	for (i = 0; i < count; i++) {
-		uint32_t num_reminder, denom_reminder;
+		uint32_t num_remainder, denom_remainder;
 		uint64_t num_result, denom_result;
 		if (checkUint32Bounary &&
 			num <= max_int32 && denom <= max_int32) {
@@ -1912,13 +1912,13 @@ uint64_t reduceSizeAndFraction(
 			break;
 		}
 		do {
-			num_result = div_u64_rem(num, prime_numbers[i], &num_reminder);
-			denom_result = div_u64_rem(denom, prime_numbers[i], &denom_reminder);
-			if (num_reminder == 0 && denom_reminder == 0) {
+			num_result = div_u64_rem(num, prime_numbers[i], &num_remainder);
+			denom_result = div_u64_rem(denom, prime_numbers[i], &denom_remainder);
+			if (num_remainder == 0 && denom_remainder == 0) {
 				num = num_result;
 				denom = denom_result;
 			}
-		} while (num_reminder == 0 && denom_reminder == 0);
+		} while (num_remainder == 0 && denom_remainder == 0);
 	}
 	*numerator = num;
 	*denominator = denom;
@@ -4003,4 +4003,20 @@ void dcn10_get_clock(struct dc *dc,
 	if (dc->clk_mgr && dc->clk_mgr->funcs->get_clock)
 				dc->clk_mgr->funcs->get_clock(dc->clk_mgr, context, clock_type, clock_cfg);
 
+}
+
+void dcn10_get_dcc_en_bits(struct dc *dc, int *dcc_en_bits)
+{
+	struct resource_pool *pool = dc->res_pool;
+	int i;
+
+	for (i = 0; i < pool->pipe_count; i++) {
+		struct hubp *hubp = pool->hubps[i];
+		struct dcn_hubp_state *s = &(TO_DCN10_HUBP(hubp)->state);
+
+		hubp->funcs->hubp_read_state(hubp);
+
+		if (!s->blank_en)
+			dcc_en_bits[i] = s->dcc_en ? 1 : 0;
+	}
 }

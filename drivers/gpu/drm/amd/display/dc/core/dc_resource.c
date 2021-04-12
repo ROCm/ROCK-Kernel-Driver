@@ -1949,6 +1949,9 @@ enum dc_status dc_remove_stream_from_ctx(
 				dc->res_pool,
 			del_pipe->stream_res.stream_enc,
 			false);
+	/* Release link encoder from stream in new dc_state. */
+	if (dc->res_pool->funcs->link_enc_unassign)
+		dc->res_pool->funcs->link_enc_unassign(new_ctx, del_pipe->stream);
 
 	if (del_pipe->stream_res.audio)
 		update_audio_usage(
@@ -2866,6 +2869,10 @@ bool pipe_need_reprogram(
 	if (pipe_ctx_old->stream_res.dsc != pipe_ctx->stream_res.dsc)
 		return true;
 #endif
+
+	/* DIG link encoder resource assignment for stream changed. */
+	if (pipe_ctx_old->stream->link_enc != pipe_ctx->stream->link_enc)
+		return true;
 
 	return false;
 }
