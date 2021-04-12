@@ -783,19 +783,3 @@ void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd)
 	amdgpu_device_flush_hdp((struct amdgpu_device *) kgd, NULL);
 }
 
-int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
-					uint32_t *payload)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	int ret;
-
-	/* Device or IH ring is not ready so bail. */
-	ret = amdgpu_ih_wait_on_checkpoint_process(adev, &adev->irq.ih);
-	if (ret)
-		return ret;
-
-	/* Send payload to fence KFD interrupts */
-	amdgpu_amdkfd_interrupt(adev, payload);
-
-	return 0;
-}
