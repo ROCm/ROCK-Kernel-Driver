@@ -81,5 +81,11 @@ config DRM_AMD_SECURE_DISPLAY
             of crc of specific region via debugfs.
             Cooperate with specific DMCU FW.
 
+config HP_HOOK_WORKAROUND
+        bool "temporary hp hook workaround"
+        depends on DRM_AMD_DC
+        help
+         Choose this option
+	 if you want to use hp USB-C dock
 
 endmenu
