@@ -377,11 +377,13 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 	struct kfd_process_device *pdd;
 	int count = 0;
 
-	kfd_release_debug_watch_points(target,
+	if (!unwind) {
+		kfd_release_debug_watch_points(target,
 				target->allocated_debug_watch_point_bitmask);
-	target->allocated_debug_watch_point_bitmask = 0;
-	kfd_dbg_trap_set_wave_launch_mode(target, 0);
-	kfd_dbg_trap_set_precise_mem_ops(target, 0);
+		target->allocated_debug_watch_point_bitmask = 0;
+		kfd_dbg_trap_set_wave_launch_mode(target, 0);
+		kfd_dbg_trap_set_precise_mem_ops(target, 0);
+	}
 
 	list_for_each_entry(pdd,
 			&target->per_device_data,
@@ -405,10 +407,12 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 		count++;
 	}
 
-	/* Drop the reference held by the debug session. */
-	kfd_unref_process(target);
+	/* Drop the references held by the debug session. */
+	if (!unwind) {
+		kfd_unref_process(target);
+		fput(target->dbg_ev_file);
+	}
 	target->debug_trap_enabled = false;
-	fput(target->dbg_ev_file);
 	target->dbg_ev_file = NULL;
 
 	return 0;
