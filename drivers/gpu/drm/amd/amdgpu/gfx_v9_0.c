@@ -2013,7 +2013,7 @@ static int gfx_v9_0_mec_init(struct amdgpu_device *adev)
 		 le32_to_cpu(mec_hdr->header.ucode_array_offset_bytes));
 	fw_size = le32_to_cpu(mec_hdr->header.ucode_size_bytes);
 
-	r = amdgpu_bo_create_reserved(adev, mec_hdr->header.ucode_size_bytes,
+	r = amdgpu_bo_create_reserved(adev, fw_size,
 				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_GTT,
 				      &adev->gfx.mec.mec_fw_obj,
 				      &adev->gfx.mec.mec_fw_gpu_addr,
