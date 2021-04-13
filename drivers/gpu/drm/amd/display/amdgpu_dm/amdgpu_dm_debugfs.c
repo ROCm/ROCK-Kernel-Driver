@@ -3914,6 +3914,7 @@ DEFINE_DEBUGFS_ATTRIBUTE(force_timing_sync_ops, force_timing_sync_get,
 #endif
 
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 /*
  * Disables all HPD and HPD RX interrupt handling in the
  * driver when set to 1. Default is 0.
@@ -3943,6 +3944,7 @@ static int disable_hpd_get(void *data, u64 *val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 			 disable_hpd_set, "%llu\n");
+#endif
 
 /*
  * Prints hardware capabilities. These are used for IGT testing.
