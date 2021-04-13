@@ -2093,6 +2093,9 @@ void kfd_process_drain_interrupts(struct kfd_process_device *pdd)
 {
 	uint32_t irq_drain_fence[8];
 
+	if (pdd->dev->device_info->asic_family < CHIP_VEGA10)
+		return;
+
 	pdd->process->irq_drain_is_open = true;
 
 	memset(irq_drain_fence, 0, sizeof(irq_drain_fence));
