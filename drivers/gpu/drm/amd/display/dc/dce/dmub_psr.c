@@ -291,7 +291,9 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 	copy_settings_data->debug.u32All = 0;
 	copy_settings_data->debug.bitfields.visual_confirm	= dc->dc->debug.visual_confirm == VISUAL_CONFIRM_PSR;
 	copy_settings_data->debug.bitfields.use_hw_lock_mgr		= 1;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	copy_settings_data->fec_enable_status = (link->fec_state == dc_link_fec_enabled);
+#endif
 	copy_settings_data->fec_enable_delay_in100us = link->dc->debug.fec_enable_delay_in100us;
 	copy_settings_data->cmd_version =  PSR_VERSION_1;
 	copy_settings_data->panel_inst = panel_inst;
