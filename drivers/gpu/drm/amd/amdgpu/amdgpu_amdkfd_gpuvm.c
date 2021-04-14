@@ -1985,29 +1985,43 @@ static int get_sg_table(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo *bo = mem->bo;
 	struct sg_table *sg = NULL;
-	unsigned long bus_addr, aper_limit;
-	dma_addr_t dma_addr;
-	unsigned int chunks;
-	unsigned int idx;
 	struct scatterlist *s;
+	struct page **pages;
 	uint64_t offset_in_page;
 	unsigned int page_size;
+	unsigned int cur_page;
+	unsigned int chunks;
+	unsigned int idx;
 	int ret;
 
+	/* Determine access does not cross memory boundary */
 	if (size + offset > amdgpu_bo_size(bo))
 		return -EFAULT;
+
+	/* For GPU memory use VRAM Mgr to build SG Table */
+	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
+		ret = amdgpu_vram_mgr_alloc_sgt(adev, &bo->tbo.mem, offset,
+						size, dma_dev, dir, &sg);
+		*ret_sg = (ret == 0) ?  sg : NULL;
+		return ret;
+	}
+
+	/* Handle SG Table cosntruction for system memory
+	 *    Allocate memory for SG Table
+	 *    Determine number of Scatterlist node in table
+	 *       Logic uses one Scatterlist node per PAGE_SIZE
+	 *    Allocate memory for Scatterlist nodes
+	 *    Initialize Scatterlist nodes to zero length
+	 *    Walk down system memory pointed by BO while
+	 *       Updating Scatterlist nodes with system memory info
+	 */
 	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM)
-		page_size = AMD_GPU_PAGE_SIZE;
-	else
-		page_size = PAGE_SIZE;
-
-
+	page_size = PAGE_SIZE;
 	offset_in_page = offset & (page_size - 1);
 	chunks = (size  + offset_in_page + page_size - 1)
 			/ page_size;
@@ -2019,75 +2033,30 @@ static int get_sg_table(struct amdgpu_device *adev,
 	for_each_sgtable_sg(sg, s, idx)
 		s->length = 0;
 
-	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
-		bus_addr = amdgpu_bo_gpu_offset(bo) - adev->gmc.vram_start
-			   + adev->gmc.aper_base + offset;
-		aper_limit = adev->gmc.aper_base + adev->gmc.aper_size;
-		if (bus_addr + (chunks * page_size) > aper_limit) {
-			pr_err("sg: bus addr not inside pci aperture\n");
-			ret = -EFAULT;
-			goto out_of_range;
-		}
+	pages = bo->tbo.ttm->pages;
+	cur_page = offset / page_size;
+	for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
+		uint64_t chunk_size, length;
 
-		for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
-			uint64_t chunk_size, length;
+		chunk_size = page_size - offset_in_page;
+		length = min(size, chunk_size);
 
-			chunk_size = page_size - offset_in_page;
-			length = min(size, chunk_size);
+		sg_set_page(s, pages[cur_page], length, offset_in_page);
+		s->dma_address = page_to_phys(pages[cur_page]);
+		s->dma_length = length;
 
-			/* DMA map the exported addresses */
-			dma_addr = dma_map_resource(dma_dev, bus_addr,
-					page_size, dir, DMA_ATTR_SKIP_CPU_SYNC);
-			ret = dma_mapping_error(dma_dev, dma_addr);
-			if (ret)
-				goto error_unmap;
-
-			sg_set_page(s, NULL, length, offset_in_page);
-			s->dma_address = dma_addr;
-			s->dma_length = length;
-
-			size -= length;
-			offset_in_page = 0;
-			bus_addr += length;
-		}
-	} else {
-		struct page **pages;
-		unsigned int cur_page;
-
-		pages = bo->tbo.ttm->pages;
-
-		cur_page = offset / page_size;
-		for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
-			uint64_t chunk_size, length;
-
-			chunk_size = page_size - offset_in_page;
-			length = min(size, chunk_size);
-
-			sg_set_page(s, pages[cur_page], length, offset_in_page);
-			s->dma_address = page_to_phys(pages[cur_page]);
-			s->dma_length = length;
-
-			size -= length;
-			offset_in_page = 0;
-			cur_page++;
-		}
-		ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
-		if (ret)
-			goto out_of_range;
+		size -= length;
+		offset_in_page = 0;
+		cur_page++;
 	}
+
+	ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
+	if (ret)
+		goto out_of_range;
 
 	*ret_sg = sg;
 	return 0;
 
-error_unmap:
-	for_each_sgtable_sg(sg, s, idx) {
-		if (!s->length)
-			continue;
-
-		dma_unmap_resource(dma_dev, s->dma_address,
-				   s->length, dir,
-				   DMA_ATTR_SKIP_CPU_SYNC);
-	}
 out_of_range:
 	sg_free_table(sg);
 out:
@@ -2111,20 +2080,14 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct kgd_mem *mem,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table *sgt)
 {
-	struct amdgpu_bo *bo = mem->bo;
-	struct scatterlist *sg;
-	int idx;
-
-	/* Unmap memory - Sysmem vs VRAM */
-	if (bo->preferred_domains != AMDGPU_GEM_DOMAIN_VRAM) {
-		dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
-	} else {
-		for_each_sgtable_sg(sgt, sg, idx)
-			dma_unmap_resource(dma_dev, sg->dma_address,
-					   sg->length, dir,
-					   DMA_ATTR_SKIP_CPU_SYNC);
+	/* Unmap GPU device memory */
+	if (mem->bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
+		amdgpu_vram_mgr_free_sgt(dma_dev, dir, sgt);
+		return;
 	}
 
+	/* Unmap system memory */
+	dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
 	sg_free_table(sgt);
 	kfree(sgt);
 }
