@@ -2388,6 +2388,7 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
 	 *    Walk down system memory pointed by BO while
 	 *       Updating Scatterlist nodes with system memory info
 	 */
+
 	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
 	if (!sg) {
 		ret = -ENOMEM;
