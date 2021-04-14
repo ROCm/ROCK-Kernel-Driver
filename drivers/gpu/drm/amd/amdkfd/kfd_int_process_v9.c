@@ -155,14 +155,16 @@ static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 	uint16_t source_id, client_id, pasid, vmid;
 	const uint32_t *data = ih_ring_entry;
 
-	/* Only handle interrupts from KFD VMIDs */
-	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
-	if (vmid < dev->vm_info.first_vmid_kfd ||
-	    vmid > dev->vm_info.last_vmid_kfd)
-		return false;
-
 	source_id = SOC15_SOURCE_ID_FROM_IH_ENTRY(ih_ring_entry);
 	client_id = SOC15_CLIENT_ID_FROM_IH_ENTRY(ih_ring_entry);
+
+	/* Only handle interrupts from KFD VMIDs */
+	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
+	if (!KFD_IRQ_IS_FENCE(client_id, source_id) &&
+	   (vmid < dev->vm_info.first_vmid_kfd ||
+	    vmid > dev->vm_info.last_vmid_kfd))
+		return false;
+
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
 
 	/* Only handle clients we care about */
@@ -181,7 +183,8 @@ static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 	    client_id != SOC15_IH_CLIENTID_SE0SH &&
 	    client_id != SOC15_IH_CLIENTID_SE1SH &&
 	    client_id != SOC15_IH_CLIENTID_SE2SH &&
-	    client_id != SOC15_IH_CLIENTID_SE3SH)
+	    client_id != SOC15_IH_CLIENTID_SE3SH &&
+	    !KFD_IRQ_IS_FENCE(client_id, source_id))
 		return false;
 
 	/* This is a known issue for gfx9. Under non HWS, pasid is not set
@@ -219,6 +222,7 @@ static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 		source_id == SOC15_INTSRC_SDMA_TRAP ||
 		source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG ||
 		source_id == SOC15_INTSRC_CP_BAD_OPCODE ||
+		KFD_IRQ_IS_FENCE(client_id, source_id) ||
 		((client_id == SOC15_IH_CLIENTID_VMC ||
 		client_id == SOC15_IH_CLIENTID_VMC1 ||
 		client_id == SOC15_IH_CLIENTID_UTCL2) &&
