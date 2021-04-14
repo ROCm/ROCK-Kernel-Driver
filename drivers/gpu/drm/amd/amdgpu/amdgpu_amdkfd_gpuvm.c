@@ -1955,7 +1955,7 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct kgd_mem *mem)
 	if (unlikely(ret))
 		return ret;
 
-	ret = amdgpu_bo_pin(bo, mem->domain);
+	ret = amdgpu_bo_pin_restricted(bo, mem->domain, 0, 0);
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 	amdgpu_bo_unreserve(bo);
 
