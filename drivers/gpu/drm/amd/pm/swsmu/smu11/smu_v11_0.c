@@ -174,7 +174,7 @@ int smu_v11_0_load_microcode(struct smu_context *smu)
 	hdr = (const struct smc_firmware_header_v1_0 *) adev->pm.fw->data;
 	src = (const uint32_t *)(adev->pm.fw->data +
 		le32_to_cpu(hdr->header.ucode_array_offset_bytes));
-	smc_fw_size = le32_to_cpu(hdr->header.ucode_size_bytes;)
+	smc_fw_size = hdr->header.ucode_size_bytes;
 
 	for (i = 1; i < smc_fw_size/4 - 1; i++) {
 		WREG32_PCIE(addr_start, src[i]);
