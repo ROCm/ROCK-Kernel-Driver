@@ -2223,7 +2223,7 @@ static int sdma_v4_0_print_iv_entry(struct amdgpu_device *adev,
 
 	instance = sdma_v4_0_irq_id_to_seq(entry->client_id);
 	if (instance < 0 || instance >= adev->sdma.num_instances) {
-		dev_err(adev->dev, "sdma instance invalid %d\n", instance);
+		dev_err_ratelimited(adev->dev, "sdma instance invalid %d\n", instance);
 		return -EINVAL;
 	}
 
