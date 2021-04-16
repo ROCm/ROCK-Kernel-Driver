@@ -644,8 +644,13 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->bdev);
 	struct amdgpu_res_cursor cursor;
 
-	amdgpu_res_first(&bo->mem, (u64)page_offset << PAGE_SHIFT, 0, &cursor);
-	return (adev->gmc.aper_base + cursor.start) >> PAGE_SHIFT;
+	if (bo->mem.mem_type == AMDGPU_PL_DGMA ||
+		bo->mem.mem_type == AMDGPU_PL_DGMA_IMPORT) {
+		return (bo->mem.bus.offset >> PAGE_SHIFT) + page_offset;
+	} else {
+		amdgpu_res_first(&bo->mem, (u64)page_offset << PAGE_SHIFT, 0, &cursor);
+		return (adev->gmc.aper_base + cursor.start) >> PAGE_SHIFT;
+	}
 }
 
 /**
