@@ -1929,6 +1929,7 @@ static int amdgpu_direct_gma_init(struct amdgpu_device *adev)
 						AMDGPU_GEM_CREATE_TOP_DOWN;
 	bp.type = ttm_bo_type_kernel;
 	bp.resv = NULL;
+	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
 
 	/* reserve in visible vram */
 	r = amdgpu_bo_create(adev, &bp, &abo);
