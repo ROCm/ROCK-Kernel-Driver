@@ -731,7 +731,7 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
-	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
+	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->drm_priv);
 
 	pr_debug("Restoring from suspend PASID %u queue [%i]\n",
 			    pdd->process->pasid,
@@ -818,7 +818,7 @@ static int evict_process_queues_cpsch(struct device_queue_manager *dqm,
 	 * all VMs for all devices and has no VMs itself.
 	 * Skip queue eviction on process eviction.
 	 */
-	if (!pdd->vm)
+	if (!pdd->drm_priv)
 		goto out;
 
 	pr_debug_ratelimited("Evicting PASID 0x%x queues\n",
@@ -961,14 +961,14 @@ static int restore_process_queues_cpsch(struct device_queue_manager *dqm,
 	 * all VMs for all devices and has no VMs itself.
 	 * Skip queue restore on process restore.
 	 */
-	if (!pdd->vm)
+	if (!pdd->drm_priv)
 		goto vm_not_acquired;
 
 	pr_debug_ratelimited("Restoring PASID 0x%x queues\n",
 			    pdd->process->pasid);
 
 	/* Update PD Base in QPD */
-	qpd->page_table_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->vm);
+	qpd->page_table_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->drm_priv);
 	pr_debug("Updated PD address to 0x%llx\n", qpd->page_table_base);
 
 	/* activate all active queues on the qpd */
