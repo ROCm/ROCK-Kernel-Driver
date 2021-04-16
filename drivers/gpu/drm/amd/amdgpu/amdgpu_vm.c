@@ -1199,7 +1199,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 			    mem->mem_type == AMDGPU_PL_PREEMPT))
 			pages_addr = bo->tbo.ttm->dma_address;
 		else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
-			pages_addr = (dma_addr_t *)bo->tbo.mem.bus.addr;
+			pages_addr = (dma_addr_t *)bo->dgma_addr;
 
 		/* Implicitly sync to moving fences before mapping anything */
 		r = amdgpu_sync_resv(adev, &sync, bo->tbo.base.resv,
