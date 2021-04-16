@@ -2175,7 +2175,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
-						      pdd->vm, cbo->sg,
+						      pdd->drm_priv, cbo->sg,
 						      &cbo->mem, NULL, flags);
 	mutex_unlock(&p->mutex);
 	if (ret) {
@@ -2444,7 +2444,7 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
-						      pdd->vm, NULL,
+						      pdd->drm_priv, NULL,
 						      mem, NULL, flags);
 
 	mutex_unlock(&p->mutex);
