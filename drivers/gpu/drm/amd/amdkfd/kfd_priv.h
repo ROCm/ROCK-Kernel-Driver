@@ -47,6 +47,7 @@
 #include <drm/drm_ioctl.h>
 #include <kgd_kfd_interface.h>
 #include <linux/swap.h>
+#include <linux/memremap.h>
 
 #include "amdgpu_amdkfd.h"
 #include "amd_shared.h"
