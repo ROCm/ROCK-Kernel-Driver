@@ -809,7 +809,6 @@ void amdgpu_mn_unregister(struct amdgpu_bo *bo)
 	mmu_interval_notifier_remove(&bo->notifier);
 	bo->notifier.mm = NULL;
 }
-#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
 /* flags used by HMM internal, not related to CPU/GPU PTE flags */
@@ -946,3 +945,4 @@ int amdgpu_hmm_range_get_pages_done(struct hmm_range *hmm_range)
 
 	return r;
 }
+#endif /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
