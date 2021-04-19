@@ -122,7 +122,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 	abo = ttm_to_amdgpu_bo(bo);
 	if (abo->flags & AMDGPU_AMDKFD_CREATE_SVM_BO) {
 		struct dma_fence *fence;
-		struct dma_resv *resv = &bo->base._resv;
+		struct dma_resv *resv = &(amdkcl_ttm_resv(bo));
 
 		rcu_read_lock();
 		fence = rcu_dereference(resv->fence_excl);
