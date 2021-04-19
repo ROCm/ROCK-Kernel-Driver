@@ -835,7 +835,9 @@ struct kfd_process_device {
 
 struct svm_range_list {
 	struct mutex			lock;
+#ifdef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
 	struct rb_root_cached		objects;
+#endif
 	struct list_head		list;
 	struct work_struct		deferred_list_work;
 	struct list_head		deferred_range_list;
