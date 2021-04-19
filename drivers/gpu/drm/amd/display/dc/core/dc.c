@@ -55,6 +55,7 @@
 #include "link_encoder.h"
 #include "link_enc_cfg.h"
 
+#include "dc_link.h"
 #include "dc_link_ddc.h"
 #include "dm_helpers.h"
 #include "mem_input.h"
@@ -1451,6 +1452,10 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 		return false;
 	}
 
+	if (is_edp_ilr_optimization_required(link, crtc_timing)) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -2724,6 +2729,10 @@ static void commit_planes_for_stream(struct dc *dc,
 						plane_state->triplebuffer_flips = true;
 				}
 			}
+			if (update_type == UPDATE_TYPE_FULL) {
+				/* force vsync flip when reconfiguring pipes to prevent underflow */
+				plane_state->flip_immediate = false;
+			}
 		}
 	}
 #endif
@@ -3287,6 +3296,19 @@ void dc_link_remove_remote_sink(struct dc_link *link, struct dc_sink *sink)
 			return;
 		}
 	}
+}
+
+void dc_wait_for_vblank(struct dc *dc, struct dc_stream_state *stream)
+{
+	int i;
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++)
+		if (dc->current_state->res_ctx.pipe_ctx[i].stream == stream) {
+			struct timing_generator *tg =
+				dc->current_state->res_ctx.pipe_ctx[i].stream_res.tg;
+			tg->funcs->wait_for_state(tg, CRTC_STATE_VBLANK);
+			break;
+		}
 }
 
 void get_clock_requirements_for_state(struct dc_state *state, struct AsicStateEx *info)
