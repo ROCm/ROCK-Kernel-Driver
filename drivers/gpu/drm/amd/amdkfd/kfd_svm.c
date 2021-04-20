@@ -1161,7 +1161,6 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		     struct amdgpu_device *bo_adev, struct dma_fence **fence)
 {
 	uint64_t vram_base_offset = 0;
-	struct amdgpu_bo_va bo_va;
 	bool table_freed = false;
 	uint64_t pte_flags;
 	unsigned long last_start;
@@ -1172,13 +1171,8 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	pr_debug("svms 0x%p [0x%lx 0x%lx]\n", prange->svms, prange->start,
 		 prange->last);
 
-	if (!bo_adev)
-		bo_adev = adev;
-
-	vram_base_offset = bo_adev->vm_manager.vram_base_offset;
-
-	if (prange->svm_bo && prange->ttm_res) {
-		bo_va.is_xgmi = amdgpu_xgmi_same_hive(adev, bo_adev);
+	if (prange->svm_bo && prange->ttm_res)
+		vram_base_offset = bo_adev->vm_manager.vram_base_offset;
 
 	last_start = prange->start;
 	for (i = 0; i < prange->npages; i++) {
@@ -1259,8 +1253,7 @@ static int svm_range_map_to_gpus(struct svm_range *prange,
 			return -EINVAL;
 
 		if (bo_adev && adev != bo_adev &&
-		    !amdgpu_xgmi_same_hive(adev, bo_adev) &&
-		    !amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+		    !amdgpu_xgmi_same_hive(adev, bo_adev)) {
 			pr_debug("cannot map to device idx %d\n", gpuidx);
 			continue;
 		}
@@ -2257,8 +2250,7 @@ svm_range_best_restore_location(struct svm_range *prange,
 			return 0;
 
 		bo_adev = svm_range_get_adev_by_id(prange, prange->actual_loc);
-		if (amdgpu_xgmi_same_hive(adev, bo_adev) ||
-		    amdgpu_device_is_peer_accessible(bo_adev, adev))
+		if (amdgpu_xgmi_same_hive(adev, bo_adev))
 			return prange->actual_loc;
 		else
 			return 0;
@@ -2748,8 +2740,7 @@ svm_range_best_prefetch_location(struct svm_range *prange)
 		if (adev == bo_adev)
 			continue;
 
-		if (!amdgpu_xgmi_same_hive(adev, bo_adev) &&
-		    !amdgpu_device_is_peer_accessible(bo_adev, adev)) {
+		if (!amdgpu_xgmi_same_hive(adev, bo_adev)) {
 			best_loc = 0;
 			break;
 		}
