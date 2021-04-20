@@ -596,6 +596,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bp.flags = 0;
 	bp.type = ttm_bo_type_sg;
 	bp.resv = resv;
+	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
 	dma_resv_lock(resv, NULL);
 	ret = amdgpu_bo_create(adev, &bp, &bo);
 	if (ret)
