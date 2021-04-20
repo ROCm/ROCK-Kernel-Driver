@@ -1169,7 +1169,9 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
+#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
 	cancel_delayed_work_sync(&p->svms.restore_work);
+#endif
 
 	mutex_lock(&p->mutex);
 
