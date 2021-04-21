@@ -554,6 +554,7 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
 	link->adjust.hdcp1.disable = 0;
 	hdcp_w->encryption_status[display->index] = MOD_HDCP_ENCRYPTION_STATUS_HDCP_OFF;
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 	DRM_DEBUG_DRIVER("[HDCP_DM] display %d, CP %d, type %d\n", aconnector->base.index,
 			 (!!aconnector->base.state) ?
 			 aconnector->base.state->content_protection : -1,
@@ -566,7 +567,7 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
 
 	process_output(hdcp_w);
 	mutex_unlock(&hdcp_w->mutex);
-
+#endif
 }
 
 /**
