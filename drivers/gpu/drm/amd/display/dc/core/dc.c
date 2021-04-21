@@ -1439,9 +1439,11 @@ bool dc_validate_seamless_boot_timing(const struct dc *dc,
 	if (crtc_timing->v_sync_width != hw_crtc_timing.v_sync_width)
 		return false;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* block DSC for now, as VBIOS does not currently support DSC timings */
 	if (crtc_timing->flags.DSC)
 		return false;
+#endif
 
 	if (dc_is_dp_signal(link->connector_signal)) {
 		unsigned int pix_clk_100hz;
