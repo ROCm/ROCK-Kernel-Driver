@@ -370,6 +370,8 @@ struct amdgpu_vm_manager {
 	spinlock_t				pasid_lock;
 };
 
+struct amdgpu_bo_va_mapping;
+
 #define amdgpu_vm_copy_pte(adev, ib, pe, src, count) ((adev)->vm_manager.vm_pte_funcs->copy_pte((ib), (pe), (src), (count)))
 #define amdgpu_vm_write_pte(adev, ib, pe, value, count, incr) ((adev)->vm_manager.vm_pte_funcs->write_pte((ib), (pe), (value), (count), (incr)))
 #define amdgpu_vm_set_pte_pde(adev, ib, pe, addr, count, incr, flags) ((adev)->vm_manager.vm_pte_funcs->set_pte_pde((ib), (pe), (addr), (count), (incr), (flags)))
@@ -401,6 +403,19 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 			  struct dma_fence **fence);
 int amdgpu_vm_handle_moved(struct amdgpu_device *adev,
 			   struct amdgpu_vm *vm);
+
+int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
+                                       struct amdgpu_device *bo_adev,
+                                       struct amdgpu_vm *vm, bool immediate,
+                                       bool unlocked, struct dma_resv *resv,
+                                       uint64_t start, uint64_t last,
+                                       uint64_t flags, uint64_t offset,
+                                       struct ttm_resource *mem,
+                                       struct drm_mm_node *nodes,
+                                       dma_addr_t *pages_addr,
+                                       struct dma_fence **fence,
+                                       uint64_t vram_base_offset);
+
 int amdgpu_vm_bo_update(struct amdgpu_device *adev,
 			struct amdgpu_bo_va *bo_va,
 			bool clear);

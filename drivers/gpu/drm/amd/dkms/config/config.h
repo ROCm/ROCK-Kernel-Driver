@@ -609,6 +609,9 @@
 /* hmm_range_fault() wants 1 arg */
 #define HAVE_HMM_RANGE_FAULT_1ARG 1
 
+/* dev_pagemap->owner is available */
+#define HAVE_HSA_AMD_SVM_ENABLED 1
+
 /* struct i2c_lock_operations is defined */
 #define HAVE_I2C_LOCK_OPERATIONS_STRUCT 1
 
@@ -734,6 +737,9 @@
 
 /* mem_encrypt_active() is available */
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
+
+/* migrate_vma->pgmap_owner is available */
+#define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1

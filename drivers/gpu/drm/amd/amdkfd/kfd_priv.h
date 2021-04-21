@@ -45,6 +45,7 @@
 #include <drm/drm_ioctl.h>
 #include <kgd_kfd_interface.h>
 #include <linux/swap.h>
+#include <linux/memremap.h>
 
 #include "amdgpu_amdkfd.h"
 #include "amd_shared.h"
@@ -339,6 +340,9 @@ struct kfd_dev {
 	unsigned int max_doorbell_slices;
 
 	int noretry;
+
+	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping */
+	struct dev_pagemap pgmap;
 };
 
 struct kfd_ipc_obj;
@@ -749,7 +753,7 @@ struct kfd_process_device {
 
 	/* VM context for GPUVM allocations */
 	struct file *drm_file;
-	void *vm;
+	void *drm_priv;
 
 	/* GPUVM allocations storage */
 	struct idr alloc_idr;
@@ -819,6 +823,19 @@ struct kfd_process_device {
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
+
+struct svm_range_list {
+	struct mutex			lock;
+#ifdef HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED
+	struct rb_root_cached		objects;
+#endif
+	struct list_head		list;
+	struct work_struct		deferred_list_work;
+	struct list_head		deferred_range_list;
+	spinlock_t			deferred_list_lock;
+	atomic_t			evicted_ranges;
+	struct delayed_work		restore_work;
+};
 
 /* Process data */
 struct kfd_process {
@@ -932,6 +949,12 @@ struct kfd_process {
 	/* Used to drain stale interrupts */
 	wait_queue_head_t wait_irq_drain;
 	bool irq_drain_is_open;
+
+	/* shared virtual memory registered by this process */
+	struct svm_range_list svms;
+	bool svm_disabled;
+
+	bool xnack_enabled;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
@@ -965,6 +988,20 @@ struct kfd_process *kfd_create_process(struct task_struct *thread);
 struct kfd_process *kfd_get_process(const struct task_struct *);
 struct kfd_process *kfd_lookup_process_by_pasid(u32 pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
+
+int kfd_process_gpuidx_from_gpuid(struct kfd_process *p, uint32_t gpu_id);
+int kfd_process_gpuid_from_kgd(struct kfd_process *p,
+			       struct amdgpu_device *adev, uint32_t *gpuid,
+			       uint32_t *gpuidx);
+static inline int kfd_process_gpuid_from_gpuidx(struct kfd_process *p,
+				uint32_t gpuidx, uint32_t *gpuid) {
+	return gpuidx < p->n_pdds ? p->pdds[gpuidx]->dev->id : -EINVAL;
+}
+static inline struct kfd_process_device *kfd_process_device_from_gpuidx(
+				struct kfd_process *p, uint32_t gpuidx) {
+	return gpuidx < p->n_pdds ? p->pdds[gpuidx] : NULL;
+}
+
 void kfd_unref_process(struct kfd_process *p);
 int kfd_process_evict_queues(struct kfd_process *p);
 int kfd_process_restore_queues(struct kfd_process *p);
@@ -990,6 +1027,8 @@ struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
+
+bool kfd_process_xnack_mode(struct kfd_process *p, bool supported);
 
 int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 			  struct vm_area_struct *vma);

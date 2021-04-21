@@ -270,7 +270,7 @@ static int vangogh_get_legacy_smu_metrics_data(struct smu_context *smu,
 	}
 
 	switch (member) {
-	case METRICS_AVERAGE_GFXCLK:
+	case METRICS_CURR_GFXCLK:
 		*value = metrics->GfxclkFrequency;
 		break;
 	case METRICS_AVERAGE_SOCCLK:
@@ -282,7 +282,7 @@ static int vangogh_get_legacy_smu_metrics_data(struct smu_context *smu,
 	case METRICS_AVERAGE_DCLK:
 		*value = metrics->DclkFrequency;
 		break;
-	case METRICS_AVERAGE_UCLK:
+	case METRICS_CURR_UCLK:
 		*value = metrics->MemclkFrequency;
 		break;
 	case METRICS_AVERAGE_GFXACTIVITY:
@@ -345,7 +345,7 @@ static int vangogh_get_smu_metrics_data(struct smu_context *smu,
 	}
 
 	switch (member) {
-	case METRICS_AVERAGE_GFXCLK:
+	case METRICS_CURR_GFXCLK:
 		*value = metrics->Current.GfxclkFrequency;
 		break;
 	case METRICS_AVERAGE_SOCCLK:
@@ -357,7 +357,7 @@ static int vangogh_get_smu_metrics_data(struct smu_context *smu,
 	case METRICS_AVERAGE_DCLK:
 		*value = metrics->Current.DclkFrequency;
 		break;
-	case METRICS_AVERAGE_UCLK:
+	case METRICS_CURR_UCLK:
 		*value = metrics->Current.MemclkFrequency;
 		break;
 	case METRICS_AVERAGE_GFXACTIVITY:
@@ -1092,7 +1092,6 @@ static int vangogh_set_soft_freq_limited_range(struct smu_context *smu,
 			return ret;
 		break;
 	case SMU_FCLK:
-	case SMU_MCLK:
 		ret = smu_cmn_send_smc_msg_with_param(smu,
 							SMU_MSG_SetHardMinFclkByFreq,
 							min, NULL);
@@ -1180,7 +1179,6 @@ static int vangogh_force_clk_levels(struct smu_context *smu,
 		if (ret)
 			return ret;
 		break;
-	case SMU_MCLK:
 	case SMU_FCLK:
 		ret = vangogh_get_dpm_clk_limited(smu,
 							clk_type, soft_min_level, &min_freq);
@@ -1267,7 +1265,6 @@ static int vangogh_force_dpm_limit_value(struct smu_context *smu, bool highest)
 		SMU_SOCCLK,
 		SMU_VCLK,
 		SMU_DCLK,
-		SMU_MCLK,
 		SMU_FCLK,
 	};
 
@@ -1296,7 +1293,6 @@ static int vangogh_unforce_dpm_levels(struct smu_context *smu)
 		enum smu_clk_type clk_type;
 		uint32_t	feature;
 	} clk_feature_map[] = {
-		{SMU_MCLK,   SMU_FEATURE_DPM_FCLK_BIT},
 		{SMU_FCLK, SMU_FEATURE_DPM_FCLK_BIT},
 		{SMU_SOCCLK, SMU_FEATURE_DPM_SOCCLK_BIT},
 		{SMU_VCLK, SMU_FEATURE_VCN_DPM_BIT},
@@ -1428,7 +1424,6 @@ static int vangogh_set_performance_level(struct smu_context *smu,
 		if (ret)
 			return ret;
 
-		vangogh_force_clk_levels(smu, SMU_MCLK, 1 << mclk_mask);
 		vangogh_force_clk_levels(smu, SMU_FCLK, 1 << fclk_mask);
 		vangogh_force_clk_levels(smu, SMU_SOCCLK, 1 << soc_mask);
 		vangogh_force_clk_levels(smu, SMU_VCLK, 1 << vclk_mask);
@@ -1468,7 +1463,6 @@ static int vangogh_set_performance_level(struct smu_context *smu,
 		if (ret)
 			return ret;
 
-		vangogh_force_clk_levels(smu, SMU_MCLK, 1 << mclk_mask);
 		vangogh_force_clk_levels(smu, SMU_FCLK, 1 << fclk_mask);
 		break;
 	case AMD_DPM_FORCED_LEVEL_PROFILE_PEAK:
@@ -1535,14 +1529,14 @@ static int vangogh_read_sensor(struct smu_context *smu,
 		break;
 	case AMDGPU_PP_SENSOR_GFX_MCLK:
 		ret = vangogh_common_get_smu_metrics_data(smu,
-						   METRICS_AVERAGE_UCLK,
+						   METRICS_CURR_UCLK,
 						   (uint32_t *)data);
 		*(uint32_t *)data *= 100;
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_GFX_SCLK:
 		ret = vangogh_common_get_smu_metrics_data(smu,
-						   METRICS_AVERAGE_GFXCLK,
+						   METRICS_CURR_GFXCLK,
 						   (uint32_t *)data);
 		*(uint32_t *)data *= 100;
 		*size = 4;

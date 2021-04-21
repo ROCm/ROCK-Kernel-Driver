@@ -160,6 +160,11 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
 subdir-ccflags-y += -DCONFIG_HP_HOOK_WORKAROUND
 
+ifeq ($(call _is_kcl_macro_defined,HAVE_HSA_AMD_SVM_ENABLED),y)
+export CONFIG_HSA_AMD_SVM=y
+subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
+endif
+
 ifeq ($(call _is_kcl_macro_defined,HAVE_DRM_DRM_HDCP_H),y)
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP

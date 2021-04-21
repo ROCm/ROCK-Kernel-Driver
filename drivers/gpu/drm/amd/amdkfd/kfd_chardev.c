@@ -43,6 +43,7 @@
 #include "kfd_ipc.h"
 #include "kfd_trace.h"
 
+#include "kfd_svm.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
 #include "amdgpu.h"
@@ -1461,7 +1462,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		dev->kgd, args->va_addr, args->size,
-		pdd->vm, NULL, (struct kgd_mem **) &mem, &offset,
+		pdd->drm_priv, NULL, (struct kgd_mem **) &mem, &offset,
 		flags);
 
 	if (err)
@@ -1499,7 +1500,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem,
+					       pdd->drm_priv, NULL);
 err_unlock:
 	amdgpu_read_unlock(dev->ddev);
 err_read_lock:
@@ -1543,7 +1545,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	run_rdma_free_callback(buf_obj);
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd,
-						buf_obj->mem, &size);
+						buf_obj->mem, pdd->drm_priv, &size);
 
 	/* If freeing the buffer failed, leave the handle in place for
 	 * clean-up during process tear-down.
@@ -1634,7 +1636,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			goto map_memory_to_gpu_failed;
 
 		err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
-			peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
+			peer->kgd, (struct kgd_mem *)mem, peer_pdd->drm_priv);
 		if (err) {
 			pr_err("Failed to map to gpu %d/%d\n",
 			       i, args->n_devices);
@@ -1756,7 +1758,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			goto unmap_memory_from_gpu_failed;
 
 		err = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-			peer->kgd, (struct kgd_mem *)mem, peer_pdd->vm);
+			peer->kgd, (struct kgd_mem *)mem, peer_pdd->drm_priv);
 		if (err) {
 			pr_err("Failed to unmap from gpu %d/%d\n",
 			       i, args->n_devices);
@@ -2070,11 +2072,13 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 
 	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
 		struct kfd_dev *dev = cma_bo->dev;
+		struct kfd_process_device *pdd;
 
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
+		pdd = kfd_get_process_device_data(dev, ci->p);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, pdd->drm_priv, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -2171,7 +2175,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
-						      pdd->vm, cbo->sg,
+						      pdd->drm_priv, cbo->sg,
 						      &cbo->mem, NULL, flags);
 	mutex_unlock(&p->mutex);
 	if (ret) {
@@ -2205,7 +2209,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, pdd->drm_priv, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2440,8 +2444,9 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
-						      pdd->vm, NULL,
+						      pdd->drm_priv, NULL,
 						      mem, NULL, flags);
+
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -2453,11 +2458,28 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 
 static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 {
+	struct amdgpu_device *adev;
+	struct task_struct *task;
+	struct kfd_process *p;
+	struct kfd_process_device *pdd;
+	uint32_t gpu_id, gpu_idx;
+	int r;
+
 	if (!mem)
 		return -EINVAL;
 
+	adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+	task = get_pid_task(mem->process_info->pid, PIDTYPE_PID);
+	p = kfd_get_process(task);
+	r = kfd_process_gpuid_from_kgd(p, adev, &gpu_id, &gpu_idx);
+	if (r < 0) {
+		pr_warn("no gpu id found, mem maybe leaking\n");
+		return -EINVAL;
+	}
+	pdd = kfd_process_device_from_gpuidx(p, gpu_idx);
+
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, mem, pdd->drm_priv, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
@@ -3068,6 +3090,64 @@ static int kfd_ioctl_rlc_spm(struct file *filep,
 	return kfd_rlc_spm(p, data);
 }
 
+static int kfd_ioctl_set_xnack_mode(struct file *filep,
+				    struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_set_xnack_mode_args *args = data;
+	int r = 0;
+
+	mutex_lock(&p->mutex);
+	if (args->xnack_enabled >= 0) {
+		if (!list_empty(&p->pqm.queues)) {
+			pr_debug("Process has user queues running\n");
+			mutex_unlock(&p->mutex);
+			return -EBUSY;
+		}
+		if (args->xnack_enabled && !kfd_process_xnack_mode(p, true))
+			r = -EPERM;
+		else
+			p->xnack_enabled = args->xnack_enabled;
+	} else {
+		args->xnack_enabled = p->xnack_enabled;
+	}
+	mutex_unlock(&p->mutex);
+
+	return r;
+}
+
+#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
+static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_svm_args *args = data;
+	int r = 0;
+
+	if (p->svm_disabled)
+		return -EPERM;
+
+	pr_debug("start 0x%llx size 0x%llx op 0x%x nattr 0x%x\n",
+		 args->start_addr, args->size, args->op, args->nattr);
+
+	if ((args->start_addr & ~PAGE_MASK) || (args->size & ~PAGE_MASK))
+		return -EINVAL;
+	if (!args->start_addr || !args->size)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	r = svm_ioctl(p, args->op, args->start_addr, args->size, args->nattr,
+		      args->attrs);
+
+	mutex_unlock(&p->mutex);
+
+	return r;
+}
+#else
+static int kfd_ioctl_svm(struct file *filep, struct kfd_process *p, void *data)
+{
+	return -EPERM;
+}
+#endif
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, \
 			    .cmd_drv = 0, .name = #ioctl}
@@ -3166,6 +3246,11 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SMI_EVENTS,
 			kfd_ioctl_smi_events, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SVM, kfd_ioctl_svm, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_XNACK_MODE,
+			kfd_ioctl_set_xnack_mode, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_IMPORT_HANDLE,
 				kfd_ioctl_ipc_import_handle, 0),
