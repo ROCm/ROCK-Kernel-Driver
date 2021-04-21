@@ -122,6 +122,16 @@ const char *get_ras_block_str(struct ras_common_if *ras_block)
 
 #define MAX_UMC_POISON_POLLING_TIME_ASYNC  100  //ms
 
+#ifdef HAVE_SMCA_UMC_V2
+#define GET_MCA_IPID_GPUID(m)		(((m) >> 44) & 0xF)
+#define GET_UMC_INST_NIBBLE(m)		(((m) >> 20) & 0xF)
+#define GET_CHAN_INDEX_NIBBLE(m)	(((m) >> 12) & 0xF)
+#define GPU_ID_OFFSET			8
+
+static bool notifier_registered = false;
+static void amdgpu_register_bad_pages_mca_notifier(void);
+#endif
+
 enum amdgpu_ras_retire_page_reservation {
 	AMDGPU_RAS_RETIRE_PAGE_RESERVED,
 	AMDGPU_RAS_RETIRE_PAGE_PENDING,
@@ -2774,10 +2784,13 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 	}
 
 #ifdef CONFIG_X86_MCE_AMD
+#ifdef HAVE_SMCA_UMC_V2
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
 	    (adev->gmc.xgmi.connected_to_cpu))
 		amdgpu_register_bad_pages_mca_notifier(adev);
 #endif
+#endif
+
 	return 0;
 
 free:
@@ -3511,6 +3524,7 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 }
 
 #ifdef CONFIG_X86_MCE_AMD
+#ifdef HAVE_SMCA_UMC_V2
 static struct amdgpu_device *find_adev(uint32_t node_id)
 {
 	int i;
@@ -3610,6 +3624,7 @@ static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev)
 		notifier_registered = true;
 	}
 }
+#endif
 #endif
 
 struct amdgpu_ras *amdgpu_ras_get_context(struct amdgpu_device *adev)
