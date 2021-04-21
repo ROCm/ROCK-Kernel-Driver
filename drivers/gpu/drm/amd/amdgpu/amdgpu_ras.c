@@ -34,6 +34,7 @@
 #include "amdgpu_atomfirmware.h"
 #include "amdgpu_xgmi.h"
 #include "ivsrcid/nbio/irqsrcs_nbif_7_4.h"
+#include <asm/mce.h>
 #include "atom.h"
 
 static const char *RAS_FS_NAME = "ras";
@@ -73,6 +74,16 @@ const char *ras_block_string[] = {
 
 /* typical ECC bad page rate is 1 bad page per 100MB VRAM */
 #define RAS_BAD_PAGE_COVER              (100 * 1024 * 1024ULL)
+
+#ifdef HAVE_SMCA_UMC_V2
+#define GET_MCA_IPID_GPUID(m)		(((m) >> 44) & 0xF)
+#define GET_UMC_INST_NIBBLE(m)		(((m) >> 20) & 0xF)
+#define GET_CHAN_INDEX_NIBBLE(m)	(((m) >> 12) & 0xF)
+#define GPU_ID_OFFSET			8
+
+static bool notifier_registered = false;
+static void amdgpu_register_bad_pages_mca_notifier(void);
+#endif
 
 enum amdgpu_ras_retire_page_reservation {
 	AMDGPU_RAS_RETIRE_PAGE_RESERVED,
@@ -2016,6 +2027,12 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 			adev->smu.ppt_funcs->send_hbm_bad_pages_num(&adev->smu, con->eeprom_control.ras_num_recs);
 	}
 
+#ifdef HAVE_SMCA_UMC_V2
+	if ((adev->asic_type == CHIP_ALDEBARAN) &&
+	    (adev->gmc.xgmi.connected_to_cpu))
+		amdgpu_register_bad_pages_mca_notifier();
+#endif
+
 	return 0;
 
 free:
@@ -2509,3 +2526,147 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 		kfree(con);
 	}
 }
+
+#ifdef HAVE_SMCA_UMC_V2
+static struct amdgpu_device *find_adev(uint32_t die_number)
+{
+        struct amdgpu_gpu_instance *gpu_instance;
+        int i;
+        struct amdgpu_device *adev = NULL;
+
+        mutex_lock(&mgpu_info.mutex);
+
+        for (i = 0; i < mgpu_info.num_gpu; i++) {
+                gpu_instance = &(mgpu_info.gpu_ins[i]);
+                adev = gpu_instance->adev;
+
+                if (adev->gmc.xgmi.connected_to_cpu &&
+                    adev->gmc.xgmi.physical_node_id == die_number)
+                        break;
+                adev = NULL;
+        }
+
+        mutex_unlock(&mgpu_info.mutex);
+
+        return adev;
+}
+
+static void find_umc_inst_chan_index(struct mce *m, uint32_t *umc_inst,
+                                     uint32_t *chan_index)
+{
+        uint32_t val1 = 0;
+        uint32_t val2 = 0;
+        uint32_t rem = 0;
+
+        /*
+         * Bit 20-23 provides the UMC instance nibble.
+         * Bit 12-15 provides the channel index nibble.
+        */
+        val1 = GET_UMC_INST_NIBBLE(m->ipid);
+        val2 = GET_CHAN_INDEX_NIBBLE(m->ipid);
+
+        *umc_inst = val1/2;
+        rem = val1%2;
+
+        *chan_index = (4*rem) + val2;
+}
+
+static int amdgpu_bad_page_notifier(struct notifier_block *nb,
+				    unsigned long val, void *data)
+{
+        struct mce *m = (struct mce *)data;
+        struct amdgpu_device *adev = NULL;
+        uint32_t gpu_id = 0;
+        uint32_t umc_inst = 0;
+        uint32_t chan_index = 0;
+        struct ras_err_data err_data = {0, 0, 0, NULL};
+        struct eeprom_table_record err_rec;
+        uint64_t retired_page;
+
+        /*
+         * If the error was generated in UMC_V2, which belongs to GPU UMCs,
+         * and error occured in DramECC (Extended error code = 0) then only
+         * process the error, else bail out.
+         */
+        if (!m || !(is_smca_umc_v2(m->bank) && (XEC(m->status, 0x1f) == 0x0)))
+                return NOTIFY_DONE;
+
+        gpu_id = GET_MCA_IPID_GPUID(m->ipid);
+
+        /*
+         * GPU Id is offset by GPU_ID_OFFSET in MCA_IPID_UMC register.
+         */
+        gpu_id -= GPU_ID_OFFSET;
+
+        adev = find_adev(gpu_id);
+        if (!adev) {
+                dev_warn(adev->dev, "%s: Unable to find adev for gpu_id:"
+                                    " %d\n", __func__, gpu_id);
+                return NOTIFY_DONE;
+        }
+
+        /*
+         * If it is correctable error, then print a message and return.
+         */
+        if (mce_is_correctable(m)) {
+                dev_info(adev->dev, "%s: UMC Correctable error detected.",
+                                    __func__);
+                return NOTIFY_OK;
+        }
+
+        /*
+         * If it is uncorrectable error, then find out UMC instance and
+         * channel index.
+         */
+        find_umc_inst_chan_index(m, &umc_inst, &chan_index);
+
+        dev_info(adev->dev, "Uncorrectable error detected in UMC inst: %d,"
+                            " chan_idx: %d", umc_inst, chan_index);
+
+        memset(&err_rec, 0x0, sizeof(struct eeprom_table_record));
+
+        /*
+         * Translate UMC channel address to Physical address
+         */
+        retired_page = ADDR_OF_8KB_BLOCK(m->addr) |
+                        ADDR_OF_256B_BLOCK(chan_index) |
+                        OFFSET_IN_256B_BLOCK(m->addr);
+
+        err_rec.address = m->addr;
+        err_rec.retired_page = retired_page >> AMDGPU_GPU_PAGE_SHIFT;
+        err_rec.ts = (uint64_t)ktime_get_real_seconds();
+        err_rec.err_type = AMDGPU_RAS_EEPROM_ERR_NON_RECOVERABLE;
+        err_rec.cu = 0;
+        err_rec.mem_channel = chan_index;
+        err_rec.mcumc_id = umc_inst;
+
+        err_data.err_addr = &err_rec;
+        err_data.err_addr_cnt = 1;
+
+        if (amdgpu_bad_page_threshold != 0) {
+                amdgpu_ras_add_bad_pages(adev, err_data.err_addr,
+                                                err_data.err_addr_cnt);
+                amdgpu_ras_save_bad_pages(adev);
+        }
+
+        return NOTIFY_OK;
+}
+
+static struct notifier_block amdgpu_bad_page_nb = {
+        .notifier_call  = amdgpu_bad_page_notifier,
+        .priority       = MCE_PRIO_ACCEL,
+};
+
+static void amdgpu_register_bad_pages_mca_notifier(void)
+{
+        /*
+         * Register the x86 notifier with MCE subsystem.
+         * Please note a notifier can be registered only once
+         * with the MCE subsystem.
+         */
+        if (notifier_registered == false) {
+                mce_register_decode_chain(&amdgpu_bad_page_nb);
+                notifier_registered = true;
+        }
+}
+#endif
