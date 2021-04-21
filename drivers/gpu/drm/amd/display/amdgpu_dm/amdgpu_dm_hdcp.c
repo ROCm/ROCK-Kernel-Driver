@@ -484,11 +484,13 @@ static void update_config(void *handle, struct cp_psp_stream_config *config)
 	link->adjust.hdcp1.disable = 0;
 	conn_state = aconnector->base.state;
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 	DRM_DEBUG_DRIVER("[HDCP_DM] display %d, CP %d, type %d\n", aconnector->base.index,
 			(!!aconnector->base.state) ? aconnector->base.state->content_protection : -1,
 			(!!aconnector->base.state) ? aconnector->base.state->hdcp_content_type : -1);
 
 	hdcp_update_display(hdcp_work, link_index, aconnector, conn_state->hdcp_content_type, false);
+#endif
 }
 
 
