@@ -904,7 +904,7 @@ retry:
 	 * hmm_range_fault() fails. FIXME: The pages cannot be touched outside
 	 * the notifier_lock, and mmu_interval_read_retry() must be done first.
 	 */
-	for (i = 0; pages && i < npages; i++)
+	for (i = 0; pages && i < npages; i++) {
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
 		pages[i] = hmm_device_entry_to_page(hmm_range, hmm_range->pfns[i]);
 		if (unlikely(!pages[i])) {
@@ -918,6 +918,7 @@ retry:
 #else
 		pages[i] = hmm_pfn_to_page(pfns[i]);
 #endif
+	}
 
 	*phmm_range = hmm_range;
 
