@@ -2573,17 +2573,23 @@ static void gfx_v9_0_init_compute_vmid(struct amdgpu_device *adev)
 		WREG32_SOC15_OFFSET(GC, 0, mmGDS_GWS_VMID0, i, 0);
 		WREG32_SOC15_OFFSET(GC, 0, mmGDS_OA_VMID0, i, 0);
 	}
-	data = 0;
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
-			VMID_SEL, trap_config_vmid_mask);
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
-			TRAP_EN, 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+	if (adev->asic_type != CHIP_ALDEBARAN) {
+		data = 0;
+		data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+				VMID_SEL, trap_config_vmid_mask);
+		data = REG_SET_FIELD(data, SPI_GDBG_TRAP_CONFIG,
+				TRAP_EN, 1);
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_CONFIG), data);
+
+		WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
+	} else {
+		gfx_v9_4_2_debug_trap_config_init(adev, adev->vm_manager.first_kfd_vmid,
+						AMDGPU_NUM_VMID);
+	}
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA0), 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_DATA1), 0);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
-
 }
 
 static void gfx_v9_0_init_gds_vmid(struct amdgpu_device *adev)
