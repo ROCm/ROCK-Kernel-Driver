@@ -92,12 +92,20 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(robj->tbo.bdev);
 
 	if (robj) {
+		if (robj->flags & AMDGPU_GEM_CREATE_NO_EVICT) {
+			if (!amdgpu_bo_reserve(robj, false)) {
+				amdgpu_bo_unpin(robj);
+				amdgpu_bo_unreserve(robj);
+			}
+		}
+
 		if (robj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
 			atomic64_sub(amdgpu_bo_size(robj),
 				     &adev->direct_gma.vram_usage);
 		else if (robj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
 			atomic64_sub(amdgpu_bo_size(robj),
 				     &adev->direct_gma.gart_usage);
+
 		amdgpu_mn_unregister(robj);
 		amdgpu_bo_unref(&robj);
 	}
