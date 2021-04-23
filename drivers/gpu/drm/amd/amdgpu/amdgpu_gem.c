@@ -88,6 +88,13 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 	struct amdgpu_bo *robj = gem_to_amdgpu_bo(gobj);
 
 	if (robj) {
+		if (robj->flags & AMDGPU_GEM_CREATE_NO_EVICT) {
+			if (!amdgpu_bo_reserve(robj, false)) {
+				amdgpu_bo_unpin(robj);
+				amdgpu_bo_unreserve(robj);
+			}
+		}
+
 		amdgpu_hmm_unregister(robj);
 		amdgpu_bo_unref(&robj);
 	}
