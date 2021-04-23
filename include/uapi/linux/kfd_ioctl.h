@@ -58,9 +58,10 @@
  * 5.0 - Report exception codes to the debugger
  * 6.0 - Pass event file descriptor from userspace.
  * 6.1 - Add KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO.
+ * 6.2 - Add KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT.
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	6
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	2
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -135,6 +136,18 @@ struct kfd_queue_snapshot_entry {
 	__u32 ring_size;
 	__u32 queue_type;
 	__u32 reserved[18];
+};
+
+struct kfd_dbg_device_info_entry {
+	__u64 exception_status;
+	__u64 lds_base;
+	__u64 lds_limit;
+	__u64 scratch_base;
+	__u64 scratch_limit;
+	__u64 gpuvm_base;
+	__u64 gpuvm_limit;
+	__u32 gpu_id;
+	__u32 pad;
 };
 
 /* For kfd_ioctl_set_memory_policy_args.default_policy and alternate_policy */
@@ -462,6 +475,15 @@ enum kfd_dbg_trap_exception_code {
  */
 #define KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO 11
 
+/* KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT
+ * exception_mask: exception to clear on snapshot
+ * ptr: user buffer for 'struct kfd_dbg_device_info_entry' entries (IN)
+ * data1: number of devices in snapshot (IN/OUT)
+ * data2: unused
+ * data3: unused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT  12
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 exception_mask; /* to KFD */

@@ -81,4 +81,9 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 		bool clear_exception,
 		void __user *info,
 		uint32_t *info_size);
+
+int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
+		uint64_t exception_clear_mask,
+		void __user *user_info,
+		uint32_t *number_of_device_infos);
 #endif
