@@ -1182,7 +1182,7 @@ int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 
 	if (!ttm_bo_get_unless_zero(bo)) {
 		if (locked)
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		return -EBUSY;
 	}
 
