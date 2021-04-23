@@ -2856,6 +2856,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_SUSPEND &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_NODE_RESUME &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_GET_QUEUE_SNAPSHOT &&
+		debug_trap_action != KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT &&
 		debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION;
 
 	need_user_array =
@@ -3045,6 +3046,12 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				data3 == 1,
 				(void __user *) args->ptr, /* info */
 				&args->data4);      /* info size */
+		break;
+	case KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT:
+		r = kfd_dbg_trap_device_snapshot(target,
+				exception_mask,
+				(void __user *) args->ptr,
+				&args->data1);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
