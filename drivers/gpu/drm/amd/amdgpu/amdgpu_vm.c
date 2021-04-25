@@ -956,7 +956,7 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 	}
 
 	if (!bp.resv)
-		WARN_ON(dma_resv_lock(bo->tbo.base.resv,
+		WARN_ON(dma_resv_lock(amdkcl_ttm_resvp(&bo->tbo),
 				      NULL));
 	resv = bp.resv;
 	memset(&bp, 0, sizeof(bp));
@@ -970,7 +970,7 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 	r = amdgpu_bo_create(adev, &bp, &(*vmbo)->shadow);
 
 	if (!resv)
-		dma_resv_unlock(bo->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 
 	if (r) {
 		amdgpu_bo_unref(&bo);
