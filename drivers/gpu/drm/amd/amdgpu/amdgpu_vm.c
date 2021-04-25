@@ -891,12 +891,12 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 		return 0;
 
 	if (!bp.resv)
-		WARN_ON(dma_resv_lock((*bo)->tbo.base.resv,
+		WARN_ON(dma_resv_lock(amdkcl_ttm_resvp(&(*bo)->tbo),
 				      NULL));
 	r = amdgpu_bo_create_shadow(adev, bp.size, *bo);
 
 	if (!bp.resv)
-		dma_resv_unlock((*bo)->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&(*bo)->tbo));
 
 	if (r) {
 		amdgpu_bo_unref(bo);
