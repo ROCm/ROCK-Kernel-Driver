@@ -5117,7 +5117,6 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 		break;
 	}
 
-
 	plane_info->visible = true;
 	plane_info->stereo_format = PLANE_STEREO_FORMAT_NONE;
 
