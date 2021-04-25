@@ -4538,7 +4538,11 @@ static int fill_dc_scaling_info(const struct drm_plane_state *state,
 	 * on ChromeOS.
 	 */
 	if (state->fb &&
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
+	    state->fb->pixel_format == DRM_FORMAT_NV12 &&
+#else
 	    state->fb->format->format == DRM_FORMAT_NV12 &&
+#endif
 	    (scaling_info->src_rect.x != 0 ||
 	     scaling_info->src_rect.y != 0))
 		return -EINVAL;
