@@ -1181,8 +1181,13 @@ int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 	 */
 	if (((amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(1, 0, 0)) ||
 	    (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(1, 0, 1))) &&
-	    (state->fb && state->fb->format->format == DRM_FORMAT_NV12 &&
-	    (scaling_info->src_rect.x != 0 || scaling_info->src_rect.y != 0)))
+        (state->fb &&
+#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
+        state->fb->pixel_format == DRM_FORMAT_NV12 &&
+#else
+        state->fb->format->format == DRM_FORMAT_NV12 &&
+#endif
+		(scaling_info->src_rect.x != 0 || scaling_info->src_rect.y != 0)))
 		return -EINVAL;
 
 	scaling_info->src_rect.width = state->src_w >> 16;
