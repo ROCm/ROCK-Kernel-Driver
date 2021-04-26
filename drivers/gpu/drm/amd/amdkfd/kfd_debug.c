@@ -538,8 +538,6 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 			break;
 	}
 
-	target->trap_debug_wave_launch_mode = wave_launch_mode;
-
 	return r;
 }
 
