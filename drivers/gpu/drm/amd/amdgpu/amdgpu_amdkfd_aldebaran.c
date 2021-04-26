@@ -27,16 +27,10 @@
 #include "gc/gc_9_4_2_sh_mask.h"
 #include "soc15.h"
 
-static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
-{
-	return (struct amdgpu_device *)kgd;
-}
-
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
 static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
 					    uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 
 	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, 1);
@@ -50,7 +44,6 @@ static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
 static uint32_t kgd_aldebaran_disable_debug_trap(struct kgd_dev *kgd,
 					     uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 
 	/* TRAP_EN is set globally on driver init so preserve setting. */
@@ -71,7 +64,6 @@ static int kgd_aldebaran_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					uint32_t *trap_mask_supported)
 
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 
 	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, 1);
@@ -87,7 +79,6 @@ static uint32_t kgd_aldebaran_set_wave_launch_mode(struct kgd_dev *kgd,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 	bool is_stall_mode = wave_launch_mode == 4;
 
