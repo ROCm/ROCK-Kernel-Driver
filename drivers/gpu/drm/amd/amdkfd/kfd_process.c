@@ -1417,7 +1417,6 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	kfd_event_init_process(process);
 	process->is_32bit_user_mode = in_compat_syscall();
 	process->debug_trap_enabled = false;
-	process->trap_debug_wave_launch_mode = 0;
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)

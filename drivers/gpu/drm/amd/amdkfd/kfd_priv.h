@@ -940,9 +940,6 @@ struct kfd_process {
 	/* Indicates device process is debug attached with reserved vmid. */
 	bool debug_trap_enabled;
 
-	/* Value of the wave launch mode if debugging is enabled */
-	uint32_t trap_debug_wave_launch_mode;
-
 	/* per-process-per device debug event fd file */
 	struct file *dbg_ev_file;
 
