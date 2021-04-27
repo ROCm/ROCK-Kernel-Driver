@@ -27,8 +27,6 @@ static const uint8_t DP_VGA_LVDS_CONVERTER_ID_3[] = "dnomlA";
 	link->ctx->logger
 #define DC_TRACE_LEVEL_MESSAGE(...) /* do nothing */
 
-#define DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE   0x50
-
 	/* maximum pre emphasis level allowed for each voltage swing level*/
 	static const enum dc_pre_emphasis
 	voltage_swing_to_pre_emphasis[] = { PRE_EMPHASIS_LEVEL3,
@@ -39,14 +37,6 @@ static const uint8_t DP_VGA_LVDS_CONVERTER_ID_3[] = "dnomlA";
 enum {
 	POST_LT_ADJ_REQ_LIMIT = 6,
 	POST_LT_ADJ_REQ_TIMEOUT = 200
-};
-
-enum {
-	LINK_TRAINING_MAX_RETRY_COUNT = 5,
-	/* to avoid infinite loop where-in the receiver
-	 * switches between different VS
-	 */
-	LINK_TRAINING_MAX_CR_RETRY = 100
 };
 
 static bool decide_fallback_link_setting(
@@ -99,7 +89,7 @@ static uint32_t get_eq_training_aux_rd_interval(
 	return wait_in_micro_secs;
 }
 
-static void wait_for_training_aux_rd_interval(
+void dp_wait_for_training_aux_rd_interval(
 	struct dc_link *link,
 	uint32_t wait_in_micro_secs)
 {
@@ -110,7 +100,7 @@ static void wait_for_training_aux_rd_interval(
 		wait_in_micro_secs);
 }
 
-static enum dpcd_training_patterns
+enum dpcd_training_patterns
 	dc_dp_training_pattern_to_dpcd_training_pattern(
 	struct dc_link *link,
 	enum dc_dp_training_pattern pattern)
@@ -286,7 +276,7 @@ enum dc_status dpcd_set_link_settings(
 	return status;
 }
 
-static uint8_t dc_dp_initialize_scrambling_data_symbols(
+uint8_t dc_dp_initialize_scrambling_data_symbols(
 	struct dc_link *link,
 	enum dc_dp_training_pattern pattern)
 {
@@ -435,7 +425,7 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	link->cur_lane_setting = lt_settings->lane_settings[0];
 }
 
-static bool is_cr_done(enum dc_lane_count ln_count,
+bool dp_is_cr_done(enum dc_lane_count ln_count,
 	union lane_status *dpcd_lane_status)
 {
 	uint32_t lane;
@@ -474,7 +464,7 @@ static inline bool is_interlane_aligned(union lane_align_status_updated align_st
 	return align_status.bits.INTERLANE_ALIGN_DONE == 1;
 }
 
-static void update_drive_settings(
+void dp_update_drive_settings(
 		struct link_training_settings *dest,
 		struct link_training_settings src)
 {
@@ -618,7 +608,7 @@ static void find_max_drive_settings(
 
 }
 
-static void get_lane_status_and_drive_settings(
+enum dc_status dp_get_lane_status_and_drive_settings(
 	struct dc_link *link,
 	const struct link_training_settings *link_training_setting,
 	union lane_status *ln_status,
@@ -633,6 +623,7 @@ static void get_lane_status_and_drive_settings(
 	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
 	struct link_training_settings request_settings = { {0} };
 	uint32_t lane;
+	enum dc_status status;
 
 	memset(req_settings, '\0', sizeof(struct link_training_settings));
 
@@ -643,7 +634,7 @@ static void get_lane_status_and_drive_settings(
 		lane_adjust_offset = 3;
 	}
 
-	core_link_read_dpcd(
+	status = core_link_read_dpcd(
 		link,
 		lane01_status_address,
 		(uint8_t *)(dpcd_buf),
@@ -731,9 +722,10 @@ static void get_lane_status_and_drive_settings(
 	 * read DpcdAddress_AdjustRequestPostCursor2 = 0x020C
 	 */
 
+	return status;
 }
 
-static void dpcd_set_lane_settings(
+enum dc_status dpcd_set_lane_settings(
 	struct dc_link *link,
 	const struct link_training_settings *link_training_setting,
 	uint32_t offset)
@@ -741,6 +733,7 @@ static void dpcd_set_lane_settings(
 	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = {{{0}}};
 	uint32_t lane;
 	unsigned int lane0_set_address;
+	enum dc_status status;
 
 	lane0_set_address = DP_TRAINING_LANE0_SET;
 
@@ -768,7 +761,7 @@ static void dpcd_set_lane_settings(
 			PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
 	}
 
-	core_link_write_dpcd(link,
+	status = core_link_write_dpcd(link,
 		lane0_set_address,
 		(uint8_t *)(dpcd_lane),
 		link_training_setting->link_settings.lane_count);
@@ -814,9 +807,10 @@ static void dpcd_set_lane_settings(
 	}
 	link->cur_lane_setting = link_training_setting->lane_settings[0];
 
+	return status;
 }
 
-static bool is_max_vs_reached(
+bool dp_is_max_vs_reached(
 	const struct link_training_settings *lt_settings)
 {
 	uint32_t lane;
@@ -858,19 +852,19 @@ static bool perform_post_lt_adj_req_sequence(
 			union lane_align_status_updated
 				dpcd_lane_status_updated;
 
-			get_lane_status_and_drive_settings(
-			link,
-			lt_settings,
-			dpcd_lane_status,
-			&dpcd_lane_status_updated,
-			&req_settings,
-			DPRX);
+			dp_get_lane_status_and_drive_settings(
+				link,
+				lt_settings,
+				dpcd_lane_status,
+				&dpcd_lane_status_updated,
+				&req_settings,
+				DPRX);
 
 			if (dpcd_lane_status_updated.bits.
 					POST_LT_ADJ_REQ_IN_PROGRESS == 0)
 				return true;
 
-			if (!is_cr_done(lane_count, dpcd_lane_status))
+			if (!dp_is_cr_done(lane_count, dpcd_lane_status))
 				return false;
 
 			if (!is_ch_eq_done(lane_count, dpcd_lane_status) ||
@@ -893,7 +887,7 @@ static bool perform_post_lt_adj_req_sequence(
 			}
 
 			if (req_drv_setting_changed) {
-				update_drive_settings(
+				dp_update_drive_settings(
 					lt_settings, req_settings);
 
 				dc_link_dp_set_drive_settings(link,
@@ -945,7 +939,7 @@ static uint32_t translate_training_aux_read_interval(uint32_t dpcd_aux_read_inte
 	return aux_rd_interval_us;
 }
 
-static enum link_training_result get_cr_failure(enum dc_lane_count ln_count,
+enum link_training_result dp_get_cr_failure(enum dc_lane_count ln_count,
 					union lane_status *dpcd_lane_status)
 {
 	enum link_training_result result = LINK_TRAINING_SUCCESS;
@@ -1009,14 +1003,14 @@ static enum link_training_result perform_channel_equalization_sequence(
 					translate_training_aux_read_interval(
 						link->dpcd_caps.lttpr_caps.aux_rd_interval[offset - 1]);
 
-		wait_for_training_aux_rd_interval(
+		dp_wait_for_training_aux_rd_interval(
 				link,
 				wait_time_microsec);
 
 		/* 4. Read lane status and requested
 		 * drive settings as set by the sink*/
 
-		get_lane_status_and_drive_settings(
+		dp_get_lane_status_and_drive_settings(
 			link,
 			lt_settings,
 			dpcd_lane_status,
@@ -1025,7 +1019,7 @@ static enum link_training_result perform_channel_equalization_sequence(
 			offset);
 
 		/* 5. check CR done*/
-		if (!is_cr_done(lane_count, dpcd_lane_status))
+		if (!dp_is_cr_done(lane_count, dpcd_lane_status))
 			return LINK_TRAINING_EQ_FAIL_CR;
 
 		/* 6. check CHEQ done*/
@@ -1035,13 +1029,12 @@ static enum link_training_result perform_channel_equalization_sequence(
 			return LINK_TRAINING_SUCCESS;
 
 		/* 7. update VS/PE/PC2 in lt_settings*/
-		update_drive_settings(lt_settings, req_settings);
+		dp_update_drive_settings(lt_settings, req_settings);
 	}
 
 	return LINK_TRAINING_EQ_FAIL_EQ;
 
 }
-#define TRAINING_AUX_RD_INTERVAL 100 //us
 
 static void start_clock_recovery_pattern_early(struct dc_link *link,
 		struct link_training_settings *lt_settings,
@@ -1112,14 +1105,14 @@ static enum link_training_result perform_clock_recovery_sequence(
 		if (link->lttpr_mode == LTTPR_MODE_NON_TRANSPARENT)
 			wait_time_microsec = TRAINING_AUX_RD_INTERVAL;
 
-		wait_for_training_aux_rd_interval(
+		dp_wait_for_training_aux_rd_interval(
 				link,
 				wait_time_microsec);
 
 		/* 4. Read lane status and requested drive
 		* settings as set by the sink
 		*/
-		get_lane_status_and_drive_settings(
+		dp_get_lane_status_and_drive_settings(
 				link,
 				lt_settings,
 				dpcd_lane_status,
@@ -1128,11 +1121,11 @@ static enum link_training_result perform_clock_recovery_sequence(
 				offset);
 
 		/* 5. check CR done*/
-		if (is_cr_done(lane_count, dpcd_lane_status))
+		if (dp_is_cr_done(lane_count, dpcd_lane_status))
 			return LINK_TRAINING_SUCCESS;
 
 		/* 6. max VS reached*/
-		if (is_max_vs_reached(lt_settings))
+		if (dp_is_max_vs_reached(lt_settings))
 			break;
 
 		/* 7. same lane settings*/
@@ -1147,7 +1140,7 @@ static enum link_training_result perform_clock_recovery_sequence(
 			retries_cr = 0;
 
 		/* 8. update VS/PE/PC2 in lt_settings*/
-		update_drive_settings(lt_settings, req_settings);
+		dp_update_drive_settings(lt_settings, req_settings);
 
 		retry_count++;
 	}
@@ -1160,7 +1153,7 @@ static enum link_training_result perform_clock_recovery_sequence(
 
 	}
 
-	return get_cr_failure(lane_count, dpcd_lane_status);
+	return dp_get_cr_failure(lane_count, dpcd_lane_status);
 }
 
 static inline enum link_training_result dp_transition_to_video_idle(
@@ -1587,7 +1580,7 @@ bool dc_link_dp_perform_link_training_skip_aux(
 	dp_set_hw_lane_settings(link, &lt_settings, DPRX);
 
 	/* wait receiver to lock-on*/
-	wait_for_training_aux_rd_interval(link, lt_settings.cr_pattern_time);
+	dp_wait_for_training_aux_rd_interval(link, lt_settings.cr_pattern_time);
 
 	/* 2. Perform_channel_equalization_sequence. */
 
@@ -1598,7 +1591,7 @@ bool dc_link_dp_perform_link_training_skip_aux(
 	dp_set_hw_lane_settings(link, &lt_settings, DPRX);
 
 	/* wait receiver to lock-on. */
-	wait_for_training_aux_rd_interval(link, lt_settings.eq_pattern_time);
+	dp_wait_for_training_aux_rd_interval(link, lt_settings.eq_pattern_time);
 
 	/* 3. Perform_link_training_int. */
 
