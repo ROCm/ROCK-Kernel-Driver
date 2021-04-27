@@ -1422,7 +1422,7 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 			}
 		}
 	}
-	return r;
+	return 0;
 }
 
 int amdgpu_display_resume_helper(struct amdgpu_device *adev)
