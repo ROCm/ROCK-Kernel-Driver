@@ -828,6 +828,9 @@
 /* whether si_mem_available() is available */
 #define HAVE_SI_MEM_AVAILABLE 1
 
+/* is_smca_umc_v2() is available */
+/* #undef HAVE_SMCA_UMC_V2 */
+
 /* strscpy() is available */
 #define HAVE_STRSCPY 1
 
