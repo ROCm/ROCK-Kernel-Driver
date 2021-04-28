@@ -938,6 +938,11 @@ void svm_migrate_fini(struct amdgpu_device *adev)
 	struct dev_pagemap *pgmap = &adev->kfd.dev->pgmap;
 
 	devm_memunmap_pages(adev->dev, pgmap);
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 	devm_release_mem_region(adev->dev, pgmap->range.start,
 				pgmap->range.end - pgmap->range.start + 1);
+#else
+	devm_release_mem_region(adev->dev, pgmap->res.start,
+				pgmap->res.end - pgmap->res.start + 1);
+#endif
 }
