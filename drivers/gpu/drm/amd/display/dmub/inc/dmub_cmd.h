@@ -47,10 +47,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0x23db9b126
+#define DMUB_FW_VERSION_GIT_HASH 0x41548deb6
 #define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 62
+#define DMUB_FW_VERSION_REVISION 63
 #define DMUB_FW_VERSION_TEST 0
 #define DMUB_FW_VERSION_VBIOS 0
 #define DMUB_FW_VERSION_HOTFIX 0
@@ -117,18 +117,20 @@
 /* Maximum number of planes on any ASIC. */
 #define DMUB_MAX_PLANES 6
 
+#define DMUB_MAX_SUBVP_STREAMS 2
+
 /* Trace buffer offset for entry */
 #define TRACE_BUFFER_ENTRY_OFFSET  16
 
 /**
- * ABM backlight control version legacy
+ * ABM control version legacy
  */
-#define DMUB_CMD_ABM_SET_BACKLIGHT_VERSION_UNKNOWN 0x0
+#define DMUB_CMD_ABM_CONTROL_VERSION_UNKNOWN 0x0
 
 /**
- * ABM backlight control version with multi edp support
+ * ABM control version with multi edp support
  */
-#define DMUB_CMD_ABM_SET_BACKLIGHT_VERSION_1 0x1
+#define DMUB_CMD_ABM_CONTROL_VERSION_1 0x1
 
 /**
  * Physical framebuffer address location, 64-bit.
@@ -328,7 +330,8 @@ union dmub_fw_boot_options {
 		uint32_t skip_phy_access : 1; /**< 1 if PHY access should be skipped */
 		uint32_t disable_clk_gate: 1; /**< 1 if clock gating should be disabled */
 		uint32_t skip_phy_init_panel_sequence: 1; /**< 1 to skip panel init seq */
-		uint32_t reserved : 26; /**< reserved */
+		uint32_t reserved_unreleased: 1; /**< reserved for an unreleased feature */
+		uint32_t reserved : 25; /**< reserved */
 	} bits; /**< boot bits */
 	uint32_t all; /**< 32-bit access to bits */
 };
@@ -1637,7 +1640,7 @@ struct dmub_cmd_abm_set_backlight_data {
 	uint32_t backlight_user_level;
 
 	/**
-	 * Backlight data version.
+	 * ABM control version.
 	 */
 	uint8_t version;
 
@@ -1677,6 +1680,23 @@ struct dmub_cmd_abm_set_level_data {
 	 * Set current ABM operating/aggression level.
 	 */
 	uint32_t level;
+
+	/**
+	 * ABM control version.
+	 */
+	uint8_t version;
+
+	/**
+	 * Panel Control HW instance mask.
+	 * Bit 0 is Panel Control HW instance 0.
+	 * Bit 1 is Panel Control HW instance 1.
+	 */
+	uint8_t panel_mask;
+
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[2];
 };
 
 /**
@@ -1702,6 +1722,23 @@ struct dmub_cmd_abm_set_ambient_level_data {
 	 * Ambient light sensor reading from OS.
 	 */
 	uint32_t ambient_lux;
+
+	/**
+	 * ABM control version.
+	 */
+	uint8_t version;
+
+	/**
+	 * Panel Control HW instance mask.
+	 * Bit 0 is Panel Control HW instance 0.
+	 * Bit 1 is Panel Control HW instance 1.
+	 */
+	uint8_t panel_mask;
+
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[2];
 };
 
 /**
@@ -1728,6 +1765,23 @@ struct dmub_cmd_abm_set_pwm_frac_data {
 	 * TODO: Convert to uint8_t.
 	 */
 	uint32_t fractional_pwm;
+
+	/**
+	 * ABM control version.
+	 */
+	uint8_t version;
+
+	/**
+	 * Panel Control HW instance mask.
+	 * Bit 0 is Panel Control HW instance 0.
+	 * Bit 1 is Panel Control HW instance 1.
+	 */
+	uint8_t panel_mask;
+
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[2];
 };
 
 /**
@@ -1758,6 +1812,24 @@ struct dmub_cmd_abm_init_config_data {
 	 * Indirect buffer length.
 	 */
 	uint16_t bytes;
+
+
+	/**
+	 * ABM control version.
+	 */
+	uint8_t version;
+
+	/**
+	 * Panel Control HW instance mask.
+	 * Bit 0 is Panel Control HW instance 0.
+	 * Bit 1 is Panel Control HW instance 1.
+	 */
+	uint8_t panel_mask;
+
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[2];
 };
 
 /**
