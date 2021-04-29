@@ -778,9 +778,9 @@ static int amdgpu_debugfs_fence_info_show(struct seq_file *m, void *unused)
  *
  * Manually trigger a gpu reset at the next fence wait.
  */
-static int gpu_recover_get(void *data, u64 *val)
+static int amdgpu_debugfs_gpu_recover_show(struct seq_file *m, void *unused)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)data;
+	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
 	struct drm_device *dev = adev_to_drm(adev);
 	int r;
 
@@ -790,7 +790,7 @@ static int gpu_recover_get(void *data, u64 *val)
 		return 0;
 	}
 
-	*val = amdgpu_device_gpu_recover(adev, NULL);
+	amdgpu_device_gpu_recover(adev, NULL);
 
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
@@ -799,10 +799,7 @@ static int gpu_recover_get(void *data, u64 *val)
 }
 
 DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_fence_info);
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
-DEFINE_DEBUGFS_ATTRIBUTE(amdgpu_debugfs_gpu_recover_fops, gpu_recover_get, NULL,
-			 "%lld\n");
-#endif
+DEFINE_SHOW_ATTRIBUTE(amdgpu_debugfs_gpu_recover);
 
 #endif
 
@@ -815,11 +812,9 @@ void amdgpu_debugfs_fence_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_fence_info", 0444, root, adev,
 			    &amdgpu_debugfs_fence_info_fops);
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (!amdgpu_sriov_vf(adev))
 		debugfs_create_file("amdgpu_gpu_recover", 0444, root, adev,
 				    &amdgpu_debugfs_gpu_recover_fops);
-#endif
 #endif
 }
 
