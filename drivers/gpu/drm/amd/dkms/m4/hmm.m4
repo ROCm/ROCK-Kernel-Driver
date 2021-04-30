@@ -15,8 +15,6 @@ AC_DEFUN([AC_AMDGPU_HMM_RANGE_FAULT], [
 			[hmm remove the customizable pfn format])
 		AC_DEFINE(HAVE_HMM_RANGE_FAULT_1ARG, 1,
 				[hmm_range_fault() wants 1 arg])
-
-		AC_AMDGPU_HSA_AMD_SVM
 	], [
 		dnl #
 		dnl # v5.6-rc3-21-g6bfef2f91945
@@ -66,6 +64,7 @@ AC_DEFUN([AC_AMDGPU_HMM], [
 			AC_DEFINE(HAVE_AMDKCL_HMM_MIRROR_ENABLED, 1,
 				[hmm support is enabled])
 			AC_AMDGPU_HMM_RANGE_FAULT
+			AC_AMDGPU_HSA_AMD_SVM
 		])
 	])
 ])
