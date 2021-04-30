@@ -3256,7 +3256,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	int r, i;
 	bool px = false;
 	u32 max_MBps;
-	printk("[JK] debug 001\n");
+
 	adev->shutdown = false;
 	adev->flags = flags;
 
