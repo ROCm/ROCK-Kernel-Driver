@@ -812,13 +812,13 @@ void amdgpu_mn_unregister(struct amdgpu_bo *bo)
 
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
 /* flags used by HMM internal, not related to CPU/GPU PTE flags */
-static const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
+const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
 	(1 << 0), /* HMM_PFN_VALID */
 	(1 << 1), /* HMM_PFN_WRITE */
 	0 /* HMM_PFN_DEVICE_PRIVATE */
 };
 
-static const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
+const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
 	0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
 	0, /* HMM_PFN_NONE */
 	0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
@@ -906,15 +906,14 @@ retry:
 	 */
 	for (i = 0; pages && i < npages; i++) {
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-		pages[i] = hmm_device_entry_to_page(hmm_range, hmm_range->pfns[i]);
+		pages[i] = hmm_device_entry_to_page(hmm_range, pfns[i]);
 		if (unlikely(!pages[i])) {
 			pr_err("Page fault failed for pfn[%lu] = 0x%llx\n",
-			       i, hmm_range->pfns[i]);
+			       i, pfns[i]);
 			r = -ENOMEM;
 
 			goto out_free_pfns;
 		}
-
 #else
 		pages[i] = hmm_pfn_to_page(pfns[i]);
 #endif
