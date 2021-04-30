@@ -27,7 +27,7 @@ AC_DEFUN([AC_AMDGPU_HSA_AMD_SVM], [
 		struct dev_pagemap *pm = NULL;
 		pm->owner = NULL;
 	], [
-		AC_DEFINE(HAVE_HSA_AMD_SVM_ENABLED, 1,
+		AC_DEFINE(HAVE_DEV_PAGEMAP_OWNER, 1,
 			[dev_pagemap->owner is available])
  
 	AC_AMDGPU_MIGRATE_VMA_PGMAP_OWNER
