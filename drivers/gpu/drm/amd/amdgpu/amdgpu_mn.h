@@ -65,6 +65,23 @@ static inline void amdgpu_mn_unregister(struct amdgpu_bo *bo) {}
 #include <linux/workqueue.h>
 #include <linux/interval_tree.h>
 
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+/* flags used by HMM internal, not related to CPU/GPU PTE flags */
+extern const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX];
+extern const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX];
+
+static inline struct page *hmm_pfn_to_page(unsigned long hmm_pfn)
+{
+	struct hmm_range hmm_range = {
+		.flags = hmm_range_flags,
+		.values = hmm_range_values,
+		.pfn_shift = PAGE_SHIFT,
+	};
+
+	return hmm_device_entry_to_page(&hmm_range, hmm_pfn);
+}
+#endif
+
 int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       struct mm_struct *mm, struct page **pages,
 			       uint64_t start, uint64_t npages,

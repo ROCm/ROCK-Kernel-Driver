@@ -704,20 +704,6 @@ struct amdgpu_ttm_tt {
 
 #ifdef CONFIG_DRM_AMDGPU_USERPTR
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-/* flags used by HMM internal, not related to CPU/GPU PTE flags */
-static const uint64_t hmm_range_flags[HMM_PFN_FLAG_MAX] = {
-	(1 << 0), /* HMM_PFN_VALID */
-	(1 << 1), /* HMM_PFN_WRITE */
-	0 /* HMM_PFN_DEVICE_PRIVATE */
-};
-
-static const uint64_t hmm_range_values[HMM_PFN_VALUE_MAX] = {
-	0xfffffffffffffffeUL, /* HMM_PFN_ERROR */
-	0, /* HMM_PFN_NONE */
-	0xfffffffffffffffcUL /* HMM_PFN_SPECIAL */
-};
-#endif
 /*
  * amdgpu_ttm_tt_get_user_pages - get device accessible pages that back user
  * memory and start HMM tracking CPU page table update
