@@ -1395,7 +1395,12 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 		}
 
 		r = svm_range_dma_map(prange, ctx.bitmap,
-				      hmm_range->hmm_pfns);
+#ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
+				      (unsigned long *)hmm_range->pfns
+#else
+				      hmm_range->hmm_pfns
+#endif
+				      );
 		if (r) {
 			pr_debug("failed %d to dma map range\n", r);
 			goto unreserve_out;
