@@ -543,7 +543,7 @@ static struct ras_manager *amdgpu_ras_create_obj(struct amdgpu_device *adev,
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_manager *obj;
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return NULL;
 
 	if (head->block >= AMDGPU_RAS_BLOCK_COUNT)
@@ -570,7 +570,7 @@ struct ras_manager *amdgpu_ras_find_obj(struct amdgpu_device *adev,
 	struct ras_manager *obj;
 	int i;
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return NULL;
 
 	if (head) {
@@ -624,7 +624,7 @@ static void amdgpu_ras_parse_status_code(struct amdgpu_device *adev,
 static int amdgpu_ras_is_feature_allowed(struct amdgpu_device *adev,
 					 struct ras_common_if *head)
 {
-	return adev->ras_hw_supported & BIT(head->block);
+	return adev->ras_hw_enabled & BIT(head->block);
 }
 
 static int amdgpu_ras_is_feature_enabled(struct amdgpu_device *adev,
@@ -778,7 +778,7 @@ int amdgpu_ras_feature_enable_on_boot(struct amdgpu_device *adev,
 			ret = amdgpu_ras_feature_enable(adev, head, 0);
 
 			/* clean gfx block ras features flag */
-			if (adev->ras_features && head->block == AMDGPU_RAS_BLOCK__GFX)
+			if (adev->ras_enabled && head->block == AMDGPU_RAS_BLOCK__GFX)
 				con->features &= ~BIT(head->block);
 		}
 	} else
@@ -1083,7 +1083,7 @@ unsigned long amdgpu_ras_query_error_count(struct amdgpu_device *adev,
 	struct ras_manager *obj;
 	struct ras_err_data data = {0, 0};
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return 0;
 
 	list_for_each_entry(obj, &con->head, node) {
@@ -1606,7 +1606,7 @@ static void amdgpu_ras_log_on_err_counter(struct amdgpu_device *adev)
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_manager *obj;
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return;
 
 	list_for_each_entry(obj, &con->head, node) {
@@ -1656,7 +1656,7 @@ static void amdgpu_ras_query_err_status(struct amdgpu_device *adev)
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_manager *obj;
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return;
 
 	list_for_each_entry(obj, &con->head, node) {
@@ -1970,7 +1970,7 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 	bool exc_err_limit = false;
 	int ret;
 
-	if (adev->ras_features && con)
+	if (adev->ras_enabled && con)
 		data = &con->eh_data;
 	else
 		return 0;
@@ -2093,7 +2093,7 @@ static void amdgpu_ras_get_quirks(struct amdgpu_device *adev)
 
 	if (strnstr(ctx->vbios_version, "D16406",
 		    sizeof(ctx->vbios_version)))
-		adev->ras_hw_supported |= (1 << AMDGPU_RAS_BLOCK__GFX);
+		adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__GFX);
 }
 
 /*
@@ -2107,7 +2107,7 @@ static void amdgpu_ras_get_quirks(struct amdgpu_device *adev)
  */
 static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 {
-	adev->ras_hw_supported = adev->ras_features = 0;
+	adev->ras_hw_enabled = adev->ras_enabled = 0;
 
 	if (amdgpu_sriov_vf(adev) || !adev->is_atom_fw ||
 	    !amdgpu_ras_asic_supported(adev))
@@ -2116,7 +2116,7 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 	if (!adev->gmc.xgmi.connected_to_cpu) {
 		if (amdgpu_atomfirmware_mem_ecc_supported(adev)) {
 			dev_info(adev->dev, "MEM ECC is active.\n");
-			adev->ras_hw_supported |= (1 << AMDGPU_RAS_BLOCK__UMC |
+			adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__UMC |
 						   1 << AMDGPU_RAS_BLOCK__DF);
 		} else {
 			dev_info(adev->dev, "MEM ECC is not presented.\n");
@@ -2124,7 +2124,7 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 
 		if (amdgpu_atomfirmware_sram_ecc_supported(adev)) {
 			dev_info(adev->dev, "SRAM ECC is active.\n");
-			adev->ras_hw_supported |= ~(1 << AMDGPU_RAS_BLOCK__UMC |
+			adev->ras_hw_enabled |= ~(1 << AMDGPU_RAS_BLOCK__UMC |
 						    1 << AMDGPU_RAS_BLOCK__DF);
 		} else {
 			dev_info(adev->dev, "SRAM ECC is not presented.\n");
@@ -2132,7 +2132,7 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 	} else {
 		/* driver only manages a few IP blocks RAS feature
 		 * when GPU is connected cpu through XGMI */
-		adev->ras_hw_supported |= (1 << AMDGPU_RAS_BLOCK__GFX |
+		adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__GFX |
 					   1 << AMDGPU_RAS_BLOCK__SDMA |
 					   1 << AMDGPU_RAS_BLOCK__MMHUB);
 	}
@@ -2140,10 +2140,10 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 	amdgpu_ras_get_quirks(adev);
 
 	/* hw_supported needs to be aligned with RAS block mask. */
-	adev->ras_hw_supported &= AMDGPU_RAS_BLOCK_MASK;
+	adev->ras_hw_enabled &= AMDGPU_RAS_BLOCK_MASK;
 
-	adev->ras_features = amdgpu_ras_enable == 0 ? 0 :
-		adev->ras_hw_supported & amdgpu_ras_mask;
+	adev->ras_enabled = amdgpu_ras_enable == 0 ? 0 :
+		adev->ras_hw_enabled & amdgpu_ras_mask;
 }
 
 int amdgpu_ras_init(struct amdgpu_device *adev)
@@ -2166,11 +2166,11 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 
 	amdgpu_ras_check_supported(adev);
 
-	if (!adev->ras_hw_supported || adev->asic_type == CHIP_VEGA10) {
+	if (!adev->ras_hw_enabled || adev->asic_type == CHIP_VEGA10) {
 		/* set gfx block ras context feature for VEGA20 Gaming
 		 * send ras disable cmd to ras ta during ras late init.
 		 */
-		if (!adev->ras_features && adev->asic_type == CHIP_VEGA20) {
+		if (!adev->ras_enabled && adev->asic_type == CHIP_VEGA20) {
 			con->features |= BIT(AMDGPU_RAS_BLOCK__GFX);
 
 			return 0;
@@ -2221,7 +2221,7 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 
 	dev_info(adev->dev, "RAS INFO: ras initialized successfully, "
 		 "hardware ability[%x] ras_mask[%x]\n",
-		 adev->ras_hw_supported, adev->ras_features);
+		 adev->ras_hw_enabled, adev->ras_enabled);
 
 	return 0;
 release_con:
@@ -2336,7 +2336,7 @@ void amdgpu_ras_resume(struct amdgpu_device *adev)
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	struct ras_manager *obj, *tmp;
 
-	if (!adev->ras_features || !con) {
+	if (!adev->ras_enabled || !con) {
 		/* clean ras context for VEGA20 Gaming after send ras disable cmd */
 		amdgpu_release_ras_context(adev);
 
@@ -2382,7 +2382,7 @@ void amdgpu_ras_suspend(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return;
 
 	amdgpu_ras_disable_all_features(adev, 0);
@@ -2396,7 +2396,7 @@ int amdgpu_ras_pre_fini(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return 0;
 
 	/* Need disable ras on all IPs here before ip [hw/sw]fini */
@@ -2409,7 +2409,7 @@ int amdgpu_ras_fini(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
-	if (!adev->ras_features || !con)
+	if (!adev->ras_enabled || !con)
 		return 0;
 
 	amdgpu_ras_fs_fini(adev);
@@ -2429,7 +2429,7 @@ int amdgpu_ras_fini(struct amdgpu_device *adev)
 void amdgpu_ras_global_ras_isr(struct amdgpu_device *adev)
 {
 	amdgpu_ras_check_supported(adev);
-	if (!adev->ras_hw_supported)
+	if (!adev->ras_hw_enabled)
 		return;
 
 	if (atomic_cmpxchg(&amdgpu_ras_in_intr, 0, 1) == 0) {
@@ -2458,7 +2458,7 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 	if (!con)
 		return;
 
-	if (!adev->ras_features && con->features & BIT(AMDGPU_RAS_BLOCK__GFX)) {
+	if (!adev->ras_enabled && con->features & BIT(AMDGPU_RAS_BLOCK__GFX)) {
 		con->features &= ~BIT(AMDGPU_RAS_BLOCK__GFX);
 		amdgpu_ras_set_context(adev, NULL);
 		kfree(con);
