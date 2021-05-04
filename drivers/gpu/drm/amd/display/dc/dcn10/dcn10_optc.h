@@ -173,6 +173,7 @@ struct dcn_optc_registers {
 	uint32_t OPTC_BYTES_PER_PIXEL;
 	uint32_t OPTC_WIDTH_CONTROL;
 #endif
+	uint32_t OTG_DRR_CONTROL;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t OTG_BLANK_DATA_COLOR;
 	uint32_t OTG_BLANK_DATA_COLOR_EXT;
@@ -523,7 +524,8 @@ struct dcn_optc_registers {
 	type OTG_CRC_DSC_MODE;\
 	type OTG_CRC_DATA_STREAM_COMBINE_MODE;\
 	type OTG_CRC_DATA_STREAM_SPLIT_MODE;\
-	type OTG_CRC_DATA_FORMAT;
+	type OTG_CRC_DATA_FORMAT;\
+	type OTG_V_TOTAL_LAST_USED_BY_DRR;
 
 #elif defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define TG_REG_FIELD_LIST(type) \
