@@ -152,6 +152,10 @@ extern "C" {
  * accessing it with various hw blocks
  */
 #define AMDGPU_GEM_CREATE_ENCRYPTED		(1 << 10)
+/* Flag that BO will be used only in preemptible context, which does
+ * not require GTT memory accounting
+ */
+#define AMDGPU_GEM_CREATE_PREEMPTIBLE		(1 << 11)
 
 /* hybrid specific */
 /* Flag that the memory should be in SPARSE resource */
