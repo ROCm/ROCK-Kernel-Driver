@@ -633,7 +633,7 @@ svm_migrate_vma_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 	migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
 #elif defined(HAVE_DEV_PAGEMAP_OWNER)
-	migrate.src_owner = adev;
+	migrate.src_owner = SVM_ADEV_PGMAP_OWNER(adev);
 #endif
 
 	size = 2 * sizeof(*migrate.src) + sizeof(uint64_t) + sizeof(dma_addr_t);
