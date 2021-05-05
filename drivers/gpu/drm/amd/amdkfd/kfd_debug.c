@@ -452,11 +452,6 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 {
 	int r = 0;
 
-	if (!watch_address) {
-		pr_debug("Invalid watch address option\n");
-		return -EINVAL;
-	}
-
 	r = kfd_allocate_debug_watch_point(target,
 			watch_address,
 			watch_address_mask,
