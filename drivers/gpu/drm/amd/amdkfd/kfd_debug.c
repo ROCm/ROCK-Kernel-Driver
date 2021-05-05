@@ -292,14 +292,11 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 
 	/* Drop the references held by the debug session. */
 	if (!unwind) {
-		kfd_unref_process(target);
+		cancel_work_sync(&target->debug_event_workarea);
 		fput(target->dbg_ev_file);
+		kfd_unref_process(target);
 	}
-	/* Cancel any outstanding event worker work */
-	cancel_work_sync(&target->debug_event_workarea);
 
-	/* Drop the reference held by the debug session. */
-	kfd_unref_process(target);
 	target->debug_trap_enabled = false;
 	target->dbg_ev_file = NULL;
 
