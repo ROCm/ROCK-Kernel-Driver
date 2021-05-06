@@ -35,18 +35,27 @@
 	DCCG_SRII(DTO_PARAM, DPPCLK, 2),\
 	DCCG_SRII(DTO_PARAM, DPPCLK, 3),\
 	SR(REFCLK_CNTL),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 0),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 1),\
 	SR(DISPCLK_FREQ_CHANGE_CNTL)
 
 #define DCCG_REG_LIST_DCN2() \
 	DCCG_COMMON_REG_LIST_DCN_BASE(),\
 	DCCG_SRII(DTO_PARAM, DPPCLK, 4),\
-	DCCG_SRII(DTO_PARAM, DPPCLK, 5)
+	DCCG_SRII(DTO_PARAM, DPPCLK, 5),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 2),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 3),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 4),\
+	DCCG_SRII(PIXEL_RATE_CNTL, OTG, 5)
 
 #define DCCG_SF(reg_name, field_name, post_fix)\
 	.field_name = reg_name ## __ ## field_name ## post_fix
 
 #define DCCG_SFI(reg_name, field_name, field_prefix, inst, post_fix)\
 	.field_prefix ## _ ## field_name[inst] = reg_name ## __ ## field_prefix ## inst ## _ ## field_name ## post_fix
+
+#define DCCG_SFII(block, reg_name, field_prefix, field_name, inst, post_fix)\
+	.field_prefix ## _ ## field_name[inst] = block ## inst ## _ ## reg_name ## __ ## field_prefix ## inst ## _ ## field_name ## post_fix
 
 #define DCCG_COMMON_MASK_SH_LIST_DCN_COMMON_BASE(mask_sh) \
 	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_ENABLE, DPPCLK, 0, mask_sh),\
@@ -68,7 +77,13 @@
 	DCCG_SF(DISPCLK_FREQ_CHANGE_CNTL, DCCG_FIFO_ERRDET_RESET, mask_sh),\
 	DCCG_SF(DISPCLK_FREQ_CHANGE_CNTL, DCCG_FIFO_ERRDET_STATE, mask_sh),\
 	DCCG_SF(DISPCLK_FREQ_CHANGE_CNTL, DCCG_FIFO_ERRDET_OVR_EN, mask_sh),\
-	DCCG_SF(DISPCLK_FREQ_CHANGE_CNTL, DISPCLK_CHG_FWD_CORR_DISABLE, mask_sh)
+	DCCG_SF(DISPCLK_FREQ_CHANGE_CNTL, DISPCLK_CHG_FWD_CORR_DISABLE, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 0, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 1, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 0, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 1, mask_sh)
+
+
 
 
 #define DCCG_MASK_SH_LIST_DCN2(mask_sh) \
@@ -76,7 +91,27 @@
 	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_ENABLE, DPPCLK, 4, mask_sh),\
 	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_DB_EN, DPPCLK, 4, mask_sh),\
 	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_ENABLE, DPPCLK, 5, mask_sh),\
-	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_DB_EN, DPPCLK, 5, mask_sh)
+	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_DB_EN, DPPCLK, 5, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 2, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 3, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 4, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 5, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 2, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 3, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 4, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 5, mask_sh)
+
+#define DCCG_MASK_SH_LIST_DCN2_1(mask_sh) \
+	DCCG_COMMON_MASK_SH_LIST_DCN_COMMON_BASE(mask_sh),\
+	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_ENABLE, DPPCLK, 4, mask_sh),\
+	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_DB_EN, DPPCLK, 4, mask_sh),\
+	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_ENABLE, DPPCLK, 5, mask_sh),\
+	DCCG_SFI(DPPCLK_DTO_CTRL, DTO_DB_EN, DPPCLK, 5, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 2, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, ADD_PIXEL, 3, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 2, mask_sh),\
+	DCCG_SFII(OTG, PIXEL_RATE_CNTL, OTG, DROP_PIXEL, 3, mask_sh)
+
 
 #define DCCG_REG_FIELD_LIST(type) \
 	type DPPCLK0_DTO_PHASE;\
@@ -93,7 +128,9 @@
 	type DCCG_FIFO_ERRDET_STATE;\
 	type DCCG_FIFO_ERRDET_OVR_EN;\
 	type DISPCLK_CHG_FWD_CORR_DISABLE;\
-	type DISPCLK_FREQ_CHANGE_CNTL;
+	type DISPCLK_FREQ_CHANGE_CNTL;\
+	type OTG_ADD_PIXEL[MAX_PIPES];\
+	type OTG_DROP_PIXEL[MAX_PIPES];
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define DCCG3_REG_FIELD_LIST(type) \
@@ -163,6 +200,7 @@ struct dccg_registers {
 	uint32_t DPPCLK_DTO_PARAM[6];
 	uint32_t REFCLK_CNTL;
 	uint32_t DISPCLK_FREQ_CHANGE_CNTL;
+	uint32_t OTG_PIXEL_RATE_CNTL[MAX_PIPES];
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t HDMICHARCLK_CLOCK_CNTL[6];
 	uint32_t PHYASYMCLK_CLOCK_CNTL;
@@ -201,6 +239,11 @@ void dccg2_get_dccg_ref_freq(struct dccg *dccg,
 
 void dccg2_set_fifo_errdet_ovr_en(struct dccg *dccg,
 		bool en);
+void dccg2_otg_add_pixel(struct dccg *dccg,
+		uint32_t otg_inst);
+void dccg2_otg_drop_pixel(struct dccg *dccg,
+		uint32_t otg_inst);
+
 
 void dccg2_init(struct dccg *dccg);
 
