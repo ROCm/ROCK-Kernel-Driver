@@ -936,6 +936,8 @@ int svm_migrate_init(struct amdgpu_device *adev)
 	r = devm_memremap_pages(adev->dev, pgmap);
 	if (IS_ERR(r)) {
 		pr_err("failed to register HMM device memory\n");
+		devm_release_mem_region(adev->dev, res->start,
+					res->end - res->start + 1);
 		return PTR_ERR(r);
 	}
 
@@ -951,5 +953,14 @@ int svm_migrate_init(struct amdgpu_device *adev)
 
 void svm_migrate_fini(struct amdgpu_device *adev)
 {
-	memunmap_pages(&adev->kfd.dev->pgmap);
+	struct dev_pagemap *pgmap = &adev->kfd.dev->pgmap;
+
+	devm_memunmap_pages(adev->dev, pgmap);
+#ifdef HAVE_DEV_PAGEMAP_RANGE
+	devm_release_mem_region(adev->dev, pgmap->range.start,
+				pgmap->range.end - pgmap->range.start + 1);
+#else
+	devm_release_mem_region(adev->dev, pgmap->res.start,
+				pgmap->res.end - pgmap->res.start + 1);
+#endif
 }
