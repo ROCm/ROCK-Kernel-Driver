@@ -636,8 +636,10 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 		&aconnector->dm_dp_aux.aux,
 		16,
 		4,
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT
 		max_link_enc_cap.lane_count,
 		drm_dp_bw_code_to_link_rate(max_link_enc_cap.link_rate),
+#endif
 		aconnector->connector_id);
 
 	drm_connector_attach_dp_subconnector_property(&aconnector->base);
