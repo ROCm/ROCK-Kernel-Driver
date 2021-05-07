@@ -810,6 +810,9 @@
 /* pm_suspend_via_firmware() is available */
 #define HAVE_PM_SUSPEND_VIA_FIRMWARE 1
 
+/* pxm_to_node() is available */
+#define HAVE_PXM_TO_NODE 1
+
 /* remove_conflicting_framebuffers() returns int */
 /* #undef HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT */
 
