@@ -13,6 +13,7 @@ extern void amdkcl_perf_event_init(void);
 extern void amdkcl_pci_init(void);
 extern void amdkcl_suspend_init(void);
 extern void amdkcl_sched_init(void);
+extern void amdkcl_numa_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -27,6 +28,7 @@ int __init amdkcl_init(void)
 	amdkcl_pci_init();
 	amdkcl_suspend_init();
 	amdkcl_sched_init();
+	amdkcl_numa_init();
 
 	return 0;
 }
