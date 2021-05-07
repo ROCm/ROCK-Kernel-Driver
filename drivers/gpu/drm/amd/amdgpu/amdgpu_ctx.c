@@ -694,13 +694,13 @@ static void amdgpu_ctx_fence_time(struct amdgpu_ctx *ctx,
 			continue;
 		}
 		if (dma_fence_is_signaled(&s_fence->finished) &&
-			s_fence->finished.timestamp < now)
-			*total += ktime_sub(s_fence->finished.timestamp, t1);
+			ktime_compare(s_fence->finished.timestamp, now) < 0)
+			*total = ktime_add(*total, ktime_sub(s_fence->finished.timestamp, t1));
 		else
-			*total += ktime_sub(now, t1);
+			*total = ktime_add(*total, ktime_sub(now, t1));
 		t1 = ktime_sub(now, t1);
 		dma_fence_put(fence);
-		*max = max(t1, *max);
+		*max = ktime_after(t1, *max) ? t1 : *max;
 	}
 }
 
@@ -711,10 +711,10 @@ ktime_t amdgpu_ctx_mgr_fence_usage(struct amdgpu_ctx_mgr *mgr, uint32_t hwip,
 	struct amdgpu_ctx *ctx;
 	uint32_t id;
 	struct amdgpu_ctx_entity *centity;
-	ktime_t total = 0, max = 0;
+	ktime_t total = ktime_set(0, 0), max = ktime_set(0, 0);
 
 	if (idx >= AMDGPU_MAX_ENTITY_NUM)
-		return 0;
+		return ktime_set(0, 0);
 	idp = &mgr->ctx_handles;
 	mutex_lock(&mgr->lock);
 	idr_for_each_entry(idp, ctx, id) {
@@ -738,7 +738,7 @@ ktime_t amdgpu_ctx_mgr_fence_usage(struct amdgpu_ctx_mgr *mgr, uint32_t hwip,
 
 	mutex_unlock(&mgr->lock);
 	if (elapsed)
-		*elapsed = max;
+		*elapsed = ktime_to_ns(max);
 
 	return total;
 }

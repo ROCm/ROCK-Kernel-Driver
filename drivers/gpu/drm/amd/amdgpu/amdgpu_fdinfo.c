@@ -88,8 +88,8 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 		uint32_t perc, frac;
 
 		for (idx = 0; idx < count; idx++) {
-			total = amdgpu_ctx_mgr_fence_usage(&fpriv->ctx_mgr,
-				i, idx, &min);
+			total = ktime_to_ns(amdgpu_ctx_mgr_fence_usage(&fpriv->ctx_mgr,
+					i, idx, &min));
 			if ((total == 0) || (min == 0))
 				continue;
 
