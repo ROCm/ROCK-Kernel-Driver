@@ -34,7 +34,9 @@ static const struct hw_sequencer_funcs dcn10_funcs = {
 	.power_down_on_boot = dcn10_power_down_on_boot,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
 	.apply_ctx_for_surface = NULL,
+#ifdef defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	.program_front_end_for_ctx = dcn20_program_front_end_for_ctx,
+#endif
 	.post_unlock_program_front_end = dcn10_post_unlock_program_front_end,
 	.wait_for_pending_cleared = dcn10_wait_for_pending_cleared,
 	.update_plane_addr = dcn10_update_plane_addr,
