@@ -974,6 +974,7 @@ static int convert_tiling_flags_to_modifier(struct amdgpu_framebuffer *afb)
 }
 #endif
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static void get_block_dimensions(unsigned int block_log2, unsigned int cpp,
 				 unsigned int *width, unsigned int *height)
 {
@@ -1055,16 +1056,15 @@ static int amdgpu_display_verify_plane(struct amdgpu_framebuffer *rfb, int plane
 		(uint64_t)rfb->base.pitches[plane] / block_pitch *
 		block_size * DIV_ROUND_UP(height, block_height);
 
-	if (rfb->base.obj[0]->size < size) {
+	if (drm_gem_fb_get_obj(&rfb->base, 0)->size < size) {
 		drm_dbg_kms(rfb->base.dev,
 			    "BO size 0x%zx is less than 0x%llx required for plane %d\n",
-			    rfb->base.obj[0]->size, size, plane);
+			    drm_gem_fb_get_obj(&rfb->base, 0)->size, size, plane);
 		return -EINVAL;
 	}
 
 	return 0;
 }
-
 
 static int amdgpu_display_verify_sizes(struct amdgpu_framebuffer *rfb)
 {
@@ -1141,6 +1141,7 @@ static int amdgpu_display_verify_sizes(struct amdgpu_framebuffer *rfb)
 
 	return 0;
 }
+#endif
 
 static int amdgpu_display_get_fb_info(const struct amdgpu_framebuffer *amdgpu_fb,
 				      uint64_t *tiling_flags, bool *tmz_surface)
@@ -1199,7 +1200,6 @@ err:
 	return ret;
 }
 
-#ifdef HAVE_DRM_GEN_FB_INIT_WITH_FUNCS
 int amdgpu_display_gem_fb_verify_and_init(
 	struct drm_device *dev, struct amdgpu_framebuffer *rfb,
 	struct drm_file *file_priv, const struct drm_mode_fb_cmd2 *mode_cmd,
@@ -1209,6 +1209,8 @@ int amdgpu_display_gem_fb_verify_and_init(
 
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
+
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	/* Verify that the modifier is supported. */
 	if (!drm_any_plane_has_format(dev, mode_cmd->pixel_format,
 				      mode_cmd->modifier[0])) {
@@ -1219,6 +1221,7 @@ int amdgpu_display_gem_fb_verify_and_init(
 		ret = -EINVAL;
 		goto err;
 	}
+#endif
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
@@ -1234,7 +1237,6 @@ err:
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 	return ret;
 }
-#endif
 
 int amdgpu_display_framebuffer_init(struct drm_device *dev,
 				    struct amdgpu_framebuffer *rfb,
@@ -1309,29 +1311,34 @@ amdgpu_display_user_framebuffer_create(struct drm_device *dev,
 	domains = amdgpu_display_supported_domains(drm_to_adev(dev), bo->flags);
 	if (obj->import_attach && !(domains & AMDGPU_GEM_DOMAIN_GTT)) {
 		drm_dbg_kms(dev, "Cannot create framebuffer from imported dma_buf\n");
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(-EINVAL);
 	}
 
 	amdgpu_fb = kzalloc(sizeof(*amdgpu_fb), GFP_KERNEL);
 	if (amdgpu_fb == NULL) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(-ENOMEM);
 	}
 
-#ifdef HAVE_DRM_GEN_FB_INIT_WITH_FUNCS
 	ret = amdgpu_display_gem_fb_verify_and_init(dev, amdgpu_fb, file_priv,
 						    mode_cmd, obj);
-#else
-	ret = amdgpu_display_gem_fb_init(dev, amdgpu_fb, mode_cmd, obj);
-#endif
 	if (ret) {
 		kfree(amdgpu_fb);
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		drm_gem_object_put(obj);
+#endif
 		return ERR_PTR(ret);
 	}
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	drm_gem_object_put(obj);
+#endif
+
 	return &amdgpu_fb->base;
 }
 
