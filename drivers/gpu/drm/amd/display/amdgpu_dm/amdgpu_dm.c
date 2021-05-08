@@ -4176,28 +4176,26 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 
 	return rc ? 0 : 1;
 #else
-     /*
-     * The brightness input is in the range 0-255
-     * It needs to be rescaled to be between the
-     * requested min and max input signal
-     *
-     * It also needs to be scaled up by 0x101 to
-     * match the DC interface which has a range of
-     * 0 to 0xffff
-     */
-    brightness =
-            brightness
-            * 0x101
-            * (caps.max_input_signal - caps.min_input_signal)
-            / AMDGPU_MAX_BL_LEVEL
-            + caps.min_input_signal * 0x101;
+	/*
+	 * The brightness input is in the range 0-255
+	 * It needs to be rescaled to be between the
+	 * requested min and max input signal
+	 *
+	 * It also needs to be scaled up by 0x101 to
+	 * match the DC interface which has a range of
+	 * 0 to 0xffff
+	 */
+	brightness =
+		brightness
+		* 0x101
+		* (caps.max_input_signal - caps.min_input_signal)
+		/ AMDGPU_MAX_BL_LEVEL
+		+ caps.min_input_signal * 0x101;
 
-    if (dc_link_set_backlight_level(dm->backlight_link,
-                    brightness, 0))
-            return 0;
-    else
-            return 1;
-
+        rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], brightness, 0);
+        if (!rc)
+                DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
+        return rc ? 0 : 1;
 #endif
 }
 
