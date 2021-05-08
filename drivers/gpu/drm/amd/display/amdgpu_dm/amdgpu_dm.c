@@ -3614,10 +3614,10 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 #ifdef HAVE_HDR_SINK_METADATA
 	struct dc_link *link[AMDGPU_DM_MAX_NUM_EDP];
 	u32 brightness;
-	bool rc;
 #else
 	uint32_t brightness = bd->props.brightness;
 #endif
+	bool rc;
 	int i;
 
 	amdgpu_dm_update_backlight_caps(dm);
@@ -3650,28 +3650,30 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 
 	return rc ? 0 : 1;
 #else
-     /*
-     * The brightness input is in the range 0-255
-     * It needs to be rescaled to be between the
-     * requested min and max input signal
-     *
-     * It also needs to be scaled up by 0x101 to
-     * match the DC interface which has a range of
-     * 0 to 0xffff
-     */
-    brightness =
-            brightness
-            * 0x101
-            * (caps.max_input_signal - caps.min_input_signal)
-            / AMDGPU_MAX_BL_LEVEL
-            + caps.min_input_signal * 0x101;
+	/*
+	 * The brightness input is in the range 0-255
+	 * It needs to be rescaled to be between the
+	 * requested min and max input signal
+	 *
+	 * It also needs to be scaled up by 0x101 to
+	 * match the DC interface which has a range of
+	 * 0 to 0xffff
+	 */
+	brightness =
+		brightness
+		* 0x101
+		* (caps.max_input_signal - caps.min_input_signal)
+		/ AMDGPU_MAX_BL_LEVEL
+		+ caps.min_input_signal * 0x101;
 
-    if (dc_link_set_backlight_level(dm->backlight_link,
-                    brightness, 0))
-            return 0;
-    else
-            return 1;
-
+	for (i = 0; i < dm->num_of_edps; i++) {
+		rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness, 0);
+		if (!rc) {
+			DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", i);
+			break;
+		}
+	}
+	return rc ? 0 : 1;
 #endif
 }
 
