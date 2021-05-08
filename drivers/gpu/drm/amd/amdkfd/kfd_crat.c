@@ -1926,6 +1926,7 @@ static void kfd_find_numa_node_in_srat(struct kfd_dev *kdev)
 			if (pxm > max_pxm)
 				max_pxm = pxm;
 			break;
+#ifdef HAVE_ACPI_SRAT_GENERIC_AFFINITY
 		case ACPI_SRAT_TYPE_GENERIC_AFFINITY:
 			gpu = (struct acpi_srat_generic_affinity *)sub_header;
 			bdf = *((u16 *)(&gpu->device_handle[0])) << 16 |
@@ -1935,6 +1936,7 @@ static void kfd_find_numa_node_in_srat(struct kfd_dev *kdev)
 				numa_node = pxm_to_node(gpu->proximity_domain);
 			}
 			break;
+#endif
 		default:
 			break;
 		}
