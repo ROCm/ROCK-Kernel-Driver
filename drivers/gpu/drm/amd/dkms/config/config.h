@@ -13,6 +13,9 @@
 /* acpi_put_table() is available */
 #define HAVE_ACPI_PUT_TABLE 1
 
+/* struct acpi_srat_generic_affinity is available */
+#define HAVE_ACPI_SRAT_GENERIC_AFFINITY 1
+
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
