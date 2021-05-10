@@ -3089,6 +3089,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		else
 			r = kfd_dbg_runtime_disable(target);
 		break;
+	case KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT:
+		r = kfd_dbg_send_exception_to_runtime(target,
+						data1,
+						exception_mask);
+		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);
 		r = -EINVAL;

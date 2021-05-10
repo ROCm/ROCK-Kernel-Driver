@@ -61,9 +61,10 @@
  * 6.2 - Add KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT.
  * 7.0 - Redefine exception codes
  * 7.1 - Add KFD_IOC_DBG_TRAP_RUNTIME_ENABLE
+ * 7.2 - Add KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	7
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	2
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -522,6 +523,16 @@ enum kfd_dbg_trap_exception_code {
  * FIXME: This option is temporary.  Future upstream will use a separate IOCTL.
  */
 #define KFD_IOC_DBG_TRAP_RUNTIME_ENABLE 13
+
+/* KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT
+ * exception_mask: exception to send
+ * ptr:   unused
+ * data1: destination (queue or device)
+ * data2: unused
+ * data3: usused
+ * data4: unused
+ */
+#define KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT 14
 
 struct kfd_ioctl_dbg_trap_args {
 	__u64 exception_mask; /* to KFD */

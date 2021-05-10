@@ -275,11 +275,11 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, CU_ID),
 					sq_int_data);
 				if (context_id0 & SQ_INTERRUPT_WORD_WAVE_CTXID__PRIV_MASK) {
-					kfd_set_dbg_ev_from_interrupt(dev, pasid,
-						KFD_DEBUG_DOORBELL_ID(sq_int_data),
-						KFD_DEBUG_TRAP_CODE(sq_int_data),
-						NULL, 0);
-					return;
+					if (kfd_set_dbg_ev_from_interrupt(dev, pasid,
+							KFD_DEBUG_DOORBELL_ID(sq_int_data),
+							KFD_DEBUG_TRAP_CODE(sq_int_data),
+							NULL, 0))
+						return;
 				}
 				break;
 			case SQ_INTERRUPT_WORD_ENCODING_ERROR:
@@ -355,8 +355,8 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 						&exception_data,
 						sizeof(exception_data));
 		kfd_smi_event_update_vmfault(dev, pasid);
-		kfd_process_vm_fault(dev->dqm, pasid);
-		kfd_signal_vm_fault_event(dev, pasid, &info);
+	} else if (KFD_IRQ_IS_FENCE(client_id, source_id)) {
+		kfd_process_close_interrupt_drain(pasid);
 	}
 }
 

@@ -2279,6 +2279,85 @@ void kfd_process_close_interrupt_drain(unsigned int pasid)
 	kfd_unref_process(p);
 }
 
+struct send_exception_work_handler_workarea {
+	struct work_struct work;
+	struct kfd_process *p;
+	unsigned int queue_id;
+	uint64_t error_reason;
+};
+
+void send_exception_work_handler(struct work_struct *work)
+{
+	struct send_exception_work_handler_workarea *workarea;
+	struct kfd_process *p;
+	struct queue *q;
+	struct mm_struct *mm;
+	void __user *csa_addr;
+	size_t header_offset;
+	uint64_t **err_payload_ptr_addr, *err_payload_ptr;
+	uint64_t payload_offset;
+	uint64_t cur_err;
+	uint32_t ev_id;
+
+	workarea = container_of(work,
+				struct send_exception_work_handler_workarea,
+				work);
+	p = workarea->p;
+
+	mm = get_task_mm(p->lead_thread);
+
+	if (!mm)
+		return;
+
+	kthread_use_mm(mm);
+
+	q = pqm_get_user_queue(&p->pqm, workarea->queue_id);
+
+	if (!q)
+		goto out;
+
+	csa_addr = (void __user *) q->properties.ctx_save_restore_area_address;
+	/* KFD header is 4 DWORDS in size for control stack info. */
+	header_offset = sizeof(struct mqd_user_context_save_area_header);
+	/*
+	 * User header payload_offset is 6 DWORDS down in the header after
+	 * debugger memory info.
+	 */
+	payload_offset = (uint64_t)(csa_addr + header_offset) +
+						(2 * sizeof(uint32_t));
+
+	err_payload_ptr_addr = (uint64_t **)payload_offset;
+	get_user(err_payload_ptr, err_payload_ptr_addr);
+	get_user(cur_err, err_payload_ptr);
+	cur_err |= workarea->error_reason;
+	put_user(cur_err, err_payload_ptr);
+	get_user(ev_id, (uint64_t *)(payload_offset + sizeof(err_payload_ptr)));
+
+	kfd_set_event(p, ev_id);
+
+out:
+	kthread_unuse_mm(mm);
+	mmput(mm);
+}
+
+int kfd_send_exception_to_runtime(struct kfd_process *p,
+			unsigned int queue_id,
+			uint64_t error_reason)
+{
+	struct send_exception_work_handler_workarea worker;
+
+	INIT_WORK_ONSTACK(&worker.work, send_exception_work_handler);
+
+	worker.p = p;
+	worker.queue_id = queue_id;
+	worker.error_reason = error_reason;
+
+	schedule_work(&worker.work);
+	flush_work(&worker.work);
+	destroy_work_on_stack(&worker.work);
+
+	return 0;
+}
 
 #if defined(CONFIG_DEBUG_FS)
 

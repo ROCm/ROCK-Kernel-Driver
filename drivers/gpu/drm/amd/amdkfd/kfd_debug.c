@@ -127,7 +127,7 @@ void debug_event_write_work_handler(struct work_struct *work)
 /* update process/device/queue exception status, write to descriptor
  * only if exception_status is enabled.
  */
-void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
+bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			struct kfd_dev *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data, size_t exception_data_size)
@@ -138,9 +138,10 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 	int i;
 	static const char write_data = '.';
 	loff_t pos = 0;
+	bool is_subscribed = true;
 
 	if (!(process && process->debug_trap_enabled))
-		return;
+		return false;
 
 	mutex_lock(&process->event_mutex);
 
@@ -203,13 +204,17 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 					&write_data,
 					1,
 					&pos);
+	} else {
+		is_subscribed = false;
 	}
 
 	mutex_unlock(&process->event_mutex);
+
+	return is_subscribed;
 }
 
 /* set pending event queue entry from ring entry  */
-void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
+bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
 				   uint32_t trap_code,
@@ -217,15 +222,84 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   size_t exception_data_size)
 {
 	struct kfd_process *p;
+	bool signaled_to_debugger_or_runtime = false;
 
 	p = kfd_lookup_process_by_pasid(pasid);
 
 	if (!p)
-		return;
+		return false;
 
-	kfd_dbg_ev_raise(trap_code, p, dev, doorbell_id, true, exception_data,
-						exception_data_size);
+	if (!kfd_dbg_ev_raise(trap_code, p, dev, doorbell_id, true,
+					exception_data, exception_data_size)) {
+		struct process_queue_manager *pqm;
+		struct process_queue_node *pqn;
+
+		if (KFD_DBG_EC_TYPE_IS_QUEUE(trap_code) && p->r_debug) {
+			mutex_lock(&p->mutex);
+
+			pqm = &p->pqm;
+			list_for_each_entry(pqn, &pqm->queues,
+							process_queue_list) {
+
+				if (!(pqn->q && pqn->q->device == dev &&
+						pqn->q->doorbell_id == doorbell_id))
+					continue;
+
+				kfd_send_exception_to_runtime(p,
+						pqn->q->properties.queue_id,
+						KFD_EC_MASK(trap_code));
+
+				signaled_to_debugger_or_runtime = true;
+
+				break;
+			}
+
+			mutex_unlock(&p->mutex);
+		} else if (trap_code == EC_DEVICE_MEMORY_VIOLATION) {
+			kfd_process_vm_fault(dev->dqm, p->pasid);
+			kfd_signal_vm_fault_event(dev, p->pasid, NULL,
+							exception_data);
+
+			signaled_to_debugger_or_runtime = true;
+		}
+	} else {
+		signaled_to_debugger_or_runtime = true;
+	}
+
 	kfd_unref_process(p);
+
+	return signaled_to_debugger_or_runtime;
+}
+
+int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
+					unsigned int dest_id,
+					uint64_t error_reason)
+{
+	if (error_reason & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
+		struct kfd_process_device *pdd = NULL;
+		struct kfd_hsa_memory_exception_data *data;
+		int i;
+
+		for (i = 0; i < p->n_pdds; i++) {
+			if (p->pdds[i]->dev->id == dest_id) {
+				pdd = p->pdds[i];
+				break;
+			}
+		}
+
+		if (!pdd)
+			return -ENODEV;
+
+		data = (struct kfd_hsa_memory_exception_data *)
+						pdd->vm_fault_exc_data;
+
+		kfd_process_vm_fault(pdd->dev->dqm, p->pasid);
+		kfd_signal_vm_fault_event(pdd->dev, p->pasid, NULL, data);
+	} else {
+		return kfd_send_exception_to_runtime(p, dest_id, error_reason);
+	}
+
+	return -EINVAL;
 }
 
 /* kfd_dbg_trap_disable:
