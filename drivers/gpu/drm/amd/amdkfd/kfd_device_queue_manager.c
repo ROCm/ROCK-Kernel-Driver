@@ -1748,7 +1748,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	 * Do free_mqd and delete raise event after dqm_unlock(dqm) to avoid
 	 * circular locking
 	 */
-	kfd_dbg_ev_raise(EC_QUEUE_DELETE,
+	kfd_dbg_ev_raise(EC_DEVICE_QUEUE_DELETE,
 			qpd->pqm->process,
 			q->device,
 			-1,
