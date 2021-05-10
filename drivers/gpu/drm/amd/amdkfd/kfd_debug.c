@@ -143,18 +143,6 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 
 	mutex_lock(&process->event_mutex);
 
-	/* We only notify the debugger about the following events right now:
-	 * EC_QUEUE_NEW (per queue)
-	 * EC_TRAP_HANDLER (per queue)
-	 * EC_MEMORY_VIOLATION (per device)
-	 * EC_QUEUE_DELETE (per device)
-	 */
-	if (event_type != EC_QUEUE_NEW &&
-			event_type != EC_TRAP_HANDLER &&
-			event_type != EC_MEMORY_VIOLATION &&
-			event_type != EC_QUEUE_DELETE)
-		goto out;
-
 	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
 		struct kfd_process_device *pdd;
 
@@ -166,7 +154,7 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 
 			pdd->exception_status |= ec_mask;
 
-			if (event_type == EC_MEMORY_VIOLATION) {
+			if (event_type == EC_DEVICE_MEMORY_VIOLATION) {
 				if (!pdd->vm_fault_exc_data) {
 					pdd->vm_fault_exc_data = kmemdup(
 							exception_data,
@@ -217,7 +205,7 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 					1,
 					&pos);
 	}
-out:
+
 	mutex_unlock(&process->event_mutex);
 }
 
@@ -225,7 +213,7 @@ out:
 void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault,
+				   uint32_t trap_code,
 				   void *exception_data,
 				   size_t exception_data_size)
 {
@@ -236,9 +224,7 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 	if (!p)
 		return;
 
-	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
-						p, dev, doorbell_id, true,
-						exception_data,
+	kfd_dbg_ev_raise(trap_code, p, dev, doorbell_id, true, exception_data,
 						exception_data_size);
 	kfd_unref_process(p);
 }
@@ -702,7 +688,7 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 			r = -ENODATA;
 			goto out;
 		}
-		if (exception_code == EC_MEMORY_VIOLATION) {
+		if (exception_code == EC_DEVICE_MEMORY_VIOLATION) {
 			if (*info_size < pdd->vm_fault_exc_data_size) {
 				r = -ENOSPC;
 				goto out;

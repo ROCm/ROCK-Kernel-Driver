@@ -35,7 +35,7 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault,
+				   uint32_t trap_code,
 				   void *exception_data,
 				   size_t exception_data_size);
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
