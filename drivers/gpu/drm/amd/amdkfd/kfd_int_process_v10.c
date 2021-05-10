@@ -133,16 +133,14 @@ static void event_interrupt_wq_v10(struct kfd_dev *dev,
 	else if (source_id == SOC15_INTSRC_SDMA_TRAP)
 		kfd_signal_event_interrupt(pasid, context_id0 & 0xfffffff, 28);
 	else if (source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG) {
-		if ((context_id1 & KFD_CONTEXT_ID1_ENC_TYPE_WAVE_MASK) &&
-				(context_id0 & KFD_CONTEXT_ID0_PRIV_MASK))
-			kfd_set_dbg_ev_from_interrupt(dev, pasid,
-				KFD_DEBUG_DOORBELL_ID(context_id0),
-				KFD_DEBUG_TRAP_CODE(context_id0),
-				NULL,
-				0);
-		else
-			kfd_signal_event_interrupt(pasid,
-						   context_id0 & 0x7fffff, 23);
+		if (!((context_id1 & KFD_CONTEXT_ID1_ENC_TYPE_WAVE_MASK) &&
+				(context_id0 & KFD_CONTEXT_ID0_PRIV_MASK) &&
+				kfd_set_dbg_ev_from_interrupt(dev, pasid,
+					KFD_DEBUG_DOORBELL_ID(context_id0),
+					KFD_DEBUG_TRAP_CODE(context_id0),
+					NULL,
+					0)))
+			kfd_signal_event_interrupt(pasid, context_id0 & 0x7fffff, 23);
 	} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE) {
 		kfd_set_dbg_ev_from_interrupt(dev, pasid,
 			KFD_DEBUG_DOORBELL_ID(context_id0),
@@ -179,8 +177,8 @@ static void event_interrupt_wq_v10(struct kfd_dev *dev,
 						EC_DEVICE_MEMORY_VIOLATION,
 						&exception_data,
 						sizeof(exception_data));
-		kfd_process_vm_fault(dev->dqm, pasid);
-		kfd_signal_vm_fault_event(dev, pasid, &info);
+	} else if (KFD_IRQ_IS_FENCE(client_id, source_id)) {
+		kfd_process_close_interrupt_drain(pasid);
 	}
 }
 
