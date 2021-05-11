@@ -67,6 +67,9 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 					uint32_t watch_mode);
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable);
+int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
+			bool enable_ttmp_setup);
+int kfd_dbg_runtime_disable(struct kfd_process *p);
 
 static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
 {

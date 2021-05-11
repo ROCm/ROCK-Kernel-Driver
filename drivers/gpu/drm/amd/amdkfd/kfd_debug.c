@@ -267,10 +267,11 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
 
-		debug_refresh_runlist(pdd->dev->dqm);
+		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd,
+						target->enable_ttmp_setup);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
-			if (release_debug_trap_vmid(pdd->dev->dqm))
+			if (release_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd))
 				pr_err("Failed to release debug vmid on [%i]\n",
 						pdd->dev->id);
 		count++;
@@ -314,7 +315,7 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		kfd_bind_process_to_device(pdd->dev, target);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev)) {
-			r = reserve_debug_trap_vmid(pdd->dev->dqm);
+			r = reserve_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd);
 
 			if (r)
 				goto unwind_err;
@@ -326,7 +327,7 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		r = debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
 		if (r)
 			goto unwind_err;
 
@@ -350,7 +351,8 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 	target->debug_trap_enabled = true;
 	if (target->debugger_process)
 		atomic_inc(&target->debugger_process->debugged_process_count);
-	*ttmp_save = 0; /* TBD - set based on runtime enable */
+
+	*ttmp_save = target->enable_ttmp_setup;
 
 	return 0;
 
@@ -397,7 +399,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 			pdd->spi_dbg_override = r;
 			r = 0;
 
-			r = debug_refresh_runlist(pdd->dev->dqm);
+			r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 			if (r)
 				break;
 		}
@@ -419,7 +421,7 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 				wave_launch_mode,
 				pdd->dev->vm_info.last_vmid_kfd);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -485,7 +487,7 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		if (r)
 			break;
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -551,7 +553,7 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 					watch_mode,
 					pdd->dev->vm_info.last_vmid_kfd);
 
-		r = debug_map_and_unlock(pdd->dev->dqm);
+		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -596,7 +598,7 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 								j);
 			}
 
-		r = debug_map_and_unlock(pdd->dev->dqm);
+		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -615,7 +617,7 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 {
 	bool found = false;
 	int r = 0;
-	uint32_t actual_info_size = 0;
+	uint32_t copy_size, actual_info_size = 0;
 	uint64_t *exception_status_ptr = NULL;
 
 	if (!target)
@@ -625,6 +627,7 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 		return -EINVAL;
 
 	mutex_lock(&target->event_mutex);
+
 	if (KFD_DBG_EC_TYPE_IS_QUEUE(exception_code)) {
 		/* Per queue exceptions */
 		struct queue *queue = NULL;
@@ -676,12 +679,10 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 			goto out;
 		}
 		if (exception_code == EC_DEVICE_MEMORY_VIOLATION) {
-			if (*info_size < pdd->vm_fault_exc_data_size) {
-				r = -ENOSPC;
-				goto out;
-			}
+			copy_size = min((size_t)(*info_size), pdd->vm_fault_exc_data_size);
+
 			if (copy_to_user(info, pdd->vm_fault_exc_data,
-						pdd->vm_fault_exc_data_size)) {
+						copy_size)) {
 				r = -EFAULT;
 				goto out;
 			}
@@ -695,12 +696,22 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 		exception_status_ptr = &pdd->exception_status;
 	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(exception_code)) {
 		/* Per process exceptions */
-
-		if (!(target->exception_status &
-						KFD_EC_MASK(exception_code))) {
+		if (!(target->exception_status & KFD_EC_MASK(exception_code))) {
 			r = -ENODATA;
 			goto out;
 		}
+
+		if (exception_code == EC_PROCESS_RUNTIME_ENABLE) {
+			copy_size = min((size_t)(*info_size), sizeof(target->r_debug));
+
+			if (copy_to_user(info, (void *)&target->r_debug, copy_size)) {
+				r = -EFAULT;
+				goto out;
+			}
+
+			actual_info_size = sizeof(target->r_debug);
+		}
+
 		exception_status_ptr = &target->exception_status;
 	} else {
 		pr_debug("Bad exception type [%i]\n", exception_code);
@@ -765,3 +776,40 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 	return 0;
 }
 
+int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
+			bool enable_ttmp_setup)
+{
+	int i = 0;
+
+	if (p->r_debug)
+		return -EBUSY;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		if (pdd->qpd.queue_count)
+			return -EEXIST;
+	}
+
+	p->r_debug = r_debug;
+	p->enable_ttmp_setup = enable_ttmp_setup;
+
+	return 0;
+}
+
+int kfd_dbg_runtime_disable(struct kfd_process *p)
+{
+	int i = 0;
+
+	p->r_debug = 0;
+	p->enable_ttmp_setup = false;
+
+	/* disable DISPATCH_PTR save */
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, false);
+	}
+
+	return 0;
+}
