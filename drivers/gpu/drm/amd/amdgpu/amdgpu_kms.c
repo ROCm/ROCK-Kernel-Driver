@@ -889,7 +889,7 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 			memcpy(vbios_info.vbios_pn, atom_context->vbios_pn, sizeof(atom_context->vbios_pn));
 			vbios_info.version = atom_context->version;
 			memcpy(vbios_info.date, atom_context->date, sizeof(atom_context->date));
-			memcpy(vbios_info.serial, adev->serial, sizeof(adev->serial));
+			vbios_info.serial = adev->unique_id;
 			vbios_info.dev_id = adev->pdev->device;
 			vbios_info.rev_id = adev->pdev->revision;
 			vbios_info.sub_dev_id = atom_context->sub_dev_id;
