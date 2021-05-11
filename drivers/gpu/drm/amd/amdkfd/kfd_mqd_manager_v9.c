@@ -210,7 +210,8 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 	/* Set cp_hqd_hq_status0 bit 14 to 1 to have the CP set up the
 	 * DISPATCH_PTR.  This is required for the kfd debugger
 	 */
-	m->cp_hqd_hq_status0 = 1 << 14;
+	if (q->save_ttmp)
+		m->cp_hqd_hq_status0 = 1 << 14;
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL) {
 		m->cp_hqd_aql_control =
