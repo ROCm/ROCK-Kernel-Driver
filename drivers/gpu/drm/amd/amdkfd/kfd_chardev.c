@@ -2948,6 +2948,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	if (!is_attach &&
 			debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION &&
+			debug_trap_action != KFD_IOC_DBG_TRAP_RUNTIME_ENABLE &&
 			!target->debug_trap_enabled) {
 		pr_err("Debugging is not enabled for this process\n");
 		r = -EINVAL;
@@ -3079,6 +3080,14 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				exception_mask,
 				(void __user *) args->ptr,
 				&args->data1);
+		break;
+	case KFD_IOC_DBG_TRAP_RUNTIME_ENABLE:
+		if (data1)
+			r = kfd_dbg_runtime_enable(target,
+				args->ptr,
+				data2);
+		else
+			r = kfd_dbg_runtime_disable(target);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

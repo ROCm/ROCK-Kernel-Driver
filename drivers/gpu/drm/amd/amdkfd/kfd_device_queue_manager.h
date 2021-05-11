@@ -228,8 +228,10 @@ unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 unsigned int get_num_xgmi_sdma_queues(struct device_queue_manager *dqm);
 bool check_if_queues_active(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);
-int reserve_debug_trap_vmid(struct device_queue_manager *dqm);
-int release_debug_trap_vmid(struct device_queue_manager *dqm);
+int reserve_debug_trap_vmid(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd);
+int release_debug_trap_vmid(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd);
 int suspend_queues(struct kfd_process *p,
 			uint32_t num_queues,
 			uint32_t grace_period,
@@ -245,8 +247,12 @@ void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 			      uint64_t exception_clear_mask,
 			      struct kfd_queue_snapshot_entry *qss_entry);
 int debug_lock_and_unmap(struct device_queue_manager *dqm);
-int debug_map_and_unlock(struct device_queue_manager *dqm);
-int debug_refresh_runlist(struct device_queue_manager *dqm);
+int debug_map_and_unlock(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd,
+			bool debug_trap_enable);
+int debug_refresh_runlist(struct device_queue_manager *dqm,
+			struct qcm_process_device *qpd,
+			bool debug_trap_enable);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {

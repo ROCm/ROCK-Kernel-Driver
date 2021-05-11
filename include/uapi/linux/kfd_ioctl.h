@@ -60,9 +60,10 @@
  * 6.1 - Add KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO.
  * 6.2 - Add KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT.
  * 7.0 - Redefine exception codes
+ * 7.1 - Add KFD_IOC_DBG_TRAP_RUNTIME_ENABLE
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	7
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -348,8 +349,6 @@ enum kfd_dbg_trap_exception_code {
  * data3: return ttmp/dispatch ptr save enabled (0=disabled, 1=enabled)
  * data4: unused
  *
- * FIXME: data3 will always return 0 as runtime enable is still not implemented
- * so ignore the return value for now.
  */
 #define KFD_IOC_DBG_TRAP_ENABLE 0
 
@@ -496,6 +495,9 @@ enum kfd_dbg_trap_exception_code {
  * data2: exception_code
  * data3: clear_exception (1 == true, 0 == false)
  * data4: exception info data size
+ *
+ * NOTE: If data2 == EC_PROCESS_RUNTIME_ENABLE, the saved r_debug pointer
+ * address will be copied to the exception info pointer.
  */
 #define KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO 11
 
@@ -509,9 +511,21 @@ enum kfd_dbg_trap_exception_code {
  */
 #define KFD_IOC_DBG_TRAP_DEVICE_SNAPSHOT  12
 
+/* KFD_IOC_DBG_TRAP_RUNTIME_ENABLE
+ * exception_mask: unused
+ * ptr:   r_debug info to save
+ * data1: enable (0=disable, 1=enable)
+ * data2: enable ttmp save (0=disable, 1=enable)
+ * data3: unused
+ * data4: unused
+ *
+ * FIXME: This option is temporary.  Future upstream will use a separate IOCTL.
+ */
+#define KFD_IOC_DBG_TRAP_RUNTIME_ENABLE 13
+
 struct kfd_ioctl_dbg_trap_args {
 	__u64 exception_mask; /* to KFD */
-	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
+	__u64 ptr;     /* to KFD */
 	__u32 pid;     /* to KFD */
 	__u32 op;      /* to KFD */
 	__u32 data1;   /* to KFD */
