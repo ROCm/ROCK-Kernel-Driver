@@ -3065,7 +3065,6 @@ static void dp_test_send_link_test_pattern(struct dc_link *link)
 	dp_update_dsc_config(pipe_ctx);
 #endif
 
-
 	dc_link_dp_set_test_pattern(
 			link,
 			test_pattern,
