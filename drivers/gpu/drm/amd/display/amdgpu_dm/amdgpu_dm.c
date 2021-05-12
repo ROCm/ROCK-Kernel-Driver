@@ -11357,7 +11357,11 @@ static int validate_overlay(struct drm_atomic_state *state)
 	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
 #endif
 		if (plane->type == DRM_PLANE_TYPE_OVERLAY) {
+#ifdef HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE
 			if (drm_atomic_plane_disabling(plane->state, new_plane_state))
+#else
+			if (drm_atomic_plane_disabling(plane, old_plane_state))
+#endif
 				return 0;
 
 			overlay_state = new_plane_state;
