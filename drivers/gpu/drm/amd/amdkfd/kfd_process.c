@@ -2171,7 +2171,7 @@ void kfd_flush_tlb(struct kfd_process_device *pdd)
 							pdd->qpd.vmid);
 	} else {
 		amdgpu_amdkfd_flush_gpu_tlb_pasid(dev->kgd,
-						pdd->process->pasid);
+					pdd->process->pasid, TLB_FLUSH_LEGACY);
 	}
 }
 

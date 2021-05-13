@@ -1128,7 +1128,7 @@ svm_range_unmap_from_gpus(struct svm_range *prange, unsigned long start,
 				break;
 		}
 		amdgpu_amdkfd_flush_gpu_tlb_pasid((struct kgd_dev *)adev,
-						  p->pasid);
+					p->pasid, TLB_FLUSH_HEAVYWEIGHT);
 	}
 
 	return r;
@@ -1187,7 +1187,7 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 		p = container_of(prange->svms, struct kfd_process, svms);
 		amdgpu_amdkfd_flush_gpu_tlb_pasid((struct kgd_dev *)adev,
-						  p->pasid);
+						p->pasid, TLB_FLUSH_LEGACY);
 	}
 out:
 	prange->mapping.bo_va = NULL;
