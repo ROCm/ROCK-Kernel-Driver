@@ -1309,6 +1309,7 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 {
 	struct kfd_iolink_properties *link, *cpu_link;
 	struct kfd_topology_device *cpu_dev;
+	struct amdgpu_device *adev;
 	uint32_t cap;
 	uint32_t cpu_flag = CRAT_IOLINK_FLAGS_ENABLED;
 	uint32_t flag = CRAT_IOLINK_FLAGS_ENABLED;
@@ -1316,18 +1317,24 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 	if (!dev || !dev->gpu)
 		return;
 
-	pcie_capability_read_dword(dev->gpu->pdev,
-			PCI_EXP_DEVCAP2, &cap);
+	adev = (struct amdgpu_device *)(dev->gpu->kgd);
+	if (!adev->gmc.xgmi.connected_to_cpu) {
+		pcie_capability_read_dword(dev->gpu->pdev,
+				PCI_EXP_DEVCAP2, &cap);
 
-	if (!(cap & (PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
-		     PCI_EXP_DEVCAP2_ATOMIC_COMP64)))
-		cpu_flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
-			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+		if (!(cap & (PCI_EXP_DEVCAP2_ATOMIC_COMP32 |
+			     PCI_EXP_DEVCAP2_ATOMIC_COMP64)))
+			cpu_flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+	}
 
-	if (!dev->gpu->pci_atomic_requested ||
-	    dev->gpu->device_info->asic_family == CHIP_HAWAII)
-		flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
-			CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+	if (!adev->gmc.xgmi.num_physical_nodes) {
+		if (!dev->gpu->pci_atomic_requested ||
+				dev->gpu->device_info->asic_family ==
+							CHIP_HAWAII)
+			flag |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+	}
 
 	/* GPU only creates direct links so apply flags setting to all */
 	list_for_each_entry(link, &dev->io_link_props, list) {
@@ -1768,13 +1775,13 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	adev = (struct amdgpu_device *)(dev->gpu->kgd);
 	/* kfd only concerns sram ecc on GFX and HBM ecc on UMC */
 	dev->node_props.capability |=
-		((adev->ras_features & BIT(AMDGPU_RAS_BLOCK__GFX)) != 0) ?
+		((adev->ras_enabled & BIT(AMDGPU_RAS_BLOCK__GFX)) != 0) ?
 		HSA_CAP_SRAM_EDCSUPPORTED : 0;
-	dev->node_props.capability |= ((adev->ras_features & BIT(AMDGPU_RAS_BLOCK__UMC)) != 0) ?
+	dev->node_props.capability |= ((adev->ras_enabled & BIT(AMDGPU_RAS_BLOCK__UMC)) != 0) ?
 		HSA_CAP_MEM_EDCSUPPORTED : 0;
 
 	if (adev->asic_type != CHIP_VEGA10)
-		dev->node_props.capability |= (adev->ras_features != 0) ?
+		dev->node_props.capability |= (adev->ras_enabled != 0) ?
 			HSA_CAP_RASEVENTNOTIFY : 0;
 
 	/* SVM API and HMM page migration work together, device memory type

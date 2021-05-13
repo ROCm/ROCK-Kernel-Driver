@@ -35,16 +35,20 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault);
+				   bool is_vmfault,
+				   void *exception_data,
+				   size_t exception_data_size);
 void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			struct kfd_dev *dev,
-			unsigned int source_id);
+			unsigned int source_id, bool use_worker,
+			void *exception_data,
+			size_t exception_data_size);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
 int kfd_dbg_trap_disable(struct kfd_process *target,
 			bool unwind,
 			int unwind_count);
-int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t *fd,
+int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
 			uint32_t *ttmp_save);
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
@@ -69,4 +73,17 @@ static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
 	return dev->device_info->asic_family == CHIP_ALDEBARAN;
 }
 
+void debug_event_write_work_handler(struct work_struct *work);
+
+int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
+		uint32_t source_id,
+		uint32_t exception_code,
+		bool clear_exception,
+		void __user *info,
+		uint32_t *info_size);
+
+int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
+		uint64_t exception_clear_mask,
+		void __user *user_info,
+		uint32_t *number_of_device_infos);
 #endif

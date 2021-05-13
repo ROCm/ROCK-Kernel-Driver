@@ -422,6 +422,7 @@ static bool psp_skip_tmr(struct psp_context *psp)
 	switch (psp->adev->asic_type) {
 	case CHIP_NAVI12:
 	case CHIP_SIENNA_CICHLID:
+	case CHIP_ALDEBARAN:
 		return true;
 	default:
 		return false;
@@ -2145,7 +2146,7 @@ static int psp_load_smu_fw(struct psp_context *psp)
 		return 0;
 
 	if ((amdgpu_in_reset(adev) &&
-	     ras && ras->supported &&
+	     ras && adev->ras_enabled &&
 	     (adev->asic_type == CHIP_ARCTURUS ||
 	      adev->asic_type == CHIP_VEGA20)) ||
 	     (adev->in_runpm &&

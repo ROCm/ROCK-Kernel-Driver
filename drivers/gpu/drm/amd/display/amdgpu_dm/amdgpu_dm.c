@@ -35,6 +35,7 @@
 #include "dc/inc/hw/abm.h"
 #include "dc/dc_dmub_srv.h"
 #include "dc/dc_edid_parser.h"
+#include "dc/dc_stat.h"
 #include "amdgpu_dm_trace.h"
 
 #include "vid.h"
@@ -59,6 +60,7 @@
 
 #include "ivsrcid/ivsrcid_vislands30.h"
 
+#include "i2caux_interface.h"
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/types.h>
@@ -657,6 +659,58 @@ static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
 #endif
 #endif
 
+/**
+ * dm_dmub_outbox1_low_irq() - Handles Outbox interrupt
+ * @interrupt_params: used for determining the Outbox instance
+ *
+ * Handles the Outbox Interrupt
+ * event handler.
+ */
+#define DMUB_TRACE_MAX_READ 64
+static void dm_dmub_outbox1_low_irq(void *interrupt_params)
+{
+	struct dmub_notification notify;
+	struct common_irq_params *irq_params = interrupt_params;
+	struct amdgpu_device *adev = irq_params->adev;
+	struct amdgpu_display_manager *dm = &adev->dm;
+	struct dmcub_trace_buf_entry entry = { 0 };
+	uint32_t count = 0;
+
+	if (dc_enable_dmub_notifications(adev->dm.dc)) {
+		if (irq_params->irq_src == DC_IRQ_SOURCE_DMCUB_OUTBOX) {
+			do {
+				dc_stat_get_dmub_notification(adev->dm.dc, &notify);
+			} while (notify.pending_notification);
+
+			if (adev->dm.dmub_notify)
+				memcpy(adev->dm.dmub_notify, &notify, sizeof(struct dmub_notification));
+			if (notify.type == DMUB_NOTIFICATION_AUX_REPLY)
+				complete(&adev->dm.dmub_aux_transfer_done);
+			// TODO : HPD Implementation
+
+		} else {
+			DRM_ERROR("DM: Failed to receive correct outbox IRQ !");
+		}
+	}
+
+
+	do {
+		if (dc_dmub_srv_get_dmub_outbox0_msg(dm->dc, &entry)) {
+			trace_amdgpu_dmub_trace_high_irq(entry.trace_code, entry.tick_count,
+							entry.param0, entry.param1);
+
+			DRM_DEBUG_DRIVER("trace_code:%u, tick_count:%u, param0:%u, param1:%u\n",
+				 entry.trace_code, entry.tick_count, entry.param0, entry.param1);
+		} else
+			break;
+
+		count++;
+
+	} while (count <= DMUB_TRACE_MAX_READ);
+
+	ASSERT(count <= DMUB_TRACE_MAX_READ);
+}
+
 static int dm_set_clockgating_state(void *handle,
 		  enum amd_clockgating_state state)
 {
@@ -984,34 +1038,6 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	return 0;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-#define DMUB_TRACE_MAX_READ 64
-static void dm_dmub_trace_high_irq(void *interrupt_params)
-{
-	struct common_irq_params *irq_params = interrupt_params;
-	struct amdgpu_device *adev = irq_params->adev;
-	struct amdgpu_display_manager *dm = &adev->dm;
-	struct dmcub_trace_buf_entry entry = { 0 };
-	uint32_t count = 0;
-
-	do {
-		if (dc_dmub_srv_get_dmub_outbox0_msg(dm->dc, &entry)) {
-			trace_amdgpu_dmub_trace_high_irq(entry.trace_code, entry.tick_count,
-							entry.param0, entry.param1);
-
-			DRM_DEBUG_DRIVER("trace_code:%u, tick_count:%u, param0:%u, param1:%u\n",
-				 entry.trace_code, entry.tick_count, entry.param0, entry.param1);
-		} else
-			break;
-
-		count++;
-
-	} while (count <= DMUB_TRACE_MAX_READ);
-
-	ASSERT(count <= DMUB_TRACE_MAX_READ);
-}
-#endif
-
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_addr_space_config *pa_config)
 {
@@ -1275,6 +1301,16 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 	adev->dm.crc_rd_wrk = amdgpu_dm_crtc_secure_display_create_work();
 #endif
+	if (dc_enable_dmub_notifications(adev->dm.dc)) {
+		init_completion(&adev->dm.dmub_aux_transfer_done);
+		adev->dm.dmub_notify = kzalloc(sizeof(struct dmub_notification), GFP_KERNEL);
+		if (!adev->dm.dmub_notify) {
+			DRM_INFO("amdgpu: fail to allocate adev->dm.dmub_notify");
+			goto error;
+		}
+		amdgpu_dm_outbox_init(adev);
+	}
+
 	if (amdgpu_dm_initialize_drm_device(adev)) {
 		DRM_ERROR(
 		"amdgpu: failed to initialize sw for display support.\n");
@@ -1348,6 +1384,11 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	if (adev->dm.dc->ctx->dmub_srv) {
 		dc_dmub_srv_destroy(&adev->dm.dc->ctx->dmub_srv);
 		adev->dm.dc->ctx->dmub_srv = NULL;
+	}
+
+	if (dc_enable_dmub_notifications(adev->dm.dc)) {
+		kfree(adev->dm.dmub_notify);
+		adev->dm.dmub_notify = NULL;
 	}
 
 	if (adev->dm.dmub_bo)
@@ -2881,8 +2922,7 @@ static void handle_hpd_rx_irq(void *param)
 	 * conflict, after implement i2c helper, this mutex should be
 	 * retired.
 	 */
-	if (dc_link->type != dc_connection_mst_branch)
-		mutex_lock(&aconnector->hpd_lock);
+	mutex_lock(&aconnector->hpd_lock);
 
 	read_hpd_rx_irq_data(dc_link, &hpd_irq_data);
 
@@ -2899,13 +2939,15 @@ static void handle_hpd_rx_irq(void *param)
 		}
 	}
 
-	mutex_lock(&adev->dm.dc_lock);
+	if (!amdgpu_in_reset(adev))
+		mutex_lock(&adev->dm.dc_lock);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	result = dc_link_handle_hpd_rx_irq(dc_link, &hpd_irq_data, NULL);
 #else
 	result = dc_link_handle_hpd_rx_irq(dc_link, NULL, NULL);
 #endif
-	mutex_unlock(&adev->dm.dc_lock);
+	if (!amdgpu_in_reset(adev))
+		mutex_unlock(&adev->dm.dc_lock);
 
 out:
 	if (result && !is_mst_root_connector) {
@@ -2949,10 +2991,10 @@ out:
 	}
 #endif
 
-	if (dc_link->type != dc_connection_mst_branch) {
+	if (dc_link->type != dc_connection_mst_branch)
 		drm_dp_cec_irq(&aconnector->dm_dp_aux.aux);
-		mutex_unlock(&aconnector->hpd_lock);
-	}
+
+	mutex_unlock(&aconnector->hpd_lock);
 }
 
 static void register_hpd_handlers(struct amdgpu_device *adev)
@@ -3324,28 +3366,6 @@ static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 
 	}
 
-	if (dc->ctx->dmub_srv) {
-		i = DCN_1_0__SRCID__DMCUB_OUTBOX_HIGH_PRIORITY_READY_INT;
-		r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_DCE, i, &adev->dmub_trace_irq);
-
-		if (r) {
-			DRM_ERROR("Failed to add dmub trace irq id!\n");
-			return r;
-		}
-
-		int_params.int_context = INTERRUPT_HIGH_IRQ_CONTEXT;
-		int_params.irq_source =
-			dc_interrupt_to_irq_source(dc, i, 0);
-
-		c_irq_params = &adev->dm.dmub_trace_params[0];
-
-		c_irq_params->adev = adev;
-		c_irq_params->irq_src = int_params.irq_source;
-
-		amdgpu_dm_irq_register_interrupt(adev, &int_params,
-				dm_dmub_trace_high_irq, c_irq_params);
-	}
-
 	/* HPD */
 	r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_DCE, DCN_1_0__SRCID__DC_HPD1_INT,
 			&adev->hpd_irq);
@@ -3355,6 +3375,41 @@ static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 	}
 
 	register_hpd_handlers(adev);
+
+	return 0;
+}
+/* Register Outbox IRQ sources and initialize IRQ callbacks */
+static int register_outbox_irq_handlers(struct amdgpu_device *adev)
+{
+	struct dc *dc = adev->dm.dc;
+	struct common_irq_params *c_irq_params;
+	struct dc_interrupt_params int_params = {0};
+	int r, i;
+
+	int_params.requested_polarity = INTERRUPT_POLARITY_DEFAULT;
+	int_params.current_polarity = INTERRUPT_POLARITY_DEFAULT;
+
+	r = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_DCE, DCN_1_0__SRCID__DMCUB_OUTBOX_LOW_PRIORITY_READY_INT,
+			&adev->dmub_outbox_irq);
+	if (r) {
+		DRM_ERROR("Failed to add outbox irq id!\n");
+		return r;
+	}
+
+	if (dc->ctx->dmub_srv) {
+		i = DCN_1_0__SRCID__DMCUB_OUTBOX_LOW_PRIORITY_READY_INT;
+		int_params.int_context = INTERRUPT_LOW_IRQ_CONTEXT;
+		int_params.irq_source =
+		dc_interrupt_to_irq_source(dc, i, 0);
+
+		c_irq_params = &adev->dm.dmub_outbox_params[0];
+
+		c_irq_params->adev = adev;
+		c_irq_params->irq_src = int_params.irq_source;
+
+		amdgpu_dm_irq_register_interrupt(adev, &int_params,
+				dm_dmub_outbox1_low_irq, c_irq_params);
+	}
 
 	return 0;
 }
@@ -3611,51 +3666,68 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
 	struct amdgpu_dm_backlight_caps caps;
 #ifdef HAVE_HDR_SINK_METADATA
-	struct dc_link *link = NULL;
+	struct dc_link *link[AMDGPU_DM_MAX_NUM_EDP];
 	u32 brightness;
-	bool rc;
 #else
 	uint32_t brightness = bd->props.brightness;
 #endif
+	bool rc;
+	int i;
 
 	amdgpu_dm_update_backlight_caps(dm);
 	caps = dm->backlight_caps;
 
 #ifdef HAVE_HDR_SINK_METADATA
-	link = (struct dc_link *)dm->backlight_link;
+	for (i = 0; i < dm->num_of_edps; i++)
+		link[i] = (struct dc_link *)dm->backlight_link[i];
 
 	brightness = convert_brightness_from_user(&caps, bd->props.brightness);
 	// Change brightness based on AUX property
-	if (caps.aux_support)
-		rc = dc_link_set_backlight_level_nits(link, true, brightness,
-						      AUX_BL_DEFAULT_TRANSITION_TIME_MS);
-	else
-		rc = dc_link_set_backlight_level(dm->backlight_link, brightness, 0);
+	if (caps.aux_support) {
+		for (i = 0; i < dm->num_of_edps; i++) {
+			rc = dc_link_set_backlight_level_nits(link[i], true, brightness,
+				AUX_BL_DEFAULT_TRANSITION_TIME_MS);
+			if (!rc) {
+				DRM_ERROR("DM: Failed to update backlight via AUX on eDP[%d]\n", i);
+				break;
+			}
+		}
+	} else {
+		for (i = 0; i < dm->num_of_edps; i++) {
+			rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness, 0);
+			if (!rc) {
+				DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", i);
+				break;
+			}
+		}
+	}
 
 	return rc ? 0 : 1;
 #else
-     /*
-     * The brightness input is in the range 0-255
-     * It needs to be rescaled to be between the
-     * requested min and max input signal
-     *
-     * It also needs to be scaled up by 0x101 to
-     * match the DC interface which has a range of
-     * 0 to 0xffff
-     */
-    brightness =
-            brightness
-            * 0x101
-            * (caps.max_input_signal - caps.min_input_signal)
-            / AMDGPU_MAX_BL_LEVEL
-            + caps.min_input_signal * 0x101;
+	/*
+	 * The brightness input is in the range 0-255
+	 * It needs to be rescaled to be between the
+	 * requested min and max input signal
+	 *
+	 * It also needs to be scaled up by 0x101 to
+	 * match the DC interface which has a range of
+	 * 0 to 0xffff
+	 */
+	brightness =
+		brightness
+		* 0x101
+		* (caps.max_input_signal - caps.min_input_signal)
+		/ AMDGPU_MAX_BL_LEVEL
+		+ caps.min_input_signal * 0x101;
 
-    if (dc_link_set_backlight_level(dm->backlight_link,
-                    brightness, 0))
-            return 0;
-    else
-            return 1;
-
+	for (i = 0; i < dm->num_of_edps; i++) {
+		rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness, 0);
+		if (!rc) {
+			DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", i);
+			break;
+		}
+	}
+	return rc ? 0 : 1;
 #endif
 }
 
@@ -3669,7 +3741,7 @@ static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 
 #ifdef HAVE_HDR_SINK_METADATA
 	if (caps.aux_support) {
-		struct dc_link *link = (struct dc_link *)dm->backlight_link;
+		struct dc_link *link = (struct dc_link *)dm->backlight_link[0];
 		u32 avg, peak;
 		bool rc;
 
@@ -3679,7 +3751,7 @@ static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 		return convert_brightness_to_user(&caps, avg);
 	} else {
 #endif
-		int ret = dc_link_get_backlight_level(dm->backlight_link);
+		int ret = dc_link_get_backlight_level(dm->backlight_link[0]);
 
 		if (ret == DC_ERROR_UNEXPECTED)
 			return bd->props.brightness;
@@ -3780,10 +3852,13 @@ static void register_backlight_device(struct amdgpu_display_manager *dm,
 		 * DM initialization because not having a backlight control
 		 * is better then a black screen.
 		 */
-		amdgpu_dm_register_backlight_device(dm);
+		if (!dm->backlight_dev)
+			amdgpu_dm_register_backlight_device(dm);
 
-		if (dm->backlight_dev)
-			dm->backlight_link = link;
+		if (dm->backlight_dev) {
+			dm->backlight_link[dm->num_of_edps] = link;
+			dm->num_of_edps++;
+		}
 	}
 #endif
 }
@@ -3873,6 +3948,22 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			DRM_ERROR("KMS: Failed to initialize crtc\n");
 			goto fail;
 		}
+
+	/* Use Outbox interrupt */
+	switch (adev->asic_type) {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
+	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
+#endif
+	case CHIP_RENOIR:
+		if (register_outbox_irq_handlers(dm->adev)) {
+			DRM_ERROR("DM: Failed to initialize IRQ\n");
+			goto fail;
+		}
+		break;
+	default:
+		DRM_DEBUG_KMS("Unsupported ASIC type for outbox: 0x%X\n", adev->asic_type);
+	}
 
 	/* loops over all connectors on the board */
 	for (i = 0; i < link_cnt; i++) {
@@ -7414,13 +7505,13 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 {
 	struct dc_stream_state *stream = NULL;
 	struct drm_connector *connector;
-	struct drm_connector_state *new_con_state, *old_con_state;
+	struct drm_connector_state *new_con_state;
 	struct amdgpu_dm_connector *aconnector;
 	struct dm_connector_state *dm_conn_state;
 	int i, j, clock, bpp;
 	int vcpi, pbn_div, pbn = 0;
 
-	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+	for_each_new_connector_in_state(state, connector, new_con_state, i) {
 
 		aconnector = to_amdgpu_dm_connector(connector);
 
@@ -9096,19 +9187,17 @@ static void amdgpu_dm_handle_vrr_transition(struct dm_crtc_state *old_state,
 static void amdgpu_dm_commit_cursors(struct drm_atomic_state *state)
 {
 	struct drm_plane *plane;
-	struct drm_plane_state *old_plane_state, *new_plane_state;
+	struct drm_plane_state *old_plane_state;
 	int i;
 
 	/*
 	 * TODO: Make this per-stream so we don't issue redundant updates for
 	 * commits with multiple streams.
 	 */
-#if !defined(for_each_oldnew_plane_in_state)
+#if !defined(for_each_old_plane_in_state)
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
-		new_plane_state = plane->state;
 #else
-	for_each_oldnew_plane_in_state(state, plane, old_plane_state,
-				       new_plane_state, i) {
+	for_each_old_plane_in_state(state, plane, old_plane_state, i) {
 #endif
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			handle_cursor_update(plane, old_plane_state);
@@ -11069,6 +11158,58 @@ static int add_affected_mst_dsc_crtcs(struct drm_atomic_state *state, struct drm
 }
 #endif
 
+static int validate_overlay(struct drm_atomic_state *state)
+{
+	int i;
+	struct drm_plane *plane;
+	struct drm_plane_state *old_plane_state, *new_plane_state;
+	struct drm_plane_state *primary_state, *overlay_state = NULL;
+
+	/* Check if primary plane is contained inside overlay */
+#if !defined(for_each_oldnew_plane_in_state_reverse)
+	for_each_plane_in_state(state, plane, old_plane_state, i) {
+		new_plane_state = plane->state;
+#else
+	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
+#endif
+		if (plane->type == DRM_PLANE_TYPE_OVERLAY) {
+			if (drm_atomic_plane_disabling(plane->state, new_plane_state))
+				return 0;
+
+			overlay_state = new_plane_state;
+			continue;
+		}
+	}
+
+	/* check if we're making changes to the overlay plane */
+	if (!overlay_state)
+		return 0;
+
+	/* check if overlay plane is enabled */
+	if (!overlay_state->crtc)
+		return 0;
+
+	/* find the primary plane for the CRTC that the overlay is enabled on */
+	primary_state = drm_atomic_get_plane_state(state, overlay_state->crtc->primary);
+	if (IS_ERR(primary_state))
+		return PTR_ERR(primary_state);
+
+	/* check if primary plane is enabled */
+	if (!primary_state->crtc)
+		return 0;
+
+	/* Perform the bounds check to ensure the overlay plane covers the primary */
+	if (primary_state->crtc_x < overlay_state->crtc_x ||
+	    primary_state->crtc_y < overlay_state->crtc_y ||
+	    primary_state->crtc_x + primary_state->crtc_w > overlay_state->crtc_x + overlay_state->crtc_w ||
+	    primary_state->crtc_y + primary_state->crtc_h > overlay_state->crtc_y + overlay_state->crtc_h) {
+		DRM_DEBUG_ATOMIC("Overlay plane is enabled with hardware cursor but does not fully cover primary plane\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * amdgpu_dm_atomic_check() - Atomic check implementation for AMDgpu DM.
  * @dev: The DRM device
@@ -11288,6 +11429,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (ret)
 			goto fail;
 	}
+
+	ret = validate_overlay(state);
+	if (ret)
+		goto fail;
 
 	/* Add new/modified planes */
 #if !defined(for_each_oldnew_plane_in_state_reverse)
@@ -11918,4 +12063,31 @@ uint32_t dm_read_reg_func(const struct dc_context *ctx, uint32_t address,
 	trace_amdgpu_dc_rreg(&ctx->perf_trace->read_count, address, value);
 
 	return value;
+}
+
+int amdgpu_dm_process_dmub_aux_transfer_sync(struct dc_context *ctx, unsigned int linkIndex,
+				struct aux_payload *payload, enum aux_return_code_type *operation_result)
+{
+	struct amdgpu_device *adev = ctx->driver_context;
+	int ret = 0;
+
+	dc_process_dmub_aux_transfer_async(ctx->dc, linkIndex, payload);
+	ret = wait_for_completion_interruptible_timeout(&adev->dm.dmub_aux_transfer_done, 10*HZ);
+	if (ret == 0) {
+		*operation_result = AUX_RET_ERROR_TIMEOUT;
+		return -1;
+	}
+	*operation_result = (enum aux_return_code_type)adev->dm.dmub_notify->result;
+
+	if (adev->dm.dmub_notify->result == AUX_RET_SUCCESS) {
+		(*payload->reply) = adev->dm.dmub_notify->aux_reply.command;
+
+		// For read case, Copy data to payload
+		if (!payload->write && adev->dm.dmub_notify->aux_reply.length &&
+		(*payload->reply == AUX_TRANSACTION_REPLY_AUX_ACK))
+			memcpy(payload->data, adev->dm.dmub_notify->aux_reply.data,
+			adev->dm.dmub_notify->aux_reply.length);
+	}
+
+	return adev->dm.dmub_notify->aux_reply.length;
 }

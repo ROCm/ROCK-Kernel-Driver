@@ -1905,6 +1905,24 @@ bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down)
 	return true;
 }
 
+bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_settings *max_link_enc_cap)
+{
+	if (!max_link_enc_cap) {
+		DC_LOG_ERROR("%s: Could not return max link encoder caps", __func__);
+		return false;
+	}
+
+	if (link->link_enc->funcs->get_max_link_cap) {
+		link->link_enc->funcs->get_max_link_cap(link->link_enc, max_link_enc_cap);
+		return true;
+	}
+
+	DC_LOG_ERROR("%s: Max link encoder caps unknown", __func__);
+	max_link_enc_cap->lane_count = 1;
+	max_link_enc_cap->link_rate = 6;
+	return false;
+}
+
 static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 {
 	struct dc_link_settings max_link_cap = {0};
@@ -2423,6 +2441,12 @@ bool dp_validate_mode_timing(
 
 	const struct dc_link_settings *link_setting;
 
+	/* According to spec, VSC SDP should be used if pixel format is YCbCr420 */
+	if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420 &&
+			!link->dpcd_caps.dprx_feature.bits.VSC_SDP_COLORIMETRY_SUPPORTED &&
+			dal_graphics_object_id_get_connector_id(link->link_id) != CONNECTOR_ID_VIRTUAL)
+		return false;
+
 	/*always DP fail safe mode*/
 	if ((timing->pix_clk_100hz / 10) == (uint32_t) 25175 &&
 		timing->h_addressable == (uint32_t) 640 &&
@@ -2605,13 +2629,11 @@ static bool allow_hpd_rx_irq(const struct dc_link *link)
 	/*
 	 * Don't handle RX IRQ unless one of following is met:
 	 * 1) The link is established (cur_link_settings != unknown)
-	 * 2) We kicked off MST detection
-	 * 3) We know we're dealing with an active dongle
+	 * 2) We know we're dealing with a branch device, SST or MST
 	 */
 
 	if ((link->cur_link_settings.lane_count != LANE_COUNT_UNKNOWN) ||
-		(link->type == dc_connection_mst_branch) ||
-		is_dp_active_dongle(link))
+		is_dp_branch_device(link))
 		return true;
 
 	return false;
@@ -3178,7 +3200,7 @@ bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd
 			*out_link_loss = true;
 	}
 
-	if (link->type == dc_connection_active_dongle &&
+	if (link->type == dc_connection_sst_branch &&
 		hpd_irq_dpcd_data.bytes.sink_cnt.bits.SINK_COUNT
 			!= link->dpcd_sink_count)
 		status = true;
@@ -3228,6 +3250,12 @@ bool is_mst_supported(struct dc_link *link)
 }
 
 bool is_dp_active_dongle(const struct dc_link *link)
+{
+	return (link->dpcd_caps.dongle_type >= DISPLAY_DONGLE_DP_VGA_CONVERTER) &&
+				(link->dpcd_caps.dongle_type <= DISPLAY_DONGLE_DP_HDMI_CONVERTER);
+}
+
+bool is_dp_branch_device(const struct dc_link *link)
 {
 	return link->dpcd_caps.is_branch_dev;
 }
