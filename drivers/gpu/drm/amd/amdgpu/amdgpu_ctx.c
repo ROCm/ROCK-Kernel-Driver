@@ -671,7 +671,7 @@ static void amdgpu_ctx_fence_time(struct amdgpu_ctx *ctx,
 	ktime_t now, t1;
 	uint32_t i;
 
-	*total = *max = 0;
+	*total = *max = ktime_set(0, 0);
 
 	now = ktime_get();
 	for (i = 0; i < amdgpu_sched_jobs; i++) {
