@@ -1232,6 +1232,7 @@ struct dpcd_caps {
 #endif
 	struct dc_lttpr_caps lttpr_caps;
 	struct psr_caps psr_caps;
+	struct dpcd_usb4_dp_tunneling_info usb4_dp_tun_info;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dp_128b_132b_supported_link_rates dp_128b_132b_supported_link_rates;
