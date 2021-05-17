@@ -39,6 +39,7 @@
 #include <linux/kref.h>
 #include <linux/sysfs.h>
 #include <linux/interval_tree.h>
+#include <linux/semaphore.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
 #include <drm/drm_file.h>
