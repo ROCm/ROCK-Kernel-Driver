@@ -610,6 +610,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_device *bdev,
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
 	{
+		struct drm_mm_node *mm_node = mem->mm_node;
 		struct amdgpu_dgma_node *node;
 		struct amdgpu_bo *abo;
 
