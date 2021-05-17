@@ -815,8 +815,6 @@ struct drm_amdgpu_cs_chunk_data {
 	#define AMDGPU_INFO_VBIOS_SIZE		0x1
 	/* Subquery id: Query vbios image */
 	#define AMDGPU_INFO_VBIOS_IMAGE		0x2
-	/* Subquery id: Query vbios info */
-	#define AMDGPU_INFO_VBIOS_INFO		0x3
 /* Query UVD handles */
 #define AMDGPU_INFO_NUM_HANDLES			0x1C
 /* Query sensor related information */
@@ -1025,19 +1023,6 @@ struct drm_amdgpu_memory_info {
 struct drm_amdgpu_info_firmware {
 	__u32 ver;
 	__u32 feature;
-};
-
-struct drm_amdgpu_info_vbios {
-	__u8 name[64];
-	__u32 dbdf;
-	__u8 vbios_pn[64];
-	__u32 version;
-	__u8 date[32];
-	__u64 serial;
-	__u32 dev_id;
-	__u32 rev_id;
-	__u32 sub_dev_id;
-	__u32 sub_ved_id;
 };
 
 #define AMDGPU_VRAM_TYPE_UNKNOWN 0
