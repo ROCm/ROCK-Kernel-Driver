@@ -39,6 +39,7 @@
 #include <linux/kref.h>
 #include <linux/sysfs.h>
 #include <linux/interval_tree.h>
+#include <linux/semaphore.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
 #include <drm/drm_file.h>
@@ -1010,6 +1011,8 @@ struct kfd_process {
 
 	/* Tracks runtime enable status */
 	uint64_t r_debug;
+	struct semaphore runtime_enable_sema;
+	bool is_runtime_retry;
 	bool enable_ttmp_setup;
 
 	atomic_t poison;
