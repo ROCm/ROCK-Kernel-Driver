@@ -295,6 +295,13 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 
 		kfd_process_vm_fault(pdd->dev->dqm, p->pasid);
 		kfd_signal_vm_fault_event(pdd->dev, p->pasid, NULL, data);
+	} else if (error_reason & (KFD_EC_MASK(EC_PROCESS_RUNTIME_ENABLE) |
+				KFD_EC_MASK(EC_PROCESS_RUNTIME_DISABLE))) {
+		/*
+		 * block should only happen after the debugger receives runtime
+		 * enable notice.
+		 */
+		up(&p->runtime_enable_sema);
 	} else {
 		return kfd_send_exception_to_runtime(p, dest_id, error_reason);
 	}
@@ -853,10 +860,7 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 			bool enable_ttmp_setup)
 {
-	int i = 0;
-
-	if (p->r_debug)
-		return -EBUSY;
+	int i = 0, ret = 0;
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -868,14 +872,40 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 	p->r_debug = r_debug;
 	p->enable_ttmp_setup = enable_ttmp_setup;
 
-	return 0;
+	if (p->debug_trap_enabled) {
+		if (!p->is_runtime_retry)
+			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME_ENABLE, p, NULL, 0,
+							false, NULL, 0);
+
+		mutex_unlock(&p->mutex);
+		ret = down_interruptible(&p->runtime_enable_sema);
+		mutex_lock(&p->mutex);
+
+		p->is_runtime_retry = !!ret;
+	}
+
+	return ret;
 }
 
 int kfd_dbg_runtime_disable(struct kfd_process *p)
 {
-	int i = 0;
+	int i = 0, ret;
 
 	p->r_debug = 0;
+
+	if (p->debug_trap_enabled) {
+		if (!p->is_runtime_retry)
+			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME_DISABLE, p, NULL, 0,
+							false, NULL, 0);
+		mutex_unlock(&p->mutex);
+		ret = down_interruptible(&p->runtime_enable_sema);
+		mutex_lock(&p->mutex);
+
+		p->is_runtime_retry = !!ret;
+		if (ret)
+			return ret;
+	}
+
 	p->enable_ttmp_setup = false;
 
 	/* disable DISPATCH_PTR save */
