@@ -2681,14 +2681,14 @@ static void commit_planes_for_stream(struct dc *dc,
 						top_pipe_to_program->stream_res.tg);
 		}
 
-		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-			dc->hwss.interdependent_update_lock(dc, context, true);
-		else
-			/* Lock the top pipe while updating plane addrs, since freesync requires
-			 *  plane addr update event triggers to be synchronized.
-			 *  top_pipe_to_program is expected to never be NULL
-			 */
-			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, true);
+	else
+		/* Lock the top pipe while updating plane addrs, since freesync requires
+		 *  plane addr update event triggers to be synchronized.
+		 *  top_pipe_to_program is expected to never be NULL
+		 */
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
 
 	// Stream updates
 	if (stream_update)
@@ -2706,10 +2706,10 @@ static void commit_planes_for_stream(struct dc *dc,
 			dc->hwss.program_front_end_for_ctx(dc, context);
 #endif
 
-			if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-				dc->hwss.interdependent_update_lock(dc, context, false);
-			else
-				dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+			dc->hwss.interdependent_update_lock(dc, context, false);
+		else
+			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 		dc->hwss.post_unlock_program_front_end(dc, context);
 		return;
 	}
@@ -2846,10 +2846,10 @@ static void commit_planes_for_stream(struct dc *dc,
 
 	}
 
-		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-			dc->hwss.interdependent_update_lock(dc, context, false);
-		else
-			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, false);
+	else
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 
 	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
 		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable) {
@@ -2895,8 +2895,8 @@ static void commit_planes_for_stream(struct dc *dc,
 				pipe_ctx->plane_state->skip_manual_trigger)
 			continue;
 
-			if (pipe_ctx->stream_res.tg->funcs->program_manual_trigger)
-				pipe_ctx->stream_res.tg->funcs->program_manual_trigger(pipe_ctx->stream_res.tg);
+		if (pipe_ctx->stream_res.tg->funcs->program_manual_trigger)
+			pipe_ctx->stream_res.tg->funcs->program_manual_trigger(pipe_ctx->stream_res.tg);
 	}
 }
 
