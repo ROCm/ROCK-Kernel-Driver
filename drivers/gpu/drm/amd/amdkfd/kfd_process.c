@@ -1436,6 +1436,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	process->debug_trap_enabled = false;
 	process->debugger_process = NULL;
 	atomic_set(&process->debugged_process_count, 0);
+	sema_init(&process->runtime_enable_sema, 0);
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)
