@@ -6805,6 +6805,9 @@ static void dm_disable_vblank(struct drm_crtc *crtc)
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
+	.gamma_set = drm_atomic_helper_legacy_gamma_set,
+#endif
 #ifndef HAVE_DRM_VRR_SUPPORTED
 	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
 	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
