@@ -242,7 +242,9 @@ static const struct resource_caps res_cap_dcn303 = {
 		.num_ddc = 2,
 		.num_vmid = 16,
 		.num_mpc_3dlut = 1,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 2,
+#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
@@ -733,6 +735,7 @@ static struct mpc *dcn303_mpc_create(struct dc_context *ctx, int num_mpcc, int n
 	return &mpc30->base;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = { DSC_REG_LIST_DCN20(id) }
 
@@ -761,6 +764,7 @@ static struct display_stream_compressor *dcn303_dsc_create(struct dc_context *ct
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
+#endif
 
 #define dwbc_regs_dcn3(id)\
 [id] = { DWBC_COMMON_REG_LIST_DCN30(id) }
@@ -1070,10 +1074,12 @@ static void dcn303_resource_destruct(struct resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		if (pool->dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->dscs[i]);
 	}
+#endif
 
 	if (pool->mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->mpc));
@@ -1357,7 +1363,9 @@ static struct resource_funcs dcn303_res_pool_funcs = {
 		.populate_dml_pipes = dcn30_populate_dml_pipes_from_context,
 		.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 		.add_stream_to_ctx = dcn30_add_stream_to_ctx,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
+#endif
 		.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 		.populate_dml_writeback_from_context = dcn30_populate_dml_writeback_from_context,
 		.set_mcif_arb_params = dcn30_set_mcif_arb_params,
@@ -1611,6 +1619,7 @@ static bool dcn303_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		pool->dscs[i] = dcn303_dsc_create(ctx, i);
 		if (pool->dscs[i] == NULL) {
@@ -1619,6 +1628,7 @@ static bool dcn303_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	/* DWB and MMHUBBUB */
 	if (!dcn303_dwbc_create(ctx, pool)) {
