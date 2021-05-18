@@ -304,10 +304,12 @@ static int amdgpu_fbdev_destroy(struct drm_device *dev, struct amdgpu_fbdev *rfb
 	drm_fb_helper_unregister_fbi(&rfbdev->helper);
 	obj = drm_gem_fb_get_obj(&rfb->base, 0);
 
-	if (rfb->base.obj[0]) {
+	if (obj) {
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		for (i = 0; i < rfb->base.format->num_planes; i++)
-			drm_gem_object_put(rfb->base.obj[0]);
-		amdgpufb_destroy_pinned_object(rfb->base.obj[0]);
+			drm_gem_object_put(obj);
+#endif
+		amdgpufb_destroy_pinned_object(obj);
 		kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 		drm_framebuffer_unregister_private(&rfb->base);
 		drm_framebuffer_cleanup(&rfb->base);
