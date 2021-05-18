@@ -22,7 +22,7 @@ int drm_prime_sg_to_dma_addr_array(struct sg_table *sgt, dma_addr_t *addrs,
 	 * c67e62790f5c drm/prime: split array import functions v4 for
 	 * the change to drm_prime_sg_to_page_addr_arrays()
 	 */
-	struct page **pages = (void*)addrs - max_entries;
+	struct page **pages = (void*)((unsigned long)addrs - max_entries*sizeof(dma_addr_t));
 	return drm_prime_sg_to_page_addr_arrays(sgt, pages, addrs, max_entries);
 #endif
 }
