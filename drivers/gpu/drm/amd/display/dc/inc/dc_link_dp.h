@@ -65,7 +65,8 @@ bool perform_link_training_with_retries(
 	bool skip_video_pattern,
 	int attempts,
 	struct pipe_ctx *pipe_ctx,
-	enum signal_type signal);
+	enum signal_type signal,
+	bool do_fallback);
 
 bool is_mst_supported(struct dc_link *link);
 
@@ -98,5 +99,12 @@ bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx);
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable);
 #endif
 
+/* Convert PHY repeater count read from DPCD uint8_t. */
+uint8_t dp_convert_to_count(uint8_t lttpr_repeater_count);
+
+/* Check DPCD training status registers to detect link loss. */
+enum link_training_result dp_check_link_loss_status(
+		struct dc_link *link,
+		const struct link_training_settings *link_training_setting);
 
 #endif /* __DC_LINK_DP_H__ */

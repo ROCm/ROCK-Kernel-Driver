@@ -1429,7 +1429,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			err = follow_pfn(vma, args->mmap_offset, &pfn);
 			if (err) {
 				pr_debug("Failed to get PFN: %ld\n", err);
-				return err;
+				goto err_unlock;
 			}
 			flags |= KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL;
 			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
@@ -1438,7 +1438,8 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			if (offset & (PAGE_SIZE - 1)) {
 				pr_debug("Unaligned userptr address:%llx\n",
 					 offset);
-				return -EINVAL;
+				err = -EINVAL;
+				goto err_unlock;
 			}
 			cpuva = offset;
 		}

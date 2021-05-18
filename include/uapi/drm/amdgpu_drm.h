@@ -1033,7 +1033,7 @@ struct drm_amdgpu_info_vbios {
 	__u8 vbios_pn[64];
 	__u32 version;
 	__u8 date[32];
-	__u8 serial[16];
+	__u64 serial;
 	__u32 dev_id;
 	__u32 rev_id;
 	__u32 sub_dev_id;

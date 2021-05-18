@@ -657,7 +657,6 @@ static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
 	amdgpu_dm_crtc_handle_crc_window_irq(&acrtc->base);
 }
 #endif
-#endif
 
 /**
  * dm_dmub_outbox1_low_irq() - Handles Outbox interrupt
@@ -710,6 +709,7 @@ static void dm_dmub_outbox1_low_irq(void *interrupt_params)
 
 	ASSERT(count <= DMUB_TRACE_MAX_READ);
 }
+#endif
 
 static int dm_set_clockgating_state(void *handle,
 		  enum amd_clockgating_state state)
@@ -2939,15 +2939,15 @@ static void handle_hpd_rx_irq(void *param)
 		}
 	}
 
-	if (!amdgpu_in_reset(adev))
+	if (!amdgpu_in_reset(adev)) {
 		mutex_lock(&adev->dm.dc_lock);
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	result = dc_link_handle_hpd_rx_irq(dc_link, &hpd_irq_data, NULL);
 #else
 	result = dc_link_handle_hpd_rx_irq(dc_link, NULL, NULL);
 #endif
-	if (!amdgpu_in_reset(adev))
 		mutex_unlock(&adev->dm.dc_lock);
+	}
 
 out:
 	if (result && !is_mst_root_connector) {
@@ -3949,12 +3949,11 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail;
 		}
 
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 	/* Use Outbox interrupt */
 	switch (adev->asic_type) {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_0)
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
-#endif
 	case CHIP_RENOIR:
 		if (register_outbox_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -3964,6 +3963,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	default:
 		DRM_DEBUG_KMS("Unsupported ASIC type for outbox: 0x%X\n", adev->asic_type);
 	}
+#endif
 
 	/* loops over all connectors on the board */
 	for (i = 0; i < link_cnt; i++) {
@@ -11173,7 +11173,11 @@ static int validate_overlay(struct drm_atomic_state *state)
 	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
 #endif
 		if (plane->type == DRM_PLANE_TYPE_OVERLAY) {
+#ifdef HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE
 			if (drm_atomic_plane_disabling(plane->state, new_plane_state))
+#else
+			if (drm_atomic_plane_disabling(plane, old_plane_state))
+#endif
 				return 0;
 
 			overlay_state = new_plane_state;

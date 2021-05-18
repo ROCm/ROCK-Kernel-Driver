@@ -332,11 +332,14 @@ static int amdgpu_ras_debugfs_ctrl_parse_data(struct file *f,
  * "disable" requires only the block.
  * "enable" requires the block and error type.
  * "inject" requires the block, error type, address, and value.
+ *
  * The block is one of: umc, sdma, gfx, etc.
  *	see ras_block_string[] for details
+ *
  * The error type is one of: ue, ce, where,
  *	ue is multi-uncorrectable
  *	ce is single-correctable
+ *
  * The sub-block is a the sub-block index, pass 0 if there is no sub-block.
  * The address and value are hexadecimal numbers, leading 0x is optional.
  *
@@ -597,29 +600,6 @@ struct ras_manager *amdgpu_ras_find_obj(struct amdgpu_device *adev,
 }
 /* obj end */
 
-static void amdgpu_ras_parse_status_code(struct amdgpu_device *adev,
-					 const char* invoke_type,
-					 const char* block_name,
-					 enum ta_ras_status ret)
-{
-	switch (ret) {
-	case TA_RAS_STATUS__SUCCESS:
-		return;
-	case TA_RAS_STATUS__ERROR_RAS_NOT_AVAILABLE:
-		dev_warn(adev->dev,
-			"RAS WARN: %s %s currently unavailable\n",
-			invoke_type,
-			block_name);
-		break;
-	default:
-		dev_err(adev->dev,
-			"RAS ERROR: %s %s error failed ret 0x%X\n",
-			invoke_type,
-			block_name,
-			ret);
-	}
-}
-
 /* feature ctl begin */
 static int amdgpu_ras_is_feature_allowed(struct amdgpu_device *adev,
 					 struct ras_common_if *head)
@@ -714,15 +694,10 @@ int amdgpu_ras_feature_enable(struct amdgpu_device *adev,
 	if (!amdgpu_ras_intr_triggered()) {
 		ret = psp_ras_enable_features(&adev->psp, info, enable);
 		if (ret) {
-			amdgpu_ras_parse_status_code(adev,
-						     enable ? "enable":"disable",
-						     ras_block_str(head->block),
-						    (enum ta_ras_status)ret);
-			if (ret == TA_RAS_STATUS__RESET_NEEDED)
-				ret = -EAGAIN;
-			else
-				ret = -EINVAL;
-
+			dev_err(adev->dev, "ras %s %s failed %d\n",
+				enable ? "enable":"disable",
+				ras_block_str(head->block),
+				ret);
 			goto out;
 		}
 	}
@@ -977,6 +952,10 @@ int amdgpu_ras_reset_error_status(struct amdgpu_device *adev,
 		if (adev->mmhub.ras_funcs &&
 		    adev->mmhub.ras_funcs->reset_ras_error_count)
 			adev->mmhub.ras_funcs->reset_ras_error_count(adev);
+
+		if (adev->mmhub.ras_funcs &&
+		    adev->mmhub.ras_funcs->reset_ras_error_status)
+			adev->mmhub.ras_funcs->reset_ras_error_status(adev);
 		break;
 	case AMDGPU_RAS_BLOCK__SDMA:
 		if (adev->sdma.funcs->reset_ras_error_count)
@@ -1067,10 +1046,9 @@ int amdgpu_ras_error_inject(struct amdgpu_device *adev,
 		ret = -EINVAL;
 	}
 
-	amdgpu_ras_parse_status_code(adev,
-				     "inject",
-				     ras_block_str(info->head.block),
-				     (enum ta_ras_status)ret);
+	if (ret)
+		dev_err(adev->dev, "ras inject %s failed %d\n",
+			ras_block_str(info->head.block), ret);
 
 	return ret;
 }
