@@ -610,7 +610,7 @@ kfd_mem_attach_userptr(struct amdgpu_device *adev, struct kgd_mem *mem,
 	ret = amdgpu_gem_object_create(adev, bo_size, 1,
 				       AMDGPU_GEM_DOMAIN_CPU,
 				       AMDGPU_GEM_CREATE_PREEMPTIBLE,
-				       ttm_bo_type_sg, mem->bo->tbo.base.resv,
+				       ttm_bo_type_sg, amdkcl_ttm_resvp(&mem->bo->tbo),
 				       &gobj);
 	amdgpu_bo_unreserve(mem->bo);
 	if (ret)
@@ -622,6 +622,7 @@ kfd_mem_attach_userptr(struct amdgpu_device *adev, struct kgd_mem *mem,
 	return 0;
 }
 
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 static int
 kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 		      struct amdgpu_bo **bo)
@@ -630,7 +631,11 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 	int ret;
 
 	if (!mem->dmabuf) {
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 		mem->dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base,
+#else
+		mem->dmabuf = amdgpu_gem_prime_export(adev_to_drm(adev), &mem->bo->tbo.base,
+#endif
 			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
 				DRM_RDWR : 0);
 		if (IS_ERR(mem->dmabuf)) {
@@ -656,6 +661,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 
 	return 0;
 }
+#endif
 
 /* kfd_mem_attach - Add a BO to a VM
  *
@@ -721,9 +727,11 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			 * large-BAR GPUs.
 			 */
 			attachment[i]->type = KFD_MEM_ATT_DMABUF;
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 			ret = kfd_mem_attach_dmabuf(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
+#endif
 		} else {
 			/* FIXME: Need to DMA-map other BO types:
 			 * large-BAR VRAM, doorbells, MMIO remap
