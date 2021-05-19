@@ -38,6 +38,10 @@
 #include "dcn30/display_rq_dlg_calc_30.h"
 #include "dml_logger.h"
 #endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#include "dcn31/display_mode_vba_31.h"
+#include "dcn31/display_rq_dlg_calc_31.h"
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 const struct dml_funcs dml20_funcs = {
@@ -70,6 +74,16 @@ const struct dml_funcs dml30_funcs = {
 	.rq_dlg_get_rq_reg = dml30_rq_dlg_get_rq_reg
 };
 #endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+const struct dml_funcs dml31_funcs = {
+	.validate = dml31_ModeSupportAndSystemConfigurationFull,
+	.recalculate = dml31_recalculate,
+	.rq_dlg_get_dlg_reg = dml31_rq_dlg_get_dlg_reg,
+	.rq_dlg_get_rq_reg = dml31_rq_dlg_get_rq_reg
+};
+#endif
+
 void dml_init_instance(struct display_mode_lib *lib,
 		const struct _vcs_dpi_soc_bounding_box_st *soc_bb,
 		const struct _vcs_dpi_ip_params_st *ip_params,
@@ -96,6 +110,12 @@ void dml_init_instance(struct display_mode_lib *lib,
 		break;
 #endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case DML_PROJECT_DCN31:
+	case DML_PROJECT_DCN31_FPGA:
+		lib->funcs = dml31_funcs;
+		break;
+#endif
 	default:
 		break;
 	}
