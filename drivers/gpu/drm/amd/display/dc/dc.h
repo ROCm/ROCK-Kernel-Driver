@@ -525,6 +525,9 @@ struct dc_debug_options {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	unsigned int force_odm_combine_4to1; //bit vector based on otg inst
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	bool disable_z9_mpc;
+#endif
 	unsigned int force_fclk_khz;
 	bool enable_tri_buf;
 	bool dmub_offload_enabled;
@@ -572,6 +575,10 @@ struct dc_debug_options {
 	bool force_enable_edp_fec;
 	/* FEC/PSR1 sequence enable delay in 100us */
 	uint8_t fec_enable_delay_in100us;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	bool disable_z10;
+	bool enable_sw_cntl_psr;
+#endif
 };
 
 struct dc_debug_data {
