@@ -1334,7 +1334,16 @@ static void kfd_set_iolink_no_atomics(struct kfd_topology_device *dev,
 	if (link->iolink_type == CRAT_IOLINK_TYPE_XGMI)
 		return;
 
-	/* check pcie support to set cpu(dev) flags for target_gpu_dev link. */
+	/* checkout source dev has atomics support on root. */
+	if (dev->gpu && (!dev->gpu->pci_atomic_requested ||
+			dev->gpu->device_info->asic_family ==
+							CHIP_HAWAII)) {
+		link->flags |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
+				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
+		return;
+	}
+
+	/* check target_gpu_dev is atomics capable. */
 	if (target_gpu_dev) {
 		uint32_t cap;
 
@@ -1432,17 +1441,23 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 		}
 	}
 
-	/* Create CPU<->GPU indirect links so apply flags setting to all */
+	/* Create indirect links so apply flags setting to all */
 	list_for_each_entry(link, &dev->p2p_link_props, list) {
-		cpu_dev = kfd_topology_device_by_proximity_domain(
+		link->flags = CRAT_IOLINK_FLAGS_ENABLED;
+		kfd_set_iolink_no_atomics(dev, NULL, link);
+		peer_dev = kfd_topology_device_by_proximity_domain(
 				link->node_to);
-		if (cpu_dev && !cpu_dev->gpu) {
-			list_for_each_entry(cpu_link,
-					    &cpu_dev->p2p_link_props, list)
-				if (cpu_link->node_to == link->node_from) {
-					link->flags = flag;
-					cpu_link->flags = cpu_flag;
-				}
+
+		if (!peer_dev)
+			continue;
+
+		list_for_each_entry(inbound_link, &peer_dev->p2p_link_props,
+									list) {
+			if (inbound_link->node_to != link->node_from)
+				continue;
+
+			inbound_link->flags = CRAT_IOLINK_FLAGS_ENABLED;
+			kfd_set_iolink_no_atomics(peer_dev, dev, inbound_link);
 		}
 	}
 }
