@@ -241,7 +241,7 @@ static int amdgpu_ttm_map_buffer(struct ttm_buffer_object *bo,
 	*addr += mm_cur->start & ~PAGE_MASK;
 
 	num_dw = ALIGN(adev->mman.buffer_funcs->copy_num_dw, 8);
-	num_bytes = num_pages * 8;
+	num_bytes = num_pages * 8 * AMDGPU_GPU_PAGES_IN_CPU_PAGE;
 
 	r = amdgpu_job_alloc_with_ib(adev, num_dw * 4 + num_bytes,
 				     AMDGPU_IB_POOL_DELAYED, &job);
@@ -1872,11 +1872,8 @@ static int amdgpu_ttm_reserve_tmr(struct amdgpu_device *adev)
 	bool mem_train_support = false;
 
 	if (!amdgpu_sriov_vf(adev)) {
-		ret = amdgpu_mem_train_support(adev);
-		if (ret == 1)
+		if (amdgpu_atomfirmware_mem_training_supported(adev))
 			mem_train_support = true;
-		else if (ret == -1)
-			return -EINVAL;
 		else
 			DRM_DEBUG("memory training does not support!\n");
 	}
