@@ -1644,8 +1644,8 @@ static int gfx_v9_4_2_query_utc_edc_count(struct amdgpu_device *adev,
 	return 0;
 }
 
-int gfx_v9_4_2_query_ras_error_count(struct amdgpu_device *adev,
-				   void *ras_error_status)
+static int gfx_v9_4_2_query_ras_error_count(struct amdgpu_device *adev,
+					    void *ras_error_status)
 {
 	struct ras_err_data *err_data = (struct ras_err_data *)ras_error_status;
 	uint32_t sec_count = 0, ded_count = 0;
@@ -1693,7 +1693,7 @@ static void gfx_v9_4_2_reset_ea_err_status(struct amdgpu_device *adev)
 	mutex_unlock(&adev->grbm_idx_mutex);
 }
 
-void gfx_v9_4_2_reset_ras_error_count(struct amdgpu_device *adev)
+static void gfx_v9_4_2_reset_ras_error_count(struct amdgpu_device *adev)
 {
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
 		return;
@@ -1702,7 +1702,7 @@ void gfx_v9_4_2_reset_ras_error_count(struct amdgpu_device *adev)
 	gfx_v9_4_2_query_utc_edc_count(adev, NULL, NULL);
 }
 
-int gfx_v9_4_2_ras_error_inject(struct amdgpu_device *adev, void *inject_if)
+static int gfx_v9_4_2_ras_error_inject(struct amdgpu_device *adev, void *inject_if)
 {
 	struct ras_inject_if *info = (struct ras_inject_if *)inject_if;
 	int ret;
@@ -1775,7 +1775,7 @@ static void gfx_v9_4_2_query_utc_err_status(struct amdgpu_device *adev)
 	}
 }
 
-void gfx_v9_4_2_query_ras_error_status(struct amdgpu_device *adev)
+static void gfx_v9_4_2_query_ras_error_status(struct amdgpu_device *adev)
 {
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
 		return;
@@ -1785,7 +1785,7 @@ void gfx_v9_4_2_query_ras_error_status(struct amdgpu_device *adev)
 	gfx_v9_4_2_query_sq_timeout_status(adev);
 }
 
-void gfx_v9_4_2_reset_ras_error_status(struct amdgpu_device *adev)
+static void gfx_v9_4_2_reset_ras_error_status(struct amdgpu_device *adev)
 {
 	if (!amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__GFX))
 		return;
@@ -1795,7 +1795,7 @@ void gfx_v9_4_2_reset_ras_error_status(struct amdgpu_device *adev)
 	gfx_v9_4_2_reset_sq_timeout_status(adev);
 }
 
-void gfx_v9_4_2_enable_watchdog_timer(struct amdgpu_device *adev)
+static void gfx_v9_4_2_enable_watchdog_timer(struct amdgpu_device *adev)
 {
 	uint32_t i;
 	uint32_t data;
