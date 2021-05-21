@@ -3463,6 +3463,12 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 		 * when GPU is connected cpu through XGMI */
 		adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__SDMA |
 					 1 << AMDGPU_RAS_BLOCK__MMHUB);
+		/* This is temporary workaround to leverage ras_mask
+		 * to allow nable GFX RAS manually. Should be removed later
+		 */
+		if (amdgpu_ras_enable &&
+		    (amdgpu_ras_mask == 0xe))
+			adev->ras_hw_enabled |= 1 << AMDGPU_RAS_BLOCK__GFX;
 	}
 
 	/* apply asic specific settings (vega20 only for now) */
