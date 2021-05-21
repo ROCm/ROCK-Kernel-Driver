@@ -329,7 +329,7 @@ int smu_cmn_send_smc_msg_with_param(struct smu_context *smu,
 	int res, index;
 	u32 reg;
 
-	if (smu->adev->in_pci_err_recovery)
+	if (smu->adev->no_hw_access)
 		return 0;
 
 	index = smu_cmn_to_asic_specific_index(smu,

@@ -1140,7 +1140,7 @@ struct amdgpu_device {
 	uint32_t                        ras_hw_enabled;
 	uint32_t                        ras_enabled;
 
-	bool                            in_pci_err_recovery;
+	bool                            no_hw_access;
 	struct pci_saved_state          *pci_state;
 
 	/* Track auto wait count on s_barrier settings */
