@@ -94,6 +94,7 @@ enum dmub_asic {
 	DMUB_ASIC_DCN30,
 	DMUB_ASIC_DCN301,
 	DMUB_ASIC_DCN302,
+	DMUB_ASIC_DCN303,
 #endif
 	DMUB_ASIC_MAX,
 };
@@ -325,6 +326,7 @@ struct dmub_srv_hw_funcs {
 
 	uint32_t (*get_gpint_response)(struct dmub_srv *dmub);
 
+	uint32_t (*get_current_time)(struct dmub_srv *dmub);
 };
 
 /**

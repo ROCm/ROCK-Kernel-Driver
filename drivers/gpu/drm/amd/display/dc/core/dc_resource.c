@@ -58,9 +58,10 @@
 #include "dcn21/dcn21_resource.h"
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-#include "../dcn30/dcn30_resource.h"
-#include "../dcn301/dcn301_resource.h"
-#include "../dcn302/dcn302_resource.h"
+#include "dcn30/dcn30_resource.h"
+#include "dcn301/dcn301_resource.h"
+#include "dcn302/dcn302_resource.h"
+#include "dcn303/dcn303_resource.h"
 #endif
 
 #define DC_LOGGER_INIT(logger)
@@ -139,6 +140,8 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 			dc_version = DCN_VERSION_3_0;
 		if (ASICREV_IS_DIMGREY_CAVEFISH_P(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_02;
+		if (ASICREV_IS_BEIGE_GOBY_P(asic_id.hw_internal_rev))
+			dc_version = DCN_VERSION_3_03;
 #endif
 		break;
 #endif
@@ -234,7 +237,9 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 	case DCN_VERSION_3_02:
 		res_pool = dcn302_create_resource_pool(init_data, dc);
 		break;
-
+	case DCN_VERSION_3_03:
+		res_pool = dcn303_create_resource_pool(init_data, dc);
+		break;
 #endif
 	default:
 		break;
