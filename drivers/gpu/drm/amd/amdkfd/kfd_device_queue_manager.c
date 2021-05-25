@@ -2401,6 +2401,10 @@ void copy_context_work_handler (struct work_struct *work)
 
 	p = workarea->p;
 	mm = get_task_mm(p->lead_thread);
+
+	if (!mm)
+		return;
+
 	kthread_use_mm(mm);
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
