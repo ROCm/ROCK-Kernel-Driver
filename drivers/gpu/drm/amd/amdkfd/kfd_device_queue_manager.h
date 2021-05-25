@@ -236,6 +236,7 @@ int suspend_queues(struct kfd_process *p,
 			uint64_t exception_clear_mask,
 			uint32_t *queue_ids);
 int resume_queues(struct kfd_process *p,
+		bool resume_all_queues,
 		uint32_t num_queues,
 		uint32_t *queue_ids);
 

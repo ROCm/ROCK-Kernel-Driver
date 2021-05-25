@@ -1205,6 +1205,29 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		kfd_dbg_trap_disable(p, false, 0);
 	}
 
+	/* If we are the debugger, we need to clean up the debugged process.
+	 * We should disable any debugging options enabled, and resume
+	 * any suspended queues.
+	 */
+	if (atomic_read(&p->debugged_process_count) > 0) {
+		struct kfd_process *target;
+		unsigned int temp;
+		int idx = srcu_read_lock(&kfd_processes_srcu);
+
+		hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+			if (target->debugger_process &&
+				target->debugger_process == p) {
+				mutex_lock(&target->mutex);
+				if (target->debug_trap_enabled)
+					kfd_dbg_trap_disable(target, false, 0);
+				mutex_unlock(&target->mutex);
+				if (atomic_read(&p->debugged_process_count) == 0)
+					break;
+			}
+		}
+		srcu_read_unlock(&kfd_processes_srcu, idx);
+	}
+
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
 
@@ -1418,6 +1441,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	kfd_event_init_process(process);
 	process->is_32bit_user_mode = in_compat_syscall();
 	process->debug_trap_enabled = false;
+	process->debugger_process = NULL;
+	atomic_set(&process->debugged_process_count, 0);
 
 	process->pasid = kfd_pasid_alloc();
 	if (process->pasid == 0)

@@ -2391,14 +2391,19 @@ void copy_context_work_handler (struct work_struct *work)
 }
 
 int resume_queues(struct kfd_process *p,
+		bool resume_all_queues,
 		uint32_t num_queues,
 		uint32_t *queue_ids)
 {
 	int total_resumed = 0;
 	int i;
 
+	if (!resume_all_queues && queue_ids == NULL)
+		return -EINVAL;
+
 	/* mask all queues as invalid.  unmask per successful request */
-	q_array_invalidate(num_queues, queue_ids);
+	if (!resume_all_queues)
+		q_array_invalidate(num_queues, queue_ids);
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -2411,13 +2416,18 @@ int resume_queues(struct kfd_process *p,
 
 		/* unmask queues that resume or already resumed as valid */
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = q_array_get_index(q->properties.queue_id,
-					num_queues,
-					queue_ids);
+			int q_idx = QUEUE_NOT_FOUND;
 
-			if (q_idx != QUEUE_NOT_FOUND) {
+			if (queue_ids)
+				q_idx = q_array_get_index(
+						q->properties.queue_id,
+						num_queues,
+						queue_ids);
+
+			if (resume_all_queues || q_idx != QUEUE_NOT_FOUND) {
 				resume_single_queue(dqm, &pdd->qpd, q);
-				queue_ids[q_idx] &=
+				if (queue_ids)
+					queue_ids[q_idx] &=
 						~KFD_DBG_QUEUE_INVALID_MASK;
 				per_device_resumed++;
 			}
@@ -2434,16 +2444,18 @@ int resume_queues(struct kfd_process *p,
 					USE_DEFAULT_GRACE_PERIOD);
 		if (r) {
 			pr_err("Failed to resume process queues\n");
-			list_for_each_entry(q, &qpd->queues_list, list) {
-				int q_idx = q_array_get_index(
+			if (!resume_all_queues) {
+				list_for_each_entry(q, &qpd->queues_list, list) {
+					int q_idx = q_array_get_index(
 							q->properties.queue_id,
 							num_queues,
 							queue_ids);
 
-				/* mask queue as error on resume fail */
-				if (q_idx != QUEUE_NOT_FOUND)
-					queue_ids[q_idx] |=
-						KFD_DBG_QUEUE_ERROR_MASK;
+					/* mask queue as error on resume fail */
+					if (q_idx != QUEUE_NOT_FOUND)
+						queue_ids[q_idx] |=
+							KFD_DBG_QUEUE_ERROR_MASK;
+				}
 			}
 		} else {
 			wake_up_all(&dqm->destroy_wait);
