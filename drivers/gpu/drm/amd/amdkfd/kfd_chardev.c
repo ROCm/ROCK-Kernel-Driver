@@ -1766,6 +1766,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			r = kfd_dbg_trap_disable(target, false, 0);
 			break;
 		case 1:
+			if (target != p)
+				target->debugger_process = p;
 			r = kfd_dbg_trap_enable(target, args->data2,
 						&args->data3);
 			if (!r)
@@ -1806,6 +1808,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	case KFD_IOC_DBG_TRAP_NODE_RESUME:
 		r = resume_queues(target,
+				false,
 				data1, /* Number of queues */
 				user_array); /* array of queue ids */
 
