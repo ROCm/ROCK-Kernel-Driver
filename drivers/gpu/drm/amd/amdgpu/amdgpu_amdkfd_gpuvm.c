@@ -1996,6 +1996,68 @@ void amdgpu_amdkfd_gpuvm_unpin_bo(struct kgd_mem *mem)
 #define AMD_GPU_PAGE_SHIFT	PAGE_SHIFT
 #define AMD_GPU_PAGE_SIZE (_AC(1, UL) << AMD_GPU_PAGE_SHIFT)
 
+/**
+ * @get_sg_table_of_mmio_or_doorbel_bo - Builds and returns an instance
+ * of scatter gather table (sg_table) for BO's that represent MMIO or
+ * DOORBELL memory. An example of this is the MMIO BO that is used to
+ * surface HDP registers.
+ *
+ * @note: Per current design and implementation MMIO or DOORBELL BO's
+ * use only one scatterlist node in their sg_table. This is because
+ * the size of backing memory is relatively small (e.g. 4096 bytes
+ * for MMIO BO surfacing HDP registers). Implementation of this method
+ * relies on this design choice.
+ *
+ * The method does the following:
+ *	Acquire address to use in building scatterlist nodes
+ *	Acquire size of memory to use in building scatterlist nodes
+ *	Invoke DMA Map service to obtain DMA'able address
+ *	Access sg_table construction service with above parameters
+ *	Return the handle of scatter gather table
+ *
+ * @adev: GPU device whose MMIO address needs to be exported
+ * @bo: Buffer object representing MMIO/DOORBELL memory e.g. HDP registers
+ * @dma_dev: Handle of peer PCIe device that wishes to access BO's memory
+ * @dir: Direction of data movement from peer PCIe devices perspective
+ *
+ * @sgt: Output parameter that is built and returned
+ *
+ * Return: zero if successful, non-zero otherwise
+ *
+ * @FIXME: This will only work as long as bo->tbo.sg->sgl->dma_address
+ * is not a DMA address but a physical BAR address. This will be reworked
+ * later when we add DMA mapping support for doorbell and MMIO BOs
+ */
+static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
+		struct device *dma_dev, enum dma_data_direction dir,
+		struct sg_table **sgt)
+{
+	dma_addr_t dma_addr;
+	s32 size, ret;
+	u64 addr;
+
+	/* Acquire the address of MMIO or DOORBELL BO being
+	 * exported. By policy the entire backing memory is
+	 * encapsulated in one scatterlist node
+	 */
+	size = bo->tbo.sg->sgl->length;
+	addr = bo->tbo.sg->sgl->dma_address;
+	pr_debug("MMIO/Doorbell address being exported: %llx\n", addr);
+
+	/* DMA map the acquired address - MMIO or DOORBELL */
+	dma_addr = dma_map_resource(dma_dev, addr, size,
+				    dir, DMA_ATTR_SKIP_CPU_SYNC);
+	ret = dma_mapping_error(dma_dev, dma_addr);
+	if (ret)
+		return ret;
+
+	/* Update output parameter with a new sg_table */
+	pr_debug("MMIO/Doorbell BO size: %d\n", size);
+	pr_debug("MMIO/Doorbell's DMA Address: %llx\n", dma_addr);
+	*sgt = create_doorbell_sg(dma_addr, size);
+	return 0;
+}
+
 static int get_sg_table(struct amdgpu_device *adev,
 		struct kgd_mem *mem, uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
@@ -2016,7 +2078,10 @@ static int get_sg_table(struct amdgpu_device *adev,
 	if (size + offset > amdgpu_bo_size(bo))
 		return -EFAULT;
 
-	/* For GPU memory use VRAM Mgr to build SG Table */
+	/* Handle BO (type: ttm_bo_type_device) that is used to surface
+	 * memory resources from GPU's VRAM aperture. The allocation flag
+	 * of BO falls in VRAM domain. Use VRAM Mgr to build SG Table
+	 */
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
 		ret = amdgpu_vram_mgr_alloc_sgt(adev, &bo->tbo.mem, offset,
 						size, dma_dev, dir, &sg);
@@ -2024,7 +2089,24 @@ static int get_sg_table(struct amdgpu_device *adev,
 		return ret;
 	}
 
-	/* Handle SG Table cosntruction for system memory
+	/* Handle BO (type: ttm_bo_type_sg) that is used to surface
+	 * resources from MMIO address space. The allocation flag of
+	 * BO fall in MMIO_REMAP / DOORBELL domain
+	 */
+	if ((bo->tbo.type == ttm_bo_type_sg) &&
+	    ((mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) ||
+	     (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
+		ret = get_sg_table_of_mmio_or_doorbel_bo(bo, dma_dev, dir, &sg);
+		*ret_sg = (ret == 0) ?  sg : NULL;
+		return ret;
+	}
+
+	/* Handle BO (type: ttm_bo_type_device) that is used to surface
+	 * memory resources from GPU's GART aperture. The allocation flag
+	 * of BO falls in GTT domain i.e. the physical backing memory is
+	 * part of system memory. Construction of SG Table proceeds
+	 * as follows:
+	 *
 	 *    Allocate memory for SG Table
 	 *    Determine number of Scatterlist node in table
 	 *       Logic uses one Scatterlist node per PAGE_SIZE
