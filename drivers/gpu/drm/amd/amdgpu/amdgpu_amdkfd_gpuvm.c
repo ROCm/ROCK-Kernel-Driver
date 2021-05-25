@@ -641,6 +641,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 		      struct amdgpu_bo **bo)
 {
 	struct drm_gem_object *gobj;
+	int ret;
 
 	if (!mem->dmabuf) {
 #ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
@@ -651,8 +652,9 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
 				DRM_RDWR : 0);
 		if (IS_ERR(mem->dmabuf)) {
+			ret = PTR_ERR(mem->dmabuf);
 			mem->dmabuf = NULL;
-			return PTR_ERR(mem->dmabuf);
+			return ret;
 		}
 	}
 
