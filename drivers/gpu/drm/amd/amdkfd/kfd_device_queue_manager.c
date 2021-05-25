@@ -2782,6 +2782,10 @@ void copy_context_work_handler (struct work_struct *work)
 
 	p = workarea->p;
 	mm = get_task_mm(p->lead_thread);
+
+	if (!mm)
+		return;
+
 	kthread_use_mm(mm);
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct device_queue_manager *dqm = pdd->dev->dqm;
