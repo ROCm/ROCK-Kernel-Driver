@@ -220,17 +220,21 @@ static int vcn_v2_0_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct amdgpu_ring *ring = &adev->vcn.inst->ring_dec;
-	int i, r;
+	int i, r = -1;
 
 	adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
 					     ring->doorbell_index, 0);
 
-	if (amdgpu_sriov_vf(adev))
+	if (amdgpu_sriov_vf(adev)) {
 		vcn_v2_0_start_sriov(adev);
-
-	r = amdgpu_ring_test_helper(ring);
-	if (r)
-		goto done;
+		if(adev->asic_type == CHIP_NAVI12)
+			ring->sched.ready = false;
+	}
+	else {
+		r = amdgpu_ring_test_helper(ring);
+		if (r)
+			goto done;
+	}
 
 	//Disable vcn decode for sriov
 	if (amdgpu_sriov_vf(adev))
@@ -245,8 +249,11 @@ static int vcn_v2_0_hw_init(void *handle)
 
 done:
 	if (!r)
-		DRM_INFO("VCN decode and encode initialized successfully(under %s).\n",
-			(adev->pg_flags & AMD_PG_SUPPORT_VCN_DPG)?"DPG Mode":"SPG Mode");
+		DRM_INFO("VCN %s encode initialized successfully(under %s).\n",
+			(adev->asic_type == CHIP_NAVI12 &&
+				amdgpu_sriov_vf(adev))?"":"decode and",
+			(adev->pg_flags &
+				AMD_PG_SUPPORT_VCN_DPG)?"DPG Mode":"SPG Mode");
 
 	return r;
 }
@@ -1718,9 +1725,6 @@ int vcn_v2_0_dec_ring_test_ring(struct amdgpu_ring *ring)
 	uint32_t tmp = 0;
 	unsigned i;
 	int r;
-
-	if (amdgpu_sriov_vf(adev))
-		return 0;
 
 	WREG32(adev->vcn.inst[ring->me].external.scratch9, 0xCAFEDEAD);
 	r = amdgpu_ring_alloc(ring, 4);

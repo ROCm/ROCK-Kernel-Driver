@@ -427,7 +427,9 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
 			if (adev->uvd.harvest_config & (1 << i))
 				continue;
 
-			if (adev->vcn.inst[i].ring_dec.sched.ready)
+			if (adev->vcn.inst[i].ring_dec.sched.ready ||
+				(adev->asic_type == CHIP_NAVI12 &&
+				amdgpu_sriov_vf(adev)))
 				++num_rings;
 		}
 		ib_start_alignment = 16;
@@ -785,11 +787,9 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		dev_info->_pad = 0;
 		dev_info->ids_flags = 0;
 		if (adev->flags & AMD_IS_APU)
-			dev_info->ids_flags |= AMDGPU_IDS_FLAGS_FUSION;
-		if (amdgpu_mcbp || amdgpu_sriov_vf(adev))
-			dev_info->ids_flags |= AMDGPU_IDS_FLAGS_PREEMPTION;
-		if (amdgpu_is_tmz(adev))
-			dev_info->ids_flags |= AMDGPU_IDS_FLAGS_TMZ;
+			dev_info.ids_flags |= AMDGPU_IDS_FLAGS_FUSION;
+		if (amdgpu_mcbp || (amdgpu_sriov_vf(adev)))
+			dev_info.ids_flags |= AMDGPU_IDS_FLAGS_PREEMPTION;
 
 		vm_size = adev->vm_manager.max_pfn * AMDGPU_GPU_PAGE_SIZE;
 		vm_size -= AMDGPU_VA_RESERVED_SIZE;
