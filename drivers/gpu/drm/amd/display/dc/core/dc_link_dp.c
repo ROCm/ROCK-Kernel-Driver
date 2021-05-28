@@ -1335,10 +1335,12 @@ static inline void decide_8b_10b_training_settings(
 	else
 		lt_settings->enhanced_framing = 1;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable != NULL)
 		lt_settings->should_set_fec_ready = *link->preferred_training_settings.fec_enable;
 	else
 		lt_settings->should_set_fec_ready = true;
+#endif
 }
 
 void dp_decide_training_settings(
@@ -1731,7 +1733,9 @@ enum link_training_result dc_link_dp_perform_link_training(
 
 	/* configure link prior to entering training mode */
 	dpcd_configure_lttpr_mode(link, &lt_settings);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	dp_set_fec_ready(link, lt_settings.should_set_fec_ready);
+#endif
 	dpcd_configure_channel_coding(link, &lt_settings);
 
 	/* enter training mode:
