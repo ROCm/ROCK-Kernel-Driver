@@ -28,6 +28,7 @@
 
 #include "dm_services_types.h"
 #include "dc.h"
+#include "dc_link_dp.h"
 #include "dc/inc/core_types.h"
 #include "dal_asic_id.h"
 #include "dmub/dmub_srv.h"
@@ -2911,6 +2912,7 @@ static void handle_hpd_rx_irq(void *param)
 	enum dc_connection_type new_connection_type = dc_connection_none;
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	union hpd_irq_data hpd_irq_data;
+	bool lock_flag = 0;
 
 	memset(&hpd_irq_data, 0, sizeof(hpd_irq_data));
 
@@ -2940,15 +2942,28 @@ static void handle_hpd_rx_irq(void *param)
 		}
 	}
 
-	if (!amdgpu_in_reset(adev)) {
+	/*
+	 * TODO: We need the lock to avoid touching DC state while it's being
+	 * modified during automated compliance testing, or when link loss
+	 * happens. While this should be split into subhandlers and proper
+	 * interfaces to avoid having to conditionally lock like this in the
+	 * outer layer, we need this workaround temporarily to allow MST
+	 * lightup in some scenarios to avoid timeout.
+	 */
+	if (!amdgpu_in_reset(adev) &&
+	    (hpd_rx_irq_check_link_loss_status(dc_link, &hpd_irq_data) ||
+	     hpd_irq_data.bytes.device_service_irq.bits.AUTOMATED_TEST)) {
 		mutex_lock(&adev->dm.dc_lock);
+		lock_flag = 1;
+	}
+
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 	result = dc_link_handle_hpd_rx_irq(dc_link, &hpd_irq_data, NULL);
 #else
 	result = dc_link_handle_hpd_rx_irq(dc_link, NULL, NULL);
 #endif
+	if (!amdgpu_in_reset(adev) && lock_flag)
 		mutex_unlock(&adev->dm.dc_lock);
-	}
 
 out:
 	if (result && !is_mst_root_connector) {
@@ -3662,15 +3677,15 @@ static u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *cap
 
 #endif
 
-static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
+static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
+					 u32 user_brightness)
 {
-	struct amdgpu_display_manager *dm = bl_get_data(bd);
 	struct amdgpu_dm_backlight_caps caps;
 #ifdef HAVE_HDR_SINK_METADATA
 	struct dc_link *link[AMDGPU_DM_MAX_NUM_EDP];
-	u32 brightness;
+	u32 brightness[AMDGPU_DM_MAX_NUM_EDP];
 #else
-	uint32_t brightness = bd->props.brightness;
+	uint32_t brightness = user_brightness;
 #endif
 	bool rc;
 	int i;
@@ -3679,14 +3694,16 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 	caps = dm->backlight_caps;
 
 #ifdef HAVE_HDR_SINK_METADATA
-	for (i = 0; i < dm->num_of_edps; i++)
+	for (i = 0; i < dm->num_of_edps; i++) {
+		dm->brightness[i] = user_brightness;
+		brightness[i] = convert_brightness_from_user(&caps, dm->brightness[i]);
 		link[i] = (struct dc_link *)dm->backlight_link[i];
+	}
 
-	brightness = convert_brightness_from_user(&caps, bd->props.brightness);
-	// Change brightness based on AUX property
+	/* Change brightness based on AUX property */
 	if (caps.aux_support) {
 		for (i = 0; i < dm->num_of_edps; i++) {
-			rc = dc_link_set_backlight_level_nits(link[i], true, brightness,
+			rc = dc_link_set_backlight_level_nits(link[i], true, brightness[i],
 				AUX_BL_DEFAULT_TRANSITION_TIME_MS);
 			if (!rc) {
 				DRM_ERROR("DM: Failed to update backlight via AUX on eDP[%d]\n", i);
@@ -3695,7 +3712,7 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 		}
 	} else {
 		for (i = 0; i < dm->num_of_edps; i++) {
-			rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness, 0);
+			rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness[i], 0);
 			if (!rc) {
 				DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", i);
 				break;
@@ -3732,9 +3749,17 @@ static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 #endif
 }
 
-static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
+static int amdgpu_dm_backlight_update_status(struct backlight_device *bd)
 {
 	struct amdgpu_display_manager *dm = bl_get_data(bd);
+
+	amdgpu_dm_backlight_set_level(dm, bd->props.brightness);
+
+	return 0;
+}
+
+static u32 amdgpu_dm_backlight_get_level(struct amdgpu_display_manager *dm)
+{
 	struct amdgpu_dm_backlight_caps caps;
 
 	amdgpu_dm_update_backlight_caps(dm);
@@ -3748,20 +3773,27 @@ static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
 
 		rc = dc_link_get_backlight_level_nits(link, &avg, &peak);
 		if (!rc)
-			return bd->props.brightness;
+			return dm->brightness[0];
 		return convert_brightness_to_user(&caps, avg);
 	} else {
 #endif
 		int ret = dc_link_get_backlight_level(dm->backlight_link[0]);
 
 		if (ret == DC_ERROR_UNEXPECTED)
-			return bd->props.brightness;
+			return dm->brightness[0];
 #ifdef HAVE_HDR_SINK_METADATA
 		return convert_brightness_to_user(&caps, ret);
 	}
 #else
 		return ret;
 #endif
+}
+
+static int amdgpu_dm_backlight_get_brightness(struct backlight_device *bd)
+{
+	struct amdgpu_display_manager *dm = bl_get_data(bd);
+
+	return amdgpu_dm_backlight_get_level(dm);
 }
 
 static const struct backlight_ops amdgpu_dm_backlight_ops = {
@@ -3775,8 +3807,11 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
 	struct backlight_properties props = { 0 };
+	int i;
 
 	amdgpu_dm_update_backlight_caps(dm);
+	for (i = 0; i < dm->num_of_edps; i++)
+		dm->brightness[i] = AMDGPU_MAX_BL_LEVEL;
 
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 	props.brightness = AMDGPU_MAX_BL_LEVEL;
@@ -10188,6 +10223,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	amdgpu_dm_commit_audio(dev, state);
 #endif
 
+#if defined(CONFIG_BACKLIGHT_CLASS_DEVICE) ||		\
+	defined(CONFIG_BACKLIGHT_CLASS_DEVICE_MODULE)
+	/* restore the backlight level */
+	if (dm->backlight_dev)
+		amdgpu_dm_backlight_set_level(dm, dm->brightness[0]);
+#endif
 	/*
 	 * send vblank event on all events not handled in flip and
 	 * mark consumed event for drm_atomic_helper_commit_hw_done

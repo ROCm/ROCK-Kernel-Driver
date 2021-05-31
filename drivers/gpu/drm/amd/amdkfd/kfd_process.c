@@ -1531,6 +1531,9 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	kfd_spm_init_process_device(pdd);
 	p->pdds[p->n_pdds++] = pdd;
+	if (kfd_dbg_is_per_vmid_supported(pdd->dev))
+		pdd->spi_dbg_override = pdd->dev->kfd2kgd->disable_debug_trap(
+							pdd->dev->kgd, 0);
 
 	/* Init idr used for memory handle translation */
 	idr_init(&pdd->alloc_idr);
@@ -2171,7 +2174,7 @@ void kfd_flush_tlb(struct kfd_process_device *pdd)
 							pdd->qpd.vmid);
 	} else {
 		amdgpu_amdkfd_flush_gpu_tlb_pasid(dev->kgd,
-						pdd->process->pasid);
+					pdd->process->pasid, TLB_FLUSH_LEGACY);
 	}
 }
 

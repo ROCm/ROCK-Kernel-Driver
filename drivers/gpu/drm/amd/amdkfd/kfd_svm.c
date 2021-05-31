@@ -1086,7 +1086,7 @@ svm_range_unmap_from_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	return amdgpu_vm_bo_update_mapping(adev, adev, vm, false, true, NULL,
 					   start, last, init_pte_value, 0,
-					   NULL, NULL, NULL, fence,
+					   NULL, NULL, fence, NULL,
 					   adev->vm_manager.vram_base_offset);
 }
 
@@ -1128,7 +1128,7 @@ svm_range_unmap_from_gpus(struct svm_range *prange, unsigned long start,
 				break;
 		}
 		amdgpu_amdkfd_flush_gpu_tlb_pasid((struct kgd_dev *)adev,
-						  p->pasid);
+					p->pasid, TLB_FLUSH_HEAVYWEIGHT);
 	}
 
 	return r;
@@ -1141,6 +1141,7 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 {
 	uint64_t vram_base_offset = 0;
 	struct amdgpu_bo_va bo_va;
+	bool table_freed = false;
 	uint64_t pte_flags;
 	int r = 0;
 
@@ -1163,9 +1164,8 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 					prange->mapping.last, pte_flags,
 					prange->mapping.offset,
 					prange->ttm_res,
-					prange->ttm_res ?
-						prange->ttm_res->mm_node : NULL,
 					dma_addr, &vm->last_update,
+					&table_freed,
 					vram_base_offset);
 	if (r) {
 		pr_debug("failed %d to map to gpu 0x%lx\n", r, prange->start);
@@ -1182,6 +1182,13 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (fence)
 		*fence = dma_fence_get(vm->last_update);
 
+	if (table_freed) {
+		struct kfd_process *p;
+
+		p = container_of(prange->svms, struct kfd_process, svms);
+		amdgpu_amdkfd_flush_gpu_tlb_pasid((struct kgd_dev *)adev,
+						p->pasid, TLB_FLUSH_LEGACY);
+	}
 out:
 	prange->mapping.bo_va = NULL;
 	return r;
@@ -1238,9 +1245,6 @@ static int svm_range_map_to_gpus(struct svm_range *prange,
 				break;
 			}
 		}
-
-		amdgpu_amdkfd_flush_gpu_tlb_pasid((struct kgd_dev *)adev,
-						  p->pasid);
 	}
 
 	return r;
