@@ -964,7 +964,7 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 	bp.domain = AMDGPU_GEM_DOMAIN_GTT;
 	bp.flags = AMDGPU_GEM_CREATE_CPU_GTT_USWC;
 	bp.type = ttm_bo_type_kernel;
-	bp.resv = bo->tbo.base.resv;
+	bp.resv = amdkcl_ttm_resvp(&bo->tbo);
 	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
 
 	r = amdgpu_bo_create(adev, &bp, &(*vmbo)->shadow);
