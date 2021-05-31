@@ -74,9 +74,6 @@ struct amdgpu_mn {
 	struct mmu_notifier	mn;
 	enum amdgpu_mn_type	type;
 
-	/* only used on destruction */
-	struct work_struct	work;
-
 	/* protected by adev->mn_lock */
 	struct hlist_node	node;
 
@@ -122,13 +119,12 @@ static void amdgpu_mn_free(struct rcu_head *rcu)
 /**
  * amdgpu_mn_destroy - destroy the MMU notifier
  *
- * @work: previously sheduled work item
+ * @amn: our notifier
  *
- * Lazy destroys the notifier from a work item
+ * Destroy the notifier
  */
-static void amdgpu_mn_destroy(struct work_struct *work)
+static void amdgpu_mn_destroy(struct amdgpu_mn *amn)
 {
-	struct amdgpu_mn *amn = container_of(work, struct amdgpu_mn, work);
 	struct amdgpu_device *adev = amn->adev;
 	struct amdgpu_mn_node *node, *next_node;
 	struct amdgpu_bo *bo, *next_bo;
@@ -173,15 +169,14 @@ static void amdgpu_mn_destroy(struct work_struct *work)
  * @mn: our notifier
  * @mm: the mm this callback is about
  *
- * Shedule a work item to lazy destroy our notifier.
+ * Destroy our notifier.
  */
 static void amdgpu_mn_release(struct mmu_notifier *mn,
 			      struct mm_struct *mm)
 {
 	struct amdgpu_mn *amn = container_of(mn, struct amdgpu_mn, mn);
 
-	INIT_WORK(&amn->work, amdgpu_mn_destroy);
-	schedule_work(&amn->work);
+	amdgpu_mn_destroy(amn);
 }
 
 
