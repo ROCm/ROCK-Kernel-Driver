@@ -676,38 +676,6 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 }
 #endif
 
-/**
- * @kfd_mem_attach_vram_bo: Acquires the handle of a VRAM BO that could
- * be used to enable a peer GPU access it
- *
- * Implementation determines if access to VRAM BO would employ DMABUF
- * or Shared BO mechanism. Employ DMABUF mechanism if kernel has config
- * option DMABUF_MOVE_NOTIFY enabled. Employ Shared BO mechanism if above
- * config option is not set. It is important to note that a Shared BO
- * cannot be used to enable peer acces if system has IOMMU enabled
- *
- * @TODO: ADD Check to ensure IOMMU is not enabled. Should this check
- * be somewhere as this is information could be useful in other places
- */
-static int kfd_mem_attach_vram_bo(struct amdgpu_device *adev,
-			struct kgd_mem *mem, struct amdgpu_bo **bo,
-			struct kfd_mem_attachment *attachment)
-{
-	int ret =  0;
-
-#ifdef CONFIG_DMABUF_MOVE_NOTIFY
-	attachment->type = KFD_MEM_ATT_DMABUF;
-	ret = kfd_mem_attach_dmabuf(adev, mem, bo);
-	pr_debug("Employ DMABUF mechanim to enable peer GPU access\n");
-#else
-	*bo = mem->bo;
-	attachment->type = KFD_MEM_ATT_SHARED;
-	drm_gem_object_get(&(*bo)->tbo.base);
-	pr_debug("Employ Shared BO mechanim to enable peer GPU access\n");
-#endif
-	return ret;
-}
-
 /* kfd_mem_attach - Add a BO to a VM
  *
  * Everything that needs to bo done only once when a BO is first added
@@ -729,25 +697,12 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 	uint64_t va = mem->va;
 	struct kfd_mem_attachment *attachment[2] = {NULL, NULL};
 	struct amdgpu_bo *bo[2] = {NULL, NULL};
-	bool same_hive, peer_access;
 	int i, ret;
 
 	if (!va) {
 		pr_err("Invalid VA when adding BO to VM\n");
 		return -EINVAL;
 	}
-
-	/* Determine if the two devices belong to same set */
-	same_hive = amdgpu_xgmi_same_hive(adev, bo_adev);
-
-	/* Determine if peer device can't access BO. Devices that
-	 * belong to the same xGMI hive can access each other BO's
-	 * implicitly. Devices that are connected via PCIe are not
-	 * granted automatic access.
-	 */
-	peer_access = amdgpu_device_is_peer_accessible(bo_adev, adev);
-	if (!same_hive && !peer_access)
-		return -EINVAL;
 
 	for (i = 0; i <= is_aql; i++) {
 		attachment[i] = kzalloc(sizeof(*attachment[i]), GFP_KERNEL);
@@ -759,8 +714,8 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 		pr_debug("\t add VA 0x%llx - 0x%llx to vm %p\n", va,
 			 va + bo_size, vm);
 
-		if (adev == bo_adev ||
-		    (same_hive && mem->domain == AMDGPU_GEM_DOMAIN_VRAM)) {
+		if (adev == bo_adev || (mem->domain == AMDGPU_GEM_DOMAIN_VRAM &&
+					amdgpu_xgmi_same_hive(adev, bo_adev))) {
 			/* Mappings on the local GPU and VRAM mappings in the
 			 * local hive share the original BO
 			 */
@@ -790,13 +745,6 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			if (ret)
 				goto unwind;
 #endif
-		/* Enable peer acces to VRAM BO's */
-		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM &&
-			   mem->bo->tbo.type == ttm_bo_type_device) {
-			ret = kfd_mem_attach_vram_bo(adev, mem,
-						&bo[i], attachment[i]);
-			if (ret)
-				goto unwind;
 		} else {
 			/* FIXME: Need to DMA-map other BO types:
 			 * large-BAR VRAM, doorbells, MMIO remap
