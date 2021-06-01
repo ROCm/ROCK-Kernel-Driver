@@ -1666,7 +1666,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		if (WARN_ON_ONCE(!peer_pdd))
 			continue;
 		if (!amdgpu_read_lock(peer->ddev, true)) {
-			kfd_flush_tlb(peer_pdd);
+			kfd_flush_tlb(peer_pdd, TLB_FLUSH_LEGACY);
 			amdgpu_read_unlock(peer->ddev);
 		}
 	}
