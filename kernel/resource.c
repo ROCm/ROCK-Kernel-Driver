@@ -772,6 +772,7 @@ struct resource *lookup_resource(struct resource *root, resource_size_t start)
 
 	return res;
 }
+EXPORT_SYMBOL_GPL(lookup_resource);
 
 /*
  * Insert a resource into the resource tree. If successful, return NULL,
