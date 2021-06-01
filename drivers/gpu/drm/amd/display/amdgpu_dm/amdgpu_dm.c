@@ -331,9 +331,8 @@ get_crtc_by_otg_inst(struct amdgpu_device *adev,
 	struct drm_crtc *crtc;
 	struct amdgpu_crtc *amdgpu_crtc;
 
-	if (WARN_ON(otg_inst == -1)) {
+	if (WARN_ON(otg_inst == -1))
 		return adev->mode_info.crtcs[0];
-	}
 
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		amdgpu_crtc = to_amdgpu_crtc(crtc);
