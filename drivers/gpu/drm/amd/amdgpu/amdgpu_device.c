@@ -377,9 +377,9 @@ void amdgpu_device_vram_access(struct amdgpu_device *adev, loff_t pos,
 		if (write) {
 			memcpy_toio(addr, buf, count);
 			mb();
-			amdgpu_asic_flush_hdp(adev, NULL);
+			amdgpu_device_flush_hdp(adev, NULL);
 		} else {
-			amdgpu_asic_invalidate_hdp(adev, NULL);
+			amdgpu_device_invalidate_hdp(adev, NULL);
 			mb();
 			memcpy_fromio(buf, addr, count);
 		}
@@ -5571,4 +5571,33 @@ bool amdgpu_device_is_headless(struct amdgpu_device *adev)
 
     /* Check if it is NV's VGA class while VCN is harvest, it is headless*/
     return nv_is_headless_sku(adev->pdev);
+}
+
+void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
+		struct amdgpu_ring *ring)
+{
+#ifdef CONFIG_X86_64
+	if (adev->flags & AMD_IS_APU)
+		return;
+#endif
+	if (adev->gmc.xgmi.connected_to_cpu)
+		return;
+
+	if (ring && ring->funcs->emit_hdp_flush)
+		amdgpu_ring_emit_hdp_flush(ring);
+	else
+		amdgpu_asic_flush_hdp(adev, ring);
+}
+
+void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
+		struct amdgpu_ring *ring)
+{
+#ifdef CONFIG_X86_64
+	if (adev->flags & AMD_IS_APU)
+		return;
+#endif
+	if (adev->gmc.xgmi.connected_to_cpu)
+		return;
+
+	amdgpu_asic_invalidate_hdp(adev, ring);
 }
