@@ -11271,8 +11271,12 @@ static int validate_overlay(struct drm_atomic_state *state)
 	/* Check if primary plane is contained inside overlay */
 #if !defined(for_each_new_plane_in_state_reverse)
 	struct drm_plane_state *old_plane_state;
+#ifdef for_each_oldnew_plane_in_state_reverse
+	for_each_oldnew_plane_in_state_reverse(state, plane, old_plane_state, new_plane_state, i) {
+#else
 	for_each_plane_in_state(state, plane, old_plane_state, i) {
 		new_plane_state = plane->state;
+#endif
 #else
 	for_each_new_plane_in_state_reverse(state, plane, new_plane_state, i) {
 #endif
