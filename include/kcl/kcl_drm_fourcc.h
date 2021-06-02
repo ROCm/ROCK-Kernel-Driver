@@ -214,4 +214,17 @@
 #define DRM_FORMAT_ABGR16161616F fourcc_code('A', 'B', '4', 'H') /* [63:0] A:B:G:R 16:16:16:16 little endian */
 #endif
 
+
+/* 64 bpp RGB */
+#ifndef DRM_FORMAT_XRGB16161616
+/* Copied from v5.11-3544-ga2fe23ecdbb7 */
+#define DRM_FORMAT_XRGB16161616	fourcc_code('X', 'R', '4', '8') /* [63:0] x:R:G:B 16:16:16:16 little endian */
+#define DRM_FORMAT_XBGR16161616	fourcc_code('X', 'B', '4', '8') /* [63:0] x:B:G:R 16:16:16:16 little endian */
+#endif
+
+#ifndef DRM_FORMAT_ARGB16161616
+#define DRM_FORMAT_ARGB16161616	fourcc_code('A', 'R', '4', '8') /* [63:0] A:R:G:B 16:16:16:16 little endian */
+#define DRM_FORMAT_ABGR16161616	fourcc_code('A', 'B', '4', '8') /* [63:0] A:B:G:R 16:16:16:16 little endian */
+#endif
+
 #endif /* KCL_KCL_DRM_FOURCC_H */
