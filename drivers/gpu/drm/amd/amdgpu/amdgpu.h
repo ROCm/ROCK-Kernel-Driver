@@ -1366,6 +1366,11 @@ void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring);
 
+void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
+		struct amdgpu_ring *ring);
+void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
+		struct amdgpu_ring *ring);
+
 /* atpx handler */
 #if defined(CONFIG_VGA_SWITCHEROO)
 void amdgpu_register_atpx_handler(void);
