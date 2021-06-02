@@ -141,6 +141,11 @@ void kcl_drm_err(const char *format, ...);
 void drm_dev_dbg(const struct device *dev, int category, const char *format, ...);
 #endif
 
+#if !defined(drm_dbg_atomic)
+#define drm_dbg_atomic(drm, fmt, ...)                                   \
+        drm_dev_dbg((drm)->dev, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)
+#endif
+
 #if !defined(drm_dbg_kms)
 #define drm_dbg_kms(drm, fmt, ...)				\
 	drm_dev_dbg((drm)->dev, 0x04, fmt, ##__VA_ARGS__)
