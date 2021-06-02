@@ -103,12 +103,11 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 	packet->bitfields14.num_oac = qpd->num_oac;
 	packet->bitfields14.sdma_enable = 1;
 	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
-
-	if (pdd->process->debug_trap_enabled) {
-		packet->spi_gdbg_per_vmid_cntl =
-				pdd->spi_dbg_override |
+	/* TRAP_EN is set on boot so keep it set in non-debug mode. */
+	packet->spi_gdbg_per_vmid_cntl = pdd->spi_dbg_override |
 						pdd->spi_dbg_launch_mode;
 
+	if (pdd->process->debug_trap_enabled) {
 		for (i = 0; i < kfd->device_info->num_of_watch_points; i++)
 			packet->tcp_watch_cntl[i] = pdd->watch_points[i];
 

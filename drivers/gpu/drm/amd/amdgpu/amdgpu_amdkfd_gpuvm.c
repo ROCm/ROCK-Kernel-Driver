@@ -622,13 +622,12 @@ kfd_mem_attach_userptr(struct amdgpu_device *adev, struct kgd_mem *mem,
 
 	ret = amdgpu_gem_object_create(adev, bo_size, 1,
 				       AMDGPU_GEM_DOMAIN_CPU,
-				       0, ttm_bo_type_sg,
+				       AMDGPU_GEM_CREATE_PREEMPTIBLE, ttm_bo_type_sg,
 				       amdkcl_ttm_resvp(&mem->bo->tbo),
 				       &gobj);
+	amdgpu_bo_unreserve(mem->bo);
 	if (ret)
 		return ret;
-
-	amdgpu_bo_unreserve(mem->bo);
 
 	*bo = gem_to_amdgpu_bo(gobj);
 	(*bo)->parent = amdgpu_bo_ref(mem->bo);
@@ -642,6 +641,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 		      struct amdgpu_bo **bo)
 {
 	struct drm_gem_object *gobj;
+	int ret;
 
 	if (!mem->dmabuf) {
 #ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
@@ -652,8 +652,9 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
 				DRM_RDWR : 0);
 		if (IS_ERR(mem->dmabuf)) {
+			ret = PTR_ERR(mem->dmabuf);
 			mem->dmabuf = NULL;
-			return PTR_ERR(mem->dmabuf);
+			return ret;
 		}
 	}
 
@@ -668,6 +669,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 	dma_buf_put(mem->dmabuf);
 
 	*bo = gem_to_amdgpu_bo(gobj);
+	(*bo)->flags |= AMDGPU_GEM_CREATE_PREEMPTIBLE;
 	(*bo)->parent = amdgpu_bo_ref(mem->bo);
 
 	return 0;
@@ -1469,7 +1471,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
 		domain = AMDGPU_GEM_DOMAIN_GTT;
 		alloc_domain = AMDGPU_GEM_DOMAIN_CPU;
-		alloc_flags = 0;
+		alloc_flags = AMDGPU_GEM_CREATE_PREEMPTIBLE;
 		if (!offset || !*offset)
 			return -EINVAL;
 		user_addr = untagged_addr(*offset);

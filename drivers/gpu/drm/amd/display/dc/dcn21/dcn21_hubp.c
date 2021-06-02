@@ -795,10 +795,10 @@ bool hubp21_program_surface_flip_and_addr(
 	flip_regs.tmz_surface = address->tmz_surface;
 	flip_regs.immediate = flip_immediate;
 
-		if (hubp->ctx->dc->debug.enable_dmcub_surface_flip && address->type == PLN_ADDR_TYPE_VIDEO_PROGRESSIVE)
-			dmcub_PLAT_54186_wa(hubp, &flip_regs);
-		else
-			program_surface_flip_and_addr(hubp, &flip_regs);
+	if (hubp->ctx->dc->debug.enable_dmcub_surface_flip && address->type == PLN_ADDR_TYPE_VIDEO_PROGRESSIVE)
+		dmcub_PLAT_54186_wa(hubp, &flip_regs);
+	else
+		program_surface_flip_and_addr(hubp, &flip_regs);
 
 	hubp->request_address = *address;
 

@@ -2681,14 +2681,14 @@ static void commit_planes_for_stream(struct dc *dc,
 						top_pipe_to_program->stream_res.tg);
 		}
 
-		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-			dc->hwss.interdependent_update_lock(dc, context, true);
-		else
-			/* Lock the top pipe while updating plane addrs, since freesync requires
-			 *  plane addr update event triggers to be synchronized.
-			 *  top_pipe_to_program is expected to never be NULL
-			 */
-			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, true);
+	else
+		/* Lock the top pipe while updating plane addrs, since freesync requires
+		 *  plane addr update event triggers to be synchronized.
+		 *  top_pipe_to_program is expected to never be NULL
+		 */
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, true);
 
 	// Stream updates
 	if (stream_update)
@@ -2706,10 +2706,10 @@ static void commit_planes_for_stream(struct dc *dc,
 			dc->hwss.program_front_end_for_ctx(dc, context);
 #endif
 
-			if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-				dc->hwss.interdependent_update_lock(dc, context, false);
-			else
-				dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+			dc->hwss.interdependent_update_lock(dc, context, false);
+		else
+			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 		dc->hwss.post_unlock_program_front_end(dc, context);
 		return;
 	}
@@ -2846,10 +2846,10 @@ static void commit_planes_for_stream(struct dc *dc,
 
 	}
 
-		if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
-			dc->hwss.interdependent_update_lock(dc, context, false);
-		else
-			dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
+	if ((update_type != UPDATE_TYPE_FAST) && dc->hwss.interdependent_update_lock)
+		dc->hwss.interdependent_update_lock(dc, context, false);
+	else
+		dc->hwss.pipe_control_lock(dc, top_pipe_to_program, false);
 
 	if ((update_type != UPDATE_TYPE_FAST) && stream->update_flags.bits.dsc_changed)
 		if (top_pipe_to_program->stream_res.tg->funcs->lock_doublebuffer_enable) {
@@ -2895,8 +2895,8 @@ static void commit_planes_for_stream(struct dc *dc,
 				pipe_ctx->plane_state->skip_manual_trigger)
 			continue;
 
-			if (pipe_ctx->stream_res.tg->funcs->program_manual_trigger)
-				pipe_ctx->stream_res.tg->funcs->program_manual_trigger(pipe_ctx->stream_res.tg);
+		if (pipe_ctx->stream_res.tg->funcs->program_manual_trigger)
+			pipe_ctx->stream_res.tg->funcs->program_manual_trigger(pipe_ctx->stream_res.tg);
 	}
 }
 
@@ -3421,18 +3421,10 @@ void dc_hardware_release(struct dc *dc)
 #endif
 
 /**
- *****************************************************************************
- *  Function: dc_enable_dmub_notifications
+ * dc_enable_dmub_notifications - Returns whether dmub notification can be enabled
+ * @dc: dc structure
  *
- *  @brief
- *		Returns whether dmub notification can be enabled
- *
- *  @param
- *		[in] dc: dc structure
- *
- *	@return
- *		True to enable dmub notifications, False otherwise
- *****************************************************************************
+ * Returns: True to enable dmub notifications, False otherwise
  */
 bool dc_enable_dmub_notifications(struct dc *dc)
 {
@@ -3441,21 +3433,13 @@ bool dc_enable_dmub_notifications(struct dc *dc)
 }
 
 /**
- *****************************************************************************
- *  Function: dc_process_dmub_aux_transfer_async
+ * dc_process_dmub_aux_transfer_async - Submits aux command to dmub via inbox message
+ *                                      Sets port index appropriately for legacy DDC
+ * @dc: dc structure
+ * @link_index: link index
+ * @payload: aux payload
  *
- *  @brief
- *		Submits aux command to dmub via inbox message
- *		Sets port index appropriately for legacy DDC
- *
- *  @param
- *		[in] dc: dc structure
- *		[in] link_index: link index
- *		[in] payload: aux payload
- *
- *	@return
- *		True if successful, False if failure
- *****************************************************************************
+ * Returns: True if successful, False if failure
  */
 bool dc_process_dmub_aux_transfer_async(struct dc *dc,
 				uint32_t link_index,
@@ -3514,16 +3498,8 @@ bool dc_process_dmub_aux_transfer_async(struct dc *dc,
 }
 
 /**
- *****************************************************************************
- *  Function: dc_disable_accelerated_mode
- *
- *  @brief
- *		disable accelerated mode
- *
- *  @param
- *		[in] dc: dc structure
- *
- *****************************************************************************
+ * dc_disable_accelerated_mode - disable accelerated mode
+ * @dc: dc structure
  */
 void dc_disable_accelerated_mode(struct dc *dc)
 {

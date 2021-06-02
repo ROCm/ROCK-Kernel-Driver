@@ -31,8 +31,9 @@
 #define AMDGPU_PL_GDS		(TTM_PL_PRIV + 0)
 #define AMDGPU_PL_GWS		(TTM_PL_PRIV + 1)
 #define AMDGPU_PL_OA		(TTM_PL_PRIV + 2)
-#define AMDGPU_PL_DGMA		(TTM_PL_PRIV + 3)
-#define AMDGPU_PL_DGMA_IMPORT	(TTM_PL_PRIV + 4)
+#define AMDGPU_PL_PREEMPT	(TTM_PL_PRIV + 3)
+#define AMDGPU_PL_DGMA		(TTM_PL_PRIV + 4)
+#define AMDGPU_PL_DGMA_IMPORT	(TTM_PL_PRIV + 5)
 
 #define AMDGPU_GTT_MAX_TRANSFER_SIZE	512
 #define AMDGPU_GTT_NUM_TRANSFER_WINDOWS	2
@@ -63,6 +64,11 @@ struct amdgpu_dgma_import_mgr {
 	atomic64_t available;
 };
 
+struct amdgpu_preempt_mgr {
+	struct ttm_resource_manager manager;
+	atomic64_t used;
+};
+
 struct amdgpu_mman {
 	struct ttm_device		bdev;
 	bool				initialized;
@@ -80,6 +86,7 @@ struct amdgpu_mman {
 	struct amdgpu_vram_mgr vram_mgr;
 	struct amdgpu_gtt_mgr gtt_mgr;
 	struct amdgpu_dgma_import_mgr dgma_import_mgr;
+	struct amdgpu_preempt_mgr preempt_mgr;
 
 	uint64_t		stolen_vga_size;
 	struct amdgpu_bo	*stolen_vga_memory;
@@ -107,12 +114,16 @@ struct amdgpu_copy_mem {
 
 int amdgpu_gtt_mgr_init(struct amdgpu_device *adev, uint64_t gtt_size);
 void amdgpu_gtt_mgr_fini(struct amdgpu_device *adev);
+int amdgpu_preempt_mgr_init(struct amdgpu_device *adev);
+void amdgpu_preempt_mgr_fini(struct amdgpu_device *adev);
 int amdgpu_vram_mgr_init(struct amdgpu_device *adev);
 void amdgpu_vram_mgr_fini(struct amdgpu_device *adev);
 
 bool amdgpu_gtt_mgr_has_gart_addr(struct ttm_resource *mem);
 uint64_t amdgpu_gtt_mgr_usage(struct ttm_resource_manager *man);
 int amdgpu_gtt_mgr_recover(struct ttm_resource_manager *man);
+
+uint64_t amdgpu_preempt_mgr_usage(struct ttm_resource_manager *man);
 
 u64 amdgpu_vram_mgr_bo_visible_size(struct amdgpu_bo *bo);
 int amdgpu_vram_mgr_alloc_sgt(struct amdgpu_device *adev,

@@ -638,14 +638,14 @@ static void dm_crtc_high_irq(void *interrupt_params)
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 /**
  * dm_dcn_vertical_interrupt0_high_irq() - Handles OTG Vertical interrupt0 for
  * DCN generation ASICs
- * @interrupt params - interrupt parameters
+ * @interrupt_params: interrupt parameters
  *
  * Used to set crc window/read out crc value at vertical line 0 position
  */
-#if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
 {
 	struct common_irq_params *irq_params = interrupt_params;
@@ -1029,7 +1029,8 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 		abm->dmcu_is_running = dmcu->funcs->is_dmcu_initialized(dmcu);
 	}
 
-	adev->dm.dc->ctx->dmub_srv = dc_dmub_srv_create(adev->dm.dc, dmub_srv);
+	if (!adev->dm.dc->ctx->dmub_srv)
+		adev->dm.dc->ctx->dmub_srv = dc_dmub_srv_create(adev->dm.dc, dmub_srv);
 	if (!adev->dm.dc->ctx->dmub_srv) {
 		DRM_ERROR("Couldn't allocate DC DMUB server!\n");
 		return -ENOMEM;
@@ -1384,10 +1385,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 	}
 #endif
 
-	if (adev->dm.dc->ctx->dmub_srv) {
-		dc_dmub_srv_destroy(&adev->dm.dc->ctx->dmub_srv);
-		adev->dm.dc->ctx->dmub_srv = NULL;
-	}
+	dc_dmub_srv_destroy(&adev->dm.dc->ctx->dmub_srv);
 
 	if (dc_enable_dmub_notifications(adev->dm.dc)) {
 		kfree(adev->dm.dmub_notify);
@@ -1781,7 +1779,6 @@ static int dm_late_init(void *handle)
 	unsigned int linear_lut[16];
 	int i;
 	struct dmcu *dmcu = NULL;
-	bool ret = true;
 
 	dmcu = adev->dm.dc->res_pool->dmcu;
 
@@ -1798,18 +1795,23 @@ static int dm_late_init(void *handle)
 	 * 0xFFFF x 0.01 = 0x28F
 	 */
 	params.min_abm_backlight = 0x28F;
-
 	/* In the case where abm is implemented on dmcub,
-	 * dmcu object will be null.
-	 * ABM 2.4 and up are implemented on dmcub.
-	 */
-	if (dmcu)
-		ret = dmcu_load_iram(dmcu, params);
-	else if (adev->dm.dc->ctx->dmub_srv)
-		ret = dmub_init_abm_config(adev->dm.dc->res_pool, params);
+	* dmcu object will be null.
+	* ABM 2.4 and up are implemented on dmcub.
+	*/
+	if (dmcu) {
+		if (!dmcu_load_iram(dmcu, params))
+			return -EINVAL;
+	} else if (adev->dm.dc->ctx->dmub_srv) {
+		struct dc_link *edp_links[MAX_NUM_EDP];
+		int edp_num;
 
-	if (!ret)
-		return -EINVAL;
+		get_edp_links(adev->dm.dc, edp_links, &edp_num);
+		for (i = 0; i < edp_num; i++) {
+			if (!dmub_init_abm_config(adev->dm.dc->res_pool, params, i))
+				return -EINVAL;
+		}
+	}
 
 	return detect_mst_link_for_all_connectors(adev_to_drm(adev));
 }
@@ -2081,7 +2083,6 @@ static int dm_suspend(void *handle)
 	s3_handle_mst(adev_to_drm(adev), true);
 
 	amdgpu_dm_irq_suspend(adev);
-
 
 	dc_set_power_state(dm->dc, DC_ACPI_CM_POWER_STATE_D3);
 
@@ -3602,7 +3603,7 @@ static void amdgpu_dm_update_backlight_caps(struct amdgpu_display_manager *dm)
 	if (dm->backlight_caps.caps_valid)
 		return;
 
-	amdgpu_acpi_get_backlight_caps(dm->adev, &caps);
+	amdgpu_acpi_get_backlight_caps(&caps);
 	if (caps.caps_valid) {
 		dm->backlight_caps.caps_valid = true;
 #ifdef HAVE_HDR_SINK_METADATA
@@ -3706,7 +3707,7 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 			rc = dc_link_set_backlight_level_nits(link[i], true, brightness[i],
 				AUX_BL_DEFAULT_TRANSITION_TIME_MS);
 			if (!rc) {
-				DRM_ERROR("DM: Failed to update backlight via AUX on eDP[%d]\n", i);
+				DRM_DEBUG("DM: Failed to update backlight via AUX on eDP[%d]\n", i);
 				break;
 			}
 		}
@@ -3714,7 +3715,7 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 		for (i = 0; i < dm->num_of_edps; i++) {
 			rc = dc_link_set_backlight_level(dm->backlight_link[i], brightness[i], 0);
 			if (!rc) {
-				DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", i);
+				DRM_DEBUG("DM: Failed to update backlight on eDP[%d]\n", i);
 				break;
 			}
 		}
@@ -6134,6 +6135,67 @@ static void dm_enable_per_frame_crtc_master_sync(struct dc_state *context)
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
+							struct dc_sink *sink, struct dc_stream_state *stream,
+							struct dsc_dec_dpcd_caps *dsc_caps)
+{
+	stream->timing.flags.DSC = 0;
+
+	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
+				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
+				      dsc_caps);
+#endif
+	}
+}
+
+static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
+										struct dc_sink *sink, struct dc_stream_state *stream,
+										struct dsc_dec_dpcd_caps *dsc_caps)
+{
+	struct drm_connector *drm_connector = &aconnector->base;
+	uint32_t link_bandwidth_kbps;
+
+	link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
+							dc_link_get_link_cap(aconnector->dc_link));
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	/* Set DSC policy according to dsc_clock_en */
+	dc_dsc_policy_set_enable_dsc_when_not_needed(
+		aconnector->dsc_settings.dsc_force_enable == DSC_CLK_FORCE_ENABLE);
+
+	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
+
+		if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
+						dsc_caps,
+						aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
+						0,
+						link_bandwidth_kbps,
+						&stream->timing,
+						&stream->timing.dsc_cfg)) {
+			stream->timing.flags.DSC = 1;
+			DRM_DEBUG_DRIVER("%s: [%s] DSC is selected from SST RX\n", __func__, drm_connector->name);
+		}
+	}
+
+	/* Overwrite the stream flag if DSC is enabled through debugfs */
+	if (aconnector->dsc_settings.dsc_force_enable == DSC_CLK_FORCE_ENABLE)
+		stream->timing.flags.DSC = 1;
+
+	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_num_slices_h)
+		stream->timing.dsc_cfg.num_slices_h = aconnector->dsc_settings.dsc_num_slices_h;
+
+	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_num_slices_v)
+		stream->timing.dsc_cfg.num_slices_v = aconnector->dsc_settings.dsc_num_slices_v;
+
+	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_bits_per_pixel)
+		stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
+#endif
+}
+#endif
+
 static struct drm_display_mode *
 get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
 			  bool use_probed_modes)
@@ -6230,13 +6292,13 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	struct drm_display_mode saved_mode;
 	struct drm_display_mode *freesync_mode = NULL;
 	bool native_mode_found = false;
-	bool recalculate_timing = dm_state ? (dm_state->scaling != RMX_OFF) : false;
+	bool recalculate_timing = false;
+	bool scale = dm_state ? (dm_state->scaling != RMX_OFF) : false;
 	int mode_refresh;
 	int preferred_refresh = 0;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_dec_dpcd_caps dsc_caps;
-	uint32_t link_bandwidth_kbps;
 #endif
 #endif
 
@@ -6298,7 +6360,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		 */
 		DRM_DEBUG_DRIVER("No preferred mode found\n");
 	} else {
-		recalculate_timing |= amdgpu_freesync_vid_mode &&
+		recalculate_timing = amdgpu_freesync_vid_mode &&
 				 is_freesync_video_mode(&mode, aconnector);
 		if (recalculate_timing) {
 			freesync_mode = get_highest_refresh_rate_mode(aconnector, false);
@@ -6306,11 +6368,10 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			mode = *freesync_mode;
 		} else {
 			decide_crtc_timing_for_drm_display_mode(
-				&mode, preferred_mode,
-				dm_state ? (dm_state->scaling != RMX_OFF) : false);
-		}
+				&mode, preferred_mode, scale);
 
-		preferred_refresh = drm_mode_vrefresh(preferred_mode);
+			preferred_refresh = drm_mode_vrefresh(preferred_mode);
+		}
 	}
 
 	if (recalculate_timing)
@@ -6322,7 +6383,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	* If scaling is enabled and refresh rate didn't change
 	* we copy the vic and polarities of the old timings
 	*/
-	if (!recalculate_timing || mode_refresh != preferred_refresh)
+	if (!scale || mode_refresh != preferred_refresh)
 		fill_stream_properties_from_drm_display_mode(
 			stream, &mode, &aconnector->base, con_state, NULL,
 			requested_bpc);
@@ -6332,45 +6393,12 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			requested_bpc);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	stream->timing.flags.DSC = 0;
-
-	if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
-		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
-				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
-				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
-				      &dsc_caps);
-		link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
-							     dc_link_get_link_cap(aconnector->dc_link));
-
-		if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported) {
-			/* Set DSC policy according to dsc_clock_en */
-			dc_dsc_policy_set_enable_dsc_when_not_needed(
-				aconnector->dsc_settings.dsc_force_enable == DSC_CLK_FORCE_ENABLE);
-
-			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
-						  &dsc_caps,
-						  aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
-						  0,
-						  link_bandwidth_kbps,
-						  &stream->timing,
-						  &stream->timing.dsc_cfg))
-				stream->timing.flags.DSC = 1;
-			/* Overwrite the stream flag if DSC is enabled through debugfs */
-			if (aconnector->dsc_settings.dsc_force_enable == DSC_CLK_FORCE_ENABLE)
-				stream->timing.flags.DSC = 1;
-
-			if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_num_slices_h)
-				stream->timing.dsc_cfg.num_slices_h = aconnector->dsc_settings.dsc_num_slices_h;
-
-			if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_num_slices_v)
-				stream->timing.dsc_cfg.num_slices_v = aconnector->dsc_settings.dsc_num_slices_v;
-
-			if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_bits_per_pixel)
-				stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
-		}
+	/* SST DSC determination policy */
+	update_dsc_caps(aconnector, sink, stream, &dsc_caps);
+	if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported)
+		apply_dsc_policy_for_stream(aconnector, sink, stream, &dsc_caps);
 #endif
-	}
 #endif
 
 	update_stream_scaling_settings(&mode, dm_state, stream);
@@ -11226,7 +11254,7 @@ static int validate_overlay(struct drm_atomic_state *state)
 	int i;
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
-	struct drm_plane_state *primary_state, *overlay_state = NULL;
+	struct drm_plane_state *primary_state, *cursor_state, *overlay_state = NULL;
 
 	/* Check if primary plane is contained inside overlay */
 #if !defined(for_each_oldnew_plane_in_state_reverse)
@@ -11263,6 +11291,14 @@ static int validate_overlay(struct drm_atomic_state *state)
 
 	/* check if primary plane is enabled */
 	if (!primary_state->crtc)
+		return 0;
+
+	/* check if cursor plane is enabled */
+	cursor_state = drm_atomic_get_plane_state(state, overlay_state->crtc->cursor);
+	if (IS_ERR(cursor_state))
+		return PTR_ERR(cursor_state);
+
+	if (drm_atomic_plane_disabling(plane->state, cursor_state))
 		return 0;
 
 	/* Perform the bounds check to ensure the overlay plane covers the primary */

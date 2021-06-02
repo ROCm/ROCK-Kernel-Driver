@@ -528,7 +528,7 @@ int amdgpu_gmc_allocate_vm_inv_eng(struct amdgpu_device *adev)
 }
 
 /**
- * amdgpu_tmz_set -- check and set if a device supports TMZ
+ * amdgpu_gmc_tmz_set -- check and set if a device supports TMZ
  * @adev: amdgpu_device pointer
  *
  * Check and set if an the device @adev supports Trusted Memory
@@ -574,7 +574,7 @@ void amdgpu_gmc_tmz_set(struct amdgpu_device *adev)
 }
 
 /**
- * amdgpu_noretry_set -- set per asic noretry defaults
+ * amdgpu_gmc_noretry_set -- set per asic noretry defaults
  * @adev: amdgpu_device pointer
  *
  * Set a per asic default for the no-retry parameter.
@@ -594,6 +594,7 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
 	case CHIP_DIMGREY_CAVEFISH:
+	case CHIP_BEIGE_GOBY:
 		/*
 		 * noretry = 0 will cause kfd page fault tests fail
 		 * for some ASICs, so set default to 1 for these ASICs.
