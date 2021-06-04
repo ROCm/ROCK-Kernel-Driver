@@ -745,6 +745,38 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 }
 #endif
 
+/**
+ * @kfd_mem_attach_vram_bo: Acquires the handle of a VRAM BO that could
+ * be used to enable a peer GPU access it
+ *
+ * Implementation determines if access to VRAM BO would employ DMABUF
+ * or Shared BO mechanism. Employ DMABUF mechanism if kernel has config
+ * option DMABUF_MOVE_NOTIFY enabled. Employ Shared BO mechanism if above
+ * config option is not set. It is important to note that a Shared BO
+ * cannot be used to enable peer acces if system has IOMMU enabled
+ *
+ * @TODO: ADD Check to ensure IOMMU is not enabled. Should this check
+ * be somewhere as this is information could be useful in other places
+ */
+static int kfd_mem_attach_vram_bo(struct amdgpu_device *adev,
+			struct kgd_mem *mem, struct amdgpu_bo **bo,
+			struct kfd_mem_attachment *attachment)
+{
+	int ret =  0;
+
+#ifdef CONFIG_DMABUF_MOVE_NOTIFY
+	attachment->type = KFD_MEM_ATT_DMABUF;
+	ret = kfd_mem_attach_dmabuf(adev, mem, bo);
+	pr_debug("Employ DMABUF mechanim to enable peer GPU access\n");
+#else
+	*bo = mem->bo;
+	attachment->type = KFD_MEM_ATT_SHARED;
+	drm_gem_object_get(&(*bo)->tbo.base);
+	pr_debug("Employ Shared BO mechanim to enable peer GPU access\n");
+#endif
+	return ret;
+}
+
 /* kfd_mem_attach - Add a BO to a VM
  *
  * Everything that needs to bo done only once when a BO is first added
@@ -842,6 +874,13 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 				goto unwind;
 			pr_debug("Employ DMABUF mechanism to enable peer GPU access\n");
 #endif
+		/* Enable peer acces to VRAM BO's */
+		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM &&
+			   mem->bo->tbo.type == ttm_bo_type_device) {
+			ret = kfd_mem_attach_vram_bo(adev, mem,
+						&bo[i], attachment[i]);
+			if (ret)
+				goto unwind;
 		} else {
 			WARN_ONCE(true, "Handling invalid ATTACH request");
 			ret = -EINVAL;
