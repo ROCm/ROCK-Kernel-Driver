@@ -362,8 +362,6 @@ void dcn31_link_encoder_enable_dp_output(
 	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
-	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-
 	/* Enable transmitter and encoder. */
 	if (!link_enc_cfg_is_transmitter_mappable(enc->ctx->dc->current_state, enc)) {
 
@@ -380,8 +378,6 @@ void dcn31_link_encoder_enable_dp_mst_output(
 	const struct dc_link_settings *link_settings,
 	enum clock_source_id clock_source)
 {
-	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-
 	/* Enable transmitter and encoder. */
 	if (!link_enc_cfg_is_transmitter_mappable(enc->ctx->dc->current_state, enc)) {
 
@@ -397,8 +393,6 @@ void dcn31_link_encoder_disable_output(
 	struct link_encoder *enc,
 	enum signal_type signal)
 {
-	struct dcn10_link_encoder *enc10 = TO_DCN10_LINK_ENC(enc);
-
 	/* Disable transmitter and encoder. */
 	if (!link_enc_cfg_is_transmitter_mappable(enc->ctx->dc->current_state, enc)) {
 
