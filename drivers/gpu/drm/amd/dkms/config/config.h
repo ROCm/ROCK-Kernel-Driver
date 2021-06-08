@@ -1007,3 +1007,5 @@
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "19.40"
+
+#include "config-amd-chips.h"
