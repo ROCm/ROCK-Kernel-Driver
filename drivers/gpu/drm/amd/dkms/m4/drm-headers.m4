@@ -146,6 +146,11 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_ttm_helper.h])
 
 	dnl #
+	dnl # Required by AC_KERNEL_SUPPORTED_AMD_CHIPS macro
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/amd_asic_type.h])
+
+	dnl #
 	dnl # v5.12-rc3-330-g2916059147ea
 	dnl # drm/aperture: Add infrastructure for aperture ownership
 	dnl #
