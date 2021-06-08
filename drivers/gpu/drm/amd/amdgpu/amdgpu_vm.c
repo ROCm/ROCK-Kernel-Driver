@@ -908,7 +908,7 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 		return r;
 
 	bo = &(*vmbo)->bo;
-	if (vm->is_compute_context && (adev->flags & AMD_IS_APU)) {
+	if (vm->is_compute_context || (adev->flags & AMD_IS_APU)) {
 		(*vmbo)->shadow = NULL;
 		return 0;
 	}
