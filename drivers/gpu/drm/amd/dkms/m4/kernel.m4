@@ -7,6 +7,7 @@ AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_AMDGPU_KALLSYMS_LOOKUP_NAME
 	AC_AMDGPU_LINUX_HEADERS
 	AC_AMDGPU_DRM_HEADERS
+	AC_KERNEL_SUPPORTED_AMD_CHIPS
 	AC_AMDGPU_IDR_REMOVE
 	AC_AMDGPU_KREF_READ
 	AC_AMDGPU_TYPE__POLL_T
@@ -227,6 +228,7 @@ AC_DEFUN([AC_CONFIG_KERNEL], [
 	])
 
 	AC_SUBST(KERNEL_MAKE)
+	AH_BOTTOM([#include "config-amd-chips.h"])
 ])
 
 dnl #
@@ -624,6 +626,33 @@ AC_DEFUN([AC_KERNEL_WAIT], [
 	AC_MSG_CHECKING([for module configuration])
 	wait $procs
 	AS_IF([[[ $? -eq 0 ]]], [
+		AC_MSG_RESULT([done])
+	], [
+		AC_MSG_RESULT([failed])
+	])
+])
+
+dnl #
+dnl # AC_KERNEL_SUPPORTED_AMD_CHIPS
+dnl # get list of graphics chips supported by the amdgpu kernel driver
+dnl #
+AC_DEFUN([AC_KERNEL_SUPPORTED_AMD_CHIPS], [
+	AC_MSG_CHECKING([for supported chips])
+	AS_IF([test $HAVE_DRM_AMD_ASIC_TYPE_H], [
+		chips=$(awk 'BEGIN {enum = 0} {
+			if ($[0] ~ "^enum amd_asic_type")
+				enum = 1;
+			if (enum && $[1] ~ "CHIP_") {
+				gsub(",", "");
+				if ($[1] == "CHIP_LAST")
+					exit;
+				print $[1];
+			}
+		}' $LINUX/include/drm/amd_asic_type.h)
+
+		for i in $chips; do
+			$as_echo "#define HAVE_$i" >>config/config-amd-chips.h
+		done
 		AC_MSG_RESULT([done])
 	], [
 		AC_MSG_RESULT([failed])
