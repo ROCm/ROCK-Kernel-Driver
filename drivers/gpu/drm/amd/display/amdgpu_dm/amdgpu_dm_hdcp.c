@@ -235,8 +235,10 @@ static void hdcp_remove_display(struct hdcp_workqueue *hdcp_work,
 	if (conn_state && conn_state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED) {
 		conn_state->content_protection = DRM_MODE_CONTENT_PROTECTION_DESIRED;
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 		DRM_DEBUG_DRIVER("[HDCP_DM] display %d, CP 2 -> 1, type %u, DPMS %u\n",
 			 aconnector->base.index, conn_state->hdcp_content_type, aconnector->base.dpms);
+#endif
 	}
 
 	mod_hdcp_remove_display(&hdcp_w->hdcp, aconnector->base.index, &hdcp_w->output);
