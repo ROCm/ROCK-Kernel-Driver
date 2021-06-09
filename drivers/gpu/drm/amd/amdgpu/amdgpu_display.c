@@ -1195,7 +1195,7 @@ int amdgpu_display_gem_fb_init(struct drm_device *dev,
 
 	return 0;
 err:
-	drm_err(dev, "Failed to init gem fb: %d\n", ret);
+	drm_dbg_kms(dev, "Failed to init gem fb: %d\n", ret);
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 	return ret;
 }
@@ -1236,7 +1236,7 @@ int amdgpu_display_gem_fb_verify_and_init(
 
 	return 0;
 err:
-	drm_err(dev, "Failed to verify and init gem fb: %d\n", ret);
+	drm_dbg_kms(dev, "Failed to verify and init gem fb: %d\n", ret);
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
 	return ret;
 }

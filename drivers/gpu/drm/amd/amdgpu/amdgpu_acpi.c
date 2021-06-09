@@ -76,6 +76,7 @@ struct amdgpu_atcs_functions {
 	bool pcie_perf_req;
 	bool pcie_dev_rdy;
 	bool pcie_bus_width;
+	bool power_shift_control;
 };
 
 struct amdgpu_atcs {
@@ -534,6 +535,7 @@ static void amdgpu_atcs_parse_functions(struct amdgpu_atcs_functions *f, u32 mas
 	f->pcie_perf_req = mask & ATCS_PCIE_PERFORMANCE_REQUEST_SUPPORTED;
 	f->pcie_dev_rdy = mask & ATCS_PCIE_DEVICE_READY_NOTIFICATION_SUPPORTED;
 	f->pcie_bus_width = mask & ATCS_SET_PCIE_BUS_WIDTH_SUPPORTED;
+	f->power_shift_control = mask & ATCS_SET_POWER_SHIFT_CONTROL_SUPPORTED;
 }
 
 /**
@@ -596,6 +598,18 @@ bool amdgpu_acpi_is_pcie_performance_request_supported(struct amdgpu_device *ade
 		return true;
 
 	return false;
+}
+
+/**
+ * amdgpu_acpi_is_power_shift_control_supported
+ *
+ * Check if the ATCS power shift control method
+ * is supported.
+ * returns true if supported, false if not.
+ */
+bool amdgpu_acpi_is_power_shift_control_supported(void)
+{
+	return amdgpu_acpi_priv.atcs.functions.power_shift_control;
 }
 
 /**
@@ -697,6 +711,96 @@ int amdgpu_acpi_pcie_performance_request(struct amdgpu_device *adev,
 	}
 
 	return 0;
+}
+
+/**
+ * amdgpu_acpi_power_shift_control
+ *
+ * @adev: amdgpu_device pointer
+ * @dev_state: device acpi state
+ * @drv_state: driver state
+ *
+ * Executes the POWER_SHIFT_CONTROL method to
+ * communicate current dGPU device state and
+ * driver state to APU/SBIOS.
+ * returns 0 on success, error on failure.
+ */
+int amdgpu_acpi_power_shift_control(struct amdgpu_device *adev,
+				    u8 dev_state, bool drv_state)
+{
+	union acpi_object *info;
+	struct amdgpu_atcs *atcs = &amdgpu_acpi_priv.atcs;
+	struct atcs_pwr_shift_input atcs_input;
+	struct acpi_buffer params;
+
+	if (!amdgpu_acpi_is_power_shift_control_supported())
+		return -EINVAL;
+
+	atcs_input.size = sizeof(struct atcs_pwr_shift_input);
+	/* dGPU id (bit 2-0: func num, 7-3: dev num, 15-8: bus num) */
+	atcs_input.dgpu_id = adev->pdev->devfn | (adev->pdev->bus->number << 8);
+	atcs_input.dev_acpi_state = dev_state;
+	atcs_input.drv_state = drv_state;
+
+	params.length = sizeof(struct atcs_pwr_shift_input);
+	params.pointer = &atcs_input;
+
+	info = amdgpu_atcs_call(atcs, ATCS_FUNCTION_POWER_SHIFT_CONTROL, &params);
+	if (!info) {
+		DRM_ERROR("ATCS PSC update failed\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+/**
+ * amdgpu_acpi_smart_shift_update - update dGPU device state to SBIOS
+ *
+ * @dev: drm_device pointer
+ * @ss_state: current smart shift event
+ *
+ * returns 0 on success,
+ * otherwise return error number.
+ */
+int amdgpu_acpi_smart_shift_update(struct drm_device *dev, enum amdgpu_ss ss_state)
+{
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	int r;
+
+	if (!amdgpu_device_supports_smart_shift(dev))
+		return 0;
+
+	switch (ss_state) {
+	/* SBIOS trigger “stop”, “enable” and “start” at D0, Driver Operational.
+	 * SBIOS trigger “stop” at D3, Driver Not Operational.
+	 * SBIOS trigger “stop” and “disable” at D0, Driver NOT operational.
+	 */
+	case AMDGPU_SS_DRV_LOAD:
+		r = amdgpu_acpi_power_shift_control(adev,
+						    AMDGPU_ATCS_PSC_DEV_STATE_D0,
+						    AMDGPU_ATCS_PSC_DRV_STATE_OPR);
+		break;
+	case AMDGPU_SS_DEV_D0:
+		r = amdgpu_acpi_power_shift_control(adev,
+						    AMDGPU_ATCS_PSC_DEV_STATE_D0,
+						    AMDGPU_ATCS_PSC_DRV_STATE_OPR);
+		break;
+	case AMDGPU_SS_DEV_D3:
+		r = amdgpu_acpi_power_shift_control(adev,
+						    AMDGPU_ATCS_PSC_DEV_STATE_D3_HOT,
+						    AMDGPU_ATCS_PSC_DRV_STATE_NOT_OPR);
+		break;
+	case AMDGPU_SS_DRV_UNLOAD:
+		r = amdgpu_acpi_power_shift_control(adev,
+						    AMDGPU_ATCS_PSC_DEV_STATE_D0,
+						    AMDGPU_ATCS_PSC_DRV_STATE_NOT_OPR);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return r;
 }
 
 /**
