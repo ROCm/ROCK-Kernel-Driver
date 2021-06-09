@@ -1245,7 +1245,7 @@ static void amdgpu_ttm_backend_unbind(struct ttm_device *bdev,
 	if (gtt->userptr) {
 		amdgpu_ttm_tt_unpin_userptr(bdev, ttm);
 	} else if (ttm->sg && gtt->gobj->import_attach) {
-#ifdef defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) || \
+#if defined(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING) || \
 	defined(HAVE_STRUCT_DMA_BUF_OPS_PIN)
 		struct dma_buf_attachment *attach;
 
