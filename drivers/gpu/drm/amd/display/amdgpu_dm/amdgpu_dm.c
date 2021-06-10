@@ -5528,6 +5528,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_ABGR16161616F:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616F;
 		break;
+#ifdef DRM_FORMAT_XRGB16161616
 	case DRM_FORMAT_XRGB16161616:
 	case DRM_FORMAT_ARGB16161616:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ARGB16161616;
@@ -5536,6 +5537,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	case DRM_FORMAT_ABGR16161616:
 		plane_info->format = SURFACE_PIXEL_FORMAT_GRPH_ABGR16161616;
 		break;
+#endif
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %p4cc\n",
@@ -7979,10 +7981,12 @@ static const uint32_t rgb_formats[] = {
 	DRM_FORMAT_XBGR2101010,
 	DRM_FORMAT_ARGB2101010,
 	DRM_FORMAT_ABGR2101010,
+#ifdef DRM_FORMAT_XRGB16161616
 	DRM_FORMAT_XRGB16161616,
 	DRM_FORMAT_XBGR16161616,
 	DRM_FORMAT_ARGB16161616,
 	DRM_FORMAT_ABGR16161616,
+#endif
 	DRM_FORMAT_XBGR8888,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_RGB565,
