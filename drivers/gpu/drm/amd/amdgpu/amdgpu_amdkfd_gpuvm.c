@@ -634,7 +634,11 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 #ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 		mem->dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base,
 #else
-		mem->dmabuf = amdgpu_gem_prime_export(adev_to_drm(adev), &mem->bo->tbo.base,
+		struct amdgpu_device *bo_adev;
+
+		bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+		mem->dmabuf = amdgpu_gem_prime_export(adev_to_drm(bo_adev),
+						&mem->bo->tbo.base,
 #endif
 			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
 				DRM_RDWR : 0);
@@ -765,6 +769,7 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			ret = kfd_mem_attach_userptr(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_GTT &&
 			   mem->bo->tbo.type != ttm_bo_type_sg) {
 			/* GTT BOs use DMA-mapping ability of dynamic-attach
@@ -772,7 +777,6 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			 * large-BAR GPUs.
 			 */
 			attachment[i]->type = KFD_MEM_ATT_DMABUF;
-#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 			ret = kfd_mem_attach_dmabuf(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
