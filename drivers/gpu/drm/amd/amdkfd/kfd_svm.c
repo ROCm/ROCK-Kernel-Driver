@@ -1086,7 +1086,7 @@ svm_range_unmap_from_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	return amdgpu_vm_bo_update_mapping(adev, adev, vm, false, true, NULL,
 					   start, last, init_pte_value, 0,
-					   NULL, NULL, fence, NULL,
+					   NULL, NULL, NULL, fence, NULL,
 					   adev->vm_manager.vram_base_offset);
 }
 
@@ -1164,6 +1164,8 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 					prange->mapping.last, pte_flags,
 					prange->mapping.offset,
 					prange->ttm_res,
+					prange->ttm_res ?
+						prange->ttm_res->mm_node : NULL,
 					dma_addr, &vm->last_update,
 					&table_freed,
 					vram_base_offset);
