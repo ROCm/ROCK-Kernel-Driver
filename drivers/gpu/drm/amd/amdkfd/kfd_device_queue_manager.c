@@ -1882,25 +1882,24 @@ static int get_wave_state(struct device_queue_manager *dqm,
 
 	dqm_lock(dqm);
 
-	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
-	    q->properties.is_active || !q->device->cwsr_enabled) {
-		r = -EINVAL;
-		goto dqm_unlock;
-	}
-
 	mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
 
-	if (!mqd_mgr->get_wave_state) {
-		r = -EINVAL;
-		goto dqm_unlock;
+	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
+	    q->properties.is_active || !q->device->cwsr_enabled ||
+	    !mqd_mgr->get_wave_state) {
+		dqm_unlock(dqm);
+		return -EINVAL;
 	}
 
-	r = mqd_mgr->get_wave_state(mqd_mgr, q->mqd, ctl_stack,
-			ctl_stack_used_size, save_area_used_size);
-
-dqm_unlock:
 	dqm_unlock(dqm);
-	return r;
+
+	/*
+	 * get_wave_state is outside the dqm lock to prevent circular locking
+	 * and the queue should be protected against destruction by the process
+	 * lock.
+	 */
+	return mqd_mgr->get_wave_state(mqd_mgr, q->mqd, ctl_stack,
+			ctl_stack_used_size, save_area_used_size);
 }
 
 static int process_termination_cpsch(struct device_queue_manager *dqm,
@@ -2330,6 +2329,7 @@ struct copy_context_work_handler_workarea {
 	struct kfd_process *p;
 };
 
+/* assume work is flushed while process lock is held. */
 void copy_context_work_handler (struct work_struct *work)
 {
 	struct copy_context_work_handler_workarea *workarea;
@@ -2356,9 +2356,6 @@ void copy_context_work_handler (struct work_struct *work)
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 
-		dqm_lock(dqm);
-
-
 		list_for_each_entry(q, &qpd->queues_list, list) {
 			mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
 
@@ -2374,8 +2371,6 @@ void copy_context_work_handler (struct work_struct *work)
 					&tmp_ctl_stack_used_size,
 					&tmp_save_area_used_size);
 		}
-
-		dqm_unlock(dqm);
 	}
 	kthread_unuse_mm(mm);
 	mmput(mm);
