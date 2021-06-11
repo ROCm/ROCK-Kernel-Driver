@@ -2736,7 +2736,8 @@ struct copy_context_work_handler_workarea {
 	struct kfd_process *p;
 };
 
-static void copy_context_work_handler (struct work_struct *work)
+/* assume work is flushed while process lock is held. */
+void copy_context_work_handler (struct work_struct *work)
 {
 	struct copy_context_work_handler_workarea *workarea;
 	struct mqd_manager *mqd_mgr;
@@ -2762,9 +2763,6 @@ static void copy_context_work_handler (struct work_struct *work)
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 
-		dqm_lock(dqm);
-
-
 		list_for_each_entry(q, &qpd->queues_list, list) {
 			mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
 
@@ -2780,8 +2778,6 @@ static void copy_context_work_handler (struct work_struct *work)
 					&tmp_ctl_stack_used_size,
 					&tmp_save_area_used_size);
 		}
-
-		dqm_unlock(dqm);
 	}
 	kthread_unuse_mm(mm);
 	mmput(mm);
