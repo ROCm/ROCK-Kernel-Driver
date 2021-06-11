@@ -1995,6 +1995,9 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 		ret = amdgpu_ras_load_bad_pages(adev);
 		if (ret)
 			goto free;
+
+		if (adev->smu.ppt_funcs && adev->smu.ppt_funcs->send_hbm_bad_pages_num)
+			adev->smu.ppt_funcs->send_hbm_bad_pages_num(&adev->smu, con->eeprom_control.num_recs);
 	}
 
 #ifdef HAVE_SMCA_UMC_V2
