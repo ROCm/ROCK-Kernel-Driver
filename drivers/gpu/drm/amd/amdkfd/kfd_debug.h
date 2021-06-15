@@ -45,11 +45,10 @@ bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			size_t exception_data_size);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
-int kfd_dbg_trap_disable(struct kfd_process *target,
-			bool unwind,
-			int unwind_count);
+int kfd_dbg_trap_disable(struct kfd_process *target);
 int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
-			uint32_t *ttmp_save);
+			void __user *runtime_info,
+			uint32_t *runtime_info_size);
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
 					uint32_t trap_mask_bits,
@@ -72,7 +71,8 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 int kfd_dbg_runtime_disable(struct kfd_process *p);
 
 int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
-					unsigned int dest_id,
+					unsigned int dev_id,
+					unsigned int queue_id,
 					uint64_t error_reason);
 
 static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
