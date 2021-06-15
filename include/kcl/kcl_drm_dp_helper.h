@@ -108,10 +108,6 @@
 #define DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1          0xf0020 /* 1.4a */
 #endif
 
-#if !defined(DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
-#define DP_TRAINING_PATTERN_SET_PHY_REPEATER1              0xf0010 /* 1.3 */
-#endif
-
 #if !defined(DP_PHY_REPEATER_EXTENDED_WAIT_TIMEOUT)
 #define DP_PHY_REPEATER_EXTENDED_WAIT_TIMEOUT              0xf0005 /* 1.4a */
 #endif
@@ -160,6 +156,55 @@
  * drm: Correct DP DSC macro typo */
 #ifdef DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
 #define DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
+#endif
+
+/* v5.9-rc4-979-g9782f52ab5d6
+ * drm/dp: Add LTTPR helpers
+ */
+#ifndef DP_TRAINING_PATTERN_SET_PHY_REPEATER
+
+enum drm_dp_phy {
+        DP_PHY_DPRX,
+
+        DP_PHY_LTTPR1,
+        DP_PHY_LTTPR2,
+        DP_PHY_LTTPR3,
+        DP_PHY_LTTPR4,
+        DP_PHY_LTTPR5,
+        DP_PHY_LTTPR6,
+        DP_PHY_LTTPR7,
+        DP_PHY_LTTPR8,
+
+        DP_MAX_LTTPR_COUNT = DP_PHY_LTTPR8,
+};
+
+#define DP_PHY_LTTPR(i)                                     (DP_PHY_LTTPR1 + (i))
+#define __DP_LTTPR1_BASE                                    0xf0010 /* 1.3 */
+#define __DP_LTTPR2_BASE                                    0xf0060 /* 1.3 */
+#define DP_LTTPR_BASE(dp_phy) \
+        (__DP_LTTPR1_BASE + (__DP_LTTPR2_BASE - __DP_LTTPR1_BASE) * \
+                ((dp_phy) - DP_PHY_LTTPR1))
+#define DP_LTTPR_REG(dp_phy, lttpr1_reg) \
+        (DP_LTTPR_BASE(dp_phy) - DP_LTTPR_BASE(DP_PHY_LTTPR1) + (lttpr1_reg))
+#define DP_TRAINING_PATTERN_SET_PHY_REPEATER(dp_phy) \
+        DP_LTTPR_REG(dp_phy, DP_TRAINING_PATTERN_SET_PHY_REPEATER1)
+#endif
+
+#ifndef DP_FEC_STATUS_PHY_REPEATER
+
+#define __DP_FEC1_BASE                                      0xf0290 /* 1.4 */
+#define __DP_FEC2_BASE                                      0xf0298 /* 1.4 */
+#define DP_FEC_BASE(dp_phy) \
+        (__DP_FEC1_BASE + ((__DP_FEC2_BASE - __DP_FEC1_BASE) * \
+                           ((dp_phy) - DP_PHY_LTTPR1)))
+#define DP_FEC_REG(dp_phy, fec1_reg) \
+        (DP_FEC_BASE(dp_phy) - DP_FEC_BASE(DP_PHY_LTTPR1) + fec1_reg)
+#define DP_FEC_STATUS_PHY_REPEATER1                         0xf0290 /* 1.4 */
+#define DP_FEC_STATUS_PHY_REPEATER(dp_phy) \
+        DP_FEC_REG(dp_phy, DP_FEC_STATUS_PHY_REPEATER1)
+#define DP_LTTPR_MAX_ADD                                    0xf02ff /* 1.4 */
+#define DP_DPCD_MAX_ADD                                     0xfffff /* 1.4 */
+
 #endif
 
 #endif /* _KCL_DRM_DP_HELPER_H_ */
