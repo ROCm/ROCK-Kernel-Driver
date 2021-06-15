@@ -234,7 +234,8 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 		struct process_queue_manager *pqm;
 		struct process_queue_node *pqn;
 
-		if (KFD_DBG_EC_TYPE_IS_QUEUE(trap_code) && p->r_debug) {
+		if (KFD_DBG_EC_TYPE_IS_QUEUE(trap_code) &&
+				p->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED) {
 			mutex_lock(&p->mutex);
 
 			pqm = &p->pqm;
@@ -272,7 +273,8 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 }
 
 int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
-					unsigned int dest_id,
+					unsigned int dev_id,
+					unsigned int queue_id,
 					uint64_t error_reason)
 {
 	if (error_reason & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
@@ -281,7 +283,7 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 		int i;
 
 		for (i = 0; i < p->n_pdds; i++) {
-			if (p->pdds[i]->dev->id == dest_id) {
+			if (p->pdds[i]->dev->id == dev_id) {
 				pdd = p->pdds[i];
 				break;
 			}
@@ -295,21 +297,25 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 
 		kfd_process_vm_fault(pdd->dev->dqm, p->pasid);
 		kfd_signal_vm_fault_event(pdd->dev, p->pasid, NULL, data);
-	} else if (error_reason & (KFD_EC_MASK(EC_PROCESS_RUNTIME_ENABLE) |
-				KFD_EC_MASK(EC_PROCESS_RUNTIME_DISABLE))) {
+		error_reason &= ~KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION);
+	}
+
+	if (error_reason & (KFD_EC_MASK(EC_PROCESS_RUNTIME))) {
 		/*
 		 * block should only happen after the debugger receives runtime
 		 * enable notice.
 		 */
 		up(&p->runtime_enable_sema);
-	} else {
-		return kfd_send_exception_to_runtime(p, dest_id, error_reason);
+		error_reason &= ~KFD_EC_MASK(EC_PROCESS_RUNTIME);
 	}
 
-	return -EINVAL;
+	if (error_reason)
+		return kfd_send_exception_to_runtime(p, queue_id, error_reason);
+
+	return 0;
 }
 
-/* kfd_dbg_trap_disable:
+/* kfd_dbg_trap_deactivate:
  *	target: target process
  *	unwind: If this is unwinding a failed kfd_dbg_trap_enable()
  *	unwind_count:
@@ -317,13 +323,12 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
  *				to unwind
  *		else: ignored
  */
-int kfd_dbg_trap_disable(struct kfd_process *target,
-		bool unwind,
-		int unwind_count)
+static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int unwind_count)
 {
-	int count = 0, i;
+	int i, count = 0, resume_count;
 
 	if (!unwind) {
+		cancel_work_sync(&target->debug_event_workarea);
 		kfd_release_debug_watch_points(target,
 				target->allocated_debug_watch_point_bitmask);
 		target->allocated_debug_watch_point_bitmask = 0;
@@ -349,7 +354,7 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 				pdd->dev->vm_info.last_vmid_kfd);
 
 		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd,
-						target->enable_ttmp_setup);
+						target->runtime_info.ttmp_setup);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
 			if (release_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd))
@@ -358,36 +363,43 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 		count++;
 	}
 
-	/* Drop the references held by the debug session. */
 	if (!unwind) {
-		int resume_count;
-
-		cancel_work_sync(&target->debug_event_workarea);
-		fput(target->dbg_ev_file);
-		kfd_unref_process(target);
 		resume_count = resume_queues(target, true, 0, NULL);
 		if (resume_count)
 			pr_debug("Resumed %d queues\n", resume_count);
-		if (target->debugger_process)
-			atomic_dec(&target->debugger_process->debugged_process_count);
+	}
+
+
+}
+
+int kfd_dbg_trap_disable(struct kfd_process *target)
+{
+	/*
+	 * Defer deactivation to runtime if runtime not enabled otherwise reset
+	 * attached running target runtime state to enable for re-attach.
+	 */
+	if (target->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED)
+		kfd_dbg_trap_deactivate(target, false, 0);
+	else if (target->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_DISABLED)
+		target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED;
+
+	fput(target->dbg_ev_file);
+	target->dbg_ev_file = NULL;
+
+	if (target->debugger_process) {
+		atomic_dec(&target->debugger_process->debugged_process_count);
+		target->debugger_process = NULL;
 	}
 
 	target->debug_trap_enabled = false;
-	target->dbg_ev_file = NULL;
-
-	target->debugger_process = NULL;
+	kfd_unref_process(target);
 
 	return 0;
 }
 
-int kfd_dbg_trap_enable(struct kfd_process *target,
-		uint32_t fd, uint32_t *ttmp_save)
+static int kfd_dbg_trap_activate(struct kfd_process *target)
 {
-	int unwind_count = 0, r = 0, i;
-	struct file *f;
-
-	if (target->debug_trap_enabled)
-		return -EINVAL;
+	int i, r = 0, unwind_count = 0;
 
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
@@ -398,8 +410,13 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev)) {
 			r = reserve_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd);
 
-			if (r)
+			if (r) {
+				target->runtime_info.runtime_state = (r == -EBUSY) ?
+							DEBUG_RUNTIME_STATE_ENABLED_BUSY :
+							DEBUG_RUNTIME_STATE_ENABLED_ERROR;
+
 				goto unwind_err;
+			}
 		}
 
 		pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
@@ -409,31 +426,15 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
 		r = debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
-		if (r)
+
+		if (r) {
+			target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED_ERROR;
 			goto unwind_err;
+		}
 
 		/* Increment unwind_count as the last step */
 		unwind_count++;
 	}
-
-	f = fget(fd);
-	if (!f) {
-		pr_err("Failed to get file for (%i)\n", fd);
-		r = -EBADF;
-		goto unwind_err;
-	}
-
-	target->dbg_ev_file = f;
-
-	/* We already hold the process reference but hold another one for the
-	 * debug session.
-	 */
-	kref_get(&target->ref);
-	target->debug_trap_enabled = true;
-	if (target->debugger_process)
-		atomic_inc(&target->debugger_process->debugged_process_count);
-
-	*ttmp_save = target->enable_ttmp_setup;
 
 	return 0;
 
@@ -441,7 +442,50 @@ unwind_err:
 	/* Enabling debug failed, we need to disable on
 	 * all GPUs so the enable is all or nothing.
 	 */
-	kfd_dbg_trap_disable(target, true, unwind_count);
+	kfd_dbg_trap_deactivate(target, true, unwind_count);
+	return r;
+}
+
+int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
+			void __user *runtime_info, uint32_t *runtime_size)
+{
+	struct file *f;
+	uint32_t copy_size;
+	int r = 0;
+
+	if (target->debug_trap_enabled)
+		return -EINVAL;
+
+	copy_size = min((size_t)(*runtime_size), sizeof(target->runtime_info));
+
+	f = fget(fd);
+	if (!f) {
+		pr_err("Failed to get file for (%i)\n", fd);
+		return -EBADF;
+	}
+
+	target->dbg_ev_file = f;
+
+	/* defer activation to runtime if not runtime enabled */
+	if (target->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED)
+		kfd_dbg_trap_activate(target);
+
+	/* We already hold the process reference but hold another one for the
+	 * debug session.
+	 */
+	kref_get(&target->ref);
+	target->debug_trap_enabled = true;
+
+	if (target->debugger_process)
+		atomic_inc(&target->debugger_process->debugged_process_count);
+
+	if (copy_to_user(runtime_info, (void *)&target->runtime_info, copy_size)) {
+		kfd_dbg_trap_deactivate(target, false, 0);
+		r = -EFAULT;
+	}
+
+	*runtime_size = sizeof(target->runtime_info);
+
 	return r;
 }
 
@@ -782,15 +826,15 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 			goto out;
 		}
 
-		if (exception_code == EC_PROCESS_RUNTIME_ENABLE) {
-			copy_size = min((size_t)(*info_size), sizeof(target->r_debug));
+		if (exception_code == EC_PROCESS_RUNTIME) {
+			copy_size = min((size_t)(*info_size), sizeof(target->runtime_info));
 
-			if (copy_to_user(info, (void *)&target->r_debug, copy_size)) {
+			if (copy_to_user(info, (void *)&target->runtime_info, copy_size)) {
 				r = -EFAULT;
 				goto out;
 			}
 
-			actual_info_size = sizeof(target->r_debug);
+			actual_info_size = sizeof(target->runtime_info);
 		}
 
 		exception_status_ptr = &target->exception_status;
@@ -862,6 +906,9 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 {
 	int i = 0, ret = 0;
 
+	if (p->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_DISABLED)
+		return -EBUSY;
+
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
@@ -869,13 +916,15 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 			return -EEXIST;
 	}
 
-	p->r_debug = r_debug;
-	p->enable_ttmp_setup = enable_ttmp_setup;
+	p->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED;
+	p->runtime_info.r_debug = r_debug;
+	p->runtime_info.ttmp_setup = enable_ttmp_setup;
 
 	if (p->debug_trap_enabled) {
+		kfd_dbg_trap_activate(p);
+
 		if (!p->is_runtime_retry)
-			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME_ENABLE, p, NULL, 0,
-							false, NULL, 0);
+			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME, p, NULL, 0, false, NULL, 0);
 
 		mutex_unlock(&p->mutex);
 		ret = down_interruptible(&p->runtime_enable_sema);
@@ -890,13 +939,19 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 int kfd_dbg_runtime_disable(struct kfd_process *p)
 {
 	int i = 0, ret;
+	bool was_enabled = p->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED;
 
-	p->r_debug = 0;
+	p->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_DISABLED;
+	p->runtime_info.r_debug = 0;
 
 	if (p->debug_trap_enabled) {
+		if (was_enabled) {
+			kfd_dbg_trap_deactivate(p, false, 0);
+		}
+
 		if (!p->is_runtime_retry)
-			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME_DISABLE, p, NULL, 0,
-							false, NULL, 0);
+			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME, p, NULL, 0, false, NULL, 0);
+
 		mutex_unlock(&p->mutex);
 		ret = down_interruptible(&p->runtime_enable_sema);
 		mutex_lock(&p->mutex);
@@ -906,7 +961,7 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 			return ret;
 	}
 
-	p->enable_ttmp_setup = false;
+	p->runtime_info.ttmp_setup = false;
 
 	/* disable DISPATCH_PTR save */
 	for (i = 0; i < p->n_pdds; i++) {
@@ -917,3 +972,4 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 
 	return 0;
 }
+
