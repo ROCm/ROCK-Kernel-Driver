@@ -2976,12 +2976,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
-			r = kfd_dbg_trap_disable(target, false, 0);
+			r = kfd_dbg_trap_disable(target);
 			break;
 		case 1:
 			if (target != p)
 				target->debugger_process = p;
 			r = kfd_dbg_trap_enable(target, args->data2,
+						(void __user *) args->ptr,
 						&args->data3);
 			if (!r)
 				target->exception_enable_mask = exception_mask;
@@ -3092,6 +3093,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT:
 		r = kfd_dbg_send_exception_to_runtime(target,
 						data1,
+						data2,
 						exception_mask);
 		break;
 	default:

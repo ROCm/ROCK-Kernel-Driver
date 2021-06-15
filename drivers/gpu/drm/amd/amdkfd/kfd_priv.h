@@ -987,9 +987,9 @@ struct kfd_process {
 
 	/* Tracks runtime enable status */
 	uint64_t r_debug;
-	bool enable_ttmp_setup;
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
+	struct kfd_runtime_info runtime_info;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */

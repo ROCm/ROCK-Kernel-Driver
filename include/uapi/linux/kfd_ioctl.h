@@ -62,9 +62,10 @@
  * 7.0 - Redefine exception codes
  * 7.1 - Add KFD_IOC_DBG_TRAP_RUNTIME_ENABLE
  * 7.2 - Add KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT
+ * 8.0 - Expand runtime information given to the debugger
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	7
-#define KFD_IOCTL_DBG_MINOR_VERSION	2
+#define KFD_IOCTL_DBG_MAJOR_VERSION	8
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -256,6 +257,7 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_DBG_QUEUE_ERROR_MASK	(1 << KFD_DBG_QUEUE_ERROR_BIT)
 #define KFD_DBG_QUEUE_INVALID_MASK	(1 << KFD_DBG_QUEUE_INVALID_BIT)
 
+#define KFD_INVALID_GPUID	0xffffffff
 #define KFD_INVALID_QUEUEID	0xffffffff
 
 enum kfd_dbg_trap_override_mode {
@@ -300,9 +302,8 @@ enum kfd_dbg_trap_exception_code {
 	EC_DEVICE_FATAL_HALT = 35,
 	EC_DEVICE_NEW = 36,
 	/* per process */
-	EC_PROCESS_RUNTIME_ENABLE = 48,
-	EC_PROCESS_RUNTIME_DISABLE = 49,
-	EC_PROCESS_DEVICE_REMOVE = 50,
+	EC_PROCESS_RUNTIME = 48,
+	EC_PROCESS_DEVICE_REMOVE = 49,
 	EC_MAX
 };
 
@@ -330,8 +331,7 @@ enum kfd_dbg_trap_exception_code {
 				 KFD_EC_MASK(EC_DEVICE_FATAL_HALT) |		\
 				 KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION) |	\
 				 KFD_EC_MASK(EC_DEVICE_NEW))
-#define KFD_EC_MASK_PROCESS	(KFD_EC_MASK(EC_PROCESS_RUNTIME_ENABLE) |	\
-				 KFD_EC_MASK(EC_PROCESS_RUNTIME_DISABLE) |	\
+#define KFD_EC_MASK_PROCESS	(KFD_EC_MASK(EC_PROCESS_RUNTIME) |	\
 				 KFD_EC_MASK(EC_PROCESS_DEVICE_REMOVE))
 
 /* Checks for exception code types for KFD search. */
@@ -342,12 +342,25 @@ enum kfd_dbg_trap_exception_code {
 #define KFD_DBG_EC_TYPE_IS_PROCESS(ecode)				\
 			(!!(KFD_EC_MASK(ecode) & KFD_EC_MASK_PROCESS))
 
+enum kfd_dbg_runtime_state {
+	DEBUG_RUNTIME_STATE_DISABLED = 0,
+	DEBUG_RUNTIME_STATE_ENABLED = 1,
+	DEBUG_RUNTIME_STATE_ENABLED_BUSY = 2,
+	DEBUG_RUNTIME_STATE_ENABLED_ERROR = 3
+};
+
+struct kfd_runtime_info {
+	__u64 r_debug;
+	__u32 runtime_state;
+	__u32 ttmp_setup;
+};
+
 /* KFD_IOC_DBG_TRAP_ENABLE:
  * exception_mask: exceptions to be reported to the debugger
- * ptr:   unused
+ * ptr:   runtime info buffer to copy to (IN)
  * data1: 0=disable, 1=enable
  * data2: return value for fd
- * data3: return ttmp/dispatch ptr save enabled (0=disabled, 1=enabled)
+ * data3: runtime info size
  * data4: unused
  *
  */
@@ -497,8 +510,8 @@ enum kfd_dbg_trap_exception_code {
  * data3: clear_exception (1 == true, 0 == false)
  * data4: exception info data size
  *
- * NOTE: If data2 == EC_PROCESS_RUNTIME_ENABLE, the saved r_debug pointer
- * address will be copied to the exception info pointer.
+ * NOTE: If data2 == EC_PROCESS_RUNTIME, the saved runtime info will be copied
+ * to the exception info pointer.
  */
 #define KFD_IOC_DBG_TRAP_QUERY_EXCEPTION_INFO 11
 
@@ -527,8 +540,8 @@ enum kfd_dbg_trap_exception_code {
 /* KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT
  * exception_mask: exception to send
  * ptr:   unused
- * data1: destination (queue or device)
- * data2: unused
+ * data1: destination device id
+ * data2: destination queue id
  * data3: usused
  * data4: unused
  */

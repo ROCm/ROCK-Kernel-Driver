@@ -1195,7 +1195,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	/* New debugger for GFXv9 and later */
 	if (p->debug_trap_enabled) {
-		kfd_dbg_trap_disable(p, false, 0);
+		kfd_dbg_trap_disable(p);
 	}
 
 	/* If we are the debugger, we need to clean up the debugged process.
@@ -1212,7 +1212,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 				target->debugger_process == p) {
 				mutex_lock(&target->mutex);
 				if (target->debug_trap_enabled)
-					kfd_dbg_trap_disable(target, false, 0);
+					kfd_dbg_trap_disable(target);
 				mutex_unlock(&target->mutex);
 				if (atomic_read(&p->debugged_process_count) == 0)
 					break;
