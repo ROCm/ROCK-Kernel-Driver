@@ -1013,7 +1013,7 @@ struct kfd_process {
 	uint64_t r_debug;
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
-	bool enable_ttmp_setup;
+	struct kfd_runtime_info runtime_info;
 
 	atomic_t poison;
 
