@@ -2724,7 +2724,7 @@ int release_debug_trap_vmid(struct device_queue_manager *dqm,
 	if (r)
 		goto out_unlock;
 
-	update_save_ttmp(dqm, qpd, qpd->pqm->process->enable_ttmp_setup);
+	update_save_ttmp(dqm, qpd, qpd->pqm->process->runtime_info.ttmp_setup);
 
 	r = map_queues_cpsch(dqm);
 	if (r)
