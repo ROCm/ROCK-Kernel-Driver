@@ -1185,11 +1185,12 @@ int amdgpu_display_gem_fb_init(struct drm_device *dev,
 	int ret;
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
-	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
+
+	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
 	if (ret)
 		goto err;
 
-	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
+	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret)
 		goto err;
 
@@ -1209,10 +1210,6 @@ int amdgpu_display_gem_fb_verify_and_init(
 
 	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
-	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
-
-	if (ret)
-		goto err;
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	/* Verify that the modifier is supported. */
@@ -1231,6 +1228,10 @@ int amdgpu_display_gem_fb_verify_and_init(
 #endif
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
+	if (ret)
+		goto err;
+
+	ret = drm_framebuffer_init(dev, &rfb->base, &amdgpu_fb_funcs);
 	if (ret)
 		goto err;
 
