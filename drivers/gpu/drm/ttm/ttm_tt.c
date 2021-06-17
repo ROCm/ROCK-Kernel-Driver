@@ -340,7 +340,7 @@ int ttm_tt_populate(struct ttm_device *bdev,
 		ret = ttm_global_swapout(ctx, GFP_KERNEL);
 		if (ret == 0)
 			break;
-		if (ret)
+		if (ret < 0)
 			goto error;
 	}
 
