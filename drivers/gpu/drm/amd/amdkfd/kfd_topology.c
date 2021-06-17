@@ -1405,6 +1405,7 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 
 			inbound_link->flags = CRAT_IOLINK_FLAGS_ENABLED;
 			kfd_set_iolink_no_atomics(peer_dev, dev, inbound_link);
+			kfd_set_iolink_non_coherent(peer_dev, link, inbound_link);
 		}
 	}
 }
