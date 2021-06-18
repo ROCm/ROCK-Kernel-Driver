@@ -194,6 +194,48 @@ enum pp_df_cstate {
 	DF_CSTATE_ALLOW,
 };
 
+/**
+ * DOC: amdgpu_pp_power
+ *
+ * APU power is managed to system-level requirements through the PPT
+ * (package power tracking) feature. PPT is intended to limit power to the
+ * requirements of the power source and could be dynamically updated to
+ * maximize APU performance within the system power budget.
+ *
+ * Two types of power measurement can be requested, where supported, with
+ * :c:type:`enum pp_power_type <pp_power_type>`.
+ */
+
+/**
+ * enum pp_power_limit_level - Used to query the power limits
+ *
+ * @PP_PWR_LIMIT_MIN: Minimum Power Limit
+ * @PP_PWR_LIMIT_CURRENT: Current Power Limit
+ * @PP_PWR_LIMIT_DEFAULT: Default Power Limit
+ * @PP_PWR_LIMIT_MAX: Maximum Power Limit
+ */
+enum pp_power_limit_level
+{
+	PP_PWR_LIMIT_MIN = -1,
+	PP_PWR_LIMIT_CURRENT,
+	PP_PWR_LIMIT_DEFAULT,
+	PP_PWR_LIMIT_MAX,
+};
+
+/**
+ * enum pp_power_type - Used to specify the type of the requested power
+ *
+ * @PP_PWR_TYPE_SUSTAINED: manages the configurable, thermally significant
+ * moving average of APU power (default ~5000 ms).
+ * @PP_PWR_TYPE_FAST: manages the ~10 ms moving average of APU power,
+ * where supported.
+ */
+enum pp_power_type
+{
+	PP_PWR_TYPE_SUSTAINED,
+	PP_PWR_TYPE_FAST,
+};
+
 #define PP_GROUP_MASK        0xF0000000
 #define PP_GROUP_SHIFT       28
 
@@ -293,8 +335,9 @@ struct amd_pm_funcs {
 				uint32_t block_type, bool gate);
 	int (*set_clockgating_by_smu)(void *handle, uint32_t msg_id);
 	int (*set_power_limit)(void *handle, uint32_t n);
-	int (*get_power_limit)(void *handle, uint32_t *limit, uint32_t *max_limit,
-			bool default_limit);
+	int (*get_power_limit)(void *handle, uint32_t *limit,
+			enum pp_power_limit_level pp_limit_level,
+			enum pp_power_type power_type);
 	int (*get_power_profile_mode)(void *handle, char *buf);
 	int (*set_power_profile_mode)(void *handle, long *input, uint32_t size);
 	int (*set_fine_grain_clk_vol)(void *handle, uint32_t type, long *input, uint32_t size);
@@ -517,7 +560,7 @@ struct gpu_metrics_v1_2 {
 	uint16_t			current_vclk1;
 	uint16_t			current_dclk1;
 
-	/* Throttle status */
+	/* Throttle status (ASIC dependent) */
 	uint32_t			throttle_status;
 
 	/* Fans */
@@ -605,6 +648,9 @@ struct gpu_metrics_v1_3 {
 	uint16_t			voltage_mem;
 
 	uint16_t			padding1;
+
+	/* Throttle status (ASIC independent) */
+	uint64_t			indep_throttle_status;
 };
 
 /*
@@ -709,6 +755,59 @@ struct gpu_metrics_v2_1 {
 	uint16_t			fan_pwm;
 
 	uint16_t			padding[3];
+};
+
+struct gpu_metrics_v2_2 {
+	struct metrics_table_header	common_header;
+
+	/* Temperature */
+	uint16_t			temperature_gfx; // gfx temperature on APUs
+	uint16_t			temperature_soc; // soc temperature on APUs
+	uint16_t			temperature_core[8]; // CPU core temperature on APUs
+	uint16_t			temperature_l3[2];
+
+	/* Utilization */
+	uint16_t			average_gfx_activity;
+	uint16_t			average_mm_activity; // UVD or VCN
+
+	/* Driver attached timestamp (in ns) */
+	uint64_t			system_clock_counter;
+
+	/* Power/Energy */
+	uint16_t			average_socket_power; // dGPU + APU power on A + A platform
+	uint16_t			average_cpu_power;
+	uint16_t			average_soc_power;
+	uint16_t			average_gfx_power;
+	uint16_t			average_core_power[8]; // CPU core power on APUs
+
+	/* Average clocks */
+	uint16_t			average_gfxclk_frequency;
+	uint16_t			average_socclk_frequency;
+	uint16_t			average_uclk_frequency;
+	uint16_t			average_fclk_frequency;
+	uint16_t			average_vclk_frequency;
+	uint16_t			average_dclk_frequency;
+
+	/* Current clocks */
+	uint16_t			current_gfxclk;
+	uint16_t			current_socclk;
+	uint16_t			current_uclk;
+	uint16_t			current_fclk;
+	uint16_t			current_vclk;
+	uint16_t			current_dclk;
+	uint16_t			current_coreclk[8]; // CPU core clocks
+	uint16_t			current_l3clk[2];
+
+	/* Throttle status (ASIC dependent) */
+	uint32_t			throttle_status;
+
+	/* Fans */
+	uint16_t			fan_pwm;
+
+	uint16_t			padding[3];
+
+	/* Throttle status (ASIC independent) */
+	uint64_t			indep_throttle_status;
 };
 
 #endif

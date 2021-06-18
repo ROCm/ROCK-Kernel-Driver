@@ -2907,9 +2907,9 @@ static ssize_t amdgpu_hwmon_show_power_cap_max(struct device *dev,
 {
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
-	int limit_type = to_sensor_dev_attr(attr)->index;
-	uint32_t limit = limit_type << 24;
-	uint32_t max_limit = 0;
+	enum pp_power_type power_type = to_sensor_dev_attr(attr)->index;
+	enum pp_power_limit_level pp_limit_level = PP_PWR_LIMIT_MAX;
+	uint32_t limit;
 	ssize_t size;
 	int r;
 
@@ -2924,16 +2924,16 @@ static ssize_t amdgpu_hwmon_show_power_cap_max(struct device *dev,
 		return r;
 	}
 
-	if (is_support_sw_smu(adev)) {
-		smu_get_power_limit(&adev->smu, &limit, SMU_PPT_LIMIT_MAX);
+	if (pp_funcs && pp_funcs->get_power_limit)
+		r = pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit,
+					      pp_limit_level, power_type);
+	else
+		r = -ENODATA;
+
+	if (!r)
 		size = snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
-	} else if (pp_funcs && pp_funcs->get_power_limit) {
-		pp_funcs->get_power_limit(adev->powerplay.pp_handle,
-				&limit, &max_limit, true);
-		size = snprintf(buf, PAGE_SIZE, "%u\n", max_limit * 1000000);
-	} else {
+	else
 		size = snprintf(buf, PAGE_SIZE, "\n");
-	}
 
 	pm_runtime_mark_last_busy(adev_to_drm(adev)->dev);
 	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
@@ -2947,8 +2947,9 @@ static ssize_t amdgpu_hwmon_show_power_cap(struct device *dev,
 {
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
-	int limit_type = to_sensor_dev_attr(attr)->index;
-	uint32_t limit = limit_type << 24;
+	enum pp_power_type power_type = to_sensor_dev_attr(attr)->index;
+	enum pp_power_limit_level pp_limit_level = PP_PWR_LIMIT_CURRENT;
+	uint32_t limit;
 	ssize_t size;
 	int r;
 
@@ -2963,16 +2964,16 @@ static ssize_t amdgpu_hwmon_show_power_cap(struct device *dev,
 		return r;
 	}
 
-	if (is_support_sw_smu(adev)) {
-		smu_get_power_limit(&adev->smu, &limit, SMU_PPT_LIMIT_CURRENT);
+	if (pp_funcs && pp_funcs->get_power_limit)
+		r = pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit,
+					      pp_limit_level, power_type);
+	else
+		r = -ENODATA;
+
+	if (!r)
 		size = snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
-	} else if (pp_funcs && pp_funcs->get_power_limit) {
-		pp_funcs->get_power_limit(adev->powerplay.pp_handle,
-				&limit, NULL, false);
-		size = snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
-	} else {
+	else
 		size = snprintf(buf, PAGE_SIZE, "\n");
-	}
 
 	pm_runtime_mark_last_busy(adev_to_drm(adev)->dev);
 	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
@@ -2986,8 +2987,9 @@ static ssize_t amdgpu_hwmon_show_power_cap_default(struct device *dev,
 {
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
-	int limit_type = to_sensor_dev_attr(attr)->index;
-	uint32_t limit = limit_type << 24;
+	enum pp_power_type power_type = to_sensor_dev_attr(attr)->index;
+	enum pp_power_limit_level pp_limit_level = PP_PWR_LIMIT_DEFAULT;
+	uint32_t limit;
 	ssize_t size;
 	int r;
 
@@ -3002,16 +3004,16 @@ static ssize_t amdgpu_hwmon_show_power_cap_default(struct device *dev,
 		return r;
 	}
 
-	if (is_support_sw_smu(adev)) {
-		smu_get_power_limit(&adev->smu, &limit, SMU_PPT_LIMIT_DEFAULT);
+	if (pp_funcs && pp_funcs->get_power_limit)
+		r = pp_funcs->get_power_limit(adev->powerplay.pp_handle, &limit,
+					      pp_limit_level, power_type);
+	else
+		r = -ENODATA;
+
+	if (!r)
 		size = snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
-	} else if (pp_funcs && pp_funcs->get_power_limit) {
-		pp_funcs->get_power_limit(adev->powerplay.pp_handle,
-				&limit, NULL, true);
-		size = snprintf(buf, PAGE_SIZE, "%u\n", limit * 1000000);
-	} else {
+	else
 		size = snprintf(buf, PAGE_SIZE, "\n");
-	}
 
 	pm_runtime_mark_last_busy(adev_to_drm(adev)->dev);
 	pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);

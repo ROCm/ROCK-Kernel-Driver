@@ -58,6 +58,7 @@
 #if defined(CONFIG_DEBUG_FS)
 #include "amdgpu_dm_debugfs.h"
 #endif
+#include "amdgpu_dm_psr.h"
 
 #include "ivsrcid/ivsrcid_vislands30.h"
 
@@ -117,6 +118,10 @@ MODULE_FIRMWARE(FIRMWARE_VANGOGH_DMUB);
 MODULE_FIRMWARE(FIRMWARE_DIMGREY_CAVEFISH_DMUB);
 #define FIRMWARE_BEIGE_GOBY_DMUB "amdgpu/beige_goby_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_BEIGE_GOBY_DMUB);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#define FIRMWARE_YELLOW_CARP_DMUB "amdgpu/yellow_carp_dmcub.bin"
+MODULE_FIRMWARE(FIRMWARE_YELLOW_CARP_DMUB);
 #endif
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
@@ -224,12 +229,6 @@ static void handle_cursor_update(struct drm_plane *plane,
 				 struct drm_plane_state *old_plane_state);
 
 static void prepare_flip_isr(struct amdgpu_crtc *acrtc);
-
-static void amdgpu_dm_set_psr_caps(struct dc_link *link);
-static bool amdgpu_dm_psr_enable(struct dc_stream_state *stream);
-static bool amdgpu_dm_link_setup_psr(struct dc_stream_state *stream);
-static bool amdgpu_dm_psr_disable(struct dc_stream_state *stream);
-static bool amdgpu_dm_psr_disable_all(struct amdgpu_display_manager *dm);
 
 static const struct drm_format_info *
 amd_get_format_info(const struct drm_mode_fb_cmd2 *cmd);
@@ -1204,6 +1203,11 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		init_data.flags.gpu_vm_support = true;
 		break;
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
+		init_data.flags.gpu_vm_support = true;
+		break;
+#endif
 	default:
 		break;
 	}
@@ -1459,6 +1463,9 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_BEIGE_GOBY:
 	case CHIP_VANGOGH:
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
+#endif
 		return 0;
 	case CHIP_NAVI12:
 		fw_name_dmcu = FIRMWARE_NAVI12_DMCU;
@@ -1580,6 +1587,12 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	case CHIP_BEIGE_GOBY:
 		dmub_asic = DMUB_ASIC_DCN303;
 		fw_name_dmub = FIRMWARE_BEIGE_GOBY_DMUB;
+		break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
+		dmub_asic = DMUB_ASIC_DCN31;
+		fw_name_dmub = FIRMWARE_YELLOW_CARP_DMUB;
 		break;
 #endif
 
@@ -2307,6 +2320,15 @@ static int dm_resume(void *handle)
 					= 0xffffffff;
 			}
 		}
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+		/*
+		 * Resource allocation happens for link encoders for newer ASIC in
+		 * dc_validate_global_state, so we need to revalidate it.
+		 *
+		 * This shouldn't fail (it passed once before), so warn if it does.
+		 */
+		WARN_ON(dc_validate_global_state(dm->dc, dc_state, false) != DC_OK);
+#endif
 
 		WARN_ON(!dc_commit_state(dm->dc, dc_state));
 
@@ -3988,6 +4010,9 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	switch (adev->asic_type) {
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
+#endif
 	case CHIP_RENOIR:
 		if (register_outbox_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -4095,6 +4120,9 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
 	case CHIP_VANGOGH:
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
 #endif
 		if (dcn10_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -4411,6 +4439,13 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_dig = 4;
 		break;
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	case CHIP_YELLOW_CARP:
+		adev->mode_info.num_crtc = 4;
+		adev->mode_info.num_hpd = 4;
+		adev->mode_info.num_dig = 4;
+		break;
+#endif
 	case CHIP_NAVI14:
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_DIMGREY_CAVEFISH:
@@ -4666,6 +4701,9 @@ fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
 	    adev->asic_type == CHIP_NAVY_FLOUNDER ||
 	    adev->asic_type == CHIP_DIMGREY_CAVEFISH ||
 	    adev->asic_type == CHIP_BEIGE_GOBY ||
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	    adev->asic_type == CHIP_YELLOW_CARP ||
+#endif
 	    adev->asic_type == CHIP_VANGOGH)
 		tiling_info->gfx9.num_pkrs = adev->gfx.config.gb_addr_config_fields.num_pkrs;
 #endif
@@ -5224,6 +5262,7 @@ get_plane_modifiers(const struct amdgpu_device *adev, unsigned int plane_type, u
 		break;
 	case AMDGPU_FAMILY_NV:
 	case AMDGPU_FAMILY_VGH:
+	case AMDGPU_FAMILY_YC:
 		if (adev->asic_type >= CHIP_SIENNA_CICHLID)
 			add_gfx10_3_modifiers(adev, mods, &size, &capacity);
 		else
@@ -10810,7 +10849,8 @@ skip_modeset:
 
 #ifdef HAVE_DRM_ATOMIC_GET_CRTC_STATE
 	/* Scaling or underscan settings */
-	if (is_scaling_state_different(dm_old_conn_state, dm_new_conn_state))
+	if (is_scaling_state_different(dm_old_conn_state, dm_new_conn_state) ||
+				drm_atomic_crtc_needs_modeset(new_crtc_state))
 		update_stream_scaling_settings(
 			&new_crtc_state->mode, dm_new_conn_state, dm_new_crtc_state->stream);
 #endif
@@ -11441,6 +11481,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			&& dm_old_crtc_state->dsc_force_changed == false)
 			continue;
 
+		if ((ret = amdgpu_dm_verify_lut_sizes(new_crtc_state)))
+			goto fail;
+
 		if (!new_crtc_state->enable)
 			continue;
 
@@ -11997,136 +12040,6 @@ update:
 			&connector->base, adev->mode_info.vrr_capable_property,
 			freesync_capable);
 #endif
-}
-
-static void amdgpu_dm_set_psr_caps(struct dc_link *link)
-{
-	uint8_t dpcd_data[EDP_PSR_RECEIVER_CAP_SIZE];
-
-	if (!(link->connector_signal & SIGNAL_TYPE_EDP))
-		return;
-	if (link->type == dc_connection_none)
-		return;
-	if (dm_helpers_dp_read_dpcd(NULL, link, DP_PSR_SUPPORT,
-					dpcd_data, sizeof(dpcd_data))) {
-		link->dpcd_caps.psr_caps.psr_version = dpcd_data[0];
-
-		if (dpcd_data[0] == 0) {
-			link->psr_settings.psr_version = DC_PSR_VERSION_UNSUPPORTED;
-			link->psr_settings.psr_feature_enabled = false;
-		} else {
-			link->psr_settings.psr_version = DC_PSR_VERSION_1;
-			link->psr_settings.psr_feature_enabled = true;
-		}
-
-		DRM_INFO("PSR support:%d\n", link->psr_settings.psr_feature_enabled);
-	}
-}
-
-/*
- * amdgpu_dm_link_setup_psr() - configure psr link
- * @stream: stream state
- *
- * Return: true if success
- */
-static bool amdgpu_dm_link_setup_psr(struct dc_stream_state *stream)
-{
-	struct dc_link *link = NULL;
-	struct psr_config psr_config = {0};
-	struct psr_context psr_context = {0};
-	bool ret = false;
-
-	if (stream == NULL)
-		return false;
-
-	link = stream->link;
-
-	psr_config.psr_version = link->dpcd_caps.psr_caps.psr_version;
-
-	if (psr_config.psr_version > 0) {
-		psr_config.psr_exit_link_training_required = 0x1;
-		psr_config.psr_frame_capture_indication_req = 0;
-		psr_config.psr_rfb_setup_time = 0x37;
-		psr_config.psr_sdp_transmit_line_num_deadline = 0x20;
-		psr_config.allow_smu_optimizations = 0x0;
-
-		ret = dc_link_setup_psr(link, stream, &psr_config, &psr_context);
-
-	}
-	DRM_DEBUG_DRIVER("PSR link: %d\n",	link->psr_settings.psr_feature_enabled);
-
-	return ret;
-}
-
-/*
- * amdgpu_dm_psr_enable() - enable psr f/w
- * @stream: stream state
- *
- * Return: true if success
- */
-bool amdgpu_dm_psr_enable(struct dc_stream_state *stream)
-{
-	struct dc_link *link = stream->link;
-	unsigned int vsync_rate_hz = 0;
-	struct dc_static_screen_params params = {0};
-	/* Calculate number of static frames before generating interrupt to
-	 * enter PSR.
-	 */
-	// Init fail safe of 2 frames static
-	unsigned int num_frames_static = 2;
-
-	DRM_DEBUG_DRIVER("Enabling psr...\n");
-
-	vsync_rate_hz = div64_u64(div64_u64((
-			stream->timing.pix_clk_100hz * 100),
-			stream->timing.v_total),
-			stream->timing.h_total);
-
-	/* Round up
-	 * Calculate number of frames such that at least 30 ms of time has
-	 * passed.
-	 */
-	if (vsync_rate_hz != 0) {
-		unsigned int frame_time_microsec = 1000000 / vsync_rate_hz;
-		num_frames_static = (30000 / frame_time_microsec) + 1;
-	}
-
-	params.triggers.cursor_update = true;
-	params.triggers.overlay_update = true;
-	params.triggers.surface_update = true;
-	params.num_frames = num_frames_static;
-
-	dc_stream_set_static_screen_params(link->ctx->dc,
-					   &stream, 1,
-					   &params);
-
-	return dc_link_set_psr_allow_active(link, true, false, false);
-}
-
-/*
- * amdgpu_dm_psr_disable() - disable psr f/w
- * @stream:  stream state
- *
- * Return: true if success
- */
-static bool amdgpu_dm_psr_disable(struct dc_stream_state *stream)
-{
-
-	DRM_DEBUG_DRIVER("Disabling psr...\n");
-
-	return dc_link_set_psr_allow_active(stream->link, false, true, false);
-}
-
-/*
- * amdgpu_dm_psr_disable() - disable psr f/w
- * if psr is enabled on any stream
- *
- * Return: true if success
- */
-static bool amdgpu_dm_psr_disable_all(struct amdgpu_display_manager *dm)
-{
-	DRM_DEBUG_DRIVER("Disabling psr if psr is enabled on any stream\n");
-	return dc_set_psr_allow_active(dm->dc, false);
 }
 
 void amdgpu_dm_trigger_timing_sync(struct drm_device *dev)

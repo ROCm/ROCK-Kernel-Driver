@@ -249,6 +249,9 @@ struct stream_encoder_funcs {
 		struct stream_encoder *enc,
 		bool odm_combine);
 #endif
+
+	uint32_t (*get_fifo_cal_average_level)(
+		struct stream_encoder *enc);
 };
 
 #endif /* STREAM_ENCODER_H_ */

@@ -827,6 +827,8 @@ static const struct stream_encoder_funcs dcn30_str_enc_funcs = {
 #endif
 	.set_dynamic_metadata = enc2_set_dynamic_metadata,
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
+
+	.get_fifo_cal_average_level = enc2_get_fifo_cal_average_level,
 };
 
 void dcn30_dio_stream_encoder_construct(

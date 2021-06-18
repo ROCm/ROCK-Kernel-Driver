@@ -166,6 +166,14 @@ struct dcn10_link_enc_registers {
 	uint32_t PHYB_LINK_CNTL2;
 	uint32_t PHYC_LINK_CNTL2;
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	uint32_t DIO_LINKA_CNTL;
+	uint32_t DIO_LINKB_CNTL;
+	uint32_t DIO_LINKC_CNTL;
+	uint32_t DIO_LINKD_CNTL;
+	uint32_t DIO_LINKE_CNTL;
+	uint32_t DIO_LINKF_CNTL;
+#endif
 };
 
 #define LE_SF(reg_name, field_name, post_fix)\
@@ -470,6 +478,12 @@ struct dcn10_link_enc_registers {
 	type DPCS_TX_DATA_ORDER_INVERT_18_BIT;\
 	type RDPCS_TX_CLK_EN
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#define DCN31_LINK_ENCODER_REG_FIELD_LIST(type) \
+	type ENC_TYPE_SEL;\
+	type HPO_DP_ENC_SEL;\
+	type HPO_HDMI_ENC_SEL
+#endif
 
 struct dcn10_link_enc_shift {
 	DCN_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
@@ -478,6 +492,9 @@ struct dcn10_link_enc_shift {
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN30_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	DCN31_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
 #endif
 };
 
@@ -488,6 +505,9 @@ struct dcn10_link_enc_mask {
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN30_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+	DCN31_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
 #endif
 };
 

@@ -292,13 +292,22 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 
 	/* Drop the references held by the debug session. */
 	if (!unwind) {
+		int resume_count;
+
 		cancel_work_sync(&target->debug_event_workarea);
 		fput(target->dbg_ev_file);
 		kfd_unref_process(target);
+		resume_count = resume_queues(target, true, 0, NULL);
+		if (resume_count)
+			pr_debug("Resumed %d queues\n", resume_count);
+		if (target->debugger_process)
+			atomic_dec(&target->debugger_process->debugged_process_count);
 	}
 
 	target->debug_trap_enabled = false;
 	target->dbg_ev_file = NULL;
+
+	target->debugger_process = NULL;
 
 	return 0;
 }
@@ -353,6 +362,8 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 	 */
 	kref_get(&target->ref);
 	target->debug_trap_enabled = true;
+	if (target->debugger_process)
+		atomic_inc(&target->debugger_process->debugged_process_count);
 	*ttmp_save = 0; /* TBD - set based on runtime enable */
 
 	return 0;

@@ -1882,25 +1882,24 @@ static int get_wave_state(struct device_queue_manager *dqm,
 
 	dqm_lock(dqm);
 
-	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
-	    q->properties.is_active || !q->device->cwsr_enabled) {
-		r = -EINVAL;
-		goto dqm_unlock;
-	}
-
 	mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
 
-	if (!mqd_mgr->get_wave_state) {
-		r = -EINVAL;
-		goto dqm_unlock;
+	if (q->properties.type != KFD_QUEUE_TYPE_COMPUTE ||
+	    q->properties.is_active || !q->device->cwsr_enabled ||
+	    !mqd_mgr->get_wave_state) {
+		dqm_unlock(dqm);
+		return -EINVAL;
 	}
 
-	r = mqd_mgr->get_wave_state(mqd_mgr, q->mqd, ctl_stack,
-			ctl_stack_used_size, save_area_used_size);
-
-dqm_unlock:
 	dqm_unlock(dqm);
-	return r;
+
+	/*
+	 * get_wave_state is outside the dqm lock to prevent circular locking
+	 * and the queue should be protected against destruction by the process
+	 * lock.
+	 */
+	return mqd_mgr->get_wave_state(mqd_mgr, q->mqd, ctl_stack,
+			ctl_stack_used_size, save_area_used_size);
 }
 
 static int process_termination_cpsch(struct device_queue_manager *dqm,
@@ -2142,6 +2141,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 	case CHIP_VANGOGH:
 	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
+	case CHIP_YELLOW_CARP:
 		device_queue_manager_init_v10_navi10(&dqm->asic_ops);
 		break;
 	default:
@@ -2329,6 +2329,7 @@ struct copy_context_work_handler_workarea {
 	struct kfd_process *p;
 };
 
+/* assume work is flushed while process lock is held. */
 void copy_context_work_handler (struct work_struct *work)
 {
 	struct copy_context_work_handler_workarea *workarea;
@@ -2355,9 +2356,6 @@ void copy_context_work_handler (struct work_struct *work)
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
 
-		dqm_lock(dqm);
-
-
 		list_for_each_entry(q, &qpd->queues_list, list) {
 			mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
 
@@ -2373,22 +2371,25 @@ void copy_context_work_handler (struct work_struct *work)
 					&tmp_ctl_stack_used_size,
 					&tmp_save_area_used_size);
 		}
-
-		dqm_unlock(dqm);
 	}
 	kthread_unuse_mm(mm);
 	mmput(mm);
 }
 
 int resume_queues(struct kfd_process *p,
+		bool resume_all_queues,
 		uint32_t num_queues,
 		uint32_t *queue_ids)
 {
 	int total_resumed = 0;
 	int i;
 
+	if (!resume_all_queues && queue_ids == NULL)
+		return -EINVAL;
+
 	/* mask all queues as invalid.  unmask per successful request */
-	q_array_invalidate(num_queues, queue_ids);
+	if (!resume_all_queues)
+		q_array_invalidate(num_queues, queue_ids);
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -2401,13 +2402,18 @@ int resume_queues(struct kfd_process *p,
 
 		/* unmask queues that resume or already resumed as valid */
 		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = q_array_get_index(q->properties.queue_id,
-					num_queues,
-					queue_ids);
+			int q_idx = QUEUE_NOT_FOUND;
 
-			if (q_idx != QUEUE_NOT_FOUND) {
+			if (queue_ids)
+				q_idx = q_array_get_index(
+						q->properties.queue_id,
+						num_queues,
+						queue_ids);
+
+			if (resume_all_queues || q_idx != QUEUE_NOT_FOUND) {
 				resume_single_queue(dqm, &pdd->qpd, q);
-				queue_ids[q_idx] &=
+				if (queue_ids)
+					queue_ids[q_idx] &=
 						~KFD_DBG_QUEUE_INVALID_MASK;
 				per_device_resumed++;
 			}
@@ -2424,16 +2430,18 @@ int resume_queues(struct kfd_process *p,
 					USE_DEFAULT_GRACE_PERIOD);
 		if (r) {
 			pr_err("Failed to resume process queues\n");
-			list_for_each_entry(q, &qpd->queues_list, list) {
-				int q_idx = q_array_get_index(
+			if (!resume_all_queues) {
+				list_for_each_entry(q, &qpd->queues_list, list) {
+					int q_idx = q_array_get_index(
 							q->properties.queue_id,
 							num_queues,
 							queue_ids);
 
-				/* mask queue as error on resume fail */
-				if (q_idx != QUEUE_NOT_FOUND)
-					queue_ids[q_idx] |=
-						KFD_DBG_QUEUE_ERROR_MASK;
+					/* mask queue as error on resume fail */
+					if (q_idx != QUEUE_NOT_FOUND)
+						queue_ids[q_idx] |=
+							KFD_DBG_QUEUE_ERROR_MASK;
+				}
 			}
 		} else {
 			wake_up_all(&dqm->destroy_wait);

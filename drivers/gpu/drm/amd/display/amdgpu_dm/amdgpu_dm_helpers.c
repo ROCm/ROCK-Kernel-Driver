@@ -748,6 +748,12 @@ void dm_set_dcn_clocks(struct dc_context *ctx, struct dc_clocks *clks)
 	/* TODO: something */
 }
 
+void dm_helpers_smu_timeout(struct dc_context *ctx, unsigned int msg_id, unsigned int param, unsigned int timeout_us)
+{
+	// TODO:
+	//amdgpu_device_gpu_recover(dc_context->driver-context, NULL);
+}
+
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
 void *dm_helpers_allocate_gpu_mem(
 		struct dc_context *ctx,
