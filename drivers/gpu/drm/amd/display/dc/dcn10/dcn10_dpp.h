@@ -1501,8 +1501,6 @@ void dpp1_cnv_setup (
 		enum dc_color_space input_color_space);
 #endif
 
-void dpp1_full_bypass(struct dpp *dpp_base);
-
 void dpp1_dppclk_control(
 		struct dpp *dpp_base,
 		bool dppclk_div,
