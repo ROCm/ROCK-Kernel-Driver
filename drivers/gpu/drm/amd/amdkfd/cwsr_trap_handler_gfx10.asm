@@ -776,6 +776,7 @@ L_RESTORE_VGPR_WAVE32_LOOP:
 	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128
 	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128*2
 	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128*3
+	s_waitcnt	vmcnt(0)
 
 	s_branch	L_RESTORE_SGPR
 
