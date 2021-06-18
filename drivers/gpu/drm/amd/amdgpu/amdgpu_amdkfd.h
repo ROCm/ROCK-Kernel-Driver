@@ -437,7 +437,7 @@ static int __maybe_unused kgd2kfd_resume_iommu(struct kfd_dev *kfd)
 	return 0;
 }
 
-static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
+static inline int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
 {
 	return 0;
 }
