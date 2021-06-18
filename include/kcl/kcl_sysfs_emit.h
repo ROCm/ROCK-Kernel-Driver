@@ -15,9 +15,19 @@
 #ifdef CONFIG_SYSFS
 __printf(2, 3)
 int sysfs_emit(char *buf, const char *fmt, ...);
+
+__printf(3, 4)
+int sysfs_emit_at(char *buf, int at, const char *fmt, ...);
+
 #else
 __printf(2, 3)
 static inline int sysfs_emit(char *buf, const char *fmt, ...)
+{
+        return 0;
+}
+
+__printf(3, 4)
+static inline int sysfs_emit_at(char *buf, int at, const char *fmt, ...)
 {
         return 0;
 }
