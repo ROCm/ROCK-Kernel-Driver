@@ -82,8 +82,7 @@ int phm_enable_dynamic_state_management(struct pp_hwmgr *hwmgr)
 
 	/* Skip for suspend/resume case */
 	if (!hwmgr->pp_one_vf && smum_is_dpm_running(hwmgr)
-	    && !amdgpu_passthrough(adev) && adev->in_suspend
-		&& adev->asic_type != CHIP_RAVEN) {
+	    && !amdgpu_passthrough(adev) && adev->in_suspend) {
 		pr_info("dpm has been enabled\n");
 		return 0;
 	}
