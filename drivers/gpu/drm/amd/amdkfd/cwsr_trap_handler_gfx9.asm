@@ -70,7 +70,7 @@ var SQ_WAVE_GPR_ALLOC_VGPR_SIZE_SHIFT	= 8
 #endif
 
 var SQ_WAVE_TRAPSTS_SAVECTX_MASK    =	0x400
-var SQ_WAVE_TRAPSTS_EXCE_MASK	    =	0x1FF			// Exception mask
+var SQ_WAVE_TRAPSTS_EXCP_MASK	    =	0x79FF
 var SQ_WAVE_TRAPSTS_SAVECTX_SHIFT   =	10
 var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK   =	0x100
 var SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT  =	8
@@ -96,7 +96,8 @@ var TTMP11_DEBUG_TRAP_ENABLED_MASK	=   0x800000
 /*	Save	    */
 var S_SAVE_BUF_RSRC_WORD1_STRIDE	=   0x00040000		//stride is 4 bytes
 var S_SAVE_BUF_RSRC_WORD3_MISC		=   0x00807FAC		//SQ_SEL_X/Y/Z/W, BUF_NUM_FORMAT_FLOAT, (0 for MUBUF stride[17:14] when ADD_TID_ENABLE and BUF_DATA_FORMAT_32 for MTBUF), ADD_TID_ENABLE
-
+var S_SAVE_PC_HI_TRAP_ID_MASK		=   0x00FF0000
+var S_SAVE_PC_HI_HT_MASK		=   0x01000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK	=   0x04000000		//bit[26]: FirstWaveInTG
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT	=   26
 
@@ -177,58 +178,45 @@ L_SKIP_RESTORE:
 
     s_getreg_b32    s_save_status, hwreg(HW_REG_STATUS)				    //save STATUS since we will change SCC
     s_andn2_b32	    s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK	    //check whether this is for save
-
-if SINGLE_STEP_MISSED_WORKAROUND
-    // No single step exceptions if MODE.DEBUG_EN=0.
-    s_getreg_b32    ttmp2, hwreg(HW_REG_MODE)
-    s_and_b32       ttmp2, ttmp2, SQ_WAVE_MODE_DEBUG_EN_MASK
-    s_cbranch_scc0  L_NO_SINGLE_STEP_WORKAROUND
-
-    // Second-level trap already handled exception if STATUS.HALT=1.
-    s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
-
-    // Prioritize single step exception over context save.
-    // Second-level trap will halt wave and RFE, re-entering for SAVECTX.
-    s_cbranch_scc0  L_FETCH_2ND_TRAP
-
-L_NO_SINGLE_STEP_WORKAROUND:
-end
-
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
+
+    s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+    s_cbranch_scc0  L_NOT_HALTED
+
+L_HALTED:
+    // Host trap may occur while wave is halted.
+    s_and_b32       ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
+    s_cbranch_scc1  L_FETCH_2ND_TRAP
+
+L_CHECK_SAVE:
     s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK    //check whether this is for save
     s_cbranch_scc1  L_SAVE					//this is the operation for save
 
-    // *********    Handle non-CWSR traps	*******************
-
-    // Illegal instruction is a non-maskable exception which blocks context save.
-    // Halt the wavefront and return from the trap.
-    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK
-    s_cbranch_scc1  L_HALT_WAVE
-
-    // If STATUS.MEM_VIOL is asserted then we cannot fetch from the TMA.
-    // Instead, halt the wavefront and return from the trap.
-    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
-    s_cbranch_scc0  L_FETCH_2ND_TRAP
-
-L_HALT_WAVE:
-    // If STATUS.HALT is set then this fault must come from SQC instruction fetch.
-    // We cannot prevent further faults. Spin wait until context saved.
-    s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
-    s_cbranch_scc0  L_NOT_ALREADY_HALTED
-
-L_WAIT_CTX_SAVE:
+    // Wave is halted but neither host trap nor SAVECTX is raised.
+    // Caused by instruction fetch memory violation.
+    // Spin wait until context saved to prevent interrupt storm.
     s_sleep         0x10
-    s_getreg_b32    ttmp2, hwreg(HW_REG_TRAPSTS)
-    s_and_b32       ttmp2, ttmp2, SQ_WAVE_TRAPSTS_SAVECTX_MASK
-    s_cbranch_scc0  L_WAIT_CTX_SAVE
+    s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
+    s_branch        L_CHECK_SAVE
 
-L_NOT_ALREADY_HALTED:
-    s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+L_NOT_HALTED:
+    // Let second-level handle non-SAVECTX exception or trap.
+    // Any concurrent SAVECTX will be handled upon re-entry once halted.
+    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCP_MASK
+    s_cbranch_scc1  L_FETCH_2ND_TRAP
+    s_and_b32       ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
+    s_cbranch_scc1  L_FETCH_2ND_TRAP
 
-    // If the PC points to S_ENDPGM then context save will fail if STATUS.HALT is set.
-    // Rewind the PC to prevent this from occurring. The debugger compensates for this.
-    s_sub_u32       ttmp0, ttmp0, 0x8
-    s_subb_u32      ttmp1, ttmp1, 0x0
+if SINGLE_STEP_MISSED_WORKAROUND
+    // Prioritize single step exception over context save.
+    // Second-level trap will halt wave and RFE, re-entering for SAVECTX.
+    s_getreg_b32    ttmp2, hwreg(HW_REG_MODE)
+    s_and_b32       ttmp2, ttmp2, SQ_WAVE_MODE_DEBUG_EN_MASK
+    s_cbranch_scc1  L_FETCH_2ND_TRAP
+end
+
+    s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
+    s_cbranch_scc1  L_SAVE
 
 L_FETCH_2ND_TRAP:
     // Preserve and clear scalar XNACK state before issuing scalar reads.
@@ -257,12 +245,28 @@ L_FETCH_2ND_TRAP:
     s_setpc_b64     [ttmp2, ttmp3] // jump to second-level trap handler
 
 L_NO_NEXT_TRAP:
-    s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
-    s_and_b32	    s_save_trapsts, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCE_MASK // Check whether it is an exception
-    s_cbranch_scc1  L_EXCP_CASE	  // Exception, jump back to the shader program directly.
-    s_add_u32	    ttmp0, ttmp0, 4   // S_TRAP case, add 4 to ttmp0
-    s_addc_u32	ttmp1, ttmp1, 0
-L_EXCP_CASE:
+    // If not caused by trap then halt wave to prevent re-entry.
+    s_and_b32       ttmp2, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+    s_cbranch_scc1  L_TRAP_CASE
+    s_or_b32        s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+
+    // If the PC points to S_ENDPGM then context save will fail if STATUS.HALT is set.
+    // Rewind the PC to prevent this from occurring.
+    s_sub_u32       ttmp0, ttmp0, 0x8
+    s_subb_u32      ttmp1, ttmp1, 0x0
+
+    s_branch        L_EXIT_TRAP
+
+L_TRAP_CASE:
+    // Host trap will not cause trap re-entry.
+    s_and_b32       ttmp2, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK
+    s_cbranch_scc1  L_EXIT_TRAP
+
+    // Advance past trap instruction to prevent re-entry.
+    s_add_u32       ttmp0, ttmp0, 0x4
+    s_addc_u32      ttmp1, ttmp1, 0x0
+
+L_EXIT_TRAP:
     s_and_b32	ttmp1, ttmp1, 0xFFFF
 
     restore_ib_sts(ttmp14)
