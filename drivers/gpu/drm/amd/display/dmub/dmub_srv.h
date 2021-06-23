@@ -243,6 +243,7 @@ struct dmub_srv_hw_params {
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool disable_z10;
 #endif
+	bool disable_dpia;
 };
 
 /**
