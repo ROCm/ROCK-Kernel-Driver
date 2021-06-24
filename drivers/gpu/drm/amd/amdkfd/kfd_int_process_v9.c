@@ -307,7 +307,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE) {
 			kfd_set_dbg_ev_from_interrupt(dev, pasid,
 				KFD_DEBUG_DOORBELL_ID(context_id0),
-				KFD_DEBUG_CP_BAD_OP_ECODE(context_id0),
+				KFD_EC_MASK(KFD_DEBUG_CP_BAD_OP_ECODE(context_id0)),
 				NULL, 0);
 		}
 	} else if (client_id == SOC15_IH_CLIENTID_SDMA0 ||
@@ -351,7 +351,7 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		kfd_set_dbg_ev_from_interrupt(dev,
 						pasid,
 						-1,
-						EC_DEVICE_MEMORY_VIOLATION,
+						KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION),
 						&exception_data,
 						sizeof(exception_data));
 		kfd_smi_event_update_vmfault(dev, pasid);
