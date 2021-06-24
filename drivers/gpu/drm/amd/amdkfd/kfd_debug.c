@@ -127,14 +127,13 @@ void debug_event_write_work_handler(struct work_struct *work)
 /* update process/device/queue exception status, write to descriptor
  * only if exception_status is enabled.
  */
-bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
-			struct kfd_dev *dev,
+bool kfd_dbg_ev_raise(uint64_t event_mask,
+			struct kfd_process *process, struct kfd_dev *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data, size_t exception_data_size)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	uint64_t ec_mask = KFD_EC_MASK(event_type);
 	int i;
 	static const char write_data = '.';
 	loff_t pos = 0;
@@ -145,16 +144,16 @@ bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 
 	mutex_lock(&process->event_mutex);
 
-	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
+	if (event_mask & KFD_EC_MASK_DEVICE) {
 		for (i = 0; i < process->n_pdds; i++) {
 			struct kfd_process_device *pdd = process->pdds[i];
 
 			if (pdd->dev != dev)
 				continue;
 
-			pdd->exception_status |= ec_mask;
+			pdd->exception_status |= event_mask & KFD_EC_MASK_DEVICE;
 
-			if (event_type == EC_DEVICE_MEMORY_VIOLATION) {
+			if (event_mask & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
 				if (!pdd->vm_fault_exc_data) {
 					pdd->vm_fault_exc_data = kmemdup(
 							exception_data,
@@ -172,31 +171,30 @@ bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			}
 			break;
 		}
-	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(event_type)) {
-		process->exception_status |= ec_mask;
+	} else if (event_mask & KFD_EC_MASK_PROCESS) {
+		process->exception_status |= event_mask & KFD_EC_MASK_PROCESS;
 	} else {
 		pqm = &process->pqm;
 		list_for_each_entry(pqn, &pqm->queues,
 				process_queue_list) {
 			int target_id;
-			bool need_queue_id = event_type == EC_QUEUE_NEW;
 
 			if (!pqn->q)
 				continue;
 
-			target_id = need_queue_id ?
+			target_id = event_mask & KFD_EC_MASK(EC_QUEUE_NEW) ?
 					pqn->q->properties.queue_id :
 							pqn->q->doorbell_id;
 
 			if (pqn->q->device != dev || target_id != source_id)
 				continue;
 
-			pqn->q->properties.exception_status |= ec_mask;
+			pqn->q->properties.exception_status |= event_mask;
 			break;
 		}
 	}
 
-	if (process->exception_enable_mask & ec_mask) {
+	if (process->exception_enable_mask & event_mask) {
 		if (use_worker)
 			schedule_work(&process->debug_event_workarea);
 		else
@@ -217,7 +215,7 @@ bool kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   uint32_t trap_code,
+				   uint64_t trap_mask,
 				   void *exception_data,
 				   size_t exception_data_size)
 {
@@ -229,12 +227,12 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 	if (!p)
 		return false;
 
-	if (!kfd_dbg_ev_raise(trap_code, p, dev, doorbell_id, true,
+	if (!kfd_dbg_ev_raise(trap_mask, p, dev, doorbell_id, true,
 					exception_data, exception_data_size)) {
 		struct process_queue_manager *pqm;
 		struct process_queue_node *pqn;
 
-		if (KFD_DBG_EC_TYPE_IS_QUEUE(trap_code) &&
+		if (!!(trap_mask & KFD_EC_MASK_QUEUE) &&
 				p->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED) {
 			mutex_lock(&p->mutex);
 
@@ -248,7 +246,7 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 
 				kfd_send_exception_to_runtime(p,
 						pqn->q->properties.queue_id,
-						KFD_EC_MASK(trap_code));
+						trap_mask);
 
 				signaled_to_debugger_or_runtime = true;
 
@@ -256,7 +254,7 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 			}
 
 			mutex_unlock(&p->mutex);
-		} else if (trap_code == EC_DEVICE_MEMORY_VIOLATION) {
+		} else if (trap_mask & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
 			kfd_process_vm_fault(dev->dqm, p->pasid);
 			kfd_signal_vm_fault_event(dev, p->pasid, NULL,
 							exception_data);
@@ -924,7 +922,8 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 		kfd_dbg_trap_activate(p);
 
 		if (!p->is_runtime_retry)
-			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME, p, NULL, 0, false, NULL, 0);
+			kfd_dbg_ev_raise(KFD_EC_MASK(EC_PROCESS_RUNTIME),
+					p, NULL, 0, false, NULL, 0);
 
 		mutex_unlock(&p->mutex);
 		ret = down_interruptible(&p->runtime_enable_sema);
@@ -950,7 +949,8 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 		}
 
 		if (!p->is_runtime_retry)
-			kfd_dbg_ev_raise(EC_PROCESS_RUNTIME, p, NULL, 0, false, NULL, 0);
+			kfd_dbg_ev_raise(KFD_EC_MASK(EC_PROCESS_RUNTIME),
+					p, NULL, 0, false, NULL, 0);
 
 		mutex_unlock(&p->mutex);
 		ret = down_interruptible(&p->runtime_enable_sema);
