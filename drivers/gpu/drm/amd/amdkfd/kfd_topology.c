@@ -36,6 +36,7 @@
 #include "kfd_topology.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_iommu.h"
+#include "kfd_svm.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ras.h"
 
@@ -1404,6 +1405,7 @@ static void kfd_fill_iolink_non_crat_info(struct kfd_topology_device *dev)
 
 			inbound_link->flags = CRAT_IOLINK_FLAGS_ENABLED;
 			kfd_set_iolink_no_atomics(peer_dev, dev, inbound_link);
+			kfd_set_iolink_non_coherent(peer_dev, link, inbound_link);
 		}
 	}
 }
@@ -1830,13 +1832,8 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		dev->node_props.capability |= (adev->ras_enabled != 0) ?
 			HSA_CAP_RASEVENTNOTIFY : 0;
 
-	/* SVM API and HMM page migration work together, device memory type
-	 * is initialized to not 0 when page migration register device memory.
-	 */
-#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
-	if (adev->kfd.dev->pgmap.type != 0)
+	if (KFD_IS_SVM_API_SUPPORTED(adev->kfd.dev))
 		dev->node_props.capability |= HSA_CAP_SVMAPI_SUPPORTED;
-#endif
 
 	kfd_debug_print_topology();
 

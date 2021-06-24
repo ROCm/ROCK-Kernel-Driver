@@ -842,6 +842,7 @@ struct svm_range_list {
 	spinlock_t			deferred_list_lock;
 	atomic_t			evicted_ranges;
 	struct delayed_work		restore_work;
+	DECLARE_BITMAP(bitmap_supported, MAX_GPU_INSTANCE);
 };
 
 /* Process data */
@@ -966,7 +967,6 @@ struct kfd_process {
 
 	/* shared virtual memory registered by this process */
 	struct svm_range_list svms;
-	bool svm_disabled;
 
 	bool xnack_enabled;
 

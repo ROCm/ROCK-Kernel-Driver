@@ -4146,6 +4146,7 @@ static int amdgpu_device_recover_vram(struct amdgpu_device *adev)
 {
 	struct dma_fence *fence = NULL, *next = NULL;
 	struct amdgpu_bo *shadow;
+	struct amdgpu_bo_vm *vmbo;
 	long r = 1, tmo;
 
 	if (amdgpu_sriov_runtime(adev))
@@ -4155,8 +4156,8 @@ static int amdgpu_device_recover_vram(struct amdgpu_device *adev)
 
 	dev_info(adev->dev, "recover vram bo from shadow start\n");
 	mutex_lock(&adev->shadow_list_lock);
-	list_for_each_entry(shadow, &adev->shadow_list, shadow_list) {
-
+	list_for_each_entry(vmbo, &adev->shadow_list, shadow_list) {
+		shadow = &vmbo->bo;
 		/* No need to recover an evicted BO */
 		if (shadow->tbo.mem.mem_type != TTM_PL_TT ||
 		    shadow->tbo.mem.start == AMDGPU_BO_INVALID_OFFSET ||
