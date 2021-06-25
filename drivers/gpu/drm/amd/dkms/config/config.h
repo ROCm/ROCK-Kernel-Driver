@@ -639,6 +639,9 @@
 /* kallsyms_lookup_name is available */
 /* #undef HAVE_KALLSYMS_LOOKUP_NAME */
 
+/* kernel_write() take arg type of position as pointer */
+#define HAVE_KERNEL_WRITE_PPOS 1
+
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
 
