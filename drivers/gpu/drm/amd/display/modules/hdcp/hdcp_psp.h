@@ -44,7 +44,7 @@ enum bgd_security_hdcp2_content_type {
 enum ta_dtm_command {
 	TA_DTM_COMMAND__UNUSED_1 = 1,
 	TA_DTM_COMMAND__TOPOLOGY_UPDATE_V2,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	TA_DTM_COMMAND__TOPOLOGY_ASSR_ENABLE,
 	TA_DTM_COMMAND__TOPOLOGY_UPDATE_V3
 #else
@@ -91,7 +91,7 @@ struct ta_dtm_topology_update_input_v2 {
 	uint32_t max_hdcp_supported_version;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /* For security reason/HW may change value, these encoder type enum values are not HW register values */
 /* Security code will check real HW register values and these SW enum values */
 enum ta_dtm_encoder_type {
@@ -131,7 +131,7 @@ struct ta_dtm_topology_assr_enable {
 union ta_dtm_cmd_input {
 	struct ta_dtm_topology_update_input_v2 topology_update_v2;
 	struct ta_dtm_topology_assr_enable topology_assr_enable;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct ta_dtm_topology_update_input_v3 topology_update_v3;
 #endif
 };
@@ -313,7 +313,7 @@ enum ta_hdcp2_version {
 	TA_HDCP2_VERSION_UNKNOWN = 0,
 	TA_HDCP2_VERSION_2_0 = 20,
 	TA_HDCP2_VERSION_2_1 = 21,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	TA_HDCP2_VERSION_2_3 = 23,
 #endif
 	TA_HDCP2_VERSION_2_2 = 22

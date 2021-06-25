@@ -23,7 +23,7 @@
  *
  */
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 #ifndef __DAL_IRQ_SERVICE_DCN31_H__
 #define __DAL_IRQ_SERVICE_DCN31_H__
@@ -34,4 +34,4 @@ struct irq_service *dal_irq_service_dcn31_create(
 	struct irq_service_init_data *init_data);
 
 #endif /* __DAL_IRQ_SERVICE_DCN31_H__ */
-#endif /* CONFIG_DRM_AMD_DC_DCN3_1 */
+#endif /* CONFIG_DRM_AMD_DC_DCN3_x */

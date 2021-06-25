@@ -40,7 +40,7 @@ dml_get_attr_decl(wm_memory_trip);
 dml_get_attr_decl(wm_writeback_urgent);
 dml_get_attr_decl(wm_stutter_exit);
 dml_get_attr_decl(wm_stutter_enter_exit);
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 dml_get_attr_decl(wm_z8_stutter_exit);
 dml_get_attr_decl(wm_z8_stutter_enter_exit);
 dml_get_attr_decl(stutter_efficiency_z8);
@@ -109,7 +109,7 @@ dml_get_pipe_attr_decl(vstartup);
 dml_get_pipe_attr_decl(vupdate_offset);
 dml_get_pipe_attr_decl(vupdate_width);
 dml_get_pipe_attr_decl(vready_offset);
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 dml_get_pipe_attr_decl(vready_at_or_after_vsync);
 dml_get_pipe_attr_decl(min_dst_y_next_start);
 #endif
@@ -936,7 +936,7 @@ struct vba_vars_st {
 #endif
 	bool AllowDramClockChangeOneDisplayVactive;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	double MaxAveragePercentOfIdealFabricAndSDPPortBWDisplayCanUseInNormalSystemOperation;
 	double PercentOfIdealFabricAndSDPPortBWReceivedAfterUrgLatency;
 	double PercentOfIdealDRAMBWReceivedAfterUrgLatencyPixelMixedWithVMData;

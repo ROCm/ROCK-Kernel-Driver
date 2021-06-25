@@ -142,7 +142,7 @@ struct dcn_hubbub_registers {
 	uint32_t DCHVM_RIOMMU_STAT0;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t DCHUBBUB_DET0_CTRL;
 	uint32_t DCHUBBUB_DET1_CTRL;
 	uint32_t DCHUBBUB_DET2_CTRL;
@@ -298,7 +298,7 @@ struct dcn_hubbub_registers {
 		type HOSTVM_PREFETCH_DONE
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define HUBBUB_RET_REG_FIELD_LIST(type) \
 		type DET_DEPTH;\
 		type DET0_SIZE;\
@@ -329,7 +329,7 @@ struct dcn_hubbub_shift {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	HUBBUB_HVM_REG_FIELD_LIST(uint8_t);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	HUBBUB_RET_REG_FIELD_LIST(uint8_t);
 #endif
 };
@@ -340,7 +340,7 @@ struct dcn_hubbub_mask {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	HUBBUB_HVM_REG_FIELD_LIST(uint32_t);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	HUBBUB_RET_REG_FIELD_LIST(uint32_t);
 #endif
 };

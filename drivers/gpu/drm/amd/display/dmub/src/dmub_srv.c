@@ -32,8 +32,6 @@
 #include "dmub_dcn301.h"
 #include "dmub_dcn302.h"
 #include "dmub_dcn303.h"
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
 #include "dmub_dcn31.h"
 #endif
 #include "os_types.h"
@@ -214,7 +212,7 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 		}
 #endif
 		break;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 	case DMUB_ASIC_DCN31:
 		dmub->regs_dcn31 = &dmub_srv_dcn31_regs;

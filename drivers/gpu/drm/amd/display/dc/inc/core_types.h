@@ -357,7 +357,7 @@ union pipe_update_flags {
 		uint32_t scaler : 1;
 		uint32_t viewport : 1;
 		uint32_t plane_changed : 1;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint32_t det_size : 1;
 #endif
 	} bits;
@@ -387,7 +387,7 @@ struct pipe_ctx {
 	struct _vcs_dpi_display_ttu_regs_st ttu_regs;
 	struct _vcs_dpi_display_rq_regs_st rq_regs;
 	struct _vcs_dpi_display_pipe_dest_params_st pipe_dlg_param;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int det_buffer_size_kb;
 	bool unbounded_req;
 #endif
@@ -449,7 +449,7 @@ struct dcn_bw_output {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dcn_bw_writeback bw_writeback;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int compbuf_size_kb;
 #endif
 };

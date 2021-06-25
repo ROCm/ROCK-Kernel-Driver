@@ -222,9 +222,7 @@
 	type PACK_3TO2_ELEMENT_DISABLE; \
 	type ROW_TTU_MODE; \
 	type NUM_PKRS
-#endif
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
 #define DCN31_HUBP_REG_FIELD_VARIABLE_LIST(type) \
 	DCN30_HUBP_REG_FIELD_VARIABLE_LIST(type);\
 	type HUBP_UNBOUNDED_REQ_MODE;\
@@ -243,10 +241,8 @@ struct dcn_hubp2_registers {
 };
 
 struct dcn_hubp2_shift {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN31_HUBP_REG_FIELD_VARIABLE_LIST(uint8_t);
-#elif defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	DCN30_HUBP_REG_FIELD_VARIABLE_LIST(uint8_t);
 #elif defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	DCN21_HUBP_REG_FIELD_VARIABLE_LIST(uint8_t);
 #else
@@ -255,10 +251,8 @@ struct dcn_hubp2_shift {
 };
 
 struct dcn_hubp2_mask {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN31_HUBP_REG_FIELD_VARIABLE_LIST(uint32_t);
-#elif defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	DCN30_HUBP_REG_FIELD_VARIABLE_LIST(uint32_t);
 #elif defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	DCN21_HUBP_REG_FIELD_VARIABLE_LIST(uint32_t);
 #else

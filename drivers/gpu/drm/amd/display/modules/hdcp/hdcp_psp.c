@@ -44,7 +44,7 @@ static void hdcp2_message_init(struct mod_hdcp *hdcp,
 	in->process.msg3_desc.msg_id = TA_HDCP_HDCP2_MSG_ID__NULL_MESSAGE;
 	in->process.msg3_desc.msg_size = 0;
 }
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum mod_hdcp_status mod_hdcp_remove_display_from_topology_v2(
 		struct mod_hdcp *hdcp, uint8_t index)
 #else
@@ -84,7 +84,7 @@ enum mod_hdcp_status mod_hdcp_remove_display_from_topology(
 	mutex_unlock(&psp->dtm_context.mutex);
 	return status;
 }
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum mod_hdcp_status mod_hdcp_remove_display_from_topology_v3(
 		struct mod_hdcp *hdcp, uint8_t index)
 {
@@ -137,7 +137,7 @@ enum mod_hdcp_status mod_hdcp_remove_display_from_topology(
 	return status;
 }
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum mod_hdcp_status mod_hdcp_add_display_to_topology_v2(
 		struct mod_hdcp *hdcp, struct mod_hdcp_display *display)
 #else
@@ -189,7 +189,7 @@ enum mod_hdcp_status mod_hdcp_add_display_to_topology(struct mod_hdcp *hdcp,
 	return status;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum mod_hdcp_status mod_hdcp_add_display_to_topology_v3(
 		struct mod_hdcp *hdcp, struct mod_hdcp_display *display)
 {

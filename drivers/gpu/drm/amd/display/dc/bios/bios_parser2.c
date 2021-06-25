@@ -576,7 +576,7 @@ static struct device_id device_type_from_device_id(uint16_t device_id)
 		result_device_id.device_type = DEVICE_TYPE_LCD;
 		result_device_id.enum_id = 1;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 	case ATOM_DISPLAY_LCD2_SUPPORT:
 		result_device_id.device_type = DEVICE_TYPE_LCD;
@@ -2170,7 +2170,7 @@ static enum bp_result get_integrated_info_v2_1(
 }
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum bp_result get_integrated_info_v2_2(
 	struct bios_parser *bp,
 	struct integrated_info *info)
@@ -2319,11 +2319,9 @@ static enum bp_result construct_integrated_info(
 			case 1:
 				result = get_integrated_info_v2_1(bp, info);
 				break;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
 			case 2:
 				result = get_integrated_info_v2_2(bp, info);
 				break;
-#endif
 			default:
 				return result;
 			}

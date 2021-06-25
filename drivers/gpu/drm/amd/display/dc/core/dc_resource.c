@@ -62,9 +62,7 @@
 #include "dcn301/dcn301_resource.h"
 #include "dcn302/dcn302_resource.h"
 #include "dcn303/dcn303_resource.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
 #include "../dcn31/dcn31_resource.h"
-#endif
 #endif
 
 #define DC_LOGGER_INIT(logger)
@@ -153,9 +151,7 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 	case FAMILY_VGH:
 		dc_version = DCN_VERSION_3_01;
 		break;
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
 	case FAMILY_YELLOW_CARP:
 		if (ASICREV_IS_YELLOW_CARP(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_1;
@@ -251,11 +247,9 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 	case DCN_VERSION_3_03:
 		res_pool = dcn303_create_resource_pool(init_data, dc);
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
 	case DCN_VERSION_3_1:
 		res_pool = dcn31_create_resource_pool(init_data, dc);
 		break;
-#endif
 #endif
 	default:
 		break;
@@ -2164,7 +2158,7 @@ enum dc_status dc_validate_global_state(
 
 	if (!new_ctx)
 		return DC_ERROR_UNEXPECTED;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 	/*
 	 * Update link encoder to stream assignment.
