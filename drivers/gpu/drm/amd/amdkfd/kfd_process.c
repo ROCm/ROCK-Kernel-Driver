@@ -1207,7 +1207,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		unsigned int temp;
 		int idx = srcu_read_lock(&kfd_processes_srcu);
 
-		hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		hash_for_each_rcu(kfd_processes_table, temp, target, kfd_processes) {
 			if (target->debugger_process &&
 				target->debugger_process == p) {
 				mutex_lock(&target->mutex);
