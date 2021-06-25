@@ -131,9 +131,13 @@ void dccg31_set_dtbclk_dto(
 		dtbdto_div = 2;
 		req_dtbclk_khz = req_dtbclk_khz / 4;
 	} else if ((num_odm_segments == 2) ||
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			(timing->pixel_encoding == PIXEL_ENCODING_YCBCR420) ||
 			(timing->flags.DSC && timing->pixel_encoding == PIXEL_ENCODING_YCBCR422
 					&& !timing->dsc_cfg.ycbcr422_simple)) {
+#else
+			(timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)) {
+#endif
 		dtbdto_div = 4;
 		req_dtbclk_khz = req_dtbclk_khz / 2;
 	} else
