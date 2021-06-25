@@ -189,7 +189,9 @@ void enc31_hw_init(struct link_encoder *enc)
 }
 
 static const struct link_encoder_funcs dcn31_link_enc_funcs = {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.read_state = link_enc2_read_state,
+#endif
 	.validate_output_with_stream =
 			dcn30_link_encoder_validate_output_with_stream,
 	.hw_init = enc31_hw_init,
