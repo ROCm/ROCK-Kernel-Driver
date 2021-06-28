@@ -26,6 +26,7 @@
 #include "kcl_fence_trace.h"
 
 /* Copied from drivers/dma-buf/dma-fence.c */
+#if defined(AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT) || defined(AMDKCL_FENCE_WAIT_ANY_TIMEOUT)
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 			    uint32_t *idx)
@@ -42,6 +43,7 @@ dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 	}
 	return false;
 }
+#endif
 
 struct default_wait_cb {
 	struct dma_fence_cb base;
