@@ -68,9 +68,9 @@ static inline
 void drm_mm_print(const struct drm_mm *mm, struct drm_printer *p)
 {
 #ifndef HAVE_DRM_DRM_PRINT_H
-	drm_mm_debug_table(mm, p->prefix);
+	drm_mm_debug_table((struct drm_mm *)mm, p->prefix);
 #else
-	drm_mm_debug_table(mm, "no prefix");
+	drm_mm_debug_table((struct drm_mm *)mm, "no prefix");
 #endif
 }
 #endif
