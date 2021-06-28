@@ -19,6 +19,11 @@
  * dma-buf/fence: revert "don't wait when specified timeout is zero" (v2)
  */
 #ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
+
+#ifdef dma_fence_default_wait
+#undef dma_fence_default_wait
+#endif
+
 #define dma_fence_default_wait _kcl_fence_default_wait
 #define dma_fence_wait_timeout _kcl_fence_wait_timeout
 #endif
