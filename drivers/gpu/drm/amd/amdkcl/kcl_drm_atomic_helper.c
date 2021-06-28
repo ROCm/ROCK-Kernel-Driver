@@ -71,15 +71,15 @@ EXPORT_SYMBOL(__drm_atomic_helper_crtc_reset);
  */
 void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state)
 {
-	struct drm_device *dev = state->dev;
 	struct drm_crtc_state *new_crtc_state;
 	struct drm_crtc *crtc;
-	int i;
 
 #if !defined(for_each_new_crtc_in_state)
+	struct drm_device *dev = state->dev;
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		new_crtc_state = crtc->state;
 #else
+	int i;
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 #endif
 		if (new_crtc_state->enable)
