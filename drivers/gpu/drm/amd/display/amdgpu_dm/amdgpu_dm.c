@@ -4448,7 +4448,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail;
 		}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* Use Outbox interrupt */
 	switch (adev->ip_versions[DCE_HWIP][0]) {
 	case IP_VERSION(3, 0, 0):
