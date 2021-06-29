@@ -481,6 +481,7 @@ struct kfd_criu_bo_buckets {
 	__u32 bo_alloc_flags;/* from KFD */
 	__u32 gpu_id;/* from KFD */
 	__u32 idr_handle;/* from KFD */
+	__u32 dmabuf_fd; /* from KFD */
 };
 
 struct kfd_criu_q_bucket {

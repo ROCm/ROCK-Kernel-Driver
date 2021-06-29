@@ -35,6 +35,7 @@
 #include <linux/mman.h>
 #include <linux/ptrace.h>
 #include <linux/dma-buf.h>
+#include <linux/fdtable.h>
 #include <asm/processor.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
@@ -43,6 +44,7 @@
 #include "amdgpu_amdkfd.h"
 #include "kfd_smi_events.h"
 #include "amdgpu_object.h"
+#include "amdgpu_dma_buf.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -2091,6 +2093,33 @@ static int criu_dump_queues_device(struct kfd_process_device *pdd,
 	return ret;
 }
 
+static int criu_get_prime_handle(struct drm_gem_object *gobj, int flags,
+				      u32 *shared_fd)
+{
+	struct dma_buf *dmabuf;
+	int ret;
+
+	dmabuf = amdgpu_gem_prime_export(gobj, flags);
+	if (IS_ERR(dmabuf)) {
+		ret = PTR_ERR(dmabuf);
+		pr_err("dmabuf export failed for the BO\n");
+		return ret;
+	}
+
+	ret = dma_buf_fd(dmabuf, flags);
+	if (ret < 0) {
+		pr_err("dmabuf create fd failed, ret:%d\n", ret);
+		goto out_free_dmabuf;
+	}
+
+	*shared_fd = ret;
+	return 0;
+
+out_free_dmabuf:
+	dma_buf_put(dmabuf);
+	return ret;
+}
+
 static int kfd_ioctl_criu_dumper(struct file *filep,
 				struct kfd_process *p, void *data)
 {
@@ -2193,6 +2222,15 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 					}
 				}
 
+				if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+					ret = criu_get_prime_handle(&dumper_bo->tbo.base,
+							bo_bucket[i].bo_alloc_flags &
+							KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ? DRM_RDWR : 0,
+							&bo_bucket[i].dmabuf_fd);
+					if (ret)
+						goto err_unlock;
+				}
+
 				if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL)
 					bo_bucket[i].bo_offset = KFD_MMAP_TYPE_DOORBELL |
 						KFD_MMAP_GPU_ID(pdd->dev->id);
@@ -2252,6 +2290,11 @@ static int kfd_ioctl_criu_dumper(struct file *filep,
 	return 0;
 
 err_unlock:
+	while (i--) {
+		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			close_fd(bo_bucket[i].dmabuf_fd);
+	}
+
 	kfd_process_restore_queues(p);
 	mutex_unlock(&p->mutex);
 clean:
@@ -2553,6 +2596,7 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 	for (i = 0; i < args->num_of_bos; i++) {
 		struct kfd_dev *dev;
 		struct kfd_process_device *pdd;
+		struct kgd_mem *kgd_mem;
 		void *mem;
 		u64 offset;
 		int idr_handle;
@@ -2698,6 +2742,17 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 		}
 
 		pr_info("map memory was successful for the BO\n");
+
+		/* create the dmabuf object and export the bo */
+		kgd_mem = (struct kgd_mem *)mem;
+		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+			ret = criu_get_prime_handle(&kgd_mem->bo->tbo.base,
+						    DRM_RDWR,
+						    &bo_bucket[i].dmabuf_fd);
+			if (ret)
+				goto err_unlock;
+		}
+
 	} /* done */
 
 	/* Flush TLBs after waiting for the page table updates to complete */
@@ -2730,10 +2785,25 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 	ret = copy_to_user((void __user *)args->restored_bo_array_ptr,
 			   restored_bo_offsets_arr,
 			   (args->num_of_bos * sizeof(*restored_bo_offsets_arr)));
+	if (ret) {
+		err = -EFAULT;
+		goto err_unlock;
+	}
+
+	ret = copy_to_user((void __user *)args->kfd_criu_bo_buckets_ptr,
+			bo_bucket,
+			(args->num_of_bos *
+			 sizeof(struct kfd_criu_bo_buckets)));
 	if (ret)
 		err = -EFAULT;
 
+
 err_unlock:
+	while (i--) {
+		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
+			close_fd(bo_bucket[i].dmabuf_fd);
+	}
+
 	mutex_unlock(&p->mutex);
 failed:
 	kvfree(bo_bucket);
