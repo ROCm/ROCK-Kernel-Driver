@@ -356,10 +356,10 @@ enum dcn_pwr_state {
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-enum dcn_z9_support_state {
-	DCN_Z9_SUPPORT_UNKNOWN,
-	DCN_Z9_SUPPORT_ALLOW,
-	DCN_Z9_SUPPORT_DISALLOW,
+enum dcn_zstate_support_state {
+	DCN_ZSTATE_SUPPORT_UNKNOWN,
+	DCN_ZSTATE_SUPPORT_ALLOW,
+	DCN_ZSTATE_SUPPORT_DISALLOW,
 };
 #endif
 /*
@@ -380,7 +380,7 @@ struct dc_clocks {
 	int dramclk_khz;
 	bool p_state_change_support;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	enum dcn_z9_support_state z9_support;
+	enum dcn_zstate_support_state zstate_support;
 	bool dtbclk_en;
 #endif
 	enum dcn_pwr_state pwr_state;
