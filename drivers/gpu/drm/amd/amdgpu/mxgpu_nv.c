@@ -273,7 +273,8 @@ static void xgpu_nv_mailbox_flr_work(struct work_struct *work)
 	 * otherwise the mailbox msg will be ruined/reseted by
 	 * the VF FLR.
 	 */
-	if (!down_write_trylock(&adev->reset_sem))
+	if (amdgpu_in_reset(adev) ||
+		!down_write_trylock(&adev->reset_sem))
 		return;
 
 	amdgpu_virt_fini_data_exchange(adev);
