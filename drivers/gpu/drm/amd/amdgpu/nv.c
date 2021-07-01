@@ -1305,7 +1305,6 @@ static int nv_common_early_init(void *handle)
 		break;
 
 	case CHIP_VANGOGH:
-		adev->apu_flags |= AMD_APU_IS_VANGOGH;
 		adev->cg_flags = AMD_CG_SUPPORT_GFX_MGCG |
 			AMD_CG_SUPPORT_GFX_MGLS |
 			AMD_CG_SUPPORT_GFX_CP_LS |
@@ -1440,6 +1439,12 @@ static int nv_common_sw_fini(void *handle)
 static int nv_common_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	if (adev->nbio.funcs->apply_lc_spc_mode_wa)
+		adev->nbio.funcs->apply_lc_spc_mode_wa(adev);
+
+	if (adev->nbio.funcs->apply_l1_link_width_reconfig_wa)
+		adev->nbio.funcs->apply_l1_link_width_reconfig_wa(adev);
 
 	/* enable pcie gen2/3 link */
 	nv_pcie_gen3_enable(adev);

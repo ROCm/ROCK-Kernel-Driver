@@ -68,12 +68,6 @@ static int amdgpu_ucode_id_vcns[] = {
 #define VCN_BLOCK_DECODE_DISABLE_MASK 0x40
 #define VCN_BLOCK_QUEUE_DISABLE_MASK 0xC0
 
-enum vcn_ring_type {
-	VCN_ENCODE_RING,
-	VCN_DECODE_RING,
-	VCN_UNIFIED_RING,
-};
-
 static bool vcn_v3_0_is_disabled_vcn(struct amdgpu_device *adev, enum vcn_ring_type type, uint32_t vcn_instance);
 static int vcn_v3_0_start_sriov(struct amdgpu_device *adev);
 static void vcn_v3_0_set_dec_ring_funcs(struct amdgpu_device *adev);
@@ -97,16 +91,18 @@ static void vcn_v3_0_enc_ring_set_wptr(struct amdgpu_ring *ring);
 static int vcn_v3_0_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	int i;
 
 	if (amdgpu_sriov_vf(adev)) {
-		adev->vcn.num_vcn_inst = VCN_INSTANCES_SIENNA_CICHLID;
+		for (i = 0; i < VCN_INSTANCES_SIENNA_CICHLID; i++)
+			if (amdgpu_vcn_is_disabled_vcn(adev, VCN_DECODE_RING, i))
+				adev->vcn.num_vcn_inst++;
 		adev->vcn.harvest_config = 0;
 		adev->vcn.num_enc_rings = 1;
 
 	} else {
 		if (adev->asic_type == CHIP_SIENNA_CICHLID) {
 			u32 harvest;
-			int i;
 
 			adev->vcn.num_vcn_inst = VCN_INSTANCES_SIENNA_CICHLID;
 			for (i = 0; i < adev->vcn.num_vcn_inst; i++) {
@@ -161,7 +157,8 @@ static int vcn_v3_0_sw_init(void *handle)
 		adev->firmware.fw_size +=
 			ALIGN(le32_to_cpu(hdr->ucode_size_bytes), PAGE_SIZE);
 
-		if (adev->vcn.num_vcn_inst == VCN_INSTANCES_SIENNA_CICHLID) {
+		if ((adev->vcn.num_vcn_inst == VCN_INSTANCES_SIENNA_CICHLID) ||
+		    (amdgpu_sriov_vf(adev) && adev->asic_type == CHIP_SIENNA_CICHLID)) {
 			adev->firmware.ucode[AMDGPU_UCODE_ID_VCN1].ucode_id = AMDGPU_UCODE_ID_VCN1;
 			adev->firmware.ucode[AMDGPU_UCODE_ID_VCN1].fw = adev->vcn.fw;
 			adev->firmware.fw_size +=
@@ -326,27 +323,17 @@ static int vcn_v3_0_hw_init(void *handle)
 				continue;
 
 			ring = &adev->vcn.inst[i].ring_dec;
-			if (vcn_v3_0_is_disabled_vcn(adev, VCN_DECODE_RING, i)) {
-				ring->sched.ready = false;
-				dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
-			} else {
-				ring->wptr = 0;
-				ring->wptr_old = 0;
-				vcn_v3_0_dec_ring_set_wptr(ring);
-				ring->sched.ready = true;
-			}
+			ring->wptr = 0;
+			ring->wptr_old = 0;
+			vcn_v3_0_dec_ring_set_wptr(ring);
+			ring->sched.ready = true;
 
 			for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
 				ring = &adev->vcn.inst[i].ring_enc[j];
-				if (vcn_v3_0_is_disabled_vcn(adev, VCN_ENCODE_RING, i)) {
-					ring->sched.ready = false;
-					dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
-				} else {
-					ring->wptr = 0;
-					ring->wptr_old = 0;
-					vcn_v3_0_enc_ring_set_wptr(ring);
-					ring->sched.ready = true;
-				}
+				ring->wptr = 0;
+				ring->wptr_old = 0;
+				vcn_v3_0_enc_ring_set_wptr(ring);
+				ring->sched.ready = true;
 			}
 		}
 	} else {

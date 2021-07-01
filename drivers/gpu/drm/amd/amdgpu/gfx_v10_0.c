@@ -5114,47 +5114,44 @@ static void gfx_v10_0_tcp_harvest(struct amdgpu_device *adev)
 		4 + /* RMI */
 		1); /* SQG */
 
-	if (adev->asic_type == CHIP_NAVI10 ||
-	    adev->asic_type == CHIP_NAVI14 ||
-	    adev->asic_type == CHIP_NAVI12) {
-		mutex_lock(&adev->grbm_idx_mutex);
-		for (i = 0; i < adev->gfx.config.max_shader_engines; i++) {
-			for (j = 0; j < adev->gfx.config.max_sh_per_se; j++) {
-				gfx_v10_0_select_se_sh(adev, i, j, 0xffffffff);
-				wgp_active_bitmap = gfx_v10_0_get_wgp_active_bitmap_per_sh(adev);
-				/*
-				 * Set corresponding TCP bits for the inactive WGPs in
-				 * GCRD_SA_TARGETS_DISABLE
-				 */
-				gcrd_targets_disable_tcp = 0;
-				/* Set TCP & SQC bits in UTCL1_UTCL0_INVREQ_DISABLE */
-				utcl_invreq_disable = 0;
+	mutex_lock(&adev->grbm_idx_mutex);
+	for (i = 0; i < adev->gfx.config.max_shader_engines; i++) {
+		for (j = 0; j < adev->gfx.config.max_sh_per_se; j++) {
+			gfx_v10_0_select_se_sh(adev, i, j, 0xffffffff);
+			wgp_active_bitmap = gfx_v10_0_get_wgp_active_bitmap_per_sh(adev);
+			/*
+			 * Set corresponding TCP bits for the inactive WGPs in
+			 * GCRD_SA_TARGETS_DISABLE
+			 */
+			gcrd_targets_disable_tcp = 0;
+			/* Set TCP & SQC bits in UTCL1_UTCL0_INVREQ_DISABLE */
+			utcl_invreq_disable = 0;
 
-				for (k = 0; k < max_wgp_per_sh; k++) {
-					if (!(wgp_active_bitmap & (1 << k))) {
-						gcrd_targets_disable_tcp |= 3 << (2 * k);
-						utcl_invreq_disable |= (3 << (2 * k)) |
-							(3 << (2 * (max_wgp_per_sh + k)));
-					}
+			for (k = 0; k < max_wgp_per_sh; k++) {
+				if (!(wgp_active_bitmap & (1 << k))) {
+					gcrd_targets_disable_tcp |= 3 << (2 * k);
+					gcrd_targets_disable_tcp |= 1 << (k + (max_wgp_per_sh * 2));
+					utcl_invreq_disable |= (3 << (2 * k)) |
+						(3 << (2 * (max_wgp_per_sh + k)));
 				}
-
-				tmp = RREG32_SOC15(GC, 0, mmUTCL1_UTCL0_INVREQ_DISABLE);
-				/* only override TCP & SQC bits */
-				tmp &= 0xffffffff << (4 * max_wgp_per_sh);
-				tmp |= (utcl_invreq_disable & utcl_invreq_disable_mask);
-				WREG32_SOC15(GC, 0, mmUTCL1_UTCL0_INVREQ_DISABLE, tmp);
-
-				tmp = RREG32_SOC15(GC, 0, mmGCRD_SA_TARGETS_DISABLE);
-				/* only override TCP bits */
-				tmp &= 0xffffffff << (2 * max_wgp_per_sh);
-				tmp |= (gcrd_targets_disable_tcp & gcrd_targets_disable_mask);
-				WREG32_SOC15(GC, 0, mmGCRD_SA_TARGETS_DISABLE, tmp);
 			}
-		}
 
-		gfx_v10_0_select_se_sh(adev, 0xffffffff, 0xffffffff, 0xffffffff);
-		mutex_unlock(&adev->grbm_idx_mutex);
+			tmp = RREG32_SOC15(GC, 0, mmUTCL1_UTCL0_INVREQ_DISABLE);
+			/* only override TCP & SQC bits */
+			tmp &= (0xffffffffU << (4 * max_wgp_per_sh));
+			tmp |= (utcl_invreq_disable & utcl_invreq_disable_mask);
+			WREG32_SOC15(GC, 0, mmUTCL1_UTCL0_INVREQ_DISABLE, tmp);
+
+			tmp = RREG32_SOC15(GC, 0, mmGCRD_SA_TARGETS_DISABLE);
+			/* only override TCP & SQC bits */
+			tmp &= (0xffffffffU << (3 * max_wgp_per_sh));
+			tmp |= (gcrd_targets_disable_tcp & gcrd_targets_disable_mask);
+			WREG32_SOC15(GC, 0, mmGCRD_SA_TARGETS_DISABLE, tmp);
+		}
 	}
+
+	gfx_v10_0_select_se_sh(adev, 0xffffffff, 0xffffffff, 0xffffffff);
+	mutex_unlock(&adev->grbm_idx_mutex);
 }
 
 static void gfx_v10_0_get_tcc_info(struct amdgpu_device *adev)
@@ -6998,12 +6995,8 @@ static int gfx_v10_0_kiq_init_register(struct amdgpu_ring *ring)
 	if (ring->use_doorbell) {
 		WREG32_SOC15(GC, 0, mmCP_MEC_DOORBELL_RANGE_LOWER,
 			(adev->doorbell_index.kiq * 2) << 2);
-		/* If GC has entered CGPG, ringing doorbell > first page doesn't
-		 * wakeup GC. Enlarge CP_MEC_DOORBELL_RANGE_UPPER to workaround
-		 * this issue.
-		 */
 		WREG32_SOC15(GC, 0, mmCP_MEC_DOORBELL_RANGE_UPPER,
-			(adev->doorbell.size - 4));
+			(adev->doorbell_index.userqueue_end * 2) << 2);
 	}
 
 	WREG32_SOC15(GC, 0, mmCP_HQD_PQ_DOORBELL_CONTROL,
@@ -7436,7 +7429,10 @@ static int gfx_v10_0_hw_init(void *handle)
 	 * init golden registers and rlc resume may override some registers,
 	 * reconfig them here
 	 */
-	gfx_v10_0_tcp_harvest(adev);
+	if (adev->asic_type == CHIP_NAVI10 ||
+	    adev->asic_type == CHIP_NAVI14 ||
+	    adev->asic_type == CHIP_NAVI12)
+		gfx_v10_0_tcp_harvest(adev);
 
 	r = gfx_v10_0_cp_resume(adev);
 	if (r)
@@ -7904,6 +7900,9 @@ static void gfx_v10_0_update_medium_grain_clock_gating(struct amdgpu_device *ade
 {
 	uint32_t data, def;
 
+	if (!(adev->cg_flags & (AMD_CG_SUPPORT_GFX_MGCG | AMD_CG_SUPPORT_GFX_MGLS)))
+		return;
+
 	/* It is disabled by HW by default */
 	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_MGCG)) {
 		/* 0 - Disable some blocks' MGCG */
@@ -7918,6 +7917,7 @@ static void gfx_v10_0_update_medium_grain_clock_gating(struct amdgpu_device *ade
 			  RLC_CGTT_MGCG_OVERRIDE__RLC_CGTT_SCLK_OVERRIDE_MASK |
 			  RLC_CGTT_MGCG_OVERRIDE__GFXIP_MGCG_OVERRIDE_MASK |
 			  RLC_CGTT_MGCG_OVERRIDE__GFXIP_MGLS_OVERRIDE_MASK |
+			  RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK |
 			  RLC_CGTT_MGCG_OVERRIDE__ENABLE_CGTS_LEGACY_MASK);
 
 		if (def != data)
@@ -7940,13 +7940,15 @@ static void gfx_v10_0_update_medium_grain_clock_gating(struct amdgpu_device *ade
 					WREG32_SOC15(GC, 0, mmCP_MEM_SLP_CNTL, data);
 			}
 		}
-	} else {
+	} else if (!enable || !(adev->cg_flags & AMD_CG_SUPPORT_GFX_MGCG)) {
 		/* 1 - MGCG_OVERRIDE */
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
 		data |= (RLC_CGTT_MGCG_OVERRIDE__RLC_CGTT_SCLK_OVERRIDE_MASK |
 			 RLC_CGTT_MGCG_OVERRIDE__GRBM_CGTT_SCLK_OVERRIDE_MASK |
 			 RLC_CGTT_MGCG_OVERRIDE__GFXIP_MGCG_OVERRIDE_MASK |
-			 RLC_CGTT_MGCG_OVERRIDE__GFXIP_MGLS_OVERRIDE_MASK);
+			 RLC_CGTT_MGCG_OVERRIDE__GFXIP_MGLS_OVERRIDE_MASK |
+			 RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK |
+			 RLC_CGTT_MGCG_OVERRIDE__ENABLE_CGTS_LEGACY_MASK);
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE, data);
 
@@ -7972,22 +7974,34 @@ static void gfx_v10_0_update_3d_clock_gating(struct amdgpu_device *adev,
 {
 	uint32_t data, def;
 
+	if (!(adev->cg_flags & (AMD_CG_SUPPORT_GFX_3D_CGCG | AMD_CG_SUPPORT_GFX_3D_CGLS)))
+		return;
+
 	/* Enable 3D CGCG/CGLS */
-	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGCG)) {
+	if (enable) {
 		/* write cmd to clear cgcg/cgls ov */
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
+
 		/* unset CGCG override */
-		data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_GFX3D_CG_OVERRIDE_MASK;
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGCG)
+			data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_GFX3D_CG_OVERRIDE_MASK;
+
 		/* update CGCG and CGLS override bits */
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE, data);
+
 		/* enable 3Dcgcg FSM(0x0000363f) */
 		def = RREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL_3D);
-		data = (0x36 << RLC_CGCG_CGLS_CTRL_3D__CGCG_GFX_IDLE_THRESHOLD__SHIFT) |
-			RLC_CGCG_CGLS_CTRL_3D__CGCG_EN_MASK;
+		data = 0;
+
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGCG)
+			data = (0x36 << RLC_CGCG_CGLS_CTRL_3D__CGCG_GFX_IDLE_THRESHOLD__SHIFT) |
+				RLC_CGCG_CGLS_CTRL_3D__CGCG_EN_MASK;
+
 		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGLS)
 			data |= (0x000F << RLC_CGCG_CGLS_CTRL_3D__CGLS_REP_COMPANSAT_DELAY__SHIFT) |
 				RLC_CGCG_CGLS_CTRL_3D__CGLS_EN_MASK;
+
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL_3D, data);
 
@@ -8000,9 +8014,14 @@ static void gfx_v10_0_update_3d_clock_gating(struct amdgpu_device *adev,
 	} else {
 		/* Disable CGCG/CGLS */
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL_3D);
+
 		/* disable cgcg, cgls should be disabled */
-		data &= ~(RLC_CGCG_CGLS_CTRL_3D__CGCG_EN_MASK |
-			  RLC_CGCG_CGLS_CTRL_3D__CGLS_EN_MASK);
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGCG)
+			data &= ~RLC_CGCG_CGLS_CTRL_3D__CGCG_EN_MASK;
+
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_3D_CGLS)
+			data &= ~RLC_CGCG_CGLS_CTRL_3D__CGLS_EN_MASK;
+
 		/* disable cgcg and cgls in FSM */
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL_3D, data);
@@ -8014,25 +8033,35 @@ static void gfx_v10_0_update_coarse_grain_clock_gating(struct amdgpu_device *ade
 {
 	uint32_t def, data;
 
-	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGCG)) {
+	if (!(adev->cg_flags & (AMD_CG_SUPPORT_GFX_CGCG | AMD_CG_SUPPORT_GFX_CGLS)))
+		return;
+
+	if (enable) {
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
+
 		/* unset CGCG override */
-		data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_CGCG_OVERRIDE_MASK;
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGCG)
+			data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_CGCG_OVERRIDE_MASK;
+
 		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGLS)
 			data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_CGLS_OVERRIDE_MASK;
-		else
-			data |= RLC_CGTT_MGCG_OVERRIDE__GFXIP_CGLS_OVERRIDE_MASK;
+
 		/* update CGCG and CGLS override bits */
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE, data);
 
 		/* enable cgcg FSM(0x0000363F) */
 		def = RREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL);
-		data = (0x36 << RLC_CGCG_CGLS_CTRL__CGCG_GFX_IDLE_THRESHOLD__SHIFT) |
-			RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK;
+		data = 0;
+
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGCG)
+			data = (0x36 << RLC_CGCG_CGLS_CTRL__CGCG_GFX_IDLE_THRESHOLD__SHIFT) |
+				RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK;
+
 		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGLS)
 			data |= (0x000F << RLC_CGCG_CGLS_CTRL__CGLS_REP_COMPANSAT_DELAY__SHIFT) |
 				RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK;
+
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL, data);
 
@@ -8044,8 +8073,14 @@ static void gfx_v10_0_update_coarse_grain_clock_gating(struct amdgpu_device *ade
 			WREG32_SOC15(GC, 0, mmCP_RB_WPTR_POLL_CNTL, data);
 	} else {
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL);
+
 		/* reset CGCG/CGLS bits */
-		data &= ~(RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK | RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK);
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGCG)
+			data &= ~RLC_CGCG_CGLS_CTRL__CGCG_EN_MASK;
+
+		if (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGLS)
+			data &= ~RLC_CGCG_CGLS_CTRL__CGLS_EN_MASK;
+
 		/* disable cgcg and cgls in FSM */
 		if (def != data)
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL, data);
@@ -8057,7 +8092,10 @@ static void gfx_v10_0_update_fine_grain_clock_gating(struct amdgpu_device *adev,
 {
 	uint32_t def, data;
 
-	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_FGCG)) {
+	if (!(adev->cg_flags & AMD_CG_SUPPORT_GFX_FGCG))
+		return;
+
+	if (enable) {
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
 		/* unset FGCG override */
 		data &= ~RLC_CGTT_MGCG_OVERRIDE__GFXIP_FGCG_OVERRIDE_MASK;
@@ -8088,6 +8126,97 @@ static void gfx_v10_0_update_fine_grain_clock_gating(struct amdgpu_device *adev,
 	}
 }
 
+static void gfx_v10_0_apply_medium_grain_clock_gating_workaround(struct amdgpu_device *adev)
+{
+	uint32_t reg_data = 0;
+	uint32_t reg_idx = 0;
+	uint32_t i;
+
+	const uint32_t tcp_ctrl_regs[] = {
+		mmCGTS_SA0_WGP00_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP00_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP01_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP01_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP02_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP02_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP10_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP10_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP11_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP11_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP12_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP12_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP00_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP00_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP01_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP01_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP02_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP02_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP10_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP10_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP11_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP11_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP12_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP12_CU1_TCP_CTRL_REG
+	};
+
+	const uint32_t tcp_ctrl_regs_nv12[] = {
+		mmCGTS_SA0_WGP00_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP00_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP01_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP01_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP02_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP02_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP10_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP10_CU1_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP11_CU0_TCP_CTRL_REG,
+		mmCGTS_SA0_WGP11_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP00_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP00_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP01_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP01_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP02_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP02_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP10_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP10_CU1_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP11_CU0_TCP_CTRL_REG,
+		mmCGTS_SA1_WGP11_CU1_TCP_CTRL_REG,
+	};
+
+	const uint32_t sm_ctlr_regs[] = {
+		mmCGTS_SA0_QUAD0_SM_CTRL_REG,
+		mmCGTS_SA0_QUAD1_SM_CTRL_REG,
+		mmCGTS_SA1_QUAD0_SM_CTRL_REG,
+		mmCGTS_SA1_QUAD1_SM_CTRL_REG
+	};
+
+	if (adev->asic_type == CHIP_NAVI12) {
+		for (i = 0; i < ARRAY_SIZE(tcp_ctrl_regs_nv12); i++) {
+			reg_idx = adev->reg_offset[GC_HWIP][0][mmCGTS_SA0_WGP00_CU0_TCP_CTRL_REG_BASE_IDX] +
+				  tcp_ctrl_regs_nv12[i];
+			reg_data = RREG32(reg_idx);
+			reg_data |= CGTS_SA0_WGP00_CU0_TCP_CTRL_REG__TCPI_LS_OVERRIDE_MASK;
+			WREG32(reg_idx, reg_data);
+		}
+	} else {
+		for (i = 0; i < ARRAY_SIZE(tcp_ctrl_regs); i++) {
+			reg_idx = adev->reg_offset[GC_HWIP][0][mmCGTS_SA0_WGP00_CU0_TCP_CTRL_REG_BASE_IDX] +
+				  tcp_ctrl_regs[i];
+			reg_data = RREG32(reg_idx);
+			reg_data |= CGTS_SA0_WGP00_CU0_TCP_CTRL_REG__TCPI_LS_OVERRIDE_MASK;
+			WREG32(reg_idx, reg_data);
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(sm_ctlr_regs); i++) {
+		reg_idx = adev->reg_offset[GC_HWIP][0][mmCGTS_SA0_QUAD0_SM_CTRL_REG_BASE_IDX] +
+			  sm_ctlr_regs[i];
+		reg_data = RREG32(reg_idx);
+		reg_data &= ~CGTS_SA0_QUAD0_SM_CTRL_REG__SM_MODE_MASK;
+		reg_data |= 2 << CGTS_SA0_QUAD0_SM_CTRL_REG__SM_MODE__SHIFT;
+		WREG32(reg_idx, reg_data);
+	}
+}
+
 static int gfx_v10_0_update_gfx_clock_gating(struct amdgpu_device *adev,
 					    bool enable)
 {
@@ -8104,6 +8233,10 @@ static int gfx_v10_0_update_gfx_clock_gating(struct amdgpu_device *adev,
 		gfx_v10_0_update_3d_clock_gating(adev, enable);
 		/* ===  CGCG + CGLS === */
 		gfx_v10_0_update_coarse_grain_clock_gating(adev, enable);
+
+		if ((adev->asic_type >= CHIP_NAVI10) &&
+		     (adev->asic_type <= CHIP_NAVI12))
+			gfx_v10_0_apply_medium_grain_clock_gating_workaround(adev);
 	} else {
 		/* CGCG/CGLS should be disabled before MGCG/MGLS
 		 * ===  CGCG + CGLS ===
@@ -9490,17 +9623,22 @@ static void gfx_v10_0_set_user_wgp_inactive_bitmap_per_sh(struct amdgpu_device *
 
 static u32 gfx_v10_0_get_wgp_active_bitmap_per_sh(struct amdgpu_device *adev)
 {
-	u32 data, wgp_bitmask;
-	data = RREG32_SOC15(GC, 0, mmCC_GC_SHADER_ARRAY_CONFIG);
-	data |= RREG32_SOC15(GC, 0, mmGC_USER_SHADER_ARRAY_CONFIG);
+	u32 disabled_mask =
+		~amdgpu_gfx_create_bitmask(adev->gfx.config.max_cu_per_sh >> 1);
+	u32 efuse_setting = 0;
+	u32 vbios_setting = 0;
 
-	data &= CC_GC_SHADER_ARRAY_CONFIG__INACTIVE_WGPS_MASK;
-	data >>= CC_GC_SHADER_ARRAY_CONFIG__INACTIVE_WGPS__SHIFT;
+	efuse_setting = RREG32_SOC15(GC, 0, mmCC_GC_SHADER_ARRAY_CONFIG);
+	efuse_setting &= CC_GC_SHADER_ARRAY_CONFIG__INACTIVE_WGPS_MASK;
+	efuse_setting >>= CC_GC_SHADER_ARRAY_CONFIG__INACTIVE_WGPS__SHIFT;
 
-	wgp_bitmask =
-		amdgpu_gfx_create_bitmask(adev->gfx.config.max_cu_per_sh >> 1);
+	vbios_setting = RREG32_SOC15(GC, 0, mmGC_USER_SHADER_ARRAY_CONFIG);
+	vbios_setting &= GC_USER_SHADER_ARRAY_CONFIG__INACTIVE_WGPS_MASK;
+	vbios_setting >>= GC_USER_SHADER_ARRAY_CONFIG__INACTIVE_WGPS__SHIFT;
 
-	return (~data) & wgp_bitmask;
+	disabled_mask |= efuse_setting | vbios_setting;
+
+	return (~disabled_mask);
 }
 
 static u32 gfx_v10_0_get_cu_active_bitmap_per_sh(struct amdgpu_device *adev)

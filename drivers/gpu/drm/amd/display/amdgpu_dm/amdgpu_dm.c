@@ -1221,6 +1221,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	if (amdgpu_dc_feature_mask & DC_DISABLE_FRACTIONAL_PWM_MASK)
 		init_data.flags.disable_fractional_pwm = true;
 
+	if (amdgpu_dc_feature_mask & DC_EDP_NO_POWER_SEQUENCING)
+		init_data.flags.edp_no_power_sequencing = true;
+
 	init_data.flags.power_down_display_on_boot = true;
 
 	INIT_LIST_HEAD(&adev->dm.da_list);
@@ -6501,6 +6504,8 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 				stream->use_vsc_sdp_for_colorimetry = true;
 		}
 		mod_build_vsc_infopacket(stream, &stream->vsc_infopacket);
+		aconnector->psr_skip_count = AMDGPU_DM_PSR_ENTRY_DELAY;
+
 	}
 finish:
 	dc_sink_release(sink);
@@ -9677,7 +9682,13 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		else if ((acrtc_state->update_type == UPDATE_TYPE_FAST) &&
 				acrtc_state->stream->link->psr_settings.psr_feature_enabled &&
 				!acrtc_state->stream->link->psr_settings.psr_allow_active) {
-			amdgpu_dm_psr_enable(acrtc_state->stream);
+			struct amdgpu_dm_connector *aconn = (struct amdgpu_dm_connector *)
+					acrtc_state->stream->dm_stream_context;
+
+			if (aconn->psr_skip_count > 0)
+				aconn->psr_skip_count--;
+			else
+				amdgpu_dm_psr_enable(acrtc_state->stream);
 		}
 
 		mutex_unlock(&dm->dc_lock);

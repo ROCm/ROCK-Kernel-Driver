@@ -45,7 +45,7 @@
 /* forward declaration */
 struct aux_payload;
 
-#define DC_VER "3.2.140"
+#define DC_VER "3.2.141"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -299,6 +299,7 @@ struct dc_config {
 	bool allow_seamless_boot_optimization;
 	bool power_down_display_on_boot;
 	bool edp_not_connected;
+	bool edp_no_power_sequencing;
 	bool force_enum_edp;
 	bool forced_clocks;
 	bool allow_lttpr_non_transparent_mode;
