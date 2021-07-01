@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Advanced Micro Devices, Inc.
+ * Copyright 2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,35 +19,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: Christian König
  */
-#ifndef __AMDGPU_MN_H__
-#define __AMDGPU_MN_H__
 
-#include <linux/types.h>
-#include <linux/hmm.h>
-#include <linux/rwsem.h>
-#include <linux/workqueue.h>
-#include <linux/interval_tree.h>
+#ifndef _AMDGPU_EEPROM_H
+#define _AMDGPU_EEPROM_H
 
-int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
-			       struct mm_struct *mm, struct page **pages,
-			       uint64_t start, uint64_t npages,
-			       struct hmm_range **phmm_range, bool readonly,
-			       bool mmap_locked, void *owner);
-int amdgpu_hmm_range_get_pages_done(struct hmm_range *hmm_range);
+#include <linux/i2c.h>
 
-#if defined(CONFIG_HMM_MIRROR)
-int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr);
-void amdgpu_mn_unregister(struct amdgpu_bo *bo);
-#else
-static inline int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
-{
-	DRM_WARN_ONCE("HMM_MIRROR kernel config option is not enabled, "
-		      "add CONFIG_ZONE_DEVICE=y in config file to fix this\n");
-	return -ENODEV;
-}
-static inline void amdgpu_mn_unregister(struct amdgpu_bo *bo) {}
-#endif
+int amdgpu_eeprom_read(struct i2c_adapter *i2c_adap,
+		       u32 eeprom_addr, u8 *eeprom_buf,
+		       u16 bytes);
+
+int amdgpu_eeprom_write(struct i2c_adapter *i2c_adap,
+			u32 eeprom_addr, u8 *eeprom_buf,
+			u16 bytes);
 
 #endif
