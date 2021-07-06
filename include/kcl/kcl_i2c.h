@@ -23,4 +23,11 @@ i2c_new_client_device(struct i2c_adapter *adap, struct i2c_board_info const *inf
 }
 #endif
 
+#ifndef I2C_AQ_NO_ZERO_LEN
+#define I2C_AQ_NO_ZERO_LEN_READ         BIT(5)
+#define I2C_AQ_NO_ZERO_LEN_WRITE        BIT(6)
+#define I2C_AQ_NO_ZERO_LEN              (I2C_AQ_NO_ZERO_LEN_READ | I2C_AQ_NO_ZERO_LEN_WRITE)
+#endif
+
+
 #endif
