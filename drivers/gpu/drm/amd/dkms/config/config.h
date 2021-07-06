@@ -921,6 +921,9 @@
 /* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
 
+/* struct xarray is available */
+#define HAVE_STRUCT_XARRAY 1
+
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
