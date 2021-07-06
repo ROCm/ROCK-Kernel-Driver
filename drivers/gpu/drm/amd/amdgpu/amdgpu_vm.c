@@ -102,8 +102,9 @@ struct amdgpu_prt_cb {
 int amdgpu_vm_set_pasid(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 			u32 pasid)
 {
-	int r;
+	int r = 0;
 
+#ifdef HAVE_STRUCT_XARRAY
 	if (vm->pasid == pasid)
 		return 0;
 
@@ -123,7 +124,21 @@ int amdgpu_vm_set_pasid(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 		vm->pasid = pasid;
 	}
+#else
+	unsigned long flags;
 
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+	if (pasid) {
+		r = idr_alloc(&adev->vm_manager.pasid_idr, vm, pasid, pasid + 1,
+				      GFP_ATOMIC);
+	} else if (vm->pasid) {
+		idr_remove(&adev->vm_manager.pasid_idr, vm->pasid);
+	}
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+	if (r < 0)
+		return r;
+	vm->pasid = pasid;
+#endif
 
 	return 0;
 }
@@ -3257,7 +3272,12 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
 	adev->vm_manager.vm_update_mode = 0;
 #endif
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&adev->vm_manager.pasids, XA_FLAGS_LOCK_IRQ);
+#else
+	idr_init(&adev->vm_manager.pasid_idr);
+	spin_lock_init(&adev->vm_manager.pasid_lock);
+#endif
 }
 
 /**
@@ -3269,8 +3289,13 @@ void amdgpu_vm_manager_init(struct amdgpu_device *adev)
  */
 void amdgpu_vm_manager_fini(struct amdgpu_device *adev)
 {
+#ifdef HAVE_STRUCT_XARRAY
 	WARN_ON(!xa_empty(&adev->vm_manager.pasids));
 	xa_destroy(&adev->vm_manager.pasids);
+#else
+	WARN_ON(!idr_is_empty(&adev->vm_manager.pasid_idr));
+	idr_destroy(&adev->vm_manager.pasid_idr);
+#endif
 
 	amdgpu_vmid_mgr_fini(adev);
 }
@@ -3339,13 +3364,23 @@ void amdgpu_vm_get_task_info(struct amdgpu_device *adev, u32 pasid,
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
+#else
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+
+	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
+#endif
 	if (vm)
 		*task_info = vm->task_info;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
+#else
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+#endif
 }
 
 /**
@@ -3387,15 +3422,24 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
 	struct amdgpu_vm *vm;
 	int r;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, irqflags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
+#else
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, irqflags);
+	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
+#endif
 	if (vm) {
 		root = amdgpu_bo_ref(vm->root.bo);
 		is_compute_context = vm->is_compute_context;
 	} else {
 		root = NULL;
 	}
+#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, irqflags);
+#else
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, irqflags);
+#endif
 
 	if (!root)
 		return false;
@@ -3413,11 +3457,20 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
 		goto error_unref;
 
 	/* Double check that the VM still exists */
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, irqflags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
+#else
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, irqflags);
+	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
+#endif
 	if (vm && vm->root.bo != root)
 		vm = NULL;
+#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, irqflags);
+#else
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, irqflags);
+#endif
 	if (!vm)
 		goto error_unlock;
 
