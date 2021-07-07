@@ -1265,7 +1265,9 @@ static inline void decide_8b_10b_training_settings(
 	lt_settings->pattern_for_cr = decide_cr_training_pattern(link_setting);
 	lt_settings->pattern_for_eq = decide_eq_training_pattern(link, link_setting);
 	lt_settings->enhanced_framing = 1;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	lt_settings->should_set_fec_ready = true;
+#endif
 }
 
 void dp_decide_training_settings(
