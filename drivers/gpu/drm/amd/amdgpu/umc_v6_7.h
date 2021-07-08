@@ -23,6 +23,9 @@
 #ifndef __UMC_V6_7_H__
 #define __UMC_V6_7_H__
 
+#include "soc15_common.h"
+#include "amdgpu.h"
+
 /* EccErrCnt max value */
 #define UMC_V6_7_CE_CNT_MAX		0xffff
 /* umc ce interrupt threshold */
