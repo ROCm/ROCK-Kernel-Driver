@@ -56,6 +56,10 @@
 #define GFX10_NUM_GFX_RINGS_Sienna_Cichlid	1
 #define GFX10_MEC_HPD_SIZE	2048
 
+#define RLCG_INTERFACE_NOT_ENABLED	0x4000000
+#define RLCG_WRONG_OPERATION_TYPE	0x2000000
+#define RLCG_NOT_IN_RANGE	0x1000000
+
 #define F32_CE_PROGRAM_RAM_SIZE		65536
 #define RLCG_UCODE_LOADING_START_ADDRESS	0x00002000L
 
@@ -184,6 +188,9 @@
 #define GFX_RLCG_GC_WRITE	(0x0 << 28)
 #define GFX_RLCG_GC_READ	(0x1 << 28)
 #define GFX_RLCG_MMHUB_WRITE	(0x2 << 28)
+
+#define RLCG_ERROR_REPORT_ENABLED(adev) \
+	(amdgpu_sriov_reg_indirect_mmhub(adev) || amdgpu_sriov_reg_indirect_gc(adev))
 
 MODULE_FIRMWARE("amdgpu/navi10_ce.bin");
 MODULE_FIRMWARE("amdgpu/navi10_pfp.bin");
@@ -1523,9 +1530,9 @@ static u32 gfx_v10_rlcg_rw(struct amdgpu_device *adev, u32 offset, u32 v, uint32
 		writel(v, scratch_reg0);
 		writel(offset | flag, scratch_reg1);
 		writel(1, spare_int);
-		for (i = 0; i < retries; i++) {
-			u32 tmp;
+		u32 tmp;
 
+		for (i = 0; i < retries; i++) {
 			tmp = readl(scratch_reg1);
 			if (!(tmp & flag))
 				break;
@@ -1533,8 +1540,19 @@ static u32 gfx_v10_rlcg_rw(struct amdgpu_device *adev, u32 offset, u32 v, uint32
 			udelay(10);
 		}
 
-		if (i >= retries)
-			pr_err("timeout: rlcg program reg:0x%05x failed !\n", offset);
+		if (i >= retries) {
+			if (RLCG_ERROR_REPORT_ENABLED(adev)) {
+				if (tmp & RLCG_INTERFACE_NOT_ENABLED)
+					pr_err("The interface is not enabled, program reg:0x%05x failed!\n", offset);
+				else if (tmp & RLCG_WRONG_OPERATION_TYPE)
+					pr_err("Wrong operation type, program reg:0x%05x failed!\n", offset);
+				else if (tmp & RLCG_NOT_IN_RANGE)
+					pr_err("The register is not in range, program reg:0x%05x failed!\n", offset);
+				else
+					pr_err("Unknown error type, program reg:0x%05x failed!\n", offset);
+			} else
+				pr_err("timeout: rlcg program reg:0x%05x failed!\n", offset);
+		}
 	}
 
 	ret = readl(scratch_reg0);
