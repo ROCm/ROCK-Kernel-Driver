@@ -306,9 +306,11 @@ L_SLEEP:
 #endif
 
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
-	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+	// ttmp SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)+0x40
 	get_wave_size(s_save_ttmps_hi)
 	get_vgpr_size_bytes(s_save_ttmps_lo, s_save_ttmps_hi)
+	get_svgpr_size_bytes(s_save_ttmps_hi)
+	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_ttmps_hi
 	s_and_b32	s_save_ttmps_hi, s_save_spi_init_hi, 0xFFFF
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, get_sgpr_size_bytes()
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_spi_init_lo
@@ -651,7 +653,7 @@ L_SAVE_VGPR_WAVE64:
 	// VGPR store using dw burst
 	s_mov_b32	m0, 0x4							//VGPR initial index value =4
 	s_cmp_lt_u32	m0, s_save_alloc_size
-	s_cbranch_scc0	L_SAVE_VGPR_END
+	s_cbranch_scc0	L_SAVE_SHARED_VGPR
 
 L_SAVE_VGPR_W64_LOOP:
 	v_movrels_b32	v0, v0							//v0 = v[0+m0]
@@ -669,6 +671,7 @@ L_SAVE_VGPR_W64_LOOP:
 	s_cmp_lt_u32	m0, s_save_alloc_size					//scc = (m0 < s_save_alloc_size) ? 1 : 0
 	s_cbranch_scc1	L_SAVE_VGPR_W64_LOOP					//VGPR save is complete?
 
+L_SAVE_SHARED_VGPR:
 	//Below part will be the save shared vgpr part (new for gfx10)
 	s_getreg_b32	s_save_alloc_size, hwreg(HW_REG_LDS_ALLOC,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SHIFT,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SIZE)
 	s_and_b32	s_save_alloc_size, s_save_alloc_size, 0xFFFFFFFF	//shared_vgpr_size is zero?
@@ -783,6 +786,8 @@ L_RESTORE_VGPR_NORMAL:
 	s_mov_b32	s_restore_mem_offset_save, s_restore_mem_offset		// restore start with v1, v0 will be the last
 	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 128*4
 	s_mov_b32	m0, 4							//VGPR initial index value = 4
+	s_cmp_lt_u32	m0, s_restore_alloc_size
+	s_cbranch_scc0	L_RESTORE_SGPR
 
 L_RESTORE_VGPR_WAVE32_LOOP:
 	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
@@ -815,6 +820,8 @@ L_RESTORE_VGPR_WAVE64:
 	s_mov_b32	s_restore_mem_offset_save, s_restore_mem_offset		// restore start with v4, v0 will be the last
 	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 256*4
 	s_mov_b32	m0, 4							//VGPR initial index value = 4
+	s_cmp_lt_u32	m0, s_restore_alloc_size
+	s_cbranch_scc0	L_RESTORE_SHARED_VGPR
 
 L_RESTORE_VGPR_WAVE64_LOOP:
 	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
@@ -831,6 +838,7 @@ L_RESTORE_VGPR_WAVE64_LOOP:
 	s_cmp_lt_u32	m0, s_restore_alloc_size				//scc = (m0 < s_restore_alloc_size) ? 1 : 0
 	s_cbranch_scc1	L_RESTORE_VGPR_WAVE64_LOOP				//VGPR restore (except v0) is complete?
 
+L_RESTORE_SHARED_VGPR:
 	//Below part will be the restore shared vgpr part (new for gfx10)
 	s_getreg_b32	s_restore_alloc_size, hwreg(HW_REG_LDS_ALLOC,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SHIFT,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SIZE)	//shared_vgpr_size
 	s_and_b32	s_restore_alloc_size, s_restore_alloc_size, 0xFFFFFFFF	//shared_vgpr_size is zero?
@@ -964,8 +972,10 @@ L_RESTORE_HWREG:
 	s_setreg_b32	hwreg(HW_REG_MODE), s_restore_mode
 
 	// Restore trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
-	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+	// ttmp SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)+0x40
 	get_vgpr_size_bytes(s_restore_ttmps_lo, s_restore_size)
+	get_svgpr_size_bytes(s_restore_ttmps_hi)
+	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_ttmps_hi
 	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, get_sgpr_size_bytes()
 	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_buf_rsrc0
 	s_addc_u32	s_restore_ttmps_hi, s_restore_buf_rsrc1, 0x0
