@@ -176,17 +176,12 @@ struct hubbub_funcs {
 	void (*program_compbuf_size)(struct hubbub *hubbub, unsigned compbuf_size_kb, bool safe_to_increase);
 	void (*init_crb)(struct hubbub *hubbub);
 #endif
-	void (*apply_invalidation_req_wa)(struct hubbub *hubbub,
-			struct dcn_hubbub_phys_addr_config *pa_config);
 };
 
 struct hubbub {
 	const struct hubbub_funcs *funcs;
 	struct dc_context *ctx;
 	bool riommu_active;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	struct dcn_hubbub_phys_addr_config vmid_cache;
-#endif
 };
 
 #endif
