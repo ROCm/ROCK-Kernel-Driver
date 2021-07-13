@@ -361,9 +361,11 @@ static void amdgpu_vram_mgr_virt_start(struct ttm_resource *mem,
 static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 			       struct ttm_buffer_object *tbo,
 			       const struct ttm_place *place,
+			       unsigned long num_nodes,
+			       unsigned long pages_per_node,
 			       struct ttm_resource *mem)
 {
-	unsigned long lpfn, num_nodes, pages_per_node, pages_left, pages;
+	unsigned long lpfn, pages_left, pages;
 	struct amdgpu_vram_mgr *mgr = to_vram_mgr(man);
 	struct amdgpu_device *adev = to_amdgpu_device(mgr);
 	uint64_t vis_usage = 0, mem_bytes, max_bytes;
@@ -393,21 +395,6 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 		return -ENOSPC;
 	}
 
-	if (place->flags & TTM_PL_FLAG_CONTIGUOUS) {
-		pages_per_node = ~0ul;
-		num_nodes = 1;
-	} else {
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-		pages_per_node = HPAGE_PMD_NR;
-#else
-		/* default to 2MB */
-		pages_per_node = 2UL << (20UL - PAGE_SHIFT);
-#endif
-		pages_per_node = max_t(uint32_t, pages_per_node,
-				       mem->page_alignment);
-		num_nodes = DIV_ROUND_UP(mem->num_pages, pages_per_node);
-	}
-
 	nodes = kvmalloc_array((uint32_t)num_nodes, sizeof(*nodes),
 			       GFP_KERNEL | __GFP_ZERO);
 	if (!nodes) {
@@ -435,7 +422,12 @@ static int amdgpu_vram_mgr_new(struct ttm_resource_manager *man,
 	i = 0;
 	spin_lock(&mgr->lock);
 	while (pages_left) {
-		uint32_t alignment = mem->page_alignment;
+		unsigned long alignment = mem->page_alignment;
+
+		if (i >= num_nodes) {
+			r = -E2BIG;
+			goto error;
+		}
 
 		if (pages >= pages_per_node)
 			alignment = pages_per_node;
@@ -490,6 +482,49 @@ error:
 
 	kvfree(nodes);
 	return r;
+}
+
+/**
+ * amdgpu_vram_mgr_alloc - allocate new range
+ *
+ * @man: TTM memory type manager
+ * @tbo: TTM BO we need this range for
+ * @place: placement flags and restrictions
+ * @mem: the resulting mem object
+ *
+ * Allocate VRAM for the given BO.
+ */
+static int amdgpu_vram_mgr_alloc(struct ttm_resource_manager *man,
+				 struct ttm_buffer_object *tbo,
+				 const struct ttm_place *place,
+				 struct ttm_resource *mem)
+{
+	unsigned long num_nodes, pages_per_node;
+	int r;
+
+	if (place->flags & TTM_PL_FLAG_CONTIGUOUS)
+		return amdgpu_vram_mgr_new(man, tbo, place, 1, ~0ul, mem);
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	pages_per_node = HPAGE_PMD_NR;
+#else
+	/* default to 2MB */
+	pages_per_node = 2UL << (20UL - PAGE_SHIFT);
+#endif
+	pages_per_node = max_t(uint32_t, pages_per_node,
+			       mem->page_alignment);
+	num_nodes = DIV_ROUND_UP(mem->num_pages, pages_per_node);
+
+	if (sizeof(struct drm_mm_node) * num_nodes > PAGE_SIZE) {
+		r = amdgpu_vram_mgr_new(man, tbo, place,
+				PAGE_SIZE / sizeof(struct drm_mm_node),
+				pages_per_node,	mem);
+		if (r != -E2BIG)
+			return r;
+	}
+
+	return amdgpu_vram_mgr_new(man, tbo, place, num_nodes, pages_per_node,
+				   mem);
 }
 
 /**
@@ -693,7 +728,7 @@ static void amdgpu_vram_mgr_debug(struct ttm_resource_manager *man,
 }
 
 static const struct ttm_resource_manager_func amdgpu_vram_mgr_func = {
-	.alloc	= amdgpu_vram_mgr_new,
+	.alloc	= amdgpu_vram_mgr_alloc,
 	.free	= amdgpu_vram_mgr_del,
 	.debug	= amdgpu_vram_mgr_debug
 };
