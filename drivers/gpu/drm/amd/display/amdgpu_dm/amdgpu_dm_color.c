@@ -348,7 +348,8 @@ int amdgpu_dm_update_crtc_color_mgmt(struct dm_crtc_state *crtc)
 	bool is_legacy;
 	int r;
 
-	if ((r = amdgpu_dm_verify_lut_sizes(&crtc->base)))
+	r = amdgpu_dm_verify_lut_sizes(&crtc->base);
+	if (r)
 		return r;
 
 	degamma_lut = __extract_blob_lut(crtc->base.degamma_lut, &degamma_size);
