@@ -1794,8 +1794,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	}
 	kfree(devices_arr);
 
-	mutex_unlock(&p->mutex);
-
 	return 0;
 
 bind_process_to_device_failed:
@@ -1803,6 +1801,7 @@ get_mem_obj_from_handle_failed:
 unmap_memory_from_gpu_failed:
 	mutex_unlock(&p->mutex);
 copy_from_user_failed:
+sync_memory_failed:
 	kfree(devices_arr);
 	return err;
 }
