@@ -126,7 +126,6 @@ enum mod_hdcp_display_state {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct mod_hdcp_psp_caps {
 	uint8_t dtm_v3_supported;
-	uint8_t opm_state_query_supported;
 };
 
 #endif
