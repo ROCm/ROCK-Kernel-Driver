@@ -1997,7 +1997,7 @@ int kfd_debugfs_rls_by_device(struct seq_file *m, void *data)
 		}
 
 		seq_printf(m, "Node %u, gpu_id %x:\n", i++, dev->gpu->id);
-		r = pm_debugfs_runlist(m, &dev->gpu->dqm->packets);
+		r = pm_debugfs_runlist(m, &dev->gpu->dqm->packet_mgr);
 		if (r)
 			break;
 	}
