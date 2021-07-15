@@ -128,6 +128,7 @@ static const struct cmn2asic_msg_mapping aldebaran_message_map[SMU_MSG_MAX_COUNT
 	MSG_MAP(DisableDeterminism,		     PPSMC_MSG_DisableDeterminism,		0),
 	MSG_MAP(SetUclkDpmMode,			     PPSMC_MSG_SetUclkDpmMode,			0),
 	MSG_MAP(GfxDriverResetRecovery,		     PPSMC_MSG_GfxDriverResetRecovery,		0),
+	MSG_MAP(BoardPowerCalibration,		     PPSMC_MSG_BoardPowerCalibration,		0),
 };
 
 static const struct cmn2asic_mapping aldebaran_clk_map[SMU_CLK_COUNT] = {
@@ -427,6 +428,39 @@ static int aldebaran_setup_pptable(struct smu_context *smu)
 	return ret;
 }
 
+static bool aldebaran_is_primary(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+
+	if (adev->smuio.funcs && adev->smuio.funcs->get_die_id)
+		return adev->smuio.funcs->get_die_id(adev) == 0;
+
+	return true;
+}
+
+static int aldebaran_run_board_btc(struct smu_context *smu)
+{
+	u32 smu_version;
+	int ret;
+
+	if (!aldebaran_is_primary(smu))
+		return 0;
+
+	ret = smu_cmn_get_smc_version(smu, NULL, &smu_version);
+	if (ret) {
+		dev_err(smu->adev->dev, "Failed to get smu version!\n");
+		return ret;
+	}
+	if (smu_version <= 0x00441d00)
+		return 0;
+
+	ret = smu_cmn_send_smc_msg(smu, SMU_MSG_BoardPowerCalibration, NULL);
+	if (ret)
+		dev_err(smu->adev->dev, "Board power calibration failed!\n");
+
+	return ret;
+}
+
 static int aldebaran_run_btc(struct smu_context *smu)
 {
 	int ret;
@@ -434,6 +468,8 @@ static int aldebaran_run_btc(struct smu_context *smu)
 	ret = smu_cmn_send_smc_msg(smu, SMU_MSG_RunDcBtc, NULL);
 	if (ret)
 		dev_err(smu->adev->dev, "RunDcBtc failed!\n");
+	else
+		ret = aldebaran_run_board_btc(smu);
 
 	return ret;
 }
