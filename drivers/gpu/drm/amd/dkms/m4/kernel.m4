@@ -650,7 +650,7 @@ AC_DEFUN([AC_KERNEL_SUPPORTED_AMD_CHIPS], [
 					exit;
 				print $[1];
 			}
-		}' $LINUX/include/drm/amd_asic_type.h)
+		}' ../../include/drm/amd_asic_type.h)
 
 		for i in $chips; do
 			$as_echo "#define HAVE_$i" >>config/config-amd-chips.h
