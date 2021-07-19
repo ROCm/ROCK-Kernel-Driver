@@ -1437,11 +1437,7 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 		r = amdgpu_hmm_range_get_pages(&prange->notifier, mm, NULL,
 					       prange->start << PAGE_SHIFT,
 					       prange->npages, &hmm_range,
-<<<<<<< HEAD
 					       false, true, owner);
-=======
-					       false, true);
->>>>>>> parent of 8a9ae6023336 (drm/amdkfd: add owner ref param to get hmm pages)
 		if (r) {
 			pr_debug("failed %d to get svm range pages\n", r);
 			goto unreserve_out;
@@ -2765,11 +2761,7 @@ void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm,
 	r = amdgpu_hmm_range_get_pages(&prange->notifier, mm, NULL,
 				       prange->start << PAGE_SHIFT,
 				       prange->npages, &hmm_range,
-<<<<<<< HEAD
 				       false, true, owner);
-=======
-				       false, true);
->>>>>>> parent of 8a9ae6023336 (drm/amdkfd: add owner ref param to get hmm pages)
 	if (!r) {
 		amdgpu_hmm_range_get_pages_done(hmm_range);
 		prange->validated_once = true;
