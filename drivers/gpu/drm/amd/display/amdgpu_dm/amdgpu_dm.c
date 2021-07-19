@@ -6275,17 +6275,31 @@ get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
 	return m_pref;
 }
 
+/* Standard FPS values
+ *
+ * 23.976   - TV/NTSC
+ * 24 	    - Cinema
+ * 25 	    - TV/PAL
+ * 29.97    - TV/NTSC
+ * 30 	    - TV/NTSC
+ * 48 	    - Cinema HFR
+ * 50 	    - TV/PAL
+ * 60 	    - Commonly used
+ * 48,72,96 - Multiples of 24
+ */
+const uint32_t common_rates[] = { 23976, 24000, 25000, 29970, 30000,
+				 48000, 50000, 60000, 72000, 96000 };
+
 static bool is_freesync_video_mode(const struct drm_display_mode *mode,
 				   struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_display_mode *high_mode;
 	int timing_diff;
+	int i;
 
 	high_mode = get_highest_refresh_rate_mode(aconnector, false);
 	if (!high_mode || !mode)
 		return false;
-
-	timing_diff = high_mode->vtotal - mode->vtotal;
 
 	if (high_mode->clock == 0 || high_mode->clock != mode->clock ||
 	    high_mode->hdisplay != mode->hdisplay ||
@@ -6298,88 +6312,26 @@ static bool is_freesync_video_mode(const struct drm_display_mode *mode,
 	    high_mode->vsync_start - mode->vsync_start != timing_diff ||
 	    high_mode->vsync_end - mode->vsync_end != timing_diff)
 		return false;
-	else
-		return true;
-}
 
-static struct drm_display_mode *
-get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
-			  bool use_probed_modes)
-{
-	struct drm_display_mode *m, *m_pref = NULL;
-	u16 current_refresh, highest_refresh;
-	struct list_head *list_head = use_probed_modes ?
-						    &aconnector->base.probed_modes :
-						    &aconnector->base.modes;
+	for (i = 0; i < ARRAY_SIZE(common_rates); i++) {
+		uint64_t target_vtotal, target_vtotal_diff;
+		uint64_t num, den;
 
-	if (aconnector->freesync_vid_base.clock != 0)
-		return &aconnector->freesync_vid_base;
+		if (drm_mode_vrefresh(high_mode) * 1000 < common_rates[i])
+			continue;
+		if (common_rates[i] < aconnector->min_vfreq * 1000 ||
+		    common_rates[i] > aconnector->max_vfreq * 1000)
+			continue;
+		num = (unsigned long long)high_mode->clock * 1000 * 1000;
+		den = common_rates[i] * (unsigned long long)high_mode->htotal;
+		target_vtotal = div_u64(num, den);
+		target_vtotal_diff = target_vtotal - high_mode->vtotal;
 
-	/* Find the preferred mode */
-	list_for_each_entry (m, list_head, head) {
-		if (m->type & DRM_MODE_TYPE_PREFERRED) {
-			m_pref = m;
-			break;
-		}
+		if ((mode->vtotal - target_vtotal_diff) == high_mode->vtotal)
+			return true;
 	}
 
-	if (!m_pref) {
-		/* Probably an EDID with no preferred mode. Fallback to first entry */
-		m_pref = list_first_entry_or_null(
-			&aconnector->base.modes, struct drm_display_mode, head);
-		if (!m_pref) {
-			DRM_DEBUG_DRIVER("No preferred mode found in EDID\n");
-			return NULL;
-		}
-	}
-
-	highest_refresh = drm_mode_vrefresh(m_pref);
-
-	/*
-	 * Find the mode with highest refresh rate with same resolution.
-	 * For some monitors, preferred mode is not the mode with highest
-	 * supported refresh rate.
-	 */
-	list_for_each_entry (m, list_head, head) {
-		current_refresh  = drm_mode_vrefresh(m);
-
-		if (m->hdisplay == m_pref->hdisplay &&
-		    m->vdisplay == m_pref->vdisplay &&
-		    highest_refresh < current_refresh) {
-			highest_refresh = current_refresh;
-			m_pref = m;
-		}
-	}
-
-	aconnector->freesync_vid_base = *m_pref;
-	return m_pref;
-}
-
-static bool is_freesync_video_mode(struct drm_display_mode *mode,
-				   struct amdgpu_dm_connector *aconnector)
-{
-	struct drm_display_mode *high_mode;
-	int timing_diff;
-
-	high_mode = get_highest_refresh_rate_mode(aconnector, false);
-	if (!high_mode || !mode)
-		return false;
-
-	timing_diff = high_mode->vtotal - mode->vtotal;
-
-	if (high_mode->clock == 0 || high_mode->clock != mode->clock ||
-	    high_mode->hdisplay != mode->hdisplay ||
-	    high_mode->vdisplay != mode->vdisplay ||
-	    high_mode->hsync_start != mode->hsync_start ||
-	    high_mode->hsync_end != mode->hsync_end ||
-	    high_mode->htotal != mode->htotal ||
-	    high_mode->hskew != mode->hskew ||
-	    high_mode->vscan != mode->vscan ||
-	    high_mode->vsync_start - mode->vsync_start != timing_diff ||
-	    high_mode->vsync_end - mode->vsync_end != timing_diff)
-		return false;
-	else
-		return true;
+	return false;
 }
 
 static struct dc_stream_state *
@@ -8477,23 +8429,6 @@ static uint add_fs_modes(struct amdgpu_dm_connector *aconnector)
 	struct drm_display_mode *new_mode;
 	uint i;
 	uint32_t new_modes_count = 0;
-
-	/* Standard FPS values
-	 *
-	 * 23.976   - TV/NTSC
-	 * 24 	    - Cinema
-	 * 25 	    - TV/PAL
-	 * 29.97    - TV/NTSC
-	 * 30 	    - TV/NTSC
-	 * 48 	    - Cinema HFR
-	 * 50 	    - TV/PAL
-	 * 60 	    - Commonly used
-	 * 48,72,96 - Multiples of 24
-	 */
-	static const uint32_t common_rates[] = {
-		23976, 24000, 25000, 29970, 30000,
-		48000, 50000, 60000, 72000, 96000
-	};
 
 	/*
 	 * Find mode with highest refresh rate with the same resolution
