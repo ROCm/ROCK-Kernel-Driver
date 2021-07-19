@@ -148,7 +148,11 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
 
 			addr[i] = (hmm_pfns[i] << PAGE_SHIFT) +
 				   bo_adev->vm_manager.vram_base_offset -
+#ifdef HAVE_DEV_PAGEMAP_RANGE
 				   bo_adev->kfd.dev->pgmap.range.start;
+#else
+				   bo_adev->kfd.dev->pgmap.res.start;
+#endif
 			addr[i] |= SVM_RANGE_VRAM_DOMAIN;
 			pr_debug("vram address detected: 0x%llx\n", addr[i]);
 			continue;
