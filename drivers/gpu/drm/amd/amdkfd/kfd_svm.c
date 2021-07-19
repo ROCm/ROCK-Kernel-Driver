@@ -2753,7 +2753,8 @@ out:
 /* FIXME: This is a workaround for page locking bug when some pages are
  * invalid during migration to VRAM
  */
-void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm)
+void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm,
+			void *owner)
 {
 	struct hmm_range *hmm_range;
 	int r;
@@ -2765,14 +2766,10 @@ void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm)
 				       prange->start << PAGE_SHIFT,
 				       prange->npages, &hmm_range,
 <<<<<<< HEAD
-<<<<<<< HEAD
 				       false, true, owner);
 =======
 				       false, true);
 >>>>>>> parent of 8a9ae6023336 (drm/amdkfd: add owner ref param to get hmm pages)
-=======
-				       false, true, NULL);
->>>>>>> parent of 032aa4f74b4e (drm/amdkfd: set owner ref to svm range prefault)
 	if (!r) {
 		amdgpu_hmm_range_get_pages_done(hmm_range);
 		prange->validated_once = true;
