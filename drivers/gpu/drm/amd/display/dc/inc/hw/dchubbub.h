@@ -174,7 +174,9 @@ struct hubbub {
 	const struct hubbub_funcs *funcs;
 	struct dc_context *ctx;
 	bool riommu_active;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct dcn_hubbub_phys_addr_config vmid_cache;
+#endif
 };
 
 #endif
