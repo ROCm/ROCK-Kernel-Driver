@@ -880,7 +880,9 @@ static int hubbub31_init_dchub_sys_ctx(struct hubbub *hubbub,
 
 	dcn21_dchvm_init(hubbub);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	hubbub->vmid_cache = *pa_config;
+#endif
 
 	return NUM_VMID;
 }
