@@ -2541,8 +2541,8 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 	uint64_t *restored_bo_offsets_arr = NULL;
 	struct kfd_criu_bo_buckets *bo_bucket = NULL;
 	const bool criu_resume = true;
+	int ret, i = 0, j = 0;
 	long err = 0;
-	int ret, i, j = 0;
 
 	devinfos = kvzalloc((sizeof(struct kfd_criu_devinfo_bucket) *
 			     args->num_of_devices), GFP_KERNEL);
@@ -2749,8 +2749,11 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 			ret = criu_get_prime_handle(&kgd_mem->bo->tbo.base,
 						    DRM_RDWR,
 						    &bo_bucket[i].dmabuf_fd);
-			if (ret)
+			if (ret) {
+				err = ret;
+				pr_err("Failed to obtain gem prime object\n");
 				goto err_unlock;
+			}
 		}
 
 	} /* done */
@@ -2799,11 +2802,10 @@ static int kfd_ioctl_criu_restorer(struct file *filep,
 
 
 err_unlock:
-	while (i--) {
+	while (err && i--) {
 		if (bo_bucket[i].bo_alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM)
 			close_fd(bo_bucket[i].dmabuf_fd);
 	}
-
 	mutex_unlock(&p->mutex);
 failed:
 	kvfree(bo_bucket);
