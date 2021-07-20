@@ -807,6 +807,9 @@ struct amdgpu_ssg {
 #endif
 };
 
+#define HW_ID_MAX		300
+#define IP_VERSION(mj, mn, rv) (((mj) << 16) | ((mn) << 8) | (rv))
+
 struct amd_powerplay {
 	void *pp_handle;
 	const struct amd_pm_funcs *pp_funcs;
@@ -1153,6 +1156,7 @@ struct amdgpu_device {
 	bool				barrier_has_auto_waitcnt;
 
 	struct amdgpu_reset_control     *reset_cntl;
+	uint32_t                        ip_versions[HW_ID_MAX];
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
