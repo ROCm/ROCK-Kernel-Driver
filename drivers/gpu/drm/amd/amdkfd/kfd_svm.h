@@ -35,9 +35,6 @@
 #include "amdgpu.h"
 #include "kfd_priv.h"
 
-#define SVM_ADEV_PGMAP_OWNER(adev)\
-			((adev)->hive ? (void *)(adev)->hive : (void *)(adev))
-
 struct svm_range_bo {
 	struct amdgpu_bo		*bo;
 	struct kref			kref;
