@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #include "dc.h"
 #include "dc_link.h"
 #include "../display_mode_lib.h"
@@ -7510,4 +7510,4 @@ static bool UnboundedRequest(enum unbounded_requesting_policy UseUnboundedReques
 	return (ret_val);
 }
 
-#endif /* CONFIG_DRM_AMD_DC_DCN3_1 */
+#endif /* CONFIG_DRM_AMD_DC_DCN3_x */

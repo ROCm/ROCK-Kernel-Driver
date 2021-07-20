@@ -1548,7 +1548,7 @@ static uint8_t get_stream_mask(struct dc *dc, struct dc_state *context)
 	return stream_mask;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dc_z10_restore(struct dc *dc)
 {
 	if (dc->hwss.z10_restore)
@@ -1568,9 +1568,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 	struct dc_stream_state *dc_streams[MAX_STREAMS] = {0};
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
 	dc_z10_restore(dc);
-#endif
 	dc_allow_idle_optimizations(dc, false);
 #endif
 
@@ -2671,7 +2669,7 @@ static void commit_planes_for_stream(struct dc *dc,
 	int i, j;
 	struct pipe_ctx *top_pipe_to_program = NULL;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 #endif
 
@@ -3169,7 +3167,7 @@ void dc_set_power_state(
 	case DC_ACPI_CM_POWER_STATE_D0:
 		dc_resource_state_construct(dc, dc->current_state);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		dc_z10_restore(dc);
 #endif
 		if (dc->ctx->dmub_srv)

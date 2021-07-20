@@ -98,9 +98,6 @@ struct clk_limit_table_entry {
 	unsigned int dispclk_mhz;
 	unsigned int dppclk_mhz;
 	unsigned int phyclk_mhz;
-#endif
-
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
 	unsigned int wck_ratio;
 #endif
 };

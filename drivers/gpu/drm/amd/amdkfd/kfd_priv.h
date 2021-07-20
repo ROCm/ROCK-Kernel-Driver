@@ -826,6 +826,15 @@ struct kfd_process_device {
 	uint32_t spi_dbg_override;
 	uint32_t spi_dbg_launch_mode;
 	uint32_t watch_points[4];
+
+	/* sysfs counters for GPU retry fault and page migration tracking */
+	struct kobject *kobj_counters;
+	struct attribute attr_faults;
+	struct attribute attr_page_in;
+	struct attribute attr_page_out;
+	uint64_t faults;
+	uint64_t page_in;
+	uint64_t page_out;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)

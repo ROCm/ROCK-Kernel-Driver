@@ -179,7 +179,7 @@ struct timing_generator_funcs {
 
 	bool (*enable_crtc)(struct timing_generator *tg);
 	bool (*disable_crtc)(struct timing_generator *tg);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool (*immediate_disable_crtc)(struct timing_generator *tg);
 #endif
 	bool (*is_counter_moving)(struct timing_generator *tg);

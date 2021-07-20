@@ -83,7 +83,7 @@ struct dcn20_hubbub {
 	int num_vmid;
 	struct dcn20_vmid vmid[16];
 	unsigned int detile_buf_size;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	unsigned int crb_size_segs;
 	unsigned int compbuf_size_segments;
 	unsigned int pixel_chunk_size;

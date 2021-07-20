@@ -131,7 +131,7 @@ struct link_enc_state {
 };
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum encoder_type_select {
 		ENCODER_TYPE_DIG = 0,
 		ENCODER_TYPE_HDMI_FRL = 1,
@@ -201,7 +201,7 @@ struct link_encoder_funcs {
 
 	enum signal_type (*get_dig_mode)(
 		struct link_encoder *enc);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*set_dio_phy_mux)(
 		struct link_encoder *enc,
 		enum encoder_type_select sel,

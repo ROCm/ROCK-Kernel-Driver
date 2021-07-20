@@ -363,7 +363,7 @@ union dmub_fw_boot_options {
 		uint32_t skip_phy_access : 1; /**< 1 if PHY access should be skipped */
 		uint32_t disable_clk_gate: 1; /**< 1 if clock gating should be disabled */
 		uint32_t skip_phy_init_panel_sequence: 1; /**< 1 to skip panel init seq */
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		uint32_t z10_disable: 1; /**< 1 to disable z10 */
 #else
 		uint32_t reserved_unreleased: 1; /**< reserved for an unreleased feature */
@@ -634,7 +634,7 @@ enum dmub_cmd_type {
 	 * Command type used for OUTBOX1 notification enable
 	 */
 	DMUB_CMD__OUTBOX1_ENABLE = 71,
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	/**
 	 * Command type used for all idle optimization commands.
 	 */
@@ -857,7 +857,7 @@ struct dmub_rb_cmd_mall {
 	uint8_t reserved2; /**< Reserved bits */
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 /**
  * enum dmub_cmd_idle_opt_type - Idle optimization command type.
@@ -2114,7 +2114,7 @@ struct dmub_rb_cmd_drr_update {
 		struct dmub_optc_state dmub_optc_state_req;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 /**
  * enum dmub_cmd_panel_cntl_type - Panel control command.
  */
@@ -2310,7 +2310,7 @@ union dmub_rb_cmd {
 	 * Definition of a DMUB_CMD__MALL command.
 	 */
 	struct dmub_rb_cmd_mall mall;
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	/**
 	 * Definition of a DMUB_CMD__IDLE_OPT_DCN_RESTORE command.
 	 */

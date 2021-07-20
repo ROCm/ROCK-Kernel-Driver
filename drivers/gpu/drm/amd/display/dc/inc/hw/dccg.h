@@ -29,7 +29,7 @@
 #include "dc_types.h"
 #include "hw_shared.h"
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum phyd32clk_clock_source {
 	PHYD32CLKA,
 	PHYD32CLKB,
@@ -62,7 +62,7 @@ struct dccg {
 	const struct dccg_funcs *funcs;
 	int pipe_dppclk_khz[MAX_PIPES];
 	int ref_dppclk;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int dtbclk_khz[MAX_PIPES];
 	int audio_dtbclk_khz;
 	int ref_dtbclk_khz;
@@ -83,7 +83,7 @@ struct dccg_funcs {
 	void (*otg_drop_pixel)(struct dccg *dccg,
 			uint32_t otg_inst);
 	void (*dccg_init)(struct dccg *dccg);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 	void (*set_physymclk)(
 			struct dccg *dccg,

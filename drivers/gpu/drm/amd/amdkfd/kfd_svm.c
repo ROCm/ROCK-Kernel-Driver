@@ -301,14 +301,6 @@ static bool svm_bo_ref_unless_zero(struct svm_range_bo *svm_bo)
 	return true;
 }
 
-static struct svm_range_bo *svm_range_bo_ref(struct svm_range_bo *svm_bo)
-{
-	if (svm_bo)
-		kref_get(&svm_bo->kref);
-
-	return svm_bo;
-}
-
 static void svm_range_bo_release(struct kref *kref)
 {
 	struct svm_range_bo *svm_bo;
@@ -347,7 +339,7 @@ static void svm_range_bo_release(struct kref *kref)
 	kfree(svm_bo);
 }
 
-static void svm_range_bo_unref(struct svm_range_bo *svm_bo)
+void svm_range_bo_unref(struct svm_range_bo *svm_bo)
 {
 	if (!svm_bo)
 		return;
@@ -562,6 +554,24 @@ svm_range_get_adev_by_id(struct svm_range *prange, uint32_t gpu_id)
 	}
 
 	return (struct amdgpu_device *)pdd->dev->kgd;
+}
+
+struct kfd_process_device *
+svm_range_get_pdd_by_adev(struct svm_range *prange, struct amdgpu_device *adev)
+{
+	struct kfd_process *p;
+	int32_t gpu_idx, gpuid;
+	int r;
+
+	p = container_of(prange->svms, struct kfd_process, svms);
+
+	r = kfd_process_gpuid_from_kgd(p, adev, &gpuid, &gpu_idx);
+	if (r) {
+		pr_debug("failed to get device id by adev %p\n", adev);
+		return NULL;
+	}
+
+	return kfd_process_device_from_gpuidx(p, gpu_idx);
 }
 
 static int svm_range_bo_validate(void *param, struct amdgpu_bo *bo)
@@ -1325,6 +1335,17 @@ static void svm_range_unreserve_bos(struct svm_validate_context *ctx)
 	ttm_eu_backoff_reservation(&ctx->ticket, &ctx->validate_list);
 }
 
+static void *kfd_svm_page_owner(struct kfd_process *p, int32_t gpuidx)
+{
+	struct kfd_process_device *pdd;
+	struct amdgpu_device *adev;
+
+	pdd = kfd_process_device_from_gpuidx(p, gpuidx);
+	adev = (struct amdgpu_device *)pdd->dev->kgd;
+
+	return SVM_ADEV_PGMAP_OWNER(adev);
+}
+
 /*
  * Validation+GPU mapping with concurrent invalidation (MMU notifiers)
  *
@@ -1355,6 +1376,9 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 {
 	struct svm_validate_context ctx;
 	struct hmm_range *hmm_range;
+	struct kfd_process *p;
+	void *owner;
+	int32_t idx;
 	int r = 0;
 
 	ctx.process = container_of(prange->svms, struct kfd_process, svms);
@@ -1401,10 +1425,19 @@ static int svm_range_validate_and_map(struct mm_struct *mm,
 	svm_range_reserve_bos(&ctx);
 
 	if (!prange->actual_loc) {
+		p = container_of(prange->svms, struct kfd_process, svms);
+		owner = kfd_svm_page_owner(p, find_first_bit(ctx.bitmap,
+							MAX_GPU_INSTANCE));
+		for_each_set_bit(idx, ctx.bitmap, MAX_GPU_INSTANCE) {
+			if (kfd_svm_page_owner(p, idx) != owner) {
+				owner = NULL;
+				break;
+			}
+		}
 		r = amdgpu_hmm_range_get_pages(&prange->notifier, mm, NULL,
 					       prange->start << PAGE_SHIFT,
 					       prange->npages, &hmm_range,
-					       false, true);
+					       false, true, owner);
 		if (r) {
 			pr_debug("failed %d to get svm range pages\n", r);
 			goto unreserve_out;
@@ -2334,6 +2367,33 @@ static bool svm_range_skip_recover(struct svm_range *prange)
 	return false;
 }
 
+static void
+svm_range_count_fault(struct amdgpu_device *adev, struct kfd_process *p,
+		      int32_t gpuidx)
+{
+	struct kfd_process_device *pdd;
+
+	/* fault is on different page of same range
+	 * or fault is skipped to recover later
+	 * or fault is on invalid virtual address
+	 */
+	if (gpuidx == MAX_GPU_INSTANCE) {
+		uint32_t gpuid;
+		int r;
+
+		r = kfd_process_gpuid_from_kgd(p, adev, &gpuid, &gpuidx);
+		if (r < 0)
+			return;
+	}
+
+	/* fault is recovered
+	 * or fault cannot recover because GPU no access on the range
+	 */
+	pdd = kfd_process_device_from_gpuidx(p, gpuidx);
+	if (pdd)
+		WRITE_ONCE(pdd->faults, pdd->faults + 1);
+}
+
 int
 svm_range_restore_pages(struct amdgpu_device *adev, unsigned int pasid,
 			uint64_t addr)
@@ -2343,7 +2403,8 @@ svm_range_restore_pages(struct amdgpu_device *adev, unsigned int pasid,
 	struct svm_range *prange;
 	struct kfd_process *p;
 	uint64_t timestamp;
-	int32_t best_loc, gpuidx;
+	int32_t best_loc;
+	int32_t gpuidx = MAX_GPU_INSTANCE;
 	bool write_locked = false;
 	int r = 0;
 
@@ -2463,6 +2524,9 @@ out_unlock_range:
 out_unlock_svms:
 	mutex_unlock(&svms->lock);
 	mmap_read_unlock(mm);
+
+	svm_range_count_fault(adev, p, gpuidx);
+
 	mmput(mm);
 out:
 	kfd_unref_process(p);
@@ -2685,7 +2749,8 @@ out:
 /* FIXME: This is a workaround for page locking bug when some pages are
  * invalid during migration to VRAM
  */
-void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm)
+void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm,
+			void *owner)
 {
 	struct hmm_range *hmm_range;
 	int r;
@@ -2696,7 +2761,7 @@ void svm_range_prefault(struct svm_range *prange, struct mm_struct *mm)
 	r = amdgpu_hmm_range_get_pages(&prange->notifier, mm, NULL,
 				       prange->start << PAGE_SHIFT,
 				       prange->npages, &hmm_range,
-				       false, true);
+				       false, true, owner);
 	if (!r) {
 		amdgpu_hmm_range_get_pages_done(hmm_range);
 		prange->validated_once = true;

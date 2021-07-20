@@ -43,8 +43,6 @@ enum dml_project {
 #endif
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	DML_PROJECT_DCN30,
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DCN3_1
 	DML_PROJECT_DCN31,
 	DML_PROJECT_DCN31_FPGA,
 #endif
