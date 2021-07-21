@@ -1497,6 +1497,7 @@ static u32 gfx_v10_rlcg_rw(struct amdgpu_device *adev, u32 offset, u32 v, uint32
 	uint32_t i = 0;
 	uint32_t retries = 50000;
 	u32 ret = 0;
+	u32 tmp;
 
 	scratch_reg0 = adev->rmmio +
 		       (adev->reg_offset[GC_HWIP][0][mmSCRATCH_REG0_BASE_IDX] + mmSCRATCH_REG0) * 4;
@@ -1530,7 +1531,6 @@ static u32 gfx_v10_rlcg_rw(struct amdgpu_device *adev, u32 offset, u32 v, uint32
 		writel(v, scratch_reg0);
 		writel(offset | flag, scratch_reg1);
 		writel(1, spare_int);
-		u32 tmp;
 
 		for (i = 0; i < retries; i++) {
 			tmp = readl(scratch_reg1);
