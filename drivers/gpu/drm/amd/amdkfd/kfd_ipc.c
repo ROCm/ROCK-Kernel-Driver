@@ -41,7 +41,8 @@ static struct kfd_ipc_handles {
  */
 #define HANDLE_TO_KEY(sh) ((*(uint64_t *)sh) & KFD_IPC_HASH_TABLE_SIZE_MASK)
 
-int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj)
+int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj,
+			 uint32_t flags)
 {
 	struct kfd_ipc_obj *obj;
 
@@ -59,6 +60,7 @@ int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj)
 	kref_init(&obj->ref);
 	obj->dmabuf = dmabuf;
 	get_random_bytes(obj->share_handle, sizeof(obj->share_handle));
+	obj->flags = flags;
 
 	mutex_lock(&kfd_ipc_handles.lock);
 	hlist_add_head(&obj->node,
@@ -182,7 +184,7 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
 int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 			  uint32_t gpu_id, uint32_t *share_handle,
 			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset)
+			  uint64_t *mmap_offset, uint32_t *pflags)
 {
 	int r;
 	struct kfd_ipc_obj *entry, *found = NULL;
@@ -212,6 +214,7 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 	if (r)
 		goto error_unref;
 
+	*pflags = found->flags;
 	return r;
 
 error_unref:
@@ -220,7 +223,8 @@ error_unref:
 }
 
 int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
-			     uint64_t handle, uint32_t *ipc_handle)
+			     uint64_t handle, uint32_t *ipc_handle,
+			     uint32_t flags)
 {
 	struct kfd_process_device *pdd = NULL;
 	struct kfd_ipc_obj *ipc_obj;
@@ -249,7 +253,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	mem = (struct kgd_mem *)kfd_bo->mem;
 
 	r = amdgpu_amdkfd_gpuvm_export_ipc_obj(dev->kgd, pdd->drm_priv, mem,
-					       &ipc_obj);
+					       &ipc_obj, flags);
 	if (r)
 		return r;
 
