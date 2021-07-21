@@ -6275,31 +6275,17 @@ get_highest_refresh_rate_mode(struct amdgpu_dm_connector *aconnector,
 	return m_pref;
 }
 
-/* Standard FPS values
- *
- * 23.976   - TV/NTSC
- * 24 	    - Cinema
- * 25 	    - TV/PAL
- * 29.97    - TV/NTSC
- * 30 	    - TV/NTSC
- * 48 	    - Cinema HFR
- * 50 	    - TV/PAL
- * 60 	    - Commonly used
- * 48,72,96 - Multiples of 24
- */
-const uint32_t common_rates[] = { 23976, 24000, 25000, 29970, 30000,
-				 48000, 50000, 60000, 72000, 96000 };
-
 static bool is_freesync_video_mode(const struct drm_display_mode *mode,
 				   struct amdgpu_dm_connector *aconnector)
 {
 	struct drm_display_mode *high_mode;
 	int timing_diff;
-	int i;
 
 	high_mode = get_highest_refresh_rate_mode(aconnector, false);
 	if (!high_mode || !mode)
 		return false;
+
+	timing_diff = high_mode->vtotal - mode->vtotal;
 
 	if (high_mode->clock == 0 || high_mode->clock != mode->clock ||
 	    high_mode->hdisplay != mode->hdisplay ||
@@ -6312,26 +6298,8 @@ static bool is_freesync_video_mode(const struct drm_display_mode *mode,
 	    high_mode->vsync_start - mode->vsync_start != timing_diff ||
 	    high_mode->vsync_end - mode->vsync_end != timing_diff)
 		return false;
-
-	for (i = 0; i < ARRAY_SIZE(common_rates); i++) {
-		uint64_t target_vtotal, target_vtotal_diff;
-		uint64_t num, den;
-
-		if (drm_mode_vrefresh(high_mode) * 1000 < common_rates[i])
-			continue;
-		if (common_rates[i] < aconnector->min_vfreq * 1000 ||
-		    common_rates[i] > aconnector->max_vfreq * 1000)
-			continue;
-		num = (unsigned long long)high_mode->clock * 1000 * 1000;
-		den = common_rates[i] * (unsigned long long)high_mode->htotal;
-		target_vtotal = div_u64(num, den);
-		target_vtotal_diff = target_vtotal - high_mode->vtotal;
-
-		if ((mode->vtotal - target_vtotal_diff) == high_mode->vtotal)
-			return true;
-	}
-
-	return false;
+	else
+		return true;
 }
 
 static struct dc_stream_state *
@@ -8429,6 +8397,23 @@ static uint add_fs_modes(struct amdgpu_dm_connector *aconnector)
 	struct drm_display_mode *new_mode;
 	uint i;
 	uint32_t new_modes_count = 0;
+
+	/* Standard FPS values
+	 *
+	 * 23.976   - TV/NTSC
+	 * 24 	    - Cinema
+	 * 25 	    - TV/PAL
+	 * 29.97    - TV/NTSC
+	 * 30 	    - TV/NTSC
+	 * 48 	    - Cinema HFR
+	 * 50 	    - TV/PAL
+	 * 60 	    - Commonly used
+	 * 48,72,96 - Multiples of 24
+	 */
+	static const uint32_t common_rates[] = {
+		23976, 24000, 25000, 29970, 30000,
+		48000, 50000, 60000, 72000, 96000
+	};
 
 	/*
 	 * Find mode with highest refresh rate with the same resolution
