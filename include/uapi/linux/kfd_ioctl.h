@@ -1056,16 +1056,16 @@ struct kfd_ioctl_ipc_export_handle_args {
 	__u64 handle;		/* to KFD */
 	__u32 share_handle[4];	/* from KFD */
 	__u32 gpu_id;		/* to KFD */
-	__u32 pad;
+	__u32 flags;		/* to KFD */
 };
 
 struct kfd_ioctl_ipc_import_handle_args {
 	__u64 handle;		/* from KFD */
 	__u64 va_addr;		/* to KFD */
-	__u64 mmap_offset;		/* from KFD */
+	__u64 mmap_offset;	/* from KFD */
 	__u32 share_handle[4];	/* to KFD */
 	__u32 gpu_id;		/* to KFD */
-	__u32 pad;
+	__u32 flags;		/* from KFD */
 };
 
 /* Guarantee host access to memory */

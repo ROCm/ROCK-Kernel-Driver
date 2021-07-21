@@ -2579,7 +2579,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 
 int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
 				       struct kgd_mem *mem,
-				       struct kfd_ipc_obj **ipc_obj)
+				       struct kfd_ipc_obj **ipc_obj,
+				       uint32_t flags)
 {
 	struct amdgpu_device *adev = NULL;
 	struct dma_buf *dmabuf;
@@ -2606,7 +2607,7 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
 		goto unlock_out;
 	}
 
-	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj);
+	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj, flags);
 	if (r)
 		dma_buf_put(dmabuf);
 	else
