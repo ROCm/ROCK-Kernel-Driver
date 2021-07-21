@@ -1948,7 +1948,8 @@ static int kfd_ioctl_ipc_export_handle(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle);
+	r = kfd_ipc_export_as_handle(dev, p, args->handle, args->share_handle,
+				     args->flags);
 	if (r)
 		pr_err("Failed to export IPC handle\n");
 
@@ -1973,7 +1974,7 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 
 	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
 				  args->va_addr, &args->handle,
-				  &args->mmap_offset);
+				  &args->mmap_offset, &args->flags);
 	if (r)
 		pr_err("Failed to import IPC handle\n");
 
