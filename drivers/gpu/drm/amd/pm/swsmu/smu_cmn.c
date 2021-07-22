@@ -256,7 +256,7 @@ int smu_cmn_send_msg_without_waiting(struct smu_context *smu,
 	u32 reg;
 	int res;
 
-	if (smu->adev->in_pci_err_recovery)
+	if (smu->adev->no_hw_access)
 		return 0;
 
 	mutex_lock(&smu->message_lock);
