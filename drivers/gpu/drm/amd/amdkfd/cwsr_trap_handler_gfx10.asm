@@ -50,8 +50,10 @@ var SQ_WAVE_IB_STS2_WAVE64_SHIFT		= 11
 var SQ_WAVE_IB_STS2_WAVE64_SIZE			= 1
 
 var SQ_WAVE_TRAPSTS_SAVECTX_MASK		= 0x400
-var SQ_WAVE_TRAPSTS_EXCP_MASK			= 0x79FF
+var SQ_WAVE_TRAPSTS_EXCP_MASK			= 0x1FF
 var SQ_WAVE_TRAPSTS_SAVECTX_SHIFT		= 10
+var SQ_WAVE_TRAPSTS_ADDR_WATCH_MASK		= 0x80
+var SQ_WAVE_TRAPSTS_ADDR_WATCH_SHIFT		= 7
 var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK		= 0x100
 var SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT		= 8
 var SQ_WAVE_TRAPSTS_PRE_SAVECTX_MASK		= 0x3FF
@@ -61,6 +63,10 @@ var SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK		= 0xFFFFF800
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT		= 11
 var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE		= 21
 var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK		= 0x800
+var SQ_WAVE_TRAPSTS_EXCP_HI_MASK		= 0x7000
+
+var SQ_WAVE_MODE_EXCP_EN_SHIFT			= 12
+var SQ_WAVE_MODE_EXCP_EN_ADDR_WATCH_SHIFT	= 19
 
 var SQ_WAVE_IB_STS_FIRST_REPLAY_SHIFT		= 15
 var SQ_WAVE_IB_STS_REPLAY_W64H_SHIFT		= 25
@@ -180,8 +186,31 @@ L_CHECK_SAVE:
 L_NOT_HALTED:
 	// Let second-level handle non-SAVECTX exception or trap.
 	// Any concurrent SAVECTX will be handled upon re-entry once halted.
-	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCP_MASK
+
+	// Check non-maskable exceptions. memory_violation, illegal_instruction
+	// and xnack_error exceptions always cause the wave to enter the trap
+	// handler.
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK|SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
+
+	// Check for maskable exceptions in trapsts.excp and trapsts.excp_hi.
+	// Maskable exceptions only cause the wave to enter the trap handler if
+	// their respective bit in mode.excp_en is set.
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCP_MASK|SQ_WAVE_TRAPSTS_EXCP_HI_MASK
+	s_cbranch_scc0	L_CHECK_TRAP_ID
+
+	s_and_b32	ttmp3, s_save_trapsts, SQ_WAVE_TRAPSTS_ADDR_WATCH_MASK|SQ_WAVE_TRAPSTS_EXCP_HI_MASK
+	s_cbranch_scc0	L_NOT_ADDR_WATCH
+	s_bitset1_b32	ttmp2, SQ_WAVE_TRAPSTS_ADDR_WATCH_SHIFT // Check all addr_watch[123] exceptions against excp_en.addr_watch
+
+L_NOT_ADDR_WATCH:
+	s_getreg_b32	ttmp3, hwreg(HW_REG_MODE)
+	s_lshl_b32	ttmp2, ttmp2, SQ_WAVE_MODE_EXCP_EN_SHIFT
+	s_and_b32	ttmp2, ttmp2, ttmp3
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+
+L_CHECK_TRAP_ID:
+	// Check trap_id != 0
 	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
 
