@@ -37,6 +37,7 @@
 #include <linux/kref.h>
 #include <linux/sysfs.h>
 #include <linux/interval_tree.h>
+#include <linux/semaphore.h>
 /* amdkcl: this header file is included in kcl_device_cgroup.h
 #include <linux/device_cgroup.h>*/
 #include <drm/drm_file.h>
@@ -494,6 +495,9 @@ enum KFD_QUEUE_PRIORITY {
  * @is_gws should be protected by the DQM lock, since changing it can yield the
  * possibility of updating DQM state on number of GWS queues.
  *
+ * @save_ttmp: Enables saving the dispatch pointer to TTMP 6 & 7 during
+ * the initialization or update of the MQD.
+ *
  * @vmid: If the scheduling mode is no cp scheduling the field defines the vmid
  * of the queue.
  *
@@ -519,6 +523,7 @@ struct queue_properties {
 	bool is_being_destroyed;
 	bool is_active;
 	bool is_gws;
+	bool save_ttmp;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
@@ -983,6 +988,12 @@ struct kfd_process {
 
 	/* Work area for debugger event writer worker. */
 	struct work_struct debug_event_workarea;
+
+	/* Tracks runtime enable status */
+	uint64_t r_debug;
+	struct semaphore runtime_enable_sema;
+	bool is_runtime_retry;
+	struct kfd_runtime_info runtime_info;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
@@ -1349,13 +1360,17 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
 
 void kfd_signal_vm_fault_event(struct kfd_dev *dev, u32 pasid,
-				struct kfd_vm_fault_info *info);
+				struct kfd_vm_fault_info *info,
+				struct kfd_hsa_memory_exception_data *data);
 
 void kfd_signal_reset_event(struct kfd_dev *dev);
 
 void kfd_signal_poison_consumed_event(struct kfd_dev *dev, u32 pasid);
 
 void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type);
+int kfd_send_exception_to_runtime(struct kfd_process *p,
+				unsigned int queue_id,
+				uint64_t error_reason);
 
 int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 

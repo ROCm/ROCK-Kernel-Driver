@@ -32,24 +32,23 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 			uint64_t exception_clear_mask,
 			uint64_t *event_status);
 
-void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
+bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault,
+				   uint64_t trap_mask,
 				   void *exception_data,
 				   size_t exception_data_size);
-void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
-			struct kfd_dev *dev,
+bool kfd_dbg_ev_raise(uint64_t event_mask,
+			struct kfd_process *process, struct kfd_dev *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data,
 			size_t exception_data_size);
 int kfd_dbg_ev_enable(struct kfd_process *process);
 
-int kfd_dbg_trap_disable(struct kfd_process *target,
-			bool unwind,
-			int unwind_count);
+int kfd_dbg_trap_disable(struct kfd_process *target);
 int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
-			uint32_t *ttmp_save);
+			void __user *runtime_info,
+			uint32_t *runtime_info_size);
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
 					uint32_t trap_mask_bits,
@@ -67,6 +66,14 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 					uint32_t watch_mode);
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable);
+int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
+			bool enable_ttmp_setup);
+int kfd_dbg_runtime_disable(struct kfd_process *p);
+
+int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
+					unsigned int dev_id,
+					unsigned int queue_id,
+					uint64_t error_reason);
 
 static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
 {
@@ -86,4 +93,7 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		uint64_t exception_clear_mask,
 		void __user *user_info,
 		uint32_t *number_of_device_infos);
+
+void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
+					uint64_t exception_set_mask);
 #endif

@@ -50,7 +50,8 @@ static int pm_map_process_v9(struct packet_manager *pm,
 	packet->bitfields14.sdma_enable = 1;
 	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
 
-	if (kfd->dqm->trap_debug_vmid && pdd->process->debug_trap_enabled) {
+	if (kfd->dqm->trap_debug_vmid && pdd->process->debug_trap_enabled &&
+			pdd->process->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED) {
 		packet->bitfields2.debug_vmid = kfd->dqm->trap_debug_vmid;
 		packet->bitfields2.new_debug = 1;
 	}

@@ -50,7 +50,7 @@ var SQ_WAVE_IB_STS2_WAVE64_SHIFT		= 11
 var SQ_WAVE_IB_STS2_WAVE64_SIZE			= 1
 
 var SQ_WAVE_TRAPSTS_SAVECTX_MASK		= 0x400
-var SQ_WAVE_TRAPSTS_EXCE_MASK			= 0x1FF
+var SQ_WAVE_TRAPSTS_EXCP_MASK			= 0x79FF
 var SQ_WAVE_TRAPSTS_SAVECTX_SHIFT		= 10
 var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK		= 0x100
 var SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT		= 8
@@ -81,7 +81,8 @@ var TTMP11_DEBUG_TRAP_ENABLED_MASK		= 0x800000
 // when ADD_TID_ENABLE and BUF_DATA_FORMAT_32 for MTBUF), ADD_TID_ENABLE
 var S_SAVE_BUF_RSRC_WORD1_STRIDE		= 0x00040000
 var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
-
+var S_SAVE_PC_HI_TRAP_ID_MASK			= 0x00FF0000
+var S_SAVE_PC_HI_HT_MASK			= 0x01000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 
@@ -155,36 +156,47 @@ L_JUMP_TO_RESTORE:
 L_SKIP_RESTORE:
 	s_getreg_b32	s_save_status, hwreg(HW_REG_STATUS)			//save STATUS since we will change SCC
 	s_andn2_b32	s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK
-
-if SINGLE_STEP_MISSED_WORKAROUND
-	// No single step exceptions if MODE.DEBUG_EN=0.
-	s_getreg_b32    ttmp2, hwreg(HW_REG_MODE)
-	s_and_b32       ttmp2, ttmp2, SQ_WAVE_MODE_DEBUG_EN_MASK
-	s_cbranch_scc0  L_NO_SINGLE_STEP_WORKAROUND
-
-	// Second-level trap already handled exception if STATUS.HALT=1.
-	s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
-
-	// Prioritize single step exception over context save.
-	// Second-level trap will halt wave and RFE, re-entering for SAVECTX.
-	s_cbranch_scc0  L_FETCH_2ND_TRAP
-
-L_NO_SINGLE_STEP_WORKAROUND:
-end
-
-
 	s_getreg_b32	s_save_trapsts, hwreg(HW_REG_TRAPSTS)
-	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK	//check whether this is for save
+
+	s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+	s_cbranch_scc0	L_NOT_HALTED
+
+L_HALTED:
+	// Host trap may occur while wave is halted.
+	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+
+L_CHECK_SAVE:
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
 	s_cbranch_scc1	L_SAVE
 
-	// If STATUS.MEM_VIOL is asserted then halt the wave to prevent
-	// the exception raising again and blocking context save.
-	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_MEM_VIOL_MASK
-	s_cbranch_scc0	L_FETCH_2ND_TRAP
-	s_or_b32	s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+	// Wave is halted but neither host trap nor SAVECTX is raised.
+	// Caused by instruction fetch memory violation.
+	// Spin wait until context saved to prevent interrupt storm.
+	s_sleep		0x10
+	s_getreg_b32	s_save_trapsts, hwreg(HW_REG_TRAPSTS)
+	s_branch	L_CHECK_SAVE
+
+L_NOT_HALTED:
+	// Let second-level handle non-SAVECTX exception or trap.
+	// Any concurrent SAVECTX will be handled upon re-entry once halted.
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCP_MASK
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+
+if SINGLE_STEP_MISSED_WORKAROUND
+	// Prioritize single step exception over context save.
+	// Second-level trap will halt wave and RFE, re-entering for SAVECTX.
+	s_getreg_b32	ttmp2, hwreg(HW_REG_MODE)
+	s_and_b32	ttmp2, ttmp2, SQ_WAVE_MODE_DEBUG_EN_MASK
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+end
+
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
+	s_cbranch_scc1	L_SAVE
 
 L_FETCH_2ND_TRAP:
-
 #if ASIC_TARGET_NAVI1X
 	save_and_clear_ib_sts(ttmp14, ttmp15)
 #endif
@@ -212,12 +224,28 @@ L_FETCH_2ND_TRAP:
 	s_setpc_b64	[ttmp2, ttmp3]						// jump to second-level trap handler
 
 L_NO_NEXT_TRAP:
-	s_getreg_b32	s_save_trapsts, hwreg(HW_REG_TRAPSTS)
-	s_and_b32	s_save_trapsts, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCE_MASK
-	s_cbranch_scc1	L_EXCP_CASE						// Exception, jump back to the shader program directly.
-	s_add_u32	ttmp0, ttmp0, 4						// S_TRAP case, add 4 to ttmp0
-	s_addc_u32	ttmp1, ttmp1, 0
-L_EXCP_CASE:
+	// If not caused by trap then halt wave to prevent re-entry.
+	s_and_b32	ttmp2, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+	s_cbranch_scc1	L_TRAP_CASE
+	s_or_b32	s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+
+	// If the PC points to S_ENDPGM then context save will fail if STATUS.HALT is set.
+	// Rewind the PC to prevent this from occurring.
+	s_sub_u32	ttmp0, ttmp0, 0x8
+	s_subb_u32	ttmp1, ttmp1, 0x0
+
+	s_branch	L_EXIT_TRAP
+
+L_TRAP_CASE:
+	// Host trap will not cause trap re-entry.
+	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK
+	s_cbranch_scc1	L_EXIT_TRAP
+
+	// Advance past trap instruction to prevent re-entry.
+	s_add_u32	ttmp0, ttmp0, 0x4
+	s_addc_u32	ttmp1, ttmp1, 0x0
+
+L_EXIT_TRAP:
 	s_and_b32	ttmp1, ttmp1, 0xFFFF
 
 #if ASIC_TARGET_NAVI1X
@@ -278,9 +306,11 @@ L_SLEEP:
 #endif
 
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
-	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+	// ttmp SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)+0x40
 	get_wave_size(s_save_ttmps_hi)
 	get_vgpr_size_bytes(s_save_ttmps_lo, s_save_ttmps_hi)
+	get_svgpr_size_bytes(s_save_ttmps_hi)
+	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_ttmps_hi
 	s_and_b32	s_save_ttmps_hi, s_save_spi_init_hi, 0xFFFF
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, get_sgpr_size_bytes()
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_spi_init_lo
@@ -623,7 +653,7 @@ L_SAVE_VGPR_WAVE64:
 	// VGPR store using dw burst
 	s_mov_b32	m0, 0x4							//VGPR initial index value =4
 	s_cmp_lt_u32	m0, s_save_alloc_size
-	s_cbranch_scc0	L_SAVE_VGPR_END
+	s_cbranch_scc0	L_SAVE_SHARED_VGPR
 
 L_SAVE_VGPR_W64_LOOP:
 	v_movrels_b32	v0, v0							//v0 = v[0+m0]
@@ -641,6 +671,7 @@ L_SAVE_VGPR_W64_LOOP:
 	s_cmp_lt_u32	m0, s_save_alloc_size					//scc = (m0 < s_save_alloc_size) ? 1 : 0
 	s_cbranch_scc1	L_SAVE_VGPR_W64_LOOP					//VGPR save is complete?
 
+L_SAVE_SHARED_VGPR:
 	//Below part will be the save shared vgpr part (new for gfx10)
 	s_getreg_b32	s_save_alloc_size, hwreg(HW_REG_LDS_ALLOC,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SHIFT,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SIZE)
 	s_and_b32	s_save_alloc_size, s_save_alloc_size, 0xFFFFFFFF	//shared_vgpr_size is zero?
@@ -755,6 +786,8 @@ L_RESTORE_VGPR_NORMAL:
 	s_mov_b32	s_restore_mem_offset_save, s_restore_mem_offset		// restore start with v1, v0 will be the last
 	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 128*4
 	s_mov_b32	m0, 4							//VGPR initial index value = 4
+	s_cmp_lt_u32	m0, s_restore_alloc_size
+	s_cbranch_scc0	L_RESTORE_SGPR
 
 L_RESTORE_VGPR_WAVE32_LOOP:
 	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
@@ -787,6 +820,8 @@ L_RESTORE_VGPR_WAVE64:
 	s_mov_b32	s_restore_mem_offset_save, s_restore_mem_offset		// restore start with v4, v0 will be the last
 	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 256*4
 	s_mov_b32	m0, 4							//VGPR initial index value = 4
+	s_cmp_lt_u32	m0, s_restore_alloc_size
+	s_cbranch_scc0	L_RESTORE_SHARED_VGPR
 
 L_RESTORE_VGPR_WAVE64_LOOP:
 	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
@@ -803,6 +838,7 @@ L_RESTORE_VGPR_WAVE64_LOOP:
 	s_cmp_lt_u32	m0, s_restore_alloc_size				//scc = (m0 < s_restore_alloc_size) ? 1 : 0
 	s_cbranch_scc1	L_RESTORE_VGPR_WAVE64_LOOP				//VGPR restore (except v0) is complete?
 
+L_RESTORE_SHARED_VGPR:
 	//Below part will be the restore shared vgpr part (new for gfx10)
 	s_getreg_b32	s_restore_alloc_size, hwreg(HW_REG_LDS_ALLOC,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SHIFT,SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SIZE)	//shared_vgpr_size
 	s_and_b32	s_restore_alloc_size, s_restore_alloc_size, 0xFFFFFFFF	//shared_vgpr_size is zero?
@@ -936,8 +972,10 @@ L_RESTORE_HWREG:
 	s_setreg_b32	hwreg(HW_REG_MODE), s_restore_mode
 
 	// Restore trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
-	// ttmp SR memory offset : size(VGPR)+size(SGPR)+0x40
+	// ttmp SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)+0x40
 	get_vgpr_size_bytes(s_restore_ttmps_lo, s_restore_size)
+	get_svgpr_size_bytes(s_restore_ttmps_hi)
+	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_ttmps_hi
 	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, get_sgpr_size_bytes()
 	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_buf_rsrc0
 	s_addc_u32	s_restore_ttmps_hi, s_restore_buf_rsrc1, 0x0

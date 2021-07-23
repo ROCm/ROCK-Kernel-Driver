@@ -129,11 +129,20 @@ enum SQ_INTERRUPT_ERROR_TYPE {
 			| ((ctx1 << 16) & 0xff0000))
 
 /*
- * The debugger will send user data(m0) with TRAP_MASK to indicate it requires
- * notification from the KFD with the following queue id (DOORBELL_MASK).
+ * The debugger will send user data(m0) with PRIV=1 to indicate it requires
+ * notification from the KFD with the following queue id (DOORBELL_ID) and
+ * trap code (TRAP_CODE).
  */
-#define KFD_SQ_INT_DATA_DEBUG_TRAP_MASK		0x800000
 #define KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK	0x0003ff
+#define KFD_SQ_INT_DATA_DEBUG_TRAP_CODE_SHIFT	10
+#define KFD_SQ_INT_DATA_DEBUG_TRAP_CODE_MASK	0x07fc00
+#define KFD_DEBUG_DOORBELL_ID(sq_int_data)	((sq_int_data) &	\
+				KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK)
+#define KFD_DEBUG_TRAP_CODE(sq_int_data)	(((sq_int_data) &	\
+				KFD_SQ_INT_DATA_DEBUG_TRAP_CODE_MASK)	\
+				>> KFD_SQ_INT_DATA_DEBUG_TRAP_CODE_SHIFT)
+#define KFD_DEBUG_CP_BAD_OP_ECODE(ctxid0)	(((ctxid0) & 0x3ffffff) \
+				>> KFD_SQ_INT_DATA_DEBUG_TRAP_CODE_SHIFT)
 
 static bool event_interrupt_isr_v9(struct kfd_dev *dev,
 					const uint32_t *ih_ring_entry,
@@ -266,14 +275,12 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, SIMD_ID),
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, CU_ID),
 					sq_int_data);
-				if (sq_int_data & KFD_SQ_INT_DATA_DEBUG_TRAP_MASK) {
-					if (context_id0 & SQ_INTERRUPT_WORD_WAVE_CTXID__PRIV_MASK)
-						kfd_set_dbg_ev_from_interrupt(dev, pasid,
-							sq_int_data & KFD_SQ_INT_DATA_DEBUG_DOORBELL_MASK,
-							false,
-							NULL,
-							0);
-					return;
+				if (context_id0 & SQ_INTERRUPT_WORD_WAVE_CTXID__PRIV_MASK) {
+					if (kfd_set_dbg_ev_from_interrupt(dev, pasid,
+							KFD_DEBUG_DOORBELL_ID(sq_int_data),
+							KFD_DEBUG_TRAP_CODE(sq_int_data),
+							NULL, 0))
+						return;
 				}
 				break;
 			case SQ_INTERRUPT_WORD_ENCODING_ERROR:
@@ -297,10 +304,13 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 			default:
 				break;
 			}
-
 			kfd_signal_event_interrupt(pasid, context_id0 & 0xffffff, 24);
-		} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE)
-			kfd_signal_hw_exception_event(pasid);
+		} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE) {
+			kfd_set_dbg_ev_from_interrupt(dev, pasid,
+				KFD_DEBUG_DOORBELL_ID(context_id0),
+				KFD_EC_MASK(KFD_DEBUG_CP_BAD_OP_ECODE(context_id0)),
+				NULL, 0);
+		}
 	} else if (client_id == SOC15_IH_CLIENTID_SDMA0 ||
 		   client_id == SOC15_IH_CLIENTID_SDMA1 ||
 		   client_id == SOC15_IH_CLIENTID_SDMA2 ||
@@ -342,12 +352,10 @@ static void event_interrupt_wq_v9(struct kfd_dev *dev,
 		kfd_set_dbg_ev_from_interrupt(dev,
 						pasid,
 						-1,
-						true,
+						KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION),
 						&exception_data,
 						sizeof(exception_data));
 		kfd_smi_event_update_vmfault(dev, pasid);
-		kfd_process_vm_fault(dev->dqm, pasid);
-		kfd_signal_vm_fault_event(dev, pasid, &info);
 	} else if (KFD_IRQ_IS_FENCE(client_id, source_id)) {
 		kfd_process_close_interrupt_drain(pasid);
 	}

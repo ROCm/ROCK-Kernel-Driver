@@ -355,7 +355,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pr_debug("Write ptr address   == 0x%016llX\n",
 			args->write_pointer_address);
 
-	kfd_dbg_ev_raise(EC_QUEUE_NEW, p, dev, queue_id, false, NULL, 0);
+	kfd_dbg_ev_raise(KFD_EC_MASK(EC_QUEUE_NEW), p, dev, queue_id, false, NULL, 0);
 	return 0;
 
 err_create_queue:
@@ -2950,6 +2950,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 	if (!is_attach &&
 			debug_trap_action != KFD_IOC_DBG_TRAP_GET_VERSION &&
+			debug_trap_action != KFD_IOC_DBG_TRAP_RUNTIME_ENABLE &&
 			!target->debug_trap_enabled) {
 		pr_err("Debugging is not enabled for this process\n");
 		r = -EINVAL;
@@ -2977,12 +2978,13 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	case KFD_IOC_DBG_TRAP_ENABLE:
 		switch (data1) {
 		case 0:
-			r = kfd_dbg_trap_disable(target, false, 0);
+			r = kfd_dbg_trap_disable(target);
 			break;
 		case 1:
 			if (target != p)
 				target->debugger_process = p;
 			r = kfd_dbg_trap_enable(target, args->data2,
+						(void __user *) args->ptr,
 						&args->data3);
 			if (!r)
 				target->exception_enable_mask = exception_mask;
@@ -3081,6 +3083,23 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				exception_mask,
 				(void __user *) args->ptr,
 				&args->data1);
+		break;
+	case KFD_IOC_DBG_TRAP_RUNTIME_ENABLE:
+		if (data1)
+			r = kfd_dbg_runtime_enable(target,
+				args->ptr,
+				data2);
+		else
+			r = kfd_dbg_runtime_disable(target);
+		break;
+	case KFD_IOC_DBG_TRAP_SEND_RUNTIME_EVENT:
+		r = kfd_dbg_send_exception_to_runtime(target,
+						data1,
+						data2,
+						exception_mask);
+		break;
+	case KFD_IOC_DBG_TRAP_SET_EXCEPTIONS_ENABLED:
+		kfd_dbg_set_enabled_debug_exception_mask(target, exception_mask);
 		break;
 	default:
 		pr_err("Invalid option: %i\n", debug_trap_action);

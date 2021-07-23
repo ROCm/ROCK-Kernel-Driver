@@ -127,45 +127,33 @@ void debug_event_write_work_handler(struct work_struct *work)
 /* update process/device/queue exception status, write to descriptor
  * only if exception_status is enabled.
  */
-void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
-			struct kfd_dev *dev,
+bool kfd_dbg_ev_raise(uint64_t event_mask,
+			struct kfd_process *process, struct kfd_dev *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data, size_t exception_data_size)
 {
 	struct process_queue_manager *pqm;
 	struct process_queue_node *pqn;
-	uint64_t ec_mask = KFD_EC_MASK(event_type);
 	int i;
 	static const char write_data = '.';
 	loff_t pos = 0;
+	bool is_subscribed = true;
 
 	if (!(process && process->debug_trap_enabled))
-		return;
+		return false;
 
 	mutex_lock(&process->event_mutex);
 
-	/* We only notify the debugger about the following events right now:
-	 * EC_QUEUE_NEW (per queue)
-	 * EC_TRAP_HANDLER (per queue)
-	 * EC_MEMORY_VIOLATION (per device)
-	 * EC_QUEUE_DELETE (per device)
-	 */
-	if (event_type != EC_QUEUE_NEW &&
-			event_type != EC_TRAP_HANDLER &&
-			event_type != EC_MEMORY_VIOLATION &&
-			event_type != EC_QUEUE_DELETE)
-		goto out;
-
-	if (KFD_DBG_EC_TYPE_IS_DEVICE(event_type)) {
+	if (event_mask & KFD_EC_MASK_DEVICE) {
 		for (i = 0; i < process->n_pdds; i++) {
 			struct kfd_process_device *pdd = process->pdds[i];
 
 			if (pdd->dev != dev)
 				continue;
 
-			pdd->exception_status |= ec_mask;
+			pdd->exception_status |= event_mask & KFD_EC_MASK_DEVICE;
 
-			if (event_type == EC_MEMORY_VIOLATION) {
+			if (event_mask & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
 				if (!pdd->vm_fault_exc_data) {
 					pdd->vm_fault_exc_data = kmemdup(
 							exception_data,
@@ -183,31 +171,30 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 			}
 			break;
 		}
-	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(event_type)) {
-		process->exception_status |= ec_mask;
+	} else if (event_mask & KFD_EC_MASK_PROCESS) {
+		process->exception_status |= event_mask & KFD_EC_MASK_PROCESS;
 	} else {
 		pqm = &process->pqm;
 		list_for_each_entry(pqn, &pqm->queues,
 				process_queue_list) {
 			int target_id;
-			bool need_queue_id = event_type == EC_QUEUE_NEW;
 
 			if (!pqn->q)
 				continue;
 
-			target_id = need_queue_id ?
+			target_id = event_mask & KFD_EC_MASK(EC_QUEUE_NEW) ?
 					pqn->q->properties.queue_id :
 							pqn->q->doorbell_id;
 
 			if (pqn->q->device != dev || target_id != source_id)
 				continue;
 
-			pqn->q->properties.exception_status |= ec_mask;
+			pqn->q->properties.exception_status |= event_mask;
 			break;
 		}
 	}
 
-	if (process->exception_enable_mask & ec_mask) {
+	if (process->exception_enable_mask & event_mask) {
 		if (use_worker)
 			schedule_work(&process->debug_event_workarea);
 		else
@@ -215,34 +202,118 @@ void kfd_dbg_ev_raise(int event_type, struct kfd_process *process,
 					&write_data,
 					1,
 					&pos);
+	} else {
+		is_subscribed = false;
 	}
-out:
+
 	mutex_unlock(&process->event_mutex);
+
+	return is_subscribed;
 }
 
 /* set pending event queue entry from ring entry  */
-void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
+bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
-				   bool is_vmfault,
+				   uint64_t trap_mask,
 				   void *exception_data,
 				   size_t exception_data_size)
 {
 	struct kfd_process *p;
+	bool signaled_to_debugger_or_runtime = false;
 
 	p = kfd_lookup_process_by_pasid(pasid);
 
 	if (!p)
-		return;
+		return false;
 
-	kfd_dbg_ev_raise(is_vmfault ? EC_MEMORY_VIOLATION : EC_TRAP_HANDLER,
-						p, dev, doorbell_id, true,
-						exception_data,
-						exception_data_size);
+	if (!kfd_dbg_ev_raise(trap_mask, p, dev, doorbell_id, true,
+					exception_data, exception_data_size)) {
+		struct process_queue_manager *pqm;
+		struct process_queue_node *pqn;
+
+		if (!!(trap_mask & KFD_EC_MASK_QUEUE) &&
+				p->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED) {
+			mutex_lock(&p->mutex);
+
+			pqm = &p->pqm;
+			list_for_each_entry(pqn, &pqm->queues,
+							process_queue_list) {
+
+				if (!(pqn->q && pqn->q->device == dev &&
+						pqn->q->doorbell_id == doorbell_id))
+					continue;
+
+				kfd_send_exception_to_runtime(p,
+						pqn->q->properties.queue_id,
+						trap_mask);
+
+				signaled_to_debugger_or_runtime = true;
+
+				break;
+			}
+
+			mutex_unlock(&p->mutex);
+		} else if (trap_mask & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
+			kfd_process_vm_fault(dev->dqm, p->pasid);
+			kfd_signal_vm_fault_event(dev, p->pasid, NULL,
+							exception_data);
+
+			signaled_to_debugger_or_runtime = true;
+		}
+	} else {
+		signaled_to_debugger_or_runtime = true;
+	}
+
 	kfd_unref_process(p);
+
+	return signaled_to_debugger_or_runtime;
 }
 
-/* kfd_dbg_trap_disable:
+int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
+					unsigned int dev_id,
+					unsigned int queue_id,
+					uint64_t error_reason)
+{
+	if (error_reason & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
+		struct kfd_process_device *pdd = NULL;
+		struct kfd_hsa_memory_exception_data *data;
+		int i;
+
+		for (i = 0; i < p->n_pdds; i++) {
+			if (p->pdds[i]->dev->id == dev_id) {
+				pdd = p->pdds[i];
+				break;
+			}
+		}
+
+		if (!pdd)
+			return -ENODEV;
+
+		data = (struct kfd_hsa_memory_exception_data *)
+						pdd->vm_fault_exc_data;
+
+		kfd_process_vm_fault(pdd->dev->dqm, p->pasid);
+		kfd_signal_vm_fault_event(pdd->dev, p->pasid, NULL, data);
+		error_reason &= ~KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION);
+	}
+
+	if (error_reason & (KFD_EC_MASK(EC_PROCESS_RUNTIME))) {
+		/*
+		 * block should only happen after the debugger receives runtime
+		 * enable notice.
+		 */
+		up(&p->runtime_enable_sema);
+		error_reason &= ~KFD_EC_MASK(EC_PROCESS_RUNTIME);
+	}
+
+	if (error_reason)
+		return kfd_send_exception_to_runtime(p, queue_id, error_reason);
+
+	return 0;
+}
+
+/* kfd_dbg_trap_deactivate:
  *	target: target process
  *	unwind: If this is unwinding a failed kfd_dbg_trap_enable()
  *	unwind_count:
@@ -250,13 +321,12 @@ void kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
  *				to unwind
  *		else: ignored
  */
-int kfd_dbg_trap_disable(struct kfd_process *target,
-		bool unwind,
-		int unwind_count)
+static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int unwind_count)
 {
-	int count = 0, i;
+	int i, count = 0, resume_count;
 
 	if (!unwind) {
+		cancel_work_sync(&target->debug_event_workarea);
 		kfd_release_debug_watch_points(target,
 				target->allocated_debug_watch_point_bitmask);
 		target->allocated_debug_watch_point_bitmask = 0;
@@ -281,45 +351,53 @@ int kfd_dbg_trap_disable(struct kfd_process *target,
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
 
-		debug_refresh_runlist(pdd->dev->dqm);
+		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd,
+						target->runtime_info.ttmp_setup);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
-			if (release_debug_trap_vmid(pdd->dev->dqm))
+			if (release_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd))
 				pr_err("Failed to release debug vmid on [%i]\n",
 						pdd->dev->id);
 		count++;
 	}
 
-	/* Drop the references held by the debug session. */
 	if (!unwind) {
-		int resume_count;
-
-		cancel_work_sync(&target->debug_event_workarea);
-		fput(target->dbg_ev_file);
-		kfd_unref_process(target);
 		resume_count = resume_queues(target, true, 0, NULL);
 		if (resume_count)
 			pr_debug("Resumed %d queues\n", resume_count);
-		if (target->debugger_process)
-			atomic_dec(&target->debugger_process->debugged_process_count);
+	}
+
+
+}
+
+int kfd_dbg_trap_disable(struct kfd_process *target)
+{
+	/*
+	 * Defer deactivation to runtime if runtime not enabled otherwise reset
+	 * attached running target runtime state to enable for re-attach.
+	 */
+	if (target->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED)
+		kfd_dbg_trap_deactivate(target, false, 0);
+	else if (target->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_DISABLED)
+		target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED;
+
+	fput(target->dbg_ev_file);
+	target->dbg_ev_file = NULL;
+
+	if (target->debugger_process) {
+		atomic_dec(&target->debugger_process->debugged_process_count);
+		target->debugger_process = NULL;
 	}
 
 	target->debug_trap_enabled = false;
-	target->dbg_ev_file = NULL;
-
-	target->debugger_process = NULL;
+	kfd_unref_process(target);
 
 	return 0;
 }
 
-int kfd_dbg_trap_enable(struct kfd_process *target,
-		uint32_t fd, uint32_t *ttmp_save)
+static int kfd_dbg_trap_activate(struct kfd_process *target)
 {
-	int unwind_count = 0, r = 0, i;
-	struct file *f;
-
-	if (target->debug_trap_enabled)
-		return -EINVAL;
+	int i, r = 0, unwind_count = 0;
 
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
@@ -328,10 +406,15 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 		kfd_bind_process_to_device(pdd->dev, target);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev)) {
-			r = reserve_debug_trap_vmid(pdd->dev->dqm);
+			r = reserve_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd);
 
-			if (r)
+			if (r) {
+				target->runtime_info.runtime_state = (r == -EBUSY) ?
+							DEBUG_RUNTIME_STATE_ENABLED_BUSY :
+							DEBUG_RUNTIME_STATE_ENABLED_ERROR;
+
 				goto unwind_err;
+			}
 		}
 
 		pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
@@ -340,31 +423,16 @@ int kfd_dbg_trap_enable(struct kfd_process *target,
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
-		if (r)
+		r = debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
+
+		if (r) {
+			target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED_ERROR;
 			goto unwind_err;
+		}
 
 		/* Increment unwind_count as the last step */
 		unwind_count++;
 	}
-
-	f = fget(fd);
-	if (!f) {
-		pr_err("Failed to get file for (%i)\n", fd);
-		r = -EBADF;
-		goto unwind_err;
-	}
-
-	target->dbg_ev_file = f;
-
-	/* We already hold the process reference but hold another one for the
-	 * debug session.
-	 */
-	kref_get(&target->ref);
-	target->debug_trap_enabled = true;
-	if (target->debugger_process)
-		atomic_inc(&target->debugger_process->debugged_process_count);
-	*ttmp_save = 0; /* TBD - set based on runtime enable */
 
 	return 0;
 
@@ -372,7 +440,50 @@ unwind_err:
 	/* Enabling debug failed, we need to disable on
 	 * all GPUs so the enable is all or nothing.
 	 */
-	kfd_dbg_trap_disable(target, true, unwind_count);
+	kfd_dbg_trap_deactivate(target, true, unwind_count);
+	return r;
+}
+
+int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
+			void __user *runtime_info, uint32_t *runtime_size)
+{
+	struct file *f;
+	uint32_t copy_size;
+	int r = 0;
+
+	if (target->debug_trap_enabled)
+		return -EINVAL;
+
+	copy_size = min((size_t)(*runtime_size), sizeof(target->runtime_info));
+
+	f = fget(fd);
+	if (!f) {
+		pr_err("Failed to get file for (%i)\n", fd);
+		return -EBADF;
+	}
+
+	target->dbg_ev_file = f;
+
+	/* defer activation to runtime if not runtime enabled */
+	if (target->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED)
+		kfd_dbg_trap_activate(target);
+
+	/* We already hold the process reference but hold another one for the
+	 * debug session.
+	 */
+	kref_get(&target->ref);
+	target->debug_trap_enabled = true;
+
+	if (target->debugger_process)
+		atomic_inc(&target->debugger_process->debugged_process_count);
+
+	if (copy_to_user(runtime_info, (void *)&target->runtime_info, copy_size)) {
+		kfd_dbg_trap_deactivate(target, false, 0);
+		r = -EFAULT;
+	}
+
+	*runtime_size = sizeof(target->runtime_info);
+
 	return r;
 }
 
@@ -411,7 +522,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 			pdd->spi_dbg_override = r;
 			r = 0;
 
-			r = debug_refresh_runlist(pdd->dev->dqm);
+			r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 			if (r)
 				break;
 		}
@@ -433,7 +544,7 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 				wave_launch_mode,
 				pdd->dev->vm_info.last_vmid_kfd);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -499,7 +610,7 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		if (r)
 			break;
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -565,7 +676,7 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 					watch_mode,
 					pdd->dev->vm_info.last_vmid_kfd);
 
-		r = debug_map_and_unlock(pdd->dev->dqm);
+		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -610,7 +721,7 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 								j);
 			}
 
-		r = debug_map_and_unlock(pdd->dev->dqm);
+		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
@@ -629,7 +740,7 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 {
 	bool found = false;
 	int r = 0;
-	uint32_t actual_info_size = 0;
+	uint32_t copy_size, actual_info_size = 0;
 	uint64_t *exception_status_ptr = NULL;
 
 	if (!target)
@@ -639,6 +750,7 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 		return -EINVAL;
 
 	mutex_lock(&target->event_mutex);
+
 	if (KFD_DBG_EC_TYPE_IS_QUEUE(exception_code)) {
 		/* Per queue exceptions */
 		struct queue *queue = NULL;
@@ -689,13 +801,11 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 			r = -ENODATA;
 			goto out;
 		}
-		if (exception_code == EC_MEMORY_VIOLATION) {
-			if (*info_size < pdd->vm_fault_exc_data_size) {
-				r = -ENOSPC;
-				goto out;
-			}
+		if (exception_code == EC_DEVICE_MEMORY_VIOLATION) {
+			copy_size = min((size_t)(*info_size), pdd->vm_fault_exc_data_size);
+
 			if (copy_to_user(info, pdd->vm_fault_exc_data,
-						pdd->vm_fault_exc_data_size)) {
+						copy_size)) {
 				r = -EFAULT;
 				goto out;
 			}
@@ -709,12 +819,22 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 		exception_status_ptr = &pdd->exception_status;
 	} else if (KFD_DBG_EC_TYPE_IS_PROCESS(exception_code)) {
 		/* Per process exceptions */
-
-		if (!(target->exception_status &
-						KFD_EC_MASK(exception_code))) {
+		if (!(target->exception_status & KFD_EC_MASK(exception_code))) {
 			r = -ENODATA;
 			goto out;
 		}
+
+		if (exception_code == EC_PROCESS_RUNTIME) {
+			copy_size = min((size_t)(*info_size), sizeof(target->runtime_info));
+
+			if (copy_to_user(info, (void *)&target->runtime_info, copy_size)) {
+				r = -EFAULT;
+				goto out;
+			}
+
+			actual_info_size = sizeof(target->runtime_info);
+		}
+
 		exception_status_ptr = &target->exception_status;
 	} else {
 		pr_debug("Bad exception type [%i]\n", exception_code);
@@ -779,3 +899,112 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 	return 0;
 }
 
+int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
+			bool enable_ttmp_setup)
+{
+	int i = 0, ret = 0;
+
+	if (p->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_DISABLED)
+		return -EBUSY;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		if (pdd->qpd.queue_count)
+			return -EEXIST;
+	}
+
+	p->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED;
+	p->runtime_info.r_debug = r_debug;
+	p->runtime_info.ttmp_setup = enable_ttmp_setup;
+
+	if (p->debug_trap_enabled) {
+		kfd_dbg_trap_activate(p);
+
+		if (!p->is_runtime_retry)
+			kfd_dbg_ev_raise(KFD_EC_MASK(EC_PROCESS_RUNTIME),
+					p, NULL, 0, false, NULL, 0);
+
+		mutex_unlock(&p->mutex);
+		ret = down_interruptible(&p->runtime_enable_sema);
+		mutex_lock(&p->mutex);
+
+		p->is_runtime_retry = !!ret;
+	}
+
+	return ret;
+}
+
+int kfd_dbg_runtime_disable(struct kfd_process *p)
+{
+	int i = 0, ret;
+	bool was_enabled = p->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED;
+
+	p->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_DISABLED;
+	p->runtime_info.r_debug = 0;
+
+	if (p->debug_trap_enabled) {
+		if (was_enabled) {
+			kfd_dbg_trap_deactivate(p, false, 0);
+		}
+
+		if (!p->is_runtime_retry)
+			kfd_dbg_ev_raise(KFD_EC_MASK(EC_PROCESS_RUNTIME),
+					p, NULL, 0, false, NULL, 0);
+
+		mutex_unlock(&p->mutex);
+		ret = down_interruptible(&p->runtime_enable_sema);
+		mutex_lock(&p->mutex);
+
+		p->is_runtime_retry = !!ret;
+		if (ret)
+			return ret;
+	}
+
+	p->runtime_info.ttmp_setup = false;
+
+	/* disable DISPATCH_PTR save */
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, false);
+	}
+
+	return 0;
+}
+
+void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
+					uint64_t exception_set_mask)
+{
+	uint64_t found_mask = 0;
+	struct process_queue_manager *pqm;
+	struct process_queue_node *pqn;
+	static const char write_data = '.';
+	loff_t pos = 0;
+	int i;
+
+	mutex_lock(&target->event_mutex);
+
+	found_mask |= target->exception_status;
+
+	pqm = &target->pqm;
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
+		if (!pqn)
+			continue;
+
+		found_mask |= pqn->q->properties.exception_status;
+	}
+
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
+
+		found_mask |= pdd->exception_status;
+	}
+
+	if (exception_set_mask & found_mask)
+		kernel_write(target->dbg_ev_file, &write_data, 1, &pos);
+
+	target->exception_enable_mask = exception_set_mask;
+
+	mutex_unlock(&target->event_mutex);
+}
