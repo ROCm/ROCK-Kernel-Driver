@@ -1198,6 +1198,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 					struct mm_struct *mm)
 {
 	struct kfd_process *p;
+	int i;
 
 	/*
 	 * The kfd_process structure can not be free because the
@@ -1214,6 +1215,17 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		if (pdd->qpd.doorbell_vma)
+			pdd->qpd.doorbell_vma->vm_private_data = NULL;
+
+		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
+		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
+			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+	}
 
 	/* New debugger for GFXv9 and later */
 	if (p->debug_trap_enabled) {
