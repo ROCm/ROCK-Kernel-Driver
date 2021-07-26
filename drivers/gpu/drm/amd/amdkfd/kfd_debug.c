@@ -346,10 +346,14 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, false);
 
+		/* GFX off is already disabled by debug activate if not RLC restore supported. */
+		if (kfd_dbg_is_rlc_restore_supported(pdd->dev))
+			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
 		pdd->spi_dbg_override =
 				pdd->dev->kfd2kgd->disable_debug_trap(
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd);
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd,
 						target->runtime_info.ttmp_setup);
@@ -366,8 +370,6 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 		if (resume_count)
 			pr_debug("Resumed %d queues\n", resume_count);
 	}
-
-
 }
 
 int kfd_dbg_trap_disable(struct kfd_process *target)
@@ -417,9 +419,26 @@ static int kfd_dbg_trap_activate(struct kfd_process *target)
 			}
 		}
 
+		/* Disable GFX OFF to prevent garbage read/writes to debug registers.
+		 * If RLC restore of debug registers is not supported and runtime enable
+		 * hasn't done so already on ttmp setup request, restore the trap config registers.
+		 *
+		 * If RLC restore of debug registers is not supported, keep gfx off disabled for
+		 * the debug session.
+		 */
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
+		if (!(kfd_dbg_is_rlc_restore_supported(pdd->dev) ||
+						target->runtime_info.ttmp_setup))
+			pdd->dev->kfd2kgd->enable_debug_trap(pdd->dev->kgd, true,
+								pdd->dev->vm_info.last_vmid_kfd);
+
 		pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
 					pdd->dev->kgd,
+					false,
 					pdd->dev->vm_info.last_vmid_kfd);
+
+		if (kfd_dbg_is_rlc_restore_supported(pdd->dev))
+			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
@@ -500,6 +519,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
 
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
 		r = pdd->dev->kfd2kgd->set_wave_launch_trap_override(
 				pdd->dev->kgd,
 				pdd->dev->vm_info.last_vmid_kfd,
@@ -508,6 +528,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 				trap_mask_request,
 				trap_mask_prev,
 				trap_mask_supported);
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		/*
 		 * NOTE: Per-VMID SPI debug control registers only occupy up to
@@ -539,10 +560,12 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
 
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
 		pdd->spi_dbg_launch_mode = pdd->dev->kfd2kgd->set_wave_launch_mode(
 				pdd->dev->kgd,
 				wave_launch_mode,
 				pdd->dev->vm_info.last_vmid_kfd);
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
 		if (r)
@@ -604,9 +627,12 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
 
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
 		r = pdd->dev->kfd2kgd->set_precise_mem_ops(pdd->dev->kgd,
 					pdd->dev->vm_info.last_vmid_kfd,
 					target->precise_mem_ops);
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+
 		if (r)
 			break;
 
@@ -634,6 +660,12 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 
 	if (!watch_point)
 		return -EFAULT;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
+	}
 
 	spin_lock(&watch_points_lock);
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
@@ -683,6 +715,11 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 
 out:
 	spin_unlock(&watch_points_lock);
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+	}
 	return r;
 }
 
@@ -690,6 +727,12 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 		uint32_t watch_point_bit_mask_to_free)
 {
 	int r = 0, i, j;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
+	}
 
 	spin_lock(&watch_points_lock);
 	if (~allocated_debug_watch_points & watch_point_bit_mask_to_free) {
@@ -728,6 +771,11 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 
 out:
 	spin_unlock(&watch_points_lock);
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+	}
 	return r;
 }
 
@@ -918,6 +966,20 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 	p->runtime_info.r_debug = r_debug;
 	p->runtime_info.ttmp_setup = enable_ttmp_setup;
 
+	if (p->runtime_info.ttmp_setup) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *pdd = p->pdds[i];
+
+			if (!kfd_dbg_is_rlc_restore_supported(pdd->dev)) {
+				amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
+				pdd->dev->kfd2kgd->enable_debug_trap(
+						pdd->dev->kgd,
+						true,
+						pdd->dev->vm_info.last_vmid_kfd);
+			}
+		}
+	}
+
 	if (p->debug_trap_enabled) {
 		kfd_dbg_trap_activate(p);
 
@@ -959,6 +1021,15 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 		p->is_runtime_retry = !!ret;
 		if (ret)
 			return ret;
+	}
+
+	if (was_enabled && p->runtime_info.ttmp_setup) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *pdd = p->pdds[i];
+
+			if (!kfd_dbg_is_rlc_restore_supported(pdd->dev))
+				amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+		}
 	}
 
 	p->runtime_info.ttmp_setup = false;

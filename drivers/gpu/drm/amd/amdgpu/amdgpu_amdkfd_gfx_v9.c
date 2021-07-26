@@ -826,6 +826,7 @@ out:
 }
 
 uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
+				bool restore_dbg_registers,
 				uint32_t vmid)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
