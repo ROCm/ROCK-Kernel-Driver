@@ -1792,8 +1792,7 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 			}
 
 		} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
-			addr = bo_adev->vm_manager.vram_base_offset +
-				cursor.start;
+			addr = vram_base_offset + cursor.start;
 		} else {
 			addr = 0;
 		}
