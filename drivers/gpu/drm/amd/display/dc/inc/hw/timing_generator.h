@@ -101,6 +101,9 @@ enum crc_selection {
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
 enum otg_out_mux_dest {
 	OUT_MUX_DIO = 0,
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	OUT_MUX_HPO_DP = 2,
+#endif
 };
 #endif
 
