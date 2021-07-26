@@ -1194,6 +1194,10 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 			}
 		}
 		mutex_unlock(kfd_get_dbgmgr_mutex());
+
+		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
+		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
+			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 	}
 
 	/* New debugger for GFXv9 and later */
