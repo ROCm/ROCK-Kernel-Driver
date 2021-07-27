@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/power_supply.h>
 #include <linux/pm_runtime.h>
+#include <linux/suspend.h>
 #include <acpi/video.h>
 #include <acpi/actbl.h>
 
