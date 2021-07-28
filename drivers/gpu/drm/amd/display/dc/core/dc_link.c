@@ -3752,6 +3752,7 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 	if (timing->flags.DSC)
 		return dc_dsc_stream_bandwidth_in_kbps(timing,
 				timing->dsc_cfg.bits_per_pixel,
@@ -3759,7 +3760,7 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 				timing->dsc_cfg.is_dp);
 #endif
 #endif
-
+#endif
 	switch (timing->display_color_depth) {
 	case COLOR_DEPTH_666:
 		bits_per_channel = 6;
