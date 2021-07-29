@@ -541,6 +541,7 @@ static void link_disconnect_sink(struct dc_link *link)
 	}
 
 	link->dpcd_sink_count = 0;
+	//link->dpcd_caps.dpcd_rev.raw = 0;
 }
 
 static void link_disconnect_remap(struct dc_sink *prev_sink, struct dc_link *link)
@@ -742,6 +743,7 @@ static bool detect_dp(struct dc_link *link,
 								sink_caps,
 								audio_support);
 		link->dpcd_caps.dongle_type = sink_caps->dongle_type;
+		link->dpcd_caps.dpcd_rev.raw = 0;
 	}
 
 	return true;
@@ -1662,6 +1664,12 @@ struct dc_link *link_create(const struct link_init_data *init_params)
 
 	if (false == dc_link_construct(link, init_params))
 		goto construct_fail;
+
+	/*
+	 * Must use preferred_link_setting, not reported_link_cap or verified_link_cap,
+	 * since struct preferred_link_setting won't be reset after S3.
+	 */
+	link->preferred_link_setting.dpcd_source_device_specific_field_support = true;
 
 	return link;
 

@@ -106,8 +106,17 @@ struct hubbub_addr_config {
 		uint64_t generic_fault;
 	} default_addrs;
 };
-
 #endif
+
+struct dcn_hubbub_state {
+	uint32_t vm_fault_addr_msb;
+	uint32_t vm_fault_addr_lsb;
+	uint32_t vm_error_status;
+	uint32_t vm_error_vmid;
+	uint32_t vm_error_pipe;
+	uint32_t vm_error_mode;
+};
+
 struct hubbub_funcs {
 	void (*update_dchub)(
 			struct hubbub *hubbub,
@@ -158,6 +167,8 @@ struct hubbub_funcs {
 	void (*force_wm_propagate_to_pipes)(struct hubbub *hubbub);
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
+	void (*hubbub_read_state)(struct hubbub *hubbub, struct dcn_hubbub_state *hubbub_state);
+
 	void (*force_pstate_change_control)(struct hubbub *hubbub, bool force, bool allow);
 
 	void (*init_watermarks)(struct hubbub *hubbub);
@@ -166,12 +177,17 @@ struct hubbub_funcs {
 	void (*program_compbuf_size)(struct hubbub *hubbub, unsigned compbuf_size_kb, bool safe_to_increase);
 	void (*init_crb)(struct hubbub *hubbub);
 #endif
+	void (*apply_invalidation_req_wa)(struct hubbub *hubbub,
+			struct dcn_hubbub_phys_addr_config *pa_config);
 };
 
 struct hubbub {
 	const struct hubbub_funcs *funcs;
 	struct dc_context *ctx;
 	bool riommu_active;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
+	struct dcn_hubbub_phys_addr_config vmid_cache;
+#endif
 };
 
 #endif

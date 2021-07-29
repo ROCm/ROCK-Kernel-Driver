@@ -48,6 +48,7 @@
 struct psp_context;
 struct psp_xgmi_node_info;
 struct psp_xgmi_topology_info;
+struct psp_bin_desc;
 
 enum psp_bootloader_cmd {
 	PSP_BL__LOAD_SYSDRV		= 0x10000,
@@ -116,6 +117,7 @@ struct psp_xgmi_node_info {
 	uint8_t					num_hops;
 	uint8_t					is_sharing_enabled;
 	enum ta_xgmi_assigned_sdma_engine	sdma_engine;
+	uint8_t					num_links;
 };
 
 struct psp_xgmi_topology_info {
@@ -282,6 +284,13 @@ struct psp_runtime_boot_cfg_entry {
 	uint32_t reserved;
 };
 
+struct psp_bin_desc {
+	uint32_t fw_version;
+	uint32_t feature_version;
+	uint32_t size_bytes;
+	uint8_t *start_addr;
+};
+
 struct psp_context
 {
 	struct amdgpu_device            *adev;
@@ -297,20 +306,12 @@ struct psp_context
 
 	/* sos firmware */
 	const struct firmware		*sos_fw;
-	uint32_t			sos_fw_version;
-	uint32_t			sos_feature_version;
-	uint32_t			sys_bin_size;
-	uint32_t			sos_bin_size;
-	uint32_t			toc_bin_size;
-	uint32_t			kdb_bin_size;
-	uint32_t			spl_bin_size;
-	uint32_t			rl_bin_size;
-	uint8_t				*sys_start_addr;
-	uint8_t				*sos_start_addr;
-	uint8_t				*toc_start_addr;
-	uint8_t				*kdb_start_addr;
-	uint8_t				*spl_start_addr;
-	uint8_t				*rl_start_addr;
+	struct psp_bin_desc			sys;
+	struct psp_bin_desc			sos;
+	struct psp_bin_desc			toc;
+	struct psp_bin_desc			kdb;
+	struct psp_bin_desc			spl;
+	struct psp_bin_desc			rl;
 
 	/* tmr buffer */
 	struct amdgpu_bo		*tmr_bo;
@@ -325,8 +326,6 @@ struct psp_context
 
 	/* toc firmware */
 	const struct firmware		*toc_fw;
-	uint32_t			toc_fw_version;
-	uint32_t			toc_feature_version;
 
 	/* fence buffer */
 	struct amdgpu_bo		*fence_buf_bo;
@@ -427,6 +426,7 @@ extern const struct amd_ip_funcs psp_ip_funcs;
 extern const struct amdgpu_ip_block_version psp_v3_1_ip_block;
 extern const struct amdgpu_ip_block_version psp_v10_0_ip_block;
 extern const struct amdgpu_ip_block_version psp_v11_0_ip_block;
+extern const struct amdgpu_ip_block_version psp_v11_0_8_ip_block;
 extern const struct amdgpu_ip_block_version psp_v12_0_ip_block;
 extern const struct amdgpu_ip_block_version psp_v13_0_ip_block;
 
@@ -481,4 +481,6 @@ int psp_get_fw_attestation_records_addr(struct psp_context *psp,
 
 int psp_load_fw_list(struct psp_context *psp,
 		     struct amdgpu_firmware_info **ucode_list, int ucode_count);
+
+int is_psp_fw_valid(struct psp_bin_desc bin);
 #endif
