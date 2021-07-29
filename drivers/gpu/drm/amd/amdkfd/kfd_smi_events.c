@@ -128,7 +128,7 @@ static ssize_t kfd_smi_ev_write(struct file *filep, const char __user *user,
 	struct kfd_smi_client *client = filep->private_data;
 	uint64_t events;
 
-	if (!access_ok(user, size) || size < sizeof(events))
+	if (!kcl_access_ok(user, size) || size < sizeof(events))
 		return -EFAULT;
 	if (copy_from_user(&events, user, sizeof(events)))
 		return -EFAULT;
