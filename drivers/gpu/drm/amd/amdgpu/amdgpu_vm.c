@@ -975,7 +975,11 @@ static void amdgpu_vm_free_table(struct amdgpu_vm_pt *entry)
 {
 	if (entry->base.bo) {
 		entry->base.bo->vm_bo = NULL;
+
+		spin_lock(&entry->base.vm->invalidated_lock);
 		list_del(&entry->base.vm_status);
+		spin_unlock(&entry->base.vm->invalidated_lock);
+
 		amdgpu_bo_unref(&entry->base.bo->shadow);
 		amdgpu_bo_unref(&entry->base.bo);
 	}
