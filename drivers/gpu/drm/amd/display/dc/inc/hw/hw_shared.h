@@ -42,6 +42,7 @@
 #endif
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #define MAX_HPO_DP2_ENCODERS	4
+#define MAX_HPO_DP2_LINK_ENCODERS	2
 #endif
 
 struct gamma_curve {
