@@ -76,11 +76,6 @@ const char *ras_block_string[] = {
 #define RAS_BAD_PAGE_COVER              (100 * 1024 * 1024ULL)
 
 #ifdef HAVE_SMCA_UMC_V2
-#define GET_MCA_IPID_GPUID(m)		(((m) >> 44) & 0xF)
-#define GET_UMC_INST_NIBBLE(m)		(((m) >> 20) & 0xF)
-#define GET_CHAN_INDEX_NIBBLE(m)	(((m) >> 12) & 0xF)
-#define GPU_ID_OFFSET			8
-
 static bool notifier_registered = false;
 static void amdgpu_register_bad_pages_mca_notifier(void);
 #endif
@@ -2556,25 +2551,10 @@ static struct amdgpu_device *find_adev(uint32_t die_number)
         return adev;
 }
 
-static void find_umc_inst_chan_index(struct mce *m, uint32_t *umc_inst,
-                                     uint32_t *chan_index)
-{
-        uint32_t val1 = 0;
-        uint32_t val2 = 0;
-        uint32_t rem = 0;
-
-        /*
-         * Bit 20-23 provides the UMC instance nibble.
-         * Bit 12-15 provides the channel index nibble.
-        */
-        val1 = GET_UMC_INST_NIBBLE(m->ipid);
-        val2 = GET_CHAN_INDEX_NIBBLE(m->ipid);
-
-        *umc_inst = val1/2;
-        rem = val1%2;
-
-        *chan_index = (4*rem) + val2;
-}
+#define GET_MCA_IPID_GPUID(m)	(((m) >> 44) & 0xF)
+#define GET_UMC_INST(m)		(((m) >> 21) & 0x7)
+#define GET_CHAN_INDEX(m)	((((m) >> 12) & 0x3) | (((m) >> 18) & 0x4))
+#define GPU_ID_OFFSET		8
 
 static int amdgpu_bad_page_notifier(struct notifier_block *nb,
 				    unsigned long val, void *data)
@@ -2583,7 +2563,7 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
         struct amdgpu_device *adev = NULL;
         uint32_t gpu_id = 0;
         uint32_t umc_inst = 0;
-        uint32_t chan_index = 0;
+        uint32_t ch_inst = 0, channel_index = 0;
         struct ras_err_data err_data = {0, 0, 0, NULL};
         struct eeprom_table_record err_rec;
         uint64_t retired_page;
@@ -2596,12 +2576,10 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
         if (!m || !(is_smca_umc_v2(m->bank) && (XEC(m->status, 0x1f) == 0x0)))
                 return NOTIFY_DONE;
 
-        gpu_id = GET_MCA_IPID_GPUID(m->ipid);
-
         /*
          * GPU Id is offset by GPU_ID_OFFSET in MCA_IPID_UMC register.
          */
-        gpu_id -= GPU_ID_OFFSET;
+        gpu_id = GET_MCA_IPID_GPUID(m->ipid) - GPU_ID_OFFSET;
 
         adev = find_adev(gpu_id);
         if (!adev) {
@@ -2623,18 +2601,22 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
          * If it is uncorrectable error, then find out UMC instance and
          * channel index.
          */
-        find_umc_inst_chan_index(m, &umc_inst, &chan_index);
+	umc_inst = GET_UMC_INST(m->ipid);
+	ch_inst = GET_CHAN_INDEX(m->ipid);
 
         dev_info(adev->dev, "Uncorrectable error detected in UMC inst: %d,"
-                            " chan_idx: %d", umc_inst, chan_index);
+                            " chan_idx: %d", umc_inst, ch_inst);
 
         memset(&err_rec, 0x0, sizeof(struct eeprom_table_record));
 
         /*
          * Translate UMC channel address to Physical address
          */
+	channel_index =
+		adev->umc.channel_idx_tbl[umc_inst * adev->umc.channel_inst_num + ch_inst];
+
         retired_page = ADDR_OF_8KB_BLOCK(m->addr) |
-                        ADDR_OF_256B_BLOCK(chan_index) |
+                        ADDR_OF_256B_BLOCK(channel_index) |
                         OFFSET_IN_256B_BLOCK(m->addr);
 
         err_rec.address = m->addr;
@@ -2642,7 +2624,7 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
         err_rec.ts = (uint64_t)ktime_get_real_seconds();
         err_rec.err_type = AMDGPU_RAS_EEPROM_ERR_NON_RECOVERABLE;
         err_rec.cu = 0;
-        err_rec.mem_channel = chan_index;
+        err_rec.mem_channel = channel_index;
         err_rec.mcumc_id = umc_inst;
 
         err_data.err_addr = &err_rec;
