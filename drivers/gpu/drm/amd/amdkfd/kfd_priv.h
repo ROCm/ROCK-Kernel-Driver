@@ -1104,9 +1104,9 @@ static inline struct kfd_process_device *kfd_process_device_from_gpuidx(
 }
 
 void kfd_unref_process(struct kfd_process *p);
-int kfd_process_evict_queues(struct kfd_process *p, uint32_t trigger);
+int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger);
 int kfd_process_restore_queues(struct kfd_process *p);
-void kfd_suspend_all_processes(void);
+void kfd_suspend_all_processes(bool force);
 int kfd_resume_all_processes(void);
 
 struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *process,

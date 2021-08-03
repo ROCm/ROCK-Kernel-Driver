@@ -1947,9 +1947,9 @@ struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm)
  * Eviction is reference-counted per process-device. This means multiple
  * evictions from different sources can be nested safely.
  */
-int kfd_process_evict_queues(struct kfd_process *p, uint32_t trigger)
+int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger)
 {
-	int r = 0;
+	int r = 0, r_tmp = 0;
 	int i;
 	unsigned int n_evicted = 0;
 
@@ -1960,15 +1960,17 @@ int kfd_process_evict_queues(struct kfd_process *p, uint32_t trigger)
 		kfd_smi_event_queue_eviction(pdd->dev, p->lead_thread->pid,
 					     trigger);
 
-		r = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
+		r_tmp = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
 							    &pdd->qpd);
 		/* evict return -EIO if HWS is hang or asic is resetting, in this case
 		 * we would like to set all the queues to be in evicted state to prevent
 		 * them been add back since they actually not be saved right now.
 		 */
-		if (r && r != -EIO) {
+		if (r_tmp && r_tmp != -EIO) {
 			dev_err(dev, "Failed to evict process queues\n");
-			goto fail;
+			r = r_tmp;
+			if (!force)
+				goto fail;
 		}
 		n_evicted++;
 
@@ -2172,7 +2174,7 @@ static void evict_process_worker(struct work_struct *work)
 	p->last_evict_timestamp = get_jiffies_64();
 
 	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
-	ret = kfd_process_evict_queues(p, KFD_QUEUE_EVICTION_TRIGGER_TTM);
+	ret = kfd_process_evict_queues(p, false, KFD_QUEUE_EVICTION_TRIGGER_TTM);
 	if (!ret) {
 		/* If another thread already signaled the eviction fence,
 		 * they are responsible stopping the queues and scheduling
@@ -2253,7 +2255,7 @@ static void restore_process_worker(struct work_struct *work)
 	}
 }
 
-void kfd_suspend_all_processes(void)
+void kfd_suspend_all_processes(bool force)
 {
 	struct kfd_process *p;
 	unsigned int temp;
@@ -2261,7 +2263,7 @@ void kfd_suspend_all_processes(void)
 
 	WARN(debug_evictions, "Evicting all processes");
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-		if (kfd_process_evict_queues(p, KFD_QUEUE_EVICTION_TRIGGER_SUSPEND))
+		if (kfd_process_evict_queues(p, force, KFD_QUEUE_EVICTION_TRIGGER_SUSPEND))
 			pr_err("Failed to suspend process 0x%x\n", p->pasid);
 		signal_eviction_fence(p);
 	}
