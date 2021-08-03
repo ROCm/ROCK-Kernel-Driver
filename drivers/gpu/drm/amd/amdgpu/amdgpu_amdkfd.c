@@ -223,7 +223,7 @@ void amdgpu_amdkfd_interrupt(struct amdgpu_device *adev,
 void amdgpu_amdkfd_suspend(struct amdgpu_device *adev, bool run_pm)
 {
 	if (adev->kfd.dev)
-		kgd2kfd_suspend(adev->kfd.dev, run_pm);
+		kgd2kfd_suspend(adev->kfd.dev, run_pm, true);
 }
 
 int amdgpu_amdkfd_resume_iommu(struct amdgpu_device *adev)
