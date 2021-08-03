@@ -190,6 +190,9 @@ static bool create_links(
 	int i;
 	int connectors_num;
 	struct dc_bios *bios = dc->ctx->dc_bios;
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	int dp_hpo_link_count = 0;
+#endif
 
 	dc->link_count = 0;
 
@@ -258,6 +261,24 @@ static bool create_links(
 			BREAK_TO_DEBUGGER();
 			goto failed_alloc;
 		}
+
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+		if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment) &&
+				dc->caps.dp_hpo &&
+				link->dc->res_pool->res_cap->num_hpo_dp_link_encoder > 0) {
+			/* FPGA case - Allocate HPO DP link encoder */
+			if (i < link->dc->res_pool->res_cap->num_hpo_dp_link_encoder) {
+				link->hpo_dp_link_enc = link->dc->res_pool->hpo_dp_link_enc[i];
+
+				if (link->hpo_dp_link_enc == NULL) {
+					BREAK_TO_DEBUGGER();
+					goto failed_alloc;
+				}
+				link->hpo_dp_link_enc->hpd_source = link->link_enc->hpd_source;
+				link->hpo_dp_link_enc->transmitter = link->link_enc->transmitter;
+			}
+		}
+#endif
 
 		link->link_status.dpcd_caps = &link->dpcd_caps;
 

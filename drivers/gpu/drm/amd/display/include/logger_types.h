@@ -76,6 +76,9 @@
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x) || defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define DC_LOG_DWB(...) DRM_DEBUG_KMS(__VA_ARGS__)
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+#define DC_LOG_DP2(...) DRM_DEBUG_KMS(__VA_ARGS__)
+#endif
 
 struct dal_logger;
 
@@ -129,6 +132,9 @@ enum dc_log_type {
 	LOG_MAX_HW_POINTS,
 	LOG_ALL_TF_CHANNELS,
 	LOG_SAMPLE_1DLUT,
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	LOG_DP2,
+#endif
 	LOG_SECTION_TOTAL_COUNT
 };
 
