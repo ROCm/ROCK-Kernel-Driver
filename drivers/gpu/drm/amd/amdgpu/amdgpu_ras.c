@@ -115,11 +115,6 @@ const char *get_ras_block_str(struct ras_common_if *ras_block)
 #define RAS_BAD_PAGE_COVER              (100 * 1024 * 1024ULL)
 
 #ifdef HAVE_SMCA_UMC_V2
-#define GET_MCA_IPID_GPUID(m)		(((m) >> 44) & 0xF)
-#define GET_UMC_INST_NIBBLE(m)		(((m) >> 20) & 0xF)
-#define GET_CHAN_INDEX_NIBBLE(m)	(((m) >> 12) & 0xF)
-#define GPU_ID_OFFSET			8
-
 static bool notifier_registered = false;
 static void amdgpu_register_bad_pages_mca_notifier(void);
 #endif
