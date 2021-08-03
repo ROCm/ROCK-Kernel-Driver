@@ -917,7 +917,7 @@ int kgd2kfd_pre_reset(struct kfd_dev *kfd)
 		node->dqm->ops.pre_reset(node->dqm);
 	}
 
-	kgd2kfd_suspend(kfd, false);
+	kgd2kfd_suspend(kfd, false, true);
 
 	for (i = 0; i < kfd->num_nodes; i++)
 		kfd_signal_reset_event(kfd->nodes[i]);
@@ -965,7 +965,7 @@ bool kfd_is_locked(void)
 	return  (kfd_locked > 0);
 }
 
-void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm)
+void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
 {
 	struct kfd_node *node;
 	int i;
@@ -982,7 +982,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm)
 
 		/* For first KFD device suspend all the KFD processes */
 		if (count == 1)
-			kfd_suspend_all_processes();
+			kfd_suspend_all_processes(force);
 	}
 
 	for (i = 0; i < kfd->num_nodes; i++) {
@@ -1094,7 +1094,7 @@ int kgd2kfd_quiesce_mm(struct mm_struct *mm, uint32_t trigger)
 		return -ESRCH;
 
 	WARN(debug_evictions, "Evicting pid %d", p->lead_thread->pid);
-	r = kfd_process_evict_queues(p, trigger);
+	r = kfd_process_evict_queues(p, true, trigger);
 
 	kfd_unref_process(p);
 	return r;
