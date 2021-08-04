@@ -137,4 +137,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm: add managed resources tied to drm_device
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_managed.h])
+
+	dnl #
+	dnl # v5.12-rc3-330-g2916059147ea
+	dnl # drm/aperture: Add infrastructure for aperture ownership
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_aperture.h])
 ])
