@@ -23,7 +23,9 @@
  */
 
 #include <drm/amdgpu_drm.h>
+#ifdef HAVE_DRM_DRM_APERTURE_H
 #include <drm/drm_aperture.h>
+#endif
 #include <drm/drm_drv.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_vblank.h>
