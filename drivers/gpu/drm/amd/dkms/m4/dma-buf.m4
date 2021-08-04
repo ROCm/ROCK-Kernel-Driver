@@ -7,12 +7,12 @@ AC_DEFUN([AC_AMDGPU_DMA_BUF], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/dma-buf.h>
 		],[
-			struct dma_buf_ops *ptr = NULL;
+			struct dma_buf_attach_ops *ptr = NULL;
 			ptr->allow_peer2peer = false;
 		],[
 			AC_DEFINE(HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER,
 				1,
-				[struct dma_buf_ops->allow_peer2peer is available])
+				[struct dma_buf_attach_ops->allow_peer2peer is available])
 		],[
 			dnl #
 			dnl # 4981cdb063e3 dma-buf: make move_notify mandatory if importer_ops are provided
