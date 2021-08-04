@@ -1970,7 +1970,9 @@ static struct pci_driver amdgpu_kms_pci_driver = {
 	.shutdown = amdgpu_pci_shutdown,
 	.driver.pm = &amdgpu_pm_ops,
 	.err_handler = &amdgpu_pci_err_handler,
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	.dev_groups = amdgpu_sysfs_groups,
+#endif
 };
 
 static int __init amdgpu_init(void)
