@@ -136,6 +136,41 @@ static inline void dma_buf_map_clear(struct dma_buf_map *map)
 		map->vaddr = NULL;
 	}
 }
+
+/**
+ * dma_buf_map_memcpy_to - Memcpy into dma-buf mapping
+ * @dst:        The dma-buf mapping structure
+ * @src:        The source buffer
+ * @len:        The number of byte in src
+ *
+ * Copies data into a dma-buf mapping. The source buffer is in system
+ * memory. Depending on the buffer's location, the helper picks the correct
+ * method of accessing the memory.
+ */
+static inline void dma_buf_map_memcpy_to(struct dma_buf_map *dst, const void *src, size_t len)
+{
+        if (dst->is_iomem)
+                memcpy_toio(dst->vaddr_iomem, src, len);
+        else
+                memcpy(dst->vaddr, src, len);
+}
+
+/**
+ * dma_buf_map_incr - Increments the address stored in a dma-buf mapping
+ * @map:        The dma-buf mapping structure
+ * @incr:       The number of bytes to increment
+ *
+ * Increments the address stored in a dma-buf mapping. Depending on the
+ * buffer's location, the correct value will be updated.
+ */
+static inline void dma_buf_map_incr(struct dma_buf_map *map, size_t incr)
+{
+        if (map->is_iomem)
+                map->vaddr_iomem += incr;
+        else
+                map->vaddr += incr;
+}
+
 #endif /* HAVE_LINUX_DMA_BUF_MAP_H */
 
 #endif
