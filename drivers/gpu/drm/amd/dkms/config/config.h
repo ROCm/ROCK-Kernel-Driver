@@ -917,7 +917,7 @@
 #define HAVE_STRSCPY 1
 
 /* struct dma_buf_ops->allow_peer2peer is available */
-/* #undef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER */
+#define HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER 1
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
