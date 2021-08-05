@@ -256,10 +256,9 @@ int smu_cmn_send_msg_without_waiting(struct smu_context *smu,
 	u32 reg;
 	int res;
 
-	if (smu->adev->in_pci_err_recovery)
+	if (smu->adev->no_hw_access)
 		return 0;
 
-	mutex_lock(&smu->message_lock);
 	reg = __smu_cmn_poll_stat(smu);
 	res = __smu_cmn_reg2errno(smu, reg);
 	if (reg == SMU_RESP_NONE ||
@@ -269,7 +268,6 @@ int smu_cmn_send_msg_without_waiting(struct smu_context *smu,
 	__smu_cmn_send_msg(smu, msg_index, param);
 	res = 0;
 Out:
-	mutex_unlock(&smu->message_lock);
 	return res;
 }
 
@@ -329,7 +327,7 @@ int smu_cmn_send_smc_msg_with_param(struct smu_context *smu,
 	int res, index;
 	u32 reg;
 
-	if (smu->adev->in_pci_err_recovery)
+	if (smu->adev->no_hw_access)
 		return 0;
 
 	index = smu_cmn_to_asic_specific_index(smu,

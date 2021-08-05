@@ -341,7 +341,7 @@ int psp_wait_for(struct psp_context *psp, uint32_t reg_index,
 	int i;
 	struct amdgpu_device *adev = psp->adev;
 
-	if (psp->adev->in_pci_err_recovery)
+	if (psp->adev->no_hw_access)
 		return 0;
 
 	for (i = 0; i < adev->usec_timeout; i++) {
@@ -408,7 +408,7 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	bool ras_intr = false;
 	bool skip_unsupport = false;
 
-	if (psp->adev->in_pci_err_recovery)
+	if (psp->adev->no_hw_access)
 		return 0;
 
 	mutex_lock(&psp->mutex);
@@ -2158,7 +2158,34 @@ static int psp_hw_start(struct psp_context *psp)
 		    (psp->funcs->bootloader_load_sysdrv != NULL)) {
 			ret = psp_bootloader_load_sysdrv(psp);
 			if (ret) {
-				DRM_ERROR("PSP load sysdrv failed!\n");
+				DRM_ERROR("PSP load sys drv failed!\n");
+				return ret;
+			}
+		}
+
+		if ((is_psp_fw_valid(psp->soc_drv)) &&
+		    (psp->funcs->bootloader_load_soc_drv != NULL)) {
+			ret = psp_bootloader_load_soc_drv(psp);
+			if (ret) {
+				DRM_ERROR("PSP load soc drv failed!\n");
+				return ret;
+			}
+		}
+
+		if ((is_psp_fw_valid(psp->intf_drv)) &&
+		    (psp->funcs->bootloader_load_intf_drv != NULL)) {
+			ret = psp_bootloader_load_intf_drv(psp);
+			if (ret) {
+				DRM_ERROR("PSP load intf drv failed!\n");
+				return ret;
+			}
+		}
+
+		if ((is_psp_fw_valid(psp->dbg_drv)) &&
+		    (psp->funcs->bootloader_load_dbg_drv != NULL)) {
+			ret = psp_bootloader_load_dbg_drv(psp);
+			if (ret) {
+				DRM_ERROR("PSP load dbg drv failed!\n");
 				return ret;
 			}
 		}
@@ -3024,6 +3051,82 @@ out:
 	return err;
 }
 
+static int parse_sos_bin_descriptor(struct psp_context *psp,
+				   const struct psp_fw_bin_desc *desc,
+				   const struct psp_firmware_header_v2_0 *sos_hdr)
+{
+	uint8_t *ucode_start_addr  = NULL;
+
+	if (!psp || !desc || !sos_hdr)
+		return -EINVAL;
+
+	ucode_start_addr  = (uint8_t *)sos_hdr +
+			    le32_to_cpu(desc->offset_bytes) +
+			    le32_to_cpu(sos_hdr->header.ucode_array_offset_bytes);
+
+	switch (desc->fw_type) {
+	case PSP_FW_TYPE_PSP_SOS:
+		psp->sos.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->sos.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->sos.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->sos.start_addr 	   = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_SYS_DRV:
+		psp->sys.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->sys.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->sys.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->sys.start_addr        = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_KDB:
+		psp->kdb.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->kdb.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->kdb.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->kdb.start_addr        = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_TOC:
+		psp->toc.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->toc.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->toc.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->toc.start_addr        = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_SPL:
+		psp->spl.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->spl.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->spl.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->spl.start_addr        = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_RL:
+		psp->rl.fw_version         = le32_to_cpu(desc->fw_version);
+		psp->rl.feature_version    = le32_to_cpu(desc->fw_version);
+		psp->rl.size_bytes         = le32_to_cpu(desc->size_bytes);
+		psp->rl.start_addr         = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_SOC_DRV:
+		psp->soc_drv.fw_version         = le32_to_cpu(desc->fw_version);
+		psp->soc_drv.feature_version    = le32_to_cpu(desc->fw_version);
+		psp->soc_drv.size_bytes         = le32_to_cpu(desc->size_bytes);
+		psp->soc_drv.start_addr         = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_INTF_DRV:
+		psp->intf_drv.fw_version        = le32_to_cpu(desc->fw_version);
+		psp->intf_drv.feature_version   = le32_to_cpu(desc->fw_version);
+		psp->intf_drv.size_bytes        = le32_to_cpu(desc->size_bytes);
+		psp->intf_drv.start_addr        = ucode_start_addr;
+		break;
+	case PSP_FW_TYPE_PSP_DBG_DRV:
+		psp->dbg_drv.fw_version         = le32_to_cpu(desc->fw_version);
+		psp->dbg_drv.feature_version    = le32_to_cpu(desc->fw_version);
+		psp->dbg_drv.size_bytes         = le32_to_cpu(desc->size_bytes);
+		psp->dbg_drv.start_addr         = ucode_start_addr;
+		break;
+	default:
+		dev_warn(psp->adev->dev, "Unsupported PSP FW type: %d\n", desc->fw_type);
+		break;
+	}
+
+	return 0;
+}
+
 static int psp_init_sos_base_fw(struct amdgpu_device *adev)
 {
 	const struct psp_firmware_header_v1_0 *sos_hdr;
@@ -3077,8 +3180,10 @@ int psp_init_sos_microcode(struct psp_context *psp,
 	const struct psp_firmware_header_v1_1 *sos_hdr_v1_1;
 	const struct psp_firmware_header_v1_2 *sos_hdr_v1_2;
 	const struct psp_firmware_header_v1_3 *sos_hdr_v1_3;
+	const struct psp_firmware_header_v2_0 *sos_hdr_v2_0;
 	int err = 0;
 	uint8_t *ucode_array_start_addr;
+	int fw_index = 0;
 
 	if (!chip_name) {
 		dev_err(adev->dev, "invalid chip name for sos microcode\n");
@@ -3136,6 +3241,23 @@ int psp_init_sos_microcode(struct psp_context *psp,
 				le32_to_cpu(sos_hdr_v1_3->rl.offset_bytes);
 		}
 		break;
+	case 2:
+		sos_hdr_v2_0 = (const struct psp_firmware_header_v2_0 *)adev->psp.sos_fw->data;
+
+		if (le32_to_cpu(sos_hdr_v2_0->psp_fw_bin_count) >= UCODE_MAX_PSP_PACKAGING) {
+			dev_err(adev->dev, "packed SOS count exceeds maximum limit\n");
+			err = -EINVAL;
+			goto out;
+		}
+
+		for (fw_index = 0; fw_index < le32_to_cpu(sos_hdr_v2_0->psp_fw_bin_count); fw_index++) {
+			err = parse_sos_bin_descriptor(psp,
+						       &sos_hdr_v2_0->psp_fw_bin[fw_index],
+						       sos_hdr_v2_0);
+			if (err)
+				goto out;
+		}
+		break;
 	default:
 		dev_err(adev->dev,
 			"unsupported psp sos firmware\n");
@@ -3154,7 +3276,7 @@ out:
 }
 
 static int parse_ta_bin_descriptor(struct psp_context *psp,
-				   const struct ta_fw_bin_desc *desc,
+				   const struct psp_fw_bin_desc *desc,
 				   const struct ta_firmware_header_v2_0 *ta_hdr)
 {
 	uint8_t *ucode_start_addr  = NULL;
@@ -3242,7 +3364,7 @@ int psp_init_ta_microcode(struct psp_context *psp,
 		goto out;
 	}
 
-	if (le32_to_cpu(ta_hdr->ta_fw_bin_count) >= UCODE_MAX_TA_PACKAGING) {
+	if (le32_to_cpu(ta_hdr->ta_fw_bin_count) >= UCODE_MAX_PSP_PACKAGING) {
 		dev_err(adev->dev, "packed TA count exceeds maximum limit\n");
 		err = -EINVAL;
 		goto out;
