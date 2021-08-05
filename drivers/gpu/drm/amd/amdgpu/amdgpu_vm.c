@@ -1181,7 +1181,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 
 	if (clear || !bo) {
 		mem = NULL;
-		resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
+		resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	} else {
 		struct drm_gem_object *obj = &bo->tbo.base;
 
@@ -1400,7 +1400,7 @@ static void amdgpu_vm_free_mapping(struct amdgpu_device *adev,
  */
 static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	struct dma_resv *resv = vm->root.bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	struct dma_resv_iter cursor;
 	struct dma_fence *fence;
 
@@ -1430,7 +1430,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 			  struct amdgpu_vm *vm,
 			  struct dma_fence **fence)
 {
-	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	struct amdgpu_bo_va_mapping *mapping;
 	uint64_t init_pte_value = 0;
 	struct dma_fence *f = NULL;
