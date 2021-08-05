@@ -16,5 +16,6 @@
 #include <kcl/backport/kcl_mm_backport.h>
 #include <kcl/kcl_sched_mm.h>
 #include <kcl/kcl_seq_file.h>
+#include <kcl/kcl_io-mapping.h>
 
 #endif
