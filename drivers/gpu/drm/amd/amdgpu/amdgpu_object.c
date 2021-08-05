@@ -1532,7 +1532,7 @@ u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo)
 	WARN_ON_ONCE(bo->tbo.resource->start == AMDGPU_BO_INVALID_OFFSET);
 	WARN_ON_ONCE(bo->tbo.resource->mem_type == TTM_PL_VRAM &&
 		     !(bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS));
-	WARN_ON_ONCE(bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT);
+	WARN_ON_ONCE(bo->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT);
 
 	return amdgpu_bo_gpu_offset_no_check(bo);
 }

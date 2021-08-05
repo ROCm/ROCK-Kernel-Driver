@@ -92,10 +92,10 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(robj->tbo.bdev);
 
 	if (robj) {
-		if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA)
+		if (robj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
 			atomic64_sub(amdgpu_bo_size(robj),
 				     &adev->direct_gma.vram_usage);
-		else if (robj->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+		else if (robj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
 			atomic64_sub(amdgpu_bo_size(robj),
 				     &adev->direct_gma.gart_usage);
 		amdgpu_mn_unregister(robj);
@@ -556,11 +556,11 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			return r;
 
 		abo = gem_to_amdgpu_bo(gobj);
-		dma_addr = kmalloc_array(abo->tbo.mem.num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		dma_addr = kmalloc_array(abo->tbo.resource->num_pages, sizeof(dma_addr_t), GFP_KERNEL);
 		if (unlikely(dma_addr == NULL))
 			goto release_object;
 
-		for (i = 0; i < abo->tbo.mem.num_pages; i++)
+		for (i = 0; i < abo->tbo.resource->num_pages; i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
 		abo->dgma_import_base = args->addr;
 		abo->dgma_addr = (void *)dma_addr;
@@ -573,7 +573,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			return -ENOENT;
 
 		abo = gem_to_amdgpu_bo(gobj);
-		if (abo->tbo.mem.mem_type != AMDGPU_PL_DGMA) {
+		if (abo->tbo.resource->mem_type != AMDGPU_PL_DGMA) {
 			r = -EINVAL;
 			goto release_object;
 		}

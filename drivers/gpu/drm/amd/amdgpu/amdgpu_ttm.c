@@ -634,11 +634,11 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->bdev);
 	struct amdgpu_res_cursor cursor;
 
-	if (bo->mem.mem_type == AMDGPU_PL_DGMA ||
-			bo->mem.mem_type == AMDGPU_PL_DGMA_IMPORT) {
-		return (bo->mem.bus.offset >> PAGE_SHIFT) + page_offset;
+	if (bo->resource->mem_type == AMDGPU_PL_DGMA ||
+			bo->resource->mem_type == AMDGPU_PL_DGMA_IMPORT) {
+		return (bo->resource->bus.offset >> PAGE_SHIFT) + page_offset;
 	} else {
-                amdgpu_res_first(&bo->mem, (u64)page_offset << PAGE_SHIFT, 0, &cursor);
+                amdgpu_res_first(bo->resource, (u64)page_offset << PAGE_SHIFT, 0, &cursor);
                 return (adev->gmc.aper_base + cursor.start) >> PAGE_SHIFT;
 	}
 }
@@ -2007,19 +2007,20 @@ static void amdgpu_dgma_import_mgr_fini(struct amdgpu_device *adev)
 static int amdgpu_dgma_import_mgr_new(struct ttm_resource_manager *man,
 			      struct ttm_buffer_object *tbo,
 			      const struct ttm_place *place,
-			      struct ttm_resource *mem)
+			      struct ttm_resource **res)
 {
 	struct amdgpu_dgma_import_mgr *mgr = to_dgma_import_mgr(man);
+	uint32_t num_pages = PFN_UP(tbo->base.size);
 	struct amdgpu_dgma_node *node;
 	unsigned long lpfn;
 	int r;
 
 	spin_lock(&mgr->lock);
-	if (atomic64_read(&mgr->available) < mem->num_pages) {
+	if (atomic64_read(&mgr->available) < num_pages) {
 		spin_unlock(&mgr->lock);
 		return -ENOSPC;
 	}
-	atomic64_sub(mem->num_pages, &mgr->available);
+	atomic64_sub(num_pages, &mgr->available);
 	spin_unlock(&mgr->lock);
 
 	lpfn = place->lpfn;
@@ -2035,16 +2036,16 @@ static int amdgpu_dgma_import_mgr_new(struct ttm_resource_manager *man,
 	node->tbo = tbo;
 
 	spin_lock(&mgr->lock);
-	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, mem->num_pages,
-					mem->page_alignment, 0, place->fpfn,
+	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, num_pages,
+					tbo->page_alignment, 0, place->fpfn,
 					lpfn, DRM_MM_INSERT_BEST);
 	spin_unlock(&mgr->lock);
 
 	if (unlikely(r))
 		goto err_free;
 
-	mem->mm_node = node;
-	mem->start = node->node.start;
+	*res = node->tbo->resource;
+	(*res)->start = node->node.start;
 
 	return 0;
 
@@ -2052,7 +2053,7 @@ err_free:
 	kfree(node);
 
 err_out:
-	atomic64_add(mem->num_pages, &mgr->available);
+	atomic64_add(num_pages, &mgr->available);
 
 	return r;
 }
