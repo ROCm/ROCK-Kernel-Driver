@@ -372,7 +372,7 @@ static void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
 	base->next = bo->vm_bo;
 	bo->vm_bo = base;
 
-	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo))
 		return;
 
 	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
@@ -664,7 +664,7 @@ void amdgpu_vm_del_from_lru_notify(struct ttm_buffer_object *bo)
 	for (bo_base = abo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (amdkcl_ttm_resvp(&abo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+		if (amdkcl_ttm_resvp(&abo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
 			vm->bulk_moveable = false;
 	}
 
@@ -1893,7 +1893,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 
 	if (clear || !bo) {
 		mem = NULL;
-		resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
+		resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	} else {
 		struct drm_gem_object *obj = &bo->tbo.base;
 
@@ -1926,7 +1926,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	}
 
 	if (clear || (bo && amdkcl_ttm_resvp(&bo->tbo) ==
-		      amdkcl_ttm_resvp(&vm->root.base.bo->tbo)))
+		      amdkcl_ttm_resvp(&vm->root.bo->tbo)))
 		last_update = &vm->last_update;
 	else
 		last_update = &bo_va->last_pt_update;
@@ -1970,7 +1970,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo)) {
+	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo)) {
 		uint32_t mem_type = bo->tbo.resource->mem_type;
 
 		if (!(bo->preferred_domains &
@@ -2107,7 +2107,7 @@ static void amdgpu_vm_free_mapping(struct amdgpu_device *adev,
  */
 static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	struct dma_resv *resv = vm->root.bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	struct dma_resv_iter cursor;
 	struct dma_fence *fence;
 
@@ -2137,7 +2137,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 			  struct amdgpu_vm *vm,
 			  struct dma_fence **fence)
 {
-	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.base.bo->tbo);
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	struct amdgpu_bo_va_mapping *mapping;
 	uint64_t init_pte_value = 0;
 	struct dma_fence *f = NULL;
@@ -2297,7 +2297,7 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 	if (mapping->flags & AMDGPU_PTE_PRT)
 		amdgpu_vm_prt_get(adev);
 
-	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo) &&
+	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
 	    !bo_va->base.moved) {
 		list_move(&bo_va->base.vm_status, &vm->moved);
 	}
@@ -2662,7 +2662,7 @@ void amdgpu_vm_bo_del(struct amdgpu_device *adev,
 
 	if (bo) {
 		dma_resv_assert_held(bo->tbo.base.resv);
-		if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+		if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
 			vm->bulk_moveable = false;
 
 		for (base = &bo_va->base.bo->vm_bo; *base;
@@ -2756,7 +2756,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 	for (bo_base = bo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (evicted && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo)) {
+		if (evicted && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo)) {
 			amdgpu_vm_bo_evicted(bo_base);
 			continue;
 		}
@@ -2767,7 +2767,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 
 		if (bo->tbo.type == ttm_bo_type_kernel)
 			amdgpu_vm_bo_relocated(bo_base);
-		else if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo))
+		else if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
 			amdgpu_vm_bo_moved(bo_base);
 		else
 			amdgpu_vm_bo_invalidated(bo_base);
@@ -2897,7 +2897,7 @@ void amdgpu_vm_adjust_size(struct amdgpu_device *adev, uint32_t min_vm_size,
  */
 long amdgpu_vm_wait_idle(struct amdgpu_vm *vm, long timeout)
 {
-	timeout = dma_resv_wait_timeout(amdkcl_ttm_resvp(&vm->root.base.bo->tbo), true,
+	timeout = dma_resv_wait_timeout(amdkcl_ttm_resvp(&vm->root.bo->tbo), true,
 					true, timeout);
 	if (timeout <= 0)
 		return timeout;
