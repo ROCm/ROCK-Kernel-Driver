@@ -1420,7 +1420,7 @@ static void amdgpu_vm_free_mapping(struct amdgpu_device *adev,
  */
 static void amdgpu_vm_prt_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	struct dma_resv *resv = vm->root.bo->tbo.base.resv;
+	struct dma_resv *resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 	struct dma_resv_iter cursor;
 	struct dma_fence *fence;
 
