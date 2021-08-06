@@ -617,7 +617,11 @@ amdgpu_atombios_dp_link_train_cr(struct amdgpu_atombios_dp_link_train_info *dp_i
 	dp_info->tries = 0;
 	voltage = 0xff;
 	while (1) {
+#ifdef HAVE_DRM_DP_LINK_TRAIN_CLOCK_RECOVERY_DELAY_2ARGS
 		drm_dp_link_train_clock_recovery_delay(dp_info->aux, dp_info->dpcd);
+#else
+		drm_dp_link_train_clock_recovery_delay(dp_info->dpcd);
+#endif
 
 		if (drm_dp_dpcd_read_link_status(dp_info->aux,
 						 dp_info->link_status) <= 0) {
