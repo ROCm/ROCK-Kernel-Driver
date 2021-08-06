@@ -188,7 +188,10 @@ void amdgpu_atombios_dp_aux_init(struct amdgpu_connector *amdgpu_connector)
 {
 	amdgpu_connector->ddc_bus->rec.hpd = amdgpu_connector->hpd.hpd;
 	amdgpu_connector->ddc_bus->aux.transfer = amdgpu_atombios_dp_aux_transfer;
+
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	amdgpu_connector->ddc_bus->aux.drm_dev = amdgpu_connector->base.dev;
+#endif
 
 #if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	drm_dp_aux_init(&amdgpu_connector->ddc_bus->aux);
