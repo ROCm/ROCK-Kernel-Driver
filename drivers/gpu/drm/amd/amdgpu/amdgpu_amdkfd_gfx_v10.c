@@ -563,6 +563,9 @@ static int kgd_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 	case KFD_PREEMPT_TYPE_WAVEFRONT_RESET:
 		type = RESET_WAVES;
 		break;
+	case KFD_PREEMPT_TYPE_WAVEFRONT_SAVE:
+		type = SAVE_WAVES;
+		break;
 	default:
 		type = DRAIN_PIPE;
 		break;
@@ -1051,6 +1054,32 @@ void kgd_gfx_v10_build_grace_period_packet_info(struct kgd_dev *kgd,
 
 	*reg_offset = mmCP_IQ_WAIT_TIME2;
 }
+static void program_trap_handler_settings(struct kgd_dev *kgd,
+		uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	lock_srbm(kgd, 0, 0, 0, vmid);
+
+	/*
+	 * Program TBA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_LO),
+			lower_32_bits(tba_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_HI),
+			upper_32_bits(tba_addr >> 8) |
+			(1 << SQ_SHADER_TBA_HI__TRAP_EN__SHIFT));
+
+	/*
+	 * Program TMA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_LO),
+			lower_32_bits(tma_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_HI),
+			upper_32_bits(tma_addr >> 8));
+
+	unlock_srbm(kgd);
+}
 
 const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
@@ -1081,4 +1110,5 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.set_precise_mem_ops = kgd_gfx_v10_set_precise_mem_ops,
 	.get_iq_wait_times = kgd_gfx_v10_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v10_build_grace_period_packet_info,
+	.program_trap_handler_settings = program_trap_handler_settings,
 };
