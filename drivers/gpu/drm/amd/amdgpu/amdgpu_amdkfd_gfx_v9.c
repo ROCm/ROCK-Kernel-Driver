@@ -43,7 +43,8 @@
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
 	DRAIN_PIPE,
-	RESET_WAVES
+	RESET_WAVES,
+	SAVE_WAVES
 };
 
 #define TCP_WATCH_STRIDE (mmTCP_WATCH1_ADDR_H - mmTCP_WATCH0_ADDR_H)
@@ -568,6 +569,9 @@ int kgd_gfx_v9_hqd_destroy(struct kgd_dev *kgd, void *mqd,
 		break;
 	case KFD_PREEMPT_TYPE_WAVEFRONT_RESET:
 		type = RESET_WAVES;
+		break;
+	case KFD_PREEMPT_TYPE_WAVEFRONT_SAVE:
+		type = SAVE_WAVES;
 		break;
 	default:
 		type = DRAIN_PIPE;
@@ -1312,6 +1316,31 @@ void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
 
 	*reg_offset = mmCP_IQ_WAIT_TIME2;
 }
+static void kgd_gfx_v9_program_trap_handler_settings(struct kgd_dev *kgd,
+                        uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr)
+{
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
+	kgd_gfx_v9_lock_srbm(kgd, 0, 0, 0, vmid);
+
+	/*
+	 * Program TBA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_LO),
+                        lower_32_bits(tba_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TBA_HI),
+                        upper_32_bits(tba_addr >> 8));
+
+	/*
+	 * Program TMA registers
+	 */
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_LO),
+			lower_32_bits(tma_addr >> 8));
+	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_SHADER_TMA_HI),
+			upper_32_bits(tma_addr >> 8));
+
+	kgd_gfx_v9_unlock_srbm(kgd);
+}
 
 const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.program_sh_mem_settings = kgd_gfx_v9_program_sh_mem_settings,
@@ -1343,4 +1372,5 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy,
+	.program_trap_handler_settings = kgd_gfx_v9_program_trap_handler_settings,
 };
