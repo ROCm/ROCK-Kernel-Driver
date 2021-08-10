@@ -1246,10 +1246,18 @@ int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 }
 
 static int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
-					struct drm_atomic_state *state)
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
+				 struct drm_atomic_state *state)
+#else
+				 struct drm_plane_state *state)
+#endif
 {
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
 										 plane);
+#else
+	struct drm_plane_state *new_plane_state = state;
+#endif
 	struct amdgpu_device *adev = drm_to_adev(plane->dev);
 	struct dc *dc = adev->dm.dc;
 	struct dm_plane_state *dm_plane_state;
@@ -1264,8 +1272,12 @@ static int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 	if (!dm_plane_state->dc_state)
 		return 0;
 
-	new_crtc_state = kcl_drm_atomic_get_new_crtc_state_before_commit(
-					state, new_plane_state->crtc);
+	new_crtc_state = 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
+		drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
+#else
+		drm_atomic_get_new_crtc_state(state->state, state->crtc);
+#endif
 
 	if (!new_crtc_state)
 		return -EINVAL;
@@ -1286,7 +1298,11 @@ static int amdgpu_dm_plane_atomic_check(struct drm_plane *plane,
 
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 static int amdgpu_dm_plane_atomic_async_check(struct drm_plane *plane,
-					      struct drm_atomic_state *state)
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
+				       struct drm_atomic_state *state)
+#else
+				       struct drm_plane_state *state)
+#endif
 {
 	struct drm_crtc_state *new_crtc_state;
 	struct drm_plane_state *new_plane_state;
@@ -1422,12 +1438,21 @@ void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 }
 
 static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
-						struct drm_atomic_state *state)
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
+					 struct drm_atomic_state *state)
+#else
+					 struct drm_plane_state *new_state)
+#endif
 {
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 	struct drm_plane_state *new_state = drm_atomic_get_new_plane_state(state,
 									   plane);
 	struct drm_plane_state *old_state =
 		drm_atomic_get_old_plane_state(state, plane);
+#else
+        struct drm_plane_state *old_state =
+                drm_atomic_get_old_plane_state(new_state->state, plane);
+#endif
 
 	trace_amdgpu_dm_atomic_update_cursor(new_state);
 
