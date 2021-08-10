@@ -63,3 +63,18 @@ bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_sta
 }
 EXPORT_SYMBOL(drm_connector_atomic_hdr_metadata_equal);
 #endif
+
+#if !defined(HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY)
+int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *connector)
+{
+#ifdef HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY
+        struct drm_device *dev = connector->dev;
+        struct drm_property *prop = dev->mode_config.hdr_output_metadata_property;
+
+        drm_object_attach_property(&connector->base, prop, 0);
+#endif
+
+        return 0;
+}
+EXPORT_SYMBOL(drm_connector_attach_hdr_output_metadata_property);
+#endif
