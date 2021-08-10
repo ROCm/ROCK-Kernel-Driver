@@ -65,8 +65,8 @@
 #define AMDGPU_TTM_VRAM_MAX_DW_READ	(size_t)128
 
 struct amdgpu_dgma_node {
-	struct drm_mm_node node;
 	struct ttm_buffer_object *tbo;
+	struct ttm_range_mgr_node base;
 };
 
 static int amdgpu_ttm_backend_bind(struct ttm_device *bdev,
@@ -610,11 +610,10 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_device *bdev,
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
 	{
-		struct drm_mm_node *mm_node = mem->mm_node;
 		struct amdgpu_dgma_node *node;
 		struct amdgpu_bo *abo;
 
-		node = container_of(mm_node, struct amdgpu_dgma_node, node);
+		node = container_of(mem, struct amdgpu_dgma_node, base.base);
 		abo = ttm_to_amdgpu_bo(node->tbo);
 		mem->bus.addr = abo->dgma_addr;
 		mem->bus.offset = abo->dgma_import_base;
@@ -2019,16 +2018,17 @@ static int amdgpu_dgma_import_mgr_new(struct ttm_resource_manager *man,
 	if (!lpfn)
 		lpfn = man->size;
 
-	node = kzalloc(sizeof(*node), GFP_KERNEL);
+	node = kzalloc(struct_size(node, base.mm_nodes, 1), GFP_KERNEL);
 	if (!node) {
 		r = -ENOMEM;
 		goto err_out;
 	}
 
 	node->tbo = tbo;
+	ttm_resource_init(tbo, place, &node->base.base);
 
 	spin_lock(&mgr->lock);
-	r = drm_mm_insert_node_in_range(&mgr->mm, &node->node, num_pages,
+	r = drm_mm_insert_node_in_range(&mgr->mm, &node->base.mm_nodes[0], num_pages,
 					tbo->page_alignment, 0, place->fpfn,
 					lpfn, DRM_MM_INSERT_BEST);
 	spin_unlock(&mgr->lock);
@@ -2036,8 +2036,8 @@ static int amdgpu_dgma_import_mgr_new(struct ttm_resource_manager *man,
 	if (unlikely(r))
 		goto err_free;
 
-	*res = node->tbo->resource;
-	(*res)->start = node->node.start;
+	*res = &node->base.base;
+	(*res)->start = node->base.mm_nodes[0].start;
 
 	return 0;
 
@@ -2062,11 +2062,11 @@ static void amdgpu_dgma_import_mgr_del(struct ttm_resource_manager *man,
 			       struct ttm_resource *mem)
 {
 	struct amdgpu_dgma_import_mgr *mgr = to_dgma_import_mgr(man);
-	struct amdgpu_dgma_node *node = mem->mm_node;
+	struct amdgpu_dgma_node *node = container_of(mem, struct amdgpu_dgma_node, base.base);
 
 	if (node) {
 		spin_lock(&mgr->lock);
-		drm_mm_remove_node(&node->node);
+		drm_mm_remove_node(&node->base.mm_nodes[0]);
 		spin_unlock(&mgr->lock);
 		kfree(node);
 	}

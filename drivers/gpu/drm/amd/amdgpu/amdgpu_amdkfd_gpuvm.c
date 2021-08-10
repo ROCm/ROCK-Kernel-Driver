@@ -2147,7 +2147,7 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
 
 	/* For GPU memory use VRAM Mgr to build SG Table */
 	if (bo->preferred_domains == AMDGPU_GEM_DOMAIN_VRAM) {
-		ret = amdgpu_vram_mgr_alloc_sgt(adev, &bo->tbo.mem, offset,
+		ret = amdgpu_vram_mgr_alloc_sgt(adev, bo->tbo.resource, offset,
 						size, dma_dev, dir, &sg);
 		*ret_sg = (ret == 0) ?  sg : NULL;
 		return ret;
@@ -2993,8 +2993,8 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 
 	src.bo = &src_mem->bo->tbo;
 	dst.bo = &dst_mem->bo->tbo;
-	src.mem = &src.bo->mem;
-	dst.mem = &dst.bo->mem;
+	src.mem = src.bo->resource;
+	dst.mem = dst.bo->resource;
 	src.offset = src_offset;
 	dst.offset = dst_offset;
 
