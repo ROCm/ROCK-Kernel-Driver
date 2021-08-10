@@ -32,7 +32,7 @@ void _kcl_drm_gem_ttm_vunmap(struct drm_gem_object *gem,
 	struct dma_buf_map map;
 
 	map.vaddr = vaddr;
-	map.is_iomem = bo->mem.bus.is_iomem;
+	map.is_iomem = bo->resource->bus.is_iomem;
 
 	ttm_bo_vunmap(bo, &map);
 }
