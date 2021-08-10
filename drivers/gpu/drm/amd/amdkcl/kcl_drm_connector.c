@@ -40,3 +40,26 @@ amdkcl_dummy_symbol(drm_dp_set_subconnector_property, void, return,
 				  struct drm_connector *connector, enum drm_connector_status status,
 				  const u8 *dpcd, const u8 prot_cap[4])
 #endif
+
+#ifndef HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL
+
+bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_state,
+                                             struct drm_connector_state *new_state)
+{
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA
+        struct drm_property_blob *old_blob = old_state->hdr_output_metadata;
+        struct drm_property_blob *new_blob = new_state->hdr_output_metadata;
+
+        if (!old_blob || !new_blob)
+                return old_blob == new_blob;
+
+        if (old_blob->length != new_blob->length)
+                return false;
+
+        return !memcmp(old_blob->data, new_blob->data, old_blob->length);
+#else
+	return false;
+#endif
+}
+EXPORT_SYMBOL(drm_connector_atomic_hdr_metadata_equal);
+#endif
