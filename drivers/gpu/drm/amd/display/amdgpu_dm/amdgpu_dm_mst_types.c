@@ -613,7 +613,9 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 		kasprintf(GFP_KERNEL, "AMDGPU DM aux hw bus %d",
 			  link_index);
 	aconnector->dm_dp_aux.aux.transfer = dm_dp_aux_transfer;
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	aconnector->dm_dp_aux.aux.drm_dev = dm->ddev;
+#endif
 	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
 #if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	drm_dp_aux_init(&aconnector->dm_dp_aux.aux);
