@@ -126,4 +126,8 @@ bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_sta
                                             struct drm_connector_state *new_state);
 #endif
 
+#if !defined(HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY)
+int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *connector);
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
