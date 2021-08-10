@@ -121,4 +121,9 @@ enum drm_mode_subconnector {
 #endif /* HAVE_DRM_MODE_SUBCONNECTOR_ENUM */
 #endif /* HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY */
 
+#ifndef HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL
+bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_state,
+                                            struct drm_connector_state *new_state);
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
