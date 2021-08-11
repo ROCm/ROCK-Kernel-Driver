@@ -110,7 +110,7 @@ void amdgpu_jpeg_ring_begin_use(struct amdgpu_ring *ring)
 void amdgpu_jpeg_ring_end_use(struct amdgpu_ring *ring)
 {
 	atomic_dec(&ring->adev->jpeg.total_submission_cnt);
-	schedule_delayed_work(&ring->adev->jpeg.idle_work, JPEG_IDLE_TIMEOUT);
+	mod_delayed_work(system_wq, &ring->adev->jpeg.idle_work, JPEG_IDLE_TIMEOUT);
 }
 
 int amdgpu_jpeg_dec_ring_test_ring(struct amdgpu_ring *ring)
