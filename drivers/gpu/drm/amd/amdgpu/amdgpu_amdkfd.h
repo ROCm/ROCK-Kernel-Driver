@@ -34,6 +34,7 @@
 #include <linux/memremap.h>
 #include <kgd_kfd_interface.h>
 #include <drm/drm_client.h>
+#include "amdgpu_gfx.h"
 #include "amdgpu_sync.h"
 #include "amdgpu_vm.h"
 #include "amdgpu_xcp.h"
