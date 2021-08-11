@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: MIT */
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,22 +20,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ * Authors: AMD
+ *
  */
 
-#ifndef __AMDGPU_DISCOVERY__
-#define __AMDGPU_DISCOVERY__
+#ifndef __DCN2X_H__
+#define __DCN2X_H__
 
-#define DISCOVERY_TMR_SIZE      (4 << 10)
-#define DISCOVERY_TMR_OFFSET    (64 << 10)
+void dcn20_populate_dml_writeback_from_context(struct dc *dc,
+					       struct resource_context *res_ctx,
+					       display_e2e_pipe_params_st *pipes);
 
-void amdgpu_discovery_fini(struct amdgpu_device *adev);
-int amdgpu_discovery_reg_base_init(struct amdgpu_device *adev);
-void amdgpu_discovery_harvest_ip(struct amdgpu_device *adev);
-int amdgpu_discovery_get_ip_version(struct amdgpu_device *adev, int hw_id, int number_instance,
-                                    int *major, int *minor, int *revision);
-
-int amdgpu_discovery_get_vcn_version(struct amdgpu_device *adev, int vcn_instance,
-				     int *major, int *minor, int *revision);
-int amdgpu_discovery_get_gfx_info(struct amdgpu_device *adev);
-
-#endif /* __AMDGPU_DISCOVERY__ */
+#endif /* __DCN2X_H__ */

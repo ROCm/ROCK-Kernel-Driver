@@ -1116,19 +1116,15 @@ static void event_mall_stutter(struct work_struct *work)
 
 static struct vblank_workqueue *vblank_create_workqueue(struct amdgpu_device *adev, struct dc *dc)
 {
-
-	int max_caps = dc->caps.max_links;
 	struct vblank_workqueue *vblank_work;
-	int i = 0;
 
-	vblank_work = kcalloc(max_caps, sizeof(*vblank_work), GFP_KERNEL);
+	vblank_work = kzalloc(sizeof(*vblank_work), GFP_KERNEL);
 	if (ZERO_OR_NULL_PTR(vblank_work)) {
 		kfree(vblank_work);
 		return NULL;
 	}
 
-	for (i = 0; i < max_caps; i++)
-		INIT_WORK(&vblank_work[i].mall_work, event_mall_stutter);
+	INIT_WORK(&vblank_work->mall_work, event_mall_stutter);
 
 	return vblank_work;
 }
@@ -1613,6 +1609,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	}
 
 	hdr = (const struct dmcub_firmware_header_v1_0 *)adev->dm.dmub_fw->data;
+	adev->dm.dmcub_fw_version = le32_to_cpu(hdr->header.ucode_version);
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) {
 		adev->firmware.ucode[AMDGPU_UCODE_ID_DMCUB].ucode_id =
@@ -1626,7 +1623,6 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 			 adev->dm.dmcub_fw_version);
 	}
 
-	adev->dm.dmcub_fw_version = le32_to_cpu(hdr->header.ucode_version);
 
 	adev->dm.dmub_srv = kzalloc(sizeof(*adev->dm.dmub_srv), GFP_KERNEL);
 	dmub_srv = adev->dm.dmub_srv;
