@@ -1137,7 +1137,13 @@ static void psp_xgmi_reflect_topology_info(struct psp_context *psp,
 				continue;
 
 			mirror_top_info->nodes[j].num_hops = dst_num_hops;
-			mirror_top_info->nodes[j].num_links = dst_num_links;
+			/*
+			 * prevent 0 num_links value re-reflection since reflection
+			 * criteria is based on num_hops (direct or indirect).
+			 *
+			 */
+			if (dst_num_links)
+				mirror_top_info->nodes[j].num_links = dst_num_links;
 
 			break;
 		}
