@@ -958,7 +958,7 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 	bp.type = ttm_bo_type_kernel;
 	bp.no_wait_gpu = immediate;
 	if (vm->root.bo)
-		bp.resv = vm->root.bo->tbo.base.resv;
+		bp.resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 
 	r = amdgpu_bo_create_vm(adev, &bp, vmbo);
 	if (r)

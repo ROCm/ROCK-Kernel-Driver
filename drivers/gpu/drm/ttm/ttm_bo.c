@@ -541,7 +541,7 @@ out:
 bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 			      const struct ttm_place *place)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	if (bo->resource->mem_type == TTM_PL_SYSTEM)
 		return true;
 
@@ -590,7 +590,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 	if (ret && place && !bo->bdev->funcs->eviction_valuable(bo, place)) {
 		ret = false;
 		if (*locked) {
-			dma_resv_unlock(bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(bo));
 			*locked = false;
 		}
 	}
