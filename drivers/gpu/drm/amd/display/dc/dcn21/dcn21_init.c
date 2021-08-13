@@ -129,7 +129,9 @@ static const struct hwseq_private_funcs dcn21_private_funcs = {
 	.dpp_pg_control = dcn20_dpp_pg_control,
 	.hubp_pg_control = dcn20_hubp_pg_control,
 	.update_odm = dcn20_update_odm,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.dsc_pg_control = dcn20_dsc_pg_control,
+#endif
 	.set_hdr_multiplier = dcn10_set_hdr_multiplier,
 	.verify_allow_pstate_change_high = dcn10_verify_allow_pstate_change_high,
 	.s0i3_golden_init_wa = dcn21_s0i3_golden_init_wa,

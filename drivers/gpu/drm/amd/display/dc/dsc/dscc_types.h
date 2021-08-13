@@ -1,3 +1,4 @@
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
@@ -50,3 +51,4 @@ int dscc_compute_dsc_parameters(const struct drm_dsc_config *pps, struct dsc_par
 
 #endif
 
+#endif

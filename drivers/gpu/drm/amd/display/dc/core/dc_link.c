@@ -1722,7 +1722,9 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	bool skip_video_pattern;
 	struct dc_link *link = stream->link;
 	struct dc_link_settings link_settings = {0};
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
+#endif
 	int i;
 	bool apply_seamless_boot_optimization = false;
 	uint32_t bl_oled_enable_delay = 50; // in ms
@@ -1775,12 +1777,14 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 		status = DC_FAIL_DP_LINK_TRAINING;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
 		fec_enable = true;
 
 	dp_set_fec_enable(link, fec_enable);
+#endif
 
 	// during mode set we do DP_SET_POWER off then on, aux writes are lost
 	if (link->dpcd_sink_ext_caps.bits.oled == 1 ||
@@ -2289,11 +2293,13 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 		else
 			dp_disable_link_phy_mst(link, signal);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_is_dp_sst_signal(signal) ||
 				link->mst_stream_alloc_table.stream_count == 0) {
 			dp_set_fec_enable(link, false);
 			dp_set_fec_ready(link, false);
 		}
+#endif
 	} else {
 		if (signal != SIGNAL_TYPE_VIRTUAL)
 			link->link_enc->funcs->disable_output(link->link_enc, signal);
@@ -2669,7 +2675,7 @@ bool dc_link_set_psr_allow_active(struct dc_link *link, bool allow_active,
 		return false;
 
 	link->psr_settings.psr_allow_active = allow_active;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (!allow_active)
 		dc_z10_restore(dc);
 #endif
@@ -2850,7 +2856,7 @@ bool dc_link_setup_psr(struct dc_link *link,
 	psr_context->psr_level.u32all = 0;
 
 	/*skip power down the single pipe since it blocks the cstate*/
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (link->ctx->asic_id.chip_family >= FAMILY_RV) {
 		psr_context->psr_level.bits.SKIP_CRTC_DISABLE = true;
 		if (link->ctx->asic_id.chip_family == FAMILY_YELLOW_CARP && !dc->debug.disable_z10)
@@ -3199,7 +3205,7 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 		/*stream_enc_inst*/
 		config.dig_fe = (uint8_t) pipe_ctx->stream_res.stream_enc->stream_enc_inst;
 		config.dig_be = pipe_ctx->stream->link->link_enc_hw_inst;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		config.stream_enc_idx = pipe_ctx->stream_res.stream_enc->id - ENGINE_ID_DIGA;
 		config.link_enc_idx = pipe_ctx->stream->link->link_enc->transmitter - TRANSMITTER_UNIPHY_A;
 		config.phy_idx = pipe_ctx->stream->link->link_enc->transmitter - TRANSMITTER_UNIPHY_A;
@@ -3221,7 +3227,7 @@ void core_link_enable_stream(
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_status status;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum otg_out_mux_dest otg_out_dest = OUT_MUX_DIO;
 #endif
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
@@ -3257,7 +3263,7 @@ void core_link_enable_stream(
 
 	pipe_ctx->stream->link->link_state_valid = true;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (pipe_ctx->stream_res.tg->funcs->set_out_mux)
 		pipe_ctx->stream_res.tg->funcs->set_out_mux(pipe_ctx->stream_res.tg, otg_out_dest);
 #endif
@@ -3326,11 +3332,13 @@ void core_link_enable_stream(
 		 * will be automatically set at a later time when the video is enabled
 		 * (DP_VID_STREAM_EN = 1).
 		 */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 					dc_is_virtual_signal(pipe_ctx->stream->signal))
 				dp_set_dsc_enable(pipe_ctx, true);
 		}
+#endif
 
 		status = enable_link(state, pipe_ctx);
 
@@ -3368,6 +3376,7 @@ void core_link_enable_stream(
 
 		dc->hwss.enable_stream(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* Set DPS PPS SDP (AKA "info frames") */
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
@@ -3376,6 +3385,7 @@ void core_link_enable_stream(
 				dp_set_dsc_pps_sdp(pipe_ctx, true);
 			}
 		}
+#endif
 
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_link_allocate_mst_payload(pipe_ctx);
@@ -3394,12 +3404,15 @@ void core_link_enable_stream(
 
 		dc->hwss.enable_audio_stream(pipe_ctx);
 
-	} else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
+	} 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT	
+	else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
 
 	}
+#endif
 
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
 		core_link_set_avmute(pipe_ctx, false);
@@ -3460,10 +3473,12 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 
 	dc->hwss.disable_stream(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, false);
 	}
+#endif
 }
 
 void core_link_set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
@@ -3527,12 +3542,14 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC)
 		return dc_dsc_stream_bandwidth_in_kbps(timing,
 				timing->dsc_cfg.bits_per_pixel,
 				timing->dsc_cfg.num_slices_h,
 				timing->dsc_cfg.is_dp);
+#endif
 #endif
 
 	switch (timing->display_color_depth) {
@@ -3698,6 +3715,7 @@ uint32_t dc_link_bandwidth_kbps(
 	link_bw_kbps *= 8;   /* 8 bits per byte*/
 	link_bw_kbps *= link_setting->lane_count;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (dc_link_should_enable_fec(link)) {
 		/* Account for FEC overhead.
 		 * We have to do it based on caps,
@@ -3722,6 +3740,7 @@ uint32_t dc_link_bandwidth_kbps(
 		long long fec_link_bw_kbps = link_bw_kbps * 970LL;
 		link_bw_kbps = (uint32_t)(div64_s64(fec_link_bw_kbps, 1000LL));
 	}
+#endif
 
 	return link_bw_kbps;
 
@@ -3742,6 +3761,7 @@ void dc_link_overwrite_extended_receiver_cap(
 	dp_overwrite_extended_receiver_cap(link);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dc_link_is_fec_supported(const struct dc_link *link)
 {
 	struct link_encoder *link_enc = NULL;
@@ -3781,3 +3801,4 @@ bool dc_link_should_enable_fec(const struct dc_link *link)
 
 	return ret;
 }
+#endif

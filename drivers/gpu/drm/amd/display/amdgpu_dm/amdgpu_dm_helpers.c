@@ -581,6 +581,7 @@ bool dm_helpers_submit_i2c(
 
 	return result;
 }
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
@@ -609,6 +610,7 @@ bool dm_helpers_dp_write_dsc_enable(
 
 	return (ret > 0);
 }
+#endif
 
 bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 {

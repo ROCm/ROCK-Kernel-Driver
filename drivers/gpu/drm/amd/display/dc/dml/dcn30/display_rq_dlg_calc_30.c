@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 
 #include "../display_mode_lib.h"
 #include "../display_mode_vba.h"

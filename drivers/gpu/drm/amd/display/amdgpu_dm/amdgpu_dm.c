@@ -89,7 +89,7 @@
 #include <drm/drm_hdcp.h>
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "ivsrcid/dcn/irqsrcs_dcn_1_0.h"
 
 #include "dcn/dcn_1_0_offset.h"
@@ -106,20 +106,26 @@
 
 #define FIRMWARE_RENOIR_DMUB "amdgpu/renoir_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_RENOIR_DMUB);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FIRMWARE_SIENNA_CICHLID_DMUB "amdgpu/sienna_cichlid_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_SIENNA_CICHLID_DMUB);
 #define FIRMWARE_NAVY_FLOUNDER_DMUB "amdgpu/navy_flounder_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_NAVY_FLOUNDER_DMUB);
+#endif
 #define FIRMWARE_GREEN_SARDINE_DMUB "amdgpu/green_sardine_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_GREEN_SARDINE_DMUB);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FIRMWARE_VANGOGH_DMUB "amdgpu/vangogh_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_VANGOGH_DMUB);
 #define FIRMWARE_DIMGREY_CAVEFISH_DMUB "amdgpu/dimgrey_cavefish_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_DIMGREY_CAVEFISH_DMUB);
 #define FIRMWARE_BEIGE_GOBY_DMUB "amdgpu/beige_goby_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_BEIGE_GOBY_DMUB);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FIRMWARE_YELLOW_CARP_DMUB "amdgpu/yellow_carp_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_YELLOW_CARP_DMUB);
+#endif
 
 #define FIRMWARE_RAVEN_DMCU		"amdgpu/raven_dmcu.bin"
 MODULE_FIRMWARE(FIRMWARE_RAVEN_DMCU);
@@ -630,7 +636,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 /**
  * dm_dcn_vertical_interrupt0_high_irq() - Handles OTG Vertical interrupt0 for
@@ -1035,7 +1041,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	return 0;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_addr_space_config *pa_config)
 {
 	uint64_t pt_base;
@@ -1089,7 +1095,7 @@ static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_
 
 }
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static void event_mall_stutter(struct work_struct *work)
 {
 
@@ -1151,7 +1157,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_init(&adev->dm.audio_lock);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	spin_lock_init(&adev->dm.vblank_lock);
 #endif
 
@@ -1189,15 +1195,17 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	case CHIP_RAVEN:
 	case CHIP_RENOIR:
 		init_data.flags.gpu_vm_support = true;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 			init_data.flags.disable_dmcu = true;
 #endif
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_VANGOGH:
 	case CHIP_YELLOW_CARP:
 		init_data.flags.gpu_vm_support = true;
 		break;
+#endif
 	default:
 		break;
 	}
@@ -1252,7 +1260,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	dc_hardware_init(adev->dm.dc);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	if (adev->apu_flags) {
 		struct dc_phy_addr_space_config pa_config;
 
@@ -1273,7 +1281,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	amdgpu_dm_init_color_mod();
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->dm.dc->caps.max_links > 0) {
 		adev->dm.vblank_workqueue = vblank_create_workqueue(adev, adev->dm.dc);
 
@@ -1454,12 +1462,14 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_RENOIR:
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
 	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
 	case CHIP_VANGOGH:
 	case CHIP_YELLOW_CARP:
+#endif
 		return 0;
 	case CHIP_NAVI12:
 		fw_name_dmcu = FIRMWARE_NAVI12_DMCU;
@@ -1555,11 +1565,12 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	case CHIP_RENOIR:
 		dmub_asic = DMUB_ASIC_DCN21;
 		fw_name_dmub = FIRMWARE_RENOIR_DMUB;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 			fw_name_dmub = FIRMWARE_GREEN_SARDINE_DMUB;
 #endif
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_SIENNA_CICHLID:
 		dmub_asic = DMUB_ASIC_DCN30;
 		fw_name_dmub = FIRMWARE_SIENNA_CICHLID_DMUB;
@@ -1584,7 +1595,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		dmub_asic = DMUB_ASIC_DCN31;
 		fw_name_dmub = FIRMWARE_YELLOW_CARP_DMUB;
 		break;
-
+#endif
 	default:
 		/* ASIC doesn't support DMUB. */
 		return 0;
@@ -2061,7 +2072,7 @@ static int dm_suspend(void *handle)
 	if (amdgpu_in_reset(adev)) {
 		mutex_lock(&dm->dc_lock);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		dc_allow_idle_optimizations(adev->dm.dc, false);
 #endif
 
@@ -2309,7 +2320,7 @@ static int dm_resume(void *handle)
 					= 0xffffffff;
 			}
 		}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		/*
 		 * Resource allocation happens for link encoders for newer ASIC in
 		 * dc_validate_global_state, so we need to revalidate it.
@@ -3250,7 +3261,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	return 0;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 /* Register IRQ sources and initialize IRQ callbacks */
 static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 {
@@ -4095,18 +4106,22 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			goto fail;
 		}
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case CHIP_RAVEN:
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case CHIP_NAVI12:
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_RENOIR:
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
 	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
 	case CHIP_VANGOGH:
 	case CHIP_YELLOW_CARP:
+#endif
 		if (dcn10_register_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
 			goto fail;
@@ -4392,28 +4407,39 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case CHIP_RAVEN:
-	case CHIP_RENOIR:
-	case CHIP_VANGOGH:
 		adev->mode_info.num_crtc = 4;
 		adev->mode_info.num_hpd = 4;
 		adev->mode_info.num_dig = 4;
 		break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case CHIP_NAVI10:
 	case CHIP_NAVI12:
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
+#endif
 		adev->mode_info.num_crtc = 6;
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	case CHIP_VANGOGH:
+                adev->mode_info.num_crtc = 4;
+                adev->mode_info.num_hpd = 4;
+                adev->mode_info.num_dig = 4;
+                break;
 	case CHIP_YELLOW_CARP:
 		adev->mode_info.num_crtc = 4;
 		adev->mode_info.num_hpd = 4;
 		adev->mode_info.num_dig = 4;
 		break;
+#endif
 	case CHIP_NAVI14:
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_DIMGREY_CAVEFISH:
 		adev->mode_info.num_crtc = 5;
 		adev->mode_info.num_hpd = 5;
@@ -4424,6 +4450,13 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_hpd = 2;
 		adev->mode_info.num_dig = 2;
 		break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
+        case CHIP_RENOIR:
+                adev->mode_info.num_crtc = 4;
+                adev->mode_info.num_hpd = 4;
+                adev->mode_info.num_dig = 4;
+                break;
 #endif
 	default:
 		DRM_ERROR("Unsupported ASIC type: 0x%X\n", adev->asic_type);
@@ -4654,6 +4687,7 @@ fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
 	tiling_info->gfx9.num_rb_per_se =
 		adev->gfx.config.gb_addr_config_fields.num_rb_per_se;
 	tiling_info->gfx9.shaderEnable = 1;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	if (adev->asic_type == CHIP_SIENNA_CICHLID ||
 	    adev->asic_type == CHIP_NAVY_FLOUNDER ||
 	    adev->asic_type == CHIP_DIMGREY_CAVEFISH ||
@@ -4661,6 +4695,7 @@ fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
 	    adev->asic_type == CHIP_YELLOW_CARP ||
 	    adev->asic_type == CHIP_VANGOGH)
 		tiling_info->gfx9.num_pkrs = adev->gfx.config.gb_addr_config_fields.num_pkrs;
+#endif
 }
 
 static int
@@ -6135,7 +6170,8 @@ static void dm_enable_per_frame_crtc_master_sync(struct dc_state *context)
 	}
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 							struct dc_sink *sink, struct dc_stream_state *stream,
 							struct dsc_dec_dpcd_caps *dsc_caps)
@@ -6190,6 +6226,7 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_bits_per_pixel)
 		stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
 }
+#endif
 #endif
 
 /**
@@ -6322,8 +6359,10 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	bool scale = dm_state ? (dm_state->scaling != RMX_OFF) : false;
 	int mode_refresh;
 	int preferred_refresh = 0;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_dec_dpcd_caps dsc_caps;
+#endif
 #endif
 	struct dc_sink *sink = NULL;
 
@@ -6415,11 +6454,13 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			stream, &mode, &aconnector->base, con_state, old_stream,
 			requested_bpc);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* SST DSC determination policy */
 	update_dsc_caps(aconnector, sink, stream, &dsc_caps);
 	if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported)
 		apply_dsc_policy_for_stream(aconnector, sink, stream, &dsc_caps);
+#endif
 #endif
 
 	update_stream_scaling_settings(&mode, dm_state, stream);
@@ -6675,7 +6716,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct amdgpu_display_manager *dm = &adev->dm;
 	unsigned long flags;
 #endif
@@ -6701,7 +6742,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	if (amdgpu_in_reset(adev))
 		return 0;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	spin_lock_irqsave(&dm->vblank_lock, flags);
 	dm->vblank_workqueue->dm = dm;
 	dm->vblank_workqueue->otg_inst = acrtc->otg_inst;
@@ -11702,9 +11743,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (ret)
 			goto fail;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT) && \
+        defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (!compute_mst_dsc_configs_for_state(state, dm_state->context))
 			goto fail;
+
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context);

@@ -48,7 +48,7 @@
 #include "link_encoder.h"
 #include "link_hwss.h"
 #include "dc_link_dp.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #include "dccg.h"
 #endif
 #include "clock_source.h"
@@ -1339,7 +1339,7 @@ static void program_scaler(const struct dc *dc,
 {
 	struct tg_color color = {0};
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* TOFPGA */
 	if (pipe_ctx->plane_res.xfm->funcs->transform_set_pixel_storage_depth == NULL)
 		return;
@@ -1438,7 +1438,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct drr_params params = {0};
 	unsigned int event_triggers = 0;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct pipe_ctx *odm_pipe = pipe_ctx->next_odm_pipe;
+#endif
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (hws->funcs.disable_stream_gating) {
@@ -1509,6 +1511,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		pipe_ctx->stream_res.opp,
 		&stream->bit_depth_params,
 		&stream->clamping);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	while (odm_pipe) {
 		odm_pipe->stream_res.opp->funcs->opp_set_dyn_expansion(
 				odm_pipe->stream_res.opp,
@@ -1522,6 +1525,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 				&stream->clamping);
 		odm_pipe = odm_pipe->next_odm_pipe;
 	}
+#endif
 
 	if (!stream->dpms_off)
 		core_link_enable_stream(context, pipe_ctx);
@@ -2113,7 +2117,7 @@ static void dce110_setup_audio_dto(
 
 			build_audio_output(context, pipe_ctx, &audio_output);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 			/* For DCN3.1, audio to HPO FRL encoder is using audio DTBCLK DTO */
 			if (dc->res_pool->dccg && dc->res_pool->dccg->funcs->set_audio_dtbclk_dto) {
 				/* disable audio DTBCLK DTO */

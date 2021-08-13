@@ -166,12 +166,15 @@ struct dcn_optc_registers {
 	uint32_t OTG_CRC0_WINDOWB_X_CONTROL;
 	uint32_t OTG_CRC0_WINDOWB_Y_CONTROL;
 	uint32_t GSL_SOURCE_SELECT;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	uint32_t DWB_SOURCE_SELECT;
 	uint32_t OTG_DSC_START_POSITION;
 	uint32_t OPTC_DATA_FORMAT_CONTROL;
 	uint32_t OPTC_BYTES_PER_PIXEL;
 	uint32_t OPTC_WIDTH_CONTROL;
+#endif
 	uint32_t OTG_DRR_CONTROL;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t OTG_BLANK_DATA_COLOR;
 	uint32_t OTG_BLANK_DATA_COLOR_EXT;
 	uint32_t OTG_DRR_TRIGGER_WINDOW;
@@ -179,6 +182,7 @@ struct dcn_optc_registers {
 	uint32_t OTG_M_CONST_DTO1;
 	uint32_t OTG_DRR_V_TOTAL_CHANGE;
 	uint32_t OTG_GLOBAL_CONTROL4;
+#endif
 };
 
 #define TG_COMMON_MASK_SH_LIST_DCN(mask_sh)\
@@ -478,6 +482,8 @@ struct dcn_optc_registers {
 	type MANUAL_FLOW_CONTROL;\
 	type MANUAL_FLOW_CONTROL_SEL;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+
 #define TG_REG_FIELD_LIST(type) \
 	TG_REG_FIELD_LIST_DCN1_0(type)\
 	type OTG_V_SYNC_MODE;\
@@ -520,6 +526,38 @@ struct dcn_optc_registers {
 	type OTG_CRC_DATA_STREAM_SPLIT_MODE;\
 	type OTG_CRC_DATA_FORMAT;\
 	type OTG_V_TOTAL_LAST_USED_BY_DRR;
+
+#elif defined(CONFIG_DRM_AMD_DC_DCN2_x)
+#define TG_REG_FIELD_LIST(type) \
+        TG_REG_FIELD_LIST_DCN1_0(type)\
+        type MASTER_UPDATE_LOCK_DB_X;\
+        type MASTER_UPDATE_LOCK_DB_Y;\
+        type MASTER_UPDATE_LOCK_DB_EN;\
+        type GLOBAL_UPDATE_LOCK_EN;\
+        type DIG_UPDATE_LOCATION;\
+        type OTG_DSC_START_POSITION_X;\
+        type OTG_DSC_START_POSITION_LINE_NUM;\
+        type OPTC_NUM_OF_INPUT_SEGMENT;\
+        type OPTC_SEG0_SRC_SEL;\
+        type OPTC_SEG1_SRC_SEL;\
+        type OPTC_MEM_SEL;\
+        type OPTC_DATA_FORMAT;\
+        type OPTC_DSC_MODE;\
+        type OPTC_DSC_BYTES_PER_PIXEL;\
+        type OPTC_DSC_SLICE_WIDTH;\
+        type OPTC_SEGMENT_WIDTH;\
+        type OPTC_DWB0_SOURCE_SELECT;\
+        type OPTC_DWB1_SOURCE_SELECT;\
+        type OTG_CRC_DSC_MODE;\
+        type OTG_CRC_DATA_STREAM_COMBINE_MODE;\
+        type OTG_CRC_DATA_STREAM_SPLIT_MODE;\
+        type OTG_CRC_DATA_FORMAT;
+#else
+
+#define TG_REG_FIELD_LIST(type) \
+        TG_REG_FIELD_LIST_DCN1_0(type)
+
+#endif
 
 
 struct dcn_optc_shift {

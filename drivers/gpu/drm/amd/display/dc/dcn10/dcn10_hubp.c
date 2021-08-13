@@ -308,6 +308,7 @@ void hubp1_program_pixel_format(
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 12);
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case SURFACE_PIXEL_FORMAT_GRPH_RGB111110_FIX:
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 112);
@@ -328,6 +329,8 @@ void hubp1_program_pixel_format(
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 119);
 		break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case SURFACE_PIXEL_FORMAT_GRPH_RGBE:
 		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 116,
@@ -338,6 +341,7 @@ void hubp1_program_pixel_format(
 				SURFACE_PIXEL_FORMAT, 116,
 				ALPHA_PLANE_EN, 1);
 		break;
+#endif
 	default:
 		BREAK_TO_DEBUGGER();
 		break;
@@ -1340,8 +1344,10 @@ static const struct hubp_funcs dcn10_hubp_funcs = {
 	.hubp_get_underflow_status = hubp1_get_underflow_status,
 	.hubp_init = hubp1_init,
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	.dmdata_set_attributes = NULL,
 	.dmdata_load = NULL,
+#endif
 	.hubp_soft_reset = hubp1_soft_reset,
 	.hubp_in_blank = hubp1_in_blank,
 	.hubp_set_flip_int = hubp1_set_flip_int,

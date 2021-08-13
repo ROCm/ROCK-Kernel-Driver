@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 
 #ifndef __DML2_DISPLAY_MODE_VBA_H__
 #define __DML2_DISPLAY_MODE_VBA_H__
@@ -39,10 +40,12 @@ dml_get_attr_decl(wm_memory_trip);
 dml_get_attr_decl(wm_writeback_urgent);
 dml_get_attr_decl(wm_stutter_exit);
 dml_get_attr_decl(wm_stutter_enter_exit);
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 dml_get_attr_decl(wm_z8_stutter_exit);
 dml_get_attr_decl(wm_z8_stutter_enter_exit);
 dml_get_attr_decl(stutter_efficiency_z8);
 dml_get_attr_decl(stutter_num_bursts_z8);
+#endif
 dml_get_attr_decl(wm_dram_clock_change);
 dml_get_attr_decl(wm_writeback_dram_clock_change);
 dml_get_attr_decl(stutter_efficiency_no_vblank);
@@ -106,8 +109,10 @@ dml_get_pipe_attr_decl(vstartup);
 dml_get_pipe_attr_decl(vupdate_offset);
 dml_get_pipe_attr_decl(vupdate_width);
 dml_get_pipe_attr_decl(vready_offset);
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 dml_get_pipe_attr_decl(vready_at_or_after_vsync);
 dml_get_pipe_attr_decl(min_dst_y_next_start);
+#endif
 
 double get_total_immediate_flip_bytes(
 		struct display_mode_lib *mode_lib,
@@ -926,9 +931,12 @@ struct vba_vars_st {
 	double BPP;
 	enum odm_combine_policy ODMCombinePolicy;
 	bool UseMinimumRequiredDCFCLK;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool ClampMinDCFCLK;
+#endif
 	bool AllowDramClockChangeOneDisplayVactive;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	double MaxAveragePercentOfIdealFabricAndSDPPortBWDisplayCanUseInNormalSystemOperation;
 	double PercentOfIdealFabricAndSDPPortBWReceivedAfterUrgLatency;
 	double PercentOfIdealDRAMBWReceivedAfterUrgLatencyPixelMixedWithVMData;
@@ -969,6 +977,7 @@ struct vba_vars_st {
 	int Z8NumberOfStutterBurstsPerFrame;
 	unsigned int MaximumDSCBitsPerComponent;
 	unsigned int NotEnoughUrgentLatencyHidingA[DC__VOLTAGE_STATES][2];
+#endif
 };
 
 bool CalculateMinAndMaxPrefetchMode(
@@ -990,3 +999,4 @@ double CalculateWriteBackDISPCLK(
 		unsigned int WritebackChromaLineBufferWidth);
 
 #endif /* _DML2_DISPLAY_MODE_VBA_H_ */
+#endif

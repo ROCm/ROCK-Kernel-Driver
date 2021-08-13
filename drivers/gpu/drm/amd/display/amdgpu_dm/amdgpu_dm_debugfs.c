@@ -1115,6 +1115,7 @@ static ssize_t dp_dpcd_data_read(struct file *f, char __user *buf,
  *	cat /sys/kernel/debug/dri/0/DP-X/dp_dsc_fec_support
  *
  */
+ #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static int dp_dsc_fec_support_show(struct seq_file *m, void *data)
 {
 	struct drm_connector *connector = m->private;
@@ -1170,6 +1171,7 @@ static int dp_dsc_fec_support_show(struct seq_file *m, void *data)
 
 	return ret;
 }
+#endif
 
 /* function: Trigger virtual HPD redetection on connector
  *
@@ -1290,6 +1292,7 @@ unlock:
  * 1 - means that DSC is currently enabled
  * 0 - means that DSC is disabled
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static ssize_t dp_dsc_clock_en_read(struct file *f, char __user *buf,
 				    size_t size, loff_t *pos)
 {
@@ -2276,7 +2279,7 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 	kfree(rd_buf);
 	return result;
 }
-
+#endif
 
 /*
  * function description: Read max_requested_bpc property from the connector
@@ -2458,7 +2461,9 @@ static int target_backlight_show(struct seq_file *m, void *unused)
 	return 0;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
+#endif
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
 DEFINE_SHOW_ATTRIBUTE(output_bpc);
@@ -2470,6 +2475,7 @@ DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 #endif
 DEFINE_SHOW_ATTRIBUTE(internal_display);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static const struct file_operations dp_dsc_clock_en_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.read = dp_dsc_clock_en_read,
@@ -2521,6 +2527,7 @@ static const struct file_operations dp_dsc_slice_bpg_offset_debugfs_fops = {
 	.read = dp_dsc_slice_bpg_offset_read,
 	.llseek = default_llseek
 };
+#endif
 
 static const struct file_operations trigger_hotplug_debugfs_fops = {
 	.owner = THIS_MODULE,
@@ -2602,6 +2609,9 @@ static const struct {
 		{"sdp_message", &sdp_message_fops},
 		{"aux_dpcd_address", &dp_dpcd_address_debugfs_fops},
 		{"aux_dpcd_size", &dp_dpcd_size_debugfs_fops},
+#ifndef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
+#else
 		{"aux_dpcd_data", &dp_dpcd_data_debugfs_fops},
 		{"dsc_clock_en", &dp_dsc_clock_en_debugfs_fops},
 		{"dsc_slice_width", &dp_dsc_slice_width_debugfs_fops},
@@ -2614,6 +2624,7 @@ static const struct {
 		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
 		{"max_bpc", &dp_max_bpc_debugfs_fops},
 		{"dsc_disable_passthrough", &dp_dsc_disable_passthrough_debugfs_fops},
+#endif
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP

@@ -74,7 +74,7 @@ CLK_MGR_DCE120 = dce120_clk_mgr.o
 AMD_DAL_CLK_MGR_DCE120 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dce120/,$(CLK_MGR_DCE120))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCE120)
-ifdef CONFIG_DRM_AMD_DC_DCN
+ifdef CONFIG_DRM_AMD_DC_DCN1_0
 ###############################################################################
 # DCN10
 ###############################################################################
@@ -83,7 +83,8 @@ CLK_MGR_DCN10 = rv1_clk_mgr.o rv1_clk_mgr_vbios_smu.o rv2_clk_mgr.o
 AMD_DAL_CLK_MGR_DCN10 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn10/,$(CLK_MGR_DCN10))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN10)
-
+endif
+ifdef CONFIG_DRM_AMD_DC_DCN2_x
 ###############################################################################
 # DCN20
 ###############################################################################
@@ -107,6 +108,8 @@ endif
 AMD_DAL_CLK_MGR_DCN21 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn21/,$(CLK_MGR_DCN21))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN21)
+endif
+ifdef CONFIG_DRM_AMD_DC_DCN3_x
 ###############################################################################
 # DCN30
 ###############################################################################
@@ -135,7 +138,8 @@ endif
 AMD_DAL_CLK_MGR_DCN301 = $(addprefix $(AMDDALPATH)/dc/clk_mgr/dcn301/,$(CLK_MGR_DCN301))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_CLK_MGR_DCN301)
-
+endif
+ifdef CONFIG_DRM_AMD_DC_DCN3_x
 ###############################################################################
 # DCN31
 ###############################################################################

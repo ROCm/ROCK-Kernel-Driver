@@ -32,7 +32,9 @@
 #include "dcn20_resource.h"
 #include "dcn20_hwseq.h"
 #include "dce/dce_hwseq.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dcn20_dsc.h"
+#endif
 #include "dcn20_optc.h"
 #include "abm.h"
 #include "clk_mgr.h"
@@ -336,6 +338,7 @@ void dcn20_init_blank(
 	hws->funcs.wait_for_blank_complete(opp);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn20_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -412,6 +415,7 @@ void dcn20_dsc_pg_control(
 	if (org_ip_request_cntl == 0)
 		REG_SET(DC_IP_REQUEST_CNTL, 0, IP_REQUEST_EN, 0);
 }
+#endif
 
 void dcn20_dpp_pg_control(
 		struct dce_hwseq *hws,
@@ -620,6 +624,7 @@ void dcn20_disable_plane(struct dc *dc, struct pipe_ctx *pipe_ctx)
 					pipe_ctx->pipe_idx);
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static int calc_mpc_flow_ctrl_cnt(const struct dc_stream_state *stream,
 		int opp_cnt)
 {
@@ -642,6 +647,7 @@ static int calc_mpc_flow_ctrl_cnt(const struct dc_stream_state *stream,
 
 	return flow_ctrl_cnt;
 }
+#endif
 
 enum dc_status dcn20_enable_stream_timing(
 		struct pipe_ctx *pipe_ctx,
@@ -655,11 +661,14 @@ enum dc_status dcn20_enable_stream_timing(
 	struct pipe_ctx *odm_pipe;
 	int opp_cnt = 1;
 	int opp_inst[MAX_PIPES] = { pipe_ctx->stream_res.opp->inst };
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool interlace = stream->timing.flags.INTERLACE;
 	int i;
 	struct mpc_dwb_flow_control flow_control;
 	struct mpc *mpc = dc->res_pool->mpc;
 	bool rate_control_2x_pclk = (interlace || optc2_is_two_pixels_per_containter(&stream->timing));
+#endif
 
 	/* by upper caller loop, pipe0 is parent pipe and be called first.
 	 * back end is set up by for pipe0. Other children pipe share back end
@@ -707,6 +716,7 @@ enum dc_status dcn20_enable_stream_timing(
 			pipe_ctx->stream->signal,
 			true);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	rate_control_2x_pclk = rate_control_2x_pclk || opp_cnt > 1;
 	flow_control.flow_ctrl_mode = 0;
 	flow_control.flow_ctrl_cnt0 = 0x80;
@@ -720,6 +730,7 @@ enum dc_status dcn20_enable_stream_timing(
 					&flow_control);
 		}
 	}
+#endif
 
 	for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
 		odm_pipe->stream_res.opp->funcs->opp_pipe_clock_control(
@@ -1278,7 +1289,9 @@ static void dcn20_detect_pipe_changes(struct pipe_ctx *old_pipe, struct pipe_ctx
 		new_pipe->update_flags.bits.gamut_remap = 1;
 		new_pipe->update_flags.bits.scaler = 1;
 		new_pipe->update_flags.bits.viewport = 1;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		new_pipe->update_flags.bits.det_size = 1;
+#endif
 		if (!new_pipe->top_pipe && !new_pipe->prev_odm_pipe) {
 			new_pipe->update_flags.bits.odm = 1;
 			new_pipe->update_flags.bits.global_sync = 1;
@@ -1313,9 +1326,10 @@ static void dcn20_detect_pipe_changes(struct pipe_ctx *old_pipe, struct pipe_ctx
 			new_pipe->update_flags.bits.global_sync = 1;
 	}
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (old_pipe->det_buffer_size_kb != new_pipe->det_buffer_size_kb)
 		new_pipe->update_flags.bits.det_size = 1;
-
+#endif
 	/*
 	 * Detect opp / tg change, only set on change, not on enable
 	 * Assume mpcc inst = pipe index, if not this code needs to be updated
@@ -1431,9 +1445,10 @@ static void dcn20_update_dchubp_dpp(
 			&pipe_ctx->ttu_regs,
 			&pipe_ctx->rq_regs,
 			&pipe_ctx->pipe_dlg_param);
-
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (hubp->funcs->set_unbounded_requesting)
 			hubp->funcs->set_unbounded_requesting(hubp, pipe_ctx->unbounded_req);
+#endif
 	}
 	if (pipe_ctx->update_flags.bits.hubp_interdependent)
 		hubp->funcs->hubp_setup_interdependent(
@@ -1613,9 +1628,11 @@ static void dcn20_program_pipe(
 			dc->res_pool->hubbub->funcs->force_wm_propagate_to_pipes(dc->res_pool->hubbub);
 	}
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dc->res_pool->hubbub->funcs->program_det_size && pipe_ctx->update_flags.bits.det_size)
 		dc->res_pool->hubbub->funcs->program_det_size(
 			dc->res_pool->hubbub, pipe_ctx->plane_res.hubp->inst, pipe_ctx->det_buffer_size_kb);
+#endif
 
 	if (pipe_ctx->update_flags.raw || pipe_ctx->plane_state->update_flags.raw || pipe_ctx->stream->update_flags.raw)
 		dcn20_update_dchubp_dpp(dc, pipe_ctx, context);
@@ -1707,10 +1724,13 @@ void dcn20_program_front_end_for_ctx(
 	for (i = 0; i < dc->res_pool->pipe_count; i++)
 		if (context->res_ctx.pipe_ctx[i].update_flags.bits.disable
 				|| context->res_ctx.pipe_ctx[i].update_flags.bits.opp_changed) {
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			struct hubbub *hubbub = dc->res_pool->hubbub;
 
 			if (hubbub->funcs->program_det_size && context->res_ctx.pipe_ctx[i].update_flags.bits.disable)
 				hubbub->funcs->program_det_size(hubbub, dc->current_state->res_ctx.pipe_ctx[i].plane_res.hubp->inst, 0);
+#endif
 			hws->funcs.plane_atomic_disconnect(dc, &dc->current_state->res_ctx.pipe_ctx[i]);
 			DC_LOG_DC("Reset mpcc for pipe %d\n", dc->current_state->res_ctx.pipe_ctx[i].pipe_idx);
 		}
@@ -1828,9 +1848,11 @@ void dcn20_prepare_bandwidth(
 					&context->bw_ctx.bw.dcn.watermarks,
 					dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
 					false);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* decrease compbuf size */
 	if (hubbub->funcs->program_compbuf_size)
 		hubbub->funcs->program_compbuf_size(hubbub, context->bw_ctx.bw.dcn.compbuf_size_kb, false);
+#endif
 }
 
 void dcn20_optimize_bandwidth(
@@ -1849,9 +1871,11 @@ void dcn20_optimize_bandwidth(
 			dc->clk_mgr,
 			context,
 			true);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* increase compbuf size */
 	if (hubbub->funcs->program_compbuf_size)
 		hubbub->funcs->program_compbuf_size(hubbub, context->bw_ctx.bw.dcn.compbuf_size_kb, true);
+#endif
 }
 
 bool dcn20_update_bandwidth(
@@ -1979,6 +2003,7 @@ bool dcn20_dmdata_status_done(struct pipe_ctx *pipe_ctx)
 
 void dcn20_disable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (pipe_ctx->stream_res.dsc) {
@@ -1990,10 +2015,12 @@ void dcn20_disable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 			odm_pipe = odm_pipe->next_odm_pipe;
 		}
 	}
+#endif
 }
 
 void dcn20_enable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (pipe_ctx->stream_res.dsc) {
@@ -2005,6 +2032,7 @@ void dcn20_enable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 			odm_pipe = odm_pipe->next_odm_pipe;
 		}
 	}
+#endif
 }
 
 void dcn20_set_dmdata_attributes(struct pipe_ctx *pipe_ctx)
@@ -2207,9 +2235,11 @@ static void dcn20_reset_back_end_for_pipe(
 			}
 		}
 	}
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	else if (pipe_ctx->stream_res.dsc) {
 		dp_set_dsc_enable(pipe_ctx, false);
 	}
+#endif
 
 	/* by upper caller loop, parent pipe: pipe0, will be reset last.
 	 * back end share by all pipes and will be disable only when disable
@@ -2322,9 +2352,11 @@ void dcn20_update_mpcc(struct dc *dc, struct pipe_ctx *pipe_ctx)
 	blnd_cfg.bottom_inside_gain = 0x1f000;
 	blnd_cfg.bottom_outside_gain = 0x1f000;
 	blnd_cfg.pre_multiplied_alpha = per_pixel_alpha;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (pipe_ctx->plane_state->format
 			== SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA)
 		blnd_cfg.pre_multiplied_alpha = false;
+#endif
 
 	/*
 	 * TODO: remove hack
@@ -2558,8 +2590,10 @@ void dcn20_fpga_init_hw(struct dc *dc)
 		tg->funcs->tg_init(tg);
 	}
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dc->res_pool->hubbub->funcs->init_crb)
 		dc->res_pool->hubbub->funcs->init_crb(dc->res_pool->hubbub);
+#endif
 }
 #ifndef TRIM_FSFT
 bool dcn20_optimize_timing_for_fsft(struct dc *dc,

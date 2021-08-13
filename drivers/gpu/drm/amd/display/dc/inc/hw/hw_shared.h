@@ -37,7 +37,9 @@
 #define MAX_AUDIOS 7
 #define MAX_PIPES 6
 #define MAX_DIG_LINK_ENCODERS 7
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define MAX_DWB_PIPES	1
+#endif
 
 struct gamma_curve {
 	uint32_t offset;
@@ -80,6 +82,7 @@ struct pwl_result_data {
 	uint32_t delta_blue_reg;
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dc_rgb {
 	uint32_t red;
 	uint32_t green;
@@ -108,6 +111,7 @@ struct tetrahedral_params {
 	bool use_12bits;
 
 };
+#endif
 
 /* arr_curve_points - regamma regions/segments specification
  * arr_points - beginning and end point specified separately (only one on DCE)
@@ -151,12 +155,14 @@ enum ipp_degamma_mode {
 	IPP_DEGAMMA_MODE_USER_PWL
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum gamcor_mode {
 	GAMCOR_MODE_BYPASS,
 	GAMCOR_MODE_RESERVED_1,
 	GAMCOR_MODE_USER_PWL,
 	GAMCOR_MODE_RESERVED_3
 };
+#endif
 
 enum ipp_output_format {
 	IPP_OUTPUT_FORMAT_12_BIT_FIX,
@@ -199,11 +205,13 @@ enum opp_regamma {
 	OPP_REGAMMA_USER
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum optc_dsc_mode {
 	OPTC_DSC_DISABLED = 0,
 	OPTC_DSC_ENABLED_444 = 1, /* 'RGB 444' or 'Simple YCbCr 4:2:2' (4:2:2 upsampled to 4:4:4) */
 	OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED = 2 /* Native 4:2:2 or 4:2:0 */
 };
+#endif
 
 struct dc_bias_and_scale {
 	uint16_t scale_red;
@@ -226,8 +234,12 @@ enum test_pattern_mode {
 	TEST_PATTERN_MODE_VERTICALBARS,
 	TEST_PATTERN_MODE_HORIZONTALBARS,
 	TEST_PATTERN_MODE_SINGLERAMP_RGB,
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	TEST_PATTERN_MODE_DUALRAMP_RGB,
 	TEST_PATTERN_MODE_XR_BIAS_RGB
+#else
+	TEST_PATTERN_MODE_DUALRAMP_RGB
+#endif
 };
 
 enum test_pattern_color_format {

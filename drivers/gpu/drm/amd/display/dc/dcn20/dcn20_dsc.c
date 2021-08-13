@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "reg_helper.h"
 #include "dcn20_dsc.h"
 #include "dsc/dscc_types.h"
@@ -724,3 +725,4 @@ static void dsc_write_to_registers(struct display_stream_compressor *dsc, const 
 
 }
 
+#endif

@@ -276,8 +276,10 @@ struct mpll_cfg {
 	bool dp_tx1_vergdrv_byp;
 	bool dp_tx2_vergdrv_byp;
 	bool dp_tx3_vergdrv_byp;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t tx_peaking_lvl;
 	uint32_t ctr_reqs_pll;
+#endif
 
 
 };
@@ -340,7 +342,9 @@ void enc2_fec_set_ready(struct link_encoder *enc, bool ready);
 bool enc2_fec_is_active(struct link_encoder *enc);
 void enc2_hw_init(struct link_encoder *enc);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void link_enc2_read_state(struct link_encoder *enc, struct link_enc_state *s);
+#endif
 
 void dcn20_link_encoder_enable_dp_output(
 	struct link_encoder *enc,

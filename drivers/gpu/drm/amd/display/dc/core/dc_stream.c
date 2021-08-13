@@ -106,6 +106,7 @@ static bool dc_stream_construct(struct dc_stream_state *stream,
 	/* EDID CAP translation for HDMI 2.0 */
 	stream->timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	memset(&stream->timing.dsc_cfg, 0, sizeof(stream->timing.dsc_cfg));
 	stream->timing.dsc_cfg.num_slices_h = 0;
 	stream->timing.dsc_cfg.num_slices_v = 0;
@@ -114,6 +115,7 @@ static bool dc_stream_construct(struct dc_stream_state *stream,
 	stream->timing.dsc_cfg.linebuf_depth = 9;
 	stream->timing.dsc_cfg.version_minor = 2;
 	stream->timing.dsc_cfg.ycbcr422_simple = 0;
+#endif
 
 	update_stream_signal(stream, dc_sink_data);
 
@@ -274,7 +276,7 @@ bool dc_stream_set_cursor_attributes(
 	struct dc  *dc;
 	struct resource_context *res_ctx;
 	struct pipe_ctx *pipe_to_program = NULL;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -296,7 +298,7 @@ bool dc_stream_set_cursor_attributes(
 	res_ctx = &dc->current_state->res_ctx;
 	stream->cursor_attributes = *attributes;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 	/* disable idle optimizations while updating cursor */
 	if (dc->idle_optimizations_allowed) {
@@ -325,7 +327,7 @@ bool dc_stream_set_cursor_attributes(
 	if (pipe_to_program)
 		dc->hwss.cursor_lock(dc, pipe_to_program, false);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
@@ -342,7 +344,7 @@ bool dc_stream_set_cursor_position(
 	struct dc  *dc;
 	struct resource_context *res_ctx;
 	struct pipe_ctx *pipe_to_program = NULL;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -358,7 +360,7 @@ bool dc_stream_set_cursor_position(
 
 	dc = stream->ctx->dc;
 	res_ctx = &dc->current_state->res_ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 
 	/* disable idle optimizations if enabling cursor */
@@ -391,7 +393,7 @@ bool dc_stream_set_cursor_position(
 	if (pipe_to_program)
 		dc->hwss.cursor_lock(dc, pipe_to_program, false);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
@@ -400,6 +402,7 @@ bool dc_stream_set_cursor_position(
 	return true;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 bool dc_stream_add_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		struct dc_writeback_info *wb_info)
@@ -528,6 +531,8 @@ bool dc_stream_warmup_writeback(struct dc *dc,
 	else
 		return false;
 }
+#endif
+
 uint32_t dc_stream_get_vblank_counter(const struct dc_stream_state *stream)
 {
 	uint8_t i;
@@ -613,6 +618,7 @@ bool dc_stream_get_scanoutpos(const struct dc_stream_state *stream,
 	return ret;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 bool dc_stream_dmdata_status_done(struct dc *dc, struct dc_stream_state *stream)
 {
 	struct pipe_ctx *pipe = NULL;
@@ -673,7 +679,9 @@ bool dc_stream_set_dynamic_metadata(struct dc *dc,
 
 	return true;
 }
+#endif
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
 		struct dc_state *state,
 		struct dc_stream_state *stream)
@@ -684,6 +692,7 @@ enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
 		return DC_NO_DSC_RESOURCE;
 	}
 }
+#endif
 
 void dc_stream_log(const struct dc *dc, const struct dc_stream_state *stream)
 {

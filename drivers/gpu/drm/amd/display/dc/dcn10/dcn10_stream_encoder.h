@@ -169,18 +169,22 @@ struct dcn10_stream_enc_registers {
 	uint32_t DP_MSA_TIMING_PARAM3;
 	uint32_t DP_MSA_TIMING_PARAM4;
 	uint32_t HDMI_DB_CONTROL;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	uint32_t DP_DSC_CNTL;
 	uint32_t DP_DSC_BYTES_PER_PIXEL;
 	uint32_t DME_CONTROL;
 	uint32_t DP_SEC_METADATA_TRANSMISSION;
 	uint32_t HDMI_METADATA_PACKET_CONTROL;
 	uint32_t DP_SEC_FRAMING4;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t DP_GSP11_CNTL;
 	uint32_t HDMI_GENERIC_PACKET_CONTROL6;
 	uint32_t HDMI_GENERIC_PACKET_CONTROL7;
 	uint32_t HDMI_GENERIC_PACKET_CONTROL8;
 	uint32_t HDMI_GENERIC_PACKET_CONTROL9;
 	uint32_t HDMI_GENERIC_PACKET_CONTROL10;
+#endif
 	uint32_t DIG_CLOCK_PATTERN;
 };
 
@@ -514,6 +518,7 @@ struct dcn10_stream_enc_registers {
 	type DIG_FIFO_FORCE_RECOMP_MINMAX;\
 	type DIG_CLOCK_PATTERN
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define SE_REG_FIELD_LIST_DCN2_0(type) \
 	type DP_DSC_MODE;\
 	type DP_DSC_SLICE_WIDTH;\
@@ -532,7 +537,9 @@ struct dcn10_stream_enc_registers {
 	type DOLBY_VISION_EN;\
 	type DP_PIXEL_COMBINE;\
 	type DP_SST_SDP_SPLITTING
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define SE_REG_FIELD_LIST_DCN3_0(type) \
 	type HDMI_GENERIC8_CONT;\
 	type HDMI_GENERIC8_SEND;\
@@ -558,17 +565,26 @@ struct dcn10_stream_enc_registers {
 	type DP_SEC_GSP11_PPS;\
 	type DP_SEC_GSP11_ENABLE;\
 	type DP_SEC_GSP11_LINE_NUM
+#endif
 
 struct dcn10_stream_encoder_shift {
 	SE_REG_FIELD_LIST_DCN1_0(uint8_t);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	SE_REG_FIELD_LIST_DCN2_0(uint8_t);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	SE_REG_FIELD_LIST_DCN3_0(uint8_t);
+#endif
 };
 
 struct dcn10_stream_encoder_mask {
 	SE_REG_FIELD_LIST_DCN1_0(uint32_t);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	SE_REG_FIELD_LIST_DCN2_0(uint32_t);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	SE_REG_FIELD_LIST_DCN3_0(uint32_t);
+#endif
 };
 
 struct dcn10_stream_encoder {

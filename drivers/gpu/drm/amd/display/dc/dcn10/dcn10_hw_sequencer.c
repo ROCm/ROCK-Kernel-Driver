@@ -50,7 +50,9 @@
 #include "clk_mgr.h"
 #include "link_hwss.h"
 #include "dpcd_defs.h"
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
+#endif
 #include "dce/dmub_hw_lock_mgr.h"
 #include "dc_trace.h"
 #include "dce/dmub_outbox.h"
@@ -352,6 +354,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		/*
 		 * For DCN2 and greater, a register on the OPP is used to
 		 * determine if the CRTC is blanked instead of the OTG. So use
@@ -363,6 +366,9 @@ void dcn10_log_hw_state(struct dc *dc,
 			s.blank_enabled = pool->opps[i]->funcs->dpg_is_blanked(pool->opps[i]);
 		else
 			s.blank_enabled = tg->funcs->is_blanked(tg);
+#else
+		s.blank_enabled = tg->funcs->is_blanked(tg);
+#endif
 
 		//only print if OTG master is enabled
 		if ((s.otg_enabled & 1) == 0)
@@ -397,6 +403,7 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	// dcn_dsc_state struct field bytes_per_pixel was renamed to bits_per_pixel
 	// TODO: Update golden log header to reflect this name change
 	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
@@ -453,6 +460,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		}
 	}
 	DTN_INFO("\n");
+#endif
 
 	DTN_INFO("\nCALCULATED Clocks: dcfclk_khz:%d  dcfclk_deep_sleep_khz:%d  dispclk_khz:%d\n"
 		"dppclk_khz:%d  max_supported_dppclk_khz:%d  fclk_khz:%d  socclk_khz:%d\n\n",
@@ -737,13 +745,17 @@ static void apply_DEGVIDCN10_253_wa(struct dc *dc)
 
 void dcn10_bios_golden_init(struct dc *dc)
 {
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dce_hwseq *hws = dc->hwseq;
+#endif
 	struct dc_bios *bp = dc->ctx->dc_bios;
 	int i;
 	bool allow_self_fresh_force_enable = true;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	if (hws->funcs.s0i3_golden_init_wa && hws->funcs.s0i3_golden_init_wa(dc))
 		return;
+#endif
 
 	if (dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled)
 		allow_self_fresh_force_enable =
@@ -1386,11 +1398,13 @@ void dcn10_init_hw(struct dc *dc)
 	}
 
 	/* Power gate DSCs */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (!is_optimized_init_done) {
 		for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 			if (hws->funcs.dsc_pg_control != NULL)
 				hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
 	}
+#endif
 
 	/* Enable outbox notification feature of dmub */
 	if (dc->debug.enable_dmub_aux_for_legacy_ddc)
@@ -2130,7 +2144,7 @@ void dcn10_enable_timing_synchronization(
 	struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
 	int i, width, height;
@@ -2140,7 +2154,7 @@ void dcn10_enable_timing_synchronization(
 
 	DC_SYNC_INFO("Setting up OTG reset trigger\n");
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2172,7 +2186,7 @@ void dcn10_enable_timing_synchronization(
 		grouped_pipes[i]->stream_res.tg->funcs->disable_reset_trigger(
 				grouped_pipes[i]->stream_res.tg);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2426,8 +2440,12 @@ static void dcn10_update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 			plane_state->color_space,
 			NULL);
+#else
+			plane_state->color_space);
+#endif
 
 	//set scale and bias registers
 	build_prescale_params(&bns_params, plane_state);

@@ -156,6 +156,7 @@ void optc2_set_gsl_source_select(
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* DSC encoder frame start controls: x = h position, line_num = # of lines from vstartup */
 void optc2_set_dsc_encoder_frame_start(struct timing_generator *optc,
 					int x_position,
@@ -189,6 +190,7 @@ void optc2_set_dsc_config(struct timing_generator *optc,
 	REG_UPDATE(OPTC_WIDTH_CONTROL,
 		OPTC_DSC_SLICE_WIDTH, dsc_slice_width);
 }
+#endif
 
 /*TEMP: Need to figure out inheritance model here.*/
 bool optc2_is_two_pixels_per_containter(const struct dc_crtc_timing *timing)
@@ -513,9 +515,14 @@ bool optc2_configure_crc(struct timing_generator *optc,
 {
 	struct optc *optc1 = DCN10TG_FROM_TG(optc);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	REG_SET_2(OTG_CRC_CNTL2, 0,
 			OTG_CRC_DSC_MODE, params->dsc_mode,
 			OTG_CRC_DATA_STREAM_COMBINE_MODE, params->odm_mode);
+#else
+        REG_SET(OTG_CRC_CNTL2, 0,
+                        OTG_CRC_DATA_STREAM_COMBINE_MODE, params->odm_mode);
+#endif
 
 	return optc1_configure_crc(optc, params);
 }
@@ -573,7 +580,9 @@ static struct timing_generator_funcs dcn20_tg_funcs = {
 		.setup_global_swap_lock = NULL,
 		.get_crc = optc1_get_crc,
 		.configure_crc = optc2_configure_crc,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.set_dsc_config = optc2_set_dsc_config,
+#endif
 		.set_dwb_source = optc2_set_dwb_source,
 		.set_odm_bypass = optc2_set_odm_bypass,
 		.set_odm_combine = optc2_set_odm_combine,

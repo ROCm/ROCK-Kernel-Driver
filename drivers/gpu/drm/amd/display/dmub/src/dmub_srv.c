@@ -27,11 +27,13 @@
 #include "dmub_dcn20.h"
 #include "dmub_dcn21.h"
 #include "dmub_cmd.h"
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #include "dmub_dcn30.h"
 #include "dmub_dcn301.h"
 #include "dmub_dcn302.h"
 #include "dmub_dcn303.h"
 #include "dmub_dcn31.h"
+#endif
 #include "os_types.h"
 /*
  * Note: the DMUB service is standalone. No additional headers should be
@@ -141,10 +143,12 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 	switch (asic) {
 	case DMUB_ASIC_DCN20:
 	case DMUB_ASIC_DCN21:
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case DMUB_ASIC_DCN30:
 	case DMUB_ASIC_DCN301:
 	case DMUB_ASIC_DCN302:
 	case DMUB_ASIC_DCN303:
+#endif
 		dmub->regs = &dmub_srv_dcn20_regs;
 
 		funcs->reset = dmub_dcn20_reset;
@@ -181,6 +185,7 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 
 			funcs->is_phy_init = dmub_dcn21_is_phy_init;
 		}
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (asic == DMUB_ASIC_DCN30) {
 			dmub->regs = &dmub_srv_dcn30_regs;
 
@@ -205,8 +210,10 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 			funcs->backdoor_load = dmub_dcn30_backdoor_load;
 			funcs->setup_windows = dmub_dcn30_setup_windows;
 		}
+#endif
 		break;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case DMUB_ASIC_DCN31:
 		dmub->regs_dcn31 = &dmub_srv_dcn31_regs;
 		funcs->reset = dmub_dcn31_reset;
@@ -238,7 +245,7 @@ static bool dmub_srv_hw_setup(struct dmub_srv *dmub, enum dmub_asic asic)
 		funcs->get_current_time = dmub_dcn31_get_current_time;
 
 		break;
-
+#endif
 	default:
 		return false;
 	}

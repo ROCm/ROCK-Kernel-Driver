@@ -136,7 +136,7 @@ static void dce110_update_generic_info_packet(
 			AFMT_GENERIC0_UPDATE, (packet_index == 0),
 			AFMT_GENERIC2_UPDATE, (packet_index == 2));
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (REG(AFMT_VBI_PACKET_CONTROL1)) {
 		switch (packet_index) {
 		case 0:
@@ -230,7 +230,7 @@ static void dce110_update_hdmi_info_packet(
 				HDMI_GENERIC1_SEND, send,
 				HDMI_GENERIC1_LINE, line);
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case 4:
 		if (REG(HDMI_GENERIC_PACKET_CONTROL2))
 			REG_UPDATE_3(HDMI_GENERIC_PACKET_CONTROL2,
@@ -277,7 +277,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 	bool use_vsc_sdp_for_colorimetry,
 	uint32_t enable_sdp_splitting)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	uint32_t h_active_start;
 	uint32_t v_active_start;
 	uint32_t misc0 = 0;
@@ -329,7 +329,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 		if (enc110->se_mask->DP_VID_M_DOUBLE_VALUE_EN)
 			REG_UPDATE(DP_VID_TIMING, DP_VID_M_DOUBLE_VALUE_EN, 1);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (enc110->se_mask->DP_VID_N_MUL)
 			REG_UPDATE(DP_VID_TIMING, DP_VID_N_MUL, 1);
 #endif
@@ -340,7 +340,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 		break;
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (REG(DP_MSA_MISC))
 		misc1 = REG_READ(DP_MSA_MISC);
 #endif
@@ -374,7 +374,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 	/* set dynamic range and YCbCr range */
 
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	switch (hw_crtc_timing.display_color_depth) {
 	case COLOR_DEPTH_666:
 		colorimetry_bpc = 0;
@@ -454,7 +454,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 				DP_DYN_RANGE, dynamic_range_rgb,
 				DP_YCBCR_RANGE, dynamic_range_ycbcr);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (REG(DP_MSA_COLORIMETRY))
 			REG_SET(DP_MSA_COLORIMETRY, 0, DP_MSA_MISC0, misc0);
 
@@ -489,7 +489,7 @@ static void dce110_stream_encoder_dp_set_stream_attribute(
 				hw_crtc_timing.v_front_porch;
 
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		/* start at begining of left border */
 		if (REG(DP_MSA_TIMING_PARAM2))
 			REG_SET_2(DP_MSA_TIMING_PARAM2, 0,
@@ -787,7 +787,7 @@ static void dce110_stream_encoder_update_hdmi_info_packets(
 		dce110_update_hdmi_info_packet(enc110, 3, &info_frame->hdrsmd);
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (enc110->se_mask->HDMI_DB_DISABLE) {
 		/* for bring up, disable dp double  TODO */
 		if (REG(HDMI_DB_CONTROL))
@@ -825,7 +825,7 @@ static void dce110_stream_encoder_stop_hdmi_info_packets(
 		HDMI_GENERIC1_LINE, 0,
 		HDMI_GENERIC1_SEND, 0);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* stop generic packets 2 & 3 on HDMI */
 	if (REG(HDMI_GENERIC_PACKET_CONTROL2))
 		REG_SET_6(HDMI_GENERIC_PACKET_CONTROL2, 0,

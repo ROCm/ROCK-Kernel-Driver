@@ -37,6 +37,7 @@ struct dp_mst_stream_allocation_table;
 struct aux_payload;
 enum aux_return_code_type;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 /*
  * Allocate memory accessible by the GPU
  *
@@ -57,6 +58,7 @@ void dm_helpers_free_gpu_mem(
 		struct dc_context *ctx,
 		enum dc_gpu_mem_alloc_type type,
 		void *pvMem);
+#endif
 
 enum dc_edid_status dm_helpers_parse_edid_caps(
 	struct dc_context *ctx,
@@ -141,11 +143,14 @@ bool dm_helpers_submit_i2c(
 		const struct dc_link *link,
 		struct i2c_command *cmd);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
 		bool enable
 );
+#endif
+
 bool dm_helpers_is_dp_sink_present(
 		struct dc_link *link);
 

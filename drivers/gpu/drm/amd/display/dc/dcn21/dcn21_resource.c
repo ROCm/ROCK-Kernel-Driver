@@ -97,7 +97,11 @@ struct _vcs_dpi_ip_params_st dcn2_1_ip = {
 	.gpuvm_max_page_table_levels = 1,
 	.hostvm_max_page_table_levels = 4,
 	.hostvm_cached_page_table_levels = 2,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 3,
+#else
+	.num_dsc = 0,
+#endif
 	.rob_buffer_size_kbytes = 168,
 	.det_buffer_size_kbytes = 164,
 	.dpte_buffer_size_in_pte_reqs_luma = 44,
@@ -584,6 +588,7 @@ static const struct dcn20_vmid_mask vmid_masks = {
 		DCN20_VMID_MASK_SH_LIST(_MASK)
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = {\
 	DSC_REG_LIST_DCN20(id)\
@@ -605,6 +610,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
+#endif
 
 #define ipp_regs(id)\
 [id] = {\
@@ -807,7 +813,9 @@ static const struct resource_caps res_cap_rn = {
 		.num_dwb = 1,
 		.num_ddc = 5,
 		.num_vmid = 16,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 3,
+#endif
 };
 
 #ifdef DIAGS_BUILD
@@ -832,7 +840,9 @@ static const struct resource_caps res_cap_rn_FPGA_2pipe_dsc = {
 		.num_pll = 4,
 		.num_dwb = 1,
 		.num_ddc = 4,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 2,
+#endif
 };
 #endif
 
@@ -924,10 +934,12 @@ static void dcn21_resource_destruct(struct dcn21_resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
+#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1053,9 +1065,11 @@ static void calculate_wm_set_for_vlevel(
 	wm_set->cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(dml, pipes, pipe_cnt) * 1000;
 	wm_set->cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(dml, pipes, pipe_cnt) * 1000;
 	wm_set->pte_meta_urgent_ns = get_wm_memory_trip(dml, pipes, pipe_cnt) * 1000;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	wm_set->frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(dml, pipes, pipe_cnt) * 1000;
 	wm_set->frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(dml, pipes, pipe_cnt) * 1000;
 	wm_set->urgent_latency_ns = get_urgent_latency(dml, pipes, pipe_cnt) * 1000;
+#endif
 	dml->soc.dram_clock_change_latency_us = dram_clock_change_latency_cached;
 
 }
@@ -1308,12 +1322,15 @@ static bool dcn21_fast_validate_bw(
 			ASSERT(0);
 		}
 	}
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		context->bw_ctx.dml.vba.ValidationStatus[context->bw_ctx.dml.vba.soc.num_states] =
 				DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
+#endif
 
 	*vlevel_out = vlevel;
 
@@ -1542,6 +1559,8 @@ static void read_dce_straps(
 }
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+
 struct display_stream_compressor *dcn21_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
 {
@@ -1556,6 +1575,7 @@ struct display_stream_compressor *dcn21_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
+#endif
 
 static struct _vcs_dpi_voltage_scaling_st construct_low_pstate_lvl(struct clk_limit_table *clk_table, unsigned int high_voltage_lvl)
 {
@@ -1934,7 +1954,9 @@ static const struct resource_funcs dcn21_res_pool_funcs = {
 	.validate_bandwidth = dcn21_validate_bandwidth,
 	.populate_dml_pipes = dcn21_populate_dml_pipes_from_context,
 	.add_stream_to_ctx = dcn20_add_stream_to_ctx,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
+#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 	.populate_dml_writeback_from_context = dcn20_populate_dml_writeback_from_context,
@@ -2224,6 +2246,7 @@ static bool dcn21_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn21_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -2232,6 +2255,7 @@ static bool dcn21_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	if (!dcn20_dwbc_create(ctx, &pool->base)) {
 		BREAK_TO_DEBUGGER();

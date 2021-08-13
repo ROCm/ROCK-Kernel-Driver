@@ -477,6 +477,7 @@ enum display_content_type {
 	DISPLAY_CONTENT_TYPE_GAME = 8
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum cm_gamut_adjust_type {
 	CM_GAMUT_ADJUST_TYPE_BYPASS = 0,
 	CM_GAMUT_ADJUST_TYPE_HW, /* without adjustments */
@@ -488,7 +489,10 @@ struct cm_grph_csc_adjustment {
 	enum cm_gamut_adjust_type gamut_adjust_type;
 	enum cm_gamut_coef_format gamut_coef_format;
 };
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x) || \
+        defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /* writeback */
 struct dwb_stereo_params {
 	bool				stereo_enabled;		/* false: normal mode, true: 3D stereo */
@@ -506,17 +510,21 @@ struct dc_dwb_cnv_params {
 	unsigned int		crop_x;		/* cropped window start x value at cnv output */
 	unsigned int		crop_y;		/* cropped window start y value at cnv output */
 	enum dwb_cnv_out_bpc cnv_out_bpc;	/* cnv output pixel depth - 8bpc or 10bpc */
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum dwb_out_format	fc_out_format;	/* dwb output pixel format - 2101010 or 16161616 and ARGB or RGBA */
 	enum dwb_out_denorm	out_denorm_mode;/* dwb output denormalization mode */
 	unsigned int		out_max_pix_val;/* pixel values greater than out_max_pix_val are clamped to out_max_pix_val */
 	unsigned int		out_min_pix_val;/* pixel values less than out_min_pix_val are clamped to out_min_pix_val */
+#endif
 };
 
 struct dc_dwb_params {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	unsigned int			dwbscl_black_color; /* must be in FP1.5.10 */
 	unsigned int			hdr_mult;	/* must be in FP1.6.12 */
 	struct cm_grph_csc_adjustment	csc_params;
 	struct dwb_stereo_params	stereo_params;
+#endif
 	struct dc_dwb_cnv_params	cnv_params;	/* CNV source size and cropping window parameters */
 	unsigned int			dest_width;	/* Destination width */
 	unsigned int			dest_height;	/* Destination height */
@@ -527,6 +535,7 @@ struct dc_dwb_params {
 	enum dwb_subsample_position	subsample_position;
 	struct dc_transfer_func *out_transfer_func;
 };
+#endif
 
 /* audio*/
 
@@ -638,7 +647,9 @@ enum dc_infoframe_type {
 	DC_HDMI_INFOFRAME_TYPE_AVI = 0x82,
 	DC_HDMI_INFOFRAME_TYPE_SPD = 0x83,
 	DC_HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	DC_DP_INFOFRAME_TYPE_PPS = 0x10,
+#endif
 };
 
 struct dc_info_packet {
@@ -836,6 +847,7 @@ struct dc_clock_config {
 	uint32_t current_clock_khz;/*current clock in use*/
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* DSC DPCD capabilities */
 union dsc_slice_caps1 {
 	struct {
@@ -906,6 +918,7 @@ struct dsc_dec_dpcd_caps {
 	uint32_t branch_max_line_width;
 	bool is_dp;
 };
+#endif
 
 struct dc_golden_table {
 	uint16_t dc_golden_table_ver;
@@ -920,12 +933,14 @@ struct dc_golden_table {
 	uint32_t dc_gpio_aux_ctrl_5_val;
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dc_gpu_mem_alloc_type {
 	DC_MEM_ALLOC_TYPE_GART,
 	DC_MEM_ALLOC_TYPE_FRAME_BUFFER,
 	DC_MEM_ALLOC_TYPE_INVISIBLE_FRAME_BUFFER,
 	DC_MEM_ALLOC_TYPE_AGP
 };
+#endif
 
 enum dc_psr_version {
 	DC_PSR_VERSION_1			= 0,

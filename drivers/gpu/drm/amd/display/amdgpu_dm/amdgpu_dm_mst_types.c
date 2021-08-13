@@ -43,8 +43,10 @@
 #include "amdgpu_dm_debugfs.h"
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dc/dcn20/dcn20_resource.h"
+#endif
 #endif
 
 static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
@@ -192,7 +194,7 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
@@ -224,6 +226,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	if (drm_dp_dpcd_read(aconnector->dsc_aux, DP_DSC_SUPPORT, dsc_caps, 16) < 0)
 		return false;
 
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	if (drm_dp_dpcd_read(aconnector->dsc_aux,
 			DP_DSC_BRANCH_OVERALL_THROUGHPUT_0, dsc_branch_dec_caps_raw, 3) == 3)
 		dsc_branch_dec_caps = dsc_branch_dec_caps_raw;
@@ -232,6 +235,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 				  dsc_caps, dsc_branch_dec_caps,
 				  &dc_sink->dsc_caps.dsc_dec_caps))
 		return false;
+#endif
 
 	return true;
 }

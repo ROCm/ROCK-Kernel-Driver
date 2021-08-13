@@ -284,6 +284,7 @@ struct ext_hdmi_settings {
 	struct i2c_reg_info      reg_settings_6g[3];
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct edp_info {
 	uint16_t edp_backlight_pwm_hz;
 	uint16_t edp_ss_percentage;
@@ -294,6 +295,7 @@ struct edp_info {
 	uint8_t  edp_panel_bpc;
 	uint8_t  edp_bootup_bl_level;
 };
+#endif
 
 /* V6 */
 struct integrated_info {
@@ -413,9 +415,11 @@ struct integrated_info {
 	struct i2c_reg_info dp3_ext_hdmi_6g_reg_settings[3];
 	/* V11 */
 	uint32_t dp_ss_control;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* V2.1 */
 	struct edp_info edp1_info;
 	struct edp_info edp2_info;
+#endif
 };
 
 /**

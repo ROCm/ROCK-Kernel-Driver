@@ -1,4 +1,4 @@
-
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
  *
@@ -347,3 +347,4 @@ u32 calc_dsc_bytes_per_pixel(const struct drm_dsc_config *pps)
 	DC_FP_END();
 	return ret;
 }
+#endif

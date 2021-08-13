@@ -32,7 +32,11 @@
 #define MAX_MPCC 6
 #define MAX_OPP 6
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define MAX_DWB		2
+#elif defined(CONFIG_DRM_AMD_DC_DCN2_x)
+#define MAX_DWB		1
+#endif
 
 enum mpc_output_csc_mode {
 	MPC_OUTPUT_CSC_DISABLE = 0,
@@ -65,18 +69,22 @@ struct mpcc_blnd_cfg {
 	int global_alpha;
 	bool overlap_only;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* MPCC top/bottom gain settings */
 	int bottom_gain_mode;
 	int background_color_bpc;
 	int top_gain;
 	int bottom_inside_gain;
 	int bottom_outside_gain;
+#endif
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct mpc_grph_gamut_adjustment {
 	struct fixed31_32 temperature_matrix[CSC_TEMPERATURE_MATRIX_SIZE];
 	enum graphics_gamut_adjust_type gamut_adjust_type;
 };
+#endif
 
 struct mpcc_sm_cfg {
 	bool enable;
@@ -92,6 +100,7 @@ struct mpcc_sm_cfg {
 	int force_next_field_polarity;
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct mpc_denorm_clamp {
 	int clamp_max_r_cr;
 	int clamp_min_r_cr;
@@ -100,12 +109,15 @@ struct mpc_denorm_clamp {
 	int clamp_max_b_cb;
 	int clamp_min_b_cb;
 };
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct mpc_dwb_flow_control {
 	int flow_ctrl_mode;
 	int flow_ctrl_cnt0;
 	int flow_ctrl_cnt1;
 };
+#endif
 
 /*
  * MPCC connection and blending configuration for a single MPCC instance.
@@ -117,7 +129,9 @@ struct mpcc {
 	struct mpcc *mpcc_bot;		/* pointer to bottom layer MPCC.  NULL when not connected */
 	struct mpcc_blnd_cfg blnd_cfg;	/* The blending configuration for this MPCC */
 	struct mpcc_sm_cfg sm_cfg;	/* stereo mix setting for this MPCC */
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool shared_bottom;		/* TRUE if MPCC output to both OPP and DWB endpoints, else FALSE */
+#endif
 };
 
 /*
@@ -133,8 +147,10 @@ struct mpc {
 	struct dc_context *ctx;
 
 	struct mpcc mpcc_array[MAX_MPCC];
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct pwl_params blender_params;
 	bool cm_bypass_mode;
+#endif
 };
 
 struct mpcc_state {
@@ -239,6 +255,7 @@ struct mpc_funcs {
 			int opp_id,
 			bool lock);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/*
 	 * Add DPP into 'secondary' MPC tree based on specified blending position.
 	 * Only used for planes that are part of blending chain for DWB output
@@ -281,6 +298,8 @@ struct mpc_funcs {
 	struct mpcc* (*get_mpcc_for_dpp_from_secondary)(
 			struct mpc_tree *tree,
 			int dpp_id);
+#endif
+
 	struct mpcc* (*get_mpcc_for_dpp)(
 			struct mpc_tree *tree,
 			int dpp_id);
@@ -293,6 +312,7 @@ struct mpc_funcs {
 		struct mpc *mpc,
 		struct mpc_tree *tree);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void (*set_denorm)(struct mpc *mpc,
 			int opp_id,
 			enum dc_color_depth output_depth);
@@ -320,6 +340,8 @@ struct mpc_funcs {
 			struct mpc *mpc,
 			int mpcc_id,
 			bool power_on);
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*set_dwb_mux)(
 			struct mpc *mpc,
 			int dwb_id,
@@ -358,7 +380,7 @@ struct mpc_funcs {
 			int rmu_idx);
 
 	int (*release_rmu)(struct mpc *mpc, int mpcc_id);
-
+#endif
 	unsigned int (*get_mpc_out_mux)(
 			struct mpc *mpc,
 			int opp_id);

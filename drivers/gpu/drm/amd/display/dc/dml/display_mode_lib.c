@@ -25,18 +25,23 @@
 
 #include "display_mode_lib.h"
 #include "dc_features.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #include "dcn20/display_mode_vba_20.h"
 #include "dcn20/display_rq_dlg_calc_20.h"
 #include "dcn20/display_mode_vba_20v2.h"
 #include "dcn20/display_rq_dlg_calc_20v2.h"
 #include "dcn21/display_mode_vba_21.h"
 #include "dcn21/display_rq_dlg_calc_21.h"
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #include "dcn30/display_mode_vba_30.h"
 #include "dcn30/display_rq_dlg_calc_30.h"
+#include "dml_logger.h"
 #include "dcn31/display_mode_vba_31.h"
 #include "dcn31/display_rq_dlg_calc_31.h"
-#include "dml_logger.h"
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 const struct dml_funcs dml20_funcs = {
 	.validate = dml20_ModeSupportAndSystemConfigurationFull,
 	.recalculate = dml20_recalculate,
@@ -57,7 +62,9 @@ const struct dml_funcs dml21_funcs = {
         .rq_dlg_get_dlg_reg = dml21_rq_dlg_get_dlg_reg,
         .rq_dlg_get_rq_reg = dml21_rq_dlg_get_rq_reg
 };
+#endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 const struct dml_funcs dml30_funcs = {
 	.validate = dml30_ModeSupportAndSystemConfigurationFull,
 	.recalculate = dml30_recalculate,
@@ -71,6 +78,7 @@ const struct dml_funcs dml31_funcs = {
 	.rq_dlg_get_dlg_reg = dml31_rq_dlg_get_dlg_reg,
 	.rq_dlg_get_rq_reg = dml31_rq_dlg_get_rq_reg
 };
+#endif
 
 void dml_init_instance(struct display_mode_lib *lib,
 		const struct _vcs_dpi_soc_bounding_box_st *soc_bb,
@@ -81,6 +89,7 @@ void dml_init_instance(struct display_mode_lib *lib,
 	lib->ip = *ip_params;
 	lib->project = project;
 	switch (project) {
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case DML_PROJECT_NAVI10:
 		lib->funcs = dml20_funcs;
 		break;
@@ -90,6 +99,8 @@ void dml_init_instance(struct display_mode_lib *lib,
         case DML_PROJECT_DCN21:
                 lib->funcs = dml21_funcs;
                 break;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case DML_PROJECT_DCN30:
 		lib->funcs = dml30_funcs;
 		break;
@@ -97,7 +108,7 @@ void dml_init_instance(struct display_mode_lib *lib,
 	case DML_PROJECT_DCN31_FPGA:
 		lib->funcs = dml31_funcs;
 		break;
-
+#endif
 	default:
 		break;
 	}
@@ -131,7 +142,7 @@ const char *dml_get_status_message(enum dm_validation_status status)
 	default:                                  return "Unknown Status";
 	}
 }
-
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dml_log_pipe_params(
 		struct display_mode_lib *mode_lib,
 		display_e2e_pipe_params_st *pipes,
@@ -293,3 +304,4 @@ void dml_log_mode_support_params(struct display_mode_lib *mode_lib)
 		dml_print("DML SUPPORT:     ImmediateFlipSupportedForState      : [%d, %d]\n", mode_lib->vba.ImmediateFlipSupportedForState[i][0], mode_lib->vba.ImmediateFlipSupportedForState[i][1]);
 	}
 }
+#endif

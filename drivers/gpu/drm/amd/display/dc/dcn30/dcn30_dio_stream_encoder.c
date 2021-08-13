@@ -312,6 +312,7 @@ static void enc3_stream_encoder_stop_hdmi_info_packets(
 		HDMI_GENERIC14_LINE, 0);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* Set DSC-related configuration.
  *   dsc_mode: 0 disables DSC, other values enable DSC in specified format
  *   sc_bytes_per_pixel: Bytes per pixel in u3.28 format
@@ -416,6 +417,7 @@ static void enc3_read_state(struct stream_encoder *enc, struct enc_state *s)
 		REG_GET(DP_SEC_CNTL, DP_SEC_STREAM_ENABLE, &s->sec_stream_enable);
 	}
 }
+#endif
 
 static void enc3_stream_encoder_update_dp_info_packets(
 	struct stream_encoder *enc,
@@ -818,9 +820,11 @@ static const struct stream_encoder_funcs dcn30_str_enc_funcs = {
 
 	.dp_get_pixel_format  = enc1_stream_encoder_dp_get_pixel_format,
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.enc_read_state = enc3_read_state,
 	.dp_set_dsc_config = enc3_dp_set_dsc_config,
 	.dp_set_dsc_pps_info_packet = enc3_dp_set_dsc_pps_info_packet,
+#endif
 	.set_dynamic_metadata = enc2_set_dynamic_metadata,
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
 

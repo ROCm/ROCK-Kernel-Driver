@@ -29,17 +29,23 @@
 #include "dc_features.h"
 #include "display_mode_structs.h"
 #include "display_mode_enums.h"
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #include "display_mode_vba.h"
+#endif
 
 enum dml_project {
 	DML_PROJECT_UNDEFINED,
 	DML_PROJECT_RAVEN1,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	DML_PROJECT_NAVI10,
 	DML_PROJECT_NAVI10v2,
 	DML_PROJECT_DCN21,
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	DML_PROJECT_DCN30,
 	DML_PROJECT_DCN31,
 	DML_PROJECT_DCN31_FPGA,
+#endif
 };
 
 struct display_mode_lib;
@@ -69,7 +75,9 @@ struct display_mode_lib {
 	struct _vcs_dpi_ip_params_st ip;
 	struct _vcs_dpi_soc_bounding_box_st soc;
 	enum dml_project project;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct vba_vars_st vba;
+#endif
 	struct dal_logger *logger;
 	struct dml_funcs funcs;
 };
@@ -81,10 +89,12 @@ void dml_init_instance(struct display_mode_lib *lib,
 
 const char *dml_get_status_message(enum dm_validation_status status);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dml_log_pipe_params(
 		struct display_mode_lib *mode_lib,
 		display_e2e_pipe_params_st *pipes,
 		int pipe_cnt);
 
 void dml_log_mode_support_params(struct display_mode_lib *mode_lib);
+#endif  // CONFIG_DRM_AMD_DC_DCN3_x
 #endif

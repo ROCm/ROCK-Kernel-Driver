@@ -918,7 +918,7 @@ static bool dce112_program_pix_clk(
 	struct dce110_clk_src *clk_src = TO_DCE110_CLK_SRC(clock_source);
 	struct bp_pixel_clock_parameters bp_pc_params = {0};
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	if (IS_FPGA_MAXIMUS_DC(clock_source->ctx->dce_environment)) {
 		unsigned int inst = pix_clk_params->controller_id - CONTROLLER_ID_D0;
 		unsigned dp_dto_ref_100hz = 7000000;
@@ -1029,7 +1029,7 @@ static bool get_pixel_clk_frequency_100hz(
 	return false;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /* this table is use to find *1.001 and /1.001 pixel rates from non-precise pixel rate */
 const struct pixel_rate_range_table_entry video_optimized_pixel_rates[] = {
 	// /1.001 rates
@@ -1081,6 +1081,7 @@ const struct pixel_rate_range_table_entry *look_up_in_video_optimized_rate_tlb(
 }
 #endif
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static bool dcn20_program_pix_clk(
 		struct clock_source *clock_source,
 		struct pixel_clk_params *pix_clk_params,
@@ -1125,8 +1126,9 @@ static const struct clock_source_funcs dcn20_clk_src_funcs = {
 	.get_pixel_clk_frequency_100hz = get_pixel_clk_frequency_100hz,
 	.override_dp_pix_clk = dcn20_override_dp_pix_clk
 };
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static bool dcn3_program_pix_clk(
 		struct clock_source *clock_source,
 		struct pixel_clk_params *pix_clk_params,
@@ -1575,6 +1577,7 @@ bool dce112_clk_src_construct(
 	return true;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 bool dcn20_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -1590,8 +1593,9 @@ bool dcn20_clk_src_construct(
 
 	return ret;
 }
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 bool dcn3_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -1607,9 +1611,7 @@ bool dcn3_clk_src_construct(
 
 	return ret;
 }
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 bool dcn301_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,

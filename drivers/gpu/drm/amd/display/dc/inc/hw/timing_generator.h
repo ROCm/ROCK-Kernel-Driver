@@ -98,15 +98,19 @@ enum crc_selection {
 	INTERSECT_WINDOW_NOT_A_NOT_B,
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 enum otg_out_mux_dest {
 	OUT_MUX_DIO = 0,
 };
+#endif
 
 enum h_timing_div_mode {
 	H_TIMING_NO_DIV,
 	H_TIMING_DIV_BY2,
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	H_TIMING_RESERVED,
 	H_TIMING_DIV_BY4,
+#endif
 };
 
 enum timing_synchronization_type {
@@ -129,7 +133,9 @@ struct crc_params {
 
 	enum crc_selection selection;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	uint8_t dsc_mode;
+#endif
 	uint8_t odm_mode;
 
 	bool continuous_mode;
@@ -173,7 +179,11 @@ struct timing_generator_funcs {
 
 	bool (*enable_crtc)(struct timing_generator *tg);
 	bool (*disable_crtc)(struct timing_generator *tg);
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool (*immediate_disable_crtc)(struct timing_generator *tg);
+#endif
+
 	bool (*is_counter_moving)(struct timing_generator *tg);
 	void (*get_position)(struct timing_generator *tg,
 				struct crtc_position *position);
@@ -212,8 +222,10 @@ struct timing_generator_funcs {
 	void (*lock)(struct timing_generator *tg);
 	void (*lock_doublebuffer_disable)(struct timing_generator *tg);
 	void (*lock_doublebuffer_enable)(struct timing_generator *tg);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void(*triplebuffer_unlock)(struct timing_generator *tg);
 	void(*triplebuffer_lock)(struct timing_generator *tg);
+#endif
 	void (*enable_reset_trigger)(struct timing_generator *tg,
 				     int source_tg_inst);
 	void (*enable_crtc_reset)(struct timing_generator *tg,
@@ -253,6 +265,7 @@ struct timing_generator_funcs {
 	bool (*is_optc_underflow_occurred)(struct timing_generator *tg);
 	void (*clear_optc_underflow)(struct timing_generator *tg);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void (*set_dwb_source)(struct timing_generator *optc,
 		uint32_t dwb_pipe_inst);
 
@@ -260,6 +273,7 @@ struct timing_generator_funcs {
 			uint32_t *num_of_input_segments,
 			uint32_t *seg0_src_sel,
 			uint32_t *seg1_src_sel);
+#endif
 
 	/**
 	 * Configure CRCs for the given timing generator. Return false if TG is
@@ -283,10 +297,14 @@ struct timing_generator_funcs {
 	void (*set_vtg_params)(struct timing_generator *optc,
 			const struct dc_crtc_timing *dc_crtc_timing, bool program_fp2);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	void (*set_dsc_config)(struct timing_generator *optc,
 			       enum optc_dsc_mode dsc_mode,
 			       uint32_t dsc_bytes_per_pixel,
 			       uint32_t dsc_slice_width);
+#endif
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*set_odm_bypass)(struct timing_generator *optc, const struct dc_crtc_timing *dc_crtc_timing);
 	void (*set_odm_combine)(struct timing_generator *optc, int *opp_id, int opp_cnt,
 			struct dc_crtc_timing *timing);
@@ -294,6 +312,9 @@ struct timing_generator_funcs {
 	void (*set_gsl_source_select)(struct timing_generator *optc,
 			int group_idx,
 			uint32_t gsl_ready_signal);
+#endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*set_out_mux)(struct timing_generator *tg, enum otg_out_mux_dest dest);
 	void (*set_vrr_m_const)(struct timing_generator *optc,
 			double vtotal_avg);
@@ -301,6 +322,8 @@ struct timing_generator_funcs {
 			uint32_t window_start, uint32_t window_end);
 	void (*set_vtotal_change_limit)(struct timing_generator *optc,
 			uint32_t limit);
+#endif
+
 	void (*align_vblanks)(struct timing_generator *master_optc,
 			struct timing_generator *slave_optc,
 			uint32_t master_pixel_clock_100Hz,

@@ -31,7 +31,9 @@ enum dcc_control {
 	dcc_control__256_256_xxx,
 	dcc_control__128_128_xxx,
 	dcc_control__256_64_64,
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dcc_control__256_128_128,
+#endif
 };
 
 enum segment_order {
@@ -53,6 +55,7 @@ struct dcn_hubbub_wm {
 	struct dcn_hubbub_wm_set sets[4];
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum dcn_hubbub_page_table_depth {
 	DCN_PAGE_TABLE_DEPTH_1_LEVEL,
 	DCN_PAGE_TABLE_DEPTH_2_LEVEL,
@@ -63,7 +66,9 @@ enum dcn_hubbub_page_table_depth {
 enum dcn_hubbub_page_table_block_size {
 	DCN_PAGE_TABLE_BLOCK_SIZE_4KB = 0,
 	DCN_PAGE_TABLE_BLOCK_SIZE_64KB = 4,
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DCN_PAGE_TABLE_BLOCK_SIZE_32KB = 3
+#endif
 };
 
 struct dcn_hubbub_phys_addr_config {
@@ -101,6 +106,7 @@ struct hubbub_addr_config {
 		uint64_t generic_fault;
 	} default_addrs;
 };
+#endif
 
 struct dcn_hubbub_state {
 	uint32_t vm_fault_addr_msb;
@@ -116,6 +122,7 @@ struct hubbub_funcs {
 			struct hubbub *hubbub,
 			struct dchub_init_data *dh_data);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int (*init_dchub_sys_ctx)(
 			struct hubbub *hubbub,
 			struct dcn_hubbub_phys_addr_config *pa_config);
@@ -123,6 +130,7 @@ struct hubbub_funcs {
 			struct hubbub *hubbub,
 			struct dcn_hubbub_virt_addr_config *va_config,
 			int vmid);
+#endif
 
 	bool (*get_dcc_compression_cap)(struct hubbub *hubbub,
 			const struct dc_dcc_surface_param *input,
@@ -158,6 +166,7 @@ struct hubbub_funcs {
 
 	void (*force_wm_propagate_to_pipes)(struct hubbub *hubbub);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*hubbub_read_state)(struct hubbub *hubbub, struct dcn_hubbub_state *hubbub_state);
 
 	void (*force_pstate_change_control)(struct hubbub *hubbub, bool force, bool allow);
@@ -166,6 +175,7 @@ struct hubbub_funcs {
 	void (*program_det_size)(struct hubbub *hubbub, int hubp_inst, unsigned det_buffer_size_in_kbyte);
 	void (*program_compbuf_size)(struct hubbub *hubbub, unsigned compbuf_size_kb, bool safe_to_increase);
 	void (*init_crb)(struct hubbub *hubbub);
+#endif
 	void (*apply_invalidation_req_wa)(struct hubbub *hubbub,
 			struct dcn_hubbub_phys_addr_config *pa_config);
 };
