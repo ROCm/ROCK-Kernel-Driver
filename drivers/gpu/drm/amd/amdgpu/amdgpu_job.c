@@ -255,7 +255,11 @@ static struct dma_fence *amdgpu_job_run(struct drm_sched_job *sched_job)
 
 	if (!job->job_run_counter)
 		dma_fence_get(fence);
+#if !defined(HAVE_DMA_FENCE_SET_ERROR)
+	else if (finished->status <0)
+#else
 	else if (finished->error < 0)
+#endif
 		dma_fence_put(&job->hw_fence);
 	job->job_run_counter++;
 	amdgpu_job_free_resources(job);
