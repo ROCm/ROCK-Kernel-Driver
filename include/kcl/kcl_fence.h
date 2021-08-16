@@ -27,6 +27,7 @@
 #define DMA_FENCE_TRACE FENCE_TRACE
 #define DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT FENCE_FLAG_ENABLE_SIGNAL_BIT
 #define DMA_FENCE_FLAG_SIGNALED_BIT FENCE_FLAG_SIGNALED_BIT
+#define DMA_FENCE_FLAG_USER_BITS FENCE_FLAG_USER_BITS
 #define dma_fence_wait fence_wait
 #define dma_fence_get fence_get
 #define dma_fence_put fence_put
