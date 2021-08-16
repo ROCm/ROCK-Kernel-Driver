@@ -1033,6 +1033,8 @@ struct kfd_process {
 	struct kfd_runtime_info runtime_info;
 
 	atomic_t poison;
+	/* Queues are in paused stated because we are in the process of doing a CRIU checkpoint */
+	bool queues_paused;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
