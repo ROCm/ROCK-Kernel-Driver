@@ -1273,14 +1273,22 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
+	kfree(wr_buf);
+
 	if (param_nums <= 0) {
 		DRM_DEBUG_DRIVER("user data not be read\n");
-		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	mutex_lock(&aconnector->hpd_lock);
+
+	/* Don't support for mst end device*/
+	if (aconnector->mst_port) {
+		mutex_unlock(&aconnector->hpd_lock);
 		return -EINVAL;
 	}
 
 	if (param[0] == 1) {
-		mutex_lock(&aconnector->hpd_lock);
 
 		if (!dc_link_detect_sink(aconnector->dc_link, &new_connection_type) &&
 			new_connection_type != dc_connection_none)
@@ -1321,6 +1329,10 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
+		/* If the aconnector is the root node in mst topology */
+		if (aconnector->mst_mgr.mst_state == true)
+			reset_cur_dp_mst_topology(link);
+
 		drm_modeset_lock_all(dev);
 		dm_restore_drm_connector_state(dev, connector);
 		drm_modeset_unlock_all(dev);
@@ -1335,7 +1347,6 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 unlock:
 	mutex_unlock(&aconnector->hpd_lock);
 
-	kfree(wr_buf);
 	return size;
 }
 
