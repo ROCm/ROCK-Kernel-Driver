@@ -564,26 +564,15 @@ void amdgpu_gfx_off_ctrl(struct amdgpu_device *adev, bool enable)
 
 	mutex_lock(&adev->gfx.gfx_off_mutex);
 
-	if (enable) {
-		/* If the count is already 0, it means there's an imbalance bug somewhere.
-		 * Note that the bug may be in a different caller than the one which triggers the
-		 * WARN_ON_ONCE.
-		 */
-		if (WARN_ON_ONCE(adev->gfx.gfx_off_req_count == 0))
-			goto unlock;
-
-		adev->gfx.gfx_off_req_count--;
-	} else {
+	if (!enable)
 		adev->gfx.gfx_off_req_count++;
-	}
+	else if (adev->gfx.gfx_off_req_count > 0)
+		adev->gfx.gfx_off_req_count--;
 
 	if (enable && !adev->gfx.gfx_off_state && !adev->gfx.gfx_off_req_count) {
 		schedule_delayed_work(&adev->gfx.gfx_off_delay_work, GFX_OFF_DELAY_ENABLE);
-	} else if (!enable && adev->gfx.gfx_off_req_count == 1) {
-		cancel_delayed_work_sync(&adev->gfx.gfx_off_delay_work);
-
-		if (adev->gfx.gfx_off_state &&
-		    !amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_GFX, false)) {
+	} else if (!enable && adev->gfx.gfx_off_state) {
+		if (!amdgpu_dpm_set_powergating_by_smu(adev, AMD_IP_BLOCK_TYPE_GFX, false)) {
 			adev->gfx.gfx_off_state = false;
 
 			if (adev->gfx.funcs->init_spm_golden) {
@@ -593,7 +582,6 @@ void amdgpu_gfx_off_ctrl(struct amdgpu_device *adev, bool enable)
 		}
 	}
 
-unlock:
 	mutex_unlock(&adev->gfx.gfx_off_mutex);
 }
 
