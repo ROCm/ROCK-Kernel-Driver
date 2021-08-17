@@ -29,6 +29,7 @@
 
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
 static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
+					    bool restore_dbg_registers,
 					    uint32_t vmid)
 {
 	uint32_t data = 0;

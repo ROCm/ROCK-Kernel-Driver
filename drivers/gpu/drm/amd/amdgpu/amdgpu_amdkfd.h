@@ -31,6 +31,7 @@
 #include <linux/workqueue.h>
 #include <kgd_kfd_interface.h>
 #include <drm/ttm/ttm_execbuf_util.h>
+#include "amdgpu_gfx.h"
 #include "amdgpu_sync.h"
 #include "amdgpu_vm.h"
 
@@ -239,6 +240,10 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
 					uint32_t *payload);
 int amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(struct kgd_dev *dst, struct kgd_dev *src, bool is_min);
 int amdgpu_amdkfd_get_pcie_bandwidth_mbytes(struct kgd_dev *dev, bool is_min);
+static inline void amdgpu_amdkfd_gfx_off_ctrl(struct kgd_dev *dev, bool enable)
+{
+	amdgpu_gfx_off_ctrl((struct amdgpu_device *)dev, enable);
+}
 
 /* Read user wptr from a specified user address space with page fault
  * disabled. The memory must be pinned and mapped to the hardware when

@@ -1273,7 +1273,7 @@ void amdgpu_uvd_ring_begin_use(struct amdgpu_ring *ring)
 void amdgpu_uvd_ring_end_use(struct amdgpu_ring *ring)
 {
 	if (!amdgpu_sriov_vf(ring->adev))
-		schedule_delayed_work(&ring->adev->uvd.idle_work, UVD_IDLE_TIMEOUT);
+		mod_delayed_work(system_wq, &ring->adev->uvd.idle_work, UVD_IDLE_TIMEOUT);
 }
 
 /**
