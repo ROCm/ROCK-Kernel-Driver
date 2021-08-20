@@ -54,6 +54,12 @@ bool amdgpu_dmabuf_is_xgmi_accessible(struct amdgpu_device *adev,
 struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
 #endif
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
+                          struct vm_area_struct *vma);
+#endif
+
+
 extern const struct dma_buf_ops amdgpu_dmabuf_ops;
 
 #endif
