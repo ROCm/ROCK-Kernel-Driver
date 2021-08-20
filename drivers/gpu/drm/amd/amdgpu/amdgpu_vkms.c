@@ -127,9 +127,11 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 	.reset                  = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state   = drm_atomic_helper_crtc_destroy_state,
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	.enable_vblank		= amdgpu_vkms_enable_vblank,
 	.disable_vblank		= amdgpu_vkms_disable_vblank,
 	.get_vblank_timestamp	= amdgpu_vkms_get_vblank_timestamp,
+#endif
 };
 
 static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
