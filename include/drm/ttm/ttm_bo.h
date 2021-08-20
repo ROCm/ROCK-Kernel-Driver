@@ -390,6 +390,20 @@ void ttm_bo_kunmap(struct ttm_bo_kmap_obj *map);
 int ttm_bo_vmap(struct ttm_buffer_object *bo, struct iosys_map *map);
 void ttm_bo_vunmap(struct ttm_buffer_object *bo, struct iosys_map *map);
 int ttm_bo_mmap_obj(struct vm_area_struct *vma, struct ttm_buffer_object *bo);
+
+/**
+ * ttm_bo_mmap - mmap out of the ttm device address space.
+ *
+ * @filp:      filp as input from the mmap method.
+ * @vma:       vma as input from the mmap method.
+ * @bdev:      Pointer to the ttm_device with the address space manager.
+ *
+ * This function is intended to be called by the device mmap method.
+ * if the device address space is to be backed by the bo manager.
+ */
+int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
+                struct ttm_device *bdev);
+
 int ttm_bo_swapout(struct ttm_buffer_object *bo, struct ttm_operation_ctx *ctx,
 		   gfp_t gfp_flags);
 void ttm_bo_pin(struct ttm_buffer_object *bo);
