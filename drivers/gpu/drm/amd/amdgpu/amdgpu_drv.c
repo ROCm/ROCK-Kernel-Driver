@@ -1816,7 +1816,7 @@ static const struct file_operations amdgpu_driver_kms_fops = {
 	.flush = amdgpu_flush,
 	.release = drm_release,
 	.unlocked_ioctl = amdgpu_drm_ioctl,
-	.mmap = drm_gem_mmap,
+	.mmap = amdkcl_drm_gem_mmap,
 	.poll = drm_poll,
 	.read = drm_read,
 #ifdef CONFIG_COMPAT
@@ -1953,7 +1953,8 @@ static struct drm_driver amdgpu_kms_driver = {
 	.gem_prime_vunmap = drm_gem_ttm_vunmap,
 #endif
 
-	.gem_prime_mmap = drm_gem_prime_mmap,
+	.gem_prime_mmap = amdkcl_drm_gem_prime_mmap,
+
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
 	.date = DRIVER_DATE,

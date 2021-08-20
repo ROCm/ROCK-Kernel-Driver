@@ -161,6 +161,24 @@ struct ttm_device_funcs {
 		    struct ttm_resource *new_mem,
 		    struct ttm_place *hop);
 
+#ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+        /**
+         * struct ttm_bo_driver_member verify_access
+         *
+         * @bo: Pointer to a buffer object.
+         * @filp: Pointer to a struct file trying to access the object.
+         *
+         * Called from the map / write / read methods to verify that the
+         * caller is permitted to access the buffer object.
+         * This member may be set to NULL, which will refuse this kind of
+         * access for all buffer objects.
+         * This function should return 0 if access is granted, -EPERM otherwise.
+         */
+        int (*verify_access)(struct ttm_buffer_object *bo,
+                             struct file *filp);
+#endif
+
+
 	/**
 	 * Hook to notify driver about a resource delete.
 	 */
