@@ -372,13 +372,13 @@ static void nbio_v7_4_handle_ras_controller_intr_no_bifring(struct amdgpu_device
 						"errors detected in %s block, "
 						"no user action is needed.\n",
 						obj->err_data.ce_count,
-						ras_block_str(adev->nbio.ras_if->block));
+						adev->nbio.ras_if->name);
 
 			if (err_data.ue_count)
 				dev_info(adev->dev, "%ld uncorrectable hardware "
 						"errors detected in %s block\n",
 						obj->err_data.ue_count,
-						ras_block_str(adev->nbio.ras_if->block));
+						adev->nbio.ras_if->name);
 		}
 
 		dev_info(adev->dev, "RAS controller interrupt triggered "
