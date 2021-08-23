@@ -155,4 +155,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm/aperture: Add infrastructure for aperture ownership
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_aperture.h])
+
+	dnl #
+	dnl # v5.7-13141-gca5999fde0a1
+	dnl # mm: introduce include/linux/pgtable.h
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/pgtable.h])
 ])
