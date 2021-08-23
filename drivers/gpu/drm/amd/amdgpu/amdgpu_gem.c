@@ -312,6 +312,7 @@ out_unlock:
 	ttm_eu_backoff_reservation(&ticket, &list);
 }
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma)
 {
 	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
@@ -332,6 +333,7 @@ static int amdgpu_gem_object_mmap(struct drm_gem_object *obj, struct vm_area_str
 
 	return drm_gem_ttm_mmap(obj, vma);
 }
+#endif
 
 #ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
