@@ -4462,7 +4462,11 @@ static void amdgpu_device_unmap_mmio(struct amdgpu_device *adev)
 {
 
 	/* Clear all CPU mappings pointing to this device */
+#ifdef HAVE_DRM_DRIVER_RELEASE
 	unmap_mapping_range(adev->ddev.anon_inode->i_mapping, 0, 0, 1);
+#else
+	unmap_mapping_range(adev->ddev->anon_inode->i_mapping, 0, 0, 1);
+#endif
 
 	/* Unmap all mapped bars - Doorbell, registers and VRAM */
 	amdgpu_doorbell_fini(adev);
