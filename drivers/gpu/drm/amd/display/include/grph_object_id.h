@@ -184,7 +184,7 @@ enum engine_id {
 	ENGINE_ID_DACA,
 	ENGINE_ID_DACB,
 	ENGINE_ID_VCE,	/* wireless display pseudo-encoder */
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	ENGINE_ID_HPO_0,
 	ENGINE_ID_HPO_1,
 	ENGINE_ID_HPO_DP_0,

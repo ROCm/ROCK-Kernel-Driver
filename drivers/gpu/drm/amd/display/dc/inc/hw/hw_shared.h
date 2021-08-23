@@ -40,7 +40,7 @@
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define MAX_DWB_PIPES	1
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #define MAX_HPO_DP2_ENCODERS	4
 #endif
 
