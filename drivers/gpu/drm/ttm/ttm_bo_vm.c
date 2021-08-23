@@ -434,8 +434,10 @@ vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot)
 		return VM_FAULT_OOM;
 
 	/* Set the page to be freed using drmm release action */
+#ifdef drmm_add_action_or_reset
 	if (drmm_add_action_or_reset(ddev, ttm_bo_release_dummy_page, page))
 		return VM_FAULT_OOM;
+#endif
 
 	pfn = page_to_pfn(page);
 
