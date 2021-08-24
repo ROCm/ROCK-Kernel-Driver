@@ -374,6 +374,9 @@ void dp_set_hw_test_pattern(
 {
 	struct encoder_set_dp_phy_pattern_param pattern_param = {0};
 	struct link_encoder *encoder;
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	enum dp_link_encoding link_encoding_format = dp_get_link_encoding_format(&link->cur_link_settings);
+#endif
 
 	/* Access link encoder based on whether it is statically
 	 * or dynamically assigned to a link.
@@ -390,7 +393,6 @@ void dp_set_hw_test_pattern(
 	pattern_param.dp_panel_mode = dp_get_panel_mode(link);
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	enum dp_link_encoding link_encoding_format = dp_get_link_encoding_format(&link->cur_link_settings);
 	switch (link_encoding_format) {
 	case DP_128b_132b_ENCODING:
 		link->hpo_dp_link_enc->funcs->set_link_test_pattern(
