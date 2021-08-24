@@ -3186,58 +3186,6 @@ static void update_mst_stream_alloc_table(
 				work_table[i];
 }
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-/* TODO: Temp function for Diags FPGA */
-static void dp2_update_mst_stream_alloc_table(
-	struct dc_link *link,
-	struct stream_encoder *dio_stream_enc,
-	struct hpo_dp_stream_encoder *hpo_dp_stream_enc,
-	const struct dp_mst_stream_allocation_table *proposed_table)
-{
-	struct link_mst_stream_allocation work_table[MAX_CONTROLLER_NUM] = {
-			{ 0 } };
-	struct link_mst_stream_allocation *dc_alloc;
-
-	int i;
-	int j;
-
-	/* if DRM proposed_table has more than one new payload */
-	ASSERT(proposed_table->stream_count -
-			link->mst_stream_alloc_table.stream_count < 2);
-
-	/* copy proposed_table to link, add stream encoder */
-	for (i = 0; i < proposed_table->stream_count; i++) {
-
-		for (j = 0; j < link->mst_stream_alloc_table.stream_count; j++) {
-			dc_alloc =
-			&link->mst_stream_alloc_table.stream_allocations[j];
-
-			if (dc_alloc->vcp_id ==
-				proposed_table->stream_allocations[i].vcp_id) {
-
-				work_table[i] = *dc_alloc;
-				break; /* exit j loop */
-			}
-		}
-
-		/* new vcp_id */
-		if (j == link->mst_stream_alloc_table.stream_count) {
-			work_table[i].vcp_id =
-				proposed_table->stream_allocations[i].vcp_id;
-			work_table[i].slot_count =
-				proposed_table->stream_allocations[i].slot_count;
-			work_table[i].stream_enc = dio_stream_enc;
-			work_table[i].hpo_dp_stream_enc = hpo_dp_stream_enc;
-		}
-	}
-
-	/* update link->mst_stream_alloc_table with work_table */
-	link->mst_stream_alloc_table.stream_count =
-			proposed_table->stream_count;
-	for (i = 0; i < MAX_CONTROLLER_NUM; i++)
-		link->mst_stream_alloc_table.stream_allocations[i] =
-				work_table[i];
-}
-
 /*
  * Payload allocation/deallocation for SST introduced in DP2.0
  */
