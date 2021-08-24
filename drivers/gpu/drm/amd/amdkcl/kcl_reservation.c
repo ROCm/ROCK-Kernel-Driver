@@ -164,7 +164,7 @@ void _kcl_dma_resv_add_shared_fence(struct dma_resv *obj, struct dma_fence *fenc
 {
 	struct dma_resv_list *old, *fobj = obj->staged;
 
-	old = dma_resv_get_list(obj);
+	old = dma_resv_shared_list(obj);
 	obj->staged = NULL;
 
 	if (!fobj)
