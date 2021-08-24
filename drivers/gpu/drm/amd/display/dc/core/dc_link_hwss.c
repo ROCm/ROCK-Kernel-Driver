@@ -734,10 +734,9 @@ static enum phyd32clk_clock_source get_phyd32clk_src(struct dc_link *link)
 		return PHYD32CLKD;
 	case TRANSMITTER_UNIPHY_E:
 		return PHYD32CLKE;
+	default:
+		return PHYD32CLKA;
 	}
-
-	//BREAK_TO_DEBUGGER();
-	return TRANSMITTER_UNIPHY_A;
 }
 
 void enable_dp_hpo_output(struct dc_link *link, const struct dc_link_settings *link_settings)
