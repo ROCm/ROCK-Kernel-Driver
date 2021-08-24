@@ -259,20 +259,15 @@ static void dpcd_set_training_pattern(
 static enum dc_dp_training_pattern decide_cr_training_pattern(
 		const struct dc_link_settings *link_settings)
 {
-	enum dc_dp_training_pattern pattern = DP_TRAINING_PATTERN_SEQUENCE_1;
-
 	switch (dp_get_link_encoding_format(link_settings)) {
 	case DP_8b_10b_ENCODING:
-		pattern = DP_TRAINING_PATTERN_SEQUENCE_1;
-		break;
+	default:
+		return DP_TRAINING_PATTERN_SEQUENCE_1;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case DP_128b_132b_ENCODING:
-		pattern = DP_128b_132b_TPS1;
-		break;
+		return DP_128b_132b_TPS1;
 #endif
 	}
-
-	return pattern;
 }
 
 static enum dc_dp_training_pattern decide_eq_training_pattern(struct dc_link *link,
