@@ -396,7 +396,7 @@ void amdgpu_vce_ring_begin_use(struct amdgpu_ring *ring)
 void amdgpu_vce_ring_end_use(struct amdgpu_ring *ring)
 {
 	if (!amdgpu_sriov_vf(ring->adev))
-		mod_delayed_work(system_wq, &ring->adev->vce.idle_work, VCE_IDLE_TIMEOUT);
+		schedule_delayed_work(&ring->adev->vce.idle_work, VCE_IDLE_TIMEOUT);
 }
 
 /**

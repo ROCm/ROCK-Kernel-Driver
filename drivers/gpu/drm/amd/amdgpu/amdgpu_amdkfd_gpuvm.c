@@ -686,7 +686,7 @@ static int kfd_mem_attach_vram_bo(struct amdgpu_device *adev,
 {
 	int ret =  0;
 
-#ifdef CONFIG_DMABUF_MOVE_NOTIFY
+#if defined(CONFIG_DMABUF_MOVE_NOTIFY) && defined(CONFIG_PCI_P2PDMA)
 	attachment->type = KFD_MEM_ATT_DMABUF;
 	ret = kfd_mem_attach_dmabuf(adev, mem, bo);
 	pr_debug("Employ DMABUF mechanim to enable peer GPU access\n");
