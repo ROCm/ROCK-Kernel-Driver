@@ -282,12 +282,8 @@ void dcn31_hpo_dp_link_enc_update_stream_allocation_table(
 		const struct link_mst_stream_allocation_table *table)
 {
 	struct dcn31_hpo_dp_link_encoder *enc3 = DCN3_1_HPO_DP_LINK_ENC_FROM_HPO_LINK_ENC(enc);
-	uint32_t value0 = 0;
-	uint32_t value1 = 0;
-	uint32_t value2 = 0;
 	uint32_t slots = 0;
 	uint32_t src = 0;
-	uint32_t retries = 0;
 
 	/* --- Set MSE Stream Attribute -
 	 * Setup VC Payload Table on Tx Side,
