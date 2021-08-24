@@ -2657,6 +2657,9 @@ bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_
 static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 {
 	struct dc_link_settings max_link_cap = {0};
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	enum dc_link_rate lttpr_max_link_rate;
+#endif
 
 	/* get max link encoder capability */
 	link->link_enc->funcs->get_max_link_cap(link->link_enc, &max_link_cap);
@@ -2686,7 +2689,7 @@ static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 			max_link_cap.lane_count = link->dpcd_caps.lttpr_caps.max_lane_count;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-		enum dc_link_rate lttpr_max_link_rate = get_lttpr_max_link_rate(link);
+		lttpr_max_link_rate = get_lttpr_max_link_rate(link);
 
 		if (lttpr_max_link_rate < max_link_cap.link_rate)
 			max_link_cap.link_rate = lttpr_max_link_rate;
@@ -4428,6 +4431,7 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint8_t lttpr_dpcd_data[8];
+	bool allow_lttpr_non_transparent_mode = 0;
 #else
 	uint8_t lttpr_dpcd_data[6];
 #endif
@@ -4439,7 +4443,6 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 	memset(lttpr_dpcd_data, '\0', sizeof(lttpr_dpcd_data));
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	bool allow_lttpr_non_transparent_mode = 0;
 
 	if ((link->dc->config.allow_lttpr_non_transparent_mode.bits.DP2_0 &&
 			link->dpcd_caps.channel_coding_cap.bits.DP_128b_132b_SUPPORTED)) {
@@ -5954,12 +5957,11 @@ static void get_lane_status(
 	union lane_align_status_updated *status_updated)
 {
 	unsigned int lane;
+	uint8_t dpcd_buf[3] = {0};
 
 	if (status == NULL || status_updated == NULL) {
 		return;
 	}
-
-	uint8_t dpcd_buf[3] = {0};
 
 	core_link_read_dpcd(
 			link,
@@ -5985,6 +5987,9 @@ bool dpcd_write_128b_132b_sst_payload_allocation_table(
 	bool result = false;
 	uint8_t req_slot_count = 0;
 	struct fixed31_32 avg_time_slots_per_mtp = { 0 };
+	union payload_table_update_status update_status = { 0 };
+	const uint32_t max_retries = 30;
+	uint32_t retries = 0;
 
 	if (allocate)	{
 		avg_time_slots_per_mtp = calculate_sst_avg_time_slots_per_mtp(stream, link);
@@ -5992,8 +5997,6 @@ bool dpcd_write_128b_132b_sst_payload_allocation_table(
 	} else {
 		/// Leave req_slot_count = 0 if allocate is false.
 	}
-
-	union payload_table_update_status update_status = { 0 };
 
 	/// Write DPCD 2C0 = 1 to start updating
 	update_status.bits.VC_PAYLOAD_TABLE_UPDATED = 1;
@@ -6027,8 +6030,6 @@ bool dpcd_write_128b_132b_sst_payload_allocation_table(
 
 	/// Poll till DPCD 2C0 read 1
 	/// Try for at least 150ms (30 retries, with 5ms delay after each attempt)
-	const uint32_t max_retries = 30;
-	uint32_t retries = 0;
 
 	while (retries < max_retries) {
 		if (core_link_read_dpcd(
