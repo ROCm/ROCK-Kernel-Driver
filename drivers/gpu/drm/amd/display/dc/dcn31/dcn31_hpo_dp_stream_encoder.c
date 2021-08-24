@@ -605,8 +605,6 @@ static void dcn31_hpo_dp_stream_enc_mute_control(
 	struct hpo_dp_stream_encoder *enc,
 	bool mute)
 {
-	struct dcn31_hpo_dp_stream_encoder *enc3 = DCN3_1_HPO_DP_STREAM_ENC_FROM_HPO_STREAM_ENC(enc);
-
 	ASSERT(enc->apg);
 	enc->apg->funcs->audio_mute_control(enc->apg, mute);
 }
