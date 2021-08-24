@@ -1352,7 +1352,9 @@ static int amdgpu_dm_early_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
+#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	amdgpu_dm_audio_fini(adev);
+#endif
 
 	return 0;
 }
