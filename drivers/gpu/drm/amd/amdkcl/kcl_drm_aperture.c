@@ -126,7 +126,13 @@ int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev, const
 
 #ifdef HAVE_VGA_REMOVE_VGACON
 #if IS_REACHABLE(CONFIG_FB)
+
+#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG
         ret = remove_conflicting_pci_framebuffers(pdev, name);
+#else
+        ret = remove_conflicting_pci_framebuffers(pdev, 0, name);
+#endif
+
 #endif
         if (ret == 0)
                 ret = vga_remove_vgacon(pdev);

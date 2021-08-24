@@ -77,14 +77,24 @@
 				__and(IS_MODULE(option), __is_defined(MODULE)))
 #endif /*IS_REACHABLE*/
 
+#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG
+extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
+                                               const char *name);
+#else
 extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id,
 					       const char *name);
+#endif
+
 static inline int
 _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 						  const char *name)
 {
 #if IS_REACHABLE(CONFIG_FB)
+#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG
+	return remove_conflicting_pci_framebuffers(pdev, name);
+#else
 	return remove_conflicting_pci_framebuffers(pdev, 0, name);
+#endif
 #else
 	return 0;
 #endif
@@ -94,7 +104,11 @@ static inline int
 _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 						  const char *name)
 {
+#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_WITH_RES_ID_ARG
 	return drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, name);
+#else
+	return drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, name);
+#endif
 }
 #endif /* HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
 
