@@ -3561,7 +3561,7 @@ static void fpga_dp_hpo_enable_link_and_stream(struct dc_state *state, struct pi
 	/* Set DPS PPS SDP (AKA "info frames") */
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
-		dp_set_dsc_pps_sdp(pipe_ctx, true);
+		dp_set_dsc_pps_sdp(pipe_ctx, true, true);
 	}
 #endif
 	/* Allocate Payload */
@@ -3822,7 +3822,7 @@ void core_link_enable_stream(
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 					dc_is_virtual_signal(pipe_ctx->stream->signal)) {
 				dp_set_dsc_on_rx(pipe_ctx, true);
-				dp_set_dsc_pps_sdp(pipe_ctx, true);
+				dp_set_dsc_pps_sdp(pipe_ctx, true, true);
 			}
 		}
 #endif
