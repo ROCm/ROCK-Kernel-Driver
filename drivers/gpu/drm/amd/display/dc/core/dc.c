@@ -190,9 +190,6 @@ static bool create_links(
 	int i;
 	int connectors_num;
 	struct dc_bios *bios = dc->ctx->dc_bios;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	int dp_hpo_link_count = 0;
-#endif
 
 	dc->link_count = 0;
 
