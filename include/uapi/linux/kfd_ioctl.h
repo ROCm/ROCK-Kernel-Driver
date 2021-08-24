@@ -65,8 +65,9 @@
  * 8.0 - Expand runtime information given to the debugger
  * 8.1 - Allow the debugger to set the exception mask
  * 9.0 - Handle multiple exceptions from single trap signal
+ * 10.0 - Query debug event returns both queue_id and gpu_id
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	9
+#define KFD_IOCTL_DBG_MAJOR_VERSION	10
 #define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
@@ -442,8 +443,8 @@ struct kfd_runtime_info {
 /* KFD_IOC_DBG_TRAP_QUERY_DEBUG_EVENT:
  * exception_mask: exception to clear (IN) on query and report (OUT)
  * ptr: unused
- * data1: source id (OUT)
- * data2: unused
+ * data1: queue id (OUT)
+ * data2: gpu id (OUT)
  * data3: unused
  * data4: unused
  *

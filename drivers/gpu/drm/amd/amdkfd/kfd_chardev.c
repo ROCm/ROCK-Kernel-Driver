@@ -3054,6 +3054,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = kfd_dbg_ev_query_debug_event(target,
 				/* data1 = 0 (process) or gpu_id or queue_id */
 				&args->data1,
+				&args->data2,
 				exception_mask, /* Clear mask */
 				&args->exception_mask /* Status mask */);
 		break;
