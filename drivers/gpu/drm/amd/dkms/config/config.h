@@ -76,6 +76,9 @@
 /* dma_buf dynamic_mapping is available */
 /* #undef HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING */
 
+/* dma_buf_unpin() is available */
+#define HAVE_DMA_BUF_UNPIN 1
+
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
@@ -204,6 +207,9 @@
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
+/* struct drm_connector_state has hdr_output_metadata member */
+#define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
+
 /* drm_connector_unreference() is available */
 /* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
@@ -243,6 +249,12 @@
 /* drm_dev_dbg() is available */
 #define HAVE_DRM_DEV_DBG 1
 
+/* drm_dev_enter() is available */
+#define HAVE_DRM_DEV_ENTER 1
+
+/* drm_dev_is_unplugged() is availablea */
+#define HAVE_DRM_DEV_IS_UNPLUGGED 1
+
 /* drm_dev_put() is available */
 #define HAVE_DRM_DEV_PUT 1
 
@@ -277,10 +289,10 @@
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
 /* drm_dp_link_train_channel_eq_delay() has 2 args */
-/* #undef HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS */
+#define HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS 1
 
 /* drm_dp_link_train_clock_recovery_delay() has 2 args */
-/* #undef HAVE_DRM_DP_LINK_TRAIN_CLOCK_RECOVERY_DELAY_2ARGS */
+#define HAVE_DRM_DP_LINK_TRAIN_CLOCK_RECOVERY_DELAY_2ARGS 1
 
 /* drm_dp_mst_add_affected_dsc_crtcs() is available */
 #define HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS 1
@@ -479,9 +491,6 @@
 /* ttm_buffer_object->base is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
 
-/* drm_gem_prime_mmap() is available */
-/* #undef HAVE_DRM_GEM_PRIME_MMAP */
-
 /* drm_gem_ttm_vmap() is available */
 #define HAVE_DRM_GEM_TTM_VMAP 1
 
@@ -678,8 +687,8 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
-/* kmap_local_page_prot() is available */
-#define HAVE_KMAP_LOCAL_PAGE_PROT 1
+/* kmap_local_* is available */
+#define HAVE_KMAP_LOCAL 1
 
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
@@ -761,6 +770,9 @@
 
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1
+
+/* Define to 1 if you have the <linux/pgtable.h> header file. */
+#define HAVE_LINUX_PGTABLE_H 1
 
 /* Define to 1 if you have the <linux/sched/mm.h> header file. */
 #define HAVE_LINUX_SCHED_MM_H 1
@@ -867,6 +879,13 @@
 /* remove_conflicting_framebuffers() returns int */
 #define HAVE_REMOVE_CONFLICTING_FRAMEBUFFERS_RETURNS_INT 1
 
+/* remove_conflicting_pci_framebuffers() is available and doesn't have res_id
+   arg */
+#define HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG 1
+
+/* remove_conflicting_pci_framebuffers() is available and has res_id arg */
+/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_WITH_RES_ID_ARG */
+
 /* request_firmware_direct() is available */
 #define HAVE_REQUEST_FIRMWARE_DIRECT 1
 
@@ -896,6 +915,9 @@
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
+
+/* struct dma_buf_ops->unpin() is available */
+#define HAVE_STRUCT_DMA_BUF_OPS_UNPIN 1
 
 /* struct drm_connector_state->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
@@ -962,7 +984,7 @@
 
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
-/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
 
 /* drm_plane_helper_funcs->prepare_fb() wants const p arg */
 /* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
@@ -993,6 +1015,9 @@
 
 /* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
 #define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
+
+/* vga_remove_vgacon() is available */
+#define HAVE_VGA_REMOVE_VGACON 1
 
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
