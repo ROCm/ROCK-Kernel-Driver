@@ -109,6 +109,7 @@
 #include "amdgpu_df.h"
 #include "amdgpu_smuio.h"
 #include "amdgpu_fdinfo.h"
+#include "amdgpu_mca.h"
 
 #define MAX_GPU_INSTANCE		16
 
@@ -1062,6 +1063,9 @@ struct amdgpu_device {
 
 	/* df */
 	struct amdgpu_df                df;
+
+	/* MCA */
+	struct amdgpu_mca               mca;
 
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	uint32_t		        harvest_ip_mask;
