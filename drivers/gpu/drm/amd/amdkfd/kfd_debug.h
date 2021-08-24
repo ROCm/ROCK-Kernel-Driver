@@ -28,7 +28,8 @@
 uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags);
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
-			unsigned int *source_id,
+			unsigned int *queue_id,
+			unsigned int *gpu_id,
 			uint64_t exception_clear_mask,
 			uint64_t *event_status);
 
