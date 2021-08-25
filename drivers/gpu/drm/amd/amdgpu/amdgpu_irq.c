@@ -378,7 +378,11 @@ void amdgpu_irq_fini_hw(struct amdgpu_device *adev)
 		free_irq(adev->irq.irq, adev_to_drm(adev));
 		adev->irq.installed = false;
 		if (adev->irq.msi_enabled)
+#ifdef PCI_IRQ_MSI
 			pci_free_irq_vectors(adev->pdev);
+#else
+			pci_disable_msi(adev->pdev);
+#endif
 
 		if (!amdgpu_device_has_dc_support(adev))
 			flush_work(&adev->hotplug_work);
