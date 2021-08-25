@@ -1547,6 +1547,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	 * function core_link_enable_stream
 	 */
 	if (!(hws->wa.dp_hpo_and_otg_sequence && is_dp_128b_132b_signal(pipe_ctx)))
+#endif
 		/*  */
 		/* Do not touch stream timing on seamless boot optimization. */
 		if (!pipe_ctx->stream->apply_seamless_boot_optimization)
@@ -1560,12 +1561,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	if (pipe_ctx->stream_res.tg->funcs->set_drr)
 		pipe_ctx->stream_res.tg->funcs->set_drr(
 			pipe_ctx->stream_res.tg, &params);
-#else
-	/*  */
-	/* Do not touch stream timing on seamless boot optimization. */
-	if (!pipe_ctx->stream->apply_seamless_boot_optimization)
-		hws->funcs.enable_stream_timing(pipe_ctx, context, dc);
-#endif
 
 	// DRR should set trigger event to monitor surface update event
 	if (stream->adjust.v_total_min != 0 && stream->adjust.v_total_max != 0)
