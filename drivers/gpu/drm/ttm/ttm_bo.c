@@ -987,6 +987,11 @@ int ttm_bo_init_reserved(struct ttm_device *bdev, struct ttm_buffer_object *bo,
 		amdkcl_ttm_resvp(bo) = resv;
 	else
 		amdkcl_ttm_resvp(bo) = &amdkcl_ttm_resv(bo);
+
+#ifndef HAVE_DRM_GEM_OBJECT_RESV
+	dma_resv_init(&amdkcl_ttm_resv(bo));
+#endif
+
 	atomic_inc(&ttm_glob.bo_count);
 
 	/*
