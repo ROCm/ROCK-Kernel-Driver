@@ -1004,7 +1004,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 	/* This assumes only APU display buffers are pinned with (VRAM|GTT).
 	 * See function amdgpu_display_supported_domains()
 	 */
-	domain = amdgpu_bo_get_preferred_pin_domain(adev, domain);
+	domain = amdgpu_bo_get_preferred_domain(adev, domain);
 
 #ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (bo->tbo.base.import_attach)
@@ -1579,14 +1579,14 @@ u64 amdgpu_bo_gpu_offset_no_check(struct amdgpu_bo *bo)
 }
 
 /**
- * amdgpu_bo_get_preferred_pin_domain - get preferred domain for scanout
+ * amdgpu_bo_get_preferred_domain - get preferred domain
  * @adev: amdgpu device object
  * @domain: allowed :ref:`memory domains <amdgpu_memory_domains>`
  *
  * Returns:
- * Which of the allowed domains is preferred for pinning the BO for scanout.
+ * Which of the allowed domains is preferred for allocating the BO.
  */
-uint32_t amdgpu_bo_get_preferred_pin_domain(struct amdgpu_device *adev,
+uint32_t amdgpu_bo_get_preferred_domain(struct amdgpu_device *adev,
 					    uint32_t domain)
 {
 	if (domain == (AMDGPU_GEM_DOMAIN_VRAM | AMDGPU_GEM_DOMAIN_GTT)) {
