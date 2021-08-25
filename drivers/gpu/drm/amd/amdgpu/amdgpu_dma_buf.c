@@ -884,7 +884,7 @@ int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
 	 * Wait for all shared fences to complete before we switch to future
 	 * use of exclusive fence on this prime shared bo.
 	 */
-	ret = dma_resv_wait_timeout_rcu(bo->tbo.resv, true, false,
+	ret = dma_resv_wait_timeout(bo->tbo.resv, true, false,
 						  MAX_SCHEDULE_TIMEOUT);
 	if (unlikely(ret < 0)) {
 		DRM_DEBUG_PRIME("Fence wait failed: %li\n", ret);
