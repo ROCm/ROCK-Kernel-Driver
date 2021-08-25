@@ -4918,7 +4918,12 @@ retry:
 			goto fail;
 	}
 
+#if !defined(for_each_oldnew_connector_in_state)
+        for_each_connector_in_state(state, connector, new_con_state, i) {
+                old_con_state = connector->state;
+#else
 	for_each_oldnew_connector_in_state(state, connector, old_con_state, new_con_state, i) {
+#endif
 		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
 		struct drm_crtc_state *new_crtc_state;
 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(dm_new_con_state->base.crtc);
