@@ -80,7 +80,7 @@ struct dccg_funcs {
 			uint32_t otg_inst);
 	void (*dccg_init)(struct dccg *dccg);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	void (*set_dpstreamclk)(
 			struct dccg *dccg,
 			enum hdmistreamclk_source src,
@@ -126,6 +126,7 @@ struct dccg_funcs {
 	void (*set_dispclk_change_mode)(
 			struct dccg *dccg,
 			enum dentist_dispclk_change_mode change_mode);
+#endif
 };
 
 #endif //__DAL_DCCG_H__

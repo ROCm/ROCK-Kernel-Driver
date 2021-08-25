@@ -152,7 +152,7 @@ struct bp_transmitter_control {
 	enum signal_type signal;
 	enum dc_color_depth color_depth; /* not used for DCE6.0 */
 	enum hpd_source_id hpd_sel; /* ucHPDSel, used for DCe6.0 */
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum tx_ffe_id txffe_sel; /* used for DCN3 */
 	enum engine_id hpo_engine_id; /* used for DCN3 */
 #endif

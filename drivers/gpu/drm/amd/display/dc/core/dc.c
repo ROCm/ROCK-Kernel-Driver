@@ -190,7 +190,7 @@ static bool create_links(
 	int i;
 	int connectors_num;
 	struct dc_bios *bios = dc->ctx->dc_bios;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int dp_hpo_link_count = 0;
 #endif
 
@@ -262,7 +262,7 @@ static bool create_links(
 			goto failed_alloc;
 		}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment) &&
 				dc->caps.dp_hpo &&
 				link->dc->res_pool->res_cap->num_hpo_dp_link_encoder > 0) {

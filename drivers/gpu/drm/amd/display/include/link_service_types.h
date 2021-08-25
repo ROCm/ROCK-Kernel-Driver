@@ -74,7 +74,7 @@ enum link_training_result {
 	LINK_TRAINING_LINK_LOSS,
 	/* Abort link training (because sink unplugged) */
 	LINK_TRAINING_ABORT,
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_128b_132b_LT_FAILED,
 	DP_128b_132b_MAX_LOOP_COUNT_REACHED,
 	DP_128b_132b_CHANNEL_EQ_DONE_TIMEOUT,
@@ -98,7 +98,7 @@ struct link_training_settings {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool should_set_fec_ready;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* TODO - factor lane_settings out because it changes during LT */
 	union dc_dp_ffe_preset *ffe_preset;
 #endif
@@ -108,7 +108,7 @@ struct link_training_settings {
 	uint16_t cds_pattern_time;
 	enum dc_dp_training_pattern pattern_for_cr;
 	enum dc_dp_training_pattern pattern_for_eq;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum dc_dp_training_pattern pattern_for_cds;
 
 	uint32_t eq_wait_time_limit;
@@ -138,7 +138,7 @@ enum dp_test_pattern {
 	DP_TEST_PATTERN_CP2520_2,
 	DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE = DP_TEST_PATTERN_CP2520_2,
 	DP_TEST_PATTERN_CP2520_3,
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_TEST_PATTERN_128b_132b_TPS1,
 	DP_TEST_PATTERN_128b_132b_TPS2,
 	DP_TEST_PATTERN_PRBS9,
@@ -155,7 +155,7 @@ enum dp_test_pattern {
 	DP_TEST_PATTERN_TRAINING_PATTERN2,
 	DP_TEST_PATTERN_TRAINING_PATTERN3,
 	DP_TEST_PATTERN_TRAINING_PATTERN4,
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_TEST_PATTERN_128b_132b_TPS1_TRAINING_MODE,
 	DP_TEST_PATTERN_128b_132b_TPS2_TRAINING_MODE,
 	DP_TEST_PATTERN_PHY_PATTERN_END = DP_TEST_PATTERN_128b_132b_TPS2_TRAINING_MODE,

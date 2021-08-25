@@ -47,7 +47,7 @@ struct dc_link_status {
 struct link_mst_stream_allocation {
 	/* DIG front */
 	const struct stream_encoder *stream_enc;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* HPO DP Stream Encoder */
 	const struct hpo_dp_stream_encoder *hpo_dp_stream_enc;
 #endif
