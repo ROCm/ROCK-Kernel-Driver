@@ -801,6 +801,9 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
+/* enum MAMREMAP_WC is availablea */
+#define HAVE_MEMREMAP_WC 1
+
 /* mem_encrypt_active() is available */
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
 
