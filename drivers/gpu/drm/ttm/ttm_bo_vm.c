@@ -418,9 +418,14 @@ static void ttm_bo_release_dummy_page(struct drm_device *dev, void *res)
 	__free_page(dummy_page);
 }
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, struct vm_area_struct *vma, pgprot_t prot)
+{
+#else
 vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot)
 {
 	struct vm_area_struct *vma = vmf->vma;
+#endif
 	struct ttm_buffer_object *bo = vma->vm_private_data;
 	struct drm_device *ddev = bo->base.dev;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
@@ -482,7 +487,11 @@ vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf)
 #endif
 		drm_dev_exit(idx);
 	} else {
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+		ret = ttm_bo_vm_dummy_page(vmf, vma, prot);
+#else
 		ret = ttm_bo_vm_dummy_page(vmf, prot);
+#endif
 	}
 	if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
 		return ret;

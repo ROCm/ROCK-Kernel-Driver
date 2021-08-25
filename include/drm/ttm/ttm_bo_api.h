@@ -655,6 +655,10 @@ int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
 		     void *buf, int len, int write);
 bool ttm_bo_delayed_delete(struct ttm_device *bdev, bool remove_all);
 
+#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
+vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, struct vm_area_struct *vma, pgprot_t prot);
+#else
 vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot);
+#endif
 
 #endif
