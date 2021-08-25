@@ -246,6 +246,9 @@
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
 
+/* struct drm_device has pdev member */
+/* #undef HAVE_DRM_DEVICE_PDEV */
+
 /* drm_dev_dbg() is available */
 #define HAVE_DRM_DEV_DBG 1
 
