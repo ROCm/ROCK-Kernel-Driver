@@ -1019,6 +1019,11 @@ int ttm_bo_init_reserved(struct ttm_device *bdev,
 	} else {
 		amdkcl_ttm_resvp(bo) = &amdkcl_ttm_resv(bo);
 	}
+
+#ifndef HAVE_DRM_GEM_OBJECT_RESV
+	dma_resv_init(&amdkcl_ttm_resv(bo));
+#endif
+
 	atomic_inc(&ttm_glob.bo_count);
 
 	ret = ttm_resource_alloc(bo, &sys_mem, &bo->resource);
