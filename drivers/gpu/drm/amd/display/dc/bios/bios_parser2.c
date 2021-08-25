@@ -1610,7 +1610,7 @@ static enum bp_result bios_parser_get_encoder_cap_info(
 			ATOM_ENCODER_CAP_RECORD_HBR3_EN) ? 1 : 0;
 	info->HDMI_6GB_EN = (record->encodercaps &
 			ATOM_ENCODER_CAP_RECORD_HDMI6Gbps_EN) ? 1 : 0;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	info->IS_DP2_CAPABLE = (record->encodercaps &
 			ATOM_ENCODER_CAP_RECORD_DP2) ? 1 : 0;
 	info->DP_UHBR10_EN = (record->encodercaps &

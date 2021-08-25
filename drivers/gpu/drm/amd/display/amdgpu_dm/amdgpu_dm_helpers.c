@@ -882,7 +882,7 @@ void dm_helpers_mst_enable_stream_features(const struct dc_stream_state *stream)
 					 sizeof(new_downspread));
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
 {
        // FPGA programming for this clock in diags framework that

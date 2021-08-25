@@ -100,7 +100,7 @@ enum dc_post_cursor2 {
 	POST_CURSOR2_MAX_LEVEL = POST_CURSOR2_LEVEL3,
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dc_dp_ffe_preset_level {
 	DP_FFE_PRESET_LEVEL0 = 0,
 	DP_FFE_PRESET_LEVEL1,
@@ -128,7 +128,7 @@ enum dc_dp_training_pattern {
 	DP_TRAINING_PATTERN_SEQUENCE_3,
 	DP_TRAINING_PATTERN_SEQUENCE_4,
 	DP_TRAINING_PATTERN_VIDEOIDLE,
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_128b_132b_TPS1,
 	DP_128b_132b_TPS2,
 	DP_128b_132b_TPS2_CDS,
@@ -138,7 +138,7 @@ enum dc_dp_training_pattern {
 enum dp_link_encoding {
 	DP_UNKNOWN_ENCODING = 0,
 	DP_8b_10b_ENCODING = 1,
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_128b_132b_ENCODING = 2,
 #endif
 };
@@ -152,7 +152,7 @@ struct dc_link_settings {
 	bool dpcd_source_device_specific_field_support;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 union dc_dp_ffe_preset {
 	struct {
 		uint8_t level		: 4;
@@ -169,7 +169,7 @@ struct dc_lane_settings {
 	enum dc_voltage_swing VOLTAGE_SWING;
 	enum dc_pre_emphasis PRE_EMPHASIS;
 	enum dc_post_cursor2 POST_CURSOR2;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dc_dp_ffe_preset FFE_PRESET;
 #endif
 };
@@ -183,7 +183,7 @@ struct dc_link_training_overrides {
 	enum dc_voltage_swing *voltage_swing;
 	enum dc_pre_emphasis *pre_emphasis;
 	enum dc_post_cursor2 *post_cursor2;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dc_dp_ffe_preset *ffe_preset;
 #endif
 
@@ -201,7 +201,7 @@ struct dc_link_training_overrides {
 #endif
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 union payload_table_update_status {
 	struct {
 		uint8_t  VC_PAYLOAD_TABLE_UPDATED:1;
@@ -298,7 +298,7 @@ union lane_align_status_updated {
 	struct {
 		uint8_t INTERLANE_ALIGN_DONE:1;
 		uint8_t POST_LT_ADJ_REQ_IN_PROGRESS:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint8_t EQ_INTERLANE_ALIGN_DONE_128b_132b:1;
 		uint8_t CDS_INTERLANE_ALIGN_DONE_128b_132b:1;
 		uint8_t LT_FAILED_128b_132b:1;
@@ -318,7 +318,7 @@ union lane_adjust {
 		uint8_t PRE_EMPHASIS_LANE:2;
 		uint8_t RESERVED:4;
 	} bits;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct {
 		uint8_t PRESET_VALUE	:4;
 		uint8_t RESERVED	:4;
@@ -353,7 +353,7 @@ union dpcd_training_lane {
 		uint8_t MAX_PRE_EMPHASIS_REACHED:1;
 		uint8_t RESERVED:2;
 	} bits;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct {
 		uint8_t PRESET_VALUE	:4;
 		uint8_t RESERVED	:4;
@@ -641,7 +641,7 @@ union test_response {
 
 union phy_test_pattern {
 	struct {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		/* This field is 7 bits for DP2.0 */
 		uint8_t PATTERN     :7;
 		uint8_t RESERVED    :1;
@@ -731,7 +731,7 @@ union dpcd_fec_capability {
 		uint8_t UNCORRECTED_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t CORRECTED_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t BIT_ERROR_COUNT_CAPABLE:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint8_t PARITY_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t ARITY_BIT_ERROR_COUNT_CAPABLE:1;
 		uint8_t FEC_RUNNING_INDICATOR_SUPPORTED:1;
@@ -863,7 +863,7 @@ struct psr_caps {
 	bool psr_exit_link_training_required;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define DP_MAIN_LINK_CHANNEL_CODING_CAP			0x006
 #define DP_SINK_VIDEO_FALLBACK_FORMATS			0x020
 #define DP_FEC_CAPABILITY_1				0x091

@@ -64,7 +64,7 @@
 /*******************************************************************************
  * Private functions
  ******************************************************************************/
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static bool add_dp_hpo_link_encoder_to_link(struct dc_link *link)
 {
 	struct hpo_dp_link_encoder *enc = resource_get_unused_hpo_dp_link_encoder(
@@ -116,7 +116,7 @@ static void dc_link_destruct(struct dc_link *link)
 		link->link_enc->funcs->destroy(&link->link_enc);
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (link->hpo_dp_link_enc) {
 		remove_dp_hpo_link_encoder_from_link(link);
 	}
@@ -959,7 +959,7 @@ static bool dc_link_detect_helper(struct dc_link *link,
 				return false;
 			}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (dp_get_link_encoding_format(&link->reported_link_cap) == DP_128b_132b_ENCODING)
 				add_dp_hpo_link_encoder_to_link(link);
 #endif
@@ -1209,7 +1209,7 @@ static bool dc_link_detect_helper(struct dc_link *link,
 			       sizeof(link->mst_stream_alloc_table.stream_allocations));
 		}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dp_get_link_encoding_format(&link->cur_link_settings) == DP_128b_132b_ENCODING)
 			reset_dp_hpo_stream_encoders_for_link(link);
 #endif
@@ -1590,7 +1590,7 @@ static bool dc_link_construct(struct dc_link *link,
 	}
 
 	DC_LOG_DC("BIOS object table - DP_IS_USB_C: %d", link->link_enc->features.flags.bits.DP_IS_USB_C);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DC_LOG_DC("BIOS object table - IS_DP2_CAPABLE: %d", link->link_enc->features.flags.bits.IS_DP2_CAPABLE);
 #endif
 
@@ -1787,7 +1787,7 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	/* get link settings for video mode timing */
 	decide_link_settings(stream, &link_settings);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(&link_settings) == DP_128b_132b_ENCODING &&
 			pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT) {
 		dp_enable_mst_on_sink(link, true);
@@ -1800,7 +1800,7 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 		link->dc->hwss.edp_wait_for_hpd_ready(link, true);
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(&link_settings) == DP_128b_132b_ENCODING) {
 		/* TODO - DP2.0 HW: calculate 32 symbol clock for HPO encoder */
 	} else {
@@ -1846,7 +1846,7 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 	else
 		fec_enable = true;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(&link_settings) == DP_8b_10b_ENCODING)
 		dp_set_fec_enable(link, fec_enable);
 #else
@@ -2355,7 +2355,7 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 
 	if (dc_is_dp_signal(signal)) {
 		/* SST DP, eDP */
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		struct dc_link_settings link_settings = link->cur_link_settings;
 #endif
 		if (dc_is_dp_sst_signal(signal))
@@ -2366,7 +2366,7 @@ static void disable_link(struct dc_link *link, enum signal_type signal)
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_is_dp_sst_signal(signal) ||
 				link->mst_stream_alloc_table.stream_count == 0) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (dp_get_link_encoding_format(&link_settings) == DP_8b_10b_ENCODING) {
 				dp_set_fec_enable(link, false);
 				dp_set_fec_ready(link, false);
@@ -2558,7 +2558,7 @@ static bool dp_active_dongle_validate_timing(
 		break;
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dpcd_caps->dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER &&
 			dongle_caps->extendedCapValid == true) {
 #else
@@ -2608,7 +2608,7 @@ static bool dp_active_dongle_validate_timing(
 	if (get_timing_pixel_clock_100hz(timing) > (dongle_caps->dp_hdmi_max_pixel_clk_in_khz * 10))
 		return false;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	}
 
 	if (dongle_caps->dfp_cap_ext.supported) {
@@ -3185,7 +3185,7 @@ static void update_mst_stream_alloc_table(
 		link->mst_stream_alloc_table.stream_allocations[i] =
 				work_table[i];
 }
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /* TODO: Temp function for Diags FPGA */
 static void dp2_update_mst_stream_alloc_table(
 	struct dc_link *link,
@@ -3541,7 +3541,7 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 }
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static void fpga_dp_hpo_enable_link_and_stream(struct dc_state *state, struct pipe_ctx *pipe_ctx)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
@@ -3578,12 +3578,10 @@ static void fpga_dp_hpo_enable_link_and_stream(struct dc_state *state, struct pi
 
 	/* Enable DP_STREAM_ENC */
 	dc->hwss.enable_stream(pipe_ctx);
-
 	/* Set DPS PPS SDP (AKA "info frames") */
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		dp_set_dsc_pps_sdp(pipe_ctx, true);
 	}
-
 	/* Allocate Payload */
 	if ((stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) && (state->stream_count > 1)) {
 		// MST case
@@ -3639,7 +3637,7 @@ void core_link_enable_stream(
 			dc_is_virtual_signal(pipe_ctx->stream->signal))
 		return;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (!dc_is_virtual_signal(pipe_ctx->stream->signal)
 			&& !is_dp_128b_132b_signal(pipe_ctx)) {
 #else
@@ -3654,7 +3652,7 @@ void core_link_enable_stream(
 			stream->timing.timing_3d_format != TIMING_3D_FORMAT_NONE);
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (is_dp_128b_132b_signal(pipe_ctx)) {
 		pipe_ctx->stream_res.hpo_dp_stream_enc->funcs->set_stream_attribute(
 				pipe_ctx->stream_res.hpo_dp_stream_enc,
@@ -3796,7 +3794,7 @@ void core_link_enable_stream(
 		 * as a workaround for the incorrect value being applied
 		 * from transmitter control.
 		 */
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (!(dc_is_virtual_signal(pipe_ctx->stream->signal) ||
 				is_dp_128b_132b_signal(pipe_ctx)))
 #else
@@ -3821,7 +3819,7 @@ void core_link_enable_stream(
 
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_link_allocate_mst_payload(pipe_ctx);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		else if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT &&
 				is_dp_128b_132b_signal(pipe_ctx))
 			dc_link_update_sst_payload(pipe_ctx, true);
@@ -3842,7 +3840,7 @@ void core_link_enable_stream(
 		dc->hwss.enable_audio_stream(pipe_ctx);
 
 	} else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (is_dp_128b_132b_signal(pipe_ctx)) {
 			fpga_dp_hpo_enable_link_and_stream(state, pipe_ctx);
 		}
@@ -3886,7 +3884,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		deallocate_mst_payload(pipe_ctx);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	else if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT &&
 			is_dp_128b_132b_signal(pipe_ctx))
 		dc_link_update_sst_payload(pipe_ctx, false);
@@ -3917,7 +3915,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 		}
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT &&
 			!is_dp_128b_132b_signal(pipe_ctx)) {
 
@@ -3946,7 +3944,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 			dp_set_dsc_enable(pipe_ctx, false);
 	}
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (is_dp_128b_132b_signal(pipe_ctx)) {
 		if (pipe_ctx->stream_res.tg->funcs->set_out_mux)
 			pipe_ctx->stream_res.tg->funcs->set_out_mux(pipe_ctx->stream_res.tg, OUT_MUX_DIO);
@@ -4084,7 +4082,7 @@ void dc_link_set_preferred_training_settings(struct dc *dc,
 
 	if (link_setting != NULL) {
 		link->preferred_link_setting = *link_setting;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dp_get_link_encoding_format(link_setting) ==
 				DP_128b_132b_ENCODING && !link->hpo_dp_link_enc) {
 			if (!add_dp_hpo_link_encoder_to_link(link))
@@ -4132,7 +4130,7 @@ uint32_t dc_link_bandwidth_kbps(
 	const struct dc_link *link,
 	const struct dc_link_settings *link_setting)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t total_data_bw_efficiency_x10000 = 0;
 	uint32_t link_rate_per_lane_kbps = 0;
 
