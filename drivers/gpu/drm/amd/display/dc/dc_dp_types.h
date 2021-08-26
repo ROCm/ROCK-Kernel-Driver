@@ -53,7 +53,7 @@ enum dc_link_rate {
 	LINK_RATE_RBR2 = 0x0C,		// Rate_5 (RBR2)- 3.24 Gbps/Lane
 	LINK_RATE_RATE_6 = 0x10,	// Rate_6		- 4.32 Gbps/Lane
 	LINK_RATE_HIGH2 = 0x14,		// Rate_7 (HBR2)- 5.40 Gbps/Lane
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	LINK_RATE_HIGH3 = 0x1E,		// Rate_8 (HBR3)- 8.10 Gbps/Lane
 	/* Starting from DP2.0 link rate enum directly represents actual
 	 * link rate value in unit of 10 mbps

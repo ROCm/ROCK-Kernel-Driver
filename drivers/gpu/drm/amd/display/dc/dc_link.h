@@ -156,7 +156,7 @@ struct dc_link {
 
 	struct panel_cntl *panel_cntl;
 	struct link_encoder *link_enc;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct hpo_dp_link_encoder *hpo_dp_link_enc;
 #endif
 	struct graphics_object_id link_id;
