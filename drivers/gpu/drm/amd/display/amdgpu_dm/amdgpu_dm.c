@@ -12099,8 +12099,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 		amdgpu_dm_connector->min_vfreq = 0;
 		amdgpu_dm_connector->max_vfreq = 0;
 		amdgpu_dm_connector->pixel_clock_mhz = 0;
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 		connector->display_info.monitor_range.min_vfreq = 0;
 		connector->display_info.monitor_range.max_vfreq = 0;
+#endif
 		freesync_capable = false;
 
 		goto update;
