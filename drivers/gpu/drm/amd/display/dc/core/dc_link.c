@@ -3579,9 +3579,11 @@ static void fpga_dp_hpo_enable_link_and_stream(struct dc_state *state, struct pi
 	/* Enable DP_STREAM_ENC */
 	dc->hwss.enable_stream(pipe_ctx);
 	/* Set DPS PPS SDP (AKA "info frames") */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		dp_set_dsc_pps_sdp(pipe_ctx, true);
 	}
+#endif
 	/* Allocate Payload */
 	if ((stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) && (state->stream_count > 1)) {
 		// MST case
@@ -3653,6 +3655,7 @@ void core_link_enable_stream(
 	}
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (is_dp_128b_132b_signal(pipe_ctx)) {
 		pipe_ctx->stream_res.hpo_dp_stream_enc->funcs->set_stream_attribute(
 				pipe_ctx->stream_res.hpo_dp_stream_enc,
@@ -3662,14 +3665,18 @@ void core_link_enable_stream(
 				stream->timing.flags.DSC,
 				false);
 		otg_out_dest = OUT_MUX_HPO_DP;
-	} else if (dc_is_dp_signal(pipe_ctx->stream->signal)) {
-		pipe_ctx->stream_res.stream_enc->funcs->dp_set_stream_attribute(
+	} else{
+#endif
+		if (dc_is_dp_signal(pipe_ctx->stream->signal))
+			pipe_ctx->stream_res.stream_enc->funcs->dp_set_stream_attribute(
 				pipe_ctx->stream_res.stream_enc,
 				&stream->timing,
 				stream->output_color_space,
 				stream->use_vsc_sdp_for_colorimetry,
 				stream->link->dpcd_caps.dprx_feature.bits.SST_SPLIT_SDP_CAP);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	}
+#endif
 #else
 	pipe_ctx->stream_res.stream_enc->funcs->dp_set_stream_attribute(
 			pipe_ctx->stream_res.stream_enc,
@@ -4142,10 +4149,12 @@ uint32_t dc_link_bandwidth_kbps(
 		 */
 		link_rate_per_lane_kbps = link_setting->link_rate * LINK_RATE_REF_FREQ_IN_KHZ * BITS_PER_DP_BYTE;
 		total_data_bw_efficiency_x10000 = DATA_EFFICIENCY_8b_10b_x10000;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_link_should_enable_fec(link)) {
 			total_data_bw_efficiency_x10000 /= 100;
 			total_data_bw_efficiency_x10000 *= DATA_EFFICIENCY_8b_10b_FEC_EFFICIENCY_x100;
 		}
+#endif
 		break;
 	case DP_128b_132b_ENCODING:
 		/* For 128b/132b encoding:

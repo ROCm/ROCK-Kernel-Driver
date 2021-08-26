@@ -535,7 +535,9 @@ static void dcn31_hpo_dp_stream_enc_set_dsc_pps_info_packet(
 		/* Load PPS into infoframe (SDP) registers */
 		pps_sdp.valid = true;
 		pps_sdp.hb0 = 0;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		pps_sdp.hb1 = DC_DP_INFOFRAME_TYPE_PPS;
+#endif
 		pps_sdp.hb2 = 127;
 		pps_sdp.hb3 = 0;
 
