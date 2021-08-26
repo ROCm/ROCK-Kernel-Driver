@@ -19,7 +19,11 @@ static inline void io_mapping_unmap_local(void __iomem *vaddr)
 static inline void __iomem *
 io_mapping_map_local_wc(struct io_mapping *mapping, unsigned long offset)
 {
+#ifdef HAVE_IO_MAPPING_MAP_WC_HAS_SIZE_ARG
         return io_mapping_map_wc(mapping, offset, PAGE_SIZE);
+#else
+	return io_mapping_map_wc(mapping, offset);
+#endif
 }
 #endif
 
