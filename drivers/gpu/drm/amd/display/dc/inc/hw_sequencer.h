@@ -257,7 +257,7 @@ struct hw_sequencer_funcs {
 			int width, int height, int offset);
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	void (*z10_restore)(struct dc *dc);
+	void (*z10_restore)(const struct dc *dc);
 #endif
 	void (*z10_save_init)(struct dc *dc);
 
