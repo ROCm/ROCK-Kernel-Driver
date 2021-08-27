@@ -651,38 +651,23 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 }
 
 #define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
-static int kfd_allocate_debug_watch_point(struct kfd_process *p,
-		uint64_t watch_address,
-		uint32_t watch_address_mask,
-		uint32_t *watch_point,
-		uint32_t watch_mode)
+static int kfd_dbg_get_watchpoint_id(void)
 {
-	int r = 0;
-	int i;
-	int watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
-
-	if (!watch_point)
-		return -EFAULT;
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
-	}
+	int i, watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
 
 	spin_lock(&watch_points_lock);
-	for (i = 0; i < MAX_WATCH_ADDRESSES; i++)
+
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++) {
 		if (!(allocated_debug_watch_points & (1<<i))) {
 			/* Found one at [i]. */
 			watch_point_to_allocate = i;
 			break;
 		}
+	}
+
 	if (watch_point_to_allocate != KFD_DEBUGGER_INVALID_WATCH_POINT_ID) {
-		allocated_debug_watch_points |=
-			(1<<watch_point_to_allocate);
-		*watch_point = watch_point_to_allocate;
-		pr_debug("Allocated watch point id %i\n",
-				watch_point_to_allocate);
+		allocated_debug_watch_points |= (1<<watch_point_to_allocate);
+		pr_debug("Allocated watch point id %i\n", watch_point_to_allocate);
 	} else {
 		pr_debug("Failed to allocate watch point address. "
 				"num_of_watch_points == %i "
@@ -691,9 +676,31 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 				MAX_WATCH_ADDRESSES,
 				allocated_debug_watch_points,
 				i);
-		r = -ENOMEM;
-		goto out;
 	}
+
+	spin_unlock(&watch_points_lock);
+	return watch_point_to_allocate;
+}
+
+static int kfd_allocate_debug_watch_point(struct kfd_process *p,
+		uint64_t watch_address,
+		uint32_t watch_address_mask,
+		uint32_t *watch_point,
+		uint32_t watch_mode)
+{
+	int r = 0;
+	int i;
+	int watch_point_to_allocate;
+
+	if (!watch_point)
+		return -EFAULT;
+
+	watch_point_to_allocate = kfd_dbg_get_watchpoint_id();
+
+	if (watch_point_to_allocate == KFD_DEBUGGER_INVALID_WATCH_POINT_ID)
+		return -ENOMEM;
+
+	*watch_point = watch_point_to_allocate;
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -702,41 +709,26 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 		if (r)
 			break;
 
-		pdd->watch_points[*watch_point] =
-				pdd->dev->kfd2kgd->set_address_watch(
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
+		pdd->watch_points[*watch_point] = pdd->dev->kfd2kgd->set_address_watch(
 					pdd->dev->kgd,
 					watch_address,
 					watch_address_mask,
 					*watch_point,
 					watch_mode,
 					pdd->dev->vm_info.last_vmid_kfd);
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
 	}
 
-out:
-	spin_unlock(&watch_points_lock);
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
-	}
 	return r;
 }
 
-static int kfd_release_debug_watch_points(struct kfd_process *p,
-		uint32_t watch_point_bit_mask_to_free)
+static int kfd_dbg_free_watchpoint_id(uint32_t watch_point_bit_mask_to_free)
 {
-	int r = 0, i, j;
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
-	}
-
 	spin_lock(&watch_points_lock);
 	if (~allocated_debug_watch_points & watch_point_bit_mask_to_free) {
 		pr_err("Tried to free a free watch point! "
@@ -744,13 +736,27 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 				"watch_point_bit_mask_to_free = 0x%08x\n",
 				allocated_debug_watch_points,
 				watch_point_bit_mask_to_free);
-		r = -EFAULT;
-		goto out;
+		spin_unlock(&watch_points_lock);
+		return -EFAULT;
 	}
 
 	pr_debug("Freeing watchpoint bitmask :0x%08x\n",
 			watch_point_bit_mask_to_free);
 	allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
+	spin_unlock(&watch_points_lock);
+
+	return 0;
+}
+
+
+static int kfd_release_debug_watch_points(struct kfd_process *p,
+		uint32_t watch_point_bit_mask_to_free)
+{
+	int i, j;
+	int r = kfd_dbg_free_watchpoint_id(watch_point_bit_mask_to_free);
+
+	if (r)
+		return r;
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -759,25 +765,19 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 		if (r)
 			break;
 
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, false);
 		for (j = 0; j < MAX_WATCH_ADDRESSES; j++) {
 			if ((1<<j) & watch_point_bit_mask_to_free)
 				pdd->watch_points[j] =
 					pdd->dev->kfd2kgd->clear_address_watch(
 								pdd->dev->kgd,
 								j);
-			}
+		}
+		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
 		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
 		if (r)
 			break;
-	}
-
-out:
-	spin_unlock(&watch_points_lock);
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 	}
 	return r;
 }
