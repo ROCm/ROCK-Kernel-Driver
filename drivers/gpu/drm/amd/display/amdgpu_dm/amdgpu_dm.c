@@ -688,7 +688,9 @@ void dmub_hpd_callback(struct amdgpu_device *adev, struct dmub_notification *not
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct dc_link *link;
 	uint8_t link_index = 0;
 	struct drm_device *dev = adev->dm.ddev;
@@ -711,9 +713,12 @@ void dmub_hpd_callback(struct amdgpu_device *adev, struct dmub_notification *not
 	link_index = notify->link_index;
 
 	link = adev->dm.dc->links[link_index];
-
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
+#endif
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (link && aconnector->dc_link == link) {
 			DRM_INFO("DMUB HPD callback: link_index=%u\n", link_index);
@@ -721,7 +726,9 @@ void dmub_hpd_callback(struct amdgpu_device *adev, struct dmub_notification *not
 			break;
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 
 }
