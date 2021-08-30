@@ -3852,13 +3852,13 @@ void core_link_enable_stream(
 			fpga_dp_hpo_enable_link_and_stream(state, pipe_ctx);
 		}
 #endif
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
-
 #endif
 	}
+
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
 		core_link_set_avmute(pipe_ctx, false);
 	}
