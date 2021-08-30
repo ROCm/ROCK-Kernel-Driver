@@ -4302,10 +4302,11 @@ void core_link_enable_stream(
 		if (is_dp_128b_132b_signal(pipe_ctx)) {
 			fpga_dp_hpo_enable_link_and_stream(state, pipe_ctx);
 		}
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
-
+#endif
 	}
 
 	if (pipe_ctx->stream->signal == SIGNAL_TYPE_HDMI_TYPE_A) {
