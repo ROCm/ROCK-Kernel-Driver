@@ -763,7 +763,9 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
 	struct amdgpu_dm_connector *aconnector;
 	struct amdgpu_dm_connector *hpd_aconnector = NULL;
 	struct drm_connector *connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
+#endif
 	struct dc_link *link;
 	u8 link_index = 0;
 	struct drm_device *dev;
@@ -784,9 +786,12 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
 	link_index = notify->link_index;
 	link = adev->dm.dc->links[link_index];
 	dev = adev->dm.ddev;
-
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
+#else
+	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
+#endif
 
 		if (connector->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
@@ -805,7 +810,10 @@ static void dmub_hpd_callback(struct amdgpu_device *adev,
 			break;
 		}
 	}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
+#endif
+	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 
 	if (hpd_aconnector) {
 		if (notify->type == DMUB_NOTIFICATION_HPD) {
