@@ -34,4 +34,14 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 				struct drm_file *file_priv);
 #endif
 
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+int _kcl_drm_gem_ttm_mmap(struct drm_gem_object *gem,
+                     struct vm_area_struct *vma);
+static inline
+int drm_gem_ttm_mmap(struct drm_gem_object *gem,
+                     struct vm_area_struct *vma) {
+	return _kcl_drm_gem_ttm_mmap(gem, vma);
+}
+#endif
+
 #endif
