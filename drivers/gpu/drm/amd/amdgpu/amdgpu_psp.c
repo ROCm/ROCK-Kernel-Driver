@@ -895,21 +895,35 @@ static void psp_prep_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
 	cmd->cmd.cmd_load_ta.cmd_buf_len	 = ta_shared_size;
 }
 
-static int psp_xgmi_init_shared_buf(struct psp_context *psp)
+static int psp_ta_init_shared_buf(struct psp_context *psp,
+				  struct ta_mem_context *mem_ctx,
+				  uint32_t shared_mem_size)
 {
 	int ret;
 
 	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for xgmi ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_XGMI_SHARED_MEM_SIZE,
-				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-				      &psp->xgmi_context.context.mem_context.shared_bo,
-				      &psp->xgmi_context.context.mem_context.shared_mc_addr,
-				      &psp->xgmi_context.context.mem_context.shared_buf);
+	* Allocate 16k memory aligned to 4k from Frame Buffer (local
+	* physical) for ta to host memory
+	*/
+	ret = amdgpu_bo_create_kernel(psp->adev, shared_mem_size, PAGE_SIZE,
+				      AMDGPU_GEM_DOMAIN_VRAM,
+				      &mem_ctx->shared_bo,
+				      &mem_ctx->shared_mc_addr,
+				      &mem_ctx->shared_buf);
 
 	return ret;
+}
+
+static void psp_ta_free_shared_buf(struct ta_mem_context *mem_ctx)
+{
+	amdgpu_bo_free_kernel(&mem_ctx->shared_bo, &mem_ctx->shared_mc_addr,
+			      &mem_ctx->shared_buf);
+}
+
+static int psp_xgmi_init_shared_buf(struct psp_context *psp)
+{
+	return psp_ta_init_shared_buf(psp, &psp->xgmi_context.context.mem_context,
+				      PSP_XGMI_SHARED_MEM_SIZE);
 }
 
 static void psp_prep_ta_invoke_cmd_buf(struct psp_gfx_cmd_resp *cmd,
@@ -1017,9 +1031,7 @@ int psp_xgmi_terminate(struct psp_context *psp)
 	psp->xgmi_context.context.initialized = false;
 
 	/* free xgmi shared memory */
-	amdgpu_bo_free_kernel(&psp->xgmi_context.context.mem_context.shared_bo,
-			&psp->xgmi_context.context.mem_context.shared_mc_addr,
-			&psp->xgmi_context.context.mem_context.shared_buf);
+	psp_ta_free_shared_buf(&psp->xgmi_context.context.mem_context);
 
 	return 0;
 }
@@ -1267,19 +1279,8 @@ int psp_xgmi_set_topology_info(struct psp_context *psp,
 // ras begin
 static int psp_ras_init_shared_buf(struct psp_context *psp)
 {
-	int ret;
-
-	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for ras ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_RAS_SHARED_MEM_SIZE,
-			PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-			&psp->ras_context.context.mem_context.shared_bo,
-			&psp->ras_context.context.mem_context.shared_mc_addr,
-			&psp->ras_context.context.mem_context.shared_buf);
-
-	return ret;
+	return psp_ta_init_shared_buf(psp, &psp->ras_context.context.mem_context,
+				      PSP_RAS_SHARED_MEM_SIZE);
 }
 
 static int psp_ras_load(struct psp_context *psp)
@@ -1465,9 +1466,7 @@ static int psp_ras_terminate(struct psp_context *psp)
 	psp->ras_context.context.initialized = false;
 
 	/* free ras shared memory */
-	amdgpu_bo_free_kernel(&psp->ras_context.context.mem_context.shared_bo,
-			&psp->ras_context.context.mem_context.shared_mc_addr,
-			&psp->ras_context.context.mem_context.shared_buf);
+	psp_ta_free_shared_buf(&psp->ras_context.context.mem_context);
 
 	return 0;
 }
@@ -1575,19 +1574,8 @@ int psp_ras_trigger_error(struct psp_context *psp,
 // HDCP start
 static int psp_hdcp_init_shared_buf(struct psp_context *psp)
 {
-	int ret;
-
-	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for hdcp ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_HDCP_SHARED_MEM_SIZE,
-				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-				      &psp->hdcp_context.context.mem_context.shared_bo,
-				      &psp->hdcp_context.context.mem_context.shared_mc_addr,
-				      &psp->hdcp_context.context.mem_context.shared_buf);
-
-	return ret;
+	return psp_ta_init_shared_buf(psp, &psp->hdcp_context.context.mem_context,
+				      PSP_HDCP_SHARED_MEM_SIZE);
 }
 
 static int psp_hdcp_load(struct psp_context *psp)
@@ -1713,9 +1701,7 @@ static int psp_hdcp_terminate(struct psp_context *psp)
 
 out:
 	/* free hdcp shared memory */
-	amdgpu_bo_free_kernel(&psp->hdcp_context.context.mem_context.shared_bo,
-			      &psp->hdcp_context.context.mem_context.shared_mc_addr,
-			      &psp->hdcp_context.context.mem_context.shared_buf);
+	psp_ta_free_shared_buf(&psp->hdcp_context.context.mem_context);
 
 	return 0;
 }
@@ -1724,19 +1710,8 @@ out:
 // DTM start
 static int psp_dtm_init_shared_buf(struct psp_context *psp)
 {
-	int ret;
-
-	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for dtm ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_DTM_SHARED_MEM_SIZE,
-				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-				      &psp->dtm_context.context.mem_context.shared_bo,
-				      &psp->dtm_context.context.mem_context.shared_mc_addr,
-				      &psp->dtm_context.context.mem_context.shared_buf);
-
-	return ret;
+	return psp_ta_init_shared_buf(psp, &psp->dtm_context.context.mem_context,
+				      PSP_DTM_SHARED_MEM_SIZE);
 }
 
 static int psp_dtm_load(struct psp_context *psp)
@@ -1861,10 +1836,8 @@ static int psp_dtm_terminate(struct psp_context *psp)
 	psp->dtm_context.context.initialized = false;
 
 out:
-	/* free hdcp shared memory */
-	amdgpu_bo_free_kernel(&psp->dtm_context.context.mem_context.shared_bo,
-			      &psp->dtm_context.context.mem_context.shared_mc_addr,
-			      &psp->dtm_context.context.mem_context.shared_buf);
+	/* free dtm shared memory */
+	psp_ta_free_shared_buf(&psp->dtm_context.context.mem_context);
 
 	return 0;
 }
@@ -1873,19 +1846,8 @@ out:
 // RAP start
 static int psp_rap_init_shared_buf(struct psp_context *psp)
 {
-	int ret;
-
-	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for rap ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_RAP_SHARED_MEM_SIZE,
-				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-				      &psp->rap_context.context.mem_context.shared_bo,
-				      &psp->rap_context.context.mem_context.shared_mc_addr,
-				      &psp->rap_context.context.mem_context.shared_buf);
-
-	return ret;
+	return psp_ta_init_shared_buf(psp, &psp->rap_context.context.mem_context,
+				      PSP_RAP_SHARED_MEM_SIZE);
 }
 
 static int psp_rap_load(struct psp_context *psp)
@@ -1962,9 +1924,7 @@ static int psp_rap_initialize(struct psp_context *psp)
 	if (ret || status != TA_RAP_STATUS__SUCCESS) {
 		psp_rap_unload(psp);
 
-		amdgpu_bo_free_kernel(&psp->rap_context.context.mem_context.shared_bo,
-			      &psp->rap_context.context.mem_context.shared_mc_addr,
-			      &psp->rap_context.context.mem_context.shared_buf);
+		psp_ta_free_shared_buf(&psp->rap_context.context.mem_context);
 
 		psp->rap_context.context.initialized = false;
 
@@ -1989,9 +1949,7 @@ static int psp_rap_terminate(struct psp_context *psp)
 	psp->rap_context.context.initialized = false;
 
 	/* free rap shared memory */
-	amdgpu_bo_free_kernel(&psp->rap_context.context.mem_context.shared_bo,
-			      &psp->rap_context.context.mem_context.shared_mc_addr,
-			      &psp->rap_context.context.mem_context.shared_buf);
+	psp_ta_free_shared_buf(&psp->rap_context.context.mem_context);
 
 	return ret;
 }
@@ -2034,19 +1992,9 @@ out_unlock:
 /* securedisplay start */
 static int psp_securedisplay_init_shared_buf(struct psp_context *psp)
 {
-	int ret;
-
-	/*
-	 * Allocate 16k memory aligned to 4k from Frame Buffer (local
-	 * physical) for sa ta <-> Driver
-	 */
-	ret = amdgpu_bo_create_kernel(psp->adev, PSP_SECUREDISPLAY_SHARED_MEM_SIZE,
-				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
-				      &psp->securedisplay_context.context.mem_context.shared_bo,
-				      &psp->securedisplay_context.context.mem_context.shared_mc_addr,
-				      &psp->securedisplay_context.context.mem_context.shared_buf);
-
-	return ret;
+	return psp_ta_init_shared_buf(
+		psp, &psp->securedisplay_context.context.mem_context,
+		PSP_SECUREDISPLAY_SHARED_MEM_SIZE);
 }
 
 static int psp_securedisplay_load(struct psp_context *psp)
@@ -2124,9 +2072,7 @@ static int psp_securedisplay_initialize(struct psp_context *psp)
 	if (ret) {
 		psp_securedisplay_unload(psp);
 
-		amdgpu_bo_free_kernel(&psp->securedisplay_context.context.mem_context.shared_bo,
-			      &psp->securedisplay_context.context.mem_context.shared_mc_addr,
-			      &psp->securedisplay_context.context.mem_context.shared_buf);
+		psp_ta_free_shared_buf(&psp->securedisplay_context.context.mem_context);
 
 		psp->securedisplay_context.context.initialized = false;
 
@@ -2163,9 +2109,7 @@ static int psp_securedisplay_terminate(struct psp_context *psp)
 	psp->securedisplay_context.context.initialized = false;
 
 	/* free securedisplay shared memory */
-	amdgpu_bo_free_kernel(&psp->securedisplay_context.context.mem_context.shared_bo,
-			      &psp->securedisplay_context.context.mem_context.shared_mc_addr,
-			      &psp->securedisplay_context.context.mem_context.shared_buf);
+	psp_ta_free_shared_buf(&psp->securedisplay_context.context.mem_context);
 
 	return ret;
 }

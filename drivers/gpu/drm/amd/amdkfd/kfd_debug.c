@@ -50,7 +50,8 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 					uint32_t watch_point_bit_mask_to_free);
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
-		      unsigned int *source_id,
+		      unsigned int *queue_id,
+		      unsigned int *gpu_id,
 		      uint64_t exception_clear_mask,
 		      uint64_t *event_status)
 {
@@ -63,7 +64,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 
 	mutex_lock(&process->event_mutex);
 	*event_status = 0;
-	*source_id = 0;
+	*queue_id = 0;
+	*gpu_id = 0;
 
 	/* find and report queue events */
 	pqm = &process->pqm;
@@ -79,7 +81,8 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 			continue;
 
 		*event_status = pqn->q->properties.exception_status;
-		*source_id = pqn->q->properties.queue_id;
+		*queue_id = pqn->q->properties.queue_id;
+		*gpu_id = pqn->q->device->id;
 		pqn->q->properties.exception_status &= ~exception_clear_mask;
 		goto out;
 	}
@@ -94,7 +97,7 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 			continue;
 
 		*event_status = pdd->exception_status;
-		*source_id = pdd->dev->id;
+		*gpu_id = pdd->dev->id;
 		pdd->exception_status &= ~exception_clear_mask;
 		goto out;
 	}

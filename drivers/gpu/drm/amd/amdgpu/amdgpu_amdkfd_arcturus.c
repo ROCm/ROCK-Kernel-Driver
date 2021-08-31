@@ -314,5 +314,6 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.set_precise_mem_ops = kgd_gfx_v9_set_precise_mem_ops,
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
-	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy
+	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy,
+	.program_trap_handler_settings = kgd_gfx_v9_program_trap_handler_settings
 };
