@@ -38,3 +38,25 @@ void _kcl_drm_gem_ttm_vunmap(struct drm_gem_object *gem,
 }
 EXPORT_SYMBOL(_kcl_drm_gem_ttm_vunmap);
 #endif
+
+#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
+int _kcl_drm_gem_ttm_mmap(struct drm_gem_object *gem,
+                     struct vm_area_struct *vma) {
+
+        struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(gem);
+        int ret;
+
+        ret = ttm_bo_mmap_obj(vma, bo);
+        if (ret < 0)
+                return ret;
+
+        /*
+         * ttm has its own object refcounting, so drop gem reference
+         * to avoid double accounting counting.
+         */
+        drm_gem_object_put(gem);
+
+        return 0;
+}
+EXPORT_SYMBOL(_kcl_drm_gem_ttm_mmap);
+#endif
