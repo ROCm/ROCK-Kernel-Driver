@@ -1,0 +1,128 @@
+# Usage:
+#
+# Rebuild cwsr_trap_hander.h:
+#	make -f Makefile.trap_handler SP3_PATH=/path/to/sp3/binaries
+#	    -- to use the current path for the trap handler soruce files
+#	make -f Makefile.trap_handler SP3_PATH=/path/to/sp3/binaries LINUX=/path/to/linux
+#	    -- To build the trap handler source files in a differnt linux
+#	    source tree.
+
+ifndef LINUX
+LINUX:=$(realpath ../../../../..)
+endif
+
+ifndef SP3_PATH
+$(error Required argument SP3_PATH=/path/to/sp3/binaries/)
+endif
+
+KFD=$(LINUX)/drivers/gpu/drm/amd/amdkfd
+
+all: $(KFD)/cwsr_trap_handler.h
+
+gfx8.hex: $(KFD)/cwsr_trap_handler_gfx8.asm Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx8 PROJECT=gfx8 $(SP3_PATH)/sp3-gfx8/sp3 $< -hex $@
+
+gfx8.asm: gfx8.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx8 PROJECT=gfx8 $(SP3_PATH)/sp3-gfx8/sp3 -hex $< $@
+
+gfx9.sp3: $(KFD)/cwsr_trap_handler_gfx9.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_VEGAM -DASIC_TARGET_ARCTURUS=0 -P $< -o $@
+
+gfx9.hex: gfx9.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 $< -hex $@
+
+gfx9.asm: gfx9.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 -hex $< $@
+
+nv1x.sp3: $(KFD)/cwsr_trap_handler_gfx10.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_NAVI10 -DASIC_TARGET_NAVI1X=1 -P $< -o $@
+
+nv1x.hex: nv1x.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx10.1 $(SP3_PATH)/sp3-gfx10.1/sp3 $< -hex $@
+
+nv1x.asm: nv1x.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx10.1 $(SP3_PATH)/sp3-gfx10.1/sp3 -hex $< $@
+
+arc.sp3: $(KFD)/cwsr_trap_handler_gfx9.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_ARCTURUS -DASIC_TARGET_ARCTURUS=1 -P $< -o $@
+
+arc.hex: arc.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 $< -hex $@
+
+arc.asm: arc.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 -hex $< $@
+
+ald.sp3: $(KFD)/cwsr_trap_handler_gfx9.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_ALDEBARAN -DASIC_TARGET_ARCTURUS=1 -P $< -o $@
+
+ald.hex: ald.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 $< -hex $@
+
+ald.asm: ald.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx9 $(SP3_PATH)/sp3-gfx9/sp3 -hex $< $@
+
+gfx10.sp3: $(KFD)/cwsr_trap_handler_gfx10.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_SIENNA_CICHLID -DASIC_TARGET_NAVI1X=0 -P $< -o $@
+
+gfx10.hex: gfx10.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx10.3 $(SP3_PATH)/sp3-gfx10.3/sp3 $< -hex $@
+
+gfx10.asm: gfx10.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx10.3 $(SP3_PATH)/sp3-gfx10.3/sp3 -hex $< $@
+
+gfx11.sp3: $(KFD)/cwsr_trap_handler_gfx10.asm Makefile
+	cpp -DASIC_FAMILY=CHIP_PLUM_BONITO -P $< -o $@
+
+gfx11.hex: gfx11.sp3 Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx11 $(SP3_PATH)/sp3-gfx11/sp3 $< -hex $@
+
+gfx11.asm: gfx11.hex Makefile
+	LD_LIBRARY_PATH=$(SP3_PATH)/sp3-gfx11 $(SP3_PATH)/sp3-gfx11/sp3 -hex $< $@
+
+%.nocom.asm: %.asm
+	sed 's/\/\/.*//g' $< > $@
+
+$(KFD)/cwsr_trap_handler.h: gfx8.hex gfx9.hex nv1x.hex arc.hex ald.hex gfx10.hex $(SP3_PATH)/header.h Makefile
+	cp $(SP3_PATH)/header.h $@
+	echo "#if CWSR_TRAP_GFX8_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx8.asm`" >> $@
+	echo "#   error \"GFX8 CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_gfx8_hex[] = {" >> $@
+	cat gfx8.hex >> $@
+	echo "};\n\n" >> $@
+	echo "#if CWSR_TRAP_GFX9_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx9.asm`" >> $@
+	echo "#   error \"GFX9 CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_gfx9_hex[] = {" >> $@
+	cat gfx9.hex >> $@
+	echo "};\n" >> $@
+	echo "#if CWSR_TRAP_GFXnv1x_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx10.asm`" >> $@
+	echo "#   error \"nv1x CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_nv1x_hex[] = {" >> $@
+	cat nv1x.hex >> $@
+	echo "};\n" >> $@
+	echo "#if CWSR_TRAP_GFXarc_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx9.asm`" >> $@
+	echo "#   error \"GFXarc CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_arcturus_hex[] = {" >> $@
+	cat arc.hex >> $@
+	echo "};\n" >> $@
+	echo "#if CWSR_TRAP_GFXald_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx9.asm`" >> $@
+	echo "#   error \"GFXald CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_aldebaran_hex[] = {" >> $@
+	cat ald.hex >> $@
+	echo "};\n" >> $@
+	echo "#if CWSR_TRAP_GFX10_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx10.asm`" >> $@
+	echo "#   error \"GFX10 CWSR checksum mismatch\"" >> $@
+	echo "#endif" >> $@
+	echo "static const uint32_t cwsr_trap_gfx10_hex[] = {" >> $@
+	cat gfx10.hex >> $@
+	#echo "};\n" >> $@
+	#echo "#if CWSR_TRAP_GFX11_CHECKSUM != 0x`crc32 $(KFD)/cwsr_trap_handler_gfx10.asm`" >> $@
+	#echo "#   error \"GFX11 CWSR checksum mismatch\"" >> $@
+	#echo "#endif" >> $@
+	#echo "static const uint32_t cwsr_trap_gfx11_hex[] = {" >> $@
+	#cat gfx11.hex >> $@
+	echo "};" >> $@
