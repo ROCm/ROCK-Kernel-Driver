@@ -43,12 +43,12 @@ static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
 
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
 static uint32_t kgd_aldebaran_disable_debug_trap(struct kgd_dev *kgd,
-					     uint32_t vmid)
+						bool keep_trap_enabled,
+						uint32_t vmid)
 {
 	uint32_t data = 0;
 
-	/* TRAP_EN is set globally on driver init so preserve setting. */
-	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, 1);
+	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, keep_trap_enabled);
 	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, EXCP_EN, 0);
 	data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, EXCP_REPLACE, 0);
 
