@@ -791,7 +791,9 @@ uint32_t kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
 	return 0;
 }
 
-uint32_t kgd_gfx_v10_disable_debug_trap(struct amdgpu_device *adev, uint32_t vmid)
+uint32_t kgd_gfx_v10_disable_debug_trap(struct amdgpu_device *adev,
+					bool keep_trap_enabled,
+					uint32_t vmid)
 {
 	mutex_lock(&adev->grbm_idx_mutex);
 
