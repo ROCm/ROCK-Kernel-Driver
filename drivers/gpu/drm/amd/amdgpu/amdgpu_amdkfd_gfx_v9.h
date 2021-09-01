@@ -52,7 +52,9 @@ bool kgd_gfx_v9_get_atc_vmid_pasid_mapping_info(struct amdgpu_device *adev,
 uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 				      bool restore_dbg_registers,
 				      uint32_t vmid);
-uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev, uint32_t vmid);
+uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
+					bool keep_trap_enabled,
+					uint32_t vmid);
 int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,

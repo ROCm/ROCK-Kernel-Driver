@@ -23,7 +23,9 @@
 uint32_t kgd_gfx_v10_enable_debug_trap(struct kgd_dev *kgd,
 				      bool restore_dbg_registers,
 				      uint32_t vmid);
-uint32_t kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd, uint32_t vmid);
+uint32_t kgd_gfx_v10_disable_debug_trap(struct kgd_dev *kgd,
+					bool keep_trap_enabled,
+					uint32_t vmid);
 int kgd_gfx_v10_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t vmid,
 					     uint32_t trap_override,

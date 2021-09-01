@@ -356,6 +356,7 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 		pdd->spi_dbg_override =
 				pdd->dev->kfd2kgd->disable_debug_trap(
 				pdd->dev->kgd,
+				target->runtime_info.ttmp_setup,
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
@@ -988,6 +989,15 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 						true,
 						pdd->dev->vm_info.last_vmid_kfd);
 			}
+
+			if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
+				pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
+						pdd->dev->kgd,
+						false,
+						pdd->dev->vm_info.last_vmid_kfd);
+
+				debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
+			}
 		}
 	}
 
@@ -1049,7 +1059,15 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
-		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, false);
+		if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
+			pdd->spi_dbg_override =
+					pdd->dev->kfd2kgd->disable_debug_trap(
+					pdd->dev->kgd,
+					false,
+					pdd->dev->vm_info.last_vmid_kfd);
+
+			debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, false);
+		}
 	}
 
 	return 0;
