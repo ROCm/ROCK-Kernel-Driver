@@ -23,6 +23,18 @@
 # Makefile for Heterogenous System Architecture support for AMD GPU devices
 #
 
+CWSR_TRAP_GFX8_CHECKSUM    := 0x$(shell crc32 $(FULL_AMD_PATH)/amdkfd/cwsr_trap_handler_gfx8.asm)
+CWSR_TRAP_GFX9_CHECKSUM    := 0x$(shell crc32 $(FULL_AMD_PATH)/amdkfd/cwsr_trap_handler_gfx9.asm)
+CWSR_TRAP_GFX10_CHECKSUM   := 0x$(shell crc32 $(FULL_AMD_PATH)/amdkfd/cwsr_trap_handler_gfx10.asm)
+
+KBUILD_CPPFLAGS+=-DCWSR_TRAP_GFX8_CHECKSUM=$(CWSR_TRAP_GFX8_CHECKSUM) \
+		 -DCWSR_TRAP_GFX9_CHECKSUM=$(CWSR_TRAP_GFX9_CHECKSUM) \
+		 -DCWSR_TRAP_GFXnv1x_CHECKSUM=$(CWSR_TRAP_GFX10_CHECKSUM) \
+		 -DCWSR_TRAP_GFXarc_CHECKSUM=$(CWSR_TRAP_GFX9_CHECKSUM) \
+		 -DCWSR_TRAP_GFXald_CHECKSUM=$(CWSR_TRAP_GFX9_CHECKSUM) \
+		 -DCWSR_TRAP_GFX10_CHECKSUM=$(CWSR_TRAP_GFX10_CHECKSUM)
+
+
 AMDKFD_FILES	:= $(AMDKFD_PATH)/kfd_module.o \
 		$(AMDKFD_PATH)/kfd_device.o \
 		$(AMDKFD_PATH)/kfd_chardev.o \
