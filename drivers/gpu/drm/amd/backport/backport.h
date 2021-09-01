@@ -87,5 +87,6 @@
 #include "kcl/kcl_drm_gem_ttm_helper.h"
 #include "kcl/kcl_mce.h"
 #include "kcl/kcl_drm_aperture.h"
+#include <kcl/kcl_intel_family.h>
 
 #endif /* AMDGPU_BACKPORT_H */
