@@ -762,7 +762,7 @@ void gfx_v9_4_2_debug_trap_config_init(struct amdgpu_device *adev,
 	for (i = first_vmid; i < last_vmid; i++) {
 		data = 0;
 		soc15_grbm_select(adev, 0, 0, 0, i, 0);
-		data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, 1);
+		data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, TRAP_EN, 0);
 		data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, EXCP_EN, 0);
 		data = REG_SET_FIELD(data, SPI_GDBG_PER_VMID_CNTL, EXCP_REPLACE,
 					0);
