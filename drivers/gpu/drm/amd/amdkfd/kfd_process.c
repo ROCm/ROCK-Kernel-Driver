@@ -1217,7 +1217,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		hash_for_each_rcu(kfd_processes_table, temp, target, kfd_processes) {
 			if (target->debugger_process &&
 				target->debugger_process == p) {
-				mutex_lock(&target->mutex);
+				mutex_lock_nested(&target->mutex, 1);
 				if (target->debug_trap_enabled)
 					kfd_dbg_trap_disable(target);
 				mutex_unlock(&target->mutex);
