@@ -306,7 +306,7 @@ static enum dc_dp_training_pattern decide_eq_training_pattern(struct dc_link *li
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -341,7 +341,7 @@ static enum dc_dp_training_pattern decide_eq_training_pattern(struct dc_link *li
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -2393,7 +2393,7 @@ bool perform_link_training_with_retries(
 	 * link.
 	 */
 	if (link->is_dig_mapping_flexible && link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = stream->link_enc;
+		link_enc = link_enc_cfg_get_link_enc_used_by_stream(link->ctx->dc, pipe_ctx->stream);
 	else
 		link_enc = link->link_enc;
 
@@ -2680,9 +2680,9 @@ bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign) {
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 		if (link_enc == NULL)
-			link_enc = link_enc_cfg_get_next_avail_link_enc(link->dc, link->dc->current_state);
+			link_enc = link_enc_cfg_get_next_avail_link_enc(link->ctx->dc);
 	} else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -2711,9 +2711,9 @@ static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign) {
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 		if (link_enc == NULL)
-			link_enc = link_enc_cfg_get_next_avail_link_enc(link->dc, link->dc->current_state);
+			link_enc = link_enc_cfg_get_next_avail_link_enc(link->ctx->dc);
 	} else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -2895,7 +2895,13 @@ bool dp_verify_link_cap(
 	enum link_training_result status;
 	union hpd_irq_data irq_data;
 
-	if (link->dc->debug.skip_detection_link_training) {
+	/* Accept reported capabilities if link supports flexible encoder mapping or encoder already in use. */
+	if (link->dc->debug.skip_detection_link_training ||
+			link->is_dig_mapping_flexible) {
+		link->verified_link_cap = *known_limit_link_setting;
+		return true;
+	} else if (link->link_enc && link->dc->res_pool->funcs->link_encs_assign &&
+			!link_enc_cfg_is_link_enc_avail(link->ctx->dc, link->link_enc->preferred_engine)) {
 		link->verified_link_cap = *known_limit_link_setting;
 		return true;
 	}
@@ -5705,7 +5711,7 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, bool ready)
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -5752,8 +5758,7 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(
-				link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);

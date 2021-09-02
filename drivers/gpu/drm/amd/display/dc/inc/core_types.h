@@ -411,6 +411,17 @@ struct pipe_ctx {
 	bool vtp_locked;
 };
 
+/* Data used for dynamic link encoder assignment.
+ * Tracks current and future assignments; available link encoders;
+ * and mode of operation (whether to use current or future assignments).
+ */
+struct link_enc_cfg_context {
+	enum link_enc_cfg_mode mode;
+	struct link_enc_assignment link_enc_assignments[MAX_PIPES];
+	enum engine_id link_enc_avail[MAX_DIG_LINK_ENCODERS];
+	struct link_enc_assignment transient_assignments[MAX_PIPES];
+};
+
 struct resource_context {
 	struct pipe_ctx pipe_ctx[MAX_PIPES];
 	bool is_stream_enc_acquired[MAX_PIPES * 2];
@@ -420,12 +431,7 @@ struct resource_context {
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool is_dsc_acquired[MAX_PIPES];
 #endif
-	/* A table/array of encoder-to-link assignments. One entry per stream.
-	 * Indexed by stream index in dc_state.
-	 */
-	struct link_enc_assignment link_enc_assignments[MAX_PIPES];
-	/* List of available link encoders. Uses engine ID as encoder identifier. */
-	enum engine_id link_enc_avail[MAX_DIG_LINK_ENCODERS];
+	struct link_enc_cfg_context link_enc_cfg_ctx;
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	bool is_hpo_dp_stream_enc_acquired[MAX_HPO_DP2_ENCODERS];
 #endif
