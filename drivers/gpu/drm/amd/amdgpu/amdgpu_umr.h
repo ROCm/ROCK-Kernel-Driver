@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright 2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,40 +19,33 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
+#include <linux/ioctl.h>
 
-#ifndef DM_CP_PSP_IF__H
-#define DM_CP_PSP_IF__H
-
-struct dc_link;
-
-struct cp_psp_stream_config {
-	uint8_t otg_inst;
-	uint8_t dig_be;
-	uint8_t dig_fe;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	uint8_t link_enc_idx;
-	uint8_t stream_enc_idx;
-	uint8_t phy_idx;
-#endif
-	uint8_t assr_enabled;
-	uint8_t mst_enabled;
-	uint8_t dp2_enabled;
-	void *dm_stream_ctx;
-	bool dpms_off;
+/*
+ * MMIO debugfs IOCTL structure
+ */
+struct amdgpu_debugfs_regs2_iocdata {
+	__u32 use_srbm, use_grbm, pg_lock;
+	struct {
+		__u32 se, sh, instance;
+	} grbm;
+	struct {
+		__u32 me, pipe, queue, vmid;
+	} srbm;
 };
 
-struct cp_psp_funcs {
-	bool (*enable_assr)(void *handle, struct dc_link *link);
-	void (*update_stream_config)(void *handle, struct cp_psp_stream_config *config);
+/*
+ * MMIO debugfs state data (per file* handle)
+ */
+struct amdgpu_debugfs_regs2_data {
+	struct amdgpu_device *adev;
+	struct mutex lock;
+	struct amdgpu_debugfs_regs2_iocdata id;
 };
 
-struct cp_psp {
-	void *handle;
-	struct cp_psp_funcs funcs;
+enum AMDGPU_DEBUGFS_REGS2_CMDS {
+	AMDGPU_DEBUGFS_REGS2_CMD_SET_STATE=0,
 };
 
-
-#endif /* DM_CP_PSP_IF__H */
+#define AMDGPU_DEBUGFS_REGS2_IOC_SET_STATE _IOWR(0x20, AMDGPU_DEBUGFS_REGS2_CMD_SET_STATE, struct amdgpu_debugfs_regs2_iocdata)

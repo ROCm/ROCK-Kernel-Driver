@@ -47,6 +47,10 @@ struct dc_link_status {
 struct link_mst_stream_allocation {
 	/* DIG front */
 	const struct stream_encoder *stream_enc;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	/* HPO DP Stream Encoder */
+	const struct hpo_dp_stream_encoder *hpo_dp_stream_enc;
+#endif
 	/* associate DRM payload table with DC stream encoder */
 	uint8_t vcp_id;
 	/* number of slots required for the DP stream in transport packet */
@@ -152,6 +156,9 @@ struct dc_link {
 
 	struct panel_cntl *panel_cntl;
 	struct link_encoder *link_enc;
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	struct hpo_dp_link_encoder *hpo_dp_link_enc;
+#endif
 	struct graphics_object_id link_id;
 	/* Endpoint type distinguishes display endpoints which do not have entries
 	 * in the BIOS connector table from those that do. Helps when tracking link

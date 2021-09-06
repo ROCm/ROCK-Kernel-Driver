@@ -259,6 +259,12 @@ struct resource_pool {
 	 */
 	unsigned int dig_link_enc_count;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	unsigned int hpo_dp_stream_enc_count;
+	struct hpo_dp_stream_encoder *hpo_dp_stream_enc[MAX_HPO_DP2_ENCODERS];
+	unsigned int hpo_dp_link_enc_count;
+	struct hpo_dp_link_encoder *hpo_dp_link_enc[MAX_HPO_DP2_LINK_ENCODERS];
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct dc_3dlut *mpc_lut[MAX_PIPES];
 	struct dc_transfer_func *mpc_shaper[MAX_PIPES];
@@ -315,6 +321,9 @@ struct stream_resource {
 #endif
 	struct timing_generator *tg;
 	struct stream_encoder *stream_enc;
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	struct hpo_dp_stream_encoder *hpo_dp_stream_enc;
+#endif
 	struct audio *audio;
 
 	struct pixel_clk_params pix_clk_params;
@@ -415,6 +424,9 @@ struct resource_context {
 	struct link_enc_assignment link_enc_assignments[MAX_PIPES];
 	/* List of available link encoders. Uses engine ID as encoder identifier. */
 	enum engine_id link_enc_avail[MAX_DIG_LINK_ENCODERS];
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	bool is_hpo_dp_stream_enc_acquired[MAX_HPO_DP2_ENCODERS];
+#endif
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool is_mpc_3dlut_acquired[MAX_PIPES];
 #endif
