@@ -3803,6 +3803,12 @@ fence_driver_init:
 	/* init the mode config */
 	drm_mode_config_init(adev_to_drm(adev));
 
+	if (amdgpu_sriov_vf(adev)) {
+		adev->timeout_wq = alloc_ordered_workqueue("amdgpu_ring_timeout_wq", 0);
+		if (!adev->timeout_wq)
+			dev_warn(adev->dev, "alloc_ordered_workqueue failed\n");
+	}
+
 	r = amdgpu_device_ip_init(adev);
 	if (r) {
 		/* failed in exclusive mode due to timeout */
