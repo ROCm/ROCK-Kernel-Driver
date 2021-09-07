@@ -6919,21 +6919,23 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	if (amdgpu_in_reset(adev))
 		return 0;
 
-	work = kzalloc(sizeof(*work), GFP_ATOMIC);
-	if (!work)
-		return -ENOMEM;
+	if (dm->vblank_control_workqueue) {
+		work = kzalloc(sizeof(*work), GFP_ATOMIC);
+		if (!work)
+			return -ENOMEM;
 
-	INIT_WORK(&work->work, vblank_control_worker);
-	work->dm = dm;
-	work->acrtc = acrtc;
-	work->enable = enable;
+		INIT_WORK(&work->work, vblank_control_worker);
+		work->dm = dm;
+		work->acrtc = acrtc;
+		work->enable = enable;
 
-	if (acrtc_state->stream) {
-		dc_stream_retain(acrtc_state->stream);
-		work->stream = acrtc_state->stream;
+		if (acrtc_state->stream) {
+			dc_stream_retain(acrtc_state->stream);
+			work->stream = acrtc_state->stream;
+		}
+
+		queue_work(dm->vblank_control_workqueue, &work->work);
 	}
-
-	queue_work(dm->vblank_control_workqueue, &work->work);
 #endif
 
 	return 0;
@@ -9797,7 +9799,8 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		 * If PSR or idle optimizations are enabled then flush out
 		 * any pending work before hardware programming.
 		 */
-		flush_workqueue(dm->vblank_control_workqueue);
+		if (dm->vblank_control_workqueue)
+			flush_workqueue(dm->vblank_control_workqueue);
 #endif
 
 		bundle->stream_update.stream = acrtc_state->stream;
@@ -10246,7 +10249,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		/* if there mode set or reset, disable eDP PSR */
 		if (mode_set_reset_required) {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-			flush_workqueue(dm->vblank_control_workqueue);
+			if (dm->vblank_control_workqueue)
+				flush_workqueue(dm->vblank_control_workqueue);
 #endif
 			amdgpu_dm_psr_disable_all(dm);
 		}
