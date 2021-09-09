@@ -280,6 +280,7 @@ struct ttm_device {
 	 */
 	spinlock_t lru_lock;
 	struct list_head ddestroy;
+	struct list_head pinned;
 
 	/*
 	 * Protected by load / firstopen / lastclose /unload sync.
@@ -313,5 +314,6 @@ int ttm_device_init(struct ttm_device *bdev, struct ttm_device_funcs *funcs,
 		    struct drm_vma_offset_manager *vma_manager,
 		    bool use_dma_alloc, bool use_dma32);
 void ttm_device_fini(struct ttm_device *bdev);
+void ttm_device_clear_dma_mappings(struct ttm_device *bdev);
 
 #endif
