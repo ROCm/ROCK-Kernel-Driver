@@ -20,9 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#if CWSR_TRAP_GFX8_CHECKSUM != 0x0386846f
-#   error "GFX8 CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_gfx8_hex[] = {
 	0xbf820001, 0xbf820121,
 	0xb8f4f802, 0x89748674,
@@ -276,9 +273,6 @@ static const uint32_t cwsr_trap_gfx8_hex[] = {
 };
 
 
-#if CWSR_TRAP_GFX9_CHECKSUM != 0x34234cc5
-#   error "GFX9 CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbf820001, 0xbf820253,
 	0xb8f8f802, 0x89788678,
@@ -681,9 +675,6 @@ static const uint32_t cwsr_trap_gfx9_hex[] = {
 	0xbf810000, 0x00000000,
 };
 
-#if CWSR_TRAP_GFXnv1x_CHECKSUM != 0xefdf216c
-#   error "nv1x CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_nv1x_hex[] = {
 	0xbf820001, 0xbf8201f0,
 	0xb0804004, 0xb978f802,
@@ -1101,9 +1092,6 @@ static const uint32_t cwsr_trap_nv1x_hex[] = {
 	0xbf9f0000, 0xbf9f0000,
 };
 
-#if CWSR_TRAP_GFXarc_CHECKSUM != 0x34234cc5
-#   error "GFXarc CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_arcturus_hex[] = {
 	0xbf820001, 0xbf8202cf,
 	0xb8f8f802, 0x89788678,
@@ -1582,9 +1570,6 @@ static const uint32_t cwsr_trap_arcturus_hex[] = {
 	0xbf810000, 0x00000000,
 };
 
-#if CWSR_TRAP_GFXald_CHECKSUM != 0x34234cc5
-#   error "GFXald CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_aldebaran_hex[] = {
 	0xbf820001, 0xbf8202da,
 	0xb8f8f802, 0x89788678,
@@ -2074,9 +2059,6 @@ static const uint32_t cwsr_trap_aldebaran_hex[] = {
 	0xbf810000, 0x00000000,
 };
 
-#if CWSR_TRAP_GFX10_CHECKSUM != 0xefdf216c
-#   error "GFX10 CWSR checksum mismatch"
-#endif
 static const uint32_t cwsr_trap_gfx10_hex[] = {
 	0xbf820001, 0xbf82021b,
 	0xb0804004, 0xb978f802,
