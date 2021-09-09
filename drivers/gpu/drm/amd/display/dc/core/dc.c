@@ -1818,6 +1818,23 @@ static bool is_flip_pending_in_pipes(struct dc *dc, struct dc_state *context)
 	return false;
 }
 
+/* Perform updates here which need to be deferred until next vupdate
+ *
+ * i.e. blnd lut, 3dlut, and shaper lut bypass regs are double buffered
+ * but forcing lut memory to shutdown state is immediate. This causes
+ * single frame corruption as lut gets disabled mid-frame unless shutdown
+ * is deferred until after entering bypass.
+ */
+static void process_deferred_updates(struct dc *dc)
+{
+	int i;
+
+	if (dc->debug.enable_mem_low_power.bits.cm)
+		for (i = 0; i < dc->dcn_ip->max_num_dpp; i++)
+			if (dc->res_pool->dpps[i]->funcs->dpp_deferred_update)
+				dc->res_pool->dpps[i]->funcs->dpp_deferred_update(dc->res_pool->dpps[i]);
+}
+
 void dc_post_update_surfaces_to_stream(struct dc *dc)
 {
 	int i;
@@ -1842,6 +1859,8 @@ void dc_post_update_surfaces_to_stream(struct dc *dc)
 			context->res_ctx.pipe_ctx[i].pipe_idx = i;
 			dc->hwss.disable_plane(dc, &context->res_ctx.pipe_ctx[i]);
 		}
+
+	process_deferred_updates(dc);
 
 	dc->hwss.optimize_bandwidth(dc, context);
 

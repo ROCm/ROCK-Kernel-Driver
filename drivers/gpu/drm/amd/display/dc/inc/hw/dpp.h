@@ -29,6 +29,15 @@
 
 #include "transform.h"
 
+union defer_reg_writes {
+	struct {
+		bool disable_blnd_lut:1;
+		bool disable_3dlut:1;
+		bool disable_shaper:1;
+	} bits;
+	uint32_t raw;
+};
+
 struct dpp {
 	const struct dpp_funcs *funcs;
 	struct dc_context *ctx;
@@ -47,6 +56,7 @@ struct dpp {
 	struct pwl_params shaper_params;
 	bool cm_bypass_mode;
 #endif
+	union defer_reg_writes deferred_reg_writes;
 };
 
 struct dpp_input_csc_matrix {
@@ -254,6 +264,8 @@ struct dpp_funcs {
 			bool dppclk_div,
 			bool enable);
 
+	void (*dpp_deferred_update)(
+			struct dpp *dpp);
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	bool (*dpp_program_blnd_lut)(
 			struct dpp *dpp,
