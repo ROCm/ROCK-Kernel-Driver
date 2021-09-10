@@ -555,45 +555,8 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 			dpcd_base_lt_offset,
 			dpcd_pattern.v1_4.TRAINING_PATTERN_SET);
 	}
-	/*****************************************************************
-	* DpcdAddress_Lane0Set -> DpcdAddress_Lane3Set
-	*****************************************************************/
-	for (lane = 0; lane <
-		(uint32_t)(lt_settings->link_settings.lane_count); lane++) {
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-		if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
-				DP_128b_132b_ENCODING) {
-			dpcd_lane[lane].tx_ffe.PRESET_VALUE =
-					lt_settings->lane_settings[lane].FFE_PRESET.settings.level;
-		} else if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
-				DP_8b_10b_ENCODING) {
-			dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-					(uint8_t)(lt_settings->lane_settings[lane].VOLTAGE_SWING);
-			dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-					(uint8_t)(lt_settings->lane_settings[lane].PRE_EMPHASIS);
-
-			dpcd_lane[lane].bits.MAX_SWING_REACHED =
-					(lt_settings->lane_settings[lane].VOLTAGE_SWING ==
-							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-			dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-					(lt_settings->lane_settings[lane].PRE_EMPHASIS ==
-							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-		}
-#else
-		dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-		(uint8_t)(lt_settings->lane_settings[lane].VOLTAGE_SWING);
-		dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-		(uint8_t)(lt_settings->lane_settings[lane].PRE_EMPHASIS);
-
-		dpcd_lane[lane].bits.MAX_SWING_REACHED =
-		(lt_settings->lane_settings[lane].VOLTAGE_SWING ==
-		VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-		dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-		(lt_settings->lane_settings[lane].PRE_EMPHASIS ==
-		PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-#endif
-	}
+	dp_hw_to_dpcd_lane_settings(lt_settings, lt_settings->lane_settings, dpcd_lane);
 
 	/* concatenate everything into one buffer*/
 
@@ -717,6 +680,37 @@ bool dp_is_symbol_locked(enum dc_lane_count ln_count,
 bool dp_is_interlane_aligned(union lane_align_status_updated align_status)
 {
 	return align_status.bits.INTERLANE_ALIGN_DONE == 1;
+}
+
+void dp_hw_to_dpcd_lane_settings(
+		const struct link_training_settings *lt_settings,
+		const struct dc_lane_settings hw_lane_settings[LANE_COUNT_DP_MAX],
+		union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX])
+{
+	uint8_t lane = 0;
+
+	for (lane = 0; lane < LANE_COUNT_DP_MAX; lane++) {
+		if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
+				DP_8b_10b_ENCODING) {
+			dpcd_lane_settings[lane].bits.VOLTAGE_SWING_SET =
+					(uint8_t)(hw_lane_settings[lane].VOLTAGE_SWING);
+			dpcd_lane_settings[lane].bits.PRE_EMPHASIS_SET =
+					(uint8_t)(hw_lane_settings[lane].PRE_EMPHASIS);
+			dpcd_lane_settings[lane].bits.MAX_SWING_REACHED =
+					(hw_lane_settings[lane].VOLTAGE_SWING ==
+							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
+			dpcd_lane_settings[lane].bits.MAX_PRE_EMPHASIS_REACHED =
+					(hw_lane_settings[lane].PRE_EMPHASIS ==
+							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
+		}
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+		else if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
+				DP_128b_132b_ENCODING) {
+			dpcd_lane_settings[lane].tx_ffe.PRESET_VALUE =
+					hw_lane_settings[lane].FFE_PRESET.settings.level;
+		}
+#endif
+	}
 }
 
 void dp_update_drive_settings(
@@ -1038,46 +1032,9 @@ enum dc_status dpcd_set_lane_settings(
 		lane0_set_address = DP_TRAINING_LANE0_SET_PHY_REPEATER1 +
 		((DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE) * (offset - 1));
 
-	for (lane = 0; lane <
-		(uint32_t)(link_training_setting->
-		link_settings.lane_count);
-		lane++) {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-		if (dp_get_link_encoding_format(&link_training_setting->link_settings) ==
-				DP_128b_132b_ENCODING) {
-			dpcd_lane[lane].tx_ffe.PRESET_VALUE =
-					link_training_setting->lane_settings[lane].FFE_PRESET.settings.level;
-		} else if (dp_get_link_encoding_format(&link_training_setting->link_settings) ==
-				DP_8b_10b_ENCODING) {
-			dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-					(uint8_t)(link_training_setting->lane_settings[lane].VOLTAGE_SWING);
-			dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-					(uint8_t)(link_training_setting->lane_settings[lane].PRE_EMPHASIS);
-
-			dpcd_lane[lane].bits.MAX_SWING_REACHED =
-					(link_training_setting->lane_settings[lane].VOLTAGE_SWING ==
-							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-			dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-					(link_training_setting->lane_settings[lane].PRE_EMPHASIS ==
-							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-		}
-#else
-		dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-			(uint8_t)(link_training_setting->
-			lane_settings[lane].VOLTAGE_SWING);
-		dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-			(uint8_t)(link_training_setting->
-			lane_settings[lane].PRE_EMPHASIS);
-		dpcd_lane[lane].bits.MAX_SWING_REACHED =
-			(link_training_setting->
-			lane_settings[lane].VOLTAGE_SWING ==
-			VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-		dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-			(link_training_setting->
-			lane_settings[lane].PRE_EMPHASIS ==
-			PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-#endif
-	}
+	dp_hw_to_dpcd_lane_settings(link_training_setting,
+			link_training_setting->lane_settings,
+			dpcd_lane);
 
 	status = core_link_write_dpcd(link,
 		lane0_set_address,
