@@ -107,4 +107,6 @@ static inline bool kfd_dbg_is_rlc_restore_supported(struct kfd_dev *dev)
 	return !(dev->device_info->asic_family == CHIP_NAVI10 ||
 		 dev->device_info->asic_family == CHIP_NAVI14);
 }
+
+bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev);
 #endif
