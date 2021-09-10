@@ -1108,3 +1108,53 @@ void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
 
 	mutex_unlock(&target->event_mutex);
 }
+
+bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev)
+{
+	bool firmware_supported = true;
+
+	if (dev->device_info->asic_family <= CHIP_VEGA10)
+		return false;
+
+	/*
+	 * Note: Any unlisted devices here are assumed to support exception handling.
+	 * Add additional checks here as needed.
+	 */
+	switch (dev->device_info->asic_family) {
+	case CHIP_VEGA10:
+		firmware_supported = dev->mec_fw_version >= 459 + 32768;
+		break;
+	case CHIP_VEGA12:
+	case CHIP_VEGA20:
+	case CHIP_RAVEN:
+	case CHIP_RENOIR:
+		firmware_supported = dev->mec_fw_version >= 459;
+		break;
+	case CHIP_ARCTURUS:
+		firmware_supported = dev->mec_fw_version >= 60;
+		break;
+	case CHIP_ALDEBARAN:
+		firmware_supported = dev->mec_fw_version >= 51;
+		break;
+	case CHIP_NAVI10:
+	case CHIP_NAVI12:
+	case CHIP_NAVI14:
+		firmware_supported = dev->mec_fw_version >= 144;
+		break;
+	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
+	case CHIP_VANGOGH:
+	case CHIP_DIMGREY_CAVEFISH:
+	case CHIP_BEIGE_GOBY:
+		firmware_supported = dev->mec_fw_version >= 89;
+		break;
+	case CHIP_YELLOW_CARP:
+	case CHIP_CYAN_SKILLFISH:
+		firmware_supported = false;
+		break;
+	default:
+		break;
+	}
+
+	return firmware_supported;
+}
