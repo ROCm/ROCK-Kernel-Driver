@@ -822,6 +822,9 @@
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1
 
+/* mmput_async() is available */
+#define HAVE_MMPUT_ASYNC 1
+
 /* mmu_notifier_call_srcu() is available */
 /* #undef HAVE_MMU_NOTIFIER_CALL_SRCU */
 
