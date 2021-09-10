@@ -5,6 +5,10 @@
 #include <linux/sched/mm.h>
 #include <linux/mm.h>
 
+#ifndef HAVE_MMPUT_ASYNC
+#define mmput_async _kcl_mmput_async
+#endif
+
 #ifdef get_user_pages_remote
 #undef get_user_pages_remote
 #endif
