@@ -37,6 +37,7 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
+#include "kfd_debug.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ras.h"
 
@@ -1794,10 +1795,15 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
 			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
 			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
+
 		dev->node_props.debug_prop |=
 					HSA_DBG_TRAP_DEBUG_TRAP_DATA_COUNT |
 					HSA_DBG_TRAP_DEBUG_WATCH_MASK_LO_BIT |
 					HSA_DBG_TRAP_DEBUG_WATCH_MASK_HI_BIT;
+
+		if (dev->gpu && kfd_dbg_has_supported_firmware(dev->gpu))
+			dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
+
 		break;
 	default:
 		WARN(1, "Unexpected ASIC family %u",
