@@ -30,7 +30,7 @@
 #include <drm/ttm/ttm_resource.h>
 #include <drm/ttm/ttm_pool.h>
 
-#define TTM_NUM_MEM_TYPES 8
+#define TTM_NUM_MEM_TYPES 10
 
 struct ttm_device;
 struct ttm_placement;
