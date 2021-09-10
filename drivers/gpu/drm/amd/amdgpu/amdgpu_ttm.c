@@ -2038,6 +2038,7 @@ static int amdgpu_dgma_import_mgr_init(struct amdgpu_device *adev, uint64_t p_si
 	spin_lock_init(&mgr->lock);
 	atomic64_set(&mgr->available, p_size);
 
+	BUG_ON(AMDGPU_PL_DGMA_IMPORT >= TTM_NUM_MEM_TYPES);
 	ttm_set_driver_manager(&adev->mman.bdev, AMDGPU_PL_DGMA_IMPORT, man);
 	ttm_resource_manager_set_used(man, true);
 	return 0;
