@@ -26,6 +26,10 @@
 extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
 #endif
 
+#ifndef HAVE_MMPUT_ASYNC
+extern void (*_kcl_mmput_async)(struct mm_struct *mm);
+#endif
+
 #ifndef HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST
 static inline bool fault_flag_allow_retry_first(unsigned int flags)
 {
