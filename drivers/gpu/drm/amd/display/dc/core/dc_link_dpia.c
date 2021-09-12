@@ -269,8 +269,6 @@ static enum link_training_result dpia_training_cr_non_transparent(struct dc_link
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = { { {0} } };
 	union lane_align_status_updated dpcd_lane_status_updated = { {0} };
 	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
-	union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX] = { { {0} } };
-
 	uint8_t set_cfg_data;
 	enum dpia_set_config_ts ts;
 
@@ -387,7 +385,7 @@ static enum link_training_result dpia_training_cr_non_transparent(struct dc_link
 		/* Update VS/PE. */
 		dp_decide_lane_settings(lt_settings, dpcd_lane_adjust,
 				lt_settings->lane_settings,
-				dpcd_lane_settings);
+				lt_settings->dpcd_lane_settings);
 		retry_count++;
 	}
 
@@ -427,7 +425,6 @@ static enum link_training_result dpia_training_cr_transparent(struct dc_link *li
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = { { {0} } };
 	union lane_align_status_updated dpcd_lane_status_updated = { {0} };
 	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
-	union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX] = { { {0} } };
 
 	/* Cap of LINK_TRAINING_MAX_CR_RETRY attempts at clock recovery.
 	 * Fix inherited from perform_clock_recovery_sequence() -
@@ -580,7 +577,6 @@ static enum link_training_result dpia_training_eq_non_transparent(struct dc_link
 	union lane_align_status_updated dpcd_lane_status_updated = { {0} };
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = { { {0} } };
 	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
-	union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX] = { { {0} } };
 	uint8_t set_cfg_data;
 	enum dpia_set_config_ts ts;
 
@@ -677,7 +673,7 @@ static enum link_training_result dpia_training_eq_non_transparent(struct dc_link
 
 		/* Update VS/PE. */
 		dp_decide_lane_settings(lt_settings, dpcd_lane_adjust,
-				lt_settings->lane_settings, dpcd_lane_settings);
+				lt_settings->hw_lane_settings, lt_settings->dpcd_lane_settings);
 	}
 
 	/* Abort link training if equalization failed due to HPD unplug. */
@@ -718,7 +714,6 @@ static enum link_training_result dpia_training_eq_transparent(struct dc_link *li
 	union lane_align_status_updated dpcd_lane_status_updated = { {0} };
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX] = { { {0} } };
 	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX] = { { {0} } };
-	union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX] = { { {0} } };
 
 	wait_time_microsec = dpia_get_eq_aux_rd_interval(link, lt_settings, DPRX);
 
@@ -761,7 +756,7 @@ static enum link_training_result dpia_training_eq_transparent(struct dc_link *li
 
 		/* Update VS/PE. */
 		dp_decide_lane_settings(lt_settings, dpcd_lane_adjust,
-				lt_settings->lane_settings, dpcd_lane_settings);
+				lt_settings->hw_lane_settings, lt_settings->dpcd_lane_settings);
 	}
 
 	/* Abort link training if equalization failed due to HPD unplug. */
