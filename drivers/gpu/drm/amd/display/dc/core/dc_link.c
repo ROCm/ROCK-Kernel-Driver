@@ -3615,6 +3615,9 @@ void core_link_enable_stream(
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum otg_out_mux_dest otg_out_dest = OUT_MUX_DIO;
 	struct vpg *vpg = pipe_ctx->stream_res.stream_enc->vpg;
+
+	if (is_dp_128b_132b_signal(pipe_ctx))
+		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
 #endif
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 
@@ -3874,6 +3877,9 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 	struct dc_link *link = stream->sink->link;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct vpg *vpg = pipe_ctx->stream_res.stream_enc->vpg;
+
+	if (is_dp_128b_132b_signal(pipe_ctx))
+		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
 #endif
 
 	if (!IS_DIAG_DC(dc->ctx->dce_environment) &&
