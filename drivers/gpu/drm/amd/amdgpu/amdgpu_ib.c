@@ -308,7 +308,6 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
  */
 int amdgpu_ib_pool_init(struct amdgpu_device *adev)
 {
-	unsigned size;
 	int r, i;
 
 	if (adev->ib_pool_ready)
