@@ -2916,6 +2916,7 @@ static struct pci_error_handlers amdgpu_pci_err_handler = {
 	.resume		= amdgpu_pci_resume,
 };
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 extern const struct attribute_group amdgpu_vram_mgr_attr_group;
 extern const struct attribute_group amdgpu_gtt_mgr_attr_group;
 extern const struct attribute_group amdgpu_vbios_version_attr_group;
@@ -2926,7 +2927,7 @@ static const struct attribute_group *amdgpu_sysfs_groups[] = {
 	&amdgpu_vbios_version_attr_group,
 	NULL,
 };
-
+#endif
 
 static struct pci_driver amdgpu_kms_pci_driver = {
 	.name = DRIVER_NAME,
