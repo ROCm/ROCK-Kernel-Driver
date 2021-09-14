@@ -2378,12 +2378,11 @@ bool perform_link_training_with_retries(
 	/* We need to do this before the link training to ensure the idle pattern in SST
 	 * mode will be sent right after the link training
 	 */
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	if (dp_get_link_encoding_format(&current_setting) == DP_8b_10b_ENCODING)
-#endif
+	if (dp_get_link_encoding_format(&current_setting) == DP_8b_10b_ENCODING) {
 		link_enc->funcs->connect_dig_be_to_fe(link_enc,
 							pipe_ctx->stream_res.stream_enc->id, true);
 		dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_CONNECT_DIG_FE_BE);
+	}
 
 	for (j = 0; j < attempts; ++j) {
 
