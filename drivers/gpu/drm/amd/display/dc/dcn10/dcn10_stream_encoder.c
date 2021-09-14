@@ -1402,7 +1402,7 @@ static void enc1_se_disable_dp_audio(
 	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
 	uint32_t value = 0;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (enc->afmt && enc->afmt->funcs->afmt_powerdown)
 		enc->afmt->funcs->afmt_powerdown(enc->afmt);
 #endif
@@ -1470,7 +1470,7 @@ void enc1_se_hdmi_audio_setup(
 void enc1_se_hdmi_audio_disable(
 	struct stream_encoder *enc)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (enc->afmt && enc->afmt->funcs->afmt_powerdown)
 		enc->afmt->funcs->afmt_powerdown(enc->afmt);
 #endif

@@ -1252,7 +1252,7 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 		}
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 #endif
 
@@ -3476,7 +3476,7 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 {
 	struct cp_psp *cp_psp = &pipe_ctx->stream->ctx->cp_psp;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct link_encoder *link_enc = NULL;
 #endif
 
@@ -3712,7 +3712,7 @@ void core_link_enable_stream(
 
 		pipe_ctx->stream->apply_edp_fast_boot_optimization = false;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		// Enable VPG before building infoframe
 		if (vpg && vpg->funcs->vpg_poweron)
 			vpg->funcs->vpg_poweron(vpg);
@@ -3873,7 +3873,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 	struct dc  *dc = pipe_ctx->stream->ctx->dc;
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	struct dc_link *link = stream->sink->link;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct vpg *vpg = pipe_ctx->stream_res.stream_enc->vpg;
 #endif
 
@@ -3962,7 +3962,7 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 	}
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (vpg && vpg->funcs->vpg_powerdown)
 		vpg->funcs->vpg_powerdown(vpg);
 #endif

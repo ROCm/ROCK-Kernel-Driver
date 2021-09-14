@@ -2595,7 +2595,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 		enum surface_update_type update_type,
 		struct dc_state *context)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct vpg *vpg;
 #endif
 	int j;
@@ -2618,7 +2618,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					stream_update->vrr_infopacket ||
 					stream_update->vsc_infopacket ||
 					stream_update->vsp_infopacket) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 				vpg = pipe_ctx->stream_res.stream_enc->vpg;
 				if (vpg && vpg->funcs->vpg_poweron)
 					vpg->funcs->vpg_poweron(vpg);
