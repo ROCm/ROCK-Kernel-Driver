@@ -172,7 +172,11 @@ static DEVICE_ATTR(mem_info_vis_vram_used, S_IRUGO,
 static DEVICE_ATTR(mem_info_vram_vendor, S_IRUGO,
 		   amdgpu_mem_info_vram_vendor, NULL);
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 static struct attribute *amdgpu_vram_mgr_attributes[] = {
+#else
+static const struct attribute *amdgpu_vram_mgr_attributes[] = {
+#endif
 	&dev_attr_mem_info_vram_total.attr,
 	&dev_attr_mem_info_vis_vram_total.attr,
 	&dev_attr_mem_info_vram_used.attr,
@@ -181,9 +185,11 @@ static struct attribute *amdgpu_vram_mgr_attributes[] = {
 	NULL
 };
 
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 const struct attribute_group amdgpu_vram_mgr_attr_group = {
 	.attrs = amdgpu_vram_mgr_attributes
 };
+#endif
 
 /**
  * amdgpu_vram_mgr_vis_size - Calculate visible node size
@@ -674,6 +680,9 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_vram_mgr *mgr = &adev->mman.vram_mgr;
 	struct ttm_resource_manager *man = &mgr->manager;
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	int ret;
+#endif
 
 	ttm_resource_manager_init(man, &adev->mman.bdev,
 				  adev->gmc.real_vram_size);
@@ -684,6 +693,12 @@ int amdgpu_vram_mgr_init(struct amdgpu_device *adev)
 	spin_lock_init(&mgr->lock);
 	INIT_LIST_HEAD(&mgr->reservations_pending);
 	INIT_LIST_HEAD(&mgr->reserved_pages);
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	/* Add the two VRAM-related sysfs files */
+	ret = sysfs_create_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
+	if (ret)
+		DRM_ERROR("Failed to register sysfs\n");
+#endif
 
 	ttm_set_driver_manager(&adev->mman.bdev, TTM_PL_VRAM, &mgr->manager);
 	ttm_resource_manager_set_used(man, true);
@@ -722,6 +737,9 @@ void amdgpu_vram_mgr_fini(struct amdgpu_device *adev)
 	drm_mm_takedown(&mgr->mm);
 	spin_unlock(&mgr->lock);
 
+#ifndef HAVE_PCI_DRIVER_DEV_GROUPS
+	sysfs_remove_files(&adev->dev->kobj, amdgpu_vram_mgr_attributes);
+#endif
 	ttm_resource_manager_cleanup(man);
 	ttm_set_driver_manager(&adev->mman.bdev, TTM_PL_VRAM, NULL);
 }
