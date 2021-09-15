@@ -28,6 +28,12 @@
 /* amd_iommu_invalidate_ctx take arg type of pasid as u32 */
 #define HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 1
 
+/* amd_iommu_pc_get_max_banks() declared */
+#define HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED 1
+
+/* amd_iommu_pc_get_max_banks() arg is unsigned int */
+/* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT */
+
 /* amd_iommu_pc_supported() is available */
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
