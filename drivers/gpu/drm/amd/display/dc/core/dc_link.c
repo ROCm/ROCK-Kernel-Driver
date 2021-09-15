@@ -2616,11 +2616,13 @@ static bool dp_active_dongle_validate_timing(
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	}
-
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	if (dpcd_caps->channel_coding_cap.bits.DP_128b_132b_SUPPORTED == 0 &&
 			dpcd_caps->dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_PASSTHROUGH_SUPPORT == 0 &&
 			dongle_caps->dfp_cap_ext.supported) {
-
+#else
+	if (dongle_caps->dfp_cap_ext.supported) {
+#endif
 		if (dongle_caps->dfp_cap_ext.max_pixel_rate_in_mps < (timing->pix_clk_100hz / 10000))
 			return false;
 
