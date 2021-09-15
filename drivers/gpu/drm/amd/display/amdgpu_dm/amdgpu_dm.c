@@ -1640,6 +1640,18 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 				      &adev->dm.dmub_bo_gpu_addr,
 				      &adev->dm.dmub_bo_cpu_addr);
 
+	if (adev->dm.hpd_rx_offload_wq) {
+		for (i = 0; i < adev->dm.dc->caps.max_links; i++) {
+			if (adev->dm.hpd_rx_offload_wq[i].wq) {
+				destroy_workqueue(adev->dm.hpd_rx_offload_wq[i].wq);
+				adev->dm.hpd_rx_offload_wq[i].wq = NULL;
+			}
+		}
+
+		kfree(adev->dm.hpd_rx_offload_wq);
+		adev->dm.hpd_rx_offload_wq = NULL;
+	}
+
 	/* DC Destroy TODO: Replace destroy DAL */
 	if (adev->dm.dc)
 		dc_destroy(&adev->dm.dc);
@@ -1658,17 +1670,6 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.freesync_module = NULL;
 	}
 
-	if (adev->dm.hpd_rx_offload_wq) {
-		for (i = 0; i < adev->dm.dc->caps.max_links; i++) {
-			if (adev->dm.hpd_rx_offload_wq[i].wq) {
-				destroy_workqueue(adev->dm.hpd_rx_offload_wq[i].wq);
-				adev->dm.hpd_rx_offload_wq[i].wq = NULL;
-			}
-		}
-
-		kfree(adev->dm.hpd_rx_offload_wq);
-		adev->dm.hpd_rx_offload_wq = NULL;
-	}
 
 #if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_destroy(&adev->dm.audio_lock);
