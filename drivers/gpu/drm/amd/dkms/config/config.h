@@ -11,7 +11,7 @@
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
 /* acpi_put_table() is available */
-/* #undef HAVE_ACPI_PUT_TABLE */
+#define HAVE_ACPI_PUT_TABLE 1
 
 /* struct acpi_srat_generic_affinity is available */
 #define HAVE_ACPI_SRAT_GENERIC_AFFINITY 1
@@ -29,7 +29,7 @@
 #define HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 1
 
 /* amd_iommu_pc_supported() is available */
-/* #undef HAVE_AMD_IOMMU_PC_SUPPORTED */
+#define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
 /* arch_io_{reserve/free}_memtype_wc() are available */
 #define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
@@ -65,7 +65,7 @@
 /* #undef HAVE_DEVM_MEMREMAP_PAGES_P_P_P_P */
 
 /* dev_pagemap->owner is available */
-#define HAVE_DEV_PAGEMAP_OWNER 1
+/* #undef HAVE_DEV_PAGEMAP_OWNER */
 
 /* there is 'range' field within dev_pagemap structure */
 #define HAVE_DEV_PAGEMAP_RANGE 1
@@ -170,10 +170,10 @@
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
 /* drm_connector_atomic_hdr_metadata_equal() is available */
-/* #undef HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL */
+#define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
 
 /* drm_connector_attach_hdr_output_metadata_property() is available */
-/* #undef HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY */
+#define HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY 1
 
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
@@ -255,7 +255,7 @@
 /* drm_dev_enter() is available */
 #define HAVE_DRM_DEV_ENTER 1
 
-/* drm_dev_is_unplugged() is availablea */
+/* drm_dev_is_unplugged() is available */
 #define HAVE_DRM_DEV_IS_UNPLUGGED 1
 
 /* drm_dev_put() is available */
@@ -675,6 +675,9 @@
 /* io_mapping_map_local_wc() is available */
 #define HAVE_IO_MAPPING_MAP_LOCAL_WC 1
 
+/* io_mapping_map_wc() has size argument */
+#define HAVE_IO_MAPPING_MAP_WC_HAS_SIZE_ARG 1
+
 /* io_mapping_unmap_local() is available */
 #define HAVE_IO_MAPPING_UNMAP_LOCAL 1
 
@@ -808,7 +811,7 @@
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
 
 /* migrate_vma->pgmap_owner is available */
-#define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
+/* #undef HAVE_MIGRATE_VMA_PGMAP_OWNER */
 
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1
@@ -990,7 +993,7 @@
 
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
-#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
+/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS */
 
 /* drm_plane_helper_funcs->prepare_fb() wants const p arg */
 /* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
@@ -1057,6 +1060,9 @@
 
 /* wait_queue_entry_t exists */
 #define HAVE_WAIT_QUEUE_ENTRY 1
+
+/* is_device_page is available */
+/* #undef HAVE_ZONE_DEVICE_PUBLIC */
 
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
