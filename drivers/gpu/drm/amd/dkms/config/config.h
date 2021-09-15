@@ -993,7 +993,7 @@
 
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
-/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
 
 /* drm_plane_helper_funcs->prepare_fb() wants const p arg */
 /* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
