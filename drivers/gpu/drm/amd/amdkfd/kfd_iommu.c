@@ -333,9 +333,16 @@ int kfd_iommu_resume(struct kfd_dev *kfd)
 }
 
 #ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
+#ifndef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED
 extern bool amd_iommu_pc_supported(void);
+#ifdef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT
+extern u8 amd_iommu_pc_get_max_banks(unsigned int devid);
+extern u8 amd_iommu_pc_get_max_counters(unsigned int devid);
+#else /* !HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT */
 extern u8 amd_iommu_pc_get_max_banks(u16 devid);
 extern u8 amd_iommu_pc_get_max_counters(u16 devid);
+#endif /* HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT*/
+#endif /* HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED */
 #endif
 
 /** kfd_iommu_add_perf_counters - Add IOMMU performance counters to topology
