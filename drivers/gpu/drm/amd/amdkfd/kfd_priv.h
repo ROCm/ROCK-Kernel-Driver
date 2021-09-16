@@ -483,9 +483,6 @@ enum KFD_QUEUE_PRIORITY {
  * @is_gws should be protected by the DQM lock, since changing it can yield the
  * possibility of updating DQM state on number of GWS queues.
  *
- * @save_ttmp: Enables saving the dispatch pointer to TTMP 6 & 7 during
- * the initialization or update of the MQD.
- *
  * @vmid: If the scheduling mode is no cp scheduling the field defines the vmid
  * of the queue.
  *
@@ -512,7 +509,6 @@ struct queue_properties {
 	bool is_being_destroyed;
 	bool is_active;
 	bool is_gws;
-	bool save_ttmp;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
