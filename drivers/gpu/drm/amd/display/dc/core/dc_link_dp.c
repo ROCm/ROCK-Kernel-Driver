@@ -2848,22 +2848,31 @@ bool dp_verify_link_cap(
 	enum link_training_result status;
 	union hpd_irq_data irq_data;
 
+	/* link training starts with the maximum common settings
+	 * supported by both sink and ASIC.
+	 */
+	max_link_cap = get_max_link_cap(link);
+	initial_link_settings = get_common_supported_link_settings(
+			*known_limit_link_setting,
+			max_link_cap);
+
 	/* Accept reported capabilities if link supports flexible encoder mapping or encoder already in use. */
 	if (link->dc->debug.skip_detection_link_training ||
 			link->is_dig_mapping_flexible) {
+		/* TODO - should we check link encoder's max link caps here?
+		 * How do we know which link encoder to check from?
+		 */
 		link->verified_link_cap = *known_limit_link_setting;
 		return true;
 	} else if (link->link_enc && link->dc->res_pool->funcs->link_encs_assign &&
 			!link_enc_cfg_is_link_enc_avail(link->ctx->dc, link->link_enc->preferred_engine)) {
-		link->verified_link_cap = *known_limit_link_setting;
+		link->verified_link_cap = initial_link_settings;
 		return true;
 	}
 
 	memset(&irq_data, 0, sizeof(irq_data));
 	success = false;
 	skip_link_training = false;
-
-	max_link_cap = get_max_link_cap(link);
 
 	/* Grant extended timeout request */
 	if ((link->lttpr_mode == LTTPR_MODE_NON_TRANSPARENT) && (link->dpcd_caps.lttpr_caps.max_ext_timeout > 0)) {
@@ -2886,12 +2895,6 @@ bool dp_verify_link_cap(
 
 	dp_cs_id = get_clock_source_id(link);
 
-	/* link training starts with the maximum common settings
-	 * supported by both sink and ASIC.
-	 */
-	initial_link_settings = get_common_supported_link_settings(
-			*known_limit_link_setting,
-			max_link_cap);
 	cur_link_setting = initial_link_settings;
 
 	/* Temporary Renoir-specific workaround for SWDEV-215184;
@@ -2985,7 +2988,7 @@ bool dp_verify_link_cap_with_retries(
 			link->verified_link_cap.link_spread = LINK_SPREAD_DISABLED;
 			break;
 		} else if (dp_verify_link_cap(link,
-				&link->reported_link_cap,
+				known_limit_link_setting,
 				&fail_count) && fail_count == 0) {
 			success = true;
 			break;
@@ -3000,11 +3003,21 @@ bool dp_verify_mst_link_cap(
 {
 	struct dc_link_settings max_link_cap = {0};
 
-	max_link_cap = get_max_link_cap(link);
-	link->verified_link_cap = get_common_supported_link_settings(
-		link->reported_link_cap,
-		max_link_cap);
-
+	if (dp_get_link_encoding_format(&link->reported_link_cap) ==
+			DP_8b_10b_ENCODING) {
+		max_link_cap = get_max_link_cap(link);
+		link->verified_link_cap = get_common_supported_link_settings(
+				link->reported_link_cap,
+				max_link_cap);
+	}
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	else if (dp_get_link_encoding_format(&link->reported_link_cap) ==
+			DP_128b_132b_ENCODING) {
+		dp_verify_link_cap_with_retries(link,
+				&link->reported_link_cap,
+				LINK_TRAINING_MAX_VERIFY_RETRY);
+	}
+#endif
 	return true;
 }
 
