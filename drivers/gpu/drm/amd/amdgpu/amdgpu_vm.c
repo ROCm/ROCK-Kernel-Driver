@@ -1760,43 +1760,58 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		uint64_t tmp, num_entries, addr;
 
 		num_entries = cursor.size >> AMDGPU_GPU_PAGE_SHIFT;
-		if (pages_addr) {
-			bool contiguous = true;
 
-			if (num_entries > AMDGPU_GPU_PAGES_IN_CPU_PAGE) {
-				uint64_t pfn = cursor.start >> PAGE_SHIFT;
-				uint64_t count;
+		if (res && (res->mem_type == AMDGPU_PL_DGMA_IMPORT ||
+			res->mem_type == AMDGPU_PL_DGMA)) {
+			uint64_t pfn = offset >> PAGE_SHIFT;
 
-				contiguous = pages_addr[pfn + 1] ==
-					pages_addr[pfn] + PAGE_SIZE;
-
-				tmp = num_entries /
-					AMDGPU_GPU_PAGES_IN_CPU_PAGE;
-				for (count = 2; count < tmp; ++count) {
-					uint64_t idx = pfn + count;
-
-					if (contiguous != (pages_addr[idx] ==
-					    pages_addr[idx - 1] + PAGE_SIZE))
-						break;
-				}
-				num_entries = count *
-					AMDGPU_GPU_PAGES_IN_CPU_PAGE;
-			}
-
-			if (!contiguous) {
-				addr = cursor.start;
-				params.pages_addr = pages_addr;
+			if (res->mem_type == AMDGPU_PL_DGMA_IMPORT) {
+				addr = 0;
 			} else {
-				addr = pages_addr[cursor.start >> PAGE_SHIFT];
+				addr = pfn << PAGE_SHIFT;
+				addr += vram_base_offset +
+				cursor.start + amdgpu_ttm_domain_start(adev, res->mem_type) -
+				amdgpu_ttm_domain_start(adev, TTM_PL_VRAM);
 				params.pages_addr = NULL;
 			}
-
-		} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
-			addr = vram_base_offset + cursor.start;
 		} else {
-			addr = 0;
-		}
+			if (pages_addr) {
+				bool contiguous = true;
 
+				if (num_entries > AMDGPU_GPU_PAGES_IN_CPU_PAGE) {
+					uint64_t pfn = cursor.start >> PAGE_SHIFT;
+					uint64_t count;
+
+					contiguous = pages_addr[pfn + 1] ==
+						pages_addr[pfn] + PAGE_SIZE;
+
+					tmp = num_entries /
+						AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+					for (count = 2; count < tmp; ++count) {
+						uint64_t idx = pfn + count;
+
+					if (contiguous != (pages_addr[idx] ==
+						pages_addr[idx - 1] + PAGE_SIZE))
+						break;
+					}
+					num_entries = count *
+						AMDGPU_GPU_PAGES_IN_CPU_PAGE;
+				}
+
+				if (!contiguous) {
+					addr = cursor.start;
+					params.pages_addr = pages_addr;
+				} else {
+					addr = pages_addr[cursor.start >> PAGE_SHIFT];
+					params.pages_addr = NULL;
+				}
+			} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
+				addr = vram_base_offset + cursor.start;
+			} else {
+				addr = 0;
+			}
+
+		}
 		tmp = start + num_entries;
 		r = amdgpu_vm_update_ptes(&params, start, tmp, addr, flags);
 		if (r)
