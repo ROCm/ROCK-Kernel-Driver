@@ -127,6 +127,15 @@ struct dccg_funcs {
 			struct dccg *dccg,
 			enum dentist_dispclk_change_mode change_mode);
 #endif
+
+	void (*disable_dsc)(
+		struct dccg *dccg,
+		int inst);
+
+	void (*enable_dsc)(
+		struct dccg *dccg,
+		int inst);
+
 };
 
 #endif //__DAL_DCCG_H__
