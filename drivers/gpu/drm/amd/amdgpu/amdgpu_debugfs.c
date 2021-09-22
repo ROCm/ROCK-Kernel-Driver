@@ -1500,9 +1500,13 @@ static int amdgpu_debugfs_test_ib_show(struct seq_file *m, void *unused)
 	}
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
+#ifndef HAVE_DOWN_WRITE_KILLABLE
+	down_write(&adev->reset_sem);
+#else
 	r = down_write_killable(&adev->reset_domain->sem);
 	if (r)
 		return r;
+#endif
 
 	/* hold on the scheduler */
 	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
