@@ -5620,11 +5620,13 @@ fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 	if (modifier_has_dcc(modifier) && !force_disable_dcc) {
 		uint64_t dcc_address = afb->address + afb->base.offsets[1];
 		bool independent_64b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_64B, modifier);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		bool independent_128b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_128B, modifier);
-
+#endif
 		dcc->enable = 1;
 		dcc->meta_pitch = afb->base.pitches[1];
 		dcc->independent_64b_blks = independent_64b_blks;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (AMD_FMT_MOD_GET(TILE_VERSION, modifier) == AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS) {
 			if (independent_64b_blks && independent_128b_blks)
 				dcc->dcc_ind_blk = hubp_ind_block_64b;
@@ -5640,6 +5642,7 @@ fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 			else
 				dcc->dcc_ind_blk = hubp_ind_block_unconstrained;
 		}
+#endif
 
 		address->grph.meta_addr.low_part = lower_32_bits(dcc_address);
 		address->grph.meta_addr.high_part = upper_32_bits(dcc_address);
