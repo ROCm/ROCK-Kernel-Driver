@@ -1159,7 +1159,7 @@ struct amdgpu_device {
 	bool				barrier_has_auto_waitcnt;
 
 	struct amdgpu_reset_control     *reset_cntl;
-	uint32_t                        ip_versions[HW_ID_MAX];
+	uint32_t                        ip_versions[HW_ID_MAX][HWIP_MAX_INSTANCE];
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
