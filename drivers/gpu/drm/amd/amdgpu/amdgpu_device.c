@@ -2038,9 +2038,6 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 	case CHIP_VANGOGH:
 		chip_name = "vangogh";
 		break;
-	case CHIP_CYAN_SKILLFISH:
-		chip_name = "robin";
-		break;
 	case CHIP_YELLOW_CARP:
 		chip_name = "yellow_carp";
 		break;

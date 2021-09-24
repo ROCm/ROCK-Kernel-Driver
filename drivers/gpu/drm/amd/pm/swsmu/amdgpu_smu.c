@@ -455,8 +455,6 @@ static int smu_get_power_num_states(void *handle,
 
 bool is_support_sw_smu(struct amdgpu_device *adev)
 {
-	if (adev->asic_type == CHIP_CYAN_SKILLFISH)
-		return false;
 	if (adev->asic_type >= CHIP_ARCTURUS)
 		return true;
 
