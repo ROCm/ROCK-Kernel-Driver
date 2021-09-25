@@ -75,6 +75,7 @@ bool dal_bios_parser_init_cmd_tbl_helper2(
                 *h = dal_cmd_tbl_helper_dce112_get_table2();
                 return true;
 #endif
+	case DCN_VERSION_2_01:
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case DCN_VERSION_3_0:
 	case DCN_VERSION_3_01:

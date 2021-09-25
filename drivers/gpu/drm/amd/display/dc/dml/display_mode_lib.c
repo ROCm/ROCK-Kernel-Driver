@@ -91,6 +91,7 @@ void dml_init_instance(struct display_mode_lib *lib,
 	switch (project) {
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case DML_PROJECT_NAVI10:
+	case DML_PROJECT_DCN201:
 		lib->funcs = dml20_funcs;
 		break;
 	case DML_PROJECT_NAVI10v2:
