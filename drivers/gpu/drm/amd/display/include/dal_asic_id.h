@@ -226,6 +226,7 @@ enum {
 #endif
 #endif
 
+#define DEVICE_ID_NV_13FE 0x13FE  // CYAN_SKILLFISH
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FAMILY_VGH 144
 #define DEVICE_ID_VGH_163F 0x163F

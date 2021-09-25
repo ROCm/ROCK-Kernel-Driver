@@ -1338,6 +1338,9 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		init_data.flags.gpu_vm_support = true;
 		break;
 #endif
+	case CHIP_CYAN_SKILLFISH:
+		init_data.flags.disable_dmcu = true;
+		break;
 	default:
 		break;
 	}
@@ -1621,6 +1624,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 	case CHIP_VANGOGH:
 	case CHIP_YELLOW_CARP:
 #endif
+	case CHIP_CYAN_SKILLFISH:
 		return 0;
 	case CHIP_NAVI12:
 		fw_name_dmcu = FIRMWARE_NAVI12_DMCU;
@@ -4285,6 +4289,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	case CHIP_DIMGREY_CAVEFISH:
 	case CHIP_BEIGE_GOBY:
 	case CHIP_VANGOGH:
+	case CHIP_CYAN_SKILLFISH:
 	case CHIP_YELLOW_CARP:
 #endif
 		if (dcn10_register_irq_handlers(dm->adev)) {
@@ -4608,6 +4613,11 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_dig = 4;
 		break;
 #endif
+	case CHIP_CYAN_SKILLFISH:
+		adev->mode_info.num_crtc = 2;
+		adev->mode_info.num_hpd = 2;
+		adev->mode_info.num_dig = 2;
+		break;
 	case CHIP_NAVI14:
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case CHIP_DIMGREY_CAVEFISH:
