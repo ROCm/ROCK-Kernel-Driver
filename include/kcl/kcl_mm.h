@@ -126,4 +126,11 @@ static inline bool is_cow_mapping(vm_flags_t flags)
 }
 #endif /* HAVE_IS_COW_MAPPING */
 
+#ifndef HAVE_MMGET
+/* Copied fromr include/linux/sched.h */
+static inline void mmget(struct mm_struct *mm)
+{
+        atomic_inc(&mm->mm_users);
+}
+#endif /*HAVE_MMGET */
 #endif /* AMDKCL_MM_H */

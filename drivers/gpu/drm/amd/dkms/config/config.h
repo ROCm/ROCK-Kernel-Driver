@@ -819,6 +819,9 @@
 /* migrate_vma->pgmap_owner is available */
 /* #undef HAVE_MIGRATE_VMA_PGMAP_OWNER */
 
+/* mmget is available */
+#define HAVE_MMGET 1
+
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1
 
