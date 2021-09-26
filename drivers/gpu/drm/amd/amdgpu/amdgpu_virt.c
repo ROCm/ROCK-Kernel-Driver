@@ -70,6 +70,10 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 	adev->cg_flags = 0;
 	adev->pg_flags = 0;
 
+	/*use advance recovery mode for SRIOV*/
+	if (amdgpu_gpu_recovery)
+		amdgpu_gpu_recovery = 2;
+
 	/* Reduce kcq number to 2 to reduce latency */
 	if (amdgpu_num_kcq == -1)
 		amdgpu_num_kcq = 2;
