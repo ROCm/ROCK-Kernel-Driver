@@ -20,3 +20,26 @@ AC_DEFUN([AC_AMDGPU_MMGRAB], [
 		])
 	])
 ])
+
+AC_DEFUN([AC_AMDGPU_MMGET], [
+        AC_KERNEL_DO_BACKGROUND([
+                dnl #
+                dnl # commit v4.10-10393-g3fce371bfac2
+                dnl # mm: add new mmget() helper
+                dnl #
+                AC_KERNEL_TRY_COMPILE([
+                        #ifdef HAVE_DRM_DRM_BACKPORT_H
+                        #include <drm/drm_backport.h>
+                        #endif
+                        #ifdef HAVE_LINUX_SCHED_MM_H
+                        #include <linux/sched/mm.h>
+                        #endif
+                        #include <linux/sched.h>
+                ], [
+                        mmget(NULL);
+                ], [
+                        AC_DEFINE(HAVE_MMGET, 1,
+                        [mmget is available])
+                ])
+        ])
+])
