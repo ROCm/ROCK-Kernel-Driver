@@ -297,7 +297,7 @@ static void xgpu_nv_mailbox_flr_work(struct work_struct *work)
 		if (xgpu_nv_mailbox_peek_msg(adev) == IDH_FLR_NOTIFICATION_CMPL)
 			goto flr_done;
 
-		msleep(10);
+		mdelay(10);
 		timeout -= 10;
 	} while (timeout > 1);
 
