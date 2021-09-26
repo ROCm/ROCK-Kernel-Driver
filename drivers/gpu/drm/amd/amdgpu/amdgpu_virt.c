@@ -63,6 +63,10 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 #endif
 	adev->cg_flags = 0;
 	adev->pg_flags = 0;
+
+	/*use advance recovery mode for SRIOV*/
+	if (amdgpu_gpu_recovery)
+		amdgpu_gpu_recovery = 2;
 }
 
 void amdgpu_virt_kiq_reg_write_reg_wait(struct amdgpu_device *adev,
