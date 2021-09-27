@@ -524,7 +524,6 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 	uint8_t dpcd_lt_buffer[5] = {0};
 
 	union dpcd_training_pattern dpcd_pattern = { 0 };
-	uint32_t lane;
 	uint32_t size_in_bytes;
 	bool edp_workaround = false; /* TODO link_prop.INTERNAL */
 	dpcd_base_lt_offset = DP_TRAINING_PATTERN_SET;
@@ -1024,7 +1023,6 @@ enum dc_status dpcd_set_lane_settings(
 	uint32_t offset)
 {
 	union dpcd_training_lane dpcd_lane[LANE_COUNT_DP_MAX] = {{{0}}};
-	uint32_t lane;
 	unsigned int lane0_set_address;
 	enum dc_status status;
 
