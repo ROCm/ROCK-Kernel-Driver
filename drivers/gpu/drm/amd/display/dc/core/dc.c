@@ -1921,12 +1921,14 @@ static bool is_flip_pending_in_pipes(struct dc *dc, struct dc_state *context)
  */
 static void process_deferred_updates(struct dc *dc)
 {
+#ifdef CONFIG_DRM_AMD_DC_DCN
 	int i;
 
 	if (dc->debug.enable_mem_low_power.bits.cm)
 		for (i = 0; i < dc->dcn_ip->max_num_dpp; i++)
 			if (dc->res_pool->dpps[i]->funcs->dpp_deferred_update)
 				dc->res_pool->dpps[i]->funcs->dpp_deferred_update(dc->res_pool->dpps[i]);
+#endif
 }
 
 void dc_post_update_surfaces_to_stream(struct dc *dc)
