@@ -360,6 +360,9 @@
 /* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
 /* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_USE_KTIMER_T_ARG */
 
+/* drm_vblank struct use ktime_t for time field */
+#define HAVE_DRM_VBLANK_USE_KTIME_T 1
+
 /* drm_driver->release() is available */
 #define HAVE_DRM_DRIVER_RELEASE 1
 
