@@ -703,7 +703,7 @@ void dp_hw_to_dpcd_lane_settings(
 					(hw_lane_settings[lane].PRE_EMPHASIS ==
 							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
 		}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		else if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
 				DP_128b_132b_ENCODING) {
 			dpcd_lane_settings[lane].tx_ffe.PRESET_VALUE =
@@ -3010,7 +3010,7 @@ bool dp_verify_mst_link_cap(
 				link->reported_link_cap,
 				max_link_cap);
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	else if (dp_get_link_encoding_format(&link->reported_link_cap) ==
 			DP_128b_132b_ENCODING) {
 		dp_verify_link_cap_with_retries(link,
