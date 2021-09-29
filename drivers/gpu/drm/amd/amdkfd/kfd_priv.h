@@ -996,9 +996,6 @@ struct kfd_process {
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
 	struct kfd_runtime_info runtime_info;
-
-	/* Tracks the number of queues suspended for debugger use of the address space */
-	int num_queues_suspended;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
