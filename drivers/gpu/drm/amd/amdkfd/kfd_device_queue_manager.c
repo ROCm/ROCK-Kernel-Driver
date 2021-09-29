@@ -979,11 +979,6 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 	}
 
 	q->properties.is_suspended = true;
-	/* hold process address space for safe wave inspection */
-	if (!pdd->process->num_queues_suspended)
-		mmget(pdd->process->lead_thread->mm);
-	pdd->process->num_queues_suspended++;
-
 	if (q->properties.is_active) {
 		decrement_queue_count(dqm, q->properties.type);
 		q->properties.is_active = false;
@@ -1023,10 +1018,6 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 			    q->properties.queue_id);
 
 	q->properties.is_suspended = false;
-	/* release process address space with wave inspection done */
-	pdd->process->num_queues_suspended--;
-	if (!pdd->process->num_queues_suspended)
-		mmput_async(pdd->process->mm);
 
 	if (QUEUE_IS_ACTIVE(q->properties)) {
 		q->properties.is_active = true;
