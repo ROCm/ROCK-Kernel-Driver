@@ -5228,6 +5228,8 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 	/* Actual ASIC resets if needed.*/
 	/* TODO Implement XGMI hive reset logic for SRIOV */
 	if (amdgpu_sriov_vf(adev)) {
+		r = amdgpu_device_reset_sriov(adev, job ? false : true);
+		if (r)
 			adev->asic_reset_res = r;
 	} else {
 		r = amdgpu_do_asic_reset(device_list_handle, &reset_context);
