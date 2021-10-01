@@ -36,8 +36,6 @@ DC_LIBS += dcn10 dml
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN2_x
 DC_LIBS += dcn21
-endif
-ifdef CONFIG_DRM_AMD_DC_DCN201
 DC_LIBS += dcn201
 endif
 ifdef CONFIG_DRM_AMD_DC_DCN3_x

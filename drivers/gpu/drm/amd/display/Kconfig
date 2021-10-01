@@ -47,15 +47,6 @@ config DRM_AMD_DC_DCN3_x
             sienna_cichlid/Van Gogh/Dimgrey_cavefish support
 	    for display engine
 
-config DRM_AMD_DC_DCN201
-	bool "Enable DCN201 support in DC"
-	default y
-	depends on DRM_AMD_DC && X86
-	depends on DRM_AMD_DC_DCN
-	help
-	  Choose this option if you want to have
-	  201 support for display engine
-
 config DRM_AMD_DC_HDCP
 	bool "Enable HDCP support in DC"
 	depends on DRM_AMD_DC
