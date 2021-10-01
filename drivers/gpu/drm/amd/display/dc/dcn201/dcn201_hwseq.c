@@ -621,7 +621,7 @@ void dcn201_unblank_stream(struct pipe_ctx *pipe_ctx,
 		if (optc201_is_two_pixels_per_containter(&stream->timing))
 			params.timing.pix_clk_100hz /= 2;
 
-		pipe_ctx->stream_res.stream_enc->funcs->dp_unblank(link, pipe_ctx->stream_res.stream_enc, &params);
+		pipe_ctx->stream_res.stream_enc->funcs->dp_unblank(pipe_ctx->stream_res.stream_enc, &params);
 	}
 
 	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {
