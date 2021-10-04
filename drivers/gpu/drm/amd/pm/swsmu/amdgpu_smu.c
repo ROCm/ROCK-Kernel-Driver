@@ -588,6 +588,7 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		sienna_cichlid_set_ppt_funcs(smu);
 		break;
 	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
 		renoir_set_ppt_funcs(smu);
 		break;
 	case IP_VERSION(11, 5, 0):
