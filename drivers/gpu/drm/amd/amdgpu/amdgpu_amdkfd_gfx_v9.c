@@ -1247,14 +1247,23 @@ void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
 		uint32_t *reg_offset,
 		uint32_t *reg_data)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+
 	*reg_data = wait_times;
+
+	/*
+	 * The CP cannont handle a 0 grace period input and will result in
+	 * an infinite grace period being set so set to 1 to prevent this.
+	 */
+	if (grace_period == 0)
+		grace_period = 1;
 
 	*reg_data = REG_SET_FIELD(*reg_data,
 			CP_IQ_WAIT_TIME2,
 			SCH_WAVE,
 			grace_period);
 
-	*reg_offset = mmCP_IQ_WAIT_TIME2;
+	*reg_offset = SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2);
 }
 
 
