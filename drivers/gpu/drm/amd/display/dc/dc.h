@@ -215,10 +215,10 @@ struct dc_dcc_setting {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	//These bitfields to be used starting with DCN 3.0
 	struct {
-		uint32_t dcc_256_64_64 : 1;//available in ASICs before DCN 3.0 (the worst compression case)
-		uint32_t dcc_128_128_uncontrained : 1;  //available in ASICs before DCN 3.0
-		uint32_t dcc_256_128_128 : 1;		//available starting with DCN 3.0
-		uint32_t dcc_256_256_unconstrained : 1;  //available in ASICs before DCN 3.0 (the best compression case)
+		uint32_t dcc_256_64_64 : 1;//available in ASICs before DCN (the worst compression case)
+		uint32_t dcc_128_128_uncontrained : 1;  //available in ASICs before DCN
+		uint32_t dcc_256_128_128 : 1;		//available starting with DCN
+		uint32_t dcc_256_256_unconstrained : 1;  //available in ASICs before DCN (the best compression case)
 	} dcc_controls;
 #endif
 };
@@ -740,6 +740,9 @@ struct dc {
 	bool wm_optimized_required;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool idle_optimizations_allowed;
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	bool enable_c20_dtm_b0;
 #endif
 
 	/* Require to maintain clocks and bandwidth for UEFI enabled HW */
