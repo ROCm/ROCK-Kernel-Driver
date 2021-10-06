@@ -11843,12 +11843,36 @@ static int add_affected_mst_dsc_crtcs(struct drm_atomic_state *state, struct drm
 }
 #endif
 
+static bool is_chromeos(void)
+{
+	struct mm_struct *mm = current->mm;
+	struct file *exe_file;
+	bool ret;
+
+	/* ChromeOS renames its thread to DrmThread. Also check the executable
+	 * name. */
+	if (strcmp(current->comm, "DrmThread") != 0 || !mm)
+		return false;
+
+	exe_file = get_mm_exe_file(mm);
+	if (!exe_file)
+		return false;
+	ret = strcmp(exe_file->f_path.dentry->d_name.name, "chrome") == 0;
+	fput(exe_file);
+
+	return ret;
+}
+
 static int validate_overlay(struct drm_atomic_state *state)
 {
 	int i;
 	struct drm_plane *plane;
 	struct drm_plane_state *new_plane_state;
 	struct drm_plane_state *primary_state, *overlay_state = NULL;
+
+	/* This is a workaround for ChromeOS only */
+	if (!is_chromeos())
+		return 0;
 
 	/* Check if primary plane is contained inside overlay */
 #if !defined(for_each_new_plane_in_state_reverse)
