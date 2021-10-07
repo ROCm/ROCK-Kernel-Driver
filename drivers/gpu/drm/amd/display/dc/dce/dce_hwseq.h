@@ -1166,7 +1166,8 @@ struct dce_hwseq_registers {
 	type DOMAIN_POWER_GATE;\
 	type DOMAIN_PGFSM_PWR_STATUS;\
 	type HPO_HDMISTREAMCLK_G_GATE_DIS;\
-	type DISABLE_HOSTVM_FORCE_ALLOW_PSTATE;
+	type DISABLE_HOSTVM_FORCE_ALLOW_PSTATE;\
+	type I2C_LIGHT_SLEEP_FORCE;
 #endif
 
 struct dce_hwseq_shift {
