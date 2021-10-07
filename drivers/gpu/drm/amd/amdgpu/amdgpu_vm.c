@@ -860,7 +860,7 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 			return r;
 	}
 
-	if (!drm_dev_enter(&adev->ddev, &idx))
+	if (!drm_dev_enter(adev_to_drm(adev), &idx))
 		return -ENODEV;
 
 	r = vm->update_funcs->map_table(vmbo);
@@ -1410,7 +1410,7 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
 	if (list_empty(&vm->relocated))
 		return 0;
 
-	if (!drm_dev_enter(&adev->ddev, &idx))
+	if (!drm_dev_enter(adev_to_drm(adev), &idx))
 		return -ENODEV;
 
 	memset(&params, 0, sizeof(params));
@@ -1735,7 +1735,7 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	enum amdgpu_sync_mode sync_mode;
 	int r, idx;
 
-	if (!drm_dev_enter(&adev->ddev, &idx))
+	if (!drm_dev_enter(adev_to_drm(adev), &idx))
 		return -ENODEV;
 
 	memset(&params, 0, sizeof(params));
