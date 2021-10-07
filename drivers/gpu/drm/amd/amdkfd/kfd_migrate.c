@@ -251,7 +251,7 @@ svm_migrate_get_vram_page(struct svm_range *prange, unsigned long pfn)
 	page = pfn_to_page(pfn);
 	svm_range_bo_ref(prange->svm_bo);
 	page->zone_device_data = prange->svm_bo;
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
+#ifdef HAVE_ZONE_DEVICE_COHERENT
 	VM_BUG_ON_PAGE(page_ref_count(page), page);
 	init_page_count(page);
 #else
@@ -684,9 +684,9 @@ svm_migrate_vma_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 	migrate.end = end;
 #ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
+#ifdef HAVE_ZONE_DEVICE_COHERENT
 	if (adev->gmc.xgmi.connected_to_cpu)
-		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PUBLIC;
+		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_COHERENT;
 	else
 #endif
 		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
@@ -955,7 +955,7 @@ int svm_migrate_init(struct amdgpu_device *adev)
 	 * should remove reserved size
 	 */
 	size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
+#ifdef HAVE_ZONE_DEVICE_COHERENT
 	if (adev->gmc.xgmi.connected_to_cpu) {
 #ifdef HAVE_DEV_PAGEMAP_RANGE
 		pgmap->nr_range = 1;
@@ -965,7 +965,7 @@ int svm_migrate_init(struct amdgpu_device *adev)
 		pgmap->res.start = adev->gmc.aper_base;
 		pgmap->res.end = adev->gmc.aper_base + adev->gmc.aper_size - 1;
 #endif
-		pgmap->type = MEMORY_DEVICE_PUBLIC;
+		pgmap->type = MEMORY_DEVICE_COHERENT;
 	} else
 #endif
 	{

@@ -1,13 +1,13 @@
 dnl #
-dnl # mm: add zone device public type memory support
+dnl # mm: add zone device coherent type memory support
 dnl #
-AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_PUBLIC], [
+AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_COHERENT], [
 	AC_KERNEL_TRY_COMPILE([
 		#include <linux/mm.h>
 	], [
 		is_device_page(NULL);
 	], [
-		AC_DEFINE(HAVE_ZONE_DEVICE_PUBLIC, 1,
+		AC_DEFINE(HAVE_ZONE_DEVICE_COHERENT, 1,
 			[is_device_page is available])
 	])
 ])
@@ -26,7 +26,7 @@ AC_DEFUN([AC_AMDGPU_MIGRATE_VMA_PGMAP_OWNER], [
 			[migrate_vma->pgmap_owner is available])
 	])
 
-	AC_AMDGPU_ZONE_DEVICE_PUBLIC
+	AC_AMDGPU_ZONE_DEVICE_COHERENT
 ])
 
 dnl #
