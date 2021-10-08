@@ -536,9 +536,6 @@ struct queue_properties {
 	uint32_t ctl_stack_size;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
-	/* Relevant for CU */
-	uint32_t cu_mask_count; /* Must be a multiple of 32 */
-	uint32_t *cu_mask;
 	unsigned long debug_event_type;
 	uint64_t exception_status; /* Exception code status */
 };
@@ -549,7 +546,19 @@ struct queue_properties {
 			    !(q).is_evicted && \
 			    !(q).is_suspended)
 
-struct mqd_update_info;
+enum mqd_update_flag {
+	UPDATE_FLAG_CU_MASK = 0,
+};
+
+struct mqd_update_info {
+	union {
+		struct {
+			uint32_t count; /* Must be a multiple of 32 */
+			uint32_t *ptr;
+		} cu_mask;
+	};
+	enum mqd_update_flag update_flag;
+};
 
 /**
  * struct queue
@@ -1229,10 +1238,10 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			    unsigned int *qid,
 			    uint32_t *p_doorbell_offset_in_process);
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
-int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
+int pqm_update_queue_properties(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
-int pqm_set_cu_mask(struct process_queue_manager *pqm, unsigned int qid,
-			struct queue_properties *p);
+int pqm_update_mqd(struct process_queue_manager *pqm, unsigned int qid,
+			struct mqd_update_info *minfo);
 int pqm_set_gws(struct process_queue_manager *pqm, unsigned int qid,
 			void *gws);
 struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
