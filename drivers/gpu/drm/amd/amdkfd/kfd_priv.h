@@ -549,6 +549,8 @@ struct queue_properties {
 			    !(q).is_evicted && \
 			    !(q).is_suspended)
 
+struct mqd_update_info;
+
 /**
  * struct queue
  *
