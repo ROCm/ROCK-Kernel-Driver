@@ -95,7 +95,9 @@ static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vbla
 }
 #else
 static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank) {
-	return timeval_to_ns(&vblank->time);
+	struct timeval tv;
+	drm_crtc_vblank_count_and_time(vblank, &tv);
+	return timeval_to_ktime(tv);
 }
 #endif /* HAVE_DRM_VBLANK_USE_KTIME_T */
 
