@@ -78,7 +78,12 @@ const char *ras_block_string[] = {
 
 #ifdef HAVE_SMCA_UMC_V2
 static bool notifier_registered = false;
-static void amdgpu_register_bad_pages_mca_notifier(void);
+static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev);
+struct mce_notifier_adev_list {
+	struct amdgpu_device *devs[MAX_GPU_INSTANCE];
+	int num_gpu;
+};
+static struct mce_notifier_adev_list adev_list;
 #endif
 
 enum amdgpu_ras_retire_page_reservation {
@@ -2026,7 +2031,7 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 #ifdef HAVE_SMCA_UMC_V2
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
 	    (adev->gmc.xgmi.connected_to_cpu))
-		amdgpu_register_bad_pages_mca_notifier();
+		amdgpu_register_bad_pages_mca_notifier(adev);
 #endif
 
 	return 0;
@@ -2528,25 +2533,24 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 }
 
 #ifdef HAVE_SMCA_UMC_V2
+static void add_adev_to_list(struct amdgpu_device *adev)
+{
+	adev_list.devs[adev_list.num_gpu++] = adev;
+}
+
 static struct amdgpu_device *find_adev(uint32_t die_number)
 {
-        struct amdgpu_gpu_instance *gpu_instance;
         int i;
         struct amdgpu_device *adev = NULL;
 
-        mutex_lock(&mgpu_info.mutex);
+	for (i = 0; i < adev_list.num_gpu; i++) {
+		adev = adev_list.devs[i];
 
-        for (i = 0; i < mgpu_info.num_gpu; i++) {
-                gpu_instance = &(mgpu_info.gpu_ins[i]);
-                adev = gpu_instance->adev;
-
-                if (adev->gmc.xgmi.connected_to_cpu &&
+		if (adev && adev->gmc.xgmi.connected_to_cpu &&
                     adev->gmc.xgmi.physical_node_id == die_number)
                         break;
                 adev = NULL;
         }
-
-        mutex_unlock(&mgpu_info.mutex);
 
         return adev;
 }
@@ -2583,8 +2587,7 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
 
         adev = find_adev(gpu_id);
         if (!adev) {
-                dev_warn(adev->dev, "%s: Unable to find adev for gpu_id:"
-                                    " %d\n", __func__, gpu_id);
+                DRM_WARN("%s: Unable to find adev for gpu_id:%d\n", __func__, gpu_id);
                 return NOTIFY_DONE;
         }
 
@@ -2644,13 +2647,14 @@ static struct notifier_block amdgpu_bad_page_nb = {
         .priority       = MCE_PRIO_ACCEL,
 };
 
-static void amdgpu_register_bad_pages_mca_notifier(void)
+static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev)
 {
         /*
          * Register the x86 notifier with MCE subsystem.
          * Please note a notifier can be registered only once
          * with the MCE subsystem.
          */
+	add_adev_to_list(adev);
         if (notifier_registered == false) {
                 mce_register_decode_chain(&amdgpu_bad_page_nb);
                 notifier_registered = true;
