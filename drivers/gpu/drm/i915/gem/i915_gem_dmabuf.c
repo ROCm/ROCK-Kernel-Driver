@@ -7,10 +7,13 @@
 #include <linux/dma-buf.h>
 #include <linux/highmem.h>
 #include <linux/dma-resv.h>
+#include <linux/module.h>
 
 #include "i915_drv.h"
 #include "i915_gem_object.h"
 #include "i915_scatterlist.h"
+
+MODULE_IMPORT_NS(DMA_BUF);
 
 static struct drm_i915_gem_object *dma_buf_to_obj(struct dma_buf *buf)
 {
