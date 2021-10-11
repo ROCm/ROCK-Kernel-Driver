@@ -78,3 +78,14 @@ int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *conn
 }
 EXPORT_SYMBOL(drm_connector_attach_hdr_output_metadata_property);
 #endif
+
+#if !defined(HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK)
+int _kcl_drm_connector_set_panel_orientation_with_quirk(
+        struct drm_connector *connector,
+        enum drm_panel_orientation panel_orientation,
+        int width, int height)
+{
+	return drm_connector_init_panel_orientation_property(connector, width, height);
+}
+EXPORT_SYMBOL(_kcl_drm_connector_set_panel_orientation_with_quirk);
+#endif
