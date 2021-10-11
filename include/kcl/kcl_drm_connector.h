@@ -105,4 +105,20 @@ bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_sta
 int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *connector);
 #endif
 
+#ifndef HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK
+int _kcl_drm_connector_set_panel_orientation_with_quirk(
+        struct drm_connector *connector,
+        enum drm_panel_orientation panel_orientation,
+        int width, int height);
+
+static inline
+int drm_connector_set_panel_orientation_with_quirk(
+        struct drm_connector *connector,
+        enum drm_panel_orientation panel_orientation,
+        int width, int height)
+{
+       return _kcl_drm_connector_set_panel_orientation_with_quirk(connector, panel_orientation, width, height);
+}
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
