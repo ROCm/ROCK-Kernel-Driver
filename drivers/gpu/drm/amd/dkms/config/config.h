@@ -210,6 +210,9 @@
 /* connector reference counting is available */
 #define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
 
+/* drm_connector_set_panel_orientation_with_quirk() is available */
+#define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
+
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
