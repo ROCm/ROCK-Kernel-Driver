@@ -272,7 +272,7 @@ static void amdgpu_mn_invalidate_node(struct amdgpu_mn_node *node,
 
 	list_for_each_entry(bo, &node->bos, mn_list) {
 
-		if (!amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm, start, end))
+		if (!amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm, start, end, NULL))
 			continue;
 
 		r = dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(&bo->tbo),
@@ -361,7 +361,7 @@ static int amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 
 			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
 							 range->start,
-							 end))
+							 end, NULL))
 				amdgpu_amdkfd_evict_userptr(mem, range->mm);
 		}
 	}
@@ -474,7 +474,7 @@ static void amdgpu_mn_invalidate_range_start_hsa(struct mmu_notifier *mn,
 			struct kgd_mem *mem = bo->kfd_bo;
 
 			if (amdgpu_ttm_tt_affect_userptr(bo->tbo.ttm,
-							 start, end))
+							 start, end, NULL))
 				amdgpu_amdkfd_evict_userptr(mem, mm);
 		}
 	}
