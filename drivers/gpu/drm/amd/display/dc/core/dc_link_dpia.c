@@ -109,6 +109,7 @@ static enum link_training_result dpia_configure_link(
 	if (status != DC_OK && link->is_hpd_pending)
 		return LINK_TRAINING_ABORT;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
@@ -116,6 +117,7 @@ static enum link_training_result dpia_configure_link(
 	status = dp_set_fec_ready(link, link_res, fec_enable);
 	if (status != DC_OK && link->is_hpd_pending)
 		return LINK_TRAINING_ABORT;
+#endif
 
 	return LINK_TRAINING_SUCCESS;
 }
