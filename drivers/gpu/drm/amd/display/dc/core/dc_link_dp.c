@@ -4992,7 +4992,7 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 		else
 			link->lttpr_mode = LTTPR_MODE_NON_TRANSPARENT;
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* Check DP tunnel LTTPR mode debug option. */
 	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA &&
 	    link->dc->debug.dpia_debug.bits.force_non_lttpr)
