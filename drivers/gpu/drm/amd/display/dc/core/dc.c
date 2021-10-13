@@ -3664,7 +3664,7 @@ void dc_hardware_release(struct dc *dc)
  */
 bool dc_enable_dmub_notifications(struct dc *dc)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	/* YELLOW_CARP B0 USB4 DPIA needs dmub notifications for interrupts */
 	if (dc->ctx->asic_id.chip_family == FAMILY_YELLOW_CARP &&
 	    dc->ctx->asic_id.hw_internal_rev == YELLOW_CARP_B0)
