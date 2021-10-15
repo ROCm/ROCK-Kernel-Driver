@@ -1477,7 +1477,7 @@ bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm)
  *
  */
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
-				  unsigned long end)
+				  unsigned long end, unsigned long *userptr)
 {
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
 	struct amdgpu_ttm_gup_task_list *entry;
@@ -1506,6 +1506,9 @@ bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 	spin_unlock(&gtt->guptasklock);
 
 	atomic_inc(&gtt->mmu_invalidations);
+
+	if (userptr)
+		*userptr = gtt->userptr;
 
 	return true;
 }
