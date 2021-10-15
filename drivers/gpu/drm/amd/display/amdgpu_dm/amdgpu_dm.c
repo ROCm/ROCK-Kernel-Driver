@@ -10124,7 +10124,17 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 	cursor_scale_w = new_cursor_state->crtc_w * 1000 / cursor_src_w;
 	cursor_scale_h = new_cursor_state->crtc_h * 1000 / cursor_src_h;
 
+#if !defined(for_each_new_plane_in_state_reverse)
+	struct drm_plane_state *old_underlying_state;
+#ifdef for_each_oldnew_plane_in_state_reverse
+        for_each_oldnew_plane_in_state_reverse(state, underlying, old_underlying_state, new_underlying_state, i) {
+#else
+        for_each_plane_in_state(state, underlying, old_underlying_state, i) {
+                new_underlying_state = underlying->state;
+#endif
+#else
 	for_each_new_plane_in_state_reverse(state, underlying, new_underlying_state, i) {
+#endif
 		/* Narrow down to non-cursor planes on the same CRTC as the cursor */
 		if (new_underlying_state->crtc != crtc || underlying == crtc->cursor)
 			continue;
