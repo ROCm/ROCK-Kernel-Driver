@@ -115,7 +115,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 	case DRM_MODE_CONNECTOR_DVII:
 	case DRM_MODE_CONNECTOR_HDMIB:
 		if (amdgpu_connector->use_digital) {
-			if (drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+			if (connector->display_info.is_hdmi) {
 				if (connector->display_info.bpc)
 					bpc = connector->display_info.bpc;
 			}
@@ -123,7 +123,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
 	case DRM_MODE_CONNECTOR_HDMIA:
-		if (drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+		if (connector->display_info.is_hdmi) {
 			if (connector->display_info.bpc)
 				bpc = connector->display_info.bpc;
 		}
@@ -132,7 +132,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		dig_connector = amdgpu_connector->con_priv;
 		if ((dig_connector->dp_sink_type == CONNECTOR_OBJECT_ID_DISPLAYPORT) ||
 		    (dig_connector->dp_sink_type == CONNECTOR_OBJECT_ID_eDP) ||
-		    drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+		    connector->display_info.is_hdmi) {
 			if (connector->display_info.bpc)
 				bpc = connector->display_info.bpc;
 		}
@@ -156,7 +156,7 @@ int amdgpu_connector_get_monitor_bpc(struct drm_connector *connector)
 		break;
 	}
 
-	if (drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+	if (connector->display_info.is_hdmi) {
 		/*
 		 * Pre DCE-8 hw can't handle > 12 bpc, and more than 12 bpc doesn't make
 		 * much sense without support for > 12 bpc framebuffers. RGB 4:4:4 at
@@ -1239,7 +1239,7 @@ static enum drm_mode_status amdgpu_connector_dvi_mode_valid(struct drm_connector
 		    (amdgpu_connector->connector_object_id == CONNECTOR_OBJECT_ID_DUAL_LINK_DVI_D) ||
 		    (amdgpu_connector->connector_object_id == CONNECTOR_OBJECT_ID_HDMI_TYPE_B)) {
 			return MODE_OK;
-		} else if (drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+		} else if (connector->display_info.is_hdmi) {
 			/* HDMI 1.3+ supports max clock of 340 Mhz */
 			if (mode->clock > 340000)
 				return MODE_CLOCK_HIGH;
@@ -1543,7 +1543,7 @@ static enum drm_mode_status amdgpu_connector_dp_mode_valid(struct drm_connector 
 		    (amdgpu_dig_connector->dp_sink_type == CONNECTOR_OBJECT_ID_eDP)) {
 			return amdgpu_atombios_dp_mode_valid_helper(connector, mode);
 		} else {
-			if (drm_detect_hdmi_monitor(amdgpu_connector_edid(connector))) {
+			if (connector->display_info.is_hdmi) {
 				/* HDMI 1.3+ supports max clock of 340 Mhz */
 				if (mode->clock > 340000)
 					return MODE_CLOCK_HIGH;

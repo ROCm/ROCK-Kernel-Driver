@@ -61,7 +61,7 @@ void dm_helpers_free_gpu_mem(
 #endif
 
 enum dc_edid_status dm_helpers_parse_edid_caps(
-	struct dc_context *ctx,
+	struct dc_link *link,
 	const struct dc_edid *edid,
 	struct dc_edid_caps *edid_caps);
 
