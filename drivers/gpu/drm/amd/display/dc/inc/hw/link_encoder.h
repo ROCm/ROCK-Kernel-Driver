@@ -224,6 +224,12 @@ struct link_enc_assignment {
 	bool valid;
 	struct display_endpoint_id ep_id;
 	enum engine_id eng_id;
+	struct dc_stream_state *stream;
+};
+
+enum link_enc_cfg_mode {
+	LINK_ENC_CFG_STEADY, /* Normal operation - use current_state. */
+	LINK_ENC_CFG_TRANSIENT /* During commit state - use state to be committed. */
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)

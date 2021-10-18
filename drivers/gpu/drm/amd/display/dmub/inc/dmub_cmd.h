@@ -47,10 +47,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0x591aacca1
+#define DMUB_FW_VERSION_GIT_HASH 0x42c0e74b
 #define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 80
+#define DMUB_FW_VERSION_REVISION 86
 #define DMUB_FW_VERSION_TEST 0
 #define DMUB_FW_VERSION_VBIOS 0
 #define DMUB_FW_VERSION_HOTFIX 0
@@ -372,7 +372,8 @@ union dmub_fw_boot_options {
 		uint32_t reserved2: 1; /**< reserved for an unreleased feature */
 		uint32_t reserved_unreleased1: 1; /**< reserved for an unreleased feature */
 		uint32_t invalid_vbios_data: 1; /**< 1 if VBIOS data table is invalid */
-		uint32_t reserved : 23; /**< reserved */
+		uint32_t reserved_unreleased2: 1; /**< reserved for an unreleased feature */
+		uint32_t reserved : 22; /**< reserved */
 	} bits; /**< boot bits */
 	uint32_t all; /**< 32-bit access to bits */
 };
@@ -1731,6 +1732,11 @@ enum dmub_cmd_abm_type {
 	 * Enable/disable fractional duty cycle for backlight PWM.
 	 */
 	DMUB_CMD__ABM_SET_PWM_FRAC	= 5,
+
+	/**
+	 * unregister vertical interrupt after steady state is reached
+	 */
+	DMUB_CMD__ABM_PAUSE	= 6,
 };
 
 /**
@@ -2087,6 +2093,50 @@ struct dmub_rb_cmd_abm_init_config {
 };
 
 /**
+ * Data passed from driver to FW in a DMUB_CMD__ABM_PAUSE command.
+ */
+
+struct dmub_cmd_abm_pause_data {
+
+	/**
+	 * Panel Control HW instance mask.
+	 * Bit 0 is Panel Control HW instance 0.
+	 * Bit 1 is Panel Control HW instance 1.
+	 */
+	uint8_t panel_mask;
+
+	/**
+	 * OTG hw instance
+	 */
+	uint8_t otg_inst;
+
+	/**
+	 * Enable or disable ABM pause
+	 */
+	uint8_t enable;
+
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[1];
+};
+
+/**
+ * Definition of a DMUB_CMD__ABM_PAUSE command.
+ */
+struct dmub_rb_cmd_abm_pause {
+	/**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+
+	/**
+	 * Data passed from driver to FW in a DMUB_CMD__ABM_PAUSE command.
+	 */
+	struct dmub_cmd_abm_pause_data abm_pause_data;
+};
+
+/**
  * Data passed from driver to FW in a DMUB_CMD__QUERY_FEATURE_CAPS command.
  */
 struct dmub_cmd_query_feature_caps_data {
@@ -2363,6 +2413,11 @@ union dmub_rb_cmd {
 	 * Definition of a DMUB_CMD__ABM_INIT_CONFIG command.
 	 */
 	struct dmub_rb_cmd_abm_init_config abm_init_config;
+
+	/**
+	 * Definition of a DMUB_CMD__ABM_PAUSE command.
+	 */
+	struct dmub_rb_cmd_abm_pause abm_pause;
 
 	/**
 	 * Definition of a DMUB_CMD__DP_AUX_ACCESS command.

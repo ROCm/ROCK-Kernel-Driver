@@ -147,7 +147,10 @@ bool dp_is_interlane_aligned(union lane_align_status_updated align_status);
 
 bool dp_is_max_vs_reached(
 	const struct link_training_settings *lt_settings);
-
+void dp_hw_to_dpcd_lane_settings(
+	const struct link_training_settings *lt_settings,
+	const struct dc_lane_settings hw_lane_settings[LANE_COUNT_DP_MAX],
+	union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX]);
 void dp_update_drive_settings(
 	struct link_training_settings *dest,
 	struct link_training_settings src);
@@ -167,7 +170,7 @@ uint8_t dc_dp_initialize_scrambling_data_symbols(
 enum dc_status dp_set_fec_ready(struct dc_link *link, bool ready);
 void dp_set_fec_enable(struct dc_link *link, bool enable);
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable);
-bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable);
+bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_update);
 void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable);
 bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx);
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable);

@@ -990,6 +990,7 @@ struct amdgpu_device {
 	bool				ib_pool_ready;
 	struct amdgpu_sa_manager	ib_pools[AMDGPU_IB_POOL_MAX];
 	struct amdgpu_sched		gpu_sched[AMDGPU_HW_IP_NUM][AMDGPU_RING_PRIO_MAX];
+	struct workqueue_struct *timeout_wq;
 
 	/* interrupts */
 	struct amdgpu_irq		irq;
@@ -1135,8 +1136,6 @@ struct amdgpu_device {
 	char				product_number[16];
 	char				product_name[32];
 	char				serial[20];
-
-	struct amdgpu_autodump		autodump;
 
 	atomic_t			throttling_logging_enabled;
 	struct ratelimit_state		throttling_logging_rs;

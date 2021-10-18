@@ -210,6 +210,9 @@
 /* connector reference counting is available */
 #define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
 
+/* drm_connector_set_panel_orientation_with_quirk() is available */
+#define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
+
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
@@ -359,6 +362,9 @@
 
 /* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
 /* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_USE_KTIMER_T_ARG */
+
+/* drm_vblank struct use ktime_t for time field */
+#define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
 /* drm_driver->release() is available */
 #define HAVE_DRM_DRIVER_RELEASE 1
@@ -568,6 +574,9 @@
 
 /* drm atomic nonblocking commit support is available */
 #define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT 1
+
+/* enum drm_panel_orientation is available */
+#define HAVE_DRM_PANEL_ORIENTATION_ENUM 1
 
 /* drm_plane_helper_check_state is available */
 /* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
@@ -818,6 +827,9 @@
 
 /* migrate_vma->pgmap_owner is available */
 /* #undef HAVE_MIGRATE_VMA_PGMAP_OWNER */
+
+/* mmget is available */
+#define HAVE_MMGET 1
 
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1

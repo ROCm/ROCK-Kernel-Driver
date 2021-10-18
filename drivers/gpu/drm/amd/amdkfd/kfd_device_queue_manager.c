@@ -714,11 +714,6 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 	}
 
 	q->properties.is_suspended = true;
-	/* hold process address space for safe wave inspection */
-	if (!pdd->process->num_queues_suspended)
-		mmget(pdd->process->lead_thread->mm);
-	pdd->process->num_queues_suspended++;
-
 	if (q->properties.is_active) {
 		decrement_queue_count(dqm, q->properties.type);
 		q->properties.is_active = false;
@@ -758,10 +753,6 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 			    q->properties.queue_id);
 
 	q->properties.is_suspended = false;
-	/* release process address space with wave inspection done */
-	pdd->process->num_queues_suspended--;
-	if (!pdd->process->num_queues_suspended)
-		mmput_async(pdd->process->mm);
 
 	if (QUEUE_IS_ACTIVE(q->properties)) {
 		q->properties.is_active = true;
@@ -1490,8 +1481,6 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	 */
 	q->properties.is_evicted = !!qpd->evicted;
 	q->properties.is_suspended = false;
-	q->properties.save_ttmp = qpd->pqm->process->runtime_info.ttmp_setup ||
-					qpd->pqm->process->debug_trap_enabled;
 	mqd_mgr->init_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
 
@@ -2246,23 +2235,6 @@ static void kfd_process_hw_exception(struct work_struct *work)
 	amdgpu_amdkfd_gpu_reset(dqm->dev->kgd);
 }
 
-static void update_save_ttmp(struct device_queue_manager *dqm,
-				struct qcm_process_device *qpd,
-				bool save_ttmp)
-{
-	struct queue *q;
-	struct mqd_manager *mqd_mgr =
-			dqm->mqd_mgrs[get_mqd_type_from_queue_type(
-						KFD_QUEUE_TYPE_COMPUTE)];
-
-	list_for_each_entry(q, &qpd->queues_list, list) {
-		if (q->properties.type == KFD_QUEUE_TYPE_COMPUTE) {
-			q->properties.save_ttmp = save_ttmp;
-			mqd_mgr->update_mqd(mqd_mgr, q->mqd, &q->properties);
-		}
-	}
-}
-
 /*
  * Reserves a vmid for the trap debugger
  */
@@ -2298,8 +2270,6 @@ int reserve_debug_trap_vmid(struct device_queue_manager *dqm,
 	r = set_sched_resources(dqm);
 	if (r)
 		goto out_unlock;
-
-	update_save_ttmp(dqm, qpd, true);
 
 	r = map_queues_cpsch(dqm);
 	if (r)
@@ -2348,8 +2318,6 @@ int release_debug_trap_vmid(struct device_queue_manager *dqm,
 	r = set_sched_resources(dqm);
 	if (r)
 		goto out_unlock;
-
-	update_save_ttmp(dqm, qpd, qpd->pqm->process->runtime_info.ttmp_setup);
 
 	r = map_queues_cpsch(dqm);
 	if (r)
@@ -2670,9 +2638,7 @@ int debug_lock_and_unmap(struct device_queue_manager *dqm)
 	return r;
 }
 
-int debug_map_and_unlock(struct device_queue_manager *dqm,
-			struct qcm_process_device *qpd,
-			bool debug_trap_enable)
+int debug_map_and_unlock(struct device_queue_manager *dqm)
 {
 	int r;
 
@@ -2684,9 +2650,6 @@ int debug_map_and_unlock(struct device_queue_manager *dqm,
 	if (!kfd_dbg_is_per_vmid_supported(dqm->dev))
 		return 0;
 
-	if (qpd)
-		update_save_ttmp(dqm, qpd, debug_trap_enable);
-
 	r = map_queues_cpsch(dqm);
 
 	dqm_unlock(dqm);
@@ -2694,16 +2657,14 @@ int debug_map_and_unlock(struct device_queue_manager *dqm,
 	return r;
 }
 
-int debug_refresh_runlist(struct device_queue_manager *dqm,
-			struct qcm_process_device *qpd,
-			bool debug_trap_enable)
+int debug_refresh_runlist(struct device_queue_manager *dqm)
 {
 	int r = debug_lock_and_unmap(dqm);
 
 	if (r)
 		return r;
 
-	return debug_map_and_unlock(dqm, qpd, debug_trap_enable);
+	return debug_map_and_unlock(dqm);
 }
 
 #if defined(CONFIG_DEBUG_FS)

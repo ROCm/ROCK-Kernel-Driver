@@ -359,8 +359,7 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
-		debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd,
-						target->runtime_info.ttmp_setup);
+		debug_refresh_runlist(pdd->dev->dqm);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
 			if (release_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd))
@@ -446,7 +445,7 @@ static int kfd_dbg_trap_activate(struct kfd_process *target)
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
+		r = debug_refresh_runlist(pdd->dev->dqm);
 
 		if (r) {
 			target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED_ERROR;
@@ -547,7 +546,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 			pdd->spi_dbg_override = r;
 			r = 0;
 
-			r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
+			r = debug_refresh_runlist(pdd->dev->dqm);
 			if (r)
 				break;
 		}
@@ -571,7 +570,7 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
+		r = debug_refresh_runlist(pdd->dev->dqm);
 		if (r)
 			break;
 	}
@@ -640,7 +639,7 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		if (r)
 			break;
 
-		r = debug_refresh_runlist(pdd->dev->dqm, NULL, true);
+		r = debug_refresh_runlist(pdd->dev->dqm);
 		if (r)
 			break;
 	}
@@ -720,7 +719,7 @@ static int kfd_allocate_debug_watch_point(struct kfd_process *p,
 					pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
-		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
+		r = debug_map_and_unlock(pdd->dev->dqm);
 		if (r)
 			break;
 	}
@@ -776,7 +775,7 @@ static int kfd_release_debug_watch_points(struct kfd_process *p,
 		}
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
 
-		r = debug_map_and_unlock(pdd->dev->dqm, NULL, true);
+		r = debug_map_and_unlock(pdd->dev->dqm);
 		if (r)
 			break;
 	}
@@ -988,7 +987,7 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 						false,
 						pdd->dev->vm_info.last_vmid_kfd);
 
-				debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, true);
+				debug_refresh_runlist(pdd->dev->dqm);
 			}
 		}
 	}
@@ -1058,7 +1057,7 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 					false,
 					pdd->dev->vm_info.last_vmid_kfd);
 
-			debug_refresh_runlist(pdd->dev->dqm, &pdd->qpd, false);
+			debug_refresh_runlist(pdd->dev->dqm);
 		}
 	}
 

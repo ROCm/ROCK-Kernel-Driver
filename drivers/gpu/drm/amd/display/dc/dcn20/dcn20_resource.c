@@ -89,6 +89,7 @@
 #include "dce/dce_aux.h"
 #include "dce/dce_i2c.h"
 #include "vm_helper.h"
+#include "link_enc_cfg.h"
 
 #include "amdgpu_socbb.h"
 
@@ -1612,12 +1613,28 @@ static void get_pixel_clock_parameters(
 	const struct dc_stream_state *stream = pipe_ctx->stream;
 	struct pipe_ctx *odm_pipe;
 	int opp_cnt = 1;
+	struct dc_link *link = stream->link;
+	struct link_encoder *link_enc = NULL;
 
 	for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe)
 		opp_cnt++;
 
 	pixel_clk_params->requested_pix_clk_100hz = stream->timing.pix_clk_100hz;
-	pixel_clk_params->encoder_object_id = stream->link->link_enc->id;
+
+	/* Links supporting dynamically assigned link encoder will be assigned next
+	 * available encoder if one not already assigned.
+	 */
+	if (link->is_dig_mapping_flexible &&
+			link->dc->res_pool->funcs->link_encs_assign) {
+		link_enc = link_enc_cfg_get_link_enc_used_by_stream(stream->ctx->dc, stream);
+		if (link_enc == NULL)
+			link_enc = link_enc_cfg_get_next_avail_link_enc(stream->ctx->dc);
+	} else
+		link_enc = stream->link->link_enc;
+	ASSERT(link_enc);
+
+	if (link_enc)
+		pixel_clk_params->encoder_object_id = link_enc->id;
 	pixel_clk_params->signal_type = pipe_ctx->stream->signal;
 	pixel_clk_params->controller_id = pipe_ctx->stream_res.tg->inst + 1;
 	/* TODO: un-hardcode*/
@@ -3176,6 +3193,10 @@ void dcn20_calculate_dlg_params(
 	context->bw_ctx.bw.dcn.clk.dcfclk_khz = context->bw_ctx.dml.vba.DCFCLK * 1000;
 	context->bw_ctx.bw.dcn.clk.socclk_khz = context->bw_ctx.dml.vba.SOCCLK * 1000;
 	context->bw_ctx.bw.dcn.clk.dramclk_khz = context->bw_ctx.dml.vba.DRAMSpeed * 1000 / 16;
+
+	if (dc->debug.min_dram_clk_khz > context->bw_ctx.bw.dcn.clk.dramclk_khz)
+		context->bw_ctx.bw.dcn.clk.dramclk_khz = dc->debug.min_dram_clk_khz;
+
 	context->bw_ctx.bw.dcn.clk.dcfclk_deep_sleep_khz = context->bw_ctx.dml.vba.DCFCLKDeepSleep * 1000;
 	context->bw_ctx.bw.dcn.clk.fclk_khz = context->bw_ctx.dml.vba.FabricClock * 1000;
 	context->bw_ctx.bw.dcn.clk.p_state_change_support =
@@ -3242,7 +3263,7 @@ void dcn20_calculate_dlg_params(
 
 		context->bw_ctx.dml.funcs.rq_dlg_get_rq_reg(&context->bw_ctx.dml,
 				&context->res_ctx.pipe_ctx[i].rq_regs,
-				pipes[pipe_idx].pipe);
+				&pipes[pipe_idx].pipe);
 		pipe_idx++;
 	}
 }

@@ -439,7 +439,7 @@ void dcn201_update_mpcc(struct dc *dc, struct pipe_ctx *pipe_ctx)
 	bool per_pixel_alpha = pipe_ctx->plane_state->per_pixel_alpha && pipe_ctx->bottom_pipe;
 	int mpcc_id, dpp_id;
 	struct mpcc *new_mpcc;
-	struct mpcc *remove_mpcc;
+	struct mpcc *remove_mpcc = NULL;
 	struct mpc *mpc = dc->res_pool->mpc;
 	struct mpc_tree *mpc_tree_params = &(pipe_ctx->stream_res.opp->mpc_tree_params);
 
@@ -621,7 +621,7 @@ void dcn201_unblank_stream(struct pipe_ctx *pipe_ctx,
 		if (optc201_is_two_pixels_per_containter(&stream->timing))
 			params.timing.pix_clk_100hz /= 2;
 
-		pipe_ctx->stream_res.stream_enc->funcs->dp_unblank(pipe_ctx->stream_res.stream_enc, &params);
+		pipe_ctx->stream_res.stream_enc->funcs->dp_unblank(link, pipe_ctx->stream_res.stream_enc, &params);
 	}
 
 	if (link->local_sink && link->local_sink->sink_signal == SIGNAL_TYPE_EDP) {

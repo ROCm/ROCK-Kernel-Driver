@@ -75,6 +75,8 @@
 
 #include "dmub/dmub_srv.h"
 
+#include "dcn30/dcn30_vpg.h"
+
 #include "i2caux_interface.h"
 #include "dce/dmub_hw_lock_mgr.h"
 
@@ -1585,7 +1587,7 @@ static uint8_t get_stream_mask(struct dc *dc, struct dc_state *context)
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-void dc_z10_restore(struct dc *dc)
+void dc_z10_restore(const struct dc *dc)
 {
 	if (dc->hwss.z10_restore)
 		dc->hwss.z10_restore(dc);
@@ -1816,6 +1818,23 @@ static bool is_flip_pending_in_pipes(struct dc *dc, struct dc_state *context)
 	return false;
 }
 
+/* Perform updates here which need to be deferred until next vupdate
+ *
+ * i.e. blnd lut, 3dlut, and shaper lut bypass regs are double buffered
+ * but forcing lut memory to shutdown state is immediate. This causes
+ * single frame corruption as lut gets disabled mid-frame unless shutdown
+ * is deferred until after entering bypass.
+ */
+static void process_deferred_updates(struct dc *dc)
+{
+	int i;
+
+	if (dc->debug.enable_mem_low_power.bits.cm)
+		for (i = 0; i < dc->dcn_ip->max_num_dpp; i++)
+			if (dc->res_pool->dpps[i]->funcs->dpp_deferred_update)
+				dc->res_pool->dpps[i]->funcs->dpp_deferred_update(dc->res_pool->dpps[i]);
+}
+
 void dc_post_update_surfaces_to_stream(struct dc *dc)
 {
 	int i;
@@ -1826,6 +1845,11 @@ void dc_post_update_surfaces_to_stream(struct dc *dc)
 
 	post_surface_trace(dc);
 
+	if (dc->ctx->dce_version >= DCE_VERSION_MAX)
+		TRACE_DCN_CLOCK_STATE(&context->bw_ctx.bw.dcn.clk);
+	else
+		TRACE_DCE_CLOCK_STATE(&context->bw_ctx.bw.dce);
+
 	if (is_flip_pending_in_pipes(dc, context))
 		return;
 
@@ -1835,6 +1859,8 @@ void dc_post_update_surfaces_to_stream(struct dc *dc)
 			context->res_ctx.pipe_ctx[i].pipe_idx = i;
 			dc->hwss.disable_plane(dc, &context->res_ctx.pipe_ctx[i]);
 		}
+
+	process_deferred_updates(dc);
 
 	dc->hwss.optimize_bandwidth(dc, context);
 
@@ -2033,7 +2059,11 @@ static enum surface_update_type get_plane_info_update_type(const struct dc_surfa
 	}
 
 	if (u->plane_info->dcc.enable != u->surface->dcc.enable
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+			|| u->plane_info->dcc.dcc_ind_blk != u->surface->dcc.dcc_ind_blk
+#else
 			|| u->plane_info->dcc.independent_64b_blks != u->surface->dcc.independent_64b_blks
+#endif
 			|| u->plane_info->dcc.meta_pitch != u->surface->dcc.meta_pitch) {
 		/* During DCC on/off, stutter period is calculated before
 		 * DCC has fully transitioned. This results in incorrect
@@ -2588,6 +2618,9 @@ static void commit_planes_do_stream_update(struct dc *dc,
 		enum surface_update_type update_type,
 		struct dc_state *context)
 {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	struct vpg *vpg;
+#endif
 	int j;
 
 	// Stream updates
@@ -2608,6 +2641,11 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					stream_update->vrr_infopacket ||
 					stream_update->vsc_infopacket ||
 					stream_update->vsp_infopacket) {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+				vpg = pipe_ctx->stream_res.stream_enc->vpg;
+				if (vpg && vpg->funcs->vpg_poweron)
+					vpg->funcs->vpg_poweron(vpg);
+#endif
 				resource_build_info_frame(pipe_ctx);
 				dc->hwss.update_info_frame(pipe_ctx);
 			}
@@ -3043,6 +3081,9 @@ void dc_commit_updates_for_stream(struct dc *dc,
 			if (new_pipe->plane_state && new_pipe->plane_state != old_pipe->plane_state)
 				new_pipe->plane_state->force_full_update = true;
 		}
+	} else if (update_type == UPDATE_TYPE_FAST) {
+		/* Previous frame finished and HW is ready for optimization. */
+		dc_post_update_surfaces_to_stream(dc);
 	}
 
 
@@ -3098,15 +3139,6 @@ void dc_commit_updates_for_stream(struct dc *dc,
 			if (pipe_ctx->plane_state && pipe_ctx->stream == stream)
 				pipe_ctx->plane_state->force_full_update = false;
 		}
-	}
-	/*let's use current_state to update watermark etc*/
-	if (update_type >= UPDATE_TYPE_FULL) {
-		dc_post_update_surfaces_to_stream(dc);
-
-		if (dc_ctx->dce_version >= DCE_VERSION_MAX)
-			TRACE_DCN_CLOCK_STATE(&context->bw_ctx.bw.dcn.clk);
-		else
-			TRACE_DCE_CLOCK_STATE(&context->bw_ctx.bw.dce);
 	}
 
 	return;
@@ -3612,4 +3644,58 @@ bool dc_process_dmub_aux_transfer_async(struct dc *dc,
 void dc_disable_accelerated_mode(struct dc *dc)
 {
 	bios_set_scratch_acc_mode_change(dc->ctx->dc_bios, 0);
+}
+
+
+/**
+ *****************************************************************************
+ *  dc_notify_vsync_int_state() - notifies vsync enable/disable state
+ *  @dc: dc structure
+ *	@stream: stream where vsync int state changed
+ *	@enable: whether vsync is enabled or disabled
+ *
+ *  Called when vsync is enabled/disabled
+ *	Will notify DMUB to start/stop ABM interrupts after steady state is reached
+ *
+ *****************************************************************************
+ */
+void dc_notify_vsync_int_state(struct dc *dc, struct dc_stream_state *stream, bool enable)
+{
+	int i;
+	int edp_num;
+	struct pipe_ctx *pipe = NULL;
+	struct dc_link *link = stream->sink->link;
+	struct dc_link *edp_links[MAX_NUM_EDP];
+
+
+	if (link->psr_settings.psr_feature_enabled)
+		return;
+
+	/*find primary pipe associated with stream*/
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe = &dc->current_state->res_ctx.pipe_ctx[i];
+
+		if (pipe->stream == stream && pipe->stream_res.tg)
+			break;
+	}
+
+	if (i == MAX_PIPES) {
+		ASSERT(0);
+		return;
+	}
+
+	get_edp_links(dc, edp_links, &edp_num);
+
+	/* Determine panel inst */
+	for (i = 0; i < edp_num; i++) {
+		if (edp_links[i] == link)
+			break;
+	}
+
+	if (i == edp_num) {
+		return;
+	}
+
+	if (pipe->stream_res.abm && pipe->stream_res.abm->funcs->set_abm_pause)
+		pipe->stream_res.abm->funcs->set_abm_pause(pipe->stream_res.abm, !enable, i, pipe->stream_res.tg->inst);
 }

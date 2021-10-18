@@ -1,4 +1,26 @@
-/* Copyright 2015 Advanced Micro Devices, Inc. */
+/*
+ * Copyright 2015 Advanced Micro Devices, Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Authors: AMD
+ */
 #include "dm_services.h"
 #include "dc.h"
 #include "dc_link_dp.h"
@@ -284,7 +306,7 @@ static enum dc_dp_training_pattern decide_eq_training_pattern(struct dc_link *li
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -319,7 +341,7 @@ static enum dc_dp_training_pattern decide_eq_training_pattern(struct dc_link *li
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -533,45 +555,8 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 			dpcd_base_lt_offset,
 			dpcd_pattern.v1_4.TRAINING_PATTERN_SET);
 	}
-	/*****************************************************************
-	* DpcdAddress_Lane0Set -> DpcdAddress_Lane3Set
-	*****************************************************************/
-	for (lane = 0; lane <
-		(uint32_t)(lt_settings->link_settings.lane_count); lane++) {
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-		if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
-				DP_128b_132b_ENCODING) {
-			dpcd_lane[lane].tx_ffe.PRESET_VALUE =
-					lt_settings->lane_settings[lane].FFE_PRESET.settings.level;
-		} else if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
-				DP_8b_10b_ENCODING) {
-			dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-					(uint8_t)(lt_settings->lane_settings[lane].VOLTAGE_SWING);
-			dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-					(uint8_t)(lt_settings->lane_settings[lane].PRE_EMPHASIS);
-
-			dpcd_lane[lane].bits.MAX_SWING_REACHED =
-					(lt_settings->lane_settings[lane].VOLTAGE_SWING ==
-							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-			dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-					(lt_settings->lane_settings[lane].PRE_EMPHASIS ==
-							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-		}
-#else
-		dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-		(uint8_t)(lt_settings->lane_settings[lane].VOLTAGE_SWING);
-		dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-		(uint8_t)(lt_settings->lane_settings[lane].PRE_EMPHASIS);
-
-		dpcd_lane[lane].bits.MAX_SWING_REACHED =
-		(lt_settings->lane_settings[lane].VOLTAGE_SWING ==
-		VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-		dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-		(lt_settings->lane_settings[lane].PRE_EMPHASIS ==
-		PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-#endif
-	}
+	dp_hw_to_dpcd_lane_settings(lt_settings, lt_settings->lane_settings, dpcd_lane);
 
 	/* concatenate everything into one buffer*/
 
@@ -656,8 +641,6 @@ static void dpcd_set_lt_pattern_and_lane_settings(
 				dpcd_base_lt_offset,
 				dpcd_lt_buffer,
 				size_in_bytes + sizeof(dpcd_pattern.raw));
-
-	link->cur_lane_setting = lt_settings->lane_settings[0];
 }
 
 bool dp_is_cr_done(enum dc_lane_count ln_count,
@@ -697,6 +680,37 @@ bool dp_is_symbol_locked(enum dc_lane_count ln_count,
 bool dp_is_interlane_aligned(union lane_align_status_updated align_status)
 {
 	return align_status.bits.INTERLANE_ALIGN_DONE == 1;
+}
+
+void dp_hw_to_dpcd_lane_settings(
+		const struct link_training_settings *lt_settings,
+		const struct dc_lane_settings hw_lane_settings[LANE_COUNT_DP_MAX],
+		union dpcd_training_lane dpcd_lane_settings[LANE_COUNT_DP_MAX])
+{
+	uint8_t lane = 0;
+
+	for (lane = 0; lane < LANE_COUNT_DP_MAX; lane++) {
+		if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
+				DP_8b_10b_ENCODING) {
+			dpcd_lane_settings[lane].bits.VOLTAGE_SWING_SET =
+					(uint8_t)(hw_lane_settings[lane].VOLTAGE_SWING);
+			dpcd_lane_settings[lane].bits.PRE_EMPHASIS_SET =
+					(uint8_t)(hw_lane_settings[lane].PRE_EMPHASIS);
+			dpcd_lane_settings[lane].bits.MAX_SWING_REACHED =
+					(hw_lane_settings[lane].VOLTAGE_SWING ==
+							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
+			dpcd_lane_settings[lane].bits.MAX_PRE_EMPHASIS_REACHED =
+					(hw_lane_settings[lane].PRE_EMPHASIS ==
+							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
+		}
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+		else if (dp_get_link_encoding_format(&lt_settings->link_settings) ==
+				DP_128b_132b_ENCODING) {
+			dpcd_lane_settings[lane].tx_ffe.PRESET_VALUE =
+					hw_lane_settings[lane].FFE_PRESET.settings.level;
+		}
+#endif
+	}
 }
 
 void dp_update_drive_settings(
@@ -1018,46 +1032,9 @@ enum dc_status dpcd_set_lane_settings(
 		lane0_set_address = DP_TRAINING_LANE0_SET_PHY_REPEATER1 +
 		((DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE) * (offset - 1));
 
-	for (lane = 0; lane <
-		(uint32_t)(link_training_setting->
-		link_settings.lane_count);
-		lane++) {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-		if (dp_get_link_encoding_format(&link_training_setting->link_settings) ==
-				DP_128b_132b_ENCODING) {
-			dpcd_lane[lane].tx_ffe.PRESET_VALUE =
-					link_training_setting->lane_settings[lane].FFE_PRESET.settings.level;
-		} else if (dp_get_link_encoding_format(&link_training_setting->link_settings) ==
-				DP_8b_10b_ENCODING) {
-			dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-					(uint8_t)(link_training_setting->lane_settings[lane].VOLTAGE_SWING);
-			dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-					(uint8_t)(link_training_setting->lane_settings[lane].PRE_EMPHASIS);
-
-			dpcd_lane[lane].bits.MAX_SWING_REACHED =
-					(link_training_setting->lane_settings[lane].VOLTAGE_SWING ==
-							VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-			dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-					(link_training_setting->lane_settings[lane].PRE_EMPHASIS ==
-							PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-		}
-#else
-		dpcd_lane[lane].bits.VOLTAGE_SWING_SET =
-			(uint8_t)(link_training_setting->
-			lane_settings[lane].VOLTAGE_SWING);
-		dpcd_lane[lane].bits.PRE_EMPHASIS_SET =
-			(uint8_t)(link_training_setting->
-			lane_settings[lane].PRE_EMPHASIS);
-		dpcd_lane[lane].bits.MAX_SWING_REACHED =
-			(link_training_setting->
-			lane_settings[lane].VOLTAGE_SWING ==
-			VOLTAGE_SWING_MAX_LEVEL ? 1 : 0);
-		dpcd_lane[lane].bits.MAX_PRE_EMPHASIS_REACHED =
-			(link_training_setting->
-			lane_settings[lane].PRE_EMPHASIS ==
-			PRE_EMPHASIS_MAX_LEVEL ? 1 : 0);
-#endif
-	}
+	dp_hw_to_dpcd_lane_settings(link_training_setting,
+			link_training_setting->lane_settings,
+			dpcd_lane);
 
 	status = core_link_write_dpcd(link,
 		lane0_set_address,
@@ -1125,7 +1102,6 @@ enum dc_status dpcd_set_lane_settings(
 			dpcd_lane[0].bits.MAX_SWING_REACHED,
 			dpcd_lane[0].bits.MAX_PRE_EMPHASIS_REACHED);
 	}
-	link->cur_lane_setting = link_training_setting->lane_settings[0];
 
 	return status;
 }
@@ -2370,19 +2346,19 @@ bool perform_link_training_with_retries(
 	/* Dynamically assigned link encoders associated with stream rather than
 	 * link.
 	 */
-	if (link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = stream->link_enc;
+	if (link->is_dig_mapping_flexible && link->dc->res_pool->funcs->link_encs_assign)
+		link_enc = link_enc_cfg_get_link_enc_used_by_stream(link->ctx->dc, pipe_ctx->stream);
 	else
 		link_enc = link->link_enc;
 
 	/* We need to do this before the link training to ensure the idle pattern in SST
 	 * mode will be sent right after the link training
 	 */
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	if (dp_get_link_encoding_format(&current_setting) == DP_8b_10b_ENCODING)
-#endif
+	if (dp_get_link_encoding_format(&current_setting) == DP_8b_10b_ENCODING) {
 		link_enc->funcs->connect_dig_be_to_fe(link_enc,
 							pipe_ctx->stream_res.stream_enc->id, true);
+		dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_CONNECT_DIG_FE_BE);
+	}
 
 	for (j = 0; j < attempts; ++j) {
 
@@ -2405,14 +2381,13 @@ bool perform_link_training_with_retries(
 		if (panel_mode == DP_PANEL_MODE_EDP) {
 			struct cp_psp *cp_psp = &stream->ctx->cp_psp;
 
-			if (cp_psp && cp_psp->funcs.enable_assr) {
-				if (!cp_psp->funcs.enable_assr(cp_psp->handle, link)) {
-					/* since eDP implies ASSR on, change panel
-					 * mode to disable ASSR
-					 */
-					panel_mode = DP_PANEL_MODE_DEFAULT;
-				}
-			}
+			if (cp_psp && cp_psp->funcs.enable_assr)
+				/* ASSR is bound to fail with unsigned PSP
+				 * verstage used during devlopment phase.
+				 * Report and continue with eDP panel mode to
+				 * perform eDP link training with right settings
+				 */
+				cp_psp->funcs.enable_assr(cp_psp->handle, link);
 		}
 #endif
 
@@ -2441,15 +2416,23 @@ bool perform_link_training_with_retries(
 		dp_disable_link_phy(link, signal);
 
 		/* Abort link training if failure due to sink being unplugged. */
-		if (status == LINK_TRAINING_ABORT)
-			break;
-		else if (do_fallback) {
+		if (status == LINK_TRAINING_ABORT) {
+			enum dc_connection_type type = dc_connection_none;
+
+			dc_link_detect_sink(link, &type);
+			if (type == dc_connection_none)
+				break;
+		} else if (do_fallback) {
+			uint32_t req_bw;
+			uint32_t link_bw;
+
 			decide_fallback_link_setting(*link_setting, &current_setting, status);
 			/* Fail link training if reduced link bandwidth no longer meets
 			 * stream requirements.
 			 */
-			if (dc_bandwidth_in_kbps_from_timing(&stream->timing) <
-					dc_link_bandwidth_kbps(link, &current_setting))
+			req_bw = dc_bandwidth_in_kbps_from_timing(&stream->timing);
+			link_bw = dc_link_bandwidth_kbps(link, &current_setting);
+			if (req_bw > link_bw)
 				break;
 		}
 
@@ -2638,13 +2621,27 @@ static enum dc_link_rate get_lttpr_max_link_rate(struct dc_link *link)
 
 bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_settings *max_link_enc_cap)
 {
+	struct link_encoder *link_enc = NULL;
+
 	if (!max_link_enc_cap) {
 		DC_LOG_ERROR("%s: Could not return max link encoder caps", __func__);
 		return false;
 	}
 
-	if (link->link_enc->funcs->get_max_link_cap) {
-		link->link_enc->funcs->get_max_link_cap(link->link_enc, max_link_enc_cap);
+	/* Links supporting dynamically assigned link encoder will be assigned next
+	 * available encoder if one not already assigned.
+	 */
+	if (link->is_dig_mapping_flexible &&
+			link->dc->res_pool->funcs->link_encs_assign) {
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
+		if (link_enc == NULL)
+			link_enc = link_enc_cfg_get_next_avail_link_enc(link->ctx->dc);
+	} else
+		link_enc = link->link_enc;
+	ASSERT(link_enc);
+
+	if (link_enc && link_enc->funcs->get_max_link_cap) {
+		link_enc->funcs->get_max_link_cap(link_enc, max_link_enc_cap);
 		return true;
 	}
 
@@ -2660,9 +2657,23 @@ static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum dc_link_rate lttpr_max_link_rate;
 #endif
+	struct link_encoder *link_enc = NULL;
+
+	/* Links supporting dynamically assigned link encoder will be assigned next
+	 * available encoder if one not already assigned.
+	 */
+	if (link->is_dig_mapping_flexible &&
+			link->dc->res_pool->funcs->link_encs_assign) {
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
+		if (link_enc == NULL)
+			link_enc = link_enc_cfg_get_next_avail_link_enc(link->ctx->dc);
+	} else
+		link_enc = link->link_enc;
+	ASSERT(link_enc);
 
 	/* get max link encoder capability */
-	link->link_enc->funcs->get_max_link_cap(link->link_enc, &max_link_cap);
+	if (link_enc)
+		link_enc->funcs->get_max_link_cap(link_enc, &max_link_cap);
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (max_link_cap.link_rate >= LINK_RATE_UHBR10 &&
 			!link->hpo_dp_link_enc)
@@ -2706,7 +2717,7 @@ static struct dc_link_settings get_max_link_cap(struct dc_link *link)
 	return max_link_cap;
 }
 
-enum dc_status read_hpd_rx_irq_data(
+static enum dc_status read_hpd_rx_irq_data(
 	struct dc_link *link,
 	union hpd_irq_data *irq_data)
 {
@@ -2837,16 +2848,31 @@ bool dp_verify_link_cap(
 	enum link_training_result status;
 	union hpd_irq_data irq_data;
 
-	if (link->dc->debug.skip_detection_link_training) {
+	/* link training starts with the maximum common settings
+	 * supported by both sink and ASIC.
+	 */
+	max_link_cap = get_max_link_cap(link);
+	initial_link_settings = get_common_supported_link_settings(
+			*known_limit_link_setting,
+			max_link_cap);
+
+	/* Accept reported capabilities if link supports flexible encoder mapping or encoder already in use. */
+	if (link->dc->debug.skip_detection_link_training ||
+			link->is_dig_mapping_flexible) {
+		/* TODO - should we check link encoder's max link caps here?
+		 * How do we know which link encoder to check from?
+		 */
 		link->verified_link_cap = *known_limit_link_setting;
+		return true;
+	} else if (link->link_enc && link->dc->res_pool->funcs->link_encs_assign &&
+			!link_enc_cfg_is_link_enc_avail(link->ctx->dc, link->link_enc->preferred_engine)) {
+		link->verified_link_cap = initial_link_settings;
 		return true;
 	}
 
 	memset(&irq_data, 0, sizeof(irq_data));
 	success = false;
 	skip_link_training = false;
-
-	max_link_cap = get_max_link_cap(link);
 
 	/* Grant extended timeout request */
 	if ((link->lttpr_mode == LTTPR_MODE_NON_TRANSPARENT) && (link->dpcd_caps.lttpr_caps.max_ext_timeout > 0)) {
@@ -2869,19 +2895,13 @@ bool dp_verify_link_cap(
 
 	dp_cs_id = get_clock_source_id(link);
 
-	/* link training starts with the maximum common settings
-	 * supported by both sink and ASIC.
-	 */
-	initial_link_settings = get_common_supported_link_settings(
-			*known_limit_link_setting,
-			max_link_cap);
 	cur_link_setting = initial_link_settings;
 
 	/* Temporary Renoir-specific workaround for SWDEV-215184;
 	 * PHY will sometimes be in bad state on hotplugging display from certain USB-C dongle,
 	 * so add extra cycle of enabling and disabling the PHY before first link training.
 	 */
-	if (link->link_enc->features.flags.bits.DP_IS_USB_C &&
+	if (link->link_enc && link->link_enc->features.flags.bits.DP_IS_USB_C &&
 			link->dc->debug.usbc_combo_phy_reset_wa) {
 		dp_enable_link_phy(link, link->connector_signal, dp_cs_id, cur);
 		dp_disable_link_phy(link, link->connector_signal);
@@ -2968,7 +2988,7 @@ bool dp_verify_link_cap_with_retries(
 			link->verified_link_cap.link_spread = LINK_SPREAD_DISABLED;
 			break;
 		} else if (dp_verify_link_cap(link,
-				&link->reported_link_cap,
+				known_limit_link_setting,
 				&fail_count) && fail_count == 0) {
 			success = true;
 			break;
@@ -2983,11 +3003,21 @@ bool dp_verify_mst_link_cap(
 {
 	struct dc_link_settings max_link_cap = {0};
 
-	max_link_cap = get_max_link_cap(link);
-	link->verified_link_cap = get_common_supported_link_settings(
-		link->reported_link_cap,
-		max_link_cap);
-
+	if (dp_get_link_encoding_format(&link->reported_link_cap) ==
+			DP_8b_10b_ENCODING) {
+		max_link_cap = get_max_link_cap(link);
+		link->verified_link_cap = get_common_supported_link_settings(
+				link->reported_link_cap,
+				max_link_cap);
+	}
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	else if (dp_get_link_encoding_format(&link->reported_link_cap) ==
+			DP_128b_132b_ENCODING) {
+		dp_verify_link_cap_with_retries(link,
+				&link->reported_link_cap,
+				LINK_TRAINING_MAX_VERIFY_RETRY);
+	}
+#endif
 	return true;
 }
 
@@ -3445,7 +3475,7 @@ void decide_link_settings(struct dc_stream_state *stream,
 }
 
 /*************************Short Pulse IRQ***************************/
-static bool allow_hpd_rx_irq(const struct dc_link *link)
+bool dc_link_dp_allow_hpd_rx_irq(const struct dc_link *link)
 {
 	/*
 	 * Don't handle RX IRQ unless one of following is met:
@@ -3956,7 +3986,7 @@ static void dp_test_get_audio_test_data(struct dc_link *link, bool disable_video
 	}
 }
 
-static void handle_automated_test(struct dc_link *link)
+void dc_link_dp_handle_automated_test(struct dc_link *link)
 {
 	union test_request test_request;
 	union test_response test_response;
@@ -4005,17 +4035,50 @@ static void handle_automated_test(struct dc_link *link)
 			sizeof(test_response));
 }
 
-bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd_irq_dpcd_data, bool *out_link_loss)
+void dc_link_dp_handle_link_loss(struct dc_link *link)
+{
+	int i;
+	struct pipe_ctx *pipe_ctx;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
+		if (pipe_ctx && pipe_ctx->stream && pipe_ctx->stream->link == link)
+			break;
+	}
+
+	if (pipe_ctx == NULL || pipe_ctx->stream == NULL)
+		return;
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
+		if (pipe_ctx && pipe_ctx->stream && !pipe_ctx->stream->dpms_off &&
+				pipe_ctx->stream->link == link && !pipe_ctx->prev_odm_pipe) {
+			core_link_disable_stream(pipe_ctx);
+		}
+	}
+
+	for (i = 0; i < MAX_PIPES; i++) {
+		pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
+		if (pipe_ctx && pipe_ctx->stream && !pipe_ctx->stream->dpms_off &&
+				pipe_ctx->stream->link == link && !pipe_ctx->prev_odm_pipe) {
+			core_link_enable_stream(link->dc->current_state, pipe_ctx);
+		}
+	}
+}
+
+bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd_irq_dpcd_data, bool *out_link_loss,
+							bool defer_handling, bool *has_left_work)
 {
 	union hpd_irq_data hpd_irq_dpcd_data = { { { {0} } } };
 	union device_service_irq device_service_clear = { { 0 } };
 	enum dc_status result;
 	bool status = false;
-	struct pipe_ctx *pipe_ctx;
-	int i;
 
 	if (out_link_loss)
 		*out_link_loss = false;
+
+	if (has_left_work)
+		*has_left_work = false;
 	/* For use cases related to down stream connection status change,
 	 * PSR and device auto test, refer to function handle_sst_hpd_irq
 	 * in DAL2.1*/
@@ -4047,11 +4110,14 @@ bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd
 			&device_service_clear.raw,
 			sizeof(device_service_clear.raw));
 		device_service_clear.raw = 0;
-		handle_automated_test(link);
+		if (defer_handling && has_left_work)
+			*has_left_work = true;
+		else
+			dc_link_dp_handle_automated_test(link);
 		return false;
 	}
 
-	if (!allow_hpd_rx_irq(link)) {
+	if (!dc_link_dp_allow_hpd_rx_irq(link)) {
 		DC_LOG_HW_HPD_IRQ("%s: skipping HPD handling on %d\n",
 			__func__, link->link_index);
 		return false;
@@ -4065,12 +4131,18 @@ bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd
 	 * so do not handle as a normal sink status change interrupt.
 	 */
 
-	if (hpd_irq_dpcd_data.bytes.device_service_irq.bits.UP_REQ_MSG_RDY)
+	if (hpd_irq_dpcd_data.bytes.device_service_irq.bits.UP_REQ_MSG_RDY) {
+		if (defer_handling && has_left_work)
+			*has_left_work = true;
 		return true;
+	}
 
 	/* check if we have MST msg and return since we poll for it */
-	if (hpd_irq_dpcd_data.bytes.device_service_irq.bits.DOWN_REP_MSG_RDY)
+	if (hpd_irq_dpcd_data.bytes.device_service_irq.bits.DOWN_REP_MSG_RDY) {
+		if (defer_handling && has_left_work)
+			*has_left_work = true;
 		return false;
+	}
 
 	/* For now we only handle 'Downstream port status' case.
 	 * If we got sink count changed it means
@@ -4087,29 +4159,10 @@ bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd
 					sizeof(hpd_irq_dpcd_data),
 					"Status: ");
 
-		for (i = 0; i < MAX_PIPES; i++) {
-			pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream && pipe_ctx->stream->link == link)
-				break;
-		}
-
-		if (pipe_ctx == NULL || pipe_ctx->stream == NULL)
-			return false;
-
-
-		for (i = 0; i < MAX_PIPES; i++) {
-			pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream && !pipe_ctx->stream->dpms_off &&
-					pipe_ctx->stream->link == link && !pipe_ctx->prev_odm_pipe)
-				core_link_disable_stream(pipe_ctx);
-		}
-
-		for (i = 0; i < MAX_PIPES; i++) {
-			pipe_ctx = &link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream && !pipe_ctx->stream->dpms_off &&
-					pipe_ctx->stream->link == link && !pipe_ctx->prev_odm_pipe)
-				core_link_enable_stream(link->dc->current_state, pipe_ctx);
-		}
+		if (defer_handling && has_left_work)
+			*has_left_work = true;
+		else
+			dc_link_dp_handle_link_loss(link);
 
 		status = false;
 		if (out_link_loss)
@@ -5292,7 +5345,7 @@ bool dc_link_dp_set_test_pattern(
 			 * MuteAudioEndpoint(pPathMode->pDisplayPath, true);
 			 */
 			/* Blank stream */
-			pipes->stream_res.stream_enc->funcs->dp_blank(pipe_ctx->stream_res.stream_enc);
+			pipes->stream_res.stream_enc->funcs->dp_blank(link, pipe_ctx->stream_res.stream_enc);
 		}
 
 		dp_set_hw_test_pattern(link, test_pattern,
@@ -5624,7 +5677,7 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, bool ready)
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);
@@ -5644,7 +5697,7 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, bool ready)
 				link_enc->funcs->fec_set_ready(link_enc, true);
 				link->fec_state = dc_link_fec_ready;
 			} else {
-				link_enc->funcs->fec_set_ready(link->link_enc, false);
+				link_enc->funcs->fec_set_ready(link_enc, false);
 				link->fec_state = dc_link_fec_not_ready;
 				dm_error("dpcd write failed to set fec_ready");
 			}
@@ -5671,8 +5724,7 @@ void dp_set_fec_enable(struct dc_link *link, bool enable)
 	 */
 	if (link->is_dig_mapping_flexible &&
 			link->dc->res_pool->funcs->link_encs_assign)
-		link_enc = link_enc_cfg_get_link_enc_used_by_link(
-				link->dc->current_state, link);
+		link_enc = link_enc_cfg_get_link_enc_used_by_link(link->ctx->dc, link);
 	else
 		link_enc = link->link_enc;
 	ASSERT(link_enc);

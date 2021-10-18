@@ -173,9 +173,11 @@ struct stream_encoder_funcs {
 		struct stream_encoder *enc);
 
 	void (*dp_blank)(
+		struct dc_link *link,
 		struct stream_encoder *enc);
 
 	void (*dp_unblank)(
+		struct dc_link *link,
 		struct stream_encoder *enc,
 		const struct encoder_unblank_param *param);
 
@@ -236,7 +238,8 @@ struct stream_encoder_funcs {
 
 	void (*dp_set_dsc_pps_info_packet)(struct stream_encoder *enc,
 				bool enable,
-				uint8_t *dsc_packed_pps);
+				uint8_t *dsc_packed_pps,
+				bool immediate_update);
 #endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
@@ -308,7 +311,8 @@ struct hpo_dp_stream_encoder_funcs {
 	void (*dp_set_dsc_pps_info_packet)(
 			struct hpo_dp_stream_encoder *enc,
 			bool enable,
-			uint8_t *dsc_packed_pps);
+			uint8_t *dsc_packed_pps,
+			bool immediate_update);
 
 	void (*map_stream_to_link)(
 			struct hpo_dp_stream_encoder *enc,

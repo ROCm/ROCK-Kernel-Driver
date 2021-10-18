@@ -129,6 +129,8 @@ const char *amdgpu_asic_name[] = {
 	"LAST",
 };
 
+extern bool pcie_p2p;
+
 /**
  * DOC: pcie_replay_count
  *
@@ -2463,10 +2465,6 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	if (r)
 		goto init_failed;
 
-	r = amdgpu_amdkfd_resume_iommu(adev);
-	if (r)
-		goto init_failed;
-
 	r = amdgpu_device_ip_hw_init_phase1(adev);
 	if (r)
 		goto init_failed;
@@ -2504,6 +2502,10 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	/* Don't init kfd if whole hive need to be reset during init */
 	if (!adev->gmc.xgmi.pending_reset)
 		amdgpu_amdkfd_device_init(adev);
+
+	r = amdgpu_amdkfd_resume_iommu(adev);
+	if (r)
+		goto init_failed;
 
 	amdgpu_fru_get_product_info(adev);
 
@@ -2814,6 +2816,11 @@ static int amdgpu_device_ip_fini_early(struct amdgpu_device *adev)
 		adev->ip_blocks[i].status.hw = false;
 	}
 
+	if (amdgpu_sriov_vf(adev)) {
+		if (amdgpu_virt_release_full_gpu(adev, false))
+			DRM_ERROR("failed to release exclusive mode on fini\n");
+	}
+
 	return 0;
 }
 
@@ -2873,10 +2880,6 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 	}
 
 	amdgpu_ras_fini(adev);
-
-	if (amdgpu_sriov_vf(adev))
-		if (amdgpu_virt_release_full_gpu(adev, false))
-			DRM_ERROR("failed to release exclusive mode on fini\n");
 
 	return 0;
 }
@@ -3428,6 +3431,8 @@ static int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 				continue;
 			} else if (timeout < 0) {
 				timeout = MAX_SCHEDULE_TIMEOUT;
+				dev_warn(adev->dev, "lockup timeout disabled");
+				add_taint(TAINT_SOFTLOCKUP, LOCKDEP_STILL_OK);
 			} else {
 				timeout = msecs_to_jiffies(timeout);
 			}
@@ -3744,6 +3749,12 @@ fence_driver_init:
 
 	/* init the mode config */
 	drm_mode_config_init(adev_to_drm(adev));
+
+	if (amdgpu_sriov_vf(adev)) {
+		adev->timeout_wq = alloc_ordered_workqueue("amdgpu_ring_timeout_wq", 0);
+		if (!adev->timeout_wq)
+			dev_warn(adev->dev, "alloc_ordered_workqueue failed\n");
+	}
 
 	r = amdgpu_device_ip_init(adev);
 	if (r) {
@@ -4555,10 +4566,6 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 	if (reset_context->reset_req_dev == adev)
 		job = reset_context->job;
 
-	/* no need to dump if device is not in good state during probe period */
-	if (!adev->gmc.xgmi.pending_reset)
-		amdgpu_debugfs_wait_dump(adev);
-
 	if (amdgpu_sriov_vf(adev)) {
 		/* stop the data exchange thread */
 		amdgpu_virt_fini_data_exchange(adev);
@@ -5219,6 +5226,8 @@ retry:	/* Rest of adevs pre asic reset from XGMI hive. */
 	/* Actual ASIC resets if needed.*/
 	/* TODO Implement XGMI hive reset logic for SRIOV */
 	if (amdgpu_sriov_vf(adev)) {
+		r = amdgpu_device_reset_sriov(adev, job ? false : true);
+		if (r)
 			adev->asic_reset_res = r;
 	} else {
 		r = amdgpu_do_asic_reset(device_list_handle, &reset_context);
@@ -5470,10 +5479,10 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 	resource_size_t aper_limit =
 		adev->gmc.aper_base + adev->gmc.aper_size - 1;
 
-	return adev->gmc.visible_vram_size &&
+	return pcie_p2p && (adev->gmc.visible_vram_size &&
 		adev->gmc.real_vram_size == adev->gmc.visible_vram_size &&
 		!(adev->gmc.aper_base & address_mask ||
-		  aper_limit & address_mask);
+		  aper_limit & address_mask));
 }
 
 int amdgpu_device_baco_enter(struct drm_device *dev)
