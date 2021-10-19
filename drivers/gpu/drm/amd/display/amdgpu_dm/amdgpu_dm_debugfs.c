@@ -2627,7 +2627,6 @@ static const struct {
 		{"dsc_chunk_size", &dp_dsc_chunk_size_debugfs_fops},
 		{"dsc_slice_bpg", &dp_dsc_slice_bpg_offset_debugfs_fops},
 		{"dp_dsc_fec_support", &dp_dsc_fec_support_fops},
-		{"max_bpc", &dp_max_bpc_debugfs_fops},
 #endif
 
 #ifdef HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC
