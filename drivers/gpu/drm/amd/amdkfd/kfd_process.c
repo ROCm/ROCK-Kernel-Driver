@@ -707,12 +707,12 @@ static void kfd_process_free_gpuvm(struct kgd_mem *mem,
 	struct kfd_dev *dev = pdd->dev;
 
 	if (kptr) {
-		amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(dev->kgd, mem);
+		amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(dev->adev, mem);
 		kptr = NULL;
 	}
 
-	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->kgd, mem, pdd->drm_priv);
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, mem, pdd->drm_priv,
+	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(dev->adev, mem, pdd->drm_priv);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, mem, pdd->drm_priv,
 					       NULL);
 }
 
@@ -729,25 +729,25 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	struct kfd_dev *kdev = pdd->dev;
 	int err;
 
-	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
+	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, gpu_va, size,
 						 pdd->drm_priv, NULL, mem, NULL,
 						 flags);
 	if (err)
 		goto err_alloc_mem;
 
-	err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(kdev->kgd, *mem,
+	err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(kdev->adev, *mem,
 			pdd->drm_priv, NULL);
 	if (err)
 		goto err_map_mem;
 
-	err = amdgpu_amdkfd_gpuvm_sync_memory(kdev->kgd, *mem, true);
+	err = amdgpu_amdkfd_gpuvm_sync_memory(kdev->adev, *mem, true);
 	if (err) {
 		pr_debug("Sync memory failed, wait interrupted by user signal\n");
 		goto sync_memory_failed;
 	}
 
 	if (kptr) {
-		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kdev->kgd,
+		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kdev->adev,
 				(struct kgd_mem *)*mem, kptr, NULL);
 		if (err) {
 			pr_debug("Map GTT BO to kernel failed\n");
@@ -758,10 +758,10 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	return err;
 
 sync_memory_failed:
-	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(kdev->kgd, *mem, pdd->drm_priv);
+	amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(kdev->adev, *mem, pdd->drm_priv);
 
 err_map_mem:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, *mem, pdd->drm_priv,
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->adev, *mem, pdd->drm_priv,
 					       NULL);
 err_alloc_mem:
 	*mem = NULL;
@@ -972,12 +972,12 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 				continue;
 			amdgpu_read_lock(peer_pdd->dev->ddev, false);
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
+				peer_pdd->dev->adev, buf_obj->mem, peer_pdd->drm_priv);
 			amdgpu_read_unlock(peer_pdd->dev->ddev);
 		}
 
 		amdgpu_read_lock(pdd->dev->ddev, false);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd,
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
 						      buf_obj->mem, pdd->drm_priv, NULL);
 		amdgpu_read_unlock(pdd->dev->ddev);
 		kfd_process_device_remove_obj_handle(pdd, id);
@@ -1009,7 +1009,7 @@ static void kfd_process_kunmap_signal_bo(struct kfd_process *p)
 	if (!mem)
 		goto out;
 
-	amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(kdev->kgd, mem);
+	amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(kdev->adev, mem);
 
 out:
 	mutex_unlock(&p->mutex);
@@ -1038,7 +1038,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		if (pdd->drm_file) {
 			amdgpu_amdkfd_gpuvm_release_process_vm(
-					pdd->dev->kgd, pdd->drm_priv);
+					pdd->dev->adev, pdd->drm_priv);
 			fput(pdd->drm_file);
 		}
 
@@ -1691,7 +1691,7 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	dev = pdd->dev;
 
 	ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(
-		dev->kgd, drm_file, p->pasid,
+		dev->adev, drm_file, p->pasid,
 		&p->kgd_process_info, &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
