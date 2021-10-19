@@ -234,19 +234,16 @@ int amdgpu_amdkfd_post_reset(struct amdgpu_device *adev)
 	return r;
 }
 
-void amdgpu_amdkfd_gpu_reset(struct kgd_dev *kgd)
+void amdgpu_amdkfd_gpu_reset(struct amdgpu_device *adev)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	if (amdgpu_device_should_recover_gpu(adev))
 		amdgpu_device_gpu_recover(adev, NULL);
 }
 
-int amdgpu_amdkfd_alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
+int amdgpu_amdkfd_alloc_gtt_mem(struct amdgpu_device *adev, size_t size,
 				void **mem_obj, uint64_t *gpu_addr,
 				void **cpu_ptr, bool cp_mqd_gfx9, bool is_uswc_mode)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_bo *bo = NULL;
 	struct amdgpu_bo_param bp;
 	int r;
@@ -318,7 +315,7 @@ allocate_mem_reserve_bo_failed:
 	return r;
 }
 
-void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
+void amdgpu_amdkfd_free_gtt_mem(struct amdgpu_device *adev, void *mem_obj)
 {
 	struct amdgpu_bo *bo = (struct amdgpu_bo *) mem_obj;
 
@@ -329,10 +326,9 @@ void amdgpu_amdkfd_free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 	amdgpu_bo_unref(&(bo));
 }
 
-int amdgpu_amdkfd_alloc_gws(struct kgd_dev *kgd, size_t size,
+int amdgpu_amdkfd_alloc_gws(struct amdgpu_device *adev, size_t size,
 				void **mem_obj)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_bo *bo = NULL;
 	struct amdgpu_bo_user *ubo;
 	struct amdgpu_bo_param bp;
@@ -359,7 +355,7 @@ int amdgpu_amdkfd_alloc_gws(struct kgd_dev *kgd, size_t size,
 	return 0;
 }
 
-void amdgpu_amdkfd_free_gws(struct kgd_dev *kgd, void *mem_obj)
+void amdgpu_amdkfd_free_gws(struct amdgpu_device *adev, void *mem_obj)
 {
 	struct amdgpu_bo *bo = (struct amdgpu_bo *)mem_obj;
 
@@ -681,11 +677,11 @@ int amdgpu_amdkfd_get_noretry(struct kgd_dev *kgd)
 	return adev->gmc.noretry;
 }
 
-int amdgpu_amdkfd_submit_ib(struct kgd_dev *kgd, enum kgd_engine_type engine,
+int amdgpu_amdkfd_submit_ib(struct amdgpu_device *adev,
+				enum kgd_engine_type engine,
 				uint32_t vmid, uint64_t gpu_addr,
 				uint32_t *ib_cmd, uint32_t ib_len)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
 	struct amdgpu_ring *ring;
@@ -736,10 +732,8 @@ err:
 	return ret;
 }
 
-void amdgpu_amdkfd_set_compute_idle(struct kgd_dev *kgd, bool idle)
+void amdgpu_amdkfd_set_compute_idle(struct amdgpu_device *adev, bool idle)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	amdgpu_dpm_switch_power_profile(adev,
 					PP_SMC_POWER_PROFILE_COMPUTE,
 					!idle);
@@ -753,10 +747,9 @@ bool amdgpu_amdkfd_is_kfd_vmid(struct amdgpu_device *adev, u32 vmid)
 	return false;
 }
 
-int amdgpu_amdkfd_flush_gpu_tlb_vmid(struct kgd_dev *kgd, uint16_t vmid)
+int amdgpu_amdkfd_flush_gpu_tlb_vmid(struct amdgpu_device *adev,
+				     uint16_t vmid)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	if (adev->family == AMDGPU_FAMILY_AI) {
 		int i;
 
@@ -769,10 +762,9 @@ int amdgpu_amdkfd_flush_gpu_tlb_vmid(struct kgd_dev *kgd, uint16_t vmid)
 	return 0;
 }
 
-int amdgpu_amdkfd_flush_gpu_tlb_pasid(struct kgd_dev *kgd, uint16_t pasid,
-				      enum TLB_FLUSH_TYPE flush_type)
+int amdgpu_amdkfd_flush_gpu_tlb_pasid(struct amdgpu_device *adev,
+				      uint16_t pasid, enum TLB_FLUSH_TYPE flush_type)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	bool all_hub = false;
 
 	if (adev->family == AMDGPU_FAMILY_AI)
@@ -781,10 +773,8 @@ int amdgpu_amdkfd_flush_gpu_tlb_pasid(struct kgd_dev *kgd, uint16_t pasid,
 	return amdgpu_gmc_flush_gpu_tlb_pasid(adev, pasid, flush_type, all_hub);
 }
 
-bool amdgpu_amdkfd_have_atomics_support(struct kgd_dev *kgd)
+bool amdgpu_amdkfd_have_atomics_support(struct amdgpu_device *adev)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	return adev->have_atomics_support;
 }
 
@@ -809,14 +799,14 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
 
 	return 0;
 }
-void amdgpu_amdkfd_ras_poison_consumption_handler(struct kgd_dev *kgd)
+
+void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct ras_err_data err_data = {0, 0, 0, NULL};
 
 	/* CPU MCA will handle page retirement if connected_to_cpu is 1 */
 	if (!adev->gmc.xgmi.connected_to_cpu)
 		amdgpu_umc_process_ras_data_cb(adev, &err_data, NULL);
 	else
-		amdgpu_amdkfd_gpu_reset(kgd);
+		amdgpu_amdkfd_gpu_reset(adev);
 }
