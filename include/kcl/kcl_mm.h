@@ -26,6 +26,10 @@
 extern void (*_kcl_mmput_async)(struct mm_struct *mm);
 #endif
 
+#ifndef HAVE_GET_MM_EXE_FILE
+extern struct file *(*_kcl_get_mm_exe_file)(struct mm_struct *mm);
+#endif
+
 #ifndef HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST
 static inline bool fault_flag_allow_retry_first(unsigned int flags)
 {
