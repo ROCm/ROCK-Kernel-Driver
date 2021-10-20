@@ -648,6 +648,9 @@
 /* drm_driver->gem_free_object_unlocked() is available */
 /* #undef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER */
 
+/* get_mm_exe_file() is available */
+#define HAVE_GET_MM_EXE_FILE 1
+
 /* get_user_pages() wants 6 args */
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
 
