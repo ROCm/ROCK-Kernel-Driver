@@ -71,7 +71,7 @@
 /* #undef HAVE_DEVM_MEMREMAP_PAGES_P_P_P_P */
 
 /* dev_pagemap->owner is available */
-/* #undef HAVE_DEV_PAGEMAP_OWNER */
+#define HAVE_DEV_PAGEMAP_OWNER 1
 
 /* there is 'range' field within dev_pagemap structure */
 #define HAVE_DEV_PAGEMAP_RANGE 1
@@ -820,7 +820,7 @@
 #define HAVE_MEM_ENCRYPT_ACTIVE 1
 
 /* migrate_vma->pgmap_owner is available */
-/* #undef HAVE_MIGRATE_VMA_PGMAP_OWNER */
+#define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
 /* mmgrab() is available */
 #define HAVE_MMGRAB 1
