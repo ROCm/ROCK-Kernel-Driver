@@ -1112,7 +1112,10 @@ int amdgpu_ras_eeprom_init(struct amdgpu_ras_eeprom_control *control,
 				res = 0;
 			} else {
 				*exceed_err_limit = true;
-				dev_err(adev->dev, "GPU will not be initialized. Replace this GPU or increase the threshold.");
+				dev_err(adev->dev,
+					"RAS records:%d exceed threshold:%d, "
+					"GPU will not be initialized. Replace this GPU or increase the threshold",
+					control->ras_num_recs, ras->bad_page_cnt_threshold);
 			}
 		}
 	} else {
