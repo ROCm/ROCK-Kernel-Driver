@@ -1425,8 +1425,8 @@ static enum transmitter translate_encoder_to_transmitter(struct graphics_object_
 	}
 }
 
-static bool dc_link_construct(struct dc_link *link,
-			      const struct link_init_data *init_params)
+static bool dc_link_construct_legacy(struct dc_link *link,
+				     const struct link_init_data *init_params)
 {
 	uint8_t i;
 	struct ddc_service_init_data ddc_service_init_data = { { 0 } };
@@ -1701,6 +1701,77 @@ create_fail:
 	return false;
 }
 
+static bool dc_link_construct_dpia(struct dc_link *link,
+				   const struct link_init_data *init_params)
+{
+	struct ddc_service_init_data ddc_service_init_data = { { 0 } };
+	struct dc_context *dc_ctx = init_params->ctx;
+
+	DC_LOGGER_INIT(dc_ctx->logger);
+
+	/* Initialized irq source for hpd and hpd rx */
+	link->irq_source_hpd = DC_IRQ_SOURCE_INVALID;
+	link->irq_source_hpd_rx = DC_IRQ_SOURCE_INVALID;
+	link->link_status.dpcd_caps = &link->dpcd_caps;
+
+	link->dc = init_params->dc;
+	link->ctx = dc_ctx;
+	link->link_index = init_params->link_index;
+
+	memset(&link->preferred_training_settings, 0,
+	       sizeof(struct dc_link_training_overrides));
+	memset(&link->preferred_link_setting, 0,
+	       sizeof(struct dc_link_settings));
+
+	/* Dummy Init for linkid */
+	link->link_id.type = OBJECT_TYPE_CONNECTOR;
+	link->link_id.id = CONNECTOR_ID_DISPLAY_PORT;
+	link->link_id.enum_id = ENUM_ID_1 + init_params->connector_index;
+	link->is_internal_display = false;
+	link->connector_signal = SIGNAL_TYPE_DISPLAY_PORT;
+	LINK_INFO("Connector[%d] description:signal %d\n",
+		  init_params->connector_index,
+		  link->connector_signal);
+
+	link->ep_type = DISPLAY_ENDPOINT_USB4_DPIA;
+	link->is_dig_mapping_flexible = true;
+
+	/* TODO: Initialize link : funcs->link_init */
+
+	ddc_service_init_data.ctx = link->ctx;
+	ddc_service_init_data.id = link->link_id;
+	ddc_service_init_data.link = link;
+	/* Set indicator for dpia link so that ddc won't be created */
+	ddc_service_init_data.is_dpia_link = true;
+
+	link->ddc = dal_ddc_service_create(&ddc_service_init_data);
+	if (!link->ddc) {
+		DC_ERROR("Failed to create ddc_service!\n");
+		goto ddc_create_fail;
+	}
+
+	/* Set dpia port index : 0 to number of dpia ports */
+	link->ddc_hw_inst = init_params->connector_index;
+
+	/* TODO: Create link encoder */
+
+	link->psr_settings.psr_version = DC_PSR_VERSION_UNSUPPORTED;
+
+	return true;
+
+ddc_create_fail:
+	return false;
+}
+
+static bool dc_link_construct(struct dc_link *link,
+			      const struct link_init_data *init_params)
+{
+	/* Handle dpia case */
+	if (init_params->is_dpia_link)
+		return dc_link_construct_dpia(link, init_params);
+	else
+		return dc_link_construct_legacy(link, init_params);
+}
 /*******************************************************************************
  * Public functions
  ******************************************************************************/
@@ -1792,6 +1863,12 @@ static enum dc_status enable_link_dp(struct dc_state *state,
 
 	/* get link settings for video mode timing */
 	decide_link_settings(stream, &link_settings);
+
+	/* Train with fallback when enabling DPIA link. Conventional links are
+	 * trained with fallback during sink detection.
+	 */
+	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA)
+		do_fallback = true;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(&link_settings) == DP_128b_132b_ENCODING &&
@@ -1907,6 +1984,51 @@ static enum dc_status enable_link_dp_mst(
 	dp_enable_mst_on_sink(link, true);
 
 	return enable_link_dp(state, pipe_ctx);
+}
+
+void blank_all_dp_displays(struct dc *dc, bool hw_init)
+{
+	unsigned int i, j, fe;
+	uint8_t dpcd_power_state = '\0';
+	enum dc_status status = DC_ERROR_UNEXPECTED;
+
+	for (i = 0; i < dc->link_count; i++) {
+		enum signal_type signal = dc->links[i]->connector_signal;
+
+		if ((signal == SIGNAL_TYPE_EDP) ||
+			(signal == SIGNAL_TYPE_DISPLAY_PORT)) {
+			if (hw_init && signal != SIGNAL_TYPE_EDP && dc->links[i]->priv != NULL) {
+				/* DP 2.0 spec requires that we read LTTPR caps first */
+				dp_retrieve_lttpr_cap(dc->links[i]);
+				/* if any of the displays are lit up turn them off */
+				status = core_link_read_dpcd(dc->links[i], DP_SET_POWER,
+							&dpcd_power_state, sizeof(dpcd_power_state));
+			}
+
+			if ((signal != SIGNAL_TYPE_EDP && status == DC_OK && dpcd_power_state == DP_POWER_STATE_D0) ||
+					(!hw_init && dc->links[i]->link_enc &&
+					dc->links[i]->link_enc->funcs->is_dig_enabled(dc->links[i]->link_enc))) {
+				if (dc->links[i]->link_enc->funcs->get_dig_frontend) {
+					fe = dc->links[i]->link_enc->funcs->get_dig_frontend(dc->links[i]->link_enc);
+					if (fe == ENGINE_ID_UNKNOWN)
+						continue;
+
+					for (j = 0; j < dc->res_pool->stream_enc_count; j++) {
+						if (fe == dc->res_pool->stream_enc[j]->id) {
+							dc->res_pool->stream_enc[j]->funcs->dp_blank(dc->links[i],
+									dc->res_pool->stream_enc[j]);
+							break;
+						}
+					}
+				}
+
+				if (!dc->links[i]->wa_flags.dp_keep_receiver_powered ||
+					(hw_init && signal != SIGNAL_TYPE_EDP && dc->links[i]->priv != NULL))
+					dp_receiver_power_ctrl(dc->links[i], false);
+			}
+		}
+	}
+
 }
 
 static bool get_ext_hdmi_settings(struct pipe_ctx *pipe_ctx,

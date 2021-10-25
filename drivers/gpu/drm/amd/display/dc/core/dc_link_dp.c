@@ -38,6 +38,7 @@
 #include "dpcd_defs.h"
 #include "dc_dmub_srv.h"
 #include "dce/dmub_hw_lock_mgr.h"
+#include "inc/dc_link_dpia.h"
 #include "inc/link_enc_cfg.h"
 
 /*Travis*/
@@ -1649,12 +1650,6 @@ static void override_training_settings(
 {
 	uint32_t lane;
 
-	/* Override link settings */
-	if (link->preferred_link_setting.link_rate != LINK_RATE_UNKNOWN)
-		lt_settings->link_settings.link_rate = link->preferred_link_setting.link_rate;
-	if (link->preferred_link_setting.lane_count != LANE_COUNT_UNKNOWN)
-		lt_settings->link_settings.lane_count = link->preferred_link_setting.lane_count;
-
 	/* Override link spread */
 	if (!link->dp_ss_off && overrides->downspread != NULL)
 		lt_settings->link_settings.link_spread = *overrides->downspread ?
@@ -1788,6 +1783,13 @@ static enum dc_status configure_lttpr_mode_non_transparent(
 
 		if (encoding == DP_8b_10b_ENCODING) {
 			repeater_cnt = dp_convert_to_count(link->dpcd_caps.lttpr_caps.phy_repeater_cnt);
+
+			/* Driver does not need to train the first hop. Skip DPCD read and clear
+			 * AUX_RD_INTERVAL for DPTX-to-DPIA hop.
+			 */
+			if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA)
+				link->dpcd_caps.lttpr_caps.aux_rd_interval[--repeater_cnt] = 0;
+
 			for (repeater_id = repeater_cnt; repeater_id > 0; repeater_id--) {
 				aux_interval_address = DP_TRAINING_AUX_RD_INTERVAL_PHY_REPEATER1 +
 							((DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE) * (repeater_id - 1));
@@ -2397,10 +2399,22 @@ bool perform_link_training_with_retries(
 			dc_link_dp_perform_link_training_skip_aux(link, &current_setting);
 			return true;
 		} else {
-				status = dc_link_dp_perform_link_training(
-										link,
-										&current_setting,
-										skip_video_pattern);
+			/** @todo Consolidate USB4 DP and DPx.x training. */
+			if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA) {
+				status = dc_link_dpia_perform_link_training(link,
+									    &current_setting,
+									    skip_video_pattern);
+
+				/* Transmit idle pattern once training successful. */
+				if (status == LINK_TRAINING_SUCCESS)
+					dp_set_hw_test_pattern(link, DP_TEST_PATTERN_VIDEO_MODE,
+							       NULL, 0);
+			} else {
+				status = dc_link_dp_perform_link_training(link,
+									  &current_setting,
+									  skip_video_pattern);
+			}
+
 			if (status == LINK_TRAINING_SUCCESS)
 				return true;
 		}
@@ -4532,6 +4546,12 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 		else
 			link->lttpr_mode = LTTPR_MODE_NON_TRANSPARENT;
 	}
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
+	/* Check DP tunnel LTTPR mode debug option. */
+	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA &&
+	    link->dc->debug.dpia_debug.bits.force_non_lttpr)
+		link->lttpr_mode = LTTPR_MODE_NON_LTTPR;
+#endif
 
 	if (link->lttpr_mode == LTTPR_MODE_NON_TRANSPARENT || link->lttpr_mode == LTTPR_MODE_TRANSPARENT) {
 		/* By reading LTTPR capability, RX assumes that we will enable
@@ -4583,6 +4603,7 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 
 		/* Attempt to train in LTTPR transparent mode if repeater count exceeds 8. */
 		is_lttpr_present = (dp_convert_to_count(link->dpcd_caps.lttpr_caps.phy_repeater_cnt) != 0 &&
+				link->dpcd_caps.lttpr_caps.phy_repeater_cnt < 0xff &&
 				link->dpcd_caps.lttpr_caps.max_lane_count > 0 &&
 				link->dpcd_caps.lttpr_caps.max_lane_count <= 4 &&
 				link->dpcd_caps.lttpr_caps.revision.raw >= 0x14);
@@ -4631,6 +4652,8 @@ static bool retrieve_link_cap(struct dc_link *link)
 			LINK_AUX_DEFAULT_LTTPR_TIMEOUT_PERIOD);
 
 	is_lttpr_present = dp_retrieve_lttpr_cap(link);
+	/* Read DP tunneling information. */
+	status = dpcd_get_tunneling_device_data(link);
 
 	status = core_link_read_dpcd(link, DP_SET_POWER,
 			&dpcd_power_state, sizeof(dpcd_power_state));

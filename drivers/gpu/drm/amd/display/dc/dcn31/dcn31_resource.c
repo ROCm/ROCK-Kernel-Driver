@@ -1002,7 +1002,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.disable_dcc = DCC_ENABLE,
 	.vsr_support = true,
 	.performance_trace = false,
-	.max_downscale_src_width = 7680,/*upto 8K*/
+	.max_downscale_src_width = 3840,/*upto 4K*/
 	.disable_pplib_wm_range = false,
 	.scl_reset_length10 = true,
 	.sanity_checks = false,
@@ -2437,6 +2437,13 @@ static bool dcn31_resource_construct(
 			goto create_fail;
 		}
 		pool->base.sw_i2cs[i] = NULL;
+	}
+
+	if (dc->ctx->asic_id.chip_family == FAMILY_YELLOW_CARP &&
+	    dc->ctx->asic_id.hw_internal_rev == YELLOW_CARP_B0 &&
+	    !dc->debug.dpia_debug.bits.disable_dpia) {
+		/* YELLOW CARP B0 has 4 DPIA's */
+		pool->base.usb4_dpia_count = 4;
 	}
 
 	/* Audio, Stream Encoders including HPO and virtual, MPC 3D LUTs */

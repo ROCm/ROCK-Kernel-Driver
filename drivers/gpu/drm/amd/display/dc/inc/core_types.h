@@ -64,6 +64,7 @@ struct link_init_data {
 	uint32_t connector_index; /* this will be mapped to the HPD pins */
 	uint32_t link_index; /* this is mapped to DAL display_index
 				TODO: remove it when DC is complete. */
+	bool is_dpia_link;
 };
 
 struct dc_link *link_create(const struct link_init_data *init_params);
@@ -257,6 +258,8 @@ struct resource_pool {
 	 * entries in link_encoders array.
 	 */
 	unsigned int dig_link_enc_count;
+	/* Number of USB4 DPIA (DisplayPort Input Adapter) link objects created.*/
+	unsigned int usb4_dpia_count;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	unsigned int hpo_dp_stream_enc_count;
