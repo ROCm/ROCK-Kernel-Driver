@@ -772,7 +772,7 @@ int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
 				       ttm->num_pages, &gtt->range, readonly,
 				       false, NULL);
 	if (r)
-		pr_debug("failed %d to get user pages 0x%llx\n", r, start);
+		pr_debug("failed %d to get user pages 0x%lx\n", r, start);
 
 out_putmm:
 	mmput(mm);
