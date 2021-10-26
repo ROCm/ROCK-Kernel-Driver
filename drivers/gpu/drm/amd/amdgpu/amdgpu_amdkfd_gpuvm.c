@@ -1796,6 +1796,23 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
 
+	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
+		ret = amdgpu_amdkfd_bo_validate(bo, AMDGPU_GEM_DOMAIN_GTT, false);
+		if (ret) {
+			pr_err("Validating MMIO/DOORBELL BO during ALLOC FAILED\n");
+			goto err_node_allow;
+		}
+
+		ret = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_GTT);
+		if (ret) {
+			pr_err("Pinning MMIO/DOORBELL BO during ALLOC FAILED\n");
+			goto err_node_allow;
+		}
+		bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
+		bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+	}
+
 	return 0;
 
 allocate_init_user_pages_failed:
@@ -2292,7 +2309,7 @@ void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo)
 	drm_gem_object_put(&bo->tbo.base);
 }
 
-int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo)
+int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 {
 	int ret = 0;
 
@@ -2300,7 +2317,10 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo)
 	if (unlikely(ret))
 		return ret;
 
-	ret = amdgpu_bo_pin_restricted(bo, bo->preferred_domains, 0, 0);
+	ret = amdgpu_bo_pin_restricted(bo, domain, 0, 0);
+	if (ret)
+		pr_err("Error in Pinning BO to domain: %d\n", domain);
+
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 	amdgpu_bo_unreserve(bo);
 

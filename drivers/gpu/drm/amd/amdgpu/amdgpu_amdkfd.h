@@ -312,7 +312,28 @@ struct amdgpu_bo *amdgpu_amdkfd_gpuvm_get_bo_ref(struct kgd_mem *mem,
 						 uint32_t *flags);
 void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo);
 
-int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo);
+/**
+ * amdgpu_amdkfd_gpuvm_pin_bo() - Pins a BO using following criteria
+ * @bo: Handle of buffer object being pinned
+ * @domain: Domain into which BO should be pinned
+ *
+ *   - USERPTR BOs are UNPINNABLE and will return error
+ *   - All other BO types (GTT, VRAM, MMIO and DOORBELL) will have their
+ *     PIN count incremented. It is valid to PIN a BO multiple times
+ *
+ * Return: ZERO if successful in pinning, Non-Zero in case of error.
+ * Will return -EINVAL if input BO parameter is a USERPTR type.
+ */
+int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain);
+
+/**
+ * amdgpu_amdkfd_gpuvm_unpin_bo() - Unpins BO using following criteria
+ * @bo: Handle of buffer object being unpinned
+ *
+ *   - Is a illegal request for USERPTR BOs and is ignored
+ *   - All other BO types (GTT, VRAM, MMIO and DOORBELL) will have their
+ *     PIN count decremented. Calls to UNPIN must balance calls to PIN
+ */
 void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo);
 
 int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
