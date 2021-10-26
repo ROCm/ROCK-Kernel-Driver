@@ -261,7 +261,8 @@ static int amd_get_pages(unsigned long addr, size_t size, int write, int force,
 		return -EINVAL;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_pin_bo(mem_context->bo);
+	ret = amdgpu_amdkfd_gpuvm_pin_bo(mem_context->bo,
+				mem_context->bo->kfd_bo->domain);
 	if (ret) {
 		pr_err("Pinning of buffer failed.\n");
 		return ret;
