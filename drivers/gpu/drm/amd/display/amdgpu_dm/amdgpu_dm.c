@@ -11988,10 +11988,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
-#endif
-#endif
 	struct drm_dp_mst_topology_state *mst_state;
 	struct drm_dp_mst_topology_mgr *mgr;
+#endif
+#endif
 
 	trace_amdgpu_dm_atomic_check_begin(state);
 

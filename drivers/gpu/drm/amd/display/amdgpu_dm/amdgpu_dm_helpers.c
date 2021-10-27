@@ -229,7 +229,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	int bpp = 0;
 	int pbn = 0;
 #endif
-	u8 link_encoding_cap;
+	u8 link_encoding_cap = DP_8b_10b_ENCODING;
 
 	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 	/* Accessing the connector state is required for vcpi_slots allocation
