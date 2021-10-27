@@ -1176,7 +1176,9 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	case CHIP_YELLOW_CARP:
 		if (dc->ctx->asic_id.hw_internal_rev != YELLOW_CARP_A0) {
 			hw_params.dpia_supported = true;
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 			hw_params.disable_dpia = dc->debug.dpia_debug.bits.disable_dpia;
+#endif
 		}
 		break;
 	default:
