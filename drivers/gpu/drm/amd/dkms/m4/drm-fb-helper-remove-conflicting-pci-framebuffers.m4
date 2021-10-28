@@ -43,6 +43,7 @@ AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS], [
 				dnl # video/fb: Propagate error code from failing to unregister conflicting fb
 				dnl #
 				AC_KERNEL_TRY_COMPILE_SYMBOL([
+					struct task_struct;
 					#include <linux/fb.h>
 				], [
 					int ret = remove_conflicting_framebuffers(NULL, NULL, false);
