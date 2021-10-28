@@ -1785,58 +1785,14 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
-	case CHIP_RENOIR:
-	case CHIP_ARCTURUS:
-	case CHIP_ALDEBARAN:
-	case CHIP_NAVI10:
-	case CHIP_NAVI12:
-	case CHIP_NAVI14:
-	case CHIP_SIENNA_CICHLID:
-	case CHIP_NAVY_FLOUNDER:
-	case CHIP_VANGOGH:
-	case CHIP_DIMGREY_CAVEFISH:
-	case CHIP_BEIGE_GOBY:
-	case CHIP_YELLOW_CARP:
-	case CHIP_CYAN_SKILLFISH:
-		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
-			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
-			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
-
-		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
-
-		if (dev->gpu->device_info->gfx_target_version >= 90000 &&
-			dev->gpu->device_info->gfx_target_version < 100000) {
-			/* This is GFX9 */
-			dev->node_props.debug_prop |=
-				HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9 |
-				HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-			if (dev->gpu->device_info->gfx_target_version < 90010)
-				dev->node_props.debug_prop |=
-					HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-			if (dev->gpu->device_info->gfx_target_version >= 90010)
-				dev->node_props.capability |=
-					HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-		} else if (dev->gpu->device_info->gfx_target_version >= 100000) {
-			dev->node_props.debug_prop |=
-				HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
-				HSA_DBG_WATCH_ADDR_MASK_HI_BIT |
-				HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		}
-
-		if (dev->gpu && kfd_dbg_has_supported_firmware(dev->gpu))
-			dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
-
-		break;
 	default:
-		WARN(1, "Unexpected ASIC family %u",
-		     dev->gpu->device_info->asic_family);
+		if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(9, 0, 1))
+			dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+		else
+			WARN(1, "Unexpected ASIC family %u",
+			     dev->gpu->device_info->asic_family);
 	}
 
 	/*
