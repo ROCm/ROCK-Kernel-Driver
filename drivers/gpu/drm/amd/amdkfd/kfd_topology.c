@@ -1832,12 +1832,6 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 				HSA_DBG_TRAP_DEBUG_WATCH_MASK_LO_BIT_GFX10 |
 				HSA_DBG_TRAP_DEBUG_WATCH_MASK_HI_BIT |
 				HSA_DBG_TRAP_DEBUG_DISPATCH_INFO_ALWAYS_VALID;
-
-			if (dev->gpu->device_info->gfx_target_version >= 100300)
-				dev->node_props.capability |=
-					HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-
-
 		}
 
 		if (dev->gpu && kfd_dbg_has_supported_firmware(dev->gpu))
