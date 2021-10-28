@@ -125,7 +125,9 @@ endif
 export OS_NAME OS_VERSION
 
 LINUX_SRCTREE_INCLUDE := \
-	$(filter-out -I%/uapi -include %/kconfig.h,$(LINUXINCLUDE))
+	$(shell echo $(LINUXINCLUDE) | \
+	sed -e "s|-I[^ ]*uapi||g" \
+	-e "s|-include [^ ]*/kconfig.h||g" -E "s| +| |g")
 USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(LINUXINCLUDE))
 
 LINUXINCLUDE := \
