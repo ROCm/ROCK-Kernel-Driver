@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			struct task_struct;
 			#include <linux/fb.h>
 		],[
 			remove_conflicting_pci_framebuffers(NULL, NULL);
@@ -13,6 +14,7 @@ AC_DEFUN([AC_AMDGPU_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS], [
 				[remove_conflicting_pci_framebuffers() is available and doesn't have res_id arg])
 		],[
                 	AC_KERNEL_TRY_COMPILE([
+				struct task_struct;
                         	#include <linux/fb.h>
                 	], [
                         	remove_conflicting_pci_framebuffers(NULL, 0, NULL);
