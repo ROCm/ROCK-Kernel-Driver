@@ -1312,6 +1312,10 @@ void amdgpu_driver_release_kms(struct drm_device *dev)
 
 	amdgpu_device_fini_sw(adev);
 	pci_set_drvdata(adev->pdev, NULL);
+#ifndef HAVE_DRM_DRM_MANAGED_H
+	drm_dev_fini(dev);
+	kfree(adev);
+#endif
 }
 
 /*
