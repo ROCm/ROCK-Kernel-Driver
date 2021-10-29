@@ -31,7 +31,6 @@
 #include "dc_link_dp.h"
 #include "dpcd_defs.h"
 #include "link_hwss.h"
-#include "inc/link_dpcd.h"
 #include "dm_helpers.h"
 #include "dmub/inc/dmub_cmd.h"
 #include "inc/link_dpcd.h"
@@ -195,6 +194,7 @@ static enum dpia_set_config_ts convert_trng_ptn_to_trng_stg(enum dc_dp_training_
 		ts = DPIA_TS_TPS4;
 		break;
 	default:
+		ts = DPIA_TS_DPRX_DONE;
 		ASSERT(false); /* TPS not supported by helper function. */
 		break;
 	}
@@ -776,7 +776,7 @@ static enum link_training_result dpia_training_eq_phase(struct dc_link *link,
 		struct link_training_settings *lt_settings,
 		uint32_t hop)
 {
-	enum link_training_result result = LINK_TRAINING_EQ_FAIL_EQ;
+	enum link_training_result result;
 
 	if (link->lttpr_mode == LTTPR_MODE_NON_TRANSPARENT)
 		result = dpia_training_eq_non_transparent(link, lt_settings, hop);

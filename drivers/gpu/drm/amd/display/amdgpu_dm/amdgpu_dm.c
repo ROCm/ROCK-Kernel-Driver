@@ -6628,7 +6628,7 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
  * - Cinema HFR (48 FPS)
  * - TV/PAL (50 FPS)
  * - Commonly used (60 FPS)
- * - Multiples of 24 (48,72,96 FPS)
+ * - Multiples of 24 (48,72,96,120 FPS)
  *
  * The list of standards video format is not huge and can be added to the
  * connector modeset list beforehand. With that, userspace can leverage
@@ -8899,19 +8899,19 @@ static uint add_fs_modes(struct amdgpu_dm_connector *aconnector)
 
 	/* Standard FPS values
 	 *
-	 * 23.976   - TV/NTSC
-	 * 24 	    - Cinema
-	 * 25 	    - TV/PAL
-	 * 29.97    - TV/NTSC
-	 * 30 	    - TV/NTSC
-	 * 48 	    - Cinema HFR
-	 * 50 	    - TV/PAL
-	 * 60 	    - Commonly used
-	 * 48,72,96 - Multiples of 24
+	 * 23.976       - TV/NTSC
+	 * 24 	        - Cinema
+	 * 25 	        - TV/PAL
+	 * 29.97        - TV/NTSC
+	 * 30 	        - TV/NTSC
+	 * 48 	        - Cinema HFR
+	 * 50 	        - TV/PAL
+	 * 60 	        - Commonly used
+	 * 48,72,96,120 - Multiples of 24
 	 */
 	static const uint32_t common_rates[] = {
 		23976, 24000, 25000, 29970, 30000,
-		48000, 50000, 60000, 72000, 96000
+		48000, 50000, 60000, 72000, 96000, 120000
 	};
 
 	/*
@@ -11765,18 +11765,18 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 				struct drm_crtc *crtc,
 				struct drm_crtc_state *new_crtc_state)
 {
-	struct drm_plane_state *new_cursor_state, *new_primary_state;
-	int cursor_scale_w, cursor_scale_h, primary_scale_w, primary_scale_h;
+	struct drm_plane *cursor = crtc->cursor, *underlying;
+	struct drm_plane_state *new_cursor_state, *new_underlying_state;
+	int i;
+	int cursor_scale_w, cursor_scale_h, underlying_scale_w, underlying_scale_h;
 
 	/* On DCE and DCN there is no dedicated hardware cursor plane. We get a
 	 * cursor per pipe but it's going to inherit the scaling and
 	 * positioning from the underlying pipe. Check the cursor plane's
-	 * blending properties match the primary plane's. */
+	 * blending properties match the underlying planes'. */
 
-	new_cursor_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->cursor);
-	new_primary_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, crtc->primary);
-	if (!new_cursor_state || !new_primary_state ||
-	    !new_cursor_state->fb || !new_primary_state->fb) {
+	new_cursor_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, cursor);
+	if (!new_cursor_state || !new_cursor_state->fb) {
 		return 0;
 	}
 
@@ -11785,15 +11785,44 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 	cursor_scale_h = new_cursor_state->crtc_h * 1000 /
 			 (new_cursor_state->src_h >> 16);
 
-	primary_scale_w = new_primary_state->crtc_w * 1000 /
-			 (new_primary_state->src_w >> 16);
-	primary_scale_h = new_primary_state->crtc_h * 1000 /
-			 (new_primary_state->src_h >> 16);
+#if !defined(for_each_new_plane_in_state_reverse)
+	struct drm_plane_state *old_underlying_state;
+#ifdef for_each_oldnew_plane_in_state_reverse
+        for_each_oldnew_plane_in_state_reverse(state, underlying, old_underlying_state, new_underlying_state, i) {
+#else
+        for_each_plane_in_state(state, underlying, old_underlying_state, i) {
+                new_underlying_state = underlying->state;
+#endif
+#else
+	for_each_new_plane_in_state_reverse(state, underlying, new_underlying_state, i) {
+#endif
+		/* Narrow down to non-cursor planes on the same CRTC as the cursor */
+		if (new_underlying_state->crtc != crtc || underlying == crtc->cursor)
+			continue;
 
-	if (cursor_scale_w != primary_scale_w ||
-	    cursor_scale_h != primary_scale_h) {
-		drm_dbg_atomic(crtc->dev, "Cursor plane scaling doesn't match primary plane\n");
-		return -EINVAL;
+		/* Ignore disabled planes */
+		if (!new_underlying_state->fb)
+			continue;
+
+		underlying_scale_w = new_underlying_state->crtc_w * 1000 /
+				     (new_underlying_state->src_w >> 16);
+		underlying_scale_h = new_underlying_state->crtc_h * 1000 /
+				     (new_underlying_state->src_h >> 16);
+
+		if (cursor_scale_w != underlying_scale_w ||
+		    cursor_scale_h != underlying_scale_h) {
+			drm_dbg_atomic(crtc->dev,
+				       "Cursor [PLANE:%d:%s] scaling doesn't match underlying [PLANE:%d:%s]\n",
+				       cursor->base.id, cursor->name, underlying->base.id, underlying->name);
+			return -EINVAL;
+		}
+
+		/* If this plane covers the whole CRTC, no need to check planes underneath */
+		if (new_underlying_state->crtc_x <= 0 &&
+		    new_underlying_state->crtc_y <= 0 &&
+		    new_underlying_state->crtc_x + new_underlying_state->crtc_w >= new_crtc_state->mode.hdisplay &&
+		    new_underlying_state->crtc_y + new_underlying_state->crtc_h >= new_crtc_state->mode.vdisplay)
+			break;
 	}
 
 	return 0;
@@ -11824,12 +11853,36 @@ static int add_affected_mst_dsc_crtcs(struct drm_atomic_state *state, struct drm
 }
 #endif
 
+static bool is_chromeos(void)
+{
+	struct mm_struct *mm = current->mm;
+	struct file *exe_file;
+	bool ret;
+
+	/* ChromeOS renames its thread to DrmThread. Also check the executable
+	 * name. */
+	if (strcmp(current->comm, "DrmThread") != 0 || !mm)
+		return false;
+
+	exe_file = get_mm_exe_file(mm);
+	if (!exe_file)
+		return false;
+	ret = strcmp(exe_file->f_path.dentry->d_name.name, "chrome") == 0;
+	fput(exe_file);
+
+	return ret;
+}
+
 static int validate_overlay(struct drm_atomic_state *state)
 {
 	int i;
 	struct drm_plane *plane;
 	struct drm_plane_state *new_plane_state;
 	struct drm_plane_state *primary_state, *overlay_state = NULL;
+
+	/* This is a workaround for ChromeOS only */
+	if (!is_chromeos())
+		return 0;
 
 	/* Check if primary plane is contained inside overlay */
 #if !defined(for_each_new_plane_in_state_reverse)

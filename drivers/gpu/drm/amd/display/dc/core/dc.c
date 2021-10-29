@@ -75,8 +75,6 @@
 
 #include "dmub/dmub_srv.h"
 
-#include "dcn30/dcn30_vpg.h"
-
 #include "i2caux_interface.h"
 #include "dce/dmub_hw_lock_mgr.h"
 
@@ -2714,9 +2712,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 		enum surface_update_type update_type,
 		struct dc_state *context)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-	struct vpg *vpg;
-#endif
 	int j;
 
 	// Stream updates
@@ -2737,11 +2732,6 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					stream_update->vrr_infopacket ||
 					stream_update->vsc_infopacket ||
 					stream_update->vsp_infopacket) {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
-				vpg = pipe_ctx->stream_res.stream_enc->vpg;
-				if (vpg && vpg->funcs->vpg_poweron)
-					vpg->funcs->vpg_poweron(vpg);
-#endif
 				resource_build_info_frame(pipe_ctx);
 				dc->hwss.update_info_frame(pipe_ctx);
 			}
@@ -3177,8 +3167,13 @@ void dc_commit_updates_for_stream(struct dc *dc,
 			if (new_pipe->plane_state && new_pipe->plane_state != old_pipe->plane_state)
 				new_pipe->plane_state->force_full_update = true;
 		}
-	} else if (update_type == UPDATE_TYPE_FAST) {
-		/* Previous frame finished and HW is ready for optimization. */
+	} else if (update_type == UPDATE_TYPE_FAST && dc_ctx->dce_version >= DCE_VERSION_MAX) {
+		/*
+		 * Previous frame finished and HW is ready for optimization.
+		 *
+		 * Only relevant for DCN behavior where we can guarantee the optimization
+		 * is safe to apply - retain the legacy behavior for DCE.
+		 */
 		dc_post_update_surfaces_to_stream(dc);
 	}
 
@@ -3235,6 +3230,12 @@ void dc_commit_updates_for_stream(struct dc *dc,
 			if (pipe_ctx->plane_state && pipe_ctx->stream == stream)
 				pipe_ctx->plane_state->force_full_update = false;
 		}
+	}
+
+	/* Legacy optimization path for DCE. */
+	if (update_type >= UPDATE_TYPE_FULL && dc_ctx->dce_version < DCE_VERSION_MAX) {
+		dc_post_update_surfaces_to_stream(dc);
+		TRACE_DCE_CLOCK_STATE(&context->bw_ctx.bw.dce);
 	}
 
 	return;

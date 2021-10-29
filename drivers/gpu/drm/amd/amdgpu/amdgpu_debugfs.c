@@ -1351,7 +1351,7 @@ static int amdgpu_debugfs_evict_vram(void *data, u64 *val)
 		return r;
 	}
 
-	*val = amdgpu_bo_evict_vram(adev);
+	*val = amdgpu_ttm_evict_resources(adev, TTM_PL_VRAM);
 
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
@@ -1364,17 +1364,15 @@ static int amdgpu_debugfs_evict_gtt(void *data, u64 *val)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)data;
 	struct drm_device *dev = adev_to_drm(adev);
-	struct ttm_resource_manager *man;
 	int r;
 
 	r = pm_runtime_get_sync(dev->dev);
 	if (r < 0) {
-		pm_runtime_put_autosuspend(adev_to_drm(adev)->dev);
+		pm_runtime_put_autosuspend(dev->dev);
 		return r;
 	}
 
-	man = ttm_manager_type(&adev->mman.bdev, TTM_PL_TT);
-	*val = ttm_resource_manager_evict_all(&adev->mman.bdev, man);
+	*val = amdgpu_ttm_evict_resources(adev, TTM_PL_TT);
 
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
@@ -1652,6 +1650,9 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	struct dentry *root = adev_to_drm(adev)->primary->debugfs_root;
 	struct dentry *ent;
 	int r, i;
+
+	if (!debugfs_initialized())
+		return 0;
 
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	ent = debugfs_create_file("amdgpu_preempt_ib", 0600, root, adev,
