@@ -769,6 +769,7 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			ret = kfd_mem_attach_userptr(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
+#if 0
 #ifdef AMDKCL_AMDGPU_DMABUF_OPS
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_GTT &&
 			   mem->bo->tbo.type != ttm_bo_type_sg) {
@@ -780,6 +781,7 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			ret = kfd_mem_attach_dmabuf(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
+#endif
 #endif
 		/* Enable peer acces to VRAM BO's */
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM &&
