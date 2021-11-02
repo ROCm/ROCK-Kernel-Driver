@@ -102,9 +102,12 @@ static bool amdgpu_vkms_get_vblank_timestamp(struct drm_crtc *crtc,
 
 	*vblank_time = READ_ONCE(amdgpu_crtc->vblank_timer.node.expires);
 
-	if (WARN_ON(*vblank_time == vblank->time))
+#if defined (HAVE_DRM_VBLANK_USE_KTIME_T)
+	if (WARN_ON(ktime_to_us(*vblank_time) == ktime_to_us(vblank->time)))
+#else
+	if (WARN_ON(ktime_to_us(*vblank_time) == vblank->time.tv_usec))
+#endif
 		return true;
-
 	/*
 	 * To prevent races we roll the hrtimer forward before we do any
 	 * interrupt processing - this is how real hw works (the interrupt is
@@ -112,8 +115,8 @@ static bool amdgpu_vkms_get_vblank_timestamp(struct drm_crtc *crtc,
 	 * the vblank core expects. Therefore we need to always correct the
 	 * timestampe by one frame.
 	 */
-	*vblank_time -= output->period_ns;
 
+	*vblank_time  = ktime_sub(*vblank_time, output->period_ns);
 	return true;
 }
 
