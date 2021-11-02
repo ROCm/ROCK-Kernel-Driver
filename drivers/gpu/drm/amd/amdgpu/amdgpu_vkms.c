@@ -283,16 +283,26 @@ static const struct drm_plane_funcs amdgpu_vkms_plane_funcs = {
 };
 
 static void amdgpu_vkms_plane_atomic_update(struct drm_plane *plane,
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS)
 					    struct drm_atomic_state *old_state)
+#else
+					    struct drm_plane_state *old_state)
+#endif
 {
 	return;
 }
 
 static int amdgpu_vkms_plane_atomic_check(struct drm_plane *plane,
+#if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS)
 					  struct drm_atomic_state *state)
 {
 	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
 										 plane);
+#else
+					  struct drm_plane_state *new_plane_state)
+{
+	struct drm_atomic_state *state = new_plane_state->state;
+#endif
 	struct drm_crtc_state *crtc_state;
 	int ret;
 
@@ -301,6 +311,7 @@ static int amdgpu_vkms_plane_atomic_check(struct drm_plane *plane,
 
 	crtc_state = drm_atomic_get_crtc_state(state,
 					       new_plane_state->crtc);
+
 	if (IS_ERR(crtc_state))
 		return PTR_ERR(crtc_state);
 
