@@ -3,6 +3,7 @@
 #ifndef _AMDGPU_VKMS_H_
 #define _AMDGPU_VKMS_H_
 
+#if defined(HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT)
 #define XRES_DEF  1024
 #define YRES_DEF   768
 
@@ -21,5 +22,9 @@ struct amdgpu_vkms_output {
 	ktime_t period_ns;
 	struct drm_pending_vblank_event *event;
 };
+
+#else
+extern const struct amdgpu_ip_block_version amdgpu_vkms_ip_block;
+#endif
 
 #endif /* _AMDGPU_VKMS_H_ */
