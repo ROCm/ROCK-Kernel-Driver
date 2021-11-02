@@ -124,9 +124,10 @@ endif
 
 export OS_NAME OS_VERSION
 
+_KCL_LINUXINCLUDE=$(subst -I ,-I,$(strip $(LINUXINCLUDE)))
 LINUX_SRCTREE_INCLUDE := \
-	$(filter-out -I%/uapi -include %/kconfig.h,$(LINUXINCLUDE))
-USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(LINUXINCLUDE))
+	$(filter-out -I%/uapi "-include %/kconfig.h",$(_KCL_LINUXINCLUDE))
+USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(_KCL_LINUXINCLUDE))
 
 LINUXINCLUDE := \
 	-I$(src)/include \
