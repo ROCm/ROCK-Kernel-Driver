@@ -606,6 +606,9 @@
 /* drm_printer->prefix is available */
 #define HAVE_DRM_PRINTER_PREFIX 1
 
+/* drm_simple_encoder is available */
+#define HAVE_DRM_SIMPLE_ENCODER_INIT 1
+
 /* drm_syncobj_fence_get() is available */
 /* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */
 
