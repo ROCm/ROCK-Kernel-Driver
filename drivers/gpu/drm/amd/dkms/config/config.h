@@ -237,8 +237,16 @@
 /* drm_crtc_from_index() is available */
 #define HAVE_DRM_CRTC_FROM_INDEX 1
 
-/* drm_crtc_helper_funcs->atomic_check() wants struct drm_atomic_state arg */
+/* drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants
+   struct drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
+
+/* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
+   drm_atomic_state arg */
+#define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
+
+/* have drm_crtc_helper_funcs->atomic_enable() */
+#define HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE 1
 
 /* drm_crtc_init_with_planes() wants name */
 #define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
