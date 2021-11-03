@@ -4795,7 +4795,7 @@ static bool amdgpu_device_recovery_enter(struct amdgpu_device *adev)
 static void amdgpu_device_recovery_exit(struct amdgpu_device *adev)
 {
 	atomic_set(&adev->in_gpu_reset, 0);
-	wake_up_interruptible_all(&adev->recovery_fini_event);
+	wake_up_all(&adev->recovery_fini_event);
 }
 
 /*
