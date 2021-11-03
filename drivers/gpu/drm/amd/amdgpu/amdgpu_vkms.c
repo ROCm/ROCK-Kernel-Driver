@@ -134,20 +134,34 @@ static const struct drm_crtc_funcs amdgpu_vkms_crtc_funcs = {
 #endif
 };
 
-static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc,
-					   struct drm_atomic_state *state)
+static void amdgpu_vkms_crtc_atomic_enable(struct drm_crtc *crtc
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
+					  , struct drm_atomic_state *state)
+#elif defined(HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE)
+					  , struct drm_crtc_state *state)
+#else
+					  )
+#endif
 {
 	drm_crtc_vblank_on(crtc);
 }
 
 static void amdgpu_vkms_crtc_atomic_disable(struct drm_crtc *crtc,
-					    struct drm_atomic_state *state)
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
 {
 	drm_crtc_vblank_off(crtc);
 }
 
 static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
-					  struct drm_atomic_state *state)
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
+					   struct drm_atomic_state *state)
+#else
+					   struct drm_crtc_state *state)
+#endif
 {
 	unsigned long flags;
 	if (crtc->state->event) {
@@ -166,7 +180,11 @@ static void amdgpu_vkms_crtc_atomic_flush(struct drm_crtc *crtc,
 
 static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
 	.atomic_flush	= amdgpu_vkms_crtc_atomic_flush,
+#if defined(HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE)
 	.atomic_enable	= amdgpu_vkms_crtc_atomic_enable,
+#else
+	.enable = amdgpu_vkms_crtc_atomic_enable,
+#endif
 	.atomic_disable	= amdgpu_vkms_crtc_atomic_disable,
 };
 
