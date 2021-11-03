@@ -161,4 +161,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # mm: introduce include/linux/pgtable.h
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/pgtable.h])
+	
+	dnl #
+	dnl # v4.7-rc2-479-g5b8090747a11
+	dnl # drm: Add helper for simple display pipeline
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_simple_kms_helper.h])
 ])
