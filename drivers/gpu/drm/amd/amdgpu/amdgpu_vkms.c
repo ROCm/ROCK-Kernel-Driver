@@ -296,7 +296,7 @@ static int amdgpu_vkms_plane_atomic_check(struct drm_plane *plane,
 #if defined(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS)
 					  struct drm_atomic_state *state)
 {
-	struct drm_plane_state *new_plane_state = drm_atomic_get_new_plane_state(state,
+	struct drm_plane_state *new_plane_state = kcl_drm_atomic_get_new_plane_state_before_commit(state,
 										 plane);
 #else
 					  struct drm_plane_state *new_plane_state)
