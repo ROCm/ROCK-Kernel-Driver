@@ -4844,7 +4844,7 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 				timing->dsc_cfg.num_slices_h,
 				timing->dsc_cfg.is_dp);
 #endif
-#endif
+#endif /* CONFIG_DRM_AMD_DC_DCN */
 
 	switch (timing->display_color_depth) {
 	case COLOR_DEPTH_666:
