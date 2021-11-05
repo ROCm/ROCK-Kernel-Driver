@@ -1426,14 +1426,18 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		switch (adev->ip_versions[DCE_HWIP]) {
 		case IP_VERSION(2, 1, 0):
 			init_data.flags.gpu_vm_support = true;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 			if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 				init_data.flags.disable_dmcu = true;
+#endif
 			break;
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 1):
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
+#endif
 			init_data.flags.gpu_vm_support = true;
 			break;
 		case IP_VERSION(2, 0, 3):
@@ -1750,12 +1754,14 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 		case IP_VERSION(2, 0, 3):
 		case IP_VERSION(2, 0, 0):
 		case IP_VERSION(2, 1, 0):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 2):
 		case IP_VERSION(3, 0, 3):
 		case IP_VERSION(3, 0, 1):
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
+#endif
 			return 0;
 		default:
 			break;
@@ -4341,9 +4347,11 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* Use Outbox interrupt */
 	switch (adev->ip_versions[DCE_HWIP]) {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case IP_VERSION(3, 0, 0):
 	case IP_VERSION(3, 1, 2):
 	case IP_VERSION(3, 1, 3):
+#endif
 	case IP_VERSION(2, 1, 0):
 		if (register_outbox_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -4439,20 +4447,24 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 		break;
 	default:
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		switch (adev->ip_versions[DCE_HWIP]) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 2):
 		case IP_VERSION(2, 0, 3):
 		case IP_VERSION(2, 0, 0):
 		case IP_VERSION(2, 1, 0):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 2):
 		case IP_VERSION(3, 0, 3):
 		case IP_VERSION(3, 0, 1):
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
+#endif
 			if (dcn10_register_irq_handlers(dm->adev)) {
 				DRM_ERROR("DM: Failed to initialize IRQ\n");
 				goto fail;
@@ -4746,32 +4758,50 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_dig = 6;
 		break;
 	default:
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		switch (adev->ip_versions[DCE_HWIP]) {
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 2):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
+#endif
+#endif
 			adev->mode_info.num_crtc = 6;
 			adev->mode_info.num_hpd = 6;
 			adev->mode_info.num_dig = 6;
 			break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 0):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 2):
+#endif
+#endif
 			adev->mode_info.num_crtc = 5;
 			adev->mode_info.num_hpd = 5;
 			adev->mode_info.num_dig = 5;
 			break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 3):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 3):
+#endif
+#endif
 			adev->mode_info.num_crtc = 2;
 			adev->mode_info.num_hpd = 2;
 			adev->mode_info.num_dig = 2;
 			break;
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 1):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 1, 0):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
+#endif
 			adev->mode_info.num_crtc = 4;
 			adev->mode_info.num_hpd = 4;
 			adev->mode_info.num_dig = 4;
