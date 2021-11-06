@@ -28,3 +28,4 @@ include/drm/amd_rdma.h include/drm/
 drivers/dma-buf/dma-resv.c amd/amdkcl/dma-buf/
 include/linux/dma-resv.h include/linux/
 include/kcl/reservation.h include/linux/
+include/uapi/linux/kfd_sysfs.h include/uapi/linux/
