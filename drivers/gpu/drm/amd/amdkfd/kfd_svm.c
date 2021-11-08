@@ -3487,6 +3487,61 @@ fill_values:
 	return 0;
 }
 
+int kfd_criu_resume_svm(struct kfd_process *p)
+{
+	int nattr_common = 4, nattr_accessibility = 1;
+	struct criu_svm_metadata *criu_svm_md = NULL;
+	struct criu_svm_metadata *next = NULL;
+	struct svm_range_list *svms = &p->svms;
+	int i, j, num_attrs, ret = 0;
+	struct mm_struct *mm;
+
+	if (list_empty(&svms->criu_svm_metadata_list)) {
+		pr_debug("No SVM data from CRIU restore stage 2\n");
+		return ret;
+	}
+
+	mm = get_task_mm(p->lead_thread);
+	if (!mm) {
+		pr_err("failed to get mm for the target process\n");
+		return -ESRCH;
+	}
+
+	num_attrs = nattr_common + (nattr_accessibility * p->n_pdds);
+
+	i = j = 0;
+	list_for_each_entry(criu_svm_md, &svms->criu_svm_metadata_list, list) {
+		pr_debug("criu_svm_md[%d]\n\tstart: 0x%llx size: 0x%llx (npages)\n",
+			 i, criu_svm_md->data.start_addr, criu_svm_md->data.size);
+		for (j = 0; j < num_attrs; j++) {
+			pr_debug("\ncriu_svm_md[%d]->attrs[%d].type : 0x%x \ncriu_svm_md[%d]->attrs[%d].value : 0x%x\n",
+				 i,j, criu_svm_md->data.attrs[j].type,
+				 i,j, criu_svm_md->data.attrs[j].value);
+		}
+
+		ret = svm_range_set_attr(p, mm, criu_svm_md->data.start_addr,
+					 criu_svm_md->data.size, num_attrs,
+					 criu_svm_md->data.attrs);
+		if (ret) {
+			pr_err("CRIU: failed to set range attributes\n");
+			goto exit;
+		}
+
+		i++;
+	}
+
+exit:
+	list_for_each_entry_safe(criu_svm_md, next, &svms->criu_svm_metadata_list, list) {
+		pr_debug("freeing criu_svm_md[]\n\tstart: 0x%llx\n",
+						criu_svm_md->data.start_addr);
+		kfree(criu_svm_md);
+	}
+
+	mmput(mm);
+	return ret;
+
+}
+
 int kfd_criu_restore_svm(struct kfd_process *p,
 			 uint8_t __user *user_priv_ptr,
 			 uint64_t *priv_data_offset,
