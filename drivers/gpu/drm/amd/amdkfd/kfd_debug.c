@@ -963,6 +963,9 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 {
 	int i = 0, ret = 0;
 
+	if (p->is_runtime_retry)
+		goto retry;
+
 	if (p->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_DISABLED)
 		return -EBUSY;
 
@@ -1000,12 +1003,13 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 		}
 	}
 
+retry:
 	if (p->debug_trap_enabled) {
-		kfd_dbg_trap_activate(p);
-
-		if (!p->is_runtime_retry)
+		if (!p->is_runtime_retry) {
+			kfd_dbg_trap_activate(p);
 			kfd_dbg_ev_raise(KFD_EC_MASK(EC_PROCESS_RUNTIME),
 					p, NULL, 0, false, NULL, 0);
+		}
 
 		mutex_unlock(&p->mutex);
 		ret = down_interruptible(&p->runtime_enable_sema);
