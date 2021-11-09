@@ -1504,7 +1504,7 @@ static int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
  *   - All other BO types (GTT, VRAM, MMIO and DOORBELL) will have their
  *     PIN count decremented. Calls to UNPIN must balance calls to PIN
  */
-static void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
+void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 {
 	int ret = 0;
 
