@@ -322,7 +322,6 @@ void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo);
  *     PIN count incremented. It is valid to PIN a BO multiple times
  *
  * Return: ZERO if successful in pinning, Non-Zero in case of error.
- * Will return -EINVAL if input BO parameter is a USERPTR type.
  */
 int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain);
 

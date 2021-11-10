@@ -1798,16 +1798,10 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
-		ret = amdgpu_amdkfd_bo_validate(bo, AMDGPU_GEM_DOMAIN_GTT, false);
-		if (ret) {
-			pr_err("Validating MMIO/DOORBELL BO during ALLOC FAILED\n");
-			goto err_node_allow;
-		}
-
 		ret = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_GTT);
 		if (ret) {
 			pr_err("Pinning MMIO/DOORBELL BO during ALLOC FAILED\n");
-			goto err_node_allow;
+			goto err_pin_bo;
 		}
 		bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 		bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
@@ -1818,6 +1812,7 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 allocate_init_user_pages_failed:
 err_pin_bo:
 	remove_kgd_mem_from_kfd_bo_list(*mem, avm->process_info);
+err_pin_bo:
 	drm_vma_node_revoke(&gobj->vma_node, drm_priv);
 err_node_allow:
 	/* Don't unreserve system mem limit twice */
