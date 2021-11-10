@@ -22,6 +22,7 @@
  * Authors: AMD
  *
  */
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x) && defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 
 #include "rc_calc_fpu.h"
 
@@ -289,3 +290,4 @@ u32 _do_bytes_per_pixel_calc(int slice_width,
 
 	return bytes_per_pixel;
 }
+#endif
