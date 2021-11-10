@@ -2313,9 +2313,10 @@ static enum surface_update_type det_surface_update(const struct dc *dc,
 		if (dce_use_lut(format))
 			update_flags->bits.gamma_change = 1;
 	}
-
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	if (u->lut3d_func || u->func_shaper)
 		update_flags->bits.lut_3d = 1;
+#endif
 
 	if (u->hdr_mult.value)
 		if (u->hdr_mult.value != u->surface->hdr_mult.value) {
