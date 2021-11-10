@@ -1959,16 +1959,10 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 
 	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
-		ret = amdgpu_amdkfd_bo_validate(bo, AMDGPU_GEM_DOMAIN_GTT, false);
-		if (ret) {
-			pr_err("Validating MMIO/DOORBELL BO during ALLOC FAILED\n");
-			goto err_node_allow;
-		}
-
 		ret = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_GTT);
 		if (ret) {
 			pr_err("Pinning MMIO/DOORBELL BO during ALLOC FAILED\n");
-			goto err_node_allow;
+			goto err_pin_bo;
 		}
 		bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 		bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
