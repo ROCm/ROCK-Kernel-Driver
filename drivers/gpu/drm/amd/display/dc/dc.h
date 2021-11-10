@@ -742,7 +742,7 @@ struct dc {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool idle_optimizations_allowed;
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	bool enable_c20_dtm_b0;
 #endif
 
