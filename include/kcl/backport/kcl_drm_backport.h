@@ -22,4 +22,12 @@
 #define AMDKCL_DMA_BUF_SHARE_ADDR_SPACE
 #endif
 
+/*
+ * commit v4.13-rc2-365-g144a7999d633
+ * drm: Handle properties in the core for atomic drivers
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
+#define AMDKCL_DRM_CONNECTOR_FUNCS_DPMS_MANDATORY
+#endif
+
 #endif/*AMDKCL_DRM_BACKPORT_H*/
