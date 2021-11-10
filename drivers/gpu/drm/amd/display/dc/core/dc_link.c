@@ -4298,7 +4298,8 @@ void core_link_enable_stream(
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_EDP &&
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 					apply_edp_fast_boot_optimization &&
-					!pipe_ctx->stream->timing.flags.DSC) {
+					!pipe_ctx->stream->timing.flags.DSC &&
+					!pipe_ctx->next_odm_pipe) {
 #else
 					apply_edp_fast_boot_optimization) {
 #endif
