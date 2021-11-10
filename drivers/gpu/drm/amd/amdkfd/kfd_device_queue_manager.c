@@ -313,7 +313,7 @@ static void deallocate_vmid(struct device_queue_manager *dqm,
 				struct queue *q)
 {
 	/* On GFX v7, CP doesn't flush TC at dequeue */
-	if (q->device->device_info->asic_family == CHIP_HAWAII)
+	if (q->device->adev->asic_type == CHIP_HAWAII)
 		if (flush_texture_cache_nocpsch(q->device, qpd))
 			pr_err("Failed to flush TC\n");
 
@@ -1144,7 +1144,7 @@ static int start_nocpsch(struct device_queue_manager *dqm)
 	pr_info("SW scheduler is used");
 	init_interrupts(dqm);
 
-	if (dqm->dev->device_info->asic_family == CHIP_HAWAII)
+	if (dqm->dev->adev->asic_type == CHIP_HAWAII)
 		return pm_init(&dqm->packet_mgr, dqm);
 	dqm->sched_running = true;
 
@@ -1153,7 +1153,7 @@ static int start_nocpsch(struct device_queue_manager *dqm)
 
 static int stop_nocpsch(struct device_queue_manager *dqm)
 {
-	if (dqm->dev->device_info->asic_family == CHIP_HAWAII)
+	if (dqm->dev->adev->asic_type == CHIP_HAWAII)
 		pm_uninit(&dqm->packet_mgr, false);
 	dqm->sched_running = false;
 
@@ -2063,7 +2063,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 	if (!dqm)
 		return NULL;
 
-	switch (dev->device_info->asic_family) {
+	switch (dev->adev->asic_type) {
 	/* HWS is not available on Hawaii. */
 	case CHIP_HAWAII:
 	/* HWS depends on CWSR for timely dequeue. CWSR is not
@@ -2126,7 +2126,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		goto out_free;
 	}
 
-	switch (dev->device_info->asic_family) {
+	switch (dev->adev->asic_type) {
 	case CHIP_CARRIZO:
 		device_queue_manager_init_vi(&dqm->asic_ops);
 		break;
@@ -2155,7 +2155,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 			device_queue_manager_init_v9(&dqm->asic_ops);
 		else {
 			WARN(1, "Unexpected ASIC family %u",
-			     dev->device_info->asic_family);
+			     dev->adev->asic_type);
 			goto out_free;
 		}
 	}
