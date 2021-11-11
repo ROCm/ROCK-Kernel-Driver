@@ -24,6 +24,8 @@
  *     David Airlie
  */
 
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
+
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
@@ -416,3 +418,4 @@ bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 		return true;
 	return false;
 }
+#endif
