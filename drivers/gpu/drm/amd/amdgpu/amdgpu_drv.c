@@ -2171,6 +2171,8 @@ retry_init:
 		goto err_pci;
 	}
 
+
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 	/*
 	 * 1. don't init fbdev on hw without DCE
 	 * 2. don't init fbdev if there are no connectors
@@ -2183,6 +2185,7 @@ retry_init:
 		else
 			drm_fbdev_generic_setup(adev_to_drm(adev), 32);
 	}
+#endif
 
 	ret = amdgpu_debugfs_init(adev);
 	if (ret)
