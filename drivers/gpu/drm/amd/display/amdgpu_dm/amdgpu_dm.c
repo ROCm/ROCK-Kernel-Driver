@@ -1171,6 +1171,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	for (i = 0; i < fb_info->num_fb; ++i)
 		hw_params.fb[i] = &fb_info->fb[i];
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	switch (adev->asic_type) {
 	case CHIP_YELLOW_CARP:
 		if (dc->ctx->asic_id.hw_internal_rev != YELLOW_CARP_A0) {
@@ -1181,6 +1182,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	default:
 		break;
 	}
+#endif
 
 	status = dmub_srv_hw_init(dmub_srv, &hw_params);
 	if (status != DMUB_STATUS_OK) {
