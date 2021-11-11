@@ -362,6 +362,9 @@
 /* drm_dp_start_crc() is available */
 #define HAVE_DRM_DP_START_CRC 1
 
+/* drm_dp_update_payload_part1() function has start_slot argument */
+#define HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG 1
+
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
