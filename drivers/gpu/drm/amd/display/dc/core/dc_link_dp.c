@@ -844,7 +844,9 @@ static void override_lane_settings(const struct link_training_settings *lt_setti
 
 	if (lt_settings->voltage_swing == NULL &&
 			lt_settings->pre_emphasis == NULL &&
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 			lt_settings->ffe_preset == NULL &&
+#endif
 			lt_settings->post_cursor2 == NULL)
 
 		return;
@@ -857,8 +859,10 @@ static void override_lane_settings(const struct link_training_settings *lt_setti
 		if (lt_settings->post_cursor2)
 			lane_settings[lane].POST_CURSOR2 = *lt_settings->post_cursor2;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (lt_settings->ffe_preset)
 			lane_settings[lane].FFE_PRESET = *lt_settings->ffe_preset;
+#endif
 	}
 }
 
