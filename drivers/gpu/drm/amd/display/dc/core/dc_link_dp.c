@@ -5929,7 +5929,7 @@ enum dp_link_encoding dp_get_link_encoding_format(const struct dc_link_settings 
 	return DP_UNKNOWN_ENCODING;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc_link *link)
 {
 	struct dc_link_settings link_settings = {0};
@@ -5948,9 +5948,7 @@ enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc
 
 	return dp_get_link_encoding_format(&link_settings);
 }
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 // TODO - DP2.0 Link: Fix get_lane_status to handle LTTPR offset (SST and MST)
 static void get_lane_status(
 	struct dc_link *link,
