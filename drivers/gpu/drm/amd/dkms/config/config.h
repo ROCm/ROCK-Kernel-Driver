@@ -468,6 +468,9 @@
 /* drm_encoder_find() wants file_priv */
 #define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
 
+/* drm_fbdev_generic_setup() is available */
+#define HAVE_DRM_FBDEV_GENERIC_SETUP 1
+
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
