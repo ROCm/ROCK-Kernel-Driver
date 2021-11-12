@@ -728,7 +728,6 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 {
 	struct kfd_dev *kdev = pdd->dev;
 	int err;
-	unsigned int mem_type;
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, gpu_va, size,
 						 pdd->drm_priv, NULL, mem, NULL,
