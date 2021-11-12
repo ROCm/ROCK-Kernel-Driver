@@ -112,8 +112,6 @@
 #define KMS_DRIVER_MINOR	49
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"19.10.9.418"
-
 int amdgpu_vram_limit;
 int amdgpu_vis_vram_limit;
 int amdgpu_gart_size = -1; /* auto */
