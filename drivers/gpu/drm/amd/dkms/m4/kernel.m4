@@ -254,6 +254,7 @@ AC_DEFUN([AC_CONFIG_KERNEL], [
 
 	AC_SUBST(KERNEL_MAKE)
 	AH_BOTTOM([#include "config-amd-chips.h"])
+	AH_BOTTOM([#define AMDGPU_VERSION PACKAGE_VERSION])
 ])
 
 dnl #
