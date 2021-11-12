@@ -121,7 +121,6 @@
 #define KMS_DRIVER_MINOR	57
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"19.10.9.418"
 /*
  * amdgpu.debug module options. Are all disabled by default
  */
