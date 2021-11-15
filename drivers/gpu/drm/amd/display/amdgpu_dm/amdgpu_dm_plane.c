@@ -312,6 +312,11 @@ fill_dcc_params_from_flags(const struct amdgpu_framebuffer *afb,
     dcc->meta_pitch = AMDGPU_TILING_GET(flags, DCC_PITCH_MAX) + 1;
     dcc->independent_64b_blks = i64b;
 
+	if (dcc->independent_64b_blks)
+		dcc->dcc_ind_blk = hubp_ind_block_64b;
+	else
+		dcc->dcc_ind_blk = hubp_ind_block_unconstrained;
+
     dcc_address = plane_address + (uint64_t)offset * 256;
     address->grph.meta_addr.low_part = lower_32_bits(dcc_address);
     address->grph.meta_addr.high_part = upper_32_bits(dcc_address);
