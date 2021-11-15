@@ -356,6 +356,9 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
+/* struct drm_dp_mst_topology_state has member total_avail_slots */
+#define HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS 1
+
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
