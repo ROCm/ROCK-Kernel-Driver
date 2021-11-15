@@ -804,12 +804,10 @@ out:
 	up_read(&adev->reset_sem);
 }
 
-uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 				bool restore_dbg_registers,
 				uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
@@ -825,11 +823,10 @@ uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 	return 0;
 }
 
-uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
 					bool keep_trap_enabled,
 					uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
@@ -846,7 +843,7 @@ uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd,
 	return 0;
 }
 
-int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,
 					     uint32_t trap_mask_bits,
@@ -854,7 +851,6 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 					     uint32_t *trap_mask_prev,
 					     uint32_t *trap_mask_supported)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data, wave_cntl_prev;
 
 	/* The SPI_GDBG_TRAP_MASK register is global and affects all
@@ -895,11 +891,10 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
 	return 0;
 }
 
-uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t data = 0;
 	bool is_stall_mode;
 	bool is_mode_set;
@@ -976,14 +971,13 @@ static uint32_t kgd_gfx_set_multi_process_address_watch(
 }
 
 
-uint32_t kgd_gfx_v9_set_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
 					uint32_t watch_mode,
 					uint32_t debug_vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t watch_address_high;
 	uint32_t watch_address_low;
 	uint32_t watch_address_cntl;
@@ -1044,10 +1038,9 @@ uint32_t kgd_gfx_v9_set_address_watch(struct kgd_dev *kgd,
 	return 0;
 }
 
-uint32_t kgd_gfx_v9_clear_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 					uint32_t watch_id)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t watch_address_cntl;
 
 	if (adev->asic_type == CHIP_ALDEBARAN)
@@ -1062,7 +1055,7 @@ uint32_t kgd_gfx_v9_clear_address_watch(struct kgd_dev *kgd,
 	return 0;
 }
 
-int kgd_gfx_v9_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,
+int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
 				bool enable)
 {
 	return -EPERM;
@@ -1080,12 +1073,10 @@ int kgd_gfx_v9_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,
  *     sem_rearm_wait_time      -- Wait Count for Semaphore re-arm.
  *     deq_retry_wait_time      -- Wait Count for Global Wave Syncs.
  */
-void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd,
+void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev,
 					uint32_t *wait_times)
 
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	*wait_times = RREG32(SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2));
 }
 
@@ -1274,14 +1265,12 @@ void kgd_gfx_v9_get_cu_occupancy(struct amdgpu_device *adev, int pasid,
 				adev->gfx.cu_info.max_waves_per_simd;
 }
 
-void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
+void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
 		uint32_t wait_times,
 		uint32_t grace_period,
 		uint32_t *reg_offset,
 		uint32_t *reg_data)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	*reg_data = wait_times;
 
 	/*

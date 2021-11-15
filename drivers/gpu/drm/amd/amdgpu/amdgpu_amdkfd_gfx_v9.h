@@ -59,35 +59,35 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct amdgpu_device *adev,
 
 bool kgd_gfx_v9_get_atc_vmid_pasid_mapping_info(struct amdgpu_device *adev,
 					uint8_t vmid, uint16_t *p_pasid);
-uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 				      bool restore_dbg_registers,
 				      uint32_t vmid);
-uint32_t kgd_gfx_v9_disable_debug_trap(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
 					bool keep_trap_enabled,
 					uint32_t vmid);
-int kgd_gfx_v9_set_wave_launch_trap_override(struct kgd_dev *kgd,
+int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,
 					     uint32_t trap_mask_bits,
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
 					     uint32_t *trap_mask_supported);
-uint32_t kgd_gfx_v9_set_wave_launch_mode(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
-uint32_t kgd_gfx_v9_set_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
 					uint32_t watch_mode,
 					uint32_t debug_vmid);
-uint32_t kgd_gfx_v9_clear_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 					uint32_t watch_id);
-int kgd_gfx_v9_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,
+int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
 				bool enable);
-void kgd_gfx_v9_get_iq_wait_times(struct kgd_dev *kgd, uint32_t *wait_times);
+void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev, uint32_t *wait_times);
 
-void kgd_gfx_v9_build_grace_period_packet_info(struct kgd_dev *kgd,
+void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
 					       uint32_t wait_times,
 					       uint32_t grace_period,
 					       uint32_t *reg_offset,

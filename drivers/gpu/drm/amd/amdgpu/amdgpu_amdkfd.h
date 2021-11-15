@@ -160,7 +160,7 @@ int amdgpu_amdkfd_flush_gpu_tlb_vmid(struct amdgpu_device *adev,
 int amdgpu_amdkfd_flush_gpu_tlb_pasid(struct amdgpu_device *adev,
 				uint16_t pasid, enum TLB_FLUSH_TYPE flush_type);
 
-int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+int amdgpu_amdkfd_copy_mem_to_mem(struct amdgpu_device *adev, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
 		uint64_t *actual_size);
@@ -242,15 +242,15 @@ uint32_t amdgpu_amdkfd_get_asic_rev_id(struct amdgpu_device *adev);
 int amdgpu_amdkfd_get_noretry(struct amdgpu_device *adev);
 uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct amdgpu_device *dst,
 					  struct amdgpu_device *src);
-int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
+int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 					uint32_t *payload);
 int amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(struct amdgpu_device *dst,
 					    struct amdgpu_device *src,
 					    bool is_min);
 int amdgpu_amdkfd_get_pcie_bandwidth_mbytes(struct amdgpu_device *adev, bool is_min);
-static inline void amdgpu_amdkfd_gfx_off_ctrl(struct kgd_dev *dev, bool enable)
+static inline void amdgpu_amdkfd_gfx_off_ctrl(struct amdgpu_device *adev, bool enable)
 {
-	amdgpu_gfx_off_ctrl((struct amdgpu_device *)dev, enable);
+	amdgpu_gfx_off_ctrl(adev, enable);
 }
 
 /* Read user wptr from a specified user address space with page fault
@@ -339,7 +339,7 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain);
  */
 void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo);
 
-int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		struct amdgpu_bo *bo, uint32_t flags,
 		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
@@ -354,12 +354,12 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 				      uint64_t va, void *drm_priv,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset);
-int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,
 				       uint32_t flags);
 
-void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
+void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev);
 
 int amdgpu_amdkfd_get_tile_config(struct amdgpu_device *adev,
 				struct tile_config *config);
@@ -388,12 +388,11 @@ void amdgpu_amdkfd_release_notify(struct amdgpu_bo *bo)
 }
 #endif
 
-void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl);
-int amdgpu_amdkfd_rlc_spm(struct kgd_dev *kgd, void *args);
-int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd,
+void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, bool cntl);
+int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev,
 		struct amdgpu_vm *vm, u64 gpu_addr, u32 size);
-void amdgpu_amdkfd_rlc_spm_release(struct kgd_dev *kgd, struct amdgpu_vm *vm);
-void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr);
+void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, u32 rptr);
 void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
 
 /* KGD2KFD callbacks */

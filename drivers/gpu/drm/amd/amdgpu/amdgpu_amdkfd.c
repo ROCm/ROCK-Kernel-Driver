@@ -757,15 +757,14 @@ bool amdgpu_amdkfd_have_atomics_support(struct amdgpu_device *adev)
 	return adev->have_atomics_support;
 }
 
-void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd)
+void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev)
 {
-	amdgpu_device_flush_hdp((struct amdgpu_device *) kgd, NULL);
+	amdgpu_device_flush_hdp(adev, NULL);
 }
 
-int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
+int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 					uint32_t *payload)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	int ret;
 
 	/* Device or IH ring is not ready so bail. */
