@@ -62,7 +62,6 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
 					     uint32_t *trap_mask_supported);
-
 uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
@@ -78,6 +77,11 @@ int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
 				bool enable);
 void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev, uint32_t *wait_times);
 
+void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
+					       uint32_t wait_times,
+					       uint32_t grace_period,
+					       uint32_t *reg_offset,
+					       uint32_t *reg_data);
 void kgd_gfx_v9_set_vm_context_page_table_base(struct amdgpu_device *adev,
 			uint32_t vmid, uint64_t page_table_base);
 void kgd_gfx_v9_get_cu_occupancy(struct amdgpu_device *adev, int pasid,
