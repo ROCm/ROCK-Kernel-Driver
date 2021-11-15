@@ -11867,6 +11867,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
 	for_each_new_mst_mgr_in_state(state, mgr, mst_state, i) {
 		struct amdgpu_dm_connector *aconnector;
@@ -11886,7 +11887,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 		drm_connector_list_iter_end(&iter);
 	}
-
+#endif
 	/**
 	 * Streams and planes are reset when there are changes that affect
 	 * bandwidth. Anything that affects bandwidth needs to go through
