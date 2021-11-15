@@ -361,7 +361,7 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain);
  */
 void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo);
 
-int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		struct amdgpu_bo *bo, uint32_t flags,
 		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
@@ -370,7 +370,7 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table *sg);
 
-int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 				      struct dma_buf *dmabuf,
 				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *drm_priv,
@@ -382,7 +382,7 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf_fd(struct amdgpu_device *adev, int fd,
 					 uint64_t *mmap_offset);
 int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_mem *mem,
 				      struct dma_buf **dmabuf);
-int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,
 				       uint32_t flags);
@@ -446,12 +446,11 @@ void amdgpu_amdkfd_release_notify(struct amdgpu_bo *bo)
 }
 #endif
 
-void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl);
-int amdgpu_amdkfd_rlc_spm(struct kgd_dev *kgd, void *args);
-int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd,
+void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, bool cntl);
+int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev,
 		struct amdgpu_vm *vm, u64 gpu_addr, u32 size);
-void amdgpu_amdkfd_rlc_spm_release(struct kgd_dev *kgd, struct amdgpu_vm *vm);
-void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr);
+void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm *vm);
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, u32 rptr);
 void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
 
 #if IS_ENABLED(CONFIG_HSA_AMD_SVM)
