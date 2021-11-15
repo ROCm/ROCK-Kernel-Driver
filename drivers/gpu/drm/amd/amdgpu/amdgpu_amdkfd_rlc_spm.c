@@ -25,9 +25,8 @@
 #include <uapi/linux/kfd_ioctl.h>
 #include "amdgpu_ids.h"
 
-void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl)
+void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, bool cntl)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
 
 	spin_lock(&adev->gfx.kiq.ring_lock);
@@ -40,9 +39,8 @@ void amdgpu_amdkfd_rlc_spm_cntl(struct kgd_dev *kgd, bool cntl)
 	spin_unlock(&adev->gfx.kiq.ring_lock);
 }
 
-void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr)
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, u32 rptr)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
 
 	spin_lock(&adev->gfx.kiq.ring_lock);
@@ -52,9 +50,8 @@ void amdgpu_amdkfd_rlc_spm_set_rdptr(struct kgd_dev *kgd, u32 rptr)
 	spin_unlock(&adev->gfx.kiq.ring_lock);
 }
 
-int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd, struct amdgpu_vm *vm, u64 gpu_addr, u32 size)
+int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, struct amdgpu_vm *vm, u64 gpu_addr, u32 size)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
 	int r;
 
@@ -77,9 +74,8 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct kgd_dev *kgd, struct amdgpu_vm *vm, u64
 	return r;
 }
 
-void amdgpu_amdkfd_rlc_spm_release(struct kgd_dev *kgd, struct amdgpu_vm *vm)
+void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
 
 	/* stop spm stream and interrupt */

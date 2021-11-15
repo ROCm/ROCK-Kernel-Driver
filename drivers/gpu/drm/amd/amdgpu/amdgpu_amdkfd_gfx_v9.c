@@ -1247,8 +1247,6 @@ void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
 		uint32_t *reg_offset,
 		uint32_t *reg_data)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	*reg_data = wait_times;
 
 	/*

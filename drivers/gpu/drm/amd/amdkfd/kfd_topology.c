@@ -337,7 +337,7 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 		if (mem->gpu) {
 			if (kfd_devcgroup_check_permission(mem->gpu))
 				return -EPERM;
-			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->kgd);
+			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->adev);
 			return sysfs_show_64bit_val(buffer, offs, used_mem);
 		}
 		/* TODO: Report APU/CPU-allocated memory; For now return 0 */
@@ -1534,8 +1534,8 @@ static int kfd_add_peer_prop(struct kfd_topology_device *kdev,
 	int ret = 0;
 
 	if (!amdgpu_device_is_peer_accessible(
-				(struct amdgpu_device *)kdev->gpu->kgd,
-				(struct amdgpu_device *)peer->gpu->kgd))
+				kdev->gpu->adev,
+				peer->gpu->adev))
 
 		return ret;
 
@@ -1619,7 +1619,7 @@ static int kfd_dev_create_p2p_links(void)
 	list_for_each_entry(dev, &topology_device_list, list) {
 		if (dev == new_dev)
 			break;
-		if (!dev->gpu || !dev->gpu->kgd ||
+		if (!dev->gpu || !dev->gpu->adev ||
 		    (dev->gpu->hive_id &&
 		     dev->gpu->hive_id == new_dev->gpu->hive_id))
 			goto next;
