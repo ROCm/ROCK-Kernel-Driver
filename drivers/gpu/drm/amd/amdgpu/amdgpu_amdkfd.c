@@ -774,10 +774,9 @@ void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev, bo
 	amdgpu_umc_poison_handler(adev, reset);
 }
 
-int amdgpu_amdkfd_send_close_event_drain_irq(struct kgd_dev *kgd,
+int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 					uint32_t *payload)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	int ret;
 
 	/* Device or IH ring is not ready so bail. */

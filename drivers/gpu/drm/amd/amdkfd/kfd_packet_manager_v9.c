@@ -283,7 +283,7 @@ static int pm_set_grace_period_v9(struct packet_manager *pm,
 	uint32_t reg_data = 0;
 
 	pm->dqm->dev->kfd2kgd->build_grace_period_packet_info(
-			pm->dqm->dev->kgd,
+			pm->dqm->dev->adev,
 			pm->dqm->wait_times,
 			grace_period,
 			&reg_offset,

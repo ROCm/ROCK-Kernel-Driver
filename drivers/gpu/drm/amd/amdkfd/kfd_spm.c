@@ -147,7 +147,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	}
 
 exit:
-	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->kgd, spm->ring_rptr);
+	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->adev, spm->ring_rptr);
 	return ret;
 }
 
@@ -176,7 +176,7 @@ void kfd_spm_init_process_device(struct kfd_process_device *pdd)
 	pdd->spm_cntr = NULL;
 }
 
-static int kfd_acquire_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
+static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 {
 	int ret = 0;
 
@@ -200,7 +200,7 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
 	pdd->spm_cntr->ring_mask = pdd->spm_cntr->ring_size - 1;
 	pdd->spm_cntr->has_user_buf = false;
 
-	ret = amdgpu_amdkfd_alloc_gtt_mem(kgd,
+	ret = amdgpu_amdkfd_alloc_gtt_mem(adev,
 			pdd->spm_cntr->ring_size, &pdd->spm_cntr->spm_obj,
 			&pdd->spm_cntr->gpu_addr, (void *)&pdd->spm_cntr->cpu_addr,
 			false, false);
@@ -208,7 +208,7 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
 	if (ret)
 		goto alloc_gtt_mem_failure;
 
-	ret =  amdgpu_amdkfd_rlc_spm_acquire(kgd, pdd->drm_priv,
+	ret =  amdgpu_amdkfd_rlc_spm_acquire(adev, pdd->drm_priv,
 			pdd->spm_cntr->gpu_addr, pdd->spm_cntr->ring_size);
 
 	/*
@@ -230,7 +230,7 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
 	goto out;
 
 acquire_spm_failure:
-	amdgpu_amdkfd_free_gtt_mem(kgd, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
 
 alloc_gtt_mem_failure:
 	mutex_lock(&pdd->spm_mutex);
@@ -242,7 +242,7 @@ out:
 	return ret;
 }
 
-static int kfd_release_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
+static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 {
 	unsigned long flags;
 
@@ -259,8 +259,8 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct kgd_dev *kgd)
 	flush_work(&pdd->spm_work);
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
-	amdgpu_amdkfd_rlc_spm_release(kgd, pdd->drm_priv);
-	amdgpu_amdkfd_free_gtt_mem(kgd, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_rlc_spm_release(adev, pdd->drm_priv);
+	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	kfree(pdd->spm_cntr);
@@ -330,7 +330,7 @@ static int spm_wait_for_fill_awake(struct kfd_spm_cntr *spm,
 	return ret;
 }
 
-static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct kgd_dev *kgd, void *data)
+static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_device *adev, void *data)
 {
 	struct kfd_ioctl_spm_args *user_spm_data;
 	struct kfd_spm_cntr *spm;
@@ -378,7 +378,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct kgd_dev *k
 
 		/* Start SPM  */
 		if (spm->is_spm_started == false) {
-			amdgpu_amdkfd_rlc_spm_cntl(kgd, 1);
+			amdgpu_amdkfd_rlc_spm_cntl(adev, 1);
 			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 			spm->is_spm_started = true;
 			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
@@ -389,7 +389,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct kgd_dev *k
 			schedule_work(&pdd->spm_work);
 		}
 	} else {
-		amdgpu_amdkfd_rlc_spm_cntl(kgd, 0);
+		amdgpu_amdkfd_rlc_spm_cntl(adev, 0);
 		spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 		spm->is_spm_started = false;
 		spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
@@ -419,13 +419,13 @@ int kfd_rlc_spm(struct kfd_process *p,  void *data)
 	switch (args->op) {
 	case KFD_IOCTL_SPM_OP_ACQUIRE:
 		dev->spm_pasid = p->pasid;
-		return  kfd_acquire_spm(pdd, dev->kgd);
+		return  kfd_acquire_spm(pdd, dev->adev);
 
 	case KFD_IOCTL_SPM_OP_RELEASE:
-		return  kfd_release_spm(pdd, dev->kgd);
+		return  kfd_release_spm(pdd, dev->adev);
 
 	case KFD_IOCTL_SPM_OP_SET_DEST_BUF:
-		return  kfd_set_dest_buffer(pdd, dev->kgd, data);
+		return  kfd_set_dest_buffer(pdd, dev->adev, data);
 
 	default:
 		return -EINVAL;
