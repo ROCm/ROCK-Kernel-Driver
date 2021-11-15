@@ -1610,7 +1610,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
 
 	if (dqm->dev->kfd2kgd->get_iq_wait_times)
-		dqm->dev->kfd2kgd->get_iq_wait_times(dqm->dev->kgd,
+		dqm->dev->kfd2kgd->get_iq_wait_times(dqm->dev->adev,
 					&dqm->wait_times);
 	return 0;
 }
@@ -2937,7 +2937,7 @@ int suspend_queues(struct kfd_process *p,
 
 		dqm_unlock(dqm);
 		mutex_unlock(&p->event_mutex);
-		amdgpu_amdkfd_debug_mem_fence(dqm->dev->kgd);
+		amdgpu_amdkfd_debug_mem_fence(dqm->dev->adev);
 	}
 
 	if (total_suspended) {

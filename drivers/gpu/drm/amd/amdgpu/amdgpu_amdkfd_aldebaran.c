@@ -28,7 +28,7 @@
 #include "soc15.h"
 
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
-static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
+static uint32_t kgd_aldebaran_enable_debug_trap(struct amdgpu_device *adev,
 					    bool restore_dbg_registers,
 					    uint32_t vmid)
 {
@@ -42,7 +42,7 @@ static uint32_t kgd_aldebaran_enable_debug_trap(struct kgd_dev *kgd,
 }
 
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
-static uint32_t kgd_aldebaran_disable_debug_trap(struct kgd_dev *kgd,
+static uint32_t kgd_aldebaran_disable_debug_trap(struct amdgpu_device *adev,
 						bool keep_trap_enabled,
 						uint32_t vmid)
 {
@@ -56,7 +56,7 @@ static uint32_t kgd_aldebaran_disable_debug_trap(struct kgd_dev *kgd,
 }
 
 /* returns TRAP_EN, EXCP_EN and EXCP_RPLACE. */
-static int kgd_aldebaran_set_wave_launch_trap_override(struct kgd_dev *kgd,
+static int kgd_aldebaran_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					uint32_t vmid,
 					uint32_t trap_override,
 					uint32_t trap_mask_bits,
@@ -76,7 +76,7 @@ static int kgd_aldebaran_set_wave_launch_trap_override(struct kgd_dev *kgd,
 }
 
 /* returns STALL_VMID or LAUNCH_MODE. */
-static uint32_t kgd_aldebaran_set_wave_launch_mode(struct kgd_dev *kgd,
+static uint32_t kgd_aldebaran_set_wave_launch_mode(struct amdgpu_device *adev,
 					uint8_t wave_launch_mode,
 					uint32_t vmid)
 {
@@ -94,7 +94,7 @@ static uint32_t kgd_aldebaran_set_wave_launch_mode(struct kgd_dev *kgd,
 }
 
 /* delegated to CP FW - see kfd_packet_manager_v9. */
-int kgd_aldebaran_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,
+int kgd_aldebaran_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
 					bool enable)
 {
 	return 0;
