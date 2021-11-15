@@ -16,6 +16,7 @@
 #include "ivsrcid/ivsrcid_vislands30.h"
 #include "amdgpu_vkms.h"
 #include "amdgpu_display.h"
+#include "atom.h"
 
 /**
  * DOC: amdgpu_vkms
@@ -44,7 +45,7 @@ static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
 	struct amdgpu_vkms_output *output = container_of(timer,
 							 struct amdgpu_vkms_output,
 							 vblank_hrtimer);
-	struct drm_crtc *crtc = &output->crtc;
+	struct drm_crtc *crtc = &output->crtc.base;
 	u64 ret_overrun;
 	bool ret;
 
@@ -193,6 +194,8 @@ static const struct drm_crtc_helper_funcs amdgpu_vkms_crtc_helper_funcs = {
 static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 			  struct drm_plane *primary, struct drm_plane *cursor)
 {
+	struct amdgpu_device *adev = drm_to_adev(dev);
+	struct amdgpu_crtc *amdgpu_crtc = container_of(crtc, struct amdgpu_crtc, base);
 	int ret;
 
 	ret = drm_crtc_init_with_planes(dev, crtc, primary, cursor,
@@ -203,6 +206,13 @@ static int amdgpu_vkms_crtc_init(struct drm_device *dev, struct drm_crtc *crtc,
 	}
 
 	drm_crtc_helper_add(crtc, &amdgpu_vkms_crtc_helper_funcs);
+
+	amdgpu_crtc->crtc_id = drm_crtc_index(crtc);
+	adev->mode_info.crtcs[drm_crtc_index(crtc)] = amdgpu_crtc;
+
+	amdgpu_crtc->pll_id = ATOM_PPLL_INVALID;
+	amdgpu_crtc->encoder = NULL;
+	amdgpu_crtc->connector = NULL;
 
 	return ret;
 }
@@ -442,7 +452,7 @@ int amdgpu_vkms_output_init(struct drm_device *dev,
 {
 	struct drm_connector *connector = &output->connector;
 	struct drm_encoder *encoder = &output->encoder;
-	struct drm_crtc *crtc = &output->crtc;
+	struct drm_crtc *crtc = &output->crtc.base;
 	struct drm_plane *primary, *cursor = NULL;
 	int ret;
 
@@ -493,6 +503,73 @@ err_crtc:
 	drm_plane_cleanup(primary);
 
 	return ret;
+}
+
+static u32 amdgpu_vkms_vblank_get_counter(struct amdgpu_device *adev, int crtc)
+{
+	return 0;
+}
+
+static void amdgpu_vkms_page_flip(struct amdgpu_device *adev,
+			      int crtc_id, u64 crtc_base, bool async)
+{
+	return;
+}
+
+static int amdgpu_vkms_crtc_get_scanoutpos(struct amdgpu_device *adev, int crtc,
+					u32 *vbl, u32 *position)
+{
+	*vbl = 0;
+	*position = 0;
+
+	return -EINVAL;
+}
+
+static bool amdgpu_vkms_hpd_sense(struct amdgpu_device *adev,
+			       enum amdgpu_hpd_id hpd)
+{
+	return true;
+}
+
+static void amdgpu_vkms_hpd_set_polarity(struct amdgpu_device *adev,
+				      enum amdgpu_hpd_id hpd)
+{
+	return;
+}
+
+static u32 amdgpu_vkms_hpd_get_gpio_reg(struct amdgpu_device *adev)
+{
+	return 0;
+}
+
+static void amdgpu_vkms_bandwidth_update(struct amdgpu_device *adev)
+{
+	return;
+}
+
+static const struct amdgpu_display_funcs amdgpu_vkms_display_funcs = {
+	.bandwidth_update = &amdgpu_vkms_bandwidth_update,
+	.vblank_get_counter = &amdgpu_vkms_vblank_get_counter,
+	.backlight_set_level = NULL,
+	.backlight_get_level = NULL,
+	.hpd_sense = &amdgpu_vkms_hpd_sense,
+	.hpd_set_polarity = &amdgpu_vkms_hpd_set_polarity,
+	.hpd_get_gpio_reg = &amdgpu_vkms_hpd_get_gpio_reg,
+	.page_flip = &amdgpu_vkms_page_flip,
+	.page_flip_get_scanoutpos = &amdgpu_vkms_crtc_get_scanoutpos,
+	.add_encoder = NULL,
+	.add_connector = NULL,
+};
+
+static int amdgpu_vkms_early_init(void *handle)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+
+	adev->mode_info.funcs = &amdgpu_vkms_display_funcs;
+
+	adev->mode_info.num_hpd = 1;
+	adev->mode_info.num_dig = 1;
+	return 0;
 }
 
 const struct drm_mode_config_funcs amdgpu_vkms_mode_funcs = {
@@ -656,7 +733,7 @@ static int amdgpu_vkms_set_powergating_state(void *handle,
 
 static const struct amd_ip_funcs amdgpu_vkms_ip_funcs = {
 	.name = "amdgpu_vkms",
-	.early_init = NULL,
+	.early_init = amdgpu_vkms_early_init,
 	.late_init = NULL,
 	.sw_init = amdgpu_vkms_sw_init,
 	.sw_fini = amdgpu_vkms_sw_fini,
