@@ -789,19 +789,17 @@ void build_grace_period_packet_info_v10_3(struct amdgpu_device *adev,
 }
 #endif
 
-static int set_precise_mem_ops_v10_3(struct kgd_dev *kgd, uint32_t vmid,
-				bool enable)
+static int set_precise_mem_ops_v10_3(struct amdgpu_device *adev, uint32_t vmid,
+                                bool enable)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t data;
-
-	lock_srbm(kgd, 0, 0, 0, vmid);
+        uint32_t data;
+        lock_srbm(adev, 0, 0, 0, vmid);
 
 	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_DEBUG));
 	data = REG_SET_FIELD(data, SQ_DEBUG, SINGLE_MEMOP, enable ? 1 : 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_DEBUG), data);
 
-	unlock_srbm(kgd);
+        unlock_srbm(adev);
 
 	return 0;
 }

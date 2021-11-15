@@ -981,7 +981,7 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			if (!peer_pdd->drm_priv)
 				continue;
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
+				peer_pdd->dev->adev, buf_obj->mem, peer_pdd->drm_priv);
 		}
 
 		run_rdma_free_callback(buf_obj);
@@ -1223,7 +1223,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
 		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
-			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->kgd, true);
+			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 	}
 
 	/* New debugger for GFXv9 and later */
@@ -1657,7 +1657,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	p->pdds[p->n_pdds++] = pdd;
 	if (kfd_dbg_is_per_vmid_supported(pdd->dev))
 		pdd->spi_dbg_override = pdd->dev->kfd2kgd->disable_debug_trap(
-							pdd->dev->kgd,
+							pdd->dev->adev,
 							false,
 							0);
 
@@ -2340,7 +2340,7 @@ void kfd_process_drain_interrupts(struct kfd_process_device *pdd)
 	irq_drain_fence[3] = pdd->process->pasid;
 
 	/* ensure stale irqs scheduled KFD interrupts and send drain fence. */
-	if (amdgpu_amdkfd_send_close_event_drain_irq(pdd->dev->kgd,
+	if (amdgpu_amdkfd_send_close_event_drain_irq(pdd->dev->adev,
 							irq_drain_fence)) {
 		pdd->process->irq_drain_is_open = false;
 		return;

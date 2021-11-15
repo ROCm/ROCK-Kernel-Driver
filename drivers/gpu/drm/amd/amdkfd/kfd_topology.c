@@ -348,7 +348,7 @@ static ssize_t mem_show(struct kobject *kobj, struct attribute *attr,
 		if (mem->gpu) {
 			if (kfd_devcgroup_check_permission(mem->gpu))
 				return -EPERM;
-			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->kgd);
+			used_mem = amdgpu_amdkfd_get_vram_usage(mem->gpu->adev);
 			return sysfs_show_64bit_val(buffer, offs, used_mem);
 		}
 		/* TODO: Report APU/CPU-allocated memory; For now return 0 */

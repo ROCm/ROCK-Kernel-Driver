@@ -757,7 +757,6 @@ uint32_t kgd_gfx_v10_enable_debug_trap(struct amdgpu_device *adev,
 				bool restore_dbg_registers,
 				uint32_t vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
@@ -885,14 +884,13 @@ uint32_t kgd_gfx_v10_set_wave_launch_mode(struct amdgpu_device *adev,
 	return 0;
 }
 
-uint32_t kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_set_address_watch(struct amdgpu_device *adev,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t watch_id,
 					uint32_t watch_mode,
 					uint32_t debug_vmid)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	uint32_t watch_address_high;
 	uint32_t watch_address_low;
 	uint32_t watch_address_cntl;
@@ -946,11 +944,9 @@ uint32_t kgd_gfx_v10_set_address_watch(struct kgd_dev *kgd,
 	return 0;
 }
 
-uint32_t kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
+uint32_t kgd_gfx_v10_clear_address_watch(struct amdgpu_device *adev,
 					uint32_t watch_id)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	uint32_t watch_address_cntl;
 
 	watch_address_cntl = 0;
@@ -962,7 +958,7 @@ uint32_t kgd_gfx_v10_clear_address_watch(struct kgd_dev *kgd,
 	return 0;
 }
 
-static int kgd_gfx_v10_set_precise_mem_ops(struct kgd_dev *kgd, uint32_t vmid,
+static int kgd_gfx_v10_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
 					bool enable)
 {
 	return -EPERM;
@@ -992,8 +988,6 @@ void kgd_gfx_v10_build_grace_period_packet_info(struct amdgpu_device *adev,
 						uint32_t *reg_offset,
 						uint32_t *reg_data)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
 	*reg_data = wait_times;
 
 	/*

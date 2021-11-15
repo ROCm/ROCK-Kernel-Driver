@@ -2399,13 +2399,12 @@ static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		struct amdgpu_bo *bo, uint32_t flags,
 		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table **ret_sg)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct sg_table *sg = NULL;
 	struct scatterlist *s;
 	struct page **pages;
@@ -2592,19 +2591,17 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,
 				       uint32_t flags)
 {
-	struct amdgpu_device *adev = NULL;
 	struct dma_buf *dmabuf;
 	int r = 0;
 
-	if (!kgd || !vm || !mem)
+	if (!adev|| !vm || !mem)
 		return -EINVAL;
 
-	adev = get_amdgpu_device(kgd);
 	mutex_lock(&mem->lock);
 
 	if (mem->ipc_obj) {
