@@ -1016,7 +1016,7 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 			if (!peer_pdd->drm_priv)
 				continue;
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-				peer_pdd->dev->kgd, buf_obj->mem, peer_pdd->drm_priv);
+				peer_pdd->dev->adev, buf_obj->mem, peer_pdd->drm_priv);
 		}
 
 		run_rdma_free_callback(buf_obj);
