@@ -635,11 +635,6 @@ static int amdgpu_vkms_sw_init(void *handle)
 static int amdgpu_vkms_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	int i = 0;
-
-	for (i = 0; i < adev->mode_info.num_crtc; i++)
-		if (adev->mode_info.crtcs[i])
-			hrtimer_cancel(&adev->mode_info.crtcs[i]->vblank_timer);
 
 	drm_kms_helper_poll_fini(adev_to_drm(adev));
 	drm_mode_config_cleanup(adev_to_drm(adev));
