@@ -126,6 +126,7 @@ const char *amdgpu_asic_name[] = {
 	"DIMGREY_CAVEFISH",
 	"BEIGE_GOBY",
 	"YELLOW_CARP",
+	"IP DISCOVERY",
 	"LAST",
 };
 
@@ -2197,46 +2198,11 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		if (r)
 			return r;
 		break;
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
-	case CHIP_ARCTURUS:
-	case CHIP_RENOIR:
-	case CHIP_ALDEBARAN:
-		if (adev->flags & AMD_IS_APU)
-			adev->family = AMDGPU_FAMILY_RV;
-		else
-			adev->family = AMDGPU_FAMILY_AI;
-
-		r = soc15_set_ip_blocks(adev);
-		if (r)
-			return r;
-		break;
-	case  CHIP_NAVI10:
-	case  CHIP_NAVI14:
-	case  CHIP_NAVI12:
-	case  CHIP_SIENNA_CICHLID:
-	case  CHIP_NAVY_FLOUNDER:
-	case  CHIP_DIMGREY_CAVEFISH:
-	case  CHIP_BEIGE_GOBY:
-	case CHIP_VANGOGH:
-	case CHIP_YELLOW_CARP:
-	case CHIP_CYAN_SKILLFISH:
-		if (adev->asic_type == CHIP_VANGOGH)
-			adev->family = AMDGPU_FAMILY_VGH;
-		else if (adev->asic_type == CHIP_YELLOW_CARP)
-			adev->family = AMDGPU_FAMILY_YC;
-		else
-			adev->family = AMDGPU_FAMILY_NV;
-
-		r = nv_set_ip_blocks(adev);
-		if (r)
-			return r;
-		break;
 	default:
-		/* FIXME: not supported yet */
-		return -EINVAL;
+		r = amdgpu_discovery_set_ip_blocks(adev);
+		if (r)
+			return r;
+		break;
 	}
 
 	amdgpu_amdkfd_device_probe(adev);
@@ -3320,13 +3286,15 @@ bool amdgpu_device_asic_has_dc_support(enum amd_asic_type asic_type)
 	case CHIP_VANGOGH:
 	case CHIP_YELLOW_CARP:
 #endif
+	default:
 		return amdgpu_dc != 0;
-#endif
+#else
 	default:
 		if (amdgpu_dc > 0)
 			DRM_INFO_ONCE("Display Core has been requested via kernel parameter "
 					 "but isn't supported by ASIC, ignoring\n");
 		return false;
+#endif
 	}
 }
 
@@ -3792,8 +3760,6 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
-	amdgpu_fbdev_init(adev);
-
 	r = amdgpu_pm_sysfs_init(adev);
 	if (r) {
 		adev->pm_sysfs_en = false;
@@ -3957,11 +3923,9 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		amdgpu_ucode_sysfs_fini(adev);
 	sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
 
-	amdgpu_fbdev_fini(adev);
+	amdgpu_irq_fini_hw(adev);
 
 	amdgpu_device_ip_fini_early(adev);
-
-	amdgpu_irq_fini_hw(adev);
 
 	ttm_device_clear_dma_mappings(&adev->mman.bdev);
 
@@ -3972,8 +3936,8 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 
 void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 {
-	amdgpu_device_ip_fini(adev);
 	amdgpu_fence_driver_sw_fini(adev);
+	amdgpu_device_ip_fini(adev);
 	release_firmware(adev->firmware.gpu_info_fw);
 	adev->firmware.gpu_info_fw = NULL;
 	adev->accel_working = false;
@@ -4053,7 +4017,11 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 	drm_kms_helper_poll_disable(dev);
 
 	if (fbcon)
+#ifdef HAVE_DRM_DEVICE_FB_HELPER
+		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
+#else
 		amdgpu_fbdev_set_suspend(adev, 1);
+#endif
 
 	cancel_delayed_work_sync(&adev->delayed_init_work);
 
@@ -4130,7 +4098,11 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 	flush_delayed_work(&adev->delayed_init_work);
 
 	if (fbcon)
+#ifdef HAVE_DRM_DEVICE_FB_HELPER
+		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, false);
+#else
 		amdgpu_fbdev_set_suspend(adev, 0);
+#endif
 
 	drm_kms_helper_poll_enable(dev);
 
@@ -4762,7 +4734,11 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 				if (r)
 					goto out;
 
+#ifdef HAVE_DRM_DEVICE_FB_HELPER
+				drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, false);
+#else
 				amdgpu_fbdev_set_suspend(tmp_adev, 0);
+#endif
 
 				/*
 				 * The GPU enters bad state once faulty pages
@@ -4827,7 +4803,7 @@ static bool amdgpu_device_recovery_enter(struct amdgpu_device *adev)
 static void amdgpu_device_recovery_exit(struct amdgpu_device *adev)
 {
 	atomic_set(&adev->in_gpu_reset, 0);
-	wake_up_interruptible_all(&adev->recovery_fini_event);
+	wake_up_all(&adev->recovery_fini_event);
 }
 
 /*
@@ -5178,7 +5154,11 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		 */
 		amdgpu_unregister_gpu_instance(tmp_adev);
 
+#ifdef HAVE_DRM_DEVICE_FB_HELPER
+		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
+#else
 		amdgpu_fbdev_set_suspend(tmp_adev, 1);
+#endif
 
 		/* disable ras on ALL IPs */
 		if (!need_emergency_restart &&
@@ -5780,16 +5760,6 @@ bool amdgpu_device_load_pci_state(struct pci_dev *pdev)
 	}
 
 	return true;
-}
-
-bool amdgpu_device_is_headless(struct amdgpu_device *adev)
-{
-    /* If the pcie subclass is not VGA, it is headless */
-    if ((adev->pdev->class >> 8) != PCI_CLASS_DISPLAY_VGA)
-        return true;
-
-    /* Check if it is NV's VGA class while VCN is harvest, it is headless*/
-    return nv_is_headless_sku(adev->pdev);
 }
 
 void amdgpu_device_flush_hdp(struct amdgpu_device *adev,

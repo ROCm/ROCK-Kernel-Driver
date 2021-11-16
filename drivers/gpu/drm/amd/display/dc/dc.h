@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.157"
+#define DC_VER "3.2.159"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -215,10 +215,10 @@ struct dc_dcc_setting {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	//These bitfields to be used starting with DCN 3.0
 	struct {
-		uint32_t dcc_256_64_64 : 1;//available in ASICs before DCN 3.0 (the worst compression case)
-		uint32_t dcc_128_128_uncontrained : 1;  //available in ASICs before DCN 3.0
-		uint32_t dcc_256_128_128 : 1;		//available starting with DCN 3.0
-		uint32_t dcc_256_256_unconstrained : 1;  //available in ASICs before DCN 3.0 (the best compression case)
+		uint32_t dcc_256_64_64 : 1;//available in ASICs before DCN (the worst compression case)
+		uint32_t dcc_128_128_uncontrained : 1;  //available in ASICs before DCN
+		uint32_t dcc_256_128_128 : 1;		//available starting with DCN
+		uint32_t dcc_256_256_unconstrained : 1;  //available in ASICs before DCN (the best compression case)
 	} dcc_controls;
 #endif
 };
@@ -325,6 +325,7 @@ struct dc_config {
 	bool multi_mon_pp_mclk_switch;
 	bool disable_dmcu;
 	bool enable_4to1MPC;
+	bool enable_windowed_mpo_odm;
 	bool allow_edp_hotplug_detection;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool clamp_min_dcfclk;
@@ -741,6 +742,9 @@ struct dc {
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool idle_optimizations_allowed;
 #endif
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
+	bool enable_c20_dtm_b0;
+#endif
 
 	/* Require to maintain clocks and bandwidth for UEFI enabled HW */
 
@@ -953,6 +957,7 @@ union surface_update_flags {
 		uint32_t bandwidth_change:1;
 		uint32_t clock_change:1;
 		uint32_t stereo_format_change:1;
+		uint32_t lut_3d:1;
 		uint32_t full_update:1;
 	} bits;
 

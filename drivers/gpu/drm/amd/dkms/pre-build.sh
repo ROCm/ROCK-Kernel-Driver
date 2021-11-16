@@ -71,3 +71,8 @@ if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
 		sed -i 's|$(AMDDALPATH)/.*/\(.*\.o\)|\1|' $file
 	done
 fi
+
+# compile amdgpu_vkms_legacy.o for legacy kernel w/o atomic commit support
+if ! grep -q 'define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT' $SRC/config/config.h; then
+ sed -i 's|amdgpu_vkms.o|amdgpu_vkms_legacy.o|' amd/amdgpu/Makefile
+fi

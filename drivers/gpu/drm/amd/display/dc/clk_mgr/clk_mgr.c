@@ -297,13 +297,8 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			BREAK_TO_DEBUGGER();
 			return NULL;
 		}
-		if (ASICREV_IS_YELLOW_CARP(asic_id.hw_internal_rev)) {
-			/* TODO: to add DCN31 clk_mgr support, once CLK IP header files are available,
-			 * for now use DCN3.0 clk mgr.
-			 */
-			dcn31_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
-			return &clk_mgr->base.base;
-		}
+
+		dcn31_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 		return &clk_mgr->base.base;
 	}
 #endif
@@ -341,7 +336,6 @@ void dc_destroy_clk_mgr(struct clk_mgr *clk_mgr_base)
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case FAMILY_YELLOW_CARP:
-		if (ASICREV_IS_YELLOW_CARP(clk_mgr_base->ctx->asic_id.hw_internal_rev))
 			dcn31_clk_mgr_destroy(clk_mgr);
 		break;
 #endif

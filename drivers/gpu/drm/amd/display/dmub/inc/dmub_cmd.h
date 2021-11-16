@@ -47,10 +47,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0xd146258f
+#define DMUB_FW_VERSION_GIT_HASH 0x9525efb5
 #define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 88
+#define DMUB_FW_VERSION_REVISION 90
 #define DMUB_FW_VERSION_TEST 0
 #define DMUB_FW_VERSION_VBIOS 0
 #define DMUB_FW_VERSION_HOTFIX 0
@@ -371,8 +371,13 @@ union dmub_fw_boot_options {
 		uint32_t z10_disable: 1; /**< 1 to disable z10 */
 		uint32_t enable_dpia: 1; /**< 1 if DPIA should be enabled */
 		uint32_t invalid_vbios_data: 1; /**< 1 if VBIOS data table is invalid */
-		uint32_t reserved_unreleased2: 1; /**< reserved for an unreleased feature */
-		uint32_t reserved : 22; /**< reserved */
+		uint32_t dpia_supported: 1; /**< 1 if DPIA is supported on this platform */
+		uint32_t sel_mux_phy_c_d_phy_f_g: 1; /**< 1 if PHYF/PHYG should be enabled */
+		/**< 1 if all root clock gating is enabled and low power memory is enabled*/
+		uint32_t power_optimization: 1;
+		uint32_t diag_env: 1; /* 1 if diagnostic environment */
+
+		uint32_t reserved : 19; /**< reserved */
 	} bits; /**< boot bits */
 	uint32_t all; /**< 32-bit access to bits */
 };

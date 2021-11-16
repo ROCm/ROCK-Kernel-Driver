@@ -37,7 +37,7 @@
 #endif
 #include "dce_v10_0.h"
 #include "dce_v11_0.h"
-#include "dce_virtual.h"
+#include "amdgpu_vkms.h"
 #include "ivsrcid/ivsrcid_vislands30.h"
 #include "amdgpu_display.h"
 
@@ -579,7 +579,7 @@ static int dce_virtual_set_powergating_state(void *handle,
 }
 
 static const struct amd_ip_funcs dce_virtual_ip_funcs = {
-	.name = "dce_virtual",
+	.name = "amdgpu_vkms_legacy",
 	.early_init = dce_virtual_early_init,
 	.late_init = NULL,
 	.sw_init = dce_virtual_sw_init,
@@ -811,7 +811,7 @@ static void dce_virtual_set_irq_funcs(struct amdgpu_device *adev)
 	adev->crtc_irq.funcs = &dce_virtual_crtc_irq_funcs;
 }
 
-const struct amdgpu_ip_block_version dce_virtual_ip_block =
+const struct amdgpu_ip_block_version amdgpu_vkms_ip_block =
 {
 	.type = AMD_IP_BLOCK_TYPE_DCE,
 	.major = 1,

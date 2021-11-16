@@ -416,10 +416,11 @@ amdgpu_ucode_get_load_type(struct amdgpu_device *adev, int load_type)
 		else
 			return AMDGPU_FW_LOAD_PSP;
 	default:
-		DRM_ERROR("Unknown firmware load type\n");
+		if (!load_type)
+			return AMDGPU_FW_LOAD_DIRECT;
+		else
+			return AMDGPU_FW_LOAD_PSP;
 	}
-
-	return AMDGPU_FW_LOAD_DIRECT;
 }
 
 const char *amdgpu_ucode_name(enum AMDGPU_UCODE_ID ucode_id)
@@ -526,8 +527,8 @@ FW_VERSION_ATTR(mec_fw_version, 0444, gfx.mec_fw_version);
 FW_VERSION_ATTR(mec2_fw_version, 0444, gfx.mec2_fw_version);
 FW_VERSION_ATTR(sos_fw_version, 0444, psp.sos.fw_version);
 FW_VERSION_ATTR(asd_fw_version, 0444, psp.asd_context.bin_desc.fw_version);
-FW_VERSION_ATTR(ta_ras_fw_version, 0444, psp.ras_context.context.bin_desc.feature_version);
-FW_VERSION_ATTR(ta_xgmi_fw_version, 0444, psp.xgmi_context.context.bin_desc.feature_version);
+FW_VERSION_ATTR(ta_ras_fw_version, 0444, psp.ras_context.context.bin_desc.fw_version);
+FW_VERSION_ATTR(ta_xgmi_fw_version, 0444, psp.xgmi_context.context.bin_desc.fw_version);
 FW_VERSION_ATTR(smc_fw_version, 0444, pm.fw_version);
 FW_VERSION_ATTR(sdma_fw_version, 0444, sdma.instance[0].fw_version);
 FW_VERSION_ATTR(sdma2_fw_version, 0444, sdma.instance[1].fw_version);

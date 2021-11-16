@@ -66,6 +66,8 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 	payload.i2c_over_aux = (msg->request & DP_AUX_NATIVE_WRITE) == 0;
 	payload.write = (msg->request & DP_AUX_I2C_READ) == 0;
 	payload.mot = (msg->request & DP_AUX_I2C_MOT) != 0;
+	payload.write_status_update =
+			(msg->request & DP_AUX_I2C_WRITE_STATUS_UPDATE) != 0;
 	payload.defer_delay = 0;
 
 	result = dc_link_aux_transfer_raw(TO_DM_AUX(aux)->ddc_service, &payload,
@@ -576,7 +578,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	}
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
-#ifdef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS
+#if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_DEVICE_FB_HELPER)
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
 #endif
@@ -604,10 +606,13 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 #ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_lock_all(dev);
 #endif
+
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else
 		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
+#endif
 
 #ifndef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_modeset_unlock_all(dev);

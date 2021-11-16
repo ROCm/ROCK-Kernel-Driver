@@ -237,8 +237,16 @@
 /* drm_crtc_from_index() is available */
 #define HAVE_DRM_CRTC_FROM_INDEX 1
 
-/* drm_crtc_helper_funcs->atomic_check() wants struct drm_atomic_state arg */
+/* drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants
+   struct drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
+
+/* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
+   drm_atomic_state arg */
+#define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
+
+/* have drm_crtc_helper_funcs->atomic_enable() */
+#define HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE 1
 
 /* drm_crtc_init_with_planes() wants name */
 #define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
@@ -248,6 +256,9 @@
 
 /* dev_device->driver_features is available */
 #define HAVE_DRM_DEVICE_DRIVER_FEATURES 1
+
+/* struct drm_device has fb_helper member */
+#define HAVE_DRM_DEVICE_FB_HELPER 1
 
 /* drm_device->filelist_mutex is available */
 #define HAVE_DRM_DEVICE_FILELIST_MUTEX 1
@@ -433,6 +444,9 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
+/* Define to 1 if you have the <drm/drm_simple_kms_helper.h> header file. */
+#define HAVE_DRM_DRM_SIMPLE_KMS_HELPER_H 1
+
 /* Define to 1 if you have the <drm/drm_util.h> header file. */
 #define HAVE_DRM_DRM_UTIL_H 1
 
@@ -456,6 +470,9 @@
 
 /* drm_encoder_find() wants file_priv */
 #define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
+
+/* drm_fbdev_generic_setup() is available */
+#define HAVE_DRM_FBDEV_GENERIC_SETUP 1
 
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
@@ -560,6 +577,9 @@
 /* drm_mode_config->helper_private is available */
 #define HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE 1
 
+/* drm_mode_config_helper_{suspend/resume}() is available */
+#define HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND 1
+
 /* drm_mode_get_hv_timing is available */
 #define HAVE_DRM_MODE_GET_HV_TIMING 1
 
@@ -602,6 +622,9 @@
 
 /* drm_printer->prefix is available */
 #define HAVE_DRM_PRINTER_PREFIX 1
+
+/* drm_simple_encoder is available */
+#define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
 /* drm_syncobj_fence_get() is available */
 /* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */

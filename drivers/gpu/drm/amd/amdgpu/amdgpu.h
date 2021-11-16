@@ -766,6 +766,7 @@ enum amd_hw_ip_block_type {
 	UVD_HWIP,
 	VCN_HWIP = UVD_HWIP,
 	JPEG_HWIP = VCN_HWIP,
+	VCN1_HWIP,
 	VCE_HWIP,
 	DF_HWIP,
 	DCE_HWIP,
@@ -777,6 +778,8 @@ enum amd_hw_ip_block_type {
 	CLK_HWIP,
 	UMC_HWIP,
 	RSMU_HWIP,
+	XGMI_HWIP,
+	DCI_HWIP,
 	MAX_HWIP
 };
 
@@ -806,6 +809,9 @@ struct amdgpu_ssg {
 #endif
 #endif
 };
+
+#define HW_ID_MAX		300
+#define IP_VERSION(mj, mn, rv) (((mj) << 16) | ((mn) << 8) | (rv))
 
 struct amd_powerplay {
 	void *pp_handle;
@@ -881,6 +887,7 @@ struct amdgpu_device {
 	struct notifier_block		acpi_nb;
 	struct amdgpu_i2c_chan		*i2c_bus[AMDGPU_MAX_I2C_BUS];
 	struct debugfs_blob_wrapper     debugfs_vbios_blob;
+	struct debugfs_blob_wrapper     debugfs_discovery_blob;
 	struct mutex			srbm_mutex;
 	/* GRBM index mutex. Protects concurrent access to GRBM index */
 	struct mutex                    grbm_idx_mutex;
@@ -973,6 +980,7 @@ struct amdgpu_device {
 
 	/* display */
 	bool				enable_virtual_display;
+	struct amdgpu_vkms_output       *amdgpu_vkms_output;
 	struct amdgpu_mode_info		mode_info;
 	/* For pre-DCE11. DCE11 and later are in "struct amdgpu_device->dm" */
 	struct work_struct		hotplug_work;
@@ -1151,6 +1159,7 @@ struct amdgpu_device {
 	bool				barrier_has_auto_waitcnt;
 
 	struct amdgpu_reset_control     *reset_cntl;
+	uint32_t                        ip_versions[HW_ID_MAX][HWIP_MAX_INSTANCE];
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
@@ -1380,7 +1389,6 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 				      struct amdgpu_device *peer_adev);
 int amdgpu_device_baco_enter(struct drm_device *dev);
 int amdgpu_device_baco_exit(struct drm_device *dev);
-bool amdgpu_device_is_headless(struct amdgpu_device *adev);
 
 void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring);

@@ -340,32 +340,32 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 	case AMDGPU_INFO_FW_TA:
 		switch (query_fw->index) {
 		case TA_FW_TYPE_PSP_XGMI:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.xgmi_context.context.bin_desc.fw_version;
 			fw_info->feature = adev->psp.xgmi_context.context
 						   .bin_desc.feature_version;
 			break;
 		case TA_FW_TYPE_PSP_RAS:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.ras_context.context.bin_desc.fw_version;
 			fw_info->feature = adev->psp.ras_context.context
 						   .bin_desc.feature_version;
 			break;
 		case TA_FW_TYPE_PSP_HDCP:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.hdcp_context.context.bin_desc.fw_version;
 			fw_info->feature = adev->psp.hdcp_context.context
 						   .bin_desc.feature_version;
 			break;
 		case TA_FW_TYPE_PSP_DTM:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.dtm_context.context.bin_desc.fw_version;
 			fw_info->feature = adev->psp.dtm_context.context
 						   .bin_desc.feature_version;
 			break;
 		case TA_FW_TYPE_PSP_RAP:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.rap_context.context.bin_desc.fw_version;
 			fw_info->feature = adev->psp.rap_context.context
 						   .bin_desc.feature_version;
 			break;
 		case TA_FW_TYPE_PSP_SECUREDISPLAY:
-			fw_info->ver = adev->psp.ta_fw_version;
+			fw_info->ver = adev->psp.securedisplay_context.context.bin_desc.fw_version;
 			fw_info->feature =
 				adev->psp.securedisplay_context.context.bin_desc
 					.feature_version;
@@ -1338,7 +1338,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	pm_runtime_put_autosuspend(dev->dev);
 }
 
-
+#ifdef HAVE_DRM_DRIVER_RELEASE
 void amdgpu_driver_release_kms(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
@@ -1350,6 +1350,7 @@ void amdgpu_driver_release_kms(struct drm_device *dev)
 	kfree(adev);
 #endif
 }
+#endif
 
 /*
  * VBlank related functions.

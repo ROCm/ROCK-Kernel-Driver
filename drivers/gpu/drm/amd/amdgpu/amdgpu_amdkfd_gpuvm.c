@@ -61,7 +61,6 @@ static const char * const domain_bit_to_string[] = {
 
 static void amdgpu_amdkfd_restore_userptr_worker(struct work_struct *work);
 
-
 static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
 {
 	return (struct amdgpu_device *)kgd;
@@ -1572,7 +1571,11 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	amdgpu_sync_create(&(*mem)->sync);
 
 	size = ALIGN(size, PAGE_SIZE);
-	ret = amdgpu_amdkfd_reserve_mem_limit(adev, size, alloc_domain, !!sg);
+	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))
+		ret = amdgpu_amdkfd_reserve_mem_limit(adev, size, AMDGPU_GEM_DOMAIN_GTT, !!sg);
+	else
+		ret = amdgpu_amdkfd_reserve_mem_limit(adev, size, alloc_domain, !!sg);
 	if (ret) {
 		pr_debug("Insufficient memory\n");
 		goto err_reserve_limit;
@@ -1618,17 +1621,34 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
 
+	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
+		ret = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_GTT);
+		if (ret) {
+			pr_err("Pinning MMIO/DOORBELL BO during ALLOC FAILED\n");
+			goto err_pin_bo;
+		}
+		bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
+		bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+	}
+
 	return 0;
 
 allocate_init_user_pages_failed:
 	remove_kgd_mem_from_kfd_bo_list(*mem, avm->process_info);
+err_pin_bo:
 	drm_vma_node_revoke(&gobj->vma_node, drm_priv);
 err_node_allow:
 	drm_gem_object_put(gobj);
 	/* Don't unreserve system mem limit twice */
 	goto err_reserve_limit;
 err_bo_create:
-	unreserve_mem_limit(adev, size, alloc_domain, !!sg);
+	/* Handle MMIO/DOORBELL BOs as if they are GTT BOs */
+	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))
+		unreserve_mem_limit(adev, size, AMDGPU_GEM_DOMAIN_GTT, !!sg);
+	else
+		unreserve_mem_limit(adev, size, alloc_domain, !!sg);
 err_reserve_limit:
 	mutex_destroy(&(*mem)->lock);
 	kfree(*mem);
@@ -1654,6 +1674,14 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	bool is_imported = false;
 
 	mutex_lock(&mem->lock);
+
+	/* Unpin MMIO/DOORBELL BO's that were pinnned during allocation */
+	if (mem->alloc_flags &
+	    (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+	     KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
+		amdgpu_amdkfd_gpuvm_unpin_bo(mem->bo);
+	}
+
 	mapped_to_gpu_memory = mem->mapped_to_gpu_memory;
 	is_imported = mem->is_imported;
 	mutex_unlock(&mem->lock);
@@ -2006,6 +2034,16 @@ bo_reserve_failed:
 	return ret;
 }
 
+void amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	struct amdgpu_bo *bo = mem->bo;
+
+	amdgpu_bo_reserve(bo, true);
+	amdgpu_bo_kunmap(bo);
+	amdgpu_bo_unpin(bo);
+	amdgpu_bo_unreserve(bo);
+}
+
 int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
 					      struct kfd_vm_fault_info *mem)
 {
@@ -2036,7 +2074,7 @@ void amdgpu_amdkfd_gpuvm_put_bo_ref(struct amdgpu_bo *bo)
 	drm_gem_object_put(&bo->tbo.base);
 }
 
-int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo)
+int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 {
 	int ret = 0;
 
@@ -2044,7 +2082,10 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo)
 	if (unlikely(ret))
 		return ret;
 
-	ret = amdgpu_bo_pin_restricted(bo, bo->preferred_domains, 0, 0);
+	ret = amdgpu_bo_pin_restricted(bo, domain, 0, 0);
+	if (ret)
+		pr_err("Error in Pinning BO to domain: %d\n", domain);
+
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
 	amdgpu_bo_unreserve(bo);
 
@@ -2453,18 +2494,25 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		/* Get updated user pages */
 		ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages);
 		if (ret) {
-			pr_debug("%s: Failed to get user pages: %d\n",
-				__func__, ret);
+			pr_debug("Failed %d to get user pages\n", ret);
 
-			/* Return error -EBUSY or -ENOMEM, retry restore */
-			return ret;
+			/* Return -EFAULT bad address error as success. It will
+			 * fail later with a VM fault if the GPU tries to access
+			 * it. Better than hanging indefinitely with stalled
+			 * user mode queues.
+			 *
+			 * Return other error -EBUSY or -ENOMEM to retry restore
+			 */
+			if (ret != -EFAULT)
+				return ret;
+		} else {
+
+			/*
+			 * FIXME: Cannot ignore the return code, must hold
+			 * notifier_lock
+			 */
+			amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
 		}
-
-		/*
-		 * FIXME: Cannot ignore the return code, must hold
-		 * notifier_lock
-		 */
-		amdgpu_ttm_tt_get_user_pages_done(bo->tbo.ttm);
 #else
 		if (!mem->user_pages) {
 			mem->user_pages =
@@ -2493,7 +2541,6 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			 */
 		}
 #endif
-
 		/* Mark the BO as valid unless it was invalidated
 		 * again concurrently.
 		 */

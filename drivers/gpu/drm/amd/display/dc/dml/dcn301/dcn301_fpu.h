@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2019-2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,12 +19,24 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ * Authors: AMD
+ *
  */
 
-#ifndef __DCE_VIRTUAL_H__
-#define __DCE_VIRTUAL_H__
+#ifndef __DCN301_FPU_H__
+#define __DCN301_FPU_H__
 
-extern const struct amdgpu_ip_block_version dce_virtual_ip_block;
+void dcn301_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params);
 
-#endif
+void dcn301_fpu_set_wm_ranges(int i,
+	struct pp_smu_wm_range_sets *ranges,
+	struct _vcs_dpi_soc_bounding_box_st *loaded_bb);
 
+void dcn301_fpu_init_soc_bounding_box(struct bp_soc_bb_info bb_info);
+
+void dcn301_calculate_wm_and_dlg(struct dc *dc,
+		struct dc_state *context,
+		display_e2e_pipe_params_st *pipes,
+		int pipe_cnt,
+		int vlevel_req);
+#endif /* __DCN301_FPU_H__*/

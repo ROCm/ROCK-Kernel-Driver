@@ -1921,12 +1921,16 @@ static bool is_flip_pending_in_pipes(struct dc *dc, struct dc_state *context)
  */
 static void process_deferred_updates(struct dc *dc)
 {
-	int i;
+#ifdef CONFIG_DRM_AMD_DC_DCN
+	int i = 0;
 
-	if (dc->debug.enable_mem_low_power.bits.cm)
+	if (dc->debug.enable_mem_low_power.bits.cm) {
+		ASSERT(dc->dcn_ip->max_num_dpp);
 		for (i = 0; i < dc->dcn_ip->max_num_dpp; i++)
 			if (dc->res_pool->dpps[i]->funcs->dpp_deferred_update)
 				dc->res_pool->dpps[i]->funcs->dpp_deferred_update(dc->res_pool->dpps[i]);
+	}
+#endif
 }
 
 void dc_post_update_surfaces_to_stream(struct dc *dc)
@@ -2309,6 +2313,10 @@ static enum surface_update_type det_surface_update(const struct dc *dc,
 		if (dce_use_lut(format))
 			update_flags->bits.gamma_change = 1;
 	}
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
+	if (u->lut3d_func || u->func_shaper)
+		update_flags->bits.lut_3d = 1;
+#endif
 
 	if (u->hdr_mult.value)
 		if (u->hdr_mult.value != u->surface->hdr_mult.value) {
@@ -2323,6 +2331,7 @@ static enum surface_update_type det_surface_update(const struct dc *dc,
 
 	if (update_flags->bits.input_csc_change
 			|| update_flags->bits.coeff_reduction_change
+			|| update_flags->bits.lut_3d
 			|| update_flags->bits.gamma_change
 			|| update_flags->bits.gamut_remap_change) {
 		type = UPDATE_TYPE_FULL;

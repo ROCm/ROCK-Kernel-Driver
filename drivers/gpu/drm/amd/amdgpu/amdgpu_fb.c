@@ -24,6 +24,8 @@
  *     David Airlie
  */
 
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
+
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
@@ -368,7 +370,7 @@ int amdgpu_fbdev_init(struct amdgpu_device *adev)
 #endif
 
 	/* disable all the possible outputs/crtcs before entering KMS mode */
-	if (!amdgpu_device_has_dc_support(adev))
+	if (!amdgpu_device_has_dc_support(adev) && !amdgpu_virtual_display)
 		drm_helper_disable_unused_functions(adev_to_drm(adev));
 
 	drm_fb_helper_initial_config(&rfbdev->helper, bpp_sel);
@@ -413,3 +415,4 @@ bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 		return true;
 	return false;
 }
+#endif

@@ -232,7 +232,10 @@ struct amdgpu_i2c_chan {
 	struct mutex mutex;
 };
 
+
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
 struct amdgpu_fbdev;
+#endif
 
 struct amdgpu_afmt {
 	bool enabled;
@@ -314,12 +317,14 @@ struct amdgpu_framebuffer {
 	uint64_t address;
 };
 
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
 struct amdgpu_fbdev {
 	struct drm_fb_helper helper;
 	struct amdgpu_framebuffer rfb;
 	struct list_head fbdev_list;
 	struct amdgpu_device *adev;
 };
+#endif
 
 struct amdgpu_mode_info {
 	struct atom_context *atom_context;
@@ -360,8 +365,10 @@ struct amdgpu_mode_info {
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
 
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
 	/* pointer to fbdev info structure */
 	struct amdgpu_fbdev *rfbdev;
+#endif
 	/* firmware flags */
 	u32 firmware_flags;
 	/* pointer to backlight encoder */
@@ -374,6 +381,9 @@ struct amdgpu_mode_info {
 	int			disp_priority;
 	const struct amdgpu_display_funcs *funcs;
 	const enum drm_plane_type *plane_type;
+#ifndef HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND
+	struct drm_atomic_state *suspend_state;
+#endif
 };
 
 #define AMDGPU_MAX_BL_LEVEL 0xFF
@@ -653,6 +663,7 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 			int *hpos, ktime_t *stime, ktime_t *etime,
 			const struct drm_display_mode *mode);
 
+#ifndef HAVE_DRM_DEVICE_FB_HELPER
 /* fbdev layer */
 int amdgpu_fbdev_init(struct amdgpu_device *adev);
 void amdgpu_fbdev_fini(struct amdgpu_device *adev);
@@ -661,6 +672,7 @@ int amdgpu_fbdev_total_size(struct amdgpu_device *adev);
 bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj);
 
 int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tiled);
+#endif
 
 /* amdgpu_display.c */
 void amdgpu_display_print_display_setup(struct drm_device *dev);

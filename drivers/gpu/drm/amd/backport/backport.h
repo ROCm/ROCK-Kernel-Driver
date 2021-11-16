@@ -85,8 +85,10 @@
 #include "kcl/kcl_amdgpu_drm_drv.h"
 #include "kcl/kcl_amdgpu_drm_gem.h"
 #include "kcl/kcl_drm_gem_ttm_helper.h"
+#include "kcl/kcl_amdgpu_drm_modeset_helper.h"
 #include "kcl/kcl_mce.h"
 #include "kcl/kcl_drm_aperture.h"
 #include <kcl/kcl_intel_family.h>
+#include <kcl/kcl_drm_simple_kms_helper.h>
 
 #endif /* AMDGPU_BACKPORT_H */
