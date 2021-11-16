@@ -12278,6 +12278,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
@@ -12305,6 +12306,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		drm_connector_list_iter_end(&iter);
 
 	}
+#endif
 #endif
 #endif
 	/**
