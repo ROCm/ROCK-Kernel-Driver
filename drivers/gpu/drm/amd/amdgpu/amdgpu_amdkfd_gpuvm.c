@@ -2615,9 +2615,17 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 	int ret;
 
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 	obj = amdgpu_gem_prime_import(adev_to_drm(adev), dma_buf);
 	if (IS_ERR(obj))
 		return PTR_ERR(obj);
+#else
+	obj = dma_buf->priv;
+	if (drm_to_adev(obj->dev) != adev)
+		/* Can't handle buffers from other devices */
+		return -EINVAL;
+	drm_gem_object_get(obj);
+#endif
 
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
