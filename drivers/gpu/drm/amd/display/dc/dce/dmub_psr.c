@@ -311,6 +311,7 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 	copy_settings_data->cmd_version =  DMUB_CMD_PSR_CONTROL_VERSION_1;
 	copy_settings_data->panel_inst = panel_inst;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->fec_state == dc_link_fec_enabled &&
 		(!memcmp(link->dpcd_caps.sink_dev_id_str, DP_SINK_DEVICE_STR_ID_1,
 			sizeof(link->dpcd_caps.sink_dev_id_str)) ||
@@ -318,6 +319,7 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 			sizeof(link->dpcd_caps.sink_dev_id_str))))
 		copy_settings_data->debug.bitfields.force_wakeup_by_tps3 = 1;
 	else
+#endif
 		copy_settings_data->debug.bitfields.force_wakeup_by_tps3 = 0;
 
 	dc_dmub_srv_cmd_queue(dc->dmub_srv, &cmd);
