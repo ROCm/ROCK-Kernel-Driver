@@ -2713,11 +2713,12 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 		goto unlock_out;
 	}
 
-	dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
-	if (IS_ERR(dmabuf)) {
-		r = PTR_ERR(dmabuf);
+	r = kfd_mem_export_dmabuf(mem);
+	if (r)
 		goto unlock_out;
-	}
+
+	get_dma_buf(mem->dmabuf);
+	dmabuf = mem->dmabuf;
 
 	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj, flags, restore_handle);
 	if (r)
