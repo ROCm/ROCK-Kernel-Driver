@@ -5356,7 +5356,7 @@ bool dc_link_dp_set_test_pattern(
 			return false;
 
 		if (link->dpcd_caps.dpcd_rev.raw >= DPCD_REV_12) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (test_pattern == DP_TEST_PATTERN_SQUARE_PULSE)
 				core_link_write_dpcd(link,
 						DP_LINK_SQUARE_PATTERN,
@@ -5941,7 +5941,7 @@ enum dp_link_encoding dp_get_link_encoding_format(const struct dc_link_settings 
 	return DP_UNKNOWN_ENCODING;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc_link *link)
 {
 	struct dc_link_settings link_settings = {0};
@@ -5988,6 +5988,7 @@ static void get_lane_status(
 	status_updated->raw = dpcd_buf[2];
 }
 
+#ifdef  CONFIG_DRM_AMD_DC_DCN3_x
 bool dpcd_write_128b_132b_sst_payload_allocation_table(
 		const struct dc_stream_state *stream,
 		struct dc_link *link,
@@ -6131,6 +6132,7 @@ bool dpcd_poll_for_allocation_change_trigger(struct dc_link *link)
 
 	return (result == ACT_SUCCESS);
 }
+#endif
 
 struct fixed31_32 calculate_sst_avg_time_slots_per_mtp(
 		const struct dc_stream_state *stream,
