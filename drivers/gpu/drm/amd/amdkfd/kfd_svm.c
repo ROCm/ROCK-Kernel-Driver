@@ -1982,7 +1982,7 @@ restart:
 		pr_debug("drain retry fault gpu %d svms %p\n", i, svms);
 		adev = (struct amdgpu_device *)pdd->dev->kgd;
 
-		amdgpu_ih_wait_on_checkpoint_process(adev, &adev->irq.ih1);
+		amdgpu_ih_wait_on_checkpoint_process_ts(adev, &adev->irq.ih1);
 		pr_debug("drain retry fault gpu %d svms 0x%p done\n", i, svms);
 	}
 	if (atomic_cmpxchg(&svms->drain_pagefaults, drain, 0) != drain)
