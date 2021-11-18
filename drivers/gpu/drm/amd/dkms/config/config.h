@@ -1142,7 +1142,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 19.40"
+#define PACKAGE_STRING "amdgpu-dkms 5.13.6"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1151,6 +1151,8 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "19.40"
+#define PACKAGE_VERSION "5.13.6"
 
 #include "config-amd-chips.h"
+
+#define AMDGPU_VERSION PACKAGE_VERSION
