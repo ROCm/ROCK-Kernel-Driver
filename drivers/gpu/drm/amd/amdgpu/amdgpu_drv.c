@@ -2259,8 +2259,10 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 			return -ENODEV;
 	}
 
-	if (amdgpu_aspm == -1 && !pcie_aspm_enabled(pdev))
-		amdgpu_aspm = 0;
+	if (flags == 0) {
+		DRM_INFO("Unsupported asic.  Remove me when IP discovery init is in place.\n");
+		return -ENODEV;
+	}
 
 	if (amdgpu_virtual_display ||
 	    amdgpu_device_asic_has_dc_support(flags & AMD_ASIC_MASK))
