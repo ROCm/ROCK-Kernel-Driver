@@ -34,7 +34,9 @@
 #include "amdgpu_atomfirmware.h"
 #include "amdgpu_xgmi.h"
 #include "ivsrcid/nbio/irqsrcs_nbif_7_4.h"
+#ifdef CONFIG_X86
 #include <asm/mce.h>
+#endif
 #include "atom.h"
 #include "amdgpu_reset.h"
 
