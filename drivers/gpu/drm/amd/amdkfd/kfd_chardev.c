@@ -1630,16 +1630,11 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	r = amdgpu_read_lock(dev->ddev, true);
-	if (r)
-		return r;
-
 	r = kfd_ipc_import_dmabuf(dev, p, args->gpu_id, args->dmabuf_fd,
 				  args->va_addr, &args->handle, NULL);
 	if (r)
 		pr_err("Failed to import dmabuf\n");
 
-	amdgpu_read_unlock(dev->ddev);
 	return r;
 }
 
@@ -1675,17 +1670,12 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	r = amdgpu_read_lock(dev->ddev, true);
-	if (r)
-		return r;
-
 	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
 				  args->va_addr, &args->handle,
 				  &args->mmap_offset, &args->flags);
 	if (r)
 		pr_err("Failed to import IPC handle\n");
 
-	amdgpu_read_unlock(dev->ddev);
 	return r;
 }
 
