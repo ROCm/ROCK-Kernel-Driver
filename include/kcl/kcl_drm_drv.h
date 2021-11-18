@@ -75,4 +75,12 @@ static inline bool drm_dev_is_unplugged(struct drm_device *dev)
 #endif /* HAVE_DRM_DEV_IS_UNPLUGGED */
 #endif /* HAVE_DRM_DEV_ENTER */
 
+#ifndef HAVE_DRM_DRV_USES_ATOMIC_MODESET
+static inline bool drm_drv_uses_atomic_modeset(struct drm_device *dev)
+{
+	return drm_core_check_feature(dev, DRIVER_ATOMIC) ||
+		(dev->mode_config.funcs && dev->mode_config.funcs->atomic_commit != NULL);
+}
+#endif /* HAVE_DRM_DRV_USES_ATOMIC_MODESET */
+
 #endif
