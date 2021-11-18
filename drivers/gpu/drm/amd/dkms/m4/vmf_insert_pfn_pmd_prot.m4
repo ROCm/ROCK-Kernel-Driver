@@ -4,7 +4,7 @@ dnl # v5.6-rc5-1488-g9a9731b18c9b mm: Add vmf_insert_pfn_xxx_prot() for huge pag
 dnl #
 AC_DEFUN([AC_AMDGPU_VMF_INSERT_PFN_PMD_PROT], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([vmf_insert_pfn_pmd_prot vmf_insert_pfn_pud_prot],
+		AC_KERNEL_CHECK_SYMBOL_EXPORT([vmf_insert_pfn_pmd_prot],
 			[mm/huge_memory.c], [
 			AC_DEFINE(HAVE_VMF_INSERT_PFN_PMD_PROT,
 				1,
