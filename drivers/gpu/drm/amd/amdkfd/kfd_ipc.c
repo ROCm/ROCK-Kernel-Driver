@@ -129,11 +129,14 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 		return -EINVAL;
 
 	mutex_lock(&p->mutex);
+	r = amdgpu_read_lock(dev->ddev, true);
+	if (r)
+		goto err_unlock;
 
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
 		r = PTR_ERR(pdd);
-		goto err_unlock;
+		goto err_read_unlock;
 	}
 
 	r = amdgpu_amdkfd_gpuvm_import_dmabuf(dev->adev, dmabuf, ipc_obj,
@@ -141,7 +144,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 					(struct kgd_mem **)&mem, &size,
 					mmap_offset);
 	if (r)
-		goto err_unlock;
+		goto err_read_unlock;
 
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
 							  va_addr, size, 0, 0);
@@ -150,6 +153,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 		goto err_free;
 	}
 
+	amdgpu_read_unlock(dev->ddev);
 	mutex_unlock(&p->mutex);
 
 	*handle = MAKE_HANDLE(gpu_id, idr_handle);
@@ -158,6 +162,8 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 
 err_free:
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, (struct kgd_mem *)mem, pdd->drm_priv, NULL);
+err_read_unlock:
+	amdgpu_read_unlock(dev->ddev);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return r;
