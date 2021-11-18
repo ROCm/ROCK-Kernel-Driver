@@ -69,8 +69,6 @@ static const struct kfd_device_info kaveri_device_info = {
 	.supports_cwsr = false,
 	.needs_iommu_device = true,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -89,8 +87,6 @@ static const struct kfd_device_info carrizo_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = true,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -108,8 +104,6 @@ static const struct kfd_device_info raven_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = true,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 1,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 #endif
@@ -130,8 +124,6 @@ static const struct kfd_device_info hawaii_device_info = {
 	.supports_cwsr = false,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 #endif
@@ -150,8 +142,6 @@ static const struct kfd_device_info tonga_device_info = {
 	.supports_cwsr = false,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -169,8 +159,6 @@ static const struct kfd_device_info fiji_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -188,8 +176,6 @@ static const struct kfd_device_info fiji_vf_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -208,8 +194,6 @@ static const struct kfd_device_info polaris10_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -227,8 +211,6 @@ static const struct kfd_device_info polaris10_vf_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -246,8 +228,6 @@ static const struct kfd_device_info polaris11_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -265,8 +245,6 @@ static const struct kfd_device_info polaris12_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -284,8 +262,6 @@ static const struct kfd_device_info vegam_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -303,8 +279,6 @@ static const struct kfd_device_info vega10_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -322,8 +296,6 @@ static const struct kfd_device_info vega10_vf_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -341,8 +313,6 @@ static const struct kfd_device_info vega12_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -360,8 +330,6 @@ static const struct kfd_device_info vega20_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -379,8 +347,6 @@ static const struct kfd_device_info arcturus_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 6,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -398,8 +364,6 @@ static const struct kfd_device_info aldebaran_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 3,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -417,8 +381,6 @@ static const struct kfd_device_info renoir_device_info = {
 	.supports_cwsr = true,
 	.needs_iommu_device = false,
 	.needs_pci_atomics = false,
-	.num_sdma_engines = 1,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -437,8 +399,6 @@ static const struct kfd_device_info navi10_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 145,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -457,8 +417,6 @@ static const struct kfd_device_info navi12_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 145,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -477,8 +435,6 @@ static const struct kfd_device_info navi14_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 145,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -497,8 +453,6 @@ static const struct kfd_device_info sienna_cichlid_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 4,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -517,8 +471,6 @@ static const struct kfd_device_info navy_flounder_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -537,8 +489,6 @@ static const struct kfd_device_info vangogh_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 1,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -557,8 +507,6 @@ static const struct kfd_device_info dimgrey_cavefish_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -577,8 +525,6 @@ static const struct kfd_device_info beige_goby_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 1,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
@@ -597,8 +543,6 @@ static const struct kfd_device_info yellow_carp_device_info = {
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
 	.no_atomic_fw_version = 92,
-	.num_sdma_engines = 1,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
 
@@ -616,8 +560,6 @@ static const struct kfd_device_info cyan_skillfish_device_info = {
 	.needs_iommu_device = false,
 	.supports_cwsr = true,
 	.needs_pci_atomics = true,
-	.num_sdma_engines = 2,
-	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 8,
 };
 
