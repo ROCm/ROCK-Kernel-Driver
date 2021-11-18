@@ -9,7 +9,7 @@ AC_DEFUN([AC_AMDGPU_ACCESS_OK_WITH_TWO_ARGUMENTS], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/uaccess.h>
 		],[
-			access_ok(1, 1);
+			access_ok(0, 0);
 		],[
 			AC_DEFINE(HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS, 1,
 				[whether access_ok(x, x) is available])
