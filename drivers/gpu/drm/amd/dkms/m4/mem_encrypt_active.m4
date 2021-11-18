@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_MEM_ENCRYPT_ACTIVE], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#include <linux/types.h>
 			#include <linux/mem_encrypt.h>
 		], [
 			mem_encrypt_active();
