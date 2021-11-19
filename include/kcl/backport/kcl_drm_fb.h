@@ -42,4 +42,10 @@ void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
 #define drm_helper_mode_fill_fb_struct _kcl_drm_helper_mode_fill_fb_struct
 #endif
 
+#if defined(HAVE_DRM_FBDEV_GENERIC_SETUP) &&			\
+	defined(HAVE_DRM_DEVICE_FB_HELPER) &&			\
+	DRM_VERSION_CODE >= DRM_VERSION(5, 13, 0)
+#define AMDKCL_DRM_FBDEV_GENERIC
+#endif
+
 #endif
