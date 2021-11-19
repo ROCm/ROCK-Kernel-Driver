@@ -1253,6 +1253,7 @@ int kfd_process_init_cwsr_apu(struct kfd_process *process, struct file *filep);
 
 struct kfd_criu_process_priv_data {
 	uint32_t version;
+	uint32_t xnack_mode;
 };
 
 struct kfd_criu_device_priv_data {
