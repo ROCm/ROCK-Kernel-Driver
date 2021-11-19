@@ -24,7 +24,7 @@
  *     David Airlie
  */
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
 
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
