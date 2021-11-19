@@ -2220,7 +2220,7 @@ retry_init:
 	}
 
 
-#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
+#ifdef AMDKCL_DRM_FBDEV_GENERIC 
 	/*
 	 * 1. don't init fbdev on hw without DCE
 	 * 2. don't init fbdev if there are no connectors
