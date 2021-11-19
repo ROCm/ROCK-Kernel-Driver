@@ -233,7 +233,7 @@ struct amdgpu_i2c_chan {
 };
 
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
 struct amdgpu_fbdev;
 #endif
 
@@ -317,7 +317,7 @@ struct amdgpu_framebuffer {
 	uint64_t address;
 };
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
 struct amdgpu_fbdev {
 	struct drm_fb_helper helper;
 	struct amdgpu_framebuffer rfb;
@@ -365,7 +365,7 @@ struct amdgpu_mode_info {
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
 	/* pointer to fbdev info structure */
 	struct amdgpu_fbdev *rfbdev;
 #endif
@@ -647,7 +647,7 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 			int *hpos, ktime_t *stime, ktime_t *etime,
 			const struct drm_display_mode *mode);
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
 /* fbdev layer */
 int amdgpu_fbdev_init(struct amdgpu_device *adev);
 void amdgpu_fbdev_fini(struct amdgpu_device *adev);

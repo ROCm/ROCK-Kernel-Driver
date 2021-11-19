@@ -1022,6 +1022,7 @@ out:
 	return r;
 }
 
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 static int amdgpu_gem_align_pitch(struct amdgpu_device *adev,
 				  int width,
 				  int cpp,
@@ -1047,6 +1048,7 @@ static int amdgpu_gem_align_pitch(struct amdgpu_device *adev,
 	aligned &= ~pitch_mask;
 	return aligned * cpp;
 }
+#endif
 
 int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 			    struct drm_device *dev,
@@ -1069,8 +1071,13 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 	if (adev->mman.buffer_funcs_enabled)
 		flags |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 	args->pitch = amdgpu_gem_align_pitch(adev, args->width,
 					     DIV_ROUND_UP(args->bpp, 8), 0);
+#else
+	args->pitch = amdgpu_align_pitch(adev, args->width,
+					 DIV_ROUND_UP(args->bpp, 8), 0);
+#endif
 	args->size = (u64)args->pitch * args->height;
 	args->size = ALIGN(args->size, PAGE_SIZE);
 	domain = amdgpu_bo_get_preferred_domain(adev,
