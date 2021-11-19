@@ -4030,6 +4030,9 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
+	amdgpu_fbdev_init(adev);
+#endif
 	r = amdgpu_atombios_sysfs_init(adev);
 	if (r)
 		drm_err(&adev->ddev,
@@ -4211,6 +4214,9 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		amdgpu_psp_sysfs_fini(adev);
 	sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
 
+#ifndef AMDKCL_DRM_FBDEV_GENERIC
+	amdgpu_fbdev_fini(adev);
+#endif
 	/* disable ras feature must before hw fini */
 	amdgpu_ras_pre_fini(adev);
 
@@ -4345,7 +4351,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 		DRM_WARN("smart shift update failed\n");
 
 	if (fbcon)
-#ifdef HAVE_DRM_DEVICE_FB_HELPER
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
 #else
 		amdgpu_fbdev_set_suspend(adev, 1);
@@ -4442,7 +4448,7 @@ exit:
 	flush_delayed_work(&adev->delayed_init_work);
 
 	if (fbcon)
-#ifdef HAVE_DRM_DEVICE_FB_HELPER
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, false);
 #else
 		amdgpu_fbdev_set_suspend(adev, 0);
@@ -5187,7 +5193,7 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 				if (r)
 					goto out;
 
-#ifdef HAVE_DRM_DEVICE_FB_HELPER
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 				drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, false);
 #else
 				amdgpu_fbdev_set_suspend(tmp_adev, 0);
@@ -5460,7 +5466,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		 */
 		amdgpu_unregister_gpu_instance(tmp_adev);
 
-#ifdef HAVE_DRM_DEVICE_FB_HELPER
+#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, true);
 #else
 		amdgpu_fbdev_set_suspend(tmp_adev, 1);
