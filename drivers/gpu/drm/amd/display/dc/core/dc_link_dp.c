@@ -843,11 +843,11 @@ static void override_lane_settings(const struct link_training_settings *lt_setti
 	uint32_t lane;
 
 	if (lt_settings->voltage_swing == NULL &&
-			lt_settings->pre_emphasis == NULL &&
-#ifdef CONFIG_DRM_AMD_DC_DCN3_x
-			lt_settings->ffe_preset == NULL &&
+	    lt_settings->pre_emphasis == NULL &&
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	    lt_settings->ffe_preset == NULL &&
 #endif
-			lt_settings->post_cursor2 == NULL)
+	    lt_settings->post_cursor2 == NULL)
 
 		return;
 
@@ -5352,6 +5352,14 @@ bool dc_link_dp_set_test_pattern(
 			return false;
 
 		if (link->dpcd_caps.dpcd_rev.raw >= DPCD_REV_12) {
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+			if (test_pattern == DP_TEST_PATTERN_SQUARE_PULSE)
+				core_link_write_dpcd(link,
+						DP_LINK_SQUARE_PATTERN,
+						p_custom_pattern,
+						1);
+
+#endif
 			/* tell receiver that we are sending qualification
 			 * pattern DP 1.2 or later - DP receiver's link quality
 			 * pattern is set using DPCD LINK_QUAL_LANEx_SET
@@ -5930,6 +5938,25 @@ enum dp_link_encoding dp_get_link_encoding_format(const struct dc_link_settings 
 }
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc_link *link)
+{
+	struct dc_link_settings link_settings = {0};
+
+	if (!dc_is_dp_signal(link->connector_signal))
+		return DP_UNKNOWN_ENCODING;
+
+	if (link->preferred_link_setting.lane_count !=
+			LANE_COUNT_UNKNOWN &&
+			link->preferred_link_setting.link_rate !=
+					LINK_RATE_UNKNOWN) {
+		link_settings = link->preferred_link_setting;
+	} else {
+		decide_mst_link_settings(link, &link_settings);
+	}
+
+	return dp_get_link_encoding_format(&link_settings);
+}
+
 // TODO - DP2.0 Link: Fix get_lane_status to handle LTTPR offset (SST and MST)
 static void get_lane_status(
 	struct dc_link *link,

@@ -356,11 +356,17 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
+/* struct drm_dp_mst_topology_state has member total_avail_slots */
+#define HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS 1
+
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
 /* drm_dp_start_crc() is available */
 #define HAVE_DRM_DP_START_CRC 1
+
+/* drm_dp_update_payload_part1() function has start_slot argument */
+#define HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG 1
 
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
@@ -1136,7 +1142,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 19.40"
+#define PACKAGE_STRING "amdgpu-dkms 5.13.6"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1145,6 +1151,8 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "19.40"
+#define PACKAGE_VERSION "5.13.6"
 
 #include "config-amd-chips.h"
+
+#define AMDGPU_VERSION PACKAGE_VERSION
