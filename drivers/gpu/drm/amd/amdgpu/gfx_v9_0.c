@@ -6717,10 +6717,10 @@ static int gfx_v9_0_spm_set_interrupt_state(struct amdgpu_device *adev,
 {
 	switch (state) {
 	case AMDGPU_IRQ_STATE_DISABLE:
-		WREG32(mmRLC_SPM_INT_CNTL, 0);
+		WREG32_SOC15(GC, 0, mmRLC_SPM_INT_CNTL, 0);
 		break;
 	case AMDGPU_IRQ_STATE_ENABLE:
-		WREG32(mmRLC_SPM_INT_CNTL, 1);
+		WREG32_SOC15(GC, 0, mmRLC_SPM_INT_CNTL, 1);
 		break;
 	default:
 		break;
