@@ -1375,6 +1375,7 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 		tg->funcs->tg_init(tg);
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Power gate DSCs */
 	if (hws->funcs.dsc_pg_control != NULL) {
 		uint32_t num_opps = 0;
@@ -1411,6 +1412,7 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 			hws->funcs.dsc_pg_control(hws, dc->res_pool->dscs[i]->inst, false);
 		}
 	}
+#endif
 }
 
 void dcn10_init_hw(struct dc *dc)

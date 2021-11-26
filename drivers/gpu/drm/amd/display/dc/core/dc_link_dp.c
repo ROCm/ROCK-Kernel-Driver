@@ -3362,6 +3362,7 @@ bool decide_edp_link_settings(struct dc_link *link, struct dc_link_settings *lin
 	return false;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		uint32_t req_bw,
@@ -3503,6 +3504,7 @@ static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 	}
 	return false;
 }
+#endif
 
 static bool decide_mst_link_settings(const struct dc_link *link, struct dc_link_settings *link_setting)
 {
@@ -3538,6 +3540,7 @@ void decide_link_settings(struct dc_stream_state *stream,
 		if (decide_mst_link_settings(link, link_setting))
 			return;
 	} else if (link->connector_signal == SIGNAL_TYPE_EDP) {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* enable edp link optimization for DSC eDP case */
 		if (stream->timing.flags.DSC) {
 			enum dc_link_rate max_link_rate = LINK_RATE_UNKNOWN;
@@ -3557,6 +3560,7 @@ void decide_link_settings(struct dc_stream_state *stream,
 			if (decide_edp_link_settings_with_dsc(link, link_setting, req_bw, max_link_rate))
 				return;
 		} else if (decide_edp_link_settings(link, link_setting, req_bw))
+#endif
 			return;
 	} else if (decide_dp_link_settings(link, link_setting, req_bw))
 		return;
@@ -6076,10 +6080,14 @@ bool is_edp_ilr_optimization_required(struct dc_link *link, struct dc_crtc_timin
 
 	req_bw = dc_bandwidth_in_kbps_from_timing(crtc_timing);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (!crtc_timing->flags.DSC)
 		decide_edp_link_settings(link, &link_setting, req_bw);
 	else
 		decide_edp_link_settings_with_dsc(link, &link_setting, req_bw, LINK_RATE_UNKNOWN);
+#else
+		decide_edp_link_settings(link, &link_setting, req_bw);
+#endif
 
 	if (link->dpcd_caps.edp_supported_link_rates[link_rate_set] != link_setting.link_rate ||
 			lane_count_set.bits.LANE_COUNT_SET != link_setting.lane_count) {

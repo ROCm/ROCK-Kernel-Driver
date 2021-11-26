@@ -331,7 +331,9 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 	copy_settings_data->fec_enable_delay_in100us = link->dc->debug.fec_enable_delay_in100us;
 	copy_settings_data->cmd_version =  DMUB_CMD_PSR_CONTROL_VERSION_1;
 	copy_settings_data->panel_inst = panel_inst;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	copy_settings_data->dsc_enable_status = (pipe_ctx->stream->timing.flags.DSC == 1);
+#endif
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->fec_state == dc_link_fec_enabled &&
