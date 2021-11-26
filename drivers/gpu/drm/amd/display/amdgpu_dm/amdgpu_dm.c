@@ -4549,8 +4549,10 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 				amdgpu_dm_update_connector_after_detect(aconnector);
 				register_backlight_device(dm, link);
 
+#ifdef HAVE_HDR_SINK_METADATA
 				if (dm->num_of_edps)
 					update_connector_ext_caps(aconnector);
+#endif
 
 				if (psr_feature_enabled)
 					amdgpu_dm_set_psr_caps(link);
