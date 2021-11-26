@@ -2804,8 +2804,6 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 	if (amdgpu_sriov_vf(adev) && adev->virt.ras_init_done)
 		amdgpu_virt_release_ras_err_handler_data(adev);
 
-	amdgpu_ras_pre_fini(adev);
-
 	if (adev->gmc.xgmi.num_physical_nodes > 1)
 		amdgpu_xgmi_remove_device(adev);
 
@@ -3943,9 +3941,12 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 #ifndef AMDKCL_DRM_FBDEV_GENERIC
 	amdgpu_fbdev_fini(adev);
 #endif
-	amdgpu_irq_fini_hw(adev);
+	/* disable ras feature must before hw fini */
+	amdgpu_ras_pre_fini(adev);
 
 	amdgpu_device_ip_fini_early(adev);
+
+	amdgpu_irq_fini_hw(adev);
 
 	ttm_device_clear_dma_mappings(&adev->mman.bdev);
 
