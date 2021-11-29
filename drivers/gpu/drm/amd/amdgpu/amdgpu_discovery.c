@@ -1309,7 +1309,9 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		}
 	}
 
-	if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP)) {
+	/* move add smu block after add sdma block for aldebaran */
+	if (likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP) &&
+			(adev->ip_versions[MP1_HWIP][0] != IP_VERSION(13, 0 ,2))) {
 		r = amdgpu_discovery_set_smu_ip_blocks(adev);
 		if (r)
 			return r;
@@ -1327,8 +1329,10 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 	if (r)
 		return r;
 
-	if (adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT &&
-	    !amdgpu_sriov_vf(adev)) {
+	if ((adev->firmware.load_type == AMDGPU_FW_LOAD_DIRECT &&
+	    !amdgpu_sriov_vf(adev)) ||
+		((adev->ip_versions[MP1_HWIP][0] == IP_VERSION(13, 0 ,2)) &&
+		 likely(adev->firmware.load_type == AMDGPU_FW_LOAD_PSP))) {
 		r = amdgpu_discovery_set_smu_ip_blocks(adev);
 		if (r)
 			return r;
