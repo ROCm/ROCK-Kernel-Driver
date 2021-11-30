@@ -72,8 +72,8 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 	/* enable mcbp for sriov asic_type before soc21 */
 	amdgpu_mcbp = (adev->asic_type < CHIP_IP_DISCOVERY) ? 1 : 0;
 
-	/*use advance recovery mode for SRIOV*/
-	if (amdgpu_gpu_recovery)
+	/* use advance recovery mode for SRIOV by default */
+	if (amdgpu_gpu_recovery == -1)
 		amdgpu_gpu_recovery = 2;
 }
 
