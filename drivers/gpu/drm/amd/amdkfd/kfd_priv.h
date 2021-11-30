@@ -243,7 +243,7 @@ struct kfd_vmid_info {
 };
 
 struct kfd_dev {
-	struct kgd_dev *kgd;
+	struct amdgpu_device *adev;
 
 	const struct kfd_device_info *device_info;
 	struct pci_dev *pdev;
@@ -1043,7 +1043,7 @@ struct kfd_process *kfd_lookup_process_by_pasid(u32 pasid);
 struct kfd_process *kfd_lookup_process_by_mm(const struct mm_struct *mm);
 
 int kfd_process_gpuidx_from_gpuid(struct kfd_process *p, uint32_t gpu_id);
-int kfd_process_gpuid_from_kgd(struct kfd_process *p,
+int kfd_process_gpuid_from_adev(struct kfd_process *p,
 			       struct amdgpu_device *adev, uint32_t *gpuid,
 			       uint32_t *gpuidx);
 static inline int kfd_process_gpuid_from_gpuidx(struct kfd_process *p,
@@ -1165,7 +1165,7 @@ struct kfd_topology_device *kfd_topology_device_by_proximity_domain(
 struct kfd_topology_device *kfd_topology_device_by_id(uint32_t gpu_id);
 struct kfd_dev *kfd_device_by_id(uint32_t gpu_id);
 struct kfd_dev *kfd_device_by_pci_dev(const struct pci_dev *pdev);
-struct kfd_dev *kfd_device_by_kgd(const struct kgd_dev *kgd);
+struct kfd_dev *kfd_device_by_adev(const struct amdgpu_device *adev);
 int kfd_topology_enum_kfd_devices(uint8_t idx, struct kfd_dev **kdev);
 int kfd_numa_node_to_apic_id(int numa_node_id);
 void kfd_double_confirm_iommu_support(struct kfd_dev *gpu);

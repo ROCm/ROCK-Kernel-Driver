@@ -61,11 +61,6 @@ static const char * const domain_bit_to_string[] = {
 
 static void amdgpu_amdkfd_restore_userptr_worker(struct work_struct *work);
 
-static inline struct amdgpu_device *get_amdgpu_device(struct kgd_dev *kgd)
-{
-	return (struct amdgpu_device *)kgd;
-}
-
 static bool kfd_mem_is_attached(struct amdgpu_vm *avm,
 		struct kgd_mem *mem)
 {
@@ -1384,12 +1379,11 @@ create_evict_fence_fail:
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_acquire_process_vm(struct amdgpu_device *adev,
 					   struct file *filp, u32 pasid,
 					   void **process_info,
 					   struct dma_fence **ef)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_fpriv *drv_priv;
 	struct amdgpu_vm *avm;
 	int ret;
@@ -1465,12 +1459,12 @@ void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
 	}
 }
 
-void amdgpu_amdkfd_gpuvm_release_process_vm(struct kgd_dev *kgd, void *drm_priv)
+void amdgpu_amdkfd_gpuvm_release_process_vm(struct amdgpu_device *adev,
+					    void *drm_priv)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm;
 
-	if (WARN_ON(!kgd || !drm_priv))
+	if (WARN_ON(!adev || !drm_priv))
 		return;
 
 	avm = drm_priv_to_vm(drm_priv);
@@ -1498,11 +1492,10 @@ uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *drm_priv)
 }
 
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
-		struct kgd_dev *kgd, uint64_t va, uint64_t size,
+		struct amdgpu_device *adev, uint64_t va, uint64_t size,
 		void *drm_priv, struct sg_table *sg, struct kgd_mem **mem,
 		uint64_t *offset, uint32_t flags)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
 	uint64_t user_addr = 0;
@@ -1663,7 +1656,7 @@ err:
 }
 
 int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
-		struct kgd_dev *kgd, struct kgd_mem *mem, void *drm_priv,
+		struct amdgpu_device *adev, struct kgd_mem *mem, void *drm_priv,
 		uint64_t *size)
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
@@ -1777,10 +1770,9 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 }
 
 int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
-		struct kgd_dev *kgd, struct kgd_mem *mem,
+		struct amdgpu_device *adev, struct kgd_mem *mem,
 		void *drm_priv, bool *table_freed)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	int ret;
 	struct amdgpu_bo *bo;
@@ -1907,7 +1899,7 @@ out:
 }
 
 int amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-		struct kgd_dev *kgd, struct kgd_mem *mem, void *drm_priv)
+		struct amdgpu_device *adev, struct kgd_mem *mem, void *drm_priv)
 {
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	struct amdkfd_process_info *process_info = avm->process_info;
@@ -1968,7 +1960,7 @@ out:
 }
 
 int amdgpu_amdkfd_gpuvm_sync_memory(
-		struct kgd_dev *kgd, struct kgd_mem *mem, bool intr)
+		struct amdgpu_device *adev, struct kgd_mem *mem, bool intr)
 {
 	struct amdgpu_sync sync;
 	int ret;
@@ -1984,7 +1976,7 @@ int amdgpu_amdkfd_gpuvm_sync_memory(
 	return ret;
 }
 
-int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(struct amdgpu_device *adev,
 		struct kgd_mem *mem, void **kptr, uint64_t *size)
 {
 	int ret;
@@ -2040,7 +2032,8 @@ bo_reserve_failed:
 	return ret;
 }
 
-void amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(struct kgd_dev *kgd, struct kgd_mem *mem)
+void amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(struct amdgpu_device *adev,
+						  struct kgd_mem *mem)
 {
 	struct amdgpu_bo *bo = mem->bo;
 
@@ -2050,12 +2043,9 @@ void amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(struct kgd_dev *kgd, struct kg
 	amdgpu_bo_unreserve(bo);
 }
 
-int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct kgd_dev *kgd,
-					      struct kfd_vm_fault_info *mem)
+int amdgpu_amdkfd_gpuvm_get_vm_fault_info(struct amdgpu_device *adev,
+					  struct kfd_vm_fault_info *mem)
 {
-	struct amdgpu_device *adev;
-
-	adev = (struct amdgpu_device *)kgd;
 	if (atomic_read(&adev->gmc.vm_fault_info_updated) == 1) {
 		*mem = *adev->gmc.vm_fault_info;
 		mb();
@@ -2175,13 +2165,12 @@ static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_get_sg_table(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		struct amdgpu_bo *bo, uint32_t flags,
 		uint64_t offset, uint64_t size,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table **ret_sg)
 {
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct sg_table *sg = NULL;
 	struct scatterlist *s;
 	struct page **pages;
@@ -2296,14 +2285,13 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 	kfree(sgt);
 }
 
-int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
+int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 				      struct dma_buf *dma_buf,
 				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *drm_priv,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	struct drm_gem_object *obj;
 	struct amdgpu_bo *bo;
@@ -2368,19 +2356,17 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct kgd_dev *kgd,
 	return 0;
 }
 
-int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct kgd_dev *kgd, void *vm,
+int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,
 				       uint32_t flags)
 {
-	struct amdgpu_device *adev = NULL;
 	struct dma_buf *dmabuf;
 	int r = 0;
 
-	if (!kgd || !vm || !mem)
+	if (!adev|| !vm || !mem)
 		return -EINVAL;
 
-	adev = get_amdgpu_device(kgd);
 	mutex_lock(&mem->lock);
 
 	if (mem->ipc_obj) {
@@ -3026,12 +3012,11 @@ int amdgpu_amdkfd_remove_gws_from_process(void *info, void *mem)
 	return 0;
 }
 
-int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
+int amdgpu_amdkfd_copy_mem_to_mem(struct amdgpu_device *adev, struct kgd_mem *src_mem,
 				  uint64_t src_offset, struct kgd_mem *dst_mem,
 				  uint64_t dst_offset, uint64_t size,
 				  struct dma_fence **f, uint64_t *actual_size)
 {
-	struct amdgpu_device *adev = NULL;
 	struct amdgpu_copy_mem src, dst;
 	struct ww_acquire_ctx ticket;
 	struct list_head list, duplicates;
@@ -3039,12 +3024,11 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	struct dma_fence *fence = NULL;
 	int i, r;
 
-	if (!kgd || !src_mem || !dst_mem || !actual_size)
+	if (!adev|| !src_mem || !dst_mem || !actual_size)
 		return -EINVAL;
 
 	*actual_size = 0;
 
-	adev = get_amdgpu_device(kgd);
 	INIT_LIST_HEAD(&list);
 	INIT_LIST_HEAD(&duplicates);
 
@@ -3106,11 +3090,9 @@ validate_fail:
 }
 
 /* Returns GPU-specific tiling mode information */
-int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
+int amdgpu_amdkfd_get_tile_config(struct amdgpu_device *adev,
 				struct tile_config *config)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
 	config->gb_addr_config = adev->gfx.config.gb_addr_config;
 	config->tile_config_ptr = adev->gfx.config.tile_mode_array;
 	config->num_tile_configs =

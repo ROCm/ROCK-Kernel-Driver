@@ -320,7 +320,7 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 
 	/* Build sg_table for buffer being exported, including DMA mapping */
 	ret = amdgpu_amdkfd_gpuvm_get_sg_table(
-		mem_context->dev->kgd, mem_context->bo, mem_context->flags,
+		mem_context->dev->adev, mem_context->bo, mem_context->flags,
 		mem_context->offset, mem_context->size,
 		dma_device, DMA_BIDIRECTIONAL, &sg_table_tmp);
 	if (ret) {

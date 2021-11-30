@@ -308,6 +308,8 @@ struct timing_generator_funcs {
 #endif
 
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
+	void (*get_dsc_status)(struct timing_generator *optc,
+					uint32_t *dsc_mode);
 	void (*set_odm_bypass)(struct timing_generator *optc, const struct dc_crtc_timing *dc_crtc_timing);
 	void (*set_odm_combine)(struct timing_generator *optc, int *opp_id, int opp_cnt,
 			struct dc_crtc_timing *timing);

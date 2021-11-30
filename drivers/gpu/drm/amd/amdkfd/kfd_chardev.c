@@ -959,7 +959,7 @@ static int kfd_ioctl_get_clock_counters(struct file *filep,
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev && !amdgpu_read_lock(dev->ddev, true)) {
 		/* Reading GPU clock counter from KGD */
-		args->gpu_clock_counter = amdgpu_amdkfd_get_gpu_clock_counter(dev->kgd);
+		args->gpu_clock_counter = amdgpu_amdkfd_get_gpu_clock_counter(dev->adev);
 		amdgpu_read_unlock(dev->ddev);
 	} else
 		/* Node without GPU resource */
@@ -1154,7 +1154,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		if (err)
 			return err;
 
-		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kfd->kgd,
+		err = amdgpu_amdkfd_gpuvm_map_gtt_bo_to_kernel(kfd->adev,
 						mem, &kern_addr, &size);
 		if (err) {
 			pr_err("Failed to map event page to kernel\n");
@@ -1167,7 +1167,7 @@ static int kfd_ioctl_create_event(struct file *filp, struct kfd_process *p,
 		err = kfd_event_page_set(p, kern_addr, size);
 		if (err) {
 			pr_err("Failed to set event page\n");
-			amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(kfd->kgd, mem);
+			amdgpu_amdkfd_gpuvm_unmap_gtt_bo_from_kernel(kfd->adev, mem);
 			goto out_unlock;
 		}
 
@@ -1257,7 +1257,7 @@ static int kfd_ioctl_set_scratch_backing_va(struct file *filep,
 	if (dev->dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS &&
 	    pdd->qpd.vmid != 0 && dev->kfd2kgd->set_scratch_backing_va)
 		dev->kfd2kgd->set_scratch_backing_va(
-			dev->kgd, args->va_addr, pdd->qpd.vmid);
+			dev->adev, args->va_addr, pdd->qpd.vmid);
 
 	amdgpu_read_unlock(dev->ddev);
 
@@ -1280,7 +1280,7 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	amdgpu_amdkfd_get_tile_config(dev->kgd, &config);
+	amdgpu_amdkfd_get_tile_config(dev->adev, &config);
 
 	args->gb_addr_config = config.gb_addr_config;
 	args->num_banks = config.num_banks;
@@ -1374,7 +1374,7 @@ bool kfd_dev_is_large_bar(struct kfd_dev *dev)
 	if (dev->use_iommu_v2)
 		return false;
 
-	amdgpu_amdkfd_get_local_mem_info(dev->kgd, &mem_info);
+	amdgpu_amdkfd_get_local_mem_info(dev->adev, &mem_info);
 	if (mem_info.local_mem_size_private == 0 &&
 			mem_info.local_mem_size_public > 0)
 		return true;
@@ -1478,7 +1478,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			err = -EINVAL;
 			goto err_unlock;
 		}
-		offset = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->kgd);
+		offset = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->adev);
 		if (!offset) {
 			err = -ENOMEM;
 			goto err_unlock;
@@ -1486,7 +1486,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	}
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
-		dev->kgd, args->va_addr, args->size,
+		dev->adev, args->va_addr, args->size,
 		pdd->drm_priv, NULL, (struct kgd_mem **) &mem, &offset,
 		flags);
 
@@ -1525,7 +1525,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 err_free:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, (struct kgd_mem *)mem,
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, (struct kgd_mem *)mem,
 					       pdd->drm_priv, NULL);
 err_unlock:
 	amdgpu_read_unlock(dev->ddev);
@@ -1577,7 +1577,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		goto err_unlock;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd,
+	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev,
 						buf_obj->mem, pdd->drm_priv, &size);
 
 	/* If freeing the buffer failed, leave the handle in place for
@@ -1670,7 +1670,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			goto map_memory_to_gpu_failed;
 
 		err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
-			peer->kgd, (struct kgd_mem *)mem,
+			peer->adev, (struct kgd_mem *)mem,
 			peer_pdd->drm_priv, &table_freed);
 		if (err) {
 			pr_err("Failed to map to gpu %d/%d\n",
@@ -1685,7 +1685,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	mutex_unlock(&p->mutex);
 
-	err = amdgpu_amdkfd_gpuvm_sync_memory(dev->kgd, (struct kgd_mem *) mem, true);
+	err = amdgpu_amdkfd_gpuvm_sync_memory(dev->adev, (struct kgd_mem *) mem, true);
 	if (err) {
 		pr_debug("Sync memory failed, wait interrupted by user signal\n");
 		goto sync_memory_failed;
@@ -1794,7 +1794,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			goto unmap_memory_from_gpu_failed;
 
 		err = amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
-			peer->kgd, (struct kgd_mem *)mem, peer_pdd->drm_priv);
+			peer->adev, (struct kgd_mem *)mem, peer_pdd->drm_priv);
 		if (err) {
 			pr_err("Failed to unmap from gpu %d/%d\n",
 			       i, args->n_devices);
@@ -1807,7 +1807,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	mutex_unlock(&p->mutex);
 
 	if (dev->device_info->asic_family == CHIP_ALDEBARAN) {
-		err = amdgpu_amdkfd_gpuvm_sync_memory(dev->kgd,
+		err = amdgpu_amdkfd_gpuvm_sync_memory(dev->adev,
 				(struct kgd_mem *) mem, true);
 		if (err) {
 			pr_debug("Sync memory failed, wait interrupted by user signal\n");
@@ -1897,7 +1897,7 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 {
 	struct kfd_ioctl_get_dmabuf_info_args *args = data;
 	struct kfd_dev *dev = NULL;
-	struct kgd_dev *dma_buf_kgd;
+	struct amdgpu_device *dmabuf_adev;
 	void *metadata_buffer = NULL;
 	uint32_t flags;
 	unsigned int i;
@@ -1917,15 +1917,15 @@ static int kfd_ioctl_get_dmabuf_info(struct file *filep,
 	}
 
 	/* Get dmabuf info from KGD */
-	r = amdgpu_amdkfd_get_dmabuf_info(dev->kgd, args->dmabuf_fd,
-					  &dma_buf_kgd, &args->size,
+	r = amdgpu_amdkfd_get_dmabuf_info(dev->adev, args->dmabuf_fd,
+					  &dmabuf_adev, &args->size,
 					  metadata_buffer, args->metadata_size,
 					  &args->metadata_size, &flags);
 	if (r)
 		goto exit;
 
 	/* Reverse-lookup gpu_id from kgd pointer */
-	dev = kfd_device_by_kgd(dma_buf_kgd);
+	dev = kfd_device_by_adev(dmabuf_adev);
 	if (!dev) {
 		r = -EINVAL;
 		goto exit;
@@ -2138,7 +2138,7 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
 		pdd = kfd_get_process_device_data(dev, ci->p);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, pdd->drm_priv, NULL);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, cma_bo->mem, pdd->drm_priv, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -2234,7 +2234,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 		goto pdd_fail;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, bo_size,
 						      pdd->drm_priv, cbo->sg,
 						      &cbo->mem, NULL, flags);
 	mutex_unlock(&p->mutex);
@@ -2244,7 +2244,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->kgd, bo->mem,
+		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->adev, bo->mem,
 						    offset, cbo->mem, 0,
 						    bo_size, &f, size);
 		if (ret) {
@@ -2269,7 +2269,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, pdd->drm_priv, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->adev, bo->mem, pdd->drm_priv, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2503,7 +2503,7 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 		return -EINVAL;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, size,
 						      pdd->drm_priv, NULL,
 						      mem, NULL, flags);
 
@@ -2531,7 +2531,7 @@ static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 	adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
 	task = get_pid_task(mem->process_info->pid, PIDTYPE_PID);
 	p = kfd_get_process(task);
-	r = kfd_process_gpuid_from_kgd(p, adev, &gpu_id, &gpu_idx);
+	r = kfd_process_gpuid_from_adev(p, adev, &gpu_id, &gpu_idx);
 	if (r < 0) {
 		pr_warn("no gpu id found, mem maybe leaking\n");
 		return -EINVAL;
@@ -2539,7 +2539,7 @@ static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 	pdd = kfd_process_device_from_gpuidx(p, gpu_idx);
 
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->kgd, mem, pdd->drm_priv, NULL);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, mem, pdd->drm_priv, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
@@ -2596,7 +2596,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		dst_mem = di->cma_bo->mem;
 		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
 		list_add_tail(&di->cma_bo->list, &di->cma_list);
-	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
+	} else if (src_bo->dev->adev!= dst_bo->dev->adev) {
 		/* This indicates that atleast on of the BO is in local mem.
 		 * If both are in local mem of different devices then create an
 		 * intermediate System BO and do a double copy
@@ -2617,7 +2617,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 					return -EINVAL;
 			}
 
-			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->kgd,
+			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->adev,
 						src_bo->mem, si->bo_offset,
 						*tmp_mem, 0,
 						size, f, &size))
@@ -2639,7 +2639,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		return -EINVAL;
 	}
 
-	err = amdgpu_amdkfd_copy_mem_to_mem(dev->kgd, src_mem, src_offset,
+	err = amdgpu_amdkfd_copy_mem_to_mem(dev->adev, src_mem, src_offset,
 					    dst_mem, dst_offset, size, f,
 					    copied);
 	/* The tmp_bo allocates additional memory. So it is better to wait and
@@ -3460,7 +3460,7 @@ static int kfd_mmio_mmap(struct kfd_dev *dev, struct kfd_process *process,
 	if (vma->vm_end - vma->vm_start != PAGE_SIZE)
 		return -EINVAL;
 
-	address = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->kgd);
+	address = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->adev);
 
 	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE |
 				VM_DONTDUMP | VM_PFNMAP;

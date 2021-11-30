@@ -69,16 +69,10 @@
 #define DC_LOG_GAMMA(...) pr_debug("[GAMMA]:"__VA_ARGS__)
 #define DC_LOG_ALL_GAMMA(...) pr_debug("[GAMMA]:"__VA_ARGS__)
 #define DC_LOG_ALL_TF_CHANNELS(...) pr_debug("[GAMMA]:"__VA_ARGS__)
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define DC_LOG_DSC(...) DRM_DEBUG_KMS(__VA_ARGS__)
-#endif
 #define DC_LOG_SMU(...) pr_debug("[SMU_MSG]:"__VA_ARGS__)
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x) || defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define DC_LOG_DWB(...) DRM_DEBUG_KMS(__VA_ARGS__)
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define DC_LOG_DP2(...) DRM_DEBUG_KMS(__VA_ARGS__)
-#endif
 
 struct dal_logger;
 

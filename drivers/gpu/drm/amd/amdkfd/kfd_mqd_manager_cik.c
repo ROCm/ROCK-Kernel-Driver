@@ -197,7 +197,7 @@ static int load_mqd(struct mqd_manager *mm, void *mqd, uint32_t pipe_id,
 	uint32_t wptr_shift = (p->format == KFD_QUEUE_FORMAT_AQL ? 4 : 0);
 	uint32_t wptr_mask = (uint32_t)((p->queue_size / 4) - 1);
 
-	return mm->dev->kfd2kgd->hqd_load(mm->dev->kgd, mqd, pipe_id, queue_id,
+	return mm->dev->kfd2kgd->hqd_load(mm->dev->adev, mqd, pipe_id, queue_id,
 					  (uint32_t __user *)p->write_ptr,
 					  wptr_shift, wptr_mask, mms);
 }
@@ -206,7 +206,7 @@ static int load_mqd_sdma(struct mqd_manager *mm, void *mqd,
 			 uint32_t pipe_id, uint32_t queue_id,
 			 struct queue_properties *p, struct mm_struct *mms)
 {
-	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->kgd, mqd,
+	return mm->dev->kfd2kgd->hqd_sdma_load(mm->dev->adev, mqd,
 					       (uint32_t __user *)p->write_ptr,
 					       mms);
 }
@@ -305,7 +305,7 @@ static int destroy_mqd(struct mqd_manager *mm, void *mqd,
 			unsigned int timeout, uint32_t pipe_id,
 			uint32_t queue_id)
 {
-	return mm->dev->kfd2kgd->hqd_destroy(mm->dev->kgd, mqd, type, timeout,
+	return mm->dev->kfd2kgd->hqd_destroy(mm->dev->adev, mqd, type, timeout,
 					pipe_id, queue_id);
 }
 
@@ -318,7 +318,7 @@ static int destroy_mqd_sdma(struct mqd_manager *mm, void *mqd,
 				unsigned int timeout, uint32_t pipe_id,
 				uint32_t queue_id)
 {
-	return mm->dev->kfd2kgd->hqd_sdma_destroy(mm->dev->kgd, mqd, timeout);
+	return mm->dev->kfd2kgd->hqd_sdma_destroy(mm->dev->adev, mqd, timeout);
 }
 
 static bool is_occupied(struct mqd_manager *mm, void *mqd,
@@ -326,7 +326,7 @@ static bool is_occupied(struct mqd_manager *mm, void *mqd,
 			uint32_t queue_id)
 {
 
-	return mm->dev->kfd2kgd->hqd_is_occupied(mm->dev->kgd, queue_address,
+	return mm->dev->kfd2kgd->hqd_is_occupied(mm->dev->adev, queue_address,
 					pipe_id, queue_id);
 
 }
@@ -335,7 +335,7 @@ static bool is_occupied_sdma(struct mqd_manager *mm, void *mqd,
 			uint64_t queue_address,	uint32_t pipe_id,
 			uint32_t queue_id)
 {
-	return mm->dev->kfd2kgd->hqd_sdma_is_occupied(mm->dev->kgd, mqd);
+	return mm->dev->kfd2kgd->hqd_sdma_is_occupied(mm->dev->adev, mqd);
 }
 
 /*

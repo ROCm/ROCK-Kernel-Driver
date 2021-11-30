@@ -1975,8 +1975,6 @@ static int kfd_fill_gpu_direct_io_link_to_cpu(int *avail_size,
 			struct crat_subtype_iolink *sub_type_hdr,
 			uint32_t proximity_domain)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)kdev->kgd;
-
 	*avail_size -= sizeof(struct crat_subtype_iolink);
 	if (*avail_size < 0)
 		return -ENOMEM;
@@ -1993,7 +1991,7 @@ static int kfd_fill_gpu_direct_io_link_to_cpu(int *avail_size,
 	/* Fill in IOLINK subtype.
 	 * TODO: Fill-in other fields of iolink subtype
 	 */
-	if (adev->gmc.xgmi.connected_to_cpu) {
+	if (kdev->adev->gmc.xgmi.connected_to_cpu) {
 		/*
 		 * with host gpu xgmi link, host can access gpu memory whether
 		 * or not pcie bar type is large, so always create bidirectional
@@ -2002,19 +2000,19 @@ static int kfd_fill_gpu_direct_io_link_to_cpu(int *avail_size,
 		sub_type_hdr->flags |= CRAT_IOLINK_FLAGS_BI_DIRECTIONAL;
 		sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_XGMI;
 		sub_type_hdr->num_hops_xgmi = 1;
-		if (adev->asic_type == CHIP_ALDEBARAN) {
+		if (kdev->adev->asic_type == CHIP_ALDEBARAN) {
 			sub_type_hdr->minimum_bandwidth_mbs =
 					amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(
-							kdev->kgd, NULL, true);
+							kdev->adev, NULL, true);
 			sub_type_hdr->maximum_bandwidth_mbs =
 					sub_type_hdr->minimum_bandwidth_mbs;
 		}
 	} else {
 		sub_type_hdr->io_interface_type = CRAT_IOLINK_TYPE_PCIEXPRESS;
 		sub_type_hdr->minimum_bandwidth_mbs =
-				amdgpu_amdkfd_get_pcie_bandwidth_mbytes(kdev->kgd, true);
+				amdgpu_amdkfd_get_pcie_bandwidth_mbytes(kdev->adev, true);
 		sub_type_hdr->maximum_bandwidth_mbs =
-				amdgpu_amdkfd_get_pcie_bandwidth_mbytes(kdev->kgd, false);
+				amdgpu_amdkfd_get_pcie_bandwidth_mbytes(kdev->adev, false);
 	}
 
 	sub_type_hdr->proximity_domain_from = proximity_domain;
@@ -2056,11 +2054,11 @@ static int kfd_fill_gpu_xgmi_link_to_gpu(int *avail_size,
 	sub_type_hdr->proximity_domain_from = proximity_domain_from;
 	sub_type_hdr->proximity_domain_to = proximity_domain_to;
 	sub_type_hdr->num_hops_xgmi =
-		amdgpu_amdkfd_get_xgmi_hops_count(kdev->kgd, peer_kdev->kgd);
+		amdgpu_amdkfd_get_xgmi_hops_count(kdev->adev, peer_kdev->adev);
 	sub_type_hdr->maximum_bandwidth_mbs =
-		amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(kdev->kgd, peer_kdev->kgd, false);
+		amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(kdev->adev, peer_kdev->adev, false);
 	sub_type_hdr->minimum_bandwidth_mbs = sub_type_hdr->maximum_bandwidth_mbs ?
-		amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(kdev->kgd, NULL, true) : 0;
+		amdgpu_amdkfd_get_xgmi_bandwidth_mbytes(kdev->adev, NULL, true) : 0;
 
 	return 0;
 }
@@ -2126,7 +2124,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	cu->flags |= CRAT_CU_FLAGS_GPU_PRESENT;
 	cu->proximity_domain = proximity_domain;
 
-	amdgpu_amdkfd_get_cu_info(kdev->kgd, &cu_info);
+	amdgpu_amdkfd_get_cu_info(kdev->adev, &cu_info);
 	cu->num_simd_per_cu = cu_info.simd_per_cu;
 	cu->num_simd_cores = cu_info.simd_per_cu * cu_info.cu_active_number;
 	cu->max_waves_simd = cu_info.max_waves_per_simd;
@@ -2157,7 +2155,7 @@ static int kfd_create_vcrat_image_gpu(void *pcrat_image,
 	 * report the total FB size (public+private) as a single
 	 * private heap.
 	 */
-	amdgpu_amdkfd_get_local_mem_info(kdev->kgd, &local_mem_info);
+	amdgpu_amdkfd_get_local_mem_info(kdev->adev, &local_mem_info);
 	sub_type_hdr = (typeof(sub_type_hdr))((char *)sub_type_hdr +
 			sub_type_hdr->length);
 

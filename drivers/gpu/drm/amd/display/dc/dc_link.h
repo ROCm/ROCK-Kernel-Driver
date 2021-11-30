@@ -87,6 +87,7 @@ struct psr_settings {
 	 */
 	bool psr_frame_capture_indication_req;
 	unsigned int psr_sdp_transmit_line_num_deadline;
+	unsigned int psr_power_opt;
 };
 
 /*
@@ -114,6 +115,7 @@ struct dc_link {
 	 * DIG encoder. */
 	bool is_dig_mapping_flexible;
 	bool hpd_status; /* HPD status of link without physical HPD pin. */
+	bool is_hpd_pending; /* Indicates a new received hpd */
 
 	bool edp_sink_present;
 
@@ -279,8 +281,8 @@ int dc_link_get_backlight_level(const struct dc_link *dc_link);
 
 int dc_link_get_target_backlight_pwm(const struct dc_link *link);
 
-bool dc_link_set_psr_allow_active(struct dc_link *dc_link, bool enable,
-		bool wait, bool force_static);
+bool dc_link_set_psr_allow_active(struct dc_link *dc_link, const bool *enable,
+		bool wait, bool force_static, const unsigned int *power_opts);
 
 bool dc_link_get_psr_state(const struct dc_link *dc_link, enum dc_psr_state *state);
 
@@ -289,6 +291,10 @@ bool dc_link_setup_psr(struct dc_link *dc_link,
 		struct psr_context *psr_context);
 
 void dc_link_get_psr_residency(const struct dc_link *link, uint32_t *residency);
+
+void dc_link_blank_all_dp_displays(struct dc *dc);
+
+void dc_link_blank_dp_stream(struct dc_link *link, bool hw_init);
 
 /* Request DC to detect if there is a Panel connected.
  * boot - If this call is during initial boot.
@@ -301,7 +307,7 @@ enum dc_detect_reason {
 	DETECT_REASON_HPD,
 	DETECT_REASON_HPDRX,
 	DETECT_REASON_FALLBACK,
-	DETECT_REASON_RETRAIN
+	DETECT_REASON_RETRAIN,
 };
 
 bool dc_link_detect(struct dc_link *dc_link, enum dc_detect_reason reason);

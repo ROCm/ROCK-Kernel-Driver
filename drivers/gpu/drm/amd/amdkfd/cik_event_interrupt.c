@@ -50,8 +50,8 @@ static bool cik_event_interrupt_isr(struct kfd_dev *dev,
 		*patched_flag = true;
 		*tmp_ihre = *ihre;
 
-		vmid = f2g->read_vmid_from_vmfault_reg(dev->kgd);
-		ret = f2g->get_atc_vmid_pasid_mapping_info(dev->kgd, vmid, &pasid);
+		vmid = f2g->read_vmid_from_vmfault_reg(dev->adev);
+		ret = f2g->get_atc_vmid_pasid_mapping_info(dev->adev, vmid, &pasid);
 
 		tmp_ihre->ring_id &= 0x000000ff;
 		tmp_ihre->ring_id |= vmid << 8;
@@ -113,7 +113,7 @@ static void cik_event_interrupt_wq(struct kfd_dev *dev,
 		kfd_process_vm_fault(dev->dqm, pasid);
 
 		memset(&info, 0, sizeof(info));
-		amdgpu_amdkfd_gpuvm_get_vm_fault_info(dev->kgd, &info);
+		amdgpu_amdkfd_gpuvm_get_vm_fault_info(dev->adev, &info);
 		if (!info.page_addr && !info.status)
 			return;
 

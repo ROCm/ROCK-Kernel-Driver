@@ -47,10 +47,10 @@
 
 /* Firmware versioning. */
 #ifdef DMUB_EXPOSE_VERSION
-#define DMUB_FW_VERSION_GIT_HASH 0x1d82d23e
+#define DMUB_FW_VERSION_GIT_HASH 0xcd0e1e7a
 #define DMUB_FW_VERSION_MAJOR 0
 #define DMUB_FW_VERSION_MINOR 0
-#define DMUB_FW_VERSION_REVISION 91
+#define DMUB_FW_VERSION_REVISION 93
 #define DMUB_FW_VERSION_TEST 0
 #define DMUB_FW_VERSION_VBIOS 0
 #define DMUB_FW_VERSION_HOTFIX 0
@@ -209,10 +209,9 @@ union dmub_psr_debug_flags {
 		uint32_t use_hw_lock_mgr : 1;
 
 		/**
-		 * Unused.
-		 * TODO: Remove.
+		 * Use TPS3 signal when restore main link.
 		 */
-		uint32_t log_line_nums : 1;
+		uint32_t force_wakeup_by_tps3 : 1;
 	} bitfields;
 
 	/**
@@ -1403,6 +1402,10 @@ enum dmub_cmd_psr_type {
 	 * Forces PSR enabled until an explicit PSR disable call.
 	 */
 	DMUB_CMD__PSR_FORCE_STATIC		= 5,
+	/**
+	 * Set PSR power option
+	 */
+	DMUB_CMD__SET_PSR_POWER_OPT = 7,
 };
 
 /**
@@ -1547,10 +1550,14 @@ struct dmub_cmd_psr_copy_settings_data {
 	 * Currently the support is only for 0 or 1
 	 */
 	uint8_t panel_inst;
-	/**
-	 * Explicit padding to 4 byte boundary.
+	/*
+	 * DSC enable status in driver
 	 */
-	uint8_t pad3[4];
+	uint8_t dsc_enable_status;
+	/**
+	 * Explicit padding to 3 byte boundary.
+	 */
+	uint8_t pad3[3];
 };
 
 /**
@@ -1698,6 +1705,44 @@ struct dmub_rb_cmd_psr_force_static {
 	 * Data passed from driver to FW in a DMUB_CMD__PSR_FORCE_STATIC command.
 	 */
 	struct dmub_cmd_psr_force_static_data psr_force_static_data;
+};
+
+/**
+ * Data passed from driver to FW in a DMUB_CMD__SET_PSR_POWER_OPT command.
+ */
+struct dmub_cmd_psr_set_power_opt_data {
+	/**
+	 * PSR control version.
+	 */
+	uint8_t cmd_version;
+	/**
+	 * Panel Instance.
+	 * Panel isntance to identify which psr_state to use
+	 * Currently the support is only for 0 or 1
+	 */
+	uint8_t panel_inst;
+	/**
+	 * Explicit padding to 4 byte boundary.
+	 */
+	uint8_t pad[2];
+	/**
+	 * PSR power option
+	 */
+	uint32_t power_opt;
+};
+
+/**
+ * Definition of a DMUB_CMD__SET_PSR_POWER_OPT command.
+ */
+struct dmub_rb_cmd_psr_set_power_opt {
+	/**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+	/**
+	 * Definition of a DMUB_CMD__SET_PSR_POWER_OPT command.
+	 */
+	struct dmub_cmd_psr_set_power_opt_data psr_set_power_opt_data;
 };
 
 /**
@@ -2484,6 +2529,10 @@ union dmub_rb_cmd {
 	 */
 	struct dmub_rb_cmd_psr_force_static psr_force_static;
 	/**
+	 * Definition of a DMUB_CMD__SET_PSR_POWER_OPT command.
+	 */
+	struct dmub_rb_cmd_psr_set_power_opt psr_set_power_opt;
+	/**
 	 * Definition of a DMUB_CMD__PLAT_54186_WA command.
 	 */
 	struct dmub_rb_cmd_PLAT_54186_wa PLAT_54186_wa;
@@ -2677,7 +2726,7 @@ static inline bool dmub_rb_full(struct dmub_rb *rb)
 static inline bool dmub_rb_push_front(struct dmub_rb *rb,
 				      const union dmub_rb_cmd *cmd)
 {
-	uint64_t volatile *dst = (uint64_t volatile *)(rb->base_address) + rb->wrpt / sizeof(uint64_t);
+	uint64_t volatile *dst = (uint64_t volatile *)((uint8_t *)(rb->base_address) + rb->wrpt);
 	const uint64_t *src = (const uint64_t *)cmd;
 	uint8_t i;
 
@@ -2795,7 +2844,7 @@ static inline bool dmub_rb_peek_offset(struct dmub_rb *rb,
 static inline bool dmub_rb_out_front(struct dmub_rb *rb,
 				 union dmub_rb_out_cmd *cmd)
 {
-	const uint64_t volatile *src = (const uint64_t volatile *)(rb->base_address) + rb->rptr / sizeof(uint64_t);
+	const uint64_t volatile *src = (const uint64_t volatile *)((uint8_t *)(rb->base_address) + rb->rptr);
 	uint64_t *dst = (uint64_t *)cmd;
 	uint8_t i;
 
@@ -2843,7 +2892,7 @@ static inline void dmub_rb_flush_pending(const struct dmub_rb *rb)
 	uint32_t wptr = rb->wrpt;
 
 	while (rptr != wptr) {
-		uint64_t volatile *data = (uint64_t volatile *)rb->base_address + rptr / sizeof(uint64_t);
+		uint64_t volatile *data = (uint64_t volatile *)((uint8_t *)(rb->base_address) + rptr);
 		//uint64_t volatile *p = (uint64_t volatile *)data;
 		uint64_t temp;
 		uint8_t i;
