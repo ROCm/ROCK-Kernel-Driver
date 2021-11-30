@@ -857,6 +857,10 @@ struct ip_discovery_top;
 #define AMDGPU_RESET_MAGIC_NUM 64
 #define AMDGPU_MAX_DF_PERFMONS 4
 #define AMDGPU_PRODUCT_NAME_LEN 64
+struct amdgpu_reset_domain {
+	struct workqueue_struct *wq;
+};
+
 struct amdgpu_device {
 	struct device			*dev;
 	struct pci_dev			*pdev;
@@ -1163,6 +1167,8 @@ struct amdgpu_device {
 	/* reset dump register */
 	uint32_t                        *reset_dump_reg_list;
 	int                             num_regs;
+
+	struct amdgpu_reset_domain	reset_domain;
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
