@@ -4769,11 +4769,11 @@ static void get_active_converter_info(
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 					if (link->dc->caps.hdmi_frl_pcon_support) {
+						union hdmi_encoded_link_bw hdmi_encoded_link_bw;
+
 						link->dpcd_caps.dongle_caps.dp_hdmi_frl_max_link_bw_in_kbps =
 								dc_link_bw_kbps_from_raw_frl_link_rate_data(
 										hdmi_color_caps.bits.MAX_ENCODED_LINK_BW_SUPPORT);
-
-						union hdmi_encoded_link_bw hdmi_encoded_link_bw;
 
 						// Intersect reported max link bw support with the supported link rate post FRL link training
 						if (core_link_read_dpcd(link, DP_PCON_HDMI_POST_FRL_STATUS,
