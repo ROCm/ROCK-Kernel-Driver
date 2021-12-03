@@ -79,8 +79,11 @@
 /* dev_pm_set_driver_flags() is available */
 #define HAVE_DEV_PM_SET_DRIVER_FLAGS 1
 
-/* dma_buf dynamic_mapping is available */
+/* dma_buf->dynamic_mapping is available */
 /* #undef HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING */
+
+/* dma_buf->dynamic_mapping is not available */
+/* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
 /* dma_buf_unpin() is available */
 #define HAVE_DMA_BUF_UNPIN 1
