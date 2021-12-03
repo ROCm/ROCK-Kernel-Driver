@@ -1035,7 +1035,7 @@ void amdgpu_bo_unpin(struct amdgpu_bo *bo)
 	if (bo->tbo.pin_count)
 		return;
 
-#ifdef HAVE_DMA_BUF_UNPIN
+#ifdef HAVE_STRUCT_DMA_BUF_OPS_PIN
 	if (bo->tbo.base.import_attach)
 		dma_buf_unpin(bo->tbo.base.import_attach);
 #endif
