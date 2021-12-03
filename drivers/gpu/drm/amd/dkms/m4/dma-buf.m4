@@ -13,6 +13,10 @@ AC_DEFUN([AC_AMDGPU_DMA_BUF], [
 			AC_DEFINE(HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER,
 				1,
 				[struct dma_buf_attach_ops->allow_peer2peer is available])
+
+			AC_DEFINE(HAVE_STRUCT_DMA_BUF_OPS_PIN,
+					1,
+					[struct dma_buf_ops->pin() is available])
 		],[
 			dnl #
 			dnl # 4981cdb063e3 dma-buf: make move_notify mandatory if importer_ops are provided
@@ -44,8 +48,11 @@ AC_DEFUN([AC_AMDGPU_DMA_BUF], [
 					dma_buf_ops->dynamic_mapping = true;
 				],[
 					AC_DEFINE(HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING, 1,
-						[dma_buf dynamic_mapping is available])
+						[dma_buf->dynamic_mapping is available])
 				],[
+					AC_DEFINE(HAVE_DMA_BUF_OPS_LEGACY, 1,
+						[dma_buf->dynamic_mapping is not available])
+
 					AC_AMDGPU_DRM_GEM_MAP_ATTACH
 				])
 			])
