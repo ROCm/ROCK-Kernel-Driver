@@ -759,6 +759,7 @@ static bool detect_dp(struct dc_link *link,
 							     sink_caps->transaction_type);
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			/* Apply work around for tunneled MST on certain USB4 docks. Always use DSC if dock
 			 * reports DSC support.
 			 */
@@ -768,6 +769,7 @@ static bool detect_dp(struct dc_link *link,
 					link->dpcd_caps.dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_SUPPORT &&
 					!link->dc->debug.dpia_debug.bits.disable_mst_dsc_work_around)
 				link->wa_flags.dpia_mst_dsc_always_on = true;
+#endif
 #endif
 
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
