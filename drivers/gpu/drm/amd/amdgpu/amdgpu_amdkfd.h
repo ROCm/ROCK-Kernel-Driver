@@ -357,7 +357,8 @@ void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev);
 
 int amdgpu_amdkfd_get_tile_config(struct amdgpu_device *adev,
 				struct tile_config *config);
-void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev);
+void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev,
+				bool reset);
 #if IS_ENABLED(CONFIG_HSA_AMD)
 void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
 void amdgpu_amdkfd_gpuvm_destroy_cb(struct amdgpu_device *adev,
