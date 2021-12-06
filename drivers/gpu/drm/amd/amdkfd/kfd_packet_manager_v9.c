@@ -110,7 +110,7 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 						pdd->spi_dbg_launch_mode;
 
 	if (pdd->process->debug_trap_enabled) {
-		for (i = 0; i < kfd->device_info->num_of_watch_points; i++)
+		for (i = 0; i < kfd->device_info.num_of_watch_points; i++)
 			packet->tcp_watch_cntl[i] = pdd->watch_points[i];
 
 		packet->bitfields2.single_memops =
