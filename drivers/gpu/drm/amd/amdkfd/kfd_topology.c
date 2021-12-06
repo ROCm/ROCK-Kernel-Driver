@@ -1337,7 +1337,7 @@ static void kfd_set_iolink_no_atomics(struct kfd_topology_device *dev,
 
 	/* checkout source dev has atomics support on root. */
 	if (dev->gpu && (!dev->gpu->pci_atomic_requested ||
-			dev->gpu->device_info->asic_family ==
+			dev->gpu->adev->asic_type ==
 							CHIP_HAWAII)) {
 		link->flags |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
 				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;

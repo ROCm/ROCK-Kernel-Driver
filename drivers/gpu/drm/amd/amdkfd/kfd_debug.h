@@ -78,7 +78,7 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 
 static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
 {
-	return dev->device_info->asic_family == CHIP_ALDEBARAN;
+	return dev->adev->asic_type == CHIP_ALDEBARAN;
 }
 
 void debug_event_write_work_handler(struct work_struct *work);
@@ -104,8 +104,8 @@ void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
  */
 static inline bool kfd_dbg_is_rlc_restore_supported(struct kfd_dev *dev)
 {
-	return !(dev->device_info->asic_family == CHIP_NAVI10 ||
-		 dev->device_info->asic_family == CHIP_NAVI14);
+	return !(dev->adev->asic_type == CHIP_NAVI10 ||
+		 dev->adev->asic_type == CHIP_NAVI14);
 }
 
 bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev);

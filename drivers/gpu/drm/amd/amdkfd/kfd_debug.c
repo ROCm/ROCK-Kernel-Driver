@@ -1116,14 +1116,14 @@ bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev)
 {
 	bool firmware_supported = true;
 
-	if (dev->device_info->asic_family < CHIP_VEGA10)
+	if (dev->adev->asic_type < CHIP_VEGA10)
 		return false;
 
 	/*
 	 * Note: Any unlisted devices here are assumed to support exception handling.
 	 * Add additional checks here as needed.
 	 */
-	switch (dev->device_info->asic_family) {
+	switch (dev->adev->asic_type) {
 	case CHIP_VEGA10:
 		firmware_supported = dev->mec_fw_version >= 459 + 32768;
 		break;

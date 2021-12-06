@@ -1748,7 +1748,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				&target->per_device_data,
 				per_device_list) {
 
-			if (pdd->dev->device_info->asic_family < CHIP_VEGA10) {
+			if (pdd->dev->adev->asic_type < CHIP_VEGA10) {
 				r = -ENODEV;
 				goto unlock_out;
 			}
