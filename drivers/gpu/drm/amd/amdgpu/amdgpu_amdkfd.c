@@ -748,13 +748,13 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 	return 0;
 }
 
-void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev)
+void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev, bool reset)
 {
 	struct ras_err_data err_data = {0, 0, 0, NULL};
 
 	/* CPU MCA will handle page retirement if connected_to_cpu is 1 */
 	if (!adev->gmc.xgmi.connected_to_cpu)
-		amdgpu_umc_process_ras_data_cb(adev, &err_data, NULL);
-	else
+		amdgpu_umc_do_page_retirement(adev, &err_data, NULL, reset);
+	else if (reset)
 		amdgpu_amdkfd_gpu_reset(adev);
 }
