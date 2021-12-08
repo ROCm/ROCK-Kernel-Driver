@@ -293,6 +293,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* display_info->is_hdmi is available */
+#define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
+
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 

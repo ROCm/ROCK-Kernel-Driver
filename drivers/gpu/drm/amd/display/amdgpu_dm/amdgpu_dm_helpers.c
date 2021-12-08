@@ -84,7 +84,12 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 				  edid_caps->display_name,
 				  AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
 
+#if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 	edid_caps->edid_hdmi = connector->display_info.is_hdmi;
+#else
+	edid_caps->edid_hdmi = drm_detect_hdmi_monitor(
+			(struct edid *) edid->raw_edid);
+#endif
 
 	sad_count = drm_edid_to_sad((struct edid *) edid->raw_edid, &sads);
 	if (sad_count <= 0)
