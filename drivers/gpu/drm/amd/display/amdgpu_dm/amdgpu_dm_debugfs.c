@@ -3802,9 +3802,10 @@ static int dp_force_sst_get(void *data, u64 *val)
 
 	return 0;
 }
+
+#if defined(DEFINE_DEBUGFS_ATTRIBUTE)
 DEFINE_DEBUGFS_ATTRIBUTE(dp_set_mst_en_for_sst_ops, dp_force_sst_get,
 			 dp_force_sst_set, "%llu\n");
-
 /*
  * Force DP2 sequence without VESA certified cable.
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dp_ignore_cable_id
@@ -3828,6 +3829,7 @@ static int dp_ignore_cable_id_get(void *data, u64 *val)
 }
 DEFINE_DEBUGFS_ATTRIBUTE(dp_ignore_cable_id_ops, dp_ignore_cable_id_get,
 			 dp_ignore_cable_id_set, "%llu\n");
+#endif
 
 /*
  * Sets the DC visual confirm debug option from the given string.
@@ -3980,12 +3982,12 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 			    adev, &capabilities_fops);
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
+
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file("amdgpu_dm_dp_set_mst_en_for_sst", 0644, root, adev,
 				&dp_set_mst_en_for_sst_ops);
 	debugfs_create_file("amdgpu_dm_dp_ignore_cable_id", 0644, root, adev,
 				&dp_ignore_cable_id_ops);
-
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file_unsafe("amdgpu_dm_visual_confirm", 0644, root, adev,
 				   &visual_confirm_fops);
 
