@@ -5012,7 +5012,7 @@ static void amdgpu_device_lock_hive_adev(struct amdgpu_device *adev, struct amdg
 {
 	struct amdgpu_device *tmp_adev = NULL;
 
-	if (adev->gmc.xgmi.num_physical_nodes > 1) {
+	if (!amdgpu_sriov_vf(adev) && (adev->gmc.xgmi.num_physical_nodes > 1)) {
 		if (!hive) {
 			dev_err(adev->dev, "Hive is NULL while device has multiple xgmi nodes");
 			return;
