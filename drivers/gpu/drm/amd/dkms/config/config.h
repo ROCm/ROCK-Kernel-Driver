@@ -79,8 +79,11 @@
 /* dev_pm_set_driver_flags() is available */
 #define HAVE_DEV_PM_SET_DRIVER_FLAGS 1
 
-/* dma_buf dynamic_mapping is available */
+/* dma_buf->dynamic_mapping is available */
 /* #undef HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING */
+
+/* dma_buf->dynamic_mapping is not available */
+/* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
 /* dma_buf_unpin() is available */
 #define HAVE_DMA_BUF_UNPIN 1
@@ -975,8 +978,8 @@
 /* strscpy() is available */
 #define HAVE_STRSCPY 1
 
-/* struct dma_buf_ops->allow_peer2peer is available */
-/* #undef HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER */
+/* struct dma_buf_attach_ops->allow_peer2peer is available */
+#define HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER 1
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1

@@ -104,31 +104,22 @@ unsigned int get_pipes_per_mec(struct device_queue_manager *dqm)
 	return dqm->dev->shared_resources.num_pipe_per_mec;
 }
 
-static unsigned int get_num_sdma_engines(struct device_queue_manager *dqm)
-{
-	return dqm->dev->device_info->num_sdma_engines;
-}
-
-static unsigned int get_num_xgmi_sdma_engines(struct device_queue_manager *dqm)
-{
-	return dqm->dev->device_info->num_xgmi_sdma_engines;
-}
-
 static unsigned int get_num_all_sdma_engines(struct device_queue_manager *dqm)
 {
-	return get_num_sdma_engines(dqm) + get_num_xgmi_sdma_engines(dqm);
+	return kfd_get_num_sdma_engines(dqm->dev) +
+		kfd_get_num_xgmi_sdma_engines(dqm->dev);
 }
 
 unsigned int get_num_sdma_queues(struct device_queue_manager *dqm)
 {
-	return dqm->dev->device_info->num_sdma_engines
-			* dqm->dev->device_info->num_sdma_queues_per_engine;
+	return kfd_get_num_sdma_engines(dqm->dev) *
+		dqm->dev->device_info->num_sdma_queues_per_engine;
 }
 
 unsigned int get_num_xgmi_sdma_queues(struct device_queue_manager *dqm)
 {
-	return dqm->dev->device_info->num_xgmi_sdma_engines
-			* dqm->dev->device_info->num_sdma_queues_per_engine;
+	return kfd_get_num_xgmi_sdma_engines(dqm->dev) *
+		dqm->dev->device_info->num_sdma_queues_per_engine;
 }
 
 void program_sh_mem_settings(struct device_queue_manager *dqm,
@@ -187,7 +178,7 @@ static int allocate_doorbell(struct qcm_process_device *qpd, struct queue *q)
 {
 	struct kfd_dev *dev = qpd->dqm->dev;
 
-	if (!KFD_IS_SOC15(dev->device_info->asic_family)) {
+	if (!KFD_IS_SOC15(dev)) {
 		/* On pre-SOC15 chips we need to use the queue ID to
 		 * preserve the user mode ABI.
 		 */
@@ -232,7 +223,7 @@ static void deallocate_doorbell(struct qcm_process_device *qpd,
 	unsigned int old;
 	struct kfd_dev *dev = qpd->dqm->dev;
 
-	if (!KFD_IS_SOC15(dev->device_info->asic_family) ||
+	if (!KFD_IS_SOC15(dev) ||
 	    q->properties.type == KFD_QUEUE_TYPE_SDMA ||
 	    q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI)
 		return;
@@ -280,8 +271,7 @@ static int allocate_vmid(struct device_queue_manager *dqm,
 
 	program_sh_mem_settings(dqm, qpd);
 
-	if (dqm->dev->device_info->asic_family >= CHIP_VEGA10 &&
-	    dqm->dev->cwsr_enabled)
+	if (KFD_IS_SOC15(dqm->dev) && dqm->dev->cwsr_enabled)
 		program_trap_handler_settings(dqm, qpd);
 
 	/* qpd->page_table_base is set earlier when register_process()
@@ -1192,9 +1182,9 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 		dqm->sdma_bitmap &= ~(1ULL << bit);
 		q->sdma_id = bit;
 		q->properties.sdma_engine_id = q->sdma_id %
-				get_num_sdma_engines(dqm);
+				kfd_get_num_sdma_engines(dqm->dev);
 		q->properties.sdma_queue_id = q->sdma_id /
-				get_num_sdma_engines(dqm);
+				kfd_get_num_sdma_engines(dqm->dev);
 	} else if (q->properties.type == KFD_QUEUE_TYPE_SDMA_XGMI) {
 		if (dqm->xgmi_sdma_bitmap == 0) {
 			pr_err("No more XGMI SDMA queue to allocate\n");
@@ -1209,10 +1199,11 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 		 * assumes the first N engines are always
 		 * PCIe-optimized ones
 		 */
-		q->properties.sdma_engine_id = get_num_sdma_engines(dqm) +
-				q->sdma_id % get_num_xgmi_sdma_engines(dqm);
+		q->properties.sdma_engine_id =
+			kfd_get_num_sdma_engines(dqm->dev) +
+			q->sdma_id % kfd_get_num_xgmi_sdma_engines(dqm->dev);
 		q->properties.sdma_queue_id = q->sdma_id /
-				get_num_xgmi_sdma_engines(dqm);
+			kfd_get_num_xgmi_sdma_engines(dqm->dev);
 	}
 
 	pr_debug("SDMA engine id: %d\n", q->properties.sdma_engine_id);
@@ -2157,31 +2148,16 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		device_queue_manager_init_vi_tonga(&dqm->asic_ops);
 		break;
 
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
-	case CHIP_RENOIR:
-	case CHIP_ARCTURUS:
-	case CHIP_ALDEBARAN:
-		device_queue_manager_init_v9(&dqm->asic_ops);
-		break;
-	case CHIP_NAVI10:
-	case CHIP_NAVI12:
-	case CHIP_NAVI14:
-	case CHIP_SIENNA_CICHLID:
-	case CHIP_NAVY_FLOUNDER:
-	case CHIP_VANGOGH:
-	case CHIP_DIMGREY_CAVEFISH:
-	case CHIP_BEIGE_GOBY:
-	case CHIP_YELLOW_CARP:
-	case CHIP_CYAN_SKILLFISH:
-		device_queue_manager_init_v10_navi10(&dqm->asic_ops);
-		break;
 	default:
-		WARN(1, "Unexpected ASIC family %u",
-		     dev->device_info->asic_family);
-		goto out_free;
+		if (KFD_GC_VERSION(dev) >= IP_VERSION(10, 1, 1))
+			device_queue_manager_init_v10_navi10(&dqm->asic_ops);
+		else if (KFD_GC_VERSION(dev) >= IP_VERSION(9, 0, 1))
+			device_queue_manager_init_v9(&dqm->asic_ops);
+		else {
+			WARN(1, "Unexpected ASIC family %u",
+			     dev->device_info->asic_family);
+			goto out_free;
+		}
 	}
 
 	if (init_mqd_managers(dqm))

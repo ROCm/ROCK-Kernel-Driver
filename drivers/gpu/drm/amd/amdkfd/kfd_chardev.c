@@ -335,7 +335,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	/* Return gpu_id as doorbell offset for mmap usage */
 	args->doorbell_offset = KFD_MMAP_TYPE_DOORBELL;
 	args->doorbell_offset |= KFD_MMAP_GPU_ID(args->gpu_id);
-	if (KFD_IS_SOC15(dev->device_info->asic_family))
+	if (KFD_IS_SOC15(dev))
 		/* On SOC15 ASICs, include the doorbell offset within the
 		 * process doorbell frame, which is 2 pages.
 		 */
@@ -1478,7 +1478,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			err = -EINVAL;
 			goto err_unlock;
 		}
-		offset = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->adev);
+		offset = dev->adev->rmmio_remap.bus_addr;
 		if (!offset) {
 			err = -ENOMEM;
 			goto err_unlock;
@@ -1806,7 +1806,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	}
 	mutex_unlock(&p->mutex);
 
-	if (dev->device_info->asic_family == CHIP_ALDEBARAN) {
+	if (KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2)) {
 		err = amdgpu_amdkfd_gpuvm_sync_memory(dev->adev,
 				(struct kgd_mem *) mem, true);
 		if (err) {
@@ -3450,7 +3450,7 @@ static int kfd_mmio_mmap(struct kfd_dev *dev, struct kfd_process *process,
 	if (vma->vm_end - vma->vm_start != PAGE_SIZE)
 		return -EINVAL;
 
-	address = amdgpu_amdkfd_get_mmio_remap_phys_addr(dev->adev);
+	address = dev->adev->rmmio_remap.bus_addr;
 
 	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE |
 				VM_DONTDUMP | VM_PFNMAP;

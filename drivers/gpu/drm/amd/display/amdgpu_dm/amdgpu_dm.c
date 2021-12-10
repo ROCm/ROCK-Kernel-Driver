@@ -51,6 +51,7 @@
 #include <drm/drm_hdcp.h>
 #endif
 #include "amdgpu_pm.h"
+#include "amdgpu_atombios.h"
 
 #include "amd_shared.h"
 #include "amdgpu_dm_irq.h"
@@ -4140,6 +4141,9 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 
 #ifdef HAVE_HDR_SINK_METADATA
 	dm->brightness[bl_idx] = user_brightness;
+	/* update scratch register */
+	if (bl_idx == 0)
+		amdgpu_atombios_scratch_regs_set_backlight_level(dm->adev, dm->brightness[bl_idx]);
 	brightness = convert_brightness_from_user(&caps, dm->brightness[bl_idx]);
 	link = (struct dc_link *)dm->backlight_link[bl_idx];
 

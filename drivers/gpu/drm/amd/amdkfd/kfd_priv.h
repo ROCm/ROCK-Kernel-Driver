@@ -198,7 +198,8 @@ enum cache_policy {
 	cache_policy_noncoherent
 };
 
-#define KFD_IS_SOC15(chip) ((chip) >= CHIP_VEGA10)
+#define KFD_GC_VERSION(dev) ((dev)->adev->ip_versions[GC_HWIP][0])
+#define KFD_IS_SOC15(dev)   ((KFD_GC_VERSION(dev)) >= (IP_VERSION(9, 0, 1)))
 
 struct kfd_event_interrupt_class {
 	bool (*interrupt_isr)(struct kfd_dev *dev,
@@ -223,10 +224,11 @@ struct kfd_device_info {
 	bool needs_iommu_device;
 	bool needs_pci_atomics;
 	uint32_t no_atomic_fw_version;
-	unsigned int num_sdma_engines;
-	unsigned int num_xgmi_sdma_engines;
 	unsigned int num_sdma_queues_per_engine;
 };
+
+unsigned int kfd_get_num_sdma_engines(struct kfd_dev *kdev);
+unsigned int kfd_get_num_xgmi_sdma_engines(struct kfd_dev *kdev);
 
 struct kfd_mem_obj {
 	uint32_t range_start;
@@ -865,7 +867,7 @@ struct svm_range_list {
 	struct list_head		deferred_range_list;
 	spinlock_t			deferred_list_lock;
 	atomic_t			evicted_ranges;
-	bool				drain_pagefaults;
+	atomic_t			drain_pagefaults;
 	struct delayed_work		restore_work;
 	DECLARE_BITMAP(bitmap_supported, MAX_GPU_INSTANCE);
 	struct task_struct 		*faulting_task;

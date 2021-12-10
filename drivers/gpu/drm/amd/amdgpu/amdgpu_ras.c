@@ -895,6 +895,10 @@ static void amdgpu_ras_get_ecc_info(struct amdgpu_device *adev, struct ras_err_d
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 	int ret = 0;
 
+	/* skip get ecc info during gpu recovery */
+	if (atomic_read(&ras->in_recovery) == 1)
+		return;
+
 	/*
 	 * choosing right query method according to
 	 * whether smu support query error information
@@ -1967,9 +1971,11 @@ int amdgpu_ras_save_bad_pages(struct amdgpu_device *adev)
 	if (!con || !con->eh_data)
 		return 0;
 
+	mutex_lock(&con->recovery_lock);
 	control = &con->eeprom_control;
 	data = con->eh_data;
 	save_count = data->count - control->ras_num_recs;
+	mutex_unlock(&con->recovery_lock);
 	/* only new entries are saved */
 	if (save_count > 0) {
 		if (amdgpu_ras_eeprom_append(control,
@@ -2515,7 +2521,6 @@ void amdgpu_ras_late_fini(struct amdgpu_device *adev,
 	amdgpu_ras_sysfs_remove(adev, ras_block);
 	if (ih_info->cb)
 		amdgpu_ras_interrupt_remove_handler(adev, ih_info);
-	amdgpu_ras_feature_enable(adev, ras_block, 0);
 }
 
 /* do some init work after IP late init as dependence.

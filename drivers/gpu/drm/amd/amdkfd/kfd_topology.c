@@ -569,7 +569,7 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 		sysfs_show_32bit_prop(buffer, offs, "sdma_fw_version",
 				      dev->gpu->sdma_fw_version);
 		sysfs_show_64bit_prop(buffer, offs, "unique_id",
-				      amdgpu_amdkfd_get_unique_id(dev->gpu->adev));
+				      dev->gpu->adev->unique_id);
 
 	}
 
@@ -1355,7 +1355,7 @@ static void kfd_set_iolink_non_coherent(struct kfd_topology_device *to_dev,
 		 */
 		if (inbound_link->iolink_type == CRAT_IOLINK_TYPE_PCIEXPRESS ||
 		    (inbound_link->iolink_type == CRAT_IOLINK_TYPE_XGMI &&
-		    to_dev->gpu->device_info->asic_family == CHIP_VEGA20)) {
+		    KFD_GC_VERSION(to_dev->gpu) == IP_VERSION(9, 4, 0))) {
 			outbound_link->flags |= CRAT_IOLINK_FLAGS_NON_COHERENT;
 			inbound_link->flags |= CRAT_IOLINK_FLAGS_NON_COHERENT;
 		}
@@ -1741,8 +1741,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 	dev->node_props.vendor_id = gpu->pdev->vendor;
 	dev->node_props.device_id = gpu->pdev->device;
 	dev->node_props.capability |=
-		((amdgpu_amdkfd_get_asic_rev_id(dev->gpu->adev) <<
-			HSA_CAP_ASIC_REVISION_SHIFT) &
+		((dev->gpu->adev->rev_id << HSA_CAP_ASIC_REVISION_SHIFT) &
 			HSA_CAP_ASIC_REVISION_MASK);
 	dev->node_props.location_id = pci_dev_id(gpu->pdev);
 	dev->node_props.domain = pci_domain_nr(gpu->pdev->bus);
@@ -1754,14 +1753,14 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		gpu->shared_resources.drm_render_minor;
 
 	dev->node_props.hive_id = gpu->hive_id;
-	dev->node_props.num_sdma_engines = gpu->device_info->num_sdma_engines;
+	dev->node_props.num_sdma_engines = kfd_get_num_sdma_engines(gpu);
 	dev->node_props.num_sdma_xgmi_engines =
-				gpu->device_info->num_xgmi_sdma_engines;
+					kfd_get_num_xgmi_sdma_engines(gpu);
 	dev->node_props.num_sdma_queues_per_engine =
 				gpu->device_info->num_sdma_queues_per_engine;
 	dev->node_props.num_gws = (dev->gpu->gws &&
 		dev->gpu->dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS) ?
-		amdgpu_amdkfd_get_num_gws(dev->gpu->adev) : 0;
+		dev->gpu->adev->gds.gws_size : 0;
 	dev->node_props.num_cp_queues = get_cp_queues_num(dev->gpu->dqm);
 
 	kfd_fill_mem_clk_max_info(dev);
@@ -1786,58 +1785,14 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
-	case CHIP_VEGA10:
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
-	case CHIP_RENOIR:
-	case CHIP_ARCTURUS:
-	case CHIP_ALDEBARAN:
-	case CHIP_NAVI10:
-	case CHIP_NAVI12:
-	case CHIP_NAVI14:
-	case CHIP_SIENNA_CICHLID:
-	case CHIP_NAVY_FLOUNDER:
-	case CHIP_VANGOGH:
-	case CHIP_DIMGREY_CAVEFISH:
-	case CHIP_BEIGE_GOBY:
-	case CHIP_YELLOW_CARP:
-	case CHIP_CYAN_SKILLFISH:
-		dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
-			HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
-			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
-
-		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
-
-		if (dev->gpu->device_info->gfx_target_version >= 90000 &&
-			dev->gpu->device_info->gfx_target_version < 100000) {
-			/* This is GFX9 */
-			dev->node_props.debug_prop |=
-				HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9 |
-				HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-			if (dev->gpu->device_info->gfx_target_version < 90010)
-				dev->node_props.debug_prop |=
-					HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-			if (dev->gpu->device_info->gfx_target_version >= 90010)
-				dev->node_props.capability |=
-					HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-		} else if (dev->gpu->device_info->gfx_target_version >= 100000) {
-			dev->node_props.debug_prop |=
-				HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
-				HSA_DBG_WATCH_ADDR_MASK_HI_BIT |
-				HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		}
-
-		if (dev->gpu && kfd_dbg_has_supported_firmware(dev->gpu))
-			dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
-
-		break;
 	default:
-		WARN(1, "Unexpected ASIC family %u",
-		     dev->gpu->device_info->asic_family);
+		if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(9, 0, 1))
+			dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+		else
+			WARN(1, "Unexpected ASIC family %u",
+			     dev->gpu->device_info->asic_family);
 	}
 
 	/*
@@ -1868,7 +1823,7 @@ int kfd_topology_add_device(struct kfd_dev *gpu)
 		((dev->gpu->adev->ras_enabled & BIT(AMDGPU_RAS_BLOCK__UMC)) != 0) ?
 		HSA_CAP_MEM_EDCSUPPORTED : 0;
 
-	if (dev->gpu->adev->asic_type != CHIP_VEGA10)
+	if (KFD_GC_VERSION(dev->gpu) != IP_VERSION(9, 0, 1))
 		dev->node_props.capability |= (dev->gpu->adev->ras_enabled != 0) ?
 			HSA_CAP_RASEVENTNOTIFY : 0;
 
