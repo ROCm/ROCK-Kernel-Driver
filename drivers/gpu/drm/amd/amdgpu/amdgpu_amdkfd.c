@@ -780,7 +780,7 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 	int ret;
 
 	/* Device or IH ring is not ready so bail. */
-	ret = amdgpu_ih_wait_on_checkpoint_process(adev, &adev->irq.ih);
+	ret = amdgpu_ih_wait_on_checkpoint_process_ts(adev, &adev->irq.ih);
 	if (ret)
 		return ret;
 
