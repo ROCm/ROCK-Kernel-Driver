@@ -3285,7 +3285,7 @@ DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /*
- * Force sst sequence in mst capable receiver.
+ * Temporary w/a to force sst sequence in M42D DP2 mst receiver
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dp_set_mst_en_for_sst
  */
 static int dp_force_sst_set(void *data, u64 val)
@@ -3311,6 +3311,7 @@ static int dp_force_sst_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(dp_set_mst_en_for_sst_ops, dp_force_sst_get,
 			 dp_force_sst_set, "%llu\n");
 #endif
+
 /*
  * Sets the DC visual confirm debug option from the given string.
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_visual_confirm
