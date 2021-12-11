@@ -3588,6 +3588,7 @@ static int dp_force_sst_get(void *data, u64 *val)
 #if defined(DEFINE_DEBUGFS_ATTRIBUTE)
 DEFINE_DEBUGFS_ATTRIBUTE(dp_set_mst_en_for_sst_ops, dp_force_sst_get,
 			 dp_force_sst_set, "%llu\n");
+
 /*
  * Force DP2 sequence without VESA certified cable.
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dp_ignore_cable_id
