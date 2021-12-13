@@ -253,11 +253,12 @@ static void xgpu_ai_mailbox_flr_work(struct work_struct *work)
 	 * the VF FLR.
 	 */
 	if (amdgpu_in_reset(adev) ||
-		!down_write_trylock(&adev->reset_sem))
+		(atomic_cmpxchg(&adev->in_gpu_reset, 0, 1) != 0))
 		return;
 
+	down_write(&adev->reset_sem);
+
 	amdgpu_virt_fini_data_exchange(adev);
-	atomic_set(&adev->in_gpu_reset, 1);
 
 	xgpu_ai_mailbox_trans_msg(adev, IDH_READY_TO_RESET, 0, 0, 0);
 
