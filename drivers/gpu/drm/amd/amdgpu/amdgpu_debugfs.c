@@ -1656,7 +1656,7 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_x32("amdgpu_smu_debug", 0600, root,
-			   &adev->smu.smu_debug_mask);
+			   &adev->pm.smu_debug_mask);
 
 	ent = debugfs_create_file("amdgpu_preempt_ib", 0600, root, adev,
 				  &fops_ib_preempt);
