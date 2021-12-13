@@ -626,6 +626,9 @@ struct queue {
 
 	/* procfs */
 	struct kobject kobj;
+	struct attribute attr_guid;
+	struct attribute attr_size;
+	struct attribute attr_type;
 
 	void *gang_ctx_bo;
 	uint64_t gang_ctx_gpu_addr;
