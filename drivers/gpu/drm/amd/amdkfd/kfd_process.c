@@ -88,6 +88,8 @@ static void evict_process_worker(struct work_struct *work);
 static void restore_process_worker(struct work_struct *work);
 
 static void kfd_process_device_destroy_cwsr_dgpu(struct kfd_process_device *pdd);
+static void kfd_sysfs_create_file(struct kobject *kobj, struct attribute *attr,
+				char *name);
 
 struct kfd_procfs_tree {
 	struct kobject *kobj;
@@ -455,35 +457,12 @@ static ssize_t kfd_sysfs_counters_show(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute attr_queue_size = {
-	.name = "size",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute attr_queue_type = {
-	.name = "type",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute attr_queue_gpuid = {
-	.name = "gpuid",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute *procfs_queue_attrs[] = {
-	&attr_queue_size,
-	&attr_queue_type,
-	&attr_queue_gpuid,
-	NULL
-};
-
 static const struct sysfs_ops procfs_queue_ops = {
 	.show = kfd_procfs_queue_show,
 };
 
 static struct kobj_type procfs_queue_type = {
 	.sysfs_ops = &procfs_queue_ops,
-	.default_attrs = procfs_queue_attrs,
 };
 
 static const struct sysfs_ops procfs_stats_ops = {
@@ -524,6 +503,10 @@ int kfd_procfs_add_queue(struct queue *q)
 		kobject_put(&q->kobj);
 		return ret;
 	}
+
+	kfd_sysfs_create_file(&q->kobj, &q->attr_guid, "guid");
+	kfd_sysfs_create_file(&q->kobj, &q->attr_size, "size");
+	kfd_sysfs_create_file(&q->kobj, &q->attr_type, "type");
 
 	return 0;
 }
@@ -668,6 +651,10 @@ void kfd_procfs_del_queue(struct queue *q)
 {
 	if (!q)
 		return;
+
+	sysfs_remove_file(&q->kobj, &q->attr_guid);
+	sysfs_remove_file(&q->kobj, &q->attr_size);
+	sysfs_remove_file(&q->kobj, &q->attr_type);
 
 	kobject_del(&q->kobj);
 	kobject_put(&q->kobj);
