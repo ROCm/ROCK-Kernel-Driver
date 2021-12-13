@@ -631,6 +631,10 @@ struct queue {
 
 	/* procfs */
 	struct kobject kobj;
+	struct attribute attr_guid;
+	struct attribute attr_size;
+	struct attribute attr_type;
+
 };
 
 enum KFD_MQD_TYPE {
@@ -1009,7 +1013,7 @@ struct kfd_process {
 
 	/* Keep track cwsr init */
 	bool has_cwsr;
-	
+
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
