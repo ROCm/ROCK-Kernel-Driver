@@ -600,6 +600,9 @@ struct queue {
 
 	/* procfs */
 	struct kobject kobj;
+	struct attribute attr_guid;
+	struct attribute attr_size;
+	struct attribute attr_type;
 
 	void *gang_ctx_bo;
 	uint64_t gang_ctx_gpu_addr;
@@ -989,7 +992,7 @@ struct kfd_process {
 
 	/* Keep track cwsr init */
 	bool has_cwsr;
-	
+
 	/* Exception code enable mask and status */
 	uint64_t exception_enable_mask;
 	uint64_t exception_status;
