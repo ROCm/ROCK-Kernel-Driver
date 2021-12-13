@@ -457,42 +457,12 @@ static ssize_t kfd_sysfs_counters_show(struct kobject *kobj,
 	return 0;
 }
 
-static struct attribute attr_queue_size = {
-	.name = "size",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute attr_queue_type = {
-	.name = "type",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute attr_queue_gpuid = {
-	.name = "gpuid",
-	.mode = KFD_SYSFS_FILE_MODE
-};
-
-static struct attribute *procfs_queue_attrs[] = {
-	&attr_queue_size,
-	&attr_queue_type,
-	&attr_queue_gpuid,
-	NULL
-};
-#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
-ATTRIBUTE_GROUPS(procfs_queue);
-#endif
-
 static const struct sysfs_ops procfs_queue_ops = {
 	.show = kfd_procfs_queue_show,
 };
 
 static struct kobj_type procfs_queue_type = {
 	.sysfs_ops = &procfs_queue_ops,
-#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
-	.default_groups = procfs_queue_groups,
-#else
-	.default_attrs = procfs_queue_attrs,
-#endif
 };
 
 static const struct sysfs_ops procfs_stats_ops = {
