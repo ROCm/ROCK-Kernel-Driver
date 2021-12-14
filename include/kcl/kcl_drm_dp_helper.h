@@ -260,5 +260,20 @@ enum drm_dp_phy {
 # define DP_PCON_FRL_TRAINED_BW_40GBPS	      (1 << 5)
 # define DP_PCON_FRL_TRAINED_BW_48GBPS	      (1 << 6)
 #endif
+/*
+ * v4.16-rc7-1860-g0597017cd18d
+ * drm/dp: Add DP_DPCD_REV_XX to drm_dp_helper
+ */
+
+/* DPCD Field Address Mapping */
+
+/* Receiver Capability */
+#ifndef DP_DPCD_REV_14
+# define DP_DPCD_REV_10                     0x10
+# define DP_DPCD_REV_11                     0x11
+# define DP_DPCD_REV_12                     0x12
+# define DP_DPCD_REV_13                     0x13
+# define DP_DPCD_REV_14                     0x14
+#endif
 
 #endif /* _KCL_DRM_DP_HELPER_H_ */
