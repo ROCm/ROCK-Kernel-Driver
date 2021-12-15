@@ -90,5 +90,6 @@
 #include "kcl/kcl_drm_aperture.h"
 #include <kcl/kcl_intel_family.h>
 #include <kcl/kcl_drm_simple_kms_helper.h>
+#include <kcl/kcl_bitmap.h>
 
 #endif /* AMDGPU_BACKPORT_H */
