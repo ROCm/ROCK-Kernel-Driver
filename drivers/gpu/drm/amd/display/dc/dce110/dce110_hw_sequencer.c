@@ -69,6 +69,8 @@
 
 #include "dcn10/dcn10_hw_sequencer.h"
 
+#include "dce110_hw_sequencer.h"
+
 #define GAMMA_HW_POINTS_NUM 256
 
 /*
@@ -1566,6 +1568,10 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 				&pipe_ctx->stream->audio_info);
 	}
 
+	/* make sure no pipes syncd to the pipe being enabled */
+	if (!pipe_ctx->stream->apply_seamless_boot_optimization && dc->config.use_pipe_ctx_sync_logic)
+		check_syncd_pipes_for_disabled_master_pipe(dc, context, pipe_ctx->pipe_idx);
+
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* DCN3.1 FPGA Workaround
 	 * Need to enable HPO DP Stream Encoder before setting OTG master enable.
@@ -1817,15 +1823,17 @@ void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 	get_edp_streams(context, edp_streams, &edp_stream_num);
 
 	// Check fastboot support, disable on DCE8 because of blank screens
-	if (edp_num && dc->ctx->dce_version != DCE_VERSION_8_0 &&
+	if (edp_num && edp_stream_num && dc->ctx->dce_version != DCE_VERSION_8_0 &&
 		    dc->ctx->dce_version != DCE_VERSION_8_1 &&
 		    dc->ctx->dce_version != DCE_VERSION_8_3) {
 		for (i = 0; i < edp_num; i++) {
 			edp_link = edp_links[i];
+			if (edp_link != edp_streams[0]->link)
+				continue;
 			// enable fastboot if backend is enabled on eDP
 			if (edp_link->link_enc->funcs->is_dig_enabled(edp_link->link_enc)) {
 				/* Set optimization flag on eDP stream*/
-				if (edp_stream_num && edp_link->link_status.link_active) {
+				if (edp_link->link_status.link_active) {
 					edp_stream = edp_streams[0];
 					can_apply_edp_fast_boot = !is_edp_ilr_optimization_required(edp_stream->link, &edp_stream->timing);
 					edp_stream->apply_edp_fast_boot_optimization = can_apply_edp_fast_boot;
@@ -1837,7 +1845,7 @@ void dce110_enable_accelerated_mode(struct dc *dc, struct dc_state *context)
 			}
 		}
 		// We are trying to enable eDP, don't power down VDD
-		if (edp_stream_num && can_apply_edp_fast_boot)
+		if (can_apply_edp_fast_boot)
 			keep_edp_vdd_on = true;
 	}
 
@@ -2297,6 +2305,10 @@ enum dc_status dce110_apply_ctx_to_hw(
 	struct dc_bios *dcb = dc->ctx->dc_bios;
 	enum dc_status status;
 	int i;
+
+	/* reset syncd pipes from disabled pipes */
+	if (dc->config.use_pipe_ctx_sync_logic)
+		reset_syncd_pipes_from_disabled_pipes(dc, context);
 
 	/* Reset old context */
 	/* look up the targets that have been removed since last commit */

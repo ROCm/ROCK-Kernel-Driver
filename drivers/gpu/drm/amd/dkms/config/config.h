@@ -85,9 +85,6 @@
 /* dma_buf->dynamic_mapping is not available */
 /* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
-/* dma_buf_unpin() is available */
-#define HAVE_DMA_BUF_UNPIN 1
-
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
@@ -295,6 +292,9 @@
 
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
+
+/* display_info->is_hdmi is available */
+#define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
 
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
@@ -983,9 +983,6 @@
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
-
-/* struct dma_buf_ops->unpin() is available */
-#define HAVE_STRUCT_DMA_BUF_OPS_UNPIN 1
 
 /* struct drm_connector_state->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1

@@ -83,16 +83,17 @@ static int amdgpu_dm_patch_edid_caps(struct dc_edid_caps *edid_caps)
  *	void
  * */
 enum dc_edid_status dm_helpers_parse_edid_caps(
-		struct dc_context *ctx,
+		struct dc_link *link,
 		const struct dc_edid *edid,
 		struct dc_edid_caps *edid_caps)
 {
+	struct amdgpu_dm_connector *aconnector = link->priv;
+	struct drm_connector *connector = &aconnector->base;
 	struct edid *edid_buf = (struct edid *) edid->raw_edid;
 	struct cea_sad *sads;
 	int sad_count = -1;
 	int sadb_count = -1;
 	int i = 0;
-	int j = 0;
 	uint8_t *sadb = NULL;
 
 	enum dc_edid_status result = EDID_OK;
@@ -111,23 +112,16 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 	edid_caps->manufacture_week = edid_buf->mfg_week;
 	edid_caps->manufacture_year = edid_buf->mfg_year;
 
-	/* One of the four detailed_timings stores the monitor name. It's
-	 * stored in an array of length 13. */
-	for (i = 0; i < 4; i++) {
-		if (edid_buf->detailed_timings[i].data.other_data.type == 0xfc) {
-			while (j < 13 && edid_buf->detailed_timings[i].data.other_data.data.str.str[j]) {
-				if (edid_buf->detailed_timings[i].data.other_data.data.str.str[j] == '\n')
-					break;
+	drm_edid_get_monitor_name(edid_buf,
+				  edid_caps->display_name,
+				  AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
 
-				edid_caps->display_name[j] =
-					edid_buf->detailed_timings[i].data.other_data.data.str.str[j];
-				j++;
-			}
-		}
-	}
-
+#if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
+	edid_caps->edid_hdmi = connector->display_info.is_hdmi;
+#else
 	edid_caps->edid_hdmi = drm_detect_hdmi_monitor(
 			(struct edid *) edid->raw_edid);
+#endif
 
 	sad_count = drm_edid_to_sad((struct edid *) edid->raw_edid, &sads);
 	if (sad_count <= 0)
@@ -718,14 +712,8 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		/* We don't need the original edid anymore */
 		kfree(edid);
 
-		/* connector->display_info will be parsed from EDID and saved
-		 * into drm_connector->display_info from edid by call stack
-		 * below:
-		 * drm_parse_ycbcr420_deep_color_info
-		 * drm_parse_hdmi_forum_vsdb
-		 * drm_parse_cea_ext
-		 * drm_add_display_info
-		 * drm_connector_update_edid_property
+		/* connector->display_info is parsed from EDID and saved
+		 * into drm_connector->display_info
 		 *
 		 * drm_connector->display_info will be used by amdgpu_dm funcs,
 		 * like fill_stream_properties_from_drm_display_mode
@@ -733,7 +721,7 @@ enum dc_edid_status dm_helpers_read_local_edid(
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
 		edid_status = dm_helpers_parse_edid_caps(
-						ctx,
+						link,
 						&sink->dc_edid,
 						&sink->edid_caps);
 
