@@ -698,6 +698,15 @@ int smu_v13_0_set_tool_table_location(struct smu_context *smu)
 	return ret;
 }
 
+int smu_v13_0_set_light_sbr(struct smu_context *smu, bool enable)
+{
+	int ret = 0;
+	//For alderbarn chip, SMU would do a mode 1 reset as part of SBR hence we call it HeavySBR instead of light
+	ret =  smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_HeavySBR, enable ? 1 : 0, NULL);
+
+	return ret;
+}
+
 int smu_v13_0_init_display_count(struct smu_context *smu, uint32_t count)
 {
 	int ret = 0;
