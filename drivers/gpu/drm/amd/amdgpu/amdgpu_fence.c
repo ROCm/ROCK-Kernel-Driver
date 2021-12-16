@@ -642,7 +642,7 @@ void amdgpu_fence_driver_hw_init(struct amdgpu_device *adev)
 }
 
 /**
- * amdgpu_fence_clear_job_fences - clear job embedded fences of ring
+ * amdgpu_fence_driver_clear_job_fences - clear job embedded fences of ring
  *
  * @ring: fence of the ring to be cleared
  *
