@@ -268,6 +268,6 @@ int smu_v13_0_gfx_ulv_control(struct smu_context *smu,
 
 int smu_v13_0_wait_for_event(struct smu_context *smu, enum smu_event_type event,
 			     uint64_t event_arg);
-int smu_v13_0_set_light_sbr(struct smu_context *smu, bool enable);
+
 #endif
 #endif
