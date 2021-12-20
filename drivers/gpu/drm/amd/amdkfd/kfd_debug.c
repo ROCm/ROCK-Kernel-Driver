@@ -1116,43 +1116,44 @@ bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev)
 {
 	bool firmware_supported = true;
 
-	if (dev->adev->asic_type < CHIP_VEGA10)
+	if (!KFD_IS_SOC15(dev))
 		return false;
 
 	/*
 	 * Note: Any unlisted devices here are assumed to support exception handling.
 	 * Add additional checks here as needed.
 	 */
-	switch (dev->adev->asic_type) {
-	case CHIP_VEGA10:
+	switch (KFD_GC_VERSION(dev)) {
+	case IP_VERSION(9, 0, 1): /* Vega10 */
 		firmware_supported = dev->mec_fw_version >= 459 + 32768;
 		break;
-	case CHIP_VEGA12:
-	case CHIP_VEGA20:
-	case CHIP_RAVEN:
-	case CHIP_RENOIR:
+	case IP_VERSION(9, 1, 0): /* Raven */
+	case IP_VERSION(9, 2, 1): /* Vega12 */
+	case IP_VERSION(9, 2, 2): /* Raven */
+	case IP_VERSION(9, 3, 0): /* Renoir */
+	case IP_VERSION(9, 4, 0): /* Vega20 */
 		firmware_supported = dev->mec_fw_version >= 459;
 		break;
-	case CHIP_ARCTURUS:
+	case IP_VERSION(9, 4, 1): /* Arcturus */
 		firmware_supported = dev->mec_fw_version >= 60;
 		break;
-	case CHIP_ALDEBARAN:
+	case IP_VERSION(9, 4, 2): /* Aldebaran */
 		firmware_supported = dev->mec_fw_version >= 51;
 		break;
-	case CHIP_NAVI10:
-	case CHIP_NAVI12:
-	case CHIP_NAVI14:
+	case IP_VERSION(10, 1, 10): /* Navi10 */
+	case IP_VERSION(10, 1, 2): /* Navi12 */
+	case IP_VERSION(10, 1, 1): /* Navi14 */
 		firmware_supported = dev->mec_fw_version >= 144;
 		break;
-	case CHIP_SIENNA_CICHLID:
-	case CHIP_NAVY_FLOUNDER:
-	case CHIP_VANGOGH:
-	case CHIP_DIMGREY_CAVEFISH:
-	case CHIP_BEIGE_GOBY:
+	case IP_VERSION(10, 3, 0): /* Sieanna Cichlid */
+	case IP_VERSION(10, 3, 2): /* Navy Flounder */
+	case IP_VERSION(10, 3, 1): /* Van Gogh */
+	case IP_VERSION(10, 3, 4): /* Dimgrey Cavefish */
+	case IP_VERSION(10, 3, 5): /* Beige Goby */
 		firmware_supported = dev->mec_fw_version >= 89;
 		break;
-	case CHIP_YELLOW_CARP:
-	case CHIP_CYAN_SKILLFISH:
+	case IP_VERSION(10, 1, 3): /* Cyan Skillfish */
+	case IP_VERSION(10, 3, 3): /* Yellow Carp*/
 		firmware_supported = false;
 		break;
 	default:

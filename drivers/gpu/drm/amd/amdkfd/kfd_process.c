@@ -2347,7 +2347,7 @@ void kfd_process_drain_interrupts(struct kfd_process_device *pdd)
 {
 	uint32_t irq_drain_fence[8];
 
-	if (pdd->dev->adev->asic_type < CHIP_VEGA10)
+	if (!KFD_IS_SOC15(pdd->dev))
 		return;
 
 	pdd->process->irq_drain_is_open = true;

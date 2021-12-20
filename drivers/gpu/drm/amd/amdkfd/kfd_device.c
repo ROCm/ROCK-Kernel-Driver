@@ -502,12 +502,14 @@ static int kfd_gws_init(struct kfd_dev *kfd)
 		ret = amdgpu_amdkfd_alloc_gws(kfd->adev,
 				kfd->adev->gds.gws_size, &kfd->gws);
 
-	if ((kfd->adev->asic_type == CHIP_VEGA10
-			&& kfd->mec2_fw_version < 0x81b6)
-		|| (kfd->adev->asic_type >= CHIP_VEGA12
-			&& kfd->adev->asic_type <= CHIP_RAVEN
-			&& kfd->mec2_fw_version < 0x1b6)
-		|| (kfd->adev->asic_type == CHIP_ARCTURUS
+	if ((KFD_GC_VERSION(kfd) == IP_VERSION(9, 0, 1)
+			&& kfd->mec2_fw_version < 0x81b6) ||
+		(KFD_GC_VERSION(kfd) >= IP_VERSION(9, 1, 0)
+			&& KFD_GC_VERSION(kfd) <= IP_VERSION(9, 2, 2)
+			&& kfd->mec2_fw_version < 0x1b6) ||
+		(KFD_GC_VERSION(kfd) == IP_VERSION(9, 4, 0)
+			&& kfd->mec2_fw_version < 0x1b6) ||
+		(KFD_GC_VERSION(kfd) == IP_VERSION(9, 4, 1)
 			&& kfd->mec2_fw_version < 0x30))
 		kfd->gws_debug_workaround = true;
 
