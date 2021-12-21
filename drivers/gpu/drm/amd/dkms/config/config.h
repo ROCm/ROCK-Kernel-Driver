@@ -1187,6 +1187,9 @@
 /* __dma_fence_is_later() is available and has ops arg */
 #define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
 
+/* drm_edid_get_monitor_name is available*/
+#define HAVE_DRM_EDID_GET_MONITOR_NAME 1
+
 /* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
 #define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
 
