@@ -63,6 +63,9 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 	int sadb_count = -1;
 	int i = 0;
 	uint8_t *sadb = NULL;
+#if !defined(HAVE_DRM_EDID_GET_MONITOR_NAME)
+	int j = 0;
+#endif
 
 	enum dc_edid_status result = EDID_OK;
 
@@ -79,10 +82,26 @@ enum dc_edid_status dm_helpers_parse_edid_caps(
 	edid_caps->serial_number = edid_buf->serial;
 	edid_caps->manufacture_week = edid_buf->mfg_week;
 	edid_caps->manufacture_year = edid_buf->mfg_year;
-
+#if defined(HAVE_DRM_EDID_GET_MONITOR_NAME)
 	drm_edid_get_monitor_name(edid_buf,
 				  edid_caps->display_name,
 				  AUDIO_INFO_DISPLAY_NAME_SIZE_IN_CHARS);
+#else
+       /* One of the four detailed_timings stores the monitor name. It's
+        * stored in an array of length 13. */
+       for (i = 0; i < 4; i++) {
+               if (edid_buf->detailed_timings[i].data.other_data.type == 0xfc) {
+                       while (j < 13 && edid_buf->detailed_timings[i].data.other_data.data.str.str[j]) {
+                               if (edid_buf->detailed_timings[i].data.other_data.data.str.str[j] == '\n')
+                                       break;
+
+                               edid_caps->display_name[j] =
+                                       edid_buf->detailed_timings[i].data.other_data.data.str.str[j];
+                               j++;
+                       }
+               }
+       }
+#endif
 
 #if defined(HAVE_DRM_DISPLAY_INFO_IS_HDMI)
 	edid_caps->edid_hdmi = connector->display_info.is_hdmi;
