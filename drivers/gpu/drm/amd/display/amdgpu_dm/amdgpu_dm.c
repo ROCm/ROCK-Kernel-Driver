@@ -674,7 +674,7 @@ static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
 #endif /* CONFIG_DRM_AMD_SECURE_DISPLAY */
 
 /**
- * dmub_aux_setconfig_reply_callback - Callback for AUX or SET_CONFIG command.
+ * dmub_aux_setconfig_callback - Callback for AUX or SET_CONFIG command.
  * @adev: amdgpu_device pointer
  * @notify: dmub notification structure
  *
@@ -682,7 +682,8 @@ static void dm_dcn_vertical_interrupt0_high_irq(void *interrupt_params)
  * Copies dmub notification to DM which is to be read by AUX command.
  * issuing thread and also signals the event to wake up the thread.
  */
-void dmub_aux_setconfig_callback(struct amdgpu_device *adev, struct dmub_notification *notify)
+static void dmub_aux_setconfig_callback(struct amdgpu_device *adev,
+					struct dmub_notification *notify)
 {
 	if (adev->dm.dmub_notify)
 		memcpy(adev->dm.dmub_notify, notify, sizeof(struct dmub_notification));
@@ -698,7 +699,8 @@ void dmub_aux_setconfig_callback(struct amdgpu_device *adev, struct dmub_notific
  * Dmub Hpd interrupt processing callback. Gets displayindex through the
  * ink index and calls helper to do the processing.
  */
-void dmub_hpd_callback(struct amdgpu_device *adev, struct dmub_notification *notify)
+static void dmub_hpd_callback(struct amdgpu_device *adev,
+			      struct dmub_notification *notify)
 {
 	struct amdgpu_dm_connector *aconnector;
 	struct amdgpu_dm_connector *hpd_aconnector = NULL;
@@ -762,8 +764,10 @@ void dmub_hpd_callback(struct amdgpu_device *adev, struct dmub_notification *not
  * to dmub interrupt handling thread
  * Return: true if successfully registered, false if there is existing registration
  */
-bool register_dmub_notify_callback(struct amdgpu_device *adev, enum dmub_notification_type type,
-dmub_notify_interrupt_callback_t callback, bool dmub_int_thread_offload)
+static bool register_dmub_notify_callback(struct amdgpu_device *adev,
+					  enum dmub_notification_type type,
+					  dmub_notify_interrupt_callback_t callback,
+					  bool dmub_int_thread_offload)
 {
 	if (callback != NULL && type < ARRAY_SIZE(adev->dm.dmub_thread_offload)) {
 		adev->dm.dmub_callback[type] = callback;
@@ -1116,6 +1120,11 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 		DRM_INFO("DMUB unsupported on ASIC\n");
 		return 0;
 	}
+
+	/* Reset DMCUB if it was previously running - before we overwrite its memory. */
+	status = dmub_srv_hw_reset(dmub_srv);
+	if (status != DMUB_STATUS_OK)
+		DRM_WARN("Error resetting DMUB HW: %d\n", status);
 
 	hdr = (const struct dmcub_firmware_header_v1_0 *)dmub_fw->data;
 
@@ -6695,10 +6704,12 @@ static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 
 	if (aconnector->dc_link && (sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT ||
 		sink->sink_signal == SIGNAL_TYPE_EDP)) {
-		dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
-				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
-				      aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
-				      dsc_caps);
+		if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE ||
+			sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER)
+			dc_dsc_parse_dsc_dpcd(aconnector->dc_link->ctx->dc,
+				aconnector->dc_link->dpcd_caps.dsc_caps.dsc_basic_caps.raw,
+				aconnector->dc_link->dpcd_caps.dsc_caps.dsc_branch_decoder_caps.raw,
+				dsc_caps);
 	}
 }
 
@@ -6768,6 +6779,8 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	uint32_t link_bandwidth_kbps;
 	uint32_t max_dsc_target_bpp_limit_override = 0;
 	struct dc *dc = sink->ctx->dc;
+	uint32_t max_supported_bw_in_kbps, timing_bw_in_kbps;
+	uint32_t dsc_max_supported_bw_in_kbps;
 
 	link_bandwidth_kbps = dc_link_bandwidth_kbps(aconnector->dc_link,
 							dc_link_get_link_cap(aconnector->dc_link));
@@ -6786,16 +6799,37 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 		apply_dsc_policy_for_edp(aconnector, sink, stream, dsc_caps, max_dsc_target_bpp_limit_override);
 
 	} else if (aconnector->dc_link && sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT) {
-
-		if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
+		if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE) {
+			if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
 						dsc_caps,
 						aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
 						max_dsc_target_bpp_limit_override,
 						link_bandwidth_kbps,
 						&stream->timing,
 						&stream->timing.dsc_cfg)) {
-			stream->timing.flags.DSC = 1;
-			DRM_DEBUG_DRIVER("%s: [%s] DSC is selected from SST RX\n", __func__, drm_connector->name);
+				stream->timing.flags.DSC = 1;
+				DRM_DEBUG_DRIVER("%s: [%s] DSC is selected from SST RX\n",
+								 __func__, drm_connector->name);
+			}
+		} else if (sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
+			timing_bw_in_kbps = dc_bandwidth_in_kbps_from_timing(&stream->timing);
+			max_supported_bw_in_kbps = link_bandwidth_kbps;
+			dsc_max_supported_bw_in_kbps = link_bandwidth_kbps;
+
+			if (timing_bw_in_kbps > max_supported_bw_in_kbps &&
+					max_supported_bw_in_kbps > 0 &&
+					dsc_max_supported_bw_in_kbps > 0)
+				if (dc_dsc_compute_config(aconnector->dc_link->ctx->dc->res_pool->dscs[0],
+						dsc_caps,
+						aconnector->dc_link->ctx->dc->debug.dsc_min_slice_height_override,
+						max_dsc_target_bpp_limit_override,
+						dsc_max_supported_bw_in_kbps,
+						&stream->timing,
+						&stream->timing.dsc_cfg)) {
+					stream->timing.flags.DSC = 1;
+					DRM_DEBUG_DRIVER("%s: [%s] DSC is selected from DP-HDMI PCON\n",
+									 __func__, drm_connector->name);
+				}
 		}
 	}
 
@@ -12962,8 +12996,10 @@ uint32_t dm_read_reg_func(const struct dc_context *ctx, uint32_t address,
 	return value;
 }
 
-int amdgpu_dm_set_dmub_async_sync_status(bool is_cmd_aux, struct dc_context *ctx,
-	uint8_t status_type, uint32_t *operation_result)
+static int amdgpu_dm_set_dmub_async_sync_status(bool is_cmd_aux,
+						struct dc_context *ctx,
+						uint8_t status_type,
+						uint32_t *operation_result)
 {
 	struct amdgpu_device *adev = ctx->driver_context;
 	int return_status = -1;

@@ -226,6 +226,8 @@ struct dummy_pstate_entry {
 struct clk_bw_params {
 	unsigned int vram_type;
 	unsigned int num_channels;
+ 	unsigned int dispclk_vco_khz;
+	unsigned int dc_mode_softmax_memclk;
 	struct clk_limit_table clk_table;
 	struct wm_table wm_table;
 	struct dummy_pstate_entry dummy_pstate_table[4];
@@ -278,6 +280,10 @@ struct clk_mgr_funcs {
 	/* Send message to PMFW to set hard max memclk frequency to highest DPM */
 	void (*set_hard_max_memclk)(struct clk_mgr *clk_mgr);
 
+	/* Custom set a memclk freq range*/
+	void (*set_max_memclk)(struct clk_mgr *clk_mgr, unsigned int memclk_mhz);
+	void (*set_min_memclk)(struct clk_mgr *clk_mgr, unsigned int memclk_mhz);
+
 	/* Get current memclk states from PMFW, update relevant structures */
 	void (*get_memclk_states_from_smu)(struct clk_mgr *clk_mgr);
 #endif
@@ -294,6 +300,7 @@ struct clk_mgr {
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool force_smu_not_present;
 #endif
+	bool dc_mode_softmax_enabled;
 	int dprefclk_khz; // Used by program pixel clock in clock source funcs, need to figureout where this goes
 	int dentist_vco_freq_khz;
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x

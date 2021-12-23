@@ -1159,7 +1159,7 @@ struct amdgpu_device {
 	bool				barrier_has_auto_waitcnt;
 
 	struct amdgpu_reset_control     *reset_cntl;
-	uint32_t                        ip_versions[HW_ID_MAX][HWIP_MAX_INSTANCE];
+	uint32_t                        ip_versions[MAX_HWIP][HWIP_MAX_INSTANCE];
 
 	bool				ram_is_direct_mapped;
 };
@@ -1396,6 +1396,8 @@ void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring);
 void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring);
+
+void amdgpu_device_halt(struct amdgpu_device *adev);
 
 /* atpx handler */
 #if defined(CONFIG_VGA_SWITCHEROO)

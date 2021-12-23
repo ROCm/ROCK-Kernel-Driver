@@ -457,6 +457,7 @@ bool dc_link_should_enable_fec(const struct dc_link *link);
 #endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+uint32_t dc_link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw);
 enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc_link *link);
 #endif
 #endif /* DC_LINK_H_ */

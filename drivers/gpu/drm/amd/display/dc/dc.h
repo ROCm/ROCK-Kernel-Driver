@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.164"
+#define DC_VER "3.2.166"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -197,6 +197,7 @@ struct dc_caps {
 	struct dc_color_caps color;
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool dp_hpo;
+	bool hdmi_frl_pcon_support;
 #endif
 	bool edp_dsc_support;
 	bool vbios_lttpr_aware;
@@ -1356,6 +1357,11 @@ struct dc_sink_dsc_caps {
 	// 'true' if these are virtual DPCD's DSC caps (immediately upstream of sink in MST topology),
 	// 'false' if they are sink's DSC caps
 	bool is_virtual_dpcd_dsc;
+#if defined(CONFIG_DRM_AMD_DC_DCN)
+	// 'true' if MST topology supports DSC passthrough for sink
+	// 'false' if MST topology does not support DSC passthrough
+	bool is_dsc_passthrough_supported;
+#endif
 	struct dsc_dec_dpcd_caps dsc_dec_caps;
 };
 #endif
@@ -1473,6 +1479,9 @@ void dc_unlock_memory_clock_frequency(struct dc *dc);
  * max to maxDPM, and unblank streams
  */
 void dc_lock_memory_clock_frequency(struct dc *dc);
+
+/* set soft max for memclk, to be used for AC/DC switching clock limitations */
+void dc_enable_dcmode_clk_limit(struct dc *dc, bool enable);
 
 /* cleanup on driver unload */
 void dc_hardware_release(struct dc *dc);

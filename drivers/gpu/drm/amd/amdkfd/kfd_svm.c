@@ -2041,7 +2041,7 @@ restart:
 
 		pr_debug("drain retry fault gpu %d svms %p\n", i, svms);
 
-		amdgpu_ih_wait_on_checkpoint_process(pdd->dev->adev,
+		amdgpu_ih_wait_on_checkpoint_process_ts(pdd->dev->adev,
 						     &pdd->dev->adev->irq.ih1);
 		pr_debug("drain retry fault gpu %d svms 0x%p done\n", i, svms);
 	}
@@ -2673,6 +2673,7 @@ svm_range_restore_pages(struct amdgpu_device *adev, unsigned int pasid,
 
 	if (atomic_read(&svms->drain_pagefaults)) {
 		pr_debug("draining retry fault, drop fault 0x%llx\n", addr);
+		r = 0;
 		goto out;
 	}
 
@@ -2682,6 +2683,7 @@ svm_range_restore_pages(struct amdgpu_device *adev, unsigned int pasid,
 	mm = get_task_mm(p->lead_thread);
 	if (!mm) {
 		pr_debug("svms 0x%p failed to get mm\n", svms);
+		r = 0;
 		goto out;
 	}
 
@@ -2719,6 +2721,7 @@ retry_write_locked:
 
 	if (svm_range_skip_recover(prange)) {
 		amdgpu_gmc_filter_faults_remove(adev, addr, pasid);
+		r = 0;
 		goto out_unlock_range;
 	}
 
@@ -2727,6 +2730,7 @@ retry_write_locked:
 	if (timestamp < AMDGPU_SVM_RANGE_RETRY_FAULT_PENDING) {
 		pr_debug("svms 0x%p [0x%lx %lx] already restored\n",
 			 svms, prange->start, prange->last);
+		r = 0;
 		goto out_unlock_range;
 	}
 

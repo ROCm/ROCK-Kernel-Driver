@@ -542,6 +542,9 @@ void amdgpu_irq_dispatch(struct amdgpu_device *adev,
 	/* Send it to amdkfd as well if it isn't already handled */
 	if (!handled)
 		amdgpu_amdkfd_interrupt(adev, entry.iv_entry);
+
+	if (amdgpu_ih_ts_after(ih->processed_timestamp, entry.timestamp))
+		ih->processed_timestamp = entry.timestamp;
 }
 
 /**
