@@ -772,6 +772,7 @@ static const struct dma_fence_ops amdgpu_job_fence_ops = {
 	.get_driver_name = amdgpu_fence_get_driver_name,
 	.get_timeline_name = amdgpu_job_fence_get_timeline_name,
 	.enable_signaling = amdgpu_job_fence_enable_signaling,
+	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 	.release = amdgpu_job_fence_release,
 };
 
