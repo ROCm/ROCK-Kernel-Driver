@@ -1747,17 +1747,6 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	if (offset)
 		*offset = amdgpu_bo_mmap_offset(bo);
 
-	if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
-			KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
-		ret = amdgpu_amdkfd_gpuvm_pin_bo(bo, AMDGPU_GEM_DOMAIN_GTT);
-		if (ret) {
-			pr_err("Pinning MMIO/DOORBELL BO during ALLOC FAILED\n");
-			goto err_pin_bo;
-		}
-		bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
-		bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-	}
-
 	return 0;
 
 allocate_init_user_pages_failed:
