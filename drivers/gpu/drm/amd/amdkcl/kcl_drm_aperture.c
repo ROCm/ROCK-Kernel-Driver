@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-#ifndef HAVE_DRM_APERTURE
+#ifndef HAVE_DRM_APERTURE_H
+
 #include <linux/fb.h>
 #include <linux/pci.h>
 #include <linux/vgaarb.h>
@@ -142,4 +143,4 @@ int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev, const
 }
 EXPORT_SYMBOL(drm_aperture_remove_conflicting_pci_framebuffers);
 
-#endif /* HAVE_DRM_APERTURE */
+#endif /* HAVE_DRM_APERTURE_H */
