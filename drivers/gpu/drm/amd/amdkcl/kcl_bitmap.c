@@ -26,23 +26,23 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 
-unsigned long *bitmap_alloc(unsigned int nbits, gfp_t flags)
+unsigned long *kcl_bitmap_alloc(unsigned int nbits, gfp_t flags)
 {
         return kmalloc_array(BITS_TO_LONGS(nbits), sizeof(unsigned long),
                              flags);
 }
-EXPORT_SYMBOL(bitmap_alloc);
+EXPORT_SYMBOL(kcl_bitmap_alloc);
 
-unsigned long *bitmap_zalloc(unsigned int nbits, gfp_t flags)
+unsigned long *kcl_bitmap_zalloc(unsigned int nbits, gfp_t flags)
 {
-        return bitmap_alloc(nbits, flags | __GFP_ZERO);
+        return kcl_bitmap_alloc(nbits, flags | __GFP_ZERO);
 }
-EXPORT_SYMBOL(bitmap_zalloc);
+EXPORT_SYMBOL(kcl_bitmap_zalloc);
 
-void bitmap_free(const unsigned long *bitmap)
+void kcl_bitmap_free(const unsigned long *bitmap)
 {
         kfree(bitmap);
 }
-EXPORT_SYMBOL(bitmap_free);
+EXPORT_SYMBOL(kcl_bitmap_free);
 #endif /* HAVE_BITMAP_FUNCS */
 
