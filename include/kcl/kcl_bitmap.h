@@ -34,9 +34,9 @@
  * Allocation and deallocation of bitmap.
  * Provided in lib/bitmap.c to avoid circular dependency.
  */
-unsigned long *bitmap_alloc(unsigned int nbits, gfp_t flags);
-unsigned long *bitmap_zalloc(unsigned int nbits, gfp_t flags);
-void bitmap_free(const unsigned long *bitmap);
+unsigned long *kcl_bitmap_alloc(unsigned int nbits, gfp_t flags);
+unsigned long *kcl_bitmap_zalloc(unsigned int nbits, gfp_t flags);
+void kcl_bitmap_free(const unsigned long *bitmap);
 #endif /* HAVE_BITMAP_FUNCS */
 
 #endif /* KCL_BITMAP_H */
