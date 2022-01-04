@@ -109,6 +109,7 @@
 #include "amdgpu_smuio.h"
 #include "amdgpu_fdinfo.h"
 #include "amdgpu_mca.h"
+#include "amdgpu_ras.h"
 
 #define MAX_GPU_INSTANCE		16
 
