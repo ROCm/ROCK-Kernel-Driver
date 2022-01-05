@@ -23,9 +23,7 @@
  */
 
 #include <drm/amdgpu_drm.h>
-#ifdef HAVE_DRM_DRM_APERTURE_H
 #include <drm/drm_aperture.h>
-#endif
 #include <drm/drm_drv.h>
 #include <drm/drm_gem.h>
 #include <drm/drm_vblank.h>
@@ -335,10 +333,11 @@ module_param_named(aspm, amdgpu_aspm, int, 0444);
 
 /**
  * DOC: runpm (int)
- * Override for runtime power management control for dGPUs in PX/HG laptops. The amdgpu driver can dynamically power down
- * the dGPU on PX/HG laptops when it is idle. The default is -1 (auto enable). Setting the value to 0 disables this functionality.
+ * Override for runtime power management control for dGPUs. The amdgpu driver can dynamically power down
+ * the dGPUs when they are idle if supported. The default is -1 (auto enable).
+ * Setting the value to 0 disables this functionality.
  */
-MODULE_PARM_DESC(runpm, "PX runtime pm (2 = force enable with BAMACO, 1 = force enable with BACO, 0 = disable, -1 = PX only default)");
+MODULE_PARM_DESC(runpm, "PX runtime pm (2 = force enable with BAMACO, 1 = force enable with BACO, 0 = disable, -1 = auto)");
 module_param_named(runpm, amdgpu_runtime_pm, int, 0444);
 
 /**
@@ -2340,11 +2339,26 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 	vga_switcheroo_set_dynamic_switch(pdev, VGA_SWITCHEROO_OFF);
 #endif
 
+	/*
+	 * By setting mp1_state as PP_MP1_STATE_UNLOAD, MP1 will do some
+	 * proper cleanups and put itself into a state ready for PNP. That
+	 * can address some random resuming failure observed on BOCO capable
+	 * platforms.
+	 * TODO: this may be also needed for PX capable platform.
+	 */
+	if (amdgpu_device_supports_boco(drm_dev))
+		adev->mp1_state = PP_MP1_STATE_UNLOAD;
+
 	ret = amdgpu_device_suspend(drm_dev, false);
 	if (ret) {
 		adev->in_runpm = false;
+		if (amdgpu_device_supports_boco(drm_dev))
+			adev->mp1_state = PP_MP1_STATE_NONE;
 		return ret;
 	}
+
+	if (amdgpu_device_supports_boco(drm_dev))
+		adev->mp1_state = PP_MP1_STATE_NONE;
 
 	if (amdgpu_device_supports_px(drm_dev)) {
 		/* Only need to handle PCI state in the driver for ATPX

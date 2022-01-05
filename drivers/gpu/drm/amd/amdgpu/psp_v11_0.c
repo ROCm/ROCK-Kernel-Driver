@@ -284,7 +284,6 @@ static int psp_v11_0_bootloader_load_component(struct psp_context  	*psp,
 	int ret;
 	uint32_t psp_gfxdrv_command_reg = 0;
 	struct amdgpu_device *adev = psp->adev;
-	uint32_t sol_reg;
 
 	/* Check sOS sign of life register to confirm sys driver and sOS
 	 * are already been loaded.
