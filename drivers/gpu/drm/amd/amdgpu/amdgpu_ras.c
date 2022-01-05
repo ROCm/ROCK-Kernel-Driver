@@ -977,12 +977,6 @@ int amdgpu_ras_query_error_status(struct amdgpu_device *adev,
 		amdgpu_ras_get_ecc_info(adev, &err_data);
 		break;
 	case AMDGPU_RAS_BLOCK__SDMA:
-		if (adev->sdma.funcs->query_ras_error_count) {
-			for (i = 0; i < adev->sdma.num_instances; i++)
-				adev->sdma.funcs->query_ras_error_count(adev, i,
-									&err_data);
-		}
-		break;
 	case AMDGPU_RAS_BLOCK__GFX:
 	case AMDGPU_RAS_BLOCK__MMHUB:
 		if (!block_obj || !block_obj->hw_ops)   {
@@ -1088,9 +1082,6 @@ int amdgpu_ras_reset_error_status(struct amdgpu_device *adev,
 			block_obj->hw_ops->reset_ras_error_status(adev);
 		break;
 	case AMDGPU_RAS_BLOCK__SDMA:
-		if (adev->sdma.funcs->reset_ras_error_count)
-			adev->sdma.funcs->reset_ras_error_count(adev);
-		break;
 	case AMDGPU_RAS_BLOCK__HDP:
 		if (!block_obj || !block_obj->hw_ops)	{
 			dev_info(adev->dev, "%s doesn't config ras function \n", ras_block_str(block));
