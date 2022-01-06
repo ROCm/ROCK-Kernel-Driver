@@ -49,6 +49,9 @@
 /* backlight_device_set_brightness() is available */
 #define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
 
+/* bitmap_free() is available */
+#define HAVE_BITMAP_FUNCS 1
+
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
@@ -287,14 +290,14 @@
 /* display_info->hdmi.scdc.scrambling are available */
 #define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
 
+/* display_info->is_hdmi is available */
+#define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
+
 /* display_info->max_tmds_clock is available */
 #define HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK 1
 
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
-
-/* display_info->is_hdmi is available */
-#define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
 
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
@@ -439,7 +442,7 @@
 #define HAVE_DRM_DRM_IOCTL_H 1
 
 /* Define to 1 if you have the <drm/drm_irq.h> header file. */
-#define HAVE_DRM_DRM_IRQ_H 1
+/* #undef HAVE_DRM_DRM_IRQ_H */
 
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
@@ -670,6 +673,9 @@
 
 /* drm_universal_plane_init() wants 9 args */
 #define HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS 1
+
+/* drm_vblank->time uses ktime_t type */
+#define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
@@ -1172,7 +1178,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 5.13.6"
+#define PACKAGE_STRING "amdgpu-dkms 5.13.5"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1181,7 +1187,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.13.6"
+#define PACKAGE_VERSION "5.13.5"
 
 #include "config-amd-chips.h"
 
