@@ -32,6 +32,7 @@ AC_DEFUN([AC_AMDGPU_HMM_RANGE_FAULT], [
 ])
 
 dnl #
+dnl # v5.1-10231-gbf198b2b34bf: mm/mmu_notifier: pass down vma and reasons why mmu notifier is happening
 dnl # 93f4e735b6d9 - mm/hmm: remove hmm_range_dma_map and hmm_range_dma_unmap <Christoph Hellwig> 2019-11-23 19:56:45 -0400
 dnl # d28c2c9a4877 - mm/hmm: make full use of walk_page_range() <Ralph Campbell> 2019-11-23 19:56:45 -0400
 dnl # d3eeb1d77c5d - xen/gntdev: use mmu_interval_notifier_insert <Jason Gunthorpe> 2019-11-23 19:56:45 -0400
@@ -53,10 +54,14 @@ AC_DEFUN([AC_AMDGPU_HMM], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/hmm.h>
+			#include <linux/mmu_notifier.h>
 		], [
 			#ifdef CONFIG_HMM_MIRROR
 			struct hmm_range *range = NULL;
+			struct mmu_notifier_range *mmu_range = NULL;
+
 			range->notifier = NULL;
+			mmu_range->vma = NULL;
 			#else
 			#error CONFIG_HMM_MIRROR not enabled
 			#endif
