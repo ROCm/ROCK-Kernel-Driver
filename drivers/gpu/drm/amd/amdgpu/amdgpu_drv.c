@@ -3003,7 +3003,9 @@ static struct drm_driver amdgpu_kms_driver = {
 	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
 	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #endif
+#ifdef CONFIG_DRM_LEGACY
 	.irq_handler = amdgpu_irq_handler,
+#endif
 	.ioctls = amdgpu_ioctls_kms,
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	.gem_free_object_unlocked = amdgpu_gem_object_free,

@@ -121,6 +121,9 @@ enum interrupt_node_id_per_aid {
 extern const int node_id_to_phys_map[NODEID_MAX];
 
 void amdgpu_irq_disable_all(struct amdgpu_device *adev);
+#ifdef CONFIG_DRM_LEGACY
+irqreturn_t amdgpu_irq_handler(int irq, void *arg);
+#endif
 
 int amdgpu_irq_init(struct amdgpu_device *adev);
 void amdgpu_irq_fini_sw(struct amdgpu_device *adev);
