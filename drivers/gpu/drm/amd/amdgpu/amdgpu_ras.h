@@ -29,6 +29,8 @@
 #include "ta_ras_if.h"
 #include "amdgpu_ras_eeprom.h"
 
+struct amdgpu_iv_entry;
+
 #define AMDGPU_RAS_FLAG_INIT_BY_VBIOS		(0x1 << 0)
 
 enum amdgpu_ras_block {
