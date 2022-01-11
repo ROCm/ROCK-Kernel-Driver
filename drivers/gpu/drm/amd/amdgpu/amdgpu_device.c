@@ -4581,6 +4581,7 @@ bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev)
 		case CHIP_BEIGE_GOBY:
 		case CHIP_VANGOGH:
 		case CHIP_ALDEBARAN:
+		case CHIP_YELLOW_CARP:
 			break;
 		default:
 			goto disabled;
