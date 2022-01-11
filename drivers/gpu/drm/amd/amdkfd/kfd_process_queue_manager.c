@@ -155,7 +155,7 @@ int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p)
 	pqm->queue_slot_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 					       GFP_KERNEL);
 #else
-	pqm->queue_slot_bitmap = kcl_bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
+	pqm->queue_slot_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 					       GFP_KERNEL);
 #endif
 	if (!pqm->queue_slot_bitmap)
@@ -182,7 +182,7 @@ void pqm_uninit(struct process_queue_manager *pqm)
 #if defined(HAVE_BITMAP_FUNCS)
 	bitmap_free(pqm->queue_slot_bitmap);
 #else
-	kcl_bitmap_free(pqm->queue_slot_bitmap);
+	bitmap_free(pqm->queue_slot_bitmap);
 #endif
 	pqm->queue_slot_bitmap = NULL;
 }
