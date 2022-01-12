@@ -198,7 +198,9 @@ static struct attribute *amdgpu_xgmi_hive_attrs[] = {
 	&amdgpu_xgmi_hive_id,
 	NULL
 };
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 ATTRIBUTE_GROUPS(amdgpu_xgmi_hive);
+#endif
 
 static ssize_t amdgpu_xgmi_show_attrs(struct kobject *kobj,
 	struct attribute *attr, char *buf)
@@ -231,7 +233,11 @@ static const struct sysfs_ops amdgpu_xgmi_hive_ops = {
 struct kobj_type amdgpu_xgmi_hive_type = {
 	.release = amdgpu_xgmi_hive_release,
 	.sysfs_ops = &amdgpu_xgmi_hive_ops,
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 	.default_groups = amdgpu_xgmi_hive_groups,
+#else
+	.default_attrs = amdgpu_xgmi_hive_attrs,
+#endif
 };
 
 static ssize_t amdgpu_xgmi_show_device_id(struct device *dev,
