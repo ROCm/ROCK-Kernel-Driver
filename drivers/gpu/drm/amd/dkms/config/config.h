@@ -1147,6 +1147,9 @@
 /* __print_array is available */
 #define HAVE___PRINT_ARRAY 1
 
+/* kobj_type->default_groups is available */
+#define HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
