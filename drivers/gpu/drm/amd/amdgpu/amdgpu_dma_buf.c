@@ -94,43 +94,43 @@ int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
 static int
 __dma_resv_make_exclusive(struct dma_resv *obj)
 {
-	struct dma_fence **fences;
-	unsigned int count;
-	int r;
+        struct dma_fence **fences;
+        unsigned int count;
+        int r;
 
-	if (!dma_resv_shared_list(obj)) /* no shared fences to convert */
-		return 0;
+        if (!dma_resv_shared_list(obj)) /* no shared fences to convert */
+                return 0;
 
-	r = dma_resv_get_fences(obj, NULL, &count, &fences);
-	if (r)
-		return r;
+        r = dma_resv_get_fences(obj, NULL, &count, &fences);
+        if (r)
+                return r;
 
-	if (count == 0) {
-		/* Now that was unexpected. */
-	} else if (count == 1) {
-		dma_resv_add_excl_fence(obj, fences[0]);
-		dma_fence_put(fences[0]);
-		kfree(fences);
-	} else {
-		struct dma_fence_array *array;
+        if (count == 0) {
+                /* Now that was unexpected. */
+        } else if (count == 1) {
+                dma_resv_add_excl_fence(obj, fences[0]);
+                dma_fence_put(fences[0]);
+                kfree(fences);
+        } else {
+                struct dma_fence_array *array;
 
-		array = dma_fence_array_create(count, fences,
-					       dma_fence_context_alloc(1), 0,
-					       false);
-		if (!array)
-			goto err_fences_put;
+                array = dma_fence_array_create(count, fences,
+                                               dma_fence_context_alloc(1), 0,
+                                               false);
+                if (!array)
+                        goto err_fences_put;
 
-		dma_resv_add_excl_fence(obj, &array->base);
-		dma_fence_put(&array->base);
-	}
+                dma_resv_add_excl_fence(obj, &array->base);
+                dma_fence_put(&array->base);
+        }
 
-	return 0;
+        return 0;
 
 err_fences_put:
-	while (count--)
-		dma_fence_put(fences[count]);
-	kfree(fences);
-	return -ENOMEM;
+        while (count--)
+                dma_fence_put(fences[count]);
+        kfree(fences);
+        return -ENOMEM;
 }
 
 #if defined(HAVE_DMA_BUF_OPS_LEGACY)
@@ -189,8 +189,6 @@ static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 	if (r)
 		goto error_unreserve;
 
-	if (attach->dev->driver != adev->dev->driver)
-		bo->prime_shared_count++;
 
 error_unreserve:
 	amdgpu_bo_unreserve(bo);
@@ -222,8 +220,6 @@ static void amdgpu_dma_buf_map_detach(struct dma_buf *dma_buf,
 		goto error;
 
 	amdgpu_bo_unpin(bo);
-	if (attach->dev->driver != adev->dev->driver && bo->prime_shared_count)
-		bo->prime_shared_count--;
 	amdgpu_bo_unreserve(bo);
 
 error:
@@ -255,24 +251,6 @@ static int amdgpu_dma_buf_attach(struct dma_buf *dmabuf,
 	if (r < 0)
 		goto out;
 
-	r = amdgpu_bo_reserve(bo, false);
-	if (unlikely(r != 0))
-		goto out;
-
-	/*
-	 * We only create shared fences for internal use, but importers
-	 * of the dmabuf rely on exclusive fences for implicitly
-	 * tracking write hazards. As any of the current fences may
-	 * correspond to a write, we need to convert all existing
-	 * fences on the reservation object into a single exclusive
-	 * fence.
-	 */
-	r = __dma_resv_make_exclusive(amdkcl_ttm_resvp(&bo->tbo));
-	if (r)
-		goto out;
-
-	bo->prime_shared_count++;
-	amdgpu_bo_unreserve(bo);
 	return 0;
 
 out:
@@ -634,11 +612,6 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
-#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
-	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
-#endif
-		bo->prime_shared_count = 1;
-
 	dma_resv_unlock(resv);
 	return &bo->tbo.base;
 
@@ -874,8 +847,6 @@ int amdgpu_gem_prime_pin(struct drm_gem_object *obj)
 
 	/* pin buffer into GTT */
 	ret = amdgpu_bo_pin(bo, AMDGPU_GEM_DOMAIN_GTT);
-	if (likely(ret == 0))
-		bo->prime_shared_count++;
 
 	amdgpu_bo_unreserve(bo);
 	return ret;
@@ -891,8 +862,6 @@ void amdgpu_gem_prime_unpin(struct drm_gem_object *obj)
 		return;
 
 	amdgpu_bo_unpin(bo);
-	if (bo->prime_shared_count)
-		bo->prime_shared_count--;
 	amdgpu_bo_unreserve(bo);
 }
 #endif
