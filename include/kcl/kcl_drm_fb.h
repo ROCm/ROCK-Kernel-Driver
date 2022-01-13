@@ -128,4 +128,9 @@ void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
 	_kcl_drm_fb_helper_set_suspend_unlocked(fb_helper, suspend);
 }
 #endif
+
+#ifndef HAVE_IS_FIRMWARE_FRAMEBUFFER
+extern bool is_firmware_framebuffer(struct apertures_struct *a);
+#endif
+
 #endif
