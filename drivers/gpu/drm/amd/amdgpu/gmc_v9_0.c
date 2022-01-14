@@ -1299,10 +1299,6 @@ static int gmc_v9_0_early_init(void *handle)
 	adev->gmc.private_aperture_end =
 		adev->gmc.private_aperture_start + (4ULL << 30) - 1;
 
-	/* Need to get xgmi info earlier to decide the reset behavior*/
-	if (adev->gmc.xgmi.supported)
-		adev->gfxhub.funcs->get_xgmi_info(adev);
-
 	return 0;
 }
 
