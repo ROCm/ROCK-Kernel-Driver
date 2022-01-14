@@ -870,7 +870,7 @@ static int amdgpu_ras_enable_all_features(struct amdgpu_device *adev,
 static int amdgpu_ras_block_match_default(struct amdgpu_ras_block_object *block_obj,
 		enum amdgpu_ras_block block)
 {
-	if(!block_obj)
+	if (!block_obj)
 		return -EINVAL;
 
 	if (block_obj->block == block)
@@ -879,7 +879,7 @@ static int amdgpu_ras_block_match_default(struct amdgpu_ras_block_object *block_
 	return -EINVAL;
 }
 
-static struct amdgpu_ras_block_object* amdgpu_ras_get_ras_block(struct amdgpu_device *adev,
+static struct amdgpu_ras_block_object *amdgpu_ras_get_ras_block(struct amdgpu_device *adev,
 					enum amdgpu_ras_block block, uint32_t sub_block_index)
 {
 	struct amdgpu_ras_block_object *obj, *tmp;
@@ -939,7 +939,7 @@ static void amdgpu_ras_get_ecc_info(struct amdgpu_device *adev, struct ras_err_d
 int amdgpu_ras_query_error_status(struct amdgpu_device *adev,
 				  struct ras_query_if *info)
 {
-	struct amdgpu_ras_block_object* block_obj = NULL;
+	struct amdgpu_ras_block_object *block_obj = NULL;
 	struct ras_manager *obj = amdgpu_ras_find_obj(adev, &info->head);
 	struct ras_err_data err_data = {0, 0, 0, NULL};
 
@@ -951,7 +951,7 @@ int amdgpu_ras_query_error_status(struct amdgpu_device *adev,
 	} else {
 		block_obj = amdgpu_ras_get_ras_block(adev, info->head.block, 0);
 		if (!block_obj || !block_obj->hw_ops)   {
-			dev_info(adev->dev, "%s doesn't config ras function \n",
+			dev_info(adev->dev, "%s doesn't config ras function.\n",
 					get_ras_block_str(&info->head));
 			return -EINVAL;
 		}
@@ -1021,13 +1021,14 @@ int amdgpu_ras_query_error_status(struct amdgpu_device *adev,
 int amdgpu_ras_reset_error_status(struct amdgpu_device *adev,
 		enum amdgpu_ras_block block)
 {
-	struct amdgpu_ras_block_object* block_obj = amdgpu_ras_get_ras_block(adev, block, 0);
+	struct amdgpu_ras_block_object *block_obj = amdgpu_ras_get_ras_block(adev, block, 0);
 
 	if (!amdgpu_ras_is_supported(adev, block))
 		return -EINVAL;
 
 	if (!block_obj || !block_obj->hw_ops)   {
-		dev_info(adev->dev, "%s doesn't config ras function \n", ras_block_str(block));
+		dev_info(adev->dev, "%s doesn't config ras function.\n",
+				ras_block_str(block));
 		return -EINVAL;
 	}
 
@@ -1064,7 +1065,8 @@ int amdgpu_ras_error_inject(struct amdgpu_device *adev,
 		return -EINVAL;
 
 	if (!block_obj || !block_obj->hw_ops)	{
-		dev_info(adev->dev, "%s doesn't config ras function \n", get_ras_block_str(&info->head));
+		dev_info(adev->dev, "%s doesn't config ras function.\n",
+					get_ras_block_str(&info->head));
 		return -EINVAL;
 	}
 
@@ -1700,19 +1702,25 @@ static void amdgpu_ras_log_on_err_counter(struct amdgpu_device *adev)
 static void amdgpu_ras_error_status_query(struct amdgpu_device *adev,
 					  struct ras_query_if *info)
 {
-	struct amdgpu_ras_block_object* block_obj = amdgpu_ras_get_ras_block(adev, info->head.block, info->head.sub_block_index);
+	struct amdgpu_ras_block_object *block_obj = amdgpu_ras_get_ras_block(adev,
+									info->head.block,
+									info->head.sub_block_index);
 	/*
 	 * Only two block need to query read/write
 	 * RspStatus at current state
 	 */
 	if ((info->head.block != AMDGPU_RAS_BLOCK__GFX) &&
 		(info->head.block != AMDGPU_RAS_BLOCK__MMHUB))
-		return ;
+		return;
 
-	block_obj = amdgpu_ras_get_ras_block(adev, info->head.block, info->head.sub_block_index);
+	block_obj = amdgpu_ras_get_ras_block(adev,
+					info->head.block,
+					info->head.sub_block_index);
+
 	if (!block_obj || !block_obj->hw_ops) {
-		dev_info(adev->dev, "%s doesn't config ras function \n", get_ras_block_str(&info->head));
-		return ;
+		dev_info(adev->dev, "%s doesn't config ras function.\n",
+			get_ras_block_str(&info->head));
+		return;
 	}
 
 	if (block_obj->hw_ops->query_ras_error_status)
@@ -2712,7 +2720,7 @@ static void amdgpu_register_bad_pages_mca_notifier(void)
 }
 #endif
 
-struct amdgpu_ras* amdgpu_ras_get_context(struct amdgpu_device *adev)
+struct amdgpu_ras *amdgpu_ras_get_context(struct amdgpu_device *adev)
 {
 	if (!adev)
 		return NULL;
@@ -2720,7 +2728,7 @@ struct amdgpu_ras* amdgpu_ras_get_context(struct amdgpu_device *adev)
 	return adev->psp.ras_context.ras;
 }
 
-int amdgpu_ras_set_context(struct amdgpu_device *adev, struct amdgpu_ras* ras_con)
+int amdgpu_ras_set_context(struct amdgpu_device *adev, struct amdgpu_ras *ras_con)
 {
 	if (!adev)
 		return -EINVAL;
@@ -2752,7 +2760,7 @@ int amdgpu_ras_reset_gpu(struct amdgpu_device *adev)
 
 /* Register each ip ras block into amdgpu ras */
 int amdgpu_ras_register_ras_block(struct amdgpu_device *adev,
-		struct amdgpu_ras_block_object* ras_block_obj)
+		struct amdgpu_ras_block_object *ras_block_obj)
 {
 	struct amdgpu_ras_block_object *obj, *tmp;
 	if (!adev || !ras_block_obj)
@@ -2763,9 +2771,8 @@ int amdgpu_ras_register_ras_block(struct amdgpu_device *adev,
 
 	/* If the ras object is in ras_list, don't add it again */
 	list_for_each_entry_safe(obj, tmp, &adev->ras_list, node) {
-		if (obj == ras_block_obj) {
+		if (obj == ras_block_obj)
 			return 0;
-		}
 	}
 
 	INIT_LIST_HEAD(&ras_block_obj->node);
