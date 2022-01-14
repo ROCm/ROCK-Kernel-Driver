@@ -121,6 +121,7 @@ int _kcl_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma) {
                 return -EACCES;
         }
 
+#ifdef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD
         if (node->readonly) {
                 if (vma->vm_flags & VM_WRITE) {
                         drm_gem_object_put(obj);
@@ -129,6 +130,7 @@ int _kcl_drm_gem_mmap(struct file *filp, struct vm_area_struct *vma) {
 
                 vma->vm_flags &= ~VM_MAYWRITE;
         }
+#endif
 
         ret = _kcl_drm_gem_mmap_obj(obj, drm_vma_node_size(node) << PAGE_SHIFT,
                                vma);
