@@ -2390,7 +2390,7 @@ struct send_exception_work_handler_workarea {
 	uint64_t error_reason;
 };
 
-void send_exception_work_handler(struct work_struct *work)
+static void send_exception_work_handler(struct work_struct *work)
 {
 	struct send_exception_work_handler_workarea *workarea;
 	struct kfd_process *p;

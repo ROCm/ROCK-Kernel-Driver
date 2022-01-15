@@ -2742,7 +2742,7 @@ struct copy_context_work_handler_workarea {
 	struct kfd_process *p;
 };
 
-void copy_context_work_handler (struct work_struct *work)
+static void copy_context_work_handler (struct work_struct *work)
 {
 	struct copy_context_work_handler_workarea *workarea;
 	struct mqd_manager *mqd_mgr;
