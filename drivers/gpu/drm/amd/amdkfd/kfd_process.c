@@ -2349,10 +2349,8 @@ void send_exception_work_handler(struct work_struct *work)
 	struct kfd_process *p;
 	struct queue *q;
 	struct mm_struct *mm;
-	void __user *csa_addr;
-	size_t header_offset;
-	uint64_t **err_payload_ptr_addr, *err_payload_ptr;
-	uint64_t payload_offset;
+	struct mqd_user_context_save_area_header __user *csa_header;
+	uint64_t __user *err_payload_ptr;
 	uint64_t cur_err;
 	uint32_t ev_id;
 
@@ -2373,22 +2371,13 @@ void send_exception_work_handler(struct work_struct *work)
 	if (!q)
 		goto out;
 
-	csa_addr = (void __user *) q->properties.ctx_save_restore_area_address;
-	/* KFD header is 4 DWORDS in size for control stack info. */
-	header_offset = sizeof(struct mqd_user_context_save_area_header);
-	/*
-	 * User header payload_offset is 6 DWORDS down in the header after
-	 * debugger memory info.
-	 */
-	payload_offset = (uint64_t)(csa_addr + header_offset) +
-						(2 * sizeof(uint32_t));
+	csa_header = (void __user *) q->properties.ctx_save_restore_area_address;
 
-	err_payload_ptr_addr = (uint64_t **)payload_offset;
-	get_user(err_payload_ptr, err_payload_ptr_addr);
+	get_user(err_payload_ptr, (uint64_t __user **)&csa_header->error_reason_ptr);
 	get_user(cur_err, err_payload_ptr);
 	cur_err |= workarea->error_reason;
 	put_user(cur_err, err_payload_ptr);
-	get_user(ev_id, (uint64_t *)(payload_offset + sizeof(err_payload_ptr)));
+	get_user(ev_id, &csa_header->error_event_id);
 
 	kfd_set_event(p, ev_id);
 
