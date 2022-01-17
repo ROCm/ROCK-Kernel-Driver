@@ -28,8 +28,6 @@
  */
 
 #include <linux/delay.h>
-#include <linux/stdarg.h>
-
 #include "dm_services.h"
 
 #include "dc.h"
