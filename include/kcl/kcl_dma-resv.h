@@ -48,6 +48,7 @@
 
 #include <asm/barrier.h>
 #include <kcl/backport/kcl_fence_backport.h>
+#include <kcl/backport/kcl_ww_mutex.h>
 #include <kcl/kcl_seqlock.h>
 #include <kcl/kcl_overflow.h>
 
