@@ -753,6 +753,9 @@
 /* kmap_local_* is available */
 #define HAVE_KMAP_LOCAL 1
 
+/* krealloc_array() is available */
+#define HAVE_KREALLOC_ARRAY 1
+
 /* kref_read() function is available */
 #define HAVE_KREF_READ 1
 
