@@ -1132,6 +1132,9 @@
 /* wait_queue_entry_t exists */
 #define HAVE_WAIT_QUEUE_ENTRY 1
 
+/* ww_mutex_trylock() has context arg */
+#define HAVE_WW_MUTEX_TRYLOCK_CONTEXT_ARG 1
+
 /* is_device_page is available */
 /* #undef HAVE_ZONE_DEVICE_PUBLIC */
 
