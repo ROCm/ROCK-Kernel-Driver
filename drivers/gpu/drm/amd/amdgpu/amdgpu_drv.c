@@ -2114,7 +2114,11 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 	is_fw_fb = amdgpu_is_fw_framebuffer(base, size);
 
 	/* Get rid of things like offb */
+#ifdef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
 	ret = drm_aperture_remove_conflicting_pci_framebuffers(pdev, &amdgpu_kms_driver);
+#else
+	ret = drm_aperture_remove_conflicting_pci_framebuffers(pdev, "amdgpudrmfb");
+#endif
 	if (ret)
 		return ret;
 
