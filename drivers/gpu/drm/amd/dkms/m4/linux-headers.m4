@@ -96,4 +96,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-buf: Add struct dma-buf-map for storing struct dma_buf.vaddr_ptr
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-buf-map.h])
+
+	dnl #
+	dnl # v5.14-rc5-11-gc0891ac15f04
+	dnl # isystem: ship and use stdarg.h
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/stdarg.h])
 ])
