@@ -699,6 +699,9 @@
 /* drm_driver->gem_free_object_unlocked() is available */
 /* #undef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER */
 
+/* generic_handle_domain_irq() is available */
+#define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
+
 /* get_mm_exe_file() is available */
 #define HAVE_GET_MM_EXE_FILE 1
 
