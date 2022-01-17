@@ -107,7 +107,12 @@ EXPORT_SYMBOL(drm_aperture_remove_conflicting_framebuffers);
  * Returns:
  * 0 on success, or a negative errno code otherwise
  */
+#ifdef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
+int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev, 
+						const struct drm_driver *req_driver)
+#else
 int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev, const char *name)
+#endif
 {
         resource_size_t base, size;
         int bar, ret = 0;
@@ -128,11 +133,15 @@ int drm_aperture_remove_conflicting_pci_framebuffers(struct pci_dev *pdev, const
 #ifdef HAVE_VGA_REMOVE_VGACON
 #if IS_REACHABLE(CONFIG_FB)
 
+#ifdef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
+	ret = remove_conflicting_pci_framebuffers(pdev, req_driver->name);
+#else
 #ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG
         ret = remove_conflicting_pci_framebuffers(pdev, name);
 #else
         ret = remove_conflicting_pci_framebuffers(pdev, 0, name);
 #endif
+#endif /* HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG */
 
 #endif
         if (ret == 0)
