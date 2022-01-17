@@ -1082,6 +1082,9 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
+/* synchronize_shrinkers() is available */
+#define HAVE_SYNCHRONIZE_SHRINKERS 1
+
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
 
