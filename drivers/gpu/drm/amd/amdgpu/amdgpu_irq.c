@@ -452,7 +452,11 @@ void amdgpu_irq_dispatch(struct amdgpu_device *adev,
 
 	} else if ((client_id == AMDGPU_IRQ_CLIENTID_LEGACY) &&
 		   adev->irq.virq[src_id]) {
+#ifdef HAVE_GENERIC_HANDLE_DOMAIN_IRQ
 		generic_handle_domain_irq(adev->irq.domain, src_id);
+#else
+		generic_handle_irq(irq_find_mapping(adev->irq.domain, src_id));
+#endif
 
 	} else if (!adev->irq.client[client_id].sources) {
 		DRM_DEBUG("Unregistered interrupt client_id: %d src_id: %d\n",
