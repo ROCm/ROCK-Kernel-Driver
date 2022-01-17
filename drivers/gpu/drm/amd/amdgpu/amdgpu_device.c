@@ -1357,10 +1357,18 @@ bool amdgpu_device_should_use_aspm(struct amdgpu_device *adev)
  * Enable/disable vga decode (all asics).
  * Returns VGA resource flags.
  */
+#ifdef HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE
 static unsigned int amdgpu_device_vga_set_decode(struct pci_dev *pdev,
 		bool state)
+#else
+static unsigned int amdgpu_device_vga_set_decode(void *cookie, bool state)
+#endif
 {
+#ifdef HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE
 	struct amdgpu_device *adev = drm_to_adev(pci_get_drvdata(pdev));
+#else
+	struct amdgpu_device *adev = cookie;
+#endif
 	amdgpu_asic_set_vga_state(adev, state);
 	if (state)
 		return VGA_RSRC_LEGACY_IO | VGA_RSRC_LEGACY_MEM |
@@ -3918,7 +3926,11 @@ fence_driver_init:
 	/* this will fail for cards that aren't VGA class devices, just
 	 * ignore it */
 	if ((adev->pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA)
+#ifdef HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE
 		vga_client_register(adev->pdev, amdgpu_device_vga_set_decode);
+#else
+		vga_client_register(adev->pdev, adev, NULL, amdgpu_device_vga_set_decode);
+#endif
 
 	if (amdgpu_device_supports_px(ddev)) {
 		px = true;
@@ -4063,7 +4075,11 @@ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 		vga_switcheroo_fini_domain_pm_ops(adev->dev);
 	}
 	if ((adev->pdev->class >> 8) == PCI_CLASS_DISPLAY_VGA)
+#ifdef HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE
 		vga_client_unregister(adev->pdev);
+#else
+		vga_client_register(adev->pdev, NULL, NULL, NULL);
+#endif
 
 	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
 
