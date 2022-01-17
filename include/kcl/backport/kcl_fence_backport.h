@@ -2,6 +2,7 @@
 #ifndef AMDKCL_FENCE_BACKPORT_H
 #define AMDKCL_FENCE_BACKPORT_H
 #include <kcl/kcl_fence.h>
+#include <kcl/kcl_slab.h>
 
 /*
  * commit v4.18-rc2-533-g418cc6ca0607
