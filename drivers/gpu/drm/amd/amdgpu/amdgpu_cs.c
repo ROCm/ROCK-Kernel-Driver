@@ -677,6 +677,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 
 		e->bo_va = amdgpu_vm_bo_find(vm, bo);
 
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		if (bo->tbo.base.dma_buf && !amdgpu_bo_explicit_sync(bo)) {
 			e->chain = dma_fence_chain_alloc();
 			if (!e->chain) {
@@ -684,6 +685,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto error_validate;
 			}
 		}
+#endif
 	}
 
 	/* Move fence waiting after getting reservation lock of
