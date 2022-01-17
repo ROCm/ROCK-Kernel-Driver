@@ -40,6 +40,8 @@
 #define dma_fence_remove_callback fence_remove_callback
 #define dma_fence_enable_sw_signaling fence_enable_sw_signaling
 #define dma_fence_default_wait fence_default_wait
+#define dma_fence_free fence_free
+#define dma_fence_get_rcu_safe fence_get_rcu
 
 #if defined(HAVE_DMA_FENCE_SET_ERROR)
 #define dma_fence_set_error fence_set_error
