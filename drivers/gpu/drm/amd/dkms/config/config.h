@@ -133,6 +133,10 @@
 /* drm_aperture_remove_* is availablea */
 #define HAVE_DRM_APERTURE 1
 
+/* drm_aperture_remove_conflicting_pci_framebuffers() second arg is
+   drm_driver* */
+#define HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG 1
+
 /* drm_atomic_get_old_crtc_state() and drm_atomic_get_new_crtc_state() are
    available */
 #define HAVE_DRM_ATOMIC_GET_CRTC_STATE 1
