@@ -1115,6 +1115,9 @@
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
 
+/* vma_lookup() is available */
+#define HAVE_VMA_LOOKUP 1
+
 /* vmf_insert_*() are available */
 #define HAVE_VMF_INSERT 1
 
