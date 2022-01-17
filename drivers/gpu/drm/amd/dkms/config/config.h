@@ -1106,6 +1106,9 @@
 /* Define to 1 if you have the <uapi/linux/sched/types.h> header file. */
 #define HAVE_UAPI_LINUX_SCHED_TYPES_H 1
 
+/* vga_client_register() don't pass a cookie */
+#define HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE 1
+
 /* vga_remove_vgacon() is available */
 #define HAVE_VGA_REMOVE_VGACON 1
 
