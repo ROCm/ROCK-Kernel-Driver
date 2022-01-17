@@ -88,6 +88,9 @@
 /* dma_buf->dynamic_mapping is not available */
 /* #undef HAVE_DMA_BUF_OPS_LEGACY */
 
+/* dma_fence_chain_alloc() is available */
+#define HAVE_DMA_FENCE_CHAIN_ALLOC 1
+
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
@@ -1011,6 +1014,9 @@
 
 /* struct dma_buf_ops->pin() is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_PIN 1
+
+/* struct dma_fence_chain is available */
+#define HAVE_STRUCT_DMA_FENCE_CHAIN 1
 
 /* struct drm_connector_state->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
