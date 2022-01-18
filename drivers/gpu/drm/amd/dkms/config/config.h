@@ -94,6 +94,9 @@
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
+/* struct dma_fence_ops has use_64bit_seqno field */
+#define HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO 1
+
 /* dma_fence_set_error() is available */
 #define HAVE_DMA_FENCE_SET_ERROR 1
 
