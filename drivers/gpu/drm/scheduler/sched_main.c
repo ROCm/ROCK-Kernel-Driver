@@ -685,6 +685,7 @@ int drm_sched_job_add_dependency(struct drm_sched_job *job,
 }
 EXPORT_SYMBOL(drm_sched_job_add_dependency);
 
+#ifdef HAVE_DRM_GEM_OBJECT_RESV
 /**
  * drm_sched_job_add_implicit_dependencies - adds implicit dependencies as job
  *   dependencies
@@ -723,7 +724,7 @@ int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 	return 0;
 }
 EXPORT_SYMBOL(drm_sched_job_add_implicit_dependencies);
-
+#endif
 
 /**
  * drm_sched_job_cleanup - clean up scheduler job resources
