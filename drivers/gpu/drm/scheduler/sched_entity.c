@@ -473,6 +473,9 @@ drm_sched_job_dependency(struct drm_sched_job *job,
 
 struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 {
+#ifndef HAVE_STRUCT_XARRAY
+	struct drm_gpu_scheduler *sched = entity->rq->sched;
+#endif
 	struct drm_sched_job *sched_job;
 
 	sched_job = to_drm_sched_job(spsc_queue_peek(&entity->job_queue));
@@ -480,7 +483,11 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 		return NULL;
 
 	while ((entity->dependency =
+#ifdef HAVE_STRUCT_XARRAY
 			drm_sched_job_dependency(sched_job, entity))) {
+#else
+			sched->ops->dependency(sched_job, entity))) {
+#endif
 		trace_drm_sched_job_wait_dep(sched_job, entity->dependency);
 
 		if (drm_sched_entity_add_dependency_cb(entity))

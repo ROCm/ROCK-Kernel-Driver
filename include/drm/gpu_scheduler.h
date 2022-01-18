@@ -363,10 +363,12 @@ struct drm_sched_job {
 	 * drm_sched_job_add_dependency() and
 	 * drm_sched_job_add_implicit_dependencies().
 	 */
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			dependencies;
 
 	/** @last_dependency: tracks @dependencies as they signal */
 	unsigned long			last_dependency;
+#endif
 
 	/**
 	 * @submit_ts:
@@ -554,6 +556,7 @@ int drm_sched_job_init(struct drm_sched_job *job,
 		       struct drm_sched_entity *entity,
 		       u32 credits, void *owner);
 void drm_sched_job_arm(struct drm_sched_job *job);
+
 int drm_sched_job_add_dependency(struct drm_sched_job *job,
 				 struct dma_fence *fence);
 int drm_sched_job_add_syncobj_dependency(struct drm_sched_job *job,
@@ -566,7 +569,6 @@ int drm_sched_job_add_resv_dependencies(struct drm_sched_job *job,
 int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 					    struct drm_gem_object *obj,
 					    bool write);
-
 
 void drm_sched_entity_modify_sched(struct drm_sched_entity *entity,
 				    struct drm_gpu_scheduler **sched_list,
