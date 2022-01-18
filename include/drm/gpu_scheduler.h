@@ -319,10 +319,12 @@ struct drm_sched_job {
 	 * drm_sched_job_add_dependency() and
 	 * drm_sched_job_add_implicit_dependencies().
 	 */
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			dependencies;
 
 	/** @last_dependency: tracks @dependencies as they signal */
 	unsigned long			last_dependency;
+#endif
 };
 
 static inline bool drm_sched_invalidate_job(struct drm_sched_job *s_job,
@@ -482,11 +484,14 @@ int drm_sched_job_init(struct drm_sched_job *job,
 		       struct drm_sched_entity *entity,
 		       void *owner);
 void drm_sched_job_arm(struct drm_sched_job *job);
+
+#ifdef HAVE_STRUCT_XARRAY
 int drm_sched_job_add_dependency(struct drm_sched_job *job,
 				 struct dma_fence *fence);
 int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 					    struct drm_gem_object *obj,
 					    bool write);
+#endif
 
 
 void drm_sched_entity_modify_sched(struct drm_sched_entity *entity,

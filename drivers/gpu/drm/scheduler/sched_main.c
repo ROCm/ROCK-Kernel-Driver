@@ -562,8 +562,9 @@ int drm_sched_job_init(struct drm_sched_job *job,
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&job->list);
-
+#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&job->dependencies, XA_FLAGS_ALLOC);
+#endif
 
 	return 0;
 }
@@ -599,6 +600,7 @@ void drm_sched_job_arm(struct drm_sched_job *job)
 }
 EXPORT_SYMBOL(drm_sched_job_arm);
 
+#ifdef HAVE_STRUCT_XARRAY
 /**
  * drm_sched_job_add_dependency - adds the fence as a job dependency
  * @job: scheduler job to add the dependencies to
@@ -685,6 +687,7 @@ int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 }
 EXPORT_SYMBOL(drm_sched_job_add_implicit_dependencies);
 #endif
+#endif /* HAVE_STRUCR_XARRAY */
 
 /**
  * drm_sched_job_cleanup - clean up scheduler job resources
@@ -701,8 +704,10 @@ EXPORT_SYMBOL(drm_sched_job_add_implicit_dependencies);
  */
 void drm_sched_job_cleanup(struct drm_sched_job *job)
 {
+#ifdef HAVE_STRUCT_XARRAY
 	struct dma_fence *fence;
 	unsigned long index;
+#endif
 
 	if (kref_read(&job->s_fence->finished.refcount)) {
 		/* drm_sched_job_arm() has been called */
@@ -714,11 +719,12 @@ void drm_sched_job_cleanup(struct drm_sched_job *job)
 
 	job->s_fence = NULL;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_for_each(&job->dependencies, index, fence) {
 		dma_fence_put(fence);
 	}
 	xa_destroy(&job->dependencies);
-
+#endif
 }
 EXPORT_SYMBOL(drm_sched_job_cleanup);
 

@@ -212,6 +212,7 @@ static void drm_sched_entity_kill_jobs_cb(struct dma_fence *f,
 	schedule_work(&job->work);
 }
 
+#ifdef HAVE_STRUCT_XARRAY
 static struct dma_fence *
 drm_sched_job_dependency(struct drm_sched_job *job,
 			 struct drm_sched_entity *entity)
@@ -224,6 +225,7 @@ drm_sched_job_dependency(struct drm_sched_job *job,
 
 	return NULL;
 }
+#endif
 
 static void drm_sched_entity_kill_jobs(struct drm_sched_entity *entity)
 {
@@ -235,7 +237,11 @@ static void drm_sched_entity_kill_jobs(struct drm_sched_entity *entity)
 		struct drm_sched_fence *s_fence = job->s_fence;
 
 		/* Wait for all dependencies to avoid data corruptions */
+#ifdef HAVE_STRUCT_XARRAY
 		while ((f = drm_sched_job_dependency(job, entity))) {
+#else
+		while ((f = job->sched->ops->dependency(job, entity))) {
+#endif
 			dma_fence_wait(f, false);
 			dma_fence_put(f);
 		}
@@ -418,6 +424,9 @@ static bool drm_sched_entity_add_dependency_cb(struct drm_sched_entity *entity)
 
 struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 {
+#ifndef HAVE_STRUCT_XARRAY
+	struct drm_gpu_scheduler *sched = entity->rq->sched;
+#endif
 	struct drm_sched_job *sched_job;
 
 	sched_job = to_drm_sched_job(spsc_queue_peek(&entity->job_queue));
@@ -425,7 +434,11 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 		return NULL;
 
 	while ((entity->dependency =
+#ifdef HAVE_STRUCT_XARRAY
 			drm_sched_job_dependency(sched_job, entity))) {
+#else
+			sched->ops->dependency(sched_job, entity))) {
+#endif
 		trace_drm_sched_job_wait_dep(sched_job, entity->dependency);
 
 		if (drm_sched_entity_add_dependency_cb(entity))
