@@ -1424,7 +1424,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	amdgpu_vm_move_to_lru_tail(p->adev, &fpriv->vm);
 
 	amdgpu_bo_list_for_each_entry(e, p->bo_list) {
-		struct dma_resv *resv = e->tv.bo->base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(e->tv.bo);
 		struct dma_fence_chain *chain = e->chain;
 
 		if (!chain)
