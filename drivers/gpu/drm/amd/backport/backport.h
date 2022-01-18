@@ -92,5 +92,6 @@
 #include <kcl/kcl_drm_simple_kms_helper.h>
 #include <kcl/backport/kcl_bitmap.h>
 #include <kcl/kcl_capability.h>
+#include <kcl/kcl_fdtable.h>
 
 #endif /* AMDGPU_BACKPORT_H */
