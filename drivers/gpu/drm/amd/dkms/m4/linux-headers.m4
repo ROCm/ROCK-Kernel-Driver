@@ -102,4 +102,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # isystem: ship and use stdarg.h
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/stdarg.h])
+
+	dnl #
+	dnl # v5.0-1331-g7bf60c52e093
+	dnl # dma-buf: add new dma_fence_chain container v7
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/dma-fence-chain.h])
 ])
