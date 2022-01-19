@@ -39,6 +39,7 @@
 #include "gfx_v9_0.h"
 #include "amdgpu_amdkfd_gfx_v9.h"
 #include <uapi/linux/kfd_ioctl.h>
+#include "amdgpu_reset.h"
 
 enum hqd_dequeue_request_type {
 	NO_ACTION = 0,
@@ -743,7 +744,7 @@ static void kgd_gfx_v9_set_barrier_auto_waitcnt(struct amdgpu_device *adev,
 
 	WRITE_ONCE(adev->barrier_has_auto_waitcnt, enable_waitcnt);
 
-	if (!down_read_trylock(&adev->reset_sem))
+	if (!down_read_trylock(&adev->reset_domain->sem))
 		return;
 
 	amdgpu_amdkfd_suspend(adev, false);
@@ -779,7 +780,7 @@ out:
 	 */
 	amdgpu_amdkfd_resume(adev, false, true);
 
-	up_read(&adev->reset_sem);
+	up_read(&adev->reset_domain->sem);
 }
 
 uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
