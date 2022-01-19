@@ -2115,7 +2115,11 @@ static int criu_get_prime_handle(struct drm_gem_object *gobj, int flags,
 	struct dma_buf *dmabuf;
 	int ret;
 
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
 	dmabuf = amdgpu_gem_prime_export(gobj, flags);
+#else
+	dmabuf = amdgpu_gem_prime_export(gobj->dev, gobj, flags);
+#endif
 	if (IS_ERR(dmabuf)) {
 		ret = PTR_ERR(dmabuf);
 		pr_err("dmabuf export failed for the BO\n");
