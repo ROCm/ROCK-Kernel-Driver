@@ -825,8 +825,6 @@ static void set_queue_properties_from_criu(struct queue_properties *qp,
 	qp->ctl_stack_size = q_data->ctl_stack_size;
 	qp->type = q_data->type;
 	qp->format = q_data->format;
-
-	return 0;
 }
 
 
