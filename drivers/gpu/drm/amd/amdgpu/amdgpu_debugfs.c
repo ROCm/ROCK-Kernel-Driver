@@ -1501,7 +1501,7 @@ static int amdgpu_debugfs_test_ib_show(struct seq_file *m, void *unused)
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
 #ifndef HAVE_DOWN_WRITE_KILLABLE
-	down_write(&adev->reset_sem);
+	down_write(&adev->reset_domain->sem);
 #else
 	r = down_write_killable(&adev->reset_domain->sem);
 	if (r)
@@ -1778,7 +1778,7 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 	if (r)
 		goto pro_end;
 #else
-	down_read(&adev->reset_sem);
+	down_read(&adev->reset_domain->sem);
 #endif
 
 	/* stop the scheduler */
@@ -1885,9 +1885,13 @@ static ssize_t amdgpu_reset_dump_register_list_read(struct file *f,
 		return 0;
 
 	memset(reg_offset, 0, 12);
+#ifdef HAVE_DOWN_READ_KILLABLE
 	ret = down_read_killable(&adev->reset_domain->sem);
 	if (ret)
 		return ret;
+#else
+	down_read(&adev->reset_domain->sem);
+#endif
 
 	for (i = 0; i < adev->num_regs; i++) {
 		sprintf(reg_offset, "0x%x\n", adev->reset_dump_reg_list[i]);
@@ -1896,9 +1900,13 @@ static ssize_t amdgpu_reset_dump_register_list_read(struct file *f,
 			return -EFAULT;
 
 		len += strlen(reg_offset);
+		#ifdef HAVE_DOWN_READ_KILLABLE
 		ret = down_read_killable(&adev->reset_domain->sem);
 		if (ret)
 			return ret;
+		#else
+		down_read(&adev->reset_domain->sem);
+		#endif
 	}
 
 	up_read(&adev->reset_domain->sem);
