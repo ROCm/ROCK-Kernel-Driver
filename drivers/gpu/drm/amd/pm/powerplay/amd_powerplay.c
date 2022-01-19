@@ -31,7 +31,8 @@
 #include "power_state.h"
 #include "amdgpu.h"
 #include "hwmgr.h"
-
+#include "amdgpu_dpm_internal.h"
+#include "amdgpu_display.h"
 
 static const struct amd_pm_funcs pp_dpm_funcs;
 
@@ -322,12 +323,6 @@ static void pp_dpm_en_umd_pstate(struct pp_hwmgr  *hwmgr,
 		if (*level & profile_mode_mask) {
 			hwmgr->saved_dpm_level = hwmgr->dpm_level;
 			hwmgr->en_umd_pstate = true;
-			amdgpu_device_ip_set_powergating_state(hwmgr->adev,
-					AMD_IP_BLOCK_TYPE_GFX,
-					AMD_PG_STATE_UNGATE);
-			amdgpu_device_ip_set_clockgating_state(hwmgr->adev,
-						AMD_IP_BLOCK_TYPE_GFX,
-						AMD_CG_STATE_UNGATE);
 		}
 	} else {
 		/* exit umd pstate, restore level, enable gfx cg*/
@@ -335,12 +330,6 @@ static void pp_dpm_en_umd_pstate(struct pp_hwmgr  *hwmgr,
 			if (*level == AMD_DPM_FORCED_LEVEL_PROFILE_EXIT)
 				*level = hwmgr->saved_dpm_level;
 			hwmgr->en_umd_pstate = false;
-			amdgpu_device_ip_set_clockgating_state(hwmgr->adev,
-					AMD_IP_BLOCK_TYPE_GFX,
-					AMD_CG_STATE_GATE);
-			amdgpu_device_ip_set_powergating_state(hwmgr->adev,
-					AMD_IP_BLOCK_TYPE_GFX,
-					AMD_PG_STATE_GATE);
 		}
 	}
 }
@@ -499,38 +488,43 @@ static enum amd_pm_state_type pp_dpm_get_current_power_state(void *handle)
 	return pm_type;
 }
 
-static void pp_dpm_set_fan_control_mode(void *handle, uint32_t mode)
+static int pp_dpm_set_fan_control_mode(void *handle, uint32_t mode)
 {
 	struct pp_hwmgr *hwmgr = handle;
 
 	if (!hwmgr || !hwmgr->pm_en)
-		return;
+		return -EOPNOTSUPP;
 
-	if (hwmgr->hwmgr_func->set_fan_control_mode == NULL) {
-		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return;
-	}
+	if (hwmgr->hwmgr_func->set_fan_control_mode == NULL)
+		return -EOPNOTSUPP;
+
+	if (mode == U32_MAX)
+		return -EINVAL;
+
 	mutex_lock(&hwmgr->smu_lock);
 	hwmgr->hwmgr_func->set_fan_control_mode(hwmgr, mode);
 	mutex_unlock(&hwmgr->smu_lock);
+
+	return 0;
 }
 
-static uint32_t pp_dpm_get_fan_control_mode(void *handle)
+static int pp_dpm_get_fan_control_mode(void *handle, uint32_t *fan_mode)
 {
 	struct pp_hwmgr *hwmgr = handle;
-	uint32_t mode = 0;
 
 	if (!hwmgr || !hwmgr->pm_en)
-		return 0;
+		return -EOPNOTSUPP;
 
-	if (hwmgr->hwmgr_func->get_fan_control_mode == NULL) {
-		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return 0;
-	}
+	if (hwmgr->hwmgr_func->get_fan_control_mode == NULL)
+		return -EOPNOTSUPP;
+
+	if (!fan_mode)
+		return -EINVAL;
+
 	mutex_lock(&hwmgr->smu_lock);
-	mode = hwmgr->hwmgr_func->get_fan_control_mode(hwmgr);
+	*fan_mode = hwmgr->hwmgr_func->get_fan_control_mode(hwmgr);
 	mutex_unlock(&hwmgr->smu_lock);
-	return mode;
+	return 0;
 }
 
 static int pp_dpm_set_fan_speed_pwm(void *handle, uint32_t speed)
@@ -539,12 +533,14 @@ static int pp_dpm_set_fan_speed_pwm(void *handle, uint32_t speed)
 	int ret = 0;
 
 	if (!hwmgr || !hwmgr->pm_en)
+		return -EOPNOTSUPP;
+
+	if (hwmgr->hwmgr_func->set_fan_speed_pwm == NULL)
+		return -EOPNOTSUPP;
+
+	if (speed == U32_MAX)
 		return -EINVAL;
 
-	if (hwmgr->hwmgr_func->set_fan_speed_pwm == NULL) {
-		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return 0;
-	}
 	mutex_lock(&hwmgr->smu_lock);
 	ret = hwmgr->hwmgr_func->set_fan_speed_pwm(hwmgr, speed);
 	mutex_unlock(&hwmgr->smu_lock);
@@ -557,12 +553,13 @@ static int pp_dpm_get_fan_speed_pwm(void *handle, uint32_t *speed)
 	int ret = 0;
 
 	if (!hwmgr || !hwmgr->pm_en)
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
-	if (hwmgr->hwmgr_func->get_fan_speed_pwm == NULL) {
-		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return 0;
-	}
+	if (hwmgr->hwmgr_func->get_fan_speed_pwm == NULL)
+		return -EOPNOTSUPP;
+
+	if (!speed)
+		return -EINVAL;
 
 	mutex_lock(&hwmgr->smu_lock);
 	ret = hwmgr->hwmgr_func->get_fan_speed_pwm(hwmgr, speed);
@@ -576,9 +573,12 @@ static int pp_dpm_get_fan_speed_rpm(void *handle, uint32_t *rpm)
 	int ret = 0;
 
 	if (!hwmgr || !hwmgr->pm_en)
-		return -EINVAL;
+		return -EOPNOTSUPP;
 
 	if (hwmgr->hwmgr_func->get_fan_speed_rpm == NULL)
+		return -EOPNOTSUPP;
+
+	if (!rpm)
 		return -EINVAL;
 
 	mutex_lock(&hwmgr->smu_lock);
@@ -593,12 +593,14 @@ static int pp_dpm_set_fan_speed_rpm(void *handle, uint32_t rpm)
 	int ret = 0;
 
 	if (!hwmgr || !hwmgr->pm_en)
+		return -EOPNOTSUPP;
+
+	if (hwmgr->hwmgr_func->set_fan_speed_rpm == NULL)
+		return -EOPNOTSUPP;
+
+	if (rpm == U32_MAX)
 		return -EINVAL;
 
-	if (hwmgr->hwmgr_func->set_fan_speed_rpm == NULL) {
-		pr_info_ratelimited("%s was not implemented.\n", __func__);
-		return 0;
-	}
 	mutex_lock(&hwmgr->smu_lock);
 	ret = hwmgr->hwmgr_func->set_fan_speed_rpm(hwmgr, rpm);
 	mutex_unlock(&hwmgr->smu_lock);
@@ -1683,6 +1685,41 @@ static int pp_get_prv_buffer_details(void *handle, void **addr, size_t *size)
 	return 0;
 }
 
+static void pp_pm_compute_clocks(void *handle)
+{
+	struct pp_hwmgr *hwmgr = handle;
+	struct amdgpu_device *adev = hwmgr->adev;
+	int i = 0;
+
+	if (adev->mode_info.num_crtc)
+		amdgpu_display_bandwidth_update(adev);
+
+	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
+		struct amdgpu_ring *ring = adev->rings[i];
+		if (ring && ring->sched.ready)
+			amdgpu_fence_wait_empty(ring);
+	}
+
+	if (!amdgpu_device_has_dc_support(adev)) {
+		amdgpu_dpm_get_active_displays(adev);
+		adev->pm.pm_display_cfg.num_display = adev->pm.dpm.new_active_crtc_count;
+		adev->pm.pm_display_cfg.vrefresh = amdgpu_dpm_get_vrefresh(adev);
+		adev->pm.pm_display_cfg.min_vblank_time = amdgpu_dpm_get_vblank_time(adev);
+		/* we have issues with mclk switching with
+		 * refresh rates over 120 hz on the non-DC code.
+		 */
+		if (adev->pm.pm_display_cfg.vrefresh > 120)
+			adev->pm.pm_display_cfg.min_vblank_time = 0;
+
+		pp_display_configuration_change(handle,
+						&adev->pm.pm_display_cfg);
+	}
+
+	pp_dpm_dispatch_tasks(handle,
+			      AMD_PP_TASK_DISPLAY_CONFIG_CHANGE,
+			      NULL);
+}
+
 static const struct amd_pm_funcs pp_dpm_funcs = {
 	.load_firmware = pp_dpm_load_fw,
 	.wait_for_fw_loading_complete = pp_dpm_fw_loading_complete,
@@ -1747,4 +1784,5 @@ static const struct amd_pm_funcs pp_dpm_funcs = {
 	.get_gpu_metrics = pp_get_gpu_metrics,
 	.gfx_state_change_set = pp_gfx_state_change_set,
 	.get_smu_prv_buf_details = pp_get_prv_buffer_details,
+	.pm_compute_clocks = pp_pm_compute_clocks,
 };

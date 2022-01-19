@@ -59,7 +59,7 @@ static int smu_handle_task(struct smu_context *smu,
 			   bool lock_needed);
 static int smu_reset(struct smu_context *smu);
 static int smu_set_fan_speed_pwm(void *handle, u32 speed);
-static int smu_set_fan_control_mode(struct smu_context *smu, int value);
+static int smu_set_fan_control_mode(void *handle, u32 value);
 static int smu_set_power_limit(void *handle, uint32_t limit);
 static int smu_set_fan_speed_rpm(void *handle, uint32_t speed);
 static int smu_set_gfx_cgpg(struct smu_context *smu, bool enabled);
@@ -100,17 +100,14 @@ static int smu_sys_set_pp_feature_mask(void *handle,
 	return ret;
 }
 
-int smu_get_status_gfxoff(struct amdgpu_device *adev, uint32_t *value)
+int smu_get_status_gfxoff(struct smu_context *smu, uint32_t *value)
 {
-	int ret = 0;
-	struct smu_context *smu = &adev->smu;
+	if (!smu->ppt_funcs->get_gfx_off_status)
+		return -EINVAL;
 
-	if (is_support_sw_smu(adev) && smu->ppt_funcs->get_gfx_off_status)
-		*value = smu_get_gfx_off_status(smu);
-	else
-		ret = -EINVAL;
+	*value = smu_get_gfx_off_status(smu);
 
-	return ret;
+	return 0;
 }
 
 int smu_set_soft_freq_range(struct smu_context *smu,
@@ -410,7 +407,7 @@ static void smu_restore_dpm_user_profile(struct smu_context *smu)
 	if (smu->user_dpm_profile.fan_mode == AMD_FAN_CTRL_MANUAL ||
 	    smu->user_dpm_profile.fan_mode == AMD_FAN_CTRL_NONE) {
 		ret = smu_set_fan_control_mode(smu, smu->user_dpm_profile.fan_mode);
-		if (ret) {
+		if (ret != -EOPNOTSUPP) {
 			smu->user_dpm_profile.fan_speed_pwm = 0;
 			smu->user_dpm_profile.fan_speed_rpm = 0;
 			smu->user_dpm_profile.fan_mode = AMD_FAN_CTRL_AUTO;
@@ -419,13 +416,13 @@ static void smu_restore_dpm_user_profile(struct smu_context *smu)
 
 		if (smu->user_dpm_profile.fan_speed_pwm) {
 			ret = smu_set_fan_speed_pwm(smu, smu->user_dpm_profile.fan_speed_pwm);
-			if (ret)
+			if (ret != -EOPNOTSUPP)
 				dev_err(smu->adev->dev, "Failed to set manual fan speed in pwm\n");
 		}
 
 		if (smu->user_dpm_profile.fan_speed_rpm) {
 			ret = smu_set_fan_speed_rpm(smu, smu->user_dpm_profile.fan_speed_rpm);
-			if (ret)
+			if (ret != -EOPNOTSUPP)
 				dev_err(smu->adev->dev, "Failed to set manual fan speed in rpm\n");
 		}
 	}
@@ -471,10 +468,7 @@ bool is_support_sw_smu(struct amdgpu_device *adev)
 
 bool is_support_cclk_dpm(struct amdgpu_device *adev)
 {
-	struct smu_context *smu = &adev->smu;
-
-	if (!is_support_sw_smu(adev))
-		return false;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (!smu_feature_is_enabled(smu, SMU_FEATURE_CCLK_DPM_BIT))
 		return false;
@@ -578,7 +572,7 @@ static int smu_get_driver_allowed_feature_mask(struct smu_context *smu)
 
 static int smu_set_funcs(struct amdgpu_device *adev)
 {
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (adev->pm.pp_feature & PP_OVERDRIVE_MASK)
 		smu->od_enabled = true;
@@ -630,7 +624,11 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 static int smu_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu;
+
+	smu = kzalloc(sizeof(struct smu_context), GFP_KERNEL);
+	if (!smu)
+		return -ENOMEM;
 
 	smu->adev = adev;
 	smu->pm_enabled = !!amdgpu_dpm;
@@ -690,7 +688,7 @@ err0_out:
 static int smu_late_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret = 0;
 
 	smu_set_fine_grain_gfx_freq_parameters(smu);
@@ -736,7 +734,7 @@ static int smu_late_init(void *handle)
 
 	smu_get_fan_parameters(smu);
 
-	smu_handle_task(&adev->smu,
+	smu_handle_task(smu,
 			smu->smu_dpm.dpm_level,
 			AMD_PP_TASK_COMPLETE_INIT,
 			false);
@@ -1026,7 +1024,7 @@ static void smu_interrupt_work_fn(struct work_struct *work)
 static int smu_sw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
 	smu->pool_size = adev->pm.smu_prv_buffer_size;
@@ -1101,7 +1099,7 @@ static int smu_sw_init(void *handle)
 static int smu_sw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
 	ret = smu_smc_table_sw_fini(smu);
@@ -1336,7 +1334,7 @@ static int smu_hw_init(void *handle)
 {
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev)) {
 		smu->pm_enabled = false;
@@ -1352,7 +1350,7 @@ static int smu_hw_init(void *handle)
 	if (smu->is_apu) {
 		smu_dpm_set_vcn_enable(smu, true);
 		smu_dpm_set_jpeg_enable(smu, true);
-		smu_set_gfx_cgpg(&adev->smu, true);
+		smu_set_gfx_cgpg(smu, true);
 	}
 
 	if (!smu->pm_enabled)
@@ -1405,8 +1403,14 @@ static int smu_disable_dpms(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0;
+	/*
+	 * TODO: (adev->in_suspend && !adev->in_s0ix) is added to pair
+	 * the workaround which always reset the asic in suspend.
+	 * It's likely that workaround will be dropped in the future.
+	 * Then the change here should be dropped together.
+	 */
 	bool use_baco = !smu->is_apu &&
-		((amdgpu_in_reset(adev) &&
+		(((amdgpu_in_reset(adev) || (adev->in_suspend && !adev->in_s0ix)) &&
 		  (amdgpu_asic_reset_method(adev) == AMD_RESET_METHOD_BACO)) ||
 		 ((adev->in_runpm || adev->in_s4) && amdgpu_asic_supports_baco(adev)));
 
@@ -1506,7 +1510,7 @@ static int smu_smc_hw_cleanup(struct smu_context *smu)
 static int smu_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
 		return 0;
@@ -1525,12 +1529,18 @@ static int smu_hw_fini(void *handle)
 	return smu_smc_hw_cleanup(smu);
 }
 
+static void smu_late_fini(void *handle)
+{
+	struct amdgpu_device *adev = handle;
+	struct smu_context *smu = adev->powerplay.pp_handle;
+
+	kfree(smu);
+}
+
 static int smu_reset(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret;
-
-	amdgpu_gfx_off_ctrl(smu->adev, false);
 
 	ret = smu_hw_fini(adev);
 	if (ret)
@@ -1544,15 +1554,13 @@ static int smu_reset(struct smu_context *smu)
 	if (ret)
 		return ret;
 
-	amdgpu_gfx_off_ctrl(smu->adev, true);
-
 	return 0;
 }
 
 static int smu_suspend(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
 	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
@@ -1569,7 +1577,7 @@ static int smu_suspend(void *handle)
 
 	smu->watermarks_bitmap &= ~(WATERMARKS_LOADED);
 
-	smu_set_gfx_cgpg(&adev->smu, false);
+	smu_set_gfx_cgpg(smu, false);
 
 	return 0;
 }
@@ -1578,7 +1586,7 @@ static int smu_resume(void *handle)
 {
 	int ret;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))
 		return 0;
@@ -1600,7 +1608,7 @@ static int smu_resume(void *handle)
 		return ret;
 	}
 
-	smu_set_gfx_cgpg(&adev->smu, true);
+	smu_set_gfx_cgpg(smu, true);
 
 	smu->disable_uclk_switch = 0;
 
@@ -1669,14 +1677,7 @@ static int smu_enable_umd_pstate(void *handle,
 		/* enter umd pstate, save current level, disable gfx cg*/
 		if (*level & profile_mode_mask) {
 			smu_dpm_ctx->saved_dpm_level = smu_dpm_ctx->dpm_level;
-			smu_dpm_ctx->enable_umd_pstate = true;
 			smu_gpo_control(smu, false);
-			amdgpu_device_ip_set_powergating_state(smu->adev,
-							       AMD_IP_BLOCK_TYPE_GFX,
-							       AMD_PG_STATE_UNGATE);
-			amdgpu_device_ip_set_clockgating_state(smu->adev,
-							       AMD_IP_BLOCK_TYPE_GFX,
-							       AMD_CG_STATE_UNGATE);
 			smu_gfx_ulv_control(smu, false);
 			smu_deep_sleep_control(smu, false);
 			amdgpu_asic_update_umd_stable_pstate(smu->adev, true);
@@ -1686,16 +1687,9 @@ static int smu_enable_umd_pstate(void *handle,
 		if (!(*level & profile_mode_mask)) {
 			if (*level == AMD_DPM_FORCED_LEVEL_PROFILE_EXIT)
 				*level = smu_dpm_ctx->saved_dpm_level;
-			smu_dpm_ctx->enable_umd_pstate = false;
 			amdgpu_asic_update_umd_stable_pstate(smu->adev, false);
 			smu_deep_sleep_control(smu, true);
 			smu_gfx_ulv_control(smu, true);
-			amdgpu_device_ip_set_clockgating_state(smu->adev,
-							       AMD_IP_BLOCK_TYPE_GFX,
-							       AMD_CG_STATE_GATE);
-			amdgpu_device_ip_set_powergating_state(smu->adev,
-							       AMD_IP_BLOCK_TYPE_GFX,
-							       AMD_PG_STATE_GATE);
 			smu_gpo_control(smu, true);
 		}
 	}
@@ -2132,6 +2126,7 @@ const struct amd_ip_funcs smu_ip_funcs = {
 	.sw_fini = smu_sw_fini,
 	.hw_init = smu_hw_init,
 	.hw_fini = smu_hw_fini,
+	.late_fini = smu_late_fini,
 	.suspend = smu_suspend,
 	.resume = smu_resume,
 	.is_idle = NULL,
@@ -2140,7 +2135,6 @@ const struct amd_ip_funcs smu_ip_funcs = {
 	.soft_reset = NULL,
 	.set_clockgating_state = smu_set_clockgating_state,
 	.set_powergating_state = smu_set_powergating_state,
-	.enable_umd_pstate = smu_enable_umd_pstate,
 };
 
 const struct amdgpu_ip_block_version smu_v11_0_ip_block =
@@ -2224,18 +2218,22 @@ static int smu_set_fan_speed_rpm(void *handle, uint32_t speed)
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
+	if (!smu->ppt_funcs->set_fan_speed_rpm)
+		return -EOPNOTSUPP;
+
+	if (speed == U32_MAX)
+		return -EINVAL;
+
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_speed_rpm) {
-		ret = smu->ppt_funcs->set_fan_speed_rpm(smu, speed);
-		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
-			smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_RPM;
-			smu->user_dpm_profile.fan_speed_rpm = speed;
+	ret = smu->ppt_funcs->set_fan_speed_rpm(smu, speed);
+	if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+		smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_RPM;
+		smu->user_dpm_profile.fan_speed_rpm = speed;
 
-			/* Override custom PWM setting as they cannot co-exist */
-			smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_PWM;
-			smu->user_dpm_profile.fan_speed_pwm = 0;
-		}
+		/* Override custom PWM setting as they cannot co-exist */
+		smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_PWM;
+		smu->user_dpm_profile.fan_speed_pwm = 0;
 	}
 
 	mutex_unlock(&smu->mutex);
@@ -2568,59 +2566,64 @@ static int smu_set_power_profile_mode(void *handle,
 }
 
 
-static u32 smu_get_fan_control_mode(void *handle)
+static int smu_get_fan_control_mode(void *handle, u32 *fan_mode)
 {
 	struct smu_context *smu = handle;
-	u32 ret = 0;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return AMD_FAN_CTRL_NONE;
+		return -EOPNOTSUPP;
+
+	if (!smu->ppt_funcs->get_fan_control_mode)
+		return -EOPNOTSUPP;
+
+	if (!fan_mode)
+		return -EINVAL;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_control_mode)
-		ret = smu->ppt_funcs->get_fan_control_mode(smu);
+	*fan_mode = smu->ppt_funcs->get_fan_control_mode(smu);
 
 	mutex_unlock(&smu->mutex);
 
-	return ret;
+	return 0;
 }
 
-static int smu_set_fan_control_mode(struct smu_context *smu, int value)
+static int smu_set_fan_control_mode(void *handle, u32 value)
 {
+	struct smu_context *smu = handle;
 	int ret = 0;
 
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return  -EOPNOTSUPP;
+		return -EOPNOTSUPP;
+
+	if (!smu->ppt_funcs->set_fan_control_mode)
+		return -EOPNOTSUPP;
+
+	if (value == U32_MAX)
+		return -EINVAL;
 
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_control_mode) {
-		ret = smu->ppt_funcs->set_fan_control_mode(smu, value);
-		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE))
-			smu->user_dpm_profile.fan_mode = value;
+	ret = smu->ppt_funcs->set_fan_control_mode(smu, value);
+	if (ret)
+		goto out;
+
+	if (!(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+		smu->user_dpm_profile.fan_mode = value;
+
+		/* reset user dpm fan speed */
+		if (value != AMD_FAN_CTRL_MANUAL) {
+			smu->user_dpm_profile.fan_speed_pwm = 0;
+			smu->user_dpm_profile.fan_speed_rpm = 0;
+			smu->user_dpm_profile.flags &= ~(SMU_CUSTOM_FAN_SPEED_RPM | SMU_CUSTOM_FAN_SPEED_PWM);
+		}
 	}
 
+out:
 	mutex_unlock(&smu->mutex);
-
-	/* reset user dpm fan speed */
-	if (!ret && value != AMD_FAN_CTRL_MANUAL &&
-			!(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
-		smu->user_dpm_profile.fan_speed_pwm = 0;
-		smu->user_dpm_profile.fan_speed_rpm = 0;
-		smu->user_dpm_profile.flags &= ~(SMU_CUSTOM_FAN_SPEED_RPM | SMU_CUSTOM_FAN_SPEED_PWM);
-	}
 
 	return ret;
 }
-
-static void smu_pp_set_fan_control_mode(void *handle, u32 value)
-{
-	struct smu_context *smu = handle;
-
-	smu_set_fan_control_mode(smu, value);
-}
-
 
 static int smu_get_fan_speed_pwm(void *handle, u32 *speed)
 {
@@ -2630,10 +2633,15 @@ static int smu_get_fan_speed_pwm(void *handle, u32 *speed)
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
+	if (!smu->ppt_funcs->get_fan_speed_pwm)
+		return -EOPNOTSUPP;
+
+	if (!speed)
+		return -EINVAL;
+
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_speed_pwm)
-		ret = smu->ppt_funcs->get_fan_speed_pwm(smu, speed);
+	ret = smu->ppt_funcs->get_fan_speed_pwm(smu, speed);
 
 	mutex_unlock(&smu->mutex);
 
@@ -2648,18 +2656,22 @@ static int smu_set_fan_speed_pwm(void *handle, u32 speed)
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
+	if (!smu->ppt_funcs->set_fan_speed_pwm)
+		return -EOPNOTSUPP;
+
+	if (speed == U32_MAX)
+		return -EINVAL;
+
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->set_fan_speed_pwm) {
-		ret = smu->ppt_funcs->set_fan_speed_pwm(smu, speed);
-		if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
-			smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_PWM;
-			smu->user_dpm_profile.fan_speed_pwm = speed;
+	ret = smu->ppt_funcs->set_fan_speed_pwm(smu, speed);
+	if (!ret && !(smu->user_dpm_profile.flags & SMU_DPM_USER_PROFILE_RESTORE)) {
+		smu->user_dpm_profile.flags |= SMU_CUSTOM_FAN_SPEED_PWM;
+		smu->user_dpm_profile.fan_speed_pwm = speed;
 
-			/* Override custom RPM setting as they cannot co-exist */
-			smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_RPM;
-			smu->user_dpm_profile.fan_speed_rpm = 0;
-		}
+		/* Override custom RPM setting as they cannot co-exist */
+		smu->user_dpm_profile.flags &= ~SMU_CUSTOM_FAN_SPEED_RPM;
+		smu->user_dpm_profile.fan_speed_rpm = 0;
 	}
 
 	mutex_unlock(&smu->mutex);
@@ -2675,10 +2687,15 @@ static int smu_get_fan_speed_rpm(void *handle, uint32_t *speed)
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
 		return -EOPNOTSUPP;
 
+	if (!smu->ppt_funcs->get_fan_speed_rpm)
+		return -EOPNOTSUPP;
+
+	if (!speed)
+		return -EINVAL;
+
 	mutex_lock(&smu->mutex);
 
-	if (smu->ppt_funcs->get_fan_speed_rpm)
-		ret = smu->ppt_funcs->get_fan_speed_rpm(smu, speed);
+	ret = smu->ppt_funcs->get_fan_speed_rpm(smu, speed);
 
 	mutex_unlock(&smu->mutex);
 
@@ -3107,7 +3124,7 @@ static int smu_get_prv_buffer_details(void *handle, void **addr, size_t *size)
 
 static const struct amd_pm_funcs swsmu_pm_funcs = {
 	/* export for sysfs */
-	.set_fan_control_mode    = smu_pp_set_fan_control_mode,
+	.set_fan_control_mode    = smu_set_fan_control_mode,
 	.get_fan_control_mode    = smu_get_fan_control_mode,
 	.set_fan_speed_pwm   = smu_set_fan_speed_pwm,
 	.get_fan_speed_pwm   = smu_get_fan_speed_pwm,
@@ -3159,11 +3176,10 @@ static const struct amd_pm_funcs swsmu_pm_funcs = {
 	.get_smu_prv_buf_details = smu_get_prv_buffer_details,
 };
 
-int smu_wait_for_event(struct amdgpu_device *adev, enum smu_event_type event,
+int smu_wait_for_event(struct smu_context *smu, enum smu_event_type event,
 		       uint64_t event_arg)
 {
 	int ret = -EINVAL;
-	struct smu_context *smu = &adev->smu;
 
 	if (smu->ppt_funcs->wait_for_event) {
 		mutex_lock(&smu->mutex);
@@ -3197,7 +3213,7 @@ int smu_stb_collect_info(struct smu_context *smu, void *buf, uint32_t size)
 static int smu_stb_debugfs_open(struct inode *inode, struct file *filp)
 {
 	struct amdgpu_device *adev = filp->f_inode->i_private;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 	unsigned char *buf;
 	int r;
 
@@ -3222,7 +3238,7 @@ static ssize_t smu_stb_debugfs_read(struct file *filp, char __user *buf, size_t 
 				loff_t *pos)
 {
 	struct amdgpu_device *adev = filp->f_inode->i_private;
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 
 	if (!filp->private_data)
@@ -3263,7 +3279,7 @@ void amdgpu_smu_stb_debug_fs_init(struct amdgpu_device *adev)
 {
 #if defined(CONFIG_DEBUG_FS)
 
-	struct smu_context *smu = &adev->smu;
+	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (!smu->stb_context.stb_buf_size)
 		return;
@@ -3275,5 +3291,14 @@ void amdgpu_smu_stb_debug_fs_init(struct amdgpu_device *adev)
 			    &smu_stb_debugfs_fops,
 			    smu->stb_context.stb_buf_size);
 #endif
+}
 
+int smu_send_hbm_bad_pages_num(struct smu_context *smu, uint32_t size)
+{
+	int ret = 0;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->send_hbm_bad_pages_num)
+		ret = smu->ppt_funcs->send_hbm_bad_pages_num(smu, size);
+
+	return ret;
 }

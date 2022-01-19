@@ -72,6 +72,9 @@
 #define mmDCHUBBUB_SDPIF_MMIO_CNTRL_0                                                                  0x049d
 #define mmDCHUBBUB_SDPIF_MMIO_CNTRL_0_BASE_IDX                                                         2
 
+#define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2                                                          0x05ea
+#define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2_BASE_IDX                                                 2
+
 
 static const char *gfxhub_client_ids[] = {
 	"CB",
@@ -1129,6 +1132,8 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 	u32 d1vga_control = RREG32_SOC15(DCE, 0, mmD1VGA_CONTROL);
 	unsigned size;
 
+	/* TODO move to DC so GMC doesn't need to hard-code DCN registers */
+
 	if (REG_GET_FIELD(d1vga_control, D1VGA_CONTROL, D1VGA_MODE_ENABLE)) {
 		size = AMDGPU_VBIOS_VGA_ALLOCATION;
 	} else {
@@ -1137,8 +1142,15 @@ static unsigned gmc_v9_0_get_vbios_fb_size(struct amdgpu_device *adev)
 		switch (adev->ip_versions[DCE_HWIP][0]) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
-		case IP_VERSION(2, 1, 0):
 			viewport = RREG32_SOC15(DCE, 0, mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION);
+			size = (REG_GET_FIELD(viewport,
+					      HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION, PRI_VIEWPORT_HEIGHT) *
+				REG_GET_FIELD(viewport,
+					      HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION, PRI_VIEWPORT_WIDTH) *
+				4);
+			break;
+		case IP_VERSION(2, 1, 0):
+			viewport = RREG32_SOC15(DCE, 0, mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2);
 			size = (REG_GET_FIELD(viewport,
 					      HUBP0_DCSURF_PRI_VIEWPORT_DIMENSION, PRI_VIEWPORT_HEIGHT) *
 				REG_GET_FIELD(viewport,
@@ -1185,7 +1197,7 @@ static void gmc_v9_0_set_umc_funcs(struct amdgpu_device *adev)
 		adev->umc.umc_inst_num = UMC_V6_1_UMC_INSTANCE_NUM;
 		adev->umc.channel_offs = UMC_V6_1_PER_CHANNEL_OFFSET_VG20;
 		adev->umc.channel_idx_tbl = &umc_v6_1_channel_idx_tbl[0][0];
-		adev->umc.ras_funcs = &umc_v6_1_ras_funcs;
+		adev->umc.ras = &umc_v6_1_ras;
 		break;
 	case IP_VERSION(6, 1, 2):
 		adev->umc.max_ras_err_cnt_per_query = UMC_V6_1_TOTAL_CHANNEL_NUM;
@@ -1193,7 +1205,7 @@ static void gmc_v9_0_set_umc_funcs(struct amdgpu_device *adev)
 		adev->umc.umc_inst_num = UMC_V6_1_UMC_INSTANCE_NUM;
 		adev->umc.channel_offs = UMC_V6_1_PER_CHANNEL_OFFSET_ARCT;
 		adev->umc.channel_idx_tbl = &umc_v6_1_channel_idx_tbl[0][0];
-		adev->umc.ras_funcs = &umc_v6_1_ras_funcs;
+		adev->umc.ras = &umc_v6_1_ras;
 		break;
 	case IP_VERSION(6, 7, 0):
 		adev->umc.max_ras_err_cnt_per_query = UMC_V6_7_TOTAL_CHANNEL_NUM;
@@ -1201,7 +1213,7 @@ static void gmc_v9_0_set_umc_funcs(struct amdgpu_device *adev)
 		adev->umc.umc_inst_num = UMC_V6_7_UMC_INSTANCE_NUM;
 		adev->umc.channel_offs = UMC_V6_7_PER_CHANNEL_OFFSET;
 		if (!adev->gmc.xgmi.connected_to_cpu)
-			adev->umc.ras_funcs = &umc_v6_7_ras_funcs;
+			adev->umc.ras = &umc_v6_7_ras;
 		if (1 & adev->smuio.funcs->get_die_id(adev))
 			adev->umc.channel_idx_tbl = &umc_v6_7_channel_idx_tbl_first[0][0];
 		else
@@ -1209,6 +1221,21 @@ static void gmc_v9_0_set_umc_funcs(struct amdgpu_device *adev)
 		break;
 	default:
 		break;
+	}
+
+	if (adev->umc.ras) {
+		amdgpu_ras_register_ras_block(adev, &adev->umc.ras->ras_block);
+
+		strcpy(adev->umc.ras->ras_block.name,"umc");
+		adev->umc.ras->ras_block.block = AMDGPU_RAS_BLOCK__UMC;
+
+		/* If don't define special ras_late_init function, use default ras_late_init */
+		if (!adev->umc.ras->ras_block.ras_late_init)
+				adev->umc.ras->ras_block.ras_late_init = amdgpu_umc_ras_late_init;
+
+		/* If don't define special ras_fini function, use default ras_fini */
+		if (!adev->umc.ras->ras_block.ras_fini)
+				adev->umc.ras->ras_block.ras_fini = amdgpu_umc_ras_fini;
 	}
 }
 
@@ -1231,17 +1258,32 @@ static void gmc_v9_0_set_mmhub_ras_funcs(struct amdgpu_device *adev)
 {
 	switch (adev->ip_versions[MMHUB_HWIP][0]) {
 	case IP_VERSION(9, 4, 0):
-		adev->mmhub.ras_funcs = &mmhub_v1_0_ras_funcs;
+		adev->mmhub.ras = &mmhub_v1_0_ras;
 		break;
 	case IP_VERSION(9, 4, 1):
-		adev->mmhub.ras_funcs = &mmhub_v9_4_ras_funcs;
+		adev->mmhub.ras = &mmhub_v9_4_ras;
 		break;
 	case IP_VERSION(9, 4, 2):
-		adev->mmhub.ras_funcs = &mmhub_v1_7_ras_funcs;
+		adev->mmhub.ras = &mmhub_v1_7_ras;
 		break;
 	default:
 		/* mmhub ras is not available */
 		break;
+	}
+
+	if (adev->mmhub.ras) {
+		amdgpu_ras_register_ras_block(adev, &adev->mmhub.ras->ras_block);
+
+		strcpy(adev->mmhub.ras->ras_block.name,"mmhub");
+		adev->mmhub.ras->ras_block.block = AMDGPU_RAS_BLOCK__MMHUB;
+
+		/* If don't define special ras_late_init function, use default ras_late_init */
+		if (!adev->mmhub.ras->ras_block.ras_late_init)
+			adev->mmhub.ras->ras_block.ras_late_init = amdgpu_mmhub_ras_late_init;
+
+		/* If don't define special ras_fini function, use default ras_fini */
+		if (!adev->mmhub.ras->ras_block.ras_fini)
+			adev->mmhub.ras->ras_block.ras_fini = amdgpu_mmhub_ras_fini;
 	}
 }
 
@@ -1252,7 +1294,8 @@ static void gmc_v9_0_set_gfxhub_funcs(struct amdgpu_device *adev)
 
 static void gmc_v9_0_set_hdp_ras_funcs(struct amdgpu_device *adev)
 {
-	adev->hdp.ras_funcs = &hdp_v4_0_ras_funcs;
+	adev->hdp.ras = &hdp_v4_0_ras;
+	amdgpu_ras_register_ras_block(adev, &adev->hdp.ras->ras_block);
 }
 
 static void gmc_v9_0_set_mca_funcs(struct amdgpu_device *adev)
@@ -1325,13 +1368,13 @@ static int gmc_v9_0_late_init(void *handle)
 	}
 
 	if (!amdgpu_persistent_edc_harvesting_supported(adev)) {
-		if (adev->mmhub.ras_funcs &&
-		    adev->mmhub.ras_funcs->reset_ras_error_count)
-			adev->mmhub.ras_funcs->reset_ras_error_count(adev);
+		if (adev->mmhub.ras && adev->mmhub.ras->ras_block.hw_ops &&
+		    adev->mmhub.ras->ras_block.hw_ops->reset_ras_error_count)
+			adev->mmhub.ras->ras_block.hw_ops->reset_ras_error_count(adev);
 
-		if (adev->hdp.ras_funcs &&
-		    adev->hdp.ras_funcs->reset_ras_error_count)
-			adev->hdp.ras_funcs->reset_ras_error_count(adev);
+		if (adev->hdp.ras && adev->hdp.ras->ras_block.hw_ops &&
+		    adev->hdp.ras->ras_block.hw_ops->reset_ras_error_count)
+			adev->hdp.ras->ras_block.hw_ops->reset_ras_error_count(adev);
 	}
 
 	r = amdgpu_gmc_ras_late_init(adev);
@@ -1738,7 +1781,7 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 	if (amdgpu_sriov_vf(adev) && amdgpu_in_reset(adev))
 		goto skip_pin_bo;
 
-	r = amdgpu_gart_table_vram_pin(adev);
+	r = amdgpu_gtt_mgr_recover(&adev->mman.gtt_mgr);
 	if (r)
 		return r;
 
@@ -1816,7 +1859,6 @@ static void gmc_v9_0_gart_disable(struct amdgpu_device *adev)
 {
 	adev->gfxhub.funcs->gart_disable(adev);
 	adev->mmhub.funcs->gart_disable(adev);
-	amdgpu_gart_table_vram_unpin(adev);
 }
 
 static int gmc_v9_0_hw_fini(void *handle)

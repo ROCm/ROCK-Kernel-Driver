@@ -522,9 +522,8 @@ out_put:
 
 uint64_t amdgpu_amdkfd_get_vram_usage(struct amdgpu_device *adev)
 {
-	struct ttm_resource_manager *vram_man = ttm_manager_type(&adev->mman.bdev, TTM_PL_VRAM);
 
-	return amdgpu_vram_mgr_usage(vram_man);
+	return amdgpu_vram_mgr_usage(&adev->mman.vram_mgr);
 }
 
 uint8_t amdgpu_amdkfd_get_xgmi_hops_count(struct amdgpu_device *dst,
