@@ -12300,7 +12300,7 @@ static int dm_check_crtc_cursor(struct drm_atomic_state *state,
 	 * positioning from the underlying pipe. Check the cursor plane's
 	 * blending properties match the underlying planes'. */
 
-	new_cursor_state = drm_atomic_get_new_plane_state(state, cursor);
+	new_cursor_state = kcl_drm_atomic_get_new_plane_state_before_commit(state, cursor);
 	if (!new_cursor_state || !new_cursor_state->fb) {
 		return 0;
 	}
