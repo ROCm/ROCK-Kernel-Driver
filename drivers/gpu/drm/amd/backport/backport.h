@@ -87,5 +87,6 @@
 #include <kcl/kcl_fdtable.h>
 #include <kcl/kcl_bitmap.h>
 #include <kcl/kcl_dma_fence_chain.h>
+#include <kcl/kcl_pci.h>
 
 #endif /* AMDGPU_BACKPORT_H */
