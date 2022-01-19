@@ -27,7 +27,11 @@
 #include "dc_trace.h"
 
 #if defined(CONFIG_X86)
+#if defined(HAVE_ASM_FPU_API_H)
 #include <asm/fpu/api.h>
+#else
+#include<asm/i387.h>
+#endif
 #elif defined(CONFIG_PPC64)
 #include <asm/switch_to.h>
 #include <asm/cputable.h>
