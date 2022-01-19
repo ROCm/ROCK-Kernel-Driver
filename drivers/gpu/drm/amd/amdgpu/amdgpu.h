@@ -1106,7 +1106,6 @@ struct amdgpu_device {
 
 	atomic_t 			in_gpu_reset;
 	enum pp_mp1_state               mp1_state;
-	struct rw_semaphore reset_sem;
 	struct amdgpu_doorbell_index doorbell_index;
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED

@@ -424,10 +424,10 @@ bool amdgpu_device_skip_hw_access(struct amdgpu_device *adev)
 	 * the lock.
 	 */
 	if (in_task()) {
-		if (down_read_trylock(&adev->reset_sem))
-			up_read(&adev->reset_sem);
+		if (down_read_trylock(&adev->reset_domain->sem))
+			up_read(&adev->reset_domain->sem);
 		else
-			lockdep_assert_held(&adev->reset_sem);
+			lockdep_assert_held(&adev->reset_domain->sem);
 	}
 #endif
 	return false;
@@ -3609,7 +3609,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->virt.vf_errors.lock);
 	hash_init(adev->mn_hash);
 	atomic_set(&adev->in_gpu_reset, 0);
-	init_rwsem(&adev->reset_sem);
 	mutex_init(&adev->psp.mutex);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	mutex_init(&adev->notifier_lock);
@@ -4760,7 +4759,7 @@ static int amdgpu_reset_reg_dumps(struct amdgpu_device *adev)
 	uint32_t reg_value;
 	int i;
 
-	lockdep_assert_held(&adev->reset_sem);
+	lockdep_assert_held(&adev->reset_domain->sem);
 	dump_stack();
 
 	for (i = 0; i < adev->num_regs; i++) {
@@ -4949,9 +4948,9 @@ static void amdgpu_device_lock_adev(struct amdgpu_device *adev,
 	atomic_set(&adev->in_gpu_reset, 1);
 
 	if (hive) {
-		down_write_nest_lock(&adev->reset_sem, &hive->hive_lock);
+		down_write_nest_lock(&adev->reset_domain->sem, &hive->hive_lock);
 	} else {
-		down_write(&adev->reset_sem);
+		down_write(&adev->reset_domain->sem);
 	}
 
 	switch (amdgpu_asic_reset_method(adev)) {
@@ -4972,7 +4971,7 @@ static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
 	amdgpu_vf_error_trans_all(adev);
 	adev->mp1_state = PP_MP1_STATE_NONE;
 	atomic_set(&adev->in_gpu_reset, 0);
-	up_write(&adev->reset_sem);
+	up_write(&adev->reset_domain->sem);
 }
 
 static void amdgpu_device_resume_display_audio(struct amdgpu_device *adev)
@@ -5623,7 +5622,7 @@ pci_ers_result_t amdgpu_pci_error_detected(struct pci_dev *pdev, pci_channel_sta
 	/* Fatal error, prepare for slot reset */
 	case pci_channel_io_frozen:
 		/*
-		 * Locking adev->reset_sem will prevent any external access
+		 * Locking adev->reset_domain->sem will prevent any external access
 		 * to GPU during PCI error recovery
 		 */
 		amdgpu_device_lock_adev(adev, NULL);
