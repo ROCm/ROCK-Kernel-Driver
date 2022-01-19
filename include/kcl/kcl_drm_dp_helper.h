@@ -276,4 +276,16 @@ enum drm_dp_phy {
 # define DP_DPCD_REV_14                     0x14
 #endif
 
+/*
+ * v4.20-rc3-897-g71b15621f097
+ * drm: Add the PSR SU granularity registers offsets
+ */
+#ifndef DP_PSR2_SU_X_GRANULARITY
+#define DP_PSR2_SU_X_GRANULARITY           0x072 /* eDP 1.4b */
+#endif
+#ifndef DP_PSR2_SU_Y_GRANULARITY
+#define DP_PSR2_SU_Y_GRANULARITY           0x074 /* eDP 1.4b */
+#endif
+
+
 #endif /* _KCL_DRM_DP_HELPER_H_ */
