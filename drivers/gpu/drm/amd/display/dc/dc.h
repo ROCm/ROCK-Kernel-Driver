@@ -702,13 +702,11 @@ struct dc_debug_options {
 	bool disable_dsc_edp;
 	unsigned int  force_dsc_edp_policy;
 	bool enable_dram_clock_change_one_display_vactive;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* TODO - remove once tested */
 	bool legacy_dp2_lt;
 	bool set_mst_en_for_sst;
 	bool disable_uhbr;
 	bool force_dp2_lt_fallback_method;
-#endif
 	union mem_low_power_enable_options enable_mem_low_power;
 	union root_clock_optimization_options root_clock_optimization;
 	bool hpo_optimization;
@@ -1256,6 +1254,7 @@ struct dpcd_caps {
 	bool is_branch_dev;
 	/* Dongle's downstream count. */
 	union sink_count sink_count;
+	bool is_mst_capable;
 	/* If dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER,
 	indicates 'Frame Sequential-to-lllFrame Pack' conversion capability.*/
 	struct dc_dongle_caps dongle_caps;

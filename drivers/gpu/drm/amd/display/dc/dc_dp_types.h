@@ -138,9 +138,7 @@ enum dc_dp_training_pattern {
 enum dp_link_encoding {
 	DP_UNKNOWN_ENCODING = 0,
 	DP_8b_10b_ENCODING = 1,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_128b_132b_ENCODING = 2,
-#endif
 };
 
 struct dc_link_settings {
@@ -929,7 +927,6 @@ struct dpcd_usb4_dp_tunneling_info {
 	uint8_t usb4_topology_id[DPCD_USB4_TOPOLOGY_ID_LEN];
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #ifndef DP_MAIN_LINK_CHANNEL_CODING_CAP
 #define DP_MAIN_LINK_CHANNEL_CODING_CAP			0x006
 #endif
@@ -1095,6 +1092,5 @@ union dp_128b_132b_training_aux_rd_interval {
 	} bits;
 	uint8_t raw;
 };
-#endif
 
 #endif /* DC_DP_TYPES_H */
