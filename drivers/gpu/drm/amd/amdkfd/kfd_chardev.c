@@ -1612,14 +1612,16 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 				       void *data)
 {
 	struct kfd_ioctl_ipc_import_handle_args *args = data;
-	struct kfd_dev *dev = NULL;
+	struct kfd_process_device *pdd;
 	int r;
 
-	dev = kfd_device_by_id(args->gpu_id);
-	if (!dev)
+	mutex_lock(&p->mutex);
+	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
+	mutex_unlock(&p->mutex);
+	if (!pdd)
 		return -EINVAL;
 
-	r = kfd_ipc_import_handle(dev, p, args->gpu_id, args->share_handle,
+	r = kfd_ipc_import_handle(pdd->dev, p, args->gpu_id, args->share_handle,
 				  args->va_addr, &args->handle,
 				  &args->mmap_offset, &args->flags);
 	if (r)
