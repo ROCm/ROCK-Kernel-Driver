@@ -3608,7 +3608,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->mn_lock);
 	mutex_init(&adev->virt.vf_errors.lock);
 	hash_init(adev->mn_hash);
-	atomic_set(&adev->in_gpu_reset, 0);
 	mutex_init(&adev->psp.mutex);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	mutex_init(&adev->notifier_lock);
@@ -4945,7 +4944,7 @@ end:
 static void amdgpu_device_lock_adev(struct amdgpu_device *adev,
 				struct amdgpu_hive_info *hive)
 {
-	atomic_set(&adev->in_gpu_reset, 1);
+	atomic_set(&adev->reset_domain->in_gpu_reset, 1);
 
 	if (hive) {
 		down_write_nest_lock(&adev->reset_domain->sem, &hive->hive_lock);
@@ -4970,7 +4969,7 @@ static void amdgpu_device_unlock_adev(struct amdgpu_device *adev)
 {
 	amdgpu_vf_error_trans_all(adev);
 	adev->mp1_state = PP_MP1_STATE_NONE;
-	atomic_set(&adev->in_gpu_reset, 0);
+	atomic_set(&adev->reset_domain->in_gpu_reset, 0);
 	up_write(&adev->reset_domain->sem);
 }
 
@@ -5844,6 +5843,11 @@ void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
 		return;
 
 	amdgpu_asic_invalidate_hdp(adev, ring);
+}
+
+int amdgpu_in_reset(struct amdgpu_device *adev)
+{
+	return atomic_read(&adev->reset_domain->in_gpu_reset);
 }
 
 /**
