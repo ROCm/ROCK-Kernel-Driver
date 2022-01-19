@@ -2042,9 +2042,13 @@ static ssize_t amdgpu_reset_dump_register_list_read(struct file *f,
 		return 0;
 
 	memset(reg_offset, 0, 12);
+#ifdef HAVE_DOWN_READ_KILLABLE
 	ret = down_read_killable(&adev->reset_domain->sem);
 	if (ret)
 		return ret;
+#else
+	down_read(&adev->reset_domain->sem);
+#endif
 
 	for (i = 0; i < adev->num_regs; i++) {
 		sprintf(reg_offset, "0x%x\n", adev->reset_dump_reg_list[i]);
@@ -2053,9 +2057,13 @@ static ssize_t amdgpu_reset_dump_register_list_read(struct file *f,
 			return -EFAULT;
 
 		len += strlen(reg_offset);
+		#ifdef HAVE_DOWN_READ_KILLABLE
 		ret = down_read_killable(&adev->reset_domain->sem);
 		if (ret)
 			return ret;
+		#else
+		down_read(&adev->reset_domain->sem);
+		#endif
 	}
 
 	up_read(&adev->reset_domain->sem);
