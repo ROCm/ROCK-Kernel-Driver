@@ -48,6 +48,41 @@
 #endif
 #endif
 
+#if !defined(HAVE__DMA_FENCE_IS_LATER_2ARGS)
+
+#if !defined(HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO)
+static inline bool __dma_fence_is_later(u64 f1, u64 f2)
+{
+	
+	/* This is for backward compatibility with drivers which can only handle
+	 * 32bit sequence numbers. Use a 64bit compare when any of the higher
+	 * bits are none zero, otherwise use a 32bit compare with wrap around
+	 * handling.
+	 */
+	if (upper_32_bits(f1) || upper_32_bits(f2))
+		return f1 > f2;
+
+	return (int)(lower_32_bits(f1) - lower_32_bits(f2)) > 0;
+}
+
+#elif !defined(HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG) && \
+	defined(HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO)
+static inline bool __dma_fence_is_later(u64 f1, u64 f2,
+                                        const struct dma_fence_ops *ops)
+{
+        /* This is for backward compatibility with drivers which can only handle
+         * 32bit sequence numbers. Use a 64bit compare when the driver says to
+         * do so.
+         */
+        if (ops->use_64bit_seqno)
+                return f1 > f2;
+
+        return (int)(lower_32_bits(f1) - lower_32_bits(f2)) > 0;
+}
+
+#endif
+#endif /* HAVE__DMA_FENCE_IS_LATER_2ARGS */
+
 /* commit v4.5-rc3-715-gb47bcb93bbf2
  * fall back to HAVE_LINUX_DMA_FENCE_H check directly
  * as it's hard to detect the implementation in kernel
