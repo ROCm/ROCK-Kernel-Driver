@@ -50,21 +50,13 @@ struct resource_caps {
 	int num_pll;
 	int num_dwb;
 	int num_ddc;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int num_vmid;
-#endif
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	int num_dsc;
-#endif
 	unsigned int num_dig_link_enc; // Total number of DIGs (digital encoders) in DIO (Display Input/Output).
 	unsigned int num_usb4_dpia; // Total number of USB4 DPIA (DisplayPort Input Adapters).
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	int num_hpo_dp_stream_encoder;
 	int num_hpo_dp_link_encoder;
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	int num_mpc_3dlut;
-#endif
 };
 
 struct resource_straps {
@@ -83,14 +75,12 @@ struct resource_create_funcs {
 	struct stream_encoder *(*create_stream_encoder)(
 			enum engine_id eng_id, struct dc_context *ctx);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct hpo_dp_stream_encoder *(*create_hpo_dp_stream_encoder)(
 			enum engine_id eng_id, struct dc_context *ctx);
 
 	struct hpo_dp_link_encoder *(*create_hpo_dp_link_encoder)(
 			uint8_t inst,
 			struct dc_context *ctx);
-#endif
 
 	struct dce_hwseq *(*create_hwseq)(
 			struct dc_context *ctx);
@@ -211,12 +201,10 @@ int get_num_mpc_splits(struct pipe_ctx *pipe);
 
 int get_num_odm_splits(struct pipe_ctx *pipe);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
 		const struct resource_context *res_ctx,
 		const struct resource_pool *pool,
 		const struct dc_link *link);
-#endif
 
 void reset_syncd_pipes_from_disabled_pipes(struct dc *dc,
 	struct dc_state *context);

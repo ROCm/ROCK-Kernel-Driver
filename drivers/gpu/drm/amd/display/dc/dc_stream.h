@@ -121,12 +121,10 @@ struct periodic_interrupt_config {
 	int lines_offset;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct dc_mst_stream_bw_update {
 	bool is_increase; // is bandwidth reduced or increased
 	uint32_t mst_stream_bw; // new mst bandwidth in kbps
 };
-#endif
 
 union stream_update_flags {
 	struct {
@@ -136,13 +134,9 @@ union stream_update_flags {
 		uint32_t abm_level:1;
 		uint32_t dpms_off:1;
 		uint32_t gamut_remap:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		uint32_t wb_update:1;
-#endif
 		uint32_t dsc_changed : 1;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint32_t mst_bw : 1;
-#endif
 	} bits;
 
 	uint32_t raw;
@@ -298,17 +292,11 @@ struct dc_stream_update {
 
 	struct dc_csc_transform *output_csc_transform;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct dc_writeback_update *wb_update;
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	struct dc_dsc_config *dsc_config;
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct dc_mst_stream_bw_update *mst_bw_update;
 	struct dc_transfer_func *func_shaper;
 	struct dc_3dlut *lut3d_func;
-#endif
 
 	struct test_pattern *pending_test_pattern;
 };

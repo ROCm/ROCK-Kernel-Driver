@@ -400,7 +400,6 @@ struct dc_lttpr_caps {
 	uint8_t aux_rd_interval[MAX_REPEATER_CNT - 1];
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct dc_dongle_dfp_cap_ext {
 	bool supported;
 	uint16_t max_pixel_rate_in_mps;
@@ -412,7 +411,6 @@ struct dc_dongle_dfp_cap_ext {
 	struct dp_color_depth_caps ycbcr422_color_depth_caps;
 	struct dp_color_depth_caps ycbcr420_color_depth_caps;
 };
-#endif
 
 struct dc_dongle_caps {
 	/* dongle type (DP converter, CV smart dongle) */
@@ -427,10 +425,8 @@ struct dc_dongle_caps {
 	bool is_dp_hdmi_ycbcr420_converter;
 	uint32_t dp_hdmi_max_bpc;
 	uint32_t dp_hdmi_max_pixel_clk_in_khz;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	uint32_t dp_hdmi_frl_max_link_bw_in_kbps;
 	struct dc_dongle_dfp_cap_ext dfp_cap_ext;
-#endif
 };
 /* Scaling format */
 enum scaling_transformation {
@@ -470,8 +466,6 @@ struct cm_grph_csc_adjustment {
 };
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x) || \
-        defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /* writeback */
 struct dwb_stereo_params {
 	bool				stereo_enabled;		/* false: normal mode, true: 3D stereo */
@@ -514,7 +508,7 @@ struct dc_dwb_params {
 	enum dwb_subsample_position	subsample_position;
 	struct dc_transfer_func *out_transfer_func;
 };
-#endif
+
 
 /* audio*/
 
@@ -867,7 +861,6 @@ struct dc_context {
 
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* DSC DPCD capabilities */
 union dsc_slice_caps1 {
 	struct {
@@ -938,7 +931,6 @@ struct dsc_dec_dpcd_caps {
 	uint32_t branch_max_line_width;
 	bool is_dp;
 };
-#endif
 
 struct dc_golden_table {
 	uint16_t dc_golden_table_ver;

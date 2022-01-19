@@ -261,16 +261,12 @@ struct resource_pool {
 	/* Number of USB4 DPIA (DisplayPort Input Adapter) link objects created.*/
 	unsigned int usb4_dpia_count;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	unsigned int hpo_dp_stream_enc_count;
 	struct hpo_dp_stream_encoder *hpo_dp_stream_enc[MAX_HPO_DP2_ENCODERS];
 	unsigned int hpo_dp_link_enc_count;
 	struct hpo_dp_link_encoder *hpo_dp_link_enc[MAX_HPO_DP2_LINK_ENCODERS];
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct dc_3dlut *mpc_lut[MAX_PIPES];
 	struct dc_transfer_func *mpc_shaper[MAX_PIPES];
-#endif
 	struct {
 		unsigned int xtalin_clock_inKhz;
 		unsigned int dccg_ref_clock_inKhz;
@@ -279,9 +275,7 @@ struct resource_pool {
 	unsigned int timing_generator_count;
 	unsigned int mpcc_count;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	unsigned int writeback_pipe_count;
-#endif
 	/*
 	 * reserved clock source for DP
 	 */
@@ -318,14 +312,10 @@ struct dcn_fe_bandwidth {
 
 struct stream_resource {
 	struct output_pixel_processor *opp;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct display_stream_compressor *dsc;
-#endif
 	struct timing_generator *tg;
 	struct stream_encoder *stream_enc;
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct hpo_dp_stream_encoder *hpo_dp_stream_enc;
-#endif
 	struct audio *audio;
 
 	struct pixel_clk_params pix_clk_params;
@@ -352,18 +342,12 @@ struct plane_resource {
 	struct dcn_fe_bandwidth bw;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 #define LINK_RES_HPO_DP_REC_MAP__MASK 0xFFFF
 #define LINK_RES_HPO_DP_REC_MAP__SHIFT 0
-#endif
 
 /* all mappable hardware resources used to enable a link */
 struct link_resource {
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct hpo_dp_link_encoder *hpo_dp_link_enc;
-#else
-	void *dummy;
-#endif
 };
 
 union pipe_update_flags {
@@ -447,18 +431,12 @@ struct resource_context {
 	bool is_audio_acquired[MAX_PIPES];
 	uint8_t clock_source_ref_count[MAX_CLOCK_SOURCES];
 	uint8_t dp_clock_source_ref_count;
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool is_dsc_acquired[MAX_PIPES];
-#endif
 	struct link_enc_cfg_context link_enc_cfg_ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	bool is_hpo_dp_stream_enc_acquired[MAX_HPO_DP2_ENCODERS];
 	unsigned int hpo_dp_link_enc_to_link_idx[MAX_HPO_DP2_LINK_ENCODERS];
 	int hpo_dp_link_enc_ref_cnts[MAX_HPO_DP2_LINK_ENCODERS];
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool is_mpc_3dlut_acquired[MAX_PIPES];
-#endif
 };
 
 struct dce_bw_output {

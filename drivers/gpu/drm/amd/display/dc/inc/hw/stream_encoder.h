@@ -108,10 +108,9 @@ struct stream_encoder {
 	struct dc_bios *bp;
 	enum engine_id id;
 	uint32_t stream_enc_inst;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct vpg *vpg;
 	struct afmt *afmt;
-#endif
+
 };
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
@@ -231,7 +230,6 @@ struct stream_encoder_funcs {
 		enum dc_pixel_encoding *encoding,
 		enum dc_color_depth *depth);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	void (*enc_read_state)(struct stream_encoder *enc, struct enc_state *s);
 
 	void (*dp_set_dsc_config)(
@@ -244,14 +242,11 @@ struct stream_encoder_funcs {
 				bool enable,
 				uint8_t *dsc_packed_pps,
 				bool immediate_update);
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	void (*set_dynamic_metadata)(struct stream_encoder *enc,
 			bool enable,
 			uint32_t hubp_requestor_id,
 			enum dynamic_metadata_mode dmdata_mode);
-#endif
 
 	void (*dp_set_odm_combine)(
 		struct stream_encoder *enc,
@@ -261,7 +256,6 @@ struct stream_encoder_funcs {
 		struct stream_encoder *enc);
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 struct hpo_dp_stream_encoder_state {
 	uint32_t stream_enc_enabled;
 	uint32_t vid_stream_enabled;
@@ -341,6 +335,5 @@ struct hpo_dp_stream_encoder_funcs {
 			struct hpo_dp_stream_encoder *enc,
 			struct hpo_dp_stream_encoder_state *state);
 };
-#endif
 
 #endif /* STREAM_ENCODER_H_ */

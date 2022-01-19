@@ -195,10 +195,8 @@ struct dc_caps {
 	unsigned int cursor_cache_size;
 	struct dc_plane_cap planes[MAX_PLANES];
 	struct dc_color_caps color;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool dp_hpo;
 	bool hdmi_frl_pcon_support;
-#endif
 	bool edp_dsc_support;
 	bool vbios_lttpr_aware;
 	bool vbios_lttpr_enable;
@@ -308,7 +306,6 @@ struct dc_cap_funcs {
 
 struct link_training_settings;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 union allow_lttpr_non_transparent_mode {
 	struct {
 		bool DP1_4A : 1;
@@ -316,7 +313,7 @@ union allow_lttpr_non_transparent_mode {
 	} bits;
 	unsigned char raw;
 };
-#endif
+
 /* Structure to hold configuration flags set by dm at dc creation. */
 struct dc_config {
 	bool gpu_vm_support;
@@ -329,11 +326,7 @@ struct dc_config {
 	bool edp_no_power_sequencing;
 	bool force_enum_edp;
 	bool forced_clocks;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union allow_lttpr_non_transparent_mode allow_lttpr_non_transparent_mode;
-#else
-	bool allow_lttpr_non_transparent_mode;
-#endif
 	bool multi_mon_pp_mclk_switch;
 	bool disable_dmcu;
 	bool enable_4to1MPC;
@@ -677,9 +670,7 @@ struct dc_debug_options {
 #endif
 	bool dmub_command_table; /* for testing only */
 	struct dc_bw_validation_profile bw_val_profile;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_fec;
-#endif
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool disable_48mhz_pwrdwn;
 #endif
@@ -1275,20 +1266,16 @@ struct dpcd_caps {
 	bool dpcd_display_control_capable;
 	bool ext_receiver_cap_field_present;
 	bool dynamic_backlight_capable_edp;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	union dpcd_fec_capability fec_cap;
 	struct dpcd_dsc_capabilities dsc_caps;
-#endif
 	struct dc_lttpr_caps lttpr_caps;
 	struct psr_caps psr_caps;
 	struct dpcd_usb4_dp_tunneling_info usb4_dp_tun_info;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dp_128b_132b_supported_link_rates dp_128b_132b_supported_link_rates;
 	union dp_main_line_channel_coding_cap channel_coding_cap;
 	union dp_sink_video_fallback_formats fallback_formats;
 	union dp_fec_capability1 fec_cap1;
-#endif
 };
 
 union dpcd_sink_ext_caps {

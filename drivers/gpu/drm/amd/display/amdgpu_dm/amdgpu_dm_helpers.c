@@ -677,7 +677,6 @@ bool dm_helpers_dp_write_dsc_enable(
 	return (ret > 0);
 }
 #endif
-
 bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 {
 	bool dp_sink_present;
@@ -920,16 +919,12 @@ void dm_helpers_mst_enable_stream_features(const struct dc_stream_state *stream)
 					 sizeof(new_downspread));
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
 {
-       // FPGA programming for this clock in diags framework that
-       // needs to go through dm layer, therefore leave dummy interace here
+       // TODO
 }
-
 
 void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
 {
 	/* TODO: add peridic detection implementation */
 }
-#endif

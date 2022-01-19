@@ -12,9 +12,7 @@
 #include "dc_link_ddc.h"
 #include "dm_helpers.h"
 #include "dpcd_defs.h"
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
-#endif
 #include "resource.h"
 #include "link_enc_cfg.h"
 #include "clk_mgr.h"
@@ -122,49 +120,32 @@ void dp_enable_link_phy(
 
 	link->cur_link_settings = *link_settings;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(link_settings) == DP_128b_132b_ENCODING) {
 		/* TODO - DP2.0 HW: notify link rate change here */
 	} else if (dp_get_link_encoding_format(link_settings) == DP_8b_10b_ENCODING) {
 		if (dc->clk_mgr->funcs->notify_link_rate_change)
 			dc->clk_mgr->funcs->notify_link_rate_change(dc->clk_mgr, link);
 	}
-#else
-	if (dc->clk_mgr->funcs->notify_link_rate_change)
-		dc->clk_mgr->funcs->notify_link_rate_change(dc->clk_mgr, link);
-#endif
+
 	if (dmcu != NULL && dmcu->funcs->lock_phy)
 		dmcu->funcs->lock_phy(dmcu);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(link_settings) == DP_128b_132b_ENCODING) {
 		enable_dp_hpo_output(link, link_res, link_settings);
 	} else if (dp_get_link_encoding_format(link_settings) == DP_8b_10b_ENCODING) {
 		if (dc_is_dp_sst_signal(signal)) {
 			link_enc->funcs->enable_dp_output(
-							link_enc,
-							link_settings,
-							clock_source);
+					link_enc,
+					link_settings,
+					clock_source);
 		} else {
 			link_enc->funcs->enable_dp_mst_output(
-							link_enc,
-							link_settings,
-							clock_source);
+					link_enc,
+					link_settings,
+					clock_source);
 		}
 	}
-#else
-	if (dc_is_dp_sst_signal(signal)) {
-		link_enc->funcs->enable_dp_output(
-						link_enc,
-						link_settings,
-						clock_source);
-	} else {
-		link_enc->funcs->enable_dp_mst_output(
-						link_enc,
-						link_settings,
-						clock_source);
-	}
-#endif
+
 	if (dmcu != NULL && dmcu->funcs->unlock_phy)
 		dmcu->funcs->unlock_phy(dmcu);
 
@@ -244,9 +225,7 @@ void dp_disable_link_phy(struct dc_link *link, const struct link_resource *link_
 {
 	struct dc  *dc = link->ctx->dc;
 	struct dmcu *dmcu = dc->res_pool->dmcu;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct hpo_dp_link_encoder *hpo_link_enc = link_res->hpo_dp_link_enc;
-#endif
 	struct link_encoder *link_enc;
 
 	/* Link should always be assigned encoder when en-/disabling. */
@@ -262,28 +241,21 @@ void dp_disable_link_phy(struct dc_link *link, const struct link_resource *link_
 	if (signal == SIGNAL_TYPE_EDP) {
 		if (link->dc->hwss.edp_backlight_control)
 			link->dc->hwss.edp_backlight_control(link, false);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dp_get_link_encoding_format(&link->cur_link_settings) == DP_128b_132b_ENCODING)
 			disable_dp_hpo_output(link, link_res, signal);
 		else
 			link_enc->funcs->disable_output(link_enc, signal);
-#else
-		link_enc->funcs->disable_output(link_enc, signal);
-#endif
 		link->dc->hwss.edp_power_control(link, false);
 	} else {
 		if (dmcu != NULL && dmcu->funcs->lock_phy)
 			dmcu->funcs->lock_phy(dmcu);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dp_get_link_encoding_format(&link->cur_link_settings) == DP_128b_132b_ENCODING &&
 				hpo_link_enc)
 			disable_dp_hpo_output(link, link_res, signal);
 		else
 			link_enc->funcs->disable_output(link_enc, signal);
-#else
-		link_enc->funcs->disable_output(link_enc, signal);
-#endif
+
 		if (dmcu != NULL && dmcu->funcs->unlock_phy)
 			dmcu->funcs->unlock_phy(dmcu);
 	}
@@ -332,14 +304,12 @@ bool dp_set_hw_training_pattern(
 	case DP_TRAINING_PATTERN_SEQUENCE_4:
 		test_pattern = DP_TEST_PATTERN_TRAINING_PATTERN4;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case DP_128b_132b_TPS1:
 		test_pattern = DP_TEST_PATTERN_128b_132b_TPS1_TRAINING_MODE;
 		break;
 	case DP_128b_132b_TPS2:
 		test_pattern = DP_TEST_PATTERN_128b_132b_TPS2_TRAINING_MODE;
 		break;
-#endif
 	default:
 		break;
 	}
@@ -349,10 +319,8 @@ bool dp_set_hw_training_pattern(
 	return true;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define DC_LOGGER \
 	link->ctx->logger
-#endif
 void dp_set_hw_lane_settings(
 	struct dc_link *link,
 	const struct link_resource *link_res,
@@ -365,7 +333,6 @@ void dp_set_hw_lane_settings(
 		return;
 
 	/* call Encoder to set lane settings */
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(&link_settings->link_settings) ==
 			DP_128b_132b_ENCODING) {
 		link_res->hpo_dp_link_enc->funcs->set_ffe(
@@ -376,9 +343,6 @@ void dp_set_hw_lane_settings(
 			== DP_8b_10b_ENCODING) {
 		encoder->funcs->dp_set_lane_settings(encoder, link_settings);
 	}
-#else
-	encoder->funcs->dp_set_lane_settings(encoder, link_settings);
-#endif
 	memmove(link->cur_lane_setting,
 			link_settings->lane_settings,
 			sizeof(link->cur_lane_setting));
@@ -393,9 +357,7 @@ void dp_set_hw_test_pattern(
 {
 	struct encoder_set_dp_phy_pattern_param pattern_param = {0};
 	struct link_encoder *encoder;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	enum dp_link_encoding link_encoding_format = dp_get_link_encoding_format(&link->cur_link_settings);
-#endif
 
 	/* Access link encoder based on whether it is statically
 	 * or dynamically assigned to a link.
@@ -411,7 +373,6 @@ void dp_set_hw_test_pattern(
 	pattern_param.custom_pattern_size = custom_pattern_size;
 	pattern_param.dp_panel_mode = dp_get_panel_mode(link);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	switch (link_encoding_format) {
 	case DP_128b_132b_ENCODING:
 		link_res->hpo_dp_link_enc->funcs->set_link_test_pattern(
@@ -425,14 +386,10 @@ void dp_set_hw_test_pattern(
 		DC_LOG_ERROR("%s: Unknown link encoding format.", __func__);
 		break;
 	}
-#else
-	encoder->funcs->dp_set_phy_pattern(encoder, &pattern_param);
-#endif
+
 	dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_SET_SOURCE_PATTERN);
 }
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #undef DC_LOGGER
-#endif
 
 void dp_retrain_link_dp_test(struct dc_link *link,
 			struct dc_link_settings *link_setting,
@@ -502,7 +459,6 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 	}
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define DC_LOGGER \
 	dsc->ctx->logger
 static void dsc_optc_config_log(struct display_stream_compressor *dsc,
@@ -526,6 +482,7 @@ static void dsc_optc_config_log(struct display_stream_compressor *dsc,
 	DC_LOG_DSC("\tslice_width %d", config->slice_width);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
@@ -538,7 +495,7 @@ bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 		result = dm_helpers_dp_write_dsc_enable(dc->ctx, stream, enable);
 	return result;
 }
-
+#endif
 /* The stream with these settings can be sent (unblanked) only after DSC was enabled on RX first,
  * i.e. after dp_enable_dsc_on_rx() had been called
  */
@@ -582,12 +539,8 @@ void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 		optc_dsc_mode = dsc_optc_cfg.is_pixel_format_444 ? OPTC_DSC_ENABLED_444 : OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED;
 
 		/* Enable DSC in encoder */
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dc_is_dp_signal(stream->signal) && !IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)
 				&& !is_dp_128b_132b_signal(pipe_ctx)) {
-#else
-		if (dc_is_dp_signal(stream->signal) && !IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
-#endif
 			DC_LOG_DSC("Setting stream encoder DSC config for engine %d:", (int)pipe_ctx->stream_res.stream_enc->id);
 			dsc_optc_config_log(dsc, &dsc_optc_cfg);
 			pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(pipe_ctx->stream_res.stream_enc,
@@ -613,17 +566,13 @@ void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 
 		/* disable DSC in stream encoder */
 		if (dc_is_dp_signal(stream->signal)) {
-
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (is_dp_128b_132b_signal(pipe_ctx))
 				pipe_ctx->stream_res.hpo_dp_stream_enc->funcs->dp_set_dsc_pps_info_packet(
 										pipe_ctx->stream_res.hpo_dp_stream_enc,
 										false,
 										NULL,
 										true);
-			else
-#endif
-				if (!IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
+			else if (!IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment)) {
 					pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(
 							pipe_ctx->stream_res.stream_enc,
 							OPTC_DSC_DISABLED, 0, 0);
@@ -638,7 +587,7 @@ void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 			odm_pipe->stream_res.dsc->funcs->dsc_disable(odm_pipe->stream_res.dsc);
 	}
 }
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
@@ -662,7 +611,7 @@ bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 out:
 	return result;
 }
-
+#endif
 /*
  * For dynamic bpp change case, dsc is programmed with MASTER_UPDATE_LOCK enabled;
  * hence PPS info packet update need to use frame update instead of immediate update.
@@ -699,7 +648,6 @@ bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_u
 		dsc->funcs->dsc_get_packed_pps(dsc, &dsc_cfg, &dsc_packed_pps[0]);
 		if (dc_is_dp_signal(stream->signal)) {
 			DC_LOG_DSC("Setting stream encoder DSC PPS SDP for engine %d\n", (int)pipe_ctx->stream_res.stream_enc->id);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (is_dp_128b_132b_signal(pipe_ctx))
 				pipe_ctx->stream_res.hpo_dp_stream_enc->funcs->dp_set_dsc_pps_info_packet(
 										pipe_ctx->stream_res.hpo_dp_stream_enc,
@@ -707,7 +655,6 @@ bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_u
 										&dsc_packed_pps[0],
 										immediate_update);
 			else
-#endif
 				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_pps_info_packet(
 										pipe_ctx->stream_res.stream_enc,
 										true,
@@ -717,7 +664,6 @@ bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_u
 	} else {
 		/* disable DSC PPS in stream encoder */
 		if (dc_is_dp_signal(stream->signal)) {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (is_dp_128b_132b_signal(pipe_ctx))
 				pipe_ctx->stream_res.hpo_dp_stream_enc->funcs->dp_set_dsc_pps_info_packet(
 										pipe_ctx->stream_res.hpo_dp_stream_enc,
@@ -725,7 +671,6 @@ bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_u
 										NULL,
 										true);
 			else
-#endif
 				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_pps_info_packet(
 							pipe_ctx->stream_res.stream_enc, false, NULL, true);
 		}
@@ -748,9 +693,7 @@ bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx)
 	dp_set_dsc_pps_sdp(pipe_ctx, true, false);
 	return true;
 }
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #undef DC_LOGGER
 #define DC_LOGGER \
 	link->ctx->logger
@@ -902,4 +845,3 @@ void setup_dp_hpo_stream(struct pipe_ctx *pipe_ctx, bool enable)
 }
 
 #undef DC_LOGGER
-#endif

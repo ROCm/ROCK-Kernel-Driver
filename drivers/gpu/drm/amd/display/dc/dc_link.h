@@ -32,13 +32,11 @@
 
 struct link_resource;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_link_fec_state {
 	dc_link_fec_not_ready,
 	dc_link_fec_ready,
 	dc_link_fec_enabled
 };
-#endif
 
 struct dc_link_status {
 	bool link_active;
@@ -49,10 +47,8 @@ struct dc_link_status {
 struct link_mst_stream_allocation {
 	/* DIG front */
 	const struct stream_encoder *stream_enc;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* HPO DP Stream Encoder */
 	const struct hpo_dp_stream_encoder *hpo_dp_stream_enc;
-#endif
 	/* associate DRM payload table with DC stream encoder */
 	uint8_t vcp_id;
 	/* number of slots required for the DP stream in transport packet */
@@ -208,9 +204,7 @@ struct dc_link {
 
 	struct link_trace link_trace;
 	struct gpio *hpd_gpio;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	enum dc_link_fec_state fec_state;
-#endif
 };
 
 const struct dc_link_status *dc_link_get_status(const struct dc_link *dc_link);
@@ -322,10 +316,8 @@ enum dc_detect_reason {
 bool dc_link_detect(struct dc_link *dc_link, enum dc_detect_reason reason);
 bool dc_link_get_hpd_state(struct dc_link *dc_link);
 enum dc_status dc_link_allocate_mst_payload(struct pipe_ctx *pipe_ctx);
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dc_status dc_link_reduce_mst_payload(struct pipe_ctx *pipe_ctx, uint32_t req_pbn);
 enum dc_status dc_link_increase_mst_payload(struct pipe_ctx *pipe_ctx, uint32_t req_pbn);
-#endif
 
 /* Notify DC about DP RX Interrupt (aka Short Pulse Interrupt).
  * Return:
@@ -456,15 +448,11 @@ bool dc_submit_i2c_oem(
 uint32_t dc_bandwidth_in_kbps_from_timing(
 	const struct dc_crtc_timing *timing);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dc_link_is_fec_supported(const struct dc_link *link);
 bool dc_link_should_enable_fec(const struct dc_link *link);
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 uint32_t dc_link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw);
 enum dp_link_encoding dc_link_dp_mst_decide_link_encoding_format(const struct dc_link *link);
-#endif
 
 const struct link_resource *dc_link_get_cur_link_res(const struct dc_link *link);
 /* take a snapshot of current link resource allocation state */

@@ -53,7 +53,6 @@ enum dc_link_rate {
 	LINK_RATE_RBR2 = 0x0C,		// Rate_5 (RBR2)- 3.24 Gbps/Lane
 	LINK_RATE_RATE_6 = 0x10,	// Rate_6		- 4.32 Gbps/Lane
 	LINK_RATE_HIGH2 = 0x14,		// Rate_7 (HBR2)- 5.40 Gbps/Lane
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	LINK_RATE_HIGH3 = 0x1E,		// Rate_8 (HBR3)- 8.10 Gbps/Lane
 	/* Starting from DP2.0 link rate enum directly represents actual
 	 * link rate value in unit of 10 mbps
@@ -61,9 +60,6 @@ enum dc_link_rate {
 	LINK_RATE_UHBR10 = 1000,	// UHBR10 - 10.0 Gbps/Lane
 	LINK_RATE_UHBR13_5 = 1350,	// UHBR13.5 - 13.5 Gbps/Lane
 	LINK_RATE_UHBR20 = 2000,	// UHBR10 - 20.0 Gbps/Lane
-#else
-	LINK_RATE_HIGH3 = 0x1E		// Rate_8 (HBR3)- 8.10 Gbps/Lane
-#endif
 };
 
 enum dc_link_spread {
@@ -100,7 +96,6 @@ enum dc_post_cursor2 {
 	POST_CURSOR2_MAX_LEVEL = POST_CURSOR2_LEVEL3,
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 enum dc_dp_ffe_preset_level {
 	DP_FFE_PRESET_LEVEL0 = 0,
 	DP_FFE_PRESET_LEVEL1,
@@ -120,7 +115,6 @@ enum dc_dp_ffe_preset_level {
 	DP_FFE_PRESET_LEVEL15,
 	DP_FFE_PRESET_MAX_LEVEL = DP_FFE_PRESET_LEVEL15,
 };
-#endif
 
 enum dc_dp_training_pattern {
 	DP_TRAINING_PATTERN_SEQUENCE_1 = 0,
@@ -128,11 +122,9 @@ enum dc_dp_training_pattern {
 	DP_TRAINING_PATTERN_SEQUENCE_3,
 	DP_TRAINING_PATTERN_SEQUENCE_4,
 	DP_TRAINING_PATTERN_VIDEOIDLE,
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	DP_128b_132b_TPS1,
 	DP_128b_132b_TPS2,
 	DP_128b_132b_TPS2_CDS,
-#endif
 };
 
 enum dp_link_encoding {
@@ -150,7 +142,6 @@ struct dc_link_settings {
 	bool dpcd_source_device_specific_field_support;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 union dc_dp_ffe_preset {
 	struct {
 		uint8_t level		: 4;
@@ -161,24 +152,19 @@ union dc_dp_ffe_preset {
 	} settings;
 	uint8_t raw;
 };
-#endif
 
 struct dc_lane_settings {
 	enum dc_voltage_swing VOLTAGE_SWING;
 	enum dc_pre_emphasis PRE_EMPHASIS;
 	enum dc_post_cursor2 POST_CURSOR2;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dc_dp_ffe_preset FFE_PRESET;
-#endif
 };
 
 struct dc_link_training_overrides {
 	enum dc_voltage_swing *voltage_swing;
 	enum dc_pre_emphasis *pre_emphasis;
 	enum dc_post_cursor2 *post_cursor2;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	union dc_dp_ffe_preset *ffe_preset;
-#endif
 
 	uint16_t *cr_pattern_time;
 	uint16_t *eq_pattern_time;
@@ -189,12 +175,9 @@ struct dc_link_training_overrides {
 	bool *alternate_scrambler_reset;
 	bool *enhanced_framing;
 	bool *mst_enable;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool *fec_enable;
-#endif
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 union payload_table_update_status {
 	struct {
 		uint8_t  VC_PAYLOAD_TABLE_UPDATED:1;
@@ -202,7 +185,6 @@ union payload_table_update_status {
 	} bits;
 	uint8_t  raw;
 };
-#endif
 
 union dpcd_rev {
 	struct {
@@ -291,14 +273,10 @@ union lane_align_status_updated {
 	struct {
 		uint8_t INTERLANE_ALIGN_DONE:1;
 		uint8_t POST_LT_ADJ_REQ_IN_PROGRESS:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint8_t EQ_INTERLANE_ALIGN_DONE_128b_132b:1;
 		uint8_t CDS_INTERLANE_ALIGN_DONE_128b_132b:1;
 		uint8_t LT_FAILED_128b_132b:1;
 		uint8_t RESERVED:1;
-#else
-		uint8_t RESERVED:4;
-#endif
 		uint8_t DOWNSTREAM_PORT_STATUS_CHANGED:1;
 		uint8_t LINK_STATUS_UPDATED:1;
 	} bits;
@@ -311,12 +289,10 @@ union lane_adjust {
 		uint8_t PRE_EMPHASIS_LANE:2;
 		uint8_t RESERVED:4;
 	} bits;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct {
 		uint8_t PRESET_VALUE	:4;
 		uint8_t RESERVED	:4;
 	} tx_ffe;
-#endif
 	uint8_t raw;
 };
 
@@ -346,12 +322,10 @@ union dpcd_training_lane {
 		uint8_t MAX_PRE_EMPHASIS_REACHED:1;
 		uint8_t RESERVED:2;
 	} bits;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct {
 		uint8_t PRESET_VALUE	:4;
 		uint8_t RESERVED	:4;
 	} tx_ffe;
-#endif
 	uint8_t raw;
 };
 
@@ -665,18 +639,9 @@ union test_response {
 
 union phy_test_pattern {
 	struct {
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		/* This field is 7 bits for DP2.0 */
 		uint8_t PATTERN     :7;
 		uint8_t RESERVED    :1;
-#else
-		/* DpcdPhyTestPatterns. This field is 2 bits for DP1.1
-		 * and 3 bits for DP1.2.
-		 */
-		uint8_t PATTERN     :3;
-		/* BY speci, bit7:2 is 0 for DP1.1. */
-		uint8_t RESERVED    :5;
-#endif
 	} bits;
 	uint8_t raw;
 };
@@ -747,7 +712,6 @@ struct dp_audio_test_data {
 	uint8_t pattern_period[8];
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* FEC capability DPCD register field bits-*/
 union dpcd_fec_capability {
 	struct {
@@ -755,14 +719,10 @@ union dpcd_fec_capability {
 		uint8_t UNCORRECTED_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t CORRECTED_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t BIT_ERROR_COUNT_CAPABLE:1;
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		uint8_t PARITY_BLOCK_ERROR_COUNT_CAPABLE:1;
 		uint8_t ARITY_BIT_ERROR_COUNT_CAPABLE:1;
 		uint8_t FEC_RUNNING_INDICATOR_SUPPORTED:1;
 		uint8_t FEC_ERROR_REPORTING_POLICY_SUPPORTED:1;
-#else
-		uint8_t RESERVED:4;
-#endif
 	} bits;
 	uint8_t raw;
 };
@@ -878,7 +838,6 @@ struct dpcd_dsc_capabilities {
 	union dpcd_dsc_basic_capabilities dsc_basic_caps;
 	union dpcd_dsc_branch_decoder_capabilities dsc_branch_decoder_caps;
 };
-#endif
 
 /* These parameters are from PSR capabilities reported by Sink DPCD */
 struct psr_caps {
@@ -995,7 +954,6 @@ struct dpcd_usb4_dp_tunneling_info {
 #endif
 #ifndef DP_INTRA_HOP_AUX_REPLY_INDICATION
 #define DP_INTRA_HOP_AUX_REPLY_INDICATION		(1 << 3)
-#endif
 /* TODO - Use DRM header to replace above once available */
 
 union dp_main_line_channel_coding_cap {
@@ -1093,4 +1051,5 @@ union dp_128b_132b_training_aux_rd_interval {
 	uint8_t raw;
 };
 
+#endif // DP_INTRA_HOP_AUX_REPLY_INDICATION
 #endif /* DC_DP_TYPES_H */
