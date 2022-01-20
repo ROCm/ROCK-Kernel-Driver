@@ -42,8 +42,8 @@ static bool is_fru_eeprom_supported(struct amdgpu_device *adev)
 
 	/* The i2c access is blocked on VF
 	 * TODO: Need other way to get the info
-	 */  
-	if (amdgpu_sriov_vf(adev)
+	 */
+	if (amdgpu_sriov_vf(adev))
 		return false;
 
 	/* VBIOS is of the format ###-DXXXYY-##. For SKU identification,
