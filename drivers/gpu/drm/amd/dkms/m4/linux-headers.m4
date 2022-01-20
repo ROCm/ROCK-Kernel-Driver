@@ -108,4 +108,11 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-buf: add new dma_fence_chain container v7
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-fence-chain.h])
+
+
+	dnl #
+	dnl # v4.16-11455-gf6bb2a2c0b81
+	dnl # xarray: add the xa_lock to the radix_tree_root
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/xarray.h])
 ])
