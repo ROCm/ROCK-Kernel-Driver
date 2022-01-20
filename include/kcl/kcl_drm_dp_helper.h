@@ -287,5 +287,15 @@ enum drm_dp_phy {
 #define DP_PSR2_SU_Y_GRANULARITY           0x074 /* eDP 1.4b */
 #endif
 
+/*
+ * v4.10-rc3-483-gd0ce90629120
+ * drm : adds Y-coordinate and Colorimetry Format
+ */
+#ifndef DP_PSR2_SU_Y_COORDINATE_REQUIRED
+# define DP_PSR2_SU_Y_COORDINATE_REQUIRED   (1 << 4)  /* eDP 1.4a */
+# define DP_PSR2_SU_GRANULARITY_REQUIRED    (1 << 5)  /* eDP 1.4b */
+#endif
+
+
 
 #endif /* _KCL_DRM_DP_HELPER_H_ */
