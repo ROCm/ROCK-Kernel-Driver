@@ -386,6 +386,9 @@
 /* drm_vblank struct use ktime_t for time field */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
+/* drm_vblank->time is array */
+/* #undef  HAVE_DRM_VBLANK_CRTC_HAS_ARRAY_TIME_FIELD */
+
 /* drm_driver->release() is available */
 #define HAVE_DRM_DRIVER_RELEASE 1
 
