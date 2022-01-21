@@ -9,8 +9,8 @@ AC_DEFUN([AC_AMDGPU_DRM_BITMAP_FUNCS], [
                         #include <linux/bitmap.h>
                 ],[
                         bitmap_free(NULL);
-                        bitmap_alloc(NULL);
-                        bitmap_zalloc(NULL);
+                        bitmap_alloc(0, 0);
+                        bitmap_zalloc(0, 0);
                 ],[
                         AC_DEFINE(HAVE_BITMAP_FUNCS,
                                 1,
