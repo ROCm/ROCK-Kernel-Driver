@@ -9309,7 +9309,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 		break;
 	case DRM_MODE_CONNECTOR_DisplayPort:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
-		link->link_enc = dp_get_link_enc(link);
+		link->link_enc = link_enc_cfg_get_link_enc(link);
 		ASSERT(link->link_enc);
 #ifdef HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED
 		if (link->link_enc)
