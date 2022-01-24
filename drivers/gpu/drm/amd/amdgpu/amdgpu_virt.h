@@ -296,6 +296,8 @@ static inline bool is_virtual_machine(void)
 {
 #ifdef CONFIG_X86
 	return boot_cpu_has(X86_FEATURE_HYPERVISOR);
+#elif CONFIG_ARM64
+	return !is_kernel_in_hyp_mode();
 #else
 	return false;
 #endif
