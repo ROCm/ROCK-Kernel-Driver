@@ -1188,12 +1188,10 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 		hw_params.fb[i] = &fb_info->fb[i];
 
 #ifdef CONFIG_DRM_AMD_DC_DCN3_x
-	switch (adev->asic_type) {
-	case CHIP_YELLOW_CARP:
-		if (dc->ctx->asic_id.hw_internal_rev != YELLOW_CARP_A0) {
-			hw_params.dpia_supported = true;
-			hw_params.disable_dpia = dc->debug.dpia_debug.bits.disable_dpia;
-		}
+	switch (adev->ip_versions[DCE_HWIP][0]) {
+	case IP_VERSION(3, 1, 3): /* Only for this asic hw internal rev B0 */
+		hw_params.dpia_supported = true;
+		hw_params.disable_dpia = dc->debug.dpia_debug.bits.disable_dpia;
 		break;
 	default:
 		break;
