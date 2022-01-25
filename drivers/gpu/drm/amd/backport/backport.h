@@ -47,7 +47,7 @@
 #endif
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_task_barrier.h>
-#include <kcl/kcl_drm_print.h>
+#include <kcl/backport/kcl_drm_print.h>
 #include <kcl/kcl_drm_auth.h>
 #include <kcl/backport/kcl_drm_crtc.h>
 #include <kcl/backport/kcl_drm_plane.h>

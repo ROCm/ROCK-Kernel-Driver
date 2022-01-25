@@ -165,4 +165,9 @@ static  inline bool drm_debug_enabled(unsigned int category)
 	drm_printf((printer), "%.*s" fmt, (indent), "\t\t\t\t\tX", ##__VA_ARGS__)
 #endif
 
+#ifndef HAVE_DRM_PRINT_BITS
+void drm_print_bits(struct drm_printer *p, unsigned long value,
+		    const char * const bits[], unsigned int nbits);
+#endif
+
 #endif
