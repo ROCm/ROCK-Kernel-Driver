@@ -159,4 +159,10 @@ static  inline bool drm_debug_enabled(unsigned int category)
 }
 #endif /* HAVE_DRM_DEBUG_ENABLED */
 
+/* Copied from v4.14-rc3-610-gbf6234a294c5 include/drm/drm_print.h */
+#ifndef drm_printf_indent
+#define drm_printf_indent(printer, indent, fmt, ...) \
+	drm_printf((printer), "%.*s" fmt, (indent), "\t\t\t\t\tX", ##__VA_ARGS__)
+#endif
+
 #endif
