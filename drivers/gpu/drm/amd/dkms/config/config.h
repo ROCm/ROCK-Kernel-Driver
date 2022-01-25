@@ -638,6 +638,12 @@
 /* drm_printer->prefix is available */
 #define HAVE_DRM_PRINTER_PREFIX 1
 
+/* drm_print_bits() is available */
+#define HAVE_DRM_PRINT_BITS 1
+
+/* drm_print_bits() has 4 args */
+#define HAVE_DRM_PRINT_BITS_4ARGS 1
+
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
