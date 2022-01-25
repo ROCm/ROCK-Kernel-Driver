@@ -23,6 +23,7 @@
  * Rob Clark <robdclark@gmail.com>
  */
 #include <kcl/kcl_drm_print.h>
+#include <kcl/kcl_bitops.h>
 #include <stdarg.h>
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
@@ -101,4 +102,28 @@ void kcl_drm_err(const char *format, ...)
 }
 EXPORT_SYMBOL(kcl_drm_err);
 
+#endif
+
+#ifndef HAVE_DRM_PRINT_BITS
+/* Copied from v5.3-rc1-684-g141f6357f45c drivers/gpu/drm/drm_print.c */
+void drm_print_bits(struct drm_printer *p, unsigned long value,
+		    const char * const bits[], unsigned int nbits)
+{
+	bool first = true;
+	unsigned int i;
+
+	if (WARN_ON_ONCE(nbits > BITS_PER_TYPE(value)))
+		nbits = BITS_PER_TYPE(value);
+
+	for_each_set_bit(i, &value, nbits) {
+		if (WARN_ON_ONCE(!bits[i]))
+			continue;
+		drm_printf(p, "%s%s", first ? "" : ",",
+			   bits[i]);
+		first = false;
+	}
+	if (first)
+		drm_printf(p, "(none)");
+}
+EXPORT_SYMBOL(drm_print_bits);
 #endif
