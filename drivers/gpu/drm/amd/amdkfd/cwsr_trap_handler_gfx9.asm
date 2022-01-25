@@ -54,6 +54,7 @@ var SQ_WAVE_STATUS_PRE_SPI_PRIO_SIZE    = 1
 var SQ_WAVE_STATUS_POST_SPI_PRIO_SHIFT  = 3
 var SQ_WAVE_STATUS_POST_SPI_PRIO_SIZE   = 29
 var SQ_WAVE_STATUS_ALLOW_REPLAY_MASK    = 0x400000
+var SQ_WAVE_STATUS_ECC_ERR_MASK         = 0x20000
 
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SHIFT	= 12
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SIZE	= 9
@@ -183,7 +184,11 @@ L_JUMP_TO_RESTORE:
 L_SKIP_RESTORE:
 
     s_getreg_b32    s_save_status, hwreg(HW_REG_STATUS)				    //save STATUS since we will change SCC
-    s_andn2_b32	    s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK	    //check whether this is for save
+
+    // Clear SPI_PRIO: do not save with elevated priority.
+    // Clear ECC_ERR: prevents SQC store and triggers FATAL_HALT if setreg'd.
+    s_andn2_b32     s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK|SQ_WAVE_STATUS_ECC_ERR_MASK
+
     s_getreg_b32    s_save_trapsts, hwreg(HW_REG_TRAPSTS)
 
     s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
