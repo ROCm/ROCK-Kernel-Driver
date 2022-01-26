@@ -108,6 +108,7 @@ GPIO_DCN30 = hw_translate_dcn30.o hw_factory_dcn30.o
 AMD_DAL_GPIO_DCN30 = $(addprefix $(AMDDALPATH)/dc/gpio/dcn30/,$(GPIO_DCN30))
 
 AMD_DISPLAY_FILES += $(AMD_DAL_GPIO_DCN30)
+
 endif
 ###############################################################################
 # Diagnostics on FPGA

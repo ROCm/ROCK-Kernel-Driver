@@ -70,6 +70,7 @@
 #include "dcn302/dcn302_resource.h"
 #include "dcn303/dcn303_resource.h"
 #include "dcn31/dcn31_resource.h"
+#include "dcn316/dcn316_resource.h"
 #endif
 
 #define DC_LOGGER_INIT(logger)
@@ -266,6 +267,9 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 		break;
 	case DCN_VERSION_3_1:
 		res_pool = dcn31_create_resource_pool(init_data, dc);
+		break;
+	case DCN_VERSION_3_16:
+		res_pool = dcn316_create_resource_pool(init_data, dc);
 		break;
 #endif
 	default:
