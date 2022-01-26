@@ -2900,8 +2900,8 @@ static struct drm_driver amdgpu_kms_driver = {
 #endif
 
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
-	.gem_prime_vmap = drm_gem_ttm_vmap,
-	.gem_prime_vunmap = drm_gem_ttm_vunmap,
+	.gem_prime_vmap = amdgpu_gem_prime_vmap,
+	.gem_prime_vunmap = amdgpu_gem_prime_vunmap,
 #endif
 
 	.gem_prime_mmap = amdkcl_drm_gem_prime_mmap,

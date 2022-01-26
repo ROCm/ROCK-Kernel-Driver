@@ -342,8 +342,13 @@ static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.open = amdgpu_gem_object_open,
 	.close = amdgpu_gem_object_close,
 	.export = amdgpu_gem_prime_export,
+#ifdef HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS
 	.vmap = drm_gem_ttm_vmap,
 	.vunmap = drm_gem_ttm_vunmap,
+#else
+	.vmap = amdgpu_gem_prime_vmap,
+	.vunmap = amdgpu_gem_prime_vunmap,
+#endif
 	.mmap = amdgpu_gem_object_mmap,
 	.vm_ops = &amdgpu_gem_vm_ops,
 };
