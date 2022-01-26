@@ -139,13 +139,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_managed.h])
 
 	dnl #
-	dnl # v5.3-rc1-623-gff540b76f14a
-	dnl # drm/ttm: add drm gem ttm helpers,
-	dnl # starting with drm_gem_ttm_print_info()
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_ttm_helper.h])
-
-	dnl #
 	dnl # Required by AC_KERNEL_SUPPORTED_AMD_CHIPS macro
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/amd_asic_type.h])
