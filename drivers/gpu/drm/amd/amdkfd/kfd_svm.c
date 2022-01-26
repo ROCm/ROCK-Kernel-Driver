@@ -45,6 +45,11 @@
  */
 #define AMDGPU_SVM_RANGE_RETRY_FAULT_PENDING	2000
 
+struct criu_svm_metadata {
+	struct list_head list;
+	struct kfd_criu_svm_range_priv_data data;
+};
+
 static void svm_range_evict_svm_bo_worker(struct work_struct *work);
 static bool
 svm_range_cpu_invalidate_pagetables(struct mmu_interval_notifier *mni,
@@ -2875,6 +2880,7 @@ int svm_range_list_init(struct kfd_process *p)
 	INIT_DELAYED_WORK(&svms->restore_work, svm_range_restore_work);
 	INIT_WORK(&svms->deferred_list_work, svm_range_deferred_list_work);
 	INIT_LIST_HEAD(&svms->deferred_range_list);
+	INIT_LIST_HEAD(&svms->criu_svm_metadata_list);
 	spin_lock_init(&svms->deferred_list_lock);
 
 	for (i = 0; i < p->n_pdds; i++)
@@ -3203,10 +3209,10 @@ static void svm_range_evict_svm_bo_worker(struct work_struct *work)
 }
 
 static int
-svm_range_set_attr(struct kfd_process *p, uint64_t start, uint64_t size,
-		   uint32_t nattr, struct kfd_ioctl_svm_attribute *attrs)
+svm_range_set_attr(struct kfd_process *p, struct mm_struct *mm,
+		   uint64_t start, uint64_t size, uint32_t nattr,
+		   struct kfd_ioctl_svm_attribute *attrs)
 {
-	struct mm_struct *mm = current->mm;
 	struct list_head update_list;
 	struct list_head insert_list;
 	struct list_head remove_list;
@@ -3305,8 +3311,9 @@ out:
 }
 
 static int
-svm_range_get_attr(struct kfd_process *p, uint64_t start, uint64_t size,
-		   uint32_t nattr, struct kfd_ioctl_svm_attribute *attrs)
+svm_range_get_attr(struct kfd_process *p, struct mm_struct *mm,
+		   uint64_t start, uint64_t size, uint32_t nattr,
+		   struct kfd_ioctl_svm_attribute *attrs)
 {
 	DECLARE_BITMAP(bitmap_access, MAX_GPU_INSTANCE);
 	DECLARE_BITMAP(bitmap_aip, MAX_GPU_INSTANCE);
@@ -3316,7 +3323,6 @@ svm_range_get_attr(struct kfd_process *p, uint64_t start, uint64_t size,
 	bool get_accessible = false;
 	bool get_flags = false;
 	uint64_t last = start + size - 1UL;
-	struct mm_struct *mm = current->mm;
 	uint8_t granularity = 0xff;
 	struct interval_tree_node *node;
 	struct svm_range_list *svms;
@@ -3481,10 +3487,272 @@ fill_values:
 	return 0;
 }
 
+int kfd_criu_resume_svm(struct kfd_process *p)
+{
+	int nattr_common = 4, nattr_accessibility = 1;
+	struct criu_svm_metadata *criu_svm_md = NULL;
+	struct criu_svm_metadata *next = NULL;
+	struct svm_range_list *svms = &p->svms;
+	int i, j, num_attrs, ret = 0;
+	struct mm_struct *mm;
+
+	if (list_empty(&svms->criu_svm_metadata_list)) {
+		pr_debug("No SVM data from CRIU restore stage 2\n");
+		return ret;
+	}
+
+	mm = get_task_mm(p->lead_thread);
+	if (!mm) {
+		pr_err("failed to get mm for the target process\n");
+		return -ESRCH;
+	}
+
+	num_attrs = nattr_common + (nattr_accessibility * p->n_pdds);
+
+	i = j = 0;
+	list_for_each_entry(criu_svm_md, &svms->criu_svm_metadata_list, list) {
+		pr_debug("criu_svm_md[%d]\n\tstart: 0x%llx size: 0x%llx (npages)\n",
+			 i, criu_svm_md->data.start_addr, criu_svm_md->data.size);
+		for (j = 0; j < num_attrs; j++) {
+			pr_debug("\ncriu_svm_md[%d]->attrs[%d].type : 0x%x \ncriu_svm_md[%d]->attrs[%d].value : 0x%x\n",
+				 i,j, criu_svm_md->data.attrs[j].type,
+				 i,j, criu_svm_md->data.attrs[j].value);
+		}
+
+		ret = svm_range_set_attr(p, mm, criu_svm_md->data.start_addr,
+					 criu_svm_md->data.size, num_attrs,
+					 criu_svm_md->data.attrs);
+		if (ret) {
+			pr_err("CRIU: failed to set range attributes\n");
+			goto exit;
+		}
+
+		i++;
+	}
+
+exit:
+	list_for_each_entry_safe(criu_svm_md, next, &svms->criu_svm_metadata_list, list) {
+		pr_debug("freeing criu_svm_md[]\n\tstart: 0x%llx\n",
+						criu_svm_md->data.start_addr);
+		kfree(criu_svm_md);
+	}
+
+	mmput(mm);
+	return ret;
+
+}
+
+int kfd_criu_restore_svm(struct kfd_process *p,
+			 uint8_t __user *user_priv_ptr,
+			 uint64_t *priv_data_offset,
+			 uint64_t max_priv_data_size)
+{
+	uint64_t svm_priv_data_size, svm_object_md_size, svm_attrs_size;
+	int nattr_common = 4, nattr_accessibility = 1;
+	struct criu_svm_metadata *criu_svm_md = NULL;
+	struct svm_range_list *svms = &p->svms;
+	uint32_t num_devices;
+	int ret = 0;
+
+	num_devices = p->n_pdds;
+	/* Handle one SVM range object at a time, also the number of gpus are
+	 * assumed to be same on the restore node, checking must be done while
+	 * evaluating the topology earlier */
+
+	svm_attrs_size = sizeof(struct kfd_ioctl_svm_attribute) *
+		(nattr_common + nattr_accessibility * num_devices);
+	svm_object_md_size = sizeof(struct criu_svm_metadata) + svm_attrs_size;
+
+	svm_priv_data_size = sizeof(struct kfd_criu_svm_range_priv_data) +
+								svm_attrs_size;
+
+	criu_svm_md = kzalloc(svm_object_md_size, GFP_KERNEL);
+	if (!criu_svm_md) {
+		pr_err("failed to allocate memory to store svm metadata\n");
+		return -ENOMEM;
+	}
+	if (*priv_data_offset + svm_priv_data_size > max_priv_data_size) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = copy_from_user(&criu_svm_md->data, user_priv_ptr + *priv_data_offset,
+			     svm_priv_data_size);
+	if (ret) {
+		ret = -EFAULT;
+		goto exit;
+	}
+	*priv_data_offset += svm_priv_data_size;
+
+	list_add_tail(&criu_svm_md->list, &svms->criu_svm_metadata_list);
+
+	return 0;
+
+
+exit:
+	kfree(criu_svm_md);
+	return ret;
+}
+
+int svm_range_get_info(struct kfd_process *p, uint32_t *num_svm_ranges,
+		       uint64_t *svm_priv_data_size)
+{
+	uint64_t total_size, accessibility_size, common_attr_size;
+	int nattr_common = 4, nattr_accessibility = 1;
+	int num_devices = p->n_pdds;
+	struct svm_range_list *svms;
+	struct svm_range *prange;
+	uint32_t count = 0;
+
+	*svm_priv_data_size = 0;
+
+	svms = &p->svms;
+	if (!svms)
+		return -EINVAL;
+
+	mutex_lock(&svms->lock);
+	list_for_each_entry(prange, &svms->list, list) {
+		pr_debug("prange: 0x%p start: 0x%lx\t npages: 0x%llx\t end: 0x%llx\n",
+			 prange, prange->start, prange->npages,
+			 prange->start + prange->npages - 1);
+		count++;
+	}
+	mutex_unlock(&svms->lock);
+
+	*num_svm_ranges = count;
+	/* Only the accessbility attributes need to be queried for all the gpus
+	 * individually, remaining ones are spanned across the entire process
+	 * regardless of the various gpu nodes. Of the remaining attributes,
+	 * KFD_IOCTL_SVM_ATTR_CLR_FLAGS need not be saved.
+	 *
+	 * KFD_IOCTL_SVM_ATTR_PREFERRED_LOC
+	 * KFD_IOCTL_SVM_ATTR_PREFETCH_LOC
+	 * KFD_IOCTL_SVM_ATTR_SET_FLAGS
+	 * KFD_IOCTL_SVM_ATTR_GRANULARITY
+	 *
+	 * ** ACCESSBILITY ATTRIBUTES **
+	 * (Considered as one, type is altered during query, value is gpuid)
+	 * KFD_IOCTL_SVM_ATTR_ACCESS
+	 * KFD_IOCTL_SVM_ATTR_ACCESS_IN_PLACE
+	 * KFD_IOCTL_SVM_ATTR_NO_ACCESS
+	 */
+	if (*num_svm_ranges > 0) {
+		common_attr_size = sizeof(struct kfd_ioctl_svm_attribute) *
+			nattr_common;
+		accessibility_size = sizeof(struct kfd_ioctl_svm_attribute) *
+			nattr_accessibility * num_devices;
+
+		total_size = sizeof(struct kfd_criu_svm_range_priv_data) +
+			common_attr_size + accessibility_size;
+
+		*svm_priv_data_size = *num_svm_ranges * total_size;
+	}
+
+	pr_debug("num_svm_ranges %u total_priv_size %llu\n", *num_svm_ranges,
+		 *svm_priv_data_size);
+	return 0;
+}
+
+int kfd_criu_checkpoint_svm(struct kfd_process *p,
+			    uint8_t __user *user_priv_data,
+			    uint64_t *priv_data_offset)
+{
+	struct kfd_criu_svm_range_priv_data *svm_priv = NULL;
+	struct kfd_ioctl_svm_attribute *query_attr = NULL;
+	uint64_t svm_priv_data_size, query_attr_size = 0;
+	int index, nattr_common = 4, ret = 0;
+	struct svm_range_list *svms;
+	int num_devices = p->n_pdds;
+	struct svm_range *prange;
+	struct mm_struct *mm;
+
+	svms = &p->svms;
+	if (!svms)
+		return -EINVAL;
+
+	mm = get_task_mm(p->lead_thread);
+	if (!mm) {
+		pr_err("failed to get mm for the target process\n");
+		return -ESRCH;
+	}
+
+	query_attr_size = sizeof(struct kfd_ioctl_svm_attribute) *
+				(nattr_common + num_devices);
+
+	query_attr = kzalloc(query_attr_size, GFP_KERNEL);
+	if (!query_attr) {
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	query_attr[0].type = KFD_IOCTL_SVM_ATTR_PREFERRED_LOC;
+	query_attr[1].type = KFD_IOCTL_SVM_ATTR_PREFETCH_LOC;
+	query_attr[2].type = KFD_IOCTL_SVM_ATTR_SET_FLAGS;
+	query_attr[3].type = KFD_IOCTL_SVM_ATTR_GRANULARITY;
+
+	for (index = 0; index < num_devices; index++) {
+		struct kfd_process_device *pdd = p->pdds[index];
+
+		query_attr[index + nattr_common].type =
+			KFD_IOCTL_SVM_ATTR_ACCESS;
+		query_attr[index + nattr_common].value = pdd->user_gpu_id;
+	}
+
+	svm_priv_data_size = sizeof(*svm_priv) + query_attr_size;
+
+	svm_priv = kzalloc(svm_priv_data_size, GFP_KERNEL);
+	if (!svm_priv) {
+		ret = -ENOMEM;
+		goto exit_query;
+	}
+
+	index = 0;
+	list_for_each_entry(prange, &svms->list, list) {
+
+		svm_priv->object_type = KFD_CRIU_OBJECT_TYPE_SVM_RANGE;
+		svm_priv->start_addr = prange->start;
+		svm_priv->size = prange->npages;
+		memcpy(&svm_priv->attrs, query_attr, query_attr_size);
+		pr_debug("CRIU: prange: 0x%p start: 0x%lx\t npages: 0x%llx end: 0x%llx\t size: 0x%llx\n",
+			 prange, prange->start, prange->npages,
+			 prange->start + prange->npages - 1,
+			 prange->npages * PAGE_SIZE);
+
+		ret = svm_range_get_attr(p, mm, svm_priv->start_addr,
+					 svm_priv->size,
+					 (nattr_common + num_devices),
+					 svm_priv->attrs);
+		if (ret) {
+			pr_err("CRIU: failed to obtain range attributes\n");
+			goto exit_priv;
+		}
+
+		ret = copy_to_user(user_priv_data + *priv_data_offset,
+				   svm_priv, svm_priv_data_size);
+		if (ret) {
+			pr_err("Failed to copy svm priv to user\n");
+			goto exit_priv;
+		}
+
+		*priv_data_offset += svm_priv_data_size;
+
+	}
+
+
+exit_priv:
+	kfree(svm_priv);
+exit_query:
+	kfree(query_attr);
+exit:
+	mmput(mm);
+	return ret;
+}
+
 int
 svm_ioctl(struct kfd_process *p, enum kfd_ioctl_svm_op op, uint64_t start,
 	  uint64_t size, uint32_t nattrs, struct kfd_ioctl_svm_attribute *attrs)
 {
+	struct mm_struct *mm = current->mm;
 	int r;
 
 	start >>= PAGE_SHIFT;
@@ -3492,10 +3760,10 @@ svm_ioctl(struct kfd_process *p, enum kfd_ioctl_svm_op op, uint64_t start,
 
 	switch (op) {
 	case KFD_IOCTL_SVM_OP_SET_ATTR:
-		r = svm_range_set_attr(p, start, size, nattrs, attrs);
+		r = svm_range_set_attr(p, mm, start, size, nattrs, attrs);
 		break;
 	case KFD_IOCTL_SVM_OP_GET_ATTR:
-		r = svm_range_get_attr(p, start, size, nattrs, attrs);
+		r = svm_range_get_attr(p, mm, start, size, nattrs, attrs);
 		break;
 	default:
 		r = EINVAL;

@@ -901,7 +901,8 @@ static void remove_kgd_mem_from_kfd_bo_list(struct kgd_mem *mem,
  *
  * Returns 0 for success, negative errno for errors.
  */
-static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
+static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
+			   bool criu_resume)
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
 	struct amdgpu_bo *bo = mem->bo;
@@ -921,6 +922,18 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr)
 		pr_err("%s: Failed to register MMU notifier: %d\n",
 		       __func__, ret);
 		goto out;
+	}
+
+	if (criu_resume) {
+		/*
+		 * During a CRIU restore operation, the userptr buffer objects
+		 * will be validated in the restore_userptr_work worker at a
+		 * later stage when it is scheduled by another ioctl called by
+		 * CRIU master process for the target pid for restore.
+		 */
+		atomic_inc(&mem->invalid);
+		mutex_unlock(&process_info->lock);
+		return 0;
 	}
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -1511,10 +1524,39 @@ uint64_t amdgpu_amdkfd_gpuvm_get_process_page_dir(void *drm_priv)
 	return avm->pd_phys_addr;
 }
 
+void amdgpu_amdkfd_block_mmu_notifications(void *p)
+{
+	struct amdkfd_process_info *pinfo = (struct amdkfd_process_info *)p;
+
+	mutex_lock(&pinfo->lock);
+	WRITE_ONCE(pinfo->block_mmu_notifications, true);
+	mutex_unlock(&pinfo->lock);
+}
+
+int amdgpu_amdkfd_criu_resume(void *p)
+{
+	int ret = 0;
+	struct amdkfd_process_info *pinfo = (struct amdkfd_process_info *)p;
+
+	mutex_lock(&pinfo->lock);
+	pr_debug("scheduling work\n");
+	atomic_inc(&pinfo->evicted_bos);
+	if (!READ_ONCE(pinfo->block_mmu_notifications)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+	WRITE_ONCE(pinfo->block_mmu_notifications, false);
+	schedule_delayed_work(&pinfo->restore_userptr_work, 0);
+
+out_unlock:
+	mutex_unlock(&pinfo->lock);
+	return ret;
+}
+
 int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 		struct amdgpu_device *adev, uint64_t va, uint64_t size,
 		void *drm_priv, struct sg_table *sg, struct kgd_mem **mem,
-		uint64_t *offset, uint32_t flags)
+		uint64_t *offset, uint32_t flags, bool criu_resume)
 {
 	struct amdgpu_vm *avm = drm_priv_to_vm(drm_priv);
 	enum ttm_bo_type bo_type = ttm_bo_type_device;
@@ -1623,7 +1665,8 @@ int amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(
 	add_kgd_mem_to_kfd_bo_list(*mem, avm->process_info, user_addr);
 
 	if (user_addr) {
-		ret = init_user_pages(*mem, user_addr);
+		pr_debug("creating userptr BO for user_addr = %llu\n", user_addr);
+		ret = init_user_pages(*mem, user_addr, criu_resume);
 		if (ret)
 			goto allocate_init_user_pages_failed;
 	} else  if (flags & (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
@@ -1891,12 +1934,6 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 				&avm->process_info->eviction_fence->base,
 				true);
 	ret = unreserve_bo_and_vms(&ctx, false, false);
-
-	/* Only apply no TLB flush on Aldebaran to
-	 * workaround regressions on other Asics.
-	 */
-	if (table_freed && (adev->asic_type != CHIP_ALDEBARAN))
-		*table_freed = true;
 
 	goto out;
 
@@ -2422,6 +2459,10 @@ int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
 	struct amdkfd_process_info *process_info = mem->process_info;
 	int evicted_bos;
 	int r = 0;
+
+	/* Do not process MMU notifications until stage-4 IOCTL is received */
+	if (READ_ONCE(process_info->block_mmu_notifications))
+		return 0;
 
 	atomic_inc(&mem->invalid);
 	evicted_bos = atomic_inc_return(&process_info->evicted_bos);
@@ -3117,4 +3158,15 @@ int amdgpu_amdkfd_get_tile_config(struct amdgpu_device *adev,
 	config->num_ranks = adev->gfx.config.num_ranks;
 
 	return 0;
+}
+
+bool amdgpu_amdkfd_bo_mapped_to_dev(struct amdgpu_device *adev, struct kgd_mem *mem)
+{
+	struct kfd_mem_attachment *entry;
+
+	list_for_each_entry(entry, &mem->attachments, list) {
+		if (entry->is_mapped && entry->adev == adev)
+			return true;
+	}
+	return false;
 }

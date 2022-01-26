@@ -942,19 +942,15 @@ static void psp_prep_ta_load_cmd_buf(struct psp_gfx_cmd_resp *cmd,
 static int psp_ta_init_shared_buf(struct psp_context *psp,
 				  struct ta_mem_context *mem_ctx)
 {
-	int ret;
-
 	/*
 	* Allocate 16k memory aligned to 4k from Frame Buffer (local
 	* physical) for ta to host memory
 	*/
-	ret = amdgpu_bo_create_kernel(psp->adev, mem_ctx->shared_mem_size,
+	return amdgpu_bo_create_kernel(psp->adev, mem_ctx->shared_mem_size,
 				      PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM,
 				      &mem_ctx->shared_bo,
 				      &mem_ctx->shared_mc_addr,
 				      &mem_ctx->shared_buf);
-
-	return ret;
 }
 
 static void psp_ta_free_shared_buf(struct ta_mem_context *mem_ctx)
@@ -1336,6 +1332,11 @@ static void psp_ras_ta_check_status(struct psp_context *psp)
 		break;
 	case TA_RAS_STATUS__SUCCESS:
 		break;
+	case TA_RAS_STATUS__TEE_ERROR_ACCESS_DENIED:
+		if (ras_cmd->cmd_id == TA_RAS_COMMAND__TRIGGER_ERROR)
+			dev_warn(psp->adev->dev,
+					"RAS WARNING: Inject error to critical region is not allowed\n");
+		break;
 	default:
 		dev_warn(psp->adev->dev,
 				"RAS WARNING: ras status = 0x%X\n", ras_cmd->ras_status);
@@ -1548,7 +1549,9 @@ int psp_ras_trigger_error(struct psp_context *psp,
 	if (amdgpu_ras_intr_triggered())
 		return 0;
 
-	if (ras_cmd->ras_status)
+	if (ras_cmd->ras_status == TA_RAS_STATUS__TEE_ERROR_ACCESS_DENIED)
+		return -EACCES;
+	else if (ras_cmd->ras_status)
 		return -EINVAL;
 
 	return 0;

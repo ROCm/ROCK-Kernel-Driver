@@ -717,7 +717,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, gpu_va, size,
 						 pdd->drm_priv, NULL, mem, NULL,
-						 flags);
+						 flags, false);
 	if (err)
 		goto err_alloc_mem;
 
@@ -1466,6 +1466,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	process->mm = thread->mm;
 	process->lead_thread = thread->group_leader;
 	process->n_pdds = 0;
+	process->queues_paused = false;
 	INIT_DELAYED_WORK(&process->eviction_work, evict_process_worker);
 	INIT_DELAYED_WORK(&process->restore_work, restore_process_worker);
 	process->last_restore_timestamp = get_jiffies_64();
@@ -1633,6 +1634,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 	pdd->runtime_inuse = false;
 	pdd->vram_usage = 0;
 	pdd->sdma_past_activity_counter = 0;
+	pdd->user_gpu_id = dev->id;
 	atomic64_set(&pdd->evict_duration_counter, 0);
 	kfd_spm_init_process_device(pdd);
 	p->pdds[p->n_pdds++] = pdd;
@@ -1773,7 +1775,8 @@ out:
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
-					unsigned int mem_type)
+					unsigned int mem_type,
+					int preferred_id)
 {
 	int handle;
 	struct kfd_bo *buf_obj;
@@ -1795,7 +1798,11 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
 
-	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+	if (preferred_id < 0)
+		handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+	else
+		handle = idr_alloc(&pdd->alloc_idr, buf_obj, preferred_id,
+						preferred_id + 1, GFP_KERNEL);
 
 	if (handle < 0)
 		kfree(buf_obj);
@@ -1987,7 +1994,7 @@ int kfd_process_gpuidx_from_gpuid(struct kfd_process *p, uint32_t gpu_id)
 	int i;
 
 	for (i = 0; i < p->n_pdds; i++)
-		if (p->pdds[i] && gpu_id == p->pdds[i]->dev->id)
+		if (p->pdds[i] && gpu_id == p->pdds[i]->user_gpu_id)
 			return i;
 	return -EINVAL;
 }
@@ -2000,7 +2007,7 @@ kfd_process_gpuid_from_adev(struct kfd_process *p, struct amdgpu_device *adev,
 
 	for (i = 0; i < p->n_pdds; i++)
 		if (p->pdds[i] && p->pdds[i]->dev->adev == adev) {
-			*gpuid = p->pdds[i]->dev->id;
+			*gpuid = p->pdds[i]->user_gpu_id;
 			*gpuidx = i;
 			return 0;
 		}
@@ -2336,16 +2343,14 @@ struct send_exception_work_handler_workarea {
 	uint64_t error_reason;
 };
 
-void send_exception_work_handler(struct work_struct *work)
+static void send_exception_work_handler(struct work_struct *work)
 {
 	struct send_exception_work_handler_workarea *workarea;
 	struct kfd_process *p;
 	struct queue *q;
 	struct mm_struct *mm;
-	void __user *csa_addr;
-	size_t header_offset;
-	uint64_t **err_payload_ptr_addr, *err_payload_ptr;
-	uint64_t payload_offset;
+	struct mqd_user_context_save_area_header __user *csa_header;
+	uint64_t __user *err_payload_ptr;
 	uint64_t cur_err;
 	uint32_t ev_id;
 
@@ -2366,22 +2371,13 @@ void send_exception_work_handler(struct work_struct *work)
 	if (!q)
 		goto out;
 
-	csa_addr = (void __user *) q->properties.ctx_save_restore_area_address;
-	/* KFD header is 4 DWORDS in size for control stack info. */
-	header_offset = sizeof(struct mqd_user_context_save_area_header);
-	/*
-	 * User header payload_offset is 6 DWORDS down in the header after
-	 * debugger memory info.
-	 */
-	payload_offset = (uint64_t)(csa_addr + header_offset) +
-						(2 * sizeof(uint32_t));
+	csa_header = (void __user *) q->properties.ctx_save_restore_area_address;
 
-	err_payload_ptr_addr = (uint64_t **)payload_offset;
-	get_user(err_payload_ptr, err_payload_ptr_addr);
+	get_user(err_payload_ptr, (uint64_t __user **)&csa_header->error_reason_ptr);
 	get_user(cur_err, err_payload_ptr);
 	cur_err |= workarea->error_reason;
 	put_user(cur_err, err_payload_ptr);
-	get_user(ev_id, (uint64_t *)(payload_offset + sizeof(err_payload_ptr)));
+	get_user(ev_id, &csa_header->error_event_id);
 
 	kfd_set_event(p, ev_id);
 
@@ -2407,6 +2403,37 @@ int kfd_send_exception_to_runtime(struct kfd_process *p,
 	destroy_work_on_stack(&worker.work);
 
 	return 0;
+}
+
+struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *p, uint32_t gpu_id)
+{
+	int i;
+
+	if (gpu_id) {
+		for (i = 0; i < p->n_pdds; i++) {
+			struct kfd_process_device *pdd = p->pdds[i];
+
+			if (pdd->user_gpu_id == gpu_id)
+				return pdd;
+		}
+	}
+	return NULL;
+}
+
+int kfd_process_get_user_gpu_id(struct kfd_process *p, uint32_t actual_gpu_id)
+{
+	int i;
+
+	if (!actual_gpu_id)
+		return 0;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		if (pdd->dev->id == actual_gpu_id)
+			return pdd->user_gpu_id;
+	}
+	return -EINVAL;
 }
 
 #if defined(CONFIG_DEBUG_FS)

@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.167"
+#define DC_VER "3.2.169"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -324,7 +324,7 @@ struct dc_config {
 	bool fbc_support;
 	bool disable_fractional_pwm;
 	bool allow_seamless_boot_optimization;
-	bool power_down_display_on_boot;
+	bool seamless_boot_edp_requested;
 	bool edp_not_connected;
 	bool edp_no_power_sequencing;
 	bool force_enum_edp;
@@ -398,6 +398,7 @@ enum dcn_pwr_state {
 enum dcn_zstate_support_state {
 	DCN_ZSTATE_SUPPORT_UNKNOWN,
 	DCN_ZSTATE_SUPPORT_ALLOW,
+	DCN_ZSTATE_SUPPORT_ALLOW_Z10_ONLY,
 	DCN_ZSTATE_SUPPORT_DISALLOW,
 };
 #endif

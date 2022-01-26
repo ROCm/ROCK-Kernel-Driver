@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Advanced Micro Devices, Inc.
+ * Copyright 2019-2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,30 +19,14 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
+ * Authors: AMD
+ *
  */
-#ifndef __AMDGPU_HDP_H__
-#define __AMDGPU_HDP_H__
-#include "amdgpu_ras.h"
 
-struct amdgpu_hdp_ras {
-	struct amdgpu_ras_block_object ras_block;
-};
+#ifndef __DCN302_FPU_H__
+#define __DCN302_FPU_H__
 
-struct amdgpu_hdp_funcs {
-	void (*flush_hdp)(struct amdgpu_device *adev, struct amdgpu_ring *ring);
-	void (*invalidate_hdp)(struct amdgpu_device *adev,
-			       struct amdgpu_ring *ring);
-	void (*update_clock_gating)(struct amdgpu_device *adev, bool enable);
-	void (*get_clock_gating_state)(struct amdgpu_device *adev, u32 *flags);
-	void (*init_registers)(struct amdgpu_device *adev);
-};
+void dcn302_fpu_init_soc_bounding_box(struct bp_soc_bb_info bb_info);
+void dcn302_fpu_update_bw_bounding_box(struct dc *dc, struct clk_bw_params *bw_params);
 
-struct amdgpu_hdp {
-	struct ras_common_if			*ras_if;
-	const struct amdgpu_hdp_funcs		*funcs;
-	struct amdgpu_hdp_ras	*ras;
-};
-
-int amdgpu_hdp_ras_late_init(struct amdgpu_device *adev, void *ras_info);
-void amdgpu_hdp_ras_fini(struct amdgpu_device *adev);
-#endif /* __AMDGPU_HDP_H__ */
+#endif /* __DCN302_FPU_H__*/

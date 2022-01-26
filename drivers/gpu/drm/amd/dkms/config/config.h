@@ -1147,6 +1147,12 @@
 /* kobj_type->default_groups is available */
 #define HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE 1
 
+/* close_fd() is available */
+#define HAVE_KERNEL_CLOSE_FD 1
+
+/* ksys_close() is available */
+#define HAVE_KSYS_CLOSE_FD 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
