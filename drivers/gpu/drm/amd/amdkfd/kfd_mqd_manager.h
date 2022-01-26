@@ -148,27 +148,6 @@ struct mqd_user_context_save_area_header {
 	 * Must be 4 byte aligned.
 	 */
 	uint32_t wave_state_size;
-
-	/* Byte offset from start of the user context save area to the memory
-	 * reserved for the debugger. Must be 64 byte aligned
-	 */
-	uint32_t debug_offset;
-
-	/* Byte size of the memory reserved for the debugger. Must be 64 byte
-	 * aligned.
-	 */
-	uint32_t debug_size;
-
-	/* Address of the HSA signal payload for reporting the error reason
-	 * bitmask. Must be 4-byte aligned.
-	 */
-	uint64_t error_reason_ptr;
-
-	/* Event ID used for exception signaling */
-	uint32_t error_event_id;
-
-	/* Reserved padding */
-	uint32_t reserved1;
 };
 
 struct kfd_mem_obj *allocate_hiq_mqd(struct kfd_dev *dev,
