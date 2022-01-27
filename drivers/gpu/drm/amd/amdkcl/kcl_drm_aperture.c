@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-#ifndef HAVE_DRM_APERTURE_H
+#ifndef HAVE_DRM_DRM_APERTURE_H
 
 #include <linux/fb.h>
 #include <linux/pci.h>
