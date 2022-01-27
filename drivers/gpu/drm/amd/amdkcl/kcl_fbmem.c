@@ -79,7 +79,6 @@ int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, int res_id, const 
 }
 #endif /* HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_NO_RES_ID_ARG */
 
-EXPORT_SYMBOL(remove_conflicting_pci_framebuffers);
 #endif
 
 #ifndef HAVE_IS_FIRMWARE_FRAMEBUFFER
