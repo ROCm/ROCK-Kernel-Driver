@@ -2004,7 +2004,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		fw_name_dmub = FIRMWARE_YELLOW_CARP_DMUB;
 		break;
 	case IP_VERSION(3, 1, 6):
-		dmub_asic = DMUB_ASIC_DCN31B;
+		dmub_asic = DMUB_ASIC_DCN316;
 		fw_name_dmub = FIRMWARE_DCN316_DMUB;
 		break;
 #endif
@@ -4959,7 +4959,7 @@ static int dm_early_init(void *handle)
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
-<		case IP_VERSION(3, 1, 6):
+		case IP_VERSION(3, 1, 6):
 #endif
 			adev->mode_info.num_crtc = 4;
 			adev->mode_info.num_hpd = 4;
