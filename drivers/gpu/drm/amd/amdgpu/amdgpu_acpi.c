@@ -1478,8 +1478,12 @@ void amdgpu_acpi_release(void)
  */
 bool amdgpu_acpi_is_s3_active(struct amdgpu_device *adev)
 {
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	return !(adev->flags & AMD_IS_APU) ||
 		(pm_suspend_target_state == PM_SUSPEND_MEM);
+#else
+	return true;
+#endif
 }
 
 /**
@@ -1491,9 +1495,13 @@ bool amdgpu_acpi_is_s3_active(struct amdgpu_device *adev)
  */
 bool amdgpu_acpi_is_s0ix_active(struct amdgpu_device *adev)
 {
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	if (!(adev->flags & AMD_IS_APU) ||
 	    (pm_suspend_target_state != PM_SUSPEND_TO_IDLE))
 		return false;
+#else
+	return false;
+#endif
 
 	if (adev->asic_type < CHIP_RAVEN)
 		return false;
