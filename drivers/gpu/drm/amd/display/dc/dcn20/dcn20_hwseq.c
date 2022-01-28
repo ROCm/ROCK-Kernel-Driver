@@ -57,6 +57,7 @@
 #include "inc/link_dpcd.h"
 #include "dpcd_defs.h"
 #include "inc/link_enc_cfg.h"
+#include "link_hwss.h"
 
 #define DC_LOGGER_INIT(logger)
 
