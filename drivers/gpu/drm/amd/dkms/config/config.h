@@ -1162,6 +1162,9 @@
 /* ksys_close() is available */
 #define HAVE_KSYS_CLOSE_FD 1
 
+/* pm_suspend_target_state is available */
+#define HAVE_PM_SUSPEND_TARGET_STATE 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
