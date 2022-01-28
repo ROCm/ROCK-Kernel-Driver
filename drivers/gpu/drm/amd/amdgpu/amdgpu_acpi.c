@@ -1035,8 +1035,12 @@ void amdgpu_acpi_detect(void)
  */
 bool amdgpu_acpi_is_s3_active(struct amdgpu_device *adev)
 {
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	return !(adev->flags & AMD_IS_APU) ||
 		(pm_suspend_target_state == PM_SUSPEND_MEM);
+#else
+	return true;
+#endif
 }
 
 /**
@@ -1050,7 +1054,11 @@ bool amdgpu_acpi_should_gpu_reset(struct amdgpu_device *adev)
 {
 	if (adev->flags & AMD_IS_APU)
 		return false;
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	return pm_suspend_target_state != PM_SUSPEND_TO_IDLE;
+#else
+	return false;
+#endif
 }
 
 /**
@@ -1062,9 +1070,13 @@ bool amdgpu_acpi_should_gpu_reset(struct amdgpu_device *adev)
  */
 bool amdgpu_acpi_is_s0ix_active(struct amdgpu_device *adev)
 {
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	if (!(adev->flags & AMD_IS_APU) ||
 	    (pm_suspend_target_state != PM_SUSPEND_TO_IDLE))
 		return false;
+#else
+	return false;
+#endif
 
 	if (!(acpi_gbl_FADT.flags & ACPI_FADT_LOW_POWER_S0)) {
 		dev_warn_once(adev->dev,
@@ -1081,5 +1093,4 @@ bool amdgpu_acpi_is_s0ix_active(struct amdgpu_device *adev)
 	return true;
 #endif /* CONFIG_AMD_PMC */
 }
-
 #endif /* CONFIG_SUSPEND */
