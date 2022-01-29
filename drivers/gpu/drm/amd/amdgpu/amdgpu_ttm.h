@@ -125,7 +125,7 @@ void amdgpu_vram_mgr_fini(struct amdgpu_device *adev);
 
 bool amdgpu_gtt_mgr_has_gart_addr(struct ttm_resource *mem);
 uint64_t amdgpu_gtt_mgr_usage(struct amdgpu_gtt_mgr *mgr);
-int amdgpu_gtt_mgr_recover(struct amdgpu_gtt_mgr *mgr);
+void amdgpu_gtt_mgr_recover(struct amdgpu_gtt_mgr *mgr);
 
 uint64_t amdgpu_preempt_mgr_usage(struct ttm_resource_manager *man);
 
@@ -172,7 +172,7 @@ int amdgpu_mmap(struct file *filp, struct vm_area_struct *vma);
 #endif
 
 int amdgpu_ttm_alloc_gart(struct ttm_buffer_object *bo);
-int amdgpu_ttm_recover_gart(struct ttm_buffer_object *tbo);
+void amdgpu_ttm_recover_gart(struct ttm_buffer_object *tbo);
 uint64_t amdgpu_ttm_domain_start(struct amdgpu_device *adev, uint32_t type);
 
 #if IS_ENABLED(CONFIG_DRM_AMDGPU_USERPTR)
