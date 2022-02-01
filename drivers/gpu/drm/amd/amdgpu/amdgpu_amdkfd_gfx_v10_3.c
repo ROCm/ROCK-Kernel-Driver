@@ -822,8 +822,8 @@ const struct kfd2kgd_calls gfx_v10_3_kfd2kgd = {
 	.set_vm_context_page_table_base = set_vm_context_page_table_base_v10_3,
 	.enable_debug_trap = kgd_gfx_v10_enable_debug_trap,
 	.disable_debug_trap = kgd_gfx_v10_disable_debug_trap,
-	.set_wave_launch_trap_override =
-				kgd_gfx_v10_set_wave_launch_trap_override,
+	.validate_trap_override_request = kgd_gfx_v10_validate_trap_override_request,
+	.set_wave_launch_trap_override = kgd_gfx_v10_set_wave_launch_trap_override,
 	.set_wave_launch_mode = kgd_gfx_v10_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v10_set_address_watch,
 	.clear_address_watch = kgd_gfx_v10_clear_address_watch,
