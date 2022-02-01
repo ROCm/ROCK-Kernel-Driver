@@ -2306,6 +2306,10 @@ struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *adev,
 {
 	struct amdgpu_bo_va *bo_va;
 
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
+#endif
+
 	bo_va = kzalloc(sizeof(struct amdgpu_bo_va), GFP_KERNEL);
 	if (bo_va == NULL) {
 		return NULL;
@@ -2318,6 +2322,10 @@ struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *adev,
 
 	if (!bo)
 		return bo_va;
+
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+	dma_resv_assert_held(bo->tbo.base.resv);
+#endif
 
 	if (amdgpu_dmabuf_is_xgmi_accessible(adev, bo)) {
 		bo_va->is_xgmi = true;
@@ -2713,7 +2721,14 @@ void amdgpu_vm_bo_rmv(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm = bo_va->base.vm;
 	struct amdgpu_vm_bo_base **base;
 
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+	dma_resv_assert_held(vm->root.bo->tbo.base.resv);
+#endif
+
 	if (bo) {
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+		dma_resv_assert_held(bo->tbo.base.resv);
+#endif
 		if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
 			vm->bulk_moveable = false;
 
