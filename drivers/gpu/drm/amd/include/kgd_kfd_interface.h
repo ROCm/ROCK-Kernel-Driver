@@ -300,15 +300,17 @@ struct kfd2kgd_calls {
 	uint32_t (*disable_debug_trap)(struct amdgpu_device *adev,
 					bool keep_trap_enabled,
 					uint32_t vmid);
-	int (*set_wave_launch_trap_override)(struct amdgpu_device *adev,
+	int (*validate_trap_override_request)(struct amdgpu_device *adev,
+					uint32_t trap_override,
+					uint32_t *trap_mask_supported);
+	uint32_t (*set_wave_launch_trap_override)(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,
 					     uint32_t trap_mask_bits,
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
-					     uint32_t *trap_mask_supported);
-
-	void (*set_wave_launch_mode)(struct amdgpu_device *adev,
+					     uint32_t kfd_dbg_trap_cntl_prev);
+	uint32_t (*set_wave_launch_mode)(struct amdgpu_device *adev,
 					uint8_t wave_launch_mode,
 					uint32_t vmid);
 	uint32_t (*set_address_watch)(struct amdgpu_device *adev,
