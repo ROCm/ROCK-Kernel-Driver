@@ -821,15 +821,11 @@ uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
 	return 0;
 }
 
-int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
-					     uint32_t vmid,
-					     uint32_t trap_override,
-					     uint32_t trap_mask_bits,
-					     uint32_t trap_mask_request,
-					     uint32_t *trap_mask_prev,
-					     uint32_t *trap_mask_supported)
+int kgd_gfx_v9_validate_trap_override_request(struct amdgpu_device *adev,
+					uint32_t trap_override,
+					uint32_t *trap_mask_supported)
 {
-	uint32_t data, wave_cntl_prev;
+	*trap_mask_supported &= KFD_DBG_TRAP_MASK_DBG_ADDRESS_WATCH;
 
 	/* The SPI_GDBG_TRAP_MASK register is global and affects all
 	 * processes. Only allow OR-ing the address-watch bit, since
@@ -840,9 +836,18 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 	if (trap_override != KFD_DBG_TRAP_OVERRIDE_OR)
 		return -EPERM;
 
-	*trap_mask_supported = KFD_DBG_TRAP_MASK_DBG_ADDRESS_WATCH;
-	if (trap_mask_request & ~*trap_mask_supported)
-		return -EACCES;
+	return 0;
+}
+
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
+					     uint32_t vmid,
+					     uint32_t trap_override,
+					     uint32_t trap_mask_bits,
+					     uint32_t trap_mask_request,
+					     uint32_t *trap_mask_prev,
+					     uint32_t kfd_dbg_cntl_prev)
+{
+	uint32_t data, wave_cntl_prev;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
@@ -855,10 +860,9 @@ int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 
 	trap_mask_bits = (trap_mask_bits & trap_mask_request) |
 		(*trap_mask_prev & ~trap_mask_request);
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
-			EXCP_EN, trap_mask_bits);
-	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK,
-		REPLACE, trap_override);
+
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK, EXCP_EN, trap_mask_bits);
+	data = REG_SET_FIELD(data, SPI_GDBG_TRAP_MASK, REPLACE, trap_override);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), data);
 
 	/* We need to preserve wave launch mode stall settings. */
@@ -1308,6 +1312,7 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.set_vm_context_page_table_base = kgd_gfx_v9_set_vm_context_page_table_base,
 	.enable_debug_trap = kgd_gfx_v9_enable_debug_trap,
 	.disable_debug_trap = kgd_gfx_v9_disable_debug_trap,
+	.validate_trap_override_request = kgd_gfx_v9_validate_trap_override_request,
 	.set_wave_launch_trap_override = kgd_gfx_v9_set_wave_launch_trap_override,
 	.set_wave_launch_mode = kgd_gfx_v9_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v9_set_address_watch,
