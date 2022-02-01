@@ -512,6 +512,32 @@ int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
 	return r;
 }
 
+static int kfd_dbg_validate_trap_override_request(struct kfd_process *p,
+						uint32_t trap_override,
+						uint32_t trap_mask_request,
+						uint32_t *trap_mask_supported)
+{
+	int i = 0;
+
+	*trap_mask_supported = 0xffffffff;
+
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+		int err = pdd->dev->kfd2kgd->validate_trap_override_request(
+								pdd->dev->adev,
+								trap_override,
+								trap_mask_supported);
+
+		if (err)
+			return err;
+	}
+
+	if (trap_mask_request & ~*trap_mask_supported)
+		return -EACCES;
+
+	return 0;
+}
+
 int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_override,
 					uint32_t trap_mask_bits,
@@ -522,35 +548,29 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 	int r = 0;
 	struct kfd_process_device *pdd;
 
-	/* FIXME: This assumes all GPUs are of the same type */
-	list_for_each_entry(pdd,
-			&target->per_device_data,
-			per_device_list) {
+	r = kfd_dbg_validate_trap_override_request(target,
+						trap_override,
+						trap_mask_request,
+						trap_mask_supported);
+
+	if (r)
+		return r;
+
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
 
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
-		r = pdd->dev->kfd2kgd->set_wave_launch_trap_override(
+		pdd->spi_dbg_override = pdd->dev->kfd2kgd->set_wave_launch_trap_override(
 				pdd->dev->adev,
 				pdd->dev->vm_info.last_vmid_kfd,
 				trap_override,
 				trap_mask_bits,
 				trap_mask_request,
 				trap_mask_prev,
-				trap_mask_supported);
+				pdd->spi_dbg_override);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		/*
-		 * NOTE: Per-VMID SPI debug control registers only occupy up to
-		 * 16 valid bits at the moment so this return check is ok for
-		 * now.
-		 */
-		if (r < 0) {
-			pr_err("failed to set wave launch override on [%i]\n",
-					pdd->dev->id);
-			break;
-		} else {
-			pdd->spi_dbg_override = r;
-			r = 0;
-
+		if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
 			r = debug_refresh_runlist(pdd->dev->dqm);
 			if (r)
 				break;

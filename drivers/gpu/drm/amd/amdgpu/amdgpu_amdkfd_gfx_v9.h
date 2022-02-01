@@ -55,13 +55,16 @@ uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
 					bool keep_trap_enabled,
 					uint32_t vmid);
-int kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
+int kgd_gfx_v9_validate_trap_override_request(struct amdgpu_device *adev,
+					     uint32_t trap_override,
+					     uint32_t *trap_mask_supported);
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
 					     uint32_t vmid,
 					     uint32_t trap_override,
 					     uint32_t trap_mask_bits,
 					     uint32_t trap_mask_request,
 					     uint32_t *trap_mask_prev,
-					     uint32_t *trap_mask_supported);
+					     uint32_t kfd_dbg_trap_cntl_prev);
 uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					 uint8_t wave_launch_mode,
 					 uint32_t vmid);
