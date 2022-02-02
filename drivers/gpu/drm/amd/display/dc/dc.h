@@ -613,8 +613,8 @@ struct dc_debug_options {
 	bool disable_dfs_bypass;
 	bool disable_dpp_power_gate;
 	bool disable_hubp_power_gate;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_dsc_power_gate;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	int dsc_min_slice_height_override;
 	int dsc_bpp_increment_div;
 #endif
