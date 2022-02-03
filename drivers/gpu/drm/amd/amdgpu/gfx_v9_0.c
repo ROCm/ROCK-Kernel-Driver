@@ -789,7 +789,8 @@ static u32 gfx_v9_0_rlcg_rw(struct amdgpu_device *adev, u32 offset, u32 v, uint3
 
 		for (i = 0; i < retries; i++) {
 			tmp = readl(scratch_reg1);
-			if (!(tmp & flag))
+			//Check the address bits
+			if (!(tmp & 0xFFFFF))
 				break;
 
 			udelay(10);
