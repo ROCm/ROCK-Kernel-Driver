@@ -358,11 +358,11 @@ int kgd_gfx_v9_hqd_dump(struct amdgpu_device *adev,
 {
 	uint32_t i = 0, reg;
 #define HQD_N_REGS 56
-#define DUMP_REG(addr) do {				\
-		if (WARN_ON_ONCE(i >= HQD_N_REGS))	\
-			break;				\
-		(*dump)[i][0] = (addr) << 2;		\
-		(*dump)[i++][1] = RREG32(addr);		\
+#define DUMP_REG(addr) do {					\
+		if (WARN_ON_ONCE(i >= HQD_N_REGS))		\
+			break;					\
+		(*dump)[i][0] = (addr) << 2;			\
+		(*dump)[i++][1] = RREG32_SOC15_IP(GC, addr);	\
 	} while (0)
 
 	*dump = kmalloc_array(HQD_N_REGS * 2, sizeof(uint32_t), GFP_KERNEL);
@@ -1077,7 +1077,7 @@ void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev,
 					uint32_t *wait_times)
 
 {
-	*wait_times = RREG32(SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2));
+	*wait_times = RREG32_SOC15(GC, 0, mmCP_IQ_WAIT_TIME2);
 }
 
 void kgd_gfx_v9_set_vm_context_page_table_base(struct amdgpu_device *adev,
