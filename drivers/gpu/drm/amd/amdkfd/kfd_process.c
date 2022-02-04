@@ -40,7 +40,6 @@ struct mm_struct;
 
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
-#include "kfd_dbgmgr.h"
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
 #include "kfd_trace.h"
@@ -1200,16 +1199,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 
 		if (pdd->qpd.doorbell_vma)
 			pdd->qpd.doorbell_vma->vm_private_data = NULL;
-
-		/* Old (deprecated) debugger for GFXv8 and older */
-		mutex_lock(kfd_get_dbgmgr_mutex());
-		if (dev && dev->dbgmgr && dev->dbgmgr->pasid == p->pasid) {
-			if (!kfd_dbgmgr_unregister(dev->dbgmgr, p)) {
-				kfd_dbgmgr_destroy(dev->dbgmgr);
-				dev->dbgmgr = NULL;
-			}
-		}
-		mutex_unlock(kfd_get_dbgmgr_mutex());
 
 		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
 		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
