@@ -1725,7 +1725,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 {
 	uint64_t gtt_size;
 	int r;
-	u64 vis_vram_limit;
 
 	mutex_init(&adev->mman.gtt_window_lock);
 
@@ -1747,12 +1746,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		DRM_ERROR("Failed initializing VRAM heap.\n");
 		return r;
 	}
-
-	/* Reduce size of CPU-visible VRAM if requested */
-	vis_vram_limit = (u64)amdgpu_vis_vram_limit * 1024 * 1024;
-	if (amdgpu_vis_vram_limit > 0 &&
-	    vis_vram_limit <= adev->gmc.visible_vram_size)
-		adev->gmc.visible_vram_size = vis_vram_limit;
 
 	/* Change the size here instead of the init above so only lpfn is affected */
 	amdgpu_ttm_set_buffer_funcs_status(adev, false);
