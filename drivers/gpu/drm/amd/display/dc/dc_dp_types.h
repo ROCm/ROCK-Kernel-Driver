@@ -961,7 +961,7 @@ struct dpcd_usb4_dp_tunneling_info {
 #ifndef DP_INTRA_HOP_AUX_REPLY_INDICATION
 #define DP_INTRA_HOP_AUX_REPLY_INDICATION		(1 << 3)
 /* TODO - Use DRM header to replace above once available */
-#endif // DP_INTRA_HOP_AUX_REPLY_INDICATION
+#endif
 
 union dp_main_line_channel_coding_cap {
 	struct {
@@ -1068,4 +1068,32 @@ union dp_128b_132b_training_aux_rd_interval {
 	uint8_t raw;
 };
 
+union edp_alpm_caps {
+	struct {
+		uint8_t AUX_WAKE_ALPM_CAP       :1;
+		uint8_t PM_STATE_2A_SUPPORT     :1;
+		uint8_t AUX_LESS_ALPM_CAP       :1;
+		uint8_t RESERVED                :5;
+	} bits;
+	uint8_t raw;
+};
+
+union edp_psr_dpcd_caps {
+	struct {
+		uint8_t LINK_TRAINING_ON_EXIT_NOT_REQUIRED      :1;
+		uint8_t PSR_SETUP_TIME  :3;
+		uint8_t Y_COORDINATE_REQUIRED   :1;
+		uint8_t SU_GRANULARITY_REQUIRED :1;
+		uint8_t FRAME_SYNC_IS_NOT_NEEDED_FOR_SU :1;
+		uint8_t RESERVED                :1;
+	} bits;
+	uint8_t raw;
+};
+
+struct edp_psr_info {
+	uint8_t psr_version;
+	union edp_psr_dpcd_caps psr_dpcd_caps;
+	uint8_t psr2_su_y_granularity_cap;
+	uint8_t force_psrsu_cap;
+};
 #endif /* DC_DP_TYPES_H */
