@@ -258,7 +258,7 @@ bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
 
 			mutex_unlock(&p->mutex);
 		} else if (trap_mask & KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION)) {
-			kfd_process_vm_fault(dev->dqm, p->pasid);
+			kfd_dqm_evict_pasid(dev->dqm, p->pasid);
 			kfd_signal_vm_fault_event(dev, p->pasid, NULL,
 							exception_data);
 
@@ -296,7 +296,7 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 		data = (struct kfd_hsa_memory_exception_data *)
 						pdd->vm_fault_exc_data;
 
-		kfd_process_vm_fault(pdd->dev->dqm, p->pasid);
+		kfd_dqm_evict_pasid(pdd->dev->dqm, p->pasid);
 		kfd_signal_vm_fault_event(pdd->dev, p->pasid, NULL, data);
 		error_reason &= ~KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION);
 	}
