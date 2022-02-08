@@ -638,37 +638,28 @@ int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable)
 {
-	int r = 0, i;
+	int i;
 
 	if (!(enable == 0 || enable == 1)) {
 		pr_err("Invalid precise mem ops option: %i\n", enable);
 		return -EINVAL;
 	}
 
-	target->precise_mem_ops = enable == 1;
+	for (i = 0; i < target->n_pdds; i++)
+		if (!kfd_dbg_is_per_vmid_supported(target->pdds[i]->dev))
+			return -EPERM;
 
-	/* FIXME: This assumes all GPUs are of the same type */
+	target->precise_mem_ops = !!enable;
 	for (i = 0; i < target->n_pdds; i++) {
-		struct kfd_process_device *pdd = target->pdds[i];
+		int r = debug_refresh_runlist(target->pdds[i]->dev->dqm);
 
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
-		r = pdd->dev->kfd2kgd->set_precise_mem_ops(pdd->dev->adev,
-					pdd->dev->vm_info.last_vmid_kfd,
-					target->precise_mem_ops);
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
-
-		if (r)
-			break;
-
-		r = debug_refresh_runlist(pdd->dev->dqm);
-		if (r)
-			break;
+		if (r) {
+			target->precise_mem_ops = false;
+			return r;
+		}
 	}
 
-	if (r)
-		target->precise_mem_ops = false;
-
-	return r;
+	return 0;
 }
 
 #define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
