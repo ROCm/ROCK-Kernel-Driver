@@ -1036,13 +1036,6 @@ uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 	return 0;
 }
 
-int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
-				bool enable)
-{
-	return -EPERM;
-}
-
-
 /* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
  * The values read are:
  *     ib_offload_wait_time     -- Wait Count for Indirect Buffer Offloads.
@@ -1317,7 +1310,6 @@ const struct kfd2kgd_calls gfx_v9_kfd2kgd = {
 	.set_wave_launch_mode = kgd_gfx_v9_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v9_set_address_watch,
 	.clear_address_watch = kgd_gfx_v9_clear_address_watch,
-	.set_precise_mem_ops = kgd_gfx_v9_set_precise_mem_ops,
 	.get_iq_wait_times = kgd_gfx_v9_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy,
