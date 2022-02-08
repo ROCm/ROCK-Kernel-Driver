@@ -1513,6 +1513,33 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	if (!pipe_ctx->stream->apply_seamless_boot_optimization && dc->config.use_pipe_ctx_sync_logic)
 		check_syncd_pipes_for_disabled_master_pipe(dc, context, pipe_ctx->pipe_idx);
 
+	pipe_ctx->stream_res.opp->funcs->opp_program_fmt(
+		pipe_ctx->stream_res.opp,
+		&stream->bit_depth_params,
+		&stream->clamping);
+
+	pipe_ctx->stream_res.opp->funcs->opp_set_dyn_expansion(
+			pipe_ctx->stream_res.opp,
+			COLOR_SPACE_YCBCR601,
+			stream->timing.display_color_depth,
+			stream->signal);
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
+	while (odm_pipe) {
+		odm_pipe->stream_res.opp->funcs->opp_set_dyn_expansion(
+				odm_pipe->stream_res.opp,
+				COLOR_SPACE_YCBCR601,
+				stream->timing.display_color_depth,
+				stream->signal);
+
+		odm_pipe->stream_res.opp->funcs->opp_program_fmt(
+				odm_pipe->stream_res.opp,
+				&stream->bit_depth_params,
+				&stream->clamping);
+		odm_pipe = odm_pipe->next_odm_pipe;
+	}
+#endif
+
 	/* DCN3.1 FPGA Workaround
 	 * Need to enable HPO DP Stream Encoder before setting OTG master enable.
 	 * To do so, move calling function enable_stream_timing to only be done AFTER calling
@@ -1551,32 +1578,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal))
 		dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_CONNECT_DIG_FE_OTG);
-
-	pipe_ctx->stream_res.opp->funcs->opp_set_dyn_expansion(
-			pipe_ctx->stream_res.opp,
-			COLOR_SPACE_YCBCR601,
-			stream->timing.display_color_depth,
-			stream->signal);
-
-	pipe_ctx->stream_res.opp->funcs->opp_program_fmt(
-		pipe_ctx->stream_res.opp,
-		&stream->bit_depth_params,
-		&stream->clamping);
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	while (odm_pipe) {
-		odm_pipe->stream_res.opp->funcs->opp_set_dyn_expansion(
-				odm_pipe->stream_res.opp,
-				COLOR_SPACE_YCBCR601,
-				stream->timing.display_color_depth,
-				stream->signal);
-
-		odm_pipe->stream_res.opp->funcs->opp_program_fmt(
-				odm_pipe->stream_res.opp,
-				&stream->bit_depth_params,
-				&stream->clamping);
-		odm_pipe = odm_pipe->next_odm_pipe;
-	}
-#endif
 
 	if (!stream->dpms_off)
 		core_link_enable_stream(context, pipe_ctx);
