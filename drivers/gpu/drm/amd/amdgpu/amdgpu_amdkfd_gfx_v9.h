@@ -76,8 +76,6 @@ uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 					uint32_t debug_vmid);
 uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 					uint32_t watch_id);
-int kgd_gfx_v9_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
-				bool enable);
 void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev, uint32_t *wait_times);
 
 void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
