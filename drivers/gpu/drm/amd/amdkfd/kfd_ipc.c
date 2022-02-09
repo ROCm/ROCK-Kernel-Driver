@@ -241,30 +241,33 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 	if (!dev || !ipc_handle)
 		return -EINVAL;
 
+	/* Protect kgd_mem object from being deleted by another thread */
 	mutex_lock(&p->mutex);
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
-		mutex_unlock(&p->mutex);
 		pr_err("Failed to get pdd\n");
-		return PTR_ERR(pdd);
+		r = PTR_ERR(pdd);
+		goto unlock;
 	}
 
 	kfd_bo = kfd_process_device_find_bo(pdd, GET_IDR_HANDLE(handle));
-	mutex_unlock(&p->mutex);
 
 	if (!kfd_bo) {
 		pr_err("Failed to get bo");
-		return -EINVAL;
+		r = -EINVAL;
+		goto unlock;
 	}
 	mem = (struct kgd_mem *)kfd_bo->mem;
 
 	r = amdgpu_amdkfd_gpuvm_export_ipc_obj(dev->adev, pdd->drm_priv, mem,
 					       &ipc_obj, flags);
 	if (r)
-		return r;
+		goto unlock;
 
 	memcpy(ipc_handle, ipc_obj->share_handle,
 	       sizeof(ipc_obj->share_handle));
 
+unlock:
+	mutex_unlock(&p->mutex);
 	return r;
 }
