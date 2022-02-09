@@ -674,6 +674,7 @@ static int amdgpu_discovery_set_common_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(10, 1, 1):
 	case IP_VERSION(10, 1, 2):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 0):
 	case IP_VERSION(10, 3, 1):
 	case IP_VERSION(10, 3, 2):
@@ -709,6 +710,7 @@ static int amdgpu_discovery_set_gmc_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(10, 1, 1):
 	case IP_VERSION(10, 1, 2):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 0):
 	case IP_VERSION(10, 3, 1):
 	case IP_VERSION(10, 3, 2):
@@ -910,6 +912,7 @@ static int amdgpu_discovery_set_gc_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(10, 1, 2):
 	case IP_VERSION(10, 1, 1):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 0):
 	case IP_VERSION(10, 3, 2):
 	case IP_VERSION(10, 3, 1):
@@ -1043,6 +1046,7 @@ static int amdgpu_discovery_set_mes_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(10, 1, 1):
 	case IP_VERSION(10, 1, 2):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 0):
 	case IP_VERSION(10, 3, 1):
 	case IP_VERSION(10, 3, 2):
@@ -1242,6 +1246,7 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(10, 1, 1):
 	case IP_VERSION(10, 1, 2):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 0):
 	case IP_VERSION(10, 3, 2):
 	case IP_VERSION(10, 3, 4):
@@ -1263,6 +1268,7 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(9, 2, 2):
 	case IP_VERSION(9, 3, 0):
 	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 1, 4):
 	case IP_VERSION(10, 3, 1):
 	case IP_VERSION(10, 3, 3):
 		adev->flags |= AMD_IS_APU;
