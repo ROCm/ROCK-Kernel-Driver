@@ -91,6 +91,9 @@
 /* dma_fence_chain_alloc() is available */
 #define HAVE_DMA_FENCE_CHAIN_ALLOC 1
 
+/* dma_fence_describe() is available */
+#define HAVE_DMA_FENCE_DESCRIBE 1
+
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
