@@ -96,5 +96,6 @@
 #include <kcl/kcl_bitmap.h>
 #include <kcl/kcl_dma_fence_chain.h>
 #include <kcl/kcl_pci.h>
+#include <kcl/kcl_cc_platform.h>
 
 #endif /* AMDGPU_BACKPORT_H */
