@@ -612,7 +612,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	}
 #ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
-#if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_DEVICE_FB_HELPER)
+#if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_FBDEV_GENERIC_SETUP)
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
 #endif
@@ -641,7 +641,7 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 	drm_modeset_lock_all(dev);
 #endif
 
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
+#if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_FBDEV_GENERIC_SETUP)
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
 	else

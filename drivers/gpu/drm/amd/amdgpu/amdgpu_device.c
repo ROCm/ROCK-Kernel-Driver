@@ -3836,7 +3836,7 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
+#ifndef HAVE_DRM_FBDEV_GENERIC_SETUP
 	amdgpu_fbdev_init(adev);
 #endif
 
@@ -4006,7 +4006,7 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		amdgpu_ucode_sysfs_fini(adev);
 	sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
+#ifndef HAVE_DRM_FBDEV_GENERIC_SETUP
 	amdgpu_fbdev_fini(adev);
 #endif
 	/* disable ras feature must before hw fini */
@@ -4119,7 +4119,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 	drm_kms_helper_poll_disable(dev);
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
 #else
 		amdgpu_fbdev_set_suspend(adev, 1);
@@ -4195,7 +4195,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 	flush_delayed_work(&adev->delayed_init_work);
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, false);
 #else
 		amdgpu_fbdev_set_suspend(adev, 0);
@@ -4820,7 +4820,7 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 				if (r)
 					goto out;
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 				drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, false);
 #else
 				amdgpu_fbdev_set_suspend(tmp_adev, 0);
@@ -5245,7 +5245,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		 */
 		amdgpu_unregister_gpu_instance(tmp_adev);
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
 #else
 		amdgpu_fbdev_set_suspend(tmp_adev, 1);

@@ -1774,7 +1774,7 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 			continue;
 		}
 		robj = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
+#ifndef HAVE_DRM_FBDEV_GENERIC_SETUP
 		/* don't unpin kernel fb objects */
 		if (!amdgpu_fbdev_robj_is_fb(adev, robj)) {
 			r = amdgpu_bo_reserve(robj, true);
