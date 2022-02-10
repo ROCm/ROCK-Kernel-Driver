@@ -279,3 +279,21 @@ struct dma_fence *_kcl_dma_fence_get_stub(void)
 }
 EXPORT_SYMBOL(_kcl_dma_fence_get_stub);
 #endif
+
+#if !defined(HAVE_DMA_FENCE_DESCRIBE)
+/**
+ * dma_fence_describe - Dump fence describtion into seq_file
+ * @fence: the 6fence to describe
+ * @seq: the seq_file to put the textual description into
+ *
+ * Dump a textual description of the fence and it's state into the seq_file.
+ */
+void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq)
+{
+        seq_printf(seq, "%s %s seq %llu %ssignalled\n",
+                   fence->ops->get_driver_name(fence),
+                   fence->ops->get_timeline_name(fence), fence->seqno,
+                   dma_fence_is_signaled(fence) ? "" : "un");
+}
+EXPORT_SYMBOL(dma_fence_describe);
+#endif
