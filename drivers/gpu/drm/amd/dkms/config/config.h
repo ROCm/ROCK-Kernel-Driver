@@ -527,6 +527,9 @@
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
 
+/* drm_firmware_drivers_only() is available */
+#define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
+
 /* drm_format_info.block_w and rm_format_info.block_h is available */
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
