@@ -208,4 +208,8 @@ static inline struct dma_fence *dma_fence_get_stub(void)
 }
 #endif
 
+#if !defined(HAVE_DMA_FENCE_DESCRIBE)
+void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
+#endif
+
 #endif /* AMDKCL_FENCE_H */
