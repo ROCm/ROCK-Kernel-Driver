@@ -422,20 +422,20 @@ struct device *kfd_chardev(void);
 /**
  * enum kfd_unmap_queues_filter - Enum for queue filters.
  *
- * @KFD_UNMAP_QUEUES_FILTER_SINGLE_QUEUE: Preempts single queue.
- *
  * @KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES: Preempts all queues in the
  *						running queues list.
+ *
+ * @KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES: Preempts all non-static queues
+ *						in the run list.
  *
  * @KFD_UNMAP_QUEUES_FILTER_BY_PASID: Preempts queues that belongs to
  *						specific process.
  *
  */
 enum kfd_unmap_queues_filter {
-	KFD_UNMAP_QUEUES_FILTER_SINGLE_QUEUE,
-	KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES,
-	KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
-	KFD_UNMAP_QUEUES_FILTER_BY_PASID
+	KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES = 1,
+	KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES = 2,
+	KFD_UNMAP_QUEUES_FILTER_BY_PASID = 3
 };
 
 /**
@@ -1451,10 +1451,8 @@ struct packet_manager_funcs {
 	int (*map_queues)(struct packet_manager *pm, uint32_t *buffer,
 			struct queue *q, bool is_static);
 	int (*unmap_queues)(struct packet_manager *pm, uint32_t *buffer,
-			enum kfd_queue_type type,
 			enum kfd_unmap_queues_filter mode,
-			uint32_t filter_param, bool reset,
-			unsigned int sdma_engine);
+			uint32_t filter_param, bool reset);
 	int (*set_grace_period)(struct packet_manager *pm, uint32_t *buffer,
 			uint32_t grace_period);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
@@ -1484,10 +1482,9 @@ int pm_send_runlist(struct packet_manager *pm, struct list_head *dqm_queues);
 int pm_send_query_status(struct packet_manager *pm, uint64_t fence_address,
 				uint64_t fence_value);
 
-int pm_send_unmap_queue(struct packet_manager *pm, enum kfd_queue_type type,
+int pm_send_unmap_queue(struct packet_manager *pm,
 			enum kfd_unmap_queues_filter mode,
-			uint32_t filter_param, bool reset,
-			unsigned int sdma_engine);
+			uint32_t filter_param, bool reset);
 
 void pm_release_ib(struct packet_manager *pm);
 

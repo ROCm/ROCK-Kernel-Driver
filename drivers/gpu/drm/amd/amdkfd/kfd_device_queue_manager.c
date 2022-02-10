@@ -1711,8 +1711,7 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 			return retval;
 	}
 
-	retval = pm_send_unmap_queue(&dqm->packet_mgr, KFD_QUEUE_TYPE_COMPUTE,
-			filter, filter_param, reset, 0);
+	retval = pm_send_unmap_queue(&dqm->packet_mgr, filter, filter_param, reset);
 	if (retval)
 		return retval;
 	*dqm->fence_addr = KFD_FENCE_INIT;
