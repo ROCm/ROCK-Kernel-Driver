@@ -20,5 +20,6 @@
 #include <kcl/kcl_io-mapping.h>
 #include <kcl/kcl_highmem-internal.h>
 #include <kcl/kcl_shrinker.h>
+#include <kcl/kcl_cc_platform.h>
 
 #endif
