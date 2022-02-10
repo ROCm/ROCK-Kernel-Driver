@@ -63,4 +63,8 @@ static inline bool drm_dev_is_unplugged(struct drm_device *dev)
 #endif /* HAVE_DRM_DEV_IS_UNPLUGGED */
 #endif /* HAVE_DRM_DEV_ENTER */
 
+#ifndef HAVE_DRM_FIRMWARE_DRIVERS_ONLY
+extern bool drm_firmware_drivers_only(void);
+#endif /* HAVE_DRM_FIRMWARE_DRIVERS_ONLY */
+
 #endif
