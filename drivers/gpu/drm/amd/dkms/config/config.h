@@ -386,6 +386,9 @@
 /* drm_vblank struct use ktime_t for time field */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
+/* drm_vblank->time is array */
+/* #undef  HAVE_DRM_VBLANK_CRTC_HAS_ARRAY_TIME_FIELD */
+
 /* drm_driver->release() is available */
 #define HAVE_DRM_DRIVER_RELEASE 1
 
@@ -428,9 +431,6 @@
 /* Define to 1 if you have the <drm/drm_gem_framebuffer_helper.h> header file.
    */
 #define HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H 1
-
-/* Define to 1 if you have the <drm/drm_gem_ttm_helper.h> header file. */
-#define HAVE_DRM_DRM_GEM_TTM_HELPER_H 1
 
 /* Define to 1 if you have the <drm/drm_hdcp.h> header file. */
 #define HAVE_DRM_DRM_HDCP_H 1
@@ -523,6 +523,9 @@
 /* drm_gem_map_attach() wants 2 arguments */
 /* #undef HAVE_DRM_GEM_MAP_ATTACH_2ARGS */
 
+/* drm_gem_object_funcs->vmap() has 2 args */
+#define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
+
 /* drm_gem_object_lookup() wants 2 args */
 #define HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS 1
 
@@ -534,9 +537,6 @@
 
 /* ttm_buffer_object->base is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
-
-/* drm_gem_ttm_vmap() is available */
-#define HAVE_DRM_GEM_TTM_VMAP 1
 
 /* drm_gen_fb_init_with_funcs() is available */
 #define HAVE_DRM_GEN_FB_INIT_WITH_FUNCS 1
@@ -634,6 +634,12 @@
 
 /* drm_printer->prefix is available */
 #define HAVE_DRM_PRINTER_PREFIX 1
+
+/* drm_print_bits() is available */
+#define HAVE_DRM_PRINT_BITS 1
+
+/* drm_print_bits() has 4 args */
+#define HAVE_DRM_PRINT_BITS_4ARGS 1
 
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
@@ -1152,6 +1158,9 @@
 
 /* ksys_close() is available */
 #define HAVE_KSYS_CLOSE_FD 1
+
+/* pm_suspend_target_state is available */
+#define HAVE_PM_SUSPEND_TARGET_STATE 1
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""

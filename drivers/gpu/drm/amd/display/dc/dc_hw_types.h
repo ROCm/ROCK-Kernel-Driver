@@ -727,9 +727,7 @@ struct dc_crtc_timing_flags {
 	 * rates less than or equal to 340Mcsc */
 	uint32_t LTE_340MCSC_SCRAMBLE:1;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	uint32_t DSC : 1; /* Use DSC with this timing */
-#endif
 #ifndef TRIM_FSFT
 	uint32_t FAST_TRANSPORT: 1;
 #endif
@@ -758,7 +756,6 @@ enum dc_timing_3d_format {
 	TIMING_3D_FORMAT_MAX,
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct dc_dsc_config {
 	uint32_t num_slices_h; /* Number of DSC slices - horizontal */
 	uint32_t num_slices_v; /* Number of DSC slices - vertical */
@@ -773,7 +770,7 @@ struct dc_dsc_config {
 #endif
 	bool is_dp; /* indicate if DSC is applied based on DP's capability */
 };
-#endif
+
 struct dc_crtc_timing {
 	uint32_t h_total;
 	uint32_t h_border_left;
@@ -805,9 +802,7 @@ struct dc_crtc_timing {
 
 	struct dc_crtc_timing_flags flags;
 	uint32_t dsc_fixed_bits_per_pixel_x16; /* DSC target bitrate in 1/16 of bpp (e.g. 128 -> 8bpp) */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_dsc_config dsc_cfg;
-#endif
 };
 
 enum trigger_delay {
@@ -844,7 +839,6 @@ enum vram_type {
 	VIDEO_MEMORY_TYPE_GDDR6  = 6,
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum dwb_cnv_out_bpc {
 	DWB_CNV_OUT_BPC_8BPC  = 0,
 	DWB_CNV_OUT_BPC_10BPC = 1,
@@ -884,7 +878,6 @@ enum dwb_stereo_type {
 	DWB_STEREO_TYPE_FRAME_SEQUENTIAL = 3,	/* Frame sequential */
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 enum dwb_out_format {
 	DWB_OUT_FORMAT_32BPP_ARGB = 0,
 	DWB_OUT_FORMAT_32BPP_RGBA = 1,
@@ -916,7 +909,6 @@ struct mcif_warmup_params {
 	unsigned int		region_size;
 	unsigned int		p_vmid;
 };
-#endif
 
 #define MCIF_BUF_COUNT	4
 
@@ -932,7 +924,6 @@ struct mcif_buf_params {
 #endif
 };
 
-#endif
 
 #define MAX_TG_COLOR_VALUE 0x3FF
 struct tg_color {

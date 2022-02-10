@@ -37,13 +37,9 @@
 #define MAX_AUDIOS 7
 #define MAX_PIPES 6
 #define MAX_DIG_LINK_ENCODERS 7
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #define MAX_DWB_PIPES	1
-#endif
-#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #define MAX_HPO_DP2_ENCODERS	4
 #define MAX_HPO_DP2_LINK_ENCODERS	2
-#endif
 
 struct gamma_curve {
 	uint32_t offset;
@@ -86,7 +82,6 @@ struct pwl_result_data {
 	uint32_t delta_blue_reg;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 struct dc_rgb {
 	uint32_t red;
 	uint32_t green;
@@ -115,7 +110,6 @@ struct tetrahedral_params {
 	bool use_12bits;
 
 };
-#endif
 
 /* arr_curve_points - regamma regions/segments specification
  * arr_points - beginning and end point specified separately (only one on DCE)
@@ -209,13 +203,11 @@ enum opp_regamma {
 	OPP_REGAMMA_USER
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum optc_dsc_mode {
 	OPTC_DSC_DISABLED = 0,
 	OPTC_DSC_ENABLED_444 = 1, /* 'RGB 444' or 'Simple YCbCr 4:2:2' (4:2:2 upsampled to 4:4:4) */
 	OPTC_DSC_ENABLED_NATIVE_SUBSAMPLED = 2 /* Native 4:2:2 or 4:2:0 */
 };
-#endif
 
 struct dc_bias_and_scale {
 	uint16_t scale_red;

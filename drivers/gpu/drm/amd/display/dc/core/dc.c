@@ -2402,10 +2402,8 @@ static enum surface_update_type check_update_surfaces_for_stream(
 			su_flags->bits.dsc_changed = 1;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (stream_update->mst_bw_update)
 			su_flags->bits.mst_bw = 1;
-#endif
 
 		if (su_flags->raw != 0)
 			overall_type = UPDATE_TYPE_FULL;
@@ -2799,14 +2797,12 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				dp_update_dsc_config(pipe_ctx);
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (stream_update->mst_bw_update) {
 				if (stream_update->mst_bw_update->is_increase)
 					dc_link_increase_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
 				else
 					dc_link_reduce_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
 			}
-#endif
 
 			if (stream_update->pending_test_pattern) {
 				dc_link_dp_set_test_pattern(stream->link,

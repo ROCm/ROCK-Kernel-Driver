@@ -1658,13 +1658,14 @@ static void svm_range_restore_work(struct work_struct *work)
 
 	pr_debug("restore svm ranges\n");
 
-	/* kfd_process_notifier_release destroys this worker thread. So during
-	 * the lifetime of this thread, kfd_process and mm will be valid.
-	 */
 	p = container_of(svms, struct kfd_process, svms);
-	mm = p->mm;
-	if (!mm)
+
+	/* Keep mm reference when svm_range_validate_and_map ranges */
+	mm = get_task_mm(p->lead_thread);
+	if (!mm) {
+		pr_debug("svms 0x%p process mm gone\n", svms);
 		return;
+	}
 
 	svm_range_list_lock_and_flush_work(svms, mm);
 	mutex_lock(&svms->lock);
@@ -1718,6 +1719,7 @@ static void svm_range_restore_work(struct work_struct *work)
 out_reschedule:
 	mutex_unlock(&svms->lock);
 	mmap_write_unlock(mm);
+	mmput(mm);
 
 	/* If validation failed, reschedule another attempt */
 	if (evicted_ranges) {
@@ -2000,10 +2002,9 @@ svm_range_update_notifier_and_interval_tree(struct mm_struct *mm,
 }
 
 static void
-svm_range_handle_list_op(struct svm_range_list *svms, struct svm_range *prange)
+svm_range_handle_list_op(struct svm_range_list *svms, struct svm_range *prange,
+			 struct mm_struct *mm)
 {
-	struct mm_struct *mm = prange->work_item.mm;
-
 	switch (prange->work_item.op) {
 	case SVM_OP_NULL:
 		pr_debug("NULL OP 0x%p prange 0x%p [0x%lx 0x%lx]\n",
@@ -2080,39 +2081,43 @@ static void svm_range_deferred_list_work(struct work_struct *work)
 	struct svm_range_list *svms;
 	struct svm_range *prange;
 	struct mm_struct *mm;
-	struct kfd_process *p;
 
 	svms = container_of(work, struct svm_range_list, deferred_list_work);
 	pr_debug("enter svms 0x%p\n", svms);
-
-	p = container_of(svms, struct kfd_process, svms);
-	/* Avoid mm is gone when inserting mmu notifier */
-	mm = get_task_mm(p->lead_thread);
-	if (!mm) {
-		pr_debug("svms 0x%p process mm gone\n", svms);
-		return;
-	}
-retry:
-	mmap_write_lock(mm);
-
-	/* Checking for the need to drain retry faults must be inside
-	 * mmap write lock to serialize with munmap notifiers.
-	 */
-	if (unlikely(atomic_read(&svms->drain_pagefaults))) {
-		mmap_write_unlock(mm);
-		svm_range_drain_retry_fault(svms);
-		goto retry;
-	}
 
 	spin_lock(&svms->deferred_list_lock);
 	while (!list_empty(&svms->deferred_range_list)) {
 		prange = list_first_entry(&svms->deferred_range_list,
 					  struct svm_range, deferred_list);
-		list_del_init(&prange->deferred_list);
 		spin_unlock(&svms->deferred_list_lock);
 
 		pr_debug("prange 0x%p [0x%lx 0x%lx] op %d\n", prange,
 			 prange->start, prange->last, prange->work_item.op);
+
+		mm = prange->work_item.mm;
+retry:
+		mmap_write_lock(mm);
+
+		/* Checking for the need to drain retry faults must be inside
+		 * mmap write lock to serialize with munmap notifiers.
+		 */
+		if (unlikely(atomic_read(&svms->drain_pagefaults))) {
+			mmap_write_unlock(mm);
+			svm_range_drain_retry_fault(svms);
+			goto retry;
+		}
+
+		/* Remove from deferred_list must be inside mmap write lock, for
+		 * two race cases:
+		 * 1. unmap_from_cpu may change work_item.op and add the range
+		 *    to deferred_list again, cause use after free bug.
+		 * 2. svm_range_list_lock_and_flush_work may hold mmap write
+		 *    lock and continue because deferred_list is empty, but
+		 *    deferred_list work is actually waiting for mmap lock.
+		 */
+		spin_lock(&svms->deferred_list_lock);
+		list_del_init(&prange->deferred_list);
+		spin_unlock(&svms->deferred_list_lock);
 
 		mutex_lock(&svms->lock);
 		mutex_lock(&prange->migrate_mutex);
@@ -2124,19 +2129,20 @@ retry:
 			pr_debug("child prange 0x%p op %d\n", pchild,
 				 pchild->work_item.op);
 			list_del_init(&pchild->child_list);
-			svm_range_handle_list_op(svms, pchild);
+			svm_range_handle_list_op(svms, pchild, mm);
 		}
 		mutex_unlock(&prange->migrate_mutex);
 
-		svm_range_handle_list_op(svms, prange);
+		svm_range_handle_list_op(svms, prange, mm);
 		mutex_unlock(&svms->lock);
+		mmap_write_unlock(mm);
+
+		/* Pairs with mmget in svm_range_add_list_work */
+		mmput(mm);
 
 		spin_lock(&svms->deferred_list_lock);
 	}
 	spin_unlock(&svms->deferred_list_lock);
-
-	mmap_write_unlock(mm);
-	mmput(mm);
 	pr_debug("exit svms 0x%p\n", svms);
 }
 
@@ -2154,6 +2160,9 @@ svm_range_add_list_work(struct svm_range_list *svms, struct svm_range *prange,
 			prange->work_item.op = op;
 	} else {
 		prange->work_item.op = op;
+
+		/* Pairs with mmput in deferred_list_work */
+		mmget(mm);
 		prange->work_item.mm = mm;
 		list_add_tail(&prange->deferred_list,
 			      &prange->svms->deferred_range_list);
@@ -2845,6 +2854,8 @@ void svm_range_list_fini(struct kfd_process *p)
 
 	pr_debug("pasid 0x%x svms 0x%p\n", p->pasid, &p->svms);
 
+	cancel_delayed_work_sync(&p->svms.restore_work);
+
 	/* Ensure list work is finished before process is destroyed */
 	flush_work(&p->svms.deferred_list_work);
 
@@ -2854,7 +2865,6 @@ void svm_range_list_fini(struct kfd_process *p)
 	 */
 	atomic_inc(&p->svms.drain_pagefaults);
 	svm_range_drain_retry_fault(&p->svms);
-
 
 	list_for_each_entry_safe(prange, next, &p->svms.list, list) {
 		svm_range_unlink(prange);
@@ -3489,11 +3499,14 @@ fill_values:
 
 int kfd_criu_resume_svm(struct kfd_process *p)
 {
+	struct kfd_ioctl_svm_attribute *set_attr = NULL;
 	int nattr_common = 4, nattr_accessibility = 1;
 	struct criu_svm_metadata *criu_svm_md = NULL;
-	struct criu_svm_metadata *next = NULL;
 	struct svm_range_list *svms = &p->svms;
+	struct criu_svm_metadata *next = NULL;
+	uint32_t set_flags = 0xffffffff;
 	int i, j, num_attrs, ret = 0;
+	uint64_t set_attr_size;
 	struct mm_struct *mm;
 
 	if (list_empty(&svms->criu_svm_metadata_list)) {
@@ -3513,15 +3526,59 @@ int kfd_criu_resume_svm(struct kfd_process *p)
 	list_for_each_entry(criu_svm_md, &svms->criu_svm_metadata_list, list) {
 		pr_debug("criu_svm_md[%d]\n\tstart: 0x%llx size: 0x%llx (npages)\n",
 			 i, criu_svm_md->data.start_addr, criu_svm_md->data.size);
+
 		for (j = 0; j < num_attrs; j++) {
 			pr_debug("\ncriu_svm_md[%d]->attrs[%d].type : 0x%x \ncriu_svm_md[%d]->attrs[%d].value : 0x%x\n",
 				 i,j, criu_svm_md->data.attrs[j].type,
 				 i,j, criu_svm_md->data.attrs[j].value);
+			switch (criu_svm_md->data.attrs[j].type) {
+			/* During Checkpoint operation, the query for
+			 * KFD_IOCTL_SVM_ATTR_PREFETCH_LOC attribute might
+			 * return KFD_IOCTL_SVM_LOCATION_UNDEFINED if they were
+			 * not used by the range which was checkpointed. Care
+			 * must be taken to not restore with an invalid value
+			 * otherwise the gpuidx value will be invalid and
+			 * set_attr would eventually fail so just replace those
+			 * with another dummy attribute such as
+			 * KFD_IOCTL_SVM_ATTR_SET_FLAGS.
+			 */
+			case KFD_IOCTL_SVM_ATTR_PREFETCH_LOC:
+				if (criu_svm_md->data.attrs[j].value ==
+				    KFD_IOCTL_SVM_LOCATION_UNDEFINED) {
+					criu_svm_md->data.attrs[j].type =
+						KFD_IOCTL_SVM_ATTR_SET_FLAGS;
+					criu_svm_md->data.attrs[j].value = 0;
+				}
+				break;
+			case KFD_IOCTL_SVM_ATTR_SET_FLAGS:
+				set_flags = criu_svm_md->data.attrs[j].value;
+				break;
+			default:
+				break;
+			}
 		}
 
+		/* CLR_FLAGS is not available via get_attr during checkpoint but
+		 * it needs to be inserted before restoring the ranges so
+		 * allocate extra space for it before calling set_attr
+		 */
+		set_attr_size = sizeof(struct kfd_ioctl_svm_attribute) *
+						(num_attrs + 1);
+		set_attr = krealloc(set_attr, set_attr_size,
+					    GFP_KERNEL);
+		if (!set_attr) {
+			ret = -ENOMEM;
+			goto exit;
+		}
+
+		memcpy(set_attr, criu_svm_md->data.attrs, num_attrs *
+					sizeof(struct kfd_ioctl_svm_attribute));
+		set_attr[num_attrs].type = KFD_IOCTL_SVM_ATTR_CLR_FLAGS;
+		set_attr[num_attrs].value = ~set_flags;
+
 		ret = svm_range_set_attr(p, mm, criu_svm_md->data.start_addr,
-					 criu_svm_md->data.size, num_attrs,
-					 criu_svm_md->data.attrs);
+					 criu_svm_md->data.size, num_attrs + 1,
+					 set_attr);
 		if (ret) {
 			pr_err("CRIU: failed to set range attributes\n");
 			goto exit;
@@ -3529,8 +3586,8 @@ int kfd_criu_resume_svm(struct kfd_process *p)
 
 		i++;
 	}
-
 exit:
+	kfree(set_attr);
 	list_for_each_entry_safe(criu_svm_md, next, &svms->criu_svm_metadata_list, list) {
 		pr_debug("freeing criu_svm_md[]\n\tstart: 0x%llx\n",
 						criu_svm_md->data.start_addr);

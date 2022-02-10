@@ -108,6 +108,10 @@ struct amdgpu_mman {
 	u64		fw_vram_usage_size;
 	struct amdgpu_bo	*fw_vram_usage_reserved_bo;
 	void		*fw_vram_usage_va;
+
+	/* PAGE_SIZE'd BO for process memory r/w over SDMA. */
+	struct amdgpu_bo	*sdma_access_bo;
+	void			*sdma_access_ptr;
 };
 
 struct amdgpu_copy_mem {

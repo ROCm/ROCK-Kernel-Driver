@@ -373,7 +373,6 @@ bool resource_construct(
 		}
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	pool->hpo_dp_stream_enc_count = 0;
 	if (create_funcs->create_hpo_dp_stream_encoder) {
 		for (i = 0; i < caps->num_hpo_dp_stream_encoder; i++) {
@@ -394,7 +393,6 @@ bool resource_construct(
 			pool->hpo_dp_link_enc_count++;
 		}
 	}
-#endif
 
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	for (i = 0; i < caps->num_mpc_3dlut; i++) {
@@ -1730,7 +1728,6 @@ static void update_stream_engine_usage(
 	}
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static void update_hpo_dp_stream_engine_usage(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -1832,7 +1829,6 @@ static void remove_hpo_dp_link_enc_from_ctx(struct resource_context *res_ctx,
 		pipe_ctx->link_res.hpo_dp_link_enc = NULL;
 	}
 }
-#endif
 
 /* TODO: release audio object */
 void update_audio_usage(
@@ -1878,7 +1874,6 @@ static int acquire_first_free_pipe(
 	return -1;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static struct hpo_dp_stream_encoder *find_first_free_match_hpo_dp_stream_enc_for_link(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -1896,7 +1891,6 @@ static struct hpo_dp_stream_encoder *find_first_free_match_hpo_dp_stream_enc_for
 
 	return NULL;
 }
-#endif
 
 static struct audio *find_first_free_audio(
 		struct resource_context *res_ctx,
@@ -1988,7 +1982,6 @@ enum dc_status dc_remove_stream_from_ctx(
 	if (dc->res_pool->funcs->link_enc_unassign)
 		dc->res_pool->funcs->link_enc_unassign(new_ctx, del_pipe->stream);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (is_dp_128b_132b_signal(del_pipe)) {
 		update_hpo_dp_stream_engine_usage(
 			&new_ctx->res_ctx, dc->res_pool,
@@ -1996,7 +1989,6 @@ enum dc_status dc_remove_stream_from_ctx(
 			false);
 		remove_hpo_dp_link_enc_from_ctx(&new_ctx->res_ctx, del_pipe, del_pipe->stream);
 	}
-#endif
 
 	if (del_pipe->stream_res.audio)
 		update_audio_usage(
@@ -2249,7 +2241,6 @@ enum dc_status resource_map_pool_resources(
 		pipe_ctx->stream_res.stream_enc,
 		true);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* Allocate DP HPO Stream Encoder based on signal, hw capabilities
 	 * and link settings
 	 */
@@ -2274,7 +2265,6 @@ enum dc_status resource_map_pool_resources(
 				return DC_NO_LINK_ENC_RESOURCE;
 		}
 	}
-#endif
 
 	/* TODO: Add check if ASIC support and EDID audio */
 	if (!stream->converter_disable_audio &&
@@ -2950,12 +2940,10 @@ bool pipe_need_reprogram(
 		return true;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (pipe_ctx_old->stream_res.hpo_dp_stream_enc != pipe_ctx->stream_res.hpo_dp_stream_enc)
 		return true;
 	if (pipe_ctx_old->link_res.hpo_dp_link_enc != pipe_ctx->link_res.hpo_dp_link_enc)
 		return true;
-#endif
 
 	/* DIG link encoder resource assignment for stream changed. */
 	if (pipe_ctx_old->stream->ctx->dc->res_pool->funcs->link_encs_assign) {
@@ -3222,7 +3210,6 @@ void get_audio_check(struct audio_info *aud_modes,
 	}
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
 		const struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -3241,7 +3228,6 @@ struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
 
 	return hpo_dp_link_enc;
 }
-#endif
 
 void reset_syncd_pipes_from_disabled_pipes(struct dc *dc,
 		struct dc_state *context)

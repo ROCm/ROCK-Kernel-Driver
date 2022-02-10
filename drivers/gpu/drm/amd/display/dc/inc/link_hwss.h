@@ -72,4 +72,26 @@ void dp_retrain_link_dp_test(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		bool skip_video_pattern);
 
+struct dc_link;
+struct link_resource;
+struct fixed31_32;
+struct pipe_ctx;
+
+struct link_hwss {
+	/* you must define a dummy implementation and assign the function to
+	 * dummy_link_hwss if you don't want to check for NULL pointer
+	 */
+	void (*set_throttled_vcp_size)(struct pipe_ctx *pipe_ctx,
+			struct fixed31_32 throttled_vcp_size);
+
+	/* function pointers below this point require check for NULL
+	 * *********************************************************************
+	 */
+	void (*set_hblank_min_symbol_width)(struct pipe_ctx *pipe_ctx,
+			const struct dc_link_settings *link_settings,
+			struct fixed31_32 throttled_vcp_size);
+};
+
+const struct link_hwss *dc_link_hwss_get(const struct dc_link *link, const struct link_resource *link_res);
+
 #endif /* __DC_LINK_HWSS_H__ */

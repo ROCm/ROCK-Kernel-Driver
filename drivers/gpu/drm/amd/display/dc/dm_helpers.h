@@ -115,7 +115,7 @@ bool dm_helpers_dp_mst_start_top_mgr(
 		const struct dc_link *link,
 		bool boot);
 
-void dm_helpers_dp_mst_stop_top_mgr(
+bool dm_helpers_dp_mst_stop_top_mgr(
 		struct dc_context *ctx,
 		struct dc_link *link);
 /**
@@ -143,13 +143,11 @@ bool dm_helpers_submit_i2c(
 		const struct dc_link *link,
 		struct i2c_command *cmd);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
 		const struct dc_stream_state *stream,
 		bool enable
 );
-#endif
 
 bool dm_helpers_is_dp_sink_present(
 		struct dc_link *link);

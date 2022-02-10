@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Advanced Micro Devices, Inc.
+ * Copyright (C) 2016 Red Hat
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,25 +19,33 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
+ * Authors:
+ * Rob Clark <robdclark@gmail.com>
  */
 
-#ifndef MOD_INFO_PACKET_H_
-#define MOD_INFO_PACKET_H_
 
-#include "dm_services.h"
-#include "mod_shared.h"
-//Forward Declarations
-struct dc_stream_state;
-struct dc_info_packet;
-struct mod_vrr_params;
+// Copied from include/drm/drm_print.h
+#ifndef _KCL_BACKPORT_KCL__DRM_PRINT_H__H_
+#define _KCL_BACKPORT_KCL__DRM_PRINT_H__H_
 
-void mod_build_vsc_infopacket(const struct dc_stream_state *stream,
-		struct dc_info_packet *info_packet,
-		enum dc_color_space cs);
+#include <drm/drm_print.h>
+#include <kcl/kcl_drm_print.h>
 
-void mod_build_hf_vsif_infopacket(const struct dc_stream_state *stream,
-		struct dc_info_packet *info_packet);
+#if !defined(HAVE_DRM_PRINT_BITS_4ARGS) && \
+	defined(HAVE_DRM_PRINT_BITS)
+static inline
+void _kcl_drm_print_bits(struct drm_printer *p, unsigned long value,
+		    const char * const bits[], unsigned int nbits)
+{
+	unsigned int from, to;
+
+	from = ffs(value);
+	to = fls(value);
+	WARN_ON_ONCE(to > nbits);
+
+	drm_print_bits(p, value, bits, from, nbits);
+}
+#define drm_print_bits _kcl_drm_print_bits
+#endif
 
 #endif

@@ -14,8 +14,8 @@
 	container_of(gem_obj, struct ttm_buffer_object, base)
 #endif
 
-#ifndef HAVE_DRM_GEM_TTM_VMAP
-void *_kcl_drm_gem_ttm_vmap(struct drm_gem_object *obj)
+#ifndef HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS
+void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj)
 {
 	struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(obj);
 	struct dma_buf_map map;
@@ -23,9 +23,8 @@ void *_kcl_drm_gem_ttm_vmap(struct drm_gem_object *obj)
 	ttm_bo_vmap(bo, &map);
 	return map.vaddr;
 }
-EXPORT_SYMBOL(_kcl_drm_gem_ttm_vmap);
 
-void _kcl_drm_gem_ttm_vunmap(struct drm_gem_object *gem,
+void amdgpu_gem_prime_vunmap(struct drm_gem_object *gem,
 			void *vaddr)
 {
 	struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(gem);
@@ -36,27 +35,4 @@ void _kcl_drm_gem_ttm_vunmap(struct drm_gem_object *gem,
 
 	ttm_bo_vunmap(bo, &map);
 }
-EXPORT_SYMBOL(_kcl_drm_gem_ttm_vunmap);
-#endif
-
-#ifndef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
-int _kcl_drm_gem_ttm_mmap(struct drm_gem_object *gem,
-                     struct vm_area_struct *vma) {
-
-        struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(gem);
-        int ret;
-
-        ret = ttm_bo_mmap_obj(vma, bo);
-        if (ret < 0)
-                return ret;
-
-        /*
-         * ttm has its own object refcounting, so drop gem reference
-         * to avoid double accounting counting.
-         */
-        drm_gem_object_put(gem);
-
-        return 0;
-}
-EXPORT_SYMBOL(_kcl_drm_gem_ttm_mmap);
 #endif

@@ -1,4 +1,3 @@
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef DC_DSC_H_
 #define DC_DSC_H_
 /*
@@ -101,5 +100,4 @@ void dc_dsc_policy_set_enable_dsc_when_not_needed(bool enable);
 
 void dc_dsc_policy_set_disable_dsc_stream_overhead(bool disable);
 
-#endif
 #endif

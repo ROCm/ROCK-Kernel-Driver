@@ -54,6 +54,8 @@ enum {
 	PEAK_FACTOR_X1000 = 1006,
 };
 
+struct dc_link_settings dp_get_max_link_cap(struct dc_link *link);
+
 bool dp_verify_link_cap(
 	struct dc_link *link,
 	const struct link_resource *link_res,
@@ -65,10 +67,6 @@ bool dp_verify_link_cap_with_retries(
 	const struct link_resource *link_res,
 	struct dc_link_settings *known_limit_link_setting,
 	int attempts);
-
-bool dp_verify_mst_link_cap(
-	struct dc_link *link,
-	const struct link_resource *link_res);
 
 bool dp_validate_mode_timing(
 	struct dc_link *link,
@@ -114,6 +112,9 @@ void dp_set_panel_mode(struct dc_link *link, enum dp_panel_mode panel_mode);
 bool dp_overwrite_extended_receiver_cap(struct dc_link *link);
 
 void dpcd_set_source_specific_data(struct dc_link *link);
+
+void dpcd_update_cable_id(struct dc_link *link);
+
 /* Write DPCD link configuration data. */
 enum dc_status dpcd_set_link_settings(
 	struct dc_link *link,
@@ -171,14 +172,15 @@ uint8_t dc_dp_initialize_scrambling_data_symbols(
 	struct dc_link *link,
 	enum dc_dp_training_pattern pattern);
 
-struct link_encoder *dp_get_link_enc(struct dc_link *link);
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready);
 void dp_set_fec_enable(struct dc_link *link, bool enable);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable);
+#endif
 bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_update);
 void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable);
 bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable);
 #endif
 
@@ -224,7 +226,6 @@ void disable_dp_hpo_output(struct dc_link *link,
 		enum signal_type signal);
 void setup_dp_hpo_stream(struct pipe_ctx *pipe_ctx, bool enable);
 bool is_dp_128b_132b_signal(struct pipe_ctx *pipe_ctx);
-void reset_dp_hpo_stream_encoders_for_link(struct dc_link *link);
 
 bool dp_retrieve_lttpr_cap(struct dc_link *link);
 void edp_panel_backlight_power_on(struct dc_link *link);

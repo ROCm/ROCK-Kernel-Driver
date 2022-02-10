@@ -52,6 +52,7 @@
 #include <drm/ttm/ttm_range_manager.h>
 
 #include <drm/amdgpu_drm.h>
+#include <drm/drm_drv.h>
 
 #include "amdgpu.h"
 #include "amdgpu_object.h"
@@ -1728,6 +1729,63 @@ static void amdgpu_ttm_vram_mm_access(struct amdgpu_device *adev, loff_t pos,
 	}
 }
 
+static int amdgpu_ttm_access_memory_sdma(struct ttm_buffer_object *bo,
+					unsigned long offset, void *buf, int len, int write)
+{
+	struct amdgpu_bo *abo = ttm_to_amdgpu_bo(bo);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(abo->tbo.bdev);
+	struct amdgpu_res_cursor src_mm;
+	struct amdgpu_job *job;
+	struct dma_fence *fence;
+	uint64_t src_addr, dst_addr;
+	unsigned int num_dw;
+	int r, idx;
+
+	if (len != PAGE_SIZE)
+		return -EINVAL;
+
+	if (!adev->mman.sdma_access_ptr)
+		return -EACCES;
+
+	if (!drm_dev_enter(adev_to_drm(adev), &idx))
+		return -ENODEV;
+
+	if (write)
+		memcpy(adev->mman.sdma_access_ptr, buf, len);
+
+	num_dw = ALIGN(adev->mman.buffer_funcs->copy_num_dw, 8);
+	r = amdgpu_job_alloc_with_ib(adev, num_dw * 4, AMDGPU_IB_POOL_DELAYED, &job);
+	if (r)
+		goto out;
+
+	amdgpu_res_first(abo->tbo.resource, offset, len, &src_mm);
+	src_addr = amdgpu_ttm_domain_start(adev, bo->resource->mem_type) + src_mm.start;
+	dst_addr = amdgpu_bo_gpu_offset(adev->mman.sdma_access_bo);
+	if (write)
+		swap(src_addr, dst_addr);
+
+	amdgpu_emit_copy_buffer(adev, &job->ibs[0], src_addr, dst_addr, PAGE_SIZE, false);
+
+	amdgpu_ring_pad_ib(adev->mman.buffer_funcs_ring, &job->ibs[0]);
+	WARN_ON(job->ibs[0].length_dw > num_dw);
+
+	r = amdgpu_job_submit(job, &adev->mman.entity, AMDGPU_FENCE_OWNER_UNDEFINED, &fence);
+	if (r) {
+		amdgpu_job_free(job);
+		goto out;
+	}
+
+	if (!dma_fence_wait_timeout(fence, false, adev->sdma_timeout))
+		r = -ETIMEDOUT;
+	dma_fence_put(fence);
+
+	if (!(r || write))
+		memcpy(buf, adev->mman.sdma_access_ptr, len);
+out:
+	drm_dev_exit(idx);
+	return r;
+}
+
 /**
  * amdgpu_ttm_access_memory - Read or Write memory that backs a buffer object.
  *
@@ -1751,6 +1809,10 @@ static int amdgpu_ttm_access_memory(struct ttm_buffer_object *bo,
 
 	if (bo->resource->mem_type != TTM_PL_VRAM)
 		return -EIO;
+
+	if (amdgpu_device_has_timeouts_enabled(adev) &&
+			!amdgpu_ttm_access_memory_sdma(bo, offset, buf, len, write))
+		return len;
 
 	amdgpu_res_first(bo->resource, offset, len, &cursor);
 	while (cursor.remaining) {
@@ -2452,6 +2514,12 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		return r;
 	}
 
+	if (amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
+				AMDGPU_GEM_DOMAIN_GTT,
+				&adev->mman.sdma_access_bo, NULL,
+				&adev->mman.sdma_access_ptr))
+		DRM_WARN("Debug VRAM access will use slowpath MM access\n");
+
 	return 0;
 }
 
@@ -2473,6 +2541,8 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	if (adev->mman.stolen_reserved_size)
 		amdgpu_bo_free_kernel(&adev->mman.stolen_reserved_memory,
 				      NULL, NULL);
+	amdgpu_bo_free_kernel(&adev->mman.sdma_access_bo, NULL,
+					&adev->mman.sdma_access_ptr);
 	amdgpu_ttm_fw_reserve_vram_fini(adev);
 
 	if (drm_dev_enter(adev_to_drm(adev), &idx)) {

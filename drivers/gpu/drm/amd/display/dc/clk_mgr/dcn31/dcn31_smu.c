@@ -120,7 +120,11 @@ static int dcn31_smu_send_msg_with_param(struct clk_mgr_internal *clk_mgr,
 	result = dcn31_smu_wait_for_response(clk_mgr, 10, 200000);
 
 	if (result == VBIOSSMC_Result_Failed) {
-		ASSERT(0);
+		if (msg_id == VBIOSSMC_MSG_TransferTableDram2Smu &&
+		    param == TABLE_WATERMARKS)
+			DC_LOG_WARNING("Watermarks table not configured properly by SMU");
+		else
+			ASSERT(0);
 		REG_WRITE(MP1_SMN_C2PMSG_91, VBIOSSMC_Result_OK);
 		return -1;
 	}
@@ -308,11 +312,15 @@ void dcn31_smu_transfer_wm_table_dram_2_smu(struct clk_mgr_internal *clk_mgr)
 
 void dcn31_smu_set_zstate_support(struct clk_mgr_internal *clk_mgr, enum dcn_zstate_support_state support)
 {
-	//TODO: Work with smu team to define optimization options.
 	unsigned int msg_id, param;
 
 	if (!clk_mgr->smu_present)
 		return;
+
+	if (!clk_mgr->base.ctx->dc->debug.enable_z9_disable_interface &&
+			(support == DCN_ZSTATE_SUPPORT_ALLOW_Z10_ONLY))
+		support = DCN_ZSTATE_SUPPORT_DISALLOW;
+
 
 	if (support == DCN_ZSTATE_SUPPORT_ALLOW_Z10_ONLY)
 		param = 1;
