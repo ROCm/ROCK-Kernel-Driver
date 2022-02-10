@@ -120,4 +120,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # kernel.h: split out container_of() and typeof_member() macros
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/container_of.h])
+
+	dnl #
+	dnl # v5.15-rc4-2-g46b49b12f3fc
+	dnl # arch/cc: Introduce a function to check for confidential computing features
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/cc_platform.h])
 ])
