@@ -709,9 +709,9 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q,
 		}
 
 		retval = mqd_mgr->destroy_mqd(mqd_mgr, q->mqd,
-				(dqm->dev->cwsr_enabled?
-				 KFD_PREEMPT_TYPE_WAVEFRONT_SAVE:
-				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN),
+				(dqm->dev->cwsr_enabled ?
+				 KFD_PREEMPT_TYPE_WAVEFRONT_SAVE :
+				 KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN),
 				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
 		if (retval) {
 			pr_err("destroy mqd failed\n");
@@ -885,9 +885,9 @@ static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
 			continue;
 
 		retval = mqd_mgr->destroy_mqd(mqd_mgr, q->mqd,
-				(dqm->dev->cwsr_enabled?
-				 KFD_PREEMPT_TYPE_WAVEFRONT_SAVE:
-				KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN),
+				(dqm->dev->cwsr_enabled ?
+				 KFD_PREEMPT_TYPE_WAVEFRONT_SAVE :
+				 KFD_PREEMPT_TYPE_WAVEFRONT_DRAIN),
 				KFD_UNMAP_LATENCY_MS, q->pipe, q->queue);
 		if (retval && !ret)
 			/* Return the first error, but keep going to
@@ -2876,8 +2876,7 @@ int dqm_debugfs_hqds(struct seq_file *m, void *data)
 	int r = 0;
 
 	if (!dqm->sched_running) {
-		seq_printf(m, " Device is stopped\n");
-
+		seq_puts(m, " Device is stopped\n");
 		return 0;
 	}
 
