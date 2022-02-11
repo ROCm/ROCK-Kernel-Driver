@@ -1899,7 +1899,8 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, bo_size,
 						      pdd->drm_priv, cbo->sg,
-						      &cbo->mem, NULL, flags);
+						      &cbo->mem, NULL, flags,
+						      false);
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -2168,7 +2169,7 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, size,
 						      pdd->drm_priv, NULL,
-						      mem, NULL, flags);
+						      mem, NULL, flags, false);
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -3536,6 +3537,7 @@ static int criu_restore_bos(struct kfd_process *p,
 						bo_bucket->addr,
 						bo_bucket->size,
 						pdd->drm_priv,
+						NULL,
 						(struct kgd_mem **) &mem,
 						&offset,
 						bo_bucket->alloc_flags,
