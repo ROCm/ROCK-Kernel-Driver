@@ -997,8 +997,11 @@ static bool dc_construct(struct dc *dc,
 #endif
 
 #ifdef CONFIG_DRM_AMD_DC_DCN2_x
-	if (dc->res_pool->funcs->update_bw_bounding_box)
+	if (dc->res_pool->funcs->update_bw_bounding_box) {
+		DC_FP_START();
 		dc->res_pool->funcs->update_bw_bounding_box(dc, dc->clk_mgr->bw_params);
+		DC_FP_END();
+	}
 #endif
 
 	/* Creation of current_state must occur after dc->dml
