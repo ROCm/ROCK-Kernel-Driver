@@ -1149,6 +1149,9 @@
 /* pm_suspend_target_state is available */
 #define HAVE_PM_SUSPEND_TARGET_STATE 1
 
+/* Define to 1 if you have the <linux/processor.h> header file. */
+#define HAVE_LINUX_PROCESSOR_H 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 

@@ -96,4 +96,11 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-buf: Add struct dma-buf-map for storing struct dma_buf.vaddr_ptr
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-buf-map.h])
+
+	dnl #
+	dnl # commit fd851a3cdc196bfc1d229b5f22369069af532bf8
+	dnl # spin loop primitives for busy waiting
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/processor.h])
+
 ])
