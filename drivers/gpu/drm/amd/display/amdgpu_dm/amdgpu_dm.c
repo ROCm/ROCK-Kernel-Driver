@@ -6241,6 +6241,7 @@ static bool is_freesync_video_mode(const struct drm_display_mode *mode,
        return false;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 			    struct dc_sink *sink, struct dc_stream_state *stream,
 			    struct dsc_dec_dpcd_caps *dsc_caps)
@@ -6258,7 +6259,6 @@ static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 				dsc_caps);
 	}
 }
-
 
 static void apply_dsc_policy_for_edp(struct amdgpu_dm_connector *aconnector,
 				    struct dc_sink *sink, struct dc_stream_state *stream,
@@ -6391,6 +6391,7 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	if (stream->timing.flags.DSC && aconnector->dsc_settings.dsc_bits_per_pixel)
 		stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
 }
+#endif
 
 static struct dc_stream_state *
 create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
@@ -6413,7 +6414,9 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	int mode_refresh;
 	int preferred_refresh = 0;
 	enum color_transfer_func tf = TRANSFER_FUNC_UNKNOWN;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dsc_dec_dpcd_caps dsc_caps;
+#endif
 
 	struct dc_sink *sink = NULL;
 
@@ -6512,10 +6515,12 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		stream->timing = *aconnector->timing_requested;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* SST DSC determination policy */
 	update_dsc_caps(aconnector, sink, stream, &dsc_caps);
 	if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported)
 		apply_dsc_policy_for_stream(aconnector, sink, stream, &dsc_caps);
+#endif
 	update_stream_scaling_settings(&mode, dm_state, stream);
 
 	fill_audio_info(
@@ -7005,8 +7010,10 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 		}
 
 		dc_result = dc_validate_stream(adev->dm.dc, stream);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_result == DC_OK && stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_result = dm_dp_mst_is_port_support_mode(aconnector, stream);
+#endif
 
 		if (dc_result == DC_OK)
 			dc_result = dm_validate_stream_and_context(adev->dm.dc, stream);
@@ -10710,9 +10717,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	bool lock_and_validation_needed = false;
 	bool is_top_most_overlay = true;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct drm_dp_mst_topology_mgr *mgr;
 	struct drm_dp_mst_topology_state *mst_state;
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
+#endif
 
 	trace_amdgpu_dm_atomic_check_begin(state);
 
@@ -11037,6 +11046,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
 	for_each_new_mst_mgr_in_state(state, mgr, mst_state, i) {
@@ -11057,6 +11067,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 		drm_connector_list_iter_end(&iter);
 	}
+#endif
 #endif
 	/**
 	 * Streams and planes are reset when there are changes that affect
@@ -11086,6 +11097,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			goto fail;
 		}
 
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 		ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
 		if (ret) {
 			DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
