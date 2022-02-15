@@ -1305,7 +1305,11 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 		dm_restore_drm_connector_state(dev, connector);
 		drm_modeset_unlock_all(dev);
 
+#ifdef HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT
 		drm_kms_helper_connector_hotplug_event(connector);
+#else
+		drm_kms_helper_hotplug_event(dev);
+#endif
 	} else if (param[0] == 0) {
 		if (!aconnector->dc_link)
 			goto unlock;
@@ -1331,7 +1335,11 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 		dm_restore_drm_connector_state(dev, connector);
 		drm_modeset_unlock_all(dev);
 
+#ifdef HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT
 		drm_kms_helper_connector_hotplug_event(connector);
+#else
+		drm_kms_helper_hotplug_event(dev);
+#endif
 	}
 
 unlock:
