@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/display/drm_dsc_helper.h>
 
 #include "reg_helper.h"
@@ -745,4 +746,4 @@ static void dsc_write_to_registers(struct display_stream_compressor *dsc, const 
 		RANGE_BPG_OFFSET14, reg_vals->pps.rc_range_params[14].range_bpg_offset);
 
 }
-
+#endif

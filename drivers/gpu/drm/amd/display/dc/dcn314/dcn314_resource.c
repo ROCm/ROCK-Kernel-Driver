@@ -728,6 +728,7 @@ static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
 	DSC_REG_LIST_DCN314(id)\
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static const struct dcn20_dsc_registers dsc_regs[] = {
 	dsc_regsDCN314(0),
 	dsc_regsDCN314(1),
@@ -742,6 +743,7 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN314(_MASK)
 };
+#endif
 
 static const struct dcn30_mpc_registers mpc_regs = {
 		MPC_REG_LIST_DCN3_0(0),
@@ -1570,10 +1572,12 @@ static void dcn314_resource_destruct(struct dcn314_resource_pool *pool)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
+#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1744,6 +1748,7 @@ static bool dcn31_mmhubbub_create(struct dc_context *ctx, struct resource_pool *
 	return true;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct display_stream_compressor *dcn314_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
 {
@@ -1758,6 +1763,7 @@ static struct display_stream_compressor *dcn314_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
+#endif
 
 static void dcn314_destroy_resource_pool(struct resource_pool **pool)
 {
@@ -1998,7 +2004,9 @@ static struct resource_funcs dcn314_res_pool_funcs = {
 	.populate_dml_pipes = dcn314_populate_dml_pipes_from_context,
 	.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 	.add_stream_to_ctx = dcn30_add_stream_to_ctx,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
+#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.populate_dml_writeback_from_context = dcn30_populate_dml_writeback_from_context,
 	.set_mcif_arb_params = dcn30_set_mcif_arb_params,
@@ -2266,6 +2274,7 @@ static bool dcn314_resource_construct(
 		goto create_fail;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn314_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -2274,6 +2283,7 @@ static bool dcn314_resource_construct(
 			goto create_fail;
 		}
 	}
+#endif
 
 	/* DWB and MMHUBBUB */
 	if (!dcn31_dwbc_create(ctx, &pool->base)) {

@@ -168,6 +168,7 @@ void optc3_set_vtotal_change_limit(struct timing_generator *optc,
 }
 
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* Set DSC-related configuration.
  *   dsc_mode: 0 disables DSC, other values enable DSC in specified format
  *   sc_bytes_per_pixel: Bytes per pixel in u3.28 format
@@ -186,6 +187,7 @@ void optc3_set_dsc_config(struct timing_generator *optc,
 		REG_UPDATE(OTG_V_SYNC_A_CNTL, OTG_V_SYNC_MODE, 0);
 
 }
+#endif
 
 void optc3_set_vrr_m_const(struct timing_generator *optc,
 		double vtotal_avg)
@@ -347,7 +349,9 @@ static struct timing_generator_funcs dcn30_tg_funcs = {
 		.setup_global_swap_lock = NULL,
 		.get_crc = optc1_get_crc,
 		.configure_crc = optc2_configure_crc,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.set_dsc_config = optc3_set_dsc_config,
+#endif
 		.get_dsc_status = optc2_get_dsc_status,
 		.set_dwb_source = NULL,
 		.set_odm_bypass = optc3_set_odm_bypass,
