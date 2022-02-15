@@ -587,6 +587,9 @@
 /* drm_is_current_master() is available */
 #define HAVE_DRM_IS_CURRENT_MASTER 1
 
+/* drm_kms_helper_connector_hotplug_event() function is available */
+#define HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT 1
+
 /* drm_kms_helper_is_poll_worker() is available */
 #define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
 
