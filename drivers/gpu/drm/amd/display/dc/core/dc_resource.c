@@ -2604,7 +2604,11 @@ bool dc_resource_is_dsc_encoding_supported(const struct dc *dc)
 	if (dc->res_pool == NULL)
 		return false;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	return dc->res_pool->res_cap->num_dsc > 0;
+#else
+	return 0;
+#endif
 }
 
 static bool planes_changed_for_existing_stream(struct dc_state *context,
@@ -3465,8 +3469,10 @@ bool pipe_need_reprogram(
 		false == pipe_ctx_old->stream->dpms_off)
 		return true;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx_old->stream_res.dsc != pipe_ctx->stream_res.dsc)
 		return true;
+#endif
 
 	if (pipe_ctx_old->stream_res.hpo_dp_stream_enc != pipe_ctx->stream_res.hpo_dp_stream_enc)
 		return true;

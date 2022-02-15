@@ -1513,7 +1513,6 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	 * function core_link_enable_stream
 	 */
 	if (!(hws->wa.dp_hpo_and_otg_sequence && is_dp_128b_132b_signal(pipe_ctx)))
-#endif
 		/*  */
 		/* Do not touch stream timing on seamless boot optimization. */
 		if (!pipe_ctx->stream->apply_seamless_boot_optimization)

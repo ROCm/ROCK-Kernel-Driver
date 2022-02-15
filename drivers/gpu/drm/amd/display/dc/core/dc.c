@@ -60,7 +60,9 @@
 #include "dc_link_dp.h"
 #include "dc_dmub_srv.h"
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
+#endif
 
 #include "vm_helper.h"
 
@@ -606,7 +608,9 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
 		param.windowb_y_end = crc_window->windowb_y_end;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	param.dsc_mode = pipe->stream->timing.flags.DSC ? 1:0;
+#endif
 	param.odm_mode = pipe->next_odm_pipe ? 1:0;
 
 	/* Default to the union of both windows */
@@ -2562,8 +2566,10 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		if (stream_update->wb_update)
 			su_flags->bits.wb_update = 1;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (stream_update->dsc_config)
 			su_flags->bits.dsc_changed = 1;
+#endif
 
 		if (stream_update->mst_bw_update)
 			su_flags->bits.mst_bw = 1;
@@ -2873,7 +2879,9 @@ static void copy_stream_update_to_stream(struct dc *dc,
 					 struct dc_stream_state *stream,
 					 struct dc_stream_update *update)
 {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_context *dc_ctx = dc->ctx;
+#endif
 
 	if (update == NULL || stream == NULL)
 		return;
@@ -2960,6 +2968,8 @@ static void copy_stream_update_to_stream(struct dc *dc,
 			stream->writeback_info[i] =
 				update->wb_update->writeback_info[i];
 	}
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (update->dsc_config) {
 		struct dc_dsc_config old_dsc_cfg = stream->timing.dsc_cfg;
 		uint32_t old_dsc_enabled = stream->timing.flags.DSC;
@@ -2986,6 +2996,7 @@ static void copy_stream_update_to_stream(struct dc *dc,
 			update->dsc_config = NULL;
 		}
 	}
+#endif
 }
 
 static bool update_planes_and_stream_state(struct dc *dc,
@@ -3177,8 +3188,10 @@ static void commit_planes_do_stream_update(struct dc *dc,
 			if (update_type == UPDATE_TYPE_FAST)
 				continue;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (stream_update->dsc_config)
 				dp_update_dsc_config(pipe_ctx);
+#endif
 
 			if (stream_update->mst_bw_update) {
 				if (stream_update->mst_bw_update->is_increase)

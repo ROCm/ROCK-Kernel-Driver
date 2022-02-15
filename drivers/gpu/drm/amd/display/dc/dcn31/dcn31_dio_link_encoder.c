@@ -488,7 +488,9 @@ void dcn31_link_encoder_enable_dp_output(
 
 		if (link) {
 			dpia_control.dpia_id = link->ddc_hw_inst;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			dpia_control.fec_rdy = dc_link_should_enable_fec(link);
+#endif
 		} else {
 			DC_LOG_ERROR("%s: Failed to execute DPIA enable DMUB command.\n", __func__);
 			BREAK_TO_DEBUGGER();
@@ -535,7 +537,9 @@ void dcn31_link_encoder_enable_dp_mst_output(
 
 		if (link) {
 			dpia_control.dpia_id = link->ddc_hw_inst;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			dpia_control.fec_rdy = dc_link_should_enable_fec(link);
+#endif
 		} else {
 			DC_LOG_ERROR("%s: Failed to execute DPIA enable DMUB command.\n", __func__);
 			BREAK_TO_DEBUGGER();

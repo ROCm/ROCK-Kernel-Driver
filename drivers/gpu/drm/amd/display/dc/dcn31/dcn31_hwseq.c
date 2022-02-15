@@ -392,8 +392,10 @@ void dcn31_enable_power_gating_plane(
 	REG_UPDATE(DOMAIN3_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
 
 	force_on = true; /* disable power gating */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (enable && !hws->ctx->dc->debug.disable_dsc_power_gate)
 		force_on = false;
+#endif
 
 	/* DCS0/1/2/3/4/5 */
 	REG_UPDATE(DOMAIN16_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);

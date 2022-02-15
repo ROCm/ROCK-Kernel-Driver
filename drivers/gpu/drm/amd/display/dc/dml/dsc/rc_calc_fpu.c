@@ -23,6 +23,7 @@
  *
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "rc_calc_fpu.h"
 
 #include "qp_tables.h"
@@ -257,4 +258,4 @@ void _do_calc_rc_params(struct rc_params *rc,
 	rc->rc_buf_thresh[12] = 8000;
 	rc->rc_buf_thresh[13] = 8064;
 }
-
+#endif

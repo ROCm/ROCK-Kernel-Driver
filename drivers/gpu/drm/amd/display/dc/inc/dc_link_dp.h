@@ -166,13 +166,20 @@ uint8_t dc_dp_initialize_scrambling_data_symbols(
 	struct dc_link *link,
 	enum dc_dp_training_pattern pattern);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready);
+#endif
+
 void dp_set_fec_enable(struct dc_link *link, bool enable);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable);
+#endif
 bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_update);
 void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable);
 bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable);
+#endif
 
 /* Initialize output parameter lt_settings. */
 void dp_decide_training_settings(

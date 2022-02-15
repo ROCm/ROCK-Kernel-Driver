@@ -2629,12 +2629,15 @@ static void disable_link(struct dc_link *link, const struct link_resource *link_
 
 	if (dc_is_dp_signal(signal)) {
 		/* SST DP, eDP */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		struct dc_link_settings link_settings = link->cur_link_settings;
+#endif
 		if (dc_is_dp_sst_signal(signal))
 			dp_disable_link_phy(link, link_res, signal);
 		else
 			dp_disable_link_phy_mst(link, link_res, signal);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_is_dp_sst_signal(signal) ||
 				link->mst_stream_alloc_table.stream_count == 0) {
 			if (dp_get_link_encoding_format(&link_settings) == DP_8b_10b_ENCODING) {
@@ -2642,6 +2645,7 @@ static void disable_link(struct dc_link *link, const struct link_resource *link_
 				dp_set_fec_ready(link, link_res, false);
 			}
 		}
+#endif
 	} else if (signal != SIGNAL_TYPE_VIRTUAL) {
 		link->dc->hwss.disable_link_output(link, link_res, signal);
 	}
@@ -2910,10 +2914,13 @@ static bool dp_active_dongle_validate_timing(
 			return false;
 #endif
 	}
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (dpcd_caps->channel_coding_cap.bits.DP_128b_132b_SUPPORTED == 0 &&
 			dpcd_caps->dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_PASSTHROUGH_SUPPORT == 0 &&
 			dongle_caps->dfp_cap_ext.supported) {
+#else
+	if (dongle_caps->dfp_cap_ext.supported) {
+#endif
 
 		if (dongle_caps->dfp_cap_ext.max_pixel_rate_in_mps < (timing->pix_clk_100hz / 10000))
 			return false;
@@ -4192,10 +4199,12 @@ static void fpga_dp_hpo_enable_link_and_stream(struct dc_state *state, struct pi
 	/* Enable DP_STREAM_ENC */
 	dc->hwss.enable_stream(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Set DPS PPS SDP (AKA "info frames") */
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		dp_set_dsc_pps_sdp(pipe_ctx, true, true);
 	}
+#endif
 
 	/* Allocate Payload */
 	if ((stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) && (state->stream_count > 1)) {
@@ -4339,12 +4348,14 @@ void core_link_enable_stream(
 		 * will be automatically set at a later time when the video is enabled
 		 * (DP_VID_STREAM_EN = 1).
 		 */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
 
 		}
+#endif
 
 		status = enable_link(state, pipe_ctx);
 
@@ -4387,6 +4398,7 @@ void core_link_enable_stream(
 
 		dc->hwss.enable_stream(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* Set DPS PPS SDP (AKA "info frames") */
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
@@ -4395,6 +4407,7 @@ void core_link_enable_stream(
 				dp_set_dsc_pps_sdp(pipe_ctx, true, true);
 			}
 		}
+#endif
 
 		if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_link_allocate_mst_payload(pipe_ctx);
@@ -4516,10 +4529,12 @@ void core_link_disable_stream(struct pipe_ctx *pipe_ctx)
 		disable_link(pipe_ctx->stream->link, &pipe_ctx->link_res, pipe_ctx->stream->signal);
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, false);
 	}
+#endif
 	if (is_dp_128b_132b_signal(pipe_ctx)) {
 		if (pipe_ctx->stream_res.tg->funcs->set_out_mux)
 			pipe_ctx->stream_res.tg->funcs->set_out_mux(pipe_ctx->stream_res.tg, OUT_MUX_DIO);
@@ -4716,10 +4731,12 @@ uint32_t dc_link_bandwidth_kbps(
 		 */
 		link_rate_per_lane_kbps = link_setting->link_rate * LINK_RATE_REF_FREQ_IN_KHZ * BITS_PER_DP_BYTE;
 		total_data_bw_efficiency_x10000 = DATA_EFFICIENCY_8b_10b_x10000;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_link_should_enable_fec(link)) {
 			total_data_bw_efficiency_x10000 /= 100;
 			total_data_bw_efficiency_x10000 *= DATA_EFFICIENCY_8b_10b_FEC_EFFICIENCY_x100;
 		}
+#endif
 		break;
 	case DP_128b_132b_ENCODING:
 		/* For 128b/132b encoding:
@@ -4795,12 +4812,14 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 	uint32_t kbps;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC)
 		return dc_dsc_stream_bandwidth_in_kbps(timing,
 				timing->dsc_cfg.bits_per_pixel,
 				timing->dsc_cfg.num_slices_h,
 				timing->dsc_cfg.is_dp);
 #endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif
 
 	switch (timing->display_color_depth) {
 	case COLOR_DEPTH_666:

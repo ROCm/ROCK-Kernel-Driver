@@ -2935,7 +2935,11 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 	enum link_training_result lt_status = LINK_TRAINING_SUCCESS;
 	enum dp_panel_mode panel_mode = DP_PANEL_MODE_DEFAULT;
 	enum clock_source_id dp_cs_id = CLOCK_SOURCE_ID_EXTERNAL;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 	bool fec_enable = false;
+#endif
+#endif
 
 	dp_decide_training_settings(
 			link,
@@ -2958,10 +2962,14 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 		dp_cs_id, link_settings);
 
 	/* Set FEC enable */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 	if (dp_get_link_encoding_format(link_settings) == DP_8b_10b_ENCODING) {
 		fec_enable = lt_overrides->fec_enable && *lt_overrides->fec_enable;
 		dp_set_fec_ready(link, NULL, fec_enable);
 	}
+#endif
+#endif
 
 	if (lt_overrides->alternate_scrambler_reset) {
 		if (*lt_overrides->alternate_scrambler_reset)
@@ -3004,10 +3012,18 @@ bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down)
 	 * Still shouldn't turn off dp_receiver (DPCD:600h)
 	 */
 	if (link_down == true) {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 		struct dc_link_settings link_settings = link->cur_link_settings;
+#endif
+#endif
 		dp_disable_link_phy(link, NULL, link->connector_signal);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 		if (dp_get_link_encoding_format(&link_settings) == DP_8b_10b_ENCODING)
 			dp_set_fec_ready(link, NULL, false);
+#endif
+#endif
 	}
 
 	link->sync_lt_in_progress = false;
@@ -3028,6 +3044,7 @@ static enum dc_link_rate get_lttpr_max_link_rate(struct dc_link *link)
 	return lttpr_max_link_rate;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static enum dc_link_rate get_cable_max_link_rate(struct dc_link *link)
 {
 	enum dc_link_rate cable_max_link_rate = LINK_RATE_UNKNOWN;
@@ -3041,6 +3058,7 @@ static enum dc_link_rate get_cable_max_link_rate(struct dc_link *link)
 
 	return cable_max_link_rate;
 }
+#endif
 
 bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_settings *max_link_enc_cap)
 {
@@ -3070,7 +3088,9 @@ struct dc_link_settings dp_get_max_link_cap(struct dc_link *link)
 {
 	struct dc_link_settings max_link_cap = {0};
 	enum dc_link_rate lttpr_max_link_rate;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	enum dc_link_rate cable_max_link_rate;
+#endif
 	struct link_encoder *link_enc = NULL;
 
 
@@ -3108,6 +3128,7 @@ struct dc_link_settings dp_get_max_link_cap(struct dc_link *link)
 	 * after actual dp pre-training. Cable id is considered as an auxiliary
 	 * method of determining max link bandwidth capability.
 	 */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	cable_max_link_rate = get_cable_max_link_rate(link);
 
 	if (!link->dc->debug.ignore_cable_id &&
@@ -3115,7 +3136,8 @@ struct dc_link_settings dp_get_max_link_cap(struct dc_link *link)
 			cable_max_link_rate < max_link_cap.link_rate)
 		max_link_cap.link_rate = cable_max_link_rate;
 
-	/* account for lttpr repeaters cap
+#endif
+	 /* account for lttpr repeaters cap
 	 * notes: repeaters do not snoop in the DPRX Capabilities addresses (3.6.3).
 	 */
 	if (dp_is_lttpr_present(link)) {
@@ -3770,6 +3792,7 @@ bool decide_edp_link_settings(struct dc_link *link, struct dc_link_settings *lin
 	return false;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		uint32_t req_bw,
@@ -3911,6 +3934,7 @@ static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 	}
 	return false;
 }
+#endif
 
 static bool decide_mst_link_settings(const struct dc_link *link, struct dc_link_settings *link_setting)
 {
@@ -3943,6 +3967,7 @@ bool decide_link_settings(struct dc_stream_state *stream,
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) {
 		decide_mst_link_settings(link, link_setting);
 	} else if (link->connector_signal == SIGNAL_TYPE_EDP) {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* enable edp link optimization for DSC eDP case */
 		if (stream->timing.flags.DSC) {
 			enum dc_link_rate max_link_rate = LINK_RATE_UNKNOWN;
@@ -3963,6 +3988,9 @@ bool decide_link_settings(struct dc_stream_state *stream,
 		} else {
 			decide_edp_link_settings(link, link_setting, req_bw);
 		}
+#else
+			decide_edp_link_settings(link, link_setting, req_bw);
+#endif
 	} else {
 		decide_dp_link_settings(link, link_setting, req_bw);
 	}
@@ -5550,6 +5578,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 		}
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	memset(&link->dpcd_caps.dsc_caps, '\0',
 			sizeof(link->dpcd_caps.dsc_caps));
 	memset(&link->dpcd_caps.fec_cap, '\0', sizeof(link->dpcd_caps.fec_cap));
@@ -5600,6 +5629,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 		} else
 			link->wa_flags.dpia_forced_tbt3_mode = false;
 	}
+#endif
 
 	if (!dpcd_read_sink_ext_caps(link))
 		link->dpcd_sink_ext_caps.raw = 0;
@@ -6440,6 +6470,7 @@ enum dp_panel_mode dp_get_panel_mode(struct dc_link *link)
 	return DP_PANEL_MODE_DEFAULT;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready)
 {
 	/* FEC has to be "set ready" before the link training.
@@ -6486,6 +6517,7 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource
 
 	return status;
 }
+#endif
 
 void dp_set_fec_enable(struct dc_link *link, bool enable)
 {
@@ -6751,10 +6783,14 @@ bool is_edp_ilr_optimization_required(struct dc_link *link, struct dc_crtc_timin
 
 	req_bw = dc_bandwidth_in_kbps_from_timing(crtc_timing);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (!crtc_timing->flags.DSC)
 		decide_edp_link_settings(link, &link_setting, req_bw);
 	else
 		decide_edp_link_settings_with_dsc(link, &link_setting, req_bw, LINK_RATE_UNKNOWN);
+#else
+		decide_edp_link_settings(link, &link_setting, req_bw);
+#endif
 
 	if (link->dpcd_caps.edp_supported_link_rates[link_rate_set] != link_setting.link_rate ||
 			lane_count_set.bits.LANE_COUNT_SET != link_setting.lane_count) {
@@ -7340,6 +7376,7 @@ static void dsc_optc_config_log(struct display_stream_compressor *dsc,
 	DC_LOG_DSC("\tslice_width %d", config->slice_width);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
@@ -7352,6 +7389,7 @@ bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 		result = dm_helpers_dp_write_dsc_enable(dc->ctx, stream, enable);
 	return result;
 }
+#endif
 
 /* The stream with these settings can be sent (unblanked) only after DSC was enabled on RX first,
  * i.e. after dp_enable_dsc_on_rx() had been called
@@ -7445,6 +7483,7 @@ void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
@@ -7468,6 +7507,7 @@ bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 out:
 	return result;
 }
+#endif
 
 /*
  * For dynamic bpp change case, dsc is programmed with MASTER_UPDATE_LOCK enabled;
