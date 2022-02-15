@@ -63,7 +63,9 @@
 #include "dc_link_dp.h"
 #include "dc_dmub_srv.h"
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
+#endif
 
 #include "vm_helper.h"
 
@@ -614,7 +616,9 @@ bool dc_stream_configure_crc(struct dc *dc, struct dc_stream_state *stream,
 		param.windowb_y_end = crc_window->windowb_y_end;
 	}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	param.dsc_mode = pipe->stream->timing.flags.DSC ? 1:0;
+#endif
 	param.odm_mode = pipe->next_odm_pipe ? 1:0;
 
 	/* Default to the union of both windows */
@@ -1428,10 +1432,12 @@ static void program_timing_sync(
 			for (j = j + 1; j < group_size; j++) {
 				bool is_blanked;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 				if (pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked)
 					is_blanked =
 						pipe_set[j]->stream_res.opp->funcs->dpg_is_blanked(pipe_set[j]->stream_res.opp);
 				else
+#endif
 					is_blanked =
 						pipe_set[j]->stream_res.tg->funcs->is_blanked(pipe_set[j]->stream_res.tg);
 				if (!is_blanked) {
@@ -2383,8 +2389,10 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		if (stream_update->wb_update)
 			su_flags->bits.wb_update = 1;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (stream_update->dsc_config)
 			su_flags->bits.dsc_changed = 1;
+#endif
 
 		if (stream_update->mst_bw_update)
 			su_flags->bits.mst_bw = 1;
@@ -2673,6 +2681,8 @@ static void copy_stream_update_to_stream(struct dc *dc,
 			stream->writeback_info[i] =
 				update->wb_update->writeback_info[i];
 	}
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (update->dsc_config) {
 		struct dc_dsc_config old_dsc_cfg = stream->timing.dsc_cfg;
 		uint32_t old_dsc_enabled = stream->timing.flags.DSC;
@@ -2699,6 +2709,7 @@ static void copy_stream_update_to_stream(struct dc *dc,
 			update->dsc_config = NULL;
 		}
 	}
+#endif
 }
 
 static void commit_planes_do_stream_update(struct dc *dc,
@@ -2766,8 +2777,10 @@ static void commit_planes_do_stream_update(struct dc *dc,
 			if (update_type == UPDATE_TYPE_FAST)
 				continue;
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (stream_update->dsc_config)
 				dp_update_dsc_config(pipe_ctx);
+#endif
 
 			if (stream_update->mst_bw_update) {
 				if (stream_update->mst_bw_update->is_increase)

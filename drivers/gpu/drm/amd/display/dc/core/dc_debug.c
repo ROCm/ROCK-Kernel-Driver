@@ -406,10 +406,12 @@ char *dc_status_to_str(enum dc_status status)
 		return "Scaling failure";
 	case DC_FAIL_DP_LINK_TRAINING:
 		return "DP link training failure";
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	case DC_FAIL_DSC_VALIDATE:
 		return "DSC validation failure";
 	case DC_NO_DSC_RESOURCE:
 		return "No DSC resource";
+#endif
 	case DC_FAIL_UNSUPPORTED_1:
 		return "Unsupported";
 	case DC_FAIL_CLK_EXCEED_MAX:

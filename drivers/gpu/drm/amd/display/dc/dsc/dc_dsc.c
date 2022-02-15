@@ -22,6 +22,7 @@
  * Author: AMD
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/drm_dsc.h>
 #include "dc_hw_types.h"
 #include "dsc.h"
@@ -1104,3 +1105,4 @@ void dc_dsc_policy_set_disable_dsc_stream_overhead(bool disable)
 {
 	dsc_policy_disable_dsc_stream_overhead = disable;
 }
+#endif

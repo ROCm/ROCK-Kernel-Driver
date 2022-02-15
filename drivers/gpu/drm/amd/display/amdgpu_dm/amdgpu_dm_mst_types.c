@@ -45,11 +45,13 @@
 #include "amdgpu_dm_debugfs.h"
 #endif
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #include "dc/dcn20/dcn20_resource.h"
 bool is_timing_changed(struct dc_stream_state *cur_stream,
 		       struct dc_stream_state *new_stream);
 
+#endif
 #endif
 
 static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
@@ -240,6 +242,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	if (drm_dp_dpcd_read(aconnector->dsc_aux, DP_DSC_SUPPORT, dsc_caps, 16) < 0)
 		return false;
 
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 	if (drm_dp_dpcd_read(aconnector->dsc_aux,
 			DP_DSC_BRANCH_OVERALL_THROUGHPUT_0, dsc_branch_dec_caps_raw, 3) == 3)
 		dsc_branch_dec_caps = dsc_branch_dec_caps_raw;
@@ -248,6 +251,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 				  dsc_caps, dsc_branch_dec_caps,
 				  &dc_sink->dsc_caps.dsc_dec_caps))
 		return false;
+#endif
 
 	return true;
 }

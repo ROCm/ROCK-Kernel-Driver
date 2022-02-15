@@ -334,10 +334,12 @@ void optc3_program_blank_color(struct timing_generator *optc,
 void optc3_set_vtotal_change_limit(struct timing_generator *optc,
 		uint32_t limit);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void optc3_set_dsc_config(struct timing_generator *optc,
 		enum optc_dsc_mode dsc_mode,
 		uint32_t dsc_bytes_per_pixel,
 		uint32_t dsc_slice_width);
+#endif
 
 void optc3_set_timing_db_mode(struct timing_generator *optc, bool enable);
 

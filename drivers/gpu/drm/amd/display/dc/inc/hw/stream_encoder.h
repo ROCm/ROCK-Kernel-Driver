@@ -108,6 +108,7 @@ struct stream_encoder {
 	struct afmt *afmt;
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct enc_state {
 	uint32_t dsc_mode;  // DISABLED  0; 1 or 2 indicate enabled state.
 	uint32_t dsc_slice_width;
@@ -117,6 +118,7 @@ struct enc_state {
 	uint32_t sec_gsp_pps_enable;
 	uint32_t sec_stream_enable;
 };
+#endif
 
 struct stream_encoder_funcs {
 	void (*dp_set_stream_attribute)(

@@ -756,7 +756,9 @@ static void apply_synaptics_fifo_reset_wa(struct drm_dp_aux *aux)
 
 	DC_LOG_DC("Done apply_synaptics_fifo_reset_wa\n");
 }
+#endif
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 		struct drm_dp_aux *aux,
 		const struct dc_stream_state *stream,
@@ -792,7 +794,6 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 
 	return ret;
 }
-#endif
 
 bool dm_helpers_dp_write_dsc_enable(
 		struct dc_context *ctx,
@@ -840,6 +841,7 @@ bool dm_helpers_dp_write_dsc_enable(
 
 	return (ret > 0);
 }
+#endif
 
 bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 {
