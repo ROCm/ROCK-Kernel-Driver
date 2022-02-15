@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.170"
+#define DC_VER "3.2.172"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -200,6 +200,7 @@ struct dc_caps {
 	bool edp_dsc_support;
 	bool vbios_lttpr_aware;
 	bool vbios_lttpr_enable;
+	uint32_t max_otg_num;
 };
 
 struct dc_bug_wa {
@@ -1167,7 +1168,7 @@ struct dc_validation_set {
 	uint8_t plane_count;
 };
 
-bool dc_validate_seamless_boot_timing(const struct dc *dc,
+bool dc_validate_boot_timing(const struct dc *dc,
 				const struct dc_sink *sink,
 				struct dc_crtc_timing *crtc_timing);
 

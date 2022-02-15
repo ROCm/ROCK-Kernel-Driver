@@ -201,10 +201,9 @@ int get_num_mpc_splits(struct pipe_ctx *pipe);
 
 int get_num_odm_splits(struct pipe_ctx *pipe);
 
-struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
-		const struct resource_context *res_ctx,
-		const struct resource_pool *pool,
-		const struct dc_link *link);
+bool get_temp_dp_link_res(struct dc_link *link,
+		struct link_resource *link_res,
+		struct dc_link_settings *link_settings);
 
 void reset_syncd_pipes_from_disabled_pipes(struct dc *dc,
 	struct dc_state *context);
@@ -213,5 +212,8 @@ void check_syncd_pipes_for_disabled_master_pipe(struct dc *dc,
 	struct dc_state *context,
 	uint8_t disabled_master_pipe_idx);
 uint8_t resource_transmitter_to_phy_idx(const struct dc *dc, enum transmitter transmitter);
+
+const struct link_hwss *get_link_hwss(const struct dc_link *link,
+		const struct link_resource *link_res);
 
 #endif /* DRIVERS_GPU_DRM_AMD_DC_DEV_DC_INC_RESOURCE_H_ */

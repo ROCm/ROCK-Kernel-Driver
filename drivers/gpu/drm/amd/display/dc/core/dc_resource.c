@@ -43,6 +43,10 @@
 #include "dpcd_defs.h"
 #include "link_enc_cfg.h"
 #include "dc_link_dp.h"
+#include "virtual/virtual_link_hwss.h"
+#include "link/link_hwss_dio.h"
+#include "link/link_hwss_dpia.h"
+#include "link/link_hwss_hpo_dp.h"
 
 #if defined(CONFIG_DRM_AMD_DC_SI)
 #include "dce60/dce60_resource.h"
@@ -1978,10 +1982,6 @@ enum dc_status dc_remove_stream_from_ctx(
 				dc->res_pool,
 			del_pipe->stream_res.stream_enc,
 			false);
-	/* Release link encoder from stream in new dc_state. */
-	if (dc->res_pool->funcs->link_enc_unassign)
-		dc->res_pool->funcs->link_enc_unassign(new_ctx, del_pipe->stream);
-
 	if (is_dp_128b_132b_signal(del_pipe)) {
 		update_hpo_dp_stream_engine_usage(
 			&new_ctx->res_ctx, dc->res_pool,
@@ -2185,7 +2185,7 @@ static void mark_seamless_boot_stream(
 
 	if (dc->config.allow_seamless_boot_optimization &&
 			!dcb->funcs->is_accelerated_mode(dcb)) {
-		if (dc_validate_seamless_boot_timing(dc, stream->sink, &stream->timing))
+		if (dc_validate_boot_timing(dc, stream->sink, &stream->timing))
 			stream->apply_seamless_boot_optimization = true;
 	}
 }
@@ -3210,9 +3210,9 @@ void get_audio_check(struct audio_info *aud_modes,
 	}
 }
 
-struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
+static struct hpo_dp_link_encoder *get_temp_hpo_dp_link_enc(
 		const struct resource_context *res_ctx,
-		const struct resource_pool *pool,
+		const struct resource_pool *const pool,
 		const struct dc_link *link)
 {
 	struct hpo_dp_link_encoder *hpo_dp_link_enc = NULL;
@@ -3227,6 +3227,24 @@ struct hpo_dp_link_encoder *resource_get_hpo_dp_link_enc_for_det_lt(
 		hpo_dp_link_enc = pool->hpo_dp_link_enc[enc_index];
 
 	return hpo_dp_link_enc;
+}
+
+bool get_temp_dp_link_res(struct dc_link *link,
+		struct link_resource *link_res,
+		struct dc_link_settings *link_settings)
+{
+	const struct dc *dc  = link->dc;
+	const struct resource_context *res_ctx = &dc->current_state->res_ctx;
+
+	memset(link_res, 0, sizeof(*link_res));
+
+	if (dp_get_link_encoding_format(link_settings) == DP_128b_132b_ENCODING) {
+		link_res->hpo_dp_link_enc = get_temp_hpo_dp_link_enc(res_ctx,
+				dc->res_pool, link);
+		if (!link_res->hpo_dp_link_enc)
+			return false;
+	}
+	return true;
 }
 
 void reset_syncd_pipes_from_disabled_pipes(struct dc *dc,
@@ -3314,4 +3332,37 @@ uint8_t resource_transmitter_to_phy_idx(const struct dc *dc, enum transmitter tr
 	}
 #endif
 	return phy_idx;
+}
+
+const struct link_hwss *get_link_hwss(const struct dc_link *link,
+		const struct link_resource *link_res)
+{
+	/* Link_hwss is only accessible by getter function instead of accessing
+	 * by pointers in dc with the intent to protect against breaking polymorphism.
+	 */
+	if (can_use_hpo_dp_link_hwss(link, link_res))
+		/* TODO: some assumes that if decided link settings is 128b/132b
+		 * channel coding format hpo_dp_link_enc should be used.
+		 * Others believe that if hpo_dp_link_enc is available in link
+		 * resource then hpo_dp_link_enc must be used. This bound between
+		 * hpo_dp_link_enc != NULL and decided link settings is loosely coupled
+		 * with a premise that both hpo_dp_link_enc pointer and decided link
+		 * settings are determined based on single policy function like
+		 * "decide_link_settings" from upper layer. This "convention"
+		 * cannot be maintained and enforced at current level.
+		 * Therefore a refactor is due so we can enforce a strong bound
+		 * between those two parameters at this level.
+		 *
+		 * To put it simple, we want to make enforcement at low level so that
+		 * we will not return link hwss if caller plans to do 8b/10b
+		 * with an hpo encoder. Or we can return a very dummy one that doesn't
+		 * do work for all functions
+		 */
+		return get_hpo_dp_link_hwss();
+	else if (can_use_dpia_link_hwss(link, link_res))
+		return get_dpia_link_hwss();
+	else if (can_use_dio_link_hwss(link, link_res))
+		return get_dio_link_hwss();
+	else
+		return get_virtual_link_hwss();
 }

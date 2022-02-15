@@ -312,6 +312,7 @@ void dc_link_blank_dp_stream(struct dc_link *link, bool hw_init);
  */
 enum dc_detect_reason {
 	DETECT_REASON_BOOT,
+	DETECT_REASON_RESUMEFROMS3S4,
 	DETECT_REASON_HPD,
 	DETECT_REASON_HPDRX,
 	DETECT_REASON_FALLBACK,
@@ -465,6 +466,8 @@ void dc_link_get_cur_link_res(const struct dc_link *link,
 void dc_get_cur_link_res_map(const struct dc *dc, uint32_t *map);
 /* restore link resource allocation state from a snapshot */
 void dc_restore_link_res_map(const struct dc *dc, uint32_t *map);
-
 void dc_link_dp_clear_rx_status(struct dc_link *link);
+struct gpio *get_hpd_gpio(struct dc_bios *dcb,
+		struct graphics_object_id link_id,
+		struct gpio_service *gpio_service);
 #endif /* DC_LINK_H_ */

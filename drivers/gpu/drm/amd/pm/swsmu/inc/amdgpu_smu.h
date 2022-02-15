@@ -390,7 +390,6 @@ struct smu_feature
 	uint32_t feature_num;
 	DECLARE_BITMAP(supported, SMU_FEATURE_MAX);
 	DECLARE_BITMAP(allowed, SMU_FEATURE_MAX);
-	DECLARE_BITMAP(enabled, SMU_FEATURE_MAX);
 };
 
 struct smu_clocks {
@@ -605,8 +604,22 @@ struct pptable_funcs {
 	 *                    to buffer. Star current level.
 	 *
 	 * Used for sysfs interfaces.
+	 * Return: Number of characters written to the buffer
 	 */
 	int (*print_clk_levels)(struct smu_context *smu, enum smu_clk_type clk_type, char *buf);
+
+	/**
+	 * @emit_clk_levels: Print DPM clock levels for a clock domain
+	 *                    to buffer using sysfs_emit_at. Star current level.
+	 *
+	 * Used for sysfs interfaces.
+	 * &buf: sysfs buffer
+	 * &offset: offset within buffer to start printing, which is updated by the
+	 * function.
+	 *
+	 * Return: 0 on Success or Negative to indicate an error occurred.
+	 */
+	int (*emit_clk_levels)(struct smu_context *smu, enum smu_clk_type clk_type, char *buf, int *offset);
 
 	/**
 	 * @force_clk_levels: Set a range of allowed DPM levels for a clock
@@ -975,10 +988,9 @@ struct pptable_funcs {
 	/**
 	 * @get_enabled_mask: Get a mask of features that are currently enabled
 	 *                    on the SMU.
-	 * &feature_mask: Array representing enabled feature mask.
-	 * &num: Elements in &feature_mask.
+	 * &feature_mask: Enabled feature mask.
 	 */
-	int (*get_enabled_mask)(struct smu_context *smu, uint32_t *feature_mask, uint32_t num);
+	int (*get_enabled_mask)(struct smu_context *smu, uint64_t *feature_mask);
 
 	/**
 	 * @feature_is_enabled: Test if a feature is enabled.
@@ -992,7 +1004,6 @@ struct pptable_funcs {
 	 *                                       exception to those in &mask.
 	 */
 	int (*disable_all_features_with_exception)(struct smu_context *smu,
-						   bool no_hw_disablement,
 						   enum smu_feature_mask mask);
 
 	/**

@@ -343,7 +343,6 @@ struct amdgpu_pm {
 	struct amdgpu_ctx       *stable_pstate_ctx;
 };
 
-u32 amdgpu_dpm_get_vblank_time(struct amdgpu_device *adev);
 int amdgpu_dpm_read_sensor(struct amdgpu_device *adev, enum amd_pp_sensors sensor,
 			   void *data, uint32_t *size);
 
@@ -441,6 +440,10 @@ int amdgpu_dpm_odn_edit_dpm_table(struct amdgpu_device *adev,
 int amdgpu_dpm_print_clock_levels(struct amdgpu_device *adev,
 				  enum pp_clock_type type,
 				  char *buf);
+int amdgpu_dpm_emit_clock_levels(struct amdgpu_device *adev,
+				  enum pp_clock_type type,
+				  char *buf,
+				  int *offset);
 int amdgpu_dpm_set_ppfeature_status(struct amdgpu_device *adev,
 				    uint64_t ppfeature_masks);
 int amdgpu_dpm_get_ppfeature_status(struct amdgpu_device *adev, char *buf);

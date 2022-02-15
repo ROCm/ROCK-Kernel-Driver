@@ -950,7 +950,6 @@ static int smu_sw_init(void *handle)
 	smu->pool_size = adev->pm.smu_prv_buffer_size;
 	smu->smu_feature.feature_num = SMU_FEATURE_MAX;
 	bitmap_zero(smu->smu_feature.supported, SMU_FEATURE_MAX);
-	bitmap_zero(smu->smu_feature.enabled, SMU_FEATURE_MAX);
 	bitmap_zero(smu->smu_feature.allowed, SMU_FEATURE_MAX);
 
 	mutex_init(&smu->message_lock);
@@ -1057,8 +1056,10 @@ static int smu_get_thermal_temperature_range(struct smu_context *smu)
 
 static int smu_smc_hw_setup(struct smu_context *smu)
 {
+	struct smu_feature *feature = &smu->smu_feature;
 	struct amdgpu_device *adev = smu->adev;
 	uint32_t pcie_gen = 0, pcie_width = 0;
+	uint64_t features_supported;
 	int ret = 0;
 
 	if (adev->in_suspend && smu_is_dpm_running(smu)) {
@@ -1137,6 +1138,15 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 		dev_err(adev->dev, "Failed to enable requested dpm features!\n");
 		return ret;
 	}
+
+	ret = smu_feature_get_enabled_mask(smu, &features_supported);
+	if (ret) {
+		dev_err(adev->dev, "Failed to retrieve supported dpm features!\n");
+		return ret;
+	}
+	bitmap_copy(feature->supported,
+		    (unsigned long *)&features_supported,
+		    feature->feature_num);
 
 	if (!smu_is_dpm_running(smu))
 		dev_info(adev->dev, "dpm has been disabled\n");
@@ -1350,9 +1360,7 @@ static int smu_disable_dpms(struct smu_context *smu)
 		case IP_VERSION(11, 5, 0):
 		case IP_VERSION(11, 0, 12):
 		case IP_VERSION(11, 0, 13):
-			return smu_disable_all_features_with_exception(smu,
-								       true,
-								       SMU_FEATURE_COUNT);
+			return 0;
 		default:
 			break;
 		}
@@ -1368,9 +1376,7 @@ static int smu_disable_dpms(struct smu_context *smu)
 		case IP_VERSION(11, 0, 0):
 		case IP_VERSION(11, 0, 5):
 		case IP_VERSION(11, 0, 9):
-			return smu_disable_all_features_with_exception(smu,
-								       true,
-								       SMU_FEATURE_BACO_BIT);
+			return 0;
 		default:
 			break;
 		}
@@ -1382,7 +1388,6 @@ static int smu_disable_dpms(struct smu_context *smu)
 	 */
 	if (use_baco && smu_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT)) {
 		ret = smu_disable_all_features_with_exception(smu,
-							      false,
 							      SMU_FEATURE_BACO_BIT);
 		if (ret)
 			dev_err(adev->dev, "Failed to disable smu features except BACO.\n");
@@ -2216,11 +2221,8 @@ static int smu_print_smuclk_levels(struct smu_context *smu, enum smu_clk_type cl
 	return ret;
 }
 
-static int smu_print_ppclk_levels(void *handle,
-				  enum pp_clock_type type,
-				  char *buf)
+static enum smu_clk_type smu_convert_to_smuclk(enum pp_clock_type type)
 {
-	struct smu_context *smu = handle;
 	enum smu_clk_type clk_type;
 
 	switch (type) {
@@ -2253,10 +2255,43 @@ static int smu_print_ppclk_levels(void *handle,
 	case OD_CCLK:
 		clk_type = SMU_OD_CCLK; break;
 	default:
-		return -EINVAL;
+		clk_type = SMU_CLK_COUNT; break;
 	}
 
+	return clk_type;
+}
+
+static int smu_print_ppclk_levels(void *handle,
+				  enum pp_clock_type type,
+				  char *buf)
+{
+	struct smu_context *smu = handle;
+	enum smu_clk_type clk_type;
+
+	clk_type = smu_convert_to_smuclk(type);
+	if (clk_type == SMU_CLK_COUNT)
+		return -EINVAL;
+
 	return smu_print_smuclk_levels(smu, clk_type, buf);
+}
+
+static int smu_emit_ppclk_levels(void *handle, enum pp_clock_type type, char *buf, int *offset)
+{
+	struct smu_context *smu = handle;
+	enum smu_clk_type clk_type;
+
+	clk_type = smu_convert_to_smuclk(type);
+	if (clk_type == SMU_CLK_COUNT)
+		return -EINVAL;
+
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
+		return -EOPNOTSUPP;
+
+	if (!smu->ppt_funcs->emit_clk_levels)
+		return -ENOENT;
+
+	return smu->ppt_funcs->emit_clk_levels(smu, clk_type, buf, offset);
+
 }
 
 static int smu_od_edit_dpm_table(void *handle,
@@ -2310,7 +2345,7 @@ static int smu_read_sensor(void *handle,
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_ENABLED_SMC_FEATURES_MASK:
-		ret = smu_feature_get_enabled_mask(smu, (uint32_t *)data, 2);
+		ret = smu_feature_get_enabled_mask(smu, (uint64_t *)data);
 		*size = 8;
 		break;
 	case AMDGPU_PP_SENSOR_UVD_POWER:
@@ -2824,6 +2859,7 @@ static const struct amd_pm_funcs swsmu_pm_funcs = {
 	.get_fan_speed_pwm   = smu_get_fan_speed_pwm,
 	.force_clock_level       = smu_force_ppclk_levels,
 	.print_clock_levels      = smu_print_ppclk_levels,
+	.emit_clock_levels       = smu_emit_ppclk_levels,
 	.force_performance_level = smu_force_performance_level,
 	.read_sensor             = smu_read_sensor,
 	.get_performance_level   = smu_get_performance_level,

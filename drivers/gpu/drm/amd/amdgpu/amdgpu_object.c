@@ -1345,7 +1345,12 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))
 		return;
 
-	dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
+#if defined(HAVE_DRM_GEM_OBJECT_RESV)
+	if (WARN_ON_ONCE(!dma_resv_trylock(bo->base.resv)))
+#else
+	if (WARN_ON_ONCE(!dma_resv_trylock(amdkcl_ttm_resvp(bo))))
+#endif
+	return;
 
 	r = amdgpu_fill_buffer(abo, AMDGPU_POISON, amdkcl_ttm_resvp(bo), &fence);
 	if (!WARN_ON(r)) {

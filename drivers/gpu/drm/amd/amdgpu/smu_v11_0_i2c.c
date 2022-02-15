@@ -753,7 +753,7 @@ int smu_v11_0_i2c_control_init(struct amdgpu_device *adev)
 	i2c_set_adapdata(control, smu_i2c);
 
 	adev->pm.ras_eeprom_i2c_bus = &adev->pm.smu_i2c[0].adapter;
-	adev->pm.fru_eeprom_i2c_bus = NULL;
+	adev->pm.fru_eeprom_i2c_bus = &adev->pm.smu_i2c[0].adapter;
 
 	res = i2c_add_adapter(control);
 	if (res)
@@ -768,6 +768,7 @@ void smu_v11_0_i2c_control_fini(struct amdgpu_device *adev)
 
 	i2c_del_adapter(control);
 	adev->pm.ras_eeprom_i2c_bus = NULL;
+	adev->pm.fru_eeprom_i2c_bus = NULL;
 }
 
 /*
