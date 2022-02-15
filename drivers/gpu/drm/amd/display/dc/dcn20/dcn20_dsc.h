@@ -21,6 +21,7 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef __DCN20_DSC_H__
 #define __DCN20_DSC_H__
 
@@ -558,4 +559,4 @@ void dsc2_construct(struct dcn20_dsc *dsc,
 		const struct dcn20_dsc_mask *dsc_mask);
 
 #endif
-
+#endif
