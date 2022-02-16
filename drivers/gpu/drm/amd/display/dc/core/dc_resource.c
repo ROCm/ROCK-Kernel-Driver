@@ -56,11 +56,15 @@
 #include "dce110/dce110_resource.h"
 #include "dce112/dce112_resource.h"
 #include "dce120/dce120_resource.h"
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dcn10/dcn10_resource.h"
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #include "dcn20/dcn20_resource.h"
 #include "dcn21/dcn21_resource.h"
+#endif
 #include "dcn201/dcn201_resource.h"
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #include "dcn30/dcn30_resource.h"
 #include "dcn301/dcn301_resource.h"
 #include "dcn302/dcn302_resource.h"
@@ -124,31 +128,38 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 		else
 			dc_version = DCE_VERSION_12_0;
 		break;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case FAMILY_RV:
 		dc_version = DCN_VERSION_1_0;
 		if (ASICREV_IS_RAVEN2(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_1_01;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		if (ASICREV_IS_RENOIR(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_2_1;
 		if (ASICREV_IS_GREEN_SARDINE(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_2_1;
+#endif
 		break;
+#endif
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case FAMILY_NV:
 		dc_version = DCN_VERSION_2_0;
 		if (asic_id.chip_id == DEVICE_ID_NV_13FE || asic_id.chip_id == DEVICE_ID_NV_143F) {
 			dc_version = DCN_VERSION_2_01;
 			break;
 		}
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (ASICREV_IS_SIENNA_CICHLID_P(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_0;
 		if (ASICREV_IS_DIMGREY_CAVEFISH_P(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_02;
 		if (ASICREV_IS_BEIGE_GOBY_P(asic_id.hw_internal_rev))
 			dc_version = DCN_VERSION_3_03;
+#endif
 		break;
-
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case FAMILY_VGH:
 		dc_version = DCN_VERSION_3_01;
 		break;
@@ -227,11 +238,14 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 				init_data->num_virtual_links, dc);
 		break;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case DCN_VERSION_1_0:
 	case DCN_VERSION_1_01:
 		res_pool = dcn10_create_resource_pool(init_data, dc);
 		break;
+#endif
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case DCN_VERSION_2_0:
 		res_pool = dcn20_create_resource_pool(init_data, dc);
 		break;
@@ -241,6 +255,8 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 	case DCN_VERSION_2_01:
 		res_pool = dcn201_create_resource_pool(init_data, dc);
 		break;
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case DCN_VERSION_3_0:
 		res_pool = dcn30_create_resource_pool(init_data, dc);
 		break;
@@ -397,7 +413,7 @@ bool resource_construct(
 		}
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	for (i = 0; i < caps->num_mpc_3dlut; i++) {
 		pool->mpc_lut[i] = dc_create_3dlut_func();
 		if (pool->mpc_lut[i] == NULL)
@@ -1360,7 +1376,7 @@ static struct pipe_ctx *acquire_free_pipe_for_head(
 	return pool->funcs->acquire_idle_pipe_for_layer(context, pool, head_pipe->stream);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static int acquire_first_split_pipe(
 		struct resource_context *res_ctx,
 		const struct resource_pool *pool,
@@ -1438,7 +1454,7 @@ bool dc_add_plane_to_context(
 	while (head_pipe) {
 		free_pipe = acquire_free_pipe_for_head(context, pool, head_pipe);
 
-	#if defined(CONFIG_DRM_AMD_DC_DCN)
+	#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (!free_pipe) {
 			int pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
 			if (pipe_idx >= 0)
@@ -2218,7 +2234,7 @@ enum dc_status resource_map_pool_resources(
 		/* acquire new resources */
 		pipe_idx = acquire_first_free_pipe(&context->res_ctx, pool, stream);
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 	if (pipe_idx < 0)
 		pipe_idx = acquire_first_split_pipe(&context->res_ctx, pool, stream);
 #endif
@@ -2284,7 +2300,7 @@ enum dc_status resource_map_pool_resources(
 
 	/* Add ABM to the resource if on EDP */
 	if (pipe_ctx->stream && dc_is_embedded_signal(pipe_ctx->stream->signal)) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (pool->abm)
 			pipe_ctx->stream_res.abm = pool->abm;
 		else
@@ -2413,7 +2429,7 @@ enum dc_status dc_validate_global_state(
 		if (!dc->res_pool->funcs->validate_bandwidth(dc, new_ctx, fast_validate))
 			result = DC_FAIL_BANDWIDTH_VALIDATE;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/*
 	 * Only update link encoder to stream assignment after bandwidth validation passed.
 	 * TODO: Split out assignment and validation.
@@ -3149,7 +3165,7 @@ unsigned int resource_pixel_format_to_bpp(enum surface_pixel_format format)
 	case SURFACE_PIXEL_FORMAT_GRPH_ARGB2101010:
 	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010:
 	case SURFACE_PIXEL_FORMAT_GRPH_ABGR2101010_XR_BIAS:
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case SURFACE_PIXEL_FORMAT_GRPH_RGBE:
 	case SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA:
 #endif
@@ -3305,7 +3321,7 @@ uint8_t resource_transmitter_to_phy_idx(const struct dc *dc, enum transmitter tr
 	/* TODO - get transmitter to phy idx mapping from DMUB */
 	uint8_t phy_idx = transmitter - TRANSMITTER_UNIPHY_A;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dc->ctx->dce_version == DCN_VERSION_3_1 &&
 			dc->ctx->asic_id.hw_internal_rev == YELLOW_CARP_B0) {
 		switch (transmitter) {

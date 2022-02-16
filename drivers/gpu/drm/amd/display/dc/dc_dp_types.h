@@ -352,7 +352,7 @@ enum dpcd_downstream_port_detailed_type {
 union dwnstream_port_caps_byte2 {
 	struct {
 		uint8_t MAX_BITS_PER_COLOR_COMPONENT:2;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		uint8_t MAX_ENCODED_LINK_BW_SUPPORT:3;
 		uint8_t SOURCE_CONTROL_MODE_SUPPORT:1;
 		uint8_t CONCURRENT_LINK_BRING_UP_SEQ_SUPPORT:1;
@@ -397,7 +397,7 @@ union dwnstream_port_caps_byte3_hdmi {
 	uint8_t raw;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 union hdmi_sink_encoded_link_bw_support {
 	struct {
 		uint8_t HDMI_SINK_ENCODED_LINK_BW_SUPPORT:3;

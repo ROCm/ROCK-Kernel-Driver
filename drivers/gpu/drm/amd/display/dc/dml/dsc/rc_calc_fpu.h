@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x) && defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 #ifndef __RC_CALC_FPU_H__
 #define __RC_CALC_FPU_H__
 

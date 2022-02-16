@@ -164,7 +164,9 @@
 #define RAVEN2_A0 0x81
 #define RAVEN1_F0 0xF0
 #define RAVEN_UNKNOWN 0xFF
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define RENOIR_A0 0x91
+#endif
 #ifndef ASICREV_IS_RAVEN
 #define ASICREV_IS_RAVEN(eChipRev) ((eChipRev >= RAVEN_A0) && eChipRev < RAVEN_UNKNOWN)
 #endif
@@ -181,7 +183,11 @@
 
 #define ASICREV_IS_PICASSO(eChipRev) ((eChipRev >= PICASSO_A0) && (eChipRev < RAVEN2_A0))
 #ifndef ASICREV_IS_RAVEN2
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RENOIR_A0))
+#else
+#define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RAVEN1_F0))
+#endif
 #endif
 #define ASICREV_IS_RV1_F0(eChipRev) ((eChipRev >= RAVEN1_F0) && (eChipRev < RAVEN_UNKNOWN))
 
@@ -237,6 +243,7 @@ enum {
 #define ASICREV_IS_GREEN_SARDINE(eChipRev) ((eChipRev >= GREEN_SARDINE_A0) && (eChipRev < 0xFF))
 #endif
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #define FAMILY_YELLOW_CARP                     146
 #define YELLOW_CARP_A0 0x01
 #define YELLOW_CARP_B0 0x20
@@ -244,6 +251,7 @@ enum {
 
 #ifndef ASICREV_IS_YELLOW_CARP
 #define ASICREV_IS_YELLOW_CARP(eChipRev) ((eChipRev >= YELLOW_CARP_A0) && (eChipRev < YELLOW_CARP_UNKNOWN))
+#endif
 #endif
 
 #define AMDGPU_FAMILY_GC_10_3_6                     149

@@ -23,7 +23,7 @@
  *
  */
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 
 #ifndef __DAL_IRQ_SERVICE_DCN30_H__
 #define __DAL_IRQ_SERVICE_DCN30_H__

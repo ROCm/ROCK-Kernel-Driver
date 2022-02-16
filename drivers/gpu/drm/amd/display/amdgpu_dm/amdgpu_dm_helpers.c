@@ -265,7 +265,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
 	mst_port = aconnector->port;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	link_coding_cap = dc_link_dp_mst_decide_link_encoding_format(aconnector->dc_link);
 #endif
 
@@ -624,7 +624,7 @@ bool dm_helpers_submit_i2c(
 	return result;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static bool execute_synaptics_rc_command(struct drm_dp_aux *aux,
 		bool is_write_cmd,
 		unsigned char cmd,
@@ -813,7 +813,7 @@ bool dm_helpers_dp_write_dsc_enable(
 		if (!aconnector->dsc_aux)
 			return false;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		// apply w/a to synaptics
 		if (needs_dsc_aux_workaround(aconnector->dc_link) &&
 		    (aconnector->mst_downstream_port_present.byte & 0x7) != 0x3)
@@ -826,12 +826,12 @@ bool dm_helpers_dp_write_dsc_enable(
 	}
 
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT || stream->signal == SIGNAL_TYPE_EDP) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (stream->sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE) {
 #endif
 			ret = dm_helpers_dp_write_dpcd(ctx, stream->link, DP_DSC_ENABLE, &enable_dsc, 1);
 			DC_LOG_DC("Send DSC %s to SST RX\n", enable_dsc ? "enable" : "disable");
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		} else if (stream->sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
 			ret = dm_helpers_dp_write_dpcd(ctx, stream->link, DP_DSC_ENABLE, &enable_dsc, 1);
 			DC_LOG_DC("Send DSC %s to DP-HDMI PCON\n", enable_dsc ? "enable" : "disable");

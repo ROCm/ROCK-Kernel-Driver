@@ -119,7 +119,9 @@ struct link_encoder {
 	struct encoder_feature_support features;
 	enum transmitter transmitter;
 	enum hpd_source_id hpd_source;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool usbc_combo_phy;
+#endif
 };
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT

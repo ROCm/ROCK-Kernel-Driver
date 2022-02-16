@@ -73,7 +73,9 @@
 struct dcn10_link_enc_aux_registers {
 	uint32_t AUX_CONTROL;
 	uint32_t AUX_DPHY_RX_CONTROL0;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	uint32_t AUX_DPHY_TX_CONTROL;
+#endif
 	uint32_t AUX_DPHY_RX_CONTROL1;
 };
 
@@ -107,6 +109,7 @@ struct dcn10_link_enc_registers {
 	uint32_t DP_DPHY_HBR2_PATTERN_CONTROL;
 	uint32_t DP_SEC_CNTL1;
 	uint32_t TMDS_CTL_BITS;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	/* DCCG  */
 	uint32_t CLOCK_ENABLE;
 	/* DIG */
@@ -157,6 +160,8 @@ struct dcn10_link_enc_registers {
 	uint32_t RAWLANE2_DIG_PCS_XF_RX_OVRD_IN_3;
 	uint32_t RAWLANE3_DIG_PCS_XF_RX_OVRD_IN_2;
 	uint32_t RAWLANE3_DIG_PCS_XF_RX_OVRD_IN_3;
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	uint32_t TMDS_DCBALANCER_CONTROL;
 	uint32_t PHYA_LINK_CNTL2;
 	uint32_t PHYB_LINK_CNTL2;
@@ -167,6 +172,7 @@ struct dcn10_link_enc_registers {
 	uint32_t DIO_LINKD_CNTL;
 	uint32_t DIO_LINKE_CNTL;
 	uint32_t DIO_LINKF_CNTL;
+#endif
 };
 
 #define LE_SF(reg_name, field_name, post_fix)\
@@ -275,6 +281,7 @@ struct dcn10_link_enc_registers {
 	type AUX_RX_RECEIVE_WINDOW
 
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define DCN20_LINK_ENCODER_DPCS_REG_FIELD_LIST(type) \
 		type RDPCS_PHY_DP_TX0_DATA_EN;\
 		type RDPCS_PHY_DP_TX1_DATA_EN;\
@@ -457,7 +464,9 @@ struct dcn10_link_enc_registers {
 	type AUX_RX_PRECHARGE_SKIP;\
 	type AUX_RX_TIMEOUT_LEN;\
 	type AUX_RX_TIMEOUT_LEN_MUL
+#endif
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 #define DCN30_LINK_ENCODER_REG_FIELD_LIST(type) \
 	type TMDS_SYNC_DCBAL_EN;\
 	type PHY_HPO_DIG_SRC_SEL;\
@@ -471,19 +480,28 @@ struct dcn10_link_enc_registers {
 	type ENC_TYPE_SEL;\
 	type HPO_DP_ENC_SEL;\
 	type HPO_HDMI_ENC_SEL
+#endif
 
 struct dcn10_link_enc_shift {
 	DCN_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	DCN20_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	DCN30_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
 	DCN31_LINK_ENCODER_REG_FIELD_LIST(uint8_t);
+#endif
 };
 
 struct dcn10_link_enc_mask {
 	DCN_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	DCN20_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	DCN30_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
 	DCN31_LINK_ENCODER_REG_FIELD_LIST(uint32_t);
+#endif
 };
 
 struct dcn10_link_encoder {

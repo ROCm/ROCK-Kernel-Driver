@@ -581,10 +581,12 @@ static struct device_id device_type_from_device_id(uint16_t device_id)
 		result_device_id.enum_id = 1;
 		break;
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case ATOM_DISPLAY_LCD2_SUPPORT:
 		result_device_id.device_type = DEVICE_TYPE_LCD;
 		result_device_id.enum_id = 2;
 		break;
+#endif
 
 	case ATOM_DISPLAY_DFP1_SUPPORT:
 		result_device_id.device_type = DEVICE_TYPE_DFP;
@@ -1432,9 +1434,11 @@ static enum bp_result bios_parser_get_firmware_info(
 			case 3:
 				result = get_firmware_info_v3_2(bp, info);
                                 break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			case 4:
 				result = get_firmware_info_v3_4(bp, info);
 				break;
+#endif
 			default:
 				break;
 			}
@@ -1910,8 +1914,10 @@ static enum bp_result get_integrated_info_v11(
 	info->ma_channel_number = info_v11->umachannelnumber;
 	info->lvds_ss_percentage =
 	le16_to_cpu(info_v11->lvds_ss_percentage);
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	info->dp_ss_control =
 	le16_to_cpu(info_v11->reserved1);
+#endif
 	info->lvds_sspread_rate_in_10hz =
 	le16_to_cpu(info_v11->lvds_ss_rate_10hz);
 	info->hdmi_ss_percentage =
@@ -2096,6 +2102,7 @@ static enum bp_result get_integrated_info_v11(
 	return BP_RESULT_OK;
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static enum bp_result get_integrated_info_v2_1(
 	struct bios_parser *bp,
 	struct integrated_info *info)
@@ -2357,6 +2364,7 @@ static enum bp_result get_integrated_info_v2_2(
 
 	return BP_RESULT_OK;
 }
+#endif
 
 /*
  * construct_integrated_info
@@ -2389,6 +2397,7 @@ static enum bp_result construct_integrated_info(
 
 		get_atom_data_table_revision(header, &revision);
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		switch (revision.major) {
 		case 1:
 			switch (revision.minor) {
@@ -2415,6 +2424,7 @@ static enum bp_result construct_integrated_info(
 		default:
 			return result;
 		}
+#endif
 	}
 
 	if (result != BP_RESULT_OK)

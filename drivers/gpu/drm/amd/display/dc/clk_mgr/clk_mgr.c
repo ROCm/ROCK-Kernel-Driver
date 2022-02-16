@@ -38,14 +38,17 @@
 #include "dcn10/rv1_clk_mgr.h"
 #include "dcn10/rv2_clk_mgr.h"
 #include "dcn20/dcn20_clk_mgr.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 #include "dcn21/rn_clk_mgr.h"
+#endif
 #include "dcn201/dcn201_clk_mgr.h"
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #include "dcn30/dcn30_clk_mgr.h"
 #include "dcn301/vg_clk_mgr.h"
 #include "dcn31/dcn31_clk_mgr.h"
 #include "dcn315/dcn315_clk_mgr.h"
 #include "dcn316/dcn316_clk_mgr.h"
-
+#endif
 
 int clk_mgr_helper_get_active_display_cnt(
 		struct dc *dc,
@@ -213,7 +216,7 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			dce120_clk_mgr_construct(ctx, clk_mgr);
 		return &clk_mgr->base;
 	}
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	case FAMILY_RV: {
 		struct clk_mgr_internal *clk_mgr = kzalloc(sizeof(*clk_mgr), GFP_KERNEL);
 
@@ -222,6 +225,7 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			return NULL;
 		}
 
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ASICREV_IS_RENOIR(asic_id.hw_internal_rev)) {
 			rn_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			return &clk_mgr->base;
@@ -231,6 +235,7 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			rn_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			return &clk_mgr->base;
 		}
+#endif /* DCN2_x */
 		if (ASICREV_IS_RAVEN2(asic_id.hw_internal_rev)) {
 			rv2_clk_mgr_construct(ctx, clk_mgr, pp_smu);
 			return &clk_mgr->base;
@@ -242,6 +247,8 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 		}
 		return &clk_mgr->base;
 	}
+#endif /* Family RV */
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case FAMILY_NV: {
 		struct clk_mgr_internal *clk_mgr = kzalloc(sizeof(*clk_mgr), GFP_KERNEL);
 
@@ -249,6 +256,8 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			BREAK_TO_DEBUGGER();
 			return NULL;
 		}
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (ASICREV_IS_SIENNA_CICHLID_P(asic_id.hw_internal_rev)) {
 			dcn3_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			return &clk_mgr->base;
@@ -261,6 +270,7 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 			dcn3_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			return &clk_mgr->base;
 		}
+#endif /* DCN3_x */
 		if (asic_id.chip_id == DEVICE_ID_NV_13FE) {
 			dcn201_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 			return &clk_mgr->base;
@@ -268,6 +278,8 @@ struct clk_mgr *dc_clk_mgr_create(struct dc_context *ctx, struct pp_smu_funcs *p
 		dcn20_clk_mgr_construct(ctx, clk_mgr, pp_smu, dccg);
 		return &clk_mgr->base;
 	}
+#endif /* Family NV */
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case FAMILY_VGH:
 		if (ASICREV_IS_VANGOGH(asic_id.hw_internal_rev)) {
 			struct clk_mgr_vgh *clk_mgr = kzalloc(sizeof(*clk_mgr), GFP_KERNEL);
@@ -330,7 +342,7 @@ void dc_destroy_clk_mgr(struct clk_mgr *clk_mgr_base)
 {
 	struct clk_mgr_internal *clk_mgr = TO_CLK_MGR_INTERNAL(clk_mgr_base);
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	switch (clk_mgr_base->ctx->asic_id.chip_family) {
 	case FAMILY_NV:
 		if (ASICREV_IS_SIENNA_CICHLID_P(clk_mgr_base->ctx->asic_id.hw_internal_rev)) {

@@ -37,6 +37,7 @@ struct dp_mst_stream_allocation_table;
 struct aux_payload;
 enum aux_return_code_type;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 /*
  * Allocate memory accessible by the GPU
  *
@@ -57,6 +58,7 @@ void dm_helpers_free_gpu_mem(
 		struct dc_context *ctx,
 		enum dc_gpu_mem_alloc_type type,
 		void *pvMem);
+#endif
 
 enum dc_edid_status dm_helpers_parse_edid_caps(
 	struct dc_link *link,
@@ -161,7 +163,7 @@ void dm_set_dcn_clocks(
 		struct dc_context *ctx,
 		struct dc_clocks *clks);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable);
 #endif
 

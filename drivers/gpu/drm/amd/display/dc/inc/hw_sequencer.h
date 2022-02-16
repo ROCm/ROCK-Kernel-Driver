@@ -39,18 +39,24 @@ enum vline_select {
 
 struct pipe_ctx;
 struct dc_state;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 struct dc_stream_status;
 struct dc_writeback_info;
+#endif
 struct dchub_init_data;
 struct dc_static_screen_params;
 struct resource_pool;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 struct dc_phy_addr_space_config;
 struct dc_virtual_addr_space_config;
+#endif
 struct dpp;
 struct dce_hwseq;
 
 struct hw_sequencer_funcs {
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	void (*hardware_release)(struct dc *dc);
+#endif
 	/* Embedded Display Related */
 	void (*edp_power_control)(struct dc_link *link, bool enable);
 	void (*edp_wait_for_hpd_ready)(struct dc_link *link, bool power_up);
@@ -68,8 +74,10 @@ struct hw_sequencer_funcs {
 	void (*apply_ctx_for_surface)(struct dc *dc,
 			const struct dc_stream_state *stream,
 			int num_planes, struct dc_state *context);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*program_front_end_for_ctx)(struct dc *dc,
 			struct dc_state *context);
+#endif
 	void (*wait_for_pending_cleared)(struct dc *dc,
 			struct dc_state *context);
 	void (*post_unlock_program_front_end)(struct dc *dc,
@@ -84,8 +92,10 @@ struct hw_sequencer_funcs {
 	void (*edp_backlight_control)(
 			struct dc_link *link,
 			bool enable);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*program_triplebuffer)(const struct dc *dc,
 		struct pipe_ctx *pipe_ctx, bool enableTripleBuffer);
+#endif
 	void (*update_pending_status)(struct pipe_ctx *pipe_ctx);
 	void (*power_down)(struct dc *dc);
 
@@ -94,8 +104,10 @@ struct hw_sequencer_funcs {
 			struct pipe_ctx *pipe, bool lock);
 	void (*interdependent_update_lock)(struct dc *dc,
 			struct dc_state *context, bool lock);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*set_flip_control_gsl)(struct pipe_ctx *pipe_ctx,
 			bool flip_immediate);
+#endif
 	void (*cursor_lock)(struct dc *dc, struct pipe_ctx *pipe, bool lock);
 
 	/* Timing Related */
@@ -138,7 +150,9 @@ struct hw_sequencer_funcs {
 
 	/* Bandwidth Related */
 	void (*prepare_bandwidth)(struct dc *dc, struct dc_state *context);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	bool (*update_bandwidth)(struct dc *dc, struct dc_state *context);
+#endif
 	void (*optimize_bandwidth)(struct dc *dc, struct dc_state *context);
 
 	/* Infopacket Related */
@@ -149,8 +163,10 @@ struct hw_sequencer_funcs {
 			unsigned int sdp_message_size);
 	void (*update_info_frame)(struct pipe_ctx *pipe_ctx);
 	void (*set_dmdata_attributes)(struct pipe_ctx *pipe);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*program_dmdata_engine)(struct pipe_ctx *pipe_ctx);
 	bool (*dmdata_status_done)(struct pipe_ctx *pipe_ctx);
+#endif
 
 	/* Cursor Related */
 	void (*set_cursor_position)(struct pipe_ctx *pipe);
@@ -163,6 +179,7 @@ struct hw_sequencer_funcs {
 			enum dc_color_space colorspace,
 			uint16_t *matrix, int opp_id);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	/* VM Related */
 	int (*init_sys_ctx)(struct dce_hwseq *hws,
 			struct dc *dc,
@@ -185,6 +202,7 @@ struct hw_sequencer_funcs {
 	bool (*mmhubbub_warmup)(struct dc *dc,
 			unsigned int num_dwb,
 			struct dc_writeback_info *wb_info);
+#endif
 
 	/* Clock Related */
 	enum dc_status (*set_clock)(struct dc *dc,
@@ -220,8 +238,10 @@ struct hw_sequencer_funcs {
 
 	void (*get_dcc_en_bits)(struct dc *dc, int *dcc_en_bits);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	/* Idle Optimization Related */
 	bool (*apply_idle_power_optimizations)(struct dc *dc, bool enable);
+#endif
 
 	bool (*does_plane_fit_in_mall)(struct dc *dc, struct dc_plane_state *plane,
 			struct dc_cursor_attributes *cursor_attr);
@@ -237,7 +257,9 @@ struct hw_sequencer_funcs {
 			const struct tg_color *solid_color,
 			int width, int height, int offset);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	void (*z10_restore)(const struct dc *dc);
+#endif
 	void (*z10_save_init)(struct dc *dc);
 
 	void (*update_visual_confirm_color)(struct dc *dc,

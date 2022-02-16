@@ -311,7 +311,7 @@ bool dc_stream_set_cursor_attributes(
 	const struct dc_cursor_attributes *attributes)
 {
 	struct dc  *dc;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -332,7 +332,7 @@ bool dc_stream_set_cursor_attributes(
 	dc = stream->ctx->dc;
 	stream->cursor_attributes = *attributes;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 	/* disable idle optimizations while updating cursor */
 	if (dc->idle_optimizations_allowed) {
@@ -343,7 +343,7 @@ bool dc_stream_set_cursor_attributes(
 #endif
 	program_cursor_attributes(dc, stream, attributes);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
@@ -393,7 +393,7 @@ bool dc_stream_set_cursor_position(
 	const struct dc_cursor_position *position)
 {
 	struct dc  *dc;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	bool reset_idle_optimizations = false;
 #endif
 
@@ -408,7 +408,7 @@ bool dc_stream_set_cursor_position(
 	}
 
 	dc = stream->ctx->dc;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 
 	/* disable idle optimizations if enabling cursor */
@@ -421,7 +421,7 @@ bool dc_stream_set_cursor_position(
 	stream->cursor_position = *position;
 
 	program_cursor_position(dc, stream, position);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* re-enable idle optimizations if necessary */
 	if (reset_idle_optimizations)
 		dc_allow_idle_optimizations(dc, true);
@@ -430,6 +430,7 @@ bool dc_stream_set_cursor_position(
 	return true;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 bool dc_stream_add_writeback(struct dc *dc,
 		struct dc_stream_state *stream,
 		struct dc_writeback_info *wb_info)
@@ -558,6 +559,8 @@ bool dc_stream_warmup_writeback(struct dc *dc,
 	else
 		return false;
 }
+#endif
+
 uint32_t dc_stream_get_vblank_counter(const struct dc_stream_state *stream)
 {
 	uint8_t i;
@@ -643,6 +646,7 @@ bool dc_stream_get_scanoutpos(const struct dc_stream_state *stream,
 	return ret;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 bool dc_stream_dmdata_status_done(struct dc *dc, struct dc_stream_state *stream)
 {
 	struct pipe_ctx *pipe = NULL;
@@ -703,6 +707,7 @@ bool dc_stream_set_dynamic_metadata(struct dc *dc,
 
 	return true;
 }
+#endif
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,

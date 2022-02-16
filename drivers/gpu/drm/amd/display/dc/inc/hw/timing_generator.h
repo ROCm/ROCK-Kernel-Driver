@@ -106,8 +106,10 @@ enum otg_out_mux_dest {
 enum h_timing_div_mode {
 	H_TIMING_NO_DIV,
 	H_TIMING_DIV_BY2,
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	H_TIMING_RESERVED,
 	H_TIMING_DIV_BY4,
+#endif
 };
 
 enum timing_synchronization_type {
@@ -290,6 +292,7 @@ struct timing_generator_funcs {
 			       enum optc_dsc_mode dsc_mode,
 			       uint32_t dsc_bytes_per_pixel,
 			       uint32_t dsc_slice_width);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*get_dsc_status)(struct timing_generator *optc,
 					uint32_t *dsc_mode);
 	void (*set_odm_bypass)(struct timing_generator *optc, const struct dc_crtc_timing *dc_crtc_timing);
@@ -299,6 +302,7 @@ struct timing_generator_funcs {
 	void (*set_gsl_source_select)(struct timing_generator *optc,
 			int group_idx,
 			uint32_t gsl_ready_signal);
+#endif
 	void (*set_out_mux)(struct timing_generator *tg, enum otg_out_mux_dest dest);
 	void (*set_vrr_m_const)(struct timing_generator *optc,
 			double vtotal_avg);

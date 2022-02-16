@@ -73,7 +73,9 @@ extern "C" {
 /* Forward declarations */
 struct dmub_srv;
 struct dmub_srv_common_regs;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 struct dmub_srv_dcn31_regs;
+#endif
 
 struct dmcub_trace_buf_entry;
 
@@ -92,6 +94,7 @@ enum dmub_asic {
 	DMUB_ASIC_NONE = 0,
 	DMUB_ASIC_DCN20,
 	DMUB_ASIC_DCN21,
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	DMUB_ASIC_DCN30,
 	DMUB_ASIC_DCN301,
 	DMUB_ASIC_DCN302,
@@ -100,6 +103,7 @@ enum dmub_asic {
 	DMUB_ASIC_DCN31B,
 	DMUB_ASIC_DCN315,
 	DMUB_ASIC_DCN316,
+#endif
 	DMUB_ASIC_MAX,
 };
 
@@ -239,7 +243,9 @@ struct dmub_srv_hw_params {
 	uint32_t psp_version;
 	bool load_inst_const;
 	bool skip_panel_power_sequence;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool disable_z10;
+#endif
 	bool power_optimization;
 	bool dpia_supported;
 	bool disable_dpia;
@@ -408,7 +414,9 @@ struct dmub_srv {
 
 	/* private: internal use only */
 	const struct dmub_srv_common_regs *regs;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	const struct dmub_srv_dcn31_regs *regs_dcn31;
+#endif
 
 	struct dmub_srv_base_funcs funcs;
 	struct dmub_srv_hw_funcs hw_funcs;

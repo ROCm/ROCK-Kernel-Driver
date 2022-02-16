@@ -40,7 +40,9 @@ enum pp_smu_ver {
 	PP_SMU_UNSUPPORTED,
 	PP_SMU_VER_RV,
 	PP_SMU_VER_NV,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	PP_SMU_VER_RN,
+#endif
 
 	PP_SMU_VER_MAX
 };
@@ -283,6 +285,7 @@ struct pp_smu_funcs_rn {
 			struct dpm_clocks *clock_table);
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 struct pp_smu_funcs_vgh {
 	struct pp_smu pp_smu;
 
@@ -304,14 +307,19 @@ struct pp_smu_funcs_vgh {
 
 	enum pp_smu_status (*notify_smu_timeout) (struct pp_smu *pp);
 };
+#endif
 
 struct pp_smu_funcs {
 	struct pp_smu ctx;
 	union {
 		struct pp_smu_funcs_rv rv_funcs;
 		struct pp_smu_funcs_nv nv_funcs;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		struct pp_smu_funcs_rn rn_funcs;
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		struct pp_smu_funcs_vgh vgh_funcs;
+#endif
 	};
 };
 

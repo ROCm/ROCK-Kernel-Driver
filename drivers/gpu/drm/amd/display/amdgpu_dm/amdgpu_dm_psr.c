@@ -46,7 +46,7 @@ static bool link_get_psr_caps(struct dc_link *link)
 	link->dpcd_caps.psr_caps.psr_version = psr_dpcd_data[0];
 	link->dpcd_caps.psr_caps.edp_revision = edp_rev_dpcd_data;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 	if (link->dpcd_caps.psr_caps.psr_version > 0x1) {
 		uint8_t alpm_dpcd_data;
 		uint8_t su_granularity_dpcd_data;
@@ -71,7 +71,7 @@ static bool link_get_psr_caps(struct dc_link *link)
 	return true;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 static bool link_supports_psrsu(struct dc_link *link)
 {
 	struct dc *dc = link->ctx->dc;
@@ -117,7 +117,7 @@ void amdgpu_dm_set_psr_caps(struct dc_link *link)
 		link->psr_settings.psr_feature_enabled = false;
 
 	} else {
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (link_supports_psrsu(link))
 			link->psr_settings.psr_version = DC_PSR_VERSION_SU_1;
 		else

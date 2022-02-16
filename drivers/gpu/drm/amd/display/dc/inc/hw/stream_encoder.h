@@ -65,11 +65,13 @@ struct audio_clock_info {
 	uint32_t cts_48khz;
 };
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 enum dynamic_metadata_mode {
 	dmdata_dp,
 	dmdata_hdmi,
 	dmdata_dolby_vision
 };
+#endif
 
 struct encoder_info_frame {
 	/* auxiliary video information */
@@ -88,7 +90,9 @@ struct encoder_info_frame {
 struct encoder_unblank_param {
 	struct dc_link_settings link_settings;
 	struct dc_crtc_timing timing;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int opp_cnt;
+#endif
 };
 
 struct encoder_set_dp_phy_pattern_param {

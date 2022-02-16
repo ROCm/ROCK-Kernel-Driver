@@ -22,8 +22,7 @@
  * Authors: AMD
  *
  */
-
-
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #include "../display_mode_lib.h"
 #include "../display_mode_vba.h"
 #include "../dml_inline_defs.h"
@@ -1803,4 +1802,4 @@ static void calculate_ttu_cursor(
 		ASSERT(*refcyc_per_req_delivery_cur < dml_pow(2, 13));
 	}
 }
-
+#endif

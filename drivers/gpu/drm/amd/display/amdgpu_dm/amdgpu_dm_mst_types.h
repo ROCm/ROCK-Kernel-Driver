@@ -47,7 +47,7 @@ void
 dm_dp_create_fake_mst_encoders(struct amdgpu_device *adev);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 
 struct dsc_mst_fairness_vars {
 	int pbn;

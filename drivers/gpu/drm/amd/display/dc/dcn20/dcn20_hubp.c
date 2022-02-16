@@ -338,8 +338,10 @@ void hubp2_program_size(
 	 */
 	use_pitch_c = format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN
 		&& format < SURFACE_PIXEL_FORMAT_SUBSAMPLE_END;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	use_pitch_c = use_pitch_c
 		|| (format == SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA);
+#endif
 	if (use_pitch_c) {
 		ASSERT(plane_size->chroma_pitch != 0);
 		/* Chroma pitch zero can cause system hang! */
@@ -364,8 +366,10 @@ void hubp2_program_size(
 			PITCH, pitch, META_PITCH, meta_pitch);
 
 	use_pitch_c = format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	use_pitch_c = use_pitch_c
 		|| (format == SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA);
+#endif
 	if (use_pitch_c)
 		REG_UPDATE_2(DCSURF_SURFACE_PITCH_C,
 			PITCH_C, pitch_c, META_PITCH_C, meta_pitch_c);
@@ -497,6 +501,7 @@ void hubp2_program_pixel_format(
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 112);
 		break;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	case SURFACE_PIXEL_FORMAT_GRPH_BGR101111_FIX:
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 113);
@@ -513,6 +518,8 @@ void hubp2_program_pixel_format(
 		REG_UPDATE(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 119);
 		break;
+#endif
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	case SURFACE_PIXEL_FORMAT_GRPH_RGBE:
 		REG_UPDATE_2(DCSURF_SURFACE_CONFIG,
 				SURFACE_PIXEL_FORMAT, 116,
@@ -523,6 +530,7 @@ void hubp2_program_pixel_format(
 				SURFACE_PIXEL_FORMAT, 116,
 				ALPHA_PLANE_EN, 1);
 		break;
+#endif
 	default:
 		BREAK_TO_DEBUGGER();
 		break;

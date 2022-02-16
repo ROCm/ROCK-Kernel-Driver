@@ -355,6 +355,7 @@ void dcn10_log_hw_state(struct dc *dc,
 		/* Read shared OTG state registers for all DCNx */
 		optc1_read_otg_state(DCN10TG_FROM_TG(tg), &s);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		/*
 		 * For DCN2 and greater, a register on the OPP is used to
 		 * determine if the CRTC is blanked instead of the OTG. So use
@@ -366,6 +367,9 @@ void dcn10_log_hw_state(struct dc *dc,
 			s.blank_enabled = pool->opps[i]->funcs->dpg_is_blanked(pool->opps[i]);
 		else
 			s.blank_enabled = tg->funcs->is_blanked(tg);
+#else
+		s.blank_enabled = tg->funcs->is_blanked(tg);
+#endif
 
 		//only print if OTG master is enabled
 		if ((s.otg_enabled & 1) == 0)
@@ -801,13 +805,17 @@ static void apply_DEGVIDCN10_253_wa(struct dc *dc)
 
 void dcn10_bios_golden_init(struct dc *dc)
 {
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct dce_hwseq *hws = dc->hwseq;
+#endif
 	struct dc_bios *bp = dc->ctx->dc_bios;
 	int i;
 	bool allow_self_fresh_force_enable = true;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	if (hws->funcs.s0i3_golden_init_wa && hws->funcs.s0i3_golden_init_wa(dc))
 		return;
+#endif
 
 	if (dc->res_pool->hubbub->funcs->is_allow_self_refresh_enabled)
 		allow_self_fresh_force_enable =
@@ -2204,7 +2212,7 @@ void dcn10_enable_timing_synchronization(
 	struct pipe_ctx *grouped_pipes[])
 {
 	struct dc_context *dc_ctx = dc->ctx;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	struct output_pixel_processor *opp;
 	struct timing_generator *tg;
 	int i, width, height;
@@ -2214,7 +2222,7 @@ void dcn10_enable_timing_synchronization(
 
 	DC_SYNC_INFO("Setting up OTG reset trigger\n");
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2246,7 +2254,7 @@ void dcn10_enable_timing_synchronization(
 		grouped_pipes[i]->stream_res.tg->funcs->disable_reset_trigger(
 				grouped_pipes[i]->stream_res.tg);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	for (i = 1; i < group_size; i++) {
 		opp = grouped_pipes[i]->stream_res.opp;
 		tg = grouped_pipes[i]->stream_res.tg;
@@ -2500,8 +2508,12 @@ static void dcn10_update_dpp(struct dpp *dpp, struct dc_plane_state *plane_state
 			plane_state->format,
 			EXPANSION_MODE_ZERO,
 			plane_state->input_csc_color_matrix,
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 			plane_state->color_space,
 			NULL);
+#else
+			plane_state->color_space);
+#endif
 
 	//set scale and bias registers
 	build_prescale_params(&bns_params, plane_state);

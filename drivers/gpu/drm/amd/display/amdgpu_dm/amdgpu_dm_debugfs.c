@@ -3461,7 +3461,6 @@ DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 			 disable_hpd_set, "%llu\n");
 #endif
 
-
 #if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 /*
  * Temporary w/a to force sst sequence in M42D DP2 mst receiver

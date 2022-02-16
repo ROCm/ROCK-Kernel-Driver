@@ -2921,10 +2921,12 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 
 	/* Set FEC enable */
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dp_get_link_encoding_format(link_settings) == DP_8b_10b_ENCODING) {
+#endif
 		fec_enable = lt_overrides->fec_enable && *lt_overrides->fec_enable;
 		dp_set_fec_ready(link, NULL, fec_enable);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	}
 #endif
 #endif
@@ -2970,13 +2972,15 @@ bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down)
 	 * Still shouldn't turn off dp_receiver (DPCD:600h)
 	 */
 	if (link_down == true) {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		struct dc_link_settings link_settings = link->cur_link_settings;
+#endif
 		dp_disable_link_phy(link, NULL, link->connector_signal);
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (dp_get_link_encoding_format(&link_settings) == DP_8b_10b_ENCODING)
-			dp_set_fec_ready(link, NULL, false);
 #endif
+			dp_set_fec_ready(link, NULL, false);
 #endif
 	}
 
@@ -4671,7 +4675,7 @@ static int translate_dpcd_max_bpc(enum dpcd_downstream_port_max_bpc bpc)
 	return -1;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 uint32_t dc_link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw)
 {
 	switch (bw) {
@@ -4832,7 +4836,7 @@ static void get_active_converter_info(
 						translate_dpcd_max_bpc(
 							hdmi_color_caps.bits.MAX_BITS_PER_COLOR_COMPONENT);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 					if (link->dc->caps.hdmi_frl_pcon_support) {
 						union hdmi_encoded_link_bw hdmi_encoded_link_bw;
 
@@ -5367,7 +5371,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 		 * only if required.
 		 */
 		if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA &&
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 				!link->dc->debug.dpia_debug.bits.disable_force_tbt3_work_around &&
 #endif
 				link->dpcd_caps.is_branch_dev &&
@@ -5630,12 +5634,14 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		stream->timing.display_color_depth;
 	struct bit_depth_reduction_params params;
 	struct output_pixel_processor *opp = pipe_ctx->stream_res.opp;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	int width = pipe_ctx->stream->timing.h_addressable +
 		pipe_ctx->stream->timing.h_border_left +
 		pipe_ctx->stream->timing.h_border_right;
 	int height = pipe_ctx->stream->timing.v_addressable +
 		pipe_ctx->stream->timing.v_border_bottom +
 		pipe_ctx->stream->timing.v_border_top;
+#endif
 
 	memset(&params, 0, sizeof(params));
 
@@ -5679,6 +5685,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 		if (pipe_ctx->stream_res.tg->funcs->set_test_pattern)
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				controller_test_pattern, color_depth);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		else if (link->dc->hwss.set_disp_pattern_generator) {
 			struct pipe_ctx *odm_pipe;
 			enum controller_dp_color_space controller_color_space;
@@ -5735,6 +5742,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 				offset += offset;
 			}
 		}
+#endif
 	}
 	break;
 	case DP_TEST_PATTERN_VIDEO_MODE:
@@ -5747,6 +5755,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 			pipe_ctx->stream_res.tg->funcs->set_test_pattern(pipe_ctx->stream_res.tg,
 				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE,
 				color_depth);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		else if (link->dc->hwss.set_disp_pattern_generator) {
 			struct pipe_ctx *odm_pipe;
 			int opp_cnt = 1;
@@ -5780,6 +5789,7 @@ static void set_crtc_test_pattern(struct dc_link *link,
 					height,
 					0);
 		}
+#endif
 	}
 	break;
 
@@ -5943,7 +5953,7 @@ bool dc_link_dp_set_test_pattern(
 			return false;
 
 		if (link->dpcd_caps.dpcd_rev.raw >= DPCD_REV_12) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (test_pattern == DP_TEST_PATTERN_SQUARE_PULSE)
 				core_link_write_dpcd(link,
 						DP_LINK_SQUARE_PATTERN,
@@ -6304,7 +6314,7 @@ void dpcd_set_source_specific_data(struct dc_link *link)
 				(uint8_t *)(&amd_device_id),
 				sizeof(amd_device_id));
 
-#if defined(CONFIG_DRM_AMD_DC_DCN2_0)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (link->ctx->dce_version >= DCN_VERSION_2_0 &&
 			link->dc->caps.min_horizontal_blanking_period != 0) {
 

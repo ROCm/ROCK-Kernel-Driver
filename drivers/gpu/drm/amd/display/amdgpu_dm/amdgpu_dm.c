@@ -91,7 +91,7 @@
 #include <drm/drm_hdcp.h>
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "ivsrcid/dcn/irqsrcs_dcn_1_0.h"
 
 #include "dcn/dcn_1_0_offset.h"
@@ -108,12 +108,15 @@
 
 #define FIRMWARE_RENOIR_DMUB "amdgpu/renoir_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_RENOIR_DMUB);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FIRMWARE_SIENNA_CICHLID_DMUB "amdgpu/sienna_cichlid_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_SIENNA_CICHLID_DMUB);
 #define FIRMWARE_NAVY_FLOUNDER_DMUB "amdgpu/navy_flounder_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_NAVY_FLOUNDER_DMUB);
+#endif
 #define FIRMWARE_GREEN_SARDINE_DMUB "amdgpu/green_sardine_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_GREEN_SARDINE_DMUB);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define FIRMWARE_VANGOGH_DMUB "amdgpu/vangogh_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_VANGOGH_DMUB);
 #define FIRMWARE_DIMGREY_CAVEFISH_DMUB "amdgpu/dimgrey_cavefish_dmcub.bin"
@@ -122,6 +125,7 @@ MODULE_FIRMWARE(FIRMWARE_DIMGREY_CAVEFISH_DMUB);
 MODULE_FIRMWARE(FIRMWARE_BEIGE_GOBY_DMUB);
 #define FIRMWARE_YELLOW_CARP_DMUB "amdgpu/yellow_carp_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_YELLOW_CARP_DMUB);
+#endif
 #define FIRMWARE_DCN_315_DMUB "amdgpu/dcn_3_1_5_dmcub.bin"
 MODULE_FIRMWARE(FIRMWARE_DCN_315_DMUB);
 #define FIRMWARE_DCN316_DMUB "amdgpu/dcn_3_1_6_dmcub.bin"
@@ -647,7 +651,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	spin_unlock_irqrestore(&adev_to_drm(adev)->event_lock, flags);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #if defined(CONFIG_DRM_AMD_SECURE_DISPLAY)
 /**
  * dm_dcn_vertical_interrupt0_high_irq() - Handles OTG Vertical interrupt0 for
@@ -879,7 +883,7 @@ static void dm_dmub_outbox1_low_irq(void *interrupt_params)
 	if (count > DMUB_TRACE_MAX_READ)
 		DRM_DEBUG_DRIVER("Warning : count > DMUB_TRACE_MAX_READ");
 }
-#endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif /* CONFIG_DRM_AMD_DC_DCN1_0 */
 
 static int dm_set_clockgating_state(void *handle,
 		  enum amd_clockgating_state state)
@@ -1184,16 +1188,16 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	for (i = 0; i < fb_info->num_fb; ++i)
 		hw_params.fb[i] = &fb_info->fb[i];
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	switch (adev->ip_versions[DCE_HWIP][0]) {
 	case IP_VERSION(3, 1, 3): /* Only for this asic hw internal rev B0 */
 		hw_params.dpia_supported = true;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 		hw_params.disable_dpia = adev->dm.dc->debug.dpia_debug.bits.disable_dpia;
-#endif
 		break;
 	default:
 		break;
 	}
+#endif
 
 	status = dmub_srv_hw_init(dmub_srv, &hw_params);
 	if (status != DMUB_STATUS_OK) {
@@ -1251,7 +1255,7 @@ static void dm_dmub_hw_resume(struct amdgpu_device *adev)
 	}
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_addr_space_config *pa_config)
 {
 	uint64_t pt_base;
@@ -1307,7 +1311,7 @@ static void mmhub_read_system_context(struct amdgpu_device *adev, struct dc_phy_
 
 }
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 static void vblank_control_worker(struct work_struct *work)
 {
 	struct vblank_control_work *vblank_work =
@@ -1475,7 +1479,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 #if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_init(&adev->dm.audio_lock);
 #endif
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	spin_lock_init(&adev->dm.vblank_lock);
 #endif
 
@@ -1529,10 +1533,12 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 			break;
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 1):
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
 		case IP_VERSION(3, 1, 5):
+#endif
 			init_data.flags.gpu_vm_support = true;
 			break;
 		case IP_VERSION(2, 0, 3):
@@ -1556,7 +1562,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	if (amdgpu_dc_feature_mask & DC_EDP_NO_POWER_SEQUENCING)
 		init_data.flags.edp_no_power_sequencing = true;
 
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 	if (amdgpu_dc_feature_mask & DC_DISABLE_LTTPR_DP1_4A)
 		init_data.flags.allow_lttpr_non_transparent_mode.bits.DP1_4A = true;
 	if (amdgpu_dc_feature_mask & DC_DISABLE_LTTPR_DP2_0)
@@ -1617,7 +1623,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		goto error;
 	}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	if ((adev->flags & AMD_IS_APU) && (adev->asic_type >= CHIP_CARRIZO)) {
 		struct dc_phy_addr_space_config pa_config;
 
@@ -1638,7 +1644,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	amdgpu_dm_init_color_mod();
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->dm.dc->caps.max_links > 0) {
 		adev->dm.vblank_control_workqueue =
 			create_singlethread_workqueue("dm_vblank_control_workqueue");
@@ -1677,7 +1683,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		}
 
 		amdgpu_dm_outbox_init(adev);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (!register_dmub_notify_callback(adev, DMUB_NOTIFICATION_AUX_REPLY,
 			dmub_aux_setconfig_callback, false)) {
 			DRM_ERROR("amdgpu: fail to register dmub aux callback");
@@ -1691,7 +1697,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 			DRM_ERROR("amdgpu: fail to register dmub hpd callback");
 			goto error;
 		}
-#endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif /* CONFIG_DRM_AMD_DC_DCN3_x */
 	}
 
 	if (amdgpu_dm_initialize_drm_device(adev)) {
@@ -1740,7 +1746,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 {
 	int i;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->dm.vblank_control_workqueue) {
 		destroy_workqueue(adev->dm.vblank_control_workqueue);
 		adev->dm.vblank_control_workqueue = NULL;
@@ -1869,6 +1875,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 		case IP_VERSION(2, 0, 3):
 		case IP_VERSION(2, 0, 0):
 		case IP_VERSION(2, 1, 0):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 2):
 		case IP_VERSION(3, 0, 3):
@@ -1877,6 +1884,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 		case IP_VERSION(3, 1, 3):
 		case IP_VERSION(3, 1, 5):
 		case IP_VERSION(3, 1, 6):
+#endif
 			return 0;
 		default:
 			break;
@@ -1963,11 +1971,12 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	case IP_VERSION(2, 1, 0):
 		dmub_asic = DMUB_ASIC_DCN21;
 		fw_name_dmub = FIRMWARE_RENOIR_DMUB;
-#if defined(CONFIG_DRM_AMD_DC_DCN2_1)
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 			fw_name_dmub = FIRMWARE_GREEN_SARDINE_DMUB;
 #endif
 		break;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case IP_VERSION(3, 0, 0):
 		if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(10, 3, 0)) {
 			dmub_asic = DMUB_ASIC_DCN30;
@@ -2002,6 +2011,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 		dmub_asic = DMUB_ASIC_DCN316;
 		fw_name_dmub = FIRMWARE_DCN316_DMUB;
 		break;
+#endif
 	default:
 		/* ASIC doesn't support DMUB. */
 		return 0;
@@ -2476,7 +2486,7 @@ static int dm_suspend(void *handle)
 	if (amdgpu_in_reset(adev)) {
 		mutex_lock(&dm->dc_lock);
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		dc_allow_idle_optimizations(adev->dm.dc, false);
 #endif
 
@@ -3735,7 +3745,7 @@ static int dce110_register_irq_handlers(struct amdgpu_device *adev)
 	return 0;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 /* Register IRQ sources and initialize IRQ callbacks */
 static int dcn10_register_irq_handlers(struct amdgpu_device *adev)
 {
@@ -4485,11 +4495,13 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* Use Outbox interrupt */
 	switch (adev->ip_versions[DCE_HWIP][0]) {
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	case IP_VERSION(3, 0, 0):
 	case IP_VERSION(3, 1, 2):
 	case IP_VERSION(3, 1, 3):
 	case IP_VERSION(3, 1, 5):
 	case IP_VERSION(3, 1, 6):
+#endif
 	case IP_VERSION(2, 1, 0):
 		if (register_outbox_irq_handlers(dm->adev)) {
 			DRM_ERROR("DM: Failed to initialize IRQ\n");
@@ -4613,14 +4625,17 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 		break;
 	default:
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		switch (adev->ip_versions[DCE_HWIP][0]) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 2):
 		case IP_VERSION(2, 0, 3):
 		case IP_VERSION(2, 0, 0):
 		case IP_VERSION(2, 1, 0):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
 		case IP_VERSION(3, 0, 2):
 		case IP_VERSION(3, 0, 3):
@@ -4629,6 +4644,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		case IP_VERSION(3, 1, 3):
 		case IP_VERSION(3, 1, 5):
 		case IP_VERSION(3, 1, 6):
+#endif
 			if (dcn10_register_irq_handlers(dm->adev)) {
 				DRM_ERROR("DM: Failed to initialize IRQ\n");
 				goto fail;
@@ -4923,34 +4939,52 @@ static int dm_early_init(void *handle)
 		adev->mode_info.num_dig = 6;
 		break;
 	default:
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		switch (adev->ip_versions[DCE_HWIP][0]) {
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 2):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 0):
+#endif
+#endif
 			adev->mode_info.num_crtc = 6;
 			adev->mode_info.num_hpd = 6;
 			adev->mode_info.num_dig = 6;
 			break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 0):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 2):
+#endif
+#endif
 			adev->mode_info.num_crtc = 5;
 			adev->mode_info.num_hpd = 5;
 			adev->mode_info.num_dig = 5;
 			break;
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 0, 3):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 3):
+#endif
+#endif
 			adev->mode_info.num_crtc = 2;
 			adev->mode_info.num_hpd = 2;
 			adev->mode_info.num_dig = 2;
 			break;
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 0, 1):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 		case IP_VERSION(2, 1, 0):
+#endif
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
 		case IP_VERSION(3, 1, 5):
 		case IP_VERSION(3, 1, 6):
+#endif
 			adev->mode_info.num_crtc = 4;
 			adev->mode_info.num_hpd = 4;
 			adev->mode_info.num_dig = 4;
@@ -5191,8 +5225,10 @@ fill_gfx9_tiling_info_from_device(const struct amdgpu_device *adev,
 	tiling_info->gfx9.num_rb_per_se =
 		adev->gfx.config.gb_addr_config_fields.num_rb_per_se;
 	tiling_info->gfx9.shaderEnable = 1;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (adev->ip_versions[GC_HWIP][0] >= IP_VERSION(10, 3, 0))
 		tiling_info->gfx9.num_pkrs = adev->gfx.config.gb_addr_config_fields.num_pkrs;
+#endif
 }
 
 static int
@@ -5759,11 +5795,14 @@ fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 	if (modifier_has_dcc(modifier) && !force_disable_dcc) {
 		uint64_t dcc_address = afb->address + afb->base.offsets[1];
 		bool independent_64b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_64B, modifier);
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		bool independent_128b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_128B, modifier);
+#endif
 
 		dcc->enable = 1;
 		dcc->meta_pitch = afb->base.pitches[1];
 		dcc->independent_64b_blks = independent_64b_blks;
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (AMD_FMT_MOD_GET(TILE_VERSION, modifier) == AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS) {
 			if (independent_64b_blks && independent_128b_blks)
 				dcc->dcc_ind_blk = hubp_ind_block_64b_no_128bcl;
@@ -5779,6 +5818,7 @@ fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 			else
 				dcc->dcc_ind_blk = hubp_ind_block_unconstrained;
 		}
+#endif
 
 		address->grph.meta_addr.low_part = lower_32_bits(dcc_address);
 		address->grph.meta_addr.high_part = upper_32_bits(dcc_address);
@@ -6646,7 +6686,7 @@ static void dm_enable_per_frame_crtc_master_sync(struct dc_state *context)
 }
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 static void update_dsc_caps(struct amdgpu_dm_connector *aconnector,
 							struct dc_sink *sink, struct dc_stream_state *stream,
 							struct dsc_dec_dpcd_caps *dsc_caps)
@@ -6799,7 +6839,7 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 		stream->timing.dsc_cfg.bits_per_pixel = aconnector->dsc_settings.dsc_bits_per_pixel;
 }
 #endif
-#endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif /* CONFIG_DRM_AMD_DC_DCN1_0 */
 
 /**
  * DOC: FreeSync Video
@@ -6964,7 +7004,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 	int mode_refresh;
 	int preferred_refresh = 0;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_dec_dpcd_caps dsc_caps;
 #endif
 #endif
@@ -7058,7 +7098,7 @@ create_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			requested_bpc);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* SST DSC determination policy */
 	update_dsc_caps(aconnector, sink, stream, &dsc_caps);
 	if (aconnector->dsc_settings.dsc_force_enable != DSC_CLK_FORCE_DISABLE && dsc_caps.is_dsc_supported)
@@ -7320,7 +7360,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
 	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct dm_crtc_state *acrtc_state = to_dm_crtc_state(crtc->state);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	struct amdgpu_display_manager *dm = &adev->dm;
 	struct vblank_control_work *work;
 #endif
@@ -7346,7 +7386,7 @@ static inline int dm_set_vblank(struct drm_crtc *crtc, bool enable)
 	if (amdgpu_in_reset(adev))
 		return 0;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (dm->vblank_control_workqueue) {
 		work = kzalloc(sizeof(*work), GFP_ATOMIC);
 		if (!work)
@@ -10290,7 +10330,7 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 	/* Update the planes if changed or disable if we don't have any. */
 	if ((planes_count || acrtc_state->active_planes == 0) &&
 		acrtc_state->stream) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		/*
 		 * If PSR or idle optimizations are enabled then flush out
 		 * any pending work before hardware programming.
@@ -10744,7 +10784,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	if (dc_state) {
 		/* if there mode set or reset, disable eDP PSR */
 		if (mode_set_reset_required) {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 			if (dm->vblank_control_workqueue)
 				flush_workqueue(dm->vblank_control_workqueue);
 #endif
@@ -12144,7 +12184,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	bool lock_and_validation_needed = false;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
 	struct drm_dp_mst_topology_state *mst_state;
 	struct drm_dp_mst_topology_mgr *mgr;
@@ -12200,7 +12240,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			}
 		}
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 		pre_validate_dsc(state, &dm_state, vars);
+#endif
 #endif
 	}
 #endif
@@ -12456,7 +12498,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	}
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
 	for_each_new_mst_mgr_in_state(state, mgr, mst_state, i) {
@@ -12515,7 +12557,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT) && \
-	defined(CONFIG_DRM_AMD_DC_DCN)
+	defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (!compute_mst_dsc_configs_for_state(state, dm_state->context, vars)) {
 			DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
 			goto fail;

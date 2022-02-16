@@ -74,8 +74,10 @@ struct _vcs_dpi_soc_bounding_box_st {
 	unsigned int num_states;
 	double sr_exit_time_us;
 	double sr_enter_plus_exit_time_us;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	double sr_exit_z8_time_us;
 	double sr_enter_plus_exit_z8_time_us;
+#endif
 	double urgent_latency_us;
 	double urgent_latency_pixel_data_only_us;
 	double urgent_latency_pixel_mixed_with_vm_data_us;
@@ -128,7 +130,9 @@ struct _vcs_dpi_soc_bounding_box_st {
 
 struct _vcs_dpi_ip_params_st {
 	bool use_min_dcfclk;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	bool clamp_min_dcfclk;
+#endif
 	bool gpuvm_enable;
 	bool hostvm_enable;
 	bool dsc422_native_support;
@@ -161,6 +165,7 @@ struct _vcs_dpi_ip_params_st {
 	unsigned int writeback_interface_buffer_size_kbytes;
 	unsigned int writeback_line_buffer_buffer_size;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	unsigned int writeback_10bpc420_supported;
 	double writeback_max_hscl_ratio;
 	double writeback_max_vscl_ratio;
@@ -171,6 +176,7 @@ struct _vcs_dpi_ip_params_st {
 	unsigned int writeback_max_vscl_taps;
 	unsigned int writeback_line_buffer_luma_buffer_size;
 	unsigned int writeback_line_buffer_chroma_buffer_size;
+#endif
 
 	unsigned int max_page_table_levels;
 	unsigned int max_num_dpp;
@@ -211,12 +217,14 @@ struct _vcs_dpi_ip_params_st {
 	unsigned int is_line_buffer_bpp_fixed;
 	unsigned int line_buffer_fixed_bpp;
 	unsigned int dcc_supported;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	unsigned int config_return_buffer_size_in_kbytes;
 	unsigned int compressed_buffer_segment_size_in_kbytes;
 	unsigned int meta_fifo_size_in_kentries;
 	unsigned int zero_size_buffer_entries;
 	unsigned int compbuf_reserved_space_64b;
 	unsigned int compbuf_reserved_space_zs;
+#endif
 
 	unsigned int IsLineBufferBppFixed;
 	unsigned int LineBufferFixedBpp;

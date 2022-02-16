@@ -46,7 +46,7 @@
 #endif
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "dc/dcn20/dcn20_resource.h"
 bool is_timing_changed(struct dc_stream_state *cur_stream,
 		       struct dc_stream_state *new_stream);
@@ -201,7 +201,7 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&

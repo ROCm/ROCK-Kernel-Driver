@@ -2051,7 +2051,9 @@ int dcn20_populate_dml_pipes_from_context(
 		unsigned int v_total;
 		unsigned int front_porch;
 		int output_bpc;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		struct audio_check aud_check = {0};
+#endif
 
 		if (!res_ctx->pipe_ctx[i].stream)
 			continue;
@@ -2113,9 +2115,11 @@ int dcn20_populate_dml_pipes_from_context(
 		case 1:
 			pipes[pipe_cnt].pipe.dest.odm_combine = dm_odm_combine_mode_2to1;
 			break;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		case 3:
 			pipes[pipe_cnt].pipe.dest.odm_combine = dm_odm_combine_mode_4to1;
 			break;
+#endif
 		default:
 			pipes[pipe_cnt].pipe.dest.odm_combine = dm_odm_combine_mode_disabled;
 		}
@@ -2184,9 +2188,11 @@ int dcn20_populate_dml_pipes_from_context(
 		case COLOR_DEPTH_161616:
 			output_bpc = 16;
 			break;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 		case COLOR_DEPTH_999:
 			output_bpc = 9;
 			break;
+#endif
 		case COLOR_DEPTH_111111:
 			output_bpc = 11;
 			break;
@@ -2229,9 +2235,11 @@ int dcn20_populate_dml_pipes_from_context(
 
 		/* todo: default max for now, until there is logic reflecting this in dc*/
 		pipes[pipe_cnt].dout.dsc_input_bpc = 12;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		/*fill up the audio sample rate (unit in kHz)*/
 		get_audio_check(&res_ctx->pipe_ctx[i].stream->audio_info, &aud_check);
 		pipes[pipe_cnt].dout.max_audio_sample_rate = aud_check.max_audiosample_rate / 1000;
+#endif
 		/*
 		 * For graphic plane, cursor number is 1, nv12 is 0
 		 * bw calculations due to cursor on/off
@@ -2278,10 +2286,13 @@ int dcn20_populate_dml_pipes_from_context(
 			if (pipes[pipe_cnt].pipe.dest.odm_combine == dm_odm_combine_mode_2to1) {
 				pipes[pipe_cnt].pipe.src.viewport_width /= 2;
 				pipes[pipe_cnt].pipe.dest.recout_width /= 2;
-			} else if (pipes[pipe_cnt].pipe.dest.odm_combine == dm_odm_combine_mode_4to1) {
+			} 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
+			else if (pipes[pipe_cnt].pipe.dest.odm_combine == dm_odm_combine_mode_4to1) {
 				pipes[pipe_cnt].pipe.src.viewport_width /= 4;
 				pipes[pipe_cnt].pipe.dest.recout_width /= 4;
 			}
+#endif
 		} else {
 			struct dc_plane_state *pln = res_ctx->pipe_ctx[i].plane_state;
 			struct scaler_data *scl = &res_ctx->pipe_ctx[i].plane_res.scl_data;
@@ -2312,8 +2323,12 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].pipe.src.surface_height_y = pln->plane_size.surface_size.height;
 			pipes[pipe_cnt].pipe.src.surface_width_c = pln->plane_size.chroma_size.width;
 			pipes[pipe_cnt].pipe.src.surface_height_c = pln->plane_size.chroma_size.height;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 			if (pln->format == SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA
 					|| pln->format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
+#else
+			if (pln->format >= SURFACE_PIXEL_FORMAT_VIDEO_BEGIN) {
+#endif
 				pipes[pipe_cnt].pipe.src.data_pitch = pln->plane_size.surface_pitch;
 				pipes[pipe_cnt].pipe.src.data_pitch_c = pln->plane_size.chroma_pitch;
 				pipes[pipe_cnt].pipe.src.meta_pitch = pln->dcc.meta_pitch;
@@ -2329,8 +2344,10 @@ int dcn20_populate_dml_pipes_from_context(
 			pipes[pipe_cnt].pipe.dest.full_recout_width = scl->recout.width;
 			if (pipes[pipe_cnt].pipe.dest.odm_combine == dm_odm_combine_mode_2to1)
 				pipes[pipe_cnt].pipe.dest.full_recout_width *= 2;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 			else if (pipes[pipe_cnt].pipe.dest.odm_combine == dm_odm_combine_mode_4to1)
 				pipes[pipe_cnt].pipe.dest.full_recout_width *= 4;
+#endif
 			else {
 				struct pipe_ctx *split_pipe = res_ctx->pipe_ctx[i].bottom_pipe;
 
@@ -2388,8 +2405,10 @@ int dcn20_populate_dml_pipes_from_context(
 			case SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS:
 				pipes[pipe_cnt].pipe.src.source_format = dm_444_8;
 				break;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 			case SURFACE_PIXEL_FORMAT_GRPH_RGBE_ALPHA:
 				pipes[pipe_cnt].pipe.src.source_format = dm_rgbe_alpha;
+#endif
 				break;
 			default:
 				pipes[pipe_cnt].pipe.src.source_format = dm_444_32;
@@ -2774,6 +2793,7 @@ int dcn20_validate_apply_pipe_split_flags(
 			split[i] = 2;
 			v->ODMCombineEnablePerState[vlevel][pipe_plane] = dm_odm_combine_mode_2to1;
 		}
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		if (dc->debug.force_odm_combine_4to1 & (1 << pipe->stream_res.tg->inst)) {
 			split[i] = 4;
 			v->ODMCombineEnablePerState[vlevel][pipe_plane] = dm_odm_combine_mode_4to1;
@@ -2783,6 +2803,7 @@ int dcn20_validate_apply_pipe_split_flags(
 				pipe->stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
 			split[i] = 4;
 		}
+#endif
 		v->ODMCombineEnabled[pipe_plane] =
 			v->ODMCombineEnablePerState[vlevel][pipe_plane];
 
@@ -3046,9 +3067,11 @@ static void dcn20_calculate_wm(
 	context->bw_ctx.bw.dcn.watermarks.b.cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.b.cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.b.pte_meta_urgent_ns = get_wm_memory_trip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	context->bw_ctx.bw.dcn.watermarks.b.frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.b.frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.b.urgent_latency_ns = get_urgent_latency(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#endif
 
 	if (vlevel < 2) {
 		pipes[0].clks_cfg.voltage = 2;
@@ -3060,9 +3083,10 @@ static void dcn20_calculate_wm(
 	context->bw_ctx.bw.dcn.watermarks.c.cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.c.cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.c.pte_meta_urgent_ns = get_wm_memory_trip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	context->bw_ctx.bw.dcn.watermarks.c.frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.c.frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
-
+#endif
 	if (vlevel < 3) {
 		pipes[0].clks_cfg.voltage = 3;
 		pipes[0].clks_cfg.dcfclk_mhz = context->bw_ctx.dml.soc.clock_limits[2].dcfclk_mhz;
@@ -3073,8 +3097,10 @@ static void dcn20_calculate_wm(
 	context->bw_ctx.bw.dcn.watermarks.d.cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.d.cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.d.pte_meta_urgent_ns = get_wm_memory_trip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	context->bw_ctx.bw.dcn.watermarks.d.frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.d.frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#endif
 
 	pipes[0].clks_cfg.voltage = vlevel;
 	pipes[0].clks_cfg.dcfclk_mhz = context->bw_ctx.dml.soc.clock_limits[vlevel].dcfclk_mhz;
@@ -3084,10 +3110,13 @@ static void dcn20_calculate_wm(
 	context->bw_ctx.bw.dcn.watermarks.a.cstate_pstate.cstate_exit_ns = get_wm_stutter_exit(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.a.cstate_pstate.pstate_change_ns = get_wm_dram_clock_change(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.a.pte_meta_urgent_ns = get_wm_memory_trip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	context->bw_ctx.bw.dcn.watermarks.a.frac_urg_bw_nom = get_fraction_of_urgent_bandwidth(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
 	context->bw_ctx.bw.dcn.watermarks.a.frac_urg_bw_flip = get_fraction_of_urgent_bandwidth_imm_flip(&context->bw_ctx.dml, pipes, pipe_cnt) * 1000;
+#endif
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 static bool is_dtbclk_required(struct dc *dc, struct dc_state *context)
 {
 	int i;
@@ -3099,6 +3128,7 @@ static bool is_dtbclk_required(struct dc *dc, struct dc_state *context)
 	}
 	return false;
 }
+#endif
 
 static enum dcn_zstate_support_state  decide_zstate_support(struct dc *dc, struct dc_state *context)
 {
@@ -3162,9 +3192,10 @@ void dcn20_calculate_dlg_params(
 							!= dm_dram_clock_change_unsupported;
 	context->bw_ctx.bw.dcn.clk.dppclk_khz = 0;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	context->bw_ctx.bw.dcn.clk.zstate_support = decide_zstate_support(dc, context);
-
 	context->bw_ctx.bw.dcn.clk.dtbclk_en = is_dtbclk_required(dc, context);
+#endif
 
 	if (context->bw_ctx.bw.dcn.clk.dispclk_khz < dc->debug.min_disp_clk_khz)
 		context->bw_ctx.bw.dcn.clk.dispclk_khz = dc->debug.min_disp_clk_khz;
@@ -3176,8 +3207,11 @@ void dcn20_calculate_dlg_params(
 		pipes[pipe_idx].pipe.dest.vupdate_offset = get_vupdate_offset(&context->bw_ctx.dml, pipes, pipe_cnt, pipe_idx);
 		pipes[pipe_idx].pipe.dest.vupdate_width = get_vupdate_width(&context->bw_ctx.dml, pipes, pipe_cnt, pipe_idx);
 		pipes[pipe_idx].pipe.dest.vready_offset = get_vready_offset(&context->bw_ctx.dml, pipes, pipe_cnt, pipe_idx);
+
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 		context->res_ctx.pipe_ctx[i].det_buffer_size_kb = context->bw_ctx.dml.ip.det_buffer_size_kbytes;
 		context->res_ctx.pipe_ctx[i].unbounded_req = pipes[pipe_idx].pipe.src.unbounded_req_mode;
+#endif
 
 		if (context->bw_ctx.bw.dcn.clk.dppclk_khz < pipes[pipe_idx].clks_cfg.dppclk_mhz * 1000)
 			context->bw_ctx.bw.dcn.clk.dppclk_khz = pipes[pipe_idx].clks_cfg.dppclk_mhz * 1000;
@@ -3192,8 +3226,10 @@ void dcn20_calculate_dlg_params(
 	context->bw_ctx.bw.dcn.clk.max_supported_dppclk_khz = context->bw_ctx.dml.soc.clock_limits[vlevel].dppclk_mhz * 1000;
 	context->bw_ctx.bw.dcn.clk.max_supported_dispclk_khz = context->bw_ctx.dml.soc.clock_limits[vlevel].dispclk_mhz * 1000;
 
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
 	context->bw_ctx.bw.dcn.compbuf_size_kb = context->bw_ctx.dml.ip.config_return_buffer_size_in_kbytes
 						- context->bw_ctx.dml.ip.det_buffer_size_kbytes * pipe_idx;
+#endif
 
 	for (i = 0, pipe_idx = 0; i < dc->res_pool->pipe_count; i++) {
 		bool cstate_en = context->bw_ctx.dml.vba.PrefetchMode[vlevel][context->bw_ctx.dml.vba.maxMpcComb] != 2;

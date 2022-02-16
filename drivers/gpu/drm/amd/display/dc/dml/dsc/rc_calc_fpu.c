@@ -23,7 +23,7 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x) && defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 #include "rc_calc_fpu.h"
 
 #include "qp_tables.h"

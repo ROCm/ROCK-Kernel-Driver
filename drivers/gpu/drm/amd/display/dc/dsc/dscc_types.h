@@ -23,6 +23,7 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #ifndef __DSCC_TYPES_H__
 #define __DSCC_TYPES_H__
 
@@ -49,4 +50,4 @@ struct dsc_parameters {
 int dscc_compute_dsc_parameters(const struct drm_dsc_config *pps, struct dsc_parameters *dsc_params);
 
 #endif
-
+#endif

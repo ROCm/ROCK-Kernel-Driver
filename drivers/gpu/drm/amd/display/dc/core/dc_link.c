@@ -799,7 +799,7 @@ static bool wait_for_entering_dp_alt_mode(struct dc_link *link)
 
 static void apply_dpia_mst_dsc_always_on_wa(struct dc_link *link)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/* Apply work around for tunneled MST on certain USB4 docks. Always use DSC if dock
 	 * reports DSC support.
 	 */
@@ -876,7 +876,7 @@ static bool should_prepare_phy_clocks_for_link_verification(const struct dc *dc,
 
 static void prepare_phy_clocks_for_destructive_link_verification(const struct dc *dc)
 {
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	dc_z10_restore(dc);
 #endif
 	clk_mgr_exit_optimized_pwr_state(dc, dc->clk_mgr);
@@ -2787,7 +2787,7 @@ static bool dp_active_dongle_validate_timing(
 			return false;
 		}
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 		if (dongle_caps->dp_hdmi_frl_max_link_bw_in_kbps > 0) { // DP to HDMI FRL converter
 			struct dc_crtc_timing outputTiming = *timing;
 
@@ -3056,7 +3056,7 @@ bool dc_link_set_psr_allow_active(struct dc_link *link, const bool *allow_active
 	if (allow_active && link->psr_settings.psr_allow_active != *allow_active) {
 		link->psr_settings.psr_allow_active = *allow_active;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 		if (!link->psr_settings.psr_allow_active)
 			dc_z10_restore(dc);
 #endif
@@ -3239,7 +3239,7 @@ bool dc_link_setup_psr(struct dc_link *link,
 	psr_context->psr_level.u32all = 0;
 
 	/*skip power down the single pipe since it blocks the cstate*/
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	if (link->ctx->asic_id.chip_family >= FAMILY_RV) {
 		switch(link->ctx->asic_id.chip_family) {
 		case FAMILY_YELLOW_CARP:
@@ -4692,14 +4692,14 @@ uint32_t dc_bandwidth_in_kbps_from_timing(
 	uint32_t bits_per_channel = 0;
 	uint32_t kbps;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC)
 		return dc_dsc_stream_bandwidth_in_kbps(timing,
 				timing->dsc_cfg.bits_per_pixel,
 				timing->dsc_cfg.num_slices_h,
 				timing->dsc_cfg.is_dp);
-#endif /* CONFIG_DRM_AMD_DC_DCN */
+#endif /* CONFIG_DRM_AMD_DC_DCN1_0 */
 #endif
 
 	switch (timing->display_color_depth) {

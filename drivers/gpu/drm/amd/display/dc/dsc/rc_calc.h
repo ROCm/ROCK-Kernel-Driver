@@ -23,7 +23,7 @@
  * Authors: AMD
  *
  */
-
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #ifndef __RC_CALC_H__
 #define __RC_CALC_H__
 
@@ -32,4 +32,4 @@
 void calc_rc_params(struct rc_params *rc, const struct drm_dsc_config *pps);
 
 #endif
-
+#endif

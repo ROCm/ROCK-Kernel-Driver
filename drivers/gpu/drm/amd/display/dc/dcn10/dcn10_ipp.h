@@ -49,6 +49,7 @@
 	SRI(CURSOR_HOT_SPOT, CURSOR, id), \
 	SRI(CURSOR_DST_OFFSET, CURSOR, id)
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define IPP_REG_LIST_DCN20(id) \
 	IPP_REG_LIST_DCN(id), \
 	SRI(CURSOR_SETTINGS, HUBPREQ, id), \
@@ -59,6 +60,7 @@
 	SRI(CURSOR_POSITION, CURSOR0_, id), \
 	SRI(CURSOR_HOT_SPOT, CURSOR0_, id), \
 	SRI(CURSOR_DST_OFFSET, CURSOR0_, id)
+#endif
 
 #define IPP_REG_LIST_DCN201(id) \
 	IPP_REG_LIST_DCN(id), \
@@ -107,6 +109,7 @@
 	IPP_SF(CURSOR0_CURSOR_DST_OFFSET, CURSOR_DST_X_OFFSET, mask_sh), \
 	IPP_SF(CNVC_CFG0_FORMAT_CONTROL, OUTPUT_FP, mask_sh)
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define IPP_MASK_SH_LIST_DCN20(mask_sh) \
 	IPP_MASK_SH_LIST_DCN(mask_sh), \
 	IPP_SF(HUBPREQ0_CURSOR_SETTINGS, CURSOR0_DST_Y_OFFSET, mask_sh), \
@@ -125,6 +128,7 @@
 	IPP_SF(CURSOR0_0_CURSOR_HOT_SPOT, CURSOR_HOT_SPOT_X, mask_sh), \
 	IPP_SF(CURSOR0_0_CURSOR_HOT_SPOT, CURSOR_HOT_SPOT_Y, mask_sh), \
 	IPP_SF(CURSOR0_0_CURSOR_DST_OFFSET, CURSOR_DST_X_OFFSET, mask_sh)
+#endif
 
 #define IPP_MASK_SH_LIST_DCN201(mask_sh) \
 	IPP_MASK_SH_LIST_DCN(mask_sh), \
@@ -213,11 +217,13 @@ void dcn10_ipp_construct(struct dcn10_ipp *ippn10,
 	const struct dcn10_ipp_shift *ipp_shift,
 	const struct dcn10_ipp_mask *ipp_mask);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 void dcn20_ipp_construct(struct dcn10_ipp *ippn10,
 	struct dc_context *ctx,
 	int inst,
 	const struct dcn10_ipp_registers *regs,
 	const struct dcn10_ipp_shift *ipp_shift,
 	const struct dcn10_ipp_mask *ipp_mask);
+#endif
 
 #endif /* _DCN10_IPP_H_ */

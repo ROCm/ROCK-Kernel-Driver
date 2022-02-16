@@ -1193,6 +1193,7 @@ void dce110_disable_stream(struct pipe_ctx *pipe_ctx)
 
 	link_hwss->reset_stream_encoder(pipe_ctx);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN1_0
 	if (is_dp_128b_132b_signal(pipe_ctx)) {
 		/* TODO: This looks like a bug to me as we are disabling HPO IO when
 		 * we are just disabling a single HPO stream. Shouldn't we disable HPO
@@ -1202,6 +1203,7 @@ void dce110_disable_stream(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->stream->ctx->dc->hwseq->funcs.setup_hpo_hw_control(
 					pipe_ctx->stream->ctx->dc->hwseq, false);
 	}
+#endif
 }
 
 void dce110_unblank_stream(struct pipe_ctx *pipe_ctx,
@@ -1368,7 +1370,7 @@ static void program_scaler(const struct dc *dc,
 {
 	struct tg_color color = {0};
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 	/* TOFPGA */
 	if (pipe_ctx->plane_res.xfm->funcs->transform_set_pixel_storage_depth == NULL)
 		return;
@@ -1468,7 +1470,9 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	struct dc_link *link = stream->link;
 	struct drr_params params = {0};
 	unsigned int event_triggers = 0;
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	struct pipe_ctx *odm_pipe = pipe_ctx->next_odm_pipe;
+#endif
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (hws->funcs.disable_stream_gating) {
@@ -1558,6 +1562,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 		pipe_ctx->stream_res.opp,
 		&stream->bit_depth_params,
 		&stream->clamping);
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	while (odm_pipe) {
 		odm_pipe->stream_res.opp->funcs->opp_set_dyn_expansion(
 				odm_pipe->stream_res.opp,
@@ -1571,6 +1576,7 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 				&stream->clamping);
 		odm_pipe = odm_pipe->next_odm_pipe;
 	}
+#endif
 
 	if (!stream->dpms_off)
 		core_link_enable_stream(context, pipe_ctx);

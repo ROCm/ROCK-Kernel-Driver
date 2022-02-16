@@ -392,15 +392,6 @@ struct amdgpu_display_manager {
 	 */
 	struct mutex audio_lock;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
-	/**
-	 * @vblank_lock:
-	 *
-	 * Guards access to deferred vblank work state.
-	 */
-	spinlock_t vblank_lock;
-#endif
-
 	/**
 	 * @audio_component:
 	 *
@@ -415,6 +406,15 @@ struct amdgpu_display_manager {
 	 * successfully, false otherwise.
 	 */
 	bool audio_registered;
+#endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
+	/**
+	 * @vblank_lock:
+	 *
+	 * Guards access to deferred vblank work state.
+	 */
+	spinlock_t vblank_lock;
 #endif
 
 	/**
@@ -504,7 +504,7 @@ struct amdgpu_display_manager {
 	struct hdcp_workqueue *hdcp_workqueue;
 #endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/**
 	 * @vblank_control_workqueue:
 	 *
@@ -526,9 +526,11 @@ struct amdgpu_display_manager {
 	 * gpu_info FW provided soc bounding box struct or 0 if not
 	 * available in FW
 	 */
+#if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	const struct gpu_info_soc_bounding_box_v1_0 *soc_bounding_box;
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 	/**
 	 * @active_vblank_irq_count:
 	 *

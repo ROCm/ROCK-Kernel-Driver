@@ -52,7 +52,7 @@
 
 #define dm_error(fmt, ...) DRM_ERROR(fmt, ##__VA_ARGS__)
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 #include "amdgpu_dm/dc_fpu.h"
 #define DC_FP_START() dc_fpu_begin(__func__, __LINE__)
 #define DC_FP_END() dc_fpu_end(__func__, __LINE__)

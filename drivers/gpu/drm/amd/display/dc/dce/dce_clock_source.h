@@ -55,6 +55,7 @@
 	CS_SF(PHYPLLA_PIXCLK_RESYNC_CNTL, PHYPLLA_DCCG_DEEP_COLOR_CNTL, mask_sh),\
 	CS_SF(PHYPLLA_PIXCLK_RESYNC_CNTL, PHYPLLA_PIXCLK_DOUBLE_RATE_ENABLE, mask_sh)
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define CS_COMMON_REG_LIST_DCN2_0(index, pllid) \
 		SRI(PIXCLK_RESYNC_CNTL, PHYPLL, pllid),\
 		SRII(PHASE, DP_DTO, 0),\
@@ -99,8 +100,9 @@
 		SRII(PIXEL_RATE_CNTL, OTG, 1),\
 		SRII(PIXEL_RATE_CNTL, OTG, 2),\
 		SRII(PIXEL_RATE_CNTL, OTG, 3)
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 #define CS_COMMON_REG_LIST_DCN3_0(index, pllid) \
 		SRI(PIXCLK_RESYNC_CNTL, PHYPLL, pllid),\
 		SRII(PHASE, DP_DTO, 0),\
@@ -130,9 +132,7 @@
 		SRII(PIXEL_RATE_CNTL, OTG, 1),\
 		SRII(PIXEL_RATE_CNTL, OTG, 2),\
 		SRII(PIXEL_RATE_CNTL, OTG, 3)
-#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 #define CS_COMMON_REG_LIST_DCN3_02(index, pllid) \
 		SRI(PIXCLK_RESYNC_CNTL, PHYPLL, pllid),\
 		SRII(PHASE, DP_DTO, 0),\
@@ -159,15 +159,17 @@
 		SRII(MODULO, DP_DTO, 1),\
 		SRII(PIXEL_RATE_CNTL, OTG, 0),\
 		SRII(PIXEL_RATE_CNTL, OTG, 1)
-
 #endif
+
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 #define CS_COMMON_MASK_SH_LIST_DCN2_0(mask_sh)\
 	CS_SF(DP_DTO0_PHASE, DP_DTO0_PHASE, mask_sh),\
 	CS_SF(DP_DTO0_MODULO, DP_DTO0_MODULO, mask_sh),\
 	CS_SF(PHYPLLA_PIXCLK_RESYNC_CNTL, PHYPLLA_DCCG_DEEP_COLOR_CNTL, mask_sh),\
 	CS_SF(OTG0_PIXEL_RATE_CNTL, DP_DTO0_ENABLE, mask_sh)
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN1_0)
 
 #define CS_COMMON_REG_LIST_DCN1_0(index, pllid) \
 		SRI(PIXCLK_RESYNC_CNTL, PHYPLL, pllid),\
@@ -265,6 +267,7 @@ bool dce112_clk_src_construct(
 	const struct dce110_clk_src_shift *cs_shift,
 	const struct dce110_clk_src_mask *cs_mask);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 bool dcn20_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -273,8 +276,9 @@ bool dcn20_clk_src_construct(
 	const struct dce110_clk_src_regs *regs,
 	const struct dce110_clk_src_shift *cs_shift,
 	const struct dce110_clk_src_mask *cs_mask);
+#endif
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 bool dcn3_clk_src_construct(
 	struct dce110_clk_src *clk_src,
 	struct dc_context *ctx,
@@ -303,7 +307,7 @@ struct pixel_rate_range_table_entry {
 	unsigned short div_factor;
 };
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 extern const struct pixel_rate_range_table_entry video_optimized_pixel_rates[];
 const struct pixel_rate_range_table_entry *look_up_in_video_optimized_rate_tlb(
 		unsigned int pixel_rate_khz);
