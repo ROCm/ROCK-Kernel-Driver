@@ -94,4 +94,6 @@
 #include <kcl/kcl_capability.h>
 #include <kcl/kcl_fdtable.h>
 #include <kcl/kcl_hypervisor.h>
+#include <kcl/kcl_module.h>
+
 #endif /* AMDGPU_BACKPORT_H */
