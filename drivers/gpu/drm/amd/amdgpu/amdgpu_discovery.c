@@ -829,7 +829,9 @@ static struct ip_hw_instance_attr ip_hw_attr[] = {
 };
 
 static struct attribute *ip_hw_instance_attrs[ARRAY_SIZE(ip_hw_attr) + 1];
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 ATTRIBUTE_GROUPS(ip_hw_instance);
+#endif
 
 #define to_ip_hw_instance(x) container_of(x, struct ip_hw_instance, kobj)
 #define to_ip_hw_instance_attr(x) container_of(x, struct ip_hw_instance_attr, attr)
@@ -861,7 +863,11 @@ static void ip_hw_instance_release(struct kobject *kobj)
 static const struct kobj_type ip_hw_instance_ktype = {
 	.release = ip_hw_instance_release,
 	.sysfs_ops = &ip_hw_instance_sysfs_ops,
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 	.default_groups = ip_hw_instance_groups,
+#else
+	.default_attrs = ip_hw_instance_attrs,
+#endif
 };
 
 /* -------------------------------------------------- */
@@ -910,7 +916,9 @@ static struct attribute *ip_die_entry_attrs[] = {
 	&num_ips_attr.attr,
 	NULL,
 };
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 ATTRIBUTE_GROUPS(ip_die_entry); /* ip_die_entry_groups */
+#endif
 
 #define to_ip_die_entry(x) container_of(to_kset(x), struct ip_die_entry, ip_kset)
 
@@ -943,7 +951,11 @@ static const struct sysfs_ops ip_die_entry_sysfs_ops = {
 static const struct kobj_type ip_die_entry_ktype = {
 	.release = ip_die_entry_release,
 	.sysfs_ops = &ip_die_entry_sysfs_ops,
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 	.default_groups = ip_die_entry_groups,
+#else
+	.default_attrs = ip_die_entry_attrs,
+#endif
 };
 
 static const struct kobj_type die_kobj_ktype = {
