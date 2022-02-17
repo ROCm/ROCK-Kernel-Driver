@@ -902,7 +902,9 @@ out_destroy:
 	mutex_unlock(&kfd_processes_mutex);
 	synchronize_srcu(&kfd_processes_srcu);
 	/* kfd_process_free_notifier will trigger the cleanup */
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&process->mmu_notifier);
+#endif
 	return ERR_PTR(ret);
 }
 
