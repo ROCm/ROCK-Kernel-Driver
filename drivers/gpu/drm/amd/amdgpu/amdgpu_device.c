@@ -3639,6 +3639,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->notifier_lock);
 #endif
 	mutex_init(&adev->pm.stable_pstate_ctx_lock);
+	mutex_init(&adev->benchmark_mutex);
 
 	amdgpu_device_init_apu_flags(adev);
 
