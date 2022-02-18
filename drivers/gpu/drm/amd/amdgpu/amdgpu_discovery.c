@@ -321,6 +321,87 @@ static int amdgpu_discovery_validate_ip(const struct ip *ip)
 	return 0;
 }
 
+static void amdgpu_discovery_read_harvest_bit_per_ip(struct amdgpu_device *adev,
+						uint32_t *vcn_harvest_count)
+{
+	struct binary_header *bhdr;
+	struct ip_discovery_header *ihdr;
+	struct die_header *dhdr;
+	struct ip *ip;
+	uint16_t die_offset, ip_offset, num_dies, num_ips;
+	int i, j;
+
+	bhdr = (struct binary_header *)adev->mman.discovery_bin;
+	ihdr = (struct ip_discovery_header *)(adev->mman.discovery_bin +
+			le16_to_cpu(bhdr->table_list[IP_DISCOVERY].offset));
+	num_dies = le16_to_cpu(ihdr->num_dies);
+
+	/* scan harvest bit of all IP data structures */
+	for (i = 0; i < num_dies; i++) {
+		die_offset = le16_to_cpu(ihdr->die_info[i].die_offset);
+		dhdr = (struct die_header *)(adev->mman.discovery_bin + die_offset);
+		num_ips = le16_to_cpu(dhdr->num_ips);
+		ip_offset = die_offset + sizeof(*dhdr);
+
+		for (j = 0; j < num_ips; j++) {
+			ip = (struct ip *)(adev->mman.discovery_bin + ip_offset);
+
+			if (amdgpu_discovery_validate_ip(ip))
+				goto next_ip;
+
+			if (le16_to_cpu(ip->harvest) == 1) {
+				switch (le16_to_cpu(ip->hw_id)) {
+				case VCN_HWID:
+					(*vcn_harvest_count)++;
+					if (ip->number_instance == 0)
+						adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN0;
+					else
+						adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN1;
+					break;
+				case DMU_HWID:
+					adev->harvest_ip_mask |= AMD_HARVEST_IP_DMU_MASK;
+					break;
+				default:
+					break;
+                                }
+                        }
+next_ip:
+			ip_offset += sizeof(*ip) + 4 * (ip->num_base_address - 1);
+		}
+	}
+}
+
+static void amdgpu_disocvery_read_from_harvest_table(struct amdgpu_device *adev,
+						uint32_t *vcn_harvest_count)
+{
+	struct binary_header *bhdr;
+	struct harvest_table *harvest_info;
+	int i;
+
+	bhdr = (struct binary_header *)adev->mman.discovery_bin;
+	harvest_info = (struct harvest_table *)(adev->mman.discovery_bin +
+			le16_to_cpu(bhdr->table_list[HARVEST_INFO].offset));
+	for (i = 0; i < 32; i++) {
+		if (le16_to_cpu(harvest_info->list[i].hw_id) == 0)
+			break;
+
+		switch (le16_to_cpu(harvest_info->list[i].hw_id)) {
+		case VCN_HWID:
+			(*vcn_harvest_count)++;
+			if (harvest_info->list[i].number_instance == 0)
+				adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN0;
+			else
+				adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN1;
+			break;
+		case DMU_HWID:
+			adev->harvest_ip_mask |= AMD_HARVEST_IP_DMU_MASK;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 int amdgpu_discovery_reg_base_init(struct amdgpu_device *adev)
 {
 	struct binary_header *bhdr;
@@ -484,33 +565,20 @@ int amdgpu_discovery_get_ip_version(struct amdgpu_device *adev, int hw_id, int n
 
 void amdgpu_discovery_harvest_ip(struct amdgpu_device *adev)
 {
-	struct binary_header *bhdr;
-	struct harvest_table *harvest_info;
-	int i, vcn_harvest_count = 0;
+	int vcn_harvest_count = 0;
 
-	bhdr = (struct binary_header *)adev->mman.discovery_bin;
-	harvest_info = (struct harvest_table *)(adev->mman.discovery_bin +
-			le16_to_cpu(bhdr->table_list[HARVEST_INFO].offset));
+	/*
+	 * Harvest table does not fit Navi1x and legacy GPUs,
+	 * so read harvest bit per IP data structure to set
+	 * harvest configuration.
+	 */
+	if (adev->ip_versions[GC_HWIP][0] < IP_VERSION(10, 2, 0))
+		amdgpu_discovery_read_harvest_bit_per_ip(adev,
+							&vcn_harvest_count);
+	else
+		amdgpu_disocvery_read_from_harvest_table(adev,
+							&vcn_harvest_count);
 
-	for (i = 0; i < 32; i++) {
-		if (le16_to_cpu(harvest_info->list[i].hw_id) == 0)
-			break;
-
-		switch (le16_to_cpu(harvest_info->list[i].hw_id)) {
-		case VCN_HWID:
-			vcn_harvest_count++;
-			if (harvest_info->list[i].number_instance == 0)
-				adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN0;
-			else
-				adev->vcn.harvest_config |= AMDGPU_VCN_HARVEST_VCN1;
-			break;
-		case DMU_HWID:
-			adev->harvest_ip_mask |= AMD_HARVEST_IP_DMU_MASK;
-			break;
-		default:
-			break;
-		}
-	}
 	/* some IP discovery tables on Navy Flounder don't have this set correctly */
 	if ((adev->ip_versions[UVD_HWIP][1] == IP_VERSION(3, 0, 1)) &&
 	    (adev->ip_versions[GC_HWIP][0] == IP_VERSION(10, 3, 2)))
