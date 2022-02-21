@@ -132,8 +132,6 @@ static void amdgpu_flip_work_func(struct work_struct *__work)
 	int vpos, hpos, stat, min_udelay = 0;
 	struct drm_vblank_crtc *vblank = &crtc->dev->vblank[work->crtc_id];
 
-	if (amdgpu_display_flip_handle_fence(work, &work->excl))
-		return;
 
 	for (i = 0; i < work->shared_count; ++i)
 		if (amdgpu_display_flip_handle_fence(work, &work->shared[i]))
@@ -454,7 +452,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		goto unreserve;
 	}
 
-	r = dma_resv_get_fences(amdkcl_ttm_resvp(&new_abo->tbo), &work->excl,
+	r = dma_resv_get_fences(amdkcl_ttm_resvp(&new_abo->tbo), NULL,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
@@ -510,7 +508,6 @@ unreserve:
 
 cleanup:
 	amdgpu_bo_unref(&work->old_abo);
-	fence_put(work->excl);
 	for (i = 0; i < work->shared_count; ++i)
 		fence_put(work->shared[i]);
 	kfree(work->shared);
