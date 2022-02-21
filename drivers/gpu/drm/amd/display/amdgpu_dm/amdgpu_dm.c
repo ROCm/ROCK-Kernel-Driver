@@ -11781,7 +11781,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		goto fail;
 	}
 
+#if !defined(for_each_new_crtc_in_state)
+	for_each_crtc_in_state(state, crtc, new_crtc_state, i) {
+#else
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
+#endif
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		if (dm_new_crtc_state->mpo_requested)
 			drm_dbg_atomic(dev, "MPO enablement requested on crtc:[%p]\n", crtc);
