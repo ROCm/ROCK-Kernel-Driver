@@ -93,6 +93,13 @@ void drm_mm_print(const struct drm_mm *mm, struct drm_printer *p)
 	_DRM_PRINTK(_once, WARNING, fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef drm_WARN_ONCE
+#define drm_WARN_ONCE(drm, condition, format, arg...)			\
+	WARN_ONCE(condition, "%s %s: " format,				\
+			dev_driver_string((drm)->dev),			\
+			dev_name((drm)->dev), ## arg)
+#endif
+
 #ifndef DRM_NOTE
 #define DRM_NOTE(fmt, ...)						\
 	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
