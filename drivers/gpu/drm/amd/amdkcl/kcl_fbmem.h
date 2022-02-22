@@ -6,7 +6,8 @@
 #include <linux/pci.h>
 
 /* Copied from include/linux/fb.h */
-#if !defined(HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
+#if !defined(HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS) && \
+	!defined(HAVE_DRM_DRM_APERTURE_H)
 extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 					       const char *name);
 #endif
