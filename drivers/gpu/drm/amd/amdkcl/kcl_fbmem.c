@@ -14,7 +14,8 @@
 #include <kcl/kcl_drm_fb.h>
 
 /* Copied from drivers/video/fbdev/core/fbmem.c and modified for KCL */
-#if !defined(HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS)
+#if !defined(HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS) && \
+	!defined(HAVE_DRM_DRM_APERTURE_H)
 int remove_conflicting_pci_framebuffers(struct pci_dev *pdev, const char *name)
 {
 	struct apertures_struct *ap;
