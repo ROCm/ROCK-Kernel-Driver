@@ -572,12 +572,20 @@ void amdgpu_discovery_harvest_ip(struct amdgpu_device *adev)
 	 * so read harvest bit per IP data structure to set
 	 * harvest configuration.
 	 */
-	if (adev->ip_versions[GC_HWIP][0] < IP_VERSION(10, 2, 0))
-		amdgpu_discovery_read_harvest_bit_per_ip(adev,
-							&vcn_harvest_count);
-	else
+	if (adev->ip_versions[GC_HWIP][0] < IP_VERSION(10, 2, 0)) {
+		if ((adev->pdev->device == 0x731E &&
+			(adev->pdev->revision == 0xC6 ||
+			 adev->pdev->revision == 0xC7)) ||
+			(adev->pdev->device == 0x7340 &&
+			 adev->pdev->revision == 0xC9) ||
+			(adev->pdev->device == 0x7360 &&
+			 adev->pdev->revision == 0xC7))
+			amdgpu_discovery_read_harvest_bit_per_ip(adev,
+				&vcn_harvest_count);
+	} else {
 		amdgpu_disocvery_read_from_harvest_table(adev,
-							&vcn_harvest_count);
+			&vcn_harvest_count);
+	}
 
 	/* some IP discovery tables on Navy Flounder don't have this set correctly */
 	if ((adev->ip_versions[UVD_HWIP][1] == IP_VERSION(3, 0, 1)) &&
