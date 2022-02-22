@@ -951,6 +951,9 @@
 /* num_u32_u32 is available */
 #define HAVE_MUL_U32_U32 1
 
+/* pcie_aspm_enabled() is available */
+#define HAVE_PCIE_ASPM_ENABLED 1
+
 /* pcie_bandwidth_available() is available */
 #define HAVE_PCIE_BANDWIDTH_AVAILABLE 1
 
