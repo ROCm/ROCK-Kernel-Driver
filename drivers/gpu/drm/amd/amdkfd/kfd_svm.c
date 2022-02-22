@@ -1234,20 +1234,21 @@ svm_range_unmap_from_gpus(struct svm_range *prange, unsigned long start,
 			if (r)
 				break;
 		}
-		amdgpu_amdkfd_flush_gpu_tlb_pasid(pdd->dev->adev,
-					p->pasid, TLB_FLUSH_HEAVYWEIGHT);
+		kfd_flush_tlb(pdd, TLB_FLUSH_HEAVYWEIGHT);
 	}
 
 	return r;
 }
 
 static int
-svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
-		     struct svm_range *prange, unsigned long offset,
-		     unsigned long npages, bool readonly, dma_addr_t *dma_addr,
-		     struct amdgpu_device *bo_adev, struct dma_fence **fence)
+svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
+		     unsigned long offset, unsigned long npages, bool readonly,
+		     dma_addr_t *dma_addr, struct amdgpu_device *bo_adev,
+		     struct dma_fence **fence)
 {
 	uint64_t vram_base_offset = 0;
+	struct amdgpu_device *adev = pdd->dev->adev;
+	struct amdgpu_vm *vm = drm_priv_to_vm(pdd->drm_priv);
 	bool table_freed = false;
 	uint64_t pte_flags;
 	unsigned long last_start;
@@ -1315,12 +1316,8 @@ svm_range_map_to_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	if (fence)
 		*fence = dma_fence_get(vm->last_update);
 
-	if (table_freed) {
-		struct kfd_process *p;
-
-		p = container_of(prange->svms, struct kfd_process, svms);
-		amdgpu_amdkfd_flush_gpu_tlb_pasid(adev, p->pasid, TLB_FLUSH_LEGACY);
-	}
+	if (table_freed)
+		kfd_flush_tlb(pdd, TLB_FLUSH_LEGACY);
 out:
 	return r;
 }
@@ -1361,8 +1358,7 @@ svm_range_map_to_gpus(struct svm_range *prange, unsigned long offset,
 			continue;
 		}
 
-		r = svm_range_map_to_gpu(pdd->dev->adev, drm_priv_to_vm(pdd->drm_priv),
-					 prange, offset, npages, readonly,
+		r = svm_range_map_to_gpu(pdd, prange, offset, npages, readonly,
 					 prange->dma_addr[gpuidx],
 					 bo_adev, wait ? &fence : NULL);
 		if (r)
@@ -3499,7 +3495,7 @@ fill_values:
 
 int kfd_criu_resume_svm(struct kfd_process *p)
 {
-	struct kfd_ioctl_svm_attribute *set_attr = NULL;
+	struct kfd_ioctl_svm_attribute *set_attr_new, *set_attr = NULL;
 	int nattr_common = 4, nattr_accessibility = 1;
 	struct criu_svm_metadata *criu_svm_md = NULL;
 	struct svm_range_list *svms = &p->svms;
@@ -3528,9 +3524,9 @@ int kfd_criu_resume_svm(struct kfd_process *p)
 			 i, criu_svm_md->data.start_addr, criu_svm_md->data.size);
 
 		for (j = 0; j < num_attrs; j++) {
-			pr_debug("\ncriu_svm_md[%d]->attrs[%d].type : 0x%x \ncriu_svm_md[%d]->attrs[%d].value : 0x%x\n",
-				 i,j, criu_svm_md->data.attrs[j].type,
-				 i,j, criu_svm_md->data.attrs[j].value);
+			pr_debug("\ncriu_svm_md[%d]->attrs[%d].type : 0x%x\ncriu_svm_md[%d]->attrs[%d].value : 0x%x\n",
+				 i, j, criu_svm_md->data.attrs[j].type,
+				 i, j, criu_svm_md->data.attrs[j].value);
 			switch (criu_svm_md->data.attrs[j].type) {
 			/* During Checkpoint operation, the query for
 			 * KFD_IOCTL_SVM_ATTR_PREFETCH_LOC attribute might
@@ -3564,12 +3560,13 @@ int kfd_criu_resume_svm(struct kfd_process *p)
 		 */
 		set_attr_size = sizeof(struct kfd_ioctl_svm_attribute) *
 						(num_attrs + 1);
-		set_attr = krealloc(set_attr, set_attr_size,
+		set_attr_new = krealloc(set_attr, set_attr_size,
 					    GFP_KERNEL);
-		if (!set_attr) {
+		if (!set_attr_new) {
 			ret = -ENOMEM;
 			goto exit;
 		}
+		set_attr = set_attr_new;
 
 		memcpy(set_attr, criu_svm_md->data.attrs, num_attrs *
 					sizeof(struct kfd_ioctl_svm_attribute));
@@ -3614,7 +3611,8 @@ int kfd_criu_restore_svm(struct kfd_process *p,
 	num_devices = p->n_pdds;
 	/* Handle one SVM range object at a time, also the number of gpus are
 	 * assumed to be same on the restore node, checking must be done while
-	 * evaluating the topology earlier */
+	 * evaluating the topology earlier
+	 */
 
 	svm_attrs_size = sizeof(struct kfd_ioctl_svm_attribute) *
 		(nattr_common + nattr_accessibility * num_devices);
@@ -3784,10 +3782,10 @@ int kfd_criu_checkpoint_svm(struct kfd_process *p,
 			goto exit_priv;
 		}
 
-		ret = copy_to_user(user_priv_data + *priv_data_offset,
-				   svm_priv, svm_priv_data_size);
-		if (ret) {
+		if (copy_to_user(user_priv_data + *priv_data_offset, svm_priv,
+				 svm_priv_data_size)) {
 			pr_err("Failed to copy svm priv to user\n");
+			ret = -EFAULT;
 			goto exit_priv;
 		}
 

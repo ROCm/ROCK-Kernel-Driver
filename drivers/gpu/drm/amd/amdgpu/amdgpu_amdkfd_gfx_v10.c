@@ -674,20 +674,6 @@ static bool get_atc_vmid_pasid_mapping_info(struct amdgpu_device *adev,
 	return !!(value & ATC_VMID0_PASID_MAPPING__VALID_MASK);
 }
 
-static int kgd_address_watch_disable(struct amdgpu_device *adev)
-{
-	return 0;
-}
-
-static int kgd_address_watch_execute(struct amdgpu_device *adev,
-					unsigned int watch_point_id,
-					uint32_t cntl_val,
-					uint32_t addr_hi,
-					uint32_t addr_lo)
-{
-	return 0;
-}
-
 static int kgd_wave_control_execute(struct amdgpu_device *adev,
 					uint32_t gfx_index_val,
 					uint32_t sq_cmd)
@@ -709,13 +695,6 @@ static int kgd_wave_control_execute(struct amdgpu_device *adev,
 	WREG32_SOC15(GC, 0, mmGRBM_GFX_INDEX, data);
 	mutex_unlock(&adev->grbm_idx_mutex);
 
-	return 0;
-}
-
-static uint32_t kgd_address_watch_get_offset(struct amdgpu_device *adev,
-					unsigned int watch_point_id,
-					unsigned int reg_offset)
-{
 	return 0;
 }
 
@@ -984,12 +963,6 @@ uint32_t kgd_gfx_v10_clear_address_watch(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int kgd_gfx_v10_set_precise_mem_ops(struct amdgpu_device *adev, uint32_t vmid,
-					bool enable)
-{
-	return -EPERM;
-}
-
 /* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
  * The values read are:
  *	ib_offload_wait_time     -- Wait Count for Indirect Buffer Offloads.
@@ -1069,10 +1042,7 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.hqd_sdma_is_occupied = kgd_hqd_sdma_is_occupied,
 	.hqd_destroy = kgd_hqd_destroy,
 	.hqd_sdma_destroy = kgd_hqd_sdma_destroy,
-	.address_watch_disable = kgd_address_watch_disable,
-	.address_watch_execute = kgd_address_watch_execute,
 	.wave_control_execute = kgd_wave_control_execute,
-	.address_watch_get_offset = kgd_address_watch_get_offset,
 	.get_atc_vmid_pasid_mapping_info =
 			get_atc_vmid_pasid_mapping_info,
 	.set_vm_context_page_table_base = set_vm_context_page_table_base,
@@ -1083,7 +1053,6 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.set_wave_launch_mode = kgd_gfx_v10_set_wave_launch_mode,
 	.set_address_watch = kgd_gfx_v10_set_address_watch,
 	.clear_address_watch = kgd_gfx_v10_clear_address_watch,
-	.set_precise_mem_ops = kgd_gfx_v10_set_precise_mem_ops,
 	.get_iq_wait_times = kgd_gfx_v10_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v10_build_grace_period_packet_info,
 	.program_trap_handler_settings = program_trap_handler_settings,

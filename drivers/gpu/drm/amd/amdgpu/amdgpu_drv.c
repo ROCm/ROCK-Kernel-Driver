@@ -1957,6 +1957,7 @@ static const struct pci_device_id pciidlist[] = {
 
 	/* CYAN_SKILLFISH */
 	{0x1002, 0x13FE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_CYAN_SKILLFISH|AMD_IS_APU},
+	{0x1002, 0x143F, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_CYAN_SKILLFISH|AMD_IS_APU},
 
 	/* BEIGE_GOBY */
 	{0x1002, 0x7420, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CHIP_BEIGE_GOBY},
@@ -2166,7 +2167,7 @@ retry_init:
 	}
 
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC 
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 	/*
 	 * 1. don't init fbdev on hw without DCE
 	 * 2. don't init fbdev if there are no connectors

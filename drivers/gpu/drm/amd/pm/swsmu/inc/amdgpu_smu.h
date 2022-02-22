@@ -337,6 +337,7 @@ struct smu_table_context
 	struct smu_bios_boot_up_values	boot_values;
 	void                            *driver_pptable;
 	void                            *ecc_table;
+	void				*driver_smu_config_table;
 	struct smu_table		tables[SMU_TABLE_COUNT];
 	/*
 	 * The driver table is just a staging buffer for
@@ -1281,6 +1282,16 @@ struct pptable_funcs {
 	 * @stb_collect_info: Collects Smart Trace Buffers data.
 	 */
 	int (*stb_collect_info)(struct smu_context *smu, void *buf, uint32_t size);
+
+	/**
+	 * @get_default_config_table_settings: Get the ASIC default DriverSmuConfig table settings.
+	 */
+	int (*get_default_config_table_settings)(struct smu_context *smu, struct config_table_setting *table);
+
+	/**
+	 * @set_config_table: Apply the input DriverSmuConfig table settings.
+	 */
+	int (*set_config_table)(struct smu_context *smu, struct config_table_setting *table);
 };
 
 typedef enum {

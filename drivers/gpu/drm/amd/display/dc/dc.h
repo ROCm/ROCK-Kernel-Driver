@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.172"
+#define DC_VER "3.2.173"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -613,8 +613,8 @@ struct dc_debug_options {
 	bool disable_dfs_bypass;
 	bool disable_dpp_power_gate;
 	bool disable_hubp_power_gate;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_dsc_power_gate;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	int dsc_min_slice_height_override;
 	int dsc_bpp_increment_div;
 #endif
@@ -1487,7 +1487,10 @@ void dc_z10_restore(const struct dc *dc);
 void dc_z10_save_init(struct dc *dc);
 #endif
 
+bool dc_is_dmub_outbox_supported(struct dc *dc);
 bool dc_enable_dmub_notifications(struct dc *dc);
+
+void dc_enable_dmub_outbox(struct dc *dc);
 
 bool dc_process_dmub_aux_transfer_async(struct dc *dc,
 				uint32_t link_index,

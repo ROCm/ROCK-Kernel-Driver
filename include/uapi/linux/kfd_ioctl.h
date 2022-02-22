@@ -1173,7 +1173,7 @@ struct kfd_ioctl_svm_args {
 	__u32 op;
 	__u32 nattr;
 	/* Variable length array of attributes */
-	struct kfd_ioctl_svm_attribute attrs[0];
+	struct kfd_ioctl_svm_attribute attrs[];
 };
 
 /**
@@ -1256,16 +1256,16 @@ struct kfd_ioctl_set_xnack_mode_args {
 #define AMDKFD_IOC_WAIT_EVENTS			\
 		AMDKFD_IOWR(0x0C, struct kfd_ioctl_wait_events_args)
 
-#define AMDKFD_IOC_DBG_REGISTER			\
+#define AMDKFD_IOC_DBG_REGISTER_DEPRECATED	\
 		AMDKFD_IOW(0x0D, struct kfd_ioctl_dbg_register_args)
 
-#define AMDKFD_IOC_DBG_UNREGISTER		\
+#define AMDKFD_IOC_DBG_UNREGISTER_DEPRECATED	\
 		AMDKFD_IOW(0x0E, struct kfd_ioctl_dbg_unregister_args)
 
-#define AMDKFD_IOC_DBG_ADDRESS_WATCH		\
+#define AMDKFD_IOC_DBG_ADDRESS_WATCH_DEPRECATED	\
 		AMDKFD_IOW(0x0F, struct kfd_ioctl_dbg_address_watch_args)
 
-#define AMDKFD_IOC_DBG_WAVE_CONTROL		\
+#define AMDKFD_IOC_DBG_WAVE_CONTROL_DEPRECATED	\
 		AMDKFD_IOW(0x10, struct kfd_ioctl_dbg_wave_control_args)
 
 #define AMDKFD_IOC_SET_SCRATCH_BACKING_VA	\

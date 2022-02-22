@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
+ * Copyright 2014-2022 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -41,6 +42,41 @@ struct device_process_node {
 	struct list_head list;
 };
 
+union SQ_CMD_BITS {
+	struct {
+		uint32_t cmd:3;
+		uint32_t:1;
+		uint32_t mode:3;
+		uint32_t check_vmid:1;
+		uint32_t trap_id:3;
+		uint32_t:5;
+		uint32_t wave_id:4;
+		uint32_t simd_id:2;
+		uint32_t:2;
+		uint32_t queue_id:3;
+		uint32_t:1;
+		uint32_t vm_id:4;
+	} bitfields, bits;
+	uint32_t u32All;
+	signed int i32All;
+	float f32All;
+};
+
+union GRBM_GFX_INDEX_BITS {
+	struct {
+		uint32_t instance_index:8;
+		uint32_t sh_index:8;
+		uint32_t se_index:8;
+		uint32_t:5;
+		uint32_t sh_broadcast_writes:1;
+		uint32_t instance_broadcast_writes:1;
+		uint32_t se_broadcast_writes:1;
+	} bitfields, bits;
+	uint32_t u32All;
+	signed int i32All;
+	float f32All;
+};
+
 /**
  * struct device_queue_manager_ops
  *
@@ -58,7 +94,7 @@ struct device_process_node {
  *
  * @initialize: Initializes the pipelines and memory module for that device.
  *
- * @start: Initializes the resources/modules the the device needs for queues
+ * @start: Initializes the resources/modules the device needs for queues
  * execution. This function is called on device initialization and after the
  * system woke up after suspension.
  *
@@ -79,7 +115,7 @@ struct device_process_node {
  *
  * @evict_process_queues: Evict all active queues of a process
  *
- * @restore_process_queues: Restore all evicted queues queues of a process
+ * @restore_process_queues: Restore all evicted queues of a process
  *
  * @get_wave_state: Retrieves context save state and optionally copies the
  * control stack, if kept in the MQD, to the given userspace address.
@@ -297,9 +333,7 @@ static inline void dqm_unlock(struct device_queue_manager *dqm)
 
 static inline int read_sdma_queue_counter(uint64_t __user *q_rptr, uint64_t *val)
 {
-        /*
-         * SDMA activity counter is stored at queue's RPTR + 0x8 location.
-         */
+	/* SDMA activity counter is stored at queue's RPTR + 0x8 location. */
 	return get_user(*val, q_rptr + 1);
 }
 #endif /* KFD_DEVICE_QUEUE_MANAGER_H_ */

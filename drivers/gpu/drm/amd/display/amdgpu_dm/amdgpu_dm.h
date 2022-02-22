@@ -791,4 +791,21 @@ int amdgpu_dm_process_dmub_aux_transfer_sync(bool is_cmd_aux,
 
 bool check_seamless_boot_capability(struct amdgpu_device *adev);
 
+struct dc_stream_state *
+	create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
+					const struct drm_display_mode *drm_mode,
+					const struct dm_connector_state *dm_state,
+					const struct dc_stream_state *old_stream);
+
+int dm_atomic_get_state(struct drm_atomic_state *state,
+			struct dm_atomic_state **dm_state);
+
+struct amdgpu_dm_connector *
+amdgpu_dm_find_first_crtc_matching_connector(struct drm_atomic_state *state,
+#ifndef for_each_new_connector_in_state
+                                             struct drm_crtc *crtc,
+                                              bool from_state_var);
+#else
+					     struct drm_crtc *crtc);
+#endif
 #endif /* __AMDGPU_DM_H__ */

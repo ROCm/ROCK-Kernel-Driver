@@ -1026,7 +1026,7 @@ out:
 	return r;
 }
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 static int amdgpu_gem_align_pitch(struct amdgpu_device *adev,
 				  int width,
 				  int cpp,
@@ -1075,7 +1075,7 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 	if (adev->mman.buffer_funcs_enabled)
 		flags |= AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
+#ifdef HAVE_DRM_FBDEV_GENERIC_SETUP
 	args->pitch = amdgpu_gem_align_pitch(adev, args->width,
 					     DIV_ROUND_UP(args->bpp, 8), 0);
 #else
