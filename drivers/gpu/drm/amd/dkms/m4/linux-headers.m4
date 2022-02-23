@@ -126,4 +126,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # arch/cc: Introduce a function to check for confidential computing features
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/cc_platform.h])
+
+	dnl #
+	dnl # v4.12-rc3-120-gfd851a3cdc19
+	dnl # spin loop primitives for busy waiting
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/processor.h])
 ])
