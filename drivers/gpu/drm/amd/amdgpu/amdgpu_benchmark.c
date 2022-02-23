@@ -163,8 +163,8 @@ int amdgpu_benchmark(struct amdgpu_device *adev, int test_number)
 			 "benchmark test: %d (simple test, VRAM to VRAM)\n",
 			 test_number);
 		/* simple test, VRAM to VRAM */
-		amdgpu_benchmark_move(adev, 1024*1024, AMDGPU_GEM_DOMAIN_VRAM,
-				      AMDGPU_GEM_DOMAIN_VRAM);
+		r = amdgpu_benchmark_move(adev, 1024*1024, AMDGPU_GEM_DOMAIN_VRAM,
+					  AMDGPU_GEM_DOMAIN_VRAM);
 		if (r)
 			goto done;
 		break;
