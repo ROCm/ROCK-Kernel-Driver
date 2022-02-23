@@ -882,6 +882,9 @@
 /* Define to 1 if you have the <linux/pgtable.h> header file. */
 #define HAVE_LINUX_PGTABLE_H 1
 
+/* Define to 1 if you have the <linux/processor.h> header file. */
+#define HAVE_LINUX_PROCESSOR_H 1
+
 /* Define to 1 if you have the <linux/sched/mm.h> header file. */
 #define HAVE_LINUX_SCHED_MM_H 1
 
