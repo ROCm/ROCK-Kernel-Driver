@@ -296,6 +296,4 @@ enum drm_dp_phy {
 # define DP_PSR2_SU_GRANULARITY_REQUIRED    (1 << 5)  /* eDP 1.4b */
 #endif
 
-
-
 #endif /* _KCL_DRM_DP_HELPER_H_ */
