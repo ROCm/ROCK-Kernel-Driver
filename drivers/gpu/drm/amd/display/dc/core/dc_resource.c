@@ -144,7 +144,7 @@ enum dce_version resource_parse_asic_id(struct hw_asic_id asic_id)
 #if defined(CONFIG_DRM_AMD_DC_DCN2_x)
 	case FAMILY_NV:
 		dc_version = DCN_VERSION_2_0;
-		if (asic_id.chip_id == DEVICE_ID_NV_13FE || asic_id.chip_id == DEVICE_ID_NV_1400) {
+		if (asic_id.chip_id == DEVICE_ID_NV_13FE || asic_id.chip_id == DEVICE_ID_NV_143F) {
 			dc_version = DCN_VERSION_2_01;
 			break;
 		}
