@@ -1100,7 +1100,9 @@ void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
        // TODO
 }
 
+#if defined(CONFIG_DRM_AMD_DC_DCN3_x)
 void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
 {
-	/* TODO: add peridic detection implementation */
+	/* TODO: add periodic detection implementation */
 }
+#endif
