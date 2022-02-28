@@ -2351,6 +2351,9 @@ void dc_resource_state_construct(
 
 bool dc_resource_is_dsc_encoding_supported(const struct dc *dc)
 {
+	if (dc->res_pool == NULL)
+		return false;
+
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	return dc->res_pool->res_cap->num_dsc > 0;
 #else
