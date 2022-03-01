@@ -1794,7 +1794,8 @@ out:
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
-					unsigned int mem_type)
+					unsigned int mem_type,
+					int preferred_id)
 {
 	int handle;
 	struct kfd_bo *buf_obj;
@@ -1816,7 +1817,11 @@ int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 	buf_obj->cpuva = cpuva;
 	buf_obj->mem_type = mem_type;
 
-	handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+	if (preferred_id < 0)
+		handle = idr_alloc(&pdd->alloc_idr, buf_obj, 0, 0, GFP_KERNEL);
+	else
+		handle = idr_alloc(&pdd->alloc_idr, buf_obj, preferred_id,
+						preferred_id + 1, GFP_KERNEL);
 
 	if (handle < 0)
 		kfree(buf_obj);

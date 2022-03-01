@@ -1178,7 +1178,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, cpuva, mem_type);
+			args->va_addr, args->size, cpuva, mem_type, -1);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
@@ -3003,11 +3003,11 @@ static uint32_t get_process_num_bos(struct kfd_process *p)
 	/* Run over all PDDs of the process */
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
-		void *mem;
+		struct kfd_bo *buf_obj;
 		int id;
 
-		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
-			struct kgd_mem *kgd_mem = (struct kgd_mem *)mem;
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
+			struct kgd_mem *kgd_mem = (struct kgd_mem *)buf_obj->mem;
 
 			if ((uint64_t)kgd_mem->va > pdd->gpuvm_base)
 				num_of_bos++;
@@ -3056,7 +3056,7 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 	struct kfd_criu_bo_bucket *bo_buckets;
 	struct kfd_criu_bo_priv_data *bo_privs;
 	int ret = 0, pdd_index, bo_index = 0, id;
-	void *mem;
+	struct kfd_bo *buf_obj;
 
 	bo_buckets = kvzalloc(num_bos * sizeof(*bo_buckets), GFP_KERNEL);
 	if (!bo_buckets)
@@ -3073,17 +3073,17 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 		struct amdgpu_bo *dumper_bo;
 		struct kgd_mem *kgd_mem;
 
-		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 			struct kfd_criu_bo_bucket *bo_bucket;
 			struct kfd_criu_bo_priv_data *bo_priv;
 			int i, dev_idx = 0;
 
-			if (!mem) {
+			if (!buf_obj) {
 				ret = -ENOMEM;
 				goto exit;
 			}
 
-			kgd_mem = (struct kgd_mem *)mem;
+			kgd_mem = (struct kgd_mem *)buf_obj->mem;
 			dumper_bo = kgd_mem->bo;
 
 			if ((uint64_t)kgd_mem->va <= pdd->gpuvm_base)
@@ -3448,9 +3448,11 @@ static int criu_restore_bos(struct kfd_process *p,
 {
 	struct kfd_criu_bo_bucket *bo_buckets = NULL;
 	struct kfd_criu_bo_priv_data *bo_privs = NULL;
+	unsigned int mem_type = 0;
 	const bool criu_resume = true;
 	bool flush_tlbs = false;
 	int ret = 0, j = 0;
+	uint64_t cpuva = 0;
 	uint32_t i = 0;
 
 	if (*priv_offset + (args->num_bos * sizeof(*bo_privs)) > max_priv_data_size)
@@ -3541,7 +3543,7 @@ static int criu_restore_bos(struct kfd_process *p,
 				goto exit;
 			}
 		} else if (bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
-			offset = bo_priv->user_addr;
+			cpuva = offset = bo_priv->user_addr;
 		}
 		/* Create the BO */
 		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->adev,
@@ -3563,10 +3565,15 @@ static int criu_restore_bos(struct kfd_process *p,
 
 		/* Restore previuos IDR handle */
 		pr_debug("Restoring old IDR handle for the BO");
-		idr_handle = idr_alloc(&pdd->alloc_idr, mem,
-				       bo_priv->idr_handle,
-				       bo_priv->idr_handle + 1, GFP_KERNEL);
+		mem_type = bo_bucket->alloc_flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+				KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+				KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+				KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+				KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 
+		idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+					bo_bucket->addr, bo_bucket->size, cpuva,
+					mem_type, bo_priv->idr_handle);
 		if (idr_handle < 0) {
 			pr_err("Could not allocate idr\n");
 			amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev,
@@ -3602,7 +3609,7 @@ static int criu_restore_bos(struct kfd_process *p,
 				break;
 
 			peer_pdd = kfd_process_device_data_by_id(p, bo_priv->mapped_gpuids[j]);
-			if (IS_ERR(peer_pdd)) {
+			if (!peer_pdd) {
 				ret = -EINVAL;
 				goto exit;
 			}

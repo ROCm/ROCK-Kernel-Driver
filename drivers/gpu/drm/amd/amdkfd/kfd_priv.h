@@ -1129,7 +1129,8 @@ int kfd_reserved_mem_mmap(struct kfd_dev *dev, struct kfd_process *process,
 int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd,
 					void *mem, uint64_t start,
 					uint64_t length, uint64_t cpuva,
-					unsigned int mem_type);
+					unsigned int mem_type,
+					int preferred_id);
 void *kfd_process_device_translate_handle(struct kfd_process_device *p,
 					int handle);
 struct kfd_bo *kfd_process_device_find_bo(struct kfd_process_device *pdd,

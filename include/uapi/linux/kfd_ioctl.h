@@ -1326,7 +1326,7 @@ struct kfd_ioctl_set_xnack_mode_args {
 		AMDKFD_IOWR(0x22, struct kfd_ioctl_criu_args)
 
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x22
+#define AMDKFD_COMMAND_END		0x23
 
 /* non-upstream ioctls */
 #define AMDKFD_IOC_IPC_IMPORT_HANDLE                                    \

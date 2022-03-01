@@ -3582,24 +3582,6 @@ int kfd_criu_resume_svm(struct kfd_process *p)
 		set_attr[num_attrs].type = KFD_IOCTL_SVM_ATTR_CLR_FLAGS;
 		set_attr[num_attrs].value = ~set_flags;
 
-		/* CLR_FLAGS is not available via get_attr during checkpoint but
-		 * it needs to be inserted before restoring the ranges so
-		 * allocate extra space for it before calling set_attr
-		 */
-		set_attr_size = sizeof(struct kfd_ioctl_svm_attribute) *
-						(num_attrs + 1);
-		set_attr = krealloc(set_attr, set_attr_size,
-					    GFP_KERNEL);
-		if (!set_attr) {
-			ret = -ENOMEM;
-			goto exit;
-		}
-
-		memcpy(set_attr, criu_svm_md->data.attrs, num_attrs *
-					sizeof(struct kfd_ioctl_svm_attribute));
-		set_attr[num_attrs].type = KFD_IOCTL_SVM_ATTR_CLR_FLAGS;
-		set_attr[num_attrs].value = ~set_flags;
-
 		ret = svm_range_set_attr(p, mm, criu_svm_md->data.start_addr,
 					 criu_svm_md->data.size, num_attrs + 1,
 					 set_attr);
