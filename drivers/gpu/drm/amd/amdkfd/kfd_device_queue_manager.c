@@ -2990,6 +2990,8 @@ void set_queue_snapshot_entry(struct device_queue_manager *dqm,
 	qss_entry->read_pointer_address = (uint64_t)q->properties.read_ptr,
 	qss_entry->ctx_save_restore_address =
 				q->properties.ctx_save_restore_area_address;
+	qss_entry->ctx_save_restore_area_size =
+				q->properties.ctx_save_restore_area_size;
 	qss_entry->exception_status = q->properties.exception_status;
 	qss_entry->queue_id = q->properties.queue_id;
 	qss_entry->gpu_id = q->device->id;

@@ -72,9 +72,11 @@
  * 9.0 - Handle multiple exceptions from single trap signal
  * 10.0 - Query debug event returns both queue_id and gpu_id
  * 10.1 - Add additional debug capability information
+ * 10.2 - Reserved
+ * 10.3 - Pass context_save_restore_area size to user-space
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	10
-#define KFD_IOCTL_DBG_MINOR_VERSION	1
+#define KFD_IOCTL_DBG_MINOR_VERSION	3
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -148,7 +150,8 @@ struct kfd_queue_snapshot_entry {
 	__u32 gpu_id;
 	__u32 ring_size;
 	__u32 queue_type;
-	__u32 reserved[18];
+	__u32 ctx_save_restore_area_size;
+	__u32 reserved[17];
 };
 
 struct kfd_dbg_device_info_entry {
