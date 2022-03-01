@@ -658,6 +658,27 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 				gc_ver >= IP_VERSION(10, 3, 0));
 
 	gmc->noretry = (amdgpu_noretry == -1) ? noretry_default : amdgpu_noretry;
+
+	/* keep this for kfd test fail */
+	switch (adev->asic_type) {
+	case CHIP_VEGA10:
+	case CHIP_NAVI10:
+	case CHIP_NAVI14:
+	case CHIP_SIENNA_CICHLID:
+	case CHIP_NAVY_FLOUNDER:
+	case CHIP_DIMGREY_CAVEFISH:
+		/*
+		 * noretry = 0 will cause kfd page fault tests fail
+		 * for some ASICs, so set default to 1 for these ASICs.
+		 */
+		if (amdgpu_noretry == -1)
+			gmc->noretry = 1;
+		else
+			gmc->noretry = amdgpu_noretry;
+		break;
+	default:
+		break;
+	}
 }
 
 void amdgpu_gmc_set_vm_fault_masks(struct amdgpu_device *adev, int hub_type,
