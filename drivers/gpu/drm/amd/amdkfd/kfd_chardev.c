@@ -1177,7 +1177,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			    KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
 			    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-			args->va_addr, args->size, cpuva, mem_type);
+			args->va_addr, args->size, cpuva, mem_type, -1);
 	if (idr_handle < 0) {
 		err = -EFAULT;
 		goto err_free;
@@ -1917,11 +1917,11 @@ static uint32_t get_process_num_bos(struct kfd_process *p)
 	/* Run over all PDDs of the process */
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
-		void *mem;
+		struct kfd_bo *buf_obj;
 		int id;
 
-		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
-			struct kgd_mem *kgd_mem = (struct kgd_mem *)mem;
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
+			struct kgd_mem *kgd_mem = (struct kgd_mem *)buf_obj->mem;
 
 			if (!kgd_mem->va || kgd_mem->va > pdd->gpuvm_base)
 				num_of_bos++;
@@ -1965,7 +1965,7 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 	struct kfd_criu_bo_bucket *bo_buckets;
 	struct kfd_criu_bo_priv_data *bo_privs;
 	int ret = 0, pdd_index, bo_index = 0, id;
-	void *mem;
+	struct kfd_bo *buf_obj;
 
 	bo_buckets = kvzalloc(num_bos * sizeof(*bo_buckets), GFP_KERNEL);
 	if (!bo_buckets)
@@ -1982,12 +1982,12 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 		struct amdgpu_bo *dumper_bo;
 		struct kgd_mem *kgd_mem;
 
-		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 			struct kfd_criu_bo_bucket *bo_bucket;
 			struct kfd_criu_bo_priv_data *bo_priv;
 			int i, dev_idx = 0;
 
-			kgd_mem = (struct kgd_mem *)mem;
+			kgd_mem = (struct kgd_mem *)buf_obj->mem;
 			dumper_bo = kgd_mem->bo;
 
 			/* Skip checkpointing BOs that are used for Trap handler
