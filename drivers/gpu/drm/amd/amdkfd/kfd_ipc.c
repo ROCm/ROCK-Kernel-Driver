@@ -147,7 +147,7 @@ static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
 		goto err_read_unlock;
 
 	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
-							  va_addr, size, 0, 0);
+						va_addr, size, 0, 0, -1);
 	if (idr_handle < 0) {
 		r = -EFAULT;
 		goto err_free;
