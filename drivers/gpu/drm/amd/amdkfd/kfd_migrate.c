@@ -311,6 +311,7 @@ svm_migrate_copy_to_vram(struct kfd_node *node, struct svm_range *prange,
 		migrate->dst[i] = svm_migrate_addr_to_pfn(adev, dst[i]);
 		svm_migrate_get_vram_page(prange, migrate->dst[i]);
 		migrate->dst[i] = migrate_pfn(migrate->dst[i]);
+		migrate->dst[i] |= MIGRATE_PFN_LOCKED;
 
 		spage = migrate_pfn_to_page(migrate->src[i]);
 		if (spage && !is_zone_device_page(spage)) {
@@ -640,6 +641,7 @@ svm_migrate_copy_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 				     dst[i] >> PAGE_SHIFT, page_to_pfn(dpage));
 
 		migrate->dst[i] = migrate_pfn(page_to_pfn(dpage));
+		migrate->dst[i] |= MIGRATE_PFN_LOCKED;
 		j++;
 	}
 
