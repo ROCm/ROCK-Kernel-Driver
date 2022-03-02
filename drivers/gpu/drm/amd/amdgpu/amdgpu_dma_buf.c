@@ -93,6 +93,7 @@ int amdgpu_gem_prime_mmap(struct drm_gem_object *obj,
 #endif
 
 #if defined(AMDKCL_AMDGPU_DMABUF_OPS)
+#if defined(HAVE_DMA_BUF_OPS_LEGACY)
 static int
 __dma_resv_make_exclusive(struct dma_resv *obj)
 {
@@ -135,7 +136,6 @@ err_fences_put:
         return -ENOMEM;
 }
 
-#if defined(HAVE_DMA_BUF_OPS_LEGACY)
 /**
  * amdgpu_dma_buf_map_attach - &dma_buf_ops.attach implementation
  * @dma_buf: Shared DMA buffer
