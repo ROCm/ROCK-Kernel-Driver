@@ -28,6 +28,14 @@
 
 #include "../inc/dmub_cmd.h"
 
+#ifdef REG_SET
+#undef REG_SET
+#endif
+
+#ifdef REG_GET
+#undef REG_GET
+#endif
+
 struct dmub_srv;
 
 /* Register offset and field lookup. */
