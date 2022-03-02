@@ -45,7 +45,6 @@ static enum hrtimer_restart amdgpu_vkms_vblank_simulate(struct hrtimer *timer)
 {
 	struct amdgpu_crtc *amdgpu_crtc = container_of(timer, struct amdgpu_crtc, vblank_timer);
 	struct drm_crtc *crtc = &amdgpu_crtc->base;
-	struct amdgpu_device *adev = drm_to_adev(crtc->dev);
 	struct amdgpu_vkms_output *output = drm_crtc_to_amdgpu_vkms_output(crtc);
 	u64 ret_overrun;
 	bool ret;
