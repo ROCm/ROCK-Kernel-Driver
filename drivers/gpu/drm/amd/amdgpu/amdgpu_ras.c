@@ -34,16 +34,15 @@
 #include "amdgpu_atomfirmware.h"
 #include "amdgpu_xgmi.h"
 #include "ivsrcid/nbio/irqsrcs_nbif_7_4.h"
-#ifdef CONFIG_X86
-#include <asm/mce.h>
-#endif
 #include "atom.h"
 #include "amdgpu_reset.h"
 
 #ifdef CONFIG_X86_MCE_AMD
 #include <asm/mce.h>
 
+#ifdef HAVE_SMCA_UMC_V2
 static bool notifier_registered;
+#endif
 #endif
 static const char *RAS_FS_NAME = "ras";
 
@@ -116,11 +115,6 @@ const char *get_ras_block_str(struct ras_common_if *ras_block)
 /* typical ECC bad page rate is 1 bad page per 100MB VRAM */
 #define RAS_BAD_PAGE_COVER              (100 * 1024 * 1024ULL)
 
-#ifdef HAVE_SMCA_UMC_V2
-static bool notifier_registered = false;
-static void amdgpu_register_bad_pages_mca_notifier(void);
-#endif
-
 enum amdgpu_ras_retire_page_reservation {
 	AMDGPU_RAS_RETIRE_PAGE_RESERVED,
 	AMDGPU_RAS_RETIRE_PAGE_PENDING,
@@ -134,12 +128,14 @@ static bool amdgpu_ras_check_bad_page_unlock(struct amdgpu_ras *con,
 static bool amdgpu_ras_check_bad_page(struct amdgpu_device *adev,
 				uint64_t addr);
 #ifdef CONFIG_X86_MCE_AMD
+#ifdef HAVE_SMCA_UMC_V2
 static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev);
 struct mce_notifier_adev_list {
 	struct amdgpu_device *devs[MAX_GPU_INSTANCE];
 	int num_gpu;
 };
 static struct mce_notifier_adev_list mce_adev_list;
+#endif
 #endif
 
 void amdgpu_ras_set_error_query_ready(struct amdgpu_device *adev, bool ready)
