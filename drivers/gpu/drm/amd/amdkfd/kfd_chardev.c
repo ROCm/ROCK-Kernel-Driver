@@ -1687,7 +1687,7 @@ static int kfd_ioctl_ipc_import_handle(struct file *filep,
 
 	r = kfd_ipc_import_handle(pdd->dev, p, args->gpu_id, args->share_handle,
 				  args->va_addr, &args->handle,
-				  &args->mmap_offset, &args->flags);
+				  &args->mmap_offset, &args->flags, false);
 	if (r)
 		pr_err("Failed to import IPC handle\n");
 
@@ -3132,8 +3132,18 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 					bo_priv->mapped_gpuids[dev_idx++] = p->pdds[i]->user_gpu_id;
 			}
 
-			pr_debug("bo_size = 0x%llx, bo_addr = 0x%llx bo_offset = 0x%llx\n"
+			if (kgd_mem->ipc_obj) {
+				bo_priv->ipc_flags = kgd_mem->ipc_obj->flags;
+				bo_priv->is_imported = kgd_mem->is_imported;
+
+				memcpy(bo_priv->ipc_share_handle,
+				       kgd_mem->ipc_obj->share_handle,
+				       sizeof(kgd_mem->ipc_obj->share_handle));
+			}
+
+			pr_debug("[%d]bo_size = 0x%llx, bo_addr = 0x%llx bo_offset = 0x%llx"
 					"gpu_id = 0x%x alloc_flags = 0x%x idr_handle = 0x%x",
+					bo_index,
 					bo_bucket->size,
 					bo_bucket->addr,
 					bo_bucket->offset,
@@ -3444,6 +3454,93 @@ exit:
 	return ret;
 }
 
+static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
+					  struct kfd_criu_bo_bucket *bo_bucket,
+					  struct kfd_criu_bo_priv_data *bo_priv,
+					  struct kgd_mem **kgd_mem)
+{
+	uint64_t alloc_handle = MAKE_HANDLE(pdd->user_gpu_id, bo_priv->idr_handle);
+	struct kfd_dev *dev = pdd->dev;
+	struct kfd_bo *kfd_bo;
+	int ret, idr_handle;
+	uint64_t offset;
+
+	ret = kfd_ipc_import_handle(dev, pdd->process, pdd->user_gpu_id, bo_priv->ipc_share_handle,
+				    bo_bucket->addr, &alloc_handle, &offset, NULL, true);
+	if (ret) {
+		unsigned int mem_type;
+
+		if (ret != -EINVAL) {
+			pr_err("Failed to import IPC handle ret:%d\n", ret);
+			return ret;
+		}
+
+		/* kfd_ipc_import_handle returns -EINVAL if the ipc share_handle does not exist.
+		 * In that case create a new BO and create a new ipc share_handle by calling
+		 * amdgpu_amdkfd_gpuvm_export_ipc_obj.
+		 */
+		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->adev, bo_bucket->addr,
+							      bo_bucket->size, pdd->drm_priv,
+							      NULL, kgd_mem, &offset,
+							      bo_bucket->alloc_flags, true);
+		if (ret) {
+			pr_err("Could not create the BO\n");
+			return ret;
+		}
+
+		pr_debug("New IPC BO created: size:0x%llx addr:0x%llx offset:0x%llx\n",
+			 bo_bucket->size, bo_bucket->addr, offset);
+
+		mem_type = bo_bucket->alloc_flags &
+			   (KFD_IOC_ALLOC_MEM_FLAGS_VRAM | KFD_IOC_ALLOC_MEM_FLAGS_GTT);
+
+		idr_handle = kfd_process_device_create_obj_handle(pdd, *kgd_mem, bo_bucket->addr,
+								  bo_bucket->size, 0, mem_type,
+								  bo_priv->idr_handle);
+		if (idr_handle < 0) {
+			pr_err("Could not allocate idr\n");
+
+			amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, *kgd_mem, pdd->drm_priv,
+							       NULL);
+			return -ENOMEM;
+		}
+
+		ret = amdgpu_amdkfd_gpuvm_export_ipc_obj(dev->adev, pdd->drm_priv, *kgd_mem,
+							 &(*kgd_mem)->ipc_obj, bo_priv->ipc_flags,
+							 bo_priv->ipc_share_handle);
+		if (ret == -EINVAL) {
+			/* This is a race condition. The other process that owns this same IPC
+			 * handle created the handle before this process. Delete BO and re-use
+			 * import IPC handle created by the other process.
+			 */
+			ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, *kgd_mem,
+								     pdd->drm_priv, NULL);
+			if (ret)
+				return ret;
+
+			kfd_process_device_remove_obj_handle(pdd, idr_handle);
+
+			ret = kfd_ipc_import_handle(dev, pdd->process, pdd->user_gpu_id,
+						    bo_priv->ipc_share_handle,
+						    bo_bucket->addr, &alloc_handle,
+						    &offset, NULL, true);
+			if (ret)
+				return ret;
+		}
+	}
+
+	kfd_bo = kfd_process_device_find_bo(pdd, bo_priv->idr_handle);
+	*kgd_mem = kfd_bo->mem;
+	(*kgd_mem)->is_imported = bo_priv->is_imported;
+
+	bo_bucket->restored_offset = offset;
+	if ((bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) && !bo_priv->is_imported)
+		/* Update the VRAM usage count */
+		WRITE_ONCE(pdd->vram_usage, pdd->vram_usage + bo_bucket->size);
+
+	return 0;
+}
+
 static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 				      struct kfd_criu_bo_bucket *bo_bucket,
 				      struct kfd_criu_bo_priv_data *bo_priv,
@@ -3526,10 +3623,13 @@ static int criu_restore_bo(struct kfd_process *p,
 			   struct kfd_criu_bo_bucket *bo_bucket,
 			   struct kfd_criu_bo_priv_data *bo_priv)
 {
+	const uint32_t zero_handle[4] = { 0, 0, 0, 0 };
 	struct kfd_process_device *pdd;
 	struct kgd_mem *kgd_mem;
 	int ret;
 	int j;
+
+	BUILD_BUG_ON(sizeof_field(struct kfd_ipc_obj, share_handle) != sizeof(zero_handle));
 
 	pr_debug("Restoring BO size:0x%llx addr:0x%llx gpu_id:0x%x flags:0x%x idr_handle:0x%x\n",
 		 bo_bucket->size, bo_bucket->addr, bo_bucket->gpu_id, bo_bucket->alloc_flags,
@@ -3541,7 +3641,11 @@ static int criu_restore_bo(struct kfd_process *p,
 		return -ENODEV;
 	}
 
-	ret = criu_restore_memory_of_gpu(pdd, bo_bucket, bo_priv, &kgd_mem);
+	if (memcmp(bo_priv->ipc_share_handle, zero_handle, sizeof(zero_handle)))
+		ret = criu_restore_memory_of_gpu_ipc(pdd, bo_bucket, bo_priv, &kgd_mem);
+	else
+		ret = criu_restore_memory_of_gpu(pdd, bo_bucket, bo_priv, &kgd_mem);
+
 	if (ret)
 		return ret;
 

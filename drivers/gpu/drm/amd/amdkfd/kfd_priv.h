@@ -1265,6 +1265,11 @@ struct kfd_criu_bo_priv_data {
 	uint64_t user_addr;
 	uint32_t idr_handle;
 	uint32_t mapped_gpuids[MAX_GPU_INSTANCE];
+
+	/* IPC related variables */
+	uint32_t is_imported;
+	uint32_t ipc_flags;
+	uint32_t ipc_share_handle[4];
 };
 
 /*
