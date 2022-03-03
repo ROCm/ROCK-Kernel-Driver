@@ -42,7 +42,7 @@ struct kfd_ipc_obj {
 int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 			  uint32_t gpu_id, uint32_t *share_handle,
 			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset, uint32_t *pflags);
+			  uint64_t *mmap_offset, uint32_t *pflags, bool restore);
 int kfd_ipc_import_dmabuf(struct kfd_dev *kfd, struct kfd_process *p,
 			  uint32_t gpu_id, int dmabuf_fd,
 			  uint64_t va_addr, uint64_t *handle,
@@ -52,7 +52,7 @@ int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
 			     uint32_t flags);
 
 int kfd_ipc_store_insert(struct dma_buf *dmabuf, struct kfd_ipc_obj **ipc_obj,
-			 uint32_t flags);
+			 uint32_t flags, uint32_t *restore_handle);
 void kfd_ipc_obj_put(struct kfd_ipc_obj **obj);
 
 #endif /* KFD_IPC_H_ */
