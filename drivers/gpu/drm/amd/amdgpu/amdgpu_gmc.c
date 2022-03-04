@@ -560,33 +560,18 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 	struct amdgpu_gmc *gmc = &adev->gmc;
 
 	switch (adev->asic_type) {
+	case CHIP_VEGA10:
+	case CHIP_VEGA20:
+	case CHIP_ARCTURUS:
+	case CHIP_ALDEBARAN:
 	case CHIP_NAVI10:
 	case CHIP_NAVI14:
 	case CHIP_SIENNA_CICHLID:
 	case CHIP_NAVY_FLOUNDER:
 	case CHIP_DIMGREY_CAVEFISH:
-			/*
-		 * noretry = 0 will cause kfd page fault tests fail
-		 * for some ASICs, so set default to 1 for these ASICs.
-		 */
-		if (amdgpu_noretry == -1)
-			gmc->noretry = 1;
-		else
-			gmc->noretry = amdgpu_noretry;
-		break;
-	default:
-		break;
-	}
-
-	switch (adev->ip_versions[GC_HWIP][0]) {
-	case IP_VERSION(9, 0, 1):
-	case IP_VERSION(9, 4, 0):
-	case IP_VERSION(9, 4, 1):
-	case IP_VERSION(9, 4, 2):
-	case IP_VERSION(10, 3, 5):
-	case IP_VERSION(10, 3, 3):
-	case IP_VERSION(9, 3, 0):
-	case IP_VERSION(10, 3, 6):
+	case CHIP_BEIGE_GOBY:
+	case CHIP_YELLOW_CARP:
+	case CHIP_RENOIR:
 		/*
 		 * noretry = 0 will cause kfd page fault tests fail
 		 * for some ASICs, so set default to 1 for these ASICs.
@@ -596,6 +581,7 @@ void amdgpu_gmc_noretry_set(struct amdgpu_device *adev)
 		else
 			gmc->noretry = amdgpu_noretry;
 		break;
+	case CHIP_RAVEN:
 	default:
 		/* Raven currently has issues with noretry
 		 * regardless of what we decide for other
