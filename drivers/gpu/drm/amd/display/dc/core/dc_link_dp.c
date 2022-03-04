@@ -4011,6 +4011,8 @@ void decide_link_settings(struct dc_stream_state *stream,
 			if (decide_edp_link_settings_with_dsc(link, link_setting, req_bw, max_link_rate))
 				return;
 		} else if (decide_edp_link_settings(link, link_setting, req_bw))
+#else
+		if (decide_edp_link_settings(link, link_setting, req_bw))
 #endif
 			return;
 	} else if (decide_dp_link_settings(link, link_setting, req_bw))
