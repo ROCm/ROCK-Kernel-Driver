@@ -1124,12 +1124,14 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		 * space will be oblivious of this and will use this doorbell
 		 * BO as a regular userptr BO
 		 */
+		mmap_read_lock(current->mm);
 		vma = find_vma(current->mm, args->mmap_offset);
 		if (vma && args->mmap_offset >= vma->vm_start &&
 		    (vma->vm_flags & VM_IO)) {
 			unsigned long pfn;
 
 			err = follow_pfn(vma, args->mmap_offset, &pfn);
+			mmap_read_unlock(current->mm);
 			if (err) {
 				pr_debug("Failed to get PFN: %ld\n", err);
 				goto err_unlock;
@@ -1138,6 +1140,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			flags &= ~KFD_IOC_ALLOC_MEM_FLAGS_USERPTR;
 			offset = (pfn << PAGE_SHIFT);
 		} else {
+			mmap_read_unlock(current->mm);
 			if (offset & (PAGE_SIZE - 1)) {
 				pr_debug("Unaligned userptr address:%llx\n",
 					 offset);
