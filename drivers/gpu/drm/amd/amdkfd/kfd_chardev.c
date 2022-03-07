@@ -333,7 +333,7 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 	pdd = kfd_bind_process_to_device(dev, p);
 	if (IS_ERR(pdd)) {
 		err = -ESRCH;
-		goto err_pdd_bind;
+		goto err_bind_process;
 	}
 
 	/* Starting with GFX11, wptr BOs must be mapped to GART for MES to determine work
@@ -414,8 +414,7 @@ err_create_queue:
 	if (wptr_bo)
 		amdgpu_amdkfd_free_gtt_mem(dev->adev, wptr_bo);
 err_wptr_map_gart:
-err_pdd_bind:
-	amdgpu_read_unlock(dev->ddev);
+err_bind_process:
 err_pdd:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1228,7 +1227,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 					GET_IDR_HANDLE(args->handle));
 	if (!buf_obj) {
 		ret = -EINVAL;
-		goto err_bo;
+		goto err_pdd;
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
@@ -1243,8 +1242,6 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 
 	WRITE_ONCE(pdd->vram_usage, pdd->vram_usage - size);
 
-err_bo:
-	amdgpu_read_unlock(pdd->dev->ddev);
 err_unlock:
 err_pdd:
 	mutex_unlock(&p->mutex);
