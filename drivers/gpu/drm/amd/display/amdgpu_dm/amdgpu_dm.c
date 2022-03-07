@@ -12328,7 +12328,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #else
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 #endif
+#ifndef HAVE_DRM_VRR_SUPPORTED
 		struct dm_crtc_state *dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
+#endif
 		dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
 
 		if (!drm_atomic_crtc_needs_modeset(new_crtc_state) &&
