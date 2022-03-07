@@ -1250,7 +1250,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 					GET_IDR_HANDLE(args->handle));
 	if (!buf_obj) {
 		ret = -EINVAL;
-		goto err_unlock;
+		goto err_pdd;
 	}
 
 	ret = amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
@@ -1354,6 +1354,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 			       PCI_SLOT(pdev->devfn),
 			       PCI_FUNC(pdev->devfn),
 			       ((struct kgd_mem *)mem)->domain);
+
 			goto map_memory_to_gpu_failed;
 		}
 		args->n_success = i+1;
@@ -1482,7 +1483,6 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	mutex_unlock(&p->mutex);
 
 	kfree(devices_arr);
-
 	return 0;
 
 bind_process_to_device_failed:
