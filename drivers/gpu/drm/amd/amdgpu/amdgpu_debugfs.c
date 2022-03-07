@@ -1557,7 +1557,6 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 	struct amdgpu_ring *ring;
 	struct dma_fence **fences = NULL;
 	struct amdgpu_device *adev = (struct amdgpu_device *)data;
-	struct drm_device *dev = adev_to_drm(adev);
 
 	if (val >= AMDGPU_MAX_RINGS)
 		return -EINVAL;
@@ -1577,9 +1576,13 @@ static int amdgpu_debugfs_ib_preempt(void *data, u64 val)
 		return -ENOMEM;
 
 	/* Avoid accidently unparking the sched thread during GPU reset */
-	r = amdgpu_read_lock(dev, true);
+#ifdef HAVE_DOWN_READ_KILLABLE
+	r = down_read_killable(&adev->reset_sem);
 	if (r)
 		goto pro_end;
+#else
+	down_read(&adev->reset_sem);
+#endif
 
 	/* stop the scheduler */
 	kthread_park(ring->sched.thread);
@@ -1620,7 +1623,7 @@ failure:
 	/* restart the scheduler */
 	kthread_unpark(ring->sched.thread);
 
-	amdgpu_read_unlock(dev);
+	up_read(&adev->reset_sem);
 
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 
