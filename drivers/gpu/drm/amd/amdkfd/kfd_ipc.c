@@ -193,18 +193,11 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
 		return -EINVAL;
 
 	mutex_lock(&p->mutex);
-	r = amdgpu_read_lock(dev->ddev, true);
-	if (r)
-		goto err_unlock;
 
 	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id, dmabuf, NULL,
 					    va_addr, handle, mmap_offset, false);
 
-	amdgpu_read_unlock(dev->ddev);
-
-err_unlock:
 	mutex_unlock(&p->mutex);
-
 	dma_buf_put(dmabuf);
 	return r;
 }
@@ -238,9 +231,6 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 
 	if (!restore) {
 		mutex_lock(&p->mutex);
-		r = amdgpu_read_lock(dev->ddev, true);
-		if (r)
-			goto err_unlock;
 	}
 
 	r = kfd_import_dmabuf_create_kfd_bo(dev, p, gpu_id,
@@ -248,7 +238,6 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 					    va_addr, handle, mmap_offset,
 					    restore);
 	if (!restore) {
-		amdgpu_read_unlock(dev->ddev);
 		mutex_unlock(&p->mutex);
 	}
 	if (r)
@@ -258,9 +247,6 @@ int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
 		*pflags = found->flags;
 
 	return r;
-
-err_unlock:
-	mutex_unlock(&p->mutex);
 
 error_unref:
 	kfd_ipc_obj_put(&found);
