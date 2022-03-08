@@ -3695,7 +3695,7 @@ static int criu_restore_bos(struct kfd_process *p,
 	struct kfd_criu_bo_bucket *bo_buckets = NULL;
 	struct kfd_criu_bo_priv_data *bo_privs = NULL;
 	int ret = 0;
-	uint32_t i;
+	uint32_t i = 0;
 
 	if (*priv_offset + (args->num_bos * sizeof(*bo_privs)) > max_priv_data_size)
 		return -EINVAL;
@@ -3731,7 +3731,7 @@ static int criu_restore_bos(struct kfd_process *p,
 	*priv_offset += args->num_bos * sizeof(*bo_privs);
 
 	/* Create and map new BOs */
-	for (i = 0; i < args->num_bos; i++) {
+	for (; i < args->num_bos; i++) {
 		ret = criu_restore_bo(p, &bo_buckets[i], &bo_privs[i]);
 		if (ret) {
 			pr_debug("Failed to restore BO[%d] ret%d\n", i, ret);
