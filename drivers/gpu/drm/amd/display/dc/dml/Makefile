@@ -111,7 +111,9 @@ CFLAGS_REMOVE_$(AMDDALPATH)/dc/dml/display_rq_dlg_helpers.o := $(dml_rcflags)
 DML = calcs/dce_calcs.o calcs/custom_float.o calcs/bw_fixed.o
 DML += display_mode_lib.o display_rq_dlg_helpers.o dml1_display_rq_dlg_calc.o
 
+ifdef CONFIG_DRM_AMD_DC_DCN1_0
 DML += dcn10/dcn10_fpu.o
+endif
 
 ifdef CONFIG_DRM_AMD_DC_DCN2_x
 DML += dcn20/dcn20_fpu.o
@@ -128,7 +130,9 @@ DML += dcn303/dcn303_fpu.o
 DML += dsc/rc_calc_fpu.o
 endif
 
+ifdef CONFIG_DRM_AMD_DC_DCN1_0
 DML += calcs/dcn_calcs.o calcs/dcn_calc_math.o calcs/dcn_calc_auto.o
+endif
 
 AMD_DAL_DML = $(addprefix $(AMDDALPATH)/dc/dml/,$(DML))
 
