@@ -1132,7 +1132,6 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	struct kfd_ioctl_free_memory_of_gpu_args *args = data;
 	struct kfd_process_device *pdd;
 	struct kfd_bo *buf_obj;
-	struct kfd_dev *dev;
 	int ret;
 	uint64_t size = 0;
 
@@ -1388,9 +1387,10 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 			peer_pdd = kfd_process_device_data_by_id(p, devices_arr[i]);
 			if (WARN_ON_ONCE(!peer_pdd))
 				continue;
-				kfd_flush_tlb(peer_pdd, TLB_FLUSH_HEAVYWEIGHT);
-			}
+
+			kfd_flush_tlb(peer_pdd, TLB_FLUSH_HEAVYWEIGHT);
 		}
+	}
 	kfree(devices_arr);
 	return 0;
 
