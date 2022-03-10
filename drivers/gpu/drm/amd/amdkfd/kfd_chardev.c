@@ -1240,7 +1240,6 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	struct kfd_ioctl_free_memory_of_gpu_args *args = data;
 	struct kfd_process_device *pdd;
 	struct kfd_bo *buf_obj;
-	struct kfd_dev *dev;
 	int ret;
 	uint64_t size = 0;
 
