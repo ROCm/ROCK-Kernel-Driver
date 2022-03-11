@@ -4200,7 +4200,7 @@ static u32 convert_brightness_to_user(const struct amdgpu_dm_backlight_caps *cap
 }
 #endif
 
-static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
+static void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 					 int bl_idx,
 					 u32 user_brightness)
 {
@@ -4236,7 +4236,8 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 			DRM_DEBUG("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
 	}
 
-	return rc ? 0 : 1;
+	if (rc)
+		dm->actual_brightness[bl_idx] = user_brightness;
 #else
 	/*
 	 * The brightness input is in the range 0-255
@@ -4254,10 +4255,12 @@ static int amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
 		/ AMDGPU_MAX_BL_LEVEL
 		+ caps.min_input_signal * 0x101;
 
-        rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], brightness, 0);
-        if (!rc)
-                DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
-        return rc ? 0 : 1;
+	rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], brightness, 0);
+    if (!rc)
+		DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
+
+	if (rc)
+		dm->actual_brightness[bl_idx] = user_brightness;
 #endif
 }
 
@@ -11166,7 +11169,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	/* restore the backlight level */
 	for (i = 0; i < dm->num_of_edps; i++) {
 		if (dm->backlight_dev[i] &&
-		    (amdgpu_dm_backlight_get_level(dm, i) != dm->brightness[i]))
+		    (dm->actual_brightness[i] != dm->brightness[i]))
 			amdgpu_dm_backlight_set_level(dm, i, dm->brightness[i]);
 	}
 #endif
