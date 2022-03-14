@@ -35,13 +35,14 @@
 #define __KCL_KCL_DRM_GEM_H__
 
 #include <drm/drm_gem.h>
-#if !defined(HAVE_DRM_GEM_OBJECT_PUT_LOCKED)
-#if defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
+#if defined(HAVE_DRM_GEM_OBJECT_PUT)
+#if defined(HAVE_DRM_GEM_OBJECT_PUT_SYMBOL)
 static inline void
 _kcl_drm_gem_object_put(struct drm_gem_object *obj)
 {
 	return drm_gem_object_put_unlocked(obj);
 }
+#endif
 #else
 static inline void
 drm_gem_object_put(struct drm_gem_object *obj)
@@ -54,7 +55,6 @@ drm_gem_object_get(struct drm_gem_object *obj)
 {
 	kref_get(&obj->refcount);
 }
-#endif
-#endif /* HAVE_DRM_GEM_OBJECT_PUT_LOCKED */
+#endif /* HAVE_DRM_GEM_OBJECT_PUT */
 
 #endif
