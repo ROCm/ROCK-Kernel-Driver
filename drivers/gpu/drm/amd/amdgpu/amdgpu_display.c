@@ -1200,7 +1200,7 @@ err:
 	return ret;
 }
 
-int amdgpu_display_gem_fb_verify_and_init(
+static int amdgpu_display_gem_fb_verify_and_init(
 	struct drm_device *dev, struct amdgpu_framebuffer *rfb,
 	struct drm_file *file_priv, const struct drm_mode_fb_cmd2 *mode_cmd,
 	struct drm_gem_object *obj)
