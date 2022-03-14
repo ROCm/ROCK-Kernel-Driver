@@ -630,7 +630,7 @@ struct queue {
 
 	/* procfs */
 	struct kobject kobj;
-	struct attribute attr_guid;
+	struct attribute attr_gpuid;
 	struct attribute attr_size;
 	struct attribute attr_type;
 

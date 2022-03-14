@@ -504,7 +504,7 @@ int kfd_procfs_add_queue(struct queue *q)
 		return ret;
 	}
 
-	kfd_sysfs_create_file(&q->kobj, &q->attr_guid, "guid");
+	kfd_sysfs_create_file(&q->kobj, &q->attr_gpuid, "gpuid");
 	kfd_sysfs_create_file(&q->kobj, &q->attr_size, "size");
 	kfd_sysfs_create_file(&q->kobj, &q->attr_type, "type");
 
@@ -652,7 +652,7 @@ void kfd_procfs_del_queue(struct queue *q)
 	if (!q)
 		return;
 
-	sysfs_remove_file(&q->kobj, &q->attr_guid);
+	sysfs_remove_file(&q->kobj, &q->attr_gpuid);
 	sysfs_remove_file(&q->kobj, &q->attr_size);
 	sysfs_remove_file(&q->kobj, &q->attr_type);
 
