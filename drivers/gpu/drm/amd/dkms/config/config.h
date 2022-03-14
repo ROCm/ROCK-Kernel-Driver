@@ -539,11 +539,11 @@
 /* drm_gem_object_lookup() wants 2 args */
 #define HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS 1
 
-/* drm_gem_object_put_locked() is available */
-#define HAVE_DRM_GEM_OBJECT_PUT_LOCKED 1
+/* drm_gem_object_put() is available */
+#define HAVE_DRM_GEM_OBJECT_PUT 1
 
-/* drm_gem_object_put_unlocked() is available */
-/* #undef HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED */
+/* drm_gem_object_put() is exported */
+/* #undef HAVE_DRM_GEM_OBJECT_PUT_SYMBOL */
 
 /* ttm_buffer_object->base is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1

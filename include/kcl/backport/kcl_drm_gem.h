@@ -36,8 +36,8 @@
 
 #include <kcl/kcl_drm_gem.h>
 
-#if !defined(HAVE_DRM_GEM_OBJECT_PUT_LOCKED)
-#if defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
+#if defined(HAVE_DRM_GEM_OBJECT_PUT)
+#if defined(HAVE_DRM_GEM_OBJECT_PUT_SYMBOL)
 #define drm_gem_object_put _kcl_drm_gem_object_put
 #endif
 #endif
