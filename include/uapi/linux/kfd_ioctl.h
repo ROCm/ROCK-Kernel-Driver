@@ -33,9 +33,10 @@
  * - 1.5 - Add SVM API
  * - 1.6 - Query clear flags in SVM get_attr API
  * - 1.7 - Checkpoint Restore (CRIU) API
+ * - 1.8 - CRIU - Support for SDMA transfers with GTT BOs
  */
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 7
+#define KFD_IOCTL_MINOR_VERSION 8
 
 /*
  * Debug revision change log
@@ -267,6 +268,7 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 #define KFD_INVALID_GPUID	0xffffffff
 #define KFD_INVALID_QUEUEID	0xffffffff
+#define KFD_INVALID_FD		0xffffffff
 
 enum kfd_dbg_trap_override_mode {
 	KFD_DBG_TRAP_OVERRIDE_OR = 0,

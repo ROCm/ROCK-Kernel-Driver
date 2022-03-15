@@ -48,6 +48,8 @@
 #include "athub_v2_0.h"
 #include "athub_v2_1.h"
 
+#include "amdgpu_reset.h"
+
 #if 0
 static const struct soc15_reg_golden golden_settings_navi10_hdp[] =
 {

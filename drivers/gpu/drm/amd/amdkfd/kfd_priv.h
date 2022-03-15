@@ -1265,6 +1265,11 @@ struct kfd_criu_bo_priv_data {
 	uint64_t user_addr;
 	uint32_t idr_handle;
 	uint32_t mapped_gpuids[MAX_GPU_INSTANCE];
+
+	/* IPC related variables */
+	uint32_t is_imported;
+	uint32_t ipc_flags;
+	uint32_t ipc_share_handle[4];
 };
 
 /*
@@ -1417,9 +1422,6 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
-
-struct kfd_dev *pqm_query_dev_by_qid(struct process_queue_manager *pqm,
-				     unsigned int qid);
 
 int pqm_get_queue_checkpoint_info(struct process_queue_manager *pqm,
 				  unsigned int qid,

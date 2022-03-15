@@ -1795,7 +1795,9 @@ int dcn31_populate_dml_pipes_from_context(
 	struct pipe_ctx *pipe;
 	bool upscaled = false;
 
+	DC_FP_START();
 	dcn20_populate_dml_pipes_from_context(dc, context, pipes, fast_validate);
+	DC_FP_END();
 
 	for (i = 0, pipe_cnt = 0; i < dc->res_pool->pipe_count; i++) {
 		struct dc_crtc_timing *timing;
@@ -2007,7 +2009,9 @@ static void dcn31_calculate_wm_and_dlg_fp(
 		pipe_idx++;
 	}
 
+	DC_FP_START();
 	dcn20_calculate_dlg_params(dc, context, pipes, pipe_cnt, vlevel);
+	DC_FP_END();
 }
 
 void dcn31_calculate_wm_and_dlg(
@@ -2187,7 +2191,7 @@ static struct clock_source *dcn30_clock_source_create(
 	if (!clk_src)
 		return NULL;
 
-	if (dcn3_clk_src_construct(clk_src, ctx, bios, id,
+	if (dcn31_clk_src_construct(clk_src, ctx, bios, id,
 			regs, &cs_shift, &cs_mask)) {
 		clk_src->base.dp_clk_src = dp_clk_src;
 		return &clk_src->base;

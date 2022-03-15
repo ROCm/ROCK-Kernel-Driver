@@ -238,10 +238,12 @@ struct stream_encoder_funcs {
 				uint8_t *dsc_packed_pps,
 				bool immediate_update);
 
+#ifdef CONFIG_DRM_AMD_DC_DCN2_x
 	void (*set_dynamic_metadata)(struct stream_encoder *enc,
 			bool enable,
 			uint32_t hubp_requestor_id,
 			enum dynamic_metadata_mode dmdata_mode);
+#endif
 
 	void (*dp_set_odm_combine)(
 		struct stream_encoder *enc,

@@ -352,7 +352,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,
-				       uint32_t flags);
+				       uint32_t flags,
+				       uint32_t *restore_handle);
 
 void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev);
 

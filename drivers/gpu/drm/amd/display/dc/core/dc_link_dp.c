@@ -39,6 +39,7 @@
 #include "dce/dmub_hw_lock_mgr.h"
 #include "inc/dc_link_dpia.h"
 #include "inc/link_enc_cfg.h"
+#include "link/link_dp_trace.h"
 
 /*Travis*/
 static const uint8_t DP_VGA_LVDS_CONVERTER_ID_2[] = "sivarT";
@@ -347,29 +348,6 @@ static void vendor_specific_lttpr_wa_one_start(struct dc_link *link)
 			sizeof(vendor_lttpr_write_data));
 }
 
-static void vendor_specific_lttpr_wa_one_end(
-	struct dc_link *link,
-	uint8_t retry_count)
-{
-	const uint8_t vendor_lttpr_write_data[4] = {0x1, 0x50, 0x63, 0x0};
-	const uint8_t offset = dp_convert_to_count(
-			link->dpcd_caps.lttpr_caps.phy_repeater_cnt);
-	uint32_t vendor_lttpr_write_address = 0xF004F;
-
-	if (!retry_count) {
-		if (offset != 0xFF)
-			vendor_lttpr_write_address +=
-					((DP_REPEATER_CONFIGURATION_AND_STATUS_SIZE) * (offset - 1));
-
-		/* W/A for certain LTTPR to reset their lane settings, part two of two */
-		core_link_write_dpcd(
-				link,
-				vendor_lttpr_write_address,
-				&vendor_lttpr_write_data[0],
-				sizeof(vendor_lttpr_write_data));
-	}
-}
-
 static void vendor_specific_lttpr_wa_one_two(
 	struct dc_link *link,
 	const uint8_t rate)
@@ -396,9 +374,9 @@ static void vendor_specific_lttpr_wa_one_two(
 	}
 }
 
-static void vendor_specific_lttpr_wa_three(
+static void dp_fixed_vs_pe_read_lane_adjust(
 	struct dc_link *link,
-	union lane_adjust dpcd_lane_adjust[LANE_COUNT_DP_MAX])
+	union dpcd_training_lane dpcd_lane_adjust[LANE_COUNT_DP_MAX])
 {
 	const uint8_t vendor_lttpr_write_data_vs[3] = {0x0, 0x53, 0x63};
 	const uint8_t vendor_lttpr_write_data_pe[3] = {0x0, 0x54, 0x63};
@@ -440,23 +418,8 @@ static void vendor_specific_lttpr_wa_three(
 			1);
 
 	for (lane = 0; lane < LANE_COUNT_DP_MAX; lane++) {
-		dpcd_lane_adjust[lane].bits.VOLTAGE_SWING_LANE = (dprx_vs >> (2 * lane)) & 0x3;
-		dpcd_lane_adjust[lane].bits.PRE_EMPHASIS_LANE = (dprx_pe >> (2 * lane)) & 0x3;
-	}
-}
-
-static void vendor_specific_lttpr_wa_three_dpcd(
-	struct dc_link *link,
-	union dpcd_training_lane dpcd_lane_adjust[LANE_COUNT_DP_MAX])
-{
-	union lane_adjust lane_adjust[LANE_COUNT_DP_MAX];
-	uint8_t lane = 0;
-
-	vendor_specific_lttpr_wa_three(link, lane_adjust);
-
-	for (lane = 0; lane < LANE_COUNT_DP_MAX; lane++) {
-		dpcd_lane_adjust[lane].bits.VOLTAGE_SWING_SET = lane_adjust[lane].bits.VOLTAGE_SWING_LANE;
-		dpcd_lane_adjust[lane].bits.PRE_EMPHASIS_SET = lane_adjust[lane].bits.PRE_EMPHASIS_LANE;
+		dpcd_lane_adjust[lane].bits.VOLTAGE_SWING_SET  = (dprx_vs >> (2 * lane)) & 0x3;
+		dpcd_lane_adjust[lane].bits.PRE_EMPHASIS_SET = (dprx_pe >> (2 * lane)) & 0x3;
 	}
 }
 
@@ -1462,13 +1425,6 @@ static enum link_training_result perform_clock_recovery_sequence(
 				&dpcd_lane_status_updated,
 				dpcd_lane_adjust,
 				offset);
-
-		if (link->dc->debug.apply_vendor_specific_lttpr_wa &&
-				(link->chip_caps & EXT_DISPLAY_PATH_CAPS__DP_FIXED_VS_EN) &&
-				link->lttpr_mode == LTTPR_MODE_TRANSPARENT) {
-			vendor_specific_lttpr_wa_one_end(link, retry_count);
-			vendor_specific_lttpr_wa_three(link, dpcd_lane_adjust);
-		}
 
 		/* 5. check CR done*/
 		if (dp_is_cr_done(lane_count, dpcd_lane_status))
@@ -2827,6 +2783,10 @@ bool perform_link_training_with_retries(
 	enum link_training_result status = LINK_TRAINING_CR_FAIL_LANE0;
 	struct dc_link_settings current_setting = *link_setting;
 	const struct link_hwss *link_hwss = get_link_hwss(link, &pipe_ctx->link_res);
+	int fail_count = 0;
+
+	dp_trace_commit_lt_init(link);
+
 
 	if (dp_get_link_encoding_format(&current_setting) == DP_8b_10b_ENCODING)
 		/* We need to do this before the link training to ensure the idle
@@ -2834,6 +2794,7 @@ bool perform_link_training_with_retries(
 		 */
 		link_hwss->setup_stream_encoder(pipe_ctx);
 
+	dp_trace_set_lt_start_timestamp(link, false);
 	for (j = 0; j < attempts; ++j) {
 
 		DC_LOG_HW_LINK_TRAINING("%s: Beginning link training attempt %u of %d\n",
@@ -2889,10 +2850,15 @@ bool perform_link_training_with_retries(
 						skip_video_pattern);
 			}
 
+			dp_trace_lt_total_count_increment(link, false);
+			dp_trace_lt_result_update(link, status, false);
+			dp_trace_set_lt_end_timestamp(link, false);
 			if (status == LINK_TRAINING_SUCCESS)
 				return true;
 		}
 
+		fail_count++;
+		dp_trace_lt_fail_count_update(link, fail_count, false);
 		/* latest link training still fail, skip delay and keep PHY on
 		 */
 		if (j == (attempts - 1) && link->ep_type == DISPLAY_ENDPOINT_PHY)
@@ -3377,6 +3343,8 @@ static bool dp_verify_link_cap(
 		} else {
 			(*fail_count)++;
 		}
+		dp_trace_lt_total_count_increment(link, true);
+		dp_trace_lt_result_update(link, status, true);
 		dp_disable_link_phy(link, &link_res, link->connector_signal);
 	} while (!success && decide_fallback_link_setting(link,
 			initial_link_settings, &cur_link_settings, status));
@@ -3408,13 +3376,16 @@ bool dp_verify_link_cap_with_retries(
 {
 	int i = 0;
 	bool success = false;
+	int fail_count = 0;
+
+	dp_trace_detect_lt_init(link);
 
 	if (link->link_enc && link->link_enc->features.flags.bits.DP_IS_USB_C &&
 			link->dc->debug.usbc_combo_phy_reset_wa)
 		apply_usbc_combo_phy_reset_wa(link, known_limit_link_setting);
 
+	dp_trace_set_lt_start_timestamp(link, false);
 	for (i = 0; i < attempts; i++) {
-		int fail_count = 0;
 		enum dc_connection_type type = dc_connection_none;
 
 		memset(&link->verified_link_cap, 0,
@@ -3429,6 +3400,10 @@ bool dp_verify_link_cap_with_retries(
 		}
 		msleep(10);
 	}
+
+	dp_trace_lt_fail_count_update(link, fail_count, true);
+	dp_trace_set_lt_end_timestamp(link, true);
+
 	return success;
 }
 
@@ -3518,7 +3493,8 @@ static enum dc_lane_count increase_lane_count(enum dc_lane_count lane_count)
 	}
 }
 
-static enum dc_link_rate increase_link_rate(enum dc_link_rate link_rate)
+static enum dc_link_rate increase_link_rate(struct dc_link *link,
+		enum dc_link_rate link_rate)
 {
 	switch (link_rate) {
 	case LINK_RATE_LOW:
@@ -3530,7 +3506,15 @@ static enum dc_link_rate increase_link_rate(enum dc_link_rate link_rate)
 	case LINK_RATE_HIGH3:
 		return LINK_RATE_UHBR10;
 	case LINK_RATE_UHBR10:
-		return LINK_RATE_UHBR13_5;
+		/* upto DP2.x specs UHBR13.5 is the only link rate that could be
+		 * not supported by DPRX when higher link rate is supported.
+		 * so we treat it as a special case for code simplicity. When we
+		 * have new specs with more link rates like this, we should
+		 * consider a more generic solution to handle discrete link
+		 * rate capabilities.
+		 */
+		return link->dpcd_caps.dp_128b_132b_supported_link_rates.bits.UHBR13_5 ?
+				LINK_RATE_UHBR13_5 : LINK_RATE_UHBR20;
 	case LINK_RATE_UHBR13_5:
 		return LINK_RATE_UHBR20;
 	default:
@@ -3539,11 +3523,16 @@ static enum dc_link_rate increase_link_rate(enum dc_link_rate link_rate)
 }
 
 static bool decide_fallback_link_setting_max_bw_policy(
+		struct dc_link *link,
 		const struct dc_link_settings *max,
-		struct dc_link_settings *cur)
+		struct dc_link_settings *cur,
+		enum link_training_result training_result)
 {
 	uint8_t cur_idx = 0, next_idx;
 	bool found = false;
+
+	if (training_result == LINK_TRAINING_ABORT)
+		return false;
 
 	while (cur_idx < ARRAY_SIZE(dp_lt_fallbacks))
 		/* find current index */
@@ -3557,11 +3546,22 @@ static bool decide_fallback_link_setting_max_bw_policy(
 
 	while (next_idx < ARRAY_SIZE(dp_lt_fallbacks))
 		/* find next index */
-		if (dp_lt_fallbacks[next_idx].lane_count <= max->lane_count &&
-				dp_lt_fallbacks[next_idx].link_rate <= max->link_rate)
-			break;
-		else
+		if (dp_lt_fallbacks[next_idx].lane_count > max->lane_count ||
+				dp_lt_fallbacks[next_idx].link_rate > max->link_rate)
 			next_idx++;
+		else if (dp_lt_fallbacks[next_idx].link_rate == LINK_RATE_UHBR13_5 &&
+				link->dpcd_caps.dp_128b_132b_supported_link_rates.bits.UHBR13_5 == 0)
+			/* upto DP2.x specs UHBR13.5 is the only link rate that
+			 * could be not supported by DPRX when higher link rate
+			 * is supported. so we treat it as a special case for
+			 * code simplicity. When we have new specs with more
+			 * link rates like this, we should consider a more
+			 * generic solution to handle discrete link rate
+			 * capabilities.
+			 */
+			next_idx++;
+		else
+			break;
 
 	if (next_idx < ARRAY_SIZE(dp_lt_fallbacks)) {
 		cur->lane_count = dp_lt_fallbacks[next_idx].lane_count;
@@ -3590,8 +3590,8 @@ static bool decide_fallback_link_setting(
 		return false;
 	if (dp_get_link_encoding_format(&initial_link_settings) == DP_128b_132b_ENCODING ||
 			link->dc->debug.force_dp2_lt_fallback_method)
-		return decide_fallback_link_setting_max_bw_policy(&initial_link_settings,
-				current_link_setting);
+		return decide_fallback_link_setting_max_bw_policy(link, &initial_link_settings,
+				current_link_setting, training_result);
 
 	switch (training_result) {
 	case LINK_TRAINING_CR_FAIL_LANE0:
@@ -3746,7 +3746,7 @@ static bool decide_dp_link_settings(struct dc_link *link, struct dc_link_setting
 							current_link_setting.lane_count);
 		} else {
 			current_link_setting.link_rate =
-					increase_link_rate(
+					increase_link_rate(link,
 							current_link_setting.link_rate);
 			current_link_setting.lane_count =
 					initial_link_setting.lane_count;
@@ -3862,7 +3862,7 @@ static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 				/* minimize lane */
 				if (current_link_setting.link_rate < max_link_rate) {
 					current_link_setting.link_rate =
-							increase_link_rate(
+							increase_link_rate(link,
 									current_link_setting.link_rate);
 				} else {
 					if (current_link_setting.lane_count <
@@ -3883,7 +3883,7 @@ static bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 									current_link_setting.lane_count);
 				} else {
 					current_link_setting.link_rate =
-							increase_link_rate(
+							increase_link_rate(link,
 									current_link_setting.link_rate);
 					current_link_setting.lane_count =
 							initial_link_setting.lane_count;
@@ -4163,7 +4163,7 @@ static void dp_test_send_phy_test_pattern(struct dc_link *link)
 	if (link->dc->debug.apply_vendor_specific_lttpr_wa &&
 			(link->chip_caps & EXT_DISPLAY_PATH_CAPS__DP_FIXED_VS_EN) &&
 			link->lttpr_mode == LTTPR_MODE_TRANSPARENT)
-		vendor_specific_lttpr_wa_three_dpcd(
+		dp_fixed_vs_pe_read_lane_adjust(
 				link,
 				link_training_settings.dpcd_lane_settings);
 
@@ -4701,6 +4701,8 @@ bool dc_link_handle_hpd_rx_irq(struct dc_link *link, union hpd_irq_data *out_hpd
 		status = false;
 		if (out_link_loss)
 			*out_link_loss = true;
+
+		dp_trace_link_loss_increment(link);
 	}
 
 	if (link->type == dc_connection_sst_branch &&
@@ -5137,6 +5139,7 @@ bool dp_retrieve_lttpr_cap(struct dc_link *link)
 				sizeof(lttpr_dpcd_data));
 		if (status != DC_OK) {
 			DC_LOG_DP2("%s: Read LTTPR caps data failed.\n", __func__);
+			link->lttpr_mode = LTTPR_MODE_NON_LTTPR;
 			return false;
 		}
 

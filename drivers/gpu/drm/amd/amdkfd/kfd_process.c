@@ -956,16 +956,12 @@ static void kfd_process_device_free_bos(struct kfd_process_device *pdd)
 
 			if (!peer_pdd->drm_priv)
 				continue;
-			amdgpu_read_lock(peer_pdd->dev->ddev, false);
 			amdgpu_amdkfd_gpuvm_unmap_memory_from_gpu(
 				peer_pdd->dev->adev, buf_obj->mem, peer_pdd->drm_priv);
-			amdgpu_read_unlock(peer_pdd->dev->ddev);
 		}
 
-		amdgpu_read_lock(pdd->dev->ddev, false);
 		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev,
 						      buf_obj->mem, pdd->drm_priv, NULL);
-		amdgpu_read_unlock(pdd->dev->ddev);
 		kfd_process_device_remove_obj_handle(pdd, id);
 	}
 }

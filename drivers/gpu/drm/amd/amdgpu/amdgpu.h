@@ -237,6 +237,9 @@ extern int amdgpu_cik_support;
 #endif
 extern int amdgpu_num_kcq;
 
+#define AMDGPU_VCNFW_LOG_SIZE (32 * 1024)
+extern int amdgpu_vcnfw_log;
+
 #define AMDGPU_VM_MAX_NUM_CTX			4096
 #define AMDGPU_SG_THRESHOLD			(256*1024*1024)
 #define AMDGPU_DEFAULT_GTT_SIZE_MB		3072ULL /* 3GB by default */
@@ -854,6 +857,8 @@ struct ip_discovery_top;
 #define AMDGPU_RESET_MAGIC_NUM 64
 #define AMDGPU_MAX_DF_PERFMONS 4
 #define AMDGPU_PRODUCT_NAME_LEN 64
+struct amdgpu_reset_domain;
+
 struct amdgpu_device {
 	struct device			*dev;
 	struct pci_dev			*pdev;
@@ -1099,11 +1104,7 @@ struct amdgpu_device {
 	bool				in_s4;
 	bool				in_s0ix;
 
-	atomic_t 			in_gpu_reset;
 	enum pp_mp1_state               mp1_state;
-	struct rw_semaphore reset_sem;
-	wait_queue_head_t recovery_fini_event;
-
 	struct amdgpu_doorbell_index doorbell_index;
 
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -1162,6 +1163,8 @@ struct amdgpu_device {
 	/* reset dump register */
 	uint32_t                        *reset_dump_reg_list;
 	int                             num_regs;
+
+	struct amdgpu_reset_domain	*reset_domain;
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)
@@ -1363,6 +1366,8 @@ bool amdgpu_device_has_job_running(struct amdgpu_device *adev);
 bool amdgpu_device_should_recover_gpu(struct amdgpu_device *adev);
 int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 			      struct amdgpu_job* job);
+int amdgpu_device_gpu_recover_imp(struct amdgpu_device *adev,
+			      struct amdgpu_job *job);
 void amdgpu_device_pci_config_reset(struct amdgpu_device *adev);
 int amdgpu_device_pci_reset(struct amdgpu_device *adev);
 bool amdgpu_device_need_post(struct amdgpu_device *adev);
@@ -1557,12 +1562,6 @@ static inline bool amdgpu_is_tmz(struct amdgpu_device *adev)
        return adev->gmc.tmz_enabled;
 }
 
-static inline int amdgpu_in_reset(struct amdgpu_device *adev)
-{
-	return atomic_read(&adev->in_gpu_reset);
-}
-
-int amdgpu_read_lock(struct drm_device *dev, bool interruptible);
-void amdgpu_read_unlock(struct drm_device *dev);
+int amdgpu_in_reset(struct amdgpu_device *adev);
 
 #endif
