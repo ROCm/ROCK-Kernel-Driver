@@ -672,9 +672,6 @@
 /* whether drm_syncobj_find_fence() wants 5 args */
 #define HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS 1
 
-/* drm_sysfs_connector_hotplug_event() function is available */
-#define HAVE_DRM_SYSFS_CONNECTOR_HOTPLUG_EVENT 1
-
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
