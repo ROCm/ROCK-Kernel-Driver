@@ -13,7 +13,7 @@ amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_device_cgroup.o kcl_mn.o kcl_drm_modes.o kcl_time.o kcl_ftrace.o \
 	kcl_acpi_table.o kcl_page_alloc.o kcl_numa.o kcl_fs_read_write.o kcl_drm_aperture.o \
 	kcl_drm_drv.o kcl_drm_simple_kms_helper.o kcl_bitmap.o kcl_vmscan.o kcl_dma_fence_chain.o \
-	kcl_drm_nomodeset.o kcl_drm_sysfs.o
+	kcl_drm_nomodeset.o
 
 amdkcl-$(CONFIG_DRM_AMD_DC_HDCP) += kcl_drm_hdcp.o
 amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
