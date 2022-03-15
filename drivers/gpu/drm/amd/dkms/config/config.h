@@ -909,9 +909,6 @@
 /* enum MAMREMAP_WC is availablea */
 #define HAVE_MEMREMAP_WC 1
 
-/* mem_encrypt_active() is available */
-#define HAVE_MEM_ENCRYPT_ACTIVE 1
-
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
