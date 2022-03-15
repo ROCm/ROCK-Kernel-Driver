@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_KVCALLOC], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/mm.h>
+			#include <linux/slab.h>
 		], [
 			kvcalloc(0, 0, 0);
 		], [
