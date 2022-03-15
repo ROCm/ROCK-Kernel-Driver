@@ -5,7 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_GENERIC_HANDLE_DOMAIN_IRQ], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#include <linux/irqdesc.h>
+			#include <linux/irq.h>
 		], [
 			generic_handle_domain_irq(NULL, 0);
 		], [
