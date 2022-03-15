@@ -527,7 +527,7 @@ AC_DEFUN([AC_KERNEL_COMPILE_IFELSE], [
 	m4_ifvaln([$1], [AC_KERNEL_CONFTEST_C([$1])])
 	m4_ifvaln([$5], [AC_KERNEL_CONFTEST_H([$5])], [AC_KERNEL_CONFTEST_H([])])
 	AS_IF(
-		[AC_TRY_COMMAND($CC $CFLAGS -o conftest.o conftest.c) >/dev/null && AC_TRY_COMMAND([$2])],
+		[AC_TRY_COMMAND(eval $CC $CFLAGS) > /dev/null && AC_TRY_COMMAND([$2])],
 		[$3],
 		[_AC_MSG_LOG_CONFTEST m4_ifvaln([$4],[$4])]
 	)
@@ -542,7 +542,7 @@ dnl #
 AC_DEFUN([AC_KERNEL_TRY_COMPILE],
 	[AC_KERNEL_COMPILE_IFELSE(
 	[AC_LANG_SOURCE([AC_KERNEL_LANG_PROGRAM([[$1]], [[$2]])])],
-	[test -s conftest.o],
+	[test -s conftest.o || test -s .tmp_conftest.o],
 	[$3], [$4])
 ])
 

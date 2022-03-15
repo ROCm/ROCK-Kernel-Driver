@@ -3,27 +3,24 @@ dnl # extract cc, cflags, cppflags
 dnl #
 AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 	AS_IF([test -s .conftest.o.cmd], [
-		_base_cflags="-DKBUILD_BASENAME='\"conftest\"' -DKBUILD_MODNAME='\"conftest\"'"
-		_base_dir=$(basename $PWD)
 		_conftest_cmd=$(head -1 .conftest.o.cmd)
 
 		CC=$(echo $_conftest_cmd | awk -F ' ' '{print $[3]}')
-		CFLAGS=$(echo $_conftest_cmd | \
-			 sed -e 's| -|\n&|g' | \
-			 sed -e "s|\./|${LINUX_OBJ}/|" \
-			     -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|" \
-			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|" \
-			     -e '/conftest/d' \
-			     -e '/KBUILD_/d' \
-			     -e "/$_base_dir/d" | \
-			 xargs)
-		CPPFLAGS=$(echo $CFLAGS | \
-			   sed 's| -|\n&|g' | \
-			   sed -n '/-I/p; /-include/p; /-isystem/p; /-D/p' | \
-			   xargs)
 
-		CFLAGS="$CFLAGS $_base_cflags"
-		CPPFLAGS="$CPPFLAGS $_base_cflags"
+		CFLAGS=$(echo $_conftest_cmd | \
+			 cut -d ' ' -f 4- | \
+			 sed -e "s|\./|${LINUX_OBJ}/|g" \
+			     -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|g" \
+			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|g" \
+			     -e "s|$PWD|\${PWD}|g")
+
+		CPPFLAGS=$(echo $CFLAGS | \
+			   cut -d ';' -f 1 | \
+			   sed 's| -|\n&|g' | \
+			   sed -n -e '/conftest/d' \
+				  -e '/KBUILD/d' \
+				  -e '/-I/p; /-include/p; /-isystem/p; /-D/p' | \
+			   xargs)
 
 		AC_SUBST(CC)
 		AC_SUBST(CFLAGS)
