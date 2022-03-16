@@ -708,9 +708,6 @@
 /* generic_handle_domain_irq() is available */
 #define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
 
-/* get_mm_exe_file() is available */
-#define HAVE_GET_MM_EXE_FILE 1
-
 /* get_user_pages() wants 6 args */
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
 
