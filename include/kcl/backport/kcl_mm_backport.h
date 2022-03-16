@@ -13,10 +13,6 @@
 #define mmput_async _kcl_mmput_async
 #endif
 
-#ifndef HAVE_GET_MM_EXE_FILE
-#define get_mm_exe_file _kcl_get_mm_exe_file
-#endif
-
 #ifdef get_user_pages_remote
 #undef get_user_pages_remote
 #endif
