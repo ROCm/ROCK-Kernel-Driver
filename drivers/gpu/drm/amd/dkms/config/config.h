@@ -1026,6 +1026,9 @@
 /* whether si_mem_available() is available */
 #define HAVE_SI_MEM_AVAILABLE 1
 
+/* smca_get_bank_type() is available */
+#define HAVE_SMCA_GET_BANK_TYPE 1
+
 /* is_smca_umc_v2() is available */
 /* #undef HAVE_SMCA_UMC_V2 */
 
@@ -1116,6 +1119,9 @@
 
 /* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
+
+/* struct smca_bank is available */
+/* #undef HAVE_STRUCT_SMCA_BANK */
 
 /* struct xarray is available */
 #define HAVE_STRUCT_XARRAY 1
