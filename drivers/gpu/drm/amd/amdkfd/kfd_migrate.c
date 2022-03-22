@@ -658,6 +658,22 @@ out_oom:
 	return r;
 }
 
+/**
+ * svm_migrate_vma_to_ram - migrate range inside one vma from device to system
+ *
+ * @adev: amdgpu device to migrate from
+ * @prange: svm range structure
+ * @vma: vm_area_struct that range [start, end] belongs to
+ * @start: range start virtual address in pages
+ * @end: range end virtual address in pages
+ *
+ * Context: Process context, caller hold mmap read lock, prange->migrate_mutex
+ *
+ * Return:
+ *   0 - success with all pages migrated
+ *   negative values - indicate error
+ *   positive values - partial migration, number of pages not migrated
+ */
 static long
 svm_migrate_vma_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 		       struct vm_area_struct *vma, uint64_t start, uint64_t end)
@@ -738,8 +754,6 @@ out:
 		pdd = svm_range_get_pdd_by_adev(prange, adev);
 		if (pdd)
 			WRITE_ONCE(pdd->page_out, pdd->page_out + cpages);
-
-		return upages;
 	}
 	return r ? r : upages;
 }
@@ -749,7 +763,7 @@ out:
  * @prange: range structure
  * @mm: process mm, use current->mm if NULL
  *
- * Context: Process context, caller hold mmap read lock, svms lock, prange lock
+ * Context: Process context, caller hold mmap read lock, prange->migrate_mutex
  *
  * Return:
  * 0 - OK, otherwise error code
@@ -788,13 +802,16 @@ int svm_migrate_vram_to_ram(struct svm_range *prange, struct mm_struct *mm)
 		unsigned long next;
 
 		vma = find_vma(mm, addr);
-		if (!vma || addr < vma->vm_start)
+		if (!vma || addr < vma->vm_start) {
+			pr_debug("failed to find vma for prange %p\n", prange);
+			r = -EFAULT;
 			break;
+		}
 
 		next = min(vma->vm_end, end);
 		r = svm_migrate_vma_to_ram(adev, prange, vma, addr, next);
 		if (r < 0) {
-			pr_debug("failed %ld to migrate\n", r);
+			pr_debug("failed %ld to migrate prange %p\n", r, prange);
 			break;
 		} else {
 			upages += r;
@@ -802,7 +819,7 @@ int svm_migrate_vram_to_ram(struct svm_range *prange, struct mm_struct *mm)
 		addr = next;
 	}
 
-	if (!upages) {
+	if (r >= 0 && !upages) {
 		svm_range_vram_node_free(prange);
 		prange->actual_loc = 0;
 	}

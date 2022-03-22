@@ -41,6 +41,11 @@
 #include <drm/drm_fourcc.h>
 #include <drm/drm_vblank.h>
 
+static int amdgpu_display_framebuffer_init(struct drm_device *dev,
+					   struct amdgpu_framebuffer *rfb,
+					   const struct drm_mode_fb_cmd2 *mode_cmd,
+					   struct drm_gem_object *obj);
+
 static void amdgpu_display_flip_callback(struct dma_fence *f,
 					 struct dma_fence_cb *cb)
 {
@@ -1195,7 +1200,7 @@ err:
 	return ret;
 }
 
-int amdgpu_display_gem_fb_verify_and_init(
+static int amdgpu_display_gem_fb_verify_and_init(
 	struct drm_device *dev, struct amdgpu_framebuffer *rfb,
 	struct drm_file *file_priv, const struct drm_mode_fb_cmd2 *mode_cmd,
 	struct drm_gem_object *obj)
@@ -1233,10 +1238,10 @@ err:
 	return ret;
 }
 
-int amdgpu_display_framebuffer_init(struct drm_device *dev,
-				    struct amdgpu_framebuffer *rfb,
-				    const struct drm_mode_fb_cmd2 *mode_cmd,
-				    struct drm_gem_object *obj)
+static int amdgpu_display_framebuffer_init(struct drm_device *dev,
+					   struct amdgpu_framebuffer *rfb,
+					   const struct drm_mode_fb_cmd2 *mode_cmd,
+					   struct drm_gem_object *obj)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	int ret, i;
