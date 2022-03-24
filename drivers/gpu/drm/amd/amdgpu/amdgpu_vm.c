@@ -960,9 +960,10 @@ int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 
 	if (!unlocked && (!(flags & AMDGPU_PTE_VALID) || params.table_freed)) {
 		tlb_cb->vm = vm;
-		if (!*fence || dma_fence_add_callback(*fence, &tlb_cb->cb,
-						      amdgpu_vm_tlb_seq_cb))
-			amdgpu_vm_tlb_seq_cb(*fence, &tlb_cb->cb);
+		if (!fence || !*fence ||
+		    dma_fence_add_callback(*fence, &tlb_cb->cb,
+					   amdgpu_vm_tlb_seq_cb))
+			amdgpu_vm_tlb_seq_cb(NULL, &tlb_cb->cb);
 		tlb_cb = NULL;
 	}
 
