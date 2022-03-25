@@ -308,6 +308,9 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	adev->irq.installed = true;
 	adev->irq.irq = irq;
 	adev_to_drm(adev)->max_vblank_count = 0x00ffffff;
+#ifndef HAVE_DRM_LEGACY_IRQ_UNINSTALL
+	adev_to_drm(adev)->irq_enabled = true;
+#endif
 
 	DRM_DEBUG("amdgpu: irq initialized.\n");
 	return 0;
