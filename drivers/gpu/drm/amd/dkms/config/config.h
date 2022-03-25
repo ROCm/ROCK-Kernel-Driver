@@ -584,6 +584,9 @@
 /* drm_kms_helper_is_poll_worker() is available */
 #define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
 
+/* drm_legacy_irq_uninstall() is available */
+#define HAVE_DRM_LEGACY_IRQ_UNINSTALL 1
+
 /* drm_memcpy_from_wc() is availablea */
 #define HAVE_DRM_MEMCPY_FROM_WC 1
 
