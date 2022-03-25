@@ -6,6 +6,7 @@ AC_DEFUN([AC_AMDGPU_KVFREE], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
 			#include <linux/mm.h>
+			#include <linux/slab.h>
 		], [
 			kvfree(NULL);
 		], [kvfree], [mm/util.c], [

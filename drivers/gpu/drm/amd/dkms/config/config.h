@@ -672,9 +672,6 @@
 /* whether drm_syncobj_find_fence() wants 5 args */
 #define HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS 1
 
-/* drm_sysfs_connector_hotplug_event() function is available */
-#define HAVE_DRM_SYSFS_CONNECTOR_HOTPLUG_EVENT 1
-
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
@@ -710,9 +707,6 @@
 
 /* generic_handle_domain_irq() is available */
 #define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
-
-/* get_mm_exe_file() is available */
-#define HAVE_GET_MM_EXE_FILE 1
 
 /* get_user_pages() wants 6 args */
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
@@ -911,9 +905,6 @@
 
 /* enum MAMREMAP_WC is availablea */
 #define HAVE_MEMREMAP_WC 1
-
-/* mem_encrypt_active() is available */
-#define HAVE_MEM_ENCRYPT_ACTIVE 1
 
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
