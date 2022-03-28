@@ -125,6 +125,14 @@ void kcl_drm_err(const char *format, ...);
 #define HAVE_DRM_ERR_MACRO
 #endif /* drm_err */
 
+#if !defined(DRM_UT_STATE)
+#define DRM_UT_STATE	0x40
+#endif
+
+#if !defined(DRM_UT_VBL)
+#define DRM_UT_VBL		0x20
+#endif
+
 #if !defined(DRM_DEV_DEBUG)
 #define DRM_DEV_DEBUG(dev, fmt, ...)					\
 	DRM_DEBUG(fmt, ##__VA_ARGS__)
@@ -136,7 +144,6 @@ void kcl_drm_err(const char *format, ...);
 #endif
 
 #ifndef DRM_DEBUG_VBL
-#define DRM_UT_VBL		0x20
 #define DRM_DEBUG_VBL(fmt, args...)					\
 	do {								\
 		if (unlikely(drm_debug & DRM_UT_VBL))			\
@@ -151,6 +158,16 @@ void drm_dev_dbg(const struct device *dev, int category, const char *format, ...
 #if !defined(drm_dbg_atomic)
 #define drm_dbg_atomic(drm, fmt, ...)                                   \
         drm_dev_dbg((drm)->dev, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)
+#endif
+
+#if !defined(drm_dbg_state)
+#define drm_dbg_state(drm, fmt, ...)					\
+	drm_dev_dbg((drm) ? (drm)->dev : NULL, DRM_UT_STATE, fmt, ##__VA_ARGS__)
+#endif
+
+#if !defined(drm_dbg_vbl)
+#define drm_dbg_vbl(drm, fmt, ...)					\
+	drm_dev_dbg((drm) ? (drm)->dev : NULL, DRM_UT_VBL, fmt, ##__VA_ARGS__)
 #endif
 
 #if !defined(drm_dbg_kms)
