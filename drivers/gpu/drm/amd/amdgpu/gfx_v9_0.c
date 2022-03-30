@@ -2388,7 +2388,7 @@ static void gfx_v9_0_init_sq_config(struct amdgpu_device *adev)
 	case IP_VERSION(9, 4, 1):
 		tmp = RREG32_SOC15(GC, 0, mmSQ_CONFIG);
 		tmp = REG_SET_FIELD(tmp, SQ_CONFIG, DISABLE_BARRIER_WAITCNT,
-			READ_ONCE(adev->barrier_has_auto_waitcnt) ? 0 : 1);
+				!READ_ONCE(adev->barrier_has_auto_waitcnt));
 		WREG32_SOC15(GC, 0, mmSQ_CONFIG, tmp);
 		break;
 	default:
