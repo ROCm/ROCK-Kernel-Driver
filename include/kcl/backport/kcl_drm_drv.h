@@ -28,6 +28,7 @@
 #define __KCL_BACKPORT_KCL_DRM_DRV_H__
 
 #include <kcl/kcl_drm_drv.h>
+#include <linux/console.h>
 
 #ifdef HAVE_DRM_DEV_UNPLUG
 /*
@@ -52,5 +53,10 @@ void _kcl_drm_dev_unplug(struct drm_device *dev)
 #define drm_dev_unplug _kcl_drm_dev_unplug
 #endif
 #endif
+
+
+#ifndef HAVE_DRM_FIRMWARE_DRIVERS_ONLY
+#define drm_firmware_drivers_only vgacon_text_force
+#endif /* HAVE_DRM_FIRMWARE_DRIVERS_ONLY */
 
 #endif

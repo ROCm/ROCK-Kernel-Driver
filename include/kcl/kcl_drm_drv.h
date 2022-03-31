@@ -83,8 +83,4 @@ static inline bool drm_drv_uses_atomic_modeset(struct drm_device *dev)
 }
 #endif /* HAVE_DRM_DRV_USES_ATOMIC_MODESET */
 
-#ifndef HAVE_DRM_FIRMWARE_DRIVERS_ONLY
-extern bool drm_firmware_drivers_only(void);
-#endif /* HAVE_DRM_FIRMWARE_DRIVERS_ONLY */
-
 #endif
