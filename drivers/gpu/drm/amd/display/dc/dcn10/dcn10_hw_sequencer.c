@@ -1271,6 +1271,9 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 {
 	int i;
 	struct dce_hwseq *hws = dc->hwseq;
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
+	struct hubbub *hubbub = dc->res_pool->hubbub;
+#endif
 	bool can_apply_seamless_boot = false;
 
 	for (i = 0; i < context->stream_count; i++) {
@@ -1305,6 +1308,22 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 			}
 		}
 	}
+
+#ifdef CONFIG_DRM_AMD_DC_DCN3_x
+	/* Reset det size */
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+		struct hubp *hubp = dc->res_pool->hubps[i];
+
+		/* Do not need to reset for seamless boot */
+		if (pipe_ctx->stream != NULL && can_apply_seamless_boot)
+			continue;
+		if (hubbub && hubp) {
+			if (hubbub->funcs->program_det_size)
+				hubbub->funcs->program_det_size(hubbub, hubp->inst, 0);
+		}
+	}
+#endif
 
 	/* num_opp will be equal to number of mpcc */
 	for (i = 0; i < dc->res_pool->res_cap->num_opp; i++) {
@@ -1370,6 +1389,11 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 
 		pipe_ctx->stream_res.tg = NULL;
 		pipe_ctx->plane_res.hubp = NULL;
+
+		if (tg->funcs->is_tg_enabled(tg)) {
+			if (tg->funcs->init_odm)
+				tg->funcs->init_odm(tg);
+		}
 
 		tg->funcs->tg_init(tg);
 	}
