@@ -27,6 +27,7 @@
 #ifndef __KCL_BACKPORT_KCL_DRM_DRV_H__
 #define __KCL_BACKPORT_KCL_DRM_DRV_H__
 
+#include <linux/console.h>
 /*
  * v5.1-rc5-1150-gbd53280ef042 drm/drv: Fix incorrect resolution of merge conflict
  * v5.1-rc2-5-g3f04e0a6cfeb drm: Fix drm_release() and device unplug
@@ -48,5 +49,10 @@ void _kcl_drm_dev_unplug(struct drm_device *dev)
 }
 #define drm_dev_unplug _kcl_drm_dev_unplug
 #endif
+
+
+#ifndef HAVE_DRM_FIRMWARE_DRIVERS_ONLY
+#define drm_firmware_drivers_only vgacon_text_force
+#endif /* HAVE_DRM_FIRMWARE_DRIVERS_ONLY */
 
 #endif
