@@ -1289,7 +1289,7 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 					   last_start, prange->start + i,
 					   pte_flags,
 					   last_start - prange->start,
-					   vram_base_offset,
+					   bo_adev ? vram_base_offset : 0,
 					   NULL, dma_addr, &vm->last_update);
 
 		for (j = last_start - prange->start; j <= i; j++)
