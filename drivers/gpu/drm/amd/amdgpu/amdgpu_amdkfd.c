@@ -760,7 +760,7 @@ int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
 
 bool amdgpu_amdkfd_ras_query_utcl2_poison_status(struct amdgpu_device *adev)
 {
-	if (adev->gfx.ras->query_utcl2_poison_status)
+	if (adev->gfx.ras && adev->gfx.ras->query_utcl2_poison_status)
 		return adev->gfx.ras->query_utcl2_poison_status(adev);
 	else
 		return false;
