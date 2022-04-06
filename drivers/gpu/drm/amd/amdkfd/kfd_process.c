@@ -1542,6 +1542,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	 * in case if network driver was loaded later.
 	 */
 	kfd_init_peer_direct();
+	INIT_WORK(&process->debug_event_workarea, debug_event_write_work_handler);
 
 	return process;
 
