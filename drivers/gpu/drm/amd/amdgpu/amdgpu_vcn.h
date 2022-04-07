@@ -24,6 +24,8 @@
 #ifndef __AMDGPU_VCN_H__
 #define __AMDGPU_VCN_H__
 
+#include "amdgpu_ras.h"
+
 #define AMDGPU_VCN_STACK_SIZE		(128*1024)
 #define AMDGPU_VCN_CONTEXT_SIZE 	(512*1024)
 
@@ -159,6 +161,7 @@
 #define AMDGPU_VCN_MULTI_QUEUE_FLAG	(1 << 8)
 #define AMDGPU_VCN_SW_RING_FLAG		(1 << 9)
 #define AMDGPU_VCN_FW_LOGGING_FLAG	(1 << 10)
+#define AMDGPU_VCN_SMU_VERSION_INFO_FLAG (1 << 11)
 
 #define AMDGPU_VCN_IB_FLAG_DECODE_BUFFER	0x00000001
 #define AMDGPU_VCN_CMD_FLAG_MSG_BUFFER		0x00000001
@@ -232,6 +235,10 @@ struct amdgpu_vcn_inst {
 	struct amdgpu_vcn_fw_shared fw_shared;
 };
 
+struct amdgpu_vcn_ras {
+	struct amdgpu_ras_block_object ras_block;
+};
+
 struct amdgpu_vcn {
 	unsigned		fw_version;
 	struct delayed_work	idle_work;
@@ -251,6 +258,9 @@ struct amdgpu_vcn {
 	unsigned	harvest_config;
 	int (*pause_dpg_mode)(struct amdgpu_device *adev,
 		int inst_idx, struct dpg_pause_state *new_state);
+
+	struct ras_common_if    *ras_if;
+	struct amdgpu_vcn_ras   *ras;
 };
 
 struct amdgpu_fw_shared_rb_ptrs_struct {
@@ -279,6 +289,11 @@ struct amdgpu_fw_shared_fw_logging {
 	uint32_t size;
 };
 
+struct amdgpu_fw_shared_smu_interface_info {
+	uint8_t smu_interface_type;
+	uint8_t padding[3];
+};
+
 struct amdgpu_fw_shared {
 	uint32_t present_flag_0;
 	uint8_t pad[44];
@@ -287,6 +302,7 @@ struct amdgpu_fw_shared {
 	struct amdgpu_fw_shared_multi_queue multi_queue;
 	struct amdgpu_fw_shared_sw_ring sw_ring;
 	struct amdgpu_fw_shared_fw_logging fw_log;
+	struct amdgpu_fw_shared_smu_interface_info smu_interface_info;
 };
 
 struct amdgpu_vcn_fwlog {

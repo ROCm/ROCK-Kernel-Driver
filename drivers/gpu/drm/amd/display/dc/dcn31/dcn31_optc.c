@@ -91,8 +91,7 @@ static void optc31_set_odm_combine(struct timing_generator *optc, int *opp_id, i
 	optc1->opp_count = opp_cnt;
 }
 
-/**
- * Enable CRTC
+/*
  * Enable CRTC - call ASIC Control Object to enable Timing generator.
  */
 static bool optc31_enable_crtc(struct timing_generator *optc)
@@ -124,7 +123,6 @@ static bool optc31_enable_crtc(struct timing_generator *optc)
 static bool optc31_disable_crtc(struct timing_generator *optc)
 {
 	struct optc *optc1 = DCN10TG_FROM_TG(optc);
-
 	/* disable otg request until end of the first line
 	 * in the vertical blank region
 	 */
@@ -138,6 +136,7 @@ static bool optc31_disable_crtc(struct timing_generator *optc)
 	REG_WAIT(OTG_CLOCK_CONTROL,
 			OTG_BUSY, 0,
 			1, 100000);
+	optc1_clear_optc_underflow(optc);
 
 	return true;
 }
@@ -157,6 +156,9 @@ static bool optc31_immediate_disable_crtc(struct timing_generator *optc)
 	REG_WAIT(OTG_CLOCK_CONTROL,
 			OTG_BUSY, 0,
 			1, 100000);
+
+	/* clear the false state */
+	optc1_clear_optc_underflow(optc);
 
 	return true;
 }

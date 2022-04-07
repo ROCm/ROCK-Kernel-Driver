@@ -497,7 +497,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 
 	/* Verify module parameters regarding mapped process number*/
 	if (hws_max_conc_proc >= 0)
-		kfd->max_proc_per_quantum = min(hws_max_conc_proc, kfd->vm_info.vmid_num_kfd);
+		kfd->max_proc_per_quantum = min((u32)hws_max_conc_proc, kfd->vm_info.vmid_num_kfd);
 	else
 		kfd->max_proc_per_quantum = kfd->vm_info.vmid_num_kfd;
 
