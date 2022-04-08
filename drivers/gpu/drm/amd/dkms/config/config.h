@@ -1237,6 +1237,9 @@
 /* enum x86_hypervisor_type is available */
 #define HAVE_X86_HYPERVISOR_TYPE 1
 
+/* hypervisor_is_type() is available */
+#define HAVE_HYPERVISOR_IS_TYPE 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
