@@ -1234,6 +1234,9 @@
 /* pm_suspend_target_state is available */
 #define HAVE_PM_SUSPEND_TARGET_STATE 1
 
+/* enum x86_hypervisor_type is available */
+#define HAVE_X86_HYPERVISOR_TYPE 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
