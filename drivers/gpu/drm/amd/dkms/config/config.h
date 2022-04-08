@@ -1152,6 +1152,9 @@
 /* Define to 1 if you have the <linux/processor.h> header file. */
 #define HAVE_LINUX_PROCESSOR_H 1
 
+/* enum x86_hypervisor_type is available */
+#define HAVE_X86_HYPERVISOR_TYPE 1
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
