@@ -101,4 +101,5 @@
 #include <kcl/kcl_module.h>
 #include <kcl/kcl_stddef.h>
 #include <kcl/kcl_mce.h>
+#include <kcl/kcl_hypervisor.h>
 #endif /* AMDGPU_BACKPORT_H */
