@@ -17,5 +17,13 @@ enum x86_hypervisor_type {
 	X86_HYPER_ACRN,
 };
 #endif
+
+#ifndef HAVE_HYPERVISOR_IS_TYPE
+static inline bool hypervisor_is_type(enum x86_hypervisor_type type)
+{
+	return false;
+}
 #endif
-#endif
+
+#endif /* CONFIG_X86 */
+#endif /* AMDKCL_HYPERVISOR_H */
