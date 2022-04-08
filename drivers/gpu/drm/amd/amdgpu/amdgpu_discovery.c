@@ -430,7 +430,7 @@ static void amdgpu_discovery_read_harvest_bit_per_ip(struct amdgpu_device *adev,
                                 }
                         }
 next_ip:
-			ip_offset += sizeof(*ip) + 4 * (ip->num_base_address - 1);
+			ip_offset += struct_size(ip, base_address, ip->num_base_address);
 		}
 	}
 }
