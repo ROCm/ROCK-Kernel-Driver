@@ -790,7 +790,6 @@ struct kfd_process_device {
 	/* VM context for GPUVM allocations */
 	struct file *drm_file;
 	void *drm_priv;
-	uint64_t tlb_seq;
 
 	/* GPUVM allocations storage */
 	struct idr alloc_idr;
