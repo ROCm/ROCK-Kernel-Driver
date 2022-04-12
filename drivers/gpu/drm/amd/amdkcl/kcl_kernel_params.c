@@ -27,3 +27,7 @@
 #ifdef _kcl_param_check_hexint
 STANDARD_PARAM_DEF(hexint,	unsigned int,		"%#08x", 	kstrtouint);
 #endif
+
+#ifdef _kcl_param_check_ullong
+STANDARD_PARAM_DEF(ullong,	unsigned long long,	"%llu",		kstrtoull);
+#endif
