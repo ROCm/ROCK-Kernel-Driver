@@ -14,4 +14,12 @@ extern int param_get_hexint(char *buffer, const struct kernel_param *kp);
 #define param_check_hexint(name, p) param_check_uint(name, p)
 #endif /* param_check_hexint */
 
+#ifndef param_check_ullong
+#define _kcl_param_check_ullong
+extern const struct kernel_param_ops param_ops_ullong;
+extern int param_set_ullong(const char *val, const struct kernel_param *kp);
+extern int param_get_ullong(char *buffer, const struct kernel_param *kp);
+#define param_check_ullong(name, p) __param_check(name, p, unsigned long long)
+#endif /* param_check_ullong */
+
 #endif
