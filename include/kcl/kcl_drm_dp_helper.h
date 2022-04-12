@@ -288,6 +288,20 @@ enum drm_dp_phy {
 #endif
 
 /*
+ * drm: Add PSR version 3 macro 
+ */
+#ifndef DP_PSR2_WITH_Y_COORD_IS_SUPPORTED
+# define DP_PSR2_WITH_Y_COORD_IS_SUPPORTED  3	    /* eDP 1.4a */
+#endif
+
+/*
+ * drm: add PSR2 support and capability definition as per eDP 1.5
+ */
+#ifndef DP_PSR2_WITH_Y_COORD_ET_SUPPORTED
+# define DP_PSR2_WITH_Y_COORD_ET_SUPPORTED  4	    /* eDP 1.5, adopted eDP 1.4b SCR */
+#endif
+
+/*
  * v4.10-rc3-483-gd0ce90629120
  * drm : adds Y-coordinate and Colorimetry Format
  */
