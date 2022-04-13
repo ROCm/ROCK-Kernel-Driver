@@ -1192,9 +1192,10 @@ svm_range_unmap_from_gpu(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	pr_debug("[0x%llx 0x%llx]\n", start, last);
 
-	return amdgpu_vm_update_range(adev, vm, false, true, true, NULL, start,
-				      last, init_pte_value, 0, adev->vm_manager.vram_base_offset, 
-					  NULL, NULL, fence);
+	return amdgpu_vm_bo_update_mapping(adev, adev, vm, false, true, NULL,
+					   start, last, init_pte_value, 0,
+					   NULL, NULL, fence,
+					   adev->vm_manager.vram_base_offset);
 }
 
 static int
@@ -1285,12 +1286,13 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 			 (last_domain == SVM_RANGE_VRAM_DOMAIN) ? 1 : 0,
 			 pte_flags);
 
-		r = amdgpu_vm_update_range(adev, vm, false, false, false, NULL,
-					   last_start, prange->start + i,
-					   pte_flags,
-					   last_start - prange->start,
-					   bo_adev ? vram_base_offset : 0,
-					   NULL, dma_addr, &vm->last_update);
+		r = amdgpu_vm_bo_update_mapping(adev, bo_adev, vm, false, false,
+						NULL, last_start,
+						prange->start + i, pte_flags,
+						last_start - prange->start,
+						NULL, dma_addr,
+						&vm->last_update,
+						vram_base_offset);
 
 		for (j = last_start - prange->start; j <= i; j++)
 			dma_addr[j] |= last_domain;
