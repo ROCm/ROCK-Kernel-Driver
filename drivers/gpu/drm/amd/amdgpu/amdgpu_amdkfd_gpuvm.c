@@ -262,7 +262,7 @@ create_dmamap_sg_bo(struct amdgpu_device *adev,
 	align = 1;
 	ret = amdgpu_gem_object_create(adev, mem->bo->tbo.base.size, align,
 			AMDGPU_GEM_DOMAIN_CPU, AMDGPU_GEM_CREATE_PREEMPTIBLE,
-			ttm_bo_type_sg, mem->bo->tbo.base.resv, &gem_obj);
+			ttm_bo_type_sg, amdkcl_ttm_resvp(&mem->bo->tbo), &gem_obj);
 
 	amdgpu_bo_unreserve(mem->bo);
 
@@ -885,10 +885,24 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 						&bo[i], attachment[i]);
 			if (ret)
 				goto unwind;
+
+		/* Handle DOORBELL BOs of peer devices and MMIO BOs of local and peer devices */
+		} else if ((mem->bo->tbo.type == ttm_bo_type_sg) &&
+			   ((mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) ||
+			    (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
+			attachment[i]->type = KFD_MEM_ATT_SG;
+			ret = create_dmamap_sg_bo(adev, mem, &bo[i]);
+			if (ret)
+				goto unwind;
 		} else {
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
 			WARN_ONCE(true, "Handling invalid ATTACH request");
 			ret = -EINVAL;
 			goto unwind;
+#endif
+			attachment[i]->type = KFD_MEM_ATT_SHARED;
+			bo[i] = mem->bo;
+			drm_gem_object_get(&bo[i]->tbo.base);
 		}
 
 		/* Add BO to VM internal data structures */
@@ -2278,35 +2292,27 @@ void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 
 /**
  * @get_sg_table_of_mmio_or_doorbel_bo - Builds and returns an instance
- * of scatter gather table (sg_table) for BO's that represent MMIO or
- * DOORBELL memory. An example of this is the MMIO BO that is used to
- * surface HDP registers.
+ * of scatter gather table (sg_table) for a MMIO/DOORBELL BO. An example
+ * of this is the MMIO BO that's used to surface HDP registers.
  *
- * @note: Per current design and implementation MMIO or DOORBELL BO's
- * use only one scatterlist node in their sg_table. This is because
- * the size of backing memory is relatively small (e.g. 4096 bytes
- * for MMIO BO surfacing HDP registers). Implementation of this method
- * relies on this design choice.
+ * @note: This method will only work as long as the address encapsulated
+ * by MMIO/DOORBELL BO is not a DMA mapped address
  *
  * The method does the following:
  *	Acquire address to use in building scatterlist nodes
  *	Acquire size of memory to use in building scatterlist nodes
- *	Invoke DMA Map service to obtain DMA'able address
+ *	Invoke DMA Map service to obtain DMA mapped address
  *	Access sg_table construction service with above parameters
  *	Return the handle of scatter gather table
  *
- * @adev: GPU device whose MMIO address needs to be exported
- * @bo: Buffer object representing MMIO/DOORBELL memory e.g. HDP registers
- * @dma_dev: Handle of peer PCIe device that wishes to access BO's memory
+ * @adev: GPU device whose MMIO/DOORBELL BO is being exported
+ * @bo: Handle of MMIO/DOORBELL BO e.g. HDP registers
+ * @dma_dev: Handle of peer PCIe device that wishes to access
  * @dir: Direction of data movement from peer PCIe devices perspective
  *
  * @sgt: Output parameter that is built and returned
  *
  * Return: zero if successful, non-zero otherwise
- *
- * @FIXME: This will only work as long as bo->tbo.sg->sgl->dma_address
- * is not a DMA address but a physical BAR address. This will be reworked
- * later when we add DMA mapping support for doorbell and MMIO BOs
  */
 static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
 		struct device *dma_dev, enum dma_data_direction dir,
@@ -2334,8 +2340,8 @@ static int get_sg_table_of_mmio_or_doorbel_bo(struct amdgpu_bo *bo,
 	/* Update output parameter with a new sg_table */
 	pr_debug("MMIO/Doorbell BO size: %d\n", size);
 	pr_debug("MMIO/Doorbell's DMA Address: %llx\n", dma_addr);
-	*sgt = create_doorbell_sg(dma_addr, size);
-	return 0;
+	*sgt = create_sg_table(dma_addr, size);
+	return (*sgt) ? 0 : -ENOMEM;
 }
 
 int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
