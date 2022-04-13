@@ -1195,6 +1195,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	long err = 0;
 	int i;
 	uint32_t *devices_arr = NULL;
+	bool table_freed = false;
 
 	trace_kfd_map_memory_to_gpu_start(p);
 	if (!args->n_devices) {
@@ -1257,7 +1258,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 		err = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 			peer_pdd->dev->adev, (struct kgd_mem *)mem,
-			peer_pdd->drm_priv);
+			peer_pdd->drm_priv, &table_freed);
 		if (err) {
 			struct pci_dev *pdev = peer_pdd->dev->adev->pdev;
 
@@ -1283,11 +1284,13 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	}
 
 	/* Flush TLBs after waiting for the page table updates to complete */
-	for (i = 0; i < args->n_devices; i++) {
-		peer_pdd = kfd_process_device_data_by_id(p, devices_arr[i]);
-		if (WARN_ON_ONCE(!peer_pdd))
-			continue;
-		kfd_flush_tlb(peer_pdd, TLB_FLUSH_LEGACY);
+	if (table_freed || !kfd_flush_tlb_after_unmap(dev)) {
+		for (i = 0; i < args->n_devices; i++) {
+			peer_pdd = kfd_process_device_data_by_id(p, devices_arr[i]);
+			if (WARN_ON_ONCE(!peer_pdd))
+				continue;
+			kfd_flush_tlb(peer_pdd, TLB_FLUSH_LEGACY);
+		}
 	}
 	kfree(devices_arr);
 
@@ -3543,8 +3546,8 @@ static int criu_restore_bo(struct kfd_process *p,
 		if (IS_ERR(peer_pdd))
 			return PTR_ERR(peer_pdd);
 
-		ret = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(peer->adev, kgd_mem,
-							    peer_pdd->drm_priv);
+		ret = amdgpu_amdkfd_gpuvm_map_memory_to_gpu(peer->adev, kgd_mem, peer_pdd->drm_priv,
+							    NULL);
 		if (ret) {
 			pr_err("Failed to map to gpu %d/%d\n", j, p->n_pdds);
 			return ret;
