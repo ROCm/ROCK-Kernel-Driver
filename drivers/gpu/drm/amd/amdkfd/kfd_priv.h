@@ -1546,6 +1546,13 @@ int kfd_send_exception_to_runtime(struct kfd_process *p,
 				unsigned int queue_id,
 				uint64_t error_reason);
 
+static inline bool kfd_flush_tlb_after_unmap(struct kfd_dev *dev)
+{
+	return KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2) ||
+	       (KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 1) &&
+	       dev->adev->sdma.instance[0].fw_version >= 18);
+}
+
 bool kfd_is_locked(void);
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd);
