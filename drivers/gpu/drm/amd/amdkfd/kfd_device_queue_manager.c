@@ -980,12 +980,8 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 
 	q->properties.is_suspended = true;
 	if (q->properties.is_active) {
-		decrement_queue_count(dqm, q->properties.type);
+		decrement_queue_count(dqm, &pdd->qpd, q);
 		q->properties.is_active = false;
-		if (q->properties.is_gws) {
-			dqm->gws_queue_count--;
-			pdd->qpd.mapped_gws_queue = false;
-		}
 	}
 
 	return 0;
@@ -1021,11 +1017,7 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 
 	if (QUEUE_IS_ACTIVE(q->properties)) {
 		q->properties.is_active = true;
-		increment_queue_count(dqm, q->properties.type);
-		if (q->properties.is_gws) {
-			dqm->gws_queue_count++;
-			qpd->mapped_gws_queue = true;
-		}
+		increment_queue_count(dqm, qpd, q);
 	}
 }
 
@@ -1122,6 +1114,7 @@ static int evict_process_queues_cpsch(struct device_queue_manager *dqm,
 			}
 		}
 	}
+
 	pdd->last_evict_timestamp = get_jiffies_64();
 	if (!dqm->dev->shared_resources.enable_mes)
 		retval = execute_queues_cpsch(dqm,
