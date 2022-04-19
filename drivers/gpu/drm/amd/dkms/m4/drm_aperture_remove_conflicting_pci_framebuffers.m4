@@ -9,6 +9,7 @@ AC_DEFUN([AC_AMDGPU_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS], [
 			dnl # v5.3-rc1-540-g0a8459693238 fbdev: drop res_id parameter from remove_conflicting_pci_framebuffers
 			dnl #
 			AC_KERNEL_TRY_COMPILE([
+				struct task_struct;
 				#include <linux/fb.h>
 			], [
 				remove_conflicting_pci_framebuffers(NULL, NULL);
