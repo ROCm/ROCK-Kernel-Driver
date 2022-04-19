@@ -1916,7 +1916,7 @@ err:
 static void kfd_topology_update_io_links(int proximity_domain)
 {
 	struct kfd_topology_device *dev;
-	struct kfd_iolink_properties *iolink, *tmp;
+	struct kfd_iolink_properties *iolink, *p2plink, *tmp;
 
 	list_for_each_entry(dev, &topology_device_list, list) {
 		if (dev->proximity_domain > proximity_domain)
@@ -1935,6 +1935,22 @@ static void kfd_topology_update_io_links(int proximity_domain)
 				iolink->node_from--;
 			} else if (iolink->node_to > proximity_domain) {
 				iolink->node_to--;
+			}
+		}
+
+		list_for_each_entry_safe(p2plink, tmp, &dev->p2p_link_props, list) {
+			/*
+			 * If there is a p2p link to the dev being deleted
+			 * then remove that p2p link also.
+			 */
+			if (p2plink->node_to == proximity_domain) {
+				list_del(&p2plink->list);
+				dev->node_props.p2p_links_count--;
+			} else {
+				if (p2plink->node_from > proximity_domain)
+					p2plink->node_from--;
+				if (p2plink->node_to > proximity_domain)
+					p2plink->node_to--;
 			}
 		}
 
