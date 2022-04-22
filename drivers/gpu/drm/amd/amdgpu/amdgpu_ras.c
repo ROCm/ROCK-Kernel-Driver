@@ -1925,7 +1925,6 @@ static int amdgpu_ras_realloc_eh_data_space(struct amdgpu_device *adev,
 	void *bps = kmalloc(align_space * sizeof(*data->bps), GFP_KERNEL);
 
 	if (!bps) {
-		kfree(bps);
 		return -ENOMEM;
 	}
 
