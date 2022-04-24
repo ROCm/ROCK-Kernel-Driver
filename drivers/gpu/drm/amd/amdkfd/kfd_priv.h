@@ -1308,7 +1308,7 @@ struct kfd_criu_queue_priv_data {
 	uint32_t priority;
 	uint32_t q_percent;
 	uint32_t doorbell_id;
-	uint32_t is_gws;
+	uint32_t gws;
 	uint32_t sdma_id;
 	uint32_t eop_ring_buffer_size;
 	uint32_t ctx_save_restore_area_size;
@@ -1545,6 +1545,13 @@ void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type);
 int kfd_send_exception_to_runtime(struct kfd_process *p,
 				unsigned int queue_id,
 				uint64_t error_reason);
+
+static inline bool kfd_flush_tlb_after_unmap(struct kfd_dev *dev)
+{
+	return KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2) ||
+	       (KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 1) &&
+	       dev->adev->sdma.instance[0].fw_version >= 18);
+}
 
 bool kfd_is_locked(void);
 
