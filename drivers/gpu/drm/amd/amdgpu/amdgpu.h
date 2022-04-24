@@ -683,6 +683,7 @@ enum amd_hw_ip_block_type {
 	JPEG_HWIP = VCN_HWIP,
 	VCN1_HWIP,
 	VCE_HWIP,
+	VPE_HWIP,
 	DF_HWIP,
 	DCE_HWIP,
 	OSSSYS_HWIP,
