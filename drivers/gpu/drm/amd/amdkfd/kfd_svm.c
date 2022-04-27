@@ -149,8 +149,7 @@ svm_range_dma_map_dev(struct amdgpu_device *adev, struct svm_range *prange,
 	int i, r;
 
 	if (!addr) {
-		addr = kvmalloc_array(prange->npages, sizeof(*addr),
-				      GFP_KERNEL | __GFP_ZERO);
+		addr = kvcalloc(prange->npages, sizeof(*addr), GFP_KERNEL);
 		if (!addr)
 			return -ENOMEM;
 		prange->dma_addr[gpuidx] = addr;
@@ -1234,9 +1233,7 @@ svm_range_unmap_from_gpus(struct svm_range *prange, unsigned long start,
 			if (r)
 				break;
 		}
-
-		if (kfd_flush_tlb_after_unmap(pdd->dev))
-			kfd_flush_tlb(pdd, TLB_FLUSH_HEAVYWEIGHT);
+		kfd_flush_tlb(pdd, TLB_FLUSH_HEAVYWEIGHT);
 	}
 
 	return r;

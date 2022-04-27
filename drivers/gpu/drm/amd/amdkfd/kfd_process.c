@@ -1445,7 +1445,9 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	INIT_DELAYED_WORK(&process->eviction_work, evict_process_worker);
 	INIT_DELAYED_WORK(&process->restore_work, restore_process_worker);
 	process->last_restore_timestamp = get_jiffies_64();
-	kfd_event_init_process(process);
+	err = kfd_event_init_process(process);
+	if (err)
+		goto err_event_init;
 	process->is_32bit_user_mode = in_compat_syscall();
 	process->debug_trap_enabled = false;
 	process->debugger_process = NULL;
@@ -1453,8 +1455,10 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	sema_init(&process->runtime_enable_sema, 0);
 
 	process->pasid = kfd_pasid_alloc();
-	if (process->pasid == 0)
+	if (process->pasid == 0) {
+		err = -ENOSPC;
 		goto err_alloc_pasid;
+	}
 
 	err = pqm_init(&process->pqm, process);
 	if (err != 0)
@@ -1519,6 +1523,8 @@ err_init_apertures:
 err_process_pqm_init:
 	kfd_pasid_free(process->pasid);
 err_alloc_pasid:
+	kfd_event_free_process(process);
+err_event_init:
 	mutex_destroy(&process->mutex);
 	kfree(process);
 err_alloc_process:
