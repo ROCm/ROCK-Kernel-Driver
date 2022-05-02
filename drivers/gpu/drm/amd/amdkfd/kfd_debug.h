@@ -25,9 +25,6 @@
 
 #include "kfd_priv.h"
 
-void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
-					uint32_t vmid,
-					bool stall);
 void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int unwind_count);
 int kfd_dbg_trap_activate(struct kfd_process *target);
 bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
@@ -51,6 +48,8 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t trap_mask_request,
 					uint32_t *trap_mask_prev,
 					uint32_t *trap_mask_supported);
+int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
+					uint8_t wave_launch_mode);
 
 int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 					unsigned int dev_id,
