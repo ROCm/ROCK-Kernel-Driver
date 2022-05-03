@@ -385,6 +385,18 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 	copy_settings_data->cmd_version =  DMUB_CMD_PSR_CONTROL_VERSION_1;
 	copy_settings_data->panel_inst = panel_inst;
 	copy_settings_data->dsc_enable_status = (pipe_ctx->stream->timing.flags.DSC == 1);
+	/**
+	 * WA for PSRSU+DSC on specific TCON, if DSC is enabled, force PSRSU as ffu mode(full frame update)
+	 * Note that PSRSU+DSC is still under development.
+	 */
+	if (copy_settings_data->dsc_enable_status &&
+		link->dpcd_caps.sink_dev_id == DP_DEVICE_ID_38EC11 &&
+		!memcmp(link->dpcd_caps.sink_dev_id_str, DP_SINK_DEVICE_STR_ID_1,
+			sizeof(link->dpcd_caps.sink_dev_id_str)))
+		link->psr_settings.force_ffu_mode = 1;
+	else
+		link->psr_settings.force_ffu_mode = 0;
+	copy_settings_data->force_ffu_mode = link->psr_settings.force_ffu_mode;
 
 	/**
 	 * WA for PSRSU+DSC on specific TCON, if DSC is enabled, force PSRSU as ffu mode(full frame update)
