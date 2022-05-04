@@ -2898,7 +2898,7 @@ static int __init amdgpu_init(void)
 
 	DRM_INFO("amdgpu kernel modesetting enabled.\n");
 
-	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
+	DRM_INFO("amdgpu version patched: %s\n", AMDGPU_VERSION);
 	DRM_INFO("OS DRM version: %d.%d.%d\n", DRM_VER, DRM_PATCH, DRM_SUB);
 
 	amdgpu_register_atpx_handler();

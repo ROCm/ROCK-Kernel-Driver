@@ -558,7 +558,7 @@ static int gfx_v9_4_2_do_sgprs_init(struct amdgpu_device *adev)
 	if (r) {
 		dev_err(adev->dev, "wave coverage failed when clear first 576 sgprs\n");
 		wb_ib.ptr[0] = 0xdeadbeaf; /* stop waves */
-		goto disp1_failed;
+		/* continue initialization */
 	}
 
 	wb_ib.ptr[0] = 0xdeadbeaf; /* stop waves */
@@ -567,13 +567,13 @@ static int gfx_v9_4_2_do_sgprs_init(struct amdgpu_device *adev)
 	r = dma_fence_wait(fences[0], false);
 	if (r) {
 		dev_err(adev->dev, "timeout to clear first 224 sgprs\n");
-		goto disp1_failed;
+		/* continue initialization */
 	}
 
 	r = dma_fence_wait(fences[1], false);
 	if (r) {
 		dev_err(adev->dev, "timeout to clear first 576 sgprs\n");
-		goto disp1_failed;
+		/* continue initialization */
 	}
 
 	memset(wb_ib.ptr, 0, (1 + wb_size) * sizeof(uint32_t));
