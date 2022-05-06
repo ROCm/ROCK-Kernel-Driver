@@ -641,6 +641,7 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	}
 
 	kfd_smi_init(kfd);
+	spin_lock_init(&kfd->watch_points_lock);
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
