@@ -397,11 +397,12 @@ struct kfd_dev {
 
 	int noretry;
 
-	/* Track per device allocated watch points. */
-	uint32_t alloc_watch_ids;
-
 	struct kfd_node *nodes[MAX_KFD_NODES];
 	unsigned int num_nodes;
+
+	/* Track per device allocated watch points */
+	uint32_t alloc_watch_ids;
+	spinlock_t watch_points_lock;
 };
 
 struct kfd_ipc_obj;
@@ -888,6 +889,7 @@ struct kfd_process_device {
 	uint32_t spi_dbg_override;
 	uint32_t spi_dbg_launch_mode;
 	uint32_t watch_points[4];
+	uint32_t alloc_watch_ids;
 
 	/*
 	 * If this process has been checkpointed before, then the user
@@ -1058,7 +1060,6 @@ struct kfd_process {
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
 	struct kfd_runtime_info runtime_info;
-
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
