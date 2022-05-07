@@ -143,6 +143,12 @@ void kcl_drm_err(const char *format, ...);
 	DRM_ERROR(fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef DRM_DEV_INFO
+/* NOTE: this is deprecated in favor of drm_info() or dev_info(). */
+#define DRM_DEV_INFO(dev, fmt, ...)				\
+	DRM_INFO(fmt, ##__VA_ARGS__)
+#endif
+
 #ifndef DRM_DEBUG_VBL
 #define DRM_DEBUG_VBL(fmt, args...)					\
 	do {								\
