@@ -10,5 +10,9 @@
 #define INTEL_FAM6_ROCKETLAKE       0xA7
 #endif
 
+#ifndef INTEL_FAM6_ALDERLAKE
+#define INTEL_FAM6_ALDERLAKE		0x97	/* Golden Cove / Gracemont */
+#endif
+
 #endif /* CONFIG_X86 */
 #endif
