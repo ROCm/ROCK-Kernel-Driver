@@ -81,7 +81,7 @@ static void program_sh_mem_settings_v10_3(struct amdgpu_device *adev, uint32_t v
 					uint32_t sh_mem_config,
 					uint32_t sh_mem_ape1_base,
 					uint32_t sh_mem_ape1_limit,
-					uint32_t sh_mem_bases)
+					uint32_t sh_mem_bases, uint32_t inst)
 {
 	lock_srbm(adev, 0, 0, 0, vmid);
 
@@ -94,7 +94,7 @@ static void program_sh_mem_settings_v10_3(struct amdgpu_device *adev, uint32_t v
 
 /* ATC is defeatured on Sienna_Cichlid */
 static int set_pasid_vmid_mapping_v10_3(struct amdgpu_device *adev, unsigned int pasid,
-					unsigned int vmid)
+					unsigned int vmid, uint32_t inst)
 {
 	uint32_t value = pasid << IH_VMID_0_LUT__PASID__SHIFT;
 
@@ -106,7 +106,8 @@ static int set_pasid_vmid_mapping_v10_3(struct amdgpu_device *adev, unsigned int
 	return 0;
 }
 
-static int init_interrupts_v10_3(struct amdgpu_device *adev, uint32_t pipe_id)
+static int init_interrupts_v10_3(struct amdgpu_device *adev, uint32_t pipe_id,
+				uint32_t inst)
 {
 	uint32_t mec;
 	uint32_t pipe;
@@ -178,7 +179,7 @@ static inline struct v10_sdma_mqd *get_sdma_mqd(void *mqd)
 static int hqd_load_v10_3(struct amdgpu_device *adev, void *mqd,
 			uint32_t pipe_id, uint32_t queue_id,
 			uint32_t __user *wptr, uint32_t wptr_shift,
-			uint32_t wptr_mask, struct mm_struct *mm)
+			uint32_t wptr_mask, struct mm_struct *mm, uint32_t inst)
 {
 	struct v10_compute_mqd *m;
 	uint32_t *mqd_hqd;
@@ -274,7 +275,7 @@ static int hqd_load_v10_3(struct amdgpu_device *adev, void *mqd,
 
 static int hiq_mqd_load_v10_3(struct amdgpu_device *adev, void *mqd,
 			    uint32_t pipe_id, uint32_t queue_id,
-			    uint32_t doorbell_off)
+			    uint32_t doorbell_off, uint32_t inst)
 {
 	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 	struct v10_compute_mqd *m;
@@ -326,7 +327,7 @@ out_unlock:
 
 static int hqd_dump_v10_3(struct amdgpu_device *adev,
 			uint32_t pipe_id, uint32_t queue_id,
-			uint32_t (**dump)[2], uint32_t *n_regs)
+			uint32_t (**dump)[2], uint32_t *n_regs, uint32_t inst)
 {
 	uint32_t i = 0, reg;
 #define HQD_N_REGS 56
@@ -457,7 +458,7 @@ static int hqd_sdma_dump_v10_3(struct amdgpu_device *adev,
 
 static bool hqd_is_occupied_v10_3(struct amdgpu_device *adev,
 				uint64_t queue_address, uint32_t pipe_id,
-				uint32_t queue_id)
+				uint32_t queue_id, uint32_t inst)
 {
 	uint32_t act;
 	bool retval = false;
@@ -499,7 +500,7 @@ static bool hqd_sdma_is_occupied_v10_3(struct amdgpu_device *adev,
 static int hqd_destroy_v10_3(struct amdgpu_device *adev, void *mqd,
 				enum kfd_preempt_type reset_type,
 				unsigned int utimeout, uint32_t pipe_id,
-				uint32_t queue_id)
+				uint32_t queue_id, uint32_t inst)
 {
 	enum hqd_dequeue_request_type type;
 	unsigned long end_jiffies;
@@ -587,7 +588,7 @@ static int hqd_sdma_destroy_v10_3(struct amdgpu_device *adev, void *mqd,
 
 static int wave_control_execute_v10_3(struct amdgpu_device *adev,
 					uint32_t gfx_index_val,
-					uint32_t sq_cmd)
+					uint32_t sq_cmd, uint32_t inst)
 {
 	uint32_t data = 0;
 
@@ -629,7 +630,8 @@ static void set_vm_context_page_table_base_v10_3(struct amdgpu_device *adev,
 }
 
 static void program_trap_handler_settings_v10_3(struct amdgpu_device *adev,
-			uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr)
+			uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr,
+			uint32_t inst)
 {
 	lock_srbm(adev, 0, 0, 0, vmid);
 
@@ -766,7 +768,7 @@ uint32_t set_wave_launch_mode_v10_3(struct amdgpu_device *adev,
  *	deq_retry_wait_time      -- Wait Count for Global Wave Syncs.
  */
 void get_iq_wait_times_v10_3(struct amdgpu_device *adev,
-					uint32_t *wait_times)
+					uint32_t *wait_times, uint32_t inst)
 
 {
 	*wait_times = RREG32(SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2));
@@ -776,7 +778,8 @@ void build_grace_period_packet_info_v10_3(struct amdgpu_device *adev,
 						uint32_t wait_times,
 						uint32_t grace_period,
 						uint32_t *reg_offset,
-						uint32_t *reg_data)
+						uint32_t *reg_data,
+						uint32_t inst)
 {
 	*reg_data = wait_times;
 
