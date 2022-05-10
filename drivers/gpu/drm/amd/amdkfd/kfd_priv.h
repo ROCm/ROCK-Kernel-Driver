@@ -547,6 +547,7 @@ struct queue_properties {
 	bool is_gws;
 	bool is_dbg_wa;
 	bool is_user_cu_masked;
+	uint32_t pm4_target_xcc;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
