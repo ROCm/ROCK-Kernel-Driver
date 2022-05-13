@@ -26,7 +26,7 @@
 #ifdef CONFIG_X86
 #include <asm/hypervisor.h>
 #endif
-#include <linux/version.h>
+
 #include <drm/drm_drv.h>
 
 #include "amdgpu.h"
@@ -734,10 +734,8 @@ void amdgpu_detect_virtualization(struct amdgpu_device *adev)
 		case CHIP_VEGA10:
 			soc15_set_virt_ops(adev);
 #ifdef CONFIG_X86
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 			/* not send GPU_INIT_DATA with MS_HYPERV*/
 			if (!hypervisor_is_type(X86_HYPER_MS_HYPERV))
-#endif
 #endif
 				/* send a dummy GPU_INIT_DATA request to host on vega10 */
 				amdgpu_virt_request_init_data(adev);
