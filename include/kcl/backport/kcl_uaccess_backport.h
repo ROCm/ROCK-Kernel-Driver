@@ -3,7 +3,7 @@
 #define AMDKCL_UACCESS_BACKPORT_H
 #include <linux/uaccess.h>
 
-static inline int kcl_access_ok(unsigned long addr, unsigned long size)
+static inline int kcl_access_ok(const void __user *addr, unsigned long size)
 {
 #if !defined(HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS)
 	return access_ok(VERIFY_WRITE, (addr), (size));
