@@ -63,7 +63,7 @@ static void kgd_gfx_v9_unlock_srbm(struct amdgpu_device *adev)
 	mutex_unlock(&adev->srbm_mutex);
 }
 
-static void acquire_queue(struct amdgpu_device *adev, uint32_t pipe_id,
+void kgd_gfx_v9_acquire_queue(struct amdgpu_device *adev, uint32_t pipe_id,
 				uint32_t queue_id)
 {
 	uint32_t mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
@@ -72,7 +72,7 @@ static void acquire_queue(struct amdgpu_device *adev, uint32_t pipe_id,
 	kgd_gfx_v9_lock_srbm(adev, mec, pipe, queue_id, 0);
 }
 
-static uint64_t get_queue_mask(struct amdgpu_device *adev,
+uint64_t kgd_gfx_v9_get_queue_mask(struct amdgpu_device *adev,
 			       uint32_t pipe_id, uint32_t queue_id)
 {
 	unsigned int bit = pipe_id * adev->gfx.mec.num_queue_per_pipe +
@@ -81,7 +81,7 @@ static uint64_t get_queue_mask(struct amdgpu_device *adev,
 	return 1ull << bit;
 }
 
-static void release_queue(struct amdgpu_device *adev)
+void kgd_gfx_v9_release_queue(struct amdgpu_device *adev)
 {
 	kgd_gfx_v9_unlock_srbm(adev);
 }
@@ -232,7 +232,7 @@ int kgd_gfx_v9_hqd_load(struct amdgpu_device *adev, void *mqd,
 
 	m = get_mqd(mqd);
 
-	acquire_queue(adev, pipe_id, queue_id);
+	kgd_gfx_v9_acquire_queue(adev, pipe_id, queue_id);
 
 	/* HQD registers extend from CP_MQD_BASE_ADDR to CP_HQD_EOP_WPTR_MEM. */
 	mqd_hqd = &m->cp_mqd_base_addr_lo;
@@ -284,7 +284,7 @@ int kgd_gfx_v9_hqd_load(struct amdgpu_device *adev, void *mqd,
 		WREG32_RLC(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_PQ_WPTR_POLL_ADDR_HI),
 		       upper_32_bits((uintptr_t)wptr));
 		WREG32_SOC15(GC, 0, mmCP_PQ_WPTR_POLL_CNTL1,
-		       (uint32_t)get_queue_mask(adev, pipe_id, queue_id));
+		       (uint32_t)kgd_gfx_v9_get_queue_mask(adev, pipe_id, queue_id));
 	}
 
 	/* Start the EOP fetcher */
@@ -295,7 +295,7 @@ int kgd_gfx_v9_hqd_load(struct amdgpu_device *adev, void *mqd,
 	data = REG_SET_FIELD(m->cp_hqd_active, CP_HQD_ACTIVE, ACTIVE, 1);
 	WREG32_RLC(SOC15_REG_OFFSET(GC, 0, mmCP_HQD_ACTIVE), data);
 
-	release_queue(adev);
+	kgd_gfx_v9_release_queue(adev);
 
 	return 0;
 }
@@ -311,7 +311,7 @@ int kgd_gfx_v9_hiq_mqd_load(struct amdgpu_device *adev, void *mqd,
 
 	m = get_mqd(mqd);
 
-	acquire_queue(adev, pipe_id, queue_id);
+	kgd_gfx_v9_acquire_queue(adev, pipe_id, queue_id);
 
 	mec = (pipe_id / adev->gfx.mec.num_pipe_per_mec) + 1;
 	pipe = (pipe_id % adev->gfx.mec.num_pipe_per_mec);
@@ -347,7 +347,7 @@ int kgd_gfx_v9_hiq_mqd_load(struct amdgpu_device *adev, void *mqd,
 
 out_unlock:
 	spin_unlock(&adev->gfx.kiq[0].ring_lock);
-	release_queue(adev);
+	kgd_gfx_v9_release_queue(adev);
 
 	return r;
 }
@@ -369,13 +369,13 @@ int kgd_gfx_v9_hqd_dump(struct amdgpu_device *adev,
 	if (*dump == NULL)
 		return -ENOMEM;
 
-	acquire_queue(adev, pipe_id, queue_id);
+	kgd_gfx_v9_acquire_queue(adev, pipe_id, queue_id);
 
 	for (reg = SOC15_REG_OFFSET(GC, 0, mmCP_MQD_BASE_ADDR);
 	     reg <= SOC15_REG_OFFSET(GC, 0, mmCP_HQD_PQ_WPTR_HI); reg++)
 		DUMP_REG(reg);
 
-	release_queue(adev);
+	kgd_gfx_v9_release_queue(adev);
 
 	WARN_ON_ONCE(i != HQD_N_REGS);
 	*n_regs = i;
@@ -491,7 +491,7 @@ bool kgd_gfx_v9_hqd_is_occupied(struct amdgpu_device *adev,
 	bool retval = false;
 	uint32_t low, high;
 
-	acquire_queue(adev, pipe_id, queue_id);
+	kgd_gfx_v9_acquire_queue(adev, pipe_id, queue_id);
 	act = RREG32_SOC15(GC, 0, mmCP_HQD_ACTIVE);
 	if (act) {
 		low = lower_32_bits(queue_address >> 8);
@@ -501,7 +501,7 @@ bool kgd_gfx_v9_hqd_is_occupied(struct amdgpu_device *adev,
 		   high == RREG32_SOC15(GC, 0, mmCP_HQD_PQ_BASE_HI))
 			retval = true;
 	}
-	release_queue(adev);
+	kgd_gfx_v9_release_queue(adev);
 	return retval;
 }
 
@@ -536,7 +536,7 @@ int kgd_gfx_v9_hqd_destroy(struct amdgpu_device *adev, void *mqd,
 	if (amdgpu_in_reset(adev))
 		return -EIO;
 
-	acquire_queue(adev, pipe_id, queue_id);
+	kgd_gfx_v9_acquire_queue(adev, pipe_id, queue_id);
 
 	if (m->cp_hqd_vmid == 0)
 		WREG32_FIELD15_RLC(GC, 0, RLC_CP_SCHEDULERS, scheduler1, 0);
@@ -565,13 +565,13 @@ int kgd_gfx_v9_hqd_destroy(struct amdgpu_device *adev, void *mqd,
 			break;
 		if (time_after(jiffies, end_jiffies)) {
 			pr_err("cp queue preemption time out.\n");
-			release_queue(adev);
+			kgd_gfx_v9_release_queue(adev);
 			return -ETIME;
 		}
 		usleep_range(500, 1000);
 	}
 
-	release_queue(adev);
+	kgd_gfx_v9_release_queue(adev);
 	return 0;
 }
 
