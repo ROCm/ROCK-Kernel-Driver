@@ -1460,12 +1460,14 @@ static bool dcn32_split_stream_for_mpc_or_odm(
 			sec_pipe->stream_res.opp = pool->opps[pipe_idx];
 		else
 			sec_pipe->stream_res.opp = sec_pipe->top_pipe->stream_res.opp;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (sec_pipe->stream->timing.flags.DSC == 1) {
 			dcn20_acquire_dsc(dc, res_ctx, &sec_pipe->stream_res.dsc, pipe_idx);
 			ASSERT(sec_pipe->stream_res.dsc);
 			if (sec_pipe->stream_res.dsc == NULL)
 				return false;
 		}
+#endif
 	} else {
 		if (pri_pipe->bottom_pipe) {
 			ASSERT(pri_pipe->bottom_pipe != sec_pipe);
@@ -1627,8 +1629,10 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 			pipe->stream = NULL;
 			pipe->top_pipe = NULL;
 			pipe->prev_odm_pipe = NULL;
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (pipe->stream_res.dsc)
 				dcn20_release_dsc(&context->res_ctx, dc->res_pool, &pipe->stream_res.dsc);
+#endif
 			memset(&pipe->plane_res, 0, sizeof(pipe->plane_res));
 			memset(&pipe->stream_res, 0, sizeof(pipe->stream_res));
 			repopulate_pipes = true;

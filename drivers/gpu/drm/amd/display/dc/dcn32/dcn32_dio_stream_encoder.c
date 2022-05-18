@@ -465,6 +465,7 @@ static const struct stream_encoder_funcs dcn32_str_enc_funcs = {
 	.enc_read_state = enc32_read_state,
 	.dp_set_dsc_config = enc32_dp_set_dsc_config,
 	.dp_set_dsc_pps_info_packet = enc3_dp_set_dsc_pps_info_packet,
+#endif
 	.set_dynamic_metadata = enc2_set_dynamic_metadata,
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
 
