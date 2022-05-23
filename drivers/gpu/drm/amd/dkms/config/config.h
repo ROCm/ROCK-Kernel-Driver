@@ -94,6 +94,9 @@
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
+/* DMA_FENCE_FLAG_TIMESTAMP_BIT is available */
+#define HAVE_DMA_FENCE_FLAG_TIMESTAMP_BIT 1
+
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
 
