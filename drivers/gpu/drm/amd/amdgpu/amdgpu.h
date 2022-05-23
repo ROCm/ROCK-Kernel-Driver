@@ -81,6 +81,7 @@
 #include "amdgpu_vce.h"
 #include "amdgpu_vcn.h"
 #include "amdgpu_jpeg.h"
+#include "amdgpu_vpe.h"
 #include "amdgpu_gmc.h"
 #include "amdgpu_gfx.h"
 #include "amdgpu_sdma.h"
@@ -987,6 +988,9 @@ struct amdgpu_device {
 
 	/* jpeg */
 	struct amdgpu_jpeg		jpeg;
+
+	/* vpe */
+	struct amdgpu_vpe		vpe;
 
 	/* firmwares */
 	struct amdgpu_firmware		firmware;
