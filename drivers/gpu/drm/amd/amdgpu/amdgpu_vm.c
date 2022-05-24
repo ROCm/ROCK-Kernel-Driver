@@ -2564,7 +2564,8 @@ void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
  * shouldn't be reported any more.
  */
 bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
-			    uint64_t addr, bool write_fault)
+			    u32 client_id, u32 node_id, uint64_t addr,
+			    bool write_fault)
 {
 	bool is_compute_context = false;
 	struct amdgpu_bo *root;
@@ -2597,8 +2598,8 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
 
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
-	if (is_compute_context &&
-	    !svm_range_restore_pages(adev, pasid, addr, write_fault)) {
+	if (is_compute_context && !svm_range_restore_pages(adev, pasid, client_id,
+	    node_id, addr, write_fault)) {
 		amdgpu_bo_unref(&root);
 		return true;
 	}
