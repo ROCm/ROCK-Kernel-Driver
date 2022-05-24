@@ -305,7 +305,7 @@ struct amdgpu_gfx {
 	struct amdgpu_ce		ce;
 	struct amdgpu_me		me;
 	struct amdgpu_mec		mec;
-	struct amdgpu_kiq		kiq;
+	struct amdgpu_kiq		kiq[AMDGPU_MAX_GC_INSTANCES];
 	struct amdgpu_imu		imu;
 	const struct spm_funcs		*spmfuncs;
 	bool				rs64_enable; /* firmware format */
