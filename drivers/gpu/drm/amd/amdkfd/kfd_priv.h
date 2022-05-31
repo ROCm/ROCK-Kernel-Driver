@@ -216,6 +216,8 @@ extern bool keep_idle_process_evicted;
 /* Enable eviction debug messages */
 extern bool debug_evictions;
 
+extern struct mutex kfd_processes_mutex;
+
 enum cache_policy {
 	cache_policy_coherent,
 	cache_policy_noncoherent
