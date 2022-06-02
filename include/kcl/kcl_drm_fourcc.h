@@ -96,6 +96,14 @@
  * 55:36 -                        Reserved for future use, must be zero
  */
 
+#ifndef AMD_FMT_MOD_TILE_VER_GFX11
+#define AMD_FMT_MOD_TILE_VER_GFX11 4
+#endif
+
+#ifndef AMD_FMT_MOD_TILE_GFX11_256K_R_X
+#define AMD_FMT_MOD_TILE_GFX11_256K_R_X 31
+#endif
+
 #if !defined(AMD_FMT_MOD)
 #define AMD_FMT_MOD fourcc_mod_code(AMD, 0)
 
