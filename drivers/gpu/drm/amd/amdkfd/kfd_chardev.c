@@ -1745,6 +1745,18 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto unlock_out;
 	}
 
+	if (target->runtime_info.runtime_state != DEBUG_RUNTIME_STATE_ENABLED &&
+			(debug_trap_action == KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_OVERRIDE ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS)) {
+		r = -EPERM;
+		goto unlock_out;
+	}
+
 	if (check_devices) {
 		for (i = 0; i < target->n_pdds; i++) {
 			struct kfd_process_device *pdd = target->pdds[i];
