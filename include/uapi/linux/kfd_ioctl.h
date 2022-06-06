@@ -74,9 +74,10 @@
  * 10.1 - Add additional debug capability information
  * 10.2 - Reserved
  * 10.3 - Pass context_save_restore_area size to user-space
+ * 11.0 - Restrict HW mode ops access to trap activate
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	10
-#define KFD_IOCTL_DBG_MINOR_VERSION	3
+#define KFD_IOCTL_DBG_MAJOR_VERSION	11
+#define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
