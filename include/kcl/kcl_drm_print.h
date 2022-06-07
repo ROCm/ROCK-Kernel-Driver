@@ -49,6 +49,40 @@ static inline struct drm_printer drm_seq_file_printer(struct seq_file *f)
 }
 #endif
 
+#ifndef HAVE_DRM_COREDUMP_PRINTER
+void __drm_printfn_coredump(struct drm_printer *p, struct va_format *vaf);
+void __drm_puts_coredump(struct drm_printer *p, const char *str);
+
+/**
+ * struct drm_print_iterator - local struct used with drm_printer_coredump
+ * @data: Pointer to the devcoredump output buffer
+ * @start: The offset within the buffer to start writing
+ * @remain: The number of bytes to write for this iteration
+ */
+struct drm_print_iterator {
+	void *data;
+	ssize_t start;
+	ssize_t remain;
+	/* private: */
+	ssize_t offset;
+};
+
+static inline struct drm_printer
+drm_coredump_printer(struct drm_print_iterator *iter)
+{
+	struct drm_printer p = {
+		.printfn = __drm_printfn_coredump,
+		.arg = iter,
+	};
+
+	/* Set the internal offset of the iterator to zero */
+	iter->offset = 0;
+
+	return p;
+}
+
+#endif
+
 /* Copied from 3d387d923c18 include/drm/drm_print.h */
 #if !defined(HAVE_DRM_PRINTER_PREFIX)
 extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
