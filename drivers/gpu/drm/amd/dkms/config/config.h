@@ -629,6 +629,9 @@
 /* enum drm_panel_orientation is available */
 #define HAVE_DRM_PANEL_ORIENTATION_ENUM 1
 
+/* drm_plane_get_damage_clips_count function is available */
+#define HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT 1
+
 /* drm_plane_helper_check_state is available */
 /* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
 
