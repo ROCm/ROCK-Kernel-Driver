@@ -5314,7 +5314,11 @@ static void fill_dc_dirty_rects(struct drm_plane *plane,
 	 * If plane is moved or resized, also add old bounding box to dirty
 	 * rects.
 	 */
+#ifdef HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT
 	num_clips = drm_plane_get_damage_clips_count(new_plane_state);
+#else
+	num_clips = 0;
+#endif
 	fb_changed = old_plane_state->fb->base.id !=
 		     new_plane_state->fb->base.id;
 	bb_changed = (old_plane_state->crtc_x != new_plane_state->crtc_x ||
