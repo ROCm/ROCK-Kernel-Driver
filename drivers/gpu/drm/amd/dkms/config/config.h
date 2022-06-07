@@ -244,6 +244,9 @@
 /* drm_connector_xxx() drop _mode_ */
 #define HAVE_DRM_CONNECTOR_XXX_DROP_MODE 1
 
+/* drm_coredump_printer function is available */
+#define HAVE_DRM_COREDUMP_PRINTER 1
+
 /* ddrm_atomic_stat has __drm_crtcs_state */
 /* #undef HAVE_DRM_CRTCS_STATE_MEMBER */
 
