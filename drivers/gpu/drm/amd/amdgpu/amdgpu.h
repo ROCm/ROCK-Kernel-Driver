@@ -231,6 +231,7 @@ extern int amdgpu_noretry;
 extern int amdgpu_force_asic_type;
 extern int amdgpu_smartshift_bias;
 extern int amdgpu_use_xgmi_p2p;
+extern bool pcie_p2p;
 extern int amdgpu_mtype_local;
 extern bool enforce_isolation;
 #ifdef CONFIG_HSA_AMD
