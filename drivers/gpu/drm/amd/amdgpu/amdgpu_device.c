@@ -36,6 +36,7 @@
 #include <linux/iommu.h>
 #include <linux/pci.h>
 #include <linux/pci-p2pdma.h>
+#include <linux/pci-p2pdma.h>
 #include <linux/apple-gmux.h>
 
 #include <drm/drm_atomic_helper.h>
