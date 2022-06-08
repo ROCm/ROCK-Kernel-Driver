@@ -755,7 +755,7 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
  *
  * Implementation determines if access to VRAM BO would employ DMABUF
  * or Shared BO mechanism. Employ DMABUF mechanism if kernel has config
- * option DMABUF_MOVE_NOTIFY enabled. Employ Shared BO mechanism if above
+ * option HSA_AMD_P2P enabled. Employ Shared BO mechanism if above
  * config option is not set. It is important to note that a Shared BO
  * cannot be used to enable peer acces if system has IOMMU enabled
  *
@@ -768,7 +768,7 @@ static int kfd_mem_attach_vram_bo(struct amdgpu_device *adev,
 {
 	int ret =  0;
 
-#if defined(CONFIG_DMABUF_MOVE_NOTIFY) && defined(CONFIG_PCI_P2PDMA)
+#ifdef CONFIG_HSA_AMD_P2P
 	attachment->type = KFD_MEM_ATT_DMABUF;
 	ret = kfd_mem_attach_dmabuf(adev, mem, bo);
 	pr_debug("Employ DMABUF mechanim to enable peer GPU access\n");
@@ -879,19 +879,9 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			pr_debug("Employ DMABUF mechanism to enable peer GPU access\n");
 #endif
 		/* Enable peer acces to VRAM BO's */
-		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM &&
-			   mem->bo->tbo.type == ttm_bo_type_device) {
+		} else if (mem->domain == AMDGPU_GEM_DOMAIN_VRAM) {
 			ret = kfd_mem_attach_vram_bo(adev, mem,
 						&bo[i], attachment[i]);
-			if (ret)
-				goto unwind;
-
-		/* Handle DOORBELL BOs of peer devices and MMIO BOs of local and peer devices */
-		} else if ((mem->bo->tbo.type == ttm_bo_type_sg) &&
-			   ((mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) ||
-			    (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
-			attachment[i]->type = KFD_MEM_ATT_SG;
-			ret = create_dmamap_sg_bo(adev, mem, &bo[i]);
 			if (ret)
 				goto unwind;
 		} else {
