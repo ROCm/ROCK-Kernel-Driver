@@ -368,9 +368,11 @@ static void nbio_v4_3_program_ltr(struct amdgpu_device *adev)
 		WREG32_SOC15(NBIO, 0, regRCC_STRAP0_RCC_BIF_STRAP2, data);
 
 	def = data = RREG32_SOC15(NBIO, 0, regBIF_CFG_DEV0_EPF0_DEVICE_CNTL2);
+#ifdef HAVE_PCI_DEV_LTR_PATH
 	if (adev->pdev->ltr_path)
 		data |= BIF_CFG_DEV0_EPF0_DEVICE_CNTL2__LTR_EN_MASK;
 	else
+#endif
 		data &= ~BIF_CFG_DEV0_EPF0_DEVICE_CNTL2__LTR_EN_MASK;
 	if (def != data)
 		WREG32_SOC15(NBIO, 0, regBIF_CFG_DEV0_EPF0_DEVICE_CNTL2, data);
