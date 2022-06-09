@@ -906,6 +906,9 @@
 /* list_rotate_to_front() is available */
 #define HAVE_LIST_ROTATE_TO_FRONT 1
 
+/* strurct pci_dev->ltr_path is available */
+#define HAVE_PCI_DEV_LTR_PATH 1
+
 /* enum MCE_PRIO_UC is available */
 #define HAVE_MCE_PRIO_UC 1
 
