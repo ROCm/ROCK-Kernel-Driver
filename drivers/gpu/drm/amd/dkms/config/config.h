@@ -300,6 +300,9 @@
 /* drm_dev_unplug() is available */
 #define HAVE_DRM_DEV_UNPLUG 1
 
+/* display_info->edid_hdmi_rgb444_dc_modes is available */
+/* #undef HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES */
+
 /* display_info->hdmi.scdc.scrambling are available */
 #define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
 
