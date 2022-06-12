@@ -14,6 +14,7 @@ extern void amdkcl_pci_init(void);
 extern void amdkcl_suspend_init(void);
 extern void amdkcl_sched_init(void);
 extern void amdkcl_numa_init(void);
+extern void amdkcl_workqueue_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -29,6 +30,7 @@ int __init amdkcl_init(void)
 	amdkcl_suspend_init();
 	amdkcl_sched_init();
 	amdkcl_numa_init();
+	amdkcl_workqueue_init();
 
 	return 0;
 }
