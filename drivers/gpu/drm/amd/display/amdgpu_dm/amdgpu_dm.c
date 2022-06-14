@@ -5537,8 +5537,6 @@ static bool dm_plane_format_mod_supported(struct drm_plane *plane,
 	struct amdgpu_device *adev = drm_to_adev(plane->dev);
 	const struct drm_format_info *info = drm_format_info(format);
 	struct hw_asic_id asic_id = adev->dm.dc->ctx->asic_id;
-	int i;
-
 	enum dm_micro_swizzle microtile = modifier_gfx9_swizzle_mode(modifier) & 3;
 
 	if (!info)
