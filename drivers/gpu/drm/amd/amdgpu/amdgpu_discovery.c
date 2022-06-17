@@ -175,6 +175,7 @@ static const char *hw_id_names[HW_ID_MAX] = {
 	[XGMI_HWID]		= "XGMI",
 	[XGBE_HWID]		= "XGBE",
 	[MP0_HWID]		= "MP0",
+	[VPE_HWID]		= "VPE",
 };
 
 static int hw_id_map[MAX_HWIP] = {
@@ -204,6 +205,7 @@ static int hw_id_map[MAX_HWIP] = {
 	[XGMI_HWIP]	= XGMI_HWID,
 	[DCI_HWIP]	= DCI_HWID,
 	[PCIE_HWIP]	= PCIE_HWID,
+	[VPE_HWIP]	= VPE_HWID,
 };
 
 #ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
