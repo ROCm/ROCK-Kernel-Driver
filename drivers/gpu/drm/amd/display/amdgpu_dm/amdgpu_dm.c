@@ -7398,6 +7398,10 @@ static uint add_fs_modes(struct amdgpu_dm_connector *aconnector)
 		num = (unsigned long long)m->clock * 1000 * 1000;
 		den = common_rates[i] * (unsigned long long)m->htotal;
 		target_vtotal = div_u64(num, den);
+
+		if (target_vtotal < m->vtotal)
+			continue;
+
 		target_vtotal_diff = target_vtotal - m->vtotal;
 
 		/* Check for illegal modes */
