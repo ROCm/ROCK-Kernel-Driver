@@ -8,7 +8,11 @@
 #ifndef __KCL_KCL_DRM_DP_CEC_H__
 #define __KCL_KCL_DRM_DP_CEC_H__
 
+#ifdef HAVE_DRM_DP_DRM_DP_HELPER_H
+#include <drm/dp/drm_dp_helper.h>
+#else
 #include <drm/drm_dp_helper.h>
+#endif
 
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
