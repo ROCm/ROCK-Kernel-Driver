@@ -104,4 +104,6 @@
 #include <kcl/kcl_mce.h>
 #include <kcl/kcl_hypervisor.h>
 #include <kcl/backport/kcl_workqueue_backport.h>
+#include <kcl/kcl_string_helpers.h>
+
 #endif /* AMDGPU_BACKPORT_H */
