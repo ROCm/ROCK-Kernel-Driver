@@ -5,7 +5,11 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ATOMIC_ENABLE_DSC], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		], [
 			drm_dp_mst_atomic_enable_dsc(NULL, NULL, 0, 0, false);
 		], [drm_dp_mst_atomic_enable_dsc], [drivers/gpu/drm/drm_dp_mst_topology.c], [

@@ -156,6 +156,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/dp/drm_dp_helper.h])
 
 	dnl #
+	dnl # v5.16-rc5-872-g5b529e8d9c38
+	dnl # drm/dp: Move public DisplayPort headers into dp/
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/dp/drm_dp_mst_helper.h])
+	
+	dnl #
 	dnl # v5.7-13141-gca5999fde0a1
 	dnl # mm: introduce include/linux/pgtable.h
 	dnl #
