@@ -3,7 +3,6 @@
 #define _KCL_DRM_DP_HELPER_BACKPORT_H_
 
 #include <kcl/kcl_drm_dp_helper.h>
-#include <drm/drm_dp_helper.h>
 
 /*
  * commit v4.19-rc1-100-g5ce70c799ac2
