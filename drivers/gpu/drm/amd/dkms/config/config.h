@@ -850,7 +850,7 @@
 /* #undef HAVE_LINUX_DMA_ATTRS_H */
 
 /* Define to 1 if you have the <linux/dma-buf-map.h> header file. */
-#define HAVE_LINUX_DMA_BUF_MAP_H 1
+/* #undef HAVE_LINUX_DMA_BUF_MAP_H */
 
 /* Define to 1 if you have the <linux/dma-fence-chain.h> header file. */
 #define HAVE_LINUX_DMA_FENCE_CHAIN_H 1
@@ -863,6 +863,9 @@
 
 /* Define to 1 if you have the <linux/fence-array.h> header file. */
 /* #undef HAVE_LINUX_FENCE_ARRAY_H */
+
+/* Define to 1 if you have the <linux/iosys-map.h> header file. */
+#define HAVE_LINUX_IOSYS_MAP_H 1
 
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1

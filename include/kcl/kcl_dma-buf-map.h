@@ -7,7 +7,9 @@
 #ifndef _KCL_KCL__DMA_BUF_MAP_H__H__
 #define _KCL_KCL__DMA_BUF_MAP_H__H__
 
+#ifndef HAVE_LINUX_IOSYS_MAP_H
 #include <linux/dma-buf-map.h>
+#endif
 
 #ifndef HAVE_LINUX_DMA_BUF_MAP_H
 #include <linux/io.h>
