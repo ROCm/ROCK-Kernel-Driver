@@ -1126,6 +1126,9 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
+/* str_yes_no() is defined */
+#define HAVE_STR_YES_NO 1
+
 /* synchronize_shrinkers() is available */
 #define HAVE_SYNCHRONIZE_SHRINKERS 1
 
