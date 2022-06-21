@@ -5,7 +5,11 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_MGR_INIT], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		], [
 			drm_dp_mst_topology_mgr_init(NULL, (struct drm_device *)NULL, NULL, 0, 0, 0, 0, 0);
 		], [
@@ -15,7 +19,11 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_MGR_INIT], [
 				[drm_dp_mst_topology_mgr_init() has max_lane_count and max_link_rate])
 		], [
 			AC_KERNEL_TRY_COMPILE([
+				#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+				#include <drm/dp/drm_dp_mst_helper.h>
+				#else
 				#include <drm/drm_dp_mst_helper.h>
+				#endif
 			], [
 				drm_dp_mst_topology_mgr_init(NULL, (struct drm_device *)NULL, NULL, 0, 0, 0);
 			], [
