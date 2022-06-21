@@ -342,6 +342,9 @@
 /* drm_dp_cec_register_connector() wants p,p interface */
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
+/* Define to 1 if you have the <drm/dp/drm_dp_helper.h> header file. */
+#define HAVE_DRM_DP_DRM_DP_HELPER_H 1
+
 /* drm_dp_link_train_channel_eq_delay() has 2 args */
 #define HAVE_DRM_DP_LINK_TRAIN_CHANNEL_EQ_DELAY_2ARGS 1
 
