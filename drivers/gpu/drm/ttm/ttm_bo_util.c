@@ -124,7 +124,7 @@ void ttm_move_memcpy(bool clear,
 		if (!src_map.is_iomem && !dst_map.is_iomem) {
 			memcpy(dst_map.vaddr, src_map.vaddr, PAGE_SIZE);
 		} else if (!src_map.is_iomem) {
-			dma_buf_map_memcpy_to(&dst_map, src_map.vaddr,
+			iosys_map_memcpy_to(&dst_map, 0, src_map.vaddr,
 						PAGE_SIZE);
 		} else if (!dst_map.is_iomem) {
 			memcpy_fromio(dst_map.vaddr, src_map.vaddr_iomem,
