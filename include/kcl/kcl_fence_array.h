@@ -76,6 +76,17 @@ static inline struct fence_array *to_fence_array(struct fence *fence)
 struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 				       u64 context, unsigned seqno,
 				       bool signal_on_any);
+/**
+ * dma_fence_is_array - check if a fence is from the array subclass
+ * @fence: the fence to test
+ *
+ * Return true if it is a dma_fence_array and false otherwise.
+ */
+static inline bool dma_fence_is_array(struct dma_fence *fence)
+{
+        return false;
+}
+
 #endif
 #endif
 
