@@ -5,7 +5,11 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_AUX_DRM_DEV], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#ifdef HAVE_DRM_DP_DRM_DP_HELPER_H
+			#include <drm/dp/drm_dp_helper.h>
+			#else
 			#include <drm/drm_dp_helper.h>
+			#endif
 		], [
 			struct drm_dp_aux dda;
 			dda.drm_dev = NULL;
