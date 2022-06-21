@@ -9,6 +9,9 @@
 #ifndef AMDKCL_DMA_FENCE_CHAIN_H
 #define AMDKCL_DMA_FENCE_CHAIN_H
 
+#ifdef HAVE_LINUX_DMA_FENCE_CHAIN_H
+#include <linux/dma-fence-chain.h>
+#endif
 
 #if !defined(HAVE_STRUCT_DMA_FENCE_CHAIN)
 #ifdef HAVE_LINUX_DMA_FENCE_H
