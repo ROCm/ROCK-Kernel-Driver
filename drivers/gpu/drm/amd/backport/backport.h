@@ -13,6 +13,7 @@
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
 #include <kcl/kcl_dma-buf-map.h>
+#include <kcl/kcl_iosys-map.h>
 #include <kcl/kcl_eventpoll.h>
 #include <kcl/kcl_i2c.h>
 #include <kcl/kcl_firmware.h>
