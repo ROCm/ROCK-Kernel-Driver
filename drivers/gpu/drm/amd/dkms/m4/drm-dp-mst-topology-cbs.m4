@@ -4,7 +4,11 @@ dnl # drm/dp-mst-helper: Remove hotplug callback
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG], [
 	AC_KERNEL_TRY_COMPILE([
+		#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+		#include <drm/dp/drm_dp_mst_helper.h>
+		#else
 		#include <drm/drm_dp_mst_helper.h>
+		#endif
 	], [
 		struct drm_dp_mst_topology_cbs *dp_mst_cbs = NULL;
 		dp_mst_cbs->hotplug(NULL);
@@ -24,7 +28,11 @@ dnl # drm/dp/mst: split connector registration into two parts (v2)
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR], [
 	AC_KERNEL_TRY_COMPILE([
+		#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+		#include <drm/dp/drm_dp_mst_helper.h>
+		#else
 		#include <drm/drm_dp_mst_helper.h>
+		#endif
 	], [
 		struct drm_dp_mst_topology_cbs *dp_mst_cbs = NULL;
 		dp_mst_cbs->register_connector(NULL);
@@ -40,7 +48,11 @@ dnl # drm/dp_mst: Remove drm_dp_mst_topology_cbs.destroy_connector
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR], [
 	AC_KERNEL_TRY_COMPILE([
+		#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+		#include <drm/dp/drm_dp_mst_helper.h>
+		#else
 		#include <drm/drm_dp_mst_helper.h>
+		#endif
 	], [
 		struct drm_dp_mst_topology_cbs *dp_mst_cbs = NULL;
 		dp_mst_cbs->destroy_connector(NULL, NULL);
