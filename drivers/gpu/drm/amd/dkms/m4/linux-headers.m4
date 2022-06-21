@@ -98,6 +98,12 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([linux/dma-buf-map.h])
 
 	dnl #
+	dnl # 7938f4218168
+	dnl # dma-buf: dma-buf-map: Rename to iosys-map
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/iosys-map.h])
+
+	dnl #
 	dnl # v5.14-rc5-11-gc0891ac15f04
 	dnl # isystem: ship and use stdarg.h
 	dnl #
