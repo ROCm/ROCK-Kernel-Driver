@@ -620,6 +620,9 @@
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
 
+/* drm_mode_config->fb_modifiers_not_supported is available */
+#define HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED 1
+
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 

@@ -1714,8 +1714,10 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		return res;
 #endif
 
+#ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	if (modifiers == NULL)
 		adev_to_drm(dm->adev)->mode_config.fb_modifiers_not_supported = true;
+#endif
 
 	res = drm_universal_plane_init(adev_to_drm(dm->adev), plane, possible_crtcs,
 				       &dm_plane_funcs, formats, num_formats,
