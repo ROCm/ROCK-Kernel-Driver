@@ -2891,7 +2891,9 @@ static int dce_v10_0_sw_init(void *handle)
 	/* disable prefer shadow for now due to hibernation issues */
 	adev_to_drm(adev)->mode_config.prefer_shadow = 0;
 
+#ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	adev_to_drm(adev)->mode_config.fb_modifiers_not_supported = true;
+#endif
 
 	adev_to_drm(adev)->mode_config.fb_base = adev->gmc.aper_base;
 
