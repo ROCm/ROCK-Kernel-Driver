@@ -1077,6 +1077,9 @@
 /* struct dma_fence_chain is available */
 #define HAVE_STRUCT_DMA_FENCE_CHAIN 1
 
+/* dma_fence_chain_contained() is available */
+#define HAVE_DMA_FENCE_CHAIN_CONTAINED 1
+
 /* struct drm_connector_state->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
 
