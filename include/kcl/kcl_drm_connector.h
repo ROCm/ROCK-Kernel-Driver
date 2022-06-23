@@ -156,4 +156,16 @@ int drm_connector_set_panel_orientation_with_quirk(
 }
 #endif
 
+#ifndef DRM_COLOR_FORMAT_YCBCR444
+#define DRM_COLOR_FORMAT_YCBCR444      (1<<1)
+#endif
+
+#ifndef DRM_COLOR_FORMAT_YCBCR422
+#define DRM_COLOR_FORMAT_YCBCR422      (1<<2)
+#endif
+
+#ifndef DRM_COLOR_FORMAT_YCBCR420
+#define DRM_COLOR_FORMAT_YCBCR420      (1<<3)
+#endif
+
 #endif /* AMDKCL_DRM_CONNECTOR_H */
