@@ -5097,6 +5097,7 @@ static void amdgpu_device_recheck_guilty_jobs(
 
 			/* set guilty */
 			drm_sched_increase_karma(s_job);
+			amdgpu_reset_prepare_hwcontext(adev, reset_context);
 retry:
 			/* do hw reset */
 			if (amdgpu_sriov_vf(adev)) {
