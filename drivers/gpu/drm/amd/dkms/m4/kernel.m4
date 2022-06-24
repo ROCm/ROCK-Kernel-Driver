@@ -497,7 +497,7 @@ dnl # AC_KERNEL_TMP_BUILD_DIR
 dnl # $1: contents to be executed in a temporary directory
 dnl #
 AC_DEFUN([AC_KERNEL_TMP_BUILD_DIR], [
-	build_dir=$(mktemp -d -t build-XXXXXXXX -p $build_dir_root)
+	build_dir=$(mktemp -d -t build_XXXXXXXX -p $build_dir_root)
 	cd $build_dir
 	$1
 	AS_IF([test -s confdefs.h], [
