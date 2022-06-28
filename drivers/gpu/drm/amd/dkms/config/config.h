@@ -557,6 +557,9 @@
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
 
+/* drm_gem_object_funcs.vmap hsa iosys_map arg */
+#define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG 1
+
 /* drm_gem_object_lookup() wants 2 args */
 #define HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS 1
 
