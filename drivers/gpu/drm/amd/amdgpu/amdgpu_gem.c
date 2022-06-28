@@ -342,9 +342,12 @@ static const struct drm_gem_object_funcs amdgpu_gem_object_funcs = {
 	.open = amdgpu_gem_object_open,
 	.close = amdgpu_gem_object_close,
 	.export = amdgpu_gem_prime_export,
-#ifdef HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS
+#ifdef HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG
 	.vmap = drm_gem_ttm_vmap,
 	.vunmap = drm_gem_ttm_vunmap,
+#elif defined(HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS)
+	.vmap = amdgpu_drm_gem_ttm_vmap,
+	.vunmap = amdgpu_drm_gem_ttm_vunmap,
 #else
 	.vmap = amdgpu_gem_prime_vmap,
 	.vunmap = amdgpu_gem_prime_vunmap,
