@@ -31,3 +31,24 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_GEM_OPEN_OBJECT], [
 		])
 	])
 ])
+
+
+dnl #
+dnl # commit v5.17-rc2-157-g7938f4218168
+dnl # dma-buf-map: Rename to iosys-map
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_gem.h>
+                ], [
+			struct drm_gem_object_funcs *funcs = NULL;
+			struct iosys_map *map = NULL;
+			funcs->vmap(NULL, map);
+                ], [
+                        AC_DEFINE(HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG, 1,
+                                [drm_gem_object_funcs.vmap hsa iosys_map arg])
+                ])
+        ])
+])
+
