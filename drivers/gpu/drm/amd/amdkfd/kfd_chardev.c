@@ -2591,7 +2591,7 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 		 */
 		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->adev, bo_bucket->addr,
 							      bo_bucket->size, pdd->drm_priv,
-							      NULL, kgd_mem, &offset,
+							      kgd_mem, &offset,
 							      bo_bucket->alloc_flags, true);
 		if (ret) {
 			pr_err("Could not create the BO\n");
