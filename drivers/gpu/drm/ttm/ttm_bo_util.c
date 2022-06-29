@@ -118,7 +118,7 @@ void ttm_move_memcpy(bool clear,
 		dst_ops->map_local(dst_iter, &dst_map, i);
 		src_ops->map_local(src_iter, &src_map, i);
 
-#ifdef HAVE_DRM_MEMCPY_FROM_WC
+#ifdef HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG
 		drm_memcpy_from_wc(&dst_map, &src_map, PAGE_SIZE);
 #else
 		if (!src_map.is_iomem && !dst_map.is_iomem) {
