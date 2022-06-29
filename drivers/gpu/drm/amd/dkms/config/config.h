@@ -612,7 +612,10 @@
 #define HAVE_DRM_LEGACY_IRQ_UNINSTALL 1
 
 /* drm_memcpy_from_wc() is availablea */
-#define HAVE_DRM_MEMCPY_FROM_WC 1
+/* #undef HAVE_DRM_MEMCPY_FROM_WC */
+
+/* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
+#define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
 
 /* whether drm_mm_insert_mode is available */
 #define HAVE_DRM_MM_INSERT_MODE 1
