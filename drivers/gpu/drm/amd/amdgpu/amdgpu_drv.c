@@ -2523,7 +2523,9 @@ static int amdgpu_runtime_idle_check_display(struct device *dev)
 
 	if (adev->mode_info.num_crtc) {
 		struct drm_connector *list_connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		struct drm_connector_list_iter iter;
+#endif
 		int ret = 0;
 
 		/* XXX: Return busy if any displays are connected to avoid
@@ -2532,14 +2534,20 @@ static int amdgpu_runtime_idle_check_display(struct device *dev)
 		 * the GPU was in suspend.  Remove this once that is fixed.
 		 */
 		mutex_lock(&drm_dev->mode_config.mutex);
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_begin(drm_dev, &iter);
 		drm_for_each_connector_iter(list_connector, &iter) {
+#else
+		list_for_each_entry(list_connector, &(drm_dev)->mode_config.connector_list, head) {
+#endif
 			if (list_connector->status == connector_status_connected) {
 				ret = -EBUSY;
 				break;
 			}
 		}
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 		drm_connector_list_iter_end(&iter);
+#endif
 		mutex_unlock(&drm_dev->mode_config.mutex);
 
 		if (ret)
@@ -2560,15 +2568,21 @@ static int amdgpu_runtime_idle_check_display(struct device *dev)
 			mutex_lock(&drm_dev->mode_config.mutex);
 			drm_modeset_lock(&drm_dev->mode_config.connection_mutex, NULL);
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 			drm_connector_list_iter_begin(drm_dev, &iter);
 			drm_for_each_connector_iter(list_connector, &iter) {
+#else
+			list_for_each_entry(list_connector, &(drm_dev)->mode_config.connector_list, head) {
+#endif
 				if (list_connector->dpms ==  DRM_MODE_DPMS_ON) {
 					ret = -EBUSY;
 					break;
 				}
 			}
 
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 			drm_connector_list_iter_end(&iter);
+#endif
 
 			drm_modeset_unlock(&drm_dev->mode_config.connection_mutex);
 			mutex_unlock(&drm_dev->mode_config.mutex);
