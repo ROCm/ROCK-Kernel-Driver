@@ -24,7 +24,7 @@
  */
 #include <kcl/kcl_drm_print.h>
 #include <kcl/kcl_bitops.h>
-#include <stdarg.h>
+#include <linux/stdarg.h>
 
 #if !defined(HAVE_DRM_DRM_PRINT_H)
 void drm_printf(struct drm_printer *p, const char *f, ...)
