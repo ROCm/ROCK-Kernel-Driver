@@ -67,10 +67,11 @@ done
 export KERNELVER
 (cd $SRC && ./configure)
 
-# rename CFLAGS_<path>target.o to CFLAGS_target.o
+# rename CFLAGS_<path>target.o / CFLAGS_REMOVE_<path> to CFLAGS_target.o
+# for kernel version < 5.3
 if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
 	for file in $(grep -rl 'CFLAGS_' amd/display/); do
-		sed -i 's|$(AMDDALPATH)/.*/\(.*\.o\)|\1|' $file
+		sed -i 's|\(CFLAGS_[A-Z_]*\)$(AMDDALPATH)/.*/\(.*\.o\)|\1\2|' $file
 	done
 fi
 
