@@ -1229,9 +1229,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
 
-	kfd_process_dequeue_from_all_devices(p);
-	pqm_uninit(&p->pqm);
-
 	/* Indicate to other users that MM is no longer valid */
 	p->mm = NULL;
 
