@@ -1247,8 +1247,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		}
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
-        kfd_process_dequeue_from_all_devices(p);
-        pqm_uninit(&p->pqm);
 	kfd_process_notifier_release_internal(p);
 }
 
