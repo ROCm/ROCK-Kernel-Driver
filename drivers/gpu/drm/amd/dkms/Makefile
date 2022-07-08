@@ -19,7 +19,7 @@ endif
 ifeq ($(CC), gcc)
 GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
 GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
-GCCPAT=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCCPAT=$(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
 # CONFIG_GCC_VERSION returns x.xx.xx as the version format
 GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
 ifdef CONFIG_CC_IS_GCC
