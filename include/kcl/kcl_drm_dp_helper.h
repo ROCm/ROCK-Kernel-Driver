@@ -30,7 +30,9 @@
 
 #include <drm/drm_connector.h>
 #include <drm/drm_device.h>
-#ifdef HAVE_DRM_DP_DRM_DP_HELPER_H
+#if defined(HAVE_DRM_DISPLAY_DRM_DP_HELPER_H)
+#include <drm/display/drm_dp_helper.h>
+#elif defined(HAVE_DRM_DP_DRM_DP_HELPER_H)
 #include <drm/dp/drm_dp_helper.h>
 #else
 #include <drm/drm_dp_helper.h>
