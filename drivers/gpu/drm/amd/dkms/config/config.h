@@ -312,6 +312,9 @@
 /* drm_dev_unplug() is available */
 #define HAVE_DRM_DEV_UNPLUG 1
 
+/* Define to 1 if you have the <drm/display/drm_dp_helper.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_DP_HELPER_H 1
+
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
 
@@ -346,7 +349,7 @@
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
 /* Define to 1 if you have the <drm/dp/drm_dp_helper.h> header file. */
-#define HAVE_DRM_DP_DRM_DP_HELPER_H 1
+/* #undef HAVE_DRM_DP_DRM_DP_HELPER_H */
 
 /* Define to 1 if you have the <drm/dp/drm_dp_mst_helper.h> header file. */
 #define HAVE_DRM_DP_DRM_DP_MST_HELPER_H 1
