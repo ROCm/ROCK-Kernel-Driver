@@ -916,23 +916,22 @@ out:
 int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		uint64_t exception_clear_mask,
 		void __user *user_info,
-		uint32_t *number_of_device_infos)
+		uint32_t *number_of_device_infos,
+		uint32_t *entry_size)
 {
-	int i;
-	struct kfd_dbg_device_info_entry device_info[MAX_GPU_INSTANCE];
+	struct kfd_dbg_device_info_entry device_info = {0};
+	uint32_t tmp_entry_size = *entry_size;
+	int i, r = 0;
 
-	if (!target)
-		return -EINVAL;
-
-	if (!user_info || !number_of_device_infos)
+	if (!(target && user_info && number_of_device_infos && entry_size))
 		return -EINVAL;
 
 	if (*number_of_device_infos < target->n_pdds) {
-		*number_of_device_infos = target->n_pdds;
-		return -ENOSPC;
+		r = -ENOSPC;
+		goto out;
 	}
 
-	memset(device_info, 0, sizeof(device_info));
+	*entry_size = min((size_t)entry_size, sizeof(device_info));
 
 	mutex_lock(&target->event_mutex);
 
@@ -940,26 +939,32 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
 
-		device_info[i].gpu_id = pdd->dev->id;
-		device_info[i].exception_status = pdd->exception_status;
-		device_info[i].lds_base = pdd->lds_base;
-		device_info[i].lds_limit = pdd->lds_limit;
-		device_info[i].scratch_base = pdd->scratch_base;
-		device_info[i].scratch_limit = pdd->scratch_limit;
-		device_info[i].gpuvm_base = pdd->gpuvm_base;
-		device_info[i].gpuvm_limit = pdd->gpuvm_limit;
+		device_info.gpu_id = pdd->dev->id;
+		device_info.exception_status = pdd->exception_status;
+		device_info.lds_base = pdd->lds_base;
+		device_info.lds_limit = pdd->lds_limit;
+		device_info.scratch_base = pdd->scratch_base;
+		device_info.scratch_limit = pdd->scratch_limit;
+		device_info.gpuvm_base = pdd->gpuvm_base;
+		device_info.gpuvm_limit = pdd->gpuvm_limit;
 
 		if (exception_clear_mask)
 			pdd->exception_status &= ~exception_clear_mask;
+
+		if (copy_to_user(user_info, &device_info, *entry_size)) {
+			r = -EFAULT;
+			break;
+		}
+
+		user_info += tmp_entry_size;
 	}
+
 	mutex_unlock(&target->event_mutex);
 
-	if (copy_to_user(user_info, device_info,
-				sizeof(device_info[0]) * target->n_pdds))
-		return -EFAULT;
+out:
 	*number_of_device_infos = target->n_pdds;
 
-	return 0;
+	return r;
 }
 
 int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
