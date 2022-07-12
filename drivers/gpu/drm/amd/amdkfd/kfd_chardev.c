@@ -1843,7 +1843,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = pqm_get_queue_snapshot(&target->pqm,
 					   exception_mask, /* Clear mask  */
 					   (void __user *)args->ptr,
-					   args->data1);
+					   args->data1,
+					   &args->data2);
 
 		args->data1 = r < 0 ? 0 : r;
 		if (r > 0)
@@ -1883,7 +1884,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = kfd_dbg_trap_device_snapshot(target,
 				exception_mask,
 				(void __user *) args->ptr,
-				&args->data1);
+				&args->data1,
+				&args->data2);
 		break;
 	case KFD_IOC_DBG_TRAP_RUNTIME_ENABLE:
 		if (data1)
