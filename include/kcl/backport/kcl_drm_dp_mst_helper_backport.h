@@ -22,7 +22,9 @@
 #ifndef _KCL_DRM_DP_MST_HELPER_BACKPORT_H_
 #define _KCL_DRM_DP_MST_HELPER_BACKPORT_H_
 
-#ifdef HAVE_DRM_DP_DRM_DP_MST_HELPER_H
+#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+#include <drm/display/drm_dp_mst_helper.h>
+#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
 #include <drm/dp/drm_dp_mst_helper.h>
 #else
 #include <drm/drm_dp_mst_helper.h>
