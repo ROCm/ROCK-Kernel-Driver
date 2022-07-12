@@ -583,12 +583,18 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   uint64_t exception_clear_mask,
-			   struct kfd_queue_snapshot_entry __user *buf,
-			   int num_qss_entries)
+			   void __user *buf,
+			   int num_qss_entries,
+			   uint32_t *entry_size)
 {
 	struct process_queue_node *pqn;
-	int r, qss_entry_count = 0;
+	uint32_t tmp_entry_size = *entry_size;
+	int qss_entry_count = 0;
 
+	if (!(*entry_size))
+		return -EINVAL;
+
+	*entry_size = min((size_t)entry_size, sizeof(struct kfd_queue_snapshot_entry));
 	mutex_lock(&pqm->process->event_mutex);
 
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
@@ -602,18 +608,19 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			set_queue_snapshot_entry(pqn->q->device->dqm,
 					pqn->q, exception_clear_mask, &src);
 
-			r = copy_to_user(buf++, &src, sizeof(src));
-
-			if (r) {
+			if (copy_to_user(buf, &src, *entry_size)) {
 				qss_entry_count = -EFAULT;
-				goto unlock;
+				break;
 			}
+
+			buf += tmp_entry_size;
 		}
 
 		qss_entry_count++;
 	}
-unlock:
+
 	mutex_unlock(&pqm->process->event_mutex);
+
 	return qss_entry_count;
 }
 
