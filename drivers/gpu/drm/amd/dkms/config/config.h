@@ -318,6 +318,21 @@
 /* Define to 1 if you have the <drm/display/drm_dp_mst_helper.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H 1
 
+/* Define to 1 if you have the <drm/display/drm_dsc.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_DSC_H 1
+
+/* Define to 1 if you have the <drm/display/drm_dsc_helper.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_DSC_HELPER_H 1
+
+/* Define to 1 if you have the <drm/display/drm_hdcp.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_HDCP_H 1
+
+/* Define to 1 if you have the <drm/display/drm_hdcp_helper.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_HDCP_HELPER_H 1
+
+/* Define to 1 if you have the <drm/display/drm_hdmi_helper.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_HDMI_HELPER_H 1
+
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
 
