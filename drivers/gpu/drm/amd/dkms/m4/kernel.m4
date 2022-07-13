@@ -669,6 +669,22 @@ AC_DEFUN([AC_KERNEL_CHECK_HEADERS], [
 ])
 
 dnl #
+dnl # AC_KERNEL_FREE_MEM
+dnl # return true if available memory >20%
+dnl #
+AC_DEFUN([AC_KERNEL_FREE_MEM], [
+	free_mem=$(free -t | awk '/^Total:/ {
+		printf("%d\n", $[4] / $[2] * 100)
+	}')
+
+	AS_IF([[[ $free_mem -gt 20 ]]], [
+		$1
+	], [
+		$2
+	])
+])
+
+dnl #
 dnl # AC_KERNEL_DO_BACKGROUND
 dnl # $1: contents to be executed
 dnl #
@@ -676,6 +692,17 @@ AC_DEFUN([AC_KERNEL_DO_BACKGROUND], [
 	do_background() {
 		AC_KERNEL_TMP_BUILD_DIR([$1])
 	}
+
+	while :
+	do
+		AC_KERNEL_FREE_MEM([rc=0], [rc=1])
+		if test $rc -ne 0; then :
+			sleep 1
+		else :
+			break
+		fi
+	done
+
 	do_background &
 	procs="$! $procs"
 ])
