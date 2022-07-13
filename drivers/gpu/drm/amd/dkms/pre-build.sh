@@ -41,7 +41,9 @@ done
 sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_ww_class)/d' \
        -e '/dma_resv_lockdep/,/subsys_initcall/d' $KCL/dma-buf/dma-resv.c
 sed -i -e '/extern struct ww_class reservation_ww_class/i #include <kcl/kcl_dma-resv.h>' \
-       -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h
+       -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h \
+       -e '/struct dma_resv_iter {/, /}/d' $INC/linux/dma-resv.h \
+       -e '/enum dma_resv_usage {/, /}/d' $INC/linux/dma-resv.h
 
 # add amd prefix to exported symbols
 for file in $FILES; do
@@ -75,4 +77,8 @@ fi
 # compile amdgpu_vkms_legacy.o for legacy kernel w/o atomic commit support
 if ! grep -q 'define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT' $SRC/config/config.h; then
  sed -i 's|amdgpu_vkms.o|amdgpu_vkms_legacy.o|' amd/amdgpu/Makefile
+fi
+
+if ! grep -q 'define HAVE_DMA_RESV_FENCES' $SRC/config/config.h; then
+ sed -i 's|dma-buf/dma-resv.o|kcl_dma-resv.o|' amd/amdkcl/Makefile
 fi
