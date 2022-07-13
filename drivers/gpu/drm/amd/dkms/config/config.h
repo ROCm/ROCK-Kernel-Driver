@@ -118,11 +118,14 @@
 /* dma_map_sgtable() is enabled */
 #define HAVE_DMA_MAP_SGTABLE 1
 
+/* dma_resv->fences is available */
+#define HAVE_DMA_RESV_FENCES 1
+
 /* dma_resv->seq is available */
-#define HAVE_DMA_RESV_SEQ 1
+/* #undef HAVE_DMA_RESV_SEQ */
 
 /* dma_resv->seq is seqcount_ww_mutex_t */
-#define HAVE_DMA_RESV_SEQCOUNT_WW_MUTEX_T 1
+/* #undef HAVE_DMA_RESV_SEQCOUNT_WW_MUTEX_T */
 
 /* down_read_killable() is available */
 #define HAVE_DOWN_READ_KILLABLE 1
