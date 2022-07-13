@@ -42,6 +42,25 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_SEQ], [
 ])
 
 dnl #
+dnl # v5.18-rc1-237-g047a1b877ed4
+dnl # dma-buf & drm/amdgpu: remove dma_resv workaround
+dnl #
+AC_DEFUN([AC_AMDGPU_DMA_RESV_FENCES], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/dma-resv.h>
+		], [
+			struct dma_resv *resv = NULL;
+			resv->fences = NULL;
+		], [
+			AC_DEFINE(HAVE_DMA_RESV_FENCES, 1,
+				[dma_resv->fences is available])
+		])
+	])
+])
+
+
+dnl #
 dnl # v4.19-rc6-1514-g27836b641c1b
 dnl # dma-buf: remove shared fence staging in reservation object
 dnl #
@@ -63,5 +82,6 @@ AC_DEFUN([AC_AMDGPU_RESERVATION_OBJECT_STAGED], [
 
 AC_DEFUN([AC_AMDGPU_DMA_RESV], [
 	AC_AMDGPU_DMA_RESV_SEQ
+	AC_AMDGPU_DMA_RESV_FENCES
 	AC_AMDGPU_RESERVATION_OBJECT_STAGED
 ])
