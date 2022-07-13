@@ -365,6 +365,9 @@ struct kfd_dev {
 
 	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping */
 	struct dev_pagemap pgmap;
+
+	/* Track per device allocated watch points. */
+	uint32_t alloc_watch_ids;
 };
 
 struct kfd_ipc_obj;
@@ -848,6 +851,7 @@ struct kfd_process_device {
 	uint32_t spi_dbg_override;
 	uint32_t spi_dbg_launch_mode;
 	uint32_t watch_points[4];
+	uint32_t alloc_watch_ids;
 
 	/*
 	 * If this process has been checkpointed before, then the user
@@ -971,9 +975,6 @@ struct kfd_process {
 
 	/* per-process-per device debug event fd file */
 	struct file *dbg_ev_file;
-
-	/* Allocated debug watch point IDs bitmask */
-	uint32_t allocated_debug_watch_point_bitmask;
 
 	/* If the process is a kfd debugger, we need to know so we can clean
 	 * up at exit time.  If a process enables debugging on itself, it does
