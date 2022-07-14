@@ -25,8 +25,6 @@
  * Authors: Christian König
  */
 
-#define pr_fmt(fmt) "[TTM DEVICE] " fmt
-
 #include <linux/mm.h>
 #include <linux/debugfs.h>
 
@@ -36,6 +34,11 @@
 #include <drm/ttm/ttm_bo_api.h>
 
 #include "ttm_module.h"
+
+#ifdef pr_fmt
+#undef pr_fmt
+#endif
+#define pr_fmt(fmt) "[TTM DEVICE] " fmt
 
 /*
  * ttm_global_mutex - protecting the global state
