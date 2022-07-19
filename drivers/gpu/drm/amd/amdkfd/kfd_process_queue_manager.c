@@ -216,7 +216,7 @@ static int init_user_queue(struct process_queue_manager *pqm,
 						&(*q)->gang_ctx_bo,
 						&(*q)->gang_ctx_gpu_addr,
 						&(*q)->gang_ctx_cpu_ptr,
-						false);
+						false, true);
 		if (retval) {
 			pr_err("failed to allocate gang context bo\n");
 			goto cleanup;
