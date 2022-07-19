@@ -1631,7 +1631,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 						&pdd->proc_ctx_bo,
 						&pdd->proc_ctx_gpu_addr,
 						&pdd->proc_ctx_cpu_ptr,
-						false);
+						false, true);
 		if (retval) {
 			pr_err("failed to allocate process context bo\n");
 			goto err_free_pdd;
