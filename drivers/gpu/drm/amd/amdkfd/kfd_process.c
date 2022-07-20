@@ -1484,6 +1484,11 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	hash_add_rcu(kfd_processes_table, &process->kfd_processes,
 			(uintptr_t)process->mm);
 
+	/* Avoid free_notifier to start kfd_process_wq_release if
+	 * mmu_notifier_get failed because of pending signal.
+	 */
+	kref_get(&process->ref);
+
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	/* MMU notifier registration must be the last call that can fail
 	 * because after this point we cannot unwind the process creation.
@@ -1504,6 +1509,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 		goto err_register_notifier;
 #endif
 
+	kfd_unref_process(process);
 	get_task_struct(process->lead_thread);
 
 	/* If PeerDirect interface was not detected try to detect it again
