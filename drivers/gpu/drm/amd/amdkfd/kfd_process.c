@@ -1481,6 +1481,12 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 			(uintptr_t)process->mm);
 
 #ifdef HAVE_MMU_NOTIFIER_PUT
+
+	/* Avoid free_notifier to start kfd_process_wq_release if
+	 * mmu_notifier_get failed because of pending signal.
+	 */
+	kref_get(&process->ref);
+
 	/* MMU notifier registration must be the last call that can fail
 	 * because after this point we cannot unwind the process creation.
 	 * After this point, mmu_notifier_put will trigger the cleanup by
@@ -1492,6 +1498,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 		goto err_register_notifier;
 	}
 	BUG_ON(mn != &process->mmu_notifier);
+
+	kfd_unref_process(process);
 #else
 	/* Must be last, have to use release destruction after this */
 	process->mmu_notifier.ops = &kfd_process_mmu_notifier_ops;
