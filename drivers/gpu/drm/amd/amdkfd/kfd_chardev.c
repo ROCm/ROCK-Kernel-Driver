@@ -1944,6 +1944,13 @@ out:
 	return r;
 }
 
+/* Place holder for deprecated CMA API */
+static int kfd_ioctl_cross_memory_copy_deprecated(struct file *filep,
+				struct kfd_process *local_p, void *data) {
+	dev_dbg(kfd_device, "AMDKFD_IOC_CROSS_MEMORY_COPY is deprecated.\n");
+	return -EINVAL;
+}
+
 /* Handle requests for watching SMI events */
 static int kfd_ioctl_smi_events(struct file *filep,
 				struct kfd_process *p, void *data)
@@ -3262,6 +3269,8 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
 			kfd_ioctl_rlc_spm, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_DEPRECATED,
+			kfd_ioctl_cross_memory_copy_deprecated, 0),
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
