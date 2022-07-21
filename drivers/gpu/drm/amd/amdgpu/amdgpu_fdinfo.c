@@ -94,8 +94,13 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 	seq_printf(m, "drm-memory-gtt: \t%llu KiB\n", gtt_mem/1024UL);
 	seq_printf(m, "drm-memory-cpu: \t%llu KiB\n", cpu_mem/1024UL);
 	for (hw_ip = 0; hw_ip < AMDGPU_HW_IP_NUM; ++hw_ip) {
+#ifdef HAVE_KTIME_IS_UNION
+		if (!usage[hw_ip].tv64)
+			continue;
+#else
 		if (!usage[hw_ip])
 			continue;
+#endif
 
 		seq_printf(m, "drm-engine-%s:\t%Ld ns\n", amdgpu_ip_name[hw_ip],
 			   ktime_to_ns(usage[hw_ip]));
