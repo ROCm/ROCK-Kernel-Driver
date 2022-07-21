@@ -380,7 +380,7 @@ static void dma_resv_add_excl_fence(struct dma_resv *obj,
 void dma_resv_add_fence(struct dma_resv *obj, struct dma_fence *fence,
                         enum dma_resv_usage usage)
 {
-        if (usage == DMA_RESV_USAGE_WRITE)
+        if (usage == DMA_RESV_USAGE_WRITE || usage == DMA_RESV_USAGE_KERNEL)
                 dma_resv_add_excl_fence(obj, fence);
         else
                 dma_resv_add_shared_fence(obj, fence);
