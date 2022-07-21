@@ -98,8 +98,13 @@ void amdgpu_show_fdinfo(struct drm_printer *p, struct drm_file *file)
 	drm_printf(p, "amd-requested-gtt:\t%llu KiB\n",
 		   stats.requested_gtt/1024UL);
 	for (hw_ip = 0; hw_ip < AMDGPU_HW_IP_NUM; ++hw_ip) {
+#ifdef HAVE_KTIME_IS_UNION
+		if (!usage[hw_ip].tv64)
+			continue;
+#else
 		if (!usage[hw_ip])
 			continue;
+#endif
 
 		drm_printf(p, "drm-engine-%s:\t%lld ns\n", amdgpu_ip_name[hw_ip],
 			   ktime_to_ns(usage[hw_ip]));
