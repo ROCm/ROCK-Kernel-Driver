@@ -321,7 +321,7 @@ void dma_resv_replace_fences(struct dma_resv *obj, uint64_t context,
         write_seqcount_begin(&obj->seq);
 
         old = dma_resv_excl_fence(obj);
-        if (old->context == context) {
+        if (old && old->context == context) {
                 RCU_INIT_POINTER(obj->fence_excl, dma_fence_get(replacement));
                 dma_fence_put(old);
         }
