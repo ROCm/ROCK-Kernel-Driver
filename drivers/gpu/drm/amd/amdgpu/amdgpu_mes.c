@@ -1225,7 +1225,7 @@ int amdgpu_mes_ctx_unmap_meta_data(struct amdgpu_device *adev,
 	if (!amdgpu_vm_ready(vm))
 		goto out_unlock;
 
-	r = dma_resv_get_singleton(bo->tbo.base.resv, DMA_RESV_USAGE_BOOKKEEP, &fence);
+	r = dma_resv_get_singleton(amdkcl_ttm_resvp(&bo->tbo), DMA_RESV_USAGE_BOOKKEEP, &fence);
 	if (r)
 		goto out_unlock;
 	if (fence) {

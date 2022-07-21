@@ -3037,7 +3037,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 				goto validate_map_fail;
 			}
 		}
-		dma_resv_for_each_fence(&cursor, bo->tbo.base.resv,
+		dma_resv_for_each_fence(&cursor, amdkcl_ttm_resvp(&bo->tbo),
 					DMA_RESV_USAGE_KERNEL, fence) {
 			ret = amdgpu_sync_fence(&sync_obj, fence);
 			if (ret) {
