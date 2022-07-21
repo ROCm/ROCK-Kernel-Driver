@@ -148,7 +148,7 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		}
 	}
 
-	ret = dma_resv_reserve_fences(bo->base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(bo), 1);
 	if (ret)
 		goto out_err;
 
@@ -623,7 +623,7 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 			break;
 		}
 		if (locked)
-			dma_resv_unlock(res->bo->base.resv);
+			dma_resv_unlock(amdkcl_ttm_resvp(res->bo));
 	}
 
 	if (!bo) {
@@ -664,7 +664,7 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
  */
 void ttm_bo_pin(struct ttm_buffer_object *bo)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	WARN_ON_ONCE(!kref_read(&bo->kref));
 	spin_lock(&bo->bdev->lru_lock);
 	if (bo->resource)
@@ -682,7 +682,7 @@ EXPORT_SYMBOL(ttm_bo_pin);
  */
 void ttm_bo_unpin(struct ttm_buffer_object *bo)
 {
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	WARN_ON_ONCE(!kref_read(&bo->kref));
 	if (WARN_ON_ONCE(!bo->pin_count))
 		return;
@@ -721,7 +721,7 @@ static int ttm_bo_add_move_fence(struct ttm_buffer_object *bo,
 
 	dma_resv_add_fence(amdkcl_ttm_resvp(bo), fence, DMA_RESV_USAGE_KERNEL);
 
-	ret = dma_resv_reserve_fences(bo->base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(bo), 1);
 	dma_fence_put(fence);
 	return ret;
 }
