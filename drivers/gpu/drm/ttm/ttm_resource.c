@@ -62,8 +62,8 @@ void ttm_lru_bulk_move_tail(struct ttm_lru_bulk_move *bulk)
 				continue;
 
 			lockdep_assert_held(&pos->first->bo->bdev->lru_lock);
-			dma_resv_assert_held(pos->first->bo->base.resv);
-			dma_resv_assert_held(pos->last->bo->base.resv);
+			dma_resv_assert_held(amdkcl_ttm_resvp(pos->first->bo));
+			dma_resv_assert_held(amdkcl_ttm_resvp(pos->last->bo));
 
 			man = ttm_manager_type(pos->first->bo->bdev, i);
 			list_bulk_move_tail(&man->lru[j], &pos->first->lru,

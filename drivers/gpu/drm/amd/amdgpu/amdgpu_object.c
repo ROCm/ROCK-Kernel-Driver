@@ -634,7 +634,7 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 		if (unlikely(r))
 			goto fail_unreserve;
 
-		dma_resv_add_fence(bo->tbo.base.resv, fence,
+		dma_resv_add_fence(amdkcl_ttm_resvp(&bo->tbo), fence,
 				   DMA_RESV_USAGE_KERNEL);
 		dma_fence_put(fence);
 	}
