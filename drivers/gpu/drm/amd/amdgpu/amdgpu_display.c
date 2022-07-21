@@ -452,7 +452,7 @@ int amdgpu_crtc_page_flip(struct drm_crtc *crtc,
 		goto unreserve;
 	}
 
-	r = dma_resv_get_fences(amdkcl_ttm_resvp(&new_abo->tbo), NULL,
+	r = dma_resv_get_fences(amdkcl_ttm_resvp(&new_abo->tbo), DMA_RESV_USAGE_WRITE,
 					      &work->shared_count,
 					      &work->shared);
 	if (unlikely(r != 0)) {
