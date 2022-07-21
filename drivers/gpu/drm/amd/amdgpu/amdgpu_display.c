@@ -1936,6 +1936,7 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 static bool
 amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 {
+#ifdef HAVE_DRM_FB_HELPER_BUFFER
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_fb_helper *fb_helper = dev->fb_helper;
 
@@ -1946,6 +1947,9 @@ amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 		return false;
 
 	return true;
+#else
+	return false;
+#endif
 }
 #endif
 
