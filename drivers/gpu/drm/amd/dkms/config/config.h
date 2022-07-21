@@ -548,6 +548,9 @@
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
 
+/* struct drm_fb_helper has buffer field */
+#define HAVE_DRM_FB_HELPER_BUFFER 1
+
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
