@@ -271,7 +271,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 		fbo->base.bulk_move = NULL;
 	}
 
-	ret = dma_resv_reserve_fences(&fbo->base.base._resv, 1);
+	ret = dma_resv_reserve_fences(&amdkcl_ttm_resv(&fbo->base), 1);
 	if (ret) {
 		kfree(fbo);
 		return ret;

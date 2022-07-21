@@ -81,7 +81,7 @@ static vm_fault_t amdgpu_gem_fault(struct vm_fault *vmf)
 		return ret;
 
 unlock:
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	return ret;
 }
 

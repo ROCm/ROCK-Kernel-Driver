@@ -57,7 +57,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	/*
 	 * Quick non-stalling check for idle.
 	 */
-	if (dma_resv_test_signaled(bo->base.resv, DMA_RESV_USAGE_KERNEL))
+	if (dma_resv_test_signaled(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_KERNEL))
 		return 0;
 
 	/*
@@ -82,7 +82,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 	/*
 	 * Ordinary wait.
 	 */
-	err = dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_KERNEL, true,
+	err = dma_resv_wait_timeout(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_KERNEL, true,
 				    MAX_SCHEDULE_TIMEOUT);
 	if (unlikely(err < 0)) {
 		return (err != -ERESTARTSYS) ? VM_FAULT_SIGBUS :
