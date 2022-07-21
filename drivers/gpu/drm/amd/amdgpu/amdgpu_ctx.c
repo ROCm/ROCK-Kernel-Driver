@@ -166,6 +166,7 @@ static unsigned int amdgpu_ctx_get_hw_prio(struct amdgpu_ctx *ctx, u32 hw_ip)
 /* Calculate the time spend on the hw */
 static ktime_t amdgpu_ctx_fence_time(struct dma_fence *fence)
 {
+#ifdef HAVE_DMA_FENCE_FLAG_TIMESTAMP_BIT
 	struct drm_sched_fence *s_fence;
 
 	if (!fence)
@@ -182,6 +183,9 @@ static ktime_t amdgpu_ctx_fence_time(struct dma_fence *fence)
 
 	return ktime_sub(s_fence->finished.timestamp,
 			 s_fence->scheduled.timestamp);
+#else
+	return ns_to_ktime(0);
+#endif
 }
 
 static ktime_t amdgpu_ctx_entity_time(struct amdgpu_ctx *ctx,
