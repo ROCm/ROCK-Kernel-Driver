@@ -3878,7 +3878,6 @@ DEFINE_SHOW_ATTRIBUTE(mst_topo);
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
-#endif
 
 
 /*
@@ -3913,6 +3912,7 @@ static int skip_detection_link_training_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(skip_detection_link_training_fops,
 			 skip_detection_link_training_get,
 			 skip_detection_link_training_set, "%llu\n");
+#endif
 
 /*
  * Dumps the DCC_EN bit for each pipe.
