@@ -539,7 +539,7 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	bp.xcp_id_plus1 = xcp_id + 1;
 
 	if (vm->root.bo)
-		bp.resv = vm->root.bo->tbo.base.resv;
+		bp.resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 
 	r = amdgpu_bo_create_vm(adev, &bp, vmbo);
 	if (r)
@@ -552,7 +552,7 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	}
 
 	if (!bp.resv)
-		WARN_ON(dma_resv_lock(bo->tbo.base.resv,
+		WARN_ON(dma_resv_lock(amdkcl_ttm_resvp(&bo->tbo),
 				      NULL));
 	resv = bp.resv;
 	memset(&bp, 0, sizeof(bp));
@@ -560,14 +560,14 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	bp.domain = AMDGPU_GEM_DOMAIN_GTT;
 	bp.flags = AMDGPU_GEM_CREATE_CPU_GTT_USWC;
 	bp.type = ttm_bo_type_kernel;
-	bp.resv = bo->tbo.base.resv;
+	bp.resv = amdkcl_ttm_resvp(&bo->tbo);
 	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
 	bp.xcp_id_plus1 = xcp_id + 1;
 
 	r = amdgpu_bo_create(adev, &bp, &(*vmbo)->shadow);
 
 	if (!resv)
-		dma_resv_unlock(bo->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 
 	if (r) {
 		amdgpu_bo_unref(&bo);
