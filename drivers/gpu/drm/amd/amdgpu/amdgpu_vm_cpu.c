@@ -76,7 +76,7 @@ static int amdgpu_vm_cpu_update(struct amdgpu_vm_update_params *p,
 	uint64_t value;
 	long r;
 
-	r = dma_resv_wait_timeout(vmbo->bo.tbo.base.resv, DMA_RESV_USAGE_KERNEL,
+	r = dma_resv_wait_timeout(amdkcl_ttm_resvp(&vmbo->bo.tbo), DMA_RESV_USAGE_KERNEL,
 				  true, MAX_SCHEDULE_TIMEOUT);
 	if (r < 0)
 		return r;
