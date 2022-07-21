@@ -410,6 +410,13 @@ struct amdgpu_display_manager {
 #endif
 
 	/**
+	 * @vblank_lock:
+	 *
+	 * Guards access to deferred vblank work state.
+	 */
+	spinlock_t vblank_lock;
+
+	/**
 	 * @irq_handler_list_low_tab:
 	 *
 	 * Low priority IRQ handler table.
