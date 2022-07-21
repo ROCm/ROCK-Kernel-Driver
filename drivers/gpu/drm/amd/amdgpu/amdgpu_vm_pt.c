@@ -471,7 +471,7 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	bp.xcp_id_plus1 = xcp_id + 1;
 
 	if (vm->root.bo)
-		bp.resv = vm->root.bo->tbo.base.resv;
+		bp.resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 
 	return amdgpu_bo_create_vm(adev, &bp, vmbo);
 }
