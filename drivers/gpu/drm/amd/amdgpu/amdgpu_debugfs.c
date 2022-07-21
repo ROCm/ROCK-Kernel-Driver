@@ -1943,9 +1943,14 @@ static ssize_t amdgpu_reset_dump_register_list_write(struct file *f,
 		ret = -ENOMEM;
 		goto error_free;
 	}
+
+#ifdef HAVE_DOWN_WRITE_KILLABLE
 	ret = down_write_killable(&adev->reset_domain->sem);
 	if (ret)
 		goto error_free;
+#else
+	down_write(&adev->reset_domain->sem);
+#endif
 
 	swap(adev->reset_dump_reg_list, tmp);
 	swap(adev->reset_dump_reg_value, new);
