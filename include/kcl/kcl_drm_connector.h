@@ -96,6 +96,11 @@ static inline void drm_connector_put(struct drm_connector *connector)
 #define DP_MAX_DOWNSTREAM_PORTS    0x10
 #endif
 
+/* c03d0b52ff71 - drm/connector: Fix typo in output format */
+#ifndef DRM_COLOR_FORMAT_YCRCB444
+#define DRM_COLOR_FORMAT_YCRCB444 DRM_COLOR_FORMAT_YCBCR444
+#endif
+
 #ifndef HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY
 void drm_connector_attach_dp_subconnector_property(struct drm_connector *connector);
 void drm_dp_set_subconnector_property(struct drm_connector *connector, enum drm_connector_status status,
