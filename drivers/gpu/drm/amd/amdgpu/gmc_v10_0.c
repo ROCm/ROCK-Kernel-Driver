@@ -979,8 +979,6 @@ static int gmc_v10_0_sw_init(void *handle)
 		return r;
 	}
 
-	adev->need_swiotlb = drm_need_swiotlb(44);
-
 	r = gmc_v10_0_mc_init(adev);
 	if (r)
 		return r;
