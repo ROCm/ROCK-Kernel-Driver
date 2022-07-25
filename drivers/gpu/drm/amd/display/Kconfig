@@ -13,40 +13,19 @@ config DRM_AMD_DC
 	  support for AMDGPU. This adds required support for Vega and
 	  Raven ASICs.
 
-config DRM_AMD_DC_DCN1_0
+config DRM_AMD_DC_DCN
 	def_bool n
 	help
 	  Raven family support for display engine
-
-config DRM_AMD_DC_DCN2_x
-	bool "DCN 2.0 2.1 family"
-	default y
-	depends on DRM_AMD_DC && X86
-	depends on DRM_AMD_DC_DCN1_0
-	help
-	  Choose this option if you want to have
-	  Navi/Renoir support for display engine
 
 config DRM_AMD_DC_DSC_SUPPORT
 	bool "DSC support"
 	default n
 	depends on DRM_AMD_DC && X86
-	depends on DRM_AMD_DC_DCN1_0
-	depends on DRM_AMD_DC_DCN2_x
+	depends on DRM_AMD_DC_DCN
 	help
 	  Choose this option if you want to have
 	  Dynamic Stream Compression support
-
-config DRM_AMD_DC_DCN3_x
-        bool "DCN 3.0 3.01 3.02 family"
-        default y
-        depends on DRM_AMD_DC && X86
-        depends on DRM_AMD_DC_DCN1_0
-        depends on DRM_AMD_DC_DCN2_x
-        help
-            Choose this option if you want to have
-            sienna_cichlid/Van Gogh/Dimgrey_cavefish support 
-            for display engine
 
 config DRM_AMD_DC_HDCP
 	bool "Enable HDCP support in DC"
@@ -74,7 +53,7 @@ config DEBUG_KERNEL_DC
 config DRM_AMD_SECURE_DISPLAY
         bool "Enable secure display support"
         depends on DEBUG_FS
-        depends on DRM_AMD_DC_DCN1_0
+        depends on DRM_AMD_DC_DCN
         help
             Choose this option if you want to
             support secure display
