@@ -149,9 +149,6 @@ export CONFIG_DRM_AMDGPU_CIK=y
 export CONFIG_DRM_AMDGPU_SI=y
 export CONFIG_DRM_AMDGPU_USERPTR=y
 export CONFIG_DRM_AMD_DC=y
-ifndef CONFIG_ARM64
-export CONFIG_DRM_AMD_DC_DCN1_0=y
-endif
 
 subdir-ccflags-y += -DCONFIG_HSA_AMD
 subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
@@ -159,9 +156,6 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
-ifndef CONFIG_ARM64
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN1_0
-endif
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_AMDKCL_HMM_MIRROR_ENABLED),y)
 ifdef CONFIG_DEVICE_PRIVATE
@@ -181,10 +175,8 @@ endif
 # if core2 isn't in the compiler flags
 ifndef CONFIG_ARM64
 ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
-export CONFIG_DRM_AMD_DC_DCN2_x=y
-export CONFIG_DRM_AMD_DC_DCN3_x=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN2_x
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN3_x
+export CONFIG_DRM_AMD_DC_DCN=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
 endif
 endif
 
