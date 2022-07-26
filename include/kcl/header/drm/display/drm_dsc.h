@@ -4,8 +4,8 @@
 
 #if defined(HAVE_DRM_DISPLAY_DRM_DSC_H)
 #include_next <drm/display/drm_dsc.h>
-#else
-#include_next <drm/drm_dsc.h>
+#elif defined(HAVE_DRM_DRM_DSC_H)
+#include <drm/drm_dsc.h>
 #endif
 
 #endif
