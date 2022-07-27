@@ -411,6 +411,9 @@
 /* struct drm_dp_mst_topology_cbs->register_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR */
 
+/* struct drm_dp_mst_topology_mgr.base is available */
+#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE 1
+
 /* drm_dp_mst_topology_mgr_init() wants drm_device arg */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV 1
 
