@@ -158,6 +158,17 @@
 #define DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED DP_DSC_THROUGHPUT_MODE_0_UPSUPPORTED
 #endif
 
+#ifndef DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED
+# define DP_DSC_THROUGHPUT_MODE_0_UNSUPPORTED 0
+# define DP_DSC_THROUGHPUT_MODE_0_170       (15 << 0) /* 1.4a */
+#endif
+
+#ifndef DP_UHBR10
+# define DP_UHBR10                             (1 << 0)
+# define DP_UHBR20                             (1 << 1)
+# define DP_UHBR13_5                           (1 << 2)
+#endif
+
 #ifndef DP_PHY_REPEATER_128B132B_RATES
 /* See DP_128B132B_SUPPORTED_LINK_RATES for values */
 #define DP_PHY_REPEATER_128B132B_RATES			    0xf0007 /* 2.0 */
