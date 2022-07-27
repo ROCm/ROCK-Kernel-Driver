@@ -34,7 +34,9 @@ static void copy_pps_fields(struct drm_dsc_config *to, const struct drm_dsc_conf
 	to->convert_rgb              = from->convert_rgb;
 	to->slice_width              = from->slice_width;
 	to->slice_height             = from->slice_height;
+#ifdef HAVE_DRM_DSC_CONFIG_SIMPLE_422
 	to->simple_422               = from->simple_422;
+#endif
 	to->native_422               = from->native_422;
 	to->native_420               = from->native_420;
 	to->pic_width                = from->pic_width;
