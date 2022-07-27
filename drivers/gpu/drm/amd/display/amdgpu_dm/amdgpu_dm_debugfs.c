@@ -2660,6 +2660,7 @@ static int target_backlight_show(struct seq_file *m, void *unused)
  *	cat /sys/kernel/debug/dri/0/DP-X/is_mst_connector
  *
  */
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
 {
 	struct drm_connector *connector = m->private;
@@ -2696,6 +2697,7 @@ static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
 
 	return 0;
 }
+#endif
 
 /*
  * function description: Read out the mst progress status
@@ -2764,7 +2766,9 @@ DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 DEFINE_SHOW_ATTRIBUTE(internal_display);
 DEFINE_SHOW_ATTRIBUTE(odm_combine_segments);
 DEFINE_SHOW_ATTRIBUTE(psr_capability);
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 DEFINE_SHOW_ATTRIBUTE(dp_is_mst_connector);
+#endif
 DEFINE_SHOW_ATTRIBUTE(dp_mst_progress_status);
 DEFINE_SHOW_ATTRIBUTE(is_dpia_link);
 
@@ -2902,7 +2906,9 @@ static const struct {
 		{"max_bpc", &dp_max_bpc_debugfs_fops},
 #endif
 		{"dsc_disable_passthrough", &dp_dsc_disable_passthrough_debugfs_fops},
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 		{"is_mst_connector", &dp_is_mst_connector_fops},
+#endif
 		{"mst_progress_status", &dp_mst_progress_status_fops},
 		{"is_dpia_link", &is_dpia_link_fops},
 		{"mst_link_settings", &dp_mst_link_settings_debugfs_fops}
