@@ -1294,6 +1294,9 @@
 /* struct drm_dsc_config has member simple_422 */
 #define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
 
+/* drm_dsc_pps_payload_pack() is available */
+#define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
+
 /* drm_edid_get_monitor_name is available*/
 #define HAVE_DRM_EDID_GET_MONITOR_NAME 1
 
