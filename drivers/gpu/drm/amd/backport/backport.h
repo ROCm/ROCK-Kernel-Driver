@@ -107,5 +107,6 @@
 #include <kcl/kcl_string_helpers.h>
 #include <kcl/kcl_cpumask.h>
 #include <kcl/kcl_drm_modeset_lock.h>
+#include <kcl/kcl_drm_dsc_helper.h>
 
 #endif /* AMDGPU_BACKPORT_H */
