@@ -106,5 +106,6 @@
 #include <kcl/backport/kcl_workqueue_backport.h>
 #include <kcl/kcl_string_helpers.h>
 #include <kcl/kcl_cpumask.h>
+#include <kcl/kcl_drm_modeset_lock.h>
 
 #endif /* AMDGPU_BACKPORT_H */
