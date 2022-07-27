@@ -405,6 +405,9 @@
 /* struct drm_dp_mst_port has passthrough_aux member */
 /* #undef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX */
 
+/* drm_dp_mst_port struct has full_pbn member */
+#define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
+
 /* struct drm_dp_mst_topology_cbs->destroy_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
 

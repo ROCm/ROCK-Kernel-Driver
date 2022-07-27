@@ -1649,7 +1649,11 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 		bpp = convert_dc_color_depth_into_bpc(stream->timing.display_color_depth) * 3;
 		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp, false);
 
+#ifdef HAVE_DRM_DP_MST_PORT_FULL_PBN
 		if (pbn > aconnector->port->full_pbn)
+#else
+		if (pbn > aconnector->port->available_pbn)
+#endif
 			return DC_FAIL_BANDWIDTH_VALIDATE;
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
