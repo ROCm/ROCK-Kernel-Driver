@@ -4747,7 +4747,7 @@ static bool gfx_v9_0_is_rlc_enabled(struct amdgpu_device *adev)
 	return true;
 }
 
-static void gfx_v9_0_set_safe_mode(struct amdgpu_device *adev)
+static void gfx_v9_0_set_safe_mode(struct amdgpu_device *adev, int xcc_id)
 {
 	uint32_t data;
 	unsigned i;
@@ -4764,7 +4764,7 @@ static void gfx_v9_0_set_safe_mode(struct amdgpu_device *adev)
 	}
 }
 
-static void gfx_v9_0_unset_safe_mode(struct amdgpu_device *adev)
+static void gfx_v9_0_unset_safe_mode(struct amdgpu_device *adev, int xcc_id)
 {
 	uint32_t data;
 
@@ -4775,7 +4775,7 @@ static void gfx_v9_0_unset_safe_mode(struct amdgpu_device *adev)
 static void gfx_v9_0_update_gfx_cg_power_gating(struct amdgpu_device *adev,
 						bool enable)
 {
-	amdgpu_gfx_rlc_enter_safe_mode(adev);
+	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 
 	if ((adev->pg_flags & AMD_PG_SUPPORT_GFX_PG) && enable) {
 		gfx_v9_0_enable_gfx_cg_power_gating(adev, true);
@@ -4787,7 +4787,7 @@ static void gfx_v9_0_update_gfx_cg_power_gating(struct amdgpu_device *adev,
 			gfx_v9_0_enable_gfx_pipeline_powergating(adev, false);
 	}
 
-	amdgpu_gfx_rlc_exit_safe_mode(adev);
+	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 }
 
 static void gfx_v9_0_update_gfx_mg_power_gating(struct amdgpu_device *adev,
@@ -4814,7 +4814,7 @@ static void gfx_v9_0_update_medium_grain_clock_gating(struct amdgpu_device *adev
 {
 	uint32_t data, def;
 
-	amdgpu_gfx_rlc_enter_safe_mode(adev);
+	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 
 	/* It is disabled by HW by default */
 	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_MGCG)) {
@@ -4881,7 +4881,7 @@ static void gfx_v9_0_update_medium_grain_clock_gating(struct amdgpu_device *adev
 		}
 	}
 
-	amdgpu_gfx_rlc_exit_safe_mode(adev);
+	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 }
 
 static void gfx_v9_0_update_3d_clock_gating(struct amdgpu_device *adev,
@@ -4892,7 +4892,7 @@ static void gfx_v9_0_update_3d_clock_gating(struct amdgpu_device *adev,
 	if (!adev->gfx.num_gfx_rings)
 		return;
 
-	amdgpu_gfx_rlc_enter_safe_mode(adev);
+	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 
 	/* Enable 3D CGCG/CGLS */
 	if (enable) {
@@ -4936,7 +4936,7 @@ static void gfx_v9_0_update_3d_clock_gating(struct amdgpu_device *adev,
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL_3D, data);
 	}
 
-	amdgpu_gfx_rlc_exit_safe_mode(adev);
+	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 }
 
 static void gfx_v9_0_update_coarse_grain_clock_gating(struct amdgpu_device *adev,
@@ -4944,7 +4944,7 @@ static void gfx_v9_0_update_coarse_grain_clock_gating(struct amdgpu_device *adev
 {
 	uint32_t def, data;
 
-	amdgpu_gfx_rlc_enter_safe_mode(adev);
+	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 
 	if (enable && (adev->cg_flags & AMD_CG_SUPPORT_GFX_CGCG)) {
 		def = data = RREG32_SOC15(GC, 0, mmRLC_CGTT_MGCG_OVERRIDE);
@@ -4988,7 +4988,7 @@ static void gfx_v9_0_update_coarse_grain_clock_gating(struct amdgpu_device *adev
 			WREG32_SOC15(GC, 0, mmRLC_CGCG_CGLS_CTRL, data);
 	}
 
-	amdgpu_gfx_rlc_exit_safe_mode(adev);
+	amdgpu_gfx_rlc_exit_safe_mode(adev, 0);
 }
 
 static int gfx_v9_0_update_gfx_clock_gating(struct amdgpu_device *adev,
