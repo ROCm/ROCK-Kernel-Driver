@@ -1291,6 +1291,9 @@
 /* __dma_fence_is_later() is available and has ops arg */
 #define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
 
+/* struct drm_dsc_config has member simple_422 */
+#define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
+
 /* drm_edid_get_monitor_name is available*/
 #define HAVE_DRM_EDID_GET_MONITOR_NAME 1
 
