@@ -11940,6 +11940,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			goto fail;
 		}
 
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
 #if defined(CONFIG_DRM_AMD_DC_FP)
 		if (dc_resource_is_dsc_encoding_supported(dc)) {
 			ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
@@ -11949,6 +11950,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 				goto fail;
 			}
 		}
+#endif
 #endif
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)

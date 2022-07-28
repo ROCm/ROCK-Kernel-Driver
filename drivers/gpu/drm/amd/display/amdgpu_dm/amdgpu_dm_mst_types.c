@@ -234,7 +234,6 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&
@@ -261,6 +260,7 @@ static bool is_synaptics_cascaded_panamera(struct dc_link *link, struct drm_dp_m
 	return false;
 }
 
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
