@@ -529,6 +529,12 @@
 /* drm_gem_prime_export() with p,i arg is available */
 #define HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI 1
 
+/* drm_drv_uses_atomic_modeset() is available */
+#define HAVE_DRM_DRV_USES_ATOMIC_MODESET 1
+
+/* drm_dsc_compute_rc_parameters() is available */
+#define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
+
 /* drm_edid_to_eld() are available */
 /* #undef HAVE_DRM_EDID_TO_ELD */
 
