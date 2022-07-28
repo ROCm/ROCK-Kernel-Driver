@@ -1568,6 +1568,7 @@ clean_exit:
 	return (ret == 0);
 }
 
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 static unsigned int kbps_from_pbn(unsigned int pbn)
 {
 	unsigned int kbps = pbn;
@@ -1595,6 +1596,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 
 	return bw_range->max_target_bpp_x16 && bw_range->min_target_bpp_x16;
 }
+#endif
 #endif /* CONFIG_DRM_AMD_DC_DCN */
 
 enum dc_status dm_dp_mst_is_port_support_mode(
