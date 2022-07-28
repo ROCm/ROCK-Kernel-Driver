@@ -11475,12 +11475,14 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
 		ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
 		if (ret) {
 			DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
 			ret = -EINVAL;
 			goto fail;
 		}
+#endif
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context, vars);
