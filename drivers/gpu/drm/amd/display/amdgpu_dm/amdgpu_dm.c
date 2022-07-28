@@ -7724,7 +7724,6 @@ static void dm_encoder_helper_disable(struct drm_encoder *encoder)
 
 }
 
-#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 int convert_dc_color_depth_into_bpc(enum dc_color_depth display_color_depth)
 {
 	switch (display_color_depth) {
@@ -7745,7 +7744,7 @@ int convert_dc_color_depth_into_bpc(enum dc_color_depth display_color_depth)
 	}
 	return 0;
 }
-#endif
+
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
 					  struct drm_connector_state *conn_state)
