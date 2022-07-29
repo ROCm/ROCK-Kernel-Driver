@@ -1185,6 +1185,7 @@ struct dc_plane_state {
 	/* private to dc_surface.c */
 	enum dc_irq_source irq_source;
 	struct kref refcount;
+	struct tg_color visual_confirm_color;
 };
 
 struct dc_plane_info {
