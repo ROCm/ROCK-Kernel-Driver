@@ -191,6 +191,9 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
 endif
 endif
 
+export CONFIG_DRM_AMD_DC_DSC_SUPPORT=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DSC_SUPPORT
+
 export CONFIG_DRM_TTM_HELPER=m
 subdir-ccflags-y += -DCONFIG_DRM_TTM_HELPER
 CFLAGS_drm_gem_ttm_helper.o += -include $(src)/ttm/backport/backport.h \
