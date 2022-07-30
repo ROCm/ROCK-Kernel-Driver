@@ -1752,7 +1752,7 @@ static ssize_t amdgpu_reset_dump_register_list_write(struct file *f,
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)file_inode(f)->i_private;
 	char reg_offset[11];
-	uint32_t *new, *tmp = NULL;
+	uint32_t *new = NULL, *tmp = NULL;
 	int ret, i = 0, len = 0;
 
 	do {
@@ -1799,7 +1799,8 @@ static ssize_t amdgpu_reset_dump_register_list_write(struct file *f,
 	ret = size;
 
 error_free:
-	kfree(tmp);
+	if (tmp != new)
+		kfree(tmp);
 	kfree(new);
 	return ret;
 }
