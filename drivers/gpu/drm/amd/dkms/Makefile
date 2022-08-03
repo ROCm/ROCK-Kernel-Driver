@@ -169,6 +169,11 @@ export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 endif
 
+ifeq ($(call _is_kcl_macro_defined,HAVE_LINUX_PCI_P2PDMA_H),y)
+export CONFIG_HSA_AMD_P2P=y
+subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
+endif
+
 # Trying to enable DCN2/3 with core2 optimizations will result in
 # older versions of GCC hanging during building/installing. Check
 # if the compiler is using core2 optimizations and only build DCN2/3
