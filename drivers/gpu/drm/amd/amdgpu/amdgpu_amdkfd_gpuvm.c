@@ -116,21 +116,12 @@ void amdgpu_amdkfd_reserve_system_mem(uint64_t size)
  * compromise that should work in most cases without reserving too
  * much memory for page tables unnecessarily (factor 16K, >> 14).
  */
+
 #define ESTIMATE_PT_SIZE(mem_size) max(((mem_size) >> 14), AMDGPU_VM_RESERVED_VRAM)
-
-static size_t amdgpu_amdkfd_acc_size(uint64_t size)
-{
-	size >>= PAGE_SHIFT;
-	size *= sizeof(dma_addr_t) + sizeof(void *);
-
-	return __roundup_pow_of_two(sizeof(struct amdgpu_bo)) +
-		__roundup_pow_of_two(sizeof(struct ttm_tt)) +
-		PAGE_ALIGN(size);
-}
 
 /**
  * amdgpu_amdkfd_reserve_mem_limit() - Decrease available memory by size
- * of buffer including any reserved for control structures
+ * of buffer.
  *
  * @adev: Device to which allocated BO belongs to
  * @size: Size of buffer, in bytes, encapsulated by B0. This should be
@@ -139,24 +130,21 @@ static size_t amdgpu_amdkfd_acc_size(uint64_t size)
  *
  * Return: returns -ENOMEM in case of error, ZERO otherwise
  */
-static int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
+int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 		uint64_t size, u32 alloc_flag)
 {
 	uint64_t reserved_for_pt =
 		ESTIMATE_PT_SIZE(amdgpu_amdkfd_total_mem_size);
-	size_t acc_size, system_mem_needed, ttm_mem_needed, vram_needed;
+	size_t system_mem_needed, ttm_mem_needed, vram_needed;
 	int ret = 0;
 
-	acc_size = amdgpu_amdkfd_acc_size(size);
-
+	system_mem_needed = 0;
+	ttm_mem_needed = 0;
 	vram_needed = 0;
 	if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_GTT) {
-		system_mem_needed = acc_size + size;
-		ttm_mem_needed = acc_size + size;
+		system_mem_needed = size;
+		ttm_mem_needed = size;
 	} else if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		system_mem_needed = acc_size;
-		ttm_mem_needed = acc_size;
-
 		/*
 		 * Conservatively round up the allocation requirement to 2 MB
 		 * to avoid fragmentation caused by 4K allocations in the tail
@@ -164,14 +152,10 @@ static int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 		 */
 		vram_needed = ALIGN(size, VRAM_ALLOCATION_ALIGN);
 	} else if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
-		system_mem_needed = acc_size + size;
-		ttm_mem_needed = acc_size;
-	} else if (alloc_flag &
-		   (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
-		    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
-		system_mem_needed = acc_size;
-		ttm_mem_needed = acc_size;
-	} else {
+		system_mem_needed = size;
+	} else if (!(alloc_flag &
+				(KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+				 KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
 		pr_err("%s: Invalid BO type %#x\n", __func__, alloc_flag);
 		return -ENOMEM;
 	}
@@ -186,7 +170,7 @@ static int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 	     kfd_mem_limit.max_system_mem_limit && !no_system_mem_limit) ||
 	    (kfd_mem_limit.ttm_mem_used + ttm_mem_needed >
 	     kfd_mem_limit.max_ttm_mem_limit) ||
-	    (adev->kfd.vram_used + vram_needed >
+	    (adev && adev->kfd.vram_used + vram_needed >
 	     adev->gmc.real_vram_size -
 	     atomic64_read(&adev->vram_pin_size) -
 	     reserved_for_pt)) {
@@ -197,7 +181,10 @@ static int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 	/* Update memory accounting by decreasing available system
 	 * memory, TTM memory and GPU memory as computed above
 	 */
-	adev->kfd.vram_used += vram_needed;
+	WARN_ONCE(vram_needed && !adev,
+		  "adev reference can't be null when vram is used");
+	if (adev)
+		adev->kfd.vram_used += vram_needed;
 	kfd_mem_limit.system_mem_used += system_mem_needed;
 	kfd_mem_limit.ttm_mem_used += ttm_mem_needed;
 
@@ -206,36 +193,28 @@ release:
 	return ret;
 }
 
-static void unreserve_mem_limit(struct amdgpu_device *adev,
+void amdgpu_amdkfd_unreserve_mem_limit(struct amdgpu_device *adev,
 		uint64_t size, u32 alloc_flag)
 {
-	size_t acc_size;
-
-	acc_size = amdgpu_amdkfd_acc_size(size);
-
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 
 	if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_GTT) {
-		kfd_mem_limit.system_mem_used -= (acc_size + size);
-		kfd_mem_limit.ttm_mem_used -= (acc_size + size);
+		kfd_mem_limit.system_mem_used -= size;
+		kfd_mem_limit.ttm_mem_used -= size;
 	} else if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		kfd_mem_limit.system_mem_used -= acc_size;
-		kfd_mem_limit.ttm_mem_used -= acc_size;
-		adev->kfd.vram_used -= ALIGN(size, VRAM_ALLOCATION_ALIGN);
+		WARN_ONCE(!adev,
+			  "adev reference can't be null when alloc mem flags vram is set");
+		if (adev)
+			adev->kfd.vram_used -= ALIGN(size, VRAM_ALLOCATION_ALIGN);
 	} else if (alloc_flag & KFD_IOC_ALLOC_MEM_FLAGS_USERPTR) {
-		kfd_mem_limit.system_mem_used -= (acc_size + size);
-		kfd_mem_limit.ttm_mem_used -= acc_size;
-	} else if (alloc_flag &
-		   (KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
-		    KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP)) {
-		kfd_mem_limit.system_mem_used -= acc_size;
-		kfd_mem_limit.ttm_mem_used -= acc_size;
-	} else {
+		kfd_mem_limit.system_mem_used -= size;
+	} else if (!(alloc_flag &
+				(KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+				 KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP))) {
 		pr_err("%s: Invalid BO type %#x\n", __func__, alloc_flag);
 		goto release;
 	}
-
-	WARN_ONCE(adev->kfd.vram_used < 0,
+	WARN_ONCE(adev && adev->kfd.vram_used < 0,
 		  "KFD VRAM memory accounting unbalanced");
 	WARN_ONCE(kfd_mem_limit.ttm_mem_used < 0,
 		  "KFD TTM memory accounting unbalanced");
@@ -252,7 +231,7 @@ void amdgpu_amdkfd_release_notify(struct amdgpu_bo *bo)
 	u32 alloc_flags = bo->kfd_bo->alloc_flags;
 	u64 size = amdgpu_bo_size(bo);
 
-	unreserve_mem_limit(adev, size, alloc_flags);
+	amdgpu_amdkfd_unreserve_mem_limit(adev, size, alloc_flags);
 
 	kfree(bo->kfd_bo);
 }
@@ -437,45 +416,42 @@ static uint64_t get_pte_flags(struct amdgpu_device *adev, struct kgd_mem *mem)
 
 	switch (adev->asic_type) {
 	case CHIP_ARCTURUS:
-		if (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-			if (bo_adev == adev)
-				mapping_flags |= coherent ?
-					AMDGPU_VM_MTYPE_CC : AMDGPU_VM_MTYPE_RW;
-			else
-				mapping_flags |= coherent ?
-					AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
-		} else {
-			mapping_flags |= coherent ?
-				AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
-		}
-		break;
 	case CHIP_ALDEBARAN:
-		if (coherent && uncached) {
-			if (adev->gmc.xgmi.connected_to_cpu ||
-				!(mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM))
-				snoop = true;
-			mapping_flags |= AMDGPU_VM_MTYPE_UC;
-		} else if (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
+		if (mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
 			if (bo_adev == adev) {
-				mapping_flags |= coherent ?
-					AMDGPU_VM_MTYPE_CC : AMDGPU_VM_MTYPE_RW;
-				if (adev->gmc.xgmi.connected_to_cpu)
+				if (uncached)
+					mapping_flags |= AMDGPU_VM_MTYPE_UC;
+				else if (coherent)
+					mapping_flags |= AMDGPU_VM_MTYPE_CC;
+				else
+					mapping_flags |= AMDGPU_VM_MTYPE_RW;
+				if (adev->asic_type == CHIP_ALDEBARAN &&
+				    adev->gmc.xgmi.connected_to_cpu)
 					snoop = true;
 			} else {
-				mapping_flags |= coherent ?
-					AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
+				if (uncached || coherent)
+					mapping_flags |= AMDGPU_VM_MTYPE_UC;
+				else
+					mapping_flags |= AMDGPU_VM_MTYPE_NC;
 				if (amdgpu_xgmi_same_hive(adev, bo_adev))
 					snoop = true;
 			}
 		} else {
+			if (uncached || coherent)
+				mapping_flags |= AMDGPU_VM_MTYPE_UC;
+			else
+				mapping_flags |= AMDGPU_VM_MTYPE_NC;
 			snoop = true;
-			mapping_flags |= coherent ?
-				AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
 		}
 		break;
 	default:
-		mapping_flags |= coherent ?
-			AMDGPU_VM_MTYPE_UC : AMDGPU_VM_MTYPE_NC;
+		if (uncached || coherent)
+			mapping_flags |= AMDGPU_VM_MTYPE_UC;
+		else
+			mapping_flags |= AMDGPU_VM_MTYPE_NC;
+
+		if (!(mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM))
+			snoop = true;
 	}
 
 	pte_flags = amdgpu_gem_va_map_flags(adev, mapping_flags);
@@ -1826,7 +1802,7 @@ err_node_allow:
 	/* Don't unreserve system mem limit twice */
 	goto err_reserve_limit;
 err_bo_create:
-	unreserve_mem_limit(adev, size, flags);
+	amdgpu_amdkfd_unreserve_mem_limit(adev, size, flags);
 err_reserve_limit:
 	mutex_destroy(&(*mem)->lock);
 	if (gobj)
@@ -1847,6 +1823,7 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 {
 	struct amdkfd_process_info *process_info = mem->process_info;
 	unsigned long bo_size = mem->bo->tbo.base.size;
+	bool use_release_notifier = (mem->bo->kfd_bo == mem);
 	struct kfd_mem_attachment *entry, *tmp;
 	struct bo_vm_reservation_context ctx;
 	struct ttm_validate_buffer *bo_list_entry;
@@ -1951,6 +1928,13 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	 * this needs to be the last call here.
 	 */
 	drm_gem_object_put(&mem->bo->tbo.base);
+
+	/*
+	 * For kgd_mem allocated in amdgpu_amdkfd_gpuvm_import_dmabuf(),
+	 * explicitly free it here.
+	 */
+	if (!use_release_notifier)
+		kfree(mem);
 
 	return ret;
 }
@@ -3372,3 +3356,22 @@ bool amdgpu_amdkfd_bo_mapped_to_dev(struct amdgpu_device *adev, struct kgd_mem *
 	}
 	return false;
 }
+
+#if defined(CONFIG_DEBUG_FS)
+
+int kfd_debugfs_kfd_mem_limits(struct seq_file *m, void *data)
+{
+
+	spin_lock(&kfd_mem_limit.mem_limit_lock);
+	seq_printf(m, "System mem used %lldM out of %lluM\n",
+		  (kfd_mem_limit.system_mem_used >> 20),
+		  (kfd_mem_limit.max_system_mem_limit >> 20));
+	seq_printf(m, "TTM mem used %lldM out of %lluM\n",
+		  (kfd_mem_limit.ttm_mem_used >> 20),
+		  (kfd_mem_limit.max_ttm_mem_limit >> 20));
+	spin_unlock(&kfd_mem_limit.mem_limit_lock);
+
+	return 0;
+}
+
+#endif

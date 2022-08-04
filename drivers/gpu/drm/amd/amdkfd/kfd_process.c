@@ -1111,6 +1111,15 @@ static void kfd_process_wq_release(struct work_struct *work)
 	struct kfd_process *p = container_of(work, struct kfd_process,
 					     release_work);
 
+	kfd_process_dequeue_from_all_devices(p);
+	pqm_uninit(&p->pqm);
+
+	/* Signal the eviction fence after user mode queues are
+	 * destroyed. This allows any BOs to be freed without
+	 * triggering pointless evictions or waiting for fences.
+	 */
+	dma_fence_signal(p->ef);
+
 	kfd_process_remove_sysfs(p);
 	kfd_iommu_unbind_process(p);
 
@@ -1185,8 +1194,6 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
 
-	mutex_lock(&p->mutex);
-
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
@@ -1226,18 +1233,8 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
 
-	kfd_process_dequeue_from_all_devices(p);
-	pqm_uninit(&p->pqm);
-
 	/* Indicate to other users that MM is no longer valid */
 	p->mm = NULL;
-	/* Signal the eviction fence after user mode queues are
-	 * destroyed. This allows any BOs to be freed without
-	 * triggering pointless evictions or waiting for fences.
-	 */
-	dma_fence_signal(p->ef);
-
-	mutex_unlock(&p->mutex);
 
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&p->mmu_notifier);
@@ -1484,6 +1481,11 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	hash_add_rcu(kfd_processes_table, &process->kfd_processes,
 			(uintptr_t)process->mm);
 
+	/* Avoid free_notifier to start kfd_process_wq_release if
+	 * mmu_notifier_get failed because of pending signal.
+	 */
+	kref_get(&process->ref);
+
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	/* MMU notifier registration must be the last call that can fail
 	 * because after this point we cannot unwind the process creation.
@@ -1504,6 +1506,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 		goto err_register_notifier;
 #endif
 
+	kfd_unref_process(process);
 	get_task_struct(process->lead_thread);
 
 	/* If PeerDirect interface was not detected try to detect it again

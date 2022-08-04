@@ -1689,6 +1689,8 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	if (amdgpu_dc_debug_mask & DC_FORCE_SUBVP_MCLK_SWITCH)
 		adev->dm.dc->debug.force_subvp_mclk_switch = true;
 
+	adev->dm.dc->debug.visual_confirm = amdgpu_dc_visual_confirm;
+
 	r = dm_dmub_hw_init(adev);
 	if (r) {
 		DRM_ERROR("DMUB interface failed to initialize: status=%d\n", r);
@@ -4532,6 +4534,10 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	 */
 	for (i = 0; i < dm->dc->caps.max_planes; ++i) {
 		struct dc_plane_cap *plane = &dm->dc->caps.planes[i];
+
+		/* Do not create overlay if MPO disabled */
+		if (amdgpu_dc_debug_mask & DC_DISABLE_MPO)
+			break;
 
 		if (plane->type != DC_PLANE_TYPE_DCN_UNIVERSAL)
 			continue;
