@@ -230,7 +230,9 @@ svm_migrate_get_vram_page(struct svm_range *prange, unsigned long pfn)
 	VM_BUG_ON_PAGE(page_ref_count(page), page);
 	init_page_count(page);
 #else
+#if IS_ENABLED(CONFIG_DEV_PAGEMAP_OPS)
 	get_page(page);
+#endif
 #endif
 	lock_page(page);
 }
