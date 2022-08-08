@@ -167,9 +167,11 @@ endif
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 
-ifeq ($(call _is_kcl_macro_defined,HAVE_LINUX_PCI_P2PDMA_H),y)
-export CONFIG_HSA_AMD_P2P=y
-subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
+ifeq (y,$(CONFIG_PCI_P2PDMA))
+  ifeq (y,$(CONFIG_DMABUF_MOVENOTIFY))
+    export CONFIG_HSA_AMD_P2P=y
+    subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
+  endif
 endif
 
 # Trying to enable DCN2/3 with core2 optimizations will result in
