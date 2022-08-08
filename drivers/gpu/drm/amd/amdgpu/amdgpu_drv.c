@@ -837,11 +837,9 @@ module_param_named(mtype_local, amdgpu_mtype_local, int, 0444);
  * DOC: pcie_p2p (bool)
  * Enable PCIe P2P (requires large-BAR). Default value: true (on)
  */
-#ifdef CONFIG_HSA_AMD_P2P
 bool pcie_p2p = true;
 module_param(pcie_p2p, bool, 0444);
 MODULE_PARM_DESC(pcie_p2p, "Enable PCIe P2P (requires large-BAR). (N = off, Y = on(default))");
-#endif
 
 /**
  * DOC: dcfeaturemask (uint)
