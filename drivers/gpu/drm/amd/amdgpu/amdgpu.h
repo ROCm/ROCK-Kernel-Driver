@@ -228,9 +228,6 @@ static const int __maybe_unused sched_policy = KFD_SCHED_POLICY_HWS;
 static const bool __maybe_unused debug_evictions; /* = false */
 static const bool __maybe_unused no_system_mem_limit;
 #endif
-#ifdef CONFIG_HSA_AMD_P2P
-extern bool pcie_p2p;
-#endif
 
 extern int amdgpu_tmz;
 extern int amdgpu_reset_method;
