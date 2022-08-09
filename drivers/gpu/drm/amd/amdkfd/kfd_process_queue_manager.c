@@ -151,13 +151,8 @@ void kfd_process_dequeue_from_all_devices(struct kfd_process *p)
 int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p)
 {
 	INIT_LIST_HEAD(&pqm->queues);
-#if defined(HAVE_BITMAP_FUNCS)
 	pqm->queue_slot_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 					       GFP_KERNEL);
-#else
-	pqm->queue_slot_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
-					       GFP_KERNEL);
-#endif
 	if (!pqm->queue_slot_bitmap)
 		return -ENOMEM;
 	pqm->process = p;
@@ -179,11 +174,7 @@ void pqm_uninit(struct process_queue_manager *pqm)
 		kfree(pqn);
 	}
 
-#if defined(HAVE_BITMAP_FUNCS)
 	bitmap_free(pqm->queue_slot_bitmap);
-#else
-	bitmap_free(pqm->queue_slot_bitmap);
-#endif
 	pqm->queue_slot_bitmap = NULL;
 }
 
