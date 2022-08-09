@@ -1987,7 +1987,7 @@ int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
-		kfd_smi_event_queue_eviction(pdd->dev->kfd, p->lead_thread->pid,
+		kfd_smi_event_queue_eviction(pdd->dev, p->lead_thread->pid,
 					     trigger);
 
 		r_tmp = pdd->dev->dqm->ops.evict_process_queues(pdd->dev->dqm,
@@ -2017,7 +2017,7 @@ fail:
 		if (n_evicted == 0)
 			break;
 
-		kfd_smi_event_queue_restore(pdd->dev->kfd, p->lead_thread->pid);
+		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread->pid);
 
 		if (pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
 							      &pdd->qpd))
@@ -2038,7 +2038,7 @@ int kfd_process_restore_queues(struct kfd_process *p)
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
-		kfd_smi_event_queue_restore(pdd->dev->kfd, p->lead_thread->pid);
+		kfd_smi_event_queue_restore(pdd->dev, p->lead_thread->pid);
 
 		r = pdd->dev->dqm->ops.restore_process_queues(pdd->dev->dqm,
 							      &pdd->qpd);
