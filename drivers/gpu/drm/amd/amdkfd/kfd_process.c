@@ -1028,11 +1028,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		if (pdd->qpd.cwsr_kaddr && !pdd->qpd.cwsr_base)
 			free_pages((unsigned long)pdd->qpd.cwsr_kaddr,
 				get_order(KFD_CWSR_TBA_TMA_SIZE));
-#if defined(HAVE_BITMAP_FUNCS)
 		bitmap_free(pdd->qpd.doorbell_bitmap);
-#else
-		bitmap_free(pdd->qpd.doorbell_bitmap);
-#endif
 		idr_destroy(&pdd->alloc_idr);
 		mutex_destroy(&pdd->qpd.doorbell_lock);
 
@@ -1548,13 +1544,8 @@ static int init_doorbell_bitmap(struct qcm_process_device *qpd,
 	if (!KFD_IS_SOC15(dev))
 		return 0;
 
-#if defined(HAVE_BITMAP_FUNCS)
 	qpd->doorbell_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
 					     GFP_KERNEL);
-#else
-	qpd->doorbell_bitmap = bitmap_zalloc(KFD_MAX_NUM_OF_QUEUES_PER_PROCESS,
-					     GFP_KERNEL);
-#endif
 	if (!qpd->doorbell_bitmap)
 		return -ENOMEM;
 
