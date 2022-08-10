@@ -50,6 +50,13 @@ struct dmub_debugfs_trace_entry {
 	uint32_t param1;
 };
 
+static const char *const mst_progress_status[] = {
+	"probe",
+	"remote_edid",
+	"allocate_new_payload",
+	"clear_allocated_payload",
+};
+
 /* parse_write_buffer_into_params - Helper function to parse debugfs write buffer into an array
  *
  * Function takes in attributes passed to debugfs write entry
@@ -1273,14 +1280,22 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 		return -EINVAL;
 	}
 
+	kfree(wr_buf);
+
 	if (param_nums <= 0) {
 		DRM_DEBUG_DRIVER("user data not be read\n");
-		kfree(wr_buf);
+		return -EINVAL;
+	}
+
+	mutex_lock(&aconnector->hpd_lock);
+
+	/* Don't support for mst end device*/
+	if (aconnector->mst_port) {
+		mutex_unlock(&aconnector->hpd_lock);
 		return -EINVAL;
 	}
 
 	if (param[0] == 1) {
-		mutex_lock(&aconnector->hpd_lock);
 
 		if (!dc_link_detect_sink(aconnector->dc_link, &new_connection_type) &&
 			new_connection_type != dc_connection_none)
@@ -1321,6 +1336,10 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 
 		amdgpu_dm_update_connector_after_detect(aconnector);
 
+		/* If the aconnector is the root node in mst topology */
+		if (aconnector->mst_mgr.mst_state == true)
+			reset_cur_dp_mst_topology(link);
+
 		drm_modeset_lock_all(dev);
 		dm_restore_drm_connector_state(dev, connector);
 		drm_modeset_unlock_all(dev);
@@ -1335,7 +1354,6 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
 unlock:
 	mutex_unlock(&aconnector->hpd_lock);
 
-	kfree(wr_buf);
 	return size;
 }
 
@@ -1377,9 +1395,9 @@ static ssize_t dp_dsc_clock_en_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -1483,9 +1501,9 @@ static ssize_t dp_dsc_clock_en_write(struct file *f, const char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx || !pipe_ctx->stream)
@@ -1568,9 +1586,9 @@ static ssize_t dp_dsc_slice_width_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -1672,9 +1690,9 @@ static ssize_t dp_dsc_slice_width_write(struct file *f, const char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx || !pipe_ctx->stream)
@@ -1757,9 +1775,9 @@ static ssize_t dp_dsc_slice_height_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -1861,9 +1879,9 @@ static ssize_t dp_dsc_slice_height_write(struct file *f, const char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx || !pipe_ctx->stream)
@@ -1942,9 +1960,9 @@ static ssize_t dp_dsc_bits_per_pixel_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -2043,9 +2061,9 @@ static ssize_t dp_dsc_bits_per_pixel_write(struct file *f, const char __user *bu
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx || !pipe_ctx->stream)
@@ -2122,9 +2140,9 @@ static ssize_t dp_dsc_pic_width_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -2183,9 +2201,9 @@ static ssize_t dp_dsc_pic_height_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -2259,9 +2277,9 @@ static ssize_t dp_dsc_chunk_size_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -2335,9 +2353,9 @@ static ssize_t dp_dsc_slice_bpg_offset_read(struct file *f, char __user *buf,
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe_ctx = &aconnector->dc_link->dc->current_state->res_ctx.pipe_ctx[i];
-			if (pipe_ctx && pipe_ctx->stream &&
-			    pipe_ctx->stream->link == aconnector->dc_link)
-				break;
+		if (pipe_ctx && pipe_ctx->stream &&
+		    pipe_ctx->stream->link == aconnector->dc_link)
+			break;
 	}
 
 	if (!pipe_ctx) {
@@ -2557,6 +2575,94 @@ static int target_backlight_show(struct seq_file *m, void *unused)
 	return 0;
 }
 
+/*
+ * function description: Determine if the connector is mst connector
+ *
+ * This function helps to determine whether a connector is a mst connector.
+ * - "root" stands for the root connector of the topology
+ * - "branch" stands for branch device of the topology
+ * - "end" stands for leaf node connector of the topology
+ * - "no" stands for the connector is not a device of a mst topology
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/is_mst_connector
+ *
+ */
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
+static int dp_is_mst_connector_show(struct seq_file *m, void *unused)
+{
+	struct drm_connector *connector = m->private;
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	struct drm_dp_mst_topology_mgr *mgr = NULL;
+	struct drm_dp_mst_port *port = NULL;
+	char *role = NULL;
+
+	mutex_lock(&aconnector->hpd_lock);
+
+	if (aconnector->mst_mgr.mst_state) {
+		role = "root";
+	} else if (aconnector->mst_port &&
+		aconnector->mst_port->mst_mgr.mst_state) {
+
+		role = "end";
+
+		mgr = &aconnector->mst_port->mst_mgr;
+		port = aconnector->port;
+
+		drm_modeset_lock(&mgr->base.lock, NULL);
+		if (port->pdt == DP_PEER_DEVICE_MST_BRANCHING &&
+			port->mcs)
+			role = "branch";
+		drm_modeset_unlock(&mgr->base.lock);
+
+	} else {
+		role = "no";
+	}
+
+	seq_printf(m, "%s\n", role);
+
+	mutex_unlock(&aconnector->hpd_lock);
+
+	return 0;
+}
+#endif
+
+/*
+ * function description: Read out the mst progress status
+ *
+ * This function helps to determine the mst progress status of
+ * a mst connector.
+ *
+ * Access it with the following command:
+ *
+ *	cat /sys/kernel/debug/dri/0/DP-X/mst_progress_status
+ *
+ */
+static int dp_mst_progress_status_show(struct seq_file *m, void *unused)
+{
+	struct drm_connector *connector = m->private;
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	struct amdgpu_device *adev = drm_to_adev(connector->dev);
+	int i;
+
+	mutex_lock(&aconnector->hpd_lock);
+	mutex_lock(&adev->dm.dc_lock);
+
+	if (aconnector->mst_status == MST_STATUS_DEFAULT) {
+		seq_puts(m, "disabled\n");
+	} else {
+		for (i = 0; i < sizeof(mst_progress_status)/sizeof(char *); i++)
+			seq_printf(m, "%s:%s\n",
+				mst_progress_status[i],
+				aconnector->mst_status & BIT(i) ? "done" : "not_done");
+	}
+
+	mutex_unlock(&adev->dm.dc_lock);
+	mutex_unlock(&aconnector->hpd_lock);
+
+	return 0;
+}
+
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 #endif
@@ -2571,6 +2677,10 @@ DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 #endif
 DEFINE_SHOW_ATTRIBUTE(internal_display);
 DEFINE_SHOW_ATTRIBUTE(psr_capability);
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
+DEFINE_SHOW_ATTRIBUTE(dp_is_mst_connector);
+#endif
+DEFINE_SHOW_ATTRIBUTE(dp_mst_progress_status);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static const struct file_operations dp_dsc_clock_en_debugfs_fops = {
@@ -2727,6 +2837,10 @@ static const struct {
 		{"max_bpc", &dp_max_bpc_debugfs_fops},
 #endif
 		{"dsc_disable_passthrough", &dp_dsc_disable_passthrough_debugfs_fops},
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
+		{"is_mst_connector", &dp_is_mst_connector_fops},
+#endif
+		{"mst_progress_status", &dp_mst_progress_status_fops}
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP

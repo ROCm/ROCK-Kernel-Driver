@@ -390,60 +390,6 @@ void dml32_CalculateBytePerPixelAndBlockSizes(
 #endif
 } // CalculateBytePerPixelAndBlockSizes
 
-void dml32_CalculatedoublePipeDPPCLKAndSCLThroughput(
-		double HRatio,
-		double HRatioChroma,
-		double VRatio,
-		double VRatioChroma,
-		double MaxDCHUBToPSCLThroughput,
-		double MaxPSCLToLBThroughput,
-		double PixelClock,
-		enum source_format_class SourcePixelFormat,
-		unsigned int HTaps,
-		unsigned int HTapsChroma,
-		unsigned int VTaps,
-		unsigned int VTapsChroma,
-
-		/* output */
-		double *PSCL_THROUGHPUT,
-		double *PSCL_THROUGHPUT_CHROMA,
-		double *DPPCLKUsingdoubleDPP)
-{
-	double DPPCLKUsingdoubleDPPLuma;
-	double DPPCLKUsingdoubleDPPChroma;
-
-	if (HRatio > 1) {
-		*PSCL_THROUGHPUT = dml_min(MaxDCHUBToPSCLThroughput, MaxPSCLToLBThroughput * HRatio /
-				dml_ceil((double) HTaps / 6.0, 1.0));
-	} else {
-		*PSCL_THROUGHPUT = dml_min(MaxDCHUBToPSCLThroughput, MaxPSCLToLBThroughput);
-	}
-
-	DPPCLKUsingdoubleDPPLuma = PixelClock * dml_max3(VTaps / 6 * dml_min(1, HRatio), HRatio * VRatio /
-			*PSCL_THROUGHPUT, 1);
-
-	if ((HTaps > 6 || VTaps > 6) && DPPCLKUsingdoubleDPPLuma < 2 * PixelClock)
-		DPPCLKUsingdoubleDPPLuma = 2 * PixelClock;
-
-	if ((SourcePixelFormat != dm_420_8 && SourcePixelFormat != dm_420_10 && SourcePixelFormat != dm_420_12 &&
-			SourcePixelFormat != dm_rgbe_alpha)) {
-		*PSCL_THROUGHPUT_CHROMA = 0;
-		*DPPCLKUsingdoubleDPP = DPPCLKUsingdoubleDPPLuma;
-	} else {
-		if (HRatioChroma > 1) {
-			*PSCL_THROUGHPUT_CHROMA = dml_min(MaxDCHUBToPSCLThroughput, MaxPSCLToLBThroughput *
-					HRatioChroma / dml_ceil((double) HTapsChroma / 6.0, 1.0));
-		} else {
-			*PSCL_THROUGHPUT_CHROMA = dml_min(MaxDCHUBToPSCLThroughput, MaxPSCLToLBThroughput);
-		}
-		DPPCLKUsingdoubleDPPChroma = PixelClock * dml_max3(VTapsChroma / 6 * dml_min(1, HRatioChroma),
-				HRatioChroma * VRatioChroma / *PSCL_THROUGHPUT_CHROMA, 1);
-		if ((HTapsChroma > 6 || VTapsChroma > 6) && DPPCLKUsingdoubleDPPChroma < 2 * PixelClock)
-			DPPCLKUsingdoubleDPPChroma = 2 * PixelClock;
-		*DPPCLKUsingdoubleDPP = dml_max(DPPCLKUsingdoubleDPPLuma, DPPCLKUsingdoubleDPPChroma);
-	}
-}
-
 void dml32_CalculateSwathAndDETConfiguration(
 		unsigned int DETSizeOverride[],
 		enum dm_use_mall_for_pstate_change_mode UseMALLForPStateChange[],
@@ -454,6 +400,9 @@ void dml32_CalculateSwathAndDETConfiguration(
 		unsigned int NumberOfActiveSurfaces,
 		unsigned int nomDETInKByte,
 		enum unbounded_requesting_policy UseUnboundedRequestingFinal,
+		bool DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment,
+		unsigned int PixelChunkSizeKBytes,
+		unsigned int ROBSizeKBytes,
 		unsigned int CompressedBufferSegmentSizeInkByteFinal,
 		enum output_encoder_class Output[],
 		double ReadBandwidthLuma[],
@@ -501,6 +450,8 @@ void dml32_CalculateSwathAndDETConfiguration(
 		unsigned int DETBufferSizeC[],
 		bool *UnboundedRequestEnabled,
 		unsigned int *CompressedBufferSizeInkByte,
+		unsigned int *CompBufReservedSpaceKBytes,
+		bool *CompBufReservedSpaceNeedAdjustment,
 		bool ViewportSizeSupportPerSurface[],
 		bool *ViewportSizeSupport)
 {
@@ -519,6 +470,8 @@ void dml32_CalculateSwathAndDETConfiguration(
 
 #ifdef __DML_VBA_DEBUG__
 	dml_print("DML::%s: ForceSingleDPP = %d\n", __func__, ForceSingleDPP);
+	dml_print("DML::%s: ROBSizeKBytes = %d\n", __func__, ROBSizeKBytes);
+	dml_print("DML::%s: PixelChunkSizeKBytes = %d\n", __func__, PixelChunkSizeKBytes);
 #endif
 	dml32_CalculateSwathWidth(ForceSingleDPP,
 			NumberOfActiveSurfaces,
@@ -588,8 +541,24 @@ void dml32_CalculateSwathAndDETConfiguration(
 		}
 	}
 
-	*UnboundedRequestEnabled = dml32_UnboundedRequest(UseUnboundedRequestingFinal, TotalActiveDPP,
-			NoChromaSurfaces, Output[0]);
+	// By default, just set the reserved space to 2 pixel chunks size
+	*CompBufReservedSpaceKBytes = PixelChunkSizeKBytes * 2;
+
+	// if unbounded req is enabled, program reserved space such that the ROB will not hold more than 8 swaths worth of data
+	// - assume worst-case compression rate of 4. [ROB size - 8 * swath_size / max_compression ratio]
+	// - assume for "narrow" vp case in which the ROB can fit 8 swaths, the DET should be big enough to do full size req
+	*CompBufReservedSpaceNeedAdjustment = ((int) ROBSizeKBytes - (int) *CompBufReservedSpaceKBytes) > (int) (RoundedUpMaxSwathSizeBytesY[0]/512);
+
+	if (*CompBufReservedSpaceNeedAdjustment == 1) {
+		*CompBufReservedSpaceKBytes = ROBSizeKBytes - RoundedUpMaxSwathSizeBytesY[0]/512;
+	}
+
+	#ifdef __DML_VBA_DEBUG__
+		dml_print("DML::%s: CompBufReservedSpaceKBytes          = %d\n",  __func__, *CompBufReservedSpaceKBytes);
+		dml_print("DML::%s: CompBufReservedSpaceNeedAdjustment  = %d\n",  __func__, *CompBufReservedSpaceNeedAdjustment);
+	#endif
+
+	*UnboundedRequestEnabled = dml32_UnboundedRequest(UseUnboundedRequestingFinal, TotalActiveDPP, NoChromaSurfaces, Output[0], SurfaceTiling[0], *CompBufReservedSpaceNeedAdjustment, DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment);
 
 	dml32_CalculateDETBufferSize(DETSizeOverride,
 			UseMALLForPStateChange,
@@ -748,10 +717,10 @@ void dml32_CalculateSwathWidth(
 	unsigned int k, j;
 	enum odm_combine_mode MainSurfaceODMMode;
 
-    unsigned int surface_width_ub_l;
-    unsigned int surface_height_ub_l;
-    unsigned int surface_width_ub_c;
-    unsigned int surface_height_ub_c;
+	unsigned int surface_width_ub_l;
+	unsigned int surface_height_ub_l;
+	unsigned int surface_width_ub_c;
+	unsigned int surface_height_ub_c;
 
 #ifdef __DML_VBA_DEBUG__
 	dml_print("DML::%s: ForceSingleDPP = %d\n", __func__, ForceSingleDPP);
@@ -907,9 +876,12 @@ void dml32_CalculateSwathWidth(
 } // CalculateSwathWidth
 
 bool dml32_UnboundedRequest(enum unbounded_requesting_policy UseUnboundedRequestingFinal,
-		unsigned int TotalNumberOfActiveDPP,
-		bool NoChroma,
-		enum output_encoder_class Output)
+			unsigned int TotalNumberOfActiveDPP,
+			bool NoChroma,
+			enum output_encoder_class Output,
+			enum dm_swizzle_mode SurfaceTiling,
+			bool CompBufReservedSpaceNeedAdjustment,
+			bool DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment)
 {
 	bool ret_val = false;
 
@@ -917,7 +889,20 @@ bool dml32_UnboundedRequest(enum unbounded_requesting_policy UseUnboundedRequest
 			TotalNumberOfActiveDPP == 1 && NoChroma);
 	if (UseUnboundedRequestingFinal == dm_unbounded_requesting_edp_only && Output != dm_edp)
 		ret_val = false;
-	return ret_val;
+
+	if (SurfaceTiling == dm_sw_linear)
+		ret_val = false;
+
+	if (CompBufReservedSpaceNeedAdjustment == 1 && DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment)
+		ret_val = false;
+
+#ifdef __DML_VBA_DEBUG__
+	dml_print("DML::%s: CompBufReservedSpaceNeedAdjustment  = %d\n",  __func__, CompBufReservedSpaceNeedAdjustment);
+	dml_print("DML::%s: DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment  = %d\n",  __func__, DisableUnboundRequestIfCompBufReservedSpaceNeedAdjustment);
+	dml_print("DML::%s: ret_val = %d\n",  __func__, ret_val);
+#endif
+
+	return (ret_val);
 }
 
 void dml32_CalculateDETBufferSize(
@@ -1686,17 +1671,22 @@ double dml32_RequiredDTBCLK(
 		unsigned int              AudioRate,
 		unsigned int              AudioLayout)
 {
-	double PixelWordRate = PixelClock /  (OutputFormat == dm_444 ? 1 : 2);
-	double HCActive = dml_ceil(DSCSlices * dml_ceil(OutputBpp *
-			dml_ceil(HActive / DSCSlices, 1) / 8.0, 1) / 3.0, 1);
-	double HCBlank = 64 + 32 *
-			dml_ceil(AudioRate *  (AudioLayout == 1 ? 1 : 0.25) * HTotal / (PixelClock * 1000), 1);
-	double AverageTribyteRate = PixelWordRate * (HCActive + HCBlank) / HTotal;
-	double HActiveTribyteRate = PixelWordRate * HCActive / HActive;
+	double PixelWordRate;
+	double HCActive;
+	double HCBlank;
+	double AverageTribyteRate;
+	double HActiveTribyteRate;
 
 	if (DSCEnable != true)
 		return dml_max(PixelClock / 4.0 * OutputBpp / 24.0, 25.0);
 
+	PixelWordRate = PixelClock /  (OutputFormat == dm_444 ? 1 : 2);
+	HCActive = dml_ceil(DSCSlices * dml_ceil(OutputBpp *
+			dml_ceil(HActive / DSCSlices, 1) / 8.0, 1) / 3.0, 1);
+	HCBlank = 64 + 32 *
+			dml_ceil(AudioRate *  (AudioLayout == 1 ? 1 : 0.25) * HTotal / (PixelClock * 1000), 1);
+	AverageTribyteRate = PixelWordRate * (HCActive + HCBlank) / HTotal;
+	HActiveTribyteRate = PixelWordRate * HCActive / HActive;
 	return dml_max4(PixelWordRate / 4.0, AverageTribyteRate / 4.0, HActiveTribyteRate / 4.0, 25.0) * 1.002;
 }
 
