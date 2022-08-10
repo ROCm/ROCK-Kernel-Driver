@@ -24,6 +24,7 @@
 #include <linux/bsearch.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/topology.h>
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_pm4_headers_vi.h"
@@ -815,13 +816,24 @@ static inline void kfd_queue_work(struct workqueue_struct *wq,
 				  struct work_struct *work)
 {
 	int cpu, new_cpu;
+	const struct cpumask *mask = NULL;
 
 	cpu = new_cpu = smp_processor_id();
-	do {
-		new_cpu = cpumask_next(new_cpu, cpu_online_mask) % nr_cpu_ids;
-		if (cpu_to_node(new_cpu) == numa_node_id())
+
+#if defined(CONFIG_SCHED_SMT)
+	/* CPU threads in the same core */
+	mask = cpu_smt_mask(cpu);
+#endif
+	if (!mask || cpumask_weight(mask) <= 1)
+		/* CPU threads in the same NUMA node */
+		mask = cpu_cpu_mask(cpu);
+	/* Pick the next online CPU thread in the same core or NUMA node */
+	for_each_cpu_wrap(cpu, mask, cpu+1) {
+		if (cpu != new_cpu && cpu_online(cpu)) {
+			new_cpu = cpu;
 			break;
-	} while (cpu != new_cpu);
+		}
+	}
 
 	queue_work_on(new_cpu, wq, work);
 }
