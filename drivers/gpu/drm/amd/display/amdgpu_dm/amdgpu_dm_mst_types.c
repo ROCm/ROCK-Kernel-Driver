@@ -1771,6 +1771,7 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 	struct dc_stream_state *stream)
 {
 	int bpp, pbn, branch_max_throughput_mps = 0;
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 	struct dc_link_settings cur_link_settings;
 	unsigned int end_to_end_bw_in_kbps = 0;
 	unsigned int upper_link_bw_in_kbps = 0, down_link_bw_in_kbps = 0;
@@ -1820,12 +1821,15 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 			}
 		}
 	} else {
+#endif
 		/* check if mode could be supported within full_pbn */
 		bpp = convert_dc_color_depth_into_bpc(stream->timing.display_color_depth) * 3;
 		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp << 4);
 		if (pbn > aconnector->mst_output_port->full_pbn)
 			return DC_FAIL_BANDWIDTH_VALIDATE;
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 	}
+#endif
 
 	/* check is mst dsc output bandwidth branch_overall_throughput_0_mps */
 	switch (stream->timing.pixel_encoding) {
