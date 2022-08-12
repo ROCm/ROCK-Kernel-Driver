@@ -818,14 +818,18 @@ bool dm_helpers_dp_write_dsc_enable(
 		const struct dc_stream_state *stream,
 		bool enable)
 {
+#if defined(HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX)
 	static const uint8_t DSC_DISABLE;
 	static const uint8_t DSC_DECODING = 0x01;
 	static const uint8_t DSC_PASSTHROUGH = 0x02;
 
-	struct amdgpu_dm_connector *aconnector;
 	struct drm_dp_mst_port *port;
 	uint8_t enable_dsc = enable ? DSC_DECODING : DSC_DISABLE;
 	uint8_t enable_passthrough = enable ? DSC_PASSTHROUGH : DSC_DISABLE;
+#else
+	uint8_t enable_dsc = enable ? 1 : 0;
+#endif
+	struct amdgpu_dm_connector *aconnector;
 	uint8_t ret = 0;
 
 	if (!stream)
@@ -844,7 +848,7 @@ bool dm_helpers_dp_write_dsc_enable(
 			return write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 				aconnector->dsc_aux, stream, enable_dsc);
 #endif
-
+#if defined(HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX)
 		port = aconnector->port;
 
 		if (enable) {
@@ -878,6 +882,11 @@ bool dm_helpers_dp_write_dsc_enable(
 					  ret);
 			}
 		}
+#else
+		ret = drm_dp_dpcd_write(aconnector->dsc_aux, DP_DSC_ENABLE, &enable_dsc, 1);
+                DC_LOG_DC("Send DSC %s to MST RX\n", enable_dsc ? "enable" : "disable");
+#endif
+
 	}
 
 	if (stream->signal == SIGNAL_TYPE_DISPLAY_PORT || stream->signal == SIGNAL_TYPE_EDP) {

@@ -1602,12 +1602,13 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 	struct amdgpu_dm_connector *aconnector,
 	struct dc_stream_state *stream)
 {
+	int bpp, pbn, branch_max_throughput_mps = 0;
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 	struct dc_link_settings cur_link_settings;
 	unsigned int end_to_end_bw_in_kbps = 0;
 	unsigned int upper_link_bw_in_kbps = 0, down_link_bw_in_kbps = 0;
 	unsigned int max_compressed_bw_in_kbps = 0;
 	struct dc_dsc_bw_range bw_range = {0};
-	int bpp, pbn, branch_max_throughput_mps = 0;
 
 	/*
 	 * check if the mode could be supported if DSC pass-through is supported
@@ -1642,13 +1643,16 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 			return DC_FAIL_BANDWIDTH_VALIDATE;
 		}
 	} else {
+#endif
 		/* check if mode could be supported within full_pbn */
 		bpp = convert_dc_color_depth_into_bpc(stream->timing.display_color_depth) * 3;
 		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp, false);
 
 		if (pbn > aconnector->port->full_pbn)
 			return DC_FAIL_BANDWIDTH_VALIDATE;
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 	}
+#endif
 
 	/* check is mst dsc output bandwidth branch_overall_throughput_0_mps */
 	switch (stream->timing.pixel_encoding) {
