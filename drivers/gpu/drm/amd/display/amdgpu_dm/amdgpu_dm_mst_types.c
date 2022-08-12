@@ -1915,6 +1915,7 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 		DRM_DEBUG_DRIVER("DSC is required but can't find common dsc config.");
 		return DC_FAIL_BANDWIDTH_VALIDATE;
 	}
+
 #endif
 	return DC_OK;
 }
