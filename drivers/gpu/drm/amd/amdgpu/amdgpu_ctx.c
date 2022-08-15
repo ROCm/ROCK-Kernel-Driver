@@ -333,6 +333,7 @@ static int amdgpu_ctx_init(struct amdgpu_ctx_mgr *mgr, int32_t priority,
 	else
 		ctx->stable_pstate = current_stable_pstate;
 
+	ctx->ctx_mgr = &(fpriv->ctx_mgr);
 	return 0;
 }
 
