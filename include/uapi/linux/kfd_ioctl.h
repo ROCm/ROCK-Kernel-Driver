@@ -77,9 +77,10 @@
  * 11.0 - Restrict HW mode ops access to trap activate
  * 12.0 - Let the debugger specifiy entry sizes for snapshots
  * 13.0 - Change address watch to set/clear per target device
+ * 13.1 - Extend kfd_dbg_device_info_entry
  */
 #define KFD_IOCTL_DBG_MAJOR_VERSION	13
-#define KFD_IOCTL_DBG_MINOR_VERSION	0
+#define KFD_IOCTL_DBG_MINOR_VERSION	1
 
 struct kfd_ioctl_get_version_args {
 	__u32 major_version;	/* from KFD */
@@ -166,7 +167,17 @@ struct kfd_dbg_device_info_entry {
 	__u64 gpuvm_base;
 	__u64 gpuvm_limit;
 	__u32 gpu_id;
-	__u32 pad;
+	__u32 location_id;
+	__u32 vendor_id;
+	__u32 device_id;
+	__u32 fw_version;
+	__u32 gfx_target_version;
+	__u32 simd_count;
+	__u32 max_waves_per_simd;
+	__u32 array_count;
+	__u32 simd_arrays_per_engine;
+	__u32 capability;
+	__u32 debug_prop;
 };
 
 struct kfd_ioctl_get_available_memory_args {
