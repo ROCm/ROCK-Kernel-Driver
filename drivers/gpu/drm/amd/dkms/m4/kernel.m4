@@ -674,8 +674,8 @@ dnl # AC_KERNEL_FREE_MEM
 dnl # return true if available memory >20%
 dnl #
 AC_DEFUN([AC_KERNEL_FREE_MEM], [
-	free_mem=$(free -t | awk '/^Total:/ {
-		printf("%d\n", $[4] / $[2] * 100)
+	free_mem=$(free -t | awk '/^Mem:/ { BUF_MEM=$[6]} /^Total:/ { TOTAL_MEM=$[2];FREE_MEM=$[4] } END {
+		printf("%d\n", (BUF_MEM + FREE_MEM) / TOTAL_MEM * 100)
 	}')
 
 	AS_IF([[[ $free_mem -gt 20 ]]], [
