@@ -872,6 +872,8 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 	/* Run over all pdd of the process */
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
+		struct kfd_topology_device *topo_dev =
+			kfd_topology_device_by_id(pdd->dev->id);
 
 		device_info.gpu_id = pdd->dev->id;
 		device_info.exception_status = pdd->exception_status;
@@ -881,6 +883,21 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		device_info.scratch_limit = pdd->scratch_limit;
 		device_info.gpuvm_base = pdd->gpuvm_base;
 		device_info.gpuvm_limit = pdd->gpuvm_limit;
+
+		device_info.location_id = topo_dev->node_props.location_id;
+		device_info.vendor_id = topo_dev->node_props.vendor_id;
+		device_info.device_id = topo_dev->node_props.device_id;
+		device_info.fw_version = pdd->dev->mec_fw_version;
+		device_info.gfx_target_version =
+			topo_dev->node_props.gfx_target_version;
+		device_info.simd_count = topo_dev->node_props.simd_count;
+		device_info.max_waves_per_simd =
+			topo_dev->node_props.max_waves_per_simd;
+		device_info.array_count = topo_dev->node_props.array_count;
+		device_info.simd_arrays_per_engine =
+			topo_dev->node_props.simd_arrays_per_engine;
+		device_info.capability = topo_dev->node_props.capability;
+		device_info.debug_prop = topo_dev->node_props.debug_prop;
 
 		if (exception_clear_mask)
 			pdd->exception_status &= ~exception_clear_mask;
