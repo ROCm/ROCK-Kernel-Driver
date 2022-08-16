@@ -1227,10 +1227,8 @@ void dcn32_update_phy_state(struct dc_state *state, struct pipe_ctx *pipe_ctx,
 {
 	enum phy_state current_state = pipe_ctx->stream->link->phy_state;
 
-	if (current_state == target_state) {
-		BREAK_TO_DEBUGGER();
+	if (current_state == target_state)
 		return;
-	}
 
 	if (target_state == TX_OFF_SYMCLK_OFF) {
 		core_link_disable_stream(pipe_ctx);
