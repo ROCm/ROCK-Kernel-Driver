@@ -80,7 +80,7 @@ static int ttm_global_init(void)
 
 	si_meminfo(&si);
 
-	ttm_debugfs_root = debugfs_create_dir("ttm", NULL);
+	ttm_debugfs_root = debugfs_create_dir(TTM_NAME, NULL);
 	if (IS_ERR(ttm_debugfs_root)) {
 		ttm_debugfs_root = NULL;
 	}
