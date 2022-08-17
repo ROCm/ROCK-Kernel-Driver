@@ -1558,7 +1558,7 @@ static int allocate_sdma_queue(struct device_queue_manager *dqm,
 		} else {
 			bit = find_first_bit(dqm->xgmi_sdma_bitmap,
 					     get_num_xgmi_sdma_queues(dqm));
-			clear_bit(bit, dqm->sdma_bitmap);
+			clear_bit(bit, dqm->xgmi_sdma_bitmap);
 			q->sdma_id = bit;
 		}
 		/* sdma_engine_id is sdma id including
