@@ -275,6 +275,9 @@ extern int amdgpu_vcnfw_log;
 #define AMDGPU_RESET_VCE			(1 << 13)
 #define AMDGPU_RESET_VCE1			(1 << 14)
 
+#define AMDGPU_RESET_LEVEL_SOFT_RECOVERY (1 << 0)
+#define AMDGPU_RESET_LEVEL_MODE2 (1 << 1)
+
 /* max cursor sizes (in pixels) */
 #define CIK_CURSOR_WIDTH 128
 #define CIK_CURSOR_HEIGHT 128
@@ -1095,6 +1098,9 @@ struct amdgpu_device {
 	uint32_t                        scpm_status;
 
 	struct work_struct		reset_work;
+
+	uint32_t						amdgpu_reset_level_mask;
+	bool                            job_hang;
 };
 
 static inline struct amdgpu_device *drm_to_adev(struct drm_device *ddev)

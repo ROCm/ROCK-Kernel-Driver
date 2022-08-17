@@ -58,9 +58,9 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 					uint32_t *trap_mask_supported);
 int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 					uint8_t wave_launch_mode);
-int kfd_dbg_trap_clear_address_watch(struct kfd_process *target,
+int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd,
 					uint32_t watch_id);
-int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
+int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
 					uint32_t *watch_id,
@@ -93,7 +93,8 @@ int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
 int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		uint64_t exception_clear_mask,
 		void __user *user_info,
-		uint32_t *number_of_device_infos);
+		uint32_t *number_of_device_infos,
+		uint32_t *entry_size);
 
 void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
 					uint64_t exception_set_mask);

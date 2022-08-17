@@ -1287,7 +1287,6 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 		     dma_addr_t *dma_addr, struct amdgpu_device *bo_adev,
 		     struct dma_fence **fence, bool flush_tlb)
 {
-	uint64_t vram_base_offset = 0;
 	struct amdgpu_device *adev = pdd->dev->adev;
 	struct amdgpu_vm *vm = drm_priv_to_vm(pdd->drm_priv);
 	uint64_t pte_flags;
@@ -1300,9 +1299,6 @@ svm_range_map_to_gpu(struct kfd_process_device *pdd, struct svm_range *prange,
 
 	pr_debug("svms 0x%p [0x%lx 0x%lx] readonly %d\n", prange->svms,
 		 last_start, last_start + npages - 1, readonly);
-
-	if (prange->svm_bo && prange->ttm_res)
-		vram_base_offset = bo_adev->vm_manager.vram_base_offset;
 
 	for (i = offset; i < offset + npages; i++) {
 		last_domain = dma_addr[i] & SVM_RANGE_VRAM_DOMAIN;

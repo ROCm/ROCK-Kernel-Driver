@@ -884,7 +884,7 @@ static int kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p,
 	err = kfd_wait_on_events(p, args->num_events,
 			(void __user *)args->events_ptr,
 			(args->wait_for_all != 0),
-			args->timeout, &args->wait_result);
+			&args->timeout, &args->wait_result);
 
 	return err;
 }
@@ -2496,13 +2496,12 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	struct task_struct *thread = NULL;
 	int r = 0, i;
 	struct kfd_process *target = NULL;
+	struct kfd_process_device *pdd = NULL;
 	struct pid *pid = NULL;
 	uint32_t *user_array = NULL;
 	uint32_t debug_trap_action;
 	uint64_t exception_mask;
-	uint32_t data1;
-	uint32_t data2;
-	uint32_t data3;
+	uint32_t data1, data2, data3, data4;
 	bool check_devices;
 	bool need_user_array;
 	uint32_t size_to_copy_to_user_array = 0;
@@ -2513,6 +2512,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	data1 = args->data1;
 	data2 = args->data2;
 	data3 = args->data3;
+	data4 = args->data4;
 	exception_mask = args->exception_mask;
 
 	if (sched_policy == KFD_SCHED_POLICY_NO_HWS) {
@@ -2607,8 +2607,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_WAVE_LAUNCH_MODE ||
 			 debug_trap_action == KFD_IOC_DBG_TRAP_NODE_SUSPEND ||
 			 debug_trap_action == KFD_IOC_DBG_TRAP_NODE_RESUME ||
-			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH ||
-			 debug_trap_action == KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH ||
+			 debug_trap_action == KFD_IOC_DBG_TRAP_CLEAR_NODE_ADDRESS_WATCH ||
 			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS)) {
 		r = -EPERM;
 		goto unlock_out;
@@ -2628,6 +2628,19 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 				r = -EBUSY;
 				goto unlock_out;
 			}
+		}
+	}
+
+	if (debug_trap_action == KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH ||
+			debug_trap_action == KFD_IOC_DBG_TRAP_CLEAR_NODE_ADDRESS_WATCH) {
+		uint32_t device_id = debug_trap_action == KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH ?
+							data4 : data2;
+		int user_gpu_id = kfd_process_get_user_gpu_id(target, device_id);
+
+		pdd = kfd_process_device_data_by_id(target, user_gpu_id);
+		if (user_gpu_id == -EINVAL || !pdd) {
+			r = -ENODEV;
+			goto unlock_out;
 		}
 	}
 
@@ -2700,7 +2713,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = pqm_get_queue_snapshot(&target->pqm,
 					   exception_mask, /* Clear mask  */
 					   (void __user *)args->ptr,
-					   args->data1);
+					   args->data1,
+					   &args->data2);
 
 		args->data1 = r < 0 ? 0 : r;
 		if (r > 0)
@@ -2710,11 +2724,11 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		args->data1 = KFD_IOCTL_DBG_MAJOR_VERSION;
 		args->data2 = KFD_IOCTL_DBG_MINOR_VERSION;
 		break;
-	case KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH:
-		r = kfd_dbg_trap_clear_address_watch(target, data1);
+	case KFD_IOC_DBG_TRAP_CLEAR_NODE_ADDRESS_WATCH:
+		r = kfd_dbg_trap_clear_dev_address_watch(pdd, data1);
 		break;
-	case KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
-		r = kfd_dbg_trap_set_address_watch(target,
+	case KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH:
+		r = kfd_dbg_trap_set_dev_address_watch(pdd,
 				args->ptr, /* watch address */
 				data3,     /* watch address mask */
 				&data1,    /* watch id */
@@ -2740,7 +2754,8 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		r = kfd_dbg_trap_device_snapshot(target,
 				exception_mask,
 				(void __user *) args->ptr,
-				&args->data1);
+				&args->data1,
+				&args->data2);
 		break;
 	case KFD_IOC_DBG_TRAP_RUNTIME_ENABLE:
 		if (data1)

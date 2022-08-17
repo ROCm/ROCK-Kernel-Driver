@@ -32,22 +32,11 @@ enum {
 };
 
 /*
- * A bitmask to indicate which watch points have been allocated.
- *   bit meaning:
- *     0:  unallocated/available
- *     1:  allocated/unavailable
+ * The spinlock protects the per device dev->alloc_watch_ids for multi-process access.
+ * The per-process per-device pdd->alloc_watch_ids is protected by the debug IOCTL
+ * process mutex.
  */
-static uint32_t allocated_debug_watch_points = ~((1 << MAX_WATCH_ADDRESSES) - 1);
 static DEFINE_SPINLOCK(watch_points_lock);
-
-/* Allocate and free watch point IDs for debugger */
-static int kfd_allocate_debug_watch_point(struct kfd_process *p,
-					uint64_t watch_address,
-					uint32_t watch_address_mask,
-					uint32_t *watch_point,
-					uint32_t watch_mode);
-static int kfd_release_debug_watch_points(struct kfd_process *p,
-					uint32_t watch_point_bit_mask_to_free);
 
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 		      unsigned int *queue_id,
@@ -316,6 +305,121 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 	return 0;
 }
 
+#define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
+static int kfd_dbg_get_dev_watch_id(struct kfd_process_device *pdd, int *watch_id) {
+	int i;
+
+	*watch_id = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
+
+	spin_lock(&watch_points_lock);
+
+	for (i = 0; i < MAX_WATCH_ADDRESSES; i++) {
+		/* device watchpoint in use so skip */
+		if ((pdd->dev->alloc_watch_ids >> i) & 0x1)
+				continue;
+
+		pdd->alloc_watch_ids |= 0x1 << i;
+		pdd->dev->alloc_watch_ids |= 0x1 << i;
+		*watch_id = i;
+		spin_unlock(&watch_points_lock);
+		return 0;
+	}
+
+	spin_unlock(&watch_points_lock);
+
+	return -ENOMEM;
+}
+
+static void kfd_dbg_clear_dev_watch_id(struct kfd_process_device *pdd, int watch_id) {
+	spin_lock(&watch_points_lock);
+
+	/* process owns device watch point so safe to clear */
+	if ((pdd->alloc_watch_ids >> watch_id) & 0x1) {
+		pdd->alloc_watch_ids &= ~(0x1 << watch_id);
+		pdd->dev->alloc_watch_ids &= ~(0x1 << watch_id);
+	}
+
+	spin_unlock(&watch_points_lock);
+}
+
+static bool kfd_dbg_owns_dev_watch_id(struct kfd_process_device *pdd, int watch_id)
+{
+	bool owns_watch_id = false;
+
+	spin_lock(&watch_points_lock);
+	owns_watch_id = watch_id < MAX_WATCH_ADDRESSES && ((pdd->alloc_watch_ids >> watch_id) & 0x1);
+	spin_unlock(&watch_points_lock);
+
+	return owns_watch_id;
+}
+
+int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_t watch_id)
+{
+	int r;
+
+	if (!kfd_dbg_owns_dev_watch_id(pdd, watch_id))
+		return -EINVAL;
+
+	r = debug_lock_and_unmap(pdd->dev->dqm);
+	if (r)
+		return r;
+
+	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
+	pdd->watch_points[watch_id] = pdd->dev->kfd2kgd->clear_address_watch(
+							pdd->dev->adev,
+							watch_id);
+	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
+
+	r = debug_map_and_unlock(pdd->dev->dqm);
+
+	kfd_dbg_clear_dev_watch_id(pdd, watch_id);
+
+	return r;
+}
+
+int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t *watch_id,
+					uint32_t watch_mode)
+{
+	int r = kfd_dbg_get_dev_watch_id(pdd, watch_id);
+
+	if (r)
+		return r;
+
+	r = debug_lock_and_unmap(pdd->dev->dqm);
+	if (r) {
+		kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
+		return r;
+	}
+
+	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
+	pdd->watch_points[*watch_id] = pdd->dev->kfd2kgd->set_address_watch(
+					pdd->dev->adev,
+					watch_address,
+					watch_address_mask,
+					*watch_id,
+					watch_mode,
+					pdd->dev->vm_info.last_vmid_kfd);
+	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
+
+	r = debug_map_and_unlock(pdd->dev->dqm);
+	/* HWS is broken so no point in HW rollback but release the watchpoint anyways. */
+	if (r)
+		kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
+
+	return r;
+}
+
+static void kfd_dbg_clear_process_address_watch(struct kfd_process *target) {
+	int i, j;
+
+	for (i = 0; i < target->n_pdds; i++)
+		for (j = 0; j < MAX_WATCH_ADDRESSES; j++)
+			kfd_dbg_trap_clear_dev_address_watch(target->pdds[i], j);
+}
+
 /* kfd_dbg_trap_deactivate:
  *	target: target process
  *	unwind: If this is unwinding a failed kfd_dbg_trap_enable()
@@ -330,9 +434,7 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 
 	if (!unwind) {
 		cancel_work_sync(&target->debug_event_workarea);
-		kfd_release_debug_watch_points(target,
-				target->allocated_debug_watch_point_bitmask);
-		target->allocated_debug_watch_point_bitmask = 0;
+		kfd_dbg_clear_process_address_watch(target);
 		kfd_dbg_trap_set_wave_launch_mode(target, 0);
 		kfd_dbg_trap_set_precise_mem_ops(target, 0);
 	}
@@ -599,42 +701,6 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 	return r;
 }
 
-int kfd_dbg_trap_clear_address_watch(struct kfd_process *target,
-					uint32_t watch_id)
-{
-	/* check that we own watch id */
-	if (!((1<<watch_id) & target->allocated_debug_watch_point_bitmask)) {
-		pr_debug("Trying to free a watch point we don't own\n");
-		return -EINVAL;
-	}
-	kfd_release_debug_watch_points(target, 1<<watch_id);
-	target->allocated_debug_watch_point_bitmask ^= (1<<watch_id);
-
-	return 0;
-}
-
-int kfd_dbg_trap_set_address_watch(struct kfd_process *target,
-					uint64_t watch_address,
-					uint32_t watch_address_mask,
-					uint32_t *watch_id,
-					uint32_t watch_mode)
-{
-	int r = 0;
-
-	r = kfd_allocate_debug_watch_point(target,
-			watch_address,
-			watch_address_mask,
-			watch_id,
-			watch_mode);
-	if (r)
-		return r;
-
-	/* Save the watch id in our per-process area */
-	target->allocated_debug_watch_point_bitmask |= (1 << *watch_id);
-
-	return 0;
-}
-
 int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		uint32_t enable)
 {
@@ -660,138 +726,6 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 	}
 
 	return 0;
-}
-
-#define KFD_DEBUGGER_INVALID_WATCH_POINT_ID -1
-static int kfd_dbg_get_watchpoint_id(void)
-{
-	int i, watch_point_to_allocate = KFD_DEBUGGER_INVALID_WATCH_POINT_ID;
-
-	spin_lock(&watch_points_lock);
-
-	for (i = 0; i < MAX_WATCH_ADDRESSES; i++) {
-		if (!(allocated_debug_watch_points & (1<<i))) {
-			/* Found one at [i]. */
-			watch_point_to_allocate = i;
-			break;
-		}
-	}
-
-	if (watch_point_to_allocate != KFD_DEBUGGER_INVALID_WATCH_POINT_ID) {
-		allocated_debug_watch_points |= (1<<watch_point_to_allocate);
-		pr_debug("Allocated watch point id %i\n", watch_point_to_allocate);
-	} else {
-		pr_debug("Failed to allocate watch point address. "
-				"num_of_watch_points == %i "
-				"allocated_debug_watch_points == 0x%08x "
-				"i == %i\n",
-				MAX_WATCH_ADDRESSES,
-				allocated_debug_watch_points,
-				i);
-	}
-
-	spin_unlock(&watch_points_lock);
-	return watch_point_to_allocate;
-}
-
-static int kfd_allocate_debug_watch_point(struct kfd_process *p,
-		uint64_t watch_address,
-		uint32_t watch_address_mask,
-		uint32_t *watch_point,
-		uint32_t watch_mode)
-{
-	int r = 0;
-	int i;
-	int watch_point_to_allocate;
-
-	if (!watch_point)
-		return -EFAULT;
-
-	watch_point_to_allocate = kfd_dbg_get_watchpoint_id();
-
-	if (watch_point_to_allocate == KFD_DEBUGGER_INVALID_WATCH_POINT_ID)
-		return -ENOMEM;
-
-	*watch_point = watch_point_to_allocate;
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		r = debug_lock_and_unmap(pdd->dev->dqm);
-		if (r)
-			break;
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
-		pdd->watch_points[*watch_point] = pdd->dev->kfd2kgd->set_address_watch(
-					pdd->dev->adev,
-					watch_address,
-					watch_address_mask,
-					*watch_point,
-					watch_mode,
-					pdd->dev->vm_info.last_vmid_kfd);
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
-
-		r = debug_map_and_unlock(pdd->dev->dqm);
-		if (r)
-			break;
-	}
-
-	return r;
-}
-
-static int kfd_dbg_free_watchpoint_id(uint32_t watch_point_bit_mask_to_free)
-{
-	spin_lock(&watch_points_lock);
-	if (~allocated_debug_watch_points & watch_point_bit_mask_to_free) {
-		pr_err("Tried to free a free watch point! "
-				"allocated_debug_watch_points == 0x%08x "
-				"watch_point_bit_mask_to_free = 0x%08x\n",
-				allocated_debug_watch_points,
-				watch_point_bit_mask_to_free);
-		spin_unlock(&watch_points_lock);
-		return -EFAULT;
-	}
-
-	pr_debug("Freeing watchpoint bitmask :0x%08x\n",
-			watch_point_bit_mask_to_free);
-	allocated_debug_watch_points ^= watch_point_bit_mask_to_free;
-	spin_unlock(&watch_points_lock);
-
-	return 0;
-}
-
-
-static int kfd_release_debug_watch_points(struct kfd_process *p,
-		uint32_t watch_point_bit_mask_to_free)
-{
-	int i, j;
-	int r = kfd_dbg_free_watchpoint_id(watch_point_bit_mask_to_free);
-
-	if (r)
-		return r;
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-
-		r = debug_lock_and_unmap(pdd->dev->dqm);
-		if (r)
-			break;
-
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
-		for (j = 0; j < MAX_WATCH_ADDRESSES; j++) {
-			if ((1<<j) & watch_point_bit_mask_to_free)
-				pdd->watch_points[j] =
-					pdd->dev->kfd2kgd->clear_address_watch(
-								pdd->dev->adev,
-								j);
-		}
-		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
-
-		r = debug_map_and_unlock(pdd->dev->dqm);
-		if (r)
-			break;
-	}
-	return r;
 }
 
 int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
@@ -916,23 +850,22 @@ out:
 int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		uint64_t exception_clear_mask,
 		void __user *user_info,
-		uint32_t *number_of_device_infos)
+		uint32_t *number_of_device_infos,
+		uint32_t *entry_size)
 {
-	int i;
-	struct kfd_dbg_device_info_entry device_info[MAX_GPU_INSTANCE];
+	struct kfd_dbg_device_info_entry device_info = {0};
+	uint32_t tmp_entry_size = *entry_size;
+	int i, r = 0;
 
-	if (!target)
-		return -EINVAL;
-
-	if (!user_info || !number_of_device_infos)
+	if (!(target && user_info && number_of_device_infos && entry_size))
 		return -EINVAL;
 
 	if (*number_of_device_infos < target->n_pdds) {
-		*number_of_device_infos = target->n_pdds;
-		return -ENOSPC;
+		r = -ENOSPC;
+		goto out;
 	}
 
-	memset(device_info, 0, sizeof(device_info));
+	*entry_size = min((size_t)entry_size, sizeof(device_info));
 
 	mutex_lock(&target->event_mutex);
 
@@ -940,26 +873,32 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 	for (i = 0; i < target->n_pdds; i++) {
 		struct kfd_process_device *pdd = target->pdds[i];
 
-		device_info[i].gpu_id = pdd->dev->id;
-		device_info[i].exception_status = pdd->exception_status;
-		device_info[i].lds_base = pdd->lds_base;
-		device_info[i].lds_limit = pdd->lds_limit;
-		device_info[i].scratch_base = pdd->scratch_base;
-		device_info[i].scratch_limit = pdd->scratch_limit;
-		device_info[i].gpuvm_base = pdd->gpuvm_base;
-		device_info[i].gpuvm_limit = pdd->gpuvm_limit;
+		device_info.gpu_id = pdd->dev->id;
+		device_info.exception_status = pdd->exception_status;
+		device_info.lds_base = pdd->lds_base;
+		device_info.lds_limit = pdd->lds_limit;
+		device_info.scratch_base = pdd->scratch_base;
+		device_info.scratch_limit = pdd->scratch_limit;
+		device_info.gpuvm_base = pdd->gpuvm_base;
+		device_info.gpuvm_limit = pdd->gpuvm_limit;
 
 		if (exception_clear_mask)
 			pdd->exception_status &= ~exception_clear_mask;
+
+		if (copy_to_user(user_info, &device_info, *entry_size)) {
+			r = -EFAULT;
+			break;
+		}
+
+		user_info += tmp_entry_size;
 	}
+
 	mutex_unlock(&target->event_mutex);
 
-	if (copy_to_user(user_info, device_info,
-				sizeof(device_info[0]) * target->n_pdds))
-		return -EFAULT;
+out:
 	*number_of_device_infos = target->n_pdds;
 
-	return 0;
+	return r;
 }
 
 int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,

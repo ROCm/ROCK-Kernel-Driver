@@ -367,6 +367,9 @@ struct kfd_dev {
 
 	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping */
 	struct dev_pagemap pgmap;
+
+	/* Track per device allocated watch points. */
+	uint32_t alloc_watch_ids;
 };
 
 struct kfd_ipc_obj;
@@ -882,6 +885,7 @@ struct kfd_process_device {
 	uint32_t spi_dbg_override;
 	uint32_t spi_dbg_launch_mode;
 	uint32_t watch_points[4];
+	uint32_t alloc_watch_ids;
 
 	/*
 	 * If this process has been checkpointed before, then the user
@@ -1005,9 +1009,6 @@ struct kfd_process {
 
 	/* per-process-per device debug event fd file */
 	struct file *dbg_ev_file;
-
-	/* Allocated debug watch point IDs bitmask */
-	uint32_t allocated_debug_watch_point_bitmask;
 
 	/* If the process is a kfd debugger, we need to know so we can clean
 	 * up at exit time.  If a process enables debugging on itself, it does
@@ -1435,8 +1436,9 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   uint64_t exception_clear_mask,
-			   struct kfd_queue_snapshot_entry __user *buf,
-			   int num_qss_entries);
+			   void __user *buf,
+			   int num_qss_entries,
+			   uint32_t *entry_size);
 
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
@@ -1531,7 +1533,7 @@ void kfd_event_free_process(struct kfd_process *p);
 int kfd_event_mmap(struct kfd_process *process, struct vm_area_struct *vma);
 int kfd_wait_on_events(struct kfd_process *p,
 		       uint32_t num_events, void __user *data,
-		       bool all, uint32_t user_timeout_ms,
+		       bool all, uint32_t *user_timeout_ms,
 		       uint32_t *wait_result);
 void kfd_signal_event_interrupt(u32 pasid, uint32_t partial_id,
 				uint32_t valid_id_bits);

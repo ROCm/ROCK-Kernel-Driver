@@ -75,8 +75,10 @@
  * 10.2 - Reserved
  * 10.3 - Pass context_save_restore_area size to user-space
  * 11.0 - Restrict HW mode ops access to trap activate
+ * 12.0 - Let the debugger specifiy entry sizes for snapshots
+ * 13.0 - Change address watch to set/clear per target device
  */
-#define KFD_IOCTL_DBG_MAJOR_VERSION	11
+#define KFD_IOCTL_DBG_MAJOR_VERSION	13
 #define KFD_IOCTL_DBG_MINOR_VERSION	0
 
 struct kfd_ioctl_get_version_args {
@@ -477,7 +479,7 @@ struct kfd_runtime_info {
  * exception_mask: exception to clear on snapshot
  * ptr: user buffer (IN)
  * data1: number of queue snapshots (IN/OUT) - 0 for IN ignores buffer writes
- * data2: unused
+ * data2: buffer entry size in bytes (IN/OUT)
  * data3: unused
  * data4: unused
  */
@@ -497,11 +499,11 @@ struct kfd_runtime_info {
  * exception_mask: unused
  * ptr: unused
  * data1: watch ID
- * data2: unused
+ * data2: device id
  * data3: unused
  * data4: unused
  */
-#define KFD_IOC_DBG_TRAP_CLEAR_ADDRESS_WATCH 8
+#define KFD_IOC_DBG_TRAP_CLEAR_NODE_ADDRESS_WATCH 8
 
 /* KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH:
  * exception_mask: unused
@@ -509,9 +511,9 @@ struct kfd_runtime_info {
  * data1: Watch ID (OUT)
  * data2: watch_mode: 0=read, 1=nonread, 2=atomic, 3=all
  * data3: watch address mask
- * data4: unused
+ * data4: device id
  */
-#define KFD_IOC_DBG_TRAP_SET_ADDRESS_WATCH 9
+#define KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH 9
 
 /* KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS
  * exception_mask: unused
@@ -540,7 +542,7 @@ struct kfd_runtime_info {
  * exception_mask: exception to clear on snapshot
  * ptr: user buffer for 'struct kfd_dbg_device_info_entry' entries (IN)
  * data1: number of devices in snapshot (IN/OUT)
- * data2: unused
+ * data2: buffer entry size in bytes (IN/OUT)
  * data3: unused
  * data4: unused
  */
