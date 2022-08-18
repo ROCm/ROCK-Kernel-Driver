@@ -2240,17 +2240,17 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 	struct drm_device *dev = pci_get_drvdata(pdev);
 	struct amdgpu_device *adev = drm_to_adev(dev);
 
-#ifdef HAVE_DRM_DEV_UNPLUG
-	drm_dev_unplug(dev);
-#else
-	drm_dev_unregister(dev);
-#endif
-
 	if (adev->pm.rpm_mode != AMDGPU_RUNPM_NONE) {
 		pm_runtime_get_sync(dev->dev);
 		pm_runtime_forbid(dev->dev);
 	}
 	amdgpu_driver_unload_kms(dev);
+
+#ifdef HAVE_DRM_DEV_UNPLUG
+	drm_dev_unplug(dev);
+#else
+	drm_dev_unregister(dev);
+#endif
 
 	/*
 	 * Flush any in flight DMA operations from device.
