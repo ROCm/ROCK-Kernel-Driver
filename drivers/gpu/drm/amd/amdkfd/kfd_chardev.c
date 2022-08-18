@@ -1698,7 +1698,7 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 		flags = FOLL_WRITE;
 	locked = 1;
 	mmap_read_lock(mm);
-	n = kcl_get_user_pages_remote(task, mm, pa, nents, flags, process_pages,
+	n = get_user_pages_remote(mm, pa, nents, flags, process_pages,
 				  NULL, &locked);
 	if (locked)
 		mmap_read_unlock(mm);
@@ -1743,13 +1743,11 @@ static void kfd_free_cma_bos(struct cma_iter *ci)
 
 	list_for_each_entry_safe(cma_bo, tmp, &ci->cma_list, list) {
 		struct kfd_dev *dev = cma_bo->dev;
-		struct kfd_process_device *pdd;
 
 		/* sg table is deleted by free_memory_of_gpu */
 		if (cma_bo->sg)
 			kfd_put_sg_table(cma_bo->sg);
-		pdd = kfd_get_process_device_data(dev, ci->p);
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->adev, cma_bo->mem, pdd->drm_priv, NULL);
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(dev->kgd, cma_bo->mem, NULL);
 		list_del(&cma_bo->list);
 		kfree(cma_bo);
 	}
@@ -1845,10 +1843,9 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 		goto pdd_fail;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, bo_size,
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, bo_size,
 						      pdd->drm_priv, cbo->sg,
-						      &cbo->mem, NULL, flags,
-						      false);
+						      &cbo->mem, NULL, flags);
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -1856,7 +1853,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	}
 
 	if (bo->mem_type == KFD_IOC_ALLOC_MEM_FLAGS_VRAM) {
-		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->adev, bo->mem,
+		ret = amdgpu_amdkfd_copy_mem_to_mem(kdev->kgd, bo->mem,
 						    offset, cbo->mem, 0,
 						    bo_size, &f, size);
 		if (ret) {
@@ -1881,7 +1878,7 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	return ret;
 
 copy_fail:
-	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->adev, bo->mem, pdd->drm_priv, NULL);
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(kdev->kgd, bo->mem, NULL);
 pdd_fail:
 	if (cbo->sg) {
 		kfd_put_sg_table(cbo->sg);
@@ -2038,7 +2035,7 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
 		mmap_read_lock(ri->mm);
-		nl = kcl_get_user_pages_remote(ri->task, ri->mm, rva, nl,
+		nl = get_user_pages_remote(ri->mm, rva, nl,
 					   flags, process_pages, NULL,
 					   &locked);
 		if (locked)
@@ -2115,9 +2112,9 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 		return -EINVAL;
 	}
 
-	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, 0ULL, size,
+	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->kgd, 0ULL, size,
 						      pdd->drm_priv, NULL,
-						      mem, NULL, flags, false);
+						      mem, NULL, flags);
 	mutex_unlock(&p->mutex);
 	if (ret) {
 		pr_err("Failed to create shadow system BO %d\n", ret);
@@ -2129,28 +2126,11 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 
 static int kfd_destroy_kgd_mem(struct kgd_mem *mem)
 {
-        struct amdgpu_device *adev;
-        struct task_struct *task;
-        struct kfd_process *p;
-        struct kfd_process_device *pdd;
-        uint32_t gpu_id, gpu_idx;
-        int r;
-
 	if (!mem)
 		return -EINVAL;
 
-        adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
-        task = get_pid_task(mem->process_info->pid, PIDTYPE_PID);
-        p = kfd_get_process(task);
-        r = kfd_process_gpuid_from_adev(p, adev, &gpu_id, &gpu_idx);
-        if (r < 0) {
-                pr_warn("no gpu id found, mem maybe leaking\n");
-                return -EINVAL;
-        }
-        pdd = kfd_process_device_from_gpuidx(p, gpu_idx);
-
 	/* param adev is not used*/
-	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, mem, pdd->drm_priv, NULL);
+	return amdgpu_amdkfd_gpuvm_free_memory_of_gpu(NULL, mem, NULL);
 }
 
 /* Copies @size bytes from si->cur_bo to di->cur_bo starting at their
@@ -2207,7 +2187,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		dst_mem = di->cma_bo->mem;
 		dst_offset = di->bo_offset & (PAGE_SIZE - 1);
 		list_add_tail(&di->cma_bo->list, &di->cma_list);
-	} else if (src_bo->dev->adev != dst_bo->dev->adev) {
+	} else if (src_bo->dev->kgd != dst_bo->dev->kgd) {
 		/* This indicates that atleast on of the BO is in local mem.
 		 * If both are in local mem of different devices then create an
 		 * intermediate System BO and do a double copy
@@ -2228,7 +2208,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 					return -EINVAL;
 			}
 
-			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->adev,
+			if (amdgpu_amdkfd_copy_mem_to_mem(src_bo->dev->kgd,
 						src_bo->mem, si->bo_offset,
 						*tmp_mem, 0,
 						size, f, &size))
@@ -2250,7 +2230,7 @@ static int kfd_copy_bos(struct cma_iter *si, struct cma_iter *di,
 		return -EINVAL;
 	}
 
-	err = amdgpu_amdkfd_copy_mem_to_mem(dev->adev, src_mem, src_offset,
+	err = amdgpu_amdkfd_copy_mem_to_mem(dev->kgd, src_mem, src_offset,
 					    dst_mem, dst_offset, size, f,
 					    copied);
 	/* The tmp_bo allocates additional memory. So it is better to wait and
@@ -3447,7 +3427,7 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 		 */
 		ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(dev->adev, bo_bucket->addr,
 							      bo_bucket->size, pdd->drm_priv,
-							      NULL, kgd_mem, &offset,
+							      kgd_mem, &offset,
 							      bo_bucket->alloc_flags, true);
 		if (ret) {
 			pr_err("Could not create the BO\n");
@@ -3538,7 +3518,7 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 	}
 	/* Create the BO */
 	ret = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(pdd->dev->adev, bo_bucket->addr,
-						      bo_bucket->size, pdd->drm_priv, NULL, kgd_mem,
+						      bo_bucket->size, pdd->drm_priv, kgd_mem,
 						      &offset, bo_bucket->alloc_flags, criu_resume);
 	if (ret) {
 		pr_err("Could not create the BO\n");

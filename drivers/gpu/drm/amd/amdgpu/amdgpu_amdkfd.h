@@ -164,7 +164,7 @@ int amdgpu_amdkfd_flush_gpu_tlb_vmid(struct amdgpu_device *adev,
 int amdgpu_amdkfd_flush_gpu_tlb_pasid(struct amdgpu_device *adev,
 				uint16_t pasid, enum TLB_FLUSH_TYPE flush_type);
 
-int amdgpu_amdkfd_copy_mem_to_mem(struct amdgpu_device *adev, struct kgd_mem *src_mem,
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 		uint64_t src_offset, struct kgd_mem *dst_mem,
 		uint64_t dest_offset, uint64_t size, struct dma_fence **f,
 		uint64_t *actual_size);

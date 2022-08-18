@@ -3250,11 +3250,12 @@ int amdgpu_amdkfd_remove_gws_from_process(void *info, void *mem)
 	return 0;
 }
 
-int amdgpu_amdkfd_copy_mem_to_mem(struct amdgpu_device *adev, struct kgd_mem *src_mem,
+int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 				  uint64_t src_offset, struct kgd_mem *dst_mem,
 				  uint64_t dst_offset, uint64_t size,
 				  struct dma_fence **f, uint64_t *actual_size)
 {
+	struct amdgpu_device *adev = NULL;
 	struct amdgpu_copy_mem src, dst;
 	struct ww_acquire_ctx ticket;
 	struct list_head list, duplicates;
@@ -3262,18 +3263,19 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct amdgpu_device *adev, struct kgd_mem *sr
 	struct dma_fence *fence = NULL;
 	int i, r;
 
-	if (!adev|| !src_mem || !dst_mem || !actual_size)
+	if (!kgd || !src_mem || !dst_mem || !actual_size)
 		return -EINVAL;
 
 	*actual_size = 0;
 
+	adev = get_amdgpu_device(kgd);
 	INIT_LIST_HEAD(&list);
 	INIT_LIST_HEAD(&duplicates);
 
 	src.bo = &src_mem->bo->tbo;
 	dst.bo = &dst_mem->bo->tbo;
-	src.mem = src.bo->resource;
-	dst.mem = dst.bo->resource;
+	src.mem = &src.bo->mem;
+	dst.mem = &dst.bo->mem;
 	src.offset = src_offset;
 	dst.offset = dst_offset;
 
