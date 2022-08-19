@@ -2,6 +2,7 @@ dnl #
 dnl # mm: add zone device public type memory support
 dnl #
 AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_PUBLIC], [
+AC_KERNEL_DO_BACKGROUND([
 	AC_KERNEL_TRY_COMPILE([
 		#include <linux/mm.h>
 	], [
@@ -10,6 +11,7 @@ AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_PUBLIC], [
 		AC_DEFINE(HAVE_ZONE_DEVICE_PUBLIC, 1,
 			[is_device_page is available])
 	])
+])
 ])
 
 dnl #
@@ -25,7 +27,6 @@ AC_DEFUN([AC_AMDGPU_MIGRATE_VMA_PGMAP_OWNER], [
 		AC_DEFINE(HAVE_MIGRATE_VMA_PGMAP_OWNER, 1,
 			[migrate_vma->pgmap_owner is available])
 	])
-
 	AC_AMDGPU_ZONE_DEVICE_PUBLIC
 ])
 
