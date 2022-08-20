@@ -2654,6 +2654,7 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 	int idr_handle;
 	int ret;
 	const bool criu_resume = true;
+	unsigned int mem_type = 0;
 	u64 offset;
 
 	if (bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL) {
@@ -2687,13 +2688,22 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 		 bo_bucket->size, bo_bucket->addr, offset);
 
 	/* Restore previous IDR handle */
-	pr_debug("Restoring old IDR handle for the BO");
-	idr_handle = idr_alloc(&pdd->alloc_idr, *kgd_mem, bo_priv->idr_handle,
-			       bo_priv->idr_handle + 1, GFP_KERNEL);
+	mem_type = bo_bucket->alloc_flags & (KFD_IOC_ALLOC_MEM_FLAGS_VRAM |
+					     KFD_IOC_ALLOC_MEM_FLAGS_GTT |
+					     KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
+					     KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
+					KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
+
+	idr_handle = kfd_process_device_create_obj_handle(pdd, *kgd_mem,
+							  bo_bucket->addr,
+							  bo_bucket->size,
+							  0, mem_type,
+							  bo_priv->idr_handle);
 
 	if (idr_handle < 0) {
 		pr_err("Could not allocate idr\n");
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, *kgd_mem, pdd->drm_priv,
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, *kgd_mem,
+						       pdd->drm_priv,
 						       NULL);
 		return -ENOMEM;
 	}
