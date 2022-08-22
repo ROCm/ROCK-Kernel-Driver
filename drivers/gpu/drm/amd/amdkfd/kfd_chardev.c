@@ -3538,7 +3538,7 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 					     KFD_IOC_ALLOC_MEM_FLAGS_GTT |
 					     KFD_IOC_ALLOC_MEM_FLAGS_USERPTR |
 					     KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL |
-					KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
+					     KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP);
 
 	idr_handle = kfd_process_device_create_obj_handle(pdd, *kgd_mem,
 							  bo_bucket->addr,
@@ -3548,8 +3548,7 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 
 	if (idr_handle < 0) {
 		pr_err("Could not allocate idr\n");
-		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, *kgd_mem,
-						       pdd->drm_priv,
+		amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, *kgd_mem, pdd->drm_priv,
 						       NULL);
 		return -ENOMEM;
 	}
