@@ -171,13 +171,19 @@ int amdgpu_driver_load_kms(struct amdgpu_device *adev, unsigned long flags)
 				adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
 			break;
 		default:
-			/* enable BACO as runpm mode on CI+ */
-			adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
+			/* enable BACO/BAMACO as runpm mode on CI+ */
+			if (amdgpu_runtime_pm == 2 && amdgpu_device_supports_maco(dev))
+				adev->pm.rpm_mode = AMDGPU_RUNPM_BAMACO;
+			else
+				adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
 			break;
 		}
 
 		if (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO)
 			dev_info(adev->dev, "Using BACO for runtime pm\n");
+
+		if (adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO)
+			dev_info(adev->dev, "Using BAMACO for runtime pm\n");
 	}
 
 	/* Call ACPI methods: require modeset init
