@@ -209,6 +209,29 @@ bool amdgpu_dpm_is_baco_supported(struct amdgpu_device *adev)
 	return ret ? false : baco_cap;
 }
 
+bool amdgpu_dpm_is_maco_supported(struct amdgpu_device *adev)
+{
+	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
+	void *pp_handle = adev->powerplay.pp_handle;
+	bool maco_cap;
+	int ret = 0;
+
+	if (!pp_funcs || !pp_funcs->get_asic_maco_capability)
+		return false;
+
+	if (adev->in_s3)
+		return false;
+
+	mutex_lock(&adev->pm.mutex);
+
+	ret = pp_funcs->get_asic_maco_capability(pp_handle,
+						 &maco_cap);
+
+	mutex_unlock(&adev->pm.mutex);
+
+	return ret ? false : maco_cap;
+}
+
 int amdgpu_dpm_mode2_reset(struct amdgpu_device *adev)
 {
 	const struct amd_pm_funcs *pp_funcs = adev->powerplay.pp_funcs;
