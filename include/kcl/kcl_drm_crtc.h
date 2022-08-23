@@ -48,9 +48,9 @@
 #ifndef KCL_KCL_DRM_CRTC_H
 #define KCL_KCL_DRM_CRTC_H
 
-#include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_device.h>
+#include <drm/drm_framebuffer.h>
 
 /* Copied from include/drm/drm_mode.h */
 #ifndef DRM_MODE_ROTATE_0
@@ -94,7 +94,6 @@
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
-
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
