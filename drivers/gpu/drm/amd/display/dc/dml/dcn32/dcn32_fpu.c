@@ -1746,12 +1746,13 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 				goto validate_fail;
 		}
 	}
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		vba->ValidationStatus[vba->soc.num_states] = DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
+#endif
 
 	if (repopulate_pipes) {
 		int flag_max_mpc_comb = vba->maxMpcComb;
