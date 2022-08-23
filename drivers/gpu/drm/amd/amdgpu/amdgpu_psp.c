@@ -2374,7 +2374,8 @@ static int psp_load_smu_fw(struct psp_context *psp)
 	 * Skip SMU FW reloading in case of using BACO for runpm only,
 	 * as SMU is always alive.
 	 */
-	if (adev->in_runpm && (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO))
+	if (adev->in_runpm && (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO ||
+						   adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO))
 		return 0;
 
 	if (!ucode->fw || amdgpu_sriov_vf(psp->adev))

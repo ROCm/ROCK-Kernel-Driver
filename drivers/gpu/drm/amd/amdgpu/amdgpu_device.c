@@ -272,6 +272,13 @@ bool amdgpu_device_supports_baco(struct drm_device *dev)
 	return amdgpu_asic_supports_baco(adev);
 }
 
+bool amdgpu_device_supports_maco(struct drm_device *dev)
+{
+	struct amdgpu_device *adev = drm_to_adev(dev);
+
+	return amdgpu_asic_supports_maco(adev);
+}
+
 /**
  * amdgpu_device_supports_smart_shift - Is the device dGPU with
  * smart shift support

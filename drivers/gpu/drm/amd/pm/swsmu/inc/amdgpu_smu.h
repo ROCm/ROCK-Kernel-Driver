@@ -1150,6 +1150,7 @@ struct pptable_funcs {
 	 * @baco_is_support: Check if GPU supports BACO (Bus Active, Chip Off).
 	 */
 	bool (*baco_is_support)(struct smu_context *smu);
+	bool (*maco_is_support)(struct smu_context *smu);
 
 	/**
 	 * @baco_get_state: Get the current BACO state.

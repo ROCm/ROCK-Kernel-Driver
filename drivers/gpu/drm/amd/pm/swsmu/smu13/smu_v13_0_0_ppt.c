@@ -1845,6 +1845,7 @@ static const struct pptable_funcs smu_v13_0_0_ppt_funcs = {
 	.deep_sleep_control = smu_v13_0_deep_sleep_control,
 	.gfx_ulv_control = smu_v13_0_gfx_ulv_control,
 	.baco_is_support = smu_v13_0_baco_is_support,
+	.maco_is_support = smu_v13_0_maco_is_support,
 	.baco_get_state = smu_v13_0_baco_get_state,
 	.baco_set_state = smu_v13_0_baco_set_state,
 	.baco_enter = smu_v13_0_baco_enter,

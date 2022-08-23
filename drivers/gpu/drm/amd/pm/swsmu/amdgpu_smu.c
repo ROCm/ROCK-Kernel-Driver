@@ -2756,6 +2756,21 @@ static int smu_get_baco_capability(void *handle, bool *cap)
 	return 0;
 }
 
+static int smu_get_maco_capability(void *handle, bool *cap)
+{
+	struct smu_context *smu = handle;
+
+	*cap = false;
+
+	if (!smu->pm_enabled)
+		return 0;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->maco_is_support)
+		*cap = smu->ppt_funcs->maco_is_support(smu);
+
+	return 0;
+}
+
 static int smu_baco_set_state(void *handle, int state)
 {
 	struct smu_context *smu = handle;
@@ -3017,6 +3032,7 @@ static const struct amd_pm_funcs swsmu_pm_funcs = {
 	.set_active_display_count         = smu_set_display_count,
 	.set_min_deep_sleep_dcefclk       = smu_set_deep_sleep_dcefclk,
 	.get_asic_baco_capability         = smu_get_baco_capability,
+	.get_asic_maco_capability         = smu_get_maco_capability,
 	.set_asic_baco_state              = smu_baco_set_state,
 	.get_ppfeature_status             = smu_sys_get_pp_feature_mask,
 	.set_ppfeature_status             = smu_sys_set_pp_feature_mask,
