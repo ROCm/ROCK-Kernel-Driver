@@ -48,9 +48,9 @@
 #ifndef KCL_KCL_DRM_CRTC_H
 #define KCL_KCL_DRM_CRTC_H
 
-#include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_device.h>
+#include <drm/drm_framebuffer.h>
 
 /* Copied from include/drm/drm_mode.h */
 #ifndef DRM_MODE_ROTATE_0
