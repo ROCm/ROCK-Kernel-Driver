@@ -25,7 +25,6 @@
 #define __AMDGPU_VRAM_MGR_H__
 
 #include <drm/drm_buddy.h>
-
 struct amdgpu_vram_mgr {
 	struct ttm_resource_manager manager;
 	struct drm_buddy mm;
