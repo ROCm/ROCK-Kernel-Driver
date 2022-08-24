@@ -231,6 +231,17 @@ static inline struct dma_resv_list *dma_resv_shared_list(struct dma_resv *obj)
         return rcu_dereference_check(obj->fence, lockdep_is_held(&(obj)->lock.base));
 }
 
+/**
+ * dma_resv_iter_is_exclusive - test if the current fence is the exclusive one
+ * @cursor: the cursor of the current position
+ *
+ * Returns true if the currently returned fence is the exclusive one.
+ */
+static inline bool dma_resv_iter_is_exclusive(struct dma_resv_iter *cursor)
+{
+	return cursor->index == 0;
+}
+
 #endif /* !defined(HAVE_DMA_RESV_FENCES) */
 
 #if !defined(smp_store_mb)
