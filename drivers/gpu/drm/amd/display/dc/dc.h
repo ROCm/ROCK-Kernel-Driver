@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.197"
+#define DC_VER "3.2.198"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -404,6 +404,7 @@ struct dc_config {
 	bool use_pipe_ctx_sync_logic;
 	bool ignore_dpref_ss;
 	bool enable_mipi_converter_optimization;
+	bool use_default_clock_table;
 };
 
 enum visual_confirm {

@@ -186,14 +186,6 @@ void optc3_set_dsc_config(struct timing_generator *optc,
 }
 #endif
 
-void optc3_set_vrr_m_const(struct timing_generator *optc,
-		double vtotal_avg)
-{
-	DC_FP_START();
-	optc3_fpu_set_vrr_m_const(optc, vtotal_avg);
-	DC_FP_END();
-}
-
 void optc3_set_odm_bypass(struct timing_generator *optc,
 		const struct dc_crtc_timing *dc_crtc_timing)
 {

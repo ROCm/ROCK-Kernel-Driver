@@ -717,7 +717,7 @@ static int kfd_process_alloc_gpuvm(struct kfd_process_device *pdd,
 	int err;
 
 	err = amdgpu_amdkfd_gpuvm_alloc_memory_of_gpu(kdev->adev, gpu_va, size,
-						 pdd->drm_priv, NULL, mem, NULL,
+						 pdd->drm_priv, mem, NULL,
 						 flags, false);
 	if (err)
 		goto err_alloc_mem;
