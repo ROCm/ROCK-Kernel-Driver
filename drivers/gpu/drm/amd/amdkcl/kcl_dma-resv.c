@@ -584,7 +584,7 @@ int dma_resv_copy_fences(struct dma_resv *dst, struct dma_resv *src)
                 }
 
                 dma_fence_get(f);
-                if (dma_resv_iter_usage(&cursor) == DMA_RESV_USAGE_WRITE)
+                if (dma_resv_iter_is_exclusive(&cursor))
                         excl = f;
                 else
                         RCU_INIT_POINTER(list->shared[list->shared_count++], f);
