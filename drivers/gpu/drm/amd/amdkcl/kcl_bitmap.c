@@ -19,9 +19,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <kcl/kcl_bitmap.h>
+
 #ifndef HAVE_BITMAP_FUNCS
 
-#include <kcl/kcl_bitmap.h>
 #include <linux/bitops.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -46,3 +47,29 @@ void kcl_bitmap_free(const unsigned long *bitmap)
 EXPORT_SYMBOL(kcl_bitmap_free);
 #endif /* HAVE_BITMAP_FUNCS */
 
+#ifndef HAVE_BITMAP_TO_ARR32
+#if BITS_PER_LONG == 64
+/**
+ * kcl_bitmap_to_arr32 - copy the contents of bitmap to a u32 array of bits
+ *	@buf: array of u32 (in host byte order), the dest bitmap
+ *	@bitmap: array of unsigned longs, the source bitmap
+ *	@nbits: number of bits in @bitmap
+ */
+void kcl_bitmap_to_arr32(u32 *buf, const unsigned long *bitmap, unsigned int nbits)
+{
+	unsigned int i, halfwords;
+
+	halfwords = DIV_ROUND_UP(nbits, 32);
+	for (i = 0; i < halfwords; i++) {
+		buf[i] = (u32) (bitmap[i/2] & UINT_MAX);
+		if (++i < halfwords)
+			buf[i] = (u32) (bitmap[i/2] >> 32);
+	}
+
+	/* Clear tail bits in last element of array beyond nbits. */
+	if (nbits % BITS_PER_LONG)
+		buf[halfwords - 1] &= (u32) (UINT_MAX >> ((-nbits) & 31));
+}
+EXPORT_SYMBOL(kcl_bitmap_to_arr32);
+#endif
+#endif
