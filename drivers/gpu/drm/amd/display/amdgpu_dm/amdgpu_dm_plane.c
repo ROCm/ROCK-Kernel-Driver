@@ -94,10 +94,12 @@ enum dm_micro_swizzle {
 	MICRO_SWIZZLE_R = 3
 };
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 const struct drm_format_info *amdgpu_dm_plane_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
 {
 	return amdgpu_lookup_format_info(cmd->pixel_format, cmd->modifier[0]);
 }
+#endif
 
 void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 			       bool *per_pixel_alpha, bool *pre_multiplied_alpha,
@@ -1540,6 +1542,7 @@ static struct drm_plane_state *amdgpu_dm_plane_drm_plane_duplicate_state(struct 
 	return &dm_plane_state->base;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 						 uint32_t format,
 						 uint64_t modifier)
@@ -1598,6 +1601,7 @@ static bool amdgpu_dm_plane_format_mod_supported(struct drm_plane *plane,
 
 	return true;
 }
+#endif
 
 static void amdgpu_dm_plane_drm_plane_destroy_state(struct drm_plane *plane,
 						    struct drm_plane_state *state)
