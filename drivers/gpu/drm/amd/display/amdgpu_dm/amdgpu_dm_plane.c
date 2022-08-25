@@ -960,7 +960,7 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 		return r;
 	}
 
-	r = dma_resv_reserve_fences(rbo->tbo.base.resv, 1);
+	r = dma_resv_reserve_fences(amdkcl_ttm_resvp(&rbo->tbo), 1);
 	if (r) {
 		dev_err(adev->dev, "reserving fence slot failed (%d)\n", r);
 		goto error_unlock;

@@ -66,9 +66,9 @@ int drm_gem_ttm_vmap(struct drm_gem_object *gem,
 	struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(gem);
 	int ret;
 
-	dma_resv_lock(gem->resv, NULL);
+	dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 	ret = ttm_bo_vmap(bo, map);
-	dma_resv_unlock(gem->resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 
 	return ret;
 }
@@ -87,9 +87,9 @@ void drm_gem_ttm_vunmap(struct drm_gem_object *gem,
 {
 	struct ttm_buffer_object *bo = drm_gem_ttm_of_gem(gem);
 
-	dma_resv_lock(gem->resv, NULL);
+	dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 	ttm_bo_vunmap(bo, map);
-	dma_resv_unlock(gem->resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 }
 EXPORT_SYMBOL(drm_gem_ttm_vunmap);
 
