@@ -39,4 +39,16 @@ unsigned long *kcl_bitmap_zalloc(unsigned int nbits, gfp_t flags);
 void kcl_bitmap_free(const unsigned long *bitmap);
 #endif /* HAVE_BITMAP_FUNCS */
 
+/* copy form bitmap.h */
+#ifndef HAVE_BITMAP_TO_ARR32
+#if BITS_PER_LONG == 64
+void kcl_bitmap_to_arr32(u32 *buf, const unsigned long *bitmap,
+							unsigned int nbits);
+#else
+#define kcl_bitmap_to_arr32(buf, bitmap, nbits)			\
+	bitmap_copy_clear_tail((unsigned long *) (buf),		\
+			(const unsigned long *) (bitmap), (nbits))
+#endif
+#endif /* HAVE_BITMAP_TO_ARR32 */
+
 #endif /* KCL_BITMAP_H */
