@@ -31,4 +31,8 @@
 #define bitmap_free kcl_bitmap_free
 #endif /* HAVE_BITMAP_FUNCS */
 
+#ifndef HAVE_BITMAP_TO_ARR32
+#define bitmap_to_arr32 kcl_bitmap_to_arr32
+#endif /* HAVE_BITMAP_TO_ARR32 */
+
 #endif /* KCL_BITMAP_H */
