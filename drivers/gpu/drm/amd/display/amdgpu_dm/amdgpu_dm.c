@@ -92,7 +92,6 @@
 #if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 #include <drm/drm_audio_component.h>
 #endif
-#include <drm/drm_gem_atomic_helper.h>
 #include <drm/drm_plane_helper.h>
 
 #include <acpi/video.h>
