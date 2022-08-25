@@ -787,6 +787,7 @@ uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
 	return domain;
 }
 
+#ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 static const struct drm_format_info dcc_formats[] = {
 	{ .format = DRM_FORMAT_XRGB8888, .depth = 24, .num_planes = 2,
 	  .cpp = { 4, 0, }, .block_w = {1, 1, 1}, .block_h = {1, 1, 1}, .hsub = 1, .vsub = 1, },
@@ -875,7 +876,7 @@ amdgpu_lookup_format_info(u32 format, uint64_t modifier)
 	/* returning NULL will cause the default format structs to be used. */
 	return NULL;
 }
-
+#endif
 
 /*
  * Tries to extract the renderable DCC offset from the opaque metadata attached
