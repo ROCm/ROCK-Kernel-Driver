@@ -26,7 +26,9 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
+#ifdef HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB
 #include <drm/drm_gem_atomic_helper.h>
+#endif
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_fourcc.h>
 
@@ -980,9 +982,11 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 		goto error_unpin;
 	}
 
+#ifdef HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB
 	r = drm_gem_plane_helper_prepare_fb(plane, new_state);
 	if (unlikely(r != 0))
 		goto error_unpin;
+#endif
 
 	amdgpu_bo_unreserve(rbo);
 
