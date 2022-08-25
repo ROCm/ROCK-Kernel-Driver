@@ -96,7 +96,6 @@
 #include <drm/drm_eld.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_audio_component.h>
-#include <drm/drm_gem_atomic_helper.h>
 
 #include <acpi/video.h>
 
