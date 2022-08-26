@@ -127,6 +127,9 @@
 /* dma_resv->seq is seqcount_ww_mutex_t */
 /* #undef HAVE_DMA_RESV_SEQCOUNT_WW_MUTEX_T */
 
+/* bug for missing dma_resv->seq */
+/* #undef HAVE_DMA_RESV_SEQ_BUG */
+
 /* down_read_killable() is available */
 #define HAVE_DOWN_READ_KILLABLE 1
 
