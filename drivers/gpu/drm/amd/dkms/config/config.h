@@ -1107,8 +1107,11 @@
 /* whether si_mem_available() is available */
 #define HAVE_SI_MEM_AVAILABLE 1
 
-/* smca_get_bank_type() is available */
-#define HAVE_SMCA_GET_BANK_TYPE 1
+/* smca_get_bank_type(x) is available */
+/* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
+
+/* whether smca_get_bank_type(x, x) is available */
+#define HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS 1
 
 /* is_smca_umc_v2() is available */
 /* #undef HAVE_SMCA_UMC_V2 */
