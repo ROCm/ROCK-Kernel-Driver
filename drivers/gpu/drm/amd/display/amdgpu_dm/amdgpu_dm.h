@@ -723,7 +723,6 @@ struct dm_crtc_state {
 	bool base_vrr_enabled;
 #endif
 
-	bool freesync_timing_changed;
 	bool freesync_vrr_info_changed;
 
 	bool dsc_force_changed;
