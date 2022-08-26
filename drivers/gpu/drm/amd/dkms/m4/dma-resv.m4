@@ -36,6 +36,23 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_SEQ], [
 			], [
 				AC_DEFINE(HAVE_DMA_RESV_SEQ, 1,
 					[dma_resv->seq is available])
+			],[
+				dnl #
+				dnl # dma_resv->seq is dropped since kernle 5.18.0
+				dnl # So trigger the bug only for the kernel_version < 5.18.0
+				dnl #
+				AC_KERNEL_TRY_COMPILE([
+					#include <linux/version.h>
+				], [
+					#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
+					int this_is_bug = 0;
+					#else
+					this_is_not_bug();
+					#endif
+				], [
+					AC_DEFINE(HAVE_DMA_RESV_SEQ_BUG, 1,
+					[bug for missing dma_resv->seq])
+				])
 			])
 		])
 	])
