@@ -11,10 +11,12 @@
 #define XEC(x, mask)			(((x) >> 16) & mask)
 #endif
 
-#if defined(HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS) || defined(HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT) || defined(HAVE_SMCA_BANK_STRUCT)
-enum smca_bank_types kcl_smca_get_bank_type(unsigned int bank);
+#if !defined(HAVE_SMCA_GET_BANK_TYPE)
+#ifdef HAVE_SMCA_BANK_STRUCT
+enum smca_bank_types smca_get_bank_type(unsigned int bank);
 #else
-int kcl_smca_get_bank_type(unsigned int cpu, unsigned int bank);
+int smca_get_bank_type(unsigned int bank);
+#endif
 #endif
 
 #ifndef HAVE_MCE_PRIO_UC

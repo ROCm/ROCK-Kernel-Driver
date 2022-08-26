@@ -12,19 +12,10 @@
 #ifdef CONFIG_X86_MCE_AMD
 #include <asm/mce.h>
 
-#if defined(HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS)
-enum smca_bank_types kcl_smca_get_bank_type(unsigned int cpu, unsigned int bank)
-{
-	return smca_get_bank_type(cpu, bank);
-}
-#elif defined(HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENTS)
-enum smca_bank_types kcl_smca_get_bank_type(unsigned int cpu, unsigned int bank)
-{
-        return smca_get_bank_type(bank);
-}
+#ifndef HAVE_SMCA_GET_BANK_TYPE
 
 /* Copied from v5.15-rc2-452-gf38ce910d8df:arch/x86/kernel/cpu/mce/amd.c and modified for KCL */
-#elif defined(HAVE_SMCA_BANK_STRUCT)
+#ifdef HAVE_SMCA_BANK_STRUCT
 enum smca_bank_types smca_get_bank_type(unsigned int bank)
 {
         struct smca_bank *b;
@@ -38,24 +29,14 @@ enum smca_bank_types smca_get_bank_type(unsigned int bank)
 
         return b->hwid->bank_type;
 }
-enum smca_bank_types kcl_smca_get_bank_type(unsigned int cpu, unsigned int bank)
-{
-        return smca_get_bank_type(bank);
-}
-
 #else
 int smca_get_bank_type(unsigned int bank)
 {
 	pr_warn_once("smca_get_bank_type is not supported\n");
 	return 0;
 }
-
-int kcl_smca_get_bank_type(unsigned int cpu, unsigned int bank)
-{
-        return smca_get_bank_type(bank);
-}
-
-#endif 
-EXPORT_SYMBOL_GPL(kcl_smca_get_bank_type);
+#endif /* HAVE_SMCA_BANK_STRUCT */
+EXPORT_SYMBOL_GPL(smca_get_bank_type);
+#endif /* HAVE_SMCA_GET_BANK_TYPE */
 
 #endif /* CONFIG_X86_MCE_AMD */
