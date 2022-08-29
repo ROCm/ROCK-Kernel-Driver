@@ -1136,7 +1136,7 @@ unsigned int dcn32_calculate_dccg_k1_k2_values(struct pipe_ctx *pipe_ctx, unsign
 			*k2_div = PIXEL_RATE_DIV_BY_2;
 		else
 			*k2_div = PIXEL_RATE_DIV_BY_4;
-	} else if (dc_is_dp_signal(pipe_ctx->stream->signal)) {
+	} else if (dc_is_dp_signal(pipe_ctx->stream->signal) || dc_is_virtual_signal(pipe_ctx->stream->signal)) {
 		if (two_pix_per_container) {
 			*k1_div = PIXEL_RATE_DIV_BY_1;
 			*k2_div = PIXEL_RATE_DIV_BY_2;
@@ -1220,4 +1220,36 @@ bool dcn32_is_dp_dig_pixel_rate_div_policy(struct pipe_ctx *pipe_ctx)
 		dc->debug.enable_dp_dig_pixel_rate_div_policy)
 		return true;
 	return false;
+}
+
+void dcn32_update_phy_state(struct dc_state *state, struct pipe_ctx *pipe_ctx,
+		enum phy_state target_state)
+{
+	enum phy_state current_state = pipe_ctx->stream->link->phy_state;
+
+	if (current_state == target_state) {
+		BREAK_TO_DEBUGGER();
+		return;
+	}
+
+	if (target_state == TX_OFF_SYMCLK_OFF) {
+		core_link_disable_stream(pipe_ctx);
+		pipe_ctx->stream->link->phy_state = TX_OFF_SYMCLK_OFF;
+	} else if (target_state == TX_ON_SYMCLK_ON) {
+		core_link_enable_stream(state, pipe_ctx);
+		pipe_ctx->stream->link->phy_state = TX_ON_SYMCLK_ON;
+	} else if (target_state == TX_OFF_SYMCLK_ON) {
+		if (current_state == TX_ON_SYMCLK_ON) {
+			core_link_disable_stream(pipe_ctx);
+			pipe_ctx->stream->link->phy_state = TX_OFF_SYMCLK_OFF;
+		}
+
+		pipe_ctx->clock_source->funcs->program_pix_clk(
+			pipe_ctx->clock_source,
+			&pipe_ctx->stream_res.pix_clk_params,
+			dp_get_link_encoding_format(&pipe_ctx->link_config.dp_link_settings),
+			&pipe_ctx->pll_settings);
+		pipe_ctx->stream->link->phy_state = TX_OFF_SYMCLK_ON;
+	} else
+		BREAK_TO_DEBUGGER();
 }

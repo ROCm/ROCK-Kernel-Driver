@@ -241,7 +241,6 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
-#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&
@@ -252,6 +251,7 @@ bool needs_dsc_aux_workaround(struct dc_link *link)
 	return false;
 }
 
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnector)
 {
 	struct dc_sink *dc_sink = aconnector->dc_sink;
@@ -1568,6 +1568,7 @@ clean_exit:
 	return (ret == 0);
 }
 
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 static unsigned int kbps_from_pbn(unsigned int pbn)
 {
 	unsigned int kbps = pbn;
@@ -1595,6 +1596,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 
 	return bw_range->max_target_bpp_x16 && bw_range->min_target_bpp_x16;
 }
+#endif
 #endif /* CONFIG_DRM_AMD_DC_DCN */
 
 enum dc_status dm_dp_mst_is_port_support_mode(
@@ -1649,7 +1651,11 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 		bpp = convert_dc_color_depth_into_bpc(stream->timing.display_color_depth) * 3;
 		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp, false);
 
+#ifdef HAVE_DRM_DP_MST_PORT_FULL_PBN
 		if (pbn > aconnector->port->full_pbn)
+#else
+		if (pbn > aconnector->port->available_pbn)
+#endif
 			return DC_FAIL_BANDWIDTH_VALIDATE;
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX

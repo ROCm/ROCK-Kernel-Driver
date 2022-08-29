@@ -178,6 +178,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_hdmi_helper.h])
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_hdcp_helper.h])
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_hdcp.h])
+	AC_KERNEL_CHECK_HEADERS([drm/display/drm_dp.h])
+
+
+	AC_KERNEL_CHECK_HEADERS([drm/drm_dsc.h])
 
 	dnl #
 	dnl # v5.7-13141-gca5999fde0a1

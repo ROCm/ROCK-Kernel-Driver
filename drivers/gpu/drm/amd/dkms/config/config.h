@@ -315,6 +315,9 @@
 /* drm_dev_unplug() is available */
 #define HAVE_DRM_DEV_UNPLUG 1
 
+/* Define to 1 if you have the <drm/display/drm_dp.h> header file. */
+#define HAVE_DRM_DISPLAY_DRM_DP_H 1
+
 /* Define to 1 if you have the <drm/display/drm_dp_helper.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_HELPER_H 1
 
@@ -405,6 +408,9 @@
 /* struct drm_dp_mst_port has passthrough_aux member */
 /* #undef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX */
 
+/* drm_dp_mst_port struct has full_pbn member */
+#define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
+
 /* struct drm_dp_mst_topology_cbs->destroy_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
 
@@ -489,6 +495,9 @@
 /* Define to 1 if you have the <drm/drm_drv.h> header file. */
 #define HAVE_DRM_DRM_DRV_H 1
 
+/* Define to 1 if you have the <drm/drm_dsc.h> header file. */
+/* #undef HAVE_DRM_DRM_DSC_H */
+
 /* Define to 1 if you have the <drm/drm_encoder.h> header file. */
 #define HAVE_DRM_DRM_ENCODER_H 1
 
@@ -543,6 +552,9 @@
 
 /* drm_drv_uses_atomic_modeset() is available */
 #define HAVE_DRM_DRV_USES_ATOMIC_MODESET 1
+
+/* drm_dsc_compute_rc_parameters() is available */
+#define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
 /* drm_edid_to_eld() are available */
 /* #undef HAVE_DRM_EDID_TO_ELD */
@@ -1281,6 +1293,12 @@
 
 /* __dma_fence_is_later() is available and has ops arg */
 #define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
+
+/* struct drm_dsc_config has member simple_422 */
+#define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
+
+/* drm_dsc_pps_payload_pack() is available */
+#define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
 
 /* drm_edid_get_monitor_name is available*/
 #define HAVE_DRM_EDID_GET_MONITOR_NAME 1

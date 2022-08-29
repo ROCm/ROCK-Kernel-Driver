@@ -16,15 +16,21 @@ ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ),n)
 $(error dma_resv->seq is missing., exit...)
 endif
 
-ifdef CONFIG_CC_IS_GCC
+ifeq ($(CC), gcc)
 GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
 GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
-GCCPAT=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCCPAT=$(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
 # CONFIG_GCC_VERSION returns x.xx.xx as the version format
 GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
+ifdef CONFIG_CC_IS_GCC
 ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
 $(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
 $(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
+endif
+else
+export CONFIG_CC_IS_GCC=y
+export CONFIG_GCC_VERSION=$(GCCSTR)
+$(warning "CONFIG_CC_IS_GCC is not defined. Let's export it with version $(CONFIG_GCC_VERSION)")
 endif
 endif
 
@@ -185,6 +191,12 @@ ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
 export CONFIG_DRM_AMD_DC_DCN=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
 endif
+endif
+
+ifeq ($(filter y,$(call _is_kcl_macro_defined,HAVE_DRM_DISPLAY_DRM_DSC_H) \
+	$(call _is_kcl_macro_defined,HAVE_DRM_DRM_DSC_H)), y)
+export CONFIG_DRM_AMD_DC_DSC_SUPPORT=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DSC_SUPPORT
 endif
 
 export CONFIG_DRM_TTM_HELPER=m

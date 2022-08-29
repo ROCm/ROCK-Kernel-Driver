@@ -303,7 +303,9 @@ static void dsc_log_pps(struct display_stream_compressor *dsc, struct drm_dsc_co
 	DC_LOG_DSC("\tline_buf_depth %d", pps->line_buf_depth);
 	DC_LOG_DSC("\tblock_pred_enable %d", pps->block_pred_enable);
 	DC_LOG_DSC("\tconvert_rgb %d", pps->convert_rgb);
+#ifdef HAVE_DRM_DSC_CONFIG_SIMPLE_422
 	DC_LOG_DSC("\tsimple_422 %d", pps->simple_422);
+#endif
 	DC_LOG_DSC("\tvbr_enable %d", pps->vbr_enable);
 	DC_LOG_DSC("\tbits_per_pixel %d (%d.%04d)", bits_per_pixel, bits_per_pixel / 16, ((bits_per_pixel % 16) * 10000) / 16);
 	DC_LOG_DSC("\tpic_height %d", pps->pic_height);
@@ -412,7 +414,9 @@ static bool dsc_prepare_config(const struct dsc_config *dsc_cfg, struct dsc_reg_
 	dsc_reg_vals->pps.convert_rgb = dsc_reg_vals->pixel_format == DSC_PIXFMT_RGB ? 1 : 0;
 	dsc_reg_vals->pps.native_422 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_NATIVE_YCBCR422);
 	dsc_reg_vals->pps.native_420 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_NATIVE_YCBCR420);
+#ifdef HAVE_DRM_DSC_CONFIG_SIMPLE_422
 	dsc_reg_vals->pps.simple_422 = (dsc_reg_vals->pixel_format == DSC_PIXFMT_SIMPLE_YCBCR422);
+#endif
 
 	if (dscc_compute_dsc_parameters(&dsc_reg_vals->pps, &dsc_params)) {
 		dm_output_to_console("%s: DSC config failed\n", __func__);

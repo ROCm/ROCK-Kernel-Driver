@@ -6950,7 +6950,6 @@ static void dm_encoder_helper_disable(struct drm_encoder *encoder)
 
 }
 
-#if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 int convert_dc_color_depth_into_bpc(enum dc_color_depth display_color_depth)
 {
 	switch (display_color_depth) {
@@ -6971,7 +6970,6 @@ int convert_dc_color_depth_into_bpc(enum dc_color_depth display_color_depth)
 	}
 	return 0;
 }
-#endif
 
 static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 					  struct drm_crtc_state *crtc_state,
@@ -10280,7 +10278,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
 	struct drm_dp_mst_topology_state *mst_state;
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	struct drm_dp_mst_topology_mgr *mgr;
+#endif
 #endif
 #endif
 
@@ -10303,9 +10303,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct dm_connector_state *dm_new_con_state = to_dm_connector_state(new_con_state);
 
 		/* Skip connectors that are disabled or part of modeset already. */
-		if (!old_con_state->crtc && !new_con_state->crtc)
-			continue;
-
 		if (!new_con_state->crtc)
 			continue;
 
@@ -10661,11 +10658,14 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 #if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT) && \
 	defined(CONFIG_DRM_AMD_DC_DCN)
+
+#ifdef HAVE_DRM_DP_MST_ATOMIC_CHECK
 		if (!compute_mst_dsc_configs_for_state(state, dm_state->context, vars)) {
 			DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
 			ret = -EINVAL;
 			goto fail;
 		}
+#endif
 
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context, vars);

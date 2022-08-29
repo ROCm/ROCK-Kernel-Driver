@@ -283,6 +283,11 @@ AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_AMDGPU_DRM_FB_HELPER_BUFFER
 	AC_AMDGPU_DRM_DP_MST_TOPOLOGY_MGR_BASE
 	AC_AMDGPU_DRM_DP_MST_POST_PASSTHROUGH_AUX
+	AC_AMDGPU_DRM_DP_MST_PORT_FULL_PBN
+	AC_AMDGPU_DRM_MODESET_BACKOFF_RETURN_INT
+	AC_AMDGPU_DRM_DSC_CONFIG_SIMPLE_422
+	AC_AMDGPU_DRM_DSC_PPS_PAYLOAD_PACK
+	AC_AMDGPU_DRM_DSC_COMPUTE_RC_PARAMETERS
 
 	AC_KERNEL_WAIT
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
@@ -674,8 +679,8 @@ dnl # AC_KERNEL_FREE_MEM
 dnl # return true if available memory >20%
 dnl #
 AC_DEFUN([AC_KERNEL_FREE_MEM], [
-	free_mem=$(free -t | awk '/^Total:/ {
-		printf("%d\n", $[4] / $[2] * 100)
+	free_mem=$(free -t | awk '/^Mem:/ { BUF_MEM=$[6]} /^Total:/ { TOTAL_MEM=$[2];FREE_MEM=$[4] } END {
+		printf("%d\n", (BUF_MEM + FREE_MEM) / TOTAL_MEM * 100)
 	}')
 
 	AS_IF([[[ $free_mem -gt 20 ]]], [

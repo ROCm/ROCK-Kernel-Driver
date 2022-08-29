@@ -47,9 +47,14 @@ void calc_rc_params(struct rc_params *rc, const struct drm_dsc_config *pps)
 	int slice_width  = pps->slice_width;
 	int slice_height = pps->slice_height;
 
+#ifdef HAVE_DRM_DSC_CONFIG_SIMPLE_422
 	mode = pps->convert_rgb ? CM_RGB : (pps->simple_422  ? CM_444 :
 					   (pps->native_422  ? CM_422 :
 					    pps->native_420  ? CM_420 : CM_444));
+#else
+	mode = pps->convert_rgb ? CM_RGB : (pps->native_422 ? CM_422 :
+					    pps->native_420  ? CM_420 : CM_444);
+#endif
 	bpc = (pps->bits_per_component == 8) ? BPC_8 : (pps->bits_per_component == 10)
 					     ? BPC_10 : BPC_12;
 

@@ -5182,9 +5182,12 @@ static void gfx_v11_0_update_coarse_grain_clock_gating(struct amdgpu_device *ade
 		data = REG_SET_FIELD(data, SDMA0_RLC_CGCG_CTRL, CGCG_INT_ENABLE, 1);
 		WREG32_SOC15(GC, 0, regSDMA0_RLC_CGCG_CTRL, data);
 
-		data = RREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL);
-		data = REG_SET_FIELD(data, SDMA1_RLC_CGCG_CTRL, CGCG_INT_ENABLE, 1);
-		WREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL, data);
+		/* Some ASICs only have one SDMA instance, not need to configure SDMA1 */
+		if (adev->sdma.num_instances > 1) {
+			data = RREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL);
+			data = REG_SET_FIELD(data, SDMA1_RLC_CGCG_CTRL, CGCG_INT_ENABLE, 1);
+			WREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL, data);
+		}
 	} else {
 		/* Program RLC_CGCG_CGLS_CTRL */
 		def = data = RREG32_SOC15(GC, 0, regRLC_CGCG_CGLS_CTRL);
@@ -5213,9 +5216,12 @@ static void gfx_v11_0_update_coarse_grain_clock_gating(struct amdgpu_device *ade
 		data &= ~SDMA0_RLC_CGCG_CTRL__CGCG_INT_ENABLE_MASK;
 		WREG32_SOC15(GC, 0, regSDMA0_RLC_CGCG_CTRL, data);
 
-		data = RREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL);
-		data &= ~SDMA1_RLC_CGCG_CTRL__CGCG_INT_ENABLE_MASK;
-		WREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL, data);
+		/* Some ASICs only have one SDMA instance, not need to configure SDMA1 */
+		if (adev->sdma.num_instances > 1) {
+			data = RREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL);
+			data &= ~SDMA1_RLC_CGCG_CTRL__CGCG_INT_ENABLE_MASK;
+			WREG32_SOC15(GC, 0, regSDMA1_RLC_CGCG_CTRL, data);
+		}
 	}
 }
 
@@ -5328,8 +5334,7 @@ static int gfx_v11_0_set_powergating_state(void *handle,
 		break;
 	case IP_VERSION(11, 0, 1):
 		gfx_v11_cntl_pg(adev, enable);
-		/* TODO: Enable this when GFXOFF is ready */
-		// amdgpu_gfx_off_ctrl(adev, enable);
+		amdgpu_gfx_off_ctrl(adev, enable);
 		break;
 	default:
 		break;
