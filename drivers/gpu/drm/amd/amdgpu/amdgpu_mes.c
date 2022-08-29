@@ -943,9 +943,13 @@ int amdgpu_mes_set_shader_debugger(struct amdgpu_device *adev,
 	memcpy(op_input.set_shader_debugger.tcp_watch_cntl, tcp_watch_cntl,
 			sizeof(op_input.set_shader_debugger.tcp_watch_cntl));
 
+	amdgpu_mes_lock(&adev->mes);
+
 	r = adev->mes.funcs->misc_op(&adev->mes, &op_input);
 	if (r)
 		DRM_ERROR("failed to set_shader_debugger\n");
+
+	amdgpu_mes_unlock(&adev->mes);
 
 	return r;
 }
