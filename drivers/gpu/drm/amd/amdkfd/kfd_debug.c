@@ -353,6 +353,18 @@ static bool kfd_dbg_owns_dev_watch_id(struct kfd_process_device *pdd, int watch_
 	return owns_watch_id;
 }
 
+static int kfd_dbg_set_mes_debug_mode(struct kfd_process_device *pdd)
+{
+	uint32_t spi_dbg_cntl = pdd->spi_dbg_override | pdd->spi_dbg_launch_mode;
+	uint32_t flags = pdd->process->precise_mem_ops;
+
+	if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
+		return 0;
+
+	return amdgpu_mes_set_shader_debugger(pdd->dev->adev, pdd->proc_ctx_gpu_addr, spi_dbg_cntl,
+						pdd->watch_points, flags);
+}
+
 int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_t watch_id)
 {
 	int r;
@@ -360,9 +372,11 @@ int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_
 	if (!kfd_dbg_owns_dev_watch_id(pdd, watch_id))
 		return -EINVAL;
 
-	r = debug_lock_and_unmap(pdd->dev->dqm);
-	if (r)
-		return r;
+	if (!pdd->dev->shared_resources.enable_mes) {
+		r = debug_lock_and_unmap(pdd->dev->dqm);
+		if (r)
+			return r;
+	}
 
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
 	pdd->watch_points[watch_id] = pdd->dev->kfd2kgd->clear_address_watch(
@@ -370,7 +384,10 @@ int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_
 							watch_id);
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-	r = debug_map_and_unlock(pdd->dev->dqm);
+	if (!pdd->dev->shared_resources.enable_mes)
+		r = debug_map_and_unlock(pdd->dev->dqm);
+	else
+		r = kfd_dbg_set_mes_debug_mode(pdd);
 
 	kfd_dbg_clear_dev_watch_id(pdd, watch_id);
 
@@ -388,10 +405,12 @@ int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 	if (r)
 		return r;
 
-	r = debug_lock_and_unmap(pdd->dev->dqm);
-	if (r) {
-		kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
-		return r;
+	if (!pdd->dev->shared_resources.enable_mes) {
+		r = debug_lock_and_unmap(pdd->dev->dqm);
+		if (r) {
+			kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
+			return r;
+		}
 	}
 
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, false);
@@ -404,7 +423,10 @@ int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 					pdd->dev->vm_info.last_vmid_kfd);
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-	r = debug_map_and_unlock(pdd->dev->dqm);
+	if (!pdd->dev->shared_resources.enable_mes)
+		r = debug_map_and_unlock(pdd->dev->dqm);
+	else
+		r = kfd_dbg_set_mes_debug_mode(pdd);
 	/* HWS is broken so no point in HW rollback but release the watchpoint anyways. */
 	if (r)
 		kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
@@ -513,7 +535,10 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		debug_refresh_runlist(pdd->dev->dqm);
+		if (!pdd->dev->shared_resources.enable_mes)
+			debug_refresh_runlist(pdd->dev->dqm);
+		else
+			kfd_dbg_set_mes_debug_mode(pdd);
 
 		if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
 			if (release_debug_trap_vmid(pdd->dev->dqm, &pdd->qpd))
@@ -632,7 +657,10 @@ static int kfd_dbg_trap_activate(struct kfd_process *target)
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		if (!pdd->dev->shared_resources.enable_mes)
+			r = debug_refresh_runlist(pdd->dev->dqm);
+		else
+			r = kfd_dbg_set_mes_debug_mode(pdd);
 
 		if (r) {
 			target->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED_ERROR;
@@ -753,11 +781,13 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 				pdd->spi_dbg_override);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
+		if (!pdd->dev->shared_resources.enable_mes)
 			r = debug_refresh_runlist(pdd->dev->dqm);
-			if (r)
-				break;
-		}
+		else
+			r = kfd_dbg_set_mes_debug_mode(pdd);
+		if (r)
+			break;
+
 	}
 
 	return r;
@@ -778,7 +808,10 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		r = debug_refresh_runlist(pdd->dev->dqm);
+		if (!pdd->dev->shared_resources.enable_mes)
+			r = debug_refresh_runlist(pdd->dev->dqm);
+		else
+			r = kfd_dbg_set_mes_debug_mode(pdd);
 		if (r)
 			break;
 	}
@@ -802,7 +835,13 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 
 	target->precise_mem_ops = !!enable;
 	for (i = 0; i < target->n_pdds; i++) {
-		int r = debug_refresh_runlist(target->pdds[i]->dev->dqm);
+		struct kfd_process_device *pdd = target->pdds[i];
+		int r;
+
+		if (!pdd->dev->shared_resources.enable_mes)
+			r = debug_refresh_runlist(pdd->dev->dqm);
+		else
+			r = kfd_dbg_set_mes_debug_mode(pdd);
 
 		if (r) {
 			target->precise_mem_ops = false;
@@ -1163,6 +1202,10 @@ bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev)
 
 	if (!KFD_IS_SOC15(dev))
 		return false;
+
+	if (KFD_GC_VERSION(dev) >= IP_VERSION(11, 0, 0) &&
+			KFD_GC_VERSION(dev) < IP_VERSION(12, 0, 0))
+		return (dev->adev->mes.sched_version & AMDGPU_MES_VERSION_MASK) >= 9;
 
 	/*
 	 * Note: Any unlisted devices here are assumed to support exception handling.
