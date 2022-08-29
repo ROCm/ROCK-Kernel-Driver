@@ -163,6 +163,11 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
 
+	/* Set cp_hqd_hq_status0.c_queue_debug_en to 1 to have the CP set up the
+	 * DISPATCH_PTR.  This is required for the kfd debugger
+	 */
+	m->cp_hqd_hq_status0 = 1 << 14;
+
 	if (q->format == KFD_QUEUE_FORMAT_AQL) {
 		m->cp_hqd_aql_control =
 			1 << CP_HQD_AQL_CONTROL__CONTROL0__SHIFT;
@@ -278,7 +283,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  u32 *save_area_used_size)
 {
 	struct v11_compute_mqd *m;
-	/*struct mqd_user_context_save_area_header header;*/
+	struct mqd_user_context_save_area_header header;
 
 	m = get_mqd(mqd);
 
@@ -296,7 +301,6 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	 * it's part of the context save area that is already
 	 * accessible to user mode
 	 */
-/*
 	header.control_stack_size = *ctl_stack_used_size;
 	header.wave_state_size = *save_area_used_size;
 
@@ -305,7 +309,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 
 	if (copy_to_user(ctl_stack, &header, sizeof(header)))
 		return -EFAULT;
-*/
+
 	return 0;
 }
 

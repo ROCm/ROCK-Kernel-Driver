@@ -245,6 +245,7 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	queue_input.trap_en = KFD_GC_VERSION(q->device) < IP_VERSION(11, 0, 0) ||
 			      KFD_GC_VERSION(q->device) >= IP_VERSION(12, 0, 0) ||
 			      q->properties.is_dbg_wa;
+	queue_input.skip_process_ctx_clear = qpd->pqm->process->debug_trap_enabled;
 
 	queue_type = convert_to_mes_queue_type(q->properties.type);
 	if (queue_type < 0) {
@@ -262,12 +263,13 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	amdgpu_mes_lock(&adev->mes);
 	r = adev->mes.funcs->add_hw_queue(&adev->mes, &queue_input);
 	amdgpu_mes_unlock(&adev->mes);
+
 	if (r) {
 		pr_err("failed to add hardware queue to MES, doorbell=0x%x\n",
 			q->properties.doorbell_off);
 		pr_err("MES might be in unrecoverable state, issue a GPU reset\n");
 		kfd_hws_hang(dqm);
-}
+	}
 
 	return r;
 }
@@ -963,6 +965,7 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 				      struct kfd_process_device *pdd,
 				      struct queue *q)
 {
+	int r = 0;
 	bool is_new;
 
 	if (q->properties.is_suspended)
@@ -983,11 +986,17 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 
 	q->properties.is_suspended = true;
 	if (q->properties.is_active) {
+		if (dqm->dev->shared_resources.enable_mes) {
+			r = remove_queue_mes(dqm, q, &pdd->qpd);
+			if (r)
+				return r;
+		}
+
 		decrement_queue_count(dqm, &pdd->qpd, q);
 		q->properties.is_active = false;
 	}
 
-	return 0;
+	return r;
 }
 
 /* resume_single_queue does not lock the dqm like the functions
@@ -998,15 +1007,16 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
  * called on multipe queues in a loop, so rather than locking/unlocking
  * multiple times, we will just keep the dqm locked for all of the calls.
  */
-static void resume_single_queue(struct device_queue_manager *dqm,
+static int resume_single_queue(struct device_queue_manager *dqm,
 				      struct qcm_process_device *qpd,
 				      struct queue *q)
 {
 	struct kfd_process_device *pdd;
 	uint64_t pd_base;
+	int r = 0;
 
 	if (!q->properties.is_suspended)
-		return;
+		return r;
 
 	pdd = qpd_to_pdd(qpd);
 	/* Retrieve PD base */
@@ -1019,9 +1029,17 @@ static void resume_single_queue(struct device_queue_manager *dqm,
 	q->properties.is_suspended = false;
 
 	if (QUEUE_IS_ACTIVE(q->properties)) {
+		if (dqm->dev->shared_resources.enable_mes) {
+			r = add_queue_mes(dqm, q, &pdd->qpd);
+			if (r)
+				return r;
+		}
+
 		q->properties.is_active = true;
 		increment_queue_count(dqm, qpd, q);
 	}
+
+	return r;
 }
 
 static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
@@ -2823,11 +2841,26 @@ int resume_queues(struct kfd_process *p,
 						queue_ids);
 
 			if (resume_all_queues || q_idx != QUEUE_NOT_FOUND) {
-				resume_single_queue(dqm, &pdd->qpd, q);
-				if (queue_ids)
-					queue_ids[q_idx] &=
-						~KFD_DBG_QUEUE_INVALID_MASK;
-				per_device_resumed++;
+				int err = resume_single_queue(dqm, &pdd->qpd, q);
+
+				if (queue_ids) {
+					if (!err) {
+						queue_ids[q_idx] &=
+							~KFD_DBG_QUEUE_INVALID_MASK;
+					} else {
+						queue_ids[q_idx] |=
+							KFD_DBG_QUEUE_ERROR_MASK;
+						break;
+					}
+				}
+
+				if (dqm->dev->shared_resources.enable_mes) {
+					wake_up_all(&dqm->destroy_wait);
+					if (!err)
+						total_resumed++;
+				} else {
+					per_device_resumed++;
+				}
 			}
 		}
 
@@ -2894,17 +2927,32 @@ int suspend_queues(struct kfd_process *p,
 							num_queues,
 							queue_ids);
 
-			if (q_idx != QUEUE_NOT_FOUND &&
-					!suspend_single_queue(dqm, pdd, q)) {
-				queue_ids[q_idx] &=
-					~KFD_DBG_QUEUE_INVALID_MASK;
-				per_device_suspended++;
+			if (q_idx != QUEUE_NOT_FOUND) {
+				int err = suspend_single_queue(dqm, pdd, q);
+
+				if (!err) {
+					queue_ids[q_idx] &= ~KFD_DBG_QUEUE_INVALID_MASK;
+					if (exception_clear_mask &&
+							dqm->dev->shared_resources.enable_mes)
+						q->properties.exception_status &=
+							~exception_clear_mask;
+					if (dqm->dev->shared_resources.enable_mes)
+						total_suspended++;
+					else
+						per_device_suspended++;
+				} else if (err != -EBUSY) {
+					r = err;
+					queue_ids[q_idx] |= KFD_DBG_QUEUE_ERROR_MASK;
+					break;
+				}
 			}
 		}
 
 		if (!per_device_suspended) {
 			dqm_unlock(dqm);
 			mutex_unlock(&p->event_mutex);
+			if (total_suspended)
+				amdgpu_amdkfd_debug_mem_fence(dqm->dev->adev);
 			continue;
 		}
 
