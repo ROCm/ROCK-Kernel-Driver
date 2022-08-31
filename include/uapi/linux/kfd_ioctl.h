@@ -1076,6 +1076,23 @@ struct kfd_ioctl_ipc_import_handle_args {
 	__u32 flags;		/* from KFD */
 };
 
+struct kfd_ioctl_cross_memory_copy_deprecated_args {
+	/* to KFD: Process ID of the remote process */
+	__u32 pid;
+	/* to KFD: See above definition */
+	__u32 flags;
+	/* to KFD: Source GPU VM range */
+	__u64 src_mem_range_array;
+	/* to KFD: Size of above array */
+	__u64 src_mem_array_size;
+	/* to KFD: Destination GPU VM range */
+	__u64 dst_mem_range_array;
+	/* to KFD: Size of above array */
+	__u64 dst_mem_array_size;
+	/* from KFD: Total amount of bytes copied */
+	__u64 bytes_copied;
+};
+
 /* Guarantee host access to memory */
 #define KFD_IOCTL_SVM_FLAG_HOST_ACCESS 0x00000001
 /* Fine grained coherency between all devices with access */
@@ -1364,9 +1381,11 @@ struct kfd_ioctl_set_xnack_mode_args {
 #define AMDKFD_IOC_DBG_TRAP			\
 		AMDKFD_IOWR(0x82, struct kfd_ioctl_dbg_trap_args)
 
+#define AMDKFD_IOC_CROSS_MEMORY_COPY_DEPRECATED	\
+		AMDKFD_IOWR(0x83, struct kfd_ioctl_cross_memory_copy_deprecated_args)
+
 #define AMDKFD_IOC_RLC_SPM		\
 		AMDKFD_IOWR(0x84, struct kfd_ioctl_spm_args)
-
 
 #define AMDKFD_COMMAND_START_2		0x80
 #define AMDKFD_COMMAND_END_2		0x85

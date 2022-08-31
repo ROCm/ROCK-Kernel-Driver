@@ -336,6 +336,12 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 		goto err_bind_process;
 	}
 
+	if (!pdd->doorbell_index &&
+	    kfd_alloc_process_doorbells(dev, &pdd->doorbell_index) < 0) {
+		err = -ENOMEM;
+		goto err_alloc_doorbells;
+	}
+
 	/* Starting with GFX11, wptr BOs must be mapped to GART for MES to determine work
 	 * on unmapped queues for usermode queue oversubscription (no aggregated doorbell)
 	 */
@@ -414,6 +420,7 @@ err_create_queue:
 	if (wptr_bo)
 		amdgpu_amdkfd_free_gtt_mem(dev->adev, wptr_bo);
 err_wptr_map_gart:
+err_alloc_doorbells:
 err_bind_process:
 err_pdd:
 	mutex_unlock(&p->mutex);
@@ -1136,6 +1143,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 			goto err_unlock;
 		}
 		offset = kfd_get_process_doorbells(pdd);
+		if (!offset) {
+			err = -ENOMEM;
+			goto err_unlock;
+		}
 	} else if (flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
 		if (args->size != PAGE_SIZE) {
 			err = -EINVAL;
@@ -1940,6 +1951,13 @@ out:
 	return r;
 }
 
+/* Place holder for deprecated CMA API */
+static int kfd_ioctl_cross_memory_copy_deprecated(struct file *filep,
+				struct kfd_process *local_p, void *data) {
+	dev_dbg(kfd_device, "AMDKFD_IOC_CROSS_MEMORY_COPY is deprecated.\n");
+	return -EINVAL;
+}
+
 /* Handle requests for watching SMI events */
 static int kfd_ioctl_smi_events(struct file *filep,
 				struct kfd_process *p, void *data)
@@ -2662,6 +2680,8 @@ static int criu_restore_memory_of_gpu(struct kfd_process_device *pdd,
 			return -EINVAL;
 
 		offset = kfd_get_process_doorbells(pdd);
+		if (!offset)
+			return -ENOMEM;
 	} else if (bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP) {
 		/* MMIO BOs need remapped bus address */
 		if (bo_bucket->size != PAGE_SIZE) {
@@ -3237,9 +3257,11 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP,
 			kfd_ioctl_dbg_set_debug_trap, 0),
 
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CROSS_MEMORY_COPY_DEPRECATED,
+			kfd_ioctl_cross_memory_copy_deprecated, 0),
+
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
 			kfd_ioctl_rlc_spm, 0),
-
 };
 
 static long kfd_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
