@@ -1097,6 +1097,7 @@ bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev)
 		break;
 	case IP_VERSION(10, 1, 3): /* Cyan Skillfish */
 	case IP_VERSION(10, 3, 3): /* Yellow Carp*/
+	case IP_VERSION(10, 3, 6): /* gfx1036*/
 		firmware_supported = false;
 		break;
 	default:
