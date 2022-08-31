@@ -1583,12 +1583,15 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 	 * will be automatically set at a later time when the video is enabled
 	 * (DP_VID_STREAM_EN = 1).
 	 */
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 			dc_is_virtual_signal(pipe_ctx->stream->signal))
 			dp_set_dsc_enable(pipe_ctx, true);
 
 	}
+#endif
 
 	if (!stream->dpms_off) {
 		if (dc->hwss.update_phy_state)
