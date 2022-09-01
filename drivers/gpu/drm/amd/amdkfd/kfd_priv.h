@@ -512,6 +512,8 @@ struct queue_properties {
 	bool is_being_destroyed;
 	bool is_active;
 	bool is_gws;
+	bool is_dbg_wa;
+	bool is_user_cu_masked;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
@@ -537,7 +539,8 @@ struct queue_properties {
 			    !(q).is_suspended)
 
 enum mqd_update_flag {
-	UPDATE_FLAG_CU_MASK = 0,
+	UPDATE_FLAG_DBG_WA_ENABLE = 1,
+	UPDATE_FLAG_DBG_WA_DISABLE = 2,
 };
 
 struct mqd_update_info {
