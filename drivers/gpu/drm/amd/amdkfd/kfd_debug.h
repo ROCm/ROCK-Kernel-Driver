@@ -35,7 +35,8 @@ int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
 
 static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
 {
-	return KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2);
+	return KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2) ||
+	       KFD_GC_VERSION(dev) >= IP_VERSION(11, 0, 0);
 }
 
 void debug_event_write_work_handler(struct work_struct *work);

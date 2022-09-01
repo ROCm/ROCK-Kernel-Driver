@@ -37,6 +37,70 @@ void debug_event_write_work_handler(struct work_struct *work)
 	kernel_write(process->dbg_ev_file, &write_data, 1, &pos);
 }
 
+static int kfd_dbg_set_queue_workaround(struct queue *q, bool enable)
+{
+	struct mqd_update_info minfo = {0};
+	int err;
+
+	if (!q || (!q->properties.is_dbg_wa && !enable))
+		return 0;
+
+	if (KFD_GC_VERSION(q->device) < IP_VERSION(11, 0, 0) ||
+			KFD_GC_VERSION(q->device) >= IP_VERSION(12, 0, 0))
+		return 0;
+
+	if (enable && q->properties.is_user_cu_masked)
+		return -EBUSY;
+
+	minfo.update_flag = enable ? UPDATE_FLAG_DBG_WA_ENABLE : UPDATE_FLAG_DBG_WA_DISABLE;
+
+	q->properties.is_dbg_wa = enable;
+	err = q->device->dqm->ops.update_queue(q->device->dqm, q, &minfo);
+	if (err)
+		q->properties.is_dbg_wa = false;
+
+	return err;
+}
+
+static int kfd_dbg_set_workaround(struct kfd_process *target, bool enable)
+{
+	struct process_queue_manager *pqm = &target->pqm;
+	struct process_queue_node *pqn;
+	int r = 0;
+
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
+		r = kfd_dbg_set_queue_workaround(pqn->q, enable);
+		if (enable && r)
+			goto unwind;
+	}
+
+	return 0;
+
+unwind:
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list)
+		kfd_dbg_set_queue_workaround(pqn->q, false);
+
+	if (enable) {
+		target->runtime_info.runtime_state = r == -EBUSY ?
+				DEBUG_RUNTIME_STATE_ENABLED_BUSY :
+				DEBUG_RUNTIME_STATE_ENABLED_ERROR;
+	}
+
+	return r;
+}
+
+static int kfd_dbg_set_mes_debug_mode(struct kfd_process_device *pdd)
+{
+	uint32_t spi_dbg_cntl = pdd->spi_dbg_override | pdd->spi_dbg_launch_mode;
+	uint32_t flags = pdd->process->dbg_flags;
+
+	if (!kfd_dbg_is_per_vmid_supported(pdd->dev))
+		return 0;
+
+	return amdgpu_mes_set_shader_debugger(pdd->dev->adev, pdd->proc_ctx_gpu_addr, spi_dbg_cntl,
+						pdd->watch_points, flags);
+}
+
 int kfd_dbg_trap_disable(struct kfd_process *target)
 {
 	if (!target->debug_trap_enabled)
