@@ -242,6 +242,9 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	queue_input.paging = false;
 	queue_input.tba_addr = qpd->tba_addr;
 	queue_input.tma_addr = qpd->tma_addr;
+	queue_input.trap_en = KFD_GC_VERSION(q->device) < IP_VERSION(11, 0, 0) ||
+			      KFD_GC_VERSION(q->device) >= IP_VERSION(12, 0, 0) ||
+			      q->properties.is_dbg_wa;
 
 	queue_type = convert_to_mes_queue_type(q->properties.type);
 	if (queue_type < 0) {
@@ -1787,6 +1790,9 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	 */
 	q->properties.is_evicted = !!qpd->evicted;
 	q->properties.is_suspended = false;
+	q->properties.is_dbg_wa = qpd->pqm->process->debug_trap_enabled &&
+			KFD_GC_VERSION(q->device) >= IP_VERSION(11, 0, 0) &&
+			KFD_GC_VERSION(q->device) < IP_VERSION(12, 0, 0);
 
 	if (qd)
 		mqd_mgr->restore_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj, &q->gart_mqd_addr,
