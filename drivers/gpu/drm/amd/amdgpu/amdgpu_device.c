@@ -5603,7 +5603,8 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 		adev->gmc.aper_base + adev->gmc.aper_size - 1;
 
 #ifdef CONFIG_PCI_P2PDMA
-	p2p_access = !(pci_p2pdma_distance_many(adev->pdev,
+	p2p_access = !adev->gmc.xgmi.connected_to_cpu &&
+			  !(pci_p2pdma_distance_many(adev->pdev,
 					&peer_adev->dev, 1, true) < 0);
 #endif
 	return pcie_p2p && p2p_access && (adev->gmc.visible_vram_size &&

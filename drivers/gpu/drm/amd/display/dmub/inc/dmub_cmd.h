@@ -234,8 +234,7 @@ union dmub_psr_debug_flags {
 };
 
 /**
- * DMUB feature capabilities.
- * After DMUB init, driver will query FW capabilities prior to enabling certain features.
+ * DMUB visual confirm color
  */
 struct dmub_feature_caps {
 	/**
@@ -244,6 +243,16 @@ struct dmub_feature_caps {
 	uint8_t psr;
 	uint8_t fw_assisted_mclk_switch;
 	uint8_t reserved[6];
+};
+
+struct dmub_visual_confirm_color {
+	/**
+	 * Maximum 10 bits color value
+	 */
+	uint16_t color_r_cr;
+	uint16_t color_g_y;
+	uint16_t color_b_cb;
+	uint16_t panel_inst;
 };
 
 #if defined(__cplusplus)
@@ -644,6 +653,10 @@ enum dmub_cmd_type {
 	 * Command type used to query FW feature caps.
 	 */
 	DMUB_CMD__QUERY_FEATURE_CAPS = 6,
+	/**
+	 * Command type used to get visual confirm color.
+	 */
+	DMUB_CMD__GET_VISUAL_CONFIRM_COLOR = 8,
 	/**
 	 * Command type used for all PSR commands.
 	 */
@@ -2778,6 +2791,31 @@ struct dmub_rb_cmd_query_feature_caps {
 	struct dmub_cmd_query_feature_caps_data query_feature_caps_data;
 };
 
+/**
+ * Data passed from driver to FW in a DMUB_CMD__GET_VISUAL_CONFIRM_COLOR command.
+ */
+struct dmub_cmd_visual_confirm_color_data {
+	/**
+	 * DMUB feature capabilities.
+	 * After DMUB init, driver will query FW capabilities prior to enabling certain features.
+	 */
+struct dmub_visual_confirm_color visual_confirm_color;
+};
+
+/**
+ * Definition of a DMUB_CMD__GET_VISUAL_CONFIRM_COLOR command.
+ */
+struct dmub_rb_cmd_get_visual_confirm_color {
+ /**
+	 * Command header.
+	 */
+	struct dmub_cmd_header header;
+	/**
+	 * Data passed from driver to FW in a DMUB_CMD__GET_VISUAL_CONFIRM_COLOR command.
+	 */
+	struct dmub_cmd_visual_confirm_color_data visual_confirm_color_data;
+};
+
 struct dmub_optc_state {
 	uint32_t v_total_max;
 	uint32_t v_total_min;
@@ -3150,6 +3188,11 @@ union dmub_rb_cmd {
 	 * Definition of a DMUB_CMD__QUERY_FEATURE_CAPS command.
 	 */
 	struct dmub_rb_cmd_query_feature_caps query_feature_caps;
+
+	/**
+	 * Definition of a DMUB_CMD__GET_VISUAL_CONFIRM_COLOR command.
+	 */
+	struct dmub_rb_cmd_get_visual_confirm_color visual_confirm_color;
 	struct dmub_rb_cmd_drr_update drr_update;
 	struct dmub_rb_cmd_fw_assisted_mclk_switch fw_assisted_mclk_switch;
 

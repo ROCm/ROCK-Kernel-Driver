@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.199"
+#define DC_VER "3.2.201"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -417,6 +417,7 @@ enum visual_confirm {
 	VISUAL_CONFIRM_SWAPCHAIN = 6,
 	VISUAL_CONFIRM_FAMS = 7,
 	VISUAL_CONFIRM_SWIZZLE = 9,
+	VISUAL_CONFIRM_SUBVP = 14,
 };
 
 enum dc_psr_power_opts {
@@ -804,8 +805,6 @@ struct dc_debug_options {
 	bool validate_dml_output;
 	bool enable_dmcub_surface_flip;
 	bool usbc_combo_phy_reset_wa;
-	bool disable_dsc_edp;
-	unsigned int  force_dsc_edp_policy;
 	bool enable_dram_clock_change_one_display_vactive;
 	/* TODO - remove once tested */
 	bool legacy_dp2_lt;
@@ -829,7 +828,6 @@ struct dc_debug_options {
 	int crb_alloc_policy_min_disp_count;
 	bool disable_z10;
 	bool enable_z9_disable_interface;
-	bool enable_sw_cntl_psr;
 	union dpia_debug_options dpia_debug;
 	bool disable_fixed_vs_aux_timeout_wa;
 	bool force_disable_subvp;
@@ -848,6 +846,7 @@ struct dc_debug_options {
 	bool exit_idle_opt_for_cursor_updates;
 	bool enable_single_display_2to1_odm_policy;
 	bool enable_dp_dig_pixel_rate_div_policy;
+	enum lttpr_mode lttpr_mode_override;
 };
 
 struct gpu_info_soc_bounding_box_v1_0;
@@ -1185,6 +1184,7 @@ struct dc_plane_state {
 	/* private to dc_surface.c */
 	enum dc_irq_source irq_source;
 	struct kref refcount;
+	struct tg_color visual_confirm_color;
 };
 
 struct dc_plane_info {

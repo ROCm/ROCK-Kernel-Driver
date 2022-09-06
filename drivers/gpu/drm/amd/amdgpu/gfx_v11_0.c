@@ -73,21 +73,10 @@ MODULE_FIRMWARE("amdgpu/gc_11_0_2_pfp.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_2_me.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_2_mec.bin");
 MODULE_FIRMWARE("amdgpu/gc_11_0_2_rlc.bin");
-
-static const struct soc15_reg_golden golden_settings_gc_11_0[] =
-{
-	/* Pending on emulation bring up */
-};
-
-static const struct soc15_reg_golden golden_settings_gc_11_0_0[] =
-{
-	/* Pending on emulation bring up */
-};
-
-static const struct soc15_reg_golden golden_settings_gc_rlc_spm_11_0[] =
-{
-	/* Pending on emulation bring up */
-};
+MODULE_FIRMWARE("amdgpu/gc_11_0_3_pfp.bin");
+MODULE_FIRMWARE("amdgpu/gc_11_0_3_me.bin");
+MODULE_FIRMWARE("amdgpu/gc_11_0_3_mec.bin");
+MODULE_FIRMWARE("amdgpu/gc_11_0_3_rlc.bin");
 
 static const struct soc15_reg_golden golden_settings_gc_11_0_1[] =
 {
@@ -269,34 +258,10 @@ static void gfx_v11_0_set_kiq_pm4_funcs(struct amdgpu_device *adev)
 	adev->gfx.kiq.pmf = &gfx_v11_0_kiq_pm4_funcs;
 }
 
-static void gfx_v11_0_init_spm_golden_registers(struct amdgpu_device *adev)
-{
-	switch (adev->ip_versions[GC_HWIP][0]) {
-	case IP_VERSION(11, 0, 0):
-		soc15_program_register_sequence(adev,
-						golden_settings_gc_rlc_spm_11_0,
-						(const u32)ARRAY_SIZE(golden_settings_gc_rlc_spm_11_0));
-		break;
-	default:
-		break;
-	}
-}
-
 static void gfx_v11_0_init_golden_registers(struct amdgpu_device *adev)
 {
 	switch (adev->ip_versions[GC_HWIP][0]) {
-	case IP_VERSION(11, 0, 0):
-		soc15_program_register_sequence(adev,
-						golden_settings_gc_11_0,
-						(const u32)ARRAY_SIZE(golden_settings_gc_11_0));
-		soc15_program_register_sequence(adev,
-						golden_settings_gc_11_0_0,
-						(const u32)ARRAY_SIZE(golden_settings_gc_11_0_0));
-		break;
 	case IP_VERSION(11, 0, 1):
-		soc15_program_register_sequence(adev,
-						golden_settings_gc_11_0,
-						(const u32)ARRAY_SIZE(golden_settings_gc_11_0));
 		soc15_program_register_sequence(adev,
 						golden_settings_gc_11_0_1,
 						(const u32)ARRAY_SIZE(golden_settings_gc_11_0_1));
@@ -304,7 +269,6 @@ static void gfx_v11_0_init_golden_registers(struct amdgpu_device *adev)
 	default:
 		break;
 	}
-	gfx_v11_0_init_spm_golden_registers(adev);
 }
 
 static void gfx_v11_0_write_data_to_reg(struct amdgpu_ring *ring, int eng_sel,
@@ -1140,7 +1104,6 @@ static const struct amdgpu_gfx_funcs gfx_v11_0_gfx_funcs = {
 	.read_wave_sgprs = &gfx_v11_0_read_wave_sgprs,
 	.read_wave_vgprs = &gfx_v11_0_read_wave_vgprs,
 	.select_me_pipe_q = &gfx_v11_0_select_me_pipe_q,
-	.init_spm_golden = &gfx_v11_0_init_spm_golden_registers,
 	.update_perfmon_mgcg = &gfx_v11_0_update_perf_clk,
 };
 
@@ -1151,6 +1114,7 @@ static int gfx_v11_0_gpu_early_init(struct amdgpu_device *adev)
 	switch (adev->ip_versions[GC_HWIP][0]) {
 	case IP_VERSION(11, 0, 0):
 	case IP_VERSION(11, 0, 2):
+	case IP_VERSION(11, 0, 3):
 		adev->gfx.config.max_hw_contexts = 8;
 		adev->gfx.config.sc_prim_fifo_size_frontend = 0x20;
 		adev->gfx.config.sc_prim_fifo_size_backend = 0x100;
@@ -1586,6 +1550,7 @@ static int gfx_v11_0_sw_init(void *handle)
 	case IP_VERSION(11, 0, 0):
 	case IP_VERSION(11, 0, 1):
 	case IP_VERSION(11, 0, 2):
+	case IP_VERSION(11, 0, 3):
 		adev->gfx.me.num_me = 1;
 		adev->gfx.me.num_pipe_per_me = 1;
 		adev->gfx.me.num_queue_per_pipe = 1;
@@ -2760,6 +2725,21 @@ static void gfx_v11_0_config_gfx_rs64(struct amdgpu_device *adev)
 					mec_hdr->ucode_start_addr_hi >> 2);
 	}
 	soc21_grbm_select(adev, 0, 0, 0, 0);
+
+	/* reset mec pipe */
+	tmp = RREG32_SOC15(GC, 0, regCP_MEC_RS64_CNTL);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE0_RESET, 1);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE1_RESET, 1);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE2_RESET, 1);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE3_RESET, 1);
+	WREG32_SOC15(GC, 0, regCP_MEC_RS64_CNTL, tmp);
+
+	/* clear mec pipe reset */
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE0_RESET, 0);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE1_RESET, 0);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE2_RESET, 0);
+	tmp = REG_SET_FIELD(tmp, CP_MEC_RS64_CNTL, MEC_PIPE3_RESET, 0);
+	WREG32_SOC15(GC, 0, regCP_MEC_RS64_CNTL, tmp);
 }
 
 static int gfx_v11_0_wait_for_rlc_autoload_complete(struct amdgpu_device *adev)

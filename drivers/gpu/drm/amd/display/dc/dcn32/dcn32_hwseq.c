@@ -296,24 +296,38 @@ static uint32_t dcn32_calculate_cab_allocation(struct dc *dc, struct dc_state *c
 		}
 
 		// Include cursor size for CAB allocation
-		if (stream->cursor_position.enable && plane->address.grph.cursor_cache_addr.quad_part) {
-			cursor_size = dc->caps.max_cursor_size * dc->caps.max_cursor_size;
-			switch (stream->cursor_attributes.color_format) {
-			case CURSOR_MODE_MONO:
-				cursor_size /= 2;
-				break;
-			case CURSOR_MODE_COLOR_1BIT_AND:
-			case CURSOR_MODE_COLOR_PRE_MULTIPLIED_ALPHA:
-			case CURSOR_MODE_COLOR_UN_PRE_MULTIPLIED_ALPHA:
-				cursor_size *= 4;
-				break;
+		for (j = 0; j < dc->res_pool->pipe_count; j++) {
+			struct pipe_ctx *pipe = &ctx->res_ctx.pipe_ctx[j];
+			struct hubp *hubp = pipe->plane_res.hubp;
 
-			case CURSOR_MODE_COLOR_64BIT_FP_PRE_MULTIPLIED:
-			case CURSOR_MODE_COLOR_64BIT_FP_UN_PRE_MULTIPLIED:
-				cursor_size *= 8;
-				break;
-			}
-			cache_lines_used += dcn32_cache_lines_for_surface(dc, surface_size,
+			if (pipe->stream && pipe->plane_state && hubp)
+				/* Find the cursor plane and use the exact size instead of
+				 * using the max for calculation
+				 */
+				if (hubp->curs_attr.width > 0) {
+					cursor_size = hubp->curs_attr.width * hubp->curs_attr.height;
+					break;
+				}
+		}
+
+		switch (stream->cursor_attributes.color_format) {
+		case CURSOR_MODE_MONO:
+			cursor_size /= 2;
+			break;
+		case CURSOR_MODE_COLOR_1BIT_AND:
+		case CURSOR_MODE_COLOR_PRE_MULTIPLIED_ALPHA:
+		case CURSOR_MODE_COLOR_UN_PRE_MULTIPLIED_ALPHA:
+			cursor_size *= 4;
+			break;
+
+		case CURSOR_MODE_COLOR_64BIT_FP_PRE_MULTIPLIED:
+		case CURSOR_MODE_COLOR_64BIT_FP_UN_PRE_MULTIPLIED:
+			cursor_size *= 8;
+			break;
+		}
+
+		if (stream->cursor_position.enable && plane->address.grph.cursor_cache_addr.quad_part) {
+			cache_lines_used += dcn32_cache_lines_for_surface(dc, cursor_size,
 					plane->address.grph.cursor_cache_addr.quad_part);
 		}
 	}
@@ -325,6 +339,26 @@ static uint32_t dcn32_calculate_cab_allocation(struct dc *dc, struct dc_state *c
 
 	if (cache_lines_used % lines_per_way > 0)
 		num_ways++;
+
+	for (i = 0; i < ctx->stream_count; i++) {
+		stream = ctx->streams[i];
+		for (j = 0; j < ctx->stream_status[i].plane_count; j++) {
+			plane = ctx->stream_status[i].plane_states[j];
+
+			if (stream->cursor_position.enable && plane &&
+				!plane->address.grph.cursor_cache_addr.quad_part &&
+				cursor_size > 16384) {
+				/* Cursor caching is not supported since it won't be on the same line.
+				 * So we need an extra line to accommodate it. With large cursors and a single 4k monitor
+				 * this case triggers corruption. If we're at the edge, then dont trigger display refresh
+				 * from MALL. We only need to cache cursor if its greater that 64x64 at 4 bpp.
+				 */
+				num_ways++;
+				/* We only expect one cursor plane */
+				break;
+			}
+		}
+	}
 
 	return num_ways;
 }
@@ -642,9 +676,9 @@ bool dcn32_set_output_transfer_func(struct dc *dc,
 					stream->out_transfer_func,
 					&mpc->blender_params, false))
 				params = &mpc->blender_params;
-		 /* there are no ROM LUTs in OUTGAM */
-		if (stream->out_transfer_func->type == TF_TYPE_PREDEFINED)
-			BREAK_TO_DEBUGGER();
+			/* there are no ROM LUTs in OUTGAM */
+			if (stream->out_transfer_func->type == TF_TYPE_PREDEFINED)
+				BREAK_TO_DEBUGGER();
 		}
 	}
 
@@ -1136,7 +1170,7 @@ unsigned int dcn32_calculate_dccg_k1_k2_values(struct pipe_ctx *pipe_ctx, unsign
 			*k2_div = PIXEL_RATE_DIV_BY_2;
 		else
 			*k2_div = PIXEL_RATE_DIV_BY_4;
-	} else if (dc_is_dp_signal(pipe_ctx->stream->signal) || dc_is_virtual_signal(pipe_ctx->stream->signal)) {
+	} else if (dc_is_dp_signal(pipe_ctx->stream->signal)) {
 		if (two_pix_per_container) {
 			*k1_div = PIXEL_RATE_DIV_BY_1;
 			*k2_div = PIXEL_RATE_DIV_BY_2;
@@ -1226,11 +1260,6 @@ void dcn32_update_phy_state(struct dc_state *state, struct pipe_ctx *pipe_ctx,
 		enum phy_state target_state)
 {
 	enum phy_state current_state = pipe_ctx->stream->link->phy_state;
-
-	if (current_state == target_state) {
-		BREAK_TO_DEBUGGER();
-		return;
-	}
 
 	if (target_state == TX_OFF_SYMCLK_OFF) {
 		core_link_disable_stream(pipe_ctx);

@@ -1101,7 +1101,8 @@ static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 				dc->current_state->stream_count != context->stream_count)
 			should_disable = true;
 
-		if (old_stream && !dc->current_state->res_ctx.pipe_ctx[i].top_pipe) {
+		if (old_stream && !dc->current_state->res_ctx.pipe_ctx[i].top_pipe &&
+				!dc->current_state->res_ctx.pipe_ctx[i].prev_odm_pipe) {
 			struct pipe_ctx *old_pipe, *new_pipe;
 
 			old_pipe = &dc->current_state->res_ctx.pipe_ctx[i];
@@ -3126,11 +3127,9 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 static bool dc_dmub_should_send_dirty_rect_cmd(struct dc *dc, struct dc_stream_state *stream)
 {
-	if (stream->link->psr_settings.psr_version == DC_PSR_VERSION_SU_1)
-		return true;
-
-	if (stream->link->psr_settings.psr_version == DC_PSR_VERSION_1 &&
-	    dc->debug.enable_sw_cntl_psr)
+	if ((stream->link->psr_settings.psr_version == DC_PSR_VERSION_SU_1
+			|| stream->link->psr_settings.psr_version == DC_PSR_VERSION_1)
+			&& stream->ctx->dce_version >= DCN_VERSION_3_1)
 		return true;
 
 	return false;

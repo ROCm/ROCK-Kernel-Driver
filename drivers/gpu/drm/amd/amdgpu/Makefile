@@ -93,7 +93,7 @@ amdgpu-y += \
 	gfxhub_v1_0.o mmhub_v1_0.o gmc_v9_0.o gfxhub_v1_1.o mmhub_v9_4.o \
 	gfxhub_v2_0.o mmhub_v2_0.o gmc_v10_0.o gfxhub_v2_1.o mmhub_v2_3.o \
 	mmhub_v1_7.o gfxhub_v3_0.o mmhub_v3_0.o mmhub_v3_0_2.o gmc_v11_0.o \
-	mmhub_v3_0_1.o
+	mmhub_v3_0_1.o gfxhub_v3_0_3.o
 
 # add UMC block
 amdgpu-y += \
@@ -138,7 +138,8 @@ amdgpu-y += \
 	gfx_v9_4_2.o \
 	gfx_v10_0.o \
 	imu_v11_0.o \
-	gfx_v11_0.o
+	gfx_v11_0.o \
+	imu_v11_0_3.o
 
 # add async DMA block
 amdgpu-y += \
