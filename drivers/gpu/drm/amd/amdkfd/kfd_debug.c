@@ -865,7 +865,7 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		goto out;
 	}
 
-	*entry_size = min((size_t)entry_size, sizeof(device_info));
+	*entry_size = min_t(size_t, *entry_size, sizeof(device_info));
 
 	mutex_lock(&target->event_mutex);
 
