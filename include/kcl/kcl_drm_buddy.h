@@ -131,31 +131,40 @@ drm_buddy_block_size(struct drm_buddy *mm,
 	return mm->chunk_size << drm_buddy_block_order(block);
 }
 
-int drm_buddy_init(struct drm_buddy *mm, u64 size, u64 chunk_size);
+int kcl_drm_buddy_init(struct drm_buddy *mm, u64 size, u64 chunk_size);
 
-void drm_buddy_fini(struct drm_buddy *mm);
+void kcl_drm_buddy_fini(struct drm_buddy *mm);
 
 struct drm_buddy_block *
-drm_get_buddy(struct drm_buddy_block *block);
+kcl_drm_get_buddy(struct drm_buddy_block *block);
 
-int drm_buddy_alloc_blocks(struct drm_buddy *mm,
+int kcl_drm_buddy_alloc_blocks(struct drm_buddy *mm,
 			   u64 start, u64 end, u64 size,
 			   u64 min_page_size,
 			   struct list_head *blocks,
 			   unsigned long flags);
 
-int drm_buddy_block_trim(struct drm_buddy *mm,
+int kcl_drm_buddy_block_trim(struct drm_buddy *mm,
 			 u64 new_size,
 			 struct list_head *blocks);
 
-void drm_buddy_free_block(struct drm_buddy *mm, struct drm_buddy_block *block);
+void kcl_drm_buddy_free_block(struct drm_buddy *mm, struct drm_buddy_block *block);
 
-void drm_buddy_free_list(struct drm_buddy *mm, struct list_head *objects);
+void kcl_drm_buddy_free_list(struct drm_buddy *mm, struct list_head *objects);
 
-void drm_buddy_print(struct drm_buddy *mm, struct drm_printer *p);
-void drm_buddy_block_print(struct drm_buddy *mm,
+void kcl_drm_buddy_print(struct drm_buddy *mm, struct drm_printer *p);
+void kcl_drm_buddy_block_print(struct drm_buddy *mm,
 			   struct drm_buddy_block *block,
 			   struct drm_printer *p);
 
+#define drm_buddy_print kcl_drm_buddy_print
+#define drm_buddy_block_print kcl_drm_buddy_block_print
+#define drm_buddy_alloc_blocks kcl_drm_buddy_alloc_blocks
+#define drm_buddy_block_trim kcl_drm_buddy_block_trim
+#define drm_buddy_free_list kcl_drm_buddy_free_list
+#define drm_buddy_free_block kcl_drm_buddy_free_block
+#define drm_get_buddy kcl_drm_get_buddy
+#define drm_buddy_fini kcl_drm_buddy_fini
+#define drm_buddy_init kcl_drm_buddy_init
 #endif /* HAVE_DRM_DRM_BUDDY_H */
 #endif /* __KCL_KCL_DRM_BUDDY_H__ */
