@@ -75,7 +75,7 @@ static void mark_split(struct drm_buddy_block *block)
  * Returns:
  * 0 on success, error code on failure.
  */
-int drm_buddy_init(struct drm_buddy *mm, u64 size, u64 chunk_size)
+int kcl_drm_buddy_init(struct drm_buddy *mm, u64 size, u64 chunk_size)
 {
 	unsigned int i;
 	u64 offset;
@@ -156,7 +156,7 @@ out_free_list:
 	kfree(mm->free_list);
 	return -ENOMEM;
 }
-EXPORT_SYMBOL(drm_buddy_init);
+EXPORT_SYMBOL(kcl_drm_buddy_init);
 
 /**
  * drm_buddy_fini - tear down the memory manager
@@ -165,7 +165,7 @@ EXPORT_SYMBOL(drm_buddy_init);
  *
  * Cleanup memory manager resources and the freelist
  */
-void drm_buddy_fini(struct drm_buddy *mm)
+void kcl_drm_buddy_fini(struct drm_buddy *mm)
 {
 	int i;
 
@@ -179,7 +179,7 @@ void drm_buddy_fini(struct drm_buddy *mm)
 	kfree(mm->roots);
 	kfree(mm->free_list);
 }
-EXPORT_SYMBOL(drm_buddy_fini);
+EXPORT_SYMBOL(kcl_drm_buddy_fini);
 
 static int split_block(struct drm_buddy *mm,
 		       struct drm_buddy_block *block)
@@ -235,11 +235,11 @@ __get_buddy(struct drm_buddy_block *block)
  * any concurrent allocate and free operations.
  */
 struct drm_buddy_block *
-drm_get_buddy(struct drm_buddy_block *block)
+kcl_drm_get_buddy(struct drm_buddy_block *block)
 {
 	return __get_buddy(block);
 }
-EXPORT_SYMBOL(drm_get_buddy);
+EXPORT_SYMBOL(kcl_drm_get_buddy);
 
 static void __drm_buddy_free(struct drm_buddy *mm,
 			     struct drm_buddy_block *block)
@@ -271,14 +271,14 @@ static void __drm_buddy_free(struct drm_buddy *mm,
  * @mm: DRM buddy manager
  * @block: block to be freed
  */
-void drm_buddy_free_block(struct drm_buddy *mm,
+void kcl_drm_buddy_free_block(struct drm_buddy *mm,
 			  struct drm_buddy_block *block)
 {
 	BUG_ON(!drm_buddy_block_is_allocated(block));
 	mm->avail += drm_buddy_block_size(mm, block);
 	__drm_buddy_free(mm, block);
 }
-EXPORT_SYMBOL(drm_buddy_free_block);
+EXPORT_SYMBOL(kcl_drm_buddy_free_block);
 
 /**
  * drm_buddy_free_list - free blocks
@@ -286,7 +286,7 @@ EXPORT_SYMBOL(drm_buddy_free_block);
  * @mm: DRM buddy manager
  * @objects: input list head to free blocks
  */
-void drm_buddy_free_list(struct drm_buddy *mm, struct list_head *objects)
+void kcl_drm_buddy_free_list(struct drm_buddy *mm, struct list_head *objects)
 {
 	struct drm_buddy_block *block, *on;
 
@@ -296,7 +296,7 @@ void drm_buddy_free_list(struct drm_buddy *mm, struct list_head *objects)
 	}
 	INIT_LIST_HEAD(objects);
 }
-EXPORT_SYMBOL(drm_buddy_free_list);
+EXPORT_SYMBOL(kcl_drm_buddy_free_list);
 
 static inline bool overlaps(u64 s1, u64 e1, u64 s2, u64 e2)
 {
@@ -559,7 +559,7 @@ static int __drm_buddy_alloc_range(struct drm_buddy *mm,
  * Returns:
  * 0 on success, error code on failure.
  */
-int drm_buddy_block_trim(struct drm_buddy *mm,
+int kcl_drm_buddy_block_trim(struct drm_buddy *mm,
 			 u64 new_size,
 			 struct list_head *blocks)
 {
@@ -608,7 +608,7 @@ int drm_buddy_block_trim(struct drm_buddy *mm,
 	block->parent = parent;
 	return err;
 }
-EXPORT_SYMBOL(drm_buddy_block_trim);
+EXPORT_SYMBOL(kcl_drm_buddy_block_trim);
 
 /**
  * drm_buddy_alloc_blocks - allocate power-of-two blocks
@@ -630,7 +630,7 @@ EXPORT_SYMBOL(drm_buddy_block_trim);
  * Returns:
  * 0 on success, error code on failure.
  */
-int drm_buddy_alloc_blocks(struct drm_buddy *mm,
+int kcl_drm_buddy_alloc_blocks(struct drm_buddy *mm,
 			   u64 start, u64 end, u64 size,
 			   u64 min_page_size,
 			   struct list_head *blocks,
@@ -711,7 +711,7 @@ err_free:
 	drm_buddy_free_list(mm, &allocated);
 	return err;
 }
-EXPORT_SYMBOL(drm_buddy_alloc_blocks);
+EXPORT_SYMBOL(kcl_drm_buddy_alloc_blocks);
 
 /**
  * drm_buddy_block_print - print block information
@@ -720,7 +720,7 @@ EXPORT_SYMBOL(drm_buddy_alloc_blocks);
  * @block: DRM buddy block
  * @p: DRM printer to use
  */
-void drm_buddy_block_print(struct drm_buddy *mm,
+void kcl_drm_buddy_block_print(struct drm_buddy *mm,
 			   struct drm_buddy_block *block,
 			   struct drm_printer *p)
 {
@@ -729,7 +729,7 @@ void drm_buddy_block_print(struct drm_buddy *mm,
 
 	drm_printf(p, "%#018llx-%#018llx: %llu\n", start, start + size, size);
 }
-EXPORT_SYMBOL(drm_buddy_block_print);
+EXPORT_SYMBOL(kcl_drm_buddy_block_print);
 
 /**
  * drm_buddy_print - print allocator state
@@ -737,7 +737,7 @@ EXPORT_SYMBOL(drm_buddy_block_print);
  * @mm: DRM buddy manager
  * @p: DRM printer to use
  */
-void drm_buddy_print(struct drm_buddy *mm, struct drm_printer *p)
+void kcl_drm_buddy_print(struct drm_buddy *mm, struct drm_printer *p)
 {
 	int order;
 
@@ -764,7 +764,7 @@ void drm_buddy_print(struct drm_buddy *mm, struct drm_printer *p)
 		drm_printf(p, ", pages: %llu\n", count);
 	}
 }
-EXPORT_SYMBOL(drm_buddy_print);
+EXPORT_SYMBOL(kcl_drm_buddy_print);
 
 void amdkcl_drm_buddy_module_exit(void)
 {
