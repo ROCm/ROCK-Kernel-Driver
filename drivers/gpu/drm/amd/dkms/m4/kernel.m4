@@ -675,22 +675,6 @@ AC_DEFUN([AC_KERNEL_CHECK_HEADERS], [
 ])
 
 dnl #
-dnl # AC_KERNEL_FREE_MEM
-dnl # return true if available memory >20%
-dnl #
-AC_DEFUN([AC_KERNEL_FREE_MEM], [
-	free_mem=$(free -t | awk '/^Mem:/ { BUF_MEM=$[6]} /^Total:/ { TOTAL_MEM=$[2];FREE_MEM=$[4] } END {
-		printf("%d\n", (BUF_MEM + FREE_MEM) / TOTAL_MEM * 100)
-	}')
-
-	AS_IF([[[ $free_mem -gt 20 ]]], [
-		$1
-	], [
-		$2
-	])
-])
-
-dnl #
 dnl # AC_KERNEL_DO_BACKGROUND
 dnl # $1: contents to be executed
 dnl #
@@ -699,14 +683,16 @@ AC_DEFUN([AC_KERNEL_DO_BACKGROUND], [
 		AC_KERNEL_TMP_BUILD_DIR([$1])
 	}
 
-	while :
+	AC_CHECK_PROG(NPROC, nproc, yes)
+	AS_IF([test x"$NPROC" != x"yes"], [
+		ncpu=1
+	], [
+		ncpu=$(nproc)
+	])
+
+	while [[ $(jobs | wc -l) -gt $ncpu ]]
 	do
-		AC_KERNEL_FREE_MEM([rc=0], [rc=1])
-		if test $rc -ne 0; then :
-			sleep 1
-		else :
-			break
-		fi
+		sleep 0.1
 	done
 
 	do_background &
