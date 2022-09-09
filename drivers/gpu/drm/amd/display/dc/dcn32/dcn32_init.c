@@ -109,6 +109,7 @@ static const struct hw_sequencer_funcs dcn32_funcs = {
 	.subvp_pipe_control_lock = dcn32_subvp_pipe_control_lock,
 	.update_visual_confirm_color = dcn20_update_visual_confirm_color,
 	.update_phantom_vp_position = dcn32_update_phantom_vp_position,
+	.update_dsc_pg = dcn32_update_dsc_pg,
 };
 
 static const struct hwseq_private_funcs dcn32_private_funcs = {
@@ -140,6 +141,7 @@ static const struct hwseq_private_funcs dcn32_private_funcs = {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.dsc_pg_control = dcn32_dsc_pg_control,
 #endif
+	.dsc_pg_status = dcn32_dsc_pg_status,
 	.set_hdr_multiplier = dcn10_set_hdr_multiplier,
 	.verify_allow_pstate_change_high = dcn10_verify_allow_pstate_change_high,
 	.wait_for_blank_complete = dcn20_wait_for_blank_complete,
