@@ -709,13 +709,8 @@ svm_migrate_vma_to_ram(struct amdgpu_device *adev, struct svm_range *prange,
 	migrate.start = start;
 	migrate.end = end;
 #ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
+	migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
-	if (adev->gmc.xgmi.connected_to_cpu)
-		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PUBLIC;
-	else
-#endif
-		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
 #elif defined(HAVE_DEV_PAGEMAP_OWNER)
 	migrate.src_owner = SVM_ADEV_PGMAP_OWNER(adev);
 #endif
@@ -1006,7 +1001,7 @@ int svm_migrate_init(struct amdgpu_device *adev)
 {
 	struct kfd_dev *kfddev = adev->kfd.dev;
 	struct dev_pagemap *pgmap;
-	struct resource *res = NULL;
+	struct resource *res;
 	unsigned long size;
 	void *r;
 
@@ -1021,39 +1016,26 @@ int svm_migrate_init(struct amdgpu_device *adev)
 	 * should remove reserved size
 	 */
 	size = ALIGN(adev->gmc.real_vram_size, 2ULL << 20);
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
-	if (adev->gmc.xgmi.connected_to_cpu) {
-#ifdef HAVE_DEV_PAGEMAP_RANGE
-		pgmap->nr_range = 1;
-		pgmap->range.start = adev->gmc.aper_base;
-		pgmap->range.end = adev->gmc.aper_base + adev->gmc.aper_size - 1;
-#else
-		pgmap->res.start = adev->gmc.aper_base;
-		pgmap->res.end = adev->gmc.aper_base + adev->gmc.aper_size - 1;
-#endif
-		pgmap->type = MEMORY_DEVICE_PUBLIC;
-	} else
-#endif
-	{
-		res = devm_request_free_mem_region(adev->dev, &iomem_resource, size);
-		if (IS_ERR(res))
-			return -ENOMEM;
-#ifdef HAVE_DEV_PAGEMAP_RANGE
-		pgmap->nr_range = 1;
-		pgmap->range.start = res->start;
-		pgmap->range.end = res->end;
-#else
-		pgmap->res.start = res->start;
-		pgmap->res.end = res->end;
-#endif
-		pgmap->type = MEMORY_DEVICE_PRIVATE;
-	}
+	res = devm_request_free_mem_region(adev->dev, &iomem_resource, size);
+	if (IS_ERR(res))
+		return -ENOMEM;
 
+	pgmap->type = MEMORY_DEVICE_PRIVATE;
+#ifdef HAVE_DEV_PAGEMAP_RANGE
+	pgmap->nr_range = 1;
+	pgmap->range.start = res->start;
+	pgmap->range.end = res->end;
+#else
+	pgmap->res.start = res->start;
+	pgmap->res.end = res->end;
+#endif
 	pgmap->ops = &svm_migrate_pgmap_ops;
 #ifdef HAVE_DEV_PAGEMAP_OWNER
 	pgmap->owner = SVM_ADEV_PGMAP_OWNER(adev);
 #endif
-	pgmap->flags = 0;
+#ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
+	pgmap->flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
+#endif
 
 	/* Device manager releases device-specific resources, memory region and
 	 * pgmap when driver disconnects from device.
@@ -1061,9 +1043,6 @@ int svm_migrate_init(struct amdgpu_device *adev)
 	r = devm_memremap_pages(adev->dev, pgmap);
 	if (IS_ERR(r)) {
 		pr_err("failed to register HMM device memory\n");
-		if (pgmap->type == MEMORY_DEVICE_PRIVATE)
-			devm_release_mem_region(adev->dev, res->start,
-						res->end - res->start + 1);
 
 		/* Disable SVM support capability */
 		pgmap->type = 0;
