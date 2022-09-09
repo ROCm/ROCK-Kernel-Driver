@@ -760,8 +760,10 @@ static void nbio_v7_4_program_aspm(struct amdgpu_device *adev)
 
 	/* Don't bother about LTR if LTR is not enabled
 	 * in the path */
+#ifdef HAVE_PCI_DEV_LTR_PATH
 	if (adev->pdev->ltr_path)
 		nbio_v7_4_program_ltr(adev);
+#endif
 
 	def = data = RREG32_PCIE(smnRCC_BIF_STRAP3);
 	data |= 0x5DE0 << RCC_BIF_STRAP3__STRAP_VLINK_ASPM_IDLE_TIMER__SHIFT;
