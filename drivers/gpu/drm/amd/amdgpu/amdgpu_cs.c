@@ -1479,11 +1479,15 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser)
 {
 	unsigned i;
 
+#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
+#if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		kfree(parser->post_deps[i].chain);
+#endif
 	}
 	kfree(parser->post_deps);
+#endif
 
 	dma_fence_put(parser->fence);
 
