@@ -1268,7 +1268,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 
 	list_for_each_entry(e, &p->validated, tv.head) {
 		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
-		struct dma_resv *resv = bo->tbo.base.resv;
+		struct dma_resv *resv = amdkcl_ttm_resvp(&bo->tbo);
 		enum amdgpu_sync_mode sync_mode;
 
 		sync_mode = amdgpu_bo_explicit_sync(bo) ?
