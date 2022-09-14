@@ -109,11 +109,11 @@ int kfd_iommu_device_init(struct kfd_dev *kfd)
  */
 int kfd_iommu_bind_process_to_device(struct kfd_process_device *pdd)
 {
-	struct kfd_dev *dev = pdd->dev;
+	struct kfd_node *dev = pdd->dev;
 	struct kfd_process *p = pdd->process;
 	int err;
 
-	if (!dev->use_iommu_v2 || pdd->bound == PDD_BOUND)
+	if (!dev->kfd->use_iommu_v2 || pdd->bound == PDD_BOUND)
 		return 0;
 
 	if (unlikely(pdd->bound == PDD_BOUND_SUSPENDED)) {
@@ -150,7 +150,7 @@ static void iommu_pasid_shutdown_callback(struct pci_dev *pdev, u32 pasid)
 static void iommu_pasid_shutdown_callback(struct pci_dev *pdev, int pasid)
 #endif
 {
-	struct kfd_dev *dev = kfd_device_by_pci_dev(pdev);
+	struct kfd_node *dev = kfd_device_by_pci_dev(pdev);
 	struct kfd_process *p;
 	struct kfd_process_device *pdd;
 
@@ -191,7 +191,7 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
 		unsigned long address, u16 flags)
 #endif
 {
-	struct kfd_dev *dev;
+	struct kfd_node *dev;
 
 	dev_warn_ratelimited(kfd_device,
 			"Invalid PPR device %x:%x.%x pasid 0x%x address 0x%lX flags 0x%X",
@@ -214,7 +214,7 @@ static int iommu_invalid_ppr_cb(struct pci_dev *pdev, int pasid,
  * Bind processes do the device that have been temporarily unbound
  * (PDD_BOUND_SUSPENDED) in kfd_unbind_processes_from_device.
  */
-static int kfd_bind_processes_to_device(struct kfd_dev *kfd)
+static int kfd_bind_processes_to_device(struct kfd_node *knode)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_process *p;
@@ -225,14 +225,14 @@ static int kfd_bind_processes_to_device(struct kfd_dev *kfd)
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		mutex_lock(&p->mutex);
-		pdd = kfd_get_process_device_data(kfd, p);
+		pdd = kfd_get_process_device_data(knode, p);
 
 		if (WARN_ON(!pdd) || pdd->bound != PDD_BOUND_SUSPENDED) {
 			mutex_unlock(&p->mutex);
 			continue;
 		}
 
-		err = amd_iommu_bind_pasid(kfd->adev->pdev, p->pasid,
+		err = amd_iommu_bind_pasid(knode->adev->pdev, p->pasid,
 				p->lead_thread);
 		if (err < 0) {
 			pr_err("Unexpected pasid 0x%x binding failure\n",
@@ -255,7 +255,7 @@ static int kfd_bind_processes_to_device(struct kfd_dev *kfd)
  * processes will be restored to PDD_BOUND state in
  * kfd_bind_processes_to_device.
  */
-static void kfd_unbind_processes_from_device(struct kfd_dev *kfd)
+static void kfd_unbind_processes_from_device(struct kfd_node *knode)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_process *p;
@@ -265,7 +265,7 @@ static void kfd_unbind_processes_from_device(struct kfd_dev *kfd)
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		mutex_lock(&p->mutex);
-		pdd = kfd_get_process_device_data(kfd, p);
+		pdd = kfd_get_process_device_data(knode, p);
 
 		if (WARN_ON(!pdd)) {
 			mutex_unlock(&p->mutex);
@@ -290,7 +290,7 @@ void kfd_iommu_suspend(struct kfd_dev *kfd)
 	if (!kfd->use_iommu_v2)
 		return;
 
-	kfd_unbind_processes_from_device(kfd);
+	kfd_unbind_processes_from_device(kfd->node);
 
 	amd_iommu_set_invalidate_ctx_cb(kfd->adev->pdev, NULL);
 	amd_iommu_set_invalid_ppr_cb(kfd->adev->pdev, NULL);
@@ -321,7 +321,7 @@ int kfd_iommu_resume(struct kfd_dev *kfd)
 	amd_iommu_set_invalid_ppr_cb(kfd->adev->pdev,
 				     iommu_invalid_ppr_cb);
 
-	err = kfd_bind_processes_to_device(kfd);
+	err = kfd_bind_processes_to_device(kfd->node);
 	if (err) {
 		amd_iommu_set_invalidate_ctx_cb(kfd->adev->pdev, NULL);
 		amd_iommu_set_invalid_ppr_cb(kfd->adev->pdev, NULL);

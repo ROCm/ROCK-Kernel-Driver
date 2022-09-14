@@ -81,7 +81,7 @@ struct kfd_mem_properties {
 	uint32_t		flags;
 	uint32_t		width;
 	uint32_t		mem_clk_max;
-	struct kfd_dev		*gpu;
+	struct kfd_node		*gpu;
 	struct kobject		*kobj;
 	struct attribute	attr_props;
 	struct attribute	attr_used;
@@ -100,7 +100,7 @@ struct kfd_cache_properties {
 	uint32_t		cache_latency;
 	uint32_t		cache_type;
 	uint8_t			sibling_map[CACHE_SIBLINGMAP_SIZE];
-	struct kfd_dev		*gpu;
+	struct kfd_node		*gpu;
 	struct kobject		*kobj;
 	struct attribute	attr;
 	uint32_t		sibling_map_size;
@@ -120,7 +120,7 @@ struct kfd_iolink_properties {
 	uint32_t		max_bandwidth;
 	uint32_t		rec_transfer_size;
 	uint32_t		flags;
-	struct kfd_dev		*gpu;
+	struct kfd_node		*gpu;
 	struct kobject		*kobj;
 	struct attribute	attr;
 };
@@ -146,7 +146,7 @@ struct kfd_topology_device {
 #ifdef HAVE_AMD_IOMMU_PC_SUPPORTED
 	struct list_head		perf_props;
 #endif
-	struct kfd_dev			*gpu;
+	struct kfd_node			*gpu;
 	struct kobject			*kobj_node;
 	struct kobject			*kobj_mem;
 	struct kobject			*kobj_cache;
