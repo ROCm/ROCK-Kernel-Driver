@@ -1436,7 +1436,7 @@ static int init_kfd_vm(struct amdgpu_vm *vm, void **process_info,
 	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&vm->root.bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
-	dma_resv_add_fence(vm->root.bo->tbo.base.resv,
+	dma_resv_add_fence(amdkcl_ttm_resvp(&vm->root.bo->tbo),
 			   &vm->process_info->eviction_fence->base,
 			   DMA_RESV_USAGE_BOOKKEEP);
 	amdgpu_bo_unreserve(vm->root.bo);
@@ -1995,7 +1995,7 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	}
 
 	if (!amdgpu_ttm_tt_get_usermm(bo->tbo.ttm) && !bo->tbo.pin_count)
-		dma_resv_add_fence(bo->tbo.base.resv,
+		dma_resv_add_fence(amdkcl_ttm_resvp(&bo->tbo),
 				   &avm->process_info->eviction_fence->base,
 				   DMA_RESV_USAGE_BOOKKEEP);
 	ret = unreserve_bo_and_vms(&ctx, false, false);
@@ -3090,7 +3090,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 		if (mem->bo->tbo.pin_count)
 			continue;
 
-		dma_resv_add_fence(mem->bo->tbo.base.resv,
+		dma_resv_add_fence(amdkcl_ttm_resvp(&mem->bo->tbo),
 				   &process_info->eviction_fence->base,
 				   DMA_RESV_USAGE_BOOKKEEP);
 	}
@@ -3099,7 +3099,7 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 			    vm_list_node) {
 		struct amdgpu_bo *bo = peer_vm->root.bo;
 
-		dma_resv_add_fence(bo->tbo.base.resv,
+		dma_resv_add_fence(amdkcl_ttm_resvp(&bo->tbo),
 				   &process_info->eviction_fence->base,
 				   DMA_RESV_USAGE_BOOKKEEP);
 	}
@@ -3155,7 +3155,7 @@ int amdgpu_amdkfd_add_gws_to_process(void *info, void *gws, struct kgd_mem **mem
 	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&gws_bo->tbo), 1);
 	if (ret)
 		goto reserve_shared_fail;
-	dma_resv_add_fence(gws_bo->tbo.base.resv,
+	dma_resv_add_fence(amdkcl_ttm_resvp(&gws_bo->tbo),
 			   &process_info->eviction_fence->base,
 			   DMA_RESV_USAGE_BOOKKEEP);
 	amdgpu_bo_unreserve(gws_bo);
