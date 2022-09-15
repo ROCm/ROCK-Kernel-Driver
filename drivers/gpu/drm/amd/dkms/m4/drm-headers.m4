@@ -203,4 +203,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm/amdgpu: add drm buddy support to amdgpu
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_buddy.h])
+
+	dnl #
+	dnl # v4.9-rc1~41 7520a277d
+	dnl # drm: Extract drm_framebuffer.[hc]
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_framebuffer.h])
 ])
