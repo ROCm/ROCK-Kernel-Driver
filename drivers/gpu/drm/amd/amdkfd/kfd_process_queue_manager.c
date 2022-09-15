@@ -585,7 +585,7 @@ int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 	if (!(*entry_size))
 		return -EINVAL;
 
-	*entry_size = min((size_t)entry_size, sizeof(struct kfd_queue_snapshot_entry));
+	*entry_size = min_t(size_t, *entry_size, sizeof(struct kfd_queue_snapshot_entry));
 	mutex_lock(&pqm->process->event_mutex);
 
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
@@ -907,6 +907,13 @@ int kfd_criu_restore_queue(struct kfd_process *p,
 		ret = -EINVAL;
 		goto exit;
 	}
+
+	if (!pdd->doorbell_index &&
+	    kfd_alloc_process_doorbells(pdd->dev, &pdd->doorbell_index) < 0) {
+		ret = -ENOMEM;
+		goto exit;
+	}
+
 	/* data stored in this order: mqd, ctl_stack */
 	mqd = q_extra_data;
 	ctl_stack = mqd + q_data->mqd_size;
