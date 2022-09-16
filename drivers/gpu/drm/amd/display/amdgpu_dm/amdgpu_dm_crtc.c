@@ -278,12 +278,14 @@ static void dm_crtc_reset_state(struct drm_crtc *crtc)
 }
 
 #ifdef CONFIG_DEBUG_FS
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_LATE_REGISTER
 static int amdgpu_dm_crtc_late_register(struct drm_crtc *crtc)
 {
 	crtc_debugfs_init(crtc);
 
 	return 0;
 }
+#endif
 #endif
 
 #ifndef HAVE_DRM_VRR_SUPPORTED
@@ -436,7 +438,9 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
     .get_vblank_timestamp = drm_crtc_vblank_helper_get_vblank_timestamp,
 #endif
 #if defined(CONFIG_DEBUG_FS)
+#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_LATE_REGISTER
 	.late_register = amdgpu_dm_crtc_late_register,
+#endif
 #endif
 };
 
