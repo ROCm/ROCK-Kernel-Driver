@@ -209,4 +209,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm: Extract drm_framebuffer.[hc]
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_framebuffer.h])
+
+	dnl #
+	dnl # v4.10-rc1~154 6686df8c
+	dnl # drm: Conslidate blending properties in drm_blend.[hc]
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_blend.h])
 ])
