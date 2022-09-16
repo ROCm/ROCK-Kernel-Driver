@@ -1188,6 +1188,9 @@
 /* drm_crtc_funcs->set_config() wants ctx parameter */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX 1
 
+/* drm_crtc_funcs->late_register() is available */
+#define HAVE_STRUCT_DRM_CRTC_FUNCS_LATE_REGISTER 1
+
 /* crtc->funcs->set_crc_source() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
 
