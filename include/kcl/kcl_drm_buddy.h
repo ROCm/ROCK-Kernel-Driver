@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <drm/drm_print.h>
+#include <kcl/kcl_drm_print.h>
 
 #define range_overflows(start, size, max) ({ \
 	typeof(start) start__ = (start); \
