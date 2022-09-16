@@ -1669,6 +1669,9 @@ noinline bool dcn30_internal_validate_bw(
 	if (!pipes)
 		return false;
 
+	context->bw_ctx.dml.vba.maxMpcComb = 0;
+	context->bw_ctx.dml.vba.VoltageLevel = 0;
+	context->bw_ctx.dml.vba.DRAMClockChangeSupport[0][0] = dm_dram_clock_change_vactive;
 	dc->res_pool->funcs->update_soc_for_wm_a(dc, context);
 	pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
 
@@ -1891,6 +1894,7 @@ noinline bool dcn30_internal_validate_bw(
 
 	if (repopulate_pipes)
 		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
+	context->bw_ctx.dml.vba.VoltageLevel = vlevel;
 	*vlevel_out = vlevel;
 	*pipe_cnt_out = pipe_cnt;
 
