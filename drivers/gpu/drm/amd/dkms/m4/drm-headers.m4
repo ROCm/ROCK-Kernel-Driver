@@ -215,4 +215,11 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm: Conslidate blending properties in drm_blend.[hc]
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_blend.h])
+
+	dnl #
+        dnl # v4.20-rc4-921-gd3b21767821e
+        dnl # drm: Add a new plane property to send damage during plane update
+        dnl #
+        AC_KERNEL_CHECK_HEADERS([drm/drm_damage_helper.h])
+
 ])
