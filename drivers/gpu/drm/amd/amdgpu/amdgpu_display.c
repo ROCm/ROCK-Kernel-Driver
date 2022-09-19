@@ -725,7 +725,9 @@ bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,
 static const struct drm_framebuffer_funcs amdgpu_fb_funcs = {
 	.destroy = drm_gem_fb_destroy,
 	.create_handle = drm_gem_fb_create_handle,
+#ifdef HAVE_DRM_DRM_DAMAGE_HELPER_H
 	.dirty = drm_atomic_helper_dirtyfb,
+#endif
 };
 
 uint32_t amdgpu_display_supported_domains(struct amdgpu_device *adev,
