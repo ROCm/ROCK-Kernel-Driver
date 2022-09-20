@@ -314,7 +314,7 @@ void dma_resv_replace_fences(struct dma_resv *obj, uint64_t context,
         unsigned int i;
 
         /* Only readers supported for now */
-        WARN_ON(usage != DMA_RESV_USAGE_READ);
+        WARN_ON(usage != DMA_RESV_USAGE_READ && usage != DMA_RESV_USAGE_BOOKKEEP);
 
         dma_resv_assert_held(obj);
 
