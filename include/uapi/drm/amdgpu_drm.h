@@ -102,6 +102,9 @@ extern "C" {
  *
  * %AMDGPU_GEM_DOMAIN_OA	Ordered append, used by 3D or Compute engines
  * for appending data.
+ *
+ * %AMDGPU_GEM_DOMAIN_DOORBELL	Doorbell. It is an MMIO region for
+ * signalling user mode queues.
  */
 /* hybrid specific ioctls */
 #define DRM_IOCTL_AMDGPU_SEM		DRM_IOWR(DRM_COMMAND_BASE + DRM_AMDGPU_SEM, union drm_amdgpu_sem)
@@ -112,6 +115,7 @@ extern "C" {
 #define AMDGPU_GEM_DOMAIN_GDS		0x8
 #define AMDGPU_GEM_DOMAIN_GWS		0x10
 #define AMDGPU_GEM_DOMAIN_OA		0x20
+#define AMDGPU_GEM_DOMAIN_DOORBELL	0x40
 #define AMDGPU_GEM_DOMAIN_DGMA		0x400
 #define AMDGPU_GEM_DOMAIN_DGMA_IMPORT	0x800
 #define AMDGPU_GEM_DOMAIN_MASK		(AMDGPU_GEM_DOMAIN_CPU | \
@@ -120,6 +124,7 @@ extern "C" {
 					 AMDGPU_GEM_DOMAIN_GDS | \
 					 AMDGPU_GEM_DOMAIN_GWS | \
 					 AMDGPU_GEM_DOMAIN_OA |\
+					 AMDGPU_GEM_DOMAIN_DOORBELL |\
 					 AMDGPU_GEM_DOMAIN_DGMA |\
 					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
 
