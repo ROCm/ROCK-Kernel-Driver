@@ -640,7 +640,12 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 		}
 	}
 
-	return amdgpu_sem_add_cs(p->ctx, p->entity, &p->job->sync);
+	for (i = 0; i < p->gang_size; ++i) {
+		r = amdgpu_sem_add_cs(p->ctx, p->entities[i], &p->jobs[i]->sync);
+		if (r)
+			return r;
+	}
+	return 0;
 }
 
 /* Convert microseconds to bytes. */
