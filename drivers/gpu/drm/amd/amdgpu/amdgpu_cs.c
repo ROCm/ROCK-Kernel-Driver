@@ -1426,7 +1426,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 		/* Everybody except for the gang leader uses READ */
 		for (i = 0; i < (p->gang_size - 1); ++i) {
-			dma_resv_add_fence(e->tv.bo->base.resv,
+			dma_resv_add_fence(amdkcl_ttm_resvp(e->tv.bo),
 					   &p->jobs[i]->base.s_fence->finished,
 					   DMA_RESV_USAGE_READ);
 		}
