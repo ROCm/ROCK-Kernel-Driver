@@ -1579,6 +1579,9 @@ bool dcn32_internal_validate_bw(
 					/*MPC split rules will handle this case*/
 					pipe->bottom_pipe->top_pipe = NULL;
 				} else {
+					/* when merging an ODM pipes, the bottom MPC pipe must now point to
+					 * the previous ODM pipe and its associated stream assets
+					 */
 					if (pipe->prev_odm_pipe->bottom_pipe) {
 						/* 3 plane MPO*/
 						pipe->bottom_pipe->top_pipe = pipe->prev_odm_pipe->bottom_pipe;
@@ -1588,6 +1591,8 @@ bool dcn32_internal_validate_bw(
 						pipe->bottom_pipe->top_pipe = pipe->prev_odm_pipe;
 						pipe->prev_odm_pipe->bottom_pipe = pipe->bottom_pipe;
 					}
+
+					memcpy(&pipe->bottom_pipe->stream_res, &pipe->bottom_pipe->top_pipe->stream_res, sizeof(struct stream_resource));
 				}
 			}
 
