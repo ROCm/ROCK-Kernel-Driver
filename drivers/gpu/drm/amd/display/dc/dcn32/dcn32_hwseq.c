@@ -1351,6 +1351,7 @@ bool dcn32_dsc_pg_status(
 	return pwr_status == 0;
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn32_update_dsc_pg(struct dc *dc,
 		struct dc_state *context,
 		bool safe_to_disable)
@@ -1373,6 +1374,7 @@ void dcn32_update_dsc_pg(struct dc *dc,
 		}
 	}
 }
+#endif
 
 void dcn32_enable_phantom_streams(struct dc *dc, struct dc_state *context)
 {
