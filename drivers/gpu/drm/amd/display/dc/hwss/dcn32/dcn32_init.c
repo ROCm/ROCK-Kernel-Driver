@@ -115,7 +115,9 @@ static const struct hw_sequencer_funcs dcn32_funcs = {
 	.update_visual_confirm_color = dcn10_update_visual_confirm_color,
 	.subvp_pipe_control_lock_fast = dcn32_subvp_pipe_control_lock_fast,
 	.update_phantom_vp_position = dcn32_update_phantom_vp_position,
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.update_dsc_pg = dcn32_update_dsc_pg,
+#endif
 	.apply_update_flags_for_phantom = dcn32_apply_update_flags_for_phantom,
 	.is_pipe_topology_transition_seamless = dcn32_is_pipe_topology_transition_seamless,
 	.calculate_pix_rate_divider = dcn32_calculate_pix_rate_divider,
