@@ -138,4 +138,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # spin loop primitives for busy waiting
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/processor.h])
+
+	dnl #
+	dnl # v5.9-rc6-311-g0a0f0d8be76d
+	dnl # dma-mapping: split <linux/dma-mapping.h>
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([linux/dma-map-ops.h])
 ])
