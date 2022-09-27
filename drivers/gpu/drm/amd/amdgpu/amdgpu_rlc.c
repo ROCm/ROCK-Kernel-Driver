@@ -537,9 +537,9 @@ int amdgpu_gfx_rlc_init_microcode(struct amdgpu_device *adev,
 		amdgpu_gfx_rlc_init_microcode_v2_1(adev);
 	if (version_minor >= 2)
 		amdgpu_gfx_rlc_init_microcode_v2_2(adev);
-	if (version_minor >= 3)
+	if (version_minor == 3)
 		amdgpu_gfx_rlc_init_microcode_v2_3(adev);
-	if (version_minor >= 4)
+	if (version_minor == 4)
 		amdgpu_gfx_rlc_init_microcode_v2_4(adev);
 
 	return 0;
