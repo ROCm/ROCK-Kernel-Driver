@@ -42,6 +42,8 @@
  */
 #define DRM_SCHED_FENCE_DONT_PIPELINE	DMA_FENCE_FLAG_USER_BITS
 
+enum dma_resv_usage;
+struct dma_resv;
 struct drm_gem_object;
 
 struct drm_gpu_scheduler;
@@ -519,6 +521,9 @@ void drm_sched_job_arm(struct drm_sched_job *job);
 #ifdef HAVE_STRUCT_XARRAY
 int drm_sched_job_add_dependency(struct drm_sched_job *job,
 				 struct dma_fence *fence);
+int drm_sched_job_add_resv_dependencies(struct drm_sched_job *job,
+													struct dma_resv *resv,
+													enum dma_resv_usage usage);
 int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 					    struct drm_gem_object *obj,
 					    bool write);
