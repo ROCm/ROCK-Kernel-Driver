@@ -4061,9 +4061,14 @@ static int gfx_v10_0_init_microcode(struct amdgpu_device *adev)
 		err = request_firmware(&adev->gfx.rlc_fw, fw_name, adev->dev);
 		if (err)
 			goto out;
+		/* don't check this.  There are apparently firmwares in the wild with
+		 * incorrect size in the header
+		 */
 		err = amdgpu_ucode_validate(adev->gfx.rlc_fw);
 		if (err)
-			goto out;
+			dev_dbg(adev->dev,
+				"gfx10: amdgpu_ucode_validate() failed \"%s\"\n",
+				fw_name);
 		rlc_hdr = (const struct rlc_firmware_header_v2_0 *)adev->gfx.rlc_fw->data;
 		version_major = le16_to_cpu(rlc_hdr->header.header_version_major);
 		version_minor = le16_to_cpu(rlc_hdr->header.header_version_minor);
