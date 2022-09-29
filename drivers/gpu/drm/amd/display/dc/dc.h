@@ -1193,6 +1193,8 @@ struct dc_plane_state {
 	enum dc_irq_source irq_source;
 	struct kref refcount;
 	struct tg_color visual_confirm_color;
+
+	bool is_statically_allocated;
 };
 
 struct dc_plane_info {
