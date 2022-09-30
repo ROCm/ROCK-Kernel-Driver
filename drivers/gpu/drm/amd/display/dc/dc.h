@@ -1632,6 +1632,9 @@ enum dc_status dc_process_dmub_set_mst_slots(const struct dc *dc,
 				uint8_t mst_alloc_slots,
 				uint8_t *mst_slots_in_use);
 
+void dc_process_dmub_dpia_hpd_int_enable(const struct dc *dc,
+				uint32_t hpd_int_enable);
+
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /*******************************************************************************
  * DSC Interfaces
