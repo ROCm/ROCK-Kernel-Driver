@@ -6180,6 +6180,12 @@ static void amdgpu_device_get_pcie_info(struct amdgpu_device *adev)
  * Return true if @peer_adev can access (DMA) @adev through the PCIe
  * BAR, i.e. @adev is "large BAR" and the BAR matches the DMA mask of
  * @peer_adev.
+ *
+ * @note: CONFIG_HSA_AMD_P2P indicates support for P2P DMA mappings. Query
+ * P2PDMA distance only if the kernel has all the prerequisites for P2P DMA
+ * support. Otherwise fall back to the less reliable legacy P2P support to
+ * avoid regressions.
+ *
  */
 bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 				      struct amdgpu_device *peer_adev)
@@ -6189,7 +6195,7 @@ bool amdgpu_device_is_peer_accessible(struct amdgpu_device *adev,
 		~*peer_adev->dev->dma_mask : ~((1ULL << 32) - 1);
 	resource_size_t aper_limit =
 		adev->gmc.aper_base + adev->gmc.aper_size - 1;
-#ifdef CONFIG_PCI_P2PDMA
+#ifdef CONFIG_HSA_AMD_P2P
 	p2p_access =
 		!adev->gmc.xgmi.connected_to_cpu &&
 		!(pci_p2pdma_distance(adev->pdev, peer_adev->dev, false) < 0);
