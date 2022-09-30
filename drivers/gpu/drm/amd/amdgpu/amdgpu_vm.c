@@ -2557,6 +2557,9 @@ void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
  * amdgpu_vm_handle_fault - graceful handling of VM faults.
  * @adev: amdgpu device pointer
  * @pasid: PASID of the VM
+ * @vmid: VMID, only used for GFX 9.4.3.
+ * @node_id: Node_id received in IH cookie. Only applicable for
+ *           GFX 9.4.3.
  * @addr: Address of the fault
  * @write_fault: true is write fault, false is read fault
  *
@@ -2564,7 +2567,7 @@ void amdgpu_vm_set_task_info(struct amdgpu_vm *vm)
  * shouldn't be reported any more.
  */
 bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
-			    u32 client_id, u32 node_id, uint64_t addr,
+			    u32 vmid, u32 node_id, uint64_t addr,
 			    bool write_fault)
 {
 	bool is_compute_context = false;
@@ -2598,7 +2601,7 @@ bool amdgpu_vm_handle_fault(struct amdgpu_device *adev, u32 pasid,
 
 	addr /= AMDGPU_GPU_PAGE_SIZE;
 
-	if (is_compute_context && !svm_range_restore_pages(adev, pasid, client_id,
+	if (is_compute_context && !svm_range_restore_pages(adev, pasid, vmid,
 	    node_id, addr, write_fault)) {
 		amdgpu_bo_unref(&root);
 		return true;
