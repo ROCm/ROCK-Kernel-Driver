@@ -3,6 +3,7 @@
 #define AMDKCL_DMA_MAPPING_H
 
 #include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 
 /*
  * commit v4.8-11962-ga9a62c938441
@@ -147,6 +148,11 @@ static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
 }
 #endif
 
+static inline bool kcl_has_dma_map_resource_ops(struct device *dev)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+	return ops == NULL || ops->map_resource != NULL;
+}
 /*
  * v5.8-rc3-2-g68d237056e00 ("scatterlist: protect parameters of the sg_table related macros")
  * v5.7-rc5-33-g709d6d73c756 ("scatterlist: add generic wrappers for iterating over sgtable objects")

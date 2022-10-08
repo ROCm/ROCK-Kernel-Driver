@@ -913,10 +913,17 @@ static int kfd_mem_attach(struct amdgpu_device *adev, struct kgd_mem *mem,
 			WARN_ONCE(!(mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_DOORBELL ||
 				    mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_MMIO_REMAP),
 				  "Handing invalid SG BO in ATTACH request");
-			attachment[i]->type = KFD_MEM_ATT_SG;
-			ret = create_dmamap_sg_bo(adev, mem, &bo[i]);
-			if (ret)
-				goto unwind;
+
+			if (kcl_has_dma_map_resource_ops(adev->dev)) {
+				attachment[i]->type = KFD_MEM_ATT_SG;
+				ret = create_dmamap_sg_bo(adev, mem, &bo[i]);
+				if (ret)
+					goto unwind;
+			} else {
+				attachment[i]->type = KFD_MEM_ATT_SHARED;
+				bo[i] = mem->bo;
+				drm_gem_object_get(&bo[i]->tbo.base);
+			}
 #ifdef AMDKCL_AMDGPU_DMABUF_OPS
 		/* Enable acces to GTT BOs of peer devices */
 		} else if (mem->domain == AMDGPU_GEM_DOMAIN_GTT) {
