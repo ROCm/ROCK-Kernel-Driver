@@ -1403,7 +1403,7 @@ bool dcn32_dsc_pg_status(
 		break;
 	}
 
-	return pwr_status == 0 ? true : false;
+	return pwr_status == 0;
 }
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
