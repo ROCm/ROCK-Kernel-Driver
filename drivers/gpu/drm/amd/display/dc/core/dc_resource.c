@@ -3734,7 +3734,10 @@ bool dc_resource_acquire_secondary_pipe_for_mpc_odm(
 				return false;
 		}
 #endif
+
+#if defined(CONFIG_DRM_AMD_DC_DCN)
 		dcn20_build_mapped_resource(dc, state, sec_pipe->stream);
+#endif
 	}
 
 	return true;
