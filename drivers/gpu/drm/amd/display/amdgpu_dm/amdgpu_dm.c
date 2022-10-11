@@ -11770,12 +11770,14 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 	}
 
+#if defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 #if defined(CONFIG_DRM_AMD_DC_FP)
 	if (dc_resource_is_dsc_encoding_supported(dc)) {
 		ret = pre_validate_dsc(state, &dm_state, vars);
 		if (ret != 0)
 			goto fail;
 	}
+#endif
 #endif
 
 	/* Run this here since we want to validate the streams we created */
