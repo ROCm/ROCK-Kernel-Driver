@@ -233,6 +233,7 @@ struct resource_funcs {
             unsigned int index);
 
 	bool (*remove_phantom_pipes)(struct dc *dc, struct dc_state *context);
+	void (*get_panel_config_defaults)(struct dc_panel_config *panel_config);
 };
 
 struct audio_support{
@@ -441,7 +442,6 @@ struct pipe_ctx {
 	union pipe_update_flags update_flags;
 	struct dwbc *dwbc;
 	struct mcif_wb *mcif_wb;
-	bool vtp_locked;
 };
 
 /* Data used for dynamic link encoder assignment.
