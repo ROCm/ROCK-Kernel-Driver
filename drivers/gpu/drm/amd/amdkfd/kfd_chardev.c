@@ -1648,7 +1648,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 	bool check_devices;
 	bool need_user_array;
 	uint32_t size_to_copy_to_user_array = 0;
-	bool is_attach;
+	bool is_detach, is_attach;
 	bool need_proc_create = false;
 
 	debug_trap_action = args->op;
@@ -1664,6 +1664,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
+	is_detach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 0;
 	is_attach = debug_trap_action == KFD_IOC_DBG_TRAP_ENABLE && data1 == 1;
 
 	check_devices =
@@ -1701,7 +1702,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 		goto out;
 	}
 
-	if (target != p) {
+	if (target != p && !is_detach) {
 		bool is_debugger_attached = false;
 
 		rcu_read_lock();
@@ -1711,7 +1712,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 
 		if (!is_debugger_attached) {
 			pr_err("Cannot debug process\n");
-			r = -ESRCH;
+			r = -EPERM;
 			goto out;
 		}
 	}
@@ -1753,7 +1754,7 @@ static int kfd_ioctl_dbg_set_debug_trap(struct file *filep,
 			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_NODE_ADDRESS_WATCH ||
 			 debug_trap_action == KFD_IOC_DBG_TRAP_CLEAR_NODE_ADDRESS_WATCH ||
 			 debug_trap_action == KFD_IOC_DBG_TRAP_SET_PRECISE_MEM_OPS)) {
-		r = -EPERM;
+		r = -EACCES;
 		goto unlock_out;
 	}
 
