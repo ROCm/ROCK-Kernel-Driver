@@ -477,6 +477,32 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 	}
 }
 
+static void kfd_dbg_clean_exception_status(struct kfd_process *target)
+{
+	struct process_queue_manager *pqm;
+	struct process_queue_node *pqn;
+	int i;
+
+	for (i = 0; i < target->n_pdds; i++) {
+		struct kfd_process_device *pdd = target->pdds[i];
+
+		kfd_process_drain_interrupts(pdd);
+
+		pdd->exception_status = 0;
+	}
+
+	pqm = &target->pqm;
+	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
+		if (!pqn->q)
+			continue;
+
+		pqn->q->properties.exception_status = 0;
+	}
+
+	target->exception_status = 0;
+
+}
+
 int kfd_dbg_trap_disable(struct kfd_process *target)
 {
 	/*
@@ -497,6 +523,7 @@ int kfd_dbg_trap_disable(struct kfd_process *target)
 	}
 
 	target->debug_trap_enabled = false;
+	kfd_dbg_clean_exception_status(target);
 	kfd_unref_process(target);
 
 	return 0;
