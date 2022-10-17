@@ -713,7 +713,7 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 
 	for (i = 0; i < target->n_pdds; i++)
 		if (!kfd_dbg_is_per_vmid_supported(target->pdds[i]->dev))
-			return -EPERM;
+			return -EACCES;
 
 	target->precise_mem_ops = !!enable;
 	for (i = 0; i < target->n_pdds; i++) {
