@@ -56,9 +56,7 @@ struct dmub_notification;
 #define MIN_VIEWPORT_SIZE 12
 #define MAX_NUM_EDP 2
 
-/*******************************************************************************
- * Display Core Interfaces
- ******************************************************************************/
+/* Display Core Interfaces */
 struct dc_versions {
 	const char *dc_ver;
 	struct dmcu_version dmcu_version;
@@ -1002,9 +1000,7 @@ void dc_init_callbacks(struct dc *dc,
 void dc_deinit_callbacks(struct dc *dc);
 void dc_destroy(struct dc **dc);
 
-/*******************************************************************************
- * Surface Interfaces
- ******************************************************************************/
+/* Surface Interfaces */
 
 enum {
 	TRANSFER_FUNC_POINTS = 1025
@@ -1379,9 +1375,7 @@ struct dc_state *dc_copy_state(struct dc_state *src_ctx);
 void dc_retain_state(struct dc_state *context);
 void dc_release_state(struct dc_state *context);
 
-/*******************************************************************************
- * Link Interfaces
- ******************************************************************************/
+/* Link Interfaces */
 
 struct dpcd_caps {
 	union dpcd_rev dpcd_rev;
@@ -1483,9 +1477,7 @@ struct hdcp_caps {
 
 uint32_t dc_get_opp_for_plane(struct dc *dc, struct dc_plane_state *plane);
 
-/*******************************************************************************
- * Sink Interfaces - A sink corresponds to a display output device
- ******************************************************************************/
+/* Sink Interfaces - A sink corresponds to a display output device */
 
 struct dc_container_id {
 	// 128bit GUID in binary form
@@ -1572,9 +1564,7 @@ struct dc_cursor {
 };
 
 
-/*******************************************************************************
- * Interrupt interfaces
- ******************************************************************************/
+/* Interrupt interfaces */
 enum dc_irq_source dc_interrupt_to_irq_source(
 		struct dc *dc,
 		uint32_t src_id,
@@ -1586,9 +1576,7 @@ enum dc_irq_source dc_get_hpd_irq_source_at_index(
 
 void dc_notify_vsync_int_state(struct dc *dc, struct dc_stream_state *stream, bool enable);
 
-/*******************************************************************************
- * Power Interfaces
- ******************************************************************************/
+/* Power Interfaces */
 
 void dc_set_power_state(
 		struct dc *dc,
@@ -1662,14 +1650,11 @@ void dc_process_dmub_dpia_hpd_int_enable(const struct dc *dc,
 				uint32_t hpd_int_enable);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-/*******************************************************************************
- * DSC Interfaces
- ******************************************************************************/
+/* DSC Interfaces */
 #include "dc_dsc.h"
 #endif
-/*******************************************************************************
- * Disable acc mode Interfaces
- ******************************************************************************/
+
+/* Disable acc mode Interfaces */
 void dc_disable_accelerated_mode(struct dc *dc);
 
 #endif /* DC_INTERFACE_H_ */
