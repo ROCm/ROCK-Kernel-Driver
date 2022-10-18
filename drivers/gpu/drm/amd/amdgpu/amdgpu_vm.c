@@ -1188,7 +1188,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	uint64_t flags;
 	bool uncached;
 	int r;
-	struct amdgpu_device *bo_adev;
+	struct amdgpu_device *bo_adev = adev;
 
 	amdgpu_sync_create(&sync);
 	if (clear) {
