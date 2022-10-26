@@ -34,6 +34,7 @@
  */
 #include <linux/dma-resv.h>
 #include <linux/dma-fence-array.h>
+#include <linux/dma-fence-chain.h>
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/sched/mm.h>
@@ -353,8 +354,20 @@ static void dma_resv_add_excl_fence(struct dma_resv *obj,
                                     struct dma_fence *fence)
 {
         struct dma_fence *old_fence = dma_resv_excl_fence(obj);
+	struct dma_fence_chain *chain;
 
         dma_resv_assert_held(obj);
+
+	if (old_fence && !dma_fence_is_signaled(old_fence)) {
+
+		chain = dma_fence_chain_alloc();
+		if (unlikely(!chain))
+			pr_err("dma_resv_add_excl_fence OOM\n");
+		else {
+			dma_fence_chain_init(chain, dma_fence_get(old_fence), dma_fence_get(fence), 1);
+			fence = &chain->base;
+		}
+	}
 
         dma_fence_get(fence);
 
