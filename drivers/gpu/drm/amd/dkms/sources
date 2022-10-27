@@ -31,3 +31,5 @@ include/kcl/reservation.h include/linux/
 include/uapi/linux/kfd_sysfs.h include/uapi/linux/
 drivers/gpu/drm/drm_gem_ttm_helper.c .
 include/drm/drm_gem_ttm_helper.h include/drm/
+drivers/gpu/drm/drm_buddy.c .
+include/drm/drm_buddy.h include/drm/
