@@ -207,4 +207,10 @@ CFLAGS_drm_gem_ttm_helper.o += -include $(src)/ttm/backport/backport.h \
 amddrm_ttm_helper-y := drm_gem_ttm_helper.o
 obj-$(CONFIG_DRM_TTM_HELPER) += amddrm_ttm_helper.o
 
+export CONFIG_DRM_BUDDY=m
+subdir-ccflags-y += -DCONFIG_DRM_BUDDY
+CFLAGS_drm_buddy.o += -DHAVE_CONFIG_H
+amddrm_buddy-y := drm_buddy.o
+obj-$(CONFIG_DRM_BUDDY) += amddrm_buddy.o
+
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
