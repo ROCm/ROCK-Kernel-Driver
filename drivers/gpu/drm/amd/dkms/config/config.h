@@ -363,6 +363,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* display_info->max_dsc_bpp is available */
+/* #undef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP */
+
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 
