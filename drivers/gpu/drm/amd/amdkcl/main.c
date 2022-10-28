@@ -16,11 +16,6 @@ extern void amdkcl_sched_init(void);
 extern void amdkcl_numa_init(void);
 extern void amdkcl_workqueue_init(void);
 
-#ifndef HAVE_DRM_DRM_BUDDY_H
-extern int amdkcl_drm_buddy_module_init(void);
-extern void amdkcl_drm_buddy_module_exit(void);
-#endif
-
 int __init amdkcl_init(void)
 {
 	amdkcl_symbol_init();
@@ -36,9 +31,6 @@ int __init amdkcl_init(void)
 	amdkcl_sched_init();
 	amdkcl_numa_init();
 	amdkcl_workqueue_init();
-#ifndef HAVE_DRM_DRM_BUDDY_H
-	amdkcl_drm_buddy_module_init();
-#endif
 
 	return 0;
 }
@@ -46,9 +38,7 @@ module_init(amdkcl_init);
 
 void __exit amdkcl_exit(void)
 {
-#ifndef HAVE_DRM_DRM_BUDDY_H
-	amdkcl_drm_buddy_module_exit();
-#endif
+
 }
 
 module_exit(amdkcl_exit);
