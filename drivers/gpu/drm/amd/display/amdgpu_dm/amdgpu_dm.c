@@ -6664,8 +6664,15 @@ static void apply_dsc_policy_for_stream(struct amdgpu_dm_connector *aconnector,
 	struct dc *dc = sink->ctx->dc;
 	u32 max_supported_bw_in_kbps, timing_bw_in_kbps;
 	u32 dsc_max_supported_bw_in_kbps;
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	u32 max_dsc_target_bpp_limit_override =
 		drm_connector->display_info.max_dsc_bpp;
+#else
+	u32 max_dsc_target_bpp_limit_override = 0;
+	if (stream->link && stream->link->local_sink)
+		max_dsc_target_bpp_limit_override =
+			stream->link->local_sink->edid_caps.panel_patch.max_dsc_target_bpp_limit;
+#endif
 	struct dc_dsc_config_options dsc_options = {0};
 
 	dc_dsc_get_default_config_option(dc, &dsc_options);
