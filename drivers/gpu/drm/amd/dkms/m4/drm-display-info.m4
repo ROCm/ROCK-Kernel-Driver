@@ -68,9 +68,28 @@ AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_MONITOR_RANGE], [
 	])
 ])
 
+dnl #
+dnl # commit v5.18-3347-g721ed0ae5acf
+dnl # drm/edid: add a quirk for two LG monitors to get them to work on 10bpc
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_MAX_DSC_BPP], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_connector.h>
+		],[
+			struct drm_display_info *display_info = NULL;
+			display_info->max_dsc_bpp=0;
+		],[
+			AC_DEFINE(HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP, 1,
+				[display_info->max_dsc_bpp is available])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO], [
 	AC_AMDGPU_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING
 	AC_AMDGPU_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK
 	AC_AMDGPU_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES
 	AC_AMDGPU_DRM_DISPLAY_INFO_MONITOR_RANGE
+	AC_AMDGPU_DRM_DISPLAY_INFO_MAX_DSC_BPP
 ])

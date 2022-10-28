@@ -1047,7 +1047,11 @@ static int bpp_x16_from_pbn(struct dsc_mst_fairness_params param, int pbn)
 	struct dc_dsc_config_options dsc_options = {0};
 
 	dc_dsc_get_default_config_option(param.sink->ctx->dc, &dsc_options);
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	dsc_options.max_target_bpp_limit_override_x16 = drm_connector->display_info.max_dsc_bpp * 16;
+#else
+	dsc_options.max_target_bpp_limit_override_x16 = param.sink->edid_caps.panel_patch.max_dsc_target_bpp_limit * 16;
+#endif
 
 	kbps = div_u64((u64)pbn * 994 * 8 * 54, 64);
 	dc_dsc_compute_config(
