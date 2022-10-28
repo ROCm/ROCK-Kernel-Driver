@@ -841,7 +841,11 @@ static void set_dsc_configs_from_fairness_vars(struct dsc_mst_fairness_params *p
 					params[i].sink->ctx->dc->res_pool->dscs[0],
 					&params[i].sink->dsc_caps.dsc_dec_caps,
 					params[i].sink->ctx->dc->debug.dsc_min_slice_height_override,
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 					drm_connector->display_info.max_dsc_bpp,
+#else
+					params[i].sink->edid_caps.panel_patch.max_dsc_target_bpp_limit,
+#endif
 					0,
 					params[i].timing,
 					&params[i].timing->dsc_cfg)) {
@@ -883,16 +887,22 @@ static int bpp_x16_from_pbn(struct dsc_mst_fairness_params param, int pbn)
 	struct dc_dsc_config dsc_config;
 	u64 kbps;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	struct drm_connector *drm_connector = &param.aconnector->base;
 	uint32_t max_dsc_target_bpp_limit_override =
 		drm_connector->display_info.max_dsc_bpp;
+#endif
 
 	kbps = div_u64((u64)pbn * 994 * 8 * 54, 64);
 	dc_dsc_compute_config(
 			param.sink->ctx->dc->res_pool->dscs[0],
 			&param.sink->dsc_caps.dsc_dec_caps,
 			param.sink->ctx->dc->debug.dsc_min_slice_height_override,
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 			max_dsc_target_bpp_limit_override,
+#else
+			param.sink->edid_caps.panel_patch.max_dsc_target_bpp_limit,
+#endif
 			(int) kbps, param.timing, &dsc_config);
 
 	return dsc_config.bits_per_pixel;
