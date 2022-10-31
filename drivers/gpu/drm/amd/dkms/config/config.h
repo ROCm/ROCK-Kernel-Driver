@@ -1101,6 +1101,9 @@
 /* pxm_to_node() is available */
 #define HAVE_PXM_TO_NODE 1
 
+/* whether register_shrinker(x, x) is available */
+#define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
+
 /* remove_conflicting_pci_framebuffers() is available */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
 
