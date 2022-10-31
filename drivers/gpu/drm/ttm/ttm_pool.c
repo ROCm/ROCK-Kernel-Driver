@@ -723,7 +723,7 @@ int ttm_pool_mgr_init(unsigned long num_pages)
 	mm_shrinker.count_objects = ttm_pool_shrinker_count;
 	mm_shrinker.scan_objects = ttm_pool_shrinker_scan;
 	mm_shrinker.seeks = 1;
-	return register_shrinker(&mm_shrinker, "drm-ttm_pool");
+	return kcl_register_shrinker(&mm_shrinker, "drm-ttm_pool");
 }
 
 /**
