@@ -94,9 +94,7 @@
 #include <drm/drm_edid.h>
 #include <drm/drm_eld.h>
 #include <drm/drm_vblank.h>
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 #include <drm/drm_audio_component.h>
-#endif
 
 #include <acpi/video.h>
 
