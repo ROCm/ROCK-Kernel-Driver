@@ -112,6 +112,7 @@ static const struct hw_sequencer_funcs dcn32_funcs = {
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.update_dsc_pg = dcn32_update_dsc_pg,
 #endif
+	.apply_update_flags_for_phantom = dcn32_apply_update_flags_for_phantom,
 };
 
 static const struct hwseq_private_funcs dcn32_private_funcs = {
