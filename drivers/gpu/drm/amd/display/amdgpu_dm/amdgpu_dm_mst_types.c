@@ -1724,6 +1724,7 @@ clean_exit:
 	return ret;
 }
 
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 static unsigned int kbps_from_pbn(unsigned int pbn)
 {
 	unsigned int kbps = pbn;
@@ -1753,6 +1754,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 }
 #endif
 #endif /* HAVE_DRM_DP_MST_ATOMIC_CHECK */
+#endif
 
 #if defined(CONFIG_DRM_AMD_DC_FP)
 static bool dp_get_link_current_set_bw(struct drm_dp_aux *aux, uint32_t *cur_link_bw)
