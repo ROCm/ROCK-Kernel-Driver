@@ -266,6 +266,7 @@ struct dc_caps {
 	uint8_t subvp_swath_height_margin_lines; // subvp start line must be aligned to 2 x swath height
 	uint16_t subvp_pstate_allow_width_us;
 	uint16_t subvp_vertical_int_margin_us;
+	uint8_t subvp_drr_vblank_start_margin_us;
 	bool seamless_odm;
 };
 
