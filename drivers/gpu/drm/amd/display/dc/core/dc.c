@@ -1134,10 +1134,12 @@ static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 			 * The OTG is set to disable on falling edge of VUPDATE so the plane disable
 			 * will still get it's double buffer update.
 			 */
+#ifdef CONFIG_DRM_AMD_DC_DCN
 			if (old_stream->mall_stream_config.type == SUBVP_PHANTOM) {
 				if (tg->funcs->disable_phantom_crtc)
 					tg->funcs->disable_phantom_crtc(tg);
 			}
+#endif
 		}
 	}
 
