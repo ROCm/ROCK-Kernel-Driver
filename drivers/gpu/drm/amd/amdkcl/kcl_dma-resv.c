@@ -367,9 +367,10 @@ static void dma_resv_add_excl_fence(struct dma_resv *obj,
 			dma_fence_chain_init(chain, dma_fence_get(old_fence), dma_fence_get(fence), 1);
 			fence = &chain->base;
 		}
+	} else {
+		dma_fence_get(fence);
 	}
 
-        dma_fence_get(fence);
 
         write_seqcount_begin(&obj->seq);
         /* write_seqcount_begin provides the necessary memory barrier */
