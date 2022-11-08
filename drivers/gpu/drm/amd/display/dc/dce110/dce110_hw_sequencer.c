@@ -1563,6 +1563,14 @@ static enum dc_status apply_single_controller_ctx_to_hw(
 
 	pipe_ctx->stream->link->psr_settings.psr_feature_enabled = false;
 
+	/* Phantom and main stream share the same link (because the stream
+	 * is constructed with the same sink). Make sure not to override
+	 * and link programming on the main.
+	 */
+	if (pipe_ctx->stream->mall_stream_config.type != SUBVP_PHANTOM) {
+		pipe_ctx->stream->link->psr_settings.psr_feature_enabled = false;
+	}
+
 	return DC_OK;
 }
 
