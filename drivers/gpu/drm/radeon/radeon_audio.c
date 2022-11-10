@@ -747,6 +747,7 @@ static int radeon_audio_component_get_eld(struct device *kdev, int port,
 					  unsigned char *buf, int max_bytes)
 {
 	struct drm_device *dev = dev_get_drvdata(kdev);
+	struct radeon_device *rdev = dev->dev_private;
 	struct drm_encoder *encoder;
 	struct radeon_encoder *radeon_encoder;
 	struct radeon_encoder_atom_dig *dig;
@@ -754,18 +755,18 @@ static int radeon_audio_component_get_eld(struct device *kdev, int port,
 	int ret = 0;
 
 	*enabled = false;
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		const struct drm_connector_helper_funcs *connector_funcs =
-			connector->helper_private;
-		encoder = connector_funcs->best_encoder(connector);
+	if (!rdev->audio.enabled || !rdev->mode_info.mode_config_initialized)
+		return 0;
 
-		if (!encoder)
-			continue;
+	list_for_each_entry(encoder, &rdev->ddev->mode_config.encoder_list, head) {
 		if (!radeon_encoder_is_digital(encoder))
 			continue;
 		radeon_encoder = to_radeon_encoder(encoder);
 		dig = radeon_encoder->enc_priv;
 		if (!dig->pin || dig->pin->id != port)
+			continue;
+		connector = radeon_get_connector_for_encoder(encoder);
+		if (!connector)
 			continue;
 		*enabled = true;
 		ret = drm_eld_size(connector->eld);
