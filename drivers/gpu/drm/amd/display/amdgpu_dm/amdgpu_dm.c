@@ -4661,7 +4661,10 @@ fail:
 
 static void amdgpu_dm_destroy_drm_device(struct amdgpu_display_manager *dm)
 {
+#ifdef AMDKCL_DEVM_DRM_DEV_ALLOC
 	drm_mode_config_cleanup(dm->ddev);
+#endif
+
 #ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	drm_atomic_private_obj_fini(&dm->atomic_obj);
 #endif
