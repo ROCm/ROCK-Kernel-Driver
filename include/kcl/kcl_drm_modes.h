@@ -44,4 +44,8 @@ bool drm_mode_is_420_also(const struct drm_display_info *display,
 		const struct drm_display_mode *mode);
 #endif
 
+#ifndef HAVE_DRM_MODE_INIT
+void drm_mode_init(struct drm_display_mode *dst, const struct drm_display_mode *src);
+#endif
+
 #endif
