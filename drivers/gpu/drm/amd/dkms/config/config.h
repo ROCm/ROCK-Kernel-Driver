@@ -716,6 +716,9 @@
 /* drm_mode_is_420_xxx() is available */
 #define HAVE_DRM_MODE_IS_420_XXX 1
 
+/* drm_mode_init() is available */
+#define HAVE_DRM_MODE_INTT 1
+
 /* enum drm_mode_subconnector is available */
 /* #undef HAVE_DRM_MODE_SUBCONNECTOR_ENUM */
 
