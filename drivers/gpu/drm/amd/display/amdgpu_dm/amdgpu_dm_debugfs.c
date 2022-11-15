@@ -2662,6 +2662,25 @@ static int dp_mst_progress_status_show(struct seq_file *m, void *unused)
 	return 0;
 }
 
+/*
+ * Reports whether the connected display is a USB4 DPIA tunneled display
+ * Example usage: cat /sys/kernel/debug/dri/0/DP-8/is_dpia_link
+ */
+static int is_dpia_link_show(struct seq_file *m, void *data)
+{
+	struct drm_connector *connector = m->private;
+	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+	struct dc_link *link = aconnector->dc_link;
+
+	if (connector->status != connector_status_connected)
+		return -ENODEV;
+
+	seq_printf(m, "%s\n", (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA) ? "yes" :
+				(link->ep_type == DISPLAY_ENDPOINT_PHY) ? "no" : "unknown");
+
+	return 0;
+}
+
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 #endif
@@ -2679,6 +2698,7 @@ DEFINE_SHOW_ATTRIBUTE(psr_capability);
 DEFINE_SHOW_ATTRIBUTE(dp_is_mst_connector);
 #endif
 DEFINE_SHOW_ATTRIBUTE(dp_mst_progress_status);
+DEFINE_SHOW_ATTRIBUTE(is_dpia_link);
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static const struct file_operations dp_dsc_clock_en_debugfs_fops = {
@@ -2838,7 +2858,8 @@ static const struct {
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 		{"is_mst_connector", &dp_is_mst_connector_fops},
 #endif
-		{"mst_progress_status", &dp_mst_progress_status_fops}
+		{"mst_progress_status", &dp_mst_progress_status_fops},
+		{"is_dpia_link", &is_dpia_link_fops}
 };
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
