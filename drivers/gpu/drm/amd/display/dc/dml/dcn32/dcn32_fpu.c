@@ -1761,6 +1761,7 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 	if (repopulate_pipes) {
 		int flag_max_mpc_comb = vba->maxMpcComb;
 		int flag_vlevel = vlevel;
+		int i;
 
 		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
 
@@ -1779,7 +1780,7 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 				flag_max_mpc_comb != context->bw_ctx.dml.vba.maxMpcComb) {
 			/* check the context constructed with pipe split flags is still valid*/
 			bool flags_valid = false;
-			for (int i = flag_vlevel; i < context->bw_ctx.dml.soc.num_states; i++) {
+			for (i = flag_vlevel; i < context->bw_ctx.dml.soc.num_states; i++) {
 				if (vba->ModeSupport[i][flag_max_mpc_comb]) {
 					vba->maxMpcComb = flag_max_mpc_comb;
 					vba->VoltageLevel = i;
