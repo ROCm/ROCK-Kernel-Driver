@@ -1552,7 +1552,7 @@ static void amdgpu_ttm_drv_reserve_vram_fini(struct amdgpu_device *adev)
 {
 	amdgpu_bo_free_kernel(&adev->mman.drv_vram_usage_reserved_bo,
 						  NULL,
-						  NULL);
+						  &adev->mman.drv_vram_usage_va);
 }
 
 /**
@@ -1590,8 +1590,9 @@ static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
  */
 static int amdgpu_ttm_drv_reserve_vram_init(struct amdgpu_device *adev)
 {
-	uint64_t vram_size = adev->gmc.visible_vram_size;
+	u64 vram_size = adev->gmc.visible_vram_size;
 
+	adev->mman.drv_vram_usage_va = NULL;
 	adev->mman.drv_vram_usage_reserved_bo = NULL;
 
 	if (adev->mman.drv_vram_usage_size == 0 ||
@@ -1603,7 +1604,7 @@ static int amdgpu_ttm_drv_reserve_vram_init(struct amdgpu_device *adev)
 					  adev->mman.drv_vram_usage_size,
 					  AMDGPU_GEM_DOMAIN_VRAM,
 					  &adev->mman.drv_vram_usage_reserved_bo,
-					  NULL);
+					  &adev->mman.drv_vram_usage_va);
 }
 
 /*
