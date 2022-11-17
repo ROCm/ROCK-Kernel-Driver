@@ -711,6 +711,7 @@ void amdgpu_hmm_unregister(struct amdgpu_bo *bo)
 }
 
 #else /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
+#define MAX_WALK_BYTE	(64ULL<<30)
 
 /**
  * amdgpu_hmm_invalidate_gfx - callback to notify about mm change
@@ -839,6 +840,7 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			       struct hmm_range **phmm_range)
 {
 	struct hmm_range *hmm_range;
+	unsigned long end;
 	unsigned long timeout;
 	unsigned long i;
 	unsigned long *pfns;
@@ -870,34 +872,51 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 	hmm_range->hmm_pfns = pfns;
 #endif
 	hmm_range->start = start;
-	hmm_range->end = start + npages * PAGE_SIZE;
+	end = start + npages * PAGE_SIZE;
 	hmm_range->dev_private_owner = owner;
 
-	/* Assuming 512MB takes maxmium 1 second to fault page address */
-	timeout = max(npages >> 17, 1ULL) * HMM_RANGE_DEFAULT_TIMEOUT;
-	timeout = jiffies + msecs_to_jiffies(timeout);
+	do {
+		hmm_range->end = min(hmm_range->start + MAX_WALK_BYTE, end);
+
+		pr_debug("hmm range: start = 0x%lx, end = 0x%lx",
+			hmm_range->start, hmm_range->end);
+
+		/* Assuming 512MB takes maxmium 1 second to fault page address */
+		timeout = max((hmm_range->end - hmm_range->start) >> 29, 1ULL) *
+			HMM_RANGE_DEFAULT_TIMEOUT;
+		timeout = jiffies + msecs_to_jiffies(timeout);
 
 retry:
-	hmm_range->notifier_seq = mmu_interval_read_begin(notifier);
-	r = hmm_range_fault(hmm_range);
+		hmm_range->notifier_seq = mmu_interval_read_begin(notifier);
+		r = hmm_range_fault(hmm_range);
 
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-	if (unlikely(r <= 0)) {
+		if (unlikely(r <= 0)) {
 #else
-	if (unlikely(r)) {
+		if (unlikely(r)) {
 #endif
-		/*
-		 * FIXME: This timeout should encompass the retry from
-		 * mmu_interval_read_retry() as well.
-		 */
+			/*
+		 	* FIXME: This timeout should encompass the retry from
+		 	* mmu_interval_read_retry() as well.
+		 	*/
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-		if ((r == 0 || r == -EBUSY) && !time_after(jiffies, timeout))
+			if ((r == 0 || r == -EBUSY) && !time_after(jiffies, timeout))
 #else
-		if (r == -EBUSY && !time_after(jiffies, timeout))
+			if (r == -EBUSY && !time_after(jiffies, timeout))
 #endif
-			goto retry;
-		goto out_free_pfns;
-	}
+				goto retry;
+			goto out_free_pfns;
+		}
+
+		if (hmm_range->end == end)
+			break;
+		hmm_range->hmm_pfns += MAX_WALK_BYTE >> PAGE_SHIFT;
+		hmm_range->start = hmm_range->end;
+		schedule();
+	} while (hmm_range->end < end);
+
+	hmm_range->start = start;
+	hmm_range->hmm_pfns = pfns;
 
 	/*
 	 * Due to default_flags, all pages are HMM_PFN_VALID or
