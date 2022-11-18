@@ -1628,6 +1628,8 @@ static struct resource_funcs dcn321_res_pool_funcs = {
 	.update_soc_for_wm_a = dcn30_update_soc_for_wm_a,
 	.add_phantom_pipes = dcn32_add_phantom_pipes,
 	.remove_phantom_pipes = dcn32_remove_phantom_pipes,
+	.save_mall_state = dcn32_save_mall_state,
+	.restore_mall_state = dcn32_restore_mall_state,
 };
 
 
