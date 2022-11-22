@@ -6608,7 +6608,7 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 	struct drm_connector_state *new_con_state;
 	struct amdgpu_dm_connector *aconnector;
 	struct dm_connector_state *dm_conn_state;
-	int i, j, ret;
+	int i, j;
 	int vcpi, pbn_div, pbn, slot_num = 0;
 
 	for_each_new_connector_in_state(state, connector, new_con_state, i) {
@@ -6655,11 +6655,8 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 			dm_conn_state->pbn = pbn;
 			dm_conn_state->vcpi_slots = slot_num;
 
-			ret = drm_dp_mst_atomic_enable_dsc(state, aconnector->port,
-							   dm_conn_state->pbn, false);
-			if (ret < 0)
-				return ret;
-
+			drm_dp_mst_atomic_enable_dsc(state, aconnector->port, dm_conn_state->pbn,
+						     false);
 			continue;
 		}
 
@@ -9810,9 +9807,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	if (dc_resource_is_dsc_encoding_supported(dc)) {
-		ret = pre_validate_dsc(state, &dm_state, vars);
-		if (ret != 0)
+		if (!pre_validate_dsc(state, &dm_state, vars)) {
+			ret = -EINVAL;
 			goto fail;
+		}
 	}
 #endif
 
@@ -9920,9 +9918,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
-		ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
-		if (ret) {
+		if (!compute_mst_dsc_configs_for_state(state, dm_state->context, vars)) {
 			DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
+			ret = -EINVAL;
 			goto fail;
 		}
 
