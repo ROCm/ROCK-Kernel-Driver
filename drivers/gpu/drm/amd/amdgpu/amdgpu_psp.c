@@ -750,29 +750,29 @@ static int psp_tmr_init(struct psp_context *psp)
 	void *tmr_buf;
 	void **pptr;
 
-	if (!psp->tmr_bo) {
-		/*
-		 * According to HW engineer, they prefer the TMR address be "naturally
-		 * aligned" , e.g. the start address be an integer divide of TMR size.
-		 *
-		 * Note: this memory need be reserved till the driver
-		 * uninitializes.
-		 */
-		tmr_size = PSP_TMR_SIZE(psp->adev);
+	/*
+	 * According to HW engineer, they prefer the TMR address be "naturally
+	 * aligned" , e.g. the start address be an integer divide of TMR size.
+	 *
+	 * Note: this memory need be reserved till the driver
+	 * uninitializes.
+	 */
+	tmr_size = PSP_TMR_SIZE(psp->adev);
 
-		/* For ASICs support RLC autoload, psp will parse the toc
-		 * and calculate the total size of TMR needed */
-		if (!amdgpu_sriov_vf(psp->adev) &&
-		    psp->toc.start_addr &&
-		    psp->toc.size_bytes &&
-		    psp->fw_pri_buf) {
-			ret = psp_load_toc(psp, &tmr_size);
-			if (ret) {
-				DRM_ERROR("Failed to load toc\n");
-				return ret;
-			}
+	/* For ASICs support RLC autoload, psp will parse the toc
+	 * and calculate the total size of TMR needed */
+	if (!amdgpu_sriov_vf(psp->adev) &&
+	    psp->toc.start_addr &&
+	    psp->toc.size_bytes &&
+	    psp->fw_pri_buf) {
+		ret = psp_load_toc(psp, &tmr_size);
+		if (ret) {
+			DRM_ERROR("Failed to load toc\n");
+			return ret;
 		}
+	}
 
+	if (!psp->tmr_bo) {
 		pptr = amdgpu_sriov_vf(psp->adev) ? &tmr_buf : NULL;
 		ret = amdgpu_bo_create_kernel(psp->adev, tmr_size, PSP_TMR_ALIGNMENT,
 					      AMDGPU_GEM_DOMAIN_VRAM,
