@@ -35,6 +35,11 @@
 #include <kcl/kcl_drm_crtc.h>
 #include <kcl/kcl_fence.h>
 
+/* drm/atomic-helper: Remove _HELPER_ infix from DRM_PLANE_HELPER_NO_SCALING */
+#ifndef DRM_PLANE_NO_SCALING
+#define DRM_PLANE_NO_SCALING (1<<16)
+#endif
+
 /*
  * v4.19-rc1-206-ge267364a6e1b
  * drm/atomic: Initialise planes with opaque alpha values
