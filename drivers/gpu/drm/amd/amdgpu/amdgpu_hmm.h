@@ -42,8 +42,8 @@ void amdgpu_mn_lock(struct amdgpu_mn *mn);
 void amdgpu_mn_unlock(struct amdgpu_mn *mn);
 struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 				enum amdgpu_mn_type type);
-int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr);
-void amdgpu_mn_unregister(struct amdgpu_bo *bo);
+int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr);
+void amdgpu_hmm_unregister(struct amdgpu_bo *bo);
 #else /* !CONFIG_MMU_NOTIFIER */
 static inline void amdgpu_mn_lock(struct amdgpu_mn *mn) {}
 static inline void amdgpu_mn_unlock(struct amdgpu_mn *mn) {}
@@ -52,11 +52,11 @@ static inline struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 {
 	return NULL;
 }
-static inline int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
+static inline int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr)
 {
 	return -ENODEV;
 }
-static inline void amdgpu_mn_unregister(struct amdgpu_bo *bo) {}
+static inline void amdgpu_hmm_unregister(struct amdgpu_bo *bo) {}
 #endif /* CONFIG_MMU_NOTIFIER */
 #else /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 #include <linux/types.h>
