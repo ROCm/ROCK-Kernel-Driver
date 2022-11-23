@@ -609,7 +609,7 @@ free_amn:
 }
 
 /**
- * amdgpu_mn_register - register a BO for notifier updates
+ * amdgpu_hmm_register - register a BO for notifier updates
  *
  * @bo: amdgpu buffer object
  * @addr: userptr addr we should monitor
@@ -617,7 +617,7 @@ free_amn:
  * Registers an MMU notifier for the given BO at the specified address.
  * Returns 0 on success, -ERRNO if anything goes wrong.
  */
-int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
+int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr)
 {
 	unsigned long end = addr + amdgpu_bo_size(bo) - 1;
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
@@ -676,7 +676,7 @@ int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
  *
  * Remove any registration of MMU notifier updates from the buffer object.
  */
-void amdgpu_mn_unregister(struct amdgpu_bo *bo)
+void amdgpu_hmm_unregister(struct amdgpu_bo *bo)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	struct amdgpu_mn *amn;
