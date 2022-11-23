@@ -1052,7 +1052,7 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 		goto unregister_out;
 	}
 
-	ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages);
+	ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages, NULL);
 	if (ret) {
 		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
 		goto free_out;
@@ -2705,7 +2705,7 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 		}
 
 		/* Get updated user pages */
-		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages);
+		ret = amdgpu_ttm_tt_get_user_pages(bo, mem->user_pages, NULL);
 		if (ret) {
 			mem->user_pages[0] = NULL;
 			pr_info("%s: Failed to get user pages: %d\n",

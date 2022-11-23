@@ -812,7 +812,8 @@ bool amdgpu_ttm_tt_get_user_pages_done(struct ttm_tt *ttm,
  * This provides a wrapper around the get_user_pages() call to provide
  * device accessible pages that back user memory.
  */
-int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages)
+int amdgpu_ttm_tt_get_user_pages(struct amdgpu_bo *bo, struct page **pages,
+				 struct hmm_range **range)
 {
 	struct ttm_tt *ttm = bo->tbo.ttm;
 	struct amdgpu_ttm_tt *gtt = (void *)ttm;
