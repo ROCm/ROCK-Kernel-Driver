@@ -586,7 +586,6 @@ static int amdgpu_cs_p2_syncobj_timeline_signal(struct amdgpu_cs_parser *p,
 		dep->point = syncobj_deps[i].point;
 		p->num_post_deps++;
 	}
-	}
 
 	return 0;
 }
@@ -1921,34 +1920,34 @@ err_free_fences:
  */
 int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 			   uint64_t addr, struct amdgpu_bo **bo,
-		goto err_free_fences;
-	}
-
-	if (wait->in.wait_all)
-		r = amdgpu_cs_wait_all_fences(adev, filp, wait, fences);
-	else
-		r = amdgpu_cs_wait_any_fence(adev, filp, wait, fences);
-
-err_free_fences:
-	kfree(fences);
-
-	return r;
-}
-
-/**
- * amdgpu_cs_find_mapping - find bo_va for VM address
- *
- * @parser: command submission parser context
- * @addr: VM address
- * @bo: resulting BO of the mapping found
- * @map: Placeholder to return found BO mapping
- *
- * Search the buffer objects in the command submission context for a certain
- * virtual memory address. Returns allocation structure when found, NULL
- * otherwise.
- */
-int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
-			   uint64_t addr, struct amdgpu_bo **bo,
 			   struct amdgpu_bo_va_mapping **map)
 {
 	struct amdgpu_fpriv *fpriv = parser->filp->driver_priv;
+	struct ttm_operation_ctx ctx = { false, false };
+	struct amdgpu_vm *vm = &fpriv->vm;
+	struct amdgpu_bo_va_mapping *mapping;
+	int r;
+
+	addr /= AMDGPU_GPU_PAGE_SIZE;
+
+	mapping = amdgpu_vm_bo_lookup_mapping(vm, addr);
+	if (!mapping || !mapping->bo_va || !mapping->bo_va->base.bo)
+		return -EINVAL;
+
+	*bo = mapping->bo_va->base.bo;
+	*map = mapping;
+
+	/* Double check that the BO is reserved by this CS */
+	if (dma_resv_locking_ctx((*bo)->tbo.base.resv) != &parser->ticket)
+		return -EINVAL;
+
+	if (!((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {
+		(*bo)->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;
+		amdgpu_bo_placement_from_domain(*bo, (*bo)->allowed_domains);
+		r = ttm_bo_validate(&(*bo)->tbo, &(*bo)->placement, &ctx);
+		if (r)
+			return r;
+	}
+
+	return amdgpu_ttm_alloc_gart(&(*bo)->tbo);
+}

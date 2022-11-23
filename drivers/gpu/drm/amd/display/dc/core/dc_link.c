@@ -4342,7 +4342,6 @@ void core_link_enable_stream(
 		if (pipe_ctx->stream->dpms_off)
 			return;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		/* Have to setup DSC before DIG FE and BE are connected (which happens before the
 		 * link training). This is to make sure the bandwidth sent to DIG BE won't be
 		 * bigger than what the link and/or DIG BE can handle. VBID[6]/CompressedStream_flag
