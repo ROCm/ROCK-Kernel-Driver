@@ -19,6 +19,10 @@
 /* acpi_video_backlight_use_native() is available */
 #define HAVE_ACPI_VIDEO_BACKLIGHT_USE_NATIVE 1
 
+
+/* acpi_video_register_backlight() is available */
+#define HAVE_ACPI_VIDEO_REGISTER_BACKLIGHT 1
+
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 

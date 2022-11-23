@@ -230,7 +230,9 @@ error:
 
 register_acpi_backlight:
 	/* Try registering an ACPI video backlight device instead. */
+#ifdef HAVE_ACPI_VIDEO_REGISTER_BACKLIGHT
 	acpi_video_register_backlight();
+#endif
 	return;
 }
 
