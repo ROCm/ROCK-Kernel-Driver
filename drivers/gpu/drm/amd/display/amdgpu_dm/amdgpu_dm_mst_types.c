@@ -1172,15 +1172,8 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 
 	memset(params, 0, sizeof(params));
 
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
-
-	mst_state->pbn_div = dm_mst_get_pbn_divider(dc_link);
-#if defined(CONFIG_DRM_AMD_DC_DCN)
-	drm_dp_mst_update_slots(mst_state, dc_link_dp_mst_decide_link_encoding_format(dc_link));
-#endif
-#endif
 
 	/* Set up params */
 	for (i = 0; i < dc_state->stream_count; i++) {
