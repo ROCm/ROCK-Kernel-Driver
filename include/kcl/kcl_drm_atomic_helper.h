@@ -35,6 +35,11 @@
 #include <kcl/kcl_drm_crtc.h>
 #include <kcl/kcl_fence.h>
 
+/* drm/atomic-helper: Remove _HELPER_ infix from DRM_PLANE_HELPER_NO_SCALING */
+#ifndef DRM_PLANE_NO_SCALING
+#define DRM_PLANE_NO_SCALING (1<<16)
+#endif
+
 static inline struct drm_crtc_state *
 kcl_drm_atomic_get_old_crtc_state_before_commit(struct drm_atomic_state *state,
 					    struct drm_crtc *crtc)
