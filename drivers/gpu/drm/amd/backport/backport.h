@@ -109,4 +109,5 @@
 #include <kcl/kcl_drm_modeset_lock.h>
 #include <kcl/kcl_drm_dsc_helper.h>
 #include <kcl/kcl_highmem-internal.h>
+#include <kcl/kcl_dynamic_debug.h>
 #endif /* AMDGPU_BACKPORT_H */
