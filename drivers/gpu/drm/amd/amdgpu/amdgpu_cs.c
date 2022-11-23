@@ -978,80 +978,80 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 		goto out_free_user_pages;
 	}
 #else
-       while (1) {
-               struct list_head need_pages;
+	while (1) {
+		struct list_head need_pages;
 
-               r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true,
-                                          &duplicates);
-               if (unlikely(r != 0)) {
-                       if (r != -ERESTARTSYS)
-                               DRM_ERROR("ttm_eu_reserve_buffers failed.\n");
-                       goto error_free_pages;
-               }
+		r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true,
+					   &duplicates);
+		if (unlikely(r != 0)) {
+			if (r != -ERESTARTSYS)
+				DRM_ERROR("ttm_eu_reserve_buffers failed.\n");
+			goto error_free_pages;
+		}
 
-               INIT_LIST_HEAD(&need_pages);
-               amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
-                       struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+		INIT_LIST_HEAD(&need_pages);
+		amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
+			struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 
-                       if (amdgpu_ttm_tt_userptr_invalidated(bo->tbo.ttm,
-                                &e->user_invalidated) && e->user_pages) {
+			if (amdgpu_ttm_tt_userptr_invalidated(bo->tbo.ttm,
+				 &e->user_invalidated) && e->user_pages) {
 
-                               /* We acquired a page array, but somebody
-                                * invalidated it. Free it and try again
-                                */
-                               release_pages(e->user_pages,
-                                             bo->tbo.ttm->num_pages);
-                               kvfree(e->user_pages);
-                               e->user_pages = NULL;
-                       }
+				/* We acquired a page array, but somebody
+				 * invalidated it. Free it and try again
+				 */
+				release_pages(e->user_pages,
+					      bo->tbo.ttm->num_pages);
+				kvfree(e->user_pages);
+				e->user_pages = NULL;
+			}
 
-                       if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
-                           !e->user_pages) {
-                               list_del(&e->tv.head);
-                               list_add(&e->tv.head, &need_pages);
+			if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm) &&
+			    !e->user_pages) {
+				list_del(&e->tv.head);
+				list_add(&e->tv.head, &need_pages);
 
-                               amdgpu_bo_unreserve(bo);
-                       }
-               }
+				amdgpu_bo_unreserve(bo);
+			}
+		}
 
-               if (list_empty(&need_pages))
-                       break;
+		if (list_empty(&need_pages))
+			break;
 
-               /* Unreserve everything again. */
-               ttm_eu_backoff_reservation(&p->ticket, &p->validated);
+		/* Unreserve everything again. */
+		ttm_eu_backoff_reservation(&p->ticket, &p->validated);
 
-               /* We tried too many times, just abort */
-               if (!--tries) {
-                       r = -EDEADLK;
-                       DRM_ERROR("deadlock in %s\n", __func__);
-                       goto error_free_pages;
-               }
+		/* We tried too many times, just abort */
+		if (!--tries) {
+			r = -EDEADLK;
+			DRM_ERROR("deadlock in %s\n", __func__);
+			goto error_free_pages;
+		}
 
-               /* Fill the page arrays for all userptrs. */
-               list_for_each_entry(e, &need_pages, tv.head) {
-                       struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+		/* Fill the page arrays for all userptrs. */
+		list_for_each_entry(e, &need_pages, tv.head) {
+			struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 
-                       e->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
-                                                        sizeof(struct page*),
-                                                        GFP_KERNEL | __GFP_ZERO);
-                       if (!e->user_pages) {
-                               r = -ENOMEM;
-                               DRM_ERROR("calloc failure in %s\n", __func__);
-                               goto error_free_pages;
-                       }
+			e->user_pages = kvmalloc_array(bo->tbo.ttm->num_pages,
+							 sizeof(struct page*),
+							 GFP_KERNEL | __GFP_ZERO);
+			if (!e->user_pages) {
+				r = -ENOMEM;
+				DRM_ERROR("calloc failure in %s\n", __func__);
+				goto error_free_pages;
+			}
 
-                       r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages);
-                       if (r) {
-                               DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
-                               kvfree(e->user_pages);
-                               e->user_pages = NULL;
-                               goto error_free_pages;
-                       }
-               }
+			r = amdgpu_ttm_tt_get_user_pages(bo, e->user_pages, NULL);
+			if (r) {
+				DRM_ERROR("amdgpu_ttm_tt_get_user_pages failed.\n");
+				kvfree(e->user_pages);
+				e->user_pages = NULL;
+				goto error_free_pages;
+			}
+		}
 
-               /* And try again. */
-               list_splice(&need_pages, &p->validated);
-       }
+		/* And try again. */
+		list_splice(&need_pages, &p->validated);
+	}
 #endif
 
 	amdgpu_bo_list_for_each_entry(e, p->bo_list) {
