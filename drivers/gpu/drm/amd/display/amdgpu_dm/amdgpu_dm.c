@@ -4503,12 +4503,14 @@ amdgpu_dm_register_backlight_device(struct amdgpu_dm_connector *aconnector)
 	if (aconnector->bl_idx == -1)
 		return;
 
+#ifdef HAVE_ACPI_VIDEO_BACKLIGHT_USE_NATIVE
 	if (!acpi_video_backlight_use_native()) {
 		drm_info(drm, "Skipping amdgpu DM backlight registration\n");
 		/* Try registering an ACPI video backlight device instead. */
 		acpi_video_register_backlight();
 		return;
 	}
+#endif
 
 	props.max_brightness = AMDGPU_MAX_BL_LEVEL;
 	props.brightness = AMDGPU_MAX_BL_LEVEL;
