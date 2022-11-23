@@ -159,10 +159,6 @@ void kcl_drm_err(const char *format, ...);
 #define HAVE_DRM_ERR_MACRO
 #endif /* drm_err */
 
-#if !defined(DRM_UT_STATE)
-#define DRM_UT_STATE	0x40
-#endif
-
 #if !defined(DRM_UT_VBL)
 #define DRM_UT_VBL		0x20
 #endif
