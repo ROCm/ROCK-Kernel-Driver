@@ -744,6 +744,9 @@
 /* drm_plane_helper_check_state is available */
 /* #undef HAVE_DRM_PLANE_HELPER_CHECK_STATE */
 
+/* drm_plane_helper_destroy() is available */
+/* #undef HAVE_DRM_PLANE_HELPER_DESTROY */
+
 /* drm_plane_mask is available */
 #define HAVE_DRM_PLANE_MASK 1
 
