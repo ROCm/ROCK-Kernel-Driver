@@ -439,6 +439,9 @@
 /* struct drm_dp_mst_port has passthrough_aux member */
 /* #undef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX */
 
+/* drm_dp_mst_root_conn_atomic_check() is available */
+/* #undef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK */
+
 /* drm_dp_mst_port struct has full_pbn member */
 #define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
 
