@@ -8765,7 +8765,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		DRM_ERROR("Waiting for fences timed out!");
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+#ifdef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES
 	drm_dp_mst_atomic_wait_for_dependencies(state);
+#endif
 
 #ifndef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	dm_state = to_dm_atomic_state(state);

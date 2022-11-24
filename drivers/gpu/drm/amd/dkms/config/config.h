@@ -382,6 +382,9 @@
 /* drm_dp_mst_atomic_setup_commit() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT */
 
+/* drm_dp_mst_atomic_wait_for_dependencies() is available */
+/* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
+
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 
