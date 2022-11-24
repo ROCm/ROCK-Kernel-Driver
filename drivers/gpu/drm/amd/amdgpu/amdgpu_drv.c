@@ -2568,7 +2568,7 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 		amdgpu_device_baco_enter(drm_dev);
 	}
 
-	dev_info(&pdev->dev, "asic/device is runtime suspended\n");
+	dev_dbg(&pdev->dev, "asic/device is runtime suspended\n");
 
 	return 0;
 }
