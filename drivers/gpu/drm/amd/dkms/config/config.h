@@ -388,6 +388,9 @@
 /* drm_dp_atomic_find_vcpi_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 
+/* drm_dp_atomic_release_time_slots() is available */
+/* #undef HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS */
+
 /* drm_dp_atomic_find_vcpi_slots() wants 5args */
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS 1
 
