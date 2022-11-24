@@ -86,10 +86,30 @@ AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_MAX_DSC_BPP], [
 	])
 ])
 
+dnl #
+dnl # commit v6.1-rc1~27-a61bb3422e8d
+dnl # drm/amdgpu_dm: Rely on split out luminance calculation function
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_LUMINANCE_RANGE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_connector.h>
+		],[
+			struct drm_display_info *display_info = NULL;
+			display_info->luminance_range=NULL;
+		],[
+			AC_DEFINE(HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE, 1,
+				[display_info->luminance_range is available])
+		])
+	])
+])
+
+
 AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO], [
 	AC_AMDGPU_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING
 	AC_AMDGPU_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK
 	AC_AMDGPU_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES
 	AC_AMDGPU_DRM_DISPLAY_INFO_MONITOR_RANGE
 	AC_AMDGPU_DRM_DISPLAY_INFO_MAX_DSC_BPP
+	AC_AMDGPU_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 ])
