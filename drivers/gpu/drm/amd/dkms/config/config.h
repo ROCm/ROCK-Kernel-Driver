@@ -370,6 +370,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* display_info->luminance_range is available */
+/* #undef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE */
+
 /* display_info->max_dsc_bpp is available */
 /* #undef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP */
 
