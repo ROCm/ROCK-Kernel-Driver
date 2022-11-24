@@ -67,6 +67,18 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS */
 
+#if !defined(HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS)
+static inline
+int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
+				  struct drm_dp_mst_topology_mgr *mgr,
+				  struct drm_dp_mst_port *port, int pbn,
+				  int pbn_div)
+{
+	return 0;
+}
+#define drm_dp_atomic_find_time_slots _kcl_drm_dp_atomic_find_time_slots
+#endif
+
 #ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS
 static inline int
 _kcl_drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr,
