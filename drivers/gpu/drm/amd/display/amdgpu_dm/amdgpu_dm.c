@@ -3003,7 +3003,9 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	struct drm_connector *conn_base;
 	struct amdgpu_device *adev;
 	struct dc_link *link = NULL;
+#ifdef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 	struct drm_luminance_range_info *luminance_range;
+#endif
 	int i;
 
 	if (!aconnector || !aconnector->dc_link)
@@ -3036,9 +3038,11 @@ static void update_connector_ext_caps(struct amdgpu_dm_connector *aconnector)
 	else if (amdgpu_backlight == 1)
 		caps->aux_support = true;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE
 	luminance_range = &conn_base->display_info.luminance_range;
 	caps->aux_min_input_signal = luminance_range->min_luminance;
 	caps->aux_max_input_signal = luminance_range->max_luminance;
+#endif
 }
 #endif
 
