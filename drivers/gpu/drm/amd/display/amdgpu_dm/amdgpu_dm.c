@@ -2991,7 +2991,9 @@ static const struct drm_mode_config_funcs amdgpu_dm_mode_funcs = {
 #ifdef HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE
 static struct drm_mode_config_helper_funcs amdgpu_dm_mode_config_helperfuncs = {
 	.atomic_commit_tail = amdgpu_dm_atomic_commit_tail,
+#ifdef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT
 	.atomic_commit_setup = drm_dp_mst_atomic_setup_commit,
+#endif
 };
 #endif
 
