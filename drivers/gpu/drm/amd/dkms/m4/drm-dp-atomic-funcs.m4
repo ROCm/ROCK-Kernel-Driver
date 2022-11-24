@@ -100,10 +100,28 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES], [
 	])
 ])
 
+dnl #
+dnl # commit v6.1-rc1~27-a5c2c0d164e9
+dnl # drm/display/dp_mst: Add nonblocking helpers for DP MST
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_dp_mst_helper.h>
+		],[
+			int ret;
+			ret = drm_dp_mst_root_conn_atomic_check(NULL, NULL);
+		],[
+			AC_DEFINE(HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK, 1,
+				[drm_dp_mst_root_conn_atomic_check() is available])
+		])
+	])
+])
 
 AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_FUNCS], [
 	AC_AMDGPU_DRM_DP_ATOMIC_FIND_VCPI_SLOTS
 	AC_AMDGPU_DRM_DP_ATOMIC_FIND_TIME_SLOTS
 	AC_AMDGPU_DRM_DP_ATOMIC_SETUP_COMMIT
 	AC_AMDGPU_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES
+	AC_AMDGPU_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK
 ])
