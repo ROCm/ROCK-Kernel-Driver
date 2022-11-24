@@ -1572,7 +1572,9 @@ static void dm_drm_plane_destroy_state(struct drm_plane *plane,
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_atomic_helper_disable_plane,
+#ifdef HAVE_DRM_PLANE_HELPER_DESTROY
 	.destroy	= drm_plane_helper_destroy,
+#endif
 #ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
     .set_property   = drm_atomic_helper_plane_set_property,
 #endif
