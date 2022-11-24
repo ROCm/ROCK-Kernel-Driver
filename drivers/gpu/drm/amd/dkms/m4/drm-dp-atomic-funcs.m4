@@ -118,10 +118,29 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK], [
 	])
 ])
 
+dnl #
+dnl # commit v6.1-rc1~27-df78f7f660cd
+dnl # drm/display/dp_mst: Call them time slots, not VCPI slots
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_dp_mst_helper.h>
+		],[
+			int ret;
+			ret = drm_dp_atomic_release_time_slots(NULL, NULL, NULL);
+		],[
+			AC_DEFINE(HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS, 1,
+				[drm_dp_atomic_release_time_slots() is available])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_FUNCS], [
 	AC_AMDGPU_DRM_DP_ATOMIC_FIND_VCPI_SLOTS
 	AC_AMDGPU_DRM_DP_ATOMIC_FIND_TIME_SLOTS
 	AC_AMDGPU_DRM_DP_ATOMIC_SETUP_COMMIT
 	AC_AMDGPU_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES
 	AC_AMDGPU_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK
+	AC_AMDGPU_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS
 ])
