@@ -876,14 +876,18 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 	hmm_range->dev_private_owner = owner;
 
 	do {
-		hmm_range->end = min(hmm_range->start + MAX_WALK_BYTE, end);
+		hmm_range->end = min_t(typeof(hmm_range->end),
+				       hmm_range->start + MAX_WALK_BYTE,
+				       end);
 
 		pr_debug("hmm range: start = 0x%lx, end = 0x%lx",
 			hmm_range->start, hmm_range->end);
 
 		/* Assuming 512MB takes maxmium 1 second to fault page address */
-		timeout = max((hmm_range->end - hmm_range->start) >> 29, 1ULL) *
-			HMM_RANGE_DEFAULT_TIMEOUT;
+		timeout = max_t(typeof(timeout),
+				(hmm_range->end - hmm_range->start) >> 29,
+				1ULL);
+		timeout *= HMM_RANGE_DEFAULT_TIMEOUT;
 		timeout = jiffies + msecs_to_jiffies(timeout);
 
 retry:
