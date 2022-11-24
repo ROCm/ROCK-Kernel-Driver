@@ -69,7 +69,7 @@ bool dcn32_release_post_bldn_3dlut(
 		struct dc_transfer_func **shaper);
 
 bool dcn32_remove_phantom_pipes(struct dc *dc,
-		struct dc_state *context);
+    struct dc_state *context, bool fast_update);
 
 void dcn32_add_phantom_pipes(struct dc *dc,
 		struct dc_state *context,
