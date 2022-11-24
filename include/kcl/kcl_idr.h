@@ -35,4 +35,20 @@ static inline void *_kcl_idr_remove(struct idr *idr, int id)
 #define idr_remove _kcl_idr_remove
 #endif /* HAVE_IDR_REMOVE_RETURN_VOID_POINTER */
 
+#ifndef HAVE_IDR_INIT_BASE
+#ifdef HAVE_STRUCT_IDE_IDR_BASE
+static inline void kc_idr_init_base(struct idr *idr, int base)
+{
+	INIT_RADIX_TREE(&idr->idr_rt, IDR_RT_MARKER);
+	idr->idr_base = base;
+	idr->idr_next = 0;
+}
+#else
+static inline void kc_idr_init_base(struct idr *idr, int base)
+{
+	idr_init(idr);
+}
+#endif
+#define idr_init_base kc_idr_init_base
+#endif
 #endif /* AMDKCL_IDR_H */
