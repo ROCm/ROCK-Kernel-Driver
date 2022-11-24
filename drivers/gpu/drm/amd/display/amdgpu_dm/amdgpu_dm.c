@@ -6908,15 +6908,19 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 		drm_atomic_get_old_connector_state(state, conn);
 	struct drm_crtc *crtc = new_con_state->crtc;
 	struct drm_crtc_state *new_crtc_state;
+#ifdef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK
 	struct amdgpu_dm_connector *aconn = to_amdgpu_dm_connector(conn);
+#endif
 	int ret;
 
 	trace_amdgpu_dm_connector_atomic_check(new_con_state);
 
 	if (conn->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
+#ifdef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK
 		ret = drm_dp_mst_root_conn_atomic_check(new_con_state, &aconn->mst_mgr);
 		if (ret < 0)
 			return ret;
+#endif
 	}
 
 	if (!crtc)
@@ -6952,6 +6956,7 @@ amdgpu_dm_connector_atomic_check(struct drm_connector *conn,
 	return 0;
 }
 #endif
+
 static struct drm_encoder *amdgpu_dm_connector_to_encoder(struct drm_connector *connector)
 {
 #ifdef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS
