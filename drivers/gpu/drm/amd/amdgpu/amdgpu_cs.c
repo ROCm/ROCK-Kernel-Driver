@@ -1420,7 +1420,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 		if (amdgpu_ttm_tt_userptr_needs_pages(bo->tbo.ttm)) {
 			r = -ERESTARTSYS;
-			goto error_abort;
+			goto error_unlock;
 		}
 	}
 #endif
