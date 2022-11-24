@@ -1018,7 +1018,7 @@ int ttm_bo_init_reserved(struct ttm_device *bdev, struct ttm_buffer_object *bo,
 
 err_unlock:
 	if (!resv)
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 
 err_put:
 	ttm_bo_put(bo);

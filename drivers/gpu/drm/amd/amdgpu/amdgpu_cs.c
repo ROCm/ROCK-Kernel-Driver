@@ -1938,8 +1938,8 @@ int amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 	*map = mapping;
 
 	/* Double check that the BO is reserved by this CS */
-	if (dma_resv_locking_ctx((*bo)->tbo.base.resv) != &parser->ticket)
-		return -EINVAL;
+	if (dma_resv_locking_ctx(amdkcl_ttm_resvp(&(*bo)->tbo)) != &parser->ticket)
+			return -EINVAL;
 
 	if (!((*bo)->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS)) {
 		(*bo)->flags |= AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS;

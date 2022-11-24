@@ -424,7 +424,7 @@ int ttm_bo_vmap(struct ttm_buffer_object *bo, struct iosys_map *map)
 	struct ttm_resource *mem = bo->resource;
 	int ret;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	ret = ttm_mem_io_reserve(bo->bdev, mem);
 	if (ret)
@@ -484,7 +484,7 @@ void ttm_bo_vunmap(struct ttm_buffer_object *bo, struct iosys_map *map)
 {
 	struct ttm_resource *mem = bo->resource;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	if (iosys_map_is_null(map))
 		return;
