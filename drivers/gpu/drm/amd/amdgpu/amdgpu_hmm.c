@@ -876,8 +876,8 @@ int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
 			hmm_range->start, hmm_range->end);
 
 		/* Assuming 512MB takes maxmium 1 second to fault page address */
-		timeout = max((hmm_range->end - hmm_range->start) >> 29, 1ULL) *
-			HMM_RANGE_DEFAULT_TIMEOUT;
+		timeout = max((hmm_range->end - hmm_range->start) >> 29, 1UL);
+		timeout *= HMM_RANGE_DEFAULT_TIMEOUT;
 		timeout = jiffies + msecs_to_jiffies(timeout);
 
 retry:
