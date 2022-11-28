@@ -670,7 +670,7 @@ int amdgpu_hmm_register(struct amdgpu_bo *bo, unsigned long addr)
 }
 
 /**
- * amdgpu_mn_unregister - unregister a BO for notifier updates
+ * amdgpu_hmm_unregister - unregister a BO for notifier updates
  *
  * @bo: amdgpu buffer object
  *
