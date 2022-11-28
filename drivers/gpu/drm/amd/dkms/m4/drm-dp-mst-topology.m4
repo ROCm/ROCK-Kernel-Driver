@@ -63,9 +63,9 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
 			drm_dp_mst_connector_early_unregister(NULL, NULL);
 			drm_dp_mst_connector_late_register(NULL, NULL);
 		], [
-			AC_DEFINE(HAVE_DP_MST_CONNECTOR_EARLY_UNREGISTER, 1, [
+			AC_DEFINE(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER, 1, [
 				drm_dp_mst_connector_early_unregister() is available])
-			AC_DEFINE(HAVE_DP_MST_CONNECTOR_LATE_REGISTER, 1, [
+			AC_DEFINE(HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER, 1, [
 				drm_dp_mst_connector_late_register() is available])
 		])
 	])
