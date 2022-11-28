@@ -137,10 +137,10 @@
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
 /* drm_dp_mst_connector_early_unregister() is available */
-#define HAVE_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
+#define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
 
 /* drm_dp_mst_connector_late_register() is available */
-#define HAVE_DP_MST_CONNECTOR_LATE_REGISTER 1
+#define HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER 1
 
 /* drm_accurate_vblank_count() is available */
 /* #undef HAVE_DRM_ACCURATE_VBLANK_COUNT */
