@@ -102,8 +102,6 @@ static int sanitycheck(void *arg)
 	if (!f)
 		return -ENOMEM;
 
-	dma_fence_enable_sw_signaling(f);
-
 	dma_fence_signal(f);
 	dma_fence_put(f);
 
@@ -118,8 +116,6 @@ static int test_signaling(void *arg)
 	f = mock_fence();
 	if (!f)
 		return -ENOMEM;
-
-	dma_fence_enable_sw_signaling(f);
 
 	if (dma_fence_is_signaled(f)) {
 		pr_err("Fence unexpectedly signaled on creation\n");
@@ -193,8 +189,6 @@ static int test_late_add_callback(void *arg)
 	f = mock_fence();
 	if (!f)
 		return -ENOMEM;
-
-	dma_fence_enable_sw_signaling(f);
 
 	dma_fence_signal(f);
 
@@ -288,8 +282,6 @@ static int test_status(void *arg)
 	if (!f)
 		return -ENOMEM;
 
-	dma_fence_enable_sw_signaling(f);
-
 	if (dma_fence_get_status(f)) {
 		pr_err("Fence unexpectedly has signaled status on creation\n");
 		goto err_free;
@@ -315,8 +307,6 @@ static int test_error(void *arg)
 	f = mock_fence();
 	if (!f)
 		return -ENOMEM;
-
-	dma_fence_enable_sw_signaling(f);
 
 	dma_fence_set_error(f, -EIO);
 
@@ -346,8 +336,6 @@ static int test_wait(void *arg)
 	f = mock_fence();
 	if (!f)
 		return -ENOMEM;
-
-	dma_fence_enable_sw_signaling(f);
 
 	if (dma_fence_wait_timeout(f, false, 0) != -ETIME) {
 		pr_err("Wait reported complete before being signaled\n");
@@ -390,8 +378,6 @@ static int test_wait_timeout(void *arg)
 	wt.f = mock_fence();
 	if (!wt.f)
 		return -ENOMEM;
-
-	dma_fence_enable_sw_signaling(wt.f);
 
 	if (dma_fence_wait_timeout(wt.f, false, 1) != -ETIME) {
 		pr_err("Wait reported complete before being signaled\n");
@@ -471,8 +457,6 @@ static int thread_signal_callback(void *arg)
 			err = -ENOMEM;
 			break;
 		}
-
-		dma_fence_enable_sw_signaling(f1);
 
 		rcu_assign_pointer(t->fences[t->id], f1);
 		smp_wmb();
