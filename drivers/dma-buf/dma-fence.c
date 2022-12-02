@@ -136,10 +136,6 @@ struct dma_fence *dma_fence_get_stub(void)
 			       &dma_fence_stub_ops,
 			       &dma_fence_stub_lock,
 			       0, 0);
-
-		set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
-			&dma_fence_stub.flags);
-
 		dma_fence_signal_locked(&dma_fence_stub);
 	}
 	spin_unlock(&dma_fence_stub_lock);
@@ -166,9 +162,6 @@ struct dma_fence *dma_fence_allocate_private_stub(ktime_t timestamp)
 		       &dma_fence_stub_ops,
 		       &dma_fence_stub_lock,
 		       0, 0);
-
-	set_bit(DMA_FENCE_FLAG_ENABLE_SIGNAL_BIT,
-		&fence->flags);
 
 	dma_fence_signal_timestamp(fence, timestamp);
 
