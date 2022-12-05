@@ -103,4 +103,5 @@
 #include <kcl/kcl_highmem-internal.h>
 #include <kcl/kcl_dynamic_debug.h>
 #include <kcl/kcl_drm_plane_helper.h>
+#include <drm/drm_damage_helper.h>
 #endif /* AMDGPU_BACKPORT_H */
