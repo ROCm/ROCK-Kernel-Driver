@@ -908,7 +908,8 @@ static bool subvp_drr_schedulable(struct dc *dc, struct dc_state *context, struc
 			subvp_active_us - prefetch_us - stretched_drr_us - max_vblank_mallregion > 0)
 		schedulable = true;
 
-	return schedulable;
+  /* TODO: Disable SubVP + DRR to fix underflow*/
+	return false;
 }
 
 
