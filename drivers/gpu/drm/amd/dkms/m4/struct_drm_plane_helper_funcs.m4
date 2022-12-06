@@ -28,7 +28,7 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/types.h>
-			#include <drm/drm_plane_helper.h>
+			#include <drm/drm_modeset_helper_vtables.h>
 		], [
 			struct drm_plane_helper_funcs *funcs = NULL;
 			funcs->prepare_fb((struct drm_plane *)NULL, (struct drm_plane_state *) NULL);
@@ -38,7 +38,7 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB], [
 		], [
 			AC_KERNEL_TRY_COMPILE([
 				#include <linux/types.h>
-				#include <drm/drm_plane_helper.h>
+				#include <drm/drm_modeset_helper_vtables.h>
 			], [
 				struct drm_plane_helper_funcs *funcs = NULL;
 				funcs->prepare_fb((struct drm_plane *)NULL, (const struct drm_plane_state *) NULL);
