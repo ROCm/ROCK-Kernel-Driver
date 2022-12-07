@@ -18,6 +18,7 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK], [
 ])
 
 dnl #
+dnl # v6.1-rc1~27-30c637151cfa drm/plane-helper: Export individual helpers
 dnl # v4.8-rc2-355-g1832040d010e drm: Allow drivers to modify plane_state in prepare_fb/cleanup_fb
 dnl # v4.4-rc4-250-g092d01dae09a drm: Reorganize helper vtables and their docs
 dnl # v4.2-rc8-1424-g844f9111f6f5 drm/atomic: Make prepare_fb/cleanup_fb only take state, v3.
