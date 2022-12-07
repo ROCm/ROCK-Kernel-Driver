@@ -2,7 +2,7 @@
 
 #include <linux/cpumask.h>
 #ifndef for_each_cpu_wrap
-/* copied from lib/cpumask.c
+/* copied from lib/cpumask.c */
 /**
  * cpumask_next_wrap - helper to implement for_each_cpu_wrap
  * @n: the cpu prior to the place to search
