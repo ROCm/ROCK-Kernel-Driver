@@ -423,6 +423,19 @@ static void enc32_set_dig_input_mode(struct stream_encoder *enc, unsigned int pi
 	REG_UPDATE(DIG_FIFO_CTRL0, DIG_FIFO_OUTPUT_PIXEL_MODE, pix_per_container == 2 ? 0x1 : 0x0);
 }
 
+static void enc32_reset_dig_fifo(struct stream_encoder *enc)
+{
+	struct dcn10_stream_encoder *enc1 = DCN10STRENC_FROM_STRENC(enc);
+
+	REG_UPDATE(DIG_FIFO_CTRL0, DIG_FIFO_RESET, 1);
+
+	REG_WAIT(DIG_FIFO_CTRL0, DIG_FIFO_RESET_DONE, 1, 10, 5000);
+
+	REG_UPDATE(DIG_FIFO_CTRL0, DIG_FIFO_RESET, 0);
+
+	REG_WAIT(DIG_FIFO_CTRL0, DIG_FIFO_RESET_DONE, 0, 10, 5000);
+}
+
 static const struct stream_encoder_funcs dcn32_str_enc_funcs = {
 	.dp_set_odm_combine =
 		enc32_dp_set_odm_combine,
@@ -470,6 +483,7 @@ static const struct stream_encoder_funcs dcn32_str_enc_funcs = {
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
 
 	.set_input_mode = enc32_set_dig_input_mode,
+	.reset_fifo = enc32_reset_dig_fifo,
 };
 
 void dcn32_dio_stream_encoder_construct(

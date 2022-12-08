@@ -49,6 +49,13 @@ void setup_dio_stream_encoder(struct pipe_ctx *pipe_ctx)
 				DPCD_SOURCE_SEQ_AFTER_CONNECT_DIG_FE_BE);
 	if (stream_enc->funcs->enable_fifo)
 		stream_enc->funcs->enable_fifo(stream_enc);
+
+	/* for HDMI TMDS only, reset FIFO after enable */
+	if ((dc_is_hdmi_tmds_signal(pipe_ctx->stream->signal) ||
+			dc_is_dvi_signal(pipe_ctx->stream->signal)) &&
+			stream_enc->funcs->reset_fifo) {
+		stream_enc->funcs->reset_fifo(stream_enc);
+	}
 }
 
 void reset_dio_stream_encoder(struct pipe_ctx *pipe_ctx)
