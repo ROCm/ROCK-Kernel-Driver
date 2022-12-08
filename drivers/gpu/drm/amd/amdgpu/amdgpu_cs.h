@@ -27,8 +27,6 @@
 #include "amdgpu_bo_list.h"
 #include "amdgpu_ring.h"
 
-#define AMDGPU_CS_GANG_SIZE	4
-
 struct amdgpu_bo_va_mapping;
 
 struct amdgpu_cs_chunk {
@@ -52,11 +50,9 @@ struct amdgpu_cs_parser {
 	unsigned		nchunks;
 	struct amdgpu_cs_chunk	*chunks;
 
-	/* scheduler job objects */
-	unsigned int		gang_size;
-	struct drm_sched_entity	*entities[AMDGPU_CS_GANG_SIZE];
-	struct amdgpu_job	*jobs[AMDGPU_CS_GANG_SIZE];
-	struct amdgpu_job	*gang_leader;
+	/* scheduler job object */
+	struct amdgpu_job	*job;
+	struct drm_sched_entity	*entity;
 
 	/* buffer objects */
 	struct ww_acquire_ctx		ticket;
