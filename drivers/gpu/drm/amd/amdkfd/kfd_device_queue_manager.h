@@ -261,6 +261,9 @@ struct device_queue_manager {
 	bool			sched_running;
 	uint32_t		wait_times;
 
+	/* used for GFX 9.4.3 only */
+	uint32_t		current_logical_xcc_start;
+
 	/* sync destroy and suspend  */
 	wait_queue_head_t destroy_wait;
 };
