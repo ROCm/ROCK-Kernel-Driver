@@ -1631,6 +1631,7 @@ bool dcn32_internal_validate_bw(
 #endif
 			memset(&pipe->plane_res, 0, sizeof(pipe->plane_res));
 			memset(&pipe->stream_res, 0, sizeof(pipe->stream_res));
+			memset(&pipe->link_res, 0, sizeof(pipe->link_res));
 			repopulate_pipes = true;
 		} else if (pipe->top_pipe && pipe->top_pipe->plane_state == pipe->plane_state) {
 			struct pipe_ctx *top_pipe = pipe->top_pipe;
@@ -1646,6 +1647,7 @@ bool dcn32_internal_validate_bw(
 			pipe->stream = NULL;
 			memset(&pipe->plane_res, 0, sizeof(pipe->plane_res));
 			memset(&pipe->stream_res, 0, sizeof(pipe->stream_res));
+			memset(&pipe->link_res, 0, sizeof(pipe->link_res));
 			repopulate_pipes = true;
 		} else
 			ASSERT(0); /* Should never try to merge master pipe */
