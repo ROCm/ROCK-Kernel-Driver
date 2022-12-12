@@ -80,6 +80,9 @@
 /* devcgroup_check_permission() is available */
 #define HAVE_DEVCGROUP_CHECK_PERMISSION 1
 
+/* MEMORY_DEVICE_COHERENT is availablea */
+#define HAVE_DEVICE_COHERENT 1
+
 /* devm_memremap_pages() wants struct dev_pagemap */
 #define HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP 1
 
