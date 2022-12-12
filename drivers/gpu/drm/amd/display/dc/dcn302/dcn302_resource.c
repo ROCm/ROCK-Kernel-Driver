@@ -49,6 +49,7 @@
 
 #include "dcn10/dcn10_resource.h"
 
+#include "link.h"
 #include "dce/dce_abm.h"
 #include "dce/dce_audio.h"
 #include "dce/dce_aux.h"
@@ -1133,6 +1134,9 @@ static void dcn302_resource_destruct(struct resource_pool *pool)
 
 	if (pool->dccg != NULL)
 		dcn_dccg_destroy(&pool->dccg);
+
+	if (pool->oem_device != NULL)
+		link_destroy_ddc_service(&pool->oem_device);
 }
 
 static void dcn302_destroy_resource_pool(struct resource_pool **pool)
@@ -1226,6 +1230,7 @@ static bool dcn302_resource_construct(
 	int i;
 	struct dc_context *ctx = dc->ctx;
 	struct irq_service_init_data init_data;
+	struct ddc_service_init_data ddc_init_data = {0};
 
 	ctx->dc_bios->regs = &bios_regs;
 
@@ -1508,6 +1513,17 @@ static bool dcn302_resource_construct(
 		dc->caps.planes[i] = plane_cap;
 
 	dc->cap_funcs = cap_funcs;
+
+	if (dc->ctx->dc_bios->fw_info.oem_i2c_present) {
+		ddc_init_data.ctx = dc->ctx;
+		ddc_init_data.link = NULL;
+		ddc_init_data.id.id = dc->ctx->dc_bios->fw_info.oem_i2c_obj_id;
+		ddc_init_data.id.enum_id = 0;
+		ddc_init_data.id.type = OBJECT_TYPE_GENERIC;
+		pool->oem_device = link_create_ddc_service(&ddc_init_data);
+	} else {
+		pool->oem_device = NULL;
+	}
 
 	return true;
 
