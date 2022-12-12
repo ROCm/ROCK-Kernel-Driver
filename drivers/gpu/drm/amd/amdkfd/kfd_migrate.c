@@ -723,9 +723,11 @@ svm_migrate_vma_to_ram(struct kfd_node *node, struct svm_range *prange,
 	migrate.end = end;
 #ifdef HAVE_MIGRATE_VMA_PGMAP_OWNER
 	migrate.pgmap_owner = SVM_ADEV_PGMAP_OWNER(adev);
+#ifdef HAVE_DEVICE_COHERENT
 	if (adev->gmc.xgmi.connected_to_cpu)
 		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_COHERENT;
 	else
+#endif
 		migrate.flags = MIGRATE_VMA_SELECT_DEVICE_PRIVATE;
 #elif defined(HAVE_DEV_PAGEMAP_OWNER)
 	migrate.src_owner = SVM_ADEV_PGMAP_OWNER(adev);
