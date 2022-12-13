@@ -4259,6 +4259,23 @@ void dc_interrupt_ack(struct dc *dc, enum dc_irq_source src)
 
 void dc_power_down_on_boot(struct dc *dc)
 {
+	struct dc_bios *dcb = dc->ctx->dc_bios;
+
+	if(dc->ctx->dce_environment == DCE_ENV_VIRTUAL_HW)
+		return;
+
+	if (dcb->funcs->is_accelerated_mode(dcb)) {
+		/* Driver already has control of the panel, and we
+		 * shouldn't be powering it down
+		 */
+		return;
+	}
+
+	/* eDP panel will be powering down here, so no need to
+	 * power down again with the next mode set
+	 */
+	bios_set_scratch_acc_mode_change(dc->ctx->dc_bios, 1);
+
 	if (dc->ctx->dce_environment != DCE_ENV_VIRTUAL_HW &&
 			dc->hwss.power_down_on_boot)
 		dc->hwss.power_down_on_boot(dc);
