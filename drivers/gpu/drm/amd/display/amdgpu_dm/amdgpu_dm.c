@@ -77,10 +77,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
-
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 #include <linux/component.h>
-#endif
 #include <linux/dmi.h>
 
 #include <drm/display/drm_dp_mst_helper.h>
