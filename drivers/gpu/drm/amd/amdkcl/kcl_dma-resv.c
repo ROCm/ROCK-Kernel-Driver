@@ -343,44 +343,6 @@ void dma_resv_replace_fences(struct dma_resv *obj, uint64_t context,
 EXPORT_SYMBOL(dma_resv_replace_fences);
 
 /**
- * dma_resv_add_excl_fence - Add an exclusive fence.
- * @obj: the reservation object
- * @fence: the exclusive fence to add
- *
- * Add a fence to the exclusive slot. @obj must be locked with dma_resv_lock().
- * See also &dma_resv.fence_excl for a discussion of the semantics.
- */
-static void dma_resv_add_excl_fence(struct dma_resv *obj,
-                                    struct dma_fence *fence)
-{
-        struct dma_fence *old_fence = dma_resv_excl_fence(obj);
-	struct dma_fence_chain *chain;
-
-        dma_resv_assert_held(obj);
-
-	if (old_fence && !dma_fence_is_signaled(old_fence)) {
-
-		chain = dma_fence_chain_alloc();
-		if (unlikely(!chain))
-			pr_err("dma_resv_add_excl_fence OOM\n");
-		else {
-			dma_fence_chain_init(chain, dma_fence_get(old_fence), dma_fence_get(fence), 1);
-			fence = &chain->base;
-		}
-	} else {
-		dma_fence_get(fence);
-	}
-
-
-        write_seqcount_begin(&obj->seq);
-        /* write_seqcount_begin provides the necessary memory barrier */
-        RCU_INIT_POINTER(obj->fence_excl, fence);
-        write_seqcount_end(&obj->seq);
-
-        dma_fence_put(old_fence);
-}
-
-/**
  * dma_resv_add_fence - Add a fence to the dma_resv obj
  * @obj: the reservation object
  * @fence: the fence to add
@@ -394,10 +356,28 @@ static void dma_resv_add_excl_fence(struct dma_resv *obj,
 void dma_resv_add_fence(struct dma_resv *obj, struct dma_fence *fence,
                         enum dma_resv_usage usage)
 {
-        if (usage == DMA_RESV_USAGE_WRITE || usage == DMA_RESV_USAGE_KERNEL)
-                dma_resv_add_excl_fence(obj, fence);
-        else
+        struct dma_fence_chain *chain;
+
+        if (usage >= DMA_RESV_USAGE_READ) {
                 dma_resv_add_shared_fence(obj, fence);
+                return;
+        }
+
+        chain = dma_fence_chain_alloc();
+        if (unlikely(!chain)) {
+                /* We are out of memory, block as last resort */
+                dma_fence_wait(fence, false);
+                return;
+        }
+        dma_fence_chain_init(chain, dma_resv_excl_fence(obj), dma_fence_get(fence), 1);
+
+        /* Store the usage in the user bit to retrieve it later on */
+        chain->base.flags |= usage << DMA_FENCE_FLAG_USER_BITS;
+
+        /* Install the exclusive fence manually */
+        write_seqcount_begin(&obj->seq);
+        RCU_INIT_POINTER(obj->fence_excl, &chain->base);
+        write_seqcount_end(&obj->seq);
 }
 EXPORT_SYMBOL(dma_resv_add_fence);
 
@@ -408,6 +388,8 @@ static void dma_resv_iter_restart_unlocked(struct dma_resv_iter *cursor)
         cursor->seq = read_seqcount_begin(&cursor->obj->seq);
         cursor->index = -1;
         cursor->shared_count = 0;
+	cursor->excl_fence = NULL;
+	cursor->kernel_iter = NULL;
         if (cursor->usage >= DMA_RESV_USAGE_READ) {
                 cursor->fences = dma_resv_shared_list(cursor->obj);
                 if (cursor->fences)
@@ -422,17 +404,55 @@ static void dma_resv_iter_restart_unlocked(struct dma_resv_iter *cursor)
 static void dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor)
 {
         struct dma_resv *obj = cursor->obj;
+	struct dma_fence_chain *chain;
+	struct dma_fence *f;
+	enum dma_resv_usage usage;
 
         do {
                 /* Drop the reference from the previous round */
                 dma_fence_put(cursor->fence);
 
                 if (cursor->index == -1) {
-                        cursor->fence = dma_resv_excl_fence(obj);
-                        cursor->index++;
-                        if (!cursor->fence)
-                                continue;
+			if (cursor->usage >= DMA_RESV_USAGE_WRITE) {
+				cursor->fence = dma_resv_excl_fence(obj);
+				cursor->index++;
+				if (!cursor->fence)
+					continue;
+			} else {
+				cursor->fence = NULL;
+				/* Only return KERNEL fences */
+				if (!cursor->excl_fence) {
+					cursor->excl_fence = dma_resv_excl_fence(obj);
+					if (!cursor->excl_fence)
+						break;
 
+					cursor->excl_fence = dma_fence_get(cursor->excl_fence);
+					cursor->kernel_iter = dma_fence_get(cursor->excl_fence);
+				}
+
+				while ((f = cursor->kernel_iter) != NULL) {
+					chain = to_dma_fence_chain(f);
+					if (!chain) {
+						dma_fence_put(f);
+						break;
+					}
+
+					usage = chain->base.flags >> DMA_FENCE_FLAG_USER_BITS;
+					if (usage == DMA_RESV_USAGE_KERNEL && !dma_fence_is_signaled(chain->fence))
+						cursor->fence = chain->fence;
+
+					cursor->kernel_iter = dma_fence_chain_walk(f);
+
+					if (cursor->fence)
+						break;
+				}
+
+				if (!cursor->fence) {
+					dma_fence_put(cursor->excl_fence);
+					cursor->excl_fence = NULL;
+					break;
+				}
+			}
                 } else if (!cursor->fences ||
                            cursor->index >= cursor->shared_count) {
                         cursor->fence = NULL;
@@ -464,10 +484,18 @@ static void dma_resv_iter_walk_unlocked(struct dma_resv_iter *cursor)
  */
 struct dma_fence *dma_resv_iter_first_unlocked(struct dma_resv_iter *cursor)
 {
+	bool restart = false;
+
         rcu_read_lock();
         do {
+		if (restart) {
+			/* drop reference when iter restart */
+			dma_fence_put(cursor->excl_fence);
+			dma_fence_put(cursor->kernel_iter);
+		}
                 dma_resv_iter_restart_unlocked(cursor);
                 dma_resv_iter_walk_unlocked(cursor);
+		restart = true;
         } while (read_seqcount_retry(&cursor->obj->seq, cursor->seq));
         rcu_read_unlock();
 
@@ -493,8 +521,13 @@ struct dma_fence *dma_resv_iter_next_unlocked(struct dma_resv_iter *cursor)
         cursor->is_restarted = false;
         restart = read_seqcount_retry(&cursor->obj->seq, cursor->seq);
         do {
-                if (restart)
+                if (restart) {
+			/* drop reference when iter restart */
+			dma_fence_put(cursor->excl_fence);
+			dma_fence_put(cursor->kernel_iter);
+
                         dma_resv_iter_restart_unlocked(cursor);
+		}
                 dma_resv_iter_walk_unlocked(cursor);
                 restart = true;
         } while (read_seqcount_retry(&cursor->obj->seq, cursor->seq));
@@ -515,7 +548,9 @@ EXPORT_SYMBOL(dma_resv_iter_next_unlocked);
  */
 struct dma_fence *dma_resv_iter_first(struct dma_resv_iter *cursor)
 {
-        struct dma_fence *fence;
+        struct dma_fence *fence, *f;
+	struct dma_fence_chain *chain;
+	enum dma_resv_usage usage;
 
         dma_resv_assert_held(cursor->obj);
 
@@ -525,11 +560,34 @@ struct dma_fence *dma_resv_iter_first(struct dma_resv_iter *cursor)
         else
                 cursor->fences = NULL;
 
+	cursor->kernel_iter = NULL;
         fence = dma_resv_excl_fence(cursor->obj);
         if (!fence)
                 fence = dma_resv_iter_next(cursor);
+	else if (cursor->usage == DMA_RESV_USAGE_KERNEL) {
+		cursor->kernel_iter = dma_fence_get(fence);
+		fence = NULL;
+
+		while ((f = cursor->kernel_iter) != NULL) {
+			chain = to_dma_fence_chain(f);
+			if (!chain) {
+				dma_fence_put(f);
+				break;
+			}
+
+			cursor->kernel_iter = dma_fence_chain_walk(f);
+
+			usage = chain->base.flags >> DMA_FENCE_FLAG_USER_BITS;
+			if (usage == DMA_RESV_USAGE_KERNEL)
+				fence = chain->fence;
+
+			if (fence)
+				break;
+		}
+	}
 
         cursor->is_restarted = true;
+
         return fence;
 }
 EXPORT_SYMBOL_GPL(dma_resv_iter_first);
@@ -544,10 +602,30 @@ EXPORT_SYMBOL_GPL(dma_resv_iter_first);
 struct dma_fence *dma_resv_iter_next(struct dma_resv_iter *cursor)
 {
         unsigned int idx;
+	struct dma_fence *f;
+	struct dma_fence_chain *chain;
+	enum dma_resv_usage usage;
 
         dma_resv_assert_held(cursor->obj);
 
         cursor->is_restarted = false;
+
+	if (cursor->usage == DMA_RESV_USAGE_KERNEL && cursor->kernel_iter != NULL) {
+		while ((f = cursor->kernel_iter) != NULL) {
+			chain = to_dma_fence_chain(f);
+			if (!chain) {
+				dma_fence_put(f);
+				break;
+			}
+
+			cursor->kernel_iter = dma_fence_chain_walk(f);
+
+			usage = chain->base.flags >> DMA_FENCE_FLAG_USER_BITS;
+			if (usage == DMA_RESV_USAGE_KERNEL && chain->fence)
+				return chain->fence;
+		}
+	}
+
         if (!cursor->fences || cursor->index >= cursor->fences->shared_count)
                 return NULL;
 
