@@ -243,7 +243,6 @@ static struct timing_generator_funcs dcn314_tg_funcs = {
 #endif
 		.get_dsc_status = optc2_get_dsc_status,
 		.set_dwb_source = NULL,
-		.set_odm_combine = optc314_set_odm_combine,
 		.get_optc_source = optc2_get_optc_source,
 		.set_out_mux = optc3_set_out_mux,
 		.set_drr_trigger_window = optc3_set_drr_trigger_window,
