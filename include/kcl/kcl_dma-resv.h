@@ -172,6 +172,12 @@ struct dma_resv_iter {
 
         /** @is_restarted: true if this is the first returned fence */
         bool is_restarted;
+
+	/** @excl_fence: keep a reference to excl_fence when begin iterating kernel fences */
+	struct dma_fence *excl_fence;
+
+	/** @kernel_iter: next kernel fence pointer when iterating kernel fences */
+	struct dma_fence *kernel_iter;
 };
 
 #if defined(HAVE_DMA_RESV_SEQCOUNT_WW_MUTEX_T)
