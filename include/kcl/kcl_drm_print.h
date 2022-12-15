@@ -153,10 +153,6 @@ void kcl_drm_err(const char *format, ...);
 	} while (0)
 #endif
 
-#if !defined(HAVE_DRM_DEV_DBG)
-void drm_dev_dbg(const struct device *dev, int category, const char *format, ...);
-#endif
-
 #if !defined(drm_dbg_atomic)
 #define drm_dbg_atomic(drm, fmt, ...)                                   \
         drm_dev_dbg((drm)->dev, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)

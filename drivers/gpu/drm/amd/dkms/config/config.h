@@ -307,9 +307,6 @@
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
 
-/* drm_dev_dbg() is available */
-#define HAVE_DRM_DEV_DBG 1
-
 /* drm_dev_enter() is available */
 #define HAVE_DRM_DEV_ENTER 1
 
