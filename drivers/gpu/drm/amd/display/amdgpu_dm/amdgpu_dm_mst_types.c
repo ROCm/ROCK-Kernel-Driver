@@ -401,6 +401,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		 * plugged back with same display index, its hdcp properties
 		 * will be retrieved from hdcp_work within dm_dp_mst_get_modes
 		 */
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 #ifdef CONFIG_DRM_AMD_DC_HDCP
 		if (aconnector->dc_sink && connector->state) {
 			struct drm_device *dev = connector->dev;
@@ -413,6 +414,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			connector->state->content_protection =
 			hdcp_w->content_protection[connector->index];
 		}
+#endif
 #endif
 
 		if (aconnector->dc_sink) {
