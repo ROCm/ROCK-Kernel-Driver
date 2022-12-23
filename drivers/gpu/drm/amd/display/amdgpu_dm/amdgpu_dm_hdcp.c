@@ -316,9 +316,6 @@ static void event_property_update(struct work_struct *work)
 		if (!aconnector)
 			continue;
 
-		if (!aconnector->base.index)
-			continue;
-
 		connector = &aconnector->base;
 
 		/* check if display connected */
@@ -397,11 +394,7 @@ static void event_property_validate(struct work_struct *work)
 	     conn_index++) {
 		aconnector = hdcp_work->aconnector[conn_index];
 
-
 		if (!aconnector)
-			continue;
-
-		if (!aconnector->base.index)
 			continue;
 
 		/* check if display connected */
