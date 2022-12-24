@@ -1131,7 +1131,8 @@ struct drm_amdgpu_info_device {
 	__u32 enabled_rb_pipes_mask;
 	__u32 num_rb_pipes;
 	__u32 num_hw_gfx_contexts;
-	__u32 _pad;
+	/* PCIe version (the smaller of the GPU and the CPU/motherboard) */
+	__u32 pcie_gen;
 	__u64 ids_flags;
 	/** Starting virtual address for UMDs. */
 	__u64 virtual_address_offset;
