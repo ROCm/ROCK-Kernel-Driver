@@ -1131,7 +1131,8 @@ struct drm_amdgpu_info_device {
 	__u32 enabled_rb_pipes_mask;
 	__u32 num_rb_pipes;
 	__u32 num_hw_gfx_contexts;
-	__u32 _pad;
+	/* PCIe version (the smaller of the GPU and the CPU/motherboard) */
+	__u32 pcie_gen;
 	__u64 ids_flags;
 	/** Starting virtual address for UMDs. */
 	__u64 virtual_address_offset;
@@ -1187,6 +1188,8 @@ struct drm_amdgpu_info_device {
 	__u64 high_va_max;
 	/* gfx10 pa_sc_tile_steering_override */
 	__u32 pa_sc_tile_steering_override;
+	/* PCIe number of lanes (the smaller of the GPU and the CPU/motherboard) */
+	__u32 pcie_num_lanes;
 	/* disabled TCCs */
 	__u64 tcc_disabled_mask;
 	__u64 min_engine_clock;
