@@ -29,6 +29,7 @@
 #include <linux/mm.h>
 #include <linux/kthread.h>
 #include <linux/workqueue.h>
+#include <linux/mmu_notifier.h>
 #include <kgd_kfd_interface.h>
 #include <drm/ttm/ttm_execbuf_util.h>
 #include "amdgpu_gfx.h"
@@ -67,6 +68,11 @@ struct kgd_mem {
 	struct amdgpu_bo *bo;
 	struct kfd_ipc_obj *ipc_obj;
 	struct dma_buf *dmabuf;
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+	struct hmm_range *range;
+#else
+	struct page **user_pages;
+#endif
 	struct list_head attachments;
 	/* protected by amdkfd_process_info.lock */
 	struct ttm_validate_buffer validate_list;
@@ -77,11 +83,8 @@ struct kgd_mem {
 
 	uint32_t alloc_flags;
 
-	atomic_t invalid;
+	uint32_t invalid;
 	struct amdkfd_process_info *process_info;
-#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	struct page **user_pages;
-#endif
 
 	struct amdgpu_sync sync;
 
@@ -136,7 +139,8 @@ struct amdkfd_process_info {
 	struct amdgpu_amdkfd_fence *eviction_fence;
 
 	/* MMU-notifier related fields */
-	atomic_t evicted_bos;
+	struct mutex notifier_lock;
+	uint32_t evicted_bos;
 	struct delayed_work restore_userptr_work;
 	struct pid *pid;
 	bool block_mmu_notifications;
@@ -185,7 +189,12 @@ int kfd_debugfs_kfd_mem_limits(struct seq_file *m, void *data);
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 int amdgpu_amdkfd_remove_fence_on_pt_pd_bos(struct amdgpu_bo *bo);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
+				unsigned long cur_seq, struct kgd_mem *mem);
+#else
 int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
+#endif
 #else
 static inline
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
@@ -206,7 +215,12 @@ int amdgpu_amdkfd_remove_fence_on_pt_pd_bos(struct amdgpu_bo *bo)
 }
 
 static inline
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
+int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
+				unsigned long cur_seq, struct kgd_mem *mem)
+#else
 int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm)
+#endif
 {
 	return 0;
 }

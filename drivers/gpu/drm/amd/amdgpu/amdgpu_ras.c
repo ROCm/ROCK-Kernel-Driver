@@ -1091,6 +1091,10 @@ int amdgpu_ras_error_inject(struct amdgpu_device *adev,
 							info->head.block,
 							info->head.sub_block_index);
 
+	/* inject on guest isn't allowed, return success directly */
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	if (!obj)
 		return -EINVAL;
 
@@ -2351,22 +2355,24 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 
 		if (amdgpu_atomfirmware_sram_ecc_supported(adev)) {
 			dev_info(adev->dev, "SRAM ECC is active.\n");
-			if (!amdgpu_sriov_vf(adev)) {
+			if (!amdgpu_sriov_vf(adev))
 				adev->ras_hw_enabled |= ~(1 << AMDGPU_RAS_BLOCK__UMC |
 							    1 << AMDGPU_RAS_BLOCK__DF);
-
-				if (adev->ip_versions[VCN_HWIP][0] == IP_VERSION(2, 6, 0) ||
-				    adev->ip_versions[VCN_HWIP][0] == IP_VERSION(4, 0, 0))
-					adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__VCN |
-							1 << AMDGPU_RAS_BLOCK__JPEG);
-				else
-					adev->ras_hw_enabled &= ~(1 << AMDGPU_RAS_BLOCK__VCN |
-							1 << AMDGPU_RAS_BLOCK__JPEG);
-			} else {
+			else
 				adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__PCIE_BIF |
 								1 << AMDGPU_RAS_BLOCK__SDMA |
 								1 << AMDGPU_RAS_BLOCK__GFX);
-			}
+
+			/* VCN/JPEG RAS can be supported on both bare metal and
+			 * SRIOV environment
+			 */
+			if (adev->ip_versions[VCN_HWIP][0] == IP_VERSION(2, 6, 0) ||
+			    adev->ip_versions[VCN_HWIP][0] == IP_VERSION(4, 0, 0))
+				adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__VCN |
+							1 << AMDGPU_RAS_BLOCK__JPEG);
+			else
+				adev->ras_hw_enabled &= ~(1 << AMDGPU_RAS_BLOCK__VCN |
+							1 << AMDGPU_RAS_BLOCK__JPEG);
 		} else {
 			dev_info(adev->dev, "SRAM ECC is not presented.\n");
 		}
@@ -2412,11 +2418,42 @@ Out:
 	pm_runtime_put_autosuspend(dev->dev);
 }
 
+static void amdgpu_ras_query_poison_mode(struct amdgpu_device *adev)
+{
+	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
+	bool df_poison, umc_poison;
+
+	/* poison setting is useless on SRIOV guest */
+	if (amdgpu_sriov_vf(adev) || !con)
+		return;
+
+	/* Init poison supported flag, the default value is false */
+	if (adev->gmc.xgmi.connected_to_cpu) {
+		/* enabled by default when GPU is connected to CPU */
+		con->poison_supported = true;
+	} else if (adev->df.funcs &&
+	    adev->df.funcs->query_ras_poison_mode &&
+	    adev->umc.ras &&
+	    adev->umc.ras->query_ras_poison_mode) {
+		df_poison =
+			adev->df.funcs->query_ras_poison_mode(adev);
+		umc_poison =
+			adev->umc.ras->query_ras_poison_mode(adev);
+
+		/* Only poison is set in both DF and UMC, we can support it */
+		if (df_poison && umc_poison)
+			con->poison_supported = true;
+		else if (df_poison != umc_poison)
+			dev_warn(adev->dev,
+				"Poison setting is inconsistent in DF/UMC(%d:%d)!\n",
+				df_poison, umc_poison);
+	}
+}
+
 int amdgpu_ras_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 	int r;
-	bool df_poison, umc_poison;
 
 	if (con)
 		return 0;
@@ -2491,26 +2528,7 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 			goto release_con;
 	}
 
-	/* Init poison supported flag, the default value is false */
-	if (adev->gmc.xgmi.connected_to_cpu) {
-		/* enabled by default when GPU is connected to CPU */
-		con->poison_supported = true;
-	}
-	else if (adev->df.funcs &&
-	    adev->df.funcs->query_ras_poison_mode &&
-	    adev->umc.ras &&
-	    adev->umc.ras->query_ras_poison_mode) {
-		df_poison =
-			adev->df.funcs->query_ras_poison_mode(adev);
-		umc_poison =
-			adev->umc.ras->query_ras_poison_mode(adev);
-		/* Only poison is set in both DF and UMC, we can support it */
-		if (df_poison && umc_poison)
-			con->poison_supported = true;
-		else if (df_poison != umc_poison)
-			dev_warn(adev->dev, "Poison setting is inconsistent in DF/UMC(%d:%d)!\n",
-					df_poison, umc_poison);
-	}
+	amdgpu_ras_query_poison_mode(adev);
 
 	if (amdgpu_ras_fs_init(adev)) {
 		r = -EINVAL;

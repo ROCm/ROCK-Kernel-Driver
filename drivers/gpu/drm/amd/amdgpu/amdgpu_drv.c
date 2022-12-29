@@ -104,10 +104,12 @@
  * - 3.46.0 - To enable hot plug amdgpu tests in libdrm
  * - 3.47.0 - Add AMDGPU_GEM_CREATE_DISCARDABLE and AMDGPU_VM_NOALLOC flags
  * - 3.48.0 - Add IP discovery version info to HW INFO
- *   3.49.0 - Add gang submit into CS IOCTL
+ * - 3.49.0 - Add gang submit into CS IOCTL
+ * - 3.50.0 - Update AMDGPU_INFO_DEV_INFO IOCTL for minimum engine and memory clock
+ *            Update AMDGPU_INFO_SENSOR IOCTL for PEAK_PSTATE engine and memory clock
  */
 #define KMS_DRIVER_MAJOR	3
-#define KMS_DRIVER_MINOR	49
+#define KMS_DRIVER_MINOR	50
 #define KMS_DRIVER_PATCHLEVEL	0
 
 int amdgpu_vram_limit;
@@ -2066,6 +2068,15 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 			 "See modparam exp_hw_support\n");
 		return -ENODEV;
 	}
+	/* differentiate between P10 and P11 asics with the same DID */
+	if (pdev->device == 0x67FF &&
+	    (pdev->revision == 0xE3 ||
+	     pdev->revision == 0xE7 ||
+	     pdev->revision == 0xF3 ||
+	     pdev->revision == 0xF7)) {
+		flags &= ~AMD_ASIC_MASK;
+		flags |= CHIP_POLARIS10;
+	}
 
 	/* Due to hardware bugs, S/G Display on raven requires a 1:1 IOMMU mapping,
 	 * however, SME requires an indirect IOMMU mapping because the encryption
@@ -2159,12 +2170,12 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 #endif
 	pci_set_drvdata(pdev, ddev);
 
-	ret = amdgpu_driver_load_kms(adev, ent->driver_data);
+	ret = amdgpu_driver_load_kms(adev, flags);
 	if (ret)
 		goto err_pci;
 
 retry_init:
-	ret = drm_dev_register(ddev, ent->driver_data);
+	ret = drm_dev_register(ddev, flags);
 	if (ret == -EAGAIN && ++retry <= 3) {
 		DRM_INFO("retry init %d\n", retry);
 		/* Don't request EX mode too frequently which is attacking */

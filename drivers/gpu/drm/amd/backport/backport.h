@@ -111,4 +111,11 @@
 #include <kcl/kcl_highmem-internal.h>
 #include <kcl/kcl_dynamic_debug.h>
 #include <kcl/kcl_drm_plane_helper.h>
+/*
+ * v5.13-rc3-1669-gba6cd766e0bf
+ * ("drm/plane: Move drm_plane_enable_fb_damage_clips into core")
+ * move drm_plane_enable_fb_damage_clips() to drm_planer.h.
+ * include drm_damage_helper.h to fix the missing function declaration for legacy kernel.
+ */
+#include <drm/drm_damage_helper.h>
 #endif /* AMDGPU_BACKPORT_H */

@@ -401,9 +401,6 @@ bool dc_stream_adjust_vmin_vmax(struct dc *dc,
 {
 	int i;
 
-	if (memcmp(adjust, &stream->adjust, sizeof(struct dc_crtc_timing_adjust)) == 0)
-		return true;
-
 	stream->adjust.v_total_max = adjust->v_total_max;
 	stream->adjust.v_total_mid = adjust->v_total_mid;
 	stream->adjust.v_total_mid_frame_num = adjust->v_total_mid_frame_num;
@@ -523,14 +520,15 @@ dc_stream_forward_dmcu_crc_window(struct dmcu *dmcu,
 }
 
 bool
-dc_stream_forward_crc_window(struct dc *dc,
-		struct rect *rect, struct dc_stream_state *stream, bool is_stop)
+dc_stream_forward_crc_window(struct dc_stream_state *stream,
+		struct rect *rect, bool is_stop)
 {
 	struct dmcu *dmcu;
 	struct dc_dmub_srv *dmub_srv;
 	struct otg_phy_mux mux_mapping;
 	struct pipe_ctx *pipe;
 	int i;
+	struct dc *dc = stream->ctx->dc;
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		pipe = &dc->current_state->res_ctx.pipe_ctx[i];
@@ -1565,6 +1563,9 @@ bool dc_validate_boot_timing(const struct dc *dc,
 	if (tg_inst >= dc->res_pool->timing_generator_count)
 		return false;
 
+	if (tg_inst != link->link_enc->preferred_engine)
+		return false;
+
 	tg = dc->res_pool->timing_generators[tg_inst];
 
 	if (!tg->funcs->get_hw_timing)
@@ -1994,7 +1995,7 @@ context_alloc_fail:
 
 	DC_LOG_DC("%s Finished.\n", __func__);
 
-	return (res == DC_OK);
+	return res;
 }
 
 /* TODO: When the transition to the new commit sequence is done, remove this

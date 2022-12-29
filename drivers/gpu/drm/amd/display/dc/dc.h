@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.214"
+#define DC_VER "3.2.216"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -846,6 +846,7 @@ struct dc_debug_options {
 	int crb_alloc_policy_min_disp_count;
 	bool disable_z10;
 	bool enable_z9_disable_interface;
+	bool psr_skip_crtc_disable;
 	union dpia_debug_options dpia_debug;
 	bool disable_fixed_vs_aux_timeout_wa;
 	bool force_disable_subvp;
@@ -873,6 +874,7 @@ struct dc_debug_options {
 	enum lttpr_mode lttpr_mode_override;
 	unsigned int dsc_delay_factor_wa_x1000;
 	unsigned int min_prefetch_in_strobe_ns;
+	bool disable_unbounded_requesting;
 };
 
 struct gpu_info_soc_bounding_box_v1_0;
