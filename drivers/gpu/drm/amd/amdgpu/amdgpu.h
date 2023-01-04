@@ -151,7 +151,7 @@ struct amdgpu_watchdog_timer
  * Modules parameters.
  */
 extern int amdgpu_modeset;
-extern int amdgpu_vram_limit;
+extern unsigned int amdgpu_vram_limit;
 extern int amdgpu_vis_vram_limit;
 extern int amdgpu_gart_size;
 extern int amdgpu_gtt_size;
@@ -623,7 +623,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			   struct drm_file *filp);
 
 /* VRAM scratch page for HDP bug, default vram page */
-struct amdgpu_vram_scratch {
+struct amdgpu_mem_scratch {
 	struct amdgpu_bo		*robj;
 	volatile uint32_t		*ptr;
 	u64				gpu_addr;
@@ -778,6 +778,11 @@ struct amdgpu_mqd {
 #define AMDGPU_PRODUCT_NAME_LEN 64
 struct amdgpu_reset_domain;
 
+/*
+ * Non-zero (true) if the GPU has VRAM. Zero (false) otherwise.
+ */
+#define AMDGPU_HAS_VRAM(_adev) ((_adev)->gmc.real_vram_size)
+
 struct amdgpu_device {
 	struct device			*dev;
 	struct pci_dev			*pdev;
@@ -878,7 +883,7 @@ struct amdgpu_device {
 
 	/* memory management */
 	struct amdgpu_mman		mman;
-	struct amdgpu_vram_scratch	vram_scratch;
+	struct amdgpu_mem_scratch	mem_scratch;
 	struct amdgpu_wb		wb;
 	atomic64_t			num_bytes_moved;
 	atomic64_t			num_evictions;
