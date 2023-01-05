@@ -1543,7 +1543,7 @@ bool dcn32_internal_validate_bw(
 		 * at least support prefetch mode 1.
 		 */
 		context->bw_ctx.dml.soc.allow_for_pstate_or_stutter_in_vblank_final =
-			dm_prefetch_support_stutter;
+			dm_prefetch_support_none;
 
 		vlevel = dml_get_voltage_level(&context->bw_ctx.dml, pipes, pipe_cnt);
 		if (vlevel < context->bw_ctx.dml.soc.num_states) {
