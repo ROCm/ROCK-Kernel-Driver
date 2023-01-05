@@ -13,7 +13,7 @@ endif
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ_BUG),y)
-$(error dma_resv->seq is missing., exit...)
+$(error dma_resv->seq is missing. exit...)
 endif
 
 ifeq ($(CC), gcc)
