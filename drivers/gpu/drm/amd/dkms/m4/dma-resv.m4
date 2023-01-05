@@ -45,7 +45,8 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_SEQ], [
 					#include <linux/version.h>
 				], [
 					#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0)
-					int this_is_bug = 0;
+					int this_is_bug;
+					this_is_bug = 0;
 					#else
 					this_is_not_bug();
 					#endif
