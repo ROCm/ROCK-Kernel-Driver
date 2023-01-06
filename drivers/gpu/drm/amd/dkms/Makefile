@@ -1,3 +1,37 @@
+ifeq ($(CC), gcc)
+GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
+GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCCPAT=$(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
+# CONFIG_GCC_VERSION returns x.xx.xx as the version format
+GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
+
+KERNEL_MAJ=$(VERSION)
+KERNEL_PATCHLEVEL=$(PATCHLEVEL)
+KERNEL_SUBLEVEL=$(SUBLEVEL)
+KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL), $(KERNEL_SUBLEVEL))
+
+kernel-version = $(shell [ $(KERNEL_VER)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
+
+# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
+ifeq ($(call cc-ifversion, -le, 0408, y), y)
+ifeq ($(call kernel-version, -ge, 0504, y), y)
+$(error "The GCC is too old for this kernel, please update the GCC to higher than 9.3")
+endif
+endif
+
+ifdef CONFIG_CC_IS_GCC
+ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
+$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
+$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
+endif
+else
+export CONFIG_CC_IS_GCC=y
+export CONFIG_GCC_VERSION=$(GCCSTR)
+$(warning "CONFIG_CC_IS_GCC is not defined. Let's export it with version $(CONFIG_GCC_VERSION)")
+endif
+
+endif
+
 ifndef CONFIG_DRM
 $(error CONFIG_DRM disabled, exit...)
 endif
@@ -14,24 +48,6 @@ _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q 
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ_BUG),y)
 $(error dma_resv->seq is missing. exit...)
-endif
-
-ifeq ($(CC), gcc)
-GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
-GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
-GCCPAT=$(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
-# CONFIG_GCC_VERSION returns x.xx.xx as the version format
-GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
-ifdef CONFIG_CC_IS_GCC
-ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
-$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
-$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
-endif
-else
-export CONFIG_CC_IS_GCC=y
-export CONFIG_GCC_VERSION=$(GCCSTR)
-$(warning "CONFIG_CC_IS_GCC is not defined. Let's export it with version $(CONFIG_GCC_VERSION)")
-endif
 endif
 
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
