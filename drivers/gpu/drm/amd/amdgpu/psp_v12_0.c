@@ -57,9 +57,6 @@ static int psp_v12_0_init_microcode(struct psp_context *psp)
 	err = psp_init_asd_microcode(psp, ucode_prefix);
 	if (err)
 		return err;
-	err = psp_init_ta_microcode(psp, ucode_prefix);
-	if (err)
-		return err;
 
 	err = psp_init_ta_microcode(psp, ucode_prefix);
 	if (err)
