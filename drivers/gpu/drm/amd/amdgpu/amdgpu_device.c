@@ -39,6 +39,7 @@
 #include <linux/pci-p2pdma.h>
 
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_aperture.h>
 #include <drm/drm_probe_helper.h>
 #include <drm/amdgpu_drm.h>
 #include <linux/vgaarb.h>
@@ -90,6 +91,8 @@ MODULE_FIRMWARE("amdgpu/navi12_gpu_info.bin");
 #define AMDGPU_RESUME_MS		2000
 #define AMDGPU_MAX_RETRY_LIMIT		2
 #define AMDGPU_RETRY_SRIOV_RESET(r) ((r) == -EBUSY || (r) == -ETIMEDOUT || (r) == -EINVAL)
+
+static const struct drm_driver amdgpu_kms_driver;
 
 const char *amdgpu_asic_name[] = {
 	"TAHITI",
@@ -3710,6 +3713,15 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	/* early init functions */
 	r = amdgpu_device_ip_early_init(adev);
+	if (r)
+		return r;
+
+	/* Get rid of things like offb */
+	#ifdef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
+	r = drm_aperture_remove_conflicting_pci_framebuffers(adev->pdev, &amdgpu_kms_driver);
+	#else
+	r = drm_aperture_remove_conflicting_pci_framebuffers(pdev, "amdgpudrmfb");
+	#endif
 	if (r)
 		return r;
 
