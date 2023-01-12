@@ -59,7 +59,13 @@ static void ttm_global_release(void)
 		goto out;
 
 	ttm_pool_mgr_fini();
-	debugfs_remove(ttm_debugfs_root);
+
+	/*
+	 * Replace the debugfs_remove() with debugfs_remove_recursive() for dkms code.
+	 * debugfs_remove() can't remove the ttm/ directory in legacy kernel.
+	 * So use the debugfs_remove_recursive() here.
+	*/
+	debugfs_remove_recursive(ttm_debugfs_root);
 
 	__free_page(glob->dummy_read_page);
 	memset(glob, 0, sizeof(*glob));
