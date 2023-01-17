@@ -326,4 +326,20 @@ enum drm_dp_phy {
 # define DP_PSR2_SU_GRANULARITY_REQUIRED    (1 << 5)  /* eDP 1.4b */
 #endif
 
+/*
+ * v5.15-rc1-244-gba3078dad140
+ * drm/dp: add helpers to read link training delays
+ */
+#ifndef DP_128B132B_TRAINING_AUX_RD_INTERVAL
+#define DP_128B132B_TRAINING_AUX_RD_INTERVAL                    0x2216 /* 2.0 */
+#endif
+
+/*
+ * v5.9-rc5-1031-g7d56927efac7
+ * drm/dp: add a number of DP 2.0 DPCD definitions
+ */
+#ifndef DP_128B132B_SUPPORTED_LINK_RATES
+#define DP_128B132B_SUPPORTED_LINK_RATES       0x2215 /* 2.0 */
+#endif
+
 #endif /* _KCL_DRM_DP_HELPER_H_ */
