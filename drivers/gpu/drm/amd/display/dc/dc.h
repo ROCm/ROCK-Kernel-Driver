@@ -1523,6 +1523,11 @@ struct dc_sink_fec_caps {
 	bool is_topology_fec_supported;
 };
 
+struct scdc_caps {
+	union hdmi_scdc_manufacturer_OUI_data manufacturer_OUI;
+	union hdmi_scdc_device_id_data device_id;
+};
+
 /*
  * The sink structure contains EDID and other display device properties
  */
@@ -1536,6 +1541,7 @@ struct dc_sink {
 	struct stereo_3d_features features_3d[TIMING_3D_FORMAT_MAX];
 	bool converter_disable_audio;
 
+	struct scdc_caps scdc_caps;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_sink_dsc_caps dsc_caps;
 	struct dc_sink_fec_caps fec_caps;
