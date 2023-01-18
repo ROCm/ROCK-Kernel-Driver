@@ -59,7 +59,6 @@
 #include "dc_trace.h"
 #include "dce/dmub_outbox.h"
 #include "inc/dc_link_dp.h"
-#include "inc/link_dpcd.h"
 
 #define DC_LOGGER_INIT(logger)
 

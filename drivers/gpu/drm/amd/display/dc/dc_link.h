@@ -31,6 +31,7 @@
 #include "grph_object_defs.h"
 
 struct link_resource;
+enum aux_return_code_type;
 
 enum dc_link_fec_state {
 	dc_link_fec_not_ready,
@@ -158,11 +159,11 @@ struct dc_panel_config {
 struct dc_dpia_bw_alloc {
 	int sink_verified_bw;  // The Verified BW that sink can allocated and use that has been verified already
 	int sink_allocated_bw; // The Actual Allocated BW that sink currently allocated
-	int padding_bw;        // The Padding "Un-used" BW allocated by CM for padding reasons
 	int sink_max_bw;       // The Max BW that sink can require/support
 	int estimated_bw;      // The estimated available BW for this DPIA
 	int bw_granularity;    // BW Granularity
 	bool bw_alloc_enabled; // The BW Alloc Mode Support is turned ON for all 3:  DP-Tx & Dpia & CM
+	bool response_ready;   // Response ready from the CM side
 };
 
 /*
@@ -338,14 +339,13 @@ static inline bool dc_get_edp_link_panel_inst(const struct dc *dc,
 	int edp_num, i;
 
 	*inst_out = 0;
-	if (link->connector_signal != SIGNAL_TYPE_EDP || !link->local_sink)
+	if (link->connector_signal != SIGNAL_TYPE_EDP)
 		return false;
 	get_edp_links(dc, edp_links, &edp_num);
 	for (i = 0; i < edp_num; i++) {
 		if (link == edp_links[i])
 			break;
-		if (edp_links[i]->local_sink)
-			(*inst_out)++;
+		(*inst_out)++;
 	}
 	return true;
 }
@@ -480,10 +480,6 @@ enum link_training_result dc_link_dp_sync_lt_attempt(
 
 bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down);
 
-void dc_link_dp_enable_hpd(const struct dc_link *link);
-
-void dc_link_dp_disable_hpd(const struct dc_link *link);
-
 bool dc_link_dp_set_test_pattern(
 	struct dc_link *link,
 	enum dp_test_pattern test_pattern,
@@ -494,6 +490,21 @@ bool dc_link_dp_set_test_pattern(
 
 bool dc_link_dp_get_max_link_enc_cap(const struct dc_link *link, struct dc_link_settings *max_link_enc_cap);
 
+/**
+ *****************************************************************************
+ *  Function: dc_link_enable_hpd_filter
+ *
+ *  @brief
+ *     If enable is true, programs HPD filter on associated HPD line to default
+ *     values dependent on link->connector_signal
+ *
+ *     If enable is false, programs HPD filter on associated HPD line with no
+ *     delays on connect or disconnect
+ *
+ *  @param [in] link: pointer to the dc link
+ *  @param [in] enable: boolean specifying whether to enable hbd
+ *****************************************************************************
+ */
 void dc_link_enable_hpd_filter(struct dc_link *link, bool enable);
 
 bool dc_link_is_dp_sink_present(struct dc_link *link);
@@ -566,9 +577,6 @@ void dc_get_cur_link_res_map(const struct dc *dc, uint32_t *map);
 /* restore link resource allocation state from a snapshot */
 void dc_restore_link_res_map(const struct dc *dc, uint32_t *map);
 void dc_link_clear_dprx_states(struct dc_link *link);
-struct gpio *get_hpd_gpio(struct dc_bios *dcb,
-		struct graphics_object_id link_id,
-		struct gpio_service *gpio_service);
 void dp_trace_reset(struct dc_link *link);
 bool dc_dp_trace_is_initialized(struct dc_link *link);
 unsigned long long dc_dp_trace_get_lt_end_timestamp(struct dc_link *link,
@@ -584,4 +592,13 @@ unsigned int dc_dp_trace_get_link_loss_count(struct dc_link *link);
 
 /* Destruct the mst topology of the link and reset the allocated payload table */
 bool reset_cur_dp_mst_topology(struct dc_link *link);
+
+/* Attempt to transfer the given aux payload. This function does not perform
+ * retries or handle error states. The reply is returned in the payload->reply
+ * and the result through operation_result. Returns the number of bytes
+ * transferred,or -1 on a failure.
+ */
+int dc_link_aux_transfer_raw(struct ddc_service *ddc,
+		struct aux_payload *payload,
+		enum aux_return_code_type *operation_result);
 #endif /* DC_LINK_H_ */

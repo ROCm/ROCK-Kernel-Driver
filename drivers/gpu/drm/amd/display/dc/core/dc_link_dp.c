@@ -32,12 +32,12 @@
 
 #include "inc/core_types.h"
 #include "link_hwss.h"
-#include "dc_link_ddc.h"
+#include "link/link_ddc.h"
 #include "core_status.h"
 #include "dpcd_defs.h"
 #include "dc_dmub_srv.h"
 #include "dce/dmub_hw_lock_mgr.h"
-#include "inc/dc_link_dpia.h"
+#include "link/link_dp_dpia.h"
 #include "inc/link_enc_cfg.h"
 #include "link/link_dp_trace.h"
 
@@ -50,7 +50,7 @@ static const uint8_t DP_VGA_LVDS_CONVERTER_ID_3[] = "dnomlA";
 	link->ctx->logger
 #define DC_TRACE_LEVEL_MESSAGE(...) /* do nothing */
 
-#include "link_dpcd.h"
+#include "link/link_dpcd.h"
 
 #ifndef MAX
 #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
@@ -4899,7 +4899,7 @@ static void get_active_converter_info(
 	/* decode converter info*/
 	if (!ds_port.fields.PORT_PRESENT) {
 		link->dpcd_caps.dongle_type = DISPLAY_DONGLE_NONE;
-		ddc_service_set_dongle_type(link->ddc,
+		set_dongle_type(link->ddc,
 				link->dpcd_caps.dongle_type);
 		link->dpcd_caps.is_branch_dev = false;
 		return;
@@ -5007,7 +5007,7 @@ static void get_active_converter_info(
 		}
 	}
 
-	ddc_service_set_dongle_type(link->ddc, link->dpcd_caps.dongle_type);
+	set_dongle_type(link->ddc, link->dpcd_caps.dongle_type);
 
 	{
 		struct dp_sink_hw_fw_revision dp_hw_fw_revision;
@@ -5385,7 +5385,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 	 * default to LTTPR timeout (3.2ms) first as a W/A for DP link layer
 	 * CTS 4.2.1.1 regression introduced by CTS specs requirement update.
 	 */
-	dc_link_aux_try_to_configure_timeout(link->ddc,
+	try_to_configure_aux_timeout(link->ddc,
 			LINK_AUX_DEFAULT_LTTPR_TIMEOUT_PERIOD);
 
 	status = dp_retrieve_lttpr_cap(link);
@@ -5426,7 +5426,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 	}
 
 	if (!dp_is_lttpr_present(link))
-		dc_link_aux_try_to_configure_timeout(link->ddc, LINK_AUX_DEFAULT_TIMEOUT_PERIOD);
+		try_to_configure_aux_timeout(link->ddc, LINK_AUX_DEFAULT_TIMEOUT_PERIOD);
 
 	{
 		union training_aux_rd_interval aux_rd_interval;
@@ -5899,22 +5899,6 @@ void detect_edp_sink_caps(struct dc_link *link)
 		core_link_read_dpcd(link, DP_RECEIVER_ALPM_CAP,
 			&link->dpcd_caps.alpm_caps.raw,
 			sizeof(link->dpcd_caps.alpm_caps.raw));
-}
-
-void dc_link_dp_enable_hpd(const struct dc_link *link)
-{
-	struct link_encoder *encoder = link->link_enc;
-
-	if (encoder != NULL && encoder->funcs->enable_hpd != NULL)
-		encoder->funcs->enable_hpd(encoder);
-}
-
-void dc_link_dp_disable_hpd(const struct dc_link *link)
-{
-	struct link_encoder *encoder = link->link_enc;
-
-	if (encoder != NULL && encoder->funcs->enable_hpd != NULL)
-		encoder->funcs->disable_hpd(encoder);
 }
 
 static bool is_dp_phy_pattern(enum dp_test_pattern test_pattern)
