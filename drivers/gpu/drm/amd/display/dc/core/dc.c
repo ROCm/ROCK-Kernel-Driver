@@ -1205,7 +1205,7 @@ static void disable_vbios_mode_if_required(
 						pipe->stream_res.pix_clk_params.requested_pix_clk_100hz;
 
 					if (pix_clk_100hz != requested_pix_clk_100hz) {
-						core_link_disable_stream(pipe);
+						link_set_dpms_off(pipe);
 						pipe->stream->dpms_off = false;
 					}
 				}
@@ -1313,7 +1313,7 @@ static void detect_edp_presence(struct dc *dc)
 		if (dc->config.edp_not_connected) {
 			edp_link->edp_sink_present = false;
 		} else {
-			dc_link_detect_sink(edp_link, &type);
+			dc_link_detect_connection_type(edp_link, &type);
 			edp_link->edp_sink_present = (type != dc_connection_none);
 		}
 	}
@@ -3186,7 +3186,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				dc->hwss.update_info_frame(pipe_ctx);
 
 				if (dc_is_dp_signal(pipe_ctx->stream->signal))
-					dp_source_sequence_trace(pipe_ctx->stream->link, DPCD_SOURCE_SEQ_AFTER_UPDATE_INFO_FRAME);
+					link_dp_source_sequence_trace(pipe_ctx->stream->link, DPCD_SOURCE_SEQ_AFTER_UPDATE_INFO_FRAME);
 			}
 
 			if (stream_update->hdr_static_metadata &&
@@ -3223,15 +3223,15 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (stream_update->dsc_config)
-				dp_update_dsc_config(pipe_ctx);
+				link_update_dsc_config(pipe_ctx);
 #endif
 
 			if (stream_update->mst_bw_update) {
 				if (stream_update->mst_bw_update->is_increase)
-					dc_link_increase_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
-				else
-					dc_link_reduce_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
-			}
+					link_increase_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
+ 				else
+					link_reduce_mst_payload(pipe_ctx, stream_update->mst_bw_update->mst_stream_bw);
+ 			}
 
 			if (stream_update->pending_test_pattern) {
 				dc_link_dp_set_test_pattern(stream->link,
@@ -3244,7 +3244,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 
 			if (stream_update->dpms_off) {
 				if (*stream_update->dpms_off) {
-					core_link_disable_stream(pipe_ctx);
+					link_set_dpms_off(pipe_ctx);
 					/* for dpms, keep acquired resources*/
 					if (pipe_ctx->stream_res.audio && !dc->debug.az_endpoint_mute_only)
 						pipe_ctx->stream_res.audio->funcs->az_disable(pipe_ctx->stream_res.audio);
@@ -3254,7 +3254,7 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				} else {
 					if (get_seamless_boot_stream_count(context) == 0)
 						dc->hwss.prepare_bandwidth(dc, dc->current_state);
-					core_link_enable_stream(dc->current_state, pipe_ctx);
+					link_set_dpms_on(dc->current_state, pipe_ctx);
 				}
 			}
 
@@ -4347,7 +4347,7 @@ void dc_resume(struct dc *dc)
 	uint32_t i;
 
 	for (i = 0; i < dc->link_count; i++)
-		core_link_resume(dc->links[i]);
+		link_resume(dc->links[i]);
 }
 
 bool dc_is_dmcu_initialized(struct dc *dc)

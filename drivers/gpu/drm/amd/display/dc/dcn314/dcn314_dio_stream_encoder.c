@@ -366,7 +366,7 @@ static void enc314_stream_encoder_dp_unblank(
 	 */
 	enc314_enable_fifo(enc);
 
-	dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_ENABLE_DP_VID_STREAM);
+	link_dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_ENABLE_DP_VID_STREAM);
 }
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
