@@ -132,6 +132,7 @@
 #define PPSMC_MSG_PowerUpUmsch                   0x45
 #define PPSMC_MSG_PowerDownUmsch                 0x46
 #define PPSMC_Message_Count                      0x47
+#define PPSMC_MSG_AllowIHHostInterrupt           0x4C
 
 //Debug Dump Message
 #define DEBUGSMC_MSG_TestMessage                    0x1
