@@ -1082,7 +1082,10 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 						false,
 						pdd->dev->vm_info.last_vmid_kfd);
 
-				debug_refresh_runlist(pdd->dev->dqm);
+				if (!pdd->dev->shared_resources.enable_mes)
+					debug_refresh_runlist(pdd->dev->dqm);
+				else
+					kfd_dbg_set_mes_debug_mode(pdd);
 			}
 		}
 	}
@@ -1153,7 +1156,10 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 					false,
 					pdd->dev->vm_info.last_vmid_kfd);
 
-			debug_refresh_runlist(pdd->dev->dqm);
+			if (!pdd->dev->shared_resources.enable_mes)
+				debug_refresh_runlist(pdd->dev->dqm);
+			else
+				kfd_dbg_set_mes_debug_mode(pdd);
 		}
 	}
 
