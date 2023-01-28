@@ -2013,15 +2013,20 @@ static int amdgpu_ttm_reserve_tmr(struct amdgpu_device *adev)
 		ctx->init = PSP_MEM_TRAIN_RESERVE_SUCCESS;
 	}
 
-	ret = amdgpu_bo_create_kernel_at(adev,
-					 adev->gmc.real_vram_size - adev->mman.discovery_tmr_size,
-					 adev->mman.discovery_tmr_size,
-					 &adev->mman.discovery_memory,
-					 NULL);
-	if (ret) {
-		DRM_ERROR("alloc tmr failed(%d)!\n", ret);
-		amdgpu_bo_free_kernel(&adev->mman.discovery_memory, NULL, NULL);
-		return ret;
+	if (!adev->gmc.is_app_apu) {
+		ret = amdgpu_bo_create_kernel_at(adev,
+						 adev->gmc.real_vram_size -
+						 adev->mman.discovery_tmr_size,
+						 adev->mman.discovery_tmr_size,
+						 &adev->mman.discovery_memory,
+						 NULL);
+		if (ret) {
+			DRM_ERROR("alloc tmr failed(%d)!\n", ret);
+			amdgpu_bo_free_kernel(&adev->mman.discovery_memory, NULL, NULL);
+			return ret;
+		}
+	} else {
+		DRM_DEBUG_DRIVER("backdoor fw loading path for PSP TMR, no reservation needed\n");
 	}
 
 	return 0;
@@ -2171,10 +2176,12 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		adev->mman.aper_base_kaddr = ioremap_cache(adev->gmc.aper_base,
 				adev->gmc.visible_vram_size);
 
-	else
+	else if (!adev->gmc.is_app_apu)
 #endif
 		adev->mman.aper_base_kaddr = ioremap_wc(adev->gmc.aper_base,
 				adev->gmc.visible_vram_size);
+	else
+		DRM_DEBUG_DRIVER("No need to ioremap when real vram size is 0\n");
 #endif
 
 	/*
@@ -2209,23 +2216,32 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	 * This is used for VGA emulation and pre-OS scanout buffers to
 	 * avoid display artifacts while transitioning between pre-OS
 	 * and driver.  */
-	r = amdgpu_bo_create_kernel_at(adev, 0, adev->mman.stolen_vga_size,
-				       &adev->mman.stolen_vga_memory,
-				       NULL);
-	if (r)
-		return r;
-	r = amdgpu_bo_create_kernel_at(adev, adev->mman.stolen_vga_size,
-				       adev->mman.stolen_extended_size,
-				       &adev->mman.stolen_extended_memory,
-				       NULL);
-	if (r)
-		return r;
-	r = amdgpu_bo_create_kernel_at(adev, adev->mman.stolen_reserved_offset,
-				       adev->mman.stolen_reserved_size,
-				       &adev->mman.stolen_reserved_memory,
-				       NULL);
-	if (r)
-		return r;
+	if (!adev->gmc.is_app_apu) {
+		r = amdgpu_bo_create_kernel_at(adev, 0,
+					       adev->mman.stolen_vga_size,
+					       &adev->mman.stolen_vga_memory,
+					       NULL);
+		if (r)
+			return r;
+
+		r = amdgpu_bo_create_kernel_at(adev, adev->mman.stolen_vga_size,
+					       adev->mman.stolen_extended_size,
+					       &adev->mman.stolen_extended_memory,
+					       NULL);
+
+		if (r)
+			return r;
+
+		r = amdgpu_bo_create_kernel_at(adev,
+					       adev->mman.stolen_reserved_offset,
+					       adev->mman.stolen_reserved_size,
+					       &adev->mman.stolen_reserved_memory,
+					       NULL);
+		if (r)
+			return r;
+	} else {
+		DRM_DEBUG_DRIVER("Skipped stolen memory reservation\n");
+	}
 
 	DRM_INFO("amdgpu: %uM of VRAM memory ready\n",
 		 (unsigned) (adev->gmc.real_vram_size / (1024 * 1024)));
@@ -2276,7 +2292,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		DRM_ERROR("Failed initializing oa heap.\n");
 		return r;
 	}
-
 	if (amdgpu_bo_create_kernel(adev, PAGE_SIZE, PAGE_SIZE,
 				AMDGPU_GEM_DOMAIN_GTT,
 				&adev->mman.sdma_access_bo, NULL,
@@ -2297,13 +2312,15 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 
 	amdgpu_ttm_training_reserve_vram_fini(adev);
 	/* return the stolen vga memory back to VRAM */
-	amdgpu_bo_free_kernel(&adev->mman.stolen_vga_memory, NULL, NULL);
-	amdgpu_bo_free_kernel(&adev->mman.stolen_extended_memory, NULL, NULL);
-	/* return the IP Discovery TMR memory back to VRAM */
-	amdgpu_bo_free_kernel(&adev->mman.discovery_memory, NULL, NULL);
-	if (adev->mman.stolen_reserved_size)
-		amdgpu_bo_free_kernel(&adev->mman.stolen_reserved_memory,
-				      NULL, NULL);
+	if (!adev->gmc.is_app_apu) {
+		amdgpu_bo_free_kernel(&adev->mman.stolen_vga_memory, NULL, NULL);
+		amdgpu_bo_free_kernel(&adev->mman.stolen_extended_memory, NULL, NULL);
+		/* return the IP Discovery TMR memory back to VRAM */
+		amdgpu_bo_free_kernel(&adev->mman.discovery_memory, NULL, NULL);
+		if (adev->mman.stolen_reserved_size)
+			amdgpu_bo_free_kernel(&adev->mman.stolen_reserved_memory,
+					      NULL, NULL);
+	}
 	amdgpu_bo_free_kernel(&adev->mman.sdma_access_bo, NULL,
 					&adev->mman.sdma_access_ptr);
 	amdgpu_ttm_fw_reserve_vram_fini(adev);
@@ -2346,7 +2363,7 @@ void amdgpu_ttm_set_buffer_funcs_status(struct amdgpu_device *adev, bool enable)
 	int r;
 
 	if (!adev->mman.initialized || amdgpu_in_reset(adev) ||
-	    adev->mman.buffer_funcs_enabled == enable)
+	    adev->mman.buffer_funcs_enabled == enable || adev->gmc.is_app_apu)
 		return;
 
 	if (enable) {
