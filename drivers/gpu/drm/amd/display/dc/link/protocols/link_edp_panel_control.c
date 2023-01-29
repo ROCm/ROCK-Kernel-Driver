@@ -351,10 +351,14 @@ bool edp_is_ilr_optimization_required(struct dc_link *link,
 
 	req_bw = dc_bandwidth_in_kbps_from_timing(crtc_timing, dc_link_get_highest_encoding_format(link));
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (!crtc_timing->flags.DSC)
 		edp_decide_link_settings(link, &link_setting, req_bw);
 	else
 		decide_edp_link_settings_with_dsc(link, &link_setting, req_bw, LINK_RATE_UNKNOWN);
+#else
+                decide_edp_link_settings(link, &link_setting, req_bw);
+#endif
 
 	if (link->dpcd_caps.edp_supported_link_rates[link_rate_set] != link_setting.link_rate ||
 			lane_count_set.bits.LANE_COUNT_SET != link_setting.lane_count) {
