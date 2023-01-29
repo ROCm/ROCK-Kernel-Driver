@@ -605,13 +605,20 @@ bool dp_validate_mode_timing(
 
 void dp_enable_mst_on_sink(struct dc_link *link, bool enable);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready);
+#endif
+
 void dp_set_fec_enable(struct dc_link *link, bool enable);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable);
+#endif
 bool dp_set_dsc_pps_sdp(struct pipe_ctx *pipe_ctx, bool enable, bool immediate_update);
 void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable);
 bool dp_update_dsc_config(struct pipe_ctx *pipe_ctx);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable);
+#endif
 
 bool dpcd_write_128b_132b_sst_payload_allocation_table(
 		const struct dc_stream_state *stream,

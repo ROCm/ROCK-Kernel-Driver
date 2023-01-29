@@ -4381,6 +4381,7 @@ void dp_enable_mst_on_sink(struct dc_link *link, bool enable)
 	core_link_write_dpcd(link, DP_MSTM_CTRL, &mstmCntl, 1);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready)
 {
 	/* FEC has to be "set ready" before the link training.
@@ -4427,6 +4428,7 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource
 
 	return status;
 }
+#endif
 
 void dp_set_fec_enable(struct dc_link *link, bool enable)
 {
@@ -4691,6 +4693,7 @@ static void dsc_optc_config_log(struct display_stream_compressor *dsc,
 	DC_LOG_DSC("\tslice_width %d", config->slice_width);
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
@@ -4703,6 +4706,7 @@ bool dp_set_dsc_on_rx(struct pipe_ctx *pipe_ctx, bool enable)
 		result = dm_helpers_dp_write_dsc_enable(dc->ctx, stream, enable);
 	return result;
 }
+#endif
 
 /* The stream with these settings can be sent (unblanked) only after DSC was enabled on RX first,
  * i.e. after dp_enable_dsc_on_rx() had been called
@@ -4797,6 +4801,7 @@ void dp_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 	}
 }
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 {
 	struct display_stream_compressor *dsc = pipe_ctx->stream_res.dsc;
@@ -4820,6 +4825,7 @@ bool dp_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable)
 out:
 	return result;
 }
+#endif
 
 /*
  * For dynamic bpp change case, dsc is programmed with MASTER_UPDATE_LOCK enabled;
