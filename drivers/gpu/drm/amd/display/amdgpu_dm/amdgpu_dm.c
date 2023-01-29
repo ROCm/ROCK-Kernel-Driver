@@ -1437,7 +1437,11 @@ static void force_connector_state(
 	mutex_unlock(&connector->dev->mode_config.mutex);
 
 	mutex_lock(&aconnector->hpd_lock);
-	drm_kms_helper_connector_hotplug_event(connector);
+#ifdef HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT
+        drm_kms_helper_connector_hotplug_event(connector);
+#else
+        drm_kms_helper_hotplug_event(connector->dev);
+#endif
 	mutex_unlock(&aconnector->hpd_lock);
 }
 
