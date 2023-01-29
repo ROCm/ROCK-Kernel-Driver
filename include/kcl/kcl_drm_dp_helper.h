@@ -342,4 +342,12 @@ enum drm_dp_phy {
 #define DP_128B132B_SUPPORTED_LINK_RATES       0x2215 /* 2.0 */
 #endif
 
+/*
+ * v6.0-2085-gbdf4b00bee5d
+ * drm/display: Add missing Adaptive Sync DPCD definitions
+ */
+#ifndef DP_DPRX_FEATURE_ENUMERATION_LIST_CONT_1
+#define DP_DPRX_FEATURE_ENUMERATION_LIST_CONT_1         0x2214 /* 2.0 E11 */
+#endif
+
 #endif /* _KCL_DRM_DP_HELPER_H_ */
