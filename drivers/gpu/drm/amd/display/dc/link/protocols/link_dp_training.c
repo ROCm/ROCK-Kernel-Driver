@@ -740,8 +740,11 @@ void override_training_settings(
 		lt_settings->pattern_for_eq = *overrides->pattern_for_eq;
 	if (overrides->enhanced_framing != NULL)
 		lt_settings->enhanced_framing = *overrides->enhanced_framing;
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable != NULL)
 		lt_settings->should_set_fec_ready = *link->preferred_training_settings.fec_enable;
+#endif
 
 	/* Check DP tunnel LTTPR mode debug option. */
 	if (link->ep_type == DISPLAY_ENDPOINT_USB4_DPIA && link->dc->debug.dpia_debug.bits.force_non_lttpr)
@@ -1504,7 +1507,9 @@ enum link_training_result dp_perform_link_training(
 
 	/* configure link prior to entering training mode */
 	dpcd_configure_lttpr_mode(link, &lt_settings);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	dp_set_fec_ready(link, link_res, lt_settings.should_set_fec_ready);
+#endif
 	dpcd_configure_channel_coding(link, &lt_settings);
 
 	/* enter training mode:
