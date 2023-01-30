@@ -1050,7 +1050,7 @@ int svm_migrate_init(struct amdgpu_device *adev)
 		pgmap->range.end = res->end;
 #else
 		pgmap->res.start = res->start;
-                pgmap->res.end = res->end;
+		pgmap->res.end = res->end;
 #endif
 		pgmap->type = MEMORY_DEVICE_PRIVATE;
 	}

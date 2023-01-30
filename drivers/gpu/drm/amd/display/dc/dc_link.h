@@ -294,6 +294,8 @@ struct dc_link {
 
 	struct gpio *hpd_gpio;
 	enum dc_link_fec_state fec_state;
+	bool link_powered_externally;	// Used to bypass hardware sequencing delays when panel is powered down forcibly
+
 	struct dc_panel_config panel_config;
 	struct phy_state phy_state;
 };
@@ -459,27 +461,6 @@ void dc_link_dp_set_drive_settings(
 	const struct link_resource *link_res,
 	struct link_training_settings *lt_settings);
 
-bool dc_link_dp_perform_link_training_skip_aux(
-	struct dc_link *link,
-	const struct link_resource *link_res,
-	const struct dc_link_settings *link_setting);
-
-enum link_training_result dc_link_dp_perform_link_training(
-	struct dc_link *link,
-	const struct link_resource *link_res,
-	const struct dc_link_settings *link_settings,
-	bool skip_video_pattern);
-
-bool dc_link_dp_sync_lt_begin(struct dc_link *link);
-
-enum link_training_result dc_link_dp_sync_lt_attempt(
-	struct dc_link *link,
-	const struct link_resource *link_res,
-	struct dc_link_settings *link_setting,
-	struct dc_link_training_overrides *lt_settings);
-
-bool dc_link_dp_sync_lt_end(struct dc_link *link, bool link_down);
-
 bool dc_link_dp_set_test_pattern(
 	struct dc_link *link,
 	enum dp_test_pattern test_pattern,
@@ -601,4 +582,11 @@ bool reset_cur_dp_mst_topology(struct dc_link *link);
 int dc_link_aux_transfer_raw(struct ddc_service *ddc,
 		struct aux_payload *payload,
 		enum aux_return_code_type *operation_result);
+
+enum lttpr_mode dc_link_decide_lttpr_mode(struct dc_link *link,
+		struct dc_link_settings *link_setting);
+void dc_link_dp_receiver_power_ctrl(struct dc_link *link, bool on);
+bool dc_link_decide_edp_link_settings(struct dc_link *link,
+		struct dc_link_settings *link_setting,
+		uint32_t req_bw);
 #endif /* DC_LINK_H_ */
