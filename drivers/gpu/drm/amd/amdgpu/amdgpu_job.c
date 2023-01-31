@@ -262,9 +262,6 @@ amdgpu_job_prepare_job(struct drm_sched_job *sched_job,
 			DRM_ERROR("Error getting VM ID (%d)\n", r);
 	}
 
-	if (!fence && job->gang_submit)
-		fence = amdgpu_device_switch_gang(ring->adev, job->gang_submit);
-
 	return fence;
 }
 
