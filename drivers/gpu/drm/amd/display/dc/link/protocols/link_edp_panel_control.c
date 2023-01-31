@@ -356,7 +356,7 @@ bool edp_is_ilr_optimization_required(struct dc_link *link,
 	else
 		decide_edp_link_settings_with_dsc(link, &link_setting, req_bw, LINK_RATE_UNKNOWN);
 #else
-                decide_edp_link_settings(link, &link_setting, req_bw);
+		dc_link_decide_edp_link_settings(link, &link_setting, req_bw);
 #endif
 
 	if (link->dpcd_caps.edp_supported_link_rates[link_rate_set] != link_setting.link_rate ||
