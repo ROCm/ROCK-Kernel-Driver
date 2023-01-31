@@ -63,11 +63,18 @@ static void set_reg_field_values(struct dmub_reg_value_masks *field_value_mask,
 	}
 }
 
+/*
+ * v6.0-2372-g92ffdc98c5f7
+ * ("drm/amd/display: Enable Freesync over PCon")
+ * verify __DM_SERVICES_H__ to fix the redefine function declaration for backport.h.
+ */
+#ifndef __DM_SERVICES_H__
 static inline uint32_t get_reg_field_value_ex(uint32_t reg_value, uint32_t mask,
 					      uint8_t shift)
 {
 	return (mask & reg_value) >> shift;
 }
+#endif
 
 void dmub_reg_update(struct dmub_srv *srv, uint32_t addr, int n, uint8_t shift1,
 		     uint32_t mask1, uint32_t field_value1, ...)
