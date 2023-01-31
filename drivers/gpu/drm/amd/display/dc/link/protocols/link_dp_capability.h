@@ -77,10 +77,12 @@ bool link_decide_link_settings(
 bool edp_decide_link_settings(struct dc_link *link,
 		struct dc_link_settings *link_setting, uint32_t req_bw);
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		uint32_t req_bw,
 		enum dc_link_rate max_link_rate);
+#endif
 
 enum dp_link_encoding mst_decide_link_encoding_format(const struct dc_link *link);
 
