@@ -936,7 +936,12 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	dc_link_dp_get_max_link_enc_cap(aconnector->dc_link, &max_link_enc_cap);
 	aconnector->mst_mgr.cbs = &dm_mst_cbs;
 	drm_dp_mst_topology_mgr_init(&aconnector->mst_mgr, adev_to_drm(dm->adev),
-				     &aconnector->dm_dp_aux.aux, 16, 4, aconnector->connector_id);
+				     &aconnector->dm_dp_aux.aux, 16, 4, 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT
+				     max_link_enc_cap.lane_count,
+				     drm_dp_bw_code_to_link_rate(max_link_enc_cap.link_rate),
+#endif
+				     aconnector->connector_id);
 
 	drm_connector_attach_dp_subconnector_property(&aconnector->base);
 }
