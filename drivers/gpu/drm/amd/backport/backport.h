@@ -110,4 +110,5 @@
  * include drm_damage_helper.h to fix the missing function declaration for legacy kernel.
  */
 #include <drm/drm_damage_helper.h>
+#include <kcl/backport/kcl_drm_probe_helper.h>
 #endif /* AMDGPU_BACKPORT_H */
