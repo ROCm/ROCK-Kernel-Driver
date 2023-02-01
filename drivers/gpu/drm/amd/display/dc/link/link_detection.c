@@ -718,7 +718,7 @@ static bool discover_dp_mst_topology(struct dc_link *link, enum dc_detect_reason
 	return link->type == dc_connection_mst_branch;
 }
 
-static bool reset_cur_dp_mst_topology(struct dc_link *link)
+bool link_reset_cur_dp_mst_topology(struct dc_link *link)
 {
 	DC_LOGGER_INIT(link->ctx->logger);
 
@@ -731,10 +731,6 @@ static bool reset_cur_dp_mst_topology(struct dc_link *link)
 	return dm_helpers_dp_mst_stop_top_mgr(link->ctx, link);
 }
 
-bool dc_link_reset_cur_dp_mst_topology(struct dc_link *link)
-{
-	return reset_cur_dp_mst_topology(link);
-}
 static bool should_prepare_phy_clocks_for_link_verification(const struct dc *dc,
 		enum dc_detect_reason reason)
 {
@@ -1205,7 +1201,7 @@ static bool detect_link_and_local_sink(struct dc_link *link,
  * Does not detect downstream devices, such as MST sinks
  * or display connected through active dongles
  */
-bool dc_link_detect_connection_type(struct dc_link *link, enum dc_connection_type *type)
+bool link_detect_connection_type(struct dc_link *link, enum dc_connection_type *type)
 {
 	uint32_t is_hpd_high = 0;
 
@@ -1248,7 +1244,7 @@ hpd_gpio_failure:
 	return false;
 }
 
-bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
+bool link_detect(struct dc_link *link, enum dc_detect_reason reason)
 {
 	bool is_local_sink_detect_success;
 	bool is_delegated_to_mst_top_mgr = false;
@@ -1267,18 +1263,18 @@ bool dc_link_detect(struct dc_link *link, enum dc_detect_reason reason)
 	if (is_local_sink_detect_success &&
 			pre_link_type == dc_connection_mst_branch &&
 			link->type != dc_connection_mst_branch)
-		is_delegated_to_mst_top_mgr = reset_cur_dp_mst_topology(link);
+		is_delegated_to_mst_top_mgr = link_reset_cur_dp_mst_topology(link);
 
 	return is_local_sink_detect_success && !is_delegated_to_mst_top_mgr;
 }
 
-void dc_link_clear_dprx_states(struct dc_link *link)
+void link_clear_dprx_states(struct dc_link *link)
 {
 	memset(&link->dprx_states, 0, sizeof(link->dprx_states));
 }
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
 
-bool dc_link_is_hdcp14(struct dc_link *link, enum signal_type signal)
+bool link_is_hdcp14(struct dc_link *link, enum signal_type signal)
 {
 	bool ret = false;
 
@@ -1302,7 +1298,7 @@ bool dc_link_is_hdcp14(struct dc_link *link, enum signal_type signal)
 	return ret;
 }
 
-bool dc_link_is_hdcp22(struct dc_link *link, enum signal_type signal)
+bool link_is_hdcp22(struct dc_link *link, enum signal_type signal)
 {
 	bool ret = false;
 
@@ -1326,7 +1322,7 @@ bool dc_link_is_hdcp22(struct dc_link *link, enum signal_type signal)
 }
 #endif // CONFIG_DRM_AMD_DC_HDCP
 
-const struct dc_link_status *dc_link_get_status(const struct dc_link *link)
+const struct dc_link_status *link_get_status(const struct dc_link *link)
 {
 	return &link->link_status;
 }
