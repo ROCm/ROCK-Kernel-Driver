@@ -948,9 +948,16 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 	int min_initial_slack;
 	int next_index;
 	int remaining_to_increase = 0;
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+	int pbn_per_timeslot;
+#endif
 	int link_timeslots_used;
 	int fair_pbn_alloc;
 	int ret = 0;
+
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+	pbn_per_timeslot = dm_mst_get_pbn_divider(dc_link);
+#endif
 
 	for (i = 0; i < count; i++) {
 		if (vars[i + k].dsc_enabled) {
@@ -982,10 +989,21 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 		link_timeslots_used = 0;
 
 		for (i = 0; i < count; i++)
-			link_timeslots_used += DIV_ROUND_UP(vars[i + k].pbn, mst_state->pbn_div);
+			link_timeslots_used += DIV_ROUND_UP(vars[i + k].pbn, 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+							    mst_state->pbn_div
+#else
+							    pbn_per_timeslot
+#endif
+							    );
 
 		fair_pbn_alloc =
-			(63 - link_timeslots_used) / remaining_to_increase * mst_state->pbn_div;
+			(63 - link_timeslots_used) / remaining_to_increase *
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+			mst_state->pbn_div;
+#else
+			pbn_per_timeslot;
+#endif
 
 		if (initial_slack[next_index] > fair_pbn_alloc) {
 			vars[next_index].pbn += fair_pbn_alloc;
@@ -1125,12 +1143,14 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 
 	memset(params, 0, sizeof(params));
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
 
 	mst_state->pbn_div = dm_mst_get_pbn_divider(dc_link);
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	drm_dp_mst_update_slots(mst_state, dc_link_dp_mst_decide_link_encoding_format(dc_link));
+#endif
 #endif
 
 	/* Set up params */
