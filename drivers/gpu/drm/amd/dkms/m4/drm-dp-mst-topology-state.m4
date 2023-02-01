@@ -47,3 +47,30 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS], [
 		])
 	])
 ])
+
+
+dnl #
+dnl # commit v5.19-rc6-1771-g4d07b0bc4034
+dnl # drm/display/dp_mst: Move all payload info into the atomic state
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+                        #if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+                        #include <drm/display/drm_dp_mst_helper.h>
+                        #elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+                        #include <drm/dp/drm_dp_mst_helper.h>
+                        #else
+                        #include <drm/drm_dp_mst_helper.h>
+                        #endif
+                ], [
+                        struct drm_dp_mst_topology_state * mst_state = NULL;
+                        int pbn_div;
+                        pbn_div = mst_state->pbn_div;
+                ], [
+                        AC_DEFINE(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV, 1,
+                                [struct drm_dp_mst_topology_state has member pbn_div])
+                ])
+        ])
+])
+
