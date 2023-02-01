@@ -152,9 +152,6 @@
 /* drm_accurate_vblank_count() is available */
 /* #undef HAVE_DRM_ACCURATE_VBLANK_COUNT */
 
-/* DRM_AMDGPU_FENCE_TO_HANDLE is defined */
-#define HAVE_DRM_AMDGPU_FENCE_TO_HANDLE 1
-
 /* Define to 1 if you have the <drm/amdgpu_pciid.h> header file. */
 /* #undef HAVE_DRM_AMDGPU_PCIID_H */
 
