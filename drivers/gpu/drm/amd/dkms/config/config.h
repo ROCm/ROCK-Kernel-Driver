@@ -460,6 +460,9 @@
 /* struct drm_dp_mst_topology_state has member payloads */
 #define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS 1
 
+/* struct drm_dp_mst_topology_state has member pbn_div */
+#define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV 1
+
 /* struct drm_dp_mst_topology_state has member total_avail_slots */
 #define HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS 1
 

@@ -7783,7 +7783,9 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	const struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 	struct drm_dp_mst_topology_state *mst_state;
+#endif
 	enum dc_color_depth color_depth;
 	int clock, bpp = 0;
 	bool is_y420 = false;
@@ -7797,11 +7799,13 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	if (!crtc_state->connectors_changed && !crtc_state->mode_changed)
 		return 0;
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 	mst_state = drm_atomic_get_mst_topology_state(state, mst_mgr);
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
 
 	mst_state->pbn_div.full = dfixed_const(dm_mst_get_pbn_divider(aconnector->mst_root->dc_link));
+#endif
 
 	if (!state->duplicated) {
 		int max_bpc = conn_state->max_requested_bpc;
@@ -11922,6 +11926,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
@@ -11943,6 +11948,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 		drm_connector_list_iter_end(&iter);
 	}
+#endif
 #endif
 #endif
 	/**
