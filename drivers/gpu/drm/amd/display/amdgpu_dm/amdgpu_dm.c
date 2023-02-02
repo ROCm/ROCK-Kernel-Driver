@@ -7902,14 +7902,22 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 			dm_conn_state->vcpi_slots = slot_num;
 
 			ret = drm_dp_mst_atomic_enable_dsc(state, aconnector->mst_output_port,
-							   dm_conn_state->pbn, false);
+							   dm_conn_state->pbn, 
+#ifdef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS
+							   0,
+#endif
+							   false);
 			if (ret < 0)
 				return ret;
 
 			continue;
 		}
 
-		vcpi = drm_dp_mst_atomic_enable_dsc(state, aconnector->mst_output_port, pbn, true);
+		vcpi = drm_dp_mst_atomic_enable_dsc(state, aconnector->mst_output_port, pbn,
+#ifdef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS
+						    0,
+#endif
+						    true);
 		if (vcpi < 0)
 			return vcpi;
 
