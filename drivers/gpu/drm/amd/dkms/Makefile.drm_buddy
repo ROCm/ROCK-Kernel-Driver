@@ -1,0 +1,6 @@
+export CONFIG_DRM_BUDDY=m
+
+subdir-ccflags-y += -DCONFIG_DRM_BUDDY
+CFLAGS_drm_buddy.o += -DHAVE_CONFIG_H
+amddrm_buddy-y := drm_buddy.o
+obj-$(CONFIG_DRM_BUDDY) += amddrm_buddy.o
