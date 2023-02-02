@@ -17,6 +17,28 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ATOMIC_ENABLE_DSC], [
 		], [drm_dp_mst_atomic_enable_dsc], [drivers/gpu/drm/drm_dp_mst_topology.c], [
 			AC_DEFINE(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC, 1,
 				[drm_dp_mst_atomic_enable_dsc() is available])
+			AC_DEFINE(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS, 1,
+                                [drm_dp_mst_atomic_enable_dsc() wants 5args])
+		],[
+                        dnl #
+                        dnl # commit 4d07b0bc403403438d9cf88450506240c5faf92f
+                        dnl # drm/display/dp_mst: Move all payload info into the atomic state
+                        dnl #
+                        AC_KERNEL_TRY_COMPILE([
+                                #if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+                                #include <drm/display/drm_dp_mst_helper.h>
+                                #elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+                                #include <drm/dp/drm_dp_mst_helper.h>
+                                #else
+                                #include <drm/drm_dp_mst_helper.h>
+                                #endif
+                        ], [
+                                int vcpi;
+                                vcpi = drm_dp_mst_atomic_enable_dsc(NULL, NULL, 0, false);
+                        ], [
+                                AC_DEFINE(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC, 1,
+                                        [drm_dp_atomic_find_vcpi_slots() is available])
+                        ])
 		])
 	])
 ])
