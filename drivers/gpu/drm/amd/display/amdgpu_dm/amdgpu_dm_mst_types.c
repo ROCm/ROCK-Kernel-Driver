@@ -1148,7 +1148,11 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 			ret = drm_dp_atomic_find_time_slots(state,
 							    params[next_index].port->mgr,
 							    params[next_index].port,
-							    vars[next_index].pbn);
+							    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+							    , pbn_per_timeslot
+#endif
+							    );
 			if (ret < 0)
 				return ret;
 
@@ -1160,7 +1164,11 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 				ret = drm_dp_atomic_find_time_slots(state,
 								    params[next_index].port->mgr,
 								    params[next_index].port,
-								    vars[next_index].pbn);
+								    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+								    , pbn_per_timeslot
+#endif
+								    );
 				if (ret < 0)
 					return ret;
 			}
@@ -1169,7 +1177,11 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 			ret = drm_dp_atomic_find_time_slots(state,
 							    params[next_index].port->mgr,
 							    params[next_index].port,
-							    vars[next_index].pbn);
+							    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+							    , pbn_per_timeslot
+#endif
+							    );
 			if (ret < 0)
 				return ret;
 
@@ -1181,7 +1193,11 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 				ret = drm_dp_atomic_find_time_slots(state,
 								    params[next_index].port->mgr,
 								    params[next_index].port,
-								    vars[next_index].pbn);
+								    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+								    , pbn_per_timeslot
+#endif
+								    );
 				if (ret < 0)
 					return ret;
 			}
@@ -1241,7 +1257,11 @@ static int try_disable_dsc(struct drm_atomic_state *state,
 		ret = drm_dp_atomic_find_time_slots(state,
 						    params[next_index].port->mgr,
 						    params[next_index].port,
-						    vars[next_index].pbn);
+						    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+						    , dm_mst_get_pbn_divider(dc_link)
+#endif
+						    );
 		if (ret < 0)
 			return ret;
 
@@ -1254,7 +1274,11 @@ static int try_disable_dsc(struct drm_atomic_state *state,
 			ret = drm_dp_atomic_find_time_slots(state,
 							    params[next_index].port->mgr,
 							    params[next_index].port,
-							    vars[next_index].pbn);
+							    vars[next_index].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+							    , dm_mst_get_pbn_divider(dc_link)
+#endif
+							    );
 			if (ret < 0)
 				return ret;
 		}
@@ -1348,7 +1372,11 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 		vars[i + k].dsc_enabled = false;
 		vars[i + k].bpp_x16 = 0;
 		ret = drm_dp_atomic_find_time_slots(state, params[i].port->mgr, params[i].port,
-						    vars[i + k].pbn);
+						    vars[i + k].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+						    , dm_mst_get_pbn_divider(dc_link)
+#endif
+						    );
 		if (ret < 0)
 			return ret;
 	}
@@ -1367,7 +1395,11 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 			vars[i + k].dsc_enabled = true;
 			vars[i + k].bpp_x16 = params[i].bw_range.min_target_bpp_x16;
 			ret = drm_dp_atomic_find_time_slots(state, params[i].port->mgr,
-							    params[i].port, vars[i + k].pbn);
+							    params[i].port, vars[i + k].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+							    , dm_mst_get_pbn_divider(dc_link)
+#endif
+							    );
 			if (ret < 0)
 				return ret;
 		} else {
@@ -1375,7 +1407,11 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 			vars[i + k].dsc_enabled = false;
 			vars[i + k].bpp_x16 = 0;
 			ret = drm_dp_atomic_find_time_slots(state, params[i].port->mgr,
-							    params[i].port, vars[i + k].pbn);
+							    params[i].port, vars[i + k].pbn
+#ifndef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS
+							    , dm_mst_get_pbn_divider(dc_link)
+#endif
+							    );
 			if (ret < 0)
 				return ret;
 		}
