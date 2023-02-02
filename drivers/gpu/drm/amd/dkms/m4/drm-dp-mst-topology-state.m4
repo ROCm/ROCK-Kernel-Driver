@@ -22,3 +22,28 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS], [
 	])
 ])
 
+
+dnl #
+dnl # commit 8366f01fb15a54281c193658d1a916f6f2d5eb1e
+dnl # drm/display/dp_mst: Move all payload info into the atomic state
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+			#include <drm/display/drm_dp_mst_helper.h>
+			#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
+			#include <drm/drm_dp_mst_helper.h>
+			#endif
+		], [
+			struct drm_dp_mst_topology_state * mst_state = NULL;
+			struct list_head payloads;
+			payloads = mst_state->payloads;
+		], [
+			AC_DEFINE(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS, 1,
+				[struct drm_dp_mst_topology_state has member payloads])
+		])
+	])
+])
