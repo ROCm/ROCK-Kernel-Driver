@@ -210,18 +210,8 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DSC_SUPPORT
 endif
 endif
 
-export CONFIG_DRM_TTM_HELPER=m
-subdir-ccflags-y += -DCONFIG_DRM_TTM_HELPER
-CFLAGS_drm_gem_ttm_helper.o += -include $(src)/ttm/backport/backport.h \
-								-include $(src)/include/kcl/backport/kcl_drm_gem.h \
-								-DHAVE_CONFIG_H
-amddrm_ttm_helper-y := drm_gem_ttm_helper.o
-obj-$(CONFIG_DRM_TTM_HELPER) += amddrm_ttm_helper.o
+include  $(src)/amd/dkms/Makefile.drm_ttm_helper
 
-export CONFIG_DRM_BUDDY=m
-subdir-ccflags-y += -DCONFIG_DRM_BUDDY
-CFLAGS_drm_buddy.o += -DHAVE_CONFIG_H
-amddrm_buddy-y := drm_buddy.o
-obj-$(CONFIG_DRM_BUDDY) += amddrm_buddy.o
+include  $(src)/amd/dkms/Makefile.drm_buddy
 
 obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
