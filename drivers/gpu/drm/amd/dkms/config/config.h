@@ -368,7 +368,7 @@
 /* #undef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP */
 
 /* drm_dp_atomic_find_time_slots() is available */
-/* #undef HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS */
+#define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
 
 /* drm_dp_mst_atomic_setup_commit() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT */

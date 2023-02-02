@@ -72,7 +72,7 @@ int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
 				  struct drm_dp_mst_port *port, int pbn,
 				  int pbn_div)
 {
-	return 0;
+	return drm_dp_atomic_find_vcpi_slots(state, mgr, port, pbn, pbn_div);
 }
 #define drm_dp_atomic_find_time_slots _kcl_drm_dp_atomic_find_time_slots
 #endif
