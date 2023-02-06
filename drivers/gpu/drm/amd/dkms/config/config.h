@@ -1406,9 +1406,6 @@
 /* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
 #define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
 
-/* __drm_atomic_helper_crtc_destroy_state() wants 1 arg */
-#define HAVE___DRM_ATOMIC_HELPER_CRTC_DESTROY_STATE_P 1
-
 /* __drm_atomic_helper_crtc_reset() is available */
 #define HAVE___DRM_ATOMIC_HELPER_CRTC_RESET 1
 
