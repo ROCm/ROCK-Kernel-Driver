@@ -165,9 +165,6 @@
    drm_driver* */
 #define HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG 1
 
-/* drm_atomic_get_new_plane_state() is available */
-#define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
-
 /* drm_atomic_helper_calc_timestamping_constants() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
 
