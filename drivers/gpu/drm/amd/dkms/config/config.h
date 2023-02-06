@@ -1415,9 +1415,6 @@
 /* __kthread_should_park() is available */
 #define HAVE___KTHREAD_SHOULD_PARK 1
 
-/* __print_array is available */
-#define HAVE___PRINT_ARRAY 1
-
 /* kobj_type->default_groups is available */
 #define HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE 1
 
