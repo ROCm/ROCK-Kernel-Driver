@@ -1261,12 +1261,6 @@
 /* drm_crtc_funcs->late_register() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_LATE_REGISTER 1
 
-/* crtc->funcs->set_crc_source() is available */
-#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE 1
-
-/* crtc->funcs->set_crc_source() wants 2 args */
-#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE_2ARGS 1
-
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 

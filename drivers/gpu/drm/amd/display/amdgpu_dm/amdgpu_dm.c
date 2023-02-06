@@ -9863,7 +9863,6 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		/* Handle vrr on->off / off->on transitions */
 		amdgpu_dm_handle_vrr_transition(dm_old_crtc_state, dm_new_crtc_state);
 
-#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CRC_SOURCE
 #ifdef CONFIG_DEBUG_FS
 		if (new_crtc_state->active &&
 		    (!old_crtc_state->active ||
@@ -9891,7 +9890,6 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 					DRM_DEBUG_DRIVER("Failed to configure crc source");
 			}
 		}
-#endif
 #endif
 	}
 
