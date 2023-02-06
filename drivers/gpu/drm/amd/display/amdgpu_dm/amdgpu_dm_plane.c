@@ -1269,9 +1269,9 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 
 	new_crtc_state = 
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
-		kcl_drm_atomic_get_new_crtc_state_before_commit(state, new_plane_state->crtc);
+		drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
 #else
-		kcl_drm_atomic_get_new_crtc_state_before_commit(state->state, state->crtc);
+		drm_atomic_get_new_crtc_state(state->state, state->crtc);
 #endif
 
 	if (!new_crtc_state)

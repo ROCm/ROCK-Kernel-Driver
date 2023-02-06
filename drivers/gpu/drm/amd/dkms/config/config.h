@@ -165,10 +165,6 @@
    drm_driver* */
 #define HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG 1
 
-/* drm_atomic_get_old_crtc_state() and drm_atomic_get_new_crtc_state() are
-   available */
-#define HAVE_DRM_ATOMIC_GET_CRTC_STATE 1
-
 /* drm_atomic_get_new_plane_state() is available */
 #define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
 
@@ -265,9 +261,6 @@
 
 /* drm_coredump_printer function is available */
 #define HAVE_DRM_COREDUMP_PRINTER 1
-
-/* ddrm_atomic_stat has __drm_crtcs_state */
-/* #undef HAVE_DRM_CRTCS_STATE_MEMBER */
 
 /* drm_crtc_accurate_vblank_count() is available */
 #define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
