@@ -171,9 +171,6 @@
 /* drm_atomic_helper_check_plane_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
 
-/* drm_atomic_helper_shutdown() is available */
-#define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
-
 /* drm_atomic_helper_wait_for_flip_done() is available */
 #define HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE 1
 
