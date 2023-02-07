@@ -916,9 +916,7 @@ void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,
 	aconnector->dm_dp_aux.aux.drm_dev = dm->ddev;
 #endif
 	aconnector->dm_dp_aux.ddc_service = aconnector->dc_link->ddc;
-#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	drm_dp_aux_init(&aconnector->dm_dp_aux.aux);
-#endif
 	drm_dp_cec_register_connector(&aconnector->dm_dp_aux.aux,
 				      &aconnector->base);
 
