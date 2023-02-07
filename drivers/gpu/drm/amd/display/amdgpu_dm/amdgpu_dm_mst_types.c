@@ -120,13 +120,13 @@ static enum drm_connector_status
 dm_dp_mst_detect(struct drm_connector *connector, bool force)
 {
        struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
-       struct amdgpu_dm_connector *master = aconnector->mst_port;
+       struct amdgpu_dm_connector *master = aconnector->mst_root;
 
        enum drm_connector_status status =
                drm_dp_mst_detect_port(
                        connector,
                        &master->mst_mgr,
-                       aconnector->port);
+                       aconnector->mst_output_port);
 
        return status;
 }
@@ -633,11 +633,11 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
 	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 		aconnector = to_amdgpu_dm_connector(connector);
-		if (aconnector->mst_port == master
-				&& !aconnector->port) {
+		if (aconnector->mst_root == master
+				&& !aconnector->mst_output_port) {
 			DRM_INFO("DM_MST: reusing connector: %p [id: %d] [master: %p]\n",
-						aconnector, connector->base.id, aconnector->mst_port);
-			aconnector->port = port;
+						aconnector, connector->base.id, aconnector->mst_root);
+			aconnector->mst_output_port = port;
 			drm_mode_connector_set_path_property(connector, pathprop);
 			drm_modeset_unlock(&dev->mode_config.connection_mutex);
 			return &aconnector->base;
@@ -837,7 +837,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
 	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
-		 aconnector, connector->base.id, aconnector->mst_port);
+		 aconnector, connector->base.id, aconnector->mst_root);
 
 	if (aconnector->dc_sink) {
 		amdgpu_dm_update_freesync_caps(connector, NULL);
