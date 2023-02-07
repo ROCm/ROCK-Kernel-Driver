@@ -9,23 +9,8 @@ AC_DEFUN([AC_AMDGPU_DRM_ATOMIC_PRIVATE_OBJ_INIT], [
 		], [
 			drm_atomic_private_obj_init(NULL, NULL, NULL, NULL);
 		], [
-			AC_DEFINE(HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_P_P_P_P, 1,
-				[drm_atomic_private_obj_init() has p,p,p,p interface])
-			AC_DEFINE(HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT, 1,
-				[drm_atomic_private_obj_init() is available])
-		], [
-			dnl #
-			dnl # commit v4.12-rc7-1381-ga4370c777406
-			dnl # drm/atomic: Make private objs proper objects
-			dnl #
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drm_atomic.h>
-			], [
-				drm_atomic_private_obj_init(NULL, NULL, NULL);
-			], [
-				AC_DEFINE(HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT, 1,
-					[drm_atomic_private_obj_init() is available])
-			])
+			AC_DEFINE(HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS, 1,
+				[drm_atomic_private_obj_init() wants 4 args])
 		])
 	])
 ])
