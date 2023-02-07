@@ -186,14 +186,6 @@ bool _kcl_fence_enable_signaling(struct dma_fence *f);
 #define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 #endif
 
-#if !defined(HAVE_DMA_FENCE_GET_STUB)
-struct dma_fence *_kcl_dma_fence_get_stub(void);
-static inline struct dma_fence *dma_fence_get_stub(void)
-{
-	return _kcl_dma_fence_get_stub();
-}
-#endif
-
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 void dma_fence_describe(struct dma_fence *fence, struct seq_file *seq);
 #endif
