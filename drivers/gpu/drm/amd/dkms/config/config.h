@@ -207,8 +207,8 @@
 /* drm_atomic_private_obj_init() is available */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT 1
 
-/* drm_atomic_private_obj_init() has p,p,p,p interface */
-#define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_P_P_P_P 1
+/* drm_atomic_private_obj_init() wants 4 args */
+#define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
 /* whether struct drm_atomic_state have async_update */
 #define HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE 1
