@@ -961,9 +961,6 @@
 /* Define to 1 if you have the <linux/dma-fence-chain.h> header file. */
 #define HAVE_LINUX_DMA_FENCE_CHAIN_H 1
 
-/* Define to 1 if you have the <linux/dma-fence.h> header file. */
-#define HAVE_LINUX_DMA_FENCE_H 1
-
 /* Define to 1 if you have the <linux/dma-map-ops.h> header file. */
 #define HAVE_LINUX_DMA_MAP_OPS_H 1
 
