@@ -14,9 +14,11 @@
 #define AMDKCL_DMA_FENCE_H
 
 #ifndef HAVE_DMA_FENCE_IS_CONTAINER
-#include <kcl/kcl_fence_array.h>
 #include <kcl/kcl_dma_fence_chain.h>
 
+#if !defined(HAVE_LINUX_FENCE_ARRAY_H)
+#include <linux/dma-fence-array.h>
+#endif
 /**
  * dma_fence_is_chain - check if a fence is from the chain subclass
  * @fence: the fence to test

@@ -238,11 +238,7 @@ EXPORT_SYMBOL(_kcl_fence_enable_signaling);
  */
 void amdkcl_fence_init(void)
 {
-#if defined(HAVE_LINUX_DMA_FENCE_H)
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("dma_fence_default_wait_cb", NULL);
-#else
-	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
-#endif
 }
 
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
