@@ -190,9 +190,6 @@
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
 
-/* struct drm_connector_funcs has register members */
-#define HAVE_DRM_CONNECTOR_FUNCS_REGISTER 1
-
 /* atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state
    */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE 1
