@@ -3289,10 +3289,8 @@ void crtc_debugfs_init(struct drm_crtc *crtc)
 				   &crc_win_update_fops);
 	dput(dir);
 #endif
-#ifdef HAVE_STRUCT_DRM_CRTC_DEBUGFS_ENTRY
 	debugfs_create_file("amdgpu_current_bpc", 0644, crtc->debugfs_entry,
 			    crtc, &amdgpu_current_bpc_fops);
-#endif
 }
 
 /*
