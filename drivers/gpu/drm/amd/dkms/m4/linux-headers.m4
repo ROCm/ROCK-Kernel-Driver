@@ -38,10 +38,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([linux/compiler_attributes.h])
 
 	dnl #
-	dnl # v4.9-rc2-299-gf54d1867005c
-	dnl # dma-buf: Rename struct fence to dma_fence
+	dnl # commit b3dfbdf261e076a997f812323edfdba84ba80256
+	dnl # dma-buf/fence: add fence_array fences v6
 	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/dma-fence.h])
+	AC_KERNEL_CHECK_HEADERS([linux/fence-array.h])
 
 	dnl #
 	dnl # v5.3-rc1-449-g52791eeec1d9
