@@ -107,9 +107,6 @@
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
-/* whether dma_fence_get_stub exits */
-#define HAVE_DMA_FENCE_GET_STUB 1
-
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
 

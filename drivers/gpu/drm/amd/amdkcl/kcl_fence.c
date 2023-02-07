@@ -245,41 +245,6 @@ void amdkcl_fence_init(void)
 #endif
 }
 
-#if !defined(HAVE_DMA_FENCE_GET_STUB)
-/* Copied from drivers/dma-buf/dma-fence.c and modified for KCL */
-static DEFINE_SPINLOCK(dma_fence_stub_lock);
-static struct dma_fence dma_fence_stub;
-
-static const char *dma_fence_stub_get_name(struct dma_fence *fence)
-{
-        return "stub";
-}
-
-static const struct dma_fence_ops dma_fence_stub_ops = {
-	.get_driver_name = dma_fence_stub_get_name,
-	.get_timeline_name = dma_fence_stub_get_name,
-	AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
-	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
-};
-
-struct dma_fence *_kcl_dma_fence_get_stub(void)
-{
-	spin_lock(&dma_fence_stub_lock);
-	if (!dma_fence_stub.ops) {
-		u64 fence_context = dma_fence_context_alloc(1);
-		dma_fence_init(&dma_fence_stub,
-			       &dma_fence_stub_ops,
-			       &dma_fence_stub_lock,
-			       fence_context, 0);
-		dma_fence_signal_locked(&dma_fence_stub);
-	}
-	spin_unlock(&dma_fence_stub_lock);
-
-	return dma_fence_get(&dma_fence_stub);
-}
-EXPORT_SYMBOL(_kcl_dma_fence_get_stub);
-#endif
-
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
 /**
  * dma_fence_describe - Dump fence describtion into seq_file
