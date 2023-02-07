@@ -59,10 +59,4 @@ void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
 void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state);
 #endif
 
-#ifndef HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FENCES
-int drm_atomic_helper_wait_for_fences(struct drm_device *dev,
-				      struct drm_atomic_state *state,
-				      bool pre_swap);
-#endif
-
 #endif
