@@ -1198,12 +1198,6 @@
 /* drm_crtc_funcs->enable_vblank() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
 
-/* crtc->funcs->gamma_set() wants 5 args */
-/* #undef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_5ARGS */
-
-/* crtc->funcs->gamma_set() wants 6 args */
-#define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_6ARGS 1
-
 /* HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL 1
 
