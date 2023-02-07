@@ -165,9 +165,6 @@
 /* drm_atomic_helper_check_plane_state() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
 
-/* drm_atomic_plane_disabling() wants drm_plane_state * arg */
-#define HAVE_DRM_ATOMIC_PLANE_DISABLING_DRM_PLANE_STATE 1
-
 /* drm_atomic_private_obj_init() is available */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT 1
 
