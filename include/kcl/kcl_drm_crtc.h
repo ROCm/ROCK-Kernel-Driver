@@ -94,19 +94,6 @@
 #define drm_for_each_fb(fb, dev) \
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
-/**
- * drm_color_lut_size - calculate the number of entries in the LUT
- * @blob: blob containing the LUT
- *
- * Returns:
- * The number of entries in the color LUT stored in @blob.
- */
-#if !defined(HAVE_DRM_COLOR_LUT_SIZE)
-static inline int drm_color_lut_size(const struct drm_property_blob *blob)
-{
-	return blob->length / sizeof(struct drm_color_lut);
-}
-#endif
 
 #if !defined(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT)
 static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
