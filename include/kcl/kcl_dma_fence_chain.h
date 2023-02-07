@@ -14,11 +14,7 @@
 #endif
 
 #if !defined(HAVE_STRUCT_DMA_FENCE_CHAIN)
-#ifdef HAVE_LINUX_DMA_FENCE_H
 #include <linux/dma-fence.h>
-#else
-#include <kcl/kcl_fence.h>
-#endif
 #include <linux/irq_work.h>
 #include <linux/slab.h>
 
