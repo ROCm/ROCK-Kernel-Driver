@@ -278,7 +278,7 @@ fill_dc_mst_payload_table_from_drm(struct amdgpu_dm_connector *aconnector,
 {
         int i;
         struct drm_dp_mst_topology_mgr *mst_mgr =
-                        &aconnector->mst_port->mst_mgr;
+                        &aconnector->mst_root->mst_mgr;
 
         mutex_lock(&mst_mgr->payload_lock);
 
@@ -420,7 +420,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
         if (!mst_mgr->mst_state)
                 return false;
 
-        mst_port = aconnector->port;
+        mst_port = aconnector->mst_output_port;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
         link_coding_cap = dc_link_dp_mst_decide_link_encoding_format(aconnector->dc_link);
@@ -574,7 +574,7 @@ void dm_helpers_dp_mst_send_payload_allocation(
 	new_payload = drm_atomic_get_mst_payload_state(mst_state, aconnector->mst_output_port);
 
 #else
-	mst_port = aconnector->port;
+	mst_port = aconnector->mst_output_port;
 	if (!mst_mgr->mst_state)
                 return;
 #endif
