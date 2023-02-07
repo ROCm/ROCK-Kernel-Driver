@@ -10623,10 +10623,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	struct drm_connector_state *old_con_state, *new_con_state;
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
-	struct drm_dp_mst_topology_mgr *mgr;
-	struct drm_dp_mst_topology_state *mst_state;
-#endif
 	struct drm_plane *plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	enum dc_status status;
@@ -10636,12 +10632,8 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 	struct dsc_mst_fairness_vars vars[MAX_PIPES];
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
-        struct drm_dp_mst_topology_state *mst_state;
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
-        struct drm_dp_mst_topology_mgr *mgr;
-#endif
-#endif
+	struct drm_dp_mst_topology_mgr *mgr;
+	struct drm_dp_mst_topology_state *mst_state;
 #endif
 #endif
 
@@ -10966,7 +10958,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
@@ -10977,6 +10968,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct drm_connector_list_iter iter;
 		u8 link_coding_cap;
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+		 if (!mgr->mst_state )
+                        continue;
+#endif
 		drm_connector_list_iter_begin(dev, &iter);
 		drm_for_each_connector_iter(connector, &iter) {
 			if (connector->index == mst_state->mgr->conn_base_id) {
@@ -10989,7 +10984,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 		drm_connector_list_iter_end(&iter);
 	}
-#endif
 #endif
 #endif
 #endif
