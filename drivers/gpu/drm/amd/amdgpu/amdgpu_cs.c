@@ -1630,13 +1630,9 @@ int amdgpu_cs_wait_ioctl(struct drm_device *dev, void *data,
 		r = PTR_ERR(fence);
 	else if (fence) {
 		r = dma_fence_wait_timeout(fence, true, timeout);
-#if !defined(HAVE_DMA_FENCE_SET_ERROR)
-		if (r > 0 && fence->status)
-			r = fence->status;
-#else
+
 		if (r > 0 && fence->error)
 			r = fence->error;
-#endif
 		dma_fence_put(fence);
 	} else
 		r = 1;
@@ -1842,11 +1838,7 @@ out:
 	wait->out.first_signaled = first;
 
 	if (first < fence_count && array[first])
-#if !defined(HAVE_DMA_FENCE_SET_ERROR)
-		r = array[first]->status;
-#else
 		r = array[first]->error;
-#endif
 	else
 		r = 0;
 
