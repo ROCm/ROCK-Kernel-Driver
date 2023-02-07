@@ -409,7 +409,6 @@ struct amdgpu_display_manager {
 	struct drm_device *ddev;
 	u16 display_indexes_num;
 
-#ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	/**
 	 * @atomic_obj:
 	 *
@@ -418,8 +417,6 @@ struct amdgpu_display_manager {
 	 * drm resources, like &dc_context.
 	 */
 	struct drm_private_obj atomic_obj;
-
-#endif
 
 	/**
 	 * @dc_lock:
@@ -939,11 +936,7 @@ struct dm_crtc_state {
 #define to_dm_crtc_state(x) container_of(x, struct dm_crtc_state, base)
 
 struct dm_atomic_state {
-#ifdef HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT
 	struct drm_private_state base;
-#else
-	struct drm_atomic_state base;
-#endif
 
 	struct dc_state *context;
 };
