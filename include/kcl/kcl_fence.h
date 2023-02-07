@@ -43,9 +43,7 @@
 #define dma_fence_free fence_free
 #define dma_fence_get_rcu_safe fence_get_rcu
 
-#if defined(HAVE_DMA_FENCE_SET_ERROR)
 #define dma_fence_set_error fence_set_error
-#endif
 #endif
 
 #if !defined(HAVE__DMA_FENCE_IS_LATER_2ARGS)
@@ -175,18 +173,6 @@ bool _kcl_fence_enable_signaling(struct dma_fence *f);
 	.enable_signaling = _kcl_fence_enable_signaling,
 #else
 #define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
-#endif
-
-#if !defined(HAVE_DMA_FENCE_SET_ERROR)
-/* Copied from include/linux/dma-fence.h and modified for KCL */
-static inline void dma_fence_set_error(struct dma_fence *fence,
-				       int error)
-{
-	BUG_ON(test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags));
-	BUG_ON(error >= 0 || error < -MAX_ERRNO);
-
-	fence->status = error;
-}
 #endif
 
 /*
