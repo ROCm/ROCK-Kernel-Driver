@@ -175,9 +175,6 @@
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
-/* whether struct drm_atomic_state have async_update */
-#define HAVE_DRM_ATOMIC_STATE_ASYNC_UPDATE 1
-
 /* drm_atomic_state_put() is available */
 #define HAVE_DRM_ATOMIC_STATE_PUT 1
 
