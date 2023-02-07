@@ -212,14 +212,6 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
-/*
- * Need to add support for DRM < 4.14 as DP1.1 does
- * 4.13 DRM uses .set_property hook, while 4.15 doesn't
- */
-#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
-	.dpms = drm_atomic_helper_connector_dpms,
-	.set_property = drm_atomic_helper_connector_set_property,
-#endif
 #ifndef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
 	.detect = dm_dp_mst_detect,
 #endif

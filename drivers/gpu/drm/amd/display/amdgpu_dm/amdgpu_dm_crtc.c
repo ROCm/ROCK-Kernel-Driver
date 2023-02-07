@@ -442,9 +442,6 @@ static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
     .gamma_set = drm_atomic_helper_legacy_gamma_set,
 #endif
 	.set_config = drm_atomic_helper_set_config,
-#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
-	.set_property = drm_atomic_helper_crtc_set_property,
-#endif
 #ifndef HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG
 	.page_flip = amdgpu_atomic_helper_page_flip,
 #else

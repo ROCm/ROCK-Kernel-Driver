@@ -181,14 +181,6 @@
 /* drm_atomic_helper_shutdown() is available */
 #define HAVE_DRM_ATOMIC_HELPER_SHUTDOWN 1
 
-/* drm_atomic_helper_wait_for_flip_done() is available */
-#define HAVE_DRM_ATOMIC_HELPER_WAIT_FOR_FLIP_DONE 1
-
-/* {drm_atomic_helper_crtc_set_property, drm_atomic_helper_plane_set_property,
-   drm_atomic_helper_connector_set_property, drm_atomic_helper_connector_dpms}
-   is available */
-/* #undef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY */
-
 /* drm_atomic_nonblocking_commit() is available */
 #define HAVE_DRM_ATOMIC_NONBLOCKING_COMMIT 1
 

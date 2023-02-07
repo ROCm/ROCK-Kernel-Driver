@@ -6959,10 +6959,6 @@ static void amdgpu_dm_connector_funcs_force(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
-#ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
-	.dpms = drm_atomic_helper_connector_dpms,
-	.set_property = drm_atomic_helper_connector_set_property,
-#endif
 	.reset = amdgpu_dm_connector_funcs_reset,
 	.detect = amdgpu_dm_connector_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
