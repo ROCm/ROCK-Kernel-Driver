@@ -168,9 +168,6 @@
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
-/* drm_atomic_state_put() is available */
-#define HAVE_DRM_ATOMIC_STATE_PUT 1
-
 /* drm_color_lut_size() is available */
 #define HAVE_DRM_COLOR_LUT_SIZE 1
 
