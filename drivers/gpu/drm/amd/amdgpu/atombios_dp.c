@@ -194,9 +194,7 @@ void amdgpu_atombios_dp_aux_init(struct amdgpu_connector *amdgpu_connector)
 	amdgpu_connector->ddc_bus->aux.drm_dev = amdgpu_connector->base.dev;
 #endif
 
-#if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
 	drm_dp_aux_init(&amdgpu_connector->ddc_bus->aux);
-#endif
 	amdgpu_connector->ddc_bus->has_aux = true;
 }
 
