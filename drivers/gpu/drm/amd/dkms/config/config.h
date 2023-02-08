@@ -761,9 +761,6 @@
 /* drm_plane_create_color_properties is available */
 #define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
 
-/* drm_plane_create_rotation_property is available */
-#define HAVE_DRM_PLANE_PROPERTY_ROTATION 1
-
 /* drm_prime_pages_to_sg() wants 3 arguments */
 #define HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS 1
 
