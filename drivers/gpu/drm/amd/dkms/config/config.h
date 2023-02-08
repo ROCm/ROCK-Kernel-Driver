@@ -143,9 +143,6 @@
 /* drm_dp_mst_connector_late_register() is available */
 #define HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER 1
 
-/* drm_accurate_vblank_count() is available */
-/* #undef HAVE_DRM_ACCURATE_VBLANK_COUNT */
-
 /* Define to 1 if you have the <drm/amdgpu_pciid.h> header file. */
 /* #undef HAVE_DRM_AMDGPU_PCIID_H */
 
@@ -209,12 +206,6 @@
 
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
-
-/* drm_connector_xxx() drop _mode_ */
-#define HAVE_DRM_CONNECTOR_XXX_DROP_MODE 1
-
-/* drm_crtc_accurate_vblank_count() is available */
-#define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
 
 /* drm_crtc_enable_color_mgmt() is available */
 #define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
