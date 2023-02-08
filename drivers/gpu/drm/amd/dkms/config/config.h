@@ -805,9 +805,6 @@
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
-/* drm_vma_node_verify_access() 2nd argument is drm_file */
-#define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
-
 /* Variable refresh rate(vrr) is supported */
 #define HAVE_DRM_VRR_SUPPORTED 1
 
