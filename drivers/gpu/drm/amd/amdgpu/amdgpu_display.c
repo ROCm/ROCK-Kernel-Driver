@@ -70,22 +70,14 @@ void amdgpu_display_hotplug_work_func(struct work_struct *work)
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_mode_config *mode_config = &dev->mode_config;
 	struct drm_connector *connector;
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
-#endif
 
 	mutex_lock(&mode_config->mutex);
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
-#else
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
-#endif
 		amdgpu_connector_hotplug(connector);
 
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
-#endif
 	mutex_unlock(&mode_config->mutex);
 	/* Just fire off a uevent and let userspace tell us what to do */
 	drm_helper_hpd_irq_event(dev);
@@ -428,19 +420,13 @@ void amdgpu_display_print_display_setup(struct drm_device *dev)
 	struct amdgpu_connector *amdgpu_connector;
 	struct drm_encoder *encoder;
 	struct amdgpu_encoder *amdgpu_encoder;
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
-#endif
 	uint32_t devices;
 	int i = 0;
 
 	DRM_INFO("AMDGPU Display Connectors\n");
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter) {
-#else
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head) {
-#endif
 		amdgpu_connector = to_amdgpu_connector(connector);
 		DRM_INFO("Connector %d:\n", i);
 		DRM_INFO("  %s\n", connector->name);
@@ -504,9 +490,7 @@ void amdgpu_display_print_display_setup(struct drm_device *dev)
 		}
 		i++;
 	}
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
-#endif
 }
 
 bool amdgpu_display_ddc_probe(struct amdgpu_connector *amdgpu_connector,
@@ -1787,27 +1771,19 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 	struct drm_crtc *crtc;
 	struct drm_connector *connector;
 
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
-#endif
 	int r;
 
 	drm_kms_helper_poll_disable(dev);
 
 	/* turn off display hw */
 	drm_modeset_lock_all(dev);
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
-#else
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
-#endif
 		drm_helper_connector_dpms(connector,
 					  DRM_MODE_DPMS_OFF);
 
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
-#endif
 	drm_modeset_unlock_all(dev);
 	/* unpin the front buffers and cursors */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
@@ -1855,9 +1831,7 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 {
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_connector *connector;
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	struct drm_connector_list_iter iter;
-#endif
 	struct drm_crtc *crtc;
 	int r;
 
@@ -1884,18 +1858,12 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 	/* turn on display hw */
 	drm_modeset_lock_all(dev);
 
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_begin(dev, &iter);
 	drm_for_each_connector_iter(connector, &iter)
-#else
-	list_for_each_entry(connector, &(dev)->mode_config.connector_list, head)
-#endif
 		drm_helper_connector_dpms(connector,
 					  DRM_MODE_DPMS_ON);
-#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
 	drm_connector_list_iter_end(&iter);
 
-#endif
 	drm_modeset_unlock_all(dev);
 
 	drm_kms_helper_poll_enable(dev);
