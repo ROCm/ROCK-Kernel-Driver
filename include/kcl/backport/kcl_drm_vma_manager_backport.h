@@ -56,12 +56,4 @@ kcl_drm_vma_offset_manager_init(struct drm_vma_offset_manager *mgr)
 }
 #endif
 
-#ifndef HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE
-static inline int _kcl_drm_vma_node_verify_access(struct drm_vma_offset_node *node,
-					     struct drm_file *tag)
-{
-	return drm_vma_node_verify_access(node, tag->filp);
-}
-#define drm_vma_node_verify_access _kcl_drm_vma_node_verify_access
-#endif
 #endif
