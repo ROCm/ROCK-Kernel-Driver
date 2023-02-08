@@ -197,9 +197,6 @@
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
-/* drm_coredump_printer function is available */
-#define HAVE_DRM_COREDUMP_PRINTER 1
-
 /* drm_crtc_accurate_vblank_count() is available */
 #define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
 
