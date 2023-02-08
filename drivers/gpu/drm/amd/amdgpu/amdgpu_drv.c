@@ -2935,11 +2935,7 @@ static struct drm_driver amdgpu_kms_driver = {
 #endif
 	.ioctls = amdgpu_ioctls_kms,
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
-#ifndef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER
-	.gem_free_object = amdgpu_gem_object_free,
-#else
 	.gem_free_object_unlocked = amdgpu_gem_object_free,
-#endif
 	.gem_open_object = amdgpu_gem_object_open,
 	.gem_close_object = amdgpu_gem_object_close,
 #endif
