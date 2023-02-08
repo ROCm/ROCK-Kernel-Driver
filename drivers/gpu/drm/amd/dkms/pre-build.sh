@@ -75,11 +75,6 @@ if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
 	done
 fi
 
-# compile amdgpu_vkms_legacy.o for legacy kernel w/o atomic commit support
-if ! grep -q 'define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT' $SRC/config/config.h; then
- sed -i 's|amdgpu_vkms.o|amdgpu_vkms_legacy.o|' amd/amdgpu/Makefile
-fi
-
 if ! grep -q 'define HAVE_DMA_RESV_FENCES' $SRC/config/config.h; then
  sed -i 's|dma-buf/dma-resv.o|kcl_dma-resv.o|' amd/amdkcl/Makefile
 fi
