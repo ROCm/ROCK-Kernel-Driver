@@ -94,11 +94,6 @@ static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vbla
 {
 	return vblank->time;
 }
-#elif defined(HAVE_DRM_VBLANK_CRTC_HAS_ARRAY_TIME_FIELD)
-static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank)
-{
-	return timeval_to_ktime(vblank->time[(vblank->count) % DRM_VBLANKTIME_RBSIZE]);
-}
 #else
 static inline ktime_t kcl_amdgpu_get_vblank_time_ns(struct drm_vblank_crtc *vblank)
 {
