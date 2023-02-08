@@ -224,15 +224,6 @@
 /* drm_connector_init_with_ddc() is available */
 #define HAVE_DRM_CONNECTOR_INIT_WITH_DDC 1
 
-/* connector property "max bpc" is available */
-#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
-
-/* drm_connector_put() is available */
-#define HAVE_DRM_CONNECTOR_PUT 1
-
-/* connector reference counting is available */
-#define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
-
 /* drm_connector_set_panel_orientation_with_quirk() is available */
 #define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
 
@@ -241,9 +232,6 @@
 
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
-
-/* drm_connector_unreference() is available */
-/* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
 
 /* drm_connector_xxx() drop _mode_ */
 #define HAVE_DRM_CONNECTOR_XXX_DROP_MODE 1
@@ -798,9 +786,6 @@
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
-
-/* drm_mode_object->free_cb is available */
-/* #undef HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT */
 
 /* fs_reclaim_acquire() is available */
 #define HAVE_FS_RECLAIM_ACQUIRE 1
