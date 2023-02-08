@@ -913,9 +913,6 @@
 /* ktime_get_boottime_ns() is available */
 #define HAVE_KTIME_GET_BOOTTIME_NS 1
 
-/* ktime_get_mono_fast_ns is available */
-#define HAVE_KTIME_GET_MONO_FAST_NS 1
-
 /* ktime_get_ns is available */
 #define HAVE_KTIME_GET_NS 1
 
