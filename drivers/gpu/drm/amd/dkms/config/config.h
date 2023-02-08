@@ -723,9 +723,6 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
-/* drm atomic nonblocking commit support is available */
-#define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT 1
-
 /* enum drm_panel_orientation is available */
 #define HAVE_DRM_PANEL_ORIENTATION_ENUM 1
 
