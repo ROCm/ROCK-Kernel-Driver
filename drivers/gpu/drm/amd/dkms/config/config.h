@@ -820,9 +820,6 @@
 /* fs_reclaim_acquire() is available */
 #define HAVE_FS_RECLAIM_ACQUIRE 1
 
-/* drm_driver->gem_free_object_unlocked() is available */
-/* #undef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER */
-
 /* generic_handle_domain_irq() is available */
 #define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
 
