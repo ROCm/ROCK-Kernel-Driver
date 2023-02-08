@@ -207,9 +207,6 @@
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
-/* drm_crtc_enable_color_mgmt() is available */
-#define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
-
 /* drm_crtc_from_index() is available */
 #define HAVE_DRM_CRTC_FROM_INDEX 1
 
