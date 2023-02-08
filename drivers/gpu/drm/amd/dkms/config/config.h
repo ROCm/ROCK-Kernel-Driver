@@ -904,9 +904,6 @@
 /* ksys_sync_helper() is available */
 #define HAVE_KSYS_SYNC_HELPER 1
 
-/* kthread_{park/unpark/parkme/should_park}() is available */
-#define HAVE_KTHREAD_PARK_XX 1
-
 /* kthread_{use,unuse}_mm() is available */
 #define HAVE_KTHREAD_USE_MM 1
 
