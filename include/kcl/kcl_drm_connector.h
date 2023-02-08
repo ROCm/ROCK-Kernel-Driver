@@ -35,12 +35,6 @@
 #define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
 #endif
 
-#ifndef HAVE_DRM_CONNECTOR_XXX_DROP_MODE
-#define drm_connector_update_edid_property drm_mode_connector_update_edid_property
-#define drm_connector_attach_encoder drm_mode_connector_attach_encoder
-#define drm_connector_set_path_property drm_mode_connector_set_path_property
-#endif
-
 /**
  * drm_connector_for_each_possible_encoder - iterate connector's possible encoders
  * @connector: &struct drm_connector pointer
