@@ -95,15 +95,6 @@
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
 
-#ifndef HAVE_DRM_CRTC_FROM_INDEX
-struct drm_crtc *_kcl_drm_crtc_from_index(struct drm_device *dev, int idx);
-static inline struct drm_crtc *
-drm_crtc_from_index(struct drm_device *dev, int idx)
-{
-	return _kcl_drm_crtc_from_index(dev, idx);
-}
-#endif
-
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
 int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
