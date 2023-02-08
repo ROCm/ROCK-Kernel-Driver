@@ -7,7 +7,6 @@ extern void amdkcl_dev_cgroup_init(void);
 extern void amdkcl_fence_init(void);
 extern void amdkcl_reservation_init(void);
 extern void amdkcl_io_init(void);
-extern void amdkcl_kthread_init(void);
 extern void amdkcl_mm_init(void);
 extern void amdkcl_perf_event_init(void);
 extern void amdkcl_pci_init(void);
@@ -23,7 +22,6 @@ int __init amdkcl_init(void)
 	amdkcl_fence_init();
 	amdkcl_reservation_init();
 	amdkcl_io_init();
-	amdkcl_kthread_init();
 	amdkcl_mm_init();
 	amdkcl_perf_event_init();
 	amdkcl_pci_init();
