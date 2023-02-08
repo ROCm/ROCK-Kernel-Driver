@@ -621,23 +621,6 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	struct drm_connector *connector;
 	int i;
 
-#ifndef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
-	drm_modeset_lock(&dev->mode_config.connection_mutex, NULL);
-	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
-		aconnector = to_amdgpu_dm_connector(connector);
-		if (aconnector->mst_root == master
-				&& !aconnector->mst_output_port) {
-			DRM_INFO("DM_MST: reusing connector: %p [id: %d] [master: %p]\n",
-						aconnector, connector->base.id, aconnector->mst_root);
-			aconnector->mst_output_port = port;
-			drm_mode_connector_set_path_property(connector, pathprop);
-			drm_modeset_unlock(&dev->mode_config.connection_mutex);
-			return &aconnector->base;
-		}
-	}
-	drm_modeset_unlock(&dev->mode_config.connection_mutex);
-#endif
-
 	aconnector = kzalloc(sizeof(*aconnector), GFP_KERNEL);
 	if (!aconnector)
 		return NULL;
@@ -815,11 +798,9 @@ static void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr
 static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 						    struct drm_connector *connector)
 {
-#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
 	struct drm_device *dev = master->base.dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
-#endif
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 
 	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
@@ -836,14 +817,12 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 			aconnector->dc_link->cur_link_settings.lane_count = 0;
 		mutex_unlock(&mgr->lock);
 	}
-#ifdef HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED
 	drm_connector_unregister(connector);
 #if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_DEVICE_FB_HELPER)
 	if (adev->mode_info.rfbdev)
 		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
 #endif
 	drm_connector_put(connector);
-#endif
 }
 #endif
 
