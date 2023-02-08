@@ -14,16 +14,6 @@ AC_DEFUN([AC_AMDGPU_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE], [
 			[drm_atomic_helper_check_plane_state], [drivers/gpu/drm/drm_atomic_helper.c], [
 				AC_DEFINE(HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE, 1,
 					[drm_atomic_helper_check_plane_state() is available])
-			], [
-				dnl #
-				dnl # v4.8-rc1-13-gdf86af9133b4
-				dnl # drm/plane-helper: Add drm_plane_helper_check_state()
-				dnl #
-				AC_KERNEL_CHECK_SYMBOL_EXPORT(
-					[drm_plane_helper_check_state],
-					[drivers/gpu/drm/drm_plane_helper.c],[
-						AC_DEFINE(HAVE_DRM_PLANE_HELPER_CHECK_STATE, 1,
-							[drm_plane_helper_check_state is available])
 			])
 		])
 	])

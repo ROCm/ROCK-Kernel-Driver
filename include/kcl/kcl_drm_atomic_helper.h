@@ -49,17 +49,12 @@ drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
 					bool can_position,
 					bool can_update_disabled)
 {
-#ifdef HAVE_DRM_PLANE_HELPER_CHECK_STATE
 	struct drm_rect clip = {};
 	struct drm_crtc *crtc = crtc_state->crtc;
 	if (crtc->enabled)
 		drm_mode_get_hv_timing(&crtc->mode, &clip.x2, &clip.y2);
 	return drm_plane_helper_check_state(plane_state, &clip, min_scale,
 				max_scale, can_position, can_update_disabled);
-#else
-	pr_warn_once("%s is not supported\n", __func__);
-	return 0;
-#endif
 }
 #endif
 
