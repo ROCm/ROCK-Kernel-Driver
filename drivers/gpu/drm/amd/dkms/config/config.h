@@ -720,9 +720,6 @@
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 
-/* drm_mode_config->helper_private is available */
-#define HAVE_DRM_MODE_CONFIG_HELPER_PRIVATE 1
-
 /* drm_mode_config_helper_{suspend/resume}() is available */
 #define HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND 1
 
