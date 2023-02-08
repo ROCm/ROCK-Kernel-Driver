@@ -95,18 +95,6 @@
 	list_for_each_entry(fb, &(dev)->mode_config.fb_list, head)
 #endif
 
-#if !defined(HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT)
-static inline u64 drm_crtc_accurate_vblank_count(struct drm_crtc *crtc)
-{
-#if defined(HAVE_DRM_ACCURATE_VBLANK_COUNT)
-	return drm_accurate_vblank_count(crtc);
-#else
-	pr_warn_once("%s is not supported\n", __func__);
-	return 0;
-#endif
-}
-#endif
-
 #if !defined(HAVE_DRM_HELPER_FORCE_DISABLE_ALL)
 int _kcl_drm_helper_force_disable_all(struct drm_device *dev);
 static inline
