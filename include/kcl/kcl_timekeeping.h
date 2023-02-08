@@ -47,13 +47,6 @@ static inline time64_t ktime_get_real_seconds(void)
 }
 #endif
 
-#if !defined(HAVE_KTIME_GET_MONO_FAST_NS)
-static inline u64 ktime_get_mono_fast_ns(void)
-{
-	return ktime_to_ns(ktime_get());
-}
-#endif
-
 #ifndef HAVE_JIFFIES64_TO_MSECS
 extern u64 jiffies64_to_msecs(u64 j);
 #endif
