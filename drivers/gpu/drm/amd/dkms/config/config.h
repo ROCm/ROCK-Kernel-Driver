@@ -201,9 +201,6 @@
 /* drm_connector_init_with_ddc() is available */
 #define HAVE_DRM_CONNECTOR_INIT_WITH_DDC 1
 
-/* connector property "max bpc" is available */
-#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
-
 /* drm_connector_put() is available */
 #define HAVE_DRM_CONNECTOR_PUT 1
 
