@@ -221,9 +221,6 @@
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
 
-/* drm_device->filelist_mutex is available */
-#define HAVE_DRM_DEVICE_FILELIST_MUTEX 1
-
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
 
