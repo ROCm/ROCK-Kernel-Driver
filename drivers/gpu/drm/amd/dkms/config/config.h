@@ -301,12 +301,6 @@
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
 
-/* drm_dev_enter() is available */
-#define HAVE_DRM_DEV_ENTER 1
-
-/* drm_dev_is_unplugged() is available */
-#define HAVE_DRM_DEV_IS_UNPLUGGED 1
-
 /* drm_dev_put() is available */
 #define HAVE_DRM_DEV_PUT 1
 
