@@ -53,7 +53,6 @@
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
 #endif
-#include "link_hwss.h"
 #include "dccg.h"
 #include "clk_mgr.h"
 #include "atomfirmware.h"
