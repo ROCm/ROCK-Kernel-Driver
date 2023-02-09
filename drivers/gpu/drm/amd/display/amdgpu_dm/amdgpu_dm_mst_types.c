@@ -830,10 +830,6 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 		mutex_unlock(&mgr->lock);
 	}
 	drm_connector_unregister(connector);
-#if defined(HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS) && !defined(HAVE_DRM_DEVICE_FB_HELPER)
-	if (adev->mode_info.rfbdev)
-		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
-#endif
 	drm_connector_put(connector);
 }
 #endif
@@ -853,13 +849,6 @@ static void dm_dp_mst_register_connector(struct drm_connector *connector)
 {
 	struct drm_device *dev = connector->dev;
 	struct amdgpu_device *adev = drm_to_adev(dev);
-
-#ifndef HAVE_DRM_DEVICE_FB_HELPER
-	if (adev->mode_info.rfbdev)
-		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
-	else
-		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
-#endif
 
 	drm_connector_register(connector);
 }
