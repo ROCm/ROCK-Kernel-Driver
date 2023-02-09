@@ -286,9 +286,6 @@
    drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
 
-/* have drm_crtc_helper_funcs->atomic_enable() */
-#define HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE 1
-
 /* drm_crtc_init_with_planes() wants name */
 #define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
 
