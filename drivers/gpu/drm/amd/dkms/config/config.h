@@ -292,9 +292,6 @@
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
 
-/* dev_device->driver_features is available */
-#define HAVE_DRM_DEVICE_DRIVER_FEATURES 1
-
 /* struct drm_device has fb_helper member */
 #define HAVE_DRM_DEVICE_FB_HELPER 1
 
