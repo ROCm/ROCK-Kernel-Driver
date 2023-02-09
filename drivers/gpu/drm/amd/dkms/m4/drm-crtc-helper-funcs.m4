@@ -35,25 +35,6 @@ AC_DEFUN([AC_AMDGPU_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE], [
 		], [
 			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE, 1,
 				[drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct drm_atomic_state arg])
-			AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE, 1,
-				[have drm_crtc_helper_funcs->atomic_enable()])
-
-		],[
-			dnl #
-			dnl # v4.12-rc7-1332-g0b20a0f8c3cb
-			dnl # drm: Add old state pointer to CRTC .enable() helper function
-			dnl #
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drm_modeset_helper_vtables.h>
-				#include <drm/drm_atomic.h>
-			], [
-				struct drm_crtc_helper_funcs *p = NULL;
-				p->atomic_enable(NULL, NULL);
-			], [
-				AC_DEFINE(HAVE_DRM_CRTC_HELPER_FUNCS_HAVE_ATOMIC_ENABLE, 1,
-					[have drm_crtc_helper_funcs->atomic_enable()])
-			])
-
 		])
 	])
 ])
