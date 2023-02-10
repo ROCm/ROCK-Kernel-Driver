@@ -376,9 +376,6 @@
 /* drm_dp_calc_pbn_mode() wants 3args */
 #define HAVE_DRM_DP_CALC_PBN_MODE_3ARGS 1
 
-/* drm_dp_cec* correlation functions are available */
-#define HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS 1
-
 /* drm_dp_cec_register_connector() wants p,p interface */
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
