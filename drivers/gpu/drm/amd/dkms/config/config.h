@@ -395,9 +395,6 @@
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
 
-/* Define to 1 if you have the <drm/drm_damage_helper.h> header file. */
-#define HAVE_DRM_DRM_DAMAGE_HELPER_H 1
-
 /* Define to 1 if you have the <drm/drm_debugfs.h> header file. */
 #define HAVE_DRM_DRM_DEBUGFS_H 1
 
