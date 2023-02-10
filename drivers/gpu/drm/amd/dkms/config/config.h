@@ -392,9 +392,6 @@
 /* Define to 1 if you have the <drm/drm_aperture.h> header file. */
 #define HAVE_DRM_DRM_APERTURE_H 1
 
-/* Define to 1 if you have the <drm/drm_atomic_uapi.h> header file. */
-#define HAVE_DRM_DRM_ATOMIC_UAPI_H 1
-
 /* Define to 1 if you have the <drm/drm_audio_component.h> header file. */
 #define HAVE_DRM_DRM_AUDIO_COMPONENT_H 1
 

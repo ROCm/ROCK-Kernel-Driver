@@ -85,12 +85,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_util.h])
 
 	dnl #
-	dnl # commit v4.19-rc1-160-g72fdb40c1a4b
-	dnl # drm: extract drm_atomic_uapi.c
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_atomic_uapi.h])
-
-	dnl #
 	dnl # commit v5.0-rc1-342-gfcd70cd36b9b
 	dnl # drm: Split out drm_probe_helper.h
 	dnl #
