@@ -983,7 +983,6 @@ static void amdgpu_dm_fbc_init(struct drm_connector *connector)
 
 }
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 static int amdgpu_dm_audio_component_get_eld(struct device *kdev, int port,
 					  int pipe, bool *enabled,
 					  unsigned char *buf, int max_bytes)
@@ -1118,7 +1117,6 @@ static  void amdgpu_dm_audio_eld_notify(struct amdgpu_device *adev, int pin)
 						 pin, -1);
 	}
 }
-#endif
 
 static int dm_dmub_hw_init(struct amdgpu_device *adev)
 {
@@ -1636,9 +1634,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 	mutex_init(&adev->dm.dpia_aux_lock);
 	mutex_init(&adev->dm.dc_lock);
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_init(&adev->dm.audio_lock);
-#endif
 
 	if (amdgpu_dm_irq_init(adev)) {
 		DRM_ERROR("amdgpu: failed to initialize DM IRQ support.\n");
@@ -1920,9 +1916,7 @@ static int amdgpu_dm_early_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	amdgpu_dm_audio_fini(adev);
-#endif
 
 	return 0;
 }
@@ -2003,9 +1997,7 @@ static void amdgpu_dm_fini(struct amdgpu_device *adev)
 		adev->dm.freesync_module = NULL;
 	}
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	mutex_destroy(&adev->dm.audio_lock);
-#endif
 	mutex_destroy(&adev->dm.dc_lock);
 	mutex_destroy(&adev->dm.dpia_aux_lock);
 }
@@ -4137,14 +4129,12 @@ static int amdgpu_dm_mode_config_init(struct amdgpu_device *adev)
 		return -ENOMEM;
 #endif
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	r = amdgpu_dm_audio_init(adev);
 	if (r) {
 		dc_state_release(state->context);
 		kfree(state);
 		return r;
 	}
-#endif
 
 	return 0;
 }
@@ -7791,9 +7781,7 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	aconnector->base.stereo_allowed = false;
 	aconnector->base.dpms = DRM_MODE_DPMS_OFF;
 	aconnector->hpd.hpd = AMDGPU_HPD_NONE; /* not used */
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	aconnector->audio_inst = -1;
-#endif
 	aconnector->pack_sdp_v1_3 = false;
 	aconnector->as_type = ADAPTIVE_SYNC_TYPE_NONE;
 	memset(&aconnector->vsdb_info, 0, sizeof(aconnector->vsdb_info));
@@ -8933,7 +8921,6 @@ cleanup:
 	kfree(bundle);
 }
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 static void amdgpu_dm_commit_audio(struct drm_device *dev,
 				   struct drm_atomic_state *state)
 {
@@ -9023,7 +9010,6 @@ notify:
 		amdgpu_dm_audio_eld_notify(adev, inst);
 	}
 }
-#endif
 
 /*
  * amdgpu_dm_crtc_copy_transient_flags - copy mirrored flags from DRM to DC
@@ -9793,10 +9779,8 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		acrtc->wb_enabled = true;
 	}
 
-#if defined(HAVE_DRM_DRM_AUDIO_COMPONENT_H)
 	/* Update audio instances for each connector. */
 	amdgpu_dm_commit_audio(dev, state);
-#endif
 
 	/* restore the backlight level */
 	for (i = 0; i < dm->num_of_edps; i++) {
