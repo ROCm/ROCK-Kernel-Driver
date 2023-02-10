@@ -41,7 +41,6 @@ void *__devm_drm_dev_alloc(struct device *parent, struct drm_driver *driver,
 	if (!container)
 		return ERR_PTR(-ENOMEM);
 
-#ifdef HAVE_DRM_DRIVER_RELEASE
 	drm = container + offset;
 	ret = drm_dev_init(drm, driver, parent);
 	if (ret) {
@@ -51,24 +50,12 @@ void *__devm_drm_dev_alloc(struct device *parent, struct drm_driver *driver,
 #ifdef HAVE_DRM_DRM_MANAGED_H
 	drmm_add_final_kfree(drm, container);
 #endif
-#else
-	drm = drm_dev_alloc(driver, parent);
-	if (IS_ERR(drm))
-		return PTR_ERR(drm);
-	((struct amdgpu_device*)container)->ddev = drm;
-#endif
 	drm->dev_private = container;
 	return container;
 }
 
 void amdkcl_drm_dev_release(struct drm_device *ddev)
 {
-#ifndef HAVE_DRM_DRIVER_RELEASE
-	if (ddev) {
-		kfree(drm_to_adev(ddev));
-		ddev->dev_private = NULL;
-	}
-#endif
 	drm_dev_put(ddev);
 }
 
