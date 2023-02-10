@@ -463,15 +463,6 @@
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
-/* drm_driver->get_scanout_position() return bool */
-/* #undef HAVE_DRM_DRIVER_GET_SCANOUT_POSITION_RETURN_BOOL */
-
-/* drm_driver->get_vblank_timestamp() return bool */
-/* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_RETURN_BOOL */
-
-/* drm_calc_vbltimestamp_from_scanoutpos() use ktime_t arg */
-/* #undef HAVE_DRM_DRIVER_GET_VBLANK_TIMESTAMP_USE_KTIMER_T_ARG */
-
 /* drm_vblank struct use ktime_t for time field */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
