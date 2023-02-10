@@ -214,9 +214,6 @@
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
 
-/* drm_dev_unplug() is available */
-#define HAVE_DRM_DEV_UNPLUG 1
-
 /* Define to 1 if you have the <drm/display/drm_dp.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_H 1
 
