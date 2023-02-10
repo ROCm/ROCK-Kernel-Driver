@@ -214,9 +214,6 @@
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
 
-/* drm_dev_put() is available */
-#define HAVE_DRM_DEV_PUT 1
-
 /* drm_dev_unplug() is available */
 #define HAVE_DRM_DEV_UNPLUG 1
 
