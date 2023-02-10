@@ -263,9 +263,6 @@
 /* display_info->is_hdmi is available */
 #define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
 
-/* display_info->max_tmds_clock is available */
-#define HAVE_DRM_DISPLAY_INFO_MAX_TMDS_CLOCK 1
-
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
