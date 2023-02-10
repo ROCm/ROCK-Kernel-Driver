@@ -53,7 +53,6 @@
 #include <kcl/backport/kcl_drm_crtc.h>
 #include <kcl/backport/kcl_drm_plane.h>
 #include <kcl/backport/kcl_drm_backport.h>
-#include <kcl/backport/kcl_drm_fourcc.h>
 #include <kcl/backport/kcl_drm_gem.h>
 #include <kcl/backport/kcl_drm_prime.h>
 #include <kcl/backport/kcl_drm_drv.h>
