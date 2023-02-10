@@ -355,9 +355,6 @@
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
-/* drm_dp_start_crc() is available */
-#define HAVE_DRM_DP_START_CRC 1
-
 /* drm_dp_update_payload_part1() function has start_slot argument */
 #define HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG 1
 
