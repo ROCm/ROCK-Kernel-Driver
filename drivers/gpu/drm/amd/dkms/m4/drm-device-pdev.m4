@@ -8,9 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DEVICE_PDEV], [
 			#ifdef HAVE_DRM_DRMP_H
 			#include <drm/drmP.h>
 			#endif
-			#ifdef HAVE_DRM_DRM_DEVICE_H
                         #include <drm/drm_device.h>
-                        #endif
 		], [
 			struct drm_device *pdd = NULL;
 			pdd->pdev = NULL;
