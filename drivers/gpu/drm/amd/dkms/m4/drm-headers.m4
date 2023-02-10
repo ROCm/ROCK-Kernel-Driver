@@ -70,12 +70,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_hdcp.h])
 
 	dnl #
-	dnl # v4.18-rc1-27-gae891abe7c2c
-	dnl # drm/i915: Split audio component to a generic type
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_audio_component.h])
-
-	dnl #
 	dnl # commit v4.19-rc1-154-gd78aa650670d
 	dnl # drm: Add drm/drm_util.h header file
 	dnl #
