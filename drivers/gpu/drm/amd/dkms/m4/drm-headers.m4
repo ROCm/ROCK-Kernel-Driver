@@ -22,12 +22,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_file.h])
 
 	dnl #
-	dnl # commit v4.11-rc3-918-g4834442d70be
-	dnl # drm: Extract drm_debugfs.h
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_debugfs.h])
-
-	dnl #
 	dnl # commit v4.11-rc3-927-g7cfdf711ffb0
 	dnl # drm: Extract drm_ioctl.h
 	dnl #
