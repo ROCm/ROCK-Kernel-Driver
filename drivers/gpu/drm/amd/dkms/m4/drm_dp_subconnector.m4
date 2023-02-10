@@ -12,15 +12,6 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_SUBCONNECTOR], [
 		], [
 			AC_DEFINE(HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY, 1,
 				[drm_mode_config->dp_subconnector_property is available])
-		], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <drm/drm_crtc.h>
-			], [
-				enum drm_mode_subconnector sub = 0;
-			], [
-				AC_DEFINE(HAVE_DRM_MODE_SUBCONNECTOR_ENUM, 1,
-					[enum drm_mode_subconnector is available])
-			])
 		])
 	])
 ])

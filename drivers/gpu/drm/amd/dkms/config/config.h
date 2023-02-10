@@ -729,9 +729,6 @@
 /* drm_mode_init() is available */
 #define HAVE_DRM_MODE_INTT 1
 
-/* enum drm_mode_subconnector is available */
-/* #undef HAVE_DRM_MODE_SUBCONNECTOR_ENUM */
-
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
