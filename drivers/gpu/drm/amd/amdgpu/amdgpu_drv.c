@@ -2339,7 +2339,6 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 #endif
 }
 
-#ifdef HAVE_DRM_DRIVER_RELEASE
 #ifndef HAVE_DRM_DRM_MANAGED_H
 static void amdgpu_driver_release(struct drm_device *ddev)
 {
@@ -2348,7 +2347,6 @@ static void amdgpu_driver_release(struct drm_device *ddev)
 	drm_dev_fini(ddev);
 	kfree(adev);
 }
-#endif
 #endif
 
 static void
@@ -2915,9 +2913,7 @@ static struct drm_driver amdgpu_kms_driver = {
 	.dumb_create = amdgpu_mode_dumb_create,
 	.dumb_map_offset = amdgpu_mode_dumb_mmap,
 	.fops = &amdgpu_driver_kms_fops,
-#ifdef HAVE_DRM_DRIVER_RELEASE
 	.release = &amdgpu_driver_release_kms,
-#endif
 
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
