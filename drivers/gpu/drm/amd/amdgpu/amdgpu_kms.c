@@ -1519,7 +1519,6 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 	pm_runtime_put_autosuspend(dev->dev);
 }
 
-#ifdef HAVE_DRM_DRIVER_RELEASE
 void amdgpu_driver_release_kms(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
@@ -1531,7 +1530,6 @@ void amdgpu_driver_release_kms(struct drm_device *dev)
 	kfree(adev);
 #endif
 }
-#endif
 
 /*
  * VBlank related functions.
