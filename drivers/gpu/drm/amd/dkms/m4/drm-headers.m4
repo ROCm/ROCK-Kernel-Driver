@@ -10,12 +10,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/amdgpu_pciid.h])
 
 	dnl #
-	dnl # commit v4.8-rc2-342-g522171951761
-	dnl # drm: Extract drm_connector.[hc]
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_connector.h])
-
-	dnl #
 	dnl # v4.9-rc4-834-g85e634bce01a
 	dnl # drm: Extract drm_drv.h
 	dnl #
