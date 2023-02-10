@@ -30,7 +30,6 @@
 #include <kcl/kcl_drm_drv.h>
 #include <linux/console.h>
 
-#ifdef HAVE_DRM_DEV_UNPLUG
 /*
  * v5.1-rc5-1150-gbd53280ef042 drm/drv: Fix incorrect resolution of merge conflict
  * v5.1-rc2-5-g3f04e0a6cfeb drm: Fix drm_release() and device unplug
@@ -51,7 +50,6 @@ void _kcl_drm_dev_unplug(struct drm_device *dev)
 		drm_dev_put(dev);
 }
 #define drm_dev_unplug _kcl_drm_dev_unplug
-#endif
 #endif
 
 
