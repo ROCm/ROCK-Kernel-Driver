@@ -444,19 +444,11 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
                 slots = drm_dp_find_vcpi_slots(mst_mgr, pbn);
                 ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port, pbn,
-#ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
                                slots);
-#else
-                               &slots);
-#endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
 #else
                 ret = drm_dp_mst_allocate_vcpi(mst_mgr, mst_port,
                                                dm_conn_state->pbn,
-#ifdef HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I
                                                dm_conn_state->vcpi_slots);
-#else
-                                               &dm_conn_state->vcpi_slots);
-#endif /* HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I */
 #endif
                 if (!ret)
                         return false;

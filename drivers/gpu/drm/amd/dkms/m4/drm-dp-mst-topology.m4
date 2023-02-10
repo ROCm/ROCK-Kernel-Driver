@@ -6,22 +6,6 @@ dnl # Note: This autoconf only works with compiler flag -Werror
 dnl #       The interface types are specified in Hungarian notation
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TRY_COMPILE([
-			#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
-			#include <drm/display/drm_dp_mst_helper.h>
-			#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
-			#include <drm/dp/drm_dp_mst_helper.h>
-			#else
-			#include <drm/drm_dp_mst_helper.h>
-			#endif
-		], [
-			drm_dp_mst_allocate_vcpi(NULL, NULL, 1, 1);
-		], [
-			AC_DEFINE(HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I, 1, [
-				drm_dp_mst_allocate_vcpi() has p,p,i,i interface])
-		])
-	])
 	dnl #
 	dnl # commit d25689760b747287c6ca03cfe0729da63e0717f4
 	dnl # drm/amdgpu/display: Keep malloc ref to MST port

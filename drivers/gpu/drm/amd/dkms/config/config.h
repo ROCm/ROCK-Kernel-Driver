@@ -394,9 +394,6 @@
 /* drm_dp_mst_add_affected_dsc_crtcs() is available */
 #define HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS 1
 
-/* drm_dp_mst_allocate_vcpi() has p,p,i,i interface */
-#define HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I 1
-
 /* drm_dp_mst_atomic_check() is available */
 #define HAVE_DRM_DP_MST_ATOMIC_CHECK 1
 
