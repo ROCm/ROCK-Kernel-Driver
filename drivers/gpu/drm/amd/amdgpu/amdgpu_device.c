@@ -6162,11 +6162,7 @@ void amdgpu_device_halt(struct amdgpu_device *adev)
 	struct drm_device *ddev = adev_to_drm(adev);
 
 	amdgpu_xcp_dev_unplug(adev);
-#ifdef HAVE_DRM_DEV_UNPLUG
 	drm_dev_unplug(ddev);
-#else
-        drm_dev_unregister(ddev);
-#endif
 
 	amdgpu_irq_disable_all(adev);
 
