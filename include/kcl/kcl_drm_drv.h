@@ -29,18 +29,6 @@
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
 
-#ifndef HAVE_DRM_DEV_PUT
-static inline void drm_dev_get(struct drm_device *dev)
-{
-	drm_dev_ref(dev);
-}
-
-static inline void drm_dev_put(struct drm_device *dev)
-{
-	return drm_dev_unref(dev);
-}
-#endif
-
 #ifndef HAVE_DRM_DRV_USES_ATOMIC_MODESET
 static inline bool drm_drv_uses_atomic_modeset(struct drm_device *dev)
 {
