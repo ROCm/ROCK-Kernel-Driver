@@ -145,18 +145,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # mm: introduce include/linux/pgtable.h
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/pgtable.h])
-	
+
 	dnl #
 	dnl # v5.19-rc1- c9cad937c0
 	dnl # drm/amdgpu: add drm buddy support to amdgpu
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/drm_buddy.h])
-
-	dnl #
-	dnl # v4.10-rc1~154 6686df8c
-	dnl # drm: Conslidate blending properties in drm_blend.[hc]
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_blend.h])
 
 	dnl #
         dnl # v4.20-rc4-921-gd3b21767821e
