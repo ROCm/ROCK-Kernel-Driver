@@ -16,12 +16,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_auth.h])
 
 	dnl #
-	dnl # commit v4.7-rc5-1465-g34a67dd7f33f
-	dnl # drm: Extract&Document drm_irq.h
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_irq.h])
-
-	dnl #
 	dnl # commit v4.8-rc2-342-g522171951761
 	dnl # drm: Extract drm_connector.[hc]
 	dnl #

@@ -456,9 +456,6 @@
 /* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
 #define HAVE_DRM_DRM_IOCTL_H 1
 
-/* Define to 1 if you have the <drm/drm_irq.h> header file. */
-/* #undef HAVE_DRM_DRM_IRQ_H */
-
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
