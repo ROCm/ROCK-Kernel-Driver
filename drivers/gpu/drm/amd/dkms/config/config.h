@@ -440,9 +440,6 @@
 /* Define to 1 if you have the <drm/drm_dsc.h> header file. */
 /* #undef HAVE_DRM_DRM_DSC_H */
 
-/* Define to 1 if you have the <drm/drm_encoder.h> header file. */
-#define HAVE_DRM_DRM_ENCODER_H 1
-
 /* Define to 1 if you have the <drm/drm_file.h> header file. */
 #define HAVE_DRM_DRM_FILE_H 1
 
