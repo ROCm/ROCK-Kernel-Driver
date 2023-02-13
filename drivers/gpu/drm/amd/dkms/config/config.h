@@ -398,10 +398,6 @@
 /* Define to 1 if you have the <drm/drm_dsc.h> header file. */
 /* #undef HAVE_DRM_DRM_DSC_H */
 
-/* Define to 1 if you have the <drm/drm_gem_framebuffer_helper.h> header file.
-   */
-#define HAVE_DRM_DRM_GEM_FRAMEBUFFER_HELPER_H 1
-
 /* Define to 1 if you have the <drm/drm_hdcp.h> header file. */
 #define HAVE_DRM_DRM_HDCP_H 1
 
