@@ -603,9 +603,6 @@
 /* whether drm_fb_helper_lastclose() is available */
 #define HAVE_DRM_FB_HELPER_LASTCLOSE 1
 
-/* drm_fb_helper_set_suspend_unlocked() is available */
-#define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
-
 /* drm_fb_helper_unregister_info() is available */
 #define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
 
