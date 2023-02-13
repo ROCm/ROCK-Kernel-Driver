@@ -462,9 +462,6 @@
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
-/* Define to 1 if you have the <drm/drm_plane.h> header file. */
-#define HAVE_DRM_DRM_PLANE_H 1
-
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 

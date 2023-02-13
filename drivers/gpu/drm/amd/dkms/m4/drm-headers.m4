@@ -34,12 +34,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_encoder.h])
 
 	dnl #
-	dnl # v4.8-rc2-798-g43968d7b806d
-	dnl # drm: Extract drm_plane.[hc]
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_plane.h])
-
-	dnl #
 	dnl # v4.9-rc4-834-g85e634bce01a
 	dnl # drm: Extract drm_drv.h
 	dnl #
