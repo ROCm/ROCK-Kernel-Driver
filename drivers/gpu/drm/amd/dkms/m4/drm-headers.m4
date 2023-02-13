@@ -40,12 +40,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_plane.h])
 
 	dnl #
-	dnl # commit v4.9-rc2-477-gd8187177b0b1
-	dnl # drm: add helper for printing to log or seq_file
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_print.h])
-
-	dnl #
 	dnl # v4.9-rc4-834-g85e634bce01a
 	dnl # drm: Extract drm_drv.h
 	dnl #
