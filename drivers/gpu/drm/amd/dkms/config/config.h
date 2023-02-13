@@ -1233,15 +1233,6 @@
 /* drm_dsc_pps_payload_pack() is available */
 #define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
 
-/* drm_edid_get_monitor_name is available*/
-#define HAVE_DRM_EDID_GET_MONITOR_NAME 1
-
-/* __drm_atomic_helper_connector_destroy_state() wants 1 arg */
-#define HAVE___DRM_ATOMIC_HELPER_CONNECTOR_DESTROY_STATE_P 1
-
-/* __drm_atomic_helper_crtc_destroy_state() wants 1 arg */
-#define HAVE___DRM_ATOMIC_HELPER_CRTC_DESTROY_STATE_P 1
-
 /* __drm_atomic_helper_crtc_reset() is available */
 #define HAVE___DRM_ATOMIC_HELPER_CRTC_RESET 1
 
