@@ -542,9 +542,6 @@
 /* Define to 1 if you have the <drm/drm_plane.h> header file. */
 #define HAVE_DRM_DRM_PLANE_H 1
 
-/* Define to 1 if you have the <drm/drm_print.h> header file. */
-#define HAVE_DRM_DRM_PRINT_H 1
-
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
@@ -741,9 +738,6 @@
 
 /* drm_prime_sg_to_dma_addr_array() is available */
 #define HAVE_DRM_PRIME_SG_TO_DMA_ADDR_ARRAY 1
-
-/* drm_printer->prefix is available */
-#define HAVE_DRM_PRINTER_PREFIX 1
 
 /* drm_print_bits() is available */
 #define HAVE_DRM_PRINT_BITS 1
