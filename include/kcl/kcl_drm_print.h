@@ -29,52 +29,6 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_device.h>
 
-#if !defined(HAVE_DRM_DRM_PRINT_H)
-/* Copied from d8187177b0b1 include/drm/drm_print.h */
-struct drm_printer {
-	void (*printfn)(struct drm_printer *p, struct va_format *vaf);
-	void *arg;
-	const char *prefix;
-};
-
-void drm_printf(struct drm_printer *p, const char *f, ...);
-void __drm_printfn_seq_file(struct drm_printer *p, struct va_format *vaf);
-static inline struct drm_printer drm_seq_file_printer(struct seq_file *f)
-{
-	struct drm_printer p = {
-		.printfn = __drm_printfn_seq_file,
-		.arg = f,
-	};
-	return p;
-}
-#endif
-
-/* Copied from 3d387d923c18 include/drm/drm_print.h */
-#if !defined(HAVE_DRM_PRINTER_PREFIX)
-extern void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
-
-static inline struct drm_printer drm_debug_printer(const char *prefix)
-{
-	struct drm_printer p = {
-		.printfn = __drm_printfn_debug,
-#ifndef HAVE_DRM_DRM_PRINT_H
-		.prefix = prefix
-#endif
-	};
-	return p;
-}
-
-static inline
-void drm_mm_print(const struct drm_mm *mm, struct drm_printer *p)
-{
-#ifndef HAVE_DRM_DRM_PRINT_H
-	drm_mm_debug_table((struct drm_mm *)mm, p->prefix);
-#else
-	drm_mm_debug_table((struct drm_mm *)mm, "no prefix");
-#endif
-}
-#endif
-
 #ifndef _DRM_PRINTK
 #define _DRM_PRINTK(once, level, fmt, ...)				\
 	do {								\
