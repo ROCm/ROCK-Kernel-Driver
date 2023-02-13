@@ -26,40 +26,6 @@
 #include <kcl/kcl_bitops.h>
 #include <linux/stdarg.h>
 
-#if !defined(HAVE_DRM_DRM_PRINT_H)
-void drm_printf(struct drm_printer *p, const char *f, ...)
-{
-	struct va_format vaf;
-	va_list args;
-
-	va_start(args, f);
-	vaf.fmt = f;
-	vaf.va = &args;
-	p->printfn(p, &vaf);
-	va_end(args);
-}
-EXPORT_SYMBOL(drm_printf);
-
-void __drm_printfn_seq_file(struct drm_printer *p, struct va_format *vaf)
-{
-	seq_printf(p->arg, "%pV", vaf);
-}
-EXPORT_SYMBOL(__drm_printfn_seq_file);
-#endif
-
-#if !defined(HAVE_DRM_PRINTER_PREFIX)
-void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf)
-{
-#ifndef HAVE_DRM_DRM_PRINT_H
-	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", p->prefix, vaf);
-#else
-	printk(KERN_DEBUG "[" DRM_NAME ":]" "%s %pV", "no prefix", vaf);
-#endif
-}
-EXPORT_SYMBOL(__drm_printfn_debug);
-#endif
-
-
 #if !defined(HAVE_DRM_ERR_MACRO)
 void kcl_drm_err(const char *format, ...)
 {
