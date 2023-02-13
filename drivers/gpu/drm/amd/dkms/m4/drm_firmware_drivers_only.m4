@@ -5,9 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FIRMWARE_DRIVERS_ONLY], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DRM_DRV_H
 			#include <drm/drm_drv.h>
-			#endif
 		], [
 			drm_firmware_drivers_only();
 		], [
