@@ -22,12 +22,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_vblank.h])
 
 	dnl #
-	dnl # v4.13-rc2-421-g4c3dbb2c312c
-	dnl # drm: Add GEM backed framebuffer library
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_framebuffer_helper.h])
-
-	dnl #
 	dnl # commit v4.15-rc4-1351-g495eb7f877ab
 	dnl # drm: Add some HDCP related #defines
 	dnl #
