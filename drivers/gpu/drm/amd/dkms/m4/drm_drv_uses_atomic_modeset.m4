@@ -8,9 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRV_USES_ATOMIC_MODESET], [
 			#ifdef HAVE_DRM_DRMP_H
 			#include <drm/drmP.h>
 			#endif
-			#ifdef HAVE_DRM_DRM_DRV_H
 			#include <drm/drm_drv.h>
-			#endif
 		], [
 			drm_drv_uses_atomic_modeset(0);
 		],[

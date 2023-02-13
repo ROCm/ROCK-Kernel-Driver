@@ -13,9 +13,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			struct vm_area_struct;
 			#include <drm/drmP.h>
 			#endif
-			#ifdef HAVE_DRM_DRM_DRV_H
 			#include <drm/drm_drv.h>
-			#endif
 		],[
 			int _ = DRIVER_SYNCOBJ_TIMELINE;
 		],[
@@ -34,9 +32,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			struct vm_area_struct;
 			#include <drm/drmP.h>
 			#endif
-			#ifdef HAVE_DRM_DRM_DRV_H
 			#include <drm/drm_drv.h>
-			#endif
 		],[
 			int _ = DRIVER_IRQ_SHARED;
 		],[
@@ -55,9 +51,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			struct vm_area_struct;
 			#include <drm/drmP.h>
 			#endif
-			#ifdef HAVE_DRM_DRM_DRV_H
 			#include <drm/drm_drv.h>
-			#endif
 		],[
 			int _ = DRIVER_PRIME;
 		],[
