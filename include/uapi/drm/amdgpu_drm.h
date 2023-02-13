@@ -1356,7 +1356,7 @@ struct drm_amdgpu_info_gpuvm_fault {
 #define AMDGPU_FAMILY_GC_10_3_6			149 /* GC 10.3.6 */
 #define AMDGPU_FAMILY_GC_10_3_7			151 /* GC 10.3.7 */
 #define AMDGPU_FAMILY_GC_11_5_0			150 /* GC 11.5.0 */
-#define AMDGPU_FAMILY_GC_12_0_0         152 /* GC 12.0.0 */
+#define AMDGPU_FAMILY_GC_12_0_0			152 /* GC 12.0.0 */
 
 /**
  *  Definition of System Unified Address (SUA) apertures
