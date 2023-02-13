@@ -1215,7 +1215,7 @@ int amdgpu_display_gem_fb_init(struct drm_device *dev,
 			       struct drm_gem_object *obj)
 {
 	int ret;
-	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
+	rfb->base.obj[0] = obj;
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 
 	ret = amdgpu_display_framebuffer_init(dev, rfb, mode_cmd, obj);
@@ -1229,7 +1229,7 @@ int amdgpu_display_gem_fb_init(struct drm_device *dev,
 	return 0;
 err:
 	drm_dbg_kms(dev, "Failed to init gem fb: %d\n", ret);
-	kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
+	rfb->base.obj[0] = NULL;
 	return ret;
 }
 
@@ -1241,7 +1241,7 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 {
 	int ret;
 
-	kcl_drm_gem_fb_set_obj(&rfb->base, 0, obj);
+	rfb->base.obj[0] = obj;
 	drm_helper_mode_fill_fb_struct(dev, &rfb->base, mode_cmd);
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
@@ -1273,7 +1273,7 @@ static int amdgpu_display_gem_fb_verify_and_init(struct drm_device *dev,
 	return 0;
 err:
 	drm_dbg_kms(dev, "Failed to verify and init gem fb: %d\n", ret);
-	kcl_drm_gem_fb_set_obj(&rfb->base, 0, NULL);
+	rfb->base.obj[0] = NULL;
 	return ret;
 }
 
