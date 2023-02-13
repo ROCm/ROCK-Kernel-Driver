@@ -31,10 +31,7 @@
 #include "amdgpu.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_mst_types.h"
-
-#ifdef CONFIG_DRM_AMD_DC_HDCP
 #include "amdgpu_dm_hdcp.h"
-#endif
 
 #include "dc.h"
 #include "dm_helpers.h"
@@ -397,7 +394,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		 * will be retrieved from hdcp_work within dm_dp_mst_get_modes
 		 */
 #ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
-#ifdef CONFIG_DRM_AMD_DC_HDCP
 		if (aconnector->dc_sink && connector->state) {
 			struct drm_device *dev = connector->dev;
 			struct amdgpu_device *adev = drm_to_adev(dev);
@@ -409,7 +405,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			connector->state->content_protection =
 			hdcp_w->content_protection[connector->index];
 		}
-#endif
 #endif
 
 		if (aconnector->dc_sink) {
