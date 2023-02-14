@@ -2524,9 +2524,11 @@ void link_set_dpms_on(
 	} else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
 		if (dp_is_128b_132b_signal(pipe_ctx))
 			dp_fpga_hpo_enable_link_and_stream(state, pipe_ctx);
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
 			link_set_dsc_enable(pipe_ctx, true);
+#endif
 	}
 
 	if (dc_is_hdmi_signal(pipe_ctx->stream->signal)) {
