@@ -3350,6 +3350,11 @@ static int it6505_i2c_probe(struct i2c_client *client,
 	it6505->aux.transfer = it6505_aux_transfer;
 	drm_dp_aux_init(&it6505->aux);
 
+	it6505->aux.name = "DP-AUX";
+	it6505->aux.dev = dev;
+	it6505->aux.transfer = it6505_aux_transfer;
+	drm_dp_aux_init(&it6505->aux);
+
 	it6505->bridge.funcs = &it6505_bridge_funcs;
 	it6505->bridge.type = DRM_MODE_CONNECTOR_DisplayPort;
 	it6505->bridge.ops = DRM_BRIDGE_OP_DETECT | DRM_BRIDGE_OP_EDID |
