@@ -727,7 +727,9 @@ svm_migrate_vma_to_ram(struct kfd_node *node, struct svm_range *prange,
 
 	migrate.src = buf;
 	migrate.dst = migrate.src + npages;
+#ifdef HAVE_MIGRATE_VMA_FAULT_PAGE
 	migrate.fault_page = fault_page;
+#endif
 	scratch = (dma_addr_t *)(migrate.dst + npages);
 
 	kfd_smi_event_migration_start(node, p->lead_thread->pid,
