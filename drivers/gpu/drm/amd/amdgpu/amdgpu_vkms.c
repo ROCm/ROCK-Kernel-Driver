@@ -661,7 +661,6 @@ static int amdgpu_vkms_sw_init(void *handle)
 #ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	adev_to_drm(adev)->mode_config.fb_modifiers_not_supported = true;
 #endif
-
 	r = amdgpu_display_modeset_create_props(adev);
 	if (r)
 		return r;
