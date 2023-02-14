@@ -599,11 +599,11 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 			return r;
 
 		abo = gem_to_amdgpu_bo(gobj);
-		dma_addr = kmalloc_array(abo->tbo.resource->num_pages, sizeof(dma_addr_t), GFP_KERNEL);
+		dma_addr = kmalloc_array(PFN_UP(abo->tbo.resource->size), sizeof(dma_addr_t), GFP_KERNEL);
 		if (unlikely(dma_addr == NULL))
 			goto release_object;
 
-		for (i = 0; i < abo->tbo.resource->num_pages; i++)
+		for (i = 0; i < PFN_UP(abo->tbo.resource->size); i++)
 			dma_addr[i] = args->addr + i * PAGE_SIZE;
 		abo->dgma_import_base = args->addr;
 		abo->dgma_addr = (void *)dma_addr;
