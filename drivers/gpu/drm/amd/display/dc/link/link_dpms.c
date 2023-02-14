@@ -1893,7 +1893,9 @@ static void disable_link_dp(struct dc_link *link,
 		const struct link_resource *link_res,
 		enum signal_type signal)
 {
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_link_settings link_settings = link->cur_link_settings;
+#endif
 
 	if (signal == SIGNAL_TYPE_DISPLAY_PORT_MST &&
 			link->mst_stream_alloc_table.stream_count > 0)
@@ -1910,12 +1912,13 @@ static void disable_link_dp(struct dc_link *link,
 	if (signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 		/* set the sink to SST mode after disabling the link */
 		enable_mst_on_sink(link, false);
-
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link_dp_get_encoding_format(&link_settings) ==
 			DP_8b_10b_ENCODING) {
 		dp_set_fec_enable(link, false);
 		dp_set_fec_ready(link, link_res, false);
 	}
+#endif
 }
 
 static void disable_link(struct dc_link *link,
