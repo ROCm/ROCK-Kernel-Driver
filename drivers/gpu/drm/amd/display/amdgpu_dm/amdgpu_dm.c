@@ -11605,9 +11605,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	bool is_top_most_overlay = true;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	struct drm_dp_mst_topology_mgr *mgr;
-#endif
 	struct drm_dp_mst_topology_state *mst_state;
 	struct dsc_mst_fairness_vars vars[MAX_PIPES] = {0};
 #endif
@@ -11938,7 +11936,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
@@ -11948,6 +11945,10 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct drm_connector_list_iter iter;
 		u8 link_coding_cap;
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+		 if (!mgr->mst_state )
+                        continue;
+#endif
 		drm_connector_list_iter_begin(dev, &iter);
 		drm_for_each_connector_iter(connector, &iter) {
 			if (connector->index == mst_state->mgr->conn_base_id) {
