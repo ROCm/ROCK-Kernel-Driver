@@ -218,4 +218,10 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
         dnl #
         AC_KERNEL_CHECK_HEADERS([drm/drm_damage_helper.h])
 
+        dnl #
+        dnl # v6.1-rc2-542-g8ab59da26bc0
+        dnl # drm/fb-helper: Move generic fbdev emulation into separate source file
+        dnl #
+        AC_KERNEL_CHECK_HEADERS([drm/drm_fbdev_generic.h])
+
 ])
