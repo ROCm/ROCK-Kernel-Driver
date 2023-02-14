@@ -1487,8 +1487,8 @@ bool dcn30_acquire_post_bldn_3dlut(
 				state->bits.mpc_rmu2_mux = mpcc_id;
 			ret = true;
 			break;
-			}
 		}
+	}
 	return ret;
 }
 
