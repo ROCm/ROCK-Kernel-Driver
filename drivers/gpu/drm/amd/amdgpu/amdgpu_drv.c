@@ -24,7 +24,9 @@
 
 #include <drm/amdgpu_drm.h>
 #include <drm/drm_drv.h>
+#ifdef HAVE_DRM_DRM_FBDEV_GENERIC_H
 #include <drm/drm_fbdev_generic.h>
+#endif
 #include <drm/drm_gem.h>
 #include <drm/drm_managed.h>
 #include <drm/drm_pciids.h>
