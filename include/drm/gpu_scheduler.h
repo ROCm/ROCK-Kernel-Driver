@@ -329,7 +329,7 @@ struct drm_sched_job {
 	 */
 	union {
 		struct dma_fence_cb		finish_cb;
-		struct work_struct		work;
+		struct work_struct 		work;
 	};
 
 	uint64_t			id;
@@ -379,17 +379,18 @@ enum drm_gpu_sched_stat {
  */
 struct drm_sched_backend_ops {
 	/**
-	 * @prepare_job:
+	 * @dependency:
 	 *
 	 * Called when the scheduler is considering scheduling this job next, to
 	 * get another struct dma_fence for this job to block on.  Once it
 	 * returns NULL, run_job() may be called.
 	 *
-	 * Can be NULL if no additional preparation to the dependencies are
-	 * necessary. Skipped when jobs are killed instead of run.
+	 * If a driver exclusively uses drm_sched_job_add_dependency() and
+	 * drm_sched_job_add_implicit_dependencies() this can be ommitted and
+	 * left as NULL.
 	 */
-	struct dma_fence *(*prepare_job)(struct drm_sched_job *sched_job,
-					 struct drm_sched_entity *s_entity);
+	struct dma_fence *(*dependency)(struct drm_sched_job *sched_job,
+					struct drm_sched_entity *s_entity);
 
 	/**
          * @run_job: Called to execute the job once all of the dependencies
