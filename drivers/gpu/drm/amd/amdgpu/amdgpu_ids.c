@@ -190,27 +190,26 @@ static bool amdgpu_vmid_compatible(struct amdgpu_vmid *id,
  *
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
+ * @sync: sync object where we add dependencies
  * @idle: resulting idle VMID
- * @fence: fence to wait for if no id could be grabbed
  *
  * Try to find an idle VMID, if none is idle add a fence to wait to the sync
  * object. Returns -ENOMEM when we are out of memory.
  */
 static int amdgpu_vmid_grab_idle(struct amdgpu_vm *vm,
 				 struct amdgpu_ring *ring,
-				 struct amdgpu_vmid **idle,
-				 struct dma_fence **fence)
+				 struct amdgpu_sync *sync,
+				 struct amdgpu_vmid **idle)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->funcs->vmhub;
 	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 	struct dma_fence **fences;
 	unsigned i;
+	int r;
 
-	if (!dma_fence_is_signaled(ring->vmid_wait)) {
-		*fence = dma_fence_get(ring->vmid_wait);
-		return 0;
-	}
+	if (!dma_fence_is_signaled(ring->vmid_wait))
+		return amdgpu_sync_fence(sync, ring->vmid_wait);
 
 	fences = kmalloc_array(id_mgr->num_ids, sizeof(void *), GFP_KERNEL);
 	if (!fences)
@@ -249,10 +248,10 @@ static int amdgpu_vmid_grab_idle(struct amdgpu_vm *vm,
 			return -ENOMEM;
 		}
 
-		*fence = dma_fence_get(&array->base);
+		r = amdgpu_sync_fence(sync, &array->base);
 		dma_fence_put(ring->vmid_wait);
 		ring->vmid_wait = &array->base;
-		return 0;
+		return r;
 	}
 	kfree(fences);
 
@@ -264,17 +263,17 @@ static int amdgpu_vmid_grab_idle(struct amdgpu_vm *vm,
  *
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
+ * @sync: sync object where we add dependencies
  * @job: job who wants to use the VMID
  * @id: resulting VMID
- * @fence: fence to wait for if no id could be grabbed
  *
  * Try to assign a reserved VMID.
  */
 static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
 				     struct amdgpu_ring *ring,
+				     struct amdgpu_sync *sync,
 				     struct amdgpu_job *job,
-				     struct amdgpu_vmid **id,
-				     struct dma_fence **fence)
+				     struct amdgpu_vmid **id)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->funcs->vmhub;
@@ -302,8 +301,7 @@ static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
 		tmp = amdgpu_sync_peek_fence(&(*id)->active, ring);
 		if (tmp) {
 			*id = NULL;
-			*fence = dma_fence_get(tmp);
-			return 0;
+			return amdgpu_sync_fence(sync, tmp);
 		}
 		needs_flush = true;
 	}
@@ -325,17 +323,17 @@ static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
  *
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
+ * @sync: sync object where we add dependencies
  * @job: job who wants to use the VMID
  * @id: resulting VMID
- * @fence: fence to wait for if no id could be grabbed
  *
  * Try to reuse a VMID for this submission.
  */
 static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
 				 struct amdgpu_ring *ring,
+				 struct amdgpu_sync *sync,
 				 struct amdgpu_job *job,
-				 struct amdgpu_vmid **id,
-				 struct dma_fence **fence)
+				 struct amdgpu_vmid **id)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->funcs->vmhub;
@@ -389,13 +387,13 @@ static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
  *
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
+ * @sync: sync object where we add dependencies
  * @job: job who wants to use the VMID
- * @fence: fence to wait for if no id could be grabbed
  *
  * Allocate an id for the vm, adding fences to the sync obj as necessary.
  */
 int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
-		     struct amdgpu_job *job, struct dma_fence **fence)
+		     struct amdgpu_sync *sync, struct amdgpu_job *job)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->funcs->vmhub;
@@ -405,16 +403,16 @@ int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 	int r = 0;
 
 	mutex_lock(&id_mgr->lock);
-	r = amdgpu_vmid_grab_idle(vm, ring, &idle, fence);
+	r = amdgpu_vmid_grab_idle(vm, ring, sync, &idle);
 	if (r || !idle)
 		goto error;
 
 	if (vm->reserved_vmid[vmhub]) {
-		r = amdgpu_vmid_grab_reserved(vm, ring, job, &id, fence);
+		r = amdgpu_vmid_grab_reserved(vm, ring, sync, job, &id);
 		if (r || !id)
 			goto error;
 	} else {
-		r = amdgpu_vmid_grab_used(vm, ring, job, &id, fence);
+		r = amdgpu_vmid_grab_used(vm, ring, sync, job, &id);
 		if (r)
 			goto error;
 
