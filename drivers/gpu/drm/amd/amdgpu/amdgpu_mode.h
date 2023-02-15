@@ -656,12 +656,8 @@ int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tile
 /* amdgpu_display.c */
 void amdgpu_display_print_display_setup(struct drm_device *dev);
 int amdgpu_display_modeset_create_props(struct amdgpu_device *adev);
-#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX
 int amdgpu_display_crtc_set_config(struct drm_mode_set *set,
 				   struct drm_modeset_acquire_ctx *ctx);
-#else
-int amdgpu_display_crtc_set_config(struct drm_mode_set *set);
-#endif
 
 int amdgpu_display_crtc_page_flip_target(struct drm_crtc *crtc,
 				struct drm_framebuffer *fb,

@@ -996,9 +996,6 @@
 /* drm_crtc_funcs->{get,verify}_crc_sources() is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES 1
 
-/* drm_crtc_funcs->set_config() wants ctx parameter */
-#define HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX 1
-
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
