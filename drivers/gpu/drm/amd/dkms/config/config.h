@@ -1124,9 +1124,6 @@
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
 
-/* vmf_insert_pfn_pud() is available */
-/* #undef HAVE_VMF_INSERT_PFN_PUD */
-
 /* vm_fault->{address/vam} is available */
 #define HAVE_VM_FAULT_ADDRESS_VMA 1
 
