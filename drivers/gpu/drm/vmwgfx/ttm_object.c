@@ -303,7 +303,8 @@ struct ttm_base_object *ttm_base_object_lookup(struct ttm_object_file *tfile,
 		if (!kref_get_unless_zero(&base->refcount))
 			base = NULL;
 	}
-	rcu_read_unlock();
+	spin_unlock(&tfile->lock);
+
 
 	return base;
 }
