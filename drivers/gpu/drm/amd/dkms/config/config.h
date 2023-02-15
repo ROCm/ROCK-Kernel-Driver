@@ -1152,9 +1152,6 @@
 /* drm_pending_vblank_event->sequence is available */
 #define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
 
-/* drm_plane_helper_funcs->atomic_async_check() is available */
-#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK 1
-
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
