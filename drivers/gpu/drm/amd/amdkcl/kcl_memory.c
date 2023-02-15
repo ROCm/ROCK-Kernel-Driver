@@ -106,7 +106,7 @@ vm_fault_t vmf_insert_pfn_pud_prot(struct vm_fault *vmf, pfn_t pfn,
 	cvma.vm_page_prot = pgprot;
 
 	return vmf_insert_pfn_pud(&cvmf, pfn, write);
-#elif defined(HAVE_VMF_INSERT_PFN_PUD)
+#else
 	struct vm_fault cvmf = *vmf;
 	struct vm_area_struct cvma = *vmf->vma;
 #ifdef HAVE_VM_FAULT_ADDRESS_VMA
@@ -119,9 +119,6 @@ vm_fault_t vmf_insert_pfn_pud_prot(struct vm_fault *vmf, pfn_t pfn,
 	cvma.vm_page_prot = pgprot;
 
 	return vmf_insert_pfn_pud(&cvma, addr, cvmf.pud, pfn, write);
-#else
-	pr_warn_once("% is not available\n", __func__);
-	return (vm_fault_t)0;
 #endif
 }
 EXPORT_SYMBOL_GPL(vmf_insert_pfn_pud_prot);

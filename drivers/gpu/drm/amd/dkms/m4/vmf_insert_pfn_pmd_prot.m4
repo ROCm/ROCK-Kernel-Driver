@@ -23,22 +23,6 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT_PFN_PMD_PROT], [
 				AC_DEFINE(HAVE_VMF_INSERT_PFN_PMD_3ARGS,
 					1,
 					[vmf_insert_pfn_{pmd,pud}() wants 3 args])
-			], [
-			dnl #
-			dnl # v4.10-9609-ga00cc7d9dd93
-			dnl # mm, x86: add support for PUD-sized transparent hugepages
-			dnl #
-				AC_KERNEL_CHECK_SYMBOL_EXPORT([vmf_insert_pfn_pud],
-				[mm/huge_memory.c],[
-					AC_DEFINE(HAVE_VMF_INSERT_PFN_PUD,
-						1,
-						[vmf_insert_pfn_pud() is available])
-				])
-				dnl #
-				dnl # v4.9-7746-g82b0f8c39a38
-				dnl # mm: join struct fault_env and vm_fault
-				dnl # leverage AC_AMDGPU_VM_FAULT_ADDRESS_VMA
-				dnl #
 			])
 		])
 	])
