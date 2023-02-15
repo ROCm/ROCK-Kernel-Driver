@@ -1189,9 +1189,6 @@
 /* interval_tree_insert have struct rb_root_cached */
 #define HAVE_TREE_INSERT_HAVE_RB_ROOT_CACHED 1
 
-/* ttm_sg_tt_init() is available */
-#define HAVE_TTM_SG_TT_INIT 1
-
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1
 
