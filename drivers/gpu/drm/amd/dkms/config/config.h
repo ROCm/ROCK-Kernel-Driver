@@ -1002,12 +1002,6 @@
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
-/* struct drm_crtc_state has flag for flip */
-#define HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG 1
-
-/* struct drm_crtc_state->pageflip_flags is available */
-/* #undef HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS */
-
 /* drm_gem_open_object is defined in struct drm_drv */
 /* #undef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
 
