@@ -26,12 +26,6 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([asm/fpu/api.h])
 
 	dnl #
-	dnl # commit 607ca46e97a1b6594b29647d98a32d545c24bdff
-	dnl # UAPI: (Scripted) Disintegrate include/linux
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([uapi/linux/sched/types.h])
-
-	dnl #
 	dnl # v4.19-rc6-7-ga3f8a30f3f00
 	dnl # Compiler Attributes: use feature checks instead of version checks
 	dnl #
