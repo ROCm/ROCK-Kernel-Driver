@@ -1,23 +1,4 @@
 dnl #
-dnl # v4.12-rc7-1335-gfef9df8b5945
-dnl # drm/atomic: initial support for asynchronous plane update
-dnl #
-AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drm_modeset_helper_vtables.h>
-		], [
-			struct drm_plane_helper_funcs *funcs = NULL;
-			funcs->atomic_async_check(NULL, NULL);
-			funcs->atomic_async_update(NULL, NULL);
-		], [
-			AC_DEFINE(HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK, 1,
-				[drm_plane_helper_funcs->atomic_async_check() is available])
-		])
-	])
-])
-
-dnl #
 dnl # v6.1-rc1~27-30c637151cfa drm/plane-helper: Export individual helpers
 dnl # v4.8-rc2-355-g1832040d010e drm: Allow drivers to modify plane_state in prepare_fb/cleanup_fb
 dnl # v4.4-rc4-250-g092d01dae09a drm: Reorganize helper vtables and their docs
@@ -66,7 +47,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_
 ])
 
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS], [
-	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB
 	AC_AMDGPU_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 ])
