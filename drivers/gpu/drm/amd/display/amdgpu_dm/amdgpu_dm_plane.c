@@ -1291,7 +1291,6 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 	return -EINVAL;
 }
 
-#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 static int dm_plane_atomic_async_check(struct drm_plane *plane,
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 				       struct drm_atomic_state *state)
@@ -1305,7 +1304,6 @@ static int dm_plane_atomic_async_check(struct drm_plane *plane,
 
 	return 0;
 }
-#endif
 
 static int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
 			       struct dc_cursor_position *position)
@@ -1419,7 +1417,6 @@ void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 	}
 }
 
-#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 static void dm_plane_atomic_async_update(struct drm_plane *plane,
 #ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS
 					 struct drm_atomic_state *state)
@@ -1452,15 +1449,12 @@ static void dm_plane_atomic_async_update(struct drm_plane *plane,
 
 	amdgpu_dm_plane_handle_cursor_update(plane, old_state);
 }
-#endif
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = dm_plane_helper_prepare_fb,
 	.cleanup_fb = dm_plane_helper_cleanup_fb,
 	.atomic_check = dm_plane_atomic_check,
-#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_ASYNC_CHECK
 	.atomic_async_check = dm_plane_atomic_async_check,
 	.atomic_async_update = dm_plane_atomic_async_update
-#endif
 };
 
 static void dm_drm_plane_reset(struct drm_plane *plane)
