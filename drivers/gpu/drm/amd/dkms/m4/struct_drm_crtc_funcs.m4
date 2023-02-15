@@ -20,24 +20,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP], [
 ])
 
 dnl #
-dnl # v4.11-rc3-950-ga4eff9aa6db8
-dnl # drm: Add acquire ctx parameter to ->set_config
-dnl #
-AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drm_crtc.h>
-		], [
-			struct drm_crtc_funcs *funcs = NULL;
-			funcs->set_config(NULL, NULL);
-		], [
-			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG_CTX, 1,
-				[drm_crtc_funcs->set_config() wants ctx parameter])
-		])
-	])
-])
-
-dnl #
 dnl # commit v4.10-rc5-1070-g84e354839b15
 dnl # drm: add vblank hooks to struct drm_crtc_funcs
 dnl #
@@ -92,6 +74,5 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
-	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_SET_CONFIG
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
 ])
