@@ -264,6 +264,7 @@ static int amdgpu_vmid_grab_idle(struct amdgpu_vm *vm,
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
  * @sync: sync object where we add dependencies
+ * @fence: fence protecting ID from reuse
  * @job: job who wants to use the VMID
  * @id: resulting VMID
  *
@@ -272,6 +273,7 @@ static int amdgpu_vmid_grab_idle(struct amdgpu_vm *vm,
 static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
 				     struct amdgpu_ring *ring,
 				     struct amdgpu_sync *sync,
+				     struct dma_fence *fence,
 				     struct amdgpu_job *job,
 				     struct amdgpu_vmid **id)
 {
@@ -309,7 +311,7 @@ static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
 	/* Good we can use this VMID. Remember this submission as
 	* user of the VMID.
 	*/
-	r = amdgpu_sync_fence(&(*id)->active, &job->base.s_fence->finished);
+	r = amdgpu_sync_fence(&(*id)->active, fence);
 	if (r)
 		return r;
 
@@ -324,6 +326,7 @@ static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
  * @sync: sync object where we add dependencies
+ * @fence: fence protecting ID from reuse
  * @job: job who wants to use the VMID
  * @id: resulting VMID
  *
@@ -332,6 +335,7 @@ static int amdgpu_vmid_grab_reserved(struct amdgpu_vm *vm,
 static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
 				 struct amdgpu_ring *ring,
 				 struct amdgpu_sync *sync,
+				 struct dma_fence *fence,
 				 struct amdgpu_job *job,
 				 struct amdgpu_vmid **id)
 {
@@ -369,8 +373,7 @@ static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
 		/* Good, we can use this VMID. Remember this submission as
 		 * user of the VMID.
 		 */
-		r = amdgpu_sync_fence(&(*id)->active,
-				      &job->base.s_fence->finished);
+		r = amdgpu_sync_fence(&(*id)->active, fence);
 		if (r)
 			return r;
 
@@ -388,12 +391,14 @@ static int amdgpu_vmid_grab_used(struct amdgpu_vm *vm,
  * @vm: vm to allocate id for
  * @ring: ring we want to submit job to
  * @sync: sync object where we add dependencies
+ * @fence: fence protecting ID from reuse
  * @job: job who wants to use the VMID
  *
  * Allocate an id for the vm, adding fences to the sync obj as necessary.
  */
 int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
-		     struct amdgpu_sync *sync, struct amdgpu_job *job)
+		     struct amdgpu_sync *sync, struct dma_fence *fence,
+		     struct amdgpu_job *job)
 {
 	struct amdgpu_device *adev = ring->adev;
 	unsigned vmhub = ring->funcs->vmhub;
@@ -408,11 +413,11 @@ int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 		goto error;
 
 	if (vm->reserved_vmid[vmhub]) {
-		r = amdgpu_vmid_grab_reserved(vm, ring, sync, job, &id);
+		r = amdgpu_vmid_grab_reserved(vm, ring, sync, fence, job, &id);
 		if (r || !id)
 			goto error;
 	} else {
-		r = amdgpu_vmid_grab_used(vm, ring, sync, job, &id);
+		r = amdgpu_vmid_grab_used(vm, ring, sync, fence, job, &id);
 		if (r)
 			goto error;
 
@@ -421,8 +426,7 @@ int amdgpu_vmid_grab(struct amdgpu_vm *vm, struct amdgpu_ring *ring,
 			id = idle;
 
 			/* Remember this submission as user of the VMID */
-			r = amdgpu_sync_fence(&id->active,
-					      &job->base.s_fence->finished);
+			r = amdgpu_sync_fence(&id->active, fence);
 			if (r)
 				goto error;
 

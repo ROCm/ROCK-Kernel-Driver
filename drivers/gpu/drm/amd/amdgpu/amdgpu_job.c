@@ -265,7 +265,9 @@ static struct dma_fence *amdgpu_job_dependency(struct drm_sched_job *sched_job,
 	}
 
 	while (fence == NULL && vm && !job->vmid) {
-		r = amdgpu_vmid_grab(vm, ring, &job->sync, job);
+		r = amdgpu_vmid_grab(vm, ring, &job->sync,
+				     &job->base.s_fence->finished,
+				     job);
 		if (r)
 			DRM_ERROR("Error getting VM ID (%d)\n", r);
 
