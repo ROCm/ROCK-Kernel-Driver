@@ -501,16 +501,15 @@ static int amdgpu_vcn_dec_send_msg(struct amdgpu_ring *ring,
 				   struct amdgpu_ib *ib_msg,
 				   struct dma_fence **fence)
 {
-	u64 addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg->gpu_addr);
 	struct amdgpu_device *adev = ring->adev;
 	struct dma_fence *f = NULL;
 	struct amdgpu_job *job;
 	struct amdgpu_ib *ib;
+	uint64_t addr = AMDGPU_GPU_PAGE_ALIGN(ib_msg->gpu_addr);
 	int i, r;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL,
-				     64, AMDGPU_IB_POOL_DIRECT,
-				     &job);
+	r = amdgpu_job_alloc_with_ib(adev, 64,
+					AMDGPU_IB_POOL_DIRECT, &job);
 	if (r)
 		goto err;
 
@@ -689,9 +688,8 @@ static int amdgpu_vcn_dec_sw_send_msg(struct amdgpu_ring *ring,
 	if (sq)
 		ib_size_dw += 8;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL,
-				     ib_size_dw * 4, AMDGPU_IB_POOL_DIRECT,
-				     &job);
+	r = amdgpu_job_alloc_with_ib(adev, ib_size_dw * 4,
+				AMDGPU_IB_POOL_DIRECT, &job);
 	if (r)
 		goto err;
 
@@ -819,9 +817,8 @@ static int amdgpu_vcn_enc_get_create_msg(struct amdgpu_ring *ring, uint32_t hand
 	if (sq)
 		ib_size_dw += 8;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL,
-				     ib_size_dw * 4, AMDGPU_IB_POOL_DIRECT,
-				     &job);
+	r = amdgpu_job_alloc_with_ib(ring->adev, ib_size_dw * 4,
+					AMDGPU_IB_POOL_DIRECT, &job);
 	if (r)
 		return r;
 
@@ -886,9 +883,8 @@ static int amdgpu_vcn_enc_get_destroy_msg(struct amdgpu_ring *ring, uint32_t han
 	if (sq)
 		ib_size_dw += 8;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, NULL, NULL,
-				     ib_size_dw * 4, AMDGPU_IB_POOL_DIRECT,
-				     &job);
+	r = amdgpu_job_alloc_with_ib(ring->adev, ib_size_dw * 4,
+					AMDGPU_IB_POOL_DIRECT, &job);
 	if (r)
 		return r;
 
