@@ -870,9 +870,6 @@
 /* remove_conflicting_pci_framebuffers() wants p,p args */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
 
-/* request_firmware_direct() is available */
-#define HAVE_REQUEST_FIRMWARE_DIRECT 1
-
 /* sched_set_fifo_low() is available */
 #define HAVE_SCHED_SET_FIFO_LOW 1
 
