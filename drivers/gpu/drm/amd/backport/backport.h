@@ -16,7 +16,6 @@
 #include <kcl/kcl_iosys-map.h>
 #include <kcl/kcl_eventpoll.h>
 #include <kcl/kcl_i2c.h>
-#include <kcl/kcl_firmware.h>
 #include <kcl/kcl_video.h>
 #include <kcl/kcl_acpi.h>
 #include <kcl/kcl_workqueue.h>
