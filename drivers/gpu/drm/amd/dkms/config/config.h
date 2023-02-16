@@ -981,9 +981,6 @@
 /* struct drm_connector_state->self_refresh_aware is available */
 #define HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1
 
-/* drm_connector->ycbcr_420_allowed is available */
-#define HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED 1
-
 /* HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL 1
 

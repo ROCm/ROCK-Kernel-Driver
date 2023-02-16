@@ -7519,20 +7519,16 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 	switch (connector_type) {
 	case DRM_MODE_CONNECTOR_HDMIA:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
-#ifdef HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED
 		aconnector->base.ycbcr_420_allowed =
 			link->link_enc->features.hdmi_ycbcr420_supported ? true : false;
-#endif
 		break;
 	case DRM_MODE_CONNECTOR_DisplayPort:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
 		link->link_enc = link_enc_cfg_get_link_enc(link);
 		ASSERT(link->link_enc);
-#ifdef HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED
 		if (link->link_enc)
 			aconnector->base.ycbcr_420_allowed =
 				link->link_enc->features.dp_ycbcr420_supported ? true : false;
-#endif
 		break;
 	case DRM_MODE_CONNECTOR_DVID:
 		aconnector->base.polled = DRM_CONNECTOR_POLL_HPD;
