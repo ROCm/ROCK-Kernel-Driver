@@ -31,9 +31,7 @@
 #include <linux/dma-buf.h>
 
 #include <drm/amdgpu_drm.h>
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 #include <drm/drm_syncobj.h>
-#endif
 #include "amdgpu_cs.h"
 #include "amdgpu.h"
 #include "amdgpu_trace.h"
@@ -283,10 +281,8 @@ static int amdgpu_cs_pass1(struct amdgpu_cs_parser *p,
 			break;
 
 		case AMDGPU_CHUNK_ID_DEPENDENCIES:
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 		case AMDGPU_CHUNK_ID_SYNCOBJ_OUT:
-#endif
 #if defined(HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES)
 		case AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES:
 #endif
@@ -452,7 +448,7 @@ static int amdgpu_cs_p2_dependencies(struct amdgpu_cs_parser *p,
 	}
 	return 0;
 }
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
+
 static int amdgpu_syncobj_lookup_and_add(struct amdgpu_cs_parser *p,
 					 uint32_t handle, u64 point,
 					 u64 flags)
@@ -589,7 +585,6 @@ static int amdgpu_cs_p2_syncobj_timeline_signal(struct amdgpu_cs_parser *p,
 
 	return 0;
 }
-#endif
 
 static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 {
@@ -615,7 +610,6 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 			if (r)
 				return r;
 			break;
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_IN:
 			r = amdgpu_cs_p2_syncobj_in(p, chunk);
 			if (r)
@@ -626,7 +620,6 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 			if (r)
 				return r;
 			break;
-#endif
 #if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
 		case AMDGPU_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT:
 			r = amdgpu_cs_p2_syncobj_timeline_wait(p, chunk);
@@ -1339,7 +1332,6 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 	return r;
 }
 
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 {
 	int i;
@@ -1361,7 +1353,6 @@ static void amdgpu_cs_post_dependencies(struct amdgpu_cs_parser *p)
 #endif
 	}
 }
-#endif
 
 static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			    union drm_amdgpu_cs *cs)
@@ -1446,9 +1437,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 	seq = amdgpu_ctx_add_fence(p->ctx, p->entities[p->gang_leader_idx],
 				   p->fence);
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	amdgpu_cs_post_dependencies(p);
-#endif
 
 	if ((leader->preamble_status & AMDGPU_PREAMBLE_IB_PRESENT) &&
 	    !p->ctx->preamble_presented) {
@@ -1496,7 +1485,6 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser)
 {
 	unsigned i;
 
-#if defined(HAVE_CHUNK_ID_SYNOBJ_IN_OUT)
 	for (i = 0; i < parser->num_post_deps; i++) {
 		drm_syncobj_put(parser->post_deps[i].syncobj);
 #if defined(HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL)
@@ -1504,7 +1492,6 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser)
 #endif
 	}
 	kfree(parser->post_deps);
-#endif
 
 	dma_fence_put(parser->fence);
 
