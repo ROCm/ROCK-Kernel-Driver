@@ -20,24 +20,6 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP], [
 ])
 
 dnl #
-dnl # commit v4.10-rc5-1070-g84e354839b15
-dnl # drm: add vblank hooks to struct drm_crtc_funcs
-dnl #
-AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK], [
-	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_TRY_COMPILE([
-			#include <drm/drm_crtc.h>
-		], [
-			struct drm_crtc_funcs *crtc_funcs = NULL;
-			crtc_funcs->enable_vblank(NULL);
-		], [
-			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK, 1, [
-				drm_crtc_funcs->enable_vblank() is available])
-		])
-	])
-])
-
-dnl #
 dnl # v5.10-1961-g6ca2ab8086af drm: automatic legacy gamma support
 dnl #
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL], [
@@ -51,6 +33,5 @@ AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL], [
 
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
-	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK
 	AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
 ])

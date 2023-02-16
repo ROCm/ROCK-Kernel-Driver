@@ -984,9 +984,6 @@
 /* drm_connector->ycbcr_420_allowed is available */
 #define HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED 1
 
-/* drm_crtc_funcs->enable_vblank() is available */
-#define HAVE_STRUCT_DRM_CRTC_FUNCS_ENABLE_VBLANK 1
-
 /* HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL 1
 
