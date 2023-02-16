@@ -897,9 +897,6 @@
 /* request_firmware_direct() is available */
 #define HAVE_REQUEST_FIRMWARE_DIRECT 1
 
-/* reservation_object->staged is available */
-/* #undef HAVE_RESERVATION_OBJECT_STAGED */
-
 /* sched_set_fifo_low() is available */
 #define HAVE_SCHED_SET_FIFO_LOW 1
 
