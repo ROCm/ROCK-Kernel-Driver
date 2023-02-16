@@ -248,13 +248,4 @@ u32 pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
 
 #endif /* PCI_REBAR_CTRL_BAR_SHIFT */
 
-#if !defined(HAVE_PCI_IRQ_VECTOR)
-static inline int pci_irq_vector(struct pci_dev *dev, unsigned int nr)
-{
-        if (WARN_ON_ONCE(nr > 0))
-                return -EINVAL;
-        return dev->irq;
-}
-#endif /* HAVE_PCI_IRQ_VECTOR */
-
 #endif /* AMDKCL_PCI_H */

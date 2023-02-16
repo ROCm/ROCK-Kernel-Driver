@@ -843,9 +843,6 @@
 /* struct pci_driver has field dev_groups */
 #define HAVE_PCI_DRIVER_DEV_GROUPS 1
 
-/* pci_irq_vector() is available */
-#define HAVE_PCI_IRQ_VECTOR 1
-
 /* pci_is_thunderbolt_attached() is available */
 #define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
 
