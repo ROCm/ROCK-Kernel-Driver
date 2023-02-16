@@ -40,7 +40,6 @@ int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 #define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
 #endif
 
-#if defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
 static inline
 int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
@@ -65,7 +64,6 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 }
 #define drm_dp_atomic_find_vcpi_slots _kcl_drm_dp_atomic_find_vcpi_slots
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
-#endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS */
 
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS)
 static inline
