@@ -360,7 +360,7 @@ static const struct sysfs_ops kfd_procfs_ops = {
 	.show = kfd_procfs_show,
 };
 
-static struct kobj_type procfs_type = {
+static const struct kobj_type procfs_type = {
 	.release = kfd_procfs_kobj_release,
 	.sysfs_ops = &kfd_procfs_ops,
 };
@@ -462,7 +462,7 @@ static const struct sysfs_ops procfs_queue_ops = {
 	.show = kfd_procfs_queue_show,
 };
 
-static struct kobj_type procfs_queue_type = {
+static const struct kobj_type procfs_queue_type = {
 	.sysfs_ops = &procfs_queue_ops,
 };
 
@@ -470,7 +470,7 @@ static const struct sysfs_ops procfs_stats_ops = {
 	.show = kfd_procfs_stats_show,
 };
 
-static struct kobj_type procfs_stats_type = {
+static const struct kobj_type procfs_stats_type = {
 	.sysfs_ops = &procfs_stats_ops,
 	.release = kfd_procfs_kobj_release,
 };
@@ -479,7 +479,7 @@ static const struct sysfs_ops sysfs_counters_ops = {
 	.show = kfd_sysfs_counters_show,
 };
 
-static struct kobj_type sysfs_counters_type = {
+static const struct kobj_type sysfs_counters_type = {
 	.sysfs_ops = &sysfs_counters_ops,
 	.release = kfd_procfs_kobj_release,
 };
