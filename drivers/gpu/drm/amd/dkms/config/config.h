@@ -858,9 +858,6 @@
 /* pci_upstream_bridge() is available */
 #define HAVE_PCI_UPSTREAM_BRIDGE 1
 
-/* perf_event_update_userpage() is exported */
-#define HAVE_PERF_EVENT_UPDATE_USERPAGE 1
-
 /* pfn_t is defined */
 #define HAVE_PFN_T 1
 
