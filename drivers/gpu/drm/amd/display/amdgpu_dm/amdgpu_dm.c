@@ -565,9 +565,7 @@ static void dm_crtc_high_irq(void *interrupt_params)
 	 * Following stuff must happen at start of vblank, for crc
 	 * computation and below-the-range btr support in vrr mode.
 	 */
-#ifdef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VERIFY_CRC_SOURCES
 	amdgpu_dm_crtc_handle_crc_irq(&acrtc->base);
-#endif
 
 	/* BTR updates need to happen before VUPDATE on Vega and above. */
 	if (adev->family < AMDGPU_FAMILY_AI)
