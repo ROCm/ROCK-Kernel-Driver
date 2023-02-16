@@ -56,28 +56,6 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_FENCES], [
 	])
 ])
 
-
-dnl #
-dnl # v4.19-rc6-1514-g27836b641c1b
-dnl # dma-buf: remove shared fence staging in reservation object
-dnl #
-AC_DEFUN([AC_AMDGPU_RESERVATION_OBJECT_STAGED], [
-	AC_KERNEL_DO_BACKGROUND([
-		AS_IF([test x$HAVE_LINUX_DMA_RESV_H = x ], [
-			AC_KERNEL_TRY_COMPILE([
-				#include <linux/reservation.h>
-			], [
-				struct reservation_object *resv = NULL;
-				resv->staged = NULL;
-			], [
-				AC_DEFINE(HAVE_RESERVATION_OBJECT_STAGED, 1,
-					[reservation_object->staged is available])
-			])
-		])
-	])
-])
-
 AC_DEFUN([AC_AMDGPU_DMA_RESV], [
 	AC_AMDGPU_DMA_RESV_FENCES
-	AC_AMDGPU_RESERVATION_OBJECT_STAGED
 ])
