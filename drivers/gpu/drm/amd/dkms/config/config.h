@@ -153,9 +153,6 @@
 /* drm_atomic_helper_calc_timestamping_constants() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
 
-/* drm_atomic_helper_check_plane_state() is available */
-#define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
-
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 

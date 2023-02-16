@@ -40,24 +40,6 @@
 #define DRM_PLANE_NO_SCALING (1<<16)
 #endif
 
-#ifndef HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE
-static inline int
-drm_atomic_helper_check_plane_state(struct drm_plane_state *plane_state,
-					const struct drm_crtc_state *crtc_state,
-					int min_scale,
-					int max_scale,
-					bool can_position,
-					bool can_update_disabled)
-{
-	struct drm_rect clip = {};
-	struct drm_crtc *crtc = crtc_state->crtc;
-	if (crtc->enabled)
-		drm_mode_get_hv_timing(&crtc->mode, &clip.x2, &clip.y2);
-	return drm_plane_helper_check_state(plane_state, &clip, min_scale,
-				max_scale, can_position, can_update_disabled);
-}
-#endif
-
 /*
  * v4.19-rc1-206-ge267364a6e1b
  * drm/atomic: Initialise planes with opaque alpha values
