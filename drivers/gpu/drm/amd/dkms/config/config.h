@@ -954,9 +954,6 @@
 /* is_smca_umc_v2() is available */
 /* #undef HAVE_SMCA_UMC_V2 */
 
-/* strscpy() is available */
-#define HAVE_STRSCPY 1
-
 /* struct dma_buf_ops->allow_peer2peer is available */
 #define HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER 1
 
