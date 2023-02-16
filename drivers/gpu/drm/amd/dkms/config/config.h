@@ -885,12 +885,6 @@
 /* whether register_shrinker(x, x) is available */
 #define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
 
-/* remove_conflicting_pci_framebuffers() is available */
-/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
-
-/* remove_conflicting_pci_framebuffers() wants p,i,p args */
-/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP */
-
 /* remove_conflicting_pci_framebuffers() wants p,p args */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
 

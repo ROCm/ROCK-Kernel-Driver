@@ -5,17 +5,13 @@
 #include <linux/fb.h>
 #include <linux/pci.h>
 
-/* Copied from include/linux/fb.h */
-#if !defined(HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS) && \
-	!defined(HAVE_DRM_DRM_APERTURE_H)
-extern int remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
-					       const char *name);
-#endif
 static inline
 int _kcl_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 						       const char *name)
 {
-#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP
+#ifdef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP
+	return remove_conflicting_pci_framebuffers(pdev, name);
+#else
 	/**
 	 * v5.1-rc3-20-gb0e999c95581 fbdev: list all pci memory bars as conflicting apertures
 	 * handle bar 0 directly.
@@ -32,8 +28,6 @@ int _kcl_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 	*/
 	pr_warn_once("remove conflicting pci framebuffers on bar 0\n");
 	return remove_conflicting_pci_framebuffers(pdev, 0, name);
-#else
-	return remove_conflicting_pci_framebuffers(pdev, name);
 #endif
 }
 #endif
