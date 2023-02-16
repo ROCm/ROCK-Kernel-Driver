@@ -110,9 +110,6 @@
 /* struct dma_fence_ops has use_64bit_seqno field */
 #define HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO 1
 
-/* dma_map_resource() is enabled */
-#define HAVE_DMA_MAP_RESOURCE 1
-
 /* dma_map_sgtable() is enabled */
 #define HAVE_DMA_MAP_SGTABLE 1
 
