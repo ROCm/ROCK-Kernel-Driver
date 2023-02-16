@@ -71,9 +71,6 @@
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
-/* whether CHUNK_ID_SYNOBJ_IN_OUT is defined */
-#define HAVE_CHUNK_ID_SYNOBJ_IN_OUT 1
-
 /* compat_ptr_ioctl() is available */
 #define HAVE_COMPAT_PTR_IOCTL 1
 
