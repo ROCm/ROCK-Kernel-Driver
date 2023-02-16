@@ -585,21 +585,6 @@
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
-/* drm_syncobj_fence_get() is available */
-/* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */
-
-/* drm_syncobj_find_fence() is available */
-#define HAVE_DRM_SYNCOBJ_FIND_FENCE 1
-
-/* whether drm_syncobj_find_fence() wants 3 args */
-/* #undef HAVE_DRM_SYNCOBJ_FIND_FENCE_3ARGS */
-
-/* whether drm_syncobj_find_fence() wants 4 args */
-/* #undef HAVE_DRM_SYNCOBJ_FIND_FENCE_4ARGS */
-
-/* whether drm_syncobj_find_fence() wants 5 args */
-#define HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS 1
-
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
