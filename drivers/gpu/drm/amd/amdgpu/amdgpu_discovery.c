@@ -707,7 +707,7 @@ static void ip_hw_instance_release(struct kobject *kobj)
 	kfree(ip_hw_instance);
 }
 
-static struct kobj_type ip_hw_instance_ktype = {
+static const struct kobj_type ip_hw_instance_ktype = {
 	.release = ip_hw_instance_release,
 	.sysfs_ops = &ip_hw_instance_sysfs_ops,
 #ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
@@ -730,7 +730,7 @@ static void ip_hw_id_release(struct kobject *kobj)
 	kfree(ip_hw_id);
 }
 
-static struct kobj_type ip_hw_id_ktype = {
+static const struct kobj_type ip_hw_id_ktype = {
 	.release = ip_hw_id_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 };
@@ -795,7 +795,7 @@ static const struct sysfs_ops ip_die_entry_sysfs_ops = {
 	.show = ip_die_entry_attr_show,
 };
 
-static struct kobj_type ip_die_entry_ktype = {
+static const struct kobj_type ip_die_entry_ktype = {
 	.release = ip_die_entry_release,
 	.sysfs_ops = &ip_die_entry_sysfs_ops,
 #ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
@@ -805,12 +805,12 @@ static struct kobj_type ip_die_entry_ktype = {
 #endif
 };
 
-static struct kobj_type die_kobj_ktype = {
+static const struct kobj_type die_kobj_ktype = {
 	.release = die_kobj_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 };
 
-static struct kobj_type ip_discovery_ktype = {
+static const struct kobj_type ip_discovery_ktype = {
 	.release = ip_disc_release,
 	.sysfs_ops = &kobj_sysfs_ops,
 };
