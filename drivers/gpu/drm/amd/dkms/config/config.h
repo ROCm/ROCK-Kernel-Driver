@@ -939,9 +939,6 @@
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
-/* drm_driver->set_busid is available */
-/* #undef HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER */
-
 /* whether si_mem_available() is available */
 #define HAVE_SI_MEM_AVAILABLE 1
 
