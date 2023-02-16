@@ -2883,10 +2883,6 @@ static struct drm_driver amdgpu_kms_driver = {
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
-#if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
-	.set_busid = drm_pci_set_busid,
-#endif
-
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,
