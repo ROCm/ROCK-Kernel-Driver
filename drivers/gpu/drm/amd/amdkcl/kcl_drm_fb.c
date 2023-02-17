@@ -42,11 +42,7 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 {
 	struct drm_framebuffer *fb = fb_helper->fb;
 
-#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
-#else
-	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
-#endif
 	drm_fb_helper_fill_var(info, fb_helper,
 			       sizes->fb_width, sizes->fb_height);
 
