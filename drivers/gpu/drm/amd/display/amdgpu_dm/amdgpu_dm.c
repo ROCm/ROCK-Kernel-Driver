@@ -5457,11 +5457,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 
 	memset(plane_info, 0, sizeof(*plane_info));
 
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-	switch (fb->pixel_format) {
-#else
 	switch (fb->format->format) {
-#endif
 	case DRM_FORMAT_C8:
 		plane_info->format =
 			SURFACE_PIXEL_FORMAT_GRPH_PALETA_256_COLORS;
@@ -5517,11 +5513,7 @@ fill_dc_plane_info_and_addr(struct amdgpu_device *adev,
 	default:
 		DRM_ERROR(
 			"Unsupported screen format %p4cc\n",
-#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 			&fb->format->format);
-#else
-			&fb->pixel_format);
-#endif
 		return -EINVAL;
 	}
 
@@ -10808,11 +10800,7 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 			continue;
 
 		/* Pixel format changes can require bandwidth updates. */
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-		if (old_other_state->fb->pixel_format != new_other_state->fb->pixel_format)
-#else
 		if (old_other_state->fb->format != new_other_state->fb->format)
-#endif
 			return true;
 
 		old_afb = (struct amdgpu_framebuffer *)old_other_state->fb;
