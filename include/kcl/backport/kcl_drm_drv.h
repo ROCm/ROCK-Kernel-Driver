@@ -27,7 +27,6 @@
 #ifndef __KCL_BACKPORT_KCL_DRM_DRV_H__
 #define __KCL_BACKPORT_KCL_DRM_DRV_H__
 
-#include <kcl/kcl_drm_drv.h>
 #include <linux/console.h>
 
 /*
