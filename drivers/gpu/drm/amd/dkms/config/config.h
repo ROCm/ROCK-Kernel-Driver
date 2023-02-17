@@ -828,9 +828,6 @@
 /* pcie_bandwidth_available() is available */
 #define HAVE_PCIE_BANDWIDTH_AVAILABLE 1
 
-/* pci_enable_atomic_ops_to_root() exist */
-#define HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT 1
-
 /* PCI driver handles extended tags */
 #define HAVE_PCI_CONFIGURE_EXTENDED_TAGS 1
 
