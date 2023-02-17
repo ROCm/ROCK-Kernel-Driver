@@ -394,9 +394,6 @@
 /* drm_edid_to_eld() are available */
 /* #undef HAVE_DRM_EDID_TO_ELD */
 
-/* drm_encoder_find() wants file_priv */
-#define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
-
 /* drm_fbdev_generic_setup() is available */
 /* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
 
