@@ -86,14 +86,6 @@ static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVCALLOC */
 
-#if !defined(HAVE_MMGRAB)
-/* Copied from v4.10-10392-gf1f1007644ff include/linux/sched.h */
-static inline void mmgrab(struct mm_struct *mm)
-{
-	atomic_inc(&mm->mm_count);
-}
-#endif
-
 #if !defined(HAVE_MEMALLOC_NOFS_SAVE)
 static inline unsigned int memalloc_nofs_save(void)
 {
@@ -125,14 +117,6 @@ static inline bool is_cow_mapping(vm_flags_t flags)
         return (flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 }
 #endif /* HAVE_IS_COW_MAPPING */
-
-#ifndef HAVE_MMGET
-/* Copied fromr include/linux/sched.h */
-static inline void mmget(struct mm_struct *mm)
-{
-        atomic_inc(&mm->mm_users);
-}
-#endif /*HAVE_MMGET */
 
 #ifndef HAVE_VMA_LOOKUP
 /**
