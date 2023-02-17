@@ -401,9 +401,6 @@
 /* drm_fb_helper_alloc_info() is available */
 #define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
 
-/* struct drm_fb_helper has buffer field */
-#define HAVE_DRM_FB_HELPER_BUFFER 1
-
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
