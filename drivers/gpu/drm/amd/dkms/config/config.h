@@ -410,9 +410,6 @@
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
 
-/* whether drm_fb_helper_lastclose() is available */
-#define HAVE_DRM_FB_HELPER_LASTCLOSE 1
-
 /* drm_fb_helper_unregister_info() is available */
 #define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
 
