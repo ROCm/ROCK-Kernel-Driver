@@ -807,12 +807,6 @@
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
-/* mmget is available */
-#define HAVE_MMGET 1
-
-/* mmgrab() is available */
-#define HAVE_MMGRAB 1
-
 /* mmput_async() is available */
 #define HAVE_MMPUT_ASYNC 1
 
