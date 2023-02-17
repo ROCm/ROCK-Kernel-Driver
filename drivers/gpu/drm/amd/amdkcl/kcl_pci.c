@@ -21,101 +21,11 @@
 #include <linux/version.h>
 #include <linux/acpi.h>
 
-#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
-/* Copied from drivers/pci/probe.c and modified for KCL */
-const unsigned char *_kcl_pcie_link_speed;
-
-const unsigned char _kcl_pcie_link_speed_stub[] = {
-	PCI_SPEED_UNKNOWN,              /* 0 */
-	PCIE_SPEED_2_5GT,               /* 1 */
-	PCIE_SPEED_5_0GT,               /* 2 */
-	PCIE_SPEED_8_0GT,               /* 3 */
-	PCI_SPEED_UNKNOWN,              /* 4 */
-	PCI_SPEED_UNKNOWN,              /* 5 */
-	PCI_SPEED_UNKNOWN,              /* 6 */
-	PCI_SPEED_UNKNOWN,              /* 7 */
-	PCI_SPEED_UNKNOWN,              /* 8 */
-	PCI_SPEED_UNKNOWN,              /* 9 */
-	PCI_SPEED_UNKNOWN,              /* A */
-	PCI_SPEED_UNKNOWN,              /* B */
-	PCI_SPEED_UNKNOWN,              /* C */
-	PCI_SPEED_UNKNOWN,              /* D */
-	PCI_SPEED_UNKNOWN,              /* E */
-	PCI_SPEED_UNKNOWN               /* F */
-};
-
-/* Copied from drivers/pci/pci.c */
-/**
- * pcie_bandwidth_available - determine minimum link settings of a PCIe
- *                           device and its bandwidth limitation
- * @dev: PCI device to query
- * @limiting_dev: storage for device causing the bandwidth limitation
- * @speed: storage for speed of limiting device
- * @width: storage for width of limiting device
- *
- * Walk up the PCI device chain and find the point where the minimum
- * bandwidth is available.  Return the bandwidth available there and (if
- * limiting_dev, speed, and width pointers are supplied) information about
- * that point.  The bandwidth returned is in Mb/s, i.e., megabits/second of
- * raw bandwidth.
- */
-u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting_dev,
-			enum pci_bus_speed *speed,
-			enum pcie_link_width *width)
-{
-	u16 lnksta;
-	enum pci_bus_speed next_speed;
-	enum pcie_link_width next_width;
-	u32 bw, next_bw;
-
-	if (speed)
-		*speed = PCI_SPEED_UNKNOWN;
-	if (width)
-		*width = PCIE_LNK_WIDTH_UNKNOWN;
-
-	bw = 0;
-
-	while (dev) {
-		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
-
-		next_speed = _kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
-		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
-		PCI_EXP_LNKSTA_NLW_SHIFT;
-
-		next_bw = next_width * PCIE_SPEED2MBS_ENC(next_speed);
-
-		/* Check if current device limits the total bandwidth */
-		if (!bw || next_bw <= bw) {
-			bw = next_bw;
-
-		if (limiting_dev)
-			*limiting_dev = dev;
-		if (speed)
-			*speed = next_speed;
-		if (width)
-			*width = next_width;
-		}
-
-		dev = pci_upstream_bridge(dev);
-	}
-
-	return bw;
-}
-EXPORT_SYMBOL(_kcl_pcie_bandwidth_available);
-#endif /* HAVE_PCIE_BANDWIDTH_AVAILABLE */
-
 enum pci_bus_speed (*_kcl_pcie_get_speed_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_speed_cap);
 
 enum pcie_link_width (*_kcl_pcie_get_width_cap)(struct pci_dev *dev);
 EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
-
-void amdkcl_pci_init(void)
-{
-#if !defined(HAVE_PCIE_BANDWIDTH_AVAILABLE)
-	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed", _kcl_pcie_link_speed_stub);
-#endif
-}
 
 #if !defined(HAVE_PCI_CONFIGURE_EXTENDED_TAGS)
 void _kcl_pci_configure_extended_tags(struct pci_dev *dev)
