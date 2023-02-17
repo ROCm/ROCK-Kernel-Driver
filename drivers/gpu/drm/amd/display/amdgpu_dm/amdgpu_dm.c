@@ -4716,9 +4716,11 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		amdgpu_set_panel_orientation(&aconnector->base);
 	}
 
+#ifdef HAVE_ACPI_VIDEO_REPORT_NOLCD
 	/* If we didn't find a panel, notify the acpi video detection */
 	if (dm->adev->flags & AMD_IS_APU && dm->num_of_edps == 0)
 		acpi_video_report_nolcd();
+#endif
 
 	/* Software is initialized. Now we can register interrupt handlers. */
 	switch (adev->asic_type) {

@@ -34,8 +34,25 @@ AC_DEFUN([AC_AMDGPU_ACPI_VIDEO_REGISTER_BACKLIGHT], [
 	])
 ])
 
+dnl #
+dnl # commit: v6.1-1561-g0ba8892d86ad
+dnl ACPI: video: Allow GPU drivers to report no panels
+dnl
+AC_DEFUN([AC_AMDGPU_ACPI_VIDEO_REPORT_NOLCD], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE_SYMBOL([
+                        #include <acpi/video.h>
+                ], [
+                        acpi_video_report_nolcd();
+                ], [acpi_video_report_nolcd], [drivers/acpi/acpi_video.c], [
+                        AC_DEFINE(HAVE_ACPI_VIDEO_REPORT_NOLCD, 1,
+                                [acpi_video_report_nolcd() is available])
+                ])
+        ])
+])
 
 AC_DEFUN([AC_AMDGPU_ACPI_VIDEO_FUNCS], [
-                AC_AMDGPU_ACPI_VIDEO_BACKLIGHT_USE_NATIVE
-				AC_AMDGPU_ACPI_VIDEO_REGISTER_BACKLIGHT
+		AC_AMDGPU_ACPI_VIDEO_BACKLIGHT_USE_NATIVE
+		AC_AMDGPU_ACPI_VIDEO_REGISTER_BACKLIGHT
+		AC_AMDGPU_ACPI_VIDEO_REPORT_NOLCD
 ])
