@@ -831,9 +831,6 @@
 /* pci_enable_atomic_ops_to_root() exist */
 #define HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT 1
 
-/* pcie_get_speed_cap() and pcie_get_width_cap() exist */
-#define HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP 1
-
 /* PCI driver handles extended tags */
 #define HAVE_PCI_CONFIGURE_EXTENDED_TAGS 1
 
