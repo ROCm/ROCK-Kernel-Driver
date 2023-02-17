@@ -22,15 +22,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/drm_hdcp.h])
 
 	dnl #
-	dnl # commit v4.19-rc1-154-gd78aa650670d
-	dnl # drm: Add drm/drm_util.h header file
-	dnl #
-	dnl # commit e9eafcb589213395232084a2378e2e90f67feb29
-	dnl # drm: move drm_can_sleep() to drm_util.h
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_util.h])
-
-	dnl #
 	dnl # commit v5.0-rc1-342-gfcd70cd36b9b
 	dnl # drm: Split out drm_probe_helper.h
 	dnl #
