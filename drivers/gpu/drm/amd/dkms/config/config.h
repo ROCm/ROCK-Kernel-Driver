@@ -825,9 +825,6 @@
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
-/* pcie_bandwidth_available() is available */
-#define HAVE_PCIE_BANDWIDTH_AVAILABLE 1
-
 /* PCI driver handles extended tags */
 #define HAVE_PCI_CONFIGURE_EXTENDED_TAGS 1
 
