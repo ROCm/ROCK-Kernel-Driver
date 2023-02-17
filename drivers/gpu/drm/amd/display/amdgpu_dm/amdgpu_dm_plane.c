@@ -854,11 +854,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[0] / (fb->bits_per_pixel / 8);
-#else
 			fb->pitches[0] / fb->format->cpp[0];
-#endif
 
 		address->type = PLN_ADDR_TYPE_GRAPHICS;
 		address->grph.addr.low_part = lower_32_bits(addr);
@@ -872,11 +868,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[0] / (fb->bits_per_pixel / 8);
-#else
 			fb->pitches[0] / fb->format->cpp[0];
-#endif
 
 		plane_size->chroma_size.x = 0;
 		plane_size->chroma_size.y = 0;
@@ -885,11 +877,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->chroma_size.height = fb->height / 2;
 
 		plane_size->chroma_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
-#else
 			fb->pitches[1] / fb->format->cpp[1];
-#endif
 
 		address->type = PLN_ADDR_TYPE_VIDEO_PROGRESSIVE;
 		address->video_progressive.luma_addr.low_part =
@@ -1076,11 +1064,7 @@ static void amdgpu_dm_plane_get_min_max_dc_plane_scaling(struct drm_device *dev,
 	/* Caps for all supported planes are the same on DCE and DCN 1 - 3 */
 	struct dc_plane_cap *plane_cap = &dc->caps.planes[0];
 
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-	switch (fb->pixel_format) {
-#else
 	switch (fb->format->format) {
-#endif
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
@@ -1193,12 +1177,7 @@ int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 	 */
 	if (((amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(1, 0, 0)) ||
 	    (amdgpu_ip_version(adev, DCE_HWIP, 0) == IP_VERSION(1, 0, 1))) &&
-        (state->fb &&
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-        state->fb->pixel_format == DRM_FORMAT_NV12 &&
-#else
-        state->fb->format->format == DRM_FORMAT_NV12 &&
-#endif
+		(state->fb && state->fb->format->format == DRM_FORMAT_NV12 &&
 		(scaling_info->src_rect.x != 0 || scaling_info->src_rect.y != 0)))
 		return -EINVAL;
 
@@ -1418,11 +1397,7 @@ void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 	    adev->dm.dc->caps.color.dpp.gamma_corr)
 		attributes.attribute_flags.bits.ENABLE_CURSOR_DEGAMMA = 1;
 
-#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 	attributes.pitch = afb->base.pitches[0] / afb->base.format->cpp[0];
-#else
-	attributes.pitch = afb->base.pitches[0] / (afb->base.bits_per_pixel / 8);
-#endif
 
 	if (crtc_state->stream) {
 		mutex_lock(&adev->dm.dc_lock);
