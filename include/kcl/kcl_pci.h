@@ -107,15 +107,6 @@ static inline enum pcie_link_width kcl_pcie_get_width_cap(struct pci_dev *dev)
 	return pcie_get_width_cap(dev);
 }
 
-#if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
-int _kcl_pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 comp_caps);
-static inline
-int pci_enable_atomic_ops_to_root(struct pci_dev *dev, u32 cap_mask)
-{
-	return _kcl_pci_enable_atomic_ops_to_root(dev, cap_mask);
-}
-#endif
-
 /* Copied from v3.12-rc2-29-gc6bde215acfd include/linux/pci.h */
 #if !defined(HAVE_PCI_UPSTREAM_BRIDGE)
 static inline struct pci_dev *pci_upstream_bridge(struct pci_dev *dev)
