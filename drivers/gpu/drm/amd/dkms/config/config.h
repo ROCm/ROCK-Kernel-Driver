@@ -819,9 +819,6 @@
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 
-/* num_u32_u32 is available */
-#define HAVE_MUL_U32_U32 1
-
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
