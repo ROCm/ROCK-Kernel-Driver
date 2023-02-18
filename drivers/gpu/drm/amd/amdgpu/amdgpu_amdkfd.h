@@ -70,7 +70,11 @@ struct kgd_mem {
 	struct amdgpu_bo *bo;
 	struct kfd_ipc_obj *ipc_obj;
 	struct dma_buf *dmabuf;
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	struct hmm_range *range;
+#else
+	struct page **user_pages;
+#endif
 	struct list_head attachments;
 	/* protected by amdkfd_process_info.lock */
 	struct list_head validate_list;
@@ -82,9 +86,6 @@ struct kgd_mem {
 
 	uint32_t invalid;
 	struct amdkfd_process_info *process_info;
-#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	struct page **user_pages;
-#endif
 
 	struct amdgpu_sync sync;
 
@@ -189,8 +190,12 @@ int kfd_debugfs_kfd_mem_limits(struct seq_file *m, void *data);
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm);
 struct amdgpu_amdkfd_fence *to_amdgpu_amdkfd_fence(struct dma_fence *f);
 int amdgpu_amdkfd_remove_fence_on_pt_pd_bos(struct amdgpu_bo *bo);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 				unsigned long cur_seq, struct kgd_mem *mem);
+#else
+int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
+#endif
 #else
 static inline
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
@@ -211,8 +216,12 @@ int amdgpu_amdkfd_remove_fence_on_pt_pd_bos(struct amdgpu_bo *bo)
 }
 
 static inline
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 				unsigned long cur_seq, struct kgd_mem *mem)
+#else
+int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm)
+#endif
 {
 	return 0;
 }
