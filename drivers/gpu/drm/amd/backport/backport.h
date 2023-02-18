@@ -109,4 +109,5 @@
  */
 #include <drm/drm_damage_helper.h>
 #include <kcl/backport/kcl_drm_probe_helper.h>
+#include <kcl/kcl_rbtree.h>
 #endif /* AMDGPU_BACKPORT_H */
