@@ -1850,21 +1850,21 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 	/* Cleanup user pages and MMU notifiers */
 	if (amdgpu_ttm_tt_get_usermm(mem->bo->tbo.ttm)) {
 		amdgpu_hmm_unregister(mem->bo);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		mutex_lock(&process_info->notifier_lock);
 		amdgpu_ttm_tt_discard_user_pages(mem->bo->tbo.ttm, mem->range);
 		mutex_unlock(&process_info->notifier_lock);
-	}
-
-#ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
-	/* Free user pages if necessary */
-	if (mem->user_pages) {
-		pr_debug("%s: Freeing user_pages array\n", __func__);
-		if (mem->user_pages[0])
-			release_pages(mem->user_pages,
+#else
+		/* Free user pages if necessary */
+		if (mem->user_pages) {
+			pr_debug("%s: Freeing user_pages array\n", __func__);
+			if (mem->user_pages[0])
+				release_pages(mem->user_pages,
 					mem->bo->tbo.ttm->num_pages);
-		kvfree(mem->user_pages);
-	}
+			kvfree(mem->user_pages);
+		}
 #endif
+	}
 
 	ret = reserve_bo_and_cond_vms(mem, NULL, BO_VM_ALL, &ctx);
 	if (unlikely(ret))
@@ -2636,9 +2636,16 @@ unlock_out:
  * restore, where we get updated page addresses. This function only
  * ensures that GPU access to the BO is stopped.
  */
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 				unsigned long cur_seq, struct kgd_mem *mem)
 {
+	struct mm_struct *mm = mni->mm;
+#else
+int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem,
+				struct mm_struct *mm)
+{
+#endif
 	struct amdkfd_process_info *process_info = mem->process_info;
 	int r = 0;
 
@@ -2649,12 +2656,14 @@ int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 		return 0;
 
 	mutex_lock(&process_info->notifier_lock);
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	mmu_interval_set_seq(mni, cur_seq);
+#endif
 
 	mem->invalid++;
 	if (++process_info->evicted_bos == 1) {
 		/* First eviction, stop the queues */
-		r = kgd2kfd_quiesce_mm(mni->mm,
+		r = kgd2kfd_quiesce_mm(mm,
 				       KFD_QUEUE_EVICTION_TRIGGER_USERPTR);
 		if (r)
 			pr_err("Failed to quiesce KFD\n");
@@ -2703,8 +2712,10 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 
 		bo = mem->bo;
 
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		amdgpu_ttm_tt_discard_user_pages(bo->tbo.ttm, mem->range);
 		mem->range = NULL;
+#endif
 
 		/* BO reservations and getting user pages (hmm_range_fault)
 		 * must happen outside the notifier lock
@@ -2868,7 +2879,7 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 
 #else
 		/* Copy pages array and validate the BO if we got user pages */
-		if (mem->user_pages[0]) {
+		if (mem->user_pages && mem->user_pages[0]) {
 			amdgpu_ttm_tt_set_user_pages(bo->tbo.ttm,
 						     mem->user_pages);
 			amdgpu_bo_placement_from_domain(bo, mem->domain);
@@ -2880,12 +2891,12 @@ static int validate_invalid_user_pages(struct amdkfd_process_info *process_info)
 		}
 
 		/* Validate succeeded, now the BO owns the pages, free
-		 * our copy of the pointer array. Put this BO back on
-		 * the userptr_valid_list. If we need to revalidate
-		 * it, we need to start from scratch.
+		 * our copy of the pointer array.
 		 */
-		kvfree(mem->user_pages);
-		mem->user_pages = NULL;
+		if (mem->user_pages) {
+			kvfree(mem->user_pages);
+			mem->user_pages = NULL;
+		}
 #endif
 
 		/* Update mapping. If the BO was not validated
@@ -2937,6 +2948,7 @@ static int confirm_valid_user_pages_locked(struct amdkfd_process_info *process_i
 	list_for_each_entry_safe(mem, tmp_mem,
 				 &process_info->userptr_inval_list,
 				 validate_list.head) {
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		bool valid = amdgpu_ttm_tt_get_user_pages_done(
 				mem->bo->tbo.ttm, mem->range);
 
@@ -2946,6 +2958,7 @@ static int confirm_valid_user_pages_locked(struct amdkfd_process_info *process_i
 			ret = -EAGAIN;
 			continue;
 		}
+#endif
 		WARN(mem->invalid, "Valid BO is marked invalid");
 
 		list_move_tail(&mem->validate_list.head,
