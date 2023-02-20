@@ -374,9 +374,6 @@ struct amdgpu_mode_info {
 	int			disp_priority;
 	const struct amdgpu_display_funcs *funcs;
 	const enum drm_plane_type *plane_type;
-#ifndef HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND
-	struct drm_atomic_state *suspend_state;
-#endif
 };
 
 #define AMDGPU_MAX_BL_LEVEL 0xFF
