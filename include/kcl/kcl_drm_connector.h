@@ -93,16 +93,6 @@ bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_sta
 int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *connector);
 #endif
 
-#ifndef HAVE_DRM_PANEL_ORIENTATION_ENUM
-enum drm_panel_orientation {
-        DRM_MODE_PANEL_ORIENTATION_UNKNOWN = -1,
-        DRM_MODE_PANEL_ORIENTATION_NORMAL = 0,
-        DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP,
-        DRM_MODE_PANEL_ORIENTATION_LEFT_UP,
-        DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
-};
-#endif
-
 #ifndef HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK
 int _kcl_drm_connector_set_panel_orientation_with_quirk(
         struct drm_connector *connector,
