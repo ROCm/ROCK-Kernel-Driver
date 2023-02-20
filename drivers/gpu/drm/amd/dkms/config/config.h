@@ -482,9 +482,6 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
-/* drm_plane_get_damage_clips_count function is available */
-#define HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT 1
-
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
