@@ -599,9 +599,6 @@
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
 
-/* kv[mz]alloc() are available */
-#define HAVE_KVZALLOC_KVMALLOC 1
-
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
 

@@ -38,24 +38,6 @@ static inline bool fault_flag_allow_retry_first(unsigned int flags)
 }
 #endif
 
-#ifndef HAVE_KVZALLOC_KVMALLOC
-/* Copied from v4.11-10655-ga7c3e901a46f ipc/util.c */
-static inline void *kvmalloc(size_t size, gfp_t flags)
-{
-	void *out;
-
-	if (size > PAGE_SIZE)
-		out = __vmalloc(size, flags, PAGE_KERNEL);
-	else
-		out = kmalloc(size, flags);
-	return out;
-}
-static inline void *kvzalloc(size_t size, gfp_t flags)
-{
-	return kvmalloc(size, flags | __GFP_ZERO);
-}
-#endif /* HAVE_KVZALLOC_KVMALLOC */
-
 #if !defined(HAVE_MEMALLOC_NOFS_SAVE)
 static inline unsigned int memalloc_nofs_save(void)
 {
