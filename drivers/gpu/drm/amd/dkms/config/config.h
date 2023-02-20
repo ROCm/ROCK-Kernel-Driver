@@ -464,12 +464,6 @@
 /* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
 
-/* whether drm_mm_insert_mode is available */
-#define HAVE_DRM_MM_INSERT_MODE 1
-
-/* drm_mm_insert_node has three parameters */
-#define HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS 1
-
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
 
