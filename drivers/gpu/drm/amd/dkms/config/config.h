@@ -564,9 +564,6 @@
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
 
-/* Variable refresh rate(vrr) is supported */
-#define HAVE_DRM_VRR_SUPPORTED 1
-
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
 
