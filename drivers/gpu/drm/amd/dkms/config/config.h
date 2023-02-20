@@ -485,10 +485,6 @@
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
-/* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
-   available */
-#define HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE 1
-
 /* drm_plane_create_color_properties is available */
 #define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
 
