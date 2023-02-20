@@ -85,12 +85,7 @@ int _kcl_drm_connector_set_panel_orientation_with_quirk(
         enum drm_panel_orientation panel_orientation,
         int width, int height)
 {
-#ifdef HAVE_DRM_PANEL_ORIENTATION_ENUM
 	return drm_connector_init_panel_orientation_property(connector, width, height);
-#else
-	pr_warn_once("this function is not implemented in this legacy kernel");
-	return 0;
-#endif
 }
 EXPORT_SYMBOL(_kcl_drm_connector_set_panel_orientation_with_quirk);
 #endif
