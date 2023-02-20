@@ -599,9 +599,6 @@
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
 
-/* kvmalloc_array() is available */
-#define HAVE_KVMALLOC_ARRAY 1
-
 /* kv[mz]alloc() are available */
 #define HAVE_KVZALLOC_KVMALLOC 1
 
