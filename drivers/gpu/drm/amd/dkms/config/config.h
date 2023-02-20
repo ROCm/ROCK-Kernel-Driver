@@ -599,12 +599,6 @@
 /* drm_gen_fb_init_with_funcs() is available */
 #define HAVE_DRM_GEN_FB_INIT_WITH_FUNCS 1
 
-/* drm_get_format_info() is available */
-#define HAVE_DRM_GET_FORMAT_INFO 1
-
-/* drm_get_format_name() has i,p interface */
-/* #undef HAVE_DRM_GET_FORMAT_NAME_I_P */
-
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
