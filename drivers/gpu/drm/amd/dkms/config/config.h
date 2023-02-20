@@ -476,9 +476,6 @@
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 
-/* drm_mode_is_420_xxx() is available */
-#define HAVE_DRM_MODE_IS_420_XXX 1
-
 /* drm_mode_init() is available */
 #define HAVE_DRM_MODE_INTT 1
 

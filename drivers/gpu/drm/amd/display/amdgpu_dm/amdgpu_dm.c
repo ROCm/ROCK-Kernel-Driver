@@ -5441,7 +5441,6 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 	/* Assume 8 bpc by default if no bpc is specified. */
 	bpc = bpc ? bpc : 8;
 
-#ifdef HAVE_DRM_MODE_IS_420_XXX
 	if (is_y420) {
 		bpc = 8;
 
@@ -5453,7 +5452,6 @@ convert_color_depth_from_display_info(const struct drm_connector *connector,
 		else if (connector->display_info.hdmi.y420_dc_modes & DRM_EDID_YCBCR420_DC_30)
 			bpc = 10;
 	}
-#endif
 
 	if (requested_bpc > 0) {
 		/*
