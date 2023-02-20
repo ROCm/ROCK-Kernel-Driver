@@ -55,13 +55,4 @@ static inline u32 drm_plane_mask(const struct drm_plane *plane)
 }
 #endif
 
-#ifndef HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT
-static inline unsigned int
-drm_plane_get_damage_clips_count(const struct drm_plane_state *state)
-{
-	pr_warn_once("%s:This function does not implemented. Return 0 instead\n", __func__);
-	return 0;
-}
-#endif /* HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT */
-
 #endif
