@@ -503,15 +503,6 @@
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
-/* drm_universal_plane_init() wants 7 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_7ARGS */
-
-/* drm_universal_plane_init() wants 8 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_8ARGS */
-
-/* drm_universal_plane_init() wants 9 args */
-#define HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS 1
-
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
