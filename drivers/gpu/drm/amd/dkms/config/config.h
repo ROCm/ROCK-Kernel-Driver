@@ -449,9 +449,6 @@
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,p interface */
 #define HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P 1
 
-/* drm_hdmi_vendor_infoframe_from_display_mode() has p,p,p interface */
-#define HAVE_DRM_HDMI_VENDOR_INFOFRAME_FROM_DISPLAY_MODE_P_P_P 1
-
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
