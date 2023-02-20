@@ -101,7 +101,6 @@ TRACE_EVENT(amdgpu_dc_performance,
 			(unsigned long)__entry->writes)
 );
 
-#ifdef HAVE_DRM_VRR_SUPPORTED
 TRACE_EVENT(amdgpu_dm_connector_atomic_check,
 	    TP_PROTO(const struct drm_connector_state *state),
 	    TP_ARGS(state),
@@ -444,7 +443,6 @@ TRACE_EVENT(amdgpu_dm_atomic_check_finish,
 		      __entry->state, __entry->res,
 		      __entry->async_update, __entry->allow_modeset)
 );
-#endif
 
 TRACE_EVENT(amdgpu_dm_dc_pipe_state,
 	    TP_PROTO(int pipe_idx, const struct dc_plane_state *plane_state,

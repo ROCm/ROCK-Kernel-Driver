@@ -244,9 +244,6 @@ static struct drm_crtc_state *dm_crtc_duplicate_state(struct drm_crtc *crtc)
 	}
 
 	state->active_planes = cur->active_planes;
-#ifndef HAVE_DRM_VRR_SUPPORTED
-	state->base_vrr_enabled = cur->base_vrr_enabled;
-#endif
 	state->vrr_infopacket = cur->vrr_infopacket;
 	state->abm_level = cur->abm_level;
 	state->vrr_supported = cur->vrr_supported;
@@ -289,51 +286,12 @@ static int amdgpu_dm_crtc_late_register(struct drm_crtc *crtc)
 }
 #endif
 
-#ifndef HAVE_DRM_VRR_SUPPORTED
-static int dm_crtc_funcs_atomic_set_property(
-	struct drm_crtc *crtc,
-	struct drm_crtc_state *crtc_state,
-	struct drm_property *property,
-	uint64_t val)
-{
-	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = drm_to_adev(dev);
-	struct dm_crtc_state *dm_state = to_dm_crtc_state(crtc_state);
-	if (property == adev->mode_info.vrr_enabled_property) {
-		dm_state->base_vrr_enabled = val;
-	}
-
-	return 0;
-}
-
-static int dm_crtc_funcs_atomic_get_property(struct drm_crtc *crtc,
-	const struct drm_crtc_state *state,
-	struct drm_property *property,
-	uint64_t *val)
-{
-	struct drm_device *dev = crtc->dev;
-	struct amdgpu_device *adev = drm_to_adev(dev);
-	struct dm_crtc_state *dm_state = to_dm_crtc_state(state);
-
-	if (property == adev->mode_info.vrr_enabled_property) {
-		*val = dm_state->base_vrr_enabled;
-		return 0;
-	}
-
-	return -EINVAL;
-}
-#endif
-
 /* Implemented only the options currently available for the driver */
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
     .gamma_set = drm_atomic_helper_legacy_gamma_set,
-#endif
-#ifndef HAVE_DRM_VRR_SUPPORTED
-	.atomic_set_property = dm_crtc_funcs_atomic_set_property,
-	.atomic_get_property = dm_crtc_funcs_atomic_get_property,
 #endif
 	.set_config = drm_atomic_helper_set_config,
 	.page_flip = drm_atomic_helper_page_flip,
@@ -496,12 +454,6 @@ int amdgpu_dm_crtc_init(struct amdgpu_display_manager *dm,
 
 	if (res)
 		goto fail;
-
-#ifndef HAVE_DRM_VRR_SUPPORTED
-	drm_object_attach_property(&acrtc->base.base,
-				   dm->adev->mode_info.vrr_enabled_property,
-				   0);
-#endif
 
 	drm_crtc_helper_add(&acrtc->base, &amdgpu_dm_crtc_helper_funcs);
 

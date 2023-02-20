@@ -506,9 +506,6 @@
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
-/* Variable refresh rate(vrr) is supported */
-#define HAVE_DRM_VRR_SUPPORTED 1
-
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
 
