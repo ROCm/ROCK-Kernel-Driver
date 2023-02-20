@@ -25,19 +25,6 @@
 #include <kcl/kcl_drm_fb.h>
 #include <drm/drm_fb_helper.h>
 
-#ifndef HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV
-static inline
-void _kcl_drm_helper_mode_fill_fb_struct(struct drm_device *dev,
-				    struct drm_framebuffer *fb,
-				    const struct drm_mode_fb_cmd2 *mode_cmd)
-{
-	fb->dev = dev;
-	drm_helper_mode_fill_fb_struct(fb, mode_cmd);
-}
-
-#define drm_helper_mode_fill_fb_struct _kcl_drm_helper_mode_fill_fb_struct
-#endif
-
 #if defined(HAVE_DRM_FBDEV_GENERIC_SETUP)
 #define AMDKCL_DRM_FBDEV_GENERIC
 #endif
