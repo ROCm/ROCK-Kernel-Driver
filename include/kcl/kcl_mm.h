@@ -38,17 +38,6 @@ static inline bool fault_flag_allow_retry_first(unsigned int flags)
 }
 #endif
 
-#ifndef HAVE_KVFREE
-/* Copied from mm/util.c */
-static inline void kvfree(const void *addr)
-{
-	if (is_vmalloc_addr(addr))
-		vfree(addr);
-	else
-		kfree(addr);
-}
-#endif
-
 #ifndef HAVE_KVZALLOC_KVMALLOC
 /* Copied from v4.11-10655-ga7c3e901a46f ipc/util.c */
 static inline void *kvmalloc(size_t size, gfp_t flags)
