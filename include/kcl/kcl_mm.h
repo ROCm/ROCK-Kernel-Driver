@@ -78,14 +78,6 @@ static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 }
 #endif /* HAVE_KVMALLOC_ARRAY */
 
-#ifndef HAVE_KVCALLOC
-/* Copied from v4.17-10379-g1c542f38ab8d include/linux/mm.h */
-static inline void *kvcalloc(size_t n, size_t size, gfp_t flags)
-{
-	return kvmalloc_array(n, size, flags | __GFP_ZERO);
-}
-#endif /* HAVE_KVCALLOC */
-
 #if !defined(HAVE_MEMALLOC_NOFS_SAVE)
 static inline unsigned int memalloc_nofs_save(void)
 {
