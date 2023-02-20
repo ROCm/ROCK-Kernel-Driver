@@ -9,7 +9,6 @@
 
 #if !defined(HAVE_STRUCT_DMA_FENCE_CHAIN)
 
-#include <kcl/kcl_kref.h>
 #include <kcl/kcl_fence.h>
 #include <kcl/kcl_dma_fence_chain.h>
 

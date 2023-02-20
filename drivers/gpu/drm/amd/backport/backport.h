@@ -7,7 +7,6 @@
 #include <kcl/kcl_moduleparam.h>
 #include <kcl/kcl_types.h>
 #include <kcl/kcl_idr.h>
-#include <kcl/kcl_kref.h>
 #include <kcl/kcl_kernel.h>
 #include <kcl/kcl_compiler_attributes.h>
 #include <kcl/kcl_dma_mapping.h>
