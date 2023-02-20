@@ -9894,7 +9894,6 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		if (old_other_state->rotation != new_other_state->rotation)
 			return true;
 
-#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 		/* Blending updates. */
 		if (old_other_state->pixel_blend_mode !=
 		    new_other_state->pixel_blend_mode)
@@ -9903,7 +9902,6 @@ static bool should_reset_plane(struct drm_atomic_state *state,
 		/* Alpha updates. */
 		if (old_other_state->alpha != new_other_state->alpha)
 			return true;
-#endif
 
 #ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 		/* Colorspace changes. */
