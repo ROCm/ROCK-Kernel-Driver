@@ -24,7 +24,6 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_connector.h>
-#include <kcl/kcl_kref.h>
 #include <kcl/kcl_drm_crtc.h>
 
 /*
