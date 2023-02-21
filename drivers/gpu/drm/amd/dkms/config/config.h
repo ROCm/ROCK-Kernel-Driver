@@ -638,9 +638,6 @@
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
 
-/* Define to 1 if you have the <linux/overflow.h> header file. */
-#define HAVE_LINUX_OVERFLOW_H 1
-
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1
 
