@@ -1,9 +1,6 @@
 AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 
 	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/sched/mm.h])
-
-	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/sched/task.h])
 
 	dnl #
