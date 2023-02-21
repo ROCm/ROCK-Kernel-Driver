@@ -50,7 +50,6 @@
 #include <kcl/backport/kcl_fence_backport.h>
 #include <kcl/backport/kcl_ww_mutex.h>
 #include <kcl/kcl_seqlock.h>
-#include <kcl/kcl_overflow.h>
 #include <kcl/kcl_dma_fence.h>
 
 struct dma_resv_list;
