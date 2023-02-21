@@ -13,7 +13,6 @@
 
 #include <linux/gfp.h>
 #include <linux/slab.h>
-#include <kcl/kcl_overflow.h>
 
 #ifndef HAVE_KREALLOC_ARRAY
 /**
