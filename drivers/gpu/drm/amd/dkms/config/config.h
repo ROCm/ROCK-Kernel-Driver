@@ -23,6 +23,9 @@
 /* acpi_video_register_backlight() is available */
 #define HAVE_ACPI_VIDEO_REGISTER_BACKLIGHT 1
 
+/* acpi_video_report_nolcd() is available */
+#define HAVE_ACPI_VIDEO_REPORT_NOLCD 1
+
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
@@ -597,11 +600,14 @@
 #define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
 
 /* drm_fbdev_generic_setup() is available */
-#define HAVE_DRM_FBDEV_GENERIC_SETUP 1
+/* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
 
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
+
+/* drm_fb_helper_alloc_info() is available */
+#define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
 
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
@@ -617,6 +623,9 @@
 
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
+
+/* drm_fb_helper_unregister_info() is available */
+#define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
 
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
@@ -701,6 +710,9 @@
 
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
+
+/* drm_mode_config->fb_base is available */
+/* #undef HAVE_DRM_MODE_CONFIG_FB_BASE */
 
 /* drm_mode_config->fb_modifiers_not_supported is available */
 #define HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED 1
@@ -1108,6 +1120,12 @@
 /* pxm_to_node() is available */
 #define HAVE_PXM_TO_NODE 1
 
+/* rb_add_cached is available */
+#define HAVE_RB_ADD_CACHED 1
+
+/* struct rb_root_cached is available */
+#define HAVE_RB_ROOT_CACHED 1
+
 /* whether register_shrinker(x, x) is available */
 #define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
 
@@ -1383,7 +1401,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 5.19.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.1.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1392,7 +1410,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.19.0"
+#define PACKAGE_VERSION "6.1.0"
 
 #include "config-amd-chips.h"
 
