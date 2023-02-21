@@ -13,12 +13,6 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([linux/sched/signal.h])
 
 	dnl #
-	dnl #  commit v4.15-28-gf3804203306e
-	dnl #  array_index_nospec: Sanitize speculative array de-references
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/nospec.h])
-
-	dnl #
 	dnl # commit 8bd9cb51daac89337295b6f037b0486911e1b408
 	dnl # locking/atomics, asm-generic: Move some macros from <linux/bitops.h>
 	dnl # to a new <linux/bits.h> file
