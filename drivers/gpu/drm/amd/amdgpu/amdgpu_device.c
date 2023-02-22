@@ -4082,7 +4082,11 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		goto unmap_memory;
 
 	/* Get rid of things like offb */
+#ifdef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
 	r = drm_aperture_remove_conflicting_pci_framebuffers(adev->pdev, &amdgpu_kms_driver);
+#else
+	r = drm_aperture_remove_conflicting_pci_framebuffers(pdev, "amdgpudrmfb");
+#endif
 	if (r)
 		goto unmap_memory;
 
