@@ -1700,7 +1700,6 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 						  stime, etime, mode);
 }
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 static bool
 amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 {
@@ -1715,7 +1714,6 @@ amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 
 	return true;
 }
-#endif
 
 int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 {
@@ -1757,16 +1755,7 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 			continue;
 
 		robj = gem_to_amdgpu_bo(drm_gem_fb_get_obj(fb, 0));
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-		/* don't unpin kernel fb objects */
-		if (!amdgpu_fbdev_robj_is_fb(adev, robj)) {
-			r = amdgpu_bo_reserve(robj, true);
-			if (r == 0) {
-				amdgpu_bo_unpin(robj);
-				amdgpu_bo_unreserve(robj);
-			}
-		}
-#else
+
 		if (!amdgpu_display_robj_is_fb(adev, robj)) {
 			r = amdgpu_bo_reserve(robj, true);
 			if (r == 0) {
@@ -1774,7 +1763,6 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 				amdgpu_bo_unreserve(robj);
 			}
 		}
-#endif
 	}
 	return 0;
 }
