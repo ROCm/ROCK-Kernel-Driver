@@ -207,11 +207,8 @@ ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
 export CONFIG_DRM_AMD_DC_DCN=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
 
-ifeq ($(filter y,$(call _is_kcl_macro_defined,HAVE_DRM_DISPLAY_DRM_DSC_H) \
-	$(call _is_kcl_macro_defined,HAVE_DRM_DRM_DSC_H)), y)
 export CONFIG_DRM_AMD_DC_DSC_SUPPORT=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DSC_SUPPORT
-endif
 endif
 endif
 
