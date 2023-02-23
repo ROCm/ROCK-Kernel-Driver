@@ -544,9 +544,6 @@
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
-/* drm_fbdev_generic_setup() is available */
-/* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
-
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
