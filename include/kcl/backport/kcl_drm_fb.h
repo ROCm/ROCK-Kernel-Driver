@@ -25,8 +25,4 @@
 #include <kcl/kcl_drm_fb.h>
 #include <drm/drm_fb_helper.h>
 
-#if defined(HAVE_DRM_FBDEV_GENERIC_SETUP)
-#define AMDKCL_DRM_FBDEV_GENERIC
-#endif
-
 #endif
