@@ -4362,9 +4362,6 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-	amdgpu_fbdev_init(adev);
-#endif
 	/*
 	 * Register gpu instance before amdgpu_device_enable_mgpu_fan_boost.
 	 * Otherwise the mgpu fan boost feature will be skipped due to the
@@ -4553,9 +4550,6 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 
 	amdgpu_reg_state_sysfs_fini(adev);
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-	amdgpu_fbdev_fini(adev);
-#endif
 	/* disable ras feature must before hw fini */
 	amdgpu_ras_pre_fini(adev);
 
@@ -4738,11 +4732,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 		DRM_WARN("smart shift update failed\n");
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
-#else
-		amdgpu_fbdev_set_suspend(adev, 1);
-#endif
 
 	cancel_delayed_work_sync(&adev->delayed_init_work);
 
@@ -4840,11 +4830,7 @@ exit:
 	flush_delayed_work(&adev->delayed_init_work);
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, false);
-#else
-		amdgpu_fbdev_set_suspend(adev, 0);
-#endif
 
 	amdgpu_ras_resume(adev);
 
@@ -5534,11 +5520,7 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 				if (r)
 					goto out;
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 				drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, false);
-#else
-				amdgpu_fbdev_set_suspend(tmp_adev, 0);
-#endif
 
 				/*
 				 * The GPU enters bad state once faulty pages
@@ -5826,11 +5808,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		 */
 		amdgpu_unregister_gpu_instance(tmp_adev);
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, true);
-#else
-		amdgpu_fbdev_set_suspend(tmp_adev, 1);
-#endif
 
 		/* disable ras on ALL IPs */
 		if (!need_emergency_restart &&
