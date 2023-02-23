@@ -434,9 +434,6 @@
  /* drm_gem_plane_helper_prepare_fb() is available */
  #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
 
-/* drm_gem_map_attach() wants 2 arguments */
-/* #undef HAVE_DRM_GEM_MAP_ATTACH_2ARGS */
-
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
 
