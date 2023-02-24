@@ -61,9 +61,7 @@
 			dm_write_reg(CTX, AUX_REG(reg_name), val)
 
 static const struct link_encoder_funcs dcn321_link_enc_funcs = {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.read_state = link_enc2_read_state,
-#endif
 	.validate_output_with_stream =
 			dcn30_link_encoder_validate_output_with_stream,
 	.hw_init = enc32_hw_init,

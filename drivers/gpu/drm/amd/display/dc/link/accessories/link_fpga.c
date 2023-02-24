@@ -53,12 +53,10 @@ void dp_fpga_hpo_enable_link_and_stream(struct dc_state *state, struct pipe_ctx 
 	/* Enable DP_STREAM_ENC */
 	dc->hwss.enable_stream(pipe_ctx);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Set DPS PPS SDP (AKA "info frames") */
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		link_set_dsc_pps_packet(pipe_ctx, true, true);
 	}
-#endif
 
 	/* Allocate Payload */
 	if ((stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST) && (state->stream_count > 1)) {

@@ -145,10 +145,8 @@ void dcn32_merge_pipes_for_subvp(struct dc *dc,
 			pipe->stream = NULL;
 			pipe->top_pipe = NULL;
 			pipe->prev_odm_pipe = NULL;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (pipe->stream_res.dsc)
 				dcn20_release_dsc(&context->res_ctx, dc->res_pool, &pipe->stream_res.dsc);
-#endif
 			memset(&pipe->plane_res, 0, sizeof(pipe->plane_res));
 			memset(&pipe->stream_res, 0, sizeof(pipe->stream_res));
 		} else if (pipe->top_pipe && pipe->top_pipe->plane_state == pipe->plane_state) {

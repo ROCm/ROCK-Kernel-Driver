@@ -130,9 +130,7 @@ struct crc_params {
 
 	enum crc_selection selection;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	uint8_t dsc_mode;
-#endif
 	uint8_t odm_mode;
 
 	bool continuous_mode;
