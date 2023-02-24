@@ -534,6 +534,8 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 
 	bp.type = ttm_bo_type_kernel;
 	bp.no_wait_gpu = immediate;
+	bp.mem_id_plus1 = vm->mem_id + 1;
+
 	if (vm->root.bo)
 		bp.resv = amdkcl_ttm_resvp(&vm->root.bo->tbo);
 
@@ -558,6 +560,7 @@ int amdgpu_vm_pt_create(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	bp.type = ttm_bo_type_kernel;
 	bp.resv = amdkcl_ttm_resvp(&bo->tbo);
 	bp.bo_ptr_size = sizeof(struct amdgpu_bo);
+	bp.mem_id_plus1 = vm->mem_id + 1;
 
 	r = amdgpu_bo_create(adev, &bp, &(*vmbo)->shadow);
 
