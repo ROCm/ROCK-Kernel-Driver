@@ -768,11 +768,9 @@ struct dc_debug_options {
 	bool disable_dfs_bypass;
 	bool disable_dpp_power_gate;
 	bool disable_hubp_power_gate;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_dsc_power_gate;
 	int dsc_min_slice_height_override;
 	int dsc_bpp_increment_div;
-#endif
 	bool disable_pplib_wm_range;
 	enum wm_report_mode pplib_wm_report_mode;
 	unsigned int min_disp_clk_khz;
@@ -2134,7 +2132,6 @@ struct dc_container_id {
 };
 
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct dc_sink_dsc_caps {
 	// 'true' if these are virtual DPCD's DSC caps (immediately upstream of sink in MST topology),
 	// 'false' if they are sink's DSC caps
@@ -2146,7 +2143,6 @@ struct dc_sink_dsc_caps {
 #endif
 	struct dsc_dec_dpcd_caps dsc_dec_caps;
 };
-#endif
 
 struct dc_sink_fec_caps {
 	bool is_rx_fec_supported;
@@ -2172,10 +2168,8 @@ struct dc_sink {
 	bool converter_disable_audio;
 
 	struct scdc_caps scdc_caps;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dc_sink_dsc_caps dsc_caps;
 	struct dc_sink_fec_caps fec_caps;
-#endif
 
 	bool is_vsc_sdp_colorimetry_supported;
 
@@ -2296,10 +2290,8 @@ void dc_process_dmub_dpia_hpd_int_enable(const struct dc *dc,
 
 void dc_print_dmub_diagnostic_data(const struct dc *dc);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* DSC Interfaces */
 #include "dc_dsc.h"
-#endif
 
 /* Disable acc mode Interfaces */
 void dc_disable_accelerated_mode(struct dc *dc);

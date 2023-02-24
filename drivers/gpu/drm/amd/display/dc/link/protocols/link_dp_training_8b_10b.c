@@ -115,9 +115,7 @@ void decide_8b_10b_training_settings(
 	lt_settings->pattern_for_cr = decide_cr_training_pattern(link_setting);
 	lt_settings->pattern_for_eq = decide_eq_training_pattern(link, link_setting);
 	lt_settings->enhanced_framing = 1;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	lt_settings->should_set_fec_ready = true;
-#endif
 	lt_settings->disallow_per_lane_settings = true;
 	lt_settings->always_match_dpcd_with_hw_lane_settings = true;
 	lt_settings->lttpr_mode = dp_decide_8b_10b_lttpr_mode(link);

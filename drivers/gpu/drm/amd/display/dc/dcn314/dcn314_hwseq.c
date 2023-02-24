@@ -234,7 +234,6 @@ void dcn314_update_odm(struct dc *dc, struct dc_state *context, struct pipe_ctx 
 	}
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn314_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -305,7 +304,6 @@ void dcn314_dsc_pg_control(
 	}
 
 }
-#endif
 
 void dcn314_enable_power_gating_plane(struct dce_hwseq *hws, bool enable)
 {
@@ -326,10 +324,8 @@ void dcn314_enable_power_gating_plane(struct dce_hwseq *hws, bool enable)
 	REG_UPDATE(DOMAIN3_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
 
 	force_on = true; /* disable power gating */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (enable && !hws->ctx->dc->debug.disable_dsc_power_gate)
 		force_on = false;
-#endif
 
 	/* DCS0/1/2/3/4 */
 	REG_UPDATE(DOMAIN16_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
