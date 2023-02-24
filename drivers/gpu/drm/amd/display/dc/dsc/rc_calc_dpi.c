@@ -1,4 +1,3 @@
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /*
  * Copyright 2012-17 Advanced Micro Devices, Inc.
  *
@@ -123,4 +122,3 @@ int dscc_compute_dsc_parameters(const struct drm_dsc_config *pps,
 	dsc_params->rc_buffer_model_size = dsc_cfg.rc_bits;
 	return ret;
 }
-#endif

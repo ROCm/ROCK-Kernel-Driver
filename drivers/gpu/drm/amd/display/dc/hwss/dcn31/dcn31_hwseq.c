@@ -278,7 +278,6 @@ void dcn31_init_hw(struct dc *dc)
 	dc->caps.dmub_caps.mclk_sw = dc->ctx->dmub_srv->dmub->feature_caps.fw_assisted_mclk_switch;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn31_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -341,7 +340,6 @@ void dcn31_dsc_pg_control(
 	}
 
 }
-#endif
 
 
 void dcn31_enable_power_gating_plane(
@@ -365,10 +363,8 @@ void dcn31_enable_power_gating_plane(
 	REG_UPDATE(DOMAIN3_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
 
 	force_on = true; /* disable power gating */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (enable && !hws->ctx->dc->debug.disable_dsc_power_gate)
 		force_on = false;
-#endif
 
 	/* DCS0/1/2/3/4/5 */
 	REG_UPDATE(DOMAIN16_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
@@ -523,11 +519,9 @@ static void dcn31_reset_back_end_for_pipe(
 
 	dc->hwss.set_abm_immediate_disable(pipe_ctx);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	pipe_ctx->stream_res.tg->funcs->set_dsc_config(
 			pipe_ctx->stream_res.tg,
 			OPTC_DSC_DISABLED, 0, 0);
-#endif
 	pipe_ctx->stream_res.tg->funcs->disable_crtc(pipe_ctx->stream_res.tg);
 	pipe_ctx->stream_res.tg->funcs->enable_optc_clock(pipe_ctx->stream_res.tg, false);
 	if (pipe_ctx->stream_res.tg->funcs->set_odm_bypass)
