@@ -425,7 +425,6 @@ static enum dc_link_rate get_lttpr_max_link_rate(struct dc_link *link)
 	return lttpr_max_link_rate;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static enum dc_link_rate get_cable_max_link_rate(struct dc_link *link)
 {
 	enum dc_link_rate cable_max_link_rate = LINK_RATE_UNKNOWN;
@@ -445,7 +444,6 @@ static enum dc_link_rate get_cable_max_link_rate(struct dc_link *link)
 
 	return cable_max_link_rate;
 }
-#endif
 
 static inline bool reached_minimum_lane_count(enum dc_lane_count lane_count)
 {
@@ -778,7 +776,7 @@ bool edp_decide_link_settings(struct dc_link *link,
 	return false;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+
 bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		uint32_t req_bw,
@@ -919,7 +917,6 @@ bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 	}
 	return false;
 }
-#endif
 
 static bool decide_mst_link_settings(const struct dc_link *link, struct dc_link_settings *link_setting)
 {
@@ -1837,7 +1834,6 @@ static bool retrieve_link_cap(struct dc_link *link)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	memset(&link->dpcd_caps.dsc_caps, '\0',
 			sizeof(link->dpcd_caps.dsc_caps));
 	memset(&link->dpcd_caps.fec_cap, '\0', sizeof(link->dpcd_caps.fec_cap));
@@ -1899,7 +1895,6 @@ static bool retrieve_link_cap(struct dc_link *link)
 		} else
 			link->wa_flags.dpia_forced_tbt3_mode = false;
 	}
-#endif
 
 	if (!dpcd_read_sink_ext_caps(link))
 		link->dpcd_sink_ext_caps.raw = 0;
@@ -2095,9 +2090,7 @@ struct dc_link_settings dp_get_max_link_cap(struct dc_link *link)
 {
 	struct dc_link_settings max_link_cap = {0};
 	enum dc_link_rate lttpr_max_link_rate;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	enum dc_link_rate cable_max_link_rate;
-#endif
 	struct link_encoder *link_enc = NULL;
 	bool is_uhbr13_5_supported = true;
 

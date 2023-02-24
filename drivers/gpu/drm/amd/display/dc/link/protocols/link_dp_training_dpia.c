@@ -104,9 +104,7 @@ static enum link_training_result dpia_configure_link(
 		struct link_training_settings *lt_settings)
 {
 	enum dc_status status;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool fec_enable;
-#endif
 
 	DC_LOG_HW_LINK_TRAINING("%s\n DPIA(%d) configuring\n - LTTPR mode(%d)\n",
 		__func__,
@@ -134,7 +132,6 @@ static enum link_training_result dpia_configure_link(
 	if (status != DC_OK && link->is_hpd_pending)
 		return LINK_TRAINING_ABORT;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (link->preferred_training_settings.fec_enable != NULL)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
@@ -142,7 +139,6 @@ static enum link_training_result dpia_configure_link(
 	status = dp_set_fec_ready(link, link_res, fec_enable);
 	if (status != DC_OK && link->is_hpd_pending)
 		return LINK_TRAINING_ABORT;
-#endif
 
 	return LINK_TRAINING_SUCCESS;
 }

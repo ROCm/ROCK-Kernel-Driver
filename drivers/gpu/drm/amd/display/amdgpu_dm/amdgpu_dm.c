@@ -7359,10 +7359,8 @@ create_validate_stream_for_sink(struct amdgpu_dm_connector *aconnector,
 			return stream;
 
 		dc_result = dc_validate_stream(adev->dm.dc, stream);
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_result == DC_OK && stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST)
 			dc_result = dm_dp_mst_is_port_support_mode(aconnector, stream);
-#endif
 
 		if (dc_result == DC_OK)
 			dc_result = dm_validate_stream_and_context(adev->dm.dc, stream);
@@ -7705,7 +7703,6 @@ const struct drm_encoder_helper_funcs amdgpu_dm_encoder_helper_funcs = {
 	.atomic_check = dm_encoder_helper_atomic_check
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 					    struct dc_state *dc_state,
@@ -7791,7 +7788,6 @@ static int dm_update_mst_vcpi_slots_for_dsc(struct drm_atomic_state *state,
 	}
 	return 0;
 }
-#endif
 #endif
 
 static int to_drm_connector_type(enum signal_type st)
@@ -11451,11 +11447,9 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	bool lock_and_validation_needed = false;
 	bool is_top_most_overlay = true;
 	struct dm_crtc_state *dm_old_crtc_state, *dm_new_crtc_state;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct drm_dp_mst_topology_mgr *mgr;
 	struct drm_dp_mst_topology_state *mst_state;
 	struct dsc_mst_fairness_vars vars[MAX_PIPES] = {0};
-#endif
 	trace_amdgpu_dm_atomic_check_begin(state);
 
 	ret = drm_atomic_helper_check_modeset(dev, state);
@@ -11778,7 +11772,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		lock_and_validation_needed = true;
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS
 	/* set the slot info for each mst_state based on the link encoding format */
 	for_each_new_mst_mgr_in_state(state, mgr, mst_state, i) {
@@ -11803,8 +11796,6 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		}
 		drm_connector_list_iter_end(&iter);
 	}
-#endif
-#endif
 #endif
 	/**
 	 * Streams and planes are reset when there are changes that affect

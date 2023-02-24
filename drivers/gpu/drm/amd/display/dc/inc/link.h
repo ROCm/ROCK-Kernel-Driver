@@ -164,7 +164,6 @@ struct link_service {
 	bool (*set_dsc_enable)(struct pipe_ctx *pipe_ctx, bool enable);
 	bool (*update_dsc_config)(struct pipe_ctx *pipe_ctx);
 
-
 	/*************************** DDC **************************************/
 	struct ddc_service *(*create_ddc_service)(
 			struct ddc_service_init_data *ddc_init_data);
@@ -223,9 +222,9 @@ struct link_service {
 		const struct link_resource *link_res,
 		struct link_training_settings *lt_settings);
 	void (*dpcd_write_rx_power_ctrl)(struct dc_link *link, bool on);
+ 
 
-
-	/*************************** DP IRQ Handler ***************************/
+        /*************************** DP IRQ Handler ***************************/
 	bool (*dp_parse_link_loss_status)(
 		struct dc_link *link,
 		union hpd_irq_data *hpd_irq_dpcd_data);

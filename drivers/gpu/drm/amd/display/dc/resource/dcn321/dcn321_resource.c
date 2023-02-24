@@ -445,7 +445,6 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
-
 static struct dcn30_mpc_registers mpc_regs;
 #define dcn_mpc_regs_init()\
 	MPC_REG_LIST_DCN3_2_RI(0),\
@@ -1374,7 +1373,6 @@ static void dcn321_resource_destruct(struct dcn321_resource_pool *pool)
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
-
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
 		pool->base.mpc = NULL;
