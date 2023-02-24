@@ -885,7 +885,7 @@ retry:
 		hmm_range->notifier_seq = mmu_interval_read_begin(notifier);
 		r = hmm_range_fault(hmm_range);
 #ifndef HAVE_HMM_DROP_CUSTOMIZABLE_PFN_FORMAT
-		if (unlikely(r)) {
+		if (unlikely(r<=0)) {
 #else
 		if (unlikely(r)) {
 #endif
