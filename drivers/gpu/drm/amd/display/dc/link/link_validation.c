@@ -135,14 +135,9 @@ static bool dp_active_dongle_validate_timing(
 				return false;
 		}
 	}
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (dpcd_caps->channel_coding_cap.bits.DP_128b_132b_SUPPORTED == 0 &&
 			dpcd_caps->dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_PASSTHROUGH_SUPPORT == 0 &&
 			dongle_caps->dfp_cap_ext.supported) {
-#else
-	if (dongle_caps->dfp_cap_ext.supported) {
-#endif
-
 		if (dongle_caps->dfp_cap_ext.max_pixel_rate_in_mps < (timing->pix_clk_100hz / 10000))
 			return false;
 
@@ -236,12 +231,10 @@ uint32_t dp_link_bandwidth_kbps(
 		 */
 		link_rate_per_lane_kbps = link_settings->link_rate * LINK_RATE_REF_FREQ_IN_KHZ * BITS_PER_DP_BYTE;
 		total_data_bw_efficiency_x10000 = DATA_EFFICIENCY_8b_10b_x10000;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (dc_link_should_enable_fec(link)) {
 			total_data_bw_efficiency_x10000 /= 100;
 			total_data_bw_efficiency_x10000 *= DATA_EFFICIENCY_8b_10b_FEC_EFFICIENCY_x100;
 		}
-#endif
 		break;
 	case DP_128b_132b_ENCODING:
 		/* For 128b/132b encoding:
@@ -266,13 +259,11 @@ uint32_t link_timing_bandwidth_kbps(
 	uint32_t kbps;
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (timing->flags.DSC)
 		return dc_dsc_stream_bandwidth_in_kbps(timing,
 				timing->dsc_cfg.bits_per_pixel,
 				timing->dsc_cfg.num_slices_h,
 				timing->dsc_cfg.is_dp);
-#endif
 #endif /* CONFIG_DRM_AMD_DC_DCN */
 
 

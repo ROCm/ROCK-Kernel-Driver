@@ -179,9 +179,7 @@ static struct timing_generator_funcs dcn201_tg_funcs = {
 		.clear_optc_underflow = optc1_clear_optc_underflow,
 		.get_crc = optc1_get_crc,
 		.configure_crc = optc2_configure_crc,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.set_dsc_config = optc2_set_dsc_config,
-#endif
 		.set_dwb_source = NULL,
 		.get_optc_source = optc201_get_optc_source,
 		.set_vtg_params = optc1_set_vtg_params,

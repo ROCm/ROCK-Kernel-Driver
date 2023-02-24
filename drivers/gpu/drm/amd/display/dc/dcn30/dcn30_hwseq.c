@@ -531,12 +531,10 @@ void dcn30_init_hw(struct dc *dc)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Power gate DSCs */
 	for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 		if (hws->funcs.dsc_pg_control != NULL)
 			hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
-#endif
 
 	/* we want to turn off all dp displays before doing detection */
 	link_blank_all_dp_displays(dc);

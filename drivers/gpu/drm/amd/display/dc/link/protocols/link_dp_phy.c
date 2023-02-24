@@ -129,7 +129,6 @@ void dp_set_drive_settings(
 	dpcd_set_lane_settings(link, lt_settings, DPRX);
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource *link_res, bool ready)
 {
 	/* FEC has to be "set ready" before the link training.
@@ -176,7 +175,6 @@ enum dc_status dp_set_fec_ready(struct dc_link *link, const struct link_resource
 
 	return status;
 }
-#endif
 
 void dp_set_fec_enable(struct dc_link *link, bool enable)
 {

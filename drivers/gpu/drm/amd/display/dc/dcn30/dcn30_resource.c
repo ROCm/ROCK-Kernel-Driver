@@ -46,9 +46,7 @@
 #include "dcn30/dcn30_hwseq.h"
 #include "dce110/dce110_hw_sequencer.h"
 #include "dcn30/dcn30_opp.h"
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dcn20/dcn20_dsc.h"
-#endif
 #include "dcn30/dcn30_vpg.h"
 #include "dcn30/dcn30_afmt.h"
 #include "dcn30/dcn30_dio_stream_encoder.h"
@@ -511,7 +509,6 @@ static const struct dcn30_mmhubbub_mask mcif_wb30_mask = {
 	DSC_REG_LIST_DCN20(id)\
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static const struct dcn20_dsc_registers dsc_regs[] = {
 	dsc_regsDCN20(0),
 	dsc_regsDCN20(1),
@@ -528,7 +525,6 @@ static const struct dcn20_dsc_shift dsc_shift = {
 static const struct dcn20_dsc_mask dsc_mask = {
 	DSC_REG_LIST_SH_MASK_DCN20(_MASK)
 };
-#endif
 
 static const struct dcn30_mpc_registers mpc_regs = {
 		MPC_REG_LIST_DCN3_0(0),
@@ -679,9 +675,7 @@ static const struct resource_caps res_cap_dcn3 = {
 	.num_ddc = 6,
 	.num_vmid = 16,
 	.num_mpc_3dlut = 3,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.num_dsc = 6,
-#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
@@ -1108,12 +1102,10 @@ static void dcn30_resource_destruct(struct dcn30_resource_pool *pool)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		if (pool->base.dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->base.dscs[i]);
 	}
-#endif
 
 	if (pool->base.mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->base.mpc));
@@ -1288,7 +1280,6 @@ static bool dcn30_mmhubbub_create(struct dc_context *ctx, struct resource_pool *
 	return true;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 static struct display_stream_compressor *dcn30_dsc_create(
 	struct dc_context *ctx, uint32_t inst)
 {
@@ -1303,7 +1294,6 @@ static struct display_stream_compressor *dcn30_dsc_create(
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
-#endif
 
 enum dc_status dcn30_add_stream_to_ctx(struct dc *dc, struct dc_state *new_ctx, struct dc_stream_state *dc_stream)
 {
@@ -1567,9 +1557,7 @@ static bool dcn30_split_stream_for_mpc_or_odm(
 	sec_pipe->plane_res.xfm = pool->transforms[pipe_idx];
 	sec_pipe->plane_res.dpp = pool->dpps[pipe_idx];
 	sec_pipe->plane_res.mpcc_inst = pool->dpps[pipe_idx]->inst;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	sec_pipe->stream_res.dsc = NULL;
-#endif
 	if (odm) {
 		if (pri_pipe->next_odm_pipe) {
 			ASSERT(pri_pipe->next_odm_pipe != sec_pipe);
@@ -1591,14 +1579,12 @@ static bool dcn30_split_stream_for_mpc_or_odm(
 			sec_pipe->stream_res.opp = pool->opps[pipe_idx];
 		else
 			sec_pipe->stream_res.opp = sec_pipe->top_pipe->stream_res.opp;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (sec_pipe->stream->timing.flags.DSC == 1) {
 			dcn20_acquire_dsc(dc, res_ctx, &sec_pipe->stream_res.dsc, pipe_idx);
 			ASSERT(sec_pipe->stream_res.dsc);
 			if (sec_pipe->stream_res.dsc == NULL)
 				return false;
 		}
-#endif
 	} else {
 		if (pri_pipe->bottom_pipe) {
 			ASSERT(pri_pipe->bottom_pipe != sec_pipe);
@@ -1771,10 +1757,8 @@ noinline bool dcn30_internal_validate_bw(
 			pipe->stream = NULL;
 			pipe->top_pipe = NULL;
 			pipe->prev_odm_pipe = NULL;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 			if (pipe->stream_res.dsc)
 				dcn20_release_dsc(&context->res_ctx, dc->res_pool, &pipe->stream_res.dsc);
-#endif
 			memset(&pipe->plane_res, 0, sizeof(pipe->plane_res));
 			memset(&pipe->stream_res, 0, sizeof(pipe->stream_res));
 			repopulate_pipes = true;
@@ -1893,13 +1877,11 @@ noinline bool dcn30_internal_validate_bw(
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Actual dsc count per stream dsc validation*/
 	if (!dcn20_validate_dsc(dc, context)) {
 		vba->ValidationStatus[vba->soc.num_states] = DML_FAIL_DSC_VALIDATION_FAILURE;
 		goto validate_fail;
 	}
-#endif
 
 	if (repopulate_pipes)
 		pipe_cnt = dc->res_pool->funcs->populate_dml_pipes(dc, context, pipes, fast_validate);
@@ -2254,9 +2236,7 @@ static const struct resource_funcs dcn30_res_pool_funcs = {
 	.populate_dml_pipes = dcn30_populate_dml_pipes_from_context,
 	.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 	.add_stream_to_ctx = dcn30_add_stream_to_ctx,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
-#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.populate_dml_writeback_from_context = dcn30_populate_dml_writeback_from_context,
 	.set_mcif_arb_params = dcn30_set_mcif_arb_params,
@@ -2549,7 +2529,6 @@ static bool dcn30_resource_construct(
 		goto create_fail;
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->base.res_cap->num_dsc; i++) {
 		pool->base.dscs[i] = dcn30_dsc_create(ctx, i);
 		if (pool->base.dscs[i] == NULL) {
@@ -2558,7 +2537,6 @@ static bool dcn30_resource_construct(
 			goto create_fail;
 		}
 	}
-#endif
 
 	/* DWB and MMHUBBUB */
 	if (!dcn30_dwbc_create(ctx, &pool->base)) {

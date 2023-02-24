@@ -49,9 +49,7 @@
 #include "clk_mgr.h"
 #include "link_hwss.h"
 #include "dpcd_defs.h"
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dsc.h"
-#endif
 #include "dce/dmub_psr.h"
 #include "dc_dmub_srv.h"
 #include "dce/dmub_hw_lock_mgr.h"
@@ -403,7 +401,6 @@ void dcn10_log_hw_state(struct dc *dc,
 	}
 	DTN_INFO("\n");
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	// dcn_dsc_state struct field bytes_per_pixel was renamed to bits_per_pixel
 	// TODO: Update golden log header to reflect this name change
 	DTN_INFO("DSC: CLOCK_EN  SLICE_WIDTH  Bytes_pp\n");
@@ -460,7 +457,6 @@ void dcn10_log_hw_state(struct dc *dc,
 		}
 	}
 	DTN_INFO("\n");
-#endif
 
 	DTN_INFO("\nCALCULATED Clocks: dcfclk_khz:%d  dcfclk_deep_sleep_khz:%d  dispclk_khz:%d\n"
 		"dppclk_khz:%d  max_supported_dppclk_khz:%d  fclk_khz:%d  socclk_khz:%d\n\n",
@@ -1428,7 +1424,6 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 		tg->funcs->tg_init(tg);
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Power gate DSCs */
 	if (hws->funcs.dsc_pg_control != NULL) {
 		uint32_t num_opps = 0;
@@ -1470,7 +1465,6 @@ void dcn10_init_pipes(struct dc *dc, struct dc_state *context)
 			hws->funcs.dsc_pg_control(hws, dc->res_pool->dscs[i]->inst, false);
 		}
 	}
-#endif
 }
 
 void dcn10_init_hw(struct dc *dc)

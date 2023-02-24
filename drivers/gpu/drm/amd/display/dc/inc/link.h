@@ -130,9 +130,7 @@ void link_set_dpms_on(
 void link_set_dpms_off(struct pipe_ctx *pipe_ctx);
 void link_dp_source_sequence_trace(struct dc_link *link, uint8_t dp_test_mode);
 void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable);
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool link_set_dsc_enable(struct pipe_ctx *pipe_ctx, bool enable);
-#endif
 bool link_update_dsc_config(struct pipe_ctx *pipe_ctx);
 enum dc_status link_validate_mode_timing(
 		const struct dc_stream_state *stream,

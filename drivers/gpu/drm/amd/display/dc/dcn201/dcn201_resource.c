@@ -1073,9 +1073,7 @@ static struct resource_funcs dcn201_res_pool_funcs = {
 	.validate_bandwidth = dcn20_validate_bandwidth,
 	.populate_dml_pipes = dcn20_populate_dml_pipes_from_context,
 	.add_stream_to_ctx = dcn20_add_stream_to_ctx,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.add_dsc_to_stream_resource = NULL,
-#endif
 	.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 	.acquire_idle_pipe_for_layer = dcn201_acquire_idle_pipe_for_layer,
 	.populate_dml_writeback_from_context = dcn201_populate_dml_writeback_from_context,

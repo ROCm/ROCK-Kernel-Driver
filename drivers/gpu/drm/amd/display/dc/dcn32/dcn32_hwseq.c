@@ -67,7 +67,6 @@
 #define FN(reg_name, field_name) \
 	hws->shifts->field_name, hws->masks->field_name
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn32_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -125,7 +124,6 @@ void dcn32_dsc_pg_control(
 	if (org_ip_request_cntl == 0)
 		REG_SET(DC_IP_REQUEST_CNTL, 0, IP_REQUEST_EN, 0);
 }
-#endif
 
 void dcn32_enable_power_gating_plane(
 	struct dce_hwseq *hws,
@@ -787,12 +785,10 @@ void dcn32_init_hw(struct dc *dc)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Power gate DSCs */
 	for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 		if (hws->funcs.dsc_pg_control != NULL)
 			hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
-#endif
 
 	/* we want to turn off all dp displays before doing detection */
 	link_blank_all_dp_displays(dc);
@@ -1351,7 +1347,6 @@ bool dcn32_dsc_pg_status(
 	return pwr_status == 0;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn32_update_dsc_pg(struct dc *dc,
 		struct dc_state *context,
 		bool safe_to_disable)
@@ -1374,7 +1369,6 @@ void dcn32_update_dsc_pg(struct dc *dc,
 		}
 	}
 }
-#endif
 
 void dcn32_enable_phantom_streams(struct dc *dc, struct dc_state *context)
 {

@@ -32,9 +32,7 @@
 #include "dcn20_resource.h"
 #include "dcn20_hwseq.h"
 #include "dce/dce_hwseq.h"
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include "dcn20_dsc.h"
-#endif
 #include "dcn20_optc.h"
 #include "abm.h"
 #include "clk_mgr.h"
@@ -341,7 +339,6 @@ void dcn20_init_blank(
 	hws->funcs.wait_for_blank_complete(opp);
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn20_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -418,7 +415,6 @@ void dcn20_dsc_pg_control(
 	if (org_ip_request_cntl == 0)
 		REG_SET(DC_IP_REQUEST_CNTL, 0, IP_REQUEST_EN, 0);
 }
-#endif
 
 void dcn20_dpp_pg_control(
 		struct dce_hwseq *hws,
@@ -2238,7 +2234,6 @@ bool dcn20_dmdata_status_done(struct pipe_ctx *pipe_ctx)
 
 void dcn20_disable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (pipe_ctx->stream_res.dsc) {
@@ -2250,12 +2245,10 @@ void dcn20_disable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 			odm_pipe = odm_pipe->next_odm_pipe;
 		}
 	}
-#endif
 }
 
 void dcn20_enable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct dce_hwseq *hws = dc->hwseq;
 
 	if (pipe_ctx->stream_res.dsc) {
@@ -2267,7 +2260,6 @@ void dcn20_enable_stream_gating(struct dc *dc, struct pipe_ctx *pipe_ctx)
 			odm_pipe = odm_pipe->next_odm_pipe;
 		}
 	}
-#endif
 }
 
 void dcn20_set_dmdata_attributes(struct pipe_ctx *pipe_ctx)
@@ -2476,11 +2468,9 @@ static void dcn20_reset_back_end_for_pipe(
 			}
 		}
 	}
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	else if (pipe_ctx->stream_res.dsc) {
 		link_set_dsc_enable(pipe_ctx, false);
 	}
-#endif
 
 	/* by upper caller loop, parent pipe: pipe0, will be reset last.
 	 * back end share by all pipes and will be disable only when disable

@@ -150,9 +150,7 @@ static void dcn32_link_encoder_get_max_link_cap(struct link_encoder *enc,
 }
 
 static const struct link_encoder_funcs dcn32_link_enc_funcs = {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.read_state = link_enc2_read_state,
-#endif
 	.validate_output_with_stream =
 			dcn30_link_encoder_validate_output_with_stream,
 	.hw_init = enc32_hw_init,

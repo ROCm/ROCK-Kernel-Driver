@@ -384,9 +384,7 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 	copy_settings_data->fec_enable_delay_in100us = link->dc->debug.fec_enable_delay_in100us;
 	copy_settings_data->cmd_version =  DMUB_CMD_PSR_CONTROL_VERSION_1;
 	copy_settings_data->panel_inst = panel_inst;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	copy_settings_data->dsc_enable_status = (pipe_ctx->stream->timing.flags.DSC == 1);
-#endif
 	/**
 	 * WA for PSRSU+DSC on specific TCON, if DSC is enabled, force PSRSU as ffu mode(full frame update)
 	 * Note that PSRSU+DSC is still under development.
@@ -400,7 +398,6 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 		link->psr_settings.force_ffu_mode = 0;
 	copy_settings_data->force_ffu_mode = link->psr_settings.force_ffu_mode;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (((link->dpcd_caps.fec_cap.bits.FEC_CAPABLE &&
 		!link->dc->debug.disable_fec) &&
 		(link->dpcd_caps.dsc_caps.dsc_basic_caps.fields.dsc_support.DSC_SUPPORT &&
@@ -413,7 +410,6 @@ static bool dmub_psr_copy_settings(struct dmub_psr *dmub,
 			sizeof(DP_SINK_DEVICE_STR_ID_2))))
 		copy_settings_data->debug.bitfields.force_wakeup_by_tps3 = 1;
 	else
-#endif
 		copy_settings_data->debug.bitfields.force_wakeup_by_tps3 = 0;
 
 	//WA for PSR1 on specific TCON, require frame delay for frame re-lock

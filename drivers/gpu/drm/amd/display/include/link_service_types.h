@@ -98,9 +98,7 @@ struct link_training_settings {
 	enum dc_voltage_swing *voltage_swing;
 	enum dc_pre_emphasis *pre_emphasis;
 	enum dc_post_cursor2 *post_cursor2;
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool should_set_fec_ready;
-#endif
 	/* TODO - factor lane_settings out because it changes during LT */
 	union dc_dp_ffe_preset *ffe_preset;
 

@@ -47,13 +47,11 @@
 #include "amdgpu_dm_debugfs.h"
 #endif
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #include "dc/dcn20/dcn20_resource.h"
 bool is_timing_changed(struct dc_stream_state *cur_stream,
 		       struct dc_stream_state *new_stream);
 
-#endif
 #endif
 #define PEAK_FACTOR_X1000 1006
 
@@ -237,7 +235,6 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 };
 
 #if defined(CONFIG_DRM_AMD_DC_DCN)
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&
@@ -307,7 +304,6 @@ static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnect
 
 	return true;
 }
-#endif
 #endif
 #endif
 
@@ -420,7 +416,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			amdgpu_dm_update_freesync_caps(
 					connector, aconnector->edid);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #if defined(CONFIG_DRM_AMD_DC_DCN)
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 			if (!validate_dsc_caps_on_connector(aconnector))
@@ -430,7 +425,6 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			if (!retrieve_downstream_port_device(aconnector))
 				memset(&aconnector->mst_downstream_port_present,
 					0, sizeof(aconnector->mst_downstream_port_present));
-#endif
 #endif
 #endif
 		}
@@ -778,7 +772,6 @@ int dm_mst_get_pbn_divider(struct dc_link *link)
 			dc_link_get_link_cap(link)) / (8 * 1000 * 54);
 }
 
-#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
 #if defined(CONFIG_DRM_AMD_DC_DCN) && defined(HAVE_DRM_DP_MST_ATOMIC_CHECK)
 struct dsc_mst_fairness_params {
 	struct dc_crtc_timing *timing;
@@ -1722,4 +1715,3 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 
 	return DC_OK;
 }
-#endif

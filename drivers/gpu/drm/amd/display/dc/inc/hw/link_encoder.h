@@ -141,7 +141,6 @@ struct link_encoder {
 	bool usbc_combo_phy;
 };
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 struct link_enc_state {
 
 		uint32_t dphy_fec_en;
@@ -150,7 +149,6 @@ struct link_enc_state {
 		uint32_t dp_link_training_complete;
 
 };
-#endif
 
 enum encoder_type_select {
 	ENCODER_TYPE_DIG = 0,
@@ -159,10 +157,8 @@ enum encoder_type_select {
 };
 
 struct link_encoder_funcs {
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	void (*read_state)(
 			struct link_encoder *enc, struct link_enc_state *s);
-#endif
 	bool (*validate_output_with_stream)(
 		struct link_encoder *enc, const struct dc_stream_state *stream);
 	void (*hw_init)(struct link_encoder *enc);

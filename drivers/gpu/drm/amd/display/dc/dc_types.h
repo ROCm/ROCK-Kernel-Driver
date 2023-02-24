@@ -556,9 +556,7 @@ enum dc_infoframe_type {
 	DC_HDMI_INFOFRAME_TYPE_AVI = 0x82,
 	DC_HDMI_INFOFRAME_TYPE_SPD = 0x83,
 	DC_HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	DC_DP_INFOFRAME_TYPE_PPS = 0x10,
-#endif
 };
 
 struct dc_info_packet {

@@ -25,15 +25,6 @@ config DRM_AMD_DC_DCN
 	help
 	  Raven family support for display engine
 
-config DRM_AMD_DC_DSC_SUPPORT
-	bool "DSC support"
-	default y
-	depends on DRM_AMD_DC && X86
-	depends on DRM_AMD_DC_DCN
-	help
-	  Choose this option if you want to have
-	  Dynamic Stream Compression support
-
 config DRM_AMD_DC_HDCP
 	bool "Enable HDCP support in DC"
 	depends on DRM_AMD_DC

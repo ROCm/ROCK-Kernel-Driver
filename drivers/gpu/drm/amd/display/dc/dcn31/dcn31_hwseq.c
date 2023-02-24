@@ -197,12 +197,10 @@ void dcn31_init_hw(struct dc *dc)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	/* Power gate DSCs */
 	for (i = 0; i < res_pool->res_cap->num_dsc; i++)
 		if (hws->funcs.dsc_pg_control != NULL)
 			hws->funcs.dsc_pg_control(hws, res_pool->dscs[i]->inst, false);
-#endif
 
 	/* Enables outbox notifications for usb4 dpia */
 	if (dc->res_pool->usb4_dpia_count)
@@ -304,7 +302,6 @@ void dcn31_init_hw(struct dc *dc)
 #endif
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn31_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -367,7 +364,6 @@ void dcn31_dsc_pg_control(
 	}
 
 }
-#endif
 
 
 void dcn31_enable_power_gating_plane(
@@ -391,10 +387,8 @@ void dcn31_enable_power_gating_plane(
 	REG_UPDATE(DOMAIN3_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
 
 	force_on = true; /* disable power gating */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	if (enable && !hws->ctx->dc->debug.disable_dsc_power_gate)
 		force_on = false;
-#endif
 
 	/* DCS0/1/2/3/4/5 */
 	REG_UPDATE(DOMAIN16_PG_CONFIG, DOMAIN_POWER_FORCEON, force_on);
@@ -553,11 +547,9 @@ static void dcn31_reset_back_end_for_pipe(
 
 	dc->hwss.set_abm_immediate_disable(pipe_ctx);
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	pipe_ctx->stream_res.tg->funcs->set_dsc_config(
 			pipe_ctx->stream_res.tg,
 			OPTC_DSC_DISABLED, 0, 0);
-#endif
 	pipe_ctx->stream_res.tg->funcs->disable_crtc(pipe_ctx->stream_res.tg);
 	pipe_ctx->stream_res.tg->funcs->enable_optc_clock(pipe_ctx->stream_res.tg, false);
 	if (pipe_ctx->stream_res.tg->funcs->set_odm_bypass)
@@ -596,10 +588,8 @@ static void dcn31_reset_back_end_for_pipe(
 				pipe_ctx->stream_res.audio = NULL;
 			}
 		}
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	} else if (pipe_ctx->stream_res.dsc) {
 			link_set_dsc_enable(pipe_ctx, false);
-#endif
 	}
 
 	pipe_ctx->stream = NULL;

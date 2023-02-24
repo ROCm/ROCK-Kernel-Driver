@@ -55,12 +55,10 @@ void dp_decide_training_settings(
 	struct link_training_settings *lt_settings);
 
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 bool decide_edp_link_settings_with_dsc(struct dc_link *link,
 		struct dc_link_settings *link_setting,
 		uint32_t req_bw,
 		enum dc_link_rate max_link_rate);
-#endif
 
 void dpcd_set_source_specific_data(struct dc_link *link);
 

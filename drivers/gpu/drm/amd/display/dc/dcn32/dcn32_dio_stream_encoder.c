@@ -376,7 +376,6 @@ static void enc32_stream_encoder_dp_unblank(
 	link_dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_ENABLE_DP_VID_STREAM);
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* Set DSC-related configuration.
  *   dsc_mode: 0 disables DSC, other values enable DSC in specified format
  *   sc_bytes_per_pixel: DP_DSC_BYTES_PER_PIXEL removed in DCN32
@@ -411,7 +410,6 @@ static void enc32_read_state(struct stream_encoder *enc, struct enc_state *s)
 		REG_GET(DP_SEC_CNTL, DP_SEC_STREAM_ENABLE, &s->sec_stream_enable);
 	}
 }
-#endif
 
 static void enc32_set_dig_input_mode(struct stream_encoder *enc, unsigned int pix_per_container)
 {
@@ -490,11 +488,9 @@ static const struct stream_encoder_funcs dcn32_str_enc_funcs = {
 
 	.dp_get_pixel_format  = enc1_stream_encoder_dp_get_pixel_format,
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.enc_read_state = enc32_read_state,
 	.dp_set_dsc_config = enc32_dp_set_dsc_config,
 	.dp_set_dsc_pps_info_packet = enc3_dp_set_dsc_pps_info_packet,
-#endif
 	.set_dynamic_metadata = enc2_set_dynamic_metadata,
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
 

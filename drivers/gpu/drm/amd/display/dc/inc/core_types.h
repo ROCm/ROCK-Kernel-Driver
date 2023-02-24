@@ -201,11 +201,9 @@ struct resource_funcs {
 			const struct resource_pool *pool,
 			struct dc_3dlut **lut,
 			struct dc_transfer_func **shaper);
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	enum dc_status (*add_dsc_to_stream_resource)(
 			struct dc *dc, struct dc_state *state,
 			struct dc_stream_state *stream);
-#endif
 
 	void (*add_phantom_pipes)(
             struct dc *dc,
@@ -254,9 +252,7 @@ struct resource_pool {
 		unsigned int gsl_2:1;
 	} gsl_groups;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	struct display_stream_compressor *dscs[MAX_PIPES];
-#endif
 
 	unsigned int pipe_count;
 	unsigned int underlay_pipe_index;
