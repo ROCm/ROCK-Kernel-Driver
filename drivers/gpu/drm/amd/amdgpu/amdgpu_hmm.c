@@ -51,7 +51,6 @@
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_hmm.h"
 
-#define MAX_WALK_BYTE	(2UL << 30)
 
 #ifndef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 /**
@@ -714,6 +713,7 @@ void amdgpu_hmm_unregister(struct amdgpu_bo *bo)
 
 #else /* HAVE_AMDKCL_HMM_MIRROR_ENABLED */
 
+#define MAX_WALK_BYTE	(2UL << 30)
 /**
  * amdgpu_hmm_invalidate_gfx - callback to notify about mm change
  *
