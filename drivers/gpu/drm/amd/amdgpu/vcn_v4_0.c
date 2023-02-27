@@ -79,10 +79,11 @@ static int vcn_v4_0_early_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct amdgpu_ring *ring;
+	int i;
 
 	if (amdgpu_sriov_vf(adev)) {
 		adev->vcn.harvest_config = VCN_HARVEST_MMSCH;
-		for (int i = 0; i < adev->vcn.num_vcn_inst; ++i) {
+		for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
 			ring = &adev->vcn.inst[i].ring_enc[0];
 			if (amdgpu_vcn_is_disabled_vcn(adev, VCN_ENCODE_RING, i)) {
 				adev->vcn.harvest_config |= 1 << i;
