@@ -714,11 +714,14 @@ struct amdgpu_direct_gma {
 };
 
 struct amdgpu_ip_map_info {
-	/* Map of logical to actual dev instances */
+	/* Map of logical to actual dev instances/mask */
 	uint32_t 		dev_inst[MAX_HWIP][HWIP_MAX_INSTANCE];
 	int8_t (*logical_to_dev_inst)(struct amdgpu_device *adev,
 				      enum amd_hw_ip_block_type block,
 				      int8_t inst);
+	uint32_t (*logical_to_dev_mask)(struct amdgpu_device *adev,
+					enum amd_hw_ip_block_type block,
+					uint32_t mask);
 };
 
 struct amd_powerplay {
