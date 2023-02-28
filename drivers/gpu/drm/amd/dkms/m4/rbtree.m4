@@ -9,7 +9,9 @@ AC_DEFUN([AC_AMDGPU_RB_ROOT_CACHED], [
         AC_KERNEL_DO_BACKGROUND([
                 AC_KERNEL_TRY_COMPILE([
                         #include <linux/rbtree.h>
+			#ifdef HAVE_LINUX_RBTREE_TYPES_H
                         #include <linux/rbtree_types.h>
+			#endif
                 ],[
                         struct rb_root_cached *r = NULL;
                 ],[

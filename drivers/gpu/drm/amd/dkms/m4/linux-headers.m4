@@ -138,4 +138,10 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-mapping: split <linux/dma-mapping.h>
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-map-ops.h])
+
+	dnl #
+	dnl #v5.14-rc6-42-g089050cafa10
+	dnl #rbtree: Split out the rbtree type definitions into <linux/rbtree_types.h>
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/rbtree_types.h])
 ])
