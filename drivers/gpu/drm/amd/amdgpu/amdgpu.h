@@ -492,6 +492,8 @@ struct amdgpu_fpriv {
 	struct amdgpu_ctx_mgr	ctx_mgr;
 	spinlock_t		sem_handles_lock;
 	struct idr		sem_handles;
+	/** GPU partition selection */
+	uint32_t		xcp_id;
 };
 
 int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv);
