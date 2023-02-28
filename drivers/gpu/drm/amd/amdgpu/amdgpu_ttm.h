@@ -206,6 +206,7 @@ bool amdgpu_ttm_tt_has_userptr(struct ttm_tt *ttm);
 struct mm_struct *amdgpu_ttm_tt_get_usermm(struct ttm_tt *ttm);
 bool amdgpu_ttm_tt_affect_userptr(struct ttm_tt *ttm, unsigned long start,
 				  unsigned long end, unsigned long *userptr);
+int amdgpu_ttm_tt_set_mem_pool(struct ttm_buffer_object *tbo, int mem_id);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 bool amdgpu_ttm_tt_is_userptr(struct ttm_tt *ttm);
 #else
