@@ -457,7 +457,9 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	enum mst_progress_status set_flag = MST_ALLOCATE_NEW_PAYLOAD;
 	enum mst_progress_status clr_flag = MST_CLEAR_ALLOCATED_PAYLOAD;
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 	int ret = 0;
+#endif
 
 	aconnector = (struct amdgpu_dm_connector *)stream->dm_stream_context;
 
