@@ -131,6 +131,9 @@
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
+/* fsleep() is available */
+#define HAVE_FSLEEP 1
+
 /* drm_dp_mst_connector_early_unregister() is available */
 #define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
 
