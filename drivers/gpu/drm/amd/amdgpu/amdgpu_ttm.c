@@ -2244,7 +2244,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	 * IGP - can handle 44-bits
 	 * PCI - dma32 for legacy pci gart
 	 */
-	need_dma32 = !!pci_set_dma_mask(adev->pdev, DMA_BIT_MASK(44));
+	need_dma32 = !!pci_set_dma_mask(adev->pdev, dma_get_mask(adev->dev));
 #else
 	need_dma32 = dma_addressing_limited(adev->dev);
 #endif
