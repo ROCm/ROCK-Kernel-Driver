@@ -149,6 +149,7 @@ static void drm_sched_entity_kill_jobs_work(struct work_struct *wrk)
 	job->sched->ops->free_job(job);
 }
 
+#ifdef HAVE_STRUCT_XARRAY
 /* Signal the scheduler finished fence when the entity in question is killed. */
 static void drm_sched_entity_kill_jobs_cb(struct dma_fence *f,
 					  struct dma_fence_cb *cb)
@@ -206,7 +207,7 @@ static void drm_sched_entity_kill(struct drm_sched_entity *entity)
 	}
 	dma_fence_put(prev);
 }
-
+#endif
 /**
  * drm_sched_entity_flush - Flush a context entity
  *
@@ -246,14 +247,75 @@ long drm_sched_entity_flush(struct drm_sched_entity *entity, long timeout)
 
 	/* For killed process disable any more IBs enqueue right now */
 	last_user = cmpxchg(&entity->last_user, current->group_leader, NULL);
+#ifdef HAVE_STRUCT_XARRAY
 	if ((!last_user || last_user == current->group_leader) &&
 	    (current->flags & PF_EXITING) && (current->exit_code == SIGKILL))
 		drm_sched_entity_kill(entity);
-
+#else
+	if ((!last_user || last_user == current->group_leader) &&
+	    (current->flags & PF_EXITING) && (current->exit_code == SIGKILL)) {
+		spin_lock(&entity->rq_lock);
+		entity->stopped = true;
+		drm_sched_rq_remove_entity(entity->rq, entity);
+		spin_unlock(&entity->rq_lock);
+	}
+#endif
 	return ret;
 }
 EXPORT_SYMBOL(drm_sched_entity_flush);
 
+#ifndef HAVE_STRUCT_XARRAY
+/* Signal the scheduler finished fence when the entity in question is killed. */
+static void drm_sched_entity_kill_jobs_cb(struct dma_fence *f,
+					  struct dma_fence_cb *cb)
+{
+	struct drm_sched_job *job = container_of(cb, struct drm_sched_job,
+						 finish_cb);
+
+	dma_fence_put(f);
+	INIT_WORK(&job->work, drm_sched_entity_kill_jobs_work);
+	schedule_work(&job->work);
+}
+
+static void drm_sched_entity_kill_jobs(struct drm_sched_entity *entity)
+{
+	struct drm_sched_job *job;
+	struct dma_fence *f;
+	int r;
+
+	while ((job = to_drm_sched_job(spsc_queue_pop(&entity->job_queue)))) {
+		struct drm_sched_fence *s_fence = job->s_fence;
+
+		/* Wait for all dependencies to avoid data corruptions */
+		while ((f = job->sched->ops->dependency(job, entity))) {
+			dma_fence_wait(f, false);
+			dma_fence_put(f);
+		}
+
+		drm_sched_fence_scheduled(s_fence);
+		dma_fence_set_error(&s_fence->finished, -ESRCH);
+
+		/*
+		 * When pipe is hanged by older entity, new entity might
+		 * not even have chance to submit it's first job to HW
+		 * and so entity->last_scheduled will remain NULL
+		 */
+		if (!entity->last_scheduled) {
+			drm_sched_entity_kill_jobs_cb(NULL, &job->finish_cb);
+			continue;
+		}
+
+		dma_fence_get(entity->last_scheduled);
+		r = dma_fence_add_callback(entity->last_scheduled,
+					   &job->finish_cb,
+					   drm_sched_entity_kill_jobs_cb);
+		if (r == -ENOENT)
+			drm_sched_entity_kill_jobs_cb(NULL, &job->finish_cb);
+		else if (r)
+			DRM_ERROR("fence add callback failed (%d)\n", r);
+	}
+}
+#endif
 /**
  * drm_sched_entity_fini - Destroy a context entity
  *
@@ -267,6 +329,36 @@ EXPORT_SYMBOL(drm_sched_entity_flush);
  */
 void drm_sched_entity_fini(struct drm_sched_entity *entity)
 {
+#ifndef HAVE_STRUCT_XARRAY
+	struct drm_gpu_scheduler *sched = NULL;
+
+	if (entity->rq) {
+		sched = entity->rq->sched;
+		drm_sched_rq_remove_entity(entity->rq, entity);
+	}
+
+	/* Consumption of existing IBs wasn't completed. Forcefully
+	 * remove them here.
+	 */
+	if (spsc_queue_count(&entity->job_queue)) {
+		if (sched) {
+			/*
+			 * Wait for thread to idle to make sure it isn't processing
+			 * this entity.
+			 */
+			wait_for_completion(&entity->entity_idle);
+
+		}
+		if (entity->dependency) {
+			dma_fence_remove_callback(entity->dependency,
+						  &entity->cb);
+			dma_fence_put(entity->dependency);
+			entity->dependency = NULL;
+		}
+
+		drm_sched_entity_kill_jobs(entity);
+	}
+#else
 	/*
 	 * If consumption of existing IBs wasn't completed. Forcefully remove
 	 * them here. Also makes sure that the scheduler won't touch this entity
@@ -279,7 +371,7 @@ void drm_sched_entity_fini(struct drm_sched_entity *entity)
 		dma_fence_put(entity->dependency);
 		entity->dependency = NULL;
 	}
-
+#endif
 	dma_fence_put(entity->last_scheduled);
 	entity->last_scheduled = NULL;
 }
@@ -390,6 +482,7 @@ static bool drm_sched_entity_add_dependency_cb(struct drm_sched_entity *entity)
 	return false;
 }
 
+#ifdef HAVE_STRUCT_XARRAY
 static struct dma_fence *
 drm_sched_job_dependency(struct drm_sched_job *job,
 			 struct drm_sched_entity *entity)
@@ -402,6 +495,7 @@ drm_sched_job_dependency(struct drm_sched_job *job,
 
 	return NULL;
 }
+#endif
 
 struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 {
