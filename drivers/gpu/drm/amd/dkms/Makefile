@@ -170,10 +170,8 @@ subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
 endif
 endif
 
-ifeq ($(call _is_kcl_macro_defined,HAVE_DRM_DRM_HDCP_H),y)
 export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
-endif
 
 ifeq (y,$(CONFIG_PCI_P2PDMA))
   ifeq (y,$(CONFIG_DMABUF_MOVENOTIFY))
