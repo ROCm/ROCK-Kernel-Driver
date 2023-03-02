@@ -287,7 +287,7 @@ static void drm_sched_entity_kill_jobs(struct drm_sched_entity *entity)
 		struct drm_sched_fence *s_fence = job->s_fence;
 
 		/* Wait for all dependencies to avoid data corruptions */
-		while ((f = job->sched->ops->dependency(job, entity))) {
+		while ((f = job->sched->ops->prepare_job(job, entity))) {
 			dma_fence_wait(f, false);
 			dma_fence_put(f);
 		}
@@ -512,7 +512,7 @@ struct drm_sched_job *drm_sched_entity_pop_job(struct drm_sched_entity *entity)
 #ifdef HAVE_STRUCT_XARRAY
 			drm_sched_job_dependency(sched_job, entity))) {
 #else
-			sched->ops->dependency(sched_job, entity))) {
+			sched->ops->prepare_job(sched_job, entity))) {
 #endif
 		trace_drm_sched_job_wait_dep(sched_job, entity->dependency);
 
