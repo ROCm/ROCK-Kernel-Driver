@@ -9,11 +9,7 @@
 #define AMDKCL_DRM_HDCP_H
 
 #ifdef CONFIG_DRM_AMD_DC_HDCP
-#ifdef HAVE_DRM_DISPLAY_DRM_HDCP_H 
 #include <drm/display/drm_hdcp.h>
-#else
-#include <drm/drm_hdcp.h>
-#endif
 #include <kcl/kcl_drm_connector.h>
 
 /* changed in v4.16-rc7-1717-gb8e47d87be65
