@@ -10,12 +10,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/amdgpu_pciid.h])
 
 	dnl #
-	dnl # commit v4.15-rc4-1351-g495eb7f877ab
-	dnl # drm: Add some HDCP related #defines
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_hdcp.h])
-
-	dnl #
 	dnl # commit v5.0-rc1-342-gfcd70cd36b9b
 	dnl # drm: Split out drm_probe_helper.h
 	dnl #
