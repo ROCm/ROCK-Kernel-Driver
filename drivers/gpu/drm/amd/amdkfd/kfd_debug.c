@@ -584,9 +584,6 @@ static void kfd_dbg_clean_exception_status(struct kfd_process *target)
 
 int kfd_dbg_trap_disable(struct kfd_process *target)
 {
-	if (!target->debug_trap_enabled)
-		return 0;
-
 	/*
 	 * Defer deactivation to runtime if runtime not enabled otherwise reset
 	 * attached running target runtime state to enable for re-attach.

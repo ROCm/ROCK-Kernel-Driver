@@ -1107,30 +1107,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 	struct kfd_process *p = container_of(work, struct kfd_process,
 					     release_work);
 
-	kfd_dbg_trap_disable(p);
-
-	/* If we are the debugger, we need to clean up the debugged process.
-	 * We should disable any debugging options enabled, and resume
-	 * any suspended queues.
-	 */
-	if (atomic_read(&p->debugged_process_count) > 0) {
-		struct kfd_process *target;
-		unsigned int temp;
-		int idx = srcu_read_lock(&kfd_processes_srcu);
-
-		hash_for_each_rcu(kfd_processes_table, temp, target, kfd_processes) {
-			if (target->debugger_process &&
-				target->debugger_process == p) {
-				mutex_lock(&target->mutex);
-				kfd_dbg_trap_disable(target);
-				mutex_unlock(&target->mutex);
-				if (atomic_read(&p->debugged_process_count) == 0)
-					break;
-			}
-		}
-		srcu_read_unlock(&kfd_processes_srcu, idx);
-	}
-
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
 
@@ -1223,6 +1199,34 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
 		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
 			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
+	}
+
+	/* New debugger for GFXv9 and later */
+	if (p->debug_trap_enabled) {
+		kfd_dbg_trap_disable(p);
+	}
+
+	/* If we are the debugger, we need to clean up the debugged process.
+	 * We should disable any debugging options enabled, and resume
+	 * any suspended queues.
+	 */
+	if (atomic_read(&p->debugged_process_count) > 0) {
+		struct kfd_process *target;
+		unsigned int temp;
+		int idx = srcu_read_lock(&kfd_processes_srcu);
+
+		hash_for_each_rcu(kfd_processes_table, temp, target, kfd_processes) {
+			if (target->debugger_process &&
+				target->debugger_process == p) {
+				mutex_lock_nested(&target->mutex, 1);
+				if (target->debug_trap_enabled)
+					kfd_dbg_trap_disable(target);
+				mutex_unlock(&target->mutex);
+				if (atomic_read(&p->debugged_process_count) == 0)
+					break;
+			}
+		}
+		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
 
 	/* Indicate to other users that MM is no longer valid */
