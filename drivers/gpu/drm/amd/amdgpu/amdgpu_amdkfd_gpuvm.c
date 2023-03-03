@@ -2567,7 +2567,7 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 	struct dma_buf *dmabuf;
 	int r = 0;
 
-	if (!adev|| !vm || !mem)
+	if (!adev || !vm || !mem)
 		return -EINVAL;
 
 	mutex_lock(&mem->lock);
@@ -3135,6 +3135,9 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 		}
 		list_for_each_entry(attachment, &mem->attachments, list) {
 			if (!attachment->is_mapped)
+				continue;
+
+			if (attachment->bo_va->base.bo->tbo.pin_count)
 				continue;
 
 			kfd_mem_dmaunmap_attachment(mem, attachment);
