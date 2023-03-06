@@ -26,9 +26,7 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
-#ifdef HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB
 #include <drm/drm_gem_atomic_helper.h>
-#endif
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_fourcc.h>
 
