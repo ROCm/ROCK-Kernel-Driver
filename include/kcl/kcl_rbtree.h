@@ -4,7 +4,7 @@
 
 #include <linux/rbtree.h>
 
-#ifndef HAVE_RB_ROOT_CACHED
+#ifndef RB_ROOT_CACHED
 /*
  * Leftmost-cached rbtrees.
  *
