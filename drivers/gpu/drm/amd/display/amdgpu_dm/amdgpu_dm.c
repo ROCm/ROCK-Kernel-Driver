@@ -4279,8 +4279,7 @@ static const struct backlight_ops amdgpu_dm_backlight_ops = {
 };
 
 static void
-amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm,
-				    struct amdgpu_dm_connector *aconnector)
+amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm)
 {
 	char bl_name[16];
 	struct backlight_properties props = { 0 };
@@ -4305,7 +4304,7 @@ amdgpu_dm_register_backlight_device(struct amdgpu_display_manager *dm,
 		 adev_to_drm(dm->adev)->primary->index + dm->num_of_edps);
 
 	dm->backlight_dev[dm->num_of_edps] = backlight_device_register(bl_name,
-								       aconnector->base.kdev,
+								       adev_to_drm(dm->adev)->dev,
 								       dm,
 								       &amdgpu_dm_backlight_ops,
 								       &props);
@@ -4358,7 +4357,6 @@ static int initialize_plane(struct amdgpu_display_manager *dm,
 
 
 static void register_backlight_device(struct amdgpu_display_manager *dm,
-				      struct amdgpu_dm_connector *aconnector,
 				      struct dc_link *link)
 {
 	if ((link->connector_signal & (SIGNAL_TYPE_EDP | SIGNAL_TYPE_LVDS)) &&
@@ -4369,7 +4367,7 @@ static void register_backlight_device(struct amdgpu_display_manager *dm,
 		 * is better then a black screen.
 		 */
 		if (!dm->backlight_dev[dm->num_of_edps])
-			amdgpu_dm_register_backlight_device(dm, aconnector);
+			amdgpu_dm_register_backlight_device(dm);
 
 		if (dm->backlight_dev[dm->num_of_edps]) {
 			dm->backlight_link[dm->num_of_edps] = link;
@@ -4555,7 +4553,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 
 			if (ret) {
 				amdgpu_dm_update_connector_after_detect(aconnector);
-				register_backlight_device(dm, aconnector, link);
+				register_backlight_device(dm, link);
 
 #ifdef HAVE_HDR_SINK_METADATA
 				if (dm->num_of_edps)
