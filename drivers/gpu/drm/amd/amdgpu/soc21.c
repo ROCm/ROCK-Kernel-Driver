@@ -82,6 +82,7 @@ static int soc21_query_video_codecs(struct amdgpu_device *adev, bool encode,
 
 	case IP_VERSION(4, 0, 0):
 	case IP_VERSION(4, 0, 2):
+	case IP_VERSION(4, 0, 4):
 		if (encode)
 			*codecs = &vcn_4_0_0_video_codecs_encode;
 		else
