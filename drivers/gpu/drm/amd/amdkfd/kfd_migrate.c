@@ -408,7 +408,7 @@ out_free_vram_pages:
 		migrate->dst[i + 3] = 0;
 	}
 #endif
-out:
+
 	return r;
 }
 
@@ -544,7 +544,7 @@ svm_migrate_ram_to_vram(struct svm_range *prange, uint32_t best_loc,
 
 	r = svm_range_vram_node_new(adev, prange, true);
 	if (r) {
-		dev_dbg(adev->dev, "fail %d to alloc vram\n", r);
+		dev_dbg(adev->dev, "fail %ld to alloc vram\n", r);
 		return r;
 	}
 	ttm_res_offset = prange->offset << PAGE_SHIFT;
