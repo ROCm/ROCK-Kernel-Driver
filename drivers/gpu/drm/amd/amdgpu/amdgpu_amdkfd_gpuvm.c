@@ -2597,7 +2597,7 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       uint32_t *restore_handle)
 {
 	struct dma_buf *dmabuf;
-	int r;
+	int r = 0;
 
 	if (!adev || !vm || !mem)
 		return -EINVAL;
