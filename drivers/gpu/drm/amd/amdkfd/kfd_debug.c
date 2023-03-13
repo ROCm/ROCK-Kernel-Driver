@@ -20,6 +20,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/file.h>
 #include <uapi/linux/kfd_ioctl.h>
 #include "kfd_debug.h"
 #include "kfd_priv.h"
