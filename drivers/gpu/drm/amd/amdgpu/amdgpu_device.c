@@ -3901,11 +3901,8 @@ fence_driver_init:
 #endif
 
 	r = amdgpu_pm_sysfs_init(adev);
-	if (r) {
-		adev->pm_sysfs_en = false;
-		DRM_ERROR("registering pm debugfs failed (%d).\n", r);
-	} else
-		adev->pm_sysfs_en = true;
+	if (r)
+		DRM_ERROR("registering pm sysfs failed (%d).\n", r);
 
 	r = amdgpu_ucode_sysfs_init(adev);
 	if (r) {
@@ -4054,7 +4051,7 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 	}
 
-	if (adev->pm_sysfs_en)
+	if (adev->pm.sysfs_initialized)
 		amdgpu_pm_sysfs_fini(adev);
 	if (adev->ucode_sysfs_en)
 		amdgpu_ucode_sysfs_fini(adev);
