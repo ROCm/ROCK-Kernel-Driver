@@ -259,7 +259,7 @@ void dm_helpers_dp_update_branch_info(
 	struct dc_context *ctx,
 	const struct dc_link *link)
 {}
-
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 static void dm_helpers_construct_old_payload(
 			struct dc_link *link,
 			int pbn_per_slot,
@@ -293,6 +293,7 @@ static void dm_helpers_construct_old_payload(
 	ASSERT(i != current_link_table.stream_count);
 
 }
+#endif
 
 /*
  * Writes payload allocation table in immediate downstream device.
