@@ -292,7 +292,7 @@ void dm_helpers_dp_update_branch_info(
 	struct dc_context *ctx,
 	const struct dc_link *link)
 {}
-
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 static void dm_helpers_construct_old_payload(
 			struct drm_dp_mst_topology_mgr *mgr,
 			struct drm_dp_mst_topology_state *mst_state,
@@ -324,6 +324,7 @@ static void dm_helpers_construct_old_payload(
 	old_payload->time_slots = allocated_time_slots;
 	old_payload->pbn = allocated_time_slots * pbn_per_slot;
 }
+#endif
 
 /*
  * Writes payload allocation table in immediate downstream device.
