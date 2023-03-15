@@ -325,7 +325,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
         mst_port = aconnector->mst_output_port;
 
-#if defined(CONFIG_DRM_AMD_DC_DCN)
+#if defined(CONFIG_DRM_AMD_DC_FP)
         link_coding_cap = dc_link_dp_mst_decide_link_encoding_format(aconnector->dc_link);
 #endif
 
