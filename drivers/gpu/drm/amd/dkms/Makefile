@@ -202,8 +202,8 @@ endif
 # if core2 isn't in the compiler flags
 ifndef CONFIG_ARM64
 ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
-export CONFIG_DRM_AMD_DC_DCN=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_DCN
+export CONFIG_DRM_AMD_DC_FP=y
+subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
 endif
 endif
 
