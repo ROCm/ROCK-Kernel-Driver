@@ -27,8 +27,7 @@ AC_DEFUN([AC_AMDGPU_IDR_INIT_BASE], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/idr.h>
 		], [
-			void *i;
-			i = idr_init_base(NULL, 0);
+			idr_init_base(NULL, 0);
 		], [
 			AC_DEFINE(HAVE_IDR_INIT_BASE, 1,
 				[idr_init_base() is available])
