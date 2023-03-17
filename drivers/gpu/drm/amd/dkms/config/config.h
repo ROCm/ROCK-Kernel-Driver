@@ -353,7 +353,7 @@
 #define HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE 1
 
 /* display_info->max_dsc_bpp is available */
-/* #undef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP */
+#define HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 1
 
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
