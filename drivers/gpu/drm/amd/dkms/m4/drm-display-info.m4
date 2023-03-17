@@ -64,7 +64,8 @@ AC_DEFUN([AC_AMDGPU_DRM_DISPLAY_INFO_LUMINANCE_RANGE], [
 			#include <drm/drm_connector.h>
 		],[
 			struct drm_display_info *display_info = NULL;
-			display_info->luminance_range=NULL;
+			struct drm_luminance_range_info *luminance_range;
+			luminance_range = &display_info->luminance_range;
 		],[
 			AC_DEFINE(HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE, 1,
 				[display_info->luminance_range is available])
