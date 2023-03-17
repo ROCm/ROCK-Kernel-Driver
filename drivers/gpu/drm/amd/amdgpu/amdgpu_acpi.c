@@ -988,7 +988,11 @@ bool amdgpu_acpi_should_gpu_reset(struct amdgpu_device *adev)
 		return false;
 
 #if IS_ENABLED(CONFIG_SUSPEND)
+#ifdef HAVE_PM_SUSPEND_TARGET_STATE
 	return pm_suspend_target_state != PM_SUSPEND_TO_IDLE;
+#else
+        return false;
+#endif
 #else
 	return true;
 #endif
