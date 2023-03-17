@@ -1157,44 +1157,11 @@ static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 
 static void kfd_process_notifier_release_internal(struct kfd_process *p)
 {
-	cancel_delayed_work_sync(&p->eviction_work);
+        int i;
+        struct mm_struct *mm = p->mm;
+
+        cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
-
-	/* Indicate to other users that MM is no longer valid */
-	p->mm = NULL;
-
-	mmu_notifier_put(&p->mmu_notifier);
-}
-
-static void kfd_process_notifier_release(struct mmu_notifier *mn,
-					struct mm_struct *mm)
-{
-	struct kfd_process *p;
-	int i;
-
-	/*
-	 * The kfd_process structure can not be free because the
-	 * mmu_notifier srcu is read locked
-	 */
-	p = container_of(mn, struct kfd_process, mmu_notifier);
-	if (WARN_ON(p->mm != mm))
-		return;
-
-	mutex_lock(&kfd_processes_mutex);
-	/*
-	 * Do early return if table is empty.
-	 *
-	 * This could potentially happen if this function is called concurrently
-	 * by mmu_notifier and by kfd_cleanup_pocesses.
-	 *
-	 */
-	if (hash_empty(kfd_processes_table)) {
-		mutex_unlock(&kfd_processes_mutex);
-		return;
-	}
-	hash_del_rcu(&p->kfd_processes);
-	mutex_unlock(&kfd_processes_mutex);
-	synchronize_srcu(&kfd_processes_srcu);
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
@@ -1235,7 +1202,48 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
 
-                kfd_process_notifier_release_internal(p);
+	/* Indicate to other users that MM is no longer valid */
+	p->mm = NULL;
+
+#ifdef HAVE_MMU_NOTIFIER_PUT
+	mmu_notifier_put(&p->mmu_notifier);
+#else
+	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
+	mmu_notifier_call_srcu(&p->rcu, &kfd_process_destroy_delayed);
+#endif
+}
+
+
+static void kfd_process_notifier_release(struct mmu_notifier *mn,
+					struct mm_struct *mm)
+{
+	struct kfd_process *p;
+
+	/*
+	 * The kfd_process structure can not be free because the
+	 * mmu_notifier srcu is read locked
+	 */
+	p = container_of(mn, struct kfd_process, mmu_notifier);
+	if (WARN_ON(p->mm != mm))
+		return;
+
+	mutex_lock(&kfd_processes_mutex);
+	/*
+	 * Do early return if table is empty.
+	 *
+	 * This could potentially happen if this function is called concurrently
+	 * by mmu_notifier and by kfd_cleanup_pocesses.
+	 *
+	 */
+	if (hash_empty(kfd_processes_table)) {
+		mutex_unlock(&kfd_processes_mutex);
+		return;
+	}
+	hash_del_rcu(&p->kfd_processes);
+	mutex_unlock(&kfd_processes_mutex);
+	synchronize_srcu(&kfd_processes_srcu);
+
+	kfd_process_notifier_release_internal(p);
 }
 
 static const struct mmu_notifier_ops kfd_process_mmu_notifier_ops = {
