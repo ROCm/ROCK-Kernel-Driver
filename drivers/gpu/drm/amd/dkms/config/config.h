@@ -756,6 +756,9 @@
 /* i2c_new_client_device() is enabled */
 #define HAVE_I2C_NEW_CLIENT_DEVICE 1
 
+/* idr_init_base() is available */
+#define HAVE_IDR_INIT_BASE 1
+
 /* idr_remove return void pointer */
 #define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
 
@@ -1074,6 +1077,9 @@
 
 /* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
+
+/* ide->idr_base is available */
+#define HAVE_STRUCT_IDE_IDR_BASE 1
 
 /* struct smca_bank is available */
 /* #undef HAVE_STRUCT_SMCA_BANK */
