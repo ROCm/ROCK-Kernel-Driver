@@ -54,7 +54,6 @@
 #include <kcl/backport/kcl_drm_fb.h>
 #include <kcl/backport/kcl_drm_drv.h>
 #include <kcl/kcl_drm_modes.h>
-#include <kcl/backport/kcl_drm_encoder.h>
 #include <kcl/kcl_drm_connector.h>
 #include <kcl/backport/kcl_drm_dp_helper_backport.h>
 #include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
