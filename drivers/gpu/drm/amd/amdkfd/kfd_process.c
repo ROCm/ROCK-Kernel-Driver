@@ -1174,6 +1174,7 @@ static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 static void kfd_process_notifier_release_internal(struct kfd_process *p)
 {
 	int i;
+	struct mm_struct *mm = p->mm;
 
 	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
@@ -1208,7 +1209,12 @@ static void kfd_process_notifier_release_internal(struct kfd_process *p)
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
 
+#ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&p->mmu_notifier);
+#else
+	mmu_notifier_unregister_no_release(&p->mmu_notifier, mm);
+	mmu_notifier_call_srcu(&p->rcu, &kfd_process_destroy_delayed);
+#endif
 }
 
 static void kfd_process_notifier_release(struct mmu_notifier *mn,
