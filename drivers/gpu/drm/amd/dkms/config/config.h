@@ -541,12 +541,6 @@
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
-/* drm_edid_to_eld() are available */
-/* #undef HAVE_DRM_EDID_TO_ELD */
-
-/* drm_encoder_find() wants file_priv */
-#define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
-
 /* drm_fbdev_generic_setup() is available */
 /* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
 
