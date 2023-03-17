@@ -78,6 +78,8 @@ static int amdgpu_dm_patch_edid_caps(struct dc_edid_caps *edid_caps)
 	return ret;
 }
 #endif
+/* MST Dock */
+static const uint8_t SYNAPTICS_DEVICE_ID[] = "SYNA";
 
 /* dm_helpers_parse_edid_caps
  *
