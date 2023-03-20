@@ -818,25 +818,19 @@ static void set_dsc_configs_from_fairness_vars(struct dsc_mst_fairness_params *p
 {
 	struct drm_connector *drm_connector;
 	int i;
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	struct dc_dsc_config_options dsc_options = {0};
-#endif
+
 	for (i = 0; i < count; i++) {
 		drm_connector = &params[i].aconnector->base;
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+
 		dc_dsc_get_default_config_option(params[i].sink->ctx->dc, &dsc_options);
 		dsc_options.max_target_bpp_limit_override_x16 = drm_connector->display_info.max_dsc_bpp * 16;
-#endif
+
 		memset(&params[i].timing->dsc_cfg, 0, sizeof(params[i].timing->dsc_cfg));
 		if (vars[i + k].dsc_enabled && dc_dsc_compute_config(
 					params[i].sink->ctx->dc->res_pool->dscs[0],
 					&params[i].sink->dsc_caps.dsc_dec_caps,
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 					&dsc_options,
-#else
-					params[i].sink->ctx->dc->debug.dsc_min_slice_height_override,
-					params[i].sink->edid_caps.panel_patch.max_dsc_target_bpp_limit,
-#endif
 					0,
 					params[i].timing,
 					&params[i].timing->dsc_cfg)) {
@@ -878,24 +872,17 @@ static int bpp_x16_from_pbn(struct dsc_mst_fairness_params param, int pbn)
 	struct dc_dsc_config dsc_config;
 	u64 kbps;
 
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 	struct drm_connector *drm_connector = &param.aconnector->base;
 	struct dc_dsc_config_options dsc_options = {0};
 
 	dc_dsc_get_default_config_option(param.sink->ctx->dc, &dsc_options);
 	dsc_options.max_target_bpp_limit_override_x16 = drm_connector->display_info.max_dsc_bpp * 16;
-#endif
 
 	kbps = div_u64((u64)pbn * 994 * 8 * 54, 64);
 	dc_dsc_compute_config(
 			param.sink->ctx->dc->res_pool->dscs[0],
 			&param.sink->dsc_caps.dsc_dec_caps,
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 			&dsc_options,
-#else
-			param.sink->ctx->dc->debug.dsc_min_slice_height_override,
-			param.sink->edid_caps.panel_patch.max_dsc_target_bpp_limit,
-#endif
 			(int) kbps, param.timing, &dsc_config);
 
 	return dsc_config.bits_per_pixel;
