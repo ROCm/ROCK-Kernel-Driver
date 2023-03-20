@@ -944,7 +944,11 @@ static void set_dsc_configs_from_fairness_vars(struct dsc_mst_fairness_params *p
 		drm_connector = &params[i].aconnector->base;
 
 		dc_dsc_get_default_config_option(params[i].sink->ctx->dc, &dsc_options);
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 		dsc_options.max_target_bpp_limit_override_x16 = drm_connector->display_info.max_dsc_bpp * 16;
+#else
+		dsc_options.max_target_bpp_limit_override_x16 = params[i].sink->edid_caps.panel_patch.max_dsc_target_bpp_limit * 16;
+#endif
 
 		memset(&params[i].timing->dsc_cfg, 0, sizeof(params[i].timing->dsc_cfg));
 		if (vars[i + k].dsc_enabled && dc_dsc_compute_config(
