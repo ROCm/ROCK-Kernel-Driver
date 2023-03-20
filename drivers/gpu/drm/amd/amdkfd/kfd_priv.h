@@ -328,6 +328,8 @@ struct kfd_node {
 
 	unsigned int compute_vmid_bitmap;
 
+	struct kfd_local_mem_info local_mem_info;
+
 	struct kfd_dev *kfd;
 };
 
@@ -350,7 +352,6 @@ struct kfd_dev {
 					   */
 
 	struct kgd2kfd_shared_resources shared_resources;
-	struct kfd_local_mem_info local_mem_info;
 
 	const struct kfd2kgd_calls *kfd2kgd;
 	struct mutex doorbell_mutex;
