@@ -207,6 +207,16 @@ subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
 endif
 endif
 
+# v5.17-rc4-3-ge8c07082a810 (Kbuild: move to -std=gnu11)
+# Upstream patches now uses gnu11/gnu99 as the default C standard version.
+# However, gcc in legacy OS still uses gnu89, which will introduce a standard
+# build gap leading to a DKMS build failure possibly. So add below check to
+# move gnu89 to gnu99 if KBUILD_CFLAGS still uses gnu89.
+ifeq ($(findstring gnu89,$(KBUILD_CFLAGS)),gnu89)
+KBUILD_CFLAGS := $(subst gnu89,gnu99,$(KBUILD_CFLAGS))
+$(warning "The local C standard(gnu89) doesn't match kernel default C standard(gnu11/gnu99)")
+endif
+
 include  $(src)/amd/dkms/Makefile.drm_ttm_helper
 
 include  $(src)/amd/dkms/Makefile.drm_buddy
