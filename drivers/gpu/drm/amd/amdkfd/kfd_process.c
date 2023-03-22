@@ -1158,8 +1158,9 @@ static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 static void kfd_process_notifier_release_internal(struct kfd_process *p)
 {
         int i;
+#ifndef HAVE_MMU_NOTIFIER_PUT
         struct mm_struct *mm = p->mm;
-
+#endif
         cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
 
