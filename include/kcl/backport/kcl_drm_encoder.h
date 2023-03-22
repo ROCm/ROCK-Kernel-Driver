@@ -37,16 +37,6 @@
 #include <drm/drm_encoder.h>
 #include <drm/drm_edid.h>
 
-#if !defined(HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE)
-static inline struct drm_encoder *_kcl_drm_encoder_find(struct drm_device *dev,
-						   struct drm_file *file_priv,
-						   uint32_t id)
-{
-	return drm_encoder_find(dev, id);
-}
-#define drm_encoder_find _kcl_drm_encoder_find
-#endif
-
 /* Copied from drivers/gpu/drm/drm_edid.c and modified for KCL */
 #if defined(HAVE_DRM_EDID_TO_ELD)
 static inline

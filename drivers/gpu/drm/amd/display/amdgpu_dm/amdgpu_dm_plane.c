@@ -26,9 +26,7 @@
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
-#ifdef HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB
 #include <drm/drm_gem_atomic_helper.h>
-#endif
 #include <drm/drm_plane_helper.h>
 #include <drm/drm_fourcc.h>
 
@@ -95,13 +93,13 @@ enum dm_micro_swizzle {
 };
 
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
-const struct drm_format_info *amd_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
+const struct drm_format_info *amdgpu_dm_plane_get_format_info(const struct drm_mode_fb_cmd2 *cmd)
 {
 	return amdgpu_lookup_format_info(cmd->pixel_format, cmd->modifier[0]);
 }
 #endif
 
-void fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
+void amdgpu_dm_plane_fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 			       bool *per_pixel_alpha, bool *pre_multiplied_alpha,
 			       bool *global_alpha, int *global_alpha_value)
 {
@@ -110,7 +108,6 @@ void fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	*global_alpha = false;
 	*global_alpha_value = 0xff;
 
-#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
@@ -139,7 +136,6 @@ void fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 		*global_alpha = true;
 		*global_alpha_value = plane_state->alpha >> 8;
 	}
-#endif
 }
 
 static void add_modifier(uint64_t **mods, uint64_t *size, uint64_t *cap, uint64_t mod)
@@ -809,25 +805,7 @@ static int get_plane_formats(const struct drm_plane *plane,
 	return num_formats;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_HDR
-static int attach_color_mgmt_properties(struct amdgpu_display_manager *dm, struct drm_plane *plane)
-{
-	drm_object_attach_property(&plane->base,
-				   dm->degamma_lut_property,
-				   0);
-	drm_object_attach_property(&plane->base,
-				   dm->degamma_lut_size_property,
-				   MAX_COLOR_LUT_ENTRIES);
-	drm_object_attach_property(&plane->base, dm->ctm_property,
-				   0);
-	drm_object_attach_property(&plane->base, dm->sdr_boost_property,
-				   DEFAULT_SDR_BOOST);
-
-	return 0;
-}
-#endif
-
-int fill_plane_buffer_attributes(struct amdgpu_device *adev,
+int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			     const struct amdgpu_framebuffer *afb,
 			     const enum surface_pixel_format format,
 			     const enum dc_rotation_angle rotation,
@@ -857,11 +835,7 @@ int fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[0] / (fb->bits_per_pixel / 8);
-#else
 			fb->pitches[0] / fb->format->cpp[0];
-#endif
 
 		address->type = PLN_ADDR_TYPE_GRAPHICS;
 		address->grph.addr.low_part = lower_32_bits(addr);
@@ -875,11 +849,7 @@ int fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->surface_size.width = fb->width;
 		plane_size->surface_size.height = fb->height;
 		plane_size->surface_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[0] / (fb->bits_per_pixel / 8);
-#else
 			fb->pitches[0] / fb->format->cpp[0];
-#endif
 
 		plane_size->chroma_size.x = 0;
 		plane_size->chroma_size.y = 0;
@@ -888,11 +858,7 @@ int fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		plane_size->chroma_size.height = fb->height / 2;
 
 		plane_size->chroma_pitch =
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-			fb->pitches[1] / (fb->bits_per_pixel / 8)/2;
-#else
 			fb->pitches[1] / fb->format->cpp[1];
-#endif
 
 		address->type = PLN_ADDR_TYPE_VIDEO_PROGRESSIVE;
 		address->video_progressive.luma_addr.low_part =
@@ -1022,7 +988,7 @@ static int dm_plane_helper_prepare_fb(struct drm_plane *plane,
 			dm_plane_state_new->dc_state;
 		bool force_disable_dcc = !plane_state->dcc.enable;
 
-		fill_plane_buffer_attributes(
+		amdgpu_dm_plane_fill_plane_buffer_attributes(
 			adev, afb, plane_state->format, plane_state->rotation,
 			afb->tiling_flags,
 			&plane_state->tiling_info, &plane_state->plane_size,
@@ -1079,11 +1045,7 @@ static void get_min_max_dc_plane_scaling(struct drm_device *dev,
 	/* Caps for all supported planes are the same on DCE and DCN 1 - 3 */
 	struct dc_plane_cap *plane_cap = &dc->caps.planes[0];
 
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-	switch (fb->pixel_format) {
-#else
 	switch (fb->format->format) {
-#endif
 	case DRM_FORMAT_P010:
 	case DRM_FORMAT_NV12:
 	case DRM_FORMAT_NV21:
@@ -1116,7 +1078,7 @@ static void get_min_max_dc_plane_scaling(struct drm_device *dev,
 		*min_downscale = 1000;
 }
 
-int dm_plane_helper_check_state(struct drm_plane_state *state,
+int amdgpu_dm_plane_helper_check_state(struct drm_plane_state *state,
 				       struct drm_crtc_state *new_crtc_state)
 {
 	struct drm_framebuffer *fb = state->fb;
@@ -1170,7 +1132,7 @@ int dm_plane_helper_check_state(struct drm_plane_state *state,
 		state, new_crtc_state, min_scale, max_scale, true, true);
 }
 
-int fill_dc_scaling_info(struct amdgpu_device *adev,
+int amdgpu_dm_plane_fill_dc_scaling_info(struct amdgpu_device *adev,
 				const struct drm_plane_state *state,
 				struct dc_scaling_info *scaling_info)
 {
@@ -1196,12 +1158,7 @@ int fill_dc_scaling_info(struct amdgpu_device *adev,
 	 */
 	if (((adev->ip_versions[DCE_HWIP][0] == IP_VERSION(1, 0, 0)) ||
 		(adev->ip_versions[DCE_HWIP][0] == IP_VERSION(1, 0, 1))) &&
-        (state->fb &&
-#ifndef HAVE_DRM_FRAMEBUFFER_FORMAT
-        state->fb->pixel_format == DRM_FORMAT_NV12 &&
-#else
-        state->fb->format->format == DRM_FORMAT_NV12 &&
-#endif
+        	(state->fb && state->fb->format->format == DRM_FORMAT_NV12 &&
 		(scaling_info->src_rect.x != 0 || scaling_info->src_rect.y != 0)))
 		return -EINVAL;
 
@@ -1295,11 +1252,11 @@ static int dm_plane_atomic_check(struct drm_plane *plane,
 	if (!new_crtc_state)
 		return -EINVAL;
 
-	ret = dm_plane_helper_check_state(new_plane_state, new_crtc_state);
+	ret = amdgpu_dm_plane_helper_check_state(new_plane_state, new_crtc_state);
 	if (ret)
 		return ret;
 
-	ret = fill_dc_scaling_info(adev, new_plane_state, &scaling_info);
+	ret = amdgpu_dm_plane_fill_dc_scaling_info(adev, new_plane_state, &scaling_info);
 	if (ret)
 		return ret;
 
@@ -1367,7 +1324,7 @@ static int get_cursor_position(struct drm_plane *plane, struct drm_crtc *crtc,
 	return 0;
 }
 
-void handle_cursor_update(struct drm_plane *plane,
+void amdgpu_dm_plane_handle_cursor_update(struct drm_plane *plane,
 				 struct drm_plane_state *old_plane_state)
 {
 	struct amdgpu_device *adev = drm_to_adev(plane->dev);
@@ -1416,11 +1373,7 @@ void handle_cursor_update(struct drm_plane *plane,
 	attributes.rotation_angle    = 0;
 	attributes.attribute_flags.value = 0;
 
-#ifdef HAVE_DRM_FRAMEBUFFER_FORMAT
 	attributes.pitch = afb->base.pitches[0] / afb->base.format->cpp[0];
-#else
-       attributes.pitch = afb->base.pitches[0] / (afb->base.bits_per_pixel / 8);
-#endif
 
 	if (crtc_state->stream) {
 		mutex_lock(&adev->dm.dc_lock);
@@ -1465,7 +1418,7 @@ static void dm_plane_atomic_async_update(struct drm_plane *plane,
 	plane->state->crtc_w = new_state->crtc_w;
 	plane->state->crtc_h = new_state->crtc_h;
 
-	handle_cursor_update(plane, old_state);
+	amdgpu_dm_plane_handle_cursor_update(plane, old_state);
 }
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = dm_plane_helper_prepare_fb,
@@ -1487,10 +1440,6 @@ static void dm_drm_plane_reset(struct drm_plane *plane)
 
 	if (amdgpu_state)
 		__drm_atomic_helper_plane_reset(plane, &amdgpu_state->base);
-#ifdef CONFIG_DRM_AMD_DC_HDR
-	if (amdgpu_state)
-		amdgpu_state->sdr_boost = DEFAULT_SDR_BOOST;
-#endif
 }
 
 static struct drm_plane_state *
@@ -1509,15 +1458,6 @@ dm_drm_plane_duplicate_state(struct drm_plane *plane)
 		dm_plane_state->dc_state = old_dm_plane_state->dc_state;
 		dc_plane_state_retain(dm_plane_state->dc_state);
 	}
-
-#ifdef CONFIG_DRM_AMD_DC_HDR
-	if (dm_plane_state->degamma_lut)
-		drm_property_blob_get(dm_plane_state->degamma_lut);
-	if (dm_plane_state->ctm)
-		drm_property_blob_get(dm_plane_state->ctm);
-
-	dm_plane_state->sdr_boost = old_dm_plane_state->sdr_boost;
-#endif
 
 	return &dm_plane_state->base;
 }
@@ -1588,102 +1528,11 @@ static void dm_drm_plane_destroy_state(struct drm_plane *plane,
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(state);
 
-#ifdef CONFIG_DRM_AMD_DC_HDR
-	drm_property_blob_put(dm_plane_state->degamma_lut);
-	drm_property_blob_put(dm_plane_state->ctm);
-#endif
 	if (dm_plane_state->dc_state)
 		dc_plane_state_release(dm_plane_state->dc_state);
 
 	drm_atomic_helper_plane_destroy_state(plane, state);
 }
-
-#ifdef CONFIG_DRM_AMD_DC_HDR
-/* copied from drm_atomic_uapi.c */
-static int atomic_replace_property_blob_from_id(struct drm_device *dev,
-					 struct drm_property_blob **blob,
-					 uint64_t blob_id,
-					 ssize_t expected_size,
-					 ssize_t expected_elem_size,
-					 bool *replaced)
-{
-	struct drm_property_blob *new_blob = NULL;
-
-	if (blob_id != 0) {
-		new_blob = drm_property_lookup_blob(dev, blob_id);
-		if (new_blob == NULL)
-			return -EINVAL;
-
-		if (expected_size > 0 &&
-		    new_blob->length != expected_size) {
-			drm_property_blob_put(new_blob);
-			return -EINVAL;
-		}
-		if (expected_elem_size > 0 &&
-		    new_blob->length % expected_elem_size != 0) {
-			drm_property_blob_put(new_blob);
-			return -EINVAL;
-		}
-	}
-
-	*replaced |= drm_property_replace_blob(blob, new_blob);
-	drm_property_blob_put(new_blob);
-
-	return 0;
-}
-
-int dm_drm_plane_set_property(struct drm_plane *plane,
-			      struct drm_plane_state *state,
-			      struct drm_property *property,
-			      uint64_t val)
-{
-	struct amdgpu_device *adev = drm_to_adev(plane->dev);
-	struct dm_plane_state *dm_plane_state = to_dm_plane_state(state);
-	int ret = 0;
-	bool replaced;
-
-	if (property == adev->dm.degamma_lut_property) {
-		ret = atomic_replace_property_blob_from_id(adev_to_drm(adev),
-				&dm_plane_state->degamma_lut,
-				val, -1, sizeof(struct drm_color_lut),
-				&replaced);
-	} else if (property == adev->dm.ctm_property) {
-		ret = atomic_replace_property_blob_from_id(adev_to_drm(adev),
-				&dm_plane_state->ctm,
-				val,
-				sizeof(struct drm_color_ctm), -1,
-				&replaced);
-	} else if (property == adev->dm.sdr_boost_property) {
-		dm_plane_state->sdr_boost = val;
-	} else {
-		return -EINVAL;
-	}
-
-	return ret;
-}
-
-int dm_drm_plane_get_property(struct drm_plane *plane,
-			      const struct drm_plane_state *state,
-			      struct drm_property *property,
-			      uint64_t *val)
-{
-	struct dm_plane_state *dm_plane_state = to_dm_plane_state(state);
-	struct amdgpu_device *adev = drm_to_adev(plane->dev);
-
-	if (property == adev->dm.degamma_lut_property) {
-		*val = (dm_plane_state->degamma_lut) ?
-			dm_plane_state->degamma_lut->base.id : 0;
-	} else if (property == adev->dm.ctm_property) {
-		*val = (dm_plane_state->ctm) ? dm_plane_state->ctm->base.id : 0;
-	} else if (property == adev->dm.sdr_boost_property) {
-		*val = dm_plane_state->sdr_boost;
-	} else {
-		return -EINVAL;
-	}
-
-	return 0;
-}
-#endif
 
 static const struct drm_plane_funcs dm_plane_funcs = {
 	.update_plane	= drm_atomic_helper_update_plane,
@@ -1694,10 +1543,6 @@ static const struct drm_plane_funcs dm_plane_funcs = {
 	.atomic_destroy_state = dm_drm_plane_destroy_state,
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 	.format_mod_supported = dm_plane_format_mod_supported,
-#endif
-#ifdef CONFIG_DRM_AMD_DC_HDR
-	.atomic_set_property = dm_drm_plane_set_property,
-	.atomic_get_property = dm_drm_plane_get_property,
 #endif
 };
 
@@ -1733,7 +1578,6 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 	if (res)
 		return res;
 
-#ifdef HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE
 	if (plane->type == DRM_PLANE_TYPE_OVERLAY &&
 	    plane_cap && plane_cap->per_pixel_alpha) {
 		unsigned int blend_caps = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
@@ -1743,9 +1587,7 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 		drm_plane_create_alpha_property(plane);
 		drm_plane_create_blend_mode_property(plane, blend_caps);
 	}
-#endif
 
-#ifdef HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE
 	if (plane->type == DRM_PLANE_TYPE_PRIMARY &&
 	    plane_cap &&
 	    (plane_cap->pixel_format_support.nv12 ||
@@ -1760,7 +1602,6 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 			BIT(DRM_COLOR_YCBCR_FULL_RANGE),
 			DRM_COLOR_YCBCR_BT709, DRM_COLOR_YCBCR_LIMITED_RANGE);
 	}
-#endif
 
 	supported_rotations =
 		DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_90 |
@@ -1777,9 +1618,6 @@ int amdgpu_dm_plane_init(struct amdgpu_display_manager *dm,
 
 	drm_plane_helper_add(plane, &dm_plane_helper_funcs);
 
-#ifdef CONFIG_DRM_AMD_DC_HDR
-	attach_color_mgmt_properties(dm, plane);
-#endif
 	/* Create (reset) the plane state */
 	if (plane->funcs->reset)
 		plane->funcs->reset(plane);

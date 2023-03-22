@@ -22,7 +22,6 @@
  * Author: AMD
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/display/drm_dp_helper.h>
 #include <drm/display/drm_dsc_helper.h>
 #include "dc_hw_types.h"
@@ -47,6 +46,59 @@ static bool dsc_policy_disable_dsc_stream_overhead;
 #ifndef MIN
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif
+
+uint32_t dc_bandwidth_in_kbps_from_timing(
+	const struct dc_crtc_timing *timing)
+{
+	uint32_t bits_per_channel = 0;
+	uint32_t kbps;
+
+	if (timing->flags.DSC)
+		return dc_dsc_stream_bandwidth_in_kbps(timing,
+				timing->dsc_cfg.bits_per_pixel,
+				timing->dsc_cfg.num_slices_h,
+				timing->dsc_cfg.is_dp);
+
+	switch (timing->display_color_depth) {
+	case COLOR_DEPTH_666:
+		bits_per_channel = 6;
+		break;
+	case COLOR_DEPTH_888:
+		bits_per_channel = 8;
+		break;
+	case COLOR_DEPTH_101010:
+		bits_per_channel = 10;
+		break;
+	case COLOR_DEPTH_121212:
+		bits_per_channel = 12;
+		break;
+	case COLOR_DEPTH_141414:
+		bits_per_channel = 14;
+		break;
+	case COLOR_DEPTH_161616:
+		bits_per_channel = 16;
+		break;
+	default:
+		ASSERT(bits_per_channel != 0);
+		bits_per_channel = 8;
+		break;
+	}
+
+	kbps = timing->pix_clk_100hz / 10;
+	kbps *= bits_per_channel;
+
+	if (timing->flags.Y_ONLY != 1) {
+		/*Only YOnly make reduce bandwidth by 1/3 compares to RGB*/
+		kbps *= 3;
+		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
+			kbps /= 2;
+		else if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422)
+			kbps = kbps * 2 / 3;
+	}
+
+	return kbps;
+}
+
 
 /* Forward Declerations */
 static bool decide_dsc_bandwidth_range(
@@ -74,14 +126,17 @@ static bool intersect_dsc_caps(
 		const struct dsc_enc_caps *dsc_enc_caps,
 		enum dc_pixel_encoding pixel_encoding,
 		struct dsc_enc_caps *dsc_common_caps);
-
 static bool setup_dsc_config(
 		const struct dsc_dec_dpcd_caps *dsc_sink_caps,
 		const struct dsc_enc_caps *dsc_enc_caps,
 		int target_bandwidth_kbps,
 		const struct dc_crtc_timing *timing,
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+		const struct dc_dsc_config_options *options,
+#else
 		int min_slice_height_override,
 		int max_dsc_target_bpp_limit_override_x16,
+#endif
 		struct dc_dsc_config *dsc_cfg);
 
 static bool dsc_buff_block_size_from_dpcd(int dpcd_buff_block_size, int *buff_block_size)
@@ -353,6 +408,13 @@ bool dc_dsc_compute_bandwidth_range(
 	struct dsc_enc_caps dsc_enc_caps;
 	struct dsc_enc_caps dsc_common_caps;
 	struct dc_dsc_config config;
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+	struct dc_dsc_config_options options = {0};
+
+	options.dsc_min_slice_height_override = dsc_min_slice_height_override;
+	options.max_target_bpp_limit_override_x16 = max_bpp_x16;
+	options.slice_height_granularity = 1;
+#endif
 
 	get_dsc_enc_caps(dsc, &dsc_enc_caps, timing->pix_clk_100hz);
 
@@ -361,7 +423,12 @@ bool dc_dsc_compute_bandwidth_range(
 
 	if (is_dsc_possible)
 		is_dsc_possible = setup_dsc_config(dsc_sink_caps, &dsc_enc_caps, 0, timing,
-				dsc_min_slice_height_override, max_bpp_x16, &config);
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+				&options,
+#else
+				dsc_min_slice_height_override, max_bpp_x16,
+#endif
+ 				&config);
 
 	if (is_dsc_possible)
 		is_dsc_possible = decide_dsc_bandwidth_range(min_bpp_x16, max_bpp_x16,
@@ -741,8 +808,12 @@ static bool setup_dsc_config(
 		const struct dsc_enc_caps *dsc_enc_caps,
 		int target_bandwidth_kbps,
 		const struct dc_crtc_timing *timing,
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+		const struct dc_dsc_config_options *options,
+#else
 		int min_slice_height_override,
 		int max_dsc_target_bpp_limit_override_x16,
+#endif
 		struct dc_dsc_config *dsc_cfg)
 {
 	struct dsc_enc_caps dsc_common_caps;
@@ -761,7 +832,11 @@ static bool setup_dsc_config(
 
 	memset(dsc_cfg, 0, sizeof(struct dc_dsc_config));
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+	dc_dsc_get_policy_for_timing(timing, options->max_target_bpp_limit_override_x16, &policy);
+#else
 	dc_dsc_get_policy_for_timing(timing, max_dsc_target_bpp_limit_override_x16, &policy);
+#endif
 	pic_width = timing->h_addressable + timing->h_border_left + timing->h_border_right;
 	pic_height = timing->v_addressable + timing->v_border_top + timing->v_border_bottom;
 
@@ -910,12 +985,22 @@ static bool setup_dsc_config(
 
 	// Slice height (i.e. number of slices per column): start with policy and pick the first one that height is divisible by.
 	// For 4:2:0 make sure the slice height is divisible by 2 as well.
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+	if (options->dsc_min_slice_height_override == 0)
+		slice_height = min(policy.min_slice_height, pic_height);
+	else
+		slice_height = min((int)(options->dsc_min_slice_height_override), pic_height);
+#else
 	if (min_slice_height_override == 0)
 		slice_height = min(policy.min_slice_height, pic_height);
 	else
 		slice_height = min(min_slice_height_override, pic_height);
+#endif
 
 	while (slice_height < pic_height && (pic_height % slice_height != 0 ||
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+		slice_height % options->slice_height_granularity != 0 ||
+#endif
 		(timing->pixel_encoding == PIXEL_ENCODING_YCBCR420 && slice_height % 2 != 0)))
 		slice_height++;
 
@@ -959,8 +1044,12 @@ done:
 bool dc_dsc_compute_config(
 		const struct display_stream_compressor *dsc,
 		const struct dsc_dec_dpcd_caps *dsc_sink_caps,
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+		const struct dc_dsc_config_options *options,
+#else
 		uint32_t dsc_min_slice_height_override,
 		uint32_t max_target_bpp_limit_override,
+#endif
 		uint32_t target_bandwidth_kbps,
 		const struct dc_crtc_timing *timing,
 		struct dc_dsc_config *dsc_cfg)
@@ -972,8 +1061,15 @@ bool dc_dsc_compute_config(
 	is_dsc_possible = setup_dsc_config(dsc_sink_caps,
 		&dsc_enc_caps,
 		target_bandwidth_kbps,
-		timing, dsc_min_slice_height_override,
-		max_target_bpp_limit_override * 16, dsc_cfg);
+		timing, 
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+		options, 
+#else
+		dsc_min_slice_height_override,
+		max_target_bpp_limit_override * 16,
+#endif
+		dsc_cfg);
+
 	return is_dsc_possible;
 }
 
@@ -1104,5 +1200,12 @@ void dc_dsc_policy_set_enable_dsc_when_not_needed(bool enable)
 void dc_dsc_policy_set_disable_dsc_stream_overhead(bool disable)
 {
 	dsc_policy_disable_dsc_stream_overhead = disable;
+}
+#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 
+void dc_dsc_get_default_config_option(const struct dc *dc, struct dc_dsc_config_options *options)
+{
+	options->dsc_min_slice_height_override = dc->debug.dsc_min_slice_height_override;
+	options->max_target_bpp_limit_override_x16 = 0;
+	options->slice_height_granularity = 1;
 }
 #endif

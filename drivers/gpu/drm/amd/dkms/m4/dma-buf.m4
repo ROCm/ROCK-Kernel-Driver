@@ -52,8 +52,6 @@ AC_DEFUN([AC_AMDGPU_DMA_BUF], [
 				],[
 					AC_DEFINE(HAVE_DMA_BUF_OPS_LEGACY, 1,
 						[dma_buf->dynamic_mapping is not available])
-
-					AC_AMDGPU_DRM_GEM_MAP_ATTACH
 				])
 			])
 		])

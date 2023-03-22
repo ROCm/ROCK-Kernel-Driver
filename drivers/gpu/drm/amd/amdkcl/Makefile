@@ -5,7 +5,7 @@ amdkcl-y += kcl_kernel_params.o
 amdkcl-y += dma-buf/dma-resv.o
 
 amdkcl-y += kcl_backlight.o kcl_ioctl.o \
-	kcl_kthread.o kcl_io.o kcl_perf_event.o kcl_seq_file.o \
+	kcl_kthread.o kcl_io.o kcl_seq_file.o \
 	kcl_suspend.o kcl_pci.o kcl_mm.o kcl_memory.o kcl_sched.o \
 	kcl_fence.o kcl_reservation.o kcl_drm_cache.o \
 	kcl_drm_fb.o kcl_drm_print.o kcl_fbmem.o \

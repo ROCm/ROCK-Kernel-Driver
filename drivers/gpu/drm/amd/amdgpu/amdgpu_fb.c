@@ -123,9 +123,7 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 					 struct drm_mode_fb_cmd2 *mode_cmd,
 					 struct drm_gem_object **gobj_p)
 {
-#ifdef HAVE_DRM_GET_FORMAT_INFO
 	const struct drm_format_info *info;
-#endif
 	struct amdgpu_device *adev = rfbdev->adev;
 	struct drm_gem_object *gobj = NULL;
 	struct amdgpu_bo *abo = NULL;
@@ -139,12 +137,8 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 			       AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS     |
 			       AMDGPU_GEM_CREATE_VRAM_CLEARED;
 
-#ifdef HAVE_DRM_GET_FORMAT_INFO
 	info = drm_get_format_info(adev_to_drm(adev), mode_cmd);
 	cpp = info->cpp[0];
-#else
-	cpp = drm_format_plane_cpp(mode_cmd->pixel_format, 0);
-#endif
 
 	/* need to align pitch with crtc limits */
 	mode_cmd->pitches[0] = amdgpu_align_pitch(adev, mode_cmd->width, cpp,
@@ -276,11 +270,7 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
 	DRM_INFO("fb mappable at 0x%lX\n",  info->fix.smem_start);
 	DRM_INFO("vram apper at 0x%lX\n",  (unsigned long)adev->gmc.aper_base);
 	DRM_INFO("size %lu\n", (unsigned long)amdgpu_bo_size(abo));
-#if !defined(HAVE_DRM_FRAMEBUFFER_FORMAT)
-	DRM_INFO("fb depth is %d\n", fb->depth);
-#else
 	DRM_INFO("fb depth is %d\n", fb->format->depth);
-#endif
 	DRM_INFO("pitch is %d\n", fb->pitches[0]);
 
 	vga_switcheroo_client_fb_set(adev->pdev, info);

@@ -121,15 +121,11 @@ static const struct resource_caps res_cap_dcn303 = {
 		.num_ddc = 2,
 		.num_vmid = 16,
 		.num_mpc_3dlut = 1,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.num_dsc = 2,
-#endif
 };
 
 static const struct dc_plane_cap plane_cap = {
 		.type = DC_PLANE_TYPE_DCN_UNIVERSAL,
-		.blends_with_above = true,
-		.blends_with_below = true,
 		.per_pixel_alpha = true,
 		.pixel_format_support = {
 				.argb8888 = true,
@@ -621,7 +617,6 @@ static struct mpc *dcn303_mpc_create(struct dc_context *ctx, int num_mpcc, int n
 	return &mpc30->base;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #define dsc_regsDCN20(id)\
 [id] = { DSC_REG_LIST_DCN20(id) }
 
@@ -650,7 +645,6 @@ static struct display_stream_compressor *dcn303_dsc_create(struct dc_context *ct
 	dsc2_construct(dsc, ctx, inst, &dsc_regs[inst], &dsc_shift, &dsc_mask);
 	return &dsc->base;
 }
-#endif
 
 #define dwbc_regs_dcn3(id)\
 [id] = { DWBC_COMMON_REG_LIST_DCN30(id) }
@@ -956,12 +950,10 @@ static void dcn303_resource_destruct(struct resource_pool *pool)
 		}
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		if (pool->dscs[i] != NULL)
 			dcn20_dsc_destroy(&pool->dscs[i]);
 	}
-#endif
 
 	if (pool->mpc != NULL) {
 		kfree(TO_DCN20_MPC(pool->mpc));
@@ -1059,8 +1051,11 @@ static void dcn303_resource_destruct(struct resource_pool *pool)
 	if (pool->dccg != NULL)
 		dcn_dccg_destroy(&pool->dccg);
 
-	if (pool->oem_device != NULL)
-		link_destroy_ddc_service(&pool->oem_device);
+	if (pool->oem_device != NULL) {
+		struct dc *dc = pool->oem_device->ctx->dc;
+
+		dc->link_srv->destroy_ddc_service(&pool->oem_device);
+	}
 }
 
 static void dcn303_destroy_resource_pool(struct resource_pool **pool)
@@ -1092,9 +1087,7 @@ static struct resource_funcs dcn303_res_pool_funcs = {
 		.populate_dml_pipes = dcn30_populate_dml_pipes_from_context,
 		.acquire_idle_pipe_for_layer = dcn20_acquire_idle_pipe_for_layer,
 		.add_stream_to_ctx = dcn30_add_stream_to_ctx,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.add_dsc_to_stream_resource = dcn20_add_dsc_to_stream_resource,
-#endif
 		.remove_stream_from_ctx = dcn20_remove_stream_from_ctx,
 		.populate_dml_writeback_from_context = dcn30_populate_dml_writeback_from_context,
 		.set_mcif_arb_params = dcn30_set_mcif_arb_params,
@@ -1171,7 +1164,6 @@ static bool dcn303_resource_construct(
 	dc->caps.max_cursor_size = 256;
 	dc->caps.min_horizontal_blanking_period = 80;
 	dc->caps.dmdata_alloc_size = 2048;
-#if defined(CONFIG_DRM_AMD_DC_DCN)
 	dc->caps.mall_size_per_mem_channel = 4;
 	/* total size = mall per channel * num channels * 1024 * 1024 */
 	dc->caps.mall_size_total = dc->caps.mall_size_per_mem_channel *
@@ -1179,7 +1171,6 @@ static bool dcn303_resource_construct(
 				   1024 * 1024;
 	dc->caps.cursor_cache_size =
 		dc->caps.max_cursor_size * dc->caps.max_cursor_size * 8;
-#endif
 	dc->caps.max_slave_planes = 1;
 	dc->caps.post_blend_color_processing = true;
 	dc->caps.force_dp_tps4_for_cp2520 = true;
@@ -1368,7 +1359,6 @@ static bool dcn303_resource_construct(
 		goto create_fail;
 	}
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	for (i = 0; i < pool->res_cap->num_dsc; i++) {
 		pool->dscs[i] = dcn303_dsc_create(ctx, i);
 		if (pool->dscs[i] == NULL) {
@@ -1377,7 +1367,6 @@ static bool dcn303_resource_construct(
 			goto create_fail;
 		}
 	}
-#endif
 
 	/* DWB and MMHUBBUB */
 	if (!dcn303_dwbc_create(ctx, pool)) {
@@ -1431,7 +1420,7 @@ static bool dcn303_resource_construct(
 		ddc_init_data.id.id = dc->ctx->dc_bios->fw_info.oem_i2c_obj_id;
 		ddc_init_data.id.enum_id = 0;
 		ddc_init_data.id.type = OBJECT_TYPE_GENERIC;
-		pool->oem_device = link_create_ddc_service(&ddc_init_data);
+		pool->oem_device = dc->link_srv->create_ddc_service(&ddc_init_data);
 	} else {
 		pool->oem_device = NULL;
 	}

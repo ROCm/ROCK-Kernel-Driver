@@ -104,7 +104,6 @@ static bool dc_stream_construct(struct dc_stream_state *stream,
 	/* EDID CAP translation for HDMI 2.0 */
 	stream->timing.flags.LTE_340MCSC_SCRAMBLE = dc_sink_data->edid_caps.lte_340mcsc_scramble;
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	memset(&stream->timing.dsc_cfg, 0, sizeof(stream->timing.dsc_cfg));
 	stream->timing.dsc_cfg.num_slices_h = 0;
 	stream->timing.dsc_cfg.num_slices_v = 0;
@@ -113,7 +112,6 @@ static bool dc_stream_construct(struct dc_stream_state *stream,
 	stream->timing.dsc_cfg.linebuf_depth = 9;
 	stream->timing.dsc_cfg.version_minor = 2;
 	stream->timing.dsc_cfg.ycbcr422_simple = 0;
-#endif
 
 	update_stream_signal(stream, dc_sink_data);
 
@@ -724,7 +722,6 @@ bool dc_stream_set_dynamic_metadata(struct dc *dc,
 	return true;
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
 		struct dc_state *state,
 		struct dc_stream_state *stream)
@@ -735,7 +732,6 @@ enum dc_status dc_stream_add_dsc_to_resource(struct dc *dc,
 		return DC_NO_DSC_RESOURCE;
 	}
 }
-#endif
 
 struct pipe_ctx *dc_stream_get_pipe_ctx(struct dc_stream_state *stream)
 {

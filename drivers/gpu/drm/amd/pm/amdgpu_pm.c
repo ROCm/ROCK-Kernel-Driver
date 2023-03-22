@@ -91,6 +91,8 @@ const char * const amdgpu_pp_profile_name[] = {
 	"COMPUTE",
 	"CUSTOM",
 	"WINDOW_3D",
+	"CAPPED",
+	"UNCAPPED",
 };
 
 /**
@@ -1738,7 +1740,7 @@ static ssize_t amdgpu_set_apu_thermal_cap(struct device *dev,
 	if (ret)
 		return ret;
 
-	if (value < 0 || value > 100) {
+	if (value > 100) {
 		dev_err(dev, "Invalid argument !\n");
 		return -EINVAL;
 	}

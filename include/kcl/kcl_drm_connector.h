@@ -24,7 +24,6 @@
 
 #include <drm/drm_crtc.h>
 #include <drm/drm_connector.h>
-#include <kcl/kcl_kref.h>
 #include <kcl/kcl_drm_crtc.h>
 
 /*
@@ -91,16 +90,6 @@ bool drm_connector_atomic_hdr_metadata_equal(struct drm_connector_state *old_sta
 
 #if !defined(HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY)
 int drm_connector_attach_hdr_output_metadata_property(struct drm_connector *connector);
-#endif
-
-#ifndef HAVE_DRM_PANEL_ORIENTATION_ENUM
-enum drm_panel_orientation {
-        DRM_MODE_PANEL_ORIENTATION_UNKNOWN = -1,
-        DRM_MODE_PANEL_ORIENTATION_NORMAL = 0,
-        DRM_MODE_PANEL_ORIENTATION_BOTTOM_UP,
-        DRM_MODE_PANEL_ORIENTATION_LEFT_UP,
-        DRM_MODE_PANEL_ORIENTATION_RIGHT_UP,
-};
 #endif
 
 #ifndef HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK

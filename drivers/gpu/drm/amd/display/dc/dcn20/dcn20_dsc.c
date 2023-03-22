@@ -23,7 +23,6 @@
  *
  */
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/display/drm_dsc_helper.h>
 
 #include "reg_helper.h"
@@ -51,7 +50,7 @@ static void dsc2_enable(struct display_stream_compressor *dsc, int opp_pipe);
 static void dsc2_disable(struct display_stream_compressor *dsc);
 static void dsc2_disconnect(struct display_stream_compressor *dsc);
 
-const struct dsc_funcs dcn20_dsc_funcs = {
+static const struct dsc_funcs dcn20_dsc_funcs = {
 	.dsc_get_enc_caps = dsc2_get_enc_caps,
 	.dsc_read_state = dsc2_read_state,
 	.dsc_validate_stream = dsc2_validate_stream,
@@ -783,4 +782,3 @@ static void dsc_write_to_registers(struct display_stream_compressor *dsc, const 
 		RANGE_BPG_OFFSET14, reg_vals->pps.rc_range_params[14].range_bpg_offset);
 
 }
-#endif

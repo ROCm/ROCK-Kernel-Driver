@@ -50,7 +50,6 @@
 #include <kcl/backport/kcl_fence_backport.h>
 #include <kcl/backport/kcl_ww_mutex.h>
 #include <kcl/kcl_seqlock.h>
-#include <kcl/kcl_overflow.h>
 #include <kcl/kcl_dma_fence.h>
 
 struct dma_resv_list;
@@ -187,15 +186,6 @@ struct dma_resv {
 
 	struct dma_fence __rcu *fence_excl;
 	struct dma_resv_list __rcu *fence;
-};
-#elif defined(HAVE_RESERVATION_OBJECT_STAGED)
-struct dma_resv {
-	struct ww_mutex lock;
-	seqcount_t seq;
-
-	struct dma_fence __rcu *fence_excl;
-	struct dma_resv_list __rcu *fence;
-	struct dma_resv_list *staged;
 };
 #else
 struct dma_resv {

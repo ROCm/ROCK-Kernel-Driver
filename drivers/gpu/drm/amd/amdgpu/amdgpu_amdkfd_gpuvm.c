@@ -711,6 +711,30 @@ kfd_mem_dmaunmap_attachment(struct kgd_mem *mem,
 	}
 }
 
+static int kfd_mem_export_dmabuf(struct kgd_mem *mem)
+{
+	if (!mem->dmabuf) {
+		struct dma_buf *ret;
+
+#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
+		ret = amdgpu_gem_prime_export(&mem->bo->tbo.base,
+#else
+		struct amdgpu_device *bo_adev;
+
+		bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+		ret = amdgpu_gem_prime_export(adev_to_drm(bo_adev),
+			&mem->bo->tbo.base,
+#endif
+			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
+				DRM_RDWR : 0);
+		if (IS_ERR(ret))
+			return PTR_ERR(ret);
+		mem->dmabuf = ret;
+	}
+
+	return 0;
+}
+
 #ifdef AMDKCL_AMDGPU_DMABUF_OPS
 static int
 kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
@@ -719,24 +743,9 @@ kfd_mem_attach_dmabuf(struct amdgpu_device *adev, struct kgd_mem *mem,
 	struct drm_gem_object *gobj;
 	int ret;
 
-	if (!mem->dmabuf) {
-#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
-		mem->dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base,
-#else
-		struct amdgpu_device *bo_adev;
-
-		bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
-		mem->dmabuf = amdgpu_gem_prime_export(adev_to_drm(bo_adev),
-						&mem->bo->tbo.base,
-#endif
-			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
-				DRM_RDWR : 0);
-		if (IS_ERR(mem->dmabuf)) {
-			ret = PTR_ERR(mem->dmabuf);
-			mem->dmabuf = NULL;
-			return ret;
-		}
-	}
+	ret = kfd_mem_export_dmabuf(mem);
+	if (ret)
+		return ret;
 
 	gobj = amdgpu_gem_prime_import(adev_to_drm(adev), mem->dmabuf);
 	if (IS_ERR(gobj))
@@ -1625,14 +1634,18 @@ size_t amdgpu_amdkfd_get_available_memory(struct amdgpu_device *adev)
 {
 	uint64_t reserved_for_pt =
 		ESTIMATE_PT_SIZE(amdgpu_amdkfd_total_mem_size);
-	size_t available;
+	ssize_t available;
 
 	spin_lock(&kfd_mem_limit.mem_limit_lock);
 	available = adev->gmc.real_vram_size
 		- adev->kfd.vram_used_aligned
 		- atomic64_read(&adev->vram_pin_size)
+		+ atomic64_read(&adev->kfd.vram_pinned)
 		- reserved_for_pt;
 	spin_unlock(&kfd_mem_limit.mem_limit_lock);
+
+	if (available < 0)
+		available = 0;
 
 	return ALIGN_DOWN(available, VRAM_AVAILABLITY_ALIGN);
 }
@@ -2292,8 +2305,12 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 		pr_err("Error in Pinning BO to domain: %d\n", domain);
 
 	amdgpu_bo_sync_wait(bo, AMDGPU_FENCE_OWNER_KFD, false);
-	amdgpu_bo_unreserve(bo);
 
+	if (!ret && bo->tbo.resource->mem_type == TTM_PL_VRAM)
+		atomic64_add(amdgpu_bo_size(bo),
+			&amdgpu_ttm_adev(bo->tbo.bdev)->kfd.vram_pinned);
+
+	amdgpu_bo_unreserve(bo);
 	return ret;
 }
 
@@ -2306,6 +2323,11 @@ void amdgpu_amdkfd_gpuvm_unpin_bo(struct amdgpu_bo *bo)
 		return;
 
 	amdgpu_bo_unpin(bo);
+
+	if (bo->tbo.resource->mem_type == TTM_PL_VRAM)
+		atomic64_sub(amdgpu_bo_size(bo),
+			&amdgpu_ttm_adev(bo->tbo.bdev)->kfd.vram_pinned);
+
 	amdgpu_bo_unreserve(bo);
 }
 
@@ -2499,32 +2521,35 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 	struct amdgpu_bo *bo;
 	int ret;
 
-#if defined(AMDKCL_AMDGPU_DMABUF_OPS)
-	if (dma_buf->ops != &amdgpu_dmabuf_ops)
-		/* Can't handle non-graphics buffers */
-		return -EINVAL;
-#endif
-
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
+	obj = amdgpu_gem_prime_import(adev_to_drm(adev), dma_buf);
+	if (IS_ERR(obj))
+		return PTR_ERR(obj);
+#else
 	obj = dma_buf->priv;
 	if (drm_to_adev(obj->dev) != adev)
 		/* Can't handle buffers from other devices */
 		return -EINVAL;
+	drm_gem_object_get(obj);
+#endif
 
 	bo = gem_to_amdgpu_bo(obj);
 	if (!(bo->preferred_domains & (AMDGPU_GEM_DOMAIN_VRAM |
-				    AMDGPU_GEM_DOMAIN_GTT)))
+				    AMDGPU_GEM_DOMAIN_GTT))) {
 		/* Only VRAM and GTT BOs are supported */
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_put_obj;
+	}
 
 	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
-	if (!*mem)
-		return -ENOMEM;
+	if (!*mem) {
+		ret = -ENOMEM;
+		goto err_put_obj;
+	}
 
 	ret = drm_vma_node_allow(&obj->vma_node, drm_priv);
-	if (ret) {
-		kfree(*mem);
-		return ret;
-	}
+	if (ret)
+		goto err_free_mem;
 
 	if (size)
 		*size = amdgpu_bo_size(bo);
@@ -2543,7 +2568,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 			| KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE
 			| KFD_IOC_ALLOC_MEM_FLAGS_EXECUTABLE;
 
-	drm_gem_object_get(&bo->tbo.base);
+	get_dma_buf(dma_buf);
+	(*mem)->dmabuf = dma_buf;
 	(*mem)->bo = bo;
 	(*mem)->ipc_obj = ipc_obj;
 	(*mem)->va = va;
@@ -2556,6 +2582,12 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 	(*mem)->is_imported = true;
 
 	return 0;
+
+err_free_mem:
+	kfree(*mem);
+err_put_obj:
+	drm_gem_object_put(obj);
+	return ret;
 }
 
 int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
@@ -2577,15 +2609,12 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 		goto unlock_out;
 	}
 
-#ifdef HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI
-	dmabuf = amdgpu_gem_prime_export(&mem->bo->tbo.base, 0);
-#else
-	dmabuf = amdgpu_gem_prime_export(adev_to_drm(adev), &mem->bo->tbo.base, 0);
-#endif
-	if (IS_ERR(dmabuf)) {
-		r = PTR_ERR(dmabuf);
+	r = kfd_mem_export_dmabuf(mem);
+	if (r)
 		goto unlock_out;
-	}
+
+	get_dma_buf(mem->dmabuf);
+	dmabuf = mem->dmabuf;
 
 	r = kfd_ipc_store_insert(dmabuf, &mem->ipc_obj, flags, restore_handle);
 	if (r)
@@ -2596,6 +2625,23 @@ int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 unlock_out:
 	mutex_unlock(&mem->lock);
 	return r;
+}
+
+int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_mem *mem,
+				      struct dma_buf **dma_buf)
+{
+	int ret;
+
+	mutex_lock(&mem->lock);
+	ret = kfd_mem_export_dmabuf(mem);
+	if (ret)
+		goto out;
+
+	get_dma_buf(mem->dmabuf);
+	*dma_buf = mem->dmabuf;
+out:
+	mutex_unlock(&mem->lock);
+	return ret;
 }
 
 /* Evict a userptr BO by stopping the queues if necessary

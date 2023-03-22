@@ -105,6 +105,7 @@ struct amdgpu_kfd_dev {
 	struct kfd_dev *dev;
 	int64_t vram_used;
 	uint64_t vram_used_aligned;
+	atomic64_t vram_pinned;
 	bool init_complete;
 	struct work_struct reset_work;
 };
@@ -367,6 +368,8 @@ int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
 				      uint64_t va, void *drm_priv,
 				      struct kgd_mem **mem, uint64_t *size,
 				      uint64_t *mmap_offset);
+int amdgpu_amdkfd_gpuvm_export_dmabuf(struct kgd_mem *mem,
+				      struct dma_buf **dmabuf);
 int amdgpu_amdkfd_gpuvm_export_ipc_obj(struct amdgpu_device *adev, void *vm,
 				       struct kgd_mem *mem,
 				       struct kfd_ipc_obj **ipc_obj,

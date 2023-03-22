@@ -1388,21 +1388,6 @@ int amdgpu_display_modeset_create_props(struct amdgpu_device *adev)
 						 "freesync_capable");
 		if (!adev->mode_info.freesync_capable_property)
 			return -ENOMEM;
-#ifndef HAVE_DRM_VRR_SUPPORTED
-		adev->mode_info.vrr_capable_property =
-			drm_property_create_bool(adev_to_drm(adev),
-						 DRM_MODE_PROP_IMMUTABLE,
-						 "vrr_capable");
-		if (!adev->mode_info.vrr_capable_property)
-			return -ENOMEM;
-
-		adev->mode_info.vrr_enabled_property =
-			drm_property_create_bool(adev_to_drm(adev),
-						 0,
-						 "VRR_ENABLED");
-		if (!adev->mode_info.vrr_enabled_property)
-			return -ENOMEM;
-#endif
 	}
 
 	return 0;
@@ -1684,7 +1669,6 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 static bool
 amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 {
-#ifdef HAVE_DRM_FB_HELPER_BUFFER
 	struct drm_device *dev = adev_to_drm(adev);
 	struct drm_fb_helper *fb_helper = dev->fb_helper;
 
@@ -1695,9 +1679,6 @@ amdgpu_display_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj)
 		return false;
 
 	return true;
-#else
-	return false;
-#endif
 }
 #endif
 
@@ -1709,6 +1690,8 @@ int amdgpu_display_suspend_helper(struct amdgpu_device *adev)
 
 	struct drm_connector_list_iter iter;
 	int r;
+
+	drm_kms_helper_poll_disable(dev);
 
 	/* turn off display hw */
 	drm_modeset_lock_all(dev);
@@ -1797,6 +1780,8 @@ int amdgpu_display_resume_helper(struct amdgpu_device *adev)
 	drm_connector_list_iter_end(&iter);
 
 	drm_modeset_unlock_all(dev);
+
+	drm_kms_helper_poll_enable(dev);
 
 	return 0;
 }

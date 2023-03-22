@@ -347,12 +347,6 @@ struct amdgpu_mode_info {
 	struct drm_property *freesync_property;
 	/* it is used to know about display capability of freesync mode */
 	struct drm_property *freesync_capable_property;
-#ifndef HAVE_DRM_VRR_SUPPORTED
-	/* Support for upstream vrr_capable connector property */
-	struct drm_property *vrr_capable_property;
-	/* Support for upstream vrr_enabled CRTC property */
-	struct drm_property *vrr_enabled_property;
-#endif
 	/* hardcoded DFP edid from BIOS */
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
@@ -374,9 +368,6 @@ struct amdgpu_mode_info {
 	int			disp_priority;
 	const struct amdgpu_display_funcs *funcs;
 	const enum drm_plane_type *plane_type;
-#ifndef HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND
-	struct drm_atomic_state *suspend_state;
-#endif
 };
 
 #define AMDGPU_MAX_BL_LEVEL 0xFF

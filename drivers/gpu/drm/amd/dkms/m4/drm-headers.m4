@@ -10,33 +10,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/amdgpu_pciid.h])
 
 	dnl #
-	dnl # commit v4.11-rc3-927-g7cfdf711ffb0
-	dnl # drm: Extract drm_ioctl.h
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_ioctl.h])
-
-	dnl #
-	dnl # commit v4.12-rc1-158-g3ed4351a83ca
-	dnl # drm: Extract drm_vblank.[hc]
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_vblank.h])
-
-	dnl #
-	dnl # commit v4.15-rc4-1351-g495eb7f877ab
-	dnl # drm: Add some HDCP related #defines
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_hdcp.h])
-
-	dnl #
-	dnl # commit v4.19-rc1-154-gd78aa650670d
-	dnl # drm: Add drm/drm_util.h header file
-	dnl #
-	dnl # commit e9eafcb589213395232084a2378e2e90f67feb29
-	dnl # drm: move drm_can_sleep() to drm_util.h
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_util.h])
-
-	dnl #
 	dnl # commit v5.0-rc1-342-gfcd70cd36b9b
 	dnl # drm: Split out drm_probe_helper.h
 	dnl #
@@ -101,8 +74,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_hdcp_helper.h])
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_hdcp.h])
 	AC_KERNEL_CHECK_HEADERS([drm/display/drm_dp.h])
-
-	AC_KERNEL_CHECK_HEADERS([drm/drm_dsc.h])
 
 	dnl #
 	dnl # v5.7-13141-gca5999fde0a1

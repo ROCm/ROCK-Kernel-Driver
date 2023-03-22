@@ -42,6 +42,8 @@
  */
 #define DRM_SCHED_FENCE_DONT_PIPELINE	DMA_FENCE_FLAG_USER_BITS
 
+enum dma_resv_usage;
+struct dma_resv;
 struct drm_gem_object;
 
 struct drm_gpu_scheduler;
@@ -378,17 +380,16 @@ enum drm_gpu_sched_stat {
  */
 struct drm_sched_backend_ops {
 	/**
-	 * @dependency:
+	 * @prepare_job:
 	 *
 	 * Called when the scheduler is considering scheduling this job next, to
 	 * get another struct dma_fence for this job to block on.  Once it
 	 * returns NULL, run_job() may be called.
 	 *
-	 * If a driver exclusively uses drm_sched_job_add_dependency() and
-	 * drm_sched_job_add_implicit_dependencies() this can be ommitted and
-	 * left as NULL.
+	 * Can be NULL if no additional preparation to the dependencies are
+	 * necessary. Skipped when jobs are killed instead of run.
 	 */
-	struct dma_fence *(*dependency)(struct drm_sched_job *sched_job,
+	struct dma_fence *(*prepare_job)(struct drm_sched_job *sched_job,
 					struct drm_sched_entity *s_entity);
 
 	/**
@@ -519,6 +520,9 @@ void drm_sched_job_arm(struct drm_sched_job *job);
 #ifdef HAVE_STRUCT_XARRAY
 int drm_sched_job_add_dependency(struct drm_sched_job *job,
 				 struct dma_fence *fence);
+int drm_sched_job_add_resv_dependencies(struct drm_sched_job *job,
+													struct dma_resv *resv,
+													enum dma_resv_usage usage);
 int drm_sched_job_add_implicit_dependencies(struct drm_sched_job *job,
 					    struct drm_gem_object *obj,
 					    bool write);

@@ -1,4 +1,3 @@
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
@@ -40,6 +39,7 @@
  */
 void calc_rc_params(struct rc_params *rc, const struct drm_dsc_config *pps)
 {
+#if defined(CONFIG_DRM_AMD_DC_FP)
 	enum colour_mode mode;
 	enum bits_per_comp bpc;
 	bool is_navite_422_or_420;
@@ -65,5 +65,5 @@ void calc_rc_params(struct rc_params *rc, const struct drm_dsc_config *pps)
 			   slice_width, slice_height,
 			   pps->dsc_version_minor);
 	DC_FP_END();
-}
 #endif
+}

@@ -267,7 +267,7 @@ static struct timing_generator_funcs dcn32_tg_funcs = {
 		.enable_crtc = optc32_enable_crtc,
 		.disable_crtc = optc32_disable_crtc,
 		.phantom_crtc_post_enable = optc32_phantom_crtc_post_enable,
-#ifdef CONFIG_DRM_AMD_DC_DCN
+#ifdef CONFIG_DRM_AMD_DC_FP
 		.disable_phantom_crtc = optc32_disable_phantom_otg,
 #endif
 		/* used by enable_timing_synchronization. Not need for FPGA */
@@ -304,9 +304,7 @@ static struct timing_generator_funcs dcn32_tg_funcs = {
 		.setup_global_swap_lock = NULL,
 		.get_crc = optc1_get_crc,
 		.configure_crc = optc1_configure_crc,
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		.set_dsc_config = optc3_set_dsc_config,
-#endif
 		.get_dsc_status = optc2_get_dsc_status,
 		.set_dwb_source = NULL,
 		.set_odm_bypass = optc32_set_odm_bypass,

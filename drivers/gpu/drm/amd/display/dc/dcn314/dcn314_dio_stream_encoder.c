@@ -296,12 +296,14 @@ static void enc314_stream_encoder_dp_unblank(
 		uint32_t n_vid = 0x8000;
 		uint32_t m_vid;
 		uint32_t n_multiply = 0;
+		uint32_t pix_per_cycle = 0;
 		uint64_t m_vid_l = n_vid;
 
 		/* YCbCr 4:2:0 : Computed VID_M will be 2X the input rate */
 		if (is_two_pixels_per_containter(&param->timing) || param->opp_cnt > 1) {
 			/*this logic should be the same in get_pixel_clock_parameters() */
 			n_multiply = 1;
+			pix_per_cycle = 1;
 		}
 		/* M / N = Fstream / Flink
 		 * m_vid / n_vid = pixel rate / link rate
@@ -329,6 +331,10 @@ static void enc314_stream_encoder_dp_unblank(
 		REG_UPDATE_2(DP_VID_TIMING,
 				DP_VID_M_N_GEN_EN, 1,
 				DP_VID_N_MUL, n_multiply);
+
+		REG_UPDATE(DP_PIXEL_FORMAT,
+				DP_PIXEL_PER_CYCLE_PROCESSING_MODE,
+				pix_per_cycle);
 	}
 
 	/* make sure stream is disabled before resetting steer fifo */
@@ -366,10 +372,9 @@ static void enc314_stream_encoder_dp_unblank(
 	 */
 	enc314_enable_fifo(enc);
 
-	link_dp_source_sequence_trace(link, DPCD_SOURCE_SEQ_AFTER_ENABLE_DP_VID_STREAM);
+	link->dc->link_srv->dp_trace_source_sequence(link, DPCD_SOURCE_SEQ_AFTER_ENABLE_DP_VID_STREAM);
 }
 
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 /* Set DSC-related configuration.
  *   dsc_mode: 0 disables DSC, other values enable DSC in specified format
  *   sc_bytes_per_pixel: DP_DSC_BYTES_PER_PIXEL removed in DCN32
@@ -404,7 +409,6 @@ static void enc314_read_state(struct stream_encoder *enc, struct enc_state *s)
 		REG_GET(DP_SEC_CNTL, DP_SEC_STREAM_ENABLE, &s->sec_stream_enable);
 	}
 }
-#endif
 
 static void enc314_set_dig_input_mode(struct stream_encoder *enc, unsigned int pix_per_container)
 {
@@ -453,14 +457,10 @@ static const struct stream_encoder_funcs dcn314_str_enc_funcs = {
 	.set_avmute = enc1_stream_encoder_set_avmute,
 	.dig_connect_to_otg = enc1_dig_connect_to_otg,
 	.dig_source_otg = enc1_dig_source_otg,
-
 	.dp_get_pixel_format  = enc1_stream_encoder_dp_get_pixel_format,
-
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.enc_read_state = enc314_read_state,
 	.dp_set_dsc_config = enc314_dp_set_dsc_config,
 	.dp_set_dsc_pps_info_packet = enc3_dp_set_dsc_pps_info_packet,
-#endif
 	.set_dynamic_metadata = enc2_set_dynamic_metadata,
 	.hdmi_reset_stream_attribute = enc1_reset_hdmi_stream_attribute,
 

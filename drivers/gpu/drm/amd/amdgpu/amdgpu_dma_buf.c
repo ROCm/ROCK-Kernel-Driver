@@ -147,9 +147,6 @@ err_fences_put:
  * 0 on success or a negative error code on failure.
  */
 static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
-#ifndef HAVE_DRM_GEM_MAP_ATTACH_2ARGS
-					struct device *target_dev,
-#endif
 					struct dma_buf_attachment *attach)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
@@ -157,11 +154,8 @@ static int amdgpu_dma_buf_map_attach(struct dma_buf *dma_buf,
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
 	long r;
 
-#ifdef HAVE_DRM_GEM_MAP_ATTACH_2ARGS
 	r = drm_gem_map_attach(dma_buf, attach);
-#else
-	r = drm_gem_map_attach(dma_buf, target_dev, attach);
-#endif
+
 	if (r)
 		return r;
 

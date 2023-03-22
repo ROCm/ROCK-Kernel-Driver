@@ -196,46 +196,6 @@ static int soc21_query_video_codecs(struct amdgpu_device *adev, bool encode,
 		return -EINVAL;
 	}
 }
-/*
- * Indirect registers accessor
- */
-static u32 soc21_pcie_rreg(struct amdgpu_device *adev, u32 reg)
-{
-	unsigned long address, data;
-	address = adev->nbio.funcs->get_pcie_index_offset(adev);
-	data = adev->nbio.funcs->get_pcie_data_offset(adev);
-
-	return amdgpu_device_indirect_rreg(adev, address, data, reg);
-}
-
-static void soc21_pcie_wreg(struct amdgpu_device *adev, u32 reg, u32 v)
-{
-	unsigned long address, data;
-
-	address = adev->nbio.funcs->get_pcie_index_offset(adev);
-	data = adev->nbio.funcs->get_pcie_data_offset(adev);
-
-	amdgpu_device_indirect_wreg(adev, address, data, reg, v);
-}
-
-static u64 soc21_pcie_rreg64(struct amdgpu_device *adev, u32 reg)
-{
-	unsigned long address, data;
-	address = adev->nbio.funcs->get_pcie_index_offset(adev);
-	data = adev->nbio.funcs->get_pcie_data_offset(adev);
-
-	return amdgpu_device_indirect_rreg64(adev, address, data, reg);
-}
-
-static void soc21_pcie_wreg64(struct amdgpu_device *adev, u32 reg, u64 v)
-{
-	unsigned long address, data;
-
-	address = adev->nbio.funcs->get_pcie_index_offset(adev);
-	data = adev->nbio.funcs->get_pcie_data_offset(adev);
-
-	amdgpu_device_indirect_wreg64(adev, address, data, reg, v);
-}
 
 static u32 soc21_didt_rreg(struct amdgpu_device *adev, u32 reg)
 {
@@ -360,9 +320,10 @@ static int soc21_read_register(struct amdgpu_device *adev, u32 se_num,
 	*value = 0;
 	for (i = 0; i < ARRAY_SIZE(soc21_allowed_read_registers); i++) {
 		en = &soc21_allowed_read_registers[i];
-		if (adev->reg_offset[en->hwip][en->inst] &&
-		    reg_offset != (adev->reg_offset[en->hwip][en->inst][en->seg]
-				   + en->reg_offset))
+		if (!adev->reg_offset[en->hwip][en->inst])
+			continue;
+		else if (reg_offset != (adev->reg_offset[en->hwip][en->inst][en->seg]
+					+ en->reg_offset))
 			continue;
 
 		*value = soc21_get_register_value(adev,
@@ -479,21 +440,6 @@ static int soc21_set_vce_clocks(struct amdgpu_device *adev, u32 evclk, u32 ecclk
 	return 0;
 }
 
-static void soc21_pcie_gen3_enable(struct amdgpu_device *adev)
-{
-	if (pci_is_root_bus(adev->pdev->bus))
-		return;
-
-	if (amdgpu_pcie_gen2 == 0)
-		return;
-
-	if (!(adev->pm.pcie_gen_mask & (CAIL_PCIE_LINK_SPEED_SUPPORT_GEN2 |
-					CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)))
-		return;
-
-	/* todo */
-}
-
 static void soc21_program_aspm(struct amdgpu_device *adev)
 {
 	if (!amdgpu_device_should_use_aspm(adev))
@@ -519,11 +465,6 @@ const struct amdgpu_ip_block_version soc21_common_ip_block =
 	.rev = 0,
 	.funcs = &soc21_common_ip_funcs,
 };
-
-static uint32_t soc21_get_rev_id(struct amdgpu_device *adev)
-{
-	return adev->nbio.funcs->get_rev_id(adev);
-}
 
 static bool soc21_need_full_reset(struct amdgpu_device *adev)
 {
@@ -650,10 +591,10 @@ static int soc21_common_early_init(void *handle)
 	adev->rmmio_remap.bus_addr = adev->rmmio_base + MMIO_REG_HOLE_OFFSET;
 	adev->smc_rreg = NULL;
 	adev->smc_wreg = NULL;
-	adev->pcie_rreg = &soc21_pcie_rreg;
-	adev->pcie_wreg = &soc21_pcie_wreg;
-	adev->pcie_rreg64 = &soc21_pcie_rreg64;
-	adev->pcie_wreg64 = &soc21_pcie_wreg64;
+	adev->pcie_rreg = &amdgpu_device_indirect_rreg;
+	adev->pcie_wreg = &amdgpu_device_indirect_wreg;
+	adev->pcie_rreg64 = &amdgpu_device_indirect_rreg64;
+	adev->pcie_wreg64 = &amdgpu_device_indirect_wreg64;
 	adev->pciep_rreg = amdgpu_device_pcie_port_rreg;
 	adev->pciep_wreg = amdgpu_device_pcie_port_wreg;
 
@@ -666,7 +607,7 @@ static int soc21_common_early_init(void *handle)
 
 	adev->asic_funcs = &soc21_asic_funcs;
 
-	adev->rev_id = soc21_get_rev_id(adev);
+	adev->rev_id = amdgpu_device_get_rev_id(adev);
 	adev->external_rev_id = 0xff;
 	switch (adev->ip_versions[GC_HWIP][0]) {
 	case IP_VERSION(11, 0, 0):
@@ -838,8 +779,6 @@ static int soc21_common_hw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	/* enable pcie gen2/3 link */
-	soc21_pcie_gen3_enable(adev);
 	/* enable aspm */
 	soc21_program_aspm(adev);
 	/* setup nbio registers */

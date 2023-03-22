@@ -37,16 +37,6 @@ static inline u64 ktime_get_raw_ns(void)
 }
 #endif
 
-#ifndef HAVE_KTIME_GET_REAL_SECONDS
-static inline time64_t ktime_get_real_seconds(void)
-{
-	struct timeval ts;
-
-	do_gettimeofday(&ts);
-	return (time64_t)ts.tv_sec;
-}
-#endif
-
 #ifndef HAVE_JIFFIES64_TO_MSECS
 extern u64 jiffies64_to_msecs(u64 j);
 #endif

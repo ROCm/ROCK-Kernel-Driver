@@ -15,7 +15,6 @@
  * device expects the PPS payload in big endian format for fields
  * that span more than 1 byte.
  */
-#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -331,5 +330,3 @@ int drm_dsc_compute_rc_parameters(struct drm_dsc_config *vdsc_cfg)
 }
 EXPORT_SYMBOL(drm_dsc_compute_rc_parameters);
 #endif /* HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS */
-
-#endif /* CONFIG_DRM_AMD_DC_DSC_SUPPORT */

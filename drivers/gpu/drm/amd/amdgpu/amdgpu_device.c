@@ -677,20 +677,20 @@ void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v)
  * amdgpu_device_indirect_rreg - read an indirect register
  *
  * @adev: amdgpu_device pointer
- * @pcie_index: mmio register offset
- * @pcie_data: mmio register offset
  * @reg_addr: indirect register address to read from
  *
  * Returns the value of indirect register @reg_addr
  */
 u32 amdgpu_device_indirect_rreg(struct amdgpu_device *adev,
-				u32 pcie_index, u32 pcie_data,
 				u32 reg_addr)
 {
-	unsigned long flags;
-	u32 r;
+	unsigned long flags, pcie_index, pcie_data;
 	void __iomem *pcie_index_offset;
 	void __iomem *pcie_data_offset;
+	u32 r;
+
+	pcie_index = adev->nbio.funcs->get_pcie_index_offset(adev);
+	pcie_data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
 	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
 	pcie_index_offset = (void __iomem *)adev->rmmio + pcie_index * 4;
@@ -708,20 +708,20 @@ u32 amdgpu_device_indirect_rreg(struct amdgpu_device *adev,
  * amdgpu_device_indirect_rreg64 - read a 64bits indirect register
  *
  * @adev: amdgpu_device pointer
- * @pcie_index: mmio register offset
- * @pcie_data: mmio register offset
  * @reg_addr: indirect register address to read from
  *
  * Returns the value of indirect register @reg_addr
  */
 u64 amdgpu_device_indirect_rreg64(struct amdgpu_device *adev,
-				  u32 pcie_index, u32 pcie_data,
 				  u32 reg_addr)
 {
-	unsigned long flags;
-	u64 r;
+	unsigned long flags, pcie_index, pcie_data;
 	void __iomem *pcie_index_offset;
 	void __iomem *pcie_data_offset;
+	u64 r;
+
+	pcie_index = adev->nbio.funcs->get_pcie_index_offset(adev);
+	pcie_data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
 	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
 	pcie_index_offset = (void __iomem *)adev->rmmio + pcie_index * 4;
@@ -751,12 +751,14 @@ u64 amdgpu_device_indirect_rreg64(struct amdgpu_device *adev,
  *
  */
 void amdgpu_device_indirect_wreg(struct amdgpu_device *adev,
-				 u32 pcie_index, u32 pcie_data,
 				 u32 reg_addr, u32 reg_data)
 {
-	unsigned long flags;
+	unsigned long flags, pcie_index, pcie_data;
 	void __iomem *pcie_index_offset;
 	void __iomem *pcie_data_offset;
+
+	pcie_index = adev->nbio.funcs->get_pcie_index_offset(adev);
+	pcie_data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
 	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
 	pcie_index_offset = (void __iomem *)adev->rmmio + pcie_index * 4;
@@ -780,12 +782,14 @@ void amdgpu_device_indirect_wreg(struct amdgpu_device *adev,
  *
  */
 void amdgpu_device_indirect_wreg64(struct amdgpu_device *adev,
-				   u32 pcie_index, u32 pcie_data,
 				   u32 reg_addr, u64 reg_data)
 {
-	unsigned long flags;
+	unsigned long flags, pcie_index, pcie_data;
 	void __iomem *pcie_index_offset;
 	void __iomem *pcie_data_offset;
+
+	pcie_index = adev->nbio.funcs->get_pcie_index_offset(adev);
+	pcie_data = adev->nbio.funcs->get_pcie_data_offset(adev);
 
 	spin_lock_irqsave(&adev->pcie_idx_lock, flags);
 	pcie_index_offset = (void __iomem *)adev->rmmio + pcie_index * 4;
@@ -802,6 +806,18 @@ void amdgpu_device_indirect_wreg64(struct amdgpu_device *adev,
 	writel((u32)(reg_data >> 32), pcie_data_offset);
 	readl(pcie_data_offset);
 	spin_unlock_irqrestore(&adev->pcie_idx_lock, flags);
+}
+
+/**
+ * amdgpu_device_get_rev_id - query device rev_id
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Return device rev_id
+ */
+u32 amdgpu_device_get_rev_id(struct amdgpu_device *adev)
+{
+	return adev->nbio.funcs->get_rev_id(adev);
 }
 
 /**
@@ -3802,8 +3818,6 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		}
 	}
 
-	pci_enable_pcie_error_reporting(adev->pdev);
-
 	/* Post card if necessary */
 	if (amdgpu_device_need_post(adev)) {
 		if (!adev->bios) {
@@ -3903,11 +3917,8 @@ fence_driver_init:
 #endif
 
 	r = amdgpu_pm_sysfs_init(adev);
-	if (r) {
-		adev->pm_sysfs_en = false;
-		DRM_ERROR("registering pm debugfs failed (%d).\n", r);
-	} else
-		adev->pm_sysfs_en = true;
+	if (r)
+		DRM_ERROR("registering pm sysfs failed (%d).\n", r);
 
 	r = amdgpu_ucode_sysfs_init(adev);
 	if (r) {
@@ -4056,7 +4067,7 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		ttm_bo_lock_delayed_workqueue(&adev->mman.bdev);
 	}
 
-	if (adev->pm_sysfs_en)
+	if (adev->pm.sysfs_initialized)
 		amdgpu_pm_sysfs_fini(adev);
 	if (adev->ucode_sysfs_en)
 		amdgpu_ucode_sysfs_fini(adev);
@@ -4197,8 +4208,6 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 	if (amdgpu_acpi_smart_shift_update(dev, AMDGPU_SS_DEV_D3))
 		DRM_WARN("smart shift update failed\n");
 
-	drm_kms_helper_poll_disable(dev);
-
 	if (fbcon)
 #ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
@@ -4302,8 +4311,6 @@ exit:
 #else
 		amdgpu_fbdev_set_suspend(adev, 0);
 #endif
-
-	drm_kms_helper_poll_enable(dev);
 
 	amdgpu_ras_resume(adev);
 
@@ -5655,7 +5662,7 @@ int amdgpu_device_baco_enter(struct drm_device *dev)
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 
-	if (!amdgpu_device_supports_baco(adev_to_drm(adev)))
+	if (!amdgpu_device_supports_baco(dev))
 		return -ENOTSUPP;
 
 	if (ras && adev->ras_enabled &&
@@ -5671,7 +5678,7 @@ int amdgpu_device_baco_exit(struct drm_device *dev)
 	struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
 	int ret = 0;
 
-	if (!amdgpu_device_supports_baco(adev_to_drm(adev)))
+	if (!amdgpu_device_supports_baco(dev))
 		return -ENOTSUPP;
 
 	ret = amdgpu_dpm_baco_exit(adev);

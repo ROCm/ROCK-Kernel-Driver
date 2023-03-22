@@ -1,24 +1,6 @@
 AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 
 	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/overflow.h])
-
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/sched/mm.h])
-
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/sched/task.h])
-
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/sched/signal.h])
-
-	dnl #
-	dnl #  commit v4.15-28-gf3804203306e
-	dnl #  array_index_nospec: Sanitize speculative array de-references
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/nospec.h])
-
-	dnl #
 	dnl # commit 8bd9cb51daac89337295b6f037b0486911e1b408
 	dnl # locking/atomics, asm-generic: Move some macros from <linux/bitops.h>
 	dnl # to a new <linux/bits.h> file
@@ -78,12 +60,6 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-mapping: use unsigned long for dma_attrs
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-attrs.h])
-
-	dnl #
-	dnl # v4.13-rc1-41-g7744ccdbc16f
-	dnl # x86/mm: Add Secure Memory Encryption (SME) support
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([linux/mem_encrypt.h])
 
 	dnl #
 	dnl # 01fd30da0474

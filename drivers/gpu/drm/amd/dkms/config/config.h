@@ -131,6 +131,9 @@
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
+/* fsleep() is available */
+#define HAVE_FSLEEP 1
+
 /* drm_dp_mst_connector_early_unregister() is available */
 #define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
 
@@ -192,9 +195,6 @@
 /* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
    drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
-
-/* drm_crtc_init_with_planes() wants name */
-#define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
 
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
@@ -361,15 +361,6 @@
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
 
-/* Define to 1 if you have the <drm/drm_dsc.h> header file. */
-/* #undef HAVE_DRM_DRM_DSC_H */
-
-/* Define to 1 if you have the <drm/drm_hdcp.h> header file. */
-#define HAVE_DRM_DRM_HDCP_H 1
-
-/* Define to 1 if you have the <drm/drm_ioctl.h> header file. */
-#define HAVE_DRM_DRM_IOCTL_H 1
-
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
@@ -378,12 +369,6 @@
 
 /* Define to 1 if you have the <drm/drm_buddy.h> header file. */
 #define HAVE_DRM_DRM_BUDDY_H 1
-
-/* Define to 1 if you have the <drm/drm_util.h> header file. */
-#define HAVE_DRM_DRM_UTIL_H 1
-
-/* Define to 1 if you have the <drm/drm_vblank.h> header file. */
-#define HAVE_DRM_DRM_VBLANK_H 1
 
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
@@ -397,17 +382,11 @@
 /* drm_gem_prime_export() with p,i arg is available */
 #define HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI 1
 
-/* drm_drv_uses_atomic_modeset() is available */
-#define HAVE_DRM_DRV_USES_ATOMIC_MODESET 1
-
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
 /* drm_edid_to_eld() are available */
 /* #undef HAVE_DRM_EDID_TO_ELD */
-
-/* drm_encoder_find() wants file_priv */
-#define HAVE_DRM_ENCODER_FIND_VALID_WITH_FILE 1
 
 /* drm_fbdev_generic_setup() is available */
 /* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
@@ -419,9 +398,6 @@
 /* drm_fb_helper_alloc_info() is available */
 #define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
 
-/* struct drm_fb_helper has buffer field */
-#define HAVE_DRM_FB_HELPER_BUFFER 1
-
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
@@ -430,9 +406,6 @@
 
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
-
-/* whether drm_fb_helper_lastclose() is available */
-#define HAVE_DRM_FB_HELPER_LASTCLOSE 1
 
 /* drm_fb_helper_unregister_info() is available */
 #define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
@@ -443,14 +416,8 @@
 /* drm_format_info.block_w and rm_format_info.block_h is available */
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
-/* whether struct drm_framebuffer have format */
-#define HAVE_DRM_FRAMEBUFFER_FORMAT 1
-
  /* drm_gem_plane_helper_prepare_fb() is available */
  #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
-
-/* drm_gem_map_attach() wants 2 arguments */
-/* #undef HAVE_DRM_GEM_MAP_ATTACH_2ARGS */
 
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
@@ -470,9 +437,6 @@
 /* drm_gen_fb_init_with_funcs() is available */
 #define HAVE_DRM_GEN_FB_INIT_WITH_FUNCS 1
 
-/* drm_get_format_info() is available */
-#define HAVE_DRM_GET_FORMAT_INFO 1
-
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
@@ -482,20 +446,11 @@
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,p interface */
 #define HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_P 1
 
-/* drm_hdmi_vendor_infoframe_from_display_mode() has p,p,p interface */
-#define HAVE_DRM_HDMI_VENDOR_INFOFRAME_FROM_DISPLAY_MODE_P_P_P 1
-
 /* drm_helper_force_disable_all() is available */
 #define HAVE_DRM_HELPER_FORCE_DISABLE_ALL 1
 
-/* drm_helper_mode_fill_fb_struct() wants dev arg */
-#define HAVE_DRM_HELPER_MODE_FILL_FB_STRUCT_DEV 1
-
 /* drm_kms_helper_connector_hotplug_event() function is available */
 #define HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT 1
-
-/* drm_kms_helper_is_poll_worker() is available */
-#define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
 
 /* drm_legacy_irq_uninstall() is available */
 #define HAVE_DRM_LEGACY_IRQ_UNINSTALL 1
@@ -505,12 +460,6 @@
 
 /* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
-
-/* whether drm_mm_insert_mode is available */
-#define HAVE_DRM_MM_INSERT_MODE 1
-
-/* drm_mm_insert_node has three parameters */
-#define HAVE_DRM_MM_INSERT_NODE_THREE_PARAMETERS 1
 
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
@@ -524,39 +473,14 @@
 /* drm_mode_config_funcs->atomic_state_alloc() is available */
 #define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
 
-/* drm_mode_config_helper_{suspend/resume}() is available */
-#define HAVE_DRM_MODE_CONFIG_HELPER_SUSPEND 1
-
-/* drm_mode_get_hv_timing is available */
-#define HAVE_DRM_MODE_GET_HV_TIMING 1
-
-/* drm_mode_is_420_xxx() is available */
-#define HAVE_DRM_MODE_IS_420_XXX 1
-
 /* drm_mode_init() is available */
 #define HAVE_DRM_MODE_INTT 1
 
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
-/* enum drm_panel_orientation is available */
-#define HAVE_DRM_PANEL_ORIENTATION_ENUM 1
-
-/* drm_plane_get_damage_clips_count function is available */
-#define HAVE_DRM_PLANE_GET_DAMAGE_CLIPS_COUNT 1
-
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
-
-/* drm_plane_mask is available */
-#define HAVE_DRM_PLANE_MASK 1
-
-/* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
-   available */
-#define HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE 1
-
-/* drm_plane_create_color_properties is available */
-#define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
 
 /* drm_prime_pages_to_sg() wants 3 arguments */
 #define HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS 1
@@ -576,20 +500,8 @@
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
-/* drm_universal_plane_init() wants 7 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_7ARGS */
-
-/* drm_universal_plane_init() wants 8 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_8ARGS */
-
-/* drm_universal_plane_init() wants 9 args */
-#define HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS 1
-
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
-
-/* Variable refresh rate(vrr) is supported */
-#define HAVE_DRM_VRR_SUPPORTED 1
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
@@ -681,23 +593,8 @@
 /* ktime_get_raw_ns is available */
 #define HAVE_KTIME_GET_RAW_NS 1
 
-/* ktime_get_real_seconds() is available */
-#define HAVE_KTIME_GET_REAL_SECONDS 1
-
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
-
-/* kvcalloc() is available */
-#define HAVE_KVCALLOC 1
-
-/* kvfree() is available */
-#define HAVE_KVFREE 1
-
-/* kvmalloc_array() is available */
-#define HAVE_KVMALLOC_ARRAY 1
-
-/* kv[mz]alloc() are available */
-#define HAVE_KVZALLOC_KVMALLOC 1
 
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
@@ -735,17 +632,8 @@
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
 
-/* Define to 1 if you have the <linux/mem_encrypt.h> header file. */
-#define HAVE_LINUX_MEM_ENCRYPT_H 1
-
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
-
-/* Define to 1 if you have the <linux/nospec.h> header file. */
-#define HAVE_LINUX_NOSPEC_H 1
-
-/* Define to 1 if you have the <linux/overflow.h> header file. */
-#define HAVE_LINUX_OVERFLOW_H 1
 
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1
@@ -755,15 +643,6 @@
 
 /* Define to 1 if you have the <linux/processor.h> header file. */
 #define HAVE_LINUX_PROCESSOR_H 1
-
-/* Define to 1 if you have the <linux/sched/mm.h> header file. */
-#define HAVE_LINUX_SCHED_MM_H 1
-
-/* Define to 1 if you have the <linux/sched/signal.h> header file. */
-#define HAVE_LINUX_SCHED_SIGNAL_H 1
-
-/* Define to 1 if you have the <linux/sched/task.h> header file. */
-#define HAVE_LINUX_SCHED_TASK_H 1
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
@@ -819,20 +698,8 @@
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 
-/* num_u32_u32 is available */
-#define HAVE_MUL_U32_U32 1
-
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
-
-/* pcie_bandwidth_available() is available */
-#define HAVE_PCIE_BANDWIDTH_AVAILABLE 1
-
-/* pci_enable_atomic_ops_to_root() exist */
-#define HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT 1
-
-/* pcie_get_speed_cap() and pcie_get_width_cap() exist */
-#define HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP 1
 
 /* PCI driver handles extended tags */
 #define HAVE_PCI_CONFIGURE_EXTENDED_TAGS 1
@@ -842,9 +709,6 @@
 
 /* struct pci_driver has field dev_groups */
 #define HAVE_PCI_DRIVER_DEV_GROUPS 1
-
-/* pci_irq_vector() is available */
-#define HAVE_PCI_IRQ_VECTOR 1
 
 /* pci_is_thunderbolt_attached() is available */
 #define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
@@ -857,9 +721,6 @@
 
 /* pci_upstream_bridge() is available */
 #define HAVE_PCI_UPSTREAM_BRIDGE 1
-
-/* perf_event_update_userpage() is exported */
-#define HAVE_PERF_EVENT_UPDATE_USERPAGE 1
 
 /* pfn_t is defined */
 #define HAVE_PFN_T 1
@@ -885,20 +746,8 @@
 /* whether register_shrinker(x, x) is available */
 #define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
 
-/* remove_conflicting_pci_framebuffers() is available */
-/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS */
-
-/* remove_conflicting_pci_framebuffers() wants p,i,p args */
-/* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP */
-
 /* remove_conflicting_pci_framebuffers() wants p,p args */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
-
-/* request_firmware_direct() is available */
-#define HAVE_REQUEST_FIRMWARE_DIRECT 1
-
-/* reservation_object->staged is available */
-/* #undef HAVE_RESERVATION_OBJECT_STAGED */
 
 /* sched_set_fifo_low() is available */
 #define HAVE_SCHED_SET_FIFO_LOW 1
