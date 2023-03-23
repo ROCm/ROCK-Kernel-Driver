@@ -35,10 +35,9 @@
 
 #define VMID_NUM 16
 
-#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
-
 #define KFD_MES_PROCESS_QUANTUM		100000
 #define KFD_MES_GANG_QUANTUM		10000
+#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
 
 struct device_process_node {
 	struct qcm_process_device *qpd;
@@ -258,10 +257,11 @@ struct device_queue_manager {
 	struct work_struct	hw_exception_work;
 	struct kfd_mem_obj	hiq_sdma_mqd;
 	bool			sched_running;
-	uint32_t		wait_times;
 
 	/* used for GFX 9.4.3 only */
 	uint32_t		current_logical_xcc_start;
+
+	uint32_t		wait_times;
 };
 
 void device_queue_manager_init_cik(
