@@ -326,6 +326,9 @@ static int scsi_get_vpd_size(struct scsi_device *sdev, u8 page)
 	unsigned char vpd_header[SCSI_VPD_HEADER_SIZE] __aligned(4);
 	int result;
 
+	if (sdev->no_vpd_size)
+		return SCSI_DEFAULT_VPD_LEN;
+
 	/*
 	 * Fetch the VPD page header to find out how big the page
 	 * is. This is done to prevent problems on legacy devices
@@ -587,8 +590,6 @@ EXPORT_SYMBOL(scsi_device_get);
 void scsi_device_put(struct scsi_device *sdev)
 {
 	struct module *mod = sdev->host->hostt->module;
-
-	might_sleep();
 
 	put_device(&sdev->sdev_gendev);
 	module_put(mod);

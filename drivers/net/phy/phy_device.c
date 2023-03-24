@@ -1517,7 +1517,7 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 	 * another mac interface, so we should create a device link between
 	 * phy dev and mac dev.
 	 */
-	if (phydev->mdio.bus->parent && dev->dev.parent != phydev->mdio.bus->parent)
+	if (dev && phydev->mdio.bus->parent && dev->dev.parent != phydev->mdio.bus->parent)
 		phydev->devlink = device_link_add(dev->dev.parent, &phydev->mdio.dev,
 						  DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS);
 
@@ -3053,8 +3053,6 @@ static int phy_probe(struct device *dev)
 	if (phydrv->flags & PHY_IS_INTERNAL)
 		phydev->is_internal = true;
 
-	mutex_lock(&phydev->lock);
-
 	/* Deassert the reset signal */
 	phy_device_reset(phydev, 0);
 
@@ -3122,11 +3120,9 @@ static int phy_probe(struct device *dev)
 	phydev->state = PHY_READY;
 
 out:
-	/* Assert the reset signal */
+	/* Re-assert the reset signal on error */
 	if (err)
 		phy_device_reset(phydev, 1);
-
-	mutex_unlock(&phydev->lock);
 
 	return err;
 }
@@ -3137,9 +3133,7 @@ static int phy_remove(struct device *dev)
 
 	cancel_delayed_work_sync(&phydev->state_queue);
 
-	mutex_lock(&phydev->lock);
 	phydev->state = PHY_DOWN;
-	mutex_unlock(&phydev->lock);
 
 	sfp_bus_del_upstream(phydev->sfp_bus);
 	phydev->sfp_bus = NULL;

@@ -11,9 +11,9 @@
 #include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/dev_printk.h>
+#include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/kstrtox.h>
-#include <linux/math.h>
 #include <linux/module.h>
 #include <linux/limits.h>
 #include <linux/power_supply.h>
@@ -26,7 +26,8 @@
 
 #define DRIVER_NAME	"dell-wmi-ddv"
 
-#define DELL_DDV_SUPPORTED_INTERFACE 2
+#define DELL_DDV_SUPPORTED_VERSION_MIN	2
+#define DELL_DDV_SUPPORTED_VERSION_MAX	3
 #define DELL_DDV_GUID	"8A42EA14-4F2A-FD45-6422-0087F7A7E608"
 
 #define DELL_EPPID_LENGTH	20
@@ -49,6 +50,7 @@ enum dell_ddv_method {
 	DELL_DDV_BATTERY_RAW_ANALYTICS_START	= 0x0E,
 	DELL_DDV_BATTERY_RAW_ANALYTICS		= 0x0F,
 	DELL_DDV_BATTERY_DESIGN_VOLTAGE		= 0x10,
+	DELL_DDV_BATTERY_RAW_ANALYTICS_A_BLOCK	= 0x11, /* version 3 */
 
 	DELL_DDV_INTERFACE_VERSION		= 0x12,
 
@@ -123,21 +125,27 @@ static int dell_wmi_ddv_query_buffer(struct wmi_device *wdev, enum dell_ddv_meth
 	if (ret < 0)
 		return ret;
 
-	if (obj->package.count != 2)
-		goto err_free;
+	if (obj->package.count != 2 ||
+	    obj->package.elements[0].type != ACPI_TYPE_INTEGER ||
+	    obj->package.elements[1].type != ACPI_TYPE_BUFFER) {
+		ret = -ENOMSG;
 
-	if (obj->package.elements[0].type != ACPI_TYPE_INTEGER)
 		goto err_free;
+	}
 
 	buffer_size = obj->package.elements[0].integer.value;
 
-	if (obj->package.elements[1].type != ACPI_TYPE_BUFFER)
+	if (!buffer_size) {
+		ret = -ENODATA;
+
 		goto err_free;
+	}
 
 	if (buffer_size > obj->package.elements[1].buffer.length) {
 		dev_warn(&wdev->dev,
 			 FW_WARN "WMI buffer size (%llu) exceeds ACPI buffer size (%d)\n",
 			 buffer_size, obj->package.elements[1].buffer.length);
+		ret = -EMSGSIZE;
 
 		goto err_free;
 	}
@@ -149,7 +157,7 @@ static int dell_wmi_ddv_query_buffer(struct wmi_device *wdev, enum dell_ddv_meth
 err_free:
 	kfree(obj);
 
-	return -EIO;
+	return ret;
 }
 
 static int dell_wmi_ddv_query_string(struct wmi_device *wdev, enum dell_ddv_method method,
@@ -183,7 +191,8 @@ static ssize_t temp_show(struct device *dev, struct device_attribute *attr, char
 	if (ret < 0)
 		return ret;
 
-	return sysfs_emit(buf, "%d\n", DIV_ROUND_CLOSEST(value, 10));
+	/* Use 2731 instead of 2731.5 to avoid unnecessary rounding */
+	return sysfs_emit(buf, "%d\n", value - 2731);
 }
 
 static ssize_t eppid_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -340,7 +349,7 @@ static int dell_wmi_ddv_probe(struct wmi_device *wdev, const void *context)
 		return ret;
 
 	dev_dbg(&wdev->dev, "WMI interface version: %d\n", version);
-	if (version != DELL_DDV_SUPPORTED_INTERFACE)
+	if (version < DELL_DDV_SUPPORTED_VERSION_MIN || version > DELL_DDV_SUPPORTED_VERSION_MAX)
 		return -ENODEV;
 
 	data = devm_kzalloc(&wdev->dev, sizeof(*data), GFP_KERNEL);

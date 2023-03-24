@@ -2278,6 +2278,7 @@ cifs_get_smb_ses(struct TCP_Server_Info *server, struct smb3_fs_context *ctx)
 	 * need to lock before changing something in the session.
 	 */
 	spin_lock(&cifs_tcp_ses_lock);
+	ses->dfs_root_ses = ctx->dfs_root_ses;
 	list_add(&ses->smb_ses_list, &server->smb_ses_list);
 	spin_unlock(&cifs_tcp_ses_lock);
 
@@ -2843,72 +2844,48 @@ ip_rfc1001_connect(struct TCP_Server_Info *server)
 	 * negprot - BB check reconnection in case where second
 	 * sessinit is sent but no second negprot
 	 */
-	struct rfc1002_session_packet *ses_init_buf;
-	unsigned int req_noscope_len;
-	struct smb_hdr *smb_buf;
+	struct rfc1002_session_packet req = {};
+	struct smb_hdr *smb_buf = (struct smb_hdr *)&req;
+	unsigned int len;
 
-	ses_init_buf = kzalloc(sizeof(struct rfc1002_session_packet),
-			       GFP_KERNEL);
+	req.trailer.session_req.called_len = sizeof(req.trailer.session_req.called_name);
 
-	if (ses_init_buf) {
-		ses_init_buf->trailer.session_req.called_len = 32;
+	if (server->server_RFC1001_name[0] != 0)
+		rfc1002mangle(req.trailer.session_req.called_name,
+			      server->server_RFC1001_name,
+			      RFC1001_NAME_LEN_WITH_NULL);
+	else
+		rfc1002mangle(req.trailer.session_req.called_name,
+			      DEFAULT_CIFS_CALLED_NAME,
+			      RFC1001_NAME_LEN_WITH_NULL);
 
-		if (server->server_RFC1001_name[0] != 0)
-			rfc1002mangle(ses_init_buf->trailer.
-				      session_req.called_name,
-				      server->server_RFC1001_name,
-				      RFC1001_NAME_LEN_WITH_NULL);
-		else
-			rfc1002mangle(ses_init_buf->trailer.
-				      session_req.called_name,
-				      DEFAULT_CIFS_CALLED_NAME,
-				      RFC1001_NAME_LEN_WITH_NULL);
+	req.trailer.session_req.calling_len = sizeof(req.trailer.session_req.calling_name);
 
-		ses_init_buf->trailer.session_req.calling_len = 32;
+	/* calling name ends in null (byte 16) from old smb convention */
+	if (server->workstation_RFC1001_name[0] != 0)
+		rfc1002mangle(req.trailer.session_req.calling_name,
+			      server->workstation_RFC1001_name,
+			      RFC1001_NAME_LEN_WITH_NULL);
+	else
+		rfc1002mangle(req.trailer.session_req.calling_name,
+			      "LINUX_CIFS_CLNT",
+			      RFC1001_NAME_LEN_WITH_NULL);
 
-		/*
-		 * calling name ends in null (byte 16) from old smb
-		 * convention.
-		 */
-		if (server->workstation_RFC1001_name[0] != 0)
-			rfc1002mangle(ses_init_buf->trailer.
-				      session_req.calling_name,
-				      server->workstation_RFC1001_name,
-				      RFC1001_NAME_LEN_WITH_NULL);
-		else
-			rfc1002mangle(ses_init_buf->trailer.
-				      session_req.calling_name,
-				      "LINUX_CIFS_CLNT",
-				      RFC1001_NAME_LEN_WITH_NULL);
-
-		ses_init_buf->trailer.session_req.scope1 = 0;
-		ses_init_buf->trailer.session_req.scope2 = 0;
-		smb_buf = (struct smb_hdr *)ses_init_buf;
-
-		/* sizeof RFC1002_SESSION_REQUEST with no scopes */
-		req_noscope_len = sizeof(struct rfc1002_session_packet) - 2;
-
-		/* == cpu_to_be32(0x81000044) */
-		smb_buf->smb_buf_length =
-			cpu_to_be32((RFC1002_SESSION_REQUEST << 24) | req_noscope_len);
-		rc = smb_send(server, smb_buf, 0x44);
-		kfree(ses_init_buf);
-		/*
-		 * RFC1001 layer in at least one server
-		 * requires very short break before negprot
-		 * presumably because not expecting negprot
-		 * to follow so fast.  This is a simple
-		 * solution that works without
-		 * complicating the code and causes no
-		 * significant slowing down on mount
-		 * for everyone else
-		 */
-		usleep_range(1000, 2000);
-	}
 	/*
-	 * else the negprot may still work without this
-	 * even though malloc failed
+	 * As per rfc1002, @len must be the number of bytes that follows the
+	 * length field of a rfc1002 session request payload.
 	 */
+	len = sizeof(req) - offsetof(struct rfc1002_session_packet, trailer.session_req);
+
+	smb_buf->smb_buf_length = cpu_to_be32((RFC1002_SESSION_REQUEST << 24) | len);
+	rc = smb_send(server, smb_buf, len);
+	/*
+	 * RFC1001 layer in at least one server requires very short break before
+	 * negprot presumably because not expecting negprot to follow so fast.
+	 * This is a simple solution that works without complicating the code
+	 * and causes no significant slowing down on mount for everyone else
+	 */
+	usleep_range(1000, 2000);
 
 	return rc;
 }
@@ -3480,7 +3457,8 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb3_fs_context *ctx)
 	bool isdfs;
 	int rc;
 
-	uuid_gen(&mnt_ctx.mount_id);
+	INIT_LIST_HEAD(&mnt_ctx.dfs_ses_list);
+
 	rc = dfs_mount_share(&mnt_ctx, &isdfs);
 	if (rc)
 		goto error;
@@ -3500,7 +3478,6 @@ int cifs_mount(struct cifs_sb_info *cifs_sb, struct smb3_fs_context *ctx)
 	kfree(cifs_sb->prepath);
 	cifs_sb->prepath = ctx->prepath;
 	ctx->prepath = NULL;
-	uuid_copy(&cifs_sb->dfs_mount_id, &mnt_ctx.mount_id);
 
 out:
 	cifs_try_adding_channels(cifs_sb, mnt_ctx.ses);
@@ -3512,7 +3489,7 @@ out:
 	return rc;
 
 error:
-	dfs_cache_put_refsrv_sessions(&mnt_ctx.mount_id);
+	dfs_put_root_smb_sessions(&mnt_ctx.dfs_ses_list);
 	kfree(mnt_ctx.origin_fullpath);
 	kfree(mnt_ctx.leaf_fullpath);
 	cifs_mount_put_conns(&mnt_ctx);
@@ -3710,9 +3687,6 @@ cifs_umount(struct cifs_sb_info *cifs_sb)
 	spin_unlock(&cifs_sb->tlink_tree_lock);
 
 	kfree(cifs_sb->prepath);
-#ifdef CONFIG_CIFS_DFS_UPCALL
-	dfs_cache_put_refsrv_sessions(&cifs_sb->dfs_mount_id);
-#endif
 	call_rcu(&cifs_sb->rcu, delayed_free);
 }
 
