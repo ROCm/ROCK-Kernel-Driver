@@ -83,6 +83,7 @@ enum ttm_bo_type {
  * @resource: structure describing current placement.
  * @ttm: TTM structure holding system pages.
  * @deleted: True if the object is only a zombie and already deleted.
+ * @ddestroy: List head for the delayed destroy list.
  *
  * Base class for TTM buffer object, that deals with data placement and CPU
  * mappings. GPU mappings are really up to the driver, but for simpler GPUs
@@ -118,14 +119,19 @@ struct ttm_buffer_object {
 	struct ttm_tt *ttm;
 	bool deleted;
 	struct ttm_lru_bulk_move *bulk_move;
-	unsigned priority;
-	unsigned pin_count;
 
 	/**
-	 * @delayed_delete: Work item used when we can't delete the BO
-	 * immediately
+	 * Members protected by the bdev::lru_lock.
 	 */
-	struct work_struct delayed_delete;
+
+	struct list_head ddestroy;
+
+	/**
+	 * Members protected by a bo reservation.
+	 */
+
+	unsigned priority;
+	unsigned pin_count;
 
 	/**
 	 * Special members that are protected by the reserve lock
@@ -394,6 +400,8 @@ void ttm_bo_vm_open(struct vm_area_struct *vma);
 void ttm_bo_vm_close(struct vm_area_struct *vma);
 int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
 		     void *buf, int len, int write);
+bool ttm_bo_delayed_delete(struct ttm_device *bdev, bool remove_all);
+
 vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot);
 
 int ttm_bo_mem_space(struct ttm_buffer_object *bo,
