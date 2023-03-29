@@ -2571,7 +2571,7 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 			adev->nbio.ras = &nbio_v7_4_ras;
 		break;
 	case IP_VERSION(4, 3, 0):
-		if (adev->ras_hw_enabled & AMDGPU_RAS_BLOCK__DF)
+		if (adev->ras_hw_enabled & (1 << AMDGPU_RAS_BLOCK__DF))
 			/* unlike other generation of nbio ras,
 			 * nbio v4_3 only support fatal error interrupt
 			 * to inform software that DF is freezed due to
