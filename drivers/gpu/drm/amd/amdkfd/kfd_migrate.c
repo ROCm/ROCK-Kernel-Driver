@@ -226,13 +226,8 @@ svm_migrate_get_vram_page(struct svm_range *prange, unsigned long pfn)
 	page = pfn_to_page(pfn);
 	svm_range_bo_ref(prange->svm_bo);
 	page->zone_device_data = prange->svm_bo;
-#ifdef HAVE_ZONE_DEVICE_PUBLIC
-	VM_BUG_ON_PAGE(page_ref_count(page), page);
-	init_page_count(page);
-#else
 #if IS_ENABLED(CONFIG_DEV_PAGEMAP_OPS)
 	get_page(page);
-#endif
 #endif
 	lock_page(page);
 }
