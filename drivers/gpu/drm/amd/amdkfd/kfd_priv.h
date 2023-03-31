@@ -398,9 +398,6 @@ struct kfd_dev {
 
 	int noretry;
 
-	/* HMM page migration MEMORY_DEVICE_PRIVATE mapping */
-	struct dev_pagemap pgmap;
-
 	/* Track per device allocated watch points. */
 	uint32_t alloc_watch_ids;
 
