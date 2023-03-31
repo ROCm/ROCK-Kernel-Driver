@@ -447,6 +447,16 @@ void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm 
 void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, u32 rptr);
 void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
 
+#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
+int kgd2kfd_init_zone_device(struct amdgpu_device *adev);
+#else
+static inline
+int kgd2kfd_init_zone_device(struct amdgpu_device *adev)
+{
+	return 0;
+}
+#endif
+
 /* KGD2KFD callbacks */
 void kgd2kfd_spm_interrupt(struct kfd_dev *kfd);
 int kgd2kfd_quiesce_mm(struct mm_struct *mm, uint32_t trigger);
