@@ -654,7 +654,7 @@ static int amdgpu_cs_pass2(struct amdgpu_cs_parser *p)
 	}
 
 	for (i = 0; i < p->gang_size; ++i) {
-		r = amdgpu_sem_add_cs(p->ctx, p->entities[i], &p->jobs[i]->sync);
+		r = amdgpu_sem_add_cs(p->ctx, p->entities[i], &p->sync);
 		if (r)
 			return r;
 	}
