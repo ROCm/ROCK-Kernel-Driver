@@ -1581,8 +1581,7 @@ bool perform_link_training_with_retries(
 				 * Report and continue with eDP panel mode to
 				 * perform eDP link training with right settings
 				 */
-				bool result;
-				result = cp_psp->funcs.enable_assr(cp_psp->handle, link);
+				cp_psp->funcs.enable_assr(cp_psp->handle, link);
 			}
 		}
 

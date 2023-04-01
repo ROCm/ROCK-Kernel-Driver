@@ -157,7 +157,6 @@ uint8_t dp_parse_lttpr_repeater_count(uint8_t lttpr_repeater_count)
 	return 0; // invalid value
 }
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
 uint32_t link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw)
 {
 	switch (bw) {
@@ -177,7 +176,6 @@ uint32_t link_bw_kbps_from_raw_frl_link_rate_data(uint8_t bw)
 
 	return 0;
 }
-#endif
 
 static enum dc_link_rate linkRateInKHzToLinkRateMultiplier(uint32_t link_rate_in_khz)
 {
@@ -229,7 +227,6 @@ static union dp_cable_id intersect_cable_id(
 	return out;
 }
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
 /*
  * Return PCON's post FRL link training supported BW if its non-zero, otherwise return max_supported_frl_bw.
  */
@@ -257,7 +254,6 @@ static uint32_t intersect_frl_link_bw_support(
 
 	return supported_bw_in_kbps;
 }
-#endif
 
 static enum clock_source_id get_clock_source_id(struct dc_link *link)
 {
@@ -1125,7 +1121,6 @@ static void get_active_converter_info(
 						translate_dpcd_max_bpc(
 							hdmi_color_caps.bits.MAX_BITS_PER_COLOR_COMPONENT);
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
 					if (link->dc->caps.dp_hdmi21_pcon_support) {
 						union hdmi_encoded_link_bw hdmi_encoded_link_bw;
 
@@ -1144,7 +1139,6 @@ static void get_active_converter_info(
 						if (link->dpcd_caps.dongle_caps.dp_hdmi_frl_max_link_bw_in_kbps > 0)
 							link->dpcd_caps.dongle_caps.extendedCapValid = true;
 					}
-#endif
 
 					if (link->dpcd_caps.dongle_caps.dp_hdmi_max_pixel_clk_in_khz != 0)
 						link->dpcd_caps.dongle_caps.extendedCapValid = true;
@@ -1291,7 +1285,7 @@ bool dp_overwrite_extended_receiver_cap(struct dc_link *link)
 void dpcd_set_source_specific_data(struct dc_link *link)
 {
 	if (!link->dc->vendor_signature.is_valid) {
-		enum dc_status result_write_min_hblank = DC_NOT_SUPPORTED;
+		enum dc_status __maybe_unused result_write_min_hblank = DC_NOT_SUPPORTED;
 		struct dpcd_amd_signature amd_signature = {0};
 		struct dpcd_amd_device_id amd_device_id = {0};
 
@@ -2184,7 +2178,7 @@ bool dp_verify_link_cap_with_retries(
 	return success;
 }
 
-/**
+/*
  * Check if there is a native DP or passive DP-HDMI dongle connected
  */
 bool dp_is_sink_present(struct dc_link *link)

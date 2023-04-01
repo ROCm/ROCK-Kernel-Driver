@@ -239,10 +239,10 @@
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
 /* display_info->luminance_range is available */
-/* #undef HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE */
+#define HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE 1
 
 /* display_info->max_dsc_bpp is available */
-/* #undef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP */
+#define HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 1
 
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
@@ -384,9 +384,6 @@
 
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
-
-/* drm_edid_to_eld() are available */
-/* #undef HAVE_DRM_EDID_TO_ELD */
 
 /* drm_fbdev_generic_setup() is available */
 /* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
@@ -544,6 +541,9 @@
 
 /* i2c_new_client_device() is enabled */
 #define HAVE_I2C_NEW_CLIENT_DEVICE 1
+
+/* idr_init_base() is available */
+#define HAVE_IDR_INIT_BASE 1
 
 /* idr_remove return void pointer */
 #define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
@@ -812,6 +812,9 @@
 
 /* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
+
+/* ide->idr_base is available */
+#define HAVE_STRUCT_IDE_IDR_BASE 1
 
 /* struct smca_bank is available */
 /* #undef HAVE_STRUCT_SMCA_BANK */

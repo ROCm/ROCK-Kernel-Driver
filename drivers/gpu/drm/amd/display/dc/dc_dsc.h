@@ -54,13 +54,11 @@ struct dc_dsc_policy {
 	bool enable_dsc_when_not_needed;
 };
 
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 struct dc_dsc_config_options {
 	uint32_t dsc_min_slice_height_override;
 	uint32_t max_target_bpp_limit_override_x16;
 	uint32_t slice_height_granularity;
 };
-#endif
 
 bool dc_dsc_parse_dsc_dpcd(const struct dc *dc,
 		const uint8_t *dpcd_dsc_basic_data,
@@ -79,12 +77,7 @@ bool dc_dsc_compute_bandwidth_range(
 bool dc_dsc_compute_config(
 		const struct display_stream_compressor *dsc,
 		const struct dsc_dec_dpcd_caps *dsc_sink_caps,
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
 		const struct dc_dsc_config_options *options,
-#else
-		uint32_t dsc_min_slice_height_override,
-		uint32_t max_target_bpp_limit_override,
-#endif
 		uint32_t target_bandwidth_kbps,
 		const struct dc_crtc_timing *timing,
 		struct dc_dsc_config *dsc_cfg);
@@ -111,8 +104,7 @@ void dc_dsc_policy_set_max_target_bpp_limit(uint32_t limit);
 void dc_dsc_policy_set_enable_dsc_when_not_needed(bool enable);
 
 void dc_dsc_policy_set_disable_dsc_stream_overhead(bool disable);
-#ifdef HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP
+
 void dc_dsc_get_default_config_option(const struct dc *dc, struct dc_dsc_config_options *options);
-#endif
 
 #endif

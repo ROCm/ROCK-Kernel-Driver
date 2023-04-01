@@ -79,6 +79,11 @@ void kcl_drm_err(const char *format, ...);
 #define HAVE_DRM_ERR_MACRO
 #endif /* drm_err */
 
+#ifndef drm_warn
+#define drm_warn(drm, fmt, ...)		\
+	dev_warn((drm)->dev, "[drm] " fmt, ##__VA_ARGS__)
+#endif /* drm_warn */
+
 #if !defined(DRM_UT_VBL)
 #define DRM_UT_VBL		0x20
 #endif

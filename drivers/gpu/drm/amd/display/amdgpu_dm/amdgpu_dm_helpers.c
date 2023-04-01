@@ -78,6 +78,8 @@ static int amdgpu_dm_patch_edid_caps(struct dc_edid_caps *edid_caps)
 	return ret;
 }
 #endif
+/* MST Dock */
+static const uint8_t SYNAPTICS_DEVICE_ID[] = "SYNA";
 
 /* dm_helpers_parse_edid_caps
  *
@@ -369,9 +371,7 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 
         mst_port = aconnector->mst_output_port;
 
-#if defined(CONFIG_DRM_AMD_DC_FP)
         link_coding_cap = dc_link_dp_mst_decide_link_encoding_format(aconnector->dc_link);
-#endif
 
         if (enable) {
 
