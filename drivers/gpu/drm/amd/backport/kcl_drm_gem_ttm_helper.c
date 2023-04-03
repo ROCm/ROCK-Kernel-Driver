@@ -4,8 +4,7 @@
 
 #include <drm/drm_gem.h>
 #include <drm/drm_device.h>
-#include <drm/ttm/ttm_bo_api.h>
-#include <drm/ttm/ttm_bo_driver.h>
+#include <drm/ttm/ttm_bo.h>
 #include <kcl/kcl_dma-buf-map.h>
 #include <kcl/kcl_iosys-map.h>
 #include <drm/drm_gem_ttm_helper.h>
