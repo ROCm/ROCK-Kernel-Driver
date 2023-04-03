@@ -889,6 +889,9 @@
 /* enum x86_hypervisor_type is available */
 #define HAVE_X86_HYPERVISOR_TYPE 1
 
+/* zone_device_page_init() is available */
+#define HAVE_ZONE_DEVICE_PAGE_INIT 1
+
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
 
