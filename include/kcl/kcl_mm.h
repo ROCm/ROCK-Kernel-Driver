@@ -26,6 +26,10 @@
 extern void (*_kcl_mmput_async)(struct mm_struct *mm);
 #endif
 
+#ifndef HAVE_ZONE_DEVICE_PAGE_INIT
+void zone_device_page_init(struct page *page);
+#endif
+
 #ifndef HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST
 static inline bool fault_flag_allow_retry_first(unsigned int flags)
 {
