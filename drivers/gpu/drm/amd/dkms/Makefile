@@ -8,7 +8,7 @@ GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
 KERNEL_MAJ=$(VERSION)
 KERNEL_PATCHLEVEL=$(PATCHLEVEL)
 KERNEL_SUBLEVEL=$(SUBLEVEL)
-KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL), $(KERNEL_SUBLEVEL))
+KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL) $(KERNEL_SUBLEVEL))
 
 kernel-version = $(shell [ $(KERNEL_VER)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
 
