@@ -45,7 +45,6 @@
 #include <kcl/backport/kcl_drm_cache_backport.h>
 #include <kcl/kcl_task_barrier.h>
 #include <kcl/backport/kcl_drm_print.h>
-#include <kcl/backport/kcl_drm_crtc.h>
 #include <kcl/backport/kcl_drm_backport.h>
 #include <kcl/backport/kcl_drm_gem.h>
 #include <kcl/backport/kcl_drm_prime.h>
