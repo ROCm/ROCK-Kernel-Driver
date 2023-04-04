@@ -743,9 +743,6 @@
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
-/* whether si_mem_available() is available */
-#define HAVE_SI_MEM_AVAILABLE 1
-
 /* smca_get_bank_type(x) is available */
 /* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
 
