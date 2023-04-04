@@ -28,6 +28,8 @@
 dml_ccflags := $(CC_FLAGS_FPU)
 dml_rcflags := $(CC_FLAGS_NO_FPU)
 
+include  $(src)/../dkms/Makefile.compiler
+
 ifneq ($(CONFIG_FRAME_WARN),0)
 ifeq ($(filter y,$(CONFIG_KASAN)$(CONFIG_KCSAN)),y)
 frame_warn_flag := -Wframe-larger-than=3072
