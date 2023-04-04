@@ -1360,6 +1360,11 @@ struct pptable_funcs {
 	 * @debugfs_init: Initialize debugfs for smu.
 	 */
 	void (*debugfs_init)(struct smu_context *smu);
+
+	/**
+	 * @set_cpu_smt_enable: Set the CPU SMT status.
+	 */
+	int (*set_cpu_smt_enable)(struct smu_context *smu, bool smt_enable);
 };
 
 typedef enum {
