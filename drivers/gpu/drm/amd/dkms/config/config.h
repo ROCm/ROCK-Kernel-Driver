@@ -517,9 +517,6 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
-/* Define to 1 if you have the <drm/drm_buddy.h> header file. */
-#define HAVE_DRM_DRM_BUDDY_H 1
-
 /* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
 #define HAVE_DRM_DRM_FBDEV_GENERIC_H 1
 
