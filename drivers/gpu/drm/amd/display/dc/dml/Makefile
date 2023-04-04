@@ -37,6 +37,8 @@ ifdef CONFIG_ARM64
 dml_rcflags := -mgeneral-regs-only
 endif
 
+include  $(src)/../dkms/Makefile.compiler
+
 ifneq ($(call gcc-min-version, 70100),y)
 IS_OLD_GCC = 1
 endif
