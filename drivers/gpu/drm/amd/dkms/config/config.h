@@ -734,9 +734,6 @@
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
 
-/* struct rb_root_cached is available */
-#define HAVE_RB_ROOT_CACHED 1
-
 /* whether register_shrinker(x, x) is available */
 #define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
 
