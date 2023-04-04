@@ -659,9 +659,6 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
-/* enum MAMREMAP_WC is availablea */
-#define HAVE_MEMREMAP_WC 1
-
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
