@@ -17,7 +17,6 @@
 #include <kcl/kcl_seq_file.h>
 #include <kcl/kcl_io-mapping.h>
 #include <kcl/kcl_highmem-internal.h>
-#include <kcl/kcl_io.h>
 #include <kcl/kcl_shrinker.h>
 
 #endif
