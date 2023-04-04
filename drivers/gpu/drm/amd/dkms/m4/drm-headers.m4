@@ -81,12 +81,6 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/pgtable.h])
 
-	dnl #
-	dnl # v5.19-rc1- c9cad937c0
-	dnl # drm/amdgpu: add drm buddy support to amdgpu
-	dnl #
-	AC_KERNEL_CHECK_HEADERS([drm/drm_buddy.h])
-
         dnl #
         dnl # v6.1-rc2-542-g8ab59da26bc0
         dnl # drm/fb-helper: Move generic fbdev emulation into separate source file
