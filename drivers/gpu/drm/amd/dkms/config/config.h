@@ -641,9 +641,6 @@
 /* Define to 1 if you have the <linux/xarray.h> header file. */
 #define HAVE_LINUX_XARRAY_H 1
 
-/* list_bulk_move_tail() is available */
-#define HAVE_LIST_BULK_MOVE_TAIL 1
-
 /* list_is_first() is available */
 #define HAVE_LIST_IS_FIRST 1
 
