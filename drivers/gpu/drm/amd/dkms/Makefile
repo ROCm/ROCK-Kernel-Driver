@@ -25,9 +25,7 @@ endif
 
 endif
 
-ifndef gcc-min-version
-export gcc-min-version=$(shell [ $(CONFIG_GCC_VERSION)0 -ge $(1)0 ] && echo y)
-endif
+include  $(src)/amd/dkms/Makefile.compiler
 
 # gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
 ifneq ($(call gcc-min-version, 40805), y)
