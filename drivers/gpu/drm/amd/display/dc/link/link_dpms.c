@@ -2159,6 +2159,7 @@ static enum dc_status enable_link_dp_mst(
 		struct pipe_ctx *pipe_ctx)
 {
 	struct dc_link *link = pipe_ctx->stream->link;
+	unsigned char mstm_cntl;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -2167,7 +2168,9 @@ static enum dc_status enable_link_dp_mst(
 		return DC_OK;
 
 	/* clear payload table */
-	dm_helpers_dp_mst_clear_payload_allocation_table(link->ctx, link);
+	core_link_read_dpcd(link, DP_MSTM_CTRL, &mstm_cntl, 1);
+	if (mstm_cntl & DP_MST_EN)
+		dm_helpers_dp_mst_clear_payload_allocation_table(link->ctx, link);
 
 	/* to make sure the pending down rep can be processed
 	 * before enabling the link
@@ -2475,11 +2478,12 @@ void link_set_dpms_on(
 		 * from transmitter control.
 		 */
 		if (!(dc_is_virtual_signal(pipe_ctx->stream->signal) ||
-				dp_is_128b_132b_signal(pipe_ctx)))
-			if (link_enc)
-				link_enc->funcs->setup(
-					link_enc,
-					pipe_ctx->stream->signal);
+				dp_is_128b_132b_signal(pipe_ctx))) {
+				if (link_enc)
+					link_enc->funcs->setup(
+						link_enc,
+						pipe_ctx->stream->signal);
+			}
 
 		dc->hwss.enable_stream(pipe_ctx);
 

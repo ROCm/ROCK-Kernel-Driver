@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: MIT */
 /*
  * Copyright 2022 Advanced Micro Devices, Inc.
  *
@@ -20,29 +19,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: AMD
- *
  */
 
-#ifndef __DC_HWSS_DCN314_H__
-#define __DC_HWSS_DCN314_H__
+#ifndef __GFXHUB_V1_2_H__
+#define __GFXHUB_V1_2_H__
 
-#include "hw_sequencer_private.h"
+extern const struct amdgpu_gfxhub_funcs gfxhub_v1_2_funcs;
 
-struct dc;
-
-void dcn314_update_odm(struct dc *dc, struct dc_state *context, struct pipe_ctx *pipe_ctx);
-
-void dcn314_dsc_pg_control(struct dce_hwseq *hws, unsigned int dsc_inst, bool power_on);
-
-void dcn314_enable_power_gating_plane(struct dce_hwseq *hws, bool enable);
-
-unsigned int dcn314_calculate_dccg_k1_k2_values(struct pipe_ctx *pipe_ctx, unsigned int *k1_div, unsigned int *k2_div);
-
-void dcn314_set_pixels_per_cycle(struct pipe_ctx *pipe_ctx);
-
-void dcn314_hubp_pg_control(struct dce_hwseq *hws, unsigned int hubp_inst, bool power_on);
-
-void dcn314_dpp_root_clock_control(struct dce_hwseq *hws, unsigned int dpp_inst, bool clock_on);
-
-#endif /* __DC_HWSS_DCN314_H__ */
+#endif

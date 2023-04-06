@@ -45,7 +45,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.228"
+#define DC_VER "3.2.229"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -873,6 +873,8 @@ struct dc_debug_options {
 	bool dig_fifo_off_in_blank;
 	bool temp_mst_deallocation_sequence;
 	bool override_dispclk_programming;
+	bool disable_fpo_optimizations;
+	bool support_eDP1_5;
 };
 
 struct gpu_info_soc_bounding_box_v1_0;
