@@ -61,8 +61,4 @@ void drm_fb_helper_fill_info(struct fb_info *info,
 			     struct drm_fb_helper_surface_size *sizes);
 #endif
 
-#ifndef HAVE_IS_FIRMWARE_FRAMEBUFFER
-extern bool is_firmware_framebuffer(struct apertures_struct *a);
-#endif
-
 #endif
