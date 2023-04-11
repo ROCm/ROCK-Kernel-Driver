@@ -38,6 +38,8 @@ int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 #define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
 #endif
 
+
+#if !defined(HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS)
 #if !defined(HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS)
 static inline
 int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
@@ -63,7 +65,6 @@ int _kcl_drm_dp_atomic_find_vcpi_slots(struct drm_atomic_state *state,
 #define drm_dp_atomic_find_vcpi_slots _kcl_drm_dp_atomic_find_vcpi_slots
 #endif /* HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
 
-#if !defined(HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS)
 static inline
 int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
 				  struct drm_dp_mst_topology_mgr *mgr,
@@ -73,6 +74,19 @@ int _kcl_drm_dp_atomic_find_time_slots(struct drm_atomic_state *state,
 	return drm_dp_atomic_find_vcpi_slots(state, mgr, port, pbn, pbn_div);
 }
 #define drm_dp_atomic_find_time_slots _kcl_drm_dp_atomic_find_time_slots
+#endif /* HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS */
+
+#if !defined(HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS)
+#ifdef HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT
+static inline
+int _kcl_drm_dp_atomic_release_time_slots(struct drm_atomic_state *state,
+                                  struct drm_dp_mst_topology_mgr *mgr,
+                                  struct drm_dp_mst_port *port)
+{
+        return drm_dp_atomic_release_vcpi_slots(state, mgr, port);
+}
+#define drm_dp_atomic_release_time_slots _kcl_drm_dp_atomic_release_time_slots
+#endif
 #endif
 
 #ifndef HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS
