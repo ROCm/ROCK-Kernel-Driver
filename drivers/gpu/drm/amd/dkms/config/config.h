@@ -247,6 +247,12 @@
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
 
+/* drm_dp_atomic_find_vcpi_slots() wants 5args */
+/* #undef HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
+
+/* drm_dp_atomic_release_vcpi_slots() with drm_dp_mst_port argument is available */
+/* #undef HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT */
+
 /* drm_dp_mst_atomic_setup_commit() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT */
 
@@ -254,10 +260,7 @@
 /* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
 
 /* drm_dp_atomic_release_time_slots() is available */
-/* #undef HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS */
-
-/* drm_dp_atomic_find_vcpi_slots() wants 5args */
-#define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS 1
+#define HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS
 
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
