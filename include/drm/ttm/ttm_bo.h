@@ -35,6 +35,7 @@
 
 #include <linux/kref.h>
 #include <linux/list.h>
+#include <linux/dma-resv.h>
 
 #include "ttm_device.h"
 #ifndef HAVE_CONFIG_H
