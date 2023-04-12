@@ -2562,11 +2562,15 @@ static int amdgpu_ttm_prepare_job(struct amdgpu_device *adev,
 							adev->gart.bo);
 		(*job)->vm_needs_flush = true;
 	}
+#ifndef HAVE_STRUCT_XARRAY 
+       return 0;
+#else
 	if (!resv)
 		return 0;
 
 	return drm_sched_job_add_resv_dependencies(&(*job)->base, resv,
 						   DMA_RESV_USAGE_BOOKKEEP);
+#endif
 }
 
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
