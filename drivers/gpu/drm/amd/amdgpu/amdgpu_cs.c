@@ -1399,11 +1399,13 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 
 		fence = &p->jobs[i]->base.s_fence->scheduled;
 		dma_fence_get(fence);
+#ifdef HAVE_STRUCT_XARRAY		
 		r = drm_sched_job_add_dependency(&leader->base, fence);
 		if (r) {
 			dma_fence_put(fence);
 			goto error_cleanup;
 		}
+#endif
 	}
 
 	if (p->gang_size > 1) {
