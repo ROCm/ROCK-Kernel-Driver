@@ -1168,11 +1168,13 @@ static int amdgpu_uvd_send_msg(struct amdgpu_ring *ring, struct amdgpu_bo *bo,
 		if (r)
 			goto err_free;
 	} else {
+#ifdef HAVE_STRUCT_XARRAY
 		r = drm_sched_job_add_resv_dependencies(&job->base,
 							amdkcl_ttm_resvp(&bo->tbo),
 							DMA_RESV_USAGE_KERNEL);
 		if (r)
 			goto err_free;
+#endif
 
 		f = amdgpu_job_submit(job);
 	}

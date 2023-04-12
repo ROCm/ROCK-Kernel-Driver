@@ -389,11 +389,13 @@ int amdgpu_sync_push_to_job(struct amdgpu_sync *sync, struct amdgpu_job *job)
 		}
 
 		dma_fence_get(f);
+#ifdef HAVE_STRUCT_XARRAY		
 		r = drm_sched_job_add_dependency(&job->base, f);
 		if (r) {
 			dma_fence_put(f);
 			return r;
 		}
+#endif
 	}
 	return 0;
 }
