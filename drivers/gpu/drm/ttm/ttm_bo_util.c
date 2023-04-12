@@ -569,7 +569,7 @@ static int ttm_bo_wait_free_node(struct ttm_buffer_object *bo,
 {
 	long ret;
 
-	ret = dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP,
+	ret = dma_resv_wait_timeout(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_BOOKKEEP,
 				    false, 15 * HZ);
 	if (ret == 0)
 		return -EBUSY;
@@ -728,7 +728,7 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	int ret;
 
 	/* If already idle, no need for ghost object dance. */
-	if (dma_resv_test_signaled(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP)) {
+	if (dma_resv_test_signaled(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_BOOKKEEP)) {
 		if (!bo->ttm) {
 			/* See comment below about clearing. */
 			ret = ttm_tt_create(bo, true);
@@ -765,7 +765,7 @@ int ttm_bo_pipeline_gutting(struct ttm_buffer_object *bo)
 	ret = dma_resv_copy_fences(&amdkcl_ttm_resv(ghost), amdkcl_ttm_resvp(bo));
 	/* Last resort, wait for the BO to be idle when we are OOM */
 	if (ret) {
-		dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP,
+		dma_resv_wait_timeout(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_BOOKKEEP,
 				      false, MAX_SCHEDULE_TIMEOUT);
 	}
 
