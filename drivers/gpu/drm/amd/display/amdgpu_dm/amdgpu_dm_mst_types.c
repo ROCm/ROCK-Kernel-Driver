@@ -539,15 +539,11 @@ dm_dp_mst_detect(struct drm_connector *connector,
 static int dm_dp_mst_atomic_check(struct drm_connector *connector,
 				  struct drm_atomic_state *state)
 {
-#ifdef HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	struct drm_dp_mst_topology_mgr *mst_mgr = &aconnector->mst_root->mst_mgr;
 	struct drm_dp_mst_port *mst_port = aconnector->mst_output_port;
 
 	return drm_dp_atomic_release_time_slots(state, mst_mgr, mst_port);
-#else
-	return 0;
-#endif
 }
 #endif
 

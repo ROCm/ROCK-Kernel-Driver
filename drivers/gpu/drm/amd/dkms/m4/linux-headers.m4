@@ -116,8 +116,8 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	AC_KERNEL_CHECK_HEADERS([linux/dma-map-ops.h])
 
 	dnl #
-	dnl #v5.14-rc6-42-g089050cafa10
-	dnl #rbtree: Split out the rbtree type definitions into <linux/rbtree_types.h>
+	dnl #v4.5-rc3-203-g2413306c2566
+	dnl #apple-gmux: Add helper for presence detect
 	dnl
-	AC_KERNEL_CHECK_HEADERS([linux/rbtree_types.h])
+	AC_KERNEL_CHECK_HEADERS([linux/apple-gmux.h])
 ])

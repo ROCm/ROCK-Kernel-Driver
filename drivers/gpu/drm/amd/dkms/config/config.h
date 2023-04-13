@@ -15,10 +15,9 @@
 
 /* struct acpi_srat_generic_affinity is available */
 #define HAVE_ACPI_SRAT_GENERIC_AFFINITY 1
- 
+
 /* acpi_video_backlight_use_native() is available */
 #define HAVE_ACPI_VIDEO_BACKLIGHT_USE_NATIVE 1
-
 
 /* acpi_video_register_backlight() is available */
 #define HAVE_ACPI_VIDEO_REGISTER_BACKLIGHT 1
@@ -47,6 +46,9 @@
 /* amd_iommu_pc_supported() is available */
 #define HAVE_AMD_IOMMU_PC_SUPPORTED 1
 
+/* apple_gmux_detect() is available */
+#define HAVE_APPLE_GMUX_DETECT 1
+
 /* arch_io_{reserve/free}_memtype_wc() are available */
 #define HAVE_ARCH_IO_RESERVE_FREE_MEMTYPE_WC 1
 
@@ -59,7 +61,7 @@
 /* backlight_device_set_brightness() is available */
 #define HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS 1
 
-/* bitmap_free() is available */
+/* bitmap_free(),bitmap_alloc(),bitmap_zalloc is available */
 #define HAVE_BITMAP_FUNCS 1
 
 /* bitmap_to_arr32() is available */
@@ -76,6 +78,9 @@
 
 /* debugfs_create_file_size() is available */
 #define HAVE_DEBUGFS_CREATE_FILE_SIZE 1
+
+/* kobj_type->default_groups is available */
+#define HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE 1
 
 /* devcgroup_check_permission() is available */
 #define HAVE_DEVCGROUP_CHECK_PERMISSION 1
@@ -101,6 +106,9 @@
 /* dma_fence_chain_alloc() is available */
 #define HAVE_DMA_FENCE_CHAIN_ALLOC 1
 
+/* dma_fence_chain_contained() is available */
+#define HAVE_DMA_FENCE_CHAIN_CONTAINED 1
+
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
@@ -122,7 +130,7 @@
 /* dma_resv->seq is seqcount_ww_mutex_t */
 /* #undef HAVE_DMA_RESV_SEQCOUNT_WW_MUTEX_T */
 
-/* bug for missing dma_resv->seq */
+/* Reporting dma_resv->seq bug */
 /* #undef HAVE_DMA_RESV_SEQ_BUG */
 
 /* down_read_killable() is available */
@@ -131,23 +139,11 @@
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
-/* fsleep() is available */
-#define HAVE_FSLEEP 1
-
-/* drm_dp_mst_connector_early_unregister() is available */
-#define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
-
-/* drm_dp_mst_connector_late_register() is available */
-#define HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER 1
-
 /* Define to 1 if you have the <drm/amdgpu_pciid.h> header file. */
 /* #undef HAVE_DRM_AMDGPU_PCIID_H */
 
 /* Define to 1 if you have the <drm/amd_asic_type.h> header file. */
 #define HAVE_DRM_AMD_ASIC_TYPE_H 1
-
-/* drm_aperture_remove_* is availablea */
-#define HAVE_DRM_APERTURE 1
 
 /* drm_aperture_remove_conflicting_pci_framebuffers() second arg is
    drm_driver* */
@@ -211,7 +207,8 @@
 /* Define to 1 if you have the <drm/display/drm_dp_helper.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_HELPER_H 1
 
-/* Define to 1 if you have the <drm/display/drm_dp_mst_helper.h> header file. */
+/* Define to 1 if you have the <drm/display/drm_dp_mst_helper.h> header file.
+   */
 #define HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H 1
 
 /* Define to 1 if you have the <drm/display/drm_dsc.h> header file. */
@@ -235,29 +232,33 @@
 /* display_info->is_hdmi is available */
 #define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
 
-/* struct drm_display_info has monitor_range member */
-#define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
-
 /* display_info->luminance_range is available */
 #define HAVE_DRM_DISPLAY_INFO_LUMINANCE_RANGE 1
 
 /* display_info->max_dsc_bpp is available */
 #define HAVE_DRM_DISPLAY_INFO_MAX_DSC_BPP 1
 
+/* struct drm_display_info has monitor_range member */
+#define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
+
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
+
+/* drm_dp_atomic_find_vcpi_slots() wants 5args */
+/* #undef HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
+
+/* drm_dp_atomic_release_time_slots() is available */
+#define HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS 1
+
+/* drm_dp_atomic_release_vcpi_slots() with drm_dp_mst_port argument is
+   available */
+/* #undef HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT */
 
 /* drm_dp_mst_atomic_setup_commit() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT */
 
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
-
-/* drm_dp_atomic_release_time_slots() is available */
-/* #undef HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS */
-
-/* drm_dp_atomic_find_vcpi_slots() wants 5args */
-#define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS 1
 
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
@@ -292,6 +293,12 @@
 /* drm_dp_mst_atomic_enable_dsc() wants 5args */
 /* #undef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS */
 
+/* drm_dp_mst_connector_early_unregister() is available */
+#define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
+
+/* drm_dp_mst_connector_late_register() is available */
+#define HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER 1
+
 /* drm_dp_mst_detect_port() wants p,p,p,p args */
 #define HAVE_DRM_DP_MST_DETECT_PORT_PPPP 1
 
@@ -301,14 +308,14 @@
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
 
+/* drm_dp_mst_port struct has full_pbn member */
+#define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
+
 /* struct drm_dp_mst_port has passthrough_aux member */
-/* #undef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX */
+#define HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX 1
 
 /* drm_dp_mst_root_conn_atomic_check() is available */
 /* #undef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK */
-
-/* drm_dp_mst_port struct has full_pbn member */
-#define HAVE_DRM_DP_MST_PORT_FULL_PBN 1
 
 /* struct drm_dp_mst_topology_cbs->destroy_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
@@ -321,9 +328,6 @@
 
 /* struct drm_dp_mst_topology_mgr.base is available */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE 1
-
-/* drm_dp_mst_topology_mgr_init() wants drm_device arg */
-#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV 1
 
 /* drm_dp_mst_topology_mgr_init() has max_lane_count and max_link_rate */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT */
@@ -344,13 +348,10 @@
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
 /* drm_dp_update_payload_part1() function has start_slot argument */
-#define HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG 1
+/* #undef HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG */
 
-/* drm_driver->gem_prime_res_obj() is available */
+/* drm_driver->gem_prime_res_obj() is availab/le */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
-
-/* drm_vblank struct use ktime_t for time field */
-#define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
 /* Define to 1 if you have the <drm/drmP.h> header file. */
 /* #undef HAVE_DRM_DRMP_H */
@@ -361,14 +362,14 @@
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
 
+/* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
+#define HAVE_DRM_DRM_FBDEV_GENERIC_H 1
+
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
 
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
-
-/* Define to 1 if you have the <drm/drm_buddy.h> header file. */
-#define HAVE_DRM_DRM_BUDDY_H 1
 
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
@@ -384,6 +385,12 @@
 
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
+
+/* struct drm_dsc_config has member simple_422 */
+#define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
+
+/* drm_dsc_pps_payload_pack() is available */
+#define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
 
 /* drm_fbdev_generic_setup() is available */
 /* #undef HAVE_DRM_FBDEV_GENERIC_SETUP */
@@ -413,9 +420,6 @@
 /* drm_format_info.block_w and rm_format_info.block_h is available */
 #define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
 
- /* drm_gem_plane_helper_prepare_fb() is available */
- #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
-
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
 
@@ -431,8 +435,8 @@
 /* ttm_buffer_object->base is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
 
-/* drm_gen_fb_init_with_funcs() is available */
-#define HAVE_DRM_GEN_FB_INIT_WITH_FUNCS 1
+/* drm_gem_plane_helper_prepare_fb() is available */
+#define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
 
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
@@ -458,6 +462,9 @@
 /* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
 
+/* drm_modeset_backoff() has int return */
+#define HAVE_DRM_MODESET_BACKOFF_RETURN_INT 1
+
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
 
@@ -467,11 +474,8 @@
 /* drm_mode_config->fb_modifiers_not_supported is available */
 #define HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED 1
 
-/* drm_mode_config_funcs->atomic_state_alloc() is available */
-#define HAVE_DRM_MODE_CONFIG_FUNCS_ATOMIC_STATE_ALLOC 1
-
 /* drm_mode_init() is available */
-#define HAVE_DRM_MODE_INTT 1
+#define HAVE_DRM_MODE_INIT 1
 
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
@@ -500,8 +504,14 @@
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
+/* struct drm_vma_offset_node has readonly field */
+/* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
+
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
+
+/* fsleep() is available */
+#define HAVE_FSLEEP 1
 
 /* fs_reclaim_acquire() is available */
 #define HAVE_FS_RECLAIM_ACQUIRE 1
@@ -536,6 +546,9 @@
 /* hmm_range_fault() wants 1 arg */
 #define HAVE_HMM_RANGE_FAULT_1ARG 1
 
+/* hypervisor_is_type() is available */
+#define HAVE_HYPERVISOR_IS_TYPE 1
+
 /* struct i2c_lock_operations is defined */
 #define HAVE_I2C_LOCK_OPERATIONS_STRUCT 1
 
@@ -566,6 +579,9 @@
 /* kallsyms_lookup_name is available */
 /* #undef HAVE_KALLSYMS_LOOKUP_NAME */
 
+/* close_fd() is available */
+#define HAVE_KERNEL_CLOSE_FD 1
+
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
@@ -575,8 +591,8 @@
 /* krealloc_array() is available */
 #define HAVE_KREALLOC_ARRAY 1
 
-/* kref_read() function is available */
-#define HAVE_KREF_READ 1
+/* ksys_fd() is available */
+/* #undef HAVE_KSYS_CLOSE_FD */
 
 /* ksys_sync_helper() is available */
 #define HAVE_KSYS_SYNC_HELPER 1
@@ -595,6 +611,9 @@
 
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
+
+/* Define to 1 if you have the <linux/apple-gmux.h> header file. */
+#define HAVE_LINUX_APPLE_GMUX_H 1
 
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
@@ -650,17 +669,11 @@
 /* Define to 1 if you have the <linux/xarray.h> header file. */
 #define HAVE_LINUX_XARRAY_H 1
 
-/* list_bulk_move_tail() is available */
-#define HAVE_LIST_BULK_MOVE_TAIL 1
-
 /* list_is_first() is available */
 #define HAVE_LIST_IS_FIRST 1
 
 /* list_rotate_to_front() is available */
 #define HAVE_LIST_ROTATE_TO_FRONT 1
-
-/* strurct pci_dev->ltr_path is available */
-#define HAVE_PCI_DEV_LTR_PATH 1
 
 /* enum MCE_PRIO_UC is available */
 #define HAVE_MCE_PRIO_UC 1
@@ -671,8 +684,8 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
-/* enum MAMREMAP_WC is availablea */
-#define HAVE_MEMREMAP_WC 1
+/* struct migrate_vma has fault_page */
+#define HAVE_MIGRATE_VMA_FAULT_PAGE 1
 
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
@@ -707,6 +720,9 @@
 /* pci_dev_id() is available */
 #define HAVE_PCI_DEV_ID 1
 
+/* strurct pci_dev->ltr_path is available */
+#define HAVE_PCI_DEV_LTR_PATH 1
+
 /* struct pci_driver has field dev_groups */
 #define HAVE_PCI_DRIVER_DEV_GROUPS 1
 
@@ -728,8 +744,8 @@
 /* vm_insert_mixed() wants pfn_t arg */
 /* #undef HAVE_PFN_T_VM_INSERT_MIXED */
 
-/* pm_genpd_remove_device() wants 2 arguments */
-/* #undef HAVE_PM_GENPD_REMOVE_DEVICE_2ARGS */
+/* pm_suspend_target_state is available */
+#define HAVE_PM_SUSPEND_TARGET_STATE 1
 
 /* pm_suspend_via_firmware() is available */
 #define HAVE_PM_SUSPEND_VIA_FIRMWARE 1
@@ -739,9 +755,6 @@
 
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
-
-/* struct rb_root_cached is available */
-#define HAVE_RB_ROOT_CACHED 1
 
 /* whether register_shrinker(x, x) is available */
 #define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
@@ -755,9 +768,6 @@
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
-/* whether si_mem_available() is available */
-#define HAVE_SI_MEM_AVAILABLE 1
-
 /* smca_get_bank_type(x) is available */
 /* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
 
@@ -767,9 +777,6 @@
 /* is_smca_umc_v2() is available */
 /* #undef HAVE_SMCA_UMC_V2 */
 
-/* struct dma_buf_ops->allow_peer2peer is available */
-#define HAVE_STRUCT_DMA_BUF_OPS_ALLOW_PEER2PEER 1
-
 /* struct dma_buf_attach_ops->allow_peer2peer is available */
 #define HAVE_STRUCT_DMA_BUF_ATTACH_OPS_ALLOW_PEER2PEER 1
 
@@ -778,9 +785,6 @@
 
 /* struct dma_fence_chain is available */
 #define HAVE_STRUCT_DMA_FENCE_CHAIN 1
-
-/* dma_fence_chain_contained() is available */
-#define HAVE_DMA_FENCE_CHAIN_CONTAINED 1
 
 /* struct drm_connector_state->duplicated is available */
 #define HAVE_STRUCT_DRM_ATOMIC_STATE_DUPLICATED 1
@@ -882,8 +886,8 @@
 /* ww_mutex_trylock() has context arg */
 #define HAVE_WW_MUTEX_TRYLOCK_CONTEXT_ARG 1
 
-/* is_device_page is available */
-/* #undef HAVE_ZONE_DEVICE_PUBLIC */
+/* enum x86_hypervisor_type is available */
+#define HAVE_X86_HYPERVISOR_TYPE 1
 
 /* zone_managed_pages() is available */
 #define HAVE_ZONE_MANAGED_PAGES 1
@@ -894,35 +898,11 @@
 /* __dma_fence_is_later() is available and has ops arg */
 #define HAVE__DMA_FENCE_IS_LATER_WITH_OPS_ARG 1
 
-/* struct drm_dsc_config has member simple_422 */
-#define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
-
-/* drm_dsc_pps_payload_pack() is available */
-#define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
-
 /* __drm_atomic_helper_crtc_reset() is available */
 #define HAVE___DRM_ATOMIC_HELPER_CRTC_RESET 1
 
 /* __kthread_should_park() is available */
 #define HAVE___KTHREAD_SHOULD_PARK 1
-
-/* kobj_type->default_groups is available */
-#define HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE 1
-
-/* close_fd() is available */
-#define HAVE_KERNEL_CLOSE_FD 1
-
-/* ksys_close() is available */
-#define HAVE_KSYS_CLOSE_FD 1
-
-/* pm_suspend_target_state is available */
-#define HAVE_PM_SUSPEND_TARGET_STATE 1
-
-/* enum x86_hypervisor_type is available */
-#define HAVE_X86_HYPERVISOR_TYPE 1
-
-/* hypervisor_is_type() is available */
-#define HAVE_HYPERVISOR_IS_TYPE 1
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""

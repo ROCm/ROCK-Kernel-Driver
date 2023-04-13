@@ -1,0 +1,3 @@
+ifndef gcc-min-version
+gcc-min-version = $(shell [ $(CONFIG_GCC_VERSION)0 -ge $(1)0 ] && echo y)
+endif

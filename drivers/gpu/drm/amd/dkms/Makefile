@@ -8,16 +8,9 @@ GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
 KERNEL_MAJ=$(VERSION)
 KERNEL_PATCHLEVEL=$(PATCHLEVEL)
 KERNEL_SUBLEVEL=$(SUBLEVEL)
-KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL), $(KERNEL_SUBLEVEL))
+KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL) $(KERNEL_SUBLEVEL))
 
 kernel-version = $(shell [ $(KERNEL_VER)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
-
-# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
-ifeq ($(call cc-ifversion, -le, 0408, y), y)
-ifeq ($(call kernel-version, -ge, 0504, y), y)
-$(error "The GCC is too old for this kernel, please update the GCC to higher than 9.3")
-endif
-endif
 
 ifdef CONFIG_CC_IS_GCC
 ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
@@ -30,6 +23,15 @@ export CONFIG_GCC_VERSION=$(GCCSTR)
 $(warning "CONFIG_CC_IS_GCC is not defined. Let's export it with version $(CONFIG_GCC_VERSION)")
 endif
 
+endif
+
+include  $(src)/amd/dkms/Makefile.compiler
+
+# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
+ifneq ($(call gcc-min-version, 40805), y)
+ifeq ($(call kernel-version, -ge, 0504, y), y)
+$(error "The GCC is too old for this kernel, please update the GCC to higher than 9.3")
+endif
 endif
 
 ifndef CONFIG_DRM
