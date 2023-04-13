@@ -937,6 +937,8 @@ struct drm_amdgpu_cs_chunk_data {
 	#define AMDGPU_INFO_VIDEO_CAPS_DECODE		0
 	/* Subquery id: Encode */
 	#define AMDGPU_INFO_VIDEO_CAPS_ENCODE		1
+/* Query the max number of IBs per gang per submission */
+#define AMDGPU_INFO_MAX_IBS			0x22
 
 /* Hybrid Stack Specific Defs*/
 /* gpu capability */
