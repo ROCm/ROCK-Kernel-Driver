@@ -86,4 +86,10 @@ struct vm_area_struct *vma_lookup(struct mm_struct *mm, unsigned long addr)
 }
 #endif /* HAVE_VMA_LOOKUP */
 
+#ifndef VM_ACCESS_FLAGS
+/* Copied from v5.6-12367-g6cb4d9a2870d mm/vma: introduce VM_ACCESS_FLAGS*/
+/* VMA basic access permission flags */
+#define VM_ACCESS_FLAGS (VM_READ | VM_WRITE | VM_EXEC)
+#endif
+
 #endif /* AMDKCL_MM_H */
