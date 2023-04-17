@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-amdkcl-y += main.o symbols.o kcl_common.o
+amdkcl-y += main.o kcl_common.o
 
 amdkcl-y += kcl_kernel_params.o
 amdkcl-y += dma-buf/dma-resv.o
