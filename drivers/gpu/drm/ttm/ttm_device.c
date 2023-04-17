@@ -77,6 +77,9 @@ static int ttm_global_init(void)
 {
 	struct ttm_global *glob = &ttm_glob;
 	unsigned long num_pages, num_dma32;
+#if IS_ENABLED(CONFIG_X86)
+	struct cpuinfo_x86 *c = &cpu_data(0);
+#endif
 	struct sysinfo si;
 	int ret = 0;
 
@@ -95,7 +98,17 @@ static int ttm_global_init(void)
 	 * system memory.
 	 */
 	num_pages = ((u64)si.totalram * si.mem_unit) >> PAGE_SHIFT;
+#if IS_ENABLED(CONFIG_X86)
+	/* For GFX 9.4.3 APU, set mem limit to be 3/4th of
+	 * system memory.
+	 */
+	if (c->x86 == 0x19 && c->x86_model == 0x90)
+		num_pages = (num_pages * 3) / 4;
+	else
+		num_pages /= 2;
+#else
 	num_pages /= 2;
+#endif
 
 	/* But for DMA32 we limit ourself to only use 2GiB maximum. */
 	num_dma32 = (u64)(si.totalram - si.totalhigh) * si.mem_unit
