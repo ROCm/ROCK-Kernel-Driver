@@ -4516,7 +4516,7 @@ fail:
 
 static void gfx_v9_0_spm_start(struct amdgpu_device *adev)
 {
-	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 	uint32_t data = 0;
 
 	data = RREG32_SOC15(GC, 0, mmRLC_SPM_PERFMON_CNTL);
@@ -4540,7 +4540,7 @@ static void gfx_v9_0_spm_start(struct amdgpu_device *adev)
 
 static void gfx_v9_0_spm_stop(struct amdgpu_device *adev)
 {
-	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 	uint32_t data = 0;
 
 	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
@@ -4556,7 +4556,7 @@ static void gfx_v9_0_spm_stop(struct amdgpu_device *adev)
 
 static void gfx_v9_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
 {
-	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_RING_RDPTR), rptr);
@@ -4564,7 +4564,7 @@ static void gfx_v9_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
 
 static void gfx_v9_0_set_spm_perfmon_ring_buf(struct amdgpu_device *adev, u64 gpu_addr, u32 size)
 {
-	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq.ring;
+	struct amdgpu_ring *kiq_ring = &adev->gfx.kiq[0].ring;
 
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false, SOC15_REG_OFFSET(GC, 0,
 			mmRLC_SPM_PERFMON_RING_BASE_LO), lower_32_bits(gpu_addr));
