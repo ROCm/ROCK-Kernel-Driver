@@ -350,4 +350,18 @@ enum drm_dp_phy {
 #define DP_DPRX_FEATURE_ENUMERATION_LIST_CONT_1         0x2214 /* 2.0 E11 */
 #endif
 
+/*
+ * v6.1-4885-g200199ae9a64
+ * drm/amd/display: Adding support for VESA SCR
+ */
+#ifndef DP_EDP_PANEL_LUMINANCE_CONTROL_CAPABLE
+#define DP_EDP_PANEL_LUMINANCE_CONTROL_CAPABLE (1 << 4)
+#endif
+#ifndef DP_EDP_PANEL_LUMINANCE_CONTROL_ENABLE
+#define DP_EDP_PANEL_LUMINANCE_CONTROL_ENABLE  (1 << 7)
+#endif
+#ifndef DP_EDP_PANEL_TARGET_LUMINANCE_VALUE
+#define DP_EDP_PANEL_TARGET_LUMINANCE_VALUE 0x734
+#endif
+
 #endif /* _KCL_DRM_DP_HELPER_H_ */
