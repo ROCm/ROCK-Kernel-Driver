@@ -509,6 +509,17 @@ static const struct file_operations amdgpu_debugfs_ring_fops = {
 	.llseek = default_llseek
 };
 
+static int amdgpu_debugfs_ring_error(void *data, u64 val)
+{
+	struct amdgpu_ring *ring = data;
+
+	amdgpu_fence_driver_set_error(ring, val);
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE_SIGNED(amdgpu_debugfs_error_fops, NULL,
+				amdgpu_debugfs_ring_error, "%lld\n");
+
 static ssize_t amdgpu_debugfs_mqd_read(struct file *f, char __user *buf,
 				       size_t size, loff_t *pos)
 {
@@ -576,6 +587,10 @@ void amdgpu_debugfs_ring_init(struct amdgpu_device *adev,
 	debugfs_create_file_size(name, S_IFREG | S_IRUGO, root, ring,
 				 &amdgpu_debugfs_ring_fops,
 				 ring->ring_size + 12);
+
+	sprintf(name, "amdgpu_error_%s", ring->name);
+	debugfs_create_file(name, 0200, root, ring,
+			    &amdgpu_debugfs_error_fops);
 
 	if (ring->mqd_obj) {
 		sprintf(name, "amdgpu_mqd_%s", ring->name);
