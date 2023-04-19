@@ -2,6 +2,7 @@
 #define AMDKCL_APPLE_GMUX_H
 
 #include <linux/apple-gmux.h>
+#include <linux/pnp.h>
 
 #ifndef HAVE_APPLE_GMUX_DETECT
 #if IS_ENABLED(CONFIG_APPLE_GMUX)
