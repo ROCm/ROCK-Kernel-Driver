@@ -2,7 +2,7 @@
 #ifndef AMDKCL_STRING_HELPERS_H
 #define AMDKCL_STRING_HELPERS_H
 
-
+#include <linux/string_helpers.h>
 /* Copied from v5.17-rc2-224-gea4692c75e1c linux/string_helpers.h */
 
 #ifndef HAVE_STR_YES_NO
