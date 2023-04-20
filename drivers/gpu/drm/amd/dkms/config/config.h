@@ -688,6 +688,9 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
+/* kmalloc_size_roundup is available */
+#define HAVE_KMALLOC_SIZE_ROUNDUP 1
+
 /* kmap_local_* is available */
 #define HAVE_KMAP_LOCAL 1
 
