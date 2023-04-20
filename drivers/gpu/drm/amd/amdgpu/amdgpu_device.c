@@ -604,7 +604,7 @@ u32 amdgpu_mm_rdoorbell(struct amdgpu_device *adev, u32 index)
 	if (amdgpu_device_skip_hw_access(adev))
 		return 0;
 
-	if (index < adev->doorbell.num_doorbells) {
+	if (index < adev->doorbell.num_kernel_doorbells) {
 		return readl(adev->doorbell.ptr + index);
 	} else {
 		DRM_ERROR("reading beyond doorbell aperture: 0x%08x!\n", index);
@@ -627,7 +627,7 @@ void amdgpu_mm_wdoorbell(struct amdgpu_device *adev, u32 index, u32 v)
 	if (amdgpu_device_skip_hw_access(adev))
 		return;
 
-	if (index < adev->doorbell.num_doorbells) {
+	if (index < adev->doorbell.num_kernel_doorbells) {
 		writel(v, adev->doorbell.ptr + index);
 	} else {
 		DRM_ERROR("writing beyond doorbell aperture: 0x%08x!\n", index);
@@ -648,7 +648,7 @@ u64 amdgpu_mm_rdoorbell64(struct amdgpu_device *adev, u32 index)
 	if (amdgpu_device_skip_hw_access(adev))
 		return 0;
 
-	if (index < adev->doorbell.num_doorbells) {
+	if (index < adev->doorbell.num_kernel_doorbells) {
 		return atomic64_read((atomic64_t *)(adev->doorbell.ptr + index));
 	} else {
 		DRM_ERROR("reading beyond doorbell aperture: 0x%08x!\n", index);
@@ -671,7 +671,7 @@ void amdgpu_mm_wdoorbell64(struct amdgpu_device *adev, u32 index, u64 v)
 	if (amdgpu_device_skip_hw_access(adev))
 		return;
 
-	if (index < adev->doorbell.num_doorbells) {
+	if (index < adev->doorbell.num_kernel_doorbells) {
 		atomic64_set((atomic64_t *)(adev->doorbell.ptr + index), v);
 	} else {
 		DRM_ERROR("writing beyond doorbell aperture: 0x%08x!\n", index);
@@ -1062,7 +1062,7 @@ static int amdgpu_device_doorbell_init(struct amdgpu_device *adev)
 	if (adev->asic_type < CHIP_BONAIRE) {
 		adev->doorbell.base = 0;
 		adev->doorbell.size = 0;
-		adev->doorbell.num_doorbells = 0;
+		adev->doorbell.num_kernel_doorbells = 0;
 		adev->doorbell.ptr = NULL;
 		return 0;
 	}
@@ -1077,27 +1077,27 @@ static int amdgpu_device_doorbell_init(struct amdgpu_device *adev)
 	adev->doorbell.size = pci_resource_len(adev->pdev, 2);
 
 	if (adev->enable_mes) {
-		adev->doorbell.num_doorbells =
+		adev->doorbell.num_kernel_doorbells =
 			adev->doorbell.size / sizeof(u32);
 	} else {
-		adev->doorbell.num_doorbells =
+		adev->doorbell.num_kernel_doorbells =
 			min_t(u32, adev->doorbell.size / sizeof(u32),
 			      adev->doorbell_index.max_assignment+1);
-		if (adev->doorbell.num_doorbells == 0)
+		if (adev->doorbell.num_kernel_doorbells == 0)
 			return -EINVAL;
 
 		/* For Vega, reserve and map two pages on doorbell BAR since SDMA
 		 * paging queue doorbell use the second page. The
 		 * AMDGPU_DOORBELL64_MAX_ASSIGNMENT definition assumes all the
 		 * doorbells are in the first page. So with paging queue enabled,
-		 * the max num_doorbells should + 1 page (0x400 in dword)
+		 * the max num_kernel_doorbells should + 1 page (0x400 in dword)
 		 */
 		if (adev->asic_type >= CHIP_VEGA10)
-			adev->doorbell.num_doorbells += 0x400;
+			adev->doorbell.num_kernel_doorbells += 0x400;
 	}
 
 	adev->doorbell.ptr = ioremap(adev->doorbell.base,
-				     adev->doorbell.num_doorbells *
+				     adev->doorbell.num_kernel_doorbells *
 				     sizeof(u32));
 	if (adev->doorbell.ptr == NULL)
 		return -ENOMEM;
@@ -2205,7 +2205,6 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		adev->has_pr3 = parent ? pci_pr3_present(parent) : false;
 	}
 
-	amdgpu_amdkfd_device_probe(adev);
 
 	adev->pm.pp_feature = amdgpu_pp_feature_mask;
 	if (amdgpu_sriov_vf(adev) || sched_policy == KFD_SCHED_POLICY_NO_HWS)
@@ -2261,6 +2260,7 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 	if (!total)
 		return -ENODEV;
 
+	amdgpu_amdkfd_device_probe(adev);
 	adev->cg_flags &= amdgpu_cg_mask;
 	adev->pg_flags &= amdgpu_pg_mask;
 
@@ -3326,9 +3326,11 @@ static int amdgpu_device_ip_resume(struct amdgpu_device *adev)
 {
 	int r;
 
-	r = amdgpu_amdkfd_resume_iommu(adev);
-	if (r)
-		return r;
+	if (!adev->in_s0ix) {
+		r = amdgpu_amdkfd_resume_iommu(adev);
+		if (r)
+			return r;
+	}
 
 	r = amdgpu_device_ip_resume_phase1(adev);
 	if (r)
@@ -3930,10 +3932,6 @@ fence_driver_init:
 	/* Get a log2 for easy divisions. */
 	adev->mm_stats.log2_max_MBps = ilog2(max(1u, max_MBps));
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-	amdgpu_fbdev_init(adev);
-#endif
-
 	r = amdgpu_pm_sysfs_init(adev);
 	if (r)
 		DRM_ERROR("registering pm sysfs failed (%d).\n", r);
@@ -4096,9 +4094,6 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		amdgpu_psp_sysfs_fini(adev);
 	sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-	amdgpu_fbdev_fini(adev);
-#endif
 	/* disable ras feature must before hw fini */
 	amdgpu_ras_pre_fini(adev);
 
@@ -4237,11 +4232,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 		DRM_WARN("smart shift update failed\n");
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, true);
-#else
-		amdgpu_fbdev_set_suspend(adev, 1);
-#endif
 
 	cancel_delayed_work_sync(&adev->delayed_init_work);
 
@@ -4334,11 +4325,7 @@ exit:
 	flush_delayed_work(&adev->delayed_init_work);
 
 	if (fbcon)
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(adev)->fb_helper, false);
-#else
-		amdgpu_fbdev_set_suspend(adev, 0);
-#endif
 
 	amdgpu_ras_resume(adev);
 
@@ -5075,11 +5062,7 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 				if (r)
 					goto out;
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 				drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, false);
-#else
-				amdgpu_fbdev_set_suspend(tmp_adev, 0);
-#endif
 
 				/*
 				 * The GPU enters bad state once faulty pages
@@ -5348,11 +5331,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 		 */
 		amdgpu_unregister_gpu_instance(tmp_adev);
 
-#ifdef AMDKCL_DRM_FBDEV_GENERIC
 		drm_fb_helper_set_suspend_unlocked(adev_to_drm(tmp_adev)->fb_helper, true);
-#else
-		amdgpu_fbdev_set_suspend(tmp_adev, 1);
-#endif
 
 		/* disable ras on ALL IPs */
 		if (!need_emergency_restart &&
