@@ -231,11 +231,6 @@ struct amdgpu_i2c_chan {
 	struct mutex mutex;
 };
 
-
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-struct amdgpu_fbdev;
-#endif
-
 struct amdgpu_afmt {
 	bool enabled;
 	int offset;
@@ -313,15 +308,6 @@ struct amdgpu_framebuffer {
 	uint64_t address;
 };
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-struct amdgpu_fbdev {
-	struct drm_fb_helper helper;
-	struct amdgpu_framebuffer rfb;
-	struct list_head fbdev_list;
-	struct amdgpu_device *adev;
-};
-#endif
-
 struct amdgpu_mode_info {
 	struct atom_context *atom_context;
 	struct card_info *atom_card_info;
@@ -351,10 +337,6 @@ struct amdgpu_mode_info {
 	struct edid *bios_hardcoded_edid;
 	int bios_hardcoded_edid_size;
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-	/* pointer to fbdev info structure */
-	struct amdgpu_fbdev *rfbdev;
-#endif
 	/* firmware flags */
 	u32 firmware_flags;
 	/* pointer to backlight encoder */
@@ -633,16 +615,6 @@ bool amdgpu_crtc_get_scanout_position(struct drm_crtc *crtc,
 			int *hpos, ktime_t *stime, ktime_t *etime,
 			const struct drm_display_mode *mode);
 
-#ifndef AMDKCL_DRM_FBDEV_GENERIC
-/* fbdev layer */
-int amdgpu_fbdev_init(struct amdgpu_device *adev);
-void amdgpu_fbdev_fini(struct amdgpu_device *adev);
-void amdgpu_fbdev_set_suspend(struct amdgpu_device *adev, int state);
-int amdgpu_fbdev_total_size(struct amdgpu_device *adev);
-bool amdgpu_fbdev_robj_is_fb(struct amdgpu_device *adev, struct amdgpu_bo *robj);
-
-int amdgpu_align_pitch(struct amdgpu_device *adev, int width, int bpp, bool tiled);
-#endif
 
 /* amdgpu_display.c */
 void amdgpu_display_print_display_setup(struct drm_device *dev);
