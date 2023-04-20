@@ -34,4 +34,8 @@ krealloc_array(void *p, size_t new_n, size_t new_size, gfp_t flags)
 }
 #endif
 
+#ifndef HAVE_KMALLOC_SIZE_ROUNDUP
+size_t kmalloc_size_roundup(size_t size);
+#endif
+
 #endif
