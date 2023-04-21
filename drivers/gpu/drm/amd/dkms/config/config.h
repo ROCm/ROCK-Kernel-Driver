@@ -408,6 +408,9 @@
 /* drm_fb_helper_alloc_info() is available */
 #define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
 
+/* migrate_disable() is available */
+#define HAVE_MIGRATE_DISABLE 1
+
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 

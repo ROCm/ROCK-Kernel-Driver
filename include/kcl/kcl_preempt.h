@@ -53,4 +53,15 @@
 				   (NMI_MASK | HARDIRQ_MASK | SOFTIRQ_OFFSET)))
 #endif
 
+#ifndef HAVE_MIGRATE_DISABLE
+static __always_inline void migrate_disable(void)
+{
+	preempt_disable();
+}
+static __always_inline void migrate_enable(void)
+{
+	preempt_enable();
+}
+#endif /* HAVE_MIGRATE_DISABLE */
+
 #endif /* AMDKCL_PREEMPT_H */
