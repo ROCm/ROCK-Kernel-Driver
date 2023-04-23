@@ -33,3 +33,35 @@ AC_DEFUN([AC_AMDGPU_DRM_EDID], [
 		])
 	])
 ])
+
+dnl #
+dnl # v6.1-rc1-143-g019b93874834
+dnl # drm/edid: rename drm_add_override_edid_modes() to drm_edid_override_connector_update()
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+                        #include <drm/drm_edid.h>
+                ],[
+                        int ret;
+                        ret = drm_edid_override_connector_update(NULL);
+                ],[
+                        AC_DEFINE(HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE, 1,
+                                [drm_edid_override_connector_update() is available])
+                ],[
+                dnl #
+                dnl # v5.2-rc2-25-g48eaeb7664c7
+                dnl # drm: add fallback override/firmware EDID modes workaround
+                dnl #
+                        AC_KERNEL_TRY_COMPILE([
+                                #include <drm/drm_edid.h>
+                        ],[
+                                int ret;
+                                ret = drm_add_override_edid_modes(NULL);
+                        ],[
+                                AC_DEFINE(HAVE_DRM_ADD_OVERRIDE_EDID_MODES, 1,
+                                [drm_add_override_edid_modes() is available])
+			])
+                ])
+        ])
+])

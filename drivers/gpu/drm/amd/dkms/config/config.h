@@ -450,6 +450,12 @@
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
+/* drm_edid_override_connector_update() is available */
+#define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
+
+/* drm_add_override_edid_modes() is available */
+/* #undef HAVE_DRM_ADD_OVERRIDE_EDID_MODES */
+
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,b interface */
 /* #undef HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B */
 
