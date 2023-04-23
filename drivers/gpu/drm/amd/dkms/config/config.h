@@ -699,6 +699,9 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
+/* drm_connector->edid_override is available */
+#define HAVE_DRM_CONNECTOR_EDID_OVERRIDE 1
+
 /* struct migrate_vma has fault_page */
 #define HAVE_MIGRATE_VMA_FAULT_PAGE 1
 

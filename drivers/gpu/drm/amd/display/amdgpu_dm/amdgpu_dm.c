@@ -6744,6 +6744,7 @@ amdgpu_dm_connector_late_register(struct drm_connector *connector)
 	return 0;
 }
 
+#ifdef HAVE_DRM_CONNECTOR_EDID_OVERRIDE
 static void amdgpu_dm_connector_funcs_force(struct drm_connector *connector)
 {
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
@@ -6776,6 +6777,7 @@ static void amdgpu_dm_connector_funcs_force(struct drm_connector *connector)
 			&dc_em_sink->edid_caps);
 	}
 }
+#endif
 
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.reset = amdgpu_dm_connector_funcs_reset,
@@ -6788,7 +6790,9 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property,
 	.late_register = amdgpu_dm_connector_late_register,
 	.early_unregister = amdgpu_dm_connector_unregister,
+#ifdef HAVE_DRM_CONNECTOR_EDID_OVERRIDE
 	.force = amdgpu_dm_connector_funcs_force
+#endif
 };
 
 static int get_modes(struct drm_connector *connector)
