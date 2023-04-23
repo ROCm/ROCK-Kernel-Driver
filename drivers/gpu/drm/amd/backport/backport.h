@@ -105,4 +105,5 @@
 #include <kcl/kcl_rbtree.h>
 #include <kcl/kcl_delay.h>
 #include <kcl/kcl_apple-gmux.h>
+#include <kcl/backport/kcl_drm_edid.h>
 #endif /* AMDGPU_BACKPORT_H */
