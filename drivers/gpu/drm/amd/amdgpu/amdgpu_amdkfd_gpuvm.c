@@ -3013,7 +3013,9 @@ static int update_invalid_user_pages(struct amdkfd_process_info *process_info,
 			goto unlock_out;
 		}
 		 /* set mem valid if mem has hmm range associated */
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 		if (mem->range)
+#endif
 			mem->invalid = 0;
 	}
 
