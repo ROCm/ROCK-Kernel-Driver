@@ -561,7 +561,24 @@ static int dm_dp_mst_atomic_check(struct drm_connector *connector,
 	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
 	struct drm_dp_mst_topology_mgr *mst_mgr = &aconnector->mst_root->mst_mgr;
 	struct drm_dp_mst_port *mst_port = aconnector->mst_output_port;
+#ifndef HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS
+	struct drm_connector_state *new_conn_state =
+		drm_atomic_get_new_connector_state(state, connector);
+	struct drm_connector_state *old_conn_state =
+		drm_atomic_get_old_connector_state(state, connector);
+	struct drm_crtc_state *new_crtc_state;
 
+	if (!old_conn_state->crtc)
+		return 0;
+
+	if (new_conn_state->crtc) {
+		new_crtc_state = drm_atomic_get_new_crtc_state(state, new_conn_state->crtc);
+		if (!new_crtc_state ||
+			!drm_atomic_crtc_needs_modeset(new_crtc_state) ||
+			new_crtc_state->enable)
+			return 0;
+	}
+#endif
 	return drm_dp_atomic_release_time_slots(state, mst_mgr, mst_port);
 }
 #endif
