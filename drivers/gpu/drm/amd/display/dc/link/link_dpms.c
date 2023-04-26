@@ -1336,8 +1336,10 @@ static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 	const struct dc_link_settings empty_link_settings = {0};
 	DC_LOGGER_INIT(link->ctx->logger);
 
+#if defined(HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS)
 	if (link->dc->debug.temp_mst_deallocation_sequence)
 		return deallocate_mst_payload_with_temp_drm_wa(pipe_ctx);
+#endif
 
 	/* deallocate_mst_payload is called before disable link. When mode or
 	 * disable/enable monitor, new stream is created which is not in link
