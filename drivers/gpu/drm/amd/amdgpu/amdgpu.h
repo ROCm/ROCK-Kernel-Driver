@@ -109,7 +109,7 @@
 #include "amdgpu_mca.h"
 #include "amdgpu_ras.h"
 
-#define MAX_GPU_INSTANCE		16
+#define MAX_GPU_INSTANCE		64
 
 struct amdgpu_gpu_instance
 {
