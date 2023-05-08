@@ -691,7 +691,7 @@ void amdgpu_gmc_set_vm_fault_masks(struct amdgpu_device *adev, int hub_type,
 	for (i = 0; i < 16; i++) {
 		reg = hub->vm_context0_cntl + hub->ctx_distance * i;
 
-		tmp = (hub_type == AMDGPU_GFXHUB(0)) ?
+		tmp = (hub_type == AMDGPU_GFXHUB_0) ?
 			RREG32_SOC15_IP(GC, reg) :
 			RREG32_SOC15_IP(MMHUB, reg);
 
@@ -700,7 +700,7 @@ void amdgpu_gmc_set_vm_fault_masks(struct amdgpu_device *adev, int hub_type,
 		else
 			tmp &= ~hub->vm_cntx_cntl_vm_fault;
 
-		(hub_type == AMDGPU_GFXHUB(0)) ?
+		(hub_type == AMDGPU_GFXHUB_0) ?
 			WREG32_SOC15_IP(GC, reg, tmp) :
 			WREG32_SOC15_IP(MMHUB, reg, tmp);
 	}
