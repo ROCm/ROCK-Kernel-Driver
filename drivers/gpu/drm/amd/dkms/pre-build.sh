@@ -55,6 +55,40 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
 done
 
+#!/bin/bash
+
+KERNELVER=$1
+
+#
+# Kernel 5.x scripts/Makefile.build patch
+# The patch makes rules robust against "Argument list too long" error
+#
+if [[ ${KERNELVER%%.*} -eq 5 ]]; then
+	moddir="/lib/modules/$KERNELVER"
+	mkfile="scripts/Makefile.build"
+
+	if [[ -d "$moddir/source" ]]; then
+		mkfile="$moddir/source/$mkfile"
+	else
+		mkfile="$moddir/build/$mkfile"
+	fi
+
+	mkfile=$(readlink -e $mkfile)
+
+	if [[ "$?" -eq 0 ]] && [[ ! -f "$mkfile~" ]]; then
+		cp -a ${mkfile}{,~}
+		sed -i -e "/^cmd_mod = {/,/} > \$@$/c"`
+			`"cmd_mod = printf '%s\x5Cn' \$(call real-search, \$*.o, .o, -objs -y -m) | \\\\\n"`
+			`"\t\$(AWK) '!x[\$\$0]++ { print(\"\$(obj)\/\"\$\$0) }' > \$@" \
+			-e "s/^[[:space:]]\+cmd_link_multi-m =.*$/"`
+			`"cmd_link_multi-m = \\\\\n"`
+			`"\t\$(file >\$@.in,\$(filter %.o,$^)) \\\\\n"`
+			`"\t\$(LD) \$(ld_flags) -r -o \$@ @\$@.in; \\\\\n"`
+			`"\trm -f \$@.in/" \
+			$mkfile
+	fi
+fi
+
 export KERNELVER
 (cd $SRC && ./configure)
 
