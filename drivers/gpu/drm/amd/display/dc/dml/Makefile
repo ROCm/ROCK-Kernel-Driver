@@ -39,11 +39,6 @@ endif
 
 include  $(src)/../dkms/Makefile.compiler
 
-ifdef CONFIG_LOONGARCH
-dml_ccflags := -mfpu=64
-dml_rcflags := -msoft-float
-endif
-
 ifneq ($(call gcc-min-version, 70100),y)
 IS_OLD_GCC = 1
 endif
