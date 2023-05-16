@@ -1512,7 +1512,7 @@ int smu_wait_for_event(struct smu_context *smu, enum smu_event_type event,
 		       uint64_t event_arg);
 int smu_get_ecc_info(struct smu_context *smu, void *umc_ecc);
 int smu_stb_collect_info(struct smu_context *smu, void *buff, uint32_t size);
-void amdgpu_smu_stb_debug_fs_init(struct amdgpu_device *adev);
+void amdgpu_smu_debugfs_init(struct amdgpu_device *adev);
 int smu_send_hbm_bad_pages_num(struct smu_context *smu, uint32_t size);
 int smu_send_hbm_bad_channel_flag(struct smu_context *smu, uint32_t size);
 #endif

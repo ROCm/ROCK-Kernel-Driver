@@ -3263,21 +3263,23 @@ static const struct file_operations smu_stb_debugfs_fops = {
 
 #endif
 
-void amdgpu_smu_stb_debug_fs_init(struct amdgpu_device *adev)
+void amdgpu_smu_debugfs_init(struct amdgpu_device *adev)
 {
 #if defined(CONFIG_DEBUG_FS)
 
 	struct smu_context *smu = adev->powerplay.pp_handle;
 
-	if (!smu || (!smu->stb_context.stb_buf_size))
+	if (!smu)
 		return;
 
-	debugfs_create_file_size("amdgpu_smu_stb_dump",
-			    S_IRUSR,
-			    adev_to_drm(adev)->primary->debugfs_root,
-			    adev,
-			    &smu_stb_debugfs_fops,
-			    smu->stb_context.stb_buf_size);
+	if (smu->stb_context.stb_buf_size) {
+		debugfs_create_file_size("amdgpu_smu_stb_dump",
+					 S_IRUSR,
+					 adev_to_drm(adev)->primary->debugfs_root,
+					 adev,
+					 &smu_stb_debugfs_fops,
+					 smu->stb_context.stb_buf_size);
+	}
 #endif
 }
 

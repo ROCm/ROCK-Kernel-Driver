@@ -3778,6 +3778,6 @@ void amdgpu_debugfs_pm_init(struct amdgpu_device *adev)
 					 &amdgpu_debugfs_pm_prv_buffer_fops,
 					 adev->pm.smu_prv_buffer_size);
 
-	amdgpu_dpm_stb_debug_fs_init(adev);
+	amdgpu_dpm_debugfs_init(adev);
 #endif
 }
