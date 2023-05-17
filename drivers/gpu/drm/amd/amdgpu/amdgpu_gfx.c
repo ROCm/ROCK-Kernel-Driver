@@ -597,6 +597,8 @@ int amdgpu_gfx_enable_kcq(struct amdgpu_device *adev, int xcc_id)
 
 	DRM_INFO("kiq ring mec %d pipe %d q %d\n", kiq_ring->me, kiq_ring->pipe,
 							kiq_ring->queue);
+	amdgpu_device_flush_hdp(adev, NULL);
+
 	spin_lock(&kiq->ring_lock);
 	/* No need to map kcq on the slave */
 	if (amdgpu_gfx_is_master_xcc(adev, xcc_id)) {
@@ -636,6 +638,8 @@ int amdgpu_gfx_enable_kgq(struct amdgpu_device *adev, int xcc_id)
 
 	if (!kiq->pmf || !kiq->pmf->kiq_map_queues)
 		return -EINVAL;
+
+	amdgpu_device_flush_hdp(adev, NULL);
 
 	spin_lock(&kiq->ring_lock);
 	/* No need to map kcq on the slave */
