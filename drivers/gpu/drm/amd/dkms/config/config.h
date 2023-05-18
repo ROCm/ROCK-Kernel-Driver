@@ -266,6 +266,9 @@
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
 
+/* acpi_dev_get_first_match_dev() is available */
+#define HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV 1
+
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
 

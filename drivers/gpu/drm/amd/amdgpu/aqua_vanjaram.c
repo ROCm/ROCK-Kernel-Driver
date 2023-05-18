@@ -531,6 +531,7 @@ out:
 	return ret;
 }
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static int __aqua_vanjaram_get_xcp_mem_id(struct amdgpu_device *adev,
 					  int xcc_id, uint8_t *mem_id)
 {
@@ -587,6 +588,7 @@ static int aqua_vanjaram_get_xcp_mem_id(struct amdgpu_xcp_mgr *xcp_mgr,
 
 	return r;
 }
+#endif
 
 static int aqua_vanjaram_get_xcp_ip_details(struct amdgpu_xcp_mgr *xcp_mgr, int xcp_id,
 				     enum AMDGPU_XCP_IP_BLOCK ip_id,
@@ -602,7 +604,9 @@ struct amdgpu_xcp_mgr_funcs aqua_vanjaram_xcp_funcs = {
 	.switch_partition_mode = &aqua_vanjaram_switch_partition_mode,
 	.query_partition_mode = &aqua_vanjaram_query_partition_mode,
 	.get_ip_details = &aqua_vanjaram_get_xcp_ip_details,
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	.get_xcp_mem_id = &aqua_vanjaram_get_xcp_mem_id,
+#endif
 	.select_scheds = &aqua_vanjaram_select_scheds,
 	.update_partition_sched_list = &aqua_vanjaram_update_partition_sched_list
 };

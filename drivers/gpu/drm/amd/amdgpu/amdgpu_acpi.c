@@ -39,6 +39,7 @@
 #include "amd_acpi.h"
 #include "atom.h"
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 /* Declare GUID for AMD _DSM method for XCCs */
 static const guid_t amd_xcc_dsm_guid = GUID_INIT(0x8267f5d5, 0xa556, 0x44f2,
 						 0xb8, 0xb4, 0x45, 0x56, 0x2e,
@@ -77,6 +78,7 @@ struct amdgpu_acpi_dev_info {
 };
 
 struct list_head amdgpu_acpi_dev_list;
+#endif
 
 struct amdgpu_atif_notification_cfg {
 	bool enabled;
@@ -841,6 +843,7 @@ int amdgpu_acpi_smart_shift_update(struct drm_device *dev, enum amdgpu_ss ss_sta
 	return r;
 }
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 #ifdef CONFIG_ACPI_NUMA
 static inline uint64_t amdgpu_acpi_get_numa_size(int nid)
 {
@@ -1181,6 +1184,7 @@ int amdgpu_acpi_get_mem_info(struct amdgpu_device *adev, int xcc_id,
 
 	return -ENOENT;
 }
+#endif /* HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV */
 
 /**
  * amdgpu_acpi_event - handle notify events
@@ -1437,9 +1441,12 @@ void amdgpu_acpi_detect(void)
 		atif->backlight_caps.caps_valid = false;
 	}
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	amdgpu_acpi_enumerate_xcc();
+#endif
 }
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 void amdgpu_acpi_release(void)
 {
 	struct amdgpu_acpi_dev_info *dev_info, *dev_tmp;
@@ -1467,6 +1474,7 @@ void amdgpu_acpi_release(void)
 		kfree(dev_info);
 	}
 }
+#endif
 
 #if IS_ENABLED(CONFIG_SUSPEND)
 /**

@@ -1520,12 +1520,13 @@ struct amdgpu_afmt_acr {
 struct amdgpu_afmt_acr amdgpu_afmt_acr(uint32_t clock);
 
 /* amdgpu_acpi.c */
-
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 struct amdgpu_numa_info {
 	uint64_t size;
 	int pxm;
 	int nid;
 };
+#endif
 
 /* ATCS Device/Driver State */
 #define AMDGPU_ATCS_PSC_DEV_STATE_D0		0
@@ -1544,17 +1545,22 @@ int amdgpu_acpi_power_shift_control(struct amdgpu_device *adev,
 				    u8 dev_state, bool drv_state);
 int amdgpu_acpi_smart_shift_update(struct drm_device *dev, enum amdgpu_ss ss_state);
 int amdgpu_acpi_pcie_notify_device_ready(struct amdgpu_device *adev);
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 int amdgpu_acpi_get_tmr_info(struct amdgpu_device *adev, u64 *tmr_offset,
 			     u64 *tmr_size);
 int amdgpu_acpi_get_mem_info(struct amdgpu_device *adev, int xcc_id,
 			     struct amdgpu_numa_info *numa_info);
+#endif
 
 void amdgpu_acpi_get_backlight_caps(struct amdgpu_dm_backlight_caps *caps);
 bool amdgpu_acpi_should_gpu_reset(struct amdgpu_device *adev);
 void amdgpu_acpi_detect(void);
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 void amdgpu_acpi_release(void);
+#endif
 #else
 static inline int amdgpu_acpi_init(struct amdgpu_device *adev) { return 0; }
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static inline int amdgpu_acpi_get_tmr_info(struct amdgpu_device *adev,
 					   u64 *tmr_offset, u64 *tmr_size)
 {
@@ -1566,10 +1572,13 @@ static inline int amdgpu_acpi_get_mem_info(struct amdgpu_device *adev,
 {
 	return -EINVAL;
 }
+#endif
 static inline void amdgpu_acpi_fini(struct amdgpu_device *adev) { }
 static inline bool amdgpu_acpi_should_gpu_reset(struct amdgpu_device *adev) { return false; }
 static inline void amdgpu_acpi_detect(void) { }
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static inline void amdgpu_acpi_release(void) { }
+#endif
 static inline bool amdgpu_acpi_is_power_shift_control_supported(void) { return false; }
 static inline int amdgpu_acpi_power_shift_control(struct amdgpu_device *adev,
 						  u8 dev_state, bool drv_state) { return 0; }
