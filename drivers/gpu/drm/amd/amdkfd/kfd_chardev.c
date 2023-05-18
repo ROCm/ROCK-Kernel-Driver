@@ -2368,7 +2368,7 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 					  struct kgd_mem **kgd_mem)
 {
 	uint64_t alloc_handle = MAKE_HANDLE(pdd->user_gpu_id, bo_priv->idr_handle);
-	struct kfd_dev *dev = pdd->dev;
+	struct kfd_node *dev = pdd->dev;
 	struct kfd_bo *kfd_bo;
 	int ret, idr_handle;
 	uint64_t offset;
