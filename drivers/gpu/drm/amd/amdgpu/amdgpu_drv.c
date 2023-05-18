@@ -3089,8 +3089,11 @@ static struct drm_driver amdgpu_kms_driver = {
 
 const struct drm_driver amdgpu_partition_driver = {
 	.driver_features =
-	    DRIVER_GEM | DRIVER_RENDER | DRIVER_SYNCOBJ |
-	    DRIVER_SYNCOBJ_TIMELINE,
+	    DRIVER_GEM | DRIVER_RENDER | DRIVER_SYNCOBJ 
+#ifdef HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE
+            | DRIVER_SYNCOBJ_TIMELINE
+#endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
+            ,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
