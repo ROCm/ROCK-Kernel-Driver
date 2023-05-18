@@ -140,7 +140,7 @@ struct amd_mem_context {
 	uint64_t	size;
 	unsigned long	offset;
 	struct amdgpu_bo *bo;
-	struct kfd_dev	*dev;
+	struct kfd_node	*dev;
 
 	struct sg_table *pages;
 	struct device *dma_dev;

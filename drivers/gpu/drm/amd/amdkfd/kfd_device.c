@@ -584,7 +584,7 @@ static int kfd_gws_init(struct kfd_node *node)
 			&& kfd->mec2_fw_version < 0x30) ||
 		(KFD_GC_VERSION(kfd) >= IP_VERSION(11, 0, 0) &&
 			KFD_GC_VERSION(kfd) < IP_VERSION(12, 0, 0)))
-		kfd->gws_debug_workaround = true;
+		node->gws_debug_workaround = true;
 
 	return ret;
 }
