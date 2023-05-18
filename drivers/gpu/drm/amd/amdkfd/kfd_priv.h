@@ -389,8 +389,6 @@ struct kfd_dev {
 	/* Compute Profile ref. count */
 	atomic_t compute_profile;
 
-	bool gws_debug_workaround;
-
 	/*spm process id */
 	unsigned int spm_pasid;
 
@@ -411,7 +409,7 @@ struct kfd_ipc_obj;
 struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
-	struct kfd_dev *dev;
+	struct kfd_node *dev;
 	/* page-aligned VA address */
 	uint64_t cpuva;
 	unsigned int mem_type;

@@ -33,14 +33,14 @@ int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 			uint64_t exception_clear_mask,
 			uint64_t *event_status);
 
-bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
+bool kfd_set_dbg_ev_from_interrupt(struct kfd_node *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
 				   uint64_t trap_mask,
 				   void *exception_data,
 				   size_t exception_data_size);
 bool kfd_dbg_ev_raise(uint64_t event_mask,
-			struct kfd_process *process, struct kfd_dev *dev,
+			struct kfd_process *process, struct kfd_node *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data,
 			size_t exception_data_size);
@@ -76,7 +76,7 @@ int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 					unsigned int queue_id,
 					uint64_t error_reason);
 
-static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_dev *dev)
+static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_node *dev)
 {
 	return KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 2) ||
 	       KFD_GC_VERSION(dev) >= IP_VERSION(11, 0, 0);
@@ -104,7 +104,7 @@ void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
  * registers will disable GFX off temporarily for the entire debug session.
  * See disable_on_trap_action_entry and enable_on_trap_action_exit for details.
  */
-static inline bool kfd_dbg_is_rlc_restore_supported(struct kfd_dev *dev)
+static inline bool kfd_dbg_is_rlc_restore_supported(struct kfd_node *dev)
 {
 	return !(KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 10) || /* Navi10 */
 		 KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 1));	 /* Navi14 */

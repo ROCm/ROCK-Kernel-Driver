@@ -75,7 +75,7 @@
 #define KFD_DEBUG_CP_BAD_OP_ECODE(ctxid0) (((ctxid0) & 0x3ffffff)	\
 				>> KFD_CONTEXT_ID0_DEBUG_TRAP_CODE_SHIFT)
 
-static bool event_interrupt_isr_v10(struct kfd_dev *dev,
+static bool event_interrupt_isr_v10(struct kfd_node *dev,
 					const uint32_t *ih_ring_entry,
 					uint32_t *patched_ihre,
 					bool *patched_flag)
@@ -118,7 +118,7 @@ static bool event_interrupt_isr_v10(struct kfd_dev *dev,
 		KFD_IRQ_IS_FENCE(client_id, source_id);
 }
 
-static void event_interrupt_wq_v10(struct kfd_dev *dev,
+static void event_interrupt_wq_v10(struct kfd_node *dev,
 					const uint32_t *ih_ring_entry)
 {
 	uint16_t source_id, client_id, pasid, vmid;

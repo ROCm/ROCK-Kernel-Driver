@@ -33,7 +33,7 @@ static int pm_map_process_v9(struct packet_manager *pm,
 {
 	struct pm4_mes_map_process *packet;
 	uint64_t vm_page_table_base_addr = qpd->page_table_base;
-	struct kfd_dev *kfd = pm->dqm->dev;
+	struct kfd_node *kfd = pm->dqm->dev;
 	struct kfd_process_device *pdd =
 			container_of(qpd, struct kfd_process_device, qpd);
 
@@ -87,7 +87,7 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 {
 	struct pm4_mes_map_process_aldebaran *packet;
 	uint64_t vm_page_table_base_addr = qpd->page_table_base;
-	struct kfd_dev *kfd = pm->dqm->dev;
+	struct kfd_node *node = pm->dqm->dev;
 	struct kfd_process_device *pdd =
 			container_of(qpd, struct kfd_process_device, qpd);
 	int i;
@@ -110,7 +110,7 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 						pdd->spi_dbg_launch_mode;
 
 	if (pdd->process->debug_trap_enabled) {
-		for (i = 0; i < kfd->device_info.num_of_watch_points; i++)
+		for (i = 0; i < node->kfd->device_info.num_of_watch_points; i++)
 			packet->tcp_watch_cntl[i] = pdd->watch_points[i];
 
 		packet->bitfields2.single_memops =

@@ -121,7 +121,7 @@ void debug_event_write_work_handler(struct work_struct *work)
  * only if exception_status is enabled.
  */
 bool kfd_dbg_ev_raise(uint64_t event_mask,
-			struct kfd_process *process, struct kfd_dev *dev,
+			struct kfd_process *process, struct kfd_node *dev,
 			unsigned int source_id, bool use_worker,
 			void *exception_data, size_t exception_data_size)
 {
@@ -205,7 +205,7 @@ bool kfd_dbg_ev_raise(uint64_t event_mask,
 }
 
 /* set pending event queue entry from ring entry  */
-bool kfd_set_dbg_ev_from_interrupt(struct kfd_dev *dev,
+bool kfd_set_dbg_ev_from_interrupt(struct kfd_node *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
 				   uint64_t trap_mask,
@@ -316,11 +316,11 @@ static int kfd_dbg_get_dev_watch_id(struct kfd_process_device *pdd, int *watch_i
 
 	for (i = 0; i < MAX_WATCH_ADDRESSES; i++) {
 		/* device watchpoint in use so skip */
-		if ((pdd->dev->alloc_watch_ids >> i) & 0x1)
+		if ((pdd->dev->kfd->alloc_watch_ids >> i) & 0x1)
 				continue;
 
 		pdd->alloc_watch_ids |= 0x1 << i;
-		pdd->dev->alloc_watch_ids |= 0x1 << i;
+		pdd->dev->kfd->alloc_watch_ids |= 0x1 << i;
 		*watch_id = i;
 		spin_unlock(&watch_points_lock);
 		return 0;
@@ -337,7 +337,7 @@ static void kfd_dbg_clear_dev_watch_id(struct kfd_process_device *pdd, int watch
 	/* process owns device watch point so safe to clear */
 	if ((pdd->alloc_watch_ids >> watch_id) & 0x1) {
 		pdd->alloc_watch_ids &= ~(0x1 << watch_id);
-		pdd->dev->alloc_watch_ids &= ~(0x1 << watch_id);
+		pdd->dev->kfd->alloc_watch_ids &= ~(0x1 << watch_id);
 	}
 
 	spin_unlock(&watch_points_lock);
@@ -373,7 +373,7 @@ int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_
 	if (!kfd_dbg_owns_dev_watch_id(pdd, watch_id))
 		return -EINVAL;
 
-	if (!pdd->dev->shared_resources.enable_mes) {
+	if (!pdd->dev->kfd->shared_resources.enable_mes) {
 		r = debug_lock_and_unmap(pdd->dev->dqm);
 		if (r)
 			return r;
@@ -385,7 +385,7 @@ int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd, uint32_
 							watch_id);
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-	if (!pdd->dev->shared_resources.enable_mes)
+	if (!pdd->dev->kfd->shared_resources.enable_mes)
 		r = debug_map_and_unlock(pdd->dev->dqm);
 	else
 		r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -406,7 +406,7 @@ int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 	if (r)
 		return r;
 
-	if (!pdd->dev->shared_resources.enable_mes) {
+	if (!pdd->dev->kfd->shared_resources.enable_mes) {
 		r = debug_lock_and_unmap(pdd->dev->dqm);
 		if (r) {
 			kfd_dbg_clear_dev_watch_id(pdd, *watch_id);
@@ -424,7 +424,7 @@ int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 					pdd->dev->vm_info.last_vmid_kfd);
 	amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-	if (!pdd->dev->shared_resources.enable_mes)
+	if (!pdd->dev->kfd->shared_resources.enable_mes)
 		r = debug_map_and_unlock(pdd->dev->dqm);
 	else
 		r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -536,7 +536,7 @@ static void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		if (!pdd->dev->shared_resources.enable_mes)
+		if (!pdd->dev->kfd->shared_resources.enable_mes)
 			debug_refresh_runlist(pdd->dev->dqm);
 		else
 			kfd_dbg_set_mes_debug_mode(pdd);
@@ -658,7 +658,7 @@ static int kfd_dbg_trap_activate(struct kfd_process *target)
 
 		kfd_process_set_trap_debug_flag(&pdd->qpd, true);
 
-		if (!pdd->dev->shared_resources.enable_mes)
+		if (!pdd->dev->kfd->shared_resources.enable_mes)
 			r = debug_refresh_runlist(pdd->dev->dqm);
 		else
 			r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -782,7 +782,7 @@ int kfd_dbg_trap_set_wave_launch_override(struct kfd_process *target,
 				pdd->spi_dbg_override);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		if (!pdd->dev->shared_resources.enable_mes)
+		if (!pdd->dev->kfd->shared_resources.enable_mes)
 			r = debug_refresh_runlist(pdd->dev->dqm);
 		else
 			r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -809,7 +809,7 @@ int kfd_dbg_trap_set_wave_launch_mode(struct kfd_process *target,
 				pdd->dev->vm_info.last_vmid_kfd);
 		amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
 
-		if (!pdd->dev->shared_resources.enable_mes)
+		if (!pdd->dev->kfd->shared_resources.enable_mes)
 			r = debug_refresh_runlist(pdd->dev->dqm);
 		else
 			r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -839,7 +839,7 @@ int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
 		struct kfd_process_device *pdd = target->pdds[i];
 		int r;
 
-		if (!pdd->dev->shared_resources.enable_mes)
+		if (!pdd->dev->kfd->shared_resources.enable_mes)
 			r = debug_refresh_runlist(pdd->dev->dqm);
 		else
 			r = kfd_dbg_set_mes_debug_mode(pdd);
@@ -1012,7 +1012,7 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		device_info.location_id = topo_dev->node_props.location_id;
 		device_info.vendor_id = topo_dev->node_props.vendor_id;
 		device_info.device_id = topo_dev->node_props.device_id;
-		device_info.fw_version = pdd->dev->mec_fw_version;
+		device_info.fw_version = pdd->dev->kfd->mec_fw_version;
 		device_info.gfx_target_version =
 			topo_dev->node_props.gfx_target_version;
 		device_info.simd_count = topo_dev->node_props.simd_count;
@@ -1083,7 +1083,7 @@ int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
 						false,
 						pdd->dev->vm_info.last_vmid_kfd);
 
-				if (!pdd->dev->shared_resources.enable_mes)
+				if (!pdd->dev->kfd->shared_resources.enable_mes)
 					debug_refresh_runlist(pdd->dev->dqm);
 				else
 					kfd_dbg_set_mes_debug_mode(pdd);
@@ -1157,7 +1157,7 @@ int kfd_dbg_runtime_disable(struct kfd_process *p)
 					false,
 					pdd->dev->vm_info.last_vmid_kfd);
 
-			if (!pdd->dev->shared_resources.enable_mes)
+			if (!pdd->dev->kfd->shared_resources.enable_mes)
 				debug_refresh_runlist(pdd->dev->dqm);
 			else
 				kfd_dbg_set_mes_debug_mode(pdd);

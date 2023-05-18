@@ -1013,7 +1013,7 @@ static int suspend_single_queue(struct device_queue_manager *dqm,
 
 	q->properties.is_suspended = true;
 	if (q->properties.is_active) {
-		if (dqm->dev->shared_resources.enable_mes) {
+		if (dqm->dev->kfd->shared_resources.enable_mes) {
 			r = remove_queue_mes(dqm, q, &pdd->qpd);
 			if (r)
 				return r;
@@ -1056,7 +1056,7 @@ static int resume_single_queue(struct device_queue_manager *dqm,
 	q->properties.is_suspended = false;
 
 	if (QUEUE_IS_ACTIVE(q->properties)) {
-		if (dqm->dev->shared_resources.enable_mes) {
+		if (dqm->dev->kfd->shared_resources.enable_mes) {
 			r = add_queue_mes(dqm, q, &pdd->qpd);
 			if (r)
 				return r;
@@ -2697,10 +2697,10 @@ int reserve_debug_trap_vmid(struct device_queue_manager *dqm,
 	if (r)
 		goto out_unlock;
 
-	updated_vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
+	updated_vmid_mask = dqm->dev->kfd->shared_resources.compute_vmid_bitmap;
 	updated_vmid_mask &= ~(1 << dqm->dev->vm_info.last_vmid_kfd);
 
-	dqm->dev->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
+	dqm->dev->kfd->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
 	dqm->trap_debug_vmid = dqm->dev->vm_info.last_vmid_kfd;
 	r = set_sched_resources(dqm);
 	if (r)
@@ -2745,10 +2745,10 @@ int release_debug_trap_vmid(struct device_queue_manager *dqm,
 	if (r)
 		goto out_unlock;
 
-	updated_vmid_mask = dqm->dev->shared_resources.compute_vmid_bitmap;
+	updated_vmid_mask = dqm->dev->kfd->shared_resources.compute_vmid_bitmap;
 	updated_vmid_mask |= (1 << dqm->dev->vm_info.last_vmid_kfd);
 
-	dqm->dev->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
+	dqm->dev->kfd->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
 	dqm->trap_debug_vmid = 0;
 	r = set_sched_resources(dqm);
 	if (r)
@@ -2890,7 +2890,7 @@ int resume_queues(struct kfd_process *p,
 					}
 				}
 
-				if (dqm->dev->shared_resources.enable_mes) {
+				if (dqm->dev->kfd->shared_resources.enable_mes) {
 					wake_up_all(&dqm->destroy_wait);
 					if (!err)
 						total_resumed++;
@@ -2969,10 +2969,10 @@ int suspend_queues(struct kfd_process *p,
 				if (!err) {
 					queue_ids[q_idx] &= ~KFD_DBG_QUEUE_INVALID_MASK;
 					if (exception_clear_mask &&
-							dqm->dev->shared_resources.enable_mes)
+							dqm->dev->kfd->shared_resources.enable_mes)
 						q->properties.exception_status &=
 							~exception_clear_mask;
-					if (dqm->dev->shared_resources.enable_mes)
+					if (dqm->dev->kfd->shared_resources.enable_mes)
 						total_suspended++;
 					else
 						per_device_suspended++;

@@ -1323,7 +1323,7 @@ static void kfd_set_iolink_no_atomics(struct kfd_topology_device *dev,
 		return;
 
 	/* checkout source dev has atomics support on root. */
-	if (dev->gpu && (!dev->gpu->pci_atomic_requested ||
+	if (dev->gpu && (!dev->gpu->kfd->pci_atomic_requested ||
 			dev->gpu->adev->asic_type == CHIP_HAWAII)) {
 		link->flags |= CRAT_IOLINK_FLAGS_NO_ATOMICS_32_BIT |
 				CRAT_IOLINK_FLAGS_NO_ATOMICS_64_BIT;
@@ -1712,7 +1712,7 @@ static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
 				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
 	}
 
-	if (kfd_dbg_has_supported_firmware(dev->gpu))
+	if (kfd_dbg_has_supported_firmware(dev->gpu->kfd))
 		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
 }
 
