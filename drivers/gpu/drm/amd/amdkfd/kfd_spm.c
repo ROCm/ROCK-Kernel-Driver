@@ -403,7 +403,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 int kfd_rlc_spm(struct kfd_process *p,  void *data)
 {
 	struct kfd_ioctl_spm_args *args = data;
-	struct kfd_dev *dev;
+	struct kfd_node *dev;
 	struct kfd_process_device *pdd;
 
 	dev = kfd_device_by_id(args->gpu_id);
@@ -434,9 +434,10 @@ int kfd_rlc_spm(struct kfd_process *p,  void *data)
 	return -EINVAL;
 }
 
-void kgd2kfd_spm_interrupt(struct kfd_dev *dev)
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd)
 {
 	struct kfd_process_device *pdd;
+	struct kfd_node *dev = kfd->nodes[0];
 	uint16_t pasid = dev->spm_pasid;
 
 	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
