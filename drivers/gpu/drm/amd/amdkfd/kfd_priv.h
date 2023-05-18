@@ -395,7 +395,7 @@ struct kfd_ipc_obj;
 struct kfd_bo {
 	void *mem;
 	struct interval_tree_node it;
-	struct kfd_dev *dev;
+	struct kfd_node *dev;
 	/* page-aligned VA address */
 	uint64_t cpuva;
 	unsigned int mem_type;

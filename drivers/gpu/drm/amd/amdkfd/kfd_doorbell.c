@@ -174,7 +174,7 @@ void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
 	pr_debug("Process %d unmapping doorbell 0x%lx\n",
 			process->pasid, vma->vm_start);
 
-	size = kfd_doorbell_process_slice(pdd->dev);
+	size = kfd_doorbell_process_slice(pdd->dev->kfd);
 	zap_vma_ptes(vma, vma->vm_start, size);
 	pdd->qpd.doorbell_mapped = 0;
 }
@@ -201,7 +201,7 @@ int kfd_doorbell_remap(struct kfd_process_device *pdd)
 	/* Calculate physical address of doorbell */
 	address = kfd_get_process_doorbells(pdd);
 	vma = pdd->qpd.doorbell_vma;
-	size = kfd_doorbell_process_slice(pdd->dev);
+	size = kfd_doorbell_process_slice(pdd->dev->kfd);
 
 	pr_debug("Process %d remap doorbell 0x%lx\n", process->pasid,
 		vma->vm_start);
@@ -251,7 +251,7 @@ int kfd_doorbell_mmap(struct kfd_node *dev, struct kfd_process *process,
 		 "     vm_flags            == 0x%04lX\n"
 		 "     size                == 0x%04lX\n",
 		 process->pasid, (unsigned long long) vma->vm_start,
-		 address, vma->vm_flags, kfd_doorbell_process_slice(dev));
+		 address, vma->vm_flags, kfd_doorbell_process_slice(dev->kfd));
 
 	pdd = kfd_get_process_device_data(dev, process);
 	if (WARN_ON_ONCE(!pdd))

@@ -130,7 +130,7 @@ int kfd_ipc_init(void)
 	return 0;
 }
 
-static int kfd_import_dmabuf_create_kfd_bo(struct kfd_dev *dev,
+static int kfd_import_dmabuf_create_kfd_bo(struct kfd_node *dev,
 			  struct kfd_process *p,
 			  uint32_t gpu_id,
 			  struct dma_buf *dmabuf, struct kfd_ipc_obj *ipc_obj,
@@ -180,7 +180,7 @@ err_free:
 	return r;
 }
 
-int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
+int kfd_ipc_import_dmabuf(struct kfd_node *dev,
 					   struct kfd_process *p,
 					   uint32_t gpu_id, int dmabuf_fd,
 					   uint64_t va_addr, uint64_t *handle,
@@ -202,7 +202,7 @@ int kfd_ipc_import_dmabuf(struct kfd_dev *dev,
 	return r;
 }
 
-int kfd_ipc_import_handle(struct kfd_dev *dev, struct kfd_process *p,
+int kfd_ipc_import_handle(struct kfd_node *dev, struct kfd_process *p,
 			  uint32_t gpu_id, uint32_t *share_handle,
 			  uint64_t va_addr, uint64_t *handle,
 			  uint64_t *mmap_offset, uint32_t *pflags, bool restore)
@@ -253,7 +253,7 @@ error_unref:
 	return r;
 }
 
-int kfd_ipc_export_as_handle(struct kfd_dev *dev, struct kfd_process *p,
+int kfd_ipc_export_as_handle(struct kfd_node *dev, struct kfd_process *p,
 			     uint64_t handle, uint32_t *ipc_handle,
 			     uint32_t flags)
 {
