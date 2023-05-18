@@ -203,6 +203,7 @@ static int hw_id_map[MAX_HWIP] = {
 	[PCIE_HWIP]	= PCIE_HWID,
 };
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static int amdgpu_discovery_read_binary_from_sysmem(struct amdgpu_device *adev, uint8_t *binary)
 {
 	u64 tmr_offset, tmr_size, pos;
@@ -225,20 +226,24 @@ static int amdgpu_discovery_read_binary_from_sysmem(struct amdgpu_device *adev, 
 
 	return -ENOENT;
 }
+#endif
 
 static int amdgpu_discovery_read_binary_from_mem(struct amdgpu_device *adev,
 						 uint8_t *binary)
 {
 	uint64_t vram_size = (uint64_t)RREG32(mmRCC_CONFIG_MEMSIZE) << 20;
 	int ret = 0;
-
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	if (vram_size) {
+#endif
 		uint64_t pos = vram_size - DISCOVERY_TMR_OFFSET;
 		amdgpu_device_vram_access(adev, pos, (uint32_t *)binary,
 					  adev->mman.discovery_tmr_size, false);
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	} else {
 		ret = amdgpu_discovery_read_binary_from_sysmem(adev, binary);
 	}
+#endif
 
 	return ret;
 }
