@@ -331,7 +331,7 @@ create_dmamap_sg_bo(struct amdgpu_device *adev,
 
 	ret = amdgpu_gem_object_create(adev, mem->bo->tbo.base.size, 1,
 			AMDGPU_GEM_DOMAIN_CPU, AMDGPU_GEM_CREATE_PREEMPTIBLE | flags,
-			ttm_bo_type_sg, mem->bo->tbo.base.resv, &gem_obj, 0);
+			ttm_bo_type_sg, amdkcl_ttm_resvp(&mem->bo->tbo), &gem_obj, 0);
 
 	amdgpu_bo_unreserve(mem->bo);
 
