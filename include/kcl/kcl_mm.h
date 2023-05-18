@@ -96,4 +96,8 @@ struct vm_area_struct *vma_lookup(struct mm_struct *mm, unsigned long addr)
 #define VM_ACCESS_FLAGS (VM_READ | VM_WRITE | VM_EXEC)
 #endif
 
+#ifndef page_to_virt
+#define page_to_virt(x) __va(PFN_PHYS(page_to_pfn(x)))
+#endif
+
 #endif /* AMDKCL_MM_H */
