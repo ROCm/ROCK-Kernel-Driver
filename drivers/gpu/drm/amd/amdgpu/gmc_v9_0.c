@@ -78,7 +78,9 @@
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2                                                          0x05ea
 #define mmHUBP0_DCSURF_PRI_VIEWPORT_DIMENSION_DCN2_BASE_IDX                                                 2
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 #define MAX_MEM_RANGES 8
+#endif
 
 static const char * const gfxhub_client_ids[] = {
 	"CB",
@@ -1869,6 +1871,7 @@ static void gmc_v9_0_save_registers(struct amdgpu_device *adev)
 		adev->gmc.sdpif_register = RREG32_SOC15(DCE, 0, mmDCHUBBUB_SDPIF_MMIO_CNTRL_0);
 }
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 static bool gmc_v9_0_validate_partition_info(struct amdgpu_device *adev)
 {
 	enum amdgpu_memory_partition mode;
@@ -2050,6 +2053,7 @@ static int gmc_v9_0_init_mem_ranges(struct amdgpu_device *adev)
 
 	return 0;
 }
+#endif
 
 static void gmc_v9_4_3_init_vram_info(struct amdgpu_device *adev)
 {
@@ -2219,12 +2223,14 @@ static int gmc_v9_0_sw_init(struct amdgpu_ip_block *ip_block)
 
 	amdgpu_gmc_get_vbios_allocations(adev);
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) ||
 	    amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 4)) {
 		r = gmc_v9_0_init_mem_ranges(adev);
 		if (r)
 			return r;
 	}
+#endif
 
 	/* Memory manager */
 	r = amdgpu_bo_init(adev);
@@ -2289,8 +2295,10 @@ static int gmc_v9_0_sw_fini(struct amdgpu_ip_block *ip_block)
 	amdgpu_bo_free_kernel(&adev->gmc.pdb0_bo, NULL, &adev->gmc.ptr_pdb0);
 	amdgpu_bo_fini(adev);
 
+#ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
 	adev->gmc.num_mem_partitions = 0;
 	kfree(adev->gmc.mem_partitions);
+#endif
 
 	return 0;
 }
