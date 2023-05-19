@@ -3280,9 +3280,6 @@ void amdgpu_smu_debugfs_init(struct amdgpu_device *adev)
 					 &smu_stb_debugfs_fops,
 					 smu->stb_context.stb_buf_size);
 	}
-
-	if (smu->ppt_funcs && smu->ppt_funcs->debugfs_init)
-		smu->ppt_funcs->debugfs_init(smu);
 #endif
 }
 
