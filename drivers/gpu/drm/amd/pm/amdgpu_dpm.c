@@ -1534,12 +1534,12 @@ int amdgpu_dpm_get_num_cpu_cores(struct amdgpu_device *adev)
 	return smu->cpu_core_num;
 }
 
-void amdgpu_dpm_debugfs_init(struct amdgpu_device *adev)
+void amdgpu_dpm_stb_debug_fs_init(struct amdgpu_device *adev)
 {
 	if (!is_support_sw_smu(adev))
 		return;
 
-	amdgpu_smu_debugfs_init(adev);
+	amdgpu_smu_stb_debug_fs_init(adev);
 }
 
 int amdgpu_dpm_display_configuration_change(struct amdgpu_device *adev,
