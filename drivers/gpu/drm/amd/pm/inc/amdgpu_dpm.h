@@ -523,7 +523,7 @@ int amdgpu_dpm_set_pp_table(struct amdgpu_device *adev,
 			    const char *buf,
 			    size_t size);
 int amdgpu_dpm_get_num_cpu_cores(struct amdgpu_device *adev);
-void amdgpu_dpm_debugfs_init(struct amdgpu_device *adev);
+void amdgpu_dpm_stb_debug_fs_init(struct amdgpu_device *adev);
 int amdgpu_dpm_display_configuration_change(struct amdgpu_device *adev,
 					    const struct amd_pp_display_configuration *input);
 int amdgpu_dpm_get_clock_by_type(struct amdgpu_device *adev,
