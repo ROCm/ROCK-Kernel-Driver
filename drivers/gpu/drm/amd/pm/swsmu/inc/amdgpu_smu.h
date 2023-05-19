@@ -1355,11 +1355,6 @@ struct pptable_funcs {
 	 * @init_pptable_microcode: Prepare the pptable microcode to upload via PSP
 	 */
 	int (*init_pptable_microcode)(struct smu_context *smu);
-
-	/**
-	 * @debugfs_init: Initialize debugfs for smu.
-	 */
-	void (*debugfs_init)(struct smu_context *smu);
 };
 
 typedef enum {
