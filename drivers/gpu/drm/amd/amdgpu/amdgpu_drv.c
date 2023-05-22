@@ -2063,6 +2063,11 @@ static const struct pci_device_id pciidlist[] = {
 	  .class_mask = 0xffffff,
 	  .driver_data = CHIP_IP_DISCOVERY },
 
+	{ PCI_DEVICE(0x1002, PCI_ANY_ID),
+	  .class = AMD_ACCELERATOR_PROCESSING << 8,
+	  .class_mask = 0xffffff,
+	  .driver_data = CHIP_IP_DISCOVERY },
+
 #ifdef HAVE_DRM_AMDGPU_PCIID_H
 #include <drm/amdgpu_pciid.h>
 #endif
