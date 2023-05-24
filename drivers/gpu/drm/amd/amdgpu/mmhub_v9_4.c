@@ -310,7 +310,7 @@ static void mmhub_v9_4_setup_vmid_config(struct amdgpu_device *adev, int hubid)
 		tmp = RREG32_SOC15_OFFSET(MMHUB, 0, mmVML2VC0_VM_CONTEXT1_CNTL,
 				hubid * MMHUB_INSTANCE_REGISTER_OFFSET + i);
 		tmp = REG_SET_FIELD(tmp, VML2VC0_VM_CONTEXT1_CNTL,
-				    ENABLE_CONTEXT, 1);
+				    ENABLE_CONTEXT, 0);
 		tmp = REG_SET_FIELD(tmp, VML2VC0_VM_CONTEXT1_CNTL,
 				    PAGE_TABLE_DEPTH,
 				    num_level);
@@ -357,6 +357,11 @@ static void mmhub_v9_4_setup_vmid_config(struct amdgpu_device *adev, int hubid)
 				hubid * MMHUB_INSTANCE_REGISTER_OFFSET +
 				i * hub->ctx_addr_distance,
 				upper_32_bits(adev->vm_manager.max_pfn - 1));
+		tmp = REG_SET_FIELD(tmp, VML2VC0_VM_CONTEXT1_CNTL,
+				    ENABLE_CONTEXT, 1);
+		WREG32_SOC15_OFFSET(MMHUB, 0, mmVML2VC0_VM_CONTEXT1_CNTL,
+				    hubid * MMHUB_INSTANCE_REGISTER_OFFSET +
+				    i * hub->ctx_distance, tmp);
 	}
 }
 
