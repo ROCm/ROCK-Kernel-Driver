@@ -2832,6 +2832,7 @@ void copy_context_work_handler (struct work_struct *work)
 			 */
 			mqd_mgr->get_wave_state(mqd_mgr,
 					q->mqd,
+					&q->properties,
 					(void __user *)	q->properties.ctx_save_restore_area_address,
 					&tmp_ctl_stack_used_size,
 					&tmp_save_area_used_size);
