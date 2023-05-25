@@ -583,6 +583,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
 	struct drm_amdgpu_gem_dgma *args = data;
+	struct amdgpu_fpriv *fpriv = filp->driver_priv;
 	struct drm_gem_object *gobj;
 	struct amdgpu_bo *abo;
 	dma_addr_t *dma_addr;
@@ -594,7 +595,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 		/* create a gem object to contain this object in */
 		r = amdgpu_gem_object_create(adev, args->size, 0,
 					     AMDGPU_GEM_DOMAIN_DGMA_IMPORT, 0,
-					     0, NULL, &gobj);
+					     0, NULL, &gobj, fpriv->xcp_id + 1);
 		if (r)
 			return r;
 
