@@ -23,3 +23,6 @@
 amdxcp-y := amdgpu_xcp_drv.o
 
 obj-$(CONFIG_DRM_AMDGPU) += amdxcp.o
+
+AMD_XCP_PATH := $(src)
+include $(AMD_XCP_PATH)/backport/Makefile
