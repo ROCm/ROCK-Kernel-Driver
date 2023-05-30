@@ -23,3 +23,10 @@
 amdxcp-y := amdgpu_xcp_drv.o
 
 obj-$(CONFIG_DRM_AMDGPU) += amdxcp.o
+
+ifeq ($(KBUILD_EXTMOD),)
+AMD_XCP_PATH := $(srctree)/$(src)
+else
+AMD_XCP_PATH := $(src)
+endif
+include $(AMD_XCP_PATH)/backport/Makefile
