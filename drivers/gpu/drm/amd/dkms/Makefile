@@ -223,4 +223,4 @@ include  $(src)/amd/dkms/Makefile.drm_ttm_helper
 
 include  $(src)/amd/dkms/Makefile.drm_buddy
 
-obj-m += scheduler/ amd/amdgpu/ ttm/ amd/amdkcl/
+obj-m += scheduler/ amd/amdgpu/ amd/amdxcp/ ttm/ amd/amdkcl/
