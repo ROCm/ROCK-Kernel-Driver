@@ -3535,32 +3535,35 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 		}
 	}
 
-	if (dc->debug.visual_confirm)
+	if (dc->debug.visual_confirm) {
 		for (i = 0; i < dc->res_pool->pipe_count; i++) {
 			struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 
 			if (pipe->stream && pipe->plane_state)
 				dc_update_viusal_confirm_color(dc, context, pipe);
 		}
+	}
 
-		for (i = 0; i < surface_count; i++) {
-			struct dc_plane_state *plane_state = srf_updates[i].surface;
-			/*set logical flag for lock/unlock use*/
-			for (j = 0; j < dc->res_pool->pipe_count; j++) {
-				struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
-				if (!pipe_ctx->plane_state)
-					continue;
-				if (should_update_pipe_for_plane(context, pipe_ctx, plane_state))
-					continue;
-				pipe_ctx->plane_state->triplebuffer_flips = false;
-				if (update_type == UPDATE_TYPE_FAST &&
-					dc->hwss.program_triplebuffer != NULL &&
-					!pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
-						/*triple buffer for VUpdate  only*/
-						pipe_ctx->plane_state->triplebuffer_flips = true;
-				}
+	for (i = 0; i < surface_count; i++) {
+		struct dc_plane_state *plane_state = srf_updates[i].surface;
+		/*set logical flag for lock/unlock use*/
+		for (j = 0; j < dc->res_pool->pipe_count; j++) {
+			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
+
+			if (!pipe_ctx->plane_state)
+				continue;
+			if (should_update_pipe_for_plane(context, pipe_ctx, plane_state))
+				continue;
+			pipe_ctx->plane_state->triplebuffer_flips = false;
+			if (update_type == UPDATE_TYPE_FAST &&
+			    dc->hwss.program_triplebuffer &&
+			    !pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
+				/*triple buffer for VUpdate  only*/
+				pipe_ctx->plane_state->triplebuffer_flips = true;
 			}
 		}
+	}
+
 	build_dmub_cmd_list(dc,
 			srf_updates,
 			surface_count,
