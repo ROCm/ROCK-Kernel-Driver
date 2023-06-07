@@ -1039,15 +1039,12 @@ static int resume_single_queue(struct device_queue_manager *dqm,
 				      struct queue *q)
 {
 	struct kfd_process_device *pdd;
-	uint64_t pd_base;
 	int r = 0;
 
 	if (!q->properties.is_suspended)
 		return r;
 
 	pdd = qpd_to_pdd(qpd);
-	/* Retrieve PD base */
-	pd_base = amdgpu_amdkfd_gpuvm_get_process_page_dir(pdd->drm_priv);
 
 	pr_debug("Restoring from suspend PASID %u queue [%i]\n",
 			    pdd->process->pasid,
