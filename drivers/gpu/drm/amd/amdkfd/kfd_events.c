@@ -1252,7 +1252,7 @@ void kfd_signal_vm_fault_event(struct kfd_node *dev, u32 pasid,
 		return;
 	}
 
-	/* SoC15 chips will pass in data from now on. */
+	/* SoC15 chips and onwards will pass in data from now on. */
 	if (!data) {
 		memset(&memory_exception_data, 0, sizeof(memory_exception_data));
 		memory_exception_data.gpu_id = user_gpu_id;
