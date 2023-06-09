@@ -25,6 +25,7 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_connector.h>
 #include <kcl/kcl_drm_crtc.h>
+#include <kcl/kcl_drm_print.h>
 
 /*
  * commit v4.9-rc4-949-g949f08862d66
@@ -108,6 +109,29 @@ int drm_connector_set_panel_orientation_with_quirk(
 }
 #endif
 
+#ifndef HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY
+int _kcl_drm_connector_attach_colorspace_property(struct drm_connector *connector);
+#define drm_connector_attach_colorspace_property _kcl_drm_connector_attach_colorspace_property
+#endif /* HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY */
+
+#ifndef HAVE_DRM_MODE_CREATE_HDMI_COLORSPACE_PROPERTY_2ARGS
+#define KCL_DRM_MODE_CREATE_COLORSPACE_PROPERTY
+int _kcl_drm_mode_create_hdmi_colorspace_property(struct drm_connector *connector,
+					     u32 supported_colorspaces);
+#define drm_mode_create_hdmi_colorspace_property _kcl_drm_mode_create_hdmi_colorspace_property
+#endif /* HAVE_DRM_MODE_CREATE_HDMI_COLORSPACE_PROPERTY_2ARGS */
+
+#ifndef HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS
+#define KCL_DRM_MODE_CREATE_COLORSPACE_PROPERTY
+int _kcl_drm_mode_create_dp_colorspace_property(struct drm_connector *connector,
+					     u32 supported_colorspaces);
+#define drm_mode_create_dp_colorspace_property _kcl_drm_mode_create_dp_colorspace_property
+#endif /* HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS */
+
+#ifdef KCL_DRM_MODE_CREATE_COLORSPACE_PROPERTY
+#define DRM_MODE_COLORIMETRY_COUNT 16
+#endif
+
 #ifndef DRM_COLOR_FORMAT_YCBCR444
 #define DRM_COLOR_FORMAT_YCBCR444      (1<<1)
 #endif
@@ -119,5 +143,31 @@ int drm_connector_set_panel_orientation_with_quirk(
 #ifndef DRM_COLOR_FORMAT_YCBCR420
 #define DRM_COLOR_FORMAT_YCBCR420      (1<<3)
 #endif
+
+/* For Default case, driver will set the colorspace */
+#ifndef DRM_MODE_COLORIMETRY_DEFAULT
+/* For Default case, driver will set the colorspace */
+#define DRM_MODE_COLORIMETRY_DEFAULT			0
+/* CEA 861 Normal Colorimetry options */
+#define DRM_MODE_COLORIMETRY_NO_DATA			0
+#define DRM_MODE_COLORIMETRY_SMPTE_170M_YCC		1
+#define DRM_MODE_COLORIMETRY_BT709_YCC			2
+/* CEA 861 Extended Colorimetry Options */
+#define DRM_MODE_COLORIMETRY_XVYCC_601			3
+#define DRM_MODE_COLORIMETRY_XVYCC_709			4
+#define DRM_MODE_COLORIMETRY_SYCC_601			5
+#define DRM_MODE_COLORIMETRY_OPYCC_601			6
+#define DRM_MODE_COLORIMETRY_OPRGB			7
+#define DRM_MODE_COLORIMETRY_BT2020_CYCC		8
+#define DRM_MODE_COLORIMETRY_BT2020_RGB			9
+#define DRM_MODE_COLORIMETRY_BT2020_YCC			10
+/* Additional Colorimetry extension added as part of CTA 861.G */
+#define DRM_MODE_COLORIMETRY_DCI_P3_RGB_D65		11
+#define DRM_MODE_COLORIMETRY_DCI_P3_RGB_THEATER		12
+/* Additional Colorimetry Options added for DP 1.4a VSC Colorimetry Format */
+#define DRM_MODE_COLORIMETRY_RGB_WIDE_FIXED		13
+#define DRM_MODE_COLORIMETRY_RGB_WIDE_FLOAT		14
+#define DRM_MODE_COLORIMETRY_BT601_YCC			15
+#endif /* DRM_MODE_COLORIMETRY_DEFAULT */
 
 #endif /* AMDKCL_DRM_CONNECTOR_H */
