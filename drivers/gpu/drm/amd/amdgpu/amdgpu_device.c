@@ -4443,7 +4443,7 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 			   msecs_to_jiffies(AMDGPU_RESUME_MS));
 
 	if (!adev->in_s0ix) {
-		r = amdgpu_amdkfd_resume(adev, adev->in_runpm, false);
+		r = amdgpu_amdkfd_resume(adev, adev->in_runpm);
 		if (r)
 			goto exit;
 	}

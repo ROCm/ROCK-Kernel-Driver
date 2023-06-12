@@ -140,8 +140,6 @@ static void kfd_device_info_set_event_interrupt_class(struct kfd_dev *kfd)
 	case IP_VERSION(9, 4, 1): /* ARCTURUS */
 	case IP_VERSION(9, 4, 2): /* ALDEBARAN */
 	case IP_VERSION(9, 4, 3): /* GC 9.4.3 */
-		kfd->device_info.event_interrupt_class = &event_interrupt_class_v9;
-		break;
 	case IP_VERSION(10, 3, 1): /* VANGOGH */
 	case IP_VERSION(10, 3, 3): /* YELLOW_CARP */
 	case IP_VERSION(10, 3, 6): /* GC 10.3.6 */
@@ -155,7 +153,7 @@ static void kfd_device_info_set_event_interrupt_class(struct kfd_dev *kfd)
 	case IP_VERSION(10, 3, 2): /* NAVY_FLOUNDER */
 	case IP_VERSION(10, 3, 4): /* DIMGREY_CAVEFISH */
 	case IP_VERSION(10, 3, 5): /* BEIGE_GOBY */
-		kfd->device_info.event_interrupt_class = &event_interrupt_class_v10;
+		kfd->device_info.event_interrupt_class = &event_interrupt_class_v9;
 		break;
 	case IP_VERSION(11, 0, 0):
 	case IP_VERSION(11, 0, 1):
@@ -948,7 +946,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
 	kfd_iommu_suspend(kfd);
 }
 
-int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
+int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
 {
 	int ret, count, i;
 
@@ -969,7 +967,7 @@ int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
 
 		WARN_ONCE(count < 0, "KFD suspend / resume ref. error");
 		if (count == 0)
-			ret = kfd_resume_all_processes(sync);
+			ret = kfd_resume_all_processes();
 	}
 
 	return ret;

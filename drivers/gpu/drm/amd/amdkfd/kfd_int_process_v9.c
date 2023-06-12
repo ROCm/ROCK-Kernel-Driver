@@ -23,7 +23,6 @@
 
 #include "kfd_priv.h"
 #include "kfd_events.h"
-#include "kfd_debug.h"
 #include "soc15_int.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_smi_events.h"
@@ -231,9 +230,8 @@ static bool event_interrupt_isr_v9(struct kfd_node *dev,
 
 	/* Only handle interrupts from KFD VMIDs */
 	vmid = SOC15_VMID_FROM_IH_ENTRY(ih_ring_entry);
-	if (!KFD_IRQ_IS_FENCE(client_id, source_id) &&
-	   (vmid < dev->vm_info.first_vmid_kfd ||
-	    vmid > dev->vm_info.last_vmid_kfd))
+	if (vmid < dev->vm_info.first_vmid_kfd ||
+	    vmid > dev->vm_info.last_vmid_kfd)
 		return false;
 
 	pasid = SOC15_PASID_FROM_IH_ENTRY(ih_ring_entry);
@@ -308,7 +306,6 @@ static bool event_interrupt_isr_v9(struct kfd_node *dev,
 		source_id == SOC15_INTSRC_SDMA_ECC ||
 		source_id == SOC15_INTSRC_SQ_INTERRUPT_MSG ||
 		source_id == SOC15_INTSRC_CP_BAD_OPCODE ||
-		KFD_IRQ_IS_FENCE(client_id, source_id) ||
 		((client_id == SOC15_IH_CLIENTID_VMC ||
 		client_id == SOC15_IH_CLIENTID_VMC1 ||
 		client_id == SOC15_IH_CLIENTID_UTCL2) &&
@@ -364,13 +361,6 @@ static void event_interrupt_wq_v9(struct kfd_node *dev,
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, SIMD_ID),
 					REG_GET_FIELD(context_id0, SQ_INTERRUPT_WORD_WAVE_CTXID, CU_ID),
 					sq_int_data);
-				if (context_id0 & SQ_INTERRUPT_WORD_WAVE_CTXID__PRIV_MASK) {
-					if (kfd_set_dbg_ev_from_interrupt(dev, pasid,
-							KFD_DEBUG_DOORBELL_ID(sq_int_data),
-							KFD_DEBUG_TRAP_CODE(sq_int_data),
-							NULL, 0))
-						return;
-				}
 				break;
 			case SQ_INTERRUPT_WORD_ENCODING_ERROR:
 				sq_intr_err = REG_GET_FIELD(sq_int_data, KFD_SQ_INT_DATA, ERR_TYPE);
@@ -394,10 +384,6 @@ static void event_interrupt_wq_v9(struct kfd_node *dev,
 			}
 			kfd_signal_event_interrupt(pasid, context_id0 & 0xffffff, 24);
 		} else if (source_id == SOC15_INTSRC_CP_BAD_OPCODE) {
-			kfd_set_dbg_ev_from_interrupt(dev, pasid,
-				KFD_DEBUG_DOORBELL_ID(context_id0),
-				KFD_EC_MASK(KFD_DEBUG_CP_BAD_OP_ECODE(context_id0)),
-				NULL, 0);
 		}
 	} else if (client_id == SOC15_IH_CLIENTID_SDMA0 ||
 		   client_id == SOC15_IH_CLIENTID_SDMA1 ||
@@ -442,15 +428,7 @@ static void event_interrupt_wq_v9(struct kfd_node *dev,
 		exception_data.failure.ReadOnly = info.prot_write ? 1 : 0;
 		exception_data.failure.imprecise = 0;
 
-		kfd_set_dbg_ev_from_interrupt(dev,
-						pasid,
-						-1,
-						KFD_EC_MASK(EC_DEVICE_MEMORY_VIOLATION),
-						&exception_data,
-						sizeof(exception_data));
 		kfd_smi_event_update_vmfault(dev, pasid);
-	} else if (KFD_IRQ_IS_FENCE(client_id, source_id)) {
-		kfd_process_close_interrupt_drain(pasid);
 	}
 }
 

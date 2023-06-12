@@ -38,7 +38,6 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
-#include "kfd_debug.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ras.h"
 #include "amdgpu.h"
@@ -560,8 +559,6 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				      dev->gpu->kfd->mec_fw_version);
 		sysfs_show_32bit_prop(buffer, offs, "capability",
 				      dev->node_props.capability);
-		sysfs_show_64bit_prop(buffer, offs, "debug_prop",
-				      dev->node_props.debug_prop);
 		sysfs_show_32bit_prop(buffer, offs, "sdma_fw_version",
 				      dev->gpu->kfd->sdma_fw_version);
 		sysfs_show_64bit_prop(buffer, offs, "unique_id",
@@ -1678,44 +1675,6 @@ out:
 	return ret;
 }
 
-static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
-{
-	if (!dev->gpu || KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 0, 1))
-		return;
-
-	dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
-				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
-				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
-
-	dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
-
-	if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(10, 0, 0)) {
-		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9 |
-						HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 4, 2))
-			dev->node_props.debug_prop |=
-				HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		else
-			dev->node_props.capability |=
-				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-	} else {
-		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
-					HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(11, 0, 0))
-			dev->node_props.debug_prop |= HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		else
-			dev->node_props.capability |=
-				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-	}
-
-	if (kfd_dbg_has_supported_firmware(dev->gpu->kfd))
-		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
-}
-
 /* Helper function. See kfd_fill_gpu_cache_info for parameter description */
 static int fill_in_l1_pcache(struct kfd_cache_properties **props_ext,
 				struct kfd_gpu_cache_info *pcache_info,
@@ -2100,9 +2059,11 @@ int kfd_topology_add_device(struct kfd_node *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
 	default:
-		kfd_topology_set_capabilities(dev);
-
-		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 0, 1))
+		if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(9, 0, 1))
+			dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+		else
 			WARN(1, "Unexpected ASIC family %u",
 			     dev->gpu->adev->asic_type);
 	}

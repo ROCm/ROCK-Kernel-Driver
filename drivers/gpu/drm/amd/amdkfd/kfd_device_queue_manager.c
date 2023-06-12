@@ -30,14 +30,12 @@
 #include <linux/types.h>
 #include <linux/bitops.h>
 #include <linux/sched.h>
-#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_mqd_manager.h"
 #include "cik_regs.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
-#include "kfd_debug.h"
 #include "mes_api_def.h"
 
 /* Size of the per-pipe EOP queue */
@@ -49,12 +47,10 @@ static int set_pasid_vmid_mapping(struct device_queue_manager *dqm,
 
 static int execute_queues_cpsch(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
-				uint32_t filter_param,
-				uint32_t grace_period);
+				uint32_t filter_param);
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
 				uint32_t filter_param,
-				uint32_t grace_period,
 				bool reset);
 
 static int map_queues_cpsch(struct device_queue_manager *dqm);
@@ -253,10 +249,6 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 	queue_input.paging = false;
 	queue_input.tba_addr = qpd->tba_addr;
 	queue_input.tma_addr = qpd->tma_addr;
-	queue_input.trap_en = KFD_GC_VERSION(q->device) < IP_VERSION(11, 0, 0) ||
-			      KFD_GC_VERSION(q->device) >= IP_VERSION(12, 0, 0) ||
-			      q->properties.is_dbg_wa;
-	queue_input.skip_process_ctx_clear = qpd->pqm->process->debug_trap_enabled;
 
 	queue_type = convert_to_mes_queue_type(q->properties.type);
 	if (queue_type < 0) {
@@ -902,7 +894,7 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q,
 	if (dqm->sched_policy != KFD_SCHED_POLICY_NO_HWS) {
 		if (!dqm->dev->kfd->shared_resources.enable_mes)
 			retval = unmap_queues_cpsch(dqm,
-						    KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD, false);
+						    KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, false);
 		else if (prev_active)
 			retval = remove_queue_mes(dqm, q, &pdd->qpd);
 
@@ -978,92 +970,6 @@ static int update_queue(struct device_queue_manager *dqm, struct queue *q,
 out_unlock:
 	dqm_unlock(dqm);
 	return retval;
-}
-
-/* suspend_single_queue does not lock the dqm like the
- * evict_process_queues_cpsch or evict_process_queues_nocpsch. You should
- * lock the dqm before calling, and unlock after calling.
- *
- * The reason we don't lock the dqm is because this function may be
- * called on multipe queues in a loop, so rather than locking/unlocking
- * multiple times, we will just keep the dqm locked for all of the calls.
- */
-static int suspend_single_queue(struct device_queue_manager *dqm,
-				      struct kfd_process_device *pdd,
-				      struct queue *q)
-{
-	int r = 0;
-	bool is_new;
-
-	if (q->properties.is_suspended)
-		return 0;
-
-	pr_debug("Suspending PASID %u queue [%i]\n",
-			pdd->process->pasid,
-			q->properties.queue_id);
-
-	is_new = q->properties.exception_status & KFD_EC_MASK(EC_QUEUE_NEW);
-
-	if (is_new || q->properties.is_being_destroyed) {
-		pr_debug("Suspend: skip %s queue id %i\n",
-				is_new ? "new" : "destroyed",
-				q->properties.queue_id);
-		return -EBUSY;
-	}
-
-	q->properties.is_suspended = true;
-	if (q->properties.is_active) {
-		if (dqm->dev->kfd->shared_resources.enable_mes) {
-			r = remove_queue_mes(dqm, q, &pdd->qpd);
-			if (r)
-				return r;
-		}
-
-		decrement_queue_count(dqm, &pdd->qpd, q);
-		q->properties.is_active = false;
-	}
-
-	return r;
-}
-
-/* resume_single_queue does not lock the dqm like the functions
- * restore_process_queues_cpsch or restore_process_queues_nocpsch. You should
- * lock the dqm before calling, and unlock after calling.
- *
- * The reason we don't lock the dqm is because this function may be
- * called on multipe queues in a loop, so rather than locking/unlocking
- * multiple times, we will just keep the dqm locked for all of the calls.
- */
-static int resume_single_queue(struct device_queue_manager *dqm,
-				      struct qcm_process_device *qpd,
-				      struct queue *q)
-{
-	struct kfd_process_device *pdd;
-	int r = 0;
-
-	if (!q->properties.is_suspended)
-		return r;
-
-	pdd = qpd_to_pdd(qpd);
-
-	pr_debug("Restoring from suspend PASID %u queue [%i]\n",
-			    pdd->process->pasid,
-			    q->properties.queue_id);
-
-	q->properties.is_suspended = false;
-
-	if (QUEUE_IS_ACTIVE(q->properties)) {
-		if (dqm->dev->kfd->shared_resources.enable_mes) {
-			r = add_queue_mes(dqm, q, &pdd->qpd);
-			if (r)
-				return r;
-		}
-
-		q->properties.is_active = true;
-		increment_queue_count(dqm, qpd, q);
-	}
-
-	return r;
 }
 
 static int evict_process_queues_nocpsch(struct device_queue_manager *dqm,
@@ -1165,8 +1071,7 @@ static int evict_process_queues_cpsch(struct device_queue_manager *dqm,
 		retval = execute_queues_cpsch(dqm,
 					      qpd->is_debug ?
 					      KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES :
-					      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
-					      USE_DEFAULT_GRACE_PERIOD);
+					      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 
 out:
 	dqm_unlock(dqm);
@@ -1306,7 +1211,7 @@ static int restore_process_queues_cpsch(struct device_queue_manager *dqm,
 	}
 	if (!dqm->dev->kfd->shared_resources.enable_mes)
 		retval = execute_queues_cpsch(dqm,
-					      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+					      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 	qpd->evicted = 0;
 	eviction_duration = get_jiffies_64() - pdd->last_evict_timestamp;
 	atomic64_add(eviction_duration, &pdd->evict_duration_counter);
@@ -1437,7 +1342,6 @@ static int initialize_nocpsch(struct device_queue_manager *dqm)
 	INIT_LIST_HEAD(&dqm->queues);
 	dqm->active_queue_count = dqm->next_pipe_to_allocate = 0;
 	dqm->active_cp_queue_count = 0;
-	dqm->trap_debug_vmid = 0;
 	dqm->gws_queue_count = 0;
 
 	for (pipe = 0; pipe < get_pipes_per_mec(dqm); pipe++) {
@@ -1646,15 +1550,11 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	dqm->active_cp_queue_count = 0;
 	dqm->gws_queue_count = 0;
 	dqm->active_runlist = false;
-	dqm->trap_debug_vmid = 0;
 
 	INIT_WORK(&dqm->hw_exception_work, kfd_process_hw_exception);
 
 	init_sdma_bitmaps(dqm);
 
-	if (dqm->dev->kfd2kgd->get_iq_wait_times)
-		dqm->dev->kfd2kgd->get_iq_wait_times(dqm->dev->adev,
-					&dqm->wait_times);
 	return 0;
 }
 
@@ -1694,7 +1594,7 @@ static int start_cpsch(struct device_queue_manager *dqm)
 	dqm->is_resetting = false;
 	dqm->sched_running = true;
 	if (!dqm->dev->kfd->shared_resources.enable_mes)
-		execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+		execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 	dqm_unlock(dqm);
 
 	return 0;
@@ -1719,7 +1619,7 @@ static int stop_cpsch(struct device_queue_manager *dqm)
 
 	if (!dqm->is_hws_hang) {
 		if (!dqm->dev->kfd->shared_resources.enable_mes)
-			unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD, false);
+			unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, false);
 		else
 			remove_all_queues_mes(dqm);
 	}
@@ -1761,8 +1661,7 @@ static int create_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	list_add(&kq->list, &qpd->priv_queue_list);
 	increment_queue_count(dqm, qpd, kq->queue);
 	qpd->is_debug = true;
-	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
-			USE_DEFAULT_GRACE_PERIOD);
+	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 	dqm_unlock(dqm);
 
 	return 0;
@@ -1776,8 +1675,7 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	list_del(&kq->list);
 	decrement_queue_count(dqm, qpd, kq->queue);
 	qpd->is_debug = false;
-	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
-			USE_DEFAULT_GRACE_PERIOD);
+	execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
 	/*
 	 * Unconditionally decrement this counter, regardless of the queue's
 	 * type.
@@ -1837,10 +1735,6 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 	 * updates the is_evicted flag but is a no-op otherwise.
 	 */
 	q->properties.is_evicted = !!qpd->evicted;
-	q->properties.is_suspended = false;
-	q->properties.is_dbg_wa = qpd->pqm->process->debug_trap_enabled &&
-			KFD_GC_VERSION(q->device) >= IP_VERSION(11, 0, 0) &&
-			KFD_GC_VERSION(q->device) < IP_VERSION(12, 0, 0);
 
 	if (qd)
 		mqd_mgr->restore_mqd(mqd_mgr, &q->mqd, q->mqd_mem_obj, &q->gart_mqd_addr,
@@ -1858,7 +1752,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 
 		if (!dqm->dev->kfd->shared_resources.enable_mes)
 			retval = execute_queues_cpsch(dqm,
-					KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+					KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 		else
 			retval = add_queue_mes(dqm, q, qpd);
 		if (retval)
@@ -1948,7 +1842,6 @@ static int map_queues_cpsch(struct device_queue_manager *dqm)
 static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
 				uint32_t filter_param,
-				uint32_t grace_period,
 				bool reset)
 {
 	int retval = 0;
@@ -1961,11 +1854,6 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 	if (!dqm->active_runlist)
 		return retval;
 
-	if (grace_period != USE_DEFAULT_GRACE_PERIOD) {
-		retval = pm_update_grace_period(&dqm->packet_mgr, grace_period);
-		if (retval)
-			return retval;
-	}
 	retval = pm_send_unmap_queue(&dqm->packet_mgr, filter, filter_param, reset);
 	if (retval)
 		return retval;
@@ -1997,13 +1885,6 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		return -ETIME;
 	}
 
-	/* We need to reset the grace period value for this device */
-	if (grace_period != USE_DEFAULT_GRACE_PERIOD) {
-		if (pm_update_grace_period(&dqm->packet_mgr,
-					USE_DEFAULT_GRACE_PERIOD))
-			pr_err("Failed to reset grace period\n");
-	}
-
 	pm_release_ib(&dqm->packet_mgr);
 	dqm->active_runlist = false;
 
@@ -2019,7 +1900,7 @@ static int reset_queues_cpsch(struct device_queue_manager *dqm,
 	dqm_lock(dqm);
 
 	retval = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_BY_PASID,
-			pasid, USE_DEFAULT_GRACE_PERIOD, true);
+			pasid, true);
 
 	dqm_unlock(dqm);
 	return retval;
@@ -2028,44 +1909,17 @@ static int reset_queues_cpsch(struct device_queue_manager *dqm,
 /* dqm->lock mutex has to be locked before calling this function */
 static int execute_queues_cpsch(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,
-				uint32_t filter_param,
-				uint32_t grace_period)
+				uint32_t filter_param)
 {
 	int retval;
 
 	if (dqm->is_hws_hang)
 		return -EIO;
-	retval = unmap_queues_cpsch(dqm, filter, filter_param, grace_period, false);
+	retval = unmap_queues_cpsch(dqm, filter, filter_param, false);
 	if (retval)
 		return retval;
 
 	return map_queues_cpsch(dqm);
-}
-
-/* assume this is called under dqm lock  */
-static int wait_on_destroy_queue(struct device_queue_manager *dqm,
-				 struct queue *q)
-{
-	struct kfd_process_device *pdd = kfd_get_process_device_data(q->device,
-								q->process);
-	int ret = 0;
-
-	if (pdd->qpd.is_debug)
-		return ret;
-
-	q->properties.is_being_destroyed = true;
-
-	if (pdd->process->debug_trap_enabled && q->properties.is_suspended) {
-		dqm_unlock(dqm);
-		mutex_unlock(&q->process->mutex);
-		ret = wait_event_interruptible(dqm->destroy_wait,
-						!q->properties.is_suspended);
-
-		mutex_lock(&q->process->mutex);
-		dqm_lock(dqm);
-	}
-
-	return ret;
 }
 
 static int destroy_queue_cpsch(struct device_queue_manager *dqm,
@@ -2089,13 +1943,6 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 
 	/* remove queue from list to prevent rescheduling after preemption */
 	dqm_lock(dqm);
-
-	retval = wait_on_destroy_queue(dqm, q);
-
-	if (retval) {
-		dqm_unlock(dqm);
-		return retval;
-	}
 
 	if (qpd->is_debug) {
 		/*
@@ -2124,7 +1971,7 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 		if (!dqm->dev->kfd->shared_resources.enable_mes) {
 			decrement_queue_count(dqm, qpd, q);
 			retval = execute_queues_cpsch(dqm,
-						      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+						      KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0);
 			if (retval == -ETIME)
 				qpd->reset_wavefronts = true;
 		} else {
@@ -2143,16 +1990,9 @@ static int destroy_queue_cpsch(struct device_queue_manager *dqm,
 	dqm_unlock(dqm);
 
 	/*
-	 * Do free_mqd and delete raise event after dqm_unlock(dqm) to avoid
+	 * Do free_mqd after dqm_unlock(dqm) to avoid
 	 * circular locking
 	 */
-	kfd_dbg_ev_raise(KFD_EC_MASK(EC_DEVICE_QUEUE_DELETE),
-			qpd->pqm->process,
-			q->device,
-			-1,
-			false,
-			NULL,
-			0);
 	mqd_mgr->free_mqd(mqd_mgr, q->mqd, q->mqd_mem_obj);
 
 	return retval;
@@ -2419,7 +2259,7 @@ static int process_termination_cpsch(struct device_queue_manager *dqm,
 	}
 
 	if (!dqm->dev->kfd->shared_resources.enable_mes)
-		retval = execute_queues_cpsch(dqm, filter, 0, USE_DEFAULT_GRACE_PERIOD);
+		retval = execute_queues_cpsch(dqm, filter, 0);
 
 	if ((!dqm->is_hws_hang) && (retval || qpd->reset_wavefronts)) {
 		pr_warn("Resetting wave fronts (cpsch) on dev %p\n", dqm->dev);
@@ -2617,11 +2457,6 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_node *dev)
 		goto out_free;
 	}
 
-	if (!dqm->ops.initialize(dqm)) {
-		init_waitqueue_head(&dqm->destroy_wait);
-		return dqm;
-	}
-
 out_free:
 	kfree(dqm);
 	return NULL;
@@ -2668,376 +2503,6 @@ static void kfd_process_hw_exception(struct work_struct *work)
 	amdgpu_amdkfd_gpu_reset(dqm->dev->adev);
 }
 
-/*
- * Reserves a vmid for the trap debugger
- */
-int reserve_debug_trap_vmid(struct device_queue_manager *dqm,
-				struct qcm_process_device *qpd)
-{
-	int r;
-	int updated_vmid_mask;
-
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
-		return -EINVAL;
-	}
-
-	dqm_lock(dqm);
-
-	if (dqm->trap_debug_vmid != 0) {
-		pr_err("Trap debug id already reserved\n");
-		r = -EBUSY;
-		goto out_unlock;
-	}
-
-	r = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
-			USE_DEFAULT_GRACE_PERIOD, false);
-	if (r)
-		goto out_unlock;
-
-	updated_vmid_mask = dqm->dev->kfd->shared_resources.compute_vmid_bitmap;
-	updated_vmid_mask &= ~(1 << dqm->dev->vm_info.last_vmid_kfd);
-
-	dqm->dev->kfd->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
-	dqm->trap_debug_vmid = dqm->dev->vm_info.last_vmid_kfd;
-	r = set_sched_resources(dqm);
-	if (r)
-		goto out_unlock;
-
-	r = map_queues_cpsch(dqm);
-	if (r)
-		goto out_unlock;
-
-	pr_debug("Reserved VMID for trap debug: %i\n", dqm->trap_debug_vmid);
-
-out_unlock:
-	dqm_unlock(dqm);
-	return r;
-}
-
-/*
- * Releases vmid for the trap debugger
- */
-int release_debug_trap_vmid(struct device_queue_manager *dqm,
-			struct qcm_process_device *qpd)
-{
-	int r;
-	int updated_vmid_mask;
-	uint32_t trap_debug_vmid;
-
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
-		return -EINVAL;
-	}
-
-	dqm_lock(dqm);
-	trap_debug_vmid = dqm->trap_debug_vmid;
-	if (dqm->trap_debug_vmid == 0) {
-		pr_err("Trap debug id is not reserved\n");
-		r = -EINVAL;
-		goto out_unlock;
-	}
-
-	r = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
-			USE_DEFAULT_GRACE_PERIOD, false);
-	if (r)
-		goto out_unlock;
-
-	updated_vmid_mask = dqm->dev->kfd->shared_resources.compute_vmid_bitmap;
-	updated_vmid_mask |= (1 << dqm->dev->vm_info.last_vmid_kfd);
-
-	dqm->dev->kfd->shared_resources.compute_vmid_bitmap = updated_vmid_mask;
-	dqm->trap_debug_vmid = 0;
-	r = set_sched_resources(dqm);
-	if (r)
-		goto out_unlock;
-
-	r = map_queues_cpsch(dqm);
-	if (r)
-		goto out_unlock;
-
-	pr_debug("Released VMID for trap debug: %i\n", trap_debug_vmid);
-
-out_unlock:
-	dqm_unlock(dqm);
-	return r;
-}
-
-#define QUEUE_NOT_FOUND		-1
-/* invalidate queue operation in array */
-static void q_array_invalidate(uint32_t num_queues, uint32_t *queue_ids)
-{
-	int i;
-
-	for (i = 0; i < num_queues; i++)
-		queue_ids[i] |= KFD_DBG_QUEUE_INVALID_MASK;
-}
-
-/* find queue index in array */
-static int q_array_get_index(unsigned int queue_id,
-		uint32_t num_queues,
-		uint32_t *queue_ids)
-{
-	int i;
-
-	for (i = 0; i < num_queues; i++)
-		if (queue_id == (queue_ids[i] & ~KFD_DBG_QUEUE_INVALID_MASK))
-			return i;
-
-	return QUEUE_NOT_FOUND;
-}
-
-struct copy_context_work_handler_workarea {
-	struct work_struct copy_context_work;
-	struct kfd_process *p;
-};
-
-/* assume work is flushed while process lock is held. */
-void copy_context_work_handler (struct work_struct *work)
-{
-	struct copy_context_work_handler_workarea *workarea;
-	struct mqd_manager *mqd_mgr;
-	struct queue *q;
-	struct mm_struct *mm;
-	struct kfd_process *p;
-	uint32_t tmp_ctl_stack_used_size, tmp_save_area_used_size;
-	int i;
-
-	workarea = container_of(work,
-			struct copy_context_work_handler_workarea,
-			copy_context_work);
-
-	p = workarea->p;
-	mm = get_task_mm(p->lead_thread);
-
-	if (!mm)
-		return;
-
-	kthread_use_mm(mm);
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-		struct device_queue_manager *dqm = pdd->dev->dqm;
-		struct qcm_process_device *qpd = &pdd->qpd;
-
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			mqd_mgr = dqm->mqd_mgrs[KFD_MQD_TYPE_CP];
-
-			/* We ignore the return value from get_wave_state
-			 * because
-			 * i) right now, it always returns 0, and
-			 * ii) if we hit an error, we would continue to the
-			 *      next queue anyway.
-			 */
-			mqd_mgr->get_wave_state(mqd_mgr,
-					q->mqd,
-					&q->properties,
-					(void __user *)	q->properties.ctx_save_restore_area_address,
-					&tmp_ctl_stack_used_size,
-					&tmp_save_area_used_size);
-		}
-	}
-	kthread_unuse_mm(mm);
-	mmput(mm);
-}
-
-int resume_queues(struct kfd_process *p,
-		bool resume_all_queues,
-		uint32_t num_queues,
-		uint32_t *queue_ids)
-{
-	int total_resumed = 0;
-	int i;
-
-	if (!resume_all_queues && queue_ids == NULL)
-		return -EINVAL;
-
-	/* mask all queues as invalid.  unmask per successful request */
-	if (!resume_all_queues)
-		q_array_invalidate(num_queues, queue_ids);
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-		struct device_queue_manager *dqm = pdd->dev->dqm;
-		struct qcm_process_device *qpd = &pdd->qpd;
-		struct queue *q;
-		int r, per_device_resumed = 0;
-
-		dqm_lock(dqm);
-
-		/* unmask queues that resume or already resumed as valid */
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = QUEUE_NOT_FOUND;
-
-			if (queue_ids)
-				q_idx = q_array_get_index(
-						q->properties.queue_id,
-						num_queues,
-						queue_ids);
-
-			if (resume_all_queues || q_idx != QUEUE_NOT_FOUND) {
-				int err = resume_single_queue(dqm, &pdd->qpd, q);
-
-				if (queue_ids) {
-					if (!err) {
-						queue_ids[q_idx] &=
-							~KFD_DBG_QUEUE_INVALID_MASK;
-					} else {
-						queue_ids[q_idx] |=
-							KFD_DBG_QUEUE_ERROR_MASK;
-						break;
-					}
-				}
-
-				if (dqm->dev->kfd->shared_resources.enable_mes) {
-					wake_up_all(&dqm->destroy_wait);
-					if (!err)
-						total_resumed++;
-				} else {
-					per_device_resumed++;
-				}
-			}
-		}
-
-		if (!per_device_resumed) {
-			dqm_unlock(dqm);
-			continue;
-		}
-
-		r = execute_queues_cpsch(dqm,
-					KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES,
-					0,
-					USE_DEFAULT_GRACE_PERIOD);
-		if (r) {
-			pr_err("Failed to resume process queues\n");
-			if (!resume_all_queues) {
-				list_for_each_entry(q, &qpd->queues_list, list) {
-					int q_idx = q_array_get_index(
-							q->properties.queue_id,
-							num_queues,
-							queue_ids);
-
-					/* mask queue as error on resume fail */
-					if (q_idx != QUEUE_NOT_FOUND)
-						queue_ids[q_idx] |=
-							KFD_DBG_QUEUE_ERROR_MASK;
-				}
-			}
-		} else {
-			wake_up_all(&dqm->destroy_wait);
-			total_resumed += per_device_resumed;
-		}
-
-		dqm_unlock(dqm);
-	}
-
-	return total_resumed;
-}
-
-int suspend_queues(struct kfd_process *p,
-			uint32_t num_queues,
-			uint32_t grace_period,
-			uint64_t exception_clear_mask,
-			uint32_t *queue_ids)
-{
-	int total_suspended = 0;
-	int i;
-
-	/* mask all queues as invalid.  umask on successful request */
-	q_array_invalidate(num_queues, queue_ids);
-
-	for (i = 0; i < p->n_pdds; i++) {
-		struct kfd_process_device *pdd = p->pdds[i];
-		struct device_queue_manager *dqm = pdd->dev->dqm;
-		struct qcm_process_device *qpd = &pdd->qpd;
-		struct queue *q;
-		int r, per_device_suspended = 0;
-
-		mutex_lock(&p->event_mutex);
-		dqm_lock(dqm);
-
-		/* unmask queues that suspend or already suspended */
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = q_array_get_index(q->properties.queue_id,
-							num_queues,
-							queue_ids);
-
-			if (q_idx != QUEUE_NOT_FOUND) {
-				int err = suspend_single_queue(dqm, pdd, q);
-
-				if (!err) {
-					queue_ids[q_idx] &= ~KFD_DBG_QUEUE_INVALID_MASK;
-					if (exception_clear_mask &&
-							dqm->dev->kfd->shared_resources.enable_mes)
-						q->properties.exception_status &=
-							~exception_clear_mask;
-					if (dqm->dev->kfd->shared_resources.enable_mes)
-						total_suspended++;
-					else
-						per_device_suspended++;
-				} else if (err != -EBUSY) {
-					r = err;
-					queue_ids[q_idx] |= KFD_DBG_QUEUE_ERROR_MASK;
-					break;
-				}
-			}
-		}
-
-		if (!per_device_suspended) {
-			dqm_unlock(dqm);
-			mutex_unlock(&p->event_mutex);
-			if (total_suspended)
-				amdgpu_amdkfd_debug_mem_fence(dqm->dev->adev);
-			continue;
-		}
-
-		r = execute_queues_cpsch(dqm,
-			KFD_UNMAP_QUEUES_FILTER_DYNAMIC_QUEUES, 0,
-			grace_period);
-
-		if (r)
-			pr_err("Failed to suspend process queues.\n");
-		else
-			total_suspended += per_device_suspended;
-
-		list_for_each_entry(q, &qpd->queues_list, list) {
-			int q_idx = q_array_get_index(q->properties.queue_id,
-						num_queues, queue_ids);
-
-			if (q_idx == QUEUE_NOT_FOUND)
-				continue;
-
-			/* mask queue as error on suspend fail */
-			if (r)
-				queue_ids[q_idx] |= KFD_DBG_QUEUE_ERROR_MASK;
-			else if (exception_clear_mask)
-				q->properties.exception_status &=
-							~exception_clear_mask;
-		}
-
-		dqm_unlock(dqm);
-		mutex_unlock(&p->event_mutex);
-		amdgpu_amdkfd_debug_mem_fence(dqm->dev->adev);
-	}
-
-	if (total_suspended) {
-		struct copy_context_work_handler_workarea copy_context_worker;
-
-		INIT_WORK_ONSTACK(
-				&copy_context_worker.copy_context_work,
-				copy_context_work_handler);
-
-		copy_context_worker.p = p;
-
-		schedule_work(&copy_context_worker.copy_context_work);
-
-
-		flush_work(&copy_context_worker.copy_context_work);
-		destroy_work_on_stack(&copy_context_worker.copy_context_work);
-	}
-
-	return total_suspended;
-}
-
 static uint32_t set_queue_type_for_user(struct queue_properties *q_props)
 {
 	switch (q_props->type) {
@@ -3053,80 +2518,6 @@ static uint32_t set_queue_type_for_user(struct queue_properties *q_props)
 		WARN_ONCE(true, "queue type not recognized!");
 		return 0xffffffff;
 	};
-}
-
-void set_queue_snapshot_entry(struct device_queue_manager *dqm,
-			      struct queue *q,
-			      uint64_t exception_clear_mask,
-			      struct kfd_queue_snapshot_entry *qss_entry)
-{
-	dqm_lock(dqm);
-
-	qss_entry->ring_base_address = q->properties.queue_address,
-	qss_entry->write_pointer_address = (uint64_t)q->properties.write_ptr;
-	qss_entry->read_pointer_address = (uint64_t)q->properties.read_ptr,
-	qss_entry->ctx_save_restore_address =
-				q->properties.ctx_save_restore_area_address;
-	qss_entry->ctx_save_restore_area_size =
-				q->properties.ctx_save_restore_area_size;
-	qss_entry->exception_status = q->properties.exception_status;
-	qss_entry->queue_id = q->properties.queue_id;
-	qss_entry->gpu_id = q->device->id;
-	qss_entry->ring_size = (uint32_t)q->properties.queue_size;
-	qss_entry->queue_type = set_queue_type_for_user(&q->properties);
-	q->properties.exception_status &= ~exception_clear_mask;
-
-	dqm_unlock(dqm);
-}
-
-int debug_lock_and_unmap(struct device_queue_manager *dqm)
-{
-	int r;
-
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
-		return -EINVAL;
-	}
-
-	if (!kfd_dbg_is_per_vmid_supported(dqm->dev))
-		return 0;
-
-	dqm_lock(dqm);
-
-	r = unmap_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, 0, false);
-	if (r)
-		dqm_unlock(dqm);
-
-	return r;
-}
-
-int debug_map_and_unlock(struct device_queue_manager *dqm)
-{
-	int r;
-
-	if (dqm->sched_policy == KFD_SCHED_POLICY_NO_HWS) {
-		pr_err("Unsupported on sched_policy: %i\n", dqm->sched_policy);
-		return -EINVAL;
-	}
-
-	if (!kfd_dbg_is_per_vmid_supported(dqm->dev))
-		return 0;
-
-	r = map_queues_cpsch(dqm);
-
-	dqm_unlock(dqm);
-
-	return r;
-}
-
-int debug_refresh_runlist(struct device_queue_manager *dqm)
-{
-	int r = debug_lock_and_unmap(dqm);
-
-	if (r)
-		return r;
-
-	return debug_map_and_unlock(dqm);
 }
 
 #if defined(CONFIG_DEBUG_FS)
@@ -3243,8 +2634,7 @@ int dqm_debugfs_hang_hws(struct device_queue_manager *dqm)
 		return r;
 	}
 	dqm->active_runlist = true;
-	r = execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0,
-			USE_DEFAULT_GRACE_PERIOD);
+	r = execute_queues_cpsch(dqm, KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0);
 	dqm_unlock(dqm);
 
 	return r;

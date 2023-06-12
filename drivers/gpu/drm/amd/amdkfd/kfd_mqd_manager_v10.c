@@ -48,7 +48,8 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 	struct v10_compute_mqd *m;
 	uint32_t se_mask[4] = {0}; /* 4 is the max # of SEs */
 
-	if (!minfo || !minfo->cu_mask.ptr)
+	if (!minfo || (minfo->update_flag != UPDATE_FLAG_CU_MASK) ||
+			!minfo->cu_mask.ptr)
 		return;
 
 	mqd_symmetrically_map_cu_mask(mm,
@@ -115,11 +116,6 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 	m->cp_hqd_quantum = 1 << CP_HQD_QUANTUM__QUANTUM_EN__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
-
-	/* Set cp_hqd_hq_scheduler0 bit 14 to 1 to have the CP set up the
-	 * DISPATCH_PTR.  This is required for the kfd debugger
-	 */
-	m->cp_hqd_hq_scheduler0 = 1 << 14;
 
 	if (q->format == KFD_QUEUE_FORMAT_AQL) {
 		m->cp_hqd_aql_control =
@@ -237,7 +233,6 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  u32 *save_area_used_size)
 {
 	struct v10_compute_mqd *m;
-	struct mqd_user_context_save_area_header header;
 
 	m = get_mqd(mqd);
 
@@ -255,15 +250,6 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	 * it's part of the context save area that is already
 	 * accessible to user mode
 	 */
-
-	header.control_stack_size = *ctl_stack_used_size;
-	header.wave_state_size = *save_area_used_size;
-
-	header.wave_state_offset = m->cp_hqd_wg_state_offset;
-	header.control_stack_offset = m->cp_hqd_cntl_stack_offset;
-
-	if (copy_to_user(ctl_stack, &header, sizeof(header)))
-		return -EFAULT;
 
 	return 0;
 }

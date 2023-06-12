@@ -46,33 +46,15 @@ static void update_cu_mask(struct mqd_manager *mm, void *mqd,
 {
 	struct v11_compute_mqd *m;
 	uint32_t se_mask[KFD_MAX_NUM_SE] = {0};
-	bool has_wa_flag = minfo && (minfo->update_flag & (UPDATE_FLAG_DBG_WA_ENABLE |
-			UPDATE_FLAG_DBG_WA_DISABLE));
-
-	if (!minfo || !(has_wa_flag || minfo->cu_mask.ptr))
+	
+	if (!minfo || (minfo->update_flag != UPDATE_FLAG_CU_MASK) ||
+			!minfo->cu_mask.ptr)
 		return;
-
-	m = get_mqd(mqd);
-
-	if (has_wa_flag) {
-		uint32_t wa_mask = minfo->update_flag == UPDATE_FLAG_DBG_WA_ENABLE ?
-						0xffff : 0xffffffff;
-
-		m->compute_static_thread_mgmt_se0 = wa_mask;
-		m->compute_static_thread_mgmt_se1 = wa_mask;
-		m->compute_static_thread_mgmt_se2 = wa_mask;
-		m->compute_static_thread_mgmt_se3 = wa_mask;
-		m->compute_static_thread_mgmt_se4 = wa_mask;
-		m->compute_static_thread_mgmt_se5 = wa_mask;
-		m->compute_static_thread_mgmt_se6 = wa_mask;
-		m->compute_static_thread_mgmt_se7 = wa_mask;
-
-		return;
-	}
 
 	mqd_symmetrically_map_cu_mask(mm,
 		minfo->cu_mask.ptr, minfo->cu_mask.count, se_mask);
 
+	m = get_mqd(mqd);
 	m->compute_static_thread_mgmt_se0 = se_mask[0];
 	m->compute_static_thread_mgmt_se1 = se_mask[1];
 	m->compute_static_thread_mgmt_se2 = se_mask[2];
@@ -127,7 +109,6 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 	uint64_t addr;
 	struct v11_compute_mqd *m;
 	int size;
-	uint32_t wa_mask = q->is_dbg_wa ? 0xffff : 0xffffffff;
 
 	m = (struct v11_compute_mqd *) mqd_mem_obj->cpu_ptr;
 	addr = mqd_mem_obj->gpu_addr;
@@ -142,14 +123,14 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 	m->header = 0xC0310800;
 	m->compute_pipelinestat_enable = 1;
 
-	m->compute_static_thread_mgmt_se0 = wa_mask;
-	m->compute_static_thread_mgmt_se1 = wa_mask;
-	m->compute_static_thread_mgmt_se2 = wa_mask;
-	m->compute_static_thread_mgmt_se3 = wa_mask;
-	m->compute_static_thread_mgmt_se4 = wa_mask;
-	m->compute_static_thread_mgmt_se5 = wa_mask;
-	m->compute_static_thread_mgmt_se6 = wa_mask;
-	m->compute_static_thread_mgmt_se7 = wa_mask;
+	m->compute_static_thread_mgmt_se0 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se1 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se2 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se3 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se4 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se5 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se6 = 0xFFFFFFFF;
+	m->compute_static_thread_mgmt_se7 = 0xFFFFFFFF;
 
 	m->cp_hqd_persistent_state = CP_HQD_PERSISTENT_STATE__PRELOAD_REQ_MASK |
 			0x55 << CP_HQD_PERSISTENT_STATE__PRELOAD_SIZE__SHIFT;
@@ -163,10 +144,6 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
 
-	/* Set cp_hqd_hq_status0.c_queue_debug_en to 1 to have the CP set up the
-	 * DISPATCH_PTR.  This is required for the kfd debugger
-	 */
-	m->cp_hqd_hq_status0 = 1 << 14;
 	/*
 	 * GFX11 RS64 CPFW version >= 509 supports PCIe atomics support
 	 * acknowledgment.
@@ -290,7 +267,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  u32 *save_area_used_size)
 {
 	struct v11_compute_mqd *m;
-	struct mqd_user_context_save_area_header header;
+	/*struct mqd_user_context_save_area_header header;*/
 
 	m = get_mqd(mqd);
 
@@ -308,6 +285,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	 * it's part of the context save area that is already
 	 * accessible to user mode
 	 */
+/*
 	header.control_stack_size = *ctl_stack_used_size;
 	header.wave_state_size = *save_area_used_size;
 
@@ -316,7 +294,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 
 	if (copy_to_user(ctl_stack, &header, sizeof(header)))
 		return -EFAULT;
-
+*/
 	return 0;
 }
 

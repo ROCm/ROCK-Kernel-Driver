@@ -251,7 +251,6 @@ struct device_queue_manager {
 	struct kfd_mem_obj	*fence_mem;
 	bool			active_runlist;
 	int			sched_policy;
-	uint32_t		trap_debug_vmid;
 
 	/* hw exception  */
 	bool			is_hws_hang;
@@ -263,9 +262,6 @@ struct device_queue_manager {
 
 	/* used for GFX 9.4.3 only */
 	uint32_t		current_logical_xcc_start;
-
-	/* sync destroy and suspend  */
-	wait_queue_head_t destroy_wait;
 };
 
 void device_queue_manager_init_cik(
@@ -291,27 +287,6 @@ unsigned int get_num_sdma_queues(struct device_queue_manager *dqm);
 unsigned int get_num_xgmi_sdma_queues(struct device_queue_manager *dqm);
 bool check_if_queues_active(struct device_queue_manager *dqm,
 		struct qcm_process_device *qpd);
-int reserve_debug_trap_vmid(struct device_queue_manager *dqm,
-			struct qcm_process_device *qpd);
-int release_debug_trap_vmid(struct device_queue_manager *dqm,
-			struct qcm_process_device *qpd);
-int suspend_queues(struct kfd_process *p,
-			uint32_t num_queues,
-			uint32_t grace_period,
-			uint64_t exception_clear_mask,
-			uint32_t *queue_ids);
-int resume_queues(struct kfd_process *p,
-		bool resume_all_queues,
-		uint32_t num_queues,
-		uint32_t *queue_ids);
-
-void set_queue_snapshot_entry(struct device_queue_manager *dqm,
-			      struct queue *q,
-			      uint64_t exception_clear_mask,
-			      struct kfd_queue_snapshot_entry *qss_entry);
-int debug_lock_and_unmap(struct device_queue_manager *dqm);
-int debug_map_and_unlock(struct device_queue_manager *dqm);
-int debug_refresh_runlist(struct device_queue_manager *dqm);
 
 static inline unsigned int get_sh_mem_bases_32(struct kfd_process_device *pdd)
 {

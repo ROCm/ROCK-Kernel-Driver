@@ -542,12 +542,8 @@ struct queue_properties {
 	uint32_t doorbell_off;
 	bool is_interop;
 	bool is_evicted;
-	bool is_suspended;
-	bool is_being_destroyed;
 	bool is_active;
 	bool is_gws;
-	bool is_dbg_wa;
-	bool is_user_cu_masked;
 	uint32_t pm4_target_xcc;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
@@ -563,19 +559,15 @@ struct queue_properties {
 	uint32_t ctl_stack_size;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
-	unsigned long debug_event_type;
-	uint64_t exception_status; /* Exception code status */
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
 			    (q).queue_address != 0 &&	\
 			    (q).queue_percent > 0 &&	\
-			    !(q).is_evicted && \
-			    !(q).is_suspended)
+			    !(q).is_evicted)
 
 enum mqd_update_flag {
-	UPDATE_FLAG_DBG_WA_ENABLE = 1,
-	UPDATE_FLAG_DBG_WA_DISABLE = 2,
+	UPDATE_FLAG_CU_MASK = 0
 };
 
 struct mqd_update_info {
@@ -880,17 +872,6 @@ struct kfd_process_device {
 	uint64_t page_in;
 	uint64_t page_out;
 
-	/* Exception code status*/
-	uint64_t exception_status;
-	void *vm_fault_exc_data;
-	size_t vm_fault_exc_data_size;
-
-	/* Tracks debug per-vmid request settings */
-	uint32_t spi_dbg_override;
-	uint32_t spi_dbg_launch_mode;
-	uint32_t watch_points[4];
-	uint32_t alloc_watch_ids;
-
 	/*
 	 * If this process has been checkpointed before, then the user
 	 * application will use the original gpu_id on the
@@ -1008,54 +989,15 @@ struct kfd_process {
 	unsigned long last_restore_timestamp;
 	unsigned long last_evict_timestamp;
 
-	/* Indicates device process is debug attached with reserved vmid. */
-	bool debug_trap_enabled;
-
-	/* per-process-per device debug event fd file */
-	struct file *dbg_ev_file;
-
-	/* If the process is a kfd debugger, we need to know so we can clean
-	 * up at exit time.  If a process enables debugging on itself, it does
-	 * its own clean-up, so we don't set the flag here.  We track this by
-	 * counting the number of processes this process is debugging.
-	 */
-	atomic_t debugged_process_count;
-
-	/* If the process is a debugged, this is the debugger process */
-	struct kfd_process *debugger_process;
-
 	/* Kobj for our procfs */
 	struct kobject *kobj;
 	struct kobject *kobj_queues;
 	struct attribute attr_pasid;
 
-	/* Keep track cwsr init */
-	bool has_cwsr;
-
-	/* Exception code enable mask and status */
-	uint64_t exception_enable_mask;
-	uint64_t exception_status;
-
-	/* Used to drain stale interrupts */
-	wait_queue_head_t wait_irq_drain;
-	bool irq_drain_is_open;
-
 	/* shared virtual memory registered by this process */
 	struct svm_range_list svms;
 
 	bool xnack_enabled;
-
-	/* Tracks debug per-vmid request for precise memory */
-	bool precise_mem_ops;
-
-	/* Work area for debugger event writer worker. */
-	struct work_struct debug_event_workarea;
-
-	/* Tracks runtime enable status */
-	uint64_t r_debug;
-	struct semaphore runtime_enable_sema;
-	bool is_runtime_retry;
-	struct kfd_runtime_info runtime_info;
 
 	atomic_t poison;
 
@@ -1112,18 +1054,7 @@ void kfd_unref_process(struct kfd_process *p);
 int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger);
 int kfd_process_restore_queues(struct kfd_process *p);
 void kfd_suspend_all_processes(bool force);
-/*
- * kfd_resume_all_processes:
- *	bool sync: If kfd_resume_all_processes() should wait for the
- *		delayed work to complete or not.
- *		If there will be multiple calls to kfd_suspend_all_processes()
- *		and kfd_resume_all_processes(), we need to wait for the
- *		delayed sync work for kfd_resume_all_processes() to complete
- *		or else the subsequent call to kfd_suspend_all_processes()
- *		may cancel any outstanding delayed work.  This can happen
- *		when the kfd debugger is started on a multi-gpu system.
- */
-int kfd_resume_all_processes(bool sync);
+int kfd_resume_all_processes(void);
 
 struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *process,
 							 uint32_t gpu_id);
@@ -1262,8 +1193,6 @@ bool enqueue_ih_ring_entry(struct kfd_node *kfd, const void *ih_ring_entry);
 bool interrupt_is_wanted(struct kfd_node *dev,
 				const uint32_t *ih_ring_entry,
 				uint32_t *patched_ihre, bool *flag);
-void kfd_process_drain_interrupts(struct kfd_process_device *pdd);
-void kfd_process_close_interrupt_drain(unsigned int pasid);
 
 /* amdkfd Apertures */
 int kfd_init_apertures(struct kfd_process *process);
@@ -1271,8 +1200,6 @@ int kfd_init_apertures(struct kfd_process *process);
 void kfd_process_set_trap_handler(struct qcm_process_device *qpd,
 				  uint64_t tba_addr,
 				  uint64_t tma_addr);
-void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
-				     bool enabled);
 
 /* CWSR initialization */
 int kfd_process_init_cwsr_apu(struct kfd_process *process, struct file *filep);
@@ -1457,12 +1384,6 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       u32 *ctl_stack_used_size,
 		       u32 *save_area_used_size);
 
-int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
-			   uint64_t exception_clear_mask,
-			   void __user *buf,
-			   int num_qss_entries,
-			   uint32_t *entry_size);
-
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
 			      uint64_t fence_value,
 			      unsigned int timeout_ms);
@@ -1501,8 +1422,6 @@ struct packet_manager_funcs {
 	int (*unmap_queues)(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_unmap_queues_filter mode,
 			uint32_t filter_param, bool reset);
-	int (*set_grace_period)(struct packet_manager *pm, uint32_t *buffer,
-			uint32_t grace_period);
 	int (*query_status)(struct packet_manager *pm, uint32_t *buffer,
 			uint64_t fence_address,	uint64_t fence_value);
 	int (*release_mem)(uint64_t gpu_addr, uint32_t *buffer);
@@ -1513,7 +1432,6 @@ struct packet_manager_funcs {
 	int set_resources_size;
 	int map_queues_size;
 	int unmap_queues_size;
-	int set_grace_period_size;
 	int query_status_size;
 	int release_mem_size;
 };
@@ -1535,8 +1453,6 @@ int pm_send_unmap_queue(struct packet_manager *pm,
 			uint32_t filter_param, bool reset);
 
 void pm_release_ib(struct packet_manager *pm);
-
-int pm_update_grace_period(struct packet_manager *pm, uint32_t grace_period);
 
 /* Following PM funcs can be shared among VI and AI */
 unsigned int pm_build_pm4_header(unsigned int opcode, size_t packet_size);

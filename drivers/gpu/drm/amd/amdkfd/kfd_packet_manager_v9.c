@@ -33,9 +33,6 @@ static int pm_map_process_v9(struct packet_manager *pm,
 {
 	struct pm4_mes_map_process *packet;
 	uint64_t vm_page_table_base_addr = qpd->page_table_base;
-	struct kfd_node *kfd = pm->dqm->dev;
-	struct kfd_process_device *pdd =
-			container_of(qpd, struct kfd_process_device, qpd);
 
 	packet = (struct pm4_mes_map_process *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mes_map_process));
@@ -50,12 +47,6 @@ static int pm_map_process_v9(struct packet_manager *pm,
 	packet->bitfields14.num_oac = qpd->num_oac;
 	packet->bitfields14.sdma_enable = 1;
 	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
-
-	if (kfd->dqm->trap_debug_vmid && pdd->process->debug_trap_enabled &&
-			pdd->process->runtime_info.runtime_state == DEBUG_RUNTIME_STATE_ENABLED) {
-		packet->bitfields2.debug_vmid = kfd->dqm->trap_debug_vmid;
-		packet->bitfields2.new_debug = 1;
-	}
 
 	packet->sh_mem_config = qpd->sh_mem_config;
 	packet->sh_mem_bases = qpd->sh_mem_bases;
@@ -87,10 +78,6 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 {
 	struct pm4_mes_map_process_aldebaran *packet;
 	uint64_t vm_page_table_base_addr = qpd->page_table_base;
-	struct kfd_node *node = pm->dqm->dev;
-	struct kfd_process_device *pdd =
-			container_of(qpd, struct kfd_process_device, qpd);
-	int i;
 
 	packet = (struct pm4_mes_map_process_aldebaran *)buffer;
 	memset(buffer, 0, sizeof(struct pm4_mes_map_process_aldebaran));
@@ -105,17 +92,6 @@ static int pm_map_process_aldebaran(struct packet_manager *pm,
 	packet->bitfields14.num_oac = qpd->num_oac;
 	packet->bitfields14.sdma_enable = 1;
 	packet->bitfields14.num_queues = (qpd->is_debug) ? 0 : qpd->queue_count;
-	/* TRAP_EN is set on boot so keep it set in non-debug mode. */
-	packet->spi_gdbg_per_vmid_cntl = pdd->spi_dbg_override |
-						pdd->spi_dbg_launch_mode;
-
-	if (pdd->process->debug_trap_enabled) {
-		for (i = 0; i < node->kfd->device_info.num_of_watch_points; i++)
-			packet->tcp_watch_cntl[i] = pdd->watch_points[i];
-
-		packet->bitfields2.single_memops =
-				pdd->process->precise_mem_ops ? 1 : 0;
-	}
 
 	packet->sh_mem_config = qpd->sh_mem_config;
 	packet->sh_mem_bases = qpd->sh_mem_bases;
@@ -285,41 +261,6 @@ static int pm_map_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 	return 0;
 }
 
-static int pm_set_grace_period_v9(struct packet_manager *pm,
-		uint32_t *buffer,
-		uint32_t grace_period)
-{
-	struct pm4_mec_write_data_mmio *packet;
-	uint32_t reg_offset = 0;
-	uint32_t reg_data = 0;
-
-	pm->dqm->dev->kfd2kgd->build_grace_period_packet_info(
-			pm->dqm->dev->adev,
-			pm->dqm->wait_times,
-			grace_period,
-			&reg_offset,
-			&reg_data);
-
-	if (grace_period == USE_DEFAULT_GRACE_PERIOD)
-		reg_data = pm->dqm->wait_times;
-
-	packet = (struct pm4_mec_write_data_mmio *)buffer;
-	memset(buffer, 0, sizeof(struct pm4_mec_write_data_mmio));
-
-	packet->header.u32All = pm_build_pm4_header(IT_WRITE_DATA,
-					sizeof(struct pm4_mec_write_data_mmio));
-
-	packet->bitfields2.dst_sel  = dst_sel___write_data__mem_mapped_register;
-	packet->bitfields2.addr_incr =
-			addr_incr___write_data__do_not_increment_address;
-
-	packet->bitfields3.dst_mmreg_addr = reg_offset;
-
-	packet->data = reg_data;
-
-	return 0;
-}
-
 static int pm_unmap_queues_v9(struct packet_manager *pm, uint32_t *buffer,
 			enum kfd_unmap_queues_filter filter,
 			uint32_t filter_param, bool reset)
@@ -403,7 +344,6 @@ const struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.set_resources		= pm_set_resources_v9,
 	.map_queues		= pm_map_queues_v9,
 	.unmap_queues		= pm_unmap_queues_v9,
-	.set_grace_period       = pm_set_grace_period_v9,
 	.query_status		= pm_query_status_v9,
 	.release_mem		= NULL,
 	.map_process_size	= sizeof(struct pm4_mes_map_process),
@@ -411,7 +351,6 @@ const struct packet_manager_funcs kfd_v9_pm_funcs = {
 	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
 	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
 	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
-	.set_grace_period_size  = sizeof(struct pm4_mec_write_data_mmio),
 	.query_status_size	= sizeof(struct pm4_mes_query_status),
 	.release_mem_size	= 0,
 };
@@ -422,7 +361,6 @@ const struct packet_manager_funcs kfd_aldebaran_pm_funcs = {
 	.set_resources		= pm_set_resources_v9,
 	.map_queues		= pm_map_queues_v9,
 	.unmap_queues		= pm_unmap_queues_v9,
-	.set_grace_period       = pm_set_grace_period_v9,
 	.query_status		= pm_query_status_v9,
 	.release_mem		= NULL,
 	.map_process_size	= sizeof(struct pm4_mes_map_process_aldebaran),
@@ -430,7 +368,6 @@ const struct packet_manager_funcs kfd_aldebaran_pm_funcs = {
 	.set_resources_size	= sizeof(struct pm4_mes_set_resources),
 	.map_queues_size	= sizeof(struct pm4_mes_map_queues),
 	.unmap_queues_size	= sizeof(struct pm4_mes_unmap_queues),
-	.set_grace_period_size  = sizeof(struct pm4_mec_write_data_mmio),
 	.query_status_size	= sizeof(struct pm4_mes_query_status),
 	.release_mem_size	= 0,
 };

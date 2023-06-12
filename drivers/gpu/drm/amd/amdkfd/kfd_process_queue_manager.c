@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include "kfd_device_queue_manager.h"
-#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
@@ -188,7 +187,6 @@ static int init_user_queue(struct process_queue_manager *pqm,
 
 	/* Doorbell initialized in user space*/
 	q_properties->doorbell_ptr = NULL;
-	q_properties->exception_status = KFD_EC_MASK(EC_QUEUE_NEW);
 
 	/* let DQM handle it*/
 	q_properties->vmid = 0;
@@ -326,7 +324,6 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			goto err_create_queue;
 		pqn->q = q;
 		pqn->kq = NULL;
-		kfd_process_drain_interrupts(pdd);
 		retval = dev->dqm->ops.create_queue(dev->dqm, q, &pdd->qpd, q_data,
 						    restore_mqd, restore_ctl_stack);
 		print_queue(q);
@@ -513,12 +510,8 @@ int pqm_update_mqd(struct process_queue_manager *pqm,
 		return -EFAULT;
 	}
 
-	/* CUs are masked for debugger requirements so deny user mask  */
-	if (pqn->q->properties.is_dbg_wa && minfo && minfo->cu_mask.ptr)
-		return -EBUSY;
-
 	/* ASICs that have WGPs must enforce pairwise enabled mask checks. */
-	if (minfo && minfo->cu_mask.ptr &&
+	if (minfo && minfo->update_flag == UPDATE_FLAG_CU_MASK && minfo->cu_mask.ptr &&
 			KFD_GC_VERSION(pqn->q->device) >= IP_VERSION(10, 0, 0)) {
 		int i;
 
@@ -536,9 +529,6 @@ int pqm_update_mqd(struct process_queue_manager *pqm,
 							pqn->q, minfo);
 	if (retval != 0)
 		return retval;
-
-	if (minfo && minfo->cu_mask.ptr)
-		pqn->q->properties.is_user_cu_masked = true;
 
 	return 0;
 }
@@ -585,49 +575,6 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 						       ctl_stack,
 						       ctl_stack_used_size,
 						       save_area_used_size);
-}
-
-int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
-			   uint64_t exception_clear_mask,
-			   void __user *buf,
-			   int num_qss_entries,
-			   uint32_t *entry_size)
-{
-	struct process_queue_node *pqn;
-	uint32_t tmp_entry_size = *entry_size;
-	int qss_entry_count = 0;
-
-	if (!(*entry_size))
-		return -EINVAL;
-
-	*entry_size = min_t(size_t, *entry_size, sizeof(struct kfd_queue_snapshot_entry));
-	mutex_lock(&pqm->process->event_mutex);
-
-	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
-		if (!pqn->q)
-			continue;
-
-		if (qss_entry_count < num_qss_entries) {
-
-			struct kfd_queue_snapshot_entry src = {0};
-
-			set_queue_snapshot_entry(pqn->q->device->dqm,
-					pqn->q, exception_clear_mask, &src);
-
-			if (copy_to_user(buf, &src, *entry_size)) {
-				qss_entry_count = -EFAULT;
-				break;
-			}
-
-			buf += tmp_entry_size;
-		}
-
-		qss_entry_count++;
-	}
-
-	mutex_unlock(&pqm->process->event_mutex);
-
-	return qss_entry_count;
 }
 
 static int get_queue_data_sizes(struct kfd_process_device *pdd,

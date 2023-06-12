@@ -237,12 +237,12 @@ int amdgpu_amdkfd_resume_iommu(struct amdgpu_device *adev)
 	return r;
 }
 
-int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm, bool sync)
+int amdgpu_amdkfd_resume(struct amdgpu_device *adev, bool run_pm)
 {
 	int r = 0;
 
 	if (adev->kfd.dev)
-		r = kgd2kfd_resume(adev->kfd.dev, run_pm, sync);
+		r = kgd2kfd_resume(adev->kfd.dev, run_pm);
 
 	return r;
 }
@@ -792,22 +792,6 @@ void amdgpu_amdkfd_debug_mem_fence(struct amdgpu_device *adev)
 void amdgpu_amdkfd_ras_poison_consumption_handler(struct amdgpu_device *adev, bool reset)
 {
 	amdgpu_umc_poison_handler(adev, reset);
-}
-
-int amdgpu_amdkfd_send_close_event_drain_irq(struct amdgpu_device *adev,
-					uint32_t *payload)
-{
-	int ret;
-
-	/* Device or IH ring is not ready so bail. */
-	ret = amdgpu_ih_wait_on_checkpoint_process_ts(adev, &adev->irq.ih);
-	if (ret)
-		return ret;
-
-	/* Send payload to fence KFD interrupts */
-	amdgpu_amdkfd_interrupt(adev, payload);
-
-	return 0;
 }
 
 bool amdgpu_amdkfd_ras_query_utcl2_poison_status(struct amdgpu_device *adev)
