@@ -622,9 +622,10 @@ static bool is_ver_8bit(struct intel_uc_fw_ver *ver)
 	return ver->major < 0xFF && ver->minor < 0xFF && ver->patch < 0xFF;
 }
 
-static bool guc_check_version_range(struct intel_uc_fw *uc_fw)
+static int guc_check_version_range(struct intel_uc_fw *uc_fw)
 {
 	struct intel_guc *guc = container_of(uc_fw, struct intel_guc, fw);
+	struct intel_gt *gt = __uc_fw_to_gt(uc_fw);
 
 	/*
 	 * GuC version number components are defined as being 8-bits.
@@ -650,7 +651,7 @@ static bool guc_check_version_range(struct intel_uc_fw *uc_fw)
 		return false;
 	}
 
-	return true;
+	return i915_inject_probe_error(gt->i915, -EINVAL);
 }
 
 static int check_fw_header(struct intel_gt *gt,
@@ -759,8 +760,11 @@ int intel_uc_fw_fetch(struct intel_uc_fw *uc_fw)
 	if (err)
 		goto fail;
 
-	if (uc_fw->type == INTEL_UC_FW_TYPE_GUC && !guc_check_version_range(uc_fw))
-		goto fail;
+	if (uc_fw->type == INTEL_UC_FW_TYPE_GUC) {
+		err = guc_check_version_range(uc_fw);
+		if (err)
+			goto fail;
+	}
 
 	if (uc_fw->file_wanted.ver.major && uc_fw->file_selected.ver.major) {
 		/* Check the file's major version was as it claimed */

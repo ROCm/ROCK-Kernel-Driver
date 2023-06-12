@@ -2298,6 +2298,113 @@ static void update_cvq_info(struct mlx5_vdpa_dev *mvdev)
 	}
 }
 
+static u8 query_vport_state(struct mlx5_core_dev *mdev, u8 opmod, u16 vport)
+{
+	u32 out[MLX5_ST_SZ_DW(query_vport_state_out)] = {};
+	u32 in[MLX5_ST_SZ_DW(query_vport_state_in)] = {};
+	int err;
+
+	MLX5_SET(query_vport_state_in, in, opcode, MLX5_CMD_OP_QUERY_VPORT_STATE);
+	MLX5_SET(query_vport_state_in, in, op_mod, opmod);
+	MLX5_SET(query_vport_state_in, in, vport_number, vport);
+	if (vport)
+		MLX5_SET(query_vport_state_in, in, other_vport, 1);
+
+	err = mlx5_cmd_exec_inout(mdev, query_vport_state, in, out);
+	if (err)
+		return 0;
+
+	return MLX5_GET(query_vport_state_out, out, state);
+}
+
+static bool get_link_state(struct mlx5_vdpa_dev *mvdev)
+{
+	if (query_vport_state(mvdev->mdev, MLX5_VPORT_STATE_OP_MOD_VNIC_VPORT, 0) ==
+	    VPORT_STATE_UP)
+		return true;
+
+	return false;
+}
+
+static void update_carrier(struct work_struct *work)
+{
+	struct mlx5_vdpa_wq_ent *wqent;
+	struct mlx5_vdpa_dev *mvdev;
+	struct mlx5_vdpa_net *ndev;
+
+	wqent = container_of(work, struct mlx5_vdpa_wq_ent, work);
+	mvdev = wqent->mvdev;
+	ndev = to_mlx5_vdpa_ndev(mvdev);
+	if (get_link_state(mvdev))
+		ndev->config.status |= cpu_to_mlx5vdpa16(mvdev, VIRTIO_NET_S_LINK_UP);
+	else
+		ndev->config.status &= cpu_to_mlx5vdpa16(mvdev, ~VIRTIO_NET_S_LINK_UP);
+
+	if (ndev->config_cb.callback)
+		ndev->config_cb.callback(ndev->config_cb.private);
+
+	kfree(wqent);
+}
+
+static int queue_link_work(struct mlx5_vdpa_net *ndev)
+{
+	struct mlx5_vdpa_wq_ent *wqent;
+
+	wqent = kzalloc(sizeof(*wqent), GFP_ATOMIC);
+	if (!wqent)
+		return -ENOMEM;
+
+	wqent->mvdev = &ndev->mvdev;
+	INIT_WORK(&wqent->work, update_carrier);
+	queue_work(ndev->mvdev.wq, &wqent->work);
+	return 0;
+}
+
+static int event_handler(struct notifier_block *nb, unsigned long event, void *param)
+{
+	struct mlx5_vdpa_net *ndev = container_of(nb, struct mlx5_vdpa_net, nb);
+	struct mlx5_eqe *eqe = param;
+	int ret = NOTIFY_DONE;
+
+	if (event == MLX5_EVENT_TYPE_PORT_CHANGE) {
+		switch (eqe->sub_type) {
+		case MLX5_PORT_CHANGE_SUBTYPE_DOWN:
+		case MLX5_PORT_CHANGE_SUBTYPE_ACTIVE:
+			if (queue_link_work(ndev))
+				return NOTIFY_DONE;
+
+			ret = NOTIFY_OK;
+			break;
+		default:
+			return NOTIFY_DONE;
+		}
+		return ret;
+	}
+	return ret;
+}
+
+static void register_link_notifier(struct mlx5_vdpa_net *ndev)
+{
+	if (!(ndev->mvdev.actual_features & BIT_ULL(VIRTIO_NET_F_STATUS)))
+		return;
+
+	ndev->nb.notifier_call = event_handler;
+	mlx5_notifier_register(ndev->mvdev.mdev, &ndev->nb);
+	ndev->nb_registered = true;
+	queue_link_work(ndev);
+}
+
+static void unregister_link_notifier(struct mlx5_vdpa_net *ndev)
+{
+	if (!ndev->nb_registered)
+		return;
+
+	ndev->nb_registered = false;
+	mlx5_notifier_unregister(ndev->mvdev.mdev, &ndev->nb);
+	if (ndev->mvdev.wq)
+		flush_workqueue(ndev->mvdev.wq);
+}
+
 static int mlx5_vdpa_set_driver_features(struct vdpa_device *vdev, u64 features)
 {
 	struct mlx5_vdpa_dev *mvdev = to_mvdev(vdev);
@@ -2467,10 +2574,11 @@ static int setup_driver(struct mlx5_vdpa_dev *mvdev)
 		err = 0;
 		goto out;
 	}
+	mlx5_vdpa_add_debugfs(ndev);
 	err = setup_virtqueues(mvdev);
 	if (err) {
 		mlx5_vdpa_warn(mvdev, "setup_virtqueues\n");
-		goto out;
+		goto err_setup;
 	}
 
 	err = create_rqt(ndev);
@@ -2500,6 +2608,8 @@ err_tir:
 	destroy_rqt(ndev);
 err_rqt:
 	teardown_virtqueues(ndev);
+err_setup:
+	mlx5_vdpa_remove_debugfs(ndev->debugfs);
 out:
 	return err;
 }
@@ -2513,6 +2623,8 @@ static void teardown_driver(struct mlx5_vdpa_net *ndev)
 	if (!ndev->setup)
 		return;
 
+	mlx5_vdpa_remove_debugfs(ndev->debugfs);
+	ndev->debugfs = NULL;
 	teardown_steering(ndev);
 	destroy_tir(ndev);
 	destroy_rqt(ndev);
@@ -2562,10 +2674,11 @@ static void mlx5_vdpa_set_status(struct vdpa_device *vdev, u8 status)
 				mlx5_vdpa_warn(mvdev, "failed to setup control VQ vring\n");
 				goto err_setup;
 			}
+			register_link_notifier(ndev);
 			err = setup_driver(mvdev);
 			if (err) {
 				mlx5_vdpa_warn(mvdev, "failed to setup driver\n");
-				goto err_setup;
+				goto err_driver;
 			}
 		} else {
 			mlx5_vdpa_warn(mvdev, "did not expect DRIVER_OK to be cleared\n");
@@ -2577,6 +2690,8 @@ static void mlx5_vdpa_set_status(struct vdpa_device *vdev, u8 status)
 	up_write(&ndev->reslock);
 	return;
 
+err_driver:
+	unregister_link_notifier(ndev);
 err_setup:
 	mlx5_vdpa_destroy_mr(&ndev->mvdev);
 	ndev->mvdev.status |= VIRTIO_CONFIG_S_FAILED;
@@ -2602,6 +2717,7 @@ static int mlx5_vdpa_reset(struct vdpa_device *vdev)
 	mlx5_vdpa_info(mvdev, "performing device reset\n");
 
 	down_write(&ndev->reslock);
+	unregister_link_notifier(ndev);
 	teardown_driver(ndev);
 	clear_vqs_ready(ndev);
 	mlx5_vdpa_destroy_mr(&ndev->mvdev);
@@ -2856,9 +2972,7 @@ static int mlx5_vdpa_suspend(struct vdpa_device *vdev)
 	mlx5_vdpa_info(mvdev, "suspending device\n");
 
 	down_write(&ndev->reslock);
-	ndev->nb_registered = false;
-	mlx5_notifier_unregister(mvdev->mdev, &ndev->nb);
-	flush_workqueue(ndev->mvdev.wq);
+	unregister_link_notifier(ndev);
 	for (i = 0; i < ndev->cur_num_vqs; i++) {
 		mvq = &ndev->vqs[i];
 		suspend_vq(ndev, mvq);
@@ -2994,84 +3108,6 @@ struct mlx5_vdpa_mgmtdev {
 	struct mlx5_adev *madev;
 	struct mlx5_vdpa_net *ndev;
 };
-
-static u8 query_vport_state(struct mlx5_core_dev *mdev, u8 opmod, u16 vport)
-{
-	u32 out[MLX5_ST_SZ_DW(query_vport_state_out)] = {};
-	u32 in[MLX5_ST_SZ_DW(query_vport_state_in)] = {};
-	int err;
-
-	MLX5_SET(query_vport_state_in, in, opcode, MLX5_CMD_OP_QUERY_VPORT_STATE);
-	MLX5_SET(query_vport_state_in, in, op_mod, opmod);
-	MLX5_SET(query_vport_state_in, in, vport_number, vport);
-	if (vport)
-		MLX5_SET(query_vport_state_in, in, other_vport, 1);
-
-	err = mlx5_cmd_exec_inout(mdev, query_vport_state, in, out);
-	if (err)
-		return 0;
-
-	return MLX5_GET(query_vport_state_out, out, state);
-}
-
-static bool get_link_state(struct mlx5_vdpa_dev *mvdev)
-{
-	if (query_vport_state(mvdev->mdev, MLX5_VPORT_STATE_OP_MOD_VNIC_VPORT, 0) ==
-	    VPORT_STATE_UP)
-		return true;
-
-	return false;
-}
-
-static void update_carrier(struct work_struct *work)
-{
-	struct mlx5_vdpa_wq_ent *wqent;
-	struct mlx5_vdpa_dev *mvdev;
-	struct mlx5_vdpa_net *ndev;
-
-	wqent = container_of(work, struct mlx5_vdpa_wq_ent, work);
-	mvdev = wqent->mvdev;
-	ndev = to_mlx5_vdpa_ndev(mvdev);
-	if (get_link_state(mvdev))
-		ndev->config.status |= cpu_to_mlx5vdpa16(mvdev, VIRTIO_NET_S_LINK_UP);
-	else
-		ndev->config.status &= cpu_to_mlx5vdpa16(mvdev, ~VIRTIO_NET_S_LINK_UP);
-
-	if (ndev->nb_registered && ndev->config_cb.callback)
-		ndev->config_cb.callback(ndev->config_cb.private);
-
-	kfree(wqent);
-}
-
-static int event_handler(struct notifier_block *nb, unsigned long event, void *param)
-{
-	struct mlx5_vdpa_net *ndev = container_of(nb, struct mlx5_vdpa_net, nb);
-	struct mlx5_eqe *eqe = param;
-	int ret = NOTIFY_DONE;
-	struct mlx5_vdpa_wq_ent *wqent;
-
-	if (event == MLX5_EVENT_TYPE_PORT_CHANGE) {
-		if (!(ndev->mvdev.actual_features & BIT_ULL(VIRTIO_NET_F_STATUS)))
-			return NOTIFY_DONE;
-		switch (eqe->sub_type) {
-		case MLX5_PORT_CHANGE_SUBTYPE_DOWN:
-		case MLX5_PORT_CHANGE_SUBTYPE_ACTIVE:
-			wqent = kzalloc(sizeof(*wqent), GFP_ATOMIC);
-			if (!wqent)
-				return NOTIFY_DONE;
-
-			wqent->mvdev = &ndev->mvdev;
-			INIT_WORK(&wqent->work, update_carrier);
-			queue_work(ndev->mvdev.wq, &wqent->work);
-			ret = NOTIFY_OK;
-			break;
-		default:
-			return NOTIFY_DONE;
-		}
-		return ret;
-	}
-	return ret;
-}
 
 static int config_func_mtu(struct mlx5_core_dev *mdev, u16 mtu)
 {
@@ -3253,15 +3289,11 @@ static int mlx5_vdpa_dev_add(struct vdpa_mgmt_dev *v_mdev, const char *name,
 		goto err_res2;
 	}
 
-	ndev->nb.notifier_call = event_handler;
-	mlx5_notifier_register(mdev, &ndev->nb);
-	ndev->nb_registered = true;
 	mvdev->vdev.mdev = &mgtdev->mgtdev;
 	err = _vdpa_register_device(&mvdev->vdev, max_vqs + 1);
 	if (err)
 		goto err_reg;
 
-	mlx5_vdpa_add_debugfs(ndev);
 	mgtdev->ndev = ndev;
 	return 0;
 
@@ -3290,10 +3322,7 @@ static void mlx5_vdpa_dev_del(struct vdpa_mgmt_dev *v_mdev, struct vdpa_device *
 
 	mlx5_vdpa_remove_debugfs(ndev->debugfs);
 	ndev->debugfs = NULL;
-	if (ndev->nb_registered) {
-		ndev->nb_registered = false;
-		mlx5_notifier_unregister(mvdev->mdev, &ndev->nb);
-	}
+	unregister_link_notifier(ndev);
 	wq = mvdev->wq;
 	mvdev->wq = NULL;
 	destroy_workqueue(wq);

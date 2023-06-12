@@ -3353,9 +3353,10 @@ static size_t cifs_limit_bvec_subset(const struct iov_iter *iter, size_t max_siz
 	while (n && ix < nbv) {
 		len = min3(n, bvecs[ix].bv_len - skip, max_size);
 		span += len;
+		max_size -= len;
 		nsegs++;
 		ix++;
-		if (span >= max_size || nsegs >= max_segs)
+		if (max_size == 0 || nsegs >= max_segs)
 			break;
 		skip = 0;
 		n -= len;
@@ -4010,7 +4011,6 @@ static void
 collect_uncached_read_data(struct cifs_aio_ctx *ctx)
 {
 	struct cifs_readdata *rdata, *tmp;
-	struct iov_iter *to = &ctx->iter;
 	struct cifs_sb_info *cifs_sb;
 	int rc;
 
@@ -4075,9 +4075,6 @@ again:
 		list_del_init(&rdata->list);
 		kref_put(&rdata->refcount, cifs_readdata_release);
 	}
-
-	if (!ctx->direct_io)
-		ctx->total_len = ctx->len - iov_iter_count(to);
 
 	/* mask nodata case */
 	if (rc == -ENODATA)
@@ -4885,7 +4882,9 @@ void cifs_oplock_break(struct work_struct *work)
 	struct cifs_tcon *tcon = tlink_tcon(cfile->tlink);
 	struct TCP_Server_Info *server = tcon->ses->server;
 	int rc = 0;
-	bool purge_cache = false;
+	bool purge_cache = false, oplock_break_cancelled;
+	__u64 persistent_fid, volatile_fid;
+	__u16 net_fid;
 
 	wait_on_bit(&cinode->flags, CIFS_INODE_PENDING_WRITERS,
 			TASK_UNINTERRUPTIBLE);
@@ -4922,18 +4921,32 @@ void cifs_oplock_break(struct work_struct *work)
 
 oplock_break_ack:
 	/*
+	 * When oplock break is received and there are no active
+	 * file handles but cached, then schedule deferred close immediately.
+	 * So, new open will not use cached handle.
+	 */
+
+	if (!CIFS_CACHE_HANDLE(cinode) && !list_empty(&cinode->deferred_closes))
+		cifs_close_deferred_file(cinode);
+
+	persistent_fid = cfile->fid.persistent_fid;
+	volatile_fid = cfile->fid.volatile_fid;
+	net_fid = cfile->fid.netfid;
+	oplock_break_cancelled = cfile->oplock_break_cancelled;
+
+	_cifsFileInfo_put(cfile, false /* do not wait for ourself */, false);
+	/*
 	 * releasing stale oplock after recent reconnect of smb session using
 	 * a now incorrect file handle is not a data integrity issue but do
 	 * not bother sending an oplock release if session to server still is
 	 * disconnected since oplock already released by the server
 	 */
-	if (!cfile->oplock_break_cancelled) {
-		rc = tcon->ses->server->ops->oplock_response(tcon, &cfile->fid,
-							     cinode);
+	if (!oplock_break_cancelled) {
+		rc = tcon->ses->server->ops->oplock_response(tcon, persistent_fid,
+				volatile_fid, net_fid, cinode);
 		cifs_dbg(FYI, "Oplock release rc = %d\n", rc);
 	}
 
-	_cifsFileInfo_put(cfile, false /* do not wait for ourself */, false);
 	cifs_done_oplock_break(cinode);
 }
 

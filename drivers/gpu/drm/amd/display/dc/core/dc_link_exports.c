@@ -478,3 +478,4 @@ bool dc_link_validate(struct dc *dc, const struct dc_stream_state *streams, cons
 {
 	return dc->link_srv->validate_dpia_bandwidth(streams, count);
 }
+

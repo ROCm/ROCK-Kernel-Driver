@@ -864,7 +864,7 @@ static irqreturn_t kx022a_trigger_handler(int irq, void *p)
 	if (ret < 0)
 		goto err_read;
 
-	iio_push_to_buffers_with_timestamp(idev, data->buffer, pf->timestamp);
+	iio_push_to_buffers_with_timestamp(idev, data->buffer, data->timestamp);
 err_read:
 	iio_trigger_notify_done(idev->trig);
 
@@ -1049,7 +1049,7 @@ int kx022a_probe_internal(struct device *dev)
 		data->ien_reg = KX022A_REG_INC4;
 	} else {
 		irq = fwnode_irq_get_byname(fwnode, "INT2");
-		if (irq <= 0)
+		if (irq < 0)
 			return dev_err_probe(dev, irq, "No suitable IRQ\n");
 
 		data->inc_reg = KX022A_REG_INC5;

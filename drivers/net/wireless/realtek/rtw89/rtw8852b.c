@@ -13,25 +13,25 @@
 #include "txrx.h"
 
 static const struct rtw89_hfc_ch_cfg rtw8852b_hfc_chcfg_pcie[] = {
-	{5, 343, grp_0}, /* ACH 0 */
-	{5, 343, grp_0}, /* ACH 1 */
-	{5, 343, grp_0}, /* ACH 2 */
-	{5, 343, grp_0}, /* ACH 3 */
+	{5, 341, grp_0}, /* ACH 0 */
+	{5, 341, grp_0}, /* ACH 1 */
+	{4, 342, grp_0}, /* ACH 2 */
+	{4, 342, grp_0}, /* ACH 3 */
 	{0, 0, grp_0}, /* ACH 4 */
 	{0, 0, grp_0}, /* ACH 5 */
 	{0, 0, grp_0}, /* ACH 6 */
 	{0, 0, grp_0}, /* ACH 7 */
-	{4, 344, grp_0}, /* B0MGQ */
-	{4, 344, grp_0}, /* B0HIQ */
+	{4, 342, grp_0}, /* B0MGQ */
+	{4, 342, grp_0}, /* B0HIQ */
 	{0, 0, grp_0}, /* B1MGQ */
 	{0, 0, grp_0}, /* B1HIQ */
 	{40, 0, 0} /* FWCMDQ */
 };
 
 static const struct rtw89_hfc_pub_cfg rtw8852b_hfc_pubcfg_pcie = {
-	448, /* Group 0 */
+	446, /* Group 0 */
 	0, /* Group 1 */
-	448, /* Public Max */
+	446, /* Public Max */
 	0 /* WP threshold */
 };
 
@@ -44,9 +44,9 @@ static const struct rtw89_hfc_param_ini rtw8852b_hfc_param_ini_pcie[] = {
 };
 
 static const struct rtw89_dle_mem rtw8852b_dle_mem_pcie[] = {
-	[RTW89_QTA_SCC] = {RTW89_QTA_SCC, &rtw89_mac_size.wde_size6,
-			   &rtw89_mac_size.ple_size6, &rtw89_mac_size.wde_qt6,
-			   &rtw89_mac_size.wde_qt6, &rtw89_mac_size.ple_qt18,
+	[RTW89_QTA_SCC] = {RTW89_QTA_SCC, &rtw89_mac_size.wde_size7,
+			   &rtw89_mac_size.ple_size6, &rtw89_mac_size.wde_qt7,
+			   &rtw89_mac_size.wde_qt7, &rtw89_mac_size.ple_qt18,
 			   &rtw89_mac_size.ple_qt58},
 	[RTW89_QTA_DLFW] = {RTW89_QTA_DLFW, &rtw89_mac_size.wde_size9,
 			    &rtw89_mac_size.ple_size8, &rtw89_mac_size.wde_qt4,
@@ -1284,7 +1284,7 @@ static void rtw8852b_ctrl_cck_en(struct rtw89_dev *rtwdev, bool cck_en)
 static void rtw8852b_5m_mask(struct rtw89_dev *rtwdev, const struct rtw89_chan *chan,
 			     enum rtw89_phy_idx phy_idx)
 {
-	u8 pri_ch = chan->primary_channel;
+	u8 pri_ch = chan->pri_ch_idx;
 	bool mask_5m_low;
 	bool mask_5m_en;
 
@@ -1292,12 +1292,13 @@ static void rtw8852b_5m_mask(struct rtw89_dev *rtwdev, const struct rtw89_chan *
 	case RTW89_CHANNEL_WIDTH_40:
 		/* Prich=1: Mask 5M High, Prich=2: Mask 5M Low */
 		mask_5m_en = true;
-		mask_5m_low = pri_ch == 2;
+		mask_5m_low = pri_ch == RTW89_SC_20_LOWER;
 		break;
 	case RTW89_CHANNEL_WIDTH_80:
 		/* Prich=3: Mask 5M High, Prich=4: Mask 5M Low, Else: Disable */
-		mask_5m_en = pri_ch == 3 || pri_ch == 4;
-		mask_5m_low = pri_ch == 4;
+		mask_5m_en = pri_ch == RTW89_SC_20_UPMOST ||
+			     pri_ch == RTW89_SC_20_LOWEST;
+		mask_5m_low = pri_ch == RTW89_SC_20_LOWEST;
 		break;
 	default:
 		mask_5m_en = false;

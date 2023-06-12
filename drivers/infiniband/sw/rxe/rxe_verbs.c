@@ -786,8 +786,6 @@ static int rxe_destroy_cq(struct ib_cq *ibcq, struct ib_udata *udata)
 	if (atomic_read(&cq->num_wq))
 		return -EINVAL;
 
-	rxe_cq_disable(cq);
-
 	rxe_cleanup(cq);
 	return 0;
 }
@@ -1095,7 +1093,7 @@ int rxe_register_device(struct rxe_dev *rxe, const char *ibdev_name)
 
 	err = ib_register_device(dev, ibdev_name, NULL);
 	if (err)
-		rxe_dbg(rxe, "failed with error %d\n", err);
+		rxe_dbg_dev(rxe, "failed with error %d\n", err);
 
 	/*
 	 * Note that rxe may be invalid at this point if another thread
