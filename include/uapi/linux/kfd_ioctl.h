@@ -242,7 +242,7 @@ struct kfd_ioctl_dbg_wave_control_args {
 
 #define KFD_INVALID_FD     0xffffffff
 
-struct kfd_ioctl_dbg_trap_args {
+struct kfd_ioctl_dbg_trap_args_deprecated {
 	__u64 exception_mask; /* to KFD */
 	__u64 ptr;     /* to KFD -- used for pointer arguments: queue arrays */
 	__u32 pid;     /* to KFD */
@@ -1713,6 +1713,8 @@ struct kfd_ioctl_dbg_trap_args {
 #define AMDKFD_IOC_IPC_EXPORT_HANDLE		\
 		AMDKFD_IOWR(0x81, struct kfd_ioctl_ipc_export_handle_args)
 
+#define AMDKFD_IOC_DBG_TRAP_DEPRECATED                  \
+                AMDKFD_IOWR(0x82, struct kfd_ioctl_dbg_trap_args_deprecated)
 
 #define AMDKFD_IOC_CROSS_MEMORY_COPY_DEPRECATED	\
 		AMDKFD_IOWR(0x83, struct kfd_ioctl_cross_memory_copy_deprecated_args)
