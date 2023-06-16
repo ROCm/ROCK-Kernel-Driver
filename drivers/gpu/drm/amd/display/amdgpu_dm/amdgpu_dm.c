@@ -5908,6 +5908,7 @@ get_aspect_ratio(const struct drm_display_mode *mode_in)
 	return (enum dc_aspect_ratio) mode_in->picture_aspect_ratio;
 }
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_COLORSPACE
 static enum dc_color_space
 get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
 		       const struct drm_connector_state *connector_state)
@@ -5964,6 +5965,51 @@ get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
 
 	return color_space;
 }
+#else
+static enum dc_color_space
+get_output_color_space(const struct dc_crtc_timing *dc_crtc_timing,
+		       const struct drm_connector_state *connector_state)
+{
+	enum dc_color_space color_space = COLOR_SPACE_SRGB;
+
+	switch (dc_crtc_timing->pixel_encoding)	{
+	case PIXEL_ENCODING_YCBCR422:
+	case PIXEL_ENCODING_YCBCR444:
+	case PIXEL_ENCODING_YCBCR420:
+	{
+				/*
+		 * 27030khz is the separation point between HDTV and SDTV
+		 * according to HDMI spec, we use YCbCr709 and YCbCr601
+		 * respectively
+		 */
+		if (dc_crtc_timing->pix_clk_100hz > 270300) {
+			if (dc_crtc_timing->flags.Y_ONLY)
+				color_space =
+					COLOR_SPACE_YCBCR709_LIMITED;
+			else
+				color_space = COLOR_SPACE_YCBCR709;
+		} else {
+			if (dc_crtc_timing->flags.Y_ONLY)
+				color_space =
+					COLOR_SPACE_YCBCR601_LIMITED;
+			else
+				color_space = COLOR_SPACE_YCBCR601;
+		}
+
+	}
+	break;
+	case PIXEL_ENCODING_RGB:
+		color_space = COLOR_SPACE_SRGB;
+		break;
+
+	default:
+		WARN_ON(1);
+		break;
+	}
+
+	return color_space;
+}
+#endif
 
 static enum display_content_type
 get_output_content_type(const struct drm_connector_state *connector_state)
