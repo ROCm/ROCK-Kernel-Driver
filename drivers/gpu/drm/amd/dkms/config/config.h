@@ -398,6 +398,9 @@
 /* drm_mode_create_dp_colorspace_property() has 2 args */
 #define HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS 1
 
+/* drm_connector_state->colorspace is available */
+#define HAVE_DRM_CONNECTOR_STATE_COLORSPACE 1
+
 /* struct drm_dsc_config has member simple_422 */
 #define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
 
