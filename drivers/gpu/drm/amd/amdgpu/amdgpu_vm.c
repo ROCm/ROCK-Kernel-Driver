@@ -1049,13 +1049,13 @@ static void amdgpu_vm_bo_get_memory(struct amdgpu_bo_va *bo_va,
 	 * For now ignore BOs which are currently locked and potentially
 	 * changing their location.
 	 */
-	if (bo->tbo.base.resv != vm->root.bo->tbo.base.resv &&
-	    !dma_resv_trylock(bo->tbo.base.resv))
+	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
+	    !dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo)))
 		return;
 
 	amdgpu_bo_get_memory(bo, stats);
-	if (bo->tbo.base.resv != vm->root.bo->tbo.base.resv)
-	    dma_resv_unlock(bo->tbo.base.resv);
+	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo))
+	    dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 }
 
 void amdgpu_vm_get_memory(struct amdgpu_vm *vm,
