@@ -66,9 +66,6 @@ void amdgpu_virt_init_setting(struct amdgpu_device *adev)
 	adev->cg_flags = 0;
 	adev->pg_flags = 0;
 
-	/* enable mcbp for sriov */
-	amdgpu_mcbp = 1;
-
 	/* use advance recovery mode for SRIOV by default */
 	if (amdgpu_gpu_recovery == -1)
 		amdgpu_gpu_recovery = 2;
