@@ -1876,7 +1876,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 		if (before->flags & AMDGPU_PTE_PRT)
 			amdgpu_vm_prt_get(adev);
 
-		if (bo && bo->tbo.base.resv == vm->root.bo->tbo.base.resv &&
+		if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
 		    !before->bo_va->base.moved)
 			amdgpu_vm_bo_moved(&before->bo_va->base);
 	} else {
@@ -1891,7 +1891,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 		if (after->flags & AMDGPU_PTE_PRT)
 			amdgpu_vm_prt_get(adev);
 
-		if (bo && bo->tbo.base.resv == vm->root.bo->tbo.base.resv &&
+		if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
 		    !after->bo_va->base.moved)
 			amdgpu_vm_bo_moved(&after->bo_va->base);
 	} else {
