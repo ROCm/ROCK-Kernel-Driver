@@ -338,6 +338,7 @@ static ssize_t dp_link_settings_write(struct file *f, const char __user *buf,
 	return size;
 }
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 static bool dp_mst_is_end_device(struct amdgpu_dm_connector *aconnector)
 {
 	bool is_end_device = false;
@@ -484,7 +485,7 @@ static ssize_t dp_mst_link_setting(struct file *f, const char __user *buf,
 	kfree(wr_buf);
 	return size;
 }
-
+#endif
 /* function: get current DP PHY settings: voltage swing, pre-emphasis,
  * post-cursor2 (defined by VESA DP specification)
  *
@@ -2973,12 +2974,13 @@ static const struct file_operations dp_dsc_disable_passthrough_debugfs_fops = {
 	.write = dp_dsc_passthrough_set,
 	.llseek = default_llseek
 };
-
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 static const struct file_operations dp_mst_link_settings_debugfs_fops = {
 	.owner = THIS_MODULE,
 	.write = dp_mst_link_setting,
 	.llseek = default_llseek
 };
+#endif
 
 static const struct {
 	char *name;
@@ -3008,7 +3010,9 @@ static const struct {
 #endif
 		{"mst_progress_status", &dp_mst_progress_status_fops},
 		{"is_dpia_link", &is_dpia_link_fops},
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE
 		{"mst_link_settings", &dp_mst_link_settings_debugfs_fops}
+#endif
 };
 
 static const struct {
