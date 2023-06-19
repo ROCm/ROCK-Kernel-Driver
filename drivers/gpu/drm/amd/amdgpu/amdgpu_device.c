@@ -4283,10 +4283,12 @@ fence_driver_init:
 	 * operations performed in `late_init` might affect the sysfs
 	 * interfaces creating.
 	 */
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	r = amdgpu_atombios_sysfs_init(adev);
 	if (r)
 		drm_err(&adev->ddev,
 			"registering atombios sysfs failed (%d).\n", r);
+#endif
 
 	r = amdgpu_pm_sysfs_init(adev);
 	if (r)
