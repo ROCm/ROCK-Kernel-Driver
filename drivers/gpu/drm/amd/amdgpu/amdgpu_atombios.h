@@ -214,6 +214,8 @@ int amdgpu_atombios_get_data_table(struct amdgpu_device *adev,
 
 void amdgpu_atombios_fini(struct amdgpu_device *adev);
 int amdgpu_atombios_init(struct amdgpu_device *adev);
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 int amdgpu_atombios_sysfs_init(struct amdgpu_device *adev);
+#endif
 
 #endif
