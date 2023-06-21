@@ -909,6 +909,61 @@ unlock:
 DEFINE_SHOW_ATTRIBUTE(amdgpu_current_bpc);
 
 /*
+ * Returns the current colorspace for the crtc.
+ * Example usage: cat /sys/kernel/debug/dri/0/crtc-0/amdgpu_current_colorspace
+ */
+static int amdgpu_current_colorspace_show(struct seq_file *m, void *data)
+{
+	struct drm_crtc *crtc = m->private;
+	struct drm_device *dev = crtc->dev;
+	struct dm_crtc_state *dm_crtc_state = NULL;
+	int res = -ENODEV;
+
+	mutex_lock(&dev->mode_config.mutex);
+	drm_modeset_lock(&crtc->mutex, NULL);
+	if (crtc->state == NULL)
+		goto unlock;
+
+	dm_crtc_state = to_dm_crtc_state(crtc->state);
+	if (dm_crtc_state->stream == NULL)
+		goto unlock;
+
+	switch (dm_crtc_state->stream->output_color_space) {
+	case COLOR_SPACE_SRGB:
+		seq_printf(m, "sRGB");
+		break;
+	case COLOR_SPACE_YCBCR601:
+	case COLOR_SPACE_YCBCR601_LIMITED:
+		seq_printf(m, "BT601_YCC");
+		break;
+	case COLOR_SPACE_YCBCR709:
+	case COLOR_SPACE_YCBCR709_LIMITED:
+		seq_printf(m, "BT709_YCC");
+		break;
+	case COLOR_SPACE_ADOBERGB:
+		seq_printf(m, "opRGB");
+		break;
+	case COLOR_SPACE_2020_RGB_FULLRANGE:
+		seq_printf(m, "BT2020_RGB");
+		break;
+	case COLOR_SPACE_2020_YCBCR:
+		seq_printf(m, "BT2020_YCC");
+		break;
+	default:
+		goto unlock;
+	}
+	res = 0;
+
+unlock:
+	drm_modeset_unlock(&crtc->mutex);
+	mutex_unlock(&dev->mode_config.mutex);
+
+	return res;
+}
+DEFINE_SHOW_ATTRIBUTE(amdgpu_current_colorspace);
+
+
+/*
  * Example usage:
  * Disable dsc passthrough, i.e.,: have dsc decoding at converver, not external RX
  *   echo 1 /sys/kernel/debug/dri/0/DP-1/dsc_disable_passthrough
@@ -2724,6 +2779,32 @@ static int psr_read_residency(void *data, u64 *val)
 	return 0;
 }
 
+/* read allow_edp_hotplug_detection */
+static int allow_edp_hotplug_detection_get(void *data, u64 *val)
+{
+	struct amdgpu_dm_connector *aconnector = data;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+
+	*val = adev->dm.dc->config.allow_edp_hotplug_detection;
+
+	return 0;
+}
+
+/* set allow_edp_hotplug_detection */
+static int allow_edp_hotplug_detection_set(void *data, u64 val)
+{
+	struct amdgpu_dm_connector *aconnector = data;
+	struct drm_connector *connector = &aconnector->base;
+	struct drm_device *dev = connector->dev;
+	struct amdgpu_device *adev = drm_to_adev(dev);
+
+	adev->dm.dc->config.allow_edp_hotplug_detection = (uint32_t) val;
+
+	return 0;
+}
+
 /*
  * Set dmcub trace event IRQ enable or disable.
  * Usage to enable dmcub trace event IRQ: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dmcub_trace_event_en
@@ -2762,6 +2843,10 @@ DEFINE_DEBUGFS_ATTRIBUTE(dmcub_trace_event_state_fops, dmcub_trace_event_state_g
 DEFINE_DEBUGFS_ATTRIBUTE(psr_fops, psr_get, NULL, "%llu\n");
 DEFINE_DEBUGFS_ATTRIBUTE(psr_residency_fops, psr_read_residency, NULL,
 			 "%llu\n");
+
+DEFINE_DEBUGFS_ATTRIBUTE(allow_edp_hotplug_detection_fops,
+			allow_edp_hotplug_detection_get,
+			allow_edp_hotplug_detection_set, "%llu\n");
 #endif
 
 DEFINE_SHOW_ATTRIBUTE(current_backlight);
@@ -2938,6 +3023,8 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 				    &target_backlight_fops);
 		debugfs_create_file("ilr_setting", 0644, dir, connector,
 					&edp_ilr_debugfs_fops);
+		debugfs_create_file("allow_edp_hotplug_detection", 0644, dir, connector,
+					&allow_edp_hotplug_detection_fops);
 	}
 #endif
 
@@ -3165,6 +3252,8 @@ void crtc_debugfs_init(struct drm_crtc *crtc)
 #endif
 	debugfs_create_file("amdgpu_current_bpc", 0644, crtc->debugfs_entry,
 			    crtc, &amdgpu_current_bpc_fops);
+	debugfs_create_file("amdgpu_current_colorspace", 0644, crtc->debugfs_entry,
+			    crtc, &amdgpu_current_colorspace_fops);
 }
 
 /*

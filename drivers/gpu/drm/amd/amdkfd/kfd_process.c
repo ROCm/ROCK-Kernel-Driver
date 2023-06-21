@@ -44,8 +44,8 @@ struct mm_struct;
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
 #include "kfd_trace.h"
-#include "kfd_debug.h"
 #include "kfd_smi_events.h"
+#include "kfd_debug.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -1163,54 +1163,44 @@ static void kfd_process_destroy_delayed(struct rcu_head *rcu)
 
 static void kfd_process_notifier_release_internal(struct kfd_process *p)
 {
-        int i;
+	int i;
 #ifndef HAVE_MMU_NOTIFIER_PUT
         struct mm_struct *mm = p->mm;
 #endif
         cancel_delayed_work_sync(&p->eviction_work);
+
+	cancel_delayed_work_sync(&p->eviction_work);
 	cancel_delayed_work_sync(&p->restore_work);
 
 	for (i = 0; i < p->n_pdds; i++) {
 		struct kfd_process_device *pdd = p->pdds[i];
 
-		if (pdd->qpd.doorbell_vma)
-			pdd->qpd.doorbell_vma->vm_private_data = NULL;
-
 		/* re-enable GFX OFF since runtime enable with ttmp setup disabled it. */
 		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev) && p->runtime_info.ttmp_setup)
-			amdgpu_amdkfd_gfx_off_ctrl(pdd->dev->adev, true);
+			amdgpu_gfx_off_ctrl(pdd->dev->adev, true);
 	}
 
-	/* New debugger for GFXv9 and later */
-	if (p->debug_trap_enabled) {
-		kfd_dbg_trap_disable(p);
-	}
+	/* Indicate to other users that MM is no longer valid */
+	p->mm = NULL;
+	kfd_dbg_trap_disable(p);
 
-	/* If we are the debugger, we need to clean up the debugged process.
-	 * We should disable any debugging options enabled, and resume
-	 * any suspended queues.
-	 */
 	if (atomic_read(&p->debugged_process_count) > 0) {
 		struct kfd_process *target;
 		unsigned int temp;
 		int idx = srcu_read_lock(&kfd_processes_srcu);
 
 		hash_for_each_rcu(kfd_processes_table, temp, target, kfd_processes) {
-			if (target->debugger_process &&
-				target->debugger_process == p) {
+			if (target->debugger_process && target->debugger_process == p) {
 				mutex_lock_nested(&target->mutex, 1);
-				if (target->debug_trap_enabled)
-					kfd_dbg_trap_disable(target);
+				kfd_dbg_trap_disable(target);
 				mutex_unlock(&target->mutex);
 				if (atomic_read(&p->debugged_process_count) == 0)
 					break;
 			}
 		}
+
 		srcu_read_unlock(&kfd_processes_srcu, idx);
 	}
-
-	/* Indicate to other users that MM is no longer valid */
-	p->mm = NULL;
 
 #ifdef HAVE_MMU_NOTIFIER_PUT
 	mmu_notifier_put(&p->mmu_notifier);
@@ -1459,7 +1449,6 @@ bool kfd_process_xnack_mode(struct kfd_process *p, bool supported)
 void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
 				     bool enabled)
 {
-	/* If TMA doesn't exist then flag will be set during allocation. */
 	if (qpd->cwsr_kaddr) {
 		uint64_t *tma =
 			(uint64_t *)(qpd->cwsr_kaddr + KFD_CWSR_TMA_OFFSET);
@@ -1498,6 +1487,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	process->is_32bit_user_mode = in_compat_syscall();
 	process->debug_trap_enabled = false;
 	process->debugger_process = NULL;
+	process->exception_enable_mask = 0;
 	atomic_set(&process->debugged_process_count, 0);
 	sema_init(&process->runtime_enable_sema, 0);
 
@@ -1559,9 +1549,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	 * in case if network driver was loaded later.
 	 */
 	kfd_init_peer_direct();
-
-	INIT_WORK(&process->debug_event_workarea,
-			debug_event_write_work_handler);
+	INIT_WORK(&process->debug_event_workarea, debug_event_write_work_handler);
 
 	return process;
 
@@ -2272,7 +2260,7 @@ void kfd_suspend_all_processes(bool force)
 	WARN(debug_evictions, "Evicting all processes");
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
 		cancel_delayed_work_sync(&p->eviction_work);
-		cancel_delayed_work_sync(&p->restore_work);
+		flush_delayed_work(&p->restore_work);
 
 		if (kfd_process_evict_queues(p, force, KFD_QUEUE_EVICTION_TRIGGER_SUSPEND))
 			pr_err("Failed to suspend process 0x%x\n", p->pasid);
@@ -2283,7 +2271,7 @@ void kfd_suspend_all_processes(bool force)
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 }
 
-int kfd_resume_all_processes(bool sync)
+int kfd_resume_all_processes(void)
 {
 	struct kfd_process *p;
 	unsigned int temp;
@@ -2295,16 +2283,6 @@ int kfd_resume_all_processes(bool sync)
 			       p->pasid);
 			ret = -EFAULT;
 		}
-		/*
-		 * When there are multiple calls to kfd_suspend_all_processes()
-		 * and kfd_resume_all_processes(), we need to wait for the
-		 * delayed sync work for kfd_resume_all_processes() to complete
-		 * or else the subsequent call to kfd_suspend_all_processes()
-		 * may cancel any outstanding delayed work.  This can happen
-		 * when the kfd debugger is started on a multi-gpu system.
-		 */
-		if (sync)
-			flush_delayed_work(&p->restore_work);
 	}
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 	return ret;
@@ -2372,12 +2350,13 @@ void kfd_flush_tlb(struct kfd_process_device *pdd, enum TLB_FLUSH_TYPE type)
 }
 
 /* assumes caller holds process lock. */
-void kfd_process_drain_interrupts(struct kfd_process_device *pdd)
+int kfd_process_drain_interrupts(struct kfd_process_device *pdd)
 {
 	uint32_t irq_drain_fence[8];
+	int r = 0;
 
 	if (!KFD_IS_SOC15(pdd->dev))
-		return;
+		return 0;
 
 	pdd->process->irq_drain_is_open = true;
 
@@ -2388,14 +2367,17 @@ void kfd_process_drain_interrupts(struct kfd_process_device *pdd)
 
 	/* ensure stale irqs scheduled KFD interrupts and send drain fence. */
 	if (amdgpu_amdkfd_send_close_event_drain_irq(pdd->dev->adev,
-							irq_drain_fence)) {
+						     irq_drain_fence)) {
 		pdd->process->irq_drain_is_open = false;
-		return;
+		return 0;
 	}
 
-	if (wait_event_interruptible(pdd->process->wait_irq_drain,
-				!READ_ONCE(pdd->process->irq_drain_is_open)))
+	r = wait_event_interruptible(pdd->process->wait_irq_drain,
+				     !READ_ONCE(pdd->process->irq_drain_is_open));
+	if (r)
 		pdd->process->irq_drain_is_open = false;
+
+	return r;
 }
 
 void kfd_process_close_interrupt_drain(unsigned int pasid)
@@ -2425,10 +2407,8 @@ static void send_exception_work_handler(struct work_struct *work)
 	struct kfd_process *p;
 	struct queue *q;
 	struct mm_struct *mm;
-	void __user *csa_addr;
-	size_t header_offset;
-	uint64_t **err_payload_ptr_addr, *err_payload_ptr;
-	uint64_t payload_offset;
+	struct kfd_context_save_area_header __user *csa_header;
+	uint64_t __user *err_payload_ptr;
 	uint64_t cur_err;
 	uint32_t ev_id;
 
@@ -2449,22 +2429,13 @@ static void send_exception_work_handler(struct work_struct *work)
 	if (!q)
 		goto out;
 
-	csa_addr = (void __user *) q->properties.ctx_save_restore_area_address;
-	/* KFD header is 4 DWORDS in size for control stack info. */
-	header_offset = sizeof(struct mqd_user_context_save_area_header);
-	/*
-	 * User header payload_offset is 6 DWORDS down in the header after
-	 * debugger memory info.
-	 */
-	payload_offset = (uint64_t)(csa_addr + header_offset) +
-						(2 * sizeof(uint32_t));
+	csa_header = (void __user *)q->properties.ctx_save_restore_area_address;
 
-	err_payload_ptr_addr = (uint64_t **)payload_offset;
-	get_user(err_payload_ptr, err_payload_ptr_addr);
+	get_user(err_payload_ptr, (uint64_t __user **)&csa_header->err_payload_addr);
 	get_user(cur_err, err_payload_ptr);
 	cur_err |= workarea->error_reason;
 	put_user(cur_err, err_payload_ptr);
-	get_user(ev_id, (uint64_t *)(payload_offset + sizeof(err_payload_ptr)));
+	get_user(ev_id, &csa_header->err_event_id);
 
 	kfd_set_event(p, ev_id);
 
@@ -2551,4 +2522,3 @@ int kfd_debugfs_mqds_by_process(struct seq_file *m, void *data)
 }
 
 #endif
-

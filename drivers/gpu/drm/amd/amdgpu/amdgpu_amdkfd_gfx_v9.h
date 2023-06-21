@@ -50,40 +50,6 @@ int kgd_gfx_v9_wave_control_execute(struct amdgpu_device *adev,
 					uint32_t sq_cmd, uint32_t inst);
 bool kgd_gfx_v9_get_atc_vmid_pasid_mapping_info(struct amdgpu_device *adev,
 					uint8_t vmid, uint16_t *p_pasid);
-uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
-				      bool restore_dbg_registers,
-				      uint32_t vmid);
-uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
-					bool keep_trap_enabled,
-					uint32_t vmid);
-int kgd_gfx_v9_validate_trap_override_request(struct amdgpu_device *adev,
-					     uint32_t trap_override,
-					     uint32_t *trap_mask_supported);
-uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
-					     uint32_t vmid,
-					     uint32_t trap_override,
-					     uint32_t trap_mask_bits,
-					     uint32_t trap_mask_request,
-					     uint32_t *trap_mask_prev,
-					     uint32_t kfd_dbg_trap_cntl_prev);
-uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
-					 uint8_t wave_launch_mode,
-					 uint32_t vmid);
-uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
-					uint64_t watch_address,
-					uint32_t watch_address_mask,
-					uint32_t watch_id,
-					uint32_t watch_mode,
-					uint32_t debug_vmid);
-uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
-					uint32_t watch_id);
-void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev, uint32_t *wait_times);
-
-void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
-					       uint32_t wait_times,
-					       uint32_t grace_period,
-					       uint32_t *reg_offset,
-					       uint32_t *reg_data);
 void kgd_gfx_v9_set_vm_context_page_table_base(struct amdgpu_device *adev,
 			uint32_t vmid, uint64_t page_table_base);
 void kgd_gfx_v9_get_cu_occupancy(struct amdgpu_device *adev, int pasid,
@@ -96,3 +62,39 @@ void kgd_gfx_v9_acquire_queue(struct amdgpu_device *adev, uint32_t pipe_id,
 uint64_t kgd_gfx_v9_get_queue_mask(struct amdgpu_device *adev,
 				uint32_t pipe_id, uint32_t queue_id);
 void kgd_gfx_v9_release_queue(struct amdgpu_device *adev, uint32_t inst);
+void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
+					uint32_t vmid,
+					bool stall);
+uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
+				      bool restore_dbg_registers,
+				      uint32_t vmid);
+uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
+					bool keep_trap_enabled,
+					uint32_t vmid);
+int kgd_gfx_v9_validate_trap_override_request(struct amdgpu_device *adev,
+					     uint32_t trap_override,
+					     uint32_t *trap_mask_supported);
+uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
+					uint8_t wave_launch_mode,
+					uint32_t vmid);
+uint32_t kgd_gfx_v9_set_wave_launch_trap_override(struct amdgpu_device *adev,
+					     uint32_t vmid,
+					     uint32_t trap_override,
+					     uint32_t trap_mask_bits,
+					     uint32_t trap_mask_request,
+					     uint32_t *trap_mask_prev,
+					     uint32_t kfd_dbg_trap_cntl_prev);
+uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
+					uint64_t watch_address,
+					uint32_t watch_address_mask,
+					uint32_t watch_id,
+					uint32_t watch_mode,
+					uint32_t debug_vmid);
+uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
+					uint32_t watch_id);
+void kgd_gfx_v9_get_iq_wait_times(struct amdgpu_device *adev, uint32_t *wait_times);
+void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
+					       uint32_t wait_times,
+					       uint32_t grace_period,
+					       uint32_t *reg_offset,
+					       uint32_t *reg_data);

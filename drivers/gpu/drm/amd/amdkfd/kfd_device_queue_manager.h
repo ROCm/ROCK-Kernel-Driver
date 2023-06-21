@@ -35,10 +35,9 @@
 
 #define VMID_NUM 16
 
-#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
-
 #define KFD_MES_PROCESS_QUANTUM		100000
 #define KFD_MES_GANG_QUANTUM		10000
+#define USE_DEFAULT_GRACE_PERIOD 0xffffffff
 
 struct device_process_node {
 	struct qcm_process_device *qpd;
@@ -259,13 +258,13 @@ struct device_queue_manager {
 	struct work_struct	hw_exception_work;
 	struct kfd_mem_obj	hiq_sdma_mqd;
 	bool			sched_running;
-	uint32_t		wait_times;
 
 	/* used for GFX 9.4.3 only */
 	uint32_t		current_logical_xcc_start;
 
-	/* sync destroy and suspend  */
-	wait_queue_head_t destroy_wait;
+	uint32_t		wait_times;
+
+	wait_queue_head_t	destroy_wait;
 };
 
 void device_queue_manager_init_cik(
@@ -299,14 +298,11 @@ int suspend_queues(struct kfd_process *p,
 			uint32_t num_queues,
 			uint32_t grace_period,
 			uint64_t exception_clear_mask,
-			uint32_t *queue_ids);
+			uint32_t *usr_queue_id_array);
 int resume_queues(struct kfd_process *p,
-		bool resume_all_queues,
 		uint32_t num_queues,
-		uint32_t *queue_ids);
-
-void set_queue_snapshot_entry(struct device_queue_manager *dqm,
-			      struct queue *q,
+		uint32_t *usr_queue_id_array);
+void set_queue_snapshot_entry(struct queue *q,
 			      uint64_t exception_clear_mask,
 			      struct kfd_queue_snapshot_entry *qss_entry);
 int debug_lock_and_unmap(struct device_queue_manager *dqm);

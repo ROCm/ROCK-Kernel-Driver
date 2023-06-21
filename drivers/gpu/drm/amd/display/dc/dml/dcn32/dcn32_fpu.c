@@ -679,7 +679,6 @@ static bool dcn32_assign_subvp_pipe(struct dc *dc,
 	unsigned int max_frame_time = 0;
 	bool valid_assignment_found = false;
 	unsigned int free_pipes = dcn32_get_num_free_pipes(dc, context);
-	bool current_assignment_freesync = false;
 	struct vba_vars_st *vba = &context->bw_ctx.dml.vba;
 
 	for (i = 0, pipe_idx = 0; i < dc->res_pool->pipe_count; i++) {
@@ -720,19 +719,10 @@ static bool dcn32_assign_subvp_pipe(struct dc *dc,
 				struct dc_stream_state *stream = pipe->stream;
 				unsigned int frame_us = (stream->timing.v_total * stream->timing.h_total /
 						(double)(stream->timing.pix_clk_100hz * 100)) * 1000000;
-				if (frame_us > max_frame_time && !stream->ignore_msa_timing_param) {
+				if (frame_us > max_frame_time) {
 					*index = i;
 					max_frame_time = frame_us;
 					valid_assignment_found = true;
-					current_assignment_freesync = false;
-				/* For the 2-Freesync display case, still choose the one with the
-			     * longest frame time
-			     */
-				} else if (stream->ignore_msa_timing_param && (!valid_assignment_found ||
-						(current_assignment_freesync && frame_us > max_frame_time))) {
-					*index = i;
-					valid_assignment_found = true;
-					current_assignment_freesync = true;
 				}
 			}
 		}
@@ -864,10 +854,9 @@ static bool subvp_subvp_schedulable(struct dc *dc, struct dc_state *context)
 }
 
 /**
- * subvp_drr_schedulable - Determine if SubVP + DRR config is schedulable
+ * subvp_drr_schedulable() - Determine if SubVP + DRR config is schedulable
  * @dc: current dc state
  * @context: new dc state
- * @drr_pipe: DRR pipe_ctx for the SubVP + DRR config
  *
  * High level algorithm:
  * 1. Get timing for SubVP pipe, phantom pipe, and DRR pipe
@@ -878,11 +867,12 @@ static bool subvp_subvp_schedulable(struct dc *dc, struct dc_state *context)
  *
  * Return: True if the SubVP + DRR config is schedulable, false otherwise
  */
-static bool subvp_drr_schedulable(struct dc *dc, struct dc_state *context, struct pipe_ctx *drr_pipe)
+static bool subvp_drr_schedulable(struct dc *dc, struct dc_state *context)
 {
 	bool schedulable = false;
 	uint32_t i;
 	struct pipe_ctx *pipe = NULL;
+	struct pipe_ctx *drr_pipe = NULL;
 	struct dc_crtc_timing *main_timing = NULL;
 	struct dc_crtc_timing *phantom_timing = NULL;
 	struct dc_crtc_timing *drr_timing = NULL;
@@ -905,6 +895,19 @@ static bool subvp_drr_schedulable(struct dc *dc, struct dc_state *context, struc
 
 		// Find the SubVP pipe
 		if (pipe->stream->mall_stream_config.type == SUBVP_MAIN)
+			break;
+	}
+
+	// Find the DRR pipe
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		drr_pipe = &context->res_ctx.pipe_ctx[i];
+
+		// We check for master pipe only
+		if (!drr_pipe->stream || !drr_pipe->plane_state || drr_pipe->top_pipe || drr_pipe->prev_odm_pipe)
+			continue;
+
+		if (drr_pipe->stream->mall_stream_config.type == SUBVP_NONE && drr_pipe->stream->ignore_msa_timing_param &&
+				(drr_pipe->stream->allow_freesync || drr_pipe->stream->vrr_active_variable))
 			break;
 	}
 
@@ -993,13 +996,7 @@ static bool subvp_vblank_schedulable(struct dc *dc, struct dc_state *context)
 		if (!subvp_pipe && pipe->stream->mall_stream_config.type == SUBVP_MAIN)
 			subvp_pipe = pipe;
 	}
-	// Use ignore_msa_timing_param and VRR active, or Freesync flag to identify as DRR On
-	if (found && context->res_ctx.pipe_ctx[vblank_index].stream->ignore_msa_timing_param &&
-			(context->res_ctx.pipe_ctx[vblank_index].stream->allow_freesync ||
-			context->res_ctx.pipe_ctx[vblank_index].stream->vrr_active_variable)) {
-		// SUBVP + DRR case -- only allowed if run through DRR validation path
-		schedulable = false;
-	} else if (found) {
+	if (found) {
 		main_timing = &subvp_pipe->stream->timing;
 		phantom_timing = &subvp_pipe->stream->mall_stream_config.paired_stream->timing;
 		vblank_timing = &context->res_ctx.pipe_ctx[vblank_index].stream->timing;
@@ -1029,6 +1026,53 @@ static bool subvp_vblank_schedulable(struct dc *dc, struct dc_state *context)
 }
 
 /**
+ * subvp_subvp_admissable() - Determine if subvp + subvp config is admissible
+ *
+ * @dc: Current DC state
+ * @context: New DC state to be programmed
+ *
+ * SubVP + SubVP is admissible under the following conditions:
+ * - All SubVP pipes are < 120Hz OR
+ * - All SubVP pipes are >= 120hz
+ *
+ * Return: True if admissible, false otherwise
+ */
+static bool subvp_subvp_admissable(struct dc *dc,
+				struct dc_state *context)
+{
+	bool result = false;
+	uint32_t i;
+	uint8_t subvp_count = 0;
+	uint32_t min_refresh = subvp_high_refresh_list.min_refresh, max_refresh = 0;
+	uint32_t refresh_rate = 0;
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
+
+		if (!pipe->stream)
+			continue;
+
+		if (pipe->plane_state && !pipe->top_pipe &&
+				pipe->stream->mall_stream_config.type == SUBVP_MAIN) {
+			refresh_rate = (pipe->stream->timing.pix_clk_100hz * 100 +
+					pipe->stream->timing.v_total * pipe->stream->timing.h_total - 1)
+					/ (double)(pipe->stream->timing.v_total * pipe->stream->timing.h_total);
+			if (refresh_rate < min_refresh)
+				min_refresh = refresh_rate;
+			if (refresh_rate > max_refresh)
+				max_refresh = refresh_rate;
+			subvp_count++;
+		}
+	}
+
+	if (subvp_count == 2 && ((min_refresh < 120 && max_refresh < 120) ||
+			(min_refresh >= 120 && max_refresh >= 120)))
+		result = true;
+
+	return result;
+}
+
+/**
  * subvp_validate_static_schedulability - Check which SubVP case is calculated
  * and handle static analysis based on the case.
  * @dc: current dc state
@@ -1046,11 +1090,12 @@ static bool subvp_validate_static_schedulability(struct dc *dc,
 				struct dc_state *context,
 				int vlevel)
 {
-	bool schedulable = true;	// true by default for single display case
+	bool schedulable = false;
 	struct vba_vars_st *vba = &context->bw_ctx.dml.vba;
 	uint32_t i, pipe_idx;
 	uint8_t subvp_count = 0;
 	uint8_t vactive_count = 0;
+	uint8_t non_subvp_pipes = 0;
 
 	for (i = 0, pipe_idx = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
@@ -1058,14 +1103,18 @@ static bool subvp_validate_static_schedulability(struct dc *dc,
 		if (!pipe->stream)
 			continue;
 
-		if (pipe->plane_state && !pipe->top_pipe &&
-				pipe->stream->mall_stream_config.type == SUBVP_MAIN)
-			subvp_count++;
+		if (pipe->plane_state && !pipe->top_pipe) {
+			if (pipe->stream->mall_stream_config.type == SUBVP_MAIN)
+				subvp_count++;
+			if (pipe->stream->mall_stream_config.type == SUBVP_NONE) {
+				non_subvp_pipes++;
+			}
+		}
 
 		// Count how many planes that aren't SubVP/phantom are capable of VACTIVE
 		// switching (SubVP + VACTIVE unsupported). In situations where we force
 		// SubVP for a VACTIVE plane, we don't want to increment the vactive_count.
-		if (vba->ActiveDRAMClockChangeLatencyMargin[vba->pipe_plane[pipe_idx]] > 0 &&
+		if (vba->ActiveDRAMClockChangeLatencyMarginPerState[vlevel][vba->maxMpcComb][vba->pipe_plane[pipe_idx]] > 0 &&
 		    pipe->stream->mall_stream_config.type == SUBVP_NONE) {
 			vactive_count++;
 		}
@@ -1074,13 +1123,14 @@ static bool subvp_validate_static_schedulability(struct dc *dc,
 
 	if (subvp_count == 2) {
 		// Static schedulability check for SubVP + SubVP case
-		schedulable = subvp_subvp_schedulable(dc, context);
-	} else if (vba->DRAMClockChangeSupport[vlevel][vba->maxMpcComb] == dm_dram_clock_change_vblank_w_mall_sub_vp) {
-		// Static schedulability check for SubVP + VBLANK case. Also handle the case where
-		// DML outputs SubVP + VBLANK + VACTIVE (DML will report as SubVP + VBLANK)
-		if (vactive_count > 0)
-			schedulable = false;
-		else
+		schedulable = subvp_subvp_admissable(dc, context) && subvp_subvp_schedulable(dc, context);
+	} else if (subvp_count == 1 && non_subvp_pipes == 0) {
+		// Single SubVP configs will be supported by default as long as it's suppported by DML
+		schedulable = true;
+	} else if (subvp_count == 1 && non_subvp_pipes == 1) {
+		if (dcn32_subvp_drr_admissable(dc, context))
+			schedulable = subvp_drr_schedulable(dc, context);
+		else if (dcn32_subvp_vblank_admissable(dc, context, vlevel))
 			schedulable = subvp_vblank_schedulable(dc, context);
 	} else if (vba->DRAMClockChangeSupport[vlevel][vba->maxMpcComb] == dm_dram_clock_change_vactive_w_mall_sub_vp &&
 			vactive_count > 0) {
@@ -1104,10 +1154,6 @@ static void dcn32_full_validate_bw_helper(struct dc *dc,
 	unsigned int dc_pipe_idx = 0;
 	int i = 0;
 	bool found_supported_config = false;
-	struct pipe_ctx *pipe = NULL;
-	uint32_t non_subvp_pipes = 0;
-	bool drr_pipe_found = false;
-	uint32_t drr_pipe_index = 0;
 
 	dc_assert_fp_enabled();
 
@@ -1197,31 +1243,12 @@ static void dcn32_full_validate_bw_helper(struct dc *dc,
 				}
 			}
 
-			if (*vlevel < context->bw_ctx.dml.soc.num_states &&
-			    vba->DRAMClockChangeSupport[*vlevel][vba->maxMpcComb] != dm_dram_clock_change_unsupported
-			    && subvp_validate_static_schedulability(dc, context, *vlevel)) {
+			if (*vlevel < context->bw_ctx.dml.soc.num_states
+			    && subvp_validate_static_schedulability(dc, context, *vlevel))
 				found_supported_config = true;
-			} else if (*vlevel < context->bw_ctx.dml.soc.num_states) {
-				/* Case where 1 SubVP is added, and DML reports MCLK unsupported or DRR is allowed.
-				 * This handles the case for SubVP + DRR, where the DRR display does not support MCLK
-				 * switch at it's native refresh rate / timing, or DRR is allowed for the non-subvp
-				 * display.
-				 */
-				for (i = 0; i < dc->res_pool->pipe_count; i++) {
-					pipe = &context->res_ctx.pipe_ctx[i];
-					if (pipe->stream && pipe->plane_state && !pipe->top_pipe &&
-					    pipe->stream->mall_stream_config.type == SUBVP_NONE) {
-						non_subvp_pipes++;
-						// Use ignore_msa_timing_param flag to identify as DRR
-						if (pipe->stream->ignore_msa_timing_param && pipe->stream->allow_freesync) {
-							drr_pipe_found = true;
-							drr_pipe_index = i;
-						}
-					}
-				}
-				// If there is only 1 remaining non SubVP pipe that is DRR, check static
-				// schedulability for SubVP + DRR.
-				if (non_subvp_pipes == 1 && drr_pipe_found) {
+			if (found_supported_config) {
+				// For SubVP + DRR cases, we can force the lowest vlevel that supports the mode
+				if (dcn32_subvp_drr_admissable(dc, context) && subvp_drr_schedulable(dc, context)) {
 					/* find lowest vlevel that supports the config */
 					for (i = *vlevel; i >= 0; i--) {
 						if (vba->ModeSupport[i][vba->maxMpcComb]) {
@@ -1230,9 +1257,6 @@ static void dcn32_full_validate_bw_helper(struct dc *dc,
 							break;
 						}
 					}
-
-					found_supported_config = subvp_drr_schedulable(dc, context,
-										       &context->res_ctx.pipe_ctx[drr_pipe_index]);
 				}
 			}
 		}
@@ -2324,14 +2348,48 @@ void dcn32_patch_dpm_table(struct clk_bw_params *bw_params)
 		bw_params->clk_table.entries[0].memclk_mhz = dcn3_2_soc.clock_limits[0].dram_speed_mts / 16;
 }
 
-static int build_synthetic_soc_states(struct clk_bw_params *bw_params,
+/*
+ * override_max_clk_values - Overwrite the max clock frequencies with the max DC mode timings
+ * Input:
+ *	max_clk_limit - struct containing the desired clock timings
+ * Output:
+ *	curr_clk_limit  - struct containing the timings that need to be overwritten
+ * Return: 0 upon success, non-zero for failure
+ */
+static int override_max_clk_values(struct clk_limit_table_entry *max_clk_limit,
+		struct clk_limit_table_entry *curr_clk_limit)
+{
+	if (NULL == max_clk_limit || NULL == curr_clk_limit)
+		return -1; //invalid parameters
+
+	//only overwrite if desired max clock frequency is initialized
+	if (max_clk_limit->dcfclk_mhz != 0)
+		curr_clk_limit->dcfclk_mhz = max_clk_limit->dcfclk_mhz;
+
+	if (max_clk_limit->fclk_mhz != 0)
+		curr_clk_limit->fclk_mhz = max_clk_limit->fclk_mhz;
+
+	if (max_clk_limit->memclk_mhz != 0)
+		curr_clk_limit->memclk_mhz = max_clk_limit->memclk_mhz;
+
+	if (max_clk_limit->socclk_mhz != 0)
+		curr_clk_limit->socclk_mhz = max_clk_limit->socclk_mhz;
+
+	if (max_clk_limit->dtbclk_mhz != 0)
+		curr_clk_limit->dtbclk_mhz = max_clk_limit->dtbclk_mhz;
+
+	if (max_clk_limit->dispclk_mhz != 0)
+		curr_clk_limit->dispclk_mhz = max_clk_limit->dispclk_mhz;
+
+	return 0;
+}
+
+static int build_synthetic_soc_states(bool disable_dc_mode_overwrite, struct clk_bw_params *bw_params,
 		struct _vcs_dpi_voltage_scaling_st *table, unsigned int *num_entries)
 {
 	int i, j;
 	struct _vcs_dpi_voltage_scaling_st entry = {0};
-
-	unsigned int max_dcfclk_mhz = 0, max_dispclk_mhz = 0, max_dppclk_mhz = 0,
-			max_phyclk_mhz = 0, max_dtbclk_mhz = 0, max_fclk_mhz = 0, max_uclk_mhz = 0;
+	struct clk_limit_table_entry max_clk_data = {0};
 
 	unsigned int min_dcfclk_mhz = 199, min_fclk_mhz = 299;
 
@@ -2342,51 +2400,76 @@ static int build_synthetic_soc_states(struct clk_bw_params *bw_params,
 	unsigned int num_fclk_dpms = 0;
 	unsigned int num_dcfclk_dpms = 0;
 
-	for (i = 0; i < MAX_NUM_DPM_LVL; i++) {
-		if (bw_params->clk_table.entries[i].dcfclk_mhz > max_dcfclk_mhz)
-			max_dcfclk_mhz = bw_params->clk_table.entries[i].dcfclk_mhz;
-		if (bw_params->clk_table.entries[i].fclk_mhz > max_fclk_mhz)
-			max_fclk_mhz = bw_params->clk_table.entries[i].fclk_mhz;
-		if (bw_params->clk_table.entries[i].memclk_mhz > max_uclk_mhz)
-			max_uclk_mhz = bw_params->clk_table.entries[i].memclk_mhz;
-		if (bw_params->clk_table.entries[i].dispclk_mhz > max_dispclk_mhz)
-			max_dispclk_mhz = bw_params->clk_table.entries[i].dispclk_mhz;
-		if (bw_params->clk_table.entries[i].dppclk_mhz > max_dppclk_mhz)
-			max_dppclk_mhz = bw_params->clk_table.entries[i].dppclk_mhz;
-		if (bw_params->clk_table.entries[i].phyclk_mhz > max_phyclk_mhz)
-			max_phyclk_mhz = bw_params->clk_table.entries[i].phyclk_mhz;
-		if (bw_params->clk_table.entries[i].dtbclk_mhz > max_dtbclk_mhz)
-			max_dtbclk_mhz = bw_params->clk_table.entries[i].dtbclk_mhz;
+	unsigned int num_dc_uclk_dpms = 0;
+	unsigned int num_dc_fclk_dpms = 0;
+	unsigned int num_dc_dcfclk_dpms = 0;
 
-		if (bw_params->clk_table.entries[i].memclk_mhz > 0)
+	for (i = 0; i < MAX_NUM_DPM_LVL; i++) {
+		if (bw_params->clk_table.entries[i].dcfclk_mhz > max_clk_data.dcfclk_mhz)
+			max_clk_data.dcfclk_mhz = bw_params->clk_table.entries[i].dcfclk_mhz;
+		if (bw_params->clk_table.entries[i].fclk_mhz > max_clk_data.fclk_mhz)
+			max_clk_data.fclk_mhz = bw_params->clk_table.entries[i].fclk_mhz;
+		if (bw_params->clk_table.entries[i].memclk_mhz > max_clk_data.memclk_mhz)
+			max_clk_data.memclk_mhz = bw_params->clk_table.entries[i].memclk_mhz;
+		if (bw_params->clk_table.entries[i].dispclk_mhz > max_clk_data.dispclk_mhz)
+			max_clk_data.dispclk_mhz = bw_params->clk_table.entries[i].dispclk_mhz;
+		if (bw_params->clk_table.entries[i].dppclk_mhz > max_clk_data.dppclk_mhz)
+			max_clk_data.dppclk_mhz = bw_params->clk_table.entries[i].dppclk_mhz;
+		if (bw_params->clk_table.entries[i].phyclk_mhz > max_clk_data.phyclk_mhz)
+			max_clk_data.phyclk_mhz = bw_params->clk_table.entries[i].phyclk_mhz;
+		if (bw_params->clk_table.entries[i].dtbclk_mhz > max_clk_data.dtbclk_mhz)
+			max_clk_data.dtbclk_mhz = bw_params->clk_table.entries[i].dtbclk_mhz;
+
+		if (bw_params->clk_table.entries[i].memclk_mhz > 0) {
 			num_uclk_dpms++;
-		if (bw_params->clk_table.entries[i].fclk_mhz > 0)
+			if (bw_params->clk_table.entries[i].memclk_mhz <= bw_params->dc_mode_limit.memclk_mhz)
+				num_dc_uclk_dpms++;
+		}
+		if (bw_params->clk_table.entries[i].fclk_mhz > 0) {
 			num_fclk_dpms++;
-		if (bw_params->clk_table.entries[i].dcfclk_mhz > 0)
+			if (bw_params->clk_table.entries[i].fclk_mhz <= bw_params->dc_mode_limit.fclk_mhz)
+				num_dc_fclk_dpms++;
+		}
+		if (bw_params->clk_table.entries[i].dcfclk_mhz > 0) {
 			num_dcfclk_dpms++;
+			if (bw_params->clk_table.entries[i].dcfclk_mhz <= bw_params->dc_mode_limit.dcfclk_mhz)
+				num_dc_dcfclk_dpms++;
+		}
+	}
+
+	if (!disable_dc_mode_overwrite) {
+		//Overwrite max frequencies with max DC mode frequencies for DC mode systems
+		override_max_clk_values(&bw_params->dc_mode_limit, &max_clk_data);
+		num_uclk_dpms = num_dc_uclk_dpms;
+		num_fclk_dpms = num_dc_fclk_dpms;
+		num_dcfclk_dpms = num_dc_dcfclk_dpms;
+		bw_params->clk_table.num_entries_per_clk.num_memclk_levels = num_uclk_dpms;
+		bw_params->clk_table.num_entries_per_clk.num_fclk_levels = num_fclk_dpms;
 	}
 
 	if (num_dcfclk_dpms > 0 && bw_params->clk_table.entries[0].fclk_mhz > min_fclk_mhz)
 		min_fclk_mhz = bw_params->clk_table.entries[0].fclk_mhz;
 
-	if (!max_dcfclk_mhz || !max_dispclk_mhz || !max_dtbclk_mhz)
+	if (!max_clk_data.dcfclk_mhz || !max_clk_data.dispclk_mhz || !max_clk_data.dtbclk_mhz)
 		return -1;
 
-	if (max_dppclk_mhz == 0)
-		max_dppclk_mhz = max_dispclk_mhz;
+	if (max_clk_data.dppclk_mhz == 0)
+		max_clk_data.dppclk_mhz = max_clk_data.dispclk_mhz;
 
-	if (max_fclk_mhz == 0)
-		max_fclk_mhz = max_dcfclk_mhz * dcn3_2_soc.pct_ideal_sdp_bw_after_urgent / dcn3_2_soc.pct_ideal_fabric_bw_after_urgent;
+	if (max_clk_data.fclk_mhz == 0)
+		max_clk_data.fclk_mhz = max_clk_data.dcfclk_mhz *
+				dcn3_2_soc.pct_ideal_sdp_bw_after_urgent /
+				dcn3_2_soc.pct_ideal_fabric_bw_after_urgent;
 
-	if (max_phyclk_mhz == 0)
-		max_phyclk_mhz = dcn3_2_soc.clock_limits[0].phyclk_mhz;
+	if (max_clk_data.phyclk_mhz == 0)
+		max_clk_data.phyclk_mhz = dcn3_2_soc.clock_limits[0].phyclk_mhz;
 
 	*num_entries = 0;
-	entry.dispclk_mhz = max_dispclk_mhz;
-	entry.dscclk_mhz = max_dispclk_mhz / 3;
-	entry.dppclk_mhz = max_dppclk_mhz;
-	entry.dtbclk_mhz = max_dtbclk_mhz;
-	entry.phyclk_mhz = max_phyclk_mhz;
+	entry.dispclk_mhz = max_clk_data.dispclk_mhz;
+	entry.dscclk_mhz = max_clk_data.dispclk_mhz / 3;
+	entry.dppclk_mhz = max_clk_data.dppclk_mhz;
+	entry.dtbclk_mhz = max_clk_data.dtbclk_mhz;
+	entry.phyclk_mhz = max_clk_data.phyclk_mhz;
 	entry.phyclk_d18_mhz = dcn3_2_soc.clock_limits[0].phyclk_d18_mhz;
 	entry.phyclk_d32_mhz = dcn3_2_soc.clock_limits[0].phyclk_d32_mhz;
 
@@ -2400,7 +2483,7 @@ static int build_synthetic_soc_states(struct clk_bw_params *bw_params,
 	}
 
 	// Insert the max DCFCLK
-	entry.dcfclk_mhz = max_dcfclk_mhz;
+	entry.dcfclk_mhz = max_clk_data.dcfclk_mhz;
 	entry.fabricclk_mhz = 0;
 	entry.dram_speed_mts = 0;
 
@@ -2428,7 +2511,7 @@ static int build_synthetic_soc_states(struct clk_bw_params *bw_params,
 	// If FCLK fine grained, only insert max
 	else {
 		entry.dcfclk_mhz = 0;
-		entry.fabricclk_mhz = max_fclk_mhz;
+		entry.fabricclk_mhz = max_clk_data.fclk_mhz;
 		entry.dram_speed_mts = 0;
 
 		insert_entry_into_table_sorted(table, num_entries, &entry);
@@ -2440,9 +2523,9 @@ static int build_synthetic_soc_states(struct clk_bw_params *bw_params,
 
 	// Remove states that require higher clocks than are supported
 	for (i = *num_entries - 1; i >= 0 ; i--) {
-		if (table[i].dcfclk_mhz > max_dcfclk_mhz ||
-				table[i].fabricclk_mhz > max_fclk_mhz ||
-				table[i].dram_speed_mts > max_uclk_mhz * 16)
+		if (table[i].dcfclk_mhz > max_clk_data.dcfclk_mhz ||
+				table[i].fabricclk_mhz > max_clk_data.fclk_mhz ||
+				table[i].dram_speed_mts > max_clk_data.memclk_mhz * 16)
 			remove_entry_from_table_at_index(table, num_entries, i);
 	}
 
@@ -2755,7 +2838,8 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 				dcn3_2_soc.clock_limits[i].phyclk_d32_mhz = dcn3_2_soc.clock_limits[0].phyclk_d32_mhz;
 			}
 		} else {
-			build_synthetic_soc_states(bw_params, dcn3_2_soc.clock_limits, &dcn3_2_soc.num_states);
+			build_synthetic_soc_states(dc->debug.disable_dc_mode_overwrite, bw_params,
+					dcn3_2_soc.clock_limits, &dcn3_2_soc.num_states);
 		}
 
 		/* Re-init DML with updated bb */
@@ -2821,16 +2905,34 @@ bool dcn32_allow_subvp_high_refresh_rate(struct dc *dc, struct dc_state *context
 {
 	bool allow = false;
 	uint32_t refresh_rate = 0;
-	uint32_t min_refresh = subvp_high_refresh_list.min_refresh;
-	uint32_t max_refresh = subvp_high_refresh_list.max_refresh;
+	uint32_t subvp_min_refresh = subvp_high_refresh_list.min_refresh;
+	uint32_t subvp_max_refresh = subvp_high_refresh_list.max_refresh;
+	uint32_t min_refresh = subvp_max_refresh;
 	uint32_t i;
 
-	if (!dc->debug.disable_subvp_high_refresh && pipe->stream &&
+	/* Only allow SubVP on high refresh displays if all connected displays
+	 * are considered "high refresh" (i.e. >= 120hz). We do not want to
+	 * allow combinations such as 120hz (SubVP) + 60hz (SubVP).
+	 */
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[i];
+
+		if (!pipe_ctx->stream)
+			continue;
+		refresh_rate = (pipe_ctx->stream->timing.pix_clk_100hz * 100 +
+				pipe_ctx->stream->timing.v_total * pipe_ctx->stream->timing.h_total - 1)
+						/ (double)(pipe_ctx->stream->timing.v_total * pipe_ctx->stream->timing.h_total);
+
+		if (refresh_rate < min_refresh)
+			min_refresh = refresh_rate;
+	}
+
+	if (!dc->debug.disable_subvp_high_refresh && min_refresh >= subvp_min_refresh && pipe->stream &&
 			pipe->plane_state && !(pipe->stream->vrr_active_variable || pipe->stream->vrr_active_fixed)) {
 		refresh_rate = (pipe->stream->timing.pix_clk_100hz * 100 +
 						pipe->stream->timing.v_total * pipe->stream->timing.h_total - 1)
 						/ (double)(pipe->stream->timing.v_total * pipe->stream->timing.h_total);
-		if (refresh_rate >= min_refresh && refresh_rate <= max_refresh) {
+		if (refresh_rate >= subvp_min_refresh && refresh_rate <= subvp_max_refresh) {
 			for (i = 0; i < SUBVP_HIGH_REFRESH_LIST_LEN; i++) {
 				uint32_t width = subvp_high_refresh_list.res[i].width;
 				uint32_t height = subvp_high_refresh_list.res[i].height;

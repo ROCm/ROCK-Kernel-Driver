@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-14 Advanced Micro Devices, Inc.
+ * Copyright 2012-2023 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,7 +45,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.237"
+#define DC_VER "3.2.239"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -60,7 +60,9 @@ struct dc_versions {
 };
 
 enum dp_protocol_version {
-	DP_VERSION_1_4,
+	DP_VERSION_1_4 = 0,
+	DP_VERSION_2_1,
+	DP_VERSION_UNKNOWN,
 };
 
 enum dc_plane_type {
@@ -264,6 +266,7 @@ struct dc_caps {
 	uint16_t subvp_pstate_allow_width_us;
 	uint16_t subvp_vertical_int_margin_us;
 	bool seamless_odm;
+	uint32_t max_v_total;
 	uint8_t subvp_drr_vblank_start_margin_us;
 };
 
@@ -897,6 +900,7 @@ struct dc_debug_options {
 	uint32_t fpo_vactive_min_active_margin_us;
 	uint32_t fpo_vactive_max_blank_us;
 	bool enable_legacy_fast_update;
+	bool disable_dc_mode_overwrite;
 };
 
 struct gpu_info_soc_bounding_box_v1_0;

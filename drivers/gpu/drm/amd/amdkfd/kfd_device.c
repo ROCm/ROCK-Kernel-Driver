@@ -107,20 +107,19 @@ static void kfd_device_info_set_sdma_info(struct kfd_dev *kfd)
 		kfd->device_info.num_sdma_queues_per_engine = 8;
 	}
 
+	bitmap_zero(kfd->device_info.reserved_sdma_queues_bitmap, KFD_MAX_SDMA_QUEUES);
+
 	switch (sdma_version) {
 	case IP_VERSION(6, 0, 0):
+	case IP_VERSION(6, 0, 1):
 	case IP_VERSION(6, 0, 2):
 	case IP_VERSION(6, 0, 3):
 		/* Reserve 1 for paging and 1 for gfx */
 		kfd->device_info.num_reserved_sdma_queues_per_engine = 2;
 		/* BIT(0)=engine-0 queue-0; BIT(1)=engine-1 queue-0; BIT(2)=engine-0 queue-1; ... */
-		kfd->device_info.reserved_sdma_queues_bitmap = 0xFULL;
-		break;
-	case IP_VERSION(6, 0, 1):
-		/* Reserve 1 for paging and 1 for gfx */
-		kfd->device_info.num_reserved_sdma_queues_per_engine = 2;
-		/* BIT(0)=engine-0 queue-0; BIT(1)=engine-0 queue-1; ... */
-		kfd->device_info.reserved_sdma_queues_bitmap = 0x3ULL;
+		bitmap_set(kfd->device_info.reserved_sdma_queues_bitmap, 0,
+			   kfd->adev->sdma.num_instances *
+			   kfd->device_info.num_reserved_sdma_queues_per_engine);
 		break;
 	default:
 		break;
@@ -818,6 +817,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 	if (kfd_resume_iommu(kfd))
 		goto kfd_resume_iommu_error;
 
+	spin_lock_init(&kfd->watch_points_lock);
+
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device %x:%x\n", kfd->adev->pdev->vendor,
 		 kfd->adev->pdev->device);
@@ -949,7 +950,7 @@ void kgd2kfd_suspend(struct kfd_dev *kfd, bool run_pm, bool force)
 	kfd_iommu_suspend(kfd);
 }
 
-int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
+int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm)
 {
 	int ret, count, i;
 
@@ -970,7 +971,7 @@ int kgd2kfd_resume(struct kfd_dev *kfd, bool run_pm, bool sync)
 
 		WARN_ONCE(count < 0, "KFD suspend / resume ref. error");
 		if (count == 0)
-			ret = kfd_resume_all_processes(sync);
+			ret = kfd_resume_all_processes();
 	}
 
 	return ret;

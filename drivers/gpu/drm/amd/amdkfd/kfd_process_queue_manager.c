@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include "kfd_device_queue_manager.h"
-#include "kfd_debug.h"
 #include "kfd_priv.h"
 #include "kfd_kernel_queue.h"
 #include "amdgpu_amdkfd.h"
@@ -326,7 +325,6 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 			goto err_create_queue;
 		pqn->q = q;
 		pqn->kq = NULL;
-		kfd_process_drain_interrupts(pdd);
 		retval = dev->dqm->ops.create_queue(dev->dqm, q, &pdd->qpd, q_data,
 						    restore_mqd, restore_ctl_stack);
 		print_queue(q);
@@ -340,6 +338,10 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 		kq->queue->properties.queue_id = *qid;
 		pqn->kq = kq;
 		pqn->q = NULL;
+		retval = kfd_process_drain_interrupts(pdd);
+		if (retval)
+			break;
+
 		retval = dev->dqm->ops.create_kernel_queue(dev->dqm,
 							kq, &pdd->qpd);
 		break;
@@ -590,44 +592,41 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   uint64_t exception_clear_mask,
 			   void __user *buf,
-			   int num_qss_entries,
+			   int *num_qss_entries,
 			   uint32_t *entry_size)
 {
 	struct process_queue_node *pqn;
-	uint32_t tmp_entry_size = *entry_size;
-	int qss_entry_count = 0;
+	struct kfd_queue_snapshot_entry src;
+	uint32_t tmp_entry_size = *entry_size, tmp_qss_entries = *num_qss_entries;
+	int r = 0;
 
+	*num_qss_entries = 0;
 	if (!(*entry_size))
 		return -EINVAL;
 
 	*entry_size = min_t(size_t, *entry_size, sizeof(struct kfd_queue_snapshot_entry));
 	mutex_lock(&pqm->process->event_mutex);
 
+	memset(&src, 0, sizeof(src));
+
 	list_for_each_entry(pqn, &pqm->queues, process_queue_list) {
 		if (!pqn->q)
 			continue;
 
-		if (qss_entry_count < num_qss_entries) {
-
-			struct kfd_queue_snapshot_entry src = {0};
-
-			set_queue_snapshot_entry(pqn->q->device->dqm,
-					pqn->q, exception_clear_mask, &src);
+		if (*num_qss_entries < tmp_qss_entries) {
+			set_queue_snapshot_entry(pqn->q, exception_clear_mask, &src);
 
 			if (copy_to_user(buf, &src, *entry_size)) {
-				qss_entry_count = -EFAULT;
+				r = -EFAULT;
 				break;
 			}
-
 			buf += tmp_entry_size;
 		}
-
-		qss_entry_count++;
+		*num_qss_entries += 1;
 	}
 
 	mutex_unlock(&pqm->process->event_mutex);
-
-	return qss_entry_count;
+	return r;
 }
 
 static int get_queue_data_sizes(struct kfd_process_device *pdd,

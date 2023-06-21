@@ -2388,7 +2388,7 @@ static void gfx_v9_0_init_sq_config(struct amdgpu_device *adev)
 	case IP_VERSION(9, 4, 1):
 		tmp = RREG32_SOC15(GC, 0, mmSQ_CONFIG);
 		tmp = REG_SET_FIELD(tmp, SQ_CONFIG, DISABLE_BARRIER_WAITCNT,
-			READ_ONCE(adev->barrier_has_auto_waitcnt) ? 0 : 1);
+				!READ_ONCE(adev->barrier_has_auto_waitcnt));
 		WREG32_SOC15(GC, 0, mmSQ_CONFIG, tmp);
 		break;
 	default:
@@ -4684,7 +4684,7 @@ static int gfx_v9_0_late_init(void *handle)
 	if (r)
 		return r;
 
-	if (adev->asic_type == CHIP_ALDEBARAN)
+	if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(9, 4, 2))
 		gfx_v9_4_2_debug_trap_config_init(adev,
 			adev->vm_manager.first_kfd_vmid, AMDGPU_NUM_VMID);
 	else

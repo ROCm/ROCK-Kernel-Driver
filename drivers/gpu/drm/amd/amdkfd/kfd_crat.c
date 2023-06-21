@@ -30,9 +30,6 @@
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 
-/* Fixme: Fake 32GB for 1PNPS1 mode bringup */
-#define DUMMY_VRAM_SIZE 31138512896
-
 /* GPU Processor ID base for dGPUs for which VCRAT needs to be created.
  * GPU processor ID are expressed with Bit[31]=1.
  * The base is set to 0x8000_0000 + 0x1000 to avoid collision with GPU IDs
@@ -1056,8 +1053,6 @@ static int kfd_parse_subtype_mem(struct crat_subtype_memory *mem,
 
 			props->heap_type = heap_type;
 			props->flags = flags;
-			if (size_in_bytes == 0)
-				size_in_bytes = DUMMY_VRAM_SIZE; /* Fixme: TBD */
 			props->size_in_bytes = size_in_bytes;
 			props->width = width;
 
@@ -2053,7 +2048,8 @@ static int kfd_fill_gpu_direct_io_link_to_cpu(int *avail_size,
 	sub_type_hdr->proximity_domain_from = proximity_domain;
 
 #ifdef CONFIG_ACPI_NUMA
-	if (kdev->adev->pdev->dev.numa_node == NUMA_NO_NODE)
+	if (kdev->adev->pdev->dev.numa_node == NUMA_NO_NODE &&
+	    num_possible_nodes() > 1)
 		kfd_find_numa_node_in_srat(kdev);
 #endif
 #ifdef CONFIG_NUMA

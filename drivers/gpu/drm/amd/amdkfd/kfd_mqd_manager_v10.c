@@ -237,7 +237,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  u32 *save_area_used_size)
 {
 	struct v10_compute_mqd *m;
-	struct mqd_user_context_save_area_header header;
+	struct kfd_context_save_area_header header;
 
 	m = get_mqd(mqd);
 
@@ -256,13 +256,13 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	 * accessible to user mode
 	 */
 
-	header.control_stack_size = *ctl_stack_used_size;
-	header.wave_state_size = *save_area_used_size;
+	header.wave_state.control_stack_size = *ctl_stack_used_size;
+	header.wave_state.wave_state_size = *save_area_used_size;
 
-	header.wave_state_offset = m->cp_hqd_wg_state_offset;
-	header.control_stack_offset = m->cp_hqd_cntl_stack_offset;
+	header.wave_state.wave_state_offset = m->cp_hqd_wg_state_offset;
+	header.wave_state.control_stack_offset = m->cp_hqd_cntl_stack_offset;
 
-	if (copy_to_user(ctl_stack, &header, sizeof(header)))
+	if (copy_to_user(ctl_stack, &header, sizeof(header.wave_state)))
 		return -EFAULT;
 
 	return 0;

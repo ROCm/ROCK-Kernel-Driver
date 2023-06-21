@@ -296,7 +296,7 @@ struct kfd2kgd_calls {
 			uint32_t vmid, uint64_t page_table_base);
 	uint32_t (*read_vmid_from_vmfault_reg)(struct amdgpu_device *adev);
 
-	uint32_t (*enable_debug_trap)(struct amdgpu_device*adev,
+	uint32_t (*enable_debug_trap)(struct amdgpu_device *adev,
 					bool restore_dbg_registers,
 					uint32_t vmid);
 	uint32_t (*disable_debug_trap)(struct amdgpu_device *adev,
@@ -330,7 +330,6 @@ struct kfd2kgd_calls {
 			uint32_t grace_period,
 			uint32_t *reg_offset,
 			uint32_t *reg_data);
-
 	void (*get_cu_occupancy)(struct amdgpu_device *adev, int pasid,
 			int *wave_cnt, int *max_waves_per_cu, uint32_t inst);
 	void (*program_trap_handler_settings)(struct amdgpu_device *adev,

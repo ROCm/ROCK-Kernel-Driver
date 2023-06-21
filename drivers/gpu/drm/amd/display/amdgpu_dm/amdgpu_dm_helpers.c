@@ -79,9 +79,6 @@ static int amdgpu_dm_patch_edid_caps(struct dc_edid_caps *edid_caps)
 }
 #endif
 
-/* MST Dock */
-static const uint8_t SYNAPTICS_DEVICE_ID[] = "SYNA";
-
 /* dm_helpers_parse_edid_caps
  *
  * Parse edid caps
@@ -894,6 +891,9 @@ static void apply_synaptics_fifo_reset_wa(struct drm_dp_aux *aux)
 
 	DC_LOG_DC("Done apply_synaptics_fifo_reset_wa\n");
 }
+
+/* MST Dock */
+static const uint8_t SYNAPTICS_DEVICE_ID[] = "SYNA";
 
 static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 		struct drm_dp_aux *aux,

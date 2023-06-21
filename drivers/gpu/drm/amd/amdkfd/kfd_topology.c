@@ -38,7 +38,6 @@
 #include "kfd_device_queue_manager.h"
 #include "kfd_iommu.h"
 #include "kfd_svm.h"
-#include "kfd_debug.h"
 #include "amdgpu_amdkfd.h"
 #include "amdgpu_ras.h"
 #include "amdgpu.h"
@@ -1678,44 +1677,6 @@ out:
 	return ret;
 }
 
-static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
-{
-	if (!dev->gpu || KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 0, 1))
-		return;
-
-	dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
-				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
-				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
-
-	dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
-			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
-
-	if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(10, 0, 0)) {
-		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9 |
-						HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 4, 2))
-			dev->node_props.debug_prop |=
-				HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		else
-			dev->node_props.capability |=
-				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-	} else {
-		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
-					HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
-
-		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(11, 0, 0))
-			dev->node_props.debug_prop |= HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
-		else
-			dev->node_props.capability |=
-				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
-	}
-
-	if (kfd_dbg_has_supported_firmware(dev->gpu->kfd))
-		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
-}
-
 /* Helper function. See kfd_fill_gpu_cache_info for parameter description */
 static int fill_in_l1_pcache(struct kfd_cache_properties **props_ext,
 				struct kfd_gpu_cache_info *pcache_info,
@@ -1990,6 +1951,102 @@ err:
 	return res;
 }
 
+static void kfd_topology_set_dbg_firmware_support(struct kfd_topology_device *dev)
+{
+	bool firmware_supported = true;
+
+	if (KFD_GC_VERSION(dev->gpu) >= IP_VERSION(11, 0, 0) &&
+			KFD_GC_VERSION(dev->gpu) < IP_VERSION(12, 0, 0)) {
+		uint32_t mes_api_rev = (dev->gpu->adev->mes.sched_version &
+						AMDGPU_MES_API_VERSION_MASK) >>
+						AMDGPU_MES_API_VERSION_SHIFT;
+		uint32_t mes_rev = dev->gpu->adev->mes.sched_version &
+						AMDGPU_MES_VERSION_MASK;
+
+		firmware_supported = (mes_api_rev >= 14) && (mes_rev >= 64);
+		goto out;
+	}
+
+	/*
+	 * Note: Any unlisted devices here are assumed to support exception handling.
+	 * Add additional checks here as needed.
+	 */
+	switch (KFD_GC_VERSION(dev->gpu)) {
+	case IP_VERSION(9, 0, 1):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 459 + 32768;
+		break;
+	case IP_VERSION(9, 1, 0):
+	case IP_VERSION(9, 2, 1):
+	case IP_VERSION(9, 2, 2):
+	case IP_VERSION(9, 3, 0):
+	case IP_VERSION(9, 4, 0):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 459;
+		break;
+	case IP_VERSION(9, 4, 1):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 60;
+		break;
+	case IP_VERSION(9, 4, 2):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 51;
+		break;
+	case IP_VERSION(10, 1, 10):
+	case IP_VERSION(10, 1, 2):
+	case IP_VERSION(10, 1, 1):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 144;
+		break;
+	case IP_VERSION(10, 3, 0):
+	case IP_VERSION(10, 3, 2):
+	case IP_VERSION(10, 3, 1):
+	case IP_VERSION(10, 3, 4):
+	case IP_VERSION(10, 3, 5):
+		firmware_supported = dev->gpu->kfd->mec_fw_version >= 89;
+		break;
+	case IP_VERSION(10, 1, 3):
+	case IP_VERSION(10, 3, 3):
+		firmware_supported = false;
+		break;
+	default:
+		break;
+	}
+
+out:
+	if (firmware_supported)
+		dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_FIRMWARE_SUPPORTED;
+}
+
+static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
+{
+	dev->node_props.capability |= ((HSA_CAP_DOORBELL_TYPE_2_0 <<
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_SHIFT) &
+				HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
+
+	dev->node_props.capability |= HSA_CAP_TRAP_DEBUG_SUPPORT |
+			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_TRAP_OVERRIDE_SUPPORTED |
+			HSA_CAP_TRAP_DEBUG_WAVE_LAUNCH_MODE_SUPPORTED;
+
+	if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(10, 0, 0)) {
+		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9 |
+						HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
+
+		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 4, 2))
+			dev->node_props.debug_prop |=
+				HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
+		else
+			dev->node_props.capability |=
+				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
+	} else {
+		dev->node_props.debug_prop |= HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX10 |
+					HSA_DBG_WATCH_ADDR_MASK_HI_BIT;
+
+		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(11, 0, 0))
+			dev->node_props.debug_prop |= HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
+		else
+			dev->node_props.capability |=
+				HSA_CAP_TRAP_DEBUG_PRECISE_MEMORY_OPERATIONS_SUPPORTED;
+	}
+
+	kfd_topology_set_dbg_firmware_support(dev);
+}
+
 int kfd_topology_add_device(struct kfd_node *gpu)
 {
 	uint32_t gpu_id;
@@ -2100,11 +2157,11 @@ int kfd_topology_add_device(struct kfd_node *gpu)
 			HSA_CAP_DOORBELL_TYPE_TOTALBITS_MASK);
 		break;
 	default:
-		kfd_topology_set_capabilities(dev);
-
 		if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(9, 0, 1))
 			WARN(1, "Unexpected ASIC family %u",
 			     dev->gpu->adev->asic_type);
+		else
+			kfd_topology_set_capabilities(dev);
 	}
 
 	/*

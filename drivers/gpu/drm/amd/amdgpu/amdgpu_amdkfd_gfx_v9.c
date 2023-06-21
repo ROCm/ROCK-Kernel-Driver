@@ -48,8 +48,6 @@ enum hqd_dequeue_request_type {
 	SAVE_WAVES
 };
 
-#define TCP_WATCH_STRIDE (mmTCP_WATCH1_ADDR_H - mmTCP_WATCH0_ADDR_H)
-
 static void kgd_gfx_v9_lock_srbm(struct amdgpu_device *adev, uint32_t mec, uint32_t pipe,
 			uint32_t queue, uint32_t vmid, uint32_t inst)
 {
@@ -656,10 +654,6 @@ int kgd_gfx_v9_wave_control_execute(struct amdgpu_device *adev,
 /*
  * GFX9 helper for wave launch stall requirements on debug trap setting.
  *
- * For pre-Arcturus GFX9 chips, wave launch disable/enable uses
- * SPI_GDBG_WAVE_CNTL.stall_ra for a global wave launch stall.  Arcturus uses
- * per-VMID stall.
- *
  * vmid:
  *   Target VMID to stall/unstall.
  *
@@ -669,24 +663,22 @@ int kgd_gfx_v9_wave_control_execute(struct amdgpu_device *adev,
  *   SPI in order for debug trap settings to take effect on those waves.
  *   This is roughly a ~96 clock cycle wait on SPI where a read on
  *   SPI_GDBG_WAVE_CNTL translates to ~32 clock cycles.
- *   KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY indicates the number of reads
- *   required.
+ *   KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY indicates the number of reads required.
  *
  *   NOTE: We can afford to clear the entire STALL_VMID field on unstall
- *   because Arcturus cannot support multi-process debugging due to trap
+ *   because GFX9.4.1 cannot support multi-process debugging due to trap
  *   configuration and masking being limited to global scope.  Always assume
  *   single process conditions.
- *
  */
 #define KGD_GFX_V9_WAVE_LAUNCH_SPI_DRAIN_LATENCY	3
-static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
+void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 					uint32_t vmid,
 					bool stall)
 {
 	int i;
 	uint32_t data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL));
 
-	if (adev->asic_type == CHIP_ARCTURUS)
+	if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(9, 4, 1))
 		data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL, STALL_VMID,
 							stall ? 1 << vmid : 0);
 	else
@@ -703,89 +695,12 @@ static void kgd_gfx_v9_set_wave_launch_stall(struct amdgpu_device *adev,
 }
 
 /*
- * Helper used to suspend/resume gfx pipe for image post process work to set
- * barrier behaviour.
+ * restore_dbg_registers is ignored here but is a general interface requirement
+ * for devices that support GFXOFF and where the RLC save/restore list
+ * does not support hw registers for debugging i.e. the driver has to manually
+ * initialize the debug mode registers after it has disabled GFX off during the
+ * debug session.
  */
-static int kgd_gfx_v9_suspend_resume_compute_scheduler(
-						struct amdgpu_device *adev,
-						bool suspend)
-{
-	int i, r = 0;
-
-	for (i = 0; i < adev->gfx.num_compute_rings; i++) {
-		struct amdgpu_ring *ring = &adev->gfx.compute_ring[i];
-
-		if (!(ring && ring->sched.thread))
-			continue;
-
-		/* stop secheduler and drain ring. */
-		if (suspend) {
-			drm_sched_stop(&ring->sched, NULL);
-			r = amdgpu_fence_wait_empty(ring);
-			if (r)
-				goto out;
-		} else {
-			drm_sched_start(&ring->sched, false);
-		}
-	}
-
-out:
-	/* return on resume or failure to drain rings. */
-	if (!suspend || r)
-		return r;
-
-	return amdgpu_device_ip_wait_for_idle(adev, GC_HWIP);
-}
-
-static void kgd_gfx_v9_set_barrier_auto_waitcnt(struct amdgpu_device *adev,
-						bool enable_waitcnt)
-{
-	uint32_t data;
-
-	if (adev->asic_type != CHIP_ARCTURUS)
-		return;
-
-	WRITE_ONCE(adev->barrier_has_auto_waitcnt, enable_waitcnt);
-
-	if (!down_read_trylock(&adev->reset_domain->sem))
-		return;
-
-	amdgpu_amdkfd_suspend(adev, false);
-
-	if (kgd_gfx_v9_suspend_resume_compute_scheduler(adev, true))
-		goto out;
-
-	data = RREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_CONFIG));
-	data = REG_SET_FIELD(data, SQ_CONFIG, DISABLE_BARRIER_WAITCNT,
-						enable_waitcnt ? 0 : 1);
-	WREG32(SOC15_REG_OFFSET(GC, 0, mmSQ_CONFIG), data);
-
-out:
-	kgd_gfx_v9_suspend_resume_compute_scheduler(adev, false);
-
-	/* When we call amdgpu_amdkfd_resume(), we need to wait for the
-	 * delayed work to complete before we complete, so pass true
-	 * for the 'sync' option.
-	 *
-	 * This is to prevent any subsequent calls amdgpu_amdkfd_suspend()
-	 * from cancelling any of the delayed work in amdgpu_amdkfd_resume().
-	 *
-	 * This can happen in a multi-gpu system.  If we enable the debugger
-	 * on one node, it will do the amdgpu_amdkfd_suspend() and
-	 * amdgpu_amdkfd_resume().  The call to enable the debugger will return
-	 * to the caller before the delayed work is complete.  If the debugger
-	 * is then enabled on another node, the next call to
-	 * amdgpu_amdkfd_suspend() will cancel any outstanding delayed work
-	 * from amdgpu_amdkfd_resume().
-	 *
-	 * To prevent this, we need to ensure that the delayed work in
-	 * amdgpu_amdkfd_resume() has completed before we return to the caller.
-	 */
-	amdgpu_amdkfd_resume(adev, false, true);
-
-	up_read(&adev->reset_domain->sem);
-}
-
 uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 				bool restore_dbg_registers,
 				uint32_t vmid)
@@ -793,8 +708,6 @@ uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
-
-	kgd_gfx_v9_set_barrier_auto_waitcnt(adev, true);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
@@ -805,16 +718,19 @@ uint32_t kgd_gfx_v9_enable_debug_trap(struct amdgpu_device *adev,
 	return 0;
 }
 
+/*
+ * keep_trap_enabled is ignored here but is a general interface requirement
+ * for devices that support multi-process debugging where the performance
+ * overhead from trap temporary setup needs to be bypassed when the debug
+ * session has ended.
+ */
 uint32_t kgd_gfx_v9_disable_debug_trap(struct amdgpu_device *adev,
 					bool keep_trap_enabled,
 					uint32_t vmid)
 {
-
 	mutex_lock(&adev->grbm_idx_mutex);
 
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
-
-	kgd_gfx_v9_set_barrier_auto_waitcnt(adev, false);
 
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_TRAP_MASK), 0);
 
@@ -838,7 +754,7 @@ int kgd_gfx_v9_validate_trap_override_request(struct amdgpu_device *adev,
 	 * processes.
 	 */
 	if (trap_override != KFD_DBG_TRAP_OVERRIDE_OR)
-		return -EPERM;
+		return -EINVAL;
 
 	return 0;
 }
@@ -882,19 +798,10 @@ uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 					uint32_t vmid)
 {
 	uint32_t data = 0;
-	bool is_stall_mode;
-	bool is_mode_set;
-
-	is_stall_mode = (wave_launch_mode == 4);
-	is_mode_set = (wave_launch_mode != 0 && wave_launch_mode != 4);
+	bool is_mode_set = !!wave_launch_mode;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 
-	/*
-	 * FIXME: Pre-Arcturus shouldn't stall processes it's not attached to.
-	 * This is an old bug and we'll have to work out a way to deny the
-	 * is_stall_mode request from the debugger for these chips.
-	 */
 	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, true);
 
 	data = REG_SET_FIELD(data, SPI_GDBG_WAVE_CNTL2,
@@ -903,59 +810,14 @@ uint32_t kgd_gfx_v9_set_wave_launch_mode(struct amdgpu_device *adev,
 		MODE, is_mode_set ? wave_launch_mode : 0);
 	WREG32(SOC15_REG_OFFSET(GC, 0, mmSPI_GDBG_WAVE_CNTL2), data);
 
-	if (!is_stall_mode)
-		kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
+	kgd_gfx_v9_set_wave_launch_stall(adev, vmid, false);
 
 	mutex_unlock(&adev->grbm_idx_mutex);
 
 	return 0;
 }
 
-static uint32_t kgd_gfx_set_multi_process_address_watch(
-					struct amdgpu_device *adev,
-					uint64_t watch_address,
-					uint32_t watch_address_mask,
-					uint32_t watch_id,
-					uint32_t watch_mode)
-{
-	uint32_t watch_address_high;
-	uint32_t watch_address_low;
-	uint32_t watch_address_cntl;
-
-	watch_address_cntl = 0;
-	watch_address_low = lower_32_bits(watch_address);
-	watch_address_high = upper_32_bits(watch_address) & 0xffff;
-
-	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
-			TCP_WATCH0_CNTL,
-			MODE,
-			watch_mode);
-
-	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
-			TCP_WATCH0_CNTL,
-			MASK,
-			watch_address_mask >> 6);
-
-	watch_address_cntl = REG_SET_FIELD(watch_address_cntl,
-			TCP_WATCH0_CNTL,
-			VALID,
-			1);
-
-	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_CNTL) +
-			(watch_id * TCP_WATCH_STRIDE)),
-			watch_address_cntl);
-
-	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_H) +
-			(watch_id * TCP_WATCH_STRIDE)),
-			watch_address_high);
-
-	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_ADDR_L) +
-			(watch_id * TCP_WATCH_STRIDE)),
-			watch_address_low);
-
-	return watch_address_cntl;
-}
-
+#define TCP_WATCH_STRIDE (mmTCP_WATCH1_ADDR_H - mmTCP_WATCH0_ADDR_H)
 uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 					uint64_t watch_address,
 					uint32_t watch_address_mask,
@@ -966,13 +828,6 @@ uint32_t kgd_gfx_v9_set_address_watch(struct amdgpu_device *adev,
 	uint32_t watch_address_high;
 	uint32_t watch_address_low;
 	uint32_t watch_address_cntl;
-
-	if (adev->asic_type == CHIP_ALDEBARAN)
-		return kgd_gfx_set_multi_process_address_watch(adev,
-							watch_address,
-							watch_address_mask,
-							watch_id,
-							watch_mode);
 
 	watch_address_cntl = 0;
 
@@ -1028,9 +883,6 @@ uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 {
 	uint32_t watch_address_cntl;
 
-	if (adev->asic_type == CHIP_ALDEBARAN)
-		return 0;
-
 	watch_address_cntl = 0;
 
 	WREG32_RLC((SOC15_REG_OFFSET(GC, 0, mmTCP_WATCH0_CNTL) +
@@ -1040,7 +892,7 @@ uint32_t kgd_gfx_v9_clear_address_watch(struct amdgpu_device *adev,
 	return 0;
 }
 
-/* kgd_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
+/* kgd_gfx_v9_get_iq_wait_times: Returns the mmCP_IQ_WAIT_TIME1/2 values
  * The values read are:
  *     ib_offload_wait_time     -- Wait Count for Indirect Buffer Offloads.
  *     atomic_offload_wait_time -- Wait Count for L2 and GDS Atomics Offloads.
@@ -1267,7 +1119,6 @@ void kgd_gfx_v9_build_grace_period_packet_info(struct amdgpu_device *adev,
 
 	*reg_offset = SOC15_REG_OFFSET(GC, 0, mmCP_IQ_WAIT_TIME2);
 }
-
 
 void kgd_gfx_v9_program_trap_handler_settings(struct amdgpu_device *adev,
 		uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr, uint32_t inst)

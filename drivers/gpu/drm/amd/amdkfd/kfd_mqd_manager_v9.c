@@ -224,7 +224,7 @@ static void init_mqd(struct mqd_manager *mm, void **mqd,
 			1 << CP_HQD_QUANTUM__QUANTUM_SCALE__SHIFT |
 			1 << CP_HQD_QUANTUM__QUANTUM_DURATION__SHIFT;
 
-	/* Set cp_hqd_hq_status0 bit 14 to 1 to have the CP set up the
+	/* Set cp_hqd_hq_scheduler0 bit 14 to 1 to have the CP set up the
 	 * DISPATCH_PTR.  This is required for the kfd debugger
 	 */
 	m->cp_hqd_hq_status0 = 1 << 14;
@@ -357,7 +357,7 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 			  u32 *save_area_used_size)
 {
 	struct v9_mqd *m;
-	struct mqd_user_context_save_area_header header;
+	struct kfd_context_save_area_header header;
 
 	/* Control stack is located one page after MQD. */
 	void *mqd_ctl_stack = (void *)((uintptr_t)mqd + PAGE_SIZE);
@@ -369,19 +369,18 @@ static int get_wave_state(struct mqd_manager *mm, void *mqd,
 	*save_area_used_size = m->cp_hqd_wg_state_offset -
 		m->cp_hqd_cntl_stack_size;
 
-	header.control_stack_size = *ctl_stack_used_size;
-	header.wave_state_size = *save_area_used_size;
+	header.wave_state.control_stack_size = *ctl_stack_used_size;
+	header.wave_state.wave_state_size = *save_area_used_size;
 
-	header.wave_state_offset = m->cp_hqd_wg_state_offset;
-	header.control_stack_offset = m->cp_hqd_cntl_stack_offset;
+	header.wave_state.wave_state_offset = m->cp_hqd_wg_state_offset;
+	header.wave_state.control_stack_offset = m->cp_hqd_cntl_stack_offset;
 
-	if (copy_to_user(ctl_stack, &header, sizeof(header)))
+	if (copy_to_user(ctl_stack, &header, sizeof(header.wave_state)))
 		return -EFAULT;
 
 	if (copy_to_user(ctl_stack + m->cp_hqd_cntl_stack_offset,
 				mqd_ctl_stack + m->cp_hqd_cntl_stack_offset,
 				*ctl_stack_used_size))
-
 		return -EFAULT;
 
 	return 0;

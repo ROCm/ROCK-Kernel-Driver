@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Advanced Micro Devices, Inc.
+ * Copyright 2023 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,14 +25,13 @@
 
 #include "kfd_priv.h"
 
-uint32_t kfd_dbg_get_queue_status_word(struct queue *q, int flags);
-
+void kfd_dbg_trap_deactivate(struct kfd_process *target, bool unwind, int unwind_count);
+int kfd_dbg_trap_activate(struct kfd_process *target);
 int kfd_dbg_ev_query_debug_event(struct kfd_process *process,
 			unsigned int *queue_id,
 			unsigned int *gpu_id,
 			uint64_t exception_clear_mask,
 			uint64_t *event_status);
-
 bool kfd_set_dbg_ev_from_interrupt(struct kfd_node *dev,
 				   unsigned int pasid,
 				   uint32_t doorbell_id,
@@ -44,8 +43,6 @@ bool kfd_dbg_ev_raise(uint64_t event_mask,
 			unsigned int source_id, bool use_worker,
 			void *exception_data,
 			size_t exception_data_size);
-int kfd_dbg_ev_enable(struct kfd_process *process);
-
 int kfd_dbg_trap_disable(struct kfd_process *target);
 int kfd_dbg_trap_enable(struct kfd_process *target, uint32_t fd,
 			void __user *runtime_info,
@@ -65,12 +62,13 @@ int kfd_dbg_trap_set_dev_address_watch(struct kfd_process_device *pdd,
 					uint32_t watch_address_mask,
 					uint32_t *watch_id,
 					uint32_t watch_mode);
-int kfd_dbg_trap_set_precise_mem_ops(struct kfd_process *target,
-		uint32_t enable);
-int kfd_dbg_runtime_enable(struct kfd_process *p, uint64_t r_debug,
-			bool enable_ttmp_setup);
-int kfd_dbg_runtime_disable(struct kfd_process *p);
-
+int kfd_dbg_trap_set_flags(struct kfd_process *target, uint32_t *flags);
+int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
+		uint32_t source_id,
+		uint32_t exception_code,
+		bool clear_exception,
+		void __user *info,
+		uint32_t *info_size);
 int kfd_dbg_send_exception_to_runtime(struct kfd_process *p,
 					unsigned int dev_id,
 					unsigned int queue_id,
@@ -83,14 +81,6 @@ static inline bool kfd_dbg_is_per_vmid_supported(struct kfd_node *dev)
 }
 
 void debug_event_write_work_handler(struct work_struct *work);
-
-int kfd_dbg_trap_query_exception_info(struct kfd_process *target,
-		uint32_t source_id,
-		uint32_t exception_code,
-		bool clear_exception,
-		void __user *info,
-		uint32_t *info_size);
-
 int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 		uint64_t exception_clear_mask,
 		void __user *user_info,
@@ -106,10 +96,28 @@ void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
  */
 static inline bool kfd_dbg_is_rlc_restore_supported(struct kfd_node *dev)
 {
-	return !(KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 10) || /* Navi10 */
-		 KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 1));	 /* Navi14 */
+	return !(KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 10) ||
+		 KFD_GC_VERSION(dev) == IP_VERSION(10, 1, 1));
 }
 
-bool kfd_dbg_has_supported_firmware(struct kfd_dev *dev);
+static inline bool kfd_dbg_has_gws_support(struct kfd_node *dev)
+{
+	if ((KFD_GC_VERSION(dev) == IP_VERSION(9, 0, 1)
+			&& dev->kfd->mec2_fw_version < 0x81b6) ||
+		(KFD_GC_VERSION(dev) >= IP_VERSION(9, 1, 0)
+			&& KFD_GC_VERSION(dev) <= IP_VERSION(9, 2, 2)
+			&& dev->kfd->mec2_fw_version < 0x1b6) ||
+		(KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 0)
+			&& dev->kfd->mec2_fw_version < 0x1b6) ||
+		(KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 1)
+			&& dev->kfd->mec2_fw_version < 0x30) ||
+		(KFD_GC_VERSION(dev) >= IP_VERSION(11, 0, 0) &&
+			KFD_GC_VERSION(dev) < IP_VERSION(12, 0, 0)))
+		return false;
 
+	/* Assume debugging and cooperative launch supported otherwise. */
+	return true;
+}
+
+int kfd_dbg_set_mes_debug_mode(struct kfd_process_device *pdd);
 #endif

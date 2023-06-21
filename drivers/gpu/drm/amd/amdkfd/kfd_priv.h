@@ -254,7 +254,7 @@ struct kfd_device_info {
 	uint32_t no_atomic_fw_version;
 	unsigned int num_sdma_queues_per_engine;
 	unsigned int num_reserved_sdma_queues_per_engine;
-	uint64_t reserved_sdma_queues_bitmap;
+	DECLARE_BITMAP(reserved_sdma_queues_bitmap, KFD_MAX_SDMA_QUEUES);
 };
 
 unsigned int kfd_get_num_sdma_engines(struct kfd_node *kdev);
@@ -397,11 +397,12 @@ struct kfd_dev {
 
 	int noretry;
 
-	/* Track per device allocated watch points. */
-	uint32_t alloc_watch_ids;
-
 	struct kfd_node *nodes[MAX_KFD_NODES];
 	unsigned int num_nodes;
+
+	/* Track per device allocated watch points */
+	uint32_t alloc_watch_ids;
+	spinlock_t watch_points_lock;
 };
 
 struct kfd_ipc_obj;
@@ -546,9 +547,9 @@ struct queue_properties {
 	bool is_being_destroyed;
 	bool is_active;
 	bool is_gws;
+	uint32_t pm4_target_xcc;
 	bool is_dbg_wa;
 	bool is_user_cu_masked;
-	uint32_t pm4_target_xcc;
 	/* Not relevant for user mode queues in cp scheduling */
 	unsigned int vmid;
 	/* Relevant only for sdma queues*/
@@ -563,14 +564,13 @@ struct queue_properties {
 	uint32_t ctl_stack_size;
 	uint64_t tba_addr;
 	uint64_t tma_addr;
-	unsigned long debug_event_type;
-	uint64_t exception_status; /* Exception code status */
+	uint64_t exception_status;
 };
 
 #define QUEUE_IS_ACTIVE(q) ((q).queue_size > 0 &&	\
 			    (q).queue_address != 0 &&	\
 			    (q).queue_percent > 0 &&	\
-			    !(q).is_evicted && \
+			    !(q).is_evicted &&		\
 			    !(q).is_suspended)
 
 enum mqd_update_flag {
@@ -1045,22 +1045,21 @@ struct kfd_process {
 
 	bool xnack_enabled;
 
-	/* Tracks debug per-vmid request for precise memory */
-	bool precise_mem_ops;
-
 	/* Work area for debugger event writer worker. */
 	struct work_struct debug_event_workarea;
 
-	/* Tracks runtime enable status */
-	uint64_t r_debug;
-	struct semaphore runtime_enable_sema;
-	bool is_runtime_retry;
-	struct kfd_runtime_info runtime_info;
+	/* Tracks debug per-vmid request for debug flags */
+	bool dbg_flags;
 
 	atomic_t poison;
 
 	/* Queues are in paused stated because we are in the process of doing a CRIU checkpoint */
 	bool queues_paused;
+
+	/* Tracks runtime enable status */
+	struct semaphore runtime_enable_sema;
+	bool is_runtime_retry;
+	struct kfd_runtime_info runtime_info;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
@@ -1112,18 +1111,7 @@ void kfd_unref_process(struct kfd_process *p);
 int kfd_process_evict_queues(struct kfd_process *p, bool force, uint32_t trigger);
 int kfd_process_restore_queues(struct kfd_process *p);
 void kfd_suspend_all_processes(bool force);
-/*
- * kfd_resume_all_processes:
- *	bool sync: If kfd_resume_all_processes() should wait for the
- *		delayed work to complete or not.
- *		If there will be multiple calls to kfd_suspend_all_processes()
- *		and kfd_resume_all_processes(), we need to wait for the
- *		delayed sync work for kfd_resume_all_processes() to complete
- *		or else the subsequent call to kfd_suspend_all_processes()
- *		may cancel any outstanding delayed work.  This can happen
- *		when the kfd debugger is started on a multi-gpu system.
- */
-int kfd_resume_all_processes(bool sync);
+int kfd_resume_all_processes(void);
 
 struct kfd_process_device *kfd_process_device_data_by_id(struct kfd_process *process,
 							 uint32_t gpu_id);
@@ -1251,18 +1239,18 @@ int kfd_numa_node_to_apic_id(int numa_node_id);
 void kfd_double_confirm_iommu_support(struct kfd_dev *gpu);
 
 /* Interrupts */
-#define KFD_IRQ_FENCE_CLIENTID	0xff
-#define KFD_IRQ_FENCE_SOURCEID	0xff
-#define KFD_IRQ_IS_FENCE(client, source)				\
+#define	KFD_IRQ_FENCE_CLIENTID	0xff
+#define	KFD_IRQ_FENCE_SOURCEID	0xff
+#define	KFD_IRQ_IS_FENCE(client, source)				\
 				((client) == KFD_IRQ_FENCE_CLIENTID &&	\
-				 (source) == KFD_IRQ_FENCE_SOURCEID)
+				(source) == KFD_IRQ_FENCE_SOURCEID)
 int kfd_interrupt_init(struct kfd_node *dev);
 void kfd_interrupt_exit(struct kfd_node *dev);
 bool enqueue_ih_ring_entry(struct kfd_node *kfd, const void *ih_ring_entry);
 bool interrupt_is_wanted(struct kfd_node *dev,
 				const uint32_t *ih_ring_entry,
 				uint32_t *patched_ihre, bool *flag);
-void kfd_process_drain_interrupts(struct kfd_process_device *pdd);
+int kfd_process_drain_interrupts(struct kfd_process_device *pdd);
 void kfd_process_close_interrupt_drain(unsigned int pasid);
 
 /* amdkfd Apertures */
@@ -1456,11 +1444,10 @@ int pqm_get_wave_state(struct process_queue_manager *pqm,
 		       void __user *ctl_stack,
 		       u32 *ctl_stack_used_size,
 		       u32 *save_area_used_size);
-
 int pqm_get_queue_snapshot(struct process_queue_manager *pqm,
 			   uint64_t exception_clear_mask,
 			   void __user *buf,
-			   int num_qss_entries,
+			   int *num_qss_entries,
 			   uint32_t *entry_size);
 
 int amdkfd_fence_wait_timeout(uint64_t *fence_addr,
@@ -1597,6 +1584,9 @@ static inline bool kfd_flush_tlb_after_unmap(struct kfd_dev *dev)
 	       KFD_GC_VERSION(dev) == IP_VERSION(9, 4, 0);
 }
 
+int kfd_send_exception_to_runtime(struct kfd_process *p,
+				unsigned int queue_id,
+				uint64_t error_reason);
 bool kfd_is_locked(void);
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd);
