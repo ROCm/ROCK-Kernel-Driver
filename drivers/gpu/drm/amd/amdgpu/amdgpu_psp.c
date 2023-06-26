@@ -3678,6 +3678,13 @@ rel_buf:
 	return 0;
 }
 
+static struct bin_attribute psp_vbflash_bin_attr = {
+	.attr = {.name = "psp_vbflash", .mode = 0660},
+	.size = 0,
+	.write = amdgpu_psp_vbflash_write,
+	.read = amdgpu_psp_vbflash_read,
+};
+
 static ssize_t amdgpu_psp_vbflash_status(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
@@ -3694,38 +3701,38 @@ static ssize_t amdgpu_psp_vbflash_status(struct device *dev,
 
 	return sysfs_emit(buf, "0x%x\n", vbflash_status);
 }
-
-static const struct bin_attribute psp_vbflash_bin_attr = {
-	.attr = {.name = "psp_vbflash", .mode = 0660},
-	.size = 0,
-	.write = amdgpu_psp_vbflash_write,
-	.read = amdgpu_psp_vbflash_read,
-};
-
 static DEVICE_ATTR(psp_vbflash_status, 0440, amdgpu_psp_vbflash_status, NULL);
 
-int amdgpu_psp_sysfs_init(struct amdgpu_device *adev)
+static struct attribute *flash_attrs[] = {
+	&dev_attr_psp_vbflash_status.attr,
+	&psp_vbflash_bin_attr.attr,
+	NULL
+};
+
+static umode_t amdgpu_flash_attr_is_visible(struct kobject *kobj, struct attribute *attr, int idx)
 {
-	int ret = 0;
+	struct device *dev = kobj_to_dev(kobj);
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
 
 	if (amdgpu_sriov_vf(adev))
-		return -EINVAL;
+		return 0;
 
 	switch (adev->ip_versions[MP0_HWIP][0]) {
 	case IP_VERSION(13, 0, 0):
 	case IP_VERSION(13, 0, 7):
-	case IP_VERSION(13, 0, 10):
-		ret = sysfs_create_bin_file(&adev->dev->kobj, &psp_vbflash_bin_attr);
-		if (ret)
-			dev_err(adev->dev, "Failed to create device file psp_vbflash");
-		ret = device_create_file(adev->dev, &dev_attr_psp_vbflash_status);
-		if (ret)
-			dev_err(adev->dev, "Failed to create device file psp_vbflash_status");
-		return ret;
+		if (attr == &psp_vbflash_bin_attr.attr)
+			return 0660;
+		return 0440;
 	default:
 		return 0;
 	}
 }
+
+const struct attribute_group amdgpu_flash_attr_group = {
+	.attrs = flash_attrs,
+	.is_visible = amdgpu_flash_attr_is_visible,
+};
 
 const struct amd_ip_funcs psp_ip_funcs = {
 	.name = "psp",
@@ -3753,12 +3760,6 @@ static int psp_sysfs_init(struct amdgpu_device *adev)
 		DRM_ERROR("Failed to create USBC PD FW control file!");
 
 	return ret;
-}
-
-void amdgpu_psp_sysfs_fini(struct amdgpu_device *adev)
-{
-	sysfs_remove_bin_file(&adev->dev->kobj, &psp_vbflash_bin_attr);
-	device_remove_file(adev->dev, &dev_attr_psp_vbflash_status);
 }
 
 static void psp_sysfs_fini(struct amdgpu_device *adev)

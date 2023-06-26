@@ -1074,7 +1074,6 @@ struct amdgpu_device {
 	bool                            has_pr3;
 
 	bool                            ucode_sysfs_en;
-	bool                            psp_sysfs_en;
 
 	/* Chip product information */
 	char				product_number[20];

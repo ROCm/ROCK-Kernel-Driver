@@ -3020,10 +3020,12 @@ static struct pci_error_handlers amdgpu_pci_err_handler = {
 #ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 extern const struct attribute_group amdgpu_vram_mgr_attr_group;
 extern const struct attribute_group amdgpu_gtt_mgr_attr_group;
+extern const struct attribute_group amdgpu_flash_attr_group;
 
 static const struct attribute_group *amdgpu_sysfs_groups[] = {
 	&amdgpu_vram_mgr_attr_group,
 	&amdgpu_gtt_mgr_attr_group,
+	&amdgpu_flash_attr_group,
 	NULL,
 };
 #endif
