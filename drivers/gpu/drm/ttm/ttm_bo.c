@@ -348,6 +348,7 @@ static void ttm_bo_release(struct kref *kref)
 
 		if (!dma_resv_test_signaled(amdkcl_ttm_resvp(bo),
 					    DMA_RESV_USAGE_BOOKKEEP) ||
+		    (want_init_on_free() && (bo->ttm != NULL)) ||
 		    !dma_resv_trylock(amdkcl_ttm_resvp(bo))) {
 			/* The BO is not idle, resurrect it for delayed destroy */
 			ttm_bo_flush_all_fences(bo);
