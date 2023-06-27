@@ -2477,21 +2477,11 @@ int psp_execute_load_ip_fw_cmd_buf(struct amdgpu_device *adev,
 	return ret;
 }
 
-static int psp_execute_non_psp_fw_load(struct psp_context *psp,
-				  struct amdgpu_firmware_info *ucode)
+static inline int
+psp_execute_non_psp_fw_load(struct psp_context *psp,
+			    struct amdgpu_firmware_info *ucode)
 {
-	int ret = 0;
-	struct psp_gfx_cmd_resp *cmd = acquire_psp_cmd_buf(psp);
-
-	ret = psp_prep_load_ip_fw_cmd_buf(ucode, cmd);
-	if (!ret) {
-		ret = psp_cmd_submit_buf(psp, ucode, cmd,
-					 psp->fence_buf_mc_addr);
-	}
-
-	release_psp_cmd_buf(psp);
-
-	return ret;
+	return psp_execute_load_ip_fw_cmd_buf(psp->adev, ucode, 0, 0, 0);
 }
 
 static int psp_load_smu_fw(struct psp_context *psp)
@@ -2948,19 +2938,6 @@ int psp_rlc_autoload_start(struct psp_context *psp)
 	release_psp_cmd_buf(psp);
 
 	return ret;
-}
-
-int psp_update_vcn_sram(struct amdgpu_device *adev, int inst_idx,
-			uint64_t cmd_gpu_addr, int cmd_size)
-{
-	struct amdgpu_firmware_info ucode = {0};
-
-	ucode.ucode_id = inst_idx ? AMDGPU_UCODE_ID_VCN1_RAM :
-		AMDGPU_UCODE_ID_VCN0_RAM;
-	ucode.mc_addr = cmd_gpu_addr;
-	ucode.ucode_size = cmd_size;
-
-	return psp_execute_non_psp_fw_load(&adev->psp, &ucode);
 }
 
 int psp_ring_cmd_submit(struct psp_context *psp,
