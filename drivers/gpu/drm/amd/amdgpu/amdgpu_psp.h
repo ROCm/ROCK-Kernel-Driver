@@ -466,6 +466,12 @@ int psp_gpu_reset(struct amdgpu_device *adev);
 int psp_update_vcn_sram(struct amdgpu_device *adev, int inst_idx,
 			uint64_t cmd_gpu_addr, int cmd_size);
 
+int psp_execute_load_ip_fw_cmd_buf(struct amdgpu_device *adev,
+				   struct amdgpu_firmware_info *ucode,
+				   uint32_t ucode_id,
+				   uint64_t cmd_buf_gpu_addr,
+				   int cmd_buf_size);
+
 int psp_ta_init_shared_buf(struct psp_context *psp,
 				  struct ta_mem_context *mem_ctx);
 void psp_ta_free_shared_buf(struct ta_mem_context *mem_ctx);

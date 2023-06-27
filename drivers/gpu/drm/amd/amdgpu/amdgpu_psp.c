@@ -2448,6 +2448,35 @@ static int psp_prep_load_ip_fw_cmd_buf(struct amdgpu_firmware_info *ucode,
 	return ret;
 }
 
+int psp_execute_load_ip_fw_cmd_buf(struct amdgpu_device *adev,
+				   struct amdgpu_firmware_info *ucode,
+				   uint32_t ucode_id,
+				   uint64_t cmd_buf_gpu_addr,
+				   int cmd_buf_size)
+{
+	struct amdgpu_firmware_info fw_info = {
+		.ucode_id = ucode_id,
+		.mc_addr = cmd_buf_gpu_addr,
+		.ucode_size = cmd_buf_size,
+	};
+	struct psp_context *psp = &adev->psp;
+	struct psp_gfx_cmd_resp *cmd =
+		acquire_psp_cmd_buf(psp);
+	int ret;
+
+	if (!ucode)
+		ucode = &fw_info;
+
+	ret = psp_prep_load_ip_fw_cmd_buf(ucode, cmd);
+	if (!ret)
+		ret = psp_cmd_submit_buf(psp, ucode, cmd,
+					 psp->fence_buf_mc_addr);
+
+	release_psp_cmd_buf(psp);
+
+	return ret;
+}
+
 static int psp_execute_non_psp_fw_load(struct psp_context *psp,
 				  struct amdgpu_firmware_info *ucode)
 {
