@@ -111,4 +111,5 @@
 #include <kcl/kcl_irqdesc.h>
 #include <kcl/kcl_pci_ids.h>
 #include <kcl/kcl_drm_suballoc.h>
+#include <kcl/kcl_drm_edid.h>
 #endif /* AMDGPU_BACKPORT_H */
