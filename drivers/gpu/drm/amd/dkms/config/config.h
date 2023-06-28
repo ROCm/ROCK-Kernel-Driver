@@ -153,27 +153,11 @@
    drm_driver* */
 #define HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG 1
 
-/* drm_atomic_get_old_crtc_state() and drm_atomic_get_new_crtc_state() are
-   available */
-#define HAVE_DRM_ATOMIC_GET_CRTC_STATE 1
-
-/* drm_atomic_get_new_plane_state() is available */
-#define HAVE_DRM_ATOMIC_GET_NEW_PLANE_STATE 1
-
 /* drm_atomic_helper_calc_timestamping_constants() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
 
-/* drm_atomic_helper_check_plane_state() is available */
-#define HAVE_DRM_ATOMIC_HELPER_CHECK_PLANE_STATE 1
-
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
-
-/* drm_atomic_state_put() is available */
-#define HAVE_DRM_ATOMIC_STATE_PUT 1
-
-/* drm_color_lut_size() is available */
-#define HAVE_DRM_COLOR_LUT_SIZE 1
 
 /* drm_connector_atomic_hdr_metadata_equal() is available */
 #define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
@@ -211,9 +195,6 @@
 /* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
    drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
-
-/* drm_crtc_init_with_planes() wants name */
-#define HAVE_DRM_CRTC_INIT_WITH_PLANES_VALID_WITH_NAME 1
 
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
@@ -410,9 +391,6 @@
 /* drm_gem_prime_export() with p,i arg is available */
 #define HAVE_DRM_DRV_GEM_PRIME_EXPORT_PI 1
 
-/* drm_drv_uses_atomic_modeset() is available */
-#define HAVE_DRM_DRV_USES_ATOMIC_MODESET 1
-
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
@@ -449,9 +427,6 @@
 
 /* drm_gem_object_funcs.vmap hsa iosys_map arg */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG 1
-
-/* drm_gem_object_lookup() wants 2 args */
-#define HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS 1
 
 /* drm_gem_object_put() is available */
 #define HAVE_DRM_GEM_OBJECT_PUT 1
@@ -501,9 +476,6 @@
 /* drm_need_swiotlb() is availablea */
 #define HAVE_DRM_NEED_SWIOTLB 1
 
-/* drm atomic nonblocking commit support is available */
-#define HAVE_DRM_NONBLOCKING_COMMIT_SUPPORT 1
-
 /* drm_plane_helper_destroy() is available */
 #define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
@@ -522,41 +494,11 @@
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
-/* drm_syncobj_fence_get() is available */
-/* #undef HAVE_DRM_SYNCOBJ_FENCE_GET */
-
-/* drm_syncobj_find_fence() is available */
-#define HAVE_DRM_SYNCOBJ_FIND_FENCE 1
-
-/* whether drm_syncobj_find_fence() wants 3 args */
-/* #undef HAVE_DRM_SYNCOBJ_FIND_FENCE_3ARGS */
-
-/* whether drm_syncobj_find_fence() wants 4 args */
-/* #undef HAVE_DRM_SYNCOBJ_FIND_FENCE_4ARGS */
-
-/* whether drm_syncobj_find_fence() wants 5 args */
-#define HAVE_DRM_SYNCOBJ_FIND_FENCE_5ARGS 1
-
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
-/* drm_universal_plane_init() wants 7 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_7ARGS */
-
-/* drm_universal_plane_init() wants 8 args */
-/* #undef HAVE_DRM_UNIVERSAL_PLANE_INIT_8ARGS */
-
-/* drm_universal_plane_init() wants 9 args */
-#define HAVE_DRM_UNIVERSAL_PLANE_INIT_9ARGS 1
-
 /* drm_vblank->time uses ktime_t type */
 #define HAVE_DRM_VBLANK_USE_KTIME_T 1
-
-/* drm_vma_node_verify_access() 2nd argument is drm_file */
-#define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
-
-/* Variable refresh rate(vrr) is supported */
-#define HAVE_DRM_VRR_SUPPORTED 1
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
@@ -759,9 +701,6 @@
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 
-/* num_u32_u32 is available */
-#define HAVE_MUL_U32_U32 1
-
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
 
@@ -848,9 +787,6 @@
 
 /* struct drm_connector_state->self_refresh_aware is available */
 #define HAVE_STRUCT_DRM_CONNECTOR_STATE_SELF_REFRESH_AWARE 1
-
-/* drm_connector->ycbcr_420_allowed is available */
-#define HAVE_STRUCT_DRM_CONNECTOR_YCBCR_420_ALLOWED 1
 
 /* HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL is available */
 #define HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL 1
