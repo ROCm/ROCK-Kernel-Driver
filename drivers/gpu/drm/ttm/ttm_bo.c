@@ -282,13 +282,14 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 		ret = 0;
 	}
 
-	if (ret) {
+	if (ret || unlikely(list_empty(&bo->ddestroy))) {
 		if (unlock_resv)
 			dma_resv_unlock(bo->base.resv);
 		spin_unlock(&bo->bdev->lru_lock);
 		return ret;
 	}
 
+	list_del_init(&bo->ddestroy);
 	spin_unlock(&bo->bdev->lru_lock);
 	ttm_bo_cleanup_memtype_use(bo);
 
@@ -299,21 +300,47 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 }
 
 /*
- * Block for the dma_resv object to become idle, lock the buffer and clean up
- * the resource and tt object.
+ * Traverse the delayed list, and call ttm_bo_cleanup_refs on all
+ * encountered buffers.
  */
-static void ttm_bo_delayed_delete(struct work_struct *work)
+bool ttm_bo_delayed_delete(struct ttm_device *bdev, bool remove_all)
 {
-	struct ttm_buffer_object *bo;
+	struct list_head removed;
+	bool empty;
 
-	bo = container_of(work, typeof(*bo), delayed_delete);
+	INIT_LIST_HEAD(&removed);
 
-	dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP, false,
-			      MAX_SCHEDULE_TIMEOUT);
-	dma_resv_lock(bo->base.resv, NULL);
-	ttm_bo_cleanup_memtype_use(bo);
-	dma_resv_unlock(bo->base.resv);
-	ttm_bo_put(bo);
+	spin_lock(&bdev->lru_lock);
+	while (!list_empty(&bdev->ddestroy)) {
+		struct ttm_buffer_object *bo;
+
+		bo = list_first_entry(&bdev->ddestroy, struct ttm_buffer_object,
+				      ddestroy);
+		list_move_tail(&bo->ddestroy, &removed);
+		if (!ttm_bo_get_unless_zero(bo))
+			continue;
+
+		if (remove_all || bo->base.resv != &bo->base._resv) {
+			spin_unlock(&bdev->lru_lock);
+			dma_resv_lock(bo->base.resv, NULL);
+
+			spin_lock(&bdev->lru_lock);
+			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
+
+		} else if (dma_resv_trylock(bo->base.resv)) {
+			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
+		} else {
+			spin_unlock(&bdev->lru_lock);
+		}
+
+		ttm_bo_put(bo);
+		spin_lock(&bdev->lru_lock);
+	}
+	list_splice_tail(&removed, &bdev->ddestroy);
+	empty = list_empty(&bdev->ddestroy);
+	spin_unlock(&bdev->lru_lock);
+
+	return empty;
 }
 
 static void ttm_bo_release(struct kref *kref)
@@ -342,40 +369,44 @@ static void ttm_bo_release(struct kref *kref)
 
 		drm_vma_offset_remove(bdev->vma_manager, &bo->base.vma_node);
 		ttm_mem_io_free(bdev, bo->resource);
+	}
 
-		if (!dma_resv_test_signaled(bo->base.resv,
-					    DMA_RESV_USAGE_BOOKKEEP) ||
-		    !dma_resv_trylock(bo->base.resv)) {
-			/* The BO is not idle, resurrect it for delayed destroy */
-			ttm_bo_flush_all_fences(bo);
-			bo->deleted = true;
+	if (!dma_resv_test_signaled(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP) ||
+	    !dma_resv_trylock(bo->base.resv)) {
+		/* The BO is not idle, resurrect it for delayed destroy */
+		ttm_bo_flush_all_fences(bo);
+		bo->deleted = true;
 
-			spin_lock(&bo->bdev->lru_lock);
+		spin_lock(&bo->bdev->lru_lock);
 
-			/*
-			 * Make pinned bos immediately available to
-			 * shrinkers, now that they are queued for
-			 * destruction.
-			 *
-			 * FIXME: QXL is triggering this. Can be removed when the
-			 * driver is fixed.
-			 */
-			if (bo->pin_count) {
-				bo->pin_count = 0;
-				ttm_resource_move_to_lru_tail(bo->resource);
-			}
-
-			kref_init(&bo->kref);
-			spin_unlock(&bo->bdev->lru_lock);
-
-			INIT_WORK(&bo->delayed_delete, ttm_bo_delayed_delete);
-			queue_work(bdev->wq, &bo->delayed_delete);
-			return;
+		/*
+		 * Make pinned bos immediately available to
+		 * shrinkers, now that they are queued for
+		 * destruction.
+		 *
+		 * FIXME: QXL is triggering this. Can be removed when the
+		 * driver is fixed.
+		 */
+		if (bo->pin_count) {
+			bo->pin_count = 0;
+			ttm_resource_move_to_lru_tail(bo->resource);
 		}
 
-		ttm_bo_cleanup_memtype_use(bo);
-		dma_resv_unlock(bo->base.resv);
+		kref_init(&bo->kref);
+		list_add_tail(&bo->ddestroy, &bdev->ddestroy);
+		spin_unlock(&bo->bdev->lru_lock);
+
+		schedule_delayed_work(&bdev->wq,
+				      ((HZ / 100) < 1) ? 1 : HZ / 100);
+		return;
 	}
+
+	spin_lock(&bo->bdev->lru_lock);
+	list_del(&bo->ddestroy);
+	spin_unlock(&bo->bdev->lru_lock);
+
+	ttm_bo_cleanup_memtype_use(bo);
+	dma_resv_unlock(bo->base.resv);
 
 	atomic_dec(&ttm_glob.bo_count);
 	bo->destroy(bo);
@@ -959,6 +990,7 @@ int ttm_bo_init_reserved(struct ttm_device *bdev, struct ttm_buffer_object *bo,
 	int ret;
 
 	kref_init(&bo->kref);
+	INIT_LIST_HEAD(&bo->ddestroy);
 	bo->bdev = bdev;
 	bo->type = type;
 	bo->page_alignment = alignment;
