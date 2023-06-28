@@ -15,7 +15,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ATOMIC_CHECK], [
 		], [
 			int ret;
 			ret = drm_dp_mst_atomic_check(NULL);
-		], [drm_dp_mst_atomic_check], [drivers/gpu/drm/drm_dp_mst_topology.c], [
+		], [drm_dp_mst_atomic_check], [drivers/gpu/drm/drm_dp_mst_topology.c drivers/gpu/drm/display/drm_dp_mst_topology.c], [
 			AC_DEFINE(HAVE_DRM_DP_MST_ATOMIC_CHECK, 1,
 				[drm_dp_mst_atomic_check() is available])
 		])
