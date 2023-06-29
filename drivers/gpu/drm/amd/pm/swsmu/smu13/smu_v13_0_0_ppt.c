@@ -46,7 +46,6 @@
 #include "asic_reg/mp/mp_13_0_0_sh_mask.h"
 #include "smu_cmn.h"
 #include "amdgpu_ras.h"
-#include "umc_v8_10.h"
 
 /*
  * DO NOT use these for err/warn/info/debug messages.
@@ -1711,6 +1710,7 @@ static int smu_v13_0_0_get_thermal_temperature_range(struct smu_context *smu,
 	range->mem_emergency_max = (pptable->SkuTable.TemperatureLimit[TEMP_MEM] + CTF_OFFSET_MEM)*
 		SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
 	range->software_shutdown_temp = powerplay_table->software_shutdown_temp;
+	range->software_shutdown_temp_offset = pptable->SkuTable.FanAbnormalTempLimitOffset;
 
 	return 0;
 }
@@ -2609,7 +2609,7 @@ static ssize_t smu_v13_0_0_get_ecc_info(struct smu_context *smu,
 
 	ecc_table = (EccInfoTable_t *)smu_table->ecc_table;
 
-	for (i = 0; i < UMC_V8_10_TOTAL_CHANNEL_NUM(adev); i++) {
+	for (i = 0; i < ARRAY_SIZE(ecc_table->EccInfo); i++) {
 		ecc_info_per_channel = &(eccinfo->ecc[i]);
 		ecc_info_per_channel->ce_count_lo_chip =
 				ecc_table->EccInfo[i].ce_count_lo_chip;

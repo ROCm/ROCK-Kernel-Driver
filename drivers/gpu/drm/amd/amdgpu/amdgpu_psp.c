@@ -839,6 +839,7 @@ static bool psp_skip_tmr(struct psp_context *psp)
 	case IP_VERSION(11, 0, 9):
 	case IP_VERSION(11, 0, 7):
 	case IP_VERSION(13, 0, 2):
+	case IP_VERSION(13, 0, 6):
 	case IP_VERSION(13, 0, 10):
 		return true;
 	default:
@@ -1673,10 +1674,11 @@ int psp_ras_initialize(struct psp_context *psp)
 
 	if (amdgpu_ras_is_poison_mode_supported(adev))
 		ras_cmd->ras_in_message.init_flags.poison_mode_en = 1;
-	if (!adev->gmc.xgmi.connected_to_cpu)
+	if (!adev->gmc.xgmi.connected_to_cpu && !adev->gmc.is_app_apu)
 		ras_cmd->ras_in_message.init_flags.dgpu_mode = 1;
 	ras_cmd->ras_in_message.init_flags.xcc_mask =
 		adev->gfx.xcc_mask;
+	ras_cmd->ras_in_message.init_flags.channel_dis_num = hweight32(adev->gmc.m_half_use) * 2;
 
 	ret = psp_ta_load(psp, &psp->ras_context.context);
 
@@ -2038,6 +2040,8 @@ static int psp_securedisplay_initialize(struct psp_context *psp)
 		psp_securedisplay_parse_resp_status(psp, securedisplay_cmd->status);
 		dev_err(psp->adev->dev, "SECUREDISPLAY: query securedisplay TA failed. ret 0x%x\n",
 			securedisplay_cmd->securedisplay_out_message.query_ta.query_cmd_ret);
+		/* don't try again */
+		psp->securedisplay_context.context.bin_desc.size_bytes = 0;
 	}
 
 	return 0;

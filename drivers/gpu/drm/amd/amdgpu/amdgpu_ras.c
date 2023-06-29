@@ -493,7 +493,8 @@ static ssize_t amdgpu_ras_debugfs_ctrl_write(struct file *f,
 		ret = amdgpu_ras_feature_enable(adev, &data.head, 1);
 		break;
 	case 2:
-		if ((data.inject.address >= adev->gmc.mc_vram_size) ||
+		if ((data.inject.address >= adev->gmc.mc_vram_size &&
+		    adev->gmc.mc_vram_size) ||
 		    (data.inject.address >= RAS_UMC_INJECT_ADDR_LIMIT)) {
 			dev_warn(adev->dev, "RAS WARN: input address "
 					"0x%llx is invalid.",
@@ -1690,8 +1691,7 @@ static void amdgpu_ras_interrupt_poison_consumption_handler(struct ras_manager *
 		}
 	}
 
-	if (!adev->gmc.xgmi.connected_to_cpu)
-		amdgpu_umc_poison_handler(adev, false);
+	amdgpu_umc_poison_handler(adev, false);
 
 	if (block_obj->hw_ops && block_obj->hw_ops->handle_poison_consumption)
 		poison_stat = block_obj->hw_ops->handle_poison_consumption(adev);
@@ -2459,11 +2459,10 @@ static void amdgpu_ras_check_supported(struct amdgpu_device *adev)
 {
 	adev->ras_hw_enabled = adev->ras_enabled = 0;
 
-	if (!adev->is_atom_fw ||
-	    !amdgpu_ras_asic_supported(adev))
+	if (!amdgpu_ras_asic_supported(adev))
 		return;
 
-	if (!adev->gmc.xgmi.connected_to_cpu) {
+	if (!adev->gmc.xgmi.connected_to_cpu &&	!adev->gmc.is_app_apu) {
 		if (amdgpu_atomfirmware_mem_ecc_supported(adev)) {
 			dev_info(adev->dev, "MEM ECC is active.\n");
 			adev->ras_hw_enabled |= (1 << AMDGPU_RAS_BLOCK__UMC |

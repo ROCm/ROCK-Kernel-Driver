@@ -45,7 +45,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.239"
+#define DC_VER "3.2.240"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -416,7 +416,7 @@ struct dc_config {
 	uint8_t force_bios_fixed_vs;
 	int sdpif_request_limit_words_per_umc;
 	bool use_old_fixed_vs_sequence;
-	bool disable_subvp_drr;
+	bool dc_mode_clk_limit_support;
 };
 
 enum visual_confirm {
@@ -1525,6 +1525,7 @@ struct dc_link {
 		bool dpia_forced_tbt3_mode;
 		bool dongle_mode_timing_override;
 		bool blank_stream_on_ocs_change;
+		bool read_dpcd204h_on_irq_hpd;
 	} wa_flags;
 	struct link_mst_stream_allocation_table mst_stream_alloc_table;
 
