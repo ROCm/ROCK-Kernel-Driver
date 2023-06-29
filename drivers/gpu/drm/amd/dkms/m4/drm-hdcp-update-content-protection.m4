@@ -5,7 +5,8 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_HDCP_UPDATE_CONTENT_PROTECTION], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DISPLAY_DRM_HDCP_H 
+			#ifdef HAVE_DRM_DISPLAY_DRM_HDCP_H
+			#include <drm/display/drm_hdcp_helper.h>
 			#include <drm/display/drm_hdcp.h>
 			#else
 			#include <drm/drm_hdcp.h>

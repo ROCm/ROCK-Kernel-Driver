@@ -10,6 +10,9 @@
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
 
+/* acpi_dev_get_first_match_dev() is available */
+#define HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV 1
+
 /* acpi_put_table() is available */
 #define HAVE_ACPI_PUT_TABLE 1
 
@@ -163,6 +166,9 @@
 /* down_write_killable() is available */
 #define HAVE_DOWN_WRITE_KILLABLE 1
 
+/* drm_add_override_edid_modes() is available */
+/* #undef HAVE_DRM_ADD_OVERRIDE_EDID_MODES */
+
 /* Define to 1 if you have the <drm/amdgpu_pciid.h> header file. */
 /* #undef HAVE_DRM_AMDGPU_PCIID_H */
 
@@ -184,6 +190,9 @@
 
 /* drm_connector_attach_hdr_output_metadata_property() is available */
 #define HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY 1
+
+/* drm_connector->edid_override is available */
+#define HAVE_DRM_CONNECTOR_EDID_OVERRIDE 1
 
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
@@ -214,29 +223,17 @@
 /* drm_connector_set_panel_orientation_with_quirk() is available */
 #define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
 
+/* drm_connector_state->colorspace is available */
+#define HAVE_DRM_CONNECTOR_STATE_COLORSPACE 1
+
 /* struct drm_connector_state has hdcp_content_type member */
 #define HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE 1
 
 /* struct drm_connector_state has hdr_output_metadata member */
 #define HAVE_DRM_CONNECTOR_STATE_HDR_OUTPUT_METADATA 1
 
-/* drm_connector_unreference() is available */
-/* #undef HAVE_DRM_CONNECTOR_UNREFERENCE */
-
-/* drm_connector_xxx() drop _mode_ */
-#define HAVE_DRM_CONNECTOR_XXX_DROP_MODE 1
-
-/* ddrm_atomic_stat has __drm_crtcs_state */
-/* #undef HAVE_DRM_CRTCS_STATE_MEMBER */
-
-/* drm_crtc_accurate_vblank_count() is available */
-#define HAVE_DRM_CRTC_ACCURATE_VBLANK_COUNT 1
-
-/* drm_crtc_enable_color_mgmt() is available */
-#define HAVE_DRM_CRTC_ENABLE_COLOR_MGMT 1
-
-/* drm_crtc_from_index() is available */
-#define HAVE_DRM_CRTC_FROM_INDEX 1
+/* drm_connector_attach_colorspace_property() is available */
+#define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
 
 /* drm_crtc_helper_funcs->atomic_check()/atomic_flush()/atomic_begin() wants
    struct drm_atomic_state arg */
@@ -325,9 +322,6 @@
 
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
 /* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
-
-/* acpi_dev_get_first_match_dev() is available */
-#define HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV 1
 
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
@@ -431,7 +425,7 @@
 /* drm_dp_update_payload_part1() function has start_slot argument */
 /* #undef HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG */
 
-/* drm_driver->gem_prime_res_obj() is availab/le */
+/* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
 /* Define to 1 if you have the <drm/drmP.h> header file. */
@@ -482,23 +476,14 @@
 /* drm_dsc_compute_rc_parameters() is available */
 #define HAVE_DRM_DSC_COMPUTE_RC_PARAMETERS 1
 
-/* drm_connector_attach_colorspace_property() is available */
-#define HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY 1
-
-/* drm_mode_create_hdmi_colorspace_property() has 2 args */
-#define HAVE_DRM_MODE_CREATE_HDMI_COLORSPACE_PROPERTY_2ARGS 1
-
-/* drm_mode_create_dp_colorspace_property() has 2 args */
-#define HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS 1
-
-/* drm_connector_state->colorspace is available */
-#define HAVE_DRM_CONNECTOR_STATE_COLORSPACE 1
-
 /* struct drm_dsc_config has member simple_422 */
 #define HAVE_DRM_DSC_CONFIG_SIMPLE_422 1
 
 /* drm_dsc_pps_payload_pack() is available */
 #define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
+
+/* drm_edid_override_connector_update() is available */
+#define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
 
 /* drm_fb_helper_single_add_all_connectors() &&
    drm_fb_helper_remove_one_connector() are symbol */
@@ -506,9 +491,6 @@
 
 /* drm_fb_helper_alloc_info() is available */
 #define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
-
-/* migrate_disable() is available */
-#define HAVE_MIGRATE_DISABLE 1
 
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
@@ -552,12 +534,6 @@
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
-/* drm_edid_override_connector_update() is available */
-#define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
-
-/* drm_add_override_edid_modes() is available */
-/* #undef HAVE_DRM_ADD_OVERRIDE_EDID_MODES */
-
 /* drm_hdmi_avi_infoframe_from_display_mode() has p,p,b interface */
 /* #undef HAVE_DRM_HDMI_AVI_INFOFRAME_FROM_DISPLAY_MODE_P_P_B */
 
@@ -577,7 +553,7 @@
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
 
 /* drm_modeset_backoff() has int return */
-#define HAVE_DRM_MODESET_BACKOFF_RETURN_INT 1
+/* #undef HAVE_DRM_MODESET_BACKOFF_RETURN_INT */
 
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
@@ -587,6 +563,12 @@
 
 /* drm_mode_config->fb_modifiers_not_supported is available */
 #define HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED 1
+
+/* drm_mode_create_dp_colorspace_property() has 2 args */
+#define HAVE_DRM_MODE_CREATE_DP_COLORSPACE_PROPERTY_2ARGS 1
+
+/* drm_mode_create_hdmi_colorspace_property() has 2 args */
+#define HAVE_DRM_MODE_CREATE_HDMI_COLORSPACE_PROPERTY_2ARGS 1
 
 /* drm_mode_init() is available */
 #define HAVE_DRM_MODE_INIT 1
@@ -811,14 +793,8 @@
 /* Define to 1 if you have the <linux/processor.h> header file. */
 #define HAVE_LINUX_PROCESSOR_H 1
 
-/* Define to 1 if you have the <linux/sched/mm.h> header file. */
-#define HAVE_LINUX_SCHED_MM_H 1
-
-/* Define to 1 if you have the <linux/sched/signal.h> header file. */
-#define HAVE_LINUX_SCHED_SIGNAL_H 1
-
-/* Define to 1 if you have the <linux/sched/task.h> header file. */
-#define HAVE_LINUX_SCHED_TASK_H 1
+/* Define to 1 if you have the <linux/rbtree_types.h> header file. */
+#define HAVE_LINUX_RBTREE_TYPES_H 1
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
@@ -844,8 +820,8 @@
 /* memalloc_noreclaim_save() is available */
 #define HAVE_MEMALLOC_NORECLAIM_SAVE 1
 
-/* drm_connector->edid_override is available */
-#define HAVE_DRM_CONNECTOR_EDID_OVERRIDE 1
+/* migrate_disable() is available */
+#define HAVE_MIGRATE_DISABLE 1
 
 /* struct migrate_vma has fault_page */
 #define HAVE_MIGRATE_VMA_FAULT_PAGE 1
@@ -872,7 +848,7 @@
 #define HAVE_MMU_NOTIFIER_SYNCHRONIZE 1
 
 /* mm_access() is available */
-#define HAVE_MM_ACCESS 1
+/* #undef HAVE_MM_ACCESS */
 
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
@@ -1107,7 +1083,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.1.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.2.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1116,7 +1092,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.1.0"
+#define PACKAGE_VERSION "6.2.0"
 
 #include "config-amd-chips.h"
 
