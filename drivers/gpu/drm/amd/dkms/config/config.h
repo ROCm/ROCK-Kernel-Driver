@@ -904,12 +904,6 @@
 /* vmf_insert_mixed_prot() is available */
 #define HAVE_VMF_INSERT_MIXED_PROT 1
 
-/* vmf_insert_pfn_{pmd,pud}() wants 3 args */
-/* #undef HAVE_VMF_INSERT_PFN_PMD_3ARGS */
-
-/* vmf_insert_pfn_{pmd,pud}_prot() is available */
-#define HAVE_VMF_INSERT_PFN_PMD_PROT 1
-
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
 

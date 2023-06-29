@@ -58,11 +58,4 @@ vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
 }
 #endif /* HAVE_VMF_INSERT_PFN_PROT */
 
-#ifndef HAVE_VMF_INSERT_PFN_PMD_PROT
-vm_fault_t vmf_insert_pfn_pmd_prot(struct vm_fault *vmf, pfn_t pfn,
-				   pgprot_t pgprot, bool write);
-vm_fault_t vmf_insert_pfn_pud_prot(struct vm_fault *vmf, pfn_t pfn,
-				   pgprot_t pgprot, bool write);
-#endif /* HAVE_VMF_INSERT_PFN_PMD_PROT */
-
 #endif
