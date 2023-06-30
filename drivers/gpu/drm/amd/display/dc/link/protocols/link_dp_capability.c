@@ -2166,7 +2166,9 @@ static bool dp_verify_link_cap(
 							link,
 							&irq_data))
 				(*fail_count)++;
-
+		} else if (status == LINK_TRAINING_LINK_LOSS) {
+			success = true;
+			(*fail_count)++;
 		} else {
 			(*fail_count)++;
 		}
@@ -2189,6 +2191,7 @@ bool dp_verify_link_cap_with_retries(
 	int i = 0;
 	bool success = false;
 	int fail_count = 0;
+	struct dc_link_settings last_verified_link_cap = fail_safe_link_settings;
 
 	dp_trace_detect_lt_init(link);
 
@@ -2205,10 +2208,14 @@ bool dp_verify_link_cap_with_retries(
 		if (!link_detect_connection_type(link, &type) || type == dc_connection_none) {
 			link->verified_link_cap = fail_safe_link_settings;
 			break;
-		} else if (dp_verify_link_cap(link, known_limit_link_setting,
-				&fail_count) && fail_count == 0) {
-			success = true;
-			break;
+		} else if (dp_verify_link_cap(link, known_limit_link_setting, &fail_count)) {
+			last_verified_link_cap = link->verified_link_cap;
+			if (fail_count == 0) {
+				success = true;
+				break;
+			}
+		} else {
+			link->verified_link_cap = last_verified_link_cap;
 		}
 		fsleep(10 * 1000);
 	}
