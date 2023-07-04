@@ -3839,6 +3839,7 @@ static umode_t amdgpu_flash_attr_is_visible(struct kobject *kobj, struct attribu
 	return adev->psp.sup_ifwi_up ? 0440 : 0;
 }
 
+#ifdef HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE
 static umode_t amdgpu_bin_flash_attr_is_visible(struct kobject *kobj,
 						struct bin_attribute *attr,
 						int idx)
@@ -3849,11 +3850,14 @@ static umode_t amdgpu_bin_flash_attr_is_visible(struct kobject *kobj,
 
 	return adev->psp.sup_ifwi_up ? 0660 : 0;
 }
+#endif
 
 const struct attribute_group amdgpu_flash_attr_group = {
 	.attrs = flash_attrs,
 	.bin_attrs = bin_flash_attrs,
+#ifdef HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE
 	.is_bin_visible = amdgpu_bin_flash_attr_is_visible,
+#endif
 	.is_visible = amdgpu_flash_attr_is_visible,
 };
 
