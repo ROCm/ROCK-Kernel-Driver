@@ -537,9 +537,6 @@
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
-/* drm_vblank->time uses ktime_t type */
-#define HAVE_DRM_VBLANK_USE_KTIME_T 1
-
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
 
