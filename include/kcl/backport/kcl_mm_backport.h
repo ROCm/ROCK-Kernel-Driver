@@ -5,10 +5,6 @@
 #include <linux/sched/mm.h>
 #include <linux/mm.h>
 
-#ifndef HAVE_MM_ACCESS
-#define mm_access _kcl_mm_access
-#endif
-
 #ifndef HAVE_MMPUT_ASYNC
 #define mmput_async _kcl_mmput_async
 #endif
