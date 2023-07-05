@@ -1271,17 +1271,11 @@ static int dp_dsc_fec_support_show(struct seq_file *m, void *data)
 		ret = drm_modeset_lock(&dev->mode_config.connection_mutex, &ctx);
 		if (ret) {
 			if (ret == -EDEADLK) {
-#ifdef HAVE_DRM_MODESET_BACKOFF_RETURN_INT
 				ret = drm_modeset_backoff(&ctx);
 				if (!ret) {
 					try_again = true;
 					continue;
 				}
-#else
-				drm_modeset_backoff(&ctx);
-				try_again = true;
-				continue;
-#endif
 			}
 			break;
 		}
