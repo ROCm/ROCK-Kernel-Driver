@@ -747,9 +747,6 @@
 /* mmu_notifier_synchronize() is available */
 #define HAVE_MMU_NOTIFIER_SYNCHRONIZE 1
 
-/* mm_access() is available */
-/* #undef HAVE_MM_ACCESS */
-
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
 

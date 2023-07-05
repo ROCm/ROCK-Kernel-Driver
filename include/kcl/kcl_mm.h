@@ -22,10 +22,6 @@
 #define untagged_addr(addr) (addr)
 #endif
 
-#ifndef HAVE_MM_ACCESS
-extern struct mm_struct * (*_kcl_mm_access)(struct task_struct *task, unsigned int mode);
-#endif
-
 #ifndef HAVE_MMPUT_ASYNC
 extern void (*_kcl_mmput_async)(struct mm_struct *mm);
 #endif
