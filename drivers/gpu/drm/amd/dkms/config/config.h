@@ -429,9 +429,6 @@
    drm_fb_helper_remove_one_connector() are symbol */
 /* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
 
-/* drm_fb_helper_alloc_info() is available */
-#define HAVE_DRM_FB_HELPER_ALLOC_INFO 1
-
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
@@ -440,9 +437,6 @@
 
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
-
-/* drm_fb_helper_unregister_info() is available */
-#define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
 
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
