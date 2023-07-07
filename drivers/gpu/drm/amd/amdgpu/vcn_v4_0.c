@@ -1296,7 +1296,6 @@ static int vcn_v4_0_start_sriov(struct amdgpu_device *adev)
 			cache_size);
 
 		cache_addr = adev->vcn.inst[i].gpu_addr + offset;
-		memset(adev->vcn.inst[i].cpu_addr + offset, 0, AMDGPU_VCN_STACK_SIZE);
 		MMSCH_V4_0_INSERT_DIRECT_WT(SOC15_REG_OFFSET(VCN, i,
 			regUVD_LMI_VCPU_CACHE1_64BIT_BAR_LOW),
 			lower_32_bits(cache_addr));
@@ -1312,8 +1311,6 @@ static int vcn_v4_0_start_sriov(struct amdgpu_device *adev)
 
 		cache_addr = adev->vcn.inst[i].gpu_addr + offset +
 			AMDGPU_VCN_STACK_SIZE;
-		memset(adev->vcn.inst[i].cpu_addr + offset + AMDGPU_VCN_STACK_SIZE, 0,
-			AMDGPU_VCN_STACK_SIZE);
 		MMSCH_V4_0_INSERT_DIRECT_WT(SOC15_REG_OFFSET(VCN, i,
 			regUVD_LMI_VCPU_CACHE2_64BIT_BAR_LOW),
 			lower_32_bits(cache_addr));
