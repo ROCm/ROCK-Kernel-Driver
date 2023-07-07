@@ -27,14 +27,6 @@
 #include <kcl/kcl_drm_crtc.h>
 #include <kcl/kcl_drm_print.h>
 
-/*
- * commit v4.9-rc4-949-g949f08862d66
- * drm: Make the connector .detect() callback optional
- */
-#if DRM_VERSION_CODE < DRM_VERSION(4, 10, 0)
-#define AMDKCL_AMDGPU_DRM_CONNECTOR_STATUS_DETECT_MANDATORY
-#endif
-
 /**
  * drm_connector_for_each_possible_encoder - iterate connector's possible encoders
  * @connector: &struct drm_connector pointer
