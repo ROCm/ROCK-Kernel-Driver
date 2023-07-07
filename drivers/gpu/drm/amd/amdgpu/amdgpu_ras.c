@@ -1163,7 +1163,8 @@ int amdgpu_ras_error_inject(struct amdgpu_device *adev,
 	}
 
 	/* Calculate XGMI relative offset */
-	if (adev->gmc.xgmi.num_physical_nodes > 1) {
+	if (adev->gmc.xgmi.num_physical_nodes > 1 &&
+	    info->head.block != AMDGPU_RAS_BLOCK__GFX) {
 		block_info.address =
 			amdgpu_xgmi_get_relative_phy_addr(adev,
 							  block_info.address);
@@ -2069,6 +2070,14 @@ static void amdgpu_ras_do_recovery(struct work_struct *work)
 				ras->gpu_reset_flags &= ~AMDGPU_RAS_GPU_RESET_MODE2_RESET;
 				reset_context.method = AMD_RESET_METHOD_MODE2;
 			}
+
+			/* Fatal error occurs in poison mode, mode1 reset is used to
+			 * recover gpu.
+			 */
+			if (ras->gpu_reset_flags & AMDGPU_RAS_GPU_RESET_MODE1_RESET) {
+				ras->gpu_reset_flags &= ~AMDGPU_RAS_GPU_RESET_MODE1_RESET;
+				set_bit(AMDGPU_NEED_FULL_RESET, &reset_context.flags);
+			}
 		}
 
 		amdgpu_device_gpu_recover(ras->adev, NULL, &reset_context);
@@ -2962,9 +2971,12 @@ void amdgpu_ras_global_ras_isr(struct amdgpu_device *adev)
 		return;
 
 	if (atomic_cmpxchg(&amdgpu_ras_in_intr, 0, 1) == 0) {
+		struct amdgpu_ras *ras = amdgpu_ras_get_context(adev);
+
 		dev_info(adev->dev, "uncorrectable hardware error"
 			"(ERREVENT_ATHUB_INTERRUPT) detected!\n");
 
+		ras->gpu_reset_flags |= AMDGPU_RAS_GPU_RESET_MODE1_RESET;
 		amdgpu_ras_reset_gpu(adev);
 	}
 }
