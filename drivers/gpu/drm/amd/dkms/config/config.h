@@ -699,9 +699,6 @@
 /* Define to 1 if you have the <linux/processor.h> header file. */
 #define HAVE_LINUX_PROCESSOR_H 1
 
-/* Define to 1 if you have the <linux/rbtree_types.h> header file. */
-#define HAVE_LINUX_RBTREE_TYPES_H 1
-
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
 
