@@ -1239,12 +1239,3 @@ int amdgpu_vcn_ras_sw_init(struct amdgpu_device *adev)
 
 	return 0;
 }
-
-int amdgpu_vcn_psp_update_sram(struct amdgpu_device *adev, int inst_idx)
-{
-	return psp_execute_load_ip_fw_cmd_buf(adev, NULL,
-		inst_idx ? AMDGPU_UCODE_ID_VCN1_RAM : AMDGPU_UCODE_ID_VCN0_RAM,
-		adev->vcn.inst[inst_idx].dpg_sram_gpu_addr,
-		(uint32_t)((uintptr_t)adev->vcn.inst[inst_idx].dpg_sram_curr_addr -
-			   (uintptr_t)adev->vcn.inst[inst_idx].dpg_sram_cpu_addr));
-}
