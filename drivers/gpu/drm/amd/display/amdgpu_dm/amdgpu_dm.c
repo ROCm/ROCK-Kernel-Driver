@@ -8391,7 +8391,12 @@ static void amdgpu_dm_commit_planes(struct drm_atomic_state *state,
 		 * dm_crtc_helper_atomic_check() only accepts async flips with
 		 * fast updates.
 		 */
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 		if (crtc->state->async_flip &&
+#else
+		if ((crtc->state->pageflip_flags &
+			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
 		    acrtc_state->update_type != UPDATE_TYPE_FAST)
 			drm_warn_once(state->dev,
 				      "[PLANE:%d:%s] async flip with non-fast update\n",

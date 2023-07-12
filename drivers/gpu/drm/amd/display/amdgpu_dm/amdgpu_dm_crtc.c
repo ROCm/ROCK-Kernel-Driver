@@ -412,7 +412,11 @@ static int dm_crtc_helper_atomic_check(struct drm_crtc *crtc,
 	 * Only allow async flips for fast updates that don't change the FB
 	 * pitch, the DCC state, rotation, etc.
 	 */
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
 	if (crtc_state->async_flip &&
+#else
+	if ((crtc_state->pageflip_flags & DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
 	    dm_crtc_state->update_type != UPDATE_TYPE_FAST) {
 		drm_dbg_atomic(crtc->dev,
 			       "[CRTC:%d:%s] async flips are only supported for fast updates\n",
