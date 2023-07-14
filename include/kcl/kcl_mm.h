@@ -120,4 +120,12 @@ static inline void vm_flags_clear(struct vm_area_struct *vma,
 }
 #endif
 
+#ifndef HAVE_WANT_INIT_ON_FREE
+static inline bool want_init_on_free(void)
+{
+	pr_warn_once("legacy kernel without want_init_on_free()\n");
+	return false;
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
