@@ -311,11 +311,11 @@ static void ttm_bo_delayed_delete(struct work_struct *work)
 
 	bo = container_of(work, typeof(*bo), delayed_delete);
 
-	dma_resv_wait_timeout(bo->base.resv, DMA_RESV_USAGE_BOOKKEEP, false,
+	dma_resv_wait_timeout(amdkcl_ttm_resvp(bo), DMA_RESV_USAGE_BOOKKEEP, false,
 			      MAX_SCHEDULE_TIMEOUT);
-	dma_resv_lock(bo->base.resv, NULL);
+	dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 	ttm_bo_cleanup_memtype_use(bo);
-	dma_resv_unlock(bo->base.resv);
+	dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	ttm_bo_put(bo);
 }
 
@@ -346,9 +346,9 @@ static void ttm_bo_release(struct kref *kref)
 		drm_vma_offset_remove(bdev->vma_manager, &bo->base.vma_node);
 		ttm_mem_io_free(bdev, bo->resource);
 
-		if (!dma_resv_test_signaled(bo->base.resv,
+		if (!dma_resv_test_signaled(amdkcl_ttm_resvp(bo),
 					    DMA_RESV_USAGE_BOOKKEEP) ||
-		    !dma_resv_trylock(bo->base.resv)) {
+		    !dma_resv_trylock(amdkcl_ttm_resvp(bo))) {
 			/* The BO is not idle, resurrect it for delayed destroy */
 			ttm_bo_flush_all_fences(bo);
 			bo->deleted = true;
@@ -377,7 +377,7 @@ static void ttm_bo_release(struct kref *kref)
 		}
 
 		ttm_bo_cleanup_memtype_use(bo);
-		dma_resv_unlock(bo->base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 	}
 
 	atomic_dec(&ttm_glob.bo_count);
