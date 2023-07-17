@@ -161,7 +161,6 @@ LINUXINCLUDE := \
 	-include $(src)/amd/dkms/config/config.h \
 	$(LINUX_SRCTREE_INCLUDE) \
 	-I$(src)/include/uapi \
-	-I$(src)/include/kcl/header/uapi \
 	$(USER_INCLUDE)
 
 export CONFIG_HSA_AMD=y
