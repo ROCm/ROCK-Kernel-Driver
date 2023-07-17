@@ -9373,7 +9373,9 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 		dc_allow_idle_optimizations(dm->dc, false);
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
+#ifdef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES
 	drm_dp_mst_atomic_wait_for_dependencies(state);
+#endif
 
 	dm_state = dm_atomic_get_new_state(state);
 	if (dm_state && dm_state->context) {
