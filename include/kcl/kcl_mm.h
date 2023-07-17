@@ -100,4 +100,24 @@ struct vm_area_struct *vma_lookup(struct mm_struct *mm, unsigned long addr)
 #define page_to_virt(x) __va(PFN_PHYS(page_to_pfn(x)))
 #endif
 
+#ifndef HAVE_VM_FLAGS_SET
+static inline void vm_flags_set(struct vm_area_struct *vma,
+                                vm_flags_t flags)
+{
+#ifdef HAVE_MMAP_ASSERT_WRITE_LOCKED
+        mmap_assert_write_locked(vma->vm_mm);
+#endif
+        vma->vm_flags |= flags;
+}
+
+static inline void vm_flags_clear(struct vm_area_struct *vma,
+                                  vm_flags_t flags)
+{
+#ifdef HAVE_MMAP_ASSERT_WRITE_LOCKED
+        mmap_assert_write_locked(vma->vm_mm);
+#endif
+        vma->vm_flags &= ~flags;
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
