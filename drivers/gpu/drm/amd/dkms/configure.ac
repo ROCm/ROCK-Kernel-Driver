@@ -1,4 +1,4 @@
-AC_INIT(amdgpu-dkms, 6.2.3)
+AC_INIT(amdgpu-dkms, 6.2.4)
 
 AC_LANG(C)
 AC_CONFIG_AUX_DIR([config])
