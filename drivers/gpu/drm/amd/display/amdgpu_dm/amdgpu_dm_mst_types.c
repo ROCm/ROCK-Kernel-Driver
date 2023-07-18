@@ -863,14 +863,18 @@ void dm_handle_mst_sideband_msg_ready_event(
 		DRM_DEBUG_DRIVER("Loop exceeded max iterations\n");
 }
 
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_POLL_HPD_IRQ
 static void dm_handle_mst_down_rep_msg_ready(struct drm_dp_mst_topology_mgr *mgr)
 {
 	dm_handle_mst_sideband_msg_ready_event(mgr, DOWN_REP_MSG_RDY_EVENT);
 }
+#endif
 
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_POLL_HPD_IRQ
 	.poll_hpd_irq = dm_handle_mst_down_rep_msg_ready,
+#endif
 #ifdef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR
 	.destroy_connector = dm_dp_destroy_mst_connector,
 #endif
