@@ -195,14 +195,11 @@ static void gfx_v9_4_3_init_golden_registers(struct amdgpu_device *adev)
 	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
 	for (i = 0; i < num_xcc; i++) {
 		dev_inst = GET_INST(GC, i);
-		if (dev_inst >= 2)
-			WREG32_SOC15(GC, dev_inst, regGRBM_MCM_ADDR, 0x4);
 
+		WREG32_SOC15(GC, dev_inst, regGB_ADDR_CONFIG,
+			     GOLDEN_GB_ADDR_CONFIG);
 		/* Golden settings applied by driver for ASIC with rev_id 0 */
 		if (adev->rev_id == 0) {
-			WREG32_SOC15(GC, dev_inst, regGB_ADDR_CONFIG,
-				     GOLDEN_GB_ADDR_CONFIG);
-
 			WREG32_FIELD15_PREREG(GC, dev_inst, TCP_UTCL1_CNTL1,
 					      REDUCE_FIFO_DEPTH_BY_2, 2);
 		}
@@ -1035,32 +1032,6 @@ static void gfx_v9_4_3_xcc_disable_gpa_mode(struct amdgpu_device *adev, int xcc_
 	data = RREG32_SOC15(GC, GET_INST(GC, xcc_id), regCPC_PSP_DEBUG);
 	data |= CPC_PSP_DEBUG__UTCL2IUGPAOVERRIDE_MASK;
 	WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCPC_PSP_DEBUG, data);
-}
-
-static void gfx_v9_4_3_xcc_program_xcc_id(struct amdgpu_device *adev,
-					  int xcc_id)
-{
-	uint32_t tmp = 0;
-	int num_xcc;
-
-	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
-	switch (num_xcc) {
-	/* directly config VIRTUAL_XCC_ID to 0 for 1-XCC */
-	case 1:
-		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_HYP_XCP_CTL, 0x8);
-		break;
-	case 2:
-	case 4:
-	case 6:
-	case 8:
-		tmp = (xcc_id % adev->gfx.num_xcc_per_xcp) << REG_FIELD_SHIFT(CP_HYP_XCP_CTL, VIRTUAL_XCC_ID);
-		tmp = tmp | (adev->gfx.num_xcc_per_xcp << REG_FIELD_SHIFT(CP_HYP_XCP_CTL, NUM_XCC_IN_XCP));
-		WREG32_SOC15(GC, GET_INST(GC, xcc_id), regCP_HYP_XCP_CTL, tmp);
-
-		break;
-	default:
-		break;
-	}
 }
 
 static bool gfx_v9_4_3_is_rlc_enabled(struct amdgpu_device *adev)
@@ -1919,9 +1890,6 @@ static int gfx_v9_4_3_xcc_cp_resume(struct amdgpu_device *adev, int xcc_id)
 		if (r)
 			return r;
 	}
-
-	/* set the virtual and physical id based on partition_mode */
-	gfx_v9_4_3_xcc_program_xcc_id(adev, xcc_id);
 
 	r = gfx_v9_4_3_xcc_kiq_resume(adev, xcc_id);
 	if (r)
