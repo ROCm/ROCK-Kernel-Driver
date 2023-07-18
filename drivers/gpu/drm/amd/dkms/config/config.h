@@ -389,6 +389,9 @@
 /* struct drm_dp_mst_topology_cbs has hotplug member */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG */
 
+/* struct drm_dp_mst_topology_cbs->poll_hpd_irq is available */
+#define HAVE_DRM_DP_MST_TOPOLOGY_CBS_POLL_HPD_IRQ 1
+
 /* struct drm_dp_mst_topology_cbs->register_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_REGISTER_CONNECTOR */
 
