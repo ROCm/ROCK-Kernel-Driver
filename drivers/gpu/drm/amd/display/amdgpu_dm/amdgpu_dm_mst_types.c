@@ -774,6 +774,7 @@ void dm_handle_mst_sideband_msg_ready_event(
 
 		/* handle MST irq */
 		if (aconnector->mst_mgr.mst_state)
+#ifdef HAVE_DRM_DP_MST_HPD_IRQ_HANDLE_EVENT
 			drm_dp_mst_hpd_irq_handle_event(&aconnector->mst_mgr,
 						 esi,
 						 ack,
@@ -797,6 +798,29 @@ void dm_handle_mst_sideband_msg_ready_event(
 			}
 
 			drm_dp_mst_hpd_irq_send_new_request(&aconnector->mst_mgr);
+#else
+			drm_dp_mst_hpd_irq(
+				&aconnector->mst_mgr,
+				esi,
+				&new_irq_handled);
+
+		if (new_irq_handled) {
+			/* ACK at DPCD to notify down stream */
+			const int ack_dpcd_bytes_to_write =
+				dpcd_bytes_to_read - 1;
+
+			for (retry = 0; retry < 3; retry++) {
+				u8 wret;
+
+				wret = drm_dp_dpcd_write(
+					&aconnector->dm_dp_aux.aux,
+					dpcd_addr + 1,
+					&esi[1],
+					ack_dpcd_bytes_to_write);
+				if (wret == ack_dpcd_bytes_to_write)
+					break;
+			}
+#endif
 
 			new_irq_handled = false;
 		} else {
