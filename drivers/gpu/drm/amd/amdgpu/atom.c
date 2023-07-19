@@ -1465,7 +1465,6 @@ struct atom_context *amdgpu_atom_parse(struct card_info *card, void *bios)
 	struct _ATOM_ROM_HEADER *atom_rom_header;
 	struct _ATOM_MASTER_DATA_TABLE *master_table;
 	struct _ATOM_FIRMWARE_INFO *atom_fw_info;
-	u16 idx;
 
 	if (!ctx)
 		return NULL;
