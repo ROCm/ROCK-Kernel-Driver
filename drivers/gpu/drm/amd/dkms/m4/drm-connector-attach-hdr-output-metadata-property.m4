@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY], [
 			#include <drm/drm_connector.h>
 		], [
 			drm_connector_attach_hdr_output_metadata_property(NULL);
-		], [drm_connector_attach_hdr_output_metadata_property], [drm/drm_connector.c], [
+		], [drm_connector_attach_hdr_output_metadata_property], [drivers/gpu/drm/drm_connector.c], [
 			AC_DEFINE(HAVE_DRM_CONNECTOR_ATTACH_HDR_OUTPUT_METADATA_PROPERTY, 1, 
 				[drm_connector_attach_hdr_output_metadata_property() is available])
 		])
