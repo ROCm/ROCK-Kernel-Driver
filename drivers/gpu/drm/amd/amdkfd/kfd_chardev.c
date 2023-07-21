@@ -1924,7 +1924,7 @@ static uint32_t get_process_num_bos(struct kfd_process *p)
 		idr_for_each_entry(&pdd->alloc_idr, buf_obj, id) {
 			struct kgd_mem *kgd_mem = (struct kgd_mem *)buf_obj->mem;
 
-			if ((uint64_t)kgd_mem->va > pdd->gpuvm_base)
+			if (!kgd_mem->va || kgd_mem->va > pdd->gpuvm_base)
 				num_of_bos++;
 		}
 	}
@@ -1996,7 +1996,11 @@ static int criu_checkpoint_bos(struct kfd_process *p,
 			kgd_mem = (struct kgd_mem *)buf_obj->mem;
 			dumper_bo = kgd_mem->bo;
 
-			if ((uint64_t)kgd_mem->va <= pdd->gpuvm_base)
+			/* Skip checkpointing BOs that are used for Trap handler
+			 * code and state. Currently, these BOs have a VA that
+			 * is less GPUVM Base
+			 */
+			if (kgd_mem->va && kgd_mem->va <= pdd->gpuvm_base)
 				continue;
 
 			bo_bucket = &bo_buckets[bo_index];
