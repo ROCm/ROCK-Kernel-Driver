@@ -99,10 +99,23 @@ static int kfd_pc_sample_start(struct kfd_process_device *pdd)
 	return -EINVAL;
 }
 
-static int kfd_pc_sample_stop(struct kfd_process_device *pdd)
+static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
+					struct pc_sampling_entry *pcs_entry)
 {
-	return -EINVAL;
+	bool pc_sampling_stop = false;
 
+	pcs_entry->enabled = false;
+	mutex_lock(&pdd->dev->pcs_data.mutex);
+	pdd->dev->pcs_data.hosttrap_entry.base.active_count--;
+	if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
+		pc_sampling_stop = true;
+
+	mutex_unlock(&pdd->dev->pcs_data.mutex);
+
+	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd,
+		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, false);
+
+	return 0;
 }
 
 static int kfd_pc_sample_create(struct kfd_process_device *pdd,
@@ -250,7 +263,7 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		if (!pcs_entry->enabled)
 			return -EALREADY;
 		else
-			return kfd_pc_sample_stop(pdd);
+			return kfd_pc_sample_stop(pdd, pcs_entry);
 	}
 
 	return -EINVAL;
