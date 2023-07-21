@@ -149,6 +149,19 @@ enum kfd_ioctl_flags {
 	 * we also allow ioctls with SYS_ADMIN capability.
 	 */
 	KFD_IOC_FLAG_CHECKPOINT_RESTORE = BIT(0),
+
+	/*
+	 * @KFD_IOC_FLAG_PERFMON:
+	 * Performance monitoring feature, GPU performance monitoring can allow users
+	 * to gather some information about other processes. PC sampling can allow
+	 * users to infer information about wavefronts from other processes that are
+	 * running on the same CUs, such as which execution units they are using. As
+	 * such, this type of performance monitoring should be protected and only
+	 * available to users with sufficient capabilities: either CAP_PERFMON, or,
+	 * for backwards compatibility, CAP_SYS_ADMIN.
+	 */
+
+	KFD_IOC_FLAG_PERFMON = BIT(1),
 };
 /*
  * Kernel module parameter to specify maximum number of supported queues per
