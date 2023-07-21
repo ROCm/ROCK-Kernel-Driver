@@ -284,9 +284,19 @@ struct kfd_vmid_info {
 
 struct kfd_dev;
 
+struct kfd_dev_pc_sampling_data {
+	uint32_t use_count;         /* Num of PC sampling sessions */
+	struct kfd_pc_sample_info pc_sample_info;
+};
+
+struct kfd_dev_pcs_hosttrap {
+	struct kfd_dev_pc_sampling_data base;
+};
+
 /* Per device PC Sampling data */
 struct kfd_dev_pc_sampling {
 	struct mutex mutex;
+	struct kfd_dev_pcs_hosttrap hosttrap_entry;
 };
 
 struct kfd_node {
