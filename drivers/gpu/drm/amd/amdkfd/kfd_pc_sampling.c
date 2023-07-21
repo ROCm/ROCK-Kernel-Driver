@@ -108,7 +108,64 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd)
 static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 					struct kfd_ioctl_pc_sample_args __user *user_args)
 {
-	return -EINVAL;
+	struct kfd_pc_sample_info *supported_format = NULL;
+	struct kfd_pc_sample_info user_info;
+	int ret;
+	int i;
+
+	if (user_args->num_sample_info != 1)
+		return -EINVAL;
+
+	ret = copy_from_user(&user_info, (void __user *) user_args->sample_info_ptr,
+				sizeof(struct kfd_pc_sample_info));
+	if (ret) {
+		pr_debug("Failed to copy PC sampling info from user\n");
+		return -EFAULT;
+	}
+
+	if (user_info.flags & KFD_IOCTL_PCS_FLAG_POWER_OF_2 &&
+		user_info.interval & (user_info.interval - 1)) {
+		pr_debug("Sampling interval's power is unmatched!");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(supported_formats); i++) {
+		if (KFD_GC_VERSION(pdd->dev) == supported_formats[i].ip_version
+			&& user_info.method == supported_formats[i].sample_info->method
+			&& user_info.type == supported_formats[i].sample_info->type
+			&& user_info.interval <= supported_formats[i].sample_info->interval_max
+			&& user_info.interval >= supported_formats[i].sample_info->interval_min) {
+			supported_format =
+				(struct kfd_pc_sample_info *)supported_formats[i].sample_info;
+			break;
+		}
+	}
+
+	if (!supported_format) {
+		pr_debug("Sampling format is not supported!");
+		return -EOPNOTSUPP;
+	}
+
+	mutex_lock(&pdd->dev->pcs_data.mutex);
+	if (pdd->dev->pcs_data.hosttrap_entry.base.use_count &&
+		memcmp(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
+				&user_info, sizeof(user_info))) {
+		ret = copy_to_user((void __user *) user_args->sample_info_ptr,
+			&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info,
+			sizeof(struct kfd_pc_sample_info));
+		mutex_unlock(&pdd->dev->pcs_data.mutex);
+		return ret ? -EFAULT : -EEXIST;
+	}
+
+	/* TODO: add trace_id return */
+
+	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
+		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info = user_info;
+
+	pdd->dev->pcs_data.hosttrap_entry.base.use_count++;
+	mutex_unlock(&pdd->dev->pcs_data.mutex);
+
+	return 0;
 }
 
 static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_id)
