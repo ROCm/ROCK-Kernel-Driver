@@ -61,7 +61,8 @@ AMDKFD_FILES	:= $(AMDKFD_PATH)/kfd_module.o \
 		$(AMDKFD_PATH)/kfd_ipc.o \
 		$(AMDKFD_PATH)/kfd_trace.o \
 		$(AMDKFD_PATH)/kfd_spm.o \
-		$(AMDKFD_PATH)/kfd_debug.o
+		$(AMDKFD_PATH)/kfd_debug.o \
+		$(AMDKFD_PATH)/kfd_pc_sampling.o
 
 ifneq ($(CONFIG_DEBUG_FS),)
 AMDKFD_FILES += $(AMDKFD_PATH)/kfd_debugfs.o
