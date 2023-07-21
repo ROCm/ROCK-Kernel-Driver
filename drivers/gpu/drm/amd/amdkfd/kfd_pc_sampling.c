@@ -337,6 +337,31 @@ static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_
 	return 0;
 }
 
+void kfd_pc_sample_release(struct kfd_process_device *pdd)
+{
+	struct pc_sampling_entry *pcs_entry;
+	struct idr *idp;
+	uint32_t id;
+
+	/* force to release all PC sampling task for this process */
+	idp = &pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr;
+	do {
+		pcs_entry = NULL;
+		mutex_lock(&pdd->dev->pcs_data.mutex);
+		idr_for_each_entry(idp, pcs_entry, id) {
+			if (pcs_entry->pdd != pdd)
+				continue;
+			break;
+		}
+		mutex_unlock(&pdd->dev->pcs_data.mutex);
+		if (pcs_entry) {
+			if (pcs_entry->enabled)
+				kfd_pc_sample_stop(pdd, pcs_entry);
+			kfd_pc_sample_destroy(pdd, id, pcs_entry);
+		}
+	} while (pcs_entry);
+}
+
 int kfd_pc_sample(struct kfd_process_device *pdd,
 					struct kfd_ioctl_pc_sample_args __user *args)
 {

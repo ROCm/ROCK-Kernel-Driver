@@ -30,5 +30,6 @@
 
 int kfd_pc_sample(struct kfd_process_device *pdd,
 					struct kfd_ioctl_pc_sample_args __user *args);
+void kfd_pc_sample_release(struct kfd_process_device *pdd);
 
 #endif /* KFD_PC_SAMPLING_H_ */
