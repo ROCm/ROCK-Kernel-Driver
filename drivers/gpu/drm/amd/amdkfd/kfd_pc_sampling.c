@@ -186,10 +186,24 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 	return 0;
 }
 
-static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_id)
+static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_id,
+					struct pc_sampling_entry *pcs_entry)
 {
-	return -EINVAL;
+	pr_debug("free pcs_entry = %p, trace_id = 0x%x on gpu 0x%x",
+		pcs_entry, trace_id, pdd->dev->id);
 
+	mutex_lock(&pdd->dev->pcs_data.mutex);
+	pdd->dev->pcs_data.hosttrap_entry.base.use_count--;
+	idr_remove(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr, trace_id);
+
+	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
+		memset(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info, 0x0,
+			sizeof(struct kfd_pc_sample_info));
+	mutex_unlock(&pdd->dev->pcs_data.mutex);
+
+	kfree(pcs_entry);
+
+	return 0;
 }
 
 int kfd_pc_sample(struct kfd_process_device *pdd,
@@ -224,7 +238,7 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		if (pcs_entry->enabled)
 			return -EBUSY;
 		else
-			return kfd_pc_sample_destroy(pdd, args->trace_id);
+			return kfd_pc_sample_destroy(pdd, args->trace_id, pcs_entry);
 
 	case KFD_IOCTL_PCS_OP_START:
 		if (pcs_entry->enabled)
