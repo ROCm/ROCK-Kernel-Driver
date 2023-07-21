@@ -95,9 +95,23 @@ static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 	return 0;
 }
 
-static int kfd_pc_sample_start(struct kfd_process_device *pdd)
+static int kfd_pc_sample_start(struct kfd_process_device *pdd,
+					struct pc_sampling_entry *pcs_entry)
 {
-	return -EINVAL;
+	bool pc_sampling_start = false;
+
+	pcs_entry->enabled = true;
+	mutex_lock(&pdd->dev->pcs_data.mutex);
+
+	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd,
+		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, true);
+
+	if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
+		pc_sampling_start = true;
+	pdd->dev->pcs_data.hosttrap_entry.base.active_count++;
+	mutex_unlock(&pdd->dev->pcs_data.mutex);
+
+	return 0;
 }
 
 static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
@@ -260,7 +274,7 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		if (pcs_entry->enabled)
 			return -EALREADY;
 		else
-			return kfd_pc_sample_start(pdd);
+			return kfd_pc_sample_start(pdd, pcs_entry);
 
 	case KFD_IOCTL_PCS_OP_STOP:
 		if (!pcs_entry->enabled)
