@@ -31,6 +31,8 @@
 #include <linux/types.h>
 #include <linux/bitmap.h>
 #include <linux/dma-fence.h>
+#include <uapi/linux/kfd_ioctl.h>
+
 #include "amdgpu_irq.h"
 #include "amdgpu_gfx.h"
 
@@ -323,6 +325,12 @@ struct kfd2kgd_calls {
 	void (*program_trap_handler_settings)(struct amdgpu_device *adev,
 			uint32_t vmid, uint64_t tba_addr, uint64_t tma_addr,
 			uint32_t inst);
+	uint32_t (*trigger_pc_sample_trap)(struct amdgpu_device *adev,
+					uint32_t vmid,
+					uint32_t *target_simd,
+					uint32_t *target_wave_slot,
+					enum kfd_ioctl_pc_sample_method method,
+					uint32_t inst);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */
