@@ -44,6 +44,7 @@ struct mm_struct;
 #include "kfd_trace.h"
 #include "kfd_smi_events.h"
 #include "kfd_debug.h"
+#include "kfd_pc_sampling.h"
 
 /*
  * List of struct kfd_process (field kfd_process).
@@ -1016,6 +1017,8 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 
 		pr_debug("Releasing pdd (topology id %d) for process (pasid 0x%x)\n",
 				pdd->dev->id, p->pasid);
+
+		kfd_pc_sample_release(pdd);
 
 		kfd_process_device_destroy_cwsr_dgpu(pdd);
 		kfd_process_device_destroy_ib_mem(pdd);
