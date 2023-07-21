@@ -286,6 +286,9 @@ struct kfd_dev;
 
 struct kfd_dev_pc_sampling_data {
 	uint32_t use_count;         /* Num of PC sampling sessions */
+	uint32_t active_count;      /* Num of active sessions */
+	uint32_t target_simd;       /* target simd for trap */
+	uint32_t target_wave_slot;  /* target wave slot for trap */
 	struct idr pc_sampling_idr;
 	struct kfd_pc_sample_info pc_sample_info;
 };
