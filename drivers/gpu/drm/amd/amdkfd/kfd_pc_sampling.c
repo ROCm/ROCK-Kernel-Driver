@@ -39,6 +39,92 @@ struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
 };
 
+static int kfd_pc_sample_thread(void *param)
+{
+	struct amdgpu_device *adev;
+	struct kfd_node *node = param;
+	uint32_t timeout = 0;
+	ktime_t next_trap_time;
+	bool need_wait;
+
+	mutex_lock(&node->pcs_data.mutex);
+	if (node->pcs_data.hosttrap_entry.base.active_count &&
+		node->pcs_data.hosttrap_entry.base.pc_sample_info.interval &&
+		node->kfd2kgd->trigger_pc_sample_trap) {
+		switch (node->pcs_data.hosttrap_entry.base.pc_sample_info.type) {
+		case KFD_IOCTL_PCS_TYPE_TIME_US:
+			timeout = (uint32_t)node->pcs_data.hosttrap_entry.base.pc_sample_info.interval;
+			break;
+		default:
+			pr_debug("PC Sampling type %d not supported.",
+					node->pcs_data.hosttrap_entry.base.pc_sample_info.type);
+		}
+	}
+	mutex_unlock(&node->pcs_data.mutex);
+	if (!timeout)
+		return -EINVAL;
+
+	adev = node->adev;
+	need_wait = false;
+	allow_signal(SIGKILL);
+	while (!kthread_should_stop() &&
+			!signal_pending(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+		if (!need_wait) {
+			uint32_t inst;
+
+			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
+
+			for_each_inst(inst, node->xcc_mask) {
+			node->kfd2kgd->trigger_pc_sample_trap(adev, node->vm_info.last_vmid_kfd,
+					&node->pcs_data.hosttrap_entry.base.target_simd,
+					&node->pcs_data.hosttrap_entry.base.target_wave_slot,
+					node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
+					inst);
+			}
+			pr_debug_ratelimited("triggered a host trap.");
+			need_wait = true;
+		} else {
+			ktime_t wait_time;
+			s64 wait_ns, wait_us;
+
+			wait_time = ktime_sub(next_trap_time, ktime_get_raw());
+			wait_ns = ktime_to_ns(wait_time);
+			wait_us = ktime_to_us(wait_time);
+			if (wait_ns >= 10000)
+				usleep_range(wait_us - 10, wait_us);
+			else if (wait_ns > 0)
+				schedule();
+			else
+				need_wait = false;
+		}
+	}
+
+	node->pcs_data.hosttrap_entry.base.target_simd = 0;
+	node->pcs_data.hosttrap_entry.base.target_wave_slot = 0;
+	node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+
+	return 0;
+}
+
+static int kfd_pc_sample_thread_start(struct kfd_node *node)
+{
+	char thread_name[16];
+	int ret = 0;
+
+	snprintf(thread_name, 16, "pcs_%d", node->adev->ddev.render->index);
+	node->pcs_data.hosttrap_entry.base.pc_sample_thread =
+		kthread_run(kfd_pc_sample_thread, node, thread_name);
+
+	if (IS_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+		ret = PTR_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread);
+		node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+		pr_debug("Failed to create pc sample thread for %s with ret = %d.",
+			thread_name, ret);
+	}
+
+	return ret;
+}
+
 static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 					struct kfd_ioctl_pc_sample_args __user *user_args)
 {
@@ -99,6 +185,7 @@ static int kfd_pc_sample_start(struct kfd_process_device *pdd,
 					struct pc_sampling_entry *pcs_entry)
 {
 	bool pc_sampling_start = false;
+	int ret = 0;
 
 	pcs_entry->enabled = true;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
@@ -108,10 +195,21 @@ static int kfd_pc_sample_start(struct kfd_process_device *pdd,
 
 	if (!pdd->dev->pcs_data.hosttrap_entry.base.active_count)
 		pc_sampling_start = true;
+
 	pdd->dev->pcs_data.hosttrap_entry.base.active_count++;
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
-	return 0;
+	while (pc_sampling_start) {
+		/* true means pc_sample_thread stop is in progress */
+		if (READ_ONCE(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+			usleep_range(1000, 2000);
+		} else {
+			ret = kfd_pc_sample_thread_start(pdd->dev);
+			break;
+		}
+	}
+
+	return ret;
 }
 
 static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
@@ -131,6 +229,9 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, false);
 	remap_queue(pdd->dev->dqm,
 		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
+
+	if (pc_sampling_stop)
+		kthread_stop(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread);
 
 	return 0;
 }

@@ -290,6 +290,7 @@ struct kfd_dev_pc_sampling_data {
 	uint32_t target_simd;       /* target simd for trap */
 	uint32_t target_wave_slot;  /* target wave slot for trap */
 	struct idr pc_sampling_idr;
+	struct task_struct *pc_sample_thread;
 	struct kfd_pc_sample_info pc_sample_info;
 };
 
