@@ -1282,6 +1282,8 @@ void kfd_process_set_trap_handler(struct qcm_process_device *qpd,
 				  uint64_t tma_addr);
 void kfd_process_set_trap_debug_flag(struct qcm_process_device *qpd,
 				     bool enabled);
+void kfd_process_set_trap_pc_sampling_flag(struct qcm_process_device *qpd,
+				     enum kfd_ioctl_pc_sample_method method, bool enabled);
 
 /* CWSR initialization */
 int kfd_process_init_cwsr_apu(struct kfd_process *process, struct file *filep);
