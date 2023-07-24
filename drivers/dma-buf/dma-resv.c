@@ -693,6 +693,7 @@ EXPORT_SYMBOL_GPL(dma_resv_wait_timeout);
  * May be called without holding the dma_resv lock.  Sets @deadline on
  * all fences filtered by @usage.
  */
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 void dma_resv_set_deadline(struct dma_resv *obj, enum dma_resv_usage usage,
 			   ktime_t deadline)
 {
@@ -706,6 +707,7 @@ void dma_resv_set_deadline(struct dma_resv *obj, enum dma_resv_usage usage,
 	dma_resv_iter_end(&cursor);
 }
 EXPORT_SYMBOL_GPL(dma_resv_set_deadline);
+#endif
 
 /**
  * dma_resv_test_signaled - Test if a reservation object's fences have been

@@ -589,8 +589,10 @@ void drm_sched_entity_set_priority(struct drm_sched_entity *entity,
 bool drm_sched_entity_is_ready(struct drm_sched_entity *entity);
 int drm_sched_entity_error(struct drm_sched_entity *entity);
 
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 void drm_sched_fence_set_parent(struct drm_sched_fence *s_fence,
 				struct dma_fence *fence);
+#endif
 struct drm_sched_fence *drm_sched_fence_alloc(
 	struct drm_sched_entity *s_entity, void *owner);
 void drm_sched_fence_init(struct drm_sched_fence *fence,
