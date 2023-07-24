@@ -15,3 +15,24 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_OPS_USE_64BIT_SEQNO], [
 		])
 	])
 ])
+
+
+dnl #
+dnl # v6.3-rc2-1-gaec11c8d7cb3
+dnl # dma-buf/dma-fence: Add deadline awareness
+dnl #
+AC_DEFUN([AC_AMDGPU_DMA_FENCE_OPS_SET_DEADLINE], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/dma-fence.h>
+		], [
+			ktime_t deadline = 0;
+			struct dma_fence_ops *ops = NULL;
+			ops->set_deadline(NULL, deadline);
+		], [
+			AC_DEFINE(HAVE_DMA_FENCE_OPS_SET_DEADLINE, 1,
+				[struct dma_fence_ops has callback set_deadline])
+		])
+	])
+])
+
