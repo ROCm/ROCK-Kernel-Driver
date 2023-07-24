@@ -48,6 +48,7 @@ static void __exit drm_sched_fence_slab_fini(void)
 	kmem_cache_destroy(sched_fence_slab);
 }
 
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 static void drm_sched_fence_set_parent(struct drm_sched_fence *s_fence,
 				       struct dma_fence *fence)
 {
@@ -61,6 +62,7 @@ static void drm_sched_fence_set_parent(struct drm_sched_fence *s_fence,
 		     &s_fence->finished.flags))
 		dma_fence_set_deadline(fence, s_fence->deadline);
 }
+#endif
 
 void drm_sched_fence_scheduled(struct drm_sched_fence *fence,
 			       struct dma_fence *parent)
@@ -72,8 +74,11 @@ void drm_sched_fence_scheduled(struct drm_sched_fence *fence,
 	 * up.
 	 */
 	if (!IS_ERR_OR_NULL(parent))
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 		drm_sched_fence_set_parent(fence, parent);
-
+#else
+		fence->parent = dma_fence_get(parent);
+#endif
 	dma_fence_signal(&fence->scheduled);
 }
 
@@ -149,6 +154,7 @@ static void drm_sched_fence_release_finished(struct dma_fence *f)
 	dma_fence_put(&fence->scheduled);
 }
 
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 static void drm_sched_fence_set_deadline_finished(struct dma_fence *f,
 						  ktime_t deadline)
 {
@@ -179,6 +185,7 @@ static void drm_sched_fence_set_deadline_finished(struct dma_fence *f,
 	if (parent)
 		dma_fence_set_deadline(parent, deadline);
 }
+#endif
 
 static const struct dma_fence_ops drm_sched_fence_ops_scheduled = {
 	.get_driver_name = drm_sched_fence_get_driver_name,
@@ -194,7 +201,9 @@ static const struct dma_fence_ops drm_sched_fence_ops_finished = {
 	AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
 	AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 	.release = drm_sched_fence_release_finished,
+#ifdef HAVE_DMA_FENCE_OPS_SET_DEADLINE
 	.set_deadline = drm_sched_fence_set_deadline_finished,
+#endif
 };
 
 struct drm_sched_fence *to_drm_sched_fence(struct dma_fence *f)
