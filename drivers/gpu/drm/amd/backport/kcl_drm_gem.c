@@ -70,7 +70,7 @@ static int _kcl_drm_gem_mmap_obj(struct drm_gem_object *obj, unsigned long obj_s
                         goto err_drm_gem_object_put;
                 }
 
-                vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
+                vm_flags_set(vma, VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP);
                 vma->vm_page_prot = pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
                 vma->vm_page_prot = pgprot_decrypted(vma->vm_page_prot);
         }
