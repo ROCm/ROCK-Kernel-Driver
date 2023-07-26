@@ -3,6 +3,8 @@
 #ifndef AMDKCL_DYNAMIC_DEBUG_H
 #define AMDKCL_DYNAMIC_DEBUG_H
 
+#include <linux/dynamic_debug.h>
+
 #ifndef DECLARE_DYNDBG_CLASSMAP
 enum class_map_type {
 	DD_CLASS_TYPE_DISJOINT_BITS,
@@ -61,4 +63,16 @@ struct ddebug_class_map {
 
 #endif
 
+#if IS_ENABLED(CONFIG_DYNAMIC_DEBUG)
+#ifndef _dynamic_func_call_no_desc
+#define __dynamic_func_call_no_desc(id, fmt, func, ...) do {	\
+        DEFINE_DYNAMIC_DEBUG_METADATA(id, fmt);                 \
+        if (DYNAMIC_DEBUG_BRANCH(id))                           \
+			func(__VA_ARGS__);                              	\
+} while (0)
+
+#define _dynamic_func_call_no_desc(fmt, func, ...)     \
+       __dynamic_func_call_no_desc(__UNIQUE_ID(ddebug), fmt, func, ##__VA_ARGS__)
+#endif /* _dynamic_func_call_no_desc */
+#endif /* CONFIG_DYNAMIC_DEBUG */
 #endif /* AMDKCL_DYNAMIC_DEBUG_H */
