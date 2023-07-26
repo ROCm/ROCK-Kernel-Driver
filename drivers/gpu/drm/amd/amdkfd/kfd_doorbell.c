@@ -191,7 +191,7 @@ static const struct vm_operations_struct kfd_doorbell_vm_ops = {
 	.fault = kfd_doorbell_vm_fault,
 };
 
-void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
+static void kfd_doorbell_unmap_locked(struct kfd_process_device *pdd)
 {
 	struct kfd_process *process = pdd->process;
 	struct vm_area_struct *vma;
