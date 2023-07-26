@@ -90,7 +90,7 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 	seq_printf(m, "pasid:\t%u\n", fpriv->vm.pasid);
 	seq_printf(m, "drm-driver:\t%s\n", file->minor->dev->driver->name);
 	seq_printf(m, "drm-pdev:\t%04x:%02x:%02x.%d\n", domain, bus, dev, fn);
-	seq_printf(m, "drm-client-id:\t%Lu\n", vm->immediate.fence_context);
+	seq_printf(m, "drm-client-id:\t%llu\n", vm->immediate.fence_context);
 	seq_printf(m, "drm-memory-vram:\t%llu KiB\n", stats.vram/1024UL);
 	seq_printf(m, "drm-memory-gtt: \t%llu KiB\n", stats.gtt/1024UL);
 	seq_printf(m, "drm-memory-cpu: \t%llu KiB\n", stats.cpu/1024UL);
@@ -116,7 +116,7 @@ void amdgpu_show_fdinfo(struct seq_file *m, struct file *f)
 			continue;
 #endif
 
-		seq_printf(m, "drm-engine-%s:\t%Ld ns\n", amdgpu_ip_name[hw_ip],
+		seq_printf(m, "drm-engine-%s:\t%lld ns\n", amdgpu_ip_name[hw_ip],
 			   ktime_to_ns(usage[hw_ip]));
 	}
 }
