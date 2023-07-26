@@ -115,6 +115,9 @@
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
 
+/* struct dma_fence_ops has callback set_deadline */
+#define HAVE_DMA_FENCE_OPS_SET_DEADLINE 1
+
 /* struct dma_fence_ops has use_64bit_seqno field */
 #define HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO 1
 
@@ -380,6 +383,9 @@
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
 
+/* Define to 1 if you have the <drm/drm_suballoc.h> header file. */
+#define HAVE_DRM_DRM_SUBALLOC_H 1
+
 /* drm_driver_feature DRIVER_IRQ_SHARED is available */
 /* #undef HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
 
@@ -524,6 +530,9 @@
 
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
+
+/* Has function drm_suballoc_manager_init() */
+#define HAVE_DRM_SUBALLOC_MANAGER_INIT 1
 
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
@@ -723,6 +732,9 @@
 /* migrate_vma->pgmap_owner is available */
 #define HAVE_MIGRATE_VMA_PGMAP_OWNER 1
 
+/* mmap_assert_write_locked() is available */
+#define HAVE_MMAP_ASSERT_WRITE_LOCKED 1
+
 /* mmput_async() is available */
 #define HAVE_MMPUT_ASYNC 1
 
@@ -776,6 +788,9 @@
 
 /* vm_insert_mixed() wants pfn_t arg */
 /* #undef HAVE_PFN_T_VM_INSERT_MIXED */
+
+/* PIDTYPE is availablea */
+#define HAVE_PIDTYPE_TGID 1
 
 /* pm_suspend_target_state is available */
 #define HAVE_PM_SUSPEND_TARGET_STATE 1
@@ -906,6 +921,9 @@
 
 /* vm_fault->{address/vam} is available */
 #define HAVE_VM_FAULT_ADDRESS_VMA 1
+
+/* vm_flags_{set, clear} is available */
+#define HAVE_VM_FLAGS_SET 1
 
 /* vm_insert_pfn_prot() is available */
 /* #undef HAVE_VM_INSERT_PFN_PROT */
