@@ -425,10 +425,6 @@
 /* drm_edid_override_connector_update() is available */
 #define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
 
-/* drm_fb_helper_single_add_all_connectors() &&
-   drm_fb_helper_remove_one_connector() are symbol */
-/* #undef HAVE_DRM_FB_HELPER_ADD_REMOVE_CONNECTORS */
-
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
 
