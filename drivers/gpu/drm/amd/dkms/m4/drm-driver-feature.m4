@@ -9,10 +9,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DRMP_H
-			struct vm_area_struct;
 			#include <drm/drmP.h>
-			#endif
 			#include <drm/drm_drv.h>
 		],[
 			int _ = DRIVER_SYNCOBJ_TIMELINE;
@@ -28,10 +25,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DRMP_H
-			struct vm_area_struct;
 			#include <drm/drmP.h>
-			#endif
 			#include <drm/drm_drv.h>
 		],[
 			int _ = DRIVER_IRQ_SHARED;
@@ -47,10 +41,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 	dnl #
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DRMP_H
-			struct vm_area_struct;
 			#include <drm/drmP.h>
-			#endif
 			#include <drm/drm_drv.h>
 		],[
 			int _ = DRIVER_PRIME;

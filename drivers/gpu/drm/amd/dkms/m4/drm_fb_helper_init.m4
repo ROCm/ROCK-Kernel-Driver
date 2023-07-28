@@ -5,9 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_INIT], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
-			#ifdef HAVE_DRM_DRMP_H
 			#include <drm/drmP.h>
-			#endif
 			#include <drm/drm_fb_helper.h>
 		], [
 			drm_fb_helper_init(NULL, NULL);
@@ -20,9 +18,7 @@ AC_DEFUN([AC_AMDGPU_DRM_FB_HELPER_INIT], [
 		dnl # drm: Rely on mode_config data for fb_helper initialization
 		dnl #
 			AC_KERNEL_TRY_COMPILE_SYMBOL([
-				#ifdef HAVE_DRM_DRMP_H
 				#include <drm/drmP.h>
-				#endif
 				#include <drm/drm_fb_helper.h>
 			], [
 				drm_fb_helper_init(NULL, NULL, 0);
