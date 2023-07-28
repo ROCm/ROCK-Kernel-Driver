@@ -28,7 +28,6 @@
 #include <linux/sched/task.h>
 #include <linux/mmu_context.h>
 #include <linux/slab.h>
-#include <linux/amd-iommu.h>
 #include <linux/notifier.h>
 #include <linux/compat.h>
 #include <linux/mman.h>
@@ -41,7 +40,6 @@ struct mm_struct;
 
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
-#include "kfd_iommu.h"
 #include "kfd_svm.h"
 #include "kfd_trace.h"
 #include "kfd_smi_events.h"
@@ -1109,7 +1107,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 	dma_fence_signal(p->ef);
 
 	kfd_process_remove_sysfs(p);
-	kfd_iommu_unbind_process(p);
 
 	kfd_process_kunmap_signal_bo(p);
 	kfd_process_free_outstanding_kfd_bos(p);
@@ -1750,10 +1747,6 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_node *dev,
 		}
 	}
 
-	err = kfd_iommu_bind_process_to_device(pdd);
-	if (err)
-		goto out;
-
 	/*
 	 * make sure that runtime_usage counter is incremented just once
 	 * per pdd
@@ -1761,15 +1754,6 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_node *dev,
 	pdd->runtime_inuse = true;
 
 	return pdd;
-
-out:
-	/* balance runpm reference count and exit with error */
-	if (!pdd->runtime_inuse) {
-		pm_runtime_mark_last_busy(adev_to_drm(dev->adev)->dev);
-		pm_runtime_put_autosuspend(adev_to_drm(dev->adev)->dev);
-	}
-
-	return ERR_PTR(err);
 }
 
 /* Create specific handle mapped to mem from process local memory idr
