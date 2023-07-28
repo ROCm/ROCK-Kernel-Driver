@@ -22,6 +22,9 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 				  -e '/-I/p; /-include/p; /-isystem/p; /-D/p' | \
 			   xargs)
 
+		CFLAGS=$(echo $CFLAGS | \
+			sed -e "s|nostdinc|nostdinc -I../tiny_wrapper/include|")
+
 		AC_SUBST(CC)
 		AC_SUBST(CFLAGS)
 		AC_SUBST(CPPFLAGS)
