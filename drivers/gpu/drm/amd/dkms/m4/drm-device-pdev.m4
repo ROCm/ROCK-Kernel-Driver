@@ -5,10 +5,8 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DEVICE_PDEV], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
-			#ifdef HAVE_DRM_DRMP_H
 			#include <drm/drmP.h>
-			#endif
-                        #include <drm/drm_device.h>
+            #include <drm/drm_device.h>
 		], [
 			struct drm_device *pdd = NULL;
 			pdd->pdev = NULL;

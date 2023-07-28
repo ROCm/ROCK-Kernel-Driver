@@ -15,12 +15,8 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_GEM_OPEN_OBJECT], [
 		dnl # commit v5.9-rc5-1077-gd693def4fd1c
 		dnl # drm: Remove obsolete GEM and PRIME callbacks from struct drm_driver
 			AC_KERNEL_TRY_COMPILE([
-				struct vm_area_struct;
-				#ifdef HAVE_DRM_DRMP_H
 				#include <drm/drmP.h>
-				#else
 				#include <drm/drm_drv.h>
-				#endif
 			],[
 				struct drm_driver *drv = NULL;
 				drv->gem_open_object = NULL;

@@ -5,13 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_SEND_REAL_EDID_CHECKSUM], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
-			#if defined(HAVE_DRM_DISPLAY_DRM_DP_HELPER_H)
-			#include <drm/display/drm_dp_helper.h>
-			#elif defined(HAVE_DRM_DP_DRM_DP_HELPER_H)
-			#include <drm/dp/drm_dp_helper.h>
-			#else
-			#include <drm/drm_dp_helper.h>
-			#endif			
+			#include <drm/drm_dp_helper.h>		
 		], [
 			drm_dp_send_real_edid_checksum(NULL, 0);
 		], [drm_dp_send_real_edid_checksum], [drivers/gpu/drm/drm_dp_helper.c], [
