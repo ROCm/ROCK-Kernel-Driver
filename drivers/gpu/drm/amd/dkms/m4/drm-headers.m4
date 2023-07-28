@@ -55,7 +55,13 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	dnl # drm/dp: Move public DisplayPort headers into dp/
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([drm/dp/drm_dp_mst_helper.h])
-	
+
+	dnl #
+	dnl # v5.11-rc2-620-g6dd7b6ce43ac
+	dnl # drm: Add additional atomic helpers for shadow-buffered planes
+	dnl #
+	AC_KERNEL_CHECK_HEADERS([drm/drm_gem_atomic_helper.h])
+
 	dnl #
 	dnl # v5.18-rc2-594-gda68386d9edb
 	dnl # drm: Rename dp/ to display/
