@@ -490,6 +490,7 @@ union bw_output {
 struct bw_context {
 	union bw_output bw;
 	struct display_mode_lib dml;
+	struct dml2_context *dml2;
 };
 
 struct dc_dmub_cmd {
