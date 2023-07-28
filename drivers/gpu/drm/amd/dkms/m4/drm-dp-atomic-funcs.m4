@@ -100,7 +100,13 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_SETUP_COMMIT], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+			#include <drm/display/drm_dp_mst_helper.h>
+			#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		],[
 			int ret;
 			ret = drm_dp_mst_atomic_setup_commit(NULL);
@@ -120,10 +126,15 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+			#include <drm/display/drm_dp_mst_helper.h>
+			#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		],[
-			int ret;
-			ret = drm_dp_mst_atomic_wait_for_dependencies(NULL);
+			drm_dp_mst_atomic_wait_for_dependencies(NULL);
 		],[
 			AC_DEFINE(HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES, 1,
 				[drm_dp_mst_atomic_wait_for_dependencies() is available])
@@ -138,7 +149,13 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE([
+			#if defined(HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H)
+			#include <drm/display/drm_dp_mst_helper.h>
+			#elif defined(HAVE_DRM_DP_DRM_DP_MST_HELPER_H)
+			#include <drm/dp/drm_dp_mst_helper.h>
+			#else
 			#include <drm/drm_dp_mst_helper.h>
+			#endif
 		],[
 			int ret;
 			ret = drm_dp_mst_root_conn_atomic_check(NULL, NULL);
