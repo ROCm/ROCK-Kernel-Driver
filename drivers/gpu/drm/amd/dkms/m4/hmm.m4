@@ -49,6 +49,7 @@ dnl # 107e899874e9 - mm/hmm: define the pre-processor related parts of hmm.h eve
 dnl # v5.4-rc5-20-g04ec32fbc2b2 - mm/hmm: allow hmm_range to be used with a mmu_interval_notifier or hmm_mirror <Jason Gunthorpe> 2019-11-23 19:56:44 -0400
 dnl # 99cb252f5e68 - mm/mmu_notifier: add an interval tree notifier <Jason Gunthorpe> 2019-11-23 19:56:44 -0400
 dnl # 56f434f40f05 - mm/mmu_notifier: define the header pre-processor parts even if disabled <Jason Gunthorpe> 2019-11-12 20:18:27 -0400
+dnl # 7d4a8be0c4b2 - mm/mmu_notifier: remove unused mmu_notifier_range_update_to_read_only export
 dnl #
 AC_DEFUN([AC_AMDGPU_HMM], [
 	AC_KERNEL_DO_BACKGROUND([
@@ -61,7 +62,7 @@ AC_DEFUN([AC_AMDGPU_HMM], [
 			struct mmu_notifier_range *mmu_range = NULL;
 
 			range->notifier = NULL;
-			mmu_range->vma = NULL;
+			mmu_range->event = 0;
 			#else
 			#error CONFIG_HMM_MIRROR not enabled
 			#endif
