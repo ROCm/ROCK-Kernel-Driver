@@ -276,10 +276,10 @@
 /* #undef HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT */
 
 /* drm_dp_mst_atomic_setup_commit() is available */
-/* #undef HAVE_DRM_DP_ATOMIC_SETUP_COMMIT */
+#define HAVE_DRM_DP_ATOMIC_SETUP_COMMIT 1
 
 /* drm_dp_mst_atomic_wait_for_dependencies() is available */
-/* #undef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES */
+#define HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES 1
 
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
@@ -339,7 +339,7 @@
 #define HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX 1
 
 /* drm_dp_mst_root_conn_atomic_check() is available */
-/* #undef HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK */
+#define HAVE_DRM_DP_MST_ROOT_CONN_ATOMIC_CHECK 1
 
 /* struct drm_dp_mst_topology_cbs->destroy_connector is available */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_DESTROY_CONNECTOR */
