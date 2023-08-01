@@ -128,4 +128,12 @@ static inline bool want_init_on_free(void)
 }
 #endif
 
+#ifndef HAVE_TOTALRAM_PAGES
+extern unsigned long *_kcl_totalram_pages;
+static inline unsigned long totalram_pages(void)
+{
+       return *_kcl_totalram_pages;
+}
+#endif /* HAVE_TOTALRAM_PAGES */
+
 #endif /* AMDKCL_MM_H */
