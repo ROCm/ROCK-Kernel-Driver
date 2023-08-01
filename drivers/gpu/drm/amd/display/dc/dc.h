@@ -1736,53 +1736,6 @@ enum dc_status dc_link_dp_read_hpd_rx_irq_data(
 	struct dc_link *link,
 	union hpd_irq_data *irq_data);
 
-/* Notify DC about DP RX Interrupt (aka DP IRQ_HPD).
- *
- * TODO - When defer_handling is true the function will have a different purpose.
- * It no longer does complete hpd rx irq handling. We should create a separate
- * interface specifically for this case.
- *
- * Return:
- * true - Downstream port status changed. DM should call DC to do the
- * detection.
- * false - no change in Downstream port status. No further action required
- * from DM.
- */
-bool dc_link_handle_hpd_rx_irq(struct dc_link *dc_link,
-		union hpd_irq_data *hpd_irq_dpcd_data, bool *out_link_loss,
-		bool defer_handling, bool *has_left_work);
-/* handle DP specs define test automation sequence*/
-void dc_link_dp_handle_automated_test(struct dc_link *link);
-
-/* handle DP Link loss sequence and try to recover RX link loss with best
- * effort
- */
-void dc_link_dp_handle_link_loss(struct dc_link *link);
-
-/* Determine if hpd rx irq should be handled or ignored
- * return true - hpd rx irq should be handled.
- * return false - it is safe to ignore hpd rx irq event
- */
-bool dc_link_dp_allow_hpd_rx_irq(const struct dc_link *link);
-
-/* Determine if link loss is indicated with a given hpd_irq_dpcd_data.
- * @link - link the hpd irq data associated with
- * @hpd_irq_dpcd_data - input hpd irq data
- * return - true if hpd irq data indicates a link lost
- */
-bool dc_link_check_link_loss_status(struct dc_link *link,
-		union hpd_irq_data *hpd_irq_dpcd_data);
-
-/* Read hpd rx irq data from a given link
- * @link - link where the hpd irq data should be read from
- * @irq_data - output hpd irq data
- * return - DC_OK if hpd irq data is read successfully, otherwise hpd irq data
- * read has failed.
- */
-enum dc_status dc_link_dp_read_hpd_rx_irq_data(
-	struct dc_link *link,
-	union hpd_irq_data *irq_data);
-
 /* The function clears recorded DP RX states in the link. DM should call this
  * function when it is resuming from S3 power state to previously connected links.
  *
