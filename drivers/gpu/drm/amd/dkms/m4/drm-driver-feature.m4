@@ -12,7 +12,8 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			#include <drm/drmP.h>
 			#include <drm/drm_drv.h>
 		],[
-			int _ = DRIVER_SYNCOBJ_TIMELINE;
+			int flag;
+			flag = DRIVER_SYNCOBJ_TIMELINE;
 		],[
 			AC_DEFINE(HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE, 1, [
 				drm_driver_feature DRIVER_SYNCOBJ_TIMELINE is available])
@@ -28,7 +29,8 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			#include <drm/drmP.h>
 			#include <drm/drm_drv.h>
 		],[
-			int _ = DRIVER_IRQ_SHARED;
+			int flag;
+			flag = DRIVER_IRQ_SHARED;
 		],[
 			AC_DEFINE(HAVE_DRM_DRV_DRIVER_IRQ_SHARED, 1, [
 				drm_driver_feature DRIVER_IRQ_SHARED is available])
@@ -44,7 +46,8 @@ AC_DEFUN([AC_AMDGPU_DRM_DRIVER_FEATURE], [
 			#include <drm/drmP.h>
 			#include <drm/drm_drv.h>
 		],[
-			int _ = DRIVER_PRIME;
+			int flag;
+			flag = DRIVER_PRIME;
 		],[
 			AC_DEFINE(HAVE_DRM_DRV_DRIVER_PRIME, 1, [
 				drm_driver_feature DRIVER_PRIME is available])

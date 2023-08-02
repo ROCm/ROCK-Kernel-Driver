@@ -7,11 +7,11 @@ AC_DEFUN([AC_AMDGPU_DRM_FORMAT_INFO], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <drm/drm_fourcc.h>
 		], [
-			struct drm_format_info format = {
-			    .format = DRM_FORMAT_XRGB16161616F,
-			    .block_w = {0},
-			    .block_h = {0},
-			};
+			struct drm_format_info format;
+
+			format.format = DRM_FORMAT_XRGB16161616F;
+			format.block_w[0] = 0;
+			format.block_h[0] = 0;
 		], [
 			AC_DEFINE(HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED, 1,
 				[drm_format_info.block_w and rm_format_info.block_h is available])
