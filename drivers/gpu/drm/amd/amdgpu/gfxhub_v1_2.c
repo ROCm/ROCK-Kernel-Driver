@@ -402,8 +402,6 @@ static void gfxhub_v1_2_xcc_program_invalidation(struct amdgpu_device *adev,
 static int gfxhub_v1_2_xcc_gart_enable(struct amdgpu_device *adev,
 				       uint32_t xcc_mask)
 {
-	int i;
-
 	/* GART Enable. */
 	gfxhub_v1_2_xcc_init_gart_aperture_regs(adev, xcc_mask);
 	gfxhub_v1_2_xcc_init_system_aperture_regs(adev, xcc_mask);
