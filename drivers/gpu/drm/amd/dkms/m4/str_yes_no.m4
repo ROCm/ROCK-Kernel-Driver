@@ -7,7 +7,8 @@ AC_DEFUN([AC_AMDGPU_STR_YES_NO], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/string_helpers.h>
 		], [
-			const char *str = str_yes_no(true);
+			const char *str;
+			str = str_yes_no(true);
 		], [
 			AC_DEFINE(HAVE_STR_YES_NO, 1,
 				[str_yes_no() is defined])

@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_PCI_DEV_LTR_PATH], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/pci.h>
 		], [
-			struct pci_dev *dev;
+			struct pci_dev *dev = NULL;
 			dev->ltr_path = 0;
 		], [
 			AC_DEFINE(HAVE_PCI_DEV_LTR_PATH, 1,

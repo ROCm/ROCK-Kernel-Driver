@@ -7,7 +7,7 @@ AC_DEFUN([AC_AMDGPU_MM_KMALLOC_SIZE_ROUNDUP], [
                 AC_KERNEL_TRY_COMPILE([
                         #include <linux/slab.h>
                 ], [
-                        size_t a, b;
+                        size_t a, b = 0;
                         a = kmalloc_size_roundup(b);
                 ], [
                         AC_DEFINE(HAVE_KMALLOC_SIZE_ROUNDUP, 1,
