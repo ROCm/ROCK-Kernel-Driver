@@ -40,11 +40,11 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS], [
 				#include <drm/drm_dp_mst_helper.h>
 			],[
 				int ret;
-				struct drm_dp_mst_port *port;
+				struct drm_dp_mst_port *port = NULL;
 				ret = drm_dp_atomic_release_vcpi_slots(NULL, NULL, port);
 			],[
 				AC_DEFINE(HAVE_DRM_DP_ATOMIC_RELEASE_VCPI_SLOTS_MST_PORT, 1,
-					[drm_dp_atomic_release_vcpi_slots() with drm_dp_mst_port argument is available])	
+					[drm_dp_atomic_release_vcpi_slots() with drm_dp_mst_port argument is available])
 			])
 		])
         ])
