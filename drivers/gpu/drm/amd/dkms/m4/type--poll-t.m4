@@ -7,7 +7,8 @@ AC_DEFUN([AC_AMDGPU_TYPE__POLL_T], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <uapi/linux/types.h>
 		],[
-			__poll_t mask = 0;
+			__poll_t mask;
+			mask = 0;
 		],[
 			AC_DEFINE(HAVE_TYPE__POLL_T, 1, [__poll_t is available])
 		])

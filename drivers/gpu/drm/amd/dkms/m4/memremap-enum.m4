@@ -11,8 +11,9 @@ AC_DEFUN([AC_AMDGPU_MEMORY_DEVICE_COHERENT], [
 			#include <linux/memremap.h>
 			#include <linux/migrate.h>
                 ], [
-                        int v = MEMORY_DEVICE_COHERENT;
-			int w = MIGRATE_VMA_SELECT_DEVICE_COHERENT;
+                        int v, w;
+                        v = MEMORY_DEVICE_COHERENT;
+                        w = MIGRATE_VMA_SELECT_DEVICE_COHERENT;
                 ], [
                         AC_DEFINE(HAVE_DEVICE_COHERENT, 1,
                                 [MEMORY_DEVICE_COHERENT is availablea])

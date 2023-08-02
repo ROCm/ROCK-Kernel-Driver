@@ -24,7 +24,8 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_CHAIN_STRUCT], [
                 AC_KERNEL_TRY_COMPILE([
                         #include <linux/dma-fence-chain.h>
                 ], [
-			struct dma_fence_chain *chain = NULL;
+			struct dma_fence_chain *chain;
+                        chain = NULL;
                 ], [
                         AC_DEFINE(HAVE_STRUCT_DMA_FENCE_CHAIN, 1,
                                 [struct dma_fence_chain is available])
