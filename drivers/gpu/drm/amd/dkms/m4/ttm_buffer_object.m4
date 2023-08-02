@@ -17,7 +17,7 @@ AC_DEFUN([AC_AMDGPU_TTM_BUFFER_OBJECT], [
 			gem_obj->resv = &gem_obj->_resv;
 		], [
 			AC_DEFINE(HAVE_DRM_GEM_OBJECT_RESV, 1,
-				[ttm_buffer_object->base is available])
+				[drm_gem_object->resv/_resv is available])
 		])
 	])
 ])
