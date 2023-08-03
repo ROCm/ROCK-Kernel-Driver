@@ -421,23 +421,15 @@ int ttm_mem_evict_first(struct ttm_device *bdev,
 /* Default number of pre-faulted pages in the TTM fault handler */
 #define TTM_BO_VM_NUM_PREFAULT 16
 
-#if defined(HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG)
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			     struct vm_fault *vmf);
 vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 				    pgprot_t prot,
 				    pgoff_t num_prefault);
+
+#if defined(HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG)
 vm_fault_t ttm_bo_vm_fault(struct vm_fault *vmf);
 #else
-vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
-			     struct vm_fault *vmf,
-			     struct vm_area_struct *vma);
-
-vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
-				    struct vm_area_struct *vma,
-				    pgprot_t prot,
-				    pgoff_t num_prefault);
-
 vm_fault_t ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 #endif
 
@@ -445,11 +437,7 @@ void ttm_bo_vm_open(struct vm_area_struct *vma);
 void ttm_bo_vm_close(struct vm_area_struct *vma);
 int ttm_bo_vm_access(struct vm_area_struct *vma, unsigned long addr,
 		     void *buf, int len, int write);
-#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
-vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, struct vm_area_struct *vma, pgprot_t prot);
-#else
 vm_fault_t ttm_bo_vm_dummy_page(struct vm_fault *vmf, pgprot_t prot);
-#endif
 
 int ttm_bo_mem_space(struct ttm_buffer_object *bo,
 		     struct ttm_placement *placement,
