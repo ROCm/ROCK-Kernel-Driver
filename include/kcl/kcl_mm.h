@@ -12,6 +12,7 @@
 #include <linux/mm_types.h>
 #include <linux/mm.h>
 #include <linux/gfp.h>
+#include <linux/swap.h>
 #include <linux/slab.h>
 #include <kcl/kcl_mmap_lock.h>
 #include <kcl/kcl_mm_types.h>
@@ -129,11 +130,12 @@ static inline bool want_init_on_free(void)
 #endif
 
 #ifndef HAVE_TOTALRAM_PAGES
-extern unsigned long *_kcl_totalram_pages;
-static inline unsigned long totalram_pages(void)
+extern unsigned long totalram_pages;
+static inline unsigned long _kcl_totalram_pages(void)
 {
-       return *_kcl_totalram_pages;
+       return totalram_pages;
 }
+#define totalram_pages _kcl_totalram_pages
 #endif /* HAVE_TOTALRAM_PAGES */
 
 #endif /* AMDKCL_MM_H */
