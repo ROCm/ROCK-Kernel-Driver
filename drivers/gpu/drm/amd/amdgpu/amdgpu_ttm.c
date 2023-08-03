@@ -2552,11 +2552,7 @@ static vm_fault_t amdgpu_ttm_fault(struct vm_fault *vmf)
 #endif
         vm_fault_t ret;
 
-#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
-        ret = ttm_bo_vm_reserve(bo, vmf, vma);
-#else
         ret = ttm_bo_vm_reserve(bo, vmf);
-#endif
         if (ret)
                 return ret;
 
@@ -2564,12 +2560,8 @@ static vm_fault_t amdgpu_ttm_fault(struct vm_fault *vmf)
         if (ret)
                 goto unlock;
 
-#ifndef HAVE_VM_OPERATIONS_STRUCT_FAULT_1ARG
-        ret = ttm_bo_vm_fault_reserved(vmf, vma, vma->vm_page_prot, TTM_BO_VM_NUM_PREFAULT);
-#else
         ret = ttm_bo_vm_fault_reserved(vmf, vmf->vma->vm_page_prot,
                                        TTM_BO_VM_NUM_PREFAULT);
-#endif
         if (ret == VM_FAULT_RETRY && !(vmf->flags & FAULT_FLAG_RETRY_NOWAIT))
                 return ret;
 
