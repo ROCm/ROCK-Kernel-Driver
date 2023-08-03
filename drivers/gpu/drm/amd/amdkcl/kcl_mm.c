@@ -36,11 +36,6 @@ extern struct kmem_cache *(*_kcl_kmalloc_slab)(size_t size, gfp_t flags);
 #endif
 #endif /* HAVE_KMALLOC_SIZE_ROUNDUP */
 
-#ifndef HAVE_TOTALRAM_PAGES
-unsigned long *_kcl_totalram_pages;
-EXPORT_SYMBOL(_kcl_totalram_pages);
-#endif /* HAVE_TOTALRAM_PAGES */
-
 void amdkcl_mm_init(void)
 {
 
@@ -52,9 +47,5 @@ void amdkcl_mm_init(void)
 #ifndef CONFIG_SLOB
 	_kcl_kmalloc_slab = amdkcl_fp_setup("kmalloc_slab", NULL);
 #endif
-#endif
-
-#ifndef HAVE_TOTALRAM_PAGES
-	_kcl_totalram_pages = (unsigned long *) amdkcl_fp_setup("totalram_pages", NULL);
 #endif
 }
