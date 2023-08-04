@@ -3635,6 +3635,23 @@ DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 #endif
 
 /*
+ * Returns 1 if hardware supports MALL cache
+ * 0 otherwise.
+ */
+static int capabilities_show(struct seq_file *m, void *unused)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)m->private;
+	struct dc_caps caps = adev->dm.dc->caps;
+	bool mall_supported = caps.mall_size_total;
+
+	seq_printf(m, "mall: %s\n", mall_supported ? "yes" : "no");
+
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(capabilities);
+
+/*
  * Temporary w/a to force sst sequence in M42D DP2 mst receiver
  * Example usage: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dp_set_mst_en_for_sst
  */
@@ -3832,6 +3849,8 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 
 	debugfs_create_file("amdgpu_mst_topology", 0444, root,
 			    adev, &mst_topo_fops);
+	debugfs_create_file("amdgpu_dm_capabilities", 0444, root,
+			    adev, &capabilities_fops);
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
 
