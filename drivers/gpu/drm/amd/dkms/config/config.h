@@ -955,7 +955,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.2.0"
+#define PACKAGE_VERSION "6.3.0"
 
 #include "config-amd-chips.h"
 
