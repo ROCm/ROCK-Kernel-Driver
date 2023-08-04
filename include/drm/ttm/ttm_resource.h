@@ -36,7 +36,7 @@
 #include <drm/ttm/ttm_kmap_iter.h>
 
 #define TTM_MAX_BO_PRIORITY	4U
-#define TTM_NUM_MEM_TYPES 10
+#define TTM_NUM_MEM_TYPES 12
 
 struct ttm_device;
 struct ttm_resource_manager;
