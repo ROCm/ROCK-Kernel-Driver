@@ -24,6 +24,7 @@
 #include "kfd_priv.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_pc_sampling.h"
+#include "kfd_device_queue_manager.h"
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;
@@ -114,6 +115,8 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 
 	kfd_process_set_trap_pc_sampling_flag(&pdd->qpd,
 		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info.method, false);
+	remap_queue(pdd->dev->dqm,
+		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
 
 	return 0;
 }
