@@ -556,6 +556,16 @@ static void kfd_smi_init(struct kfd_node *dev)
 	spin_lock_init(&dev->smi_lock);
 }
 
+static void kfd_pc_sampling_init(struct kfd_node *dev)
+{
+	mutex_init(&dev->pcs_data.mutex);
+}
+
+static void kfd_pc_sampling_exit(struct kfd_node *dev)
+{
+	mutex_destroy(&dev->pcs_data.mutex);
+}
+
 static int kfd_init_node(struct kfd_node *node)
 {
 	int err = -1;
@@ -586,6 +596,7 @@ static int kfd_init_node(struct kfd_node *node)
 	}
 
 	kfd_smi_init(node);
+	kfd_pc_sampling_init(node);
 
 	return 0;
 
@@ -616,6 +627,7 @@ static void kfd_cleanup_nodes(struct kfd_dev *kfd, unsigned int num_nodes)
 		kfd_topology_remove_device(knode);
 		if (knode->gws)
 			amdgpu_amdkfd_free_gws(knode->adev, knode->gws);
+		kfd_pc_sampling_exit(knode);
 		kfree(knode);
 		kfd->nodes[i] = NULL;
 	}
