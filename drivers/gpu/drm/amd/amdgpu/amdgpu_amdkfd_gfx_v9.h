@@ -110,3 +110,11 @@ uint64_t kgd_gfx_v9_hqd_reset(struct amdgpu_device *adev,
 			      uint32_t queue_id,
 			      uint32_t inst,
 			      unsigned int utimeout);
+uint32_t kgd_gfx_v9_trigger_pc_sample_trap(struct amdgpu_device *adev,
+					    uint32_t vmid,
+					    uint32_t max_wave_slot,
+					    uint32_t max_simd,
+					    uint32_t *target_simd,
+					    uint32_t *target_wave_slot,
+					    enum kfd_ioctl_pc_sample_method method,
+					    uint32_t inst);
