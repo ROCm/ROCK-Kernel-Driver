@@ -10687,7 +10687,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		 * Only allow async flips for fast updates that don't change
 		 * the FB pitch, the DCC state, rotation, etc.
 		 */
-		if (new_crtc_state->async_flip && lock_and_validation_needed) {
+#if defined(HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP)
+		if (new_crtc_state->async_flip &&
+#else
+		if ((new_crtc_state->pageflip_flags &
+			 DRM_MODE_PAGE_FLIP_ASYNC) != 0 &&
+#endif
+				lock_and_validation_needed) {
 			drm_dbg_atomic(crtc->dev,
 				       "[CRTC:%d:%s] async flips are only supported for fast updates\n",
 				       crtc->base.id, crtc->name);
