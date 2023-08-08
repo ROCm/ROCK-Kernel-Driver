@@ -110,6 +110,7 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 {
 	struct kfd_pc_sample_info *supported_format = NULL;
 	struct kfd_pc_sample_info user_info;
+	struct pc_sampling_entry *pcs_entry;
 	int ret;
 	int i;
 
@@ -157,13 +158,30 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 		return ret ? -EFAULT : -EEXIST;
 	}
 
-	/* TODO: add trace_id return */
+	pcs_entry = kzalloc(sizeof(*pcs_entry), GFP_KERNEL);
+	if (!pcs_entry) {
+		mutex_unlock(&pdd->dev->pcs_data.mutex);
+		return -ENOMEM;
+	}
+
+	i = idr_alloc_cyclic(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr,
+				pcs_entry, 1, 0, GFP_KERNEL);
+	if (i < 0) {
+		mutex_unlock(&pdd->dev->pcs_data.mutex);
+		kfree(pcs_entry);
+		return i;
+	}
 
 	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
 		pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info = user_info;
 
 	pdd->dev->pcs_data.hosttrap_entry.base.use_count++;
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
+
+	pcs_entry->pdd = pdd;
+	user_args->trace_id = (uint32_t)i;
+
+	pr_debug("alloc pcs_entry = %p, trace_id = 0x%x on gpu 0x%x", pcs_entry, i, pdd->dev->id);
 
 	return 0;
 }

@@ -286,6 +286,7 @@ struct kfd_dev;
 
 struct kfd_dev_pc_sampling_data {
 	uint32_t use_count;         /* Num of PC sampling sessions */
+	struct idr pc_sampling_idr;
 	struct kfd_pc_sample_info pc_sample_info;
 };
 
@@ -802,6 +803,11 @@ enum kfd_pdd_bound {
  * As a result, the divisor is 100.
  */
 #define SDMA_ACTIVITY_DIVISOR  100
+
+struct pc_sampling_entry {
+	bool enabled;
+	struct kfd_process_device *pdd;
+};
 
 /* Data that is per-process-per device. */
 struct kfd_process_device {
