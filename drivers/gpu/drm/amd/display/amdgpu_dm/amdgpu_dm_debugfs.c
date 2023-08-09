@@ -3635,8 +3635,7 @@ DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 #endif
 
 /*
- * Returns 1 if hardware supports MALL cache
- * 0 otherwise.
+ * Prints hardware capabilities. These are used for IGT testing.
  */
 static int capabilities_show(struct seq_file *m, void *unused)
 {
