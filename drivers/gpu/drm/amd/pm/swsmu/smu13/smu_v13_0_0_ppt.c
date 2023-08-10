@@ -96,6 +96,8 @@
  */
 #define SUPPORT_ECCTABLE_SMU_13_0_10_VERSION 0x00502200
 
+#define LINK_SPEED_MAX					3
+
 static struct cmn2asic_msg_mapping smu_v13_0_0_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(TestMessage,			PPSMC_MSG_TestMessage,                 1),
 	MSG_MAP(GetSmuVersion,			PPSMC_MSG_GetSmuVersion,               1),
@@ -1782,7 +1784,10 @@ static ssize_t smu_v13_0_0_get_gpu_metrics(struct smu_context *smu,
 	gpu_metrics->current_fan_speed = metrics->AvgFanRpm;
 
 	gpu_metrics->pcie_link_width = metrics->PcieWidth;
-	gpu_metrics->pcie_link_speed = metrics->PcieRate;
+	if ((metrics->PcieRate - 1) > LINK_SPEED_MAX)
+		gpu_metrics->pcie_link_speed = pcie_gen_to_speed(1);
+	else
+		gpu_metrics->pcie_link_speed = pcie_gen_to_speed(metrics->PcieRate);
 
 	gpu_metrics->system_clock_counter = ktime_get_boottime_ns();
 
