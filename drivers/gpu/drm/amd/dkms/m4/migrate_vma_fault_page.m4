@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_MIGRATE_VMA_FAULT_PAGE], [
                         #include <linux/migrate.h>
                 ], [
                         struct migrate_vma mig = {0};
-                        struct page *fault_page;
+                        struct page *fault_page = NULL;
                         mig.fault_page = fault_page;
                 ], [
                         AC_DEFINE(HAVE_MIGRATE_VMA_FAULT_PAGE, 1,
