@@ -104,6 +104,10 @@ var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK	= 0x1F8000
 
 var SQ_WAVE_MODE_DEBUG_EN_MASK		=   0x800
 
+var TMA_HOST_TRAP_EN_SHIFT               =   1
+var TMA_HOST_TRAP_EN_SIZE                =   1
+var TMA_HOST_TRAP_EN_BFE                 =   (TMA_HOST_TRAP_EN_SHIFT | (TMA_HOST_TRAP_EN_SIZE << 16))
+
 var TTMP_SAVE_RCNT_FIRST_REPLAY_SHIFT	=   26			// bits [31:26] unused by SPI debug data
 var TTMP_SAVE_RCNT_FIRST_REPLAY_MASK	=   0xFC000000
 var TTMP_DEBUG_TRAP_ENABLED_SHIFT	=   23
@@ -288,17 +292,21 @@ L_FETCH_2ND_TRAP:
     s_or_b32        ttmp15, ttmp15, 0xFFFF0000
 L_NO_SIGN_EXTEND_TMA:
 
-    s_load_dword    ttmp2, [ttmp14, ttmp15], 0x10 glc:1 // debug trap enabled flag
-    s_waitcnt       lgkmcnt(0)
-    s_lshl_b32      ttmp2, ttmp2, TTMP_DEBUG_TRAP_ENABLED_SHIFT
-    s_andn2_b32     s_save_ib_sts, s_save_ib_sts, TTMP_DEBUG_TRAP_ENABLED_MASK
-    s_or_b32        s_save_ib_sts, s_save_ib_sts, ttmp2
-
+    s_load_dword    ttmp4, [ttmp14, ttmp15], 0x10 glc:1 // enable flags from 1st level TMA
     s_load_dwordx2  [ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 glc:1 // second-level TBA
-    s_waitcnt       lgkmcnt(0)
     s_load_dwordx2  [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1 // second-level TMA
     s_waitcnt       lgkmcnt(0)
-
+    s_and_b32       ttmp5, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK // host trap request
+    s_cbranch_scc0  L_NOT_HT
+    s_bfe_u32       ttmp5, ttmp4, TMA_HOST_TRAP_EN_BFE // extract host_trap_en to ttmp5[0]
+    s_cbranch_scc0  L_EXIT_TRAP // HT requested, but host traps not enabled
+    s_branch        L_GOTO_2ND_TRAP
+L_NOT_HT:
+    s_and_b32       ttmp4, ttmp4, 0x1 // debug_enable bit left over
+    s_lshl_b32      ttmp4, ttmp4, TTMP_DEBUG_TRAP_ENABLED_SHIFT
+    s_andn2_b32     s_save_ib_sts, s_save_ib_sts, TTMP_DEBUG_TRAP_ENABLED_MASK
+    s_or_b32        s_save_ib_sts, s_save_ib_sts, ttmp4
+L_GOTO_2ND_TRAP:
     s_and_b64       [ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
     s_cbranch_scc0  L_NO_NEXT_TRAP // second-level trap handler not been set
     s_setpc_b64     [ttmp2, ttmp3] // jump to second-level trap handler
