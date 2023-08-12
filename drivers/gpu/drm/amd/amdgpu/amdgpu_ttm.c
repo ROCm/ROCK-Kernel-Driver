@@ -2963,7 +2963,7 @@ static ssize_t amdgpu_iomem_write(struct file *f, const char __user *buf,
 		struct page *p;
 		void *ptr;
 
-		bytes = bytes < size ? bytes : size;
+		bytes = min(bytes, size);
 
 		addr = dom ? iommu_iova_to_phys(dom, addr) : addr;
 
