@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_DSC_AUX_FOR_PORT], [
 			#include <drm/drm_dp_mst_helper.h>
 		], [
 			drm_dp_mst_dsc_aux_for_port(NULL);
-		], [drm_dp_mst_dsc_aux_for_port], [drivers/gpu/drm/drm_dp_mst_topology.c], [
+		], [drm_dp_mst_dsc_aux_for_port], [drivers/gpu/drm/drm_dp_mst_topology.c drivers/gpu/drm/display/drm_dp_mst_topology.c], [
 			AC_DEFINE(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT, 1,
 				[drm_dp_mst_dsc_aux_for_port() is available])
 		])
