@@ -9,7 +9,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS], [
 		], [
 			int ret;
 			ret = drm_dp_mst_add_affected_dsc_crtcs(NULL, NULL);
-		], [drm_dp_mst_dsc_aux_for_port], [drivers/gpu/drm/drm_dp_mst_topology.c], [
+		], [drm_dp_mst_dsc_aux_for_port], [drivers/gpu/drm/drm_dp_mst_topology.c drivers/gpu/drm/display/drm_dp_mst_topology.c], [
 			AC_DEFINE(HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS, 1,
 				[drm_dp_mst_add_affected_dsc_crtcs() is available])
 		])
