@@ -9,7 +9,7 @@ AC_DEFUN([AC_AMDGPU_CANCEL_WORK], [
 			#include <linux/workqueue.h>
 		], [
 			cancel_work(NULL);
-		], [cancel_work], [], [
+		], [cancel_work], [kernel/workqueue.c], [
 			AC_DEFINE(HAVE_CANCEL_WORK, 1,
 				[cancel_work() is available])
 		])
