@@ -7,7 +7,11 @@ dnl # drm: Move the legacy kms disable_all helper to crtc helpers
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_HELPER_FORCE_DISABLE_ALL], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_helper_force_disable_all], [drivers/gpu/drm/drm_crtc_helper.c],[
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <drm/drm_crtc_helper.h>
+		],[	
+			drm_helper_force_disable_all(NULL);
+		],[drm_helper_force_disable_all], [drivers/gpu/drm/drm_crtc_helper.c],[
 			AC_DEFINE(HAVE_DRM_HELPER_FORCE_DISABLE_ALL, 1,
 				[drm_helper_force_disable_all() is available])
 		])

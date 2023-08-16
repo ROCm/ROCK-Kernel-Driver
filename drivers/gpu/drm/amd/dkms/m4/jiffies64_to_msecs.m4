@@ -4,7 +4,11 @@ dnl # time: Introduce jiffies64_to_msecs()
 dnl #
 AC_DEFUN([AC_AMDGPU_JIFFIES64_TO_MSECS], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([jiffies64_to_msecs], [kernel/time/time.c], [
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/jiffies.h>
+		],[
+			jiffies64_to_msecs(0);
+		],[jiffies64_to_msecs], [kernel/time/time.c], [
 			AC_DEFINE(HAVE_JIFFIES64_TO_MSECS, 1, [jiffies64_to_msecs() is available])
 		])
 	])

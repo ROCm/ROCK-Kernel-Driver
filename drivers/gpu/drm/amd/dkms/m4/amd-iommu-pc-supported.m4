@@ -12,8 +12,11 @@ AC_DEFUN([AC_AMDGPU_AMD_IOMMU_PC_GET_MAX_BANKS], [
 		AC_DEFINE(HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED, 1,
 					[amd_iommu_pc_get_max_banks() declared])
 	], [
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([get_amd_iommu],
-		[drivers/iommu/amd/init.c], [
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/amd-iommu.h>
+		],[
+			get_amd_iommu(0);
+		],[get_amd_iommu],[drivers/iommu/amd/init.c], [
 			AC_DEFINE(HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT, 1,
 					[amd_iommu_pc_get_max_banks() arg is unsigned int])
 		])
