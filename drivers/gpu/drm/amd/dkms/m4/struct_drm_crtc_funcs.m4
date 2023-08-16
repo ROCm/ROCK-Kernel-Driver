@@ -23,12 +23,14 @@ dnl #
 dnl # v5.10-1961-g6ca2ab8086af drm: automatic legacy gamma support
 dnl #
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL], [
-	AC_KERNEL_CHECK_SYMBOL_EXPORT(
-		[drm_atomic_helper_legacy_gamma_set], [drivers/gpu/drm/drm_atomic_helper.c], [],
-		[
+	AC_KERNEL_TRY_COMPILE_SYMBOL([
+		#include <drm/drm_atomic_helper.h>
+	], [
+		drm_atomic_helper_legacy_gamma_set(NULL, NULL, NULL, NULL, 0, NULL);
+	], [drm_atomic_helper_legacy_gamma_set], [drivers/gpu/drm/drm_atomic_helper.c],[],[
 			AC_DEFINE(HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL, 1,
 				[HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL is available])
-		])
+	])
 ])
 
 AC_DEFUN([AC_AMDGPU_STRUCT_DRM_CRTC_FUNCS], [
