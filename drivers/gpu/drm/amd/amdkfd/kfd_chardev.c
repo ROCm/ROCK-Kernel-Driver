@@ -1723,17 +1723,17 @@ err_out:
 
 /* Place holder for deprecated DBG API  */
 static int kfd_ioctl_dbg_set_debug_trap_deprecated(struct file *filep,
-                                struct kfd_process *p, void *data)
+				struct kfd_process *p, void *data)
 {
-        dev_dbg(kfd_device, "AMDKFD_IOC_DBG_TRAP is deprecated.\n");
-        return -EINVAL;
+	dev_dbg(kfd_device, "AMDKFD_IOC_DBG_TRAP is deprecated.\n");
+	return -EINVAL;
 }
 
 /* Place holder for deprecated CMA API */
 static int kfd_ioctl_cross_memory_copy_deprecated(struct file *filep,
-                                struct kfd_process *local_p, void *data) {
-        dev_dbg(kfd_device, "AMDKFD_IOC_CROSS_MEMORY_COPY is deprecated.\n");
-        return -EINVAL;
+				struct kfd_process *local_p, void *data) {
+	dev_dbg(kfd_device, "AMDKFD_IOC_CROSS_MEMORY_COPY is deprecated.\n");
+	return -EINVAL;
 }
 
 /* Handle requests for watching SMI events */
@@ -3418,8 +3418,8 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_IPC_EXPORT_HANDLE,
 				kfd_ioctl_ipc_export_handle, 0),
 
-        AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP_DEPRECATED,
-                        kfd_ioctl_dbg_set_debug_trap_deprecated, 0),
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_TRAP_DEPRECATED,
+			kfd_ioctl_dbg_set_debug_trap_deprecated, 0),
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RLC_SPM,
 			kfd_ioctl_rlc_spm, 0),
