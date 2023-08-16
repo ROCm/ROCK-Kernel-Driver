@@ -5,7 +5,11 @@ dnl # v4.6-6601-gec8d7c14ea14 mm, oom_reaper: do not mmput synchronously from th
 dnl #
 AC_DEFUN([AC_AMDGPU_MMPUT_ASYNC], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([mmput_async], [kernel/fork.c], [
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/sched/mm.h>
+		],[
+			mmput_async(NULL);
+		],[mmput_async], [kernel/fork.c], [
 			AC_DEFINE(HAVE_MMPUT_ASYNC, 1, [mmput_async() is available])
 		])
 	])
