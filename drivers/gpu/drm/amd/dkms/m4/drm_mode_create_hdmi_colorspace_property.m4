@@ -4,8 +4,12 @@ dnl # drm: Rename HDMI colorspace property creation function
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY], [
     AC_KERNEL_DO_BACKGROUND([
-        AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_connector_attach_colorspace_property], [drivers/gpu/drm/drm_connector.c], [
-                AC_DEFINE(HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY, 1,
+        AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <drm/drm_connector.h>
+		],[
+			drm_connector_attach_colorspace_property(NULL);
+		],[drm_connector_attach_colorspace_property], [drivers/gpu/drm/drm_connector.c], [
+            AC_DEFINE(HAVE_DRM_CONNECT_ATTACH_COLORSPACE_PROPERTY, 1,
                 [drm_connector_attach_colorspace_property() is available])
 		])
     ])

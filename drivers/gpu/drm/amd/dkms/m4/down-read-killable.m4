@@ -4,10 +4,13 @@
 #dnl
 AC_DEFUN([AC_AMDGPU_DOWN_READ_KILLABLE], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT(
-			[down_read_killable],
-			[kernel/locking/rwsem.c],
-			[AC_DEFINE(HAVE_DOWN_READ_KILLABLE, 1,
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <linux/rwsem.h>
+		],[
+			int ret;
+			ret = down_read_killable(NULL);
+		],[down_read_killable], [kernel/locking/rwsem.c],[
+			AC_DEFINE(HAVE_DOWN_READ_KILLABLE, 1,
 				[down_read_killable() is available])]
 		)
 	])

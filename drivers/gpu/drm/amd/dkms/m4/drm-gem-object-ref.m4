@@ -13,10 +13,13 @@ AC_DEFUN([AC_AMDGPU_DRM_GEM_OBJECT_PUT], [
 			AC_DEFINE(HAVE_DRM_GEM_OBJECT_PUT, 1,
 				[drm_gem_object_put() is available])
 
-			AC_KERNEL_CHECK_SYMBOL_EXPORT([drm_gem_object_put],
-			[drivers/gpu/drm/drm_gem.c], [
-				AC_DEFINE(HAVE_DRM_GEM_OBJECT_PUT_SYMBOL, 1,
-					[drm_gem_object_put() is exported])
+			AC_KERNEL_TRY_COMPILE_SYMBOL([
+				#include <drm/drm_gem.h>
+			],[
+				drm_gem_object_put(NULL);
+			],[drm_gem_object_put],[drivers/gpu/drm/drm_gem.c], [
+					AC_DEFINE(HAVE_DRM_GEM_OBJECT_PUT_SYMBOL, 1,
+						[drm_gem_object_put() is exported])
 			])
 		])
 	])
