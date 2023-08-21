@@ -5,6 +5,7 @@ dnl #
 AC_DEFUN([AC_AMDGPU_SYNCHRONIZE_SHRINKERS], [
 	AC_KERNEL_DO_BACKGROUND([
 		AC_KERNEL_TRY_COMPILE_SYMBOL([
+				#include <linux/mmzone.h>
 				#include <linux/shrinker.h>
 			], [
 				synchronize_shrinkers();
