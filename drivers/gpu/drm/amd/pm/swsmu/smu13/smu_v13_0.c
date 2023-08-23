@@ -1022,8 +1022,7 @@ static int smu_v13_0_process_pending_interrupt(struct smu_context *smu)
 {
 	int ret = 0;
 
-	if (smu->dc_controlled_by_gpio &&
-	    smu_cmn_feature_is_enabled(smu, SMU_FEATURE_ACDC_BIT))
+	if (smu_cmn_feature_is_enabled(smu, SMU_FEATURE_ACDC_BIT))
 		ret = smu_v13_0_allow_ih_interrupt(smu);
 
 	return ret;
