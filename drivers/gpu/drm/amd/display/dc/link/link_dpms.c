@@ -2272,6 +2272,8 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
+	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
+		return;
 
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 
@@ -2283,9 +2285,6 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->stream->signal);
 		}
 	}
-
-	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
-		return;
 
 	if (!pipe_ctx->stream->sink->edid_caps.panel_patch.skip_avmute) {
 		if (dc_is_hdmi_signal(pipe_ctx->stream->signal))
@@ -2384,6 +2383,8 @@ void link_set_dpms_on(
 
 	if (dp_is_128b_132b_signal(pipe_ctx))
 		vpg = pipe_ctx->stream_res.hpo_dp_stream_enc->vpg;
+	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
+		return;
 
 	DC_LOGGER_INIT(pipe_ctx->stream->ctx->logger);
 
@@ -2395,9 +2396,6 @@ void link_set_dpms_on(
 			pipe_ctx->stream->signal);
 		}
 	}
-
-	if (dc_is_virtual_signal(pipe_ctx->stream->signal))
-		return;
 
 	link_enc = link_enc_cfg_get_link_enc(link);
 	ASSERT(link_enc);
