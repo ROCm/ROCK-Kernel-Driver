@@ -527,10 +527,6 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 
 	abo = ttm_to_amdgpu_bo(bo);
 
-	if (old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA ||
-	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
-		return -EINVAL;
-
 	adev = amdgpu_ttm_adev(bo->bdev);
 
 	if (!old_mem || (old_mem->mem_type == TTM_PL_SYSTEM &&
@@ -539,6 +535,10 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 		ttm_bo_move_null(bo, new_mem);
 		return 0;
 	}
+	if (old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA ||
+	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+		return -EINVAL;
+
 	if (old_mem->mem_type == TTM_PL_SYSTEM &&
 	    (new_mem->mem_type == TTM_PL_TT ||
 	     new_mem->mem_type == AMDGPU_PL_PREEMPT)) {
