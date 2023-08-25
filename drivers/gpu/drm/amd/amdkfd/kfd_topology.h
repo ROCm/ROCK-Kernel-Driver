@@ -90,7 +90,7 @@ struct kfd_mem_properties {
 	struct attribute	attr_used;
 };
 
-#define CACHE_SIBLINGMAP_SIZE 64
+#define CACHE_SIBLINGMAP_SIZE 128
 
 struct kfd_cache_properties {
 	struct list_head	list;
