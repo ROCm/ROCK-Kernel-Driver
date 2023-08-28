@@ -2796,7 +2796,20 @@ static ssize_t amdgpu_hwmon_show_power_avg(struct device *dev,
 {
 	unsigned int val;
 
-	val = amdgpu_hwmon_get_power(dev, AMDGPU_PP_SENSOR_GPU_POWER);
+	val = amdgpu_hwmon_get_power(dev, AMDGPU_PP_SENSOR_GPU_AVG_POWER);
+	if (val < 0)
+		return val;
+
+	return sysfs_emit(buf, "%u\n", val);
+}
+
+static ssize_t amdgpu_hwmon_show_power_input(struct device *dev,
+					     struct device_attribute *attr,
+					     char *buf)
+{
+	unsigned int val;
+
+	val = amdgpu_hwmon_get_power(dev, AMDGPU_PP_SENSOR_GPU_INPUT_POWER);
 	if (val < 0)
 		return val;
 
@@ -3023,6 +3036,8 @@ static ssize_t amdgpu_hwmon_show_mclk_label(struct device *dev,
  *
  * - power1_average: average power used by the SoC in microWatts.  On APUs this includes the CPU.
  *
+ * - power1_input: instantaneous power used by the SoC in microWatts.  On APUs this includes the CPU.
+ *
  * - power1_cap_min: minimum cap supported in microWatts
  *
  * - power1_cap_max: maximum cap supported in microWatts
@@ -3091,6 +3106,7 @@ static SENSOR_DEVICE_ATTR(in0_label, S_IRUGO, amdgpu_hwmon_show_vddgfx_label, NU
 static SENSOR_DEVICE_ATTR(in1_input, S_IRUGO, amdgpu_hwmon_show_vddnb, NULL, 0);
 static SENSOR_DEVICE_ATTR(in1_label, S_IRUGO, amdgpu_hwmon_show_vddnb_label, NULL, 0);
 static SENSOR_DEVICE_ATTR(power1_average, S_IRUGO, amdgpu_hwmon_show_power_avg, NULL, 0);
+static SENSOR_DEVICE_ATTR(power1_input, S_IRUGO, amdgpu_hwmon_show_power_input, NULL, 0);
 static SENSOR_DEVICE_ATTR(power1_cap_max, S_IRUGO, amdgpu_hwmon_show_power_cap_max, NULL, 0);
 static SENSOR_DEVICE_ATTR(power1_cap_min, S_IRUGO, amdgpu_hwmon_show_power_cap_min, NULL, 0);
 static SENSOR_DEVICE_ATTR(power1_cap, S_IRUGO | S_IWUSR, amdgpu_hwmon_show_power_cap, amdgpu_hwmon_set_power_cap, 0);
@@ -3137,6 +3153,7 @@ static struct attribute *hwmon_attributes[] = {
 	&sensor_dev_attr_in1_input.dev_attr.attr,
 	&sensor_dev_attr_in1_label.dev_attr.attr,
 	&sensor_dev_attr_power1_average.dev_attr.attr,
+	&sensor_dev_attr_power1_input.dev_attr.attr,
 	&sensor_dev_attr_power1_cap_max.dev_attr.attr,
 	&sensor_dev_attr_power1_cap_min.dev_attr.attr,
 	&sensor_dev_attr_power1_cap.dev_attr.attr,
@@ -3162,6 +3179,7 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	umode_t effective_mode = attr->mode;
 	uint32_t gc_ver = adev->ip_versions[GC_HWIP][0];
+	uint32_t tmp;
 
 	/* under multi-vf mode, the hwmon attributes are all not supported */
 	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
@@ -3247,6 +3265,14 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	    (attr == &sensor_dev_attr_power1_average.dev_attr.attr))
 		return 0;
 
+	/* not all products support both average and instantaneous */
+	if (attr == &sensor_dev_attr_power1_average.dev_attr.attr &&
+	    amdgpu_hwmon_get_sensor_generic(adev, AMDGPU_PP_SENSOR_GPU_AVG_POWER, (void *)&tmp) == -EOPNOTSUPP)
+		return 0;
+	if (attr == &sensor_dev_attr_power1_input.dev_attr.attr &&
+	    amdgpu_hwmon_get_sensor_generic(adev, AMDGPU_PP_SENSOR_GPU_INPUT_POWER, (void *)&tmp) == -EOPNOTSUPP)
+		return 0;
+
 	/* hide max/min values if we can't both query and manage the fan */
 	if (((amdgpu_dpm_set_fan_speed_pwm(adev, U32_MAX) == -EOPNOTSUPP) &&
 	      (amdgpu_dpm_get_fan_speed_pwm(adev, NULL) == -EOPNOTSUPP) &&
@@ -3285,8 +3311,10 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	    (gc_ver != IP_VERSION(9, 4, 3)) &&
 	    (attr == &sensor_dev_attr_temp2_input.dev_attr.attr ||
 	     attr == &sensor_dev_attr_temp2_label.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp2_crit.dev_attr.attr ||
 	     attr == &sensor_dev_attr_temp3_input.dev_attr.attr ||
-	     attr == &sensor_dev_attr_temp3_label.dev_attr.attr))
+	     attr == &sensor_dev_attr_temp3_label.dev_attr.attr ||
+	     attr == &sensor_dev_attr_temp3_crit.dev_attr.attr))
 		return 0;
 
 	/* hotspot temperature for gc 9,4,3*/
@@ -3298,9 +3326,7 @@ static umode_t hwmon_attributes_visible(struct kobject *kobj,
 	/* only SOC15 dGPUs support hotspot and mem temperatures */
 	if (((adev->flags & AMD_IS_APU) || gc_ver < IP_VERSION(9, 0, 0) ||
 	    (gc_ver == IP_VERSION(9, 4, 3))) &&
-	    (attr == &sensor_dev_attr_temp2_crit.dev_attr.attr ||
-	     attr == &sensor_dev_attr_temp2_crit_hyst.dev_attr.attr ||
-	     attr == &sensor_dev_attr_temp3_crit.dev_attr.attr ||
+	     (attr == &sensor_dev_attr_temp2_crit_hyst.dev_attr.attr ||
 	     attr == &sensor_dev_attr_temp3_crit_hyst.dev_attr.attr ||
 	     attr == &sensor_dev_attr_temp1_emergency.dev_attr.attr ||
 	     attr == &sensor_dev_attr_temp2_emergency.dev_attr.attr ||
@@ -3443,7 +3469,7 @@ static int amdgpu_debugfs_pm_info_pp(struct seq_file *m, struct amdgpu_device *a
 	if (!amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_VDDNB, (void *)&value, &size))
 		seq_printf(m, "\t%u mV (VDDNB)\n", value);
 	size = sizeof(uint32_t);
-	if (!amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_GPU_POWER, (void *)&query, &size))
+	if (!amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_GPU_AVG_POWER, (void *)&query, &size))
 		seq_printf(m, "\t%u.%u W (average GPU)\n", query >> 8, query & 0xff);
 	size = sizeof(value);
 	seq_printf(m, "\n");

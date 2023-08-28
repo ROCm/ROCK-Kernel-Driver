@@ -80,10 +80,16 @@
 /* possible frequency drift (1Mhz) */
 #define EPSILON 1
 
-#define smnPCIE_ESM_CTRL 0x193D0
-#define smnPCIE_LC_LINK_WIDTH_CNTL 0x1ab40288
+#define smnPCIE_ESM_CTRL 0x93D0
+#define smnPCIE_LC_LINK_WIDTH_CNTL 0x1a340288
 #define PCIE_LC_LINK_WIDTH_CNTL__LC_LINK_WIDTH_RD_MASK 0x00000070L
 #define PCIE_LC_LINK_WIDTH_CNTL__LC_LINK_WIDTH_RD__SHIFT 0x4
+#define MAX_LINK_WIDTH 6
+
+#define smnPCIE_LC_SPEED_CNTL                   0x1a340290
+#define PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE_MASK 0xE0
+#define PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE__SHIFT 0x5
+#define LINK_SPEED_MAX				4
 
 static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(TestMessage,			     PPSMC_MSG_TestMessage,			0),
@@ -126,6 +132,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetSoftMinGfxclk,                    PPSMC_MSG_SetSoftMinGfxClk,                0),
 	MSG_MAP(SetSoftMaxGfxClk,                    PPSMC_MSG_SetSoftMaxGfxClk,                0),
 	MSG_MAP(PrepareMp1ForUnload,                 PPSMC_MSG_PrepareForDriverUnload,          0),
+	MSG_MAP(GetCTFLimit,                         PPSMC_MSG_GetCTFLimit,                     0),
 };
 
 static const struct cmn2asic_mapping smu_v13_0_6_clk_map[SMU_CLK_COUNT] = {
@@ -714,7 +721,7 @@ static int smu_v13_0_6_get_smu_metrics_data(struct smu_context *smu,
 	case METRICS_AVERAGE_MEMACTIVITY:
 		*value = SMUQ10_TO_UINT(metrics->DramBandwidthUtilization);
 		break;
-	case METRICS_AVERAGE_SOCKETPOWER:
+	case METRICS_CURR_SOCKETPOWER:
 		*value = SMUQ10_TO_UINT(metrics->SocketPower) << 8;
 		break;
 	case METRICS_TEMPERATURE_HOTSPOT:
@@ -1139,15 +1146,6 @@ static int smu_v13_0_6_get_current_activity_percent(struct smu_context *smu,
 	return ret;
 }
 
-static int smu_v13_0_6_get_gpu_power(struct smu_context *smu, uint32_t *value)
-{
-	if (!value)
-		return -EINVAL;
-
-	return smu_v13_0_6_get_smu_metrics_data(smu, METRICS_AVERAGE_SOCKETPOWER,
-					       value);
-}
-
 static int smu_v13_0_6_thermal_get_temperature(struct smu_context *smu,
 					       enum amd_pp_sensors sensor,
 					       uint32_t *value)
@@ -1193,8 +1191,10 @@ static int smu_v13_0_6_read_sensor(struct smu_context *smu,
 							       (uint32_t *)data);
 		*size = 4;
 		break;
-	case AMDGPU_PP_SENSOR_GPU_POWER:
-		ret = smu_v13_0_6_get_gpu_power(smu, (uint32_t *)data);
+	case AMDGPU_PP_SENSOR_GPU_INPUT_POWER:
+		ret = smu_v13_0_6_get_smu_metrics_data(smu,
+						       METRICS_CURR_SOCKETPOWER,
+						       (uint32_t *)data);
 		*size = 4;
 		break;
 	case AMDGPU_PP_SENSOR_HOTSPOT_TEMP:
@@ -1220,6 +1220,7 @@ static int smu_v13_0_6_read_sensor(struct smu_context *smu,
 		ret = smu_v13_0_get_gfx_vdd(smu, (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GPU_AVG_POWER:
 	default:
 		ret = -EOPNOTSUPP;
 		break;
@@ -1935,6 +1936,7 @@ smu_v13_0_6_get_current_pcie_link_width_level(struct smu_context *smu)
 static int smu_v13_0_6_get_current_pcie_link_speed(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
+	uint32_t speed_level;
 	uint32_t esm_ctrl;
 
 	/* TODO: confirm this on real target */
@@ -1942,7 +1944,13 @@ static int smu_v13_0_6_get_current_pcie_link_speed(struct smu_context *smu)
 	if ((esm_ctrl >> 15) & 0x1FFFF)
 		return (((esm_ctrl >> 8) & 0x3F) + 128);
 
-	return smu_v13_0_get_current_pcie_link_speed(smu);
+	speed_level = (RREG32_PCIE(smnPCIE_LC_SPEED_CNTL) &
+		PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE_MASK)
+		>> PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE__SHIFT;
+	if (speed_level > LINK_SPEED_MAX)
+		speed_level = 0;
+
+	return pcie_gen_to_speed(speed_level + 1);
 }
 
 static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table)
@@ -1953,6 +1961,7 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0, inst0, xcc0;
 	MetricsTable_t *metrics;
+	u16 link_width_level;
 
 	inst0 = adev->sdma.instance[0].aid_id;
 	xcc0 = GET_INST(GC, 0);
@@ -2003,8 +2012,12 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 	gpu_metrics->throttle_status = 0;
 
 	if (!(adev->flags & AMD_IS_APU)) {
+		link_width_level = smu_v13_0_6_get_current_pcie_link_width_level(smu);
+		if (link_width_level > MAX_LINK_WIDTH)
+			link_width_level = 0;
+
 		gpu_metrics->pcie_link_width =
-			smu_v13_0_6_get_current_pcie_link_width_level(smu);
+			DECODE_LANE_WIDTH(link_width_level);
 		gpu_metrics->pcie_link_speed =
 			smu_v13_0_6_get_current_pcie_link_speed(smu);
 	}
@@ -2066,6 +2079,55 @@ static int smu_v13_0_6_mode2_reset(struct smu_context *smu)
 out:
 	mutex_unlock(&smu->message_lock);
 
+	return ret;
+}
+
+static int smu_v13_0_6_get_thermal_temperature_range(struct smu_context *smu,
+						     struct smu_temperature_range *range)
+{
+	struct amdgpu_device *adev = smu->adev;
+	u32 aid_temp, xcd_temp, mem_temp;
+	uint32_t smu_version;
+	u32 ccd_temp = 0;
+	int ret;
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
+	if (!range)
+		return -EINVAL;
+
+	/*Check smu version, GetCtfLimit message only supported for smu version 85.69 or higher */
+	smu_cmn_get_smc_version(smu, NULL, &smu_version);
+	if (smu_version < 0x554500)
+		return 0;
+
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
+					      PPSMC_AID_THM_TYPE, &aid_temp);
+	if (ret)
+		goto failed;
+
+	if (adev->flags & AMD_IS_APU) {
+		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
+						      PPSMC_CCD_THM_TYPE, &ccd_temp);
+		if (ret)
+			goto failed;
+	}
+
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
+					      PPSMC_XCD_THM_TYPE, &xcd_temp);
+	if (ret)
+		goto failed;
+
+	range->hotspot_crit_max = max3(aid_temp, xcd_temp, ccd_temp) *
+				       SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
+					      PPSMC_HBM_THM_TYPE, &mem_temp);
+	if (ret)
+		goto failed;
+
+	range->mem_crit_max = mem_temp * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+failed:
 	return ret;
 }
 
@@ -2165,6 +2227,7 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
 	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,
 	.get_gpu_metrics = smu_v13_0_6_get_gpu_metrics,
+	.get_thermal_temperature_range = smu_v13_0_6_get_thermal_temperature_range,
 	.mode1_reset_is_support = smu_v13_0_6_is_mode1_reset_supported,
 	.mode2_reset_is_support = smu_v13_0_6_is_mode2_reset_supported,
 	.mode1_reset = smu_v13_0_6_mode1_reset,

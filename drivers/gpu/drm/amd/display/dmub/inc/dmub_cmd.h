@@ -421,11 +421,6 @@ union replay_hw_flags {
 		uint32_t smu_optimizations_en : 1;
 
 		/**
-		 * @otg_powered_down: Flag to keep track of OTG power state.
-		 */
-		uint32_t otg_powered_down : 1;
-
-		/**
 		 * @phy_power_state: Indicates current phy power state
 		 */
 		uint32_t phy_power_state : 1;
@@ -2144,6 +2139,10 @@ enum dmub_phy_fsm_state {
 	DMUB_PHY_FSM_PLL_EN,
 	DMUB_PHY_FSM_TX_EN,
 	DMUB_PHY_FSM_FAST_LP,
+	DMUB_PHY_FSM_P2_PLL_OFF_CPM,
+	DMUB_PHY_FSM_P2_PLL_OFF_PG,
+	DMUB_PHY_FSM_P2_PLL_OFF,
+	DMUB_PHY_FSM_P2_PLL_ON,
 };
 
 /**

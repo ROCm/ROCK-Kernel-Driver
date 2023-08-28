@@ -65,6 +65,7 @@
  */
 
 #include "inc/dmub_cmd.h"
+#include "dc/dc_types.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -399,6 +400,9 @@ struct dmub_srv_hw_funcs {
 	void (*get_diagnostic_data)(struct dmub_srv *dmub, struct dmub_diagnostic_data *dmub_oca);
 
 	bool (*should_detect)(struct dmub_srv *dmub);
+	void (*init_reg_offsets)(struct dmub_srv *dmub, struct dc_context *ctx);
+
+	void (*subvp_save_surf_addr)(struct dmub_srv *dmub, const struct dc_plane_address *addr, uint8_t subvp_index);
 };
 
 /**
@@ -438,7 +442,7 @@ struct dmub_srv {
 	/* private: internal use only */
 	const struct dmub_srv_common_regs *regs;
 	const struct dmub_srv_dcn31_regs *regs_dcn31;
-	const struct dmub_srv_dcn32_regs *regs_dcn32;
+	struct dmub_srv_dcn32_regs *regs_dcn32;
 
 	struct dmub_srv_base_funcs funcs;
 	struct dmub_srv_hw_funcs hw_funcs;
@@ -832,6 +836,21 @@ enum dmub_status dmub_srv_wait_for_inbox0_ack(struct dmub_srv *dmub, uint32_t ti
  *   DMUB_STATUS_INVALID - hw_init false or hw function does not exist
  */
 enum dmub_status dmub_srv_clear_inbox0_ack(struct dmub_srv *dmub);
+
+/**
+ * dmub_srv_subvp_save_surf_addr() - Save primary and meta address for subvp on each flip
+ * @dmub: The dmub service
+ * @addr: The surface address to be programmed on the current flip
+ * @subvp_index: Index of subvp pipe, indicates which subvp pipe the address should be saved for
+ *
+ * Function to save the surface flip addr into scratch registers. This is to fix a race condition
+ * between FW and driver reading / writing to the surface address at the same time. This is
+ * required because there is no EARLIEST_IN_USE_META.
+ *
+ * Return:
+ *   void
+ */
+void dmub_srv_subvp_save_surf_addr(struct dmub_srv *dmub, const struct dc_plane_address *addr, uint8_t subvp_index);
 
 #if defined(__cplusplus)
 }

@@ -52,7 +52,6 @@
 #include <drm/ttm/ttm_tt.h>
 
 #include <drm/amdgpu_drm.h>
-#include <drm/drm_drv.h>
 
 #include "amdgpu.h"
 #include "amdgpu_object.h"
@@ -2909,7 +2908,7 @@ static ssize_t amdgpu_iomem_read(struct file *f, char __user *buf,
 		struct page *p;
 		void *ptr;
 
-		bytes = bytes < size ? bytes : size;
+		bytes = min(bytes, size);
 
 		/* Translate the bus address to a physical address.  If
 		 * the domain is NULL it means there is no IOMMU active
@@ -2964,7 +2963,7 @@ static ssize_t amdgpu_iomem_write(struct file *f, const char __user *buf,
 		struct page *p;
 		void *ptr;
 
-		bytes = bytes < size ? bytes : size;
+		bytes = min(bytes, size);
 
 		addr = dom ? iommu_iova_to_phys(dom, addr) : addr;
 

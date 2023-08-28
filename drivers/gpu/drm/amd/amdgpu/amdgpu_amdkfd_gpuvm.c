@@ -38,7 +38,6 @@
 #include "amdgpu_xgmi.h"
 #include "kfd_priv.h"
 #include "kfd_smi_events.h"
-#include <drm/ttm/ttm_tt.h>
 
 /* Userptr restore delay, just long enough to allow consecutive VM
  * changes to accumulate

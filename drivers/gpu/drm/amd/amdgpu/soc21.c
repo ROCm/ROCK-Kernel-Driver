@@ -543,7 +543,6 @@ static const struct amdgpu_asic_funcs soc21_asic_funcs = {
 	.need_reset_on_init = &soc21_need_reset_on_init,
 	.get_pcie_replay_count = &amdgpu_nbio_get_pcie_replay_count,
 	.supports_baco = &amdgpu_dpm_is_baco_supported,
-	.supports_maco = &amdgpu_dpm_is_maco_supported,
 	.pre_asic_init = &soc21_pre_asic_init,
 	.query_video_codecs = &soc21_query_video_codecs,
 	.update_umd_stable_pstate = &soc21_update_umd_stable_pstate,
@@ -689,6 +688,12 @@ static int soc21_common_early_init(void *handle)
 		adev->external_rev_id = adev->rev_id + 0x80;
 		break;
 
+
+	case IP_VERSION(11, 5, 0):
+		adev->cg_flags = 0;
+		adev->pg_flags = 0;
+		adev->external_rev_id = adev->rev_id + 0x1;
+		break;
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
