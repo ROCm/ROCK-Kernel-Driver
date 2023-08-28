@@ -83,7 +83,6 @@ MODULE_FIRMWARE("amdgpu/smu_13_0_10.bin");
 #define PCIE_LC_SPEED_CNTL__LC_CURRENT_DATA_RATE__SHIFT 0xE
 
 static const int link_width[] = {0, 1, 2, 4, 8, 12, 16};
-static const int link_speed[] = {25, 50, 80, 160};
 
 const int pmfw_decoded_link_speed[5] = {1, 2, 3, 4, 5};
 const int pmfw_decoded_link_width[7] = {0, 1, 2, 4, 8, 12, 16};
@@ -838,12 +837,8 @@ int smu_v13_0_notify_display_change(struct smu_context *smu)
 {
 	int ret = 0;
 
-	if (!smu->pm_enabled)
-		return ret;
-
-	if (smu_cmn_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT) &&
-	    smu->adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM)
-		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetUclkFastSwitch, 1, NULL);
+	if (!amdgpu_device_has_dc_support(smu->adev))
+		ret = smu_cmn_send_smc_msg(smu, SMU_MSG_DALNotPresent, NULL);
 
 	return ret;
 }
@@ -2242,21 +2237,6 @@ bool smu_v13_0_baco_is_support(struct smu_context *smu)
 	return true;
 }
 
-bool smu_v13_0_maco_is_support(struct smu_context *smu)
-{
-	struct smu_baco_context *smu_baco = &smu->smu_baco;
-
-	if (amdgpu_sriov_vf(smu->adev) ||
-	    !smu_baco->maco_support)
-		return false;
-
-	if (smu_cmn_feature_is_supported(smu, SMU_FEATURE_BACO_BIT) &&
-	    !smu_cmn_feature_is_enabled(smu, SMU_FEATURE_BACO_BIT))
-		return false;
-
-	return true;
-}
-
 enum smu_baco_state smu_v13_0_baco_get_state(struct smu_context *smu)
 {
 	struct smu_baco_context *smu_baco = &smu->smu_baco;
@@ -2277,7 +2257,7 @@ int smu_v13_0_baco_set_state(struct smu_context *smu,
 	if (state == SMU_BACO_STATE_ENTER) {
 		ret = smu_cmn_send_smc_msg_with_param(smu,
 						      SMU_MSG_EnterBaco,
-						      (adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO) ?
+						      (smu_baco->maco_support && amdgpu_runtime_pm != 1) ?
 						      BACO_SEQ_BAMACO : BACO_SEQ_BACO,
 						      NULL);
 	} else {

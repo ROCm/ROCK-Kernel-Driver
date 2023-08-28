@@ -78,6 +78,8 @@
 #define PP_OD_FEATURE_UCLK_FMAX				3
 #define PP_OD_FEATURE_GFX_VF_CURVE			4
 
+#define LINK_SPEED_MAX					3
+
 static struct cmn2asic_msg_mapping smu_v13_0_7_message_map[SMU_MSG_MAX_COUNT] = {
 	MSG_MAP(TestMessage,			PPSMC_MSG_TestMessage,                 1),
 	MSG_MAP(GetSmuVersion,			PPSMC_MSG_GetSmuVersion,               1),
@@ -934,7 +936,7 @@ static int smu_v13_0_7_read_sensor(struct smu_context *smu,
 						       (uint32_t *)data);
 		*size = 4;
 		break;
-	case AMDGPU_PP_SENSOR_GPU_POWER:
+	case AMDGPU_PP_SENSOR_GPU_AVG_POWER:
 		ret = smu_v13_0_7_get_smu_metrics_data(smu,
 						       METRICS_AVERAGE_SOCKETPOWER,
 						       (uint32_t *)data);
@@ -978,6 +980,7 @@ static int smu_v13_0_7_read_sensor(struct smu_context *smu,
 						       (uint32_t *)data);
 		*size = 4;
 		break;
+	case AMDGPU_PP_SENSOR_GPU_INPUT_POWER:
 	default:
 		ret = -EOPNOTSUPP;
 		break;
@@ -1735,7 +1738,10 @@ static ssize_t smu_v13_0_7_get_gpu_metrics(struct smu_context *smu,
 	gpu_metrics->current_fan_speed = metrics->AvgFanRpm;
 
 	gpu_metrics->pcie_link_width = metrics->PcieWidth;
-	gpu_metrics->pcie_link_speed = metrics->PcieRate;
+	if ((metrics->PcieRate - 1) > LINK_SPEED_MAX)
+		gpu_metrics->pcie_link_speed = pcie_gen_to_speed(1);
+	else
+		gpu_metrics->pcie_link_speed = pcie_gen_to_speed(metrics->PcieRate);
 
 	gpu_metrics->system_clock_counter = ktime_get_boottime_ns();
 
@@ -2133,7 +2139,8 @@ static int smu_v13_0_7_baco_enter(struct smu_context *smu)
 
 	if (adev->in_runpm && smu_cmn_is_audio_func_enabled(adev))
 		return smu_v13_0_baco_set_armd3_sequence(smu,
-				smu_baco->maco_support ? BACO_SEQ_BAMACO : BACO_SEQ_BACO);
+				(smu_baco->maco_support && amdgpu_runtime_pm != 1) ?
+					BACO_SEQ_BAMACO : BACO_SEQ_BACO);
 	else
 		return smu_v13_0_baco_enter(smu);
 }
@@ -2230,7 +2237,6 @@ static const struct pptable_funcs smu_v13_0_7_ppt_funcs = {
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
 	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,
 	.baco_is_support = smu_v13_0_baco_is_support,
-	.maco_is_support = smu_v13_0_maco_is_support,
 	.baco_get_state = smu_v13_0_baco_get_state,
 	.baco_set_state = smu_v13_0_baco_set_state,
 	.baco_enter = smu_v13_0_7_baco_enter,

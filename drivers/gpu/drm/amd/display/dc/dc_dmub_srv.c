@@ -31,6 +31,7 @@
 #include "core_types.h"
 #include "../basics/conversion.h"
 #include "cursor_reg_cache.h"
+#include "resource.h"
 
 #define CTX dc_dmub_srv->ctx
 #define DC_LOGGER CTX->logger
@@ -356,7 +357,7 @@ bool dc_dmub_srv_p_state_delegate(struct dc *dc, bool should_manage_pstate, stru
 	for (i = 0, k = 0; context && i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 
-		if (!pipe->top_pipe && !pipe->prev_odm_pipe && pipe->stream && pipe->stream->fpo_in_use) {
+		if (resource_is_pipe_type(pipe, OTG_MASTER) && pipe->stream->fpo_in_use) {
 			struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 			uint8_t min_refresh_in_hz = (pipe->stream->timing.min_refresh_in_uhz + 999999) / 1000000;
 
@@ -531,7 +532,8 @@ static void populate_subvp_cmd_vblank_pipe_info(struct dc *dc,
 
 		// We check for master pipe, but it shouldn't matter since we only need
 		// the pipe for timing info (stream should be same for any pipe splits)
-		if (!pipe->stream || !pipe->plane_state || pipe->top_pipe || pipe->prev_odm_pipe)
+		if (!resource_is_pipe_type(pipe, OTG_MASTER) ||
+				!resource_is_pipe_type(pipe, DPP_PIPE))
 			continue;
 
 		// Find the SubVP pipe
@@ -550,7 +552,8 @@ static void populate_subvp_cmd_vblank_pipe_info(struct dc *dc,
 	pipe_data->pipe_config.vblank_data.vblank_end =
 			vblank_pipe->stream->timing.v_total - vblank_pipe->stream->timing.v_front_porch - vblank_pipe->stream->timing.v_addressable;
 
-	if (vblank_pipe->stream->ignore_msa_timing_param)
+	if (vblank_pipe->stream->ignore_msa_timing_param &&
+		(vblank_pipe->stream->allow_freesync || vblank_pipe->stream->vrr_active_variable))
 		populate_subvp_cmd_drr_info(dc, pipe, vblank_pipe, pipe_data);
 }
 
@@ -643,7 +646,8 @@ static void populate_subvp_cmd_pipe_info(struct dc *dc,
 			main_timing->v_total - main_timing->v_front_porch - main_timing->v_addressable;
 	pipe_data->pipe_config.subvp_data.mall_region_lines = phantom_timing->v_addressable;
 	pipe_data->pipe_config.subvp_data.main_pipe_index = subvp_pipe->stream_res.tg->inst;
-	pipe_data->pipe_config.subvp_data.is_drr = subvp_pipe->stream->ignore_msa_timing_param;
+	pipe_data->pipe_config.subvp_data.is_drr = subvp_pipe->stream->ignore_msa_timing_param &&
+		(subvp_pipe->stream->allow_freesync || subvp_pipe->stream->vrr_active_variable);
 
 	/* Calculate the scaling factor from the src and dst height.
 	 * e.g. If 3840x2160 being downscaled to 1920x1080, the scaling factor is 1/2.
@@ -728,12 +732,10 @@ void dc_dmub_setup_subvp_dmub_command(struct dc *dc,
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		struct pipe_ctx *pipe = &context->res_ctx.pipe_ctx[i];
 
-		if (!pipe->stream)
-			continue;
-
 		/* For SubVP pipe count, only count the top most (ODM / MPC) pipe
 		 */
-		if (pipe->plane_state && !pipe->top_pipe && !pipe->prev_odm_pipe &&
+		if (resource_is_pipe_type(pipe, OTG_MASTER) &&
+				resource_is_pipe_type(pipe, DPP_PIPE) &&
 				pipe->stream->mall_stream_config.type == SUBVP_MAIN)
 			subvp_pipes[subvp_count++] = pipe;
 	}
@@ -750,12 +752,14 @@ void dc_dmub_setup_subvp_dmub_command(struct dc *dc,
 			 * Any ODM or MPC splits being used in SubVP will be handled internally in
 			 * populate_subvp_cmd_pipe_info
 			 */
-			if (pipe->plane_state && pipe->stream->mall_stream_config.paired_stream &&
-					!pipe->top_pipe && !pipe->prev_odm_pipe &&
+			if (resource_is_pipe_type(pipe, OTG_MASTER) &&
+					resource_is_pipe_type(pipe, DPP_PIPE) &&
+					pipe->stream->mall_stream_config.paired_stream &&
 					pipe->stream->mall_stream_config.type == SUBVP_MAIN) {
 				populate_subvp_cmd_pipe_info(dc, context, &cmd, pipe, cmd_pipe_index++);
-			} else if (pipe->plane_state && pipe->stream->mall_stream_config.type == SUBVP_NONE &&
-				    !pipe->top_pipe && !pipe->prev_odm_pipe) {
+			} else if (resource_is_pipe_type(pipe, OTG_MASTER) &&
+					resource_is_pipe_type(pipe, DPP_PIPE) &&
+					pipe->stream->mall_stream_config.type == SUBVP_NONE) {
 				// Don't need to check for ActiveDRAMClockChangeMargin < 0, not valid in cases where
 				// we run through DML without calculating "natural" P-state support
 				populate_subvp_cmd_vblank_pipe_info(dc, context, &cmd, pipe, cmd_pipe_index++);
@@ -1052,4 +1056,9 @@ void dc_dmub_srv_enable_dpia_trace(const struct dc *dc)
 	}
 
 	DC_LOG_DEBUG("Enabled DPIA trace\n");
+}
+
+void dc_dmub_srv_subvp_save_surf_addr(const struct dc_dmub_srv *dc_dmub_srv, const struct dc_plane_address *addr, uint8_t subvp_index)
+{
+	dmub_srv_subvp_save_surf_addr(dc_dmub_srv->dmub, addr, subvp_index);
 }

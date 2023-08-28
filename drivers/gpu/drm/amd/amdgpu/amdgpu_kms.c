@@ -173,19 +173,13 @@ int amdgpu_driver_load_kms(struct amdgpu_device *adev, unsigned long flags)
 				adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
 			break;
 		default:
-			/* enable BACO/BAMACO as runpm mode on CI+ */
-			if (amdgpu_runtime_pm == 2 && amdgpu_device_supports_maco(dev))
-				adev->pm.rpm_mode = AMDGPU_RUNPM_BAMACO;
-			else
-				adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
+			/* enable BACO as runpm mode on CI+ */
+			adev->pm.rpm_mode = AMDGPU_RUNPM_BACO;
 			break;
 		}
 
 		if (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO)
 			dev_info(adev->dev, "Using BACO for runtime pm\n");
-
-		if (adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO)
-			dev_info(adev->dev, "Using BAMACO for runtime pm\n");
 	}
 
 	/* Call ACPI methods: require modeset init
@@ -1058,7 +1052,7 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		case AMDGPU_INFO_SENSOR_GPU_AVG_POWER:
 			/* get average GPU power */
 			if (amdgpu_dpm_read_sensor(adev,
-						   AMDGPU_PP_SENSOR_GPU_POWER,
+						   AMDGPU_PP_SENSOR_GPU_AVG_POWER,
 						   (void *)&ui32, &ui32_size)) {
 				return -EINVAL;
 			}

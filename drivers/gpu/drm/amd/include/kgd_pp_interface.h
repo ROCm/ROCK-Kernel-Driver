@@ -132,7 +132,8 @@ enum amd_pp_sensors {
 	AMDGPU_PP_SENSOR_MEM_TEMP,
 	AMDGPU_PP_SENSOR_VCE_POWER,
 	AMDGPU_PP_SENSOR_UVD_POWER,
-	AMDGPU_PP_SENSOR_GPU_POWER,
+	AMDGPU_PP_SENSOR_GPU_AVG_POWER,
+	AMDGPU_PP_SENSOR_GPU_INPUT_POWER,
 	AMDGPU_PP_SENSOR_SS_APU_SHARE,
 	AMDGPU_PP_SENSOR_SS_DGPU_SHARE,
 	AMDGPU_PP_SENSOR_STABLE_PSTATE_SCLK,
@@ -398,7 +399,6 @@ struct amd_pm_funcs {
 	int (*set_hard_min_fclk_by_freq)(void *handle, uint32_t clock);
 	int (*set_min_deep_sleep_dcefclk)(void *handle, uint32_t clock);
 	int (*get_asic_baco_capability)(void *handle, bool *cap);
-	int (*get_asic_maco_capability)(void *handle, bool *cap);
 	int (*get_asic_baco_state)(void *handle, int *state);
 	int (*set_asic_baco_state)(void *handle, int state);
 	int (*get_ppfeature_status)(void *handle, char *buf);
