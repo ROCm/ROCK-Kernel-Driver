@@ -3,9 +3,9 @@
 KERNELVER=$1
 
 #
-# Restore original kernel 5.x scripts/Makefile.build modified by post-add.sh
+# Restore original kernel 5.x and Kernel 4.x scripts/Makefile.build modified by post-add.sh
 #
-if [[ ${KERNELVER%%.*} -eq 5 ]]; then
+if [ ${KERNELVER%%.*} -eq 5  -o  ${KERNELVER%%.*} -eq 4 ]; then
 	moddir="/lib/modules/$KERNELVER"
 	mkfile="scripts/Makefile.build"
 
