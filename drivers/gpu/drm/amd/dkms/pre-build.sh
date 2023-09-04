@@ -60,10 +60,10 @@ done
 KERNELVER=$1
 
 #
-# Kernel 5.x scripts/Makefile.build patch
+# Kernel 5.x and Kernel 4.x scripts/Makefile.build patch
 # The patch makes rules robust against "Argument list too long" error
 #
-if [[ ${KERNELVER%%.*} -eq 5 ]]; then
+if [ ${KERNELVER%%.*} -eq 5  -o  ${KERNELVER%%.*} -eq 4 ]; then
 	moddir="/lib/modules/$KERNELVER"
 	mkfile="scripts/Makefile.build"
 
@@ -80,7 +80,7 @@ if [[ ${KERNELVER%%.*} -eq 5 ]]; then
 		sed -i -e "/^cmd_mod = {/,/} > \$@$/c"`
 			`"cmd_mod = printf '%s\x5Cn' \$(call real-search, \$*.o, .o, -objs -y -m) | \\\\\n"`
 			`"\t\$(AWK) '!x[\$\$0]++ { print(\"\$(obj)\/\"\$\$0) }' > \$@" \
-			-e "s/^[[:space:]]\+cmd_link_multi-m =.*$/"`
+			-e "s/^[[:space:]]*cmd_link_multi-m = \$(LD).*$/"`
 			`"cmd_link_multi-m = \\\\\n"`
 			`"\t\$(file >\$@.in,\$(filter %.o,$^)) \\\\\n"`
 			`"\t\$(LD) \$(ld_flags) -r -o \$@ @\$@.in; \\\\\n"`
