@@ -643,18 +643,14 @@ static ssize_t amdgpu_set_pp_table(struct device *dev,
  *   They can be used to calibrate the sclk voltage curve. This is
  *   available for Vega20 and NV1X.
  *
- * - voltage offset for the six anchor points of the v/f curve labeled
- *   OD_VDDC_CURVE. They can be used to calibrate the v/f curve. This
- *   is only availabe for some SMU13 ASICs.
- *
  * - voltage offset(in mV) applied on target voltage calculation.
- *   This is available for Sienna Cichlid, Navy Flounder and Dimgrey
- *   Cavefish. For these ASICs, the target voltage calculation can be
- *   illustrated by "voltage = voltage calculated from v/f curve +
- *   overdrive vddgfx offset"
+ *   This is available for Sienna Cichlid, Navy Flounder, Dimgrey
+ *   Cavefish and some later SMU13 ASICs. For these ASICs, the target
+ *   voltage calculation can be illustrated by "voltage = voltage
+ *   calculated from v/f curve + overdrive vddgfx offset"
  *
- * - a list of valid ranges for sclk, mclk, and voltage curve points
- *   labeled OD_RANGE
+ * - a list of valid ranges for sclk, mclk, voltage curve points
+ *   or voltage offset labeled OD_RANGE
  *
  * < For APUs >
  *
@@ -686,24 +682,17 @@ static ssize_t amdgpu_set_pp_table(struct device *dev,
  *   E.g., "p 2 0 800" would set the minimum core clock on core
  *   2 to 800Mhz.
  *
- *   For sclk voltage curve,
- *     - For NV1X, enter the new values by writing a string that
- *       contains "vc point clock voltage" to the file. The points
- *       are indexed by 0, 1 and 2. E.g., "vc 0 300 600" will update
- *       point1 with clock set as 300Mhz and voltage as 600mV. "vc 2
- *       1000 1000" will update point3 with clock set as 1000Mhz and
- *       voltage 1000mV.
- *     - For SMU13 ASICs, enter the new values by writing a string that
- *       contains "vc anchor_point_index voltage_offset" to the file.
- *       There are total six anchor points defined on the v/f curve with
- *       index as 0 - 5.
- *       - "vc 0 10" will update the voltage offset for point1 as 10mv.
- *       - "vc 5 -10" will update the voltage offset for point6 as -10mv.
+ *   For sclk voltage curve supported by Vega20 and NV1X, enter the new
+ *   values by writing a string that contains "vc point clock voltage"
+ *   to the file. The points are indexed by 0, 1 and 2. E.g., "vc 0 300
+ *   600" will update point1 with clock set as 300Mhz and voltage as 600mV.
+ *   "vc 2 1000 1000" will update point3 with clock set as 1000Mhz and
+ *   voltage 1000mV.
  *
- *   To update the voltage offset applied for gfxclk/voltage calculation,
- *   enter the new value by writing a string that contains "vo offset".
- *   This is supported by Sienna Cichlid, Navy Flounder and Dimgrey Cavefish.
- *   And the offset can be a positive or negative value.
+ *   For voltage offset supported by Sienna Cichlid, Navy Flounder, Dimgrey
+ *   Cavefish and some later SMU13 ASICs, enter the new value by writing a
+ *   string that contains "vo offset". E.g., "vo -10" will update the extra
+ *   voltage offset applied to the whole v/f curve line as -10mv.
  *
  * - When you have edited all of the states as needed, write "c" (commit)
  *   to the file to commit your changes
@@ -1467,9 +1456,9 @@ static ssize_t amdgpu_set_pp_power_profile_mode(struct device *dev,
 	return -EINVAL;
 }
 
-static unsigned int amdgpu_hwmon_get_sensor_generic(struct amdgpu_device *adev,
-						    enum amd_pp_sensors sensor,
-						    void *query)
+static int amdgpu_hwmon_get_sensor_generic(struct amdgpu_device *adev,
+					   enum amd_pp_sensors sensor,
+					   void *query)
 {
 	int r, size = sizeof(uint32_t);
 
@@ -2772,8 +2761,8 @@ static ssize_t amdgpu_hwmon_show_vddnb_label(struct device *dev,
 	return sysfs_emit(buf, "vddnb\n");
 }
 
-static unsigned int amdgpu_hwmon_get_power(struct device *dev,
-					   enum amd_pp_sensors sensor)
+static int amdgpu_hwmon_get_power(struct device *dev,
+				  enum amd_pp_sensors sensor)
 {
 	struct amdgpu_device *adev = dev_get_drvdata(dev);
 	unsigned int uw;
@@ -2794,26 +2783,26 @@ static ssize_t amdgpu_hwmon_show_power_avg(struct device *dev,
 					   struct device_attribute *attr,
 					   char *buf)
 {
-	unsigned int val;
+	ssize_t val;
 
 	val = amdgpu_hwmon_get_power(dev, AMDGPU_PP_SENSOR_GPU_AVG_POWER);
 	if (val < 0)
 		return val;
 
-	return sysfs_emit(buf, "%u\n", val);
+	return sysfs_emit(buf, "%zd\n", val);
 }
 
 static ssize_t amdgpu_hwmon_show_power_input(struct device *dev,
 					     struct device_attribute *attr,
 					     char *buf)
 {
-	unsigned int val;
+	ssize_t val;
 
 	val = amdgpu_hwmon_get_power(dev, AMDGPU_PP_SENSOR_GPU_INPUT_POWER);
 	if (val < 0)
 		return val;
 
-	return sysfs_emit(buf, "%u\n", val);
+	return sysfs_emit(buf, "%zd\n", val);
 }
 
 static ssize_t amdgpu_hwmon_show_power_cap_min(struct device *dev,
@@ -3471,6 +3460,9 @@ static int amdgpu_debugfs_pm_info_pp(struct seq_file *m, struct amdgpu_device *a
 	size = sizeof(uint32_t);
 	if (!amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_GPU_AVG_POWER, (void *)&query, &size))
 		seq_printf(m, "\t%u.%u W (average GPU)\n", query >> 8, query & 0xff);
+	size = sizeof(uint32_t);
+	if (!amdgpu_dpm_read_sensor(adev, AMDGPU_PP_SENSOR_GPU_INPUT_POWER, (void *)&query, &size))
+		seq_printf(m, "\t%u.%u W (current GPU)\n", query >> 8, query & 0xff);
 	size = sizeof(value);
 	seq_printf(m, "\n");
 

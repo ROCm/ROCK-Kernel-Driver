@@ -540,7 +540,7 @@ static int amdgpu_dirtyfb(struct drm_framebuffer *fb, struct drm_file *file,
 			  struct drm_clip_rect *clips, unsigned int num_clips)
 {
 
-	if (strcmp(fb->comm, "[fbcon]"))
+	if (file)
 		return -ENOSYS;
 
 	return drm_atomic_helper_dirtyfb(fb, file, flags, color, clips,

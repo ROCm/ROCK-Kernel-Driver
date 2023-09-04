@@ -147,6 +147,7 @@ static struct cmn2asic_mapping smu_v13_0_7_clk_map[SMU_CLK_COUNT] = {
 	CLK_MAP(VCLK1,		PPCLK_VCLK_1),
 	CLK_MAP(DCLK,		PPCLK_DCLK_0),
 	CLK_MAP(DCLK1,		PPCLK_DCLK_1),
+	CLK_MAP(DCEFCLK,	PPCLK_DCFCLK),
 };
 
 static struct cmn2asic_mapping smu_v13_0_7_feature_mask_map[SMU_FEATURE_COUNT] = {
@@ -696,6 +697,22 @@ static int smu_v13_0_7_set_default_dpm_table(struct smu_context *smu)
 		pcie_table->num_of_link_levels++;
 	}
 
+	/* dcefclk dpm table setup */
+	dpm_table = &dpm_context->dpm_tables.dcef_table;
+	if (smu_cmn_feature_is_enabled(smu, SMU_FEATURE_DPM_DCN_BIT)) {
+		ret = smu_v13_0_set_single_dpm_table(smu,
+						     SMU_DCEFCLK,
+						     dpm_table);
+		if (ret)
+			return ret;
+	} else {
+		dpm_table->count = 1;
+		dpm_table->dpm_levels[0].value = smu->smu_table.boot_values.dcefclk / 100;
+		dpm_table->dpm_levels[0].enabled = true;
+		dpm_table->min = dpm_table->dpm_levels[0].value;
+		dpm_table->max = dpm_table->dpm_levels[0].value;
+	}
+
 	return 0;
 }
 
@@ -776,6 +793,9 @@ static int smu_v13_0_7_get_smu_metrics_data(struct smu_context *smu,
 		break;
 	case METRICS_CURR_FCLK:
 		*value = metrics->CurrClock[PPCLK_FCLK];
+		break;
+	case METRICS_CURR_DCEFCLK:
+		*value = metrics->CurrClock[PPCLK_DCFCLK];
 		break;
 	case METRICS_AVERAGE_GFXCLK:
 		*value = metrics->AverageGfxclkFrequencyPreDs;
@@ -1027,6 +1047,9 @@ static int smu_v13_0_7_get_current_clk_freq_by_table(struct smu_context *smu,
 	case PPCLK_DCLK_1:
 		member_type = METRICS_CURR_DCLK1;
 		break;
+	case PPCLK_DCFCLK:
+		member_type = METRICS_CURR_DCEFCLK;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -1176,6 +1199,9 @@ static int smu_v13_0_7_print_clk_levels(struct smu_context *smu,
 	case SMU_DCLK1:
 		single_dpm_table = &(dpm_context->dpm_tables.dclk_table);
 		break;
+	case SMU_DCEFCLK:
+		single_dpm_table = &(dpm_context->dpm_tables.dcef_table);
+		break;
 	default:
 		break;
 	}
@@ -1189,6 +1215,7 @@ static int smu_v13_0_7_print_clk_levels(struct smu_context *smu,
 	case SMU_VCLK1:
 	case SMU_DCLK:
 	case SMU_DCLK1:
+	case SMU_DCEFCLK:
 		ret = smu_v13_0_7_get_current_clk_freq_by_table(smu, clk_type, &curr_freq);
 		if (ret) {
 			dev_err(smu->adev->dev, "Failed to get current clock freq!");
@@ -1284,16 +1311,14 @@ static int smu_v13_0_7_print_clk_levels(struct smu_context *smu,
 					od_table->OverDriveTable.UclkFmax);
 		break;
 
-	case SMU_OD_VDDC_CURVE:
+	case SMU_OD_VDDGFX_OFFSET:
 		if (!smu_v13_0_7_is_od_feature_supported(smu,
 							 PP_OD_FEATURE_GFX_VF_CURVE_BIT))
 			break;
 
-		size += sysfs_emit_at(buf, size, "OD_VDDC_CURVE:\n");
-		for (i = 0; i < PP_NUM_OD_VF_CURVE_POINTS; i++)
-			size += sysfs_emit_at(buf, size, "%d: %dmv\n",
-						i,
-						od_table->OverDriveTable.VoltageOffsetPerZoneBoundary[i]);
+		size += sysfs_emit_at(buf, size, "OD_VDDGFX_OFFSET:\n");
+		size += sysfs_emit_at(buf, size, "%dmV\n",
+				      od_table->OverDriveTable.VoltageOffsetPerZoneBoundary[0]);
 		break;
 
 	case SMU_OD_RANGE:
@@ -1335,7 +1360,7 @@ static int smu_v13_0_7_print_clk_levels(struct smu_context *smu,
 							  PP_OD_FEATURE_GFX_VF_CURVE,
 							  &min_value,
 							  &max_value);
-			size += sysfs_emit_at(buf, size, "VDDC_CURVE: %7dmv %10dmv\n",
+			size += sysfs_emit_at(buf, size, "VDDGFX_OFFSET: %7dmv %10dmv\n",
 					      min_value, max_value);
 		}
 		break;
@@ -1484,29 +1509,26 @@ static int smu_v13_0_7_od_edit_dpm_table(struct smu_context *smu,
 		}
 		break;
 
-	case PP_OD_EDIT_VDDC_CURVE:
+	case PP_OD_EDIT_VDDGFX_OFFSET:
 		if (!smu_v13_0_7_is_od_feature_supported(smu, PP_OD_FEATURE_GFX_VF_CURVE_BIT)) {
-			dev_warn(adev->dev, "VF curve setting not supported!\n");
+			dev_warn(adev->dev, "Gfx offset setting not supported!\n");
 			return -ENOTSUPP;
 		}
-
-		if (input[0] >= PP_NUM_OD_VF_CURVE_POINTS ||
-		    input[0] < 0)
-			return -EINVAL;
 
 		smu_v13_0_7_get_od_setting_limits(smu,
 						  PP_OD_FEATURE_GFX_VF_CURVE,
 						  &minimum,
 						  &maximum);
-		if (input[1] < minimum ||
-		    input[1] > maximum) {
+		if (input[0] < minimum ||
+		    input[0] > maximum) {
 			dev_info(adev->dev, "Voltage offset (%ld) must be within [%d, %d]!\n",
-				 input[1], minimum, maximum);
+				 input[0], minimum, maximum);
 			return -EINVAL;
 		}
 
-		od_table->OverDriveTable.VoltageOffsetPerZoneBoundary[input[0]] = input[1];
-		od_table->OverDriveTable.FeatureCtrlMask |= 1U << PP_OD_FEATURE_GFX_VF_CURVE_BIT;
+		for (i = 0; i < PP_NUM_OD_VF_CURVE_POINTS; i++)
+			od_table->OverDriveTable.VoltageOffsetPerZoneBoundary[i] = input[0];
+		od_table->OverDriveTable.FeatureCtrlMask |= BIT(PP_OD_FEATURE_GFX_VF_CURVE_BIT);
 		break;
 
 	case PP_OD_RESTORE_DEFAULT_TABLE:

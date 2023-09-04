@@ -1245,6 +1245,7 @@ static void remove_stream_from_alloc_table(
 	}
 }
 
+#if defined(HAVE_DRM_DP_ATOMIC_RELEASE_TIME_SLOTS)
 static enum dc_status deallocate_mst_payload_with_temp_drm_wa(
 		struct pipe_ctx *pipe_ctx)
 {
@@ -1324,6 +1325,7 @@ static enum dc_status deallocate_mst_payload_with_temp_drm_wa(
 
 	return DC_OK;
 }
+#endif
 
 static enum dc_status deallocate_mst_payload(struct pipe_ctx *pipe_ctx)
 {
