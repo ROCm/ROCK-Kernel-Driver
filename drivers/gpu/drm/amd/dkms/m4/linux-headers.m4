@@ -114,7 +114,7 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl # dma-mapping: split <linux/dma-mapping.h>
 	dnl #
 	AC_KERNEL_CHECK_HEADERS([linux/dma-map-ops.h])
-	
+
 	dnl #v4.5-rc3-203-g2413306c2566
 	dnl #apple-gmux: Add helper for presence detect
 	dnl
@@ -124,4 +124,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #device.h: move 'struct class' stuff out to device/class.h
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/device/class.h])
+
+	dnl #v4.12-10499-gbc6245e5efd7
+	dnl #bug: split BUILD_BUG stuff out into <linux/build_bug.h>
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/build_bug.h])
 ])
