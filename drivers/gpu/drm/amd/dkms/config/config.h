@@ -455,7 +455,7 @@
 /* drm_gem_object_put() is exported */
 /* #undef HAVE_DRM_GEM_OBJECT_PUT_SYMBOL */
 
-/* ttm_buffer_object->base is available */
+/* drm_gem_object->resv/_resv is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
 
 /* drm_gem_plane_helper_prepare_fb() is available */
@@ -646,6 +646,9 @@
 
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
+
+/* Define to 1 if you have the <linux/build_bug.h> header file. */
+#define HAVE_LINUX_BUILD_BUG_H 1
 
 /* Define to 1 if you have the <linux/cc_platform.h> header file. */
 #define HAVE_LINUX_CC_PLATFORM_H 1
@@ -952,7 +955,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.2.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.3.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
