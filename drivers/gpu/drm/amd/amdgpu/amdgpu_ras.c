@@ -1574,6 +1574,8 @@ void amdgpu_ras_debugfs_create_all(struct amdgpu_device *adev)
 			amdgpu_ras_debugfs_create(adev, &fs_info, dir);
 		}
 	}
+
+	amdgpu_mca_smu_debugfs_init(adev, dir);
 }
 
 /* debugfs end */
