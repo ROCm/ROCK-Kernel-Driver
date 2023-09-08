@@ -352,6 +352,10 @@ static int amdgpu_firmware_info(struct drm_amdgpu_info_firmware *fw_info,
 		fw_info->ver = adev->gfx.imu_fw_version;
 		fw_info->feature = 0;
 		break;
+	case AMDGPU_INFO_FW_VPE:
+		fw_info->ver = adev->vpe.fw_version;
+		fw_info->feature = adev->vpe.feature_version;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -468,6 +472,13 @@ static int amdgpu_hw_ip_info(struct amdgpu_device *adev,
 		}
 		ib_start_alignment = 16;
 		ib_size_alignment = 16;
+		break;
+	case AMDGPU_HW_IP_VPE:
+		type = AMD_IP_BLOCK_TYPE_VPE;
+		if (adev->vpe.ring.sched.ready)
+			++num_rings;
+		ib_start_alignment = 256;
+		ib_size_alignment = 4;
 		break;
 	default:
 		return -EINVAL;
@@ -1765,6 +1776,14 @@ static int amdgpu_debugfs_firmware_info_show(struct seq_file *m, void *unused)
 	if (ret)
 		return ret;
 	seq_printf(m, "MES feature version: %u, firmware version: 0x%08x\n",
+		   fw_info.feature, fw_info.ver);
+
+	/* VPE */
+	query_fw.fw_type = AMDGPU_INFO_FW_VPE;
+	ret = amdgpu_firmware_info(&fw_info, &query_fw, adev);
+	if (ret)
+		return ret;
+	seq_printf(m, "VPE feature version: %u, firmware version: 0x%08x\n",
 		   fw_info.feature, fw_info.ver);
 
 	seq_printf(m, "VBIOS version: %s\n", ctx->vbios_pn);

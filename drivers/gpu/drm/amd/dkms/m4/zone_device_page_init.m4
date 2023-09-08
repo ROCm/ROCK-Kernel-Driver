@@ -5,8 +5,13 @@ dnl # v5.17-rc4-75-g27674ef6c73f mm: remove the extra ZONE_DEVICE struct page re
 dnl #
 AC_DEFUN([AC_AMDGPU_ZONE_DEVICE_PAGE_INIT], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([zone_device_page_init], [mm/memremap.c], [
-			AC_DEFINE(HAVE_ZONE_DEVICE_PAGE_INIT, 1, [zone_device_page_init() is available])
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+				#include <linux/memremap.h>
+			], [
+				zone_device_page_init(NULL);
+			], [zone_device_page_init], [mm/memremap.c], [
+				AC_DEFINE(HAVE_ZONE_DEVICE_PAGE_INIT, 1, 
+					[zone_device_page_init() is available])
 		])
 	])
 ])

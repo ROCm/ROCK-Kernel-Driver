@@ -863,11 +863,15 @@ static int gfx_v9_4_3_sw_init(void *handle)
 	if (r)
 		return r;
 
-	r = amdgpu_gfx_sysfs_init(adev);
+	r = amdgpu_gfx_ras_sw_init(adev);
 	if (r)
 		return r;
 
-	return amdgpu_gfx_ras_sw_init(adev);
+
+	if (!amdgpu_sriov_vf(adev))
+		r = amdgpu_gfx_sysfs_init(adev);
+
+	return r;
 }
 
 static int gfx_v9_4_3_sw_fini(void *handle)
@@ -888,7 +892,8 @@ static int gfx_v9_4_3_sw_fini(void *handle)
 	gfx_v9_4_3_mec_fini(adev);
 	amdgpu_bo_unref(&adev->gfx.rlc.clear_state_obj);
 	gfx_v9_4_3_free_microcode(adev);
-	amdgpu_gfx_sysfs_fini(adev);
+	if (!amdgpu_sriov_vf(adev))
+		amdgpu_gfx_sysfs_fini(adev);
 
 	return 0;
 }
@@ -4042,7 +4047,8 @@ static void gfx_v9_4_3_inst_enable_watchdog_timer(struct amdgpu_device *adev,
 	uint32_t i;
 	uint32_t data;
 
-	data = REG_SET_FIELD(0, SQ_TIMEOUT_CONFIG, TIMEOUT_FATAL_DISABLE,
+	data = RREG32_SOC15(GC, GET_INST(GC, 0), regSQ_TIMEOUT_CONFIG);
+	data = REG_SET_FIELD(data, SQ_TIMEOUT_CONFIG, TIMEOUT_FATAL_DISABLE,
 			     amdgpu_watchdog_timer.timeout_fatal_disable ? 1 : 0);
 
 	if (amdgpu_watchdog_timer.timeout_fatal_disable &&

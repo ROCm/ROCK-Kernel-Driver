@@ -42,6 +42,7 @@ DC_LIBS += dcn315
 DC_LIBS += dcn316
 DC_LIBS += dcn32
 DC_LIBS += dcn321
+DC_LIBS += dcn35
 endif
 
 DC_LIBS += dce120
@@ -78,3 +79,4 @@ DC_EDID += dc_edid_parser.o
 AMD_DISPLAY_DMUB = $(addprefix $(AMDDALPATH)/dc/,$(DC_DMUB))
 AMD_DISPLAY_EDID = $(addprefix $(AMDDALPATH)/dc/,$(DC_EDID))
 AMD_DISPLAY_FILES += $(AMD_DISPLAY_DMUB) $(AMD_DISPLAY_EDID)
+

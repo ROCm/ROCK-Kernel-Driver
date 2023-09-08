@@ -4,8 +4,11 @@ dnl # virtio-mem: Allow to specify an ACPI PXM as nid
 dnl #
 AC_DEFUN([AC_AMDGPU_PXM_TO_NODE], [
 	AC_KERNEL_DO_BACKGROUND([
-		AC_KERNEL_CHECK_SYMBOL_EXPORT([pxm_to_node],
-		[drivers/acpi/numa/srat.c], [
+		AC_KERNEL_TRY_COMPILE_SYMBOL([
+			#include <acpi/acpi_numa.h>
+		],[
+			pxm_to_node(0);
+		],[pxm_to_node], [drivers/acpi/numa/srat.c], [
 			AC_DEFINE(HAVE_PXM_TO_NODE, 1,
 				[pxm_to_node() is available])
 		])

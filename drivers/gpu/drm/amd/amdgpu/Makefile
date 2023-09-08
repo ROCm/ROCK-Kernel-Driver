@@ -210,14 +210,27 @@ amdgpu-y += \
 	vcn_v3_0.o \
 	vcn_v4_0.o \
 	vcn_v4_0_3.o \
+	vcn_v4_0_5.o \
 	amdgpu_jpeg.o \
 	jpeg_v1_0.o \
 	jpeg_v2_0.o \
 	jpeg_v2_5.o \
 	jpeg_v3_0.o \
 	jpeg_v4_0.o \
-	jpeg_v4_0_3.o
+	jpeg_v4_0_3.o \
+	jpeg_v4_0_5.o
 
+# add VPE block
+amdgpu-y += \
+	amdgpu_vpe.o \
+	vpe_v6_1.o
+
+# add UMSCH block
+amdgpu-y += \
+	amdgpu_umsch_mm.o \
+	umsch_mm_v4_0.o
+
+#
 # add ATHUB block
 amdgpu-y += \
 	athub_v1_0.o \

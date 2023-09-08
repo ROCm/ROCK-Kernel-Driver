@@ -78,12 +78,7 @@ static int vmw_bo_pin_in_placement(struct vmw_private *dev_priv,
 	if (unlikely(ret != 0))
 		goto err;
 
-	if (buf->tbo.pin_count > 0)
-		ret = ttm_resource_compat(bo->resource, placement)
-			? 0 : -EINVAL;
-	else
-		ret = ttm_bo_validate(bo, placement, &ctx);
-
+	ret = ttm_bo_validate(bo, placement, &ctx);
 	if (!ret)
 		vmw_bo_pin_reserved(buf, true);
 
@@ -122,13 +117,6 @@ int vmw_bo_pin_in_vram_or_gmr(struct vmw_private *dev_priv,
 	vmw_bo_placement_set(buf,
 			     VMW_BO_DOMAIN_GMR | VMW_BO_DOMAIN_VRAM,
 			     VMW_BO_DOMAIN_GMR);
-
-	if (buf->tbo.pin_count > 0) {
-		ret = ttm_resource_compat(bo->resource, &buf->placement)
-			? 0 : -EINVAL;
-		goto out_unreserve;
-	}
-
 	ret = ttm_bo_validate(bo, &buf->placement, &ctx);
 	if (likely(ret == 0) || ret == -ERESTARTSYS)
 		goto out_unreserve;
@@ -211,16 +199,10 @@ int vmw_bo_pin_in_start_of_vram(struct vmw_private *dev_priv,
 	}
 
 	vmw_bo_placement_set(buf,
-			     VMW_BO_DOMAIN_VRAM,
-			     VMW_BO_DOMAIN_VRAM);
-
-	if (buf->tbo.pin_count > 0)
-		ret = ttm_resource_compat(bo->resource, &buf->placement)
-			? 0 : -EINVAL;
-	else{
-		buf->places[0].lpfn = PFN_UP(bo->resource->size);
-		ret = ttm_bo_validate(bo, &buf->placement, &ctx);
-	}
+			VMW_BO_DOMAIN_VRAM,
+			VMW_BO_DOMAIN_VRAM);
+	buf->places[0].lpfn = PFN_UP(bo->resource->size);
+	ret = ttm_bo_validate(bo, &buf->placement, &ctx);
 
 	/* For some reason we didn't end up at the start of vram */
 	WARN_ON(ret == 0 && bo->resource->start != 0);

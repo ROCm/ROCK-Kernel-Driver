@@ -81,6 +81,8 @@
 #include "jpeg_v4_0.h"
 #include "vcn_v4_0_3.h"
 #include "jpeg_v4_0_3.h"
+#include "vcn_v4_0_5.h"
+#include "jpeg_v4_0_5.h"
 #include "amdgpu_vkms.h"
 #include "mes_v10_1.h"
 #include "mes_v11_0.h"
@@ -89,6 +91,8 @@
 #include "smuio_v13_0.h"
 #include "smuio_v13_0_3.h"
 #include "smuio_v13_0_6.h"
+
+#include "amdgpu_vpe.h"
 
 #define FIRMWARE_IP_DISCOVERY "amdgpu/ip_discovery.bin"
 MODULE_FIRMWARE(FIRMWARE_IP_DISCOVERY);
@@ -175,6 +179,7 @@ static const char *hw_id_names[HW_ID_MAX] = {
 	[XGMI_HWID]		= "XGMI",
 	[XGBE_HWID]		= "XGBE",
 	[MP0_HWID]		= "MP0",
+	[VPE_HWID]		= "VPE",
 };
 
 static int hw_id_map[MAX_HWIP] = {
@@ -204,6 +209,7 @@ static int hw_id_map[MAX_HWIP] = {
 	[XGMI_HWIP]	= XGMI_HWID,
 	[DCI_HWIP]	= DCI_HWID,
 	[PCIE_HWIP]	= PCIE_HWID,
+	[VPE_HWIP]	= VPE_HWID,
 };
 
 #ifdef HAVE_ACPI_DEV_GET_FIRST_MATCH_DEV
@@ -2093,6 +2099,10 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 			amdgpu_device_ip_block_add(adev, &vcn_v4_0_3_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v4_0_3_ip_block);
 			break;
+		case IP_VERSION(4, 0, 5):
+			amdgpu_device_ip_block_add(adev, &vcn_v4_0_5_ip_block);
+			amdgpu_device_ip_block_add(adev, &jpeg_v4_0_5_ip_block);
+			break;
 		default:
 			dev_err(adev->dev,
 				"Failed to add vcn/jpeg ip block(UVD_HWIP:0x%x)\n",
@@ -2150,6 +2160,35 @@ static void amdgpu_discovery_init_soc_config(struct amdgpu_device *adev)
 	default:
 		break;
 	}
+}
+
+static int amdgpu_discovery_set_vpe_ip_blocks(struct amdgpu_device *adev)
+{
+	switch (adev->ip_versions[VPE_HWIP][0]) {
+	case IP_VERSION(6, 1, 0):
+		amdgpu_device_ip_block_add(adev, &vpe_v6_1_ip_block);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int amdgpu_discovery_set_umsch_mm_ip_blocks(struct amdgpu_device *adev)
+{
+	switch (adev->ip_versions[VCN_HWIP][0]) {
+	case IP_VERSION(4, 0, 5):
+		if (amdgpu_umsch_mm & 0x1) {
+			amdgpu_device_ip_block_add(adev, &umsch_mm_v4_0_ip_block);
+			adev->enable_umsch_mm = true;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
 }
 
 int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
@@ -2636,6 +2675,14 @@ int amdgpu_discovery_set_ip_blocks(struct amdgpu_device *adev)
 		return r;
 
 	r = amdgpu_discovery_set_mes_ip_blocks(adev);
+	if (r)
+		return r;
+
+	r = amdgpu_discovery_set_vpe_ip_blocks(adev);
+	if (r)
+		return r;
+
+	r = amdgpu_discovery_set_umsch_mm_ip_blocks(adev);
 	if (r)
 		return r;
 
