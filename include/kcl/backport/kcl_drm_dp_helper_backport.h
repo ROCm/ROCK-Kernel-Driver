@@ -17,4 +17,14 @@
 #if !defined(HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP)
 #define drm_dp_cec_register_connector _kcl_drm_dp_cec_register_connector
 #endif
+
+#if !defined(HAVE_DRM_DP_READ_DPCD_CAPS)
+int _kcl_drm_dp_read_dpcd_caps(struct drm_dp_aux *aux,
+			  u8 dpcd[DP_RECEIVER_CAP_SIZE]);
+static inline int drm_dp_read_dpcd_caps(struct drm_dp_aux *aux,
+			  u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+    return _kcl_drm_dp_read_dpcd_caps(aux, dpcd);
+}
+#endif
 #endif
