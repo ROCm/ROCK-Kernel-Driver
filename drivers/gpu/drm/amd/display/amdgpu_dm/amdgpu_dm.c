@@ -1186,7 +1186,7 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	for (i = 0; i < fb_info->num_fb; ++i)
 		hw_params.fb[i] = &fb_info->fb[i];
 
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(3, 1, 3):
 	case IP_VERSION(3, 1, 4):
 	case IP_VERSION(3, 5, 0):
@@ -1620,7 +1620,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 
 	init_data.dce_environment = DCE_ENV_PRODUCTION_DRV;
 
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(2, 1, 0):
 		switch (adev->dm.dmcub_fw_version) {
 		case 0: /* development */
@@ -1645,7 +1645,7 @@ static int amdgpu_dm_init(struct amdgpu_device *adev)
 		init_data.flags.gpu_vm_support = true;
 		break;
 	default:
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
 			/* enable S/G on PCO and RV2 */
@@ -2029,7 +2029,7 @@ static int load_dmcu_fw(struct amdgpu_device *adev)
 			return 0;
 		break;
 	default:
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(2, 0, 2):
 		case IP_VERSION(2, 0, 3):
 		case IP_VERSION(2, 0, 0):
@@ -2119,7 +2119,7 @@ static int dm_dmub_sw_init(struct amdgpu_device *adev)
 	enum dmub_status status;
 	int r;
 
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(2, 1, 0):
 		dmub_asic = DMUB_ASIC_DCN21;
 		break;
@@ -2491,7 +2491,7 @@ static int amdgpu_dm_smu_write_watermarks_table(struct amdgpu_device *adev)
 	 * therefore, this function apply to navi10/12/14 but not Renoir
 	 * *
 	 */
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(2, 0, 2):
 	case IP_VERSION(2, 0, 0):
 		break;
@@ -4503,7 +4503,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 
 	/* Use Outbox interrupt */
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(3, 0, 0):
 	case IP_VERSION(3, 1, 2):
 	case IP_VERSION(3, 1, 3):
@@ -4521,12 +4521,12 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		break;
 	default:
 		DRM_DEBUG_KMS("Unsupported DCN IP version for outbox: 0x%X\n",
-			      adev->ip_versions[DCE_HWIP][0]);
+			      amdgpu_ip_version(adev, DCE_HWIP, 0));
 	}
 
 	/* Determine whether to enable PSR support by default. */
 	if (!(amdgpu_dc_debug_mask & DC_DISABLE_PSR)) {
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 1, 3):
 		case IP_VERSION(3, 1, 4):
@@ -4544,7 +4544,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 	}
 
 	if (!(amdgpu_dc_debug_mask & DC_DISABLE_REPLAY)) {
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(3, 1, 4):
 		case IP_VERSION(3, 1, 5):
 		case IP_VERSION(3, 1, 6):
@@ -4665,7 +4665,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 		}
 		break;
 	default:
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(1, 0, 0):
 		case IP_VERSION(1, 0, 1):
 		case IP_VERSION(2, 0, 2):
@@ -4691,7 +4691,7 @@ static int amdgpu_dm_initialize_drm_device(struct amdgpu_device *adev)
 			break;
 		default:
 			DRM_ERROR("Unsupported DCE IP versions: 0x%X\n",
-					adev->ip_versions[DCE_HWIP][0]);
+					amdgpu_ip_version(adev, DCE_HWIP, 0));
 			goto fail;
 		}
 		break;
@@ -4851,14 +4851,14 @@ static int dm_init_microcode(struct amdgpu_device *adev)
 	char *fw_name_dmub;
 	int r;
 
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(2, 1, 0):
 		fw_name_dmub = FIRMWARE_RENOIR_DMUB;
 		if (ASICREV_IS_GREEN_SARDINE(adev->external_rev_id))
 			fw_name_dmub = FIRMWARE_GREEN_SARDINE_DMUB;
 		break;
 	case IP_VERSION(3, 0, 0):
-		if (adev->ip_versions[GC_HWIP][0] == IP_VERSION(10, 3, 0))
+		if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(10, 3, 0))
 			fw_name_dmub = FIRMWARE_SIENNA_CICHLID_DMUB;
 		else
 			fw_name_dmub = FIRMWARE_NAVY_FLOUNDER_DMUB;
@@ -4988,7 +4988,7 @@ static int dm_early_init(void *handle)
 		break;
 	default:
 
-		switch (adev->ip_versions[DCE_HWIP][0]) {
+		switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 		case IP_VERSION(2, 0, 2):
 		case IP_VERSION(3, 0, 0):
 			adev->mode_info.num_crtc = 6;
@@ -5025,7 +5025,7 @@ static int dm_early_init(void *handle)
 			break;
 		default:
 			DRM_ERROR("Unsupported DCE IP versions: 0x%x\n",
-					adev->ip_versions[DCE_HWIP][0]);
+					amdgpu_ip_version(adev, DCE_HWIP, 0));
 			return -EINVAL;
 		}
 		break;
@@ -11398,7 +11398,7 @@ int amdgpu_dm_process_dmub_set_config_sync(
  */
 bool check_seamless_boot_capability(struct amdgpu_device *adev)
 {
-	switch (adev->ip_versions[DCE_HWIP][0]) {
+	switch (amdgpu_ip_version(adev, DCE_HWIP, 0)) {
 	case IP_VERSION(3, 0, 1):
 		if (!adev->mman.keep_stolen_vga_memory)
 			return true;
