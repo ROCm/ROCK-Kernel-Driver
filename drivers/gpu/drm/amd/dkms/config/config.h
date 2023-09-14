@@ -416,6 +416,9 @@
 /* drm_dp_read_dpcd_caps() is available */
 #define HAVE_DRM_DP_READ_DPCD_CAPS 1
 
+/* drm_dp_remove_payload_part{1,2}() is available */
+#define HAVE_DRM_DP_REMOVE_RAYLOAD_PART 1
+
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
