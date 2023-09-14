@@ -382,8 +382,11 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 		dm_helpers_construct_old_payload(mst_mgr, mst_state,
 						 new_payload, &old_payload);
 		target_payload = &old_payload;
-
+#ifdef HAVE_DRM_DP_REMOVE_RAYLOAD_PART
 		drm_dp_remove_payload_part1(mst_mgr, mst_state, new_payload);
+#else
+		drm_dp_remove_payload(mst_mgr, mst_state, &old_payload, new_payload);
+#endif
 	}
 
 	/* mst_mgr->->payloads are VC payload notify MST branch using DPCD or
@@ -552,6 +555,7 @@ void dm_helpers_dp_mst_send_payload_allocation(
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 	ret = drm_dp_add_payload_part2(mst_mgr, mst_state->base.state, new_payload);
+
 #else
 	ret = drm_dp_update_payload_part2(mst_mgr);
 #endif
