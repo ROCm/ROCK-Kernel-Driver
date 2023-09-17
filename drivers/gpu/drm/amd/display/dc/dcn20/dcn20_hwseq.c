@@ -1840,8 +1840,16 @@ void dcn20_program_front_end_for_ctx(
 			dc->current_state->res_ctx.pipe_ctx[i].stream->mall_stream_config.type == SUBVP_PHANTOM) {
 			struct timing_generator *tg = dc->current_state->res_ctx.pipe_ctx[i].stream_res.tg;
 
-			if (tg->funcs->enable_crtc)
+			if (tg->funcs->enable_crtc) {
+				if (dc->hwss.blank_phantom) {
+					int main_pipe_width, main_pipe_height;
+
+					main_pipe_width = dc->current_state->res_ctx.pipe_ctx[i].stream->mall_stream_config.paired_stream->dst.width;
+					main_pipe_height = dc->current_state->res_ctx.pipe_ctx[i].stream->mall_stream_config.paired_stream->dst.height;
+					dc->hwss.blank_phantom(dc, tg, main_pipe_width, main_pipe_height);
+				}
 				tg->funcs->enable_crtc(tg);
+			}
 		}
 	}
 	/* OTG blank before disabling all front ends */
@@ -2702,8 +2710,6 @@ void dcn20_enable_stream(struct pipe_ctx *pipe_ctx)
 	struct dce_hwseq *hws = dc->hwseq;
 	unsigned int k1_div = PIXEL_RATE_DIV_NA;
 	unsigned int k2_div = PIXEL_RATE_DIV_NA;
-	struct link_encoder *link_enc = link_enc_cfg_get_link_enc(pipe_ctx->stream->link);
-	struct stream_encoder *stream_enc = pipe_ctx->stream_res.stream_enc;
 
 	if (dc->link_srv->dp_is_128b_132b_signal(pipe_ctx)) {
 		if (dc->hwseq->funcs.setup_hpo_hw_control)
@@ -2723,10 +2729,8 @@ void dcn20_enable_stream(struct pipe_ctx *pipe_ctx)
 		dto_params.timing = &pipe_ctx->stream->timing;
 		dto_params.ref_dtbclk_khz = dc->clk_mgr->funcs->get_dtb_ref_clk_frequency(dc->clk_mgr);
 		dccg->funcs->set_dtbclk_dto(dccg, &dto_params);
-	} else if (pipe_ctx->stream->signal == SIGNAL_TYPE_DISPLAY_PORT_MST && dccg->funcs->enable_symclk_se)
-		dccg->funcs->enable_symclk_se(dccg,
-			stream_enc->stream_enc_inst, link_enc->transmitter - TRANSMITTER_UNIPHY_A);
-
+	} else {
+		}
 	if (hws->funcs.calculate_dccg_k1_k2_values && dc->res_pool->dccg->funcs->set_pixel_rate_div) {
 		hws->funcs.calculate_dccg_k1_k2_values(pipe_ctx, &k1_div, &k2_div);
 
@@ -2847,7 +2851,7 @@ void dcn20_fpga_init_hw(struct dc *dc)
 	res_pool->mpc->funcs->mpc_init(res_pool->mpc);
 
 	/* initialize OPP mpc_tree parameter */
-	for (i = 0; i < dc->res_pool->res_cap->num_opp; i++) {
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
 		res_pool->opps[i]->mpc_tree_params.opp_id = res_pool->opps[i]->inst;
 		res_pool->opps[i]->mpc_tree_params.opp_list = NULL;
 		for (j = 0; j < MAX_PIPES; j++)

@@ -47,7 +47,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.249"
+#define DC_VER "3.2.250"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -420,6 +420,7 @@ struct dc_config {
 	int sdpif_request_limit_words_per_umc;
 	bool use_old_fixed_vs_sequence;
 	bool dc_mode_clk_limit_support;
+	bool enable_auto_dpm_test_logs;
 };
 
 enum visual_confirm {

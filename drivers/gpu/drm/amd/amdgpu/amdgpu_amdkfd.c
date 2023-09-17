@@ -165,7 +165,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		 */
 		bitmap_complement(gpu_resources.cp_queue_bitmap,
 				  adev->gfx.mec_bitmap[0].queue_bitmap,
-				  KGD_MAX_QUEUES);
+				  AMDGPU_MAX_QUEUES);
 
 		/* According to linux/bitmap.h we shouldn't use bitmap_clear if
 		 * nbits is not compile time constant
@@ -173,7 +173,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
 		last_valid_bit = 1 /* only first MEC can have compute queues */
 				* adev->gfx.mec.num_pipe_per_mec
 				* adev->gfx.mec.num_queue_per_pipe;
-		for (i = last_valid_bit; i < KGD_MAX_QUEUES; ++i)
+		for (i = last_valid_bit; i < AMDGPU_MAX_QUEUES; ++i)
 			clear_bit(i, gpu_resources.cp_queue_bitmap);
 
 		amdgpu_doorbell_get_kfd_info(adev,
@@ -482,7 +482,7 @@ void amdgpu_amdkfd_get_cu_info(struct amdgpu_device *adev, struct kfd_cu_info *c
 	cu_info->cu_active_number = acu_info.number;
 	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
 	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
-	       sizeof(acu_info.bitmap));
+	       sizeof(cu_info->cu_bitmap));
 	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
 	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
 	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;

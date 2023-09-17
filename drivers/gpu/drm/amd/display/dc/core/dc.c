@@ -1070,53 +1070,6 @@ static void apply_ctx_interdependent_lock(struct dc *dc,
 	}
 }
 
-static void phantom_pipe_blank(
-		struct dc *dc,
-		struct timing_generator *tg,
-		int width,
-		int height)
-{
-	struct dce_hwseq *hws = dc->hwseq;
-	enum dc_color_space color_space;
-	struct tg_color black_color = {0};
-	struct output_pixel_processor *opp = NULL;
-	uint32_t num_opps, opp_id_src0, opp_id_src1;
-	uint32_t otg_active_width, otg_active_height;
-	uint32_t i;
-
-	/* program opp dpg blank color */
-	color_space = COLOR_SPACE_SRGB;
-	color_space_to_black_color(dc, color_space, &black_color);
-
-	otg_active_width = width;
-	otg_active_height = height;
-
-	/* get the OPTC source */
-	tg->funcs->get_optc_source(tg, &num_opps, &opp_id_src0, &opp_id_src1);
-	ASSERT(opp_id_src0 < dc->res_pool->res_cap->num_opp);
-
-	for (i = 0; i < dc->res_pool->res_cap->num_opp; i++) {
-		if (dc->res_pool->opps[i] != NULL && dc->res_pool->opps[i]->inst == opp_id_src0) {
-			opp = dc->res_pool->opps[i];
-			break;
-		}
-	}
-
-	if (opp && opp->funcs->opp_set_disp_pattern_generator)
-		opp->funcs->opp_set_disp_pattern_generator(
-				opp,
-				CONTROLLER_DP_TEST_PATTERN_SOLID_COLOR,
-				CONTROLLER_DP_COLOR_SPACE_UDEFINED,
-				COLOR_DEPTH_UNDEFINED,
-				&black_color,
-				otg_active_width,
-				otg_active_height,
-				0);
-
-	if (tg->funcs->is_tg_enabled(tg))
-		hws->funcs.wait_for_blank_complete(opp);
-}
-
 static void dc_update_viusal_confirm_color(struct dc *dc, struct dc_state *context, struct pipe_ctx *pipe_ctx)
 {
 	if (dc->ctx->dce_version >= DCN_VERSION_1_0) {
@@ -1207,7 +1160,8 @@ static void disable_dangling_plane(struct dc *dc, struct dc_state *context)
 
 					main_pipe_width = old_stream->mall_stream_config.paired_stream->dst.width;
 					main_pipe_height = old_stream->mall_stream_config.paired_stream->dst.height;
-					phantom_pipe_blank(dc, tg, main_pipe_width, main_pipe_height);
+					if (dc->hwss.blank_phantom)
+						dc->hwss.blank_phantom(dc, tg, main_pipe_width, main_pipe_height);
 					tg->funcs->enable_crtc(tg);
 				}
 			}
@@ -3928,6 +3882,7 @@ static void commit_planes_for_stream(struct dc *dc,
  */
 static bool could_mpcc_tree_change_for_active_pipes(struct dc *dc,
 		struct dc_stream_state *stream,
+		struct dc_surface_update *srf_updates,
 		int surface_count,
 		bool *is_plane_addition)
 {
@@ -3963,6 +3918,40 @@ static bool could_mpcc_tree_change_for_active_pipes(struct dc *dc,
 			} else if (surface_count > 2 && cur_stream_status->plane_count < surface_count) {
 				force_minimal_pipe_splitting = true;
 				*is_plane_addition = true;
+			}
+		}
+		if (dc->config.enable_windowed_mpo_odm) {
+			const struct rect *guaranteed_viewport = &stream->src;
+			const struct rect *surface_src, *surface_dst;
+			bool are_cur_planes_guaranteed = true;
+			bool are_new_planes_guaranteed = true;
+
+			for (i = 0; i < cur_stream_status->plane_count; i++) {
+				surface_src = &cur_stream_status->plane_states[i]->src_rect;
+				surface_dst = &cur_stream_status->plane_states[i]->dst_rect;
+				if ((surface_src->height > surface_dst->height && surface_src->height > guaranteed_viewport->height) ||
+						(surface_src->width > surface_dst->width && surface_src->width > guaranteed_viewport->width))
+					are_cur_planes_guaranteed = false;
+			}
+
+			for (i = 0; i < surface_count; i++) {
+				if (srf_updates[i].scaling_info) {
+					surface_src = &srf_updates[i].scaling_info->src_rect;
+					surface_dst = &srf_updates[i].scaling_info->dst_rect;
+				} else {
+					surface_src = &srf_updates[i].surface->src_rect;
+					surface_dst = &srf_updates[i].surface->dst_rect;
+				}
+				if ((surface_src->height > surface_dst->height && surface_src->height > guaranteed_viewport->height) ||
+						(surface_src->width > surface_dst->width && surface_src->width > guaranteed_viewport->width))
+					are_new_planes_guaranteed = false;
+			}
+
+			if (are_cur_planes_guaranteed && !are_new_planes_guaranteed) {
+				force_minimal_pipe_splitting = true;
+				*is_plane_addition = true;
+			} else if (!are_cur_planes_guaranteed && are_new_planes_guaranteed) {
+				force_minimal_pipe_splitting = true;
 			}
 		}
 	}
@@ -4060,10 +4049,10 @@ static bool commit_minimal_transition_state(struct dc *dc,
 	 * pipe, we must use the minimal transition.
 	 */
 	for (i = 0; i < dc->res_pool->pipe_count; i++) {
-		struct pipe_ctx *pipe = &dc->current_state->res_ctx.pipe_ctx[i];
+		struct pipe_ctx *pipe = &transition_base_context->res_ctx.pipe_ctx[i];
 
-		if (pipe->stream && pipe->next_odm_pipe) {
-			odm_in_use = true;
+		if (resource_is_pipe_type(pipe, OTG_MASTER)) {
+			odm_in_use = resource_get_odm_slice_count(pipe) > 1;
 			break;
 		}
 	}
@@ -4080,6 +4069,13 @@ static bool commit_minimal_transition_state(struct dc *dc,
 		dc_release_state(transition_context);
 		return true;
 	}
+
+	DC_LOG_DC("%s base = %s state, reason = %s\n", __func__,
+			dc->current_state == transition_base_context ? "current" : "new",
+			subvp_in_use ? "Subvp In Use" :
+			odm_in_use ? "ODM in Use" :
+			dc->debug.pipe_split_policy != MPC_SPLIT_AVOID ? "MPC in Use" :
+			"Unknown");
 
 	if (!dc->config.is_vmin_only_asic) {
 		tmp_mpc_policy = dc->debug.pipe_split_policy;
@@ -4317,6 +4313,7 @@ bool dc_update_planes_and_stream(struct dc *dc,
 	force_minimal_pipe_splitting = could_mpcc_tree_change_for_active_pipes(
 			dc,
 			stream,
+			srf_updates,
 			surface_count,
 			&is_plane_addition);
 
@@ -4374,6 +4371,14 @@ bool dc_update_planes_and_stream(struct dc *dc,
 				update_type,
 				context);
 	} else {
+		if (!stream_update &&
+				dc->hwss.is_pipe_topology_transition_seamless &&
+				!dc->hwss.is_pipe_topology_transition_seamless(
+						dc, dc->current_state, context)) {
+
+			DC_LOG_ERROR("performing non-seamless pipe topology transition with surface only update!\n");
+			BREAK_TO_DEBUGGER();
+		}
 		commit_planes_for_stream(
 				dc,
 				srf_updates,

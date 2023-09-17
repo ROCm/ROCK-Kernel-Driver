@@ -43,9 +43,10 @@
 #define AMDGPU_GFX_LBPW_DISABLED_MODE		0x00000008L
 
 #define AMDGPU_MAX_GC_INSTANCES		8
+#define AMDGPU_MAX_QUEUES		128
 
-#define AMDGPU_MAX_GFX_QUEUES KGD_MAX_QUEUES
-#define AMDGPU_MAX_COMPUTE_QUEUES KGD_MAX_QUEUES
+#define AMDGPU_MAX_GFX_QUEUES AMDGPU_MAX_QUEUES
+#define AMDGPU_MAX_COMPUTE_QUEUES AMDGPU_MAX_QUEUES
 
 enum amdgpu_gfx_pipe_priority {
 	AMDGPU_GFX_PIPE_PRIO_NORMAL = AMDGPU_RING_PRIO_1,
@@ -266,7 +267,7 @@ struct amdgpu_cu_info {
 	uint32_t number;
 	uint32_t ao_cu_mask;
 	uint32_t ao_cu_bitmap[4][4];
-	uint32_t bitmap[4][4];
+	uint32_t bitmap[AMDGPU_MAX_GC_INSTANCES][4][4];
 };
 
 struct amdgpu_gfx_ras {

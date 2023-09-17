@@ -273,34 +273,29 @@ static void amdgpu_restore_msix(struct amdgpu_device *adev)
  */
 int amdgpu_irq_init(struct amdgpu_device *adev)
 {
-	int r = 0;
-	unsigned int irq;
+	unsigned int irq, flags;
+	int r;
 
 	spin_lock_init(&adev->irq.lock);
 
 	/* Enable MSI if not disabled by module parameter */
 	adev->irq.msi_enabled = false;
 
+	if (!amdgpu_msi_ok(adev))
+		flags = PCI_IRQ_LEGACY;
+	else
+		flags = PCI_IRQ_ALL_TYPES;
+
+	/* we only need one vector */
+	r = pci_alloc_irq_vectors(adev->pdev, 1, 1, flags);
+	if (r < 0) {
+		dev_err(adev->dev, "Failed to alloc msi vectors\n");
+		return r;
+	}
+
 	if (amdgpu_msi_ok(adev)) {
-#ifdef PCI_IRQ_MSI
-		int nvec = pci_msix_vec_count(adev->pdev);
-		unsigned int flags;
-
-		if (nvec <= 0)
-			flags = PCI_IRQ_MSI;
-		else
-			flags = PCI_IRQ_MSI | PCI_IRQ_MSIX;
-
-		/* we only need one vector */
-		nvec = pci_alloc_irq_vectors(adev->pdev, 1, 1, flags);
-		if (nvec > 0) {
-#else
-		r = pci_enable_msi(adev->pdev);
-		if (!r) {
-#endif
-			adev->irq.msi_enabled = true;
-			dev_dbg(adev->dev, "using MSI/MSI-X.\n");
-		}
+		adev->irq.msi_enabled = true;
+		dev_dbg(adev->dev, "using MSI/MSI-X.\n");
 	}
 
 	INIT_WORK(&adev->irq.ih1_work, amdgpu_irq_handle_ih1);
@@ -310,14 +305,15 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 	/* Use vector 0 for MSI-X. */
 	r = pci_irq_vector(adev->pdev, 0);
 	if (r < 0)
-		return r;
+		goto free_vectors;
 	irq = r;
 
 	/* PCI devices require shared interrupts. */
 	r = request_irq(irq, amdgpu_irq_handler, IRQF_SHARED, adev_to_drm(adev)->driver->name,
 			adev_to_drm(adev));
 	if (r)
-		return r;
+		goto free_vectors;
+
 	adev->irq.installed = true;
 	adev->irq.irq = irq;
 	adev_to_drm(adev)->max_vblank_count = 0x00ffffff;
@@ -327,8 +323,14 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 
 	DRM_DEBUG("amdgpu: irq initialized.\n");
 	return 0;
-}
 
+free_vectors:
+	if (adev->irq.msi_enabled)
+		pci_free_irq_vectors(adev->pdev);
+
+	adev->irq.msi_enabled = false;
+	return r;
+}
 
 void amdgpu_irq_fini_hw(struct amdgpu_device *adev)
 {
@@ -336,11 +338,7 @@ void amdgpu_irq_fini_hw(struct amdgpu_device *adev)
 		free_irq(adev->irq.irq, adev_to_drm(adev));
 		adev->irq.installed = false;
 		if (adev->irq.msi_enabled)
-#ifdef PCI_IRQ_MSI
 			pci_free_irq_vectors(adev->pdev);
-#else
-			pci_disable_msi(adev->pdev);
-#endif
 	}
 
 	amdgpu_ih_ring_fini(adev, &adev->irq.ih_soft);
