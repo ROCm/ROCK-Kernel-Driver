@@ -6,6 +6,7 @@
  */
 #include <linux/sched.h>
 #include <linux/pagemap.h>
+#include <linux/slab.h>
 
 #ifndef HAVE_MMPUT_ASYNC
 void (*_kcl_mmput_async)(struct mm_struct *mm);
@@ -35,6 +36,24 @@ EXPORT_SYMBOL_GPL(zone_device_page_init);
 extern struct kmem_cache *(*_kcl_kmalloc_slab)(size_t size, gfp_t flags);
 #endif
 #endif /* HAVE_KMALLOC_SIZE_ROUNDUP */
+
+#ifndef HAVE_KVREALLOC
+void *kvrealloc(const void *p, size_t oldsize, size_t newsize, gfp_t flags)
+{
+        void *newp;
+
+        if (oldsize >= newsize)
+                return (void *)p;
+        newp = kvmalloc(newsize, flags);
+        if (!newp)
+                return NULL;
+        memcpy(newp, p, oldsize);
+        kvfree(p);
+        return newp;
+}
+EXPORT_SYMBOL(kvrealloc);
+#endif
+
 
 void amdkcl_mm_init(void)
 {
