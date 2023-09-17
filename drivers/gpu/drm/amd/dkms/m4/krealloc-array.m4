@@ -16,3 +16,25 @@ AC_DEFUN([AC_AMDGPU_KREALLOC_ARRAY], [
 		])
 	])
 ])
+
+dnl #
+dnl # 
+dnl #v5.15-11-g8587ca6f3415  mm: move kvmalloc-related functions to slab.h
+dnl #v5.14-rc4-23-gde2860f46362  mm: Add kvrealloc()
+dnl #
+AC_DEFUN([AC_AMDGPU_KVREALLOC], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/gfp.h>
+			#include <linux/slab.h>
+			#include <linux/mm.h>
+		], [
+			void *p = NULL;
+			p = kvrealloc(NULL, 0, 0, GFP_KERNEL);
+		], [
+			AC_DEFINE(HAVE_KVREALLOC, 1,
+				[kvrealloc() is available])
+		])
+	])
+])
+
