@@ -38,4 +38,8 @@ krealloc_array(void *p, size_t new_n, size_t new_size, gfp_t flags)
 size_t kmalloc_size_roundup(size_t size);
 #endif
 
+#ifndef HAVE_KVREALLOC
+extern void *kvrealloc(const void *p, size_t oldsize, size_t newsize, gfp_t flags);
+#endif
+
 #endif
