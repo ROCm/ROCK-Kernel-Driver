@@ -7,7 +7,8 @@ AC_DEFUN([AC_AMDGPU_DMA_FENCE_CHAIN_ALLOC], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/dma-fence-chain.h>
 		], [
-			dma_fence_chain_alloc();
+                        struct dma_fence_chain *chain = NULL;
+			chain = dma_fence_chain_alloc();
 		], [
 			AC_DEFINE(HAVE_DMA_FENCE_CHAIN_ALLOC, 1,
 				[dma_fence_chain_alloc() is available])
