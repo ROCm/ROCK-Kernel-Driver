@@ -98,4 +98,11 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
         dnl # drm/suballoc: Extract amdgpu_sa.c as generic suballocation helper
         dnl #
         AC_KERNEL_CHECK_HEADERS([drm/drm_suballoc.h])
+       
+        dnl #
+        dnl # v6.4-rc7-2018-g09593216bff1
+        dnl # drm: execution context for GEM buffers v7
+        dnl #
+        AC_KERNEL_CHECK_HEADERS([drm/drm_exec.h])
+
 ])
