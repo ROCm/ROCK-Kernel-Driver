@@ -6,7 +6,14 @@
 #include <linux/compiler.h>
 #include <linux/ww_mutex.h>
 
+#ifdef HAVE_DRM_GEM_OBJECT_RESV
+#define amdkcl_gem_resvp(bo) (bo->resv)
+#else
+#define amdkcl_gem_resvp(bo) (container_of(bo, struct ttm_buffer_object, base)->resv)
+#endif
 #ifndef HAVE_DRM_DRM_EXEC_H
+#include <kcl/kcl_mm_types.h>
+#include <drm/ttm/ttm_bo.h>
 #define DRM_EXEC_INTERRUPTIBLE_WAIT	BIT(0)
 #define DRM_EXEC_IGNORE_DUPLICATES	BIT(1)
 
