@@ -275,9 +275,13 @@ static void amdgpu_perf_read(struct perf_event *event)
 	if ((!pe->adev->df.funcs) ||
 	    (!pe->adev->df.funcs->pmc_get_count))
 		return;
-
+#ifdef HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG
 	prev = local64_read(&hwc->prev_count);
+#endif
 	do {
+#ifndef HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG
+		prev = local64_read(&hwc->prev_count);
+#endif
 		switch (hwc->config_base) {
 		case AMDGPU_PMU_EVENT_CONFIG_TYPE_DF:
 		case AMDGPU_PMU_EVENT_CONFIG_TYPE_XGMI:
@@ -288,8 +292,11 @@ static void amdgpu_perf_read(struct perf_event *event)
 			count = 0;
 			break;
 		}
+#ifdef HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG
 	} while (!local64_try_cmpxchg(&hwc->prev_count, &prev, count));
-
+#else
+	} while (local64_cmpxchg(&hwc->prev_count, prev, count) != prev);
+#endif
 	local64_add(count - prev, &event->count);
 }
 
