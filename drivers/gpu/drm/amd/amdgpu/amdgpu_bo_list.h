@@ -24,6 +24,7 @@
 #define __AMDGPU_BO_LIST_H__
 
 #include <drm/amdgpu_drm.h>
+#include <drm/ttm/ttm_execbuf_util.h>
 
 struct hmm_range;
 
@@ -44,6 +45,7 @@ struct amdgpu_bo_list_entry {
 	bool				user_invalidated;
 #else
 	int				user_invalidated;
+	struct ttm_validate_buffer      tv;
 #endif
 };
 

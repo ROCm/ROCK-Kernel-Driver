@@ -941,21 +941,62 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto out_free_user_pages;
 		}
 	}
+	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
+		struct mm_struct *usermm;
+
+		usermm = amdgpu_ttm_tt_get_usermm(e->bo->tbo.ttm);
+		if (usermm && usermm != current->mm) {
+			r = -EPERM;
+			goto out_free_user_pages;
+		}
+
+		if (amdgpu_ttm_tt_is_userptr(e->bo->tbo.ttm) &&
+		    e->user_invalidated && e->user_pages) {
+			amdgpu_bo_placement_from_domain(e->bo,
+							AMDGPU_GEM_DOMAIN_CPU);
+			r = ttm_bo_validate(&e->bo->tbo, &e->bo->placement,
+					    &ctx);
+			if (r)
+				goto out_free_user_pages;
+
+			amdgpu_ttm_tt_set_user_pages(e->bo->tbo.ttm,
+						     e->user_pages);
+		}
+
+		kvfree(e->user_pages);
+		e->user_pages = NULL;
+	}
 #else
 	while (1) {
 		struct list_head need_pages;
+		drm_exec_until_all_locked(&p->exec) {
+			r = amdgpu_vm_lock_pd(&fpriv->vm, &p->exec, 1 + p->gang_size);
+			drm_exec_retry_on_contention(&p->exec);
+			if (unlikely(r))
+				goto error_free_pages;
 
-		r = ttm_eu_reserve_buffers(&p->ticket, &p->validated, true,
-					   &duplicates);
-		if (unlikely(r != 0)) {
-			if (r != -ERESTARTSYS)
-				DRM_ERROR("ttm_eu_reserve_buffers failed.\n");
-			goto error_free_pages;
+			amdgpu_bo_list_for_each_entry(e, p->bo_list) {
+				/* One fence for TTM and one for each CS job */
+				r = drm_exec_prepare_obj(&p->exec, &e->bo->tbo.base,
+							1 + p->gang_size);
+				drm_exec_retry_on_contention(&p->exec);
+				if (unlikely(r))
+					goto error_free_pages;
+
+				e->bo_va = amdgpu_vm_bo_find(vm, e->bo);
+			}
+
+			if (p->uf_bo) {
+				r = drm_exec_prepare_obj(&p->exec, &p->uf_bo->tbo.base,
+							1 + p->gang_size);
+				drm_exec_retry_on_contention(&p->exec);
+				if (unlikely(r))
+					goto error_free_pages;
+			}
 		}
-
 		INIT_LIST_HEAD(&need_pages);
 		amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
-			struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
+			struct amdgpu_bo *bo = e->bo;
 
 			if (amdgpu_ttm_tt_userptr_invalidated(bo->tbo.ttm,
 				 &e->user_invalidated) && e->user_pages) {
@@ -982,7 +1023,7 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 			break;
 
 		/* Unreserve everything again. */
-		ttm_eu_backoff_reservation(&p->ticket, &p->validated);
+		drm_exec_fini(&p->exec);
 
 		/* We tried too many times, just abort */
 		if (!--tries) {
@@ -1012,37 +1053,9 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 				goto error_free_pages;
 			}
 		}
-
-		/* And try again. */
-		list_splice(&need_pages, &p->validated);
 	}
 #endif
 
-	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
-		struct mm_struct *usermm;
-
-		usermm = amdgpu_ttm_tt_get_usermm(e->bo->tbo.ttm);
-		if (usermm && usermm != current->mm) {
-			r = -EPERM;
-			goto out_free_user_pages;
-		}
-
-		if (amdgpu_ttm_tt_is_userptr(e->bo->tbo.ttm) &&
-		    e->user_invalidated && e->user_pages) {
-			amdgpu_bo_placement_from_domain(e->bo,
-							AMDGPU_GEM_DOMAIN_CPU);
-			r = ttm_bo_validate(&e->bo->tbo, &e->bo->placement,
-					    &ctx);
-			if (r)
-				goto out_free_user_pages;
-
-			amdgpu_ttm_tt_set_user_pages(e->bo->tbo.ttm,
-						     e->user_pages);
-		}
-
-		kvfree(e->user_pages);
-		e->user_pages = NULL;
-	}
 
 	amdgpu_cs_get_threshold_for_moves(p->adev, &p->bytes_moved_threshold,
 					  &p->bytes_moved_vis_threshold);
@@ -1080,8 +1093,8 @@ static int amdgpu_cs_parser_bos(struct amdgpu_cs_parser *p,
 	return 0;
 
 
-#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 out_free_user_pages:
+#ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	amdgpu_bo_list_for_each_userptr_entry(e, p->bo_list) {
 		struct amdgpu_bo *bo = e->bo;
 
@@ -1447,13 +1460,13 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 			if (p->jobs[i] == leader)
 				continue;
 
-			dma_resv_add_fence(gobj->resv,
+			dma_resv_add_fence(amdkcl_gem_resvp(gobj),
 					   &p->jobs[i]->base.s_fence->finished,
 					   DMA_RESV_USAGE_READ);
 		}
 
 		/* The gang leader as remembered as writer */
-		dma_resv_add_fence(gobj->resv, p->fence, DMA_RESV_USAGE_WRITE);
+		dma_resv_add_fence(amdkcl_gem_resvp(gobj), p->fence, DMA_RESV_USAGE_WRITE);
 	}
 
 	seq = amdgpu_ctx_add_fence(p->ctx, p->entities[p->gang_leader_idx],
