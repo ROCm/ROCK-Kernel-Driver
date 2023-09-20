@@ -31,6 +31,8 @@ long kcl_get_user_pages_remote(struct task_struct *tsk, struct mm_struct *mm,
 #elif defined(HAVE_GET_USER_PAGES_REMOTE_INTRODUCED)
 	return get_user_pages_remote(tsk, mm, start, nr_pages, !!(gup_flags & FOLL_WRITE),
 				     !!(gup_flags & FOLL_FORCE), pages, vmas);
+#elif defined(HAVE_GET_USER_PAGES_REMOTE_REMOVE_VMAS)
+	return get_user_pages_remote(mm, start, nr_pages, gup_flags, pages, locked);
 #else
 	return get_user_pages(tsk, mm, start, nr_pages, !!(gup_flags & FOLL_WRITE),
 			      !!(gup_flags & FOLL_FORCE), pages, vmas);
@@ -46,6 +48,8 @@ long _kcl_get_user_pages(unsigned long start, unsigned long nr_pages,
 #if defined(HAVE_GET_USER_PAGES_6ARGS)
 	return get_user_pages(start, nr_pages, !!(gup_flags & FOLL_WRITE),
 			      !!(gup_flags & FOLL_FORCE), pages, vmas);
+#elif defined(HAVE_GET_USER_PAGES_REMOVE_VMAS)
+	return get_user_pages(start, nr_pages, gup_flags, pages);
 #else
 	return get_user_pages(current, current->mm, start, nr_pages, !!(gup_flags & FOLL_WRITE),
 			      !!(gup_flags & FOLL_FORCE), pages, vmas);
