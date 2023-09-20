@@ -119,4 +119,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #apple-gmux: Add helper for presence detect
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/apple-gmux.h])
+
+	dnl #v5.5-rc2-6-ga8ae608529ab
+	dnl #device.h: move 'struct class' stuff out to device/class.h
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/device/class.h])
 ])
