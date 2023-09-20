@@ -25,9 +25,6 @@
 /* acpi_video_register_backlight() is available */
 #define HAVE_ACPI_VIDEO_REGISTER_BACKLIGHT 1
 
-/* acpi_video_report_nolcd() is available */
-#define HAVE_ACPI_VIDEO_REPORT_NOLCD 1
-
 /* whether AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES is defined */
 #define HAVE_AMDGPU_CHUNK_ID_SCHEDULED_DEPENDENCIES 1
 
@@ -386,8 +383,14 @@
 /* drm_dp_update_payload_part1() function has start_slot argument */
 /* #undef HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG */
 
+/* drm_driver->gem_prime_mmap() is available */
+/* #undef HAVE_DRM_DRIVER_GEM_PRIME_MMAP */
+
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
+
+/* drm_driver->show_fdinfo() is available */
+#define HAVE_DRM_DRIVER_SHOW_FDINFO 1
 
 /* Define to 1 if you have the <drm/drmP.h> header file. */
 /* #undef HAVE_DRM_DRMP_H */
@@ -397,6 +400,9 @@
 
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
+
+/* Define to 1 if you have the <drm/drm_exec.h> header file. */
+#define HAVE_DRM_DRM_EXEC_H 1
 
 /* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
 #define HAVE_DRM_DRM_FBDEV_GENERIC_H 1
@@ -464,7 +470,7 @@
 /* drm_gem_object_put() is exported */
 /* #undef HAVE_DRM_GEM_OBJECT_PUT_SYMBOL */
 
-/* ttm_buffer_object->base is available */
+/* drm_gem_object->resv/_resv is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
 
 /* drm_gem_plane_helper_prepare_fb() is available */
@@ -527,6 +533,9 @@
 /* drm_print_bits() has 4 args */
 #define HAVE_DRM_PRINT_BITS_4ARGS 1
 
+/* drm_show_fdinfo() is available */
+#define HAVE_DRM_SHOW_FDINFO 1
+
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
@@ -558,7 +567,7 @@
 /* #undef HAVE_GET_USER_PAGES_6ARGS */
 
 /* get_user_pages() wants gup_flags parameter */
-#define HAVE_GET_USER_PAGES_GUP_FLAGS 1
+/* #undef HAVE_GET_USER_PAGES_GUP_FLAGS */
 
 /* get_user_pages_remote() wants gup_flags parameter */
 /* #undef HAVE_GET_USER_PAGES_REMOTE_GUP_FLAGS */
@@ -570,7 +579,13 @@
 /* #undef HAVE_GET_USER_PAGES_REMOTE_LOCKED */
 
 /* get_user_pages_remote() remove task_struct pointer */
-#define HAVE_GET_USER_PAGES_REMOTE_REMOVE_TASK_STRUCT 1
+/* #undef HAVE_GET_USER_PAGES_REMOTE_REMOVE_TASK_STRUCT */
+
+/* get_user_pages_remote() remove argument vmas */
+#define HAVE_GET_USER_PAGES_REMOTE_REMOVE_VMAS 1
+
+/* get_user_pages() remove vmas argument */
+#define HAVE_GET_USER_PAGES_REMOVE_VMAS 1
 
 /* drm_connector_hdr_sink_metadata() is available */
 #define HAVE_HDR_SINK_METADATA 1
@@ -650,8 +665,14 @@
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
 
+/* kvrealloc() is available */
+#define HAVE_KVREALLOC 1
+
 /* Define to 1 if you have the <linux/apple-gmux.h> header file. */
 #define HAVE_LINUX_APPLE_GMUX_H 1
+
+/* atomic_long_try_cmpxchg() is available */
+#define HAVE_LINUX_ATOMIC_LONG_TRY_CMPXCHG 1
 
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
@@ -664,6 +685,9 @@
 
 /* Define to 1 if you have the <linux/container_of.h> header file. */
 #define HAVE_LINUX_CONTAINER_OF_H 1
+
+/* Define to 1 if you have the <linux/device/class.h> header file. */
+#define HAVE_LINUX_DEVICE_CLASS_H 1
 
 /* Define to 1 if you have the <linux/dma-attrs.h> header file. */
 /* #undef HAVE_LINUX_DMA_ATTRS_H */
@@ -688,6 +712,9 @@
 
 /* Define to 1 if you have the <linux/io-64-nonatomic-lo-hi.h> header file. */
 #define HAVE_LINUX_IO_64_NONATOMIC_LO_HI_H 1
+
+/* local_try_cmpchg() is available */
+#define HAVE_LINUX_LOCAL_TRY_CMPXCHG 1
 
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
@@ -751,6 +778,9 @@
 
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
+
+/* class_create has one argument */
+#define HAVE_ONE_ARGUMENT_OF_CLASS_CREATE 1
 
 /* pcie_aspm_enabled() is available */
 #define HAVE_PCIE_ASPM_ENABLED 1
@@ -913,7 +943,7 @@
 #define HAVE_VMF_INSERT 1
 
 /* vmf_insert_mixed_prot() is available */
-#define HAVE_VMF_INSERT_MIXED_PROT 1
+/* #undef HAVE_VMF_INSERT_MIXED_PROT */
 
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
@@ -967,7 +997,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.2.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.5.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -976,7 +1006,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.3.0"
+#define PACKAGE_VERSION "6.5.0"
 
 #include "config-amd-chips.h"
 
