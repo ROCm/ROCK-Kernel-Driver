@@ -37,8 +37,21 @@ AC_DEFUN([AC_AMDGPU_GET_USER_PAGES_REMOTE], [
 					AC_DEFINE(HAVE_GET_USER_PAGES_REMOTE_GUP_FLAGS, 1,
 						[get_user_pages_remote() wants gup_flags parameter])
 				],[
-					AC_DEFINE(HAVE_GET_USER_PAGES_REMOTE_INTRODUCED, 1,
-						[get_user_pages_remote() is introduced with initial prototype])
+					dnl #
+					dnl # commit v6.4-rc4-55-gca5e863233e8
+					dnl #  mm/gup: remove vmas parameter from get_user_pages_remote()
+					dnl #
+					AC_KERNEL_TRY_COMPILE_SYMBOL([
+						#include <linux/mm.h>
+					], [
+						get_user_pages_remote(NULL, 0, 0, 0, NULL, NULL);
+					], [get_user_pages_remote],[mm/gup.c],[
+						AC_DEFINE(HAVE_GET_USER_PAGES_REMOTE_REMOVE_VMAS, 1,
+							[get_user_pages_remote() remove argument vmas])
+					],[
+						AC_DEFINE(HAVE_GET_USER_PAGES_REMOTE_INTRODUCED, 1,
+							[get_user_pages_remote() is introduced with initial prototype])
+					])
 				])
 			])
 		])
