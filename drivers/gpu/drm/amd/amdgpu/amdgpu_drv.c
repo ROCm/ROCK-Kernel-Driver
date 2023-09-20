@@ -3080,7 +3080,9 @@ static struct drm_driver amdgpu_kms_driver = {
 	.gem_prime_vunmap = amdgpu_gem_prime_vunmap,
 #endif
 
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_MMAP
 	.gem_prime_mmap = amdkcl_drm_gem_prime_mmap,
+#endif
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
@@ -3108,6 +3110,9 @@ const struct drm_driver amdgpu_partition_driver = {
 	.release = &amdgpu_driver_release_kms,
 
 	.gem_prime_import = amdgpu_gem_prime_import,
+#ifdef HAVE_DRM_DRIVER_GEM_PRIME_MMAP
+	.gem_prime_mmap = drm_gem_prime_mmap,
+#endif
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
