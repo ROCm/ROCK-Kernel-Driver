@@ -66,7 +66,7 @@ static void dcn35_init_crb(struct hubbub *hubbub)
 	REG_SET_2(COMPBUF_RESERVED_SPACE, 0,
 			COMPBUF_RESERVED_SPACE_64B, hubbub2->pixel_chunk_size / 32,
 			COMPBUF_RESERVED_SPACE_ZS, hubbub2->pixel_chunk_size / 128);
-	REG_UPDATE(DCHUBBUB_DEBUG_CTRL_0, DET_DEPTH, 0x47F);
+	REG_UPDATE(DCHUBBUB_DEBUG_CTRL_0, DET_DEPTH, 0x5FF);
 }
 
 static void dcn35_program_compbuf_size(struct hubbub *hubbub, unsigned int compbuf_size_kb, bool safe_to_increase)
@@ -124,7 +124,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->a.cstate_pstate.cstate_enter_plus_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->a.cstate_pstate.cstate_enter_plus_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_A, 0,
 				DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_A, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_ENTER_WATERMARK_Z8_A calculated =%d\n"
@@ -140,7 +140,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->a.cstate_pstate.cstate_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->a.cstate_pstate.cstate_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_A, 0,
 				DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_A, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_EXIT_WATERMARK_Z8_A calculated =%d\n"
@@ -158,7 +158,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->b.cstate_pstate.cstate_enter_plus_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->b.cstate_pstate.cstate_enter_plus_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_B, 0,
 				DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_B, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_ENTER_WATERMARK_Z8_B calculated =%d\n"
@@ -174,7 +174,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->b.cstate_pstate.cstate_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->b.cstate_pstate.cstate_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_B, 0,
 				DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_B, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_EXIT_WATERMARK_Z8_B calculated =%d\n"
@@ -191,7 +191,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->c.cstate_pstate.cstate_enter_plus_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->c.cstate_pstate.cstate_enter_plus_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_C, 0,
 				DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_C, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_ENTER_WATERMARK_Z8_C calculated =%d\n"
@@ -207,7 +207,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->c.cstate_pstate.cstate_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->c.cstate_pstate.cstate_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C, 0,
 				DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_EXIT_WATERMARK_Z8_C calculated =%d\n"
@@ -224,7 +224,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->d.cstate_pstate.cstate_enter_plus_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->d.cstate_pstate.cstate_enter_plus_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D, 0,
 				DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_ENTER_WATERMARK_Z8_D calculated =%d\n"
@@ -240,7 +240,7 @@ static bool hubbub35_program_stutter_z8_watermarks(
 				watermarks->d.cstate_pstate.cstate_exit_z8_ns;
 		prog_wm_value = convert_and_clamp(
 				watermarks->d.cstate_pstate.cstate_exit_z8_ns,
-				refclk_mhz, 0xffff);
+				refclk_mhz, 0xfffff);
 		REG_SET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D, 0,
 				DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D, prog_wm_value);
 		DC_LOG_BANDWIDTH_CALCS("SR_EXIT_WATERMARK_Z8_D calculated =%d\n"
@@ -319,8 +319,10 @@ static bool hubbub35_program_watermarks(
 
 	REG_SET(DCHUBBUB_ARB_SAT_LEVEL, 0,
 			DCHUBBUB_ARB_SAT_LEVEL, 60 * refclk_mhz);
-	REG_UPDATE(DCHUBBUB_ARB_DF_REQ_OUTSTAND,
-			DCHUBBUB_ARB_MIN_REQ_OUTSTAND, 0xFF);/*hw delta*/
+	REG_UPDATE_2(DCHUBBUB_ARB_DF_REQ_OUTSTAND,
+			DCHUBBUB_ARB_MIN_REQ_OUTSTAND, 0xFF,
+			DCHUBBUB_ARB_MIN_REQ_OUTSTAND_COMMIT_THRESHOLD, 0xA);/*hw delta*/
+	REG_UPDATE(DCHUBBUB_ARB_HOSTVM_CNTL, DCHUBBUB_ARB_MAX_QOS_COMMIT_THRESHOLD, 0xF);
 
 	hubbub1_allow_self_refresh_control(hubbub, !hubbub->ctx->dc->debug.disable_stutter);
 
@@ -379,6 +381,17 @@ static void hubbub35_init_watermarks(struct hubbub *hubbub)
 	REG_WRITE(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_B, reg);
 	REG_WRITE(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_C, reg);
 	REG_WRITE(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D, reg);
+
+	reg = REG_READ(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_A);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_B, reg);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_C, reg);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D, reg);
+
+	reg = REG_READ(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_A);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_B, reg);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C, reg);
+	REG_WRITE(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D, reg);
+
 }
 
 static void hubbub35_wm_read_state(struct hubbub *hubbub,
@@ -409,6 +422,11 @@ static void hubbub35_wm_read_state(struct hubbub *hubbub,
 	REG_GET(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_A,
 			 DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_A, &s->fclk_pstate_change);
 
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_A,
+			DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_A, &s->sr_enter_exit_Z8);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_A,
+			DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_A, &s->sr_enter_Z8);
 	s = &wm->sets[1];
 	s->wm_set = 1;
 	REG_GET(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_B,
@@ -428,6 +446,12 @@ static void hubbub35_wm_read_state(struct hubbub *hubbub,
 
 	REG_GET(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_B,
 			DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_B, &s->fclk_pstate_change);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_B,
+			DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_B, &s->sr_enter_exit_Z8);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_B,
+			DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_B, &s->sr_enter_Z8);
 
 	s = &wm->sets[2];
 	s->wm_set = 2;
@@ -449,6 +473,12 @@ static void hubbub35_wm_read_state(struct hubbub *hubbub,
 	REG_GET(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_C,
 			DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_C, &s->fclk_pstate_change);
 
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C,
+			DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_C, &s->sr_enter_exit_Z8);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_C,
+			DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_C, &s->sr_enter_Z8);
+
 	s = &wm->sets[3];
 	s->wm_set = 3;
 	REG_GET(DCHUBBUB_ARB_DATA_URGENCY_WATERMARK_D,
@@ -468,6 +498,12 @@ static void hubbub35_wm_read_state(struct hubbub *hubbub,
 
 	REG_GET(DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D,
 			DCHUBBUB_ARB_FCLK_PSTATE_CHANGE_WATERMARK_D, &s->fclk_pstate_change);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D,
+			DCHUBBUB_ARB_ALLOW_SR_EXIT_WATERMARK_Z8_D, &s->sr_enter_exit_Z8);
+
+	REG_GET(DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D,
+			DCHUBBUB_ARB_ALLOW_SR_ENTER_WATERMARK_Z8_D, &s->sr_enter_Z8);
 }
 
 static void hubbub35_set_fgcg(struct dcn20_hubbub *hubbub2, bool enable)
@@ -484,8 +520,8 @@ static void hubbub35_init(struct hubbub *hubbub)
 		/*REG_UPDATE(DCFCLK_CNTL, DCFCLK_GATE_DIS, 0);*/
 
 		REG_UPDATE_2(DCHUBBUB_CLOCK_CNTL,
-			DISPCLK_R_DCHUBBUB_GATE_DIS, 0,
-			DCFCLK_R_DCHUBBUB_GATE_DIS, 0);
+			DISPCLK_R_DCHUBBUB_GATE_DIS, 1,
+			DCFCLK_R_DCHUBBUB_GATE_DIS, 1);
 	}
 	hubbub35_set_fgcg(hubbub2,
 			  hubbub->ctx->dc->debug.enable_fine_grain_clock_gating

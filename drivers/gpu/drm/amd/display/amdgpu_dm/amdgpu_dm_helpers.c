@@ -301,7 +301,7 @@ static void dm_helpers_construct_old_payload(
 	/* Set correct time_slots/PBN of old payload.
 	 * other fields (delete & dsc_enabled) in
 	 * struct drm_dp_mst_atomic_payload are don't care fields
-	 * while calling drm_dp_remove_payload()
+	 * while calling drm_dp_remove_payload_part2()
 	 */
 	for (i = 0; i < current_link_table.stream_count; i++) {
 		dc_alloc =
@@ -364,21 +364,23 @@ bool dm_helpers_dp_mst_write_payload_allocation_table(
 	mst_mgr = &aconnector->mst_root->mst_mgr;
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 	mst_state = to_drm_dp_mst_topology_state(mst_mgr->base.state);
-
-	/* It's OK for this to fail */
 	new_payload = drm_atomic_get_mst_payload_state(mst_state, aconnector->mst_output_port);
 
 	if (enable) {
 		target_payload = new_payload;
 
+		/* It's OK for this to fail */
 		drm_dp_add_payload_part1(mst_mgr, mst_state, new_payload);
 	} else {
 		/* construct old payload by VCPI*/
 		dm_helpers_construct_old_payload(stream->link, mst_state->pbn_div,
 						new_payload, &old_payload);
 		target_payload = &old_payload;
-
+#ifdef HAVE_DRM_DP_REMOVE_RAYLOAD_PART
+		drm_dp_remove_payload_part1(mst_mgr, mst_state, new_payload);
+#else
 		drm_dp_remove_payload(mst_mgr, mst_state, &old_payload, new_payload);
+#endif
 	}
 
 	/* mst_mgr->->payloads are VC payload notify MST branch using DPCD or
@@ -519,7 +521,7 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 	struct amdgpu_dm_connector *aconnector;
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 	struct drm_dp_mst_topology_state *mst_state;
-	struct drm_dp_mst_atomic_payload *payload;
+	struct drm_dp_mst_atomic_payload *new_payload, old_payload;
 #else
 	struct drm_dp_mst_port *mst_port;
 #endif
@@ -537,7 +539,8 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 	mst_mgr = &aconnector->mst_root->mst_mgr;
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
 	mst_state = to_drm_dp_mst_topology_state(mst_mgr->base.state);
-	payload = drm_atomic_get_mst_payload_state(mst_state, aconnector->mst_output_port);
+
+	new_payload = drm_atomic_get_mst_payload_state(mst_state, aconnector->mst_output_port);
 #else
 	mst_port = aconnector->mst_output_port;
 	if (!mst_mgr->mst_state)
@@ -549,8 +552,15 @@ bool dm_helpers_dp_mst_send_payload_allocation(
 	}
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
-	if (enable)
-		ret = drm_dp_add_payload_part2(mst_mgr, mst_state->base.state, payload);
+	if (enable) {
+		ret = drm_dp_add_payload_part2(mst_mgr, mst_state->base.state, new_payload);
+	} else {
+#ifdef HAVE_DRM_DP_REMOVE_RAYLOAD_PART
+		dm_helpers_construct_old_payload(stream->link, mst_state->pbn_div,
+						 new_payload, &old_payload);
+		drm_dp_remove_payload_part2(mst_mgr, mst_state, &old_payload, new_payload);
+#endif
+	}
 
 	if (ret) {
 #else
