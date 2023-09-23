@@ -722,6 +722,8 @@ static int gmc_v11_0_sw_init(void *handle)
 
 	adev->mmhub.funcs->init(adev);
 
+	adev->gfxhub.funcs->init(adev);
+
 	spin_lock_init(&adev->gmc.invalidate_lock);
 
 	r = amdgpu_atomfirmware_get_vram_info(adev,
