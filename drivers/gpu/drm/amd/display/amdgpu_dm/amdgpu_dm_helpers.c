@@ -872,8 +872,11 @@ static bool execute_synaptics_rc_command(struct drm_dp_aux *aux,
 		// read rc data
 		drm_dp_dpcd_read(aux, SYNAPTICS_RC_DATA, data, length);
 	}
-
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev, "success = %d\n", success);
+#else
+	DRM_DEBUG_KMS("%s: success = %d\n", __func__, success);
+#endif
 
 	return success;
 }
@@ -881,9 +884,11 @@ static bool execute_synaptics_rc_command(struct drm_dp_aux *aux,
 static void apply_synaptics_fifo_reset_wa(struct drm_dp_aux *aux)
 {
 	unsigned char data[16] = {0};
-
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev, "Start\n");
-
+#else
+	DRM_DEBUG_KMS("Start %s\n", __func__);
+#endif
 	// Step 2
 	data[0] = 'P';
 	data[1] = 'R';
@@ -939,8 +944,11 @@ static void apply_synaptics_fifo_reset_wa(struct drm_dp_aux *aux)
 	// Step 6
 	if (!execute_synaptics_rc_command(aux, true, 0x02, 0, 0, NULL))
 		return;
-
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev, "Done\n");
+#else
+	DRM_DEBUG_KMS("Done %s\n", __func__);
+#endif
 }
 
 /* MST Dock */
@@ -952,9 +960,12 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 		bool enable)
 {
 	uint8_t ret = 0;
-
+#ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev,
 		   "Configure DSC to non-virtual dpcd synaptics\n");
+#else
+	DRM_DEBUG_KMS("Configure DSC to non-virtual dpcd synaptics\n");
+#endif
 
 	if (enable) {
 		/* When DSC is enabled on previous boot and reboot with the hub,
@@ -1057,7 +1068,7 @@ bool dm_helpers_dp_write_dsc_enable(
 		}
 #else
 		ret = drm_dp_dpcd_write(aconnector->dsc_aux, DP_DSC_ENABLE, &enable_dsc, 1);
-                DC_LOG_DC("Send DSC %s to MST RX\n", enable_dsc ? "enable" : "disable");
+                DRM_DEBUG_KMS("Send DSC %s to MST RX\n", enable_dsc ? "enable" : "disable");
 #endif
 
 	}
