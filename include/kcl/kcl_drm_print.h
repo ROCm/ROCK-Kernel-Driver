@@ -137,6 +137,11 @@ void kcl_drm_err(const char *format, ...);
 	drm_dev_dbg((drm)->dev, 0x04, fmt, ##__VA_ARGS__)
 #endif
 
+#if !defined(drm_dbg_dp)
+#define drm_dbg_dp(drm, fmt, ...)					\
+	drm_dev_dbg((drm) ? (drm)->dev : NULL, DRM_UT_DP, fmt, ##__VA_ARGS__)
+#endif
+
 #ifndef HAVE_DRM_DEBUG_ENABLED
 /* Copied from v5.3-rc1-708-gf0a8f533adc2 include/drm/drm_print.h */
 static  inline bool drm_debug_enabled(unsigned int category)
