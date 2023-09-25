@@ -540,8 +540,8 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 	struct common_irq_params *irq_params = interrupt_params;
 	struct amdgpu_device *adev = irq_params->adev;
 	struct amdgpu_crtc *acrtc;
-#ifndef HAVE_KTIME_IS_UNION
 	struct drm_device *drm_dev;
+#ifndef HAVE_KTIME_IS_UNION
 	struct drm_vblank_crtc *vblank;
 	ktime_t frame_duration_ns, previous_timestamp;
 #endif
@@ -552,8 +552,8 @@ static void dm_vupdate_high_irq(void *interrupt_params)
 
 	if (acrtc) {
 		vrr_active = amdgpu_dm_crtc_vrr_active_irq(acrtc);
-#ifndef HAVE_KTIME_IS_UNION
 		drm_dev = acrtc->base.dev;
+#ifndef HAVE_KTIME_IS_UNION
 		vblank = drm_crtc_vblank_crtc(&acrtc->base);
 		previous_timestamp = atomic64_read(&irq_params->previous_timestamp);
 		frame_duration_ns = get_drm_vblank_crtc_time(vblank) - previous_timestamp;
