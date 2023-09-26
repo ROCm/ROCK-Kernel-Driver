@@ -1378,6 +1378,9 @@ bool amdgpu_device_seamless_boot_supported(struct amdgpu_device *adev)
 		return false;
 	}
 
+	if (!(adev->flags & AMD_IS_APU))
+		return false;
+
 	if (adev->mman.keep_stolen_vga_memory)
 		return false;
 
