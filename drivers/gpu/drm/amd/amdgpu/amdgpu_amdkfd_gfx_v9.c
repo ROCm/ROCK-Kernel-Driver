@@ -1163,6 +1163,8 @@ uint32_t kgd_gfx_v9_trigger_pc_sample_trap(struct amdgpu_device *adev,
 		value = REG_SET_FIELD(value, SQ_CMD, SIMD_ID, *target_simd);
 		/* select *target_wave_slot */
 		value = REG_SET_FIELD(value, SQ_CMD, WAVE_ID, (*target_wave_slot)++);
+		/* set TrapID 4 for HOSTTRAP */
+		value = REG_SET_FIELD(value, SQ_CMD, DATA, 0x4);
 
 		mutex_lock(&adev->grbm_idx_mutex);
 		amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
