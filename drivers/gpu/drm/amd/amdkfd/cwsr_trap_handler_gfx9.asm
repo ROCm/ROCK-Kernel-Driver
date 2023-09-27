@@ -244,6 +244,11 @@ L_NOT_HALTED:
         SQ_WAVE_TRAPSTS_TRAP_AFTER_INST_MASK
     s_cbranch_scc1  L_FETCH_2ND_TRAP
 
+    // Check TTMP1 bits 24 (HT) and 23:16(trapID): HT == 1 & trapID == 4
+    s_and_b32       ttmp2, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+    s_cmp_eq_u32    ttmp2, 0x1040000
+    s_cbranch_scc1  L_FETCH_2ND_TRAP
+
     // Check for maskable exceptions in trapsts.excp and trapsts.excp_hi.
     // Maskable exceptions only cause the wave to enter the trap handler if
     // their respective bit in mode.excp_en is set.
