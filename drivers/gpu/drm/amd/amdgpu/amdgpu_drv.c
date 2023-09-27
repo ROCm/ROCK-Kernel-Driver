@@ -3008,6 +3008,11 @@ static struct drm_driver amdgpu_kms_driver = {
 #endif
 #endif
 
+#ifdef HAVE_DRM_GEM_PRIME_HANDLE_TO_FD
+	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+#endif
+
 #ifdef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK
 	.gem_prime_export = amdgpu_gem_prime_export,
 #endif
@@ -3061,6 +3066,10 @@ const struct drm_driver amdgpu_partition_driver = {
 	.fops = &amdgpu_driver_kms_fops,
 	.release = &amdgpu_driver_release_kms,
 
+#ifdef HAVE_DRM_GEM_PRIME_HANDLE_TO_FD
+	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+#endif
 	.gem_prime_import = amdgpu_gem_prime_import,
 #ifdef HAVE_DRM_DRIVER_GEM_PRIME_MMAP
 	.gem_prime_mmap = drm_gem_prime_mmap,
