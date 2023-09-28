@@ -1251,7 +1251,7 @@ static void gmc_v9_0_override_vm_pte_flags(struct amdgpu_device *adev,
 	 * the DMA address.
 	 */
 	if (!adev->ram_is_direct_mapped) {
-		dev_dbg(adev->dev, "RAM is not direct mapped\n");
+		dev_dbg_ratelimited(adev->dev, "RAM is not direct mapped\n");
 		return;
 	}
 
@@ -1260,7 +1260,7 @@ static void gmc_v9_0_override_vm_pte_flags(struct amdgpu_device *adev,
 	 */
 	if ((*flags & AMDGPU_PTE_MTYPE_VG10_MASK) !=
 	    AMDGPU_PTE_MTYPE_VG10(MTYPE_NC)) {
-		dev_dbg(adev->dev, "MTYPE is not NC\n");
+		dev_dbg_ratelimited(adev->dev, "MTYPE is not NC\n");
 		return;
 	}
 
@@ -1271,7 +1271,7 @@ static void gmc_v9_0_override_vm_pte_flags(struct amdgpu_device *adev,
 	if (adev->gmc.is_app_apu && vm->mem_id >= 0) {
 		local_node = adev->gmc.mem_partitions[vm->mem_id].numa.node;
 	} else {
-		dev_dbg(adev->dev, "Only native mode APU is supported.\n");
+		dev_dbg_ratelimited(adev->dev, "Only native mode APU is supported.\n");
 		return;
 	}
 
@@ -1279,12 +1279,12 @@ static void gmc_v9_0_override_vm_pte_flags(struct amdgpu_device *adev,
 	 * page or NUMA nodes.
 	 */
 	if (!page_is_ram(addr >> PAGE_SHIFT)) {
-		dev_dbg(adev->dev, "Page is not RAM.\n");
+		dev_dbg_ratelimited(adev->dev, "Page is not RAM.\n");
 		return;
 	}
 	nid = pfn_to_nid(addr >> PAGE_SHIFT);
-	dev_dbg(adev->dev, "vm->mem_id=%d, local_node=%d, nid=%d\n",
-		vm->mem_id, local_node, nid);
+	dev_dbg_ratelimited(adev->dev, "vm->mem_id=%d, local_node=%d, nid=%d\n",
+			    vm->mem_id, local_node, nid);
 	if (nid == local_node) {
 		uint64_t old_flags = *flags;
 		unsigned int mtype_local = MTYPE_RW;
@@ -1296,8 +1296,8 @@ static void gmc_v9_0_override_vm_pte_flags(struct amdgpu_device *adev,
 
 		*flags = (*flags & ~AMDGPU_PTE_MTYPE_VG10_MASK) |
 			 AMDGPU_PTE_MTYPE_VG10(mtype_local);
-		dev_dbg(adev->dev, "flags updated from %llx to %llx\n",
-			old_flags, *flags);
+		dev_dbg_ratelimited(adev->dev, "flags updated from %llx to %llx\n",
+				    old_flags, *flags);
 	}
 }
 
