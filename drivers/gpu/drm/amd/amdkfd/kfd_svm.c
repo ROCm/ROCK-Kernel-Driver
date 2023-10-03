@@ -1264,8 +1264,10 @@ svm_range_get_pte_flags(struct kfd_node *node,
 		break;
 	case IP_VERSION(9, 4, 3):
 		mtype_local = amdgpu_mtype_local == 1 ? AMDGPU_VM_MTYPE_NC :
-			      (amdgpu_mtype_local == 2 || ext_coherent ?
-					AMDGPU_VM_MTYPE_CC : AMDGPU_VM_MTYPE_RW);
+			     (amdgpu_mtype_local == 2 || ext_coherent ?
+			     AMDGPU_VM_MTYPE_CC : (amdgpu_mtype_local == 3 ?
+			     AMDGPU_VM_MTYPE_RW : (node->adev->rev_id ?
+				AMDGPU_VM_MTYPE_CC : AMDGPU_VM_MTYPE_RW)));
 		snoop = true;
 		if (uncached) {
 			mapping_flags |= AMDGPU_VM_MTYPE_UC;

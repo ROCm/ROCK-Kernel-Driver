@@ -828,7 +828,7 @@ MODULE_PARM_DESC(keep_idle_process_evicted, "Restore evicted process only if que
  * DOC: mtype_local (int)
  */
 int amdgpu_mtype_local;
-MODULE_PARM_DESC(mtype_local, "MTYPE for local memory (0 = MTYPE_RW (default), 1 = MTYPE_NC, 2 = MTYPE_CC)");
+MODULE_PARM_DESC(mtype_local, "MTYPE for local memory (0 = rev0 MTYPE_RW; otherwise MTYPE_CC (default), 1 = MTYPE_NC, 2 = MTYPE_CC, 3 = MTYPE_RW)");
 module_param_named(mtype_local, amdgpu_mtype_local, int, 0444);
 
 /**

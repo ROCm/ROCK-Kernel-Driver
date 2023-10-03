@@ -1162,15 +1162,28 @@ static void gmc_v9_0_get_coherence_flags(struct amdgpu_device *adev,
 		 * NUMA systems. Their MTYPE can be overridden per-page in
 		 * gmc_v9_0_override_vm_pte_flags.
 		 */
-		mtype_local = MTYPE_RW;
-		if (amdgpu_mtype_local == 1) {
+		switch (amdgpu_mtype_local) {
+		case 1:
 			DRM_INFO_ONCE("Using MTYPE_NC for local memory\n");
 			mtype_local = MTYPE_NC;
-		} else if (amdgpu_mtype_local == 2) {
+			break;
+		case 2:
 			DRM_INFO_ONCE("Using MTYPE_CC for local memory\n");
 			mtype_local = MTYPE_CC;
-		} else {
+			break;
+		case 3:
 			DRM_INFO_ONCE("Using MTYPE_RW for local memory\n");
+			mtype_local = MTYPE_RW;
+			break;
+		default:
+			if (adev->rev_id) {
+				DRM_INFO_ONCE("Using MTYPE_CC for local memory\n");
+				mtype_local = MTYPE_CC;
+			} else {
+				DRM_INFO_ONCE("Using MTYPE_RW for local memory\n");
+				mtype_local = MTYPE_RW;
+			}
+			break;
 		}
 		is_local = (!is_vram && (adev->flags & AMD_IS_APU) &&
 			    num_possible_nodes() <= 1) ||
