@@ -3046,6 +3046,7 @@ void amdgpu_debugfs_vm_bo_info(struct amdgpu_vm *vm, struct seq_file *m)
  *
  * Cache the fault info for later use by userspace in debugging.
  */
+#ifdef HAVE_STRUCT_XARRAY
 void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 				  unsigned int pasid,
 				  uint64_t addr,
@@ -3092,6 +3093,7 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 	}
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
 }
+#endif
 
 /**
  * amdgpu_vm_is_bo_always_valid - check if the BO is VM always valid
