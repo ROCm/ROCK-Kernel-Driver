@@ -1257,6 +1257,7 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		return copy_to_user(out, max_ibs,
 				    min((size_t)size, sizeof(max_ibs))) ? -EFAULT : 0;
 	}
+#ifdef HAVE_STRUCT_XARRAY
 	case AMDGPU_INFO_GPUVM_FAULT: {
 		struct amdgpu_fpriv *fpriv = filp->driver_priv;
 		struct amdgpu_vm *vm = &fpriv->vm;
@@ -1277,6 +1278,7 @@ int amdgpu_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 		return copy_to_user(out, &gpuvm_fault,
 				    min((size_t)size, sizeof(gpuvm_fault))) ? -EFAULT : 0;
 	}
+#endif
 	default:
 		DRM_DEBUG_KMS("Invalid request %d\n", info->query);
 		return -EINVAL;
