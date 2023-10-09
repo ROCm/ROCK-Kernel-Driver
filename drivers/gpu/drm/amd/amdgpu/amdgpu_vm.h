@@ -574,10 +574,12 @@ static inline void amdgpu_vm_eviction_unlock(struct amdgpu_vm *vm)
 	mutex_unlock(&vm->eviction_lock);
 }
 
+#ifdef HAVE_STRUCT_XARRAY
 void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 				  unsigned int pasid,
 				  uint64_t addr,
 				  uint32_t status,
 				  unsigned int vmhub);
+#endif
 
 #endif

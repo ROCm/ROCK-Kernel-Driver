@@ -664,9 +664,9 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 	cid = REG_GET_FIELD(status, VM_L2_PROTECTION_FAULT_STATUS, CID);
 	rw = REG_GET_FIELD(status, VM_L2_PROTECTION_FAULT_STATUS, RW);
 	WREG32_P(hub->vm_l2_pro_fault_cntl, 1, ~1);
-
+#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_vm_update_fault_cache(adev, entry->pasid, addr, status, vmhub);
-
+#endif
 	dev_err(adev->dev,
 		"VM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
 		status);

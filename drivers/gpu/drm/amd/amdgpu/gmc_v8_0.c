@@ -1445,10 +1445,10 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 
 	if (!addr && !status)
 		return 0;
-
+#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_vm_update_fault_cache(adev, entry->pasid,
 				     ((u64)addr) << AMDGPU_GPU_PAGE_SHIFT, status, AMDGPU_GFXHUB(0));
-
+#endif
 	if (amdgpu_vm_fault_stop == AMDGPU_VM_FAULT_STOP_FIRST)
 		gmc_v8_0_set_fault_enable_default(adev, false);
 
