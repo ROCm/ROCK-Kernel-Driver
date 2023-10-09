@@ -178,8 +178,10 @@ static const struct drm_connector_funcs amdgpu_dm_wb_connector_funcs = {
 
 static const struct drm_connector_helper_funcs amdgpu_dm_wb_conn_helper_funcs = {
 	.get_modes = amdgpu_dm_wb_connector_get_modes,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB
 	.prepare_writeback_job = amdgpu_dm_wb_prepare_job,
 	.cleanup_writeback_job = amdgpu_dm_wb_cleanup_job,
+#endif
 };
 
 int amdgpu_dm_wb_connector_init(struct amdgpu_display_manager *dm,
