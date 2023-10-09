@@ -112,4 +112,5 @@
 #include <kcl/kcl_drm_suballoc.h>
 #include <kcl/kcl_drm_edid.h>
 #include <kcl/kcl_build_bug.h>
+#include <kcl/kcl_drm_dp.h>
 #endif /* AMDGPU_BACKPORT_H */
