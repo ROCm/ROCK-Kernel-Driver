@@ -878,9 +878,6 @@
 /* io_mapping_map_local_wc() is available */
 #define HAVE_IO_MAPPING_MAP_LOCAL_WC 1
 
-/* io_mapping_map_wc() has size argument */
-#define HAVE_IO_MAPPING_MAP_WC_HAS_SIZE_ARG 1
-
 /* io_mapping_unmap_local() is available */
 #define HAVE_IO_MAPPING_UNMAP_LOCAL 1
 
