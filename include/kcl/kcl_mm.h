@@ -22,4 +22,15 @@ static inline bool fault_flag_allow_retry_first(unsigned int flags)
 }
 #endif
 
+#if !defined(HAVE_MEMALLOC_NOFS_SAVE)
+static inline unsigned int memalloc_nofs_save(void)
+{
+	return current->flags;
+}
+
+static inline void memalloc_nofs_restore(unsigned int flags)
+{
+}
+#endif
+
 #endif /* AMDKCL_MM_H */
