@@ -51,6 +51,8 @@
 #include "athub_v2_0.h"
 #include "athub_v2_1.h"
 
+#include "amdgpu_reset.h"
+
 static int gmc_v10_0_ecc_interrupt_state(struct amdgpu_device *adev,
 					 struct amdgpu_irq_src *src,
 					 unsigned int type,
