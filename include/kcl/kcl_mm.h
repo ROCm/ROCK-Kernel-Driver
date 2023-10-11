@@ -42,6 +42,7 @@ static inline void memalloc_nofs_restore(unsigned int flags)
 #endif
 
 #if !defined(HAVE_ZONE_MANAGED_PAGES)
+/* Copied from v4.20-6505-g9705bea5f833 include/linux/mmzone.h and modified for KCL */
 static inline unsigned long zone_managed_pages(struct zone *zone)
 {
 #if defined(HAVE_STRUCT_ZONE_MANAGED_PAGES)
