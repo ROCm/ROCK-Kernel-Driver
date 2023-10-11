@@ -373,6 +373,9 @@
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
 
+/* apple_gmux_detect() is available */
+#define HAVE_APPLE_GMUX_DETECT 1
+
 /* drm_dp_calc_pbn_mode() wants 3args */
 #define HAVE_DRM_DP_CALC_PBN_MODE_3ARGS 1
 
@@ -813,17 +816,8 @@
 /* ktime_t is union */
 /* #undef HAVE_KTIME_IS_UNION */
 
-/* kvcalloc() is available */
-#define HAVE_KVCALLOC 1
-
-/* kvfree() is available */
-#define HAVE_KVFREE 1
-
-/* kvmalloc_array() is available */
-#define HAVE_KVMALLOC_ARRAY 1
-
-/* kv[mz]alloc() are available */
-#define HAVE_KVZALLOC_KVMALLOC 1
+/* Define to 1 if you have the <linux/apple-gmux.h> header file. */
+#define HAVE_LINUX_APPLE_GMUX_H 1
 
 /* Define to 1 if you have the <linux/bits.h> header file. */
 #define HAVE_LINUX_BITS_H 1
