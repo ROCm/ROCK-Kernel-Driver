@@ -37,6 +37,7 @@
 #include <drm/drm_encoder.h>
 #include <drm/drm_edid.h>
 
+/* Copied from drivers/gpu/drm/drm_edid.c and modified for KCL */
 #if defined(HAVE_DRM_EDID_TO_ELD)
 static inline
 int _kcl_drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
