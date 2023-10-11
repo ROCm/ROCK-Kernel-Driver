@@ -70,4 +70,24 @@ static inline bool is_cow_mapping(vm_flags_t flags)
 }
 #endif /* HAVE_IS_COW_MAPPING */
 
+#ifndef HAVE_VMA_LOOKUP
+/**
+ * vma_lookup() - Find a VMA at a specific address
+ * @mm: The process address space.
+ * @addr: The user address.
+ *
+ * Return: The vm_area_struct at the given address, %NULL otherwise.
+ */
+static inline
+struct vm_area_struct *vma_lookup(struct mm_struct *mm, unsigned long addr)
+{
+        struct vm_area_struct *vma = find_vma(mm, addr);
+
+        if (vma && addr < vma->vm_start)
+                vma = NULL;
+
+        return vma;
+}
+#endif /* HAVE_VMA_LOOKUP */
+
 #endif /* AMDKCL_MM_H */
