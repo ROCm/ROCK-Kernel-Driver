@@ -542,6 +542,9 @@ amdgpu_dm_atomic_crtc_get_property(struct drm_crtc *crtc,
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = amdgpu_dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
+    .gamma_set = drm_atomic_helper_legacy_gamma_set,
+#endif
 	.set_config = drm_atomic_helper_set_config,
 	.page_flip = drm_atomic_helper_page_flip,
 	.atomic_duplicate_state = amdgpu_dm_crtc_duplicate_state,
