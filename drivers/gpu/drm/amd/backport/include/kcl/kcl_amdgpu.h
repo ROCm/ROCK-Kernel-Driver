@@ -4,6 +4,7 @@
 
 #include <drm/drm_vblank.h>
 #include "amdgpu.h"
+#include <drm/drm_drv.h>
 
 #ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP
 
@@ -118,4 +119,5 @@ static inline int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, in
 }
 #endif
 #endif /* HAVE_STRUCT_DRM_CRTC_FUNCS_GET_VBLANK_TIMESTAMP */
+
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_H */
