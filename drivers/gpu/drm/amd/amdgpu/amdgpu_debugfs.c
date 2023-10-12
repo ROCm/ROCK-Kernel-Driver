@@ -42,6 +42,25 @@
 
 #if defined(CONFIG_DEBUG_FS)
 
+#if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
+void amdgpu_debugfs_cleanup(struct drm_minor *minor)
+{
+	struct drm_info_node *node, *tmp;
+
+	if (!&minor->debugfs_root)
+		return;
+
+	mutex_lock(&minor->debugfs_lock);
+	list_for_each_entry_safe(node, tmp,
+		&minor->debugfs_list, list) {
+		debugfs_remove(node->dent);
+		list_del(&node->list);
+		kfree(node);
+	}
+	mutex_unlock(&minor->debugfs_lock);
+}
+#endif
+
 /**
  * amdgpu_debugfs_process_reg_op - Handle MMIO register reads/writes
  *
