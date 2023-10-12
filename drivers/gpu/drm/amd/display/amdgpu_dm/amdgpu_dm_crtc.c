@@ -436,6 +436,9 @@ backoff:
 static const struct drm_crtc_funcs amdgpu_dm_crtc_funcs = {
 	.reset = amdgpu_dm_crtc_reset_state,
 	.destroy = amdgpu_dm_crtc_destroy,
+#ifndef HAVE_STRUCT_DRM_CRTC_FUNCS_GAMMA_SET_OPTIONAL
+    .gamma_set = drm_atomic_helper_legacy_gamma_set,
+#endif
 	.set_config = drm_atomic_helper_set_config,
 #ifdef HAVE_DRM_ATOMIC_HELPER_XXX_SET_PROPERTY
 	.set_property = drm_atomic_helper_crtc_set_property,
