@@ -1145,9 +1145,10 @@ static int aldebaran_read_sensor(struct smu_context *smu,
 }
 
 static int aldebaran_get_power_limit(struct smu_context *smu,
-				     uint32_t *current_power_limit,
-				     uint32_t *default_power_limit,
-				     uint32_t *max_power_limit)
+						uint32_t *current_power_limit,
+						uint32_t *default_power_limit,
+						uint32_t *max_power_limit,
+						uint32_t *min_power_limit)
 {
 	PPTable_t *pptable = smu->smu_table.driver_pptable;
 	uint32_t power_limit = 0;
@@ -1160,7 +1161,8 @@ static int aldebaran_get_power_limit(struct smu_context *smu,
 			*default_power_limit = 0;
 		if (max_power_limit)
 			*max_power_limit = 0;
-
+		if (min_power_limit)
+			*min_power_limit = 0;
 		dev_warn(smu->adev->dev,
 			"PPT feature is not enabled, power values can't be fetched.");
 
@@ -1194,6 +1196,9 @@ static int aldebaran_get_power_limit(struct smu_context *smu,
 		if (pptable)
 			*max_power_limit = pptable->PptLimit;
 	}
+
+	if (min_power_limit)
+		*min_power_limit = 0;
 
 	return 0;
 }
