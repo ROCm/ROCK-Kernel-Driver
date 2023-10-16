@@ -1511,6 +1511,36 @@ static int smu_v13_0_0_print_clk_levels(struct smu_context *smu,
 	return size;
 }
 
+
+static int smu_v13_0_0_od_restore_table_single(struct smu_context *smu, long input)
+{
+	struct smu_table_context *table_context = &smu->smu_table;
+	OverDriveTableExternal_t *boot_overdrive_table =
+		(OverDriveTableExternal_t *)table_context->boot_overdrive_table;
+	OverDriveTableExternal_t *od_table =
+		(OverDriveTableExternal_t *)table_context->overdrive_table;
+	struct amdgpu_device *adev = smu->adev;
+	int i;
+
+	switch (input) {
+	case PP_OD_EDIT_FAN_CURVE:
+		for (i = 0; i < NUM_OD_FAN_MAX_POINTS; i++) {
+			od_table->OverDriveTable.FanLinearTempPoints[i] =
+					boot_overdrive_table->OverDriveTable.FanLinearTempPoints[i];
+			od_table->OverDriveTable.FanLinearPwmPoints[i] =
+					boot_overdrive_table->OverDriveTable.FanLinearPwmPoints[i];
+		}
+		od_table->OverDriveTable.FanMode = FAN_MODE_AUTO;
+		od_table->OverDriveTable.FeatureCtrlMask |= BIT(PP_OD_FEATURE_FAN_CURVE_BIT);
+		break;
+	default:
+		dev_info(adev->dev, "Invalid table index: %ld\n", input);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int smu_v13_0_0_od_edit_dpm_table(struct smu_context *smu,
 					 enum PP_OD_DPM_TABLE_COMMAND type,
 					 long input[],
@@ -1797,13 +1827,18 @@ static int smu_v13_0_0_od_edit_dpm_table(struct smu_context *smu,
 		break;
 
 	case PP_OD_RESTORE_DEFAULT_TABLE:
-		feature_ctrlmask = od_table->OverDriveTable.FeatureCtrlMask;
-		memcpy(od_table,
+		if (size == 1) {
+			ret = smu_v13_0_0_od_restore_table_single(smu, input[0]);
+			if (ret)
+				return ret;
+		} else {
+			feature_ctrlmask = od_table->OverDriveTable.FeatureCtrlMask;
+			memcpy(od_table,
 		       table_context->boot_overdrive_table,
 		       sizeof(OverDriveTableExternal_t));
-		od_table->OverDriveTable.FeatureCtrlMask = feature_ctrlmask;
+			od_table->OverDriveTable.FeatureCtrlMask = feature_ctrlmask;
+		}
 		fallthrough;
-
 	case PP_OD_COMMIT_DPM_TABLE:
 		/*
 		 * The member below instructs PMFW the settings focused in
@@ -1963,7 +1998,6 @@ static int smu_v13_0_0_get_thermal_temperature_range(struct smu_context *smu,
 	return 0;
 }
 
-#define MAX(a, b)	((a) > (b) ? (a) : (b))
 static ssize_t smu_v13_0_0_get_gpu_metrics(struct smu_context *smu,
 					   void **table)
 {
@@ -1987,12 +2021,12 @@ static ssize_t smu_v13_0_0_get_gpu_metrics(struct smu_context *smu,
 	gpu_metrics->temperature_mem = metrics->AvgTemperature[TEMP_MEM];
 	gpu_metrics->temperature_vrgfx = metrics->AvgTemperature[TEMP_VR_GFX];
 	gpu_metrics->temperature_vrsoc = metrics->AvgTemperature[TEMP_VR_SOC];
-	gpu_metrics->temperature_vrmem = MAX(metrics->AvgTemperature[TEMP_VR_MEM0],
+	gpu_metrics->temperature_vrmem = max(metrics->AvgTemperature[TEMP_VR_MEM0],
 					     metrics->AvgTemperature[TEMP_VR_MEM1]);
 
 	gpu_metrics->average_gfx_activity = metrics->AverageGfxActivity;
 	gpu_metrics->average_umc_activity = metrics->AverageUclkActivity;
-	gpu_metrics->average_mm_activity = MAX(metrics->Vcn0ActivityPercentage,
+	gpu_metrics->average_mm_activity = max(metrics->Vcn0ActivityPercentage,
 					       metrics->Vcn1ActivityPercentage);
 
 	gpu_metrics->average_socket_power = metrics->AverageSocketPower;
@@ -2230,8 +2264,6 @@ static void smu_v13_0_0_get_unique_id(struct smu_context *smu)
 
 out:
 	adev->unique_id = ((uint64_t)upper32 << 32) | lower32;
-	if (adev->serial[0] == '\0')
-		sprintf(adev->serial, "%016llx", adev->unique_id);
 }
 
 static int smu_v13_0_0_get_fan_speed_pwm(struct smu_context *smu,
@@ -2251,7 +2283,7 @@ static int smu_v13_0_0_get_fan_speed_pwm(struct smu_context *smu,
 	}
 
 	/* Convert the PMFW output which is in percent to pwm(255) based */
-	*speed = MIN(*speed * 255 / 100, 255);
+	*speed = min(*speed * 255 / 100, (uint32_t)255);
 
 	return 0;
 }
@@ -2412,6 +2444,7 @@ static int smu_v13_0_0_set_power_profile_mode(struct smu_context *smu,
 	DpmActivityMonitorCoeffInt_t *activity_monitor =
 		&(activity_monitor_external.DpmActivityMonitorCoeffInt);
 	int workload_type, ret = 0;
+	u32 workload_mask;
 
 	smu->power_profile_mode = input[size];
 
@@ -2501,9 +2534,23 @@ static int smu_v13_0_0_set_power_profile_mode(struct smu_context *smu,
 	if (workload_type < 0)
 		return -EINVAL;
 
+	workload_mask = 1 << workload_type;
+
+	/* Add optimizations for SMU13.0.0.  Reuse the power saving profile */
+	if (smu->power_profile_mode == PP_SMC_POWER_PROFILE_COMPUTE &&
+	    (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) == IP_VERSION(13, 0, 0)) &&
+	    ((smu->adev->pm.fw_version == 0x004e6601) ||
+	     (smu->adev->pm.fw_version >= 0x004e7300))) {
+		workload_type = smu_cmn_to_asic_specific_index(smu,
+							       CMN2ASIC_MAPPING_WORKLOAD,
+							       PP_SMC_POWER_PROFILE_POWERSAVING);
+		if (workload_type >= 0)
+			workload_mask |= 1 << workload_type;
+	}
+
 	return smu_cmn_send_smc_msg_with_param(smu,
 					       SMU_MSG_SetWorkloadMask,
-					       1 << workload_type,
+					       workload_mask,
 					       NULL);
 }
 

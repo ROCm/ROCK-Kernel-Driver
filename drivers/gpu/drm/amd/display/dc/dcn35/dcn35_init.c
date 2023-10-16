@@ -22,8 +22,8 @@
  *
  */
 
-#include "dce110/dce110_hw_sequencer.h"
-#include "dcn10/dcn10_hw_sequencer.h"
+#include "dce110/dce110_hwseq.h"
+#include "dcn10/dcn10_hwseq.h"
 #include "dcn20/dcn20_hwseq.h"
 #include "dcn21/dcn21_hwseq.h"
 #include "dcn30/dcn30_hwseq.h"
@@ -35,7 +35,7 @@
 #include "dcn35_init.h"
 
 static const struct hw_sequencer_funcs dcn35_funcs = {
-	.program_gamut_remap = dcn10_program_gamut_remap,
+	.program_gamut_remap = dcn30_program_gamut_remap,
 	.init_hw = dcn35_init_hw,
 	.power_down_on_boot = dcn35_power_down_on_boot,
 	.apply_ctx_to_hw = dce110_apply_ctx_to_hw,
@@ -117,7 +117,9 @@ static const struct hw_sequencer_funcs dcn35_funcs = {
 	.calc_blocks_to_gate = dcn35_calc_blocks_to_gate,
 	.calc_blocks_to_ungate = dcn35_calc_blocks_to_ungate,
 	.block_power_control = dcn35_block_power_control,
-	.root_clock_control = dcn35_root_clock_control
+	.root_clock_control = dcn35_root_clock_control,
+	.set_idle_state = dcn35_set_idle_state,
+	.get_idle_state = dcn35_get_idle_state
 };
 
 static const struct hwseq_private_funcs dcn35_private_funcs = {

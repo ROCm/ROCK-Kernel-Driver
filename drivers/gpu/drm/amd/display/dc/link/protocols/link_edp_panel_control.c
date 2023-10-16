@@ -38,6 +38,8 @@
 #include "dc/dc_dmub_srv.h"
 #include "dce/dmub_replay.h"
 #include "abm.h"
+#define DC_LOGGER \
+	link->ctx->logger
 #define DC_LOGGER_INIT(logger)
 
 #define DP_SINK_PR_ENABLE_AND_CONFIGURATION		0x37B
@@ -300,6 +302,24 @@ bool set_cached_brightness_aux(struct dc_link *link)
 		return set_default_brightness_aux(link);
 	return false;
 }
+bool edp_is_ilr_optimization_enabled(struct dc_link *link)
+{
+	if (link->dpcd_caps.edp_supported_link_rates_count == 0 || !link->panel_config.ilr.optimize_edp_link_rate)
+		return false;
+	return true;
+}
+
+enum dc_link_rate get_max_link_rate_from_ilr_table(struct dc_link *link)
+{
+	enum dc_link_rate link_rate = link->reported_link_cap.link_rate;
+
+	for (int i = 0; i < link->dpcd_caps.edp_supported_link_rates_count; i++) {
+		if (link_rate < link->dpcd_caps.edp_supported_link_rates[i])
+			link_rate = link->dpcd_caps.edp_supported_link_rates[i];
+	}
+
+	return link_rate;
+}
 
 bool edp_is_ilr_optimization_required(struct dc_link *link,
 		struct dc_crtc_timing *crtc_timing)
@@ -312,8 +332,7 @@ bool edp_is_ilr_optimization_required(struct dc_link *link,
 
 	ASSERT(link || crtc_timing); // invalid input
 
-	if (link->dpcd_caps.edp_supported_link_rates_count == 0 ||
-			!link->panel_config.ilr.optimize_edp_link_rate)
+	if (!edp_is_ilr_optimization_enabled(link))
 		return false;
 
 

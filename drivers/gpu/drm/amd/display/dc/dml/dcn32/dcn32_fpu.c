@@ -1086,6 +1086,7 @@ struct pipe_slice_table {
 	int odm_combine_count;
 
 	struct {
+		struct pipe_ctx *pri_pipe;
 		struct dc_plane_state *plane;
 		int slice_count;
 	} mpc_combines[MAX_SURFACES];
@@ -1113,12 +1114,14 @@ static void update_slice_table_for_stream(struct pipe_slice_table *table,
 }
 
 static void update_slice_table_for_plane(struct pipe_slice_table *table,
-		struct dc_plane_state *plane, int diff)
+		struct pipe_ctx *dpp_pipe, struct dc_plane_state *plane, int diff)
 {
 	int i;
+	struct pipe_ctx *pri_dpp_pipe = resource_get_primary_dpp_pipe(dpp_pipe);
 
 	for (i = 0; i < table->mpc_combine_count; i++) {
-		if (table->mpc_combines[i].plane == plane) {
+		if (table->mpc_combines[i].plane == plane &&
+				table->mpc_combines[i].pri_pipe == pri_dpp_pipe) {
 			table->mpc_combines[i].slice_count += diff;
 			break;
 		}
@@ -1127,6 +1130,7 @@ static void update_slice_table_for_plane(struct pipe_slice_table *table,
 	if (i == table->mpc_combine_count) {
 		table->mpc_combine_count++;
 		table->mpc_combines[i].plane = plane;
+		table->mpc_combines[i].pri_pipe = pri_dpp_pipe;
 		table->mpc_combines[i].slice_count = diff;
 	}
 }
@@ -1154,7 +1158,7 @@ static void init_pipe_slice_table_from_context(
 				&context->res_ctx, dpp_pipes);
 		for (j = 0; j < count; j++)
 			if (dpp_pipes[j]->plane_state)
-				update_slice_table_for_plane(table,
+				update_slice_table_for_plane(table, dpp_pipes[j],
 						dpp_pipes[j]->plane_state, 1);
 	}
 }
@@ -1205,7 +1209,7 @@ static bool update_pipe_slice_table_with_split_flags(
 				/* merging DPP pipe of the first ODM slice means
 				 * reducing MPC slice count by 1
 				 */
-				update_slice_table_for_plane(table, pipe->plane_state, -1);
+				update_slice_table_for_plane(table, pipe, pipe->plane_state, -1);
 			updated = true;
 		}
 
@@ -1216,8 +1220,8 @@ static bool update_pipe_slice_table_with_split_flags(
 				update_slice_table_for_stream(
 						table, pipe->stream, split[i] - 1);
 			else if (!odm && resource_is_pipe_type(pipe, DPP_PIPE))
-				update_slice_table_for_plane(
-						table, pipe->plane_state, split[i] - 1);
+				update_slice_table_for_plane(table, pipe,
+						pipe->plane_state, split[i] - 1);
 			updated = true;
 		}
 	}
@@ -1267,8 +1271,6 @@ static bool should_allow_odm_power_optimization(struct dc *dc,
 {
 	struct dc_stream_state *stream = context->streams[0];
 	struct pipe_slice_table slice_table;
-	struct dc_plane_state *plane;
-	struct rect guaranteed_viewport;
 	int i;
 
 	/*
@@ -1333,31 +1335,6 @@ static bool should_allow_odm_power_optimization(struct dc *dc,
 		for (i = 0; i < slice_table.odm_combine_count; i++)
 			if (slice_table.odm_combines[i].slice_count > 1)
 				return false;
-
-		/* up to here we know that a plane with viewport equal to stream
-		 * src can be validated with single DPP pipe. Therefore any
-		 * planes with smaller or equal viewport is guaranteed to work
-		 * regardless of its position and scaling ratio. Also we know
-		 * any plane without downscale ratio greater than 1 should also
-		 * work. Up until DCN3x we still have software limitation that
-		 * doesn't implement a smooth transition between ODM combine and
-		 * MPC combine during plane resizing when we are crossing ODM
-		 * capability boundary. So we are adding this guaranteed
-		 * viewport condition to limit ODM power optimization support
-		 * for only the planes within the guaranteed viewport size. Such
-		 * planes can be supported with ODM power optimization without
-		 * ever the need to transition to MPC combine in any scaling
-		 * ratios and positions. Therefore we cover the software
-		 * limitation of this transition sequence.
-		 */
-		guaranteed_viewport = stream->src;
-		for (i = 0; i < context->stream_status[0].plane_count; i++) {
-			plane = context->stream_status[0].plane_states[i];
-
-			if ((plane->src_rect.height > plane->dst_rect.height && plane->src_rect.height > guaranteed_viewport.height) ||
-					(plane->src_rect.width > plane->dst_rect.width && plane->src_rect.width > guaranteed_viewport.width))
-				return false;
-		}
 	} else {
 		/*
 		 * the new ODM power optimization feature reduces software
@@ -1406,6 +1383,19 @@ static void try_odm_power_optimization_and_revalidate(
 	}
 }
 
+static bool is_test_pattern_enabled(
+		struct dc_state *context)
+{
+	int i;
+
+	for (i = 0; i < context->stream_count; i++) {
+		if (context->streams[i]->test_pattern.type != DP_TEST_PATTERN_VIDEO_MODE)
+			return true;
+	}
+
+	return false;
+}
+
 static void dcn32_full_validate_bw_helper(struct dc *dc,
 				   struct dc_state *context,
 				   display_e2e_pipe_params_st *pipes,
@@ -1449,7 +1439,7 @@ static void dcn32_full_validate_bw_helper(struct dc *dc,
 	 * 5. (Config doesn't support MCLK in VACTIVE/VBLANK || dc->debug.force_subvp_mclk_switch)
 	 */
 	if (!dc->debug.force_disable_subvp && !dc->caps.dmub_caps.gecc_enable && dcn32_all_pipes_have_stream_and_plane(dc, context) &&
-	    !dcn32_mpo_in_use(context) && !dcn32_any_surfaces_rotated(dc, context) &&
+	    !dcn32_mpo_in_use(context) && !dcn32_any_surfaces_rotated(dc, context) && !is_test_pattern_enabled(context) &&
 		(*vlevel == context->bw_ctx.dml.soc.num_states ||
 	    vba->DRAMClockChangeSupport[*vlevel][vba->maxMpcComb] == dm_dram_clock_change_unsupported ||
 	    dc->debug.force_subvp_mclk_switch)) {
@@ -2209,6 +2199,7 @@ bool dcn32_internal_validate_bw(struct dc *dc,
 					vba->VoltageLevel = i;
 					vlevel = i;
 					flags_valid = true;
+					break;
 				}
 			}
 
@@ -2978,12 +2969,14 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 	/* Override from passed dc->bb_overrides if available*/
 	if ((int)(dcn3_2_soc.sr_exit_time_us * 1000) != dc->bb_overrides.sr_exit_time_ns
 			&& dc->bb_overrides.sr_exit_time_ns) {
+		dc->dml2_options.bbox_overrides.sr_exit_latency_us =
 		dcn3_2_soc.sr_exit_time_us = dc->bb_overrides.sr_exit_time_ns / 1000.0;
 	}
 
 	if ((int)(dcn3_2_soc.sr_enter_plus_exit_time_us * 1000)
 			!= dc->bb_overrides.sr_enter_plus_exit_time_ns
 			&& dc->bb_overrides.sr_enter_plus_exit_time_ns) {
+		dc->dml2_options.bbox_overrides.sr_enter_plus_exit_latency_us =
 		dcn3_2_soc.sr_enter_plus_exit_time_us =
 			dc->bb_overrides.sr_enter_plus_exit_time_ns / 1000.0;
 	}
@@ -2991,12 +2984,14 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 	if ((int)(dcn3_2_soc.urgent_latency_us * 1000) != dc->bb_overrides.urgent_latency_ns
 		&& dc->bb_overrides.urgent_latency_ns) {
 		dcn3_2_soc.urgent_latency_us = dc->bb_overrides.urgent_latency_ns / 1000.0;
+		dc->dml2_options.bbox_overrides.urgent_latency_us =
 		dcn3_2_soc.urgent_latency_pixel_data_only_us = dc->bb_overrides.urgent_latency_ns / 1000.0;
 	}
 
 	if ((int)(dcn3_2_soc.dram_clock_change_latency_us * 1000)
 			!= dc->bb_overrides.dram_clock_change_latency_ns
 			&& dc->bb_overrides.dram_clock_change_latency_ns) {
+		dc->dml2_options.bbox_overrides.dram_clock_change_latency_us =
 		dcn3_2_soc.dram_clock_change_latency_us =
 			dc->bb_overrides.dram_clock_change_latency_ns / 1000.0;
 	}
@@ -3004,6 +2999,7 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 	if ((int)(dcn3_2_soc.fclk_change_latency_us * 1000)
 			!= dc->bb_overrides.fclk_clock_change_latency_ns
 			&& dc->bb_overrides.fclk_clock_change_latency_ns) {
+		dc->dml2_options.bbox_overrides.fclk_change_latency_us =
 		dcn3_2_soc.fclk_change_latency_us =
 			dc->bb_overrides.fclk_clock_change_latency_ns / 1000;
 	}
@@ -3021,14 +3017,17 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 
 		if (dc->ctx->dc_bios->funcs->get_soc_bb_info(dc->ctx->dc_bios, &bb_info) == BP_RESULT_OK) {
 			if (bb_info.dram_clock_change_latency_100ns > 0)
+				dc->dml2_options.bbox_overrides.dram_clock_change_latency_us =
 				dcn3_2_soc.dram_clock_change_latency_us =
 					bb_info.dram_clock_change_latency_100ns * 10;
 
 			if (bb_info.dram_sr_enter_exit_latency_100ns > 0)
+				dc->dml2_options.bbox_overrides.sr_enter_plus_exit_latency_us =
 				dcn3_2_soc.sr_enter_plus_exit_time_us =
 					bb_info.dram_sr_enter_exit_latency_100ns * 10;
 
 			if (bb_info.dram_sr_exit_latency_100ns > 0)
+				dc->dml2_options.bbox_overrides.sr_exit_latency_us =
 				dcn3_2_soc.sr_exit_time_us =
 					bb_info.dram_sr_exit_latency_100ns * 10;
 		}
@@ -3036,12 +3035,14 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 
 	/* Override from VBIOS for num_chan */
 	if (dc->ctx->dc_bios->vram_info.num_chans) {
+		dc->dml2_options.bbox_overrides.dram_num_chan =
 		dcn3_2_soc.num_chans = dc->ctx->dc_bios->vram_info.num_chans;
 		dcn3_2_soc.mall_allocated_for_dcn_mbytes = (double)(dcn32_calc_num_avail_chans_for_mall(dc,
 			dc->ctx->dc_bios->vram_info.num_chans) * dc->caps.mall_size_per_mem_channel);
 	}
 
 	if (dc->ctx->dc_bios->vram_info.dram_channel_width_bytes)
+		dc->dml2_options.bbox_overrides.dram_chanel_width_bytes =
 		dcn3_2_soc.dram_channel_width_bytes = dc->ctx->dc_bios->vram_info.dram_channel_width_bytes;
 
 	/* DML DSC delay factor workaround */
@@ -3052,6 +3053,10 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 	/* Override dispclk_dppclk_vco_speed_mhz from Clk Mgr */
 	dcn3_2_soc.dispclk_dppclk_vco_speed_mhz = dc->clk_mgr->dentist_vco_freq_khz / 1000.0;
 	dc->dml.soc.dispclk_dppclk_vco_speed_mhz = dc->clk_mgr->dentist_vco_freq_khz / 1000.0;
+	dc->dml2_options.bbox_overrides.disp_pll_vco_speed_mhz = dc->clk_mgr->dentist_vco_freq_khz / 1000.0;
+	dc->dml2_options.bbox_overrides.xtalclk_mhz = dc->ctx->dc_bios->fw_info.pll_info.crystal_frequency / 1000.0;
+	dc->dml2_options.bbox_overrides.dchub_refclk_mhz = dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000.0;
+	dc->dml2_options.bbox_overrides.dprefclk_mhz = dc->clk_mgr->dprefclk_khz / 1000.0;
 
 	/* Overrides Clock levelsfrom CLK Mgr table entries as reported by PM FW */
 	if (bw_params->clk_table.entries[0].memclk_mhz) {
@@ -3206,6 +3211,72 @@ void dcn32_update_bw_bounding_box_fpu(struct dc *dc, struct clk_bw_params *bw_pa
 		dml_init_instance(&dc->dml, &dcn3_2_soc, &dcn3_2_ip, DML_PROJECT_DCN32);
 		if (dc->current_state)
 			dml_init_instance(&dc->current_state->bw_ctx.dml, &dcn3_2_soc, &dcn3_2_ip, DML_PROJECT_DCN32);
+	}
+
+	if (dc->clk_mgr->bw_params->clk_table.num_entries > 1) {
+		unsigned int i = 0;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_states = dc->clk_mgr->bw_params->clk_table.num_entries;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_dcfclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dcfclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_fclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_fclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_memclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_memclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_socclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_socclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_dtbclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dtbclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_dispclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dispclk_levels;
+
+		dc->dml2_options.bbox_overrides.clks_table.num_entries_per_clk.num_dppclk_levels =
+			dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dppclk_levels;
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dcfclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].dcfclk_mhz)
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].dcfclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].dcfclk_mhz;
+		}
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_fclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].fclk_mhz)
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].fclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].fclk_mhz;
+		}
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_memclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz)
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].memclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz;
+		}
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_socclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].socclk_mhz)
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].socclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].socclk_mhz;
+		}
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dtbclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].dtbclk_mhz)
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].dtbclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].dtbclk_mhz;
+		}
+
+		for (i = 0; i < dc->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_dispclk_levels; i++) {
+			if (dc->clk_mgr->bw_params->clk_table.entries[i].dispclk_mhz) {
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].dispclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].dispclk_mhz;
+				dc->dml2_options.bbox_overrides.clks_table.clk_entries[i].dppclk_mhz =
+					dc->clk_mgr->bw_params->clk_table.entries[i].dispclk_mhz;
+			}
+		}
 	}
 }
 

@@ -1203,7 +1203,7 @@ static int arcturus_set_fan_speed_pwm(struct smu_context *smu,
 	uint32_t duty100, duty;
 	uint64_t tmp64;
 
-	speed = MIN(speed, 255);
+	speed = min_t(uint32_t, speed, 255);
 
 	duty100 = REG_GET_FIELD(RREG32_SOC15(THM, 0, mmCG_FDO_CTRL1_ARCT),
 				CG_FDO_CTRL1, FMAX_DUTY100);
@@ -1267,7 +1267,7 @@ static int arcturus_get_fan_speed_pwm(struct smu_context *smu,
 	if (duty100) {
 		tmp64 = (uint64_t)duty * 255;
 		do_div(tmp64, duty100);
-		*speed = MIN((uint32_t)tmp64, 255);
+		*speed = min_t(uint32_t, tmp64, 255);
 	} else {
 		*speed = 0;
 	}
@@ -2192,10 +2192,6 @@ static void arcturus_get_unique_id(struct smu_context *smu)
 
 	id = ((uint64_t)bottom32 << 32) | top32;
 	adev->unique_id = id;
-	/* For Arcturus-and-later, unique_id == serial_number, so convert it to a
-	 * 16-digit HEX string for convenience and backwards-compatibility
-	 */
-	sprintf(adev->serial, "%llx", id);
 }
 
 static int arcturus_set_df_cstate(struct smu_context *smu,
@@ -2227,7 +2223,8 @@ static int arcturus_set_df_cstate(struct smu_context *smu,
 	return smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_DFCstateControl, state, NULL);
 }
 
-static int arcturus_allow_xgmi_power_down(struct smu_context *smu, bool en)
+static int arcturus_select_xgmi_plpd_policy(struct smu_context *smu,
+					    enum pp_xgmi_plpd_mode mode)
 {
 	uint32_t smu_version;
 	int ret;
@@ -2244,16 +2241,16 @@ static int arcturus_allow_xgmi_power_down(struct smu_context *smu, bool en)
 		return -EINVAL;
 	}
 
-	if (en)
+	if (mode == XGMI_PLPD_DEFAULT)
 		return smu_cmn_send_smc_msg_with_param(smu,
 						   SMU_MSG_GmiPwrDnControl,
-						   1,
-						   NULL);
-
-	return smu_cmn_send_smc_msg_with_param(smu,
-					   SMU_MSG_GmiPwrDnControl,
-					   0,
-					   NULL);
+						   1, NULL);
+	else if (mode == XGMI_PLPD_DISALLOW)
+		return smu_cmn_send_smc_msg_with_param(smu,
+						   SMU_MSG_GmiPwrDnControl,
+						   0, NULL);
+	else
+		return -EINVAL;
 }
 
 static const struct throttling_logging_label {
@@ -2455,7 +2452,7 @@ static const struct pptable_funcs arcturus_ppt_funcs = {
 	.get_dpm_ultimate_freq = smu_v11_0_get_dpm_ultimate_freq,
 	.set_soft_freq_limited_range = smu_v11_0_set_soft_freq_limited_range,
 	.set_df_cstate = arcturus_set_df_cstate,
-	.allow_xgmi_power_down = arcturus_allow_xgmi_power_down,
+	.select_xgmi_plpd_policy = arcturus_select_xgmi_plpd_policy,
 	.log_thermal_throttling_event = arcturus_log_thermal_throttling_event,
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
 	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,

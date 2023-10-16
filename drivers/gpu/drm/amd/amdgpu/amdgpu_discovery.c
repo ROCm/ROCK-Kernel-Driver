@@ -1208,6 +1208,7 @@ static void amdgpu_discovery_sysfs_fini(struct amdgpu_device *adev)
 
 static int amdgpu_discovery_reg_base_init(struct amdgpu_device *adev)
 {
+	uint8_t num_base_address, subrev, variant;
 	struct binary_header *bhdr;
 	struct ip_discovery_header *ihdr;
 	struct die_header *dhdr;
@@ -1216,7 +1217,6 @@ static int amdgpu_discovery_reg_base_init(struct amdgpu_device *adev)
 	uint16_t ip_offset;
 	uint16_t num_dies;
 	uint16_t num_ips;
-	uint8_t num_base_address;
 	int hw_ip;
 	int i, j, k;
 	int r;
@@ -1354,8 +1354,22 @@ static int amdgpu_discovery_reg_base_init(struct amdgpu_device *adev)
 					 * example.  On most chips there are multiple instances
 					 * with the same HWID.
 					 */
-					adev->ip_versions[hw_ip][ip->instance_number] =
-						IP_VERSION(ip->major, ip->minor, ip->revision);
+
+					if (ihdr->version < 3) {
+						subrev = 0;
+						variant = 0;
+					} else {
+						subrev = ip->sub_revision;
+						variant = ip->variant;
+					}
+
+					adev->ip_versions[hw_ip]
+							 [ip->instance_number] =
+						IP_VERSION_FULL(ip->major,
+								ip->minor,
+								ip->revision,
+								variant,
+								subrev);
 				}
 			}
 
@@ -1849,6 +1863,9 @@ static int amdgpu_discovery_set_smu_ip_blocks(struct amdgpu_device *adev)
 	case IP_VERSION(13, 0, 11):
 		amdgpu_device_ip_block_add(adev, &smu_v13_0_ip_block);
 		break;
+	case IP_VERSION(14, 0, 0):
+		amdgpu_device_ip_block_add(adev, &smu_v14_0_ip_block);
+		break;
 	default:
 		dev_err(adev->dev,
 			"Failed to add smu ip block(MP1_HWIP:0x%x)\n",
@@ -1896,6 +1913,7 @@ static int amdgpu_discovery_set_display_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(3, 1, 6):
 		case IP_VERSION(3, 2, 0):
 		case IP_VERSION(3, 2, 1):
+		case IP_VERSION(3, 5, 0):
 			if (amdgpu_sriov_vf(adev))
 				amdgpu_discovery_set_sriov_display(adev);
 			else

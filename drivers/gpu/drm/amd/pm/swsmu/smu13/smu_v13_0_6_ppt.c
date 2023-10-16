@@ -165,11 +165,13 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetSoftMaxGfxClk,                    PPSMC_MSG_SetSoftMaxGfxClk,                0),
 	MSG_MAP(PrepareMp1ForUnload,                 PPSMC_MSG_PrepareForDriverUnload,          0),
 	MSG_MAP(GetCTFLimit,                         PPSMC_MSG_GetCTFLimit,                     0),
+	MSG_MAP(GetThermalLimit,                     PPSMC_MSG_ReadThrottlerLimit,              0),
 	MSG_MAP(ClearMcaOnRead,	                     PPSMC_MSG_ClearMcaOnRead,                  0),
 	MSG_MAP(QueryValidMcaCount,                  PPSMC_MSG_QueryValidMcaCount,              0),
 	MSG_MAP(QueryValidMcaCeCount,                PPSMC_MSG_QueryValidMcaCeCount,            0),
 	MSG_MAP(McaBankDumpDW,                       PPSMC_MSG_McaBankDumpDW,                   0),
 	MSG_MAP(McaBankCeDumpDW,                     PPSMC_MSG_McaBankCeDumpDW,                 0),
+	MSG_MAP(SelectPLPDMode,                      PPSMC_MSG_SelectPLPDMode,                  0),
 };
 
 static const struct cmn2asic_mapping smu_v13_0_6_clk_map[SMU_CLK_COUNT] = {
@@ -244,6 +246,8 @@ struct PPTable_t {
 };
 
 #define SMUQ10_TO_UINT(x) ((x) >> 10)
+#define SMUQ10_FRAC(x) ((x) & 0x3ff)
+#define SMUQ10_ROUND(x) ((SMUQ10_TO_UINT(x)) + ((SMUQ10_FRAC(x)) >= 0x200))
 
 struct smu_v13_0_6_dpm_map {
 	enum smu_clk_type clk_type;
@@ -275,7 +279,7 @@ static int smu_v13_0_6_tables_init(struct smu_context *smu)
 		return -ENOMEM;
 	smu_table->metrics_time = 0;
 
-	smu_table->gpu_metrics_table_size = sizeof(struct gpu_metrics_v1_3);
+	smu_table->gpu_metrics_table_size = sizeof(struct gpu_metrics_v1_4);
 	smu_table->gpu_metrics_table =
 		kzalloc(smu_table->gpu_metrics_table_size, GFP_KERNEL);
 	if (!smu_table->gpu_metrics_table) {
@@ -389,25 +393,25 @@ static int smu_v13_0_6_setup_driver_pptable(struct smu_context *smu)
 			return -ETIME;
 
 		pptable->MaxSocketPowerLimit =
-			SMUQ10_TO_UINT(metrics->MaxSocketPowerLimit);
+			SMUQ10_ROUND(metrics->MaxSocketPowerLimit);
 		pptable->MaxGfxclkFrequency =
-			SMUQ10_TO_UINT(metrics->MaxGfxclkFrequency);
+			SMUQ10_ROUND(metrics->MaxGfxclkFrequency);
 		pptable->MinGfxclkFrequency =
-			SMUQ10_TO_UINT(metrics->MinGfxclkFrequency);
+			SMUQ10_ROUND(metrics->MinGfxclkFrequency);
 
 		for (i = 0; i < 4; ++i) {
 			pptable->FclkFrequencyTable[i] =
-				SMUQ10_TO_UINT(metrics->FclkFrequencyTable[i]);
+				SMUQ10_ROUND(metrics->FclkFrequencyTable[i]);
 			pptable->UclkFrequencyTable[i] =
-				SMUQ10_TO_UINT(metrics->UclkFrequencyTable[i]);
-			pptable->SocclkFrequencyTable[i] = SMUQ10_TO_UINT(
+				SMUQ10_ROUND(metrics->UclkFrequencyTable[i]);
+			pptable->SocclkFrequencyTable[i] = SMUQ10_ROUND(
 				metrics->SocclkFrequencyTable[i]);
 			pptable->VclkFrequencyTable[i] =
-				SMUQ10_TO_UINT(metrics->VclkFrequencyTable[i]);
+				SMUQ10_ROUND(metrics->VclkFrequencyTable[i]);
 			pptable->DclkFrequencyTable[i] =
-				SMUQ10_TO_UINT(metrics->DclkFrequencyTable[i]);
+				SMUQ10_ROUND(metrics->DclkFrequencyTable[i]);
 			pptable->LclkFrequencyTable[i] =
-				SMUQ10_TO_UINT(metrics->LclkFrequencyTable[i]);
+				SMUQ10_ROUND(metrics->LclkFrequencyTable[i]);
 		}
 
 		/* use AID0 serial number by default */
@@ -730,50 +734,50 @@ static int smu_v13_0_6_get_smu_metrics_data(struct smu_context *smu,
 		smu_cmn_get_smc_version(smu, NULL, &smu_version);
 		if (smu_version >= 0x552F00) {
 			xcc_id = GET_INST(GC, 0);
-			*value = SMUQ10_TO_UINT(metrics->GfxclkFrequency[xcc_id]);
+			*value = SMUQ10_ROUND(metrics->GfxclkFrequency[xcc_id]);
 		} else {
 			*value = 0;
 		}
 		break;
 	case METRICS_CURR_SOCCLK:
 	case METRICS_AVERAGE_SOCCLK:
-		*value = SMUQ10_TO_UINT(metrics->SocclkFrequency[0]);
+		*value = SMUQ10_ROUND(metrics->SocclkFrequency[0]);
 		break;
 	case METRICS_CURR_UCLK:
 	case METRICS_AVERAGE_UCLK:
-		*value = SMUQ10_TO_UINT(metrics->UclkFrequency);
+		*value = SMUQ10_ROUND(metrics->UclkFrequency);
 		break;
 	case METRICS_CURR_VCLK:
-		*value = SMUQ10_TO_UINT(metrics->VclkFrequency[0]);
+		*value = SMUQ10_ROUND(metrics->VclkFrequency[0]);
 		break;
 	case METRICS_CURR_DCLK:
-		*value = SMUQ10_TO_UINT(metrics->DclkFrequency[0]);
+		*value = SMUQ10_ROUND(metrics->DclkFrequency[0]);
 		break;
 	case METRICS_CURR_FCLK:
-		*value = SMUQ10_TO_UINT(metrics->FclkFrequency);
+		*value = SMUQ10_ROUND(metrics->FclkFrequency);
 		break;
 	case METRICS_AVERAGE_GFXACTIVITY:
-		*value = SMUQ10_TO_UINT(metrics->SocketGfxBusy);
+		*value = SMUQ10_ROUND(metrics->SocketGfxBusy);
 		break;
 	case METRICS_AVERAGE_MEMACTIVITY:
-		*value = SMUQ10_TO_UINT(metrics->DramBandwidthUtilization);
+		*value = SMUQ10_ROUND(metrics->DramBandwidthUtilization);
 		break;
 	case METRICS_CURR_SOCKETPOWER:
-		*value = SMUQ10_TO_UINT(metrics->SocketPower) << 8;
+		*value = SMUQ10_ROUND(metrics->SocketPower) << 8;
 		break;
 	case METRICS_TEMPERATURE_HOTSPOT:
-		*value = SMUQ10_TO_UINT(metrics->MaxSocketTemperature) *
+		*value = SMUQ10_ROUND(metrics->MaxSocketTemperature) *
 			 SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
 		break;
 	case METRICS_TEMPERATURE_MEM:
-		*value = SMUQ10_TO_UINT(metrics->MaxHbmTemperature) *
+		*value = SMUQ10_ROUND(metrics->MaxHbmTemperature) *
 			 SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
 		break;
 	/* This is the max of all VRs and not just SOC VR.
 	 * No need to define another data type for the same.
 	 */
 	case METRICS_TEMPERATURE_VRSOC:
-		*value = SMUQ10_TO_UINT(metrics->MaxVrTemperature) *
+		*value = SMUQ10_ROUND(metrics->MaxVrTemperature) *
 			 SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
 		break;
 	default:
@@ -819,12 +823,12 @@ static int smu_v13_0_6_get_current_clk_freq_by_table(struct smu_context *smu,
 	return smu_v13_0_6_get_smu_metrics_data(smu, member_type, value);
 }
 
-static int smu_v13_0_6_print_clks(struct smu_context *smu, char *buf,
+static int smu_v13_0_6_print_clks(struct smu_context *smu, char *buf, int size,
 				  struct smu_13_0_dpm_table *single_dpm_table,
 				  uint32_t curr_clk, const char *clk_name)
 {
 	struct pp_clock_levels_with_latency clocks;
-	int i, ret, size = 0, level = -1;
+	int i, ret, level = -1;
 	uint32_t clk1, clk2;
 
 	ret = smu_v13_0_6_get_clk_table(smu, &clocks, single_dpm_table);
@@ -945,8 +949,8 @@ static int smu_v13_0_6_print_clk_levels(struct smu_context *smu,
 
 		single_dpm_table = &(dpm_context->dpm_tables.uclk_table);
 
-		return smu_v13_0_6_print_clks(smu, buf, single_dpm_table, now,
-					      "mclk");
+		return smu_v13_0_6_print_clks(smu, buf, size, single_dpm_table,
+					      now, "mclk");
 
 	case SMU_SOCCLK:
 		ret = smu_v13_0_6_get_current_clk_freq_by_table(smu, SMU_SOCCLK,
@@ -959,8 +963,8 @@ static int smu_v13_0_6_print_clk_levels(struct smu_context *smu,
 
 		single_dpm_table = &(dpm_context->dpm_tables.soc_table);
 
-		return smu_v13_0_6_print_clks(smu, buf, single_dpm_table, now,
-					      "socclk");
+		return smu_v13_0_6_print_clks(smu, buf, size, single_dpm_table,
+					      now, "socclk");
 
 	case SMU_FCLK:
 		ret = smu_v13_0_6_get_current_clk_freq_by_table(smu, SMU_FCLK,
@@ -973,8 +977,8 @@ static int smu_v13_0_6_print_clk_levels(struct smu_context *smu,
 
 		single_dpm_table = &(dpm_context->dpm_tables.fclk_table);
 
-		return smu_v13_0_6_print_clks(smu, buf, single_dpm_table, now,
-					      "fclk");
+		return smu_v13_0_6_print_clks(smu, buf, size, single_dpm_table,
+					      now, "fclk");
 
 	case SMU_VCLK:
 		ret = smu_v13_0_6_get_current_clk_freq_by_table(smu, SMU_VCLK,
@@ -987,8 +991,8 @@ static int smu_v13_0_6_print_clk_levels(struct smu_context *smu,
 
 		single_dpm_table = &(dpm_context->dpm_tables.vclk_table);
 
-		return smu_v13_0_6_print_clks(smu, buf, single_dpm_table, now,
-					      "vclk");
+		return smu_v13_0_6_print_clks(smu, buf, size, single_dpm_table,
+					      now, "vclk");
 
 	case SMU_DCLK:
 		ret = smu_v13_0_6_get_current_clk_freq_by_table(smu, SMU_DCLK,
@@ -1001,8 +1005,8 @@ static int smu_v13_0_6_print_clk_levels(struct smu_context *smu,
 
 		single_dpm_table = &(dpm_context->dpm_tables.dclk_table);
 
-		return smu_v13_0_6_print_clks(smu, buf, single_dpm_table, now,
-					      "dclk");
+		return smu_v13_0_6_print_clks(smu, buf, size, single_dpm_table,
+					      now, "dclk");
 
 	default:
 		break;
@@ -1876,8 +1880,6 @@ static void smu_v13_0_6_get_unique_id(struct smu_context *smu)
 		(struct PPTable_t *)smu_table->driver_pptable;
 
 	adev->unique_id = pptable->PublicSerialNumber_AID;
-	if (adev->serial[0] == '\0')
-		sprintf(adev->serial, "%016llx", adev->unique_id);
 }
 
 static bool smu_v13_0_6_is_baco_supported(struct smu_context *smu)
@@ -1885,19 +1887,6 @@ static bool smu_v13_0_6_is_baco_supported(struct smu_context *smu)
 	/* smu_13_0_6 does not support baco */
 
 	return false;
-}
-
-static int smu_v13_0_6_set_df_cstate(struct smu_context *smu,
-				     enum pp_df_cstate state)
-{
-	return smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_DFCstateControl,
-					       state, NULL);
-}
-
-static int smu_v13_0_6_allow_xgmi_power_down(struct smu_context *smu, bool en)
-{
-	return smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GmiPwrDnControl,
-					       en ? 0 : 1, NULL);
 }
 
 static const char *const throttling_logging_label[] = {
@@ -1978,60 +1967,65 @@ static int smu_v13_0_6_get_current_pcie_link_speed(struct smu_context *smu)
 static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table)
 {
 	struct smu_table_context *smu_table = &smu->smu_table;
-	struct gpu_metrics_v1_3 *gpu_metrics =
-		(struct gpu_metrics_v1_3 *)smu_table->gpu_metrics_table;
+	struct gpu_metrics_v1_4 *gpu_metrics =
+		(struct gpu_metrics_v1_4 *)smu_table->gpu_metrics_table;
 	struct amdgpu_device *adev = smu->adev;
-	int ret = 0, inst0, xcc0;
+	int ret = 0, xcc_id, inst, i;
 	MetricsTable_t *metrics;
 	u16 link_width_level;
-
-	inst0 = adev->sdma.instance[0].aid_id;
-	xcc0 = GET_INST(GC, 0);
 
 	metrics = kzalloc(sizeof(MetricsTable_t), GFP_KERNEL);
 	ret = smu_v13_0_6_get_metrics_table(smu, metrics, true);
 	if (ret)
 		return ret;
 
-	smu_cmn_init_soft_gpu_metrics(gpu_metrics, 1, 3);
+	smu_cmn_init_soft_gpu_metrics(gpu_metrics, 1, 4);
 
 	gpu_metrics->temperature_hotspot =
-		SMUQ10_TO_UINT(metrics->MaxSocketTemperature);
+		SMUQ10_ROUND(metrics->MaxSocketTemperature);
 	/* Individual HBM stack temperature is not reported */
 	gpu_metrics->temperature_mem =
-		SMUQ10_TO_UINT(metrics->MaxHbmTemperature);
+		SMUQ10_ROUND(metrics->MaxHbmTemperature);
 	/* Reports max temperature of all voltage rails */
 	gpu_metrics->temperature_vrsoc =
-		SMUQ10_TO_UINT(metrics->MaxVrTemperature);
+		SMUQ10_ROUND(metrics->MaxVrTemperature);
 
 	gpu_metrics->average_gfx_activity =
-		SMUQ10_TO_UINT(metrics->SocketGfxBusy);
+		SMUQ10_ROUND(metrics->SocketGfxBusy);
 	gpu_metrics->average_umc_activity =
-		SMUQ10_TO_UINT(metrics->DramBandwidthUtilization);
+		SMUQ10_ROUND(metrics->DramBandwidthUtilization);
 
-	gpu_metrics->average_socket_power =
-		SMUQ10_TO_UINT(metrics->SocketPower);
+	gpu_metrics->curr_socket_power =
+		SMUQ10_ROUND(metrics->SocketPower);
 	/* Energy counter reported in 15.259uJ (2^-16) units */
 	gpu_metrics->energy_accumulator = metrics->SocketEnergyAcc;
 
-	gpu_metrics->current_gfxclk =
-		SMUQ10_TO_UINT(metrics->GfxclkFrequency[xcc0]);
-	gpu_metrics->current_socclk =
-		SMUQ10_TO_UINT(metrics->SocclkFrequency[inst0]);
-	gpu_metrics->current_uclk = SMUQ10_TO_UINT(metrics->UclkFrequency);
-	gpu_metrics->current_vclk0 =
-		SMUQ10_TO_UINT(metrics->VclkFrequency[inst0]);
-	gpu_metrics->current_dclk0 =
-		SMUQ10_TO_UINT(metrics->DclkFrequency[inst0]);
+	for (i = 0; i < MAX_GFX_CLKS; i++) {
+		xcc_id = GET_INST(GC, i);
+		if (xcc_id >= 0)
+			gpu_metrics->current_gfxclk[i] =
+				SMUQ10_ROUND(metrics->GfxclkFrequency[xcc_id]);
 
-	gpu_metrics->average_gfxclk_frequency = gpu_metrics->current_gfxclk;
-	gpu_metrics->average_socclk_frequency = gpu_metrics->current_socclk;
-	gpu_metrics->average_uclk_frequency = gpu_metrics->current_uclk;
-	gpu_metrics->average_vclk0_frequency = gpu_metrics->current_vclk0;
-	gpu_metrics->average_dclk0_frequency = gpu_metrics->current_dclk0;
+		if (i < MAX_CLKS) {
+			gpu_metrics->current_socclk[i] =
+				SMUQ10_ROUND(metrics->SocclkFrequency[i]);
+			inst = GET_INST(VCN, i);
+			if (inst >= 0) {
+				gpu_metrics->current_vclk0[i] =
+					SMUQ10_ROUND(metrics->VclkFrequency[inst]);
+				gpu_metrics->current_dclk0[i] =
+					SMUQ10_ROUND(metrics->DclkFrequency[inst]);
+			}
+		}
+	}
+
+	gpu_metrics->current_uclk = SMUQ10_ROUND(metrics->UclkFrequency);
 
 	/* Throttle status is not reported through metrics now */
 	gpu_metrics->throttle_status = 0;
+
+	/* Clock Lock Status. Each bit corresponds to each GFXCLK instance */
+	gpu_metrics->gfxclk_lock_status = metrics->GfxLockXCDMak >> GET_INST(GC, 0);
 
 	if (!(adev->flags & AMD_IS_APU)) {
 		link_width_level = smu_v13_0_6_get_current_pcie_link_width_level(smu);
@@ -2042,21 +2036,33 @@ static ssize_t smu_v13_0_6_get_gpu_metrics(struct smu_context *smu, void **table
 			DECODE_LANE_WIDTH(link_width_level);
 		gpu_metrics->pcie_link_speed =
 			smu_v13_0_6_get_current_pcie_link_speed(smu);
+		gpu_metrics->pcie_bandwidth_acc =
+				SMUQ10_ROUND(metrics->PcieBandwidthAcc[0]);
 	}
 
 	gpu_metrics->system_clock_counter = ktime_get_boottime_ns();
 
 	gpu_metrics->gfx_activity_acc =
-		SMUQ10_TO_UINT(metrics->SocketGfxBusyAcc);
+		SMUQ10_ROUND(metrics->SocketGfxBusyAcc);
 	gpu_metrics->mem_activity_acc =
-		SMUQ10_TO_UINT(metrics->DramBandwidthUtilizationAcc);
+		SMUQ10_ROUND(metrics->DramBandwidthUtilizationAcc);
+
+	for (i = 0; i < NUM_XGMI_LINKS; i++) {
+		gpu_metrics->xgmi_read_data_acc[i] =
+			SMUQ10_ROUND(metrics->XgmiReadDataSizeAcc[i]);
+		gpu_metrics->xgmi_write_data_acc[i] =
+			SMUQ10_ROUND(metrics->XgmiWriteDataSizeAcc[i]);
+	}
+
+	gpu_metrics->xgmi_link_width = SMUQ10_ROUND(metrics->XgmiWidth);
+	gpu_metrics->xgmi_link_speed = SMUQ10_ROUND(metrics->XgmiBitrate);
 
 	gpu_metrics->firmware_timestamp = metrics->Timestamp;
 
 	*table = (void *)gpu_metrics;
 	kfree(metrics);
 
-	return sizeof(struct gpu_metrics_v1_3);
+	return sizeof(*gpu_metrics);
 }
 
 static int smu_v13_0_6_mode2_reset(struct smu_context *smu)
@@ -2108,7 +2114,7 @@ static int smu_v13_0_6_get_thermal_temperature_range(struct smu_context *smu,
 						     struct smu_temperature_range *range)
 {
 	struct amdgpu_device *adev = smu->adev;
-	u32 aid_temp, xcd_temp, mem_temp;
+	u32 aid_temp, xcd_temp, max_temp;
 	uint32_t smu_version;
 	u32 ccd_temp = 0;
 	int ret;
@@ -2124,31 +2130,50 @@ static int smu_v13_0_6_get_thermal_temperature_range(struct smu_context *smu,
 	if (smu_version < 0x554500)
 		return 0;
 
+	/* Get SOC Max operating temperature */
 	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
 					      PPSMC_AID_THM_TYPE, &aid_temp);
 	if (ret)
 		goto failed;
-
 	if (adev->flags & AMD_IS_APU) {
 		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
 						      PPSMC_CCD_THM_TYPE, &ccd_temp);
 		if (ret)
 			goto failed;
 	}
-
 	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
 					      PPSMC_XCD_THM_TYPE, &xcd_temp);
 	if (ret)
 		goto failed;
-
-	range->hotspot_crit_max = max3(aid_temp, xcd_temp, ccd_temp) *
+	range->hotspot_emergency_max = max3(aid_temp, xcd_temp, ccd_temp) *
 				       SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+
+	/* Get HBM Max operating temperature */
 	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetCTFLimit,
-					      PPSMC_HBM_THM_TYPE, &mem_temp);
+					      PPSMC_HBM_THM_TYPE, &max_temp);
+	if (ret)
+		goto failed;
+	range->mem_emergency_max =
+		max_temp * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+
+	/* Get SOC thermal throttle limit */
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetThermalLimit,
+					      PPSMC_THROTTLING_LIMIT_TYPE_SOCKET,
+					      &max_temp);
+	if (ret)
+		goto failed;
+	range->hotspot_crit_max =
+		max_temp * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+
+	/* Get HBM thermal throttle limit */
+	ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_GetThermalLimit,
+					      PPSMC_THROTTLING_LIMIT_TYPE_HBM,
+					      &max_temp);
 	if (ret)
 		goto failed;
 
-	range->mem_crit_max = mem_temp * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+	range->mem_crit_max = max_temp * SMU_TEMPERATURE_UNITS_PER_CENTIGRADES;
+
 failed:
 	return ret;
 }
@@ -2343,9 +2368,6 @@ static int mca_get_mca_entry(struct amdgpu_device *adev, enum amdgpu_mca_error_t
 		if (ret)
 			return ret;
 	}
-
-	if (ret)
-		return ret;
 
 	entry->idx = idx;
 	entry->type = type;
@@ -2714,6 +2736,44 @@ static const struct amdgpu_mca_smu_funcs smu_v13_0_6_mca_smu_funcs = {
 	.mca_get_ras_mca_idx_array = mca_smu_get_ras_mca_idx_array,
 };
 
+static int smu_v13_0_6_select_xgmi_plpd_policy(struct smu_context *smu,
+					       enum pp_xgmi_plpd_mode mode)
+{
+	struct amdgpu_device *adev = smu->adev;
+	int ret, param;
+
+	switch (mode) {
+	case XGMI_PLPD_DEFAULT:
+		param = PPSMC_PLPD_MODE_DEFAULT;
+		break;
+	case XGMI_PLPD_OPTIMIZED:
+		param = PPSMC_PLPD_MODE_OPTIMIZED;
+		break;
+	case XGMI_PLPD_DISALLOW:
+		param = 0;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (mode == XGMI_PLPD_DISALLOW)
+		ret = smu_cmn_send_smc_msg_with_param(smu,
+						      SMU_MSG_GmiPwrDnControl,
+						      param, NULL);
+	else
+		/* change xgmi per-link power down policy */
+		ret = smu_cmn_send_smc_msg_with_param(smu,
+						      SMU_MSG_SelectPLPDMode,
+						      param, NULL);
+
+	if (ret)
+		dev_err(adev->dev,
+			"select xgmi per-link power down policy %d failed\n",
+			mode);
+
+	return ret;
+}
+
 static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	/* init dpm */
 	.get_allowed_feature_mask = smu_v13_0_6_get_allowed_feature_mask,
@@ -2752,11 +2812,9 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.get_dpm_ultimate_freq = smu_v13_0_6_get_dpm_ultimate_freq,
 	.set_soft_freq_limited_range = smu_v13_0_6_set_soft_freq_limited_range,
 	.od_edit_dpm_table = smu_v13_0_6_usr_edit_dpm_table,
-	.set_df_cstate = smu_v13_0_6_set_df_cstate,
-	.allow_xgmi_power_down = smu_v13_0_6_allow_xgmi_power_down,
+	.select_xgmi_plpd_policy = smu_v13_0_6_select_xgmi_plpd_policy,
 	.log_thermal_throttling_event = smu_v13_0_6_log_thermal_throttling_event,
 	.get_pp_feature_mask = smu_cmn_get_pp_feature_mask,
-	.set_pp_feature_mask = smu_cmn_set_pp_feature_mask,
 	.get_gpu_metrics = smu_v13_0_6_get_gpu_metrics,
 	.get_thermal_temperature_range = smu_v13_0_6_get_thermal_temperature_range,
 	.mode1_reset_is_support = smu_v13_0_6_is_mode1_reset_supported,

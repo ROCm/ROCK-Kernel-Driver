@@ -35,10 +35,12 @@
 #include "grph_object_ctrl_defs.h"
 #include <inc/hw/opp.h>
 
-#include "inc/hw_sequencer.h"
+#include "hwss/hw_sequencer.h"
 #include "inc/compressor.h"
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
+
+#include "dml2/dml2_wrapper.h"
 
 struct abm_save_restore;
 
@@ -47,7 +49,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.252"
+#define DC_VER "3.2.255"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -231,6 +233,11 @@ struct dc_caps {
 	uint32_t dmdata_alloc_size;
 	unsigned int max_cursor_size;
 	unsigned int max_video_width;
+	/*
+	 * max video plane width that can be safely assumed to be always
+	 * supported by single DPP pipe.
+	 */
+	unsigned int max_optimizable_video_width;
 	unsigned int min_horizontal_blanking_period;
 	int linear_pitch_alignment;
 	bool dcc_const_color;
@@ -270,6 +277,7 @@ struct dc_caps {
 	uint16_t subvp_vertical_int_margin_us;
 	bool seamless_odm;
 	uint32_t max_v_total;
+	uint32_t max_disp_clock_khz_at_vmin;
 	uint8_t subvp_drr_vblank_start_margin_us;
 };
 
@@ -420,8 +428,9 @@ struct dc_config {
 	int sdpif_request_limit_words_per_umc;
 	bool use_old_fixed_vs_sequence;
 	bool dc_mode_clk_limit_support;
-	bool DisableMinDispClkODM;
+	bool EnableMinDispClkODM;
 	bool enable_auto_dpm_test_logs;
+	unsigned int disable_ips;
 };
 
 enum visual_confirm {
@@ -823,6 +832,7 @@ struct dc_debug_options {
 	bool disable_hubp_power_gate;
 	bool disable_dsc_power_gate;
 	bool disable_optc_power_gate;
+	bool disable_hpo_power_gate;
 	int dsc_min_slice_height_override;
 	int dsc_bpp_increment_div;
 	bool disable_pplib_wm_range;
@@ -912,7 +922,6 @@ struct dc_debug_options {
 	enum det_size crb_alloc_policy;
 	int crb_alloc_policy_min_disp_count;
 	bool disable_z10;
-	unsigned int disable_ips;
 	bool enable_z9_disable_interface;
 	bool psr_skip_crtc_disable;
 	union dpia_debug_options dpia_debug;
@@ -936,6 +945,7 @@ struct dc_debug_options {
 	bool dml_disallow_alternate_prefetch_modes;
 	bool use_legacy_soc_bb_mechanism;
 	bool exit_idle_opt_for_cursor_updates;
+	bool using_dml2;
 	bool enable_single_display_2to1_odm_policy;
 	bool enable_double_buffered_dsc_pg_support;
 	bool enable_dp_dig_pixel_rate_div_policy;
@@ -965,6 +975,8 @@ struct dc_debug_options {
 	bool replay_skip_crtc_disabled;
 	bool ignore_pg;/*do nothing, let pmfw control it*/
 	bool psp_disabled_wa;
+	unsigned int ips2_eval_delay_us;
+	unsigned int ips2_entry_delay_us;
 };
 
 struct gpu_info_soc_bounding_box_v1_0;
@@ -1041,6 +1053,8 @@ struct dc {
 			struct _vcs_dpi_voltage_scaling_st clock_limits[DC__VOLTAGE_STATES];
 		} update_bw_bounding_box;
 	} scratch;
+
+	struct dml2_configuration_options dml2_options;
 };
 
 enum frame_buffer_mode {
@@ -2357,6 +2371,12 @@ void dc_process_dmub_dpia_hpd_int_enable(const struct dc *dc,
 void dc_print_dmub_diagnostic_data(const struct dc *dc);
 
 void dc_query_current_properties(struct dc *dc, struct dc_current_properties *properties);
+
+struct dc_power_profile {
+	int power_level; /* Lower is better */
+};
+
+struct dc_power_profile dc_get_power_profile_for_dc_state(const struct dc_state *context);
 
 /* DSC Interfaces */
 #include "dc_dsc.h"

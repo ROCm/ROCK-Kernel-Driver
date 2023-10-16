@@ -43,6 +43,7 @@
 #include "smu_v13_0_5_ppt.h"
 #include "smu_v13_0_6_ppt.h"
 #include "smu_v13_0_7_ppt.h"
+#include "smu_v14_0_0_ppt.h"
 #include "amd_pcie.h"
 
 /*
@@ -278,6 +279,49 @@ static int smu_dpm_set_jpeg_enable(struct smu_context *smu,
 	return ret;
 }
 
+static int smu_dpm_set_vpe_enable(struct smu_context *smu,
+				   bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	if (!smu->ppt_funcs->dpm_set_vpe_enable)
+		return 0;
+
+	if (atomic_read(&power_gate->vpe_gated) ^ enable)
+		return 0;
+
+	ret = smu->ppt_funcs->dpm_set_vpe_enable(smu, enable);
+	if (!ret)
+		atomic_set(&power_gate->vpe_gated, !enable);
+
+	return ret;
+}
+
+static int smu_dpm_set_umsch_mm_enable(struct smu_context *smu,
+				   bool enable)
+{
+	struct smu_power_context *smu_power = &smu->smu_power;
+	struct smu_power_gate *power_gate = &smu_power->power_gate;
+	int ret = 0;
+
+	if (!smu->adev->enable_umsch_mm)
+		return 0;
+
+	if (!smu->ppt_funcs->dpm_set_umsch_mm_enable)
+		return 0;
+
+	if (atomic_read(&power_gate->umsch_mm_gated) ^ enable)
+		return 0;
+
+	ret = smu->ppt_funcs->dpm_set_umsch_mm_enable(smu, enable);
+	if (!ret)
+		atomic_set(&power_gate->umsch_mm_gated, !enable);
+
+	return ret;
+}
+
 /**
  * smu_dpm_set_power_gate - power gate/ungate the specific IP block
  *
@@ -334,6 +378,12 @@ static int smu_dpm_set_power_gate(void *handle,
 		ret = smu_dpm_set_jpeg_enable(smu, !gate);
 		if (ret)
 			dev_err(smu->adev->dev, "Failed to power %s JPEG!\n",
+				gate ? "gate" : "ungate");
+		break;
+	case AMD_IP_BLOCK_TYPE_VPE:
+		ret = smu_dpm_set_vpe_enable(smu, !gate);
+		if (ret)
+			dev_err(smu->adev->dev, "Failed to power %s VPE!\n",
 				gate ? "gate" : "ungate");
 		break;
 	default:
@@ -659,6 +709,9 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 		break;
 	case IP_VERSION(13, 0, 7):
 		smu_v13_0_7_set_ppt_funcs(smu);
+		break;
+	case IP_VERSION(14, 0, 0):
+		smu_v14_0_0_set_ppt_funcs(smu);
 		break;
 	default:
 		return -EINVAL;
@@ -1130,6 +1183,21 @@ static void smu_swctf_delayed_work_handler(struct work_struct *work)
 	orderly_poweroff(true);
 }
 
+static void smu_init_xgmi_plpd_mode(struct smu_context *smu)
+{
+	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) == IP_VERSION(11, 0, 2)) {
+		smu->plpd_mode = XGMI_PLPD_DEFAULT;
+		return;
+	}
+
+	/* PMFW put PLPD into default policy after enabling the feature */
+	if (smu_feature_is_enabled(smu,
+				   SMU_FEATURE_XGMI_PER_LINK_PWR_DWN_BIT))
+		smu->plpd_mode = XGMI_PLPD_DEFAULT;
+	else
+		smu->plpd_mode = XGMI_PLPD_NONE;
+}
+
 static int smu_sw_init(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
@@ -1150,6 +1218,8 @@ static int smu_sw_init(void *handle)
 
 	atomic_set(&smu->smu_power.power_gate.vcn_gated, 1);
 	atomic_set(&smu->smu_power.power_gate.jpeg_gated, 1);
+	atomic_set(&smu->smu_power.power_gate.vpe_gated, 1);
+	atomic_set(&smu->smu_power.power_gate.umsch_mm_gated, 1);
 
 	smu->workload_mask = 1 << smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT];
 	smu->workload_prority[PP_SMC_POWER_PROFILE_BOOTUP_DEFAULT] = 0;
@@ -1255,7 +1325,7 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 {
 	struct smu_feature *feature = &smu->smu_feature;
 	struct amdgpu_device *adev = smu->adev;
-	uint32_t pcie_gen = 0, pcie_width = 0;
+	uint8_t pcie_gen = 0, pcie_width = 0;
 	uint64_t features_supported;
 	int ret = 0;
 
@@ -1360,6 +1430,8 @@ static int smu_smc_hw_setup(struct smu_context *smu)
 		dev_err(adev->dev, "Failed to enable requested dpm features!\n");
 		return ret;
 	}
+
+	smu_init_xgmi_plpd_mode(smu);
 
 	ret = smu_feature_get_enabled_mask(smu, &features_supported);
 	if (ret) {
@@ -1500,6 +1572,8 @@ static int smu_hw_init(void *handle)
 			return ret;
 		smu_dpm_set_vcn_enable(smu, true);
 		smu_dpm_set_jpeg_enable(smu, true);
+		smu_dpm_set_vpe_enable(smu, true);
+		smu_dpm_set_umsch_mm_enable(smu, true);
 		smu_set_gfx_cgpg(smu, true);
 	}
 
@@ -1676,6 +1750,8 @@ static int smu_hw_fini(void *handle)
 
 	smu_dpm_set_vcn_enable(smu, false);
 	smu_dpm_set_jpeg_enable(smu, false);
+	smu_dpm_set_vpe_enable(smu, false);
+	smu_dpm_set_umsch_mm_enable(smu, false);
 
 	adev->vcn.cur_state = AMD_PG_STATE_GATE;
 	adev->jpeg.cur_state = AMD_PG_STATE_GATE;
@@ -2161,23 +2237,6 @@ static int smu_set_df_cstate(void *handle,
 	return ret;
 }
 
-int smu_allow_xgmi_power_down(struct smu_context *smu, bool en)
-{
-	int ret = 0;
-
-	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
-		return -EOPNOTSUPP;
-
-	if (!smu->ppt_funcs || !smu->ppt_funcs->allow_xgmi_power_down)
-		return 0;
-
-	ret = smu->ppt_funcs->allow_xgmi_power_down(smu, en);
-	if (ret)
-		dev_err(smu->adev->dev, "[AllowXgmiPowerDown] failed!\n");
-
-	return ret;
-}
-
 int smu_write_watermarks_table(struct smu_context *smu)
 {
 	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
@@ -2259,6 +2318,14 @@ const struct amdgpu_ip_block_version smu_v12_0_ip_block = {
 const struct amdgpu_ip_block_version smu_v13_0_ip_block = {
 	.type = AMD_IP_BLOCK_TYPE_SMC,
 	.major = 13,
+	.minor = 0,
+	.rev = 0,
+	.funcs = &smu_ip_funcs,
+};
+
+const struct amdgpu_ip_block_version smu_v14_0_ip_block = {
+	.type = AMD_IP_BLOCK_TYPE_SMC,
+	.major = 14,
 	.minor = 0,
 	.rev = 0,
 	.funcs = &smu_ip_funcs,
@@ -3155,6 +3222,30 @@ static int smu_get_prv_buffer_details(void *handle, void **addr, size_t *size)
 	}
 
 	return 0;
+}
+
+int smu_set_xgmi_plpd_mode(struct smu_context *smu,
+			   enum pp_xgmi_plpd_mode mode)
+{
+	int ret = -EOPNOTSUPP;
+
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled)
+		return ret;
+
+	/* PLPD policy is not supported if it's NONE */
+	if (smu->plpd_mode == XGMI_PLPD_NONE)
+		return ret;
+
+	if (smu->plpd_mode == mode)
+		return 0;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->select_xgmi_plpd_policy)
+		ret = smu->ppt_funcs->select_xgmi_plpd_policy(smu, mode);
+
+	if (!ret)
+		smu->plpd_mode = mode;
+
+	return ret;
 }
 
 static const struct amd_pm_funcs swsmu_pm_funcs = {

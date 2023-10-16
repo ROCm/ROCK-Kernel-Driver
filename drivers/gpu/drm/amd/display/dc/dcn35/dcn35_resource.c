@@ -31,7 +31,7 @@
 #include "resource.h"
 #include "include/irq_service_interface.h"
 #include "dcn35_resource.h"
-/*#include "dml2/dml2_wrapper.h"*/
+#include "dml2/dml2_wrapper.h"
 
 #include "dcn20/dcn20_resource.h"
 #include "dcn30/dcn30_resource.h"
@@ -49,7 +49,7 @@
 #include "dcn35/dcn35_optc.h"
 #include "dcn20/dcn20_hwseq.h"
 #include "dcn30/dcn30_hwseq.h"
-#include "dce110/dce110_hw_sequencer.h"
+#include "dce110/dce110_hwseq.h"
 #include "dcn35/dcn35_opp.h"
 #include "dcn35/dcn35_dsc.h"
 #include "dcn30/dcn30_vpg.h"
@@ -75,7 +75,7 @@
 #include "dcn35/dcn35_pg_cntl.h"
 #include "dcn10/dcn10_resource.h"
 #include "dcn31/dcn31_panel_cntl.h"
-#include "dcn35_hwseq.h"
+#include "dcn35/dcn35_hwseq.h"
 #include "dcn35_dio_link_encoder.h"
 #include "dml/dcn31/dcn31_fpu.h" /*todo*/
 #include "dml/dcn35/dcn35_fpu.h"
@@ -204,16 +204,6 @@ enum dcn35_clk_src_array_id {
 #define NBIO_SR_ARR(reg_name, id)\
 	REG_STRUCT[id].reg_name = NBIO_BASE(regBIF_BX2_ ## reg_name ## _BASE_IDX) + \
 		regBIF_BX2_ ## reg_name
-
-/* MMHUB */
-#define MMHUB_BASE_INNER(seg) ctx->mmhub_reg_offsets[seg]
-
-#define MMHUB_BASE(seg) \
-	MMHUB_BASE_INNER(seg)
-
-#define MMHUB_SR(reg_name)\
-		REG_STRUCT.reg_name = MMHUB_BASE(reg ## reg_name ## _BASE_IDX) + \
-					reg ## reg_name
 
 #define bios_regs_init() \
 		( \
@@ -708,7 +698,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.underflow_assert_delay_us = 0xFFFFFFFF,
 	.dwb_fi_phase = -1, // -1 = disable,
 	.dmub_command_table = true,
-	.pstate_enabled = false,
+	.pstate_enabled = true,
 	.use_max_lb = true,
 	.enable_mem_low_power = {
 		.bits = {
@@ -739,12 +729,11 @@ static const struct dc_debug_options debug_defaults_drv = {
 	},
 	.seamless_boot_odm_combine = DML_FAIL_SOURCE_PIXEL_FORMAT,
 	.enable_z9_disable_interface = true, /* Allow support for the PMFW interface for disable Z9*/
-	/* .using_dml2 = true, */
+	.using_dml2 = true,
 	.support_eDP1_5 = true,
 	.enable_hpo_pg_support = false,
 	.enable_legacy_fast_update = true,
-	.disable_stutter = true,
-	.enable_single_display_2to1_odm_policy = true,
+	.enable_single_display_2to1_odm_policy = false,
 	.disable_idle_power_optimizations = true,
 	.dmcub_emulation = false,
 	.disable_boot_optimizations = false,
@@ -752,12 +741,13 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.disable_mem_low_power = false,
 	.enable_hpo_pg_support = false,
 	//must match enable_single_display_2to1_odm_policy to support dynamic ODM transitions
-	.enable_double_buffered_dsc_pg_support = false,
+	.enable_double_buffered_dsc_pg_support = true,
 	.enable_dp_dig_pixel_rate_div_policy = 1,
 	.disable_z10 = false,
 	.ignore_pg = true,
 	.psp_disabled_wa = true,
-	.disable_ips = true,
+	.ips2_eval_delay_us = 200,
+	.ips2_entry_delay_us = 400
 };
 
 static const struct dc_panel_config panel_config_defaults = {
@@ -1703,7 +1693,7 @@ static bool dcn35_validate_bandwidth(struct dc *dc,
 {
 	bool out = false;
 
-	/*out = dml2_validate(dc, context, fast_validate);*/
+	out = dml2_validate(dc, context, fast_validate);
 
 	return out;
 }
@@ -1840,8 +1830,17 @@ static bool dcn35_resource_construct(
 	dc->caps.color.mpc.ogam_rom_caps.hlg = 0;
 	dc->caps.color.mpc.ocsc = 1;
 
+	/* max_disp_clock_khz_at_vmin is slightly lower than the STA value in order
+	 * to provide some margin.
+	 * It's expected for furture ASIC to have equal or higher value, in order to
+	 * have determinstic power improvement from generate to genration.
+	 * (i.e., we should not expect new ASIC generation with lower vmin rate)
+	 */
+	dc->caps.max_disp_clock_khz_at_vmin = 650000;
+
 	/* Use pipe context based otg sync logic */
 	dc->config.use_pipe_ctx_sync_logic = true;
+	dc->config.use_default_clock_table = false;
 	/* read VBIOS LTTPR caps */
 	{
 		if (ctx->dc_bios->funcs->get_lttpr_caps) {
@@ -2072,20 +2071,22 @@ static bool dcn35_resource_construct(
 
 	dc->cap_funcs = cap_funcs;
 
-
 	dc->dcn_ip->max_num_dpp = pool->base.pipe_count;
-#if 0
+
 	dc->dml2_options.dcn_pipe_count = pool->base.pipe_count;
-	dc->dml2_options.use_native_pstate_optimization = false;
+	dc->dml2_options.use_native_pstate_optimization = true;
 	dc->dml2_options.use_native_soc_bb_construction = true;
+	if (dc->config.EnableMinDispClkODM)
+		dc->dml2_options.minimize_dispclk_using_odm = true;
+	dc->dml2_options.enable_windowed_mpo_odm = dc->config.enable_windowed_mpo_odm;
 
 	dc->dml2_options.callbacks.dc = dc;
 	dc->dml2_options.callbacks.build_scaling_params = &resource_build_scaling_params;
 	dc->dml2_options.callbacks.can_support_mclk_switch_using_fw_based_vblank_stretch = &dcn30_can_support_mclk_switch_using_fw_based_vblank_stretch;
-	dc->dml2_options.callbacks.acquire_secondary_pipe_for_mpc_odm = &dc_resource_acquire_secondary_pipe_for_mpc_odm;
-	dc->dml2_options.max_segments_per_hubp = 18;
+	dc->dml2_options.callbacks.acquire_secondary_pipe_for_mpc_odm = &dc_resource_acquire_secondary_pipe_for_mpc_odm_legacy;
+	dc->dml2_options.max_segments_per_hubp = 24;
+
 	dc->dml2_options.det_segment_size = DCN3_2_DET_SEG_SIZE;/*todo*/
-#endif
 
 	if (dc->config.sdpif_request_limit_words_per_umc == 0)
 		dc->config.sdpif_request_limit_words_per_umc = 16;/*todo*/

@@ -710,10 +710,15 @@ enum amd_hw_ip_block_type {
 #define HWIP_MAX_INSTANCE	44
 
 #define HW_ID_MAX		300
-#define IP_VERSION(mj, mn, rv) (((mj) << 16) | ((mn) << 8) | (rv))
-#define IP_VERSION_MAJ(ver) ((ver) >> 16)
-#define IP_VERSION_MIN(ver) (((ver) >> 8) & 0xFF)
-#define IP_VERSION_REV(ver) ((ver) & 0xFF)
+#define IP_VERSION_FULL(mj, mn, rv, var, srev) \
+	(((mj) << 24) | ((mn) << 16) | ((rv) << 8) | ((var) << 4) | (srev))
+#define IP_VERSION(mj, mn, rv)		IP_VERSION_FULL(mj, mn, rv, 0, 0)
+#define IP_VERSION_MAJ(ver)		((ver) >> 24)
+#define IP_VERSION_MIN(ver)		(((ver) >> 16) & 0xFF)
+#define IP_VERSION_REV(ver)		(((ver) >> 8) & 0xFF)
+#define IP_VERSION_VARIANT(ver)		(((ver) >> 4) & 0xF)
+#define IP_VERSION_SUBREV(ver)		((ver) & 0xF)
+#define IP_VERSION_MAJ_MIN_REV(ver)	((ver) >> 8)
 
 struct amdgpu_direct_gma {
 	/* reserved in visible vram*/
@@ -802,8 +807,8 @@ struct amdgpu_mqd {
 
 #define AMDGPU_RESET_MAGIC_NUM 64
 #define AMDGPU_MAX_DF_PERFMONS 4
-#define AMDGPU_PRODUCT_NAME_LEN 64
 struct amdgpu_reset_domain;
+struct amdgpu_fru_info;
 
 /*
  * Non-zero (true) if the GPU has VRAM. Zero (false) otherwise.
@@ -1093,11 +1098,7 @@ struct amdgpu_device {
 
 	bool                            ucode_sysfs_en;
 
-	/* Chip product information */
-	char				product_number[20];
-	char				product_name[AMDGPU_PRODUCT_NAME_LEN];
-	char				serial[20];
-
+	struct amdgpu_fru_info		*fru_info;
 	atomic_t			throttling_logging_enabled;
 	struct ratelimit_state		throttling_logging_rs;
 	uint32_t                        ras_hw_enabled;
@@ -1147,7 +1148,10 @@ struct amdgpu_device {
 static inline uint32_t amdgpu_ip_version(const struct amdgpu_device *adev,
 					 uint8_t ip, uint8_t inst)
 {
-	return adev->ip_versions[ip][inst];
+	/* This considers only major/minor/rev and ignores
+	 * subrevision/variant fields.
+	 */
+	return adev->ip_versions[ip][inst] & ~0xFFU;
 }
 
 #ifdef CONFIG_DEV_COREDUMP
@@ -1356,14 +1360,12 @@ int emu_soc_asic_init(struct amdgpu_device *adev);
 	((adev)->asic_funcs->update_umd_stable_pstate ? (adev)->asic_funcs->update_umd_stable_pstate((adev), (enter)) : 0)
 #define amdgpu_asic_query_video_codecs(adev, e, c) (adev)->asic_funcs->query_video_codecs((adev), (e), (c))
 
-#define amdgpu_inc_vram_lost(adev) atomic_inc(&((adev)->vram_lost_counter));
+#define amdgpu_inc_vram_lost(adev) atomic_inc(&((adev)->vram_lost_counter))
 
 #define BIT_MASK_UPPER(i) ((i) >= BITS_PER_LONG ? 0 : ~0UL << (i))
 #define for_each_inst(i, inst_mask)        \
 	for (i = ffs(inst_mask); i-- != 0; \
 	     i = ffs(inst_mask & BIT_MASK_UPPER(i + 1)))
-
-#define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
 /* Common functions */
 bool amdgpu_device_has_job_running(struct amdgpu_device *adev);
@@ -1456,6 +1458,7 @@ void amdgpu_driver_postclose_kms(struct drm_device *dev,
 void amdgpu_driver_release_kms(struct drm_device *dev);
 
 int amdgpu_device_ip_suspend(struct amdgpu_device *adev);
+int amdgpu_device_prepare(struct drm_device *dev);
 int amdgpu_device_suspend(struct drm_device *dev, bool fbcon);
 int amdgpu_device_resume(struct drm_device *dev, bool fbcon);
 u32 amdgpu_get_vblank_counter_kms(struct drm_crtc *crtc);

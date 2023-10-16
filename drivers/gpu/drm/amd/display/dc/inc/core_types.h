@@ -307,6 +307,16 @@ struct dcn_fe_bandwidth {
 
 };
 
+/* Parameters needed to call set_disp_pattern_generator */
+struct test_pattern_params {
+	enum controller_dp_test_pattern test_pattern;
+	enum controller_dp_color_space color_space;
+	enum dc_color_depth color_depth;
+	int width;
+	int height;
+	int offset;
+};
+
 struct stream_resource {
 	struct output_pixel_processor *opp;
 	struct display_stream_compressor *dsc;
@@ -323,6 +333,8 @@ struct stream_resource {
 	 * otherwise it's using group number 'gsl_group-1'
 	 */
 	uint8_t gsl_group;
+
+	struct test_pattern_params test_pattern_params;
 };
 
 struct plane_resource {
@@ -366,6 +378,7 @@ union pipe_update_flags {
 		uint32_t plane_changed : 1;
 		uint32_t det_size : 1;
 		uint32_t unbounded_req : 1;
+		uint32_t test_pattern_changed : 1;
 	} bits;
 	uint32_t raw;
 };
@@ -490,6 +503,7 @@ union bw_output {
 struct bw_context {
 	union bw_output bw;
 	struct display_mode_lib dml;
+	struct dml2_context *dml2;
 };
 
 struct dc_dmub_cmd {
@@ -562,6 +576,17 @@ struct dc_state {
 	struct {
 		unsigned int stutter_period_us;
 	} perf_params;
+
+	struct {
+		/* used to temporarily backup plane states of a stream during
+		 * dc update. The reason is that plane states are overwritten
+		 * with surface updates in dc update. Once they are overwritten
+		 * current state is no longer valid. We want to temporarily
+		 * store current value in plane states so we can still recover
+		 * a valid current state during dc update.
+		 */
+		struct dc_plane_state plane_states[MAX_SURFACE_NUM];
+	} scratch;
 };
 
 struct replay_context {

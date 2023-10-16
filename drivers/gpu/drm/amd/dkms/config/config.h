@@ -187,6 +187,9 @@
    arg */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE 1
 
+/* drm_connector_helper_funcs->prepare_writeback_job is available */
+#define HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB 1
+
 /* drm_connector_init_with_ddc() is available */
 #define HAVE_DRM_CONNECTOR_INIT_WITH_DDC 1
 
@@ -538,6 +541,9 @@
 
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
+
+/* drm_writeback_connector_init() has 7 args */
+#define HAVE_DRM_WRITEBACK_CONNECTOR_INIT_7_ARGS 1
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1

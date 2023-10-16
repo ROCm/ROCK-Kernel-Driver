@@ -41,6 +41,7 @@
 #include "dpcd_defs.h"
 #include "link_enc_cfg.h"
 #include "link.h"
+#include "clk_mgr.h"
 #include "virtual/virtual_link_hwss.h"
 #include "link/hwss/link_hwss_dio.h"
 #include "link/hwss/link_hwss_dpia.h"
@@ -82,7 +83,11 @@
  */
 #define VISUAL_CONFIRM_DPP_OFFSET_DENO 240
 
+#define DC_LOGGER \
+	dc->ctx->logger
 #define DC_LOGGER_INIT(logger)
+
+#include "dml2/dml2_wrapper.h"
 
 #define UNABLE_TO_SPLIT -1
 
@@ -316,6 +321,10 @@ struct resource_pool *dc_create_resource_pool(struct dc  *dc,
 				res_pool->ref_clocks.xtalin_clock_inKhz;
 			res_pool->ref_clocks.dchub_ref_clock_inKhz =
 				res_pool->ref_clocks.xtalin_clock_inKhz;
+			if (res_pool->hubbub && res_pool->hubbub->funcs->get_dchub_ref_freq)
+				res_pool->hubbub->funcs->get_dchub_ref_freq(res_pool->hubbub,
+					res_pool->ref_clocks.dccg_ref_clock_inKhz,
+					&res_pool->ref_clocks.dchub_ref_clock_inKhz);
 		} else
 			ASSERT_CRITICAL(false);
 	}
@@ -943,7 +952,7 @@ static void adjust_recout_for_visual_confirm(struct rect *recout,
 	struct dc *dc = pipe_ctx->stream->ctx->dc;
 	int dpp_offset, base_offset;
 
-	if (dc->debug.visual_confirm == VISUAL_CONFIRM_DISABLE)
+	if (dc->debug.visual_confirm == VISUAL_CONFIRM_DISABLE || !pipe_ctx->plane_res.dpp)
 		return;
 
 	dpp_offset = pipe_ctx->stream->timing.v_addressable / VISUAL_CONFIRM_DPP_OFFSET_DENO;
@@ -1330,6 +1339,136 @@ static void calculate_inits_and_viewports(struct pipe_ctx *pipe_ctx)
 	ASSERT(src.x % vpc_div == 0 && src.y % vpc_div == 0);
 	data->viewport_c.x += src.x / vpc_div;
 	data->viewport_c.y += src.y / vpc_div;
+}
+
+static bool is_subvp_high_refresh_candidate(struct dc_stream_state *stream)
+{
+	uint32_t refresh_rate;
+	struct dc *dc = stream->ctx->dc;
+
+	refresh_rate = (stream->timing.pix_clk_100hz * (uint64_t)100 +
+		stream->timing.v_total * stream->timing.h_total - (uint64_t)1);
+	refresh_rate = div_u64(refresh_rate, stream->timing.v_total);
+	refresh_rate = div_u64(refresh_rate, stream->timing.h_total);
+
+	/* If there's any stream that fits the SubVP high refresh criteria,
+	 * we must return true. This is because cursor updates are asynchronous
+	 * with full updates, so we could transition into a SubVP config and
+	 * remain in HW cursor mode if there's no cursor update which will
+	 * then cause corruption.
+	 */
+	if ((refresh_rate >= 120 && refresh_rate <= 175 &&
+			stream->timing.v_addressable >= 1080 &&
+			stream->timing.v_addressable <= 2160) &&
+			(dc->current_state->stream_count > 1 ||
+			(dc->current_state->stream_count == 1 && !stream->allow_freesync)))
+		return true;
+
+	return false;
+}
+
+static enum controller_dp_test_pattern convert_dp_to_controller_test_pattern(
+				enum dp_test_pattern test_pattern)
+{
+	enum controller_dp_test_pattern controller_test_pattern;
+
+	switch (test_pattern) {
+	case DP_TEST_PATTERN_COLOR_SQUARES:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_COLORSQUARES;
+	break;
+	case DP_TEST_PATTERN_COLOR_SQUARES_CEA:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_COLORSQUARES_CEA;
+	break;
+	case DP_TEST_PATTERN_VERTICAL_BARS:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_VERTICALBARS;
+	break;
+	case DP_TEST_PATTERN_HORIZONTAL_BARS:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_HORIZONTALBARS;
+	break;
+	case DP_TEST_PATTERN_COLOR_RAMP:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_COLORRAMP;
+	break;
+	default:
+		controller_test_pattern =
+				CONTROLLER_DP_TEST_PATTERN_VIDEOMODE;
+	break;
+	}
+
+	return controller_test_pattern;
+}
+
+static enum controller_dp_color_space convert_dp_to_controller_color_space(
+		enum dp_test_pattern_color_space color_space)
+{
+	enum controller_dp_color_space controller_color_space;
+
+	switch (color_space) {
+	case DP_TEST_PATTERN_COLOR_SPACE_RGB:
+		controller_color_space = CONTROLLER_DP_COLOR_SPACE_RGB;
+		break;
+	case DP_TEST_PATTERN_COLOR_SPACE_YCBCR601:
+		controller_color_space = CONTROLLER_DP_COLOR_SPACE_YCBCR601;
+		break;
+	case DP_TEST_PATTERN_COLOR_SPACE_YCBCR709:
+		controller_color_space = CONTROLLER_DP_COLOR_SPACE_YCBCR709;
+		break;
+	case DP_TEST_PATTERN_COLOR_SPACE_UNDEFINED:
+	default:
+		controller_color_space = CONTROLLER_DP_COLOR_SPACE_UDEFINED;
+		break;
+	}
+
+	return controller_color_space;
+}
+
+void resource_build_test_pattern_params(struct resource_context *res_ctx,
+				struct pipe_ctx *otg_master)
+{
+	int odm_slice_width, last_odm_slice_width, offset = 0;
+	struct pipe_ctx *opp_heads[MAX_PIPES];
+	struct test_pattern_params *params;
+	int odm_cnt = 1;
+	enum controller_dp_test_pattern controller_test_pattern;
+	enum controller_dp_color_space controller_color_space;
+	enum dc_color_depth color_depth = otg_master->stream->timing.display_color_depth;
+	int h_active = otg_master->stream->timing.h_addressable +
+		otg_master->stream->timing.h_border_left +
+		otg_master->stream->timing.h_border_right;
+	int v_active = otg_master->stream->timing.v_addressable +
+		otg_master->stream->timing.v_border_bottom +
+		otg_master->stream->timing.v_border_top;
+	int i;
+
+	controller_test_pattern = convert_dp_to_controller_test_pattern(
+			otg_master->stream->test_pattern.type);
+	controller_color_space = convert_dp_to_controller_color_space(
+			otg_master->stream->test_pattern.color_space);
+
+	odm_cnt = resource_get_opp_heads_for_otg_master(otg_master, res_ctx, opp_heads);
+
+	odm_slice_width = h_active / odm_cnt;
+	last_odm_slice_width = h_active - odm_slice_width * (odm_cnt - 1);
+
+	for (i = 0; i < odm_cnt; i++) {
+		params = &opp_heads[i]->stream_res.test_pattern_params;
+		params->test_pattern = controller_test_pattern;
+		params->color_space = controller_color_space;
+		params->color_depth = color_depth;
+		params->height = v_active;
+		params->offset = offset;
+
+		if (i < odm_cnt - 1)
+			params->width = odm_slice_width;
+		else
+			params->width = last_odm_slice_width;
+
+		offset += odm_slice_width;
+	}
 }
 
 bool resource_build_scaling_params(struct pipe_ctx *pipe_ctx)
@@ -1805,6 +1944,20 @@ struct pipe_ctx *resource_get_opp_head(const struct pipe_ctx *pipe_ctx)
 	return opp_head;
 }
 
+struct pipe_ctx *resource_get_primary_dpp_pipe(const struct pipe_ctx *dpp_pipe)
+{
+	struct pipe_ctx *pri_dpp_pipe = (struct pipe_ctx *) dpp_pipe;
+
+	ASSERT(resource_is_pipe_type(dpp_pipe, DPP_PIPE));
+	while (pri_dpp_pipe->prev_odm_pipe)
+		pri_dpp_pipe = pri_dpp_pipe->prev_odm_pipe;
+	while (pri_dpp_pipe->top_pipe &&
+			pri_dpp_pipe->top_pipe->plane_state == pri_dpp_pipe->plane_state)
+		pri_dpp_pipe = pri_dpp_pipe->top_pipe;
+	return pri_dpp_pipe;
+}
+
+
 int resource_get_mpc_slice_index(const struct pipe_ctx *pipe_ctx)
 {
 	struct pipe_ctx *split_pipe = pipe_ctx->top_pipe;
@@ -1908,6 +2061,29 @@ bool resource_is_pipe_topology_changed(const struct dc_state *state_a,
 			return true;
 		}
 	}
+	return false;
+}
+
+bool resource_is_odm_topology_changed(const struct pipe_ctx *otg_master_a,
+		const struct pipe_ctx *otg_master_b)
+{
+	const struct pipe_ctx *opp_head_a = otg_master_a;
+	const struct pipe_ctx *opp_head_b = otg_master_b;
+
+	if (!resource_is_pipe_type(otg_master_a, OTG_MASTER) ||
+			!resource_is_pipe_type(otg_master_b, OTG_MASTER))
+		return true;
+
+	while (opp_head_a && opp_head_b) {
+		if (opp_head_a->stream_res.opp != opp_head_b->stream_res.opp)
+			return true;
+		if ((opp_head_a->next_odm_pipe && !opp_head_b->next_odm_pipe) ||
+				(!opp_head_a->next_odm_pipe && opp_head_b->next_odm_pipe))
+			return true;
+		opp_head_a = opp_head_a->next_odm_pipe;
+		opp_head_b = opp_head_b->next_odm_pipe;
+	}
+
 	return false;
 }
 
@@ -2873,6 +3049,15 @@ bool dc_remove_plane_from_context(
 		stream_status->plane_states[i] = stream_status->plane_states[i + 1];
 
 	stream_status->plane_states[stream_status->plane_count] = NULL;
+
+	if (stream_status->plane_count == 0 && dc->config.enable_windowed_mpo_odm)
+		/* ODM combine could prevent us from supporting more planes
+		 * we will reset ODM slice count back to 1 when all planes have
+		 * been removed to maximize the amount of planes supported when
+		 * new planes are added.
+		 */
+		resource_update_pipes_for_stream_with_slice_count(
+				context, dc->current_state, dc->res_pool, stream, 1);
 
 	return true;
 }
@@ -4302,6 +4487,18 @@ void dc_resource_state_destruct(struct dc_state *context)
 		context->streams[i] = NULL;
 	}
 	context->stream_count = 0;
+	context->stream_mask = 0;
+	memset(&context->res_ctx, 0, sizeof(context->res_ctx));
+	memset(&context->pp_display_cfg, 0, sizeof(context->pp_display_cfg));
+	memset(&context->dcn_bw_vars, 0, sizeof(context->dcn_bw_vars));
+	context->clk_mgr = NULL;
+	memset(&context->bw_ctx.bw, 0, sizeof(context->bw_ctx.bw));
+	memset(context->block_sequence, 0, sizeof(context->block_sequence));
+	context->block_sequence_steps = 0;
+	memset(context->dc_dmub_cmd, 0, sizeof(context->dc_dmub_cmd));
+	context->dmub_cmd_count = 0;
+	memset(&context->perf_params, 0, sizeof(context->perf_params));
+	memset(&context->scratch, 0, sizeof(context->scratch));
 }
 
 void dc_resource_state_copy_construct(
@@ -4310,8 +4507,21 @@ void dc_resource_state_copy_construct(
 {
 	int i, j;
 	struct kref refcount = dst_ctx->refcount;
+#ifdef CONFIG_DRM_AMD_DC_FP
+	struct dml2_context *dml2 = NULL;
+
+	// Need to preserve allocated dml2 context
+	if (src_ctx->clk_mgr->ctx->dc->debug.using_dml2)
+		dml2 = dst_ctx->bw_ctx.dml2;
+#endif
 
 	*dst_ctx = *src_ctx;
+
+#ifdef CONFIG_DRM_AMD_DC_FP
+	// Preserve allocated dml2 context
+	if (src_ctx->clk_mgr->ctx->dc->debug.using_dml2)
+		dst_ctx->bw_ctx.dml2 = dml2;
+#endif
 
 	for (i = 0; i < MAX_PIPES; i++) {
 		struct pipe_ctx *cur_pipe = &dst_ctx->res_ctx.pipe_ctx[i];
@@ -5053,3 +5263,16 @@ enum dc_status update_dp_encoder_resources_for_test_harness(const struct dc *dc,
 	return DC_OK;
 }
 
+bool check_subvp_sw_cursor_fallback_req(const struct dc *dc, struct dc_stream_state *stream)
+{
+	if (!dc->debug.disable_subvp_high_refresh && is_subvp_high_refresh_candidate(stream))
+		return true;
+	if (dc->current_state->stream_count == 1 && stream->timing.v_addressable >= 2880 &&
+			((stream->timing.pix_clk_100hz * 100) / stream->timing.v_total / stream->timing.h_total) < 120)
+		return true;
+	else if (dc->current_state->stream_count > 1 && stream->timing.v_addressable >= 2160 &&
+			((stream->timing.pix_clk_100hz * 100) / stream->timing.v_total / stream->timing.h_total) < 120)
+		return true;
+
+	return false;
+}

@@ -29,8 +29,6 @@
 #include "soc15_common.h"
 #include "vpe_v6_1.h"
 
-#define VPE_FW_NAME_LEN		64
-
 #define AMDGPU_CSA_VPE_SIZE 	64
 /* VPE CSA resides in the 4th page of CSA */
 #define AMDGPU_CSA_VPE_OFFSET 	(4096 * 3)
@@ -52,8 +50,7 @@ int amdgpu_vpe_init_microcode(struct amdgpu_vpe *vpe)
 {
 	struct amdgpu_device *adev = vpe->ring.adev;
 	const struct vpe_firmware_header_v1_0 *vpe_hdr;
-	char fw_name[VPE_FW_NAME_LEN];
-	char fw_prefix[VPE_FW_NAME_LEN];
+	char fw_prefix[32], fw_name[64];
 	int ret;
 
 	amdgpu_ucode_ip_version_decode(adev, VPE_HWIP, fw_prefix, sizeof(fw_prefix));
@@ -243,26 +240,12 @@ static void vpe_ring_insert_nop(struct amdgpu_ring *ring, uint32_t count)
 {
 	int i;
 
-	amdgpu_ring_write(ring, ring->funcs->nop |
+	for (i = 0; i < count; i++)
+		if (i == 0)
+			amdgpu_ring_write(ring, ring->funcs->nop |
 				VPE_CMD_NOP_HEADER_COUNT(count - 1));
-
-	for (i = 0; i < count - 1; i++)
-		amdgpu_ring_write(ring, 0);
-}
-
-static void vpe_ring_pad_ib(struct amdgpu_ring *ring, struct amdgpu_ib *ib)
-{
-	uint32_t pad_count;
-	int i;
-
-	pad_count = (-ib->length_dw) & 0x7;
-
-	ib->ptr[ib->length_dw++] = ring->funcs->nop |
-				   VPE_CMD_NOP_HEADER_COUNT(pad_count - 1);
-
-	for (i = 0; i < pad_count - 1; i++)
-		ib->ptr[ib->length_dw++] = 0;
-
+		else
+			amdgpu_ring_write(ring, ring->funcs->nop);
 }
 
 static uint64_t vpe_get_csa_mc_addr(struct amdgpu_ring *ring, uint32_t vmid)
@@ -271,7 +254,7 @@ static uint64_t vpe_get_csa_mc_addr(struct amdgpu_ring *ring, uint32_t vmid)
 	uint32_t index = 0;
 	uint64_t csa_mc_addr;
 
-	if (amdgpu_sriov_vf(adev) || vmid == 0 || !amdgpu_mcbp)
+	if (amdgpu_sriov_vf(adev) || vmid == 0 || !adev->gfx.mcbp)
 		return 0;
 
 	csa_mc_addr = amdgpu_csa_vaddr(adev) + AMDGPU_CSA_VPE_OFFSET +
@@ -287,9 +270,6 @@ static void vpe_ring_emit_ib(struct amdgpu_ring *ring,
 {
 	uint32_t vmid = AMDGPU_JOB_GET_VMID(job);
 	uint64_t csa_mc_addr = vpe_get_csa_mc_addr(ring, vmid);
-
-	/* IB packet must end on a 8 DW boundary */
-	vpe_ring_insert_nop(ring, (2 - lower_32_bits(ring->wptr)) & 7);
 
 	amdgpu_ring_write(ring, VPE_CMD_HEADER(VPE_CMD_OPCODE_INDIRECT, 0) |
 				VPE_CMD_INDIRECT_HEADER_VMID(vmid & 0xf));
@@ -639,7 +619,7 @@ static const struct amdgpu_ring_funcs vpe_ring_funcs = {
 	.emit_reg_wait = vpe_ring_emit_reg_wait,
 	.emit_reg_write_reg_wait = amdgpu_ring_emit_reg_write_reg_wait_helper,
 	.insert_nop = vpe_ring_insert_nop,
-	.pad_ib = vpe_ring_pad_ib,
+	.pad_ib = amdgpu_ring_generic_pad_ib,
 	.test_ring = vpe_ring_test_ring,
 	.test_ib = vpe_ring_test_ib,
 	.init_cond_exec = vpe_ring_init_cond_exec,

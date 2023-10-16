@@ -49,7 +49,7 @@
 #include "dcn20/dcn20_dpp.h"
 #include "dcn20/dcn20_optc.h"
 #include "dcn21/dcn21_hwseq.h"
-#include "dce110/dce110_hw_sequencer.h"
+#include "dce110/dce110_hwseq.h"
 #include "dcn20/dcn20_opp.h"
 #include "dcn20/dcn20_dsc.h"
 #include "dcn21/dcn21_link_encoder.h"
@@ -953,9 +953,17 @@ static bool dcn21_validate_bandwidth(struct dc *dc, struct dc_state *context,
 		bool fast_validate)
 {
 	bool voltage_supported;
+	display_e2e_pipe_params_st *pipes;
+
+	pipes = kcalloc(dc->res_pool->pipe_count, sizeof(display_e2e_pipe_params_st), GFP_KERNEL);
+	if (!pipes)
+		return false;
+
 	DC_FP_START();
-	voltage_supported = dcn21_validate_bandwidth_fp(dc, context, fast_validate);
+	voltage_supported = dcn21_validate_bandwidth_fp(dc, context, fast_validate, pipes);
 	DC_FP_END();
+
+	kfree(pipes);
 	return voltage_supported;
 }
 
