@@ -255,12 +255,6 @@
 /* struct drm_device has pdev member */
 /* #undef HAVE_DRM_DEVICE_PDEV */
 
-/* drm_dev_put() is available */
-#define HAVE_DRM_DEV_PUT 1
-
-/* drm_dev_unplug() is available */
-#define HAVE_DRM_DEV_UNPLUG 1
-
 /* Define to 1 if you have the <drm/display/drm_dp.h> header file. */
 #define HAVE_DRM_DISPLAY_DRM_DP_H 1
 
@@ -425,9 +419,6 @@
 /* drm_dp_send_real_edid_checksum() is available */
 #define HAVE_DRM_DP_SEND_REAL_EDID_CHECKSUM 1
 
-/* drm_dp_start_crc() is available */
-#define HAVE_DRM_DP_START_CRC 1
-
 /* drm_dp_update_payload_part1() function has start_slot argument */
 /* #undef HAVE_DRM_DP_UPDATE_PAYLOAD_PART1_START_SLOT_ARG */
 
@@ -549,6 +540,9 @@
 /* drm_gem_plane_helper_prepare_fb() is available */
 #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
 
+/* drm_gem_prime_handle_to_fd() is available */
+/* #undef HAVE_DRM_GEM_PRIME_HANDLE_TO_FD */
+
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
 
@@ -651,9 +645,6 @@
 
 /* fs_reclaim_acquire() is available */
 #define HAVE_FS_RECLAIM_ACQUIRE 1
-
-/* drm_driver->gem_free_object_unlocked() is available */
-/* #undef HAVE_GEM_FREE_OBJECT_UNLOCKED_IN_DRM_DRIVER */
 
 /* generic_handle_domain_irq() is available */
 #define HAVE_GENERIC_HANDLE_DOMAIN_IRQ 1
@@ -961,12 +952,6 @@
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
-/* drm_driver->set_busid is available */
-/* #undef HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER */
-
-/* whether si_mem_available() is available */
-#define HAVE_SI_MEM_AVAILABLE 1
-
 /* smca_get_bank_type(x) is available */
 /* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
 
@@ -1011,9 +996,6 @@
 
 /* drm_gem_open_object is defined in struct drm_drv */
 /* #undef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
-
-/* drm_pending_vblank_event->sequence is available */
-#define HAVE_STRUCT_DRM_PENDING_VBLANK_EVENT_SEQUENCE 1
 
 /* drm_plane_helper_funcs->atomic_check() second param wants drm_atomic_state
    arg */
