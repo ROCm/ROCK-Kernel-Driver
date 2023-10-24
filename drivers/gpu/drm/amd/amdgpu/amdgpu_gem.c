@@ -216,10 +216,10 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 			}
 		}
 
-		if (aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
+		if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
 			atomic64_sub(amdgpu_bo_size(aobj),
 				     &adev->direct_gma.vram_usage);
-		else if (aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
+		else if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA_IMPORT)
 			atomic64_sub(amdgpu_bo_size(aobj),
 				     &adev->direct_gma.gart_usage);
 
