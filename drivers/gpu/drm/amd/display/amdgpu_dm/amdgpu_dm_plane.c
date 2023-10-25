@@ -350,13 +350,13 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 {
 	int ret;
 
-	fill_gfx9_tiling_info_from_device(adev, tiling_info);
+	amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(adev, tiling_info);
 
 	tiling_info->gfx9.swizzle =
 		AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
 
 	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags, force_disable_dcc);
-	ret = validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
+	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
 	if (ret)
 		return ret;
 
