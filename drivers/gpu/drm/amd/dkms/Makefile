@@ -179,6 +179,7 @@ subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
 subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
+subdir-ccflags-y += -Wno-error
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_AMDKCL_HMM_MIRROR_ENABLED),y)
 ifdef CONFIG_DEVICE_PRIVATE
