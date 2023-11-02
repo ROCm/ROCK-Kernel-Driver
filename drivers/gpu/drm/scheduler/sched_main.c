@@ -335,10 +335,10 @@ drm_sched_rq_select_entity_fifo(struct drm_gpu_scheduler *sched,
 }
 
 /**
- * drm_sched_run_job_queue - enqueue run-job work
+ * __drm_sched_run_job_queue - enqueue run-job work
  * @sched: scheduler instance
  */
-static void drm_sched_run_job_queue(struct drm_gpu_scheduler *sched)
+static void __drm_sched_run_job_queue(struct drm_gpu_scheduler *sched)
 {
 	if (!READ_ONCE(sched->pause_submit))
 		queue_work(sched->submit_wq, &sched->work_run_job);
@@ -1013,7 +1013,7 @@ void drm_sched_wakeup(struct drm_gpu_scheduler *sched,
 		      struct drm_sched_entity *entity)
 {
 	if (drm_sched_can_queue(sched, entity))
-		drm_sched_run_job_queue(sched);
+		__drm_sched_run_job_queue(sched);
 }
 
 /**
@@ -1128,13 +1128,13 @@ drm_sched_pick_best(struct drm_gpu_scheduler **sched_list,
 EXPORT_SYMBOL(drm_sched_pick_best);
 
 /**
- * drm_sched_run_job_queue_if_ready - enqueue run-job work if ready
+ * drm_sched_run_job_queue - enqueue run-job work if there are ready entities
  * @sched: scheduler instance
  */
-static void drm_sched_run_job_queue_if_ready(struct drm_gpu_scheduler *sched)
+static void drm_sched_run_job_queue(struct drm_gpu_scheduler *sched)
 {
 	if (drm_sched_select_entity(sched))
-		drm_sched_run_job_queue(sched);
+		__drm_sched_run_job_queue(sched);
 }
 
 /**
@@ -1156,7 +1156,7 @@ static void drm_sched_free_job_work(struct work_struct *w)
 		sched->ops->free_job(cleanup_job);
 
 		drm_sched_run_free_queue(sched);
-		drm_sched_run_job_queue_if_ready(sched);
+		drm_sched_run_job_queue(sched);
 	}
 }
 
@@ -1216,7 +1216,7 @@ static void drm_sched_run_job_work(struct work_struct *w)
 	}
 
 	wake_up(&sched->job_scheduled);
-	drm_sched_run_job_queue_if_ready(sched);
+	drm_sched_run_job_queue(sched);
 }
 
 /**
