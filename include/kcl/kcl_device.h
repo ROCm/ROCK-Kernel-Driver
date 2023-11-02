@@ -60,4 +60,12 @@ static inline void dev_pm_set_driver_flags(struct device *dev, u32 flags)
 }
 #endif
 
+#ifndef HAVE_DEV_IS_REMOVABLE
+static inline bool _kcl_dev_is_removable(struct device *dev)
+{
+	return false;
+}
+#define dev_is_removable _kcl_dev_is_removable
+#endif
+
 #endif /* AMDKCL_DEVICE_H */
