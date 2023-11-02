@@ -94,11 +94,8 @@
 /* MEMORY_DEVICE_COHERENT is availablea */
 #define HAVE_DEVICE_COHERENT 1
 
-/* devm_memremap_pages() wants struct dev_pagemap */
-#define HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP 1
-
-/* devm_memremap_pages() wants p,p,p,p interface */
-/* #undef HAVE_DEVM_MEMREMAP_PAGES_P_P_P_P */
+/* dev_is_removable() is available */
+#define HAVE_DEV_IS_REMOVABLE 1
 
 /* dev_pagemap->owner is available */
 #define HAVE_DEV_PAGEMAP_OWNER 1
