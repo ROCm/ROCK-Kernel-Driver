@@ -447,11 +447,11 @@ int amdgpu_amdkfd_bo_validate_and_fence(struct amdgpu_bo *bo,
 	if (ret)
 		goto unreserve_out;
 
-	ret = dma_resv_reserve_fences(bo->tbo.base.resv, 1);
+	ret = dma_resv_reserve_fences(amdkcl_ttm_resvp(&bo->tbo), 1);
 	if (ret)
 		goto unreserve_out;
 
-	dma_resv_add_fence(bo->tbo.base.resv, fence,
+	dma_resv_add_fence(amdkcl_ttm_resvp(&bo->tbo), fence,
 			   DMA_RESV_USAGE_BOOKKEEP);
 
 unreserve_out:
