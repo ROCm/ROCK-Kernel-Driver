@@ -2494,19 +2494,6 @@ int smu_v13_0_update_pcie_parameters(struct smu_context *smu,
 	return 0;
 }
 
-int smu_v13_0_disable_pmfw_state(struct smu_context *smu)
-{
-	int ret;
-	struct amdgpu_device *adev = smu->adev;
-
-	WREG32_PCIE(MP1_Public | (smnMP1_FIRMWARE_FLAGS & 0xffffffff), 0);
-
-	ret = RREG32_PCIE(MP1_Public |
-					   (smnMP1_FIRMWARE_FLAGS & 0xffffffff));
-
-	return ret == 0 ? 0 : -EINVAL;
-}
-
 int smu_v13_0_enable_uclk_shadow(struct smu_context *smu, bool enable)
 {
 	return smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_EnableUCLKShadow, enable, NULL);
