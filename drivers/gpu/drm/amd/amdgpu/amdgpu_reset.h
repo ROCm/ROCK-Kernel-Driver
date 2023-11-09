@@ -98,6 +98,8 @@ struct amdgpu_reset_domain {
 	struct rw_semaphore sem;
 	atomic_t in_gpu_reset;
 	atomic_t reset_res;
+	struct work_struct clear;
+	bool drain;
 };
 
 int amdgpu_reset_init(struct amdgpu_device *adev);
@@ -134,6 +136,20 @@ static inline bool amdgpu_reset_domain_schedule(struct amdgpu_reset_domain *doma
 						struct work_struct *work)
 {
 	return queue_work(domain->wq, work);
+}
+
+static inline void amdgpu_reset_domain_clear_pending(struct amdgpu_reset_domain *domain)
+{
+	domain->drain = true;
+	/* queue one more work to the domain queue. Till this work is finished,
+	 * domain is in drain mode.
+	 */
+	queue_work(domain->wq, &domain->clear);
+}
+
+static inline bool amdgpu_reset_domain_in_drain_mode(struct amdgpu_reset_domain *domain)
+{
+	return domain->drain;
 }
 
 void amdgpu_device_lock_reset_domain(struct amdgpu_reset_domain *reset_domain);

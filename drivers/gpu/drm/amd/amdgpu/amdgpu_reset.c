@@ -119,6 +119,14 @@ void amdgpu_reset_destroy_reset_domain(struct kref *ref)
 	kvfree(reset_domain);
 }
 
+static void amdgpu_reset_domain_cancel_all_work(struct work_struct *work)
+{
+	struct amdgpu_reset_domain *reset_domain =
+		container_of(work, struct amdgpu_reset_domain, clear);
+
+	reset_domain->drain = false;
+}
+
 struct amdgpu_reset_domain *amdgpu_reset_create_reset_domain(enum amdgpu_reset_domain_type type,
 							     char *wq_name)
 {
@@ -141,6 +149,7 @@ struct amdgpu_reset_domain *amdgpu_reset_create_reset_domain(enum amdgpu_reset_d
 
 	}
 
+	INIT_WORK(&reset_domain->clear, amdgpu_reset_domain_cancel_all_work);
 	atomic_set(&reset_domain->in_gpu_reset, 0);
 	atomic_set(&reset_domain->reset_res, 0);
 	init_rwsem(&reset_domain->sem);

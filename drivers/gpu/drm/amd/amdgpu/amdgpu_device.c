@@ -5666,6 +5666,8 @@ static inline void amdgpu_device_stop_pending_resets(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
+	amdgpu_reset_domain_clear_pending(adev->reset_domain);
+
 #if defined(CONFIG_DEBUG_FS)
 	if (!amdgpu_sriov_vf(adev))
 		cancel_work(&adev->reset_work);
@@ -5723,6 +5725,9 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	bool need_emergency_restart = false;
 	bool audio_suspended = false;
 	int retry_limit = AMDGPU_MAX_RETRY_LIMIT;
+
+	if (amdgpu_reset_domain_in_drain_mode(adev->reset_domain))
+		return 0;
 
 	/*
 	 * Special case: RAS triggered and full reset isn't supported
