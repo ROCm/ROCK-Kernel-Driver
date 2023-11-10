@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_READ_DPCD_CAPS], [
 			#include <drm/drm_dp_helper.h>
 		], [
 			drm_dp_read_dpcd_caps(NULL, NULL);
-		], [drm_dp_read_dpcd_caps], [drivers/gpu/drm/display/drm_dp_helper.c], [
+		], [drm_dp_read_dpcd_caps], [drivers/gpu/drm/display/drm_dp_helper.c drivers/gpu/drm/drm_dp_helper.c], [
 			AC_DEFINE(HAVE_DRM_DP_READ_DPCD_CAPS, 1,
 				[drm_dp_read_dpcd_caps() is available])
 		])
