@@ -108,6 +108,7 @@
 #include "amdgpu_smuio.h"
 #include "amdgpu_fdinfo.h"
 #include "amdgpu_mca.h"
+#include "amdgpu_aca.h"
 #include "amdgpu_ras.h"
 #include "amdgpu_xcp.h"
 #include "amdgpu_seq64.h"
@@ -1068,6 +1069,9 @@ struct amdgpu_device {
 
 	/* MCA */
 	struct amdgpu_mca               mca;
+
+	/* ACA */
+	struct amdgpu_aca		aca;
 
 	struct amdgpu_ip_block          ip_blocks[AMDGPU_MAX_IP_NUM];
 	uint32_t		        harvest_ip_mask;
