@@ -3125,6 +3125,7 @@ static int allow_edp_hotplug_detection_set(void *data, u64 val)
 	return 0;
 }
 
+#if defined(DEFINE_DEBUGFS_ATTRIBUTE)
 /* check if kernel disallow eDP enter psr state
  * cat /sys/kernel/debug/dri/0/eDP-X/disallow_edp_enter_psr
  * 0: allow edp enter psr; 1: disallow
@@ -3250,7 +3251,7 @@ static int dmub_trace_mask_show(void *data, u64 *val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(dmub_trace_mask_fops, dmub_trace_mask_show,
 			 dmub_trace_mask_set, "0x%llx\n");
-
+#endif
 /*
  * Set dmcub trace event IRQ enable or disable.
  * Usage to enable dmcub trace event IRQ: echo 1 > /sys/kernel/debug/dri/0/amdgpu_dm_dmcub_trace_event_en
