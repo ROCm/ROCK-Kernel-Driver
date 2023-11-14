@@ -2400,7 +2400,7 @@ static void mca_bank_entry_info_decode(struct mca_bank_entry *entry, struct mca_
 	instidhi = REG_GET_FIELD(ipid, MCMP1_IPIDT0, InstanceIdHi);
 	instid = REG_GET_FIELD(ipid, MCMP1_IPIDT0, InstanceIdLo);
 	info->aid = ((instidhi >> 2) & 0x03);
-	info->socket_id = ((instid & 0x1) << 4) | (instidhi & 0x03);
+	info->socket_id = ((instid & 0x1) << 2) | (instidhi & 0x03);
 }
 
 static int mca_bank_read_reg(struct amdgpu_device *adev, enum amdgpu_mca_error_type type,
