@@ -490,6 +490,8 @@ static const struct file_operations mca_ue_dump_debug_fops = {
 
 #ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(mca_debug_mode_fops, NULL, amdgpu_mca_smu_debug_mode_set, "%llu\n");
+#else
+DEFINE_SIMPLE_ATTRIBUTE(mca_debug_mode_fops, NULL, amdgpu_mca_smu_debug_mode_set, "%llu\n");
 #endif
 #endif
 
@@ -499,9 +501,7 @@ void amdgpu_mca_smu_debugfs_init(struct amdgpu_device *adev, struct dentry *root
 	if (!root || amdgpu_ip_version(adev, MP1_HWIP, 0) != IP_VERSION(13, 0, 6))
 		return;
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file("mca_debug_mode", 0200, root, adev, &mca_debug_mode_fops);
-#endif
 	debugfs_create_file("mca_ue_dump", 0400, root, adev, &mca_ue_dump_debug_fops);
 	debugfs_create_file("mca_ce_dump", 0400, root, adev, &mca_ce_dump_debug_fops);
 #endif
