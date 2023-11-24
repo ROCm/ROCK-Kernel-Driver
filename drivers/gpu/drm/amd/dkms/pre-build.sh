@@ -65,7 +65,11 @@ ln -s $DKMS_TREE/$MODULE/$MODULE_VERSION/build $MODULE_BUILD_DIR
 # Enable gcc-toolset for kernels that are built with non-default compiler
 if [[ -d /opt/rh ]]; then
 	for f in $(find /opt/rh -type f -a -name gcc); do
-		if strings /boot/vmlinuz-$KERNELVER | grep -q "$($f --version | head -1)"; then
+		[[ -f /boot/config-$KERNELVER ]] || continue
+		config_gcc_version=$(. /boot/config-$KERNELVER && echo $CONFIG_GCC_VERSION)
+		IFS='.' read -ra ver <<<$($f -dumpfullversion)
+		gcc_version=$(printf "%d%02d%02d\n" ${ver[@]})
+		if [[ "$config_gcc_version" = "$gcc_version" ]]; then
 			. ${f%/*}/../../../enable
 			break
 		fi
