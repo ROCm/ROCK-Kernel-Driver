@@ -45,4 +45,25 @@ static inline bool dma_fence_is_container(struct dma_fence *fence)
 
 #endif /* HAVE_DMA_FENCE_IS_CONTAINER */
 
+#ifndef HAVE_DMA_FENCE_TIMESTAMP
+/**
+ * dma_fence_timestamp - helper to get the completion timestamp of a fence
+ * @fence: fence to get the timestamp from.
+ *
+ * After a fence is signaled the timestamp is updated with the signaling time,
+ * but setting the timestamp can race with tasks waiting for the signaling. This
+ * helper busy waits for the correct timestamp to appear.
+ */
+static inline ktime_t dma_fence_timestamp(struct dma_fence *fence)
+{
+        if (WARN_ON(!test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)))
+                return ktime_get();
+
+        while (!test_bit(DMA_FENCE_FLAG_TIMESTAMP_BIT, &fence->flags))
+                cpu_relax();
+
+        return fence->timestamp;
+}
+#endif
+
 #endif
