@@ -2294,8 +2294,9 @@ static int smu_v13_0_6_post_init(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
 
+	/* enable MCA debug on APU device */
 	if (!amdgpu_sriov_vf(adev) && adev->ras_enabled)
-		return smu_v13_0_6_mca_set_debug_mode(smu, false);
+		return smu_v13_0_6_mca_set_debug_mode(smu, !!(adev->flags & AMD_IS_APU));
 
 	return 0;
 }
