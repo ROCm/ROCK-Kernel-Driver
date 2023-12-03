@@ -32,3 +32,22 @@ AC_DEFUN([AC_AMDGPU_VM_FLAGS_SET], [
 		])
 	])
 ])
+
+dnl #
+dnl # v6.5-rc4-265-g11250fd12eb8
+dnl # mm: factor out VMA stack and heap checks
+dnl #
+AC_DEFUN([AC_AMDGPU_VMA_IS_INITIAL], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <linux/mm.h>
+		], [
+			vma_is_initial_heap(NULL);
+			vma_is_initial_stack(NULL);
+		], [
+			AC_DEFINE(HAVE_VMA_IS_INITIAL_HEAP, 1,
+				[vma_is_initial_{heap, stack}  is available])
+		])
+	])
+])
+
