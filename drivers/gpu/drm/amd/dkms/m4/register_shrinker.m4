@@ -17,3 +17,25 @@ AC_DEFUN([AC_AMDGPU_REGISTER_SHRINKER], [
 		])	
 	])
 ])
+
+dnl #
+dnl # commit: v6.6-rc4-53-gc42d50aefd17
+dnl # mm: shrinker: add infrastructure for dynamically allocating shrinker
+dnl # 
+AC_DEFUN([AC_AMDGPU_SHRINKER_REGISTER], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE_SYMBOL([
+                        #include <linux/shrinker.h>
+                ], [
+                        shrinker_register(NULL);
+                ], [shrinker_register], [mm/shrinker.c], [
+                        AC_DEFINE(HAVE_SHRINKER_REGISTER, 1,
+                                [shrinker_register() is available])
+                ])
+        ])
+])
+
+AC_DEFUN([AC_AMDGPU_SHRINKER], [
+		AC_AMDGPU_REGISTER_SHRINKER
+		AC_AMDGPU_SHRINKER_REGISTER
+])

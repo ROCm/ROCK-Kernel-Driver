@@ -7,6 +7,7 @@
 extern void synchronize_shrinkers(void);
 #endif
 
+#ifndef HAVE_SHRINKER_REGISTER
 static inline int __printf(2, 3) kcl_register_shrinker(struct shrinker *shrinker,
                                             const char *fmt, ...)
 {
@@ -16,5 +17,6 @@ static inline int __printf(2, 3) kcl_register_shrinker(struct shrinker *shrinker
         return register_shrinker(shrinker);
 #endif
 }
+#endif
 
 #endif
