@@ -2404,7 +2404,11 @@ static int kfd_cpumask_to_apic_id(const struct cpumask *cpumask)
 	if (first_cpu_of_numa_node >= nr_cpu_ids)
 		return -1;
 #ifdef CONFIG_X86_64
+#ifdef HAVE_CPUINFO_TOPOLOGY_IN_CPUINFO_X86_STRUCT
 	return cpu_data(first_cpu_of_numa_node).topo.apicid;
+#else
+	return cpu_data(first_cpu_of_numa_node).apicid;
+#endif
 #else
 	return first_cpu_of_numa_node;
 #endif
