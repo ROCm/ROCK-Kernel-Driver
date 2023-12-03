@@ -192,7 +192,11 @@ struct smu10_clock_voltage_dependency_record {
 
 struct smu10_voltage_dependency_table {
 	uint32_t count;
-	struct smu10_clock_voltage_dependency_record entries[] __counted_by(count);
+	struct smu10_clock_voltage_dependency_record entries[]
+#ifdef __counted_by
+		__counted_by(count)
+#endif
+		;
 };
 
 struct smu10_clock_voltage_information {
