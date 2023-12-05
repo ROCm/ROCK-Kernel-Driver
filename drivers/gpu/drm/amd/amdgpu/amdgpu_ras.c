@@ -4589,7 +4589,11 @@ static struct ras_err_node *amdgpu_ras_error_node_new(void)
 	return err_node;
 }
 
+#ifdef HAVE_LIST_CMP_FUNC_IS_CONST_PARAM
 static int ras_err_info_cmp(void *priv, const struct list_head *a, const struct list_head *b)
+#else
+static int ras_err_info_cmp(void *priv, struct list_head *a, struct list_head *b)
+#endif
 {
 	struct ras_err_node *nodea = container_of(a, struct ras_err_node, node);
 	struct ras_err_node *nodeb = container_of(b, struct ras_err_node, node);
