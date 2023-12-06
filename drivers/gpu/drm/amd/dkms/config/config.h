@@ -35,7 +35,7 @@
 #define HAVE_AMDKCL_HMM_MIRROR_ENABLED 1
 
 /* amd_iommu_invalidate_ctx take arg type of pasid as u32 */
-#define HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 1
+/* #undef HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 */
 
 /* amd_iommu_pc_get_max_banks() declared */
 #define HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED 1
@@ -81,6 +81,9 @@
 
 /* compat_ptr_ioctl() is available */
 #define HAVE_COMPAT_PTR_IOCTL 1
+
+/* cpuinfo_x86.topo is available */
+#define HAVE_CPUINFO_TOPOLOGY_IN_CPUINFO_X86_STRUCT 1
 
 /* debugfs_create_file_size() is available */
 #define HAVE_DEBUGFS_CREATE_FILE_SIZE 1
@@ -133,11 +136,8 @@
 /* struct dma_fence_ops has use_64bit_seqno field */
 #define HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO 1
 
-/* dma_fence_set_error() is available */
-#define HAVE_DMA_FENCE_SET_ERROR 1
-
-/* dma_map_resource() is enabled */
-#define HAVE_DMA_MAP_RESOURCE 1
+/* dma_fence_TIMESTAMP() is available */
+#define HAVE_DMA_FENCE_TIMESTAMP 1
 
 /* dma_map_sgtable() is enabled */
 #define HAVE_DMA_MAP_SGTABLE 1
@@ -901,8 +901,8 @@
 /* struct pci_driver has field dev_groups */
 #define HAVE_PCI_DRIVER_DEV_GROUPS 1
 
-/* pci_is_thunderbolt_attached() is available */
-#define HAVE_PCI_IS_THUNDERBOLD_ATTACHED 1
+/* pci_get_base_class() is available */
+#define HAVE_PCI_GET_BASE_CLASS 1
 
 /* pci_pr3_present() is available */
 #define HAVE_PCI_PR3_PRESENT 1
@@ -938,7 +938,7 @@
 #define HAVE_RB_ROOT_CACHED 1
 
 /* whether register_shrinker(x, x) is available */
-#define HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS 1
+/* #undef HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS */
 
 /* remove_conflicting_pci_framebuffers() wants p,p args */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
@@ -948,6 +948,9 @@
 
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
+
+/* shrinker_register() is available */
+#define HAVE_SHRINKER_REGISTER 1
 
 /* smca_get_bank_type(x) is available */
 /* #undef HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT */
@@ -1020,7 +1023,7 @@
 #define HAVE_STR_YES_NO 1
 
 /* synchronize_shrinkers() is available */
-#define HAVE_SYNCHRONIZE_SHRINKERS 1
+/* #undef HAVE_SYNCHRONIZE_SHRINKERS */
 
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
@@ -1042,6 +1045,9 @@
 
 /* vga_switcheroo_set_dynamic_switch() exist */
 /* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
+
+/* vma_is_initial_{heap, stack} is available */
+#define HAVE_VMA_IS_INITIAL_HEAP 1
 
 /* vma_lookup() is available */
 #define HAVE_VMA_LOOKUP 1
@@ -1101,7 +1107,7 @@
 #define HAVE___DRM_ATOMIC_HELPER_CRTC_RESET 1
 
 /* __kthread_should_park() is available */
-#define HAVE___KTHREAD_SHOULD_PARK 1
+/* #undef HAVE___KTHREAD_SHOULD_PARK */
 
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
