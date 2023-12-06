@@ -249,3 +249,60 @@ u32 _kcl_pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
 EXPORT_SYMBOL(_kcl_pci_rebar_get_possible_sizes);
 #endif /* HAVE_PCI_REBAR_BYTES_TO_SIZE */
 #endif /* AMDKCL_ENABLE_RESIZE_FB_BAR */
+
+/* Copied from drivers/pci/pci.c */
+#ifndef HAVE_PCI_GET_BASE_CLASS
+static inline const struct pci_device_id *
+pci_match_one_device(const struct pci_device_id *id, const struct pci_dev *dev)
+{
+        if ((id->vendor == PCI_ANY_ID || id->vendor == dev->vendor) &&
+            (id->device == PCI_ANY_ID || id->device == dev->device) &&
+            (id->subvendor == PCI_ANY_ID || id->subvendor == dev->subsystem_vendor) &&
+            (id->subdevice == PCI_ANY_ID || id->subdevice == dev->subsystem_device) &&
+            !((id->class ^ dev->class) & id->class_mask))
+                return id;
+        return NULL;
+}
+
+static int match_pci_dev_by_id(struct device *dev, const void *data)
+{
+        struct pci_dev *pdev = to_pci_dev(dev);
+        const struct pci_device_id *id = data;
+
+        if (pci_match_one_device(id, pdev))
+                return 1;
+        return 0;
+}
+
+static struct pci_dev *pci_get_dev_by_id(const struct pci_device_id *id,
+                                         struct pci_dev *from)
+{
+        struct device *dev;
+        struct device *dev_start = NULL;
+        struct pci_dev *pdev = NULL;
+
+        if (from)
+                dev_start = &from->dev;
+        dev = bus_find_device(&pci_bus_type, dev_start, (void *)id,
+                              match_pci_dev_by_id);
+        if (dev)
+                pdev = to_pci_dev(dev);
+        pci_dev_put(from);
+        return pdev;
+}
+
+struct pci_dev *pci_get_base_class(unsigned int class, struct pci_dev *from)
+{
+        struct pci_device_id id = {
+                .vendor = PCI_ANY_ID,
+                .device = PCI_ANY_ID,
+                .subvendor = PCI_ANY_ID,
+                .subdevice = PCI_ANY_ID,
+                .class_mask = 0xFF0000,
+                .class = class << 16,
+        };
+
+        return pci_get_dev_by_id(&id, from);
+}
+EXPORT_SYMBOL(pci_get_base_class);
+#endif /*HAVE_PCI_GET_BASE_CLASS*/

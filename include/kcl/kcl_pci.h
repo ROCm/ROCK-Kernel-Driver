@@ -206,4 +206,14 @@ u32 pci_rebar_get_possible_sizes(struct pci_dev *pdev, int bar)
 
 #endif /* PCI_REBAR_CTRL_BAR_SHIFT */
 
+/* Copied from include/linux/pci.h */
+#ifndef HAVE_PCI_GET_BASE_CLASS
+#ifdef CONFIG_PCI
+struct pci_dev *pci_get_base_class(unsigned int class, struct pci_dev *from);
+#else /*CONFIG_PCI*/
+static inline struct pci_dev *pci_get_base_class(unsigned int class,
+                                                struct pci_dev *from)
+{ return NULL; }
+#endif /*CONFIG_PCI*/
+#endif /*HAVE_PCI_GET_BASE_CLASS*/
 #endif /* AMDKCL_PCI_H */
