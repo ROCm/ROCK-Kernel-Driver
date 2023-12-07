@@ -28,3 +28,19 @@ AC_DEFUN([AC_AMDGPU__DMA_FENCE_IS_LATER], [
 		])
 	])
 ])
+
+dnl #
+dnl # v6.7-rc1-17-g95ba893c9f4f
+dnl # dma-buf: fix check in dma_resv_add_fence
+dnl #
+AC_DEFUN([AC_AMDGPU_DMA_FENCE_IS_LATER_OR_SAME], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+                        #include <linux/dma-fence.h>
+                ], [
+                        dma_fence_is_later_or_same(NULL, NULL);
+                ], [
+                        AC_DEFINE(HAVE_DMA_FENCE_IS_LATER_OR_SAME, 1, [dma_fence_is_later_or_same() is available])
+                ])
+        ])
+])
