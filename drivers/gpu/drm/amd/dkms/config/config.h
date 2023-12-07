@@ -538,7 +538,7 @@
 #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
 
 /* drm_gem_prime_handle_to_fd() is available */
-/* #undef HAVE_DRM_GEM_PRIME_HANDLE_TO_FD */
+#define HAVE_DRM_GEM_PRIME_HANDLE_TO_FD 1
 
 /* drm_hdcp_update_content_protection is available */
 #define HAVE_DRM_HDCP_UPDATE_CONTENT_PROTECTION 1
