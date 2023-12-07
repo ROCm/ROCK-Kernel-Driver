@@ -179,6 +179,9 @@
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
+/* drm_client_register() is available */
+#define HAVE_DRM_CLIENT_REGISTER 1
+
 /* drm_connector_atomic_hdr_metadata_equal() is available */
 #define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
 
