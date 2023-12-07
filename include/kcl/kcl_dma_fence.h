@@ -66,4 +66,12 @@ static inline ktime_t dma_fence_timestamp(struct dma_fence *fence)
 }
 #endif
 
+/* copy from include/linux/dma-fence.h*/
+#ifndef HAVE_DMA_FENCE_IS_LATER_OR_SAME
+static inline bool dma_fence_is_later_or_same(struct dma_fence *f1,
+                                              struct dma_fence *f2)
+{
+        return f1 == f2 || dma_fence_is_later(f1, f2);
+}
+#endif /*HAVE_DMA_FENCE_IS_LATER_OR_SAME*/
 #endif
