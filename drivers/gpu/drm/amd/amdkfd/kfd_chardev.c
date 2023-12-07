@@ -1656,7 +1656,7 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 
 err_free:
 	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, (struct kgd_mem *)mem,
-							pdd->drm_priv, NULL);
+					       pdd->drm_priv, NULL);
 err_unlock:
 	mutex_unlock(&p->mutex);
 	return r;

@@ -379,7 +379,7 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 		struct device *dma_dev, enum dma_data_direction dir,
 		struct sg_table *sg);
 
-int amdgpu_amdkfd_gpuvm_import_dmabuf(struct amdgpu_device *adev,
+int amdgpu_amdkfd_gpuvm_import_ipcobj(struct amdgpu_device *adev,
 				      struct dma_buf *dmabuf,
 				      struct kfd_ipc_obj *ipc_obj,
 				      uint64_t va, void *drm_priv,

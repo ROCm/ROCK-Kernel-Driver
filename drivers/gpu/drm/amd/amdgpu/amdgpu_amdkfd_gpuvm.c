@@ -2011,7 +2011,8 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_gpu(
 
 	/* Free the BO*/
 	drm_vma_node_revoke(&mem->bo->tbo.base.vma_node, drm_priv);
-	drm_gem_handle_delete(adev->kfd.client.file, mem->gem_handle);
+	if (!mem->ipc_obj)
+		drm_gem_handle_delete(adev->kfd.client.file, mem->gem_handle);
 	if (mem->dmabuf) {
 		dma_buf_put(mem->dmabuf);
 		mem->dmabuf = NULL;
@@ -2658,7 +2659,6 @@ static int import_obj_create(struct amdgpu_device *adev,
 	get_dma_buf(dma_buf);
 	(*mem)->dmabuf = dma_buf;
 	(*mem)->bo = bo;
-	(*mem)->ipc_obj = ipc_obj;
 	(*mem)->va = va;
 	(*mem)->domain = (bo->preferred_domains & AMDGPU_GEM_DOMAIN_VRAM) && !adev->gmc.is_app_apu ?
 		AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT;
@@ -2685,6 +2685,45 @@ err_remove_mem:
 	drm_vma_node_revoke(&obj->vma_node, drm_priv);
 err_free_mem:
 	kfree(*mem);
+	return ret;
+}
+
+int amdgpu_amdkfd_gpuvm_import_ipcobj(struct amdgpu_device *adev,
+				      struct dma_buf *dma_buf,
+				      struct kfd_ipc_obj *ipc_obj,
+				      uint64_t va, void *drm_priv,
+				      struct kgd_mem **mem, uint64_t *size,
+				      uint64_t *mmap_offset)
+{
+	struct drm_gem_object *obj;
+	int ret;
+
+	if (WARN_ON(!ipc_obj))
+		return -EINVAL;
+
+#ifdef AMDKCL_AMDGPU_DMABUF_OPS
+	obj = amdgpu_gem_prime_import(adev_to_drm(adev), dma_buf);
+	if (IS_ERR(obj))
+		return PTR_ERR(obj);
+#else
+	obj = dma_buf->priv;
+	if (drm_to_adev(obj->dev) != adev)
+		/* Can't handle buffers from other devices */
+		return -EINVAL;
+	drm_gem_object_get(obj);
+#endif
+
+	ret = import_obj_create(adev, dma_buf, obj, va, drm_priv, mem, size,
+				mmap_offset);
+	if (ret)
+		goto err_put_obj;
+
+	(*mem)->ipc_obj = ipc_obj;
+
+	return 0;
+
+err_put_obj:
+	drm_gem_object_put(obj);
 	return ret;
 }
 
