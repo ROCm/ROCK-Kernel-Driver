@@ -43,10 +43,6 @@ int kfd_ipc_import_handle(struct kfd_node *dev, struct kfd_process *p,
 			  uint32_t gpu_id, uint32_t *share_handle,
 			  uint64_t va_addr, uint64_t *handle,
 			  uint64_t *mmap_offset, uint32_t *pflags, bool restore);
-int kfd_ipc_import_dmabuf(struct kfd_node *kfd, struct kfd_process *p,
-			  uint32_t gpu_id, int dmabuf_fd,
-			  uint64_t va_addr, uint64_t *handle,
-			  uint64_t *mmap_offset);
 int kfd_ipc_export_as_handle(struct kfd_node *dev, struct kfd_process *p,
 			     uint64_t handle, uint32_t *ipc_handle,
 			     uint32_t flags);
