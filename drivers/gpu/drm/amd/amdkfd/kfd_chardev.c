@@ -1612,19 +1612,49 @@ static int kfd_ioctl_import_dmabuf(struct file *filep,
 {
 	struct kfd_ioctl_import_dmabuf_args *args = data;
 	struct kfd_process_device *pdd;
+	int idr_handle;
+	uint64_t size;
+	void *mem;
 	int r;
 
 	mutex_lock(&p->mutex);
 	pdd = kfd_process_device_data_by_id(p, args->gpu_id);
-	mutex_unlock(&p->mutex);
-	if (!pdd)
-		return -EINVAL;
+	if (!pdd) {
+		r = -EINVAL;
+		goto err_unlock;
+	}
 
-	r = kfd_ipc_import_dmabuf(pdd->dev, p, args->gpu_id, args->dmabuf_fd,
-				  args->va_addr, &args->handle, NULL);
+	pdd = kfd_bind_process_to_device(pdd->dev, p);
+	if (IS_ERR(pdd)) {
+		r = PTR_ERR(pdd);
+		goto err_unlock;
+	}
+
+	r = amdgpu_amdkfd_gpuvm_import_dmabuf_fd(pdd->dev->adev, args->dmabuf_fd,
+						 args->va_addr, pdd->drm_priv,
+						 (struct kgd_mem **)&mem, &size,
+						 NULL);
 	if (r)
-		pr_err("Failed to import dmabuf\n");
+		goto err_unlock;
 
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem,
+						args->va_addr, size, 0, 0, -1);
+	if (idr_handle < 0) {
+		r = -EFAULT;
+		goto err_free;
+	}
+
+	mutex_unlock(&p->mutex);
+
+	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+
+	return 0;
+
+err_free:
+	amdgpu_amdkfd_gpuvm_free_memory_of_gpu(pdd->dev->adev, (struct kgd_mem *)mem,
+					       pdd->drm_priv, NULL);
+err_unlock:
+	mutex_unlock(&p->mutex);
 	return r;
 }
 
