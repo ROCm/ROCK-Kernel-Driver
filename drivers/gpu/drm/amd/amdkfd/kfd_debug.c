@@ -1120,3 +1120,29 @@ void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
 
 	mutex_unlock(&target->event_mutex);
 }
+
+void kfd_dbg_enable_ttmp_setup(struct kfd_process *p)
+{
+	int i;
+
+	if (p->runtime_info.ttmp_setup)
+		return;
+
+	p->runtime_info.ttmp_setup = true;
+	for (i = 0; i < p->n_pdds; i++) {
+		struct kfd_process_device *pdd = p->pdds[i];
+
+		if (!kfd_dbg_is_rlc_restore_supported(pdd->dev)) {
+			amdgpu_gfx_off_ctrl(pdd->dev->adev, false);
+			pdd->dev->kfd2kgd->enable_debug_trap(
+					pdd->dev->adev,
+					true,
+					pdd->dev->vm_info.last_vmid_kfd);
+		} else if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
+			pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
+					pdd->dev->adev,
+					false,
+					0);
+		}
+	}
+}

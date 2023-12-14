@@ -3031,26 +3031,9 @@ static int runtime_enable(struct kfd_process *p, uint64_t r_debug,
 
 	p->runtime_info.runtime_state = DEBUG_RUNTIME_STATE_ENABLED;
 	p->runtime_info.r_debug = r_debug;
-	p->runtime_info.ttmp_setup = enable_ttmp_setup;
 
-	if (p->runtime_info.ttmp_setup) {
-		for (i = 0; i < p->n_pdds; i++) {
-			struct kfd_process_device *pdd = p->pdds[i];
-
-			if (!kfd_dbg_is_rlc_restore_supported(pdd->dev)) {
-				amdgpu_gfx_off_ctrl(pdd->dev->adev, false);
-				pdd->dev->kfd2kgd->enable_debug_trap(
-						pdd->dev->adev,
-						true,
-						pdd->dev->vm_info.last_vmid_kfd);
-			} else if (kfd_dbg_is_per_vmid_supported(pdd->dev)) {
-				pdd->spi_dbg_override = pdd->dev->kfd2kgd->enable_debug_trap(
-						pdd->dev->adev,
-						false,
-						0);
-			}
-		}
-	}
+	if (enable_ttmp_setup)
+		kfd_dbg_enable_ttmp_setup(p);
 
 retry:
 	if (p->debug_trap_enabled) {
@@ -3200,10 +3183,10 @@ static int kfd_ioctl_set_debug_trap(struct file *filep, struct kfd_process *p, v
 		goto out;
 	}
 
-	/* Check if target is still PTRACED. */
 	rcu_read_lock();
+	/* Check if target is still PTRACED. */
 	if (target != p && args->op != KFD_IOC_DBG_TRAP_DISABLE
-				&& ptrace_parent(target->lead_thread) != current) {
+			&& ptrace_parent(target->lead_thread) != current) {
 		pr_err("PID %i is not PTRACED and cannot be debugged\n", args->pid);
 		r = -EPERM;
 	}
@@ -3213,6 +3196,11 @@ static int kfd_ioctl_set_debug_trap(struct file *filep, struct kfd_process *p, v
 		goto out;
 
 	mutex_lock(&target->mutex);
+	if (!!target->pc_sampling_ref) {
+		pr_debug("Cannot enable debug trap on PID:%d because PC Sampling active\n", args->pid);
+		r = -EBUSY;
+		goto unlock_out;
+	}
 
 	if (args->op != KFD_IOC_DBG_TRAP_ENABLE && !target->debug_trap_enabled) {
 		pr_err("PID %i not debug enabled for op %i\n", args->pid, args->op);

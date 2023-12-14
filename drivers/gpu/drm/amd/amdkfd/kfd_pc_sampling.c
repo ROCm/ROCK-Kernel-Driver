@@ -24,6 +24,7 @@
 #include "kfd_priv.h"
 #include "amdgpu_amdkfd.h"
 #include "kfd_pc_sampling.h"
+#include "kfd_debug.h"
 #include "kfd_device_queue_manager.h"
 
 struct supported_pc_sample_info {
@@ -312,6 +313,14 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 	pcs_entry->pdd = pdd;
 	user_args->trace_id = (uint32_t)i;
 
+	/*
+	 * Set SPI_GDBG_PER_VMID_CNTL.TRAP_EN so that TTMP registers are valid in the sampling data
+	 * p->runtime_info.ttmp_setup will be cleared when user application calls runtime_disable
+	 * on exit.
+	 */
+	kfd_dbg_enable_ttmp_setup(pdd->process);
+	pdd->process->pc_sampling_ref++;
+
 	pr_debug("alloc pcs_entry = %p, trace_id = 0x%x on gpu 0x%x", pcs_entry, i, pdd->dev->id);
 
 	return 0;
@@ -323,6 +332,7 @@ static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_
 	pr_debug("free pcs_entry = %p, trace_id = 0x%x on gpu 0x%x",
 		pcs_entry, trace_id, pdd->dev->id);
 
+	pdd->process->pc_sampling_ref--;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
 	pdd->dev->pcs_data.hosttrap_entry.base.use_count--;
 	idr_remove(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr, trace_id);
@@ -381,6 +391,9 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		if (!pcs_entry ||
 			pcs_entry->pdd != pdd)
 			return -EINVAL;
+	} else if (pdd->process->debug_trap_enabled) {
+		pr_debug("Cannot have PC Sampling and debug trap simultaneously");
+		return -EBUSY;
 	}
 
 	switch (args->op) {

@@ -90,6 +90,9 @@ int kfd_dbg_trap_device_snapshot(struct kfd_process *target,
 
 void kfd_dbg_set_enabled_debug_exception_mask(struct kfd_process *target,
 					uint64_t exception_set_mask);
+
+void kfd_dbg_enable_ttmp_setup(struct kfd_process *p);
+
 /*
  * If GFX off is enabled, chips that do not support RLC restore for the debug
  * registers will disable GFX off temporarily for the entire debug session.

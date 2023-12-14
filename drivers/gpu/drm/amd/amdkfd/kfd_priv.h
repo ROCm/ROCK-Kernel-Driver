@@ -1086,6 +1086,9 @@ struct kfd_process {
 	struct semaphore runtime_enable_sema;
 	bool is_runtime_retry;
 	struct kfd_runtime_info runtime_info;
+
+	/* Indicates process' PC Sampling ref cnt*/
+	uint32_t pc_sampling_ref;
 };
 
 #define KFD_PROCESS_TABLE_SIZE 5 /* bits: 32 entries */
