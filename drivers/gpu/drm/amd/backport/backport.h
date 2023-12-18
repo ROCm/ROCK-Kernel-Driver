@@ -119,4 +119,5 @@
 #include <kcl/kcl_drm_dp.h>
 #include <kcl/kcl_drm_writeback.h>
 #include <kcl/kcl_drm_client.h>
+#include <kcl/kcl_drm_mode.h>
 #endif /* AMDGPU_BACKPORT_H */
