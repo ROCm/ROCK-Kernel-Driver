@@ -176,6 +176,9 @@
 /* drm_client_register() is available */
 #define HAVE_DRM_CLIENT_REGISTER 1
 
+/* struct drm_color_ctm_3x4 is available */
+#define HAVE_DRM_COLOR_CTM_3X4 1
+
 /* drm_connector_atomic_hdr_metadata_equal() is available */
 #define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
 
