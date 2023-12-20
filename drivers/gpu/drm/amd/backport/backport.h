@@ -120,4 +120,5 @@
 #include <kcl/kcl_drm_writeback.h>
 #include <kcl/kcl_drm_client.h>
 #include <kcl/kcl_drm_mode.h>
+#include <kcl/kcl_acpi_amd_wbrf.h>
 #endif /* AMDGPU_BACKPORT_H */
