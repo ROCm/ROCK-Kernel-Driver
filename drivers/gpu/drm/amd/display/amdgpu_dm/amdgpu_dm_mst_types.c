@@ -1879,7 +1879,7 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 #endif
 		/* check if mode could be supported within full_pbn */
 		bpp = convert_dc_color_depth_into_bpc(stream->timing.display_color_depth) * 3;
-		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp << 4);
+		pbn = drm_dp_calc_pbn_mode(stream->timing.pix_clk_100hz / 10, bpp, false);
 #ifdef HAVE_DRM_DP_MST_PORT_FULL_PBN
 		if (pbn > aconnector->mst_output_port->full_pbn)
 #else
