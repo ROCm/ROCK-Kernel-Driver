@@ -25,15 +25,20 @@
 #include <drm/display/drm_dp_mst_helper.h>
 
 /* Copied from drivers/gpu/drm/drm_dp_mst_topology.c and modified for KCL */
-#if !defined(HAVE_DRM_DP_CALC_PBN_MODE_3ARGS)
+#ifndef HAVE_DRM_DP_CALC_PBN_MODE_3ARGS
 static inline
 int _kcl_drm_dp_calc_pbn_mode(int clock, int bpp, bool dsc)
 {
+#ifndef HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H
 	if (dsc)
 		return DIV_ROUND_UP_ULL(mul_u32_u32(clock * (bpp / 16), 64 * 1006),
 				8 * 54 * 1000 * 1000);
-
-	return drm_dp_calc_pbn_mode(clock, bpp);
+#endif
+	return drm_dp_calc_pbn_mode(clock, bpp
+#ifdef HAVE_DRM_DISPLAY_DRM_DP_MST_HELPER_H
+				    << 4
+#endif
+				    );
 }
 #define drm_dp_calc_pbn_mode _kcl_drm_dp_calc_pbn_mode
 #endif
