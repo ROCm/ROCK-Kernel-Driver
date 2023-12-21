@@ -303,7 +303,12 @@ static void dm_helpers_construct_old_payload(
 			struct drm_dp_mst_atomic_payload *old_payload)
 {
 	struct drm_dp_mst_atomic_payload *pos;
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
 	int pbn_per_slot = dfixed_trunc(mst_state->pbn_div);
+#elif HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT
+	int pbn_per_slot = mst_state->pbn_div;
+#endif
+
 	u8 next_payload_vc_start = mgr->next_start_slot;
 	u8 payload_vc_start = new_payload->vc_start_slot;
 	u8 allocated_time_slots;

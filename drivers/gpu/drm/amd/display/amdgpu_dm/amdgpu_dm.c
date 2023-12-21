@@ -7683,7 +7683,7 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	const struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
 	struct drm_dp_mst_topology_mgr *mst_mgr;
 	struct drm_dp_mst_port *mst_port;
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) || defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	struct drm_dp_mst_topology_state *mst_state;
 #endif
 	enum dc_color_depth color_depth;
@@ -7699,12 +7699,15 @@ static int dm_encoder_helper_atomic_check(struct drm_encoder *encoder,
 	if (!crtc_state->connectors_changed && !crtc_state->mode_changed)
 		return 0;
 
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) || defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	mst_state = drm_atomic_get_mst_topology_state(state, mst_mgr);
 	if (IS_ERR(mst_state))
 		return PTR_ERR(mst_state);
-
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
 	mst_state->pbn_div.full = dfixed_const(dm_mst_get_pbn_divider(aconnector->mst_root->dc_link));
+#else
+	mst_state->pbn_div = dm_mst_get_pbn_divider(aconnector->mst_root->dc_link);
+#endif
 #endif
 
 	if (!state->duplicated) {
@@ -11816,7 +11819,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		struct drm_connector_list_iter iter;
 		u8 link_coding_cap;
 
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) && !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 		 if (!mgr->mst_state )
                         continue;
 #endif
