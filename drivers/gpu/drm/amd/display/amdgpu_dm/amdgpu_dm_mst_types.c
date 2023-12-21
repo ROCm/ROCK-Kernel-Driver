@@ -1074,7 +1074,7 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 	int min_initial_slack;
 	int next_index;
 	int remaining_to_increase = 0;
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) && !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	int pbn_per_timeslot;
 #endif
 	int link_timeslots_used;
@@ -1082,7 +1082,7 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 	int ret = 0;
 	uint16_t fec_overhead_multiplier_x1000 = get_fec_overhead_multiplier(dc_link);
 
-#ifndef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#if !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT) && !defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION)
 	pbn_per_timeslot = dm_mst_get_pbn_divider(dc_link);
 #endif
 
@@ -1117,8 +1117,10 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 
 		for (i = 0; i < count; i++)
 			link_timeslots_used += DIV_ROUND_UP(vars[i + k].pbn, 
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
 							    dfixed_trunc(mst_state->pbn_div)
+#elif HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT
+							    mst_state->pbn_div
 #else
 							    pbn_per_timeslot
 #endif
@@ -1126,8 +1128,10 @@ static int increase_dsc_bpp(struct drm_atomic_state *state,
 
 		fair_pbn_alloc =
 			(63 - link_timeslots_used) / remaining_to_increase *
-#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV
+#ifdef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION
 			dfixed_trunc(mst_state->pbn_div);
+#elif HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT
+			mst_state->pbn_div;
 #else
 			pbn_per_timeslot;
 #endif
