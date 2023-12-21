@@ -44,14 +44,25 @@ dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV], [
         AC_KERNEL_DO_BACKGROUND([
                 AC_KERNEL_TRY_COMPILE([
-                        #include <drm/drm_dp_mst_helper.h>
+                        #include <drm/display/drm_dp_mst_helper.h>
                 ], [
                         struct drm_dp_mst_topology_state * mst_state = NULL;
-                        int pbn_div;
+                        mst_state->pbn_div = 0;
+                ], [
+                        AC_DEFINE(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT, 1,
+                                [struct drm_dp_mst_topology_state has member pbn_div])
+		])
+        ])
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+                        #include <drm/display/drm_dp_mst_helper.h>
+                ], [
+                        struct drm_dp_mst_topology_state * mst_state = NULL;
+			fixed20_12 pbn_div;
                         pbn_div = mst_state->pbn_div;
                 ], [
-                        AC_DEFINE(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV, 1,
-                                [struct drm_dp_mst_topology_state has member pbn_div])
+                        AC_DEFINE(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION, 1,
+                                [struct drm_dp_mst_topology_state has union member pbn_div])
                 ])
         ])
 ])
