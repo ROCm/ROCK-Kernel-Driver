@@ -54,6 +54,19 @@
 			dev_name((drm)->dev), ## arg)
 #endif
 
+#ifndef drm_WARN
+#define drm_WARN(drm, condition, format, arg...)                        \
+        WARN(condition, "%s %s: " format,                               \
+                        dev_driver_string((drm)->dev),                  \
+                        dev_name((drm)->dev), ## arg)
+#endif
+
+#ifndef drm_WARN_ON
+#define drm_WARN_ON(drm, x)                                             \
+        drm_WARN((drm), (x), "%s",                                      \
+                 "drm_WARN_ON(" __stringify(x) ")")
+#endif
+
 #ifndef DRM_NOTE
 #define DRM_NOTE(fmt, ...)						\
 	_DRM_PRINTK(, NOTICE, fmt, ##__VA_ARGS__)
