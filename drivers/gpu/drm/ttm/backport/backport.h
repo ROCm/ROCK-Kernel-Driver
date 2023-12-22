@@ -18,5 +18,6 @@
 #include <kcl/kcl_io-mapping.h>
 #include <kcl/kcl_highmem-internal.h>
 #include <kcl/kcl_shrinker.h>
+#include <kcl/backport/kcl_workqueue_backport.h>
 
 #endif
