@@ -80,6 +80,7 @@ static int amdgpu_dm_wb_connector_get_modes(struct drm_connector *connector)
 	return drm_add_modes_noedid(connector, 3840, 2160);
 }
 
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB
 static int amdgpu_dm_wb_prepare_job(struct drm_writeback_connector *wb_connector,
 			       struct drm_writeback_job *job)
 {
@@ -164,6 +165,7 @@ static void amdgpu_dm_wb_cleanup_job(struct drm_writeback_connector *connector,
 	amdgpu_bo_unreserve(rbo);
 	amdgpu_bo_unref(&rbo);
 }
+#endif
 
 static const struct drm_encoder_helper_funcs amdgpu_dm_wb_encoder_helper_funcs = {
 	.atomic_check = amdgpu_dm_wb_encoder_atomic_check,
@@ -179,8 +181,10 @@ static const struct drm_connector_funcs amdgpu_dm_wb_connector_funcs = {
 
 static const struct drm_connector_helper_funcs amdgpu_dm_wb_conn_helper_funcs = {
 	.get_modes = amdgpu_dm_wb_connector_get_modes,
+#ifdef HAVE_DRM_CONNECTOR_HELPER_FUNCS_PREPARE_WRITEBACK_JOB
 	.prepare_writeback_job = amdgpu_dm_wb_prepare_job,
 	.cleanup_writeback_job = amdgpu_dm_wb_cleanup_job,
+#endif
 };
 
 int amdgpu_dm_wb_connector_init(struct amdgpu_display_manager *dm,
