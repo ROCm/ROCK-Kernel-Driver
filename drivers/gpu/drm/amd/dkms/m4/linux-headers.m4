@@ -134,4 +134,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #platform/x86/amd: Add support for AMD ACPI based Wifi band RFI mitigation feature
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/acpi_amd_wbrf.h])
+
+	dnl #v5.5-5479-g23331e489361
+	dnl #include/linux/units.h: add helpers for kelvin to/from Celsius conversion
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/units.h])
 ])
