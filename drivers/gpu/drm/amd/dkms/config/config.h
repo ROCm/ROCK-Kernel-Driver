@@ -127,6 +127,9 @@
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
 
+/* dma_fence_is_later_or_same() is available */
+#define HAVE_DMA_FENCE_IS_LATER_OR_SAME 1
+
 /* struct dma_fence_ops has callback set_deadline */
 #define HAVE_DMA_FENCE_OPS_SET_DEADLINE 1
 
@@ -305,8 +308,8 @@
 /* struct drm_dp_aux has member named 'drm_dev' */
 #define HAVE_DRM_DP_AUX_DRM_DEV 1
 
-/* drm_dp_calc_pbn_mode() wants 3args */
-#define HAVE_DRM_DP_CALC_PBN_MODE_3ARGS 1
+/* drm_dp_calc_pbn_mode() wants 3 args */
+/* #undef HAVE_DRM_DP_CALC_PBN_MODE_3ARGS */
 
 /* drm_dp_cec_register_connector() wants p,p interface */
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
@@ -390,7 +393,10 @@
 #define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS 1
 
 /* struct drm_dp_mst_topology_state has member pbn_div */
-#define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV 1
+/* #undef HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_INT */
+
+/* struct drm_dp_mst_topology_state has union member pbn_div */
+#define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV_UNION 1
 
 /* struct drm_dp_mst_topology_state has member total_avail_slots */
 #define HAVE_DRM_DP_MST_TOPOLOGY_STATE_TOTAL_AVAIL_SLOTS 1
@@ -433,6 +439,9 @@
 
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
+
+/* Define to 1 if you have the <drm/drm_eld.h> header file. */
+#define HAVE_DRM_DRM_ELD_H 1
 
 /* Define to 1 if you have the <drm/drm_exec.h> header file. */
 #define HAVE_DRM_DRM_EXEC_H 1
@@ -739,6 +748,9 @@
 /* kvrealloc() is available */
 #define HAVE_KVREALLOC 1
 
+/* Define to 1 if you have the <linux/acpi_amd_wbrf.h> header file. */
+#define HAVE_LINUX_ACPI_AMD_WBRF_H 1
+
 /* Define to 1 if you have the <linux/apple-gmux.h> header file. */
 #define HAVE_LINUX_APPLE_GMUX_H 1
 
@@ -813,6 +825,9 @@
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
+
+/* Define to 1 if you have the <linux/units.h> header file. */
+#define HAVE_LINUX_UNITS_H 1
 
 /* Define to 1 if you have the <linux/xarray.h> header file. */
 #define HAVE_LINUX_XARRAY_H 1
@@ -915,6 +930,9 @@
 
 /* pxm_to_node() is available */
 #define HAVE_PXM_TO_NODE 1
+
+/* queue_work_node() is available */
+#define HAVE_QUEUE_WORK_NODE 1
 
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
@@ -1095,7 +1113,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.5.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.7.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
