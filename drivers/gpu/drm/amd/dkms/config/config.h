@@ -614,9 +614,6 @@
 /* drm_kms_helper_connector_hotplug_event() function is available */
 #define HAVE_DRM_KMS_HELPER_CONNECTOR_HOTPLUG_EVENT 1
 
-/* drm_kms_helper_is_poll_worker() is available */
-#define HAVE_DRM_KMS_HELPER_IS_POLL_WORKER 1
-
 /* drm_memcpy_from_wc() is availablea */
 /* #undef HAVE_DRM_MEMCPY_FROM_WC */
 
