@@ -197,6 +197,9 @@ int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 #else
 int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm);
 #endif
+int amdgpu_amdkfd_bo_validate_and_fence(struct amdgpu_bo *bo,
+					uint32_t domain,
+					struct dma_fence *fence);
 #else
 static inline
 bool amdkfd_fence_check_mm(struct dma_fence *f, struct mm_struct *mm)
@@ -223,6 +226,13 @@ int amdgpu_amdkfd_evict_userptr(struct mmu_interval_notifier *mni,
 #else
 int amdgpu_amdkfd_evict_userptr(struct kgd_mem *mem, struct mm_struct *mm)
 #endif
+{
+	return 0;
+}
+static inline
+int amdgpu_amdkfd_bo_validate_and_fence(struct amdgpu_bo *bo,
+					uint32_t domain,
+					struct dma_fence *fence)
 {
 	return 0;
 }
