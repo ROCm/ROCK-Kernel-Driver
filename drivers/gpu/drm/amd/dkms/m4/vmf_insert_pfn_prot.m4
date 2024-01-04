@@ -8,7 +8,7 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT_PFN_PROT], [
 			#include <linux/mm.h>
 			#include <asm/page.h>
 		],[
-			pgprot_t prot;
+			pgprot_t prot = {0};
 			vmf_insert_pfn_prot(NULL, 0, 0, prot);
 		],[
 			AC_DEFINE(HAVE_VMF_INSERT_PFN_PROT,
@@ -23,7 +23,7 @@ AC_DEFUN([AC_AMDGPU_VMF_INSERT_PFN_PROT], [
 				#include <linux/mm.h>
 				#include <asm/page.h>
 			],[
-				pgprot_t prot;
+				pgprot_t prot = {0};
 				vm_insert_pfn_prot(NULL, 0, 0, prot);
 			],[
 				AC_DEFINE(HAVE_VM_INSERT_PFN_PROT,
