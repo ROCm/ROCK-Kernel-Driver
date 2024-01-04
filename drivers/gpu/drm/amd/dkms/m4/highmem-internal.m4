@@ -7,7 +7,7 @@ AC_DEFUN([AC_AMDGPU_KMAP_LOCAL], [
 		AC_KERNEL_TRY_COMPILE([
 			#include <linux/highmem.h>
 		], [
-			pgprot_t prot;
+			pgprot_t prot = {0};
 			kmap_local_page_prot(NULL, prot);
 		], [
 			AC_DEFINE(HAVE_KMAP_LOCAL, 1, [kmap_local_* is available])
