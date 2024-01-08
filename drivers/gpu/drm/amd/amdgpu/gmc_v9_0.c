@@ -2369,7 +2369,6 @@ static void gmc_v9_0_gart_disable(struct amdgpu_device *adev)
 static int gmc_v9_0_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	bool irq_release = true;
 
 	gmc_v9_0_gart_disable(adev);
 
@@ -2387,16 +2386,9 @@ static int gmc_v9_0_hw_fini(void *handle)
 	if (adev->mmhub.funcs->update_power_gating)
 		adev->mmhub.funcs->update_power_gating(adev, false);
 
-	if (adev->shutdown)
-		irq_release = amdgpu_irq_enabled(adev, &adev->gmc.vm_fault, 0);
+	amdgpu_irq_put(adev, &adev->gmc.vm_fault, 0);
 
-	if (irq_release)
-		amdgpu_irq_put(adev, &adev->gmc.vm_fault, 0);
-
-	if (adev->shutdown)
-		irq_release = amdgpu_irq_enabled(adev, &adev->gmc.ecc_irq, 0);
-
-	if (adev->gmc.ecc_irq.funcs && irq_release &&
+	if (adev->gmc.ecc_irq.funcs &&
 		amdgpu_ras_is_supported(adev, AMDGPU_RAS_BLOCK__UMC))
 		amdgpu_irq_put(adev, &adev->gmc.ecc_irq, 0);
 
