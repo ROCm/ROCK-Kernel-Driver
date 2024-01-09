@@ -109,6 +109,9 @@
 /* dev_pm_set_driver_flags() is available */
 #define HAVE_DEV_PM_SET_DRIVER_FLAGS 1
 
+/* dma_buf_is_dynamic() is available */
+#define HAVE_DMA_BUF_IS_DYNAMIC 1
+
 /* dma_buf->dynamic_mapping is available */
 /* #undef HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING */
 
