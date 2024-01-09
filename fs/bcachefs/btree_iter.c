@@ -2085,18 +2085,16 @@ struct bkey_s_c bch2_btree_iter_peek_upto(struct btree_iter *iter, struct bpos e
 			goto out_no_locked;
 
 		/*
-		 * iter->pos should be mononotically increasing, and always be
-		 * equal to the key we just returned - except extents can
-		 * straddle iter->pos:
+		 * We need to check against @end before FILTER_SNAPSHOTS because
+		 * if we get to a different inode that requested we might be
+		 * seeing keys for a different snapshot tree that will all be
+		 * filtered out.
+		 *
+		 * But we can't do the full check here, because bkey_start_pos()
+		 * isn't monotonically increasing before FILTER_SNAPSHOTS, and
+		 * that's what we check against in extents mode:
 		 */
-		if (!(iter->flags & BTREE_ITER_IS_EXTENTS))
-			iter_pos = k.k->p;
-		else
-			iter_pos = bkey_max(iter->pos, bkey_start_pos(k.k));
-
-		if (unlikely(!(iter->flags & BTREE_ITER_IS_EXTENTS)
-			     ? bkey_gt(iter_pos, end)
-			     : bkey_ge(iter_pos, end)))
+		if (k.k->p.inode > end.inode)
 			goto end;
 
 		if (iter->update_path &&
@@ -2154,6 +2152,21 @@ struct bkey_s_c bch2_btree_iter_peek_upto(struct btree_iter *iter, struct bpos e
 			search_key = bkey_successor(iter, k.k->p);
 			continue;
 		}
+
+		/*
+		 * iter->pos should be mononotically increasing, and always be
+		 * equal to the key we just returned - except extents can
+		 * straddle iter->pos:
+		 */
+		if (!(iter->flags & BTREE_ITER_IS_EXTENTS))
+			iter_pos = k.k->p;
+		else
+			iter_pos = bkey_max(iter->pos, bkey_start_pos(k.k));
+
+		if (unlikely(!(iter->flags & BTREE_ITER_IS_EXTENTS)
+			     ? bkey_gt(iter_pos, end)
+			     : bkey_ge(iter_pos, end)))
+			goto end;
 
 		break;
 	}
@@ -3214,10 +3227,9 @@ void bch2_fs_btree_iter_exit(struct bch_fs *c)
 	mempool_exit(&c->btree_trans_pool);
 }
 
-int bch2_fs_btree_iter_init(struct bch_fs *c)
+void bch2_fs_btree_iter_init_early(struct bch_fs *c)
 {
 	struct btree_transaction_stats *s;
-	int ret;
 
 	for (s = c->btree_transaction_stats;
 	     s < c->btree_transaction_stats + ARRAY_SIZE(c->btree_transaction_stats);
@@ -3228,6 +3240,11 @@ int bch2_fs_btree_iter_init(struct bch_fs *c)
 
 	INIT_LIST_HEAD(&c->btree_trans_list);
 	seqmutex_init(&c->btree_trans_lock);
+}
+
+int bch2_fs_btree_iter_init(struct bch_fs *c)
+{
+	int ret;
 
 	c->btree_trans_bufs = alloc_percpu(struct btree_trans_buf);
 	if (!c->btree_trans_bufs)

@@ -408,8 +408,10 @@ static int journal_entry_btree_root_validate(struct bch_fs *c,
 		return 0;
 	}
 
-	return journal_validate_key(c, jset, entry, 1, entry->btree_id, k,
-				    version, big_endian, flags);
+	ret = journal_validate_key(c, jset, entry, 1, entry->btree_id, k,
+				   version, big_endian, flags);
+	if (ret == FSCK_DELETED_KEY)
+		ret = 0;
 fsck_err:
 	return ret;
 }
@@ -1599,6 +1601,7 @@ static CLOSURE_CALLBACK(journal_write_done)
 	} while ((v = atomic64_cmpxchg(&j->reservations.counter,
 				       old.v, new.v)) != old.v);
 
+	bch2_journal_reclaim_fast(j);
 	bch2_journal_space_available(j);
 
 	closure_wake_up(&w->wait);

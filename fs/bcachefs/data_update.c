@@ -471,7 +471,7 @@ int bch2_extent_drop_ptrs(struct btree_trans *trans,
 	 * we aren't using the extent overwrite path to delete, we're
 	 * just using the normal key deletion path:
 	 */
-	if (bkey_deleted(&n->k))
+	if (bkey_deleted(&n->k) && !(iter->flags & BTREE_ITER_IS_EXTENTS))
 		n->k.size = 0;
 
 	return bch2_trans_relock(trans) ?:
@@ -560,7 +560,8 @@ int bch2_data_update_init(struct btree_trans *trans,
 				move_ctxt_wait_event(ctxt,
 						(locked = bch2_bucket_nocow_trylock(&c->nocow_locks,
 									  PTR_BUCKET_POS(c, &p.ptr), 0)) ||
-						!atomic_read(&ctxt->read_sectors));
+						(!atomic_read(&ctxt->read_sectors) &&
+						 !atomic_read(&ctxt->write_sectors)));
 
 				if (!locked)
 					bch2_bucket_nocow_lock(&c->nocow_locks,
@@ -586,12 +587,13 @@ int bch2_data_update_init(struct btree_trans *trans,
 	 * Increasing replication is an explicit operation triggered by
 	 * rereplicate, currently, so that users don't get an unexpected -ENOSPC
 	 */
-	if (durability_have >= io_opts.data_replicas) {
+	if (!(m->data_opts.write_flags & BCH_WRITE_CACHED) &&
+	    durability_have >= io_opts.data_replicas) {
 		m->data_opts.kill_ptrs |= m->data_opts.rewrite_ptrs;
 		m->data_opts.rewrite_ptrs = 0;
 		/* if iter == NULL, it's just a promote */
 		if (iter)
-			ret = bch2_extent_drop_ptrs(trans, iter, k, data_opts);
+			ret = bch2_extent_drop_ptrs(trans, iter, k, m->data_opts);
 		goto done;
 	}
 
