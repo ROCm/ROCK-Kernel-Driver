@@ -889,7 +889,11 @@ static const struct file_operations aca_ue_dump_debug_fops = {
 	.release = single_release,
 };
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(aca_debug_mode_fops, NULL, amdgpu_aca_smu_debug_mode_set, "%llu\n");
+#else
+DEFINE_SIMPLE_ATTRIBUTE(aca_debug_mode_fops, NULL, amdgpu_aca_smu_debug_mode_set, "%llu\n");
+#endif
 #endif
 
 void amdgpu_aca_smu_debugfs_init(struct amdgpu_device *adev, struct dentry *root)
