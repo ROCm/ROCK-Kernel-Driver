@@ -2267,21 +2267,12 @@ static int sdma_v4_4_2_ras_late_init(struct amdgpu_device *adev, struct ras_comm
 {
 	int r;
 
-	r = amdgpu_ras_block_late_init(adev, ras_block);
+	r = amdgpu_sdma_ras_late_init(adev, ras_block);
 	if (r)
 		return r;
 
-	r = amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__SDMA,
-				&sdma_v4_4_2_aca_info, NULL);
-	if (r)
-		goto late_fini;
-
-	return 0;
-
-late_fini:
-	amdgpu_ras_block_late_fini(adev, ras_block);
-
-	return r;
+	return amdgpu_ras_bind_aca(adev, AMDGPU_RAS_BLOCK__SDMA,
+				   &sdma_v4_4_2_aca_info, NULL);
 }
 
 static struct amdgpu_sdma_ras sdma_v4_4_2_ras = {
