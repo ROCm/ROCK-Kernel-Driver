@@ -782,10 +782,11 @@ out:
  * vital here, so they are not reported back to userspace.
  */
 static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
-				    struct amdgpu_vm *vm,
+				    struct amdgpu_fpriv *fpriv,
 				    struct amdgpu_bo_va *bo_va,
 				    uint32_t operation)
 {
+	struct amdgpu_vm *vm = &fpriv->vm;
 	int r;
 
 	if (!amdgpu_vm_ready(vm))
@@ -803,6 +804,25 @@ static void amdgpu_gem_va_update_vm(struct amdgpu_device *adev,
 	}
 
 	r = amdgpu_vm_update_pdes(adev, vm, false);
+	if (r)
+		goto error;
+
+	if (vm->is_compute_context) {
+		if (bo_va->last_pt_update)
+			r = dma_fence_wait(bo_va->last_pt_update, true);
+		if (!r && vm->last_update)
+			r = dma_fence_wait(vm->last_update, true);
+		if (!r) {
+			uint32_t xcc_mask = (!adev->xcp_mgr ||
+					     fpriv->xcp_id == ~0) ? 1 :
+				adev->xcp_mgr->xcp[fpriv->xcp_id]
+					.ip[AMDGPU_XCP_GFX].inst_mask;
+
+			r = amdgpu_vm_flush_compute_tlb(adev, vm,
+							TLB_FLUSH_LEGACY,
+							xcc_mask);
+		}
+	}
 
 error:
 	if (r && r != -ERESTARTSYS)
@@ -970,7 +990,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 		break;
 	}
 	if (!r && !(args->flags & AMDGPU_VM_DELAY_UPDATE) && !adev->debug_vm)
-		amdgpu_gem_va_update_vm(adev, &fpriv->vm, bo_va,
+		amdgpu_gem_va_update_vm(adev, fpriv, bo_va,
 					args->operation);
 
 error:
