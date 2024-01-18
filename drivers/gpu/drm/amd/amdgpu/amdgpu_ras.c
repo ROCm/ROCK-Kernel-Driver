@@ -3319,6 +3319,9 @@ int amdgpu_ras_late_init(struct amdgpu_device *adev)
 		}
 
 		obj = node->ras_obj;
+		if (!amdgpu_ras_is_feature_enabled(adev, &obj->ras_comm))
+			continue;
+
 		if (obj->ras_late_init) {
 			r = obj->ras_late_init(adev, &obj->ras_comm);
 			if (r) {
