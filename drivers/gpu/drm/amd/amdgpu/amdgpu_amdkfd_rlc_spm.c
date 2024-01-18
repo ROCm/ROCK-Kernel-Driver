@@ -66,7 +66,7 @@ int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, struct amdgpu_vm *
     }
 
 	/* init spm vmid with 0x0 */
-	adev->gfx.rlc.funcs->update_spm_vmid(adev, 0);
+	adev->gfx.rlc.funcs->update_spm_vmid(adev, NULL, 0);
 
 	/* set spm ring registers */
 	spin_lock(&adev->gfx.kiq[0].ring_lock);
@@ -95,7 +95,7 @@ void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm 
 
 	/* revert spm vmid with 0xf */
 	if (adev->gfx.rlc.funcs->update_spm_vmid)
-		adev->gfx.rlc.funcs->update_spm_vmid(adev, 0xf);
+		adev->gfx.rlc.funcs->update_spm_vmid(adev, NULL, 0xf);
 }
 
 void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev)
