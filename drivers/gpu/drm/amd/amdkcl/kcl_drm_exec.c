@@ -4,6 +4,7 @@
 #include <drm/drm_gem.h>
 #include <linux/dma-resv.h>
 #include <kcl/kcl_drm_exec.h>
+#include <kcl/backport/kcl_drm_gem.h>
 
 #ifndef HAVE_DRM_DRM_EXEC_H
 /**
