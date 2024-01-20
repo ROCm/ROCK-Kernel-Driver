@@ -1651,6 +1651,7 @@ static int fill_in_l1_pcache(struct kfd_cache_properties **props_ext,
 		pcache->processor_id_low = cu_processor_id + (first_active_cu - 1);
 		pcache->cache_level = pcache_info[cache_type].cache_level;
 		pcache->cache_size = pcache_info[cache_type].cache_size;
+		pcache->cacheline_size = pcache_info[cache_type].cache_line_size;
 
 		if (pcache_info[cache_type].flags & CRAT_CACHE_FLAGS_DATA_CACHE)
 			pcache->cache_type |= HSA_CACHE_TYPE_DATA;
@@ -1719,6 +1720,7 @@ static int fill_in_l2_l3_pcache(struct kfd_cache_properties **props_ext,
 		pcache->processor_id_low = cu_processor_id
 					+ (first_active_cu - 1);
 		pcache->cache_level = pcache_info[cache_type].cache_level;
+		pcache->cacheline_size = pcache_info[cache_type].cache_line_size;
 
 		if (KFD_GC_VERSION(knode) == IP_VERSION(9, 4, 3))
 			mode = adev->gmc.gmc_funcs->query_mem_partition_mode(adev);
