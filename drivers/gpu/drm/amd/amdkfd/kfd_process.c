@@ -1107,7 +1107,6 @@ static void kfd_process_wq_release(struct work_struct *work)
 {
 	struct kfd_process *p = container_of(work, struct kfd_process,
 					     release_work);
-	struct dma_fence *ef;
 
 	kfd_process_dequeue_from_all_devices(p);
 	pqm_uninit(&p->pqm);
@@ -1116,9 +1115,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	 * destroyed. This allows any BOs to be freed without
 	 * triggering pointless evictions or waiting for fences.
 	 */
-	synchronize_rcu();
-	ef = rcu_access_pointer(p->ef);
-	dma_fence_signal(ef);
+	dma_fence_signal(p->ef);
 
 	kfd_process_remove_sysfs(p);
 
@@ -1127,7 +1124,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 	svm_range_list_fini(p);
 
 	kfd_process_destroy_pdds(p);
-	dma_fence_put(ef);
+	dma_fence_put(p->ef);
 
 	kfd_event_free_process(p);
 
