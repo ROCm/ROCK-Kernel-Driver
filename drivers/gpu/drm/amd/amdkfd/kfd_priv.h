@@ -982,7 +982,7 @@ struct kfd_process {
 	 * fence will be triggered during eviction and new one will be created
 	 * during restore
 	 */
-	struct dma_fence __rcu *ef;
+	struct dma_fence *ef;
 
 	/* Work items for evicting and restoring BOs */
 	struct delayed_work eviction_work;
