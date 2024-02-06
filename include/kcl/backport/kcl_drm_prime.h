@@ -50,4 +50,17 @@ struct sg_table *_kcl_drm_prime_pages_to_sg(struct drm_device *dev,
 #define drm_prime_pages_to_sg _kcl_drm_prime_pages_to_sg
 #endif
 
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_FD
+int _kcl_drm_gem_prime_handle_to_fd(struct drm_device *dev,
+                               struct drm_file *file_priv, uint32_t handle,
+                               uint32_t flags,
+                               int *prime_fd);
+#define drm_gem_prime_handle_to_fd _kcl_drm_gem_prime_handle_to_fd
+
+int _kcl_drm_gem_prime_fd_to_handle(struct drm_device *dev,
+                               struct drm_file *file_priv, int prime_fd,
+                               uint32_t *handle);
+#define drm_gem_prime_fd_to_handle _kcl_drm_gem_prime_fd_to_handle
+#endif
+
 #endif

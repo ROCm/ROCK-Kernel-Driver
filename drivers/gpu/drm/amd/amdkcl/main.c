@@ -12,6 +12,7 @@ extern void amdkcl_suspend_init(void);
 extern void amdkcl_sched_init(void);
 extern void amdkcl_numa_init(void);
 extern void amdkcl_workqueue_init(void);
+extern void amdkcl_prime_init(void);
 
 int __init amdkcl_init(void)
 {
@@ -25,6 +26,7 @@ int __init amdkcl_init(void)
 	amdkcl_sched_init();
 	amdkcl_numa_init();
 	amdkcl_workqueue_init();
+	amdkcl_prime_init();
 
 	return 0;
 }
