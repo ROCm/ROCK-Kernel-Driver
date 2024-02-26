@@ -13,6 +13,7 @@
 #endif
 #ifndef HAVE_DRM_DRM_EXEC_H
 #include <kcl/kcl_mm_types.h>
+#include <kcl/kcl_mmzone.h>
 #include <drm/ttm/ttm_bo.h>
 #define DRM_EXEC_INTERRUPTIBLE_WAIT	BIT(0)
 #define DRM_EXEC_IGNORE_DUPLICATES	BIT(1)

@@ -20,5 +20,6 @@
 #include <kcl/kcl_shrinker.h>
 #include <kcl/kcl_cc_platform.h>
 #include <kcl/backport/kcl_workqueue_backport.h>
+#include <kcl/kcl_mmzone.h>
 
 #endif
