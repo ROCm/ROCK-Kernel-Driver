@@ -1068,6 +1068,7 @@ struct amdgpu_device {
 	/* mes */
 	bool                            enable_mes;
 	bool                            enable_mes_kiq;
+	bool                            enable_uni_mes;
 	struct amdgpu_mes               mes;
 	struct amdgpu_mqd               mqds[AMDGPU_HW_IP_NUM];
 
