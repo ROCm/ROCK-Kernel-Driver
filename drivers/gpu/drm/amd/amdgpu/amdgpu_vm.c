@@ -3046,7 +3046,7 @@ void amdgpu_debugfs_vm_bo_info(struct amdgpu_vm *vm, struct seq_file *m)
  *
  * Cache the fault info for later use by userspace in debugging.
  */
-#ifdef HAVE_STRUCT_XARRAY
+
 void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 				  unsigned int pasid,
 				  uint64_t addr,
@@ -3056,9 +3056,14 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
-
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
+#else
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
+#endif
+
 	/* Don't update the fault cache if status is 0.  In the multiple
 	 * fault case, subsequent faults will return a 0 status which is
 	 * useless for userspace and replaces the useful fault status, so
@@ -3091,9 +3096,12 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 			WARN_ONCE(1, "Invalid vmhub %u\n", vmhub);
 		}
 	}
+#ifdef HAVE_STRUCT_XARRAY
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
-}
+#else
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
 #endif
+}
 
 /**
  * amdgpu_vm_is_bo_always_valid - check if the BO is VM always valid
