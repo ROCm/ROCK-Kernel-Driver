@@ -2282,9 +2282,15 @@ amdgpu_vm_get_vm_from_pasid(struct amdgpu_device *adev, u32 pasid)
 	struct amdgpu_vm *vm;
 	unsigned long flags;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(&adev->vm_manager.pasids, flags);
 	vm = xa_load(&adev->vm_manager.pasids, pasid);
 	xa_unlock_irqrestore(&adev->vm_manager.pasids, flags);
+#else
+	spin_lock_irqsave(&adev->vm_manager.pasid_lock, flags);
+	vm = idr_find(&adev->vm_manager.pasid_idr, pasid);
+	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
+#endif
 
 	return vm;
 }
