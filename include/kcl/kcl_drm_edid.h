@@ -11,4 +11,11 @@
 	 ((product_id) & 0xffff))
 #endif /* drm_edid_encode_panel_id */
 
+#ifndef DRM_EDID_RANGE_OFFSET_MIN_VFREQ
+#define DRM_EDID_RANGE_OFFSET_MIN_VFREQ (1 << 0) /* 1.4 */
+#define DRM_EDID_RANGE_OFFSET_MAX_VFREQ (1 << 1) /* 1.4 */
+#define DRM_EDID_RANGE_OFFSET_MIN_HFREQ (1 << 2) /* 1.4 */
+#define DRM_EDID_RANGE_OFFSET_MAX_HFREQ (1 << 3) /* 1.4 */
+#endif
+
 #endif
