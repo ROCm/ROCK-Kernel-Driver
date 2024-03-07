@@ -331,12 +331,14 @@ static void nbif_v6_3_1_program_ltr(struct amdgpu_device *adev)
 
 	pcie_capability_read_word(adev->pdev, PCI_EXP_DEVCTL2, &devctl2);
 
+#ifdef HAVE_PCI_DEV_LTR_PATH
 	if (adev->pdev->ltr_path == (devctl2 & PCI_EXP_DEVCTL2_LTR_EN))
 		return;
 
 	if (adev->pdev->ltr_path)
 		pcie_capability_set_word(adev->pdev, PCI_EXP_DEVCTL2, PCI_EXP_DEVCTL2_LTR_EN);
 	else
+#endif
 		pcie_capability_clear_word(adev->pdev, PCI_EXP_DEVCTL2, PCI_EXP_DEVCTL2_LTR_EN);
 }
 #endif
