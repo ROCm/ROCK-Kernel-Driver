@@ -68,7 +68,7 @@ static const struct file_operations kfd_fops = {
 
 static int kfd_char_dev_major = -1;
 struct device *kfd_device;
-static const struct class kfd_class = {
+static struct class kfd_class = {
 	.name = kfd_dev_name,
 };
 
