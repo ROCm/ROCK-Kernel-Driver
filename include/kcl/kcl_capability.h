@@ -28,4 +28,8 @@
 #define CAP_CHECKPOINT_RESTORE CAP_SYS_ADMIN
 #endif
 
+#ifndef CAP_PERFMON
+#define CAP_PERFMON 38
+#endif
+
 #endif
