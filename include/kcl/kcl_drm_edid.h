@@ -18,4 +18,8 @@
 #define DRM_EDID_RANGE_OFFSET_MAX_HFREQ (1 << 3) /* 1.4 */
 #endif
 
+#ifndef DRM_EDID_FEATURE_CONTINUOUS_FREQ
+#define DRM_EDID_FEATURE_CONTINUOUS_FREQ  (1 << 0) /* 1.4 */
+#endif
+
 #endif
