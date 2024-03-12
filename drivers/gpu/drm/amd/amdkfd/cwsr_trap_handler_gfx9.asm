@@ -83,6 +83,7 @@ var SQ_WAVE_TRAPSTS_ADDR_WATCH_SHIFT =	7
 var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK   =	0x100
 var SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT  =	8
 var SQ_WAVE_TRAPSTS_HOST_TRAP_MASK  =	0x400000
+var SQ_WAVE_TRAPSTS_HOST_TRAP_SHIFT =	22
 var SQ_WAVE_TRAPSTS_WAVE_BEGIN_MASK =	0x800000
 var SQ_WAVE_TRAPSTS_WAVE_END_MASK   =	0x1000000
 var SQ_WAVE_TRAPSTS_TRAP_AFTER_INST_MASK =  0x2000000
@@ -104,20 +105,25 @@ var SQ_WAVE_IB_STS_RCNT_FIRST_REPLAY_MASK	= 0x1F8000
 
 var SQ_WAVE_MODE_DEBUG_EN_MASK		=   0x800
 
-var TMA_HOST_TRAP_EN_SHIFT               =   1
-var TMA_HOST_TRAP_EN_SIZE                =   1
-var TMA_HOST_TRAP_EN_BFE                 =   (TMA_HOST_TRAP_EN_SHIFT | (TMA_HOST_TRAP_EN_SIZE << 16))
-
 var TTMP_SAVE_RCNT_FIRST_REPLAY_SHIFT	=   26			// bits [31:26] unused by SPI debug data
 var TTMP_SAVE_RCNT_FIRST_REPLAY_MASK	=   0xFC000000
 var TTMP_DEBUG_TRAP_ENABLED_SHIFT	=   23
 var TTMP_DEBUG_TRAP_ENABLED_MASK	=   0x800000
+var TTMP_HOST_TRAP_ENABLED_SHIFT	=   24
+var TTMP_HOST_TRAP_ENABLED_MASK		=   0x1000000
+var TTMP_FEATURES_ENABLED_FLAGS_SHIFT	=   TTMP_DEBUG_TRAP_ENABLED_SHIFT
+var TTMP_FEATURES_ENABLED_FLAGS_MASK	=   TTMP_DEBUG_TRAP_ENABLED_MASK | TTMP_HOST_TRAP_ENABLED_MASK
 
 /*	Save	    */
 var S_SAVE_BUF_RSRC_WORD1_STRIDE	=   0x00040000		//stride is 4 bytes
 var S_SAVE_BUF_RSRC_WORD3_MISC		=   0x00807FAC		//SQ_SEL_X/Y/Z/W, BUF_NUM_FORMAT_FLOAT, (0 for MUBUF stride[17:14] when ADD_TID_ENABLE and BUF_DATA_FORMAT_32 for MTBUF), ADD_TID_ENABLE
 var S_SAVE_PC_HI_TRAP_ID_MASK		=   0x00FF0000
 var S_SAVE_PC_HI_HT_MASK		=   0x01000000
+var S_SAVE_PC_HI_HT_SHIFT		=   24
+var S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP	=   29	// Only used by the 1st level trap handler to remember if
+							// we saw a trap type that the driver could not mask, so that
+							// we can still go to the 2nd-level handler if we driver-mask another
+							// simultaneous trap.
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK	=   0x04000000		//bit[26]: FirstWaveInTG
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT	=   26
 
@@ -143,9 +149,15 @@ var s_save_m0		    =	ttmp5
 var s_save_ttmps_lo	    =	s_save_tmp		//no conflict
 var s_save_ttmps_hi	    =	s_save_trapsts		//no conflict
 #if ASIC_FAMILY >= CHIP_GC_9_4_3
-var s_save_ib_sts       =	ttmp13
+var s_save_ib_sts	=	ttmp13		// bits 31:26 hold IB_STS, bit 23 to hold debug flag to 2nd-level,
+						// bit 24 to hold host-trap request
+						// so bits 22:0 are available for stashing next variable's backup.
+var s_tma_flags		= 	ttmp7		// free
 #else
-var s_save_ib_sts       =	ttmp11
+var s_save_ib_sts	=	ttmp11		// bits 31:26 hold IB_STS, bit 23 to hold debug flag to 2nd-level,
+						// bit 24 to hold host-trap request, bit 6 is no-scratch, bits 5-0 are wave-in-wg
+						// so bits 22:7 are available for stashing next variable's backup
+var s_tma_flags		=	ttmp13		// free
 #endif
 
 /*	Restore	    */
@@ -214,8 +226,8 @@ L_SKIP_RESTORE:
 
 L_HALTED:
     // Host trap may occur while wave is halted.
-    s_and_b32       ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
-    s_cbranch_scc1  L_FETCH_2ND_TRAP
+    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
+    s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
 
 L_CHECK_SAVE:
     s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK    //check whether this is for save
@@ -233,20 +245,14 @@ L_NOT_HALTED:
     // Any concurrent SAVECTX will be handled upon re-entry once halted.
 
     // Check non-maskable exceptions. memory_violation, illegal_instruction
-    // and debugger (host trap, wave start/end, trap after instruction)
-    // exceptions always cause the wave to enter the trap handler.
+    // and debugger (wave start/end, trap after instruction) exceptions always
+    // cause the wave to enter the trap handler.
     s_and_b32       ttmp2, s_save_trapsts,      \
         SQ_WAVE_TRAPSTS_MEM_VIOL_MASK         | \
         SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK     | \
-        SQ_WAVE_TRAPSTS_HOST_TRAP_MASK        | \
         SQ_WAVE_TRAPSTS_WAVE_BEGIN_MASK       | \
         SQ_WAVE_TRAPSTS_WAVE_END_MASK         | \
         SQ_WAVE_TRAPSTS_TRAP_AFTER_INST_MASK
-    s_cbranch_scc1  L_FETCH_2ND_TRAP
-
-    // Check TTMP1 bits 24 (HT) and 23:16(trapID): HT == 1 & trapID == 4
-    s_and_b32       ttmp2, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
-    s_cmp_eq_u32    ttmp2, 0x1040000
     s_cbranch_scc1  L_FETCH_2ND_TRAP
 
     // Check for maskable exceptions in trapsts.excp and trapsts.excp_hi.
@@ -266,9 +272,15 @@ L_NOT_ADDR_WATCH:
     s_cbranch_scc1  L_FETCH_2ND_TRAP
 
 L_CHECK_TRAP_ID:
-    // Check trap_id != 0
+    // Check trap_id != 0.  If this is a host trap (ttmp1.HT == 1), trap_id is
+    // non 0, but we defer that part of the check until later as this exception
+    // is driver maskable.  We need to make sure that all non-driver-maskable
+    // exceptions are accounted for before checking for driver-maskable ones.
+    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
+    s_cbranch_scc1  L_SKIP_CHECK_TRAP_ID
     s_and_b32       ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
     s_cbranch_scc1  L_FETCH_2ND_TRAP
+L_SKIP_CHECK_TRAP_ID:
 
 if SINGLE_STEP_MISSED_WORKAROUND
     // Prioritize single step exception over context save.
@@ -278,16 +290,22 @@ if SINGLE_STEP_MISSED_WORKAROUND
     s_cbranch_scc1  L_FETCH_2ND_TRAP
 end
 
+    // Check TTMP1 bits 24 (HT) == 1
+    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
+    s_cbranch_scc1  L_FETCH_2ND_TRAP_DRIVER_MASKABLE
+
     s_and_b32       ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
     s_cbranch_scc1  L_SAVE
 
 L_FETCH_2ND_TRAP:
+    s_bitset1_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
+L_FETCH_2ND_TRAP_DRIVER_MASKABLE:
     // Preserve and clear scalar XNACK state before issuing scalar reads.
     save_and_clear_ib_sts(ttmp14)
 
     // Read second-level TBA/TMA from first-level TMA and jump if available.
-    // ttmp[2:5] and ttmp12 can be used (others hold SPI-initialized debug data)
-    // ttmp12 holds SQ_WAVE_STATUS
+    // ttmp[2:5] and s_tma_flags can be used (others hold SPI-initialized debug
+    // data) ttmp12 holds SQ_WAVE_STATUS
     s_getreg_b32    ttmp14, hwreg(HW_REG_SQ_SHADER_TMA_LO)
     s_getreg_b32    ttmp15, hwreg(HW_REG_SQ_SHADER_TMA_HI)
     s_lshl_b64      [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8
@@ -296,22 +314,42 @@ L_FETCH_2ND_TRAP:
     s_cbranch_scc0  L_NO_SIGN_EXTEND_TMA
     s_or_b32        ttmp15, ttmp15, 0xFFFF0000
 L_NO_SIGN_EXTEND_TMA:
-
-    s_load_dword    ttmp4, [ttmp14, ttmp15], 0x10 glc:1 // enable flags from 1st level TMA
+    s_load_dword    s_tma_flags, [ttmp14, ttmp15], 0x10 glc:1 //Load the debug enables and host trap enabled flags
     s_load_dwordx2  [ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 glc:1 // second-level TBA
     s_load_dwordx2  [ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1 // second-level TMA
     s_waitcnt       lgkmcnt(0)
-    s_and_b32       ttmp5, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK // host trap request
-    s_cbranch_scc0  L_NOT_HT
-    s_bfe_u32       ttmp5, ttmp4, TMA_HOST_TRAP_EN_BFE // extract host_trap_en to ttmp5[0]
-    s_cbranch_scc0  L_EXIT_TRAP // HT requested, but host traps not enabled
-    s_branch        L_GOTO_2ND_TRAP
-L_NOT_HT:
-    s_and_b32       ttmp4, ttmp4, 0x1 // debug_enable bit left over
-    s_lshl_b32      ttmp4, ttmp4, TTMP_DEBUG_TRAP_ENABLED_SHIFT
-    s_andn2_b32     s_save_ib_sts, s_save_ib_sts, TTMP_DEBUG_TRAP_ENABLED_MASK
-    s_or_b32        s_save_ib_sts, s_save_ib_sts, ttmp4
+
+    // Put debug enable bit and host trap bit into SAVE_IB_STS register, bits
+    // 23 and 24, respectively.
+    s_lshl_b32      s_tma_flags, s_tma_flags, TTMP_FEATURES_ENABLED_FLAGS_SHIFT
+    s_andn2_b32     s_save_ib_sts, s_save_ib_sts, TTMP_FEATURES_ENABLED_FLAGS_MASK
+    s_or_b32        s_save_ib_sts, s_save_ib_sts, s_tma_flags
+
+    // If not a host trap, then driver cannot mask this. Go to the 2nd-level
+    // trap handler now.
+    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_HT_SHIFT
+    s_cbranch_scc0  L_GOTO_2ND_TRAP
+
+    // If driver said host traps are OK, go to the 2nd-level handler now.
+    s_bitcmp1_b32   s_save_ib_sts, TTMP_HOST_TRAP_ENABLED_SHIFT
+    s_cbranch_scc1  L_GOTO_2ND_TRAP
+
+    // The driver said host traps are masked, zero out host trap and trapID.
+    s_andn2_b32     s_save_pc_hi, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+    s_setreg_imm32_b32 hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_HOST_TRAP_SHIFT, 1), 0x0
+
+    // If there was another trap besides this masked host trap, go handle it in
+    // 2nd-level handler.
+    s_bitcmp1_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
+    s_bitset0_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP // zero this out
+    s_cbranch_scc0  L_EXIT_TRAP // Otherwise, exit the trap handler
+
 L_GOTO_2ND_TRAP:
+    // Reset bits used temporarily by 1st level trap handler so they do not
+    // leak to the 2nd level trap handler.
+    s_bitset0_b32   s_save_ib_sts, TTMP_HOST_TRAP_ENABLED_SHIFT
+    s_bitset0_b32   s_save_pc_hi, S_SAVE_PC_HI_NON_DRIVER_MASKABLE_TRAP
+
     s_and_b64       [ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
     s_cbranch_scc0  L_NO_NEXT_TRAP // second-level trap handler not been set
     s_setpc_b64     [ttmp2, ttmp3] // jump to second-level trap handler
