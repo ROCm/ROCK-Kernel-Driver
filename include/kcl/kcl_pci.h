@@ -97,6 +97,12 @@
 	0)
 #endif
 
+#ifndef PCI_ERROR_RESPONSE
+#define PCI_ERROR_RESPONSE		(~0ULL)
+#define PCI_SET_ERROR_RESPONSE(val)	(*(val) = ((typeof(*(val))) PCI_ERROR_RESPONSE))
+#define PCI_POSSIBLE_ERROR(val)		((val) == ((typeof(val)) PCI_ERROR_RESPONSE))
+#endif
+
 static inline enum pci_bus_speed kcl_pcie_get_speed_cap(struct pci_dev *dev)
 {
 	return pcie_get_speed_cap(dev);
