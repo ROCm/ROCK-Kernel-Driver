@@ -966,6 +966,9 @@ struct dc_debug_options {
 	unsigned int min_prefetch_in_strobe_ns;
 	bool disable_unbounded_requesting;
 	bool dig_fifo_off_in_blank;
+	#ifndef HAVE_DRM_DP_REMOVE_RAYLOAD_PART
+	bool temp_mst_deallocation_sequence;
+	#endif
 	bool override_dispclk_programming;
 	bool otg_crc_db;
 	bool disallow_dispclk_dppclk_ds;
