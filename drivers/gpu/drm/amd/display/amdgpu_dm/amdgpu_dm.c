@@ -12321,11 +12321,13 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 		if (amdgpu_dm_connector->dc_link &&
 		    amdgpu_dm_connector->dc_link->dpcd_caps.allow_invalid_MSA_timing_param) {
 			if (edid->features & DRM_EDID_FEATURE_CONTINUOUS_FREQ) {
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 				amdgpu_dm_connector->min_vfreq = connector->display_info.monitor_range.min_vfreq;
 				amdgpu_dm_connector->max_vfreq = connector->display_info.monitor_range.max_vfreq;
 				if (amdgpu_dm_connector->max_vfreq -
 				    amdgpu_dm_connector->min_vfreq > 10)
 					freesync_capable = true;
+#endif
 			} else {
 				edid_check_required = edid->version > 1 ||
 						      (edid->version == 1 &&
