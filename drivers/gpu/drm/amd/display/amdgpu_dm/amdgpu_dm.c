@@ -11598,8 +11598,10 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 						     amdgpu_dm_connector)) {
 			if (edid->features & DRM_EDID_FEATURE_CONTINUOUS_FREQ) {
 				freesync_capable = true;
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 				amdgpu_dm_connector->min_vfreq = connector->display_info.monitor_range.min_vfreq;
 				amdgpu_dm_connector->max_vfreq = connector->display_info.monitor_range.max_vfreq;
+#endif
 			} else {
 				edid_check_required = edid->version > 1 ||
 						      (edid->version == 1 &&
