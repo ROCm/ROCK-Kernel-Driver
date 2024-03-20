@@ -90,19 +90,6 @@ struct amdgpu_reset_domain {
 	bool drain;
 };
 
-#ifdef CONFIG_DEV_COREDUMP
-
-#define AMDGPU_COREDUMP_VERSION "1"
-
-struct amdgpu_coredump_info {
-	struct amdgpu_device		*adev;
-	struct amdgpu_task_info         reset_task_info;
-	struct timespec64               reset_time;
-	bool                            reset_vram_lost;
-	struct amdgpu_ring			*ring;
-};
-#endif
-
 int amdgpu_reset_init(struct amdgpu_device *adev);
 int amdgpu_reset_fini(struct amdgpu_device *adev);
 
@@ -156,9 +143,6 @@ static inline bool amdgpu_reset_domain_in_drain_mode(struct amdgpu_reset_domain 
 void amdgpu_device_lock_reset_domain(struct amdgpu_reset_domain *reset_domain);
 
 void amdgpu_device_unlock_reset_domain(struct amdgpu_reset_domain *reset_domain);
-
-void amdgpu_coredump(struct amdgpu_device *adev, bool vram_lost,
-		     struct amdgpu_reset_context *reset_context);
 
 #define for_each_handler(i, handler, reset_ctl)                  \
 	for (i = 0; (i < AMDGPU_RESET_MAX_HANDLERS) &&           \
