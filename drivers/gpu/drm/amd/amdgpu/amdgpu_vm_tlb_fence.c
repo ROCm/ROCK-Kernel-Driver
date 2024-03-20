@@ -71,7 +71,9 @@ static void amdgpu_tlb_fence_work(struct work_struct *work)
 }
 
 static const struct dma_fence_ops amdgpu_tlb_fence_ops = {
+#ifdef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO
 	.use_64bit_seqno = true,
+#endif
 	.get_driver_name = amdgpu_tlb_fence_get_driver_name,
 	.get_timeline_name = amdgpu_tlb_fence_get_timeline_name
 };
