@@ -933,7 +933,7 @@ amdgpu_vm_tlb_flush(struct amdgpu_vm_update_params *params,
 		amdgpu_vm_tlb_fence_create(params->adev, vm, fence);
 
 		/* Makes sure no PD/PT is freed before the flush */
-		dma_resv_add_fence(vm->root.bo->tbo.base.resv, *fence,
+		dma_resv_add_fence(amdkcl_ttm_resvp(&vm->root.bo->tbo), *fence,
 				   DMA_RESV_USAGE_BOOKKEEP);
 	}
 }
