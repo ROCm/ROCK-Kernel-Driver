@@ -116,7 +116,22 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 
 	return result;
 }
+#ifndef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
+static enum drm_connector_status
+dm_dp_mst_detect(struct drm_connector *connector, bool force)
+{
+       struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+       struct amdgpu_dm_connector *master = aconnector->mst_port;
 
+       enum drm_connector_status status =
+               drm_dp_mst_detect_port(
+                       connector,
+                       &master->mst_mgr,
+                       aconnector->port);
+
+       return status;
+}
+#endif
 static void
 dm_dp_mst_connector_destroy(struct drm_connector *connector)
 {
@@ -194,6 +209,9 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 }
 
 static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
+#ifndef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
+	.detect = dm_dp_mst_detect,
+#endif
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = dm_dp_mst_connector_destroy,
 	.reset = amdgpu_dm_connector_funcs_reset,
@@ -441,6 +459,7 @@ dm_mst_atomic_best_encoder(struct drm_connector *connector,
 	return &adev->dm.mst_encoders[acrtc->crtc_id].base;
 }
 
+#ifdef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
 static int
 dm_dp_mst_detect(struct drm_connector *connector,
 		 struct drm_modeset_acquire_ctx *ctx, bool force)
@@ -513,6 +532,7 @@ dm_dp_mst_detect(struct drm_connector *connector,
 
 	return connection_status;
 }
+#endif
 
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 static int dm_dp_mst_atomic_check(struct drm_connector *connector,
@@ -530,7 +550,9 @@ static const struct drm_connector_helper_funcs dm_dp_mst_connector_helper_funcs 
 	.get_modes = dm_dp_mst_get_modes,
 	.mode_valid = amdgpu_dm_connector_mode_valid,
 	.atomic_best_encoder = dm_mst_atomic_best_encoder,
+#ifdef HAVE_DRM_DP_MST_DETECT_PORT_PPPP
 	.detect_ctx = dm_dp_mst_detect,
+#endif
 #if defined(HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_CHECK_ARG_DRM_ATOMIC_STATE)
 	.atomic_check = dm_dp_mst_atomic_check,
 #endif
