@@ -66,6 +66,7 @@
 #define FN(reg_name, field_name) \
 	hws->shifts->field_name, hws->masks->field_name
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 void dcn32_dsc_pg_control(
 		struct dce_hwseq *hws,
 		unsigned int dsc_inst,
@@ -128,7 +129,7 @@ void dcn32_dsc_pg_control(
 	if (org_ip_request_cntl == 0)
 		REG_SET(DC_IP_REQUEST_CNTL, 0, IP_REQUEST_EN, 0);
 }
-
+#endif
 
 void dcn32_enable_power_gating_plane(
 	struct dce_hwseq *hws,

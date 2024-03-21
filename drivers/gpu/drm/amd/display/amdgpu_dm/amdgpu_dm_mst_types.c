@@ -233,6 +233,8 @@ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER */
 };
 
+#if defined(CONFIG_DRM_AMD_DC_DSC_SUPPORT)
+#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 bool needs_dsc_aux_workaround(struct dc_link *link)
 {
 	if (link->dpcd_caps.branch_dev_id == DP_BRANCH_DEVICE_ID_90CC24 &&
@@ -267,9 +269,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	u8 dsc_branch_dec_caps_raw[3] = { 0 };	// DSC branch decoder caps 0xA0 ~ 0xA2
 	u8 *dsc_branch_dec_caps = NULL;
 
-#if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 	aconnector->dsc_aux = drm_dp_mst_dsc_aux_for_port(port);
-#endif
 	/*
 	 * drm_dp_mst_dsc_aux_for_port() will return NULL for certain configs
 	 * because it only check the dsc/fec caps of the "port variable" and not the dock
@@ -324,6 +324,8 @@ static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnect
 
 	return true;
 }
+#endif
+#endif
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
