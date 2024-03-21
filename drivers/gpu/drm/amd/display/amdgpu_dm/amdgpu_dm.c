@@ -7946,7 +7946,11 @@ void amdgpu_dm_connector_init_helper(struct amdgpu_display_manager *dm,
 			drm_connector_attach_vrr_capable_property(&aconnector->base);
 
 		if (adev->dm.hdcp_workqueue)
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 			drm_connector_attach_content_protection_property(&aconnector->base, true);
+#else
+			drm_connector_attach_content_protection_property(&aconnector->base);
+#endif
 	}
 }
 
@@ -8241,6 +8245,7 @@ static bool is_content_protection_different(struct drm_crtc_state *new_crtc_stat
 		new_crtc_state->active_changed,
 		new_crtc_state->connectors_changed);
 
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
 	/* hdcp content type change */
 	if (old_conn_state->hdcp_content_type != new_conn_state->hdcp_content_type &&
 	    new_conn_state->content_protection != DRM_MODE_CONTENT_PROTECTION_UNDESIRED) {
@@ -8248,6 +8253,7 @@ static bool is_content_protection_different(struct drm_crtc_state *new_crtc_stat
 		pr_debug("[HDCP_DM] Type0/1 change %s :true\n", __func__);
 		return true;
 	}
+#endif
 
 	/* CP is being re enabled, ignore this */
 	if (old_conn_state->content_protection == DRM_MODE_CONTENT_PROTECTION_ENABLED &&
@@ -9558,7 +9564,12 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 
 			hdcp_update_display(
 				adev->dm.hdcp_workqueue, aconnector->dc_link->link_index, aconnector,
-				new_con_state->hdcp_content_type, enable_encryption);
+#ifdef HAVE_DRM_CONNECTOR_STATE_HDCP_CONTENT_TYPE
+				new_con_state->hdcp_content_type,
+#else
+				DRM_MODE_HDCP_CONTENT_TYPE0,
+#endif
+				enable_encryption);
 		}
 	}
 
