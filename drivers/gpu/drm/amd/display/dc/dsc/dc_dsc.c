@@ -22,6 +22,7 @@
  * Author: AMD
  */
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #include <drm/display/drm_dp_helper.h>
 #include <drm/display/drm_dsc_helper.h>
 #include "dc_hw_types.h"
@@ -1266,3 +1267,4 @@ void dc_dsc_get_default_config_option(const struct dc *dc, struct dc_dsc_config_
 	options->slice_height_granularity = 1;
 	options->force_dsc_when_not_needed = false;
 }
+#endif

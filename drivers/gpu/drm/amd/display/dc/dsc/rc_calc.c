@@ -1,3 +1,4 @@
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 
 /*
  * Copyright 2017 Advanced Micro Devices, Inc.
@@ -62,3 +63,4 @@ void calc_rc_params(struct rc_params *rc, const struct drm_dsc_config *pps)
 	DC_FP_END();
 #endif
 }
+#endif
