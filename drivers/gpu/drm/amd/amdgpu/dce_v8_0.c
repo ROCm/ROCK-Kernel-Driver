@@ -2805,7 +2805,9 @@ static int dce_v8_0_sw_init(void *handle)
 	else
 		adev_to_drm(adev)->mode_config.prefer_shadow = 1;
 
+#ifdef HAVE_DRM_MODE_CONFIG_FB_MODIFIERS_NOT_SUPPORTED
 	adev_to_drm(adev)->mode_config.fb_modifiers_not_supported = true;
+#endif
 
 	r = amdgpu_display_modeset_create_props(adev);
 	if (r)
