@@ -21,6 +21,7 @@
  * Authors: AMD
  *
  */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 #ifndef __DCN20_DSC_H__
 #define __DCN20_DSC_H__
 
@@ -586,4 +587,4 @@ bool dsc2_get_packed_pps(struct display_stream_compressor *dsc,
 		uint8_t *dsc_packed_pps);
 
 #endif
-
+#endif
