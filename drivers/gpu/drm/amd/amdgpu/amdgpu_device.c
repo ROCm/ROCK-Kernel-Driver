@@ -76,10 +76,7 @@
 #include "amdgpu_fru_eeprom.h"
 #include "amdgpu_reset.h"
 #include "amdgpu_virt.h"
-
-#ifdef CONFIG_DEV_COREDUMP
 #include "amdgpu_dev_coredump.h"
-#endif
 
 #include <linux/suspend.h>
 #include <drm/task_barrier.h>
