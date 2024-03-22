@@ -15,3 +15,21 @@ AC_DEFUN([AC_AMDGPU_DRM_DEBUG_ENABLED], [
 		])
 	])
 ])
+
+dnl #
+dnl # commit v6.8-rc3-242-g9fd6f61a297e
+dnl # drm/print: add drm_dbg_printer() for drm device specific printer
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DBG_PRINTER], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_print.h>
+		],[
+			drm_dbg_printer(NULL, 0, NULL);
+		],[
+			AC_DEFINE(HAVE_DRM_DBG_PRINTER,
+				1,
+				[drm_dbg_printer() is available])
+		])
+	])
+])

@@ -48,4 +48,16 @@ void _kcl_drm_print_bits(struct drm_printer *p, unsigned long value,
 #define drm_print_bits _kcl_drm_print_bits
 #endif
 
+
+#ifndef HAVE_DRM_DBG_PRINTER
+static inline
+struct drm_printer _kcl_drm_dbg_printer(struct drm_device *drm,
+                                enum drm_debug_category category,
+                                const char *prefix)
+{
+	return drm_debug_printer(prefix);
+}
+#define drm_dbg_printer _kcl_drm_dbg_printer
+#endif
+
 #endif
