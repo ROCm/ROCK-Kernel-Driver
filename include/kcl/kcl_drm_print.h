@@ -179,4 +179,10 @@ void drm_print_bits(struct drm_printer *p, unsigned long value,
 		    const char * const bits[], unsigned int nbits);
 #endif
 
+#ifndef HAVE_DRM_DEBUG_CATEGORY
+enum drm_debug_category {
+	KCL_DRM_DEBUG_CATEGORY
+};
+#endif
+
 #endif
