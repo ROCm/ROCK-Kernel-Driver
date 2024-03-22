@@ -641,7 +641,7 @@ void amdgpu_vm_pt_free_list(struct amdgpu_device *adev,
 
 	if (unlocked) {
 		spin_lock(&vm->status_lock);
-		list_splice_init(&vm->pt_freed, &params->tlb_flush_waitlist);
+		list_splice_init(&params->tlb_flush_waitlist, &vm->pt_freed);
 		spin_unlock(&vm->status_lock);
 		schedule_work(&vm->pt_free_work);
 		return;
