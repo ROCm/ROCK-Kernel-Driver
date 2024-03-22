@@ -24,3 +24,19 @@ AC_DEFUN([AC_AMDGPU_DRM_GEM_OBJECT_PUT], [
 		])
 	])
 ])
+
+dnl #
+dnl # v6.8-rc3-286-gb31f5eba32ae drm: add drm_gem_object_is_shared_for_memory_stats() helper
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/drm_gem.h>
+		], [
+			drm_gem_object_is_shared_for_memory_stats(NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS, 1,
+				[drm_gem_object_is_shared_for_memory_stats() is available])			
+		])
+	])
+])
