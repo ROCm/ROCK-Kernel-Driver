@@ -57,4 +57,12 @@ drm_gem_object_get(struct drm_gem_object *obj)
 }
 #endif /* HAVE_DRM_GEM_OBJECT_PUT */
 
+/* copy from include/drm/drm_gem.h */
+#ifndef HAVE_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS
+static inline bool drm_gem_object_is_shared_for_memory_stats(struct drm_gem_object *obj)
+{
+        return (obj->handle_count > 1) || obj->dma_buf;
+}
+#endif /* HAVE_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS */
+
 #endif
