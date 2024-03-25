@@ -185,4 +185,20 @@ enum drm_debug_category {
 };
 #endif
 
+#ifndef drm_info
+/*
+ * struct drm_device based logging
+ *
+ * Prefer drm_device based logging over device or prink based logging.
+ */
+
+/* Helper for struct drm_device based logging. */
+#define __drm_printk(drm, level, type, fmt, ...)                        \
+        dev_##level##type((drm) ? (drm)->dev : NULL, "[drm] " fmt, ##__VA_ARGS__)
+
+
+#define drm_info(drm, fmt, ...)                                 \
+        __drm_printk((drm), info,, fmt, ##__VA_ARGS__)
+#endif
+
 #endif
