@@ -2802,7 +2802,8 @@ static int amdgpu_pmops_runtime_suspend(struct device *dev)
 		drm_dev->switch_power_state = DRM_SWITCH_POWER_DYNAMIC_OFF;
 	} else if (adev->pm.rpm_mode == AMDGPU_RUNPM_BOCO) {
 		/* nothing to do */
-	} else if (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO) {
+	} else if ((adev->pm.rpm_mode == AMDGPU_RUNPM_BACO) ||
+			(adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO)) {
 		amdgpu_device_baco_enter(drm_dev);
 	}
 
@@ -2842,7 +2843,8 @@ static int amdgpu_pmops_runtime_resume(struct device *dev)
 		 * PCI core handles it for _PR3.
 		 */
 		pci_set_master(pdev);
-	} else if (adev->pm.rpm_mode == AMDGPU_RUNPM_BACO) {
+	} else if ((adev->pm.rpm_mode == AMDGPU_RUNPM_BACO) ||
+			(adev->pm.rpm_mode == AMDGPU_RUNPM_BAMACO)) {
 		amdgpu_device_baco_exit(drm_dev);
 	}
 	ret = amdgpu_device_resume(drm_dev, false);
