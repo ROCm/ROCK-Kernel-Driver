@@ -125,4 +125,5 @@
 #include <kcl/kcl_units.h>
 #include <kcl/kcl_dma-buf.h>
 #include <kcl/backport/kcl_drm_exec.h>
+#include <kcl/kcl_math64.h>
 #endif /* AMDGPU_BACKPORT_H */
