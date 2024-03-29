@@ -1910,7 +1910,11 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 		}
 
 		if (slot_num > max_slot_num ||
-			pbn > aconnector->mst_output_port->full_pbn) {
+#ifdef HAVE_DRM_DP_MST_PORT_FULL_PBN
+		    pbn > aconnector->mst_output_port->full_pbn) {
+#else
+		    pbn > aconnector->mst_output_port->available_pbn) {
+#endif
 			DRM_DEBUG_DRIVER("Mode can not be supported within mst links!");
 			return DC_FAIL_BANDWIDTH_VALIDATE;
 		}
