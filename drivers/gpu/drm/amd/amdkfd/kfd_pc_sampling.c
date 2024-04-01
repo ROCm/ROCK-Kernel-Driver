@@ -133,6 +133,7 @@ static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 	int num_method = 0;
 	int ret;
 	int i;
+	const uint32_t user_num_sample_info = user_args->num_sample_info;
 
 	for (i = 0; i < ARRAY_SIZE(supported_formats); i++)
 		if (KFD_GC_VERSION(pdd->dev) == supported_formats[i].ip_version)
@@ -160,8 +161,15 @@ static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 	}
 	mutex_unlock(&pdd->dev->pcs_data.mutex);
 
-	if (!user_args->sample_info_ptr || user_args->num_sample_info < num_method) {
-		user_args->num_sample_info = num_method;
+	user_args->num_sample_info = num_method;
+
+	if (!user_args->sample_info_ptr || !user_num_sample_info) {
+		/*
+		 * User application is querying the size of buffer needed. Application will
+		 * allocate required buffer size and send a second query.
+		 */
+		return 0;
+	} else if (user_num_sample_info < num_method) {
 		pr_debug("ASIC requires space for %d kfd_pc_sample_info entries.", num_method);
 		return -ENOSPC;
 	}
