@@ -76,9 +76,6 @@
 /* whether CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL is defined */
 #define HAVE_CHUNK_ID_SYNCOBJ_TIMELINE_WAIT_SIGNAL 1
 
-/* whether CHUNK_ID_SYNOBJ_IN_OUT is defined */
-#define HAVE_CHUNK_ID_SYNOBJ_IN_OUT 1
-
 /* compat_ptr_ioctl() is available */
 #define HAVE_COMPAT_PTR_IOCTL 1
 
@@ -200,9 +197,6 @@
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
 #define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
 
-/* struct drm_connector_funcs has register members */
-#define HAVE_DRM_CONNECTOR_FUNCS_REGISTER 1
-
 /* atomic_best_encoder take 2nd arg type of state as struct drm_atomic_state
    */
 #define HAVE_DRM_CONNECTOR_HELPER_FUNCS_ATOMIC_BEST_ENCODER_ARG_DRM_ATOMIC_STATE 1
@@ -239,6 +233,12 @@
 /* drm_crtc_helper_funcs->atomic_enable()/atomic_disable() wants struct
    drm_atomic_state arg */
 #define HAVE_DRM_CRTC_HELPER_FUNCS_ATOMIC_ENABLE_ARG_DRM_ATOMIC_STATE 1
+
+/* drm_dbg_printer() is available */
+#define HAVE_DRM_DBG_PRINTER 1
+
+/* enum drm_debug_category is available */
+#define HAVE_DRM_DEBUG_CATEGORY 1
 
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
@@ -383,9 +383,6 @@
 /* struct drm_dp_mst_topology_mgr.base is available */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_BASE 1
 
-/* drm_dp_mst_topology_mgr_init() wants drm_device arg */
-#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_DRM_DEV 1
-
 /* drm_dp_mst_topology_mgr_init() has max_lane_count and max_link_rate */
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_MGR_INIT_MAX_LANE_COUNT */
 
@@ -431,15 +428,6 @@
 /* Define to 1 if you have the <drm/drm_aperture.h> header file. */
 #define HAVE_DRM_DRM_APERTURE_H 1
 
-/* Define to 1 if you have the <drm/drm_atomic_uapi.h> header file. */
-#define HAVE_DRM_DRM_ATOMIC_UAPI_H 1
-
-/* Define to 1 if you have the <drm/drm_audio_component.h> header file. */
-#define HAVE_DRM_DRM_AUDIO_COMPONENT_H 1
-
-/* Define to 1 if you have the <drm/drm_auth.h> header file. */
-#define HAVE_DRM_DRM_AUTH_H 1
-
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
 
@@ -457,9 +445,6 @@
 
 /* Define to 1 if you have the <drm/drm_managed.h> header file. */
 #define HAVE_DRM_DRM_MANAGED_H 1
-
-/* Define to 1 if you have the <drm/drm_plane.h> header file. */
-#define HAVE_DRM_DRM_PLANE_H 1
 
 /* Define to 1 if you have the <drm/drm_probe_helper.h> header file. */
 #define HAVE_DRM_DRM_PROBE_HELPER_H 1
@@ -492,7 +477,7 @@
 #define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
 
 /* drm_exec() has 3 arguments */
-#define HAVE_DRM_EXEC_INIT_3_ARGUMENTS
+#define HAVE_DRM_EXEC_INIT_3_ARGUMENTS 1
 
 /* drm_fb_helper_fill_info() is available */
 #define HAVE_DRM_FB_HELPER_FILL_INFO 1
@@ -502,12 +487,6 @@
 
 /* drm_fb_helper_init() has 3 args */
 /* #undef HAVE_DRM_FB_HELPER_INIT_3ARGS */
-
-/* whether drm_fb_helper_lastclose() is available */
-#define HAVE_DRM_FB_HELPER_LASTCLOSE 1
-
-/* drm_fb_helper_unregister_info() is available */
-#define HAVE_DRM_FB_HELPER_UNREGISTER_INFO 1
 
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
@@ -520,6 +499,9 @@
 
 /* drm_gem_object_funcs.vmap hsa iosys_map arg */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_HAS_IOSYS_MAP_ARG 1
+
+/* drm_gem_object_is_shared_for_memory_stats() is available */
+#define HAVE_DRM_GEM_OBJECT_IS_SHARED_FOR_MEMORY_STATS 1
 
 /* drm_gem_object_put() is available */
 #define HAVE_DRM_GEM_OBJECT_PUT 1
@@ -557,9 +539,6 @@
 /* drm_memcpy_from_wc() is availablea and has struct iosys_map* arg */
 #define HAVE_DRM_MEMCPY_FROM_WC_IOSYS_MAP_ARG 1
 
-/* drm_modeset_backoff() has int return */
-/* #undef HAVE_DRM_MODESET_BACKOFF_RETURN_INT */
-
 /* drm_mode_config->dp_subconnector_property is available */
 #define HAVE_DRM_MODE_CONFIG_DP_SUBCONNECTOR_PROPERTY 1
 
@@ -582,20 +561,7 @@
 #define HAVE_DRM_NEED_SWIOTLB 1
 
 /* drm_plane_helper_destroy() is available */
-/* #undef HAVE_DRM_PLANE_HELPER_DESTROY */
-
-/* drm_plane_mask is available */
-#define HAVE_DRM_PLANE_MASK 1
-
-/* drm_plane_create_alpha_property, drm_plane_create_blend_mode_property are
-   available */
-#define HAVE_DRM_PLANE_PROPERTY_ALPHA_BLEND_MODE 1
-
-/* drm_plane_create_color_properties is available */
-#define HAVE_DRM_PLANE_PROPERTY_COLOR_ENCODING_RANGE 1
-
-/* drm_plane_create_rotation_property is available */
-#define HAVE_DRM_PLANE_PROPERTY_ROTATION 1
+#define HAVE_DRM_PLANE_HELPER_DESTROY 1
 
 /* drm_prime_pages_to_sg() wants 3 arguments */
 #define HAVE_DRM_PRIME_PAGES_TO_SG_3ARGS 1
@@ -620,9 +586,6 @@
 
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
-
-/* drm_vblank->time uses ktime_t type */
-#define HAVE_DRM_VBLANK_USE_KTIME_T 1
 
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
@@ -804,12 +767,6 @@
 /* Define to 1 if you have the <linux/mmap_lock.h> header file. */
 #define HAVE_LINUX_MMAP_LOCK_H 1
 
-/* Define to 1 if you have the <linux/nospec.h> header file. */
-#define HAVE_LINUX_NOSPEC_H 1
-
-/* Define to 1 if you have the <linux/overflow.h> header file. */
-#define HAVE_LINUX_OVERFLOW_H 1
-
 /* Define to 1 if you have the <linux/pci-p2pdma.h> header file. */
 #define HAVE_LINUX_PCI_P2PDMA_H 1
 
@@ -818,9 +775,6 @@
 
 /* Define to 1 if you have the <linux/processor.h> header file. */
 #define HAVE_LINUX_PROCESSOR_H 1
-
-/* Define to 1 if you have the <linux/rbtree_types.h> header file. */
-#define HAVE_LINUX_RBTREE_TYPES_H 1
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
@@ -875,9 +829,6 @@
 
 /* mmu_notifier_synchronize() is available */
 #define HAVE_MMU_NOTIFIER_SYNCHRONIZE 1
-
-/* mm_access() is available */
-/* #undef HAVE_MM_ACCESS */
 
 /* release_pages() wants 2 args */
 #define HAVE_MM_RELEASE_PAGES_2ARGS 1
@@ -935,9 +886,6 @@
 
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
-
-/* struct rb_root_cached is available */
-#define HAVE_RB_ROOT_CACHED 1
 
 /* whether register_shrinker(x, x) is available */
 /* #undef HAVE_REGISTER_SHRINKER_WITH_TWO_ARGUMENTS */
@@ -997,12 +945,6 @@
    arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
 
-/* drm_plane_helper_funcs->prepare_fb() wants const p arg */
-/* #undef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_CONST */
-
-/* drm_plane_helper_funcs->prepare_fb() wants p,p arg */
-#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_PREPARE_FB_PP 1
-
 /* ide->idr_base is available */
 #define HAVE_STRUCT_IDE_IDR_BASE 1
 
@@ -1039,9 +981,6 @@
 /* vga_remove_vgacon() is available */
 #define HAVE_VGA_REMOVE_VGACON 1
 
-/* vga_switcheroo_set_dynamic_switch() exist */
-/* #undef HAVE_VGA_SWITCHEROO_SET_DYNAMIC_SWITCH */
-
 /* vma_is_initial_{heap, stack} is available */
 #define HAVE_VMA_IS_INITIAL_HEAP 1
 
@@ -1053,12 +992,6 @@
 
 /* vmf_insert_mixed_prot() is available */
 /* #undef HAVE_VMF_INSERT_MIXED_PROT */
-
-/* vmf_insert_pfn_{pmd,pud}() wants 3 args */
-/* #undef HAVE_VMF_INSERT_PFN_PMD_3ARGS */
-
-/* vmf_insert_pfn_{pmd,pud}_prot() is available */
-#define HAVE_VMF_INSERT_PFN_PMD_PROT 1
 
 /* vmf_insert_pfn_prot() is available */
 #define HAVE_VMF_INSERT_PFN_PROT 1
