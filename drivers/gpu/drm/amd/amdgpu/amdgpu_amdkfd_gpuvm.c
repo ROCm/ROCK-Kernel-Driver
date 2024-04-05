@@ -2411,6 +2411,23 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 	if (unlikely(ret))
 		return ret;
 
+	if (bo->flags & AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS) {
+		/*
+		 * If bo is not contiguous on VRAM, move to system memory first to ensure
+		 * we can get contiguous VRAM space after evicting other BOs.
+		 */
+		if (!(bo->tbo.resource->placement & TTM_PL_FLAG_CONTIGUOUS)) {
+			struct ttm_operation_ctx ctx = { true, false };
+
+			amdgpu_bo_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_GTT);
+			ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+			if (unlikely(ret)) {
+				pr_debug("validate bo 0x%p to GTT failed %d\n", &bo->tbo, ret);
+				goto out;
+			}
+		}
+	}
+
 	ret = amdgpu_bo_pin_restricted(bo, domain, 0, 0);
 	if (ret)
 		pr_err("Error in Pinning BO to domain: %d\n", domain);
@@ -2421,6 +2438,7 @@ int amdgpu_amdkfd_gpuvm_pin_bo(struct amdgpu_bo *bo, u32 domain)
 		atomic64_add(amdgpu_bo_size(bo),
 			&amdgpu_ttm_adev(bo->tbo.bdev)->kfd.vram_pinned);
 
+out:
 	amdgpu_bo_unreserve(bo);
 	return ret;
 }
