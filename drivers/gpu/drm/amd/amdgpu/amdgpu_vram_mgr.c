@@ -721,12 +721,15 @@ int amdgpu_vram_mgr_alloc_sgt(struct amdgpu_device *adev,
 		unsigned long size = min(cursor.size, AMDGPU_MAX_SG_SEGMENT_SIZE);
 		dma_addr_t addr;
 
-		addr = dma_map_resource(dev, phys, size, dir,
-					DMA_ATTR_SKIP_CPU_SYNC);
-		r = dma_mapping_error(dev, addr);
-		if (r)
-			goto error_unmap;
-
+		if (dev) {
+			addr = dma_map_resource(dev, phys, size, dir,
+						DMA_ATTR_SKIP_CPU_SYNC);
+			r = dma_mapping_error(dev, addr);
+			if (r)
+				goto error_unmap;
+		} else {
+			addr = phys;
+		}
 		sg_set_page(sg, NULL, size, 0);
 		sg_dma_address(sg) = addr;
 		sg_dma_len(sg) = size;
@@ -740,10 +743,10 @@ error_unmap:
 	for_each_sgtable_sg((*sgt), sg, i) {
 		if (!sg->length)
 			continue;
-
-		dma_unmap_resource(dev, sg->dma_address,
-				   sg->length, dir,
-				   DMA_ATTR_SKIP_CPU_SYNC);
+		if (dev)
+			dma_unmap_resource(dev, sg->dma_address,
+					   sg->length, dir,
+					   DMA_ATTR_SKIP_CPU_SYNC);
 	}
 	sg_free_table(*sgt);
 
@@ -768,10 +771,12 @@ void amdgpu_vram_mgr_free_sgt(struct device *dev,
 	struct scatterlist *sg;
 	int i;
 
-	for_each_sgtable_sg(sgt, sg, i)
-		dma_unmap_resource(dev, sg->dma_address,
-				   sg->length, dir,
-				   DMA_ATTR_SKIP_CPU_SYNC);
+	if (dev) {
+		for_each_sgtable_sg(sgt, sg, i)
+			dma_unmap_resource(dev, sg->dma_address,
+					   sg->length, dir,
+					   DMA_ATTR_SKIP_CPU_SYNC);
+	}
 	sg_free_table(sgt);
 	kfree(sgt);
 }
