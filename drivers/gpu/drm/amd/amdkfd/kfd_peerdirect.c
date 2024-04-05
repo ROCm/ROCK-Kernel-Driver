@@ -281,7 +281,9 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 			struct device *dma_device, int dmasync, int *nmap)
 {
 	struct sg_table *sg_table_tmp;
+	struct scatterlist *sg;
 	int ret;
+	int i;
 
 	/*
 	 * NOTE/TODO:
@@ -308,7 +310,7 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	pr_debug("Client context: 0x%p, sg_head: 0x%p\n",
 			client_context, sg_head);
 
-	if (!mem_context || !mem_context->bo || !mem_context->dev) {
+	if (!mem_context || !mem_context->bo) {
 		pr_warn("Invalid client context");
 		return -EINVAL;
 	}
@@ -328,6 +330,11 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 		return ret;
 	}
 
+	pr_debug("size 0x%llx nents %d\n", mem_context->size, sg_table_tmp->nents);
+	for_each_sgtable_sg(sg_table_tmp, sg, i)
+		pr_debug("segment_%d dma_address 0x%llx length 0x%x dma_length 0x%x\n",
+			i, sg->dma_address, sg->length, sg->dma_length);
+
 	/* Maintain a copy of the handle to sg_table */
 	mem_context->pages = sg_table_tmp;
 	mem_context->dma_dev = dma_device;
@@ -335,7 +342,7 @@ static int amd_dma_map(struct sg_table *sg_head, void *client_context,
 	/* Copy information about previosly allocated sg_table */
 	*sg_head = *mem_context->pages;
 
-	/* Return number of pages */
+	/* Return number of sg table segments */
 	*nmap = mem_context->pages->nents;
 
 	return ret;
@@ -350,7 +357,7 @@ static int amd_dma_unmap(struct sg_table *sg_head, void *client_context,
 	pr_debug("Client context: 0x%p, sg_table: 0x%p\n",
 			client_context, sg_head);
 
-	if (!mem_context || !mem_context->bo || !mem_context->dma_dev) {
+	if (!mem_context || !mem_context->bo) {
 		pr_warn("Invalid client context");
 		return -EINVAL;
 	}
