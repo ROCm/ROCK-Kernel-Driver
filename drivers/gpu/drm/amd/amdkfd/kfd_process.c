@@ -652,8 +652,7 @@ int kfd_process_create_wq(void)
 	if (!kfd_process_wq)
 		kfd_process_wq = alloc_workqueue("kfd_process_wq", 0, 0);
 	if (!kfd_restore_wq)
-		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq",
-							 WQ_FREEZABLE);
+		kfd_restore_wq = alloc_ordered_workqueue("kfd_restore_wq", 0);
 
 	if (!kfd_process_wq || !kfd_restore_wq) {
 		kfd_process_destroy_wq();
@@ -1692,7 +1691,6 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 	struct amdgpu_fpriv *drv_priv;
 	struct amdgpu_vm *avm;
 	struct kfd_process *p;
-	struct dma_fence *ef;
 	struct kfd_node *dev;
 	int ret;
 
@@ -1712,12 +1710,11 @@ int kfd_process_device_init_vm(struct kfd_process_device *pdd,
 
 	ret = amdgpu_amdkfd_gpuvm_acquire_process_vm(dev->adev, avm,
 						     &p->kgd_process_info,
-						     &ef);
+						     &p->ef);
 	if (ret) {
 		pr_err("Failed to create process VM object\n");
 		return ret;
 	}
-	RCU_INIT_POINTER(p->ef, ef);
 	pdd->drm_priv = drm_file->private_data;
 
 	ret = kfd_process_device_reserve_ib_mem(pdd);
@@ -2043,21 +2040,6 @@ kfd_process_gpuid_from_node(struct kfd_process *p, struct kfd_node *node,
 	return -EINVAL;
 }
 
-static int signal_eviction_fence(struct kfd_process *p)
-{
-	struct dma_fence *ef;
-	int ret;
-
-	rcu_read_lock();
-	ef = dma_fence_get_rcu_safe(&p->ef);
-	rcu_read_unlock();
-
-	ret = dma_fence_signal(ef);
-	dma_fence_put(ef);
-
-	return ret;
-}
-
 void kfd_process_schedule_restore(struct kfd_process *p)
 {
 	int ret;
@@ -2162,51 +2144,36 @@ static void evict_process_worker(struct work_struct *work)
 	 */
 	p = container_of(dwork, struct kfd_process, eviction_work);
 	trace_kfd_evict_process_worker_start(p);
+	WARN_ONCE(p->last_eviction_seqno != p->ef->seqno,
+		  "Eviction fence mismatch\n");
+
+	/* Narrow window of overlap between restore and evict work
+	 * item is possible. Once amdgpu_amdkfd_gpuvm_restore_process_bos
+	 * unreserves KFD BOs, it is possible to evicted again. But
+	 * restore has few more steps of finish. So lets wait for any
+	 * previous restore work to complete
+	 */
+	flush_delayed_work(&p->restore_work);
 
 	p->last_evict_timestamp = get_jiffies_64();
 
 	pr_debug("Started evicting pasid 0x%x\n", p->pasid);
 	ret = kfd_process_evict_queues(p, false, KFD_QUEUE_EVICTION_TRIGGER_TTM);
 	if (!ret) {
-		if (!kfd_process_unmap_doorbells_if_idle(p)){
-			/* If another thread already signaled the eviction fence,
-			* they are responsible stopping the queues and scheduling
-			* the restore work.
-			*/
-			if (!signal_eviction_fence(p))
-				kfd_process_schedule_restore(p);
-			else
-				kfd_process_restore_queues(p);
-			pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
-		}
+		dma_fence_signal(p->ef);
+		dma_fence_put(p->ef);
+		p->ef = NULL;
+
+		if (!kfd_process_unmap_doorbells_if_idle(p))
+			kfd_process_schedule_restore(p);
 		else
 			pr_debug("Process %d queues idle, doorbell unmapped\n",
 				p->pasid);
+
+		pr_debug("Finished evicting pasid 0x%x\n", p->pasid);
 	} else
 		pr_err("Failed to evict queues of pasid 0x%x\n", p->pasid);
 	trace_kfd_evict_process_worker_end(p, ret ? "Failed" : "Success");
-}
-
-static int restore_process_helper(struct kfd_process *p)
-{
-	int ret = 0;
-
-	/* VMs may not have been acquired yet during debugging. */
-	if (p->kgd_process_info) {
-		ret = amdgpu_amdkfd_gpuvm_restore_process_bos(
-			p->kgd_process_info, &p->ef);
-		if (ret)
-			return ret;
-	}
-
-	ret = kfd_process_restore_queues(p);
-	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
-	if (!ret)
-		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
-	else
-		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
-
-	return ret;
 }
 
 static void restore_process_worker(struct work_struct *work)
@@ -2235,8 +2202,10 @@ static void restore_process_worker(struct work_struct *work)
 	 */
 
 	p->last_restore_timestamp = get_jiffies_64();
-
-	ret = restore_process_helper(p);
+	/* VMs may not have been acquired yet during debugging. */
+	if (p->kgd_process_info)
+		ret = amdgpu_amdkfd_gpuvm_restore_process_bos(p->kgd_process_info,
+							     &p->ef);
 	if (ret) {
 		pr_debug("Failed to restore BOs of pasid 0x%x, retry after %d ms\n",
 			 p->pasid, PROCESS_BACK_OFF_TIME_MS);
@@ -2246,7 +2215,15 @@ static void restore_process_worker(struct work_struct *work)
 		trace_kfd_restore_process_worker_end(p, ret ?
 					"Rescheduled restore" :
 					"Failed to reschedule restore");
+		return;
 	}
+
+	ret = kfd_process_restore_queues(p);
+	trace_kfd_restore_process_worker_end(p, ret ? "Failed" : "Success");
+	if (!ret)
+		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
+	else
+		pr_err("Failed to restore queues of pasid 0x%x\n", p->pasid);
 }
 
 void kfd_suspend_all_processes(bool force)
@@ -2257,9 +2234,14 @@ void kfd_suspend_all_processes(bool force)
 
 	WARN(debug_evictions, "Evicting all processes");
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
+		cancel_delayed_work_sync(&p->eviction_work);
+		flush_delayed_work(&p->restore_work);
+
 		if (kfd_process_evict_queues(p, force, KFD_QUEUE_EVICTION_TRIGGER_SUSPEND))
 			pr_err("Failed to suspend process 0x%x\n", p->pasid);
-		signal_eviction_fence(p);
+		dma_fence_signal(p->ef);
+		dma_fence_put(p->ef);
+		p->ef = NULL;
 	}
 	srcu_read_unlock(&kfd_processes_srcu, idx);
 }
@@ -2271,7 +2253,7 @@ int kfd_resume_all_processes(void)
 	int ret = 0, idx = srcu_read_lock(&kfd_processes_srcu);
 
 	hash_for_each_rcu(kfd_processes_table, temp, p, kfd_processes) {
-		if (restore_process_helper(p)) {
+		if (!queue_delayed_work(kfd_restore_wq, &p->restore_work, 0)) {
 			pr_err("Restore process %d failed during resume\n",
 			       p->pasid);
 			ret = -EFAULT;
