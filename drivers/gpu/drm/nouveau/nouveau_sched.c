@@ -416,8 +416,7 @@ nouveau_sched_init(struct nouveau_sched *sched, struct nouveau_drm *drm,
 		sched->wq = wq;
 	}
 
-	ret = drm_sched_init(drm_sched, &nouveau_sched_ops, wq,
-			NOUVEAU_SCHED_PRIORITY_COUNT,
+	ret = drm_sched_init(drm_sched, &nouveau_sched_ops,
 			credit_limit, 0, job_hang_limit,
 			NULL, NULL, "nouveau_sched", drm->dev->dev);
 	if (ret)
