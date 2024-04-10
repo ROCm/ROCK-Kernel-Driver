@@ -732,14 +732,8 @@ int drm_sched_job_init(struct drm_sched_job *job,
 		       struct drm_sched_entity *entity,
 		       u32 credits, void *owner)
 {
-	if (!entity->rq) {
-		/* This will most likely be followed by missing frames
-		 * or worse--a blank screen--leave a trail in the
-		 * logs, so this can be debugged easier.
-		 */
-		drm_err(job->sched, "%s: entity has no rq!\n", __func__);
+	if (!entity->rq)
 		return -ENOENT;
-	}
 
 	if (unlikely(!credits)) {
 		pr_err("*ERROR* %s: credits cannot be 0!\n", __func__);
@@ -784,7 +778,7 @@ void drm_sched_job_arm(struct drm_sched_job *job)
 	sched = entity->rq->sched;
 
 	job->sched = sched;
-	job->s_priority = entity->priority;
+	job->s_priority = entity->rq - sched->sched_rq;
 	job->id = atomic64_inc_return(&sched->job_id_count);
 
 	drm_sched_fence_init(job->s_fence, job->entity);
@@ -999,11 +993,10 @@ drm_sched_select_entity(struct drm_gpu_scheduler *sched)
 	int i;
 
 	/* Kernel run queue has higher priority than normal run queue*/
-        for (i = DRM_SCHED_PRIORITY_KERNEL; i < sched->num_rqs; i++) {
-                entity = drm_sched_policy == DRM_SCHED_POLICY_FIFO ?
-                        drm_sched_rq_select_entity_fifo(sched, sched->sched_rq[i]) :
-                        drm_sched_rq_select_entity_rr(sched, sched->sched_rq[i]);
-
+	for (i = DRM_SCHED_PRIORITY_COUNT - 1; i >= DRM_SCHED_PRIORITY_KERNEL; i--) {
+		entity = drm_sched_policy == DRM_SCHED_POLICY_FIFO ?
+			drm_sched_rq_select_entity_fifo(sched, &sched->sched_rq[i]) :
+			drm_sched_rq_select_entity_rr(sched, &sched->sched_rq[i]);
 		if (entity)
 			break;
 	}
@@ -1183,9 +1176,7 @@ static int drm_sched_main(void *param)
  *
  * @sched: scheduler instance
  * @ops: backend operations for this scheduler
- * @num_rqs: number of runqueues, one for each priority, up to DRM_SCHED_PRIORITY_COUNT
  * @credit_limit: the number of credits this scheduler can hold from all jobs
- * @num_rqs: number of runqueues, one for each priority, up to DRM_SCHED_PRIORITY_COUNT
  * @hang_limit: number of times to allow a job to hang before dropping it
  * @timeout: timeout value in jiffies for the scheduler
  * @timeout_wq: workqueue to use for timeout work. If NULL, the system_wq is
@@ -1198,12 +1189,11 @@ static int drm_sched_main(void *param)
  */
 int drm_sched_init(struct drm_gpu_scheduler *sched,
 		   const struct drm_sched_backend_ops *ops,
-		   u32 num_rqs, u32 credit_limit, unsigned int hang_limit,
+		   u32 credit_limit, unsigned int hang_limit,
 		   long timeout, struct workqueue_struct *timeout_wq,
 		   atomic_t *score, const char *name, struct device *dev)
 {
 	int i, ret;
-
 	sched->ops = ops;
 	sched->credit_limit = credit_limit;
 	sched->name = name;
@@ -1213,35 +1203,8 @@ int drm_sched_init(struct drm_gpu_scheduler *sched,
 	sched->score = score ? score : &sched->_score;
 	sched->dev = dev;
 
-	if (num_rqs > DRM_SCHED_PRIORITY_COUNT) {
-		/* This is a gross violation--tell drivers what the  problem is.
-		 */
-		drm_err(sched, "%s: num_rqs cannot be greater than DRM_SCHED_PRIORITY_COUNT\n",
-			__func__);
-		return -EINVAL;
-	} else if (sched->sched_rq) {
-		/* Not an error, but warn anyway so drivers can
-		 * fine-tune their DRM calling order, and return all
-		 * is good.
-		 */
-		drm_warn(sched, "%s: scheduler already initialized!\n", __func__);
-		return 0;
-	}
-
-	sched->sched_rq = kmalloc_array(num_rqs, sizeof(*sched->sched_rq),
-					GFP_KERNEL | __GFP_ZERO);
-	if (!sched->sched_rq) {
-		drm_err(sched, "%s: out of memory for sched_rq\n", __func__);
-		return -ENOMEM;
-	}
-	sched->num_rqs = num_rqs;
-	ret = -ENOMEM;
-	for (i = DRM_SCHED_PRIORITY_KERNEL; i < sched->num_rqs; i++) {
-		sched->sched_rq[i] = kzalloc(sizeof(*sched->sched_rq[i]), GFP_KERNEL);
-		if (!sched->sched_rq[i])
-			goto Out_unroll;
-		drm_sched_rq_init(sched, sched->sched_rq[i]);
-	}
+	for (i = DRM_SCHED_PRIORITY_KERNEL; i < DRM_SCHED_PRIORITY_COUNT; i++)
+		drm_sched_rq_init(sched, &sched->sched_rq[i]);
 
 	init_waitqueue_head(&sched->wake_up_worker);
 	init_waitqueue_head(&sched->job_scheduled);
@@ -1252,24 +1215,18 @@ int drm_sched_init(struct drm_gpu_scheduler *sched,
 	atomic_set(&sched->_score, 0);
 	atomic64_set(&sched->job_id_count, 0);
 
-	/* Each scheduler will run on a seperate kernel thread */
-	sched->thread = kthread_run(drm_sched_main, sched, sched->name);
-	if (IS_ERR(sched->thread)) {
-		ret = PTR_ERR(sched->thread);
-		sched->thread = NULL;
-		DRM_DEV_ERROR(sched->dev, "Failed to create scheduler for %s.\n", name);
-		goto Out_unroll;
-	}
+ 
+        /* Each scheduler will run on a seperate kernel thread */
+        sched->thread = kthread_run(drm_sched_main, sched, sched->name);
+        if (IS_ERR(sched->thread)) {
+                ret = PTR_ERR(sched->thread);
+                sched->thread = NULL;
+                DRM_DEV_ERROR(sched->dev, "Failed to create scheduler for %s.\n", name);
+                return ret;
+        }
 
 	sched->ready = true;
 	return 0;
-Out_unroll:
-	for (--i ; i >= DRM_SCHED_PRIORITY_KERNEL; i--)
-		kfree(sched->sched_rq[i]);
-	kfree(sched->sched_rq);
-	sched->sched_rq = NULL;
-	drm_err(sched, "%s: Failed to setup GPU scheduler--out of memory\n", __func__);
-	return ret;
 }
 EXPORT_SYMBOL(drm_sched_init);
 
@@ -1288,8 +1245,8 @@ void drm_sched_fini(struct drm_gpu_scheduler *sched)
 	if (sched->thread)
 		kthread_stop(sched->thread);
 
-	for (i = DRM_SCHED_PRIORITY_KERNEL; i < sched->num_rqs; i++) {
-		struct drm_sched_rq *rq = sched->sched_rq[i];
+	for (i = DRM_SCHED_PRIORITY_COUNT - 1; i >= DRM_SCHED_PRIORITY_KERNEL; i--) {
+		struct drm_sched_rq *rq = &sched->sched_rq[i];
 
 		spin_lock(&rq->lock);
 		list_for_each_entry(s_entity, &rq->entities, list)
@@ -1300,7 +1257,7 @@ void drm_sched_fini(struct drm_gpu_scheduler *sched)
 			 */
 			s_entity->stopped = true;
 		spin_unlock(&rq->lock);
-		kfree(sched->sched_rq[i]);
+
 	}
 
 	/* Wakeup everyone stuck in drm_sched_entity_flush for this scheduler */
@@ -1310,8 +1267,6 @@ void drm_sched_fini(struct drm_gpu_scheduler *sched)
 	cancel_delayed_work_sync(&sched->work_tdr);
 
 	sched->ready = false;
-	kfree(sched->sched_rq);
-	sched->sched_rq = NULL;
 }
 EXPORT_SYMBOL(drm_sched_fini);
 
@@ -1337,8 +1292,10 @@ void drm_sched_increase_karma(struct drm_sched_job *bad)
 	 */
 	if (bad->s_priority != DRM_SCHED_PRIORITY_KERNEL) {
 		atomic_inc(&bad->karma);
-		for (i = DRM_SCHED_PRIORITY_HIGH; i < sched->num_rqs; i++) {
-			struct drm_sched_rq *rq = sched->sched_rq[i];
+
+		for (i = DRM_SCHED_PRIORITY_KERNEL; i < DRM_SCHED_PRIORITY_COUNT;
+		     i++) {
+			struct drm_sched_rq *rq = &sched->sched_rq[i];
 
 			spin_lock(&rq->lock);
 			list_for_each_entry_safe(entity, tmp, &rq->entities, list) {
