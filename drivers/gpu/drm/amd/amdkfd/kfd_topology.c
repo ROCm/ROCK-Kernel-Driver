@@ -1720,7 +1720,8 @@ static int fill_in_l2_l3_pcache(struct kfd_cache_properties **props_ext,
 					+ (first_active_cu - 1);
 		pcache->cache_level = pcache_info[cache_type].cache_level;
 
-		if (KFD_GC_VERSION(knode) == IP_VERSION(9, 4, 3))
+		if (KFD_GC_VERSION(knode) == IP_VERSION(9, 4, 3) ||
+		    KFD_GC_VERSION(knode) == IP_VERSION(9, 4, 4))
 			mode = adev->gmc.gmc_funcs->query_mem_partition_mode(adev);
 		else
 			mode = UNKNOWN_MEMORY_PARTITION_MODE;
@@ -1993,7 +1994,8 @@ static void kfd_topology_set_capabilities(struct kfd_topology_device *dev)
 		dev->node_props.debug_prop |= HSA_DBG_DISPATCH_INFO_ALWAYS_VALID;
 
 	if (KFD_GC_VERSION(dev->gpu) < IP_VERSION(10, 0, 0)) {
-		if (KFD_GC_VERSION(dev->gpu) == IP_VERSION(9, 4, 3))
+		if (KFD_GC_VERSION(dev->gpu) == IP_VERSION(9, 4, 3) ||
+		    KFD_GC_VERSION(dev->gpu) == IP_VERSION(9, 4, 4))
 			dev->node_props.debug_prop |=
 				HSA_DBG_WATCH_ADDR_MASK_LO_BIT_GFX9_4_3 |
 				HSA_DBG_WATCH_ADDR_MASK_HI_BIT_GFX9_4_3;
