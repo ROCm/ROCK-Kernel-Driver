@@ -2077,7 +2077,6 @@ static int signal_eviction_fence(struct kfd_process *p)
 
 void kfd_process_schedule_restore(struct kfd_process *p)
 {
-	int ret;
 	unsigned long evicted_jiffies;
 	unsigned long delay_jiffies = msecs_to_jiffies(PROCESS_RESTORE_TIME_MS);
 
@@ -2090,9 +2089,8 @@ void kfd_process_schedule_restore(struct kfd_process *p)
 		delay_jiffies = 0;
 
 	pr_debug("Process %d schedule restore work\n", p->pasid);
-	ret = queue_delayed_work(kfd_restore_wq, &p->restore_work,
-				delay_jiffies);
-	WARN(!ret, "Schedule restore work failed\n");
+	if (mod_delayed_work(kfd_restore_wq, &p->restore_work, delay_jiffies))
+		kfd_process_restore_queues(p);
 }
 
 static void kfd_process_unmap_doorbells(struct kfd_process *p)
@@ -2213,7 +2211,6 @@ static int restore_process_helper(struct kfd_process *p)
 	}
 
 	ret = kfd_process_restore_queues(p);
-	trace_kfd_restore_process_worker_end(p,	ret ? "Failed" : "Success");
 	if (!ret)
 		pr_debug("Finished restoring pasid 0x%x\n", p->pasid);
 	else
@@ -2234,6 +2231,13 @@ static void restore_process_worker(struct work_struct *work)
 	 * lifetime of this thread, kfd_process p will be valid
 	 */
 	p = container_of(dwork, struct kfd_process, restore_work);
+
+	if (kfd_process_unmap_doorbells_if_idle(p)) {
+		pr_debug("Process %d queues idle, doorbell unmapped\n",
+			 p->pasid);
+		return;
+	}
+
 	pr_debug("Started restoring pasid 0x%x\n", p->pasid);
 	trace_kfd_restore_process_worker_start(p);
 
