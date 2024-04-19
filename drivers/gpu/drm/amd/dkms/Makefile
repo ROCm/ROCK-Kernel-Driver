@@ -192,7 +192,7 @@ export CONFIG_DRM_AMD_DC_HDCP=y
 subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
 
 ifeq (y,$(CONFIG_PCI_P2PDMA))
-  ifeq (y,$(CONFIG_DMABUF_MOVENOTIFY))
+  ifeq (y,$(CONFIG_DMABUF_MOVE_NOTIFY))
     export CONFIG_HSA_AMD_P2P=y
     subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
   endif
