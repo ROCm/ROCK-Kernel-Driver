@@ -144,7 +144,7 @@ static const char *mes_v11_0_get_misc_op_string(union MESAPI__MISC *x_pkt)
 	const char *op_str = NULL;
 
 	if ((x_pkt->header.opcode == MES_SCH_API_MISC) &&
-	    (x_pkt->opcode <= ARRAY_SIZE(mes_v11_0_misc_opcodes)))
+	    (x_pkt->opcode < ARRAY_SIZE(mes_v11_0_misc_opcodes)))
 		op_str = mes_v11_0_misc_opcodes[x_pkt->opcode];
 
 	return op_str;
