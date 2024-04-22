@@ -596,7 +596,7 @@ static void amdgpu_virt_update_vf2pf_work_item(struct work_struct *work)
 	if (ret) {
 		adev->virt.vf2pf_update_retry_cnt++;
 		if ((adev->virt.vf2pf_update_retry_cnt >= AMDGPU_VF2PF_UPDATE_MAX_RETRY_LIMIT) &&
-		    amdgpu_sriov_runtime(adev) && !amdgpu_in_reset(adev)) {
+		    amdgpu_sriov_runtime(adev)) {
 			if (amdgpu_reset_domain_schedule(adev->reset_domain,
 							  &adev->virt.flr_work))
 				return;
