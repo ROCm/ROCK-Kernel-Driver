@@ -156,10 +156,14 @@ int _kcl_drm_mode_create_dp_colorspace_property(struct drm_connector *connector,
 /* Additional Colorimetry extension added as part of CTA 861.G */
 #define DRM_MODE_COLORIMETRY_DCI_P3_RGB_D65		11
 #define DRM_MODE_COLORIMETRY_DCI_P3_RGB_THEATER		12
+#endif /* DRM_MODE_COLORIMETRY_DEFAULT */
+
+/* v5.3-rc1-676-g45cf0e91df8c */
+#ifndef DRM_MODE_COLORIMETRY_RGB_WIDE_FIXED
 /* Additional Colorimetry Options added for DP 1.4a VSC Colorimetry Format */
 #define DRM_MODE_COLORIMETRY_RGB_WIDE_FIXED		13
 #define DRM_MODE_COLORIMETRY_RGB_WIDE_FLOAT		14
 #define DRM_MODE_COLORIMETRY_BT601_YCC			15
-#endif /* DRM_MODE_COLORIMETRY_DEFAULT */
+#endif
 
 #endif /* AMDKCL_DRM_CONNECTOR_H */
