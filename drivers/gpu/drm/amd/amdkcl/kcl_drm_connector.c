@@ -164,7 +164,7 @@ static const u32 dp_colorspaces =
 	BIT(DRM_MODE_COLORIMETRY_BT2020_CYCC) |
 	BIT(DRM_MODE_COLORIMETRY_BT2020_YCC);
 
-static int drm_mode_create_colorspace_property(struct drm_connector *connector,
+static int _kcl_drm_mode_create_colorspace_property(struct drm_connector *connector,
 					u32 supported_colorspaces)
 {
 	struct drm_device *dev = connector->dev;
@@ -232,7 +232,7 @@ int _kcl_drm_mode_create_hdmi_colorspace_property(struct drm_connector *connecto
 	else
 		colorspaces = hdmi_colorspaces;
 
-	return drm_mode_create_colorspace_property(connector, colorspaces);
+	return _kcl_drm_mode_create_colorspace_property(connector, colorspaces);
 }
 EXPORT_SYMBOL(_kcl_drm_mode_create_hdmi_colorspace_property);
 #endif
@@ -248,7 +248,7 @@ int _kcl_drm_mode_create_dp_colorspace_property(struct drm_connector *connector,
 	else
 		colorspaces = dp_colorspaces;
 
-	return drm_mode_create_colorspace_property(connector, colorspaces);
+	return _kcl_drm_mode_create_colorspace_property(connector, colorspaces);
 }
 EXPORT_SYMBOL(_kcl_drm_mode_create_dp_colorspace_property);
 #endif
