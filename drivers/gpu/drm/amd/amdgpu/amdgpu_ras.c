@@ -2083,6 +2083,7 @@ static void amdgpu_ras_interrupt_poison_creation_handler(struct ras_manager *obj
 	dev_info(obj->adev->dev,
 		"Poison is created\n");
 
+#ifdef HAVE_KFIFO_PUT_NON_POINTER
 	if (amdgpu_ip_version(obj->adev, UMC_HWIP, 0) >= IP_VERSION(12, 0, 0)) {
 		struct amdgpu_ras *con = amdgpu_ras_get_context(obj->adev);
 
@@ -2093,6 +2094,7 @@ static void amdgpu_ras_interrupt_poison_creation_handler(struct ras_manager *obj
 
 		wake_up(&con->page_retirement_wq);
 	}
+#endif
 }
 
 static void amdgpu_ras_interrupt_umc_handler(struct ras_manager *obj,
@@ -2720,6 +2722,7 @@ static void amdgpu_ras_validate_threshold(struct amdgpu_device *adev,
 	}
 }
 
+#ifdef HAVE_KFIFO_PUT_NON_POINTER
 int amdgpu_ras_put_poison_req(struct amdgpu_device *adev,
 		enum amdgpu_ras_block block, uint16_t pasid,
 		pasid_notify pasid_fn, void *data, uint32_t reset)
@@ -2751,6 +2754,7 @@ static int amdgpu_ras_get_poison_req(struct amdgpu_device *adev,
 
 	return kfifo_get(&con->poison_fifo, poison_msg);
 }
+#endif
 
 #ifdef HAVE_RADIX_TREE_ITER_DELETE
 static void amdgpu_ras_ecc_log_init(struct ras_ecc_log_info *ecc_log)
@@ -2895,6 +2899,7 @@ static int amdgpu_ras_page_retirement_thread(void *param)
 
 		atomic_dec(&con->page_retirement_req_cnt);
 
+#ifdef HAVE_KFIFO_PUT_NON_POINTER
 		if (!amdgpu_ras_get_poison_req(adev, &poison_msg))
 			continue;
 
@@ -2921,6 +2926,13 @@ static int amdgpu_ras_page_retirement_thread(void *param)
 			amdgpu_ras_poison_consumption_handler(adev, &poison_msg);
 			poison_creation_is_handled = false;
 		}
+#else
+        dev_info(adev->dev, "Start processing page retirement. request:%d\n",
+                    atomic_read(&con->page_retirement_req_cnt));
+
+        amdgpu_umc_bad_page_polling_timeout(adev,
+                        0, MAX_UMC_POISON_POLLING_TIME_ASYNC);
+#endif
 	}
 
 	return 0;

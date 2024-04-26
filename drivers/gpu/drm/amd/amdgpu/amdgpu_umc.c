@@ -294,8 +294,10 @@ int amdgpu_umc_pasid_poison_handler(struct amdgpu_device *adev,
 		} else {
 				struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
 
+#ifdef HAVE_KFIFO_PUT_NON_POINTER
 				amdgpu_ras_put_poison_req(adev,
 					block, pasid, pasid_fn, data, reset);
+#endif
 
 				atomic_inc(&con->page_retirement_req_cnt);
 
