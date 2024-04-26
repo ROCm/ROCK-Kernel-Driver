@@ -37,6 +37,7 @@
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
 #include <linux/pci.h>
+#include "amdgpu_fdinfo.h"
 #ifndef HAVE_DRM_SHOW_FDINFO
 /**
  * drm_show_fdinfo - helper for drm file fops
@@ -63,6 +64,7 @@ void drm_show_fdinfo(struct seq_file *m, struct file *f)
                            pci_domain_nr(pdev->bus), pdev->bus->number,
                            PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
         }
+
+	amdgpu_show_fdinfo(&p, file);
 }
-EXPORT_SYMBOL(drm_show_fdinfo);
 #endif
