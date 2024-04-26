@@ -695,6 +695,9 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
+/* kfifo_put() have non pointer parameter */
+#define HAVE_KFIFO_PUT_NON_POINTER 1
+
 /* kmalloc_size_roundup is available */
 #define HAVE_KMALLOC_SIZE_ROUNDUP 1
 
