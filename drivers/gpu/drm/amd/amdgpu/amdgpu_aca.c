@@ -896,7 +896,9 @@ DEFINE_SIMPLE_ATTRIBUTE(aca_debug_mode_fops, NULL, amdgpu_aca_smu_debug_mode_set
 void amdgpu_aca_smu_debugfs_init(struct amdgpu_device *adev, struct dentry *root)
 {
 #if defined(CONFIG_DEBUG_FS)
-	if (!root || adev->ip_versions[MP1_HWIP][0] != IP_VERSION(13, 0, 6))
+	if (!root ||
+	    (adev->ip_versions[MP1_HWIP][0] != IP_VERSION(13, 0, 6) &&
+	     adev->ip_versions[MP1_HWIP][0] != IP_VERSION(13, 0, 14)))
 		return;
 
 	debugfs_create_file("aca_debug_mode", 0200, root, adev, &aca_debug_mode_fops);
