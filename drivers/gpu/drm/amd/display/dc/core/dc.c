@@ -3615,9 +3615,6 @@ static void commit_plane_for_stream_offload_fams2_flip(struct dc *dc,
 	for (i = 0; i < surface_count; i++) {
 		struct dc_plane_state *plane_state = srf_updates[i].surface;
 
-		/* set offload flag so driver does not program address */
-		plane_state->address.offload_flip = true;
-
 		for (j = 0; j < dc->res_pool->pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
@@ -3639,12 +3636,6 @@ static void commit_plane_for_stream_offload_fams2_flip(struct dc *dc,
 				stream,
 				srf_updates,
 				surface_count);
-
-	/* reset offload flip flag */
-	for (i = 0; i < surface_count; i++) {
-		struct dc_plane_state *plane_state = srf_updates[i].surface;
-		plane_state->address.offload_flip = false;
-	}
 }
 
 static void commit_planes_for_stream_fast(struct dc *dc,
