@@ -833,10 +833,20 @@ static int renoir_force_clk_levels(struct smu_context *smu,
 		ret = renoir_get_dpm_clk_limited(smu, clk_type, soft_max_level, &max_freq);
 		if (ret)
 			return ret;
-		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxSocclkByFreq, max_freq, NULL);
+		 /* =  0: min_freq
+		  * =  1: UMD_PSTATE_CLK
+		  * >= 2: max_freq
+		  */
+		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxSocclkByFreq,
+							soft_max_level == 0 ? min_freq :
+							soft_max_level == 1 ? RENOIR_UMD_PSTATE_SOCCLK : max_freq,
+							NULL);
 		if (ret)
 			return ret;
-		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinSocclkByFreq, min_freq, NULL);
+		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinSocclkByFreq,
+							soft_min_level == 0 ? min_freq :
+							soft_min_level == 1 ? RENOIR_UMD_PSTATE_SOCCLK : max_freq,
+							NULL);
 		if (ret)
 			return ret;
 		break;
@@ -848,10 +858,21 @@ static int renoir_force_clk_levels(struct smu_context *smu,
 		ret = renoir_get_dpm_clk_limited(smu, clk_type, soft_max_level, &max_freq);
 		if (ret)
 			return ret;
-		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxFclkByFreq, max_freq, NULL);
+		/* mclk levels are in reverse order
+		 * =  0: max_freq
+		 * =  1: UMD_PSTATE_CLK
+		 * >= 2: min_freq
+		 */
+		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxFclkByFreq,
+							soft_max_level >= 2 ? min_freq :
+							soft_max_level == 1 ? RENOIR_UMD_PSTATE_FCLK : max_freq,
+							NULL);
 		if (ret)
 			return ret;
-		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinFclkByFreq, min_freq, NULL);
+		ret = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetHardMinFclkByFreq,
+							soft_min_level >= 2  ? min_freq :
+							soft_min_level == 1 ? RENOIR_UMD_PSTATE_SOCCLK : max_freq,
+							NULL);
 		if (ret)
 			return ret;
 		break;
