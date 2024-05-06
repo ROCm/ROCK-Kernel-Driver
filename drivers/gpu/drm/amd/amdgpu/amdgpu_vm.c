@@ -348,7 +348,7 @@ void amdgpu_vm_bo_base_init(struct amdgpu_vm_bo_base *base,
 	base->next = bo->vm_bo;
 	bo->vm_bo = base;
 
-	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo))
+	if (!amdgpu_vm_is_bo_always_valid(vm, bo))
 		return;
 
 	dma_resv_assert_held(amdkcl_ttm_resvp(&vm->root.bo->tbo));
@@ -1130,12 +1130,12 @@ static void amdgpu_vm_bo_get_memory(struct amdgpu_bo_va *bo_va,
 	 * For now ignore BOs which are currently locked and potentially
 	 * changing their location.
 	 */
-	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
+	if (!amdgpu_vm_is_bo_always_valid(vm, bo) &&
 	    !dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo)))
 		return;
 
 	amdgpu_bo_get_memory(bo, stats);
-	if (amdkcl_ttm_resvp(&bo->tbo) != amdkcl_ttm_resvp(&vm->root.bo->tbo))
+	if (!amdgpu_vm_is_bo_always_valid(vm, bo))
 	    dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 }
 
@@ -1233,8 +1233,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		uncached = false;
 	}
 
-	if (clear || (bo && amdkcl_ttm_resvp(&bo->tbo) ==
-		      amdkcl_ttm_resvp(&vm->root.bo->tbo)))
+	if (clear || amdgpu_vm_is_bo_always_valid(vm, bo))
 		last_update = &vm->last_update;
 	else
 		last_update = &bo_va->last_pt_update;
@@ -1288,7 +1287,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	 * the evicted list so that it gets validated again on the
 	 * next command submission.
 	 */
-	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo)) {
+	if (amdgpu_vm_is_bo_always_valid(vm, bo)) {
 		uint32_t mem_type = bo->tbo.resource->mem_type;
 
 		if (!(bo->preferred_domains &
@@ -1682,10 +1681,9 @@ static void amdgpu_vm_bo_insert_map(struct amdgpu_device *adev,
 	if (mapping->flags & AMDGPU_PTE_PRT_FLAG(adev))
 		amdgpu_vm_prt_get(adev);
 
-	if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
-	    !bo_va->base.moved) {
+	if (amdgpu_vm_is_bo_always_valid(vm, bo) && !bo_va->base.moved)
 		amdgpu_vm_bo_moved(&bo_va->base);
-	}
+
 	trace_amdgpu_vm_bo_map(bo_va, mapping);
 }
 
@@ -1984,7 +1982,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 		if (before->flags & AMDGPU_PTE_PRT_FLAG(adev))
 			amdgpu_vm_prt_get(adev);
 
-		if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
+		if (amdgpu_vm_is_bo_always_valid(vm, bo) &&
 		    !before->bo_va->base.moved)
 			amdgpu_vm_bo_moved(&before->bo_va->base);
 	} else {
@@ -1999,7 +1997,7 @@ int amdgpu_vm_bo_clear_mappings(struct amdgpu_device *adev,
 		if (after->flags & AMDGPU_PTE_PRT_FLAG(adev))
 			amdgpu_vm_prt_get(adev);
 
-		if (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo) &&
+		if (amdgpu_vm_is_bo_always_valid(vm, bo) &&
 		    !after->bo_va->base.moved)
 			amdgpu_vm_bo_moved(&after->bo_va->base);
 	} else {
@@ -2079,7 +2077,7 @@ void amdgpu_vm_bo_del(struct amdgpu_device *adev,
 
 	if (bo) {
 		dma_resv_assert_held(amdkcl_ttm_resvp(&bo->tbo));
-		if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
+		if (amdgpu_vm_is_bo_always_valid(vm, bo))
 			ttm_bo_set_bulk_move(&bo->tbo, NULL);
 
 		for (base = &bo_va->base.bo->vm_bo; *base;
@@ -2173,7 +2171,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 	for (bo_base = bo->vm_bo; bo_base; bo_base = bo_base->next) {
 		struct amdgpu_vm *vm = bo_base->vm;
 
-		if (evicted && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo)) {
+		if (evicted && amdgpu_vm_is_bo_always_valid(vm, bo)) {
 			amdgpu_vm_bo_evicted(bo_base);
 			continue;
 		}
@@ -2184,7 +2182,7 @@ void amdgpu_vm_bo_invalidate(struct amdgpu_device *adev,
 
 		if (bo->tbo.type == ttm_bo_type_kernel)
 			amdgpu_vm_bo_relocated(bo_base);
-		else if (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo))
+		else if (amdgpu_vm_is_bo_always_valid(vm, bo))
 			amdgpu_vm_bo_moved(bo_base);
 		else
 			amdgpu_vm_bo_invalidated(bo_base);
@@ -3102,5 +3100,18 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
 #else
 	spin_unlock_irqrestore(&adev->vm_manager.pasid_lock, flags);
 #endif
+}
 
+/**
+ * amdgpu_vm_is_bo_always_valid - check if the BO is VM always valid
+ *
+ * @vm: VM to test against.
+ * @abo: BO to be tested.
+ *
+ * Returns true if the BO shares the dma_resv object with the root PD and is
+ * always guaranteed to be valid inside the VM.
+ */
+bool amdgpu_vm_is_bo_always_valid(struct amdgpu_vm *vm, struct amdgpu_bo *bo)
+{
+	return bo && bo->tbo.base.resv == vm->root.bo->tbo.base.resv;
 }
