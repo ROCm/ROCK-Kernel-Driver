@@ -565,8 +565,6 @@ static inline const char *amdgpu_gfx_compute_mode_desc(int mode)
 	default:
 		return "UNKNOWN";
 	}
-
-	return "UNKNOWN";
 }
 
 #endif
