@@ -47,6 +47,7 @@ static int kfd_pc_sample_thread(void *param)
 	uint32_t timeout = 0;
 	ktime_t next_trap_time;
 	bool need_wait;
+	uint32_t inst;
 
 	mutex_lock(&node->pcs_data.mutex);
 	if (node->pcs_data.hosttrap_entry.base.active_count &&
@@ -68,11 +69,14 @@ static int kfd_pc_sample_thread(void *param)
 	adev = node->adev;
 	need_wait = false;
 	allow_signal(SIGKILL);
+
+	if (node->kfd2kgd->override_core_cg)
+		for_each_inst(inst, node->xcc_mask)
+			node->kfd2kgd->override_core_cg(adev, 1, inst);
+
 	while (!kthread_should_stop() &&
 			!signal_pending(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
 		if (!need_wait) {
-			uint32_t inst;
-
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
 			for_each_inst(inst, node->xcc_mask) {
@@ -100,6 +104,9 @@ static int kfd_pc_sample_thread(void *param)
 			}
 		}
 	}
+	if (node->kfd2kgd->override_core_cg)
+		for_each_inst(inst, node->xcc_mask)
+			node->kfd2kgd->override_core_cg(adev, 0, inst);
 
 	node->pcs_data.hosttrap_entry.base.target_simd = 0;
 	node->pcs_data.hosttrap_entry.base.target_wave_slot = 0;

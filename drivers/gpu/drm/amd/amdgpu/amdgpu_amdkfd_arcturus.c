@@ -431,5 +431,6 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 	.get_cu_occupancy = kgd_gfx_v9_get_cu_occupancy,
 	.program_trap_handler_settings = kgd_gfx_v9_program_trap_handler_settings,
-	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap
+	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg,
 };
