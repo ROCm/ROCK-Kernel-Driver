@@ -91,12 +91,13 @@ static int kfd_pc_sample_thread(void *param)
 			wait_time = ktime_sub(next_trap_time, ktime_get_raw());
 			wait_ns = ktime_to_ns(wait_time);
 			wait_us = ktime_to_us(wait_time);
-			if (wait_ns >= 10000)
+			if (wait_ns >= 10000) {
 				usleep_range(wait_us - 10, wait_us);
-			else if (wait_ns > 0)
+			} else {
 				schedule();
-			else
-				need_wait = false;
+				if (wait_ns <= 0)
+					need_wait = false;
+			}
 		}
 	}
 
