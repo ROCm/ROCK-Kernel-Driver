@@ -104,6 +104,7 @@ static void apply_edid_quirks(struct edid *edid, struct dc_edid_caps *edid_caps)
 	case drm_edid_encode_panel_id('A', 'U', 'O', 0xE69B):
 	case drm_edid_encode_panel_id('B', 'O', 'E', 0x092A):
 	case drm_edid_encode_panel_id('L', 'G', 'D', 0x06D1):
+	case drm_edid_encode_panel_id('M', 'S', 'F', 0x1003):
 		DRM_DEBUG_DRIVER("Clearing DPCD 0x317 on monitor with panel id %X\n", panel_id);
 		edid_caps->panel_patch.remove_sink_ext_caps = true;
 		break;
@@ -1498,7 +1499,10 @@ void dm_set_phyd32clk(struct dc_context *ctx, int freq_khz)
 
 void dm_helpers_enable_periodic_detection(struct dc_context *ctx, bool enable)
 {
-	/* TODO: add periodic detection implementation */
+	struct amdgpu_device *adev = ctx->driver_context;
+
+	if (adev->dm.idle_workqueue)
+		adev->dm.idle_workqueue->enable = enable;
 }
 
 void dm_helpers_dp_mst_update_branch_bandwidth(

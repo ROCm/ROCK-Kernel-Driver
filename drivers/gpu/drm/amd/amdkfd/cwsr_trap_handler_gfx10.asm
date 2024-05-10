@@ -33,33 +33,68 @@
  * gfx11:
  *   cpp -DASIC_FAMILY=CHIP_PLUM_BONITO cwsr_trap_handler_gfx10.asm -P -o gfx11.sp3
  *   sp3 gfx11.sp3 -hex gfx11.hex
+ *
+ * gfx12:
+ *   cpp -DASIC_FAMILY=CHIP_GFX12 cwsr_trap_handler_gfx10.asm -P -o gfx12.sp3
+ *   sp3 gfx12.sp3 -hex gfx12.hex
  */
 
 #define CHIP_NAVI10 26
 #define CHIP_SIENNA_CICHLID 30
 #define CHIP_PLUM_BONITO 36
+#define CHIP_GFX12 37
 
 #define NO_SQC_STORE (ASIC_FAMILY >= CHIP_SIENNA_CICHLID)
 #define HAVE_XNACK (ASIC_FAMILY < CHIP_SIENNA_CICHLID)
 #define HAVE_SENDMSG_RTN (ASIC_FAMILY >= CHIP_PLUM_BONITO)
 #define HAVE_BUFFER_LDS_LOAD (ASIC_FAMILY < CHIP_PLUM_BONITO)
-#define SW_SA_TRAP (ASIC_FAMILY >= CHIP_PLUM_BONITO)
+#define SW_SA_TRAP (ASIC_FAMILY >= CHIP_PLUM_BONITO && ASIC_FAMILY < CHIP_GFX12)
 #define SAVE_AFTER_XNACK_ERROR (HAVE_XNACK && !NO_SQC_STORE) // workaround for TCP store failure after XNACK error when ALLOW_REPLAY=0, for debugger
+#define SINGLE_STEP_MISSED_WORKAROUND 1	//workaround for lost MODE.DEBUG_EN exception when SAVECTX raised
 
-var SINGLE_STEP_MISSED_WORKAROUND		= 1	//workaround for lost MODE.DEBUG_EN exception when SAVECTX raised
+#if ASIC_FAMILY < CHIP_GFX12
+#define S_COHERENCE glc:1
+#define V_COHERENCE slc:1 glc:1
+#else
+#define S_COHERENCE scope:SCOPE_SYS
+#define V_COHERENCE scope:SCOPE_SYS
 
+#define HW_REG_SHADER_FLAT_SCRATCH_LO HW_REG_WAVE_SCRATCH_BASE_LO
+#define HW_REG_SHADER_FLAT_SCRATCH_HI HW_REG_WAVE_SCRATCH_BASE_HI
+#define HW_REG_GPR_ALLOC HW_REG_WAVE_GPR_ALLOC
+#define HW_REG_LDS_ALLOC HW_REG_WAVE_LDS_ALLOC
+#define HW_REG_MODE HW_REG_WAVE_MODE
+#endif
+
+#if ASIC_FAMILY < CHIP_GFX12
 var SQ_WAVE_STATUS_SPI_PRIO_MASK		= 0x00000006
 var SQ_WAVE_STATUS_HALT_MASK			= 0x2000
 var SQ_WAVE_STATUS_ECC_ERR_MASK			= 0x20000
 var SQ_WAVE_STATUS_TRAP_EN_SHIFT		= 6
+var SQ_WAVE_IB_STS2_WAVE64_SHIFT		= 11
+var SQ_WAVE_IB_STS2_WAVE64_SIZE			= 1
+var S_STATUS_HWREG				= HW_REG_STATUS
+var S_STATUS_ALWAYS_CLEAR_MASK			= SQ_WAVE_STATUS_SPI_PRIO_MASK|SQ_WAVE_STATUS_ECC_ERR_MASK
+var S_STATUS_HALT_MASK				= SQ_WAVE_STATUS_HALT_MASK
+var S_SAVE_PC_HI_TRAP_ID_MASK			= 0x00FF0000
+var S_SAVE_PC_HI_HT_MASK			= 0x01000000
+#else
+var SQ_WAVE_STATE_PRIV_SYS_PRIO_MASK		= 0xC00
+var SQ_WAVE_STATE_PRIV_HALT_MASK		= 0x4000
+var SQ_WAVE_STATE_PRIV_POISON_ERR_MASK		= 0x8000
+var SQ_WAVE_STATUS_WAVE64_SHIFT			= 29
+var SQ_WAVE_STATUS_WAVE64_SIZE			= 1
+var S_STATUS_HWREG				= HW_REG_WAVE_STATE_PRIV
+var S_STATUS_ALWAYS_CLEAR_MASK			= SQ_WAVE_STATE_PRIV_SYS_PRIO_MASK|SQ_WAVE_STATE_PRIV_POISON_ERR_MASK
+var S_STATUS_HALT_MASK				= SQ_WAVE_STATE_PRIV_HALT_MASK
+var S_SAVE_PC_HI_TRAP_ID_MASK			= 0xF0000000
+#endif
 
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SHIFT		= 12
 var SQ_WAVE_LDS_ALLOC_LDS_SIZE_SIZE		= 9
 var SQ_WAVE_GPR_ALLOC_VGPR_SIZE_SIZE		= 8
 var SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SHIFT	= 24
 var SQ_WAVE_LDS_ALLOC_VGPR_SHARED_SIZE_SIZE	= 4
-var SQ_WAVE_IB_STS2_WAVE64_SHIFT		= 11
-var SQ_WAVE_IB_STS2_WAVE64_SIZE			= 1
 
 #if ASIC_FAMILY < CHIP_PLUM_BONITO
 var SQ_WAVE_GPR_ALLOC_VGPR_SIZE_SHIFT		= 8
@@ -67,6 +102,7 @@ var SQ_WAVE_GPR_ALLOC_VGPR_SIZE_SHIFT		= 8
 var SQ_WAVE_GPR_ALLOC_VGPR_SIZE_SHIFT		= 12
 #endif
 
+#if ASIC_FAMILY < CHIP_GFX12
 var SQ_WAVE_TRAPSTS_SAVECTX_MASK		= 0x400
 var SQ_WAVE_TRAPSTS_EXCP_MASK			= 0x1FF
 var SQ_WAVE_TRAPSTS_SAVECTX_SHIFT		= 10
@@ -74,12 +110,6 @@ var SQ_WAVE_TRAPSTS_ADDR_WATCH_MASK		= 0x80
 var SQ_WAVE_TRAPSTS_ADDR_WATCH_SHIFT		= 7
 var SQ_WAVE_TRAPSTS_MEM_VIOL_MASK		= 0x100
 var SQ_WAVE_TRAPSTS_MEM_VIOL_SHIFT		= 8
-var SQ_WAVE_TRAPSTS_PRE_SAVECTX_MASK		= 0x3FF
-var SQ_WAVE_TRAPSTS_PRE_SAVECTX_SHIFT		= 0x0
-var SQ_WAVE_TRAPSTS_PRE_SAVECTX_SIZE		= 10
-var SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK		= 0xFFFFF800
-var SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT		= 11
-var SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE		= 21
 var SQ_WAVE_TRAPSTS_ILLEGAL_INST_MASK		= 0x800
 var SQ_WAVE_TRAPSTS_EXCP_HI_MASK		= 0x7000
 #if ASIC_FAMILY >= CHIP_PLUM_BONITO
@@ -108,6 +138,34 @@ var S_TRAPSTS_NON_MASKABLE_EXCP_MASK		= SQ_WAVE_TRAPSTS_MEM_VIOL_MASK		|\
 						  SQ_WAVE_TRAPSTS_WAVE_END_MASK		|\
 						  SQ_WAVE_TRAPSTS_TRAP_AFTER_INST_MASK
 #endif
+var S_TRAPSTS_HWREG				= HW_REG_TRAPSTS
+var S_TRAPSTS_SAVE_CONTEXT_MASK			= SQ_WAVE_TRAPSTS_SAVECTX_MASK
+var S_TRAPSTS_SAVE_CONTEXT_SHIFT		= SQ_WAVE_TRAPSTS_SAVECTX_SHIFT
+#else
+var SQ_WAVE_EXCP_FLAG_PRIV_ADDR_WATCH_MASK	= 0xF
+var SQ_WAVE_EXCP_FLAG_PRIV_MEM_VIOL_MASK	= 0x10
+var SQ_WAVE_EXCP_FLAG_PRIV_SAVE_CONTEXT_SHIFT	= 5
+var SQ_WAVE_EXCP_FLAG_PRIV_SAVE_CONTEXT_MASK	= 0x20
+var SQ_WAVE_EXCP_FLAG_PRIV_ILLEGAL_INST_MASK	= 0x40
+var SQ_WAVE_EXCP_FLAG_PRIV_HOST_TRAP_MASK	= 0x80
+var SQ_WAVE_EXCP_FLAG_PRIV_WAVE_START_MASK	= 0x100
+var SQ_WAVE_EXCP_FLAG_PRIV_WAVE_END_MASK	= 0x200
+var SQ_WAVE_EXCP_FLAG_PRIV_TRAP_AFTER_INST_MASK	= 0x800
+var SQ_WAVE_TRAP_CTRL_ADDR_WATCH_MASK		= 0x80
+var SQ_WAVE_TRAP_CTRL_TRAP_AFTER_INST_MASK	= 0x200
+
+var S_TRAPSTS_HWREG				= HW_REG_WAVE_EXCP_FLAG_PRIV
+var S_TRAPSTS_SAVE_CONTEXT_MASK			= SQ_WAVE_EXCP_FLAG_PRIV_SAVE_CONTEXT_MASK
+var S_TRAPSTS_SAVE_CONTEXT_SHIFT		= SQ_WAVE_EXCP_FLAG_PRIV_SAVE_CONTEXT_SHIFT
+var S_TRAPSTS_NON_MASKABLE_EXCP_MASK		= SQ_WAVE_EXCP_FLAG_PRIV_MEM_VIOL_MASK		|\
+						  SQ_WAVE_EXCP_FLAG_PRIV_ILLEGAL_INST_MASK	|\
+						  SQ_WAVE_EXCP_FLAG_PRIV_HOST_TRAP_MASK		|\
+						  SQ_WAVE_EXCP_FLAG_PRIV_WAVE_START_MASK	|\
+						  SQ_WAVE_EXCP_FLAG_PRIV_WAVE_END_MASK		|\
+						  SQ_WAVE_EXCP_FLAG_PRIV_TRAP_AFTER_INST_MASK
+var BARRIER_STATE_SIGNAL_OFFSET			= 16
+var BARRIER_STATE_VALID_OFFSET			= 0
+#endif
 
 // bits [31:24] unused by SPI debug data
 var TTMP11_SAVE_REPLAY_W64H_SHIFT		= 31
@@ -121,8 +179,6 @@ var TTMP11_DEBUG_TRAP_ENABLED_MASK		= 0x800000
 // when ADD_TID_ENABLE and BUF_DATA_FORMAT_32 for MTBUF), ADD_TID_ENABLE
 var S_SAVE_BUF_RSRC_WORD1_STRIDE		= 0x00040000
 var S_SAVE_BUF_RSRC_WORD3_MISC			= 0x10807FAC
-var S_SAVE_PC_HI_TRAP_ID_MASK			= 0x00FF0000
-var S_SAVE_PC_HI_HT_MASK			= 0x01000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_MASK		= 0x04000000
 var S_SAVE_SPI_INIT_FIRST_WAVE_SHIFT		= 26
 
@@ -182,6 +238,7 @@ var s_restore_buf_rsrc3				= ttmp11
 var s_restore_size				= ttmp6
 var s_restore_ttmps_lo				= s_restore_tmp
 var s_restore_ttmps_hi				= s_restore_alloc_size
+var s_restore_spi_init_hi_save			= s_restore_exec_hi
 
 shader main
 	asic(DEFAULT)
@@ -194,13 +251,13 @@ L_JUMP_TO_RESTORE:
 	s_branch	L_RESTORE
 
 L_SKIP_RESTORE:
-	s_getreg_b32	s_save_status, hwreg(HW_REG_STATUS)			//save STATUS since we will change SCC
+	s_getreg_b32	s_save_status, hwreg(S_STATUS_HWREG)			//save STATUS since we will change SCC
 
 	// Clear SPI_PRIO: do not save with elevated priority.
 	// Clear ECC_ERR: prevents SQC store and triggers FATAL_HALT if setreg'd.
-	s_andn2_b32	s_save_status, s_save_status, SQ_WAVE_STATUS_SPI_PRIO_MASK|SQ_WAVE_STATUS_ECC_ERR_MASK
+	s_andn2_b32	s_save_status, s_save_status, S_STATUS_ALWAYS_CLEAR_MASK
 
-	s_getreg_b32	s_save_trapsts, hwreg(HW_REG_TRAPSTS)
+	s_getreg_b32	s_save_trapsts, hwreg(S_TRAPSTS_HWREG)
 
 #if SW_SA_TRAP
 	// If ttmp1[30] is set then issue s_barrier to unblock dependent waves.
@@ -215,23 +272,27 @@ L_TRAP_NO_BARRIER:
 	s_cbranch_scc1  L_CHECK_SAVE
 #endif
 
-	s_and_b32       ttmp2, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+	s_and_b32       ttmp2, s_save_status, S_STATUS_HALT_MASK
 	s_cbranch_scc0	L_NOT_HALTED
 
 L_HALTED:
 	// Host trap may occur while wave is halted.
+#if ASIC_FAMILY < CHIP_GFX12
 	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
+#else
+	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_EXCP_FLAG_PRIV_HOST_TRAP_MASK
+#endif
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
 
 L_CHECK_SAVE:
-	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
+	s_and_b32	ttmp2, s_save_trapsts, S_TRAPSTS_SAVE_CONTEXT_MASK
 	s_cbranch_scc1	L_SAVE
 
 	// Wave is halted but neither host trap nor SAVECTX is raised.
 	// Caused by instruction fetch memory violation.
 	// Spin wait until context saved to prevent interrupt storm.
 	s_sleep		0x10
-	s_getreg_b32	s_save_trapsts, hwreg(HW_REG_TRAPSTS)
+	s_getreg_b32	s_save_trapsts, hwreg(S_TRAPSTS_HWREG)
 	s_branch	L_CHECK_SAVE
 
 L_NOT_HALTED:
@@ -247,6 +308,7 @@ L_NOT_HALTED:
 	// Check for maskable exceptions in trapsts.excp and trapsts.excp_hi.
 	// Maskable exceptions only cause the wave to enter the trap handler if
 	// their respective bit in mode.excp_en is set.
+#if ASIC_FAMILY < CHIP_GFX12
 	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_EXCP_MASK|SQ_WAVE_TRAPSTS_EXCP_HI_MASK
 	s_cbranch_scc0	L_CHECK_TRAP_ID
 
@@ -259,21 +321,37 @@ L_NOT_ADDR_WATCH:
 	s_lshl_b32	ttmp2, ttmp2, SQ_WAVE_MODE_EXCP_EN_SHIFT
 	s_and_b32	ttmp2, ttmp2, ttmp3
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
+#else
+	s_getreg_b32	ttmp2, hwreg(HW_REG_WAVE_EXCP_FLAG_USER)
+	s_and_b32	ttmp3, s_save_trapsts, SQ_WAVE_EXCP_FLAG_PRIV_ADDR_WATCH_MASK
+	s_cbranch_scc0	L_NOT_ADDR_WATCH
+	s_or_b32	ttmp2, ttmp2, SQ_WAVE_TRAP_CTRL_ADDR_WATCH_MASK
+
+L_NOT_ADDR_WATCH:
+	s_getreg_b32	ttmp3, hwreg(HW_REG_WAVE_TRAP_CTRL)
+	s_and_b32	ttmp2, ttmp3, ttmp2
+	s_cbranch_scc1	L_FETCH_2ND_TRAP
+#endif
 
 L_CHECK_TRAP_ID:
 	// Check trap_id != 0
 	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
 
-if SINGLE_STEP_MISSED_WORKAROUND
+#if SINGLE_STEP_MISSED_WORKAROUND
 	// Prioritize single step exception over context save.
 	// Second-level trap will halt wave and RFE, re-entering for SAVECTX.
+#if ASIC_FAMILY < CHIP_GFX12
 	s_getreg_b32	ttmp2, hwreg(HW_REG_MODE)
 	s_and_b32	ttmp2, ttmp2, SQ_WAVE_MODE_DEBUG_EN_MASK
+#else
+	// WAVE_TRAP_CTRL is already in ttmp3.
+	s_and_b32	ttmp3, ttmp3, SQ_WAVE_TRAP_CTRL_TRAP_AFTER_INST_MASK
+#endif
 	s_cbranch_scc1	L_FETCH_2ND_TRAP
-end
+#endif
 
-	s_and_b32	ttmp2, s_save_trapsts, SQ_WAVE_TRAPSTS_SAVECTX_MASK
+	s_and_b32	ttmp2, s_save_trapsts, S_TRAPSTS_SAVE_CONTEXT_MASK
 	s_cbranch_scc1	L_SAVE
 
 L_FETCH_2ND_TRAP:
@@ -298,15 +376,15 @@ L_FETCH_2ND_TRAP:
 	s_or_b32	ttmp15, ttmp15, 0xFFFF0000
 L_NO_SIGN_EXTEND_TMA:
 
-	s_load_dword    ttmp2, [ttmp14, ttmp15], 0x10 glc:1			// debug trap enabled flag
+	s_load_dword    ttmp2, [ttmp14, ttmp15], 0x10 S_COHERENCE		// debug trap enabled flag
 	s_waitcnt       lgkmcnt(0)
 	s_lshl_b32      ttmp2, ttmp2, TTMP11_DEBUG_TRAP_ENABLED_SHIFT
 	s_andn2_b32     ttmp11, ttmp11, TTMP11_DEBUG_TRAP_ENABLED_MASK
 	s_or_b32        ttmp11, ttmp11, ttmp2
 
-	s_load_dwordx2	[ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 glc:1		// second-level TBA
+	s_load_dwordx2	[ttmp2, ttmp3], [ttmp14, ttmp15], 0x0 S_COHERENCE	// second-level TBA
 	s_waitcnt	lgkmcnt(0)
-	s_load_dwordx2	[ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 glc:1		// second-level TMA
+	s_load_dwordx2	[ttmp14, ttmp15], [ttmp14, ttmp15], 0x8 S_COHERENCE	// second-level TMA
 	s_waitcnt	lgkmcnt(0)
 
 	s_and_b64	[ttmp2, ttmp3], [ttmp2, ttmp3], [ttmp2, ttmp3]
@@ -315,9 +393,18 @@ L_NO_SIGN_EXTEND_TMA:
 
 L_NO_NEXT_TRAP:
 	// If not caused by trap then halt wave to prevent re-entry.
-	s_and_b32	ttmp2, s_save_pc_hi, (S_SAVE_PC_HI_TRAP_ID_MASK|S_SAVE_PC_HI_HT_MASK)
+	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_TRAP_ID_MASK
 	s_cbranch_scc1	L_TRAP_CASE
-	s_or_b32	s_save_status, s_save_status, SQ_WAVE_STATUS_HALT_MASK
+
+	// Host trap will not cause trap re-entry.
+#if ASIC_FAMILY < CHIP_GFX12
+	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK
+#else
+	s_getreg_b32	ttmp2, hwreg(HW_REG_WAVE_EXCP_FLAG_PRIV)
+	s_and_b32	ttmp2, ttmp2, SQ_WAVE_EXCP_FLAG_PRIV_HOST_TRAP_MASK
+#endif
+	s_cbranch_scc1	L_EXIT_TRAP
+	s_or_b32	s_save_status, s_save_status, S_STATUS_HALT_MASK
 
 	// If the PC points to S_ENDPGM then context save will fail if STATUS.HALT is set.
 	// Rewind the PC to prevent this from occurring.
@@ -327,10 +414,6 @@ L_NO_NEXT_TRAP:
 	s_branch	L_EXIT_TRAP
 
 L_TRAP_CASE:
-	// Host trap will not cause trap re-entry.
-	s_and_b32	ttmp2, s_save_pc_hi, S_SAVE_PC_HI_HT_MASK
-	s_cbranch_scc1	L_EXIT_TRAP
-
 	// Advance past trap instruction to prevent re-entry.
 	s_add_u32	ttmp0, ttmp0, 0x4
 	s_addc_u32	ttmp1, ttmp1, 0x0
@@ -345,14 +428,14 @@ L_EXIT_TRAP:
 	// Restore SQ_WAVE_STATUS.
 	s_and_b64	exec, exec, exec					// Restore STATUS.EXECZ, not writable by s_setreg_b32
 	s_and_b64	vcc, vcc, vcc						// Restore STATUS.VCCZ, not writable by s_setreg_b32
-	s_setreg_b32	hwreg(HW_REG_STATUS), s_save_status
+	s_setreg_b32	hwreg(S_STATUS_HWREG), s_save_status
 
 	s_rfe_b64	[ttmp0, ttmp1]
 
 L_SAVE:
 	s_and_b32	s_save_pc_hi, s_save_pc_hi, 0x0000ffff			//pc[47:32]
 	s_mov_b32	s_save_tmp, 0
-	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_SAVECTX_SHIFT, 1), s_save_tmp	//clear saveCtx bit
+	s_setreg_b32	hwreg(S_TRAPSTS_HWREG, S_TRAPSTS_SAVE_CONTEXT_SHIFT, 1), s_save_tmp	//clear saveCtx bit
 
 #if HAVE_XNACK
 	save_and_clear_ib_sts(s_save_tmp, s_save_trapsts)
@@ -399,7 +482,7 @@ L_SLEEP:
 	s_and_b32	s_save_ttmps_hi, exec_hi, 0xFFFF
 	s_mov_b32	exec_lo, 0xFFFFFFFF
 	s_mov_b32	exec_hi, 0xFFFFFFFF
-	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] slc:1 glc:1
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] V_COHERENCE
 	v_mov_b32	v0, 0x0
 	s_mov_b32	exec_lo, s_save_ttmps_lo
 	s_mov_b32	exec_hi, s_save_ttmps_hi
@@ -407,7 +490,7 @@ L_SLEEP:
 
 	// Save trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
 	// ttmp SR memory offset : size(VGPR)+size(SVGPR)+size(SGPR)+0x40
-	get_wave_size(s_save_ttmps_hi)
+	get_wave_size2(s_save_ttmps_hi)
 	get_vgpr_size_bytes(s_save_ttmps_lo, s_save_ttmps_hi)
 	get_svgpr_size_bytes(s_save_ttmps_hi)
 	s_add_u32	s_save_ttmps_lo, s_save_ttmps_lo, s_save_ttmps_hi
@@ -431,15 +514,15 @@ L_SLEEP:
 
 	s_mov_b32	exec_lo, 0x3FFF
 	s_mov_b32	exec_hi, 0x0
-	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] inst_offset:0x40 slc:1 glc:1
+	global_store_dword_addtid	v0, [s_save_ttmps_lo, s_save_ttmps_hi] inst_offset:0x40 V_COHERENCE
 	v_readlane_b32	ttmp14, v0, 0xE
 	v_readlane_b32	ttmp15, v0, 0xF
 	s_mov_b32	exec_lo, ttmp14
 	s_mov_b32	exec_hi, ttmp15
 #else
-	s_store_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_save_ttmps_lo, s_save_ttmps_hi], 0x50 glc:1
-	s_store_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_save_ttmps_lo, s_save_ttmps_hi], 0x60 glc:1
-	s_store_dword   ttmp13, [s_save_ttmps_lo, s_save_ttmps_hi], 0x74 glc:1
+	s_store_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_save_ttmps_lo, s_save_ttmps_hi], 0x50 S_COHERENCE
+	s_store_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_save_ttmps_lo, s_save_ttmps_hi], 0x60 S_COHERENCE
+	s_store_dword   ttmp13, [s_save_ttmps_lo, s_save_ttmps_hi], 0x74 S_COHERENCE
 #endif
 
 	/* setup Resource Contants */
@@ -453,7 +536,7 @@ L_SLEEP:
 
 	/* global mem offset */
 	s_mov_b32	s_save_mem_offset, 0x0
-	get_wave_size(s_wave_size)
+	get_wave_size2(s_wave_size)
 
 #if HAVE_XNACK
 	// Save and clear vector XNACK state late to free up SGPRs.
@@ -488,11 +571,11 @@ L_SAVE_FIRST_VGPRS32_WITH_TCP:
 #endif
 
 #if !NO_SQC_STORE
-	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 #endif
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*2
-	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*3
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128*2
+	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128*3
 	s_branch	L_SAVE_HWREG
 
 L_SAVE_4VGPR_WAVE64:
@@ -511,11 +594,11 @@ L_SAVE_FIRST_VGPRS64_WITH_TCP:
 #endif
 
 #if !NO_SQC_STORE
-	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 #endif
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*2
-	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*3
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256*2
+	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256*3
 
 	/* save HW registers */
 
@@ -535,6 +618,12 @@ L_SAVE_HWREG:
 	s_mov_b32	m0, 0x0							//Next lane of v2 to write to
 #endif
 
+#if ASIC_FAMILY >= CHIP_GFX12
+	// Ensure no further changes to barrier or LDS state.
+	s_barrier_signal	-2
+	s_barrier_wait	-2
+#endif
+
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_pc_lo, s_save_buf_rsrc0, s_save_mem_offset)
 	s_andn2_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
@@ -543,7 +632,7 @@ L_SAVE_HWREG:
 	write_hwreg_to_mem(s_save_exec_hi, s_save_buf_rsrc0, s_save_mem_offset)
 	write_hwreg_to_mem(s_save_status, s_save_buf_rsrc0, s_save_mem_offset)
 
-	s_getreg_b32	s_save_tmp, hwreg(HW_REG_TRAPSTS)
+	s_getreg_b32	s_save_tmp, hwreg(S_TRAPSTS_HWREG)
 	write_hwreg_to_mem(s_save_tmp, s_save_buf_rsrc0, s_save_mem_offset)
 
 	// Not used on Sienna_Cichlid but keep layout same for debugger.
@@ -558,11 +647,26 @@ L_SAVE_HWREG:
 	s_getreg_b32	s_save_m0, hwreg(HW_REG_SHADER_FLAT_SCRATCH_HI)
 	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
 
+#if ASIC_FAMILY >= CHIP_GFX12
+	s_getreg_b32	s_save_m0, hwreg(HW_REG_WAVE_EXCP_FLAG_USER)
+	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
+
+	s_getreg_b32	s_save_m0, hwreg(HW_REG_WAVE_TRAP_CTRL)
+	write_hwreg_to_mem(s_save_m0, s_save_buf_rsrc0, s_save_mem_offset)
+
+	s_getreg_b32	s_save_tmp, hwreg(HW_REG_WAVE_STATUS)
+	write_hwreg_to_mem(s_save_tmp, s_save_buf_rsrc0, s_save_mem_offset)
+
+	s_get_barrier_state s_save_tmp, -1
+	s_wait_kmcnt (0)
+	write_hwreg_to_mem(s_save_tmp, s_save_buf_rsrc0, s_save_mem_offset)
+#endif
+
 #if NO_SQC_STORE
 	// Write HWREGs with 16 VGPR lanes. TTMPs occupy space after this.
 	s_mov_b32       exec_lo, 0xFFFF
 	s_mov_b32	exec_hi, 0x0
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 
 	// Write SGPRs with 32 VGPR lanes. This works in wave32 and wave64 mode.
 	s_mov_b32       exec_lo, 0xFFFFFFFF
@@ -605,7 +709,7 @@ L_SAVE_SGPR_LOOP:
 	s_cmp_eq_u32	ttmp13, 0x20						//have 32 VGPR lanes filled?
 	s_cbranch_scc0	L_SAVE_SGPR_SKIP_TCP_STORE
 
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, 0x80
 	s_mov_b32	ttmp13, 0x0
 	v_mov_b32	v2, 0x0
@@ -626,7 +730,7 @@ L_SAVE_SGPR_SKIP_TCP_STORE:
 	write_12sgpr_to_mem(s0, s_save_buf_rsrc0, s_save_mem_offset)
 
 #if NO_SQC_STORE
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 #else
 	// restore s_save_buf_rsrc0,1
 	s_mov_b32	s_save_buf_rsrc0, s_save_xnack_mask
@@ -650,7 +754,9 @@ L_SAVE_LDS_NORMAL:
 	s_and_b32	s_save_alloc_size, s_save_alloc_size, 0xFFFFFFFF	//lds_size is zero?
 	s_cbranch_scc0	L_SAVE_LDS_DONE						//no lds used? jump to L_SAVE_DONE
 
+#if ASIC_FAMILY < CHIP_GFX12
 	s_barrier								//LDS is used? wait for other waves in the same TG
+#endif
 	s_and_b32	s_save_tmp, s_save_pc_hi, S_SAVE_PC_HI_FIRST_WAVE_MASK
 	s_cbranch_scc0	L_SAVE_LDS_DONE
 
@@ -709,7 +815,7 @@ L_SAVE_LDS_WITH_TCP_W32:
 L_SAVE_LDS_LOOP_W32:
 	ds_read_b32	v1, v0
 	s_waitcnt	0
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 
 	s_add_u32	m0, m0, s3						//every buffer_store_lds does 128 bytes
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, s3
@@ -747,7 +853,7 @@ L_SAVE_LDS_WITH_TCP_W64:
 L_SAVE_LDS_LOOP_W64:
 	ds_read_b32	v1, v0
 	s_waitcnt	0
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 
 	s_add_u32	m0, m0, s3						//every buffer_store_lds does 256 bytes
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, s3
@@ -814,10 +920,10 @@ L_SAVE_VGPR_W32_LOOP:
 	v_movrels_b32	v2, v2							//v2 = v[2+m0]
 	v_movrels_b32	v3, v3							//v3 = v[3+m0]
 
-	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*2
-	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:128*3
+	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128*2
+	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:128*3
 
 	s_add_u32	m0, m0, 4						//next vgpr index
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, 128*4		//every buffer_store_dword does 128 bytes
@@ -859,10 +965,10 @@ L_SAVE_VGPR_W64_LOOP:
 	v_movrels_b32	v2, v2							//v2 = v[2+m0]
 	v_movrels_b32	v3, v3							//v3 = v[3+m0]
 
-	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
-	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256
-	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*2
-	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1 offset:256*3
+	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
+	buffer_store_dword	v1, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256
+	buffer_store_dword	v2, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256*2
+	buffer_store_dword	v3, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE offset:256*3
 
 	s_add_u32	m0, m0, 4						//next vgpr index
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, 256*4		//every buffer_store_dword does 256 bytes
@@ -899,7 +1005,7 @@ L_SAVE_SHARED_VGPR_WAVE64_LOOP_SQC:
 
 L_SAVE_SHARED_VGPR_WAVE64_LOOP:
 	v_movrels_b32	v0, v0							//v0 = v[0+m0]
-	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset slc:1 glc:1
+	buffer_store_dword	v0, v0, s_save_buf_rsrc0, s_save_mem_offset V_COHERENCE
 	s_add_u32	m0, m0, 1						//next vgpr index
 	s_add_u32	s_save_mem_offset, s_save_mem_offset, 128
 	s_cmp_lt_u32	m0, s_save_alloc_size					//scc = (m0 < s_save_alloc_size) ? 1 : 0
@@ -916,8 +1022,13 @@ L_RESTORE:
 	s_mov_b32	s_restore_buf_rsrc2, 0					//NUM_RECORDS initial value = 0 (in bytes)
 	s_mov_b32	s_restore_buf_rsrc3, S_RESTORE_BUF_RSRC_WORD3_MISC
 
+#if ASIC_FAMILY >= CHIP_GFX12
+	// Save s_restore_spi_init_hi for later use.
+	s_mov_b32 s_restore_spi_init_hi_save, s_restore_spi_init_hi
+#endif
+
 	//determine it is wave32 or wave64
-	get_wave_size(s_restore_size)
+	get_wave_size2(s_restore_size)
 
 	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_FIRST_WAVE_MASK
 	s_cbranch_scc0	L_RESTORE_VGPR
@@ -1017,10 +1128,10 @@ L_RESTORE_VGPR_NORMAL:
 	s_cbranch_scc0	L_RESTORE_SGPR
 
 L_RESTORE_VGPR_WAVE32_LOOP:
-	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
-	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:128
-	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:128*2
-	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:128*3
+	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE
+	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:128
+	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:128*2
+	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:128*3
 	s_waitcnt	vmcnt(0)
 	v_movreld_b32	v0, v0							//v[0+m0] = v0
 	v_movreld_b32	v1, v1
@@ -1032,10 +1143,10 @@ L_RESTORE_VGPR_WAVE32_LOOP:
 	s_cbranch_scc1	L_RESTORE_VGPR_WAVE32_LOOP				//VGPR restore (except v0) is complete?
 
 	/* VGPR restore on v0 */
-	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1
-	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128
-	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128*2
-	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:128*3
+	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE
+	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:128
+	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:128*2
+	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:128*3
 	s_waitcnt	vmcnt(0)
 
 	s_branch	L_RESTORE_SGPR
@@ -1051,10 +1162,10 @@ L_RESTORE_VGPR_WAVE64:
 	s_cbranch_scc0	L_RESTORE_SHARED_VGPR
 
 L_RESTORE_VGPR_WAVE64_LOOP:
-	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
-	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:256
-	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:256*2
-	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1 offset:256*3
+	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE
+	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:256
+	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:256*2
+	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE offset:256*3
 	s_waitcnt	vmcnt(0)
 	v_movreld_b32	v0, v0							//v[0+m0] = v0
 	v_movreld_b32	v1, v1
@@ -1077,7 +1188,7 @@ L_RESTORE_SHARED_VGPR:
 	s_mov_b32	exec_lo, 0xFFFFFFFF
 	s_mov_b32	exec_hi, 0x00000000
 L_RESTORE_SHARED_VGPR_WAVE64_LOOP:
-	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset slc:1 glc:1
+	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset V_COHERENCE
 	s_waitcnt	vmcnt(0)
 	v_movreld_b32	v0, v0							//v[0+m0] = v0
 	s_add_u32	m0, m0, 1						//next vgpr index
@@ -1089,10 +1200,10 @@ L_RESTORE_SHARED_VGPR_WAVE64_LOOP:
 
 	/* VGPR restore on v0 */
 L_RESTORE_V0:
-	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1
-	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:256
-	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:256*2
-	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save slc:1 glc:1 offset:256*3
+	buffer_load_dword	v0, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE
+	buffer_load_dword	v1, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:256
+	buffer_load_dword	v2, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:256*2
+	buffer_load_dword	v3, v0, s_restore_buf_rsrc0, s_restore_mem_offset_save V_COHERENCE offset:256*3
 	s_waitcnt	vmcnt(0)
 
 	/* restore SGPRs */
@@ -1151,7 +1262,9 @@ L_RESTORE_SGPR:
 	// s_barrier with MODE.DEBUG_EN=1, STATUS.PRIV=1 incorrectly asserts debug exception.
 	// Clear DEBUG_EN before and restore MODE after the barrier.
 	s_setreg_imm32_b32	hwreg(HW_REG_MODE), 0
+#if ASIC_FAMILY < CHIP_GFX12
 	s_barrier								//barrier to ensure the readiness of LDS before access attemps from any other wave in the same TG
+#endif
 
 	/* restore HW registers */
 L_RESTORE_HWREG:
@@ -1162,6 +1275,11 @@ L_RESTORE_HWREG:
 	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, get_sgpr_size_bytes()
 
 	s_mov_b32	s_restore_buf_rsrc2, 0x1000000				//NUM_RECORDS in bytes
+
+#if ASIC_FAMILY >= CHIP_GFX12
+	// Restore s_restore_spi_init_hi before the saved value gets clobbered.
+	s_mov_b32 s_restore_spi_init_hi, s_restore_spi_init_hi_save
+#endif
 
 	read_hwreg_from_mem(s_restore_m0, s_restore_buf_rsrc0, s_restore_mem_offset)
 	read_hwreg_from_mem(s_restore_pc_lo, s_restore_buf_rsrc0, s_restore_mem_offset)
@@ -1182,20 +1300,56 @@ L_RESTORE_HWREG:
 
 	s_setreg_b32	hwreg(HW_REG_SHADER_FLAT_SCRATCH_HI), s_restore_flat_scratch
 
+#if ASIC_FAMILY >= CHIP_GFX12
+	read_hwreg_from_mem(s_restore_tmp, s_restore_buf_rsrc0, s_restore_mem_offset)
+	s_waitcnt	lgkmcnt(0)
+	s_setreg_b32	hwreg(HW_REG_WAVE_EXCP_FLAG_USER), s_restore_tmp
+
+	read_hwreg_from_mem(s_restore_tmp, s_restore_buf_rsrc0, s_restore_mem_offset)
+	s_waitcnt	lgkmcnt(0)
+	s_setreg_b32	hwreg(HW_REG_WAVE_TRAP_CTRL), s_restore_tmp
+
+	// Only the first wave needs to restore the workgroup barrier.
+	s_and_b32	s_restore_tmp, s_restore_spi_init_hi, S_RESTORE_SPI_INIT_FIRST_WAVE_MASK
+	s_cbranch_scc0	L_SKIP_BARRIER_RESTORE
+
+	// Skip over WAVE_STATUS, since there is no state to restore from it
+	s_add_u32	s_restore_mem_offset, s_restore_mem_offset, 4
+
+	read_hwreg_from_mem(s_restore_tmp, s_restore_buf_rsrc0, s_restore_mem_offset)
+	s_waitcnt	lgkmcnt(0)
+
+	s_bitcmp1_b32	s_restore_tmp, BARRIER_STATE_VALID_OFFSET
+	s_cbranch_scc0	L_SKIP_BARRIER_RESTORE
+
+	// extract the saved signal count from s_restore_tmp
+	s_lshr_b32	s_restore_tmp, s_restore_tmp, BARRIER_STATE_SIGNAL_OFFSET
+
+	// We need to call s_barrier_signal repeatedly to restore the signal
+	// count of the work group barrier.  The member count is already
+	// initialized with the number of waves in the work group.
+L_BARRIER_RESTORE_LOOP:
+	s_and_b32	s_restore_tmp, s_restore_tmp, s_restore_tmp
+	s_cbranch_scc0	L_SKIP_BARRIER_RESTORE
+	s_barrier_signal	-1
+	s_add_i32	s_restore_tmp, s_restore_tmp, -1
+	s_branch	L_BARRIER_RESTORE_LOOP
+
+L_SKIP_BARRIER_RESTORE:
+	// Make barrier and LDS state visible to all waves in the group.
+	s_barrier_signal	-2
+	s_barrier_wait	-2
+#endif
+
 	s_mov_b32	m0, s_restore_m0
 	s_mov_b32	exec_lo, s_restore_exec_lo
 	s_mov_b32	exec_hi, s_restore_exec_hi
-
-	s_and_b32	s_restore_m0, SQ_WAVE_TRAPSTS_PRE_SAVECTX_MASK, s_restore_trapsts
-	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_PRE_SAVECTX_SHIFT, SQ_WAVE_TRAPSTS_PRE_SAVECTX_SIZE), s_restore_m0
 
 #if HAVE_XNACK
 	s_setreg_b32	hwreg(HW_REG_SHADER_XNACK_MASK), s_restore_xnack_mask
 #endif
 
-	s_and_b32	s_restore_m0, SQ_WAVE_TRAPSTS_POST_SAVECTX_MASK, s_restore_trapsts
-	s_lshr_b32	s_restore_m0, s_restore_m0, SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT
-	s_setreg_b32	hwreg(HW_REG_TRAPSTS, SQ_WAVE_TRAPSTS_POST_SAVECTX_SHIFT, SQ_WAVE_TRAPSTS_POST_SAVECTX_SIZE), s_restore_m0
+	s_setreg_b32	hwreg(S_TRAPSTS_HWREG), s_restore_trapsts
 	s_setreg_b32	hwreg(HW_REG_MODE), s_restore_mode
 
 	// Restore trap temporaries 4-11, 13 initialized by SPI debug dispatch logic
@@ -1207,9 +1361,9 @@ L_RESTORE_HWREG:
 	s_add_u32	s_restore_ttmps_lo, s_restore_ttmps_lo, s_restore_buf_rsrc0
 	s_addc_u32	s_restore_ttmps_hi, s_restore_buf_rsrc1, 0x0
 	s_and_b32	s_restore_ttmps_hi, s_restore_ttmps_hi, 0xFFFF
-	s_load_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x50 glc:1
-	s_load_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x60 glc:1
-	s_load_dword	ttmp13, [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x74 glc:1
+	s_load_dwordx4	[ttmp4, ttmp5, ttmp6, ttmp7], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x50 S_COHERENCE
+	s_load_dwordx4	[ttmp8, ttmp9, ttmp10, ttmp11], [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x60 S_COHERENCE
+	s_load_dword	ttmp13, [s_restore_ttmps_lo, s_restore_ttmps_hi], 0x74 S_COHERENCE
 	s_waitcnt	lgkmcnt(0)
 
 #if HAVE_XNACK
@@ -1232,7 +1386,7 @@ L_RESTORE_HWREG:
 L_RETURN_WITHOUT_PRIV:
 #endif
 
-	s_setreg_b32	hwreg(HW_REG_STATUS), s_restore_status			// SCC is included, which is changed by previous salu
+	s_setreg_b32	hwreg(S_STATUS_HWREG), s_restore_status			// SCC is included, which is changed by previous salu
 	s_rfe_b64	s_restore_pc_lo						//Return to the main shader program and resume execution
 
 L_END_PGM:
@@ -1247,7 +1401,7 @@ function write_hwreg_to_mem(s, s_rsrc, s_mem_offset)
 #else
 	s_mov_b32	exec_lo, m0
 	s_mov_b32	m0, s_mem_offset
-	s_buffer_store_dword	s, s_rsrc, m0 glc:1
+	s_buffer_store_dword	s, s_rsrc, m0 S_COHERENCE
 	s_add_u32	s_mem_offset, s_mem_offset, 4
 	s_mov_b32	m0, exec_lo
 #endif
@@ -1262,10 +1416,10 @@ function write_16sgpr_to_mem(s, s_rsrc, s_mem_offset)
 		s_add_u32	ttmp13, ttmp13, 0x1
 	end
 #else
-	s_buffer_store_dwordx4	s[0], s_rsrc, 0 glc:1
-	s_buffer_store_dwordx4	s[4], s_rsrc, 16 glc:1
-	s_buffer_store_dwordx4	s[8], s_rsrc, 32 glc:1
-	s_buffer_store_dwordx4	s[12], s_rsrc, 48 glc:1
+	s_buffer_store_dwordx4	s[0], s_rsrc, 0 S_COHERENCE
+	s_buffer_store_dwordx4	s[4], s_rsrc, 16 S_COHERENCE
+	s_buffer_store_dwordx4	s[8], s_rsrc, 32 S_COHERENCE
+	s_buffer_store_dwordx4	s[12], s_rsrc, 48 S_COHERENCE
 	s_add_u32	s_rsrc[0], s_rsrc[0], 4*16
 	s_addc_u32	s_rsrc[1], s_rsrc[1], 0x0
 #endif
@@ -1279,32 +1433,32 @@ function write_12sgpr_to_mem(s, s_rsrc, s_mem_offset)
 		s_add_u32	ttmp13, ttmp13, 0x1
 	end
 #else
-	s_buffer_store_dwordx4	s[0], s_rsrc, 0 glc:1
-	s_buffer_store_dwordx4	s[4], s_rsrc, 16 glc:1
-	s_buffer_store_dwordx4	s[8], s_rsrc, 32 glc:1
+	s_buffer_store_dwordx4	s[0], s_rsrc, 0 S_COHERENCE
+	s_buffer_store_dwordx4	s[4], s_rsrc, 16 S_COHERENCE
+	s_buffer_store_dwordx4	s[8], s_rsrc, 32 S_COHERENCE
 	s_add_u32	s_rsrc[0], s_rsrc[0], 4*12
 	s_addc_u32	s_rsrc[1], s_rsrc[1], 0x0
 #endif
 end
 
 function read_hwreg_from_mem(s, s_rsrc, s_mem_offset)
-	s_buffer_load_dword	s, s_rsrc, s_mem_offset glc:1
+	s_buffer_load_dword	s, s_rsrc, s_mem_offset S_COHERENCE
 	s_add_u32	s_mem_offset, s_mem_offset, 4
 end
 
 function read_16sgpr_from_mem(s, s_rsrc, s_mem_offset)
 	s_sub_u32	s_mem_offset, s_mem_offset, 4*16
-	s_buffer_load_dwordx16	s, s_rsrc, s_mem_offset glc:1
+	s_buffer_load_dwordx16	s, s_rsrc, s_mem_offset S_COHERENCE
 end
 
 function read_8sgpr_from_mem(s, s_rsrc, s_mem_offset)
 	s_sub_u32	s_mem_offset, s_mem_offset, 4*8
-	s_buffer_load_dwordx8	s, s_rsrc, s_mem_offset glc:1
+	s_buffer_load_dwordx8	s, s_rsrc, s_mem_offset S_COHERENCE
 end
 
 function read_4sgpr_from_mem(s, s_rsrc, s_mem_offset)
 	s_sub_u32	s_mem_offset, s_mem_offset, 4*4
-	s_buffer_load_dwordx4	s, s_rsrc, s_mem_offset glc:1
+	s_buffer_load_dwordx4	s, s_rsrc, s_mem_offset S_COHERENCE
 end
 
 #if SAVE_AFTER_XNACK_ERROR
@@ -1375,11 +1529,16 @@ function get_hwreg_size_bytes
 	return 128
 end
 
-function get_wave_size(s_reg)
+function get_wave_size2(s_reg)
+#if ASIC_FAMILY < CHIP_GFX12
 	s_getreg_b32	s_reg, hwreg(HW_REG_IB_STS2,SQ_WAVE_IB_STS2_WAVE64_SHIFT,SQ_WAVE_IB_STS2_WAVE64_SIZE)
+#else
+	s_getreg_b32	s_reg, hwreg(HW_REG_WAVE_STATUS,SQ_WAVE_STATUS_WAVE64_SHIFT,SQ_WAVE_STATUS_WAVE64_SIZE)
+#endif
 	s_lshl_b32	s_reg, s_reg, S_WAVE_SIZE
 end
 
+#if HAVE_XNACK
 function save_and_clear_ib_sts(tmp1, tmp2)
 	// Preserve and clear scalar XNACK state before issuing scalar loads.
 	// Save IB_STS.REPLAY_W64H[25], RCNT[21:16], FIRST_REPLAY[15] into
@@ -1404,3 +1563,4 @@ function restore_ib_sts(tmp1, tmp2)
 	s_or_b32	tmp1, tmp1, tmp2
 	s_setreg_b32	hwreg(HW_REG_IB_STS), tmp1
 end
+#endif

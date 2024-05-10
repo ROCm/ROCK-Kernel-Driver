@@ -49,103 +49,6 @@ static bool disable_128b_132b_stream_overhead;
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #endif
 
-/* Need to account for padding due to pixel-to-symbol packing
- * for uncompressed 128b/132b streams.
- */
-static uint32_t apply_128b_132b_stream_overhead(
-	const struct dc_crtc_timing *timing, const uint32_t kbps)
-{
-	uint32_t total_kbps = kbps;
-
-	if (disable_128b_132b_stream_overhead)
-		return kbps;
-
-	if (!timing->flags.DSC) {
-		struct fixed31_32 bpp;
-		struct fixed31_32 overhead_factor;
-
-		bpp = dc_fixpt_from_int(kbps);
-		bpp = dc_fixpt_div_int(bpp, timing->pix_clk_100hz / 10);
-
-		/* Symbols_per_HActive = HActive * bpp / (4 lanes * 32-bit symbol size)
-		 * Overhead_factor = ceil(Symbols_per_HActive) / Symbols_per_HActive
-		 */
-		overhead_factor = dc_fixpt_from_int(timing->h_addressable);
-		overhead_factor = dc_fixpt_mul(overhead_factor, bpp);
-		overhead_factor = dc_fixpt_div_int(overhead_factor, 128);
-		overhead_factor = dc_fixpt_div(
-			dc_fixpt_from_int(dc_fixpt_ceil(overhead_factor)),
-			overhead_factor);
-
-		total_kbps = dc_fixpt_ceil(
-			dc_fixpt_mul_int(overhead_factor, total_kbps));
-	}
-
-	return total_kbps;
-}
-
-uint32_t dc_bandwidth_in_kbps_from_timing(
-	const struct dc_crtc_timing *timing,
-	const enum dc_link_encoding_format link_encoding)
-{
-	uint32_t bits_per_channel = 0;
-	uint32_t kbps;
-
-	if (timing->flags.DSC)
-		return dc_dsc_stream_bandwidth_in_kbps(timing,
-				timing->dsc_cfg.bits_per_pixel,
-				timing->dsc_cfg.num_slices_h,
-				timing->dsc_cfg.is_dp);
-
-	switch (timing->display_color_depth) {
-	case COLOR_DEPTH_666:
-		bits_per_channel = 6;
-		break;
-	case COLOR_DEPTH_888:
-		bits_per_channel = 8;
-		break;
-	case COLOR_DEPTH_101010:
-		bits_per_channel = 10;
-		break;
-	case COLOR_DEPTH_121212:
-		bits_per_channel = 12;
-		break;
-	case COLOR_DEPTH_141414:
-		bits_per_channel = 14;
-		break;
-	case COLOR_DEPTH_161616:
-		bits_per_channel = 16;
-		break;
-	default:
-		ASSERT(bits_per_channel != 0);
-		bits_per_channel = 8;
-		break;
-	}
-
-	kbps = timing->pix_clk_100hz / 10;
-	kbps *= bits_per_channel;
-
-	if (timing->flags.Y_ONLY != 1) {
-		/*Only YOnly make reduce bandwidth by 1/3 compares to RGB*/
-		kbps *= 3;
-		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
-			kbps /= 2;
-		else if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422)
-			kbps = kbps * 2 / 3;
-	}
-
-	if (link_encoding == DC_LINK_ENCODING_DP_128b_132b)
-		kbps = apply_128b_132b_stream_overhead(timing, kbps);
-
-	if (link_encoding == DC_LINK_ENCODING_HDMI_FRL &&
-			timing->vic == 0 && timing->hdmi_vic == 0 &&
-			timing->frl_uncompressed_video_bandwidth_in_kbps != 0)
-		kbps = timing->frl_uncompressed_video_bandwidth_in_kbps;
-
-	return kbps;
-}
-
-
 /* Forward Declerations */
 static bool decide_dsc_bandwidth_range(
 		const uint32_t min_bpp_x16,
@@ -1019,14 +922,30 @@ static bool setup_dsc_config(
 		else
 			is_dsc_possible = false;
 	}
-	// When we force 2:1 ODM, we can't have 1 slice to divide amongst 2 separate DSC instances
-	// need to enforce at minimum 2 horizontal slices
-	if (options->dsc_force_odm_hslice_override) {
-		num_slices_h = fit_num_slices_up(dsc_common_caps.slice_caps, 2);
-		if (num_slices_h == 0)
-			is_dsc_possible = false;
+	// When we force ODM, num dsc h slices must be divisible by num odm h slices
+	switch (options->dsc_force_odm_hslice_override) {
+	case 0:
+	case 1:
+		break;
+	case 2:
+		if (num_slices_h < 2)
+			num_slices_h = fit_num_slices_up(dsc_common_caps.slice_caps, 2);
+		break;
+	case 3:
+		if (dsc_common_caps.slice_caps.bits.NUM_SLICES_12)
+			num_slices_h = 12;
+		else
+			num_slices_h = 0;
+		break;
+	case 4:
+		if (num_slices_h < 4)
+			num_slices_h = fit_num_slices_up(dsc_common_caps.slice_caps, 4);
+		break;
+	default:
+		break;
 	}
-
+	if (num_slices_h == 0)
+		is_dsc_possible = false;
 	if (!is_dsc_possible)
 		goto done;
 
@@ -1244,6 +1163,11 @@ void dc_dsc_policy_set_disable_dsc_stream_overhead(bool disable)
 void dc_set_disable_128b_132b_stream_overhead(bool disable)
 {
 	disable_128b_132b_stream_overhead = disable;
+}
+
+bool dc_get_disable_128b_132b_stream_overhead(void)
+{
+	return disable_128b_132b_stream_overhead;
 }
 
 void dc_dsc_get_default_config_option(const struct dc *dc, struct dc_dsc_config_options *options)

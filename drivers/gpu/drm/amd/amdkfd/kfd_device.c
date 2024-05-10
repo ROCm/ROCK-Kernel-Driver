@@ -57,6 +57,7 @@ extern const struct kfd2kgd_calls gc_9_4_3_kfd2kgd;
 extern const struct kfd2kgd_calls gfx_v10_kfd2kgd;
 extern const struct kfd2kgd_calls gfx_v10_3_kfd2kgd;
 extern const struct kfd2kgd_calls gfx_v11_kfd2kgd;
+extern const struct kfd2kgd_calls gfx_v12_kfd2kgd;
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,
 				unsigned int chunk_size);
@@ -99,6 +100,8 @@ static void kfd_device_info_set_sdma_info(struct kfd_dev *kfd)
 	case IP_VERSION(6, 0, 3):
 	case IP_VERSION(6, 1, 0):
 	case IP_VERSION(6, 1, 1):
+	case IP_VERSION(7, 0, 0):
+	case IP_VERSION(7, 0, 1):
 		kfd->device_info.num_sdma_queues_per_engine = 8;
 		break;
 	default:
@@ -117,6 +120,8 @@ static void kfd_device_info_set_sdma_info(struct kfd_dev *kfd)
 	case IP_VERSION(6, 0, 3):
 	case IP_VERSION(6, 1, 0):
 	case IP_VERSION(6, 1, 1):
+	case IP_VERSION(7, 0, 0):
+	case IP_VERSION(7, 0, 1):
 		/* Reserve 1 for paging and 1 for gfx */
 		kfd->device_info.num_reserved_sdma_queues_per_engine = 2;
 		/* BIT(0)=engine-0 queue-0; BIT(1)=engine-1 queue-0; BIT(2)=engine-0 queue-1; ... */
@@ -173,6 +178,11 @@ static void kfd_device_info_set_event_interrupt_class(struct kfd_dev *kfd)
 	case IP_VERSION(11, 5, 1):
 		kfd->device_info.event_interrupt_class = &event_interrupt_class_v11;
 		break;
+	case IP_VERSION(12, 0, 0):
+	case IP_VERSION(12, 0, 1):
+		/* GFX12_TODO: Change to v12 version. */
+		kfd->device_info.event_interrupt_class = &event_interrupt_class_v11;
+		break;
 	default:
 		dev_warn(kfd_device, "v9 event interrupt handler is set due to "
 			"mismatch of gc ip block(GC_HWIP:0x%x).\n", gc_version);
@@ -223,6 +233,8 @@ static void kfd_device_info_init(struct kfd_dev *kfd,
 			 */
 			kfd->device_info.needs_pci_atomics = true;
 			kfd->device_info.no_atomic_fw_version = kfd->adev->gfx.rs64_enable ? 509 : 0;
+		} else {
+			kfd->device_info.needs_pci_atomics = true;
 		}
 	} else {
 		kfd->device_info.doorbell_size = 4;
@@ -427,6 +439,14 @@ struct kfd_dev *kgd2kfd_probe(struct amdgpu_device *adev, bool vf)
 			gfx_target_version = 110501;
 			f2g = &gfx_v11_kfd2kgd;
 			break;
+		case IP_VERSION(12, 0, 0):
+			gfx_target_version = 120000;
+			f2g = &gfx_v12_kfd2kgd;
+			break;
+		case IP_VERSION(12, 0, 1):
+			gfx_target_version = 120001;
+			f2g = &gfx_v12_kfd2kgd;
+			break;
 		default:
 			break;
 		}
@@ -501,12 +521,16 @@ static void kfd_cwsr_init(struct kfd_dev *kfd)
 					     > KFD_CWSR_TMA_OFFSET);
 			kfd->cwsr_isa = cwsr_trap_gfx10_hex;
 			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx10_hex);
-		} else {
+		} else if (KFD_GC_VERSION(kfd) < IP_VERSION(12, 0, 0)) {
 			/* The gfx11 cwsr trap handler must fit inside a single
 			   page. */
 			BUILD_BUG_ON(sizeof(cwsr_trap_gfx11_hex) > PAGE_SIZE);
 			kfd->cwsr_isa = cwsr_trap_gfx11_hex;
 			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx11_hex);
+		} else {
+			BUILD_BUG_ON(sizeof(cwsr_trap_gfx12_hex) > PAGE_SIZE);
+			kfd->cwsr_isa = cwsr_trap_gfx12_hex;
+			kfd->cwsr_isa_size = sizeof(cwsr_trap_gfx12_hex);
 		}
 
 		kfd->cwsr_enabled = true;

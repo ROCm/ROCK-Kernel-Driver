@@ -1273,6 +1273,8 @@ static struct hpo_dp_link_encoder *dcn401_hpo_dp_link_encoder_create(
 
 	/* allocate HPO link encoder */
 	hpo_dp_enc31 = kzalloc(sizeof(struct dcn31_hpo_dp_link_encoder), GFP_KERNEL);
+	if (!hpo_dp_enc31)
+		return NULL; /* out of memory */
 
 #undef REG_STRUCT
 #define REG_STRUCT hpo_dp_link_enc_regs
@@ -1643,7 +1645,6 @@ static void dcn401_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 	if (stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR422)
 		pixel_clk_params->color_depth = COLOR_DEPTH_888;
 
-	/* TODO: Do we still need this? */
 	if (stream->timing.timing_3d_format == TIMING_3D_FORMAT_HW_FRAME_PACKING)
 		pixel_clk_params->requested_pix_clk_100hz *= 2;
 	if (dc_is_tmds_signal(stream->signal) &&
@@ -1654,6 +1655,23 @@ static void dcn401_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 			pipe_ctx->clock_source,
 			&pipe_ctx->stream_res.pix_clk_params,
 			&pipe_ctx->pll_settings);
+
+	pixel_clk_params->dio_se_pix_per_cycle = 1;
+	if (dc_is_tmds_signal(stream->signal) &&
+			stream->timing.pixel_encoding == PIXEL_ENCODING_YCBCR420) {
+		pixel_clk_params->dio_se_pix_per_cycle = 2;
+	} else if (dc_is_dp_signal(stream->signal)) {
+		/* round up to nearest power of 2, or max at 8 pixels per cycle */
+		if (pixel_clk_params->requested_pix_clk_100hz > 4 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+			pixel_clk_params->dio_se_pix_per_cycle = 8;
+		} else if (pixel_clk_params->requested_pix_clk_100hz > 2 * stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+			pixel_clk_params->dio_se_pix_per_cycle = 4;
+		} else if (pixel_clk_params->requested_pix_clk_100hz > stream->ctx->dc->clk_mgr->dprefclk_khz * 10) {
+			pixel_clk_params->dio_se_pix_per_cycle = 2;
+		} else {
+			pixel_clk_params->dio_se_pix_per_cycle = 1;
+		}
+	}
 }
 
 static struct resource_funcs dcn401_res_pool_funcs = {

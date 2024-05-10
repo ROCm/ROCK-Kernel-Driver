@@ -465,6 +465,8 @@ static int smu_v14_0_2_tables_init(struct smu_context *smu)
 		       PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM);
 	SMU_TABLE_INIT(tables, SMU_TABLE_OVERDRIVE, sizeof(OverDriveTable_t),
 		       PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM);
+	SMU_TABLE_INIT(tables, SMU_TABLE_PMSTATUSLOG, SMU14_TOOL_SIZE,
+		       PAGE_SIZE, AMDGPU_GEM_DOMAIN_VRAM);
 	SMU_TABLE_INIT(tables, SMU_TABLE_ACTIVITY_MONITOR_COEFF,
 		       sizeof(DpmActivityMonitorCoeffIntExternal_t), PAGE_SIZE,
 		       AMDGPU_GEM_DOMAIN_VRAM);
@@ -1230,7 +1232,59 @@ static int smu_v14_0_2_get_thermal_temperature_range(struct smu_context *smu,
 
 static int smu_v14_0_2_populate_umd_state_clk(struct smu_context *smu)
 {
-	// TODO
+	struct smu_14_0_dpm_context *dpm_context =
+		smu->smu_dpm.dpm_context;
+	struct smu_14_0_dpm_table *gfx_table =
+		&dpm_context->dpm_tables.gfx_table;
+	struct smu_14_0_dpm_table *mem_table =
+		&dpm_context->dpm_tables.uclk_table;
+	struct smu_14_0_dpm_table *soc_table =
+		&dpm_context->dpm_tables.soc_table;
+	struct smu_14_0_dpm_table *vclk_table =
+		&dpm_context->dpm_tables.vclk_table;
+	struct smu_14_0_dpm_table *dclk_table =
+		&dpm_context->dpm_tables.dclk_table;
+	struct smu_14_0_dpm_table *fclk_table =
+		&dpm_context->dpm_tables.fclk_table;
+	struct smu_umd_pstate_table *pstate_table =
+		&smu->pstate_table;
+	struct smu_table_context *table_context = &smu->smu_table;
+	PPTable_t *pptable = table_context->driver_pptable;
+	DriverReportedClocks_t driver_clocks =
+			pptable->SkuTable.DriverReportedClocks;
+
+	pstate_table->gfxclk_pstate.min = gfx_table->min;
+	if (driver_clocks.GameClockAc &&
+	    (driver_clocks.GameClockAc < gfx_table->max))
+		pstate_table->gfxclk_pstate.peak = driver_clocks.GameClockAc;
+	else
+		pstate_table->gfxclk_pstate.peak = gfx_table->max;
+
+	pstate_table->uclk_pstate.min = mem_table->min;
+	pstate_table->uclk_pstate.peak = mem_table->max;
+
+	pstate_table->socclk_pstate.min = soc_table->min;
+	pstate_table->socclk_pstate.peak = soc_table->max;
+
+	pstate_table->vclk_pstate.min = vclk_table->min;
+	pstate_table->vclk_pstate.peak = vclk_table->max;
+
+	pstate_table->dclk_pstate.min = dclk_table->min;
+	pstate_table->dclk_pstate.peak = dclk_table->max;
+
+	pstate_table->fclk_pstate.min = fclk_table->min;
+	pstate_table->fclk_pstate.peak = fclk_table->max;
+
+	if (driver_clocks.BaseClockAc &&
+	    driver_clocks.BaseClockAc < gfx_table->max)
+		pstate_table->gfxclk_pstate.standard = driver_clocks.BaseClockAc;
+	else
+		pstate_table->gfxclk_pstate.standard = gfx_table->max;
+	pstate_table->uclk_pstate.standard = mem_table->max;
+	pstate_table->socclk_pstate.standard = soc_table->min;
+	pstate_table->vclk_pstate.standard = vclk_table->min;
+	pstate_table->dclk_pstate.standard = dclk_table->min;
+	pstate_table->fclk_pstate.standard = fclk_table->min;
 
 	return 0;
 }
@@ -1637,7 +1691,13 @@ static int smu_v14_0_2_mode1_reset(struct smu_context *smu)
 {
 	int ret = 0;
 
-	// TODO
+	ret = smu_cmn_send_smc_msg(smu, SMU_MSG_Mode1Reset, NULL);
+	if (!ret) {
+		if (amdgpu_emu_mode == 1)
+			msleep(50000);
+		else
+			msleep(500);
+	}
 
 	return ret;
 }

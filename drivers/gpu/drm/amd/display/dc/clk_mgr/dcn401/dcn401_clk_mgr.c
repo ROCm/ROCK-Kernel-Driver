@@ -21,7 +21,6 @@
 #include "dcn/dcn_4_1_0_offset.h"
 #include "dcn/dcn_4_1_0_sh_mask.h"
 
-#include "dcn401/dcn401_clk_mgr.h"
 #include "dml/dcn401/dcn401_fpu.h"
 
 #define mmCLK01_CLK0_CLK_PLL_REQ                        0x16E37
@@ -131,7 +130,7 @@ static void dcn401_init_single_clock(struct clk_mgr_internal *clk_mgr, PPCLK_e c
 		*num_levels = ret & 0xFF;
 
 	/* if the initial message failed, num_levels will be 0 */
-	for (i = 0; i < *num_levels; i++) {
+	for (i = 0; i < *num_levels && i < ARRAY_SIZE(clk_mgr->base.bw_params->clk_table.entries); i++) {
 		*((unsigned int *)entry_i) = (dcn30_smu_get_dpm_freq_by_index(clk_mgr, clk, i) & 0xFFFF);
 		entry_i += sizeof(clk_mgr->base.bw_params->clk_table.entries[0]);
 	}

@@ -95,8 +95,11 @@ static bool gpu_addr_to_uma(struct dce_hwseq *hwseq,
 	} else if (hwseq->fb_offset.quad_part <= addr->quad_part &&
 			addr->quad_part <= hwseq->uma_top.quad_part) {
 		is_in_uma = true;
+	} else if (addr->quad_part == 0) {
+		is_in_uma = false;
 	} else {
 		is_in_uma = false;
+		BREAK_TO_DEBUGGER();
 	}
 	return is_in_uma;
 }
@@ -167,7 +170,7 @@ void dcn201_init_blank(
 	struct tg_color black_color = {0};
 	struct output_pixel_processor *opp = NULL;
 	uint32_t num_opps, opp_id_src0, opp_id_src1;
-	uint32_t otg_active_width, otg_active_height;
+	uint32_t otg_active_width = 0, otg_active_height = 0;
 
 	/* program opp dpg blank color */
 	color_space = COLOR_SPACE_SRGB;
@@ -601,7 +604,7 @@ void dcn201_unblank_stream(struct pipe_ctx *pipe_ctx,
 
 	if (dc_is_dp_signal(pipe_ctx->stream->signal)) {
 		/*check whether it is half the rate*/
-		if (optc201_is_two_pixels_per_containter(&stream->timing))
+		if (pipe_ctx->stream_res.tg->funcs->is_two_pixels_per_container(&stream->timing))
 			params.timing.pix_clk_100hz /= 2;
 
 		pipe_ctx->stream_res.stream_enc->funcs->dp_unblank(link, pipe_ctx->stream_res.stream_enc, &params);

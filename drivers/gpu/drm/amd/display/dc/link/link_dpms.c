@@ -726,7 +726,7 @@ static void set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
 
 static void enable_mst_on_sink(struct dc_link *link, bool enable)
 {
-	unsigned char mstmCntl;
+	unsigned char mstmCntl = 0;
 
 	core_link_read_dpcd(link, DP_MSTM_CTRL, &mstmCntl, 1);
 	if (enable)
@@ -804,7 +804,7 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 
 	if (enable) {
 		struct dsc_config dsc_cfg;
-		struct dsc_optc_config dsc_optc_cfg;
+		struct dsc_optc_config dsc_optc_cfg = {0};
 		enum optc_dsc_mode optc_dsc_mode;
 
 		/* Enable DSC hw block */
@@ -820,14 +820,14 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 		dsc->funcs->dsc_set_config(dsc, &dsc_cfg, &dsc_optc_cfg);
 		dsc->funcs->dsc_enable(dsc, pipe_ctx->stream_res.opp->inst);
 		if (should_use_dto_dscclk)
-			dccg->funcs->set_dto_dscclk(dccg, dsc->inst);
+			dccg->funcs->set_dto_dscclk(dccg, dsc->inst, true);
 		for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
 			struct display_stream_compressor *odm_dsc = odm_pipe->stream_res.dsc;
 
 			odm_dsc->funcs->dsc_set_config(odm_dsc, &dsc_cfg, &dsc_optc_cfg);
 			odm_dsc->funcs->dsc_enable(odm_dsc, odm_pipe->stream_res.opp->inst);
 			if (should_use_dto_dscclk)
-				dccg->funcs->set_dto_dscclk(dccg, odm_dsc->inst);
+				dccg->funcs->set_dto_dscclk(dccg, odm_dsc->inst, true);
 		}
 		dsc_cfg.dc_dsc_cfg.num_slices_h *= opp_cnt;
 		dsc_cfg.pic_width *= opp_cnt;
@@ -838,10 +838,11 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 		if (dc_is_dp_signal(stream->signal) && !dp_is_128b_132b_signal(pipe_ctx)) {
 			DC_LOG_DSC("Setting stream encoder DSC config for engine %d:", (int)pipe_ctx->stream_res.stream_enc->id);
 			dsc_optc_config_log(dsc, &dsc_optc_cfg);
-			pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(pipe_ctx->stream_res.stream_enc,
-									optc_dsc_mode,
-									dsc_optc_cfg.bytes_per_pixel,
-									dsc_optc_cfg.slice_width);
+			if (pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config)
+				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(pipe_ctx->stream_res.stream_enc,
+										optc_dsc_mode,
+										dsc_optc_cfg.bytes_per_pixel,
+										dsc_optc_cfg.slice_width);
 
 			/* PPS SDP is set elsewhere because it has to be done after DIG FE is connected to DIG BE */
 		}
@@ -868,19 +869,26 @@ void link_set_dsc_on_stream(struct pipe_ctx *pipe_ctx, bool enable)
 										NULL,
 										true);
 			else {
-				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(
-						pipe_ctx->stream_res.stream_enc,
-						OPTC_DSC_DISABLED, 0, 0);
+				if (pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config)
+					pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_config(
+							pipe_ctx->stream_res.stream_enc,
+							OPTC_DSC_DISABLED, 0, 0);
 				pipe_ctx->stream_res.stream_enc->funcs->dp_set_dsc_pps_info_packet(
 							pipe_ctx->stream_res.stream_enc, false, NULL, true);
 			}
 		}
 
 		/* disable DSC block */
+		if (dccg->funcs->set_dto_dscclk)
+			dccg->funcs->set_dto_dscclk(dccg, pipe_ctx->stream_res.dsc->inst, false);
+		pipe_ctx->stream_res.dsc->funcs->dsc_disconnect(pipe_ctx->stream_res.dsc);
 		if (dccg->funcs->set_ref_dscclk)
 			dccg->funcs->set_ref_dscclk(dccg, pipe_ctx->stream_res.dsc->inst);
 		pipe_ctx->stream_res.dsc->funcs->dsc_disable(pipe_ctx->stream_res.dsc);
 		for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
+			if (dccg->funcs->set_dto_dscclk)
+				dccg->funcs->set_dto_dscclk(dccg, odm_pipe->stream_res.dsc->inst, false);
+			odm_pipe->stream_res.dsc->funcs->dsc_disconnect(odm_pipe->stream_res.dsc);
 			if (dccg->funcs->set_ref_dscclk)
 				dccg->funcs->set_ref_dscclk(dccg, odm_pipe->stream_res.dsc->inst);
 			odm_pipe->stream_res.dsc->funcs->dsc_disable(odm_pipe->stream_res.dsc);
@@ -1158,12 +1166,13 @@ static bool poll_for_allocation_change_trigger(struct dc_link *link)
 	int i;
 	const int act_retries = 30;
 	enum act_return_status result = ACT_FAILED;
+	enum dc_connection_type display_connected = (link->type != dc_connection_none);
 	union payload_table_update_status update_status = {0};
 	union lane_status dpcd_lane_status[LANE_COUNT_DP_MAX];
 	union lane_align_status_updated lane_status_updated;
 	DC_LOGGER_INIT(link->ctx->logger);
 
-	if (link->aux_access_disabled)
+	if (!display_connected || link->aux_access_disabled)
 		return true;
 	for (i = 0; i < act_retries; i++) {
 		get_lane_status(link, link->cur_link_settings.lane_count, dpcd_lane_status, &lane_status_updated);
@@ -1595,6 +1604,7 @@ static bool write_128b_132b_sst_payload_allocation_table(
 	union payload_table_update_status update_status = { 0 };
 	const uint32_t max_retries = 30;
 	uint32_t retries = 0;
+	enum dc_connection_type display_connected = (link->type != dc_connection_none);
 	DC_LOGGER_INIT(link->ctx->logger);
 
 	if (allocate)	{
@@ -1612,7 +1622,7 @@ static bool write_128b_132b_sst_payload_allocation_table(
 	proposed_table->stream_allocations[0].slot_count = req_slot_count;
 	proposed_table->stream_allocations[0].vcp_id = vc_id;
 
-	if (link->aux_access_disabled)
+	if (!display_connected || link->aux_access_disabled)
 		return true;
 
 	/// Write DPCD 2C0 = 1 to start updating
@@ -1659,7 +1669,7 @@ static bool write_128b_132b_sst_payload_allocation_table(
 				break;
 			}
 		} else {
-			union dpcd_rev dpcdRev;
+			union dpcd_rev dpcdRev = {0};
 
 			if (core_link_read_dpcd(
 					link,
@@ -2202,7 +2212,7 @@ static enum dc_status enable_link_dp_mst(
 		struct pipe_ctx *pipe_ctx)
 {
 	struct dc_link *link = pipe_ctx->stream->link;
-	unsigned char mstm_cntl;
+	unsigned char mstm_cntl = 0;
 
 	/* sink signal type after MST branch is MST. Multiple MST sinks
 	 * share one link. Link DP PHY is enable or training only once.
@@ -2395,8 +2405,6 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 
 	dc->hwss.disable_audio_stream(pipe_ctx);
 
-	edp_set_panel_assr(link, pipe_ctx, &panel_mode_dp, false);
-
 	update_psp_stream_config(pipe_ctx, true);
 	dc->hwss.blank_stream(pipe_ctx);
 
@@ -2450,6 +2458,8 @@ void link_set_dpms_off(struct pipe_ctx *pipe_ctx)
 		dc->hwss.disable_stream(pipe_ctx);
 		disable_link(pipe_ctx->stream->link, &pipe_ctx->link_res, pipe_ctx->stream->signal);
 	}
+	edp_set_panel_assr(link, pipe_ctx, &panel_mode_dp, false);
+
 	if (pipe_ctx->stream->timing.flags.DSC) {
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			link_set_dsc_enable(pipe_ctx, false);

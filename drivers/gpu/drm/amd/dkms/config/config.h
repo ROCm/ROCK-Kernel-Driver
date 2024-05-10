@@ -677,6 +677,9 @@
 /* kernel_write() take arg type of position as pointer */
 #define HAVE_KERNEL_WRITE_PPOS 1
 
+/* kfifo_put() have non pointer parameter */
+#define HAVE_KFIFO_PUT_NON_POINTER 1
+
 /* kmalloc_size_roundup is available */
 #define HAVE_KMALLOC_SIZE_ROUNDUP 1
 
@@ -884,6 +887,9 @@
 /* queue_work_node() is available */
 #define HAVE_QUEUE_WORK_NODE 1
 
+/* radix_tree_iter_delete() is available */
+#define HAVE_RADIX_TREE_ITER_DELETE 1
+
 /* rb_add_cached is available */
 #define HAVE_RB_ADD_CACHED 1
 
@@ -1045,7 +1051,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.7.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.8.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1054,7 +1060,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.7.0"
+#define PACKAGE_VERSION "6.8.0"
 
 #include "config-amd-chips.h"
 
