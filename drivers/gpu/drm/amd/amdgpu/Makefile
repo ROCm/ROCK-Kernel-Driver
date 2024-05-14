@@ -330,7 +330,9 @@ amdgpu-y += $(AMD_DISPLAY_FILES)
 endif
 
 # add isp block
+ifneq ($(CONFIG_DRM_AMD_ISP),)
 amdgpu-y += amdgpu_isp.o
+endif
 
 include $(FULL_AMD_PATH)/backport/Makefile
 
