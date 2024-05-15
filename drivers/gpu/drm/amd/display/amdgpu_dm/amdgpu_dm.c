@@ -7047,6 +7047,7 @@ amdgpu_dm_should_create_sysfs(struct amdgpu_dm_connector *amdgpu_dm_connector)
 	if (amdgpu_dm_connector->base.connector_type != DRM_MODE_CONNECTOR_eDP)
 		return false;
 
+#ifdef HAVE_HDR_SINK_METADATA
 	/* check for OLED panels */
 	if (amdgpu_dm_connector->bl_idx >= 0) {
 		struct drm_device *drm = amdgpu_dm_connector->base.dev;
@@ -7057,6 +7058,7 @@ amdgpu_dm_should_create_sysfs(struct amdgpu_dm_connector *amdgpu_dm_connector)
 		if (caps->aux_support)
 			return false;
 	}
+#endif
 
 	return true;
 }
