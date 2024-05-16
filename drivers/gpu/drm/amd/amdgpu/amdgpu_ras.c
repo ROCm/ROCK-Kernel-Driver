@@ -44,9 +44,7 @@
 #ifdef CONFIG_X86_MCE_AMD
 #include <asm/mce.h>
 
-#ifdef HAVE_SMCA_UMC_V2
 static bool notifier_registered;
-#endif
 #endif
 static const char *RAS_FS_NAME = "ras";
 
@@ -141,14 +139,12 @@ static bool amdgpu_ras_check_bad_page_unlock(struct amdgpu_ras *con,
 static bool amdgpu_ras_check_bad_page(struct amdgpu_device *adev,
 				uint64_t addr);
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev);
 struct mce_notifier_adev_list {
 	struct amdgpu_device *devs[MAX_GPU_INSTANCE];
 	int num_gpu;
 };
 static struct mce_notifier_adev_list mce_adev_list;
-#endif
 #endif
 
 void amdgpu_ras_set_error_query_ready(struct amdgpu_device *adev, bool ready)
@@ -3238,11 +3234,9 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 	amdgpu_ras_ecc_log_init(&con->umc_ecc_log);
 #endif
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
 	    (adev->gmc.xgmi.connected_to_cpu))
 		amdgpu_register_bad_pages_mca_notifier(adev);
-#endif
 #endif
 
 	return 0;
@@ -4149,7 +4143,6 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 }
 
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 static struct amdgpu_device *find_adev(uint32_t node_id)
 {
 	int i;
@@ -4185,8 +4178,10 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
 	 * and error occurred in DramECC (Extended error code = 0) then only
 	 * process the error, else bail out.
 	 */
+#ifdef HAVE_SMCA_UMC_V2
 	if (!m || !((kcl_smca_get_bank_type(m->extcpu, m->bank) == SMCA_UMC_V2) &&
 		    (XEC(m->status, 0x3f) == 0x0)))
+#endif
 		return NOTIFY_DONE;
 
 	/*
@@ -4249,7 +4244,6 @@ static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev)
 		notifier_registered = true;
 	}
 }
-#endif
 #endif
 
 struct amdgpu_ras *amdgpu_ras_get_context(struct amdgpu_device *adev)

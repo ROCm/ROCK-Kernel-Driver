@@ -15,3 +15,20 @@ AC_DEFUN([AC_AMDGPU_MCE_PRIO_UC], [
                 ])
         ])
 ])
+dnl #
+dnl # v5.13-rc3-1-g94a311ce248e
+dnl # x86/MCE/AMD, EDAC/mce_amd: Add new SMCA bank types
+dnl #
+AC_DEFUN([AC_AMDGPU_SMCA_UMC_V2], [
+        AC_KERNEL_DO_BACKGROUND([
+                AC_KERNEL_TRY_COMPILE([
+                        #include <asm/mce.h>
+                ], [
+                        enum smca_bank_types bank_type;
+                        bank_type = SMCA_UMC_V2;
+                ], [
+                        AC_DEFINE(HAVE_SMCA_UMC_V2, 1,
+                                [enum SMCA_UMC_V2 is available])
+                ])
+        ])
+])
