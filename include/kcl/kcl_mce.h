@@ -17,7 +17,7 @@
 
 #if !defined(HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS)
 #if defined(HAVE_SMCA_GET_BANK_TYPE_WITH_ONE_ARGUMENT) || defined(HAVE_STRUCT_SMCA_BANK)
-#if ddfined(HAVE_STRUCT_SMCA_BANK)
+#if defined(HAVE_STRUCT_SMCA_BANK)
 enum smca_bank_types smca_get_bank_type(unsigned int bank);
 #endif
 static inline
