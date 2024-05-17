@@ -1277,7 +1277,7 @@ void kgd_gfx_v9_override_core_cg(struct amdgpu_device *adev,
 					    uint32_t value,
 					    uint32_t inst)
 {
-	uint32_t clk_cntl;
+	uint32_t clk_cntl = 0;
 
 	mutex_lock(&adev->grbm_idx_mutex);
 	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
