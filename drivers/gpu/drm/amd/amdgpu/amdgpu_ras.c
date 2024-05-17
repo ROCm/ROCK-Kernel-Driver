@@ -4179,7 +4179,7 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
 	 * process the error, else bail out.
 	 */
 #ifdef HAVE_SMCA_UMC_V2
-	if (!m || !((kcl_smca_get_bank_type(m->extcpu, m->bank) == SMCA_UMC_V2) &&
+	if (!m || !((smca_get_bank_type(m->extcpu, m->bank) == SMCA_UMC_V2) &&
 		    (XEC(m->status, 0x3f) == 0x0)))
 #endif
 		return NOTIFY_DONE;
