@@ -113,6 +113,10 @@
 #include "amdgpu_xcp.h"
 #include "amdgpu_seq64.h"
 #include "amdgpu_reg_state.h"
+#include "amdgpu_umsch_mm.h"
+#if defined(CONFIG_DRM_AMD_ISP)
+#include "amdgpu_isp.h"
+#endif
 
 #define MAX_GPU_INSTANCE		64
 
@@ -255,10 +259,12 @@ extern int amdgpu_cik_support;
 extern int amdgpu_num_kcq;
 
 #define AMDGPU_VCNFW_LOG_SIZE (32 * 1024)
+#define AMDGPU_UMSCHFW_LOG_SIZE (32 * 1024)
 extern int amdgpu_vcnfw_log;
 extern int amdgpu_sg_display;
 extern int amdgpu_umsch_mm;
 extern int amdgpu_seamless;
+extern int amdgpu_umsch_mm_fwlog;
 
 extern int amdgpu_user_partt_mode;
 extern int amdgpu_agp;
@@ -728,6 +734,7 @@ enum amd_hw_ip_block_type {
 	XGMI_HWIP,
 	DCI_HWIP,
 	PCIE_HWIP,
+	ISP_HWIP,
 	MAX_HWIP
 };
 
@@ -1066,6 +1073,11 @@ struct amdgpu_device {
 	/* display related functionality */
 	struct amdgpu_display_manager dm;
 
+#if defined(CONFIG_DRM_AMD_ISP)
+	/* isp */
+	struct amdgpu_isp		isp;
+#endif
+
 	/* mes */
 	bool                            enable_mes;
 	bool                            enable_mes_kiq;
@@ -1187,6 +1199,7 @@ struct amdgpu_device {
 	bool                            debug_largebar;
 	bool                            debug_disable_soft_recovery;
 	bool                            debug_use_vram_fw_buf;
+	bool                            debug_enable_ras_aca;
 };
 
 static inline uint32_t amdgpu_ip_version(const struct amdgpu_device *adev,

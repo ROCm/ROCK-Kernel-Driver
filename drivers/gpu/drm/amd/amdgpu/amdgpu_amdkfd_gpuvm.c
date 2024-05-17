@@ -417,6 +417,10 @@ static int amdgpu_amdkfd_bo_validate(struct amdgpu_bo *bo, uint32_t domain,
 		 "Called with userptr BO"))
 		return -EINVAL;
 
+	/* bo has been pinned, not need validate it */
+	if (bo->tbo.pin_count)
+		return 0;
+
 	amdgpu_bo_placement_from_domain(bo, domain);
 
 	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
@@ -1144,7 +1148,10 @@ static int init_user_pages(struct kgd_mem *mem, uint64_t user_addr,
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
 	ret = amdgpu_ttm_tt_get_user_pages(bo, bo->tbo.ttm->pages, &range);
 	if (ret) {
-		pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
+		if (ret == -EAGAIN)
+			pr_debug("Failed to get user pages, try again\n");
+		else
+			pr_err("%s: Failed to get user pages: %d\n", __func__, ret);
 		goto unregister_out;
 	}
 #else
@@ -2609,9 +2616,11 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		cur_page++;
 	}
 
-	ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
-	if (ret)
-		goto out_of_range;
+	if (dma_dev) {
+		ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
+		if (ret)
+			goto out_of_range;
+	}
 
 	*ret_sg = sg;
 	return 0;
@@ -2635,7 +2644,8 @@ void amdgpu_amdkfd_gpuvm_put_sg_table(struct amdgpu_bo *bo,
 	}
 
 	/* Unmap system memory */
-	dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
+	if (dma_dev)
+		dma_unmap_sgtable(dma_dev, sgt, dir, DMA_ATTR_SKIP_CPU_SYNC);
 	sg_free_table(sgt);
 	kfree(sgt);
 }
@@ -3163,7 +3173,7 @@ static int confirm_valid_user_pages_locked(struct amdkfd_process_info *process_i
 
 		/* keep mem without hmm range at userptr_inval_list */
 		if (!mem->range)
-			 continue;
+			continue;
 
 		/* Only check mem with hmm range associated */
 		valid = amdgpu_ttm_tt_get_user_pages_done(
@@ -3407,9 +3417,6 @@ int amdgpu_amdkfd_gpuvm_restore_process_bos(void *info, struct dma_fence **ef)
 
 		list_for_each_entry(attachment, &mem->attachments, list) {
 			if (!attachment->is_mapped)
-				continue;
-
-			if (attachment->bo_va->base.bo->tbo.pin_count)
 				continue;
 
 			kfd_mem_dmaunmap_attachment(mem, attachment);

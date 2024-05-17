@@ -131,6 +131,7 @@ enum AMDGPU_DEBUG_MASK {
 	AMDGPU_DEBUG_LARGEBAR = BIT(1),
 	AMDGPU_DEBUG_DISABLE_GPU_SOFT_RECOVERY = BIT(2),
 	AMDGPU_DEBUG_USE_VRAM_FW_BUF = BIT(3),
+	AMDGPU_DEBUG_ENABLE_RAS_ACA = BIT(4),
 };
 
 unsigned int amdgpu_vram_limit = UINT_MAX;
@@ -219,6 +220,7 @@ uint amdgpu_debug_mask;
 int amdgpu_agp = -1; /* auto */
 int amdgpu_wbrf = -1;
 int amdgpu_damage_clips = -1; /* auto */
+int amdgpu_umsch_mm_fwlog;
 
 static void amdgpu_drv_delayed_reset_work_handler(struct work_struct *work);
 
@@ -996,6 +998,13 @@ module_param_named(sg_display, amdgpu_sg_display, int, 0444);
 MODULE_PARM_DESC(umsch_mm,
 	"Enable Multi Media User Mode Scheduler (0 = disabled (default), 1 = enabled)");
 module_param_named(umsch_mm, amdgpu_umsch_mm, int, 0444);
+
+/**
+ * DOC: umsch_mm_fwlog (int)
+ * Enable umschfw log output for debugging, the default is disabled.
+ */
+MODULE_PARM_DESC(umsch_mm_fwlog, "Enable umschfw log(0 = disable (default value), 1 = enable)");
+module_param_named(umsch_mm_fwlog, amdgpu_umsch_mm_fwlog, int, 0444);
 
 /**
  * DOC: smu_pptable_id (int)
@@ -2209,6 +2218,11 @@ static void amdgpu_init_debug_options(struct amdgpu_device *adev)
 	if (amdgpu_debug_mask & AMDGPU_DEBUG_USE_VRAM_FW_BUF) {
 		pr_info("debug: place fw in vram for frontdoor loading\n");
 		adev->debug_use_vram_fw_buf = true;
+	}
+
+	if (amdgpu_debug_mask & AMDGPU_DEBUG_ENABLE_RAS_ACA) {
+		pr_info("debug: enable RAS ACA\n");
+		adev->debug_enable_ras_aca = true;
 	}
 }
 

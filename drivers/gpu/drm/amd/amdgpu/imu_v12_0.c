@@ -32,6 +32,7 @@
 #include "gc/gc_12_0_0_sh_mask.h"
 #include "mmhub/mmhub_4_1_0_offset.h"
 
+MODULE_FIRMWARE("amdgpu/gc_12_0_0_imu.bin");
 MODULE_FIRMWARE("amdgpu/gc_12_0_1_imu.bin");
 
 #define TRANSFER_RAM_MASK	0x001c0000
@@ -39,7 +40,7 @@ MODULE_FIRMWARE("amdgpu/gc_12_0_1_imu.bin");
 static int imu_v12_0_init_microcode(struct amdgpu_device *adev)
 {
 	char fw_name[40];
-	char ucode_prefix[30];
+	char ucode_prefix[15];
 	int err;
 	const struct imu_firmware_header_v1_0 *imu_hdr;
 	struct amdgpu_firmware_info *info = NULL;
@@ -367,6 +368,7 @@ static void imu_v12_0_program_rlc_ram(struct amdgpu_device *adev)
 	WREG32_SOC15(GC, 0, regGFX_IMU_RLC_RAM_INDEX, 0x2);
 
 	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
+	case IP_VERSION(12, 0, 0):
 	case IP_VERSION(12, 0, 1):
 		if (!r)
 			program_imu_rlc_ram(adev, data, (const u32)size);

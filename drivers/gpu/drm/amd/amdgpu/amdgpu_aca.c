@@ -534,7 +534,7 @@ int amdgpu_aca_get_error_data(struct amdgpu_device *adev, struct aca_handle *han
 	if (aca_handle_is_valid(handle))
 		return -EOPNOTSUPP;
 
-	if (!(BIT(type) & handle->mask))
+	if ((type < 0) || (!(BIT(type) & handle->mask)))
 		return  0;
 
 	return __aca_get_error_data(adev, handle, type, err_data, qctx);
@@ -686,7 +686,8 @@ static void aca_manager_fini(struct aca_handle_manager *mgr)
 
 bool amdgpu_aca_is_enabled(struct amdgpu_device *adev)
 {
-	return adev->aca.is_enabled;
+	return (adev->aca.is_enabled ||
+		adev->debug_enable_ras_aca);
 }
 
 int amdgpu_aca_init(struct amdgpu_device *adev)

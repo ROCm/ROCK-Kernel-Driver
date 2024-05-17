@@ -56,7 +56,7 @@ static const char * const __smu_message_names[] = {
 static const char *smu_get_message_name(struct smu_context *smu,
 					enum smu_message_type type)
 {
-	if (type < 0 || type >= SMU_MSG_MAX_COUNT)
+	if (type >= SMU_MSG_MAX_COUNT)
 		return "unknown smu message";
 
 	return __smu_message_names[type];
@@ -760,7 +760,7 @@ static const char *__smu_feature_names[] = {
 static const char *smu_get_feature_name(struct smu_context *smu,
 					enum smu_feature_mask feature)
 {
-	if (feature < 0 || feature >= SMU_FEATURE_COUNT)
+	if (feature >= SMU_FEATURE_COUNT)
 		return "unknown smu feature";
 	return __smu_feature_names[feature];
 }
@@ -1051,6 +1051,9 @@ void smu_cmn_init_soft_gpu_metrics(void *table, uint8_t frev, uint8_t crev)
 		break;
 	case METRICS_VERSION(1, 5):
 		structure_size = sizeof(struct gpu_metrics_v1_5);
+		break;
+	case METRICS_VERSION(1, 6):
+		structure_size = sizeof(struct gpu_metrics_v1_6);
 		break;
 	case METRICS_VERSION(2, 0):
 		structure_size = sizeof(struct gpu_metrics_v2_0);

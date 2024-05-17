@@ -408,7 +408,7 @@ out:
 static int gfx_v12_0_init_microcode(struct amdgpu_device *adev)
 {
 	char fw_name[40];
-	char ucode_prefix[30];
+	char ucode_prefix[15];
 	int err;
 	const struct rlc_firmware_header_v2_0 *rlc_hdr;
 	uint16_t version_major;
@@ -2691,16 +2691,14 @@ static int gfx_v12_0_gfx_init_queue(struct amdgpu_ring *ring)
 		soc24_grbm_select(adev, 0, 0, 0, 0);
 		mutex_unlock(&adev->srbm_mutex);
 		if (adev->gfx.me.mqd_backup[mqd_idx])
-			memcpy(adev->gfx.me.mqd_backup[mqd_idx], mqd, sizeof(*mqd));
-	} else if (amdgpu_in_reset(adev)) {
-		/* reset mqd with the backup copy */
+			memcpy_fromio(adev->gfx.me.mqd_backup[mqd_idx], mqd, sizeof(*mqd));
+	} else {
+		/* restore mqd with the backup copy */
 		if (adev->gfx.me.mqd_backup[mqd_idx])
-			memcpy(mqd, adev->gfx.me.mqd_backup[mqd_idx], sizeof(*mqd));
+			memcpy_toio(mqd, adev->gfx.me.mqd_backup[mqd_idx], sizeof(*mqd));
 		/* reset the ring */
 		ring->wptr = 0;
 		*ring->wptr_cpu_addr = 0;
-		amdgpu_ring_clear_ring(ring);
-	} else {
 		amdgpu_ring_clear_ring(ring);
 	}
 
@@ -3040,17 +3038,14 @@ static int gfx_v12_0_kcq_init_queue(struct amdgpu_ring *ring)
 		mutex_unlock(&adev->srbm_mutex);
 
 		if (adev->gfx.mec.mqd_backup[mqd_idx])
-			memcpy(adev->gfx.mec.mqd_backup[mqd_idx], mqd, sizeof(*mqd));
-	} else if (amdgpu_in_reset(adev)) { /* for GPU_RESET case */
-		/* reset MQD to a clean status */
+			memcpy_fromio(adev->gfx.mec.mqd_backup[mqd_idx], mqd, sizeof(*mqd));
+	} else {
+		/* restore MQD to a clean status */
 		if (adev->gfx.mec.mqd_backup[mqd_idx])
-			memcpy(mqd, adev->gfx.mec.mqd_backup[mqd_idx], sizeof(*mqd));
-
+			memcpy_toio(mqd, adev->gfx.mec.mqd_backup[mqd_idx], sizeof(*mqd));
 		/* reset ring buffer */
 		ring->wptr = 0;
 		atomic64_set((atomic64_t *)ring->wptr_cpu_addr, 0);
-		amdgpu_ring_clear_ring(ring);
-	} else {
 		amdgpu_ring_clear_ring(ring);
 	}
 
@@ -3862,6 +3857,7 @@ static int gfx_v12_0_set_clockgating_state(void *handle,
 		return 0;
 
 	switch (adev->ip_versions[GC_HWIP][0]) {
+	case IP_VERSION(12, 0, 0):
 	case IP_VERSION(12, 0, 1):
 		gfx_v12_0_update_gfx_clock_gating(adev,
 						  state == AMD_CG_STATE_GATE);

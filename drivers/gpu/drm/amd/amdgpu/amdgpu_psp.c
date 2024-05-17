@@ -1362,6 +1362,9 @@ static void psp_xgmi_reflect_topology_info(struct psp_context *psp,
 	uint8_t dst_num_links = node_info.num_links;
 
 	hive = amdgpu_get_xgmi_hive(psp->adev);
+	if (WARN_ON(!hive))
+		return;
+
 	list_for_each_entry(mirror_adev, &hive->device_list, gmc.xgmi.head) {
 		struct psp_xgmi_topology_info *mirror_top_info;
 		int j;
@@ -2538,6 +2541,9 @@ static int psp_get_fw_type(struct amdgpu_firmware_info *ucode,
 		break;
 	case AMDGPU_UCODE_ID_JPEG_RAM:
 		*type = GFX_FW_TYPE_JPEG_RAM;
+		break;
+	case AMDGPU_UCODE_ID_ISP:
+		*type = GFX_FW_TYPE_ISP;
 		break;
 	case AMDGPU_UCODE_ID_MAXIMUM:
 	default:
