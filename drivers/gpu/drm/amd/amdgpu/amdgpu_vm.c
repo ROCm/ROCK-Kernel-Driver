@@ -3113,5 +3113,5 @@ void amdgpu_vm_update_fault_cache(struct amdgpu_device *adev,
  */
 bool amdgpu_vm_is_bo_always_valid(struct amdgpu_vm *vm, struct amdgpu_bo *bo)
 {
-	return bo && bo->tbo.base.resv == vm->root.bo->tbo.base.resv;
+	return bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo);
 }
