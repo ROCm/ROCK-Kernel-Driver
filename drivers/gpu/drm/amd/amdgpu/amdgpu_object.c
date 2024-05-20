@@ -1642,10 +1642,10 @@ u64 amdgpu_bo_print_info(int id, struct amdgpu_bo *bo, struct seq_file *m)
 			else
 				placement = "VRAM";
 			break;
-		case AMDGPU_GEM_DOMAIN_DGMA:
+		case AMDGPU_PL_DGMA:
 			placement = "DGMA";
 			break;
-		case AMDGPU_GEM_DOMAIN_DGMA_IMPORT:
+		case AMDGPU_PL_DGMA_IMPORT:
 			placement = "DGMA_IMPORT";
 			break;
 		case TTM_PL_TT:
