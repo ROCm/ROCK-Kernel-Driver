@@ -453,7 +453,11 @@ static int vangogh_init_smc_tables(struct smu_context *smu)
 
 #ifdef CONFIG_X86
 	/* AMD x86 APU only */
+#ifdef HAVE_TOPOLOGY_NUM_CORES_PER_PACKAGE
 	smu->cpu_core_num = topology_num_cores_per_package();
+#else
+	smu->cpu_core_num = boot_cpu_data.x86_max_cores;
+#endif
 #else
 	smu->cpu_core_num = 4;
 #endif
