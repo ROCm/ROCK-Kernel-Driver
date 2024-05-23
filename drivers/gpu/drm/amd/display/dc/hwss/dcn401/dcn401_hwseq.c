@@ -32,6 +32,7 @@
 #include "dcn401_hwseq.h"
 #include "dcn401/dcn401_resource.h"
 #include "dc_state_priv.h"
+#include "link_enc_cfg.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -497,9 +498,9 @@ void dcn401_populate_mcm_luts(struct dc *dc,
 		if (m_lut_params.pwl) {
 			if (mpc->funcs->populate_lut)
 				mpc->funcs->populate_lut(mpc, MCM_LUT_1DLUT, m_lut_params, lut_bank_a, mpcc_id);
-			if (mpc->funcs->program_lut_mode)
-				mpc->funcs->program_lut_mode(mpc, MCM_LUT_1DLUT, lut1d_xable, lut_bank_a, mpcc_id);
 		}
+		if (mpc->funcs->program_lut_mode)
+			mpc->funcs->program_lut_mode(mpc, MCM_LUT_1DLUT, lut1d_xable, lut_bank_a, mpcc_id);
 	}
 
 	/* Shaper */
@@ -518,9 +519,9 @@ void dcn401_populate_mcm_luts(struct dc *dc,
 		if (m_lut_params.pwl) {
 			if (mpc->funcs->populate_lut)
 				mpc->funcs->populate_lut(mpc, MCM_LUT_SHAPER, m_lut_params, lut_bank_a, mpcc_id);
-			if (mpc->funcs->program_lut_mode)
-				mpc->funcs->program_lut_mode(mpc, MCM_LUT_SHAPER, shaper_xable, lut_bank_a, mpcc_id);
 		}
+		if (mpc->funcs->program_lut_mode)
+			mpc->funcs->program_lut_mode(mpc, MCM_LUT_SHAPER, shaper_xable, lut_bank_a, mpcc_id);
 	}
 
 	/* 3DLUT */
@@ -631,6 +632,15 @@ void dcn401_populate_mcm_luts(struct dc *dc,
 		}
 		break;
 
+	}
+}
+
+void dcn401_trigger_3dlut_dma_load(struct dc *dc, struct pipe_ctx *pipe_ctx)
+{
+	struct hubp *hubp = pipe_ctx->plane_res.hubp;
+
+	if (hubp->funcs->hubp_enable_3dlut_fl) {
+		hubp->funcs->hubp_enable_3dlut_fl(hubp, true);
 	}
 }
 
@@ -966,6 +976,8 @@ void dcn401_enable_stream(struct pipe_ctx *pipe_ctx)
 	int dp_hpo_inst = 0;
 	unsigned int tmds_div = PIXEL_RATE_DIV_NA;
 	unsigned int unused_div = PIXEL_RATE_DIV_NA;
+	struct link_encoder *link_enc = link_enc_cfg_get_link_enc(pipe_ctx->stream->link);
+	struct stream_encoder *stream_enc = pipe_ctx->stream_res.stream_enc;
 
 	dcn401_enable_stream_calc(pipe_ctx, &dp_hpo_inst, &phyd32clk,
 				&tmds_div, &early_control);
@@ -978,6 +990,8 @@ void dcn401_enable_stream(struct pipe_ctx *pipe_ctx)
 		} else {
 			/* need to set DTBCLK_P source to DPREFCLK for DP8B10B */
 			dccg->funcs->set_dtbclk_p_src(dccg, DPREFCLK, tg->inst);
+			dccg->funcs->enable_symclk_se(dccg, stream_enc->stream_enc_inst,
+					link_enc->transmitter - TRANSMITTER_UNIPHY_A);
 		}
 	}
 
@@ -1075,7 +1089,9 @@ void dcn401_set_cursor_position(struct pipe_ctx *pipe_ctx)
 	bool odm_combine_on = (pipe_ctx->next_odm_pipe != NULL) ||
 		(pipe_ctx->prev_odm_pipe != NULL);
 	int prev_odm_width = 0;
+	int prev_odm_offset = 0;
 	int next_odm_width = 0;
+	int next_odm_offset = 0;
 
 	int x_pos = pos_cpy.x;
 	int y_pos = pos_cpy.y;
@@ -1138,22 +1154,26 @@ void dcn401_set_cursor_position(struct pipe_ctx *pipe_ctx)
 		y_pos += pipe_ctx->plane_state->src_rect.y;
 	}
 
-	/* Adjust for ODM Combine */
+	/* Adjust for ODM Combine
+	 * next/prev_odm_offset is to account for scaled modes that have underscan
+	 */
 	if (odm_combine_on) {
 		struct pipe_ctx *next_odm_pipe = pipe_ctx->next_odm_pipe;
 		struct pipe_ctx *prev_odm_pipe = pipe_ctx->prev_odm_pipe;
 
 		while (next_odm_pipe != NULL) {
 			next_odm_width += next_odm_pipe->plane_res.scl_data.recout.width;
+			next_odm_offset += next_odm_pipe->plane_res.scl_data.recout.x;
 			next_odm_pipe = next_odm_pipe->next_odm_pipe;
 		}
 		while (prev_odm_pipe != NULL) {
 			prev_odm_width += prev_odm_pipe->plane_res.scl_data.recout.width;
+			prev_odm_offset += prev_odm_pipe->plane_res.scl_data.recout.x;
 			prev_odm_pipe = prev_odm_pipe->prev_odm_pipe;
 		}
 
 		if (param.rotation == ROTATION_ANGLE_0) {
-			x_pos -= prev_odm_width;
+			x_pos -= (prev_odm_width + prev_odm_offset);
 		}
 	}
 
@@ -1255,7 +1275,7 @@ void dcn401_set_cursor_position(struct pipe_ctx *pipe_ctx)
 				pos_cpy.y += pos_cpy_x_offset;
 
 			} else {
-				pos_cpy.x = pipe_ctx->plane_res.scl_data.recout.width + next_odm_width - pos_cpy.y;
+				pos_cpy.x = pipe_ctx->plane_res.scl_data.recout.width + next_odm_width + next_odm_offset - pos_cpy.y;
 				pos_cpy.y = temp_x;
 			}
 		} else {

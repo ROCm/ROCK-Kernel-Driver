@@ -342,7 +342,53 @@ bool dcn401_validate_bandwidth(struct dc *dc,
 	SRI_ARR(OBUF_MEM_PWR_CTRL, DSCL, id),                                    \
 	SRI_ARR(DSCL_MEM_PWR_STATUS, DSCL, id),                                  \
 	SRI_ARR(DSCL_MEM_PWR_CTRL, DSCL, id),                                    \
-	SRI_ARR(DSCL_CONTROL, DSCL, id)
+	SRI_ARR(DSCL_CONTROL, DSCL, id),                                         \
+	SRI_ARR(DSCL_SC_MODE, DSCL, id),                                         \
+	SRI_ARR(DSCL_EASF_H_MODE, DSCL, id),                                     \
+	SRI_ARR(DSCL_EASF_H_BF_CNTL, DSCL, id),                                  \
+	SRI_ARR(DSCL_EASF_H_RINGEST_EVENTAP_REDUCE, DSCL, id),                   \
+	SRI_ARR(DSCL_EASF_H_RINGEST_EVENTAP_GAIN, DSCL, id),                     \
+	SRI_ARR(DSCL_EASF_H_BF_FINAL_MAX_MIN, DSCL, id),                         \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG0, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG1, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG2, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG3, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG4, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG5, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG6, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF1_PWL_SEG7, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG0, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG1, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG2, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG3, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG4, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_H_BF3_PWL_SEG5, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_MODE, DSCL, id),                                     \
+	SRI_ARR(DSCL_EASF_V_BF_CNTL, DSCL, id),                                  \
+	SRI_ARR(DSCL_EASF_V_RINGEST_3TAP_CNTL1, DSCL, id),                       \
+	SRI_ARR(DSCL_EASF_V_RINGEST_3TAP_CNTL2, DSCL, id),                       \
+	SRI_ARR(DSCL_EASF_V_RINGEST_3TAP_CNTL3, DSCL, id),                       \
+	SRI_ARR(DSCL_EASF_V_RINGEST_EVENTAP_REDUCE, DSCL, id),                   \
+	SRI_ARR(DSCL_EASF_V_RINGEST_EVENTAP_GAIN, DSCL, id),                     \
+	SRI_ARR(DSCL_EASF_V_BF_FINAL_MAX_MIN, DSCL, id),                         \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG0, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG1, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG2, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG3, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG4, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG5, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG6, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF1_PWL_SEG7, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG0, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG1, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG2, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG3, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG4, DSCL, id),                             \
+	SRI_ARR(DSCL_EASF_V_BF3_PWL_SEG5, DSCL, id),                             \
+	SRI_ARR(DSCL_SC_MATRIX_C0C1, DSCL, id),                                  \
+	SRI_ARR(DSCL_SC_MATRIX_C2C3, DSCL, id),                                  \
+	SRI_ARR(SCL_VERT_FILTER_INIT_BOT, DSCL, id),                             \
+	SRI_ARR(SCL_VERT_FILTER_INIT_BOT_C, DSCL, id)
 
 /* OPP */
 #define OPP_REG_LIST_DCN401_RI(id)                                              \
@@ -576,6 +622,10 @@ bool dcn401_validate_bandwidth(struct dc *dc,
 	SR(DCCG_GATE_DISABLE_CNTL3),\
 	SR(DCCG_GATE_DISABLE_CNTL4),\
 	SR(DCCG_GATE_DISABLE_CNTL5),\
-	SR(DCCG_GATE_DISABLE_CNTL6)
+	SR(DCCG_GATE_DISABLE_CNTL6),\
+	SR(SYMCLKA_CLOCK_ENABLE),\
+	SR(SYMCLKB_CLOCK_ENABLE),\
+	SR(SYMCLKC_CLOCK_ENABLE),\
+	SR(SYMCLKD_CLOCK_ENABLE)
 
 #endif /* _DCN401_RESOURCE_H_ */

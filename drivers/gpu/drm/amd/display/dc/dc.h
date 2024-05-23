@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.285"
+#define DC_VER "3.2.286"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -1041,6 +1041,9 @@ struct dc_debug_options {
 	union dmub_fams2_global_feature_config fams2_config;
 	bool enable_legacy_clock_update;
 	unsigned int force_cositing;
+	unsigned int disable_spl;
+	unsigned int force_easf;
+	unsigned int force_lls;
 };
 
 

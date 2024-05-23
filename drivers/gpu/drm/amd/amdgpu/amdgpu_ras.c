@@ -44,9 +44,7 @@
 #ifdef CONFIG_X86_MCE_AMD
 #include <asm/mce.h>
 
-#ifdef HAVE_SMCA_UMC_V2
 static bool notifier_registered;
-#endif
 #endif
 static const char *RAS_FS_NAME = "ras";
 
@@ -139,14 +137,12 @@ static bool amdgpu_ras_check_bad_page_unlock(struct amdgpu_ras *con,
 static bool amdgpu_ras_check_bad_page(struct amdgpu_device *adev,
 				uint64_t addr);
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev);
 struct mce_notifier_adev_list {
 	struct amdgpu_device *devs[MAX_GPU_INSTANCE];
 	int num_gpu;
 };
 static struct mce_notifier_adev_list mce_adev_list;
-#endif
 #endif
 
 void amdgpu_ras_set_error_query_ready(struct amdgpu_device *adev, bool ready)
@@ -1763,6 +1759,9 @@ int amdgpu_ras_sysfs_create(struct amdgpu_device *adev,
 {
 	struct ras_manager *obj = amdgpu_ras_find_obj(adev, head);
 
+	if (amdgpu_aca_is_enabled(adev))
+		return 0;
+
 	if (!obj || obj->attr_inuse)
 		return -EINVAL;
 
@@ -1796,6 +1795,9 @@ int amdgpu_ras_sysfs_remove(struct amdgpu_device *adev,
 		struct ras_common_if *head)
 {
 	struct ras_manager *obj = amdgpu_ras_find_obj(adev, head);
+
+	if (amdgpu_aca_is_enabled(adev))
+		return 0;
 
 	if (!obj || !obj->attr_inuse)
 		return -EINVAL;
@@ -3013,11 +3015,9 @@ int amdgpu_ras_recovery_init(struct amdgpu_device *adev)
 	amdgpu_ras_ecc_log_init(&con->umc_ecc_log);
 #endif
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 	if ((adev->asic_type == CHIP_ALDEBARAN) &&
 	    (adev->gmc.xgmi.connected_to_cpu))
 		amdgpu_register_bad_pages_mca_notifier(adev);
-#endif
 #endif
 
 	return 0;
@@ -3636,12 +3636,11 @@ int amdgpu_ras_late_init(struct amdgpu_device *adev)
 	amdgpu_ras_event_mgr_init(adev);
 
 	if (amdgpu_aca_is_enabled(adev)) {
-		if (amdgpu_in_reset(adev))
-			r = amdgpu_aca_reset(adev);
-		 else
+		if (!amdgpu_in_reset(adev)) {
 			r = amdgpu_aca_init(adev);
-		if (r)
-			return r;
+			if (r)
+				return r;
+		}
 
 		if (!amdgpu_sriov_vf(adev))
 			amdgpu_ras_set_aca_debug_mode(adev, false);
@@ -3830,7 +3829,6 @@ void amdgpu_release_ras_context(struct amdgpu_device *adev)
 }
 
 #ifdef CONFIG_X86_MCE_AMD
-#ifdef HAVE_SMCA_UMC_V2
 static struct amdgpu_device *find_adev(uint32_t node_id)
 {
 	int i;
@@ -3866,8 +3864,10 @@ static int amdgpu_bad_page_notifier(struct notifier_block *nb,
 	 * and error occurred in DramECC (Extended error code = 0) then only
 	 * process the error, else bail out.
 	 */
-	if (!m || !((kcl_smca_get_bank_type(m->extcpu, m->bank) == SMCA_UMC_V2) &&
+#ifdef HAVE_SMCA_UMC_V2
+	if (!m || !((smca_get_bank_type(m->extcpu, m->bank) == SMCA_UMC_V2) &&
 		    (XEC(m->status, 0x3f) == 0x0)))
+#endif
 		return NOTIFY_DONE;
 
 	/*
@@ -3930,7 +3930,6 @@ static void amdgpu_register_bad_pages_mca_notifier(struct amdgpu_device *adev)
 		notifier_registered = true;
 	}
 }
-#endif
 #endif
 
 struct amdgpu_ras *amdgpu_ras_get_context(struct amdgpu_device *adev)
@@ -4524,4 +4523,22 @@ int amdgpu_ras_reserve_page(struct amdgpu_device *adev, uint64_t pfn)
 	mutex_unlock(&con->page_rsv_lock);
 
 	return ret;
+}
+
+void amdgpu_ras_event_log_print(struct amdgpu_device *adev, u64 event_id,
+				const char *fmt, ...)
+{
+	struct va_format vaf;
+	va_list args;
+
+	va_start(args, fmt);
+	vaf.fmt = fmt;
+	vaf.va = &args;
+
+	if (amdgpu_ras_event_id_is_valid(adev, event_id))
+		dev_printk(KERN_INFO, adev->dev, "{%llu}%pV", event_id, &vaf);
+	else
+		dev_printk(KERN_INFO, adev->dev, "%pV", &vaf);
+
+	va_end(args);
 }

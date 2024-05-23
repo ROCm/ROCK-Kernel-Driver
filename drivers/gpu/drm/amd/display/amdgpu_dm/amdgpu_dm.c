@@ -1219,6 +1219,9 @@ static int dm_dmub_hw_init(struct amdgpu_device *adev)
 	memset(fb_info->fb[DMUB_WINDOW_6_FW_STATE].cpu_addr, 0,
 	       fb_info->fb[DMUB_WINDOW_6_FW_STATE].size);
 
+	memset(fb_info->fb[DMUB_WINDOW_SHARED_STATE].cpu_addr, 0,
+	       fb_info->fb[DMUB_WINDOW_SHARED_STATE].size);
+
 	/* Initialize hardware. */
 	memset(&hw_params, 0, sizeof(hw_params));
 	hw_params.fb_base = adev->gmc.fb_start;
@@ -9649,9 +9652,6 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 	int crtc_disable_count = 0;
 
 	trace_amdgpu_dm_atomic_commit_tail_begin(state);
-
-	if (dm->dc->caps.ips_support && dm->dc->idle_optimizations_allowed)
-		dc_allow_idle_optimizations(dm->dc, false);
 
 	drm_atomic_helper_update_legacy_modeset_state(dev, state);
 #ifdef HAVE_DRM_DP_ATOMIC_WAIT_FOR_DEPENDENCIES

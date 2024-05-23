@@ -2214,52 +2214,126 @@ static int pp_dpm_clk_default_attr_update(struct amdgpu_device *adev, struct amd
 	return 0;
 }
 
-/* Following items will be read out to indicate current plpd policy:
- *  - -1: none
- *  - 0: disallow
- *  - 1: default
- *  - 2: optimized
+/* pm policy attributes */
+struct amdgpu_pm_policy_attr {
+	struct device_attribute dev_attr;
+	enum pp_pm_policy id;
+};
+
+/**
+ * DOC: pm_policy
+ *
+ * Certain SOCs can support different power policies to optimize application
+ * performance. However, this policy is provided only at SOC level and not at a
+ * per-process level. This is useful especially when entire SOC is utilized for
+ * dedicated workload.
+ *
+ * The amdgpu driver provides a sysfs API for selecting the policy. Presently,
+ * only two types of policies are supported through this interface.
+ *
+ *  Pstate Policy Selection - This is to select different Pstate profiles which
+ *  decides clock/throttling preferences.
+ *
+ *  XGMI PLPD Policy Selection - When multiple devices are connected over XGMI,
+ *  this helps to select policy to be applied for per link power down.
+ *
+ * The list of available policies and policy levels vary between SOCs. They can
+ * be viewed under pm_policy node directory. If SOC doesn't support any policy,
+ * this node won't be available. The different policies supported will be
+ * available as separate nodes under pm_policy.
+ *
+ *	cat /sys/bus/pci/devices/.../pm_policy/<policy_type>
+ *
+ * Reading the policy file shows the different levels supported. The level which
+ * is applied presently is denoted by * (asterisk). E.g.,
+ *
+ * .. code-block:: console
+ *
+ *	cat /sys/bus/pci/devices/.../pm_policy/soc_pstate
+ *	0 : soc_pstate_default
+ *	1 : soc_pstate_0
+ *	2 : soc_pstate_1*
+ *	3 : soc_pstate_2
+ *
+ *	cat /sys/bus/pci/devices/.../pm_policy/xgmi_plpd
+ *	0 : plpd_disallow
+ *	1 : plpd_default
+ *	2 : plpd_optimized*
+ *
+ * To apply a specific policy
+ *
+ * "echo  <level> > /sys/bus/pci/devices/.../pm_policy/<policy_type>"
+ *
+ * For the levels listed in the example above, to select "plpd_optimized" for
+ * XGMI and "soc_pstate_2" for soc pstate policy -
+ *
+ * .. code-block:: console
+ *
+ *	echo "2" > /sys/bus/pci/devices/.../pm_policy/xgmi_plpd
+ *	echo "3" > /sys/bus/pci/devices/.../pm_policy/soc_pstate
+ *
  */
-static ssize_t amdgpu_get_xgmi_plpd_policy(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
+static ssize_t amdgpu_get_pm_policy_attr(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
-	char *mode_desc = "none";
-	int mode;
+	struct amdgpu_pm_policy_attr *policy_attr;
+
+	policy_attr =
+		container_of(attr, struct amdgpu_pm_policy_attr, dev_attr);
 
 	if (amdgpu_in_reset(adev))
 		return -EPERM;
 	if (adev->in_suspend && !adev->in_runpm)
 		return -EPERM;
 
-	mode = amdgpu_dpm_get_xgmi_plpd_mode(adev, &mode_desc);
-
-	return sysfs_emit(buf, "%d: %s\n", mode, mode_desc);
+	return amdgpu_dpm_get_pm_policy_info(adev, policy_attr->id, buf);
 }
 
-/* Following argument value is expected from user to change plpd policy
- *  - arg 0: disallow plpd
- *  - arg 1: default policy
- *  - arg 2: optimized policy
- */
-static ssize_t amdgpu_set_xgmi_plpd_policy(struct device *dev,
-					   struct device_attribute *attr,
-					   const char *buf, size_t count)
+static ssize_t amdgpu_set_pm_policy_attr(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t count)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_to_adev(ddev);
-	int mode, ret;
+	struct amdgpu_pm_policy_attr *policy_attr;
+	int ret, num_params = 0;
+	char delimiter[] = " \n\t";
+	char tmp_buf[128];
+	char *tmp, *param;
+	long val;
 
 	if (amdgpu_in_reset(adev))
 		return -EPERM;
 	if (adev->in_suspend && !adev->in_runpm)
 		return -EPERM;
 
-	ret = kstrtos32(buf, 0, &mode);
-	if (ret)
+	count = min(count, sizeof(tmp_buf));
+	memcpy(tmp_buf, buf, count);
+	tmp_buf[count - 1] = '\0';
+	tmp = tmp_buf;
+
+	tmp = skip_spaces(tmp);
+	while ((param = strsep(&tmp, delimiter))) {
+		if (!strlen(param)) {
+			tmp = skip_spaces(tmp);
+			continue;
+		}
+		ret = kstrtol(param, 0, &val);
+		if (ret)
+			return -EINVAL;
+		num_params++;
+		if (num_params > 1)
+			return -EINVAL;
+	}
+
+	if (num_params != 1)
 		return -EINVAL;
+
+	policy_attr =
+		container_of(attr, struct amdgpu_pm_policy_attr, dev_attr);
 
 	ret = pm_runtime_get_sync(ddev->dev);
 	if (ret < 0) {
@@ -2267,7 +2341,7 @@ static ssize_t amdgpu_set_xgmi_plpd_policy(struct device *dev,
 		return ret;
 	}
 
-	ret = amdgpu_dpm_set_xgmi_plpd_mode(adev, mode);
+	ret = amdgpu_dpm_set_pm_policy(adev, policy_attr->id, val);
 
 	pm_runtime_mark_last_busy(ddev->dev);
 	pm_runtime_put_autosuspend(ddev->dev);
@@ -2277,6 +2351,48 @@ static ssize_t amdgpu_set_xgmi_plpd_policy(struct device *dev,
 
 	return count;
 }
+
+#define AMDGPU_PM_POLICY_ATTR(_name, _id)                                  \
+	static struct amdgpu_pm_policy_attr pm_policy_attr_##_name = {     \
+		.dev_attr = __ATTR(_name, 0644, amdgpu_get_pm_policy_attr, \
+				   amdgpu_set_pm_policy_attr),             \
+		.id = PP_PM_POLICY_##_id,                                  \
+	};
+
+#define AMDGPU_PM_POLICY_ATTR_VAR(_name) pm_policy_attr_##_name.dev_attr.attr
+
+AMDGPU_PM_POLICY_ATTR(soc_pstate, SOC_PSTATE)
+AMDGPU_PM_POLICY_ATTR(xgmi_plpd, XGMI_PLPD)
+
+static struct attribute *pm_policy_attrs[] = {
+	&AMDGPU_PM_POLICY_ATTR_VAR(soc_pstate),
+	&AMDGPU_PM_POLICY_ATTR_VAR(xgmi_plpd),
+	NULL
+};
+
+static umode_t amdgpu_pm_policy_attr_visible(struct kobject *kobj,
+					     struct attribute *attr, int n)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = drm_to_adev(ddev);
+	struct amdgpu_pm_policy_attr *policy_attr;
+
+	policy_attr =
+		container_of(attr, struct amdgpu_pm_policy_attr, dev_attr.attr);
+
+	if (amdgpu_dpm_get_pm_policy_info(adev, policy_attr->id, NULL) ==
+	    -ENOENT)
+		return 0;
+
+	return attr->mode;
+}
+
+const struct attribute_group amdgpu_pm_policy_attr_group = {
+	.name = "pm_policy",
+	.attrs = pm_policy_attrs,
+	.is_visible = amdgpu_pm_policy_attr_visible,
+};
 
 static struct amdgpu_device_attr amdgpu_device_attrs[] = {
 	AMDGPU_DEVICE_ATTR_RW(power_dpm_state,				ATTR_FLAG_BASIC|ATTR_FLAG_ONEVF),
@@ -2325,7 +2441,6 @@ static struct amdgpu_device_attr amdgpu_device_attrs[] = {
 			      .attr_update = ss_power_attr_update),
 	AMDGPU_DEVICE_ATTR_RW(smartshift_bias,				ATTR_FLAG_BASIC,
 			      .attr_update = ss_bias_attr_update),
-	AMDGPU_DEVICE_ATTR_RW(xgmi_plpd_policy,				ATTR_FLAG_BASIC),
 	AMDGPU_DEVICE_ATTR_RO(pm_metrics,				ATTR_FLAG_BASIC,
 			      .attr_update = amdgpu_pm_metrics_attr_update),
 };
@@ -2392,9 +2507,6 @@ static int default_attr_update(struct amdgpu_device *adev, struct amdgpu_device_
 			*states = ATTR_STATE_UNSUPPORTED;
 		else if ((gc_ver == IP_VERSION(10, 3, 0) ||
 			  gc_ver == IP_VERSION(11, 0, 3)) && amdgpu_sriov_vf(adev))
-			*states = ATTR_STATE_UNSUPPORTED;
-	} else if (DEVICE_ATTR_IS(xgmi_plpd_policy)) {
-		if (amdgpu_dpm_get_xgmi_plpd_mode(adev, NULL) == XGMI_PLPD_NONE)
 			*states = ATTR_STATE_UNSUPPORTED;
 	} else if (DEVICE_ATTR_IS(pp_mclk_od)) {
 		if (amdgpu_dpm_get_mclk_od(adev) == -EOPNOTSUPP)
@@ -4418,6 +4530,16 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 	} else if (adev->pm.pp_feature & PP_OVERDRIVE_MASK) {
 		dev_info(adev->dev, "overdrive feature is not supported\n");
 	}
+
+#ifdef HAVE_PCI_DRIVER_DEV_GROUPS
+	if (amdgpu_dpm_get_pm_policy_info(adev, PP_PM_POLICY_NONE, NULL) !=
+	    -EOPNOTSUPP) {
+		ret = devm_device_add_group(adev->dev,
+					    &amdgpu_pm_policy_attr_group);
+		if (ret)
+			goto err_out0;
+	}
+#endif
 
 	adev->pm.sysfs_initialized = true;
 

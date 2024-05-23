@@ -47,6 +47,7 @@ static int kfd_pc_sample_thread(void *param)
 	uint32_t timeout = 0;
 	ktime_t next_trap_time;
 	bool need_wait;
+	uint32_t inst;
 
 	mutex_lock(&node->pcs_data.mutex);
 	if (node->pcs_data.hosttrap_entry.base.active_count &&
@@ -68,11 +69,14 @@ static int kfd_pc_sample_thread(void *param)
 	adev = node->adev;
 	need_wait = false;
 	allow_signal(SIGKILL);
+
+	if (node->kfd2kgd->override_core_cg)
+		for_each_inst(inst, node->xcc_mask)
+			node->kfd2kgd->override_core_cg(adev, 1, inst);
+
 	while (!kthread_should_stop() &&
 			!signal_pending(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
 		if (!need_wait) {
-			uint32_t inst;
-
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
 			for_each_inst(inst, node->xcc_mask) {
@@ -91,14 +95,18 @@ static int kfd_pc_sample_thread(void *param)
 			wait_time = ktime_sub(next_trap_time, ktime_get_raw());
 			wait_ns = ktime_to_ns(wait_time);
 			wait_us = ktime_to_us(wait_time);
-			if (wait_ns >= 10000)
+			if (wait_ns >= 10000) {
 				usleep_range(wait_us - 10, wait_us);
-			else if (wait_ns > 0)
+			} else {
 				schedule();
-			else
-				need_wait = false;
+				if (wait_ns <= 0)
+					need_wait = false;
+			}
 		}
 	}
+	if (node->kfd2kgd->override_core_cg)
+		for_each_inst(inst, node->xcc_mask)
+			node->kfd2kgd->override_core_cg(adev, 0, inst);
 
 	node->pcs_data.hosttrap_entry.base.target_simd = 0;
 	node->pcs_data.hosttrap_entry.base.target_wave_slot = 0;

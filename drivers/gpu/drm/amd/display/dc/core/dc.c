@@ -1019,7 +1019,7 @@ static bool dc_construct(struct dc *dc,
 		goto fail;
 	}
 
-        dc_ctx = dc->ctx;
+	dc_ctx = dc->ctx;
 
 	/* Resource should construct all asic specific resources.
 	 * This should be the only place where we need to parse the asic id
@@ -3362,10 +3362,10 @@ static void commit_planes_do_stream_update(struct dc *dc,
 				if (stream_update->mst_bw_update->is_increase)
 					dc->link_srv->increase_mst_payload(pipe_ctx,
 							stream_update->mst_bw_update->mst_stream_bw);
- 				else
+				else
 					dc->link_srv->reduce_mst_payload(pipe_ctx,
 							stream_update->mst_bw_update->mst_stream_bw);
- 			}
+			}
 
 			if (stream_update->pending_test_pattern) {
 				/*
@@ -3742,24 +3742,6 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 				context->block_sequence_steps);
 	}
 
-	build_dmub_cmd_list(dc,
-			srf_updates,
-			surface_count,
-			stream,
-			context,
-			context->dc_dmub_cmd,
-			&(context->dmub_cmd_count));
-	hwss_build_fast_sequence(dc,
-			context->dc_dmub_cmd,
-			context->dmub_cmd_count,
-			context->block_sequence,
-			&(context->block_sequence_steps),
-			top_pipe_to_program,
-			stream_status,
-			context);
-	hwss_execute_sequence(dc,
-			context->block_sequence,
-			context->block_sequence_steps);
 	/* Clear update flags so next flip doesn't have redundant programming
 	 * (if there's no stream update, the update flags are not cleared).
 	 * Surface updates are cleared unconditionally at the beginning of each flip,
@@ -3989,6 +3971,7 @@ static void commit_planes_for_stream(struct dc *dc,
 
 	for (i = 0; i < surface_count; i++) {
 		struct dc_plane_state *plane_state = srf_updates[i].surface;
+
 		/*set logical flag for lock/unlock use*/
 		for (j = 0; j < dc->res_pool->pipe_count; j++) {
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
@@ -4091,6 +4074,14 @@ static void commit_planes_for_stream(struct dc *dc,
 
 				if (!should_update_pipe_for_plane(context, pipe_ctx, plane_state))
 					continue;
+
+				if (srf_updates[i].cm2_params &&
+						srf_updates[i].cm2_params->cm2_luts.lut3d_data.lut3d_src ==
+								DC_CM2_TRANSFER_FUNC_SOURCE_VIDMEM &&
+						srf_updates[i].cm2_params->component_settings.shaper_3dlut_setting ==
+								DC_CM2_SHAPER_3DLUT_SETTING_ENABLE_SHAPER_3DLUT &&
+						dc->hwss.trigger_3dlut_dma_load)
+					dc->hwss.trigger_3dlut_dma_load(dc, pipe_ctx);
 
 				/*program triple buffer after lock based on flip type*/
 				if (dc->hwss.program_triplebuffer != NULL && dc->debug.enable_tri_buf) {
@@ -5123,7 +5114,7 @@ bool dc_update_planes_and_stream(struct dc *dc,
 	 * specially handle compatibility problems with transitions among those
 	 * features as they are now transparent to the new sequence.
 	 */
-	if (dc->ctx->dce_version > DCN_VERSION_4_01)
+	if (dc->ctx->dce_version >= DCN_VERSION_4_01)
 		return update_planes_and_stream_v3(dc, srf_updates,
 				surface_count, stream, stream_update);
 	return update_planes_and_stream_v2(dc, srf_updates,
@@ -5143,7 +5134,7 @@ void dc_commit_updates_for_stream(struct dc *dc,
 	 * we get more confident about this change we'll need to enable
 	 * the new sequence for all ASICs.
 	 */
-	if (dc->ctx->dce_version > DCN_VERSION_4_01) {
+	if (dc->ctx->dce_version >= DCN_VERSION_4_01) {
 		update_planes_and_stream_v3(dc, srf_updates, surface_count,
 				stream, stream_update);
 		return;
@@ -5979,103 +5970,4 @@ struct dc_power_profile dc_get_power_profile_for_dc_state(const struct dc_state 
 	profile.power_level += !context->bw_ctx.bw.dcn.clk.p_state_change_support;
 
 	return profile;
-}
-
-/* Need to account for padding due to pixel-to-symbol packing
- * for uncompressed 128b/132b streams.
- */
-static uint32_t apply_128b_132b_stream_overhead(
-	const struct dc_crtc_timing *timing, const uint32_t kbps)
-{
-	uint32_t total_kbps = kbps;
-#if defined(CONFIG_DRM_AMD_DC_FP)
-	if (dc_get_disable_128b_132b_stream_overhead())
-		return kbps;
-#endif
-
-	if (!timing->flags.DSC) {
-		struct fixed31_32 bpp;
-		struct fixed31_32 overhead_factor;
-
-		bpp = dc_fixpt_from_int(kbps);
-		bpp = dc_fixpt_div_int(bpp, timing->pix_clk_100hz / 10);
-
-		/* Symbols_per_HActive = HActive * bpp / (4 lanes * 32-bit symbol size)
-		 * Overhead_factor = ceil(Symbols_per_HActive) / Symbols_per_HActive
-		 */
-		overhead_factor = dc_fixpt_from_int(timing->h_addressable);
-		overhead_factor = dc_fixpt_mul(overhead_factor, bpp);
-		overhead_factor = dc_fixpt_div_int(overhead_factor, 128);
-		overhead_factor = dc_fixpt_div(
-			dc_fixpt_from_int(dc_fixpt_ceil(overhead_factor)),
-			overhead_factor);
-
-		total_kbps = dc_fixpt_ceil(
-			dc_fixpt_mul_int(overhead_factor, total_kbps));
-	}
-
-	return total_kbps;
-}
-
-uint32_t dc_bandwidth_in_kbps_from_timing(
-	const struct dc_crtc_timing *timing,
-	const enum dc_link_encoding_format link_encoding)
-{
-	uint32_t bits_per_channel = 0;
-	uint32_t kbps;
-
-#if defined(CONFIG_DRM_AMD_DC_FP)
-	if (timing->flags.DSC)
-		return dc_dsc_stream_bandwidth_in_kbps(timing,
-				timing->dsc_cfg.bits_per_pixel,
-				timing->dsc_cfg.num_slices_h,
-				timing->dsc_cfg.is_dp);
-#endif
-
-	switch (timing->display_color_depth) {
-	case COLOR_DEPTH_666:
-		bits_per_channel = 6;
-		break;
-	case COLOR_DEPTH_888:
-		bits_per_channel = 8;
-		break;
-	case COLOR_DEPTH_101010:
-		bits_per_channel = 10;
-		break;
-	case COLOR_DEPTH_121212:
-		bits_per_channel = 12;
-		break;
-	case COLOR_DEPTH_141414:
-		bits_per_channel = 14;
-		break;
-	case COLOR_DEPTH_161616:
-		bits_per_channel = 16;
-		break;
-	default:
-		ASSERT(bits_per_channel != 0);
-		bits_per_channel = 8;
-		break;
-	}
-
-	kbps = timing->pix_clk_100hz / 10;
-	kbps *= bits_per_channel;
-
-	if (timing->flags.Y_ONLY != 1) {
-		/*Only YOnly make reduce bandwidth by 1/3 compares to RGB*/
-		kbps *= 3;
-		if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR420)
-			kbps /= 2;
-		else if (timing->pixel_encoding == PIXEL_ENCODING_YCBCR422)
-			kbps = kbps * 2 / 3;
-	}
-
-	if (link_encoding == DC_LINK_ENCODING_DP_128b_132b)
-		kbps = apply_128b_132b_stream_overhead(timing, kbps);
-
-	if (link_encoding == DC_LINK_ENCODING_HDMI_FRL &&
-			timing->vic == 0 && timing->hdmi_vic == 0 &&
-			timing->frl_uncompressed_video_bandwidth_in_kbps != 0)
-		kbps = timing->frl_uncompressed_video_bandwidth_in_kbps;
-
-	return kbps;
 }

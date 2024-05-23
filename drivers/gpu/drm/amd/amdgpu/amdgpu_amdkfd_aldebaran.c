@@ -204,4 +204,5 @@ const struct kfd2kgd_calls aldebaran_kfd2kgd = {
 	.build_grace_period_packet_info = kgd_gfx_v9_build_grace_period_packet_info,
 	.program_trap_handler_settings = kgd_gfx_v9_program_trap_handler_settings,
 	.trigger_pc_sample_trap = kgd_aldebaran_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg,
 };

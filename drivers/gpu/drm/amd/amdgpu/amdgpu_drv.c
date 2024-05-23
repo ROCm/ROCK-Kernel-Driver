@@ -202,12 +202,13 @@ int amdgpu_discovery = -1;
 int amdgpu_mes;
 int amdgpu_mes_log_enable = 0;
 int amdgpu_mes_kiq;
-int amdgpu_uni_mes;
+int amdgpu_uni_mes = 1;
 int amdgpu_noretry = -1;
 int amdgpu_force_asic_type = -1;
 int amdgpu_tmz = -1; /* auto */
 uint amdgpu_freesync_vid_mode;
 int amdgpu_reset_method = -1; /* auto */
+int amdgpu_jpeg_test;
 int amdgpu_num_kcq = -1;
 int amdgpu_smartshift_bias;
 int amdgpu_use_xgmi_p2p = 1;
@@ -703,7 +704,7 @@ module_param_named(mes_kiq, amdgpu_mes_kiq, int, 0444);
  * (0 = disabled (default), 1 = enabled)
  */
 MODULE_PARM_DESC(uni_mes,
-	"Enable Unified Micro Engine Scheduler (0 = disabled (default), 1 = enabled)");
+	"Enable Unified Micro Engine Scheduler (0 = disabled, 1 = enabled(default)");
 module_param_named(uni_mes, amdgpu_uni_mes, int, 0444);
 
 /**
@@ -960,6 +961,9 @@ module_param_named(freesync_video, amdgpu_freesync_vid_mode, uint, 0444);
  */
 MODULE_PARM_DESC(reset_method, "GPU reset method (-1 = auto (default), 0 = legacy, 1 = mode0, 2 = mode1, 3 = mode2, 4 = baco/bamaco)");
 module_param_named(reset_method, amdgpu_reset_method, int, 0644);
+
+MODULE_PARM_DESC(jpeg_test, "jpeg test(0 = disable (default), 1 = enable)");
+module_param_named(jpeg_test, amdgpu_jpeg_test, int, 0444);
 
 /**
  * DOC: bad_page_threshold (int) Bad page threshold is specifies the
