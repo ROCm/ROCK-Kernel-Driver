@@ -1132,12 +1132,12 @@ static void amdgpu_vm_bo_get_memory(struct amdgpu_bo_va *bo_va,
 	 * changing their location.
 	 */
 	if (!amdgpu_vm_is_bo_always_valid(vm, bo) &&
-	    !dma_resv_trylock(bo->tbo.base.resv))
+	    !dma_resv_trylock(amdkcl_ttm_resvp(&bo->tbo)))
 		return;
 
 	amdgpu_bo_get_memory(bo, stats);
 	if (!amdgpu_vm_is_bo_always_valid(vm, bo))
-		dma_resv_unlock(bo->tbo.base.resv);
+		dma_resv_unlock(amdkcl_ttm_resvp(&bo->tbo));
 }
 
 void amdgpu_vm_get_memory(struct amdgpu_vm *vm,
