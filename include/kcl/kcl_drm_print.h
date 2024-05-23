@@ -201,4 +201,10 @@ enum drm_debug_category {
         __drm_printk((drm), info,, fmt, ##__VA_ARGS__)
 #endif
 
+#ifndef drm_info_once
+/* copied from include/drm/drm_print.h */
+#define drm_info_once(drm, fmt, ...)                            \
+        __drm_printk((drm), info, _once, fmt, ##__VA_ARGS__)
+#endif
+
 #endif
