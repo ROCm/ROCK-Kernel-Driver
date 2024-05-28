@@ -223,7 +223,8 @@ int amdgpu_amdkfd_reserve_mem_limit(struct amdgpu_device *adev,
 	    (kfd_mem_limit.ttm_mem_used + ttm_mem_needed >
 	     kfd_mem_limit.max_ttm_mem_limit) ||
 	    (adev && xcp_id >= 0 && adev->kfd.vram_used[xcp_id] + vram_needed >
-	     vram_size - reserved_for_pt - reserved_for_ras - atomic64_read(&adev->vram_pin_size))) {
+	     vram_size - reserved_for_pt - reserved_for_ras - atomic64_read(&adev->vram_pin_size) +
+	     atomic64_read(&adev->kfd.vram_pinned))) {
 		ret = -ENOMEM;
 		goto release;
 	}
