@@ -2517,13 +2517,13 @@ static int detect_mst_link_for_all_connectors(struct drm_device *dev)
 		aconnector = to_amdgpu_dm_connector(connector);
 		if (aconnector->dc_link->type == dc_connection_mst_branch &&
 		    aconnector->mst_mgr.aux) {
-			DRM_DEBUG_DRIVER("DM_MST: starting TM on aconnector: %p [id: %d]\n",
+			drm_dbg_kms(dev, "DM_MST: starting TM on aconnector: %p [id: %d]\n",
 					 aconnector,
 					 aconnector->base.base.id);
 
 			ret = drm_dp_mst_topology_mgr_set_mst(&aconnector->mst_mgr, true);
 			if (ret < 0) {
-				DRM_ERROR("DM_MST: Failed to start MST\n");
+				drm_err(dev, "DM_MST: Failed to start MST\n");
 				aconnector->dc_link->type =
 					dc_connection_single;
 				ret = dm_helpers_dp_mst_stop_top_mgr(aconnector->dc_link->ctx,
@@ -3460,15 +3460,15 @@ void amdgpu_dm_update_connector_after_detect(
 		 * We got a DP short pulse (Link Loss, DP CTS, etc...).
 		 * Do nothing!!
 		 */
-		DRM_DEBUG_DRIVER("DCHPD: connector_id=%d: dc_sink didn't change.\n",
-				aconnector->connector_id);
+		drm_dbg_kms(dev, "DCHPD: connector_id=%d: dc_sink didn't change.\n",
+				 aconnector->connector_id);
 		if (sink)
 			dc_sink_release(sink);
 		return;
 	}
 
-	DRM_DEBUG_DRIVER("DCHPD: connector_id=%d: Old sink=%p New sink=%p\n",
-		aconnector->connector_id, aconnector->dc_sink, sink);
+	drm_dbg_kms(dev, "DCHPD: connector_id=%d: Old sink=%p New sink=%p\n",
+		    aconnector->connector_id, aconnector->dc_sink, sink);
 
 	mutex_lock(&dev->mode_config.mutex);
 
@@ -9572,7 +9572,9 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 
 		if (amdgpu_dm_crtc_modeset_required(new_crtc_state, dm_new_crtc_state->stream, dm_old_crtc_state->stream)) {
 
-			DRM_DEBUG_ATOMIC("Atomic commit: SET crtc id %d: [%p]\n", acrtc->crtc_id, acrtc);
+			drm_dbg_atomic(dev,
+				       "Atomic commit: SET crtc id %d: [%p]\n",
+				       acrtc->crtc_id, acrtc);
 
 			if (!dm_new_crtc_state->stream) {
 				/*
@@ -9590,8 +9592,9 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 				 * have a sink to keep the pipe running so that
 				 * hw state is consistent with the sw state
 				 */
-				DRM_DEBUG_DRIVER("%s: Failed to create new stream for crtc %d\n",
-						__func__, acrtc->base.base.id);
+				drm_dbg_atomic(dev,
+					       "Failed to create new stream for crtc %d\n",
+						acrtc->base.base.id);
 				continue;
 			}
 
@@ -9605,7 +9608,9 @@ static void amdgpu_dm_commit_streams(struct drm_atomic_state *state,
 			crtc->hwmode = new_crtc_state->mode;
 			mode_set_reset_required = true;
 		} else if (modereset_required(new_crtc_state)) {
-			DRM_DEBUG_ATOMIC("Atomic commit: RESET. crtc id %d:[%p]\n", acrtc->crtc_id, acrtc);
+			drm_dbg_atomic(dev,
+				       "Atomic commit: RESET. crtc id %d:[%p]\n",
+				       acrtc->crtc_id, acrtc);
 			/* i.e. reset mode */
 			if (dm_old_crtc_state->stream)
 				remove_stream(adev, acrtc, dm_old_crtc_state->stream);
@@ -10079,7 +10084,7 @@ static void amdgpu_dm_atomic_commit_tail(struct drm_atomic_state *state)
 #endif
 				if (amdgpu_dm_crtc_configure_crc_source(
 					crtc, dm_new_crtc_state, cur_crc_src))
-					DRM_DEBUG_DRIVER("Failed to configure crc source");
+					drm_dbg_atomic(dev, "Failed to configure crc source");
 			}
 		}
 #endif
@@ -11264,7 +11269,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 	ret = drm_atomic_helper_check_modeset(dev, state);
 	if (ret) {
-		DRM_DEBUG_DRIVER("drm_atomic_helper_check_modeset() failed\n");
+		drm_dbg_atomic(dev, "drm_atomic_helper_check_modeset() failed\n");
 		goto fail;
 	}
 
@@ -11279,7 +11284,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		new_crtc_state = drm_atomic_get_crtc_state(state, new_con_state->crtc);
 		if (IS_ERR(new_crtc_state)) {
-			DRM_DEBUG_DRIVER("drm_atomic_get_crtc_state() failed\n");
+			drm_dbg_atomic(dev, "drm_atomic_get_crtc_state() failed\n");
 			ret = PTR_ERR(new_crtc_state);
 			goto fail;
 		}
@@ -11295,7 +11300,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 			if (drm_atomic_crtc_needs_modeset(new_crtc_state)) {
 				ret = add_affected_mst_dsc_crtcs(state, crtc);
 				if (ret) {
-					DRM_DEBUG_DRIVER("add_affected_mst_dsc_crtcs() failed\n");
+					drm_dbg_atomic(dev, "add_affected_mst_dsc_crtcs() failed\n");
 					goto fail;
 				}
 			}
@@ -11312,7 +11317,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		ret = amdgpu_dm_verify_lut_sizes(new_crtc_state);
 		if (ret) {
-			DRM_DEBUG_DRIVER("amdgpu_dm_verify_lut_sizes() failed\n");
+			drm_dbg_atomic(dev, "amdgpu_dm_verify_lut_sizes() failed\n");
 			goto fail;
 		}
 
@@ -11321,13 +11326,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 		ret = drm_atomic_add_affected_connectors(state, crtc);
 		if (ret) {
-			DRM_DEBUG_DRIVER("drm_atomic_add_affected_connectors() failed\n");
+			drm_dbg_atomic(dev, "drm_atomic_add_affected_connectors() failed\n");
 			goto fail;
 		}
 
 		ret = drm_atomic_add_affected_planes(state, crtc);
 		if (ret) {
-			DRM_DEBUG_DRIVER("drm_atomic_add_affected_planes() failed\n");
+			drm_dbg_atomic(dev, "drm_atomic_add_affected_planes() failed\n");
 			goto fail;
 		}
 
@@ -11366,7 +11371,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 			if (IS_ERR(new_plane_state)) {
 				ret = PTR_ERR(new_plane_state);
-				DRM_DEBUG_DRIVER("new_plane_state is BAD\n");
+				drm_dbg_atomic(dev, "new_plane_state is BAD\n");
 				goto fail;
 			}
 		}
@@ -11398,7 +11403,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 					    &lock_and_validation_needed,
 					    &is_top_most_overlay);
 		if (ret) {
-			DRM_DEBUG_DRIVER("dm_update_plane_state() failed\n");
+			drm_dbg_atomic(dev, "dm_update_plane_state() failed\n");
 			goto fail;
 		}
 	}
@@ -11411,7 +11416,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 					   false,
 					   &lock_and_validation_needed);
 		if (ret) {
-			DRM_DEBUG_DRIVER("DISABLE: dm_update_crtc_state() failed\n");
+			drm_dbg_atomic(dev, "DISABLE: dm_update_crtc_state() failed\n");
 			goto fail;
 		}
 	}
@@ -11424,7 +11429,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 					   true,
 					   &lock_and_validation_needed);
 		if (ret) {
-			DRM_DEBUG_DRIVER("ENABLE: dm_update_crtc_state() failed\n");
+			drm_dbg_atomic(dev, "ENABLE: dm_update_crtc_state() failed\n");
 			goto fail;
 		}
 	}
@@ -11438,7 +11443,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 					    &lock_and_validation_needed,
 					    &is_top_most_overlay);
 		if (ret) {
-			DRM_DEBUG_DRIVER("dm_update_plane_state() failed\n");
+			drm_dbg_atomic(dev, "dm_update_plane_state() failed\n");
 			goto fail;
 		}
 	}
@@ -11456,21 +11461,21 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	/* Run this here since we want to validate the streams we created */
 	ret = drm_atomic_helper_check_planes(dev, state);
 	if (ret) {
-		DRM_DEBUG_DRIVER("drm_atomic_helper_check_planes() failed\n");
+		drm_dbg_atomic(dev, "drm_atomic_helper_check_planes() failed\n");
 		goto fail;
 	}
 
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 		dm_new_crtc_state = to_dm_crtc_state(new_crtc_state);
 		if (dm_new_crtc_state->mpo_requested)
-			DRM_DEBUG_DRIVER("MPO enablement requested on crtc:[%p]\n", crtc);
+			drm_dbg_atomic(dev, "MPO enablement requested on crtc:[%p]\n", crtc);
 	}
 
 	/* Check cursor planes scaling */
 	for_each_new_crtc_in_state(state, crtc, new_crtc_state, i) {
 		ret = dm_check_crtc_cursor(state, crtc, new_crtc_state);
 		if (ret) {
-			DRM_DEBUG_DRIVER("dm_check_crtc_cursor() failed\n");
+			drm_dbg_atomic(dev, "dm_check_crtc_cursor() failed\n");
 			goto fail;
 		}
 	}
@@ -11565,13 +11570,13 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 	if (lock_and_validation_needed) {
 		ret = dm_atomic_get_state(state, &dm_state);
 		if (ret) {
-			DRM_DEBUG_DRIVER("dm_atomic_get_state() failed\n");
+			drm_dbg_atomic(dev, "dm_atomic_get_state() failed\n");
 			goto fail;
 		}
 
 		ret = do_aquire_global_lock(dev, state);
 		if (ret) {
-			DRM_DEBUG_DRIVER("do_aquire_global_lock() failed\n");
+			drm_dbg_atomic(dev, "do_aquire_global_lock() failed\n");
 			goto fail;
 		}
 
@@ -11580,7 +11585,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 		if (dc_resource_is_dsc_encoding_supported(dc)) {
 			ret = compute_mst_dsc_configs_for_state(state, dm_state->context, vars);
 			if (ret) {
-				DRM_DEBUG_DRIVER("compute_mst_dsc_configs_for_state() failed\n");
+				drm_dbg_atomic(dev, "compute_mst_dsc_configs_for_state() failed\n");
 				ret = -EINVAL;
 				goto fail;
 			}
@@ -11591,7 +11596,7 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = dm_update_mst_vcpi_slots_for_dsc(state, dm_state->context, vars);
 		if (ret) {
-			DRM_DEBUG_DRIVER("dm_update_mst_vcpi_slots_for_dsc() failed\n");
+			drm_dbg_atomic(dev, "dm_update_mst_vcpi_slots_for_dsc() failed\n");
 			goto fail;
 		}
 #endif
@@ -11606,14 +11611,14 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 #if defined(HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC)
 		ret = drm_dp_mst_atomic_check(state);
 		if (ret) {
-			DRM_DEBUG_DRIVER("drm_dp_mst_atomic_check() failed\n");
+			drm_dbg_atomic(dev, "drm_dp_mst_atomic_check() failed\n");
 			goto fail;
 		}
 #endif
 #endif
 		status = dc_validate_global_state(dc, dm_state->context, true);
 		if (status != DC_OK) {
-			DRM_DEBUG_DRIVER("DC global validation failure: %s (%d)",
+			drm_dbg_atomic(dev, "DC global validation failure: %s (%d)",
 				       dc_status_to_str(status), status);
 			ret = -EINVAL;
 			goto fail;
@@ -11697,11 +11702,11 @@ static int amdgpu_dm_atomic_check(struct drm_device *dev,
 
 fail:
 	if (ret == -EDEADLK)
-		DRM_DEBUG_DRIVER("Atomic check stopped to avoid deadlock.\n");
+		drm_dbg_atomic(dev, "Atomic check stopped to avoid deadlock.\n");
 	else if (ret == -EINTR || ret == -EAGAIN || ret == -ERESTARTSYS)
-		DRM_DEBUG_DRIVER("Atomic check stopped due to signal.\n");
+		drm_dbg_atomic(dev, "Atomic check stopped due to signal.\n");
 	else
-		DRM_DEBUG_DRIVER("Atomic check failed with err: %d\n", ret);
+		drm_dbg_atomic(dev, "Atomic check failed with err: %d\n", ret);
 
 	trace_amdgpu_dm_atomic_check_finish(state, ret);
 
