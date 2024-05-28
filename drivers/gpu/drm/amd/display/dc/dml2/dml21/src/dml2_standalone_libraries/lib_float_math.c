@@ -4,7 +4,9 @@
 
 #include "lib_float_math.h"
 
+#ifndef ASSERT
 #define ASSERT(condition)
+#endif
 
 #define isNaN(number) ((number) != (number))
 
