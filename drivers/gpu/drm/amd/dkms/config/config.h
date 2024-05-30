@@ -38,13 +38,13 @@
 /* #undef HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 */
 
 /* amd_iommu_pc_get_max_banks() declared */
-#define HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED 1
+/* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED */
 
 /* amd_iommu_pc_get_max_banks() arg is unsigned int */
 /* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT */
 
 /* amd_iommu_pc_supported() is available */
-#define HAVE_AMD_IOMMU_PC_SUPPORTED 1
+/* #undef HAVE_AMD_IOMMU_PC_SUPPORTED */
 
 /* apple_gmux_detect() is available */
 #define HAVE_APPLE_GMUX_DETECT 1
@@ -123,9 +123,6 @@
 
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
-
-/* whether dma_fence_get_stub exits */
-#define HAVE_DMA_FENCE_GET_STUB 1
 
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
@@ -211,15 +208,6 @@
 /* drm_connector_init_with_ddc() is available */
 #define HAVE_DRM_CONNECTOR_INIT_WITH_DDC 1
 
-/* connector property "max bpc" is available */
-#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
-
-/* drm_connector_put() is available */
-#define HAVE_DRM_CONNECTOR_PUT 1
-
-/* connector reference counting is available */
-#define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
-
 /* drm_connector_set_panel_orientation_with_quirk() is available */
 #define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
 
@@ -251,9 +239,6 @@
 
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
-
-/* drm_device->filelist_mutex is available */
-#define HAVE_DRM_DEVICE_FILELIST_MUTEX 1
 
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
@@ -288,9 +273,6 @@
 
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
-
-/* display_info->hdmi.scdc.scrambling are available */
-#define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
 
 /* display_info->is_hdmi is available */
 #define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
@@ -674,9 +656,6 @@
 /* io_mapping_map_local_wc() is available */
 #define HAVE_IO_MAPPING_MAP_LOCAL_WC 1
 
-/* io_mapping_map_wc() has size argument */
-#define HAVE_IO_MAPPING_MAP_WC_HAS_SIZE_ARG 1
-
 /* io_mapping_unmap_local() is available */
 #define HAVE_IO_MAPPING_UNMAP_LOCAL 1
 
@@ -962,12 +941,6 @@
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
-/* struct drm_crtc_state has flag for flip */
-#define HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG 1
-
-/* struct drm_crtc_state->pageflip_flags is available */
-/* #undef HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS */
-
 /* drm_gem_open_object is defined in struct drm_drv */
 /* #undef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
 
@@ -995,6 +968,9 @@
 
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
+
+/* topology_num_cores_per_package is availablea */
+#define HAVE_TOPOLOGY_NUM_CORES_PER_PACKAGE 1
 
 /* totalram_pages() is available */
 #define HAVE_TOTALRAM_PAGES 1
@@ -1075,7 +1051,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.8.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.9.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1084,7 +1060,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.8.0"
+#define PACKAGE_VERSION "6.9.0"
 
 #include "config-amd-chips.h"
 
