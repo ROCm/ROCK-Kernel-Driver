@@ -39,7 +39,6 @@ struct kfd_spm_cntr {
 	struct mutex spm_worker_mutex;
 	u64    gpu_addr;
 	u32    ring_size;
-	u32    ring_mask;
 	u32    ring_rptr;
 	u32    size_copied;
 	u32    has_data_loss;
@@ -63,7 +62,8 @@ static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 		return -EFAULT;
 
 	user_address = (uint64_t *)((uint64_t)spm->ubuf.user_addr + spm->size_copied);
-	ring_buf =  (uint64_t *)((uint64_t)spm->cpu_addr + spm->ring_rptr);
+	// From RLC spec, ring_rptr = 0 points to spm->cpu_addr+0x20
+	ring_buf =  (uint64_t *)((uint64_t)spm->cpu_addr + spm->ring_rptr + 0x20);
 
 	if (user_address == NULL)
 		return -EFAULT;
@@ -101,7 +101,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	int ret = 0;
 	u32 ring_wptr;
 
-	ring_wptr = READ_ONCE(spm->cpu_addr[0]) & spm->ring_mask;
+	ring_wptr = READ_ONCE(spm->cpu_addr[0]);
 
 	/* keep SPM ring buffer running */
 	if (!spm->has_user_buf || spm->is_user_buf_filled) {
@@ -118,13 +118,6 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	if (spm->ring_rptr == ring_wptr)
 		goto exit;
 
-	if ((spm->ring_rptr >= 0) &&  (spm->ring_rptr  < 0x20)) {
-		/*
-		 * First 8DW, only use for WritePtr, it is not Counter data
-		 */
-		spm->ring_rptr = 0x20;
-	}
-
 	if (ring_wptr > spm->ring_rptr) {
 		size_to_copy = ring_wptr - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
@@ -139,7 +132,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 				spm->ring_rptr = ring_wptr;
 				goto exit;
 			}
-			spm->ring_rptr = 0x20;
+			spm->ring_rptr = 0;
 			size_to_copy = ring_wptr - spm->ring_rptr;
 			if (!ret)
 				ret = kfd_spm_data_copy(pdd, size_to_copy);
@@ -192,12 +185,10 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 		mutex_unlock(&pdd->spm_mutex);
 		return -ENOMEM;
 	}
-	mutex_unlock(&pdd->spm_mutex);
 
 	/* git spm ring buffer 4M */
 	pdd->spm_cntr->ring_size = order_base_2(4 * 1024 * 1024/4);
-	pdd->spm_cntr->ring_size = (1 << pdd->spm_cntr->ring_size) * 4 - 0xff;
-	pdd->spm_cntr->ring_mask = pdd->spm_cntr->ring_size - 1;
+	pdd->spm_cntr->ring_size = (1 << pdd->spm_cntr->ring_size) * 4;
 	pdd->spm_cntr->has_user_buf = false;
 
 	ret = amdgpu_amdkfd_alloc_gtt_mem(adev,
@@ -208,7 +199,7 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	if (ret)
 		goto alloc_gtt_mem_failure;
 
-	ret =  amdgpu_amdkfd_rlc_spm_acquire(adev, pdd->drm_priv,
+	ret =  amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
 			pdd->spm_cntr->gpu_addr, pdd->spm_cntr->ring_size);
 
 	/*
@@ -233,12 +224,11 @@ acquire_spm_failure:
 	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
 
 alloc_gtt_mem_failure:
-	mutex_lock(&pdd->spm_mutex);
 	kfree(pdd->spm_cntr);
 	pdd->spm_cntr = NULL;
-	mutex_unlock(&pdd->spm_mutex);
 
 out:
+	mutex_unlock(&pdd->spm_mutex);
 	return ret;
 }
 
@@ -259,7 +249,7 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	flush_work(&pdd->spm_work);
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
-	amdgpu_amdkfd_rlc_spm_release(adev, pdd->drm_priv);
+	amdgpu_amdkfd_rlc_spm_release(adev, drm_priv_to_vm(pdd->drm_priv));
 	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
