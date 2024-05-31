@@ -1043,6 +1043,7 @@ struct dc_debug_options {
 	unsigned int force_cositing;
 	unsigned int disable_spl;
 	unsigned int force_easf;
+	unsigned int force_sharpness;
 	unsigned int force_lls;
 };
 
@@ -1068,6 +1069,8 @@ struct dchub_init_data {
 	bool dchub_initialzied;
 	bool dchub_info_valid;
 };
+
+struct dml2_soc_bb;
 
 struct dc_init_data {
 	struct hw_asic_id asic_id;
@@ -1101,6 +1104,7 @@ struct dc_init_data {
 	uint32_t *dcn_reg_offsets;
 	uint32_t *nbio_reg_offsets;
 	uint32_t *clk_reg_offsets;
+	struct dml2_soc_bb *bb_from_dmub;
 };
 
 struct dc_callback_init {
@@ -1589,7 +1593,6 @@ struct dc_plane_state *dc_get_surface_for_mpcc(struct dc *dc,
 uint32_t dc_get_opp_for_plane(struct dc *dc, struct dc_plane_state *plane);
 
 void dc_set_disable_128b_132b_stream_overhead(bool disable);
-bool dc_get_disable_128b_132b_stream_overhead(void);
 
 /* The function returns minimum bandwidth required to drive a given timing
  * return - minimum required timing bandwidth in kbps.

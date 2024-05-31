@@ -191,7 +191,6 @@ amdgpu-y += \
 # add MES block
 amdgpu-y += \
 	amdgpu_mes.o \
-	mes_v10_1.o \
 	mes_v11_0.o \
 	mes_v12_0.o
 
@@ -331,7 +330,10 @@ endif
 
 # add isp block
 ifneq ($(CONFIG_DRM_AMD_ISP),)
-amdgpu-y += amdgpu_isp.o
+amdgpu-y += \
+	amdgpu_isp.o \
+	isp_v4_1_0.o \
+	isp_v4_1_1.o
 endif
 
 include $(FULL_AMD_PATH)/backport/Makefile

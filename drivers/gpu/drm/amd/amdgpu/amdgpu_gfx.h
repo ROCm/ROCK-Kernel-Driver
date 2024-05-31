@@ -446,7 +446,9 @@ struct amdgpu_gfx {
 	bool				mcbp; /* mid command buffer preemption */
 
 	/* IP reg dump */
-	uint32_t			*ip_dump;
+	uint32_t			*ip_dump_core;
+	uint32_t			*ip_dump_cp_queues;
+	uint32_t			*ip_dump_gfx_queues;
 };
 
 struct amdgpu_gfx_ras_reg_entry {

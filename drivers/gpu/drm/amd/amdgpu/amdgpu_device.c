@@ -679,7 +679,7 @@ uint32_t amdgpu_device_xcc_rreg(struct amdgpu_device *adev,
 		    amdgpu_virt_get_rlcg_reg_access_flag(adev, acc_flags,
 							 GC_HWIP, false,
 							 &rlcg_flag)) {
-			ret = amdgpu_virt_rlcg_reg_rw(adev, reg, 0, rlcg_flag, xcc_id);
+			ret = amdgpu_virt_rlcg_reg_rw(adev, reg, 0, rlcg_flag, GET_INST(GC, xcc_id));
 		} else if (!(acc_flags & AMDGPU_REGS_NO_KIQ) &&
 		    amdgpu_sriov_runtime(adev) &&
 		    down_read_trylock(&adev->reset_domain->sem)) {
@@ -807,7 +807,7 @@ void amdgpu_device_xcc_wreg(struct amdgpu_device *adev,
 		    amdgpu_virt_get_rlcg_reg_access_flag(adev, acc_flags,
 							 GC_HWIP, true,
 							 &rlcg_flag)) {
-			amdgpu_virt_rlcg_reg_rw(adev, reg, v, rlcg_flag, xcc_id);
+			amdgpu_virt_rlcg_reg_rw(adev, reg, v, rlcg_flag, GET_INST(GC, xcc_id));
 		} else if (!(acc_flags & AMDGPU_REGS_NO_KIQ) &&
 		    amdgpu_sriov_runtime(adev) &&
 		    down_read_trylock(&adev->reset_domain->sem)) {
@@ -4064,6 +4064,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	mutex_init(&adev->grbm_idx_mutex);
 	mutex_init(&adev->mn_lock);
 	mutex_init(&adev->virt.vf_errors.lock);
+	mutex_init(&adev->virt.rlcg_reg_lock);
 	hash_init(adev->mn_hash);
 	mutex_init(&adev->psp.mutex);
 #ifdef HAVE_AMDKCL_HMM_MIRROR_ENABLED
@@ -5413,11 +5414,13 @@ int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 	if (!test_bit(AMDGPU_SKIP_COREDUMP, &reset_context->flags)) {
 		amdgpu_reset_reg_dumps(tmp_adev);
 
+		dev_info(tmp_adev->dev, "Dumping IP State\n");
 		/* Trigger ip dump before we reset the asic */
 		for (i = 0; i < tmp_adev->num_ip_blocks; i++)
 			if (tmp_adev->ip_blocks[i].version->funcs->dump_ip_state)
 				tmp_adev->ip_blocks[i].version->funcs
 				->dump_ip_state((void *)tmp_adev);
+		dev_info(tmp_adev->dev, "Dumping IP State Completed\n");
 	}
 
 	reset_context->reset_device_list = device_list_handle;
@@ -5991,13 +5994,18 @@ static void amdgpu_device_partner_bandwidth(struct amdgpu_device *adev,
 	*speed = PCI_SPEED_UNKNOWN;
 	*width = PCIE_LNK_WIDTH_UNKNOWN;
 
-	while ((parent = pci_upstream_bridge(parent))) {
-		/* skip upstream/downstream switches internal to dGPU*/
-		if (parent->vendor == PCI_VENDOR_ID_ATI)
-			continue;
-		*speed = pcie_get_speed_cap(parent);
-		*width = pcie_get_width_cap(parent);
-		break;
+	if (amdgpu_device_pcie_dynamic_switching_supported(adev)) {
+		while ((parent = pci_upstream_bridge(parent))) {
+			/* skip upstream/downstream switches internal to dGPU*/
+			if (parent->vendor == PCI_VENDOR_ID_ATI)
+				continue;
+			*speed = pcie_get_speed_cap(parent);
+			*width = pcie_get_width_cap(parent);
+			break;
+		}
+	} else {
+		/* use the current speeds rather than max if switching is not supported */
+		pcie_bandwidth_available(adev->pdev, NULL, speed, width);
 	}
 }
 

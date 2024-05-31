@@ -6,8 +6,8 @@
 #include "include/logger_interface.h"
 #include "../dce110/irq_service_dce110.h"
 
-#include "dcn/dcn_3_2_0_offset.h"
-#include "dcn/dcn_3_2_0_sh_mask.h"
+#include "dcn/dcn_4_1_0_offset.h"
+#include "dcn/dcn_4_1_0_sh_mask.h"
 
 #include "irq_service_dcn401.h"
 
@@ -301,12 +301,10 @@ irq_source_info_dcn401[DAL_IRQ_SOURCES_NUMBER] = {
 	hpd_int_entry(1),
 	hpd_int_entry(2),
 	hpd_int_entry(3),
-	hpd_int_entry(4),
 	hpd_rx_int_entry(0),
 	hpd_rx_int_entry(1),
 	hpd_rx_int_entry(2),
 	hpd_rx_int_entry(3),
-	hpd_rx_int_entry(4),
 	i2c_int_entry(1),
 	i2c_int_entry(2),
 	i2c_int_entry(3),

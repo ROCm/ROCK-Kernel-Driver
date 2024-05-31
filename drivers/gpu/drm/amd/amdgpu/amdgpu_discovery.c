@@ -94,7 +94,6 @@
 #include "vcn_v4_0_5.h"
 #include "jpeg_v4_0_5.h"
 #include "amdgpu_vkms.h"
-#include "mes_v10_1.h"
 #include "mes_v11_0.h"
 #include "mes_v12_0.h"
 #include "smuio_v11_0.h"
@@ -2339,25 +2338,6 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 static int amdgpu_discovery_set_mes_ip_blocks(struct amdgpu_device *adev)
 {
 	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
-	case IP_VERSION(10, 1, 10):
-	case IP_VERSION(10, 1, 1):
-	case IP_VERSION(10, 1, 2):
-	case IP_VERSION(10, 1, 3):
-	case IP_VERSION(10, 1, 4):
-	case IP_VERSION(10, 3, 0):
-	case IP_VERSION(10, 3, 1):
-	case IP_VERSION(10, 3, 2):
-	case IP_VERSION(10, 3, 3):
-	case IP_VERSION(10, 3, 4):
-	case IP_VERSION(10, 3, 5):
-	case IP_VERSION(10, 3, 6):
-		if (amdgpu_mes) {
-			amdgpu_device_ip_block_add(adev, &mes_v10_1_ip_block);
-			adev->enable_mes = true;
-			if (amdgpu_mes_kiq)
-				adev->enable_mes_kiq = true;
-		}
-		break;
 	case IP_VERSION(11, 0, 0):
 	case IP_VERSION(11, 0, 1):
 	case IP_VERSION(11, 0, 2):
@@ -2431,8 +2411,10 @@ static int amdgpu_discovery_set_isp_ip_blocks(struct amdgpu_device *adev)
 #if defined(CONFIG_DRM_AMD_ISP)
 	switch (amdgpu_ip_version(adev, ISP_HWIP, 0)) {
 	case IP_VERSION(4, 1, 0):
+		amdgpu_device_ip_block_add(adev, &isp_v4_1_0_ip_block);
+		break;
 	case IP_VERSION(4, 1, 1):
-		amdgpu_device_ip_block_add(adev, &isp_ip_block);
+		amdgpu_device_ip_block_add(adev, &isp_v4_1_1_ip_block);
 		break;
 	default:
 		break;
