@@ -47,12 +47,10 @@ struct amdgpu_iv_entry;
 #define AMDGPU_RAS_GPU_ERR_SOCKET_ID(x)			AMDGPU_GET_REG_FIELD(x, 10, 8)
 #define AMDGPU_RAS_GPU_ERR_AID_ID(x)			AMDGPU_GET_REG_FIELD(x, 12, 11)
 #define AMDGPU_RAS_GPU_ERR_HBM_ID(x)			AMDGPU_GET_REG_FIELD(x, 14, 13)
-#define AMDGPU_RAS_GPU_ERR_BOOT_STATUS(x)		AMDGPU_GET_REG_FIELD(x, 31, 31)
 
-#define AMDGPU_RAS_BOOT_STATUS_POLLING_LIMIT	1000
+#define AMDGPU_RAS_BOOT_STATUS_POLLING_LIMIT	100
 #define AMDGPU_RAS_BOOT_STEADY_STATUS		0xBA
 #define AMDGPU_RAS_BOOT_STATUS_MASK		0xFF
-#define AMDGPU_RAS_BOOT_SUCEESS			0x80000000
 
 #define AMDGPU_RAS_FLAG_INIT_BY_VBIOS		(0x1 << 0)
 /* position of instance value in sub_block_index of
@@ -64,6 +62,9 @@ struct amdgpu_iv_entry;
 #define AMDGPU_RAS_FEATURES_SOCKETID_SHIFT 29
 #define AMDGPU_RAS_FEATURES_SOCKETID_MASK 0xe0000000
 
+/* Reserve 8 physical dram row for possible retirement.
+ * In worst cases, it will lose 8 * 2MB memory in vram domain */
+#define AMDGPU_RAS_RESERVED_VRAM_SIZE	(16ULL << 20)
 /* The high three bits indicates socketid */
 #define AMDGPU_RAS_GET_FEATURES(val)  ((val) & ~AMDGPU_RAS_FEATURES_SOCKETID_MASK)
 
@@ -541,6 +542,7 @@ struct amdgpu_ras {
 	struct ras_event_manager __event_mgr;
 	struct ras_event_manager *event_mgr;
 
+	uint64_t reserved_pages_in_bytes;
 };
 
 struct ras_fs_data {

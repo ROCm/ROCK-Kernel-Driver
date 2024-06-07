@@ -1045,6 +1045,7 @@ struct dc_debug_options {
 	unsigned int force_easf;
 	unsigned int force_sharpness;
 	unsigned int force_lls;
+	bool edp_oled_no_backlight_enable;
 };
 
 

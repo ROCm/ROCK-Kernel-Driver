@@ -3648,8 +3648,10 @@ enum dc_status resource_map_pool_resources(
 	/* Allocate DP HPO Stream Encoder based on signal, hw capabilities
 	 * and link settings
 	 */
-	if (dc_is_dp_signal(stream->signal)) {
-		if (!dc->link_srv->dp_decide_link_settings(stream, &pipe_ctx->link_config.dp_link_settings))
+	if (dc_is_dp_signal(stream->signal) ||
+			dc_is_virtual_signal(stream->signal)) {
+		if (!dc->link_srv->dp_decide_link_settings(stream,
+				&pipe_ctx->link_config.dp_link_settings))
 			return DC_FAIL_DP_LINK_BANDWIDTH;
 		if (dc->link_srv->dp_get_encoding_format(
 				&pipe_ctx->link_config.dp_link_settings) == DP_128b_132b_ENCODING) {
@@ -3968,6 +3970,12 @@ enum dc_status dc_validate_with_context(struct dc *dc,
 	}
 
 	res = dc_validate_global_state(dc, context, fast_validate);
+
+	/* calculate pixel rate divider after deciding pxiel clock & odm combine  */
+	if ((dc->hwss.calculate_pix_rate_divider) && (res == DC_OK)) {
+		for (i = 0; i < add_streams_count; i++)
+			dc->hwss.calculate_pix_rate_divider(dc, context, add_streams[i]);
+	}
 
 fail:
 	if (res != DC_OK)
