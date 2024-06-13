@@ -58,4 +58,20 @@ void __drm_atomic_helper_crtc_reset(struct drm_crtc *crtc,
 void drm_atomic_helper_calc_timestamping_constants(struct drm_atomic_state *state);
 #endif
 
+#ifndef HAVE_DRM_ATOMIC_PLANE_ENABLING
+static inline bool drm_atomic_plane_enabling(struct drm_plane_state *old_plane_state,
+					     struct drm_plane_state *new_plane_state)
+{
+	/*
+	 * When enabling a plane, CRTC and FB should always be set together.
+	 * Anything else should be considered a bug in the atomic core, so we
+	 * gently warn about it.
+	 */
+	WARN_ON((!new_plane_state->crtc && new_plane_state->fb) ||
+		(new_plane_state->crtc && !new_plane_state->fb));
+
+	return !old_plane_state->crtc && new_plane_state->crtc;
+}
+#endif
+
 #endif
