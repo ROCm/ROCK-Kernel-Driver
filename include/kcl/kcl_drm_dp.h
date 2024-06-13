@@ -76,4 +76,12 @@
 #define DP_TEST_264BIT_CUSTOM_PATTERN_263_256		0X2250
 #endif
 
+/* v5.9-rc5-1031-g7d56927efac7 *
+ * drm/dp: add a number of DP 2.0 DPCD definitions */
+#ifndef DP_LINK_BW_10
+#define DP_LINK_BW_10                      0x01    /* 2.0 128b/132b Link Layer */
+#define DP_LINK_BW_13_5                    0x04    /* 2.0 128b/132b Link Layer */
+#define DP_LINK_BW_20                      0x02    /* 2.0 128b/132b Link Layer */
+#endif
+
 #endif
