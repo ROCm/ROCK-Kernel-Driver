@@ -27,6 +27,14 @@
 #include "kfd_debug.h"
 #include "kfd_device_queue_manager.h"
 
+/*
+ * PC Sampling revision change log
+ *
+ * 0.1 - Initial revision
+ */
+#define KFD_IOCTL_PCS_MAJOR_VERSION	0
+#define KFD_IOCTL_PCS_MINOR_VERSION	1
+
 struct supported_pc_sample_info {
 	uint32_t ip_version;
 	const struct kfd_pc_sample_info *sample_info;
@@ -141,6 +149,9 @@ static int kfd_pc_sample_query_cap(struct kfd_process_device *pdd,
 	int ret;
 	int i;
 	const uint32_t user_num_sample_info = user_args->num_sample_info;
+
+	/* use version field to pass back pc sampling revision temporarily, not for upstream */
+	user_args->version = KFD_IOCTL_PCS_MAJOR_VERSION << 16 | KFD_IOCTL_PCS_MINOR_VERSION;
 
 	for (i = 0; i < ARRAY_SIZE(supported_formats); i++)
 		if (KFD_GC_VERSION(pdd->dev) == supported_formats[i].ip_version)
