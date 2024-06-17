@@ -36,7 +36,6 @@ const struct kfd_pc_sample_info sample_info_hosttrap_9_0_0 = {
 	0, 1, ~0ULL, 0, KFD_IOCTL_PCS_METHOD_HOSTTRAP, KFD_IOCTL_PCS_TYPE_TIME_US };
 
 struct supported_pc_sample_info supported_formats[] = {
-	{ IP_VERSION(9, 4, 1), &sample_info_hosttrap_9_0_0 },
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
 };
 
