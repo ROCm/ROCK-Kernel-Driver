@@ -454,9 +454,6 @@ int ttm_bo_evict_first(struct ttm_device *bdev,
 		       struct ttm_resource_manager *man,
 		       struct ttm_operation_ctx *ctx);
 
-/* Default number of pre-faulted pages in the TTM fault handler */
-#define TTM_BO_VM_NUM_PREFAULT 16
-
 vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 			     struct vm_fault *vmf);
 vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
