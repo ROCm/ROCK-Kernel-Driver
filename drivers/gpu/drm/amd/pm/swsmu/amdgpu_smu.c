@@ -3864,3 +3864,99 @@ int smu_phase_det_enable(struct smu_context *smu, bool enable)
 
 	return pd_ctl->ops->enable(smu, enable);
 }
+
+#if defined(CONFIG_DEBUG_FS)
+
+static int smu_phase_det_debugfs_status(void *data, u64 *val)
+{
+	struct smu_context *smu = (struct smu_context *)data;
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+
+	*val = pd_ctl->status;
+
+	return 0;
+}
+
+static int smu_phase_det_debugfs_enable(void *data, u64 val)
+{
+	struct smu_context *smu = (struct smu_context *)data;
+	struct amdgpu_device *adev = smu->adev;
+
+	if (amdgpu_in_reset(adev) || adev->in_suspend)
+		return -EPERM;
+
+	return smu_phase_det_enable(smu, !!val);
+}
+
+#define DEBUGFS_PHASE_DET_FOPS(param)						\
+	static int smu_phase_det_fops_##param##_get(void *data, u64 *val)	\
+	{									\
+		struct smu_context *smu = (struct smu_context *)data;		\
+		int r;								\
+		u32 v;								\
+										\
+		r = smu_get_phase_det_param(smu, PP_PM_PHASE_DET_##param, &v);	\
+		*val = v;							\
+		return r;							\
+	}									\
+										\
+	static int smu_phase_det_fops_##param##_set(void *data, u64 val)	\
+	{									\
+		struct smu_context *smu = (struct smu_context *)data;		\
+		struct amdgpu_device *adev = smu->adev;				\
+										\
+		if (amdgpu_in_reset(adev) || adev->in_suspend)			\
+			return -EPERM;						\
+										\
+		return smu_set_phase_det_param(smu, PP_PM_PHASE_DET_##param,	\
+					       (u32)val);			\
+	}									\
+	DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_##param,			\
+				 smu_phase_det_fops_##param##_get,		\
+				 smu_phase_det_fops_##param##_set, "%llu\n")
+
+DEBUGFS_PHASE_DET_FOPS(LO_FREQ);
+DEBUGFS_PHASE_DET_FOPS(HI_FREQ);
+DEBUGFS_PHASE_DET_FOPS(THRESH);
+DEBUGFS_PHASE_DET_FOPS(ALPHA);
+DEBUGFS_PHASE_DET_FOPS(HYST);
+
+DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_en, smu_phase_det_debugfs_status,
+			 smu_phase_det_debugfs_enable, "%llu\n");
+
+#define DEBUGFS_CREATE_PHASE_DET_ATTR(name, param) \
+	debugfs_create_file(#name, 0644, dir, smu, &smu_phase_det_fops_##param)
+
+#define AMDGPU_SMU_PHASE_DET "smu_phase_detect"
+#endif
+
+void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev)
+{
+#if defined(CONFIG_DEBUG_FS)
+
+	struct smu_context *smu = adev->powerplay.pp_handle;
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	struct dentry *dir;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+
+	if (!smu || !pd_ctl)
+		return;
+
+	dir = debugfs_create_dir(AMDGPU_SMU_PHASE_DET,
+				 adev_to_drm(adev)->primary->debugfs_root);
+
+	debugfs_create_file("enable", 0644, dir, smu, &smu_phase_det_fops_en);
+
+	DEBUGFS_CREATE_PHASE_DET_ATTR(freq_lo, LO_FREQ);
+	DEBUGFS_CREATE_PHASE_DET_ATTR(freq_hi, HI_FREQ);
+	DEBUGFS_CREATE_PHASE_DET_ATTR(threshold, THRESH);
+	DEBUGFS_CREATE_PHASE_DET_ATTR(alpha, ALPHA);
+	DEBUGFS_CREATE_PHASE_DET_ATTR(hyst, HYST);
+
+#endif
+}

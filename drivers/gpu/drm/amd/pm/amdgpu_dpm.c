@@ -1879,3 +1879,11 @@ int amdgpu_dpm_get_dpm_clock_table(struct amdgpu_device *adev,
 
 	return ret;
 }
+
+void amdgpu_dpm_phase_det_debugfs_init(struct amdgpu_device *adev)
+{
+	if (!is_support_sw_smu(adev))
+		return;
+
+	amdgpu_smu_phase_det_debugfs_init(adev);
+}
