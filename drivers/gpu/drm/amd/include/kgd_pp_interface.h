@@ -290,6 +290,15 @@ enum pp_policy_soc_pstate {
 
 #define PP_POLICY_MAX_LEVELS 5
 
+enum pp_pm_phase_det_param_id {
+	PP_PM_PHASE_DET_LO_FREQ = 0,
+	PP_PM_PHASE_DET_HI_FREQ = 1,
+	PP_PM_PHASE_DET_THRESH = 2,
+	PP_PM_PHASE_DET_ALPHA = 3,
+	PP_PM_PHASE_DET_HYST = 4,
+	PP_PM_PHASE_DET_ALL = 5,
+};
+
 #define PP_GROUP_MASK        0xF0000000
 #define PP_GROUP_SHIFT       28
 

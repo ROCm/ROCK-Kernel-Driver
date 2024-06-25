@@ -3811,3 +3811,56 @@ int smu_send_rma_reason(struct smu_context *smu)
 
 	return ret;
 }
+
+int smu_set_phase_det_param(struct smu_context *smu,
+			    enum pp_pm_phase_det_param_id id, uint32_t val)
+{
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled || !pd_ctl)
+		return -EOPNOTSUPP;
+
+	if (!pd_ctl->ops || !pd_ctl->ops->set)
+		return -EOPNOTSUPP;
+
+	if (pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return -EPERM;
+
+	return pd_ctl->ops->set(smu, id, val);
+}
+
+int smu_get_phase_det_param(struct smu_context *smu,
+			    enum pp_pm_phase_det_param_id id, uint32_t *val)
+{
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled || !pd_ctl)
+		return -EOPNOTSUPP;
+
+	if (!pd_ctl->ops || !pd_ctl->ops->get)
+		return -EOPNOTSUPP;
+
+	return pd_ctl->ops->get(smu, id, val);
+}
+
+int smu_phase_det_enable(struct smu_context *smu, bool enable)
+{
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled || !pd_ctl)
+		return -EOPNOTSUPP;
+
+	if (!pd_ctl->ops || !pd_ctl->ops->enable)
+		return -EOPNOTSUPP;
+
+	if (pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return -EPERM;
+
+	return pd_ctl->ops->enable(smu, enable);
+}

@@ -383,6 +383,34 @@ struct smu_dpm_policy_ctxt {
 	unsigned long policy_mask;
 };
 
+struct smu_phase_det_params {
+	uint32_t freq_hi;
+	uint32_t freq_lo;
+	uint32_t thresh;
+	uint32_t hyst;
+	uint32_t alpha;
+};
+
+struct smu_phase_det_ops {
+	int (*set)(struct smu_context *smu, enum pp_pm_phase_det_param_id id,
+		   uint32_t val);
+	int (*get)(struct smu_context *smu, enum pp_pm_phase_det_param_id id,
+		   uint32_t *val);
+	int (*enable)(struct smu_context *smu, bool enable);
+};
+
+enum phase_det_state {
+	SMU_PHASE_DET_OFF = 0,
+	SMU_PHASE_DET_ON = 1,
+	SMU_PHASE_DET_DISABLED = -1,
+};
+
+struct smu_phase_det_ctl {
+	struct smu_phase_det_params params;
+	struct smu_phase_det_ops *ops;
+	enum phase_det_state status;
+};
+
 struct smu_dpm_context {
 	uint32_t dpm_context_size;
 	void *dpm_context;
@@ -394,6 +422,7 @@ struct smu_dpm_context {
 	struct smu_power_state *dpm_current_power_state;
 	struct mclock_latency_table *mclk_latency_table;
 	struct smu_dpm_policy_ctxt *dpm_policies;
+	struct smu_phase_det_ctl *pd_ctl;
 };
 
 struct smu_power_gate {
@@ -1622,6 +1651,12 @@ int smu_set_pm_policy(struct smu_context *smu, enum pp_pm_policy p_type,
 		      int level);
 ssize_t smu_get_pm_policy_info(struct smu_context *smu,
 			       enum pp_pm_policy p_type, char *sysbuf);
+
+int smu_set_phase_det_param(struct smu_context *smu,
+			    enum pp_pm_phase_det_param_id id, uint32_t val);
+int smu_get_phase_det_param(struct smu_context *smu,
+			    enum pp_pm_phase_det_param_id id, uint32_t *val);
+int smu_phase_det_enable(struct smu_context *smu, bool enable);
 
 #endif
 #endif
