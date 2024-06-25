@@ -4844,5 +4844,6 @@ void amdgpu_debugfs_pm_init(struct amdgpu_device *adev)
 					 adev->pm.smu_prv_buffer_size);
 
 	amdgpu_dpm_stb_debug_fs_init(adev);
+	amdgpu_dpm_phase_det_debugfs_init(adev);
 #endif
 }
