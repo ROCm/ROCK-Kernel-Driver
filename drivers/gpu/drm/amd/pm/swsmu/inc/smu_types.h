@@ -273,7 +273,13 @@
 	__SMU_DUMMY_MAP(GetMetricsVersion), \
 	__SMU_DUMMY_MAP(EnableUCLKShadow), \
 	__SMU_DUMMY_MAP(RmaDueToBadPageThreshold),\
-	__SMU_DUMMY_MAP(SelectPstatePolicy),
+	__SMU_DUMMY_MAP(SelectPstatePolicy), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwThreshold), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwFreqHigh), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwFreqLow), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwHystDown), \
+	__SMU_DUMMY_MAP(SetPhsDetWRbwAlpha), \
+	__SMU_DUMMY_MAP(SetPhsDetOnOff),
 
 #undef __SMU_DUMMY_MAP
 #define __SMU_DUMMY_MAP(type)	SMU_MSG_##type

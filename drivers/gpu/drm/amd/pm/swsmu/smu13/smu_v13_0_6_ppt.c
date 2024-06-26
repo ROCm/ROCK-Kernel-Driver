@@ -175,6 +175,12 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SelectPLPDMode,                      PPSMC_MSG_SelectPLPDMode,                  0),
 	MSG_MAP(RmaDueToBadPageThreshold,            PPSMC_MSG_RmaDueToBadPageThreshold,        0),
 	MSG_MAP(SelectPstatePolicy,                  PPSMC_MSG_SelectPstatePolicy,              0),
+	MSG_MAP(SetPhsDetWRbwThreshold,              PPSMC_MSG_SetPhsDetWRbwThreshold,          0),
+	MSG_MAP(SetPhsDetWRbwFreqHigh,               PPSMC_MSG_SetPhsDetWRbwFreqHigh,           0),
+	MSG_MAP(SetPhsDetWRbwFreqLow,                PPSMC_MSG_SetPhsDetWRbwFreqLow,            0),
+	MSG_MAP(SetPhsDetWRbwHystDown,               PPSMC_MSG_SetPhsDetWRbwHystDown,           0),
+	MSG_MAP(SetPhsDetWRbwAlpha,                  PPSMC_MSG_SetPhsDetWRbwAlpha,              0),
+	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
 };
 
 // clang-format on
@@ -438,6 +444,112 @@ static int smu_v13_0_6_select_plpd_policy(struct smu_context *smu, int level)
 	return ret;
 }
 
+static int smu_v13_0_6_phase_det_set(struct smu_context *smu,
+				     enum pp_pm_phase_det_param_id id,
+				     uint32_t val)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	uint32_t *param;
+	int r, msg_id;
+
+	pd_ctl = smu_dpm->pd_ctl;
+	if (!pd_ctl)
+		return -EINVAL;
+
+	switch (id) {
+	case PP_PM_PHASE_DET_LO_FREQ:
+		msg_id = SMU_MSG_SetPhsDetWRbwFreqLow;
+		param = &pd_ctl->params.freq_lo;
+		break;
+	case PP_PM_PHASE_DET_HI_FREQ:
+		msg_id = SMU_MSG_SetPhsDetWRbwFreqHigh;
+		param = &pd_ctl->params.freq_hi;
+		break;
+	case PP_PM_PHASE_DET_THRESH:
+		msg_id = SMU_MSG_SetPhsDetWRbwThreshold;
+		param = &pd_ctl->params.thresh;
+		break;
+	case PP_PM_PHASE_DET_ALPHA:
+		msg_id = SMU_MSG_SetPhsDetWRbwAlpha;
+		param = &pd_ctl->params.alpha;
+		break;
+	case PP_PM_PHASE_DET_HYST:
+		msg_id = SMU_MSG_SetPhsDetWRbwHystDown;
+		param = &pd_ctl->params.hyst;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	r = smu_cmn_send_smc_msg_with_param(smu, msg_id, val, NULL);
+	if (!r)
+		*param = val;
+
+	return r;
+}
+
+static int smu_v13_0_6_phase_det_get(struct smu_context *smu,
+				     enum pp_pm_phase_det_param_id id,
+				     uint32_t *val)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = smu_dpm->pd_ctl;
+	if (!pd_ctl || !val)
+		return -EINVAL;
+
+	switch (id) {
+	case PP_PM_PHASE_DET_LO_FREQ:
+		*val = pd_ctl->params.freq_lo;
+		break;
+	case PP_PM_PHASE_DET_HI_FREQ:
+		*val = pd_ctl->params.freq_hi;
+		break;
+	case PP_PM_PHASE_DET_THRESH:
+		*val = pd_ctl->params.thresh;
+		break;
+	case PP_PM_PHASE_DET_ALPHA:
+		*val = pd_ctl->params.alpha;
+		break;
+	case PP_PM_PHASE_DET_HYST:
+		*val = pd_ctl->params.hyst;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int smu_v13_0_6_phase_det_enable(struct smu_context *smu, bool enable)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	int r;
+
+	pd_ctl = smu_dpm->pd_ctl;
+	r = smu_cmn_send_smc_msg_with_param(smu, SMU_MSG_SetPhsDetOnOff, enable,
+					    NULL);
+
+	if (!r) {
+		pd_ctl->status = enable ? SMU_PHASE_DET_ON : SMU_PHASE_DET_OFF;
+	} else {
+		dev_warn(smu->adev->dev, "Phase detect %s failed",
+			 enable ? "enable" : "disable");
+		pd_ctl->status = SMU_PHASE_DET_DISABLED;
+	}
+
+	return r;
+}
+
+static struct smu_phase_det_ops smu_v13_0_6_pd_ops = {
+	.set = smu_v13_0_6_phase_det_set,
+	.get = smu_v13_0_6_phase_det_get,
+	.enable = smu_v13_0_6_phase_det_enable,
+};
+
 static int smu_v13_0_6_allocate_dpm_context(struct smu_context *smu)
 {
 	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
@@ -455,6 +567,17 @@ static int smu_v13_0_6_allocate_dpm_context(struct smu_context *smu)
 		kfree(smu_dpm->dpm_context);
 		return -ENOMEM;
 	}
+
+	smu_dpm->pd_ctl = kzalloc(sizeof(struct smu_phase_det_ctl), GFP_KERNEL);
+	if (!smu_dpm->pd_ctl) {
+		kfree(smu_dpm->dpm_policies);
+		kfree(smu_dpm->dpm_context);
+		return -ENOMEM;
+	}
+	smu_dpm->pd_ctl->ops = &smu_v13_0_6_pd_ops;
+	smu_dpm->pd_ctl->status = SMU_PHASE_DET_OFF;
+	/* Init to 0xFF to indicate that present values are unknown */
+	memset(&smu_dpm->pd_ctl->params, 0xFF, sizeof(struct smu_phase_det_params));
 
 	if (!(smu->adev->flags & AMD_IS_APU)) {
 		policy = &(smu_dpm->dpm_policies->policies[0]);
@@ -753,6 +876,7 @@ static int smu_v13_0_6_set_default_dpm_table(struct smu_context *smu)
 	struct smu_13_0_dpm_context *dpm_context = smu->smu_dpm.dpm_context;
 	struct smu_table_context *smu_table = &smu->smu_table;
 	struct smu_13_0_dpm_table *dpm_table = NULL;
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
 	struct PPTable_t *pptable =
 		(struct PPTable_t *)smu_table->driver_pptable;
 	uint32_t gfxclkmin, gfxclkmax, levels;
@@ -784,6 +908,12 @@ static int smu_v13_0_6_set_default_dpm_table(struct smu_context *smu)
 
 		smu_dpm->dpm_policies->policy_mask &=
 			~BIT(PP_PM_POLICY_SOC_PSTATE);
+	}
+
+	if (smu_dpm->pd_ctl && !(smu->adev->flags & AMD_IS_APU) &&
+	    (smu->smc_fw_version < 0x00556E00)) {
+		kfree(smu_dpm->pd_ctl);
+		smu_dpm->pd_ctl = NULL;
 	}
 
 	smu_v13_0_6_pm_policy_init(smu);
@@ -2642,6 +2772,23 @@ static int smu_v13_0_6_send_rma_reason(struct smu_context *smu)
 	return ret;
 }
 
+static int smu_v13_0_6_post_init(struct smu_context *smu)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+	bool enable;
+
+	pd_ctl = smu_dpm->pd_ctl;
+
+	if (!pd_ctl || pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return 0;
+
+	enable = (pd_ctl->status == SMU_PHASE_DET_ON) ? true : false;
+	smu_v13_0_6_phase_det_enable(smu, enable);
+
+	return 0;
+}
+
 static int mca_smu_set_debug_mode(struct amdgpu_device *adev, bool enable)
 {
 	struct smu_context *smu = adev->powerplay.pp_handle;
@@ -3287,6 +3434,7 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.i2c_fini = smu_v13_0_6_i2c_control_fini,
 	.send_hbm_bad_pages_num = smu_v13_0_6_smu_send_hbm_bad_page_num,
 	.send_rma_reason = smu_v13_0_6_send_rma_reason,
+	.post_init = smu_v13_0_6_post_init,
 };
 
 void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu)
