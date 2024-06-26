@@ -3075,6 +3075,7 @@ static int amdgpu_ras_poison_creation_handler(struct amdgpu_device *adev,
 	return 0;
 }
 
+#ifdef HAVE_KFIFO_PUT_NON_POINTER
 static void amdgpu_ras_clear_poison_fifo(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
@@ -3129,6 +3130,7 @@ static int amdgpu_ras_poison_consumption_handler(struct amdgpu_device *adev,
 
 	return 0;
 }
+#endif
 
 static int amdgpu_ras_page_retirement_thread(void *param)
 {
