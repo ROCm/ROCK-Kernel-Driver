@@ -233,4 +233,13 @@
 #define DRM_FORMAT_ARGB16161616F fourcc_code('A', 'R', '4', 'H') /* [63:0] A:R:G:B 16:16:16:16 little endian */
 #endif
 
+#ifndef AMD_FMT_MOD_TILE_GFX12_256B_2D
+#define AMD_FMT_MOD_TILE_GFX12_256B_2D 1
+#define AMD_FMT_MOD_TILE_GFX12_4K_2D 2
+#endif
+
+#ifndef AMD_FMT_MOD_TILE_GFX12_256K_2D
+#define AMD_FMT_MOD_TILE_GFX12_256K_2D 4
+#endif
+
 #endif /* KCL_KCL_DRM_FOURCC_H */
