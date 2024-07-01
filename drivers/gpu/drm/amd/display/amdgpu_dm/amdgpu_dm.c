@@ -12146,6 +12146,7 @@ static bool parse_edid_cea(struct amdgpu_dm_connector *aconnector,
 	return ret;
 }
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 static void parse_edid_displayid_vrr(struct drm_connector *connector,
 		struct edid *edid)
 {
@@ -12188,6 +12189,7 @@ static void parse_edid_displayid_vrr(struct drm_connector *connector,
 		j++;
 	}
 }
+#endif
 
 static int parse_amd_vsdb(struct amdgpu_dm_connector *aconnector,
 			  struct edid *edid, struct amdgpu_hdmi_vsdb_info *vsdb_info)
@@ -12311,10 +12313,12 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 	if (!adev->dm.freesync_module)
 		goto update;
 
+#ifdef HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE
 	/* Some eDP panels only have the refresh rate range info in DisplayID */
 	if ((connector->display_info.monitor_range.min_vfreq == 0 ||
 	     connector->display_info.monitor_range.max_vfreq == 0))
 		parse_edid_displayid_vrr(connector, edid);
+#endif
 
 	if (edid && (sink->sink_signal == SIGNAL_TYPE_DISPLAY_PORT ||
 		     sink->sink_signal == SIGNAL_TYPE_EDP)) {
