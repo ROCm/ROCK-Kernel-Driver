@@ -3898,6 +3898,7 @@ static int smu_phase_det_debugfs_enable(void *data, u64 val)
 	return smu_phase_det_enable(smu, !!val);
 }
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 #define DEBUGFS_PHASE_DET_FOPS(param)						\
 	static int smu_phase_det_fops_##param##_get(void *data, u64 *val)	\
 	{									\
@@ -3924,6 +3925,34 @@ static int smu_phase_det_debugfs_enable(void *data, u64 val)
 	DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_##param,			\
 				 smu_phase_det_fops_##param##_get,		\
 				 smu_phase_det_fops_##param##_set, "%llu\n")
+#else
+#define DEBUGFS_PHASE_DET_FOPS(param)						\
+	static int smu_phase_det_fops_##param##_get(void *data, u64 *val)	\
+	{									\
+		struct smu_context *smu = (struct smu_context *)data;		\
+		int r;								\
+		u32 v;								\
+										\
+		r = smu_get_phase_det_param(smu, PP_PM_PHASE_DET_##param, &v);	\
+		*val = v;							\
+		return r;							\
+	}									\
+										\
+	static int smu_phase_det_fops_##param##_set(void *data, u64 val)	\
+	{									\
+		struct smu_context *smu = (struct smu_context *)data;		\
+		struct amdgpu_device *adev = smu->adev;				\
+										\
+		if (amdgpu_in_reset(adev) || adev->in_suspend)			\
+			return -EPERM;						\
+										\
+		return smu_set_phase_det_param(smu, PP_PM_PHASE_DET_##param,	\
+					       (u32)val);			\
+	}									\
+	DEFINE_SIMPLE_ATTRIBUTE(smu_phase_det_fops_##param,			\
+				 smu_phase_det_fops_##param##_get,		\
+				 smu_phase_det_fops_##param##_set, "%llu\n")
+#endif
 
 DEBUGFS_PHASE_DET_FOPS(LO_FREQ);
 DEBUGFS_PHASE_DET_FOPS(HI_FREQ);
@@ -3931,8 +3960,13 @@ DEBUGFS_PHASE_DET_FOPS(THRESH);
 DEBUGFS_PHASE_DET_FOPS(ALPHA);
 DEBUGFS_PHASE_DET_FOPS(HYST);
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_en, smu_phase_det_debugfs_status,
 			 smu_phase_det_debugfs_enable, "%llu\n");
+#else
+DEFINE_SIMPLE_ATTRIBUTE(smu_phase_det_fops_en, smu_phase_det_debugfs_status,
+			 smu_phase_det_debugfs_enable, "%llu\n");
+#endif
 
 #define DEBUGFS_CREATE_PHASE_DET_ATTR(name, param) \
 	debugfs_create_file(#name, 0644, dir, smu, &smu_phase_det_fops_##param)
