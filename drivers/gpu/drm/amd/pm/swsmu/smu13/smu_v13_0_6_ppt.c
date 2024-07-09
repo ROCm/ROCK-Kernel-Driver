@@ -568,17 +568,22 @@ static int smu_v13_0_6_allocate_dpm_context(struct smu_context *smu)
 		return -ENOMEM;
 	}
 
-	smu_dpm->pd_ctl = kzalloc(sizeof(struct smu_phase_det_ctl), GFP_KERNEL);
-	if (!smu_dpm->pd_ctl) {
-		kfree(smu_dpm->dpm_policies);
-		kfree(smu_dpm->dpm_context);
-		return -ENOMEM;
-	}
-	smu_dpm->pd_ctl->ops = &smu_v13_0_6_pd_ops;
-	smu_dpm->pd_ctl->status = SMU_PHASE_DET_OFF;
-	/* Init to 0xFF to indicate that present values are unknown */
-	memset(&smu_dpm->pd_ctl->params, 0xFF, sizeof(struct smu_phase_det_params));
+	if (amdgpu_ip_version(smu->adev, MP1_HWIP, 0) == IP_VERSION(13, 0, 6) &&
+	    !(smu->adev->flags & AMD_IS_APU)) {
+		smu_dpm->pd_ctl =
+			kzalloc(sizeof(struct smu_phase_det_ctl), GFP_KERNEL);
+		if (!smu_dpm->pd_ctl) {
+			kfree(smu_dpm->dpm_policies);
+			kfree(smu_dpm->dpm_context);
+			return -ENOMEM;
+		}
 
+		smu_dpm->pd_ctl->ops = &smu_v13_0_6_pd_ops;
+		smu_dpm->pd_ctl->status = SMU_PHASE_DET_OFF;
+		/* Init to 0xFF to indicate that present values are unknown */
+		memset(&smu_dpm->pd_ctl->params, 0xFF,
+		       sizeof(struct smu_phase_det_params));
+	}
 	if (!(smu->adev->flags & AMD_IS_APU)) {
 		policy = &(smu_dpm->dpm_policies->policies[0]);
 
@@ -910,8 +915,7 @@ static int smu_v13_0_6_set_default_dpm_table(struct smu_context *smu)
 			~BIT(PP_PM_POLICY_SOC_PSTATE);
 	}
 
-	if (smu_dpm->pd_ctl && !(smu->adev->flags & AMD_IS_APU) &&
-	    (smu->smc_fw_version < 0x00556E00)) {
+	if (smu_dpm->pd_ctl && (smu->smc_fw_version < 0x00556E00)) {
 		kfree(smu_dpm->pd_ctl);
 		smu_dpm->pd_ctl = NULL;
 	}
