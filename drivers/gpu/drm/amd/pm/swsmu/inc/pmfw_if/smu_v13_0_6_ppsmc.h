@@ -99,7 +99,8 @@
 #define PPSMC_MSG_SetPhsDetWRbwHystDown             0x48
 #define PPSMC_MSG_SetPhsDetWRbwAlpha                0x49
 #define PPSMC_MSG_SetPhsDetOnOff                    0x4A
-#define PPSMC_Message_Count                         0x4B
+#define PPSMC_MSG_GetPhsDetResidency                0x4B
+#define PPSMC_Message_Count                         0x4C
 
 //PPSMC Reset Types for driver msg argument
 #define PPSMC_RESET_TYPE_DRIVER_MODE_1_RESET        0x1
