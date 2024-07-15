@@ -3872,7 +3872,39 @@ int smu_phase_det_enable(struct smu_context *smu, bool enable)
 	return pd_ctl->ops->enable(smu, enable);
 }
 
+static int smu_phase_det_get_residency(struct smu_context *smu, uint32_t *res)
+{
+	struct smu_dpm_context *dpm_ctxt = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = dpm_ctxt->pd_ctl;
+	if (!smu->pm_enabled || !smu->adev->pm.dpm_enabled || !pd_ctl)
+		return -EOPNOTSUPP;
+
+	if (!pd_ctl->ops || !pd_ctl->ops->get_residency)
+		return -EOPNOTSUPP;
+
+	if (pd_ctl->status == SMU_PHASE_DET_DISABLED)
+		return -EPERM;
+
+	return pd_ctl->ops->get_residency(smu, res);
+}
+
 #if defined(CONFIG_DEBUG_FS)
+
+static int smu_phase_det_debugfs_get_residency(void *data, u64 *val)
+{
+	struct smu_context *smu = (struct smu_context *)data;
+	uint32_t res;
+	int r;
+
+	r = smu_phase_det_get_residency(smu, &res);
+	if (r)
+		return r;
+	*val = res;
+
+	return 0;
+}
 
 static int smu_phase_det_debugfs_status(void *data, u64 *val)
 {
@@ -3968,6 +4000,9 @@ DEFINE_SIMPLE_ATTRIBUTE(smu_phase_det_fops_en, smu_phase_det_debugfs_status,
 			 smu_phase_det_debugfs_enable, "%llu\n");
 #endif
 
+DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_res,
+			 smu_phase_det_debugfs_get_residency, NULL, "%llu\n");
+
 #define DEBUGFS_CREATE_PHASE_DET_ATTR(name, param) \
 	debugfs_create_file(#name, 0644, dir, smu, &smu_phase_det_fops_##param)
 
@@ -3992,6 +4027,10 @@ void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev)
 				 adev_to_drm(adev)->primary->debugfs_root);
 
 	debugfs_create_file("enable", 0644, dir, smu, &smu_phase_det_fops_en);
+
+	if (pd_ctl->ops->get_residency)
+		debugfs_create_file("residency", 0444, dir, smu,
+				    &smu_phase_det_fops_res);
 
 	DEBUGFS_CREATE_PHASE_DET_ATTR(freq_lo, LO_FREQ);
 	DEBUGFS_CREATE_PHASE_DET_ATTR(freq_hi, HI_FREQ);

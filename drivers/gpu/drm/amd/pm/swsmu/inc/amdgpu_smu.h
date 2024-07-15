@@ -397,6 +397,7 @@ struct smu_phase_det_ops {
 	int (*get)(struct smu_context *smu, enum pp_pm_phase_det_param_id id,
 		   uint32_t *val);
 	int (*enable)(struct smu_context *smu, bool enable);
+	int (*get_residency)(struct smu_context *smu, uint32_t *res);
 };
 
 enum phase_det_state {
@@ -409,6 +410,7 @@ struct smu_phase_det_ctl {
 	struct smu_phase_det_params params;
 	struct smu_phase_det_ops *ops;
 	enum phase_det_state status;
+	uint32_t residency;
 };
 
 struct smu_dpm_context {
