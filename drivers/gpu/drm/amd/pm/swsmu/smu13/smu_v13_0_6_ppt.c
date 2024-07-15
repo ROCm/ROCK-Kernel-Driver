@@ -181,6 +181,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetPhsDetWRbwHystDown,               PPSMC_MSG_SetPhsDetWRbwHystDown,           0),
 	MSG_MAP(SetPhsDetWRbwAlpha,                  PPSMC_MSG_SetPhsDetWRbwAlpha,              0),
 	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
+	MSG_MAP(GetPhsDetResidency,                  PPSMC_MSG_GetPhsDetResidency,              0),
 };
 
 // clang-format on
@@ -540,10 +541,30 @@ static int smu_v13_0_6_phase_det_enable(struct smu_context *smu, bool enable)
 	return r;
 }
 
+static int smu_v13_0_6_phase_det_get_residency(struct smu_context *smu,
+					       uint32_t *res)
+{
+	struct smu_dpm_context *smu_dpm = &smu->smu_dpm;
+	struct smu_phase_det_ctl *pd_ctl;
+
+	pd_ctl = smu_dpm->pd_ctl;
+
+	if (!res)
+		return -EINVAL;
+
+	if (pd_ctl->status != SMU_PHASE_DET_ON) {
+		*res = 0;
+		return 0;
+	}
+
+	return smu_cmn_send_smc_msg(smu, SMU_MSG_GetPhsDetResidency, res);
+}
+
 static struct smu_phase_det_ops smu_v13_0_6_pd_ops = {
 	.set = smu_v13_0_6_phase_det_set,
 	.get = smu_v13_0_6_phase_det_get,
 	.enable = smu_v13_0_6_phase_det_enable,
+	.get_residency = smu_v13_0_6_phase_det_get_residency,
 };
 
 static int smu_v13_0_6_allocate_dpm_context(struct smu_context *smu)
@@ -915,6 +936,9 @@ static int smu_v13_0_6_set_default_dpm_table(struct smu_context *smu)
 		kfree(smu_dpm->pd_ctl);
 		smu_dpm->pd_ctl = NULL;
 	}
+
+	if (smu_dpm->pd_ctl && (smu->smc_fw_version < 0x00556F78))
+		smu_dpm->pd_ctl->ops->get_residency = NULL;
 
 	smu_v13_0_6_pm_policy_init(smu);
 	/* gfxclk dpm table setup */
