@@ -32,6 +32,10 @@
 /*
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
+
+/* Copied from drivers/dma-buf/dma-resv.c */
+#ifndef HAVE_DMA_RESV_FENCES
+
 #include <linux/dma-resv.h>
 #include <linux/dma-fence-array.h>
 #include <linux/dma-fence-chain.h>
@@ -40,9 +44,6 @@
 #include <linux/sched/mm.h>
 #include <linux/mmu_notifier.h>
 #include <linux/seq_file.h>
-
-/* Copied from drivers/dma-buf/dma-resv.c */
-#ifndef HAVE_DMA_RESV_FENCES
 
 /**
  * DOC: Reservation Object Overview

@@ -34,10 +34,12 @@ version_le () {
 source $KCL/files
 
 sed -i -e '/DEFINE_WD_CLASS(reservation_ww_class)/,/EXPORT_SYMBOL(reservation_ww_class)/d' \
-       -e '/dma_resv_lockdep/,/subsys_initcall/d' $KCL/dma-buf/dma-resv.c
+       -e '/dma_resv_lockdep/,/subsys_initcall/d' \
+       -e '1i\#ifdef HAVE_DMA_RESV_FENCES' \
+       -e '$a\#endif' $KCL/dma-buf/dma-resv.c
 sed -i -e '/extern struct ww_class reservation_ww_class/i #include <kcl/kcl_dma-resv.h>' \
-       -e '/struct dma_resv {/, /}/d' $INC/linux/dma-resv.h \
-       -e '/struct dma_resv_iter {/, /}/d' $INC/linux/dma-resv.h \
+       -e '/struct dma_resv {/, /}/d' \
+       -e '/struct dma_resv_iter {/, /}/d' \
        -e '/enum dma_resv_usage {/, /}/d' $INC/linux/dma-resv.h
 
 # add amd prefix to exported symbols
@@ -85,8 +87,4 @@ if ! grep -q 'define HAVE_AMDKCL_FLAGS_TAKE_PATH' $SRC/config/config.h; then
 	for file in $(grep -rl 'CFLAGS_' amd/display/); do
 		sed -i 's|\(CFLAGS_[A-Z_]*\)$(AMDDALPATH)/.*/\(.*\.o\)|\1\2|' $file
 	done
-fi
-
-if ! grep -q 'define HAVE_DMA_RESV_FENCES' $SRC/config/config.h; then
- sed -i 's|dma-buf/dma-resv.o|kcl_dma-resv.o|' amd/amdkcl/Makefile
 fi

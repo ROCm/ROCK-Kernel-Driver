@@ -2,7 +2,7 @@
 amdkcl-y += main.o kcl_common.o
 
 amdkcl-y += kcl_kernel_params.o
-amdkcl-y += dma-buf/dma-resv.o
+amdkcl-y += dma-buf/dma-resv.o kcl_dma-resv.o
 
 amdkcl-y += kcl_backlight.o kcl_ioctl.o \
 	kcl_kthread.o kcl_io.o kcl_seq_file.o \
