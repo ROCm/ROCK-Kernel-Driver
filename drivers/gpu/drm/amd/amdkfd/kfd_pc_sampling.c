@@ -31,9 +31,10 @@
  * PC Sampling revision change log
  *
  * 0.1 - Initial revision
+ * 0.2 - Support gfx9_4_3 Host Trap PC sampling
  */
 #define KFD_IOCTL_PCS_MAJOR_VERSION	0
-#define KFD_IOCTL_PCS_MINOR_VERSION	1
+#define KFD_IOCTL_PCS_MINOR_VERSION	2
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;
@@ -45,6 +46,7 @@ const struct kfd_pc_sample_info sample_info_hosttrap_9_0_0 = {
 
 struct supported_pc_sample_info supported_formats[] = {
 	{ IP_VERSION(9, 4, 2), &sample_info_hosttrap_9_0_0 },
+	{ IP_VERSION(9, 4, 3), &sample_info_hosttrap_9_0_0 },
 };
 
 static int kfd_pc_sample_thread(void *param)
