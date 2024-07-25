@@ -85,14 +85,14 @@ static int kfd_pc_sample_thread(void *param)
 			node->kfd2kgd->override_core_cg(adev, 1, inst);
 
 	while (!kthread_should_stop() &&
-			!signal_pending(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+			!signal_pending(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
 		if (!need_wait) {
 			next_trap_time = ktime_add_us(ktime_get_raw(), timeout);
 
 			for_each_inst(inst, node->xcc_mask) {
 			node->kfd2kgd->trigger_pc_sample_trap(adev, node->vm_info.last_vmid_kfd,
-					&node->pcs_data.hosttrap_entry.base.target_simd,
-					&node->pcs_data.hosttrap_entry.base.target_wave_slot,
+					&node->pcs_data.hosttrap_entry.target_simd,
+					&node->pcs_data.hosttrap_entry.target_wave_slot,
 					node->pcs_data.hosttrap_entry.base.pc_sample_info.method,
 					inst);
 			}
@@ -118,9 +118,9 @@ static int kfd_pc_sample_thread(void *param)
 		for_each_inst(inst, node->xcc_mask)
 			node->kfd2kgd->override_core_cg(adev, 0, inst);
 
-	node->pcs_data.hosttrap_entry.base.target_simd = 0;
-	node->pcs_data.hosttrap_entry.base.target_wave_slot = 0;
-	node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+	node->pcs_data.hosttrap_entry.target_simd = 0;
+	node->pcs_data.hosttrap_entry.target_wave_slot = 0;
+	node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
 
 	return 0;
 }
@@ -131,12 +131,12 @@ static int kfd_pc_sample_thread_start(struct kfd_node *node)
 	int ret = 0;
 
 	snprintf(thread_name, 16, "pcs_%d", node->adev->ddev.render->index);
-	node->pcs_data.hosttrap_entry.base.pc_sample_thread =
+	node->pcs_data.hosttrap_entry.pc_sample_thread =
 		kthread_run(kfd_pc_sample_thread, node, thread_name);
 
-	if (IS_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
-		ret = PTR_ERR(node->pcs_data.hosttrap_entry.base.pc_sample_thread);
-		node->pcs_data.hosttrap_entry.base.pc_sample_thread = NULL;
+	if (IS_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread)) {
+		ret = PTR_ERR(node->pcs_data.hosttrap_entry.pc_sample_thread);
+		node->pcs_data.hosttrap_entry.pc_sample_thread = NULL;
 		pr_debug("Failed to create pc sample thread for %s with ret = %d.",
 			thread_name, ret);
 	}
@@ -231,7 +231,7 @@ static int kfd_pc_sample_start(struct kfd_process_device *pdd,
 
 	while (pc_sampling_start) {
 		/* true means pc_sample_thread stop is in progress */
-		if (READ_ONCE(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread)) {
+		if (READ_ONCE(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread)) {
 			usleep_range(1000, 2000);
 		} else {
 			ret = kfd_pc_sample_thread_start(pdd->dev);
@@ -261,7 +261,7 @@ static int kfd_pc_sample_stop(struct kfd_process_device *pdd,
 		KFD_UNMAP_QUEUES_FILTER_ALL_QUEUES, 0, USE_DEFAULT_GRACE_PERIOD);
 
 	if (pc_sampling_stop)
-		kthread_stop(pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_thread);
+		kthread_stop(pdd->dev->pcs_data.hosttrap_entry.pc_sample_thread);
 
 	return 0;
 }
@@ -325,7 +325,7 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 		return -ENOMEM;
 	}
 
-	i = idr_alloc_cyclic(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr,
+	i = idr_alloc_cyclic(&pdd->dev->pcs_data.sampling_idr,
 				pcs_entry, 1, 0, GFP_KERNEL);
 	if (i < 0) {
 		mutex_unlock(&pdd->dev->pcs_data.mutex);
@@ -364,7 +364,7 @@ static int kfd_pc_sample_destroy(struct kfd_process_device *pdd, uint32_t trace_
 	pdd->process->pc_sampling_ref--;
 	mutex_lock(&pdd->dev->pcs_data.mutex);
 	pdd->dev->pcs_data.hosttrap_entry.base.use_count--;
-	idr_remove(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr, trace_id);
+	idr_remove(&pdd->dev->pcs_data.sampling_idr, trace_id);
 
 	if (!pdd->dev->pcs_data.hosttrap_entry.base.use_count)
 		memset(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sample_info, 0x0,
@@ -383,7 +383,7 @@ void kfd_pc_sample_release(struct kfd_process_device *pdd)
 	uint32_t id;
 
 	/* force to release all PC sampling task for this process */
-	idp = &pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr;
+	idp = &pdd->dev->pcs_data.sampling_idr;
 	do {
 		pcs_entry = NULL;
 		mutex_lock(&pdd->dev->pcs_data.mutex);
@@ -410,7 +410,7 @@ int kfd_pc_sample(struct kfd_process_device *pdd,
 		args->op != KFD_IOCTL_PCS_OP_CREATE) {
 
 		mutex_lock(&pdd->dev->pcs_data.mutex);
-		pcs_entry = idr_find(&pdd->dev->pcs_data.hosttrap_entry.base.pc_sampling_idr,
+		pcs_entry = idr_find(&pdd->dev->pcs_data.sampling_idr,
 				args->trace_id);
 		mutex_unlock(&pdd->dev->pcs_data.mutex);
 

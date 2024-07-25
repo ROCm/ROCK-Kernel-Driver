@@ -613,12 +613,12 @@ static void kfd_smi_init(struct kfd_node *dev)
 static void kfd_pc_sampling_init(struct kfd_node *dev)
 {
 	mutex_init(&dev->pcs_data.mutex);
-	idr_init_base(&dev->pcs_data.hosttrap_entry.base.pc_sampling_idr, 1);
+	idr_init_base(&dev->pcs_data.sampling_idr, 1);
 }
 
 static void kfd_pc_sampling_exit(struct kfd_node *dev)
 {
-	idr_destroy(&dev->pcs_data.hosttrap_entry.base.pc_sampling_idr);
+	idr_destroy(&dev->pcs_data.sampling_idr);
 	mutex_destroy(&dev->pcs_data.mutex);
 }
 
