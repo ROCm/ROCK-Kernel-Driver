@@ -539,6 +539,30 @@ static uint32_t kgd_v9_4_3_trigger_pc_sample_trap(struct amdgpu_device *adev,
 					target_simd, target_wave_slot, method, inst);
 }
 
+static uint32_t kgd_v9_4_3_setup_stoch_sampling(struct amdgpu_device *adev,
+					    uint32_t compute_vmid_bitmap,
+					    bool enable,
+					    enum kfd_ioctl_pc_sample_type type,
+					    uint64_t intval,
+					    uint32_t inst)
+{
+	uint32_t value = 0;
+
+	/* turn on all VMID for this instance */
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, VMID_MASK, compute_vmid_bitmap);
+
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, COUNT_INTVAL, ffs(intval >> 9));
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, COUNT_SEL, type - 1);
+	value = REG_SET_FIELD(value, SQ_PERF_SNAPSHOT_CTRL, ENABLE, enable);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+	WREG32_SOC15(GC, GET_INST(GC, inst), regSQ_PERF_SNAPSHOT_CTRL, value);
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	return 0;
+}
+
 const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.program_sh_mem_settings = kgd_gfx_v9_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_gfx_v9_4_3_set_pasid_vmid_mapping,
@@ -575,5 +599,6 @@ const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.hqd_get_pq_addr = kgd_gfx_v9_hqd_get_pq_addr,
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
 	.trigger_pc_sample_trap = kgd_v9_4_3_trigger_pc_sample_trap,
-	.override_core_cg = kgd_gfx_v9_4_3_override_core_cg
+	.override_core_cg = kgd_gfx_v9_4_3_override_core_cg,
+	.setup_stoch_sampling = kgd_v9_4_3_setup_stoch_sampling,
 };

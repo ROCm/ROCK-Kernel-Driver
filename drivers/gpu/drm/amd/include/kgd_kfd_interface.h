@@ -346,6 +346,12 @@ struct kfd2kgd_calls {
 	void (*override_core_cg)(struct amdgpu_device *adev,
 					uint32_t value,
 					uint32_t inst);
+	uint32_t (*setup_stoch_sampling)(struct amdgpu_device *adev,
+					uint32_t compute_vmid_bitmap,
+					bool enable,
+					enum kfd_ioctl_pc_sample_type type,
+					uint64_t intval,
+					uint32_t inst);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */
