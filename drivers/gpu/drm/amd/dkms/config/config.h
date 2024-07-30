@@ -473,8 +473,17 @@
 /* drm_dsc_pps_payload_pack() is available */
 #define HAVE_DRM_DSC_PPS_PAYLOAD_PACK 1
 
+/* drm_edid_alloc() is available */
+#define HAVE_DRM_EDID_MALLOC 1
+
 /* drm_edid_override_connector_update() is available */
 #define HAVE_DRM_EDID_OVERRIDE_CONNECTOR_UPDATE 1
+
+/* drm_edid_raw() is available */
+#define HAVE_DRM_EDID_RAW 1
+
+/* drm_edid_valid() is available */
+#define HAVE_DRM_EDID_VALID 1
 
 /* drm_exec() has 3 arguments */
 #define HAVE_DRM_EXEC_INIT_3_ARGUMENTS 1
