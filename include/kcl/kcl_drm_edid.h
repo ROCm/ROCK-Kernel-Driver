@@ -22,4 +22,38 @@
 #define DRM_EDID_FEATURE_CONTINUOUS_FREQ  (1 << 0) /* 1.4 */
 #endif
 
+
+/*	commit v5.18-rc5-1046-ge4ccf9a777d3
+	drm/edid: add struct drm_edid container	*/
+#if !defined(HAVE_DRM_EDID_MALLOC) || !defined(HAVE_DRM_EDID_RAW) || !defined(HAVE_DRM_EDID_VALID)
+struct drm_edid {
+	/* Size allocated for edid */
+	size_t size;
+	const struct edid *edid;
+};
+#endif
+
+#ifndef HAVE_DRM_EDID_MALLOC
+const struct drm_edid *_kcl_drm_edid_alloc(const void *edid, size_t size);
+void _kcl_drm_edid_free(const struct drm_edid *drm_edid);
+#define  drm_edid_alloc _kcl_drm_edid_alloc
+#define  drm_edid_free _kcl_drm_edid_free
+#endif
+
+#ifndef HAVE_DRM_EDID_RAW
+const struct edid *_kcl_drm_edid_raw(const struct drm_edid *drm_edid);
+#define  drm_edid_raw _kcl_drm_edid_raw
+#endif
+
+#ifndef HAVE_DRM_EDID_VALID
+static inline bool _kcl_drm_edid_valid(const struct drm_edid *drm_edid)
+{
+	if (!drm_edid)
+		return false;
+
+	return drm_edid_is_valid(drm_edid->edid);
+}
+#define  drm_edid_valid _kcl_drm_edid_valid
+#endif
+
 #endif
