@@ -152,6 +152,12 @@ static inline bool amdgpu_reset_domain_in_drain_mode(struct amdgpu_reset_domain 
 	return domain->drain;
 }
 
+static inline bool amdgpu_reset_pending(struct amdgpu_reset_domain *domain)
+{
+	lockdep_assert_held(&domain->sem);
+	return rwsem_is_contended(&domain->sem);
+}
+
 void amdgpu_device_lock_reset_domain(struct amdgpu_reset_domain *reset_domain);
 
 void amdgpu_device_unlock_reset_domain(struct amdgpu_reset_domain *reset_domain);
