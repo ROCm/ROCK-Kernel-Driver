@@ -980,9 +980,9 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 	uint8_t ret = 0;
 #ifdef HAVE_DRM_DP_AUX_DRM_DEV
 	drm_dbg_dp(aux->drm_dev,
-		   "Configure DSC to non-virtual dpcd synaptics\n");
+		   "MST_DSC Configure DSC to non-virtual dpcd synaptics\n");
 #else
-	DRM_DEBUG_KMS("Configure DSC to non-virtual dpcd synaptics\n");
+	DRM_DEBUG_KMS("MST_DSC Configure DSC to non-virtual dpcd synaptics\n");
 #endif
 
 	if (enable) {
@@ -996,7 +996,7 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 			apply_synaptics_fifo_reset_wa(aux);
 
 		ret = drm_dp_dpcd_write(aux, DP_DSC_ENABLE, &enable, 1);
-		DRM_INFO("Send DSC enable to synaptics\n");
+		DRM_INFO("MST_DSC Send DSC enable to synaptics\n");
 
 	} else {
 		/* Synaptics hub not support virtual dpcd,
@@ -1005,7 +1005,7 @@ static uint8_t write_dsc_enable_synaptics_non_virtual_dpcd_mst(
 		 */
 		if (!stream->link->link_status.link_active) {
 			ret = drm_dp_dpcd_write(aux, DP_DSC_ENABLE, &enable, 1);
-			DRM_INFO("Send DSC disable to synaptics\n");
+			DRM_INFO("MST_DSC Send DSC disable to synaptics\n");
 		}
 	}
 
@@ -1052,14 +1052,14 @@ bool dm_helpers_dp_write_dsc_enable(
 							DP_DSC_ENABLE,
 							&enable_passthrough, 1);
 				drm_dbg_dp(dev,
-					   "Sent DSC pass-through enable to virtual dpcd port, ret = %u\n",
+					   "MST_DSC Sent DSC pass-through enable to virtual dpcd port, ret = %u\n",
 					   ret);
 			}
 
 			ret = drm_dp_dpcd_write(aconnector->dsc_aux,
 						DP_DSC_ENABLE, &enable_dsc, 1);
 			drm_dbg_dp(dev,
-				   "Sent DSC decoding enable to %s port, ret = %u\n",
+				   "MST_DSC Sent DSC decoding enable to %s port, ret = %u\n",
 				   (port->passthrough_aux) ? "remote RX" :
 				   "virtual dpcd",
 				   ret);
@@ -1067,7 +1067,7 @@ bool dm_helpers_dp_write_dsc_enable(
 			ret = drm_dp_dpcd_write(aconnector->dsc_aux,
 						DP_DSC_ENABLE, &enable_dsc, 1);
 			drm_dbg_dp(dev,
-				   "Sent DSC decoding disable to %s port, ret = %u\n",
+				   "MST_DSC Sent DSC decoding disable to %s port, ret = %u\n",
 				   (port->passthrough_aux) ? "remote RX" :
 				   "virtual dpcd",
 				   ret);
@@ -1077,7 +1077,7 @@ bool dm_helpers_dp_write_dsc_enable(
 							DP_DSC_ENABLE,
 							&enable_passthrough, 1);
 				drm_dbg_dp(dev,
-					   "Sent DSC pass-through disable to virtual dpcd port, ret = %u\n",
+					   "MST_DSC Sent DSC pass-through disable to virtual dpcd port, ret = %u\n",
 					   ret);
 			}
 		}
@@ -1092,12 +1092,12 @@ bool dm_helpers_dp_write_dsc_enable(
 		if (stream->sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_NONE) {
 			ret = dm_helpers_dp_write_dpcd(ctx, stream->link, DP_DSC_ENABLE, &enable_dsc, 1);
 			drm_dbg_dp(dev,
-				   "Send DSC %s to SST RX\n",
+				   "SST_DSC Send DSC %s to SST RX\n",
 				   enable_dsc ? "enable" : "disable");
 		} else if (stream->sink->link->dpcd_caps.dongle_type == DISPLAY_DONGLE_DP_HDMI_CONVERTER) {
 			ret = dm_helpers_dp_write_dpcd(ctx, stream->link, DP_DSC_ENABLE, &enable_dsc, 1);
 			drm_dbg_dp(dev,
-				   "Send DSC %s to DP-HDMI PCON\n",
+				   "SST_DSC Send DSC %s to DP-HDMI PCON\n",
 				   enable_dsc ? "enable" : "disable");
 		}
 	}
