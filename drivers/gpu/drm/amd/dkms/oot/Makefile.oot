@@ -1,0 +1,41 @@
+ifneq ($(KERNELRELEASE),)
+include $(src)/amd/dkms/Makefile
+else
+KERNELVER := $(shell uname -r)
+kernel_build_dir := /lib/modules/$(KERNELVER)/build
+PACKAGE_NAME := $(shell sed -n '/PACKAGE_NAME/s|.*=||p' amd/dkms/dkms.conf)
+PACKAGE_VERSION := $(shell sed -n '/PACKAGE_VERSION/s|.*=||p' amd/dkms/dkms.conf)
+module_src_dir := $(CURDIR)
+module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
+module_build_flags :=
+num_cpu_cores := $(shell nproc)
+Q := @
+
+ifeq ($(wildcard $(kernel_build_dir)/include/config/auto.conf),)
+$(error "invalid kernel obj dir, is kernel-devel installed?")
+endif
+
+.PHONY: modules pre-build
+
+include $(kernel_build_dir)/include/config/auto.conf
+
+ifneq ($(CONFIG_CC_IS_CLANG),)
+module_build_flags += CC=clang
+endif
+ifneq ($(CONFIG_LD_IS_LLD),)
+module_build_flags += LD=ld.lld
+endif
+
+modules:pre-build
+	$(Q)make -j$(num_cpu_cores) KERNELRELEASE=$(KERNELVER) \
+		TTM_NAME=amdttm \
+		SCHED_NAME=amd-sched \
+		-C $(kernel_build_dir) \
+		M=$(module_build_dir) $(module_build_flags)
+	$(Q)unlink $(module_build_dir)
+
+pre-build:
+	$(Q)cp -f amd/dkms/oot/pre-build.sh amd/dkms
+	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(PACKAGE_NAME) $(PACKAGE_VERSION) $(module_build_dir)
+
+endif
