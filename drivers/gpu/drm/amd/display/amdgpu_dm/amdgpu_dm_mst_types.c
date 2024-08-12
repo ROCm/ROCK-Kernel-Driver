@@ -2027,11 +2027,13 @@ enum dc_status dm_dp_mst_is_port_support_mode(
                  */
 	int pbn_div, slot_num, max_slot_num;
 	enum dc_link_encoding_format link_encoding;
+	uint16_t fec_overhead_multiplier_x1000 =
+			get_fec_overhead_multiplier(stream->link);
 	uint32_t stream_kbps = dc_bandwidth_in_kbps_from_timing(
 		&stream->timing,
 		dc_link_get_highest_encoding_format(stream->link));
 
-	pbn = kbps_to_peak_pbn(stream_kbps);
+	pbn = kbps_to_peak_pbn(stream_kbps, fec_overhead_multiplier_x1000);
 	pbn_div = dm_mst_get_pbn_divider(stream->link);
 	slot_num = DIV_ROUND_UP(pbn, pbn_div);
 
