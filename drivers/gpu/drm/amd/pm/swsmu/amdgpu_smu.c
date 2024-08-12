@@ -4000,8 +4000,13 @@ DEFINE_SIMPLE_ATTRIBUTE(smu_phase_det_fops_en, smu_phase_det_debugfs_status,
 			 smu_phase_det_debugfs_enable, "%llu\n");
 #endif
 
+#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(smu_phase_det_fops_res,
 			 smu_phase_det_debugfs_get_residency, NULL, "%llu\n");
+#else
+DEFINE_SIMPLE_ATTRIBUTE(smu_phase_det_fops_res,
+			 smu_phase_det_debugfs_get_residency, NULL, "%llu\n");
+#endif
 
 #define DEBUGFS_CREATE_PHASE_DET_ATTR(name, param) \
 	debugfs_create_file(#name, 0644, dir, smu, &smu_phase_det_fops_##param)
