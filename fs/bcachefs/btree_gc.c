@@ -641,16 +641,30 @@ static int bch2_gc_btree(struct btree_trans *trans, enum btree_id btree, bool in
 		target_depth = 0;
 
 	/* root */
-	mutex_lock(&c->btree_root_lock);
-	struct btree *b = bch2_btree_id_root(c, btree)->b;
-	if (!btree_node_fake(b)) {
+	do {
+retry_root:
+		bch2_trans_begin(trans);
+
+		struct btree_iter iter;
+		bch2_trans_node_iter_init(trans, &iter, btree, POS_MIN,
+					  0, bch2_btree_id_root(c, btree)->b->c.level, 0);
+		struct btree *b = bch2_btree_iter_peek_node(&iter);
+		ret = PTR_ERR_OR_ZERO(b);
+		if (ret)
+			goto err_root;
+
+		if (b != btree_node_root(c, b)) {
+			bch2_trans_iter_exit(trans, &iter);
+			goto retry_root;
+		}
+
 		gc_pos_set(c, gc_pos_btree(btree, b->c.level + 1, SPOS_MAX));
-		ret = lockrestart_do(trans,
-			bch2_gc_mark_key(trans, b->c.btree_id, b->c.level + 1,
-					 NULL, NULL, bkey_i_to_s_c(&b->key), initial));
+		struct bkey_s_c k = bkey_i_to_s_c(&b->key);
+		ret = bch2_gc_mark_key(trans, btree, b->c.level + 1, NULL, NULL, k, initial);
 		level = b->c.level;
-	}
-	mutex_unlock(&c->btree_root_lock);
+err_root:
+		bch2_trans_iter_exit(trans, &iter);
+	} while (bch2_err_matches(ret, BCH_ERR_transaction_restart));
 
 	if (ret)
 		return ret;
@@ -903,6 +917,8 @@ static int bch2_alloc_write_key(struct btree_trans *trans,
 		bch2_dev_usage_update(c, ca, &old_gc, &gc, 0, true);
 	percpu_up_read(&c->mark_lock);
 
+	gc.fragmentation_lru = alloc_lru_idx_fragmentation(gc, ca);
+
 	if (fsck_err_on(new.data_type != gc.data_type, c,
 			alloc_key_data_type_wrong,
 			"bucket %llu:%llu gen %u has wrong data_type"
@@ -916,23 +932,19 @@ static int bch2_alloc_write_key(struct btree_trans *trans,
 #define copy_bucket_field(_errtype, _f)					\
 	if (fsck_err_on(new._f != gc._f, c, _errtype,			\
 			"bucket %llu:%llu gen %u data type %s has wrong " #_f	\
-			": got %u, should be %u",			\
+			": got %llu, should be %llu",			\
 			iter->pos.inode, iter->pos.offset,		\
 			gc.gen,						\
 			bch2_data_type_str(gc.data_type),		\
-			new._f, gc._f))					\
+			(u64) new._f, (u64) gc._f))				\
 		new._f = gc._f;						\
 
-	copy_bucket_field(alloc_key_gen_wrong,
-			  gen);
-	copy_bucket_field(alloc_key_dirty_sectors_wrong,
-			  dirty_sectors);
-	copy_bucket_field(alloc_key_cached_sectors_wrong,
-			  cached_sectors);
-	copy_bucket_field(alloc_key_stripe_wrong,
-			  stripe);
-	copy_bucket_field(alloc_key_stripe_redundancy_wrong,
-			  stripe_redundancy);
+	copy_bucket_field(alloc_key_gen_wrong,			gen);
+	copy_bucket_field(alloc_key_dirty_sectors_wrong,	dirty_sectors);
+	copy_bucket_field(alloc_key_cached_sectors_wrong,	cached_sectors);
+	copy_bucket_field(alloc_key_stripe_wrong,		stripe);
+	copy_bucket_field(alloc_key_stripe_redundancy_wrong,	stripe_redundancy);
+	copy_bucket_field(alloc_key_fragmentation_lru_wrong,	fragmentation_lru);
 #undef copy_bucket_field
 
 	if (!bch2_alloc_v4_cmp(*old, new))
@@ -946,7 +958,7 @@ static int bch2_alloc_write_key(struct btree_trans *trans,
 	a->v = new;
 
 	/*
-	 * The trigger normally makes sure this is set, but we're not running
+	 * The trigger normally makes sure these are set, but we're not running
 	 * triggers:
 	 */
 	if (a->v.data_type == BCH_DATA_cached && !a->v.io_time[READ])

@@ -6146,6 +6146,24 @@ static u16 bnxt_get_max_rss_ring(struct bnxt *bp)
 	return max_ring;
 }
 
+u16 bnxt_get_max_rss_ctx_ring(struct bnxt *bp)
+{
+	u16 i, tbl_size, max_ring = 0;
+	struct bnxt_rss_ctx *rss_ctx;
+
+	if (!BNXT_SUPPORTS_MULTI_RSS_CTX(bp))
+		return 0;
+
+	tbl_size = bnxt_get_rxfh_indir_size(bp->dev);
+
+	list_for_each_entry(rss_ctx, &bp->rss_ctx_list, list) {
+		for (i = 0; i < tbl_size; i++)
+			max_ring = max(max_ring, rss_ctx->rss_indir_tbl[i]);
+	}
+
+	return max_ring;
+}
+
 int bnxt_get_nr_rss_ctxs(struct bnxt *bp, int rx_rings)
 {
 	if (bp->flags & BNXT_FLAG_CHIP_P5_PLUS) {
@@ -12669,7 +12687,11 @@ bool bnxt_rfs_capable(struct bnxt *bp, bool new_rss_ctx)
 	if (!BNXT_NEW_RM(bp))
 		return true;
 
-	if (hwr.vnic == bp->hw_resc.resv_vnics &&
+	/* Do not reduce VNIC and RSS ctx reservations.  There is a FW
+	 * issue that will mess up the default VNIC if we reduce the
+	 * reservations.
+	 */
+	if (hwr.vnic <= bp->hw_resc.resv_vnics &&
 	    hwr.rss_ctx <= bp->hw_resc.resv_rsscos_ctxs)
 		return true;
 
