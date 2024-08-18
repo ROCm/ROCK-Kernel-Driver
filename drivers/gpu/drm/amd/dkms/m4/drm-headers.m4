@@ -110,4 +110,11 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
         dnl # drm/edid: split out drm_eld.h from drm_edid.h
         dnl #
         AC_KERNEL_CHECK_HEADERS([drm/drm_eld.h])
+
+    dnl #
+    dnl # v6.9-rc6-1436-gaae4682e5d66
+    dnl # drm/fbdev-generic: Convert to fbdev-ttm
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_fbdev_ttm.h])
+
 ])
