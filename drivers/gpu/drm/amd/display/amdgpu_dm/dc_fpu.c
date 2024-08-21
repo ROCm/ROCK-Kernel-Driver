@@ -26,7 +26,20 @@
 
 #include "dc_trace.h"
 
+#ifdef CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 #include <linux/fpu.h>
+#else
+#if defined(CONFIG_X86)
+#include <asm/fpu/api.h>
+#elif defined(CONFIG_PPC64)
+#include <asm/switch_to.h>
+#include <asm/cputable.h>
+#elif defined(CONFIG_ARM64)
+#include <asm/neon.h>
+#elif defined(CONFIG_LOONGARCH)
+#include <asm/fpu.h>
+#endif
+#endif
 
 /**
  * DOC: DC FPU manipulation overview
@@ -79,8 +92,19 @@ void dc_fpu_begin(const char *function_name, const int line)
 	preempt_disable();
 	depth = __this_cpu_inc_return(fpu_recursion_depth);
 	if (depth == 1) {
+#ifdef CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 		BUG_ON(!kernel_fpu_available());
 		kernel_fpu_begin();
+#else
+#if defined(CONFIG_X86) || defined(CONFIG_LOONGARCH)
+		kernel_fpu_begin();
+#elif defined(CONFIG_PPC64)
+		if (!cpu_has_feature(CPU_FTR_FPU_UNAVAILABLE))
+			enable_kernel_fp();
+#elif defined(CONFIG_ARM64)
+		kernel_neon_begin();
+#endif
+#endif
 	}
 
 	TRACE_DCN_FPU(true, function_name, line, depth);
@@ -102,7 +126,18 @@ void dc_fpu_end(const char *function_name, const int line)
 
 	depth = __this_cpu_dec_return(fpu_recursion_depth);
 	if (depth == 0) {
+#ifdef CONFIG_ARCH_HAS_KERNEL_FPU_SUPPORT
 		kernel_fpu_end();
+#else
+#if defined(CONFIG_X86) || defined(CONFIG_LOONGARCH)
+		kernel_fpu_end();
+#elif defined(CONFIG_PPC64)
+		if (!cpu_has_feature(CPU_FTR_FPU_UNAVAILABLE))
+			disable_kernel_fp();
+#elif defined(CONFIG_ARM64)
+		kernel_neon_end();
+#endif
+#endif
 	} else {
 		WARN_ON_ONCE(depth < 0);
 	}
