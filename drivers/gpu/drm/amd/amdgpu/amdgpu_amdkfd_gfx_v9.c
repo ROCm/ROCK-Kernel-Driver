@@ -1273,6 +1273,22 @@ out:
 	return sq_hosttrap_status;
 }
 
+void kgd_gfx_v9_override_core_cg(struct amdgpu_device *adev,
+					    uint32_t value,
+					    uint32_t inst)
+{
+	uint32_t clk_cntl;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+
+	RREG32_SOC15(GC, GET_INST(GC, inst), mmCGTT_SQ_CLK_CTRL);
+	clk_cntl = REG_SET_FIELD(clk_cntl, CGTT_SQ_CLK_CTRL, CORE_OVERRIDE, value);
+	WREG32_SOC15(GC, GET_INST(GC, inst), mmCGTT_SQ_CLK_CTRL, clk_cntl);
+
+	mutex_unlock(&adev->grbm_idx_mutex);
+}
+
 uint32_t kgd_gfx_v9_trigger_pc_sample_trap(struct amdgpu_device *adev,
 					    uint32_t vmid,
 					    uint32_t max_wave_slot,

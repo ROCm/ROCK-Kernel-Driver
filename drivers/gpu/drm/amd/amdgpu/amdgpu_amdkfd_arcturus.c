@@ -433,5 +433,6 @@ const struct kfd2kgd_calls arcturus_kfd2kgd = {
 	.program_trap_handler_settings = kgd_gfx_v9_program_trap_handler_settings,
 	.hqd_get_pq_addr = kgd_gfx_v9_hqd_get_pq_addr,
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
-	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap
+	.trigger_pc_sample_trap = kgd_arcturus_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg
 };

@@ -206,4 +206,5 @@ const struct kfd2kgd_calls aldebaran_kfd2kgd = {
 	.hqd_get_pq_addr = kgd_gfx_v9_hqd_get_pq_addr,
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
 	.trigger_pc_sample_trap = kgd_aldebaran_trigger_pc_sample_trap,
+	.override_core_cg = kgd_gfx_v9_override_core_cg,
 };

@@ -337,6 +337,9 @@ struct kfd2kgd_calls {
 					uint32_t *target_wave_slot,
 					enum kfd_ioctl_pc_sample_method method,
 					uint32_t inst);
+	void (*override_core_cg)(struct amdgpu_device *adev,
+					uint32_t value,
+					uint32_t inst);
 };
 
 #endif	/* KGD_KFD_INTERFACE_H_INCLUDED */
