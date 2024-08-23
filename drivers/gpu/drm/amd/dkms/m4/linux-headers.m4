@@ -129,4 +129,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #bug: split BUILD_BUG stuff out into <linux/build_bug.h>
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/build_bug.h])
+	
+	dnl #v6.7-rc1-2-g58e82a62669d
+	dnl #platform/x86/amd: Add support for AMD ACPI based Wifi band RFI mitigation feature
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/acpi_amd_wbrf.h])
 ])
