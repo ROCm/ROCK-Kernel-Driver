@@ -20,7 +20,7 @@ amdkcl-$(CONFIG_DRM_AMD_DC_HDCP) += kcl_drm_hdcp.o
 amdkcl-$(CONFIG_MMU_NOTIFIER) += kcl_mn.o
 amdkcl-$(CONFIG_DEBUG_FS) += kcl_debugfs_inode.o kcl_debugfs_file.o
 amdkcl-$(CONFIG_SYSFS) += kcl_sysfs_emit.o
-
+amdkcl-$(CONFIG_AMD_WBRF) += kcl_wbrf.o
 CFLAGS_kcl_fence.o := -I$(src)
 
 ccflags-y += \
