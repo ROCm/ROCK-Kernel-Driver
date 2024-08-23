@@ -222,4 +222,10 @@ static inline struct pci_dev *pci_get_base_class(unsigned int class,
 { return NULL; }
 #endif /*CONFIG_PCI*/
 #endif /*HAVE_PCI_GET_BASE_CLASS*/
+
+/* Copied from include/linux/pci.h */
+#ifndef PCI_IRQ_INTX
+#define PCI_IRQ_INTX PCI_IRQ_LEGACY
+#endif
+
 #endif /* AMDKCL_PCI_H */
