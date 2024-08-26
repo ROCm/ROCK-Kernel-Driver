@@ -1307,6 +1307,8 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 int amdgpu_do_asic_reset(struct list_head *device_list_handle,
 			 struct amdgpu_reset_context *reset_context);
 
+int amdgpu_device_reinit_after_reset(struct amdgpu_reset_context *reset_context);
+
 int emu_soc_asic_init(struct amdgpu_device *adev);
 
 /*
