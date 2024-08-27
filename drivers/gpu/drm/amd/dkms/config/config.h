@@ -289,6 +289,9 @@
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
 
+/* drm_dp_add_payload_part2 has two arguments */
+/* #undef HAVE_DRM_DP_ADD_PAYLOAD_PART2_TWO_ARGUMENTS */
+
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
 

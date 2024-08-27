@@ -104,4 +104,15 @@ _kcl_drm_dp_mst_topology_mgr_resume(struct drm_dp_mst_topology_mgr *mgr,
 #define drm_dp_mst_topology_mgr_resume _kcl_drm_dp_mst_topology_mgr_resume
 #endif
 
+#ifdef HAVE_DRM_DP_ADD_PAYLOAD_PART2_TWO_ARGUMENTS
+static inline int
+	_kcl_drm_dp_add_payload_part2(struct drm_dp_mst_topology_mgr *mgr,
+			     struct drm_atomic_state *state,
+			     struct drm_dp_mst_atomic_payload *payload)
+{
+	return drm_dp_add_payload_part2(mgr, payload);
+}
+#define drm_dp_add_payload_part2 _kcl_drm_dp_add_payload_part2
+#endif
+
 #endif
