@@ -67,3 +67,23 @@ AC_DEFUN([AC_AMDGPU_DRM_DP_MST_TOPOLOGY_STATE_PBN_DIV], [
         ])
 ])
 
+dnl #
+dnl # commit v6.9-rc6-1554-g8a0a7b98d4b6
+dnl # drm/mst: Fix NULL pointer dereference at drm_dp_add_payload_part2
+dnl #
+dnl # commit v5.19-rc6-1771-g4d07b0bc4034
+dnl # drm/display/dp_mst: Move all payload info into the atomic state
+dnl #
+AC_DEFUN([AC_AMDGPU_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_TRY_COMPILE([
+			#include <drm/display/drm_dp_mst_helper.h>
+		], [
+		    int a = 0;
+			a = drm_dp_add_payload_part2(NULL, NULL, NULL);
+		], [
+			AC_DEFINE(HAVE_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS, 1,
+				[drm_dp_add_payload_part2 has three arguments])
+		])
+	])
+])
