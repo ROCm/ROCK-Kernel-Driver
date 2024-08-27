@@ -185,6 +185,9 @@
 /* drm_client_register() is available */
 #define HAVE_DRM_CLIENT_REGISTER 1
 
+/* struct drm_color_ctm_3x4 is available */
+/* #undef HAVE_DRM_COLOR_CTM_3X4 */
+
 /* drm_connector_atomic_hdr_metadata_equal() is available */
 #define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
 
@@ -288,6 +291,9 @@
 
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
+
+/* drm_dp_add_payload_part2 has three arguments */
+/* #undef HAVE_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS */
 
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
@@ -438,7 +444,10 @@
 #define HAVE_DRM_DRM_EXEC_H 1
 
 /* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
-#define HAVE_DRM_DRM_FBDEV_GENERIC_H 1
+/* #undef HAVE_DRM_DRM_FBDEV_GENERIC_H */
+
+/* Define to 1 if you have the <drm/drm_fbdev_ttm.h> header file. */
+#define HAVE_DRM_DRM_FBDEV_TTM_H 1
 
 /* Define to 1 if you have the <drm/drm_gem_atomic_helper.h> header file. */
 #define HAVE_DRM_DRM_GEM_ATOMIC_HELPER_H 1
