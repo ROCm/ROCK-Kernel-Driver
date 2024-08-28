@@ -3,7 +3,7 @@
 #if !defined(_TRACE_KCL_FENCE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_KCL_FENCE_H
 
-#include <linux/tracepoint.h>
+#include <kcl/kcl_tracepoint.h>
 
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM kcl_fence
@@ -25,8 +25,8 @@ DECLARE_EVENT_CLASS(kcl_fence,
 	),
 
 	TP_fast_assign(
-		__assign_str(driver, fence->ops->get_driver_name(fence))
-		__assign_str(timeline, fence->ops->get_timeline_name(fence))
+		__amdkcl_assign_str(driver, fence->ops->get_driver_name(fence));
+		__amdkcl_assign_str(timeline, fence->ops->get_timeline_name(fence));
 		__entry->context = fence->context;
 		__entry->seqno = fence->seqno;
 	),
