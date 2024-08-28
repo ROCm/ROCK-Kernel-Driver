@@ -596,6 +596,9 @@
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
 
+/* __assign_str() wants 1 arguments */
+#define HAVE_ASSIGN_STR_ONE_ARGUMENT 1
+
 /* follow_pfn() is available */
 /* #undef HAVE_FOLLOW_PFN */
 

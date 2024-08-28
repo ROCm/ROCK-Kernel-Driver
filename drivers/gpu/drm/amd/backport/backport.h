@@ -128,4 +128,5 @@
 #include <kcl/backport/kcl_mce.h>
 #include <kcl/backport/kcl_drm_fbdev_ttm.h>
 #include <kcl/kcl_drm_vblank.h>
+#include <kcl/kcl_tracepoint.h>
 #endif /* AMDGPU_BACKPORT_H */

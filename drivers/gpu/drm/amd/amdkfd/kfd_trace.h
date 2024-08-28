@@ -61,7 +61,7 @@ TRACE_EVENT(kfd_map_memory_to_gpu_end,
 	    TP_fast_assign(
 			   __entry->pasid = p->pasid;
 				__entry->array_size = array_size;
-				__assign_str(pStatusMsg, pStatusMsg);
+				__amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
 	    TP_printk("pasid = %u, array_size =	%u, StatusMsg=%s",
 				__entry->pasid,
@@ -109,7 +109,7 @@ TRACE_EVENT(kfd_evict_process_worker_end,
 			    ),
 	    TP_fast_assign(
 			    __entry->pasid = p->pasid;
-			    __assign_str(pStatusMsg, pStatusMsg);
+			    __amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
 	    TP_printk("pasid=%u, StatusMsg=%s",
 			    __entry->pasid, __get_str(pStatusMsg))
@@ -137,7 +137,7 @@ TRACE_EVENT(kfd_restore_process_worker_end,
 			    ),
 	    TP_fast_assign(
 				 entry->pasid = p->pasid;
-				__assign_str(pStatusMsg, pStatusMsg);
+				__amdkcl_assign_str(pStatusMsg, pStatusMsg);
 			   ),
 	    TP_printk("pasid=%u, StatusMsg=%s",
 			    __entry->pasid, __get_str(pStatusMsg))
