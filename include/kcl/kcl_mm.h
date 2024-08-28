@@ -166,4 +166,10 @@ static inline bool vma_is_initial_stack(const struct vm_area_struct *vma)
 }
 #endif
 
+#ifndef HAVE_FOLLOW_PFN
+int _kcl_follow_pfn(struct vm_area_struct *vma, unsigned long address,
+        unsigned long *pfn);
+#define follow_pfn _kcl_follow_pfn
+#endif
+
 #endif /* AMDKCL_MM_H */
