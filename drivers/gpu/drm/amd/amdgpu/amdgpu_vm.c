@@ -1231,7 +1231,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 			pages_addr = (dma_addr_t *)bo->dgma_addr;
 
 		/* Implicitly sync to moving fences before mapping anything */
-		r = amdgpu_sync_resv(adev, &sync, bo->tbo.base.resv,
+		r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo),
 				     AMDGPU_SYNC_EXPLICIT, vm);
 		if (r)
 			goto error_free;
