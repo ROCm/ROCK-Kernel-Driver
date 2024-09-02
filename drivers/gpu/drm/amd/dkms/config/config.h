@@ -680,6 +680,9 @@
 /* idr_remove return void pointer */
 #define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
 
+/* import_guid() is available */
+#define HAVE_IMPORT_GUID 1
+
 /* in_compat_syscall is defined */
 #define HAVE_IN_COMPAT_SYSCALL 1
 
