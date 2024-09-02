@@ -1200,7 +1200,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		/* Implicitly sync to command submissions in the same VM before
 		 * unmapping.
 		 */
-		r = amdgpu_sync_resv(adev, &sync, vm->root.bo->tbo.base.resv,
+		r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&vm->root.bo->tbo),
 				     AMDGPU_SYNC_EQ_OWNER, vm);
 		if (r)
 			goto error_free;
@@ -1224,7 +1224,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 			pages_addr = (dma_addr_t *)bo->dgma_addr;
 
 		/* Implicitly sync to moving fences before mapping anything */
-		r = amdgpu_sync_resv(adev, &sync, bo->tbo.base.resv,
+		r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo),
 				     AMDGPU_SYNC_EXPLICIT, vm);
 		if (r)
 			goto error_free;
@@ -1480,7 +1480,7 @@ int amdgpu_vm_clear_freed(struct amdgpu_device *adev,
 	 * unmapping.
 	 */
 	amdgpu_sync_create(&sync);
-	r = amdgpu_sync_resv(adev, &sync, vm->root.bo->tbo.base.resv,
+	r = amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&vm->root.bo->tbo),
 			     AMDGPU_SYNC_EQ_OWNER, vm);
 	if (r)
 		goto error_free;
