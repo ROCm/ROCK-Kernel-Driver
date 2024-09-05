@@ -58,6 +58,9 @@
 /* Define to 1 if you have the <asm/set_memory.h> header file. */
 #define HAVE_ASM_SET_MEMORY_H 1
 
+/* __assign_str() wants 1 arguments */
+#define HAVE_ASSIGN_STR_ONE_ARGUMENT 1
+
 /* amdgpu_attr_group->is_bin_visible is available */
 #define HAVE_ATTRIBUTE_GROUP_IS_BIN_VISIBLE 1
 
@@ -81,6 +84,9 @@
 
 /* cpuinfo_x86.topo is available */
 #define HAVE_CPUINFO_TOPOLOGY_IN_CPUINFO_X86_STRUCT 1
+
+/* drm_edid_raw() is available */
+#define HAVE_CRTC_DRM_VBLANK_CRTC 1
 
 /* debugfs_create_file_size() is available */
 #define HAVE_DEBUGFS_CREATE_FILE_SIZE 1
@@ -596,12 +602,6 @@
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
 
-/* __assign_str() wants 1 arguments */
-#define HAVE_ASSIGN_STR_ONE_ARGUMENT 1
-
-/* follow_pfn() is available */
-/* #undef HAVE_FOLLOW_PFN */
-
 /* drm_simple_encoder is available */
 #define HAVE_DRM_SIMPLE_ENCODER_INIT 1
 
@@ -619,6 +619,9 @@
 
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
+
+/* follow_pfn() is available */
+/* #undef HAVE_FOLLOW_PFN */
 
 /* fsleep() is available */
 #define HAVE_FSLEEP 1
@@ -1078,7 +1081,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.9.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.10.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1087,7 +1090,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.9.0"
+#define PACKAGE_VERSION "6.10.0"
 
 #include "config-amd-chips.h"
 
