@@ -2683,7 +2683,11 @@ static void resume_mst_branch_status(struct drm_dp_mst_topology_mgr *mgr)
 		}
 	}
 
+#ifdef HAVE_DRM_DP_MST_BRANCH_GUID_T
 	guid_copy(&mgr->mst_primary->guid, &guid);
+#else
+	memcpy(mgr->mst_primary->guid, &guid, 16);
+#endif
 
 out_fail:
 	mutex_unlock(&mgr->lock);

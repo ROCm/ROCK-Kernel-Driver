@@ -353,6 +353,9 @@
 /* drm_dp_mst_atomic_enable_dsc() wants 5args */
 /* #undef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS */
 
+/* the guid of struct drm_dp_mst_branch is guid_t */
+#define HAVE_DRM_DP_MST_BRANCH_GUID_T 1
+
 /* drm_dp_mst_connector_early_unregister() is available */
 #define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
 
