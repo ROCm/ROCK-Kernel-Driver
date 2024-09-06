@@ -8647,6 +8647,7 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 				 struct amdgpu_crtc *acrtc,
 				 struct dm_crtc_state *acrtc_state)
 {
+#ifdef HAVE_DRM_VBLANK_CRTC_CONFIG
 	/*
 	 * We have no guarantee that the frontend index maps to the same
 	 * backend index - some even map to more than one.
@@ -8706,6 +8707,12 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 			irq_type);
 		drm_crtc_vblank_off(&acrtc->base);
 	}
+#else
+	if (acrtc_state)
+		drm_crtc_vblank_on(&acrtc->base);
+	else
+		drm_crtc_vblank_off(&acrtc->base);
+#endif
 }
 
 static void dm_update_pflip_irq_state(struct amdgpu_device *adev,
