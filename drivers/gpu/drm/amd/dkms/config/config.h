@@ -614,6 +614,9 @@
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
+/* drm_vblank_crtc_config is available */
+/* #undef HAVE_DRM_VBLANK_CRTC_CONFIG */
+
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
 

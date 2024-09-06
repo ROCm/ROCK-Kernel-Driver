@@ -8536,6 +8536,7 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 				 struct amdgpu_crtc *acrtc,
 				 struct dm_crtc_state *acrtc_state)
 {
+#ifdef HAVE_DRM_VBLANK_CRTC_CONFIG
 	struct drm_vblank_crtc_config config = {0};
 	struct dc_crtc_timing *timing;
 	int offdelay;
@@ -8563,6 +8564,12 @@ static void manage_dm_interrupts(struct amdgpu_device *adev,
 	} else {
 		drm_crtc_vblank_off(&acrtc->base);
 	}
+#else
+	if (acrtc_state)
+		drm_crtc_vblank_on(&acrtc->base);
+	else
+		drm_crtc_vblank_off(&acrtc->base);
+#endif
 }
 
 static void dm_update_pflip_irq_state(struct amdgpu_device *adev,
