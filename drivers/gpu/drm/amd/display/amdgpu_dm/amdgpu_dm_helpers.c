@@ -26,6 +26,7 @@
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <linux/i2c.h>
+#include <linux/version.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_probe_helper.h>
@@ -560,7 +561,11 @@ void dm_helpers_dp_mst_send_payload_allocation(
 #endif
 
 #if defined(HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS)
+#if LINUX_VERSION_CODE <= 395276
 	ret = drm_dp_add_payload_part2(mst_mgr, mst_state->base.state, new_payload);
+#else
+	ret = drm_dp_add_payload_part2(mst_mgr, new_payload);
+#endif
 #else
 	ret = drm_dp_update_payload_part2(mst_mgr);
 #endif
