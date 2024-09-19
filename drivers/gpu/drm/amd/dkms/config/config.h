@@ -353,6 +353,9 @@
 /* drm_dp_mst_atomic_enable_dsc() wants 5args */
 /* #undef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC_WITH_5_ARGS */
 
+/* the guid of struct drm_dp_mst_branch is guid_t */
+#define HAVE_DRM_DP_MST_BRANCH_GUID_T 1
+
 /* drm_dp_mst_connector_early_unregister() is available */
 #define HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
 
@@ -611,6 +614,9 @@
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
+/* drm_vblank_crtc_config is available */
+/* #undef HAVE_DRM_VBLANK_CRTC_CONFIG */
+
 /* struct drm_vma_offset_node has readonly field */
 /* #undef HAVE_DRM_VMA_OFFSET_NODE_READONLY_FIELD */
 
@@ -679,6 +685,9 @@
 
 /* idr_remove return void pointer */
 #define HAVE_IDR_REMOVE_RETURN_VOID_POINTER 1
+
+/* import_guid() is available */
+#define HAVE_IMPORT_GUID 1
 
 /* in_compat_syscall is defined */
 #define HAVE_IN_COMPAT_SYSCALL 1
