@@ -103,9 +103,12 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 
 	ring_wptr = READ_ONCE(spm->cpu_addr[0]);
 
-	/* keep SPM ring buffer running */
+	/* SPM might stall if we cannot copy data out of SPM ringbuffer.
+	 * spm->has_data_loss is only a hint here since stall is only a
+	 * possibility and data loss might not happen. But it is a useful
+	 * hint for user mode profiler to take extra actions.
+	 */
 	if (!spm->has_user_buf || spm->is_user_buf_filled) {
-		spm->ring_rptr = ring_wptr;
 		spm->has_data_loss = true;
 		/* set flag due to there is no flag setup
 		 * when read ring buffer timeout.
