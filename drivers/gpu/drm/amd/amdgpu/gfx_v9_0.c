@@ -4809,11 +4809,6 @@ static void gfx_v9_0_spm_start(struct amdgpu_device *adev)
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
 
-	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
-			STRM_PERFMON_STATE_START_COUNTING);
-	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
-			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
-
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_INT_CNTL), 1);
 }
