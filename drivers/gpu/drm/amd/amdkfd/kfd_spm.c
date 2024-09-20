@@ -62,7 +62,7 @@ static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 		return -EFAULT;
 
 	user_address = (uint64_t *)((uint64_t)spm->ubuf.user_addr + spm->size_copied);
-	// From RLC spec, ring_rptr = 0 points to spm->cpu_addr+0x20
+	/* From RLC spec, ring_rptr = 0 points to spm->cpu_addr + 0x20 */
 	ring_buf =  (uint64_t *)((uint64_t)spm->cpu_addr + spm->ring_rptr + 0x20);
 
 	if (user_address == NULL)
@@ -221,7 +221,7 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	goto out;
 
 acquire_spm_failure:
-	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_free_gtt_mem(adev, &pdd->spm_cntr->spm_obj);
 
 alloc_gtt_mem_failure:
 	kfree(pdd->spm_cntr);
@@ -250,7 +250,7 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
 	amdgpu_amdkfd_rlc_spm_release(adev, drm_priv_to_vm(pdd->drm_priv));
-	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_free_gtt_mem(adev, &pdd->spm_cntr->spm_obj);
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	kfree(pdd->spm_cntr);
