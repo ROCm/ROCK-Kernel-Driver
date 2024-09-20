@@ -264,26 +264,24 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	return 0;
 }
 
-static void spm_copy_data_to_usr(struct kfd_ioctl_spm_args *user_spm_data,
-			struct kfd_process_device *pdd)
-{
-	mutex_lock(&pdd->spm_cntr->spm_worker_mutex);
-	user_spm_data->bytes_copied = pdd->spm_cntr->size_copied;
-	user_spm_data->has_data_loss = pdd->spm_cntr->has_data_loss;
-	pdd->spm_cntr->has_user_buf = false;
-	mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
-}
-
-static void spm_set_dest_info(struct kfd_process_device *pdd,
+static void spm_update_dest_info(struct kfd_process_device *pdd,
 			struct kfd_ioctl_spm_args *user_spm_data)
 {
+	struct kfd_spm_cntr *spm = pdd->spm_cntr;
 	mutex_lock(&pdd->spm_cntr->spm_worker_mutex);
-	pdd->spm_cntr->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
-	pdd->spm_cntr->ubuf.ubufsize = user_spm_data->buf_size;
-	pdd->spm_cntr->has_data_loss = false;
-	pdd->spm_cntr->size_copied = 0;
-	pdd->spm_cntr->is_user_buf_filled = false;
-	pdd->spm_cntr->has_user_buf = true;
+	if (spm->has_user_buf) {
+		user_spm_data->bytes_copied = spm->size_copied;
+		user_spm_data->has_data_loss = spm->has_data_loss;
+		spm->has_user_buf = false;
+	}
+	if (user_spm_data->dest_buf) {
+		spm->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
+		spm->ubuf.ubufsize = user_spm_data->buf_size;
+		spm->has_data_loss = false;
+		spm->size_copied = 0;
+		spm->is_user_buf_filled = false;
+		spm->has_user_buf = true;
+	}
 	mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
 }
 
@@ -360,16 +358,15 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		flush_work(&pdd->spm_work);
 	}
 
-	if (spm->has_user_buf) {
-		/* get info about filled space in previous output buffer */
-		spm_copy_data_to_usr(user_spm_data, pdd);
+	if (spm->has_user_buf || user_spm_data->dest_buf) {
+		/* Get info about filled space in previous output buffer.
+		 * Setup new dest buf if provided.
+		 */
+		spm_update_dest_info(pdd, user_spm_data);
 	}
 
 	if (user_spm_data->dest_buf) {
-		/* setup new dest buf, start streaming if necessary */
-		spm_set_dest_info(pdd, user_spm_data);
-
-		/* Start SPM  */
+		/* Start SPM if necessary*/
 		if (spm->is_spm_started == false) {
 			amdgpu_amdkfd_rlc_spm_cntl(adev, 1);
 			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
