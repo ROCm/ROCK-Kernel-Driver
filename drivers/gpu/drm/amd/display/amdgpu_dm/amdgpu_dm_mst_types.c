@@ -306,6 +306,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	return true;
 }
 #endif
+#endif
 
 static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnector)
 {
@@ -325,7 +326,6 @@ static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnect
 
 	return true;
 }
-#endif
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
@@ -448,11 +448,10 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 				memset(&aconnector->dc_sink->dsc_caps,
 				       0, sizeof(aconnector->dc_sink->dsc_caps));
 #endif
-
+#endif
 			if (!retrieve_downstream_port_device(aconnector))
 				memset(&aconnector->mst_downstream_port_present,
 					0, sizeof(aconnector->mst_downstream_port_present));
-#endif
 		}
 	}
 
