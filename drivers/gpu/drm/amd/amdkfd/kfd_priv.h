@@ -875,6 +875,8 @@ struct kfd_process_device {
 	struct mutex spm_mutex;
 	struct work_struct spm_work;
 	spinlock_t spm_irq_lock;
+	/* reserve space to fix spm overflow */
+	u32    spm_overflow_reserved;
 
 	/* Eviction activity tracking */
 	uint64_t last_evict_timestamp;
