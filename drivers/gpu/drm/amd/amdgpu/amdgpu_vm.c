@@ -1200,7 +1200,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		if (r)
 			goto error_free;
 		if (bo) {
-			r = amdgpu_sync_kfd(&sync, bo->tbo.base.resv);
+			r = amdgpu_sync_kfd(&sync, amdkcl_ttm_resvp(&bo->tbo));
 			if (r)
 				goto error_free;
 		}
