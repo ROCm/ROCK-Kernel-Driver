@@ -235,7 +235,7 @@ out:
 	return ret;
 }
 
-static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
+int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 {
 	unsigned long flags;
 

@@ -1049,6 +1049,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 				pdd->dev->id, p->pasid);
 
 		kfd_pc_sample_release(pdd);
+		kfd_release_spm(pdd, pdd->dev->adev);
 
 		kfd_process_device_destroy_cwsr_dgpu(pdd);
 		kfd_process_device_destroy_ib_mem(pdd);
