@@ -551,6 +551,9 @@
 /* drm_gem_plane_helper_prepare_fb() is available */
 #define HAVE_DRM_GEM_PLANE_HELPER_PREPARE_FB 1
 
+/* drm_gem_prime_handle_to_dmabuf() is available */
+#define HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF 1
+
 /* drm_gem_prime_handle_to_fd() is available */
 #define HAVE_DRM_GEM_PRIME_HANDLE_TO_FD 1
 
