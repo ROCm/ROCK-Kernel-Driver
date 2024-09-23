@@ -50,6 +50,21 @@ struct kfd_spm_cntr {
 	bool   is_spm_started;
 };
 
+/* used to detect SPM overflow */
+#define SPM_OVERFLOW_MAGIC        0xBEEFABCDDEADABCD
+
+static void kfd_spm_preset(struct kfd_process_device *pdd, u32 size)
+{
+	uint64_t *overflow_ptr, *overflow_end_ptr;
+
+	overflow_ptr = (uint64_t *)((uint64_t)pdd->spm_cntr->cpu_addr
+				+ pdd->spm_cntr->ring_size + 0x20);
+	overflow_end_ptr = overflow_ptr + (size >> 3);
+	/* SPM data filling is 0x20 alignment */
+	for ( ;  overflow_ptr < overflow_end_ptr; overflow_ptr += 4)
+		*overflow_ptr = SPM_OVERFLOW_MAGIC;
+}
+
 static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 {
 	struct kfd_spm_cntr *spm = pdd->spm_cntr;
@@ -97,6 +112,7 @@ static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 {
 	struct kfd_spm_cntr *spm = pdd->spm_cntr;
+	u32 overflow_size = 0;
 	u32 size_to_copy;
 	int ret = 0;
 	u32 ring_wptr;
@@ -125,6 +141,19 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 		size_to_copy = ring_wptr - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
 	} else {
+		uint64_t *ring_start, *ring_end;
+
+		ring_start = (uint64_t *)((uint64_t)pdd->spm_cntr->cpu_addr + 0x20);
+		ring_end = ring_start + (pdd->spm_cntr->ring_size >> 3);
+		for ( ; overflow_size < pdd->spm_overflow_reserved; overflow_size += 0x20) {
+			uint64_t *overflow_ptr = ring_end + (overflow_size >> 3);
+
+			if (*overflow_ptr == SPM_OVERFLOW_MAGIC)
+				break;
+		}
+		/* move overflow counters into ring buffer to avoid data loss */
+		memcpy(ring_start, ring_end, overflow_size);
+
 		size_to_copy = spm->ring_size - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
 
@@ -143,6 +172,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	}
 
 exit:
+	kfd_spm_preset(pdd, overflow_size);
 	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->adev, spm->ring_rptr);
 	return ret;
 }
@@ -168,6 +198,10 @@ static void kfd_spm_work(struct work_struct *work)
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd)
 {
+	/* pre-gfx11 spm has a hardware bug to cause overflow */
+	if (pdd->dev->adev->ip_versions[GC_HWIP][0] < IP_VERSION(11, 0, 1))
+		pdd->spm_overflow_reserved = 0x400;
+
 	mutex_init(&pdd->spm_mutex);
 	pdd->spm_cntr = NULL;
 }
@@ -202,7 +236,9 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	if (ret)
 		goto alloc_gtt_mem_failure;
 
-	ret =  amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
+	/* reserve space to fix spm overflow */
+	pdd->spm_cntr->ring_size -= pdd->spm_overflow_reserved;
+	ret = amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
 			pdd->spm_cntr->gpu_addr, pdd->spm_cntr->ring_size);
 
 	/*
@@ -220,6 +256,8 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	INIT_WORK(&pdd->spm_work, kfd_spm_work);
 
 	spin_lock_init(&pdd->spm_irq_lock);
+
+	kfd_spm_preset(pdd, pdd->spm_overflow_reserved);
 
 	goto out;
 
