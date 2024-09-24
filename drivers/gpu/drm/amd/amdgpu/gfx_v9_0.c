@@ -4809,6 +4809,12 @@ static void gfx_v9_0_spm_start(struct amdgpu_device *adev)
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
 
+	/* When SPM is reset, RLC automatically resets wptr to 0.
+	 * Manually reset rptr to match this.
+	 */
+	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
+			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_RING_RDPTR), 0);
+
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_INT_CNTL), 1);
 }
@@ -4827,6 +4833,12 @@ static void gfx_v9_0_spm_stop(struct amdgpu_device *adev)
 			CP_PERFMON_STATE_DISABLE_AND_RESET);
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
+
+	/* When SPM is reset, RLC automatically resets wptr to 0.
+	 * Manually reset rptr to match this.
+	 */
+	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
+			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_RING_RDPTR), 0);
 }
 
 static void gfx_v9_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)
