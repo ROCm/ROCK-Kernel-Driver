@@ -371,6 +371,10 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			amdgpu_amdkfd_rlc_spm_cntl(adev, 1);
 			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 			spm->is_spm_started = true;
+			/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
+			 * Adjust rptr accordingly
+			 */
+			spm->ring_rptr = 0;
 			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 		} else {
 			/* If SPM was already started, there may already
@@ -382,6 +386,10 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		amdgpu_amdkfd_rlc_spm_cntl(adev, 0);
 		spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 		spm->is_spm_started = false;
+		/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
+		 * Adjust rptr accordingly
+		 */
+		spm->ring_rptr = 0;
 		spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 	}
 
