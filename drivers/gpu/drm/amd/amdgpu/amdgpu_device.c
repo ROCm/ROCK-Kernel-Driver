@@ -616,10 +616,13 @@ uint32_t amdgpu_device_rreg(struct amdgpu_device *adev,
 
 	if ((reg * 4) < adev->rmmio_size) {
 		if (!(acc_flags & AMDGPU_REGS_NO_KIQ) &&
-		    amdgpu_sriov_runtime(adev))
+		    amdgpu_sriov_runtime(adev) &&
+		    down_read_trylock(&adev->reset_domain->sem)) {
 			ret = amdgpu_kiq_rreg(adev, reg, 0);
-		else
+			up_read(&adev->reset_domain->sem);
+		} else {
 			ret = readl(((void __iomem *)adev->rmmio) + (reg * 4));
+		}
 	} else {
 		ret = adev->pcie_rreg(adev, reg * 4);
 	}
@@ -740,10 +743,13 @@ void amdgpu_device_wreg(struct amdgpu_device *adev,
 
 	if ((reg * 4) < adev->rmmio_size) {
 		if (!(acc_flags & AMDGPU_REGS_NO_KIQ) &&
-		    amdgpu_sriov_runtime(adev))
+		    amdgpu_sriov_runtime(adev) &&
+		    down_read_trylock(&adev->reset_domain->sem)) {
 			amdgpu_kiq_wreg(adev, reg, v, 0);
-		else
+			up_read(&adev->reset_domain->sem);
+		} else {
 			writel(v, ((void __iomem *)adev->rmmio) + (reg * 4));
+		}
 	} else {
 		adev->pcie_wreg(adev, reg * 4, v);
 	}
