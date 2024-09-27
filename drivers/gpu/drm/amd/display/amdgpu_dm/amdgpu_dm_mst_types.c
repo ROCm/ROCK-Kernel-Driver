@@ -306,6 +306,7 @@ static bool validate_dsc_caps_on_connector(struct amdgpu_dm_connector *aconnecto
 	return true;
 }
 #endif
+#endif
 
 static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnector)
 {
@@ -325,7 +326,6 @@ static bool retrieve_downstream_port_device(struct amdgpu_dm_connector *aconnect
 
 	return true;
 }
-#endif
 
 static int dm_dp_mst_get_modes(struct drm_connector *connector)
 {
@@ -448,11 +448,10 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 				memset(&aconnector->dc_sink->dsc_caps,
 				       0, sizeof(aconnector->dc_sink->dsc_caps));
 #endif
-
+#endif
 			if (!retrieve_downstream_port_device(aconnector))
 				memset(&aconnector->mst_downstream_port_present,
 					0, sizeof(aconnector->mst_downstream_port_present));
-#endif
 		}
 	}
 
@@ -1369,7 +1368,7 @@ static int compute_mst_dsc_configs_for_link(struct drm_atomic_state *state,
 		params[count].num_slices_v = aconnector->dsc_settings.dsc_num_slices_v;
 		params[count].bpp_overwrite = aconnector->dsc_settings.dsc_bits_per_pixel;
 		params[count].compression_possible = stream->sink->dsc_caps.dsc_dec_caps.is_dsc_supported;
-		dc_dsc_get_policy_for_timing(params[count].timing, 0, &dsc_policy);
+		dc_dsc_get_policy_for_timing(params[count].timing, 0, &dsc_policy, dc_link_get_highest_encoding_format(stream->link));
 		if (!dc_dsc_compute_bandwidth_range(
 				stream->sink->ctx->dc->res_pool->dscs[0],
 				stream->sink->ctx->dc->debug.dsc_min_slice_height_override,
@@ -1916,7 +1915,7 @@ static bool is_dsc_common_config_possible(struct dc_stream_state *stream,
 {
 	struct dc_dsc_policy dsc_policy = {0};
 
-	dc_dsc_get_policy_for_timing(&stream->timing, 0, &dsc_policy);
+	dc_dsc_get_policy_for_timing(&stream->timing, 0, &dsc_policy, dc_link_get_highest_encoding_format(stream->link));
 	dc_dsc_compute_bandwidth_range(stream->sink->ctx->dc->res_pool->dscs[0],
 				       stream->sink->ctx->dc->debug.dsc_min_slice_height_override,
 				       dsc_policy.min_target_bpp * 16,
