@@ -201,6 +201,7 @@ static const struct cmn2asic_msg_mapping smu_v13_0_6_message_map[SMU_MSG_MAX_COU
 	MSG_MAP(SetPhsDetWRbwAlpha,                  PPSMC_MSG_SetPhsDetWRbwAlpha,              0),
 	MSG_MAP(SetPhsDetOnOff,                      PPSMC_MSG_SetPhsDetOnOff,                  0),
 	MSG_MAP(GetPhsDetResidency,                  PPSMC_MSG_GetPhsDetResidency,              0),
+	MSG_MAP(ResetSDMA,                           PPSMC_MSG_ResetSDMA,                       0),
 };
 
 // clang-format on
@@ -2889,6 +2890,27 @@ static int smu_v13_0_6_post_init(struct smu_context *smu)
 	return 0;
 }
 
+static int smu_v13_0_6_reset_sdma(struct smu_context *smu, uint32_t inst_mask)
+{
+	struct amdgpu_device *adev = smu->adev;
+	int ret = 0;
+
+	/* the message is only valid on SMU 13.0.6 with pmfw 85.121.00 and above */
+	if ((adev->flags & AMD_IS_APU) ||
+	    amdgpu_ip_version(adev, MP1_HWIP, 0) != IP_VERSION(13, 0, 6) ||
+	    smu->smc_fw_version < 0x00557900)
+		return 0;
+
+	ret = smu_cmn_send_smc_msg_with_param(smu,
+					      SMU_MSG_ResetSDMA, inst_mask, NULL);
+	if (ret)
+		dev_err(smu->adev->dev,
+			"failed to send ResetSDMA event with mask 0x%x\n",
+			inst_mask);
+
+	return ret;
+}
+
 static int mca_smu_set_debug_mode(struct amdgpu_device *adev, bool enable)
 {
 	struct smu_context *smu = adev->powerplay.pp_handle;
@@ -3559,6 +3581,7 @@ static const struct pptable_funcs smu_v13_0_6_ppt_funcs = {
 	.send_hbm_bad_pages_num = smu_v13_0_6_smu_send_hbm_bad_page_num,
 	.send_rma_reason = smu_v13_0_6_send_rma_reason,
 	.post_init = smu_v13_0_6_post_init,
+	.reset_sdma = smu_v13_0_6_reset_sdma,
 };
 
 void smu_v13_0_6_set_ppt_funcs(struct smu_context *smu)

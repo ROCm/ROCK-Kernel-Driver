@@ -282,7 +282,8 @@
 	__SMU_DUMMY_MAP(SetPhsDetWRbwHystDown), \
 	__SMU_DUMMY_MAP(SetPhsDetWRbwAlpha), \
 	__SMU_DUMMY_MAP(SetPhsDetOnOff), \
-	__SMU_DUMMY_MAP(GetPhsDetResidency),
+	__SMU_DUMMY_MAP(GetPhsDetResidency), \
+	__SMU_DUMMY_MAP(ResetSDMA),
 
 #undef __SMU_DUMMY_MAP
 #define __SMU_DUMMY_MAP(type)	SMU_MSG_##type

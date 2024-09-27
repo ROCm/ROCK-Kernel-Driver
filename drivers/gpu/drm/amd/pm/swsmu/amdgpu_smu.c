@@ -4094,3 +4094,13 @@ void amdgpu_smu_phase_det_debugfs_init(struct amdgpu_device *adev)
 
 #endif
 }
+
+int smu_reset_sdma(struct smu_context *smu, uint32_t inst_mask)
+{
+	int ret = 0;
+
+	if (smu->ppt_funcs && smu->ppt_funcs->reset_sdma)
+		ret = smu->ppt_funcs->reset_sdma(smu, inst_mask);
+
+	return ret;
+}
