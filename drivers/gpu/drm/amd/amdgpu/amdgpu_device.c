@@ -2178,7 +2178,8 @@ int amdgpu_device_ip_set_clockgating_state(void *dev,
  */
 int amdgpu_device_ip_set_powergating_state(void *dev,
 					   enum amd_ip_block_type block_type,
-					   enum amd_powergating_state state)
+					   enum amd_powergating_state state,
+					   int inst)
 {
 	struct amdgpu_device *adev = dev;
 	int i, r = 0;
@@ -2187,6 +2188,9 @@ int amdgpu_device_ip_set_powergating_state(void *dev,
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
 		if (adev->ip_blocks[i].version->type != block_type)
+			continue;
+		if (block_type == AMD_IP_BLOCK_TYPE_VCN &&
+				adev->ip_blocks[i].instance != inst)
 			continue;
 		if (!adev->ip_blocks[i].version->funcs->set_powergating_state)
 			continue;

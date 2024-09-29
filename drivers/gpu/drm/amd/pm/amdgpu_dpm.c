@@ -1012,7 +1012,8 @@ int amdgpu_dpm_force_performance_level(struct amdgpu_device *adev,
 		/* enter UMD Pstate */
 		amdgpu_device_ip_set_powergating_state(adev,
 						       AMD_IP_BLOCK_TYPE_GFX,
-						       AMD_PG_STATE_UNGATE);
+						       AMD_PG_STATE_UNGATE,
+						       0);
 		amdgpu_device_ip_set_clockgating_state(adev,
 						       AMD_IP_BLOCK_TYPE_GFX,
 						       AMD_CG_STATE_UNGATE);
@@ -1024,7 +1025,8 @@ int amdgpu_dpm_force_performance_level(struct amdgpu_device *adev,
 						       AMD_CG_STATE_GATE);
 		amdgpu_device_ip_set_powergating_state(adev,
 						       AMD_IP_BLOCK_TYPE_GFX,
-						       AMD_PG_STATE_GATE);
+						       AMD_PG_STATE_GATE,
+						       0);
 	}
 
 	mutex_lock(&adev->pm.mutex);

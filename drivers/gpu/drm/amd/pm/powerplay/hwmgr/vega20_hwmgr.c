@@ -3715,11 +3715,13 @@ static void vega20_power_gate_vce(struct pp_hwmgr *hwmgr, bool bgate)
 		vega20_enable_disable_vce_dpm(hwmgr, !bgate);
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCE,
-						AMD_PG_STATE_GATE);
+						AMD_PG_STATE_GATE,
+						0);
 	} else {
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCE,
-						AMD_PG_STATE_UNGATE);
+						AMD_PG_STATE_UNGATE,
+						0);
 		vega20_enable_disable_vce_dpm(hwmgr, !bgate);
 	}
 
