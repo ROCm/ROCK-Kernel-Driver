@@ -481,7 +481,9 @@ static const char *nps_desc[] = {
 	[AMDGPU_NPS8_PARTITION_MODE] = "NPS8",
 };
 
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 ATTRIBUTE_GROUPS(xcp_cfg_res_sysfs);
+#endif
 
 #define to_xcp_attr(x) \
 	container_of(x, struct amdgpu_xcp_res_sysfs_attribute, attr)
@@ -508,7 +510,11 @@ static const struct sysfs_ops xcp_cfg_res_sysfs_ops = {
 
 static const struct kobj_type xcp_cfg_res_sysfs_ktype = {
 	.sysfs_ops = &xcp_cfg_res_sysfs_ops,
+#ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 	.default_groups = xcp_cfg_res_sysfs_groups,
+#else
+	.default_attrs = xcp_cfg_res_sysfs_attrs,
+#endif
 };
 
 const char *xcp_res_names[] = {
