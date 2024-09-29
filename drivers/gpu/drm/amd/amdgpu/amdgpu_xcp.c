@@ -615,7 +615,11 @@ static ssize_t xcp_config_store(struct kobject *kobj,
 }
 
 static struct kobj_attribute xcp_cfg_sysfs_mode =
+#ifdef __ATTR_RW_MODE
 	__ATTR_RW_MODE(xcp_config, 0644);
+#else
+	__ATTR(xcp_config, 0644, xcp_config_show, xcp_config_store);
+#endif
 
 static void xcp_cfg_sysfs_release(struct kobject *kobj)
 {
