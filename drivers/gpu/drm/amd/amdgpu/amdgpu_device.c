@@ -4770,7 +4770,7 @@ int amdgpu_device_prepare(struct drm_device *dev)
 			continue;
 		if (!adev->ip_blocks[i].version->funcs->prepare_suspend)
 			continue;
-		r = adev->ip_blocks[i].version->funcs->prepare_suspend((void *)adev);
+		r = adev->ip_blocks[i].version->funcs->prepare_suspend(&adev->ip_blocks[i]);
 		if (r)
 			goto unprepare;
 	}
