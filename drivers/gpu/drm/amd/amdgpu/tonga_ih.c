@@ -399,7 +399,7 @@ static bool tonga_ih_check_soft_reset(void *handle)
 	}
 }
 
-static int tonga_ih_pre_soft_reset(void *handle)
+static int tonga_ih_pre_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	if (!ip_block->adev->irq.srbm_soft_reset)
 		return 0;
