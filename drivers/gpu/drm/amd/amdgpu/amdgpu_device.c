@@ -3485,7 +3485,7 @@ static int amdgpu_device_ip_suspend_phase1(struct amdgpu_device *adev)
 			continue;
 
 		/* XXX handle errors */
-		r = adev->ip_blocks[i].version->funcs->suspend(adev);
+		r = adev->ip_blocks[i].version->funcs->suspend(&adev->ip_blocks[i]);
 		/* XXX handle errors */
 		if (r) {
 			DRM_ERROR("suspend of IP block <%s> failed %d\n",
@@ -3567,7 +3567,7 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
 			continue;
 
 		/* XXX handle errors */
-		r = adev->ip_blocks[i].version->funcs->suspend(adev);
+		r = adev->ip_blocks[i].version->funcs->suspend(&adev->ip_blocks[i]);
 		/* XXX handle errors */
 		if (r) {
 			DRM_ERROR("suspend of IP block <%s> failed %d\n",
