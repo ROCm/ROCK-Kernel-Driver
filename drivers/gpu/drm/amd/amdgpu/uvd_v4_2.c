@@ -677,9 +677,9 @@ static int uvd_v4_2_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return -ETIMEDOUT;
 }
 
-static int uvd_v4_2_soft_reset(void *handle)
+static int uvd_v4_2_soft_reset(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	uvd_v4_2_stop(adev);
 

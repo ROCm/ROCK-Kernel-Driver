@@ -2053,6 +2053,7 @@ static void smu_late_fini(void *handle)
 static int smu_reset(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
+	struct amdgpu_ip_block *ip_block;
 	int ret;
 
 	ip_block = amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_SMC);

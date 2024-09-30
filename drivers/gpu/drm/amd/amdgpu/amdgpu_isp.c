@@ -159,7 +159,7 @@ static int isp_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static int isp_soft_reset(void *handle)
+static int isp_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }

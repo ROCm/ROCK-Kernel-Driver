@@ -982,10 +982,9 @@ static int gmc_v6_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 
 }
 
-static int gmc_v6_0_soft_reset(void *handle)
+static int gmc_v6_0_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
-
 	u32 srbm_soft_reset = 0;
 	u32 tmp = RREG32(mmSRBM_STATUS);
 

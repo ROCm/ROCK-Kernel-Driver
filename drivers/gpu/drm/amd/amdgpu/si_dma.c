@@ -566,7 +566,7 @@ static int si_dma_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return -ETIMEDOUT;
 }
 
-static int si_dma_soft_reset(void *handle)
+static int si_dma_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	DRM_INFO("si_dma_soft_reset --- not implemented !!!!!!!\n");
 	return 0;

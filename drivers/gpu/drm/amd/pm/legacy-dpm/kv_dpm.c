@@ -3106,7 +3106,7 @@ static int kv_dpm_wait_for_idle(struct amdgpu_ip_block *ip_block)
 }
 
 
-static int kv_dpm_soft_reset(void *handle)
+static int kv_dpm_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }

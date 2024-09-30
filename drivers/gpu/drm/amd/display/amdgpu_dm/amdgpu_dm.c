@@ -332,7 +332,7 @@ static bool dm_check_soft_reset(void *handle)
 	return false;
 }
 
-static int dm_soft_reset(void *handle)
+static int dm_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	/* XXX todo */
 	return 0;

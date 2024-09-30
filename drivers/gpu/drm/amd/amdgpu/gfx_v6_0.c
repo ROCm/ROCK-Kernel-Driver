@@ -3186,7 +3186,7 @@ static int gfx_v6_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return -ETIMEDOUT;
 }
 
-static int gfx_v6_0_soft_reset(void *handle)
+static int gfx_v6_0_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
