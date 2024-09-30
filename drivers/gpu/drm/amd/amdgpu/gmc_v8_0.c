@@ -1300,10 +1300,10 @@ static int gmc_v8_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 
 }
 
-static bool gmc_v8_0_check_soft_reset(void *handle)
+static bool gmc_v8_0_check_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	u32 srbm_soft_reset = 0;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	u32 tmp = RREG32(mmSRBM_STATUS);
 
 	if (tmp & SRBM_STATUS__VMC_BUSY_MASK)
