@@ -49,9 +49,9 @@ static int isp_sw_fini(void *handle)
  * @handle: handle for amdgpu_device pointer
  *
  */
-static int isp_hw_init(void *handle)
+static int isp_hw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_isp *isp = &adev->isp;
 
 	const struct amdgpu_ip_block *ip_block =
