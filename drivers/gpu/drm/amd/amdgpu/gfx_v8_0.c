@@ -4885,10 +4885,9 @@ static int gfx_v8_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 	return -ETIMEDOUT;
 }
 
-static int gfx_v8_0_hw_fini(void *handle)
+static int gfx_v8_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct amdgpu_ip_block *ip_block;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
 	amdgpu_irq_put(adev, &adev->gfx.priv_inst_irq, 0);
@@ -4906,10 +4905,6 @@ static int gfx_v8_0_hw_fini(void *handle)
 		return 0;
 	}
 
-	ip_block = amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_GFX);
-	if (!ip_block)
-		return -EINVAL;
-
 	amdgpu_gfx_rlc_enter_safe_mode(adev, 0);
 	if (!gfx_v8_0_wait_for_idle(ip_block))
 		gfx_v8_0_cp_enable(adev, false);
@@ -4926,9 +4921,7 @@ static int gfx_v8_0_hw_fini(void *handle)
 
 static int gfx_v8_0_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = ip_block->adev;
-
-	return gfx_v8_0_hw_fini(adev);
+	return gfx_v8_0_hw_fini(ip_block);
 }
 
 static int gfx_v8_0_resume(struct amdgpu_ip_block *ip_block)
