@@ -2280,6 +2280,8 @@ static int amdgpu_discovery_set_sdma_ip_blocks(struct amdgpu_device *adev)
 
 static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 {
+	int i;
+
 	if (amdgpu_ip_version(adev, VCE_HWIP, 0)) {
 		switch (amdgpu_ip_version(adev, UVD_HWIP, 0)) {
 		case IP_VERSION(7, 0, 0):
@@ -2323,11 +2325,13 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(2, 0, 3):
 			break;
 		case IP_VERSION(2, 5, 0):
-			amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
+			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
+				amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v2_5_ip_block);
 			break;
 		case IP_VERSION(2, 6, 0):
-			amdgpu_device_ip_block_add(adev, &vcn_v2_6_ip_block);
+			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
+				amdgpu_device_ip_block_add(adev, &vcn_v2_6_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v2_6_ip_block);
 			break;
 		case IP_VERSION(3, 0, 0):
