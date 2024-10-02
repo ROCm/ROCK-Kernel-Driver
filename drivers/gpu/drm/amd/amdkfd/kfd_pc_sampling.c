@@ -32,9 +32,10 @@
  *
  * 0.1 - Initial revision
  * 0.2 - Support gfx9_4_3 Host Trap PC sampling
+ * 0.3 - Fix gfx9_4_3 SQ hang issue
  */
 #define KFD_IOCTL_PCS_MAJOR_VERSION	0
-#define KFD_IOCTL_PCS_MINOR_VERSION	2
+#define KFD_IOCTL_PCS_MINOR_VERSION	3
 
 struct supported_pc_sample_info {
 	uint32_t ip_version;

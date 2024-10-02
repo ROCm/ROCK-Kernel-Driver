@@ -509,6 +509,25 @@ static uint32_t kgd_gfx_v9_4_3_clear_address_watch(struct amdgpu_device *adev,
 	return 0;
 }
 
+void kgd_gfx_v9_4_3_override_core_cg(struct amdgpu_device *adev,
+					    uint32_t value,
+					    uint32_t inst)
+{
+	uint32_t sq_clk_ctrl;
+
+	/* disable/enable SQ core override */
+	amdgpu_amdkfd_config_sq_perfmon(adev, GET_INST(GC, inst), value, 0, 0);
+
+	mutex_lock(&adev->grbm_idx_mutex);
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+	sq_clk_ctrl = RREG32_SOC15(GC, GET_INST(GC, inst), regCGTT_SQ_CLK_CTRL);
+	amdgpu_gfx_select_se_sh(adev, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, inst);
+	mutex_unlock(&adev->grbm_idx_mutex);
+
+	dev_dbg(adev->dev, "sq clock control on instance [%d]: 0x%x\n",
+				GET_INST(GC, inst), sq_clk_ctrl);
+}
+
 static uint32_t kgd_v9_4_3_trigger_pc_sample_trap(struct amdgpu_device *adev,
 					    uint32_t vmid,
 					    uint32_t *target_simd,
@@ -556,5 +575,5 @@ const struct kfd2kgd_calls gc_9_4_3_kfd2kgd = {
 	.hqd_get_pq_addr = kgd_gfx_v9_hqd_get_pq_addr,
 	.hqd_reset = kgd_gfx_v9_hqd_reset,
 	.trigger_pc_sample_trap = kgd_v9_4_3_trigger_pc_sample_trap,
-	.override_core_cg = kgd_gfx_v9_override_core_cg
+	.override_core_cg = kgd_gfx_v9_4_3_override_core_cg
 };
