@@ -357,7 +357,7 @@ struct psp_gfx_cmd_sriov_spatial_part {
 
 /*Structure for sq performance monitoring/profiling enable/disable*/
 struct psp_gfx_cmd_config_sq_perfmon {
-	uint32_t        gfx_xcp_mask;
+	uint32_t        gfx_xcc_mask;
 	uint8_t         core_override;
 	uint8_t         reg_override;
 	uint8_t         perfmon_override;

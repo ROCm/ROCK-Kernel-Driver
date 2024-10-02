@@ -560,7 +560,7 @@ int is_psp_fw_valid(struct psp_bin_desc bin);
 int amdgpu_psp_wait_for_bootloader(struct amdgpu_device *adev);
 bool amdgpu_psp_get_ras_capability(struct psp_context *psp);
 
-int psp_config_sq_perfmon(struct psp_context *psp, uint32_t xcp_id,
+int psp_config_sq_perfmon(struct psp_context *psp, uint32_t xcc_id,
 	bool core_override_enable, bool reg_override_enable, bool perfmon_override_enable);
 bool amdgpu_psp_tos_reload_needed(struct amdgpu_device *adev);
 
