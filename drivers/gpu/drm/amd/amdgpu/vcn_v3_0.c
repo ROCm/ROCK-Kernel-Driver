@@ -345,8 +345,9 @@ static int vcn_v3_0_sw_fini(struct amdgpu_ip_block *ip_block)
 static int vcn_v3_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
+	int inst = ip_block->instance;
 	struct amdgpu_ring *ring;
-	int i, j, r;
+	int j, r;
 
 	if (amdgpu_sriov_vf(adev)) {
 		r = vcn_v3_0_start_sriov(adev);
@@ -354,57 +355,53 @@ static int vcn_v3_0_hw_init(struct amdgpu_ip_block *ip_block)
 			return r;
 
 		/* initialize VCN dec and enc ring buffers */
-		for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-			if (adev->vcn.harvest_config & (1 << i))
-				continue;
+		if (adev->vcn.harvest_config & (1 << inst))
+			return 0;
 
-			ring = &adev->vcn.inst[i].ring_dec;
-			if (amdgpu_vcn_is_disabled_vcn(adev, VCN_DECODE_RING, i)) {
+		ring = &adev->vcn.inst[inst].ring_dec;
+		if (amdgpu_vcn_is_disabled_vcn(adev, VCN_DECODE_RING, inst)) {
+			ring->sched.ready = false;
+			ring->no_scheduler = true;
+			dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
+		} else {
+			ring->wptr = 0;
+			ring->wptr_old = 0;
+			vcn_v3_0_dec_ring_set_wptr(ring);
+			ring->sched.ready = true;
+		}
+
+		for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
+			ring = &adev->vcn.inst[inst].ring_enc[j];
+			if (amdgpu_vcn_is_disabled_vcn(adev, VCN_ENCODE_RING, inst)) {
 				ring->sched.ready = false;
 				ring->no_scheduler = true;
 				dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
 			} else {
 				ring->wptr = 0;
 				ring->wptr_old = 0;
-				vcn_v3_0_dec_ring_set_wptr(ring);
+				vcn_v3_0_enc_ring_set_wptr(ring);
 				ring->sched.ready = true;
 			}
-
-			for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
-				ring = &adev->vcn.inst[i].ring_enc[j];
-				if (amdgpu_vcn_is_disabled_vcn(adev, VCN_ENCODE_RING, i)) {
-					ring->sched.ready = false;
-					ring->no_scheduler = true;
-					dev_info(adev->dev, "ring %s is disabled by hypervisor\n", ring->name);
-				} else {
-					ring->wptr = 0;
-					ring->wptr_old = 0;
-					vcn_v3_0_enc_ring_set_wptr(ring);
-					ring->sched.ready = true;
-				}
-			}
 		}
-	} else {
-		for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-			if (adev->vcn.harvest_config & (1 << i))
-				continue;
+	}
 
-			ring = &adev->vcn.inst[i].ring_dec;
+	if (adev->vcn.harvest_config & (1 << inst))
+		return 0;
 
-			adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
-						     ring->doorbell_index, i);
+	ring = &adev->vcn.inst[inst].ring_dec;
 
-			r = amdgpu_ring_test_helper(ring);
-			if (r)
-				return r;
+	adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
+					 ring->doorbell_index, inst);
 
-			for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
-				ring = &adev->vcn.inst[i].ring_enc[j];
-				r = amdgpu_ring_test_helper(ring);
-				if (r)
-					return r;
-			}
-		}
+	r = amdgpu_ring_test_helper(ring);
+	if (r)
+		return r;
+
+	for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
+		ring = &adev->vcn.inst[inst].ring_enc[j];
+		r = amdgpu_ring_test_helper(ring);
+		if (r)
+			return r;
 	}
 
 	return 0;

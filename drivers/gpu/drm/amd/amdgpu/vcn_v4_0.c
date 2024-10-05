@@ -311,37 +311,34 @@ static int vcn_v4_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_ring *ring;
-	int i, r;
+	int inst = ip_block->instance;
+	int r;
 
 	if (amdgpu_sriov_vf(adev)) {
 		r = vcn_v4_0_start_sriov(adev);
 		if (r)
 			return r;
 
-		for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-			if (adev->vcn.harvest_config & (1 << i))
-				continue;
+		if (adev->vcn.harvest_config & (1 << inst))
+			return 0;
 
-			ring = &adev->vcn.inst[i].ring_enc[0];
-			ring->wptr = 0;
-			ring->wptr_old = 0;
-			vcn_v4_0_unified_ring_set_wptr(ring);
-			ring->sched.ready = true;
-		}
+		ring = &adev->vcn.inst[inst].ring_enc[0];
+		ring->wptr = 0;
+		ring->wptr_old = 0;
+		vcn_v4_0_unified_ring_set_wptr(ring);
+		ring->sched.ready = true;
 	} else {
-		for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-			if (adev->vcn.harvest_config & (1 << i))
-				continue;
+		if (adev->vcn.harvest_config & (1 << inst))
+			return 0;
 
-			ring = &adev->vcn.inst[i].ring_enc[0];
+		ring = &adev->vcn.inst[inst].ring_enc[0];
 
-			adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
-					((adev->doorbell_index.vcn.vcn_ring0_1 << 1) + 8 * i), i);
+		adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
+				((adev->doorbell_index.vcn.vcn_ring0_1 << 1) + 8 * inst), inst);
 
-			r = amdgpu_ring_test_helper(ring);
-			if (r)
-				return r;
-		}
+		r = amdgpu_ring_test_helper(ring);
+		if (r)
+			return r;
 	}
 
 	return 0;
