@@ -92,9 +92,9 @@ static const struct amdgpu_hwip_reg_entry vcn_reg_list_2_5[] = {
 	SOC15_REG_ENTRY_STR(VCN, 0, mmUVD_DPG_PAUSE)
 };
 
-static void vcn_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev);
-static void vcn_v2_5_set_enc_ring_funcs(struct amdgpu_device *adev);
-static void vcn_v2_5_set_irq_funcs(struct amdgpu_device *adev);
+static void vcn_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev, int inst);
+static void vcn_v2_5_set_enc_ring_funcs(struct amdgpu_device *adev, int inst);
+static void vcn_v2_5_set_irq_funcs(struct amdgpu_device *adev, int inst);
 static int vcn_v2_5_set_powergating_state(struct amdgpu_ip_block *ip_block,
 				enum amd_powergating_state state);
 static int vcn_v2_5_pause_dpg_mode(struct amdgpu_device *adev,
@@ -139,9 +139,9 @@ static int vcn_v2_5_early_init(struct amdgpu_ip_block *ip_block)
 		adev->vcn.num_enc_rings = 2;
 	}
 
-	vcn_v2_5_set_dec_ring_funcs(adev);
-	vcn_v2_5_set_enc_ring_funcs(adev);
-	vcn_v2_5_set_irq_funcs(adev);
+	vcn_v2_5_set_dec_ring_funcs(adev, inst);
+	vcn_v2_5_set_enc_ring_funcs(adev, inst);
+	vcn_v2_5_set_irq_funcs(adev, inst);
 	vcn_v2_5_set_ras_funcs(adev);
 
 	return amdgpu_vcn_early_init(adev, inst);
@@ -1737,29 +1737,25 @@ static const struct amdgpu_ring_funcs vcn_v2_5_enc_ring_vm_funcs = {
 	.emit_reg_write_reg_wait = amdgpu_ring_emit_reg_write_reg_wait_helper,
 };
 
-static void vcn_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev)
+static void vcn_v2_5_set_dec_ring_funcs(struct amdgpu_device *adev, int inst)
+{
+		if (adev->vcn.harvest_config & (1 << inst))
+			return;
+
+		adev->vcn.inst[inst].ring_dec.funcs = &vcn_v2_5_dec_ring_vm_funcs;
+		adev->vcn.inst[inst].ring_dec.me = inst;
+}
+
+static void vcn_v2_5_set_enc_ring_funcs(struct amdgpu_device *adev, int inst)
 {
 	int i;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (adev->vcn.harvest_config & (1 << i))
-			continue;
-		adev->vcn.inst[i].ring_dec.funcs = &vcn_v2_5_dec_ring_vm_funcs;
-		adev->vcn.inst[i].ring_dec.me = i;
-	}
-}
+	if (adev->vcn.harvest_config & (1 << inst))
+		return;
 
-static void vcn_v2_5_set_enc_ring_funcs(struct amdgpu_device *adev)
-{
-	int i, j;
-
-	for (j = 0; j < adev->vcn.num_vcn_inst; ++j) {
-		if (adev->vcn.harvest_config & (1 << j))
-			continue;
-		for (i = 0; i < adev->vcn.num_enc_rings; ++i) {
-			adev->vcn.inst[j].ring_enc[i].funcs = &vcn_v2_5_enc_ring_vm_funcs;
-			adev->vcn.inst[j].ring_enc[i].me = j;
-		}
+	for (i = 0; i < adev->vcn.num_enc_rings; ++i) {
+		adev->vcn.inst[inst].ring_enc[i].funcs = &vcn_v2_5_enc_ring_vm_funcs;
+		adev->vcn.inst[inst].ring_enc[i].me = inst;
 	}
 }
 
@@ -1904,19 +1900,16 @@ static const struct amdgpu_irq_src_funcs vcn_v2_6_ras_irq_funcs = {
 	.process = amdgpu_vcn_process_poison_irq,
 };
 
-static void vcn_v2_5_set_irq_funcs(struct amdgpu_device *adev)
+static void vcn_v2_5_set_irq_funcs(struct amdgpu_device *adev, int inst)
 {
-	int i;
+	if (adev->vcn.harvest_config & (1 << inst))
+		return;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (adev->vcn.harvest_config & (1 << i))
-			continue;
-		adev->vcn.inst[i].irq.num_types = adev->vcn.num_enc_rings + 1;
-		adev->vcn.inst[i].irq.funcs = &vcn_v2_5_irq_funcs;
+	adev->vcn.inst[inst].irq.num_types = adev->vcn.num_enc_rings + 1;
+	adev->vcn.inst[inst].irq.funcs = &vcn_v2_5_irq_funcs;
 
-		adev->vcn.inst[i].ras_poison_irq.num_types = adev->vcn.num_enc_rings + 1;
-		adev->vcn.inst[i].ras_poison_irq.funcs = &vcn_v2_6_ras_irq_funcs;
-	}
+	adev->vcn.inst[inst].ras_poison_irq.num_types = adev->vcn.num_enc_rings + 1;
+	adev->vcn.inst[inst].ras_poison_irq.funcs = &vcn_v2_6_ras_irq_funcs;
 }
 
 static void vcn_v2_5_print_ip_state(struct amdgpu_ip_block *ip_block, struct drm_printer *p)

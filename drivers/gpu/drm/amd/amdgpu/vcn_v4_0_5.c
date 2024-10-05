@@ -93,8 +93,8 @@ static int amdgpu_ih_clientid_vcns[] = {
 	SOC15_IH_CLIENTID_VCN1
 };
 
-static void vcn_v4_0_5_set_unified_ring_funcs(struct amdgpu_device *adev);
-static void vcn_v4_0_5_set_irq_funcs(struct amdgpu_device *adev);
+static void vcn_v4_0_5_set_unified_ring_funcs(struct amdgpu_device *adev, int inst);
+static void vcn_v4_0_5_set_irq_funcs(struct amdgpu_device *adev, int inst);
 static int vcn_v4_0_5_set_powergating_state(struct amdgpu_ip_block *ip_block,
 		enum amd_powergating_state state);
 static int vcn_v4_0_5_pause_dpg_mode(struct amdgpu_device *adev,
@@ -116,8 +116,8 @@ static int vcn_v4_0_5_early_init(struct amdgpu_ip_block *ip_block)
 
 	/* re-use enc ring as unified ring */
 	adev->vcn.num_enc_rings = 1;
-	vcn_v4_0_5_set_unified_ring_funcs(adev);
-	vcn_v4_0_5_set_irq_funcs(adev);
+	vcn_v4_0_5_set_unified_ring_funcs(adev, inst);
+	vcn_v4_0_5_set_irq_funcs(adev, inst);
 
 	return amdgpu_vcn_early_init(adev, inst);
 }
@@ -1424,17 +1424,13 @@ static const struct amdgpu_ring_funcs vcn_v4_0_5_unified_ring_vm_funcs = {
  *
  * Set unified ring functions
  */
-static void vcn_v4_0_5_set_unified_ring_funcs(struct amdgpu_device *adev)
+static void vcn_v4_0_5_set_unified_ring_funcs(struct amdgpu_device *adev, int inst)
 {
-	int i;
+	if (adev->vcn.harvest_config & (1 << inst))
+		return;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (adev->vcn.harvest_config & (1 << i))
-			continue;
-
-		adev->vcn.inst[i].ring_enc[0].funcs = &vcn_v4_0_5_unified_ring_vm_funcs;
-		adev->vcn.inst[i].ring_enc[0].me = i;
-	}
+	adev->vcn.inst[inst].ring_enc[0].funcs = &vcn_v4_0_5_unified_ring_vm_funcs;
+	adev->vcn.inst[inst].ring_enc[0].me = inst;
 }
 
 /**
@@ -1599,17 +1595,13 @@ static const struct amdgpu_irq_src_funcs vcn_v4_0_5_irq_funcs = {
  *
  * Set VCN block interrupt irq functions
  */
-static void vcn_v4_0_5_set_irq_funcs(struct amdgpu_device *adev)
+static void vcn_v4_0_5_set_irq_funcs(struct amdgpu_device *adev, int inst)
 {
-	int i;
+	if (adev->vcn.harvest_config & (1 << inst))
+		return;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (adev->vcn.harvest_config & (1 << i))
-			continue;
-
-		adev->vcn.inst[i].irq.num_types = adev->vcn.num_enc_rings + 1;
-		adev->vcn.inst[i].irq.funcs = &vcn_v4_0_5_irq_funcs;
-	}
+	adev->vcn.inst[inst].irq.num_types = adev->vcn.num_enc_rings + 1;
+	adev->vcn.inst[inst].irq.funcs = &vcn_v4_0_5_irq_funcs;
 }
 
 static void vcn_v4_0_5_print_ip_state(struct amdgpu_ip_block *ip_block, struct drm_printer *p)

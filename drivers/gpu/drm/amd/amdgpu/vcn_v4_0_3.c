@@ -85,8 +85,8 @@ static const struct amdgpu_hwip_reg_entry vcn_reg_list_4_0_3[] = {
 		(offset & 0x1FFFF)
 
 static int vcn_v4_0_3_start_sriov(struct amdgpu_device *adev);
-static void vcn_v4_0_3_set_unified_ring_funcs(struct amdgpu_device *adev);
-static void vcn_v4_0_3_set_irq_funcs(struct amdgpu_device *adev);
+static void vcn_v4_0_3_set_unified_ring_funcs(struct amdgpu_device *adev, int inst);
+static void vcn_v4_0_3_set_irq_funcs(struct amdgpu_device *adev, int inst);
 static int vcn_v4_0_3_set_powergating_state(struct amdgpu_ip_block *ip_block,
 		enum amd_powergating_state state);
 static int vcn_v4_0_3_pause_dpg_mode(struct amdgpu_device *adev,
@@ -117,8 +117,8 @@ static int vcn_v4_0_3_early_init(struct amdgpu_ip_block *ip_block)
 	/* re-use enc ring as unified ring */
 	adev->vcn.num_enc_rings = 1;
 
-	vcn_v4_0_3_set_unified_ring_funcs(adev);
-	vcn_v4_0_3_set_irq_funcs(adev);
+	vcn_v4_0_3_set_unified_ring_funcs(adev, inst);
+	vcn_v4_0_3_set_irq_funcs(adev, inst);
 	vcn_v4_0_3_set_ras_funcs(adev);
 
 	return amdgpu_vcn_early_init(adev, inst);
@@ -1541,17 +1541,15 @@ static const struct amdgpu_ring_funcs vcn_v4_0_3_unified_ring_vm_funcs = {
  *
  * Set unified ring functions
  */
-static void vcn_v4_0_3_set_unified_ring_funcs(struct amdgpu_device *adev)
+static void vcn_v4_0_3_set_unified_ring_funcs(struct amdgpu_device *adev, int inst)
 {
-	int i, vcn_inst;
+	int vcn_inst;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		adev->vcn.inst[i].ring_enc[0].funcs = &vcn_v4_0_3_unified_ring_vm_funcs;
-		adev->vcn.inst[i].ring_enc[0].me = i;
-		vcn_inst = GET_INST(VCN, i);
-		adev->vcn.inst[i].aid_id =
-			vcn_inst / adev->vcn.num_inst_per_aid;
-	}
+	adev->vcn.inst[inst].ring_enc[0].funcs = &vcn_v4_0_3_unified_ring_vm_funcs;
+	adev->vcn.inst[inst].ring_enc[0].me = inst;
+	vcn_inst = GET_INST(VCN, inst);
+	adev->vcn.inst[inst].aid_id =
+		vcn_inst / adev->vcn.num_inst_per_aid;
 }
 
 /**
@@ -1734,13 +1732,10 @@ static const struct amdgpu_irq_src_funcs vcn_v4_0_3_irq_funcs = {
  *
  * Set VCN block interrupt irq functions
  */
-static void vcn_v4_0_3_set_irq_funcs(struct amdgpu_device *adev)
+static void vcn_v4_0_3_set_irq_funcs(struct amdgpu_device *adev, int inst)
 {
-	int i;
+	adev->vcn.inst->irq.num_types++;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		adev->vcn.inst->irq.num_types++;
-	}
 	adev->vcn.inst->irq.funcs = &vcn_v4_0_3_irq_funcs;
 }
 
