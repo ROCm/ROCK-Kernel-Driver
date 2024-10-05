@@ -189,7 +189,7 @@ sw_init:
 	if (r)
 		return r;
 
-	amdgpu_vcn_setup_ucode(adev);
+	amdgpu_vcn_setup_ucode(adev, inst);
 
 	r = amdgpu_vcn_resume(adev, inst);
 	if (r)
