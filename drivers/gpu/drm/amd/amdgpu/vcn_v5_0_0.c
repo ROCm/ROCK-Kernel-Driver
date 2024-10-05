@@ -1202,17 +1202,14 @@ static bool vcn_v5_0_0_is_idle(void *handle)
 static int vcn_v5_0_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
-	int i, ret = 0;
+	int inst = ip_block->instance;
+	int ret;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (adev->vcn.harvest_config & (1 << i))
-			continue;
+	if (adev->vcn.harvest_config & (1 << inst))
+		return 0;
 
-		ret = SOC15_WAIT_ON_RREG(VCN, i, regUVD_STATUS, UVD_STATUS__IDLE,
-			UVD_STATUS__IDLE);
-		if (ret)
-			return ret;
-	}
+	ret = SOC15_WAIT_ON_RREG(VCN, inst, regUVD_STATUS, UVD_STATUS__IDLE,
+		UVD_STATUS__IDLE);
 
 	return ret;
 }
