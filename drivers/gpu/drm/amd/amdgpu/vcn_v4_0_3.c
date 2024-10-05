@@ -234,16 +234,16 @@ static int vcn_v4_0_3_sw_init(struct amdgpu_ip_block *ip_block)
 static int vcn_v4_0_3_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_device *adev = ip_block->adev;
-	int i, r, idx;
+	int inst = ip_block->instance;
+	int r, idx;
 
 	if (drm_dev_enter(&adev->ddev, &idx)) {
-		for (i = 0; i < adev->vcn.num_vcn_inst; i++) {
-			volatile struct amdgpu_vcn4_fw_shared *fw_shared;
+		volatile struct amdgpu_vcn4_fw_shared *fw_shared;
 
-			fw_shared = adev->vcn.inst[i].fw_shared.cpu_addr;
-			fw_shared->present_flag_0 = 0;
-			fw_shared->sq.is_enabled = cpu_to_le32(false);
-		}
+		fw_shared = adev->vcn.inst[inst].fw_shared.cpu_addr;
+		fw_shared->present_flag_0 = 0;
+		fw_shared->sq.is_enabled = cpu_to_le32(false);
+
 		drm_dev_exit(idx);
 	}
 
@@ -255,7 +255,7 @@ static int vcn_v4_0_3_sw_fini(struct amdgpu_ip_block *ip_block)
 		return r;
 
 	amdgpu_vcn_sysfs_reset_mask_fini(adev);
-	r = amdgpu_vcn_sw_fini(adev);
+	r = amdgpu_vcn_sw_fini(adev, inst);
 
 	kfree(adev->vcn.ip_dump);
 

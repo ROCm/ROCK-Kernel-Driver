@@ -248,33 +248,31 @@ int amdgpu_vcn_sw_init(struct amdgpu_device *adev, int inst)
 	return 0;
 }
 
-int amdgpu_vcn_sw_fini(struct amdgpu_device *adev)
+int amdgpu_vcn_sw_fini(struct amdgpu_device *adev, int inst)
 {
-	int i, j;
+	int i;
 
-	for (j = 0; j < adev->vcn.num_vcn_inst; ++j) {
-		if (adev->vcn.harvest_config & (1 << j))
-			continue;
+	if (adev->vcn.harvest_config & (1 << inst))
+		goto done;
 
-		amdgpu_bo_free_kernel(
-			&adev->vcn.inst[j].dpg_sram_bo,
-			&adev->vcn.inst[j].dpg_sram_gpu_addr,
-			(void **)&adev->vcn.inst[j].dpg_sram_cpu_addr);
+	amdgpu_bo_free_kernel(
+		&adev->vcn.inst[inst].dpg_sram_bo,
+		&adev->vcn.inst[inst].dpg_sram_gpu_addr,
+		(void **)&adev->vcn.inst[inst].dpg_sram_cpu_addr);
 
-		kvfree(adev->vcn.inst[j].saved_bo);
+	kvfree(adev->vcn.inst[inst].saved_bo);
 
-		amdgpu_bo_free_kernel(&adev->vcn.inst[j].vcpu_bo,
-					  &adev->vcn.inst[j].gpu_addr,
-					  (void **)&adev->vcn.inst[j].cpu_addr);
+	amdgpu_bo_free_kernel(&adev->vcn.inst[inst].vcpu_bo,
+				  &adev->vcn.inst[inst].gpu_addr,
+				  (void **)&adev->vcn.inst[inst].cpu_addr);
 
-		amdgpu_ring_fini(&adev->vcn.inst[j].ring_dec);
+	amdgpu_ring_fini(&adev->vcn.inst[inst].ring_dec);
 
-		for (i = 0; i < adev->vcn.num_enc_rings; ++i)
-			amdgpu_ring_fini(&adev->vcn.inst[j].ring_enc[i]);
+	for (i = 0; i < adev->vcn.num_enc_rings; ++i)
+		amdgpu_ring_fini(&adev->vcn.inst[inst].ring_enc[i]);
 
-		amdgpu_ucode_release(&adev->vcn.inst[j].fw);
-	}
-
+	amdgpu_ucode_release(&adev->vcn.inst[inst].fw);
+done:
 	mutex_destroy(&adev->vcn.vcn1_jpeg1_workaround);
 	mutex_destroy(&adev->vcn.vcn_pg_lock);
 
