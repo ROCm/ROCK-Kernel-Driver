@@ -1603,18 +1603,17 @@ static int vcn_v4_0_3_set_clockgating_state(struct amdgpu_ip_block *ip_block,
 {
 	struct amdgpu_device *adev = ip_block->adev;
 	bool enable = state == AMD_CG_STATE_GATE;
-	int i;
+	int inst = ip_block->instance;
 
-	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
-		if (enable) {
-			if (RREG32_SOC15(VCN, GET_INST(VCN, i),
-					 regUVD_STATUS) != UVD_STATUS__IDLE)
-				return -EBUSY;
-			vcn_v4_0_3_enable_clock_gating(adev, i);
-		} else {
-			vcn_v4_0_3_disable_clock_gating(adev, i);
-		}
+	if (enable) {
+		if (RREG32_SOC15(VCN, GET_INST(VCN, inst),
+				 regUVD_STATUS) != UVD_STATUS__IDLE)
+			return -EBUSY;
+		vcn_v4_0_3_enable_clock_gating(adev, inst);
+	} else {
+		vcn_v4_0_3_disable_clock_gating(adev, inst);
 	}
+
 	return 0;
 }
 
