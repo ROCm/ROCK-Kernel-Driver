@@ -607,9 +607,8 @@ enum kfd_ioctl_spm_op {
  * @buf_size[in]:      size of the destination buffer
  * @timeout[in/out]:   [in]: timeout in milliseconds, [out]: amount of time left
  *                      `in the timeout window
- * @bytes_copied[out]: amount of data that was copied to the previous dest_buf
- * @has_data_loss:     boolean indicating whether data was lost
- *                      (e.g. due to a ring-buffer overflow)
+ * @bytes_copied[out]: total amount of data that was copied to the previous dest_buf
+ * @has_data_loss:     total count for sub-block which has data loss
  *
  * This ioctl performs different functions depending on the @op parameter.
  *
@@ -657,6 +656,21 @@ struct kfd_ioctl_spm_args {
 	__u32 gpu_id;
 	__u32 bytes_copied;
 	__u32 has_data_loss;
+};
+
+/**
+ * kfd_ioctl_spm_buffer_header - SPM Buffer header for kfd_ioctl_spm_args->dest_buf
+ *
+ * @version        [out]: spm versiom
+ * @bytes_copied   [out]: amount of data for each sub-block
+ * @has_data_loss: [out]: boolean indicating whether data was lost for each sub-block
+ *                        (e.g. due to a ring-buffer overflow)
+ */
+struct kfd_ioctl_spm_buffer_header {
+	__u32 version; /* 0-23: minor 24-31: major */
+	__u32 bytes_copied;
+	__u32 has_data_loss;
+	__u32 reserved[5];
 };
 
 /*
