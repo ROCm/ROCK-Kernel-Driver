@@ -2755,6 +2755,9 @@ static enum surface_update_type check_update_surfaces_for_stream(
 		if (stream_update->scaler_sharpener_update)
 			su_flags->bits.scaler_sharpener = 1;
 
+		if (stream_update->sharpening_required)
+			su_flags->bits.sharpening_required = 1;
+
 		if (su_flags->raw != 0)
 			overall_type = UPDATE_TYPE_FULL;
 
@@ -3094,6 +3097,8 @@ static void copy_stream_update_to_stream(struct dc *dc,
 	}
 	if (update->scaler_sharpener_update)
 		stream->scaler_sharpener_update = *update->scaler_sharpener_update;
+	if (update->sharpening_required)
+		stream->sharpening_required = *update->sharpening_required;
 }
 
 static void backup_planes_and_stream_state(
