@@ -1033,6 +1033,16 @@ static void kfd_process_free_outstanding_kfd_bos(struct kfd_process *p)
 		kfd_process_device_free_bos(p->pdds[i]);
 }
 
+static void kfd_process_profiler_release(struct kfd_process *p, struct kfd_process_device *pdd)
+{
+	mutex_lock(&pdd->dev->kfd->profiler_lock);
+	if (pdd->dev->kfd->profiler_process == p) {
+		pdd->qpd.dqm->ops.set_perfcount(pdd->qpd.dqm, 0);
+		pdd->dev->kfd->profiler_process = NULL;
+	}
+	mutex_unlock(&pdd->dev->kfd->profiler_lock);
+}
+
 static void kfd_process_destroy_pdds(struct kfd_process *p)
 {
 	int i;
@@ -1043,6 +1053,7 @@ static void kfd_process_destroy_pdds(struct kfd_process *p)
 		pr_debug("Releasing pdd (topology id %d) for process (pasid 0x%x)\n",
 				pdd->dev->id, p->pasid);
 
+		kfd_process_profiler_release(p, pdd);
 		kfd_pc_sample_release(pdd);
 		kfd_release_spm(pdd, pdd->dev->adev);
 
