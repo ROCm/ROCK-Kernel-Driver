@@ -29,6 +29,15 @@
 #include <linux/mmu_context.h> // for use_mm()
 #include <linux/wait.h>
 
+/*
+ * SPM revision change log
+ *
+ * 0.1 - Initial revision
+ * 0.2 - add kfd_ioctl_spm_buffer_header
+ */
+#define KFD_IOCTL_SPM_MAJOR_VERSION	0
+#define KFD_IOCTL_SPM_MINOR_VERSION	2
+
 struct user_buf {
 	uint64_t __user *user_addr;
 	u32 ubufsize;
@@ -379,25 +388,52 @@ int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 	return 0;
 }
 
-static void spm_update_dest_info(struct kfd_process_device *pdd,
+static int spm_update_dest_info(struct kfd_process_device *pdd,
 			struct kfd_ioctl_spm_args *user_spm_data)
 {
 	struct kfd_spm_cntr *spm = pdd->spm_cntr;
+	int ret = 0;
+
 	mutex_lock(&pdd->spm_cntr->spm_worker_mutex);
 	if (spm->has_user_buf) {
-		user_spm_data->bytes_copied = spm->size_copied;
-		user_spm_data->has_data_loss = spm->has_data_loss;
+		struct kfd_ioctl_spm_buffer_header spm_header;
+		uint64_t __user *user_address;
+
+		user_spm_data->bytes_copied += spm->size_copied;
+		user_spm_data->has_data_loss += spm->has_data_loss;
+
+		memset(&spm_header, 0, sizeof(spm_header));
+		user_address = (uint64_t *)((uint64_t)spm->ubuf.user_addr - sizeof(spm_header));
+		spm_header.version = KFD_IOCTL_SPM_MAJOR_VERSION << 24 |
+					KFD_IOCTL_SPM_MINOR_VERSION;
+		spm_header.bytes_copied = spm->size_copied;
+		spm_header.has_data_loss = spm->has_data_loss;
 		spm->has_user_buf = false;
+
+		ret = copy_to_user(user_address, &spm_header, sizeof(spm_header));
+		if (ret) {
+			ret = -EFAULT;
+			goto out;
+		}
 	}
 	if (user_spm_data->dest_buf) {
+		user_spm_data->bytes_copied = 0;
+		user_spm_data->has_data_loss = 0;
+
 		spm->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
 		spm->ubuf.ubufsize = user_spm_data->buf_size;
+		/* reserve space for kfd_ioctl_spm_buffer_header */
+		spm->ubuf.user_addr = (uint64_t *)((uint64_t)spm->ubuf.user_addr +
+					sizeof(struct kfd_ioctl_spm_buffer_header));
+		spm->ubuf.ubufsize -= sizeof(struct kfd_ioctl_spm_buffer_header);
 		spm->has_data_loss = false;
 		spm->size_copied = 0;
 		spm->is_user_buf_filled = false;
 		spm->has_user_buf = true;
 	}
+out:
 	mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
+	return ret;
 }
 
 static int spm_wait_for_fill_awake(struct kfd_spm_cntr *spm,
@@ -441,6 +477,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 	struct kfd_ioctl_spm_args *user_spm_data;
 	struct kfd_spm_cntr *spm;
 	unsigned long flags;
+	u32 ubufsize;
 	int ret = 0;
 
 	user_spm_data = (struct kfd_ioctl_spm_args *) data;
@@ -449,8 +486,14 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 	spm = pdd->spm_cntr;
 
 	if (spm == NULL) {
-		mutex_unlock(&pdd->spm_mutex);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ubufsize = user_spm_data->buf_size;
+	if (ubufsize  <= sizeof(struct kfd_ioctl_spm_buffer_header)) {
+		ret = -EINVAL;
+		goto out;
 	}
 
 	if (user_spm_data->timeout && spm->has_user_buf &&
@@ -464,8 +507,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			ret = 0;
 		} else if (ret) {
 			/* handle other errors normally, including -ERESTARTSYS */
-			mutex_unlock(&pdd->spm_mutex);
-			return ret;
+			goto out;
 		}
 	} else if (!user_spm_data->timeout && spm->has_user_buf) {
 		/* Copy (partial) data to user buffer */
@@ -477,7 +519,9 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		/* Get info about filled space in previous output buffer.
 		 * Setup new dest buf if provided.
 		 */
-		spm_update_dest_info(pdd, user_spm_data);
+		ret = spm_update_dest_info(pdd, user_spm_data);
+		if (ret)
+			goto out;
 	}
 
 	if (user_spm_data->dest_buf) {
@@ -514,6 +558,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			kthread_stop(pdd->dev->spm_monitor_thread);
 	}
 
+out:
 	mutex_unlock(&pdd->spm_mutex);
 
 	return ret;
