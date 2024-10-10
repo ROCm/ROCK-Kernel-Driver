@@ -1652,7 +1652,7 @@ int kfd_send_exception_to_runtime(struct kfd_process *p,
 bool kfd_is_locked(void);
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd);
-int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev);
+void kfd_spm_release_process_device(struct kfd_process_device *pdd);
 int kfd_rlc_spm(struct kfd_process *p,  void __user *data);
 
 /* PeerDirect support */
