@@ -7621,10 +7621,10 @@ static int si_dpm_process_interrupt(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int si_dpm_late_init(struct amdgpu_ip_block *ip_block)
+static int si_dpm_late_init(void *handle)
 {
 	int ret;
-	struct amdgpu_device *adev = ip_block->adev;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	if (!adev->pm.dpm_enabled)
 		return 0;

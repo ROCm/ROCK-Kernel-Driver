@@ -1638,9 +1638,9 @@ static int gmc_v9_0_early_init(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static int gmc_v9_0_late_init(struct amdgpu_ip_block *ip_block)
+static int gmc_v9_0_late_init(void *handle)
 {
-	struct amdgpu_device *adev = ip_block->adev;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int r;
 
 	r = amdgpu_gmc_allocate_vm_inv_eng(adev);

@@ -944,9 +944,9 @@ static int nv_common_early_init(struct amdgpu_ip_block *ip_block)
 	return 0;
 }
 
-static int nv_common_late_init(struct amdgpu_ip_block *ip_block)
+static int nv_common_late_init(void *handle)
 {
-	struct amdgpu_device *adev = ip_block->adev;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
 	if (amdgpu_sriov_vf(adev)) {
 		xgpu_nv_mailbox_get_irq(adev);

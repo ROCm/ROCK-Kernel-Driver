@@ -826,9 +826,9 @@ static int smu_apply_default_config_table_settings(struct smu_context *smu)
 	return smu_set_config_table(smu, &adev->pm.config_table);
 }
 
-static int smu_late_init(struct amdgpu_ip_block *ip_block)
+static int smu_late_init(void *handle)
 {
-	struct amdgpu_device *adev = ip_block->adev;
+	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret = 0;
 
@@ -2068,11 +2068,7 @@ static int smu_reset(struct smu_context *smu)
 	if (ret)
 		return ret;
 
-<<<<<<< HEAD
 	ret = smu_late_init(ip_block);
-=======
-	ret = smu_late_init(&adev->ip_blocks[AMD_IP_BLOCK_TYPE_SMC]);
->>>>>>> 813dabea1d31 (drm/amdgpu: update the handle ptr in late_init)
 	if (ret)
 		return ret;
 
