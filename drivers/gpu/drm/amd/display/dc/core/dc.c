@@ -1157,6 +1157,8 @@ static void dc_update_visual_confirm_color(struct dc *dc, struct dc_state *conte
 			get_surface_visual_confirm_color(pipe_ctx, &(pipe_ctx->visual_confirm_color));
 		else if (dc->debug.visual_confirm == VISUAL_CONFIRM_SWIZZLE)
 			get_surface_tile_visual_confirm_color(pipe_ctx, &(pipe_ctx->visual_confirm_color));
+		else if (dc->debug.visual_confirm == VISUAL_CONFIRM_HW_CURSOR)
+			get_cursor_visual_confirm_color(pipe_ctx, &(pipe_ctx->visual_confirm_color));
 		else {
 			if (dc->ctx->dce_version < DCN_VERSION_2_0)
 				color_space_to_black_color(
@@ -1876,6 +1878,41 @@ void dc_z10_save_init(struct dc *dc)
 		dc->hwss.z10_save_init(dc);
 }
 
+/* Set a pipe unlock order based on the change in DET allocation and stores it in dc scratch memory
+ * Prevents over allocation of DET during unlock process
+ * e.g. 2 pipe config with different streams with a max of 20 DET segments
+ *	Before:								After:
+ *		- Pipe0: 10 DET segments			- Pipe0: 12 DET segments
+ *		- Pipe1: 10 DET segments			- Pipe1: 8 DET segments
+ * If Pipe0 gets updated first, 22 DET segments will be allocated
+ */
+static void determine_pipe_unlock_order(struct dc *dc, struct dc_state *context)
+{
+	unsigned int i = 0;
+	struct pipe_ctx *pipe = NULL;
+	struct timing_generator *tg = NULL;
+
+	if (!dc->config.set_pipe_unlock_order)
+		return;
+
+	memset(dc->scratch.pipes_to_unlock_first, 0, sizeof(dc->scratch.pipes_to_unlock_first));
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		pipe = &context->res_ctx.pipe_ctx[i];
+		tg = pipe->stream_res.tg;
+
+		if (!resource_is_pipe_type(pipe, OTG_MASTER) ||
+				!tg->funcs->is_tg_enabled(tg) ||
+				dc_state_get_pipe_subvp_type(context, pipe) == SUBVP_PHANTOM) {
+			continue;
+		}
+
+		if (resource_calculate_det_for_stream(context, pipe) <
+				resource_calculate_det_for_stream(dc->current_state, &dc->current_state->res_ctx.pipe_ctx[i])) {
+			dc->scratch.pipes_to_unlock_first[i] = true;
+		}
+	}
+}
+
 /**
  * dc_commit_state_no_check - Apply context to the hardware
  *
@@ -1974,6 +2011,7 @@ static enum dc_status dc_commit_state_no_check(struct dc *dc, struct dc_state *c
 		context->streams[i]->update_flags.bits.dsc_changed = prev_dsc_changed;
 	}
 
+	determine_pipe_unlock_order(dc, context);
 	/* Program all planes within new context*/
 	if (dc->res_pool->funcs->prepare_mcache_programming)
 		dc->res_pool->funcs->prepare_mcache_programming(dc, context);
@@ -2477,12 +2515,20 @@ static enum surface_update_type get_scaling_info_update_type(
 	if (!u->scaling_info)
 		return UPDATE_TYPE_FAST;
 
-	if (u->scaling_info->dst_rect.width != u->surface->dst_rect.width
+	if (u->scaling_info->src_rect.width != u->surface->src_rect.width
+			|| u->scaling_info->src_rect.height != u->surface->src_rect.height
+			|| u->scaling_info->dst_rect.width != u->surface->dst_rect.width
 			|| u->scaling_info->dst_rect.height != u->surface->dst_rect.height
+			|| u->scaling_info->clip_rect.width != u->surface->clip_rect.width
+			|| u->scaling_info->clip_rect.height != u->surface->clip_rect.height
 			|| u->scaling_info->scaling_quality.integer_scaling !=
-				u->surface->scaling_quality.integer_scaling
-			) {
+					u->surface->scaling_quality.integer_scaling) {
 		update_flags->bits.scaling_change = 1;
+
+		if (u->scaling_info->src_rect.width > u->surface->src_rect.width
+				|| u->scaling_info->src_rect.height > u->surface->src_rect.height)
+			/* Making src rect bigger requires a bandwidth change */
+			update_flags->bits.clock_change = 1;
 
 		if ((u->scaling_info->dst_rect.width < u->surface->dst_rect.width
 			|| u->scaling_info->dst_rect.height < u->surface->dst_rect.height)
@@ -2490,27 +2536,13 @@ static enum surface_update_type get_scaling_info_update_type(
 					|| u->scaling_info->dst_rect.height < u->surface->src_rect.height))
 			/* Making dst rect smaller requires a bandwidth change */
 			update_flags->bits.bandwidth_change = 1;
+
+		if (u->scaling_info->src_rect.width > dc->caps.max_optimizable_video_width &&
+			(u->scaling_info->clip_rect.width > u->surface->clip_rect.width ||
+			 u->scaling_info->clip_rect.height > u->surface->clip_rect.height))
+			 /* Changing clip size of a large surface may result in MPC slice count change */
+			update_flags->bits.bandwidth_change = 1;
 	}
-
-	if (u->scaling_info->src_rect.width != u->surface->src_rect.width
-		|| u->scaling_info->src_rect.height != u->surface->src_rect.height) {
-
-		update_flags->bits.scaling_change = 1;
-		if (u->scaling_info->src_rect.width > u->surface->src_rect.width
-				|| u->scaling_info->src_rect.height > u->surface->src_rect.height)
-			/* Making src rect bigger requires a bandwidth change */
-			update_flags->bits.clock_change = 1;
-	}
-
-	if (u->scaling_info->src_rect.width > dc->caps.max_optimizable_video_width &&
-		(u->scaling_info->clip_rect.width > u->surface->clip_rect.width ||
-		 u->scaling_info->clip_rect.height > u->surface->clip_rect.height))
-		 /* Changing clip size of a large surface may result in MPC slice count change */
-		update_flags->bits.bandwidth_change = 1;
-
-	if (u->scaling_info->clip_rect.width != u->surface->clip_rect.width ||
-			u->scaling_info->clip_rect.height != u->surface->clip_rect.height)
-		update_flags->bits.clip_size_change = 1;
 
 	if (u->scaling_info->src_rect.x != u->surface->src_rect.x
 			|| u->scaling_info->src_rect.y != u->surface->src_rect.y
@@ -2520,13 +2552,13 @@ static enum surface_update_type get_scaling_info_update_type(
 			|| u->scaling_info->dst_rect.y != u->surface->dst_rect.y)
 		update_flags->bits.position_change = 1;
 
+	/* process every update flag before returning */
 	if (update_flags->bits.clock_change
 			|| update_flags->bits.bandwidth_change
 			|| update_flags->bits.scaling_change)
 		return UPDATE_TYPE_FULL;
 
-	if (update_flags->bits.position_change ||
-			update_flags->bits.clip_size_change)
+	if (update_flags->bits.position_change)
 		return UPDATE_TYPE_MED;
 
 	return UPDATE_TYPE_FAST;
@@ -3226,8 +3258,7 @@ static bool update_planes_and_stream_state(struct dc *dc,
 
 		if (update_type != UPDATE_TYPE_MED)
 			continue;
-		if (surface->update_flags.bits.clip_size_change ||
-				surface->update_flags.bits.position_change) {
+		if (surface->update_flags.bits.position_change) {
 			for (j = 0; j < dc->res_pool->pipe_count; j++) {
 				struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 
@@ -3626,6 +3657,10 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 	struct pipe_ctx *top_pipe_to_program = NULL;
 	struct dc_stream_status *stream_status = NULL;
 	bool should_offload_fams2_flip = false;
+	bool should_lock_all_pipes = (update_type != UPDATE_TYPE_FAST);
+
+	if (should_lock_all_pipes)
+		determine_pipe_unlock_order(dc, context);
 
 	if (dc->debug.fams2_config.bits.enable &&
 			dc->debug.fams2_config.bits.enable_offload_flip &&
@@ -3678,13 +3713,14 @@ static void commit_planes_for_stream_fast(struct dc *dc,
 
 			if (!pipe_ctx->plane_state)
 				continue;
-			if (should_update_pipe_for_plane(context, pipe_ctx, plane_state))
+			if (!should_update_pipe_for_plane(context, pipe_ctx, plane_state))
 				continue;
+
 			pipe_ctx->plane_state->triplebuffer_flips = false;
 			if (update_type == UPDATE_TYPE_FAST &&
-			    dc->hwss.program_triplebuffer != NULL &&
-			    !pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
-				/*triple buffer for VUpdate  only*/
+					dc->hwss.program_triplebuffer != NULL &&
+					!pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
+				/*triple buffer for VUpdate only*/
 				pipe_ctx->plane_state->triplebuffer_flips = true;
 			}
 		}
@@ -3743,6 +3779,8 @@ static void commit_planes_for_stream(struct dc *dc,
 	bool subvp_curr_use = false;
 	uint8_t current_stream_mask = 0;
 
+	if (should_lock_all_pipes)
+		determine_pipe_unlock_order(dc, context);
 	// Once we apply the new subvp context to hardware it won't be in the
 	// dc->current_state anymore, so we have to cache it before we apply
 	// the new SubVP context
@@ -3921,19 +3959,20 @@ static void commit_planes_for_stream(struct dc *dc,
 			struct pipe_ctx *pipe_ctx = &context->res_ctx.pipe_ctx[j];
 			if (!pipe_ctx->plane_state)
 				continue;
-			if (should_update_pipe_for_plane(context, pipe_ctx, plane_state))
+			if (!should_update_pipe_for_plane(context, pipe_ctx, plane_state))
 				continue;
 			pipe_ctx->plane_state->triplebuffer_flips = false;
 			if (update_type == UPDATE_TYPE_FAST &&
-				dc->hwss.program_triplebuffer != NULL &&
-				!pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
-					/*triple buffer for VUpdate  only*/
-					pipe_ctx->plane_state->triplebuffer_flips = true;
+					dc->hwss.program_triplebuffer != NULL &&
+					!pipe_ctx->plane_state->flip_immediate && dc->debug.enable_tri_buf) {
+				/*triple buffer for VUpdate only*/
+				pipe_ctx->plane_state->triplebuffer_flips = true;
 			}
 		}
 		if (update_type == UPDATE_TYPE_FULL) {
 			/* force vsync flip when reconfiguring pipes to prevent underflow */
 			plane_state->flip_immediate = false;
+			plane_state->triplebuffer_flips = false;
 		}
 	}
 
@@ -3954,7 +3993,6 @@ static void commit_planes_for_stream(struct dc *dc,
 				continue;
 
 			ASSERT(!pipe_ctx->plane_state->triplebuffer_flips);
-
 			if (dc->hwss.program_triplebuffer != NULL && dc->debug.enable_tri_buf) {
 				/*turn off triple buffer for full update*/
 				dc->hwss.program_triplebuffer(
@@ -4029,7 +4067,7 @@ static void commit_planes_for_stream(struct dc *dc,
 
 				/*program triple buffer after lock based on flip type*/
 				if (dc->hwss.program_triplebuffer != NULL && dc->debug.enable_tri_buf) {
-					/*only enable triplebuffer for  fast_update*/
+					/*only enable triplebuffer for fast_update*/
 					dc->hwss.program_triplebuffer(
 						dc, pipe_ctx, pipe_ctx->plane_state->triplebuffer_flips);
 				}
@@ -5761,7 +5799,7 @@ enum dc_status dc_process_dmub_set_mst_slots(const struct dc *dc,
  *
  * @dc: [in] dc structure
  * @link_index: [in] link index
- * @ts: [in] request tps
+ * @tps: [in] request tps
  *
  * Submits set_tps_notification command to dmub via inbox message
  */
@@ -5976,8 +6014,15 @@ void dc_set_edp_power(const struct dc *dc, struct dc_link *edp_link,
 struct dc_power_profile dc_get_power_profile_for_dc_state(const struct dc_state *context)
 {
 	struct dc_power_profile profile = { 0 };
+	struct dc *dc = NULL;
 
-	profile.power_level += !context->bw_ctx.bw.dcn.clk.p_state_change_support;
+	if (!context || !context->clk_mgr || !context->clk_mgr->ctx || !context->clk_mgr->ctx->dc)
+		return profile;
+
+	dc = context->clk_mgr->ctx->dc;
+
+	if (dc->res_pool->funcs->get_power_profile)
+		profile.power_level = dc->res_pool->funcs->get_power_profile(context);
 
 	return profile;
 }

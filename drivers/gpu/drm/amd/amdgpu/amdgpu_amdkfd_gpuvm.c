@@ -820,6 +820,7 @@ static int kfd_mem_export_dmabuf(struct kgd_mem *mem)
 	if (!mem->dmabuf) {
 		struct amdgpu_device *bo_adev;
 		struct dma_buf *dmabuf;
+#ifndef HAVE_DRM_GEM_PRIME_HANDLE_TO_DMABUF
 		int r, fd;
 
 		bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
@@ -831,7 +832,14 @@ static int kfd_mem_export_dmabuf(struct kgd_mem *mem)
 			return r;
 		dmabuf = dma_buf_get(fd);
 		close_fd(fd);
-		if (WARN_ON_ONCE(IS_ERR(dmabuf)))
+#else
+		bo_adev = amdgpu_ttm_adev(mem->bo->tbo.bdev);
+		dmabuf = drm_gem_prime_handle_to_dmabuf(&bo_adev->ddev, bo_adev->kfd.client.file,
+					       mem->gem_handle,
+			mem->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE ?
+					       DRM_RDWR : 0);
+#endif
+		if (IS_ERR(dmabuf))
 			return PTR_ERR(dmabuf);
 		mem->dmabuf = dmabuf;
 	}

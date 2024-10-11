@@ -326,6 +326,9 @@ void set_queue_snapshot_entry(struct queue *q,
 int debug_lock_and_unmap(struct device_queue_manager *dqm);
 int debug_map_and_unlock(struct device_queue_manager *dqm);
 int debug_refresh_runlist(struct device_queue_manager *dqm);
+bool kfd_dqm_is_queue_in_process(struct device_queue_manager *dqm,
+				 struct qcm_process_device *qpd,
+				 int doorbell_off, u32 *queue_format);
 
 void remap_queue(struct device_queue_manager *dqm,
 				enum kfd_unmap_queues_filter filter,

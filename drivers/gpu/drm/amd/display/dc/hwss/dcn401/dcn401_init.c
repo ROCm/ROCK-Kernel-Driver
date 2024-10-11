@@ -84,7 +84,7 @@ static const struct hw_sequencer_funcs dcn401_funcs = {
 	.enable_lvds_link_output = dce110_enable_lvds_link_output,
 	.enable_tmds_link_output = dce110_enable_tmds_link_output,
 	.enable_dp_link_output = dce110_enable_dp_link_output,
-	.disable_link_output = dcn32_disable_link_output,
+	.disable_link_output = dcn401_disable_link_output,
 	.set_disp_pattern_generator = dcn30_set_disp_pattern_generator,
 	.get_dcc_en_bits = dcn10_get_dcc_en_bits,
 	.enable_phantom_streams = dcn32_enable_phantom_streams,
@@ -100,6 +100,7 @@ static const struct hw_sequencer_funcs dcn401_funcs = {
 	.fams2_update_config = dcn401_fams2_update_config,
 	.fams2_global_control_lock_fast = dcn401_fams2_global_control_lock_fast,
 	.program_outstanding_updates = dcn401_program_outstanding_updates,
+	.wait_for_all_pending_updates = dcn30_wait_for_all_pending_updates,
 };
 
 static const struct hwseq_private_funcs dcn401_private_funcs = {
@@ -111,7 +112,7 @@ static const struct hwseq_private_funcs dcn401_private_funcs = {
 	.power_down = dce110_power_down,
 	.enable_display_power_gating = dcn10_dummy_display_power_gating,
 	.blank_pixel_data = dcn20_blank_pixel_data,
-	.reset_hw_ctx_wrap = dcn20_reset_hw_ctx_wrap,
+	.reset_hw_ctx_wrap = dcn401_reset_hw_ctx_wrap,
 	.enable_stream_timing = dcn401_enable_stream_timing,
 	.edp_backlight_control = dce110_edp_backlight_control,
 	.setup_vupdate_interrupt = dcn20_setup_vupdate_interrupt,
@@ -136,7 +137,7 @@ static const struct hwseq_private_funcs dcn401_private_funcs = {
 	.update_mall_sel = dcn32_update_mall_sel,
 	.calculate_dccg_k1_k2_values = NULL,
 	.apply_single_controller_ctx_to_hw = dce110_apply_single_controller_ctx_to_hw,
-	.reset_back_end_for_pipe = dcn20_reset_back_end_for_pipe,
+	.reset_back_end_for_pipe = dcn401_reset_back_end_for_pipe,
 	.populate_mcm_luts = NULL,
 };
 

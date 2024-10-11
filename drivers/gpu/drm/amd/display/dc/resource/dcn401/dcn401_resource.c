@@ -1688,6 +1688,22 @@ static void dcn401_build_pipe_pix_clk_params(struct pipe_ctx *pipe_ctx)
 	}
 }
 
+static int dcn401_get_power_profile(const struct dc_state *context)
+{
+	int uclk_mhz = context->bw_ctx.bw.dcn.clk.dramclk_khz / 1000;
+	int dpm_level = 0;
+
+	for (int i = 0; i < context->clk_mgr->bw_params->clk_table.num_entries_per_clk.num_memclk_levels; i++) {
+		if (context->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz == 0 ||
+			uclk_mhz < context->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz)
+			break;
+		if (uclk_mhz > context->clk_mgr->bw_params->clk_table.entries[i].memclk_mhz)
+			dpm_level++;
+	}
+
+	return dpm_level;
+}
+
 static struct resource_funcs dcn401_res_pool_funcs = {
 	.destroy = dcn401_destroy_resource_pool,
 	.link_enc_create = dcn401_link_encoder_create,
@@ -1714,6 +1730,7 @@ static struct resource_funcs dcn401_res_pool_funcs = {
 	.prepare_mcache_programming = dcn401_prepare_mcache_programming,
 	.build_pipe_pix_clk_params = dcn401_build_pipe_pix_clk_params,
 	.calculate_mall_ways_from_bytes = dcn32_calculate_mall_ways_from_bytes,
+	.get_power_profile = dcn401_get_power_profile,
 };
 
 static uint32_t read_pipe_fuses(struct dc_context *ctx)
@@ -1867,6 +1884,7 @@ static bool dcn401_resource_construct(
 	dc->config.prefer_easf = true;
 	dc->config.dc_mode_clk_limit_support = true;
 	dc->config.enable_windowed_mpo_odm = true;
+	dc->config.set_pipe_unlock_order = true; /* Need to ensure DET gets freed before allocating */
 	/* read VBIOS LTTPR caps */
 	{
 		if (ctx->dc_bios->funcs->get_lttpr_caps) {

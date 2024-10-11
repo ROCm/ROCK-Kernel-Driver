@@ -875,6 +875,8 @@ struct kfd_process_device {
 	struct mutex spm_mutex;
 	struct work_struct spm_work;
 	spinlock_t spm_irq_lock;
+	/* reserve space to fix spm overflow */
+	u32    spm_overflow_reserved;
 
 	/* Eviction activity tracking */
 	uint64_t last_evict_timestamp;
@@ -1480,7 +1482,6 @@ int pqm_init(struct process_queue_manager *pqm, struct kfd_process *p);
 void pqm_uninit(struct process_queue_manager *pqm);
 int pqm_create_queue(struct process_queue_manager *pqm,
 			    struct kfd_node *dev,
-			    struct file *f,
 			    struct queue_properties *properties,
 			    unsigned int *qid,
 			    const struct kfd_criu_queue_priv_data *q_data,
@@ -1650,6 +1651,7 @@ int kfd_send_exception_to_runtime(struct kfd_process *p,
 bool kfd_is_locked(void);
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd);
+int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev);
 int kfd_rlc_spm(struct kfd_process *p,  void __user *data);
 
 /* PeerDirect support */

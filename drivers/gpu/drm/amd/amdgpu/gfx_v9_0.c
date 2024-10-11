@@ -3191,6 +3191,15 @@ static void gfx_v9_0_cp_gfx_enable(struct amdgpu_device *adev, bool enable)
 {
 	u32 tmp = RREG32_SOC15(GC, 0, mmCP_ME_CNTL);
 
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, CE_INVALIDATE_ICACHE, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, PFP_INVALIDATE_ICACHE, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, ME_INVALIDATE_ICACHE, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, CE_PIPE0_RESET, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, CE_PIPE1_RESET, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, PFP_PIPE0_RESET, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, PFP_PIPE1_RESET, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, ME_PIPE0_RESET, enable ? 0 : 1);
+	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, ME_PIPE1_RESET, enable ? 0 : 1);
 	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, ME_HALT, enable ? 0 : 1);
 	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, PFP_HALT, enable ? 0 : 1);
 	tmp = REG_SET_FIELD(tmp, CP_ME_CNTL, CE_HALT, enable ? 0 : 1);
@@ -3400,7 +3409,15 @@ static void gfx_v9_0_cp_compute_enable(struct amdgpu_device *adev, bool enable)
 		WREG32_SOC15_RLC(GC, 0, mmCP_MEC_CNTL, 0);
 	} else {
 		WREG32_SOC15_RLC(GC, 0, mmCP_MEC_CNTL,
-			(CP_MEC_CNTL__MEC_ME1_HALT_MASK | CP_MEC_CNTL__MEC_ME2_HALT_MASK));
+				 (CP_MEC_CNTL__MEC_INVALIDATE_ICACHE_MASK |
+				  CP_MEC_CNTL__MEC_ME1_PIPE0_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME1_PIPE1_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME1_PIPE2_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME1_PIPE3_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME2_PIPE0_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME2_PIPE1_RESET_MASK |
+				  CP_MEC_CNTL__MEC_ME1_HALT_MASK |
+				  CP_MEC_CNTL__MEC_ME2_HALT_MASK));
 		adev->gfx.kiq[0].ring.sched.ready = false;
 	}
 	udelay(50);
@@ -3920,6 +3937,10 @@ static int gfx_v9_0_cp_resume(struct amdgpu_device *adev)
 		if (r)
 			return r;
 	}
+
+	if (adev->gfx.num_gfx_rings)
+		gfx_v9_0_cp_gfx_enable(adev, false);
+	gfx_v9_0_cp_compute_enable(adev, false);
 
 	r = gfx_v9_0_kiq_resume(adev);
 	if (r)
@@ -4768,10 +4789,11 @@ static void gfx_v9_0_spm_start(struct amdgpu_device *adev)
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
 
-	data = REG_SET_FIELD(0, CP_PERFMON_CNTL, SPM_PERFMON_STATE,
-			STRM_PERFMON_STATE_START_COUNTING);
+	/* When SPM is reset, RLC automatically resets wptr to 0.
+	 * Manually reset rptr to match this.
+	 */
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
-			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
+			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_RING_RDPTR), 0);
 
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_INT_CNTL), 1);
@@ -4791,6 +4813,12 @@ static void gfx_v9_0_spm_stop(struct amdgpu_device *adev)
 			CP_PERFMON_STATE_DISABLE_AND_RESET);
 	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), data);
+
+	/* When SPM is reset, RLC automatically resets wptr to 0.
+	 * Manually reset rptr to match this.
+	 */
+	gfx_v9_0_write_data_to_reg(kiq_ring, 0, false,
+			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_RING_RDPTR), 0);
 }
 
 static void gfx_v9_0_spm_set_rdptr(struct amdgpu_device *adev,  u32 rptr)

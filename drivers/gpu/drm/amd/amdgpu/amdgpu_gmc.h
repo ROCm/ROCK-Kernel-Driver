@@ -182,7 +182,6 @@ struct amdgpu_xgmi {
 	bool supported;
 	struct ras_common_if *ras_if;
 	bool connected_to_cpu;
-	bool pending_reset;
 	struct amdgpu_xgmi_ras *ras;
 };
 
@@ -447,7 +446,6 @@ void amdgpu_gmc_get_vbios_allocations(struct amdgpu_device *adev);
 void amdgpu_gmc_init_pdb0(struct amdgpu_device *adev);
 uint64_t amdgpu_gmc_vram_mc2pa(struct amdgpu_device *adev, uint64_t mc_addr);
 uint64_t amdgpu_gmc_vram_pa(struct amdgpu_device *adev, struct amdgpu_bo *bo);
-uint64_t amdgpu_gmc_vram_cpu_pa(struct amdgpu_device *adev, struct amdgpu_bo *bo);
 int amdgpu_gmc_vram_checking(struct amdgpu_device *adev);
 int amdgpu_gmc_sysfs_init(struct amdgpu_device *adev);
 void amdgpu_gmc_sysfs_fini(struct amdgpu_device *adev);

@@ -50,6 +50,21 @@ struct kfd_spm_cntr {
 	bool   is_spm_started;
 };
 
+/* used to detect SPM overflow */
+#define SPM_OVERFLOW_MAGIC        0xBEEFABCDDEADABCD
+
+static void kfd_spm_preset(struct kfd_process_device *pdd, u32 size)
+{
+	uint64_t *overflow_ptr, *overflow_end_ptr;
+
+	overflow_ptr = (uint64_t *)((uint64_t)pdd->spm_cntr->cpu_addr
+				+ pdd->spm_cntr->ring_size + 0x20);
+	overflow_end_ptr = overflow_ptr + (size >> 3);
+	/* SPM data filling is 0x20 alignment */
+	for ( ;  overflow_ptr < overflow_end_ptr; overflow_ptr += 4)
+		*overflow_ptr = SPM_OVERFLOW_MAGIC;
+}
+
 static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 {
 	struct kfd_spm_cntr *spm = pdd->spm_cntr;
@@ -62,7 +77,7 @@ static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 		return -EFAULT;
 
 	user_address = (uint64_t *)((uint64_t)spm->ubuf.user_addr + spm->size_copied);
-	// From RLC spec, ring_rptr = 0 points to spm->cpu_addr+0x20
+	/* From RLC spec, ring_rptr = 0 points to spm->cpu_addr + 0x20 */
 	ring_buf =  (uint64_t *)((uint64_t)spm->cpu_addr + spm->ring_rptr + 0x20);
 
 	if (user_address == NULL)
@@ -97,15 +112,19 @@ static int kfd_spm_data_copy(struct kfd_process_device *pdd, u32 size_to_copy)
 static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 {
 	struct kfd_spm_cntr *spm = pdd->spm_cntr;
+	u32 overflow_size = 0;
 	u32 size_to_copy;
 	int ret = 0;
 	u32 ring_wptr;
 
 	ring_wptr = READ_ONCE(spm->cpu_addr[0]);
 
-	/* keep SPM ring buffer running */
+	/* SPM might stall if we cannot copy data out of SPM ringbuffer.
+	 * spm->has_data_loss is only a hint here since stall is only a
+	 * possibility and data loss might not happen. But it is a useful
+	 * hint for user mode profiler to take extra actions.
+	 */
 	if (!spm->has_user_buf || spm->is_user_buf_filled) {
-		spm->ring_rptr = ring_wptr;
 		spm->has_data_loss = true;
 		/* set flag due to there is no flag setup
 		 * when read ring buffer timeout.
@@ -122,6 +141,19 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 		size_to_copy = ring_wptr - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
 	} else {
+		uint64_t *ring_start, *ring_end;
+
+		ring_start = (uint64_t *)((uint64_t)pdd->spm_cntr->cpu_addr + 0x20);
+		ring_end = ring_start + (pdd->spm_cntr->ring_size >> 3);
+		for ( ; overflow_size < pdd->spm_overflow_reserved; overflow_size += 0x20) {
+			uint64_t *overflow_ptr = ring_end + (overflow_size >> 3);
+
+			if (*overflow_ptr == SPM_OVERFLOW_MAGIC)
+				break;
+		}
+		/* move overflow counters into ring buffer to avoid data loss */
+		memcpy(ring_start, ring_end, overflow_size);
+
 		size_to_copy = spm->ring_size - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
 
@@ -140,6 +172,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	}
 
 exit:
+	kfd_spm_preset(pdd, overflow_size);
 	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->adev, spm->ring_rptr);
 	return ret;
 }
@@ -165,6 +198,10 @@ static void kfd_spm_work(struct work_struct *work)
 
 void kfd_spm_init_process_device(struct kfd_process_device *pdd)
 {
+	/* pre-gfx11 spm has a hardware bug to cause overflow */
+	if (pdd->dev->adev->ip_versions[GC_HWIP][0] < IP_VERSION(11, 0, 1))
+		pdd->spm_overflow_reserved = 0x400;
+
 	mutex_init(&pdd->spm_mutex);
 	pdd->spm_cntr = NULL;
 }
@@ -199,7 +236,9 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	if (ret)
 		goto alloc_gtt_mem_failure;
 
-	ret =  amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
+	/* reserve space to fix spm overflow */
+	pdd->spm_cntr->ring_size -= pdd->spm_overflow_reserved;
+	ret = amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
 			pdd->spm_cntr->gpu_addr, pdd->spm_cntr->ring_size);
 
 	/*
@@ -218,10 +257,12 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 
 	spin_lock_init(&pdd->spm_irq_lock);
 
+	kfd_spm_preset(pdd, pdd->spm_overflow_reserved);
+
 	goto out;
 
 acquire_spm_failure:
-	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_free_gtt_mem(adev, &pdd->spm_cntr->spm_obj);
 
 alloc_gtt_mem_failure:
 	kfree(pdd->spm_cntr);
@@ -232,7 +273,7 @@ out:
 	return ret;
 }
 
-static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
+int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 {
 	unsigned long flags;
 
@@ -250,7 +291,7 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
 	amdgpu_amdkfd_rlc_spm_release(adev, drm_priv_to_vm(pdd->drm_priv));
-	amdgpu_amdkfd_free_gtt_mem(adev, pdd->spm_cntr->spm_obj);
+	amdgpu_amdkfd_free_gtt_mem(adev, &pdd->spm_cntr->spm_obj);
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	kfree(pdd->spm_cntr);
@@ -261,26 +302,24 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	return 0;
 }
 
-static void spm_copy_data_to_usr(struct kfd_ioctl_spm_args *user_spm_data,
-			struct kfd_process_device *pdd)
-{
-	mutex_lock(&pdd->spm_cntr->spm_worker_mutex);
-	user_spm_data->bytes_copied = pdd->spm_cntr->size_copied;
-	user_spm_data->has_data_loss = pdd->spm_cntr->has_data_loss;
-	pdd->spm_cntr->has_user_buf = false;
-	mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
-}
-
-static void spm_set_dest_info(struct kfd_process_device *pdd,
+static void spm_update_dest_info(struct kfd_process_device *pdd,
 			struct kfd_ioctl_spm_args *user_spm_data)
 {
+	struct kfd_spm_cntr *spm = pdd->spm_cntr;
 	mutex_lock(&pdd->spm_cntr->spm_worker_mutex);
-	pdd->spm_cntr->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
-	pdd->spm_cntr->ubuf.ubufsize = user_spm_data->buf_size;
-	pdd->spm_cntr->has_data_loss = false;
-	pdd->spm_cntr->size_copied = 0;
-	pdd->spm_cntr->is_user_buf_filled = false;
-	pdd->spm_cntr->has_user_buf = true;
+	if (spm->has_user_buf) {
+		user_spm_data->bytes_copied = spm->size_copied;
+		user_spm_data->has_data_loss = spm->has_data_loss;
+		spm->has_user_buf = false;
+	}
+	if (user_spm_data->dest_buf) {
+		spm->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
+		spm->ubuf.ubufsize = user_spm_data->buf_size;
+		spm->has_data_loss = false;
+		spm->size_copied = 0;
+		spm->is_user_buf_filled = false;
+		spm->has_user_buf = true;
+	}
 	mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
 }
 
@@ -357,20 +396,23 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		flush_work(&pdd->spm_work);
 	}
 
-	if (spm->has_user_buf) {
-		/* get info about filled space in previous output buffer */
-		spm_copy_data_to_usr(user_spm_data, pdd);
+	if (spm->has_user_buf || user_spm_data->dest_buf) {
+		/* Get info about filled space in previous output buffer.
+		 * Setup new dest buf if provided.
+		 */
+		spm_update_dest_info(pdd, user_spm_data);
 	}
 
 	if (user_spm_data->dest_buf) {
-		/* setup new dest buf, start streaming if necessary */
-		spm_set_dest_info(pdd, user_spm_data);
-
-		/* Start SPM  */
+		/* Start SPM if necessary*/
 		if (spm->is_spm_started == false) {
 			amdgpu_amdkfd_rlc_spm_cntl(adev, 1);
 			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 			spm->is_spm_started = true;
+			/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
+			 * Adjust rptr accordingly
+			 */
+			spm->ring_rptr = 0;
 			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 		} else {
 			/* If SPM was already started, there may already
@@ -382,6 +424,10 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		amdgpu_amdkfd_rlc_spm_cntl(adev, 0);
 		spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 		spm->is_spm_started = false;
+		/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
+		 * Adjust rptr accordingly
+		 */
+		spm->ring_rptr = 0;
 		spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 	}
 
