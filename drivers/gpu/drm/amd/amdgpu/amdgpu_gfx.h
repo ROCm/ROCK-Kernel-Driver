@@ -162,10 +162,10 @@ struct amdgpu_kiq {
 };
 
 struct spm_funcs {
-	void (*start)(struct amdgpu_device *adev);
-	void (*stop)(struct amdgpu_device *adev);
-	void (*set_rdptr)(struct amdgpu_device *adev, u32 rptr);
-	void (*set_spm_perfmon_ring_buf)(struct amdgpu_device *adev, u64 gpu_rptr, u32 size);
+	void (*start)(struct amdgpu_device *adev, int xcc_id);
+	void (*stop)(struct amdgpu_device *adev, int xcc_id);
+	void (*set_rdptr)(struct amdgpu_device *adev, int xcc_id, u32 rptr);
+	void (*set_spm_perfmon_ring_buf)(struct amdgpu_device *adev, int xcc_id, u64 gpu_rptr, u32 size);
 	/* Packet sizes */
 	int set_spm_config_size;
 };

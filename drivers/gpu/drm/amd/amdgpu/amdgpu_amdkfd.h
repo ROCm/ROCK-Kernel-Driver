@@ -462,12 +462,12 @@ void amdgpu_amdkfd_release_notify(struct amdgpu_bo *bo)
 }
 #endif
 
-void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, bool cntl);
-int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev,
+void amdgpu_amdkfd_rlc_spm_cntl(struct amdgpu_device *adev, int xcc_id, bool cntl);
+int amdgpu_amdkfd_rlc_spm_acquire(struct amdgpu_device *adev, int xcc_id,
 		struct amdgpu_vm *vm, u64 gpu_addr, u32 size);
-void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, struct amdgpu_vm *vm);
-void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, u32 rptr);
-void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev);
+void amdgpu_amdkfd_rlc_spm_release(struct amdgpu_device *adev, int xcc_id, struct amdgpu_vm *vm);
+void amdgpu_amdkfd_rlc_spm_set_rdptr(struct amdgpu_device *adev, int xcc_id, u32 rptr);
+void amdgpu_amdkfd_rlc_spm_interrupt(struct amdgpu_device *adev, int xcc_id);
 
 #if IS_ENABLED(CONFIG_HSA_AMD_SVM)
 int kgd2kfd_init_zone_device(struct amdgpu_device *adev);
@@ -480,7 +480,7 @@ int kgd2kfd_init_zone_device(struct amdgpu_device *adev)
 #endif
 
 /* KGD2KFD callbacks */
-void kgd2kfd_spm_interrupt(struct kfd_dev *kfd);
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd, int xcc_id);
 int kgd2kfd_quiesce_mm(struct mm_struct *mm, uint32_t trigger);
 int kgd2kfd_resume_mm(struct mm_struct *mm);
 int kgd2kfd_schedule_evict_and_restore_process(struct mm_struct *mm,

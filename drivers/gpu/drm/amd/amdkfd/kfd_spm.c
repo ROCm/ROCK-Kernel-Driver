@@ -267,7 +267,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 
 exit:
 	kfd_spm_preset(pdd, overflow_size);
-	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->adev, spm->ring_rptr);
+	amdgpu_amdkfd_rlc_spm_set_rdptr(pdd->dev->adev, 0, spm->ring_rptr);
 	return ret;
 }
 
@@ -329,7 +329,7 @@ static int _kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device
 
 	/* reserve space to fix spm overflow */
 	spm->ring_size -= pdd->spm_overflow_reserved;
-	ret = amdgpu_amdkfd_rlc_spm_acquire(adev, drm_priv_to_vm(pdd->drm_priv),
+	ret = amdgpu_amdkfd_rlc_spm_acquire(adev, 0, drm_priv_to_vm(pdd->drm_priv),
 			spm->gpu_addr, spm->ring_size);
 
 	/*
@@ -401,7 +401,7 @@ static void _kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_devic
 
 	if (!spm->ring_size)
 		return;
-	amdgpu_amdkfd_rlc_spm_release(adev, drm_priv_to_vm(pdd->drm_priv));
+	amdgpu_amdkfd_rlc_spm_release(adev, 0, drm_priv_to_vm(pdd->drm_priv));
 	amdgpu_amdkfd_free_gtt_mem(adev, &(spm->spm_obj));
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
@@ -428,7 +428,7 @@ static int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	pdd->spm_cntr->spm.is_spm_started = false;
 	spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 
-	amdgpu_amdkfd_rlc_spm_cntl(adev, 0);
+	amdgpu_amdkfd_rlc_spm_cntl(adev, 0, 0);
 	flush_work(&pdd->spm_work);
 	wake_up_all(&pdd->spm_cntr->spm_buf_wq);
 
@@ -591,8 +591,9 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 
 	if (user_spm_data->dest_buf) {
 		/* Start SPM if necessary*/
+
 		if (spm->is_spm_started == false) {
-			amdgpu_amdkfd_rlc_spm_cntl(adev, 1);
+			amdgpu_amdkfd_rlc_spm_cntl(adev, 0, 1);
 			spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 			spm->is_spm_started = true;
 			/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
@@ -610,7 +611,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			 need_schedule = true;
 		}
 	} else {
-		amdgpu_amdkfd_rlc_spm_cntl(adev, 0);
+		amdgpu_amdkfd_rlc_spm_cntl(adev, 0, 0);
 		spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 		spm->is_spm_started = false;
 		/* amdgpu_amdkfd_rlc_spm_cntl() will reset SPM and wptr will become 0.
@@ -666,7 +667,7 @@ int kfd_rlc_spm(struct kfd_process *p,  void *data)
 	return -EINVAL;
 }
 
-void kgd2kfd_spm_interrupt(struct kfd_dev *kfd)
+void kgd2kfd_spm_interrupt(struct kfd_dev *kfd, int xcc_id)
 {
 	struct kfd_process_device *pdd;
 	struct kfd_node *dev = kfd->nodes[0];
