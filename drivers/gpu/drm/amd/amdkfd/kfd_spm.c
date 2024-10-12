@@ -35,9 +35,10 @@
  * 0.1 - Initial revision
  * 0.2 - add kfd_ioctl_spm_buffer_header
  * 0.3 - add multiple XCC support
+ * 0.4 - add gfx_v9_4_3 SPM support
  */
 #define KFD_IOCTL_SPM_MAJOR_VERSION	0
-#define KFD_IOCTL_SPM_MINOR_VERSION	3
+#define KFD_IOCTL_SPM_MINOR_VERSION	4
 
 struct user_buf {
 	uint64_t __user *user_addr;
