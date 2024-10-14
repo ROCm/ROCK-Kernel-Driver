@@ -721,6 +721,11 @@ static void set_avmute(struct pipe_ctx *pipe_ctx, bool enable)
 	if (!dc_is_hdmi_signal(pipe_ctx->stream->signal))
 		return;
 
+#if defined(CONFIG_DRM_AMD_DC_HDMI2_1)
+	if (pipe_ctx->stream->timing.flags.DSC)
+		return;
+#endif
+
 	dc->hwss.set_avmute(pipe_ctx, enable);
 }
 
