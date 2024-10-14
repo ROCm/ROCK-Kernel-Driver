@@ -926,6 +926,12 @@
 /* PIDTYPE is availablea */
 #define HAVE_PIDTYPE_TGID 1
 
+/* pm_runtime_get_if_active() has one parameters */
+#define HAVE_PM_RUNTIME_GET_IF_ACTIVE_1ARGS 1
+
+/* pm_runtime_get_if_active() has two parameters */
+/* #undef HAVE_PM_RUNTIME_GET_IF_ACTIVE_2ARGS */
+
 /* pm_runtime_resume_and_get() is available */
 #define HAVE_PM_RUNTIME_RESUME_AND_GET 1
 

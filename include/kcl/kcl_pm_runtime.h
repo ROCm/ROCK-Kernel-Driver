@@ -24,4 +24,20 @@ static inline int pm_runtime_resume_and_get(struct device *dev)
 }
 #endif
 
-#endif
+#ifdef CONFIG_PM
+#if defined(HAVE_PM_RUNTIME_GET_IF_ACTIVE_2ARGS)
+static inline int _kcl_pm_runtime_get_if_active(struct device *dev)
+{
+	return pm_runtime_get_if_active(dev, true);
+}
+#define pm_runtime_get_if_active _kcl_pm_runtime_get_if_active
+#elif !defined(HAVE_PM_RUNTIME_GET_IF_ACTIVE_1ARGS)
+static inline int _kcl_pm_runtime_get_if_active(struct device *dev)
+{
+	return pm_runtime_get_if_in_use(dev);
+}
+#define pm_runtime_get_if_active _kcl_pm_runtime_get_if_active
+#endif /* HAVE_PM_RUNTIME_GET_IF_ACTIVE_2ARGS */
+#endif /* CONFIG_PM */
+
+#endif /* KCL_KCL_PM_RUNTIME_H */
