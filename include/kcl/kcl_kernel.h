@@ -29,4 +29,9 @@
 #define __GFP_KSWAPD_RECLAIM	((__force gfp_t)___GFP_KSWAPD_RECLAIM) /* kswapd can wake */
 #endif /* ___GFP_KSWAPD_RECLAIM */
 
+/* v5.13-335-gf39650de687e ("kernel.h: split out panic and oops helpers") */
+#ifndef TAINT_CPU_OUT_OF_SPEC
+#define TAINT_CPU_OUT_OF_SPEC TAINT_UNSAFE_SMP
+#endif
+
 #endif /* AMDKCL_KERNEL_H */
