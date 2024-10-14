@@ -926,6 +926,9 @@
 /* PIDTYPE is availablea */
 #define HAVE_PIDTYPE_TGID 1
 
+/* pm_runtime_resume_and_get() is available */
+#define HAVE_PM_RUNTIME_RESUME_AND_GET 1
+
 /* pm_suspend_target_state is available */
 #define HAVE_PM_SUSPEND_TARGET_STATE 1
 
