@@ -2522,7 +2522,7 @@ static int criu_restore_memory_of_gpu_ipc(struct kfd_process_device *pdd,
 	bo_bucket->restored_offset = offset;
 	if ((bo_bucket->alloc_flags & KFD_IOC_ALLOC_MEM_FLAGS_VRAM) && !bo_priv->is_imported)
 		/* Update the VRAM usage count */
-		WRITE_ONCE(pdd->vram_usage, pdd->vram_usage + bo_bucket->size);
+		atomic64_add(bo_bucket->size, &pdd->vram_usage);
 
 	return 0;
 }
