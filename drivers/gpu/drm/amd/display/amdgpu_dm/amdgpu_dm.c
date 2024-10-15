@@ -3651,22 +3651,20 @@ void amdgpu_dm_update_connector_after_detect(
 				drm_dp_cec_unset_edid(&aconnector->dm_dp_aux.aux);
 			}
 		} else {
-#ifdef HAVE_DRM_DP_MST_EDID_READ
 			const struct edid *edid = (const struct edid *)sink->dc_edid.raw_edid;
-
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 			aconnector->drm_edid = drm_edid_alloc(edid, sink->dc_edid.length);
 			drm_edid_connector_update(connector, aconnector->drm_edid);
+#else
+			aconnector->edid = edid;
+#endif
 
 			if (aconnector->dc_link->aux_mode)
+#ifdef HAVE_DRM_DP_CEC_ATTACH
 				drm_dp_cec_attach(&aconnector->dm_dp_aux.aux,
 						  connector->display_info.source_physical_address);
 #else
-			aconnector->edid =
-				(struct edid *)sink->dc_edid.raw_edid;
-
-			if (aconnector->dc_link->aux_mode)
-				drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux,
-						    aconnector->edid);
+				drm_dp_cec_set_edid(&aconnector->dm_dp_aux.aux, edid);
 #endif
 		}
 
