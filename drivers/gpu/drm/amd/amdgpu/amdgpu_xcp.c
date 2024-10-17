@@ -462,15 +462,6 @@ static struct attribute *xcp_cfg_res_sysfs_attrs[] = {
 	&XCP_CFG_SYSFS_RES_ATTR_PTR(num_inst),
 	&XCP_CFG_SYSFS_RES_ATTR_PTR(num_shared), NULL
 };
-
-static const char *xcp_desc[] = {
-	[AMDGPU_SPX_PARTITION_MODE] = "SPX",
-	[AMDGPU_DPX_PARTITION_MODE] = "DPX",
-	[AMDGPU_TPX_PARTITION_MODE] = "TPX",
-	[AMDGPU_QPX_PARTITION_MODE] = "QPX",
-	[AMDGPU_CPX_PARTITION_MODE] = "CPX",
-};
-
 #ifdef HAVE_DEFAULT_GROUP_IN_KOBJ_TYPE
 ATTRIBUTE_GROUPS(xcp_cfg_res_sysfs);
 #endif
@@ -525,27 +516,6 @@ static int amdgpu_xcp_get_res_info(struct amdgpu_xcp_mgr *xcp_mgr,
 }
 
 #define to_xcp_cfg(x) container_of(x, struct amdgpu_xcp_cfg, kobj)
-static ssize_t supported_xcp_configs_show(struct kobject *kobj,
-					  struct kobj_attribute *attr, char *buf)
-{
-	struct amdgpu_xcp_cfg *xcp_cfg = to_xcp_cfg(kobj);
-	struct amdgpu_xcp_mgr *xcp_mgr = xcp_cfg->xcp_mgr;
-	int size = 0, mode;
-	char *sep = "";
-
-	if (!xcp_mgr || !xcp_mgr->supp_xcp_modes)
-		return sysfs_emit(buf, "Not supported\n");
-
-	for_each_inst(mode, xcp_mgr->supp_xcp_modes) {
-		size += sysfs_emit_at(buf, size, "%s%s", sep, xcp_desc[mode]);
-		sep = ", ";
-	}
-
-	size += sysfs_emit_at(buf, size, "\n");
-
-	return size;
-}
-
 static ssize_t xcp_config_show(struct kobject *kobj,
 			       struct kobj_attribute *attr, char *buf)
 {
@@ -603,15 +573,6 @@ static const struct kobj_type xcp_cfg_sysfs_ktype = {
 	.sysfs_ops = &kobj_sysfs_ops,
 };
 
-static struct kobj_attribute supp_part_sysfs_mode =
-	__ATTR_RO(supported_xcp_configs);
-
-static const struct attribute *xcp_attrs[] = {
-	&supp_part_sysfs_mode.attr,
-	&xcp_cfg_sysfs_mode.attr,
-	NULL,
-};
-
 void amdgpu_xcp_cfg_sysfs_init(struct amdgpu_device *adev)
 {
 	struct amdgpu_xcp_res_details *xcp_res;
@@ -631,7 +592,7 @@ void amdgpu_xcp_cfg_sysfs_init(struct amdgpu_device *adev)
 	if (r)
 		goto err1;
 
-	r = sysfs_create_files(&xcp_cfg->kobj, xcp_attrs);
+	r = sysfs_create_file(&xcp_cfg->kobj, &xcp_cfg_sysfs_mode.attr);
 	if (r)
 		goto err1;
 
@@ -659,7 +620,7 @@ err:
 		kobject_put(&xcp_res->kobj);
 	}
 
-	sysfs_remove_files(&xcp_cfg->kobj, xcp_attrs);
+	sysfs_remove_file(&xcp_cfg->kobj, &xcp_cfg_sysfs_mode.attr);
 err1:
 	kobject_put(&xcp_cfg->kobj);
 }
@@ -679,6 +640,6 @@ void amdgpu_xcp_cfg_sysfs_fini(struct amdgpu_device *adev)
 		kobject_put(&xcp_res->kobj);
 	}
 
-	sysfs_remove_files(&xcp_cfg->kobj, xcp_attrs);
+	sysfs_remove_file(&xcp_cfg->kobj, &xcp_cfg_sysfs_mode.attr);
 	kobject_put(&xcp_cfg->kobj);
 }
