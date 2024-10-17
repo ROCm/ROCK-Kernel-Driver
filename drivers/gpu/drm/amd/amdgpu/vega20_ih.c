@@ -526,18 +526,18 @@ static void vega20_ih_set_self_irq_funcs(struct amdgpu_device *adev)
 	adev->irq.self_irq.funcs = &vega20_ih_self_irq_funcs;
 }
 
-static int vega20_ih_early_init(void *handle)
+static int vega20_ih_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	vega20_ih_set_interrupt_funcs(adev);
 	vega20_ih_set_self_irq_funcs(adev);
 	return 0;
 }
 
-static int vega20_ih_sw_init(void *handle)
+static int vega20_ih_sw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	bool use_bus_addr = true;
 	int r;
 
@@ -586,19 +586,19 @@ static int vega20_ih_sw_init(void *handle)
 	return r;
 }
 
-static int vega20_ih_sw_fini(void *handle)
+static int vega20_ih_sw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	amdgpu_irq_fini_sw(adev);
 
 	return 0;
 }
 
-static int vega20_ih_hw_init(void *handle)
+static int vega20_ih_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	r = vega20_ih_irq_init(adev);
 	if (r)
@@ -607,27 +607,21 @@ static int vega20_ih_hw_init(void *handle)
 	return 0;
 }
 
-static int vega20_ih_hw_fini(void *handle)
+static int vega20_ih_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	vega20_ih_irq_disable(adev);
+	vega20_ih_irq_disable(ip_block->adev);
 
 	return 0;
 }
 
-static int vega20_ih_suspend(void *handle)
+static int vega20_ih_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return vega20_ih_hw_fini(adev);
+	return vega20_ih_hw_fini(ip_block);
 }
 
-static int vega20_ih_resume(void *handle)
+static int vega20_ih_resume(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return vega20_ih_hw_init(adev);
+	return vega20_ih_hw_init(ip_block);
 }
 
 static bool vega20_ih_is_idle(void *handle)
@@ -636,13 +630,13 @@ static bool vega20_ih_is_idle(void *handle)
 	return true;
 }
 
-static int vega20_ih_wait_for_idle(void *handle)
+static int vega20_ih_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	/* todo */
 	return -ETIMEDOUT;
 }
 
-static int vega20_ih_soft_reset(void *handle)
+static int vega20_ih_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	/* todo */
 

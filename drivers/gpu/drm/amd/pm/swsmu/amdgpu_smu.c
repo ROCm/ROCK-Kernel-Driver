@@ -742,9 +742,9 @@ static int smu_set_funcs(struct amdgpu_device *adev)
 	return 0;
 }
 
-static int smu_early_init(void *handle)
+static int smu_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu;
 	int r;
 
@@ -826,9 +826,9 @@ static int smu_apply_default_config_table_settings(struct smu_context *smu)
 	return smu_set_config_table(smu, &adev->pm.config_table);
 }
 
-static int smu_late_init(void *handle)
+static int smu_late_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret = 0;
 
@@ -1235,9 +1235,9 @@ static void smu_init_xgmi_plpd_mode(struct smu_context *smu)
 	}
 }
 
-static int smu_sw_init(void *handle)
+static int smu_sw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
@@ -1314,9 +1314,9 @@ static int smu_sw_init(void *handle)
 	return 0;
 }
 
-static int smu_sw_fini(void *handle)
+static int smu_sw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
@@ -1787,10 +1787,10 @@ static int smu_start_smc_engine(struct smu_context *smu)
 	return ret;
 }
 
-static int smu_hw_init(void *handle)
+static int smu_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev)) {
@@ -2009,9 +2009,9 @@ static int smu_reset_mp1_state(struct smu_context *smu)
 	return ret;
 }
 
-static int smu_hw_fini(void *handle)
+static int smu_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 
@@ -2042,9 +2042,9 @@ static int smu_hw_fini(void *handle)
 	return 0;
 }
 
-static void smu_late_fini(void *handle)
+static void smu_late_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	kfree(smu);
@@ -2053,26 +2053,31 @@ static void smu_late_fini(void *handle)
 static int smu_reset(struct smu_context *smu)
 {
 	struct amdgpu_device *adev = smu->adev;
+	struct amdgpu_ip_block *ip_block;
 	int ret;
 
-	ret = smu_hw_fini(adev);
+	ip_block = amdgpu_device_ip_get_ip_block(adev, AMD_IP_BLOCK_TYPE_SMC);
+	if (!ip_block)
+		return -EINVAL;
+
+	ret = smu_hw_fini(ip_block);
 	if (ret)
 		return ret;
 
-	ret = smu_hw_init(adev);
+	ret = smu_hw_init(ip_block);
 	if (ret)
 		return ret;
 
-	ret = smu_late_init(adev);
+	ret = smu_late_init(ip_block);
 	if (ret)
 		return ret;
 
 	return 0;
 }
 
-static int smu_suspend(void *handle)
+static int smu_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 	int ret;
 	uint64_t count;
@@ -2104,10 +2109,10 @@ static int smu_suspend(void *handle)
 	return 0;
 }
 
-static int smu_resume(void *handle)
+static int smu_resume(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct smu_context *smu = adev->powerplay.pp_handle;
 
 	if (amdgpu_sriov_vf(adev)&& !amdgpu_sriov_is_pp_one_vf(adev))

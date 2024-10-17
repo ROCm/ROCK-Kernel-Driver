@@ -1319,12 +1319,12 @@ static void gfx_v12_0_alloc_ip_dump(struct amdgpu_device *adev)
 	}
 }
 
-static int gfx_v12_0_sw_init(void *handle)
+static int gfx_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	int i, j, k, r, ring_id = 0;
 	unsigned num_compute_rings;
 	int xcc_id = 0;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	switch (amdgpu_ip_version(adev, GC_HWIP, 0)) {
 	case IP_VERSION(12, 0, 0):
@@ -1492,10 +1492,10 @@ static void gfx_v12_0_rlc_autoload_buffer_fini(struct amdgpu_device *adev)
 			(void **)&adev->gfx.rlc.rlc_autoload_ptr);
 }
 
-static int gfx_v12_0_sw_fini(void *handle)
+static int gfx_v12_0_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	int i;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	for (i = 0; i < adev->gfx.num_gfx_rings; i++)
 		amdgpu_ring_fini(&adev->gfx.gfx_ring[i]);
@@ -3513,10 +3513,10 @@ static void gfx_v12_0_init_golden_registers(struct amdgpu_device *adev)
 	}
 }
 
-static int gfx_v12_0_hw_init(void *handle)
+static int gfx_v12_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->firmware.load_type == AMDGPU_FW_LOAD_RLC_BACKDOOR_AUTO) {
 		if (adev->gfx.imu.funcs && (amdgpu_dpm > 0)) {
@@ -3603,9 +3603,9 @@ static int gfx_v12_0_hw_init(void *handle)
 	return r;
 }
 
-static int gfx_v12_0_hw_fini(void *handle)
+static int gfx_v12_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	uint32_t tmp;
 
 	amdgpu_irq_put(adev, &adev->gfx.priv_reg_irq, 0);
@@ -3643,14 +3643,14 @@ static int gfx_v12_0_hw_fini(void *handle)
 	return 0;
 }
 
-static int gfx_v12_0_suspend(void *handle)
+static int gfx_v12_0_suspend(struct amdgpu_ip_block *ip_block)
 {
-	return gfx_v12_0_hw_fini(handle);
+	return gfx_v12_0_hw_fini(ip_block);
 }
 
-static int gfx_v12_0_resume(void *handle)
+static int gfx_v12_0_resume(struct amdgpu_ip_block *ip_block)
 {
-	return gfx_v12_0_hw_init(handle);
+	return gfx_v12_0_hw_init(ip_block);
 }
 
 static bool gfx_v12_0_is_idle(void *handle)
@@ -3664,11 +3664,11 @@ static bool gfx_v12_0_is_idle(void *handle)
 		return true;
 }
 
-static int gfx_v12_0_wait_for_idle(void *handle)
+static int gfx_v12_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	unsigned i;
 	u32 tmp;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	for (i = 0; i < adev->usec_timeout; i++) {
 		/* read MC_STATUS */
@@ -3695,9 +3695,9 @@ static uint64_t gfx_v12_0_get_gpu_clock_counter(struct amdgpu_device *adev)
 	return clock;
 }
 
-static int gfx_v12_0_early_init(void *handle)
+static int gfx_v12_0_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->gfx.funcs = &gfx_v12_0_gfx_funcs;
 
@@ -3717,9 +3717,9 @@ static int gfx_v12_0_early_init(void *handle)
 	return gfx_v12_0_init_microcode(adev);
 }
 
-static int gfx_v12_0_late_init(void *handle)
+static int gfx_v12_0_late_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	int r;
 
 	r = amdgpu_irq_get(adev, &adev->gfx.priv_reg_irq, 0);
@@ -5038,9 +5038,9 @@ static void gfx_v12_ring_insert_nop(struct amdgpu_ring *ring, uint32_t num_nop)
 		amdgpu_ring_write(ring, ring->funcs->nop);
 }
 
-static void gfx_v12_ip_print(void *handle, struct drm_printer *p)
+static void gfx_v12_ip_print(struct amdgpu_ip_block *ip_block, struct drm_printer *p)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	uint32_t i, j, k, reg, index = 0;
 	uint32_t reg_count = ARRAY_SIZE(gc_reg_list_12_0);
 
@@ -5102,9 +5102,9 @@ static void gfx_v12_ip_print(void *handle, struct drm_printer *p)
 	}
 }
 
-static void gfx_v12_ip_dump(void *handle)
+static void gfx_v12_ip_dump(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	uint32_t i, j, k, reg, index = 0;
 	uint32_t reg_count = ARRAY_SIZE(gc_reg_list_12_0);
 

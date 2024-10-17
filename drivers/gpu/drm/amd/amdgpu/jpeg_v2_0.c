@@ -45,9 +45,9 @@ static int jpeg_v2_0_set_powergating_state(void *handle,
  *
  * Set ring and irq function pointers
  */
-static int jpeg_v2_0_early_init(void *handle)
+static int jpeg_v2_0_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->jpeg.num_jpeg_inst = 1;
 	adev->jpeg.num_jpeg_rings = 1;
@@ -65,9 +65,9 @@ static int jpeg_v2_0_early_init(void *handle)
  *
  * Load firmware and sw initialization
  */
-static int jpeg_v2_0_sw_init(void *handle)
+static int jpeg_v2_0_sw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_ring *ring;
 	int r;
 
@@ -108,10 +108,10 @@ static int jpeg_v2_0_sw_init(void *handle)
  *
  * JPEG suspend and free up sw allocation
  */
-static int jpeg_v2_0_sw_fini(void *handle)
+static int jpeg_v2_0_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	r = amdgpu_jpeg_suspend(adev);
 	if (r)
@@ -128,9 +128,9 @@ static int jpeg_v2_0_sw_fini(void *handle)
  * @handle: amdgpu_device pointer
  *
  */
-static int jpeg_v2_0_hw_init(void *handle)
+static int jpeg_v2_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	struct amdgpu_ring *ring = adev->jpeg.inst->ring_dec;
 
 	adev->nbio.funcs->vcn_doorbell_range(adev, ring->use_doorbell,
@@ -146,9 +146,9 @@ static int jpeg_v2_0_hw_init(void *handle)
  *
  * Stop the JPEG block, mark ring as not ready any more
  */
-static int jpeg_v2_0_hw_fini(void *handle)
+static int jpeg_v2_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	cancel_delayed_work_sync(&adev->vcn.idle_work);
 
@@ -166,16 +166,15 @@ static int jpeg_v2_0_hw_fini(void *handle)
  *
  * HW fini and suspend JPEG block
  */
-static int jpeg_v2_0_suspend(void *handle)
+static int jpeg_v2_0_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	int r;
 
-	r = jpeg_v2_0_hw_fini(adev);
+	r = jpeg_v2_0_hw_fini(ip_block);
 	if (r)
 		return r;
 
-	r = amdgpu_jpeg_suspend(adev);
+	r = amdgpu_jpeg_suspend(ip_block->adev);
 
 	return r;
 }
@@ -187,16 +186,15 @@ static int jpeg_v2_0_suspend(void *handle)
  *
  * Resume firmware and hw init JPEG block
  */
-static int jpeg_v2_0_resume(void *handle)
+static int jpeg_v2_0_resume(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 
-	r = amdgpu_jpeg_resume(adev);
+	r = amdgpu_jpeg_resume(ip_block->adev);
 	if (r)
 		return r;
 
-	r = jpeg_v2_0_hw_init(adev);
+	r = jpeg_v2_0_hw_init(ip_block);
 
 	return r;
 }
@@ -666,9 +664,9 @@ static bool jpeg_v2_0_is_idle(void *handle)
 		UVD_JRBC_STATUS__RB_JOB_DONE_MASK);
 }
 
-static int jpeg_v2_0_wait_for_idle(void *handle)
+static int jpeg_v2_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	int ret;
 
 	ret = SOC15_WAIT_ON_RREG(JPEG, 0, mmUVD_JRBC_STATUS, UVD_JRBC_STATUS__RB_JOB_DONE_MASK,

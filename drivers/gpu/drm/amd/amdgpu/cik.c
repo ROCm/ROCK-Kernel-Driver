@@ -1985,9 +1985,9 @@ static const struct amdgpu_asic_funcs cik_asic_funcs =
 	.query_video_codecs = &cik_query_video_codecs,
 };
 
-static int cik_common_early_init(void *handle)
+static int cik_common_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->smc_rreg = &cik_smc_rreg;
 	adev->smc_wreg = &cik_smc_wreg;
@@ -2124,19 +2124,19 @@ static int cik_common_early_init(void *handle)
 	return 0;
 }
 
-static int cik_common_sw_init(void *handle)
+static int cik_common_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
 
-static int cik_common_sw_fini(void *handle)
+static int cik_common_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
 
-static int cik_common_hw_init(void *handle)
+static int cik_common_hw_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	/* move the golden regs per IP block */
 	cik_init_golden_registers(adev);
@@ -2148,23 +2148,19 @@ static int cik_common_hw_init(void *handle)
 	return 0;
 }
 
-static int cik_common_hw_fini(void *handle)
+static int cik_common_hw_fini(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
 
-static int cik_common_suspend(void *handle)
+static int cik_common_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return cik_common_hw_fini(adev);
+	return cik_common_hw_fini(ip_block);
 }
 
-static int cik_common_resume(void *handle)
+static int cik_common_resume(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return cik_common_hw_init(adev);
+	return cik_common_hw_init(ip_block);
 }
 
 static bool cik_common_is_idle(void *handle)
@@ -2172,12 +2168,12 @@ static bool cik_common_is_idle(void *handle)
 	return true;
 }
 
-static int cik_common_wait_for_idle(void *handle)
+static int cik_common_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
 
-static int cik_common_soft_reset(void *handle)
+static int cik_common_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	/* XXX hard reset?? */
 	return 0;

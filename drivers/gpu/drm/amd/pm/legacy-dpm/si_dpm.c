@@ -7621,10 +7621,10 @@ static int si_dpm_process_interrupt(struct amdgpu_device *adev,
 	return 0;
 }
 
-static int si_dpm_late_init(void *handle)
+static int si_dpm_late_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (!adev->pm.dpm_enabled)
 		return 0;
@@ -7718,10 +7718,10 @@ static int si_dpm_init_microcode(struct amdgpu_device *adev)
 	return err;
 }
 
-static int si_dpm_sw_init(void *handle)
+static int si_dpm_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	ret = amdgpu_irq_add_id(adev, AMDGPU_IRQ_CLIENTID_LEGACY, 230, &adev->pm.dpm.thermal.irq);
 	if (ret)
@@ -7765,9 +7765,9 @@ dpm_failed:
 	return ret;
 }
 
-static int si_dpm_sw_fini(void *handle)
+static int si_dpm_sw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	flush_work(&adev->pm.dpm.thermal.work);
 
@@ -7776,11 +7776,11 @@ static int si_dpm_sw_fini(void *handle)
 	return 0;
 }
 
-static int si_dpm_hw_init(void *handle)
+static int si_dpm_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
 
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (!amdgpu_dpm)
 		return 0;
@@ -7795,9 +7795,9 @@ static int si_dpm_hw_init(void *handle)
 	return ret;
 }
 
-static int si_dpm_hw_fini(void *handle)
+static int si_dpm_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled)
 		si_dpm_disable(adev);
@@ -7805,9 +7805,9 @@ static int si_dpm_hw_fini(void *handle)
 	return 0;
 }
 
-static int si_dpm_suspend(void *handle)
+static int si_dpm_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled) {
 		/* disable dpm */
@@ -7818,10 +7818,10 @@ static int si_dpm_suspend(void *handle)
 	return 0;
 }
 
-static int si_dpm_resume(void *handle)
+static int si_dpm_resume(struct amdgpu_ip_block *ip_block)
 {
 	int ret;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	if (adev->pm.dpm_enabled) {
 		/* asic init will reset to the boot state */
@@ -7843,13 +7843,13 @@ static bool si_dpm_is_idle(void *handle)
 	return true;
 }
 
-static int si_dpm_wait_for_idle(void *handle)
+static int si_dpm_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	/* XXX */
 	return 0;
 }
 
-static int si_dpm_soft_reset(void *handle)
+static int si_dpm_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
@@ -7930,10 +7930,10 @@ static void si_dpm_print_power_state(void *handle,
 	amdgpu_dpm_print_ps_status(adev, rps);
 }
 
-static int si_dpm_early_init(void *handle)
+static int si_dpm_early_init(struct amdgpu_ip_block *ip_block)
 {
 
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->powerplay.pp_funcs = &si_dpm_funcs;
 	adev->powerplay.pp_handle = adev;

@@ -3023,9 +3023,9 @@ static const struct amdgpu_rlc_funcs gfx_v6_0_rlc_funcs = {
 	.start = gfx_v6_0_rlc_start
 };
 
-static int gfx_v6_0_early_init(void *handle)
+static int gfx_v6_0_early_init(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	adev->gfx.xcc_mask = 1;
 	adev->gfx.num_gfx_rings = GFX6_NUM_GFX_RINGS;
@@ -3039,10 +3039,10 @@ static int gfx_v6_0_early_init(void *handle)
 	return 0;
 }
 
-static int gfx_v6_0_sw_init(void *handle)
+static int gfx_v6_0_sw_init(struct amdgpu_ip_block *ip_block)
 {
 	struct amdgpu_ring *ring;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 	int i, r;
 
 	r = amdgpu_irq_add_id(adev, AMDGPU_IRQ_CLIENTID_LEGACY, 181, &adev->gfx.eop_irq);
@@ -3107,10 +3107,10 @@ static int gfx_v6_0_sw_init(void *handle)
 	return r;
 }
 
-static int gfx_v6_0_sw_fini(void *handle)
+static int gfx_v6_0_sw_fini(struct amdgpu_ip_block *ip_block)
 {
 	int i;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	for (i = 0; i < adev->gfx.num_gfx_rings; i++)
 		amdgpu_ring_fini(&adev->gfx.gfx_ring[i]);
@@ -3122,10 +3122,10 @@ static int gfx_v6_0_sw_fini(void *handle)
 	return 0;
 }
 
-static int gfx_v6_0_hw_init(void *handle)
+static int gfx_v6_0_hw_init(struct amdgpu_ip_block *ip_block)
 {
 	int r;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	gfx_v6_0_constants_init(adev);
 
@@ -3142,9 +3142,9 @@ static int gfx_v6_0_hw_init(void *handle)
 	return r;
 }
 
-static int gfx_v6_0_hw_fini(void *handle)
+static int gfx_v6_0_hw_fini(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	gfx_v6_0_cp_enable(adev, false);
 	adev->gfx.rlc.funcs->stop(adev);
@@ -3153,18 +3153,14 @@ static int gfx_v6_0_hw_fini(void *handle)
 	return 0;
 }
 
-static int gfx_v6_0_suspend(void *handle)
+static int gfx_v6_0_suspend(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return gfx_v6_0_hw_fini(adev);
+	return gfx_v6_0_hw_fini(ip_block);
 }
 
-static int gfx_v6_0_resume(void *handle)
+static int gfx_v6_0_resume(struct amdgpu_ip_block *ip_block)
 {
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-
-	return gfx_v6_0_hw_init(adev);
+	return gfx_v6_0_hw_init(ip_block);
 }
 
 static bool gfx_v6_0_is_idle(void *handle)
@@ -3177,20 +3173,20 @@ static bool gfx_v6_0_is_idle(void *handle)
 		return true;
 }
 
-static int gfx_v6_0_wait_for_idle(void *handle)
+static int gfx_v6_0_wait_for_idle(struct amdgpu_ip_block *ip_block)
 {
 	unsigned i;
-	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
+	struct amdgpu_device *adev = ip_block->adev;
 
 	for (i = 0; i < adev->usec_timeout; i++) {
-		if (gfx_v6_0_is_idle(handle))
+		if (gfx_v6_0_is_idle(adev))
 			return 0;
 		udelay(1);
 	}
 	return -ETIMEDOUT;
 }
 
-static int gfx_v6_0_soft_reset(void *handle)
+static int gfx_v6_0_soft_reset(struct amdgpu_ip_block *ip_block)
 {
 	return 0;
 }
