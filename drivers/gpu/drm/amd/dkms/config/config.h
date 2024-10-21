@@ -1050,6 +1050,9 @@
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1
 
+/* usleep_range_stat() is available */
+#define HAVE_USLEEP_RANGE_STATE 1
+
 /* vga_client_register() don't pass a cookie */
 #define HAVE_VGA_CLIENT_REGISTER_NOT_PASS_COOKIE 1
 
