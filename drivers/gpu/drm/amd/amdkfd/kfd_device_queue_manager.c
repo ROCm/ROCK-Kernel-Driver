@@ -2075,7 +2075,7 @@ int amdkfd_fence_wait_timeout(struct device_queue_manager *dqm,
 {
 	unsigned long end_jiffies = msecs_to_jiffies(timeout_ms) + jiffies;
 	struct device *dev = dqm->dev->adev->dev;
-	volatile uint64_t *fence_addr = dqm->fence_addr;
+	uint64_t *fence_addr =  dqm->fence_addr;
 
 	while (*fence_addr != fence_value) {
 		/* Fatal err detected, this response won't come */
@@ -2280,7 +2280,6 @@ static int unmap_queues_cpsch(struct device_queue_manager *dqm,
 		goto out;
 
 	*dqm->fence_addr = KFD_FENCE_INIT;
-	mb();
 	pm_send_query_status(&dqm->packet_mgr, dqm->fence_gpu_addr,
 				KFD_FENCE_COMPLETED);
 	/* should be timed out */
