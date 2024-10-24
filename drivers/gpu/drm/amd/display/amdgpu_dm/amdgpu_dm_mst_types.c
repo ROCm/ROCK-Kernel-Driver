@@ -146,7 +146,11 @@ dm_dp_mst_connector_destroy(struct drm_connector *connector)
 	}
 #endif
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	drm_edid_free(aconnector->drm_edid);
+#else
+	kfree(aconnector->edid);
+#endif
 
 	drm_connector_cleanup(connector);
 #if defined(HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC)
@@ -204,7 +208,11 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 
 		dc_sink_release(dc_sink);
 		aconnector->dc_sink = NULL;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		aconnector->drm_edid = NULL;
+#else
+		aconnector->edid = NULL;
+#endif
 		aconnector->dsc_aux = NULL;
 #ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 		port->passthrough_aux = NULL;
@@ -335,6 +343,7 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 	if (!aconnector)
 		return drm_add_edid_modes(connector, NULL);
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	if (!aconnector->drm_edid) {
 		const struct drm_edid *drm_edid;
 
@@ -343,12 +352,25 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 						aconnector->mst_output_port);
 
 		if (!drm_edid) {
+#else
+	if (!aconnector->edid) {
+		struct edid *edid;
+		edid = drm_dp_mst_get_edid(connector, &aconnector->mst_root->mst_mgr, aconnector->mst_output_port);
+
+		if (!edid) {
+#endif
 			amdgpu_dm_set_mst_status(&aconnector->mst_status,
 			MST_REMOTE_EDID, false);
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 			drm_edid_connector_update(
 				&aconnector->base,
 				NULL);
+#else
+			drm_connector_update_edid_property(
+				&aconnector->base,
+				NULL);
+#endif
 
 			DRM_DEBUG_KMS("Can't get EDID of %s. Add default remote sink.", connector->name);
 			if (!aconnector->dc_sink) {
@@ -380,7 +402,11 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 			return ret;
 		}
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		aconnector->drm_edid = drm_edid;
+#else
+		aconnector->edid = edid;
+#endif
 		amdgpu_dm_set_mst_status(&aconnector->mst_status,
 			MST_REMOTE_EDID, true);
 	}
@@ -395,13 +421,20 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		struct dc_sink_init_data init_params = {
 				.link = aconnector->dc_link,
 				.sink_signal = SIGNAL_TYPE_DISPLAY_PORT_MST };
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		const struct edid *edid;
 
 		edid = drm_edid_raw(aconnector->drm_edid); // FIXME: Get rid of drm_edid_raw()
+#endif
 		dc_sink = dc_link_add_remote_sink(
 			aconnector->dc_link,
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 			(uint8_t *)edid,
 			(edid->extensions + 1) * EDID_LENGTH,
+#else
+			(uint8_t *)aconnector->edid,
+			(aconnector->edid->extensions + 1) * EDID_LENGTH,
+#endif
 			&init_params);
 
 		if (!dc_sink) {
@@ -445,7 +478,11 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 
 		if (aconnector->dc_sink) {
 			amdgpu_dm_update_freesync_caps(
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 					connector, aconnector->drm_edid);
+#else
+					connector, aconnector->edid);
+#endif
 
 #if defined(HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT)
 #if defined(CONFIG_DRM_AMD_DC_FP)
@@ -460,10 +497,16 @@ static int dm_dp_mst_get_modes(struct drm_connector *connector)
 		}
 	}
 
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 	drm_edid_connector_update(&aconnector->base, aconnector->drm_edid);
 
 	ret = drm_edid_connector_add_modes(connector);
+#else
+	drm_connector_update_edid_property(
+					&aconnector->base, aconnector->edid);
 
+	ret = drm_add_edid_modes(connector, aconnector->edid);
+#endif
 	return ret;
 }
 
@@ -546,7 +589,11 @@ dm_dp_mst_detect(struct drm_connector *connector,
 
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
+#ifdef HAVE_DRM_DP_MST_EDID_READ
 		aconnector->drm_edid = NULL;
+#else
+		aconnector->edid = NULL;
+#endif
 		aconnector->dsc_aux = NULL;
 #ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
 		port->passthrough_aux = NULL;

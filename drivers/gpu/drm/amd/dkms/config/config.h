@@ -380,6 +380,9 @@
 /* drm_dp_mst_dsc_aux_for_port() is available */
 #define HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT 1
 
+/* drm_dp_mst_edid_read() is available */
+#define HAVE_DRM_DP_MST_EDID_READ 1
+
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
 
