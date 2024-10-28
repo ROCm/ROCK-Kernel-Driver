@@ -60,6 +60,7 @@ if [ -x "/usr/sbin/weak-modules" ]; then
     printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amd-sched.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
     printf '%s\n' "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdttm.ko" | /usr/sbin/weak-modules --no-initramfs --add-modules
 fi
+dracut -f --kver %{kernel}.%{_arch}
 
 %preun
 echo "/lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdgpu.ko" >> /var/run/rpm-%{pkg}-modules.list
@@ -78,6 +79,7 @@ if [ -x "/usr/sbin/weak-modules" ]; then
     printf '%s\n' "${modules[@]}" | /usr/sbin/weak-modules --no-initramfs --remove-modules
 fi
 rm /var/run/rpm-%{pkg}-modules.list
+dracut -f --kver %{kernel}.%{_arch}
 
 %files
 /lib/modules/%{kernel}.%{_arch}/extra/drivers/gpu/drm/amdgpu/amdgpu.ko
