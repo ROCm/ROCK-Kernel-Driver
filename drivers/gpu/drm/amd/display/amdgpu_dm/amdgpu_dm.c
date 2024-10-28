@@ -12661,6 +12661,8 @@ void amdgpu_dm_update_freesync_caps(struct drm_connector *connector,
 
 	if (!drm_edid || !sink) {
 #else
+	drm_connector_update_edid_property(connector, edid);
+
 	if (!edid || !sink) {
 #endif
 		dm_con_state = to_dm_connector_state(connector->state);
