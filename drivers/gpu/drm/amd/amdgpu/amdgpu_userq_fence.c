@@ -311,7 +311,9 @@ static void amdgpu_userq_fence_release(struct dma_fence *f)
 }
 
 static const struct dma_fence_ops amdgpu_userq_fence_ops = {
+#ifdef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO
 	.use_64bit_seqno = true,
+#endif
 	.get_driver_name = amdgpu_userq_fence_get_driver_name,
 	.get_timeline_name = amdgpu_userq_fence_get_timeline_name,
 	.signaled = amdgpu_userq_fence_signaled,
