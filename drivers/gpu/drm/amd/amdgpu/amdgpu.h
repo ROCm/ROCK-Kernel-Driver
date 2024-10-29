@@ -397,6 +397,8 @@ struct amdgpu_ip_block {
 	const struct amdgpu_ip_block_version *version;
 	struct amdgpu_device *adev;
 	unsigned int instance;
+	/* IP reg dump */
+	uint32_t *ip_dump;
 };
 
 int amdgpu_device_ip_block_version_cmp(struct amdgpu_device *adev,
