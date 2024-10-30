@@ -220,6 +220,9 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 			if (*overflow_ptr == SPM_OVERFLOW_MAGIC)
 				break;
 		}
+		if (overflow_size)
+			dev_dbg(pdd->dev->adev->dev,
+				"SPM ring buffer overflow size 0x%x", overflow_size);
 		/* move overflow counters into ring buffer to avoid data loss */
 		memcpy(ring_start, ring_end, overflow_size);
 
