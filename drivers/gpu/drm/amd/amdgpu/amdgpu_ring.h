@@ -378,6 +378,8 @@ static inline void amdgpu_ring_clear_ring(struct amdgpu_ring *ring)
 static inline void amdgpu_ring_write(struct amdgpu_ring *ring, uint32_t v)
 {
 	ring->ring[ring->wptr++ & ring->buf_mask] = v;
+	ring->wptr &= ring->ptr_mask;
+	ring->count_dw--;
 }
 
 static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
@@ -401,6 +403,8 @@ static inline void amdgpu_ring_write_multiple(struct amdgpu_ring *ring,
 	}
 
 	ring->wptr += count_dw;
+	ring->wptr &= ring->ptr_mask;
+	ring->count_dw -= count_dw;
 }
 
 /**
