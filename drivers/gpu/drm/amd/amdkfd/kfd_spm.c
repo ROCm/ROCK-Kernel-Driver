@@ -48,10 +48,78 @@ struct kfd_spm_cntr {
 	bool   has_user_buf;
 	bool   is_user_buf_filled;
 	bool   is_spm_started;
+	u32    warned_ring_rptr;
 };
 
 /* used to detect SPM overflow */
 #define SPM_OVERFLOW_MAGIC        0xBEEFABCDDEADABCD
+
+static int kfd_spm_monitor_thread(void *param)
+{
+	struct kfd_process_device *pdd = param;
+	struct kfd_node *node = pdd->dev;
+
+	allow_signal(SIGKILL);
+	while (!kthread_should_stop() &&
+			!signal_pending(node->spm_monitor_thread) && pdd->spm_cntr) {
+		struct kfd_spm_cntr *spm = pdd->spm_cntr;
+		bool need_schedule = false;
+
+		usleep_range(1, 11);
+
+		if (!mutex_trylock(&pdd->spm_cntr->spm_worker_mutex))
+			continue;
+
+		if (spm->is_spm_started) {
+			u32 warned_ring_rptr;
+			u32 ring_size;
+			u32 ring_rptr;
+			u32 ring_wptr;
+
+			ring_size = spm->ring_size;
+			ring_rptr = spm->ring_rptr;
+			warned_ring_rptr = spm->warned_ring_rptr;
+			ring_wptr = READ_ONCE(spm->cpu_addr[0]);
+
+			if (need_schedule || (ring_rptr != warned_ring_rptr &&
+				(ring_size + ring_wptr - ring_rptr) % ring_size >
+					(ring_size >> 1))) {
+				spm->warned_ring_rptr = ring_rptr;
+				if (!need_schedule) {
+					dev_dbg(node->adev->dev,
+						"SPM soft interrupt rptr:0x%08x--wptr:0x%08x",
+						 ring_rptr, ring_wptr);
+					need_schedule = true;
+				}
+			}
+		}
+		mutex_unlock(&pdd->spm_cntr->spm_worker_mutex);
+		if (need_schedule)
+			schedule_work(&pdd->spm_work);
+	}
+	node->spm_monitor_thread = NULL;
+	return 0;
+}
+
+static int kfd_spm_monitor_thread_start(struct kfd_process_device *pdd)
+{
+	struct kfd_node *node = pdd->dev;
+	char thread_name[16];
+	int ret = 0;
+
+	snprintf(thread_name, 16, "spm_%d", node->adev->ddev.render->index);
+	node->spm_monitor_thread =
+		kthread_run(kfd_spm_monitor_thread, pdd, thread_name);
+
+	if (IS_ERR(node->spm_monitor_thread)) {
+		ret = PTR_ERR(node->spm_monitor_thread);
+		node->spm_monitor_thread = NULL;
+		dev_dbg(node->adev->dev, "Failed to create spm monitor thread %s with ret = %d.",
+			thread_name, ret);
+	}
+
+	return ret;
+}
 
 static void kfd_spm_preset(struct kfd_process_device *pdd, u32 size)
 {
@@ -137,6 +205,7 @@ static int kfd_spm_read_ring_buffer(struct kfd_process_device *pdd)
 	if (spm->ring_rptr == ring_wptr)
 		goto exit;
 
+	spm->warned_ring_rptr = spm->ring_rptr;
 	if (ring_wptr > spm->ring_rptr) {
 		size_to_copy = ring_wptr - spm->ring_rptr;
 		ret = kfd_spm_data_copy(pdd, size_to_copy);
@@ -258,6 +327,8 @@ static int kfd_acquire_spm(struct kfd_process_device *pdd, struct amdgpu_device 
 	spin_lock_init(&pdd->spm_irq_lock);
 
 	kfd_spm_preset(pdd, pdd->spm_overflow_reserved);
+	pdd->spm_cntr->warned_ring_rptr = ~0;
+	pdd->dev->spm_monitor_thread = NULL;
 
 	goto out;
 
@@ -282,6 +353,9 @@ int kfd_release_spm(struct kfd_process_device *pdd, struct amdgpu_device *adev)
 		mutex_unlock(&pdd->spm_mutex);
 		return -EINVAL;
 	}
+
+	if (pdd->dev->spm_monitor_thread)
+		kthread_stop(pdd->dev->spm_monitor_thread);
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
 	pdd->spm_cntr->is_spm_started = false;
@@ -413,7 +487,10 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			 * Adjust rptr accordingly
 			 */
 			spm->ring_rptr = 0;
+			spm->warned_ring_rptr = ~0;
 			spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
+			if (!pdd->dev->spm_monitor_thread)
+				kfd_spm_monitor_thread_start(pdd);
 		} else {
 			/* If SPM was already started, there may already
 			 * be data in the ring-buffer that needs to be read.
@@ -428,7 +505,10 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		 * Adjust rptr accordingly
 		 */
 		spm->ring_rptr = 0;
+		spm->warned_ring_rptr = ~0;
 		spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
+		if (pdd->dev->spm_monitor_thread)
+			kthread_stop(pdd->dev->spm_monitor_thread);
 	}
 
 	mutex_unlock(&pdd->spm_mutex);
@@ -480,7 +560,7 @@ void kgd2kfd_spm_interrupt(struct kfd_dev *kfd)
 	unsigned long flags;
 
 	if (!p) {
-		pr_debug("kfd_spm_interrupt p = %p\n", p);
+		dev_dbg(dev->adev->dev, "kfd_spm_interrupt p = %p\n", p);
 		return; /* Presumably process exited. */
 	}
 
@@ -489,11 +569,11 @@ void kgd2kfd_spm_interrupt(struct kfd_dev *kfd)
 		return;
 
 	spin_lock_irqsave(&pdd->spm_irq_lock, flags);
-
 	if (pdd->spm_cntr && pdd->spm_cntr->is_spm_started)
-		schedule_work(&pdd->spm_work);
+		pdd->spm_cntr->has_data_loss = true;
 	spin_unlock_irqrestore(&pdd->spm_irq_lock, flags);
 
+	dev_dbg(dev->adev->dev, "SPM ring buffer stall.");
 	kfd_unref_process(p);
 }
 

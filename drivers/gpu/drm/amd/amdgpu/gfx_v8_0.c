@@ -5342,7 +5342,7 @@ static void gfx_v8_0_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
 			mmRLC_SPM_PERFMON_RING_SIZE, size);
 
 	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false,
-			mmRLC_SPM_SEGMENT_THRESHOLD, 0xff);
+			mmRLC_SPM_SEGMENT_THRESHOLD, 0x1);
 
 	gfx_v8_0_write_data_to_reg(kiq_ring, 0, false, mmCP_PERFMON_CNTL, 0);
 }

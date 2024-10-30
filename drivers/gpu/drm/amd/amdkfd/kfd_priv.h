@@ -349,6 +349,7 @@ struct kfd_node {
 
 	/*spm process id */
 	unsigned int spm_pasid;
+	struct task_struct *spm_monitor_thread;
 
 	/* Maximum process number mapped to HW scheduler */
 	unsigned int max_proc_per_quantum;

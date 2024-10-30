@@ -7781,7 +7781,7 @@ static void gfx_v10_0_set_spm_perfmon_ring_buf(struct amdgpu_device *adev,
 			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_PERFMON_RING_SIZE), size);
 
 	gfx_v10_0_write_data_to_reg(kiq_ring, 0, false,
-			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_SEGMENT_THRESHOLD), 0xff);
+			SOC15_REG_OFFSET(GC, 0, mmRLC_SPM_SEGMENT_THRESHOLD), 0x1);
 
 	gfx_v10_0_write_data_to_reg(kiq_ring, 0, false,
 			SOC15_REG_OFFSET(GC, 0, mmCP_PERFMON_CNTL), 0);
