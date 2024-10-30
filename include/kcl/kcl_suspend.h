@@ -2,6 +2,8 @@
 #ifndef AMDKCL_SUSPEND_H
 #define AMDKCL_SUSPEND_H
 
+#include <linux/suspend.h>
+
 #ifndef HAVE_KSYS_SYNC_HELPER
 #ifdef CONFIG_PM_SLEEP
 extern void _kcl_ksys_sync_helper(void);
