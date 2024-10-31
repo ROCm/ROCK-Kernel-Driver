@@ -178,7 +178,7 @@ static int amd_acquire(unsigned long addr, size_t size,
 		p = peer_mem_private_data;
 	} else {
 		p = kfd_get_process(current);
-		if (!p) {
+		if (IS_ERR(p)) {
 			pr_debug("Not a KFD process\n");
 			return 0;
 		}
