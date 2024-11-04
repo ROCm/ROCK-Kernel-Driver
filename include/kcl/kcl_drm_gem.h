@@ -35,6 +35,14 @@
 #define __KCL_KCL_DRM_GEM_H__
 
 #include <drm/drm_gem.h>
+
+#ifndef HAVE_DRM_PRINT_MEMORY_STATS
+enum drm_gem_object_status {
+	DRM_GEM_OBJECT_RESIDENT  = BIT(0),
+	DRM_GEM_OBJECT_PURGEABLE = BIT(1),
+};
+#endif
+
 #if defined(HAVE_DRM_GEM_OBJECT_PUT)
 #if defined(HAVE_DRM_GEM_OBJECT_PUT_SYMBOL)
 static inline void

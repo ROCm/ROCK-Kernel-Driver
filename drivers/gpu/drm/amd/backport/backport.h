@@ -67,6 +67,7 @@
 #include <kcl/kcl_sched_mm.h>
 #include <kcl/backport/kcl_numa_backport.h>
 #include <kcl/kcl_mmzone.h>
+#include <kcl/kcl_drm_file.h>
 #include "kcl/kcl_amdgpu_drm_fb_helper.h"
 #include "kcl/kcl_amdgpu.h"
 #include "kcl/kcl_amdgpu_drm_drv.h"
@@ -112,7 +113,6 @@
 #include <kcl/kcl_pci_ids.h>
 #include <kcl/kcl_drm_suballoc.h>
 #include <kcl/kcl_drm_edid.h>
-#include <kcl/kcl_drm_file.h>
 #include <kcl/kcl_drm_exec.h>
 #include <kcl/kcl_local64.h>
 #include <kcl/kcl_class.h>

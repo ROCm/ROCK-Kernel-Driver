@@ -620,6 +620,9 @@
 /* drm_print_bits() has 4 args */
 #define HAVE_DRM_PRINT_BITS_4ARGS 1
 
+/* drm_print_memory_stats() is available */
+#define HAVE_DRM_PRINT_MEMORY_STATS 1
+
 /* drm_show_fdinfo() is available */
 #define HAVE_DRM_SHOW_FDINFO 1
 
