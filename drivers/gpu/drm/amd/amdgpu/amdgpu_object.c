@@ -1264,7 +1264,7 @@ void amdgpu_bo_get_memory(struct amdgpu_bo *bo,
 	if (res) {
 		stats[type].drm.resident += size;
 
-		if (!dma_resv_test_signaled(obj->resv, DMA_RESV_USAGE_BOOKKEEP))
+		if (!dma_resv_test_signaled(amdkcl_gem_resvp(obj), DMA_RESV_USAGE_BOOKKEEP))
 			stats[type].drm.active += size;
 		else if (bo->flags & AMDGPU_GEM_CREATE_DISCARDABLE)
 			stats[type].drm.purgeable += size;
