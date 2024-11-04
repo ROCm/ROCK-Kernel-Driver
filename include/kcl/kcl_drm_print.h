@@ -54,6 +54,12 @@
 			dev_name((drm)->dev), ## arg)
 #endif
 
+#ifndef drm_WARN_ON_ONCE
+#define drm_WARN_ON_ONCE(drm, x)					\
+	drm_WARN_ONCE((drm), (x), "%s",					\
+		      "drm_WARN_ON_ONCE(" __stringify(x) ")")
+#endif
+
 #ifndef drm_WARN
 #define drm_WARN(drm, condition, format, arg...)                        \
         WARN(condition, "%s %s: " format,                               \
