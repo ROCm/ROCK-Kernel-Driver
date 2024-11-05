@@ -27,4 +27,12 @@ static inline const char *str_enabled_disabled(bool v)
 }
 
 #endif /* HAVE_STR_YES_NO */
+
+#ifndef HAVE_STR_READ_WRITE
+static inline const char *str_read_write(bool v)
+{
+	return v ? "read" : "write";
+}
+#endif
+
 #endif

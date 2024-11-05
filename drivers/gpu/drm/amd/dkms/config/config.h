@@ -1035,6 +1035,9 @@
 /* zone->managed_pages is available */
 /* #undef HAVE_STRUCT_ZONE_MANAGED_PAGES */
 
+/* str_read_write() is defined */
+#define HAVE_STR_READ_WRITE 1
+
 /* str_yes_no() is defined */
 #define HAVE_STR_YES_NO 1
 
