@@ -4781,7 +4781,11 @@ static void amdgpu_dm_backlight_set_level(struct amdgpu_display_manager *dm,
             / AMDGPU_MAX_BL_LEVEL
             + caps.min_input_signal * 0x101;
 
-    rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], brightness, 0);
+    struct set_backlight_level_params backlight_level_params = { 0 };
+	
+    backlight_level_params.backlight_pwm_u16_16 = brightness;
+    backlight_level_params.transition_time_in_ms = 0;
+    rc = dc_link_set_backlight_level(dm->backlight_link[bl_idx], &backlight_level_params);
 
     if (!rc)
 	    DRM_ERROR("DM: Failed to update backlight on eDP[%d]\n", bl_idx);
