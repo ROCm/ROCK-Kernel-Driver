@@ -37,9 +37,13 @@ struct amdgpu_userq_fence {
 	 */
 	spinlock_t lock;
 	struct list_head link;
+#ifdef HAVE_STRUCT_XARRAY
 	unsigned long fence_drv_array_count;
 	struct amdgpu_userq_fence_driver *fence_drv;
 	struct amdgpu_userq_fence_driver **fence_drv_array;
+#else
+	struct amdgpu_userq_fence_driver *fence_drv;
+#endif
 };
 
 struct amdgpu_userq_fence_driver {
@@ -55,7 +59,9 @@ struct amdgpu_userq_fence_driver {
 	spinlock_t fence_list_lock;
 	struct list_head fences;
 	struct amdgpu_device *adev;
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray *fence_drv_xa_ptr;
+#endif
 	char timeline_name[TASK_COMM_LEN];
 };
 
@@ -69,9 +75,11 @@ int amdgpu_userq_fence_driver_alloc(struct amdgpu_device *adev,
 				    struct amdgpu_usermode_queue *userq);
 void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_drv);
 void amdgpu_userq_fence_driver_destroy(struct kref *ref);
+#ifdef HAVE_STRUCT_XARRAY
 int amdgpu_userq_signal_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *filp);
 int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 			    struct drm_file *filp);
+#endif
 
 #endif

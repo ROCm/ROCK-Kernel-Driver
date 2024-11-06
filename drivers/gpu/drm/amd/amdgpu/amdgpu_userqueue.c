@@ -27,6 +27,7 @@
 #include "amdgpu_userqueue.h"
 #include "amdgpu_userq_fence.h"
 
+#ifdef HAVE_STRUCT_XARRAY
 static void amdgpu_userq_walk_and_drop_fence_drv(struct xarray *xa)
 {
 	struct amdgpu_userq_fence_driver *fence_drv;
@@ -52,6 +53,7 @@ amdgpu_userq_fence_driver_free(struct amdgpu_usermode_queue *userq)
 	/* Drop the fence_drv reference held by user queue */
 	amdgpu_userq_fence_driver_put(userq->fence_drv);
 }
+#endif
 
 static void
 amdgpu_userqueue_cleanup(struct amdgpu_userq_mgr *uq_mgr,
@@ -62,7 +64,11 @@ amdgpu_userqueue_cleanup(struct amdgpu_userq_mgr *uq_mgr,
 	const struct amdgpu_userq_funcs *uq_funcs = adev->userq_funcs[queue->queue_type];
 
 	uq_funcs->mqd_destroy(uq_mgr, queue);
+#ifdef HAVE_STRUCT_XARRAY
 	amdgpu_userq_fence_driver_free(queue);
+#else
+	amdgpu_userq_fence_driver_put(queue->fence_drv);
+#endif
 	idr_remove(&uq_mgr->userq_idr, queue_id);
 	kfree(queue);
 }
@@ -254,7 +260,9 @@ amdgpu_userqueue_create(struct drm_file *filp, union drm_amdgpu_userq *args)
 	}
 	queue->doorbell_index = index;
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&queue->fence_drv_xa, XA_FLAGS_ALLOC);
+#endif
 	r = amdgpu_userq_fence_driver_alloc(adev, queue);
 	if (r) {
 		DRM_ERROR("Failed to alloc fence driver\n");

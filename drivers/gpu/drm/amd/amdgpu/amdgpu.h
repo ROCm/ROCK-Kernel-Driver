@@ -1113,7 +1113,9 @@ struct amdgpu_device {
 	 * in the EOP interrupt handler to signal the particular user
 	 * queue fence.
 	 */
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray			userq_xa;
+#endif
 
 	/* df */
 	struct amdgpu_df                df;

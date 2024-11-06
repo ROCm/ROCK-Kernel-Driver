@@ -97,7 +97,9 @@ int amdgpu_userq_fence_driver_alloc(struct amdgpu_device *adev,
 	spin_lock_init(&fence_drv->fence_list_lock);
 
 	fence_drv->adev = adev;
+#ifdef HAVE_STRUCT_XARRAY
 	fence_drv->fence_drv_xa_ptr = &userq->fence_drv_xa;
+#endif
 	fence_drv->context = dma_fence_context_alloc(1);
 	get_task_comm(fence_drv->timeline_name, current);
 
@@ -125,7 +127,9 @@ void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_d
 	struct amdgpu_userq_fence *userq_fence, *tmp;
 	struct dma_fence *fence;
 	u64 rptr;
+#ifdef HAVE_STRUCT_XARRAY
 	int i;
+#endif
 
 	if (!fence_drv)
 		return;
@@ -136,6 +140,7 @@ void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_d
 	list_for_each_entry_safe(userq_fence, tmp, &fence_drv->fences, link) {
 		fence = &userq_fence->base;
 
+#ifdef HAVE_STRUCT_XARRAY
 		if (rptr < fence->seqno)
 			break;
 
@@ -146,6 +151,16 @@ void amdgpu_userq_fence_driver_process(struct amdgpu_userq_fence_driver *fence_d
 
 		list_del(&userq_fence->link);
 		dma_fence_put(fence);
+#else
+		if (rptr >= fence->seqno) {
+			dma_fence_signal(fence);
+			list_del(&userq_fence->link);
+
+			dma_fence_put(fence);
+		} else {
+			break;
+		}
+#endif
 	}
 	spin_unlock(&fence_drv->fence_list_lock);
 }
@@ -155,11 +170,15 @@ void amdgpu_userq_fence_driver_destroy(struct kref *ref)
 	struct amdgpu_userq_fence_driver *fence_drv = container_of(ref,
 					 struct amdgpu_userq_fence_driver,
 					 refcount);
+#ifdef HAVE_STRUCT_XARRAY
 	struct amdgpu_userq_fence_driver *xa_fence_drv;
+#endif
 	struct amdgpu_device *adev = fence_drv->adev;
 	struct amdgpu_userq_fence *fence, *tmp;
+#ifdef HAVE_STRUCT_XARRAY
 	struct xarray *xa = &adev->userq_xa;
 	unsigned long index, flags;
+#endif
 	struct dma_fence *f;
 
 	spin_lock(&fence_drv->fence_list_lock);
@@ -176,11 +195,13 @@ void amdgpu_userq_fence_driver_destroy(struct kref *ref)
 	}
 	spin_unlock(&fence_drv->fence_list_lock);
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_lock_irqsave(xa, flags);
 	xa_for_each(xa, index, xa_fence_drv)
 		if (xa_fence_drv == fence_drv)
 			__xa_erase(xa, index);
 	xa_unlock_irqrestore(xa, flags);
+#endif
 
 	/* Free seq64 memory */
 	amdgpu_seq64_free(adev, fence_drv->va);
@@ -224,6 +245,7 @@ int amdgpu_userq_fence_create(struct amdgpu_usermode_queue *userq,
 	amdgpu_userq_fence_driver_get(fence_drv);
 	dma_fence_get(fence);
 
+#ifdef HAVE_STRUCT_XARRAY
 	if (!xa_empty(&userq->fence_drv_xa)) {
 		struct amdgpu_userq_fence_driver *stored_fence_drv;
 		unsigned long index, count = 0;
@@ -250,6 +272,7 @@ int amdgpu_userq_fence_create(struct amdgpu_usermode_queue *userq,
 		userq_fence->fence_drv_array = NULL;
 		userq_fence->fence_drv_array_count = 0;
 	}
+#endif
 
 	/* Check if hardware has already processed the job */
 	spin_lock_irqsave(&fence_drv->fence_list_lock, flags);
@@ -301,7 +324,9 @@ static void amdgpu_userq_fence_free(struct rcu_head *rcu)
 	/* Release the fence driver reference */
 	amdgpu_userq_fence_driver_put(fence_drv);
 
+#ifdef HAVE_STRUCT_XARRAY
 	kvfree(userq_fence->fence_drv_array);
+#endif
 	kmem_cache_free(amdgpu_userq_fence_slab, userq_fence);
 }
 
@@ -320,6 +345,7 @@ static const struct dma_fence_ops amdgpu_userq_fence_ops = {
 	.release = amdgpu_userq_fence_release,
 };
 
+#ifdef HAVE_STRUCT_XARRAY
 #ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
 /**
  * amdgpu_userq_fence_read_wptr - Read the userq wptr value
@@ -922,4 +948,5 @@ int amdgpu_userq_wait_ioctl(struct drm_device *dev, void *data,
 {
 	return -ENOTSUPP;
 }
+#endif
 #endif
