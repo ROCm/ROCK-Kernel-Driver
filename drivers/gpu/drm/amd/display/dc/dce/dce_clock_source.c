@@ -998,6 +998,12 @@ static bool dcn31_program_pix_clk(
 				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
 						DP_DTO0_ENABLE, 1,
 						PIPE0_DTO_SRC_SEL, 2);
+#if defined(CONFIG_DRM_AMD_DC_HDMI2_1)
+			else if (dc_is_hdmi_frl_signal(pix_clk_params->signal_type) || encoding == DP_128b_132b_ENCODING)
+				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
+						DP_DTO0_ENABLE, 0,
+						PIPE0_DTO_SRC_SEL, 2);
+#endif
 			else
 				REG_UPDATE_2(PIXEL_RATE_CNTL[inst],
 						DP_DTO0_ENABLE, 1,
