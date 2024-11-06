@@ -117,4 +117,9 @@ _kcl_drm_dp_add_payload_part2(struct drm_dp_mst_topology_mgr *mgr,
 #define drm_dp_add_payload_part2 _kcl_drm_dp_add_payload_part2
 #endif
 
+#ifndef HAVE_DRM_DP_MST_TOPOLOGY_QUEUE_PROBE
+void _kcl_drm_dp_mst_topology_queue_probe(struct drm_dp_mst_topology_mgr *mgr);
+#define drm_dp_mst_topology_queue_probe _kcl_drm_dp_mst_topology_queue_probe
+#endif
+
 #endif

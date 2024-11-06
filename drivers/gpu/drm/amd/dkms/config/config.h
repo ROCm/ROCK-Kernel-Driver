@@ -422,6 +422,9 @@
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
 #define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
+/* drm_dp_mst_topology_queue_probe() is available */
+#define HAVE_DRM_DP_MST_TOPOLOGY_QUEUE_PROBE 1
+
 /* struct drm_dp_mst_topology_state has member payloads */
 #define HAVE_DRM_DP_MST_TOPOLOGY_STATE_PAYLOADS 1
 
