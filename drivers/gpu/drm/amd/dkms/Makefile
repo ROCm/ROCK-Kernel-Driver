@@ -52,6 +52,10 @@ ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ_BUG),y)
 $(error dma_resv->seq is missing. exit...)
 endif
 
+ifeq ($(call _is_kcl_macro_defined,HAVE_RESERVATION_WW_CLASS_BUG),y)
+$(error reservation_ww_class is missing. exit...)
+endif
+
 DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
 DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
 ifeq ($(DRM_VER),)

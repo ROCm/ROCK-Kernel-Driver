@@ -56,6 +56,16 @@ AC_DEFUN([AC_AMDGPU_DMA_RESV_FENCES], [
 	])
 ])
 
+AC_DEFUN([AC_AMDGPU_DMA_RESV_RESERVATION_WW_CLASS], [
+	AC_KERNEL_DO_BACKGROUND([
+		AC_KERNEL_CHECK_SYMBOL_EXPORT([reservation_ww_class],[drivers/dma-buf/dma-resv.c],
+			[],[
+				AC_DEFINE(HAVE_RESERVATION_WW_CLASS_BUG, 1, [Reporting reservation_ww_class missing])
+		])
+	])
+])
+
 AC_DEFUN([AC_AMDGPU_DMA_RESV], [
 	AC_AMDGPU_DMA_RESV_FENCES
+	AC_AMDGPU_DMA_RESV_RESERVATION_WW_CLASS
 ])
