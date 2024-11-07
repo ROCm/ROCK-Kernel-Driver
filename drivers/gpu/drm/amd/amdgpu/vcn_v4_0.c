@@ -222,6 +222,11 @@ static int vcn_v4_0_sw_init(struct amdgpu_ip_block *ip_block)
 		return r;
 
 	vcn_v4_0_fw_shared_init(adev, inst);
+
+	/* TODO: Add queue reset mask when FW fully supports it */
+	adev->sdma.supported_reset =
+		amdgpu_get_soft_full_reset_mask(&adev->vcn.inst[0].ring_enc[0]);
+
 done:
 	if (amdgpu_sriov_vf(adev)) {
 		r = amdgpu_virt_alloc_mm_table(adev);
@@ -243,6 +248,12 @@ done:
 		adev->vcn.ip_dump = NULL;
 	} else {
 		adev->vcn.ip_dump = ptr;
+	}
+
+	if (inst == 0) {
+		r = amdgpu_vcn_sysfs_reset_mask_init(adev);
+		if (r)
+			return r;
 	}
 
 	return 0;
@@ -282,6 +293,7 @@ static int vcn_v4_0_sw_fini(struct amdgpu_ip_block *ip_block)
 	if (r)
 		return r;
 
+	amdgpu_vcn_sysfs_reset_mask_fini(adev);
 	r = amdgpu_vcn_sw_fini(adev);
 
 	kfree(adev->vcn.ip_dump);
