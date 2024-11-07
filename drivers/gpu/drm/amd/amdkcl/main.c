@@ -2,7 +2,6 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
-extern void amdkcl_symbol_init(void);
 extern void amdkcl_dev_cgroup_init(void);
 extern void amdkcl_fence_init(void);
 extern void amdkcl_io_init(void);
@@ -15,7 +14,6 @@ extern void amdkcl_prime_init(void);
 
 int __init amdkcl_init(void)
 {
-	amdkcl_symbol_init();
 	amdkcl_dev_cgroup_init();
 	amdkcl_fence_init();
 	amdkcl_io_init();
