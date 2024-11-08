@@ -21,6 +21,7 @@
  *
  */
 
+#include <drm/drm_drv.h>
 #include <linux/firmware.h>
 #include "amdgpu.h"
 #include "amdgpu_sdma.h"
@@ -448,9 +449,14 @@ int amdgpu_sdma_sysfs_reset_mask_init(struct amdgpu_device *adev)
 
 void amdgpu_sdma_sysfs_reset_mask_fini(struct amdgpu_device *adev)
 {
+	int idx;
+
 	if (!amdgpu_gpu_recovery)
 		return;
 
-	if (adev->sdma.num_instances)
-		device_remove_file(adev->dev, &dev_attr_sdma_reset_mask);
+	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
+		if (adev->sdma.num_instances)
+			device_remove_file(adev->dev, &dev_attr_sdma_reset_mask);
+		drm_dev_exit(idx);
+	}
 }

@@ -20,6 +20,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+#include <drm/drm_drv.h>
 #include "amdgpu.h"
 #include "df_v3_6.h"
 
@@ -254,9 +255,12 @@ static void df_v3_6_sw_init(struct amdgpu_device *adev)
 
 static void df_v3_6_sw_fini(struct amdgpu_device *adev)
 {
+	int idx;
 
-	device_remove_file(adev->dev, &dev_attr_df_cntr_avail);
-
+	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
+		device_remove_file(adev->dev, &dev_attr_df_cntr_avail);
+		drm_dev_exit(idx);
+	}
 }
 
 static void df_v3_6_enable_broadcast_mode(struct amdgpu_device *adev,
