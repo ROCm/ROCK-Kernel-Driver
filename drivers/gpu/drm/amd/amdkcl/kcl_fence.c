@@ -50,9 +50,9 @@ struct default_wait_cb {
 	struct task_struct *task;
 };
 
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
 
-#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
 _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 {
@@ -238,7 +238,9 @@ EXPORT_SYMBOL(_kcl_fence_enable_signaling);
  */
 void amdkcl_fence_init(void)
 {
+#ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 	_kcl_fence_default_wait_cb = amdkcl_fp_setup("dma_fence_default_wait_cb", NULL);
+#endif
 }
 
 #if !defined(HAVE_DMA_FENCE_DESCRIBE)
