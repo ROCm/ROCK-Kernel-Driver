@@ -248,7 +248,7 @@ static bool ttm_resource_is_swapped(struct ttm_resource *res, struct ttm_buffer_
 	if (bo->resource != res || !bo->ttm)
 		return false;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 	return ttm_tt_is_swapped(bo->ttm);
 }
 

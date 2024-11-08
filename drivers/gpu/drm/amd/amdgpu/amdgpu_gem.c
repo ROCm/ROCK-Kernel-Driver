@@ -132,7 +132,7 @@ amdgpu_gem_update_bo_mapping(struct drm_file *filp,
 	switch (operation) {
 	case AMDGPU_VA_OP_MAP:
 	case AMDGPU_VA_OP_REPLACE:
-		if (bo && (bo->tbo.base.resv == vm->root.bo->tbo.base.resv))
+		if (bo && (amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.bo->tbo)))
 			last_update = vm->last_update;
 		else
 			last_update = bo_va->last_pt_update;

@@ -1224,7 +1224,7 @@ int ttm_bo_populate(struct ttm_buffer_object *bo,
 	bool swapped;
 	int ret;
 
-	dma_resv_assert_held(bo->base.resv);
+	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
 
 	if (!tt)
 		return 0;
