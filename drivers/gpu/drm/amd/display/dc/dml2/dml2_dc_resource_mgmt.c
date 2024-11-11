@@ -266,7 +266,9 @@ static unsigned int find_preferred_pipe_candidates(const struct dc_state *existi
 		for (i = 0; i < pipe_count; i++) {
 			if (existing_state->res_ctx.pipe_ctx[i].stream && existing_state->res_ctx.pipe_ctx[i].stream->stream_id == stream_id) {
 				struct pipe_ctx *head_pipe =
-					resource_get_primary_dpp_pipe(&existing_state->res_ctx.pipe_ctx[i]);
+					resource_is_pipe_type(&existing_state->res_ctx.pipe_ctx[i], DPP_PIPE) ?
+						resource_get_primary_dpp_pipe(&existing_state->res_ctx.pipe_ctx[i]) :
+							NULL;
 
 				// we should always respect the head pipe from selection
 				if (head_pipe && head_pipe->pipe_idx == i)
@@ -304,7 +306,9 @@ static unsigned int find_last_resort_pipe_candidates(const struct dc_state *exis
 	if (existing_state) {
 		for (i  = 0; i < pipe_count; i++) {
 			struct pipe_ctx *head_pipe =
-				resource_get_primary_dpp_pipe(&existing_state->res_ctx.pipe_ctx[i]);
+				resource_is_pipe_type(&existing_state->res_ctx.pipe_ctx[i], DPP_PIPE) ?
+					resource_get_primary_dpp_pipe(&existing_state->res_ctx.pipe_ctx[i]) :
+						NULL;
 
 			// we should always respect the head pipe from selection
 			if (head_pipe && head_pipe->pipe_idx == i)
