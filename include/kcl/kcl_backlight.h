@@ -13,4 +13,11 @@
 int backlight_device_set_brightness(struct backlight_device *bd,
 				    unsigned long brightness);
 #endif /* HAVE_BACKLIGHT_DEVICE_SET_BRIGHTNESS */
+
+#ifndef BACKLIGHT_POWER_ON
+#define BACKLIGHT_POWER_ON              (0)
+#define BACKLIGHT_POWER_OFF             (4)
+#define BACKLIGHT_POWER_REDUCED         (1) // deprecated; don't use in new code
+#endif
+
 #endif
