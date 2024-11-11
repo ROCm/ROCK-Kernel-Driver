@@ -332,10 +332,6 @@ struct amdgpu_vcn {
 	uint16_t inst_mask;
 	uint8_t	num_inst_per_aid;
 	bool using_unified_queue;
-
-	/* IP reg dump */
-	uint32_t		*ip_dump;
-
 	uint32_t		supported_reset;
 };
 
