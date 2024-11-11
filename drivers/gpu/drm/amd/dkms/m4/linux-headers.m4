@@ -139,4 +139,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #include/linux/units.h: add helpers for kelvin to/from Celsius conversion
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/units.h])
+
+	dnl #v5.17-rc6-1496-g64a8f92fd783
+	dnl #dma-buf: add dma_fence_unwrap v2
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/dma-fence-unwrap.h])
 ])
