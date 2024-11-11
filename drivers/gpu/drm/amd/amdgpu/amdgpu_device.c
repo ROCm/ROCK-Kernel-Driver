@@ -4253,7 +4253,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	spin_lock_init(&adev->mm_stats.lock);
 	spin_lock_init(&adev->wb.lock);
 
+#ifdef HAVE_STRUCT_XARRAY
 	xa_init_flags(&adev->userq_xa, XA_FLAGS_LOCK_IRQ);
+#endif
 
 	INIT_LIST_HEAD(&adev->reset_list);
 
