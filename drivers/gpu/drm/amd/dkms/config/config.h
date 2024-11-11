@@ -635,6 +635,9 @@
 /* Has function drm_suballoc_manager_init() */
 #define HAVE_DRM_SUBALLOC_MANAGER_INIT 1
 
+/* drm_syncobj_add_point() is available */
+#define HAVE_DRM_SYNCOBJ_ADD_POINT 1
+
 /* Define to 1 if you have the <drm/task_barrier.h> header file. */
 #define HAVE_DRM_TASK_BARRIER_H 1
 
