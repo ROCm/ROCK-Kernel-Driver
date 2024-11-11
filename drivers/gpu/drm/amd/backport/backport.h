@@ -131,4 +131,5 @@
 #include <kcl/kcl_tracepoint.h>
 #include <kcl/kcl_uuid.h>
 #include <kcl/kcl_pm_runtime.h>
+#include <kcl/kcl_file.h>
 #endif /* AMDGPU_BACKPORT_H */
