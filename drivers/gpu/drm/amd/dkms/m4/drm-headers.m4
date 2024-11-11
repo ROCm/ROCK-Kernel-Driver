@@ -117,4 +117,9 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
     dnl #
     AC_KERNEL_CHECK_HEADERS([drm/drm_fbdev_ttm.h])
 
+    dnl #
+    dnl # v6.12-rc1-3-g5f60d5f6bbc1
+    dnl # move asm/unaligned.h to linux/unaligned.h
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([linux/unaligned.h])
 ])
