@@ -1119,6 +1119,9 @@ struct kfd_process {
 	bool is_runtime_retry;
 	struct kfd_runtime_info runtime_info;
 
+	/* if gpu page fault sent to KFD */
+	bool gpu_page_fault;
+
 	/* Indicates process' PC Sampling ref cnt*/
 	uint32_t pc_sampling_ref;
 };
