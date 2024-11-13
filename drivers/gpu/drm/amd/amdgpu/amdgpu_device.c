@@ -2179,6 +2179,7 @@ int amdgpu_device_ip_set_clockgating_state(void *dev,
  * @dev: amdgpu_device pointer
  * @block_type: Type of hardware IP (SMU, GFX, UVD, etc.)
  * @state: powergating state (gate or ungate)
+ * @inst: Instance id of the specific block_type
  *
  * Sets the requested powergating state for all instances of
  * the hardware IP specified.
