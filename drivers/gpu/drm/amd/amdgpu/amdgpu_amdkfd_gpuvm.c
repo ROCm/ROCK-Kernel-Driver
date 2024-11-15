@@ -2576,13 +2576,11 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 		struct sg_table **ret_sg)
 {
 	struct sg_table *sg = NULL;
-	struct scatterlist *s;
 	struct page **pages;
 	uint64_t offset_in_page;
 	unsigned int page_size;
 	unsigned int cur_page;
-	unsigned int chunks;
-	unsigned int idx;
+	size_t max_segment = 0;
 	int ret;
 
 	/* Determine access does not cross memory boundary */
@@ -2612,52 +2610,29 @@ int amdgpu_amdkfd_gpuvm_get_sg_table(struct amdgpu_device *adev,
 	/* Handle BO (type: ttm_bo_type_device) that is used to surface
 	 * memory resources from GPU's GART aperture. The allocation flag
 	 * of BO falls in GTT domain i.e. the physical backing memory is
-	 * part of system memory. Construction of SG Table proceeds
-	 * as follows:
-	 *
-	 *    Allocate memory for SG Table
-	 *    Determine number of Scatterlist node in table
-	 *       Logic uses one Scatterlist node per PAGE_SIZE
-	 *    Allocate memory for Scatterlist nodes
-	 *    Initialize Scatterlist nodes to zero length
-	 *    Walk down system memory pointed by BO while
-	 *       Updating Scatterlist nodes with system memory info
+	 * part of system memory
 	 */
 
 	sg = kmalloc(sizeof(*sg), GFP_KERNEL);
-	if (!sg) {
-		ret = -ENOMEM;
-		goto out;
-	}
+	if (!sg)
+		return -ENOMEM;
 
 	page_size = PAGE_SIZE;
 	offset_in_page = offset & (page_size - 1);
-	chunks = (size  + offset_in_page + page_size - 1)
-			/ page_size;
-
-	ret = sg_alloc_table(sg, chunks, GFP_KERNEL);
-	if (unlikely(ret))
-		goto out;
-
-	for_each_sgtable_sg(sg, s, idx)
-		s->length = 0;
 
 	pages = bo->tbo.ttm->pages;
 	cur_page = offset / page_size;
-	for_each_sg(sg->sgl, s, sg->orig_nents, idx) {
-		uint64_t chunk_size, length;
 
-		chunk_size = page_size - offset_in_page;
-		length = min(size, chunk_size);
+	max_segment = dma_max_mapping_size(dma_dev);
+	if (!max_segment)
+		max_segment = UINT_MAX;
 
-		sg_set_page(s, pages[cur_page], length, offset_in_page);
-		s->dma_address = page_to_phys(pages[cur_page]);
-		s->dma_length = length;
-
-		size -= length;
-		offset_in_page = 0;
-		cur_page++;
-	}
+	ret = sg_alloc_table_from_pages_segment(sg, &pages[cur_page],
+						bo->tbo.ttm->num_pages - cur_page,
+						offset_in_page, size, max_segment,
+						GFP_KERNEL);
+	if (ret)
+		goto out;
 
 	if (dma_dev) {
 		ret = dma_map_sgtable(dma_dev, sg, dir, DMA_ATTR_SKIP_CPU_SYNC);
