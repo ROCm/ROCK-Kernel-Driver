@@ -2405,11 +2405,20 @@ retry_init:
 
 		/* select 8 bpp console on low vram cards */
 		if (adev->gmc.real_vram_size <= (32*1024*1024))
+#if HAVE_DRM_CLIENT_SETUP
 			format = drm_format_info(DRM_FORMAT_C8);
+#else
+			drm_fbdev_ttm_setup(adev_to_drm(adev), 8);
+#endif
 		else
+#if HAVE_DRM_CLIENT_SETUP
 			format = NULL;
-
+#else
+			drm_fbdev_ttm_setup(adev_to_drm(adev), 32);
+#endif
+#if HAVE_DRM_CLIENT_SETUP
 		drm_client_setup(adev_to_drm(adev), format);
+#endif
 	}
 
 	ret = amdgpu_debugfs_init(adev);
@@ -3003,7 +3012,9 @@ static struct drm_driver amdgpu_kms_driver = {
 	.num_ioctls = ARRAY_SIZE(amdgpu_ioctls_kms),
 	.dumb_create = amdgpu_mode_dumb_create,
 	.dumb_map_offset = amdgpu_mode_dumb_mmap,
+#ifdef DRM_FBDEV_TTM_DRIVER_OPS
 	DRM_FBDEV_TTM_DRIVER_OPS,
+#endif
 	.fops = &amdgpu_driver_kms_fops,
 	.release = &amdgpu_driver_release_kms,
 #ifdef HAVE_DRM_DRIVER_SHOW_FDINFO
@@ -3062,7 +3073,9 @@ const struct drm_driver amdgpu_partition_driver = {
 	.num_ioctls = ARRAY_SIZE(amdgpu_ioctls_kms),
 	.dumb_create = amdgpu_mode_dumb_create,
 	.dumb_map_offset = amdgpu_mode_dumb_mmap,
+#ifdef DRM_FBDEV_TTM_DRIVER_OPS
 	DRM_FBDEV_TTM_DRIVER_OPS,
+#endif
 	.fops = &amdgpu_driver_kms_fops,
 	.release = &amdgpu_driver_release_kms,
 
