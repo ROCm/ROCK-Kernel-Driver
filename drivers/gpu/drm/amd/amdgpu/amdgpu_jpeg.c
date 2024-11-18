@@ -24,7 +24,6 @@
  *
  */
 
-#include <drm/drm_drv.h>
 #include "amdgpu.h"
 #include "amdgpu_jpeg.h"
 #include "amdgpu_pm.h"
@@ -448,11 +447,6 @@ int amdgpu_jpeg_sysfs_reset_mask_init(struct amdgpu_device *adev)
 
 void amdgpu_jpeg_sysfs_reset_mask_fini(struct amdgpu_device *adev)
 {
-	int idx;
-
-	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
-		if (adev->jpeg.num_jpeg_inst)
-			device_remove_file(adev->dev, &dev_attr_jpeg_reset_mask);
-		drm_dev_exit(idx);
-	}
+	if (adev->jpeg.num_jpeg_inst)
+		device_remove_file(adev->dev, &dev_attr_jpeg_reset_mask);
 }

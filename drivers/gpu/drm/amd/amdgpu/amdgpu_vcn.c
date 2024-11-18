@@ -1310,11 +1310,6 @@ int amdgpu_vcn_sysfs_reset_mask_init(struct amdgpu_device *adev)
 
 void amdgpu_vcn_sysfs_reset_mask_fini(struct amdgpu_device *adev)
 {
-	int idx;
-
-	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
-		if (adev->vcn.num_vcn_inst)
-			device_remove_file(adev->dev, &dev_attr_vcn_reset_mask);
-		drm_dev_exit(idx);
-	}
+	if (adev->vcn.num_vcn_inst)
+		device_remove_file(adev->dev, &dev_attr_vcn_reset_mask);
 }

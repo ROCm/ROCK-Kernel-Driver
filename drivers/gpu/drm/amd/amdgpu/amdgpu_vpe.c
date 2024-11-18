@@ -904,13 +904,8 @@ int amdgpu_vpe_sysfs_reset_mask_init(struct amdgpu_device *adev)
 
 void amdgpu_vpe_sysfs_reset_mask_fini(struct amdgpu_device *adev)
 {
-	int idx;
-
-	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
-		if (adev->vpe.num_instances)
-			device_remove_file(adev->dev, &dev_attr_vpe_reset_mask);
-		drm_dev_exit(idx);
-	}
+	if (adev->vpe.num_instances)
+		device_remove_file(adev->dev, &dev_attr_vpe_reset_mask);
 }
 
 static const struct amdgpu_ring_funcs vpe_ring_funcs = {

@@ -23,7 +23,6 @@
  * Authors: Christian König, Felix Kuehling
  */
 
-#include <drm/drm_drv.h>
 #include "amdgpu.h"
 
 /**
@@ -130,7 +129,7 @@ int amdgpu_preempt_mgr_init(struct amdgpu_device *adev)
 void amdgpu_preempt_mgr_fini(struct amdgpu_device *adev)
 {
 	struct ttm_resource_manager *man = &adev->mman.preempt_mgr;
-	int idx, ret;
+	int ret;
 
 	ttm_resource_manager_set_used(man, false);
 
@@ -138,10 +137,7 @@ void amdgpu_preempt_mgr_fini(struct amdgpu_device *adev)
 	if (ret)
 		return;
 
-	if (!drm_dev_enter(adev_to_drm(adev), &idx)) {
-		device_remove_file(adev->dev, &dev_attr_mem_info_preempt_used);
-		drm_dev_exit(idx);
-	}
+	device_remove_file(adev->dev, &dev_attr_mem_info_preempt_used);
 
 	ttm_resource_manager_cleanup(man);
 	ttm_set_driver_manager(&adev->mman.bdev, AMDGPU_PL_PREEMPT, NULL);
