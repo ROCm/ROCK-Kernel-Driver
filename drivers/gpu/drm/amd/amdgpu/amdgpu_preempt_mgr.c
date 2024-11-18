@@ -138,7 +138,7 @@ void amdgpu_preempt_mgr_fini(struct amdgpu_device *adev)
 	if (ret)
 		return;
 
-	if (drm_dev_enter(adev_to_drm(adev), &idx)) {
+	if (!drm_dev_enter(adev_to_drm(adev), &idx)) {
 		device_remove_file(adev->dev, &dev_attr_mem_info_preempt_used);
 		drm_dev_exit(idx);
 	}
