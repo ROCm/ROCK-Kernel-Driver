@@ -38,13 +38,16 @@
 /* #undef HAVE_AMD_IOMMU_INVALIDATE_CTX_PASID_U32 */
 
 /* amd_iommu_pc_get_max_banks() declared */
-#define HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED 1
+/* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_DECLARED */
 
 /* amd_iommu_pc_get_max_banks() arg is unsigned int */
 /* #undef HAVE_AMD_IOMMU_PC_GET_MAX_BANKS_UINT */
 
 /* amd_iommu_pc_supported() is available */
-#define HAVE_AMD_IOMMU_PC_SUPPORTED 1
+/* #undef HAVE_AMD_IOMMU_PC_SUPPORTED */
+
+/* aperture_remove_conflicting_pci_device() is available */
+#define HAVE_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES 1
 
 /* apple_gmux_detect() is available */
 #define HAVE_APPLE_GMUX_DETECT 1
@@ -130,9 +133,6 @@
 /* dma_fence_describe() is available */
 #define HAVE_DMA_FENCE_DESCRIBE 1
 
-/* whether dma_fence_get_stub exits */
-#define HAVE_DMA_FENCE_GET_STUB 1
-
 /* dma_fence_is_container() is available */
 #define HAVE_DMA_FENCE_IS_CONTAINER 1
 
@@ -180,7 +180,7 @@
 
 /* drm_aperture_remove_conflicting_pci_framebuffers() second arg is
    drm_driver* */
-#define HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG 1
+/* #undef HAVE_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG */
 
 /* drm_atomic_helper_calc_timestamping_constants() is available */
 #define HAVE_DRM_ATOMIC_HELPER_CALC_TIMESTAMPING_CONSTANTS 1
@@ -191,8 +191,17 @@
 /* drm_atomic_private_obj_init() wants 4 args */
 #define HAVE_DRM_ATOMIC_PRIVATE_OBJ_INIT_4ARGS 1
 
+/* drm_client_dev_resume() is available */
+#define HAVE_DRM_CLIENT_DEV_RESUME 1
+
 /* drm_client_register() is available */
 #define HAVE_DRM_CLIENT_REGISTER 1
+
+/* drm_client_setup() is available */
+#define HAVE_DRM_CLIENT_SETUP 1
+
+/* struct drm_color_ctm_3x4 is available */
+/* #undef HAVE_DRM_COLOR_CTM_3X4 */
 
 /* drm_connector_atomic_hdr_metadata_equal() is available */
 #define HAVE_DRM_CONNECTOR_ATOMIC_HDR_METADATA_EQUAL 1
@@ -219,15 +228,6 @@
 
 /* drm_connector_init_with_ddc() is available */
 #define HAVE_DRM_CONNECTOR_INIT_WITH_DDC 1
-
-/* connector property "max bpc" is available */
-#define HAVE_DRM_CONNECTOR_PROPERTY_MAX_BPC 1
-
-/* drm_connector_put() is available */
-#define HAVE_DRM_CONNECTOR_PUT 1
-
-/* connector reference counting is available */
-#define HAVE_DRM_CONNECTOR_REFERENCE_COUNTING_SUPPORTED 1
 
 /* drm_connector_set_panel_orientation_with_quirk() is available */
 #define HAVE_DRM_CONNECTOR_SET_PANEL_ORIENTATION_WITH_QUIRK 1
@@ -260,9 +260,6 @@
 
 /* drm_debug_enabled() is available */
 #define HAVE_DRM_DEBUG_ENABLED 1
-
-/* drm_device->filelist_mutex is available */
-#define HAVE_DRM_DEVICE_FILELIST_MUTEX 1
 
 /* drm_device->open_count is int */
 /* #undef HAVE_DRM_DEVICE_OPEN_COUNT_INT */
@@ -298,9 +295,6 @@
 /* display_info->edid_hdmi_rgb444_dc_modes is available */
 #define HAVE_DRM_DISPLAY_INFO_EDID_HDMI_RGB444_DC_MODES 1
 
-/* display_info->hdmi.scdc.scrambling are available */
-#define HAVE_DRM_DISPLAY_INFO_HDMI_SCDC_SCRAMBLING 1
-
 /* display_info->is_hdmi is available */
 #define HAVE_DRM_DISPLAY_INFO_IS_HDMI 1
 
@@ -312,6 +306,9 @@
 
 /* struct drm_display_info has monitor_range member */
 #define HAVE_DRM_DISPLAY_INFO_MONITOR_RANGE 1
+
+/* drm_dp_add_payload_part2 has three arguments */
+/* #undef HAVE_DRM_DP_ADD_PAYLOAD_PART2_THREE_ARGUMENTS */
 
 /* drm_dp_atomic_find_time_slots() is available */
 #define HAVE_DRM_DP_ATOMIC_FIND_TIME_SLOTS 1
@@ -462,10 +459,16 @@
 /* #undef HAVE_DRM_DRMP_H */
 
 /* Define to 1 if you have the <drm/drm_aperture.h> header file. */
-#define HAVE_DRM_DRM_APERTURE_H 1
+/* #undef HAVE_DRM_DRM_APERTURE_H */
 
 /* Define to 1 if you have the <drm/drm_backport.h> header file. */
 /* #undef HAVE_DRM_DRM_BACKPORT_H */
+
+/* Define to 1 if you have the <drm/drm_client_event.h> header file. */
+#define HAVE_DRM_DRM_CLIENT_EVENT_H 1
+
+/* Define to 1 if you have the <drm/drm_client_setup.h> header file. */
+#define HAVE_DRM_DRM_CLIENT_SETUP_H 1
 
 /* Define to 1 if you have the <drm/drm_eld.h> header file. */
 #define HAVE_DRM_DRM_ELD_H 1
@@ -474,7 +477,10 @@
 #define HAVE_DRM_DRM_EXEC_H 1
 
 /* Define to 1 if you have the <drm/drm_fbdev_generic.h> header file. */
-#define HAVE_DRM_DRM_FBDEV_GENERIC_H 1
+/* #undef HAVE_DRM_DRM_FBDEV_GENERIC_H */
+
+/* Define to 1 if you have the <drm/drm_fbdev_ttm.h> header file. */
+#define HAVE_DRM_DRM_FBDEV_TTM_H 1
 
 /* Define to 1 if you have the <drm/drm_gem_atomic_helper.h> header file. */
 #define HAVE_DRM_DRM_GEM_ATOMIC_HELPER_H 1
@@ -653,8 +659,14 @@
 /* fault_flag_allow_retry_first() is available */
 #define HAVE_FAULT_FLAG_ALLOW_RETRY_FIRST 1
 
+/* file_operation->fop_flags is available */
+#define HAVE_FILE_OPERATION_FOP_FLAGS 1
+
 /* follow_pfn() is available */
 /* #undef HAVE_FOLLOW_PFN */
+
+/* follow_pfnmap_start() is available */
+#define HAVE_FOLLOW_PFNMAP_START 1
 
 /* fsleep() is available */
 #define HAVE_FSLEEP 1
@@ -722,9 +734,6 @@
 /* io_mapping_map_local_wc() is available */
 #define HAVE_IO_MAPPING_MAP_LOCAL_WC 1
 
-/* io_mapping_map_wc() has size argument */
-#define HAVE_IO_MAPPING_MAP_WC_HAS_SIZE_ARG 1
-
 /* io_mapping_unmap_local() is available */
 #define HAVE_IO_MAPPING_UNMAP_LOCAL 1
 
@@ -777,10 +786,13 @@
 /* #undef HAVE_KTIME_IS_UNION */
 
 /* kvrealloc() is available */
-#define HAVE_KVREALLOC 1
+/* #undef HAVE_KVREALLOC */
 
 /* Define to 1 if you have the <linux/acpi_amd_wbrf.h> header file. */
 #define HAVE_LINUX_ACPI_AMD_WBRF_H 1
+
+/* Define to 1 if you have the <linux/aperture.h> header file. */
+#define HAVE_LINUX_APERTURE_H 1
 
 /* Define to 1 if you have the <linux/apple-gmux.h> header file. */
 #define HAVE_LINUX_APPLE_GMUX_H 1
@@ -850,6 +862,9 @@
 
 /* Define to 1 if you have the <linux/stdarg.h> header file. */
 #define HAVE_LINUX_STDARG_H 1
+
+/* Define to 1 if you have the <linux/unaligned.h> header file. */
+#define HAVE_LINUX_UNALIGNED_H 1
 
 /* Define to 1 if you have the <linux/units.h> header file. */
 #define HAVE_LINUX_UNITS_H 1
@@ -977,6 +992,9 @@
 /* remove_conflicting_pci_framebuffers() wants p,p args */
 /* #undef HAVE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
 
+/* Reporting reservation_ww_class missing */
+/* #undef HAVE_RESERVATION_WW_CLASS_BUG */
+
 /* seq_hex_dump() is available */
 #define HAVE_SEQ_HEX_DUMP 1
 
@@ -1019,12 +1037,6 @@
 /* struct drm_crtc_state->async_flip is available */
 #define HAVE_STRUCT_DRM_CRTC_STATE_ASYNC_FLIP 1
 
-/* struct drm_crtc_state has flag for flip */
-#define HAVE_STRUCT_DRM_CRTC_STATE_FLIP_FLAG 1
-
-/* struct drm_crtc_state->pageflip_flags is available */
-/* #undef HAVE_STRUCT_DRM_CRTC_STATE_PAGEFLIP_FLAGS */
-
 /* drm_gem_open_object is defined in struct drm_drv */
 /* #undef HAVE_STRUCT_DRM_DRV_GEM_OPEN_OBJECT_CALLBACK */
 
@@ -1056,6 +1068,9 @@
 /* sysfs_emit() and sysfs_emit_at() are available */
 #define HAVE_SYSFS_EMIT 1
 
+/* topology_num_cores_per_package is availablea */
+#define HAVE_TOPOLOGY_NUM_CORES_PER_PACKAGE 1
+
 /* totalram_pages() is available */
 #define HAVE_TOTALRAM_PAGES 1
 
@@ -1065,7 +1080,7 @@
 /* __poll_t is available */
 #define HAVE_TYPE__POLL_T 1
 
-/* usleep_range_stat() is available */
+/* usleep_range_state() is available */
 #define HAVE_USLEEP_RANGE_STATE 1
 
 /* vga_client_register() don't pass a cookie */
@@ -1138,7 +1153,7 @@
 #define PACKAGE_NAME "amdgpu-dkms"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "amdgpu-dkms 6.10.0"
+#define PACKAGE_STRING "amdgpu-dkms 6.12.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "amdgpu-dkms"
@@ -1147,7 +1162,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "6.10.0"
+#define PACKAGE_VERSION "6.12.0"
 
 #include "config-amd-chips.h"
 
