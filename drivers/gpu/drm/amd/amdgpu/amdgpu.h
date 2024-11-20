@@ -364,8 +364,7 @@ int amdgpu_device_ip_set_clockgating_state(void *dev,
 					   enum amd_clockgating_state state);
 int amdgpu_device_ip_set_powergating_state(void *dev,
 					   enum amd_ip_block_type block_type,
-					   enum amd_powergating_state state,
-					   int inst);
+					   enum amd_powergating_state state);
 void amdgpu_device_ip_get_clockgating_state(struct amdgpu_device *adev,
 					    u64 *flags);
 int amdgpu_device_ip_wait_for_idle(struct amdgpu_device *adev,
@@ -398,9 +397,6 @@ struct amdgpu_ip_block {
 	struct amdgpu_ip_block_status status;
 	const struct amdgpu_ip_block_version *version;
 	struct amdgpu_device *adev;
-	unsigned int instance;
-	/* IP reg dump */
-	uint32_t *ip_dump;
 };
 
 int amdgpu_device_ip_block_version_cmp(struct amdgpu_device *adev,

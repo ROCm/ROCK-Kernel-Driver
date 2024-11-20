@@ -1407,8 +1407,7 @@ static void smu10_powergate_vcn(struct pp_hwmgr *hwmgr, bool bgate)
 	if (bgate) {
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCN,
-						AMD_PG_STATE_GATE,
-						0);
+						AMD_PG_STATE_GATE);
 		smum_send_msg_to_smc_with_parameter(hwmgr,
 					PPSMC_MSG_PowerDownVcn, 0, NULL);
 		smu10_data->vcn_power_gated = true;
@@ -1417,8 +1416,7 @@ static void smu10_powergate_vcn(struct pp_hwmgr *hwmgr, bool bgate)
 						PPSMC_MSG_PowerUpVcn, 0, NULL);
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCN,
-						AMD_PG_STATE_UNGATE,
-						0);
+						AMD_PG_STATE_UNGATE);
 		smu10_data->vcn_power_gated = false;
 	}
 }

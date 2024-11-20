@@ -2302,8 +2302,6 @@ static int amdgpu_discovery_set_sdma_ip_blocks(struct amdgpu_device *adev)
 
 static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 {
-	int i;
-
 	if (amdgpu_ip_version(adev, VCE_HWIP, 0)) {
 		switch (amdgpu_ip_version(adev, UVD_HWIP, 0)) {
 		case IP_VERSION(7, 0, 0):
@@ -2347,13 +2345,11 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(2, 0, 3):
 			break;
 		case IP_VERSION(2, 5, 0):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v2_5_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v2_5_ip_block);
 			break;
 		case IP_VERSION(2, 6, 0):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v2_6_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v2_6_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v2_6_ip_block);
 			break;
 		case IP_VERSION(3, 0, 0):
@@ -2361,8 +2357,7 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(3, 1, 1):
 		case IP_VERSION(3, 1, 2):
 		case IP_VERSION(3, 0, 2):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v3_0_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v3_0_ip_block);
 			if (!amdgpu_sriov_vf(adev))
 				amdgpu_device_ip_block_add(adev, &jpeg_v3_0_ip_block);
 			break;
@@ -2372,24 +2367,20 @@ static int amdgpu_discovery_set_mm_ip_blocks(struct amdgpu_device *adev)
 		case IP_VERSION(4, 0, 0):
 		case IP_VERSION(4, 0, 2):
 		case IP_VERSION(4, 0, 4):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v4_0_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v4_0_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v4_0_ip_block);
 			break;
 		case IP_VERSION(4, 0, 3):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v4_0_3_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v4_0_3_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v4_0_3_ip_block);
 			break;
 		case IP_VERSION(4, 0, 5):
 		case IP_VERSION(4, 0, 6):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v4_0_5_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v4_0_5_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v4_0_5_ip_block);
 			break;
 		case IP_VERSION(5, 0, 0):
-			for (i = 0; i < adev->vcn.num_vcn_inst; ++i)
-				amdgpu_device_ip_block_add(adev, &vcn_v5_0_0_ip_block);
+			amdgpu_device_ip_block_add(adev, &vcn_v5_0_0_ip_block);
 			amdgpu_device_ip_block_add(adev, &jpeg_v5_0_0_ip_block);
 			break;
 		default:

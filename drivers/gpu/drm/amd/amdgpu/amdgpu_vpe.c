@@ -330,7 +330,7 @@ static void vpe_idle_work_handler(struct work_struct *work)
 	fences += amdgpu_fence_count_emitted(&adev->vpe.ring);
 
 	if (fences == 0)
-		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_GATE, 0);
+		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_GATE);
 	else
 		schedule_delayed_work(&adev->vpe.idle_work, VPE_IDLE_TIMEOUT);
 }
@@ -414,7 +414,7 @@ static int vpe_hw_init(struct amdgpu_ip_block *ip_block)
 
 	/* Power on VPE */
 	ret = amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE,
-						     AMD_PG_STATE_UNGATE, 0);
+						     AMD_PG_STATE_UNGATE);
 	if (ret)
 		return ret;
 
@@ -437,7 +437,7 @@ static int vpe_hw_fini(struct amdgpu_ip_block *ip_block)
 	vpe_ring_stop(vpe);
 
 	/* Power off VPE */
-	amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_GATE, 0);
+	amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_GATE);
 
 	return 0;
 }
@@ -853,7 +853,7 @@ static void vpe_ring_begin_use(struct amdgpu_ring *ring)
 		uint32_t context_notify;
 
 		/* Power on VPE */
-		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_UNGATE, 0);
+		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VPE, AMD_PG_STATE_UNGATE);
 
 		/* Indicates that a job from a new context has been submitted. */
 		context_notify = RREG32(vpe_get_reg_offset(vpe, 0, vpe->regs.context_indicator));
@@ -904,10 +904,8 @@ int amdgpu_vpe_sysfs_reset_mask_init(struct amdgpu_device *adev)
 
 void amdgpu_vpe_sysfs_reset_mask_fini(struct amdgpu_device *adev)
 {
-	if (adev->dev->kobj.sd) {
-		if (adev->vpe.num_instances)
-			device_remove_file(adev->dev, &dev_attr_vpe_reset_mask);
-	}
+	if (adev->vpe.num_instances)
+		device_remove_file(adev->dev, &dev_attr_vpe_reset_mask);
 }
 
 static const struct amdgpu_ring_funcs vpe_ring_funcs = {

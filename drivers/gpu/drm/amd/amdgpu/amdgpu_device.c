@@ -2200,7 +2200,6 @@ int amdgpu_device_ip_set_clockgating_state(void *dev,
  * @dev: amdgpu_device pointer
  * @block_type: Type of hardware IP (SMU, GFX, UVD, etc.)
  * @state: powergating state (gate or ungate)
- * @inst: Instance id of the specific block_type
  *
  * Sets the requested powergating state for all instances of
  * the hardware IP specified.
@@ -2208,8 +2207,7 @@ int amdgpu_device_ip_set_clockgating_state(void *dev,
  */
 int amdgpu_device_ip_set_powergating_state(void *dev,
 					   enum amd_ip_block_type block_type,
-					   enum amd_powergating_state state,
-					   int inst)
+					   enum amd_powergating_state state)
 {
 	struct amdgpu_device *adev = dev;
 	int i, r = 0;
@@ -2218,9 +2216,6 @@ int amdgpu_device_ip_set_powergating_state(void *dev,
 		if (!adev->ip_blocks[i].status.valid)
 			continue;
 		if (adev->ip_blocks[i].version->type != block_type)
-			continue;
-		if (block_type == AMD_IP_BLOCK_TYPE_VCN &&
-				adev->ip_blocks[i].instance != inst)
 			continue;
 		if (!adev->ip_blocks[i].version->funcs->set_powergating_state)
 			continue;
@@ -2358,28 +2353,6 @@ int amdgpu_device_ip_block_version_cmp(struct amdgpu_device *adev,
 }
 
 /**
- * amdgpu_device_ip_get_num_instances - get number of instances of an IP block
- *
- * @adev: amdgpu_device pointer
- * @type: Type of hardware IP (SMU, GFX, UVD, etc.)
- *
- * Returns the count of the hardware IP blocks structure for that type.
- */
-static unsigned int
-amdgpu_device_ip_get_num_instances(struct amdgpu_device *adev,
-				    enum amd_ip_block_type type)
-{
-	unsigned int i, count = 0;
-
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (adev->ip_blocks[i].version->type == type)
-			count++;
-	}
-
-	return count;
-}
-
-/**
  * amdgpu_device_ip_block_add
  *
  * @adev: amdgpu_device pointer
@@ -2411,8 +2384,7 @@ int amdgpu_device_ip_block_add(struct amdgpu_device *adev,
 		  ip_block_version->funcs->name);
 
 	adev->ip_blocks[adev->num_ip_blocks].adev = adev;
-	adev->ip_blocks[adev->num_ip_blocks].instance =
-		amdgpu_device_ip_get_num_instances(adev, ip_block_version->type);
+
 	adev->ip_blocks[adev->num_ip_blocks++].version = ip_block_version;
 
 	return 0;

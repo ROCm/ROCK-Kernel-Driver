@@ -1675,7 +1675,7 @@ static void kv_dpm_powergate_uvd(void *handle, bool gate)
 	if (gate) {
 		/* stop the UVD block */
 		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_UVD,
-						       AMD_PG_STATE_GATE, 0);
+						       AMD_PG_STATE_GATE);
 		kv_update_uvd_dpm(adev, gate);
 		if (pi->caps_uvd_pg)
 			/* power off the UVD block */
@@ -1688,7 +1688,7 @@ static void kv_dpm_powergate_uvd(void *handle, bool gate)
 		kv_update_uvd_dpm(adev, gate);
 
 		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_UVD,
-						       AMD_PG_STATE_UNGATE, 0);
+						       AMD_PG_STATE_UNGATE);
 	}
 }
 
@@ -1702,7 +1702,7 @@ static void kv_dpm_powergate_vce(void *handle, bool gate)
 	if (gate) {
 		/* stop the VCE block */
 		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-						       AMD_PG_STATE_GATE, 0);
+						       AMD_PG_STATE_GATE);
 		kv_enable_vce_dpm(adev, false);
 		if (pi->caps_vce_pg) /* power off the VCE block */
 			amdgpu_kv_notify_message_to_smu(adev, PPSMC_MSG_VCEPowerOFF);
@@ -1712,7 +1712,7 @@ static void kv_dpm_powergate_vce(void *handle, bool gate)
 		kv_enable_vce_dpm(adev, true);
 		/* re-init the VCE block */
 		amdgpu_device_ip_set_powergating_state(adev, AMD_IP_BLOCK_TYPE_VCE,
-						       AMD_PG_STATE_UNGATE, 0);
+						       AMD_PG_STATE_UNGATE);
 	}
 }
 

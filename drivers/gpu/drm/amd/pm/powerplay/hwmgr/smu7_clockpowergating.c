@@ -120,8 +120,7 @@ void smu7_powergate_uvd(struct pp_hwmgr *hwmgr, bool bgate)
 	if (bgate) {
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_UVD,
-						AMD_PG_STATE_GATE,
-						0);
+						AMD_PG_STATE_GATE);
 		amdgpu_device_ip_set_clockgating_state(hwmgr->adev,
 				AMD_IP_BLOCK_TYPE_UVD,
 				AMD_CG_STATE_GATE);
@@ -134,8 +133,7 @@ void smu7_powergate_uvd(struct pp_hwmgr *hwmgr, bool bgate)
 				AMD_CG_STATE_UNGATE);
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_UVD,
-						AMD_PG_STATE_UNGATE,
-						0);
+						AMD_PG_STATE_UNGATE);
 		smu7_update_uvd_dpm(hwmgr, false);
 	}
 
@@ -150,8 +148,7 @@ void smu7_powergate_vce(struct pp_hwmgr *hwmgr, bool bgate)
 	if (bgate) {
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCE,
-						AMD_PG_STATE_GATE,
-						0);
+						AMD_PG_STATE_GATE);
 		amdgpu_device_ip_set_clockgating_state(hwmgr->adev,
 				AMD_IP_BLOCK_TYPE_VCE,
 				AMD_CG_STATE_GATE);
@@ -164,8 +161,7 @@ void smu7_powergate_vce(struct pp_hwmgr *hwmgr, bool bgate)
 				AMD_CG_STATE_UNGATE);
 		amdgpu_device_ip_set_powergating_state(hwmgr->adev,
 						AMD_IP_BLOCK_TYPE_VCE,
-						AMD_PG_STATE_UNGATE,
-						0);
+						AMD_PG_STATE_UNGATE);
 		smu7_update_vce_dpm(hwmgr, false);
 	}
 }
