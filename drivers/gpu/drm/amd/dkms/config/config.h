@@ -1007,6 +1007,9 @@
 /* whether smca_get_bank_type(x, x) is available */
 #define HAVE_SMCA_GET_BANK_TYPE_WITH_TWO_ARGUMENTS 1
 
+/* whether sg_alloc_table_from_pages_segment() is available */
+#define HAVE_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT 1
+
 /* enum SMCA_UMC_V2 is available */
 #define HAVE_SMCA_UMC_V2 1
 

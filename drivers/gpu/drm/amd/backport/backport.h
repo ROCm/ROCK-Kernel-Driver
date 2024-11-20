@@ -135,4 +135,5 @@
 #include <kcl/kcl_drm_syncobj.h>
 #include <kcl/kcl_drm_client_event.h>
 #include <kcl/backport/kcl_linux_aperture.h>
+#include <kcl/kcl_scatterlist.h>
 #endif /* AMDGPU_BACKPORT_H */
