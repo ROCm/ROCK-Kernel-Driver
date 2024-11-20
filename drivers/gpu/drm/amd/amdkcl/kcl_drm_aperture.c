@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-#ifndef HAVE_DRM_DRM_APERTURE_H
+#if !defined(HAVE_DRM_DRM_APERTURE_H) && !defined(HAVE_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES)
 
 #include <linux/fb.h>
 #include <linux/vgaarb.h>

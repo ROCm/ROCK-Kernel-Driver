@@ -144,4 +144,9 @@ AC_DEFUN([AC_AMDGPU_LINUX_HEADERS], [
 	dnl #dma-buf: add dma_fence_unwrap v2
 	dnl
 	AC_KERNEL_CHECK_HEADERS([linux/dma-fence-unwrap.h])
+	
+	dnl #5.19-rc2-317-g7283f862bd99
+	dnl #drm: Implement DRM aperture helpers under video/
+	dnl
+	AC_KERNEL_CHECK_HEADERS([linux/aperture.h])
 ])

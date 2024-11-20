@@ -16,3 +16,25 @@ AC_DEFUN([AC_AMDGPU_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_
 		])
 	])
 ])
+
+dnl #
+dnl # v5.19-rc2-317-g7283f862bd99
+dnl # drm: Implement DRM aperture helpers under video/
+dnl #
+AC_DEFUN([AC_AMDGPU_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES], [
+    AC_KERNEL_DO_BACKGROUND([
+        AC_KERNEL_TRY_COMPILE([
+            #include <linux/aperture.h>
+        ], [
+            aperture_remove_conflicting_pci_devices(NULL, NULL);
+        ], [
+            AC_DEFINE(HAVE_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES, 1,
+                [aperture_remove_conflicting_pci_device() is available])
+        ])
+    ])
+])
+
+AC_DEFUN([AC_AMDGPU_DRM_APERTURE], [
+    AC_AMDGPU_DRM_APERTURE_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_DRM_DRIVER_ARG
+	AC_AMDGPU_APERTURE_REMOVE_CONFLICTING_PCI_DEVICES
+])
