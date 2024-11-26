@@ -676,6 +676,14 @@ static void kfd_cleanup_nodes(struct kfd_dev *kfd, unsigned int num_nodes)
 	struct kfd_node *knode;
 	unsigned int i;
 
+	/*
+	 * flush_work ensures that there are no outstanding
+	 * work-queue items that will access interrupt_ring. New work items
+	 * can't be created because we stopped interrupt handling above.
+	 */
+	flush_workqueue(kfd->ih_wq);
+	destroy_workqueue(kfd->ih_wq);
+
 	for (i = 0; i < num_nodes; i++) {
 		knode = kfd->nodes[i];
 		device_queue_manager_uninit(knode->dqm);
@@ -1098,32 +1106,6 @@ static int kfd_resume(struct kfd_node *node)
 	return err;
 }
 
-static inline void kfd_queue_work(struct workqueue_struct *wq,
-				  struct work_struct *work)
-{
-	int cpu, new_cpu;
-	const struct cpumask *mask = NULL;
-
-	cpu = new_cpu = smp_processor_id();
-
-#if defined(CONFIG_SCHED_SMT)
-	/* CPU threads in the same core */
-	mask = cpu_smt_mask(cpu);
-#endif
-	if (!mask || cpumask_weight(mask) <= 1)
-		/* CPU threads in the same NUMA node */
-		mask = cpu_cpu_mask(cpu);
-	/* Pick the next online CPU thread in the same core or NUMA node */
-	for_each_cpu_wrap(cpu, mask, cpu+1) {
-		if (cpu != new_cpu && cpu_online(cpu)) {
-			new_cpu = cpu;
-			break;
-		}
-	}
-
-	queue_work_on(new_cpu, wq, work);
-}
-
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
@@ -1149,7 +1131,7 @@ void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 			    	patched_ihre, &is_patched)
 		    && enqueue_ih_ring_entry(node,
 			    	is_patched ? patched_ihre : ih_ring_entry)) {
-			kfd_queue_work(node->ih_wq, &node->interrupt_work);
+			queue_work(node->kfd->ih_wq, &node->interrupt_work);
 			spin_unlock_irqrestore(&node->interrupt_lock, flags);
 			return;
 		}
