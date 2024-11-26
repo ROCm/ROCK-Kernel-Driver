@@ -450,7 +450,7 @@ amdgpu_userqueue_validate_bos(struct amdgpu_userq_mgr *uq_mgr)
 	while (!list_empty(&vm->invalidated)) {
 		bo_va = list_first_entry(&vm->invalidated, struct amdgpu_bo_va,
 					 base.vm_status);
-		resv = bo_va->base.bo->tbo.base.resv;
+		resv = amdkcl_ttm_resvp(&bo_va->base.bo->tbo);
 		spin_unlock(&vm->status_lock);
 
 		bo = bo_va->base.bo;
