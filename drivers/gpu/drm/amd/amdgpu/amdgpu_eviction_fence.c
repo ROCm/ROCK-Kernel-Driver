@@ -168,7 +168,9 @@ static bool amdgpu_eviction_fence_enable_signaling(struct dma_fence *f)
 }
 
 static const struct dma_fence_ops amdgpu_eviction_fence_ops = {
+#ifdef HAVE_DMA_FENCE_OPS_USE_64BIT_SEQNO
 	.use_64bit_seqno = true,
+#endif
 	.get_driver_name = amdgpu_eviction_fence_get_driver_name,
 	.get_timeline_name = amdgpu_eviction_fence_get_timeline_name,
 	.enable_signaling = amdgpu_eviction_fence_enable_signaling,
