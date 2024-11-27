@@ -4815,7 +4815,6 @@ static void gfx_v9_4_3_ip_dump(struct amdgpu_ip_block *ip_block)
 
 	num_xcc = NUM_XCC(adev->gfx.xcc_mask);
 
-	amdgpu_gfx_off_ctrl(adev, false);
 	for (xcc_id = 0; xcc_id < num_xcc; xcc_id++) {
 		xcc_offset = xcc_id * reg_count;
 		for (i = 0; i < reg_count; i++)
@@ -4823,7 +4822,6 @@ static void gfx_v9_4_3_ip_dump(struct amdgpu_ip_block *ip_block)
 				RREG32(SOC15_REG_ENTRY_OFFSET_INST(gc_reg_list_9_4_3[i],
 								   GET_INST(GC, xcc_id)));
 	}
-	amdgpu_gfx_off_ctrl(adev, true);
 
 	/* dump compute queue registers for all instances */
 	if (!adev->gfx.ip_dump_compute_queues)
@@ -4832,7 +4830,6 @@ static void gfx_v9_4_3_ip_dump(struct amdgpu_ip_block *ip_block)
 	num_inst = adev->gfx.mec.num_mec * adev->gfx.mec.num_pipe_per_mec *
 		adev->gfx.mec.num_queue_per_pipe;
 	reg_count = ARRAY_SIZE(gc_cp_reg_list_9_4_3);
-	amdgpu_gfx_off_ctrl(adev, false);
 	mutex_lock(&adev->srbm_mutex);
 	for (xcc_id = 0; xcc_id < num_xcc; xcc_id++) {
 		xcc_offset = xcc_id * reg_count * num_inst;
@@ -4859,7 +4856,6 @@ static void gfx_v9_4_3_ip_dump(struct amdgpu_ip_block *ip_block)
 	}
 	soc15_grbm_select(adev, 0, 0, 0, 0, 0);
 	mutex_unlock(&adev->srbm_mutex);
-	amdgpu_gfx_off_ctrl(adev, true);
 }
 
 static void gfx_v9_4_3_ring_emit_cleaner_shader(struct amdgpu_ring *ring)
