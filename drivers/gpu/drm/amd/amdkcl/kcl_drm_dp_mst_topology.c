@@ -20,7 +20,7 @@
  * OF THIS SOFTWARE.
  */
 
-#include <kcl/backport/kcl_drm_dp_mst_helper_backport.h>
+#include <kcl/kcl_drm_dp_mst_helper.h>
 #include <kcl/kcl_drm_print.h>
 
 #ifndef HAVE_DRM_DP_MST_TOPOLOGY_QUEUE_PROBE
@@ -54,7 +54,7 @@ _kcl_drm_dp_mst_topology_mgr_invalidate_mstb(struct drm_dp_mst_branch *mstb)
  * cases - for instance when a sink gets plugged/unplugged to a port - the SW
  * state will get updated automatically via MST UP message notifications.
  */
-void drm_dp_mst_topology_queue_probe(struct drm_dp_mst_topology_mgr *mgr)
+void _kcl_drm_dp_mst_topology_queue_probe(struct drm_dp_mst_topology_mgr *mgr)
 {
 	mutex_lock(&mgr->lock);
 
