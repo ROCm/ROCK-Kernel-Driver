@@ -13,10 +13,13 @@
 #include <linux/dma-fence-chain.h>
 #endif
 
+#if !defined(HAVE_STRUCT_DMA_FENCE_CHAIN) || !defined(HAVE_DMA_FENCE_CHAIN_ALLOC)
+#include <linux/slab.h>
+#endif
+
 #if !defined(HAVE_STRUCT_DMA_FENCE_CHAIN)
 #include <linux/dma-fence.h>
 #include <linux/irq_work.h>
-#include <linux/slab.h>
 
 /**
  * struct dma_fence_chain - fence to represent an node of a fence chain
