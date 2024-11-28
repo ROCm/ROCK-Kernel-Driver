@@ -1149,6 +1149,9 @@
 /* __kthread_should_park() is available */
 /* #undef HAVE___KTHREAD_SHOULD_PARK */
 
+/* __sg_alloc_table_from_pages() has 9 args */
+/* #undef HAVE___SG_ALLOC_TABLE_FROM_PAGES_9ARGS */
+
 /* Define to the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT ""
 
