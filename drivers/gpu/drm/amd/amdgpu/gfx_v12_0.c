@@ -4821,13 +4821,18 @@ static int gfx_v12_0_eop_irq(struct amdgpu_device *adev,
 			     struct amdgpu_irq_src *source,
 			     struct amdgpu_iv_entry *entry)
 {
+#ifdef HAVE_STRUCT_XARRAY
 	u32 doorbell_offset = entry->src_data[0];
+#else
+	uint32_t mes_queue_id = entry->src_data[0];
+#endif
 	u8 me_id, pipe_id, queue_id;
 	struct amdgpu_ring *ring;
 	int i;
 
 	DRM_DEBUG("IH: CP EOP\n");
 
+#ifdef HAVE_STRUCT_XARRAY
 	if (adev->enable_mes && doorbell_offset) {
 		struct amdgpu_userq_fence_driver *fence_drv = NULL;
 		struct xarray *xa = &adev->userq_xa;
@@ -4838,6 +4843,20 @@ static int gfx_v12_0_eop_irq(struct amdgpu_device *adev,
 		if (fence_drv)
 			amdgpu_userq_fence_driver_process(fence_drv);
 		xa_unlock_irqrestore(xa, flags);
+#else
+	if (adev->enable_mes && (mes_queue_id & AMDGPU_FENCE_MES_QUEUE_FLAG)) {
+		struct amdgpu_mes_queue *queue;
+
+		mes_queue_id &= AMDGPU_FENCE_MES_QUEUE_ID_MASK;
+
+		spin_lock(&adev->mes.queue_id_lock);
+		queue = idr_find(&adev->mes.queue_id_idr, mes_queue_id);
+		if (queue) {
+			DRM_DEBUG("process mes queue id = %d\n", mes_queue_id);
+			amdgpu_fence_process(queue->ring);
+		}
+		spin_unlock(&adev->mes.queue_id_lock);
+#endif
 	} else {
 		me_id = (entry->ring_id & 0x0c) >> 2;
 		pipe_id = (entry->ring_id & 0x03) >> 0;
