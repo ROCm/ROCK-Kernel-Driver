@@ -14,7 +14,7 @@
 #include <linux/fs.h>
 #include <kcl/kcl_debugfs.h>
 
-#ifdef KCL_FAKE_DEBUGFS_ATTRIBUTE_SIGNED
+#ifdef KCL_FAKE_DEBUGFS_ATTRIBUTE_XSIGNED
 /* Copied from fs/libfs.c */
 struct simple_attr {
 	int (*get)(void *, u64 *);

@@ -569,7 +569,6 @@ static ssize_t dp_phy_settings_read(struct file *f, char __user *buf,
 	return result;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 static int dp_lttpr_status_show(struct seq_file *m, void *unused)
 {
 	struct drm_connector *connector = m->private;
@@ -604,7 +603,6 @@ static int dp_lttpr_status_show(struct seq_file *m, void *unused)
 	seq_puts(m, "\n");
 	return 0;
 }
-#endif
 
 static ssize_t dp_phy_settings_write(struct file *f, const char __user *buf,
 				 size_t size, loff_t *pos)
@@ -2855,9 +2853,7 @@ static int is_dpia_link_show(struct seq_file *m, void *data)
 DEFINE_SHOW_ATTRIBUTE(dp_dsc_fec_support);
 DEFINE_SHOW_ATTRIBUTE(dmub_fw_state);
 DEFINE_SHOW_ATTRIBUTE(dmub_tracebuffer);
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_SHOW_ATTRIBUTE(dp_lttpr_status);
-#endif
 DEFINE_SHOW_ATTRIBUTE(hdcp_sink_capability);
 DEFINE_SHOW_ATTRIBUTE(internal_display);
 DEFINE_SHOW_ATTRIBUTE(odm_combine_segments);
@@ -2979,9 +2975,7 @@ static const struct {
 } dp_debugfs_entries[] = {
 		{"link_settings", &dp_link_settings_debugfs_fops},
 		{"phy_settings", &dp_phy_settings_debugfs_fop},
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 		{"lttpr_status", &dp_lttpr_status_fops},
-#endif
 		{"test_pattern", &dp_phy_test_pattern_fops},
 		{"hdcp_sink_capability", &hdcp_sink_capability_fops},
 		{"sdp_message", &sdp_message_fops},
@@ -3037,10 +3031,8 @@ static int force_yuv420_output_get(void *data, u64 *val)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_yuv420_output_fops, force_yuv420_output_get,
 			 force_yuv420_output_set, "%llu\n");
-#endif
 
 /*
  *  Read Replay state
@@ -3274,7 +3266,6 @@ static int dmcub_trace_event_state_get(void *data, u64 *val)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(dmcub_trace_event_state_fops, dmcub_trace_event_state_get,
 			 dmcub_trace_event_state_set, "%llu\n");
 
@@ -3291,7 +3282,6 @@ DEFINE_DEBUGFS_ATTRIBUTE(allow_edp_hotplug_detection_fops,
 DEFINE_DEBUGFS_ATTRIBUTE(disallow_edp_enter_psr_fops,
 			disallow_edp_enter_psr_get,
 			disallow_edp_enter_psr_set, "%llu\n");
-#endif
 
 DEFINE_SHOW_ATTRIBUTE(current_backlight);
 DEFINE_SHOW_ATTRIBUTE(target_backlight);
@@ -3301,9 +3291,7 @@ static const struct {
 	char *name;
 	const struct file_operations *fops;
 } connector_debugfs_entries[] = {
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 		{"force_yuv420_output", &force_yuv420_output_fops},
-#endif
 		{"trigger_hotplug", &trigger_hotplug_debugfs_fops},
 		{"internal_display", &internal_display_fops},
 		{"odm_combine_segments", &odm_combine_segments_fops}
@@ -3457,7 +3445,6 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		}
 	}
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	if (connector->base.connector_type == DRM_MODE_CONNECTOR_eDP) {
 		debugfs_create_file("replay_capability", 0444, dir, connector,
 					&replay_capability_fops);
@@ -3477,7 +3464,6 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 		debugfs_create_file("disallow_edp_enter_psr", 0644, dir, connector,
 					&disallow_edp_enter_psr_fops);
 	}
-#endif
 
 	for (i = 0; i < ARRAY_SIZE(connector_debugfs_entries); i++) {
 		debugfs_create_file(connector_debugfs_entries[i].name,
@@ -3797,7 +3783,6 @@ static int mst_topo_show(struct seq_file *m, void *unused)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 /*
  * Sets trigger hpd for MST topologies.
  * All connected connectors will be rediscovered and re started as needed if val of 1 is sent.
@@ -3871,7 +3856,6 @@ static int trigger_hpd_mst_get(void *data, u64 *val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(trigger_hpd_mst_ops, trigger_hpd_mst_get,
 			 trigger_hpd_mst_set, "%llu\n");
-#endif
 
 /*
  * Sets the force_timing_sync debug option from the given string.
@@ -3902,13 +3886,9 @@ static int force_timing_sync_get(void *data, u64 *val)
 	return 0;
 }
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(force_timing_sync_ops, force_timing_sync_get,
 			 force_timing_sync_set, "%llu\n");
-#endif
 
-
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 /*
  * Disables all HPD and HPD RX interrupt handling in the
  * driver when set to 1. Default is 0.
@@ -3938,7 +3918,6 @@ static int disable_hpd_get(void *data, u64 *val)
 
 DEFINE_DEBUGFS_ATTRIBUTE(disable_hpd_ops, disable_hpd_get,
 			 disable_hpd_set, "%llu\n");
-#endif
 
 /*
  * Prints hardware capabilities. These are used for IGT testing.
@@ -4048,10 +4027,8 @@ static int visual_confirm_get(void *data, u64 *val)
 }
 
 DEFINE_SHOW_ATTRIBUTE(mst_topo);
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 DEFINE_DEBUGFS_ATTRIBUTE(visual_confirm_fops, visual_confirm_get,
 			 visual_confirm_set, "%llu\n");
-
 
 /*
  * Sets the DC skip_detection_link_training debug option from the given string.
@@ -4085,7 +4062,6 @@ static int skip_detection_link_training_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(skip_detection_link_training_fops,
 			 skip_detection_link_training_get,
 			 skip_detection_link_training_set, "%llu\n");
-#endif
 
 /*
  * Dumps the DCC_EN bit for each pipe.
@@ -4173,7 +4149,6 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 	debugfs_create_file("amdgpu_dm_dtn_log", 0644, root, adev,
 			    &dtn_log_fops);
 
-#ifdef DEFINE_DEBUGFS_ATTRIBUTE
 	debugfs_create_file("amdgpu_dm_dp_set_mst_en_for_sst", 0644, root, adev,
 				&dp_set_mst_en_for_sst_ops);
 	debugfs_create_file("amdgpu_dm_dp_ignore_cable_id", 0644, root, adev,
@@ -4211,5 +4186,4 @@ void dtn_debugfs_init(struct amdgpu_device *adev)
 	if (adev->dm.dc->caps.ips_support)
 		debugfs_create_file_unsafe("amdgpu_dm_ips_status", 0644, root, adev,
 					   &ips_status_fops);
-#endif
 }
