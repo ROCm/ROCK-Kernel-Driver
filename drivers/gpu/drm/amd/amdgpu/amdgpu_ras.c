@@ -1222,7 +1222,7 @@ static void amdgpu_ras_virt_error_generate_report(struct amdgpu_device *adev,
 	unsigned long new_ue, new_ce, new_de;
 	struct ras_manager *obj = amdgpu_ras_find_obj(adev, &query_if->head);
 	const char *blk_name = get_ras_block_str(&query_if->head);
-	u64 event_id = qctx->event_id;
+	u64 event_id = qctx->evid.event_id;
 
 	new_ce = err_data->ce_count - obj->err_data.ce_count;
 	new_ue = err_data->ue_count - obj->err_data.ue_count;
