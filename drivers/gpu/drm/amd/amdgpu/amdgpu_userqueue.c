@@ -76,6 +76,7 @@ amdgpu_userqueue_cleanup(struct amdgpu_userq_mgr *uq_mgr,
 
 	uq_funcs->mqd_destroy(uq_mgr, queue);
 #ifdef HAVE_STRUCT_XARRAY
+	queue->fence_drv->fence_drv_xa_ptr = NULL;
 	amdgpu_userq_fence_driver_free(queue);
 #else
 	amdgpu_userq_fence_driver_put(queue->fence_drv);
