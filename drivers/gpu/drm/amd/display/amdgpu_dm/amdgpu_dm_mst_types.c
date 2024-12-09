@@ -180,6 +180,22 @@ amdgpu_dm_mst_connector_late_register(struct drm_connector *connector)
 }
 #endif /* HAVE_DRM_DP_MST_CONNECTOR_LATE_REGISTER */
 
+static inline void
+amdgpu_dm_mst_reset_mst_connector_setting(struct amdgpu_dm_connector *aconnector)
+{
+#ifdef HAVE_DRM_DP_MST_EDID_READ
+	aconnector->drm_edid = NULL;
+#else
+	aconnector->edid = NULL;
+#endif
+	aconnector->dsc_aux = NULL;
+#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
+	aconnector->mst_output_port->passthrough_aux = NULL;
+#endif
+	aconnector->mst_local_bw = 0;
+	aconnector->vc_full_pbn = 0;
+}
+
 #if defined(HAVE_DRM_DP_MST_CONNECTOR_EARLY_UNREGISTER)
 static void
 amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
@@ -208,15 +224,7 @@ amdgpu_dm_mst_connector_early_unregister(struct drm_connector *connector)
 
 		dc_sink_release(dc_sink);
 		aconnector->dc_sink = NULL;
-#ifdef HAVE_DRM_DP_MST_EDID_READ
-		aconnector->drm_edid = NULL;
-#else
-		aconnector->edid = NULL;
-#endif
-		aconnector->dsc_aux = NULL;
-#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
-		port->passthrough_aux = NULL;
-#endif
+		amdgpu_dm_mst_reset_mst_connector_setting(aconnector);
 	}
 
 	aconnector->mst_status = MST_STATUS_DEFAULT;
@@ -589,15 +597,7 @@ dm_dp_mst_detect(struct drm_connector *connector,
 
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
-#ifdef HAVE_DRM_DP_MST_EDID_READ
-		aconnector->drm_edid = NULL;
-#else
-		aconnector->edid = NULL;
-#endif
-		aconnector->dsc_aux = NULL;
-#ifdef HAVE_DRM_DP_MST_PORT_PASSTHROUGH_AUX
-		port->passthrough_aux = NULL;
-#endif
+		amdgpu_dm_mst_reset_mst_connector_setting(aconnector);
 
 		amdgpu_dm_set_mst_status(&aconnector->mst_status,
 			MST_REMOTE_EDID | MST_ALLOCATE_NEW_PAYLOAD | MST_CLEAR_ALLOCATED_PAYLOAD,
@@ -2103,9 +2103,18 @@ enum dc_status dm_dp_mst_is_port_support_mode(
 			struct drm_dp_mst_port *immediate_upstream_port = NULL;
 			uint32_t end_link_bw = 0;
 
-			/*Get last DP link BW capability*/
-			if (dp_get_link_current_set_bw(&aconnector->mst_output_port->aux, &end_link_bw)) {
-				if (stream_kbps > end_link_bw) {
+			/*Get last DP link BW capability. Mode shall be supported by Legacy peer*/
+			if (aconnector->mst_output_port->pdt != DP_PEER_DEVICE_DP_LEGACY_CONV &&
+				aconnector->mst_output_port->pdt != DP_PEER_DEVICE_NONE) {
+				if (aconnector->vc_full_pbn != aconnector->mst_output_port->full_pbn) {
+					dp_get_link_current_set_bw(&aconnector->mst_output_port->aux, &end_link_bw);
+					aconnector->vc_full_pbn = aconnector->mst_output_port->full_pbn;
+					aconnector->mst_local_bw = end_link_bw;
+				} else {
+					end_link_bw = aconnector->mst_local_bw;
+				}
+
+				if (end_link_bw > 0 && stream_kbps > end_link_bw) {
 					DRM_DEBUG_DRIVER("MST_DSC dsc decode at last link."
 							 "Mode required bw can't fit into last link\n");
 					return DC_FAIL_BANDWIDTH_VALIDATE;
