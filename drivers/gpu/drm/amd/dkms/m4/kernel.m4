@@ -258,6 +258,7 @@ AC_DEFUN([AC_CONFIG_KERNEL], [
 	AC_AMDGPU_DRM_CLIENT
 	AC_AMDGPU_DRM_SYNCOBJ_ADD_POINT
 	AC_AMDGPU_SG_ALLOC_TABLE_FROM_PAGES_SEGMENT
+	AC_AMDGPU_FIRMWARE_REQUEST_NOWARN
 	
 	AC_KERNEL_WAIT
 	AS_IF([test "$LINUX_OBJ" != "$LINUX"], [
@@ -474,7 +475,7 @@ AC_DEFUN([AC_KERNEL_COMPILE_MODULE_IFELSE], [
 	test "x$enable_linux_builtin" = xyes && kbuild_src_flag='KBUILD_SRC=' # override KBUILD_SRC
 	test "x$enable_linux_builtin" = xyes && kbuild_workaround_flag='sub_make_done=' # override sub_make_done
 	AS_IF(
-		[AC_TRY_COMMAND(make [$2] -C $LINUX_OBJ EXTRA_CFLAGS="-Werror -Wno-error=array-bounds" M=$PWD $kbuild_src_flag $kbuild_workaround_flag $kbuild_modpost_flag $kbuild_cc) >/dev/null && AC_TRY_COMMAND([$3])],
+		[AC_TRY_COMMAND(make [$2] -C $LINUX_OBJ EXTRA_CFLAGS="-Werror -Wno-error=unused-variable -Wno-error=array-bounds" M=$PWD $kbuild_src_flag $kbuild_workaround_flag $kbuild_modpost_flag $kbuild_cc) >/dev/null && AC_TRY_COMMAND([$3])],
 		[$4],
 		[_AC_MSG_LOG_CONFTEST m4_ifvaln([$5],[$5])]
 	)

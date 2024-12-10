@@ -2015,6 +2015,7 @@ static bool amdgpu_ras_aca_is_supported(struct amdgpu_device *adev)
 
 	switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
 	case IP_VERSION(13, 0, 6):
+	case IP_VERSION(13, 0, 12):
 	case IP_VERSION(13, 0, 14):
 		ret = true;
 		break;
@@ -2945,13 +2946,7 @@ int amdgpu_ras_save_bad_pages(struct amdgpu_device *adev,
 	mutex_lock(&con->recovery_lock);
 	control = &con->eeprom_control;
 	data = con->eh_data;
-	bad_page_num = control->ras_num_recs;
-	/* one record on eeprom stands for all pages in one memory row
-	 * in this mode
-	 */
-	if (control->rec_type == AMDGPU_RAS_EEPROM_REC_MCA)
-		bad_page_num = control->ras_num_recs * adev->umc.retire_unit;
-
+	bad_page_num = control->ras_num_bad_pages;
 	save_count = data->count - bad_page_num;
 	mutex_unlock(&con->recovery_lock);
 
@@ -3017,9 +3012,20 @@ static int amdgpu_ras_load_bad_pages(struct amdgpu_device *adev)
 				control->rec_type = AMDGPU_RAS_EEPROM_REC_MCA;
 		}
 
+		ret = amdgpu_ras_eeprom_check(control);
+		if (ret)
+			goto out;
+
+		/* HW not usable */
+		if (amdgpu_ras_is_rma(adev)) {
+			ret = -EHWPOISON;
+			goto out;
+		}
+
 		ret = amdgpu_ras_add_bad_pages(adev, bps, control->ras_num_recs, true);
 	}
 
+out:
 	kfree(bps);
 	return ret;
 }
@@ -3418,10 +3424,6 @@ int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 	if (ret)
 		return ret;
 
-	/* HW not usable */
-	if (amdgpu_ras_is_rma(adev))
-		return -EHWPOISON;
-
 	if (!adev->umc.ras || !adev->umc.ras->convert_ras_err_addr)
 		control->rec_type = AMDGPU_RAS_EEPROM_REC_PA;
 
@@ -3436,7 +3438,7 @@ int amdgpu_ras_init_badpage_info(struct amdgpu_device *adev)
 			return ret;
 
 		amdgpu_dpm_send_hbm_bad_pages_num(
-			adev, control->ras_num_recs);
+			adev, control->ras_num_bad_pages);
 
 		if (con->update_channel_flag == true) {
 			amdgpu_dpm_send_hbm_bad_channel_flag(
@@ -3582,6 +3584,7 @@ static bool amdgpu_ras_asic_supported(struct amdgpu_device *adev)
 		switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
 		case IP_VERSION(13, 0, 2):
 		case IP_VERSION(13, 0, 6):
+		case IP_VERSION(13, 0, 12):
 		case IP_VERSION(13, 0, 14):
 			return true;
 		default:
@@ -3594,6 +3597,7 @@ static bool amdgpu_ras_asic_supported(struct amdgpu_device *adev)
 		case IP_VERSION(13, 0, 0):
 		case IP_VERSION(13, 0, 6):
 		case IP_VERSION(13, 0, 10):
+		case IP_VERSION(13, 0, 12):
 		case IP_VERSION(13, 0, 14):
 			return true;
 		default:
@@ -3845,6 +3849,7 @@ static void amdgpu_ras_init_reserved_vram_size(struct amdgpu_device *adev)
 	switch (amdgpu_ip_version(adev, MP0_HWIP, 0)) {
 	case IP_VERSION(13, 0, 2):
 	case IP_VERSION(13, 0, 6):
+	case IP_VERSION(13, 0, 12):
 	case IP_VERSION(13, 0, 14):
 		con->reserved_pages_in_bytes = AMDGPU_RAS_RESERVED_VRAM_SIZE;
 		break;
@@ -3921,6 +3926,7 @@ int amdgpu_ras_init(struct amdgpu_device *adev)
 			adev->nbio.ras = &nbio_v4_3_ras;
 		break;
 	case IP_VERSION(7, 9, 0):
+	case IP_VERSION(7, 9, 1):
 		if (!adev->gmc.is_app_apu)
 			adev->nbio.ras = &nbio_v7_9_ras;
 		break;

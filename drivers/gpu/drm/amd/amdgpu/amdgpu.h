@@ -847,6 +847,7 @@ struct amdgpu_mqd_prop {
 	uint64_t shadow_addr;
 	uint64_t gds_bkup_addr;
 	uint64_t csa_addr;
+	uint64_t fence_address;
 };
 
 struct amdgpu_mqd {
@@ -907,6 +908,7 @@ struct amdgpu_device {
 	bool				need_swiotlb;
 	bool				accel_working;
 	struct notifier_block		acpi_nb;
+	struct notifier_block		pm_nb;
 	struct amdgpu_i2c_chan		*i2c_bus[AMDGPU_MAX_I2C_BUS];
 	struct debugfs_blob_wrapper     debugfs_vbios_blob;
 	struct debugfs_blob_wrapper     debugfs_discovery_blob;

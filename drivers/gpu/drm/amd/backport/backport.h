@@ -137,4 +137,5 @@
 #include <kcl/backport/kcl_linux_aperture.h>
 #include <kcl/kcl_scatterlist.h>
 #include <kcl/kcl_drm_dp_mst_helper.h>
+#include <kcl/kcl_firmware.h>
 #endif /* AMDGPU_BACKPORT_H */

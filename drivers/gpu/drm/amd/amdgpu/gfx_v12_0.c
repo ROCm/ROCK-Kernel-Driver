@@ -46,6 +46,8 @@
 #include "gfx_v12_0.h"
 #include "nbif_v6_3_1.h"
 #include "mes_v12_0.h"
+#include "mes_userqueue.h"
+#include "amdgpu_userq_fence.h"
 
 #define GFX12_NUM_GFX_RINGS	1
 #define GFX12_MEC_HPD_SIZE	2048
@@ -537,6 +539,7 @@ static int gfx_v12_0_init_toc_microcode(struct amdgpu_device *adev, const char *
 	int err = 0;
 
 	err = amdgpu_ucode_request(adev, &adev->psp.toc_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_toc.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -566,6 +569,7 @@ static int gfx_v12_0_init_microcode(struct amdgpu_device *adev)
 	amdgpu_ucode_ip_version_decode(adev, GC_HWIP, ucode_prefix, sizeof(ucode_prefix));
 
 	err = amdgpu_ucode_request(adev, &adev->gfx.pfp_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_pfp.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -573,6 +577,7 @@ static int gfx_v12_0_init_microcode(struct amdgpu_device *adev)
 	amdgpu_gfx_cp_init_microcode(adev, AMDGPU_UCODE_ID_CP_RS64_PFP_P0_STACK);
 
 	err = amdgpu_ucode_request(adev, &adev->gfx.me_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_me.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -581,6 +586,7 @@ static int gfx_v12_0_init_microcode(struct amdgpu_device *adev)
 
 	if (!amdgpu_sriov_vf(adev)) {
 		err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
+					   AMDGPU_UCODE_REQUIRED,
 					   "amdgpu/%s_rlc.bin", ucode_prefix);
 		if (err)
 			goto out;
@@ -593,6 +599,7 @@ static int gfx_v12_0_init_microcode(struct amdgpu_device *adev)
 	}
 
 	err = amdgpu_ucode_request(adev, &adev->gfx.mec_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_mec.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -1364,6 +1371,10 @@ static int gfx_v12_0_sw_init(struct amdgpu_ip_block *ip_block)
 		adev->gfx.mec.num_mec = 2;
 		adev->gfx.mec.num_pipe_per_mec = 2;
 		adev->gfx.mec.num_queue_per_pipe = 4;
+#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+		adev->userq_funcs[AMDGPU_HW_IP_GFX] = &userq_mes_funcs;
+		adev->userq_funcs[AMDGPU_HW_IP_COMPUTE] = &userq_mes_funcs;
+#endif
 		break;
 	default:
 		adev->gfx.me.num_me = 1;
@@ -2961,6 +2972,14 @@ static int gfx_v12_0_gfx_mqd_init(struct amdgpu_device *adev, void *m,
 
 	/* active the queue */
 	mqd->cp_gfx_hqd_active = 1;
+
+	/* set gfx UQ items */
+	mqd->shadow_base_lo = lower_32_bits(prop->shadow_addr);
+	mqd->shadow_base_hi = upper_32_bits(prop->shadow_addr);
+	mqd->fw_work_area_base_lo = lower_32_bits(prop->csa_addr);
+	mqd->fw_work_area_base_hi = upper_32_bits(prop->csa_addr);
+	mqd->fence_address_lo = lower_32_bits(prop->fence_address);
+	mqd->fence_address_hi = upper_32_bits(prop->fence_address);
 
 	return 0;
 }
@@ -4807,13 +4826,29 @@ static int gfx_v12_0_eop_irq(struct amdgpu_device *adev,
 			     struct amdgpu_irq_src *source,
 			     struct amdgpu_iv_entry *entry)
 {
-	int i;
+#ifdef HAVE_STRUCT_XARRAY
+	u32 doorbell_offset = entry->src_data[0];
+#else
+	uint32_t mes_queue_id = entry->src_data[0];
+#endif
 	u8 me_id, pipe_id, queue_id;
 	struct amdgpu_ring *ring;
-	uint32_t mes_queue_id = entry->src_data[0];
+	int i;
 
 	DRM_DEBUG("IH: CP EOP\n");
 
+#ifdef HAVE_STRUCT_XARRAY
+	if (adev->enable_mes && doorbell_offset) {
+		struct amdgpu_userq_fence_driver *fence_drv = NULL;
+		struct xarray *xa = &adev->userq_xa;
+		unsigned long flags;
+
+		xa_lock_irqsave(xa, flags);
+		fence_drv = xa_load(xa, doorbell_offset);
+		if (fence_drv)
+			amdgpu_userq_fence_driver_process(fence_drv);
+		xa_unlock_irqrestore(xa, flags);
+#else
 	if (adev->enable_mes && (mes_queue_id & AMDGPU_FENCE_MES_QUEUE_FLAG)) {
 		struct amdgpu_mes_queue *queue;
 
@@ -4826,6 +4861,7 @@ static int gfx_v12_0_eop_irq(struct amdgpu_device *adev,
 			amdgpu_fence_process(queue->ring);
 		}
 		spin_unlock(&adev->mes.queue_id_lock);
+#endif
 	} else {
 		me_id = (entry->ring_id & 0x0c) >> 2;
 		pipe_id = (entry->ring_id & 0x03) >> 0;

@@ -13,6 +13,7 @@ AC_DEFUN([AC_KERNEL_SINGLE_TARGET_CFLAGS], [
 			     -e "s|-I\([[[a-z]]]*\)|-I${LINUX_OBJ}/\1|g" \
 			     -e "s|-include \([[[a-z]]]*\)|-include ${LINUX_OBJ}/\1|g" \
 			     -e "s|$PWD|\${PWD}|g")
+		CFLAGS=$(echo $CFLAGS | sed -E 's/-W(array-bounds|error=array-bounds|unused-variable|error=unused-variable|unused-.*-variable|error=unused-.*-variable)( |$)//g')
 
 		CPPFLAGS=$(echo $CFLAGS | \
 			   cut -d ';' -f 1 | \

@@ -42,6 +42,7 @@
 #include "sdma_common.h"
 #include "sdma_v7_0.h"
 #include "v12_structs.h"
+#include "mes_userqueue.h"
 
 MODULE_FIRMWARE("amdgpu/sdma_7_0_0.bin");
 MODULE_FIRMWARE("amdgpu/sdma_7_0_1.bin");
@@ -887,6 +888,9 @@ static int sdma_v7_0_mqd_init(struct amdgpu_device *adev, void *mqd,
 	m->sdmax_rlcx_rb_aql_cntl = 0x4000;	//regSDMA0_QUEUE0_RB_AQL_CNTL_DEFAULT;
 	m->sdmax_rlcx_dummy_reg = 0xf;	//regSDMA0_QUEUE0_DUMMY_REG_DEFAULT;
 
+	m->sdmax_rlcx_csa_addr_lo = lower_32_bits(prop->csa_addr);
+	m->sdmax_rlcx_csa_addr_hi = upper_32_bits(prop->csa_addr);
+
 	return 0;
 }
 
@@ -1322,6 +1326,11 @@ static int sdma_v7_0_sw_init(struct amdgpu_ip_block *ip_block)
 		adev->sdma.ip_dump = ptr;
 	else
 		DRM_ERROR("Failed to allocated memory for SDMA IP Dump\n");
+
+#ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
+	adev->userq_funcs[AMDGPU_HW_IP_DMA] = &userq_mes_funcs;
+#endif
+
 
 	return r;
 }

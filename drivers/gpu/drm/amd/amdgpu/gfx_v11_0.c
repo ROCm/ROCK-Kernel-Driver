@@ -50,7 +50,7 @@
 #include "gfx_v11_0_3.h"
 #include "nbio_v4_3.h"
 #include "mes_v11_0.h"
-#include "mes_v11_0_userqueue.h"
+#include "mes_userqueue.h"
 #include "amdgpu_userq_fence.h"
 
 #define GFX11_NUM_GFX_RINGS		1
@@ -641,6 +641,7 @@ static int gfx_v11_0_init_toc_microcode(struct amdgpu_device *adev, const char *
 	int err = 0;
 
 	err = amdgpu_ucode_request(adev, &adev->psp.toc_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_toc.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -690,6 +691,7 @@ static int gfx_v11_0_init_microcode(struct amdgpu_device *adev)
 
 	amdgpu_ucode_ip_version_decode(adev, GC_HWIP, ucode_prefix, sizeof(ucode_prefix));
 	err = amdgpu_ucode_request(adev, &adev->gfx.pfp_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_pfp.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -707,6 +709,7 @@ static int gfx_v11_0_init_microcode(struct amdgpu_device *adev)
 	}
 
 	err = amdgpu_ucode_request(adev, &adev->gfx.me_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_me.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -722,9 +725,11 @@ static int gfx_v11_0_init_microcode(struct amdgpu_device *adev)
 		if (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(11, 0, 0) &&
 		    adev->pdev->revision == 0xCE)
 			err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
+						   AMDGPU_UCODE_REQUIRED,
 						   "amdgpu/gc_11_0_0_rlc_1.bin");
 		else
 			err = amdgpu_ucode_request(adev, &adev->gfx.rlc_fw,
+						   AMDGPU_UCODE_REQUIRED,
 						   "amdgpu/%s_rlc.bin", ucode_prefix);
 		if (err)
 			goto out;
@@ -737,6 +742,7 @@ static int gfx_v11_0_init_microcode(struct amdgpu_device *adev)
 	}
 
 	err = amdgpu_ucode_request(adev, &adev->gfx.mec_fw,
+				   AMDGPU_UCODE_REQUIRED,
 				   "amdgpu/%s_mec.bin", ucode_prefix);
 	if (err)
 		goto out;
@@ -1566,8 +1572,8 @@ static int gfx_v11_0_sw_init(struct amdgpu_ip_block *ip_block)
 		adev->gfx.mec.num_pipe_per_mec = 4;
 		adev->gfx.mec.num_queue_per_pipe = 4;
 #ifdef CONFIG_DRM_AMDGPU_NAVI3X_USERQ
-		adev->userq_funcs[AMDGPU_HW_IP_GFX] = &userq_mes_v11_0_funcs;
-		adev->userq_funcs[AMDGPU_HW_IP_COMPUTE] = &userq_mes_v11_0_funcs;
+		adev->userq_funcs[AMDGPU_HW_IP_GFX] = &userq_mes_funcs;
+		adev->userq_funcs[AMDGPU_HW_IP_COMPUTE] = &userq_mes_funcs;
 #endif
 		break;
 	case IP_VERSION(11, 0, 1):
@@ -1582,8 +1588,8 @@ static int gfx_v11_0_sw_init(struct amdgpu_ip_block *ip_block)
 		adev->gfx.mec.num_pipe_per_mec = 4;
 		adev->gfx.mec.num_queue_per_pipe = 4;
 #ifdef CONFIG_DRM_AMD_USERQ_GFX
-		adev->userq_funcs[AMDGPU_HW_IP_GFX] = &userq_mes_v11_0_funcs;
-		adev->userq_funcs[AMDGPU_HW_IP_COMPUTE] = &userq_mes_v11_0_funcs;
+		adev->userq_funcs[AMDGPU_HW_IP_GFX] = &userq_mes_funcs;
+		adev->userq_funcs[AMDGPU_HW_IP_COMPUTE] = &userq_mes_funcs;
 #endif
 		break;
 	default:
@@ -4058,6 +4064,8 @@ static int gfx_v11_0_gfx_mqd_init(struct amdgpu_device *adev, void *m,
 	mqd->gds_bkup_base_hi = upper_32_bits(prop->gds_bkup_addr);
 	mqd->fw_work_area_base_lo = lower_32_bits(prop->csa_addr);
 	mqd->fw_work_area_base_hi = upper_32_bits(prop->csa_addr);
+	mqd->fence_address_lo = lower_32_bits(prop->fence_address);
+	mqd->fence_address_hi = upper_32_bits(prop->fence_address);
 
 	return 0;
 }
