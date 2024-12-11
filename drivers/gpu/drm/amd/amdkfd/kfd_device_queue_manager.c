@@ -239,7 +239,7 @@ static int add_queue_mes(struct device_queue_manager *dqm, struct queue *q,
 				&pdd->proc_ctx_bo,
 				&pdd->proc_ctx_gpu_addr,
 				&pdd->proc_ctx_cpu_ptr,
-				false);
+				false, true);
 		if (r) {
 			dev_err(adev->dev,
 				"failed to allocate process context bo\n");
