@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Advanced Micro Devices, Inc.
+ * Copyright 2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,14 +21,17 @@
  *
  */
 
-#ifndef __NBIO_V6_3_1_H__
-#define __NBIO_V6_3_1_H__
+#ifndef __VCN_v5_0_1_H__
+#define __VCN_v5_0_1_H__
 
-#include "soc15_common.h"
+#define VCN_VID_SOC_ADDRESS                        0x1FC00
+#define VCN_AON_SOC_ADDRESS                        0x1F800
+#define VCN1_VID_SOC_ADDRESS                       0x48300
+#define VCN1_AON_SOC_ADDRESS                       0x48000
 
-extern const struct nbio_hdp_flush_reg nbif_v6_3_1_hdp_flush_reg;
-extern const struct amdgpu_nbio_funcs nbif_v6_3_1_funcs;
-extern const struct amdgpu_nbio_funcs nbif_v6_3_1_sriov_funcs;
-extern struct amdgpu_nbio_ras nbif_v6_3_1_ras;
+#define VCN_VID_IP_ADDRESS                         0x0
+#define VCN_AON_IP_ADDRESS                         0x30000
 
-#endif
+extern const struct amdgpu_ip_block_version vcn_v5_0_1_ip_block;
+
+#endif /* __VCN_v5_0_1_H__ */

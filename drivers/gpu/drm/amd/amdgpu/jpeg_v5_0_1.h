@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Advanced Micro Devices, Inc.
+ * Copyright 2024 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,14 +21,9 @@
  *
  */
 
-#ifndef __NBIO_V6_3_1_H__
-#define __NBIO_V6_3_1_H__
+#ifndef __JPEG_V5_0_1_H__
+#define __JPEG_V5_0_1_H__
 
-#include "soc15_common.h"
+extern const struct amdgpu_ip_block_version jpeg_v5_0_1_ip_block;
 
-extern const struct nbio_hdp_flush_reg nbif_v6_3_1_hdp_flush_reg;
-extern const struct amdgpu_nbio_funcs nbif_v6_3_1_funcs;
-extern const struct amdgpu_nbio_funcs nbif_v6_3_1_sriov_funcs;
-extern struct amdgpu_nbio_ras nbif_v6_3_1_ras;
-
-#endif
+#endif /* __JPEG_V5_0_0_H__ */

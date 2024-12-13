@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.312"
+#define DC_VER "3.2.313"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -1530,6 +1530,7 @@ struct dc_surface_update {
 	const struct dc_cm2_parameters *cm2_params;
 	const struct dc_csc_transform *cursor_csc_color_matrix;
 	unsigned int sdr_white_level_nits;
+	struct dc_bias_and_scale bias_and_scale;
 };
 
 /*
