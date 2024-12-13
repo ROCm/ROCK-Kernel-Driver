@@ -2622,6 +2622,7 @@ static const struct drm_crtc_helper_funcs dce_v8_0_crtc_helper_funcs = {
 #endif
 };
 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 static void dce_v8_0_panic_flush(struct drm_plane *plane)
 {
 	struct drm_framebuffer *fb;
@@ -2646,6 +2647,7 @@ static const struct drm_plane_helper_funcs dce_v8_0_drm_primary_plane_helper_fun
 	.get_scanout_buffer = amdgpu_display_get_scanout_buffer,
 	.panic_flush = dce_v8_0_panic_flush,
 };
+#endif
 
 static int dce_v8_0_crtc_init(struct amdgpu_device *adev, int index)
 {
@@ -2674,7 +2676,9 @@ static int dce_v8_0_crtc_init(struct amdgpu_device *adev, int index)
 	amdgpu_crtc->encoder = NULL;
 	amdgpu_crtc->connector = NULL;
 	drm_crtc_helper_add(&amdgpu_crtc->base, &dce_v8_0_crtc_helper_funcs);
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 	drm_plane_helper_add(amdgpu_crtc->base.primary, &dce_v8_0_drm_primary_plane_helper_funcs);
+#endif
 
 	return 0;
 }

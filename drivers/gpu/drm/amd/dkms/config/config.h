@@ -1053,6 +1053,9 @@
    arg */
 #define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_ATOMIC_CHECK_DRM_ATOMIC_STATE_PARAMS 1
 
+/* struct drm_plane_helper_funcs->get_scanout_buffer is available */
+#define HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER 1
+
 /* ide->idr_base is available */
 #define HAVE_STRUCT_IDE_IDR_BASE 1
 

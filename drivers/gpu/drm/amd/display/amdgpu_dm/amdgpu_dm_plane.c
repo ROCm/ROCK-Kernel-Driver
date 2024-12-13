@@ -1520,6 +1520,7 @@ static void amdgpu_dm_plane_atomic_async_update(struct drm_plane *plane,
 	amdgpu_dm_plane_handle_cursor_update(plane, old_state);
 }
 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 static void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
 {
 	struct dm_plane_state *dm_plane_state = to_dm_plane_state(plane->state);
@@ -1533,6 +1534,7 @@ static void amdgpu_dm_plane_panic_flush(struct drm_plane *plane)
 
 	dc_plane_force_update_for_panic(dc_plane_state, fb->modifier ? true : false);
 }
+#endif
 
 static const struct drm_plane_helper_funcs dm_plane_helper_funcs = {
 	.prepare_fb = amdgpu_dm_plane_helper_prepare_fb,
@@ -1548,8 +1550,10 @@ static const struct drm_plane_helper_funcs dm_primary_plane_helper_funcs = {
 	.atomic_check = amdgpu_dm_plane_atomic_check,
 	.atomic_async_check = amdgpu_dm_plane_atomic_async_check,
 	.atomic_async_update = amdgpu_dm_plane_atomic_async_update,
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 	.get_scanout_buffer = amdgpu_display_get_scanout_buffer,
 	.panic_flush = amdgpu_dm_plane_panic_flush,
+#endif
 };
 
 static void amdgpu_dm_plane_drm_plane_reset(struct drm_plane *plane)

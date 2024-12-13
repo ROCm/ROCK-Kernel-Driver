@@ -51,7 +51,9 @@ amdgpu_lookup_format_info(u32 format, uint64_t modifier);
 int amdgpu_display_suspend_helper(struct amdgpu_device *adev);
 int amdgpu_display_resume_helper(struct amdgpu_device *adev);
 
+#ifdef HAVE_STRUCT_DRM_PLANE_HELPER_FUNCS_GET_SCANOUT_BUFFER
 int amdgpu_display_get_scanout_buffer(struct drm_plane *plane,
 				      struct drm_scanout_buffer *sb);
+#endif
 
 #endif
