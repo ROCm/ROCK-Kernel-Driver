@@ -1149,6 +1149,8 @@ struct replay_settings {
 	uint16_t low_rr_full_screen_video_pseudo_vtotal;
 	/* Replay last pseudo vtotal set to DMUB */
 	uint16_t last_pseudo_vtotal;
+	/* Replay desync error */
+	uint32_t replay_desync_error_fail_count;
 };
 
 /* To split out "global" and "per-panel" config settings.
