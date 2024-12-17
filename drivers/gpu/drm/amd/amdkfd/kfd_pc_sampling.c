@@ -285,12 +285,6 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 		return -EFAULT;
 	}
 
-	if (user_info.flags & KFD_IOCTL_PCS_FLAG_POWER_OF_2 &&
-		user_info.interval & (user_info.interval - 1)) {
-		pr_debug("Sampling interval's power is unmatched!");
-		return -EINVAL;
-	}
-
 	for (i = 0; i < ARRAY_SIZE(supported_formats); i++) {
 		if (KFD_GC_VERSION(pdd->dev) == supported_formats[i].ip_version
 			&& user_info.method == supported_formats[i].sample_info->method
@@ -306,6 +300,12 @@ static int kfd_pc_sample_create(struct kfd_process_device *pdd,
 	if (!supported_format) {
 		pr_debug("Sampling format is not supported!");
 		return -EOPNOTSUPP;
+	}
+
+	if (supported_format->flags == KFD_IOCTL_PCS_FLAG_POWER_OF_2 &&
+		user_info.interval & (user_info.interval - 1)) {
+		pr_debug("Sampling interval's power is unmatched!");
+		return -EINVAL;
 	}
 
 	mutex_lock(&pdd->dev->pcs_data.mutex);
