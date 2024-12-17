@@ -1,230 +1,40 @@
-ifeq ($(CC), gcc)
-GCCMAJ=$(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
-GCCMIN=$(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
-GCCPAT=$(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
-# CONFIG_GCC_VERSION returns x.xx.xx as the version format
-GCCSTR=$(shell printf "%d%02d%02d" $(GCCMAJ) $(GCCMIN) $(GCCPAT))
-
-KERNEL_MAJ=$(VERSION)
-KERNEL_PATCHLEVEL=$(PATCHLEVEL)
-KERNEL_SUBLEVEL=$(SUBLEVEL)
-KERNEL_VER=$(shell printf "%d%02d%02d" $(KERNEL_MAJ) $(KERNEL_PATCHLEVEL) $(KERNEL_SUBLEVEL))
-
-kernel-version = $(shell [ $(KERNEL_VER)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
-
-ifdef CONFIG_CC_IS_GCC
-ifeq ($(shell [ $(CONFIG_GCC_VERSION) -ne $(GCCSTR) ] && echo y), y)
-$(warning "Local GCC version $(GCCSTR) does not match kernel compiler GCC version $(CONFIG_GCC_VERSION)")
-$(warning "This may cause unexpected and hard-to-isolate compiler-related issues")
-endif
+ifneq ($(KERNELRELEASE),)
+include $(src)/amd/dkms/Kbuild
 else
-export CONFIG_CC_IS_GCC=y
-export CONFIG_GCC_VERSION=$(GCCSTR)
-$(warning "CONFIG_CC_IS_GCC is not defined. Let's export it with version $(CONFIG_GCC_VERSION)")
+KERNELVER := $(shell uname -r)
+kernel_build_dir := /lib/modules/$(KERNELVER)/build
+module_src_dir := $(CURDIR)
+module_build_dir := $(shell mktemp -ut amd.XXXXXXXX)
+module_build_flags :=
+num_cpu_cores := $(shell which nproc > /dev/null && nproc || echo "1")
+Q := @
+
+ifeq ($(wildcard $(kernel_build_dir)/include/config/auto.conf),)
+$(error "invalid kernel obj dir, is kernel-devel installed?")
 endif
 
+.PHONY: modules pre-build clean
+
+include $(kernel_build_dir)/include/config/auto.conf
+
+ifneq ($(CONFIG_CC_IS_CLANG),)
+module_build_flags += CC=clang
+endif
+ifneq ($(CONFIG_LD_IS_LLD),)
+module_build_flags += LD=ld.lld
 endif
 
-include  $(src)/amd/dkms/Makefile.compiler
+modules:pre-build
+	$(Q)$(shell cat $(module_build_dir)/.env) make -j$(num_cpu_cores) \
+		TTM_NAME=amdttm \
+		SCHED_NAME=amd-sched \
+		-C $(kernel_build_dir) \
+		M=$(module_build_dir) $(module_build_flags)
+	$(Q)amd/dkms/post-build.sh $(module_build_dir)
 
-# gcc 4.8.5 is too old for kernel >= 5.4, which will cause the compile failure.
-ifneq ($(call gcc-min-version, 40805), y)
-ifeq ($(call kernel-version, -ge, 0504, y), y)
-$(error "The GCC is too old for this kernel, please update the GCC to higher than 9.3")
+pre-build:
+	$(Q)amd/dkms/pre-build.sh $(KERNELVER) $(module_src_dir) $(module_build_dir)
+
+clean:
+	$(Q)make -C $(kernel_build_dir) M=$(module_src_dir) clean
 endif
-endif
-
-ifndef CONFIG_DRM
-$(error CONFIG_DRM disabled, exit...)
-endif
-
-ifeq (y,$(CONFIG_DRM_AMDGPU))
-$(error DRM_AMDGPU is built-in, exit...)
-endif
-
-ifndef CONFIG_KALLSYMS
-$(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
-endif
-
-_is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
-
-ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ_BUG),y)
-$(error dma_resv->seq is missing. exit...)
-endif
-
-ifeq ($(call _is_kcl_macro_defined,HAVE_RESERVATION_WW_CLASS_BUG),y)
-$(error reservation_ww_class is missing. exit...)
-endif
-
-DRM_VER=$(shell sed -n 's/^RHEL_DRM_VERSION = \(.*\)/\1/p' $(srctree)/Makefile)
-DRM_PATCH=$(shell sed -n 's/^RHEL_DRM_PATCHLEVEL = \(.*\)/\1/p' $(srctree)/Makefile)
-ifeq ($(DRM_VER),)
-DRM_VER = $(VERSION)
-DRM_PATCH = $(PATCHLEVEL)
-endif
-
-subdir-ccflags-y += \
-	-DDRM_VER=$(DRM_VER) \
-	-DDRM_PATCH=$(DRM_PATCH) \
-	-DDRM_SUB="0"
-
-define get_rhel_version
-printf "#include <linux/version.h>\n$(1)" | $(CC) $(LINUXINCLUDE) -E -x c - | tail -n 1 | grep -v $(1)
-endef
-RHEL_MAJOR := $(shell $(call get_rhel_version,RHEL_MAJOR))
-RHEL_MINOR := $(shell $(call get_rhel_version,RHEL_MINOR))
-
-ifneq (,$(RHEL_MAJOR))
-OS_NAME = "rhel"
-OS_VERSION = "$(RHEL_MAJOR).$(RHEL_MINOR)"
-else ifneq (,$(wildcard /etc/os-release))
-OS_NAME = "$(shell sed -n 's/^ID=\(.*\)/\1/p' /etc/os-release | tr -d '\"')"
-# On CentOS/RHEL, users could have installed a kernel not distributed from RHEL
-ifeq ("centos",$(OS_NAME))
-OS_NAME="custom-rhel"
-else ifeq ("rhel",$(OS_NAME))
-OS_NAME="custom-rhel"
-else ifeq ("linuxmint",$(OS_NAME))
-OS_NAME="ubuntu"
-endif
-OS_VERSION = $(shell sed -n 's/^VERSION_ID=\(.*\)/\1/p' /etc/os-release)
-else
-OS_NAME = "unknown"
-OS_VERSION = "0.0"
-endif
-
-OS_VERSION_STR = $(subst .,_,$(OS_VERSION))
-
-ifeq ("ubuntu",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_UBUNTU
-else ifeq ("rhel",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_RHEL
-else ifeq ("steamos",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_STEAMOS
-else ifeq ("sled",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_SLE
-else ifeq ("sles",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_SLE
-else ifeq ("amzn",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_AMZ
-else ifeq ("debian",$(OS_NAME))
-subdir-ccflags-y += -DOS_NAME_DEBIAN
-else
-subdir-ccflags-y += -DOS_NAME_UNKNOWN
-endif
-
-subdir-ccflags-y += \
-	-DOS_VERSION_MAJOR=$(shell echo $(OS_VERSION).0 | cut -d. -f1) \
-	-DOS_VERSION_MINOR=$(shell echo $(OS_VERSION).0 | cut -d. -f2)
-
-ifeq ($(OS_NAME),"opensuse-leap")
-subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
-endif
-
-ifeq ($(OS_NAME),"sled")
-subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
-endif
-
-ifeq ($(OS_NAME),"sles")
-subdir-ccflags-y += -DOS_NAME_SUSE_$(OS_VERSION_STR)
-endif
-
-ifeq ($(OS_NAME),"ubuntu")
-OS_BUILD_NUM = $(shell echo $(KERNELRELEASE) | cut -d '-' -f 2)
-subdir-ccflags-y += -DUBUNTU_BUILD_NUM=$(OS_BUILD_NUM)
-OS_OEM = "$(shell echo $(KERNELRELEASE) | cut -d '-' -f 3)"
-ifeq ($(OS_OEM),"oem")
-subdir-ccflags-y += -DOS_NAME_UBUNTU_OEM
-endif
-subdir-ccflags-y += -DOS_NAME_UBUNTU_$(OS_VERSION_STR)
-endif
-
-ifeq ($(OS_NAME),"rhel")
-subdir-ccflags-y += -DOS_NAME_RHEL_$(OS_VERSION_STR)
-
-ifeq ($(RHEL_MAJOR),7)
-subdir-ccflags-y += -DOS_NAME_RHEL_7_X \
-	-include /usr/src/kernels/$(KERNELRELEASE)/include/drm/drm_backport.h
-else ifeq ($(RHEL_MAJOR),8)
-subdir-ccflags-y += -DOS_NAME_RHEL_8_X
-endif
-endif
-
-export OS_NAME OS_VERSION
-
-_KCL_LINUXINCLUDE=$(subst -I ,-I,$(strip $(LINUXINCLUDE)))
-LINUX_SRCTREE_INCLUDE := \
-	$(filter-out -I%/uapi "-include %/kconfig.h",$(_KCL_LINUXINCLUDE))
-USER_INCLUDE := $(filter-out $(LINUX_SRCTREE_INCLUDE), $(_KCL_LINUXINCLUDE))
-
-LINUXINCLUDE := \
-	-I$(src)/include \
-	-I$(src)/include/kcl/header \
-	-include $(src)/include/kcl/kcl_version.h \
-	-include $(src)/include/rename_symbol.h \
-	-include $(src)/amd/dkms/config/config.h \
-	$(LINUX_SRCTREE_INCLUDE) \
-	-I$(src)/include/uapi \
-	$(USER_INCLUDE)
-
-export CONFIG_HSA_AMD=y
-export CONFIG_DRM_TTM=m
-export CONFIG_DRM_TTM_DMA_PAGE_POOL=y
-export CONFIG_DRM_AMDGPU=m
-export CONFIG_DRM_SCHED=m
-export CONFIG_DRM_AMDGPU_CIK=y
-export CONFIG_DRM_AMDGPU_SI=y
-export CONFIG_DRM_AMDGPU_USERPTR=y
-export CONFIG_DRM_AMD_DC=y
-
-subdir-ccflags-y += -DCONFIG_HSA_AMD
-subdir-ccflags-y += -DCONFIG_DRM_TTM_DMA_PAGE_POOL
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_CIK
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_SI
-subdir-ccflags-y += -DCONFIG_DRM_AMDGPU_USERPTR
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC
-subdir-ccflags-y += -Wno-error
-
-ifeq ($(call _is_kcl_macro_defined,HAVE_AMDKCL_HMM_MIRROR_ENABLED),y)
-ifdef CONFIG_DEVICE_PRIVATE
-export CONFIG_HSA_AMD_SVM=y
-subdir-ccflags-y += -DCONFIG_HSA_AMD_SVM
-endif
-endif
-
-export CONFIG_DRM_AMD_DC_HDCP=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_HDCP
-
-ifeq (y,$(CONFIG_PCI_P2PDMA))
-  ifeq (y,$(CONFIG_DMABUF_MOVENOTIFY))
-    export CONFIG_HSA_AMD_P2P=y
-    subdir-ccflags-y += -DCONFIG_HSA_AMD_P2P
-  endif
-endif
-
-# Trying to enable DCN2/3 with core2 optimizations will result in
-# older versions of GCC hanging during building/installing. Check
-# if the compiler is using core2 optimizations and only build DCN2/3
-# if core2 isn't in the compiler flags
-ifndef CONFIG_ARM64
-ifeq ($(filter %core2, $(KBUILD_CFLAGS)),)
-export CONFIG_DRM_AMD_DC_FP=y
-subdir-ccflags-y += -DCONFIG_DRM_AMD_DC_FP
-endif
-endif
-
-# v5.17-rc4-3-ge8c07082a810 (Kbuild: move to -std=gnu11)
-# Upstream patches now uses gnu11/gnu99 as the default C standard version.
-# However, gcc in legacy OS still uses gnu89, which will introduce a standard
-# build gap leading to a DKMS build failure possibly. So add below check to
-# move gnu89 to gnu99 if KBUILD_CFLAGS still uses gnu89.
-ifeq ($(findstring gnu89,$(KBUILD_CFLAGS)),gnu89)
-KBUILD_CFLAGS := $(subst gnu89,gnu99,$(KBUILD_CFLAGS))
-$(warning "The local C standard(gnu89) doesn't match kernel default C standard(gnu11/gnu99)")
-endif
-
-include  $(src)/amd/dkms/Makefile.drm_ttm_helper
-
-include  $(src)/amd/dkms/Makefile.drm_buddy
-
-obj-m += scheduler/ amd/amdgpu/ amd/amdxcp/ ttm/ amd/amdkcl/

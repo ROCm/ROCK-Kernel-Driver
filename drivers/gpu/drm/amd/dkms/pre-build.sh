@@ -6,9 +6,7 @@ SRC="amd/dkms"
 
 KERNELVER=$1
 DKMS_TREE=$2
-MODULE=$3
-MODULE_VERSION=$4
-MODULE_BUILD_DIR=$5
+MODULE_BUILD_DIR=$3
 KERNELVER_BASE=${KERNELVER%%-*}
 
 version_lt () {
@@ -58,14 +56,15 @@ for config in $AMDGPU_CONFIG $TTM_CONFIG $SCHED_CONFIG; do
 	for file in $(grep -rl $config ./); do
 		sed -i "s/\<$config\>/&_AMDKCL/" $file
 	done
-	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Makefile
+	sed -i "/${config}$/s/$/_AMDKCL/" amd/dkms/Kbuild
 done
 
 export KERNELVER
-ln -s $DKMS_TREE/$MODULE/$MODULE_VERSION/build $MODULE_BUILD_DIR
+ln -s $DKMS_TREE $MODULE_BUILD_DIR
 
 # Enable gcc-toolset for kernels that are built with non-default compiler
-if [[ -d /opt/rh ]]; then
+# perform this check only when permissions allow
+if [[ -d /opt/rh && `id -u` -eq 0 ]]; then
 	for f in $(find /opt/rh -type f -a -name gcc); do
 		[[ -f /boot/config-$KERNELVER ]] || continue
 		config_gcc_version=$(. /boot/config-$KERNELVER && echo $CONFIG_GCC_VERSION)
