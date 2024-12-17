@@ -112,6 +112,12 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
         AC_KERNEL_CHECK_HEADERS([drm/drm_eld.h])
 
     dnl #
+    dnl # v6.9-rc2-212-ge2a1cda3e0c7
+    dnl # drm/panic: Add drm panic locking
+    dnl #
+    AC_KERNEL_CHECK_HEADERS([drm/drm_panic.h])
+
+    dnl #
     dnl # v6.9-rc6-1436-gaae4682e5d66
     dnl # drm/fbdev-generic: Convert to fbdev-ttm
     dnl #
