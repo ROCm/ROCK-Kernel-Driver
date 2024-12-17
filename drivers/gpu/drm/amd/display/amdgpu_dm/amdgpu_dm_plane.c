@@ -309,14 +309,14 @@ static void
 fill_dcc_params_from_flags(const struct amdgpu_framebuffer *afb,
                           struct dc_plane_dcc_param *dcc,
                           struct dc_plane_address *address,
-                          const uint64_t flags, bool force_disable_dcc)
+                          const uint64_t flags)
 {
     uint64_t dcc_address;
     uint64_t plane_address = afb->address + afb->base.offsets[0];
     uint32_t offset = AMDGPU_TILING_GET(flags, DCC_OFFSET_256B);
     uint32_t i64b = AMDGPU_TILING_GET(flags, DCC_INDEPENDENT_64B) != 0;
 
-    if (!offset || force_disable_dcc)
+    if (!offset)
         return;
 
     dcc->enable = 1;
@@ -342,8 +342,7 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 				      union dc_tiling_info *tiling_info,
 				      struct dc_plane_dcc_param *dcc,
 				      struct dc_plane_address *address,
-				      uint64_t tiling_flags,
-				      bool force_disable_dcc)
+				      uint64_t tiling_flags)
 {
 	int ret;
 
@@ -352,7 +351,7 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 	tiling_info->gfx9.swizzle =
 		AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
 
-	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags, force_disable_dcc);
+	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags);
 	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
 	if (ret)
 		return ret;
@@ -975,8 +974,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 #endif
 			ret = fill_gfx9_plane_attributes_from_flags(adev, afb, format, rotation,
 								    plane_size, tiling_info, dcc,
-								    address, tiling_flags,
-								    force_disable_dcc);
+								    address, tiling_flags);
 			if (ret)
 				return ret;
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
