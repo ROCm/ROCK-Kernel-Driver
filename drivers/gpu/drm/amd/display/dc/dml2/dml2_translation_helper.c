@@ -371,7 +371,7 @@ void dml2_init_soc_states(struct dml2_context *dml2, const struct dc *in_dc,
 		p->in_states->state_array[0].urgent_latency_vm_data_only_us = 0;
 		p->in_states->state_array[0].writeback_latency_us = 12;
 		p->in_states->state_array[0].urgent_latency_adjustment_fabric_clock_component_us = 1;
-		p->in_states->state_array[0].urgent_latency_adjustment_fabric_clock_reference_mhz = 3000;
+		p->in_states->state_array[0].urgent_latency_adjustment_fabric_clock_reference_mhz = 1000;
 		p->in_states->state_array[0].sr_exit_z8_time_us = 0;
 		p->in_states->state_array[0].sr_enter_plus_exit_z8_time_us = 0;
 		p->in_states->state_array[0].dram_clock_change_latency_us = 400;
