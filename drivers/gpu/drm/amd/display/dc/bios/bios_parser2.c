@@ -1778,12 +1778,15 @@ static enum bp_result get_firmware_info_v3_1(
 	struct dc_firmware_info *info)
 {
 	struct atom_firmware_info_v3_1 *firmware_info;
+	struct atom_firmware_info_v3_2 *firmware_info32;
 	struct atom_display_controller_info_v4_1 *dce_info = NULL;
 
 	if (!info)
 		return BP_RESULT_BADINPUT;
 
 	firmware_info = GET_IMAGE(struct atom_firmware_info_v3_1,
+			DATA_TABLES(firmwareinfo));
+	firmware_info32 = GET_IMAGE(struct atom_firmware_info_v3_2,
 			DATA_TABLES(firmwareinfo));
 
 	dce_info = GET_IMAGE(struct atom_display_controller_info_v4_1,
@@ -1817,7 +1820,15 @@ static enum bp_result get_firmware_info_v3_1(
 				bp->cmd_tbl.get_smu_clock_info(bp, SMU9_SYSPLL0_ID) * 10;
 	}
 
-	info->oem_i2c_present = false;
+	/* These fields are marked as reserved in v3_1, but they appear to be populated
+	 * properly.
+	 */
+	if (firmware_info32->board_i2c_feature_id == 0x2) {
+		info->oem_i2c_present = true;
+		info->oem_i2c_obj_id = firmware_info32->board_i2c_feature_gpio_id;
+	} else {
+		info->oem_i2c_present = false;
+	}
 
 	return BP_RESULT_OK;
 }
