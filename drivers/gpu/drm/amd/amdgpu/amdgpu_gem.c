@@ -206,7 +206,7 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 #endif
 {
 	struct amdgpu_bo *aobj = gem_to_amdgpu_bo(gobj);
-	struct amdgpu_device *adev = amdgpu_ttm_adev(aobj->tbo.bdev);
+	struct amdgpu_device *adev;
 
 	if (aobj) {
 		if (aobj->flags & AMDGPU_GEM_CREATE_NO_EVICT) {
@@ -216,6 +216,7 @@ static void amdgpu_gem_object_free(struct drm_gem_object *gobj)
 			}
 		}
 
+		adev = amdgpu_ttm_adev(aobj->tbo.bdev);
 		if (aobj->tbo.resource && aobj->tbo.resource->mem_type == AMDGPU_PL_DGMA)
 			atomic64_sub(amdgpu_bo_size(aobj),
 				     &adev->direct_gma.vram_usage);
