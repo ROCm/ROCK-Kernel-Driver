@@ -614,9 +614,11 @@ void amdgpu_fence_driver_hw_fini(struct amdgpu_device *adev)
 
 		if (!drm_dev_is_unplugged(adev_to_drm(adev)) &&
 		    ring->fence_drv.irq_src &&
-		    amdgpu_fence_need_ring_interrupt_restore(ring))
+		    ring->fence_drv.irq_enabled) {
 			amdgpu_irq_put(adev, ring->fence_drv.irq_src,
 				       ring->fence_drv.irq_type);
+		        ring->fence_drv.irq_enabled = false;
+		}
 
 		del_timer_sync(&ring->fence_drv.fallback_timer);
 	}
@@ -691,9 +693,12 @@ void amdgpu_fence_driver_hw_init(struct amdgpu_device *adev)
 
 		/* enable the interrupt */
 		if (ring->fence_drv.irq_src &&
-		    amdgpu_fence_need_ring_interrupt_restore(ring))
+		    !ring->fence_drv.irq_enabled &&
+		    amdgpu_fence_need_ring_interrupt_restore(ring)) {
 			amdgpu_irq_get(adev, ring->fence_drv.irq_src,
 				       ring->fence_drv.irq_type);
+		        ring->fence_drv.irq_enabled = true;
+		}
 	}
 }
 

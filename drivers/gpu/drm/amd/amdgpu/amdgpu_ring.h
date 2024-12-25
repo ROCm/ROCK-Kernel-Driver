@@ -118,6 +118,7 @@ struct amdgpu_fence_driver {
 	uint32_t			sync_seq;
 	atomic_t			last_seq;
 	bool				initialized;
+	bool				irq_enabled;
 	struct amdgpu_irq_src		*irq_src;
 	unsigned			irq_type;
 	struct timer_list		fallback_timer;
