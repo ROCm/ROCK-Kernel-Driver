@@ -1157,6 +1157,9 @@ struct amdgpu_device {
 	bool                            in_runpm;
 	bool                            has_pr3;
 
+	bool				sysfs_en;
+	bool				fru_sysfs_en;
+	bool				reg_state_sysfs_en;
 	bool                            ucode_sysfs_en;
 
 	struct amdgpu_fru_info		*fru_info;

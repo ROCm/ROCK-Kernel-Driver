@@ -4533,8 +4533,13 @@ fence_driver_init:
 		adev->ucode_sysfs_en = true;
 
 	r = sysfs_create_files(&adev->dev->kobj, amdgpu_dev_attributes);
-	if (r)
+	if (r) {
 		dev_err(adev->dev, "Could not create amdgpu device attr\n");
+		adev->sysfs_en = false;
+	} else {
+		adev->sysfs_en = true;
+	}
+
 #ifdef HAVE_PCI_DRIVER_DEV_GROUPS
 	r = devm_device_add_group(adev->dev, &amdgpu_board_attrs_group);
 	if (r)
@@ -4542,8 +4547,21 @@ fence_driver_init:
 			"Could not create amdgpu board attributes\n");
 #endif
 
-	amdgpu_fru_sysfs_init(adev);
-	amdgpu_reg_state_sysfs_init(adev);
+	r = amdgpu_fru_sysfs_init(adev);
+	if (r) {
+		dev_err(adev->dev, "Could not create amdgpu fru attr\n");
+		adev->fru_sysfs_en = false;
+	} else {
+		adev->fru_sysfs_en = true;
+	}
+
+	r = amdgpu_reg_state_sysfs_init(adev);
+	if (r) {
+		dev_err(adev->dev, "Could not create amdgpu reg state attr\n");
+		adev->reg_state_sysfs_en = false;
+	} else {
+		adev->reg_state_sysfs_en = true;
+	}
 
 	if (IS_ENABLED(CONFIG_PERF_EVENTS))
 		r = amdgpu_pmu_init(adev);
@@ -4666,10 +4684,12 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 		amdgpu_pm_sysfs_fini(adev);
 	if (adev->ucode_sysfs_en)
 		amdgpu_ucode_sysfs_fini(adev);
-	sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
-	amdgpu_fru_sysfs_fini(adev);
-
-	amdgpu_reg_state_sysfs_fini(adev);
+	if (adev->sysfs_en)
+		sysfs_remove_files(&adev->dev->kobj, amdgpu_dev_attributes);
+	if (adev->fru_sysfs_en)
+		amdgpu_fru_sysfs_fini(adev);
+	if (adev->reg_state_sysfs_en)
+		amdgpu_reg_state_sysfs_fini(adev);
 
 	/* disable ras feature must before hw fini */
 	amdgpu_ras_pre_fini(adev);
