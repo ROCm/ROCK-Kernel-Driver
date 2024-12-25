@@ -663,6 +663,8 @@ static void kfd_cleanup_nodes(struct kfd_dev *kfd, unsigned int num_nodes)
 
 	for (i = 0; i < num_nodes; i++) {
 		knode = kfd->nodes[i];
+		if (!knode)
+			continue;
 		device_queue_manager_uninit(knode->dqm);
 		kfd_interrupt_exit(knode);
 		kfd_topology_remove_device(knode);
@@ -954,7 +956,10 @@ void kgd2kfd_device_exit(struct kfd_dev *kfd)
 		kfd_doorbell_fini(kfd);
 		ida_destroy(&kfd->doorbell_ida);
 		kfd_gtt_sa_fini(kfd);
-		amdgpu_amdkfd_free_gtt_mem(kfd->adev, &kfd->gtt_mem);
+		if (kfd->gtt_mem) {
+			amdgpu_amdkfd_free_gtt_mem(kfd->adev, &kfd->gtt_mem);
+			kfd->gtt_mem = NULL;
+		}
 	}
 
 	kfree(kfd);
