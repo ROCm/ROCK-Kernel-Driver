@@ -14,6 +14,7 @@ $(error "invalid kernel obj dir, is kernel-devel installed?")
 endif
 
 .PHONY: modules pre-build clean
+modules:
 
 include $(kernel_build_dir)/include/config/auto.conf
 
