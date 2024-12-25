@@ -545,9 +545,6 @@
 /* drm_firmware_drivers_only() is available */
 #define HAVE_DRM_FIRMWARE_DRIVERS_ONLY 1
 
-/* drm_format_info.block_w and rm_format_info.block_h is available */
-#define HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED 1
-
 /* drm_gem_object_funcs->vmap() has 2 args */
 #define HAVE_DRM_GEM_OBJECT_FUNCS_VMAP_2ARGS 1
 
