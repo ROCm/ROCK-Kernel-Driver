@@ -17,6 +17,18 @@ endif
 
 include $(kernel_build_dir)/include/config/auto.conf
 
+ifndef CONFIG_DRM
+$(error CONFIG_DRM disabled, exit...)
+endif
+
+ifeq (y,$(CONFIG_DRM_AMDGPU_AMDKCL))
+$(error DRM_AMDGPU is built-in, exit...)
+endif
+
+ifndef CONFIG_KALLSYMS
+$(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
+endif
+
 ifneq ($(CONFIG_CC_IS_CLANG),)
 module_build_flags += CC=clang
 endif

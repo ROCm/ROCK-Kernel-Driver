@@ -34,18 +34,6 @@ $(error "The GCC is too old for this kernel, please update the GCC to higher tha
 endif
 endif
 
-ifndef CONFIG_DRM
-$(error CONFIG_DRM disabled, exit...)
-endif
-
-ifeq (y,$(CONFIG_DRM_AMDGPU))
-$(error DRM_AMDGPU is built-in, exit...)
-endif
-
-ifndef CONFIG_KALLSYMS
-$(error CONFIG_KALLSYMS disabled, kallsyms_lookup_name() is absent, exit...)
-endif
-
 _is_kcl_macro_defined=$(shell grep $1 $(src)/amd/dkms/config/config.h | grep -q "define" && echo "y" || echo "n")
 
 ifeq ($(call _is_kcl_macro_defined,HAVE_DMA_RESV_SEQ_BUG),y)
