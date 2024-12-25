@@ -422,6 +422,9 @@ bool amdgpu_device_supports_boco(struct drm_device *dev)
 {
 	struct amdgpu_device *adev = drm_to_adev(dev);
 
+	if (!IS_ENABLED(CONFIG_HOTPLUG_PCI_PCIE))
+		return false;
+
 	if (adev->has_pr3 ||
 	    ((adev->flags & AMD_IS_PX) && amdgpu_is_atpx_hybrid()))
 		return true;
@@ -5914,6 +5917,7 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	 * detected at the same time, let RAS recovery take care of it.
 	 */
 	if (amdgpu_ras_is_err_state(adev, AMDGPU_RAS_BLOCK__ANY) &&
+	    !amdgpu_sriov_vf(adev) &&
 	    reset_context->src != AMDGPU_RESET_SRC_RAS) {
 		dev_dbg(adev->dev,
 			"Gpu recovery from source: %d yielding to RAS error recovery handling",

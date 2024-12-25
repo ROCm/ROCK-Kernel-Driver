@@ -55,7 +55,7 @@ struct aux_payload;
 struct set_config_cmd_payload;
 struct dmub_notification;
 
-#define DC_VER "3.2.313"
+#define DC_VER "3.2.314"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -629,6 +629,8 @@ struct dc_clocks {
 	int bw_dispclk_khz;
 	int idle_dramclk_khz;
 	int idle_fclk_khz;
+	int subvp_prefetch_dramclk_khz;
+	int subvp_prefetch_fclk_khz;
 };
 
 struct dc_bw_validation_profile {
@@ -1059,6 +1061,7 @@ struct dc_debug_options {
 	bool dml21_force_pstate_method;
 	uint32_t dml21_force_pstate_method_values[MAX_PIPES];
 	uint32_t dml21_disable_pstate_method_mask;
+	union fw_assisted_mclk_switch_version fams_version;
 	union dmub_fams2_global_feature_config fams2_config;
 	bool enable_legacy_clock_update;
 	unsigned int force_cositing;
@@ -1074,6 +1077,7 @@ struct dc_debug_options {
 	bool skip_full_updated_if_possible;
 	unsigned int enable_oled_edp_power_up_opt;
 	bool enable_hblank_borrow;
+	bool force_subvp_df_throttle;
 };
 
 

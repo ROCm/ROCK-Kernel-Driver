@@ -470,7 +470,8 @@ out:
 }
 
 static int spm_update_dest_info(struct kfd_process_device *pdd,
-				int inst, struct kfd_ioctl_spm_args *user_spm_data)
+				int inst, struct kfd_ioctl_spm_args *user_spm_data,
+				struct kfd_ioctl_spm_args *user_spm_ptr)
 {
 	struct kfd_spm_base *spm = &(pdd->spm_cntr->spm[inst]);
 	int ret = 0;
@@ -480,8 +481,8 @@ static int spm_update_dest_info(struct kfd_process_device *pdd,
 		struct kfd_ioctl_spm_buffer_header spm_header;
 		uint64_t __user *user_address;
 
-		user_spm_data->bytes_copied += spm->size_copied;
-		user_spm_data->has_data_loss += spm->has_data_loss;
+		user_spm_ptr->bytes_copied += spm->size_copied;
+		user_spm_ptr->has_data_loss += spm->has_data_loss;
 
 		memset(&spm_header, 0, sizeof(spm_header));
 		user_address = (uint64_t *)((uint64_t)spm->ubuf.user_addr - sizeof(spm_header));
@@ -499,9 +500,6 @@ static int spm_update_dest_info(struct kfd_process_device *pdd,
 		}
 	}
 	if (user_spm_data->dest_buf) {
-		user_spm_data->bytes_copied = 0;
-		user_spm_data->has_data_loss = 0;
-
 		spm->ubuf.user_addr = (uint64_t *)user_spm_data->dest_buf;
 		spm->ubuf.ubufsize = user_spm_data->buf_size;
 		/* reserve space for kfd_ioctl_spm_buffer_header */
@@ -585,6 +583,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 
 	memcpy(&user_spm_data, user_spm_ptr, sizeof(user_spm_data));
 	user_spm_data.buf_size = ubufsize;
+
 	if (user_spm_data.timeout && spm_cntr->have_users_buf_cnt &&
 	    !READ_ONCE(spm_cntr->are_users_buf_filled)) {
 		dev_dbg(pdd->dev->adev->dev, "SPM waiting for fill awake, timeout = %d ms.",
@@ -606,6 +605,8 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 		flush_work(&pdd->spm_work);
 	}
 
+	user_spm_ptr->bytes_copied = 0;
+	user_spm_ptr->has_data_loss = 0;
 	for_each_inst(inst, pdd->dev->xcc_mask) {
 		struct kfd_spm_base *spm = &(spm_cntr->spm[inst]);
 
@@ -613,7 +614,7 @@ static int kfd_set_dest_buffer(struct kfd_process_device *pdd, struct amdgpu_dev
 			/* Get info about filled space in previous output buffer.
 			 * Setup new dest buf if provided.
 			 */
-			ret = spm_update_dest_info(pdd, inst, &user_spm_data);
+			ret = spm_update_dest_info(pdd, inst, &user_spm_data, user_spm_ptr);
 			if (ret)
 				goto out;
 		}

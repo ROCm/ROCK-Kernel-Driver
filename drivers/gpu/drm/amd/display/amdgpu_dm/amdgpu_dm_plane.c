@@ -309,14 +309,14 @@ static void
 fill_dcc_params_from_flags(const struct amdgpu_framebuffer *afb,
                           struct dc_plane_dcc_param *dcc,
                           struct dc_plane_address *address,
-                          const uint64_t flags, bool force_disable_dcc)
+                          const uint64_t flags)
 {
     uint64_t dcc_address;
     uint64_t plane_address = afb->address + afb->base.offsets[0];
     uint32_t offset = AMDGPU_TILING_GET(flags, DCC_OFFSET_256B);
     uint32_t i64b = AMDGPU_TILING_GET(flags, DCC_INDEPENDENT_64B) != 0;
 
-    if (!offset || force_disable_dcc)
+    if (!offset)
         return;
 
     dcc->enable = 1;
@@ -342,8 +342,7 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 				      union dc_tiling_info *tiling_info,
 				      struct dc_plane_dcc_param *dcc,
 				      struct dc_plane_address *address,
-				      uint64_t tiling_flags,
-				      bool force_disable_dcc)
+				      uint64_t tiling_flags)
 {
 	int ret;
 
@@ -352,7 +351,7 @@ fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
 	tiling_info->gfx9.swizzle =
 		AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
 
-	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags, force_disable_dcc);
+	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags);
 	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
 	if (ret)
 		return ret;
@@ -368,8 +367,7 @@ static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdg
 								     const struct plane_size *plane_size,
 								     union dc_tiling_info *tiling_info,
 								     struct dc_plane_dcc_param *dcc,
-								     struct dc_plane_address *address,
-								     const bool force_disable_dcc)
+								     struct dc_plane_address *address)
 {
 	const uint64_t modifier = afb->base.modifier;
 	int ret = 0;
@@ -377,7 +375,7 @@ static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdg
 	amdgpu_dm_plane_fill_gfx9_tiling_info_from_modifier(adev, tiling_info, modifier);
 	tiling_info->gfx9.swizzle = amdgpu_dm_plane_modifier_gfx9_swizzle_mode(modifier);
 
-	if (amdgpu_dm_plane_modifier_has_dcc(modifier) && !force_disable_dcc) {
+	if (amdgpu_dm_plane_modifier_has_dcc(modifier)) {
 		uint64_t dcc_address = afb->address + afb->base.offsets[1];
 		bool independent_64b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_64B, modifier);
 		bool independent_128b_blks = AMD_FMT_MOD_GET(DCC_INDEPENDENT_128B, modifier);
@@ -420,8 +418,7 @@ static int amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(struct amd
 								      const struct plane_size *plane_size,
 								      union dc_tiling_info *tiling_info,
 								      struct dc_plane_dcc_param *dcc,
-								      struct dc_plane_address *address,
-								      const bool force_disable_dcc)
+								      struct dc_plane_address *address)
 {
 	const uint64_t modifier = afb->base.modifier;
 	int ret = 0;
@@ -431,7 +428,7 @@ static int amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(struct amd
 
 	tiling_info->gfx9.swizzle = amdgpu_dm_plane_modifier_gfx9_swizzle_mode(modifier);
 
-	if (amdgpu_dm_plane_modifier_has_dcc(modifier) && !force_disable_dcc) {
+	if (amdgpu_dm_plane_modifier_has_dcc(modifier)) {
 		int max_compressed_block = AMD_FMT_MOD_GET(DCC_MAX_COMPRESSED_BLOCK, modifier);
 
 		dcc->enable = 1;
@@ -901,8 +898,7 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 			     struct plane_size *plane_size,
 			     struct dc_plane_dcc_param *dcc,
 			     struct dc_plane_address *address,
-			     bool tmz_surface,
-			     bool force_disable_dcc)
+			     bool tmz_surface)
 {
 	const struct drm_framebuffer *fb = &afb->base;
 	int ret;
@@ -962,26 +958,23 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		ret = amdgpu_dm_plane_fill_gfx12_plane_attributes_from_modifiers(adev, afb, format,
 										 rotation, plane_size,
 										 tiling_info, dcc,
-										 address,
-										 force_disable_dcc);
+										 address);
 		if (ret)
 			return ret;
 	} else if (adev->family >= AMDGPU_FAMILY_AI) {
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
 		if (afb->base.flags & DRM_MODE_FB_MODIFIERS) {
-			ret = amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
-									rotation, plane_size,
-									tiling_info, dcc,
-									address,
-									force_disable_dcc);
+		ret = amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
+										rotation, plane_size,
+										tiling_info, dcc,
+										address);
 			if (ret)
 				return ret;
 		} else {
 #endif
 			ret = fill_gfx9_plane_attributes_from_flags(adev, afb, format, rotation,
 								    plane_size, tiling_info, dcc,
-								    address, tiling_flags,
-								    force_disable_dcc);
+								    address, tiling_flags);
 			if (ret)
 				return ret;
 #ifdef HAVE_DRM_FORMAT_INFO_MODIFIER_SUPPORTED
@@ -1077,14 +1070,13 @@ static int amdgpu_dm_plane_helper_prepare_fb(struct drm_plane *plane,
 	    dm_plane_state_old->dc_state != dm_plane_state_new->dc_state) {
 		struct dc_plane_state *plane_state =
 			dm_plane_state_new->dc_state;
-		bool force_disable_dcc = !plane_state->dcc.enable;
 
 		amdgpu_dm_plane_fill_plane_buffer_attributes(
 			adev, afb, plane_state->format, plane_state->rotation,
 			afb->tiling_flags,
 			&plane_state->tiling_info, &plane_state->plane_size,
 			&plane_state->dcc, &plane_state->address,
-			afb->tmz_surface, force_disable_dcc);
+			afb->tmz_surface);
 	}
 
 	return 0;

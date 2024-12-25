@@ -2153,6 +2153,11 @@ enum dc_status dc_commit_streams(struct dc *dc, struct dc_commit_streams_params 
 		struct dc_stream_state *stream = params->streams[i];
 		struct dc_stream_status *status = dc_stream_get_status(stream);
 
+		/* revalidate streams */
+		res = dc_validate_stream(dc, stream);
+		if (res != DC_OK)
+			return res;
+
 		dc_stream_log(dc, stream);
 
 		set[i].stream = stream;
@@ -5312,11 +5317,13 @@ void dc_set_power_state(struct dc *dc, enum dc_acpi_cm_power_state power_state)
 			dc->vm_pa_config.valid) {
 			dc->hwss.init_sys_ctx(dc->hwseq, dc, &dc->vm_pa_config);
 		}
-
+		/*mark d0 last*/
+		dc->power_state = power_state;
 		break;
 	default:
 		ASSERT(dc->current_state->stream_count == 0);
-
+		/*mark d3 first*/
+		dc->power_state = power_state;
 		dc_dmub_srv_notify_fw_dc_power_state(dc->ctx->dmub_srv, power_state);
 
 		dc_state_destruct(dc->current_state);
