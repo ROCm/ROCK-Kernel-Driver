@@ -1331,6 +1331,8 @@ Out_check_own:
 	if (sched->own_submit_wq)
 		destroy_workqueue(sched->submit_wq);
 	drm_err(sched, "%s: Failed to setup GPU scheduler--out of memory\n", __func__);
+	// amdgpu_fence_driver_sw_fini() checks sched->ops for status.
+	sched->ops = NULL;
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(drm_sched_init);
@@ -1375,6 +1377,7 @@ void drm_sched_fini(struct drm_gpu_scheduler *sched)
 	sched->ready = false;
 	kfree(sched->sched_rq);
 	sched->sched_rq = NULL;
+	sched->ops = NULL;
 }
 EXPORT_SYMBOL(drm_sched_fini);
 
