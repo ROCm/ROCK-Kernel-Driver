@@ -4866,7 +4866,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 		amdgpu_virt_fini_data_exchange(adev);
 		r = amdgpu_virt_request_full_gpu(adev, false);
 		if (r)
-			return r;
+			goto error_out;
 	}
 
 	if (amdgpu_acpi_smart_shift_update(dev, AMDGPU_SS_DEV_D3))
@@ -4886,7 +4886,7 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 
 	r = amdgpu_device_evict_resources(adev);
 	if (r)
-		return r;
+		goto error_out;
 
 	amdgpu_ttm_set_buffer_funcs_status(adev, false);
 
@@ -4899,9 +4899,12 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 
 	r = amdgpu_dpm_notify_rlc_state(adev, false);
 	if (r)
-		return r;
+		goto error_out;
 
 	return 0;
+error_out:
+	adev->in_suspend = false;
+	return r;
 }
 
 /**
@@ -4963,8 +4966,10 @@ exit:
 		amdgpu_virt_release_full_gpu(adev, true);
 	}
 
-	if (r)
+	if (r) {
+		adev->in_suspend = false;
 		return r;
+	}
 
 	/* Make sure IB tests flushed */
 	flush_delayed_work(&adev->delayed_init_work);
