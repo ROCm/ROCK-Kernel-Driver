@@ -305,59 +305,6 @@ static int amdgpu_dm_plane_validate_dcc(struct amdgpu_device *adev,
 
 	return 0;
 }
-static void
-fill_dcc_params_from_flags(const struct amdgpu_framebuffer *afb,
-                          struct dc_plane_dcc_param *dcc,
-                          struct dc_plane_address *address,
-                          const uint64_t flags)
-{
-    uint64_t dcc_address;
-    uint64_t plane_address = afb->address + afb->base.offsets[0];
-    uint32_t offset = AMDGPU_TILING_GET(flags, DCC_OFFSET_256B);
-    uint32_t i64b = AMDGPU_TILING_GET(flags, DCC_INDEPENDENT_64B) != 0;
-
-    if (!offset)
-        return;
-
-    dcc->enable = 1;
-    dcc->meta_pitch = AMDGPU_TILING_GET(flags, DCC_PITCH_MAX) + 1;
-    dcc->independent_64b_blks = i64b;
-
-	if (dcc->independent_64b_blks)
-		dcc->dcc_ind_blk = hubp_ind_block_64b;
-	else
-		dcc->dcc_ind_blk = hubp_ind_block_unconstrained;
-
-    dcc_address = plane_address + (uint64_t)offset * 256;
-    address->grph.meta_addr.low_part = lower_32_bits(dcc_address);
-    address->grph.meta_addr.high_part = upper_32_bits(dcc_address);
-}
-
-static int
-fill_gfx9_plane_attributes_from_flags(struct amdgpu_device *adev,
-				      const struct amdgpu_framebuffer *afb,
-				      const enum surface_pixel_format format,
-				      const enum dc_rotation_angle rotation,
-				      const struct plane_size *plane_size,
-				      union dc_tiling_info *tiling_info,
-				      struct dc_plane_dcc_param *dcc,
-				      struct dc_plane_address *address,
-				      uint64_t tiling_flags)
-{
-	int ret;
-
-	amdgpu_dm_plane_fill_gfx9_tiling_info_from_device(adev, tiling_info);
-
-	tiling_info->gfx9.swizzle =
-		AMDGPU_TILING_GET(tiling_flags, SWIZZLE_MODE);
-
-	fill_dcc_params_from_flags(afb, dcc, address, tiling_flags);
-	ret = amdgpu_dm_plane_validate_dcc(adev, format, rotation, tiling_info, dcc, address, plane_size);
-	if (ret)
-		return ret;
-
-	return 0;
-}
 
 static int amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(struct amdgpu_device *adev,
 								     const struct amdgpu_framebuffer *afb,
@@ -962,20 +909,12 @@ int amdgpu_dm_plane_fill_plane_buffer_attributes(struct amdgpu_device *adev,
 		if (ret)
 			return ret;
 	} else if (adev->family >= AMDGPU_FAMILY_AI) {
-		if (afb->base.flags & DRM_MODE_FB_MODIFIERS) {
 		ret = amdgpu_dm_plane_fill_gfx9_plane_attributes_from_modifiers(adev, afb, format,
 										rotation, plane_size,
 										tiling_info, dcc,
 										address);
-			if (ret)
-				return ret;
-		} else {
-			ret = fill_gfx9_plane_attributes_from_flags(adev, afb, format, rotation,
-								    plane_size, tiling_info, dcc,
-								    address, tiling_flags);
-			if (ret)
-				return ret;
-		}
+		if (ret)
+			return ret;
 	} else {
 		amdgpu_dm_plane_fill_gfx8_tiling_info_from_flags(tiling_info, tiling_flags);
 	}
