@@ -164,8 +164,10 @@ int amdgpu_driver_load_kms(struct amdgpu_device *adev, unsigned long flags)
 		DRM_WARN("smart shift update failed\n");
 
 out:
-	if (r)
+	if (r) {
+		amdgpu_xcp_dev_unplug(adev);
 		amdgpu_driver_unload_kms(dev);
+	}
 
 	return r;
 }
